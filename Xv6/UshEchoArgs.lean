@@ -42,6 +42,8 @@ import Xv6.UshEchoImg
 import Xv6.ExecArgs
 import Xv6.UshMainLine
 
+noncomputable section
+
 namespace Xv6
 
 /-! ## §1 The line has no NUL -/

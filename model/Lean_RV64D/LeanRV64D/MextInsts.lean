@@ -227,7 +227,7 @@ def encdec_mul_op_backwards (arg_ : (BitVec 3)) : SailM mul_op := do
             signed_rs2 := Unsigned })
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def encdec_mul_op_forwards_matches (arg_ : mul_op) : Bool :=
@@ -266,7 +266,7 @@ def mul_mnemonic_backwards (arg_ : String) : SailM mul_op := do
             signed_rs2 := Unsigned })
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def mul_mnemonic_forwards_matches (arg_ : mul_op) : Bool :=

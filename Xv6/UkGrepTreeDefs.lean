@@ -20,6 +20,8 @@
 import Xv6.UkTree
 import Xv6.UkGrepLoopDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -154,7 +156,7 @@ theorem grepMainWords_files (args : List UArg) (g : UArg) (hl : 3 ≤ args.lengt
 /-! ## §3 grep's instance -/
 
 section Prog
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
 
 /-- **Rocq `grep_prog`**: grep's instance -- its code and its five stubs. -/
 def grepProg (γt : GName) : Uprog GF :=

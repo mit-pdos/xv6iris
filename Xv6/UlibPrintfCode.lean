@@ -6,6 +6,8 @@ encodings in every ulib link.  Rocq `UkInitPrintf`/`UkGrepFprintf`'s
 -/
 import Xv6.UlibCode
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL LeanRV64D
@@ -48,7 +50,7 @@ theorem ulibPrintfTab_size : ulibPrintfTab.all (fun x => decide (x.off < ulibPri
   decide
 
 section
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- **`printf`'s code at printf.o's `base`.** -/
 abbrev ulibPrintfCode (L : UlibRun GF) (base : BitVec 64) : IProp GF :=

@@ -57,6 +57,8 @@ Nothing.
 import Xv6.UMemLemmas
 import Xv6.FsAbsDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris.Std MachCSL

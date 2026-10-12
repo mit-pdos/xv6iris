@@ -88,18 +88,20 @@ import Xv6.InitBoot
 import Xv6.SpecAllocproc
 import Xv6.UsertrapRes
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 /-- Rocq `ParkCap`'s residue family `URB`, indexed by the slot (deviation 1). -/
-abbrev ParkURB (GF : BundledGFunctors) : Type _ :=
+abbrev ParkURB (GF : BundledGFunctors.{0}) : Type _ :=
   Nat → CPU → CurCtx → UPtd → BitVec 64 → ProcPriv → List FdState → ExtTreeSet GName compare →
     BitVec 32 → IProp GF
 
 section ParkCap
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg]

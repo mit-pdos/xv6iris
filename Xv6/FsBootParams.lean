@@ -21,6 +21,8 @@ image's BYTES.
 import Xv6.FsDurSnapBytes
 import Xv6.FsCrashPure
 
+noncomputable section
+
 namespace Xv6
 
 open Std

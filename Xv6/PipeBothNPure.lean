@@ -27,6 +27,8 @@ invariant `tokN` with its witness `tokN_blocks`.
 -/
 import Xv6.PipesDisc
 
+noncomputable section
+
 namespace Xv6
 
 open Pline' PipeStage

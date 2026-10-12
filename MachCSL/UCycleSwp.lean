@@ -35,6 +35,8 @@ Rocq's `resv_any`.
 import MachCSL.UWait
 import MachCSL.UTick
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
@@ -44,7 +46,7 @@ open LeanRV64D LeanRV64D.Functions
 open Register HartState Step ExecutionResult FetchResult ExceptionType
 
 section swp
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {cpu : CPU} {ξ : CtxId} {D : UFoot} (RF : URegFrame GF cpu D) (BF : UByteFrame GF ξ)
 
 /-! ## Walks as `swp` -/

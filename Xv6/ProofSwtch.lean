@@ -13,7 +13,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- Open a literal `ctxCells` into its 14 word cells. -/
 macro "ctx_cells" : tactic =>

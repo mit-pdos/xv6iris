@@ -60,6 +60,8 @@ import Xv6.UshRedirAns
 import Xv6.UshMainStubs
 import Xv6.FileOutEra
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -143,7 +145,7 @@ theorem imgPath_mem (Img : ElfMem) (pv : Nat) (pl : List (BitVec 8))
     exact absurd (h0.trans h1.symm) (by decide)
 
 section Img
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -191,7 +193,7 @@ end Img
 /-! ## §1 The receipt, at the claim -/
 
 section UshFileRedir
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
@@ -242,7 +244,7 @@ theorem redirK_inum (g : FileGn) (r : FileAppNames) (heq : fileAppIs (hlc := hlc
   · imodintro
     iintro %av Hd Hp
     subst heq
-    imod (filePred_timeless (hlc := hlc) (GF := GF) g.fgnCl r av).timeless $$ Hp with Hp
+    imod (@timeless_except0 _ _ _ (filePred_timeless (hlc := hlc) (GF := GF) g.fgnCl r av)).mp $$ Hp with Hp
     ihave ⟨Hp, Hd, Hres⟩ := fileDeedInum_acc (hlc := hlc) g.fgnCl r av (s.insert nm (i, [])) nm i []
       (by simp) (by simp [lineMax]) $$ Hd Hp
     imodintro

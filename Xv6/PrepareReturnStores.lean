@@ -38,7 +38,7 @@ theorem prepare_return_tvec_eq : 274877902848#64 = uservecTvec := by decide
 theorem prepare_return_usertrap_eq : KA.«prepare_return» + 336#64 = KA.«usertrap» := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
 theorem prepare_return_stvec (c : CPU) (kb : KCtx) (hsie : kb.sie = false) (R : RegMap) (tv0 : BitVec 64) :
@@ -93,7 +93,7 @@ theorem prepare_return_stvec (c : CPU) (kb : KCtx) (hsie : kb.sie = false) (R : 
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- `prepare_return_tf_store` at the address form the store rule sees. -/
 theorem prepare_return_tf_store_at (tfp : BitVec 44) (ws : List (BitVec 64)) (j : Nat) (hj : j < 36)
@@ -191,7 +191,7 @@ end
 /-! ## `+0x54 .. +0x6c`: the sret half -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- One word of the trapframe page out, for a LOAD, at the address form the
 rule sees. -/

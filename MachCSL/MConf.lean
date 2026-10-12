@@ -15,12 +15,14 @@ the PMP check passing for RAM accesses.
 -/
 import MachCSL.WpPmpDefs
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open LeanRV64D LeanRV64D.Functions
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- The mutable part of the machine-mode configuration. -/
 structure MConf where

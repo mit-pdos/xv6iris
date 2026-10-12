@@ -13,6 +13,8 @@ may prove the same facts under their own names.
 import Xv6.KallocDefs
 import Xv6.PtOwnLemmas
 
+noncomputable section
+
 namespace Xv6.PtRun
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -649,7 +651,7 @@ theorem allIdx_getElem {k : Nat} {y : BitVec 9} (h : allIdx[k]? = some y) : y.to
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- Open a big separating conjunction over the 512 indices at one index,
 with a closing wand that accepts any replacement for that index's clause. -/

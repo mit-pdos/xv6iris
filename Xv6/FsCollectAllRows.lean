@@ -48,6 +48,8 @@ import Xv6.FsCollectSlot
 import Xv6.IcacheCover
 import Xv6.IcacheEscrowPool
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -102,14 +104,14 @@ theorem colSingleton_disj (x : Nat) (X : ExtTreeSet Nat compare) (h : x ∉ X) :
 
 /-- The singleton-union big-op step (helper; Rocq's `big_sepS_insert` at
 `{[x]} ∪ X`). -/
-theorem colBigSepS_cons {GF : BundledGFunctors} (Φ : Nat → IProp GF) (x : Nat)
+theorem colBigSepS_cons {GF : BundledGFunctors.{0}} (Φ : Nat → IProp GF) (x : Nat)
     (X : ExtTreeSet Nat compare) (h : x ∉ X) :
     ([∗set] y ∈ ({x} ∪ X : ExtTreeSet Nat compare), Φ y) ⊣⊢ Φ x ∗ [∗set] y ∈ X, Φ y :=
   (BigSepS.bigSepS_union (colSingleton_disj x X h)).trans
     (sep_congr BigSepS.bigSepS_singleton .rfl)
 
 section Crossing
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- THE REGION CROSSING, both ways (deviation 2; Rocq's `nested_to_set` /
 `nested_of_set`). -/
@@ -129,7 +131,7 @@ theorem colCovers_ofRange {A : Type _} (l : List A) (P : Nat → IProp GF) (n : 
 end Crossing
 
 section Rows
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
   [FsBlocksG GF] [FsTopG GF] [FsLinkG GF]
 

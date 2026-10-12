@@ -92,7 +92,7 @@ theorem uftXlate_of_valid (hv : UftLeavesValid P) : UftXlate C P := by
 end xlate
 
 section spec
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- **U2-F's deliverable, discharged** (the contract of lane U3-L): at every
 user machine, `fetch ()` lands in `UstFetchOut`, for a table whose user

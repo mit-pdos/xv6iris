@@ -23,6 +23,8 @@ block).  State the FORM TO COMPUTE WITH, never the naive one.
 -/
 import Xv6.FsImgNames
 
+noncomputable section
+
 namespace Xv6
 
 /-! ## 2.  THE ROOT'S ENTRY MAP -/

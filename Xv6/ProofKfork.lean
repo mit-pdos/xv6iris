@@ -121,6 +121,8 @@ import Xv6.SpecFiledup
 import Xv6.ConsoleintrParts
 import Xv6.CopyLemmas
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -170,7 +172,7 @@ macro_rules
 /-! ## Addresses -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-- **The slot a fresh USED process owns**: `allocproc` left it at USED
 with a parked record owed (`procCtxAt`) and the whole hart tag
@@ -285,7 +287,7 @@ into a single `iapply` whose only side goals are the instruction (from the
 kernel text) and the address fold. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
@@ -2997,7 +2999,7 @@ interrupts-off one; allocproc's success arm hands back its acquire's arm
 `reen = k.sie`; the `wait_lock` and second `np->lock` windows pay back their
 own acquires' arms the same way. -/
 /-- allocproc's led post, at an equal actor (NI M2-G2b). -/
-theorem kf_postLed_act {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+theorem kf_postLed_act {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
     (Γ : SchedNames) (γ : FileNames) (c : CPU) (γk : KmemNames) (on : Option Nat) (pav : Option Nat)
@@ -3008,7 +3010,7 @@ theorem kf_postLed_act {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
 /-- allocproc's led null arm, read at a `0` answer: its reason (NI joint
 fork lane F2), the null `kalloc`'s receipt or the scan's exhaustion; the
 found arm is refuted (`procAddr` is nonzero). -/
-theorem kf_postLed_reason {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+theorem kf_postLed_reason {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
     (Γ : SchedNames) (γ : FileNames) (c : CPU) (γk : KmemNames) (on : Option Nat) (pav : Option Nat)
@@ -3037,7 +3039,7 @@ the null reason -- allocproc's (`kf_postLed_reason`) or uvmcopy's
 `kNullRcpt` -- persistent past `freeproc` and `release`. -/
 theorem kfork_led_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCPROC)
     (UV : UVMCOPY) (FP : FREEPROC) (FD : FILEDUP) (ID : IDUP) (SS : SAFESTRCPY)
-    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+    {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [X : CurCtx]

@@ -58,6 +58,8 @@ import MachCSL.UExecCtlBase
 import MachCSL.UTranslate
 import MachCSL.WpSmodeSret
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -100,7 +102,7 @@ def ufFoot : UFoot := uFootL ufRwList ufRoList ufWires
 
 /-- The user register frame (Rocq `hreg_frame rs u_Drw ∗ hreg_frame_ro
 (u_Df dqc) rs u_Dro`). -/
-def ufRegF {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] (cpu : CPU) (C : UCfg) :
+def ufRegF {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] (cpu : CPU) (C : UCfg) :
     URegFrame GF cpu ufFoot :=
   ufRegFrame cpu (ufDf C.dqc) ufRwList ufRoList ufWires ufLists_nodup
 
@@ -239,7 +241,7 @@ def UfUser (v : UfVals) : Prop :=
 /-! ## §3 The bundles, as frame pieces -/
 
 section bundles
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- **Rocq `u_gpr_file_frame` / `u_frame_gpr_file`**: the GPR file read off
 a register file is the frame's GPR cells. -/
@@ -331,7 +333,7 @@ end bundles
 /-! ## §4 Open and close -/
 
 section openclose
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- What rides aside the frames: `mepc` (not read at User). -/
 def ufAside (cpu : CPU) : IProp GF := iprop(∃ mepc : BitVec 64, Register.mepc ↦ᵣ[cpu] mepc)
@@ -578,7 +580,7 @@ theorem ufTrapSet_pc (f : RegFile) (p : Privilege) (ms sc stv sep npc : BitVec 6
   unfold ufTrapSet; simp [RegFile.set_other]
 
 section seams
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 set_option maxRecDepth 10000 in
 /-- **The frame opened into UTrap's cells** (with `hwConfig`, the caller's

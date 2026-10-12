@@ -28,6 +28,8 @@ import Xv6.SpecIget
 import Xv6.BallocParts
 import Xv6.BfreeParts
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -171,7 +173,7 @@ def ireclaimFmtStr : List (BitVec 8) :=
    0x64#8, 0x65#8, 0x20#8, 0x25#8, 0x64#8, 0x0a#8]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 set_option maxRecDepth 100000 in
 /-- Rocq's `irc_msg_bytes` + `kernel_data_string`. -/

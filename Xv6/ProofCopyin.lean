@@ -22,6 +22,8 @@ import Xv6.UPtAllocLemmas
 import MachCSL.WpSmodeFrame12
 import MachCSL.BvLemmas
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -42,7 +44,7 @@ survives as such: it is split into `BitVec.ofNat 64 A + BitVec.ofNat 64 d`
 stated on the shapes the normaliser actually leaves. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {lent : Bool}
 
 /-! ## The twelve-slot frame of `copyin` (ra, s0..s10) -/

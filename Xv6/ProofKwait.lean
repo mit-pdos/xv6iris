@@ -158,6 +158,8 @@ import Xv6.CodeTactics
 import Xv6.CopyLemmas
 import MachCSL.BvLemmas
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -235,7 +237,7 @@ never leave the page (the low two bits are clear), so the claim, pin and
 window transport to each byte and back. -/
 
 section Bridge
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 theorem kw_inRam4_of_ends (p : BitVec 64) (hlo : inRam p 1) (hhi : inRam (p + BitVec.ofNat 64 3) 1)
     (hp : p.toNat < 2 ^ 56) : inRam p 4 := by
@@ -314,7 +316,7 @@ theorem kw_zombie_not_needsCtx : ¬ needsCtx ZOMBIE := by decide
 theorem kw_zombie_not_isRunning : ¬ isRunning ZOMBIE := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- The lock's share of the mirror at ZOMBIE (unclaimed) IS the whole
 variable, as `freeproc`'s `procHeld` demands. -/
@@ -462,7 +464,7 @@ scan reads only the parent cells (`waitResAt ξ ps`, which IS
 `kwWRest ξ ps` (Rocq `kw_pay ps` minus the cells). -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- `wait_lock`'s payload beside the parent cells: the children map, the
 orphan column, the invariant tying the four columns, and the zombie ledger's
@@ -866,7 +868,7 @@ end
 /-! ## The `copyout` seam (Rocq `proc_priv_copy`) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- **The copy borrow, with the event counter lent out beside it** (Rocq
 `ProcInv.proc_priv_copy_ev`, permit sweep L1b; the cells-level twin of
@@ -912,7 +914,7 @@ end
 /-! ## The callee call-site helpers (interface at the folded entry address) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
 /-- `acquire`'s contract at its entry, for a payload `Rp`. -/
@@ -1078,7 +1080,7 @@ end
 /-! ## The ten-slot frame and the epilogue -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- `kwait`'s ten-slot frame at `sp` (`ra`, `s0`, `s1`..`s7`, and the unused
 top slot at `sp - 80`). -/
@@ -1259,7 +1261,7 @@ theorem kwj_2250 : jumpPc (KA.«kwait» + 0xa6#64) = (KA.«kwait» + 0xa6#64) :=
 theorem kw_neg1_ext : (18446744073709551615#64 : BitVec 64) = BitVec.signExtend 64 (-1#32) := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
 set_option maxHeartbeats 1000000 in
 /-- `release` at an explicit lock address `lk`. -/
@@ -1282,7 +1284,7 @@ theorem kw_rel_at (RE : RELEASE) (c : CPU) (k' : KCtx) (γ : GName) (lk : BitVec
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
 theorem kwait_br_fffffffffffff352 : KA.«kwait» + 0xfffffffffffff352#64 = KA.«copyout» := by decide
 
@@ -1965,7 +1967,7 @@ theorem kwj_22b0 : jumpPc (KA.«kwait» + 0x106#64) = (KA.«kwait» + 0x106#64) 
 theorem kwj_2274b : jumpPc (KA.«kwait» + 0xca#64) = (KA.«kwait» + 0xca#64) := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
 theorem kwait_br_ffffffffffffe9e8 : KA.«kwait» + 0xffffffffffffe9e8#64 = KA.«acquire» := by decide
 
@@ -2911,7 +2913,7 @@ theorem kwait_br_164c0 : KA.«kwait» + 0x164c0#64 = KA.«tickslock» := by deci
 
 theorem kwait_cells (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (CO : COPYOUT)
     (FP : FREEPROC) (KL : KILLED) (SP : SLEEP_PREPARE) (SL : SLEEP)
-    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+    {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
@@ -3143,7 +3145,7 @@ theorem kwait_cells (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (CO : COPYOUT)
 /-! ## The whole block (Rocq `proc_priv`) around the cells-level body -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
@@ -3162,7 +3164,7 @@ theorem kw_procGen_split (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (g : GN
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [X : CurCtx]

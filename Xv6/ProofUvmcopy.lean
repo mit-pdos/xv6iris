@@ -35,6 +35,8 @@ import Xv6.UvmallocDefs
 import Xv6.WalkaddrDefs
 import MachCSL.BvLemmas
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -175,7 +177,7 @@ theorem uc_inv_ok {Pold Pnew P : UPtd} {Mold Mnew : Nat → List (BitVec 8)} {n 
       exact ⟨hb, by unfold UPtCopy.ucView; rw [if_pos hi]⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-! ## The callees, at their entry addresses -/
 
@@ -624,7 +626,7 @@ theorem uc_setLeaf_entAt_self : ∀ (lvl : Nat) (t : PTree) (vpn : BitVec 27),
 theorem uc_pte2pa_shift (x : BitVec 64) : (x >>> 10) <<< 12 = pte2pa x := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-- Open the bytes of one mapped page, with the length up front. -/
 theorem uc_umPages_acc [CurCtx] (P : UPtd) (M : Nat → List (BitVec 8)) (k : Nat) (w : BitVec 64)

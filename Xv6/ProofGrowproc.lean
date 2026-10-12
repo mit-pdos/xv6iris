@@ -83,7 +83,7 @@ theorem bge0'_neg {α : Type _} (x : BitVec 64) (h : x.toInt < 0) (p q : α) :
   exact h
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [X : CurCtx]
@@ -144,7 +144,7 @@ theorem gp_priv_same (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : Pr
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X : CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [X : CurCtx]
 
 /-- THE SHRINK keeps the fill empty (Rocq `lazy_free_del_run`, as
 `ProofGrowproc`'s shrink arm reads it): uvmdealloc's run starts at

@@ -29,13 +29,15 @@ re-seal `userInv` / `userTrapFrame`.  The cycle is UCycleSwp's
 -/
 import Xv6.UserStepTrap
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open Sail LeanRV64D LeanRV64D.Functions
 
 section active
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- **The fetch, as the loop consumes it** (U2-F's deliverable; Rocq
 `UserFetch`/`UserFetchCert`/`UserFaultCert` through `UserActiveClass`'s `va`

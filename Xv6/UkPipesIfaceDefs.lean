@@ -51,6 +51,8 @@ import Xv6.PipeBothNPure
 import Xv6.PipeProto
 import Xv6.ConsoleInvDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -83,14 +85,14 @@ def pnsSinkTy : Csink → FdType
 /-! ## §0' The cameras (deviations 1, 2) -/
 
 /-- **Rocq `pnsRegG`**: the pipeline registry. -/
-class PnsRegG (GF : BundledGFunctors) where
+class PnsRegG (GF : BundledGFunctors.{0}) where
   [regG : ElemG GF (HfpReg.RegF Pdev)]
 
 attribute [reducible, instance] PnsRegG.regG
 
 /-- **Rocq `pipesNG`**: THE FAMILY'S MODE GHOSTS (`PipeBothN.wmodeN`'s
 camera), as one class. -/
-class PipesNG (GF : BundledGFunctors) where
+class PipesNG (GF : BundledGFunctors.{0}) where
   [modeG : GhostVarG GF (Option (List (BitVec 8)))]
 
 attribute [reducible, instance] PipesNG.modeG

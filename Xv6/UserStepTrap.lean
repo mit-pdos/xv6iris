@@ -25,13 +25,15 @@ closer files into `userTrapFrame`):
 -/
 import Xv6.UserStepClose
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open Sail LeanRV64D LeanRV64D.Functions
 
 section arms
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- **The arm rider at a constant `Rr`** (NI M2-W2b): `Rr` and the landing's
 receipt rider (`uxRcpt`: a user landing, or the machine receipt of the exit

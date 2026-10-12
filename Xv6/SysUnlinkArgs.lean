@@ -9,12 +9,14 @@ import Xv6.FsAbsDefs
 import Xv6.PieceFam
 import Xv6.ProcDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
 /-- The contract's parameters, as one record (the `NamexArgs` pattern). -/
-structure SysUnlinkArgs (GF : BundledGFunctors) where
+structure SysUnlinkArgs (GF : BundledGFunctors.{0}) where
   γ : FileNames
   j : Nat
   pid : BitVec 32

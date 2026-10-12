@@ -12,6 +12,8 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.SpecProcinit
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -23,7 +25,7 @@ def initsleeplockAddr : BitVec 64 := KA.«initsleeplock»
 def sleepLockNameAddr : BitVec 64 := KStr.«sleep lock»
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- A `struct sleeplock` at `lk`, before. -/
 def sleepLockIn (lk : BitVec 64) : IProp GF := iprop%
@@ -53,7 +55,7 @@ end
 
 /-- The interface of `initsleeplock`. -/
 structure INITSLEEPLOCK : Prop where
-  wp_initsleeplock : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx) hK,
+  wp_initsleeplock : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx) hK,
     wp_initsleeplock_body (hlc := hlc) (GF := GF) cpu k hK
 
 end Xv6

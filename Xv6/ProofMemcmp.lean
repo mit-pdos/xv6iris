@@ -8,6 +8,8 @@ import Xv6.CodeTactics
 import Xv6.StepLemmas
 import MachCSL.BvLemmas
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -52,7 +54,7 @@ set_option maxHeartbeats 4000000 in
 bne a5,a4,cca`): with `a0 = s1 + i`, `a1 = s2 + i`, reads both bytes `i`
 and lands at `cca` if they differ, at `cbe` otherwise, at whichever hart
 the thread is on by then. -/
-theorem memcmp_iter {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+theorem memcmp_iter {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (kb : KCtx)
     (s1 s2 : BitVec 64) (dq1 dq2 : DFrac) (bs1 bs2 : List (BitVec 8)) (i : Nat) (a b : BitVec 8)
     (ha : bs1[i]? = some a) (hb : bs2[i]? = some b)
@@ -87,7 +89,7 @@ theorem memcmp_iter {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
 
 /-- What the loop leaves in the registers: either the first differing
 pair, at `cca`, or agreement on all `n` bytes, at `cc6`. -/
-def memcmpLoopPost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+def memcmpLoopPost {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (bs1 bs2 : List (BitVec 8)) (n : Nat) (R' : RegMap) : IProp GF := iprop%
   (pcIs cpu (KA.«memcmp» + 0x2a#64) ∗
     ⌜∃ k a b, k < n ∧ (∀ j, j < k → bs1[j]? = bs2[j]?) ∧ bs1[k]? = some a ∧ bs2[k]? = some b ∧ a ≠ b ∧
@@ -99,7 +101,7 @@ set_option maxHeartbeats 4000000 in
 (`i < n`, the first `i` bytes agreeing) runs to `cca` or `cc6`; only
 `a0`, `a1`, `a4`, `a5` change.  The hart is quantified inside the
 induction: each iteration may move the thread. -/
-theorem memcmp_loop {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+theorem memcmp_loop {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (kb : KCtx)
     (s1 s2 : BitVec 64) (dq1 dq2 : DFrac) (bs1 bs2 : List (BitVec 8)) (n : Nat) (hn32 : n < 2 ^ 32)
     (hl1 : n ≤ bs1.length) (hl2 : n ≤ bs2.length)

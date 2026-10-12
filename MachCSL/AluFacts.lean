@@ -6,6 +6,8 @@ supervisor-mode ALU file does not wait for the machine-mode rules.
 import MachCSL.Tactics
 import Std.Tactic.BVDecide
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std

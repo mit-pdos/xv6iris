@@ -22,6 +22,8 @@ import Xv6.UserFetchWf
 import Xv6.UMemLemmas
 import Xv6.UserPerm
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Std MachCSL

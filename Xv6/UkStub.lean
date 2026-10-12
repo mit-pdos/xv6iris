@@ -50,6 +50,8 @@ import Xv6.User.EchoText
 import Xv6.User.CatText
 import Xv6.User.GrepText
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -77,7 +79,7 @@ theorem stub_pc4 (addr : Nat) : BitVec.ofNat 64 addr + 4#64 = BitVec.ofNat 64 (a
   rw [BitVec.ofNat_add]
 
 section UkStub
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 

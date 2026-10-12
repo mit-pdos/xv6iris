@@ -41,12 +41,14 @@ arm is a fupd-producing wand.
 -/
 import Xv6.SpecFileclose
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
 section PipeReg
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-! ## 1.  THE REGISTRY -/
 

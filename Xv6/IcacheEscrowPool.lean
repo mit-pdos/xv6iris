@@ -135,6 +135,8 @@ three dead movers of 2692--3360 are recorded in
 import Xv6.IcacheEscrowTok
 import Xv6.TxPin
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -420,7 +422,7 @@ where it does today -- the caller's licence and `ifreeze_excl` -- because
 the movers hand out and take back the FULL pool row. -/
 
 section Pool
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
   [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- THE ORDINARY ROWS, as one big-op -- what boot stocks and what the

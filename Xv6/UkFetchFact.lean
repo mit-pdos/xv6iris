@@ -50,6 +50,14 @@ theorem ukf_addInt2 (pc : BitVec 64) (h : pc.toNat < 2 ^ 38) : (BitVec.addInt pc
 
 /-! ## §2 The contracts -/
 
+/-- A 32-bit word is its two 16-bit halves (the fetch's two reads).  Stated with an explicit
+`Eq` type: `binrel%` would otherwise coerce the sides; and on its own so that Lean ≥ 4.34's
+`bv_decide` does not see the fetch proof's context ("unknown free variable"). -/
+theorem ukf_split16 (w : BitVec 32) :
+    @Eq (BitVec 32) (BitVec.setWidth (2 * 8) (BitVec.extractLsb' 16 16 w) ++
+      BitVec.setWidth (2 * 8) (BitVec.extractLsb' 0 16 w)) w := by
+  bv_decide
+
 /-- **C2, a base instruction** (`F_Base w`).  No in-page premise (Rocq
 `c5bce82eb`): each READ of the fetch is naturally aligned and stays on its
 page; the split fetch (a 2-mod-4 pc) reads `pc + 2` through ITS OWN page's
@@ -116,7 +124,7 @@ theorem ukFetch_base (C : UCfg) (P : UPtd) (T : BMap) (pc : BitVec 64) (V : Nat 
     obtain ⟨-, hf, -⟩ := ukmOut_trans (C := C) ⟨hl1, hf1, hv1⟩ ⟨hl2, hf2, hv2⟩
     refine ⟨s2, orc, hres.trans ?_, hl2, hf, hV2⟩
     simp only [Option.some.injEq, Prod.mk.injEq, FetchResult.F_Base.injEq, and_true]
-    bv_decide
+    exact ukf_split16 w
 
 /-- **C2, a compressed instruction** (`F_RVC h`): one read, naturally
 aligned (4 bytes at a 4-aligned pc, 2 at a 2-mod-4 one), on the pc's page. -/

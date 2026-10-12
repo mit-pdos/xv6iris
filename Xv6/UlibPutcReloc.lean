@@ -41,7 +41,7 @@ theorem ulibPutc_cat_writeAt :
     ulibWriteAt (BitVec.ofNat 64 User.Cat.Sym.«putc») = BitVec.ofNat 64 User.Cat.Sym.«write» := by decide
 
 /-- `putc`'s code at `cat`'s `putc`, from `cat`'s text. -/
-theorem ulibPutcCode_cat {GF : BundledGFunctors} (L : UlibRun GF) :
+theorem ulibPutcCode_cat {GF : BundledGFunctors.{0}} (L : UlibRun GF) :
     L.utext User.Cat.tree ⊢ ulibPutcCode L (BitVec.ofNat 64 User.Cat.Sym.«putc») :=
   ulibPutcCode_of_text L _ _ (by decide) ulibPutc_cat_putcAt
 
@@ -55,7 +55,7 @@ theorem ulibPutc_grep_writeAt :
     ulibWriteAt (BitVec.ofNat 64 User.Grep.Sym.«putc») = BitVec.ofNat 64 User.Grep.Sym.«write» := by decide
 
 /-- `putc`'s code at `grep`'s `putc`, from `grep`'s text. -/
-theorem ulibPutcCode_grep {GF : BundledGFunctors} (L : UlibRun GF) :
+theorem ulibPutcCode_grep {GF : BundledGFunctors.{0}} (L : UlibRun GF) :
     L.utext User.Grep.tree ⊢ ulibPutcCode L (BitVec.ofNat 64 User.Grep.Sym.«putc») :=
   ulibPutcCode_of_text L _ _ (by decide) ulibPutc_grep_putcAt
 
@@ -69,7 +69,7 @@ theorem ulibPutc_init_writeAt :
     ulibWriteAt (BitVec.ofNat 64 User.Init.Sym.«putc») = BitVec.ofNat 64 User.Init.Sym.«write» := by decide
 
 /-- `putc`'s code at `init`'s `putc`, from `init`'s text. -/
-theorem ulibPutcCode_init {GF : BundledGFunctors} (L : UlibRun GF) :
+theorem ulibPutcCode_init {GF : BundledGFunctors.{0}} (L : UlibRun GF) :
     L.utext User.Init.tree ⊢ ulibPutcCode L (BitVec.ofNat 64 User.Init.Sym.«putc») :=
   ulibPutcCode_of_text L _ _ (by decide) ulibPutc_init_putcAt
 
@@ -83,7 +83,7 @@ theorem ulibPutc_seccomp_writeAt :
     ulibWriteAt (BitVec.ofNat 64 User.Seccomp.Sym.«putc») = BitVec.ofNat 64 User.Seccomp.Sym.«write» := by decide
 
 /-- `putc`'s code at `seccomp`'s `putc`, from `seccomp`'s text. -/
-theorem ulibPutcCode_seccomp {GF : BundledGFunctors} (L : UlibRun GF) :
+theorem ulibPutcCode_seccomp {GF : BundledGFunctors.{0}} (L : UlibRun GF) :
     L.utext User.Seccomp.tree ⊢ ulibPutcCode L (BitVec.ofNat 64 User.Seccomp.Sym.«putc») :=
   ulibPutcCode_of_text L _ _ (by decide) ulibPutc_seccomp_putcAt
 

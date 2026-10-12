@@ -16,6 +16,8 @@ e.2.2`.  Every consumer reads the entry through the projections, as in Rocq.
 -/
 import MachCSL.Lang
 
+noncomputable section
+
 namespace MachCSL
 
 /-- One accepted console input: the history it arrived at, the byte, and

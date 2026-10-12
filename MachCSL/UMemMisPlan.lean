@@ -29,6 +29,8 @@ a symbolic address (performance rule 2):
 import MachCSL.BvEnumSatp
 import Xv6.UmodeArith
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1
@@ -77,9 +79,7 @@ theorem umm_split_on_page_boundary_intra (a : BitVec 64) (w : Nat) (h0 : 0 < w) 
   · rfl
   · rename_i h
     exfalso; apply h
-    generalize hm : Sail.BitVec.updateSubrange _ _ _ _ = M
-    have hM : M = 0xFFFFFFFFFFFFF000#64 := by subst hm; exact umm_pageMask a
-    subst hM
+    rw [umm_pageMask a]
     simp only [Sail.BitVec.addInt, Sail.BitVec.subInt, Xv6.umoi_natCast, BitVec.ofInt_ofNat, ← hb,
       beq_self_eq_true]
 
@@ -107,9 +107,7 @@ theorem umm_split_on_page_boundary_straddle (a : BitVec 64) (w : Nat) (h8 : w �
   split
   · rename_i h
     exfalso
-    generalize hm : Sail.BitVec.updateSubrange _ _ _ _ = M at h
-    have hM : M = 0xFFFFFFFFFFFFF000#64 := by subst hm; exact umm_pageMask a
-    subst hM
+    rw [umm_pageMask a] at h
     simp only [Sail.BitVec.addInt, Sail.BitVec.subInt, Xv6.umoi_natCast, BitVec.ofInt_ofNat,
       beq_iff_eq] at h
     exact hb h

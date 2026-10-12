@@ -173,7 +173,7 @@ with a nonzero count is LIVE by `FsAbsMknodFire.mkfEra_live` (Rocq's
 `opf_era_live`; deviation 3). -/
 
 section OpenFire
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [FsTopG GF] [FsBytesG GF]
 
 /-! ## 1.  Item 1: the walk premise -/

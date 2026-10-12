@@ -18,6 +18,8 @@ import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame8
 import Xv6.ByteCursor
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -176,7 +178,7 @@ theorem piKept_trans {R R' R'' : RegMap} (h : piKept R R') (h' : piKept R' R'') 
     h'.2.2.2.2.2.2.2.2.2.2.2.trans h.2.2.2.2.2.2.2.2.2.2.2⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {lent : Bool}
 
 /-! ## The eight-slot frame -/
@@ -585,7 +587,7 @@ set_option maxHeartbeats 4000000 in
 pre-8-P `wp_procinit_body`): the lock, state and kstack words only.
 `procinit_proof` frames the dormant blocks and the supply shares around it
 and routes the shares (`pi_route`). -/
-def procinitCellsBody {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+def procinitCellsBody {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) : Prop :=
   kctx cpu k ∗ pcIs cpu procinitAddr ∗
   (∃ vlock vname vcpu, lockWords pidLockAddr vlock vname vcpu) ∗
@@ -598,7 +600,7 @@ def procinitCellsBody {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cur
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
-theorem procinit_cells (IL : INITLOCK) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+theorem procinit_cells (IL : INITLOCK) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
     [CurCtx] (cpu : CPU) (k : KCtx) (hK : 10 ≤ k.avail) :
     procinitCellsBody (hlc := hlc) (GF := GF) cpu k := by
   unfold procinitCellsBody
@@ -782,7 +784,7 @@ end
 /-! ## The supplies, routed (Rocq `ProofProcinit`'s carve) -/
 
 section Route
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- `n` shares of `m` units, one per slot. -/

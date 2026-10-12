@@ -17,6 +17,8 @@ import Xv6.ItruncParts
 import Xv6.CodeTactics
 import Xv6.BlkmapBuf
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -45,7 +47,7 @@ def itERegs (k : KCtx) (ip : BitVec 64) (kk q : Nat) (R : RegMap) : Prop :=
   R 18#5 = aBufData (bnode kk) + 1024#64 ∧ R 19#5 = ip ∧ R 20#5 = bnode kk
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- ONE ENTRY of the checked-out indirect block, borrowed READ-ONLY (Rocq's
 `bm_buf_word_acc` + `bm_ent_read` + `bm_buf_restore`, 1335–1363): the word
@@ -74,7 +76,7 @@ theorem itrunc_ent_acc [CurCtx] (kk : Nat) (bno dsk : BitVec 32) (e : List (BitV
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- The resources at a point of the indirect loop, cursor `q` (Rocq's

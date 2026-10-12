@@ -226,7 +226,7 @@ def fetch_bytes (fetch_start : (BitVec 64)) (granule_start : (BitVec 64)) (width
   match (← (mem_read (InstructionFetch ()) pbmt paddr width false false false)) with
   | .Err (exc_addr, e) =>
     (do
-      assert (exc_addr == paddr) "postlude/fetch.sail:44.30-44.31"
+      (assert (exc_addr == paddr) "postlude/fetch.sail:44.30-44.31")
       (pure (FetchBytes_Exception e)))
   | .Ok bytes => (pure (FetchBytes_Success bytes))
 

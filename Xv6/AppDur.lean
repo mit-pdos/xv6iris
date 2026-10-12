@@ -51,12 +51,14 @@ supplies.
 import Xv6.AppInv
 import Xv6.FsCrashSeam
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
 section AppDurRaw
-variable {GF : BundledGFunctors} [FsTopG GF]
+variable {GF : BundledGFunctors.{0}} [FsTopG GF]
 
 /-- THE DURABLE CLAIM at a predicate, a durable-copy predicate `Okc` (Rocq
 SY3-A3b) and a snapshot map name `gt`: the guest half of the map's authority
@@ -104,7 +106,7 @@ end AppDurRaw
 machine's started auth (Rocq SY3-A1). -/
 
 section AppDurMerge
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsTopG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsTopG GF]
 
 /-- THE MERGE (the commit, SY3-K2; Rocq `app_dur_raw_merge`, main): run the
 merge on the running claim (which satisfies the era's record predicate
@@ -147,7 +149,7 @@ theorem appDurRaw_merge {N : Type} (A : N → Aview → IProp GF) (Ok Okc : N �
 end AppDurMerge
 
 section AppDur
-variable {GF : BundledGFunctors} [FsTopG GF] [Appcfg GF]
+variable {GF : BundledGFunctors.{0}} [FsTopG GF] [Appcfg GF]
 
 /-- THE GUEST, at the application's own predicate and a durable-copy predicate:
 the one value the WAL's opaque index `G : GName → IProp` ever takes (Rocq
@@ -160,7 +162,7 @@ end AppDur
 /-! ## THE ERA'S DURABLE SIDE, AS ONE PACKAGE (Rocq `app_dur_laws`, SY3-A3b) -/
 
 section AppDurLaws
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsLinkG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsLinkG GF]
   [FsTopG GF] [Appcfg GF]
 
 /-- THE CRASH SEAM AT THE ERA'S GUEST AND THE MERGE PACKAGE, closed over ONE

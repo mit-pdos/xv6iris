@@ -60,6 +60,8 @@ import Xv6.UkPipesIfaceKit
 import Xv6.PipesFire
 import Xv6.PipeProtoRead
 
+noncomputable section
+
 namespace Xv6
 
 namespace UShPipesDefs
@@ -94,7 +96,7 @@ theorem flow_down_idx (i j : Nat) (h : 1 ≤ i ∧ i ≤ j + 1) (hne : i ≠ j +
 
 /-- **Rocq `UShPipesDefs`'s section context (data)**: `UkPipesIface`'s round
 fields, the producer, its loan, the pipes and the one-shot names. -/
-structure PdRound (hlc : HasLC) (GF : BundledGFunctors) [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+structure PdRound (hlc : HasLC) (GF : BundledGFunctors.{0}) [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
     [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF] where
   /-- THE ROUND'S CLAIM at a line model with a pipeline view -/
   g : PipeGn
@@ -124,7 +126,7 @@ structure PdRound (hlc : HasLC) (GF : BundledGFunctors) [MachGS hlc GF] [Xv6G GF
   gG : Nat → GName
 
 section Round
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF]
 variable (D : PdRound hlc GF)
 
@@ -359,7 +361,7 @@ instance pinv_persistent (j : Nat) : Persistent (D.pinv j) := by
 end Round
 
 /-- **Rocq `UShPipesDefs`'s section hypotheses** (deviation 1). -/
-structure PdRoundOk {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+structure PdRoundOk {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
     [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF] (D : PdRound hlc GF) : Prop where
   /-- Rocq `Hext` -/
   hext : ∀ k l, D.WA.gext k l = pext D.g k l
@@ -375,7 +377,7 @@ structure PdRoundOk {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G 
   hplok : plOk D.lR
 
 section RoundOk
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF] [PipesNG GF]
 variable {D : PdRound hlc GF}
 

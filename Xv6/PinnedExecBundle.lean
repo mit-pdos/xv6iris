@@ -39,7 +39,7 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 open Std (ExtTreeSet)
 
 section PinnedExecBundle
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
   [Appcfg GF] [Icfg] [CtokG GF]
 
 /-- **Rocq `pobs_node_id`**: THE PIN AS A SUPPLIER OF (W)'s THIRD PIECE --

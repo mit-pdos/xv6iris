@@ -25,6 +25,8 @@ file-system file.  Its only import is `Xv6.UartTrace` (`UartNames`).
 -/
 import Xv6.UartTrace
 
+noncomputable section
+
 namespace Xv6
 
 /-- The console ring's ghost names (Rocq `cons_names`: `cn_uart cn_log cn_rd

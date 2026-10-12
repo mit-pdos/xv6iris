@@ -54,6 +54,8 @@ import Xv6.SpecSysMknod
 import Xv6.ProcPrivAcc
 import Xv6.KexecParts
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -111,13 +113,14 @@ theorem sys_mknod_tdev_nz : T_DEVICE_w.toNat ≠ 0 := by decide
 /-- ...and without the NUL, the path itself. -/
 theorem sys_mknod_bview_self (pl : List (BitVec 8)) :
     bview pl.length (sysfilePfun pl) = pl := by
-  apply List.ext_getElem
-  · simp [bview_length]
-  · intro i h1 h2
-    rw [bview_length] at h1
-    unfold bview sysfilePfun
-    simp only [List.getElem_map, List.getElem_range]
-    simp [List.getD_eq_getElem?_getD, List.getElem?_eq_getElem h1]
+  -- Lean ≥ 4.34: rewriting the bound inside the goal's `getElem` proof leaves the goal ill-typed
+  -- at reducible transparency, which `simp` refuses; go through `getElem?`
+  apply List.ext_getElem?
+  intro i
+  unfold bview sysfilePfun
+  by_cases hi : i < pl.length
+  · simp [List.getElem?_range, hi, List.getD_eq_getElem?_getD, List.getElem?_eq_getElem hi]
+  · simp [List.getElem?_range, hi, List.getElem?_eq_none_iff] <;> omega
 
 /-- argstr's success arm, read: the path, its shape, its length under the
 buffer, and THE READING OF ARGUMENT 0 at the view argstr read it in. -/
@@ -135,7 +138,7 @@ theorem sys_mknod_path_of (M : Nat → List (BitVec 8)) (va : Nat) (pl : List (B
 /-! ## The generic carve: slots ↔ bytes -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {lent : Bool}
 
 /-- THE CARVE (Rocq `mn_frame_carve`, the path half): slots 3..18 ARE
@@ -452,7 +455,7 @@ theorem sysMknodPins_exit (k : KCtx) (R : RegMap) (h : sysMknodPins k R) :
 /-! ## The arguments, the block's seams, the out bundle, the join point -/
 
 /-- The contract's parameters, as one record (the `SysChdirArgs` pattern). -/
-structure SysMknodArgs (GF : BundledGFunctors) where
+structure SysMknodArgs (GF : BundledGFunctors.{0}) where
   γ : FileNames
   j : Nat
   pid : BitVec 32
@@ -470,7 +473,7 @@ structure SysMknodArgs (GF : BundledGFunctors) where
   Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]

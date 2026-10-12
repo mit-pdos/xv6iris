@@ -119,6 +119,8 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 import Xv6.ParkCap
 import Xv6.KforkChild
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -150,7 +152,7 @@ parent cell (`WaitFresh.childrenInv_row_fresh`), so the union is a growth
 by one.  (Rocq's `pme ≠ 0` premise is Lean's `procAddr j`, nonzero by
 `procAddr_nonzero`.)  THE LEND `Rc` comes back on the `-1` arm (no child
 was built, Rocq `kfork_post`'s refund). -/
-def kforkRet {hlc : HasLC} {GF : BundledGFunctors}
+def kforkRet {hlc : HasLC} {GF : BundledGFunctors.{0}}
     [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
@@ -178,7 +180,7 @@ trapframe `kalloc`'s `kAllocRcpt γk (procAddr j)`, the `-1` arm its reason,
 the null `kalloc`'s `kNullRcpt γk (procAddr j)` (allocproc's trapframe or
 `proc_pagetable` page, or uvmcopy's page or `walk` node) or the scan's
 exhaustion (F1's `sFullRcpt (procAddr j)`). -/
-def kforkRetLed {hlc : HasLC} {GF : BundledGFunctors}
+def kforkRetLed {hlc : HasLC} {GF : BundledGFunctors.{0}}
     [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
@@ -201,7 +203,7 @@ def kforkRetLed {hlc : HasLC} {GF : BundledGFunctors}
       ∃ (hz : List Zev) (i : Nat), zombReceipt hz (.ZFork (procAddr j) i rv γc)))
 
 /-- The landed answer is the led one with the receipts dropped. -/
-theorem kforkRetLed_ret {hlc : HasLC} {GF : BundledGFunctors}
+theorem kforkRetLed_ret {hlc : HasLC} {GF : BundledGFunctors.{0}}
     [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
@@ -228,7 +230,7 @@ lend `Rc`, and THE CHILD'S SLOT -- ∀ generation and pid (allocproc mints
 both inside the call; the pid is not `<init>`'s), paid under the child's
 own `myPay` and the lend, keyed at `kforkChild V` (the parent's record
 with `a0 := 0`) and the parent's descriptor states, at no children. -/
-def kforkPark {hlc : HasLC} {GF : BundledGFunctors}
+def kforkPark {hlc : HasLC} {GF : BundledGFunctors.{0}}
     [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
@@ -244,7 +246,7 @@ def kforkPark {hlc : HasLC} {GF : BundledGFunctors}
     uslot (hlc := hlc) (SG := SG) (uvisOf (kforkChild V) M stsP g' ∅ pidc))
 
 /-- **WP of `kfork`.** -/
-def wp_kfork_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_kfork_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
@@ -277,14 +279,14 @@ def wp_kfork_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
 by the answer): at whichever hart the thread returns on, the entry context
 with some `SPIE`/`SPP` (left unconstrained, as the interrupts-off contract
 always stated it), callee-saved registers, the answer in `a0`, and `B rv`. -/
-def kforkPostB {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+def kforkPostB {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (k : KCtx) (B : BitVec 32 → IProp GF) : CPU → IProp GF := fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (rv : BitVec 32),
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ kforkAns rv⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     B rv -∗ wpLoop cpu')
 
 /-- What `kfork` hands back (Rocq `kfork_post`). -/
-def kforkPost {hlc : HasLC} {GF : BundledGFunctors}
+def kforkPost {hlc : HasLC} {GF : BundledGFunctors.{0}}
     [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
@@ -296,7 +298,7 @@ def kforkPost {hlc : HasLC} {GF : BundledGFunctors}
 
 /-- What the LED `kfork` hands back (NI M2-G2b): `kforkPostB` at the led
 answer. -/
-def kforkPostLed {hlc : HasLC} {GF : BundledGFunctors}
+def kforkPostLed {hlc : HasLC} {GF : BundledGFunctors.{0}}
     [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
@@ -314,7 +316,7 @@ the second `np->lock`) is paired with a `release` that re-enables
 interrupts exactly when the entry had them on, paying back the arm the
 acquire minted.  No trap bundle crosses the interface; the crossing is
 `k.sie`.  Entered at depth 0 (so, by `KCtx.wf`, no spinlock held). -/
-def wp_kfork_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_kfork_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
@@ -340,7 +342,7 @@ def wp_kfork_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
 /-- **WP of the LED `kfork`** (NI M2-G2b): `wp_kfork_eb_body` with the post
 `kforkPostLed`.  The led form is the proof; `wp_kfork_eb_body` is its
 corollary (`kforkRetLed_ret`). -/
-def wp_kfork_led_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_kfork_led_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
@@ -365,7 +367,7 @@ def wp_kfork_led_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
 
 /-- The interface of `kfork`. -/
 structure KFORK : Prop where
-  wp_kfork_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  wp_kfork_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
@@ -376,7 +378,7 @@ structure KFORK : Prop where
     wp_kfork_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk γft γ j pid V M stsP Q csP Rc
       hj hproc hK hnoff htier
   /-- (NI M2-G2b) the led twin: the success arm's two receipts -/
-  wp_kfork_led_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  wp_kfork_led_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]

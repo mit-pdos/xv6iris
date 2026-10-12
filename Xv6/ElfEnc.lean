@@ -89,6 +89,8 @@ Imports only definitional files.
 -/
 import MachCSL.ByteWordDefs
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

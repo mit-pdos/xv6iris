@@ -43,6 +43,8 @@ import Xv6.KexecOkQ
 import Xv6.KexecImageOk
 import Xv6.KexecImageAlg
 
+noncomputable section
+
 namespace Xv6
 
 open Iris MachCSL

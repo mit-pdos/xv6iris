@@ -33,6 +33,8 @@ consumer).  Pure.
 -/
 import Xv6.FileDiscLine
 
+noncomputable section
+
 namespace Xv6
 
 /-- **Rocq `bat`**: the bytes `bs` sit at `c` in the byte function `g`. -/

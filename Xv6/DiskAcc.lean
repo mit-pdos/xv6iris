@@ -54,6 +54,8 @@ import Xv6.PtOwnLemmas
 import Xv6.DiskTier
 import MachCSL.SmodeDevDefs
 
+noncomputable section
+
 namespace Xv6
 
 set_option linter.unusedSimpArgs false
@@ -61,7 +63,7 @@ set_option linter.unusedSimpArgs false
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
 
 /-! ## The MMIO window, as the fabric sees it
 
@@ -273,7 +275,7 @@ theorem disk_reg_read_dead (γ : DiskNames) (c : VirtioCfg) (off : Nat) (w : Bit
   iexists v
   iframe Hfrag
   isplit
-  · ipureintro; rw [hx]; rfl
+  · ipureintro; exact Option.isSome_iff_exists.mpr ⟨_, hx⟩
   inext
   iintro %b %v' %hrd' Hfrag
   obtain ⟨rfl, rfl⟩ := Prod.mk.inj (Option.some.inj (hx.symm.trans hrd'))
@@ -385,7 +387,7 @@ theorem disk_reg_write_dead (γ : DiskNames) (c c' : VirtioCfg) (off : Nat) (w :
   iexists v
   iframe Hfrag
   isplit
-  · ipureintro; rw [hx]; rfl
+  · ipureintro; exact Option.isSome_iff_exists.mpr ⟨_, hx⟩
   inext
   iintro %v'' %hwr Hfrag
   obtain rfl : v' = v'' := Option.some.inj (hx.symm.trans hwr)
@@ -425,7 +427,7 @@ theorem disk_notify_write (γ : DiskNames) (w : BitVec 32) :
   iexists v
   iframe Hfrag
   isplit
-  · ipureintro; rw [hx]; rfl
+  · ipureintro; exact Option.isSome_iff_exists.mpr ⟨_, hx⟩
   inext
   iintro %v'' %hwr Hfrag
   obtain rfl : v = v'' := Option.some.inj (hx.symm.trans hwr)
@@ -456,7 +458,7 @@ theorem disk_isr_read (γ : DiskNames) :
   iexists v
   iframe Hfrag
   isplit
-  · ipureintro; rw [hx]; rfl
+  · ipureintro; exact Option.isSome_iff_exists.mpr ⟨_, hx⟩
   inext
   iintro %b %v' %hrd' Hfrag
   obtain ⟨rfl, rfl⟩ := Prod.mk.inj (Option.some.inj (hx.symm.trans hrd'))
@@ -487,7 +489,7 @@ theorem disk_ack_write (γ : DiskNames) (msk : BitVec 32) :
   iexists v
   iframe Hfrag
   isplit
-  · ipureintro; rw [hx]; rfl
+  · ipureintro; exact Option.isSome_iff_exists.mpr ⟨_, hx⟩
   inext
   iintro %v'' %hwr Hfrag
   obtain rfl := Option.some.inj (hx.symm.trans hwr)
@@ -1336,7 +1338,7 @@ theorem disk_driver_ok_write [CurCtx] (γ : DiskNames) (c c' : VirtioCfg) (w : B
   iexists v
   iframe Hfrag
   isplit
-  · ipureintro; rw [hx]; rfl
+  · ipureintro; exact Option.isSome_iff_exists.mpr ⟨_, hx⟩
   inext
   iintro %v'' %hwrx Hfrag
   obtain rfl : ({ v with cfg := c' } : VirtioState) = v'' := Option.some.inj (hx.symm.trans hwrx)

@@ -24,6 +24,8 @@ repeats in every law.
 import Xv6.UkPipeDevXv6
 import Xv6.UkPipesIfaceDev
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -32,7 +34,7 @@ open Std (ExtTreeSet)
 open UexecSG
 
 /-- **The laws' context (data)** (deviation 1). -/
-structure PnsCtx (hlc : HasLC) (GF : BundledGFunctors) [MachGS hlc GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
+structure PnsCtx (hlc : HasLC) (GF : BundledGFunctors.{0}) [MachGS hlc GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
     [PS : UprogSG GF] [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
     [GhostMapG GF (Option Nat) UfdCell UfdMapF] [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
     [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [DiskG GF] [EchoOutG GF] where
@@ -40,7 +42,7 @@ structure PnsCtx (hlc : HasLC) (GF : BundledGFunctors) [MachGS hlc GF] [CtokG GF
   Q : PnsProc GF
 
 /-- **The laws' context (hypotheses)**. -/
-structure PnsCtxOk {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
+structure PnsCtxOk {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
     [PS : UprogSG GF] [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
     [GhostMapG GF (Option Nat) UfdCell UfdMapF] [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
     [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [DiskG GF] [EchoOutG GF] [PipesNG GF] (C : PnsCtx hlc GF) : Prop where
@@ -53,7 +55,7 @@ structure PnsCtxOk {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG 
   hpc : Persistent C.Q.P.code
 
 /-- lane hfp-P1's pipe leaves at the xv6 instance (`UkPipeDevXv6`). -/
-noncomputable def PnsCtxOk.DK {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+noncomputable def PnsCtxOk.DK {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
     [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
     [PS : UprogSG GF] [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
     [GhostMapG GF (Option Nat) UfdCell UfdMapF] [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
@@ -61,7 +63,7 @@ noncomputable def PnsCtxOk.DK {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc 
   pipeDevK_xv6 CK.UL
 
 section Ctx
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
   [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [DiskG GF] [EchoOutG GF] [PnsRegG GF] [PipesNG GF]

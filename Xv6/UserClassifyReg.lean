@@ -25,6 +25,8 @@ import Xv6.UserClassifyLand
 import MachCSL.UclCbo
 import MachCSL.UExecAlu
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

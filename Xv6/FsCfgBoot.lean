@@ -56,6 +56,8 @@ import Xv6.FsImgBridge
 import Xv6.FsImgWf
 import Xv6.FsCrashPure
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.Std Std MachCSL

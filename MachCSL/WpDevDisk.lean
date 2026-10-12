@@ -33,6 +33,8 @@ that fact of the model.
 import MachCSL.WpDevDmaStepV
 import MachCSL.WpDev
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
@@ -65,7 +67,7 @@ theorem DevM.KeepsDisk.lift {S T : Type} {dk : S → Nat → BitVec 8} (o : DevO
 /-! ## The lend -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- WHAT A DISK STEP IS LENT (Rocq: the arguments `wp_disk_step` threads into
 a permit): the durable authority at the image the step moves FROM, and the

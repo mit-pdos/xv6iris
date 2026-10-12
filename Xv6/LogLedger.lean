@@ -26,6 +26,8 @@ import Xv6.LogInv
 import Xv6.FsWords
 import MachCSL.BvLemmas
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL

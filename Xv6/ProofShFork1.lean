@@ -56,7 +56,7 @@ theorem ushF1_cs (m m2 : RegMap) (r : BitVec 64)
   exact hq q h1 (by exact hsp) h8 (ucs_ne q 10#5 hcs (by decide)) (ucs_ne q 17#5 hcs (by decide))
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 

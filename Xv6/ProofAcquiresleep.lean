@@ -32,6 +32,8 @@ import Xv6.FsWords
 import Xv6.KilledDefs
 import Xv6.VirtioDiskRwDefs3
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -138,7 +140,7 @@ theorem asl_popExit (kb : KCtx) (s a b : Bool) (hwf : kb.wf) (hs : kb.sie = s) :
   rw [hs] at h; exact h
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] [CurCtx]
 
 /-! ## The post -/
 
@@ -314,7 +316,7 @@ end
 /-! ## The exit path `(KernelSyms.«acquiresleep» + 0x36)`: take the lock, stamp the pid, release -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] [X : CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] [X : CurCtx]
 
 theorem acquiresleep_br_ffffffffffffcba8 : KA.«acquiresleep» + 0xffffffffffffcba8#64 = KA.«release» := by decide
 
@@ -464,7 +466,7 @@ theorem asl_exit (RE : RELEASE) (MP : MYPROC) (c0 cpu : CPU) (k kb : KCtx) (hb :
       exact asl_calleeSaved_mk k.regs R5 e19 e20 e21 e22 e23 e24 e25 e26 e27
     case ha0 => k_norm_g [m18]
     case hsr => k_norm_g
-    case hnr => k_norm_g; rw [hb.noff]; omega
+    case hnr => k_norm_g; rw [hb.noff]
     case hKr => k_norm_g; unfold acquiresleepSlots sleepSlots at hK; omega
     case hrr => k_norm_g; simp [hb.intena, hb.noff]
     case hor =>
@@ -479,7 +481,7 @@ end
 /-! ## The wait loop at `(KernelSyms.«acquiresleep» + 0x1c)` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] [X : CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] [X : CurCtx]
 
 /-- The loop invariant at `0x80004154`: the inner lock held with its payload
 closed, `s1 = lk`, `s2 = &lk->lk`, the deposit still in hand, and the WHOLE
@@ -702,7 +704,7 @@ theorem asl_round (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLEEP_PREPAR
       case hslpp => k_norm_g; exact hb.proc
     case ha0 => k_norm_g [P18]
     case hsr => k_norm_g
-    case hnr => k_norm_g; rw [hb.noff]; omega
+    case hnr => k_norm_g; rw [hb.noff]
     case hKr => k_norm_g; unfold acquiresleepSlots sleepSlots at hK; omega
     case hrr => k_norm_g; simp [hb.intena, hb.noff]
     case hor =>
@@ -886,7 +888,7 @@ theorem asl_pushed_spie_nb (k : KCtx) (m : Nat) :
 theorem asl_withSpie_self_nb (k : KCtx) : k.withSpie k.spie k.spp = k := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] [X : CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] [X : CurCtx]
 
 /-- The non-blocking specification's post, as a λ over the returning hart. -/
 def aslPostNb (k : KCtx) (γ γt : GName) (Rp : CtxId → IProp GF) (q : Qp) (slk : BitVec 64)

@@ -28,6 +28,8 @@ that node-by-node drive packaged once.
 -/
 import MachCSL.UFetchMem
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
@@ -227,7 +229,7 @@ end walker
 /-! ## §2 The Iris rule -/
 
 section iris
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {cpu : CPU} {ξ : CtxId} {D : UFoot} (RF : URegFrame GF cpu D) (BF : UByteFrame GF ξ)
 
 /-- The obligation after a fetch-walk from `s`: whatever the oracle (the

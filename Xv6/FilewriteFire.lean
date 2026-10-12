@@ -30,6 +30,8 @@ import Xv6.FileOffProto
 import Xv6.FileRwShared
 import Xv6.FilewriteChain
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -100,7 +102,7 @@ end Join
 /-! ## 2.  The fire -/
 
 section Fire
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [FsBytesG GF] [OffboxG GF] [Appcfg GF] [Fscfg] [Icfg]
 
 set_option maxHeartbeats 8000000 in
@@ -256,7 +258,7 @@ end Fire
 /-! ## 3.  The lock-held ghost steps, before and after writei -/
 
 section Held
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]

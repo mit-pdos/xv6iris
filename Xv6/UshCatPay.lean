@@ -52,6 +52,8 @@ notations `a0_idx`/`a1_idx`, `sh_cat_slot_persistent`, `cat_uargv_shape`,
 import Xv6.UshCat
 import Xv6.UshExecPin
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -87,7 +89,7 @@ theorem ushExecPinProg_of_grep (hg : kexecLoadable User.Grep.elf) : UshExecPinPr
 /-! ## 2. The ingredients -- `UShEcho.sh_echo_slot` at /cat -/
 
 section UshCatPay
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]

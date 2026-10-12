@@ -36,12 +36,14 @@ import Xv6.UlibPrintfDefs
 import Xv6.UlibRunPrintf
 import Xv6.UlibVprintfCode
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL LeanRV64D
 
 section
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- **WP of `vprintf` at `base`, no directive** (Rocq `wp_kcat_vprintf`). -/
 def wp_ulibVprintf_body (L : UlibRunP GF) (base : BitVec 64) (a len : Nat) (f : Nat → BitVec 8)
@@ -135,14 +137,14 @@ end
 
 /-- The interface of `vprintf`: ONE pair of contracts, every load address. -/
 structure ULIB_VPRINTF : Prop where
-  wp_ulibVprintf : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] (L : UlibRunP GF)
+  wp_ulibVprintf : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] (L : UlibRunP GF)
     (base : BitVec 64) (a len : Nat) (f : Nat → BitVec 8) (m : RegMap) (n : Nat) (Ci Co : IProp GF),
     wp_ulibVprintf_body L base a len f m n Ci Co
-  wp_ulibVprintfS : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] (L : UlibRunP GF)
+  wp_ulibVprintfS : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] (L : UlibRunP GF)
     (base : BitVec 64) (a len q : Nat) (f : Nat → BitVec 8) (apz sa : Nat) (dq : DFrac) (slen : Nat)
     (sf : Nat → BitVec 8) (m : RegMap) (n : Nat) (Ci Cm1 Cm2 Co : IProp GF),
     wp_ulibVprintfS_body L base a len q f apz sa dq slen sf m n Ci Cm1 Cm2 Co
-  wp_ulibVprintfSG : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] (L : UlibRunP GF)
+  wp_ulibVprintfSG : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] (L : UlibRunP GF)
     (base : BitVec 64) (a len q : Nat) (f : Nat → BitVec 8) (apz sa : Nat) (dq sdq : DFrac) (slen : Nat)
     (sf : Nat → BitVec 8) (m : RegMap) (n : Nat) (Ci Cm1 Cm2 Co : IProp GF),
     wp_ulibVprintfSG_body L base a len q f apz sa dq sdq slen sf m n Ci Cm1 Cm2 Co

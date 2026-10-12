@@ -16,13 +16,15 @@ frame is the same `frame12` with nine saves.
 -/
 import MachCSL.WpSmodeFrame12
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {lent : Bool}
 
 /-- The frame's twelve saved values (`ra`, `s0 .. s10` of the entry). -/

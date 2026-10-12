@@ -33,6 +33,8 @@ frame plus matchstar's six.
 -/
 import Xv6.UkGrepDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -155,7 +157,7 @@ theorem grepUstrHd_nul (len : Nat) (f : Nat → BitVec 8) (hne : ∀ j, j < len 
 /-! ## §4 Frames of four and six words -/
 
 section Stack
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
 
 /-- A four-word frame, opened (match's; Rocq `ustack_4`). -/
 theorem grepUstack_four (γd : GName) (sp : BitVec 64) :
@@ -201,7 +203,7 @@ end Stack
 /-! ## §5 THE TWO CONTRACTS, indexed by the pattern's length -/
 
 section Specs
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 

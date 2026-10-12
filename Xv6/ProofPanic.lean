@@ -12,6 +12,8 @@ import MachCSL.WpSmodeFrame
 import Xv6.SpecPanic
 import Xv6.CodeTactics
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -28,7 +30,7 @@ theorem pn_fmt_addr : KA.«panic» + 0x67e8#64 = KStr.«%s\n» := by decide
 theorem pn_br_printk : KA.«panic» + 0xfffffffffffffcee#64 = KA.«printk» := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-! ## The two read-only format strings -/
 
@@ -55,7 +57,7 @@ theorem pn_cstr_fmt [CurCtx] :
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-! ## `printk` at the two call sites -/
 
@@ -124,7 +126,7 @@ theorem pn_printk1 (PK : PRINTK) [CurCtx]
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-! ## The self-jump
 

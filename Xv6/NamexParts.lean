@@ -42,6 +42,8 @@ import Xv6.SpecIunlockput
 import Xv6.SpecIlock
 import Xv6.SpecIdup
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL LeanRV64D

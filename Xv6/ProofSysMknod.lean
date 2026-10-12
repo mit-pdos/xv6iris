@@ -58,6 +58,8 @@ import Xv6.ReadiDefs
 import Xv6.SysLinkParts
 import Xv6.DirlookupParts
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -77,13 +79,13 @@ abbrev sysMknodHw (v : BitVec 64) : BitVec 16 := (v.extractLsb' 0 32).extractLsb
 
 theorem sys_mknod_hw_dev (v : BitVec 64) : (sysMknodHw v).toNat = devArg v := mkfDev_arg v
 
-theorem sys_mknod_ite_t {GF : BundledGFunctors} (X Y : IProp GF) : (if true = true then X else Y) ⊢ X := by
+theorem sys_mknod_ite_t {GF : BundledGFunctors.{0}} (X Y : IProp GF) : (if true = true then X else Y) ⊢ X := by
   simp only [ite_true]; exact .rfl
-theorem sys_mknod_ite_f {GF : BundledGFunctors} (X Y : IProp GF) : (if false = true then X else Y) ⊢ Y := by
+theorem sys_mknod_ite_f {GF : BundledGFunctors.{0}} (X Y : IProp GF) : (if false = true then X else Y) ⊢ Y := by
   simp only [Bool.false_eq_true, ite_false]; exact .rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]

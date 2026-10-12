@@ -60,6 +60,8 @@ constructor is `CfUp.step (cf_… )`, a finished subproof is `CfUp.done`.
 -/
 import Xv6.LineWords
 
+noncomputable section
+
 namespace Xv6
 
 /-- Rocq `bytes`. -/

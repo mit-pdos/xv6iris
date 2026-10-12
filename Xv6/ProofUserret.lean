@@ -30,7 +30,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- The file the kernel context hands over reads the user `satp` in `a0`. -/
 theorem userret_a0_get (cpu : CPU) (regs : RegMap) (v : BitVec 64) (h : regs 10#5 = v) :

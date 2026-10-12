@@ -91,13 +91,15 @@ fragment, `unit_mass 0 = 1`).
 import Xv6.BcacheInv
 import Xv6.WordFrac
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
 
 instance diskBlock_timeless (γd : DiskNames) (b : Nat) (bs : List (BitVec 8)) :
@@ -421,7 +423,7 @@ theorem bufEscrow_withdraw (γ : BcacheNames) (V : BioView GF) (γbk : BoxNames)
   imod stampsFrag_empty (GF := GF) (Id := BufId) γbk with Hf0
   imod boxWithdrawL1 (bufBoxPay γ V k qd qb) (ndot bioxN k) γbk cpu curCtx r 0
       (∅ : StampMap BufId) Kd 0 E (nclose_subseteq' k hE) hw (by rw [qsum_empty]; rfl) hKd
-      (by rw [maxStamp_empty]; exact Nat.le_refl 0) $$ [Hbox Hrun Hfld Hrd Hc Hf0]
+      (by rw [maxStamp_empty]) $$ [Hbox Hrun Hfld Hrd Hc Hf0]
     with ⟨Hrun, Hc, ⟨%x0, %T0, %hT0, Hrd, Hhdr⟩⟩
   · iframe Hbox Hrun Hrd Hc Hf0
     isplit

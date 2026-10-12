@@ -37,12 +37,14 @@ Rocq's notes, abridged (the reasons are the content):
 -/
 import Xv6.AppFileSteps
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section AppFileHook
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF]
 
 /-- THE TOKEN AS THE ERA HOLDS IT: the shares, or the taint (Rocq
@@ -115,8 +117,8 @@ theorem unionHook_file (c : FileFixed) (k : Nat) (r0 : FileAppNames) (s : Dst)
   unfold unionHk
   iintro %I %r %r' %hr %hr' %hrc Hg Hp Htk
   iapply bupd_except0_elim
-  imod (filePred_timeless (hlc := hlc) (GF := GF) c r' (absView I)).timeless $$ Hg with Hg
-  imod (filePred_timeless (hlc := hlc) (GF := GF) c r (absView I)).timeless $$ Hp with Hp
+  imod (@timeless_except0 _ _ _ (filePred_timeless (hlc := hlc) (GF := GF) c r' (absView I))).mp $$ Hg with Hg
+  imod (@timeless_except0 _ _ _ (filePred_timeless (hlc := hlc) (GF := GF) c r (absView I))).mp $$ Hp with Hp
   imodintro
   unfold unionTk
   -- THE TAINT, from any of its three sources: the loan untouched

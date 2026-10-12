@@ -80,6 +80,8 @@ Deviations from Rocq (spelling; every statement is Rocq's):
 -/
 import MachCSL.ObsTrace
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

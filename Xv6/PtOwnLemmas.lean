@@ -11,6 +11,9 @@ the supply covers `missingOn`.
 -/
 import Xv6.PtOwn
 import MachCSL.ByteWord
+import MachCSL.DecInst
+
+noncomputable section
 
 namespace MachCSL
 
@@ -194,7 +197,7 @@ theorem PTree.walk_fill (lvl : Nat) (t : PTree) (vpn : BitVec 27) (fr : List (Bi
       by_cases hj : vpnIdx v (l+1) = vpnIdx vpn (l+1)
       · rw [if_pos hj, hj, hk]
         exact ih c fr hc2
-      · rw [if_neg hj]
+      · rw [if_neg hj]; rfl
     | none =>
       cases fr with
       | nil => rfl
@@ -203,6 +206,7 @@ theorem PTree.walk_fill (lvl : Nat) (t : PTree) (vpn : BitVec 27) (fr : List (Bi
         rw [hk] at hz
         simp only [PTree.walk, PTree.setKid, PTree.setEnt, PTree.kids_node, PTree.ents_node,
           PTree.base_node]
+        fix_dec
         by_cases hj : vpnIdx v (l+1) = vpnIdx vpn (l+1)
         · rw [if_pos hj, if_pos hj, hj, hk, hz, if_pos rfl]
           exact (ih _ fr' (PTree.zeroNode_wfU b l)).trans (PTree.zeroNode_walk b l v)
@@ -368,7 +372,7 @@ open Sail LeanRV64D LeanRV64D.Functions
 set_option maxRecDepth 8000
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-! ## Updating one element of a big separating conjunction -/
 

@@ -23,6 +23,8 @@ Prop over the union's ghost names) is the union top's, not ported here.
 -/
 import Xv6.UnionOutPureSync
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

@@ -30,6 +30,8 @@ import MachCSL.DecodeBridge
 import MachCSL.Instr
 import Xv6.UserText
 
+noncomputable section
+
 namespace Xv6.User
 
 open Iris Iris.BI Iris.ProofMode Iris.ProgramLogic
@@ -171,7 +173,7 @@ reference registers (`MachCSL.swp_runRead`). -/
 
 section Step
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- A full word: its window, and its decode step. -/
 theorem utext_step_base (dref : (r : Register) → Option (RegisterType r)) {t : UTextTree}

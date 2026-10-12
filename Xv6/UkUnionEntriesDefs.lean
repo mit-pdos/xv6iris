@@ -59,6 +59,8 @@ import Xv6.UkFileDevSysHolds
 import Xv6.UexecExecMintW
 import Xv6.UkTreeEntryCat
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -68,7 +70,7 @@ open HfpFileClaimsP
 /-! ## §0 small facts -/
 
 /-- `imageEntry`, used at one call (its `□ ∀` opened). -/
-theorem imageEntry_use {GF : BundledGFunctors} [CtokG GF] (f : ElfBytes) (M : Nat → List (BitVec 8))
+theorem imageEntry_use {GF : BundledGFunctors.{0}} [CtokG GF] (f : ElfBytes) (M : Nat → List (BitVec 8))
     (av : BitVec 64) (sts : List FdState) (cw : Nat) (secc : BitVec 64) (cs : ExtTreeSet GName compare)
     (pidv : BitVec 32) (Q : Int → IProp GF) (Pay : IProp GF) (X : Uvis → IProp GF)
     (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (W' : Uvis)
@@ -97,7 +99,7 @@ theorem ue_fd1 {E : Penv} (hE : E.fd = fun x => if x = 1 then some 0 else none) 
   · rw [if_neg h1] at h; cases h
 
 section Params
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF] [FifRegG GF]
   [FileOutG GF] [PipeOutG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
@@ -219,7 +221,7 @@ end Params
 /-! ## §4 UkFileDev's parameters at the entries (deviation 6) -/
 
 section DevP
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]

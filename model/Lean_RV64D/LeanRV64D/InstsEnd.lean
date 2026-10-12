@@ -12360,7 +12360,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
       then (pure (0b100#3 +++ (1#1 +++ (0b00000#5 +++ ((encdec_ntl_forwards op) +++ 0b10#2)))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_NOP imm =>
     (do
@@ -12370,7 +12370,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
                     imm 4 0) +++ 0b01#2)))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_ADDI4SPN (rd, nzimm) =>
     (do
@@ -12384,7 +12384,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
                         rd) +++ 0b00#2)))))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_LW (uimm, rs1, rd) =>
     (do
@@ -12394,7 +12394,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
                     uimm 0 0) +++ ((Sail.BitVec.extractLsb uimm 4 4) +++ ((encdec_creg_forwards rd) +++ 0b00#2)))))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_LD (uimm, rs1, rd) =>
     (do
@@ -12407,7 +12407,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
                     uimm 4 3) +++ ((encdec_creg_forwards rd) +++ 0b00#2))))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_SW (uimm, rs1, rs2) =>
     (do
@@ -12417,7 +12417,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
                     uimm 0 0) +++ ((Sail.BitVec.extractLsb uimm 4 4) +++ ((encdec_creg_forwards rs2) +++ 0b00#2)))))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_SD (uimm, rs1, rs2) =>
     (do
@@ -12430,7 +12430,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
                     uimm 4 3) +++ ((encdec_creg_forwards rs2) +++ 0b00#2))))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_ADDI (imm, rsd) =>
     (do
@@ -12443,7 +12443,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
                     imm 4 0) +++ 0b01#2)))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_JAL imm =>
     (do
@@ -12458,7 +12458,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
                             2 0) +++ ((Sail.BitVec.extractLsb imm 4 4) +++ 0b01#2))))))))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_ADDIW (imm, rsd) =>
     (do
@@ -12475,7 +12475,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
                     imm 4 0) +++ 0b01#2)))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_LI (imm, rd) =>
     (do
@@ -12485,7 +12485,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
                     imm 4 0) +++ 0b01#2)))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_ADDI16SP nzimm =>
     (do
@@ -12499,7 +12499,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
                         nzimm 4 3) +++ ((Sail.BitVec.extractLsb nzimm 1 1) +++ 0b01#2))))))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_LUI (imm, rd) =>
     (do
@@ -12516,7 +12516,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
                     imm 4 0) +++ 0b01#2)))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_SRLI (shamt, rsd) =>
     (do
@@ -12529,7 +12529,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
                     rsd) +++ ((Sail.BitVec.extractLsb shamt 4 0) +++ 0b01#2))))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_SRAI (shamt, rsd) =>
     (do
@@ -12542,7 +12542,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
                     rsd) +++ ((Sail.BitVec.extractLsb shamt 4 0) +++ 0b01#2))))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_ANDI (imm, rsd) =>
     (do
@@ -12552,7 +12552,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
                     rsd) +++ ((Sail.BitVec.extractLsb imm 4 0) +++ 0b01#2))))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_SUB (rsd, rs2) =>
     (do
@@ -12562,7 +12562,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
                         rs2) +++ 0b01#2)))))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_XOR (rsd, rs2) =>
     (do
@@ -12572,7 +12572,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
                         rs2) +++ 0b01#2)))))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_OR (rsd, rs2) =>
     (do
@@ -12582,7 +12582,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
                         rs2) +++ 0b01#2)))))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_AND (rsd, rs2) =>
     (do
@@ -12592,7 +12592,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
                         rs2) +++ 0b01#2)))))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_SUBW (rsd, rs2) =>
     (do
@@ -12605,7 +12605,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
                         rs2) +++ 0b01#2)))))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_ADDW (rsd, rs2) =>
     (do
@@ -12618,7 +12618,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
                         rs2) +++ 0b01#2)))))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_J imm =>
     (do
@@ -12630,7 +12630,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
                             2 0) +++ ((Sail.BitVec.extractLsb imm 4 4) +++ 0b01#2))))))))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_BEQZ (imm, rs) =>
     (do
@@ -12641,7 +12641,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
                           imm 4 4) +++ 0b01#2))))))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_BNEZ (imm, rs) =>
     (do
@@ -12652,7 +12652,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
                           imm 4 4) +++ 0b01#2))))))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_SLLI (shamt, rsd) =>
     (do
@@ -12665,7 +12665,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
                     shamt 4 0) +++ 0b10#2)))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_LWSP (uimm, rd) =>
     (do
@@ -12678,7 +12678,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
                     uimm 2 0) +++ ((Sail.BitVec.extractLsb uimm 5 4) +++ 0b10#2))))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_LDSP (uimm, rd) =>
     (do
@@ -12695,7 +12695,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
                     uimm 1 0) +++ ((Sail.BitVec.extractLsb uimm 5 3) +++ 0b10#2))))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_SWSP (uimm, rs2) =>
     (do
@@ -12705,7 +12705,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
                     rs2) +++ 0b10#2)))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_SDSP (uimm, rs2) =>
     (do
@@ -12718,7 +12718,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
                     rs2) +++ 0b10#2)))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_JR rs1 =>
     (do
@@ -12729,7 +12729,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
       then (pure (0b100#3 +++ (0#1 +++ ((encdec_reg_forwards rs1) +++ (0b00000#5 +++ 0b10#2)))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_JALR rs1 =>
     (do
@@ -12740,7 +12740,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
       then (pure (0b100#3 +++ (1#1 +++ ((encdec_reg_forwards rs1) +++ (0b00000#5 +++ 0b10#2)))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_MV (rd, rs2) =>
     (do
@@ -12752,7 +12752,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
         (pure (0b100#3 +++ (0#1 +++ ((encdec_reg_forwards rd) +++ ((encdec_reg_forwards rs2) +++ 0b10#2)))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_EBREAK () =>
     (do
@@ -12760,7 +12760,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
       then (pure (0b1001#4 +++ (0b0000000000#10 +++ 0b10#2)))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_ADD (rsd, rs2) =>
     (do
@@ -12772,7 +12772,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
         (pure (0b100#3 +++ (1#1 +++ ((encdec_reg_forwards rsd) +++ ((encdec_reg_forwards rs2) +++ 0b10#2)))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_LBU (uimm, rdc, rsc1) =>
     (do
@@ -12782,7 +12782,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
                     uimm 0 0) +++ ((Sail.BitVec.extractLsb uimm 1 1) +++ ((encdec_creg_forwards rdc) +++ 0b00#2)))))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_LHU (v__940, rdc, rsc1) =>
     (do
@@ -12794,7 +12794,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
                         rdc) +++ 0b00#2))))))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_LH (v__942, rdc, rsc1) =>
     (do
@@ -12806,7 +12806,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
                         rdc) +++ 0b00#2))))))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_SB (uimm, rsc1, rsc2) =>
     (do
@@ -12816,7 +12816,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
                     uimm 0 0) +++ ((Sail.BitVec.extractLsb uimm 1 1) +++ ((encdec_creg_forwards rsc2) +++ 0b00#2)))))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_SH (v__944, rsc1, rsc2) =>
     (do
@@ -12828,7 +12828,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
                         rsc2) +++ 0b00#2))))))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_ZEXT_B rsdc =>
     (do
@@ -12837,7 +12837,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
         (pure (0b100#3 +++ (0b111#3 +++ ((encdec_creg_forwards rsdc) +++ (0b11#2 +++ (0b000#3 +++ 0b01#2))))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_SEXT_B rsdc =>
     (do
@@ -12849,7 +12849,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
         (pure (0b100#3 +++ (0b111#3 +++ ((encdec_creg_forwards rsdc) +++ (0b11#2 +++ (0b001#3 +++ 0b01#2))))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_ZEXT_H rsdc =>
     (do
@@ -12861,7 +12861,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
         (pure (0b100#3 +++ (0b111#3 +++ ((encdec_creg_forwards rsdc) +++ (0b11#2 +++ (0b010#3 +++ 0b01#2))))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_SEXT_H rsdc =>
     (do
@@ -12873,7 +12873,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
         (pure (0b100#3 +++ (0b111#3 +++ ((encdec_creg_forwards rsdc) +++ (0b11#2 +++ (0b011#3 +++ 0b01#2))))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_ZEXT_W rsdc =>
     (do
@@ -12885,7 +12885,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
         (pure (0b100#3 +++ (0b111#3 +++ ((encdec_creg_forwards rsdc) +++ (0b11#2 +++ (0b100#3 +++ 0b01#2))))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_NOT rsdc =>
     (do
@@ -12894,7 +12894,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
         (pure (0b100#3 +++ (0b111#3 +++ ((encdec_creg_forwards rsdc) +++ (0b11#2 +++ (0b101#3 +++ 0b01#2))))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_MUL (rsdc, rsc2) =>
     (do
@@ -12911,7 +12911,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
                       rsc2) +++ 0b01#2))))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_SSPUSH () =>
     (do
@@ -12926,7 +12926,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
       then (pure (0b011#3 +++ (0#1 +++ (0#1 +++ (0b000#3 +++ (1#1 +++ (0b00000#5 +++ 0b01#2)))))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_SSPOPCHK () =>
     (do
@@ -12941,7 +12941,7 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
       then (pure (0b011#3 +++ (0#1 +++ (0#1 +++ (0b010#3 +++ (1#1 +++ (0b00000#5 +++ 0b01#2)))))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .ZCMOP mop =>
     (do
@@ -12949,12 +12949,12 @@ noncomputable def encdec_compressed_forwards (arg_ : instruction) : SailM (BitVe
       then (pure (0b01100#5 +++ ((mop : (BitVec 3)) +++ (0b100000#6 +++ 0b01#2))))
       else
         (do
-          assert false "Pattern match failure at unknown location"
+          (assert false "Pattern match failure at unknown location")
           throw Error.Exit))
   | .C_ILLEGAL s => (pure s)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 noncomputable def encdec_compressed_backwards (arg_ : (BitVec 16)) : SailM instruction := do
@@ -17580,7 +17580,7 @@ def execute_ZICBOZ (rs1 : regidx) : SailM ExecutionResult := SailME.run do
           match (← (mem_write_ea paddr cache_block_size access pbmt false false false)) with
           | .Err (exc_addr, e) =>
             (do
-              assert (exc_addr == paddr) "extensions/Zicboz/zicboz_insts.sail:57.38-57.39"
+              (assert (exc_addr == paddr) "extensions/Zicboz/zicboz_insts.sail:57.38-57.39")
               (memory_exception (sub_virtaddr_xlenbits vaddr negative_offset) e))
           | .Ok _ =>
             (do
@@ -17593,7 +17593,7 @@ def execute_ZICBOZ (rs1 : regidx) : SailM ExecutionResult := SailME.run do
                   "store got false from mem_write_value")
               | .Err (exc_addr, e) =>
                 (do
-                  assert (exc_addr == paddr) "extensions/Zicboz/zicboz_insts.sail:66.42-66.43"
+                  (assert (exc_addr == paddr) "extensions/Zicboz/zicboz_insts.sail:66.42-66.43")
                   (memory_exception (sub_virtaddr_xlenbits vaddr negative_offset) e)))))
 
 def execute_ZICBOP (cbop : cbop_zicbop) (rs1 : regidx) (offset : (BitVec 12)) : SailM ExecutionResult := do
@@ -17764,7 +17764,7 @@ def execute_UTYPE (imm : (BitVec 20)) (rd : regidx) (op : uop) : SailM Execution
 
 /-- Type quantifiers: width : Nat, k_ex673555_ : Bool, k_ex673554_ : Bool, width ∈ {1, 2, 4, 8} -/
 def execute_STORECON (aq : Bool) (rl : Bool) (rs2 : regidx) (rs1 : regidx) (width : Nat) (rd : regidx) : SailM ExecutionResult := do
-  assert (width ≤b xlen_bytes) "extensions/A/zalrsc_insts.sail:68.28-68.29"
+  (assert (width ≤b xlen_bytes) "extensions/A/zalrsc_insts.sail:68.28-68.29")
   let data ← do (pure (Sail.BitVec.extractLsb (← (rX_bits rs2)) ((width *i 8) -i 1) 0))
   match (← (vmem_write rs1 (zeros (n := 64)) width data (StoreConditional (aq, rl, Data))
       (aq && rl) rl true)) with
@@ -17778,7 +17778,7 @@ def execute_STORECON (aq : Bool) (rl : Bool) (rs2 : regidx) (rs1 : regidx) (widt
 /-- Type quantifiers: width : Nat, width ∈ {1, 2, 4, 8} -/
 def execute_STORE (imm : (BitVec 12)) (rs2 : regidx) (rs1 : regidx) (width : Nat) : SailM ExecutionResult := do
   let offset : xlenbits := (sign_extend (m := 64) imm)
-  assert (width ≤b xlen_bytes) "extensions/I/base_insts.sail:320.28-320.29"
+  (assert (width ≤b xlen_bytes) "extensions/I/base_insts.sail:320.28-320.29")
   let data ← do (pure (Sail.BitVec.extractLsb (← (rX_bits rs2)) ((width *i 8) -i 1) 0))
   match (← (vmem_write rs1 offset width data (Store Data) false false false)) with
   | .Ok _ => (pure RETIRE_SUCCESS)
@@ -17895,17 +17895,17 @@ def execute_SSAMOSWAP (aq : Bool) (rl : Bool) (rs2 : regidx) (rs1 : regidx) (wid
     match (← (mem_write_ea paddr width access pbmt (aq && rl) rl true)) with
     | .Err (exc_addr, e) =>
       SailME.throw (← do
-          assert (exc_addr == paddr) "extensions/cfi/zicfiss_insts.sail:206.30-206.31"
+          (assert (exc_addr == paddr) "extensions/cfi/zicfiss_insts.sail:206.30-206.31")
           (memory_exception vaddr e))
     | .Ok _ =>
       (do
         match (← (mem_read access pbmt paddr width aq (aq && rl) true)) with
         | .Err (exc_addr, e) =>
           SailME.throw (← do
-              assert (exc_addr == paddr) "extensions/cfi/zicfiss_insts.sail:212.32-212.33"
+              (assert (exc_addr == paddr) "extensions/cfi/zicfiss_insts.sail:212.32-212.33")
               (memory_exception vaddr e))
         | .Ok v => (pure v)) ) : SailME ExecutionResult (BitVec (width * 8)) )
-  assert ((width == 4) || ((xlen == 64) && (width == 8))) "extensions/cfi/zicfiss_insts.sail:220.48-220.49"
+  (assert ((width == 4) || ((xlen == 64) && (width == 8))) "extensions/cfi/zicfiss_insts.sail:220.48-220.49")
   let write_val ← (( do (pure (Sail.BitVec.extractLsb (← (rX_bits rs2)) ((width *i 8) -i 1) 0))
     ) : SailME ExecutionResult (BitVec (width * 8)) )
   match (← (mem_write_value paddr width write_val access pbmt (aq && rl) rl true)) with
@@ -17915,7 +17915,7 @@ def execute_SSAMOSWAP (aq : Bool) (rl : Bool) (rs2 : regidx) (rs1 : regidx) (wid
       "AMOSWAP_SS got false from mem_write_value")
   | .Err (exc_addr, e) =>
     SailME.throw (← do
-        assert (exc_addr == paddr) "extensions/cfi/zicfiss_insts.sail:230.30-230.31"
+        (assert (exc_addr == paddr) "extensions/cfi/zicfiss_insts.sail:230.30-230.31")
         (memory_exception vaddr e))
   (pure RETIRE_SUCCESS)
 
@@ -18232,7 +18232,7 @@ def execute_LPAD (lpl : (BitVec 20)) : SailM ExecutionResult := do
 
 /-- Type quantifiers: width : Nat, k_ex673564_ : Bool, k_ex673563_ : Bool, width ∈ {1, 2, 4, 8} -/
 def execute_LOADRES (aq : Bool) (rl : Bool) (rs1 : regidx) (width : Nat) (rd : regidx) : SailM ExecutionResult := do
-  assert (width ≤b xlen_bytes) "extensions/A/zalrsc_insts.sail:43.28-43.29"
+  (assert (width ≤b xlen_bytes) "extensions/A/zalrsc_insts.sail:43.28-43.29")
   match (← (vmem_read rs1 (zeros (n := 64)) width (LoadReserved (aq, rl, Data)) aq (aq && rl) true)) with
   | .Ok data =>
     (do
@@ -18243,7 +18243,7 @@ def execute_LOADRES (aq : Bool) (rl : Bool) (rs1 : regidx) (width : Nat) (rd : r
 /-- Type quantifiers: width : Nat, k_ex673566_ : Bool, width ∈ {1, 2, 4, 8} -/
 def execute_LOAD (imm : (BitVec 12)) (rs1 : regidx) (rd : regidx) (is_unsigned : Bool) (width : Nat) : SailM ExecutionResult := do
   let offset : xlenbits := (sign_extend (m := 64) imm)
-  assert (width ≤b xlen_bytes) "extensions/I/base_insts.sail:289.28-289.29"
+  (assert (width ≤b xlen_bytes) "extensions/I/base_insts.sail:289.28-289.29")
   match (← (vmem_read rs1 offset width (Load Data) false false false)) with
   | .Ok data =>
     (do
@@ -18662,7 +18662,7 @@ def execute_BTYPE (imm : (BitVec 13)) (rs2 : regidx) (rs1 : regidx) (op : bop) :
   {1, 2, 4, 8, 16} -/
 def execute_AMO (op : amoop) (aq : Bool) (rl : Bool) (rs2 : regidx) (rs1 : regidx) (width : Nat) (rd : regidx) : SailM ExecutionResult := SailME.run do
   let width := width
-  assert (width ≤b (xlen_bytes *i 2)) "extensions/A/zaamo_insts.sail:73.32-73.33"
+  (assert (width ≤b (xlen_bytes *i 2)) "extensions/A/zaamo_insts.sail:73.32-73.33")
   let access := (Atomic (op, aq, rl, Data, Data))
   let vaddr ← (( do
     match (← (get_transformed_data_addr rs1 (zeros (n := 64)) access width)) with
@@ -18691,14 +18691,14 @@ def execute_AMO (op : amoop) (aq : Bool) (rl : Bool) (rs2 : regidx) (rs1 : regid
     match (← (mem_write_ea addr width access pbmt (aq && rl) rl true)) with
     | .Err (exc_addr, e) =>
       SailME.throw (← do
-          assert (exc_addr == addr) "extensions/A/zaamo_insts.sail:104.29-104.30"
+          (assert (exc_addr == addr) "extensions/A/zaamo_insts.sail:104.29-104.30")
           (memory_exception vaddr e))
     | .Ok _ =>
       (do
         match (← (mem_read access pbmt addr width aq (aq && rl) true)) with
         | .Err (exc_addr, e) =>
           SailME.throw (← do
-              assert (exc_addr == addr) "extensions/A/zaamo_insts.sail:110.31-110.32"
+              (assert (exc_addr == addr) "extensions/A/zaamo_insts.sail:110.31-110.32")
               (memory_exception vaddr e))
         | .Ok loaded => (pure loaded)) ) : SailME ExecutionResult (BitVec (width * 8)) )
   let rs2_val ← (( do
@@ -18758,7 +18758,7 @@ def execute_AMO (op : amoop) (aq : Bool) (rl : Bool) (rs2 : regidx) (rs1 : regid
         (internal_error "extensions/A/zaamo_insts.sail" 153 "AMO got false from mem_write_value")
       | .Err (exc_addr, e) =>
         (do
-          assert (exc_addr == addr) "extensions/A/zaamo_insts.sail:156.29-156.30"
+          (assert (exc_addr == addr) "extensions/A/zaamo_insts.sail:156.29-156.30")
           (memory_exception vaddr e)))
 
 def execute_ADDIW (imm : (BitVec 12)) (rs1 : regidx) (rd : regidx) : SailM ExecutionResult := do

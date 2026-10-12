@@ -37,6 +37,8 @@ import Xv6.UnionDiscDec
 import Xv6.GenOutPureSeal
 import Xv6.PipesLedPure
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

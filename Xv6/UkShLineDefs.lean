@@ -13,6 +13,8 @@ Rocq `UkSh.v`: `ush_line_is` (line 385) and `ush_line_at` (line 450), pinned
 -/
 import Xv6.FileDiscLine
 
+noncomputable section
+
 namespace Xv6
 
 /-- **Rocq `ush_line_is`**: the buffer at `k` holds the echo line of `ws`. -/

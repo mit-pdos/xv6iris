@@ -34,6 +34,8 @@ import Xv6.UnionDiscDec
 import Xv6.UshFileRedir
 import Xv6.UnionDemo
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI MachCSL
@@ -209,6 +211,9 @@ theorem udone_tie_of_pre_prefix (cs cs' : List Nat) (sb : Fstate) (I : List (Bit
       have h := hid (by omega)
       simp only [lmAt] at h
       rw [← hl', ll_snoc_lookup_total] at h
+      -- `ulmG` is reducible (so that `lmSt` unifies, Lean ≥ 4.34): `simp` unfolded its projections
+      -- in `h` but not in the goal
+      change c = ustep (ust cs' sb I) (ul I) (ualtDec a)
       rw [h]
       exact hc
 

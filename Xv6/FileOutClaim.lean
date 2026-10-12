@@ -44,12 +44,14 @@ Rocq's header, abridged:
 import Xv6.FileOutEra
 import Xv6.GenOut
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section FileOutClaim
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF]
 
 /-! ## The writer's witness and the claim's parameters -/
@@ -87,8 +89,8 @@ noncomputable def fileCparams (g : FileGn) : GenCparams hlc GF fileLm where
   gcPIN_tl := fun _ _ => inferInstance
   gcPIN_agree := fileOut_eraPin_agree (fgnEcho g)
   gcW := f0cw (hlc := hlc) g
-  gcW_pers := fun _ _ => inferInstance
-  gcW_tl := fun _ _ => inferInstance
+  gcW_pers := fun k s => f0cw_persistent g k s
+  gcW_tl := fun k s => f0cw_timeless g k s
 
 /-! ## The state witness's authority -/
 
@@ -174,10 +176,10 @@ theorem fileGextGrow (_k : Nat) (_l : List (BitVec 8)) (_b : BitVec 8) :
 /-- THE STATE WITNESS RECORD (Rocq `file_wa`). -/
 noncomputable def fileWa (g : FileGn) : GenWa fileLm (fileCparams (hlc := hlc) (GF := GF) g) (∅ : Fstate) where
   gwa := f0wa g
-  gwa_tl := fun _ _ => inferInstance
+  gwa_tl := fun k st => f0wa_timeless g k st
   gwa_agree := f0wa_agree_d g
   gwaTy := f0Typed g
-  gwaTy_pers := fun _ => inferInstance
+  gwaTy_pers := fun s => f0Typed_persistent g s
   gwa_W := f0wa_W g
   gwaBoot := f0boot g
   gwa_file := f0wa_file g
@@ -200,7 +202,8 @@ noncomputable def fecl (g : FileGn) (k : Nat) (ho : List Obs) (H : ConsHist) : I
 
 instance fecl_timeless (g : FileGn) (k : Nat) (ho : List Obs) (H : ConsHist) :
     Timeless (fecl (hlc := hlc) (GF := GF) g k ho H) := by
-  unfold fecl; infer_instance
+  -- Lean ≥ 4.34: instance search does not unify `gcl_timeless`'s pattern here; the term does
+  unfold fecl; exact gcl_timeless _ _ _ _ _ _ _
 
 /-! ## The credential /init is handed at its era's first instruction -/
 

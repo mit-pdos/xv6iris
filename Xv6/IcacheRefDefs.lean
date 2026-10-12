@@ -173,6 +173,8 @@ import Xv6.BlkmapDefs
 import Xv6.OffBoxCam
 import Xv6.SleepLockGhost
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -381,7 +383,7 @@ one-shot, the link ledger, the redemption ticket, the escrow-name registry,
 the locked registry, the pool's residency / in-transition keys, the transit
 ledger, the corpse ledger, the count coupling, the freeze mirror and the
 lock-window pin. -/
-class IcacheG (GF : BundledGFunctors) where
+class IcacheG (GF : BundledGFunctors.{0}) where
   [irefG : ElemG GF (constOF IcacheUR)]
   [idG : GhostVarG GF (Bool × BitVec 32 × BitVec 32)]
   [liveG : ElemG GF (constOF IliveUR)]
@@ -405,7 +407,7 @@ attribute [reducible, instance] IcacheG.irefG IcacheG.idG IcacheG.liveG IcacheG.
 /-- The icache instance of the transit box (Rocq `Xv6Cameras.icboxG`):
 stamps at `IcBid`, the two register ghost variables.  The count member is
 the kernel's shared `GhostVarG GF Nat` (`Xv6G.gvNatG`; deviation 5). -/
-class IcboxG (GF : BundledGFunctors) where
+class IcboxG (GF : BundledGFunctors.{0}) where
   [stampsG : ElemG GF (StampsRF IcBid)]
   [slotdG : GhostVarG GF (SlotReg IcBid IcX)]
   [slotpG : GhostVarG GF (L2Reg IcBid)]
@@ -828,7 +830,7 @@ theorem hpnBootMap_valid : ✓ hpnBootMap := by
 `icfgAlloc`; deviation 9) -/
 
 section IcacheIty
-variable {GF : BundledGFunctors} [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [IcacheG GF]
 
 /-- Minted at the recycle, parked at the slot's fresh generation. -/
 def ityPending (g : GName) : IProp GF :=
@@ -884,7 +886,7 @@ end IcacheIty
 /-! ## 4.  THE BOOT ALLOCATION -/
 
 section Alloc
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- One ghost per index, as a function (Rocq's four `*_fun_alloc`s, with
 their always-`0` start index dropped). -/
@@ -1107,7 +1109,7 @@ holder of `iregBoot` proves every slot is unclaimed
 forkret's first branch. -/
 
 section IcacheRegime
-variable {GF : BundledGFunctors} [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [IcacheG GF]
 
 def iregBoot [Icfg] : IProp GF := ityPending icfgBoot
 

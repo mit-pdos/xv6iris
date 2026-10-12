@@ -20,6 +20,8 @@ Imports only definitional files.
 -/
 import Xv6.HandlerEnv
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -49,7 +51,7 @@ whose device path calls `devintr`.  Nothing else about the interrupted
 context is assumed -- `ihsF` quantifies it freely, and the running slot is
 named by THE CLAIM the trap hands over (`Xv6.cpuClaim_proc_shape`). -/
 structure KERNELVEC : Prop where
-  handler : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
+  handler : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
     (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
     [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU),
     ⊢ ihs (GF := GF) ⟨envFam Γ γ0 γ1 γc γl0 γl1 γd γdl γt, cpu, kernelvecAddr⟩
@@ -61,7 +63,7 @@ handler -- at WHATEVER disk pages its credentials name (the pages
 `virtio_disk_init` chose; batch 8-P, pending (e)).  (This is what
 `procsInvAll`, the family over ALL contexts the contract used to demand,
 made impossible.) -/
-theorem intrRes_of_kernelvec {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+theorem intrRes_of_kernelvec {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [DiskG GF] [CurCtx] (KV : KERNELVEC) (Γ : SchedNames) (γ0 γ1 : UartNames)
     (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName) (pd pav pu : BitVec 64)
     [ClaimIs (hlc := hlc) GF Γ]
@@ -80,7 +82,7 @@ theorem intrRes_of_kernelvec {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc G
   · iapply envAt_of_caps' Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu hT $$ [$Hpinv $Hcaps]
 
 section Row
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
 
 /-- kernelvec's contract at hart `cpu`, at every environment the row

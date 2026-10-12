@@ -79,6 +79,8 @@ import Xv6.SchedCtx
 import Xv6.UMemImg
 import Xv6.SpecEitherCopyin
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -115,7 +117,7 @@ def consWriteCnt (P P' : UPtd) (ua : BitVec 64) (n : Int) (i : Nat) : Prop :=
     ¬ uvaRmapped P (ua + BitVec.ofNat 64 d).toNat)
 
 section ConsOutChain
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-- **THE CALLER'S JUSTIFICATION FOR THE BYTES THIS CALL MAY PUSH** (Rocq
 `cons_out_chain`, lane OUT-FUPD F3): at cursor `j` with `cnt` bytes still
@@ -237,7 +239,7 @@ complement (`trapCsrsExt` / `cpuClaimExt`, `emp` at `sie = true`) in and
 out, handed to `uartwrite`'s eb contract across each park.  Depth 0 (no
 spinlock held, `KCtx.wf`); it parks, so the crossing is the literal
 `true`.  `a0 = user_src` (nonzero), `a1 = src`, `a2 = n`. -/
-def wp_consolewrite_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+def wp_consolewrite_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γ : UartNames)
     (γkl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
@@ -269,7 +271,7 @@ def wp_consolewrite_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
 
 /-- The interface of `consolewrite`. -/
 structure CONSOLEWRITE : Prop where
-  wp_consolewrite_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+  wp_consolewrite_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γ : UartNames)
     (γkl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)

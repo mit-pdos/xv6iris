@@ -20,12 +20,14 @@ import MachCSL.WpSmodeRules
 import MachCSL.Lock
 import MachCSL.WpLockSchema
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open LeanRV64D LeanRV64D.Functions
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {lent : Bool}
 
 -- The schema `wpLoop_k_lock` lives in `MachCSL.WpLockSchema`.

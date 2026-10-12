@@ -44,7 +44,7 @@ theorem sys_exec_br_memset : KA.«sys_exec» + 0xffffffffffffb754#64 = KA.«mems
 theorem sys_exec_ret_46 : jumpPc (KA.«sys_exec» + 0x46#64) = KA.«sys_exec» + 0x46#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 set_option maxHeartbeats 8000000 in
 /-- `memset(dst, c, n)` (Rocq `Memset.wp_memset_sconf`): memset does not
@@ -77,7 +77,7 @@ theorem sys_exec_memset (MS : MEMSET) (cpu : CPU) (k' : KCtx) (se : Bool) (hs : 
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]

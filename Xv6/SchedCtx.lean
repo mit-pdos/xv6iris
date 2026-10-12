@@ -37,6 +37,8 @@ import Xv6.ProcDefs
 import Xv6.Image
 import Xv6.SlotLed
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -133,7 +135,7 @@ theorem parkOk_not_RUNNING {st : BitVec 32} (h : parkOk st) : st ≠ RUNNING := 
 @[simp] theorem unclaimed_RUNNING : ¬ unclaimed RUNNING := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-! ## Transport
 
@@ -505,7 +507,7 @@ theorem procClaim_elim (Γ : SchedNames) (cpu : CPU) (j : Nat) (hj : j < NPROC) 
 `claimP := procClaim Γ`, and the instance is `rfl`.  Every wave-2 contract
 takes it, which is how `MachCSL.cpuClaim` -- the thing the interrupt arm
 carries -- becomes the proc table's own claim. -/
-class ClaimIs (GF : BundledGFunctors) [MachGS hlc GF] [Xv6G GF] (Γ : SchedNames) : Prop where
+class ClaimIs (GF : BundledGFunctors.{0}) [MachGS hlc GF] [Xv6G GF] (Γ : SchedNames) : Prop where
   eq : ∀ (cpu : CPU) (p : BitVec 64), cpuClaim (hlc := hlc) (GF := GF) cpu p = procClaim Γ cpu p
 
 theorem cpuClaim_eq (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (p : BitVec 64) :
@@ -516,7 +518,7 @@ end
 /-! ## The public cells (Rocq `SchedCtx.proc_pub`) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 section PubRest
 variable [CtokG GF] [WchG GF]
@@ -644,7 +646,7 @@ end
 /-! ## The records and the slot invariant -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-- `&cpus[h].context`. -/
 def cpuCtxAddr (h : CPU) : BitVec 64 := cpuAddr h + 8#64

@@ -52,12 +52,14 @@ register notations `a0_idx`..`a7_idx`.
 import Xv6.FileWritePart
 import Xv6.UkRunSysWrite
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section UEchoFile
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [OffboxG GF]
 
 /-! ## §1 the cursor: the deed and the fragment at one position -/

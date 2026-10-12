@@ -104,6 +104,8 @@ import MachCSL.CallConv
 import MachCSL.KCtxMove
 import Xv6.UartGhosts
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -179,7 +181,7 @@ theorem devswReadVal_is_console (mj : Nat) (h : devswReadVal mj = KA.«consolere
     exact absurd h (by decide)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-! ## The ring's bytes and its tag column -/
 
@@ -901,7 +903,7 @@ needs a `CtxMorph`; they are NOT convertible across two contexts and do not
 have to be -- a deposit wants TRANSPORTABILITY. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 instance devswTable_morph (t : KTier) :
     CtxMorph (GF := GF) (fun ξ => devswTable (X := ⟨ξ, t⟩)) :=

@@ -18,7 +18,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Std MachCSL LeanRV64D
 
 section
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- **The bump**, `+0x100 → +0x10e` (any `%`-state, any `ap`). -/
 theorem ulibVprintf_next (L : UlibRunP GF) (base : BitVec 64) (m0 m : RegMap) (a : Nat)

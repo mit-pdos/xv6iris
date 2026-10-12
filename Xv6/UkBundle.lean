@@ -22,6 +22,8 @@ body is `uvAmb ∗ ukCore ∗ Rfd ∗ ukontF` up to reassociation.
 import Xv6.UkLand
 import Xv6.UexecRetSlot
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -53,7 +55,7 @@ theorem ukOpened_preS {C : UCfg} {P : UPtd} {T : BMap} {m : RegMap} {pc : BitVec
     by rw [ucPreS_file_other _ _ (by decide)]; exact h.hnpc, h.view⟩
 
 section core
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- **The bundle's machine core** (see the header). -/
 def ukCore [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IProp GF) (sz : Nat) (M : ElfMem)

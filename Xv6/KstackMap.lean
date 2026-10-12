@@ -24,6 +24,8 @@ import Xv6.KvmSeal
 import Xv6.SpecProcinit
 import Xv6.UPtUnmapLemmas
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -102,7 +104,7 @@ theorem kvmTableOk_kptFacts_stacks (t : PTree) (pas : Nat → BitVec 44) (h : kv
 
 /-! ## The stack claims -/
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- The 64 stack claims: page `pas i` is mapped read-write at `KSTACK(i)`. -/
 def kstackMapAt [CurCtx] (pas : Nat → BitVec 44) : IProp GF := iprop%

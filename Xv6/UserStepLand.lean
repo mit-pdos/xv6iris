@@ -52,6 +52,8 @@ tower's `ufTrapSet`, the clock tick).
 import Xv6.UserFrameFoot
 import MachCSL.UTrap
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

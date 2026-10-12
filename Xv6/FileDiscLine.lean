@@ -50,6 +50,8 @@ import Xv6.FileClass
 import Xv6.FileState
 import Xv6.EchoDisc
 
+noncomputable section
+
 namespace Xv6
 
 /-! ## 1.  THE LINES THE USER MAY TYPE -/

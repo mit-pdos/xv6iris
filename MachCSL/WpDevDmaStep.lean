@@ -56,11 +56,13 @@ Nothing here changes `MachCSL/WpDevDma.lean`: `DevM.Lease` is untouched.
 -/
 import MachCSL.WpDevDma
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-! ## The derivation -/
 
@@ -72,7 +74,7 @@ behind when it ENDS -- `True` for a forked task, and the root loop's own
 resource `Cr` for the root, which is how a resource survives from one
 iteration of the root loop to the next.  `.setPin` is excluded exactly as
 in `DevM.Lease`. -/
-inductive DevM.LeaseL {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] {S T : Type}
+inductive DevM.LeaseL {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] {S T : Type}
     (R : S → IProp GF) (Lt : T → IProp GF) (Ce : IProp GF) : IProp GF → DevM S T Unit → Prop
   /-- The end of the program: whatever context is left must produce `Ce`.
   For the ROOT task `Ce` is the loop's own resource `Cr`, which the next

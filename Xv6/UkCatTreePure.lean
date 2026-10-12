@@ -28,6 +28,8 @@ Deviations from Rocq:
 import Xv6.UkCatDefs
 import Xv6.ProgTree
 
+noncomputable section
+
 namespace Xv6
 
 /-- **Rocq `write_bytes_app`**. -/

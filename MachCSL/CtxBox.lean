@@ -73,13 +73,15 @@ THE TRANSITIONS (Rocq's seven, with their hooked forms): (a)
 -/
 import MachCSL.Lock
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std
 open LeanRV64D
 
 section transport
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 local notation "era" => MachGS.era (hlc := hlc) (GF := GF)
 
@@ -277,7 +279,7 @@ structure BoxNames where
 /-- **The client's payload family** (Rocq's four section parameters `P_hdr`,
 `P_rest`, `Q1`, `Q2`): the header the L1 side reads and writes, the rest of
 the bundle, and the two arm-indexed ghost residues. -/
-structure BoxPay (GF : BundledGFunctors) (Id X : Type) where
+structure BoxPay (GF : BundledGFunctors.{0}) (Id X : Type) where
   hdr : Id → X → CtxId → IProp GF
   rest : X → CtxId → IProp GF
   q1 : Nat → IProp GF
@@ -699,7 +701,7 @@ abbrev StampsRF (Id : Type) [Ord Id] [Std.TransOrd Id] [Std.LawfulEqOrd Id] : CO
 
 section box
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {Id X : Type} [Ord Id] [Std.TransOrd Id] [Std.LawfulEqOrd Id] [DecidableEq Id]
 
 /-- The client's obligations (Rocq's section `Context`s): both halves of the

@@ -106,6 +106,8 @@ Rocq statement.
 -/
 import Xv6.DirView
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

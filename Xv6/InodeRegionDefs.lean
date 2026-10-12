@@ -86,6 +86,8 @@ import Xv6.FsStateInode
 import Xv6.IcacheRefLink
 import Xv6.FsBytes
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.Std MachCSL

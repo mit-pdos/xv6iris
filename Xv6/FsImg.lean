@@ -76,6 +76,8 @@ import Xv6.LogDefs
 import Xv6.DinodeEnc
 import Xv6.FsGeom
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

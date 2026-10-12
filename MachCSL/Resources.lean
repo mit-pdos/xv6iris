@@ -47,6 +47,8 @@ import Iris.Instances.Lib.GhostVar
 import Iris.ProgramLogic.WeakestPre
 import MachCSL.FrameFilter
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
@@ -149,7 +151,7 @@ structure EraGS where
 
 /-- The functors the machine needs (for adequacy: what a `BundledGFunctors`
 must contain). -/
-class MachGpreS (hlc : outParam HasLC) (GF : BundledGFunctors) extends InvGpreS GF where
+class MachGpreS (hlc : outParam HasLC) (GF : BundledGFunctors.{0}) extends InvGpreS GF where
   reg_pre : GhostMapG GF Nat RegVal RegMapF
   mem_pre : genHeapPreS PAddr Hist GF MemF
   mono_pre : MonoNatG GF
@@ -192,7 +194,7 @@ attribute [reducible, instance] MachGpreS.diskImg_pre
 attribute [reducible, instance] MachGpreS.mirror_pre
 
 /-- The fixed layer: allocated once, survives every power cycle. -/
-class MachFixedGS (hlc : outParam HasLC) (GF : BundledGFunctors) where
+class MachFixedGS (hlc : outParam HasLC) (GF : BundledGFunctors.{0}) where
   -- not an instance on purpose to avoid diamonds with IrisGS_gen
   [invGS : InvGS_gen hlc GF]
   reg : GhostMapG GF Nat RegVal RegMapF
@@ -417,7 +419,7 @@ structure CtxId where
 /-- The ambient instance: the fixed layer, one era (its register names and
 memory heap, spelled out as fields so the heap can be an instance), and the
 era's generation. -/
-class MachGS (hlc : outParam HasLC) (GF : BundledGFunctors) where
+class MachGS (hlc : outParam HasLC) (GF : BundledGFunctors.{0}) where
   [fixed : MachFixedGS hlc GF]
   /-- the register-map ghost name of each hart -/
   regName : CPU → GName
@@ -451,7 +453,7 @@ class MachGS (hlc : outParam HasLC) (GF : BundledGFunctors) where
 
 attribute [reducible, instance] MachGS.fixed
 
-variable {hlc : HasLC} {GF : BundledGFunctors}
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}}
 
 /-- Era `E`'s memory heap: the fixed layer's heap functors at the era's two
 heap names. -/
@@ -660,8 +662,10 @@ where the device fabric ends). -/
 theorem devAddr_false_of_inRam {pa : PAddr} {n : Nat} (h : inRam pa n) : devAddr pa = false := by
   have h1 := h.1
   simp only [ramBase] at h1
-  simp only [devAddr, devBound, decide_eq_false_iff_not, Nat.not_lt]
-  omega
+  simp only [devAddr, devBound]
+  -- the goal is `decide (pa.toNat < devBound) = false` (Sail's `<b`); since Lean 4.34
+  -- `decide_eq_false_iff_not` does not fire on it under `simp only`
+  exact decide_eq_false (by omega)
 
 /-- A memory access whose footprint is DRAM is not an MMIO access. -/
 theorem devAddr_false_of_ramBytes {pa : PAddr} {n : Nat} (h : ramBytes pa n) (hn : 0 < n) :
@@ -708,7 +712,7 @@ theorem devWrite_pos {ds ds' : DevStates} {pa : PAddr} {n : Nat} {w : BitVec (8 
     | some p =>
       obtain ⟨d, off⟩ := p
       cases d <;> simp [devSig, Uart.sig, Uart.writeN, Plic.sig, Plic.writeN,
-        Virtio.sig, Virtio.writeN]
+        Virtio.sig, Virtio.writeN, Option.map]
   · exact hn
 
 /-! ### Getting `ramBytes` out of the memory -/
@@ -952,7 +956,7 @@ def memModelAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) : IProp GF := ipro
 
 /-- `cpus` lists every hart at its own index. -/
 theorem cpus_get? (cpu : CPU) : cpus[cpu.val]? = some cpu := by
-  simp [cpus, cpu.isLt]; exact Fin.ext rfl
+  simp [cpus, cpu.isLt]
 
 theorem cpus_get?_ne {k : Nat} {y : CPU} (hk : cpus[k]? = some y) (cpu : CPU) (hne : k ≠ cpu.val) :
     y ≠ cpu := by
@@ -1160,36 +1164,36 @@ theorem obsHistLb_prefix (h h0 : List Obs) :
 
 /-- THE TRIVIAL TAG FAMILY: what an application that claims nothing about its
 input fills the tag slot with. -/
-def rxTagTriv {GF : BundledGFunctors} : List Obs → IProp GF := fun _ => iprop(True)
-instance {GF : BundledGFunctors} (h : List Obs) : Persistent (rxTagTriv (GF := GF) h) := by
+def rxTagTriv {GF : BundledGFunctors.{0}} : List Obs → IProp GF := fun _ => iprop(True)
+instance {GF : BundledGFunctors.{0}} (h : List Obs) : Persistent (rxTagTriv (GF := GF) h) := by
   unfold rxTagTriv; infer_instance
-instance {GF : BundledGFunctors} (h : List Obs) : Timeless (rxTagTriv (GF := GF) h) := by
+instance {GF : BundledGFunctors.{0}} (h : List Obs) : Timeless (rxTagTriv (GF := GF) h) := by
   unfold rxTagTriv; infer_instance
 
 /-- THE TRIVIAL KILL CREDENTIAL: `True`, so the `□` every party holds it
 under is free. -/
-def killCredTriv {GF : BundledGFunctors} : IProp GF := iprop(True)
-instance {GF : BundledGFunctors} : Persistent (killCredTriv (GF := GF)) := by
+def killCredTriv {GF : BundledGFunctors.{0}} : IProp GF := iprop(True)
+instance {GF : BundledGFunctors.{0}} : Persistent (killCredTriv (GF := GF)) := by
   unfold killCredTriv; infer_instance
-instance {GF : BundledGFunctors} : Timeless (killCredTriv (GF := GF)) := by
+instance {GF : BundledGFunctors.{0}} : Timeless (killCredTriv (GF := GF)) := by
   unfold killCredTriv; infer_instance
 
 /-- THE TRIVIAL CONSOLE CLAIM: an application that claims nothing of the
 console; the founding and every route that returns it are `emp`. -/
-def consResTriv {GF : BundledGFunctors} : Nat → List Obs → ConsHist → IProp GF :=
+def consResTriv {GF : BundledGFunctors.{0}} : Nat → List Obs → ConsHist → IProp GF :=
   fun _ _ _ => iprop(emp)
-instance {GF : BundledGFunctors} (k : Nat) (h : List Obs) (H : ConsHist) :
+instance {GF : BundledGFunctors.{0}} (k : Nat) (h : List Obs) (H : ConsHist) :
     Timeless (consResTriv (GF := GF) k h H) := by
   unfold consResTriv; infer_instance
 
 /-- THE ABSENT WILD CREDENTIAL (Rocq `RiscvPtsto.wild_none`): what an
 application with no masked program fills the `wild` and `rdwild` slots
 with.  Its law (`Xv6.wildNone_lic`) is proved from `False`, at any claim. -/
-def wildNone {GF : BundledGFunctors} : Nat → IProp GF := fun _ => iprop(False)
-instance wildNone_persistent {GF : BundledGFunctors} (k : Nat) :
+def wildNone {GF : BundledGFunctors.{0}} : Nat → IProp GF := fun _ => iprop(False)
+instance wildNone_persistent {GF : BundledGFunctors.{0}} (k : Nat) :
     Persistent (wildNone (GF := GF) k) := by
   unfold wildNone; infer_instance
-instance wildNone_timeless {GF : BundledGFunctors} (k : Nat) :
+instance wildNone_timeless {GF : BundledGFunctors.{0}} (k : Nat) :
     Timeless (wildNone (GF := GF) k) := by
   unfold wildNone; infer_instance
 
@@ -1371,7 +1375,7 @@ theorem uRcptOpt_valid (h : List Obs) (ox : Option (Nat × Obs)) :
 M2-W2d): the round claim `Cr i` of the cited exit, or the origin ticket
 `Co`.  `uClaimFor` is it at the record's slots; the adequacy states its
 hooks at the raw families. -/
-def uClaimForRaw {GF : BundledGFunctors} (Cr : Nat → IProp GF) (Co : IProp GF) :
+def uClaimForRaw {GF : BundledGFunctors.{0}} (Cr : Nat → IProp GF) (Co : IProp GF) :
     Option (Nat × Obs) → IProp GF
   | none => Co
   | some (i, _) => Cr i

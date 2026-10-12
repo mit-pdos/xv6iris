@@ -38,7 +38,7 @@ theorem bu_br_acq : KA.«bunpin» + 0xffffffffffffddde#64 = KA.«acquire» := by
 theorem bu_br_rel : KA.«bunpin» + 0xffffffffffffde66#64 = KA.«release» := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF] [CurCtx]
 
 /-! ## The tail: the epilogue -/
 

@@ -42,6 +42,8 @@ header, point for point:
 import Xv6.SpecUkLeaves
 import Xv6.UmodeAbi
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

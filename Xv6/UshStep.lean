@@ -48,6 +48,8 @@ import Xv6.UkRunMem
 import Xv6.UkProgAbi
 import Xv6.UkRunLeaf
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -156,7 +158,7 @@ theorem ush_cs_epi (m me : RegMap) (rs : List (BitVec 5)) (sp0 : BitVec 64) (hsp
 /-! ## §1 The step lemmas at `Nat` pcs -/
 
 section UshStep
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] {C : IProp GF} [Persistent C]
 

@@ -22,6 +22,8 @@ import MachCSL.WpSmodeFrame6
 import Xv6.UvmallocDefs
 import Xv6.WalkaddrDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -108,7 +110,7 @@ theorem kkKept_trans {R R' R'' : RegMap} (h : kkKept R R') (h' : kkKept R' R'') 
 
 /-- `kkill`'s six-slot frame at `sp`: `ra`, `s0`, `s1`, `s2`, `s3` and the
 unused bottom word. -/
-def kkFrame {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+def kkFrame {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (sp v0 v1 v2 v3 v4 v5 : BitVec 64) : IProp GF := iprop%
   wordPointsTo (sp + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) v0 ∗
   wordPointsTo (sp + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) v1 ∗
@@ -117,7 +119,7 @@ def kkFrame {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
   wordPointsTo (sp + 0xFFFFFFFFFFFFFFD8#64) 8 (DFrac.own 1) v4 ∗
   wordPointsTo (sp + 0xFFFFFFFFFFFFFFD0#64) 8 (DFrac.own 1) v5
 
-theorem kkFrame_split {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+theorem kkFrame_split {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (sp v0 v1 v2 v3 v4 v5 : BitVec 64) :
     kkFrame (GF := GF) sp v0 v1 v2 v3 v4 v5 ⊢
       iprop(wordPointsTo (sp + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) v0 ∗
@@ -128,7 +130,7 @@ theorem kkFrame_split {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cur
       wordPointsTo (sp + 0xFFFFFFFFFFFFFFD0#64) 8 (DFrac.own 1) v5) := by
   unfold kkFrame; iintro H; iexact H
 
-theorem kkFrame_join {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+theorem kkFrame_join {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (sp v0 v1 v2 v3 v4 v5 : BitVec 64) :
     iprop(wordPointsTo (sp + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) v0 ∗
       wordPointsTo (sp + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) v1 ∗
@@ -140,7 +142,7 @@ theorem kkFrame_join {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurC
   unfold kkFrame; iintro H; iexact H
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-- **The wake step of `kkill`** (the port of `wakeup`'s): at SLEEPING the
 lock owns BOTH halves of the state mirror (`unclaimed SLEEPING`), so the
@@ -198,7 +200,7 @@ and the termination test.  The lock is still held, so the hart is pinned up
 to the release. -/
 theorem kkill_br_ffffffffffffeb2a : KA.«kkill» + 0xffffffffffffeb2a#64 = KA.«release» := by decide
 
-theorem kk_rel_nomatch (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
+theorem kk_rel_nomatch (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors.{0}}
     [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (k : KCtx) (arg : BitVec 64) (hwf : k.wf) (hnoff : k.noff + 1 < 2 ^ 31)
     (hK : 16 ≤ k.avail) (hlk : "proc" ∉ k.locks)
@@ -300,7 +302,7 @@ theorem kk_rel_nomatch (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
 
 set_option maxHeartbeats 4000000 in
 /-- The match tail at `+0x4c`: `release(&p->lock)` and `return 0`. -/
-theorem kk_rel_found (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
+theorem kk_rel_found (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors.{0}}
     [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (k : KCtx) (arg : BitVec 64) (hwf : k.wf) (hnoff : k.noff + 1 < 2 ^ 31)
     (hK : 16 ≤ k.avail) (hlk : "proc" ∉ k.locks)
@@ -392,7 +394,7 @@ theorem kk_rel_found (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
 set_option maxHeartbeats 4000000 in
 /-- The match arm at `+0x40`: `p->killed = 1`, and at SLEEPING
 `p->state = RUNNABLE`, then the release tail. -/
-theorem kk_found (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
+theorem kk_found (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors.{0}}
     [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
     (Γ : SchedNames) (k : KCtx) (arg : BitVec 64) (hwf : k.wf) (hnoff : k.noff + 1 < 2 ^ 31)
     (hK : 16 ≤ k.avail) (hlk : "proc" ∉ k.locks) (htier : k.tier = KTier.kpt)
@@ -516,7 +518,7 @@ theorem kkill_br_ffffffffffffeaa2 : KA.«kkill» + 0xffffffffffffeaa2#64 = KA.«
 set_option maxHeartbeats 4000000 in
 /-- The body at `+0x22` for slot `i`: `acquire(&p->lock)`, the pid
 test, and then either the match arm or the no-match release tail. -/
-theorem kk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
+theorem kk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors.{0}}
     [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
     (Γ : SchedNames) (k : KCtx) (arg : BitVec 64)
     (hwf : k.wf) (hnoff : k.noff + 1 < 2 ^ 31) (hK : 16 ≤ k.avail)
@@ -633,7 +635,7 @@ set_option maxHeartbeats 4000000 in
 epilogue at `+0x54`, either through a match (`a0 = 0`) or off the end
 of the table (`a0 = -1`).  A bounded loop: induction on a `fuel` bounding
 the iterations left, with the hart quantified inside. -/
-theorem kk_loop (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
+theorem kk_loop (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors.{0}}
     [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (k : KCtx) (arg : BitVec 64)
     (hwf : k.wf) (hnoff : k.noff + 1 < 2 ^ 31) (hK : 16 ≤ k.avail)
@@ -746,7 +748,7 @@ theorem kk_loop (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
 set_option maxHeartbeats 4000000 in
 /-- The epilogue at `+0x54`: restore `ra`, `s0`..`s3`, pop the frame,
 return. -/
-theorem kk_epi {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+theorem kk_epi {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu cur : CPU) (k : KCtx)
     (hpin : k.sie = false ∨ k.proc = 0#64 → cur = cpu) (hK : 6 ≤ k.avail)
     (spie spp : Bool) (hsp : k.sie = false → spie = k.spie ∧ spp = k.spp)

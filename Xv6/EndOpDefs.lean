@@ -22,6 +22,8 @@ pair.
 import Xv6.LogLedger
 import MachCSL.WpSmodeFrame8
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -125,7 +127,7 @@ cells only on the arms that clobber them (`+0x68`, the panic, and `+0x9e`,
 the commit), and the cell at offset 0 is never touched at all. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- The four cells saved by the prologue. -/
 def eoFrame4 (sp ra s0 s1 s2 : BitVec 64) : IProp GF := iprop%
@@ -382,7 +384,7 @@ PEELS one entry at a time.  Both rows are index-free, so `List.range_succ`
 and `bigSepL_append` do all the work. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- An INDEXED row over a list, read as a `List.range` row: the values are
 forgotten and only the position survives. -/
@@ -564,7 +566,7 @@ theorem eo_cov_perm : ∀ (l c : List Nat), c.Nodup → l.Nodup → (∀ x ∈ l
     exact ⟨r, hperm.trans (List.Perm.cons x hr)⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsBlocksG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsBlocksG GF]
 
 /-- **The pin halves, split along the write set and rejoined ALL FALSE**
 (Rocq's `eo_cov_split` + `eo_cov_join`, as one accessor). -/
@@ -612,7 +614,7 @@ on-disk header away from clean and back, so it cannot ride a bundle held
 across `write_head`. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 def eoOpen (γb : BcacheNames) (γfs : FsNames) (cov : Std.ExtTreeSet Nat compare)
@@ -805,7 +807,7 @@ end
 /-! ## The lock's payload, and the caller's continuation -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 /-- The caller's continuation, at whichever hart the thread ends on.

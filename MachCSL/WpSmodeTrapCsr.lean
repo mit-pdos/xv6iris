@@ -20,13 +20,15 @@ not in `SConfAt`, so the two `sstatus` rules are proved directly from
 -/
 import MachCSL.WpSmodeIntr
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D LeanRV64D.Functions
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {lent : Bool}
 
 @[sail_facts] theorem csr_name_map_forwards_sepc : csr_name_map_forwards 0x141#12 = pure "sepc" := rfl
@@ -392,7 +394,10 @@ macro "sstatus_write_bits" : tactic =>
                _get_Sstatus_SIE, _get_Sstatus_SPIE, _get_Sstatus_SPP, _get_Sstatus_VS, _get_Sstatus_FS,
                _get_Sstatus_XS, _get_Sstatus_SUM, _get_Sstatus_MXR, _get_Sstatus_SPELP, _get_Sstatus_UXL,
                _get_Sstatus_SD, Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange',
-               Sail.BitVec.extractLsb, BitVec.extractLsb, Sail.BitVec.length]
+               Sail.BitVec.extractLsb, BitVec.extractLsb, Sail.BitVec.length,
+               Int.reduceNatCast, Int.reduceNatCast', Int.reduceSub, Int.reduceAdd, Int.reduceToNat, Nat.reduceSub, Nat.reduceAdd,
+               BitVec.reduceAllOnes, BitVec.reduceZeroExtend, BitVec.reduceSetWidth, BitVec.reduceOfNatClamp,
+               Bool.cond_eq_ite]
              bv_decide))
 
 set_option maxHeartbeats 4000000 in

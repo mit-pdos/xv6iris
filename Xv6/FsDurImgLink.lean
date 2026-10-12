@@ -32,6 +32,8 @@ receives no ticket at all (W9's directory arm) while its multiplicity is
 -/
 import Xv6.FsDurImgView
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.Std MachCSL

@@ -49,7 +49,7 @@ theorem ci_ret_1c : jumpPc (KA.«consoleinit» + 0x1c#64) = KA.«consoleinit» +
 theorem ci_ret_20 : jumpPc (KA.«consoleinit» + 0x20#64) = KA.«consoleinit» + 0x20#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-! ## The callees, at their entry addresses -/
 

@@ -39,7 +39,7 @@ theorem ci_sw_ne' (c n : BitVec 8) (m : BitVec 64) (hm : BitVec.setWidth 64 n = 
     BitVec.setWidth 64 c ≠ m := hm ▸ ci_sw_ne c n h
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 set_option maxHeartbeats 8000000 in
 /-- **The four character tests**, from `+0x18` (just past `acquire`):

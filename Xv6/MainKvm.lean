@@ -34,6 +34,8 @@ import Xv6.SpecKvminit
 import Xv6.MainSecondaryParts
 import Xv6.KexecSeam
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -47,7 +49,7 @@ theorem mn_br_6e : KA.«main» + 18446744073709550716#64 = KA.«kinit» := by de
 theorem mn_ret_72 : jumpPc (KA.«main» + 114#64) = KA.«main» + 114#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF]
 
 set_option maxHeartbeats 4000000 in
 /-- **+0x6e → +0x72**: `kinit()`: the `kmem` lock is born at `γl` over the
@@ -94,7 +96,7 @@ theorem mn_ret_76 : jumpPc (KA.«main» + 118#64) = KA.«main» + 118#64 := by d
 theorem mn_kvmCount : kvmmakeCount < kinitPages := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF]
 
 set_option maxHeartbeats 4000000 in
 /-- **+0x72 → +0x76**: `kvminit()`: the kernel table, built, owned
@@ -142,7 +144,7 @@ theorem mn_pageAddr_hi (t : BitVec 44) : BitVec.extractLsb' 56 8 (pageAddr t) = 
 theorem mn_ret_7a : jumpPc (KA.«main» + 122#64) = KA.«main» + 122#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-- **THE PUBLICATION** (Rocq's one-way door between kvminit and
@@ -198,7 +200,7 @@ theorem mn_br_7a : KA.«main» + 2506#64 = KA.«procinit» := by decide
 theorem mn_ret_7e : jumpPc (KA.«main» + 126#64) = KA.«main» + 126#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF]
 
 set_option maxHeartbeats 4000000 in

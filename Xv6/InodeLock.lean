@@ -52,6 +52,8 @@ What is left is pure, and shared by both sides of that seam.
 import Xv6.InodeInv
 import Xv6.StepLemmas
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
@@ -138,7 +140,7 @@ theorem inodeRef_spos (w : BitVec 32) (h0 : 0 < w.toNat) (h1 : w.toNat < 2 ^ 31)
   rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsBlocksG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsBlocksG GF]
 
 /-! ## The cells at NO particular value
 

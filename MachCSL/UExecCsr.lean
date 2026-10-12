@@ -39,6 +39,8 @@ kernel walks at a table that does not pin the enables), and the three
 -/
 import MachCSL.UExecCsrTab
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

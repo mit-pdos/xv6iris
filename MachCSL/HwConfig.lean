@@ -38,6 +38,8 @@ registers of `hwVal` (MachCSL/Tactics.lean).
 -/
 import MachCSL.Wp
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
@@ -80,7 +82,7 @@ def hwRegs : List Register :=
   [.misa, .mseccfg, .pma_regions, .htif_tohost_base, .elp, .senvcfg, .scounteren, .mstateen0,
    .sstateen0, .mcountinhibit, .minstretcfg, .mcyclecfg, .mhpmcounter]
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 instance regPointsTo_discard_persistent (cpu : CPU) (r : Register) (v : RegisterType r) :
     Persistent (r ↦ᵣ[cpu]□ v : IProp GF) := by

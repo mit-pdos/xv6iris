@@ -25,7 +25,7 @@ theorem ulibZmin_ne (c : BitVec 8) (k : Nat) (hk : k < 256) (h : c.toNat ≠ k) 
   bv_omega
 
 section
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- **The dispatch** to the `%s` arm. -/
 theorem ulibVprintf_disp (L : UlibRunP GF) (base : BitVec 64) (hb : base.toNat % 2 = 0) (m0 m : RegMap)

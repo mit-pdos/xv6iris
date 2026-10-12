@@ -22,6 +22,8 @@ splitting the allocation in two lets the round name `pn` BEFORE `pipe(2)`.
 -/
 import Xv6.PipeProto
 
+noncomputable section
+
 namespace Xv6
 
 namespace UShPipeLeaves
@@ -29,7 +31,7 @@ namespace UShPipeLeaves
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section Proto
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
   [CtokG GF] [PipeProtoG GF]
 
 /-- **Rocq `pipe_pre`**: the body's own half at the initial state. -/

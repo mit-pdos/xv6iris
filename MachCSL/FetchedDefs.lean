@@ -5,6 +5,8 @@ in `WpStagesM` do not wait for them).
 -/
 import LeanRV64D.Fetch
 
+noncomputable section
+
 namespace MachCSL
 
 open LeanRV64D LeanRV64D.Functions

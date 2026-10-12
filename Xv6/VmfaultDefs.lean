@@ -20,6 +20,8 @@ import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
 import Xv6.UvmCallSites
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -136,7 +138,7 @@ theorem vf_round_bound (va : BitVec 64) (h : va.toNat < 2 ^ 38) :
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-- The exit context at the caller's own interrupt state. -/
 theorem vf_kctx_withSpie_self [CurCtx] [KernelGeom] [KernelImage GF] (c : CPU) (k : KCtx)

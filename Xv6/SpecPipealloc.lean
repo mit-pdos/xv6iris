@@ -46,6 +46,8 @@ the pipe -- Rocq's shape; the authority is in the lock's payload.)
 -/
 import Xv6.SpecFileclose
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -58,7 +60,7 @@ def pipeallocSlots : Nat := 6 + filecloseSlots
 
 theorem pipeallocSlots_eq : pipeallocSlots = 94 := by decide
 
-def pipeallocPost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
+def pipeallocPost {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
     (γ : FileNames) (γk : KmemNames) (on : Option Nat) (pf0 pf1 r : BitVec 64) : IProp GF := iprop%
   (⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ kallocAvail γk on ∗ fdSlot ∗ fdSlot ∗
     (∃ w0 w1 : BitVec 64, wordPointsTo pf0 8 (DFrac.own 1) w0 ∗ wordPointsTo pf1 8 (DFrac.own 1) w1)) ∨
@@ -83,7 +85,7 @@ b69bd0fab; `SpecFileclose` deviation 8): Rocq's pipealloc holds
 the counter to fileclose).  Lean's holds only the pid cell, so it is a
 BLOCK-LESS contract and takes the lend itself: `actLend k.proc ke` in, `∃ k'
 ≥ ke` back right after the return pc. -/
-def wp_pipealloc_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_pipealloc_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -113,7 +115,7 @@ ghost classes and `ClaimIs` appear although nothing in the contract mentions
 the file system: fileclose's inode arm needs them (Rocq's header note, the
 same). -/
 structure PIPEALLOC : Prop where
-  wp_pipealloc_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  wp_pipealloc_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]

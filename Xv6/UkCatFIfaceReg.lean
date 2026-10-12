@@ -45,6 +45,8 @@ import Xv6.ConsoleInvDefs
 import Xv6.UkHandler
 import Xv6.PipeProto
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -58,7 +60,7 @@ inductive CfDev where
   | UDProd (pn : PNames) (gp : PipeNames) (w : Wid) (A X : List (List (BitVec 8)))
 
 /-- **Rocq `cifRegG`** (deviation 4). -/
-abbrev CifRegG (GF : BundledGFunctors) := ElemG GF (HfpReg.RegF CfDev)
+abbrev CifRegG (GF : BundledGFunctors.{0}) := ElemG GF (HfpReg.RegF CfDev)
 
 /-! ## §0b The binding's pure half -/
 
@@ -409,7 +411,7 @@ theorem cif_dst_none (s : Option (Nat × List (BitVec 8))) (h : s.map Prod.snd =
 /-! ## §0c The registry tokens (deviation 4) -/
 
 section Toks
-variable {GF : BundledGFunctors} [CifRegG GF]
+variable {GF : BundledGFunctors.{0}} [CifRegG GF]
 
 /-- **Rocq `cif_tok`**. -/
 abbrev cifTok (γreg : GName) (d : Nat) (q : Qp) (x : CfDev) : IProp GF := HfpReg.tok γreg d q x

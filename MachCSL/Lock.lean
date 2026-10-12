@@ -33,6 +33,8 @@ holder's token `locked` carries the lock's context parked under its own
 import MachCSL.CtxBoot
 import MachCSL.KCtx
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.BI Iris.ProofMode Std
@@ -303,7 +305,7 @@ end geom
 /-! ## The ghost state -/
 
 section res
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- One half of the lock's state pair: the state and the acquire position. -/
 def lockHalf (γ : GName) (st : LockState) (B : Nat) : IProp GF :=

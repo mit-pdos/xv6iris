@@ -56,6 +56,8 @@ import Xv6.UkPipesIfaceDefs
 import Xv6.UkCatFIfaceReg
 import Xv6.UkFileIfaceReg
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.Std Std MachCSL COFE
@@ -64,33 +66,35 @@ open Iris Iris.BI Iris.Std Std MachCSL COFE
 
 /-- **THE UNION'S CONCRETE FUNCTOR LIST** (Rocq `unionΣ`): `xv6GF` and one
 slot per new camera. -/
-def unionGF : BundledGFunctors :=
+def unionGF : BundledGFunctors.{0} :=
   xv6GF
-  |>.set 95 ⟨xgfGm Nat EraPins RegMapF, inferInstance⟩
-  |>.set 96 ⟨GhostVarF Dst, inferInstance⟩
-  |>.set 97 ⟨xgfMl FlLine, inferInstance⟩
-  |>.set 98 ⟨xgfMl EscRec, inferInstance⟩
-  |>.set 99 ⟨xgfGm Nat FileEra RegMapF, inferInstance⟩
-  |>.set 100 ⟨xgfMl Fstate, inferInstance⟩
-  |>.set 101 ⟨xgfGm Nat PipeEra RegMapF, inferInstance⟩
-  |>.set 102 ⟨GhostVarF (Nat × GName × Bool), inferInstance⟩
-  |>.set 103 ⟨constOF PipeEofR, inferInstance⟩
-  |>.set 104 ⟨HfpReg.RegF Pdev, inferInstance⟩
-  |>.set 105 ⟨GhostVarF (Option (List (BitVec 8))), inferInstance⟩
-  |>.set 106 ⟨HfpReg.RegF CfDev, inferInstance⟩
-  |>.set 107 ⟨HfpReg.RegF Fdev, inferInstance⟩
-  |>.set 108 ⟨xgfMl Srec, inferInstance⟩
+  |>.set 95 ⟨ULiftOF (xgfGm Nat EraPins RegMapF), inferInstance⟩
+  |>.set 96 ⟨ULiftOF (GhostVarF Dst), inferInstance⟩
+  |>.set 97 ⟨ULiftOF (xgfMl FlLine), inferInstance⟩
+  |>.set 98 ⟨ULiftOF (xgfMl EscRec), inferInstance⟩
+  |>.set 99 ⟨ULiftOF (xgfGm Nat FileEra RegMapF), inferInstance⟩
+  |>.set 100 ⟨ULiftOF (xgfMl Fstate), inferInstance⟩
+  |>.set 101 ⟨ULiftOF (xgfGm Nat PipeEra RegMapF), inferInstance⟩
+  |>.set 102 ⟨ULiftOF (GhostVarF (Nat × GName × Bool)), inferInstance⟩
+  |>.set 103 ⟨ULiftOF (constOF PipeEofR), inferInstance⟩
+  |>.set 104 ⟨ULiftOF (HfpReg.RegF Pdev), inferInstance⟩
+  |>.set 105 ⟨ULiftOF (GhostVarF (Option (List (BitVec 8)))), inferInstance⟩
+  |>.set 106 ⟨ULiftOF (HfpReg.RegF CfDev), inferInstance⟩
+  |>.set 107 ⟨ULiftOF (HfpReg.RegF Fdev), inferInstance⟩
+  |>.set 108 ⟨ULiftOF (xgfMl Srec), inferInstance⟩
 
 /-! ## One instance per camera -/
 
 section cameras
 
 /-- the slot's `ElemG`, by computation on the table -/
-local macro "ugf_slot " n:num : term => `(⟨$n, rfl⟩)
+local macro "ugf_slot " n:num : term => `(ElemG.ofEqLift $n rfl)
+/-- a slot whose functor already lives at `IProp`'s universe (no `ULiftOF`) -/
+local macro "ugf_slot_poly " n:num : term => `(ElemG.ofEq $n rfl)
 
 
 -- iris
-instance ugfInvMap : ElemG unionGF InvMapF := ugf_slot 0
+instance ugfInvMap : ElemG unionGF InvMapF := ugf_slot_poly 0
 instance ugfEnabled : ElemG unionGF (constOF CoPsetDisjL) := ugf_slot 1
 instance ugfDisabled : ElemG unionGF (constOF (DisjointLeibnizSet PosSet)) := ugf_slot 2
 instance ugfCredit : ElemG unionGF (Auth.AuthURF (constOF Credit)) := ugf_slot 3
@@ -112,7 +116,7 @@ instance ugfObsVar : GhostVarG unionGF (List Obs) := { elemG := ugf_slot 17 }
 instance ugfObsHist : MonoListG unionGF Obs := ⟨ugf_slot 18⟩
 instance ugfBytes : GhostMapG unionGF Nat (BitVec 8) RegMapF := ⟨ugf_slot 19⟩
 instance ugfMirror : GhostVarG unionGF LogMirror := { elemG := ugf_slot 20 }
-instance ugfSavedProp : SavedPropG unionGF := { elemG := ugf_slot 21 }
+instance ugfSavedProp : SavedPropG unionGF := { elemG := ugf_slot_poly 21 }
 instance ugfCrashPerm : GhostMapG unionGF Nat CrashPermVal RegMapF := ⟨ugf_slot 22⟩
 -- Xv6G
 instance ugfMlByte : MonoListG unionGF (BitVec 8) := ⟨ugf_slot 23⟩
@@ -162,7 +166,7 @@ instance ugfFpay : GhostVarG unionGF FPNames := { elemG := ugf_slot 62 }
 instance ugfFdst : ElemG unionGF FdstF := ugf_slot 63
 instance ugfUfd : GhostMapG unionGF (Option Nat) UfdCell UfdMapF := ⟨ugf_slot 64⟩
 -- CtokG
-instance ugfGen : SavedAnythingG unionGF GenF := { elemG := ugf_slot 65 }
+instance ugfGen : SavedAnythingG unionGF GenF := { elemG := ugf_slot_poly 65 }
 instance ugfAtok : ElemG unionGF (constOF AtokR) := ugf_slot 66
 instance ugfKshot : ElemG unionGF (constOF KshotR) := ugf_slot 67
 -- SleepLockG, FsBytesG, FsBlocksG

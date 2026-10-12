@@ -47,6 +47,8 @@ import Xv6.ConsoleDefs
 import Xv6.SchedCtx
 import MachCSL.WpSmodeIntr
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -59,7 +61,7 @@ def consoleintrAddr : BitVec 64 := KA.«consoleintr»
 def consoleintrSlots : Nat := 26
 
 /-- **WP of `consoleintr`.**  The byte in `a0`. -/
-def wp_consoleintr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+def wp_consoleintr_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γc γl : GName) (γ : UartNames)
     (hb : List Obs) (cb : BitVec 8) (hh hg : Option (List Obs))
     (hnoff : k.noff + 2 < 2 ^ 31) (hK : consoleintrSlots ≤ k.avail)
@@ -83,7 +85,7 @@ def wp_consoleintr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
 
 /-- The interface of `consoleintr`. -/
 structure CONSOLEINTR : Prop where
-  wp_consoleintr : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+  wp_consoleintr : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γc γl : GName) (γ : UartNames)
     (hb : List Obs) (cb : BitVec 8) (hh hg : Option (List Obs))
     hnoff hK hlk htier ha0 hends hboots hx hxg hshb hnext,

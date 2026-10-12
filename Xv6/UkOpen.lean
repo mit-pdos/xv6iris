@@ -21,6 +21,8 @@ close re-seals at the page view `ukView P.um mm' T` of the landing map.
 -/
 import Xv6.UkDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
@@ -161,7 +163,7 @@ theorem ukView_lookup (um : RegMapF (BitVec 64)) (M : Nat → List (BitVec 8)) (
 /-! ## §2 The pages, both ways -/
 
 section pages
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- Stamped ownership of an association list of bytes. -/
 def ukOwnX (ξ : CtxId) (K : Nat) (A : List (PAddr × BitVec 8)) : IProp GF :=
@@ -349,7 +351,7 @@ end pages
 /-! ## §3 Open and close -/
 
 section openclose
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 theorem uk_nodup_left {X : Type} (l₁ l₂ : List X) (h : (l₁ ++ l₂).Nodup) : l₁.Nodup :=
   (List.nodup_append.1 h).1

@@ -113,6 +113,8 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 import Xv6.WaitLock
 import Xv6.FdTable
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -143,12 +145,12 @@ def kwaitAns (rv : BitVec 32) (addr : BitVec 64) (d : Nat) : Prop :=
 row `FdTable.procGenAt` minus `firstTok` and the xstate half): the kernel's
 quarter with the payload reading, and the slot/pid halves with the spent
 marker. -/
-def kwaitGen {GF : BundledGFunctors} [CtokG GF] [WchG GF] (pa : BitVec 64) (pid : BitVec 32) (g : GName) :
+def kwaitGen {GF : BundledGFunctors.{0}} [CtokG GF] [WchG GF] (pa : BitVec 64) (pid : BitVec 32) (g : GName) :
     IProp GF :=
   iprop((∃ Q : Int → IProp GF, genKq g pa pid Q ∗ myPay g Q) ∗ genHalvesPriv pa pid g)
 
 /-- **WP of `kwait(addr = a0)`.** -/
-def wp_kwait_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_kwait_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -187,7 +189,7 @@ form, the Rocq kexit/sys_sync shape): `cpu_own 0 eb`, the trap-CSR complement
 (the complement is `emp`), at `sie = false` the caller brings the pair.
 Depth 0, so no spinlock held (`KCtx.wf`).  It parks: the crossing is the
 literal `true`. -/
-def wp_kwait_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_kwait_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -222,7 +224,7 @@ def wp_kwait_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
 ni-zombie-ledger.md D4): verbatim, with the answer at `waitAnsLed … (procAddr
 j)` -- the reaping arm also hands back the zombie ledger's receipt of
 `ZReap (procAddr j) n rv` (`n` the reaped slot). -/
-def wp_kwait_led_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_kwait_led_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -258,7 +260,7 @@ def wp_kwait_led_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
 ni-zombie-ledger.md D4): verbatim, with the answer at `waitAnsLed … (procAddr
 j)`.  The led form is the proof; `wp_kwait_eb_body` is its corollary
 (`UserChildren.waitAnsLed_post`). -/
-def wp_kwait_led_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_kwait_led_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -292,7 +294,7 @@ def wp_kwait_led_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
 
 /-- The interface of `kwait`. -/
 structure KWAIT : Prop where
-  wp_kwait_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  wp_kwait_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -303,7 +305,7 @@ structure KWAIT : Prop where
       hj hproc hK hnoff htier
   /-- THE LED FORM (Rocq `Parameter wp_kwait_led_sconf`, design
   ni-zombie-ledger.md D4): the answer carries the reap's receipt. -/
-  wp_kwait_led_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  wp_kwait_led_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]

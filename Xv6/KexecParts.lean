@@ -80,6 +80,8 @@ import Xv6.CodeTactics
 import Xv6.KstackMap
 import MachCSL.WpSmodeFrame12b
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -112,7 +114,7 @@ theorem kxc_rest_addr (sp0 : BitVec 64) :
   bv_omega_g
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {lent : Bool}
 
 /-! ## The 55 low slots, and the three carves -/

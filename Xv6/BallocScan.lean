@@ -19,6 +19,8 @@ branches on `Xv6.bmBit_test_64`.
 import Xv6.BallocAlloc
 import MachCSL.WpSmodeLh
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -44,7 +46,7 @@ def baScanRegs (k : KCtx) (dev : BitVec 32) (kk size bi : Nat) (R : RegMap) : Pr
   R 10#5 = BitVec.signExtend 64 (BitVec.ofNat 32 size)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 /-- The resources at a point of the loop body (Rocq's `ba_scan` precondition). -/

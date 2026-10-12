@@ -12,6 +12,8 @@ and `tlbOk` what the model's TLB may hold about such a tree.
 import MachCSL.Pte
 import LeanRV64D.VmemTlb
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1
@@ -184,10 +186,11 @@ theorem PTree.walk_eq (lvl : Nat) (t : PTree) (vpn : BitVec 27) :
   induction lvl generalizing t with
   | zero => rfl
   | succ lvl ih =>
-    simp only [walk, slot, entAt]
+    -- split on the kid before unfolding: afterwards the scrutinee sits in the `if`'s decidability
+    -- instance too, and `cases h :` cannot generalise it (Lean ≥ 4.34)
     cases h : t.kids (vpnIdx vpn (lvl+1)) with
-    | none => rfl
-    | some c => simpa using ih c
+    | none => simp only [walk, slot, entAt, h]
+    | some c => simp only [walk, slot, entAt, h]; exact ih c
 
 theorem PTree.path_ne_nil (lvl : Nat) (t : PTree) (vpn : BitVec 27) : t.path lvl vpn ≠ [] := by
   cases lvl with

@@ -38,7 +38,7 @@ theorem consputc_ret_32 : jumpPc (KA.«consputc» + 0x32#64) = KA.«consputc» +
 theorem consputc_ret_3a : jumpPc (KA.«consputc» + 0x3a#64) = KA.«consputc» + 0x3a#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-- `uartputc_sync`'s contract as a rule at its entry address. -/
 theorem cp_uart_call (UP : UARTPUTC_SYNC) [CurCtx] (c : CPU) (k' : KCtx)

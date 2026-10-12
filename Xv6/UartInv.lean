@@ -32,6 +32,8 @@ import MachCSL.SmodeDevDefs
 import Xv6.UartModel
 import Xv6.UartLinks
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -58,7 +60,7 @@ theorem uartByteOk (i : UartId) (off : Nat) (hoff : off < 8) :
   cases i <;> (rcases off with _ | _ | _ | _ | _ | _ | _ | _ | off <;> first | decide | omega)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-- `uarts[i].base`, read-only after boot: the port's MMIO base. -/
 def uartBaseWord [CurCtx] (i : UartId) : IProp GF :=
@@ -83,6 +85,12 @@ def uartBody (i : UartId) (γ : UartNames) (u : UartState) : IProp GF := iprop%
 instance uartBody_timeless (i : UartId) (γ : UartNames) (u : UartState) :
     Timeless (uartBody (GF := GF) i γ u) := by
   unfold uartBody; infer_instance
+
+/-- The same instance at the fabric's spelling of the state type: instance search unifies the
+state's type at reducible transparency only (Lean ≥ 4.34), so `DevSt (.uart i)` does not reach
+`UartState`. -/
+instance uartBody_timeless' (i : UartId) (γ : UartNames) (u : DevSt (.uart i)) :
+    Timeless (uartBody (GF := GF) i γ u) := uartBody_timeless i γ u
 
 /-- The port's invariant: the mirror beside the ghosts. -/
 def uartInv (i : UartId) (γ : UartNames) : IProp GF :=
@@ -564,7 +572,9 @@ theorem thr_write_au (i : UartId) (γ : UartNames) (l bs : List (BitVec 8)) (b :
     iexists { u with tx := u.tx ++ [b], thri := false }
     iframe Hfrag
     iapply uartBody_intro i γ { u with tx := u.tx ++ [b], thri := false }
-    rw [outAuth_thr, dlabAuth_thr]
+    -- instantiated: with `u` and `f` open, Lean ≥ 4.34 matches the update pattern against the plain
+    -- `u` by structure eta, and the rewrite is a no-op
+    rw [outAuth_thr γ u _ false, dlabAuth_thr γ u _ false]
     iframe Hsent Htx Hout Hdlab Hcol Hcl
   imod Hc
   imodintro
@@ -640,7 +650,9 @@ theorem thr_write_au_at (i : UartId) (γ : UartNames) (l bs L0 : List (BitVec 8)
     iexists { u with tx := u.tx ++ [b], thri := false }
     iframe Hfrag
     iapply uartBody_intro i γ { u with tx := u.tx ++ [b], thri := false }
-    rw [outAuth_thr, dlabAuth_thr]
+    -- instantiated: with `u` and `f` open, Lean ≥ 4.34 matches the update pattern against the plain
+    -- `u` by structure eta, and the rewrite is a no-op
+    rw [outAuth_thr γ u _ false, dlabAuth_thr γ u _ false]
     iframe Hsent Htx Hout Hdlab Hcol Hcl
   imod Hc
   imodintro
@@ -880,7 +892,7 @@ theorem lcr_write_au (i : UartId) (γ : UartNames) (b0 : Bool) (b : BitVec 8) :
     iexists { u with lcr := b }
     iframe Hfrag
     iapply uartBody_intro i γ { u with lcr := b }
-    rw [sentAuth_lcr, outAuth_lcr, txAuth_lcr, consClaimAt_eq i γ u { u with lcr := b } rfl]
+    rw [sentAuth_lcr γ u b, outAuth_lcr γ u b, txAuth_lcr γ u b, consClaimAt_eq i γ u { u with lcr := b } rfl]
     iframe Hsent Hout Htx Hdlab Hcol Hcl
   imod Hc
   imodintro
@@ -1086,7 +1098,7 @@ port the log's mark IS the popper's anchor (or nothing is logged yet and
 everything popped went to uartinit's flush). -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-- The popper's resource at count `k` and anchor `hl` (Rocq `uart_rx_writer`). -/
 def uartRxWriter (i : UartId) (γ : UartNames) (k : Nat) (hl : Option (List Obs)) : IProp GF := iprop%
@@ -1120,7 +1132,7 @@ end
 /-! ## The receive accessors at the writer (what `uartintr` holds) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-- `lsr_read_rx_au` with the whole PLIC payload in hand. -/
 theorem lsr_read_rx_au_w (i : UartId) (γ : UartNames) (k : Nat) (hl : Option (List Obs)) :
@@ -1146,7 +1158,7 @@ credential, the frozen divisor latch and the port's base word.  All
 persistent, so one copy serves every caller. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 def uartPort [CurCtx] (i : UartId) (γl : GName) (γ : UartNames) : IProp GF := iprop%
   uartInv i γ ∗ isTxLockAt i γl γ ∗ dlabOff γ ∗ uartBaseWord i
@@ -1182,7 +1194,7 @@ flips the regime once, irreversibly, with `uartPreinit_deposit`.  Nothing
 in the `uartinit` cone mentions either: the flip happens beside it. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-- Port `γ`'s one-shot, unfired: an EXCLUSIVE whole (the boot client's). -/
 def uartPreinit (γ : UartNames) : IProp GF := γ.init ↪VAR{.own 1} false

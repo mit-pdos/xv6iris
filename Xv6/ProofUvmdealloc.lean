@@ -33,7 +33,7 @@ theorem ua_ret_127e : jumpPc (KA.«uvmdealloc» + 0x42#64) = (KA.«uvmdealloc» 
   decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF]
 
 /-! ## `uvmdealloc`: the shared tail at `(KernelSyms.«uvmdealloc» + 0x26)` -/
 

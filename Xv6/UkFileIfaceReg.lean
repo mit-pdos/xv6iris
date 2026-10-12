@@ -61,6 +61,8 @@ import Xv6.SysOpenDefs
 import Xv6.ConsoleInvDefs
 import Xv6.UkHandler
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -89,7 +91,7 @@ abbrev fifDom (vs : FifVs) (d : Nat) : Prop := PartialMap.dom vs d
 /-! ## §1 The registry camera (deviation 4) -/
 
 /-- **Rocq `fifRegG`**: THE registry camera at `Fdev`. -/
-class FifRegG (GF : BundledGFunctors) where
+class FifRegG (GF : BundledGFunctors.{0}) where
   [regG : ElemG GF (HfpReg.RegF Fdev)]
 
 attribute [reducible, instance] FifRegG.regG
@@ -491,7 +493,7 @@ theorem dst_none_of_snd (s : Option (Nat × Bytes)) (h : Prod.snd <$> s = none) 
 /-! ## §3 The registry's tokens -/
 
 section Tok
-variable {GF : BundledGFunctors} [FifRegG GF]
+variable {GF : BundledGFunctors.{0}} [FifRegG GF]
 
 /-- **Rocq `fif_tok`**: `HfpReg.tok` at `Fdev`. -/
 abbrev fifTok (γreg : GName) (d : Nat) (q : Qp) (v : Fdev) : IProp GF := HfpReg.tok γreg d q v

@@ -19,6 +19,8 @@ cone audit trimmed from `Xv6/FsConsPin.lean` (its deviation 3).
 -/
 import Xv6.FsConsPin
 
+noncomputable section
+
 namespace Xv6
 
 /-- Rocq `cons_absent_apath`. -/

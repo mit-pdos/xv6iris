@@ -29,6 +29,8 @@ import Xv6.UsertrapSys
 import Xv6.UtReadWhyXv6
 import Xv6.UsertrapKexit
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL

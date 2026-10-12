@@ -48,6 +48,8 @@ import Xv6.SchedCtx
 import Xv6.PidLock
 import Xv6.SpecProcinit
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -57,7 +59,7 @@ def freeprocAddr : BitVec 64 := KA.«freeproc»
 def freeprocSlots : Nat := 44
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- What `freeproc` takes of the block: the private fields, the slot's
 allowances (`dormantAllow`, Rocq `fp_rest`'s `[∗ list] _ ∈ pv_ofile V,
@@ -98,7 +100,7 @@ def freeprocGen (pa : BitVec 64) (pid : BitVec 32) (g : GName) : IProp GF := ipr
 
 end
 
-def wp_freeproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+def wp_freeproc_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γl γp : GName) (γk : KmemNames) (j : Nat) (st : BitVec 32) (ch : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (g : GName) (ke : Nat)
     (hj : j < NPROC) (hp : k.regs 10#5 = procAddr j) (hst : st = USED ∨ st = ZOMBIE)
@@ -120,7 +122,7 @@ def wp_freeproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
 `wp_freeproc_led_sconf_body`): `wp_freeproc_body` verbatim, the
 continuation also receiving the receipt `∃ h, pidReceipt h (.PFree k.proc
 pid)` of the release at `p->pid = 0`. -/
-def wp_freeproc_led_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+def wp_freeproc_led_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γl γp : GName) (γk : KmemNames) (j : Nat) (st : BitVec 32) (ch : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (g : GName) (ke : Nat)
     (hj : j < NPROC) (hp : k.regs 10#5 = procAddr j) (hst : st = USED ∨ st = ZOMBIE)
@@ -142,11 +144,11 @@ def wp_freeproc_led_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
 /-- The interface of `freeproc`: the landed contract and (Rocq's second
 `Parameter`) its led form. -/
 structure FREEPROC : Prop where
-  wp_freeproc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx] (Γ : SchedNames) (cpu : CPU) (k : KCtx)
+  wp_freeproc : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx] (Γ : SchedNames) (cpu : CPU) (k : KCtx)
     (γl γp : GName) (γk : KmemNames) (j : Nat) (st : BitVec 32) (ch : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (g : GName) (ke : Nat) hj hp hst hnoff hK hsie hlk hlp htier,
     wp_freeproc_body (hlc := hlc) (GF := GF) Γ cpu k γl γp γk j st ch pid V M g ke hj hp hst hnoff hK hsie hlk hlp htier
-  wp_freeproc_led : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx] (Γ : SchedNames) (cpu : CPU) (k : KCtx)
+  wp_freeproc_led : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx] (Γ : SchedNames) (cpu : CPU) (k : KCtx)
     (γl γp : GName) (γk : KmemNames) (j : Nat) (st : BitVec 32) (ch : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (g : GName) (ke : Nat) hj hp hst hnoff hK hsie hlk hlp htier,
     wp_freeproc_led_body (hlc := hlc) (GF := GF) Γ cpu k γl γp γk j st ch pid V M g ke hj hp hst hnoff hK hsie hlk hlp htier

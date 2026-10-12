@@ -56,6 +56,8 @@ DROPPED from `UShPanic` (unreached): `ksh_w_of_link_prompt_post_at`,
 import Xv6.UshMainStubs
 import Xv6.UshSysPHolds
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -70,7 +72,7 @@ theorem altExecfail_len : altExecfail.length = 19 := by decide
 /-! ## S1 THE FRAME BYTE, IN TWO HALVES -/
 
 section Halves
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
 
 /-- `UkConsOut.ubyteq_op` at the program tier's two ghost classes alone. -/
 theorem ushp_ubyteq_op (γ : GName) (dq1 dq2 : DFrac) (a : Nat) (b : BitVec 8) :
@@ -137,7 +139,7 @@ end Halves
 /-! ## S2 SH'S WRITE STUB OVER THE RUN-CARRYING LEAF -/
 
 section Stub
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 

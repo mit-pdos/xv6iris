@@ -90,6 +90,8 @@ import Xv6.FsAbsDelta
 import Xv6.AppInv
 import Xv6.FsBytesGamma
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -119,7 +121,7 @@ def unlPre (av : Aview) (d : Nat) (nm : Fname) (ents : Std.ExtTreeMap Fname Nat 
 /-! ## 2.  The commits -/
 
 section UnlinkDefs
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF]
 
 /-- INSTANT 1 -- the parent-row commit, two-phase at the raw map (Rocq's
 `uent_commit_at`; `acre_commit_at`'s mold: phase 1 observes the pre-state

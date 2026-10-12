@@ -30,7 +30,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode MachCSL
 
 section proof
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- **The fetch fact, closed**: leaf validity from the landing (`uptWf`'s
 pin, through `UbMemWf`). -/

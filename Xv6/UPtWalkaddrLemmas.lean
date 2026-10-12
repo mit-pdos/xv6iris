@@ -119,7 +119,7 @@ theorem and1_zero : (0#64 &&& 1#64) = 0#64 := by decide
 /-! ## Reading one entry of the tree without changing it -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- Open the tree at the level-0 entry a complete walk reaches and put the
 same word back. -/

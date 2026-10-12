@@ -39,6 +39,8 @@ the one shared `Xv6G.gmUnitG` (one capacity per camera type).
 import Xv6.UartTrace
 import Xv6.VirtioQueue
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
@@ -71,7 +73,7 @@ def fdFreesFrom : Nat → List (BitVec 64) → List Nat
 def fdFrees (fs : List (BitVec 64)) : List Nat := fdFreesFrom 0 fs
 
 section Keyed
-variable {GF : BundledGFunctors} [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [Xv6G GF]
 
 /-- `n` distinct `Nat ↦ ()` tokens at name `γ`, keys below `B` (the shape
 both supplies share). -/
@@ -235,17 +237,17 @@ end Keyed
 /-! ## The fd-slot supply (Rocq `FdSlots.v`) -/
 
 /-- The fd-slot supply's NAME (Rocq `fdslotG.fdslot_name`; deviation 2). -/
-class FdslotG (GF : BundledGFunctors) where
+class FdslotG (GF : BundledGFunctors.{0}) where
   fdslotName : GName
 
 /-! ## The bio-slot supply (Rocq `BioDefs.v`) -/
 
 /-- The bio-slot supply's NAME (Rocq `bioslotG.bioslot_name`; deviation 2). -/
-class BioslotG (GF : BundledGFunctors) where
+class BioslotG (GF : BundledGFunctors.{0}) where
   bioslotName : GName
 
 section Fd
-variable {GF : BundledGFunctors} [Xv6G GF] [FdslotG GF]
+variable {GF : BundledGFunctors.{0}} [Xv6G GF] [FdslotG GF]
 
 /-- `n` units: `n` distinct fd-slot tokens, all minted at boot with keys
 below `FDSLOTS` (FdSlots.v's `fd_slots n`; the bound rides the tokens). -/
@@ -298,7 +300,7 @@ theorem fdSlots_to_list {A : Type _} : ∀ (l : List A),
 end Fd
 
 section Bio
-variable {GF : BundledGFunctors} [Xv6G GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [Xv6G GF] [BioslotG GF]
 
 /-- `n` units: `n` distinct slot tokens, all minted at boot with keys below
 `BSLOTS` (Rocq `BioDefs.bslots`). -/
@@ -336,7 +338,7 @@ end Bio
 /-! ## Boot: the two mints (create the class instances) -/
 
 /-- Mint the fd-slot supply (Rocq `fd_slots_alloc`; deviation 3). -/
-theorem fdSlots_alloc {GF : BundledGFunctors} [Xv6G GF] :
+theorem fdSlots_alloc {GF : BundledGFunctors.{0}} [Xv6G GF] :
     ⊢@{IProp GF} |==> ∃ I : FdslotG GF, @fdSlots GF _ I FDSLOTS := by
   imod slotToks_alloc (GF := GF) FDSLOTS with ⟨%γ, H⟩
   imodintro
@@ -345,7 +347,7 @@ theorem fdSlots_alloc {GF : BundledGFunctors} [Xv6G GF] :
   iexact H
 
 /-- Mint the bio-slot supply (Rocq `bslots_alloc`; deviation 3). -/
-theorem bslots_alloc {GF : BundledGFunctors} [Xv6G GF] :
+theorem bslots_alloc {GF : BundledGFunctors.{0}} [Xv6G GF] :
     ⊢@{IProp GF} |==> ∃ I : BioslotG GF, @bslots GF _ I BSLOTS := by
   imod slotToks_alloc (GF := GF) BSLOTS with ⟨%γ, H⟩
   imodintro

@@ -12,6 +12,8 @@ here.
 -/
 import Xv6.UPtDefs
 
+noncomputable section
+
 namespace Xv6.UPt
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -138,7 +140,7 @@ theorem umBelow_mono (sz sz' : BitVec 64) (P : UPtd) (hle : sz.toNat ≤ sz'.toN
 /-! ## The resources: `umPages`, `ptOwnRep`, `procPtAt` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- The per-page conjunct of `umPages`. -/
 def umPageAt [CurCtx] (M : Nat → List (BitVec 8)) (k : Nat) (w : BitVec 64) : IProp GF := iprop%

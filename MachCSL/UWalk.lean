@@ -23,6 +23,8 @@ import MachCSL.PteClass
 import MachCSL.UWalkRun
 import MachCSL.UTranslate
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

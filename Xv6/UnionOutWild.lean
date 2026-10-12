@@ -14,6 +14,8 @@ witness authority, `union_gn`, the ledger) waits on the file claims lane
 import Xv6.UnionView
 import Xv6.GenOutWild
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL Pline' Ualt

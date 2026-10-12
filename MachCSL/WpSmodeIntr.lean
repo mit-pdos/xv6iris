@@ -15,13 +15,15 @@ them on takes the arm back and reserves the slots again.
 import MachCSL.WpSmodeRules
 import MachCSL.CallConv
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D LeanRV64D.Functions
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {lent : Bool}
 
 /-! ## The status facts across the flips -/
@@ -426,7 +428,7 @@ theorem KCtx.intrOff_pushed (k : KCtx) (m : Nat) (a b : Bool) (h : m ≤ k.avail
   obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k
   simp only at h
   simp only [KCtx.pushed, KCtx.intrOff, KCtx.mk.injEq, _root_.true_and, _root_.and_true]
-  omega
+  exact ⟨by omega, rfl⟩
 
 /-- The `SIE` bit of a value with `sstatusAt`, as `srli; andi` extracts it. -/
 theorem sie_shr_and1 (v : BitVec 64) (old : Bool) (hv : sstatusAt old v) :

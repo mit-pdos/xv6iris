@@ -45,6 +45,8 @@ The jump leaf carries the model's target-alignment premise (SpecUkLeaves
 import Xv6.UserTextDefs
 import Xv6.SpecUkLeaves
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL LeanRV64D
@@ -104,7 +106,7 @@ noncomputable def uTextDecode (t : Xv6.User.UTextTree) (pc : BitVec 64) : Option
 
 /-- **The run interface** (spike stand-in for U0-6's `UK_LEAVES` + `urun`;
 see the header).  `goal` is Rocq's `mWP (Loop : expr riscv_lang)`. -/
-structure UlibRun (GF : BundledGFunctors) where
+structure UlibRun (GF : BundledGFunctors.{0}) where
   /-- Rocq `urun N h m pc avail`: a user hart running at `pc` with registers
   `m` and `avail` free stack words below `sp`. -/
   urun : RegMap → BitVec 64 → Nat → IProp GF

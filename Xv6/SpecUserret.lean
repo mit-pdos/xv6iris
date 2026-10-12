@@ -84,6 +84,8 @@ Imports only definitional files.
 import Xv6.SpecPrepareReturn
 import Xv6.NiLedger
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -93,7 +95,7 @@ open LeanRV64D
 def userretVa : BitVec 64 := TRAMPOLINE + 0x9c#64
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- The kernel page table's shared invariant at `root` (persistent): what
 `kptSlot` keeps once its TLB cell has gone to the user table. -/
@@ -135,7 +137,7 @@ the record's evidence (NI M2-X1: `MachFixedGS.uEvid ox`, persistent, handed to
 the entry hook) and the justification `uFit ox` of exactly the event the
 `sret` emits -- the user `satp`, the resume `sepc`, the restored registers
 `tfGprs ws` (`NiLedger`). -/
-def wp_userret_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+def wp_userret_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (P : UPtd) (M : Nat → List (BitVec 8)) (ws : List (BitVec 64))
     (sep sc tv : BitVec 64) (ox : Option (Nat × Obs))
     (hsie : k.sie = false) (hspie : k.spie = true) (hspp : k.spp = false) (htier : k.tier = KTier.kpt)
@@ -153,7 +155,7 @@ def wp_userret_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
 
 /-- **Rocq `Module Type USERRET`**. -/
 structure USERRET : Prop where
-  wp_userret : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+  wp_userret : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (P : UPtd) (M : Nat → List (BitVec 8)) (ws : List (BitVec 64))
     (sep sc tv : BitVec 64) (ox : Option (Nat × Obs)) hsie hspie hspp htier ha0,
     wp_userret_body (hlc := hlc) (GF := GF) cpu k P M ws sep sc tv ox hsie hspie hspp htier ha0

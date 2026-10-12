@@ -40,6 +40,8 @@ Deviations from Rocq:
 import Xv6.GenOutPure
 import Xv6.EchoOutLine
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL
@@ -160,7 +162,7 @@ theorem gclPure_rd_stage (k : Nat) (ho : List Obs) (so : GStage M) (H : ConsHist
   rw [hcsl]
   split
   · rename_i hd
-    rw [ll_nlines_removelast _ hd.2]; exact Nat.le_refl _
+    rw [ll_nlines_removelast _ hd.2]
   · exact nlines_prefix _ _ (Xv6.ll_removelast_prefix _)
 
 /-! ### The event steps of the pure part -/

@@ -27,6 +27,8 @@ Rocq's header, abridged:
 import Xv6.AppFilePure
 import Xv6.UnionAdm
 
+noncomputable section
+
 namespace Xv6
 
 open Std

@@ -35,6 +35,8 @@ frame owns `mstatus`, so this costs nothing.
 -/
 import MachCSL.WpTrap
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std

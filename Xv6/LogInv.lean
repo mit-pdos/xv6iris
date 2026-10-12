@@ -67,6 +67,8 @@ import Xv6.LogSnapLaw
 import Xv6.LogHelp
 import Xv6.SbPark
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -154,7 +156,7 @@ def opPending (om : RegMapF OpEntry) (b : Nat) : Prop :=
   ∃ i e, PartialMap.get? om i = some e ∧ b ∈ e.set
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 /-! ## An active operation -/
@@ -885,7 +887,7 @@ block maps but not the log's own ghosts, and their consumers
 do not all carry `Xv6.LogG`. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [DiskG GF] [FsBlocksG GF] [CurCtx]
 
 /-- The payload's logical content, read off a CLIENT half (Rocq's

@@ -33,6 +33,8 @@ wrap once `addr < p->sz`.
 import MachCSL.WpSmodeSltu
 import Xv6.SpecFetchaddr
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -100,7 +102,7 @@ theorem fetchaddr_snez_negw (v : BitVec 64) (h : v = 0#64 ∨ v = 18446744073709
   rcases h with h | h <;> subst h <;> decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-! ## The word cell as eight bytes -/
 

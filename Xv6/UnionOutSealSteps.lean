@@ -27,6 +27,8 @@ DEVIATIONS from Rocq:
 import Xv6.UnionOut
 import Xv6.PipeOutWSeal
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -34,7 +36,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 set_option synthInstance.maxSize 1024
 
 section UnionOutSealSteps
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF] [PipeOutG GF]
 
 /-- THE UNION'S DRAIN RECEIPT (Rocq `udrain_ret`, sync SY3-A4): the trace

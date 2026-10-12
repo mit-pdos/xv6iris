@@ -22,6 +22,8 @@ import Xv6.UkShLineDefs
 import Xv6.UkShWords
 import Xv6.UkShParseSym
 
+noncomputable section
+
 namespace Xv6
 
 /-! ## §1 The byte classes against the lexer's tables -/

@@ -28,6 +28,8 @@ file's, the sync REGISTRY, the ERA'S BASE and the FLOOR, and its conclusion
 import Xv6.UnionOut
 import Xv6.AppFileBoot
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -39,7 +41,7 @@ def unionBorn (_ _ _ : GName) (γst : GName) (ug : UnionGn) : Prop :=
   ug.ugnFile.fgnCl.ffSt = γst
 
 section UnionOutLed
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF] [PipeOutG GF]
 
 /-- THE CONCLUSION'S RESOURCE (Rocq `union_phi_res`, sync SY3-A4): each

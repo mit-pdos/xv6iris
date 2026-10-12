@@ -77,6 +77,8 @@ import Xv6.CreateFreshTy
 import Xv6.SpecNamecmp
 import MachCSL.BvLemmas
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -100,7 +102,7 @@ theorem create_buf_14 (sp : BitVec 64) :
   unfold createBuf; rw [BitVec.add_assoc]; rfl
 
 section Frame
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {lent : Bool}
 
 /-- create's eight upper cells, from `sp-8` (`ra`) down to `sp-64` (`s6`);

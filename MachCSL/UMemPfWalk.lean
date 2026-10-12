@@ -24,6 +24,8 @@ invalid-entry steps and the miss's fill (`uwk_walk_ptr`/`_inv`,
 import MachCSL.UTlb
 import MachCSL.UMemCbo
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

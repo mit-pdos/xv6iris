@@ -40,6 +40,8 @@ import MachCSL.UFetchWalk
 import MachCSL.UWalk
 import MachCSL.UCycle
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std

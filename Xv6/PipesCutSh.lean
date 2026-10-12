@@ -21,6 +21,8 @@ here (via `ushpNulfold_zeroAt`/`ushZeroAt_miss`); `concat` is
 import Xv6.PipesCut
 import Xv6.RefParseBars
 
+noncomputable section
+
 namespace Xv6
 
 /-- **Rocq `prod_ws_ok`**. -/

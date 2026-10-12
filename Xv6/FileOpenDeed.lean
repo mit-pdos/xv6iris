@@ -22,12 +22,14 @@ terminal observation).
 -/
 import Xv6.AppFileDeed
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section FileOpenDeed
-variable {GF : BundledGFunctors} [FileAppG GF]
+variable {GF : BundledGFunctors.{0}} [FileAppG GF]
 
 /-- THE DEED AT A FRACTION (Rocq `fdq`). -/
 def fdq (r : FileAppNames) (q : Qp) (s : Dst) : IProp GF :=

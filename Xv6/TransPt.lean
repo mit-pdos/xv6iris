@@ -26,6 +26,8 @@ Rocq's §1 case analysis (O1/O2/O3cur/O3prev) is the three branches of
 import Xv6.UptWalkTramp
 import Xv6.UPtWalkaddrLemmas
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -145,7 +147,7 @@ theorem uptSetLeaf_self (t : PTree) (vpn : BitVec 27) (addr v : BitVec 64) (hwf 
   exact UPtWalkaddr.setLeaf_entAt_self 2 t vpn
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-! ## The window invariant -/
 

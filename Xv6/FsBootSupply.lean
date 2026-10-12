@@ -49,6 +49,8 @@ view) and the third is the on-disk header's write set.
 import Xv6.FsCfgKits
 import Xv6.OffBox
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -64,7 +66,7 @@ def fsBootTies [Fscfg] [Icfg] (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Nat comp
   fscCons = cnm
 
 section FsBootSupply
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF]
   [WchG GF] [Appcfg GF]

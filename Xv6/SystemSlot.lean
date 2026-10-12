@@ -102,6 +102,8 @@ import Xv6.FsDurImg
 import Xv6.FirstTok
 import MachCSL.AdequacyDisk
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
@@ -138,7 +140,7 @@ def xv6TracePure (cov : ExtTreeSet Nat compare) (ls : Nat) (g : GState) : Prop :
 /-! ## 2.  The application's clone and the power-on transport -/
 
 section AppXferBoot
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- THE CLONE WITH THE BOOT RESOURCE (Rocq `app_clone_raw`): `appXferRaw A`
 with the clone's own `B r'` beside it.  The PowerOn transport
@@ -234,7 +236,7 @@ end AppXferBoot
 `app_triv_sync_run`) -/
 
 section AppTrivSync
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- THE TRIVIAL FOUNDING (Rocq `app_triv_found`): the token is `True`, so the
 turn the swap handed on goes to `<init>` whole. -/
@@ -255,7 +257,7 @@ end AppTrivSync
 /-! ## 3.  The durable claim at a NAMED instance -/
 
 section AppDurAt
-variable {GF : BundledGFunctors} [FsTopG GF]
+variable {GF : BundledGFunctors.{0}} [FsTopG GF]
 
 /-- THE DURABLE CLAIM AT A NAMED INSTANCE (Rocq `app_dur_at`): `appDurRaw`
 with the instance `r` exposed, which is what the LEND needs -- its boot
@@ -298,7 +300,7 @@ end AppDurAt
 /-! ## 4.  The composite crash slot -/
 
 section Slot
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGpreS hlc GF] [Xv6G GF]
   [FsLinkG GF] [FsTopG GF]
 
 /-- THE COMPOSITE CRASH SLOT (Rocq `xv6_slot`): the file system's durability
@@ -494,7 +496,7 @@ end Slot
 /-! ## 5.  One era's lend, unpacked (Rocq `xv6_boot_era` :680-750) -/
 
 section Lend
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [FsLinkG GF] [FsTopG GF]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF] [FsLinkG GF] [FsTopG GF]
 
 /-- THE LEND → THE ERA'S FILE-SYSTEM STATE (Rocq `xv6_boot_era` :680-750):
 the lent epoch is pinned to the boot's own recovery map `D` (recovery is a
@@ -559,7 +561,7 @@ end Lend
 /-! ## 6.  The trace hooks -/
 
 section Trace
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGpreS hlc GF] [Xv6G GF]
   [FsLinkG GF] [FsTopG GF]
 
 /-- THE DISK HALF OF THE TRACE HOOK (Rocq `fs_trace_hook`): at the machine's

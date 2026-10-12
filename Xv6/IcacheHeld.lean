@@ -86,6 +86,8 @@ needs the transports -- needs the pointer-keyed forms too.
 import Xv6.IcacheRef
 import MachCSL.KCtxMove
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -94,7 +96,7 @@ open Iris.Algebra
 /-! ## 5.  THE ADDRESS-KEYED FORM OF A REFERENCE -/
 
 section IcacheHeld
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF]
   [SleepLockG GF] [IcboxG GF]
 
 /-- A REFERENCE, KEYED BY THE POINTER a caller actually holds -- the form
@@ -278,7 +280,7 @@ Nothing else in these bundles moves: `liveGenlo`, `irefFrag`, `slhTok` and
 the stamps are ghost state, and the only cells are `inodeIdent`'s two `↦₄`s. -/
 
 section IcacheHeldAny
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF]
   [SleepLockG GF] [IcboxG GF]
 
 instance inodeIdent_morph (t : KTier) (k : Nat) (dq : DFrac) (dev inum : BitVec 32) :

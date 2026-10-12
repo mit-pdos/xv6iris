@@ -42,12 +42,14 @@ Rocq's header, kept because the reasons are the content:
 -/
 import Xv6.SpecFilewrite
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 
 section FilewriteChain
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [OffboxG GF] [Appcfg GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [OffboxG GF] [Appcfg GF]
 
 /-- THE LOOP'S CARRIED COMMIT STATE (Rocq `fw_au_raw`). -/
 def fwrRaw (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n : Int) (M : Nat → List (BitVec 8))
@@ -437,7 +439,7 @@ end FilewriteChain
 /-! ## The entry and the packaged fires (need the row and the fire lemmas) -/
 
 section FilewriteChainFire
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [FsBytesG GF] [Fscfg] [Icfg] [CurCtx]
@@ -472,7 +474,7 @@ theorem fwrSt_init (om : OffMode) (rb wb : Bool) (i : Nat) (γo : GName)
 end FilewriteChainFire
 
 section FilewriteChainFire2
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [FsBytesG GF]
   [OffboxG GF] [Appcfg GF] [Fscfg] [Icfg]
 

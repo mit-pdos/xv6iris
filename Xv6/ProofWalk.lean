@@ -29,6 +29,8 @@ import Xv6.KvmLemmas
 import Xv6.PtRunLemmas
 import MachCSL.BvLemmas
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -39,7 +41,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option maxRecDepth 8000
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {lent : Bool}
 
 /-! ## Arithmetic and address facts -/
@@ -1051,7 +1053,7 @@ theorem walk_proof (KAL : KALLOC) (MS : MEMSET) : WALK :=
 /-! ## The non-allocating walk -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- `walk`'s postcondition with `alloc = 0`, as `wp_walk_noalloc_body`
 states it. -/

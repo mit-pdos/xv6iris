@@ -18,7 +18,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Std MachCSL LeanRV64D
 
 section
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 theorem wp_ulibPrintf_gen {hlc : HasLC} [MachGS hlc GF] (L : UlibRunP GF) (base : BitVec 64) (a : Nat)
     (m : RegMap) (n : Nat) (R : IProp GF) : wp_ulibPrintf_gen_body L base a m n R := by

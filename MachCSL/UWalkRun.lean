@@ -40,6 +40,8 @@ result `r` and leaves `r = rhs` (closed by `rfl` when it can);
 import MachCSL.URunRW
 import Std.Tactic.BVDecide
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1
@@ -287,6 +289,7 @@ def normState (s : Lean.Expr) : MetaM Lean.Expr := do
 /-- Evaluate a closed decidable proposition. -/
 def decideClosed (T : Lean.Expr) : MetaM (Option (Lean.Expr × Bool)) := do
   if T.hasFVar || T.hasMVar then return none
+  trace m!"uwk decideClosed:{indentExpr T}"
   let inst ← try synthInstance (mkApp (mkConst ``Decidable) T) catch _ => return none
   let d := mkApp2 (mkConst ``Decidable.decide) T inst
   let r ← try withTransparency .all <| whnf d catch _ => return none
@@ -298,17 +301,25 @@ def decideClosed (T : Lean.Expr) : MetaM (Option (Lean.Expr × Bool)) := do
       (mkApp2 (mkConst ``Eq.refl [Level.one]) (mkConst ``Bool) falseE), false)
   return none
 
-/-- Unification at instance transparency, then (on failure) at default. -/
+/-- Unification at instance transparency, then (on failure) at default.  The default
+attempt is bounded: unifying two calls of a model function on different open arguments
+unfolds the bodies, and (Lean ≥ 4.34, `within_clint`) runs into `Nat.sub x <literal>`-style
+unary recursions that only end at the recursion limit; such an overflow is a mismatch. -/
 def defEqI (a b : Lean.Expr) : MetaM Bool := do
   let saved ← saveState
   if ← withTransparency .instances <| isDefEq a b then return true
   restoreState saved
-  if ← withTransparency .default <| isDefEq a b then return true
+  let ok ← tryCatchRuntimeEx
+    (withTheReader Core.Context (fun ctx => { ctx with maxRecDepth := min ctx.maxRecDepth (ctx.currRecDepth + 4096) }) <|
+      withTransparency .default <| isDefEq a b)
+    (fun _ => pure false)
+  if ok then return true
   restoreState saved
   return false
 
 /-- A local hypothesis proving `T` (unification may assign mvars of `T`). -/
 def byHyp (T : Lean.Expr) : MetaM (Option Lean.Expr) := do
+  trace m!"uwk byHyp:{indentExpr T}"
   let Tf := T.getAppFn
   for ld in (← getLCtx) do
     if ld.isImplementationDetail then continue
@@ -319,6 +330,7 @@ def byHyp (T : Lean.Expr) : MetaM (Option Lean.Expr) := do
 
 /-- A given lemma proving `T` (its own hypotheses by hypotheses or evaluation). -/
 def byLemma (cx : Cfg) (T : Lean.Expr) : MetaM (Option Lean.Expr) := do
+  trace m!"uwk byLemma:{indentExpr T}"
   for l in cx.lemmas do
     let lt ← inferType l
     let (args, _, concl) ← forallMetaTelescopeReducing lt
@@ -343,6 +355,7 @@ def byLemma (cx : Cfg) (T : Lean.Expr) : MetaM (Option Lean.Expr) := do
 /-- `simp` a term with the side-condition set, closed subterms evaluated
 before and after (the result's proof is up to that definitional step). -/
 def simpProp (cx : Cfg) (T : Lean.Expr) : MetaM Simp.Result := do
+  trace m!"uwk simpProp:{indentExpr T}"
   let ctx ← cx.simpCtx.setLctxInitIndices
   let T1 ← urwEvalClosed (← instantiateMVars T)
   let (r1, _) ← Lean.Meta.simp T1 ctx cx.simprocs
@@ -377,6 +390,7 @@ def byBv (T : Lean.Expr) (bv : Bool := true) : TacticM (Option Lean.Expr) := do
 
 /-- Prove a proposition (no metavariables). -/
 def prove (cx : Cfg) (T : Lean.Expr) : TacticM (Option Lean.Expr) := do
+  trace m!"uwk prove:{indentExpr T}"
   if let some (p, true) ← decideClosed T then return some p
   let T ← urwEvalClosed (← instantiateMVars T)
   if let some p ← byHyp T then return some p
@@ -394,6 +408,7 @@ def prove (cx : Cfg) (T : Lean.Expr) : TacticM (Option Lean.Expr) := do
 
 /-- Decide a proposition: a proof of `c` (true) or of `¬ c` (false). -/
 def decideProp (cx : Cfg) (c : Lean.Expr) : TacticM (Option (Lean.Expr × Bool)) := do
+  trace m!"uwk decideProp:{indentExpr c}"
   if let some r ← decideClosed c then return some r
   let c ← urwEvalClosed (← instantiateMVars c)
   if let some p ← byHyp c then return some (p, true)
@@ -441,6 +456,7 @@ def isValue (d : Lean.Expr) : MetaM Bool := do
 
 /-- Evaluate `e` to a constructor form `v`, with a proof of `e = v`. -/
 def evalTo (cx : Cfg) (e : Lean.Expr) : TacticM (Option (Lean.Expr × Lean.Expr)) := do
+  trace m!"uwk evalTo:{indentExpr e}"
   let ety ← whnfR (← inferType e)
   let numeric := ety.isAppOfArity ``BitVec 1 || ety.isConstOf ``Nat || ety.isConstOf ``Int
   let isCtorLike (x : Lean.Expr) : MetaM Bool :=
@@ -475,6 +491,7 @@ proof of `s.file r = v` (up to definitional unfolding): through the pins the
 walk set, a closed pin table, a hypothesis `s.file r = v` / `s.pin r = some v`,
 and otherwise `s.file r` itself. -/
 partial def fileValue (s r : Lean.Expr) : MetaM (Lean.Expr × Lean.Expr) := do
+  trace m!"uwk fileValue: {r}"
   let fe := mkApp2 (mkConst ``UWSt.file) s r
   let hyp : MetaM (Option (Lean.Expr × Lean.Expr)) := do
     let ty ← inferType fe
@@ -531,6 +548,7 @@ def dischargeArgs (cx : Cfg) (args : Array Lean.Expr) (skipLast : Bool) : Tactic
     if ← a.mvarId!.isAssigned then continue
     let aty ← instantiateMVars (← inferType a)
     unless ← isProp aty do continue
+    trace m!"uwk discharge:{indentExpr aty}"
     if !aty.hasMVar then
       match ← prove cx aty with
       | some p => a.mvarId!.assign p
@@ -560,6 +578,7 @@ mutual
 partial def walk (cx : Cfg) (X orc s m : Lean.Expr) : TacticM (Lean.Expr × Lean.Expr) := do
   let n ← cx.steps.modifyGet fun n => (n + 1, n + 1)
   if n > cx.limit then throwError "uwk_run: step limit reached at{indentExpr m}"
+  trace m!"uwk walk[{n}]: {m.getAppFn}"
   -- a fact about `m` itself
   if let some rp ← bySubFact cx X orc s m then return rp
   let m ← whnfI m
@@ -691,6 +710,7 @@ partial def bySubFact (cx : Cfg) (X orc s m : Lean.Expr) (retry : Bool := true) 
     TacticM (Option (Lean.Expr × Lean.Expr)) := do
   let mfn := m.getAppFn
   unless mfn.isConst do return none
+  trace m!"uwk bySubFact: {mfn}"
   let target := mkApp4 (mkApp (mkConst ``runRW) X) cx.D orc s m
   let cands : Array Lean.Expr := (← getLCtx).foldl (init := #[]) fun acc ld =>
     if ld.isImplementationDetail then acc else acc.push ld.toExpr
@@ -762,6 +782,7 @@ partial def walkEvent (cx : Cfg) (X orc s m : Lean.Expr) : TacticM (Lean.Expr ×
   unless call.isAppOfArity ``Except.ok 3 do throwError "uwk_run: unexpected call{indentExpr call}"
   let o ← whnf call.appArg!
   let ofn := o.getAppFn
+  trace m!"uwk event: {ofn}"
   let target := mkApp4 (mkApp (mkConst ``runRW) X) cx.D orc s m
   -- try the step lemmas for this event, in order
   let lems : List Name :=
@@ -822,7 +843,7 @@ def mkCtx (lemmas : Array Syntax.Term) : TacticM (Simp.Context × Simp.SimprocsA
       BitVec.reduceEq, BitVec.reduceNe, BitVec.reduceBEq, BitVec.reduceBNe, BitVec.reduceULT,
       BitVec.reduceULE, BitVec.reduceExtractLsb', BitVec.reduceSetWidth, BitVec.reduceZeroExtend,
       BitVec.reduceSignExtend, BitVec.reduceGetLsb, Nat.reduceMul, Nat.reduceAdd, Nat.reduceSub,
-      Nat.reduceDiv, Nat.reduceMod, Nat.reducePow, Nat.reduceLTLE, Nat.reduceLeDiff, Nat.reduceEqDiff,
+      Nat.reduceDiv, Nat.reduceMod, Nat.reducePow, Nat.reduceLeDiff, Nat.reduceEqDiff,
       Int.reduceToNat, Int.reduceMul, Int.reduceAdd, Int.reduceSub, Int.reduceNeg,
       Sail.BitVec.toNatInt, Int.toNat_natCast, uwk_toNat_ofNat, BitVec.add_zero, BitVec.reduceOfInt,
       Int.cast_ofNat_Int, Int.natCast_mul, BitVec.setWidth_eq, *])

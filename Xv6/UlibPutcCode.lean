@@ -37,6 +37,8 @@ instance is then one `decide` on its image (`UlibPutcReloc.lean`).
 -/
 import Xv6.UlibRun
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL LeanRV64D
@@ -87,7 +89,7 @@ theorem ulibPutcTab_decode (k : Nat) (x : UlibIns) (hk : ulibPutcTab[k]? = some 
   exact Option.some.inj h
 
 section
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- **`putc`'s code at `base`** (Rocq `cat_code γt`'s `putc` rows, at any
 load address). -/

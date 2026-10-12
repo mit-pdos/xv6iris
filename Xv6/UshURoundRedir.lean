@@ -50,7 +50,7 @@ open HfpFileClaimsP
 set_option synthInstance.maxSize 1024
 
 section UShURoundRedir
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF] [FifRegG GF]
   [FileOutG GF] [PipeOutG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
@@ -239,7 +239,7 @@ theorem uHchild_redir (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : USH_FPRINTF) (SP : 
       have hlst : (vf.feBase ++ ulinesIn I).getLast? = some (Uline.LEchoF ws file) := by
         rw [List.getLast?_append, ulinesIn_last I hpos, hul]; rfl
       have hnp : (vf.feBase ++ ulinesIn I).length ≤ vf.feBase.length + nlines I := by
-        rw [List.length_append, ulinesIn_length]; exact Nat.le_refl _
+        rw [List.length_append, ulinesIn_length]
       -- THE ROUND POSITION, advanced to the line's count
       unfold urpos
       icases Hup with ⟨%vf0, %n0, #Hvf0, Hposh, %hn0, #Hrr⟩

@@ -22,12 +22,14 @@ Three groups of lemmas:
 -/
 import MachCSL.KCtx
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open LeanRV64D
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 local notation "era" => MachGS.era (hlc := hlc) (GF := GF)
 
@@ -134,8 +136,10 @@ instance instCtxMorphTransSlot [KernelGeom] (tier : KTier) (cpu : CPU) (tr : KTi
 depends on the context, and the environment carries its own re-homing
 witness (`MachCSL.CtxLaws.envAt`). -/
 instance instCtxMorphIntrResP (tier : KTier) (S : IhsIx GF → IProp GF) (cpu : CPU) :
-    CtxMorph (GF := GF) (fun ξ => @intrResP hlc GF _ ⟨ξ, tier⟩ S cpu) :=
-  @instCtxMorphExists hlc GF _ _
+    CtxMorph (GF := GF) (fun ξ => @intrResP hlc GF _ ⟨ξ, tier⟩ S cpu) := by
+  -- the body's type is the unfolding of `intrResP` (Lean ≥ 4.34 does not unify through it)
+  unfold intrResP
+  exact @instCtxMorphExists hlc GF _ _
     (fun (E : CtxId → IProp GF) ξ => iprop(∃ h : BitVec 64,
       ⌜stvecDirect h⌝ ∗ Register.stvec ↦ᵣ[cpu] h ∗ □ S ⟨E, cpu, h⟩ ∗ envAt E ξ))
     (fun E => @instCtxMorphExists hlc GF _ _

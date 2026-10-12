@@ -311,7 +311,7 @@ def vreg_name_raw_backwards (arg_ : String) : SailM (BitVec 5) := do
   | "v31" => (pure 0b11111#5)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def vreg_name_raw_forwards_matches (arg_ : (BitVec 5)) : Bool :=
@@ -403,7 +403,7 @@ def vreg_name_backwards (arg_ : String) : SailM vregidx := do
   | .some result => (pure result)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def vreg_name_forwards_matches (arg_ : vregidx) : Bool :=
@@ -462,7 +462,7 @@ def rV (app_0 : vregno) : SailM (BitVec (2 ^ 8)) := do
   | _ => readReg vr31
 
 def dirty_v_context (_ : Unit) : SailM Unit := do
-  assert (hartSupports Ext_Zve32x) "extensions/V/vext_regs.sail:138.33-138.34"
+  (assert (hartSupports Ext_Zve32x) "extensions/V/vext_regs.sail:138.33-138.34")
   writeReg mstatus (Sail.BitVec.updateSubrange (← readReg mstatus) 10 9
     (extStatus_map_forwards Dirty))
   writeReg mstatus (Sail.BitVec.updateSubrange (← readReg mstatus) (64 -i 1) (64 -i 1) 1#1)
@@ -633,7 +633,7 @@ def is_invalid_lmul_pow (v : (BitVec 3)) : Bool :=
 
 def get_sew_pow (_ : Unit) : SailM Nat := do
   let sew_pow ← do (pure (BitVec.toNatInt (_get_Vtype_vsew (← readReg vtype))))
-  assert (sew_pow <b 4) "Reserved SEW stored in vtype register. This should be impossible."
+  (assert (sew_pow <b 4) "Reserved SEW stored in vtype register. This should be impossible.")
   (pure (sew_pow +i 3))
 
 def get_sew (_ : Unit) : SailM Int := do
@@ -644,7 +644,7 @@ def get_sew_bytes (_ : Unit) : SailM Int := do
 
 def get_lmul_pow (_ : Unit) : SailM Int := do
   let lmul_pow ← do (pure (BitVec.toInt (_get_Vtype_vlmul (← readReg vtype))))
-  assert (lmul_pow >b (Neg.neg 4)) "Reserved LMUL stored in vtype register. This should be impossible."
+  (assert (lmul_pow >b (Neg.neg 4)) "Reserved LMUL stored in vtype register. This should be impossible.")
   (pure lmul_pow)
 
 def undefined_agtype (_ : Unit) : SailM agtype := do

@@ -42,6 +42,8 @@
 import Xv6.FsImgInode
 import Xv6.BitmapEnc
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL Iris Iris.Std Std

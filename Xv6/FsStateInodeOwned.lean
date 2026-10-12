@@ -108,6 +108,8 @@ Rocq's statement (modulo the deviations below).
 import Xv6.FsStateInode
 import Xv6.FsStateLink
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -188,7 +190,7 @@ def nodeEntOk (i : Nat) (n : FsNode) (D : Std.ExtTreeSet Fname compare) (v : Ity
 /-! ## 4 (cont.).  The fragments -/
 
 section InodeOwned
-variable {GF : BundledGFunctors} [FsLinkG GF]
+variable {GF : BundledGFunctors.{0}} [FsLinkG GF]
 open FsStateLink
 
 /-- The fragment at a KNOWN value -- the shape the pack / scatter and the

@@ -42,13 +42,16 @@ the collection goes through `colFreeSlotLnk_acc`).
 -/
 import Xv6.FsCollect
 import Xv6.IcacheEscrowTok
+import MachCSL.DecInst
+
+noncomputable section
 
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section Helpers
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- A pure reading beside BOTH of its sources (deviation 3; helper). -/
 theorem colKeep {A B : IProp GF} {φ : Prop} (h : A ⊢ B -∗ ⌜φ⌝) : A ⊢ B -∗ ⌜φ⌝ ∗ A ∗ B :=
@@ -59,7 +62,7 @@ end Helpers
 /-! ## 7.  A FREE INUM'S BUNDLE -/
 
 section Free
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsBlocksG GF] [IregG GF] [FsTopG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsBlocksG GF] [IregG GF] [FsTopG GF]
 
 /-- A FREE inum owns no block and no indirect block, so the bundle is the
 record proxy beside the TIED abstract fragment (Rocq's
@@ -96,7 +99,7 @@ end Free
 /-! ## THE DOOR: ONE REGION SLOT, AT A QUIESCENT TRANSACTION LEDGER -/
 
 section Slot
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
   [FsBlocksG GF] [FsTopG GF] [FsLinkG GF]
 
@@ -316,6 +319,7 @@ theorem colIty_iff (n : FsNode) (d : Dinode) (hrec : n.fnRec = d) (w : Ity) :
   subst hrec
   have hty : iregDirTy = T_DIR_z := rfl
   cases w <;> simp [iregRegOk, fnItyOk, fnIsDir, fnType, hty]
+  all_goals (fix_dec; simp)
 
 /-- ...and its multiplicity. -/
 theorem colMult_eq (n : FsNode) (d : Dinode) (hrec : n.fnRec = d) :

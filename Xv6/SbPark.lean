@@ -59,6 +59,8 @@ the run is free AND something `end_op` will hold is being built, so
 import Xv6.FsImg
 import Xv6.FsBlocks
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -86,7 +88,7 @@ theorem fsbN_sbN_disj : (↑fsbN : CoPset) ## (↑sbN : CoPset) :=
   ndot_ne_disjoint logN (by decide)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsBlocksG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsBlocksG GF]
 
 /-! ## The park
 

@@ -38,6 +38,8 @@ the bridge `Xv6/FsDurImgLink.lean`).
 -/
 import Xv6.FsDurImgToks
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.Std MachCSL

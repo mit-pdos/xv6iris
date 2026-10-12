@@ -50,6 +50,8 @@ shift `slli a4,a3,3` of the sign-extended number is slot `num`'s offset
 import Xv6.KernelData
 import Xv6.UsysDet
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -253,7 +255,7 @@ theorem syscall_tbl_run : ∀ k, k < 24 →
   decide +kernel
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- **Slot `k` of the table, straight out of the read-only image** (Rocq
 `sysc_table_word`). -/

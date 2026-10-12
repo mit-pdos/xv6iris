@@ -36,6 +36,8 @@ import Xv6.LineModelSeal
 import Xv6.LineModelLinksSeal
 import Xv6.EchoOutPureSeal
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

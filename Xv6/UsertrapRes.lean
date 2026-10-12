@@ -152,6 +152,8 @@ import Xv6.SpecUservec
 import Xv6.SpecKernelvec
 import Xv6.WaitLock
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -173,7 +175,7 @@ theorem uservecCtx_ok (k : KCtx) (g : RegMap) (ws : List (BitVec 64)) (h : k.sie
 def utStackTop (k : KCtx) (ksp : BitVec 64) : Prop := k.sp = ksp ∧ k.avail = 512
 
 section Trap
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- **Re-forming the stack** (the uservec obligation): `m` dead slots above
 the context's `sp` -- a frame whose owner never pops it (forkret's) -- are
@@ -285,7 +287,7 @@ theorem uservecTf_low (ws : List (BitVec 64)) (g : RegMap) (i : Nat) (hi : i < 5
     uvSaveSeq_low _ (by simp [uvSavesB]) g _ i hi, uvSaveSeq_low _ (by simp [uvSavesA]) g _ i hi]
 
 section Tfk
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- **Rocq `ut_tfk`**: the kernel words, at an existential root whose
 kernel-table invariant is beside it (persistent).  Established where the
@@ -339,7 +341,7 @@ end Tfk
 /-! ## §4 The five cones' environments -/
 
 section Env
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [X : CurCtx]
@@ -671,7 +673,7 @@ the parker's (`utParkCaps`); the bcache slots are ghost (`parkOwn`).
 Deviation 8. -/
 
 section Park
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
@@ -774,7 +776,7 @@ end Park
 /-! ## §5 The `csrw stvec, kernelvec` fold (Rocq `ut_trap_csrs_fold`) -/
 
 section Fold
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 /-- **Rocq `ut_trap_csrs_fold` / `ut_csrs_raw_fold`**: the three trap-scratch

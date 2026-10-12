@@ -77,6 +77,8 @@ Imports only Spec files and the definitional layer.
 -/
 import Xv6.SpecMain
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -87,7 +89,7 @@ callee, which is the scheduler (printk's 52 is below it). -/
 def mainSecondarySlots : Nat := 2 + schedulerSlots
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
   [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
 
 /-! ## The deposit -/
@@ -163,7 +165,7 @@ end
 
 /-- The interface of `main`'s secondary arm (Rocq `MAIN_SECONDARY`). -/
 structure MAIN_SECONDARY : Prop where
-  wp_main_secondary : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+  wp_main_secondary : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] (X : CurCtx)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)

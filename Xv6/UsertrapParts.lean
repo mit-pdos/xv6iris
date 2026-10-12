@@ -36,6 +36,8 @@ Definitional + pure + small proof-mode lemmas; no instruction stepping.
 -/
 import Xv6.SpecUsertrap
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -50,7 +52,7 @@ def utReadCons (tf : List (BitVec 64)) (sts : List FdState) : Prop :=
     ∃ rb : Bool, sts[(usysArgfd tf).toNat]? = some (.open true rb (.device 1))
 
 section ReadWhy
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]
 open UexecSG
 
 /-- **Rocq `UexecExecInst.spost_at_read_why`, as a hypothesis**: read's
@@ -76,7 +78,7 @@ def UtPauseWhy : Prop :=
 end ReadWhy
 
 section ExitElim
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CtokG GF] [SG : UexecSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CtokG GF] [SG : UexecSG GF]
 open UexecSG
 
 /-- **Rocq `UexecExecInst.sbundle_at_exit_elim`, as a hypothesis** (the
@@ -96,7 +98,7 @@ the slot, the table and stack top, the record at entry, the descriptor
 states, generation, children and pid, the three trap cells' values, the
 deposit's families, the kill key, and the residue's names (opened at the
 entry). -/
-structure UtArgs (GF : BundledGFunctors) [CtokG GF] [UexecSG GF] where
+structure UtArgs (GF : BundledGFunctors.{0}) [CtokG GF] [UexecSG GF] where
   k : KCtx
   j : Nat
   P : UPtd
@@ -114,7 +116,7 @@ structure UtArgs (GF : BundledGFunctors) [CtokG GF] [UexecSG GF] where
   N : UtNames
 
 section Args
-variable {GF : BundledGFunctors} [CtokG GF] [UexecSG GF]
+variable {GF : BundledGFunctors.{0}} [CtokG GF] [UexecSG GF]
 
 /-- **The entry's facts** (the contract's premises, the residue's pins and
 the context's depth-0 facts), as one record. -/
@@ -152,7 +154,7 @@ end Args
 /-! ## §4 The pure rows -/
 
 section Rows
-variable {GF : BundledGFunctors} [CtokG GF] [UexecSG GF]
+variable {GF : BundledGFunctors.{0}} [CtokG GF] [UexecSG GF]
 
 /-- **The round's pure rows at the record a block parks** (`V2`, `M2`, the
 states `sts2` and set `cs2`), all but the live row (which the kill check
@@ -217,7 +219,7 @@ end Rows
 /-! ## §5 The out rows -/
 
 section Outs
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [WchG GF]
     [CurCtx] [Xv6G GF] [Fscfg]
 
 /-- **The four channel answers at the parked record** (the post's out rows
@@ -295,7 +297,7 @@ end Outs
 /-! ## §6 The live reason and the kill reading -/
 
 section Kill
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [WchG GF]
     [CurCtx]
 
 /-- **What the last kill check lends** (Rocq's `Hres` / `Hlvres`): the
@@ -381,7 +383,7 @@ theorem ut_kill_lend_shot (j : Nat) (pid : BitVec 32) (gn : GName) (hnz : pid.to
 end Kill
 
 section Tear
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CtokG GF] [WchG GF]
 
 /-- **THE TEAR-DOWN'S PRICE** (Rocq `ut_kexit`'s package, lane PQ-C,
 design/pipe.md "The exit path"): LEFT, a kill by a THIRD PARTY -- the

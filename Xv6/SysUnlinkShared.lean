@@ -32,6 +32,8 @@ import Xv6.SpecSysUnlink
 import Xv6.DinodeSlot
 import Xv6.SysUnlinkPure
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -125,7 +127,7 @@ theorem sys_unlink_dir_dots (dn : Dinode) (bm : Blkmap) (data : Nat → List (Bi
 /-- What every stage lemma of the walk takes about the entry context and the
 record, as ONE hypothesis (the landed contract's premises plus the carve's
 alignment). -/
-structure SuOk {GF : BundledGFunctors} (k : KCtx) (A : SysUnlinkArgs GF) : Prop where
+structure SuOk {GF : BundledGFunctors.{0}} (k : KCtx) (A : SysUnlinkArgs GF) : Prop where
   hj : A.j < NPROC
   hproc : k.proc = procAddr A.j
   hK : sysUnlinkK ≤ k.avail
@@ -136,12 +138,12 @@ structure SuOk {GF : BundledGFunctors} (k : KCtx) (A : SysUnlinkArgs GF) : Prop 
 
 /-- THE RECORD AT A RAISED COUNT (permit sweep L1b): argstr hands the block
 back at `A.V.updEv kv`, and the walk runs at this record. -/
-abbrev SysUnlinkArgs.raise {GF : BundledGFunctors} (A : SysUnlinkArgs GF) (kv : Nat) :
+abbrev SysUnlinkArgs.raise {GF : BundledGFunctors.{0}} (A : SysUnlinkArgs GF) (kv : Nat) :
     SysUnlinkArgs GF :=
   { A with V := A.V.updEv kv }
 
 /-- The static premises survive the raise (the counter is in none of them). -/
-theorem SuOk.raise {GF : BundledGFunctors} {k : KCtx} {A : SysUnlinkArgs GF} (ok : SuOk k A)
+theorem SuOk.raise {GF : BundledGFunctors.{0}} {k : KCtx} {A : SysUnlinkArgs GF} (ok : SuOk k A)
     (kv : Nat) : SuOk k (A.raise kv) :=
   ⟨ok.hj, ok.hproc, ok.hK, ok.hnoff, ok.htier, ok.hsp, ok.hal⟩
 
@@ -158,7 +160,7 @@ theorem sys_unlink_off_nonnull (sp : BitVec 64) (h : 240 ≤ sp.toNat) :
 /-! ## The arms, introduced (Rocq builds each inline at its exit) -/
 
 section Arms
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
   [Appcfg GF] [Icfg]
 
 variable (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (M : Nat → List (BitVec 8)) (pv : Nat)
@@ -350,7 +352,7 @@ end Arms
 /-! ## The kernel-data windows and the three panic messages -/
 
 section Data
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [IrefslotG GF]
 
 set_option maxRecDepth 100000 in
@@ -420,7 +422,7 @@ end Data
 /-! ## The isdirempty record's byte views (deviation 3) -/
 
 section Bytes
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 theorem sys_unlink_del_name (sp0 : BitVec 64) :
     sysUnlinkDel sp0 + BitVec.ofNat 64 2 = sysUnlinkDelName sp0 := by
@@ -466,7 +468,7 @@ end Bytes
 /-! ## The transaction share, quartered (Rocq's `log_tx_split` / `log_tx_add`) -/
 
 section Tx
-variable {GF : BundledGFunctors} [Xv6G GF] [LogG GF] [FsLinkG GF] [FsTopG GF]
+variable {GF : BundledGFunctors.{0}} [Xv6G GF] [LogG GF] [FsLinkG GF] [FsTopG GF]
 
 theorem sys_unlink_quarter : (1 : Qp).half = (1 : Qp).half.half + (1 : Qp).half.half :=
   (Qp.half_add_half _).symm

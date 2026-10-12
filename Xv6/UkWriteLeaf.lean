@@ -46,6 +46,8 @@ import Xv6.UkReadRows
 import Xv6.UshSysP
 import Xv6.UkRunSysDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -55,13 +57,13 @@ open Std (ExtTreeSet)
 
 /-- **Rocq `xfam_wr`**: row 16's one field, the caller's own output cursor
 `wQ`, and the payload row `kfXpay`; everything else inert. -/
-def xfamWr {GF : BundledGFunctors} (Q : Nat → IProp GF) (Xp : Int → IProp GF) : Xfam GF :=
+def xfamWr {GF : BundledGFunctors.{0}} (Q : Nat → IProp GF) (Xp : Int → IProp GF) : Xfam GF :=
   { xfamPt with wQ := Q, kfXpay := Xp }
 
 /-! ## S2 THE TWO KEY-LEVEL ROWS, S3 the arm -/
 
 section Rows
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg]
 
 local notation "SGX" => uexecSGXv6 (hlc := hlc)
@@ -115,7 +117,7 @@ theorem uwr_fd_st_dev (v0 : BitVec 64) (fdv l : List FdState) (i : Nat) (rb : Bo
 /-! ## S4 THE SUPPLY -/
 
 section Supply
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
@@ -203,7 +205,7 @@ end Supply
 /-! ## THE POST, READ BACK AT THE SAME FAMILY -/
 
 section Post
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg]
 
 local notation "SGX" => uexecSGXv6 (hlc := hlc)

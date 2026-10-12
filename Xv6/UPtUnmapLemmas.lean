@@ -10,6 +10,8 @@ import Xv6.UPtDefs
 import Xv6.PtRunLemmas
 import Xv6.ByteCursor
 
+noncomputable section
+
 namespace Xv6.UPtUnmap
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -249,7 +251,7 @@ theorem run_key_lt_tf (va : BitVec 64) (n j : Nat) (hj : j < n)
 /-! ## The user pages of a leaf map -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
 
 /-- `umPages`, over a bare leaf map. -/
 def umMap (um : RegMapF (BitVec 64)) (M : Nat → List (BitVec 8)) : IProp GF := iprop%

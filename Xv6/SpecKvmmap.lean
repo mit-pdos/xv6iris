@@ -19,6 +19,8 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.SpecMappages
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -29,7 +31,7 @@ def kvmmapAddr : BitVec 64 := KA.«kvmmap»
 
 /-- The specification of `kvmmap` (counted mode): `a0 = kpgtbl`, `a1 = va`,
 `a2 = pa`, `a3 = sz`, `a4 = perm`. -/
-def wp_kvmmap_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
+def wp_kvmmap_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (nb : Nat) (t : PTree) (n : Nat)
     (perm : BitVec 64)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 34 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
@@ -58,7 +60,7 @@ def wp_kvmmap_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
 
 /-- The interface of `kvmmap`. -/
 structure KVMMAP : Prop where
-  wp_kvmmap : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_kvmmap : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γl : GName) (γk : KmemNames) (nb : Nat) (t : PTree) (n : Nat) (perm : BitVec 64)
     hnoff hK hlk hroot hargs hperm hmask hrwx hwf hnd hpg hcount hp0,
     wp_kvmmap_body (hlc := hlc) (GF := GF) cpu k γl γk nb t n perm hnoff hK hlk hroot hargs hperm

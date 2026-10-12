@@ -21,6 +21,8 @@ Rocq's `secc_lit*` are the generic kit (`seccLit`/`seccLitOk` name it).
 import Xv6.UserLit
 import Xv6.User.SeccompImage
 
+noncomputable section
+
 namespace Xv6.User.Seccomp
 
 open Xv6.User

@@ -59,6 +59,8 @@ import Xv6.FsAbsCreateFire
 import Xv6.PathElems
 import Xv6.ArgPath
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -90,7 +92,7 @@ failure fold keeps its shape, and `argPathOf_uniq` makes the two readings
 interchangeable in BOTH directions. -/
 
 section NparCur
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- Rocq `npar_cur` (image and pointer as `ArgPath`'s deviations 1-2; inums
 `Nat`). -/

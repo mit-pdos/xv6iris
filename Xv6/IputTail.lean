@@ -67,7 +67,7 @@ private theorem iputTail_sub_of_inc {q qt : Qp} {n : PosNat}
     unfold qpSub Qp.ofRat?
     rw [dif_pos (by grind)]
 
-theorem iput_tail_ref_sub [Icfg] {GF : BundledGFunctors} [IcacheG GF]
+theorem iput_tail_ref_sub [Icfg] {GF : BundledGFunctors.{0}} [IcacheG GF]
     (M : RegMapF (Qp × PosNat)) (k : Nat) (q : Qp) :
     itableHalf (GF := GF) M ∗ irefFrag k q ⊢
       ⌜∃ (qt : Qp) (n : PosNat), PartialMap.get? M k = some (qt, n) ∧
@@ -99,7 +99,7 @@ theorem iput_tail_rest_frac (q qt qrest qr : Qp) (hsub : qpSub qt q = some qrest
   show (1 : Qp).half.val = qrest.val + (q.val + qr.val)
   grind
 
-theorem iput_tail_icHdr_cur {hlc : HasLC} {GF : BundledGFunctors} [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
+theorem iput_tail_icHdr_cur {hlc : HasLC} {GF : BundledGFunctors.{0}} [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
     [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [MachGS hlc GF] [Icfg] [CurCtx]
     (cn : IcNames) (γfs : FsNames) (γi : GName) (cov : ExtTreeSet Nat compare)
     (logstart k : Nat) (i : IcBid) (x : IcX) :
@@ -109,7 +109,7 @@ theorem iput_tail_icHdr_cur {hlc : HasLC} {GF : BundledGFunctors} [IcacheG GF] [
 theorem iput_tail_ret_30 : jumpPc (KA.«iput» + 0x30#64) = (KA.«iput» + 0x30#64) := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]

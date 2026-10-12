@@ -49,6 +49,8 @@ import Xv6.UserExec
 import Std.Data.ExtTreeSet
 import Xv6.ProcDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris MachCSL

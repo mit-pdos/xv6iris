@@ -31,13 +31,15 @@ takes them); `shp_code`/`shp_rodata`/`shk_code` are `ushCode`; Rocq's
 -/
 import Xv6.SpecShRuncmdExec
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 open Std (ExtTreeSet)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 variable (E : UshExecEnv (hlc := hlc) (GF := GF))
@@ -87,7 +89,7 @@ end
 predicate that reads back as the ledger (`hps`: the numbers the program
 admits, Rocq's section hypothesis `Hpsok_free`). -/
 structure SH_CHILD_EXEC : Prop where
-  wp_shChildXGen : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+  wp_shChildXGen : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
     [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] (E : UshExecEnv (hlc := hlc) (GF := GF)),
     (∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k) →

@@ -29,6 +29,8 @@ DEVIATIONS from Rocq: spelling as `UnionOutPure.lean` (`!!` is `[·]?`,
 import Xv6.UnionAdmSync
 import Xv6.UnionOutPureSeal
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

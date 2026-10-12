@@ -218,10 +218,10 @@ def reset (_ : Unit) : SailM Unit := do
   (pure (ext_reset ()))
 
 def init_model (config_filename : String) : SailM Unit := do
-  assert (← (config_is_valid ())) (HAppend.hAppend
+  (assert (← (config_is_valid ())) (HAppend.hAppend
     (if ((config_filename == "") : Bool)
     then "Default config"
-    else (HAppend.hAppend "Config in " config_filename)) " is invalid.")
+    else (HAppend.hAppend "Config in " config_filename)) " is invalid."))
   (reset ())
 
 def init_boot_requirements (_ : Unit) : SailM Unit := do

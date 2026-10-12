@@ -69,6 +69,8 @@ Deviations from Rocq:
 import Xv6.LineWords
 import MachCSL.ObsTrace
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

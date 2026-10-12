@@ -27,6 +27,8 @@ moved here from `Xv6/EndOpCrash.lean` as Rocq moved them (K3-3).
 import Xv6.LogLedger
 import Xv6.FsCrashLand
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
@@ -81,7 +83,7 @@ theorem eo_tx_empty (T : RegMapF Unit) (om : RegMapF OpEntry)
   | some v => exact absurd h (eo_map_empty T hT0 c v)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx] [FsLinkG GF] [FsTopG GF]
 
 /-! ## 2.  What the quiescent lock resource lends -/

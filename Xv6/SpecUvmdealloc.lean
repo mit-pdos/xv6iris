@@ -16,6 +16,8 @@ import Xv6.UPtDefs
 import Xv6.Image
 import Xv6.SlotGen
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -24,7 +26,7 @@ open LeanRV64D
 def uvmdeallocAddr : BitVec 64 := KA.«uvmdealloc»
 def uvmdeallocSlots : Nat := 26
 
-def wp_uvmdealloc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
+def wp_uvmdealloc_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8)) (ke : Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : uvmdeallocSlots ≤ k.avail) (hlk : "kmem" ∉ k.locks)
     (hroot : k.regs 10#5 = pageAddr P.root) (hold : (k.regs 11#5).toNat ≤ uvmMaxsz) : Prop :=
@@ -39,7 +41,7 @@ def wp_uvmdealloc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
   ⊢ wpLoop (GF := GF) cpu
 
 structure UVMDEALLOC : Prop where
-  wp_uvmdealloc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_uvmdealloc : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8)) (ke : Nat) hnoff hK hlk hroot hold,
     wp_uvmdealloc_body (hlc := hlc) (GF := GF) cpu k γl γk P M ke hnoff hK hlk hroot hold
 

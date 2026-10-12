@@ -23,7 +23,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
 
 /-- **Rocq `ubytes_persist`**: a run, made read-only forever. -/
 theorem ushUbytes_persist (γ : GName) (a n : Nat) (f : Nat → BitVec 8) :

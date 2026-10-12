@@ -63,7 +63,7 @@ theorem ulibRetPc_at (b : BitVec 64) (hb : b.toNat % 2 = 0) (t : Nat) (ht : t % 
 /-! ## The step lemmas -/
 
 section
-variable {GF : BundledGFunctors} (L : UlibRunP GF) (C : IProp GF) [Persistent C]
+variable {GF : BundledGFunctors.{0}} (L : UlibRunP GF) (C : IProp GF) [Persistent C]
 
 theorem ulibS_addi {b : BitVec 64} {x : Nat} {rvc : Bool} {imm : BitVec 12} {rs1 rd : BitVec 5}
     (hc : C ⊢ L.uinstrIs (b + BitVec.ofNat 64 x) rvc (.ITYPE (imm, .Regidx rs1, .Regidx rd, .ADDI)))

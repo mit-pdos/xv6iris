@@ -29,13 +29,15 @@ a separate obligation).  `DevM.Lease` subsumes `DevM.LocalR` -- see
 -/
 import MachCSL.WpDma
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 
 /-! ## What a primitive of a bus-mastering device does -/
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-! ## The two DMA obligations -/
 
@@ -114,7 +116,7 @@ theorem dmaReadPin_view (σ : MState) (pa : PAddr) (n : Nat) (Q : BitVec (8 * n)
 are covered by the client's lease out of `R`, and whose DMA reads are
 pinned; `C` is the persistent knowledge the program has accumulated so far
 (`True` at a loop boundary and at a fork).  `.setPin` is still excluded. -/
-inductive DevM.Lease {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] {S T : Type}
+inductive DevM.Lease {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] {S T : Type}
     (rel : S → S → Prop) (R : S → IProp GF) : IProp GF → DevM S T Unit → Prop
   | pure (C : IProp GF) (a : Unit) : Lease rel R C (.pure a)
   | op (C : IProp GF) (o : DevOp S T) (k : o.ret → DevM S T Unit)

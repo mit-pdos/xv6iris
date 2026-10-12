@@ -42,6 +42,8 @@ import Xv6.SpecBeginOp
 import Xv6.SpecEndOp
 import Xv6.SpecIunlockput
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -86,18 +88,18 @@ def sysfilePfun (pl : List (BitVec 8)) (i : Nat) : BitVec 8 := pl.getD i 0#8
 
 theorem sysfile_bview (pl : List (BitVec 8)) :
     bview (pl.length + 1) (sysfilePfun pl) = pl ++ [0#8] := by
-  apply List.ext_getElem
-  · simp [bview_length]
-  · intro i h1 h2
-    rw [bview_length] at h1
-    unfold bview sysfilePfun
-    simp only [List.getElem_map, List.getElem_range]
-    by_cases hi : i < pl.length
-    · rw [List.getElem_append_left hi]
-      simp [List.getD_eq_getElem?_getD, List.getElem?_eq_getElem hi]
-    · have he : i = pl.length := by omega
-      subst he
-      simp [List.getD_eq_getElem?_getD]
+  apply List.ext_getElem?
+  intro i
+  unfold bview sysfilePfun
+  by_cases hi : i < pl.length
+  · simp [List.getElem?_range, hi, Nat.lt_succ_of_lt hi, List.getD_eq_getElem?_getD,
+      List.getElem?_append_left hi, List.getElem?_eq_getElem hi]
+  · by_cases he : i = pl.length
+    · subst he
+      simp [List.getElem?_range, List.getD_eq_getElem?_getD]
+    · have hge : pl.length ≤ i := by omega
+      have hn : ¬ i < pl.length + 1 := by omega
+      simp [List.getElem?_range, hn, List.getElem?_append_right hge, List.getElem?_eq_none_iff]
 
 theorem sysfile_pfun_nn (pl : List (BitVec 8)) (hn : nonul pl) :
     ∀ i, i < pl.length → sysfilePfun pl i ≠ 0#8 := by
@@ -149,7 +151,7 @@ theorem sysfile_setnl_type_stable (dn : Dinode) (nl : BitVec 16) :
 /-! ## Slots and bytes, the path buffer -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- A buffer of `n` bytes at `a`, contents unknown. -/
 def sysfileAny [CurCtx] (a : BitVec 64) (n : Nat) : IProp GF :=
@@ -188,7 +190,7 @@ end
 /-! ## The environment and the call sites -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -444,7 +446,7 @@ end
 /-! ## The block around argaddr / argfd (moved from SysFstatParts) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF]
   [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [X : CurCtx]
 
@@ -495,7 +497,7 @@ theorem sysfile_blk_bare_ev (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) 
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -570,7 +572,7 @@ form the syscalls that keep the trap-CSR complement at the entry hart and
 move it by the pins use (sys_wait, sys_pipe; sys_dup, sys_close). -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- `argaddr(i, ip)` (Rocq `Argaddr.wp_argaddr_sconf`), unpacked. -/
@@ -596,7 +598,7 @@ theorem sysfile_argaddr_wp (AA : ARGADDR) (c : CPU) (k' : KCtx) (i : Nat) (tfp :
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF]
   [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 

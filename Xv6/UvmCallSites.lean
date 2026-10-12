@@ -18,7 +18,7 @@ theorem uc_beq_ne {α : Type} (x : BitVec 64) (h : x ≠ 0#64) (p q : α) :
   rw [if_neg (by simp only [bcond, beq_iff_eq]; exact h)]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 set_option maxHeartbeats 1000000 in
 /-- `kalloc`'s contract as a rule, AT THE BOOT (`hp0`; permit sweep L3b: the

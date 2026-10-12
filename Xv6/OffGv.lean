@@ -66,6 +66,8 @@ authority) are `Xv6.OffboxBoxG` in `Xv6/OffBoxCam.lean`, over the generalised
 -/
 import MachCSL.Resources
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
@@ -74,11 +76,11 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 shadow's ghost variable over `Int` (Rocq `offbox_offG`); the box members come
 with the OffBox port.  `offG` is deliberately NOT an instance: see the
 header's "PINNED CLASS". -/
-class OffboxG (GF : BundledGFunctors) where
+class OffboxG (GF : BundledGFunctors.{0}) where
   offG : GhostVarG GF Int
 
 section OffGv
-variable {GF : BundledGFunctors} [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [OffboxG GF]
 
 /-- The offset shadow at fraction `q` (Rocq `off_gv`), pinned to the class's
 own ghost-variable member. -/
@@ -131,7 +133,7 @@ closed), so the nesting is never simultaneous. -/
 def foffN : Namespace := ndot (ndot nroot "app") "foff"
 
 section OffUser
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [OffboxG GF]
 
 /-- The user half, parked with its value existential (Rocq `off_user_inv`). -/
 def offUserInv (γo : GName) : IProp GF :=

@@ -30,13 +30,15 @@ import MachCSL.WireInv
 import MachCSL.BootReset
 import MachCSL.CtxBoot
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std
 open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF]
 
 /-! ## A whole register file as a ghost map -/
 
@@ -754,7 +756,7 @@ namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF]
 
 /-! ## Instantiating a client at a fresh era
 

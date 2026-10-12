@@ -40,6 +40,8 @@ Nothing beyond deviation 3 (the brief counts 0 dead declarations here).
 import Xv6.FsDurBytes
 import Xv6.FsStateBitmap
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -126,7 +128,7 @@ and still overlap.  Exclusivity, one byte of it. -/
 namespace FsView
 
 section Overlap
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- Rocq's `byte_range_q_overlap`. -/
 theorem byteRangeQ_overlap (Γ : FsViewNames GF) (hex : phiExcl Γ) (dq1 dq2 : DFrac)
@@ -180,7 +182,7 @@ end FsView
 /-! ## 3.  THE SNAPSHOT'S IDENTITY, AND THE READINGS OFF IT -/
 
 section Read
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF]
 
 /-- THE IDENTITY: the snapshot's byte authority, and the equation that makes
 it the COMMITTED VIEW's.  THE MAP ITSELF IS EXISTENTIAL: nothing above

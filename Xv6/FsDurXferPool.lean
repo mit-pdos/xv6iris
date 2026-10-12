@@ -52,6 +52,8 @@ and no carve.
 import Xv6.FsDurXferRuns
 import Xv6.FsState
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -107,7 +109,7 @@ def xfShape (S : FsStateRec) (PM : BlockMap) : Prop :=
     poolPm (List.range S.fssSb.sbSize) S.fssUsed PM
 
 section FsRuns
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-! ### 3a.  ONE INODE -/
 
@@ -261,7 +263,7 @@ end FsRuns
 /-! ## 3c.  THE FREE POOL -/
 
 section FsPool
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- Rocq's `free_pool_list_pm`: the free entries' existential bytes,
 collected into the SOURCE's own map. -/
@@ -424,7 +426,7 @@ end FsPool
 /-! ## 3d.  THE WHOLE BYTE HALF -/
 
 section FsFoot
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- A literal run at the head (helper; stated at variables so no concrete
 byte list is ever unfolded by unification). -/

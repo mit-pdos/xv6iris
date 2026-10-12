@@ -25,6 +25,8 @@ value is exactly what the memory model says:
 -/
 import MachCSL.Wp
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std
@@ -32,7 +34,7 @@ open Sail Sail.ConcurrencyInterfaceV1
 open Sail.ArchSem (FreeM)
 open LeanRV64D
 
-variable {hlc : HasLC} {GF : BundledGFunctors}
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}}
 
 /-! ## Histories of a byte window -/
 

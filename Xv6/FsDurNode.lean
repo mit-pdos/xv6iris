@@ -24,6 +24,8 @@ certificate about all of them (`durNode_of_snap`).
 -/
 import Xv6.FsDurSnapBytes
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.Std Std MachCSL

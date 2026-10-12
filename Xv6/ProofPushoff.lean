@@ -13,6 +13,8 @@ import Xv6.SpecMycpu
 import Xv6.CodeTactics
 import Xv6.StepLemmas
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -97,7 +99,7 @@ set_option maxHeartbeats 4000000 in
 from the frame) are the caller's. -/
 theorem push_off_br_d3e : KA.«push_off» + 0xd3e#64 = KA.«mycpu» := by decide
 
-theorem push_off_tail {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] (M : MYCPU) (lent : Bool)
+theorem push_off_tail {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx] (M : MYCPU) (lent : Bool)
     (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 6 ≤ k.avail) (hwf : k.wf) (hl : lent = false → 1 ≤ k.noff)
     (b : Bool) (hb : lent = false → b = k.intena) (R : RegMap)
@@ -169,7 +171,7 @@ set_option maxHeartbeats 4000000 in
 /-- `push_off` from its `mv s1,a5` on, with interrupts off: the calls to
 `mycpu`, the depth test, at depth 0 the store of `old` (the `SIE` bit read)
 into the borrowed `c->intena` cell, the increment, the epilogue. -/
-theorem push_off_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] (M : MYCPU)
+theorem push_off_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx] (M : MYCPU)
     (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 6 ≤ k.avail) (hwf : k.wf) (old : Bool) (v : BitVec 64)
     (hv : sstatusAt old v) :

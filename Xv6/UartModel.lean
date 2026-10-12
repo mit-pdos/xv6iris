@@ -7,6 +7,8 @@ on LSR.  Nothing here is about the program logic.
 -/
 import MachCSL.Dev.Uart
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL MachCSL.Uart

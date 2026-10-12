@@ -44,6 +44,8 @@ import Xv6.SpecSysMkdir
 import Xv6.ProcPrivAcc
 import Xv6.KexecParts
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -95,7 +97,7 @@ reading; `UMemL.umemStr_nul` is deviation 3) -/
 /-! ## The generic carve: slots ↔ bytes -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {lent : Bool}
 
 /-- THE CARVE (Rocq `md_frame_carve`): the sixteen low slots ARE
@@ -277,20 +279,19 @@ theorem sys_mkdir_path_of (M : Nat → List (BitVec 8)) (va : Nat) (pl : List (B
     (hs : umemStr M va 128 = some (pl ++ [0#8])) :
     argPathOf M va (bview pl.length (sysfilePfun pl)) := by
   have hself : bview pl.length (sysfilePfun pl) = pl := by
-    apply List.ext_getElem
-    · simp [bview_length]
-    · intro i h1 h2
-      rw [bview_length] at h1
-      unfold bview sysfilePfun
-      simp only [List.getElem_map, List.getElem_range]
-      simp [List.getD_eq_getElem?_getD, List.getElem?_eq_getElem h1]
+    apply List.ext_getElem?
+    intro i
+    unfold bview sysfilePfun
+    by_cases hi : i < pl.length
+    · simp [List.getElem?_range, hi, List.getD_eq_getElem?_getD, List.getElem?_eq_getElem hi]
+    · simp [List.getElem?_range, hi, List.getElem?_eq_none_iff] <;> omega
   rw [hself]
   obtain ⟨pl', hpl', hof⟩ := argPathOf_umemStr M va 128 _ (by decide) hs
   rw [List.append_cancel_right hpl']
   exact hof
 
 /-- The contract's parameters, as one record (the `NamexArgs` pattern). -/
-structure SysMkdirArgs (GF : BundledGFunctors) where
+structure SysMkdirArgs (GF : BundledGFunctors.{0}) where
   γ : FileNames
   j : Nat
   pid : BitVec 32
@@ -308,7 +309,7 @@ structure SysMkdirArgs (GF : BundledGFunctors) where
   Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]

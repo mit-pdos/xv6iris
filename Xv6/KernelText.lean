@@ -14,11 +14,13 @@ import Xv6.KernelTree
 import Xv6.KernelMap
 import Xv6.KernelTac
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- The bytes of one dumped instruction: the boot image's, never written
 (readable by the instruction cache at every view). -/

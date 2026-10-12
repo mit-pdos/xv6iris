@@ -80,7 +80,11 @@ def interpretSailEffects : PreSailM ue ty → M ue ty :=
   FreeM.liftM (fun
     | .inl (.error err) => throw err
     | .inl (.ok eff) => interpretInstructionEffect eff
-    | .inr choice => if h : (0 : Nat) < choice then pure (⟨0, h⟩ : Fin choice) else throw .Unreachable)
+    -- `FinChoice` is a `def` for `Nat`; since Lean 4.34 instance search no longer unfolds it, so the
+    -- decision procedure is named explicitly.
+    | .inr choice => match Nat.decLt 0 choice with
+      | .isTrue h => pure (⟨0, h⟩ : Fin choice)
+      | .isFalse _ => throw .Unreachable)
 
 def main_of_sail_main (initialState : SequentialState Arch.register_type)
     (main : Unit → PreSailM ue Unit) : IO UInt32 := do

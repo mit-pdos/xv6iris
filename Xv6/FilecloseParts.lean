@@ -25,6 +25,8 @@ import Xv6.FtableLock
 import MachCSL.WpSmodeFrame8
 import Xv6.CodeTactics
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -110,7 +112,7 @@ theorem fc_calleeSaved_mk (KR R : RegMap)
 
 /-- The caller's `true` crossing is HART-FREE at a process (Rocq's
 `wp_next true` at `p = proc_addr j`). -/
-theorem fc_next_free {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] (k : KCtx) (j : Nat)
+theorem fc_next_free {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] (k : KCtx) (j : Nat)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (cpu c : CPU) (K : CPU → IProp GF) :
     wpNext true k.proc cpu K ⊢ wpNext true k.proc c K :=
   wpNext_shift true k.proc cpu c K (fun h => h.elim (fun e => absurd e (by decide))
@@ -148,14 +150,14 @@ theorem fc_locks_nil (k : KCtx) (hwf : k.wf) (hnoff : k.noff = 0) : k.locks = []
   List.eq_nil_of_length_eq_zero (by have := hwf.2.2.2.1; omega)
 
 /-- The caller's `true` crossing, from the entry hart to one pinned to it. -/
-theorem fc_next_shift {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] (k : KCtx)
+theorem fc_next_shift {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] (k : KCtx)
     (cpu c : CPU) (K : CPU → IProp GF)
     (hpin : k.sie = false ∨ k.proc = 0#64 → c = cpu) :
     wpNext true k.proc cpu K ⊢ wpNext true k.proc c K :=
   wpNext_shift true k.proc cpu c K (fun h => hpin (h.elim (fun e => absurd e (by decide)) Or.inr))
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF]

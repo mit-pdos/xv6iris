@@ -12,6 +12,8 @@ import MachCSL.WpPmpXv6
 import MachCSL.WpSmodeAuDefs
 import MachCSL.ModelFacts
 
+noncomputable section
+
 
 namespace MachCSL
 
@@ -19,7 +21,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D LeanRV64D.Functions
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 set_option maxHeartbeats 4000000 in
 set_option swp_run.memStop true in

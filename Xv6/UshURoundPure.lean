@@ -44,6 +44,8 @@ import Xv6.UshURoundTies
 import Xv6.UshCatPay
 import Xv6.UNamePathCat
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL

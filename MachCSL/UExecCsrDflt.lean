@@ -19,6 +19,8 @@ The 339 other numbers are closed values (`UExecCsrTab`).
 -/
 import MachCSL.UExecCsrBase
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

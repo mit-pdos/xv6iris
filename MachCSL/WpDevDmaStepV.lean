@@ -28,11 +28,13 @@ program at a time.  Nothing in `MachCSL/WpDevDmaStep.lean` changes.
 -/
 import MachCSL.WpDevDmaStep
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-! ## A read pin whose postcondition sees the answer -/
 
@@ -73,7 +75,7 @@ behind when it ENDS -- `True` for a forked task, and the root loop's own
 resource `Cr` for the root, which is how a resource survives from one
 iteration of the root loop to the next.  `.setPin` is excluded exactly as
 in `DevM.Lease`. -/
-inductive DevM.LeaseV {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] {S T : Type}
+inductive DevM.LeaseV {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] {S T : Type}
     (R : S → IProp GF) (Lt : T → IProp GF) (Ce : IProp GF) : IProp GF → DevM S T Unit → Prop
   /-- The end of the program: whatever context is left must produce `Ce`.
   For the ROOT task `Ce` is the loop's own resource `Cr`, which the next

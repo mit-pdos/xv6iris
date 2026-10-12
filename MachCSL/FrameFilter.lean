@@ -32,6 +32,8 @@ new instance that decomposes the HYPOTHESIS would need a line in `mayFrame`.
 -/
 import Iris.ProofMode.Tactics.Frame
 
+noncomputable section
+
 namespace MachCSL.FrameFilter
 
 open Lean Elab Tactic Meta Qq Iris.ProofMode Iris.BI

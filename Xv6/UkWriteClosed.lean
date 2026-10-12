@@ -34,6 +34,8 @@ import Xv6.UkSysIOHolds
 import Xv6.UshMainStubs
 import Xv6.UkInitStubs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -48,7 +50,7 @@ theorem uwr_fd_st_closed (v0 : BitVec 64) (fdv l : List FdState) (i : Nat)
   std_fd_st_of_key v0 fdv l i _ h0 hi htake hli
 
 /-- **Rocq `kwc_fam`**: row 16 at the TRIVIAL cursor family. -/
-def kwcFam {GF : BundledGFunctors} (N : UkNames GF) : Xfam GF := xfamWr (fun _ => iprop(True)) N.pay
+def kwcFam {GF : BundledGFunctors.{0}} (N : UkNames GF) : Xfam GF := xfamWr (fun _ => iprop(True)) N.pay
 
 /-- **Rocq `a0_after_a7`**: the stub writes a7, which is not a0. -/
 theorem a0_after_a7 (m : RegMap) (fdw : BitVec 64) (i : Nat) (ha0 : m.get 10#5 = fdw)
@@ -57,7 +59,7 @@ theorem a0_after_a7 (m : RegMap) (fdw : BitVec 64) (i : Nat) (ha0 : m.get 10#5 =
   rw [ukWr_get_other _ _ _ _ (by decide), ha0]; exact hfd
 
 section KinitChain
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -165,7 +167,7 @@ theorem kinitW1_of_dep (UL : UK_LEAVES) (N : UkNames GF) (fdw : BitVec 64) (b : 
 end KinitChain
 
 section UkWriteClosed
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]

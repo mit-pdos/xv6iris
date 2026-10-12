@@ -32,7 +32,7 @@ theorem pki_ret_086a : jumpPc (KA.«printkinit» + 0x1c#64) = (KA.«printkinit»
   decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-! ## The callee, at its entry address -/
 

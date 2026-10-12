@@ -9,13 +9,15 @@ import MachCSL.DecodeBridge
 import MachCSL.PlatformFacts
 import MachCSL.Tactics
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D LeanRV64D.Functions
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 @[sail_facts] theorem csr_name_map_forwards_sstatus : csr_name_map_forwards 0x100#12 = pure "sstatus" := rfl
 @[sail_facts] theorem csr_name_map_backwards_sstatus : csr_name_map_backwards "sstatus" = pure 0x100#12 := rfl
@@ -38,6 +40,7 @@ theorem write_CSR_sstatus (v : BitVec 64) : write_CSR 0x100#12 v =
 theorem lift_sstatus_mpp (o s : BitVec 64) :
     BitVec.extractLsb' 11 2 (lift_sstatus o s) = BitVec.extractLsb' 11 2 o := by
   unfold lift_sstatus
+  dsimp only  -- zeta: `let dirty := …` (Lean ≥ 4.34 keeps it)
   generalize (bool_to_bit _) = d
   simp only [_update_Mstatus_SIE, _update_Mstatus_SPIE, _update_Mstatus_SPP, _update_Mstatus_VS,
     _update_Mstatus_FS, _update_Mstatus_XS, _update_Mstatus_SUM, _update_Mstatus_MXR, _update_Mstatus_SPELP,
@@ -45,6 +48,7 @@ theorem lift_sstatus_mpp (o s : BitVec 64) :
     _get_Sstatus_VS, _get_Sstatus_FS, _get_Sstatus_XS, _get_Sstatus_SUM, _get_Sstatus_MXR, _get_Sstatus_SPELP,
     _get_Sstatus_UXL, Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', Sail.BitVec.extractLsb,
     BitVec.extractLsb]
+  dsimp only [Int.reduceSub, Int.reduceAdd, Int.reduceNeg, Int.reduceToNat, Nat.reduceSub, Nat.reduceAdd]  -- widths are dependent arguments
   bv_decide
 
 /-- `legalize_mstatus o L` on this platform (S and U present, no Zicfilp,
@@ -213,6 +217,7 @@ theorem sstatus_clear_sie' (o : BitVec 64)
     _update_Sstatus_SD, _get_Sstatus_SIE, _get_Sstatus_SPIE, _get_Sstatus_SPP, _get_Sstatus_VS, _get_Sstatus_FS,
     _get_Sstatus_XS, _get_Sstatus_SUM, _get_Sstatus_MXR, _get_Sstatus_SPELP, _get_Sstatus_UXL, 
     Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', Sail.BitVec.extractLsb, BitVec.extractLsb]
+  dsimp only [Int.reduceSub, Int.reduceAdd, Int.reduceNeg, Int.reduceToNat, Nat.reduceSub, Nat.reduceAdd]  -- widths are dependent arguments
   bv_decide
 
 /-- Setting `SIE` in `sstatus` sets exactly that bit of `mstatus`. -/
@@ -239,6 +244,7 @@ theorem sstatus_set_sie' (o : BitVec 64)
     _update_Sstatus_SD, _get_Sstatus_SIE, _get_Sstatus_SPIE, _get_Sstatus_SPP, _get_Sstatus_VS, _get_Sstatus_FS,
     _get_Sstatus_XS, _get_Sstatus_SUM, _get_Sstatus_MXR, _get_Sstatus_SPELP, _get_Sstatus_UXL, 
     Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', Sail.BitVec.extractLsb, BitVec.extractLsb]
+  dsimp only [Int.reduceSub, Int.reduceAdd, Int.reduceNeg, Int.reduceToNat, Nat.reduceSub, Nat.reduceAdd]  -- widths are dependent arguments
   bv_decide
 
 

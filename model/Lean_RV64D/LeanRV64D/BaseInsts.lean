@@ -213,7 +213,7 @@ def encdec_uop_backwards (arg_ : (BitVec 7)) : SailM uop := do
   | 0b0010111 => (pure AUIPC)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def encdec_uop_forwards_matches (arg_ : uop) : Bool :=
@@ -233,7 +233,7 @@ def utype_mnemonic_backwards (arg_ : String) : SailM uop := do
   | "auipc" => (pure AUIPC)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def utype_mnemonic_forwards_matches (arg_ : uop) : Bool :=
@@ -251,7 +251,7 @@ def jump_to (target : (BitVec 64)) : SailM ExecutionResult := SailME.run do
   match (ext_control_check_pc target) with
   | .some e => SailME.throw ((Ext_ControlAddr_Check_Failure e) : ExecutionResult)
   | none => (pure ())
-  assert ((BitVec.access target 0) == 0#1) "extensions/I/base_insts.sail:59.25-59.26"
+  (assert ((BitVec.access target 0) == 0#1) "extensions/I/base_insts.sail:59.25-59.26")
   if ((← do
        if ((bit_to_bool (BitVec.access target 1)) : Bool)
        then (pure (not (← (currentlyEnabled Ext_Zca))))
@@ -272,7 +272,7 @@ def encdec_bop_backwards (arg_ : (BitVec 3)) : SailM bop := do
   | 0b111 => (pure BGEU)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def encdec_bop_forwards_matches (arg_ : bop) : Bool :=
@@ -304,7 +304,7 @@ def btype_mnemonic_backwards (arg_ : String) : SailM bop := do
   | "bgeu" => (pure BGEU)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def btype_mnemonic_forwards_matches (arg_ : bop) : Bool :=
@@ -336,7 +336,7 @@ def encdec_iop_backwards (arg_ : (BitVec 3)) : SailM iop := do
   | 0b100 => (pure XORI)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def encdec_iop_forwards_matches (arg_ : iop) : Bool :=
@@ -368,7 +368,7 @@ def itype_mnemonic_backwards (arg_ : String) : SailM iop := do
   | "andi" => (pure ANDI)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def itype_mnemonic_forwards_matches (arg_ : iop) : Bool :=
@@ -402,7 +402,7 @@ def encdec_sop_backwards (arg_ : (BitVec 3)) : SailM sop := do
   | 0b101 => (pure SRLI)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def encdec_sop_forwards_matches (arg_ : sop) : Bool :=
@@ -425,7 +425,7 @@ def shiftiop_mnemonic_backwards (arg_ : String) : SailM sop := do
   | "srai" => (pure SRAI)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def shiftiop_mnemonic_forwards_matches (arg_ : sop) : Bool :=
@@ -455,7 +455,7 @@ def rtype_mnemonic_backwards (arg_ : String) : SailM rop := do
   | "sra" => (pure SRA)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def rtype_mnemonic_forwards_matches (arg_ : rop) : Bool :=
@@ -497,7 +497,7 @@ def maybe_u_backwards (arg_ : String) : SailM Bool := do
   | "" => (pure false)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 /-- Type quantifiers: k_ex673536_ : Bool -/
@@ -521,7 +521,7 @@ def rtypew_mnemonic_backwards (arg_ : String) : SailM ropw := do
   | "sraw" => (pure SRAW)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def rtypew_mnemonic_forwards_matches (arg_ : ropw) : Bool :=
@@ -548,7 +548,7 @@ def shiftiwop_mnemonic_backwards (arg_ : String) : SailM sopw := do
   | "sraiw" => (pure SRAIW)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def shiftiwop_mnemonic_forwards_matches (arg_ : sopw) : Bool :=
@@ -578,7 +578,7 @@ def bit_maybe_r_backwards (arg_ : String) : SailM (BitVec 1) := do
   | "" => (pure 0#1)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def bit_maybe_r_forwards_matches (arg_ : (BitVec 1)) : Bool :=
@@ -599,7 +599,7 @@ def bit_maybe_w_backwards (arg_ : String) : SailM (BitVec 1) := do
   | "" => (pure 0#1)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def bit_maybe_w_forwards_matches (arg_ : (BitVec 1)) : Bool :=
@@ -620,7 +620,7 @@ def bit_maybe_i_backwards (arg_ : String) : SailM (BitVec 1) := do
   | "" => (pure 0#1)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def bit_maybe_i_forwards_matches (arg_ : (BitVec 1)) : Bool :=
@@ -641,7 +641,7 @@ def bit_maybe_o_backwards (arg_ : String) : SailM (BitVec 1) := do
   | "" => (pure 0#1)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def bit_maybe_o_forwards_matches (arg_ : (BitVec 1)) : Bool :=

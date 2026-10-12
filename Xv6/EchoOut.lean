@@ -71,6 +71,8 @@ The FIFTH, `ghost_mapG nat era_pins`, is new: it is the one field of
 import Xv6.ConsLog
 import Xv6.DiskInvDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -165,13 +167,13 @@ theorem pinDom_insert {A : Type} (M : RegMapF A) (n : Nat) (a : A) (hd : pinDom 
 /-- THE ECHO APPLICATION'S ONE NEW CAMERA (Rocq `echoOutG`'s `eo_pin`): the
 era map.  The other four components of Rocq's class are shared cameras
 (header, "Camera classes"). -/
-class EchoOutG (GF : BundledGFunctors) where
+class EchoOutG (GF : BundledGFunctors.{0}) where
   [pinG : GhostMapG GF Nat EraPins RegMapF]
 
 attribute [reducible, instance] EchoOutG.pinG
 
 section EchoOut
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 
 /-! ## The era's pin -/
 

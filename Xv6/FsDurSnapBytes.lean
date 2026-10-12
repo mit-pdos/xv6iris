@@ -55,6 +55,8 @@ producer that has to supply it is era 0's carve (`FsDurAlloc`, batch CF).
 import Xv6.FsState
 import Xv6.InodeRegionDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.Std Std MachCSL

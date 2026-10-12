@@ -33,6 +33,8 @@ them.  `TfUser.tfUeq` is the corresponding equivalence and
 -/
 import Xv6.UexecRetSlot
 
+noncomputable section
+
 namespace Xv6
 
 open Std

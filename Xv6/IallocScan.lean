@@ -38,6 +38,8 @@ import Xv6.IallocClaim
 import MachCSL.WpSmodeLh
 import Xv6.IupdateSteps
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -52,7 +54,7 @@ def iallocScanRegs [Icfg] (k : KCtx) (ty : BitVec 16) (n : Nat) (R : RegMap) : P
   iallocBody k ty R ∧ R 18#5 = BitVec.ofNat 64 n
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF]
 

@@ -28,12 +28,14 @@ files the entry's input number (`consLogIns_snoc`).
 -/
 import Xv6.UartInv
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 theorem uartLogm_agree (γ : UartNames) (q1 q2 : Qp) (L1 L2 : List LogEntry) :
     uartLogm (GF := GF) γ q1 L1 ∗ uartLogm γ q2 L2 ⊢ ⌜L1 = L2⌝ ∗ uartLogm γ q1 L1 ∗ uartLogm γ q2 L2 := by

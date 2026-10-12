@@ -98,7 +98,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
 section IcachePinwObl
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- The racy read's pure half: a read of a window whose every entry (and
 floor value) is a member, at a view the floor is visible to, is a member's

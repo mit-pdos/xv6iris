@@ -121,6 +121,8 @@ import Xv6.InodeRegionSlot
 import Xv6.AppInv
 import Xv6.FsBytesMint
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Iris.Algebra MachCSL
@@ -218,7 +220,7 @@ block, which is what B1 needs (two inodes of one block are checked out at
 once in mknod itself) and what `SpecLogWrite.lw_au_rec` is shaped for. -/
 
 section Recs
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- THE RECORD RUN AT THE REGION'S OWN SPELLING OF ITS ADDRESS.
 `recOwnedAt Γ istart z` is "offset `64*(z mod 16)` of block
@@ -304,7 +306,7 @@ end Recs
 /-! ## 2.  THE BODY -/
 
 section Body
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBytesG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- Block `bi`'s conjunct: the parked list `ds` of its sixteen records,
@@ -416,7 +418,7 @@ ANY share.  Because the entry RECORDS the share, `iregRelease` hands back
 exactly what `iregArm` took. -/
 
 section Top
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
   [FsTopG GF] [FsBytesG GF]
 
 /-- what an arm parks: its transaction's element, at the arm's own share -/
@@ -627,7 +629,7 @@ end Top
 /-! ## 4.  THE BUNDLES -/
 
 section Bundles
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- THE REGION AT POWERON, BEFORE RECOVERY HAS RUN (durable-disk lane
@@ -750,7 +752,7 @@ ABSENT rows (ilock's fresh-inode fill and the escrow deposit's free, both
 reading the pre-node's zero count off `iregTopPark`). -/
 
 section Retag
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
   [FsTopG GF] [FsBytesG GF] [Appcfg GF]
 
 /-- Rocq's `ireg_top_retag_gen`. -/
@@ -855,7 +857,7 @@ end Retag
 /-! ## 6.  THE BLOCK ACCESSOR (writer form) -/
 
 section Acc
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBytesG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- a block's conjunct only reads the map at its OWN sixteen keys -/

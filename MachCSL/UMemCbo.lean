@@ -33,6 +33,8 @@ state (a TLB fill, an A-bit write-back), and the fact lands where they did.
 -/
 import MachCSL.UMemAmoBase
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

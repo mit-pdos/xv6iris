@@ -153,6 +153,8 @@ itable.lock's payload.
 import Xv6.IcacheInvAlg
 import Xv6.IcacheRef
 
+noncomputable section
+
 /-! ## 0.  Word-history and context helpers (design note §3/§5) -/
 
 namespace MachCSL
@@ -218,7 +220,7 @@ theorem WordHist.read_head_vis {n : Nat} (W : WordHist n) (Hold : Nat → Hist) 
     exact tailOk_visible [] h ts htail hKt hvis hauth
 
 section res
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- A KEY of the running context is under the store order's top
 (Rocq: the `llb` of an arm store's own position; design §3's
@@ -331,7 +333,7 @@ theorem iRef_ram_aligned (k : Nat) (hk : k < NINODE) :
   omega
 
 section Claims
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- A6.145: the read leaves' address claims, minted ONCE at boot off the
 pre-conversion cells and persistent forever after.  `is_itable2` carries
@@ -417,7 +419,7 @@ end Claims
 /-! ## 5b.  The merged per-slot row and the invariant -/
 
 section IstmpAuth
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- Rocq `mono_nat_auth_own (icfg_istmp k) q tst` (deviation 4): the A6.144
 exact-read stamp's authority.  Half in the live slot's row, half on
@@ -446,7 +448,7 @@ theorem istmpAuth_split [Icfg] (k : Nat) (q1 q2 : Qp) (tst : Nat) :
 end IstmpAuth
 
 section IcacheRefInv
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF]
 
 /-- A FREE slot keeps only the liveness unit (and the selector's whole
 `false`) -- its count cell rides itable.lock's payload as a plain ctx cell
@@ -1005,7 +1007,7 @@ end IcacheRefInv
 /-! ### The count-move token -/
 
 section IcacheRefTok
-variable {GF : BundledGFunctors} [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
+variable {GF : BundledGFunctors.{0}} [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
 
 /-- The token a pinw count-move hands out: the reference's three ghost
 slices AT THE SLOT's `(g, lo)`.  The caller wraps it to the floored bundle
@@ -1056,7 +1058,7 @@ code, but "unreachable" is not a fact any invariant here states.  Writing
 automatically at every split and no wf clause has to mention fractions. -/
 
 section IcacheTable
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- Rocq `islot_rest_at`: a live slot's retained identity share. -/
 def islotRestAt [CurCtx] (k : Nat) (q : Qp) (dev inum : BitVec 32) : IProp GF :=

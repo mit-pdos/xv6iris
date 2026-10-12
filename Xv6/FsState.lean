@@ -83,6 +83,8 @@ Everything else is ported with Rocq's statement (modulo the deviations).
 import Xv6.FsStateTop
 import Xv6.FsStateInodeOwned
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -147,7 +149,7 @@ theorem fsGeom_dom {S : FsStateRec} {i : Nat} (hg : FsGeom S) (hi : i < S.fssSb.
   hg.fgRegdom i (by omega)
 
 section FsStateBytes
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-! ## 2.  The nested predicates: the byte-only pieces
 
@@ -205,7 +207,7 @@ instance fsPure_timeless (S : FsStateRec) : Timeless (fsPure (GF := GF) S) := by
 end FsStateBytes
 
 section FsState
-variable {GF : BundledGFunctors} [FsLinkG GF]
+variable {GF : BundledGFunctors.{0}} [FsLinkG GF]
 open FsStateLink
 
 /-! ## 2.  The nested predicates -/
@@ -380,7 +382,7 @@ theorem fsStateBigOpSingletons_neg {A : Type} [UCMRA A] (I : RegMapF FsNode)
     rfl
 
 section FsStateLinks
-variable {GF : BundledGFunctors} [FsLinkG GF]
+variable {GF : BundledGFunctors.{0}} [FsLinkG GF]
 open FsStateLink
 
 /-- Rocq's `fs_ghost_split`. -/
@@ -503,7 +505,7 @@ TOP map is a plain ghost map and owes NO validity, so it may be allocated
 at a different map than the link family. -/
 
 section FsStateBoot
-variable {GF : BundledGFunctors} [FsLinkG GF] [FsTopG GF]
+variable {GF : BundledGFunctors.{0}} [FsLinkG GF] [FsTopG GF]
 open FsStateLink
 
 /-- THE BOOT MINT'S ALLOCATION, AT THE SLACKED ELEMENT: ONE `own_alloc` at
@@ -575,7 +577,7 @@ theorem linkFullMap_valid (I : RegMapF FsNode) (fv : Nat → Ity) : ✓ linkFull
     exact trivial
 
 section FsStateFactor
-variable {GF : BundledGFunctors} [FsLinkG GF]
+variable {GF : BundledGFunctors.{0}} [FsLinkG GF]
 
 /-- The two directions of the factoring, AS ENTAILMENTS from a held
 hypothesis (Rocq's `fs_state_to`). -/

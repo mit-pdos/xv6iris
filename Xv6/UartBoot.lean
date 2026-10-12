@@ -42,12 +42,14 @@ Imports only definitional files.
 import MachCSL.CtxBox
 import Xv6.UartInv
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-- The empty console history (the power-on step's founding point). -/
 abbrev uartBootHist : ConsHist := ⟨[], [], [], none⟩

@@ -17,6 +17,8 @@ import Xv6.Image
 import Xv6.Geom
 import MachCSL.BytesFree
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -27,7 +29,7 @@ def memsetAddr : BitVec 64 := KA.«memset»
 
 /-- **WP of `memset`.**  `dst` holds `olds` (of length `n`) and afterwards
 holds `n` copies of the low byte of `a1`. -/
-def wp_memset_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+def wp_memset_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (olds : List (BitVec 8)) (n : Nat) (hK : 2 ≤ k.avail)
     (hn : k.regs 12#5 = BitVec.ofNat 64 n) (hn32 : n < 2 ^ 32)
     (hl : olds.length = n) : Prop :=
@@ -40,7 +42,7 @@ def wp_memset_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx
 
 /-- The interface of `memset`. -/
 structure MEMSET : Prop where
-  wp_memset : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+  wp_memset : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (olds : List (BitVec 8)) (n : Nat) hK hn hn32 hl,
     wp_memset_body (hlc := hlc) (GF := GF) cpu k olds n hK hn hn32 hl
 
@@ -48,7 +50,7 @@ structure MEMSET : Prop where
 `n` visibility-free bytes (`bytesFree`, e.g. reclaimed memory whose era
 keys are gone) and afterwards holds -- VALUED -- `n` copies of the low byte
 of `a1`, each byte's key minted by the store that wrote it. -/
-def wp_memset_free_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+def wp_memset_free_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (olds : List (BitVec 8)) (n : Nat) (hK : 2 ≤ k.avail)
     (hn : k.regs 12#5 = BitVec.ofNat 64 n) (hn32 : n < 2 ^ 32)
     (hl : olds.length = n) : Prop :=
@@ -61,7 +63,7 @@ def wp_memset_free_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [C
 
 /-- The interface of the raw (visibility-free) `memset`. -/
 structure MEMSET_FREE : Prop where
-  wp_memset_free : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+  wp_memset_free : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (olds : List (BitVec 8)) (n : Nat) hK hn hn32 hl,
     wp_memset_free_body (hlc := hlc) (GF := GF) cpu k olds n hK hn hn32 hl
 

@@ -30,6 +30,8 @@ import Xv6.UshUPipesPure
 import Xv6.UshPipesNodeLaw
 import Xv6.UshCatFStageSup
 
+noncomputable section
+
 namespace Xv6
 
 namespace UShUPipes
@@ -40,7 +42,7 @@ open Wid Pline'
 open UShPipesDefs UShPipesStage UShPipesNode
 
 section CatF
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostMapG GF (Option Nat) UfdCell UfdMapF]

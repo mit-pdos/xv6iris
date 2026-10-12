@@ -34,6 +34,8 @@ import Xv6.RefParseBridge
 import Xv6.UkShPipesLex
 import Xv6.UshSeamPure
 
+noncomputable section
+
 namespace Xv6
 
 /-- **Rocq `UkShPipesParse.ushq_ptree`**: the parser's right spine. -/

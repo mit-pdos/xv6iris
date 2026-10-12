@@ -154,6 +154,8 @@ Imports only definitional files and callee `Spec*` files.
 import Xv6.FsAbsReadFire
 import Xv6.ConsoleInvDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -190,7 +192,7 @@ theorem fileread_off_advance (sz : BitVec 32) (off n tot : Nat) (htot : tot ≤ 
 /-! ## The environment, keyed on the descriptor's state -/
 
 section Env
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -327,7 +329,7 @@ end Env
 /-! ## The console's receipt -/
 
 section Receipt
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CtokG GF] [Appcfg GF] [Fscfg]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CtokG GF] [Appcfg GF] [Fscfg]
 
 /-- **THE CONSOLE'S RECEIPT** (Rocq `console_receipt`, deviation 4): what a
 process learns about the bytes a console read left in its own buffer.
@@ -413,7 +415,7 @@ end Receipt
 /-! ## The keyed input, the extra, the arms -/
 
 section Keyed
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [CtokG GF] [Appcfg GF] [FsBytesG GF] [Fscfg]
 
 /-- **WHAT THE CALLER HANDS IN, by `st`** (Rocq `fileread_in`): a WAND
@@ -681,7 +683,7 @@ end Keyed
 /-! ## THE CONTRACT -/
 
 section Post
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -721,7 +723,7 @@ end Post
 deviation 1).  `F` is the inode arm's one-shot piece family, `Rd` what the
 caller asks to be told about the console window, `Rin` the console input
 link's answer, `P` the caller's payload, lent for the call. -/
-def wp_fileread_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_fileread_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -760,7 +762,7 @@ def wp_fileread_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
 /-- The interface of `fileread` (Rocq's `Module Type FILEREAD`): ONE
 contract, the arms keyed on the descriptor's state inside it. -/
 structure FILEREAD : Prop where
-  wp_fileread_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  wp_fileread_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]

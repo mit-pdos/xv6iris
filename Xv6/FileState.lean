@@ -45,6 +45,8 @@ Deviations from Rocq (spelling only; every statement is Rocq's):
 import Std.Data.ExtTreeMap
 import Xv6.LineWords
 
+noncomputable section
+
 namespace Xv6
 
 /-! ## 1.  THE STATE -/

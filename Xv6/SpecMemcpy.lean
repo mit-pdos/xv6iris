@@ -10,6 +10,8 @@ import MachCSL.WpSmodeFrame
 import Xv6.Image
 import Xv6.Geom
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -19,7 +21,7 @@ open LeanRV64D
 def memcpyAddr : BitVec 64 := KA.«memcpy»
 
 /-- **WP of `memcpy`.** -/
-def wp_memcpy_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+def wp_memcpy_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (bs olds : List (BitVec 8)) (n : Nat) (dqs : DFrac) (hK : 4 ≤ k.avail)
     (hn : k.regs 12#5 = BitVec.ofNat 64 n) (hn32 : n < 2 ^ 32)
     (hls : bs.length = n) (hld : olds.length = n) : Prop :=
@@ -33,7 +35,7 @@ def wp_memcpy_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx
 
 /-- The interface of `memcpy`. -/
 structure MEMCPY : Prop where
-  wp_memcpy : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+  wp_memcpy : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (bs olds : List (BitVec 8)) (n : Nat) (dqs : DFrac)
     hK hn hn32 hls hld,
     wp_memcpy_body (hlc := hlc) (GF := GF) cpu k bs olds n dqs hK hn hn32 hls hld

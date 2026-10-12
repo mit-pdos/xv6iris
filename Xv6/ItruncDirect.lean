@@ -30,6 +30,8 @@ import Xv6.ItruncParts
 import Xv6.CodeTactics
 import Xv6.BlkmapBuf
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -45,7 +47,7 @@ def itDRegs (k : KCtx) (ip : BitVec 64) (kx : Nat) (R : RegMap) : Prop :=
   itPins k R ∧ R 9#5 = iAddr ip kx ∧ R 18#5 = iAddr ip NDIRECT ∧ R 19#5 = ip
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- The resources at a point of the direct loop, cursor `kx` (the state

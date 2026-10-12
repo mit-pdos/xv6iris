@@ -56,6 +56,8 @@ import Xv6.SpecDirlookup
 import Xv6.FsWords
 import MachCSL.BvLemmas
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -109,7 +111,7 @@ def dirlookupMsgStr : List (BitVec 8) :=
    0x72#8, 0x65#8, 0x61#8, 0x64#8]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 set_option maxRecDepth 100000 in
 /-- Rocq's `dlk_msg_str`. -/
@@ -285,7 +287,7 @@ theorem dirlookup_delivered (data : Nat → List (BitVec 8)) (i : Nat) (olds : L
 /-! ## The frame -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {lent : Bool}
 
 /-- The `de` record's address, `s0 - 96`. -/

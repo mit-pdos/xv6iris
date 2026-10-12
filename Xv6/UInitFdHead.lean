@@ -43,12 +43,14 @@ CONE (re-walked on the pinned globs: UInitFd 33/50 reached).  This file:
 -/
 import Xv6.UInitFd
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 
 section UInitFdHead
-variable {GF : BundledGFunctors} [GhostMapG GF (Option Nat) UfdCell UfdMapF]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF (Option Nat) UfdCell UfdMapF]
 
 /-! ## 2.  THE FIRST ALLOCATION, AT A NAMED VIEW -/
 

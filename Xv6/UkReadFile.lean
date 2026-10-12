@@ -21,18 +21,20 @@ ported): `a1_idx`, `udepwf_st_read_file` (the PARKED row), `wp_uk_ecall_read_fil
 import Xv6.UkReadRows
 import Xv6.UkRunSysDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
 /-- **Rocq `read_file_fam`**: the inode member at the caller's receipt. -/
-def readFileFam {GF : BundledGFunctors} (Q : Int → IProp GF) (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) :
+def readFileFam {GF : BundledGFunctors.{0}} (Q : Int → IProp GF) (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) :
     Xfam GF :=
   xfamRdf Q F
 
 section UkReadFile
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]

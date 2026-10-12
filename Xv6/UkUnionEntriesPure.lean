@@ -24,6 +24,8 @@ reader `ucat_diag_take`).
 import Xv6.UnionDisc
 import Xv6.UkConsOut
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL Ualt

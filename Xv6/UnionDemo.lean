@@ -41,6 +41,8 @@ The demos:
 import Xv6.UnionDisc
 import Xv6.LineModelSeal
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL Pline' PLAlt Ualt

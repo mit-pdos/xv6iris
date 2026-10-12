@@ -17,6 +17,8 @@ import MachCSL.WpSmodeFrame6
 import Xv6.UPtPptLemmas
 import MachCSL.BvLemmas
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -103,7 +105,7 @@ theorem iiKept_trans {R R' R'' : RegMap} (h : iiKept R R') (h' : iiKept R' R'') 
     h'.2.2.2.2.2.2.2.2.2.2.2.trans h.2.2.2.2.2.2.2.2.2.2.2⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-! ## The frame -/
 

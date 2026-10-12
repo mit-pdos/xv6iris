@@ -90,6 +90,8 @@ the dormant block (`ProcDefs.procDormant`, Rocq `proc_dormant`) parks
 -/
 import Xv6.SlotSupply
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
@@ -193,11 +195,11 @@ theorem natUfrac_incl (n m : Nat) (h : natUfrac n ≼ natUfrac m) : n ≤ m := b
 iref-slot supply per system, and threading a `γ` would drag a filesystem
 ghost name through `ProcInv.proc_dormant` and every scheduler spec purely
 so that an empty cwd can hold a token. -/
-class IrefslotG (GF : BundledGFunctors) where
+class IrefslotG (GF : BundledGFunctors.{0}) where
   irefslotName : GName
 
 section IrefSlots
-variable {GF : BundledGFunctors} [Xv6G GF] [IrefslotG GF]
+variable {GF : BundledGFunctors.{0}} [Xv6G GF] [IrefslotG GF]
 
 /-- A SHARE of the supply.  `irefFrac 1` is one whole unit; a share below
 one is what an ftable entry's fraction of a file carries, and the shares of
@@ -297,7 +299,7 @@ end IrefSlots
 /-- Boot: mint the supply and hand every unit out.  CREATES the `IrefslotG`
 instance, so it sits outside the section.  The authority goes to the
 itable; the `IREFSLOTS` units go to the proc and file layers. -/
-theorem irefSlots_alloc {GF : BundledGFunctors} [Xv6G GF] :
+theorem irefSlots_alloc {GF : BundledGFunctors.{0}} [Xv6G GF] :
     ⊢@{IProp GF} |==> ∃ I : IrefslotG GF,
       @irefSlotsAuth GF _ I ∗ @irefSlots GF _ I IREFSLOTS := by
   imod iOwn_alloc (F := IrefslotRF) (GF := GF)

@@ -24,6 +24,8 @@ notations).
 import Xv6.UshURoundWide
 import Xv6.UkPipesIfaceDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -31,7 +33,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 set_option synthInstance.maxSize 1024
 
 section UShURoundShapes
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF] [PipeOutG GF] [PipesNG GF]
 
 /-- **Rocq `upterm_shape`**: A FORK FAILED at node `i` of the right spine --

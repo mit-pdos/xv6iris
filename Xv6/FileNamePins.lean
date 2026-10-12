@@ -31,6 +31,8 @@ import Xv6.FileClass
 import Xv6.TreeImg
 import Xv6.FsConsPin
 
+noncomputable section
+
 namespace Xv6
 
 open Iris.Std

@@ -52,6 +52,8 @@ absorb a later.
 import Xv6.FsBytesMap
 import Xv6.FsBlocks
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
@@ -129,7 +131,7 @@ def bytesExcVal (L : RegMapF (BitVec 8)) (Xv : Nat → List (BitVec 8)) (X : Lis
   ∀ b ∈ X, mapSeq (b * BSZ) (Xv b) ⊆ L
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsBytesG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsBytesG GF]
 
 /-! ## The exception handle and its seal -/
 
@@ -380,7 +382,7 @@ theorem lens_insert (C : BlockMap) (b : Nat) (v : List (BitVec 8))
     exact hlens b' bs' hb'
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsBlocksG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsBlocksG GF]
 
 /-! ## The body and the invariant -/
 

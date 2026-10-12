@@ -21,6 +21,8 @@ import Xv6.KstackMap
 import Xv6.SyscallEnv
 import Xv6.LogBoot
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -79,7 +81,7 @@ theorem kvmTableOk_kptFacts_tramp (t : PTree) (pas : Nat → BitVec 44) (h : kvm
   · exact h4 vpn v h'
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- The static map, the stacks and the trampoline inserted into the (owned)
 mapping authority. -/

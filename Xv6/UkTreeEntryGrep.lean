@@ -52,7 +52,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
 section UkTreeEntryGrep
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
@@ -105,7 +105,7 @@ theorem grepImageEntryEnvC_holds (GS : GREP_START) : GrepImageEntryEnvC (hlc := 
       exact hkey i hlt
   have hc' : Conforms E (grepTree ((grepArgs W').map uargBytes)) := by rw [hwords]; exact hc
   -- the frame is the key's own need
-  have hneed : grepStack (grepArgs W') ≤ grepNeed ws := by rw [grepStack_need, hwords]; exact Nat.le_refl _
+  have hneed : grepStack (grepArgs W') ≤ grepNeed ws := by rw [grepStack_need, hwords]
   -- the argv registers
   have ha0 : (tfResumeGpr0 W'.tf).get 10#5 = BitVec.ofNat 64 (grepArgs W').length := by
     rw [grepArgs, echoArgs_length]

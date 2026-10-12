@@ -14,13 +14,15 @@ import MachCSL.WpSmodeRegOps
 import MachCSL.KNormCache
 import MachCSL.KApply
 
+noncomputable section
+
 
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open LeanRV64D
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {lent : Bool}
 
 /-- A two-slot frame at `sp` holding `ra` and `s0`. -/
@@ -135,7 +137,7 @@ macro_rules
   | `(tactic| k_norm_g [$extra:term,*]) => `(tactic| k_norm_all [$extra,*])
   | `(tactic| k_norm_g [$extra:term,*] at $h:ident) => do
     let lems ← extra.getElems.mapM fun l => `(Lean.Parser.Tactic.simpLemma| $l:term)
-    `(tactic| try simp only [k_norm_simps, k_addr, $lems,*] at $h:ident)
+    `(tactic| try simp (config := { implicitDefEqProofs := false }) only [k_norm_simps, k_addr, $lems,*] at $h:ident)
 
 set_option hygiene false in
 macro_rules
@@ -774,7 +776,7 @@ namespace MachCSL
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open LeanRV64D
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {lent : Bool}
 
 /-! ## The four-slot frame with `s1` and `s2` saved -/

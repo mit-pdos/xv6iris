@@ -55,6 +55,8 @@ xv6GF/unionGF slots, U4).
 import Xv6.AppFileTyped
 import Xv6.AppFileChain
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -96,7 +98,7 @@ structure FileEra where
   feFloor : List Srec
 
 /-- THE FILE APPLICATION'S TWO NEW CAMERAS (Rocq `fileOutG`). -/
-class FileOutG (GF : BundledGFunctors) where
+class FileOutG (GF : BundledGFunctors.{0}) where
   [eraG : GhostMapG GF Nat FileEra RegMapF]
   [f0G : MonoListG GF Fstate]
 
@@ -118,7 +120,7 @@ theorem fileOut_single_prefix (s s' : Fstate) (h : [s] <+: [s']) : s = s' := by
   | cons y z => simp at hz
 
 section FileOutEra
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF]
 
 /-! ## The era's boot-state record, pinned -/

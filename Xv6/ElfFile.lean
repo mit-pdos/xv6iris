@@ -69,6 +69,8 @@ Imports only definitional files.
 -/
 import Xv6.ElfEnc
 
+noncomputable section
+
 namespace Xv6
 
 /-- Rocq `elf_bytes`: the file contents, index = FILE OFFSET. -/

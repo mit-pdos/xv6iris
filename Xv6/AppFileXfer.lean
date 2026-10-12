@@ -46,12 +46,14 @@ Rocq's notes, abridged (the reasons are the content):
 import Xv6.AppFileSeal
 import Xv6.AppFileHook
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section AppFileXfer
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF]
 
 /-- The file state reads only its own names (Rocq `f_state_rec_eq`). -/
@@ -99,7 +101,7 @@ theorem fileXferBoot (c : FileFixed) (gen : Nat) (r : FileAppNames) (av : Aview)
   subst hr
   iintro Hst Hnew #Hreg #Hls0 #HF Hp
   iapply bupd_except0_elim
-  imod (filePred_timeless (hlc := hlc) (GF := GF) c _ av).timeless $$ Hp with Hp
+  imod (@timeless_except0 _ _ _ (filePred_timeless (hlc := hlc) (GF := GF) c _ av)).mp $$ Hp with Hp
   imodintro
   ihave ⟨He, Hrest⟩ := filePred_split c _ av $$ Hp
   have hex := echoXferBoot (hlc := hlc) (GF := GF) c.ffEcho (gen + 1)

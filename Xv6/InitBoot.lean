@@ -44,6 +44,8 @@ import Xv6.UexecRetSlot
 import Xv6.SpecKexec
 import Xv6.ConsoleInvDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
@@ -67,7 +69,7 @@ theorem initBootBytes_nul : initBootBytes 5 = 0#8 := by decide
 /-! ## 2.  THE BUNDLE -/
 
 section InitBoot
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [FsBytesG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [FsBytesG GF]
   [Appcfg GF] [CtokG GF] {SG : UexecSG GF} [Fscfg]
 
 /-- **Rocq `init_boot_bundle`**: WHAT THE APPLICATION OWES THE KERNEL ABOUT

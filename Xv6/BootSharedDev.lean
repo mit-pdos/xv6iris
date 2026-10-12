@@ -47,6 +47,8 @@ import Xv6.ProcBoot
 import Xv6.DiskBoot
 import Xv6.BootCarveProc
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -54,7 +56,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 /-! ## §1 The gname-only mints -/
 
 section names
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-- **The name/slot rows** (the proc rows, lock tokens and slot shares
 `SpecMain.wp_main_boot_body` and `mainGlobalsRaw` take), at the minted
@@ -144,7 +146,7 @@ end names
 /-! ## §2 The devices, at their power-on states -/
 
 section devs
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
   [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
 
 /-- **Both UART ports and the console ring's names** (Rocq's two

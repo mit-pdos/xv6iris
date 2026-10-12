@@ -46,6 +46,8 @@ kernel re-checks, the walker needs no soundness argument of its own.
 -/
 import MachCSL.DecodeBridge
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

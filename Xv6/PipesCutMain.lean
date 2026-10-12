@@ -17,6 +17,8 @@ Deviations from Rocq: `Forall P l` is `∀ x ∈ l, P x`; `l !!! j` is `l[j]!`;
 import Xv6.UkShLineDefs
 import Xv6.PipesCut
 
+noncomputable section
+
 namespace Xv6
 
 /-- **Rocq `pipes_lpg`**: the loop's typed line at an echo producer and any

@@ -21,6 +21,8 @@ seccomp 0x4c0).  Per-instruction facts `ulibVprintf_iXXX` are Rocq's
 -/
 import Xv6.UlibCode
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL LeanRV64D
@@ -143,7 +145,7 @@ theorem ulibVprintfTab_size : ulibVprintfTab.all (fun x => decide (x.off < ulibV
   decide
 
 section
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- **`vprintf`'s code at printf.o's `base`.** -/
 abbrev ulibVprintfCode (L : UlibRun GF) (base : BitVec 64) : IProp GF :=

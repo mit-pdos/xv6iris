@@ -39,13 +39,15 @@ Imports only definitional files.
 -/
 import Xv6.SpecDevintr
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-! ## The credentials transport
 
@@ -157,21 +159,21 @@ end
 section
 
 /-- The family, out of the environment. -/
-theorem env_of_envAt {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
+theorem env_of_envAt {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
     (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName) (ξ : CtxId) :
     envAt (envFam (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt) ξ ⊢
       envFam (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt ξ :=
   envAt_env _ ξ
 
 /-- ...and back: the family IS the environment (with its witness). -/
-theorem envAt_of_env {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
+theorem envAt_of_env {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
     (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName) (ξ : CtxId) :
     envFam (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt ξ ⊢
       envAt (envFam (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt) ξ :=
   envAt_of_ctxMorph _ ξ
 
 /-- The table, out of the environment. -/
-theorem procsInv_of_envAt {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
+theorem procsInv_of_envAt {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
     (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
     (ξ : CtxId) :
     envAt (envFam (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt) ξ ⊢ @procsInv hlc GF _ _ _ _ _ _ _ ⟨ξ, KTier.kpt⟩ Γ := by
@@ -182,7 +184,7 @@ theorem procsInv_of_envAt {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
 
 /-- devintr's credentials, out of the environment, at the pages the driver
 chose. -/
-theorem devintrCaps_of_envAt {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
+theorem devintrCaps_of_envAt {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
     (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
     (ξ : CtxId) :
     envAt (envFam (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt) ξ ⊢
@@ -195,7 +197,7 @@ theorem devintrCaps_of_envAt {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc G
 
 /-- The table at the AMBIENT context, out of the environment: `procsInv`
 does not see the tier. -/
-theorem procsInv_of_envAt' {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
+theorem procsInv_of_envAt' {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
     (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
     [X : CurCtx] :
     envAt (envFam (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt) curCtx ⊢ procsInv Γ := by
@@ -205,7 +207,7 @@ theorem procsInv_of_envAt' {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 /-- The credentials at the AMBIENT context: the family is pinned at the
 kernel tier, which is the ambient one in a trap handler
 (`MachCSL.kctx_tier` on the interrupted bundle). -/
-theorem devintrCaps_of_envAt' {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
+theorem devintrCaps_of_envAt' {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
     (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
     [X : CurCtx] (hT : curTier = KTier.kpt) :
     envAt (envFam (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt) curCtx ⊢
@@ -218,7 +220,7 @@ theorem devintrCaps_of_envAt' {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc 
 
 /-- ...and the environment, from the two at the ambient context, at any
 disk pages. -/
-theorem envAt_of_caps' {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
+theorem envAt_of_caps' {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
     (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
     (pd pav pu : BitVec 64)
     [X : CurCtx] (hT : curTier = KTier.kpt) :
@@ -240,7 +242,7 @@ end
 /-! ## The row a process carries (Rocq `ihs_env` / `devintr_caps_any`) -/
 
 section Row
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
 
 /-- **The handler environment at SOME device names** (header): the family

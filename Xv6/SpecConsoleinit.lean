@@ -25,6 +25,8 @@ Imports only definitional files.
 import Xv6.SpecUartinit
 import Xv6.ConsoleInvDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -38,7 +40,7 @@ def devswConsoleRead : BitVec 64 := KA.«devsw» + 16#64
 def devswConsoleWrite : BitVec 64 := KA.«devsw» + 24#64
 
 /-- **WP of `consoleinit`.** -/
-def wp_consoleinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_consoleinit_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ0 γ1 : UartNames) (l0 l1 : List (BitVec 8)) (k0 k1 : Nat)
     (vlock0 vlock1 : BitVec 32) (vname0 vcpu0 vname1 vcpu1 : BitVec 64)
     (vclock : BitVec 32) (vcname vccpu vread vwrite : BitVec 64)
@@ -61,7 +63,7 @@ def wp_consoleinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
 
 /-- The interface of `consoleinit`. -/
 structure CONSOLEINIT : Prop where
-  wp_consoleinit : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+  wp_consoleinit : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ0 γ1 : UartNames) (l0 l1 : List (BitVec 8)) (k0 k1 : Nat)
     (vlock0 vlock1 : BitVec 32) (vname0 vcpu0 vname1 vcpu1 : BitVec 64)
     (vclock : BitVec 32) (vcname vccpu vread vwrite : BitVec 64) hsie hK,

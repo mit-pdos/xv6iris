@@ -32,7 +32,7 @@ open Iris Iris.BI Iris.ProofMode Std MachCSL
 open Iris.Std (get?)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [WchG GF] [CtokG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [WchG GF] [CtokG GF]
 
 /-- **Rocq `children_inv_row_fresh`**: a generation whose slot's parent cell
 still reads 0 is in no row of the children map -- in particular not in the

@@ -71,7 +71,7 @@ theorem shStart_ofLeaves (UL : UK_LEAVES) : SH_START :=
   (shMain_linked UL (ukSysP_holds UL) (ushSysP_holds UL) (ushFprintf_holds UL)).2.2.2.2.1
 
 section Eng
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
@@ -100,7 +100,7 @@ end Eng
 /-! ## `al_programs`, by name (Rocq `UInitUnion.union_Hinit_boot`) -/
 
 section Prog
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G GF] [CtokG GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGpreS hlc GF] [Xv6G GF] [CtokG GF] [DiskG GF]
   [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [SleepLockG GF]
   [BcacheG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF] [FsBytesG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF] [PipeOutG GF]

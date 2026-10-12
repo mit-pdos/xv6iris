@@ -62,6 +62,8 @@ binary's addresses).
 import Xv6.UkStub
 import Xv6.ProgTree
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -71,7 +73,7 @@ open Std (ExtTreeSet)
 
 /-- **Rocq `uprog`**: the program instance -- its code, and where its five
 stubs are (deviation 3). -/
-structure Uprog (GF : BundledGFunctors) where
+structure Uprog (GF : BundledGFunctors.{0}) where
   code : IProp GF
   write : Nat
   read : Nat
@@ -129,11 +131,11 @@ theorem ukBytesOf_one (b : BitVec 8) : ukBytesOf [b] (fun _ => b) := by
 instance procOFE : OFE Proc := OFE.ofDiscrete _
 
 /-- Every predicate on trees is non-expansive (the OFE is discrete). -/
-instance proc_ne {GF : BundledGFunctors} (Φ : Proc → IProp GF) : OFE.NonExpansive Φ :=
+instance proc_ne {GF : BundledGFunctors.{0}} (Φ : Proc → IProp GF) : OFE.NonExpansive Φ :=
   ⟨fun {_ _ _} (h : _ = _) => h ▸ OFE.Dist.rfl⟩
 
 section UkTree
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 

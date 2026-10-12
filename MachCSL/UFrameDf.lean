@@ -11,13 +11,15 @@ the same frame with the fraction a function `Df` of the register.
 -/
 import MachCSL.URunRW
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open Sail LeanRV64D
 
 section frames
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- The cells of `L`, exclusively, at the file's values. -/
 def ufCells (cpu : CPU) (L : List Register) (f : RegFile) : IProp GF :=

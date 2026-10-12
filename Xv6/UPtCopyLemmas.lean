@@ -14,6 +14,8 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 import Xv6.UPtDefs
 import Xv6.PtRunLemmas
 
+noncomputable section
+
 namespace Xv6.UPtCopy
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -330,7 +332,7 @@ theorem ucInv_delRun {Pold Pnew P : UPtd} {i n : Nat} (h : ucInv Pold Pnew P i)
 /-! ## Resources -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- Two whole pages at the same address cannot both be owned. -/
 theorem byteBuf_excl [CurCtx] (a : BitVec 64) (bs bs' : List (BitVec 8))

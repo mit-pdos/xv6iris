@@ -85,6 +85,8 @@ with `inode_ref_short_shr_genlo_agree` after two separate intros.
 import Xv6.CreateParts
 import Xv6.IregClaimPlain
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -111,12 +113,12 @@ theorem create_beqz_ientry (k : Nat) (hk : k < NINODE) :
   exact beq_eq_false_iff_ne.mpr (ientry_ne_zero k (Nat.le_of_lt hk))
 
 /-- The claim licence does not read its generation. -/
-theorem create_lic_regen [Icfg] {GF : BundledGFunctors} [IcacheG GF] (ty : BitVec 16) (t : Nat)
+theorem create_lic_regen [Icfg] {GF : BundledGFunctors.{0}} [IcacheG GF] (ty : BitVec 16) (t : Nat)
     (q : Qp) (g1 g2 : GName) (z : Nat) :
     iregWdLic (GF := GF) (.claimK ty t q) g1 z ⊢ iregWdLic (.claimK ty t q) g2 z := .rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]

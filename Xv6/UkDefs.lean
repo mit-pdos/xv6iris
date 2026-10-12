@@ -29,6 +29,8 @@ import Xv6.UserFrame
 import MachCSL.URunX
 import MachCSL.UCycle
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL

@@ -41,6 +41,8 @@ Deviations.
 import MachCSL.Dev.Virtio
 import Iris.Instances.Lib.GhostMap
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.BI Iris.ProofMode Std
@@ -84,7 +86,7 @@ theorem diskRead_agree (dk dk' : Nat → BitVec 8) (N : Nat)
   simpa using h2
 
 section
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) DiskMapF]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) DiskMapF]
 
 /-! ## The points-to, at a bare name -/
 

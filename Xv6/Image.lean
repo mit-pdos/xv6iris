@@ -5,11 +5,13 @@ contract states neither; a proof takes them out of the context once.
 -/
 import Xv6.KernelData
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- The kernel's read-only image, as `kctx` owns it: the text, the rodata,
 and the static mapping claims. -/

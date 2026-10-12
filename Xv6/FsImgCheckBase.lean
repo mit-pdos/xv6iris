@@ -13,6 +13,8 @@ stays as the sentences `FsImgCheck.fsimgWfOk` cites.
 import Xv6.FsImgDisk
 import Xv6.FsImgInode
 
+noncomputable section
+
 namespace Xv6
 
 /-- mkfs's eight numbers (Rocq `fsimg_sb`): data starts at `bmapstart + 1 =

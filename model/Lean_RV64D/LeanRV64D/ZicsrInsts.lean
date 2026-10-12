@@ -228,7 +228,7 @@ def encdec_csrop_backwards (arg_ : (BitVec 2)) : SailM csrop := do
   | 0b11 => (pure CSRRC)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def encdec_csrop_forwards_matches (arg_ : csrop) : Bool :=
@@ -305,7 +305,7 @@ def get_scountovf (priv : Privilege) : SailM (BitVec 32) := do
 
 def hpmidx_from_bits (b : (BitVec 5)) : SailM Nat := do
   let index := (BitVec.toNatInt b)
-  assert (index ≥b 3) "unreachable HPM index"
+  (assert (index ≥b 3) "unreachable HPM index")
   (pure index)
 
 /-- Type quantifiers: index : Nat, 3 ≤ index ∧ index ≤ 31 -/
@@ -22270,7 +22270,7 @@ def csr_mnemonic_backwards (arg_ : String) : SailM csrop := do
   | "csrrc" => (pure CSRRC)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def csr_mnemonic_forwards_matches (arg_ : csrop) : Bool :=

@@ -43,6 +43,8 @@ nothing is assumed about the model.
 -/
 import MachCSL.UExecAluGpr
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1
@@ -77,9 +79,9 @@ def ucArm (step_val : Step) : SailM Unit :=
   | .Step_Ext_Fetch_Failure e => (pure (ext_handle_fetch_check_error e))
   | .Step_Fetch_Failure (vaddr, e) => (handle_exception (bits_of_virtaddr vaddr) e)
   | .Step_Waiting _ => do
-    assert (hart_is_waiting (← readReg hart_state)) "cannot be Waiting in a non-Wait state"
+    (assert (hart_is_waiting (← readReg hart_state)) "cannot be Waiting in a non-Wait state")
   | .Step_Execute (.Retire_Success (), _) => do
-    assert (hart_is_active (← readReg hart_state)) "postlude/step.sail:219.74-219.75"
+    (assert (hart_is_active (← readReg hart_state)) "postlude/step.sail:219.74-219.75")
   | .Step_Execute (.ExecuteAs _, _) =>
     (internal_error "postlude/step.sail" 223
       "Multiple chained ExecuteAs (only one redirection is supported).")
@@ -91,7 +93,7 @@ def ucArm (step_val : Step) : SailM Unit :=
   | .Step_Execute (.Enter_Wait wr, instbits) =>
     (do
       if ((wait_is_nop wr) : Bool)
-      then assert (hart_is_active (← readReg hart_state)) "postlude/step.sail:232.41-232.42"
+      then (assert (hart_is_active (← readReg hart_state)) "postlude/step.sail:232.41-232.42")
       else
         (do
           if ((get_config_print_instr ()) : Bool)

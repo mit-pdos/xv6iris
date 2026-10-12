@@ -15,6 +15,8 @@ which §1 has written.
 import MachCSL.ArchReset
 import MachCSL.BootPeel
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

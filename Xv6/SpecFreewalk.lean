@@ -21,6 +21,8 @@ import Xv6.UPtDefs
 import Xv6.Image
 import Xv6.SlotGen
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -29,7 +31,7 @@ open LeanRV64D
 def freewalkAddr : BitVec 64 := KA.«freewalk»
 def freewalkSlots (lvl : Nat) : Nat := 6 * (lvl + 1) + 14
 
-def wp_freewalk_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
+def wp_freewalk_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (lvl : Nat) (t : PTree) (ke : Nat)
     (hlvl : lvl ≤ 2) (hnoff : k.noff + 1 < 2 ^ 31) (hK : freewalkSlots lvl ≤ k.avail) (hlk : "kmem" ∉ k.locks)
     (hroot : k.regs 10#5 = pageAddr t.base) (hwf : t.wfU lvl) (hnd : t.pagesNodup lvl)
@@ -44,7 +46,7 @@ def wp_freewalk_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   ⊢ wpLoop (GF := GF) cpu
 
 structure FREEWALK : Prop where
-  wp_freewalk : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_freewalk : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γl : GName) (γk : KmemNames) (lvl : Nat) (t : PTree) (ke : Nat) hlvl hnoff hK hlk hroot hwf hnd hpg hnl,
     wp_freewalk_body (hlc := hlc) (GF := GF) cpu k γl γk lvl t ke hlvl hnoff hK hlk hroot hwf hnd hpg hnl
 

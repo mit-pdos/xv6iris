@@ -11,6 +11,8 @@ is a lemma: everything it needs is pure or the persistent `kmapStatic`
 -/
 import Xv6.UserBytes
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -48,7 +50,7 @@ theorem ubView_bytes (P : UPtd) (t : PTree) (mm : BMap) (hwf : UbMemWf P t mm) :
   simp only [ubView, hk, List.getElem?_map, List.getElem?_range hj, Option.map_some, Option.getD_some, hb]
 
 section access
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 theorem ubOwn_eq (ξ : CtxId) (D D' : List PAddr) (mm : BMap) (h : D = D') :
     ubOwn (GF := GF) ξ D mm ⊢ ubOwn ξ D' mm := by subst h; exact .rfl

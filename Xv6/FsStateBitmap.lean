@@ -65,6 +65,8 @@ import Xv6.FsStateDefs
 import Xv6.BitmapEnc
 import Xv6.FsImg
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
@@ -82,7 +84,7 @@ theorem rangeGetElem? {nb k x : Nat} (h : (List.range nb)[k]? = some x) :
     exact absurd h (by simp)
 
 section
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-! ## The pool -/
 

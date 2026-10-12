@@ -21,6 +21,8 @@ user tier by `uxc_fiom`).  The compressed forms are stated on `uxaExecAs`.
 import MachCSL.UExecCtlBase
 import MachCSL.UTranslate
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

@@ -60,13 +60,15 @@ that names a descriptor state can name a queue.
 -/
 import Xv6.UMemLemmas
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 open ExclAuth
 
 section PipeQueue
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-! ## 1.  THE ALGEBRA -/
 

@@ -28,7 +28,7 @@ theorem ulibPutc_sh_writeAt :
     ulibWriteAt (BitVec.ofNat 64 User.Sh.Sym.«putc») = BitVec.ofNat 64 User.Sh.Sym.«write» := by decide
 
 /-- `putc`'s code at `sh`'s `putc`, from `sh`'s text. -/
-theorem ulibPutcCode_sh {GF : BundledGFunctors} (L : UlibRun GF) :
+theorem ulibPutcCode_sh {GF : BundledGFunctors.{0}} (L : UlibRun GF) :
     L.utext User.Sh.tree ⊢ ulibPutcCode L (BitVec.ofNat 64 User.Sh.Sym.«putc») :=
   ulibPutcCode_of_text L _ _ (by decide) ulibPutc_sh_putcAt
 
@@ -38,7 +38,7 @@ theorem ulibVprintf_sh_at : ulibTabAt User.Sh.tree ulibVprintfTab User.Sh.Sym.«
   decide +kernel
 
 /-- `vprintf`'s code at `sh`'s printf.o, from `sh`'s text. -/
-theorem ulibVprintfCode_sh {GF : BundledGFunctors} (L : UlibRun GF) :
+theorem ulibVprintfCode_sh {GF : BundledGFunctors.{0}} (L : UlibRun GF) :
     L.utext User.Sh.tree ⊢ ulibVprintfCode L (BitVec.ofNat 64 User.Sh.Sym.«putc») :=
   ulibTabCode_of_text L _ ulibVprintfTab_decodes _ ulibVprintfTab_size _ _ (by decide) ulibVprintf_sh_at
 
@@ -49,7 +49,7 @@ theorem ulibFprintf_sh_sym : ulibFprintfAt (BitVec.ofNat 64 User.Sh.Sym.«putc»
   decide
 
 /-- `fprintf`'s code at `sh`'s printf.o, from `sh`'s text. -/
-theorem ulibFprintfCode_sh {GF : BundledGFunctors} (L : UlibRun GF) :
+theorem ulibFprintfCode_sh {GF : BundledGFunctors.{0}} (L : UlibRun GF) :
     L.utext User.Sh.tree ⊢ ulibFprintfCode L (BitVec.ofNat 64 User.Sh.Sym.«putc») :=
   ulibTabCode_of_text L _ ulibFprintfTab_decodes _ ulibFprintfTab_size _ _ (by decide) ulibFprintf_sh_at
 
@@ -60,7 +60,7 @@ theorem ulibPrintf_sh_sym : ulibPrintfAt (BitVec.ofNat 64 User.Sh.Sym.«putc») 
   decide
 
 /-- `printf`'s code at `sh`'s printf.o, from `sh`'s text. -/
-theorem ulibPrintfCode_sh {GF : BundledGFunctors} (L : UlibRun GF) :
+theorem ulibPrintfCode_sh {GF : BundledGFunctors.{0}} (L : UlibRun GF) :
     L.utext User.Sh.tree ⊢ ulibPrintfCode L (BitVec.ofNat 64 User.Sh.Sym.«putc») :=
   ulibTabCode_of_text L _ ulibPrintfTab_decodes _ ulibPrintfTab_size _ _ (by decide) ulibPrintf_sh_at
 

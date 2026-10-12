@@ -30,6 +30,8 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.SpecPlicClaim
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -43,7 +45,7 @@ def plicCompleteAddr : BitVec 64 := KA.«plic_complete»
 def plicCompleteSlots : Nat := 4 + 2
 
 /-- **WP of `plic_complete`.**  `a0` is the source the claim returned. -/
-def wp_plic_complete_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_plic_complete_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ0 γ1 : UartNames)
     (hsie : k.sie = false) (hK : plicCompleteSlots ≤ k.avail) : Prop :=
   kctx cpu k ∗ pcIs cpu plicCompleteAddr ∗ plicInv γ0 γ1 ∗ uartInited γ0 ∗ uartInited γ1 ∗
@@ -54,7 +56,7 @@ def wp_plic_complete_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
 
 /-- The interface of `plic_complete`. -/
 structure PLIC_COMPLETE : Prop where
-  wp_plic_complete : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+  wp_plic_complete : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ0 γ1 : UartNames) hsie hK,
     wp_plic_complete_body (hlc := hlc) (GF := GF) cpu k γ0 γ1 hsie hK
 

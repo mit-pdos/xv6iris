@@ -108,6 +108,8 @@ import Xv6.UhistDefs
 import Xv6.NiEvid
 import Xv6.UexecApply
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
@@ -538,20 +540,20 @@ variable {hlc : HasLC}
 /-- **What a citation shows the record**, at a raw anchor family `A`: nothing
 for no citation; for a citation of era `k` at `ι`, the era's registered
 names and the cited prefixes' lower bounds at them (`NiEvid.niIotaLbs`). -/
-def niCiteResRaw {GF : BundledGFunctors} [MonoNatG GF] [Xv6G GF] [WchGpre GF]
+def niCiteResRaw {GF : BundledGFunctors.{0}} [MonoNatG GF] [Xv6G GF] [WchGpre GF]
     (A : Nat → List GName → IProp GF) : Option (Nat × UIota) → IProp GF
   | none => iprop(emp)
   | some (k, ι) => iprop(∃ ns : List GName, A k ns ∗ niIotaLbs ns ι)
 
 /-- **What a key-history citation shows** (NI M3 U-2b): the lower bound of
 the history at its name, start key and rounds. -/
-def niUhRes {GF : BundledGFunctors} [Xv6G GF] (u : NiUh) : IProp GF := uhistLb u.1 u.2.1 u.2.2
+def niUhRes {GF : BundledGFunctors.{0}} [Xv6G GF] (u : NiUh) : IProp GF := uhistLb u.1 u.2.1 u.2.2
 
-instance niUhRes_persistent {GF : BundledGFunctors} [Xv6G GF] (u : NiUh) : Persistent (niUhRes (GF := GF) u) := by
+instance niUhRes_persistent {GF : BundledGFunctors.{0}} [Xv6G GF] (u : NiUh) : Persistent (niUhRes (GF := GF) u) := by
   unfold niUhRes; infer_instance
 
 /-- `niCiteResRaw` at the record's anchor (`MachFixedGS.uEraAnchor`). -/
-def niCiteRes {GF : BundledGFunctors} [MachFixedGS hlc GF] [Xv6G GF] [WchGpre GF]
+def niCiteRes {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [Xv6G GF] [WchGpre GF]
     (c : Option (Nat × UIota)) : IProp GF :=
   niCiteResRaw (MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF)) c
 
@@ -560,7 +562,7 @@ def niCiteRes {GF : BundledGFunctors} [MachFixedGS hlc GF] [Xv6G GF] [WchGpre GF
 beside `ClaimIs` (`SystemBootEra`); the closed trap loop's cone takes it.
 (NI M2-X2) It is stated at the ledgers' cameras (`[Xv6G]`, `[WchGpre]`):
 the lower bounds a citation shows (`niCiteRes`) live there. -/
-class NiFitIs (GF : BundledGFunctors) [MachGS hlc GF] [Xv6G GF] [WchGpre GF] : Prop where
+class NiFitIs (GF : BundledGFunctors.{0}) [MachGS hlc GF] [Xv6G GF] [WchGpre GF] : Prop where
   fit : ∀ (ox : Option (Nat × Obs)) (e : Obs), niFit ox e → MachFixedGS.uFit (hlc := hlc) (GF := GF) ox e
   /-- (NI M2-W2d) the extra claim a fork ecall's exit mints is an origin
   ticket (the kernel routes it to the child's park) -/
@@ -580,11 +582,11 @@ class NiFitIs (GF : BundledGFunctors) [MachGS hlc GF] [Xv6G GF] [WchGpre GF] : P
   evidNone : ∀ (e : Obs) (u : NiUh), niFitEv none e none u →
     niUhRes u ⊢ MachFixedGS.uEvid (hlc := hlc) (GF := GF) none e
 
-theorem uFit_of_niFit {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchGpre GF] [NiFitIs (hlc := hlc) GF]
+theorem uFit_of_niFit {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchGpre GF] [NiFitIs (hlc := hlc) GF]
     (ox : Option (Nat × Obs)) (e : Obs) (h : niFit ox e) : MachFixedGS.uFit (hlc := hlc) (GF := GF) ox e :=
   NiFitIs.fit ox e h
 
-theorem uClaimO_of_fork {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchGpre GF]
+theorem uClaimO_of_fork {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchGpre GF]
     [NiFitIs (hlc := hlc) GF]
     (i : Nat) (x : Obs) (h : niForkExit x = true) :
     MachFixedGS.uClaimX (hlc := hlc) (GF := GF) i x ⊢ MachFixedGS.uClaimO (hlc := hlc) (GF := GF) :=
@@ -601,7 +603,7 @@ Minting inserts at the new position's keys (fresh: every key the map holds,
 and every key spent, is below `2 * h.length`); spending deletes. -/
 
 section claims
-variable {GF : BundledGFunctors} [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [Xv6G GF]
 
 /-- **The round claim** of the exit at position `i`. -/
 def roundClaim (γ : GName) (i : Nat) : IProp GF := γ ↪◯MAP[2 * i] ()
@@ -951,7 +953,7 @@ the keys are `Xv6G.gmUnitG` fragments at the NI name `γe` (keyed by
 cited prefix `Hc k` with its lower bounds at the registered names. -/
 
 section chain
-variable {GF : BundledGFunctors} [MonoNatG GF] [Xv6G GF] [WchGpre GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MonoNatG GF] [Xv6G GF] [WchGpre GF] [DiskG GF]
 
 /-- Era `k`'s key: its shot variable is `γs` (a discarded fragment). -/
 def niEraKey (γe : GName) (k : Nat) (γs : GName) : IProp GF :=

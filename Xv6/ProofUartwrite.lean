@@ -40,6 +40,8 @@ import Xv6.PrintkDefs
 import MachCSL.BvLemmas
 import MachCSL.WpSmodeDev
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -181,7 +183,7 @@ theorem uw_cs9' (R R' : RegMap) (w : BitVec 64) (hcs : calleeSaved (R.set 1#5 w)
   rw [hcs.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-! ## The transmit token -/
 
@@ -411,7 +413,7 @@ end
 /-! ## The loop invariant at the guard `+0x44` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 def uwLoop (cpu : CPU) (k kb : KCtx) (i : UartId) (γ : UartNames) (dq : DFrac)
     (bs L0 cs : List (BitVec 8)) (n : Nat) (Φ : IProp GF) : IProp GF := iprop(

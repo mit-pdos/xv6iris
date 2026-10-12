@@ -15,12 +15,14 @@ CONE (re-walked on the pinned globs: 2/13 reached): `write_file_fam`,
 -/
 import Xv6.UkWriteLeaf
 
+noncomputable section
+
 namespace Xv6
 
 open Iris MachCSL
 
 /-- **Rocq `write_file_fam`**: the file member of row 16 is `xfam_wr`. -/
-def writeFileFam {GF : BundledGFunctors} (Q : Nat → IProp GF) (Xp : Int → IProp GF) : Xfam GF :=
+def writeFileFam {GF : BundledGFunctors.{0}} (Q : Nat → IProp GF) (Xp : Int → IProp GF) : Xfam GF :=
   xfamWr Q Xp
 
 end Xv6

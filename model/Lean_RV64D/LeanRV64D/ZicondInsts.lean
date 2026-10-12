@@ -213,7 +213,7 @@ def encdec_zicondop_backwards (arg_ : (BitVec 3)) : SailM zicondop := do
   | 0b111 => (pure CZERO_NEZ)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def encdec_zicondop_forwards_matches (arg_ : zicondop) : Bool :=
@@ -233,7 +233,7 @@ def zicond_mnemonic_backwards (arg_ : String) : SailM zicondop := do
   | "czero.nez" => (pure CZERO_NEZ)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def zicond_mnemonic_forwards_matches (arg_ : zicondop) : Bool :=

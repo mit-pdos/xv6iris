@@ -62,6 +62,8 @@ import Xv6.UexecSeccMasked
 import Xv6.User.SeccompText
 import Xv6.UkForkHeap
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -71,7 +73,7 @@ open Std (ExtTreeSet)
 /-! ## §1 seccomp's instruction facts (deviation 1) -/
 
 section Code
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
 
 /-- **seccomp's catalog, once** (Rocq `UCodeSeccomp.uis_seccomp_<pc>`). -/
 theorem secc_uis (γt : GName) (pc : Nat) (rvc : Bool) (i : instruction)
@@ -181,7 +183,7 @@ theorem secc_pid_ne0 (pidv : BitVec 32) (h : 1 ≤ pidv.toNat ∧ pidv.toNat ≤
   simp at this; omega
 
 section UkSecc
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -283,7 +285,7 @@ end UkSecc
 /-! ## §5 The printf cone, as an interface (deviation 2) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -305,7 +307,7 @@ end
 /-- The interface of seccomp's `fprintf` (P-printf's cone at seccomp's
 load address, once `UlibRunP.ofUkRun` exists). -/
 structure SECC_FPRINTF : Prop where
-  wp_seccFprintf : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+  wp_seccFprintf : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
     [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpSeccFprintfBody (hlc := hlc) (GF := GF)
 

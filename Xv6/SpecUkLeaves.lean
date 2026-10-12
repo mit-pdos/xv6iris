@@ -78,6 +78,8 @@ key components the leaf threads unchanged (`fdv cw gn cs pidv`) are `UkKey`.
 -/
 import Xv6.UexecRetSlot
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
@@ -91,11 +93,11 @@ which names `Ustep.ulands` (NI M3 U-2a); their text is unchanged. -/
 /-! ## §6 The section and the leaf shape -/
 
 section Leaves
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
 
 /-- **Rocq's section context**: the ambient hart, config, table, descriptor
 resource, residue, permission projection, break and payload. -/
-structure UkSec (GF : BundledGFunctors) where
+structure UkSec (GF : BundledGFunctors.{0}) where
   cpu : CPU
   C : UCfg
   pt : UPtd
@@ -294,39 +296,39 @@ instances as `SpecUser.USER` is.  PROVED: `LinkUkLeaves.ukLeaves_holds` (the
 engine `UkEngine` over USER's tower; the icache stamp minted at userret's
 `fence.i`). -/
 structure UK_LEAVES : Prop where
-  wp_uk_rtype : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
+  wp_uk_rtype : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
     [CurCtx], wpUkRtypeBody (hlc := hlc) (GF := GF)
-  wp_uk_itype : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
+  wp_uk_itype : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
     [CurCtx], wpUkItypeBody (hlc := hlc) (GF := GF)
-  wp_uk_shiftiop : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
+  wp_uk_shiftiop : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
     [CurCtx], wpUkShiftiopBody (hlc := hlc) (GF := GF)
-  wp_uk_rtypew : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
+  wp_uk_rtypew : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
     [CurCtx], wpUkRtypewBody (hlc := hlc) (GF := GF)
-  wp_uk_addiw : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
+  wp_uk_addiw : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
     [CurCtx], wpUkAddiwBody (hlc := hlc) (GF := GF)
-  wp_uk_shiftiwop : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
+  wp_uk_shiftiwop : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
     [CurCtx], wpUkShiftiwopBody (hlc := hlc) (GF := GF)
-  wp_uk_utype : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
+  wp_uk_utype : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
     [CurCtx], wpUkUtypeBody (hlc := hlc) (GF := GF)
-  wp_uk_div : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
+  wp_uk_div : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
     [CurCtx], wpUkDivBody (hlc := hlc) (GF := GF)
-  wp_uk_rem : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
+  wp_uk_rem : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
     [CurCtx], wpUkRemBody (hlc := hlc) (GF := GF)
-  wp_uk_jal : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
+  wp_uk_jal : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
     [CurCtx], wpUkJalBody (hlc := hlc) (GF := GF)
-  wp_uk_jalr : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
+  wp_uk_jalr : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
     [CurCtx], wpUkJalrBody (hlc := hlc) (GF := GF)
-  wp_uk_btype : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
+  wp_uk_btype : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
     [CurCtx], wpUkBtypeBody (hlc := hlc) (GF := GF)
-  wp_uk_load : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
+  wp_uk_load : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
     [CurCtx], wpUkLoadBody (hlc := hlc) (GF := GF)
-  wp_uk_load_text : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
+  wp_uk_load_text : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
     [CurCtx], wpUkLoadTextBody (hlc := hlc) (GF := GF)
-  wp_uk_store : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
+  wp_uk_store : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
     [CurCtx], wpUkStoreBody (hlc := hlc) (GF := GF)
-  wp_uk_store_denied : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF]
+  wp_uk_store_denied : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF]
     [UexecSG GF] [CurCtx], wpUkStoreDeniedBody (hlc := hlc) (GF := GF)
-  wp_uk_ecall : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
+  wp_uk_ecall : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
     [CurCtx], wpUkEcallBody (hlc := hlc) (GF := GF)
 
 end Xv6

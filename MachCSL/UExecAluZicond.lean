@@ -9,6 +9,8 @@ not, both write `rd`), so the value is explicit: `uxaZicondVal`.
 -/
 import MachCSL.UExecAluGpr
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

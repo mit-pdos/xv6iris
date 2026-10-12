@@ -20,6 +20,7 @@ file is the pure and bookkeeping facts the step lemmas of
 Definitional; imports only `Xv6.DiskInvDefs`.
 -/
 import Xv6.DiskInvDefs
+import MachCSL.DecInst
 
 namespace Xv6
 
@@ -76,7 +77,7 @@ theorem crashRow_del_isSome (l : List (Nat × List (BitVec 8))) (k k' : Nat) :
 /-! ## A row depends on its head's phase and its chain's cache keys -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
 
 theorem crashRow_congr (γ : DiskNames) (v v' : VirtioState) (i : Nat) (s : HState) (b : SByte)
     (hph : Virtio.phase v' (BitVec.ofNat 16 i) = Virtio.phase v (BitVec.ofNat 16 i))
@@ -94,6 +95,7 @@ theorem crashRow_congr (γ : DiskNames) (v v' : VirtioState) (i : Nat) (s : HSta
     have hp : rowPopped v' i b = rowPopped v i b := by unfold rowPopped; rw [hph]
     have hc : rowCap v' i b = rowCap v i b := by unfold rowCap; rw [hph]
     simp only [crashRow, rowDoneB, rowTodo, hp, hc, hrc]
+    fix_dec
   | inactive => rfl
   | member _ => rfl
 

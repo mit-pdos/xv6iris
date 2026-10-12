@@ -36,7 +36,7 @@ theorem trapMstatusOk_smFacts (ms : BitVec 64) (h : trapMstatusOk ms) :
   refine ⟨⟨by simpa using h1, h17, h34, h19, h22, h20, h13, h15, h9, h63, h11⟩, fun _ => ⟨by simpa using h5, by simpa using h8⟩⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-! ## The hand-off -/
 

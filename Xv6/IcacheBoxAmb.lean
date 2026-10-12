@@ -221,6 +221,8 @@ ProofIput), `ic_pay` (IcacheCover, ProofIput, ProofIlock),
 import Xv6.IcacheEscrowDep
 import Xv6.IcacheInvRef
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -249,7 +251,7 @@ they are context-constant, which is what Rocq's `ic_hdr_morph` proves of
 them with `ctx_morph_const`. -/
 
 section IcacheBoxAmb
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
   [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- THE STITCH: the payload's GHOST side -- main's `icLoaded` minus its two

@@ -24,6 +24,8 @@ carve is over `byteBuf` / `wordToBytes` (dirlookup's `de` move,
 import MachCSL.WpSmodeFrame12b
 import Xv6.SpecNamecmp
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -34,7 +36,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {lent : Bool}
 
 /-- The name buffer's base: the frame's lowest slot, `sp - 32`

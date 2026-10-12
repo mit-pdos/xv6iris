@@ -72,7 +72,7 @@ theorem diskBoot_blockView (v : VirtioState) (h : v.cache = []) (b : Nat) :
   rw [diskBoot_cacheView v h, Nat.mul_comm]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
 
 /-! ## Allocation helpers -/
 

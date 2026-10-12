@@ -36,6 +36,8 @@ accessors are `Xv6.PlicInv`'s.
 import MachCSL.WpSmodeDev4
 import Xv6.KernelMap
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

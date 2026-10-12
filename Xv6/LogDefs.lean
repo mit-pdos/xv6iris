@@ -46,6 +46,8 @@ import MachCSL.LockBornHook
 import Xv6.UartTrace
 import Xv6.SyncHook
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
@@ -367,7 +369,7 @@ only ever read for membership.
 The open transactions (`LogNames.tx`) and the batch epoch (`LogNames.ep`)
 use the SHARED cameras -- `Xv6G.gmUnitG` and `MachFixedGS.mono` -- one
 instance per camera type, as Rocq's `inG`; their names keep them apart. -/
-class LogG (GF : BundledGFunctors) where
+class LogG (GF : BundledGFunctors.{0}) where
   /-- the reservation ledger: op id ↦ (budget, logged set, birth epoch) -/
   [gmOps : GhostMapG GF Nat OpEntry RegMapF]
   /-- the append registry: row id ↦ (epoch, block) -/
@@ -380,7 +382,7 @@ class LogG (GF : BundledGFunctors) where
 attribute [reducible, instance] LogG.gmOps LogG.gmLg LogG.gmHelp
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [LogG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [LogG GF]
 
 /-! ## The two client-side fragments
 

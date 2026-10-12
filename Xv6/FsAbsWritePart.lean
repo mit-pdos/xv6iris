@@ -44,7 +44,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section WritePart
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [OffboxG GF]
 
 /-- THE ADVANCED PARTIAL NODE AT A MAPPED SOURCE (Rocq's
 `awrite_part_adv_mapped_straddle`): at a source run every byte of which is

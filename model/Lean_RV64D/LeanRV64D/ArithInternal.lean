@@ -379,7 +379,7 @@ def float_add_same_exp (op_0 : (BitVec k_n)) (op_1 : (BitVec k_n)) : SailM ((Bit
   let bitsize := (Sail.BitVec.length op_0)
   let fp_0 := (float_decompose op_0)
   let fp_1 := (float_decompose op_1)
-  assert (fp_0.exp == fp_1.exp) "The exp of floating point must be same."
+  (assert (fp_0.exp == fp_1.exp) "The exp of floating point must be same.")
   let is_exp_0_all_ones := (is_all_ones fp_0.exp)
   let is_mantissa_all_zeros := (is_all_zeros (fp_0.mantissa ||| fp_1.mantissa))
   if ((is_all_zeros fp_0.exp) : Bool)
@@ -399,7 +399,7 @@ def float_add_less_than_exp (op_0 : (BitVec k_n)) (op_1 : (BitVec k_n)) : SailM 
   let bitsize := (Sail.BitVec.length op_0)
   let fp_0 := (float_decompose op_0)
   let fp_1 := (float_decompose op_1)
-  assert ((BitVec.toNatInt fp_0.exp) <b (BitVec.toNatInt fp_1.exp)) "The exp of floating point op_0 must be less than op_1."
+  (assert ((BitVec.toNatInt fp_0.exp) <b (BitVec.toNatInt fp_1.exp)) "The exp of floating point op_0 must be less than op_1.")
   let is_exp_all_ones := (is_all_ones fp_1.exp)
   let mantissa_shift := (fp_1.mantissa <<< ((Sail.BitVec.length fp_1.exp) -i 2))
   let is_nan := (! (is_all_zeros mantissa_shift))
@@ -411,7 +411,7 @@ def float_add_less_than_exp (op_0 : (BitVec k_n)) (op_1 : (BitVec k_n)) : SailM 
       then (pure ((float_get_sign_with_all_ones_exp fp_0.sign op_0), fp_eflag_none))
       else
         (do
-          assert false "Not implemented yet."
+          (assert false "Not implemented yet.")
           throw Error.Exit))
 
 /-- Type quantifiers: k_n : Nat, k_n ≥ 0, k_n ∈ {16, 32, 64, 128} -/
@@ -419,25 +419,25 @@ def float_add_diff_exp (op_0 : (BitVec k_n)) (op_1 : (BitVec k_n)) : SailM ((Bit
   let bitsize := (Sail.BitVec.length op_0)
   let fp_0 := (float_decompose op_0)
   let fp_1 := (float_decompose op_1)
-  assert (fp_0.exp != fp_1.exp) "The exp of floating point cannot be same."
+  (assert (fp_0.exp != fp_1.exp) "The exp of floating point cannot be same.")
   if (((BitVec.toNatInt fp_0.exp) <b (BitVec.toNatInt fp_1.exp)) : Bool)
   then (float_add_less_than_exp op_0 op_1)
   else
     (do
-      assert false "Not implemented yet."
+      (assert false "Not implemented yet.")
       throw Error.Exit)
 
 /-- Type quantifiers: k_n : Nat, k_n ≥ 0, k_n ∈ {16, 32, 64, 128} -/
 def float_add_internal (op_0 : (BitVec k_n)) (op_1 : (BitVec k_n)) : SailM ((BitVec k_n) × (BitVec 5)) := do
   let fp_0 := (float_decompose op_0)
   let fp_1 := (float_decompose op_1)
-  assert ((fp_0.sign ^^^ fp_1.sign) == (0#1 : (BitVec 1))) "The sign of float add operand 0 and operand 1 must be the same."
+  (assert ((fp_0.sign ^^^ fp_1.sign) == (0#1 : (BitVec 1))) "The sign of float add operand 0 and operand 1 must be the same.")
   if ((fp_0.exp == fp_1.exp) : Bool)
   then (float_add_same_exp op_0 op_1)
   else (float_add_diff_exp op_0 op_1)
 
 /-- Type quantifiers: k_n : Nat, k_n ≥ 0, k_n ∈ {16, 32, 64, 128} -/
 def float_sub_internal (_op_0 : (BitVec k_n)) (_op_1 : (BitVec k_n)) : SailM ((BitVec k_n) × (BitVec 5)) := do
-  assert false "Not implemented yet."
+  (assert false "Not implemented yet.")
   throw Error.Exit
 

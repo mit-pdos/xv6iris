@@ -66,6 +66,8 @@ import Xv6.FileOutClaim
 import Xv6.AppFileSync
 import Xv6.UnionOutSyncPure
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -87,7 +89,7 @@ ledger's map (Rocq `ugn_pipe`). -/
 def ugnPipe (ug : UnionGn) : PipeGn := ⟨fgnEcho ug.ugnFile, ug.ugnPera⟩
 
 section UnionOut
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF] [PipeOutG GF]
 
 /-! ## 1. The parameters and the claim -/
@@ -105,8 +107,9 @@ noncomputable def ucparams (ug : UnionGn) : GenCparams hlc GF ulmG where
   gcPIN_tl := fun _ _ => inferInstance
   gcPIN_agree := fileOut_eraPin_agree (fgnEcho ug.ugnFile)
   gcW := f0cw ug.ugnFile
-  gcW_pers := fun _ _ => inferInstance
-  gcW_tl := fun _ _ => inferInstance
+  -- Lean ≥ 4.34: `inferInstance` does not find these in a structure-instance field; name them
+  gcW_pers := fun k s => f0cw_persistent ug.ugnFile k s
+  gcW_tl := fun k s => f0cw_timeless ug.ugnFile k s
 
 /-- The parameters' projections, by name (Iris's tactics match up to
 reducible unfolding only). -/

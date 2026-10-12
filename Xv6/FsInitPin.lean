@@ -41,6 +41,8 @@ import Xv6.FsImgFilesInit
 import Xv6.FsDurNode
 import Xv6.ReadiParts
 
+noncomputable section
+
 namespace Xv6
 
 open Iris.Std

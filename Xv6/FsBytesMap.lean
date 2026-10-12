@@ -28,6 +28,8 @@ deviation), so `map_seqZ` is `map_seq`.
 -/
 import Xv6.FsBytes
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
@@ -160,7 +162,7 @@ theorem mapSeq_dom_eq (start : Nat) (xs ys : List (BitVec 8)) (hlen : xs.length 
   rw [h]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsBytesG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsBytesG GF]
 
 /-! ## The run as a `[∗map]` -/
 

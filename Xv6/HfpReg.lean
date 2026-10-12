@@ -33,6 +33,8 @@ is the fragment of number `d` at fraction `q`.
 -/
 import MachCSL.WpSmodeFrame
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -133,7 +135,7 @@ end Pure
 /-! ## The tokens, at a registry name -/
 
 section Own
-variable {GF : BundledGFunctors} {X : Type} [ElemG GF (RegF X)]
+variable {GF : BundledGFunctors.{0}} {X : Type} [ElemG GF (RegF X)]
 
 /-- **Rocq `*_reg_alloc`**. -/
 theorem reg_alloc (w : Nat → X) : ⊢ |==> ∃ γ, iOwn (GF := GF) (F := RegF X) γ (pool (fun _ => False) w) :=

@@ -44,6 +44,8 @@ payload's token stands at the position I hold" is an agreement
 -/
 import Xv6.ConsoleInvDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
@@ -54,7 +56,7 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 parametric in, bundled so the application builds the record ONCE and the
 seam takes a pair.  The taint is NOT a field (it comes from the
 application's interface). -/
-structure ConsCred (GF : BundledGFunctors) where
+structure ConsCred (GF : BundledGFunctors.{0}) where
   /-- the per-position credential on the lease -/
   ccRd : Nat → IProp GF
   ccRd_timeless : ∀ i : Nat, Timeless (ccRd i)
@@ -72,15 +74,15 @@ attribute [instance] ConsCred.ccRd_timeless ConsCred.ccWb_timeless
 
 /-- **Rocq `cc_wbn`**: /init's POSITION-INDEXED view of the banner-owed
 credential -- the input itself is existential. -/
-def ccWbn {GF : BundledGFunctors} (Cr : ConsCred GF) (n : Nat) : IProp GF :=
+def ccWbn {GF : BundledGFunctors.{0}} (Cr : ConsCred GF) (n : Nat) : IProp GF :=
   iprop(∃ I : List (BitVec 8), ⌜I.length = n⌝ ∗ Cr.ccWb I)
 
-instance ccWbn_timeless {GF : BundledGFunctors} (Cr : ConsCred GF) (n : Nat) :
+instance ccWbn_timeless {GF : BundledGFunctors.{0}} (Cr : ConsCred GF) (n : Nat) :
     Timeless (ccWbn Cr n) := by
   unfold ccWbn; infer_instance
 
 section UserConsole
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-! ## 1.  THE POSITION PAIR -/
 

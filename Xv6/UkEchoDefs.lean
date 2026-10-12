@@ -34,6 +34,8 @@ argument's write, then the separator's (or, after the last, the newline's).
 -/
 import Xv6.UkStub
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -43,7 +45,7 @@ open Std (ExtTreeSet)
 /-! ## §1 echo's instruction facts (deviation 1) -/
 
 section Code
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
 
 /-- **echo's catalog, once** (Rocq `UCodeEcho.uis_echo_<pc>`): an instruction
 echo's text tree finds and decodes at `pc`. -/
@@ -57,7 +59,7 @@ theorem echo_uis (γt : GName) (pc : Nat) (rvc : Bool) (i : instruction)
 end Code
 
 section UkEcho
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 

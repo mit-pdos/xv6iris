@@ -26,13 +26,15 @@ statement (the proof takes `UL : UK_LEAVES`).
 -/
 import Xv6.UshExecDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 open Std (ExtTreeSet)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 variable (E : UshExecEnv (hlc := hlc) (GF := GF))
@@ -78,7 +80,7 @@ end
 /-- The interface of runcmd's EXEC arm at the disciplined line, at any
 table predicate that reads back as the ledger. -/
 structure SH_RUNCMD_EXEC : Prop where
-  wp_shExecXAtGen : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+  wp_shExecXAtGen : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
     [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] (E : UshExecEnv (hlc := hlc) (GF := GF))
     (TabF : GName → List FdState → IProp GF), (∀ γ ld, TabF γ ld ⊢ ustd γ ld) →

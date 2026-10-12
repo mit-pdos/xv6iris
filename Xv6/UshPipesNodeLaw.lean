@@ -56,7 +56,7 @@ open UShPipesDefs UShPipesStage UShPipeLeaves UShPipeCall
 
 /-- **Rocq's second section hypotheses** (deviation 1): the stages as the
 parse cut them and sh's ledger at the top node. -/
-structure LawOk {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+structure LawOk {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
     [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF]
     (D : PdRound hlc GF) (s0 : Nat) (gs : Nat → BitVec 8) (stgs : List (List UArg)) (args0 : List UArg)
     (ld0 : List FdState) (rb1 rb2 : Bool) : Prop where
@@ -101,7 +101,7 @@ theorem nd_set_self (ld0 : List FdState) (st0 : FdState) (h : ld0[0]? = some st0
   · rfl
 
 section Law
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]

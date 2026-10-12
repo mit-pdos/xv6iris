@@ -70,12 +70,14 @@ Rocq's header, abridged:
 -/
 import Xv6.GenOutHist
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 
 /-- WHAT THE CLAIM READS OF AN APPLICATION (Rocq `gen_cparams`). -/
-structure GenCparams (hlc : HasLC) (GF : BundledGFunctors) [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+structure GenCparams (hlc : HasLC) (GF : BundledGFunctors.{0}) [MachGS hlc GF] [Xv6G GF] [DiskG GF]
     [EchoOutG GF] (M : LModel) where
   gcL : LmLaws M
   gcK : LmHooks M
@@ -92,7 +94,7 @@ structure GenCparams (hlc : HasLC) (GF : BundledGFunctors) [MachGS hlc GF] [Xv6G
 
 /-- THE STATE WITNESS'S AUTHORITY, and what the steps read off it (Rocq
 `gen_wa`).  `sd` is the instance's default state. -/
-structure GenWa {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+structure GenWa {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
     [EchoOutG GF] (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) where
   gwa : Nat → Option M.lmSt → IProp GF
   gwa_tl : ∀ k st, Timeless (gwa k st)
@@ -126,7 +128,7 @@ structure GenWa {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] 
   gpr_tl : ∀ k v I a, Timeless (gpr k v I a)
 
 section inst
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 variable {M : LModel} (G : GenCparams hlc GF M) {sd : M.lmSt} (A : GenWa M G sd)
 
 instance GenCparams.gcT_persistent : Persistent G.gcT := G.gcT_pers
@@ -153,7 +155,7 @@ payload.  Paired with the choice list's authority (`gcsAuth`), so it rides
 every arm the authority does and grows exactly where it does. -/
 
 section gen_store
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 variable (R : Nat → EraPins → List (BitVec 8) → Nat → IProp GF)
 
 /-- ONE FILED ROUND (Rocq `gitem`): the payload at its alternative, and its
@@ -331,7 +333,7 @@ theorem gopPrefix_snoc_lookup {A : Type} (w l : List A) (b : A) (hp : w <+: l) (
     exact ⟨z, by simp⟩
 
 section genout
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 
 /-- AN EMPTY STAGE HAS AN EMPTY PROLOGUE RESOLUTION (Rocq
 `gop_empty_stage_ps`) -/

@@ -28,6 +28,8 @@ serves every turn of the walk.
 -/
 import Xv6.NamexParts
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -42,7 +44,7 @@ theorem namex_path_lookup (plen i : Nat) (f : Nat → BitVec 8) (hi : i ≤ plen
     (bview (plen + 1) f)[i]? = some (f i) := bview_lookup _ _ _ (by omega)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- The five instructions of a separator skip at `base`. -/
 def namexSkipCode (base : BitVec 64) : IProp GF := iprop%

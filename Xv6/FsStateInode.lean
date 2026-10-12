@@ -131,7 +131,7 @@ Everything else in the file is ported with Rocq's statement.
 8. **THE BYTE OWNERSHIP IS STATED OVER A BARE `GF`.**  Rocq's
    `Section InodeOwned` carries `fsLinkG Σ`, but `ind_owned*`,
    `inode_dat*` and `inode_phi*` never touch the link RA; they are stated
-   here, like `Section RecOwned`, over `{GF : BundledGFunctors}` and a
+   here, like `Section RecOwned`, over `{GF : BundledGFunctors.{0}}` and a
    `Γ : FsViewNames GF`.  The shapes they are built from are
    `Xv6/FsStateDefs.lean`'s `FsView.byteRange` / `blkOwned` / `gammaQ` /
    `viewShed` (the ABSTRACT byte view, namespaced `FsView`).  Rocq's
@@ -155,6 +155,8 @@ Everything else in the file is ported with Rocq's statement.
 import Xv6.FsNode
 import Xv6.FsTree
 import Xv6.FsStateBitmap
+
+noncomputable section
 
 namespace Xv6
 
@@ -403,7 +405,7 @@ RA-free as well (deviation 8). -/
 
 section RecOwned
 open Iris Iris.BI Iris.ProofMode
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- Inum `i`'s 64-byte slot of its inode block (Rocq's `rec_owned`).  The
 inum is `BitVec.ofNat 32 i`, Rocq's `fs_inum_bv i` (deviation 7). -/
@@ -589,7 +591,7 @@ end RecOwned
 
 section InodeOwned
 open Iris Iris.BI Iris.ProofMode
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- THE INDIRECT BLOCK, at a share (durable-fs-plan.md §4/§6; Rocq's
 `ind_owned_q`).  `emp` when the node has none. -/

@@ -46,12 +46,14 @@ Imports only definitional files.
 import Xv6.KillRow
 import Xv6.WaitInv
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-! ## The private block (Rocq `pprivate` / `proc_fields` / `proc_priv_bare`) -/
 

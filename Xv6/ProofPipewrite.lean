@@ -51,6 +51,8 @@ import MachCSL.LockFacts
 import Xv6.PipeQstep
 import Xv6.WordFrac
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -93,7 +95,7 @@ macro_rules
                k_ext_move))
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-! ## Link registers, immediates -/
 
@@ -736,7 +738,7 @@ theorem pw_popExit_off (kb : KCtx) (a b : Bool) (hwf : kb.wf) (s : Bool) (hs : k
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
 /-! ## The shared tail `(KernelSyms.«pipewrite» + 0x108)`: wake readers, release, return `s2` -/
 
@@ -820,7 +822,7 @@ theorem pw_tail (WK : WAKEUP) (RE : RELEASE_GEN) (Γ : SchedNames)
   isplitl [Harm]
   · iapply popArm_sie c k _ (by k_norm_g [hb.proc]) $$ Harm
   case hsr => k_norm_g
-  case hnr => k_norm_g; rw [hb.noff]; decide
+  case hnr => k_norm_g; rw [hb.noff]
   case hKr => k_norm_g [pw_sec_avail kb a b _ k.sie hsie]; unfold pipewriteSlots at hK; omega
   case hrr => k_norm_g; simp [hb.intena, hb.noff]
   case hor =>
@@ -935,7 +937,7 @@ theorem pw_minus1 (RE : RELEASE_GEN)
   isplitl [Harm]
   · iapply popArm_sie c k _ (by k_norm_g [hb.proc]) $$ Harm
   case hsr => k_norm_g
-  case hnr => k_norm_g; rw [hb.noff]; decide
+  case hnr => k_norm_g; rw [hb.noff]
   case hKr => k_norm_g [pw_sec_avail kb a b _ k.sie hsie]; unfold pipewriteSlots at hK; omega
   case hrr => k_norm_g; simp [hb.intena, hb.noff]
   case hor =>
@@ -1303,7 +1305,7 @@ theorem pw_sleep_arm (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : S
   isplitl [Harm]
   · iapply popArm_sie c k _ (by k_norm_g [hb.proc]) $$ Harm
   case hsr => k_norm_g
-  case hnr => k_norm_g; rw [hb.noff]; decide
+  case hnr => k_norm_g; rw [hb.noff]
   case hKr => k_norm_g; unfold pipewriteSlots at hK; omega
   case hrr => k_norm_g; simp [hb.intena, hb.noff]
   case hor =>

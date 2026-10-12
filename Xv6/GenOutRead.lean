@@ -86,7 +86,7 @@ theorem greadStage (M : LModel) (ps cs : List Nat) (s : M.lmSt) (Iw E : List (Bi
     exact Nat.le_trans (nlines_prefix _ _ (Xv6.pop_prefix_of_removelast J Iw hJ hne)) hqle
 
 section read
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 
 /-- the state witness's authority, with the writer's witness read off it
 where the state is filed (Rocq's inline `iAssert` of `gcl_step_read`) -/

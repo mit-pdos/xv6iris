@@ -8,6 +8,8 @@ walk proofs.
 import MachCSL.PtTree
 import Std.Tactic.BVDecide
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

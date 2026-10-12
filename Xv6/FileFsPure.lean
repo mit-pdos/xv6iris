@@ -15,6 +15,8 @@ import Xv6.FsGrepPin
 import Xv6.FsSeccPin
 import Xv6.FsSyncPin
 
+noncomputable section
+
 namespace Xv6
 
 /-- Rocq `file_fs_pure`. -/

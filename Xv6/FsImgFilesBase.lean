@@ -7,6 +7,8 @@ header is the design of record).  Each program's facts are their own module
 import Xv6.FsImgCheck
 import Xv6.ElfUserBase
 
+noncomputable section
+
 namespace Xv6
 
 open Xv6.User

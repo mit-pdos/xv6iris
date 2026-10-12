@@ -33,6 +33,8 @@ pure model `ushpFind`, and the parse tree `UshpCmd`.
 -/
 import Xv6.UmodeAbi
 
+noncomputable section
+
 namespace Xv6
 
 /-! ## §1 The two static tables of sh.c -/

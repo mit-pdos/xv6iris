@@ -47,6 +47,8 @@ import Xv6.SpecPrintint
 import Xv6.SpecPrputc
 import Xv6.CodeTactics
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -79,7 +81,7 @@ theorem pi_lt_pow20 (x : BitVec 64) : x.toNat < 10 ^ 20 := by
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-! ## The byte buffer carved out of three frame slots -/
 

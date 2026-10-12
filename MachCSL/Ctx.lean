@@ -35,12 +35,14 @@ spec texts stay context-free.  There is deliberately no default instance.
 -/
 import MachCSL.Resources
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std
 open LeanRV64D
 
-variable {hlc : HasLC} {GF : BundledGFunctors}
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}}
 
 /-! ## Receipts, at an explicit era -/
 

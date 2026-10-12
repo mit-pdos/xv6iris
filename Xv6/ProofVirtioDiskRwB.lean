@@ -24,6 +24,8 @@ import Xv6.CodeTactics
 import Xv6.PrintkDefs
 import MachCSL.LockFacts
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -116,7 +118,7 @@ theorem vdrw2_filter : (["virtio_disk"] : List String).filter (fun x => x ≠ "v
   decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 /-! ## One turn of the eight-way scan -/
 
@@ -678,7 +680,7 @@ theorem tkOut_1 (h m : Nat) : tkOut 1 h m = updB (fun _ => false) h true := rfl
 theorem tkOut_2 (h m : Nat) : tkOut 2 h m = updB (updB (fun _ => false) h true) m true := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
 /-- **The failure ladder** at `+0x7a`: give the `i` descriptors already

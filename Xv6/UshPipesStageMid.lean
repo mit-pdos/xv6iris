@@ -37,6 +37,8 @@ import Xv6.UshPipesStageCtx
 import Xv6.UshExecPinHolds
 import Xv6.UshPipesStageW
 
+noncomputable section
+
 namespace Xv6
 
 namespace UShPipesStage
@@ -48,7 +50,7 @@ open Wid RdOut WrOut
 open UShPipesDefs
 
 section Mid
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]

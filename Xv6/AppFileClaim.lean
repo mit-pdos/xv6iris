@@ -41,12 +41,14 @@ import Xv6.AppFileEscrow
 import Xv6.FileFsPure
 import Xv6.AppFileSync
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section AppFileClaim
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF]
 
 /-- THE CORE (Rocq `f_core`): the EXACT arm, or IN FLIGHT. -/

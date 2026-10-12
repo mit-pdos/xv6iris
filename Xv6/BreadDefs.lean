@@ -18,6 +18,8 @@ import Xv6.SpecPanic
 import Xv6.ConsoleintrArms
 import Xv6.StepLemmas
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -96,7 +98,7 @@ bnos i ≠ bno` -- which alone does NOT say the block is uncached.  The DEV
 PIN closes it: a slot claiming a covered block is on the view's device, and
 the request is too, so the `dev` disjunct is impossible at the requested
 block and the `blockno` disjunct is what remains. -/
-theorem bd_miss_of_tie {GF : BundledGFunctors} (V : BioView GF) (devs bnos : Nat → BitVec 32) (dev bno : BitVec 32)
+theorem bd_miss_of_tie {GF : BundledGFunctors.{0}} (V : BioView GF) (devs bnos : Nat → BitVec 32) (dev bno : BitVec 32)
     (hdevp : bcacheDev V devs bnos) (hcov : bno.toNat ∈ V.cov) (hdev : dev = V.dev)
     (hmiss : ∀ j, j < NBUF → ¬(devs j = dev ∧ bnos j = bno)) :
     ∀ j, j < NBUF → (bnos j).toNat ≠ bno.toNat := by
@@ -109,7 +111,7 @@ theorem bd_miss_of_tie {GF : BundledGFunctors} (V : BioView GF) (devs bnos : Nat
 /-- The covered-blockno INJECTIVITY, re-established at the recycle: slot `k`'s
 claim moves to the requested block, every other slot's is untouched, and the
 miss fact kills the only new pair. -/
-theorem bd_inj_upd {GF : BundledGFunctors} (V : BioView GF) (bnos : Nat → BitVec 32) (k : Nat) (B : BitVec 32)
+theorem bd_inj_upd {GF : BundledGFunctors.{0}} (V : BioView GF) (bnos : Nat → BitVec 32) (k : Nat) (B : BitVec 32)
     (hinj : bcacheInj V bnos) (hmissB : ∀ j, j < NBUF → (bnos j).toNat ≠ B.toNat) :
     bcacheInj V (updAtF bnos k B) := by
   intro k1 k2 hk1 hk2 hcov heq
@@ -126,7 +128,7 @@ theorem bd_inj_upd {GF : BundledGFunctors} (V : BioView GF) (bnos : Nat → BitV
     exact hinj k1 k2 hk1 hk2 hcov heq
 
 /-- The DEV PIN survives the recycle: slot `k`'s new device IS the view's. -/
-theorem bd_devpin_upd {GF : BundledGFunctors} (V : BioView GF) (devs bnos : Nat → BitVec 32) (k : Nat) (D B : BitVec 32)
+theorem bd_devpin_upd {GF : BundledGFunctors.{0}} (V : BioView GF) (devs bnos : Nat → BitVec 32) (k : Nat) (D B : BitVec 32)
     (hdevp : bcacheDev V devs bnos) (hD : D = V.dev) :
     bcacheDev V (updAtF devs k D) (updAtF bnos k B) := by
   intro j hj hcov
@@ -151,7 +153,7 @@ theorem bd_ord_ne_nil (ord : List Nat) (hord : ord.Perm (List.range NBUF)) : ord
   exact absurd this.symm (by unfold NBUF; decide)
 
 /-- The evicted block's own uniqueness premise, out of the injectivity. -/
-theorem bd_old_unique {GF : BundledGFunctors} (V : BioView GF) (bnos : Nat → BitVec 32) (k : Nat) (hk : k < NBUF)
+theorem bd_old_unique {GF : BundledGFunctors.{0}} (V : BioView GF) (bnos : Nat → BitVec 32) (k : Nat) (hk : k < NBUF)
     (hinj : bcacheInj V bnos) :
     (bnos k).toNat ∈ V.cov → ∀ j, j < NBUF → j ≠ k → (bnos j).toNat ≠ (bnos k).toNat := by
   intro hcov j hj hjk he
@@ -165,7 +167,7 @@ def bdMsgStr : List (BitVec 8) :=
    0x62#8, 0x75#8, 0x66#8, 0x66#8, 0x65#8, 0x72#8, 0x73#8]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 set_option maxRecDepth 100000 in
 theorem bd_cstr_msg [CurCtx] :
@@ -179,7 +181,7 @@ end
 /-! ## The OPEN form of the `bcache.lock` resource -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
 variable [DiskG GF] [CurCtx]
 
 /-- Rocq's `bcache_scan2` with its six existentials NAMED: what both scans
@@ -240,7 +242,7 @@ end
 /-! ## The callees, at their call sites -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
 variable [SleepLockG GF] [DiskG GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
@@ -362,7 +364,7 @@ theorem bd_ps_wl (k : KCtx) (a b : Bool) (n : Nat) :
     ((k.pushed n).withSpie a b).withLocks k.locks = (k.withSpie a b).pushed n := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 end
 

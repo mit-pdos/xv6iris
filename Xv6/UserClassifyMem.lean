@@ -44,6 +44,8 @@ configuration they are refused before any access (`MachCSL.UclCbo`,
 -/
 import Xv6.UserClassifyLand
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

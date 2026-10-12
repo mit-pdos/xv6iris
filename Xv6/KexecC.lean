@@ -49,6 +49,8 @@ run at that record.
 import Xv6.KexecCSetup
 import Xv6.KexecCArgv
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -117,7 +119,7 @@ theorem kxcVecBytes_get (f : Nat → BitVec 64) (c i k : Nat) (hk : k < 8) (hi :
       rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> simp
 
 section Bytes
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- **The ustack words as the bytes copyout reads**, the tail `rest` already
 bytes. -/
@@ -274,7 +276,7 @@ theorem kxcC_slot0 (x : BitVec 64) (c : Nat) (h : c < 2 ^ 60) :
   bv_omega
 
 section Frame
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- `kxcC_ustack_take` backwards (any value in the slot). -/
 theorem kxcC_ustack_untake [CurCtx] (sp0 : BitVec 64) (c : Nat) (hc : c < 33) (w : BitVec 64) :
@@ -315,7 +317,7 @@ theorem kxcC_spFinal_mono (top : Int) (len : Nat → Nat) (i j : Nat) (hij : i �
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]

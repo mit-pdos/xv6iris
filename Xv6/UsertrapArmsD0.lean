@@ -79,7 +79,7 @@ theorem utD0_umemLazy_fill (P : UPtd) (sz : Nat) (M : Nat → List (BitVec 8)) (
 /-! ## §2 The call site -/
 
 section Calls
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
 /-- `vmfault(pt, sz, va, read)` at interrupts off. -/
@@ -121,7 +121,7 @@ theorem utD0_vmfault_tgt : KA.«usertrap» + 18446744073709547158#64 = KA.«vmfa
 theorem utD0_ret : jumpPc (KA.«usertrap» + 0xe6#64) = KA.«usertrap» + 0xe6#64 := by decide
 
 section ArmD0
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]

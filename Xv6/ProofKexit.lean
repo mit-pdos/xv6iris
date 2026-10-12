@@ -121,6 +121,8 @@ import MachCSL.WpSmodeFrame6
 import Xv6.CopyLemmas
 import Xv6.DinodeSlot
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -184,7 +186,7 @@ theorem kx_invDormant_zombie : invDormant ZOMBIE := by decide
 /-! ## The ZOMBIE park's payment -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- The dormant block a ZOMBIE park owes, built from the zeroed private block
 and the whole kernel stack (at the explicit context key `parkPay` wants). -/
@@ -303,7 +305,7 @@ theorem kx_setReg_frame {availval : Nat} {eb : Bool} (k : KCtx) (j : Nat) (statu
     rw [KCtx.setReg_avail]; exact hav
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 /-- The resume pc of a call whose return address `v` (even) sits in `ra`. -/
 theorem kx_pcIs_jump (cpu : CPU) (X : KCtx) (R : RegMap) (v : BitVec 64) (hv : jumpPc v = v) :
     pcIs (GF := GF) cpu (jumpPc ((X.withRegs (R.set 1#5 v)).regs 1#5)) ⊢ pcIs cpu v := by
@@ -311,7 +313,7 @@ theorem kx_pcIs_jump (cpu : CPU) (X : KCtx) (R : RegMap) (v : BitVec 64) (hv : j
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [X : CurCtx]
@@ -1594,7 +1596,7 @@ end
 /-! ## The whole function -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
 /-- `&initproc` from `auipc a5,0x8; ld a5,536(a5)` at `0x80002114`. -/
 theorem kx_initproc_addr :
@@ -1629,7 +1631,7 @@ theorem kx_slots_panic (a : Nat) (h : kexitSlots ≤ a) : panicSlots ≤ a - 6 :
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 set_option maxRecDepth 100000 in
 /-- Rocq's `kx_msg_str`. -/
@@ -1695,7 +1697,7 @@ theorem kx_init_panic [CurCtx] (PN : PANIC) (cpu : CPU) (k : KCtx)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 theorem kexit_br_fffffffffffff880 : KA.«kexit» + 0xfffffffffffff880#64 = KA.«myproc» := by decide
 

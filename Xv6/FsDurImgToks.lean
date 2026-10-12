@@ -30,6 +30,8 @@ Nothing here reads an image: it is generic in the ticket list.
 -/
 import Xv6.FsCfgBoot
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.Std MachCSL

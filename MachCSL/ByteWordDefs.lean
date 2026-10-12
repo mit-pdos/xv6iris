@@ -10,6 +10,8 @@ files import: it starts as soon as `TsoMem` is built.
 -/
 import MachCSL.TsoMem
 
+noncomputable section
+
 namespace MachCSL
 
 /-- The eight bytes of a doubleword, little-endian. -/

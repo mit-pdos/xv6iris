@@ -27,6 +27,8 @@ file is still at inum 4 after any write: every sentence is about
 import Xv6.FsInitPinBoot
 import Xv6.FsImgFilesEcho
 
+noncomputable section
+
 namespace Xv6
 
 open Iris.Std

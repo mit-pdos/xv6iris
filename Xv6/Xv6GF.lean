@@ -51,6 +51,8 @@ import Xv6.FsStateTop
 import Xv6.InodeRegion
 import Xv6.AppCfg
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.Std Std MachCSL COFE
@@ -67,154 +69,156 @@ abbrev xgfMl (α : Type) : OFunctorPre := constOF (MonoList (DiscreteO α))
 /-! ## The slot table -/
 
 /-- **THE CONCRETE FUNCTOR LIST** (Rocq `xv6Σ`): one slot per camera. -/
-def xv6GF : BundledGFunctors :=
+def xv6GF : BundledGFunctors.{0} :=
   BundledGFunctors.default
   -- iris: wsat + later credits (`InvGpreS`)
   |>.set 0 ⟨InvMapF, inferInstance⟩
-  |>.set 1 ⟨constOF CoPsetDisjL, inferInstance⟩
-  |>.set 2 ⟨constOF (DisjointLeibnizSet PosSet), inferInstance⟩
-  |>.set 3 ⟨Auth.AuthURF (constOF Credit), inferInstance⟩
+  |>.set 1 ⟨ULiftOF (constOF CoPsetDisjL), inferInstance⟩
+  |>.set 2 ⟨ULiftOF (constOF (DisjointLeibnizSet PosSet)), inferInstance⟩
+  |>.set 3 ⟨ULiftOF (Auth.AuthURF (constOF Credit)), inferInstance⟩
   -- MachCSL (`MachGpreS`, less the registry; `CrashPermG`)
-  |>.set 4 ⟨xgfGm Nat RegVal RegMapF, inferInstance⟩
-  |>.set 5 ⟨xgfGm PAddr Hist MemF, inferInstance⟩
-  |>.set 6 ⟨xgfGm PAddr GName MemF, inferInstance⟩
-  |>.set 7 ⟨constOF MetaUR, inferInstance⟩
-  |>.set 8 ⟨MonoNatRF, inferInstance⟩
-  |>.set 9 ⟨xgfGm Nat Nat RegMapF, inferInstance⟩
-  |>.set 10 ⟨xgfGm Nat ResvVal RegMapF, inferInstance⟩
-  |>.set 11 ⟨xgfGm Nat CPU RegMapF, inferInstance⟩
-  |>.set 12 ⟨xgfGm String Unit StrMapF, inferInstance⟩
-  |>.set 13 ⟨GhostVarF (LockState × Nat), inferInstance⟩
-  |>.set 14 ⟨xgfGm Nat (BitVec 64) RegMapF, inferInstance⟩
-  |>.set 15 ⟨GhostVarF (BitVec 44), inferInstance⟩
-  |>.set 16 ⟨GhostVarF DevVal, inferInstance⟩
-  |>.set 17 ⟨GhostVarF (List Obs), inferInstance⟩
-  |>.set 18 ⟨xgfMl Obs, inferInstance⟩
-  |>.set 19 ⟨xgfGm Nat (BitVec 8) RegMapF, inferInstance⟩
-  |>.set 20 ⟨GhostVarF LogMirror, inferInstance⟩
+  |>.set 4 ⟨ULiftOF (xgfGm Nat RegVal RegMapF), inferInstance⟩
+  |>.set 5 ⟨ULiftOF (xgfGm PAddr Hist MemF), inferInstance⟩
+  |>.set 6 ⟨ULiftOF (xgfGm PAddr GName MemF), inferInstance⟩
+  |>.set 7 ⟨ULiftOF (constOF MetaUR), inferInstance⟩
+  |>.set 8 ⟨ULiftOF (MonoNatRF), inferInstance⟩
+  |>.set 9 ⟨ULiftOF (xgfGm Nat Nat RegMapF), inferInstance⟩
+  |>.set 10 ⟨ULiftOF (xgfGm Nat ResvVal RegMapF), inferInstance⟩
+  |>.set 11 ⟨ULiftOF (xgfGm Nat CPU RegMapF), inferInstance⟩
+  |>.set 12 ⟨ULiftOF (xgfGm String Unit StrMapF), inferInstance⟩
+  |>.set 13 ⟨ULiftOF (GhostVarF (LockState × Nat)), inferInstance⟩
+  |>.set 14 ⟨ULiftOF (xgfGm Nat (BitVec 64) RegMapF), inferInstance⟩
+  |>.set 15 ⟨ULiftOF (GhostVarF (BitVec 44)), inferInstance⟩
+  |>.set 16 ⟨ULiftOF (GhostVarF DevVal), inferInstance⟩
+  |>.set 17 ⟨ULiftOF (GhostVarF (List Obs)), inferInstance⟩
+  |>.set 18 ⟨ULiftOF (xgfMl Obs), inferInstance⟩
+  |>.set 19 ⟨ULiftOF (xgfGm Nat (BitVec 8) RegMapF), inferInstance⟩
+  |>.set 20 ⟨ULiftOF (GhostVarF LogMirror), inferInstance⟩
   |>.set 21 ⟨DFracAgree.DFracAgreeRF (LaterOF IdOF), inferInstance⟩
-  |>.set 22 ⟨xgfGm Nat CrashPermVal RegMapF, inferInstance⟩
+  |>.set 22 ⟨ULiftOF (xgfGm Nat CrashPermVal RegMapF), inferInstance⟩
   -- Xv6G
-  |>.set 23 ⟨xgfMl (BitVec 8), inferInstance⟩
-  |>.set 24 ⟨GhostVarF (List (BitVec 8)), inferInstance⟩
-  |>.set 25 ⟨GhostVarF Nat, inferInstance⟩
-  |>.set 26 ⟨GhostVarF Unit, inferInstance⟩
-  |>.set 27 ⟨GhostVarF CPU, inferInstance⟩
-  |>.set 28 ⟨GhostVarF (BitVec 32), inferInstance⟩
-  |>.set 29 ⟨GhostVarF Bool, inferInstance⟩
-  |>.set 30 ⟨xgfGm Nat Unit RegMapF, inferInstance⟩
-  |>.set 31 ⟨xgfGm Nat (List (BitVec 8)) RegMapF, inferInstance⟩
-  |>.set 32 ⟨constOF (Auth (Option UFrac)), inferInstance⟩
-  |>.set 33 ⟨CInvF, inferInstance⟩
-  |>.set 34 ⟨GhostVarF (Nat × Option (List Obs)), inferInstance⟩
-  |>.set 35 ⟨GhostVarF (Option (List Obs)), inferInstance⟩
-  |>.set 36 ⟨xgfMl LogEntry, inferInstance⟩
-  |>.set 37 ⟨GhostVarF (List (List Obs × BitVec 8)), inferInstance⟩
-  |>.set 38 ⟨GhostVarF (List LogEntry), inferInstance⟩
-  |>.set 39 ⟨GhostVarF (Option ConsArm), inferInstance⟩
-  |>.set 40 ⟨xgfMl (List Obs × BitVec 8), inferInstance⟩
-  |>.set 41 ⟨xgfMl (RegMapF (List (BitVec 8))), inferInstance⟩
+  |>.set 23 ⟨ULiftOF (xgfMl (BitVec 8)), inferInstance⟩
+  |>.set 24 ⟨ULiftOF (GhostVarF (List (BitVec 8))), inferInstance⟩
+  |>.set 25 ⟨ULiftOF (GhostVarF Nat), inferInstance⟩
+  |>.set 26 ⟨ULiftOF (GhostVarF Unit), inferInstance⟩
+  |>.set 27 ⟨ULiftOF (GhostVarF CPU), inferInstance⟩
+  |>.set 28 ⟨ULiftOF (GhostVarF (BitVec 32)), inferInstance⟩
+  |>.set 29 ⟨ULiftOF (GhostVarF Bool), inferInstance⟩
+  |>.set 30 ⟨ULiftOF (xgfGm Nat Unit RegMapF), inferInstance⟩
+  |>.set 31 ⟨ULiftOF (xgfGm Nat (List (BitVec 8)) RegMapF), inferInstance⟩
+  |>.set 32 ⟨ULiftOF (constOF (Auth (Option UFrac))), inferInstance⟩
+  |>.set 33 ⟨ULiftOF (CInvF), inferInstance⟩
+  |>.set 34 ⟨ULiftOF (GhostVarF (Nat × Option (List Obs))), inferInstance⟩
+  |>.set 35 ⟨ULiftOF (GhostVarF (Option (List Obs))), inferInstance⟩
+  |>.set 36 ⟨ULiftOF (xgfMl LogEntry), inferInstance⟩
+  |>.set 37 ⟨ULiftOF (GhostVarF (List (List Obs × BitVec 8))), inferInstance⟩
+  |>.set 38 ⟨ULiftOF (GhostVarF (List LogEntry)), inferInstance⟩
+  |>.set 39 ⟨ULiftOF (GhostVarF (Option ConsArm)), inferInstance⟩
+  |>.set 40 ⟨ULiftOF (xgfMl (List Obs × BitVec 8)), inferInstance⟩
+  |>.set 41 ⟨ULiftOF (xgfMl (RegMapF (List (BitVec 8)))), inferInstance⟩
   -- IcacheG
-  |>.set 42 ⟨constOF IcacheUR, inferInstance⟩
-  |>.set 43 ⟨GhostVarF (Bool × BitVec 32 × BitVec 32), inferInstance⟩
-  |>.set 44 ⟨constOF IliveUR, inferInstance⟩
-  |>.set 45 ⟨GhostVarF IcDep, inferInstance⟩
-  |>.set 46 ⟨constOF ItyR, inferInstance⟩
-  |>.set 47 ⟨constOF LinkUR, inferInstance⟩
-  |>.set 48 ⟨constOF (Excl Unit), inferInstance⟩
-  |>.set 49 ⟨xgfGm Nat (Nat × Nat) RegMapF, inferInstance⟩
-  |>.set 50 ⟨xgfGm Nat IregArmEnt RegMapF, inferInstance⟩
-  |>.set 51 ⟨GhostVarF (ExtTreeSet Nat compare), inferInstance⟩
-  |>.set 52 ⟨GhostVarF (RegMapF (Nat × Qp)), inferInstance⟩
-  |>.set 53 ⟨xgfGm Nat Icorpse RegMapF, inferInstance⟩
-  |>.set 54 ⟨constOF IcntUR, inferInstance⟩
-  |>.set 55 ⟨constOF FrzmUR, inferInstance⟩
-  |>.set 56 ⟨constOF HpnUR, inferInstance⟩
+  |>.set 42 ⟨ULiftOF (constOF IcacheUR), inferInstance⟩
+  |>.set 43 ⟨ULiftOF (GhostVarF (Bool × BitVec 32 × BitVec 32)), inferInstance⟩
+  |>.set 44 ⟨ULiftOF (constOF IliveUR), inferInstance⟩
+  |>.set 45 ⟨ULiftOF (GhostVarF IcDep), inferInstance⟩
+  |>.set 46 ⟨ULiftOF (constOF ItyR), inferInstance⟩
+  |>.set 47 ⟨ULiftOF (constOF LinkUR), inferInstance⟩
+  |>.set 48 ⟨ULiftOF (constOF (Excl Unit)), inferInstance⟩
+  |>.set 49 ⟨ULiftOF (xgfGm Nat (Nat × Nat) RegMapF), inferInstance⟩
+  |>.set 50 ⟨ULiftOF (xgfGm Nat IregArmEnt RegMapF), inferInstance⟩
+  |>.set 51 ⟨ULiftOF (GhostVarF (ExtTreeSet Nat compare)), inferInstance⟩
+  |>.set 52 ⟨ULiftOF (GhostVarF (RegMapF (Nat × Qp))), inferInstance⟩
+  |>.set 53 ⟨ULiftOF (xgfGm Nat Icorpse RegMapF), inferInstance⟩
+  |>.set 54 ⟨ULiftOF (constOF IcntUR), inferInstance⟩
+  |>.set 55 ⟨ULiftOF (constOF FrzmUR), inferInstance⟩
+  |>.set 56 ⟨ULiftOF (constOF HpnUR), inferInstance⟩
   -- IcboxG
-  |>.set 57 ⟨StampsRF IcBid, inferInstance⟩
-  |>.set 58 ⟨GhostVarF (SlotReg IcBid IcX), inferInstance⟩
-  |>.set 59 ⟨GhostVarF (L2Reg IcBid), inferInstance⟩
+  |>.set 57 ⟨ULiftOF (StampsRF IcBid), inferInstance⟩
+  |>.set 58 ⟨ULiftOF (GhostVarF (SlotReg IcBid IcX)), inferInstance⟩
+  |>.set 59 ⟨ULiftOF (GhostVarF (L2Reg IcBid)), inferInstance⟩
   -- LogG (its append registry is slot 49)
-  |>.set 60 ⟨xgfGm Nat OpEntry RegMapF, inferInstance⟩
+  |>.set 60 ⟨ULiftOF (xgfGm Nat OpEntry RegMapF), inferInstance⟩
   -- FileG
-  |>.set 61 ⟨xgfGm Nat (Nat × Qp) RegMapF, inferInstance⟩
-  |>.set 62 ⟨GhostVarF FPNames, inferInstance⟩
-  |>.set 63 ⟨FdstF, inferInstance⟩
-  |>.set 64 ⟨xgfGm (Option Nat) UfdCell UfdMapF, inferInstance⟩
+  |>.set 61 ⟨ULiftOF (xgfGm Nat (Nat × Qp) RegMapF), inferInstance⟩
+  |>.set 62 ⟨ULiftOF (GhostVarF FPNames), inferInstance⟩
+  |>.set 63 ⟨ULiftOF (FdstF), inferInstance⟩
+  |>.set 64 ⟨ULiftOF (xgfGm (Option Nat) UfdCell UfdMapF), inferInstance⟩
   -- CtokG
   |>.set 65 ⟨DFracAgree.DFracAgreeRF GenF, inferInstance⟩
-  |>.set 66 ⟨constOF AtokR, inferInstance⟩
-  |>.set 67 ⟨constOF KshotR, inferInstance⟩
+  |>.set 66 ⟨ULiftOF (constOF AtokR), inferInstance⟩
+  |>.set 67 ⟨ULiftOF (constOF KshotR), inferInstance⟩
   -- SleepLockG, FsBytesG, FsBlocksG
-  |>.set 68 ⟨GhostVarF Qp, inferInstance⟩
-  |>.set 69 ⟨xgfGm Nat (List Nat) RegMapF, inferInstance⟩
-  |>.set 70 ⟨xgfGm Nat Bool RegMapF, inferInstance⟩
+  |>.set 68 ⟨ULiftOF (GhostVarF Qp), inferInstance⟩
+  |>.set 69 ⟨ULiftOF (xgfGm Nat (List Nat) RegMapF), inferInstance⟩
+  |>.set 70 ⟨ULiftOF (xgfGm Nat Bool RegMapF), inferInstance⟩
   -- BcacheG (its reference map is slot 9)
-  |>.set 71 ⟨StampsRF BufId, inferInstance⟩
-  |>.set 72 ⟨GhostVarF (SlotReg BufId BufX), inferInstance⟩
-  |>.set 73 ⟨GhostVarF (L2Reg BufId), inferInstance⟩
+  |>.set 71 ⟨ULiftOF (StampsRF BufId), inferInstance⟩
+  |>.set 72 ⟨ULiftOF (GhostVarF (SlotReg BufId BufX)), inferInstance⟩
+  |>.set 73 ⟨ULiftOF (GhostVarF (L2Reg BufId)), inferInstance⟩
   -- OffboxG
-  |>.set 74 ⟨GhostVarF Int, inferInstance⟩
+  |>.set 74 ⟨ULiftOF (GhostVarF Int), inferInstance⟩
   -- WchGpre
-  |>.set 75 ⟨xgfGm Nat (BitVec 64 × ExtTreeSet Nat compare) RegMapF, inferInstance⟩
-  |>.set 76 ⟨GhostVarF OrphMap, inferInstance⟩
-  |>.set 77 ⟨constOF SgenUR, inferInstance⟩
-  |>.set 78 ⟨xgfGm Int Nat IntMapF, inferInstance⟩
-  |>.set 79 ⟨constOF IpidUR, inferInstance⟩
+  |>.set 75 ⟨ULiftOF (xgfGm Nat (BitVec 64 × ExtTreeSet Nat compare) RegMapF), inferInstance⟩
+  |>.set 76 ⟨ULiftOF (GhostVarF OrphMap), inferInstance⟩
+  |>.set 77 ⟨ULiftOF (constOF SgenUR), inferInstance⟩
+  |>.set 78 ⟨ULiftOF (xgfGm Int Nat IntMapF), inferInstance⟩
+  |>.set 79 ⟨ULiftOF (constOF IpidUR), inferInstance⟩
   -- FsLinkG, FsTopG
-  |>.set 80 ⟨constOF FsLinkUR, inferInstance⟩
-  |>.set 81 ⟨xgfGm Nat FsNode RegMapF, inferInstance⟩
+  |>.set 80 ⟨ULiftOF (constOF FsLinkUR), inferInstance⟩
+  |>.set 81 ⟨ULiftOF (xgfGm Nat FsNode RegMapF), inferInstance⟩
   -- DiskG
-  |>.set 82 ⟨GhostVarF VirtioCfg, inferInstance⟩
-  |>.set 83 ⟨GhostVarF HState, inferInstance⟩
-  |>.set 84 ⟨GhostVarF (Option Nat), inferInstance⟩
-  |>.set 85 ⟨xgfGm Nat (BitVec 16 × Chain × Option VPhase × Option (BitVec 16 × Bool)) RegMapF,
+  |>.set 82 ⟨ULiftOF (GhostVarF VirtioCfg), inferInstance⟩
+  |>.set 83 ⟨ULiftOF (GhostVarF HState), inferInstance⟩
+  |>.set 84 ⟨ULiftOF (GhostVarF (Option Nat)), inferInstance⟩
+  |>.set 85 ⟨ULiftOF (xgfGm Nat (BitVec 16 × Chain × Option VPhase × Option (BitVec 16 × Bool)) RegMapF),
     inferInstance⟩
-  |>.set 86 ⟨xgfMl Nat, inferInstance⟩
-  |>.set 87 ⟨xgfMl (Nat × Nat × Nat × Nat), inferInstance⟩
+  |>.set 86 ⟨ULiftOF (xgfMl Nat), inferInstance⟩
+  |>.set 87 ⟨ULiftOF (xgfMl (Nat × Nat × Nat × Nat)), inferInstance⟩
   -- IregG
-  |>.set 88 ⟨xgfGm Int Dinode IregMapF, inferInstance⟩
+  |>.set 88 ⟨ULiftOF (xgfGm Int Dinode IregMapF), inferInstance⟩
   -- OffboxBoxG
-  |>.set 89 ⟨StampsRF Nat, inferInstance⟩
-  |>.set 90 ⟨GhostVarF (SlotReg Nat Unit), inferInstance⟩
-  |>.set 91 ⟨GhostVarF (L2Reg Nat), inferInstance⟩
-  |>.set 92 ⟨constOF OffSetUR, inferInstance⟩
+  |>.set 89 ⟨ULiftOF (StampsRF Nat), inferInstance⟩
+  |>.set 90 ⟨ULiftOF (GhostVarF (SlotReg Nat Unit)), inferInstance⟩
+  |>.set 91 ⟨ULiftOF (GhostVarF (L2Reg Nat)), inferInstance⟩
+  |>.set 92 ⟨ULiftOF (constOF OffSetUR), inferInstance⟩
   -- MachCSL: the era registry (`MachGpreS.registry_pre`)
-  |>.set 93 ⟨xgfGm Nat EraGS RegMapF, inferInstance⟩
+  |>.set 93 ⟨ULiftOF (xgfGm Nat EraGS RegMapF), inferInstance⟩
   -- Xv6G: the pipe byte queue (Rocq `pipeqR`)
-  |>.set 94 ⟨constOF (ExclAuth.ExclAuthR (A := PipeSt)), inferInstance⟩
+  |>.set 94 ⟨ULiftOF (constOF (ExclAuth.ExclAuthR (A := PipeSt))), inferInstance⟩
   -- LogG: the helping slot's map (Rocq `loghelp_inG`, sync K3-2); slot 120, clear of
   -- the union's own slots (95..)
-  |>.set 120 ⟨xgfGm Nat (GName × BitVec 32) RegMapF, inferInstance⟩
+  |>.set 120 ⟨ULiftOF (xgfGm Nat (GName × BitVec 32) RegMapF), inferInstance⟩
   -- Xv6G: the page allocator's event ledger (Rocq `kallocG`'s `mono_listR (leibnizO kev)`,
   -- NI-LEDGER-KALLOC); slot 121, clear of the union's (95..108)
-  |>.set 121 ⟨xgfMl Kev, inferInstance⟩
+  |>.set 121 ⟨ULiftOF (xgfMl Kev), inferInstance⟩
   -- WchGpre: the pid ledger (Rocq `wpl_pre_inG`'s `mono_listR (leibnizO pev)`,
   -- NI-LEDGER-REST); slot 122, clear of the union's (95..108)
-  |>.set 122 ⟨xgfMl Pev, inferInstance⟩
+  |>.set 122 ⟨ULiftOF (xgfMl Pev), inferInstance⟩
   -- WchGpre: the zombie ledger (Rocq `wzl_pre_inG`'s `mono_listR (leibnizO zev)`,
   -- NI-LEDGER-REST); slot 123, clear of the union's (95..108)
-  |>.set 123 ⟨xgfMl Zev, inferInstance⟩
+  |>.set 123 ⟨ULiftOF (xgfMl Zev), inferInstance⟩
   -- Xv6G: the encoded per-process ledger (Rocq `uledG`'s `mono_listR (leibnizO positive)`,
   -- NI-LEDGER-REST, the key history); slot 124, clear of the union's (95..108)
-  |>.set 124 ⟨xgfMl Uled, inferInstance⟩
+  |>.set 124 ⟨ULiftOF (xgfMl Uled), inferInstance⟩
   -- WchGpre: the family ledger's zombie column (tie T2, NI M2-G1b); slot 125, clear of
   -- the union's (95..108)
-  |>.set 125 ⟨xgfGm Nat (Option (BitVec 32 × Int)) RegMapF, inferInstance⟩
+  |>.set 125 ⟨ULiftOF (xgfGm Nat (Option (BitVec 32 × Int)) RegMapF), inferInstance⟩
   -- WchGpre: the slot-occupancy ledger and its column (NI joint fork lane F1); slots
   -- 126 / 127, clear of the union's (95..108)
-  |>.set 126 ⟨xgfMl Sev, inferInstance⟩
-  |>.set 127 ⟨xgfGm (BitVec 64) Bool AddrMapF, inferInstance⟩
+  |>.set 126 ⟨ULiftOF (xgfMl Sev), inferInstance⟩
+  |>.set 127 ⟨ULiftOF (xgfGm (BitVec 64) Bool AddrMapF), inferInstance⟩
 
 /-! ## One instance per camera -/
 
 section cameras
 
 /-- the slot's `ElemG`, by computation on the table -/
-local macro "xgf_slot " n:num : term => `(⟨$n, rfl⟩)
+local macro "xgf_slot " n:num : term => `(ElemG.ofEqLift $n rfl)
+/-- a slot whose functor already lives at `IProp`'s universe (no `ULiftOF`) -/
+local macro "xgf_slot_poly " n:num : term => `(ElemG.ofEq $n rfl)
 
 -- iris
-instance xgfInvMap : ElemG xv6GF InvMapF := xgf_slot 0
+instance xgfInvMap : ElemG xv6GF InvMapF := xgf_slot_poly 0
 instance xgfEnabled : ElemG xv6GF (constOF CoPsetDisjL) := xgf_slot 1
 instance xgfDisabled : ElemG xv6GF (constOF (DisjointLeibnizSet PosSet)) := xgf_slot 2
 instance xgfCredit : ElemG xv6GF (Auth.AuthURF (constOF Credit)) := xgf_slot 3
@@ -236,7 +240,7 @@ instance xgfObsVar : GhostVarG xv6GF (List Obs) := { elemG := xgf_slot 17 }
 instance xgfObsHist : MonoListG xv6GF Obs := ⟨xgf_slot 18⟩
 instance xgfBytes : GhostMapG xv6GF Nat (BitVec 8) RegMapF := ⟨xgf_slot 19⟩
 instance xgfMirror : GhostVarG xv6GF LogMirror := { elemG := xgf_slot 20 }
-instance xgfSavedProp : SavedPropG xv6GF := { elemG := xgf_slot 21 }
+instance xgfSavedProp : SavedPropG xv6GF := { elemG := xgf_slot_poly 21 }
 instance xgfCrashPerm : GhostMapG xv6GF Nat CrashPermVal RegMapF := ⟨xgf_slot 22⟩
 -- Xv6G
 instance xgfMlByte : MonoListG xv6GF (BitVec 8) := ⟨xgf_slot 23⟩
@@ -286,7 +290,7 @@ instance xgfFpay : GhostVarG xv6GF FPNames := { elemG := xgf_slot 62 }
 instance xgfFdst : ElemG xv6GF FdstF := xgf_slot 63
 instance xgfUfd : GhostMapG xv6GF (Option Nat) UfdCell UfdMapF := ⟨xgf_slot 64⟩
 -- CtokG
-instance xgfGen : SavedAnythingG xv6GF GenF := { elemG := xgf_slot 65 }
+instance xgfGen : SavedAnythingG xv6GF GenF := { elemG := xgf_slot_poly 65 }
 instance xgfAtok : ElemG xv6GF (constOF AtokR) := xgf_slot 66
 instance xgfKshot : ElemG xv6GF (constOF KshotR) := xgf_slot 67
 -- SleepLockG, FsBytesG, FsBlocksG

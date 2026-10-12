@@ -32,13 +32,15 @@ What this file provides:
 import MachCSL.WpSmodeCycleT
 import MachCSL.WpSmodeFrame
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D LeanRV64D.Functions
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- **The translation obligation of a fetch**: under configuration `c`, the
 instruction-fetch translation of `va` lands on `pa`, handing the translation

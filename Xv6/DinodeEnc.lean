@@ -55,6 +55,8 @@ DEVIATIONS from Rocq.
 import Xv6.BlockWords
 import MachCSL.ByteWord2
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

@@ -22,12 +22,14 @@ so `putc`'s code composes with the tables below.
 -/
 import Xv6.UlibPutcCode
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL LeanRV64D
 
 section
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- **The code of a routine table at `base`.** -/
 def ulibTabCode (L : UlibRun GF) (tab : List UlibIns) (base : BitVec 64) : IProp GF :=

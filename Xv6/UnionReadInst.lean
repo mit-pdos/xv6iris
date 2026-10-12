@@ -58,7 +58,7 @@ theorem lmDiscInput_U_no_cr (I : List (BitVec 8)) (j : Nat) (hd : lmDiscInput ul
   decide
 
 section UnionReadInst
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF] [PipeOutG GF] [Fscfg]
 
 /-- The era's read link off the bundle (Rocq `uri_rd`). -/

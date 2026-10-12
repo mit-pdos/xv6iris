@@ -102,6 +102,8 @@ M2-W2's.
 -/
 import Xv6.SystemAdequacy
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -112,7 +114,7 @@ open Iris.ProgramLogic Language.Notation PrimStep
 /-- **THE APPLICATION'S LAWS** (Rocq `xv6_app_laws`): eleven fields, in
 Rocq's order.  Everything the system theorem demands of an application
 except the two statements about an IMAGE (`Happ_init`, `Hphi`). -/
-class Xv6AppLaws {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G GF] [CtokG GF]
+class Xv6AppLaws {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGpreS hlc GF] [Xv6G GF] [CtokG GF]
     [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
     [IcboxG GF] [SleepLockG GF] [BcacheG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF]
     (A : Xv6App GF) : Prop where
@@ -235,7 +237,7 @@ class Xv6AppLaws {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G 
       (A.hk c k)
 
 section inst
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G GF] [CtokG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGpreS hlc GF] [Xv6G GF] [CtokG GF]
   [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
   [IcboxG GF] [SleepLockG GF] [BcacheG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF]
 
@@ -249,7 +251,7 @@ end inst
 `app_init_of_valid`, `app_init_of_valid_okc`, `app_triv_init`) -/
 
 section trivLemmas
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- A LANDED APPLICATION WITH NOTHING FOR THE CRASH SLOT AT BIRTH (Rocq
 `app_birth_of_valid_cls`): its birth is its old one. -/
@@ -293,7 +295,7 @@ end trivLemmas
 /-! ## §2 THE APPLICATION THEOREM (Rocq `App.xv6_app_adequacy`) -/
 
 section gen
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G GF] [WchGpre GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGpreS hlc GF] [Xv6G GF] [WchGpre GF]
   [CtokG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
   [IcboxG GF] [SleepLockG GF] [BcacheG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF]
 
@@ -373,7 +375,7 @@ end gen
 the unfolded `⟨Unit, fun _ _ => True, r⟩` (`iapply` does not see through the
 record at reducible transparency). -/
 section trivBoot
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [Xv6G GF] [CtokG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [Xv6G GF] [CtokG GF]
   [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
   [IcboxG GF] [SleepLockG GF] [BcacheG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF]
 
@@ -407,7 +409,7 @@ theorem appTriv_initBoot (US : USER) (c : Unit)
 end trivBoot
 
 section triv
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G GF] [WchGpre GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGpreS hlc GF] [Xv6G GF] [WchGpre GF]
   [CtokG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
   [IcboxG GF] [SleepLockG GF] [BcacheG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF]
 

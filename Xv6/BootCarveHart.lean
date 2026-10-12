@@ -65,6 +65,8 @@ Imports only definitional files.
 import Xv6.BootHart
 import Xv6.SpecMain
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -92,7 +94,7 @@ theorem bh_cpusBase_toNat : (KernelGeom.cpusBase : BitVec 64).toNat = 0x80012530
 theorem bh_range_cpus : List.range NCPU = cpus.map Fin.val := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-! ## §1 The GOT word, discarded -/
 
@@ -274,6 +276,7 @@ theorem bh_range_two (n : Nat) : List.range (n + 2) = 0 :: 1 :: (List.range n).m
   rw [List.range_succ_eq_map, List.range_succ_eq_map, List.map_cons, List.map_map]
   rfl
 
+set_option linter.iris.multipleSIdx false in -- the linter overflows the recursion limit on this statement (Lean 4.34)
 /-- **The bridge's stack premise, reassembled** (Rocq `boot_entry_bridge`'s
 stack frame): `timerinit`'s two words, as `wp_boot_body` hands them back
 (`sp₀ - 24`, `sp₀ - 32`), in front of the other 508 words, are the
@@ -519,7 +522,7 @@ end
 /-! ## At the era the power thread mints -/
 
 section era
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF]
 
 /-- **A running token carries a `viewLb … 0` receipt** (what `cpuCtxFree`
 needs at boot: Lean's `viewLb c 0` is not free, so it is read off

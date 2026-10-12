@@ -38,12 +38,14 @@ Deviations from Rocq:
 import Xv6.ConsoleInvDefs
 import Xv6.UartInv
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-- THE ECHO'S JUSTIFICATION, FIXED AT BOOT (Rocq `cons_echo_shift`). -/
 def consEchoShift : IProp GF := iprop%

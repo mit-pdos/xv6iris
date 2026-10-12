@@ -65,7 +65,7 @@ theorem fileWrite_dst_insert_insert (s : Dst) (N : Fname) (v w : Nat × List (Bi
   by_cases h : compare N k = .eq <;> simp [h]
 
 section FileWriteNode
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [OffboxG GF] [FsTopG GF] [Icfg]
 
 /-- the offset link's two arms, for `icases` (deviation 5). -/
@@ -95,7 +95,7 @@ theorem FileWrite.fileClaimRead [inst : Appcfg GF] (γfs : FsNames) (c : FileFix
   subst heq
   ihave %hI := ghost_map_auth_agree _ _ _ _ _ $$ Hka Hh
   subst hI
-  imod (filePred_timeless (hlc := hlc) (GF := GF) c r (absView I)).timeless $$ Hp with Hp
+  imod (@timeless_except0 _ _ _ (filePred_timeless (hlc := hlc) (GF := GF) c r (absView I))).mp $$ Hp with Hp
   ihave ⟨Hp, Hd, Hfact⟩ := Hlaw $$ %(absView I) %s Hd Hp
   imod Hclose $$ [Hh Hp]
   · inext

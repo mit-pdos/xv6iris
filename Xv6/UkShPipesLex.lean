@@ -24,6 +24,8 @@ pipeline's line (`ushqLinesWs`) is one.
 import Xv6.UShLexRedir
 import Xv6.UkShPipeLex
 
+noncomputable section
+
 namespace Xv6
 
 /-! ## §1 A bar, read locally -/

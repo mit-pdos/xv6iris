@@ -31,6 +31,8 @@ import Xv6.UkPipesIfaceDefs
 import Xv6.AppFilePure
 import Xv6.UshMainPure
 
+noncomputable section
+
 namespace Xv6
 
 namespace UShUPipes

@@ -34,6 +34,8 @@ import Xv6.UshEchoPure
 import Xv6.UshMainSeam
 import Xv6.UshMainBytes
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -52,7 +54,7 @@ def ushcmdOfTree (s0 : Nat) (g : Nat → BitVec 8) : UshpCmd → Ushcmd
   | .back c => .back (ushcmdOfTree s0 g c)
 
 section UshSeam
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 

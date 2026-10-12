@@ -33,7 +33,7 @@ theorem fi_ret_40b2 : jumpPc (KA.«fileinit» + 0x1c#64) = (KA.«fileinit» + 0x
   decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-! ## The callee, at its entry address -/
 

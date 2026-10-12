@@ -10,6 +10,8 @@ it); the image is init's R-X segment (Rocq `init_ro`).
 import Xv6.UserLit
 import Xv6.User.InitImage
 
+noncomputable section
+
 namespace Xv6.User.Init
 
 open Xv6.User

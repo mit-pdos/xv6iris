@@ -121,6 +121,8 @@ import Xv6.SpecSysFork
 import Xv6.SpecSysWait
 import Xv6.SysExecDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -265,7 +267,7 @@ structure SyscRows (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPriv)
 /-! ## §2 The deposit channels (Rocq `Section SyscExec`, deviation 2) -/
 
 section SyscExec
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [WchG GF]
 open UexecSG
 
 /-- **Rocq `uwait_ans_at_m`** (deviation 5): wait's answer at the a0 WORD
@@ -457,7 +459,7 @@ end SyscExec
 /-! ## §3 The contract -/
 
 section Contract
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
@@ -578,7 +580,7 @@ end Contract
 token `PT` -- PERSISTENT, as Rocq's `park_token` is (`park_token_persistent`),
 so the environment is (SyscallEnv's header) -- and the deposit class. -/
 structure SYSCALL : Prop where
-  wp_syscall : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+  wp_syscall : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [CtokG GF] [WchG GF] [Appcfg GF] [FileG GF] [UexecSG GF] [Fscfg] [Icfg] [CurCtx]

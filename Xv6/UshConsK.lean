@@ -78,6 +78,8 @@ import Xv6.UshMainStubs
 import Xv6.UStrImg
 import Xv6.UInitCons
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -127,7 +129,7 @@ theorem shConsPath_of (E : ElfMem) (Mv : Nat → List (BitVec 8)) (hro : uimgSub
     exact hag _ _ (hro _ _ shConsRo_nul_bool)
 
 section UshConsK
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF] [DiskG GF]
   [FsTopG GF] [Appcfg GF] [Icfg]
@@ -170,7 +172,7 @@ back by `cons_open_dead_recv` (`openAbsentCall`).  Generic over the
 caller's literal: its code image `ro`, the path's address `pv` and the path
 reading; the console arm at any credential fact `Pv`.  Discharged by
 `UConsOpenCalls.shConsOpenCalls_holds`. -/
-structure ShConsOpenCalls {hlc : HasLC} (GF : BundledGFunctors) [MachGS hlc GF] [CtokG GF] [UexecSG GF]
+structure ShConsOpenCalls {hlc : HasLC} (GF : BundledGFunctors.{0}) [MachGS hlc GF] [CtokG GF] [UexecSG GF]
     [UprogSG GF] [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
     [GhostMapG GF (Option Nat) UfdCell UfdMapF] [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
     [Xv6G GF] [DiskG GF] [FsTopG GF] [Appcfg GF] [Icfg] (γfs : FsNames) where
@@ -213,7 +215,7 @@ structure ShConsOpenCalls {hlc : HasLC} (GF : BundledGFunctors) [MachGS hlc GF] 
 /-! ## S3 The two leaf discharges -/
 
 section UshConsKLeaves
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF] [DiskG GF]
   [FsTopG GF] [Appcfg GF] [Icfg]

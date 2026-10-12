@@ -23,6 +23,8 @@ the ownership of `T` (domain exactly the list `DT`), every byte stamped at
 import MachCSL.CtxX
 import MachCSL.UByteFrame
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.BI Iris.ProofMode Std
@@ -51,7 +53,7 @@ def uxRun {X : Type} (D : UFoot) (T : BMap) : UOrc → UWSt → SailM X → Opti
     (runRW D orc s (FreeM.impure c FreeM.pure)).bind fun r => uxRun D T r.2.2 r.2.1 (k r.1)
 
 section own
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- **The text map, owned and stamped** (Rocq `bytes_own_p` at the stamped
 payload): its domain is exactly `DT` (duplicate-free), every byte of it held

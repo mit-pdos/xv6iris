@@ -32,6 +32,8 @@ Rocq's header, abridged:
 -/
 import Xv6.GenOut
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL
@@ -457,7 +459,7 @@ theorem gclPureO_blkN_file (K : LmHooks M) (B : LmByteLaws M) (k : Nat) (ho : Li
   subst hcs0
   have hposc := nlines_pos_of_rest_nil _ hnn hrr
   have hrlbnd : nlines (so.gsE.map Prod.snd).dropLast ≤ so.gsCs.length := by
-    rw [ll_nlines_removelast _ hrr, hqq]; exact Nat.le_refl _
+    rw [ll_nlines_removelast _ hrr, hqq]
   have hpinq : lmProPin M so.gsPs (so.gsCs ++ [a]) (so.gsE.map Prod.snd) := by
     intro qq hqq2
     have hns := ll_nstarted_rest_nil (so.gsE.map Prod.snd) hrr

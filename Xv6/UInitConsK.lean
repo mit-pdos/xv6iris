@@ -65,6 +65,8 @@ application's, `UInitConsFile`.)
 import Xv6.UConsOpenCalls
 import Xv6.UkInitStubs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -146,7 +148,7 @@ theorem initConsK_xkA_run2 (m : RegMap) (pc : BitVec 64) (M : ElfMem) (π : Nat 
 /-! ## S2  THE MKNOD DEPOSIT'S FAMILY -/
 
 section Fam
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- **Rocq `xfam_mknod`**: row 17's families pinned, every other trivial;
 `kfXpay` the program's own exit payload. -/
@@ -157,7 +159,7 @@ def xfamMknod (P : Nat → Nat → IProp GF) (Farm Fun : Pfam GF (Aview → Nat 
 end Fam
 
 section UInitConsK
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx] [PS : UprogSG GF]

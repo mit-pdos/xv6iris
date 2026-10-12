@@ -35,6 +35,8 @@ import Xv6.LogDefs
 import Xv6.FsBytes
 import Xv6.BioPool
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
@@ -73,14 +75,14 @@ this port had split the byte view's two into their own class.  Making
 their theory over `FsBytesG` alone, exactly as Rocq's `FsBytes` section
 does) while costing not one `[FsBytesG GF]` binder at the ~20 log-layer
 files that already carry `[FsBlocksG GF]`. -/
-class FsBlocksG (GF : BundledGFunctors) extends FsBytesG GF where
+class FsBlocksG (GF : BundledGFunctors.{0}) extends FsBytesG GF where
   -- the logged view (`FsNames.cache`) uses the SHARED `Xv6G.gmBlkG`
   [gmDirty : GhostMapG GF Nat Bool RegMapF]
 
 attribute [reducible, instance] FsBlocksG.gmDirty
 
 section
-variable {GF : BundledGFunctors} [Xv6G GF] [FsBlocksG GF]
+variable {GF : BundledGFunctors.{0}} [Xv6G GF] [FsBlocksG GF]
 
 /-- **The logged view's authority** (Rocq's `ghost_map_auth (fs_cache γfs) 1 L`):
 the freeze-by-auth that makes `log_write` and the committer the only

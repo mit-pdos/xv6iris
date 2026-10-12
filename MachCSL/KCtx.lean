@@ -91,6 +91,8 @@ import MachCSL.KptInv
 import Iris.BI.Lib.Fixpoint
 import MachCSL.SConfDefs
 
+noncomputable section
+
 
 namespace MachCSL
 
@@ -170,7 +172,7 @@ def gprIdxs : List (BitVec 5) :=
 theorem gprIdxs_get (k : Nat) (hk : k < 31) : gprIdxs[k]? = some (BitVec.ofNat 5 (k + 1)) := by
   revert k; decide
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- The whole register file of hart `cpu`, holding `m`. -/
 def gprFile (cpu : CPU) (m : RegMap) : IProp GF := iprop%
@@ -452,7 +454,7 @@ theorem trapCsrs_intro (cpu : CPU) (a b c : BitVec 64) : trapCsrsAt (GF := GF) c
 /-- The index of the trap handler's contract: the ENVIRONMENT the handler
 closes over (Rocq `ihs kt E`: the contract is a family over environments),
 a hart and its handler. -/
-structure IhsIx (GF : BundledGFunctors) where
+structure IhsIx (GF : BundledGFunctors.{0}) where
   env : CtxId → IProp GF
   cpu : CPU
   h : BitVec 64
@@ -778,7 +780,7 @@ theorem KCtx.wf_trapped (k : KCtx) (h : k.wf) : k.trapped.wf :=
 proposition (the xv6 client's `kernelText ∗ kernelData`).  `kctx` owns a
 copy, so no contract states it, and a proof takes the copy out (`kctx_ro`)
 to derive the instruction facts and read-only data its rules need. -/
-class KernelImage (GF : BundledGFunctors) where
+class KernelImage (GF : BundledGFunctors.{0}) where
   ro : IProp GF
   ro_persistent : Persistent ro
 

@@ -22,6 +22,8 @@ single-block receipt `wi16Pre` / `wi16Fresh`.
 -/
 import Xv6.WriteiBudgetW
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL LeanRV64D

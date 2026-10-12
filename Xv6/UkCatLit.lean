@@ -14,6 +14,8 @@ ones main's and cat()'s auipc/addi pairs compute (7b2c1b1b binary).
 import Xv6.UserLit
 import Xv6.User.CatImage
 
+noncomputable section
+
 namespace Xv6.User.Cat
 
 open Xv6.User

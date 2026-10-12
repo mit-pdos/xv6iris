@@ -74,6 +74,8 @@ import Xv6.UkInitDefs
 import Xv6.UshKernel
 import Xv6.UshParseDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.Std MachCSL

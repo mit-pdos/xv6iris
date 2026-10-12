@@ -45,6 +45,8 @@ Deviations from Rocq:
 -/
 import Xv6.LineModelLinks
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

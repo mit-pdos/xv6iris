@@ -40,6 +40,8 @@ import Xv6.Image
 import Xv6.KallocDefs
 import Xv6.SlotGen
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -55,7 +57,7 @@ def walkRet (t : PTree) (vpn : BitVec 27) (r : BitVec 64) : Prop :=
   (t.complete 2 vpn ∧ r = pteAddr (t.slot 2 vpn).1 (vpnIdx vpn 0))
 
 /-- The specification of `walk` with `alloc = 1`. -/
-def wp_walk_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
+def wp_walk_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (on : Option Nat) (t : PTree) (ke : Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 22 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
     (hroot : k.regs 10#5 = pageAddr t.base) (hva : (k.regs 11#5).toNat < 2 ^ 38)
@@ -80,13 +82,13 @@ def wp_walk_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 
 /-- The interface of `walk` (allocating). -/
 structure WALK : Prop where
-  wp_walk : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_walk : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γl : GName) (γk : KmemNames) (on : Option Nat) (t : PTree) (ke : Nat) hnoff hK hlk hroot hva halloc hwf hnd hpg,
     wp_walk_body (hlc := hlc) (GF := GF) cpu k γl γk on t ke hnoff hK hlk hroot hva halloc hwf hnd hpg
 
 /-- The specification of `walk` with `alloc = 0`: no allocation, the tree
 (at any fraction) unchanged. -/
-def wp_walk_noalloc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_walk_noalloc_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (dq : DFrac) (t : PTree)
     (hK : 8 ≤ k.avail)
     (hroot : k.regs 10#5 = pageAddr t.base) (hva : (k.regs 11#5).toNat < 2 ^ 38)
@@ -101,7 +103,7 @@ def wp_walk_noalloc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
 
 /-- The interface of `walk` (non-allocating). -/
 structure WALK_NOALLOC : Prop where
-  wp_walk_noalloc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_walk_noalloc : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (dq : DFrac) (t : PTree) hK hroot hva halloc hwf,
     wp_walk_noalloc_body (hlc := hlc) (GF := GF) cpu k dq t hK hroot hva halloc hwf
 

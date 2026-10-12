@@ -36,6 +36,8 @@ The geometry is `Xv6/FsGeom.lean`'s (`IBLOCK`, `islot`, `NDIRECT`,
 -/
 import Xv6.FsImg
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

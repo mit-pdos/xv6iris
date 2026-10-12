@@ -64,6 +64,8 @@ cursor (`nparElems`, `nparWalkDeadEra`, `epStart`) or the slot supplies.
 import Xv6.SpecNameiparent
 import Xv6.FsAbsCreateNm
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -102,7 +104,7 @@ theorem T_DIR_tyOk : iregTyOkW T_DIR := Or.inr (Or.inl rfl)
 /-! ## THE LOCKED-INODE PAYOUT -/
 
 section Locked
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF]
   [Fscfg] [Icfg] [CurCtx]
@@ -178,7 +180,7 @@ supplies (`FsAbsCreateFire`).  The child's content is indexed by the
 requested type (`creC0` / `creChild`). -/
 
 section Commits
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [Appcfg GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [Appcfg GF]
 
 /-- **THE DOTS LEG IS GUARDED BY THE TYPE** (Rocq's `cre_dots_leg`): only a
 DIRECTORY gets dots -- the `beq s4,a4` at +0xca is taken exactly on

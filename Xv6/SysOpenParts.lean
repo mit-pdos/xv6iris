@@ -169,6 +169,8 @@ import Xv6.SysfileCalls
 import Xv6.SpecFdalloc
 import Xv6.SysOpenBits
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -298,7 +300,7 @@ so Rocq's middle three lines (name it, pin it with
 `inode_ref_short_shr_genlo_agree`) are `sys_open_shr_held`. -/
 
 section Publish
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF]
   [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF]
 
 /-- THE OTHER SIDE OF THE PUBLICATION: opening the fresh slot (Rocq
@@ -465,7 +467,7 @@ theorem sys_open_trunc_rec_local (dn : Dinode) (hrl : inodeRecLocal dn) :
   inodeRecLocal_sameType dn (diTrunc dn) hrl rfl hrl.2.1 (fun _ => by simp [diTrunc])
 
 section Trunc
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF]
   [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- ...and the close direction at itrunc's outputs (Rocq
@@ -495,13 +497,13 @@ end Trunc
 /-! ## §2.  THE FRAME: 192 bytes, TWENTY-FOUR slots -/
 
 /-- A cell's address, moved along an equation (the carve's literal sums). -/
-theorem sys_open_cell_eq [CurCtx] {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+theorem sys_open_cell_eq [CurCtx] {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
     (a b : BitVec 64) (n : Nat) (dq : DFrac) (w : BitVec (8 * n)) (h : a = b) :
     wordPointsTo (GF := GF) a n dq w ⊢ wordPointsTo b n dq w := by
   rw [h]
 
 section Frame
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {lent : Bool}
 
 /-- A buffer of `n` bytes at `a`, contents unknown. -/
@@ -765,7 +767,7 @@ theorem sysOpenPins_exit (k : KCtx) (R : RegMap)
 /-! ### The ambient context, pinned at the kernel tier -/
 
 section Exit
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 set_option maxHeartbeats 8000000 in
 /-- **THE JOIN POINT `+0xca`** (Rocq `so_epilogue`): every arm arrives here
@@ -825,7 +827,7 @@ four families.  The create side's four (`Farm Fun Fok Fex`) are separate
 parameters of the create entry (`sysOpenEntryCBody`): every body below the
 join is stated at the plain arms, and the create entry reaches them through
 `SysOpenCreArm`'s families (Rocq's `socr_*`, the "shim"). -/
-structure SysOpenArgs (GF : BundledGFunctors) where
+structure SysOpenArgs (GF : BundledGFunctors.{0}) where
   γl : GName
   γ : FileNames
   j : Nat
@@ -847,7 +849,7 @@ structure SysOpenArgs (GF : BundledGFunctors) where
 /-- THE STATIC PREMISES (Rocq's `K_sys_open <= K -> … -> eb = true ->`
 block, minus `eb`): the contract's own, fixed for the whole call.  `k` is
 sys_open's ENTRY context. -/
-structure SysOpenStatic {GF : BundledGFunctors} (k : KCtx) (A : SysOpenArgs GF) : Prop where
+structure SysOpenStatic {GF : BundledGFunctors.{0}} (k : KCtx) (A : SysOpenArgs GF) : Prop where
   hj : A.j < NPROC
   hproc : k.proc = procAddr A.j
   htier : k.tier = KTier.kpt
@@ -860,30 +862,30 @@ structure SysOpenStatic {GF : BundledGFunctors} (k : KCtx) (A : SysOpenArgs GF) 
 /-- THE RECORD AT A RAISED COUNT (permit sweep L1b; Rocq's `UA := upd_usV U
 (upd_ev (us_V U) kA)` in `ProofSysOpen`): argstr hands the block back at
 `A.V.updEv kv`, and the run below +0x20 is at this record. -/
-abbrev SysOpenArgs.raise {GF : BundledGFunctors} (A : SysOpenArgs GF) (kv : Nat) : SysOpenArgs GF :=
+abbrev SysOpenArgs.raise {GF : BundledGFunctors.{0}} (A : SysOpenArgs GF) (kv : Nat) : SysOpenArgs GF :=
   { A with V := A.V.updEv kv }
 
 /-- The static premises survive the raise (the counter is in none of them). -/
-theorem SysOpenStatic.raise {GF : BundledGFunctors} {k : KCtx} {A : SysOpenArgs GF}
+theorem SysOpenStatic.raise {GF : BundledGFunctors.{0}} {k : KCtx} {A : SysOpenArgs GF}
     (hS : SysOpenStatic k A) (kv : Nat) : SysOpenStatic k (A.raise kv) :=
   ⟨hS.hj, hS.hproc, hS.htier, hS.hnoff, hS.hK, hS.hns, hS.hv0, hS.hv1⟩
 
 /-- The block after argstr: the page table grown to `P2`, the view faulted
 (argstr's post; Rocq's `us_upt U P2`). -/
-abbrev sysOpenV2 {GF : BundledGFunctors} (A : SysOpenArgs GF) (P2 : UPtd) : ProcPriv := { A.V with upt := P2 }
-abbrev sysOpenM2 {GF : BundledGFunctors} (A : SysOpenArgs GF) (P2 : UPtd) : Nat → List (BitVec 8) :=
+abbrev sysOpenV2 {GF : BundledGFunctors.{0}} (A : SysOpenArgs GF) (P2 : UPtd) : ProcPriv := { A.V with upt := P2 }
+abbrev sysOpenM2 {GF : BundledGFunctors.{0}} (A : SysOpenArgs GF) (P2 : UPtd) : Nat → List (BitVec 8) :=
   viewFaulted A.V.upt P2 A.M
 
 /-- `omode` as argint stored it. -/
-abbrev sysOpenOm {GF : BundledGFunctors} (A : SysOpenArgs GF) : BitVec 32 := BitVec.extractLsb' 0 32 A.vom
+abbrev sysOpenOm {GF : BundledGFunctors.{0}} (A : SysOpenArgs GF) : BitVec 32 := BitVec.extractLsb' 0 32 A.vom
 
 /-- THE IMAGE THE PATH IS READ AT (Rocq's `us_M U` at entry): the entry view
 with every lazy page read as zeros (`UMemLazy.viewLazy`), which is where
 argstr reads its string.  `A.M` itself when the block has no lazy page. -/
-abbrev sysOpenIm {GF : BundledGFunctors} (A : SysOpenArgs GF) : Nat → List (BitVec 8) := viewLazy A.V.upt A.V.sz A.M
+abbrev sysOpenIm {GF : BundledGFunctors.{0}} (A : SysOpenArgs GF) : Nat → List (BitVec 8) := viewLazy A.V.upt A.V.sz A.M
 
 section Vocab
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -1112,7 +1114,7 @@ sys_open goes through ONE argstr wrapper (the coordinator's ruling, Sept
 (`sysOpenIm`; `SpecSysOpen` deviation 10). -/
 
 section Argstr
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -1197,7 +1199,7 @@ persistent `sysOpenEnv`.  The block is at `procAddr A.j` (the contract's
 -/
 
 section Bodies
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]

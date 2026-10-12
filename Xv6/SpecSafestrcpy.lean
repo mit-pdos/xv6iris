@@ -30,6 +30,8 @@ import MachCSL.WpSmodeFrame
 import Xv6.Image
 import Xv6.ProcDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -42,7 +44,7 @@ def safestrcpyAddr : BitVec 64 := KA.«safestrcpy»
 `dst` holds any 16 bytes, `src` any 16 bytes (read only); afterwards `dst`
 holds a well-formed name (`pnameWf`: 16 bytes NUL-terminated within), the
 source is unchanged, and `a0 = dst`. -/
-def wp_safestrcpy_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+def wp_safestrcpy_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (bsd bss : List (BitVec 8)) (dq : DFrac)
     (hK : 2 ≤ k.avail) (hn : k.regs 12#5 = 16#64)
     (hld : bsd.length = 16) (hls : bss.length = 16) : Prop :=
@@ -57,7 +59,7 @@ def wp_safestrcpy_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cu
 
 /-- The interface of `safestrcpy` (the `n = 16` case). -/
 structure SAFESTRCPY : Prop where
-  wp_safestrcpy : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+  wp_safestrcpy : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (bsd bss : List (BitVec 8)) (dq : DFrac) hK hn hld hls,
     wp_safestrcpy_body (hlc := hlc) (GF := GF) cpu k bsd bss dq hK hn hld hls
 

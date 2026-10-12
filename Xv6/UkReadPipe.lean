@@ -35,6 +35,8 @@ it).  Unreached (not ported):
 import Xv6.UkReadRows
 import Xv6.UkRunSysPipe
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -42,7 +44,7 @@ open Std (ExtTreeSet)
 
 /-- **Rocq `read_pipe_fam`**: `xfamRd` at the trivial console readings, with
 the caller's queue cursor `Rp` and empty-ring observation `Rpe`. -/
-def readPipeFam {GF : BundledGFunctors} (Q : Int → IProp GF) (Rp : List (BitVec 8) → IProp GF)
+def readPipeFam {GF : BundledGFunctors.{0}} (Q : Int → IProp GF) (Rp : List (BitVec 8) → IProp GF)
     (Rpe : List (BitVec 8) → PipeSt → IProp GF) : Xfam GF :=
   { xfamRd Q (fun _ _ => iprop(True)) (fun _ => iprop(True)) with rPq := Rp, rPqe := Rpe }
 
@@ -66,7 +68,7 @@ theorem ustd_after_none (l : List FdState) (st : FdState) (h : fdLowestClosed l 
   unfold ustdAfter; rw [h]
 
 section Pure
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg]
 
 /-- **Rocq `uread_pipe_core`**: the post's pipe arm, the match at one
@@ -82,7 +84,7 @@ theorem uread_pipe_core (gn : GName) (pt : UPtd) (st : FdState) (wb : Bool) (γp
 end Pure
 
 section Handles
-variable {GF : BundledGFunctors} [GhostMapG GF (Option Nat) UfdCell UfdMapF]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF (Option Nat) UfdCell UfdMapF]
 
 /-- **Rocq `upipe_ends_handles`**: at a ledger with no free standard slot,
 pipe's two allocations are HANDLES. -/
@@ -100,7 +102,7 @@ theorem upipe_ends_handles (γf : GName) (l : List FdState) (a b : Nat) (γp : P
 end Handles
 
 section Supply
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
@@ -110,7 +112,7 @@ local notation "SGX" => uexecSGXv6 (hlc := hlc)
 end Supply
 
 section PipeEnd
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]

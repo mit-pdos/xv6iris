@@ -34,6 +34,9 @@ makes `used->ring[used_idx % NUM]` and `avail->ring[idx % NUM]` agree
 with the record's `p % NUM`.
 -/
 import Xv6.DiskDefs
+import MachCSL.DecInst
+
+noncomputable section
 
 namespace Xv6
 
@@ -598,12 +601,14 @@ theorem cacheView_drain (v : VirtioState) (s : Nat) (hc : cacheOk v) :
           rw [hsec]; exact hs
         rw [cacheView_none w a h1, cacheView_some v a bs h2, hwd, diskWrite_eq]
         simp only [sectorSize_eq] at hsec hlen ⊢
+        fix_dec
         rw [if_pos (by omega)]
         have heq : a - 512 * s = a % 512 := by omega
         rw [heq]
       · have hdisk : w.disk a = v.disk a := by
           rw [hwd, diskWrite_eq]
           simp only [sectorSize_eq] at hsec ⊢
+          fix_dec
           by_cases hle : 512 * s <= a
           · rw [if_pos hle, List.getElem?_eq_none (by omega)]
             rfl

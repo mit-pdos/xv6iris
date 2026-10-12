@@ -22,7 +22,7 @@ namespace MachCSL
 open Iris Iris.BI Iris.ProofMode
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- A word cell's address is below `2^38` (`wordPointsTo`'s own clause; was
 `SysUnlinkFrame.sys_unlink_wpt_lt38`). -/

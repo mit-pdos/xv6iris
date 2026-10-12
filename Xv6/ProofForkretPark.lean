@@ -48,13 +48,15 @@ import Xv6.EnvMorph
 import Xv6.FtableMorph
 import Xv6.SpecForkret
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
@@ -158,7 +160,7 @@ instance fkp_parkBlock_morph (steady : Bool) (N : UtNames) (V : ProcPriv) (M : N
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg]
@@ -219,7 +221,7 @@ end
 
 set_option maxHeartbeats 1000000 in
 /-- **Rocq `forkret_park_paid`**: THE CAP, proved from forkret's contract. -/
-theorem forkret_park_paid (FR : FORKRET) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+theorem forkret_park_paid (FR : FORKRET) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
     [FdslotG GF] [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF]
     [WchG GF] [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
@@ -337,7 +339,7 @@ theorem forkret_park_paid (FR : FORKRET) {hlc : HasLC} {GF : BundledGFunctors} [
 
 /-- The residue's channel at the park token (`UtResFits.usertrapResAt_park`
 at `PT := parkToken`), for every record of the table. -/
-theorem fkp_chan {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+theorem fkp_chan {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
     [FdslotG GF] [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF]
     [WchG GF] [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg]
@@ -351,7 +353,7 @@ theorem fkp_chan {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
   exact h
 
 /-- The cap at `W := parkToken Γ` (`forkret_park_paid`). -/
-theorem fkp_cap (FR : FORKRET) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+theorem fkp_cap (FR : FORKRET) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
     [FdslotG GF] [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF]
     [WchG GF] [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
@@ -368,7 +370,7 @@ theorem fkp_cap (FR : FORKRET) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc
 
 /-- **Rocq `park_token_intro`**: the cap above at `W := parkToken Γ`, and the
 residue's channel at the same `W`, tied into the fixpoint. -/
-theorem park_token_intro (FR : FORKRET) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+theorem park_token_intro (FR : FORKRET) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
     [FdslotG GF] [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF]
     [WchG GF] [Appcfg GF] [FileG GF] [Fscfg] [Icfg]

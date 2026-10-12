@@ -9,6 +9,8 @@ split out of `Xv6/FileDefs.lean` for the same reason: `IrefSlots` and
 -/
 import Xv6.KernelImage
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

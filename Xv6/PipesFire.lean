@@ -40,6 +40,8 @@ own short names are kept (`real`, `realP`, `realN`, `realT`, `upok`,
 -/
 import Xv6.PipeBothNPure
 
+noncomputable section
+
 namespace Xv6
 
 open Pline' PipeStage Wid

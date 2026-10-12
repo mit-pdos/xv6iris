@@ -39,6 +39,8 @@ A port of the Rocq prototype's TSO machine (`RiscvLang.mnode_step`,
 -/
 import LeanRV64D.Defs
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

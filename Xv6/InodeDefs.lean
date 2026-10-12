@@ -9,6 +9,8 @@ existing `Xv6.BSIZE` of `Xv6/DiskDefs.lean` rather than Rocq's
 -/
 import Xv6.DiskDefs
 
+noncomputable section
+
 namespace Xv6
 
 /-- The flat byte view of block-indexed file contents (Rocq's

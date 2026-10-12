@@ -80,6 +80,8 @@ the one field of `PipeProtoG` (a new xv6GF/unionGF slot, U4).
 -/
 import Xv6.PipeReg
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -93,7 +95,7 @@ abbrev PipeEofR : Type := Csum (Excl Unit) (Agree (DiscreteO (List (BitVec 8))))
 
 /-- THE PROTOCOL'S ONE NEW CAMERA (Rocq `pipeProtoG`'s `ppg_eof`); the other
 four components are shared cameras (header, "Camera classes"). -/
-class PipeProtoG (GF : BundledGFunctors) where
+class PipeProtoG (GF : BundledGFunctors.{0}) where
   [eofG : ElemG GF (constOF PipeEofR)]
 
 attribute [reducible, instance] PipeProtoG.eofG
@@ -134,7 +136,7 @@ theorem pipe_take_succ (L : List (BitVec 8)) (n : Nat) (h : n < L.length) :
   rfl
 
 section PipeProto
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
   [CtokG GF] [PipeProtoG GF]
 
 /-! ## 1.  The pieces -/

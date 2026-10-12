@@ -54,6 +54,8 @@ Deviations from Rocq (each forced by the Lean language, none by taste):
 -/
 import MachCSL.Lang
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris.ProgramLogic
@@ -830,7 +832,7 @@ theorem foldl_seg_era (seg κ : List Obs) (hκ : ∀ e ∈ κ, isIo e = true ∨
     have ih' := ih (segStep seg e) (fun e' he' => hκ e' (List.mem_cons_of_mem _ he'))
     simp only [List.foldl_cons]
     rw [ih']
-    cases e <;> first | (simp [isIo, isUser] at he; done) | simp [segStep, isIo]
+    cases e <;> first | (simp [isIo, isUser] at he; done) | simp [segStep, isIo, List.filter_cons]
 
 theorem openSeg_io (h κ : List Obs) (hκ : ∀ e ∈ κ, isIo e = true) :
     openSeg (h ++ κ) = openSeg h ++ κ := by

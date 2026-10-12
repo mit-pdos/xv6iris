@@ -62,6 +62,8 @@ import Xv6.SpecDirlookup
 import Xv6.SpecWritei
 import Xv6.SpecIput
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL LeanRV64D

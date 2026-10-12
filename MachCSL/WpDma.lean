@@ -44,7 +44,7 @@ theorem hartAgent_ne_diskAgent (c : CPU) : hartAgent c ≠ diskAgent := by
 theorem diskAgent_ne_hartAgent (c : CPU) : diskAgent ≠ hartAgent c :=
   (hartAgent_ne_diskAgent c).symm
 
-variable {hlc : HasLC} {GF : BundledGFunctors}
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}}
 
 /-! ## The mirrors under a DMA write -/
 

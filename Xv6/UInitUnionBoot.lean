@@ -57,7 +57,7 @@ open UShUPipes
 /-! ## A slot absorbs a `◇` (Rocq `uslot_except_0_u`) -/
 
 section Slot
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]
 
 /-- **Rocq `uslot_except_0_u`**: A SLOT ABSORBS A `◇`, because it ends in a
 `WP`. -/
@@ -78,7 +78,7 @@ end Slot
 /-! ## /init's exec bundle (Rocq `union_Hinit_boot_at`) -/
 
 section UnionInitBoot
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]

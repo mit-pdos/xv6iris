@@ -106,7 +106,7 @@ theorem gclPure_write_first (M : LModel) (sd : M.lmSt) (k : Nat) (ho : List Obs)
       exact List.eq_nil_of_length_eq_zero (by rw [hq]; rfl)
     · exact absurd ⟨hwnil, by rw [hEnil]; rfl⟩ hne
   refine ⟨hf0nil, hEnil, hwnil, hpsnil, hcsnil, ?_⟩
-  refine gclPure_out M sd k ho so _ H b (by rw [hcsnil]; exact Nat.le_refl _) (by rw [hEnil])
+  refine gclPure_out M sd k ho so _ H b (by rw [hcsnil]) (by rw [hEnil])
     ?_ ?_ ?_ ?_ hall0
   · refine ⟨?_, ?_, ?_, ?_, ?_, ?_, lmAltsPre_nil M s0 [], ?_, ?_, Nat.zero_le _, Or.inl rfl, ?_,
       ?_, hfok⟩
@@ -139,7 +139,7 @@ theorem gclPure_write_first (M : LModel) (sd : M.lmSt) (k : Nat) (ho : List Obs)
     rw [List.map_nil, linesBytes_nil]; exact Nat.zero_le _
 
 section write
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 
 /-- (W) THE ORDINARY WRITE (Rocq `gcl_step_write`): the writer's witness
 pins the state the stage reads, so the byte it computes from the stream is

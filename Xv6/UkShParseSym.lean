@@ -23,6 +23,8 @@ terminator a parameter; at `stop = len` it is exactly `UshpTokens`.
 -/
 import Xv6.UkShParsePure
 
+noncomputable section
+
 namespace Xv6
 
 /-! ## §1 The byte classes -/

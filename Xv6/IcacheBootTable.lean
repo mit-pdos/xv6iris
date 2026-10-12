@@ -161,6 +161,8 @@ import Xv6.IcacheBoxSites
 import Xv6.ArrCursor
 import MachCSL.BigSepLib
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -228,7 +230,7 @@ theorem slLk_iLock_ientry16 (k : Nat) :
   congr 1
 
 section Claims
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 theorem ientry_kmapId [CurCtx] (k m : Nat) (hk : k < NINODE) (hm : m < ISLOTSZ) :
     kmapStatic (GF := GF) ⊢ kmapId (ientry k + BitVec.ofNat 64 m) := by
@@ -287,7 +289,7 @@ end Claims
 /-! ### Choice: a big-op of existentials is one function of the index -/
 
 section IcacheBootTable
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [LogG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [LogG GF]
   [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcboxG GF] [SleepLockG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF]
 

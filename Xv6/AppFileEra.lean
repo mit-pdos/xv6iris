@@ -46,7 +46,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section AppFileEra
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF]
 
 /-- PHASE 1 at `AppInv.appStep`'s shape (Rocq `file_app_step_park`). -/
@@ -99,7 +99,7 @@ theorem fileAppStep_escrow [inst : Appcfg GF] (c : FileFixed) (r : FileAppNames)
   unfold appStep
   iintro %nd %hav Hp
   rw [hav]
-  imod (filePred_timeless (hlc := hlc) (GF := GF) c r (absView I)).timeless $$ Hp with Hp
+  imod (@timeless_except0 _ _ _ (filePred_timeless (hlc := hlc) (GF := GF) c r (absView I))).mp $$ Hp with Hp
   imod fileEscrow_step (hlc := hlc) c r (absView I) av' n s s' g hpins hab hpr hok
     $$ Hkey Htok Hty' Hre Hp with Hp
   imodintro
@@ -126,7 +126,7 @@ theorem fileResync [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed) (r : File
   subst heq
   ihave %hI := ghost_map_auth_agree _ _ _ _ _ $$ Hka Hh
   subst hI
-  imod (filePred_timeless (hlc := hlc) (GF := GF) c r (absView I')).timeless $$ Hp with Hp
+  imod (@timeless_except0 _ _ _ (filePred_timeless (hlc := hlc) (GF := GF) c r (absView I'))).mp $$ Hp with Hp
   unfold filePred
   icases Hp with (#Ht | ⟨%hpins, Hc, Hf, Hsy⟩)
   · -- TAINTED: the ticket comes back beside the taint
@@ -202,7 +202,7 @@ theorem fileEscrowPark [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed) (r : 
   unfold appBody
   icases Hbody with ⟨%I0, >Hka, Hp, >%hdom⟩
   subst heq
-  imod (filePred_timeless (hlc := hlc) (GF := GF) c r (absView I0)).timeless $$ Hp with Hp
+  imod (@timeless_except0 _ _ _ (filePred_timeless (hlc := hlc) (GF := GF) c r (absView I0))).mp $$ Hp with Hp
   unfold filePred
   icases Hp with (#Ht | ⟨%hpins, Hc, Hf, Hsy⟩)
   · imod Hclose $$ [Hka]
@@ -281,7 +281,7 @@ theorem fileEscrowReturn [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed) (r 
   unfold appBody
   icases Hbody with ⟨%I0, >Hka, Hp, >%hdom⟩
   subst heq
-  imod (filePred_timeless (hlc := hlc) (GF := GF) c r (absView I0)).timeless $$ Hp with Hp
+  imod (@timeless_except0 _ _ _ (filePred_timeless (hlc := hlc) (GF := GF) c r (absView I0))).mp $$ Hp with Hp
   unfold filePred
   icases Hp with (#Ht | ⟨%hpins, Hc, Hf, Hsy⟩)
   · imod Hclose $$ [Hka]
@@ -348,7 +348,7 @@ theorem filePosAdvance [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed) (r : 
   unfold appBody
   icases Hbody with ⟨%I0, >Hka, Hp, >%hdom⟩
   subst heq
-  imod (filePred_timeless (hlc := hlc) (GF := GF) c r (absView I0)).timeless $$ Hp with Hp
+  imod (@timeless_except0 _ _ _ (filePred_timeless (hlc := hlc) (GF := GF) c r (absView I0))).mp $$ Hp with Hp
   unfold filePred
   icases Hp with (#Ht | ⟨%hpins, Hc, Hf, Hsy⟩)
   · imod Hclose $$ [Hka]

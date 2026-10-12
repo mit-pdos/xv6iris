@@ -27,6 +27,8 @@ the first instruction of the chain formatting).
 import Xv6.VirtioDiskRwDefs
 import Xv6.PtOwnLemmas
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -67,7 +69,7 @@ theorem tk3_true (h m t : Nat) : tk3 h m t h = true ∧ tk3 h m t m = true ∧ t
 /-! ## A slot, with its `free` byte spelled out -/
 
 section slots
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 /-- The `free` byte a receipt implies. -/
 def freeByte : HState → BitVec 8
@@ -235,7 +237,7 @@ end slots
 /-! ## The payload, mid-allocation -/
 
 section payload
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 /-- **The lock's payload with the slots marked by `tk` taken out.**  At
 `tk = fun _ => false` it IS `Xv6.diskRes`. -/
@@ -369,7 +371,7 @@ end payload
 /-! ## The frame, split into the saved registers and `int idx[3]` -/
 
 section frame
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- The TEN saved-register cells of `virtio_disk_rw`'s frame: the twelve
 of `MachCSL.frame12s8` minus the two scratch ones that hold `int idx[3]`. -/
@@ -407,7 +409,7 @@ theorem tk3_eq (h m t : Nat) :
 /-! ## The two seams of P2 -/
 
 section seams
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 /-- **The head of the outer retry loop** (`virtio_disk_rw + 0xbc`): the
 P1 seam with the frame's two scratch cells already split into `idx[]`.

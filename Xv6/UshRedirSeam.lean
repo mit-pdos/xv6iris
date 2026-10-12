@@ -31,6 +31,8 @@ import Xv6.UkShRedirCut
 import Xv6.UkShMallocCap
 import Xv6.PipesCutSh
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -115,7 +117,7 @@ theorem ushs_nulcut_ref (len : Nat) (f : Nat → BitVec 8) (gp fe : Nat) (args :
   rw [ushZeroAt_snoc]; unfold ushsNulcut; rw [ushpNulfold_zeroAt]
 
 section UshRedirSeam
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 

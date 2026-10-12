@@ -28,6 +28,8 @@ Deviations from Rocq:
 -/
 import Xv6.EchoDisc
 
+noncomputable section
+
 namespace Xv6
 
 /-! ## §0 Small list and prefix facts -/

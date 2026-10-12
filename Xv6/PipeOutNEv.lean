@@ -36,6 +36,8 @@ import Xv6.PipeOutNSteps
 import Xv6.GenOutRead
 import Xv6.GenOutWriteBlk
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
@@ -62,7 +64,7 @@ theorem gclPureO_rd_stage (k : Nat) (ho : List Obs) (so : GStage M) (r : Nat)
   obtain ⟨_, _, _, hpsb, hpin, hcsb, _⟩ := hout
   obtain ⟨hq, hr, _⟩ := lmBlkOpen_cs M sd so r pre hop
   refine ⟨hpsb, hcsb, hpin, ?_⟩
-  rw [ll_nlines_removelast _ hr, hq]; exact Nat.le_refl _
+  rw [ll_nlines_removelast _ hr, hq]
 
 /-- THE READ, pure (Rocq `gcl_pure_o_read`). -/
 theorem gclPureO_read (k : Nat) (ho : List Obs) (so : GStage M) (r : Nat)
@@ -91,7 +93,7 @@ theorem popenV_filed (k : Nat) (ho : List Obs) (so : GStage M) (r : Nat)
 end OpenEventsPure
 
 section PipesEventsV
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [PipeOutG GF]
 
 theorem peclV_gen (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)

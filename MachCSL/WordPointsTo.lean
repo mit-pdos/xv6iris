@@ -8,12 +8,15 @@ Rocq prototype's `word_pointsto`), so an instruction rule takes the cell and
 nothing else: no client proves RAM membership or alignment at a memory access.
 -/
 import MachCSL.KMap
+import MachCSL.BvEnums -- `bv_decide`'s enum encodings, declared once
+
+noncomputable section
 
 namespace MachCSL
 
 open Iris Iris.BI Iris.ProofMode Std
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- The identity claim of a kernel address: its page maps to itself, read-write. -/
 abbrev kmapId [CurCtx] (va : BitVec 64) : IProp GF :=

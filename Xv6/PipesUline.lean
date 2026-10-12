@@ -21,6 +21,8 @@ word of any command.
 -/
 import Xv6.PipesDisc
 
+noncomputable section
+
 namespace Xv6
 
 open Pline'

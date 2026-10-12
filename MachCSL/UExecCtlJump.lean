@@ -21,6 +21,8 @@ is the data-level Boolean `uxcBTaken op a b` in the result state.
 import MachCSL.UExecCtlBase
 import MachCSL.UTranslate
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

@@ -23,6 +23,8 @@ the NUL-freeness facts are read off `toNat` (`decide`), where Rocq uses
 import Xv6.UnionDisc
 import Xv6.PipesView
 
+noncomputable section
+
 namespace Xv6
 
 open Pline' PLAlt Ualt

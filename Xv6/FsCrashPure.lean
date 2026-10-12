@@ -67,6 +67,8 @@ Rocq gunk: none of FsCrash.v's dead declarations (D36) fall in :1-1480.
 import Xv6.FsCrashSector
 import Xv6.FsImg
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.Std Std MachCSL

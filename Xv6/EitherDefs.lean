@@ -51,6 +51,8 @@ import Xv6.CodeTactics
 import Xv6.ProcPrivBare
 import MachCSL.WpSmodeFrame6
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -63,7 +65,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option maxRecDepth 8000
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx] [WchG GF]
 
 /-- **The block of the CURRENTLY RUNNING thread** (`FdTable.procPrivBareAt`
 at the ambient context, Rocq `proc_priv_bare` + the lazy claim): no context
@@ -164,7 +166,7 @@ end
 /-- At the kernel-page-table tier the contracts' bare block
 (`procPrivBareAt curCtx`, Rocq `proc_priv_bare` + the lazy claim) IS the
 ambient `procPrivExt` (by `rfl` once the ambient context is taken apart). -/
-theorem procPrivExt_conv {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [WchG GF] [X : CurCtx] (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32)
+theorem procPrivExt_conv {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [WchG GF] [X : CurCtx] (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32)
     (V : ProcPriv) (P : UPtd) (M : Nat → List (BitVec 8)) :
     procPrivBareAt (GF := GF) curCtx pa pid { V with upt := P } M ⊣⊢ procPrivExt pa pid V P M := by
   obtain ⟨ξ, t⟩ := X
@@ -173,7 +175,7 @@ theorem procPrivExt_conv {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   exact .rfl
 
 /-- ... at the block's own descriptor. -/
-theorem procPrivExt_conv0 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [WchG GF] [X : CurCtx] (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32)
+theorem procPrivExt_conv0 {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [WchG GF] [X : CurCtx] (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) :
     procPrivBareAt (GF := GF) curCtx pa pid V M ⊣⊢ procPrivExt pa pid V V.upt M := by
   obtain ⟨ξ, t⟩ := X
@@ -223,7 +225,7 @@ theorem ec_ret_2e0 : jumpPc (KA.«either_copyout» + 0x2c#64) = (KA.«either_cop
   decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-! ## The six-slot frame -/
 

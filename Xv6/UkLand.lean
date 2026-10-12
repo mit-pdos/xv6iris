@@ -12,6 +12,8 @@ closers take (`UkFinal`, `UkTrapLand` with `PC` at the handler).
 -/
 import Xv6.UkFrame
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

@@ -27,12 +27,14 @@ The real instance, from `UkRun.urun` and `UK_LEAVES`, is
 import Xv6.UlibRun
 import Xv6.UmodeAbi
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL LeanRV64D
 
 section
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- **The free stack's words** (UserHeap `ustackBody`): the `k` words below
 `s`, values existential. -/
@@ -51,7 +53,7 @@ theorem ulibWords_zero (L : UlibRun GF) (s : Nat) : ulibWords L s 0 ⊣⊢ emp :
 end
 
 /-- **The run interface of the printf cone** (see the header). -/
-structure UlibRunP (GF : BundledGFunctors) extends UlibRun GF where
+structure UlibRunP (GF : BundledGFunctors.{0}) extends UlibRun GF where
   /-- Rocq `utext γt a b`: a text byte. -/
   utextB : Nat → BitVec 8 → IProp GF
   utextB_persistent : ∀ a b, Persistent (utextB a b)
@@ -117,7 +119,7 @@ structure UlibRunP (GF : BundledGFunctors) extends UlibRun GF where
 attribute [instance] UlibRunP.utextB_persistent
 
 section
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 theorem ulibRange_set_self (n j : Nat) : (List.range n).set j j = List.range n := by
   apply List.ext_getElem?

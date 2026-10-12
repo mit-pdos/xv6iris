@@ -124,6 +124,8 @@ import Xv6.FsStateEraPure
 import Xv6.PathElems
 import Xv6.FsStateTop
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -196,7 +198,7 @@ theorem umStartOf_rel (rt cw : Nat) (pl : List (BitVec 8)) (h : pl[0]? ≠ some 
 /-! ## The hop family, generically (deviation 4) -/
 
 section Hops
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- PEEL THE HEAD HOP (the common proof of Rocq's `ex_hops_cons` /
 `ep_hops_cons`). -/
@@ -247,7 +249,7 @@ theorem axHops_triv (rt : Nat) (F : Nat → DFrac → Std.ExtTreeMap Fname Nat c
 end Hops
 
 section FsAbsEra
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF]
 
 /-! ## 1.  The lend -/
 

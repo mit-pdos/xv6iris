@@ -18,7 +18,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Std MachCSL LeanRV64D
 
 section
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- **Rocq `wp_kcat_vprintf_pro`** at `base`. -/
 theorem ulibVprintf_pro (L : UlibRunP GF) (base : BitVec 64) (hb : base.toNat % 2 = 0) (a len : Nat)

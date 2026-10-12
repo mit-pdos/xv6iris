@@ -60,6 +60,8 @@ Imports only definitional files.
 -/
 import Xv6.SlotGen
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -78,7 +80,7 @@ theorem occBit_of_ne {st : BitVec 32} (h : st ≠ UNUSED) : occBit st = true := 
 /-! ## The raw ghost (names only) -/
 
 section Raw
-variable {GF : BundledGFunctors} [WchG GF]
+variable {GF : BundledGFunctors.{0}} [WchG GF]
 
 /-- The ledger's authoritative history. -/
 def slotLedAuth (h : List Sev) : IProp GF := WchG.wslName GF ↪●ML h
@@ -159,7 +161,7 @@ theorem soAuth_full (h : List Sev) (act : BitVec 64) (k0 : Nat) :
 end Raw
 
 section Rows
-variable {GF : BundledGFunctors} [WchGpre GF]
+variable {GF : BundledGFunctors.{0}} [WchGpre GF]
 
 /-- THE BOOT ROWS: one element per slot at `false`, keyed by the slot's
 address, installed into a raw authority over the first `n` slots. -/
@@ -208,7 +210,7 @@ end Rows
 /-! ## The invariant, the element, the receipt -/
 
 section Inv
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [WchG GF]
 
 /-- **THE SLOT-OCCUPANCY LEDGER'S INVARIANT.** -/
 def slotLedInv : IProp GF := inv slotN (slotLedBody (GF := GF))

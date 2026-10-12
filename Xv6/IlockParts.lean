@@ -35,6 +35,8 @@ import Xv6.IcacheRefDefs
 import Xv6.InodeInv
 import Xv6.SpecPanic
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -82,7 +84,7 @@ def ilMsgStr : List (BitVec 8) :=
    0x74#8, 0x79#8, 0x70#8, 0x65#8]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 set_option maxRecDepth 100000 in
 /-- Rocq's `il_msg_str`. -/

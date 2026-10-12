@@ -35,6 +35,8 @@ import Xv6.SpecShSysExec
 import Xv6.UshMainStubs
 import Xv6.UshRedirArm
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -59,7 +61,7 @@ theorem ushR_usysno (m : RegMap) (v : BitVec 64) :
   rw [ukWr_ne0 _ _ _ (by decide), RegMap.set_same]
 
 section UshRunWalk
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 

@@ -28,6 +28,8 @@ applies to them verbatim.
 -/
 import LeanRV64D.Defs
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

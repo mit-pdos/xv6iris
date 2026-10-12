@@ -211,6 +211,7 @@ import MachCSL.UMemRam
 import MachCSL.UMemAccess
 import MachCSL.UMemStore
 import MachCSL.BvEnumSatp
+import MachCSL.BvEnums
 import MachCSL.UMemMisPlan
 import MachCSL.UMemMisBytes
 import MachCSL.UMemMisLoop

@@ -124,6 +124,8 @@ Everything of `Xv6/IcacheBox.lean`; `ipoolTakeLend`
 import Xv6.IcacheBox
 import Xv6.IcacheEscrowPoolMove
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -131,7 +133,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 /-! ## THE SITES (R3's map), as statements over CtxBox's transitions -/
 
 section IcacheBoxSites
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [LogG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [LogG GF]
   [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcboxG GF]
 
 /-- iget's RECYCLE, part 1 -- (a) at `c = 0` on a DEAD slot: the raw header
@@ -157,7 +159,7 @@ theorem icRecycleWithdraw [Icfg] [CurCtx] (cpu : CPU) (cn : IcNames) (γfs : FsN
   imod stampsFrag_empty (GF := GF) (Id := IcBid) (icfgBox k) with Hf0
   imod boxWithdrawL1 (icBoxPay cn γfs γi cov logstart k) (ndot icBoxN k) (icfgBox k) cpu ξ
       ⟨td, false, none, rx⟩ 0 ∅ Kd 0 E (nclose_subseteq' k hE) rfl
-      (by rw [qsum_empty]; rfl) hKd (by rw [maxStamp_empty]; exact Nat.le_refl 0)
+      (by rw [qsum_empty]; rfl) hKd (by rw [maxStamp_empty])
       $$ [Hrun Hrd Hc Hf0 Hqr] with ⟨Hrun, Hc, %x0, %T0, %hT0, Hrd, Hhdr⟩
   · isplitr
     · iexact Hbox

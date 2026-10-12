@@ -17,6 +17,8 @@ Deviations from Rocq:
 -/
 import Xv6.FileDisc
 
+noncomputable section
+
 namespace Xv6
 
 /-! ## S2  THE BYTE LAYOUTS AROUND A NAME OF ANY LENGTH -/

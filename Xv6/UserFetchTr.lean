@@ -22,6 +22,8 @@ Hypothesis: the table's user leaves are VALID (`UftLeavesValid`, Rocq
 -/
 import Xv6.UserFetchLeaf
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

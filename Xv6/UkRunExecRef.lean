@@ -38,6 +38,8 @@ bumped key is the continuation at `a0 := -1`, `pc + 4`, closed by
 -/
 import Xv6.UkRunLeaf
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -50,7 +52,7 @@ theorem usysExec_ne_fork : USYS_exec ≠ USYS_fork := by unfold USYS_exec USYS_f
 theorem usysExec_ne_wait : USYS_exec ≠ USYS_wait := by unfold USYS_exec USYS_wait; decide
 
 section UkRunExecRef
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 

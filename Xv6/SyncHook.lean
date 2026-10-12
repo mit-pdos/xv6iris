@@ -15,12 +15,14 @@ them everywhere (`riscv_sync_tok gen_id`, `riscv_sync_hook gen_id`):
 -/
 import MachCSL.Resources
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI MachCSL
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- The era's sync token (Rocq `riscv_sync_tok gen_id`). -/
 abbrev eraSyncTok : IProp GF :=
@@ -33,7 +35,7 @@ abbrev eraSyncHook (Q : IProp GF) : IProp GF :=
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF]
 
 /-- Rocq `hook_opt`: at `none` the unit (the dispatcher's own arm 22, a
 program that deposits no hook); at `some Q` the era's hook at `Q`, fired

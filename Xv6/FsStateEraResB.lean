@@ -105,6 +105,8 @@ included, so a zero is a hard zero):
 import Xv6.FsStateInodeOwned
 import Xv6.FsStateEraPure
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -326,7 +328,7 @@ theorem dirEntries_dirlinkNopEq (dn dn' : Dinode) (bm bm' : Blkmap)
   · exact dirView_dataExt data' data _ (fun x _ => hbytes x)
   · rfl
 
-variable {GF : BundledGFunctors} [FsLinkG GF]
+variable {GF : BundledGFunctors.{0}} [FsLinkG GF]
 open FsStateLink
 
 /-- ...and the node-level move: one token IN, at the name the record now

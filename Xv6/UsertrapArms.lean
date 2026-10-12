@@ -27,7 +27,7 @@ set_option linter.unusedSimpArgs false
 /-! ## §1 Pure facts -/
 
 section Pure
-variable {GF : BundledGFunctors} [CtokG GF] [UexecSG GF]
+variable {GF : BundledGFunctors.{0}} [CtokG GF] [UexecSG GF]
 
 /-- A device cause is not the ecall. -/
 theorem utA_sCause_ne (sc : BitVec 64) (h : sCauseOk sc) : sc ≠ uecallScause := by
@@ -52,7 +52,7 @@ end Pure
 /-! ## §2 The kill rows -/
 
 section KillRows
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [WchG GF]
     [CurCtx]
 
 /-- Off the ecall the kill deposit is the additive pair. -/
@@ -80,7 +80,7 @@ theorem utA_killOut_slot (sc : BitVec 64) (W : Uvis) (hne : sc ≠ uecallScause)
 end KillRows
 
 section Own
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -107,7 +107,7 @@ theorem utA_ea_kexit : KA.«usertrap» + 18446744073709550156#64 = KA.«kexit» 
 theorem utA_ea_ret : jumpPc (KA.«usertrap» + 0xf0#64) = KA.«usertrap» + 0xf0#64 := by decide
 
 section EA
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]

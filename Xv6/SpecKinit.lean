@@ -36,6 +36,8 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 import MachCSL.LockBornHook
 import Xv6.SpecFreerange
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -52,7 +54,7 @@ def kinitPages : Nat := 32732
 def kmemNameAddr : BitVec 64 := KStr.«kmem»
 
 /-- The specification of `kinit`. -/
-def wp_kinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_kinit_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (vlock : BitVec 32) (vname vcpu : BitVec 64)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 22 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
     (hp0 : k.proc = 0#64) : Prop :=
@@ -76,7 +78,7 @@ def wp_kinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
 
 /-- The interface of `kinit`. -/
 structure KINIT : Prop where
-  wp_kinit : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_kinit : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γl : GName) (γk : KmemNames) (vlock : BitVec 32) (vname vcpu : BitVec 64) hnoff hK hlk hp0,
     wp_kinit_body (hlc := hlc) (GF := GF) cpu k γl γk vlock vname vcpu hnoff hK hlk hp0
 

@@ -24,7 +24,7 @@ namespace Xv6
 open Iris MachCSL
 
 section
-variable {GF : BundledGFunctors} [CtokG GF] [UexecSG GF]
+variable {GF : BundledGFunctors.{0}} [CtokG GF] [UexecSG GF]
 
 theorem ut_sysNum_raw (sep : BitVec 64) (V : ProcPriv) :
     usysNum (utSysRec sep V).tf = usysNum (utProTf sep V) := by

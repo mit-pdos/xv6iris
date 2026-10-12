@@ -48,13 +48,13 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 set_option linter.unusedSimpArgs false
 
-theorem frd_ctx_entry {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+theorem frd_ctx_entry {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (c : CPU) (k : KCtx) (R0 R : RegMap) :
     kctx (GF := GF) c (((k.withRegs R0).pushed 6).withRegs R) ⊢
       kctx c (((k.withSpie k.spie k.spp).pushed 6).withRegs R) := .rfl
 
 section Frame
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 set_option maxHeartbeats 4000000 in
 /-- The lazy spills `sd s1,24(sp) ; sd s3,8(sp)` at `+0x10`. -/
@@ -84,7 +84,7 @@ theorem frd_spill2 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
 end Frame
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]

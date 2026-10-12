@@ -47,6 +47,8 @@ ported either (nothing uses them).
 import Xv6.UexecExecInst
 import Xv6.UkRun
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -62,7 +64,7 @@ theorem argZ_setWidth (v : BitVec 64) : argZ v = (BitVec.setWidth 32 v).toInt :=
 /-! ## §1 THE TWO FAMILIES -/
 
 section Fam
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- **Rocq `xfam_rd`**: THE CONSOLE / STANDARD-STREAM MEMBER -- `rRd` is what
 the caller asks to be told about the cursor the call ran at, `rRin` about
@@ -81,7 +83,7 @@ end Fam
 /-! ## §2 THE PAIR, §3 the descriptor the call runs on -/
 
 section Rows
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg]
 
 local notation "SGX" => uexecSGXv6 (hlc := hlc)
@@ -124,7 +126,7 @@ theorem ufd_fd_st_of_key (v0 : BitVec 64) (fdv : List FdState) (fd : Nat) (st : 
 /-! ## §3b THE STATE-FIXED DEPOSIT, AND THE HANDLE'S AGREEMENT -/
 
 section StateFixed
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -158,7 +160,7 @@ theorem uread_count_is_cap (w : BitVec 64) (cap : Nat) (hu : w.toNat = cap) (hlt
 restores them -/
 
 section PostRows
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg]
 
 local notation "SGX" => uexecSGXv6 (hlc := hlc)
@@ -198,9 +200,9 @@ end PostRows
 row-16 post readings, a parameter until `UexecExecInst.xpostRead` /
 `xpostWrite` carry `proc_pt_wf` / `lazy_free` again. -/
 structure UK_POST_ROWS : Prop where
-  rd : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+  rd : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
     [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg], ukPostRd (hlc := hlc) (GF := GF)
-  wr : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+  wr : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
     [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg], ukPostWr (hlc := hlc) (GF := GF)
 
 /-- **`UK_POST_ROWS` HOLDS** (lane runsys): the kernel's row-5 / row-16 posts
@@ -213,7 +215,7 @@ theorem ukPostRows_holds : UK_POST_ROWS where
     rw [spostAt_xv6_write]; exact .rfl
 
 section PostElim
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg]
 
 local notation "SGX" => uexecSGXv6 (hlc := hlc)

@@ -21,6 +21,8 @@ pays grep's tree holes (`UkTree`) and is H-tree's to unblock.
 -/
 import Xv6.UkGrepDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -58,7 +60,7 @@ theorem grepGlRegs_keep (W : List Nat) (m0 : RegMap) (sp0 : BitVec 64) (ar : Nat
     (e 25#5 (by decide)).trans g7, (e 26#5 (by decide)).trans g8, (e 27#5 (by decide)).trans g9⟩
 
 section Heap
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
 
 /-- **Rocq `ubytes_open3`**: THE BUFFER, in three runs. -/
 theorem grepUbytes_open3 (γd : GName) (a x y z : Nat) (F : Nat → BitVec 8) :
@@ -194,7 +196,7 @@ def grepGframe (γd : GName) (sp0 : BitVec 64) (m0 : RegMap) : IProp GF :=
 end Heap
 
 section Walks
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 

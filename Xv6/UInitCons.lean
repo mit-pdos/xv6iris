@@ -63,6 +63,8 @@ import Xv6.SpecSysMknod
 import Xv6.AppEcho
 import Xv6.FileDiscLine
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -151,7 +153,7 @@ theorem init_cons_open_fd (vom : BitVec 64) (sts : List FdState) (r : BitVec 64)
 /-! ## §5-§9  THE LAWS (statements over the ambient record) -/
 
 section Laws
-variable {GF : BundledGFunctors} [DiskG GF] [Appcfg GF]
+variable {GF : BundledGFunctors.{0}} [DiskG GF] [Appcfg GF]
 
 /-- **Rocq `init_cons_pin_law`**: THE LINEAR CLAIM LAW, generalised over the
 fact the credential pins (lane E2): holding `K`, every view the claim holds
@@ -254,7 +256,7 @@ end Laws
 /-! ## §6  THE MKNOD'S FOUR FAMILIES -/
 
 section Fams
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- **Rocq `init_mk_Farm`**: the permit's payload (the claim's pure half and
 the credential's reading at the arm's own view, and the key), refunding the
@@ -303,7 +305,7 @@ end Fams
 /-! ## §3-§6  THE BUNDLES -/
 
 section UInitCons
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]

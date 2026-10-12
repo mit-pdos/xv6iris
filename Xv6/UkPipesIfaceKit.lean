@@ -51,6 +51,8 @@ them); nothing else in these sections is unreached.
 import Xv6.UkPipesIfaceDefs
 import Xv6.PipeOutNFam
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -58,7 +60,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 /-! ## §2 The round (deviation 1) -/
 
 /-- **Rocq `UkPipesIface`'s section context (data)**. -/
-structure PnsRound (hlc : HasLC) (GF : BundledGFunctors) [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF]
+structure PnsRound (hlc : HasLC) (GF : BundledGFunctors.{0}) [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF]
     [EchoOutG GF] where
   /-- THE ROUND'S CLAIM: its names, a line model with a pipeline view, the
   claim's parameters, a default state, its state witness -/
@@ -83,7 +85,7 @@ structure PnsRound (hlc : HasLC) (GF : BundledGFunctors) [MachGS hlc GF] [Xv6G G
   γm : Wid → GName
 
 section Round
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF]
 variable (R : PnsRound hlc GF)
 
 /-- Rocq `T`: the claim's taint. -/
@@ -103,7 +105,7 @@ abbrev PnsRound.WITN : Bool → List (BitVec 8) → Prop := pwitV R.M R.I R.sR
 end Round
 
 /-- **Rocq `UkPipesIface`'s section hypotheses** (deviation 1). -/
-structure PnsRoundOk {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF]
+structure PnsRoundOk {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF]
     [EchoOutG GF] [PipesNG GF] (R : PnsRound hlc GF) : Prop where
   /-- Rocq `Hext` -/
   hext : ∀ k l, R.WA.gext k l = pext R.g k l
@@ -125,7 +127,7 @@ structure PnsRoundOk {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   dep_tl : ∀ w s, Timeless (R.dep w s)
 
 section Kit
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF]
   [PipesNG GF]
 variable (R : PnsRound hlc GF)
 

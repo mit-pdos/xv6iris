@@ -44,6 +44,8 @@ import Xv6.SpecPlicinithart
 import MachCSL.LockFacts
 import MachCSL.WpSmodeFenceFloor
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -68,7 +70,7 @@ theorem ms_slots (k : KCtx) (hK : mainSecondarySlots ≤ k.avail) :
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-- `cpuid`'s contract at the call site (interrupts off). -/
 theorem ms_call_cpuid (CI : CPUID) [CurCtx] (cpu : CPU) (k' : KCtx)
@@ -354,7 +356,7 @@ end
 /-! ## The per-hart init and the join into `scheduler` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
   [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
 
 theorem ms_trapinithart_br : KA.«main» + 5750#64 = KA.«trapinithart» := by decide

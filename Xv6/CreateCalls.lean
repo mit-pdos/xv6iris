@@ -41,7 +41,7 @@ theorem create_name_addr (sp : BitVec 64) :
   unfold createBuf; rfl
 
 section Tx
-variable {GF : BundledGFunctors} [Xv6G GF] [LogG GF] [FsLinkG GF] [FsTopG GF]
+variable {GF : BundledGFunctors.{0}} [Xv6G GF] [LogG GF] [FsLinkG GF] [FsTopG GF]
 
 /-- The transaction element's join (Rocq's `log_tx_join_q`). -/
 theorem create_tx_join [Icfg] (t : Nat) (q q1 q2 : Qp) (hq : q = q1 + q2) :
@@ -53,7 +53,7 @@ theorem create_tx_join [Icfg] (t : Nat) (q q1 q2 : Qp) (hq : q = q1 + q2) :
 end Tx
 
 section Bare
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [WchG GF]
 
 /-- **The bare block's pid cell** (Rocq's `Hppid` / `proc_priv_bare_acc`,
 the `namexEra_core_rows` shape at the bare block): at the ambient context
@@ -78,7 +78,7 @@ theorem create_bare_pid [X : CurCtx] (hct : X.curTier = KTier.kpt) (pa : BitVec 
 end Bare
 
 section Env
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]

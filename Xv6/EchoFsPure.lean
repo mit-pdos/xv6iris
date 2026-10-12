@@ -11,6 +11,8 @@ is a `Prop` and the predicate embeds it.
 import Xv6.FsShPin
 import Xv6.FsEchoPin
 
+noncomputable section
+
 namespace Xv6
 
 /-- Rocq `echo_fs_pure`. -/

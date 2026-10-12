@@ -143,6 +143,8 @@ import Xv6.SpecSysExec
 import Xv6.SpecFetchaddr
 import Xv6.SysMknodFrame
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -197,7 +199,7 @@ theorem sys_exec_argv_al (sp0 : BitVec 64) (hal : sp0.toNat % 8 = 0) :
 /-! ## §1.  THE FRAME: 480 bytes, SIXTY slots -/
 
 section Frame
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {lent : Bool}
 
 /-- Slots 1 and 2: `ra` and `s0`, spilled by the prologue. -/
@@ -420,7 +422,7 @@ end Frame
 /-! ### The prologue and the epilogue -/
 
 section Code
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {lent : Bool}
 
 set_option maxHeartbeats 4000000 in
@@ -576,7 +578,7 @@ theorem sysExecPins_exit (k : KCtx) (R : RegMap) (h : sysExecPinsE k R) :
 /-! ### THE JOIN POINT `+0x104` -/
 
 section Exit
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 set_option maxHeartbeats 8000000 in
 /-- **THE JOIN POINT `+0x104`** (Rocq `sx_epilogue`): every exit arrives here
@@ -837,7 +839,7 @@ abbrev sysExecV2 (A : SysExecArgs) (P : UPtd) (kv : Nat) : ProcPriv := { A.V.upd
 abbrev sysExecM2 (A : SysExecArgs) (P : UPtd) : Nat → List (BitVec 8) := viewFaulted A.V.upt P A.M
 
 /-- The AU side of the contract (only the break and the seal read it). -/
-structure SysExecAU (GF : BundledGFunctors) where
+structure SysExecAU (GF : BundledGFunctors.{0}) where
   sts : List FdState
   gn : GName
   cs : Std.ExtTreeSet GName compare
@@ -848,7 +850,7 @@ structure SysExecAU (GF : BundledGFunctors) where
   Fo : Pfam GF (Aview → Nat → Anode → IProp GF)
 
 section Vocab
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -959,7 +961,7 @@ end Vocab
 instantiated at the vector the walk built** -- the walk piece narrows at the
 ONE path argstr fetched, the slot piece at that path and argument vector
 (its refund untouched, `pfAt_mono`). -/
-theorem sysExecAuPre_at {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF]
+theorem sysExecAuPre_at {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF]
     [FsBytesG GF] [Appcfg GF] [CtokG GF]
     (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (secc : BitVec 64)
     (Q : Int → IProp GF) (P Pmiss : Nat → Nat → IProp GF)
@@ -1003,7 +1005,7 @@ spie spp).pushed 60).withRegs R)`.
 The epilogue at +0x104 is `sys_exec_exit` (§1, proved here). -/
 
 section Bodies
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -1228,7 +1230,7 @@ of the returns into the contract's `sysExecArms`.  The seal
 (`ProofSysExec`) instantiates it at the proved bodies. -/
 
 section Compose
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]

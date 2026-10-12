@@ -20,6 +20,8 @@ import Xv6.BreadTail
 import Xv6.BcacheLock
 import Xv6.VirtioDiskRwDefs3
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -56,7 +58,7 @@ theorem bdOther_set (R0 R : RegMap) (h : bdOther R0 R) (i : BitVec 5) (v : BitVe
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] <;> assumption
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
 variable [SleepLockG GF] [DiskG GF] [CurCtx]
 
 set_option maxHeartbeats 8000000 in

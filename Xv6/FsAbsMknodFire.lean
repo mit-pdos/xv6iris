@@ -99,6 +99,8 @@ Rocq's header, kept because the reasons are the content:
 import Xv6.FsAbsEra
 import Xv6.FsAbsCreateNm
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -132,7 +134,7 @@ theorem mkfParent_row (dn dn' : Dinode) (bm bm' : Blkmap) (data data' : Nat → 
 /-! ## 3.  The read-only fire point, `ftopN` opened and closed -/
 
 section MknodFire
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [FsTopG GF] [FsBytesG GF]
 
 /-- THE READ-ONLY FIRE, at create's dirlookup(found) under the parent's lock
@@ -199,7 +201,7 @@ passes its block's `rti` and `cwi`); the hops are at `rt` too
 (`FsAbsWalk.axHop`'s self rule). -/
 
 section EraMknod
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
 
 /-- THE PARENT-PREFIX ONE-SHOT (Rocq's `npar_walk_pre_era`): one fupd,
 universally quantified over the fetched string, yielding the cursor at the
@@ -245,7 +247,7 @@ contract (`SpecNparEra`) consumes and produces.  Rocq's reading, kept:
 Rocq's `np_rootino_agree` is DROPPED (header deviation 7). -/
 
 section NparMknod
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
 
 /-- Rocq's `np_elems_is_mknod_parent_elems`. -/
 theorem npElems_is_nparElems (pl : List (BitVec 8)) : npElems pl = nparElems pl := rfl
@@ -339,7 +341,7 @@ theorem cafMade_row (ty major minor : BitVec 16) (bm : Blkmap) (data : Nat → L
 /-! ### 7.3  The success fire, fused with the parent-row retag -/
 
 section CreateFire2
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [FsTopG GF] [FsBytesG GF] [Appcfg GF]
 
 /-- THE SUCCESS FIRE, FUSED WITH THE PARENT-ROW RETAG (Rocq's

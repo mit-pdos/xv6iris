@@ -68,6 +68,8 @@ kept.)
 -/
 import Xv6.FileDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
@@ -75,7 +77,7 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 /-! ## 1.  The held half -/
 
 section UserOffHeld
-variable {GF : BundledGFunctors} [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [OffboxG GF]
 
 /-- THE PROGRAM'S OFFSET (Rocq's `uoff`).  A `Nat`, because every consumer
 of a file position is stated at `Nat`; the ghost's `Int` is an encoding
@@ -154,7 +156,7 @@ end UserOffHeld
 /-! ## 2.  The supplier: what a fire needs of the user side -/
 
 section UserOffSupply
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [OffboxG GF]
 
 /-- THE ONE-WAY DOOR (Rocq's `uoff_park`).  There is no converse:
 `offUserInv` is persistent. -/

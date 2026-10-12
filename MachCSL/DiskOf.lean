@@ -15,6 +15,8 @@ the hart, UART and PLIC rules frame it through their own
 -/
 import MachCSL.Lang
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

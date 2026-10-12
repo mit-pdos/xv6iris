@@ -106,6 +106,8 @@ Nothing dropped; everything not listed as ported is DEFERRED above.
 import Xv6.FsAbsMknodFire
 import Xv6.FdTable
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -151,7 +153,7 @@ theorem omRdwr_plain (v : BitVec 64) (h : omArg v = 2) :
 /-! ## 2.  The commits -/
 
 section OpenDefs
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF]
 
 /-! ### 2a.  The observation commit (single-phase, read-only, at the map) -/
 
@@ -255,7 +257,7 @@ still threaded through the proof; the K6-B re-spec folds it back here, at
 Rocq's position.) -/
 
 section TruncPermit
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [Appcfg GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [Appcfg GF]
 
 /-! ### The keyed commit -/
 
@@ -299,7 +301,7 @@ end TruncPermit
 /-! ### The cursor permits (plain surface: the terminal; O_CREATE: the tie) -/
 
 section TruncCursor
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- Rocq `trunc_term_at`: THE PLAIN SURFACE'S PERMIT, the walk's terminal
 cursor, bare at the ONE-PATH tier. -/
@@ -358,7 +360,7 @@ end TruncCursor
 /-! ### The O_CREATE surface's permit -/
 
 section TruncPermitOf
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [Appcfg GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [Appcfg GF]
 
 /-- Rocq `trunc_permit_of`: the tie beside the DISJUNCTION create's two arms
 pay from -- the FRESH run's fired create receipt, or the EXISTS run's fired
@@ -645,7 +647,7 @@ end TruncPermitOf
 /-! ## 2c.  The walk package (full path; the era hops; quantified start) -/
 
 section OpenWalk
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
 
 /-- ONE SHOT, instantiated by the walk at the string argstr fetched and at
 the inum it starts from (Rocq's `namei_walk_pre_era`):
@@ -821,7 +823,7 @@ def openFdRcpt (rb wb : Bool) (t : FdType) (sts : List FdState) (r : BitVec 64)
 /-! ## 2e.  The descriptor story (the kernel's half; deviation 9) -/
 
 section OpenFd
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF]
   [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 

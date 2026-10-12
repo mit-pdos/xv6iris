@@ -23,6 +23,8 @@ lanes'; `HfpProgP`'s temporary `echoNodeImg` folded into it).
 -/
 import Xv6.UshEchoPure
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

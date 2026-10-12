@@ -39,6 +39,8 @@ import Xv6.PlicPlan
 import Xv6.UartInv
 import MachCSL.WpWire
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -241,7 +243,7 @@ def plicNames (γ0 γ1 : UartNames) (i : Nat) : UartNames := if i = 10 then γ0 
 @[simp] theorem plicNames_12 (γ0 γ1 : UartNames) : plicNames γ0 γ1 12 = γ1 := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-- What a pending, unclaimed source hands its handler: the port's receive
 token.  (Nothing, for a source the invariant does not track.) -/
@@ -571,7 +573,7 @@ theorem plic_write_au (γ0 γ1 : UartNames) (off : Nat) (v : BitVec 32) (f : Pli
   iexists p
   iframe Hfrag
   isplit
-  · ipureintro; rw [hx]; rfl
+  · ipureintro; exact Option.isSome_iff_exists.mpr ⟨_, hx⟩
   inext
   iintro %p'' %hwr Hfrag
   obtain rfl : f p = p'' := Option.some.inj (hx.symm.trans hwr)
@@ -653,7 +655,7 @@ theorem plic_claim_au (γ0 γ1 : UartNames) (hrt : Nat) (hh : hrt < NCPU) :
   iexists p
   iframe Hfrag
   isplit
-  · ipureintro; rw [hx]; rfl
+  · ipureintro; exact Option.isSome_iff_exists.mpr ⟨_, hx⟩
   inext
   iintro %w %p' %hrd Hfrag
   obtain ⟨rfl, rfl⟩ := Prod.mk.inj (Option.some.inj (hx.symm.trans hrd))
@@ -709,7 +711,7 @@ theorem plic_complete_au (γ0 γ1 : UartNames) (hrt : Nat) (hh : hrt < NCPU) (w 
   iexists p
   iframe Hfrag
   isplit
-  · ipureintro; rw [hx]; rfl
+  · ipureintro; exact Option.isSome_iff_exists.mpr ⟨_, hx⟩
   inext
   iintro %p'' %hwr Hfrag
   obtain rfl : Plic.complete p w.toNat = p'' := Option.some.inj (hx.symm.trans hwr)

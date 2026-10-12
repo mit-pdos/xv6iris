@@ -37,13 +37,15 @@ Rocq `UserExec.user_step_obligation(_active)`/`wp_user_exec`,
 import Xv6.UserStepActive
 import Xv6.UserStepWait
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open Sail LeanRV64D LeanRV64D.Functions
 
 section loop
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- **Rocq `user_step_obligation`**. -/
 def ustStepObligation (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp GF) : IProp GF :=

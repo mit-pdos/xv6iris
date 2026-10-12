@@ -43,13 +43,13 @@ theorem fsbN_sub_crash : (↑fsbN : CoPset) ⊆ ⊤ \ ↑crashN := by
   rw [CoPset.in_diff]
   exact ⟨CoPset.subseteq_top p hp, fun hc => hd p ⟨fsbN_logN p hp, hc⟩⟩
 
-theorem pFsComp_unfold {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [Xv6G GF]
+theorem pFsComp_unfold {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [Xv6G GF]
     [FsLinkG GF] [FsTopG GF] (G : GName → IProp GF) (cov : ExtTreeSet Nat compare) (ls : Nat) :
     pFsComp (hlc := hlc) G cov ls ⊣⊢ iprop(∃ gt : GName, pFsAnyAt (hlc := hlc) gt cov ls ∗ G gt) :=
   .rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx] [FsLinkG GF] [FsTopG GF]
 
 /-- **THE GHOST COMMIT** (Rocq `log_ghost_commit`): a `wpHart cpu m -∗

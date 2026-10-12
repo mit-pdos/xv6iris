@@ -25,6 +25,9 @@ import Xv6.FsStateBitmap
 import Xv6.FsWords
 import Xv6.KmemTier
 import Xv6.PtRunLemmas
+import MachCSL.BvEnums -- `bv_decide`'s enum encodings, declared once
+
+noncomputable section
 
 namespace Xv6
 
@@ -62,7 +65,7 @@ theorem pageRw_of_pageValid (p : BitVec 64) (hb : pageValid p) : pageRw p := by
   · unfold ramEnd; omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-! ## A zeroed page window, as the raw context bytes a DMA lease is made of -/
 
@@ -113,7 +116,7 @@ theorem vdi_zbuf [CurCtx] (a : BitVec 64) (n : Nat)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 variable {lent : Bool}
 
 /-! ## The two MMIO instruction rules, with the identity claim supplied -/
@@ -164,7 +167,7 @@ end
 /-! ## The three callees, at this hart -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 set_option maxHeartbeats 1000000 in
 /-- `initlock`'s contract as a rule, with the lock and name pointers named. -/
@@ -194,7 +197,7 @@ theorem vdi_initlock_call (IL : INITLOCK) [CurCtx] (c : CPU) (k' : KCtx) (hsie :
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 set_option maxHeartbeats 1000000 in
 /-- `kalloc`'s contract as a rule (interrupts off, so `SPIE`/`SPP` come back
@@ -248,7 +251,7 @@ end
 /-! ## Carving the three zeroed pages into the device's windows -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- The head of a replicated buffer splits off (at the page's base). -/
 theorem vdi_bb_cut0 (p : BitVec 64) (c : BitVec 8) (m n tot : Nat) (htot : tot = m + n) :
@@ -440,7 +443,7 @@ end
 /-! ## The two halves of `disk.desc`, which the driver reads with two `lw`s -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 theorem vdi_nth_lo (w : BitVec 64) (j : Nat) (hj : j < 4) :
     nthByte (n := 4) (BitVec.extractLsb' 0 32 w) j = nthByte (n := 8) w j := by
@@ -702,7 +705,7 @@ theorem vdi_read_qnummax (st qn : BitVec 32) (rdy : Bool) (d a u : PAddr) (v : V
   rw [vread_queueNumMax, hv]; rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
 
 set_option maxHeartbeats 4000000 in
 /-- **The identification checks**: the four `lw`s and the four `bne` panics
@@ -841,7 +844,7 @@ theorem vdi_reset_ok (c : VirtioCfg) :
 theorem vdi_beqz8 : bcond bop.BEQ 8#64 0#64 = false := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
 
 set_option maxHeartbeats 4000000 in
 /-- **The status ladder and the feature negotiation**: reset, ACKNOWLEDGE,
@@ -1004,7 +1007,7 @@ theorem vdi_beqz1024 : bcond bop.BEQ 1024#64 0#64 = false := by decide
 theorem vdi_bgeu7 : bcond bop.BGEU 7#64 1024#64 = false := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
 
 set_option maxHeartbeats 4000000 in
 /-- **The queue checks**: `QUEUE_SEL = 0`, `QUEUE_READY` must read `0`
@@ -1164,7 +1167,7 @@ theorem vdi_avail_pos (m : Nat) (hm : 0 < m) : ¬ availZero (some m) := by
   · injection h with h; omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
 
 set_option maxHeartbeats 4000000 in
 /-- **The three queue pages**: `kalloc` three times (it cannot fail, the
@@ -1339,7 +1342,7 @@ theorem vdi_alloc [WchG GF] (KAL : KALLOC) (cpu : CPU) (k : KCtx) (R : RegMap)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
 
 set_option maxHeartbeats 4000000 in
 /-- **Zeroing the three pages**: `memset(p, 0, PGSIZE)` three times. -/
@@ -1515,7 +1518,7 @@ theorem vdi_wr_usedHi' (st qn : BitVec 32) (rdy : Bool) (d a p : PAddr)
   exact h
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
 
 set_option maxHeartbeats 4000000 in
 /-- **The queue registers**: `QUEUE_NUM = NUM` and the six halves of the
@@ -1718,7 +1721,7 @@ theorem vdi_aUsedIdx : aUsedIdx = KA.«disk» + 32#64 := by decide
 theorem vdi_range8 : List.range NUM = [0, 1, 2, 3, 4, 5, 6, 7] := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
 
 set_option maxHeartbeats 2000000 in
 /-- **The flip's input**: the three zeroed pages, carved into the device's
@@ -1780,7 +1783,7 @@ theorem vdi_flipIn (γ : DiskNames) (pd pav pu : BitVec 64)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
 
 /-- **The live flip**, at the shape of the ladder. -/
 theorem vdi_flip_au (γ : DiskNames) (pd pav pu : BitVec 64) :
@@ -1909,7 +1912,7 @@ theorem vdi_str_addr : KA.«virtio_disk_init» + 0x1d24#64 = KStr.«virtio_disk�
 theorem vdi_lock_addr : KA.«virtio_disk_init» + 0x1e1cc#64 = aVdiskLock := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- The `free[]` array, as its eight byte cells. -/
 theorem vdi_free_split (free0 : List (BitVec 8)) (hl : free0.length = NUM) :

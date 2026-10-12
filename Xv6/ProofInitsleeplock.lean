@@ -33,7 +33,7 @@ theorem isl_ret_3fa8 : jumpPc (KA.«initsleeplock» + 0x1e#64) = (KA.«initsleep
   decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-! ## The callee, at its entry address -/
 

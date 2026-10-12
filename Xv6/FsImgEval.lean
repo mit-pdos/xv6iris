@@ -32,6 +32,8 @@ import Xv6.FsImgCheckBase
 import Xv6.FsImgDir
 import Xv6.FsImgUsed
 
+noncomputable section
+
 namespace Xv6
 
 open Std

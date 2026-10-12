@@ -59,6 +59,8 @@ with the credential `K` riding the cursor so it comes home.
 -/
 import Xv6.SysOpenDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -117,7 +119,7 @@ def pinResolvesAbs (Pin : Aview → Prop) (rt cw : Nat) (pl : List (BitVec 8)) (
   ∀ v : Aview, Pin v → ∃ k : Nat, PartialMap.get? v ino = some ⟨nd, k⟩
 
 section PinnedObs
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
   [Appcfg GF] [Icfg]
 
 /-- `fsGammaL`'s top map is the names' (`rfl`; stated so `simp` can see it

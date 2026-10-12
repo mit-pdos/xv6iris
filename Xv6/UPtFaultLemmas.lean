@@ -316,7 +316,7 @@ theorem pageValid_mod8 (r : BitVec 64) (h : pageValid r) : r.toNat % 8 = 0 := by
 /-! ## `umPages` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- Two exclusive buffers of at least a word cannot start at the same
 aligned address. -/

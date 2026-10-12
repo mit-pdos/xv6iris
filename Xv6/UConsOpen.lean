@@ -50,6 +50,8 @@ table-view part (`uk_open_fd_arm_at`, `init_cons_fail_std_at`, here;
 import Xv6.SysOpenDefs
 import Xv6.UserFd
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
@@ -88,7 +90,7 @@ theorem initCons_moiNat_inj (a b : Nat) (ha : a < NOFILE) (hb : b < NOFILE)
   exact this
 
 section UConsOpen
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
 
 /-! ## 3.  THE DEAD WALK THAT GIVES THE CREDENTIAL BACK -/
 
@@ -105,7 +107,7 @@ end UConsOpen
 /-! ## 4.  THE LEDGER ARM, READ -/
 
 section UConsOpenFd
-variable {GF : BundledGFunctors} [GhostMapG GF (Option Nat) UfdCell UfdMapF]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF (Option Nat) UfdCell UfdMapF]
 
 /-- **Rocq `uk_open_fd_arm`**: a receipt either allocated a (non-pipe)
 descriptor, read off the ledger by `ualloc`, or said `-1` and left the table

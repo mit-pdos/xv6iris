@@ -13,13 +13,15 @@ client picks the ghost bits.
 import MachCSL.WpSmodeIntr
 import MachCSL.WpMmodeMret
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D LeanRV64D.Functions
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- `mstatus` after `sret` (from `SPP = S`): `SIE := SPIE`, `SPIE := 1`,
 `SPP := U`, `MPRV := 0`, `SPELP := 0`. -/
@@ -57,7 +59,7 @@ theorem execSpecF_sret (cpu : CPU) (c : MConf) (hok : SConfPhys (GF := GF) c fal
     $$ [Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren
         Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n]
   case' _ =>
-    simp only [sretMs]
+    simp only [sretMs, hspie, BitVec.reduceZeroExtend]
     iframe
     iexact Hhw
   iapply HΦ $$ HmConf HPC HnextPC [HF Hsepc]

@@ -15,6 +15,8 @@ import Iris.Instances.Lib.CInvariants
 import Xv6.PipeNames
 import Xv6.KallocEv
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -38,7 +40,7 @@ inductive Uled where
 of every camera two xv6 subsystems share (one instance per camera type, as
 Rocq's `inG`; the subsystems' ghost NAMES keep their resources apart).  The
 `MonoNatG` camera is `MachGS`'s own (`MachFixedGS.mono`). -/
-class Xv6G (GF : BundledGFunctors) where
+class Xv6G (GF : BundledGFunctors.{0}) where
   [monoListG : MonoListG GF (BitVec 8)]
   [gvListG : GhostVarG GF (List (BitVec 8))]
   [gvNatG : GhostVarG GF Nat]
@@ -169,7 +171,7 @@ structure UartNames where
   dlcnt : GName
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-- The trace so far has `tr` as a prefix (persistent). -/
 def uartSent (γ : UartNames) (tr : List (BitVec 8)) : IProp GF := MonoList.lb_own γ.acc tr
@@ -265,7 +267,7 @@ theorem sentRunAt_snoc {L0 L l : List (BitVec 8)} {ps : List Nat} {cs : List (Bi
     rw [List.mem_singleton.1 hp]; exact hl.length_le
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 theorem uartSentRun_intro (γ : UartNames) (L0 L : List (BitVec 8)) (ps : List Nat) (cs : List (BitVec 8))
     (h : sentRunAt L0 L ps cs) : uartSent (GF := GF) γ L ⊢ uartSentRun γ L0 ps cs := by

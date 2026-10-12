@@ -45,6 +45,8 @@ import Xv6.UshDiagDefs
 import Xv6.UkShPipesLex
 import Xv6.UshEchoPure
 
+noncomputable section
+
 namespace Xv6
 
 /-- **R-prog's pure facts this file reads** (Rocq `UShCatPay`, `UShCat`,

@@ -31,6 +31,8 @@ import Xv6.UserretDefs
 import Xv6.ProcPrivAcc
 import Xv6.SpecKexit
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -44,7 +46,7 @@ abbrev utPc (off : BitVec 64) : BitVec 64 := KA.«usertrap» + off
 /-! ## §2 The frame, the pins, the base -/
 
 section Frame
-variable {GF : BundledGFunctors} [CtokG GF] [UexecSG GF]
+variable {GF : BundledGFunctors.{0}} [CtokG GF] [UexecSG GF]
 
 /-- **Rocq `ut_cs` + `M !!! sp = pa_stk ksp 4` + `M !!! s1 = pj`**: the
 register facts every block keeps. -/
@@ -119,7 +121,7 @@ end Frame
 /-! ## §3 The residue's pieces, opened -/
 
 section Acc
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
@@ -249,7 +251,7 @@ end Acc
 /-! ## §4 The context's kernel table, and the kexit closer -/
 
 section Ctx
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- **The kernel table's shared invariant, out of the context** (Rocq's
 `kpt_on` read off the KPT receipt): what `utTfk` keeps. -/
@@ -290,7 +292,7 @@ end Ctx
 /-! ## §4b The `killed` call site (the three kill checks share it) -/
 
 section Killed
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- `killed`'s contract with a reading, at its entry (the strong form
@@ -323,7 +325,7 @@ end Killed
 /-! ## §5 The block statements -/
 
 section Blocks
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]

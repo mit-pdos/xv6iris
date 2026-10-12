@@ -29,6 +29,8 @@ The walk itself (Rocq `wp_kgl_head`/`_step`/`_scan`/`_post`/`_loop`,
 -/
 import Xv6.UkGrepMatchDefs
 
+noncomputable section
+
 namespace Xv6
 
 /-! ## §1 The scan, one line at a time -/

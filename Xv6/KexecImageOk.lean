@@ -72,6 +72,8 @@ definitional / lemma files.
 import Xv6.KexecBuilt
 import Xv6.UexecSlot
 
+noncomputable section
+
 namespace Xv6
 
 open Iris MachCSL

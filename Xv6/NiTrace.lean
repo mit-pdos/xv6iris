@@ -406,6 +406,8 @@ PURE: imports `NiLedger` (its pure definitions only) and `UsysDet`.
 -/
 import Xv6.NiLedger
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL Std
@@ -2117,6 +2119,8 @@ theorem niDetPair_round {h₁ h₂ : List Obs} {i₁ j₁ i₂ j₂ k₁ k₂ : 
   · rw [NiStep.outBytes_of_law hl₁, NiStep.outBytes_of_law hl₂]
     simp only [NiStep.outClass, NiStep.wout, exitView, hg, uwriteCon_congr hW, uwriteOut_congr hW,
       hW.2.2.2.2.2.2.2.2.2.2.1, hW.2.2.2.2.2.2.2.2.2.2.2]
+    -- both sides agree up to the `Decidable` instances the rewrites left behind (Lean ≥ 4.34)
+    rfl
 
 /-! ### The run -/
 

@@ -33,6 +33,8 @@ import Xv6.UvmallocDefs
 import Xv6.WalkaddrDefs
 import MachCSL.BvLemmas
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -128,7 +130,7 @@ theorem unKept_trans {R R' R'' : RegMap} (h : unKept R R') (h' : unKept R' R'') 
     h'.2.2.2.2.2.2.2.2.2.2.trans h.2.2.2.2.2.2.2.2.2.2⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-! ## The allocator and the lend -/
 

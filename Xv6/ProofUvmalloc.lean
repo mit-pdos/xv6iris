@@ -27,6 +27,8 @@ import Xv6.UvmallocDefs
 import Xv6.CodeTactics
 import MachCSL.BvLemmas
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -38,7 +40,7 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-- The context at the entry interrupt state, in the exit shape. -/
 theorem ua_setReg_spie (k : KCtx) (i : BitVec 5) (v : BitVec 64) :
@@ -47,7 +49,7 @@ theorem ua_setReg_spie (k : KCtx) (i : BitVec 5) (v : BitVec 64) :
 /-! ## `uvmalloc`: the ten-slot frame -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-- `uvmalloc`'s ten-slot frame: `ra`, `s0`, `s1`..`s7` and one unused slot. -/
 def uaFrame [CurCtx] (sp v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 : BitVec 64) : IProp GF := iprop%
@@ -166,7 +168,7 @@ end
 /-! ## `uvmalloc` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-- The permission word `uvmalloc` passes to `mappages`. -/
 theorem ua_perm_eq (x : BitVec 64) : x ||| PTE_R ||| PTE_U = x ||| 18#64 := by

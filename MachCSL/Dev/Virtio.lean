@@ -83,6 +83,8 @@ have to be in the guard rather than in the argument.
 -/
 import MachCSL.Dev.DevLang
 
+noncomputable section
+
 namespace MachCSL
 
 /-! ## Geometry and identity -/
@@ -591,7 +593,7 @@ def task : VTask → VM Unit
 
 /-- The device, as the fabric sees it.  A power cycle is a device reset: the
 durable image survives it, the cache and every in-flight request do not. -/
-def sig : DevSig :=
+@[reducible] def sig : DevSig :=
   { S := VirtioState, T := VTask, body := body, task := task,
     read := readN, write := writeN, irq := irq, reset := reset }
 

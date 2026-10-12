@@ -65,6 +65,8 @@ import Xv6.LinkMain
 import Xv6.LinkMainSecondary
 import Xv6.BootPrimarySupply
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -79,7 +81,7 @@ theorem bootChain_mainSlots_le : mainSlots ≤ bootStackSlots := by decide
 theorem bootChain_mainSecondarySlots_le : mainSecondarySlots ≤ bootStackSlots := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- The kernel image `kctx` owns (Xv6's `KernelImage` instance), out of the
 text and the rodata. -/
@@ -171,7 +173,7 @@ end
 /-! ## §2 A secondary hart's whole chain -/
 
 section secondary
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
   [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
 
 /-- **A SECONDARY HART'S WHOLE CHAIN** (Rocq `boot_hart_secondary`), at the
@@ -216,7 +218,7 @@ end secondary
 /-! ## §3 The boot hart's whole chain -/
 
 section primary
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
   [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
 
 /-- **THE DEPOSIT RECIPE, DISCHARGED** (Rocq `boot_hart_primary`'s closing

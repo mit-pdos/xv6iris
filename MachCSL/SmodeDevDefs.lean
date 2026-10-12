@@ -8,11 +8,13 @@ the rules, so they no longer wait for the S-mode instruction rules.
 -/
 import MachCSL.WpDev
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-! ## A device byte -/
 

@@ -25,12 +25,14 @@ design §4.5 "The merge", "The hook", "The round position", "PowerOn",
 -/
 import Xv6.AppFileSync
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section AppFileSyncClose
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF]
 
 /-- Rocq `sync_claim_rec_eq`: the sync part reads only an instance's sync
@@ -113,7 +115,7 @@ theorem unionHook_closes (c : FileFixed) (r' r : FileAppNames) (av : Aview) (gen
     intro rec hin
     rcases List.mem_append.mp hin with hin | hin
     · exact hbm rec hin
-    · rw [List.mem_singleton.mp hin]; exact Nat.le_refl _
+    · rw [List.mem_singleton.mp hin]
   imodintro
   isplitl [Hg Hcmg Hhg Hrag]
   · iapply syncClaim_intro c ⟨gc, gd, gt, ge, gγ, gen + 1, true, gp⟩ av L _ hch' hw' $$ Hregg HL

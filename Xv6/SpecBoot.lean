@@ -11,6 +11,8 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.SpecStart
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -39,7 +41,7 @@ supervisor mode at `main`, for every time `t` the clock read, with
 `start`'s frame holding `_entry`'s `ra` (= KernelSyms.«spin») and `sp`'s old value,
 `timerinit`'s frame below it, the hart id and GOT slot unchanged, and the
 clock cells at some value. -/
-def wp_boot_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+def wp_boot_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (dqg : DFrac) (hartid s0 v1 v2 v4 v8 v10 v11 v14 v15 f0 f8 g0 g8 : BitVec 64) :
     Prop :=
   mBoot cpu (DFrac.own 1) ∗
@@ -80,7 +82,7 @@ def wp_boot_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 
 /-- The interface of the boot path. -/
 structure BOOT : Prop where
-  wp_boot : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+  wp_boot : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (dqg : DFrac) (hartid s0 v1 v2 v4 v8 v10 v11 v14 v15 f0 f8 g0 g8 : BitVec 64),
     wp_boot_body (hlc := hlc) (GF := GF) cpu dqg hartid s0 v1 v2 v4 v8 v10 v11 v14 v15 f0 f8 g0 g8
 

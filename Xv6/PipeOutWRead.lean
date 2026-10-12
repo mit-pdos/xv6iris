@@ -16,6 +16,8 @@ seccomp newline's push trace).
 -/
 import Xv6.PipeOutWSteps
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
@@ -31,7 +33,7 @@ def rdWild (M : LModel) (WL : M.lmLine → Bool) (CH : ConsHist)
   ∧ WL (lmLineAt M ((CH.chDl ++ ws).map Prod.snd)) = true
 
 section PipesWildRead
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [PipeOutG GF]
 
 /-- THE READER'S RECEIPT: the generic one, and -- at a read that completes a

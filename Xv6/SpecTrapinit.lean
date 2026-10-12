@@ -16,6 +16,8 @@ import Xv6.Geom
 import MachCSL.WpSmodeFrame
 import MachCSL.Lock
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -29,7 +31,7 @@ def tickslockAddr : BitVec 64 := KA.«tickslock»
 def timeNameAddr : BitVec 64 := KStr.«time»
 
 /-- The specification of `trapinit`. -/
-def wp_trapinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+def wp_trapinit_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (vlock : BitVec 32) (vname vcpu : BitVec 64) (hK : 4 ≤ k.avail) : Prop :=
   kctx cpu k ∗ pcIs cpu trapinitAddr ∗
   kmapId tickslockAddr ∗ kmapId (tickslockAddr + 16#64) ∗
@@ -44,7 +46,7 @@ def wp_trapinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurC
 
 /-- The interface of `trapinit`. -/
 structure TRAPINIT : Prop where
-  wp_trapinit : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+  wp_trapinit : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (vlock : BitVec 32) (vname vcpu : BitVec 64) hK,
     wp_trapinit_body (hlc := hlc) (GF := GF) cpu k vlock vname vcpu hK
 

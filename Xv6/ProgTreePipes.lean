@@ -20,6 +20,8 @@ nothing on the pipe yet -- the failure report `cat: cannot open f` of `xs`.
 -/
 import Xv6.ProgTree
 
+noncomputable section
+
 namespace Xv6
 
 /-! ## §2b cat f at the producer device -/

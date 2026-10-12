@@ -80,6 +80,8 @@ Imports only definitional files.
 import Iris.Instances.Lib.SavedProp
 import MachCSL.KernelElf
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -119,7 +121,7 @@ instance : OFE.Discrete ShotVal := ⟨fun h => h⟩
 abbrev KshotR : Type := Csum (Excl ShotVal) (Agree (DiscreteO ShotVal))
 
 /-- THE CAPACITY CLASS (Rocq `ctokG`), beside its users as in Rocq. -/
-class CtokG (GF : BundledGFunctors) where
+class CtokG (GF : BundledGFunctors.{0}) where
   [genG : SavedAnythingG GF GenF]
   [takenG : ElemG GF (constOF AtokR)]
   [shotG : ElemG GF (constOF KshotR)]
@@ -127,7 +129,7 @@ class CtokG (GF : BundledGFunctors) where
 attribute [reducible, instance] CtokG.genG CtokG.takenG CtokG.shotG
 
 section ChildTok
-variable {GF : BundledGFunctors} [CtokG GF]
+variable {GF : BundledGFunctors.{0}} [CtokG GF]
 
 /-! ## The taken token -/
 
@@ -563,7 +565,7 @@ a fancy update, a WP step -- does). -/
 theorem gen_pay_timeless (γ : GName) (pid : BitVec 32) (Q : Int → IProp GF) (xs : Int)
     [Timeless (Q xs)] :
     childTok γ pid Q ∗ exitTok γ pid xs ⊢ ◇ Q xs :=
-  (gen_pay γ pid Q xs).trans Timeless.timeless
+  (gen_pay γ pid Q xs).trans timeless_except0.mp
 
 /-! ## The mint, the choice, and the split -/
 

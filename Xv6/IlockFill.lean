@@ -40,6 +40,8 @@ import Xv6.IcacheEscrowTok
 import Xv6.InodeRegionWithdraw
 import Xv6.FsStateEraPure
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -51,7 +53,7 @@ theorem il_bmcells_empty : bmCells bmEmpty = List.replicate 13 0 := by
   simp [bmCells, bmEmpty, NDIRECT, List.replicate]
 
 section Empty
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsBlocksG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsBlocksG GF]
 
 /-- Rocq's `il_ind_res_empty`. -/
 theorem il_indRes_empty (γfs : FsNames) : ⊢ indRes (GF := GF) γfs bmEmpty := by
@@ -99,7 +101,7 @@ theorem il_box_rec (dn : Dinode) (hf : freshShape dn) (hty : iregTyOk dn) :
 /-! ## The fill's outcome -/
 
 section Fill
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- What the fill hands on to the type test (Rocq 1123-1152): EITHER the

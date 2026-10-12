@@ -31,6 +31,8 @@ import Xv6.FilereadCalls
 import Xv6.FileOffProto
 import Xv6.FileRwShared
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -43,7 +45,7 @@ set_option linter.unusedSimpArgs false
 /-! ## The frame's two lazy restores and the tail -/
 
 section Frame
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 set_option maxHeartbeats 4000000 in
 /-- `ld s1,24(sp) ; ld s3,8(sp)` at `pc` (Rocq `fr_rest2`). -/
@@ -74,7 +76,7 @@ theorem frd_rest2 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) 
 end Frame
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]

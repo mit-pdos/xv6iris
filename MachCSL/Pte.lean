@@ -10,6 +10,8 @@ these forms, so the tree spec never mentions raw bit positions.
 -/
 import LeanRV64D.VmemPte
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1
@@ -58,6 +60,9 @@ theorem bv1_cases (x : BitVec 1) : x = 0#1 ∨ x = 1#1 := by revert x; decide
 theorem ppn_of_mkPte (ppn : BitVec 44) (flags : BitVec 8) : PPN_of_PTE (mkPte ppn flags) = ppn := by
   simp only [PPN_of_PTE, Sail.BitVec.length, Nat.reduceBEq, Bool.false_eq_true, ↓reduceIte,
     Sail.BitVec.extractLsb, BitVec.extractLsb, mkPte]
+  -- the width `if decide (64 = 32) = true then 22 else 44` is a dependent argument, which
+  -- `simp` leaves alone (Lean ≥ 4.34); it is `44` by computation
+  change BitVec.setWidth 44 (BitVec.extractLsb' 10 44 _) = ppn
   bv_decide
 
 theorem flags_of_mkPte (ppn : BitVec 44) (flags : BitVec 8) :
@@ -73,6 +78,7 @@ theorem ppn_of_pteSetAD (pte : BitVec 64) (a d : BitVec 1) : PPN_of_PTE (pteSetA
   simp only [PPN_of_PTE, pteSetAD, Sail.BitVec.length, Nat.reduceBEq, Bool.false_eq_true,
     ↓reduceIte, Sail.BitVec.extractLsb, Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange',
     BitVec.extractLsb, _update_PTE_Flags_A, _update_PTE_Flags_D]
+  change BitVec.setWidth 44 (BitVec.extractLsb' 10 44 _) = BitVec.setWidth 44 (BitVec.extractLsb' 10 44 _)
   bv_decide
 
 theorem ext_of_pteSetAD (pte : BitVec 64) (a d : BitVec 1) : ext_bits_of_PTE (pteSetAD pte a d) = ext_bits_of_PTE pte := by

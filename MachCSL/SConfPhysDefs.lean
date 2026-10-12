@@ -5,13 +5,15 @@ from the S-mode stage file (`WpSmode`) so its users do not wait for it.
 -/
 import MachCSL.SConfDefs
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D LeanRV64D.Functions
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- The PMP check passes, in supervisor mode, for every kernel access inside RAM. -/
 def pmpPassesS (cpu : CPU) (dq : DFrac) (c : MConf) : Prop :=

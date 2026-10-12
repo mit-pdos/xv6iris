@@ -49,13 +49,15 @@ definitions are introduced persistently by every consumer).
 -/
 import Xv6.SpecSysExec
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode
 open Std (ExtTreeSet)
 
 section ExecEntry
-variable {GF : BundledGFunctors} [CtokG GF]
+variable {GF : BundledGFunctors.{0}} [CtokG GF]
 
 /-! ## 1.  THE ENTRY AT ONE ARGUMENT SHAPE -/
 

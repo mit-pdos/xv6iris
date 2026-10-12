@@ -30,6 +30,8 @@ import Xv6.DinodeSlot
 import Xv6.SpecEitherCopyout
 import Xv6.BlkmapBuf
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -38,7 +40,7 @@ open LeanRV64D
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-! ## The destination -/
 
@@ -116,7 +118,7 @@ end
 /-! ## The callees, at their call sites -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
@@ -167,7 +169,7 @@ theorem rd_bmap (BM : BMAP_NOALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 set_option maxHeartbeats 4000000 in
 /-- **THE COPY** (`jal either_copyout` at `+0x60`), on both arms: the
@@ -284,7 +286,7 @@ end
 /-! ## The buffer, the block, the agreement -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
   [DiskG GF] [FsBlocksG GF] [SleepLockG GF] [CurCtx]
 
 /-- Rocq's `rd_buf_win_acc` (+ `rd_held_swap`): the `m`-byte window at
@@ -361,7 +363,7 @@ theorem rd_pay_contentQ (E : CoPset) (γb : BcacheNames) (γfs : FsNames) (V : B
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsBlocksG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsBlocksG GF]
 
 /-- Rocq's `rd_blocks_restore`: the block put back at the bytes it had. -/
 theorem rd_blocks_restore (γfs : FsNames) (dq : DFrac) (bm : Blkmap)
@@ -391,7 +393,7 @@ def rdRegs (k : KCtx) (ip : BitVec 64) (N : Nat) (R : RegMap) (tot pos : Nat) : 
   R 22#5 = ip ∧ R 23#5 = k.regs 11#5 ∧ R 24#5 = 0xFFFFFFFFFFFFFFFF#64 ∧ R 25#5 = 1024#64
 
 section
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- The facts fixed for the whole call (Rocq's section context + the
 contract's premises), bundled so the stage lemmas stay readable. -/

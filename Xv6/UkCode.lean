@@ -18,12 +18,14 @@ Deviation from Rocq (DU3): no per-pc lemma; the catalog's `echo_code`/
 -/
 import Xv6.UserHeap
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 open LeanRV64D LeanRV64D.Functions
 
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
 
 /-- **Rocq `<p>_code γt`**: a program's whole text, as the text heap holds it
 (U0-7's `utextImg` at `UserHeap.utext`).  Persistent. -/

@@ -59,6 +59,8 @@ its callers' shape; nothing dropped.
 -/
 import Xv6.UsysMemOk
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
@@ -424,7 +426,7 @@ theorem ufdKm_sub {D S : RegMapF FdState} {v : List FdState} (h : ufdKm D ⊆ uf
 /-! ## §2 The resource -/
 
 section UserFd
-variable {GF : BundledGFunctors} [GhostMapG GF (Option Nat) UfdCell UfdMapF]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF (Option Nat) UfdCell UfdMapF]
 
 /-- The raw claim on one slot (Rocq `Some k ↪[γf] UCSlot st`), fixed at this
 file's camera. -/

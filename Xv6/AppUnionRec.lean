@@ -41,6 +41,8 @@ import Xv6.AppPreGS
 import Xv6.UnionOutLed
 import Xv6.AppFileHook
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -53,7 +55,7 @@ verbatim (sync SY3-A4); it reads the trace alone. -/
 def unionPhiApp : GState → List Obs → Prop := fun _ h => unionPhiSync h
 
 section UnionApp
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGpreS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF] [PipeOutG GF]
 
 attribute [local instance] appPreGS
@@ -182,6 +184,8 @@ theorem union_al_kill (c : (appUnion (hlc := hlc) (GF := GF)).fixed)
     (r : (appUnion (hlc := hlc) (GF := GF)).names) :
     appSupRaw ((appUnion (hlc := hlc) (GF := GF)).pred c) r ⊢
       iprop(□ (appUnion (hlc := hlc) (GF := GF)).kill c) := by
+  -- Lean ≥ 4.34: `r`'s type must be `FileAppNames` syntactically for `appSupRaw_persistent` to apply
+  change FileAppNames at r
   show appSupRaw (filePred (hlc := hlc) c.ugnFile.fgnCl) r ⊢ iprop(□ fileTaint (hlc := hlc) c.ugnFile.fgnCl)
   iintro #Hs
   imodintro
@@ -194,6 +198,8 @@ theorem union_al_sup (c : (appUnion (hlc := hlc) (GF := GF)).fixed)
       iprop(□ ∀ (k : Nat) (h : List Obs) (H : ConsHist) (ev : ConsEv),
         (appUnion (hlc := hlc) (GF := GF)).cons c k h H ==∗
           (appUnion (hlc := hlc) (GF := GF)).cons c k h (consStep H ev)) := by
+  -- Lean ≥ 4.34: `r`'s type must be `FileAppNames` syntactically for `appSupRaw_persistent` to apply
+  change FileAppNames at r
   show appSupRaw (filePred (hlc := hlc) c.ugnFile.fgnCl) r ⊢
       iprop(□ ∀ (k : Nat) (h : List Obs) (H : ConsHist) (ev : ConsEv),
         unionCons (hlc := hlc) c k h H ==∗ unionCons (hlc := hlc) c k h (consStep H ev))

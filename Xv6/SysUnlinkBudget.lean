@@ -64,6 +64,8 @@ Nothing.
 import Xv6.SpecWritei
 import Xv6.SpecNamex
 
+noncomputable section
+
 namespace Xv6
 
 /-! ## 1.  What each of sys_unlink's logging callees spends -/

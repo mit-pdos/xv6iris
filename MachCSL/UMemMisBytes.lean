@@ -12,6 +12,8 @@ writes change bytes, never the map's domain.
 -/
 import MachCSL.URunRW
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

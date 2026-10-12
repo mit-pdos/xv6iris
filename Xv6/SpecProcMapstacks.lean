@@ -27,6 +27,8 @@ import Xv6.Image
 import Xv6.KallocDefs
 import Xv6.SlotGen
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -36,12 +38,12 @@ open LeanRV64D
 def procMapstacksAddr : BitVec 64 := KA.«proc_mapstacks»
 
 /-- The 64 stack pages, owned, as `kalloc` left them. -/
-def kstackPages {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+def kstackPages {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (pas : Nat → BitVec 44) : IProp GF := iprop%
   [∗list] i ∈ List.range 64, byteBuf (pageAddr (pas i)) (DFrac.own 1) (List.replicate 4096 5#8)
 
 /-- The specification of `proc_mapstacks` (counted mode). -/
-def wp_proc_mapstacks_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
+def wp_proc_mapstacks_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (nb : Nat) (t : PTree)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 44 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
     (hroot : k.regs 10#5 = pageAddr t.base)
@@ -68,7 +70,7 @@ def wp_proc_mapstacks_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 /-- The interface of `proc_mapstacks`. -/
 structure PROC_MAPSTACKS : Prop where
-  wp_proc_mapstacks : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_proc_mapstacks : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γl : GName) (γk : KmemNames) (nb : Nat) (t : PTree) hnoff hK hlk hroot hwf hnd hpg hunm hcount hp0,
     wp_proc_mapstacks_body (hlc := hlc) (GF := GF) cpu k γl γk nb t hnoff hK hlk hroot hwf hnd hpg hunm hcount hp0
 

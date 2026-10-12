@@ -21,6 +21,8 @@ import Xv6.DinodeSlot
 import Xv6.SpecBrelse
 import Xv6.SpecInitlog
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -37,7 +39,7 @@ them too. -/
 /-- The crash rows `initlog` consumes beyond the seam and the certificate:
 the era's born-true mirror, the file system's law minus block 1's park, and
 the byte view's row named at `Xv`. -/
-def fsinitCrash {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+def fsinitCrash {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF] [DiskG GF] [FsBlocksG GF]
     [LogG GF] [FsLinkG GF] [FsTopG GF] [Fscfg] [Icfg] [CurCtx]
     (M : LogMirror) (sbrec : FsSb) (Xv : Nat → List (BitVec 8)) : IProp GF :=
@@ -112,7 +114,7 @@ theorem fsinit_sb_align (i : Nat) (hi : i < 8) : (KA.«sb» + BitVec.ofNat 64 (4
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- One word off the front of a window. -/
 theorem fsinit_word_cons (a : BitVec 64) (w : BitVec 32) (rest : List (BitVec 8))
@@ -202,7 +204,7 @@ end
 /-! ## The buffer's data window, and the `readsb` crossing -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [CurCtx]
 
 /-- `b->data` is `b + 88`: the address `addi a1,a0,88` at `+0x1a` computes. -/
@@ -260,7 +262,7 @@ end
 /-! ## The boot dirty map, as the pure fact initlog consumes -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsBlocksG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsBlocksG GF]
 
 /-- Rocq's `initlog_dirty_all_false`: every covered block's pin half is
 `false`, so the authority says so too. -/

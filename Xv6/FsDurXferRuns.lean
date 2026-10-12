@@ -51,6 +51,8 @@ THE SHAPE, bottom up:
 -/
 import Xv6.FsDurBytes
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -169,7 +171,7 @@ theorem xrDisj_head (r : XRun) (l : List XRun) (hd : xrDisj (r :: l)) :
 /-! ## 2.  THE RUNS AT A VIEW, AND THE FLAT MAP -/
 
 section Runs
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- Rocq's `phi_map`. -/
 def phiMap (Γ : FsViewNames GF) (M : RegMapF (BitVec 8)) : IProp GF :=
@@ -286,7 +288,7 @@ theorem xqOk_at (dq : DFrac) (l : List XRun) (hdq : ¬ ✓ (dq • dq)) : xqOk (
     exact hdq
 
 section RunsQ
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- Rocq's `phi_map_q`. -/
 def phiMapQ (Γ : FsViewNames GF) (dq : DFrac) (M : RegMapF (BitVec 8)) : IProp GF :=

@@ -24,6 +24,8 @@ latching of this port's level is the PLIC's own program's business
 -/
 import MachCSL.Dev.DevLang
 
+noncomputable section
+
 namespace MachCSL
 
 /-- The state of one 16550. -/
@@ -217,7 +219,7 @@ def body (i : UartId) : DevM UartState Empty Unit := do
   else pure ()
 
 /-- The device, as the fabric sees it. -/
-def sig (i : UartId) : DevSig :=
+@[reducible] def sig (i : UartId) : DevSig :=
   { S := UartState, T := Empty, body := body i, task := (fun t => nomatch t),
     read := readN, write := writeN, irq := irq, reset := fun _ => reset }
 

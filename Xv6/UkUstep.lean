@@ -23,6 +23,8 @@ whose step is not `stuck` is in the regime and runs one of the families
 -/
 import Xv6.UkAbi
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

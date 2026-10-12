@@ -23,6 +23,8 @@ No semantics is restated: each `R` reader is a transcription of
 -/
 import Xv6.UserTextDefs
 
+noncomputable section
+
 namespace Xv6.User
 
 open Xv6

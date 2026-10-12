@@ -27,6 +27,9 @@ oracle's walk of `uxaExecAs i` over the user footprint `ufFoot` lands in
 import Xv6.UserStepLand
 import MachCSL.UclCtl
 import MachCSL.UExecCsr
+import MachCSL.BvEnums -- `bv_decide`'s enum encodings, declared once
+
+noncomputable section
 
 namespace Xv6
 

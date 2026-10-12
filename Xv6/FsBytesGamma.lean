@@ -38,12 +38,14 @@ stated once, here, and never re-derived at a use site.  The Lean twins are
 import Xv6.FsStateDefs
 import Xv6.FsBlocks
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsBytesG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsBytesG GF]
 
 /-- Rocq's `fs_gamma_L`: the LOGGED instance of the abstract view. -/
 def fsGammaL (γfs : FsNames) : FsViewNames GF :=

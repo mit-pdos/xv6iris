@@ -42,6 +42,8 @@ DEVIATIONS from Rocq:
 -/
 import Xv6.UnionDisc
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

@@ -1,4 +1,5 @@
 import MachCSL.URunRW
+import MachCSL.BvEnums -- `bv_decide`'s enum encodings, declared once
 
 /-!
 # One home for `bv_decide`'s `SATPMode` encoding
@@ -8,7 +9,8 @@ auxiliary declaration `SATPMode.enumToBitVec` (and its lemmas) to the
 environment. Two modules that each trigger it add the same name and then clash
 when imported together. This file triggers it once; every module whose
 `bv_decide` sees a `SATPMode` imports this file, and `bv_decide` reuses the
-existing declaration.
+existing declaration.  Since Lean 4.34 the encodings all live in `MachCSL.BvEnums` (which
+this file imports; its theorem below then adds nothing); kept for its importers.
 -/
 
 namespace MachCSL

@@ -50,7 +50,7 @@ theorem ushpi_key_wr (m : RegMap) (k : Nat) (hk : k < NOFILE) :
   rw [ukWr_get_same _ _ _ (by decide)]; exact ushpi_fd_key k hk
 
 section UshPipeArmKids
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 

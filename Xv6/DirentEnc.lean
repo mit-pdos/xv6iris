@@ -114,6 +114,8 @@ Pure: no proof mode, nothing in `IProp`, exactly as Rocq's file is iris-free.
 import Xv6.CstringInv
 import Xv6.DinodeEnc
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

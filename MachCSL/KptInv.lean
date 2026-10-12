@@ -21,6 +21,8 @@ import MachCSL.WordHist
 import MachCSL.WordPointsTo
 import MachCSL.CtxLaws
 
+noncomputable section
+
 set_option maxRecDepth 100000
 
 namespace MachCSL
@@ -28,7 +30,7 @@ namespace MachCSL
 open Iris Iris.BI Iris.ProofMode Std
 open LeanRV64D LeanRV64D.Functions
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 local notation "era" => MachGS.era (hlc := hlc) (GF := GF)
 

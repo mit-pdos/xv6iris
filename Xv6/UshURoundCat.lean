@@ -53,6 +53,8 @@ import Xv6.UshExecEnvRun
 import Xv6.SpecShChildExec
 import Xv6.UshOomPaid
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -84,7 +86,7 @@ theorem ucat_line_facts (I nm : List (BitVec 8)) (hlws : ulineWs (.LCat nm) = la
     exact uline_of_u_eq _ _ hfl (by intro h; cases h)
 
 section UShURoundCat
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF] [FifRegG GF]
   [FileOutG GF] [PipeOutG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]

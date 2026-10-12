@@ -30,6 +30,8 @@ The machine picks the outcome (the wake test reads `mip`), so the Iris rule
 -/
 import MachCSL.UCycle
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

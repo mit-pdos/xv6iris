@@ -21,6 +21,8 @@ import MachCSL.WpCsr
 import Xv6.KernelText
 import MachCSL.Boot
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -44,7 +46,7 @@ at arbitrary values, is safe provided the continuation is safe at `ret` with
 `sp`, `ra`, `s0` restored, `a4 = 1000000`, `a5 = t + 1000000`, the frame
 holding the saved `ra`/`s0`, and the configuration `timerinitConf c t` for
 some `t`. -/
-def wp_timerinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+def wp_timerinit_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (c : MConf) (hok : MConf.ok (GF := GF) c)
     (hcbie : BitVec.extractLsb' 4 2 (c.menvcfg ||| 0x8000000000000000#64) = 0#2)
     (hpmm : BitVec.extractLsb' 32 2 (c.menvcfg ||| 0x8000000000000000#64) = 0#2)
@@ -72,7 +74,7 @@ def wp_timerinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cur
 
 /-- The interface of `timerinit`. -/
 structure TIMERINIT : Prop where
-  wp_timerinit : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+  wp_timerinit : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (c : MConf) (hok : MConf.ok (GF := GF) c) hcbie hpmm hstce
     (ret sp₀ v8 v14 v15 f0 f8 : BitVec 64),
     wp_timerinit_body (hlc := hlc) (GF := GF) cpu c hok hcbie hpmm hstce ret sp₀ v8 v14 v15 f0 f8

@@ -61,6 +61,8 @@ descriptor discipline under ANY answer.  This file is the logic's half:
 -/
 import Xv6.UkTree
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -153,7 +155,7 @@ theorem fdDom_delete (fdm : Fdmap) (fd : Int) :
 /-! ## §1 The interface -/
 
 /-- The device predicate at a spec (deviation 2; Rocq's inline match). -/
-def devSel {GF : BundledGFunctors} (out outh : Nat → List Bytes → IProp GF) (halt : Nat → IProp GF)
+def devSel {GF : BundledGFunctors.{0}} (out outh : Nat → List Bytes → IProp GF) (halt : Nat → IProp GF)
     (outm : Nat → List Bytes → IProp GF) (inp inE : Nat → Bytes → IProp GF) (inEnd : Nat → IProp GF)
     (copy : Nat → PFilter → Bool → Bytes → Bytes → Bytes → IProp GF)
     (copyEnd : Nat → PFilter → Bool → Bytes → IProp GF) (copyHalt : Nat → Option Bytes → IProp GF)
@@ -173,7 +175,7 @@ def devSel {GF : BundledGFunctors} (out outh : Nat → List Bytes → IProp GF) 
   | .DProdHalt ds => prodHalt d ds
 
 section UkHandler
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 

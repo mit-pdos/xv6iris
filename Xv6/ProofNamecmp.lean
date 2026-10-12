@@ -134,7 +134,7 @@ theorem namecmp_proof (S : STRNCMP) : NAMECMP := ⟨fun {hlc GF} _ _ cpu k f g d
       (((((k.regs.set 2#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFFF0#64)).set 8#5 (k.regs 2#5)).set 12#5 14#64).set
         1#5 (KA.«namecmp» + 0xe#64))))
     (bview 14 f) (bview 14 g) 14 dq1 dq2 (by k_norm_g; omega) (by k_norm_g) (by decide)
-    (by rw [bview_length]; omega) (by rw [bview_length]; omega)
+    (by rw [bview_length]) (by rw [bview_length])
   unfold wp_strncmp_body at hm
   simp only [strncmpAddr] at hm
   k_norm_g at hm

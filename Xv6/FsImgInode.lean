@@ -37,6 +37,8 @@ Rocq.
 -/
 import Xv6.FsImgTree
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL Iris Iris.Std Std

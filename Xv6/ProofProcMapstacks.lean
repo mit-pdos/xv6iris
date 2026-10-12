@@ -22,6 +22,8 @@ import Xv6.UvmCallSites
 import Xv6.UvmallocDefs
 import MachCSL.BvLemmas
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -226,7 +228,7 @@ theorem pmsKept_trans {R R' R'' : RegMap} (h : pmsKept R R') (h' : pmsKept R' R'
 
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF]
 
 /-! ## The callees, at their entry addresses -/
 

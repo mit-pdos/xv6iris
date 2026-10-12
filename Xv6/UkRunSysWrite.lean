@@ -37,6 +37,8 @@ through the page table the key's projection admits (`usrcOk`).
 -/
 import Xv6.UkRunSysDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -77,7 +79,7 @@ theorem ukText_rmapped (P : UPtd) (sz a : Nat) (hwf : uptWf P) (hx : uxAddr (per
 
 /-- **Rocq `uheap_ubytes_wat`**: a run the program owns at the word `ua`'s
 address is in the image at the WORD'S sums (the run does not wrap). -/
-theorem uheap_ubytes_wat {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
+theorem uheap_ubytes_wat {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
     (γt γd γs : GName) (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (dq : DFrac)
     (ua : BitVec 64) (nb : Nat) (f : Nat → BitVec 8) :
     ⊢@{IProp GF} uheap γt γd γs M pm sz -∗ ubytesq γd dq ua.toNat nb f -∗
@@ -95,7 +97,7 @@ theorem uheap_ubytes_wat {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) Re
   rw [e]; exact hM
 
 section UkRunSysWrite
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 

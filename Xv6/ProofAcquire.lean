@@ -27,7 +27,7 @@ set_option maxHeartbeats 4000000 in
 /-- The spin: from `0x80000c72` with `a4 = 1` and `s1 = lk`, the loop
 `mv a5,a4; amoswap.w.aq a5,a5,(s1); sext.w a5,a5; bnez a5` runs until the
 swap returns 0; the registers other than `a5` are those of `R0`. -/
-theorem acquire_spin {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+theorem acquire_spin {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (kb : KCtx) (hsie : kb.sie = false)
     (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF) [CtxMorph R]
     (tl : Nat)
@@ -92,7 +92,7 @@ theorem acquire_br_d04 : KA.«acquire» + 0xd04#64 = KA.«mycpu» := by decide
 
 theorem acquire_br_ffffffffffffff9a : KA.«acquire» + 0xffffffffffffff9a#64 = KA.«holding» := by decide
 
-theorem acquire_body (HO : HOLDING) (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+theorem acquire_body (HO : HOLDING) (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (kb : KCtx) (hsie : kb.sie = false) (hK : 10 ≤ kb.avail)
     (γ : GName) (s : String) (R : CtxId → IProp GF) [CtxMorph R]
     (tl : Nat)
@@ -305,7 +305,7 @@ set_option maxHeartbeats 4000000 in
 loop entry (the conclusion's last premise), is consumed and returned by the
 `amoswap.w.aq` each iteration (`wp_s_amoswap_lock_gen`), re-supplied to the
 IH on a lost swap and handed to the won-continuation on a winning one. -/
-theorem acquire_spin_gen {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+theorem acquire_spin_gen {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (kb : KCtx) (hsie : kb.sie = false)
     (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF) [CtxMorph R]
     (D : IProp GF) [Timeless D] (Tc : IProp GF) (hrefute : ⊢ Tc -∗ D -∗ (False : IProp GF))
@@ -368,7 +368,7 @@ set_option maxHeartbeats 4000000 in
 push_off, through the holding check (`HO.wp_holding_notheld_gen`), into
 `acquire_spin_gen`, through the owner store (`wp_s_sd_lkcpu_acquire_gen`),
 to the epilogue and continuation. -/
-theorem acquire_body_gen (HO : HOLDING) (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+theorem acquire_body_gen (HO : HOLDING) (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (kb : KCtx) (hsie : kb.sie = false) (hK : 10 ≤ kb.avail)
     (γ : GName) (s : String) (R : CtxId → IProp GF) [CtxMorph R]
     (D : IProp GF) [Timeless D] (Tc : IProp GF) (hrefute : ⊢ Tc -∗ D -∗ (False : IProp GF))

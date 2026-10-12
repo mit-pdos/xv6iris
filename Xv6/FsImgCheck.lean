@@ -40,6 +40,8 @@ import Xv6.FsImgCheckSweeps
 import Xv6.FsBootParams
 import Xv6.FsDurImg
 
+noncomputable section
+
 namespace Xv6
 
 open Std

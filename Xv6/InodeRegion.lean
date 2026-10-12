@@ -124,6 +124,8 @@ Nothing.  (`Global Instance`s for timelessness are `instance`s.)
 -/
 import Xv6.InodeRegionDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -135,13 +137,13 @@ so the marker can sit below every inum. -/
 abbrev IregMapF := fun V => Std.ExtTreeMap Int V compare
 
 /-- Rocq `Xv6Cameras.iregG`: one `ghost_mapG Σ Z dinode`. -/
-class IregG (GF : BundledGFunctors) where
+class IregG (GF : BundledGFunctors.{0}) where
   [gmIreg : GhostMapG GF Int Dinode IregMapF]
 
 attribute [reducible, instance] IregG.gmIreg
 
 section
-variable {GF : BundledGFunctors} [IregG GF]
+variable {GF : BundledGFunctors.{0}} [IregG GF]
 
 /-! ## 3.  THE GHOST, AND WHAT A CALLER HOLDS -/
 

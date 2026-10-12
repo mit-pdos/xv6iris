@@ -9,6 +9,8 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.SpecInitsleeplock
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -23,7 +25,7 @@ def inodeAddr (i : Nat) : BitVec 64 := (KA.«itable» + 0x28#64) + BitVec.ofNat 
 def inodeNameAddr : BitVec 64 := KStr.«inode»
 
 /-- The specification of `iinit`. -/
-def wp_iinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+def wp_iinit_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (vlock : BitVec 32) (vname vcpu : BitVec 64) (hK : 12 ≤ k.avail) : Prop :=
   kctx cpu k ∗ pcIs cpu iinitAddr ∗ lockWords itableLockAddr vlock vname vcpu ∗
   ([∗list] i ∈ List.range 50, sleepLockIn (inodeAddr i)) ∗
@@ -36,7 +38,7 @@ def wp_iinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 
 /-- The interface of `iinit`. -/
 structure IINIT : Prop where
-  wp_iinit : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+  wp_iinit : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (vlock : BitVec 32) (vname vcpu : BitVec 64) hK,
     wp_iinit_body (hlc := hlc) (GF := GF) cpu k vlock vname vcpu hK
 

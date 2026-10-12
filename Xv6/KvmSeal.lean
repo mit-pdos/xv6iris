@@ -190,7 +190,7 @@ theorem kvmTableOk_kptFacts (t : PTree) (pas : Nat → BitVec 44) (h : kvmTableO
 /-! ## The tree's ownership as the framework's entry list -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 theorem nodeOwn_entries [CurCtx] (dq : DFrac) (t : PTree) :
     nodeOwn (GF := GF) dq t =

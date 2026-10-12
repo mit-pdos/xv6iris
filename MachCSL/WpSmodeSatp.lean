@@ -5,13 +5,15 @@ transport of points-to resources from the ambient Bare tier to the Kpt tier.
 -/
 import MachCSL.WpSmodeFrame
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D LeanRV64D.Functions
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {lent : Bool}
 
 /-- The PPN field update of `legalize_satp` is the identity on a 44-bit

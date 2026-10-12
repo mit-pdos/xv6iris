@@ -50,13 +50,12 @@ set_option linter.unusedSimpArgs false
 theorem sys_exec_bview_full (bs : List (BitVec 8)) (n : Nat) (h : bs.length = n) :
     bview n (sysfilePfun bs) = bs := by
   subst h
-  apply List.ext_getElem
-  · simp [bview_length]
-  · intro i h1 h2
-    unfold bview sysfilePfun
-    simp only [List.getElem_map, List.getElem_range]
-    rw [List.getD_eq_getElem?_getD, List.getElem?_eq_getElem h2]
-    rfl
+  apply List.ext_getElem?
+  intro i
+  unfold bview sysfilePfun
+  by_cases hi : i < bs.length
+  · simp [List.getElem?_range, hi, List.getD_eq_getElem?_getD, List.getElem?_eq_getElem hi]
+  · simp [List.getElem?_range, hi, List.getElem?_eq_none_iff] <;> omega
 
 /-- **What fetchstr's success hands the loop** (Rocq `sx_step`'s `Hgot` /
 `sx_ok_push` side conditions): the 4096-byte buffer is the page's byte
@@ -116,7 +115,7 @@ theorem sys_exec_uargv_i (v : BitVec 64) (i : Nat) (hi : i < 32) :
 /-! ## The pages -/
 
 section Pages
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- **Rocq `sx_pages_close`**: this round's page joins the run, at the
 updated page / byte functions. -/
@@ -148,7 +147,7 @@ theorem sysExecPages_push (pg : Nat → BitVec 64) (afun : Nat → Nat → BitVe
 end Pages
 
 /-- The allocator and the rest of `fsReady` out of the fabric. -/
-theorem sysExecEnv_ready {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+theorem sysExecEnv_ready {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [CtokG GF] [WchG GF] [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames)
@@ -161,7 +160,7 @@ theorem sysExecEnv_ready {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
 /-! ## The three callees -/
 
 section Calls
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]

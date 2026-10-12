@@ -33,6 +33,8 @@ import Xv6.UshMainCode
 import Xv6.UshGettokScan
 import Xv6.UshMainLine
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -132,7 +134,7 @@ def ushGetsRegs (m : RegMap) (a Nb spz i : Nat) : Prop :=
   m.get 20#5 = BitVec.ofNat 64 Nb ∧ m.get 21#5 = BitVec.ofNat 64 1 ∧ m.get 22#5 = BitVec.ofNat 64 (spz - 81)
 
 section GetsLoop
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 

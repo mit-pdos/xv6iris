@@ -12,6 +12,8 @@ import LeanRV64D.ZicsrInsts
 import LeanRV64D.Arithmetic
 import LeanRV64D.BaseInsts
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1
@@ -27,17 +29,16 @@ theorem matching_pma_ram (pa : BitVec 64) (n : Nat) (h : inRam pa n) (hn : 0 < n
   simp only [ramBase, ramEnd] at h1 h2
   simp only [matching_pma_region, matching_pma_region_bits_range, bootPMA, ramRegion,
     range_subset, zopz0zIzJ_u, zero_extend, bits_of_physaddr, to_bits, get_slice_int,
-    Sail.BitVec.zeroExtend, Sail.BitVec.toNatInt, BitVec.setWidth_eq, Bool.and_eq_true,
-    decide_eq_true_eq]
+    Sail.BitVec.zeroExtend, Sail.BitVec.toNatInt, BitVec.setWidth_eq, Bool.and_eq_true]
   have hslice : BitVec.extractLsb' 0 64 (BitVec.ofInt (0 + 64 + 1) (n : Int)) = BitVec.ofNat 64 n := by
     apply BitVec.eq_of_toNat_eq
     simp only [BitVec.extractLsb'_toNat, BitVec.toNat_ofInt, Nat.shiftRight_zero, BitVec.toNat_ofNat]
     omega
+  simp only [Int.ofNat_eq_natCast, Int.ofNat_le] at hslice ⊢
   rw [hslice]
-  simp only [Int.ofNat_eq_natCast, Int.ofNat_le]
-  rw [if_neg (by intro hc; obtain ⟨c1, c2, c3⟩ := hc; bv_omega),
-    if_neg (by intro hc; obtain ⟨c1, c2, c3⟩ := hc; bv_omega),
-    if_pos (by refine ⟨?_, ?_, ?_⟩ <;> bv_omega)]
+  rw [if_neg (by intro hc; simp only [decide_eq_true_eq] at hc; obtain ⟨c1, c2, c3⟩ := hc; bv_omega),
+    if_neg (by intro hc; simp only [decide_eq_true_eq] at hc; obtain ⟨c1, c2, c3⟩ := hc; bv_omega),
+    if_pos (by simp only [decide_eq_true_eq]; refine ⟨?_, ?_, ?_⟩ <;> bv_omega)]
   rfl
 
 /-- The I/O region of the platform's PMA table: `[0x2000000, 0x12000000)`,
@@ -50,16 +51,15 @@ theorem matching_pma_io (pa : BitVec 64) (n : Nat) (h1 : 0x2000000 ≤ pa.toNat)
     matching_pma_region bootPMA (physaddr.Physaddr pa) n = some ioRegion := by
   simp only [matching_pma_region, matching_pma_region_bits_range, bootPMA, ioRegion,
     range_subset, zopz0zIzJ_u, zero_extend, bits_of_physaddr, to_bits, get_slice_int,
-    Sail.BitVec.zeroExtend, Sail.BitVec.toNatInt, BitVec.setWidth_eq, Bool.and_eq_true,
-    decide_eq_true_eq]
+    Sail.BitVec.zeroExtend, Sail.BitVec.toNatInt, BitVec.setWidth_eq, Bool.and_eq_true]
   have hslice : BitVec.extractLsb' 0 64 (BitVec.ofInt (0 + 64 + 1) (n : Int)) = BitVec.ofNat 64 n := by
     apply BitVec.eq_of_toNat_eq
     simp only [BitVec.extractLsb'_toNat, BitVec.toNat_ofInt, Nat.shiftRight_zero, BitVec.toNat_ofNat]
     omega
+  simp only [Int.ofNat_eq_natCast, Int.ofNat_le] at hslice ⊢
   rw [hslice]
-  simp only [Int.ofNat_eq_natCast, Int.ofNat_le]
-  rw [if_neg (by intro hc; obtain ⟨c1, c2, c3⟩ := hc; bv_omega),
-    if_pos (by refine ⟨?_, ?_, ?_⟩ <;> bv_omega)]
+  rw [if_neg (by intro hc; simp only [decide_eq_true_eq] at hc; obtain ⟨c1, c2, c3⟩ := hc; bv_omega),
+    if_pos (by simp only [decide_eq_true_eq]; refine ⟨?_, ?_, ?_⟩ <;> bv_omega)]
   rfl
 
 /-- The CLINT window's configured base and size. -/

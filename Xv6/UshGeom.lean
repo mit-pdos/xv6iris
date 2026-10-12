@@ -62,6 +62,8 @@ import Xv6.UshKernel
 import Xv6.UEchoKernel
 import Xv6.UshEchoPure
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.Std MachCSL

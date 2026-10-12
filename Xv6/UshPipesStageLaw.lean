@@ -24,6 +24,8 @@ R-prog's `UshEchoPipePay.ushFd1pipe`; `mWP Loop` is `wpLoop h'`; numbers are
 import Xv6.UshPipesStageW
 import Xv6.UshEchoPipePay
 
+noncomputable section
+
 namespace Xv6
 
 namespace UShPipesStage
@@ -35,7 +37,7 @@ open Wid
 open UShPipesDefs
 
 section Law
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]

@@ -274,46 +274,46 @@ def pmaCheck (paddr : physaddr) (width : Nat) (access : (MemoryAccessType mem_pa
     | .InstructionFetch () => (pure attributes.executable)
     | .Load .Data =>
       (do
-        assert (not res_or_con) "sys/mem.sail:101.53-101.54"
+        (assert (not res_or_con) "sys/mem.sail:101.53-101.54")
         (pure attributes.readable))
     | .Load .Vector =>
       (do
-        assert (not res_or_con) "sys/mem.sail:102.53-102.54"
+        (assert (not res_or_con) "sys/mem.sail:102.53-102.54")
         (pure attributes.readable))
     | .Load .PageTableEntry => (pure attributes.supports_pte_read)
     | .Store .Data =>
       (do
-        assert (not res_or_con) "sys/mem.sail:104.53-104.54"
+        (assert (not res_or_con) "sys/mem.sail:104.53-104.54")
         (pure attributes.writable))
     | .Store .Vector =>
       (do
-        assert (not res_or_con) "sys/mem.sail:105.53-105.54"
+        (assert (not res_or_con) "sys/mem.sail:105.53-105.54")
         (pure attributes.writable))
     | .Store .PageTableEntry => (pure attributes.supports_pte_write)
     | .LoadReserved (_, _, .Data) =>
       (do
-        assert res_or_con "sys/mem.sail:110.55-110.56"
+        (assert res_or_con "sys/mem.sail:110.55-110.56")
         (pure (attributes.readable && (bne attributes.reservability RsrvNone))))
     | .StoreConditional (_, _, .Data) =>
       (do
-        assert res_or_con "sys/mem.sail:111.55-111.56"
+        (assert res_or_con "sys/mem.sail:111.55-111.56")
         (pure (attributes.writable && (bne attributes.reservability RsrvNone))))
     | .Atomic (op, _, _, .Data, .Data) =>
       (do
-        assert res_or_con "sys/mem.sail:112.55-112.56"
+        (assert res_or_con "sys/mem.sail:112.55-112.56")
         (pure (attributes.readable && (attributes.writable && (pma_allows_atomic_op
                 attributes.atomic_support op width)))))
     | .Load .ShadowStack =>
       (do
-        assert (not res_or_con) "sys/mem.sail:116.53-116.54"
+        (assert (not res_or_con) "sys/mem.sail:116.53-116.54")
         (pure (attributes.readable && attributes.read_idempotent)))
     | .Store .ShadowStack =>
       (do
-        assert (not res_or_con) "sys/mem.sail:117.53-117.54"
+        (assert (not res_or_con) "sys/mem.sail:117.53-117.54")
         (pure (attributes.writable && attributes.write_idempotent)))
     | .Atomic (.AMOSWAP, _, _, .ShadowStack, .ShadowStack) =>
       (do
-        assert res_or_con "sys/mem.sail:118.73-118.74"
+        (assert res_or_con "sys/mem.sail:118.73-118.74")
         (pure (attributes.readable && (attributes.writable && (attributes.read_idempotent && (attributes.write_idempotent && (pma_allows_atomic_op
                     attributes.atomic_support AMOSWAP width)))))))
     | .CacheAccess (.CB_zero ()) => (pure (attributes.writable && attributes.supports_cbo_zero))
@@ -426,7 +426,7 @@ def checked_mem_read (access : (MemoryAccessType mem_payload)) (pbmt : page_base
   let (data, finished, i) ← (( do
     let loop_vars ← untilFuelM (fuel :=N) (fun (data, finished, i) => (pure finished)) (data, finished, i)
       fun (data, finished, i) => do
-        assert true "loop dummy assert"
+        (assert true "loop dummy assert")
         let offset := i
         let paddr := (Physaddr (BitVec.addInt paddr_bits (offset *i split_width)))
         match (← (pmpCheck paddr split_width access priv)) with
@@ -517,7 +517,7 @@ def mem_write_ea (paddr : physaddr) (width : Nat) (access : (MemoryAccessType me
   let (finished, i) ← (( do
     let loop_vars ← untilFuelM (fuel :=N) (fun (finished, i) => (pure finished)) (finished, i)
       fun (finished, i) => do
-        assert true "loop dummy assert"
+        (assert true "loop dummy assert")
         let offset := i
         let paddr := (Physaddr (BitVec.addInt paddr_bits (offset *i split_width)))
         match (← (pmpCheck paddr split_width access priv)) with
@@ -554,7 +554,7 @@ def checked_mem_write (paddr : physaddr) (width : Nat) (data : (BitVec (8 * widt
   let (finished, i, write_success) ← (( do
     let loop_vars ← untilFuelM (fuel :=N) (fun (finished, i, write_success) => (pure finished)) (finished, i, write_success)
       fun (finished, i, write_success) => do
-        assert true "loop dummy assert"
+        (assert true "loop dummy assert")
         let offset := i
         let paddr := (Physaddr (BitVec.addInt paddr_bits (offset *i split_width)))
         match (← (pmpCheck paddr split_width access priv)) with

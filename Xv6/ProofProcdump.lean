@@ -17,6 +17,8 @@ import Xv6.CodeTactics
 import Xv6.WalkaddrDefs
 import MachCSL.BvLemmas
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -27,7 +29,7 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-! ## The read-only strings and the `states` table -/
 
@@ -321,7 +323,7 @@ theorem pd_slot_acc [CurCtx] (i : Nat) (hi : i < NPROC) :
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-! ## The callee, at its entry address -/
 
@@ -414,7 +416,7 @@ theorem pd_tail [CurCtx] (k : KCtx) (i : Nat) (hi : i < NPROC) (spie spp : Bool)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 set_option maxHeartbeats 1000000 in
 /-- `printk(f)` with no varargs. -/
@@ -479,7 +481,7 @@ theorem pd_printk3 (PK : PRINTK) [CurCtx]
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 theorem pd_pid_fold [CurCtx] (pa : BitVec 64) (dq : DFrac) (w : BitVec 32) :
     wordPointsTo (GF := GF) (pa + 48#64) 4 dq w ⊢ wordPointsTo (pPid pa) 4 dq w := by
@@ -638,7 +640,7 @@ theorem pd_print (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : Uar
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 theorem pd_state_fold [CurCtx] (pa : BitVec 64) (dq : DFrac) (w : BitVec 32) :
     wordPointsTo (GF := GF) (pa + 24#64) 4 dq w ⊢ wordPointsTo (pState pa) 4 dq w := by
@@ -722,7 +724,7 @@ theorem pd_tbl_arm (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : U
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 set_option maxHeartbeats 4000000 in
 /-- One iteration of the scan, from the loop head at `0x80002480`: read
@@ -941,7 +943,7 @@ theorem pd_iter (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : Uart
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-! ## The loop -/
 
@@ -1103,7 +1105,7 @@ theorem pd_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-! ## The function -/
 

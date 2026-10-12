@@ -45,6 +45,8 @@ import Xv6.AppFileCons
 import Xv6.UserOff
 import Xv6.PieceFam
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -89,7 +91,7 @@ theorem fileOpen_dst_ne_insert (s : Dst) (N : Fname) (p : Nat × List (BitVec 8)
   rw [he, Std.ExtTreeMap.getElem?_insert_self]
 
 section FileOpenFams
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [OffboxG GF]
 
 /-! ## §3a. The create's families, at an escrowed deed -/

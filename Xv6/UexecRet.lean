@@ -80,6 +80,8 @@ import Xv6.UexecSG
 import Xv6.TfUser
 import MachCSL.WpSmodeSret
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL LeanRV64D
@@ -281,7 +283,7 @@ theorem urunEq_resume {Wk : Uvis} {V V2 : ProcPriv} {M M2 : Nat → List (BitVec
 /-! ## §2 The trapped machine -/
 
 section TrappedMachine
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- **Rocq `trapped_machine`**: a thin wrapper on `userTrapFrameAtm` at the
 key's own data (the epc word in `sepc`, the resume file in `gprFile`, the lazy
@@ -338,7 +340,7 @@ instance ukillSc_dec (sc : BitVec 64) : Decidable (ukillSc sc) := by
 theorem ukillSc_ne_ecall {sc : BitVec 64} (h : ukillSc sc) : sc ≠ uecallScause := h.1
 
 /-- One `if` of IProps is non-expansive in its branches. -/
-theorem uexec_ite_ne {GF : BundledGFunctors} {k : Nat} {c : Prop} [Decidable c]
+theorem uexec_ite_ne {GF : BundledGFunctors.{0}} {k : Nat} {c : Prop} [Decidable c]
     {a a' b b' : IProp GF} (h1 : c → a ≡{k}≡ a') (h2 : ¬ c → b ≡{k}≡ b') :
     (if c then a else b) ≡{k}≡ (if c then a' else b') := by
   by_cases h : c
@@ -346,7 +348,7 @@ theorem uexec_ite_ne {GF : BundledGFunctors} {k : Nat} {c : Prop} [Decidable c]
   · rw [if_neg h, if_neg h]; exact h2 h
 
 section UexecRet
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]
 open UexecSG
 
 /-- Rocq `RiscvPtsto.riscv_kill_cred`: MachCSL's ambient kill credential. -/

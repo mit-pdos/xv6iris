@@ -25,6 +25,8 @@ remainder, UexecRet).
 -/
 import Xv6.UsysMemOk
 
+noncomputable section
+
 namespace Xv6
 
 /-- **Rocq `tf_ueq`**: equal epc word and equal restorable registers
