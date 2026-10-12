@@ -49,6 +49,6 @@ end
 
 /-- **sh's `panic` holds** (at the engine, the exit row and fprintf). -/
 theorem shPanic_holds (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : USH_FPRINTF) : SH_PANIC :=
-  ⟨fun {_ _} _ _ _ _ _ _ _ _ _ _ => wp_shPanicChain UL HS HF⟩
+  ⟨fun {_} _ _ _ _ _ _ _ _ _ _ => wp_shPanicChain UL HS HF⟩
 
 end Xv6

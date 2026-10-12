@@ -401,6 +401,6 @@ end
 /-- **sh's `parseexec` holds**, at the engine and its callees' interfaces. -/
 theorem shParseexec_holds (UL : UK_LEAVES) (SP : SH_PEEK) (SG : SH_GETTOKEN) (SE : SH_EXECCMD)
     (SR : SH_PARSEREDIRS) : SH_PARSEEXEC :=
-  ⟨fun {_ _ _ _ _ _ _ _ _ _ _} => wp_shParseexec UL SP SG SE SR⟩
+  ⟨fun {_ _ _ _ _ _ _ _ _ _} => wp_shParseexec UL SP SG SE SR⟩
 
 end Xv6

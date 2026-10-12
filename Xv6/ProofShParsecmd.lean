@@ -307,7 +307,7 @@ end
 engine and its callees' interfaces. -/
 theorem shParsecmd_holds (UL : UK_LEAVES) (SS : SH_STRLEN) (SPL : SH_PARSELINE) (SP : SH_PEEK)
     (SN : SH_NULTERMINATE) : SH_PARSECMD :=
-  ⟨fun {_ _ _ _ _ _ _ _ _ _ _} => wp_shParsecmd UL SS SPL SP SN,
-   fun {_ _ _ _ _ _ _ _ _ _ _} => wp_shParser UL SS SPL SP SN⟩
+  ⟨fun {_ _ _ _ _ _ _ _ _ _} => wp_shParsecmd UL SS SPL SP SN,
+   fun {_ _ _ _ _ _ _ _ _ _} => wp_shParser UL SS SPL SP SN⟩
 
 end Xv6

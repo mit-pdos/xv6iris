@@ -26,7 +26,8 @@ deferred here on ExecBundle/ExecEntry/PinnedExec and K4) are ported there as
 ## Deviations from Rocq
 
 1. The deposit instance is `UexecExecInst.uexecSGXv6`, passed explicitly
-   (`SG := uexecSGXv6`): its `hlc` is not determined by the class.
+   (`SG := uexecSGXv6`); the reason, that its `hlc` was not determined by the class, is
+   moot since the `hasLC` specialisation, but the explicit form stays.
 2. Rocq's `xfam_at Q (xfam_exec P Pmiss Fo Rs)` is `xfamExecAt P Pmiss Fo Rs
    (fun _ => True) emp Q` (UexecExecInst's own exec family,
    `sbundleAt_exec_intro_xv6`); the bundle's AU is `xrowExec`'s (the page-view

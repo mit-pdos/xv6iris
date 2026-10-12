@@ -220,7 +220,7 @@ theorem wp_shGets (UL : UK_LEAVES) : wpShGetsBody (GF := GF) := by
 
 /-- **sh's `gets` holds** (at the engine `UL`). -/
 theorem shGets_holds (UL : UK_LEAVES) : SH_GETS :=
-  ⟨fun {_ _ _ _ _ _ _ _ _ _ _ _} => wp_shGets UL⟩
+  ⟨fun {_ _ _ _ _ _ _ _ _ _ _} => wp_shGets UL⟩
 
 end
 

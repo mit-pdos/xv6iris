@@ -45,7 +45,7 @@ hypotheses, as in Rocq.
 3. `WP (Loop : expr riscv_lang)` is MachCSL's `wpLoop cpu` (the hart's safety
    from a cycle boundary, given the generation's certificate).
 4. `Module Type USER` is a `Prop` structure quantified over the ambient
-   instances (`hlc`, `GF`, `MachGS`, `CurCtx`), the form of the retired
+   instances (`GF`, `MachGS`, `CurCtx`), the form of the retired
    `DiskAcc.DISK_INIT_WM`; Rocq's `GenId` is MachCSL's `genId` (inside `MachGS`), its `CpuId`
    the explicit `cpu`.
 5. **`kmapStatic -∗`** after `hw_config -∗` (coordinator decision, U1-K;

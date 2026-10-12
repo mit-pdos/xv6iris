@@ -227,6 +227,6 @@ end
 
 /-- **sh's `getcmd` holds**, at the engine, the quiet row, memset and gets. -/
 theorem shGetcmd_holds (UL : UK_LEAVES) (HS : UK_SYS_P) (MS : USH_MEMSET) (SGt : SH_GETS) : SH_GETCMD :=
-  ⟨fun {_ _ _ _ _ _ _ _ _ _ _ _} => wp_shGetcmd UL HS MS SGt⟩
+  ⟨fun {_ _ _ _ _ _ _ _ _ _ _} => wp_shGetcmd UL HS MS SGt⟩
 
 end Xv6

@@ -78,8 +78,7 @@ doors) are `Xv6/IcacheEscrowPoolMove.lean`, split off for size at Rocq's own
    `iExists … ; iFrame` at every close).
 8. **Section binders**: each declaration takes only the camera classes it
    names (`IcacheEscrowTok` deviation 8).  `ipoolBody` / `ipoolInv` / `ipool`
-   carry `hlc` (`inv`, and `ipoolExt`'s `escAInv`), so write
-   `` at their uses as for `iregReg`.
+   carry `[MachGS GF]` (`inv`, and `ipoolExt`'s `escAInv`).
 9. `tl_struct` is `infer_instance` after `unfold` (`IcacheEscrowTok`
    deviation 6).
 

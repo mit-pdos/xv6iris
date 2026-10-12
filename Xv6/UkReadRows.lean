@@ -22,7 +22,7 @@ ported either (nothing uses them).
 ## Deviations from Rocq
 
 1. **The instance is `uexecSGXv6`, passed explicitly** (`ExecRun` deviation
-   1: its `hlc` is not determined by the class); the notation `SGX` names it.
+   1); the notation `SGX` names it.
 2. **Words** (UkSysP deviations 1/4): the C `int` reading `bv_signed (trunc32
    v)` is `(BitVec.setWidth 32 v).toInt`; the kernel's count
    `sys_rw_count v` is `argZ v` (the row's own reading; `argZ_setWidth` is

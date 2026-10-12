@@ -53,6 +53,6 @@ end
 /-- **sh's `main` holds** (at the engine `UL`, the rows `HS`/`HSS` and
 getcmd `SC`). -/
 theorem shMain_holds (UL : UK_LEAVES) (HS : UK_SYS_P) (HSS : USH_SYS_P) (SC : SH_GETCMD) : SH_MAIN :=
-  ⟨fun {_ _ _ _ _ _ _ _ _ _ _ _} => wp_shMain UL HS HSS SC⟩
+  ⟨fun {_ _ _ _ _ _ _ _ _ _ _} => wp_shMain UL HS HSS SC⟩
 
 end Xv6

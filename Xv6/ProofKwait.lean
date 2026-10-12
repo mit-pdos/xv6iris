@@ -3229,11 +3229,11 @@ end
 landed one its corollary (`kwait_eb_of_led`). -/
 theorem kwait_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (CO : COPYOUT)
     (FP : FREEPROC) (KL : KILLED) (SP : SLEEP_PREPARE) (SL : SLEEP) : KWAIT :=
-  ⟨fun {_ _} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γw γp γl γk γ j pid V M cs
+  ⟨fun {_} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γw γp γl γk γ j pid V M cs
       hj hproc hK hnoff htier =>
     kwait_eb_of_led Γ cpu k γw γp γl γk γ j pid V M cs hj hproc hK hnoff htier
       (kwait_led_proof MP AC RE CO FP KL SP SL Γ cpu k γw γp γl γk γ j pid V M cs hj hproc hK hnoff htier),
-   fun {_ _} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γw γp γl γk γ j pid V M cs
+   fun {_} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γw γp γl γk γ j pid V M cs
       hj hproc hK hnoff htier =>
     kwait_led_proof MP AC RE CO FP KL SP SL Γ cpu k γw γp γl γk γ j pid V M cs hj hproc hK hnoff htier⟩
 

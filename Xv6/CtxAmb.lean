@@ -93,9 +93,9 @@ split without unfolding a definition; a leaf closes by a named instance, as a
 constant, or -- read at the ambient only for its tier -- by `amb_tier_rfl`. -/
 macro "amb_morph_solve" : tactic => `(tactic| repeat' (first
     | exact MachCSL.instCtxMorphConst _
-    | with_reducible refine @MachCSL.instCtxMorphSep _ _ _ _ _ ?_ ?_
-    | with_reducible refine @MachCSL.instCtxMorphExists _ _ _ _ _ (fun _ => ?_)
-    | with_reducible refine @Xv6.instCtxMorphOr _ _ _ _ _ ?_ ?_
+    | with_reducible refine @MachCSL.instCtxMorphSep _ _ _ _ ?_ ?_
+    | with_reducible refine @MachCSL.instCtxMorphExists _ _ _ _ (fun _ => ?_)
+    | with_reducible refine @Xv6.instCtxMorphOr _ _ _ _ ?_ ?_
     | with_reducible refine MachCSL.ctxMorph_bigSepL _ _ (fun _ _ => ?_)
     | infer_instance
     | exact ctxMorph_ofEq _ (fun _ _ => by amb_tier_rfl)))

@@ -704,7 +704,7 @@ theorem freewalk_ind (KF : KFREE) : ∀ lvl, FwAt lvl := by
     exact ih
 
 theorem freewalk_proof (KF : KFREE) : FREEWALK :=
-  ⟨fun {_hlc _GF} _ _ _ _ cpu k γl γk lvl t ke hlvl hnoff hK hlk hroot hwf hnd hpg hnl =>
+  ⟨fun {_GF} _ _ _ _ cpu k γl γk lvl t ke hlvl hnoff hK hlk hroot hwf hnd hpg hnl =>
     (freewalk_ind KF lvl).wp_fw cpu k γl γk t ke hlvl hnoff hK hlk hroot hwf hnd hpg hnl⟩
 
 end Xv6

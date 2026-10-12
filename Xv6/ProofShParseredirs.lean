@@ -164,6 +164,6 @@ end
 /-- **sh's `parseredirs` holds**, at the engine and its callees' interfaces. -/
 theorem shParseredirs_holds (UL : UK_LEAVES) (SP : SH_PEEK) (SG : SH_GETTOKEN) (SR : SH_REDIRCMD) :
     SH_PARSEREDIRS :=
-  ⟨fun {_ _ _ _ _ _ _ _ _ _ _} => wp_shParseredirs UL SP SG SR⟩
+  ⟨fun {_ _ _ _ _ _ _ _ _ _} => wp_shParseredirs UL SP SG SR⟩
 
 end Xv6

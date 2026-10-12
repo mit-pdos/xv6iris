@@ -15,7 +15,7 @@ def process(path):
     out = []
     # strip the blanket bits
     lines = [l for l in lines if l.strip() != 'variable [CurCtx]' and l.strip() != 'set_option linter.unusedSectionVars false']
-    lines = [l.replace('variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]','variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]') for l in lines]
+    lines = [l.replace('variable {GF : BundledGFunctors} [MachGS GF] [CurCtx]','variable {GF : BundledGFunctors} [MachGS GF]') for l in lines]
     # find declaration starts
     starts = [i for i,l in enumerate(lines) if HDR.match(l) and not l.startswith(' ')]
     starts.append(len(lines))

@@ -462,9 +462,8 @@ heap names. -/
 
 set_option synthInstance.checkSynthOrder false in
 /-- The ambient memory heap: the fixed layer's heap functors at the ambient
-era's heap names.  (`hlc` is an out-parameter of `MachGS`, found from the
-ambient instance; the order check does not know that, as for the former
-field projection.) -/
+era's heap names.  (The order-check exemption dates from `MachGS`'s former
+`hlc` out-parameter, found from the ambient instance; kept as it was.) -/
 @[reducible] instance MachGS.mem [MachGS GF] : genHeapGS PAddr Hist GF MemF :=
   ⟨MachGS.heapName (GF := GF), MachGS.metaName (GF := GF)⟩
 

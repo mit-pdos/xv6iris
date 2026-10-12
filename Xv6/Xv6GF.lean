@@ -431,7 +431,7 @@ the final theorem; here at arbitrary names, to show they add no camera) -/
 /-- **JOINT INSTANTIABILITY** of the capacity-only binder list of the final
 theorem (brief §3, `xv6FsAdequacy`), at ONE concrete functor list: every
 class resolves, together, through the single-camera instances above
-(`MachGpreS` at any `HasLC` and any name for its mono counter). -/
+(`MachGpreS` at any name for its mono counter). -/
 theorem xv6GF_capacityClasses :
     Nonempty (MachGpreS xv6GF) ∧
     Nonempty (Xv6G xv6GF) ∧ Nonempty (WchGpre xv6GF) ∧ Nonempty (CtokG xv6GF) ∧

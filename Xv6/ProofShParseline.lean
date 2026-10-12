@@ -202,6 +202,6 @@ end
 
 /-- **sh's `parseline` holds**, at the engine and its callees' interfaces. -/
 theorem shParseline_holds (UL : UK_LEAVES) (SP : SH_PEEK) (SPP : SH_PARSEPIPE) : SH_PARSELINE :=
-  ⟨fun {_ _ _ _ _ _ _ _ _ _ _} => wp_shParseline UL SP SPP⟩
+  ⟨fun {_ _ _ _ _ _ _ _ _ _} => wp_shParseline UL SP SPP⟩
 
 end Xv6

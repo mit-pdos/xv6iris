@@ -255,6 +255,6 @@ end
 /-- **sh's `parsepipe` holds**, at the engine and its callees' interfaces. -/
 theorem shParsepipe_holds (UL : UK_LEAVES) (SE : SH_PARSEEXEC) (SP : SH_PEEK) (SG : SH_GETTOKEN)
     (SPC : SH_PIPECMD) : SH_PARSEPIPE :=
-  ⟨fun {_ _ _ _ _ _ _ _ _ _ _} => wp_shParsepipe UL SE SP SG SPC⟩
+  ⟨fun {_ _ _ _ _ _ _ _ _ _} => wp_shParsepipe UL SE SP SG SPC⟩
 
 end Xv6

@@ -284,7 +284,7 @@ end
 
 /-- **sh's `memset` holds**, at the engine `UL`. -/
 theorem shMemset_holds (UL : UK_LEAVES) : USH_MEMSET :=
-  ⟨fun {_ _} _ _ _ _ _ _ _ _ _ => wp_ushMemset UL,
-   fun {_ _} _ _ _ _ _ _ _ _ _ => wp_ushMemsetNullP UL⟩
+  ⟨fun {_} _ _ _ _ _ _ _ _ _ => wp_ushMemset UL,
+   fun {_} _ _ _ _ _ _ _ _ _ => wp_ushMemsetNullP UL⟩
 
 end Xv6

@@ -186,7 +186,7 @@ theorem wp_shGettoken (UL : UK_LEAVES) (SC : SH_STRCHR) : wpShGettokenBody (GF :
 
 /-- **sh's `gettoken` holds** (at the engine `UL` and strchr `SC`). -/
 theorem shGettoken_holds (UL : UK_LEAVES) (SC : SH_STRCHR) : SH_GETTOKEN :=
-  ⟨fun {_ _ _ _ _ _ _ _ _ _ _} => wp_shGettoken UL SC⟩
+  ⟨fun {_ _ _ _ _ _ _ _ _ _} => wp_shGettoken UL SC⟩
 
 end
 

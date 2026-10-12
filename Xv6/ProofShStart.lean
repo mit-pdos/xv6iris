@@ -46,6 +46,6 @@ end
 
 /-- **sh's `start` holds** (at the engine `UL` and main `SM`). -/
 theorem shStart_holds (UL : UK_LEAVES) (SM : SH_MAIN) : SH_START :=
-  ⟨fun {_ _ _ _ _ _ _ _ _ _ _ _} => wp_shStart UL SM⟩
+  ⟨fun {_ _ _ _ _ _ _ _ _ _ _} => wp_shStart UL SM⟩
 
 end Xv6

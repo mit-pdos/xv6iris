@@ -480,13 +480,13 @@ theorem holding_locked_refute_proof (MC : MYCPU) {GF : BundledGFunctors.{0}} [Ma
     · ipureintro; rfl
 
 theorem holding_proof (MC : MYCPU) : HOLDING :=
-  ⟨fun {_ _} _ _ cpu k γ s R hsie hK hs => holding_notheld_proof MC cpu k γ s R hsie hK hs,
-   fun {_ _} _ _ cpu k γ s R hsie hK => holding_locked_proof MC cpu k γ s R hsie hK,
-   fun {_ _} _ _ cpu k γ s R D _ Tc hrefute hsie hK hs =>
+  ⟨fun {_} _ _ cpu k γ s R hsie hK hs => holding_notheld_proof MC cpu k γ s R hsie hK hs,
+   fun {_} _ _ cpu k γ s R hsie hK => holding_locked_proof MC cpu k γ s R hsie hK,
+   fun {_} _ _ cpu k γ s R D _ Tc hrefute hsie hK hs =>
      holding_notheld_gen_proof MC cpu k γ s R D Tc hrefute hsie hK hs,
-   fun {_ _} _ _ cpu k γ s R D _ Tc hrefute hsie hK =>
+   fun {_} _ _ cpu k γ s R D _ Tc hrefute hsie hK =>
      holding_locked_gen_proof MC cpu k γ s R D Tc hrefute hsie hK,
-   fun {_ _} _ _ cpu k γ s R D _ hrefute hsie hK =>
+   fun {_} _ _ cpu k γ s R D _ hrefute hsie hK =>
      holding_locked_refute_proof MC cpu k γ s R D hrefute hsie hK⟩
 
 end Xv6
