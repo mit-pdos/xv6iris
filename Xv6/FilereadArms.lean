@@ -63,7 +63,7 @@ theorem frd_exit_m1 (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (v18 w
     pcIs cpu (KA.«fileread» + 0xb4#64) ∗
     frame6s3 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) w1 (k.regs 18#5) w3 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    (∀ (c' : CPU) (R' : RegMap), ⌜calleeSaved k.regs R' ∧ R' 10#5 = -1#64⌝ -∗
+    (∀ (c' : CPU), £ 1 -∗ ∀ (R' : RegMap), ⌜calleeSaved k.regs R' ∧ R' 10#5 = -1#64⌝ -∗
       kctx c' ((k.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) cpu := by
@@ -145,7 +145,7 @@ theorem frd_arm_pipe (PR : PIPEREAD) (Γ : SchedNames) [ClaimIs GF Γ]
   case ptier => k_norm_g; exact htier
   case pn => k_norm_g; exact h12
   -- ===== back from piperead =====
-  iintro %cpu %spie1 %spp1 %R1 %P' %M' %d %⟨hcs1, hext, hdle, hret, hwin⟩ Hk Hpc Hte Hce Hpref Hpriv
+  iintro %cpu Hlc %spie1 %spp1 %R1 %P' %M' %d %⟨hcs1, hext, hdle, hret, hwin⟩ Hk Hpc Hte Hce Hpref Hpriv
     Hgen Hpost
   k_norm_g [frd_ret_70, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed] at hwin
   rw [h11] at hwin
@@ -172,14 +172,14 @@ theorem frd_arm_pipe (PR : PIPEREAD) (Γ : SchedNames) [ClaimIs GF Γ]
   have hr3 := frdRegs_rest2 k (fnode fk) (R1 10#5) (BitVec.ofInt 64 n) (k.regs 9#5) (k.regs 19#5) _ hr2
   -- +0x76  c.j +0x5e
   k_step_e (wp_s_j cpu _ (KA.«fileread» + 0x76#64) true 2097128#21)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] £ Hlc
   iintro Hk Hpc
   iapply (frd_tail cpu k spie1 spp1 _ (R1 10#5) (k.regs 9#5) (k.regs 19#5) hK6 hr3)
     $$ [- $Hk $Hpc $Hframe $Hte $Hce]
   rotate_right 1
   k_norm_g
   iframe
-  iintro %c' %R' %⟨hcs, h10'⟩ Hk Hpc Hte Hce
+  iintro %c' Hlc %R' %⟨hcs, h10'⟩ Hk Hpc Hte Hce
   ihave Hpay := Hpback $$ Hpref
   ihave Hfields := Hfw $$ Hpcell
   ihave Href := filerw_ref_close γ fk q (.open true wb (.pipe γp)) C $$ [Htok Hfields Hpay]
@@ -190,7 +190,7 @@ theorem frd_arm_pipe (PR : PIPEREAD) (Γ : SchedNames) [ClaimIs GF Γ]
     · exact Or.inr hm
     · exact Or.inl (by rw [hd, BitVec.ofInt_natCast])
   unfold frdK
-  iapply HΦ $$ %c' %spie1 %spp1 %R' %P' %M' %d [] Hk Hpc Hte Hce Href Hpriv Hgen [] [HP Hpost]
+  iapply HΦ $$ %c' Hlc %spie1 %spp1 %R' %P' %M' %d [] Hk Hpc Hte Hce Href Hpriv Hgen [] [HP Hpost]
   · ipureintro; exact ⟨hcs, hext, hdle, hr10, hwin⟩
   · iapply frd_envout_pipe
   · unfold filereadArms

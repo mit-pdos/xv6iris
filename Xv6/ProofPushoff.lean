@@ -156,7 +156,7 @@ theorem push_off_tail {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx] (M : MYCP
   k_norm
   iframe
   inext
-  iintro Hk Hpc
+  iintro Hk Hpc _
   iapply HΦ $$ %_ Hk Hpc
   ipureintro
   have hc : csRegs k.regs (R2.set 15#5 (BitVec.ofNat 64 (k.noff + 1))) :=
@@ -305,12 +305,12 @@ theorem push_off_proof (M : MYCPU) : PUSHOFF := ⟨fun {GF} _ _ cpu k hnoff hK =
   iintro %c1 %hp1 Hk Hpc Hframe
   -- csrrci a5,sstatus,2: interrupts off from here on, at this hart
   k_step_gen (wp_s_csrrci_sstatus_flip c1 _ (KA.«push_off» + 0xa#64) false 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
-    $$ [- $Hk $Hpc] next c2 hp2
+    $$ [- $Hk $Hpc] next c2 hp2 £ Hlc
   iintro %spie %spp %v %⟨hsp, hv⟩ Hk Hpc Harm
   have hK4 : 4 ≤ k.avail := by omega
   k_norm_g [KCtx.intrOff_withRegs, KCtx.intrOff_pushed, hK4]
   have hpin : k.sie = false ∨ k.proc = 0#64 → c2 = cpu := fun h => (hp2 h).trans (hp1 h)
-  ihave HΦ' := wpNext_at _ _ _ c2 _ hpin $$ HΦ
+  ihave HΦ' := wpNext_at _ _ _ c2 _ hpin $$ HΦ Hlc
   have hwf' := KCtx.wf_intrOff k spie spp hwf
   have heq := KCtx.pushOffB_intrOff k spie spp hwf
   rw [show k.regs = (k.intrOff spie spp).regs from rfl]

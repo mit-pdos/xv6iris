@@ -167,7 +167,7 @@ theorem sfs_tail (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (hK : 4 �
     pcIs cpu (KA.«sys_fstat» + 0x32#64) ∗
     frame4s0 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    (∀ (c' : CPU) (R' : RegMap), ⌜calleeSaved k.regs R' ∧ R' 10#5 = R 10#5⌝ -∗
+    (∀ (c' : CPU), £ 1 -∗ ∀ (R' : RegMap), ⌜calleeSaved k.regs R' ∧ R' 10#5 = R 10#5⌝ -∗
       kctx c' ((k.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) cpu := by
@@ -181,10 +181,10 @@ theorem sfs_tail (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (hK : 4 �
   k_norm_g
   iframe
   inext
-  k_next_e
+  k_next_e £ Hlc
   iintro Hk Hpc
   k_norm_g
-  iapply Hnext $$ %cpu %_ [] Hk Hpc Hte Hce
+  iapply Hnext $$ %cpu Hlc %_ [] Hk Hpc Hte Hce
   ipureintro
   refine ⟨sfs_cs_epi k R hr, ?_⟩
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
@@ -215,7 +215,7 @@ theorem sfs_filestat (FS : FILESTAT) (Γ : SchedNames) [ClaimIs GF Γ]
     fileRef γ fk q st ∗ procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     filestatEnv st ∗
-    (∀ c' : CPU, filestatPost k' γ fk q st j pid V M c')
+    (∀ c' : CPU, £ 1 -∗ filestatPost k' γ fk q st j pid V M c')
     ⊢ wpLoop (GF := GF) c := by
   have h := FS.wp_filestat_eb (GF := GF) Γ c k' γ fk q st j pid V M γkl γk
     hK hfk hj hproc hnoff htier ha0
@@ -224,9 +224,9 @@ theorem sfs_filestat (FS : FILESTAT) (Γ : SchedNames) [ClaimIs GF Γ]
   iintro ⟨Hk, Hpc, Hpi, Hte, Hce, Hpe, Href, Hpriv, Hkl, Hav, Henv, HK⟩
   iapply h
   iframe Hk Hpc Hpi Hte Hce Hpe Href Hpriv Hkl Hav Henv
-  iapply wpNext_intro_pin
-  iintro %c' %-
-  iapply HK
+  iapply wpNext_intro_pin_lc
+  iintro %c' %- Hlc
+  iapply HK $$ %c' Hlc
 
 end
 

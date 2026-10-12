@@ -122,7 +122,7 @@ theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
       hle hip hr h10)
   iframe Hk Hpc Hte Hce Hpid Hip Hshr Hbs
   iframe #
-  iintro %cpu %spie1 %spp1 %R1 %dn %bm %K %⟨hr1, hK1⟩ #Hflr Hk Hpc Hte Hce Hpid Hip Hbs Hlk
+  iintro %cpu Hlc %spie1 %spp1 %R1 %dn %bm %K %⟨hr1, hK1⟩ #Hflr Hk Hpc Hte Hce Hpid Hip Hbs Hlk
     Hoff Hheld #Hshot'
   -- the lock-held ghost steps before readi: open the quarter, check `f->off` out
   iapply wpLoop_fupd
@@ -144,7 +144,7 @@ theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
       hproc hnoff htier ht hok hip hwf hn0 hn1 hr1)
   iframe Hk Hpc Hte Hce Hip Hcell Hdev Hmeta Hmap Hblk Hpriv Hbs
   iframe #
-  iintro %cpu %spie2 %spp2 %R2 %tot %dd %P' %M' %a0 %⟨hr2, hle2, harm, hext, himg⟩ Hk Hpc Hte Hce
+  iintro %cpu Hlc %spie2 %spp2 %R2 %tot %dd %P' %M' %a0 %⟨hr2, hle2, harm, hext, himg⟩ Hk Hpc Hte Hce
     Hip Hcell Hdev Hmeta Hmap Hblk Hpriv Hbs
   have hcap : v.toNat + dd ≤ MAXFILE * BSIZE := by
     have := fileread_off_advance dn.diSize v.toNat n.toNat tot hle2 hok.2.2.2.2.1 hwf
@@ -169,7 +169,7 @@ theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
       (k.regs 9#5) (k.regs 19#5) hK hnoff hlocks htier hik hle hip (BitVec.ofInt 64 n) hr2)
   iframe Hk Hpc Hframe Hte Hce Hip Hlk Hrows Hheld Hpid
   iframe #
-  iintro %cpu %spie3 %spp3 %R3 %hr3 Hk Hpc Hframe Hte Hce Hpid Hip Hshr
+  iintro %cpu Hlc %spie3 %spp3 %R3 %hr3 Hk Hpc Hframe Hte Hce Hpid Hip Hshr
   ihave Hpid : wordPointsTo (pPid (procAddr j)) 4 pidPriv pid $$ [Hpid]
   · rw [← hproc]; iexact Hpid
   ihave Hpriv := Hpback $$ Hpid
@@ -180,7 +180,7 @@ theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
   -- +0x5e : the tail
   iapply (frd_tail cpu k spie3 spp3 R3 a0 (k.regs 9#5) (k.regs 19#5) hK6 hr3)
   iframe Hk Hpc Hframe Hte Hce
-  iintro %c' %R' %⟨hcs, h10'⟩ Hk Hpc Hte Hce
+  iintro %c' Hlc %R' %⟨hcs, h10'⟩ Hk Hpc Hte Hce
   icases frd_pageLenEv (procAddr j) pid V P' M' $$ Hpriv with ⟨%hpl, Hpriv⟩
   have hclamp := rdClamp_le dn.diSize v.toNat n.toNat
   have hr10 : R' 10#5 = BitVec.ofNat 64 tot ∨ R' 10#5 = -1#64 := by
@@ -190,7 +190,7 @@ theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
     · exact Or.inl h
   have hwin := frd_wrote_rdImg V.upt P' M M' (k.regs 11#5) data v.toNat tot himg
   unfold frdK
-  iapply HΦ $$ %c' %spie3 %spp3 %R' %P' %M' %tot [] Hk Hpc Hte Hce Href Hpriv Hgen [Hbs] [HP Hrecv]
+  iapply HΦ $$ %c' Hlc %spie3 %spp3 %R' %P' %M' %tot [] Hk Hpc Hte Hce Href Hpriv Hgen [Hbs] [HP Hrecv]
   · ipureintro; exact ⟨hcs, hext, by omega, hr10, hwin⟩
   · iapply frd_envout_inode $$ Hbs
   unfold filereadArms

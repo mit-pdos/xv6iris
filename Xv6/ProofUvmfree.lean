@@ -155,11 +155,11 @@ theorem uvmfree_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
     with [KCtx.pop_pushed _ _ _ hK', hR2] next c4 hp4
   iintro Hk Hpc
   k_step_gen (wp_s_ret c4 _ (KA.«uvmfree» + 0x1c#64) true 1#5) from (text_instr _ _ _ _ rfl rfl) Htext
-    $$ [- $Hk $Hpc] next c5 hp5
+    $$ [- $Hk $Hpc] next c5 hp5 £ Hlc
   iintro Hk Hpc
   ihave HΦ' := wpNext_at _ _ _ c5 _
     (fun h => (hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans
-      ((hp1 h).trans (hpin h)))))) $$ HΦ
+      ((hp1 h).trans (hpin h)))))) $$ HΦ Hlc
   iapply HΦ' $$ %spie %spp %_ %hsp Hk Hpc
   ipureintro
   unfold calleeSaved

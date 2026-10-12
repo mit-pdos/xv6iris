@@ -318,11 +318,10 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [Bioslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
 
-omit [MachGS GF] in
 /-- **The exit slot, at any hart** (deviation 2, Rocq `sysc_exit_retarget`):
 the process address is nonzero, so the crossing's pin is vacuous. -/
 theorem syscall_post_at (p : BitVec 64) (hp : p ≠ 0#64) (c0 c : CPU) (K : CPU → IProp GF) :
-    wpNext true p c0 K ⊢ K c :=
+    wpNext true p c0 K ⊢ £ 1 -∗ K c :=
   wpNext_at true p c0 c K (fun h => h.elim (fun h => absurd h (by decide)) (fun h => absurd h hp))
 
 /-- **WHAT THE ARM FOR TABLE INDEX `n` PROVES** (Rocq `sysc_arm_goal`):

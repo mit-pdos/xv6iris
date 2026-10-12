@@ -209,7 +209,7 @@ theorem acquire_body (HO : HOLDING) (MC : MYCPU) {GF : BundledGFunctors.{0}} [Ma
   k_norm
   iframe
   inext
-  iintro Hk Hpc
+  iintro Hk Hpc _
   k_norm
   iapply HΦ $$ %_ Hk Hpc [] [Hlc Hheld] HR Hview
   · ipureintro
@@ -279,15 +279,15 @@ theorem acquire_llb_proof (PU : PUSHOFF) (HO : HOLDING) (MC : MYCPU) : ACQUIRE_L
   case hn => k_norm_g; omega
   case hK => k_norm_g; omega
   k_norm_g
-  iapply wpNext_intro_pin
-  iintro %c4 %hp4 %spie %spp %R2 %hsp Hk Hpc %hcs2 Harm
+  iapply wpNext_intro_pin_lc
+  iintro %c4 %hp4 Hlc %spie %spp %R2 %hsp Hk Hpc %hcs2 Harm
   have hK4 : 4 ≤ k.avail := by omega
   have hret1 : jumpPc (KA.«acquire» + 0x10#64) = (KA.«acquire» + 0x10#64) := by decide
   k_norm_g [hret1, KCtx.pushOffAt_withRegs, KCtx.pushOffAt_pushed, hK4]
   k_norm_g at hcs2
   have hpin : k.sie = false ∨ k.proc = 0#64 → c4 = cpu :=
     fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))
-  ihave HΦ' := wpNext_at _ _ _ c4 _ hpin $$ HΦ
+  ihave HΦ' := wpNext_at _ _ _ c4 _ hpin $$ HΦ Hlc
   rw [show k.regs = (k.pushOffAt spie spp).regs from rfl]
   iapply (acquire_body HO MC c4 (k.pushOffAt spie spp) rfl (by simp only [KCtx.pushOffAt_avail]; omega) γ s R tl
     (by simp only [KCtx.pushOffAt_locks]; exact hs)
@@ -485,7 +485,7 @@ theorem acquire_body_gen (HO : HOLDING) (MC : MYCPU) {GF : BundledGFunctors.{0}}
   k_norm
   iframe
   inext
-  iintro Hk Hpc
+  iintro Hk Hpc _
   k_norm
   iapply HΦ $$ %_ Hk Hpc [] [Hlc Hheld] HR Hview Hcred
   · ipureintro
@@ -554,15 +554,15 @@ theorem acquire_gen_llb_proof (PU : PUSHOFF) (HO : HOLDING) (MC : MYCPU) : ACQUI
   case hn => k_norm_g; omega
   case hK => k_norm_g; omega
   k_norm_g
-  iapply wpNext_intro_pin
-  iintro %c4 %hp4 %spie %spp %R2 %hsp Hk Hpc %hcs2 Harm
+  iapply wpNext_intro_pin_lc
+  iintro %c4 %hp4 Hlc %spie %spp %R2 %hsp Hk Hpc %hcs2 Harm
   have hK4 : 4 ≤ k.avail := by omega
   have hret1 : jumpPc (KA.«acquire» + 0x10#64) = (KA.«acquire» + 0x10#64) := by decide
   k_norm_g [hret1, KCtx.pushOffAt_withRegs, KCtx.pushOffAt_pushed, hK4]
   k_norm_g at hcs2
   have hpin : k.sie = false ∨ k.proc = 0#64 → c4 = cpu :=
     fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))
-  ihave HΦ' := wpNext_at _ _ _ c4 _ hpin $$ HΦ
+  ihave HΦ' := wpNext_at _ _ _ c4 _ hpin $$ HΦ Hlc
   rw [show k.regs = (k.pushOffAt spie spp).regs from rfl]
   iapply (acquire_body_gen HO MC c4 (k.pushOffAt spie spp) rfl (by simp only [KCtx.pushOffAt_avail]; omega) γ s R D Tc hrefute tl
     (by simp only [KCtx.pushOffAt_locks]; exact hs)

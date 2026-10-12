@@ -172,11 +172,11 @@ theorem myproc_proof (PU : PUSHOFF) (PO : POPOFF) : MYPROC := ⟨fun {GF} _ _ cp
   iframe
   inext
   k_norm_g
-  iapply wpNext_intro_pin
-  iintro %c6 %hp6 Hk Hpc
+  iapply wpNext_intro_pin_lc
+  iintro %c6 %hp6 Hlc Hk Hpc
   have hpin : k.sie = false ∨ k.proc = 0#64 → c6 = cpu :=
     fun h => (hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))
-  ihave HΦ' := wpNext_at _ _ _ c6 _ hpin $$ HΦ
+  ihave HΦ' := wpNext_at _ _ _ c6 _ hpin $$ HΦ Hlc
   k_norm_g
   iapply HΦ' $$ %spie %spp %_ %hsp Hk Hpc
   ipureintro

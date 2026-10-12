@@ -412,7 +412,7 @@ theorem iput_lk_a (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_NB)
   rotate_right 1
   case h10 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   case h1 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-  iintro %c %R3 %hcs3 Hk Hpc Hte Hce
+  iintro %c Hlc %R3 %hcs3 Hk Hpc Hte Hce
   rw [iput_lk_ret_6a]
   obtain ⟨f2, f8, f9, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27⟩ := hcs3
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at f2 f9 f18 f19 f20 f21 f22 f23 f24 f25 f26 f27

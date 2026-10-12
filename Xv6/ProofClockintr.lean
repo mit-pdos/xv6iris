@@ -245,7 +245,7 @@ theorem clockintr_tail (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (hK : 2 ≤
   k_norm
   iframe
   inext
-  iintro Hk Hpc
+  iintro Hk Hpc _
   unfold ckPost
   iapply HΦ $$ %_ Hk Hpc
   ipureintro

@@ -115,7 +115,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [Bioslot
 
 /-- The step's continuation (`sysExecStepBody`'s, verbatim). -/
 def sysExecStepOut (k : KCtx) (A : SysExecArgs) (i : Nat) (pl rest : List (BitVec 8)) : IProp GF :=
-  iprop(∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (kv' : Nat) (i' : Nat)
+  iprop(∀ (c' : CPU), £ 1 -∗ ∀ (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (kv' : Nat) (i' : Nat)
         (pg' : Nat → BitVec 64)
         (alen' : Nat → Nat) (afun' : Nat → Nat → BitVec 8) (uvf' : Nat → BitVec 64),
       ((⌜i' = i + 1⌝ ∗ sysExecLoopSt k A spie' spp' R' P' kv' i' pg' alen' afun' uvf' pl
@@ -185,7 +185,7 @@ theorem sys_exec_step_str (FS : FETCHSTR) (Γ : SchedNames) (k : KCtx) (A : SysE
   case gn => k_norm_g; exact hS.hnoff
   case gK => k_norm_g; omega
   case gmx => k_norm_g; rw [List.length_replicate]
-  iintro %cpu %spie1 %spp1 %R1 %P2 %bs %kv2 %⟨hcs1, hext1, hret⟩ Hk Hpc Hte Hce %hkv2 Hbare Hbuf
+  iintro %cpu Hlc %spie1 %spp1 %R1 %P2 %bs %kv2 %⟨hcs1, hext1, hret⟩ Hk Hpc Hte Hce %hkv2 Hbare Hbuf
   have hkv12 : A.V.ev ≤ kv2 := Nat.le_trans hkv hkv2
   k_norm_g [sys_exec_ret_86, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 : sysExecLoopPins k R1 i := by
@@ -240,7 +240,7 @@ theorem sys_exec_step_str (FS : FETCHSTR) (Γ : SchedNames) (k : KCtx) (A : SysE
       have hp3 := sys_exec_pins_succ k R1 i hp1
       ihave H60 := (show wordPointsTo (GF := GF) (k.regs 2#5 + 0xFFFFFFFFFFFFFE20#64) 8 (DFrac.own 1) u ⊢
         wordPointsTo (sysExecUarg (k.regs 2#5)) 8 (DFrac.own 1) u from .rfl) $$ H60
-      iapply HΦ $$ %cpu %spie1 %spp1 %_ %P2 %kv2 %(i + 1) %(sysExecUpd pg i p)
+      iapply HΦ $$ %cpu Hlc %spie1 %spp1 %_ %P2 %kv2 %(i + 1) %(sysExecUpd pg i p)
         %(sysExecUpd alen i pl'.length) %(sysExecUpd afun i (sysfilePfun bs)) %(sysExecUpd uvf i u)
       iright
       iright
@@ -260,7 +260,7 @@ theorem sys_exec_step_str (FS : FETCHSTR) (Γ : SchedNames) (k : KCtx) (A : SysE
       have hp3 := sys_exec_pins_succ k R1 i hp1
       ihave H60 := (show wordPointsTo (GF := GF) (k.regs 2#5 + 0xFFFFFFFFFFFFFE20#64) 8 (DFrac.own 1) u ⊢
         wordPointsTo (sysExecUarg (k.regs 2#5)) 8 (DFrac.own 1) u from .rfl) $$ H60
-      iapply HΦ $$ %cpu %spie1 %spp1 %_ %P2 %kv2 %(i + 1) %(sysExecUpd pg i p)
+      iapply HΦ $$ %cpu Hlc %spie1 %spp1 %_ %P2 %kv2 %(i + 1) %(sysExecUpd pg i p)
         %(sysExecUpd alen i pl'.length) %(sysExecUpd afun i (sysfilePfun bs)) %(sysExecUpd uvf i u)
       ileft
       unfold sysExecLoopSt
@@ -283,7 +283,7 @@ theorem sys_exec_step_str (FS : FETCHSTR) (Γ : SchedNames) (k : KCtx) (A : SysE
       iexact Hbuf
     ihave H60 := (show wordPointsTo (GF := GF) (k.regs 2#5 + 0xFFFFFFFFFFFFFE20#64) 8 (DFrac.own 1) u ⊢
       wordPointsTo (sysExecUarg (k.regs 2#5)) 8 (DFrac.own 1) u from .rfl) $$ H60
-    iapply HΦ $$ %cpu %spie1 %spp1 %R1 %P2 %kv2 %(i + 1) %(sysExecUpd pg i p) %alen
+    iapply HΦ $$ %cpu Hlc %spie1 %spp1 %R1 %P2 %kv2 %(i + 1) %(sysExecUpd pg i p) %alen
       %(sysExecUpd afun i (sysfilePfun bs)) %uvf
     iright
     iright
@@ -343,7 +343,7 @@ theorem sys_exec_step_kalloc (KL : KALLOC) (FS : FETCHSTR) (Γ : SchedNames) (k 
   iframe #
   case gn => k_norm_g; exact hS.hnoff
   case gK => k_norm_g; omega
-  iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hl Hpost
+  iintro %cpu Hlc %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hl Hpost
   ihave Hl := actLend_congr hS.hproc (kv + 1) $$ Hl
   icases Hlb $$ %(kv + 1) %(Nat.le_succ kv) Hl with ⟨%kv1, %hkv1, Hcnt⟩
   ihave Hblk := Hblk $$ %kv1 Hcnt
@@ -380,7 +380,7 @@ theorem sys_exec_step_kalloc (KL : KALLOC) (FS : FETCHSTR) (Γ : SchedNames) (k 
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr0, MachCSL.beqz_zero]
     iintro Hk Hpc
     unfold sysExecStepOut
-    iapply HΦ $$ %cpu %spie1 %spp1 %_ %P %kv1 %i %pg %alen %afun %uvf
+    iapply HΦ $$ %cpu Hlc %spie1 %spp1 %_ %P %kv1 %i %pg %alen %afun %uvf
     iright
     iright
     unfold sysExecBadSt
@@ -460,7 +460,7 @@ theorem sys_exec_step (FA : FETCHADDR) (KL : KALLOC) (FS : FETCHSTR) (Γ : Sched
   case gpr => k_norm_g; exact hS.hproc
   case gn => k_norm_g; exact hS.hnoff
   case gK => k_norm_g; omega
-  iintro %cpu %spie1 %spp1 %R1 %P2 %w %kv2 %⟨hcs1, hext1, hans⟩ Hk Hpc Hte Hce %hkv2 Hext H60
+  iintro %cpu Hlc %spie1 %spp1 %R1 %P2 %w %kv2 %⟨hcs1, hext1, hans⟩ Hk Hpc Hte Hce %hkv2 Hext H60
   have hkv12 : A.V.ev ≤ kv2 := Nat.le_trans hkv hkv2
   k_norm_g [sys_exec_ret_66, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 : sysExecLoopPins k R1 i := by
@@ -495,7 +495,7 @@ theorem sys_exec_step (FA : FETCHADDR) (KL : KALLOC) (FS : FETCHSTR) (Γ : Sched
     k_step_e (wp_s_branch cpu _ (KA.«sys_exec» + 0x66#64) false 44#13 10#5 0#5 (by decide) bop.BLT)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hm1, MachCSL.bltz_m1]
     iintro Hk Hpc
-    iapply HΦ $$ %cpu %spie1 %spp1 %R1 %P2 %kv2 %i %pg %alen %afun %uvf
+    iapply HΦ $$ %cpu Hlc %spie1 %spp1 %R1 %P2 %kv2 %i %pg %alen %afun %uvf
     iright
     iright
     unfold sysExecBadSt
@@ -530,7 +530,7 @@ theorem sys_exec_step (FA : FETCHADDR) (KL : KALLOC) (FS : FETCHSTR) (Γ : Sched
       k_step_e (wp_s_branch cpu _ (KA.«sys_exec» + 0x6e#64) true 72#13 15#5 0#5 (by decide) bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hwz, MachCSL.beqz_zero]
       iintro Hk Hpc
-      iapply HΦ $$ %cpu %spie1 %spp1 %(R1.set 15#5 w) %P2 %kv2 %i %pg %alen %afun %uvf
+      iapply HΦ $$ %cpu Hlc %spie1 %spp1 %(R1.set 15#5 w) %P2 %kv2 %i %pg %alen %afun %uvf
       iright
       ileft
       isplitr

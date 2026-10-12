@@ -227,13 +227,13 @@ theorem sc_exit (Γ : SchedNames) (cr : CPU) (k : KCtx) (γ : FileNames) (γd : 
     $$ [- $Hk $Hpc $Hframe]
   isplitl [Hpost Hcp Hpe Hfe Hir]
   · iframe Hpost Hcp Hpe Hfe Hir
-  iapply wpNext_intro_pin
-  iintro %c %hc %R'' Hk Hpc %hfacts ⟨Hpost, Hcp, Hpe, Hfe, Hir⟩
+  iapply wpNext_intro_pin_lc
+  iintro %c %hc Hlc %R'' Hk Hpc %hfacts ⟨Hpost, Hcp, Hpe, Hfe, Hir⟩
   have hc' : k.sie = false ∨ k.proc = 0#64 → c = cr := hc
   ihave Hte := trapCsrsExt_move _ _ _ (fun h => hc' (Or.inl h)) $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ (fun h => hc' (Or.inl h)) $$ Hce
   ihave HΦ := wpNext_at true k.proc cr c _
-    (fun h => hc' (h.elim (fun e => absurd e (by decide)) Or.inr)) $$ Hnext
+    (fun h => hc' (h.elim (fun e => absurd e (by decide)) Or.inr)) $$ Hnext Hlc
   k_norm_g
   iapply HΦ $$ %spie %spp %R'' %kv [] Hk Hpc Hte Hce %hkv [Hpost] Hcp Hpe Hfe Hir
   · ipureintro; exact hfacts.1

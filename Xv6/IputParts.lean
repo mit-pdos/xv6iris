@@ -277,7 +277,7 @@ it there.  The complement `trapCsrsExt` / `cpuClaimExt` comes back at the
 index `k.sie` of the caller. -/
 def iputPost (k : KCtx) (n : Nat) (Sb : List Nat) (crb cru crz : Bool)
     (tid : Nat) (qtx : Qp) (pidv : BitVec 32) (dqp dqb dqs : DFrac) (rg : Bool) : IProp GF :=
-  iprop(∀ (cpu' : CPU) (spie spp : Bool) (R' : RegMap) (n' : Nat)
+  iprop(∀ (cpu' : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (n' : Nat)
       (Sb' : List Nat) (w : Bool),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -392,12 +392,12 @@ theorem iput_epi (c : CPU) (k : KCtx) (s p : Bool) (R : RegMap)
   k_norm_g
   iframe
   inext
-  iapply wpNext_intro_pin
-  iintro %c2 %hpin Hk Hpc
+  iapply wpNext_intro_pin_lc
+  iintro %c2 %hpin Hlc Hk Hpc
   k_ext_move
   unfold iputPost iputRet
   icases Hret with ⟨Hpid, Hsb, Hsi, Hsl, Hop, Hrg⟩
-  iapply Hpost $$ %c2 %s %p %_ %n' %Sb' %w [] [Hk] Hpc Hte Hce Hpid Hsb Hsi Hsl %hled Hop Htx
+  iapply Hpost $$ %c2 Hlc %s %p %_ %n' %Sb' %w [] [Hk] Hpc Hte Hce Hpid Hsb Hsi Hsl %hled Hop Htx
     Hslot Hrg
   · ipureintro
     exact iput_calleeSaved_epi k.regs R h18 h19 h20 hpins
@@ -490,7 +490,7 @@ theorem iput_release (RH : RELEASE_HOOK) (c : CPU) (kb : KCtx) (hwf : kb.wf)
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
     locked fscItlock c ∗ sieArm c kb.sie kb.proc ∗ iputRin curCtx ∗
     trapCsrsExt c kb.sie ∗ cpuClaimExt c kb.sie kb.proc ∗
-    (∀ (c' : CPU) (R' : RegMap), ⌜calleeSaved R R'⌝ -∗ kctx c' ((kb.pushed 6).withRegs R') -∗
+    (∀ (c' : CPU), £ 1 -∗ ∀ (R' : RegMap), ⌜calleeSaved R R'⌝ -∗ kctx c' ((kb.pushed 6).withRegs R') -∗
       pcIs c' (jumpPc ret) -∗ trapCsrsExt c' kb.sie -∗ cpuClaimExt c' kb.sie kb.proc -∗
       wpLoop c')
     ⊢ wpLoop (GF := GF) c := by
@@ -520,11 +520,11 @@ theorem iput_release (RH : RELEASE_HOOK) (c : CPU) (kb : KCtx) (hwf : kb.wf)
   · iapply itableCtxHook
   isplitl [Harm]
   · iapply (popArm_sie c kb _ (by rfl)) $$ Harm
-  iapply wpNext_intro_pin
-  iintro %cr %hpin %R' Hk Hpc %hcs
+  iapply wpNext_intro_pin_lc
+  iintro %cr %hpin Hlc %R' Hk Hpc %hcs
   k_ext_move
   k_norm_g [hfilt, KCtx.pushOffAt_popExit kb kb.spie kb.spp hwf, hkb, h1]
-  iapply Hcont $$ %cr %R' %hcs Hk Hpc Hte Hce
+  iapply Hcont $$ %cr Hlc %R' %hcs Hk Hpc Hte Hce
 
 end Lock
 

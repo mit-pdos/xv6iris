@@ -271,12 +271,12 @@ theorem walkaddr_proof (W : WALK_NOALLOC) : WALKADDR :=
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
     iintro Hk Hpc
     k_step_gen (wp_s_ret c4 _ (KA.«walkaddr» + 0xa#64) true 1#5)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c5 hp5 £ Hlc
     iintro Hk Hpc
     k_norm_g
     have hpinE : k.sie = false ∨ k.proc = 0#64 → c5 = cpu := fun h =>
       (hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))
-    ihave HΦ := wpNext_at _ _ _ c5 _ hpinE $$ HΦ
+    ihave HΦ := wpNext_at _ _ _ c5 _ hpinE $$ HΦ Hlc
     iapply HΦ $$ %_ Hk Hpc Htree
     ipureintro
     refine ⟨?_, ?_⟩

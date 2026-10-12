@@ -155,9 +155,9 @@ theorem writei_entry (IU : IUPDATE) (BM : BMAP) (BR : BREAD) (LW : LOG_WRITE) (B
   ihave Hnext : wiContEb (GF := GF) k A $$ [Hnext]
   · unfold wiContEb
     iintro %c' %spie %spp %R' %tot %bm' %data' %dn' %dn0' %n' %wrote %dist %dstb %P' %Sb' %hcs
-      %hout Hk Hpc Hte Hce Hcells Hmeta Hmap Hblk Hdn Hsrc Hsl Hop
+      %hout Hlc Hk Hpc Hte Hce Hcells Hmeta Hmap Hblk Hdn Hsrc Hsl Hop
     ihave HΦ := wpNext_at true k.proc cpu c' _ (fun hc => Or.elim hc (fun hx => absurd hx (by decide))
-      (fun hx => absurd (hA.hproc.symm.trans hx) (procAddr_nonzero hA.hj))) $$ Hnext
+      (fun hx => absurd (hA.hproc.symm.trans hx) (procAddr_nonzero hA.hj))) $$ Hnext Hlc
     unfold wiCells
     icases Hcells with ⟨Hidev, Hinum, Hsi, Hsz, Hbms⟩
     iapply HΦ $$ %spie %spp %R' %tot %bm' %data' %dn' %dn0' %n' %wrote %dist %dstb %P' %Sb' %hcs
@@ -218,12 +218,12 @@ theorem writei_entry (IU : IUPDATE) (BM : BMAP) (BR : BREAD) (LW : LOG_WRITE) (B
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     k_step_e (wp_s_ret cpu _ (KA.«writei» + 0x100#64) true 1#5)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] £ Hlc
     iintro Hk Hpc
     unfold wiContEb
     ihave Hk := MachCSL.kctx_self cpu k _ $$ Hk
     iapply Hnext $$ %cpu %k.spie %k.spp %_ %0 %A.bm %A.data %A.dn %A.dn0 %A.ncount %(fun _ => 0#8) %0
-      %(fun _ => 0#8) %A.V.upt %A.Sb [] [] Hk Hpc Hte Hce Hcells Hmeta Hmap Hblk Hdn Hsrc Hsl Hop
+      %(fun _ => 0#8) %A.V.upt %A.Sb [] [] Hlc Hk Hpc Hte Hce Hcells Hmeta Hmap Hblk Hdn Hsrc Hsl Hop
     · ipureintro
       unfold calleeSaved
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]

@@ -223,7 +223,7 @@ theorem sysfile_argint (AI : ARGINT) (cpu : CPU) (k' : KCtx) (se : Bool) (hs : k
     trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗
     wordPointsTo (pTrapframe pj) 8 dqt (pageAddr tfp) ∗ tfPageAt tfp ws ∗
     wordPointsTo (k'.regs 11#5) 4 (DFrac.own 1) old ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap),
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c se -∗ cpuClaimExt c se pj -∗
@@ -238,12 +238,12 @@ theorem sysfile_argint (AI : ARGINT) (cpu : CPU) (k' : KCtx) (se : Bool) (hs : k
   iintro ⟨Hk, Hpc, Hte, Hce, Htf, Hpg, Hcell, HK⟩
   iapply h
   iframe Hk Hpc Htf Hpg Hcell
-  iapply wpNext_intro_pin
-  iintro %c %hpin %spie %spp %R' %- Hk Hpc %hcs Htf Hpg Hcell
+  iapply wpNext_intro_pin_lc
+  iintro %c %hpin Hlc %spie %spp %R' %- Hk Hpc %hcs Htf Hpg Hcell
   have hpin' : k'.sie = false → c = cpu := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
-  iapply HK $$ %c %spie %spp %R' %hcs Hk Hpc Hte Hce Htf Hpg Hcell
+  iapply HK $$ %c Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Htf Hpg Hcell
 
 set_option maxHeartbeats 8000000 in
 /-- `argstr(i, buf, max)` (Rocq `Argstr.wp_argstr_sconf`): argstr
@@ -260,7 +260,7 @@ theorem sysfile_argstr (AS : ARGSTR) (Γ : SchedNames) (cpu : CPU) (k' : KCtx) (
     kctx cpu k' ∗ pcIs cpu KA.«argstr» ∗
     trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv Γ ∗
     procPrivBareAt curCtx pa pid V M ∗ byteBuf (k'.regs 11#5) (DFrac.own 1) old ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (bs : List (BitVec 8)) (kv : Nat),
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (bs : List (BitVec 8)) (kv : Nat),
       ⌜calleeSaved k'.regs R' ∧ V.upt.extSz V.sz P' ∧
         fetchstrRet (viewLazy V.upt V.sz M) v.toNat old bs (R' 10#5)⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
@@ -282,12 +282,12 @@ theorem sysfile_argstr (AS : ARGSTR) (Γ : SchedNames) (cpu : CPU) (k' : KCtx) (
   iapply h
   iframe Hk Hpc Hblk Hbuf
   iframe #
-  iapply wpNext_intro_pin
-  iintro %c %hpin %spie %spp %R' %- Hk Hpc ⟨%P', %bs, %kv, %hf, %hkv, Hblk, Hbuf⟩ %hcs
+  iapply wpNext_intro_pin_lc
+  iintro %c %hpin Hlc %spie %spp %R' %- Hk Hpc ⟨%P', %bs, %kv, %hf, %hkv, Hblk, Hbuf⟩ %hcs
   have hpin' : k'.sie = false → c = cpu := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
-  iapply HK $$ %c %spie %spp %R' %P' %bs %kv [] Hk Hpc Hte Hce %hkv Hblk Hbuf
+  iapply HK $$ %c Hlc %spie %spp %R' %P' %bs %kv [] Hk Hpc Hte Hce %hkv Hblk Hbuf
   ipureintro
   exact ⟨hcs, hf.1, hf.2⟩
 
@@ -301,7 +301,7 @@ theorem sysfile_begin_op (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs GF Γ]
     kctx cpu k' ∗ pcIs cpu KA.«begin_op» ∗
     trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv Γ ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap),
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c se -∗ cpuClaimExt c se pj -∗
@@ -321,9 +321,9 @@ theorem sysfile_begin_op (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs GF Γ]
   iapply h
   iframe Hk Hpc Hte Hce Hpid
   iframe #
-  iapply wpNext_intro_pin
-  iintro %c %_ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hop
-  iapply HK $$ %c %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hop
+  iapply wpNext_intro_pin_lc
+  iintro %c %_ Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hop
+  iapply HK $$ %c Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hop
 
 set_option maxHeartbeats 8000000 in
 /-- `end_op()`, the pid cell at a caller-named share. -/
@@ -335,7 +335,7 @@ theorem sysfile_end_op (EO : END_OP) (Γ : SchedNames) [ClaimIs GF Γ]
     kctx cpu k' ∗ pcIs cpu KA.«end_op» ∗
     trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv Γ ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗ logOp icfgLog u ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap),
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c se -∗ cpuClaimExt c se pj -∗
@@ -360,9 +360,9 @@ theorem sysfile_end_op (EO : END_OP) (Γ : SchedNames) [ClaimIs GF Γ]
   iapply h
   iframe Hk Hpc Hte Hce Hpid Hop
   iframe #
-  iapply wpNext_intro_pin
-  iintro %c %_ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid
-  iapply HK $$ %c %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid
+  iapply wpNext_intro_pin_lc
+  iintro %c %_ Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid
+  iapply HK $$ %c Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid
 
 set_option maxHeartbeats 8000000 in
 /-- `iunlockput(ip)`, the write arm, COUNTED (Rocq
@@ -390,7 +390,7 @@ theorem sysfile_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     ityShot g dn.diType ∗ ifreezeOff inum.toNat ∗
     inodeRefShort kk (qi + s) qi icfgDev inum ∗ runitAny inum.toNat ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗ bslots 3 ∗ logOpb icfgLog n ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (n' : Nat),
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (n' : Nat),
       ⌜calleeSaved k'.regs R' ∧ n - iputUnits ≤ n' ∧ n' ≤ n⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c se -∗ cpuClaimExt c se pj -∗
@@ -424,9 +424,9 @@ theorem sysfile_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
   iframe #
   isplitl [Hkeep Hru]
   · unfold inodeRefpShort; iframe
-  iapply wpNext_intro_pin
-  iintro %c %_ %spie %spp %R' %n' %hcs Hk Hpc Hte Hce Hpid - - Hbs %hf Hop Hslot
-  iapply HK $$ %c %spie %spp %R' %n' [] Hk Hpc Hte Hce Hpid Hbs Hop Hslot
+  iapply wpNext_intro_pin_lc
+  iintro %c %_ Hlc %spie %spp %R' %n' %hcs Hk Hpc Hte Hce Hpid - - Hbs %hf Hop Hslot
+  iapply HK $$ %c Hlc %spie %spp %R' %n' [] Hk Hpc Hte Hce Hpid Hbs Hop Hslot
   ipureintro
   exact ⟨hcs, hf⟩
 
@@ -512,7 +512,7 @@ theorem sysfile_argaddr (AA : ARGADDR) (c : CPU) (k' : KCtx) (i : Nat) (tfp : Bi
     kctx c k' ∗ pcIs c KA.«argaddr» ∗ trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗
     wordPointsTo (pTrapframe k'.proc) 8 dqt (pageAddr tfp) ∗ tfPageAt tfp ws ∗
     wordPointsTo (k'.regs 11#5) 8 (DFrac.own 1) old ∗
-    (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap), ⌜calleeSaved k'.regs R'⌝ -∗
+    (∀ (c' : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap), ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c' ((k'.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗
       wordPointsTo (pTrapframe k'.proc) 8 dqt (pageAddr tfp) -∗ tfPageAt tfp ws -∗
@@ -524,12 +524,12 @@ theorem sysfile_argaddr (AA : ARGADDR) (c : CPU) (k' : KCtx) (i : Nat) (tfp : Bi
   iintro ⟨Hk, Hpc, Hte, Hce, Htf, Htfp, Hst, HK⟩
   iapply h
   iframe Hk Hpc Htf Htfp Hst
-  iapply wpNext_intro_pin
-  iintro %c' %hpin %spie %spp %R' %- Hk Hpc %hcs Htf Htfp Hst
+  iapply wpNext_intro_pin_lc
+  iintro %c' %hpin Hlc %spie %spp %R' %- Hk Hpc %hcs Htf Htfp Hst
   have hpin' : k'.sie = false → c' = c := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
-  iapply HK $$ %c' %spie %spp %R' %hcs Hk Hpc Hte Hce Htf Htfp Hst
+  iapply HK $$ %c' Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Htf Htfp Hst
 
 set_option maxHeartbeats 4000000 in
 /-- `argfd(i, pfd, pf)` (Rocq `Argfd.wp_argfd_sconf`), the complement carried across
@@ -543,7 +543,7 @@ theorem sysfile_argfd (AF : ARGFD) (c : CPU) (k' : KCtx) (γ : FileNames) (pa : 
     kctx c k' ∗ pcIs c KA.«argfd» ∗ trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗
     procPrivCoreNoctxAt curCtx pa pid V M ∗ procOfilesOwe γ V.fdg pa V.ofile D ∗
     ofdOut (k'.regs 11#5) oldfd ∗ wordPointsTo (k'.regs 12#5) 8 (DFrac.own 1) oldf ∗
-    (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap), ⌜calleeSaved k'.regs R'⌝ -∗
+    (∀ (c' : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap), ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c' ((k'.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗
       procPrivCoreNoctxAt curCtx pa pid V M -∗ procOfilesOwe γ V.fdg pa V.ofile D -∗
@@ -556,12 +556,12 @@ theorem sysfile_argfd (AF : ARGFD) (c : CPU) (k' : KCtx) (γ : FileNames) (pa : 
   iintro ⟨Hk, Hpc, Hte, Hce, Hcore, Howe, Hfd, Hf, HK⟩
   iapply h
   iframe Hk Hpc Hcore Howe Hfd Hf
-  iapply wpNext_intro_pin
-  iintro %c' %hpin %spie %spp %R' %- Hk Hpc %hcs Hcore Howe Hpost
+  iapply wpNext_intro_pin_lc
+  iintro %c' %hpin Hlc %spie %spp %R' %- Hk Hpc %hcs Hcore Howe Hpost
   have hpin' : k'.sie = false → c' = c := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
-  iapply HK $$ %c' %spie %spp %R' %hcs Hk Hpc Hte Hce Hcore Howe Hpost
+  iapply HK $$ %c' Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hcore Howe Hpost
 
 end
 

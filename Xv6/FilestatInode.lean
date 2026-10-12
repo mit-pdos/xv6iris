@@ -122,7 +122,7 @@ theorem filestat_copy (CO : COPYOUT) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R
   case hsz => k_norm_g; have := hf.1; unfold uvmMaxsz at this; omega
   case hlen => k_norm_g; rw [fstatBytes_length]
   -- ===== back from copyout =====
-  iintro %c1 %spie1 %spp1 %R1 %P' %M' %⟨hcs, hext, hw⟩ Hk Hpc Hte Hce Hlend Hbuf Hpt
+  iintro %c1 Hlc %spie1 %spp1 %R1 %P' %M' %⟨hcs, hext, hw⟩ Hk Hpc Hte Hce Hlend Hbuf Hpt
   icases Hrest $$ Hlend with ⟨%kc, %hkc, Hrest⟩
   k_norm_g [filestat_ret_4e, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed] at hext
   k_norm_g [filestat_ret_4e, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, r20]
@@ -145,7 +145,7 @@ theorem filestat_copy (CO : COPYOUT) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R
   iintro Hk Hpc Hf32
   k_step_e (wp_s_ld cpu _ (KA.«filestat» + 0x54#64) true 40#12 19#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 19#5))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr1.1]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr1.1] £ Hlc
   iintro Hk Hpc Hf40
   ihave Hframe : fstatFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5)
       (k.regs 19#5) (k.regs 20#5) v9 $$ [Hf8 Hf16 Hf24 Hf32 Hf40 Hf48 Hf80]
@@ -162,14 +162,14 @@ theorem filestat_copy (CO : COPYOUT) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R
   rotate_right 1
   k_norm_g
   iframe
-  iintro %c' %R' %⟨hcs', h10'⟩ Hk Hpc Hte Hce
+  iintro %c' Hlc %R' %⟨hcs', h10'⟩ Hk Hpc Hte Hce
   unfold fstatK
   have hR : R' 10#5 = R1 10#5 := by rw [h10']
   rcases hw with ⟨h10, hM, hmap⟩ | ⟨h10, d, hd, hM, hmap⟩
-  · iapply HΦ $$ %c' %spie1 %spp1 %R' %P' %M' %24 %kc [] Hk Hpc Hte Hce Href %hkc Hpriv Henv
+  · iapply HΦ $$ %c' Hlc %spie1 %spp1 %R' %P' %M' %24 %kc [] Hk Hpc Hte Hce Href %hkc Hpriv Henv
     ipureintro
     refine ⟨hcs', Or.inl (hR.trans h10), hext, Nat.le_refl _, ⟨_, fstatBytes_length _ _ _ _ _ _, hM, hmap⟩⟩
-  · iapply HΦ $$ %c' %spie1 %spp1 %R' %P' %M' %d %kc [] Hk Hpc Hte Hce Href %hkc Hpriv Henv
+  · iapply HΦ $$ %c' Hlc %spie1 %spp1 %R' %P' %M' %d %kc [] Hk Hpc Hte Hce Href %hkc Hpriv Henv
     have hd' : d < 24 := hd
     ipureintro
     refine ⟨hcs', Or.inr (hR.trans h10), hext, Nat.le_of_lt hd', ⟨_, ?_, hM, hmap⟩⟩
@@ -242,7 +242,7 @@ theorem filestat_stat (ST : STATI) (IU : IUNLOCK) (CO : COPYOUT) (Γ : SchedName
   case ha1 => k_norm_g
   case hKs => k_norm_g; unfold statiSlots; omega
   -- ===== back from stati =====
-  iintro %c1 %R1 %hcs Hk Hpc Hte Hce Hdev Hinum Hmeta Hstat
+  iintro %c1 Hlc %R1 %hcs Hk Hpc Hte Hce Hdev Hinum Hmeta Hstat
   k_norm_g [filestat_ret_36]
   have hr1 : fstatRegs k fk (procAddr j) (fstatBufAddr (k.regs 2#5)) R1 := by
     refine fstatRegs_cs _ _ _ _ _ _ ?_ hcs
@@ -282,7 +282,7 @@ theorem filestat_stat (ST : STATI) (IU : IUNLOCK) (CO : COPYOUT) (Γ : SchedName
   case htu => k_norm_g; exact htier
   case ha0u => k_norm_g; exact hip
   -- ===== back from iunlock =====
-  iintro %c2 %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid Hshr
+  iintro %c2 Hlc %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid Hshr
   k_norm_g [filestat_ret_3c, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, hproc]
   ihave Hpriv := Hpw $$ Hpid
   ihave Hpay := Hback $$ Hshr
@@ -382,7 +382,7 @@ theorem filestat_lock (IL : ILOCK) (ST : STATI) (IU : IUNLOCK) (CO : COPYOUT) (�
   case htl => k_norm_g; exact htier
   case ha0l => k_norm_g; exact hip
   -- ===== back from ilock =====
-  iintro %c1 %spie1 %spp1 %R1 %dn %bm %hcs Hk Hpc Hte Hce Hpid Hbs Hlk
+  iintro %c1 Hlc %spie1 %spp1 %R1 %dn %bm %hcs Hk Hpc Hte Hce Hpid Hbs Hlk
   k_norm_g [filestat_ret_2a, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, hproc]
   ihave Hpriv := Hpw $$ Hpid
   have hr1 : fstatRegs k fk (procAddr j) (k.regs 19#5) R1 := by

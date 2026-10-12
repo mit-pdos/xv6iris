@@ -82,7 +82,7 @@ theorem namex_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU)
     inodeShrGenlo ik q.half icfgDev inum g lo ∗ runitAny inum.toNat ∗
     wordPointsTo sbInodestart 4 A.dqs (BitVec.ofNat 32 icfgIst) ∗
     wordPointsTo (pPid k'.proc) 4 A.dqp A.pidv ∗ bslot ∗ logTx icfgLog ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (dn : Dinode) (bm : Blkmap),
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (dn : Dinode) (bm : Blkmap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c k'.sie -∗ cpuClaimExt c k'.sie k'.proc -∗
@@ -112,13 +112,13 @@ theorem namex_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU)
   iframe #
   isplitl [Hru]
   · iapply namex_lic_plain; iexact Hru
-  iapply wpNext_intro_pin
-  iintro %c %_
+  iapply wpNext_intro_pin_lc
+  iintro %c %_ Hlc
   unfold ilockPostTxEb
   iintro %spie %spp %R' %dn %bm %filled %hcs - Hk Hpc Hte Hce Hpid Hsi Hbs Hsl Hdep Hoff Hdev
     Hinum Hval Hload Hshot Hfrz %- Hru %-
   ihave Hru := namex_back_plain g inum.toNat $$ Hru
-  iapply HK $$ %c %spie %spp %R' %dn %bm %hcs Hk Hpc Hte Hce Hsi Hpid Hbs Hsl Hdep Hoff Hdev Hinum
+  iapply HK $$ %c Hlc %spie %spp %R' %dn %bm %hcs Hk Hpc Hte Hce Hsi Hpid Hbs Hsl Hdep Hoff Hdev Hinum
     Hval Hload Hshot Hfrz Hru
 
 /-- The iunlockput continuation, hart-free. -/
@@ -208,7 +208,7 @@ theorem namex_iunlock (IU : IUNLOCK) (Γ : SchedNames) [ClaimIs GF Γ]
     icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
     ityShot g dn.diType ∗ ifreezeOff inum.toNat ∗
     wordPointsTo (pPid k'.proc) 4 A.dqp A.pidv ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap),
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c k'.sie -∗ cpuClaimExt c k'.sie k'.proc -∗
@@ -229,12 +229,12 @@ theorem namex_iunlock (IU : IUNLOCK) (Γ : SchedNames) [ClaimIs GF Γ]
   iapply h
   iframe Hk Hpc Hsl Hdep Hoff Hdev Hinum Hval Hload Hshot Hfrz Hpid
   iframe #
-  iapply wpNext_intro_pin
-  iintro %c %hpin %spie %spp %R' %- Hk Hpc %hcs Hpid Hshr Htx
+  iapply wpNext_intro_pin_lc
+  iintro %c %hpin Hlc %spie %spp %R' %- Hk Hpc %hcs Hpid Hshr Htx
   have hpin' : k'.sie = false → c = cpu := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
-  iapply HK $$ %c %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hshr Htx
+  iapply HK $$ %c Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hshr Htx
 
 /-- The iput continuation, hart-free. -/
 def namexIputK (k' : KCtx) (A : NamexArgs) (ncur : Nat) (Scur : List Nat) (wc : Bool) :

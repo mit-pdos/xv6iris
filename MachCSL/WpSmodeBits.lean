@@ -36,8 +36,9 @@ theorem wp_s_and_bits [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KC
   iframe HI Hk Hpc
   inext
   rw [hsie]
-  ihave HΦ' := wpNext_off _ _ _ $$ HΦ
-  iapply wpNext_off_intro
+  iapply wpNext_off_intro_lc
+  iintro Hlc
+  ihave HΦ' := wpNext_off _ _ _ $$ HΦ Hlc
   rw [e]
   iexact HΦ'
 

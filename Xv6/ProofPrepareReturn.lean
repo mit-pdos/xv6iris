@@ -150,10 +150,10 @@ theorem prepare_return_proof (MP : MYPROC) : PREPARE_RETURN :=
   k_norm_g
   iframe Hk Hpc Hframe
   inext
-  iapply wpNext_intro_pin
-  iintro %c5 %hp5 Hk Hpc
+  iapply wpNext_intro_pin_lc
+  iintro %c5 %hp5 Hlc Hk Hpc
   obtain rfl := hp5 (Or.inl rfl)
-  ihave Hnext := wpNext_at _ _ _ c5 _ hpin $$ Hnext
+  ihave Hnext := wpNext_at _ _ _ c5 _ hpin $$ Hnext Hlc
   ihave Htfc := prepare_return_cell_eq _ _ _ htfv.symm $$ Htfc
   ihave Hpriv := Hclose $$ %_ Hks Htfc Hpage
   iapply Hnext $$ %_ Hk Hpc [] Hpay Hsepc Hscause Hstval Hstv Hpriv

@@ -103,9 +103,9 @@ theorem rd_early (cpu c0 : CPU) (k : KCtx) (R : RegMap)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   k_step_e (wp_s_ret cpu _ (KA.«readi» + 0xf0#64) true 1#5)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h1]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h1] £ Hlc
   iintro Hk Hpc
-  ihave HΦ := wpNext_at true k.proc c0 cpu _ (rd_pin hj k hproc cpu c0) $$ Hnext
+  ihave HΦ := wpNext_at true k.proc c0 cpu _ (rd_pin hj k hproc cpu c0) $$ Hnext Hlc
   ihave HΦ := rdPost_elim _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ $$ HΦ
   ihave Hdst := rdDst_post k user j pidv Vp M Vp.upt M dqp data olds off 0 hproc
     (rdUserOk_zero user Vp M (k.regs 12#5) data off) $$ Hdst

@@ -92,7 +92,7 @@ instance fwrEnv_persistent (Γ : SchedNames) (A : FwrA) :
 quantified and the block as `EitherDefs.procPrivExt`. -/
 def fwrK (k : KCtx) (γl : GName) (γu : UartNames) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) : IProp GF :=
-  iprop(∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd),
+  iprop(∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd),
     ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ fwConsCnt st V.upt P' (k.regs 11#5) n (R' 10#5)⌝ -∗
     fwConsOut st γu (writerImg V.upt M) (k.regs 11#5) (R' 10#5) -∗
     kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
@@ -126,7 +126,7 @@ theorem fwr_tail (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (fk : Nat
     frame12 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) v2 (k.regs 18#5) v4 v5 (k.regs 21#5)
       (k.regs 22#5) v8 v9 v10 v11 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    (∀ (c' : CPU) (R' : RegMap), ⌜calleeSaved k.regs R' ∧ R' 10#5 = R 10#5⌝ -∗
+    (∀ (c' : CPU), £ 1 -∗ ∀ (R' : RegMap), ⌜calleeSaved k.regs R' ∧ R' 10#5 = R 10#5⌝ -∗
       kctx c' ((k.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) cpu := by
@@ -140,10 +140,10 @@ theorem fwr_tail (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (fk : Nat
   k_norm_g
   iframe
   inext
-  k_next_e
+  k_next_e £ Hlc
   iintro Hk Hpc
   k_norm_g
-  iapply Hnext $$ %cpu %_ [] Hk Hpc Hte Hce
+  iapply Hnext $$ %cpu Hlc %_ [] Hk Hpc Hte Hce
   ipureintro
   refine ⟨fwr_cs_epi k fk n R hr, ?_⟩
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
@@ -204,7 +204,7 @@ theorem fwr_exit_ok (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q : N
   k_norm_g
   iframe
   inext
-  k_next_e
+  k_next_e £ Hlc
   iintro Hk Hpc Hframe
   k_norm_g
   have hr' := fwrRegs_restore k A.fk A.n v9 v19 (BitVec.ofNat 64 t) 3072#64 1#64 3072#64
@@ -216,12 +216,12 @@ theorem fwr_exit_ok (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q : N
   rotate_right 1
   k_norm_g
   iframe
-  iintro %c' %R' %⟨hcs, h10⟩ Hk Hpc Hte Hce
+  iintro %c' Hlc %R' %⟨hcs, h10⟩ Hk Hpc Hte Hce
   have ha0 : R' 10#5 = BitVec.ofInt 64 A.n := by
     simp only [h10, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   ihave Hpriv := fwr_priv_backEv (procAddr A.j) A.pid A.V P A.M hext.1 $$ Hpriv
   unfold fwrK
-  iapply HΦ $$ %c' %spie %spp %R' %P [] [] Hk Hpc Hte Hce Href Hpriv [Hbs] [Hst]
+  iapply HΦ $$ %c' Hlc %spie %spp %R' %P [] [] Hk Hpc Hte Hce Href Hpriv [Hbs] [Hst]
   · ipureintro; exact ⟨hcs, hext, fun _ h => by cases h⟩
   · iapply fwConsOut_off; intro _ h; cases h
   · iapply (filewrite_env_out_inode (GF := GF) A.γul A.γuu A.rb true A.i A.γo A.om)
@@ -281,7 +281,7 @@ theorem fwr_exit_fail (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q :
   k_norm_g
   -- +0x138  c.j +0xf4
   k_step_e (wp_s_j cpu _ (KA.«filewrite» + 0x138#64) true 2097084#21)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] £ Hlc
   iintro Hk Hpc
   have hr' := fwrRegs_restore k A.fk A.n v9 v19 (BitVec.ofNat 64 t) 3072#64 1#64 3072#64
     (k.regs 9#5) (k.regs 19#5) (k.regs 20#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) _
@@ -292,12 +292,12 @@ theorem fwr_exit_fail (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q :
   rotate_right 1
   k_norm_g
   iframe
-  iintro %c' %R' %⟨hcs, h10⟩ Hk Hpc Hte Hce
+  iintro %c' Hlc %R' %⟨hcs, h10⟩ Hk Hpc Hte Hce
   have ha0 : R' 10#5 = -1#64 := by
     simp only [h10, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; decide
   ihave Hpriv := fwr_priv_backEv (procAddr A.j) A.pid A.V P A.M hext.1 $$ Hpriv
   unfold fwrK
-  iapply HΦ $$ %c' %spie %spp %R' %P [] [] Hk Hpc Hte Hce Href Hpriv [Hbs] [Hst]
+  iapply HΦ $$ %c' Hlc %spie %spp %R' %P [] [] Hk Hpc Hte Hce Href Hpriv [Hbs] [Hst]
   · ipureintro; exact ⟨hcs, hext, fun _ h => by cases h⟩
   · iapply fwConsOut_off; intro _ h; cases h
   · iapply (filewrite_env_out_inode (GF := GF) A.γul A.γuu A.rb true A.i A.γo A.om)

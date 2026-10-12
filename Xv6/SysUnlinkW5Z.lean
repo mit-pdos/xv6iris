@@ -180,7 +180,7 @@ def sysUnlinkAtAe (Γ : SchedNames) (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF
   suAny (sysUnlinkDel (k.regs 2#5)) 16 ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv Γ ∗
   wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ sysUnlinkHole A k.proc P2 ∗
-  (∀ c : CPU, sysUnlinkPostA k A c) ∗
+  (∀ c : CPU, £ 1 -∗ sysUnlinkPostA k A c) ∗
   sysUnlinkLkAt A.pid kd q g lo tl dinum dnd γil γisl t (1 : Qp).half.half ∗
   dlinks fscFs dinum.toNat dnd bmd datd ∗ dinodeAt fscIreg dinum dnW ∗
   inodeMeta (ientry kd) dnW ∗ inodeMap fscFs (ientry kd) bmW ∗ inodeBlocks fscFs bmW datW ∗

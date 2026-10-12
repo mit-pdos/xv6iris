@@ -88,7 +88,7 @@ theorem fkr_fsinit_call [CurCtx] (FS : FSINIT) (Γ : SchedNames) [ClaimIs GF Γ]
     trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
     wordPointsTo (pPid k.proc) 4 dq pid ∗
     firstBootPersist ∗ kallocAvail fsReadyKmem none ∗ firstFsinit ∗
-    (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap), ⌜calleeSaved k.regs R'⌝ -∗
+    (∀ (c' : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap), ⌜calleeSaved k.regs R'⌝ -∗
       kctx c' ((k.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗
       wordPointsTo (pPid k.proc) 4 dq pid -∗
@@ -128,8 +128,8 @@ theorem fkr_fsinit_call [CurCtx] (FS : FSINIT) (Γ : SchedNames) [ClaimIs GF Γ]
   iframe Hk Hpc Hpinv Hte Hce Hpe Hbio Hdc Hpid Hdurl Hcert Hcinv Hmir Hlf Hbinv Hb1 Hsb Hxo Hireg'
     Hbm' Hboot Hit2 Hitb Hslk Hk0 Hk16 Hlk Hnm Hcpu Hst Hdv Hout Hcmt Hnc Hn Hblk HL HD Hdty Hhdr
     Hslots Hbsl Hir1
-  iapply wpNext_intro
-  iintro %c' %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hmg Hsz Hnb Hni Hnl Hls Hist Hbms #Hlctx Hbs3
+  iapply wpNext_intro_lc
+  iintro %c' Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hmg Hsz Hnb Hni Hnl Hls Hist Hbms #Hlctx Hbs3
     Hir1 Hboot
   iapply wpLoop_bupd
   imod (lbWord_persist sbNinodes 4 (DFrac.own 1) (BitVec.ofNat 32 fscNinodes)) $$ Hni with #Hni
@@ -145,7 +145,7 @@ theorem fkr_fsinit_call [CurCtx] (FS : FSINIT) (Γ : SchedNames) [ClaimIs GF Γ]
   ihave Hir1 := (show irefSlot (GF := GF) ⊢ irefSlots 1 from .rfl) $$ Hir1
   ihave Hirs := irefSlots_combine (GF := GF) 1 1 $$ [Hir1 Hir2]
   · iframe Hir1 Hir2
-  iapply Hcont $$ %c' %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hfsr Henv Hbs3 Hirs
+  iapply Hcont $$ %c' Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hfsr Henv Hbs3 Hirs
 
 theorem fkr_fsinit_slots : fsinitSlots ≤ 416 := by decide
 
@@ -194,7 +194,7 @@ theorem fkr_boot_fsinit [CurCtx] (FS : FSINIT) (Γ : SchedNames) [ClaimIs GF Γ]
   case ha => simp [KCtx.setReg_regs, RegMap.set_apply]
   simp only [KCtx.setReg_sie, KCtx.setReg_proc, hs, hp]
   iframe Hpinv Hte Hce Hpid Hbp Hka Hfsi
-  iintro %c3 %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid #Hfsr #Henv Hbs Hir
+  iintro %c3 Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid #Hfsr #Henv Hbs Hir
   simp only [KCtx.setReg_regs, RegMap.set_apply, ite_true, fkr_ret24]
   k_norm [fkr_ret24]
   -- +0x24  auipc a5,0x9

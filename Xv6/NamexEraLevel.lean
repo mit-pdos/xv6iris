@@ -86,7 +86,7 @@ theorem namexEra_tests (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKUP)
     irefSlots 1 ∗ namexKeep k A ∗ namexPath k A ∗ byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) ∗
     bslots 3 ∗ logOpS icfgLog ncur Scur ∗
     P es0.length inum.toNat ∗ namexEraHops A P Pmiss es0.length ∗
-    (∀ c' : CPU, namexEraPostR k A P Pmiss c') ∗ namexEraLoop k A P Pmiss fuel
+    (∀ c' : CPU, £ 1 -∗ namexEraPostR k A P Pmiss c') ∗ namexEraLoop k A P Pmiss fuel
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨r2, r8, r9, r19, r20, r21, r22, r23, r24, r25, r27⟩ := id hf.hregs
   obtain ⟨hA, hB, hn, hC⟩ := hf.hbud
@@ -245,7 +245,7 @@ theorem namexEra_level (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRL
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0xc4#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     namexEnv Γ A ∗ namexEraWalk k A P Pmiss ipv dcur es0.length ncur Scur nf ∗
-    (∀ c' : CPU, namexEraPostR k A P Pmiss c') ∗ namexEraLoop k A P Pmiss fuel
+    (∀ c' : CPU, £ 1 -∗ namexEraPostR k A P Pmiss c') ∗ namexEraLoop k A P Pmiss fuel
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Henv, Hwalk, Hnext, IH⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -290,7 +290,7 @@ theorem namexEra_level (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRL
   case gn => k_norm_g; try exact hs.hnoff
   case gt => k_norm_g; try exact hs.htier
   case ga => k_norm_g
-  iintro %c %spie' %spp' %R' %dn %bm %hcs Hk Hpc Hte Hce Hsi Hpid Hb1 Hsl Hdep Hoff Hdev Hinum
+  iintro %c Hlc %spie' %spp' %R' %dn %bm %hcs Hk Hpc Hte Hce Hsi Hpid Hb1 Hsl Hdep Hoff Hdev Hinum
     Hval Hload #Hshot Hfrz Hru
   let cpu := c
   k_norm_g [namex_ret_c6]

@@ -37,7 +37,7 @@ theorem wpLoop_s_instr [CurCtx] (cpu : CPU) (c c' : MConf) (tier : KTier) (root 
     instr pc is_rvc i ∗ confCells cpu (DFrac.own 1) Privilege.Supervisor c ∗ clockCells cpu ∗ pcIs cpu pc ∗
     transTok cpu tier root ∗ P ∗
     (▷ (confCells cpu (DFrac.own 1) Privilege.Supervisor c' -∗ clockCells cpu -∗ pcIs cpu npc -∗
-        transTok cpu tier root -∗ Q -∗ wpLoop cpu) ∧
+        transTok cpu tier root -∗ Q -∗ £ 1 -∗ wpLoop cpu) ∧
       trapBranch cpu c tier root sie pc P)
     ⊢ wpLoop cpu := by
   iintro ⟨HI, HmConf, Hclock, Hpc, HT, HP, HΦ⟩
@@ -55,8 +55,8 @@ theorem wpLoop_s_instr [CurCtx] (cpu : CPU) (c c' : MConf) (tier : KTier) (root 
     isplit
     · icases HΦ with ⟨HΦ, -⟩
       inext
-      iintro HmConf Hclock Hpc HT _ HQ
-      iapply HΦ $$ HmConf Hclock Hpc HT HQ
+      iintro HmConf Hclock Hpc HT _ HQ Hlc
+      iapply HΦ $$ HmConf Hclock Hpc HT HQ Hlc
     · icases HΦ with ⟨-, HTrap⟩
       iexact HTrap
   | F_RVC h =>
@@ -72,8 +72,8 @@ theorem wpLoop_s_instr [CurCtx] (cpu : CPU) (c c' : MConf) (tier : KTier) (root 
     isplit
     · icases HΦ with ⟨HΦ, -⟩
       inext
-      iintro HmConf Hclock Hpc HT _ HQ
-      iapply HΦ $$ HmConf Hclock Hpc HT HQ
+      iintro HmConf Hclock Hpc HT _ HQ Hlc
+      iapply HΦ $$ HmConf Hclock Hpc HT HQ Hlc
     · icases HΦ with ⟨-, HTrap⟩
       iexact HTrap
   | F_Error e => exact (by simp [decodesTo] at hdec : False).elim
@@ -225,10 +225,10 @@ macro "schema_step_run" hexec:term : tactic =>
              rotate_left 1
              · schema_trap_branch
              inext
-             iintro HmConf Hclock Hpc HT HF
+             iintro HmConf Hclock Hpc HT HF Hlc
              unfold transTok
              icases HT with ⟨Htrans, Htok⟩
-             ihave HΦ' := wpNext_at _ _ _ cpu' _ hpin $$ HΦ
+             ihave HΦ' := wpNext_at _ _ _ cpu' _ hpin $$ HΦ Hlc
              ihave HConf := kConf_intro cpu' curTier k.root k.sie k.spie k.spp ms mdl mepc stc lf ⟨hsm, hsr, hmdl, hlf⟩ $$ HmConf))
 
 set_option hygiene false in

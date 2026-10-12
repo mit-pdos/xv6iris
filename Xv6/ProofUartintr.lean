@@ -522,7 +522,7 @@ set_option maxHeartbeats 4000000 in
 theorem ui_exit [CurCtx] (cpu : CPU) (k : KCtx) (i : UartId) (γ : UartNames)
     (hsie : k.sie = false) (hK : uartintrSlots ≤ k.avail) :
     frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
-    (∀ R' : RegMap, kctx cpu (k.withRegs R') -∗ pcIs cpu (jumpPc (k.regs 1#5)) -∗
+    (£ 1 -∗ ∀ R' : RegMap, kctx cpu (k.withRegs R') -∗ pcIs cpu (jumpPc (k.regs 1#5)) -∗
       ⌜calleeSaved k.regs R'⌝ -∗ (∃ (kp' : Nat) (hl' : Option (List Obs)), uartRxWriter i γ kp' hl') -∗ wpLoop cpu)
     ⊢ ∀ R' : RegMap, kctx (GF := GF) cpu ((k.pushed 4).withRegs R') -∗
       pcIs cpu (KA.«uartintr» + 0x76#64) -∗ ⌜uiPres k R'⌝ -∗
@@ -536,8 +536,8 @@ theorem ui_exit [CurCtx] (cpu : CPU) (k : KCtx) (i : UartId) (γ : UartNames)
   k_norm
   iframe
   inext
-  iintro Hk Hpc
-  iapply HΦ $$ %_ Hk Hpc
+  iintro Hk Hpc Hlc
+  iapply HΦ $$ Hlc %_ Hk Hpc
   · ipureintro
     unfold calleeSaved
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, if_true, true_and, and_true]

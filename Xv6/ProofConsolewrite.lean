@@ -663,11 +663,11 @@ def cwPost (k : KCtx) (γ : UartNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv
 theorem cw_post_at (cpu c : CPU) (k : KCtx) (γ : UartNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) (Q : Nat → IProp GF)
     (hj : j < NPROC) (hkproc : k.proc = procAddr j) :
-    wpNext true k.proc cpu (cwPost (GF := GF) k γ j pid V M n Q) ⊢ cwPost k γ j pid V M n Q c := by
-  iintro H
+    wpNext true k.proc cpu (cwPost (GF := GF) k γ j pid V M n Q) ⊢ £ 1 -∗ cwPost k γ j pid V M n Q c := by
+  iintro H Hlc
   iapply wpNext_at true k.proc cpu c _
     (fun h => h.elim (fun h => absurd h (by decide))
-      (fun h => absurd h (by rw [hkproc]; exact procAddr_nonzero hj))) $$ H
+      (fun h => absurd h (by rw [hkproc]; exact procAddr_nonzero hj))) $$ H Hlc
 
 /-- THE EXIT'S VIEW (the writer's image back to the landed `viewFaulted`
 view, on every page the grown table maps). -/
@@ -740,12 +740,12 @@ theorem cw_epi (c0 cpu : CPU) (k : KCtx) (γ : UartNames) (j : Nat)
   k_norm_g
   iframe
   inext
-  k_next_e
+  k_next_e £ Hlc
   iintro Hk Hpc
   ihave HK := cw_post_at c0 cpu k γ j pid V M n Q hj hkproc $$ Hnext
   ihave Hpriv := cw_priv_back curCtx (procAddr j) pid (V.updEv kv) P' M $$ Hpriv
   unfold cwPost
-  iapply HK $$ %spie %spp %_ %P' %i %kv [] HO Hk Hpc Hte Hce %hkv Hpriv HQ
+  iapply HK $$ Hlc %spie %spp %_ %P' %i %kv [] HO Hk Hpc Hte Hce %hkv Hpriv HQ
   ipureintro
   refine ⟨?_, hext, ?_, hin, hwhy, hcnt⟩
   · unfold calleeSaved

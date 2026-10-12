@@ -385,12 +385,12 @@ theorem uvmcopy_epi [CurCtx] (cpu cur : CPU) (k : KCtx) (Q : IProp GF)
     with [KCtx.pop_pushed _ _ _ hK', hR2] next c10 hp10
   iintro Hk Hpc
   k_step_gen (wp_s_ret c10 _ (KA.«uvmcopy» + 0x94#64) true 1#5)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c11 hp11
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c11 hp11 £ Hlc
   iintro Hk Hpc
   have hpinZ : k.sie = false ∨ k.proc = 0#64 → c11 = cpu := fun h =>
     (hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans
       ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans ((hp1 h).trans (hpin h)))))))))))
-  ihave HΦ' := wpNext_at _ _ _ c11 _ hpinZ $$ HΦ
+  ihave HΦ' := wpNext_at _ _ _ c11 _ hpinZ $$ HΦ Hlc
   iapply HΦ' $$ %spie %spp %_ %hsp Hk Hpc HQ
   ipureintro
   refine ⟨?_, ?_⟩
@@ -770,12 +770,12 @@ theorem uvmcopy_iter [WchG GF] (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (M
       rw [← UPtCopy.leaves_get Pold i hne_tf hne_tr]
       exact h
     k_step_gen (wp_s_branch c5 _ (KA.«uvmcopy» + 0x34#64) true 8176#13 10#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.beq_zero _ hz] next c6 hp6
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.beq_zero _ hz] next c6 hp6 £ Hlc
     iintro Hk Hpc
     ihave Hold := UPtCopy.procPtAt_intro Pold Mold told hwfo hbaseo hrepo $$ [Htreeo Hpageso]
     case' _ => iframe
     have hpin6 : k.sie = false ∨ k.proc = 0#64 → c6 = cur := fun h => (hp6 h).trans (hpin4 h)
-    ihave HΦ' := wpNext_at _ _ _ c6 _ hpin6 $$ HΦ
+    ihave HΦ' := wpNext_at _ _ _ c6 _ hpin6 $$ HΦ Hlc
     iapply HΦ' $$ %spie %spp %_ %P %_ %(fun _ => ⟨rfl, rfl⟩) Hk Hpc Hlend Hav Hold Hchild []
     · iintro %hpc
       exfalso
@@ -821,13 +821,13 @@ theorem uvmcopy_iter [WchG GF] (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (M
         exact h
       k_step_gen (wp_s_branch c8 _ (KA.«uvmcopy» + 0x3e#64) true 8166#13 15#5 0#5 (by decide) bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hv1, MachCSL.beq_zero _ rfl]
-        next c9 hp9
+        next c9 hp9 £ Hlc
       iintro Hk Hpc
       ihave Hold := UPtCopy.procPtAt_intro Pold Mold told hwfo hbaseo hrepo $$ [Htreeo Hpageso]
       case' _ => iframe
       have hpin9 : k.sie = false ∨ k.proc = 0#64 → c9 = cur := fun h =>
         (hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans (hpin4 h))))
-      ihave HΦ' := wpNext_at _ _ _ c9 _ hpin9 $$ HΦ
+      ihave HΦ' := wpNext_at _ _ _ c9 _ hpin9 $$ HΦ Hlc
       iapply HΦ' $$ %spie %spp %_ %P %_ %(fun _ => ⟨rfl, rfl⟩) Hk Hpc Hlend Hav Hold Hchild []
       · iintro %hpc
         exfalso
@@ -914,13 +914,13 @@ theorem uvmcopy_iter [WchG GF] (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (M
         iintro Hk Hpc
         k_step_gen (wp_s_branch c12 _ (KA.«uvmcopy» + 0x46#64) true 38#13 10#5 0#5 (by decide) bop.BEQ)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-          with [MachCSL.beq_zero _ hz0.1] next c13 hp13
+          with [MachCSL.beq_zero _ hz0.1] next c13 hp13 £ Hlc
         iintro Hk Hpc
         ihave Hold := UPtCopy.procPtAt_intro Pold Mold told hwfo hbaseo hrepo $$ [Htreeo Hpageso]
         case' _ => iframe
         have hpin13 : k.sie = false ∨ k.proc = 0#64 → c13 = cur := fun h =>
           (hp13 h).trans ((hp12 h).trans (hpin10 h))
-        ihave HΦ' := wpNext_at _ _ _ c13 _ hpin13 $$ HΦ
+        ihave HΦ' := wpNext_at _ _ _ c13 _ hpin13 $$ HΦ Hlc
         rw [kRcpt_null γk _ (R3 10#5) hz0.1]
         iapply HΦ' $$ %spie2 %spp2 %_ %P %_ %hsp2 Hk Hpc Hlend Hav Hold Hchild []
         · -- the null `kalloc`'s receipt
@@ -1139,12 +1139,12 @@ theorem uvmcopy_iter [WchG GF] (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (M
           ihave Hold := UPtCopy.procPtAt_intro Pold Mold told hwfo hbaseo hrepo $$ [Htreeo Hpageso]
           case' _ => iframe
           k_step_gen (wp_s_branch c25 _ (KA.«uvmcopy» + 0x64#64) true 8128#13 10#5 0#5 (by decide) bop.BEQ)
-            from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c26 hp26
+            from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c26 hp26 £ Hlc
           iintro Hk Hpc
           k_norm_g [MachCSL.beq_zero _ h0]
           have hpin26 : k.sie = false ∨ k.proc = 0#64 → c26 = cur := fun h =>
             (hp26 h).trans (hpin25 h)
-          ihave HΦ' := wpNext_at _ _ _ c26 _ hpin26 $$ HΦ
+          ihave HΦ' := wpNext_at _ _ _ c26 _ hpin26 $$ HΦ Hlc
           iclear Hrc2
           iapply HΦ' $$ %spie3 %spp3 %_ %{ P with um := insert P.um i (leafOf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) } %_ %hsp' Hk Hpc Hlend Hav Hold Hchild []
           · iintro %hpc
@@ -1196,8 +1196,8 @@ theorem uvmcopy_iter [WchG GF] (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (M
           case hKf => k_norm_g; omega
           case hlkf => k_norm_g; exact hlk
           case hpf => k_norm_g; exact hpv
-          iapply wpNext_intro_pin
-          iintro %c29 %hp29 %spie4 %spp4 %R6 %hsp4 Hk Hpc Hlend Hav %hcs5
+          iapply wpNext_intro_pin_lc
+          iintro %c29 %hp29 Hlc %spie4 %spp4 %R6 %hsp4 Hk Hpc Hlend Hav %hcs5
           ihave Hlend := actLend_ret_step _ hk3 $$ Hlend
           have hpin29 : k.sie = false ∨ k.proc = 0#64 → c29 = cur := fun h =>
             (hp29 h).trans ((hp28 h).trans ((hp27 h).trans ((hp26 h).trans (hpin25 h))))
@@ -1212,7 +1212,7 @@ theorem uvmcopy_iter [WchG GF] (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (M
             obtain ⟨e1, e2⟩ := hsp4 h
             rw [e1, e2]
             exact hsp' h
-          ihave HΦ' := wpNext_at _ _ _ c29 _ hpin29 $$ HΦ
+          ihave HΦ' := wpNext_at _ _ _ c29 _ hpin29 $$ HΦ Hlc
           iapply HΦ' $$ %spie4 %spp4 %_ %P %_ %hsp'' Hk Hpc Hlend Hav Hold Hchild []
           · -- the failed `mappages`' null receipt
             iintro -
@@ -1269,13 +1269,13 @@ theorem uvmcopy_loop [WchG GF] (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (M
       i hi P hinv spie spp R h9 h20 h22 h23 cur) $$ [- $Hk $Hpc $Hav $Hold $Hchild $Hlend]
     rotate_right 1
     iframe #
-    iapply wpNext_intro_pin
-    iintro %c1 %hp1 %spie2 %spp2 %R2 %P' %pcv %hsp2 Hk Hpc Hlend Hav Hold Hchild Hrc %hpost
+    iapply wpNext_intro_pin_lc
+    iintro %c1 %hp1 Hlc %spie2 %spp2 %R2 %P' %pcv %hsp2 Hk Hpc Hlend Hav Hold Hchild Hrc %hpost
     obtain ⟨hkept, hrest⟩ := hpost
     rcases hrest with ⟨hpc, hinv'⟩ | ⟨hpc, hPP⟩
     case inr =>
       subst hpc
-      ihave HΦ' := wpNext_at _ _ _ c1 _ hp1 $$ HΦ
+      ihave HΦ' := wpNext_at _ _ _ c1 _ hp1 $$ HΦ Hlc
       iapply HΦ' $$ %spie2 %spp2 %_ %P' %_ %hsp2 Hk Hpc Hlend Hav Hold Hchild Hrc
       ipureintro
       refine ⟨ucKeptL_of_ucKept hkept, Or.inr ⟨rfl, i, by omega, ?_, ?_⟩⟩
@@ -1292,14 +1292,14 @@ theorem uvmcopy_loop [WchG GF] (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (M
         with [g9, g20, uc_page_add i] next c2 hp2
       iintro Hk Hpc
       k_step_gen (wp_s_branch c2 _ (KA.«uvmcopy» + 0x26#64) false 88#13 9#5 21#5 (by decide) bop.BGEU)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3 £ Hlc
       iintro Hk Hpc
       k_norm_g [g21, uc_bgeu_test sz n (i + 1) hn hsz (by omega), if_pos hlast]
       have hpin3 : k.sie = false ∨ k.proc = 0#64 → c3 = c1 := fun h =>
         (hp3 h).trans (hp2 h)
       have hpin3' : k.sie = false ∨ k.proc = 0#64 → c3 = cur := fun h =>
         (hpin3 h).trans (hp1 h)
-      ihave HΦ' := wpNext_at _ _ _ c3 _ hpin3' $$ HΦ
+      ihave HΦ' := wpNext_at _ _ _ c3 _ hpin3' $$ HΦ Hlc
       iclear Hrc
       iapply HΦ' $$ %spie2 %spp2 %_ %P' %_ %hsp2 Hk Hpc Hlend Hav Hold Hchild []
       · iintro %hpc
@@ -1322,13 +1322,13 @@ theorem uvmcopy_loop [WchG GF] (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (M
       i hi P hinv spie spp R h9 h20 h22 h23 cur) $$ [- $Hk $Hpc $Hav $Hold $Hchild $Hlend]
     rotate_right 1
     iframe #
-    iapply wpNext_intro_pin
-    iintro %c1 %hp1 %spie2 %spp2 %R2 %P' %pcv %hsp2 Hk Hpc Hlend Hav Hold Hchild Hrc %hpost
+    iapply wpNext_intro_pin_lc
+    iintro %c1 %hp1 Hlc %spie2 %spp2 %R2 %P' %pcv %hsp2 Hk Hpc Hlend Hav Hold Hchild Hrc %hpost
     obtain ⟨hkept, hrest⟩ := hpost
     rcases hrest with ⟨hpc, hinv'⟩ | ⟨hpc, hPP⟩
     case inr =>
       subst hpc
-      ihave HΦ' := wpNext_at _ _ _ c1 _ hp1 $$ HΦ
+      ihave HΦ' := wpNext_at _ _ _ c1 _ hp1 $$ HΦ Hlc
       iapply HΦ' $$ %spie2 %spp2 %_ %P' %_ %hsp2 Hk Hpc Hlend Hav Hold Hchild Hrc
       ipureintro
       refine ⟨ucKeptL_of_ucKept hkept, Or.inr ⟨rfl, i, by omega, ?_, ?_⟩⟩
@@ -1409,11 +1409,11 @@ theorem uvmcopy_proof (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (MM : MEMMO
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
     iintro Hk Hpc
     k_step_gen (wp_s_ret c2 _ (KA.«uvmcopy» + 0x98#64) true 1#5)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3 £ Hlc
     iintro Hk Hpc
     have hpin3 : k.sie = false ∨ k.proc = 0#64 → c3 = cpu := fun h =>
       (hp3 h).trans ((hp2 h).trans (hp1 h))
-    ihave HΦ' := wpNext_at _ _ _ c3 _ hpin3 $$ HΦ
+    ihave HΦ' := wpNext_at _ _ _ c3 _ hpin3 $$ HΦ Hlc
     rw [uc_setReg_as k 10#5 (KCtx.rget c2 k 0#5)]
     have hra : KCtx.rget c3
         ((k.withSpie k.spie k.spp).withRegs (k.regs.set (10#5) (KCtx.rget c2 k 0#5))) 1#5

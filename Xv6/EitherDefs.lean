@@ -291,11 +291,11 @@ theorem ec_ret [CurCtx] (c : CPU) (k : KCtx) (hK : 6 ≤ k.avail) (R : RegMap) (
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c7 hp7
   iintro Hk Hpc
   k_step_gen (wp_s_ret c7 _ (KA.«either_copyout» + 0x3a#64) true 1#5)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c8 hp8
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c8 hp8 £ Hlc
   iintro Hk Hpc
   ihave HΦ' := wpNext_at _ _ _ c8 _
     (fun h => (hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans
-      ((hp3 h).trans ((hp2 h).trans (hp1 h)))))))) $$ HΦ
+      ((hp3 h).trans ((hp2 h).trans (hp1 h)))))))) $$ HΦ Hlc
   iapply HΦ' $$ %_ Hk Hpc
   ipureintro
   unfold ecExit
@@ -352,11 +352,11 @@ theorem ei_ret [CurCtx] (c : CPU) (k : KCtx) (hK : 6 ≤ k.avail) (R : RegMap) (
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c7 hp7
   iintro Hk Hpc
   k_step_gen (wp_s_ret c7 _ (KA.«either_copyin» + 0x3a#64) true 1#5)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c8 hp8
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c8 hp8 £ Hlc
   iintro Hk Hpc
   ihave HΦ' := wpNext_at _ _ _ c8 _
     (fun h => (hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans
-      ((hp3 h).trans ((hp2 h).trans (hp1 h)))))))) $$ HΦ
+      ((hp3 h).trans ((hp2 h).trans (hp1 h)))))))) $$ HΦ Hlc
   iapply HΦ' $$ %_ Hk Hpc
   ipureintro
   unfold ecExit

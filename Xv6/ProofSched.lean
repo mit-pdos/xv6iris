@@ -734,7 +734,7 @@ theorem sched_proof (SW : SWTCH) (MP : MYPROC) (HO : HOLDING) : SCHED :=
         (KA.«sched» + 0x7a#64) false 172#12 18#5 19#5 ?haS k.intena ?hvS
         (resumedK_wf R8 spie spp (k.avail - 6) k.intena k.root (procAddr j)))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [resumedK_regs, resumedK_sie, resumedK_spie, resumedK_spp, resumedK_avail, resumedK_noff, resumedK_intena, resumedK_locks, resumedK_tier, resumedK_root, resumedK_proc, resumedK_sp]
+      with [resumedK_regs, resumedK_sie, resumedK_spie, resumedK_spp, resumedK_avail, resumedK_noff, resumedK_intena, resumedK_locks, resumedK_tier, resumedK_root, resumedK_proc, resumedK_sp] £ Hlc
     rotate_right 1
     case haS =>
       simp only [KCtx.rget_eq, BitVec.reduceEq, ite_false, KCtx.withRegs_regs, e8_18,
@@ -823,7 +823,7 @@ theorem sched_proof (SW : SWTCH) (MP : MYPROC) (HO : HOLDING) : SCHED :=
         ownCtxCells (pContext (procAddr j) 0) -∗ hartFull Γ j cpu' -∗
         ▷ schedVcAt Γ cpu' (cpuCtxAddr cpu') (procAddr j) -∗ wpLoop cpu'))
       (fun hc => Or.elim hc (fun hx => absurd hx (by decide))
-        (fun hx => absurd hx (procAddr_nonzero hj))) $$ HΦ
+        (fun hx => absurd hx (procAddr_nonzero hj))) $$ HΦ Hlc
     iapply HΦ' $$ %_ %spie %spp %ch' %hcsF Hk Hpc Hheld' Htc' Hir' Hcells Htag' Hvc'
   · -- THE PARK THAT NEVER RETURNS: no record is left, and the whole stack
     -- region sched was called with goes to the slot

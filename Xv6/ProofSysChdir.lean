@@ -145,7 +145,7 @@ theorem sys_chdir_tested (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPUT) (EO : END
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv Γ ∗
     sysChdirRows (procAddr A.j) A.pid A.V.cwd A.V.cwi ∗
     sysChdirHole A.γ (procAddr A.j) A.pid (sysChdirV1 A P2) (sysChdirM1 A P2) ∗
-    (∀ c : CPU, sysChdirPostA k A c) ∗
+    (∀ c : CPU, £ 1 -∗ sysChdirPostA k A c) ∗
     sysChdirLocked kk q g lo tl γil γisl inum A.pid dn bm ∗
     bslots 3 ∗ irefSlots 1 ∗ logOpS icfgLog n Sb ∗
     pfAt (aopenCommitAt (fsGammaL fscFs) appE) A.Fo ∗
@@ -252,7 +252,7 @@ theorem sys_chdir_miss (EO : END_OP) (Γ : SchedNames) [ClaimIs GF Γ]
     byteBuf (sysfileRestAddr (sysChdirBuf (k.regs 2#5)) pl.length) (DFrac.own 1) rest ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysChdirV1 A P2) (sysChdirM1 A P2) ∗
-    (∀ c : CPU, sysChdirPostA k A c) ∗ bslots 3 ∗ irefSlots 2 ∗
+    (∀ c : CPU, £ 1 -∗ sysChdirPostA k A c) ∗ bslots 3 ∗ irefSlots 2 ∗
     logOpS icfgLog n Sb ∗ logTx icfgLog ∗
     nameiWalkDeadEra fscFs A.V.rti A.P A.Pmiss (bview pl.length (sysfilePfun pl)) ∗
     pfAt (aopenCommitAt (fsGammaL fscFs) appE) A.Fo
@@ -312,7 +312,7 @@ theorem sys_chdir_found (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPU
     byteBuf (sysfileRestAddr (sysChdirBuf (k.regs 2#5)) pl.length) (DFrac.own 1) rest ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysChdirV1 A P2) (sysChdirM1 A P2) ∗
-    (∀ c : CPU, sysChdirPostA k A c) ∗ bslots 3 ∗ irefSlots 1 ∗
+    (∀ c : CPU, £ 1 -∗ sysChdirPostA k A c) ∗ bslots 3 ∗ irefSlots 1 ∗
     logOpS icfgLog n Sb ∗ logTx icfgLog ∗
     inodeHeldAt ipv iL ∗ A.P (pathElems (bview pl.length (sysfilePfun pl))).length iL ∗
     pfAt (aopenCommitAt (fsGammaL fscFs) appE) A.Fo
@@ -402,7 +402,7 @@ theorem sys_chdir_fetched (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK) (IP : IPU
     byteBuf (sysChdirBuf (k.regs 2#5)) (DFrac.own 1) bs ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysChdirV1 A P2) (sysChdirM1 A P2) ∗
-    (∀ c : CPU, sysChdirPostA k A c) ∗ bslots 3 ∗ irefSlots 2 ∗ logOp icfgLog MAXOPBLOCKS ∗
+    (∀ c : CPU, £ 1 -∗ sysChdirPostA k A c) ∗ bslots 3 ∗ irefSlots 2 ∗ logOp icfgLog MAXOPBLOCKS ∗
     chdirAuPre (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.P A.Pmiss A.Fo
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hbuf, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Hau⟩
@@ -525,7 +525,7 @@ theorem sys_chdir_args (AS : ARGSTR) (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK
     sysfileAny (sysChdirBuf (k.regs 2#5)) 128 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid A.V A.M ∗
-    (∀ c : CPU, sysChdirPostA k A c) ∗ bslots 3 ∗ irefSlots 2 ∗ logOp icfgLog MAXOPBLOCKS ∗
+    (∀ c : CPU, £ 1 -∗ sysChdirPostA k A c) ∗ bslots 3 ∗ irefSlots 2 ∗ logOp icfgLog MAXOPBLOCKS ∗
     chdirAuPre (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.P A.Pmiss A.Fo
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hbuf, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Hau⟩
@@ -564,7 +564,7 @@ theorem sys_chdir_args (AS : ARGSTR) (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK
   case gn => k_norm_g; omega
   case gK => k_norm_g; exact hKas
   case gmx => k_norm_g [hold]
-  iintro %cpu %spie1 %spp1 %R1 %P2 %bs %kv %⟨hcs1, hext, hret⟩ Hk Hpc Hte Hce %hkv Hbare Hbuf
+  iintro %cpu Hlc %spie1 %spp1 %R1 %P2 %bs %kv %⟨hcs1, hext, hret⟩ Hk Hpc Hte Hce %hkv Hbare Hbuf
   k_norm_g [sys_chdir_ret_22, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   ihave Hbuf := (show byteBuf (GF := GF) (k.regs 2#5 + 18446744073709551456#64) (DFrac.own 1) bs ⊢
     byteBuf (sysChdirBuf (k.regs 2#5)) (DFrac.own 1) bs from .rfl) $$ Hbuf
@@ -575,9 +575,9 @@ theorem sys_chdir_args (AS : ARGSTR) (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK
       (viewFaulted A.V.upt P2 A.M) ⊢
     procPrivFd (A.raise kv).γ (procAddr (A.raise kv).j) (A.raise kv).pid (sysChdirV1 (A.raise kv) P2)
       (sysChdirM1 (A.raise kv) P2) from .rfl) $$ Hblk
-  ihave HΦ : (∀ c : CPU, sysChdirPostA k (A.raise kv) c) $$ [HΦ]
-  · iintro %c
-    ispecialize HΦ $$ %c
+  ihave HΦ : (∀ c : CPU, £ 1 -∗ sysChdirPostA k (A.raise kv) c) $$ [HΦ]
+  · iintro %c Hlc
+    ispecialize HΦ $$ %c Hlc
     iapply (sysChdirK_raise k A.γ (procAddr A.j) A.pid A.V A.M A.P A.Pmiss A.Fo c kv hkv) $$ HΦ
   ihave Hau := (show chdirAuPre (GF := GF) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.P A.Pmiss A.Fo ⊢
     chdirAuPre (fsGammaL fscFs) fscFs (A.raise kv).V.rti (A.raise kv).V.cwi (A.raise kv).P (A.raise kv).Pmiss
@@ -617,10 +617,10 @@ theorem sys_chdir_main (MP : MYPROC) (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI_E
   ihave #Henv : sysfileEnv Γ $$ []
   · unfold sysfileEnv; iframe #
   -- THE CONTRACT'S CONTINUATION, hart-free
-  ihave HΦ : (∀ c : CPU, sysChdirPostA k (⟨γ, j, pid, V, M, P, Pmiss, Fo⟩ : SysChdirArgs GF) c)
+  ihave HΦ : (∀ c : CPU, £ 1 -∗ sysChdirPostA k (⟨γ, j, pid, V, M, P, Pmiss, Fo⟩ : SysChdirArgs GF) c)
     $$ [Hnext]
-  · iintro %c
-    iapply wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext
+  · iintro %c Hlc
+    iapply wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext Hlc
   ihave Hce := (show cpuClaimExt (GF := GF) cpu k.sie k.proc ⊢ cpuClaimExt cpu k.sie (procAddr j)
     from by rw [hproc]) $$ Hce
   simp only [sysChdirAddr]
@@ -677,7 +677,7 @@ theorem sys_chdir_main (MP : MYPROC) (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI_E
   case bK => k_norm_g; exact hKbo
   case bn => k_norm_g; exact hnoff
   case bt => k_norm_g; exact htier
-  iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid Hop
+  iintro %cpu Hlc %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid Hop
   k_norm_g [sys_chdir_ret_14, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   ihave Hblk := sys_chdir_hole_close _ _ _ _ _ $$ [Hhole Hpid Hcwd Hcwr]
   · unfold sysChdirRows; iframe

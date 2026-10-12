@@ -41,12 +41,12 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [Bioslot
 /-- What the tail hands whichever arm reached it: the balanced return
 context at `a0`, and the complement. -/
 def dirlookupRet (k : KCtx) (spie spp : Bool) (a0 : BitVec 64) (c' : CPU) : IProp GF :=
-  iprop(∀ R' : RegMap, ⌜calleeSaved k.regs R' ∧ R' 10#5 = a0⌝ -∗
+  iprop(£ 1 -∗ ∀ R' : RegMap, ⌜calleeSaved k.regs R' ∧ R' 10#5 = a0⌝ -∗
     kctx c' ((k.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗ wpLoop c')
 
 theorem dirlookupRet_elim (k : KCtx) (spie spp : Bool) (a0 : BitVec 64) (c' : CPU) :
-    dirlookupRet (GF := GF) k spie spp a0 c' ⊢
+    dirlookupRet (GF := GF) k spie spp a0 c' ⊢ £ 1 -∗
       ∀ R' : RegMap, ⌜calleeSaved k.regs R' ∧ R' 10#5 = a0⌝ -∗
         kctx c' ((k.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k.regs 1#5)) -∗
         trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗ wpLoop c' := by
@@ -83,12 +83,12 @@ theorem dirlookup_ret (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
   k_norm_g
   iframe
   inext
-  k_next_e
+  k_next_e £ Hlc
   iintro Hk Hpc
   k_norm_g
   ispecialize Hnext $$ %cpu
   ihave HΦ := dirlookupRet_elim _ _ _ _ _ $$ Hnext
-  iapply HΦ $$ %_ [] Hk Hpc Hte Hce
+  iapply HΦ $$ Hlc %_ [] Hk Hpc Hte Hce
   ipureintro
   refine ⟨?_, ?_⟩
   · unfold calleeSaved
@@ -104,12 +104,12 @@ theorem dirlookup_ret_scan (k : KCtx) (spie spp : Bool) (ip : BitVec 64) (dinum 
     (q : Qp) (a0 : BitVec 64) :
     dirlookupKeep (GF := GF) k ip dinum bm data dn dr fn pidv dqp dqd dqn ∗
       dirlookupArm data dn fn hasp (k.regs 12#5) pofv found kk kslot q a0 ∗
-      (∀ c' : CPU, dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c') ⊢
+      (∀ c' : CPU, £ 1 -∗ dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c') ⊢
     ∀ c' : CPU, dirlookupRet k spie spp a0 c' := by
   iintro ⟨Hkeep, Harm, Hnext⟩ %c'
   unfold dirlookupRet
-  iintro %R' %⟨hcs, ha0⟩ Hk Hpc Hte Hce
-  ispecialize Hnext $$ %c'
+  iintro Hlc %R' %⟨hcs, ha0⟩ Hk Hpc Hte Hce
+  ispecialize Hnext $$ %c' Hlc
   ihave HΦ := dirlookupPost_elim _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ $$ Hnext
   iapply HΦ $$ %spie %spp %R' %found %kk %kslot %q %hcs Hk Hpc Hte Hce Hkeep
   rw [ha0]
@@ -138,7 +138,7 @@ theorem dirlookup_tail (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     dirlookupKeep k ip dinum bm data dn dr fn pidv dqp dqd dqn ∗
     dirlookupArm data dn fn hasp (k.regs 12#5) pofv found kk kslot q a0 ∗
-    (∀ c' : CPU, dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c')
+    (∀ c' : CPU, £ 1 -∗ dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hR2' : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFA0#64 := hR2
   iintro ⟨Hk, Hpc, Hframe, Hde, Hte, Hce, Hkeep, Harm, Hnext⟩

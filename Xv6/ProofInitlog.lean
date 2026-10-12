@@ -266,13 +266,13 @@ theorem il_install_trans (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs GF Γ]
   isplitl []
   · imodintro
     iexact Hgen
-  iapply wpNext_intro_pin
-  iintro %cpu2 %hp2 %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid HlhN HW Hexc HL HD HS Hsl HRn
+  iapply wpNext_intro_pin_lc
+  iintro %cpu2 %hp2 Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid HlhN HW Hexc HL HD HS Hsl HRn
   ihave HS := BigSepL.bigSepL_mono
     (Φ := fun i (_ : BitVec 32) => iprop(fsChalf (GF := GF) γfs (logSlotBno logstart i) (Lw i) ∗ emp))
     (Ψ := fun i (_ : BitVec 32) => fsChalf (GF := GF) γfs (logSlotBno logstart i) (Lw i)) (l := W)
     (fun _ => by iintro ⟨H, -⟩; iexact H) $$ HS
-  ihave Hn := wpNext_at true k'.proc c cpu2 _ hp2 $$ Hnext
+  ihave Hn := wpNext_at true k'.proc c cpu2 _ hp2 $$ Hnext Hlc
   iapply Hn $$ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid HlhN HW Hexc HL HD HS Hsl HRn
 
 set_option maxHeartbeats 2000000 in
@@ -328,9 +328,9 @@ theorem il_write_head (WH : WRITE_HEAD) (Γ : SchedNames) [ClaimIs GF Γ]
   isplitr [HL Hch Hsl Hfam Hnext]
   · iapply BigSepL.bigSepL_nil.2; iempintro
   iframe HL Hch Hsl Hfam
-  iapply wpNext_intro_pin
-  iintro %cpu2 %hp2 %spie %spp %R' %bs' %hcs Hk Hpc Hte Hce Hpid HlhN - HL Hch %hbs Hsl HQ
-  ihave Hn := wpNext_at true k'.proc c cpu2 _ hp2 $$ Hnext
+  iapply wpNext_intro_pin_lc
+  iintro %cpu2 %hp2 Hlc %spie %spp %R' %bs' %hcs Hk Hpc Hte Hce Hpid HlhN - HL Hch %hbs Hsl HQ
+  ihave Hn := wpNext_at true k'.proc c cpu2 _ hp2 $$ Hnext Hlc
   iapply Hn $$ %spie %spp %R' %bs' %hcs Hk Hpc Hte Hce Hpid HlhN HL Hch %hbs Hsl HQ
 
 end
@@ -406,7 +406,7 @@ theorem il_seal (Γ : SchedNames) [ClaimIs GF Γ]
     ([∗list] i ∈ List.range LOGBLOCKS, ∃ bs : List (BitVec 8),
        fsChalf γfs (logSlotBno logstart i) bs) ∗
     bslots (LOGBLOCKS + 2) ∗ bslots 2 ∗
-    (∀ (cpu' : CPU) (spie spp : Bool) (R' : RegMap),
+    (∀ (cpu' : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k.regs R'⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
@@ -458,10 +458,10 @@ theorem il_seal (Γ : SchedNames) [ClaimIs GF Γ]
   k_norm_g
   iframe
   inext
-  k_next_e
+  k_next_e £ Hlc
   iintro Hk Hpc
   k_norm_g
-  iapply Hnext $$ %cpu %spie1 %spp1 %_ [] Hk Hpc [Hte] [Hce] [Hpid] [Hsb] [Hwork] [Hctx]
+  iapply Hnext $$ %cpu Hlc %spie1 %spp1 %_ [] Hk Hpc [Hte] [Hce] [Hpid] [Hsb] [Hwork] [Hctx]
   · ipureintro
     exact calleeSaved_epi6s3 k.regs R p20 p21 p22 p23 p24 p25 p26 p27
   · iexact Hte
@@ -519,7 +519,7 @@ theorem initlog_proof
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hwf.2.2.2.1; omega)
   -- the caller's continuation is hart-free (a park's crossing, at a proc)
-  ihave Hnext : ∀ (c : CPU) (spie spp : Bool) (R' : RegMap),
+  ihave Hnext : ∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k.regs R'⌝ -∗
       kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
@@ -527,9 +527,9 @@ theorem initlog_proof
       wordPointsTo (sb + 20#64) 4 dqs (BitVec.ofNat 32 logstart) -∗
       bslots 2 -∗
       logCtx γ γb γfs V.cov logstart dev -∗ wpLoop c $$ [Hnext]
-  · iintro %c
+  · iintro %c Hlc
     iapply wpNext_at true k.proc cpu c _ (fun hc => Or.elim hc (fun hx => absurd hx (by decide))
-      (fun hx => absurd (hproc ▸ hx) (procAddr_nonzero hj))) $$ Hnext
+      (fun hx => absurd (hproc ▸ hx) (procAddr_nonzero hj))) $$ Hnext Hlc
   icases il_slots_split γb $$ Hpool0 with ⟨Hu1, Hu2, Hpool⟩
   -- ===== the prologue =====
   iapply (wp_prologue6s3_gen cpu k KA.«initlog» hK6)

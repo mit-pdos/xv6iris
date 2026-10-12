@@ -239,12 +239,12 @@ theorem pi_prologue [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx
   iintro Hk Hpc Hf56
   k_step_gen (wp_s_sd c8 _ (pc + 16#64) true 0#12 2#5 22#5 (by decide) w₈) $$ [- $Hk $Hpc] next c9 hp9
   iintro Hk Hpc Hf64
-  k_step_gen (wp_s_addi c9 _ (pc + 18#64) true 64#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c10 hp10
+  k_step_gen (wp_s_addi c9 _ (pc + 18#64) true 64#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c10 hp10 £ Hlc
   iintro Hk Hpc
   k_norm_g
   ihave HΦ' := wpNext_at _ _ _ c10 _
     (fun h => (hp10 h).trans ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans
-      ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))))))) $$ HΦ
+      ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))))))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc [Hf8 Hf16 Hf24 Hf32 Hf40 Hf48 Hf56 Hf64]
   unfold piFrame
   iframe
@@ -304,11 +304,11 @@ theorem pi_epilogue [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx
   k_step_gen (wp_s_pop c8 _ (pc + 16#64) true 64#12 8 MachCSL.imm_p64) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c9 hp9
   iintro Hk Hpc
-  k_step_gen (wp_s_ret c9 _ (pc + 18#64) true 1#5) $$ [- $Hk $Hpc] next c10 hp10
+  k_step_gen (wp_s_ret c9 _ (pc + 18#64) true 1#5) $$ [- $Hk $Hpc] next c10 hp10 £ Hlc
   iintro Hk Hpc
   ihave HΦ' := wpNext_at _ _ _ c10 _
     (fun h => (hp10 h).trans ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans
-      ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))))))) $$ HΦ
+      ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))))))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc
 
 /-! ## The callee, at its entry address -/
@@ -470,13 +470,13 @@ theorem pi_iter (IL : INITLOCK) [CurCtx] (k : KCtx) (hK : 10 ≤ k.avail)
   iintro Hk Hpc
   k_step_gen (wp_s_branch c14 _ (KA.«procinit» + 0x98#64) false 8154#13 9#5 20#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [g20, pi_bne_last i hi] next c15 hp15
+    with [g20, pi_bne_last i hi] next c15 hp15 £ Hlc
   iintro Hk Hpc
   ihave Hout := pi_out_close i $$ [Hnm Hfresh Hst Hks]
   case' _ => iframe
   have hpinZ : k.sie = false ∨ k.proc = 0#64 → c15 = cur := fun h =>
     (hp15 h).trans ((hp14 h).trans ((hp13 h).trans ((hp12 h).trans ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans ((hp1 h)))))))))))))))
-  ihave HΦ' := wpNext_at _ _ _ c15 _ hpinZ $$ HΦ
+  ihave HΦ' := wpNext_at _ _ _ c15 _ hpinZ $$ HΦ Hlc
   iapply HΦ' $$ %_ Hk Hpc Hout
   ipureintro
   refine ⟨?_, ?_⟩
@@ -533,13 +533,13 @@ theorem pi_loop (IL : INITLOCK) [CurCtx] (k : KCtx) (hK : 10 ≤ k.avail) (fuel 
     iintro ⟨Hk, Hpc, Hlist, HΦ⟩
     icases pi_range_in_cons i 0 $$ Hlist with ⟨Hin, Hrest⟩
     iapply (pi_iter IL k hK i hi R h9 h18 h19 h20 h21 h22 cur) $$ [- $Hk $Hpc $Hin]
-    iapply wpNext_intro_pin
-    iintro %c1 %hp1 %R2 Hk Hpc Hout %hpost
+    iapply wpNext_intro_pin_lc
+    iintro %c1 %hp1 Hlc %R2 Hk Hpc Hout %hpost
     rw [if_pos hlast]
     obtain ⟨hkept, hcur⟩ := hpost
     ihave Hlist := pi_range_out_cons i 0 $$ [Hout Hrest]
     case' _ => iframe; exact BigSepL.bigSepL_nil_intro
-    ihave HΦ' := wpNext_at _ _ _ c1 _ hp1 $$ HΦ
+    ihave HΦ' := wpNext_at _ _ _ c1 _ hp1 $$ HΦ Hlc
     iapply HΦ' $$ %R2 Hk Hpc Hlist
     ipureintro
     exact hkept

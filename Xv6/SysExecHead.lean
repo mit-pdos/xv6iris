@@ -69,13 +69,13 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [Bioslot
 
 /-- THE HEAD'S TWO WAYS OUT (`sysExecHeadBody`'s `∧`, verbatim). -/
 def sysExecHeadOuts (k : KCtx) (A : SysExecArgs) : IProp GF :=
-  iprop((∀ (c' : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (kv : Nat),
+  iprop((∀ (c' : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (kv : Nat),
         ⌜calleeSaved k.regs R' ∧ R' 10#5 = 0xFFFFFFFFFFFFFFFF#64 ∧ A.V.upt.extSz A.V.sz P' ∧
           A.V.ev ≤ kv⌝ -∗
         kctx c' ((k.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k.regs 1#5)) -∗
         trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗
         procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P' kv) (sysExecM2 A P') -∗ wpLoop c') ∧
-     (∀ (c' : CPU) (spie spp : Bool) (R : RegMap) (P' : UPtd) (kv : Nat) (pl rest : List (BitVec 8)),
+     (∀ (c' : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R : RegMap) (P' : UPtd) (kv : Nat) (pl rest : List (BitVec 8)),
         ⌜sysExecPinsE k R ∧ A.V.upt.extSz A.V.sz P' ∧ A.V.ev ≤ kv ∧ pl.length < 128 ∧
           argPathOf (sysExecIm A) A.v0.toNat pl ∧ (k.regs 2#5).toNat % 8 = 0⌝ -∗
         kctx c' (((k.withSpie spie spp).pushed 60).withRegs R) -∗ pcIs c' (sysExecAddr + 0x28#64) -∗
@@ -141,11 +141,11 @@ theorem sys_exec_head_ret (k : KCtx) (A : SysExecArgs) (hS : SysExecStatic k A) 
     -- +0x24  bltz a5 : falls through
     k_step_e (wp_s_branch cpu _ (KA.«sys_exec» + 0x24#64) false 224#13 15#5 0#5 (by decide) bop.BLT)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [hr, sysfile_bltz_nat pl''.length (by omega)]
+      with [hr, sysfile_bltz_nat pl''.length (by omega)] £ Hlc
     iintro Hk Hpc
     icases HO with ⟨-, HO⟩
     icases sysfile_buf_split _ pl'' _ $$ Hbuf with ⟨Hp, Hrest⟩
-    iapply HO $$ %cpu %spie %spp %_ %P' %kv %pl'' %(old.drop (pl''.length + 1)) [] Hk Hpc Hte Hce
+    iapply HO $$ %cpu Hlc %spie %spp %_ %P' %kv %pl'' %(old.drop (pl''.length + 1)) [] Hk Hpc Hte Hce
       Hblk Hrs Hsp H10 [Hp Hrest] Hargv H59 H60
     · ipureintro
       refine ⟨?_, hext, hkv, hlt, hof, hal⟩
@@ -174,8 +174,8 @@ theorem sys_exec_head_ret (k : KCtx) (A : SysExecArgs) (hS : SysExecStatic k A) 
     simp only [sysExecAddr] at hx
     iapply hx
     iframe
-    iintro %c' %R' %⟨hcs, ha0⟩ Hk Hpc Hte Hce
-    iapply HO $$ %c' %spie %spp %R' %P' %kv [] Hk Hpc Hte Hce Hblk
+    iintro %c' Hlc %R' %⟨hcs, ha0⟩ Hk Hpc Hte Hce
+    iapply HO $$ %c' Hlc %spie %spp %R' %P' %kv [] Hk Hpc Hte Hce Hblk
     ipureintro
     refine ⟨hcs, ?_, hext, hkv⟩
     rw [ha0]
@@ -237,7 +237,7 @@ theorem sys_exec_head_str (AS : ARGSTR) (Γ : SchedNames) (k : KCtx) (A : SysExe
   case gn => k_norm_g; rw [hS.hnoff]
   case gK => k_norm_g; exact hKas
   case gmx => k_norm_g [hold]
-  iintro %cpu %spie1 %spp1 %R1 %P2 %bs %kv %⟨hcs1, hext, hret⟩ Hk Hpc Hte Hce %hkv Hbare Hbuf
+  iintro %cpu Hlc %spie1 %spp1 %R1 %P2 %bs %kv %⟨hcs1, hext, hret⟩ Hk Hpc Hte Hce %hkv Hbare Hbuf
   k_norm_g [sys_exec_head_ret_20, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   ihave Hbuf := (show byteBuf (GF := GF) (k.regs 2#5 + 0xFFFFFFFFFFFFFF30#64) (DFrac.own 1) bs ⊢
     byteBuf (sysExecPath (k.regs 2#5)) (DFrac.own 1) bs from .rfl) $$ Hbuf
@@ -306,7 +306,7 @@ theorem sys_exec_head (AA : ARGADDR) (AS : ARGSTR) (Γ : SchedNames) (k : KCtx) 
   case ha0 => k_norm_g
   case hna => k_norm_g; rw [hS.hnoff]; decide
   case hKa => k_norm_g; exact hKaa
-  iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Htf Htfp H59
+  iintro %cpu Hlc %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Htf Htfp H59
   k_norm_g [sys_exec_head_ret_12, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe k.proc) 8 (DFrac.own 1) (pageAddr A.V.upt.tfp) ⊢
       wordPointsTo (pTrapframe (procAddr A.j)) 8 (DFrac.own 1) A.V.trapframe from by

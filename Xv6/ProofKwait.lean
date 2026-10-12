@@ -1190,7 +1190,7 @@ theorem kw_epi (Γ : SchedNames) (cpu cur : CPU) (k : KCtx) (γw γp γl : GName
     with [KCtx.pop_pushed _ _ _ hK', hR2] next c10 hq10
   iintro Hk Hpc
   k_step_gen (wp_s_ret c10 _ (KA.«kwait» + 0x92#64) true 1#5)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c11 hq11
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c11 hq11 £ Hlc
   iintro Hk Hpc
   -- the complement follows the thread (it can only move where the hart cannot)
   have hpinE : k.sie = false → c11 = cur := fun hsie => by
@@ -1203,7 +1203,7 @@ theorem kw_epi (Γ : SchedNames) (cpu cur : CPU) (k : KCtx) (γw γp γl : GName
   -- apply the sleep-shaped post (any hart, since k.proc ≠ 0)
   ihave HΦ := wpNext_at true k.proc cpu c11 _
     (fun hc => hc.elim (fun h => absurd h (by decide))
-      (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))) $$ HΦ
+      (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))) $$ HΦ Hlc
   k_norm_g
   iapply HΦ $$ %spie %spp %_ %P' %rv %xw %d %cs' %k' [] Hans Hkg Hrow Hk Hpc Hte Hce %hk' Hpriv
   ipureintro
@@ -2053,9 +2053,9 @@ theorem kw_scan_acq (AC : ACQUIRE) (Γ : SchedNames) (cur : CPU) (kh : KCtx) (n 
   iintro Hk Hpc Hstate
   -- beq a5,s4  (state == ZOMBIE ?)
   k_step (wp_s_branch c _ (KA.«kwait» + 0xc0#64) false 8064#13 15#5 20#5 (by decide) bop.BEQ)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] £ Hlc
   iintro Hk Hpc
-  ihave HΦ := wpNext_at false kh.proc cur c _ (fun _ => hcur) $$ HΦ
+  ihave HΦ := wpNext_at false kh.proc cur c _ (fun _ => hcur) $$ HΦ Hlc
   k_norm [kw_bcond_zombie, decide_eq_true_eq, h20', KCtx.pushOffAt_withRegs, kwj_2268]
   iapply HΦ $$ %spie2 %spp2 %(R2.set 15#5 (BitVec.signExtend 64 st)) %st %ch %kl %xs %pid0 []
     Hk Hpc Hlocked Hstate Hpl Hchan Hrest Hslots Harm

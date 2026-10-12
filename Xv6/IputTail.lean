@@ -541,7 +541,7 @@ theorem iput_tail_exit (RH : RELEASE_HOOK) (c : CPU) (k : KCtx)
   rotate_right 1
   case h10 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   case h1 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-  iintro %c %R' %hcs Hk Hpc Hte Hce
+  iintro %c Hlc %R' %hcs Hk Hpc Hte Hce
   rw [iput_tail_ret_30]
   obtain ⟨c2, c8, c9, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27⟩ := hcs
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at c2 c18 c19 c20 c21 c22 c23 c24 c25 c26 c27

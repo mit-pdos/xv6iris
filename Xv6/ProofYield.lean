@@ -340,7 +340,7 @@ theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : Y
   k_norm
   iframe
   inext
-  iintro Hk Hpc
+  iintro Hk Hpc Hlc
   k_norm
   -- back to the caller, on the hart that dispatched us
   ihave HΦ' := wpNext_at true (procAddr j) cpu h1
@@ -350,7 +350,7 @@ theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : Y
       wpLoop cpu'))
     (fun hc => Or.elim hc (fun hx => absurd hx (by decide))
       (fun hx => absurd hx (procAddr_nonzero hj))) $$ HΦ
-  iapply HΦ' $$ %spie %spp %_ Hk Hpc Htc Hclaim2 Hres
+  iapply HΦ' $$ Hlc %spie %spp %_ Hk Hpc Htc Hclaim2 Hres
   ipureintro
   unfold calleeSaved
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>

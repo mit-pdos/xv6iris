@@ -269,12 +269,12 @@ theorem uvmunmap_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
     with [KCtx.pop_pushed _ _ _ hK', hR2] next c8 hp8
   iintro Hk Hpc
   k_step_gen (wp_s_ret c8 _ (KA.«uvmunmap» + 0x88#64) true 1#5)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c9 hp9
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c9 hp9 £ Hlc
   iintro Hk Hpc
   have hpinZ : k.sie = false ∨ k.proc = 0#64 → c9 = cpu := fun h =>
     (hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans
       ((hp3 h).trans ((hp2 h).trans ((hp1 h).trans (hpin h)))))))))
-  ihave HΦ' := wpNext_at _ _ _ c9 _ hpinZ $$ HΦ
+  ihave HΦ' := wpNext_at _ _ _ c9 _ hpinZ $$ HΦ Hlc
   iapply HΦ' $$ %_ Hk Hpc HA HB HC
   ipureintro
   unfold calleeSaved
@@ -307,9 +307,9 @@ theorem uvmunmap_tail [CurCtx] (k : KCtx) (va : BitVec 64) (n i : Nat) (hi : i <
   iintro Hk Hpc
   k_step_gen (wp_s_branch c1 _ (KA.«uvmunmap» + 0x4c#64) false 42#13 18#5 19#5 (by decide) bop.BGEU)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [h19, un_bgeu_step va n i hi hr] next c2 hp2
+    with [h19, un_bgeu_step va n i hi hr] next c2 hp2 £ Hlc
   iintro Hk Hpc
-  ihave HΦ' := wpNext_at _ _ _ c2 _ (fun h => (hp2 h).trans (hp1 h)) $$ HΦ
+  ihave HΦ' := wpNext_at _ _ _ c2 _ (fun h => (hp2 h).trans (hp1 h)) $$ HΦ Hlc
   iapply HΦ' $$ %_ Hk Hpc HA HB HC
   ipureintro
   simp only [unKept, RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
@@ -354,10 +354,10 @@ theorem uvmunmap_free_page [WchG GF] (KF : KFREE) [CurCtx]
     have h13 : k.regs 13#5 = 0#64 := hdf0 rfl
     k_step_gen (wp_s_branch cur _ (KA.«uvmunmap» + 0x66#64) false 8160#13 21#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [h21, MachCSL.beq_zero _ h13] next c1 hp1
+      with [h21, MachCSL.beq_zero _ h13] next c1 hp1 £ Hlc
     iintro Hk Hpc
     rw [delete_id Qm key (hQ0 rfl)]
-    ihave HΦ' := wpNext_at _ _ _ c1 _ hp1 $$ HΦ
+    ihave HΦ' := wpNext_at _ _ _ c1 _ hp1 $$ HΦ Hlc
     iapply HΦ' $$ %spie %spp %_ %(fun _ => ⟨rfl, rfl⟩) Hk Hpc Hum Hfree HRes
     ipureintro
     exact calleeSaved_refl R
@@ -396,11 +396,11 @@ theorem uvmunmap_free_page [WchG GF] (KF : KFREE) [CurCtx]
     ihave Hl := actLend_ret_step k.proc hk1 $$ Hl
     icases kctx_kernelText _ _ $$ Hk with ⟨#Htext2, Hk⟩
     k_step_gen (wp_s_j c5 _ (KA.«uvmunmap» + 0x74#64) true 2097106#21)
-      from (text_instr _ _ _ _ rfl rfl) Htext2 $$ [- $Hk $Hpc] next c6 hp6
+      from (text_instr _ _ _ _ rfl rfl) Htext2 $$ [- $Hk $Hpc] next c6 hp6 £ Hlc
     iintro Hk Hpc
     have hpinZ : k.sie = false ∨ k.proc = 0#64 → c6 = cur := fun h =>
       (hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))
-    ihave HΦ' := wpNext_at _ _ _ c6 _ hpinZ $$ HΦ
+    ihave HΦ' := wpNext_at _ _ _ c6 _ hpinZ $$ HΦ Hlc
     have hsp' : k.sie = false ∨ true = false → spie2 = spie ∧ spp2 = spp := by
       intro h
       rcases h with h | h

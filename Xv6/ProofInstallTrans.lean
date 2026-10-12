@@ -223,10 +223,10 @@ theorem it_prologue (cpu : CPU) (k : KCtx) (hK : 10 ≤ k.avail) :
   iintro Hk Hpc F8
   k_step_gen (wp_s_sd c9 _ (KA.«install_trans» + 0x20#64) true 0#12 2#5 24#5 (by decide) w9) $$ [- $Hk $Hpc] next c10 hp10
   iintro Hk Hpc F9
-  k_step_gen (wp_s_addi c10 _ (KA.«install_trans» + 0x22#64) true 80#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c11 hp11
+  k_step_gen (wp_s_addi c10 _ (KA.«install_trans» + 0x22#64) true 80#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c11 hp11 £ Hlc
   iintro Hk Hpc
   k_norm_g
-  ihave HΦ := wpNext_at _ _ _ c11 _ (fun h => ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans ((hp1 h).trans (hp0 h))))))))))))) $$ HΦ
+  ihave HΦ := wpNext_at _ _ _ c11 _ (fun h => ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans ((hp1 h).trans (hp0 h))))))))))))) $$ HΦ Hlc
   iapply HΦ $$ Hk Hpc [F0 F1 F2 F3 F4 F5 F6 F7 F8 F9]
   unfold itFrame
   iframe
@@ -280,10 +280,10 @@ theorem it_epilogue (cpu : CPU) (k : KCtx) (hK : 10 ≤ k.avail) (R : RegMap)
   case' _ => stack_cells; iframe
   k_step_gen (wp_s_pop d10 _ (KA.«install_trans» + 0xc6#64) true 80#12 10 MachCSL.imm_p80) $$ [- $Hk $Hpc] with [KCtx.pop_pushed _ _ _ hK, hR2] next d11 hq11
   iintro Hk Hpc
-  k_step_gen (wp_s_ret d11 _ (KA.«install_trans» + 0xc8#64) true 1#5) $$ [- $Hk $Hpc] next d12 hq12
+  k_step_gen (wp_s_ret d11 _ (KA.«install_trans» + 0xc8#64) true 1#5) $$ [- $Hk $Hpc] next d12 hq12 £ Hlc
   iintro Hk Hpc
   k_norm_g
-  ihave HΦ := wpNext_at _ _ _ d12 _ (fun h => ((hq12 h).trans ((hq11 h).trans ((hq10 h).trans ((hq9 h).trans ((hq8 h).trans ((hq7 h).trans ((hq6 h).trans ((hq5 h).trans ((hq4 h).trans ((hq3 h).trans ((hq2 h).trans (hq1 h))))))))))))) $$ HΦ
+  ihave HΦ := wpNext_at _ _ _ d12 _ (fun h => ((hq12 h).trans ((hq11 h).trans ((hq10 h).trans ((hq9 h).trans ((hq8 h).trans ((hq7 h).trans ((hq6 h).trans ((hq5 h).trans ((hq4 h).trans ((hq3 h).trans ((hq2 h).trans (hq1 h))))))))))))) $$ HΦ Hlc
   iapply HΦ $$ Hk Hpc
 
 end
@@ -671,7 +671,7 @@ theorem it_post_at (cpu c : CPU) (k : KCtx) (γb : BcacheNames) (γfs : FsNames)
     (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8)) (L : BlockMap) (D : RegMapF Bool)
     (pidv : BitVec 32) (dqp : DFrac) (Xexc : List Nat) (Rt : Nat → IProp GF)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) :
-    wpNext true k.proc cpu (itPost (GF := GF) k γb γfs recovering logstart n W Lw L D pidv dqp Xexc Rt) ⊢
+    wpNext true k.proc cpu (itPost (GF := GF) k γb γfs recovering logstart n W Lw L D pidv dqp Xexc Rt) ⊢ £ 1 -∗
     ∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k.regs R'⌝ -∗
       kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
@@ -684,10 +684,10 @@ theorem it_post_at (cpu c : CPU) (k : KCtx) (γb : BcacheNames) (γfs : FsNames)
       fsDirtyAuth γfs (if recovering then D else dirtyClear D (W.map (fun w => w.toNat))) -∗
       ([∗list] i ↦ w ∈ W, itRowPost γfs recovering logstart Lw i w) -∗
       bslots (2 + (if recovering then 0 else W.length)) -∗ ▷ Rt n -∗ wpLoop c := by
-  iintro H
+  iintro H Hlc
   ihave H := wpNext_at true k.proc cpu c _
     (fun h => h.elim (fun h => absurd h (by decide))
-      (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))) $$ H
+      (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))) $$ H Hlc
   iapply itPost_elim (Rt := Rt) $$ H
 
 end
@@ -739,11 +739,11 @@ theorem it_exit (c0 cpu : CPU) (k : KCtx) (γb : BcacheNames) (γfs : FsNames)
   k_norm_g
   iframe
   inext
-  k_next_e
+  k_next_e £ Hlc
   iintro Hk Hpc
   k_norm_g
   ihave HΦ := it_post_at c0 cpu k γb γfs recovering logstart n j W Lw L D pidv dqp Xexc Rt hj hproc $$ HΦ
-  iapply HΦ $$ %a %b %_ [] Hk Hpc Hte Hce Hpid HlhN Hlhb Hexc Hauth Hdirty Hrows Hslots HRt
+  iapply HΦ $$ Hlc %a %b %_ [] Hk Hpc Hte Hce Hpid HlhN Hlhb Hexc Hauth Hdirty Hrows Hslots HRt
   ipureintro
   unfold calleeSaved
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
@@ -2048,7 +2048,7 @@ theorem installTrans_proof (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE
       with [KCtx.setReg_eq_withRegs, MachCSL.signExtend_ofNat32 n hn31, it_blez n (by omega), decide_eq_true hzero]
     iintro Hk Hpc
     k_step_e (wp_s_ret cpu _ (KA.«install_trans» + 0xca#64) true 1#5)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.setReg_eq_withRegs]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.setReg_eq_withRegs] £ Hlc
     iintro Hk Hpc
     ihave HΦ := it_post_at c0 cpu k γb γfs recovering logstart n j [] Lw L D pidv dqp Xexc Rt hj hproc $$ HΦ
     have hn0 : n = 0 := by simpa using hnW
@@ -2087,7 +2087,7 @@ theorem installTrans_proof (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE
       simp only [List.map_nil, excDelMany_nil]
       iintro H; iexact H) $$ Hexc
     rw [it_ctx_spie0 k]
-    iapply HΦ $$ %(k.spie) %(k.spp) %_ [] Hk Hpc Hte Hce Hpid HlhN Hlhb Hexc Hauth Hdirty
+    iapply HΦ $$ Hlc %(k.spie) %(k.spp) %_ [] Hk Hpc Hte Hce Hpid HlhN Hlhb Hexc Hauth Hdirty
       Hrows Hslots HR0
     ipureintro
     unfold calleeSaved

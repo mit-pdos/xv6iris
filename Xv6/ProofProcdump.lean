@@ -398,12 +398,12 @@ theorem pd_tail [CurCtx] (k : KCtx) (i : Nat) (hi : i < NPROC) (spie spp : Bool)
   iintro Hk Hpc
   k_step_gen (wp_s_branch c1 _ (KA.«procdump» + 0x6a#64) false 36#13 9#5 18#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [h18, pd_beq_last i hi] next c2 hq2
+    with [h18, pd_beq_last i hi] next c2 hq2 £ Hlc
   iintro Hk Hpc
   have hpinZ : k.sie = false ∨ k.proc = 0#64 → c2 = cur := fun h =>
     (hq2 h).trans ((hq1 h).trans (hpin h))
   have hsp : k.sie = false → spie = spie ∧ spp = spp := fun _ => ⟨rfl, rfl⟩
-  ihave HPhi := wpNext_at _ _ _ c2 _ hpinZ $$ HPhi
+  ihave HPhi := wpNext_at _ _ _ c2 _ hpinZ $$ HPhi Hlc
   iapply HPhi $$ %spie %spp %_ %hsp Hk Hpc
   ipureintro
   refine ⟨?_, ?_⟩
@@ -977,11 +977,11 @@ theorem pd_loop (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : Uart
       h23 cur) $$ [- $Hk $Hpc $Hview $Hsent]
     rotate_right 1
     iframe #
-    iapply wpNext_intro_pin
-    iintro %c1 %hq1 %spie2 %spp2 %R2 %cs %hsp2 Hk Hpc %hpost Hview Hsent
+    iapply wpNext_intro_pin_lc
+    iintro %c1 %hq1 Hlc %spie2 %spp2 %R2 %cs %hsp2 Hk Hpc %hpost Hview Hsent
     rw [if_pos hlast]
     obtain ⟨hkept2, -⟩ := hpost
-    ihave HPhi := wpNext_at _ _ _ c1 _ hq1 $$ HPhi
+    ihave HPhi := wpNext_at _ _ _ c1 _ hq1 $$ HPhi Hlc
     iapply HPhi $$ %spie2 %spp2 %R2 %cs %hsp2 Hk Hpc %hkept2 Hview Hsent
   | succ fuel ih =>
     intro i hf bs' spie spp R h9 h18 h19 h20 h21 h22 h23 cur
@@ -1089,12 +1089,12 @@ theorem pd_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
     with [KCtx.pop_pushed _ _ _ hK', hR2] next c10 hq10
   iintro Hk Hpc
   k_step_gen (wp_s_ret c10 _ (KA.«procdump» + 0xa2#64) true 1#5)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c11 hq11
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c11 hq11 £ Hlc
   iintro Hk Hpc
   have hpinZ : k.sie = false ∨ k.proc = 0#64 → c11 = cpu := fun h =>
     (hq11 h).trans ((hq10 h).trans ((hq9 h).trans ((hq8 h).trans ((hq7 h).trans ((hq6 h).trans
       ((hq5 h).trans ((hq4 h).trans ((hq3 h).trans ((hq2 h).trans ((hq1 h).trans (hpin h)))))))))))
-  ihave HPhi := wpNext_at _ _ _ c11 _ hpinZ $$ HPhi
+  ihave HPhi := wpNext_at _ _ _ c11 _ hpinZ $$ HPhi Hlc
   iapply HPhi $$ %spie %spp %_ %hsp Hk Hpc
   ipureintro
   unfold calleeSaved

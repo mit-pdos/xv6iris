@@ -484,7 +484,7 @@ theorem ig_recycle_rel (RH : RELEASE_HOOK) (c cpu : CPU) (k : KCtx) (spie spp : 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ig_lock]
   iintro Hk Hpc
   k_step (wp_s_jal c _ (KA.«iget» + 0x88#64) false 2088100#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ig_br_rel]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ig_br_rel] £ Hlc
   iintro Hk Hpc
   iapply (ig_release RH c cpu k spie spp hwf hK hlk hpin _ ?h10 (KA.«iget» + 0x8c#64) ?h1)
     $$ [- $Hk $Hpc $Henv $Hlocked $Harm $HRin]
@@ -494,7 +494,7 @@ theorem ig_recycle_rel (RH : RELEASE_HOOK) (c cpu : CPU) (k : KCtx) (spie spp : 
   iintro %cr %R' %hpr %hcs Hk Hpc
   rw [ig_ret_8c]
   unfold igTailC
-  ihave Htail := wpNext_at _ _ _ cr _ hpr $$ Htail
+  ihave Htail := wpNext_at _ _ _ cr _ hpr $$ Htail Hlc
   obtain ⟨c2, c8, c9, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27⟩ := hcs
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at c2 c19 c21 c22 c23 c24 c25 c26 c27
   obtain ⟨p21, p22, p23, p24, p25, p26, p27⟩ := hpins

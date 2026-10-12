@@ -197,7 +197,7 @@ theorem sys_open_stores_pub (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
       foffPubT A.omo t -∗
       openPostOkPlain A.omo (fsGammaL fscFs) A.γ (procAddr A.j) A.pid (sysOpenIm A) A.v.toNat
         A.vom A.P A.Fo A.Ft A.sts (sysOpenV2 A P2) (sysOpenM2 A P2) r) -∗
-    (∀ c' : CPU, sysOpenPostP k A c') -∗
+    (∀ c' : CPU, £ 1 -∗ sysOpenPostP k A c') -∗
     wpLoop (GF := GF) cpu := by
   unfold sysOpenPubBody at hPub
   simp only [sysOpenAddr] at hPub
@@ -228,7 +228,7 @@ theorem sys_open_stores_itrunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs GF Γ]
     wordPointsTo (iInum (ientry kk)) 4 (DFrac.own (1 : Qp).half) inum ∗
     inodeMeta (ientry kk) dn ∗ inodeMap fscFs (ientry kk) bm ∗ inodeBlocks fscFs bm data ∗
     dinodeAt fscIreg inum dn ∗ sysOpenPid A ∗ bslots 3 ∗ logOpSe icfgLog (u + 2) Sb e0 ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap),
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c se -∗ cpuClaimExt c se pj -∗ sysOpenPid A -∗
@@ -267,10 +267,10 @@ theorem sys_open_stores_itrunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs GF Γ]
   iapply h
   iframe Hk Hpc Hte Hce Hdev Hinum Hmeta Hmap Hblk Hat Hpid Hbs Hop
   iframe #
-  iapply wpNext_intro_pin
-  iintro %c %_ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hdev Hinum - - Hmeta Hmap Hblk Hat Hbs
+  iapply wpNext_intro_pin_lc
+  iintro %c %_ Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hdev Hinum - - Hmeta Hmap Hblk Hat Hbs
     ⟨%w, %u', %Sb', %-, HopS⟩
-  iapply HK $$ %c %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hdev Hinum Hmeta Hmap Hblk Hat Hbs
+  iapply HK $$ %c Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hdev Hinum Hmeta Hmap Hblk Hat Hbs
   iexists u'
   iapply logOpS_opb icfgLog u' Sb' $$ HopS
 
@@ -326,7 +326,7 @@ theorem sys_open_stores_trunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs GF Γ]
     logOpb icfgLog u -∗ bslots 3 -∗ irefSlots nsj -∗ fdSlot -∗
     fdFrags A.V.fdg A.sts -∗ fdStAuth A.V.fdg fd .closed -∗
     sysOpenResidue A pl inum dn bm data -∗
-    (∀ c' : CPU, sysOpenPostP k A c') -∗
+    (∀ c' : CPU, £ 1 -∗ sysOpenPostP k A c') -∗
     wpLoop (GF := GF) cpu := by
   obtain ⟨hkk, hinb, hipos, hle, hu2⟩ := hA
   iintro Hk Hpc Hte Hce #Henv Hcells Hbuf Hlk Hflat Hkeep Href Hflds Hnames Hoff
@@ -369,7 +369,7 @@ theorem sys_open_stores_trunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs GF Γ]
   case tn => k_norm_g; exact hS.hnoff
   case tt => k_norm_g; exact hS.htier
   case ta => k_norm_g
-  iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hdev Hinum Hmeta Hmap Hblk Hat Hbs
+  iintro %cpu Hlc %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hdev Hinum Hmeta Hmap Hblk Hat Hbs
     ⟨%u', Hop⟩
   k_norm_g [sys_open_stores_ret_154, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysOpenPins_cs k _ R1 _ _ _ (sysOpenPins_set k _ _ _ _ 1#5 _

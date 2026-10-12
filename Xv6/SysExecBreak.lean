@@ -242,7 +242,7 @@ theorem sys_exec_kexec (KX : KEXEC) (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU
     sysExecPages pg afun 0 i ∗ bslots 3 ∗ irefSlots 2 ∗ myPay U.gn U.Q ∗
     execAuPre U.Fs (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.V.pvSecc U.Q U.P U.Pmiss U.Fo pl i alen afun
       U.sts U.cs A.pid ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
       ⌜calleeSaved k'.regs R'⌝ -∗
       execArms U.Fs (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.V.pvSecc U.Q U.P U.Pmiss U.Fo pl i alen afun
         U.sts U.gn U.cs A.pid (sysExecV2 A P kv) (sysExecM2 A P) V' M' (R' 10#5) -∗
@@ -272,10 +272,10 @@ theorem sys_exec_kexec (KX : KEXEC) (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU
   unfold sysExecEnv
   iframe
   iframe #
-  iapply wpNext_intro_pin
-  iintro %c %- %spie %spp %R' %V' %M' %hcs Harms Hk Hpc Hte Hce Hblk ⟨Hpath, Hargv, Hstrs⟩ Hbs Hir
+  iapply wpNext_intro_pin_lc
+  iintro %c %- Hlc %spie %spp %R' %V' %M' %hcs Harms Hk Hpc Hte Hce Hblk ⟨Hpath, Hargv, Hstrs⟩ Hbs Hir
   ihave Hpgs := (sysExecBreak_pages (GF := GF) A P kv pl i pg alen afun).2 $$ Hstrs
-  iapply HΦ $$ %c %spie %spp %R' %V' %M' %hcs Harms Hk Hpc Hte Hce Hblk Hpath Hargv Hpgs Hbs Hir
+  iapply HΦ $$ %c Hlc %spie %spp %R' %V' %M' %hcs Harms Hk Hpc Hte Hce Hblk Hpath Hargv Hpgs Hbs Hir
 
 /-! ## §4.  THE BREAK (Rocq `sx_break_au`) -/
 
@@ -408,7 +408,7 @@ theorem sys_exec_break (KX : KEXEC) (Γ : SchedNames) [ClaimIs GF Γ] (k : KCtx)
   case hti => k_norm_g; exact hS.htier
   case h10 => k_norm_g; rfl
   case h11 => k_norm_g; rfl
-  iintro %c2 %spie2 %spp2 %R2 %V' %M' %hcs Harms Hk Hpc Hte Hce Hblk Hpath Hargv Hpgs Hbs Hir
+  iintro %c2 Hlc %spie2 %spp2 %R2 %V' %M' %hcs Harms Hk Hpc Hte Hce Hblk Hpath Hargv Hpgs Hbs Hir
   have hpins2 : sysExecLoopPins k R2 i := by
     refine sysExecPins_cs k _ R2 _ _ _ _ _ _ _ ?_ hcs
     repeat (refine sysExecPins_set _ _ _ _ _ _ _ _ _ _ _ ?_ (by decide))
@@ -427,11 +427,11 @@ theorem sys_exec_break (KX : KEXEC) (Γ : SchedNames) [ClaimIs GF Γ] (k : KCtx)
   iapply hsucc $$ %c2 %spie2 %spp2 %R2 %i %pg %afun %pl %rest %(R2 10#5) %V'.ev
     %⟨Nat.le_of_lt hi, sysExecOk_pgOk pg alen afun i hok, sysExecLoopPins_bad k R2 i hpins2, rfl, hal⟩
     Hk Hpc Hte Hce Henv Hcarry H59 H60 Harr Hpgs Hl
-  iintro %c3 %spie3 %spp3 %R3 %⟨hcs3, h10⟩ Hk Hpc Hte Hce ⟨%k1, %hk1, Hl⟩
+  iintro %c3 Hlc %spie3 %spp3 %R3 %⟨hcs3, h10⟩ Hk Hpc Hte Hce ⟨%k1, %hk1, Hl⟩
   ihave Hl := actLend_congr hS.hproc k1 $$ Hl
   icases Hblk $$ %k1 %hk1 Hl with ⟨%V'', %hV'', Hblk⟩
   ihave Harms := execArms_evAfter hV'' $$ Harms
-  iapply HΦ $$ %c3 %spie3 %spp3 %R3 %V'' %M' %hcs3 %hargs %hext %hkv [Harms] Hk Hpc Hte Hce Hbs Hir Hblk
+  iapply HΦ $$ %c3 Hlc %spie3 %spp3 %R3 %V'' %M' %hcs3 %hargs %hext %hkv [Harms] Hk Hpc Hte Hce Hbs Hir Hblk
   rw [h10]
   iexact Harms
 

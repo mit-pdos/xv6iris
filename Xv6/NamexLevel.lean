@@ -99,7 +99,7 @@ theorem namex_tests (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKUP)
     namexLk A ik q g lo tl inum dn γil γisl ∗ icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
     irefSlots 1 ∗ namexKeep k A ∗ namexPath k A ∗ byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) ∗
     bslots 3 ∗ logOpS icfgLog ncur Scur ∗
-    (∀ c' : CPU, namexPostA k A c') ∗ namexLoop k A fuel
+    (∀ c' : CPU, £ 1 -∗ namexPostA k A c') ∗ namexLoop k A fuel
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨r2, r8, r9, r19, r20, r21, r22, r23, r24, r25, r27⟩ := id hf.hregs
   obtain ⟨hA, hB, hn, hC⟩ := hf.hbud
@@ -247,7 +247,7 @@ theorem namex_level (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOK
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0xc4#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     namexEnv Γ A ∗ namexWalk k A ipv ncur Scur nf ∗
-    (∀ c' : CPU, namexPostA k A c') ∗ namexLoop k A fuel
+    (∀ c' : CPU, £ 1 -∗ namexPostA k A c') ∗ namexLoop k A fuel
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Henv, Hwalk, Hnext, IH⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -291,7 +291,7 @@ theorem namex_level (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOK
   case gn => k_norm_g; try exact hs.hnoff
   case gt => k_norm_g; try exact hs.htier
   case ga => k_norm_g
-  iintro %c %spie' %spp' %R' %dn %bm %hcs Hk Hpc Hte Hce Hsi Hpid Hb1 Hsl Hdep Hoff Hdev Hinum
+  iintro %c Hlc %spie' %spp' %R' %dn %bm %hcs Hk Hpc Hte Hce Hsi Hpid Hb1 Hsl Hdep Hoff Hdev Hinum
     Hval Hload #Hshot Hfrz Hru
   let cpu := c
   k_norm_g [namex_ret_c6]

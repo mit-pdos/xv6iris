@@ -394,11 +394,11 @@ theorem wp_prologue_dirlookup [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU)
   iintro Hk Hpc Hf8
   k_step_gen (wp_s_sd c2 _ (pc + 4#64) true 80#12 2#5 8#5 (by decide) w₂) $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc Hf16
-  k_step_gen (wp_s_addi c3 _ (pc + 6#64) true 96#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c4 hp4
+  k_step_gen (wp_s_addi c3 _ (pc + 6#64) true 96#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c4 hp4 £ Hlc
   iintro Hk Hpc
   k_norm_g
   ihave HΦ' := wpNext_at _ _ _ c4 _
-    (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ
+    (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc [Hf8 Hf16 Hf24 Hf32 Hf40 Hf48 Hf56 Hf64 Hf72 Hf80 Hf88 Hf96]
   iexists w₃, w₄, w₅, w₆, w₇, w₈, w₉, w₁₀, w₁₁, w₁₂
   unfold frame12
@@ -433,11 +433,11 @@ theorem wp_restore3_dirlookup [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU)
     $$ [- $Hk $Hpc] with [hR2] next c2 hp2
   iintro Hk Hpc Hf48
   k_step_gen (wp_s_ld c2 _ (pc + 4#64) true 32#12 22#5 2#5 (by decide) (by decide) (DFrac.own 1) s6)
-    $$ [- $Hk $Hpc] with [hR2] next c3 hp3
+    $$ [- $Hk $Hpc] with [hR2] next c3 hp3 £ Hlc
   iintro Hk Hpc Hf64
   k_norm_g
   ihave HΦ' := wpNext_at _ _ _ c3 _
-    (fun h => (hp3 h).trans ((hp2 h).trans (hp1 h))) $$ HΦ
+    (fun h => (hp3 h).trans ((hp2 h).trans (hp1 h))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc Hf40 Hf48 Hf64
 
 set_option maxHeartbeats 4000000 in
@@ -491,12 +491,12 @@ theorem wp_epilogue_dirlookup [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU)
   k_step_gen (wp_s_pop c6 _ (pc + 12#64) true 96#12 12 MachCSL.imm_p96) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c7 hp7
   iintro Hk Hpc
-  k_step_gen (wp_s_ret c7 _ (pc + 14#64) true 1#5) $$ [- $Hk $Hpc] next c8 hp8
+  k_step_gen (wp_s_ret c7 _ (pc + 14#64) true 1#5) $$ [- $Hk $Hpc] next c8 hp8 £ Hlc
   iintro Hk Hpc
   k_norm_g
   ihave HΦ' := wpNext_at _ _ _ c8 _
     (fun h => (hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans
-      ((hp3 h).trans ((hp2 h).trans (hp1 h)))))))) $$ HΦ
+      ((hp3 h).trans ((hp2 h).trans (hp1 h)))))))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc
 
 end

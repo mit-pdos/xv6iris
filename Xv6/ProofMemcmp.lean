@@ -82,9 +82,9 @@ theorem memcmp_iter {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
   ihave Hbuf2 := Hclose2 $$ Hb2
   -- bne a5,a4,cca
   k_step_gen (wp_s_branch c2 _ (KA.«memcmp» + 0x1a#64) false 16#13 15#5 14#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
-    $$ [- $Hk $Hpc] with [ite_bne_bytes] next c3 hp3
+    $$ [- $Hk $Hpc] with [ite_bne_bytes] next c3 hp3 £ Hlc
   iintro Hk Hpc
-  ihave HΦ' := wpNext_at _ _ _ c3 _ (fun h => (hp3 h).trans ((hp2 h).trans (hp1 h))) $$ HΦ
+  ihave HΦ' := wpNext_at _ _ _ c3 _ (fun h => (hp3 h).trans ((hp2 h).trans (hp1 h))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc Hbuf1 Hbuf2
 
 /-- What the loop leaves in the registers: either the first differing
@@ -126,8 +126,8 @@ theorem memcmp_loop {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
     iapply (memcmp_iter cpu kb s1 s2 dq1 dq2 bs1 bs2 i bs1[i] bs2[i] ha hb R h10 h11)
     iframe
-    iapply wpNext_intro_pin
-    iintro %c1 %hp1 Hk Hpc Hbuf1 Hbuf2
+    iapply wpNext_intro_pin_lc
+    iintro %c1 %hp1 Hlc Hk Hpc Hbuf1 Hbuf2
     by_cases hab : bs1[i] = bs2[i]
     · simp only [hab, ite_true]
       -- addi a0,a0,1 ; addi a1,a1,1 ; bne a0,a3,cb2 (not taken: the last byte)
@@ -138,9 +138,9 @@ theorem memcmp_loop {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
         with [h11] next c3 hp3
       iintro Hk Hpc
       k_step_gen (wp_s_branch c3 _ (KA.«memcmp» + 0x22#64) false 8176#13 10#5 13#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
-        $$ [- $Hk $Hpc] with [h13, ite_bne, ptr_next_eq s1 i n (by omega) (by omega), hi] next c4 hp4
+        $$ [- $Hk $Hpc] with [h13, ite_bne, ptr_next_eq s1 i n (by omega) (by omega), hi] next c4 hp4 £ Hlc
       iintro Hk Hpc
-      ihave HΦ' := wpNext_at _ _ _ c4 _ (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ
+      ihave HΦ' := wpNext_at _ _ _ c4 _ (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ Hlc
       iapply HΦ' $$ %_ Hk Hbuf1 Hbuf2
       · ipureintro
         intro r h10' h11' h14' h15'
@@ -156,7 +156,7 @@ theorem memcmp_loop {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
           subst this
           rw [ha, hb, hab]
     · simp only [hab, ite_false]
-      ihave HΦ' := wpNext_at _ _ _ c1 _ hp1 $$ HΦ
+      ihave HΦ' := wpNext_at _ _ _ c1 _ hp1 $$ HΦ Hlc
       iapply HΦ' $$ %_ Hk Hbuf1 Hbuf2
       · ipureintro
         intro r h10' h11' h14' h15'
@@ -175,8 +175,8 @@ theorem memcmp_loop {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
     iapply (memcmp_iter cpu kb s1 s2 dq1 dq2 bs1 bs2 i bs1[i] bs2[i] ha hb R h10 h11)
     iframe
-    iapply wpNext_intro_pin
-    iintro %c1 %hp1 Hk Hpc Hbuf1 Hbuf2
+    iapply wpNext_intro_pin_lc
+    iintro %c1 %hp1 Hlc Hk Hpc Hbuf1 Hbuf2
     by_cases hab : bs1[i] = bs2[i]
     · simp only [hab, ite_true]
       k_step_gen (wp_s_addi c1 _ (KA.«memcmp» + 0x1e#64) true 1#12 10#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
@@ -211,7 +211,7 @@ theorem memcmp_loop {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
         simp [RegMap.set_apply, h10', h11', h14', h15']
       · iexact Hpost
     · simp only [hab, ite_false]
-      ihave HΦ' := wpNext_at _ _ _ c1 _ hp1 $$ HΦ
+      ihave HΦ' := wpNext_at _ _ _ c1 _ hp1 $$ HΦ Hlc
       iapply HΦ' $$ %_ Hk Hbuf1 Hbuf2
       · ipureintro
         intro r h10' h11' h14' h15'

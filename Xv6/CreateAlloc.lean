@@ -167,7 +167,7 @@ theorem create_alloc_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     wordPointsTo (pPid k'.proc) 4 pidPriv pidv ∗ bslots 3 ∗ logOpSe icfgLog n Sb e0 ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (n' : Nat) (Sb' : List Nat) (w : Bool),
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (n' : Nat) (Sb' : List Nat) (w : Bool),
       ⌜calleeSaved k'.regs R' ∧ (∀ x ∈ Sb, x ∈ Sb') ∧ (w = true → fscBmapstart ∈ Sb') ∧
         (crb = true → w = false) ∧ n - ipSpendW w cru false ≤ n' ∧ n' ≤ n⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
@@ -201,9 +201,9 @@ theorem create_alloc_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF
   · unfold inodeRefpShort; iframe
   isplitl []
   · simp only [Bool.false_eq_true, if_false]; iempintro
-  iapply wpNext_intro_pin
-  iintro %c %_ %spie %spp %R' %n' %Sb' %w %hcs Hk Hpc Hte Hce Hpid Hsb Hsi Hbs %hf Hops Hslot Hside
-  iapply HK $$ %c %spie %spp %R' %n' %Sb' %w [] Hk Hpc Hte Hce Hpid Hsb Hsi Hbs Hops Hslot [Hside]
+  iapply wpNext_intro_pin_lc
+  iintro %c %_ Hlc %spie %spp %R' %n' %Sb' %w %hcs Hk Hpc Hte Hce Hpid Hsb Hsi Hbs %hf Hops Hslot Hside
+  iapply HK $$ %c Hlc %spie %spp %R' %n' %Sb' %w [] Hk Hpc Hte Hce Hpid Hsb Hsi Hbs Hops Hslot [Hside]
   · ipureintro; exact ⟨hcs, hf⟩
   · unfold icDepSide icDepSideTx txPinO; iexact Hside
 
@@ -233,7 +233,7 @@ theorem create_alloc_iupdate (IU : IUPDATE) (Γ : SchedNames) [ClaimIs GF Γ]
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     dinodeAt fscIreg inum dn0 ∗ iregLinkPin pin inum.toNat dn0 ∗
     wordPointsTo (pPid k'.proc) 4 pidPriv pidv ∗ bslots 2 ∗ logOpS icfgLog (u + 1) Sb ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap),
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c k'.sie -∗ cpuClaimExt c k'.sie k'.proc -∗
@@ -263,14 +263,14 @@ theorem create_alloc_iupdate (IU : IUPDATE) (Γ : SchedNames) [ClaimIs GF Γ]
   iframe #
   isplitl [Hdev Hinum Hmeta Hmap Hsi]
   · unfold iuCells; iframe Hdev Hinum Hmeta Hmap Hsi
-  iapply wpNext_intro_pin
-  iintro %c %_ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hcells Hdi ⟨%w, ⟨%hw, %hwv⟩, Htok⟩ Hpin Hbs
+  iapply wpNext_intro_pin_lc
+  iintro %c %_ Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hcells Hdi ⟨%w, ⟨%hw, %hwv⟩, Htok⟩ Hpin Hbs
     Hop
   unfold iuCells
   icases Hcells with ⟨Hdev, Hinum, Hmeta, Hmap, Hsi⟩
   have hwe : w = v := (hwv v rfl)
   subst hwe
-  iapply HK $$ %c %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hdev Hinum Hmeta Hmap Hsi Hdi Htok Hpin
+  iapply HK $$ %c Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hdev Hinum Hmeta Hmap Hsi Hdi Htok Hpin
     Hbs Hop
 
 set_option maxHeartbeats 8000000 in
@@ -318,7 +318,7 @@ theorem create_alloc_dirlink (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs GF Γ]
     bslots 3 ∗ irefSlot ∗
     dlinks fscFs dinum.toNat dn bm data ∗
     logOpS icfgLog ncount Sb ∗ txPin icfgLog tid qtx ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (found : Bool)
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (found : Bool)
       (bm' : Blkmap) (data' : Nat → List (BitVec 8)) (dn' dn0' : Dinode) (n' : Nat)
       (Sb' : List Nat) (tot : Nat),
       ⌜calleeSaved k'.regs R' ∧
@@ -358,10 +358,10 @@ theorem create_alloc_dirlink (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs GF Γ]
   iframe Hk Hpc Hte Hce Hdev Hinum Hmeta Hmap Hblk Hnm Hsi Hss Hsb Hdi Hpid Hsh Hru Hrt Hrh Hbs
     Hslot Hdl Hop Htx
   iframe #
-  iapply wpNext_intro_pin
-  iintro %c %_ %spie %spp %R' %found %bm' %data' %dn' %dn0' %n' %Sb' %tot %hcs %hout Hk Hpc Hte Hce
+  iapply wpNext_intro_pin_lc
+  iintro %c %_ Hlc %spie %spp %R' %found %bm' %data' %dn' %dn0' %n' %Sb' %tot %hcs %hout Hk Hpc Hte Hce
     Hdev Hinum Hmeta Hmap Hblk Hnm Hsi Hss Hsb Hdi Hpid Hsh Hru Hrt Hrh Hbs Hslot Hdl Hop Htx
-  iapply HK $$ %c %spie %spp %R' %found %bm' %data' %dn' %dn0' %n' %Sb' %tot [] Hk Hpc Hte Hce Hdev
+  iapply HK $$ %c Hlc %spie %spp %R' %found %bm' %data' %dn' %dn0' %n' %Sb' %tot [] Hk Hpc Hte Hce Hdev
     Hinum Hmeta Hmap Hblk Hnm Hsi Hss Hsb Hdi Hpid Hsh Hru Hrt Hrh Hbs Hslot Hdl Hop Htx
   ipureintro
   exact ⟨hcs, hout⟩
@@ -692,7 +692,7 @@ theorem create_alloc_cok (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
       pfAt (aunarmOfArmNd (fsGammaL fscFs) appE Nd Farm) Fun -∗
       creAcreFired Fok dind.toNat (bname 14 nf) cinum.toNat
         (creChild ty.toNat major.toNat minor.toNat dind.toNat cinum.toNat) -∗
-      (∀ c' : CPU, createPost k plen pfun ty major minor γ pid V M u Sb ns
+      (∀ c' : CPU, £ 1 -∗ createPost k plen pfun ty major minor γ pid V M u Sb ns
         dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex c') -∗
       wpLoop cpu := by
   obtain ⟨hj, hproc, hK, hnoff, htier, hroot, hnib0, hgeom, hbg, hbel, hireg, hnn, hterm, hplen,
@@ -730,7 +730,7 @@ theorem create_alloc_cok (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
   case gt => k_norm_g; try exact htier
   case ga0 => k_norm_g [r9]
   -- back from iunlockput(dp), at +0xe6
-  iintro %cpu %spie1 %spp1 %R1 %n2 %Sb2 %w2 %hp1 Hk Hpc Hte Hce Hpid Hsb Hsi Hbs Hop Hslot Htp
+  iintro %cpu Hlc %spie1 %spp1 %R1 %n2 %Sb2 %w2 %hp1 Hk Hpc Hte Hce Hpid Hsb Hsi Hbs Hop Hslot Htp
   obtain ⟨hcs1, hsub2, -, -, hn2, hn2u⟩ := hp1
   k_norm_g [create_ret_e6]
   unfold calleeSaved at hcs1
@@ -769,7 +769,7 @@ theorem create_alloc_cok (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
   iapply (create_tail cpu k spie1 spp1 ((R1.set 18#5 (R1 19#5)).set 19#5 (k.regs 19#5))
       (k.regs 19#5) nf tl hK10 hal.1 hal.2 hTr)
     $$ [- $Hk $Hpc $Hframe $Hnm $Htl $Hte $Hce]
-  iintro %c' %R' %hfin Hk Hpc Hte Hce
+  iintro %c' Hlc %R' %hfin Hk Hpc Hte Hce
   obtain ⟨hcsf, ha0f⟩ := hfin
   ihave Hbare := Hpw $$ Hpid
   ihave Hpriv := Hbw $$ Hbare
@@ -777,7 +777,7 @@ theorem create_alloc_cok (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
   · unfold irefSlot; iframe
   ihave Hcshot : ityShot g (createSetf dnc major minor 1#16).diType $$ [Hcshot]
   · rw [createSetf_type]; iexact Hcshot
-  ispecialize Hpost $$ %c'
+  ispecialize Hpost $$ %c' Hlc
   unfold createPost
   iapply Hpost $$ %spie1 %spp1 %R' %true %true %kslot %q.half %q.half %g %cinum
     %(createSetf dnc major minor 1#16) %bmc %n2 %Sb2 %(1 + (ns - 2)) [] Hk Hpc Hte Hce Hsn Hsi Hss
@@ -933,7 +933,7 @@ theorem create_alloc_file (IUP : IUNLOCKPUT) (DLK : DIRLINK) (Γ : SchedNames)
       pfAt (acreCommitAtGenNm (fsGammaL fscFs) appE
         (creChild ty.toNat major.toNat minor.toNat) Nm
         (P (nparElems (bview plen pfun)).length) Farm) Fok -∗
-      (∀ c' : CPU, createPost k plen pfun ty major minor γ pid V M u Sb ns
+      (∀ c' : CPU, £ 1 -∗ createPost k plen pfun ty major minor γ pid V M u Sb ns
         dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex c') -∗
       wpLoop cpu := by
   have hS' := hS
@@ -1021,7 +1021,7 @@ theorem create_alloc_file (IUP : IUNLOCKPUT) (DLK : DIRLINK) (Γ : SchedNames)
   case ga0 => k_norm_g [r9]
   case ga2 => k_norm_g [r19]; exact create_a2_low16 cinum hc16
   -- back from dirlink, at +0xdc
-  iintro %cpu %spie2 %spp2 %R2 %found %bm' %data' %dn' %dn0' %n' %Sb' %tot %hp2 Hk Hpc Hte Hce
+  iintro %cpu Hlc %spie2 %spp2 %R2 %found %bm' %data' %dn' %dn0' %n' %Sb' %tot %hp2 Hk Hpc Hte Hce
     Hdev Hinum Hmeta Hmap Hblk Hnm Hsi Hss Hsb Hdi Hpid Hshr Hru Hrt Hrh Hbs Hslot Hdl Hop Htx
   ihave Hkeep := inodeRefShortGenlo_regather kd (qd.half + qd.half) qd.half icfgDev dind gd lo'
     $$ [$Hkeep $Hshr]
@@ -1268,7 +1268,7 @@ theorem create_alloc_made (IUP : IUNLOCKPUT) (IU : IUPDATE) (DLK : DIRLINK) (Γ 
       pfAt (dlookupCommitAt (fsGammaL fscFs) appE) Fex -∗
       creCommits (fsGammaL fscFs) ty.toNat major.toNat minor.toNat
       Nm Nd (P (nparElems (bview plen pfun)).length) Farm Fdots Fun Fok -∗
-      (∀ c' : CPU, createPost k plen pfun ty major minor γ pid V M u Sb ns
+      (∀ c' : CPU, £ 1 -∗ createPost k plen pfun ty major minor γ pid V M u Sb ns
         dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex c') -∗
       wpLoop cpu := by
   have hS' := hS
@@ -1362,7 +1362,7 @@ theorem create_alloc_made (IUP : IUNLOCKPUT) (IU : IUPDATE) (DLK : DIRLINK) (Γ 
   case gt => k_norm_g; try exact htier
   case ga0 => k_norm_g [r19]
   -- back from iupdate, at +0xc8
-  iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hcdev Hcinum Hcmeta Hcmap Hsi Hcdi Htok
+  iintro %cpu Hlc %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hcdev Hcinum Hcmeta Hcmap Hsi Hcdi Htok
     Hpin Hb2 Hop
   k_norm_g [create_ret_c8]
   unfold calleeSaved at hcs1
@@ -1539,7 +1539,7 @@ theorem create_alloc_half (IL : ILOCK) (IUP : IUNLOCKPUT) (IA : IALLOC) (IU : IU
     $$ [- $Hk $Hpc]
   k_norm_g
   iframe Hte Hce Hfenv Hsn Hsi Hpid Hrh Hbs Hisl1 Hdev Htp Htcl Hop
-  iintro %cpu
+  iintro %cpu Hlc
   unfold createFreshPost createFreshAlloc createFreshFail
   iintro %spie1 %spp1 %R1 %alloc %kslot %q %g %lo %tl0 %cinum %gil %gisl %dnc %bmc %hcs1 Hk Hte Hce
     Hsn Hsi Hpid Hrh Hbs Hdev Hres
@@ -1594,7 +1594,7 @@ theorem create_alloc_half (IL : ILOCK) (IUP : IUNLOCKPUT) (IA : IALLOC) (IU : IU
     case gt => k_norm_g; try exact htier
     case ga0 => k_norm_g [s9]
     -- back from iunlockput(dp), at +0xf2
-    iintro %cpu %spie2 %spp2 %R2 %n2 %Sb2 %w2 %hp2 Hk Hpc Hte Hce Hpid Hsb Hsi Hbs Hop Hslot Htp
+    iintro %cpu Hlc %spie2 %spp2 %R2 %n2 %Sb2 %w2 %hp2 Hk Hpc Hte Hce Hpid Hsb Hsi Hbs Hop Hslot Htp
     obtain ⟨hcs2, hsub2, -, -, hn2, hn2u⟩ := hp2
     k_norm_g [create_ret_f2]
     unfold calleeSaved at hcs2
@@ -1626,7 +1626,7 @@ theorem create_alloc_half (IL : ILOCK) (IUP : IUNLOCKPUT) (IA : IALLOC) (IU : IU
     iapply (create_tail cpu k spie2 spp2 ((R2.set 18#5 (R2 19#5)).set 19#5 (k.regs 19#5))
         (k.regs 19#5) nf tl hK10 hal.1 hal.2 hTr)
       $$ [- $Hk $Hpc $Hframe $Hnm $Htl $Hte $Hce]
-    iintro %c' %R' %hfin Hk Hpc Hte Hce
+    iintro %c' Hlc %R' %hfin Hk Hpc Hte Hce
     obtain ⟨hcsf, ha0f⟩ := hfin
     ihave Hbare := Hpw $$ Hpid
     ihave Hpriv := Hbw $$ Hbare
@@ -1634,7 +1634,7 @@ theorem create_alloc_half (IL : ILOCK) (IUP : IUNLOCKPUT) (IA : IALLOC) (IU : IU
     · unfold irefSlot; iframe
     ihave Hisl := irefSlots_combine 1 (1 + (ns - 2)) $$ [Hislg Hisl]
     · unfold irefSlot; iframe
-    ispecialize Hpost $$ %c'
+    ispecialize Hpost $$ %c' Hlc
     unfold createPost
     iapply Hpost $$ %spie2 %spp2 %R' %false %false %0 %1 %1 %gd %0#32 %dn %bm %n2 %Sb2
       %(1 + (1 + (ns - 2))) [] Hk Hpc Hte Hce Hsn Hsi Hss Hsb Hpriv Hpath Hbs [] Hisl [] Hop

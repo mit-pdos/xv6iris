@@ -562,7 +562,7 @@ theorem iput_lk_c (RH : RELEASE_HOOK) (HO : IputOfflockSpec)
   · iapply iput_lk_te_ws; iexact Hte
   isplitl [Hce]
   · iapply iput_lk_ce_ws; iexact Hce
-  iintro %c %R' %hcs Hk Hpc Hte Hce
+  iintro %c Hlc %R' %hcs Hk Hpc Hte Hce
   ihave Hte := (show trapCsrsExt (GF := GF) c (k.withSpie s p).sie ⊢ trapCsrsExt c k.sie
     from .rfl) $$ Hte
   ihave Hce := (show cpuClaimExt (GF := GF) c (k.withSpie s p).sie (k.withSpie s p).proc ⊢

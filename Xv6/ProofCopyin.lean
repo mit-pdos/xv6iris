@@ -122,13 +122,13 @@ theorem wp_prologueCi_gen [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k 
   iintro Hk Hpc Hf88
   k_step_gen (wp_s_sd c12 _ (pc + 24#64) true 0#12 2#5 26#5 (by decide) w₁₂) $$ [- $Hk $Hpc] next c13 hp13
   iintro Hk Hpc Hf96
-  k_step_gen (wp_s_addi c13 _ (pc + 26#64) true 96#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c14 hp14
+  k_step_gen (wp_s_addi c13 _ (pc + 26#64) true 96#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c14 hp14 £ Hlc
   iintro Hk Hpc
   k_norm_g
   ihave HΦ' := wpNext_at _ _ _ c14 _
     (fun h => (hp14 h).trans ((hp13 h).trans ((hp12 h).trans ((hp11 h).trans ((hp10 h).trans
       ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans
-      ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))))))))))) $$ HΦ
+      ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))))))))))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc [Hf8 Hf16 Hf24 Hf32 Hf40 Hf48 Hf56 Hf64 Hf72 Hf80 Hf88 Hf96]
   unfold frameCi
   iframe
@@ -208,12 +208,12 @@ theorem wp_epilogueCi_gen [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k 
   k_step_gen (wp_s_pop c12 _ (pc + 24#64) true 96#12 12 MachCSL.imm_p96) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c13 hp13
   iintro Hk Hpc
-  k_step_gen (wp_s_ret c13 _ (pc + 26#64) true 1#5) $$ [- $Hk $Hpc] next c14 hp14
+  k_step_gen (wp_s_ret c13 _ (pc + 26#64) true 1#5) $$ [- $Hk $Hpc] next c14 hp14 £ Hlc
   iintro Hk Hpc
   ihave HΦ' := wpNext_at _ _ _ c14 _
     (fun h => (hp14 h).trans ((hp13 h).trans ((hp12 h).trans ((hp11 h).trans ((hp10 h).trans
       ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans
-      ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))))))))))) $$ HΦ
+      ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))))))))))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc
 
 /-! ## Return addresses of `copyin` -/
@@ -404,10 +404,10 @@ theorem ci_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [WchG GF] [CurCtx]
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [co_li_neg1] next c14 hp14
       iintro Hk Hpc
       k_step_gen (wp_s_j c14 _ (KA.«copyin» + 0x78#64) true 4#21)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c15 hp15
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c15 hp15 £ Hlc
       iintro Hk Hpc
       ihave HΦ' := wpNext_at _ _ _ c15 _ (fun h => (hp15 h).trans ((hp14 h).trans
-        ((hp13 h).trans (hpinB h)))) $$ HΦ
+        ((hp13 h).trans (hpinB h)))) $$ HΦ Hlc
       iapply HΦ' $$ %spie2 %spp2 %_ %P1 %0#64 %_ %hsp3' Hk Hpc Hlend HP Hdst
       ipureintro
       refine ⟨?_, hext1, UMemL.ext_refl P1, Or.inl ⟨rfl, ?_, ?_⟩⟩
@@ -454,9 +454,9 @@ theorem ci_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [WchG GF] [CurCtx]
       rw [hvpn, ← hVF, hbufeq]
       k_step_gen (wp_s_branch c12 _ (KA.«copyin» + 0x74#64) true 8124#13 10#5 0#5 (by decide) bop.BNE)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-        with [Xv6.UPtAlloc.bne_pos _ hrne] next c13 hp13
+        with [Xv6.UPtAlloc.bne_pos _ hrne] next c13 hp13 £ Hlc
       iintro Hk Hpc
-      ihave HΦ' := wpNext_at _ _ _ c13 _ (fun h => (hp13 h).trans (hpinB h)) $$ HΦ
+      ihave HΦ' := wpNext_at _ _ _ c13 _ (fun h => (hp13 h).trans (hpinB h)) $$ HΦ Hlc
       iapply HΦ' $$ %spie2 %spp2 %_ %(P1.insertLeaf ((A + d) / 4096) r (PTE_W ||| PTE_U ||| PTE_R))
         %(leafOf (BitVec.extractLsb' 12 44 r) (PTE_W ||| PTE_U ||| PTE_R)) %_ %hsp3' Hk Hpc Hlend HP Hdst
       ipureintro
@@ -469,7 +469,7 @@ theorem ci_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [WchG GF] [CurCtx]
   · -- the page is mapped already
     k_step_gen (wp_s_branch c5 _ (KA.«copyin» + 0x66#64) true 8138#13 10#5 0#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [Xv6.UPtAlloc.bne_pos _ hz] next c6 hp6
+      with [Xv6.UPtAlloc.bne_pos _ hz] next c6 hp6 £ Hlc
     iintro Hk Hpc
     simp only [walkaddrRet, RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false] at hret2
     rcases hret2 with ⟨hr0, -⟩ | ⟨w, hw, hvu, hlt38, hpa⟩
@@ -482,7 +482,7 @@ theorem ci_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [WchG GF] [CurCtx]
     rw [hvpn] at hw
     have hum : get? P1.um ((A + d) / 4096) = some w := UMemL.um_of_leaves_vu P1 _ w hw hvu
     ihave HΦ' := wpNext_at _ _ _ c6 _
-      (fun h => (hp6 h).trans (hpinA h)) $$ HΦ
+      (fun h => (hp6 h).trans (hpinA h)) $$ HΦ Hlc
     iapply HΦ' $$ %spie %spp %_ %P1 %w %_ %(fun _ => ⟨rfl, rfl⟩) Hk Hpc Hlend HP Hdst
     ipureintro
     refine ⟨?_, hext1, UMemL.ext_refl P1, Or.inr ⟨rfl, hum, hvu, ?_, ?_, hva0lt⟩⟩
@@ -663,10 +663,10 @@ theorem ci_move (MM : MEMMOVE) [Xv6G GF] [CurCtx]
       with [co_beq_ofNat_zero _ hlast] next c10 hp10
     iintro Hk Hpc
     k_step_gen (wp_s_addi c10 _ (KA.«copyin» + 0x7a#64) true 0#12 10#5 0#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [co_li_zero] next c11 hp11
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [co_li_zero] next c11 hp11 £ Hlc
     iintro Hk Hpc
     ihave HΦ' := wpNext_at _ _ _ c11 _ (fun h => (hp11 h).trans ((hp10 h).trans
-      ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans (hpinA h)))))) $$ HΦ
+      ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans (hpinA h)))))) $$ HΦ Hlc
     iapply HΦ' $$ %spie %spp %_ %P2 %_ %(d + n) %_ %(fun _ => ⟨rfl, rfl⟩) Hk Hpc HP Hdst
     ipureintro
     refine ⟨?_, Or.inl ⟨rfl, ⟨hext2, Or.inl ⟨?_, ?_, hfull ▸ hMapC, hfull ▸ hpreC⟩⟩, ?_⟩⟩
@@ -683,10 +683,10 @@ theorem ci_move (MM : MEMMOVE) [Xv6G GF] [CurCtx]
       · omega
     k_step_gen (wp_s_branch c9 _ (KA.«copyin» + 0x56#64) false 36#13 20#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [co_beq_ofNat_nz _ hlast (by omega)] next c10 hp10
+      with [co_beq_ofNat_nz _ hlast (by omega)] next c10 hp10 £ Hlc
     iintro Hk Hpc
     ihave HΦ' := wpNext_at _ _ _ c10 _ (fun h => (hp10 h).trans ((hp9 h).trans
-      ((hp8 h).trans ((hp7 h).trans (hpinA h))))) $$ HΦ
+      ((hp8 h).trans ((hp7 h).trans (hpinA h))))) $$ HΦ Hlc
     iapply HΦ' $$ %spie %spp %_ %P2 %_ %(d + n) %_ %(fun _ => ⟨rfl, rfl⟩) Hk Hpc HP Hdst
     ipureintro
     refine ⟨?_, Or.inr ⟨rfl, by omega, by omega, hext2, rfl, hMapC, hpreC, by omega, by omega, ?_, ?_, ?_, ?_,
@@ -875,13 +875,13 @@ theorem ci_iter (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) [Xv6G GF] [WchG GF
   rotate_right 1
   iframe #
   iframe HP Hdst Hlend
-  iapply wpNext_intro_pin
-  iintro %c %hp %spie2 %spp2 %R2 %P2 %w %pcv %hsp2 Hk Hpc Hlend HP Hdst %hpost
+  iapply wpNext_intro_pin_lc
+  iintro %c %hp Hlc %spie2 %spp2 %R2 %P2 %w %pcv %hsp2 Hk Hpc Hlend HP Hdst %hpost
   obtain ⟨hkeep, hext2, hext12, hcase⟩ := hpost
   obtain ⟨j2, j18, j20, j21, j22, j23, j24, j25, j26, j27⟩ := hkeep
   rcases hcase with ⟨hpcv, hm1⟩ | ⟨hpcv, hum, hvu, h10', h19', hmax'⟩
   · subst hpcv
-    ihave HΦ' := wpNext_at _ _ _ c _ hp $$ HΦ
+    ihave HΦ' := wpNext_at _ _ _ c _ hp $$ HΦ Hlc
     iapply HΦ' $$ %spie2 %spp2 %R2 %P2 %_ %d %_ %hsp2 Hk Hpc Hlend HP Hdst
     ipureintro
     exact ⟨j2.trans hsp, Or.inl ⟨rfl, ⟨hext2, Or.inr ⟨hm1.1, ⟨d, by omega, rfl⟩, d, hd, hA64, hm1.2⟩⟩,
@@ -896,9 +896,9 @@ theorem ci_iter (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) [Xv6G GF] [WchG GF
       $$ [- $Hk $Hpc $HP $Hdst]
     rotate_right 1
     iframe
-    iapply wpNext_intro_pin
-    iintro %c2 %hp2 %spie3 %spp3 %R3 %P3 %bs3 %d2 %pcv2 %hsp3 Hk Hpc HP Hdst %hpost3
-    ihave HΦ' := wpNext_at _ _ _ c2 _ hp2 $$ HΦ
+    iapply wpNext_intro_pin_lc
+    iintro %c2 %hp2 Hlc %spie3 %spp3 %R3 %P3 %bs3 %d2 %pcv2 %hsp3 Hk Hpc HP Hdst %hpost3
+    ihave HΦ' := wpNext_at _ _ _ c2 _ hp2 $$ HΦ Hlc
     iapply HΦ' $$ %spie3 %spp3 %R3 %P3 %bs3 %d2 %pcv2
       %(fun hh => ⟨((hsp3 hh).1.trans (hsp2 hh).1), ((hsp3 hh).2.trans (hsp2 hh).2)⟩)
       Hk Hpc Hlend HP Hdst
@@ -948,13 +948,13 @@ theorem ci_loop (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) [Xv6G GF] [WchG GF
     rotate_right 1
     iframe #
     iframe
-    iapply wpNext_intro_pin
-    iintro %c %hp %spie2 %spp2 %R2 %P2 %bs2 %d2 %pcv %hsp2 Hk Hpc Hlend HP Hdst %hpost
+    iapply wpNext_intro_pin_lc
+    iintro %c %hp Hlc %spie2 %spp2 %R2 %P2 %bs2 %d2 %pcv %hsp2 Hk Hpc Hlend HP Hdst %hpost
     obtain ⟨hs2, hcase⟩ := hpost
     rcases hcase with ⟨hpcv, hres⟩ | ⟨hpcv, hlt2, hd2, hext2, hbs2, hmap2, hpre2, hle2, hmod2, e23, e25, e18,
       e21, e20, e22, e24, e26, e27⟩
     · subst hpcv
-      ihave HΦ' := wpNext_at _ _ _ c _ hp $$ HΦ
+      ihave HΦ' := wpNext_at _ _ _ c _ hp $$ HΦ Hlc
       iapply HΦ' $$ %spie2 %spp2 %R2 %P2 %bs2 %hsp2 Hk Hpc Hlend HP Hdst
       ipureintro
       exact ⟨hs2, hres⟩
@@ -966,9 +966,9 @@ theorem ci_loop (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) [Xv6G GF] [WchG GF
       rotate_right 1
       iframe #
       iframe
-      iapply wpNext_intro_pin
-      iintro %c2 %hp2 %spie3 %spp3 %R3 %P3 %bs3 %hsp3 Hk Hpc Hlend HP Hdst %hpost3
-      ihave HΦ' := wpNext_at _ _ _ c2 _ hp2 $$ HΦ
+      iapply wpNext_intro_pin_lc
+      iintro %c2 %hp2 Hlc %spie3 %spp3 %R3 %P3 %bs3 %hsp3 Hk Hpc Hlend HP Hdst %hpost3
+      ihave HΦ' := wpNext_at _ _ _ c2 _ hp2 $$ HΦ Hlc
       iapply HΦ' $$ %spie3 %spp3 %R3 %P3 %bs3
         %(fun hh => ⟨((hsp3 hh).1.trans (hsp2 hh).1), ((hsp3 hh).2.trans (hsp2 hh).2)⟩)
         Hk Hpc Hlend HP Hdst
@@ -1001,10 +1001,10 @@ theorem copyin_proof (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) : COPYIN :=
       with [co_li_zero, KCtx.setReg_eq_withRegs] next c2 hp2
     iintro Hk Hpc
     k_step_gen (wp_s_ret c2 _ (KA.«copyin» + 0x9a#64) true 1#5)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3 £ Hlc
     iintro Hk Hpc
     ihave Hk := MachCSL.kctx_self c3 k _ $$ Hk
-    ihave HΦ' := wpNext_at _ _ _ c3 _ (fun h => (hp3 h).trans ((hp2 h).trans (hp1 h))) $$ HΦ
+    ihave HΦ' := wpNext_at _ _ _ c3 _ (fun h => (hp3 h).trans ((hp2 h).trans (hp1 h))) $$ HΦ Hlc
     iapply HΦ' $$ %k.spie %k.spp %_ %(fun _ => ⟨rfl, rfl⟩) Hk Hpc Hlend [HP Hdst]
     · iexists P, old
       isplitr [HP Hdst]
@@ -1111,10 +1111,10 @@ theorem copyin_proof (WA : WALKADDR) (VF : VMFAULT) (MM : MEMMOVE) : COPYIN :=
     k_norm_g
     iframe
     inext
-    iapply wpNext_intro_pin
-    iintro %c12 %hp12 Hk Hpc
+    iapply wpNext_intro_pin_lc
+    iintro %c12 %hp12 Hlc Hk Hpc
     k_norm_g
-    ihave HΦ' := wpNext_at _ _ _ c12 _ (fun h => (hp12 h).trans ((hp11 h).trans (hpinA h))) $$ HΦ
+    ihave HΦ' := wpNext_at _ _ _ c12 _ (fun h => (hp12 h).trans ((hp11 h).trans (hpinA h))) $$ HΦ Hlc
     icases UMemL.procPtAt_wf _ _ $$ HP with ⟨HP, %hwf3⟩
     iapply HΦ' $$ %spie2 %spp2 %_ %hsp2 Hk Hpc Hlend [HP Hdst]
     · iexists P3, bs'

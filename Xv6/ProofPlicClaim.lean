@@ -155,7 +155,7 @@ theorem plic_claim_proof (CI : CPUID) : PLIC_CLAIM :=
   k_norm
   iframe
   inext
-  iintro Hk Hpc
+  iintro Hk Hpc _
   iapply HΦ $$ %_ Hk Hpc
   · ipureintro
     unfold calleeSaved at hcs2 ⊢

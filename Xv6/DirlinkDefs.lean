@@ -189,12 +189,12 @@ theorem dirlink_post_of_spec {j : Nat} (hj : j < NPROC) (cpu : CPU) (k : KCtx)
       dlinks fscFs dinum.toNat dn bm data -∗
       logOpS icfgLog n' Sb' -∗
       txPin icfgLog tid qtx -∗ wpLoop cpu'))
-    ⊢ ∀ c : CPU, dirlinkPost (GF := GF) k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
+    ⊢ ∀ c : CPU, £ 1 -∗ dirlinkPost (GF := GF) k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
         dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr c := by
   unfold dirlinkPost
-  iintro H %c %spie %spp %R' %found %bm' %data' %dn' %dn0' %n' %Sb' %tot %hcs %hout Hk Hpc Hte
+  iintro H %c Hlc %spie %spp %R' %found %bm' %data' %dn' %dn0' %n' %Sb' %tot %hcs %hout Hk Hpc Hte
     Hce Hkeep Hbs Hsl Hlk Hop Htx
-  ihave HK := wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ H
+  ihave HK := wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ H Hlc
   unfold dirlinkKeep
   icases Hkeep with ⟨Hdev, Hinum, Hmeta, Hmap, Hblk, Hnm, Hsi, Hss, Hsb, Hdi, Hpid, Hdr⟩
   unfold dirlinkRoot
@@ -243,7 +243,7 @@ def dirlinkLoop (Γ : SchedNames) (γl : GName) (pd pav pu : BitVec 64) (γkl : 
     dirlinkKeep k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr -∗
     bslots 3 -∗ irefSlot -∗ dlinks fscFs dinum.toNat dn bm data -∗
     logOpS icfgLog ncount Sb -∗ txPin icfgLog tid qtx -∗
-    (∀ c' : CPU, dirlinkPost k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
+    (∀ c' : CPU, £ 1 -∗ dirlinkPost k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
       dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr c') -∗
     wpLoop c)
 
@@ -268,7 +268,7 @@ theorem dirlinkLoop_elim (Γ : SchedNames) (γl : GName) (pd pav pu : BitVec 64)
       dirlinkKeep k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr -∗
       bslots 3 -∗ irefSlot -∗ dlinks fscFs dinum.toNat dn bm data -∗
       logOpS icfgLog ncount Sb -∗ txPin icfgLog tid qtx -∗
-      (∀ c' : CPU, dirlinkPost k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
+      (∀ c' : CPU, £ 1 -∗ dirlinkPost k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
         dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr c') -∗
       wpLoop c := by
   unfold dirlinkLoop; iintro H; iexact H
@@ -292,7 +292,7 @@ theorem dirlinkLoop_intro (Γ : SchedNames) (γl : GName) (pd pav pu : BitVec 64
       dirlinkKeep k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr -∗
       bslots 3 -∗ irefSlot -∗ dlinks fscFs dinum.toNat dn bm data -∗
       logOpS icfgLog ncount Sb -∗ txPin icfgLog tid qtx -∗
-      (∀ c' : CPU, dirlinkPost k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
+      (∀ c' : CPU, £ 1 -∗ dirlinkPost k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
         dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr c') -∗
       wpLoop c) ⊢
     dirlinkLoop (GF := GF) Γ γl pd pav pu γkl γk k ip dinum bm data dn dn0 fn inum ncount Sb tid

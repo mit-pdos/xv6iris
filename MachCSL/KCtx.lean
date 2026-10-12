@@ -789,57 +789,79 @@ attribute [instance] KernelImage.ro_persistent
 /-- The continuation of an S-mode instruction: with interrupts enabled and a
 current proc, execution may resume on ANY hart (a preempting trap, the
 scheduler, a resume elsewhere); otherwise on this one.  A continuation
-proved for every hart discharges it at any index. -/
-def wpNext (sie : Bool) (p : BitVec 64) (cpu : CPU) (K : CPU → IProp GF) : IProp GF := iprop%
-  ∀ cpu' : CPU, ⌜sie = false ∨ p = 0#64 → cpu' = cpu⌝ → K cpu'
+proved for every hart discharges it at any index.
 
-omit [MachGS GF] in
+THE LATER CREDIT (Rocq's `WpNext.v`): every continuation receives one `£ 1`,
+the credit of the step between two instructions (`wpHart_lift` →
+`wpLoop_restart_lc` → the cycle engines → the rule schemas), carried through
+the instruction and paid here.  A proof that does not need it drops it
+(`wpNext_intro`, `wpNext_off_intro`, `wpNext_intro_pin`, hence every `k_step`);
+one that needs it -- to strip the later of an invariant whose body is not
+timeless, at an ordinal step index -- keeps it (`wpNext_intro_lc`,
+`wpNext_off_intro_lc`, `wpNext_intro_pin_lc`, the `… £ Hlc` forms of the step
+macros).  Whoever ELIMINATES a `wpNext` pays the credit (`wpNext_off`,
+`wpNext_at`, `wpNext_self`): a function proof pays its return continuation
+with the credit its last instruction delivered. -/
+def wpNext (sie : Bool) (p : BitVec 64) (cpu : CPU) (K : CPU → IProp GF) : IProp GF := iprop%
+  ∀ cpu' : CPU, ⌜sie = false ∨ p = 0#64 → cpu' = cpu⌝ → £ 1 -∗ K cpu'
+
 theorem wpNext_intro (sie : Bool) (p : BitVec 64) (cpu : CPU) (K : CPU → IProp GF) :
     (∀ cpu', K cpu') ⊢ wpNext sie p cpu K := by
   unfold wpNext
-  iintro H %cpu' %_
+  iintro H %cpu' %_ _
   iapply H
 
-omit [MachGS GF] in
+/-- `wpNext_intro`, keeping the step's credit. -/
+theorem wpNext_intro_lc (sie : Bool) (p : BitVec 64) (cpu : CPU) (K : CPU → IProp GF) :
+    (∀ cpu', £ 1 -∗ K cpu') ⊢ wpNext sie p cpu K := by
+  unfold wpNext
+  iintro H %cpu' %_ Hlc
+  iapply H $$ %cpu' Hlc
+
 /-- With interrupts off, it suffices to continue at this hart. -/
 theorem wpNext_off_intro (p : BitVec 64) (cpu : CPU) (K : CPU → IProp GF) :
     K cpu ⊢ wpNext false p cpu K := by
   unfold wpNext
-  iintro H %cpu' %h
+  iintro H %cpu' %h _
   have := h (Or.inl rfl)
   subst this
   iexact H
 
-omit [MachGS GF] in
-/-- With interrupts off, the continuation is at this hart. -/
+/-- `wpNext_off_intro`, keeping the step's credit. -/
+theorem wpNext_off_intro_lc (p : BitVec 64) (cpu : CPU) (K : CPU → IProp GF) :
+    (£ 1 -∗ K cpu) ⊢ wpNext false p cpu K := by
+  unfold wpNext
+  iintro H %cpu' %h Hlc
+  have := h (Or.inl rfl)
+  subst this
+  iapply H $$ Hlc
+
+/-- With interrupts off, the continuation is at this hart; it costs the credit. -/
 theorem wpNext_off (p : BitVec 64) (cpu : CPU) (K : CPU → IProp GF) :
-    wpNext false p cpu K ⊢ K cpu := by
+    wpNext false p cpu K ⊢ £ 1 -∗ K cpu := by
   unfold wpNext
-  iintro H
-  iapply H $$ %cpu %(fun _ => rfl)
+  iintro H Hlc
+  iapply H $$ %cpu %(fun _ => rfl) Hlc
 
-omit [MachGS GF] in
-/-- The continuation at a hart the pinning condition allows. -/
+/-- The continuation at a hart the pinning condition allows; it costs the credit. -/
 theorem wpNext_at (sie : Bool) (p : BitVec 64) (cpu cpu' : CPU) (K : CPU → IProp GF)
-    (h : sie = false ∨ p = 0#64 → cpu' = cpu) : wpNext sie p cpu K ⊢ K cpu' := by
+    (h : sie = false ∨ p = 0#64 → cpu' = cpu) : wpNext sie p cpu K ⊢ £ 1 -∗ K cpu' := by
   unfold wpNext
-  iintro H
-  iapply H $$ %cpu' %h
+  iintro H Hlc
+  iapply H $$ %cpu' %h Hlc
 
-omit [MachGS GF] in
-/-- The continuation at this hart, whatever the index. -/
+/-- The continuation at this hart, whatever the index; it costs the credit. -/
 theorem wpNext_self (sie : Bool) (p : BitVec 64) (cpu : CPU) (K : CPU → IProp GF) :
-    wpNext sie p cpu K ⊢ K cpu :=
+    wpNext sie p cpu K ⊢ £ 1 -∗ K cpu :=
   wpNext_at sie p cpu cpu K (fun _ => rfl)
 
-omit [MachGS GF] in
 /-- `wpNext` is monotone in its continuation. -/
 theorem wpNext_mono (sie : Bool) (p : BitVec 64) (cpu : CPU) (K K' : CPU → IProp GF) :
     wpNext sie p cpu K ⊢ (∀ cpu', K cpu' -∗ K' cpu') -∗ wpNext sie p cpu K' := by
   unfold wpNext
-  iintro H HK %cpu' %h
+  iintro H HK %cpu' %h Hlc
   iapply HK $$ %cpu'
-  iapply H $$ %cpu' %h
+  iapply H $$ %cpu' %h Hlc
 
 /-- The kernel execution context resource of hart `cpu`, over an abstract
 handler contract `S` and an explicit ambient context `X`: everything below
@@ -1128,7 +1150,7 @@ theorem kctx_trap_resume [X : CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) 
   iapply HF $$ %X %k %pc %sc %⟨hwf, hs, hpc, hsc⟩ Hk Hpc Hcsrs Hstv Henv Hclaim
   inext
   unfold wpNext
-  iintro %cpu' %hpin Hk Hpc
+  iintro %cpu' %hpin _ Hk Hpc
   iapply IH $$ %cpu' %(fun h0 => hpin (Or.inr h0)) HI Hk Hpc
 
 /-- The hart id, sign-extended from 32 bits and scaled by `sizeof (struct cpu)`. -/

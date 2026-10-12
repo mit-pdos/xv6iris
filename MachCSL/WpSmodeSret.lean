@@ -152,7 +152,7 @@ theorem wp_s_sret [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) 
     iintro %hs
     exact absurd hs Bool.false_ne_true
   inext
-  iintro HmConf Hclock Hpc HT HQ
+  iintro HmConf Hclock Hpc HT HQ _
   unfold transTok
   icases HT with ⟨Htrans, Htok⟩
   icases HQ with ⟨HF, Hsepc⟩

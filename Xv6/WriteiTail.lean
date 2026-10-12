@@ -94,10 +94,10 @@ theorem writei_ret (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (A : Wi
   iintro Hk Hpc
   -- +0xec  ret
   k_step_e (wp_s_ret cpu _ (KA.«writei» + 0xec#64) true 1#5)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] £ Hlc
   iintro Hk Hpc
   unfold wiContEb
-  iapply Hnext $$ %cpu %spie %spp %_ %tot %bm' %data' %dn' %dn0' %n' %wrote %dist %dstb %P' %Sb' [] []
+  iapply Hnext $$ %cpu %spie %spp %_ %tot %bm' %data' %dn' %dn0' %n' %wrote %dist %dstb %P' %Sb' [] [] Hlc
     Hk Hpc Hte Hce Hcells Hmeta Hmap Hblk Hdn Hsrc Hsl Hop
   · ipureintro
     exact writei_calleeSaved_epi k.regs R h9 h19 h24 h25 h26 h27

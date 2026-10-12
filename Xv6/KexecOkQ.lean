@@ -238,7 +238,7 @@ binds; the failure plug with `QF c ∧ M' = A.M` (a `-1` return leaves the
 old image in place). -/
 def kexecCloser (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) (QF : KxfCause → Prop)
     (k : KCtx) (A : KexecArgs) (cpu' : CPU) : IProp GF :=
-  iprop(∀ (spie spp : Bool) (R' : RegMap) (V' : ProcPriv) (M' : Nat → List (BitVec 8))
+  iprop(£ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (V' : ProcPriv) (M' : Nat → List (BitVec 8))
       (entry spv szv' : BitVec 64),
     ⌜calleeSaved k.regs R'⌝ -∗
     ⌜kexecOkQf (fun e => Q e V' M') (fun c => QF c ∧ M' = A.M) A.V V' (R' 10#5) entry spv szv'
@@ -260,9 +260,9 @@ theorem kexecCloser_after (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 
     (∀ c' : CPU, kexecCloser (GF := GF) Q QF k A c') ⊢
       ∀ c' : CPU, kexecCloser Q QF k { A with V := V1 } c' := by
   unfold kexecCloser
-  iintro H %c' %spie %spp %R' %V' %M' %entry %spv %szv' %hcs %hok Hk Hpc Hte Hce Hpv Hbufs Hbs Hirs
+  iintro H %c' Hlc %spie %spp %R' %V' %M' %entry %spv %szv' %hcs %hok Hk Hpc Hte Hce Hpv Hbufs Hbs Hirs
   ihave Hbufs := (show kxcBufs (GF := GF) k { A with V := V1 } ⊢ kxcBufs k A from .rfl) $$ Hbufs
-  iapply H $$ %c' %spie %spp %R' %V' %M' %entry %spv %szv' %hcs
+  iapply H $$ %c' Hlc %spie %spp %R' %V' %M' %entry %spv %szv' %hcs
     %(kexecOkQf_after _ _ A.V V1 V' _ _ _ _ _ _ h hok) Hk Hpc Hte Hce Hpv Hbufs Hbs Hirs
 
 end

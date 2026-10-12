@@ -83,11 +83,11 @@ theorem bd_ret (cpu c0 : CPU) (k0 : KCtx) (sp1 sp2 : Bool)
   k_norm_g
   iframe
   inext
-  k_next_e
+  k_next_e £ Hlc
   iintro Hk Hpc
   k_norm_g
   ihave HΦ := wpNext_at true k0.proc c0 cpu _
-    (fun hh => Or.elim hh (fun hx => absurd hx (by decide)) (fun hx => absurd hx hp0)) $$ Hnext
+    (fun hh => Or.elim hh (fun hx => absurd hx (by decide)) (fun hx => absurd hx hp0)) $$ Hnext Hlc
   iapply HΦ $$ %sp1 %sp2 %_ %kk %bs %bsd %d [] Hk Hpc Hte Hce Hpid Hhold
   ipureintro
   refine ⟨calleeSaved_epi6s3 k0.regs (R.set 10#5 (bnode kk)) ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_, ?_⟩ <;>

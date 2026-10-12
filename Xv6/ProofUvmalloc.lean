@@ -148,12 +148,12 @@ theorem uvma_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
     with [KCtx.pop_pushed _ _ _ hK', hR2] next c7 hp7
   iintro Hk Hpc
   k_step_gen (wp_s_ret c7 _ (KA.«uvmalloc» + 0x86#64) true 1#5)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c8 hp8
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c8 hp8 £ Hlc
   iintro Hk Hpc
   have hpinZ : k.sie = false ∨ k.proc = 0#64 → c8 = cpu := fun h =>
     (hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans
       ((hp2 h).trans ((hp1 h).trans (hpin h))))))))
-  ihave HΦ' := wpNext_at _ _ _ c8 _ hpinZ $$ HΦ
+  ihave HΦ' := wpNext_at _ _ _ c8 _ hpinZ $$ HΦ Hlc
   iapply HΦ' $$ %_ Hk Hpc HQ
   ipureintro
   refine ⟨?_, ?_⟩
@@ -540,11 +540,11 @@ theorem uvma_rollB [WchG GF] (KF : KFREE) (UD : UVMDEALLOC) [CurCtx]
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e2, f2, g2] next c12 hp12
   iintro Hk Hpc C6
   k_step_gen (wp_s_j c12 _ (KA.«uvmalloc» + 0xa0#64) true 2097112#21)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c13 hp13
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c13 hp13 £ Hlc
   iintro Hk Hpc
   have hpinZ : k.sie = false ∨ k.proc = 0#64 → c13 = cpu := fun h =>
     (hp13 h).trans ((hp12 h).trans ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans ((hp1 h).trans (hpin h)))))))))))))
-  ihave HΦ' := wpNext_at _ _ _ c13 _ hpinZ $$ HΦ
+  ihave HΦ' := wpNext_at _ _ _ c13 _ hpinZ $$ HΦ Hlc
   ihave Hsv := uaSaved_join (k.regs 2#5) (k.regs 9#5) (k.regs 19#5) (k.regs 22#5) $$ [C1 C3 C6]
   case' _ => iframe
   have hsp' : k.sie = false → spie2 = spie ∧ spp2 = spp := by
@@ -724,12 +724,12 @@ theorem uvma_rollA [WchG GF] (UD : UVMDEALLOC) [CurCtx]
   iintro Hk Hpc C3
   k_step_gen (wp_s_ld c8 _ (KA.«uvmalloc» + 0x76#64) true 16#12 22#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 22#5))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e2, g2] next c9 hp9
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e2, g2] next c9 hp9 £ Hlc
   iintro Hk Hpc C6
   have hpinZ : k.sie = false ∨ k.proc = 0#64 → c9 = cpu := fun h =>
     (hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans
       ((hp3 h).trans ((hp2 h).trans ((hp1 h).trans (hpin h)))))))))
-  ihave HΦ' := wpNext_at _ _ _ c9 _ hpinZ $$ HΦ
+  ihave HΦ' := wpNext_at _ _ _ c9 _ hpinZ $$ HΦ Hlc
   ihave Hsv := uaSaved_join (k.regs 2#5) (k.regs 9#5) (k.regs 19#5) (k.regs 22#5) $$ [C1 C3 C6]
   case' _ => iframe
   iapply HΦ' $$ %spie2 %spp2 %_ %hsp2 Hk Hpc Hlend HP Hsv
@@ -1025,11 +1025,11 @@ theorem uvma_iter [WchG GF] (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPP
       -- c.bnez a0 : not taken (a0 = 0)
       k_step_gen (wp_s_branch c15 _ (KA.«uvmalloc» + 0x54#64) true 52#13 10#5 0#5 (by decide) bop.BNE)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-        with [bne_neg (R5 10#5) h0] next c16 hp16
+        with [bne_neg (R5 10#5) h0] next c16 hp16 £ Hlc
       iintro Hk Hpc
       have hpin16 : k.sie = false ∨ k.proc = 0#64 → c16 = cpu := fun h =>
         (hp16 h).trans (hpin15 h)
-      ihave HΦ' := wpNext_at _ _ _ c16 _ hpin16 $$ HΦ
+      ihave HΦ' := wpNext_at _ _ _ c16 _ hpin16 $$ HΦ Hlc
       ihave Hout := uaOut_cont k γk P M perm newsz A i R5 (KA.«uvmalloc» + 0x56#64)
         (Pi.insertLeaf (A / 4096 + i) (R1 10#5) perm) (viewZero Mi (A / 4096 + i)) rfl
         (uaInv_step P M perm (A / 4096) i Pi Mi hinv (R1 10#5) hvalid) hregs5 $$ [HP' Hav]
@@ -1205,8 +1205,8 @@ theorem uvma_loop [WchG GF] (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPP
       $$ [- $Hk $Hpc $Hav $HP $Hsv $Hlend]
     rotate_right 1
     iframe #
-    iapply wpNext_intro_pin
-    iintro %c1 %hp1 %spie2 %spp2 %R2 %pcv %hsp2 Hk Hpc Hlend Hsv Hout
+    iapply wpNext_intro_pin_lc
+    iintro %c1 %hp1 Hlc %spie2 %spp2 %R2 %pcv %hsp2 Hk Hpc Hlend Hsv Hout
     icases uaOut_elim k γk P M perm newsz A i R2 pcv $$ Hout
       with ⟨⟨%Pc, %Mc, %hcont, HP', Hav⟩ | ⟨%hexit, HP, #Hn⟩⟩
     · -- one page mapped, and it was the last one
@@ -1225,11 +1225,11 @@ theorem uvma_loop [WchG GF] (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPP
         rw [g19]; rw [← hlast]; exact ua_add4096 (R2 18#5) A i g18 hb64
       k_step_gen (wp_s_branch c2 _ (KA.«uvmalloc» + 0x58#64) false 8158#13 18#5 20#5 (by decide) bop.BLTU)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-        with [bltu_neg (R2 18#5 + R2 19#5) (R2 20#5) (by rw [g20, hR18]; omega)] next c3 hp3
+        with [bltu_neg (R2 18#5 + R2 19#5) (R2 20#5) (by rw [g20, hR18]; omega)] next c3 hp3 £ Hlc
       iintro Hk Hpc
       have hpin3 : k.sie = false ∨ k.proc = 0#64 → c3 = cur := fun h =>
         (hp3 h).trans ((hp2 h).trans (hp1 h))
-      ihave HΦ' := wpNext_at _ _ _ c3 _ hpin3 $$ HΦ
+      ihave HΦ' := wpNext_at _ _ _ c3 _ hpin3 $$ HΦ Hlc
       iapply HΦ' $$ %spie2 %spp2 %_ %Pc %Mc %(KA.«uvmalloc» + 0x5c#64) %hsp2 Hk Hpc Hlend Hsv HP' []
       · iintro %hpc
         exfalso
@@ -1242,7 +1242,7 @@ theorem uvma_loop [WchG GF] (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPP
     · -- rolled back
       obtain ⟨hpcf, hx, h10⟩ := hexit
       subst hpcf
-      ihave HΦ' := wpNext_at _ _ _ c1 _ hp1 $$ HΦ
+      ihave HΦ' := wpNext_at _ _ _ c1 _ hp1 $$ HΦ Hlc
       iapply HΦ' $$ %spie2 %spp2 %R2 %P %M %(KA.«uvmalloc» + 0x78#64) %hsp2 Hk Hpc Hlend Hsv HP []
       · iintro -
         iexact Hn
@@ -1258,8 +1258,8 @@ theorem uvma_loop [WchG GF] (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPP
       $$ [- $Hk $Hpc $Hav $HP $Hsv $Hlend]
     rotate_right 1
     iframe #
-    iapply wpNext_intro_pin
-    iintro %c1 %hp1 %spie2 %spp2 %R2 %pcv %hsp2 Hk Hpc Hlend Hsv Hout
+    iapply wpNext_intro_pin_lc
+    iintro %c1 %hp1 Hlc %spie2 %spp2 %R2 %pcv %hsp2 Hk Hpc Hlend Hsv Hout
     icases uaOut_elim k γk P M perm newsz A i R2 pcv $$ Hout
       with ⟨⟨%Pc, %Mc, %hcont, HP', Hav⟩ | ⟨%hexit, HP, #Hn⟩⟩
     · -- one page mapped, keep looping
@@ -1301,7 +1301,7 @@ theorem uvma_loop [WchG GF] (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPP
     · -- rolled back
       obtain ⟨hpcf, hx, h10⟩ := hexit
       subst hpcf
-      ihave HΦ' := wpNext_at _ _ _ c1 _ hp1 $$ HΦ
+      ihave HΦ' := wpNext_at _ _ _ c1 _ hp1 $$ HΦ Hlc
       iapply HΦ' $$ %spie2 %spp2 %R2 %P %M %(KA.«uvmalloc» + 0x78#64) %hsp2 Hk Hpc Hlend Hsv HP []
       · iintro -
         iexact Hn
@@ -1353,11 +1353,11 @@ theorem uvmalloc_proof (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_
     iintro Hk Hpc
     k_step_gen (wp_s_ret c2 _ (KA.«uvmalloc» + 0xa4#64) true 1#5)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [KCtx.rget_eq, KCtx.setReg_regs] next c3 hp3
+      with [KCtx.rget_eq, KCtx.setReg_regs] next c3 hp3 £ Hlc
     iintro Hk Hpc
     have hpin : k.sie = false ∨ k.proc = 0#64 → c3 = cpu := fun h =>
       (hp3 h).trans ((hp2 h).trans (hp1 h))
-    ihave HΦ' := wpNext_at _ _ _ c3 _ hpin $$ HΦ
+    ihave HΦ' := wpNext_at _ _ _ c3 _ hpin $$ HΦ Hlc
     have hnp : uvmaNp (k.regs 11#5) (k.regs 12#5) = 0 := by
       unfold uvmaNp; rw [if_pos (by omega)]
     rw [ua_setReg_spie k 10#5 (k.regs 11#5)]

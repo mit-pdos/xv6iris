@@ -403,6 +403,27 @@ theorem wpLoop_restart (cpu : CPU) :
   iframe Hσ
   iexact H
 
+/-- `wpLoop_restart`, handing the step's later credit (`wpHart_lift`'s `£ 1`)
+to the continuation: the source of every `wpNext`'s credit. -/
+theorem wpLoop_restart_lc (cpu : CPU) :
+    (∀ tick : Bool, ▷ (£ 1 -∗ wpHart cpu (riscvStep tick))) ⊢@{IProp GF} wpLoop cpu := by
+  unfold wpLoop
+  iintro H
+  iapply wpHart_lift
+  iintro %σ Hσ
+  iapply fupd_mask_intro LawfulSet.empty_subset
+  iintro Hclose
+  isplit
+  · ipureintro
+    exact ⟨rfl, riscvStep false, σ, false, rfl, rfl⟩
+  inext
+  iintro %m' %σ' %Hs Hlc
+  obtain ⟨tick, rfl, rfl⟩ := Hs
+  imod Hclose
+  imodintro
+  iframe Hσ
+  iapply H $$ %tick Hlc
+
 /-- Extract one hart's register interpretation from the state
 interpretation, with a closing wand that accepts an updated register file. -/
 theorem machInterp_acc (σ : MState) (cpu : CPU) :

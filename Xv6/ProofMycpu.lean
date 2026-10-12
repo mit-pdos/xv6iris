@@ -63,7 +63,7 @@ theorem mycpu_proof : MYCPU := ⟨fun {GF} _ _ {lent} cpu k hsie hK => by
   k_norm
   iframe
   inext
-  iintro Hk Hpc
+  iintro Hk Hpc _
   iapply HΦ $$ %_ Hk Hpc
   ipureintro
   constructor

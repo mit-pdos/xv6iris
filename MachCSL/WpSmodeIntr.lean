@@ -171,10 +171,10 @@ theorem wp_s_csrci_sstatus_x0 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU)
     rotate_left 1
     · schema_trap_branch
     inext
-    iintro HmConf Hclock Hpc HT HF
+    iintro HmConf Hclock Hpc HT HF Hlc
     unfold transTok
     icases HT with ⟨Htrans, Htok⟩
-    ihave HΦ' := wpNext_at _ _ _ cpu' _ hpin $$ HΦ
+    ihave HΦ' := wpNext_at _ _ _ cpu' _ hpin $$ HΦ Hlc
     simp only [sConfOf_setMs, sConfOf_mstatus]
     ihave HConf := kConf_intro cpu' curTier k.root false (spieOf ms) (sppOf ms) (ms &&& 0xFFFFFFFFFFFFFFFD#64)
       mdl mepc stc lf ⟨smFacts_clear ms k.sie hsm, sretFacts_clear ms, hmdl, hlf⟩ $$ HmConf
@@ -253,10 +253,10 @@ theorem wp_s_csrrci_sstatus_flip [CurCtx] [KernelGeom] [KernelImage GF] (cpu : C
     rotate_left 1
     · schema_trap_branch
     inext
-    iintro HmConf Hclock Hpc HT HF
+    iintro HmConf Hclock Hpc HT HF Hlc
     unfold transTok
     icases HT with ⟨Htrans, Htok⟩
-    ihave HΦ' := wpNext_at _ _ _ cpu' _ hpin $$ HΦ
+    ihave HΦ' := wpNext_at _ _ _ cpu' _ hpin $$ HΦ Hlc
     simp only [sConfOf_setMs, sConfOf_mstatus]
     ihave HConf := kConf_intro cpu' curTier k.root false (spieOf ms) (sppOf ms) (ms &&& 0xFFFFFFFFFFFFFFFD#64)
       mdl mepc stc lf ⟨smFacts_clear ms k.sie hsm, sretFacts_clear ms, hmdl, hlf⟩ $$ HmConf
@@ -332,10 +332,10 @@ theorem wp_s_csrsi_sstatus_x0 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU)
     iintro %hs
     exact absurd hs Bool.false_ne_true
   inext
-  iintro HmConf Hclock Hpc HT HF
+  iintro HmConf Hclock Hpc HT HF Hlc
   unfold transTok
   icases HT with ⟨Htrans, Htok⟩
-  ihave HΦ' := wpNext_off _ _ _ $$ HΦ
+  ihave HΦ' := wpNext_off _ _ _ $$ HΦ Hlc
   simp only [sConfOf_setMs, sConfOf_mstatus]
   ihave HConf := kConf_intro cpu curTier k.root true k.spie k.spp (ms ||| 2#64) mdl mepc stc lf
     ⟨smFacts_set ms false hsm, sretFacts_on _ _ _, hmdl, hlf⟩ $$ HmConf

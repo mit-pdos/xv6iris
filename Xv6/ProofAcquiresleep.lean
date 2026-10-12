@@ -178,11 +178,11 @@ theorem aslPost_at (cpu c : CPU) (k : KCtx) (γ : GName) (Rp : CtxId → IProp G
     (slk : BitVec 64) (pid : BitVec 32) (dqp : DFrac) (j : Nat)
     (hj : j < NPROC) (hkproc : k.proc = procAddr j) :
     wpNext true k.proc cpu (aslPost (GF := GF) k γ Rp q slk pid dqp)
-      ⊢ aslPost k γ Rp q slk pid dqp c := by
-  iintro H
+      ⊢ £ 1 -∗ aslPost k γ Rp q slk pid dqp c := by
+  iintro H Hlc
   iapply wpNext_at true k.proc cpu c _
     (fun h => h.elim (fun h => absurd h (by decide))
-      (fun h => absurd h (by rw [hkproc]; exact procAddr_nonzero hj))) $$ H
+      (fun h => absurd h (by rw [hkproc]; exact procAddr_nonzero hj))) $$ H Hlc
 
 theorem aslPost_elim (c : CPU) (k : KCtx) (γ : GName) (Rp : CtxId → IProp GF) (q : Qp)
     (slk : BitVec 64) (pid : BitVec 32) (dqp : DFrac) :
@@ -354,9 +354,9 @@ theorem asl_exit (RE : RELEASE) (MP : MYPROC) (c0 cpu : CPU) (k kb : KCtx) (hb :
     Hpid, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- the caller's continuation, claimed at whatever hart the thread returns on
-  ihave HΦ : ∀ c : CPU, aslPost k γ Rp q slk pid dqp c $$ [HΦ]
-  · iintro %c
-    iapply aslPost_at c0 c k γ Rp q slk pid dqp j hj hkproc $$ HΦ
+  ihave HΦ : ∀ c : CPU, £ 1 -∗ aslPost k γ Rp q slk pid dqp c $$ [HΦ]
+  · iintro %c Hlc
+    iapply aslPost_at c0 c k γ Rp q slk pid dqp j hj hkproc $$ HΦ Hlc
   -- the ghost step: the idle holder pair becomes ours, at our own fraction
   iapply wpLoop_bupd
   imod slFree_retarget γ slk q0 q $$ [Hfree Hauth] with ⟨Hfree, Hauth⟩
@@ -456,10 +456,10 @@ theorem asl_exit (RE : RELEASE) (MP : MYPROC) (c0 cpu : CPU) (k kb : KCtx) (hb :
       k_norm_g
       iframe
       inext
-      k_next_e
+      k_next_e £ Hlc
       iintro Hk Hpc
-      ihave HΦ := aslPost_elim cpu k γ Rp q slk pid dqp $$ [HΦ]
-      · iapply HΦ
+      ihave HΦ := aslPost_elim cpu k γ Rp q slk pid dqp $$ [HΦ Hlc]
+      · iapply HΦ $$ %cpu Hlc
       k_norm_g
       iapply HΦ $$ %a %b %_ [] Hk Hpc Hte Hce Hheld HR Hpid
       ipureintro
@@ -1040,9 +1040,11 @@ theorem asl_exit_nb (RE : RELEASE) (MP : MYPROC) (cpu : CPU) (k : KCtx)
       k_norm_g [hsie]
       iframe
       inext
-      iapply wpNext_off_intro
+      iapply wpNext_off_intro_lc
+      iintro Hlc
       iintro Hk Hpc
       ihave HΦ := wpNext_off k.proc cpu (aslPostNb k γ γt Rp q slk pid dqp) $$ HΦ
+      ihave HΦ := HΦ $$ Hlc
       ihave HΦ := aslPostNb_elim cpu k γ γt Rp q slk pid dqp $$ HΦ
       k_norm_g
       ihave Hk := asl_kctx_spie_nb cpu k _ $$ Hk

@@ -146,7 +146,7 @@ theorem plicinithart_proof (CI : CPUID) : PLICINITHART :=
   k_norm
   iframe
   inext
-  iintro Hk Hpc
+  iintro Hk Hpc _
   iapply HΦ $$ %_ Hk Hpc
   ipureintro
   unfold calleeSaved at hcs2 ⊢

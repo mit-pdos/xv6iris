@@ -102,10 +102,10 @@ theorem wpLoop_k_gen [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
       inext
       iexact HΦ
     inext
-    iintro HmConf Hclock Hpc HT ⟨HF, HQ⟩
+    iintro HmConf Hclock Hpc HT ⟨HF, HQ⟩ Hlc
     unfold transTok
     icases HT with ⟨Htrans, Htok⟩
-    ihave HΦ' := wpNext_at _ _ _ cpu' _ hpin $$ HΦ
+    ihave HΦ' := wpNext_at _ _ _ cpu' _ hpin $$ HΦ Hlc
     ihave HConf := kConf_intro cpu' curTier k.root k.sie k.spie k.spp ms mdl mepc stc lf ⟨hsm, hsr, hmdl, hlf⟩ $$ HmConf
     iapply HΦ' $$ [HConf HF Hstack Htrans Harm Hcpu Htok Hclock] Hpc HQ
     iapply (kctx_intro' cpu' (k.withRegs (R' cpu')) ((KCtx.wf_withRegs k (R' cpu')).mpr hwf))
@@ -180,10 +180,10 @@ theorem wpLoop_k_mem [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
       inext
       iexact HΦ
     inext
-    iintro HmConf Hclock Hpc HT ⟨HF, HQ⟩
+    iintro HmConf Hclock Hpc HT ⟨HF, HQ⟩ Hlc
     unfold transTok
     icases HT with ⟨Htrans, Htok⟩
-    ihave HΦ' := wpNext_at _ _ _ cpu' _ hpin $$ HΦ
+    ihave HΦ' := wpNext_at _ _ _ cpu' _ hpin $$ HΦ Hlc
     ihave HConf := kConf_intro cpu' curTier k.root k.sie k.spie k.spp ms mdl mepc stc lf ⟨hsm, hsr, hmdl, hlf⟩ $$ HmConf
     iapply HΦ' $$ [HConf HF Hstack Htrans Harm Hcpu Htok Hclock] Hpc HQ
     iapply (kctx_intro' cpu' (k.withRegs (R' cpu')) ((KCtx.wf_withRegs k (R' cpu')).mpr hwf))
@@ -589,10 +589,10 @@ theorem wp_s_pop [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
       inext
       iexact HΦ
     inext
-    iintro HmConf Hclock Hpc HT HF
+    iintro HmConf Hclock Hpc HT HF Hlc
     unfold transTok
     icases HT with ⟨Htrans, Htok⟩
-    ihave HΦ' := wpNext_at _ _ _ cpu' _ hpin $$ HΦ
+    ihave HΦ' := wpNext_at _ _ _ cpu' _ hpin $$ HΦ Hlc
     ihave HConf := kConf_intro cpu' curTier k.root k.sie k.spie k.spp ms mdl mepc stc lf ⟨hsm, hsr, hmdl, hlf⟩ $$ HmConf
     ihave Hstack := (show stackOwn (GF := GF) k.sp (trapRes k.sie + k.avail) ⊢
         stackOwn (k.sp + 8#64 * BitVec.ofNat 64 m - 8#64 * BitVec.ofNat 64 m) (trapRes k.sie + k.avail) by
@@ -804,11 +804,11 @@ theorem wpLoop_k_cpu [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
     iintro %hs
     exact absurd hs Bool.false_ne_true
   inext
-  iintro HmConf Hclock Hpc HT ⟨HF, HQ⟩
+  iintro HmConf Hclock Hpc HT ⟨HF, HQ⟩ Hlc
   unfold transTok
   icases HT with ⟨Htrans, Htok⟩
   ihave Hcells := Hclose $$ HQ
-  ihave HΦ' := wpNext_off _ _ _ $$ HΦ
+  ihave HΦ' := wpNext_off _ _ _ $$ HΦ Hlc
   ihave HConf := kConf_intro cpu curTier k.root false k.spie k.spp ms mdl mepc stc lf ⟨hsm, hsr, hmdl, hlf⟩ $$ HmConf
   iapply HΦ' $$ [HConf HF Hstack Htrans Harm Hcells Hlocks Hcsrs Htok Hclock] Hpc
   iapply (kctx_intro' cpu (k.withCpu R' noff' intena') hwf')
@@ -863,11 +863,11 @@ theorem wpLoop_k_cpuE [CurCtx] {lent' : Bool} [KernelGeom] [KernelImage GF] (cpu
     iintro %hs
     exact absurd hs Bool.false_ne_true
   inext
-  iintro HmConf Hclock Hpc HT ⟨HF, HQ⟩
+  iintro HmConf Hclock Hpc HT ⟨HF, HQ⟩ Hlc
   unfold transTok
   icases HT with ⟨Htrans, Htok⟩
   icases Hclose $$ HQ with ⟨Hcells, HE'⟩
-  ihave HΦ' := wpNext_off _ _ _ $$ HΦ
+  ihave HΦ' := wpNext_off _ _ _ $$ HΦ Hlc
   ihave HConf := kConf_intro cpu curTier k.root false k.spie k.spp ms mdl mepc stc lf ⟨hsm, hsr, hmdl, hlf⟩ $$ HmConf
   iapply HΦ' $$ [HConf HF Hstack Htrans Harm Hcells Hlocks Hcsrs Htok Hclock] Hpc HE'
   iapply (kctx_intro' cpu (k.withCpu R' noff' intena') hwf')

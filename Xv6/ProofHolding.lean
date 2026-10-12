@@ -128,7 +128,7 @@ theorem holding_tail (MC : MYCPU) {GF : BundledGFunctors.{0}} [MachGS GF] [CurCt
   k_norm
   iframe
   inext
-  iintro Hk Hpc
+  iintro Hk Hpc _
   iapply HΦ $$ %_ %w Hk Hpc [] HQ
   ipureintro
   k_norm at hcs2

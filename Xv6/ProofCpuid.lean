@@ -40,7 +40,7 @@ theorem cpuid_proof : CPUID := ⟨fun {GF} _ _ cpu k hsie hK => by
   k_norm
   iframe
   inext
-  iintro Hk Hpc
+  iintro Hk Hpc _
   iapply HΦ $$ %_ Hk Hpc
   ipureintro
   constructor

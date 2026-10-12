@@ -92,7 +92,7 @@ theorem namexEra_consts (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUN
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0x3c#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     namexEnv Γ A ∗ namexEraWalk k A P Pmiss ipv dcur 0 A.n A.Sb nf ∗
-    (∀ c' : CPU, namexEraPostR k A P Pmiss c')
+    (∀ c' : CPU, £ 1 -∗ namexEraPostR k A P Pmiss c')
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨r2, r8, r9, r20, r21, r22, r27⟩ := id hr
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Henv, Hwalk, Hnext⟩
@@ -140,7 +140,7 @@ theorem namexEra_rel (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOC
     kctx cpu (((k.withSpie k.spie k.spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0x2e#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     namexEnv Γ A ∗ namexPre k A nf ∗ namexEraStart A P Pmiss ∗
-    (∀ c' : CPU, namexEraPostR k A P Pmiss c')
+    (∀ c' : CPU, £ 1 -∗ namexEraPostR k A P Pmiss c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hrc : A.cwi = umStartOf A.rti A.cwi A.pl :=
     (umStartOf_rel A.rti A.cwi A.pl (fun h => hsl (bview_headSlash A.plen A.pfun h))).symm
@@ -250,7 +250,7 @@ theorem namexEra_abs (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOC
     kctx cpu (((k.withSpie k.spie k.spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0x48#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     namexEnv Γ A ∗ namexPre k A nf ∗ namexEraStart A P Pmiss ∗
-    (∀ c' : CPU, namexEraPostR k A P Pmiss c')
+    (∀ c' : CPU, £ 1 -∗ namexEraPostR k A P Pmiss c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hrc : A.rti = umStartOf A.rti A.cwi A.pl :=
     (umStartOf_slash A.rti A.cwi A.pl (bview_headSlash_intro A.plen A.pfun hs.hterm hsl)).symm
@@ -363,7 +363,7 @@ theorem namexEra_entry (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNL
     pcIs cpu (KA.«namex» + 0x1c#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     namexEnv Γ A ∗ namexPre k A nf ∗ namexEraStart A P Pmiss ∗
-    (∀ c' : CPU, namexEraPostR k A P Pmiss c')
+    (∀ c' : CPU, £ 1 -∗ namexEraPostR k A P Pmiss c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hacc := namex_path_lookup A.plen 0 A.pfun (Nat.zero_le _)
   have hbs := namex_beq_slash (A.pfun 0)

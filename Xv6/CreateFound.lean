@@ -213,7 +213,7 @@ theorem createFound_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF Γ] (cpu : 
     credFloor lo tl ∗ inodeRefGenlo ik q icfgDev inum g lo ∗ runitAny inum.toNat ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     wordPointsTo (pPid k'.proc) 4 dqp pidv ∗ bslot ∗ logTx icfgLog ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (dn : Dinode) (bm : Blkmap) (γil γisl : GName),
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (dn : Dinode) (bm : Blkmap) (γil γisl : GName),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c k'.sie -∗ cpuClaimExt c k'.sie k'.proc -∗
@@ -242,14 +242,14 @@ theorem createFound_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF Γ] (cpu : 
   isplitl [Hru]
   · iapply (show runitAny (GF := GF) inum.toNat ⊢ iregWdLic .plainK g inum.toNat from .rfl)
     iexact Hru
-  iapply wpNext_intro_pin
-  iintro %c %_
+  iapply wpNext_intro_pin_lc
+  iintro %c %_ Hlc
   unfold ilockPostTxEb
   iintro %spie %spp %R' %dn %bm %filled %hcs - Hk Hpc Hte Hce Hpid Hsi Hbs Hsl Hdep Hoff Hdev
     Hinum Hval Hload Hshot Hfrz %- Hru %-
   ihave Hru := (show iregWdBack (GF := GF) .plainK g inum.toNat ⊢ runitAny inum.toNat from .rfl)
     $$ Hru
-  iapply HK $$ %c %spie %spp %R' %dn %bm %γil %γisl %hcs Hk Hpc Hte Hce Hsi Hpid Hbs [-Hload]
+  iapply HK $$ %c Hlc %spie %spp %R' %dn %bm %γil %γisl %hcs Hk Hpc Hte Hce Hsi Hpid Hbs [-Hload]
     Hload
   unfold createFoundLk
   iframe
@@ -518,7 +518,7 @@ theorem createFound_npar (NP : NPAR_WRAP_ERA) (Γ : SchedNames) [ClaimIs GF Γ]
     byteBuf (k'.regs 11#5) (DFrac.own 1) (bview 14 nfun) ∗
     bslots 3 ∗ irefSlots 2 ∗ logOpS icfgLog n Sb ∗ logTx icfgLog ∗
     epStart fscFs V.rti V.cwi P Pmiss (bview plen pfun) ∗
-    (∀ c : CPU, nparWrapEraPost k' plen pfun n Sb P Pmiss pid V M dqb dqs dqpv c)
+    (∀ c : CPU, £ 1 -∗ nparWrapEraPost k' plen pfun n Sb P Pmiss pid V M dqb dqs dqpv c)
     ⊢ wpLoop (GF := GF) cpu := by
   have h := NP.wp_npar_wrap_era_eb (GF := GF) Γ cpu k' γl pd pav pu j γkl γk plen
     pfun nfun n Sb P Pmiss pid V M dqb dqs dqpv hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel
@@ -531,10 +531,9 @@ theorem createFound_npar (NP : NPAR_WRAP_ERA) (Γ : SchedNames) [ClaimIs GF Γ]
   iapply h
   iframe Hk Hpc Hte Hce Hsb Hsi Hcore Hpath Hnm Hbs Hs2 Hop Htx Hst
   iframe #
-  iapply wpNext_intro_pin
-  iintro %c %_
-  iapply HK $$ %c
-
+  iapply wpNext_intro_pin_lc
+  iintro %c %_ Hlc
+  iapply HK $$ %c Hlc
 end Calls
 
 /-! ## 3.  The half's arguments, bundled (the `NamexArgs` idiom) -/
@@ -586,7 +585,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [Bioslot
 
 /-- The contract's continuation, hart-free, at the bundled arguments. -/
 def createFoundK (k : KCtx) (A : CreateFoundArgs) (F : CreateFoundFams GF) : IProp GF :=
-  iprop(∀ c' : CPU, createPost k A.plen A.pfun A.ty A.major A.minor A.γ A.pid A.V A.M
+  iprop(∀ c' : CPU, £ 1 -∗ createPost k A.plen A.pfun A.ty A.major A.minor A.γ A.pid A.V A.M
     A.u A.Sb A.ns A.dqb A.dqs A.dqbs A.dqn A.dqpv F.Nm F.Nd F.P F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex c')
 
 /-- The contract's persistent context, at the bundled arguments. -/
@@ -663,9 +662,9 @@ theorem createFound_exit_fail (cpu : CPU) (k : KCtx) (A : CreateFoundArgs)
   rw [hm]
   iapply (create_tail cpu k spie spp R v3 nf tl hK hal htl hR)
   iframe Hk Hpc Hfr Hnm Htl Hte Hce
-  iintro %c' %R' %⟨hcs, ha0⟩ Hk Hpc Hte Hce
+  iintro %c' Hlc %R' %⟨hcs, ha0⟩ Hk Hpc Hte Hce
   unfold createFoundK
-  ispecialize Hpost $$ %c'
+  ispecialize Hpost $$ %c' Hlc
   unfold createPost
   iapply Hpost $$ %spie %spp %R' %false %false %0 %1 %1 %A.γl %0#32 %default %default %u'
     %Sb' %A.ns %hcs Hk Hpc Hte Hce Hsn Hsi Hss Hsb Hpriv Hpath Hbs [] Hsl [] Hop
@@ -707,9 +706,9 @@ theorem createFound_exit_ok (cpu : CPU) (k : KCtx) (A : CreateFoundArgs)
   · iapply (show irefSlot (GF := GF) ⊢ irefSlots 1 from .rfl); iexact Hm
   iapply (create_tail cpu k spie spp R v3 nf tl hK hal htl hR)
   iframe Hk Hpc Hfr Hnm Htl Hte Hce
-  iintro %c' %R' %⟨hcs, ha0⟩ Hk Hpc Hte Hce
+  iintro %c' Hlc %R' %⟨hcs, ha0⟩ Hk Hpc Hte Hce
   unfold createFoundK
-  ispecialize Hpost $$ %c'
+  ispecialize Hpost $$ %c' Hlc
   unfold createPost
   iapply Hpost $$ %spie %spp %R' %true %false %kk %q %q %g %inum %dn %bm %u'
     %Sb' %(1 + (A.ns - 2)) %hcs Hk Hpc Hte Hce Hsn Hsi Hss Hsb Hpriv Hpath Hbs [] Hsl [] Hop
@@ -1297,7 +1296,7 @@ theorem createFound_found (IL : ILOCK) (IUP : IUNLOCKPUT) (Γ : SchedNames)
   case ln => k_norm_g; try exact hS.hnoff
   case lt => k_norm_g; try exact hS.htier
   case la0 => k_norm_g [s18]
-  iintro %cpu %spie2 %spp2 %R2 %dnc %bmc %γilc %γislc %hcs2 Hk Hpc Hte Hce Hsi Hpid Hb1 Hlkc
+  iintro %cpu Hlc %spie2 %spp2 %R2 %dnc %bmc %γilc %γislc %hcs2 Hk Hpc Hte Hce Hsi Hpid Hb1 Hlkc
     Hloadc
   k_norm_g [create_ret_5a]
   have hr2 : createRegs k (ientry kd) (ientry kslot) A.ty A.major A.minor R2 :=
@@ -1732,7 +1731,7 @@ theorem createFound_parent (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ 
   case ln => k_norm_g; try exact hS.hnoff
   case lt => k_norm_g; try exact hS.htier
   case la0 => k_norm_g [h10]
-  iintro %cpu %spie1 %spp1 %R1 %dn %bm %γil %γisl %hcs Hk Hpc Hte Hce Hsi Hpid Hb1 Hlk Hload
+  iintro %cpu Hlc %spie1 %spp1 %R1 %dn %bm %γil %γisl %hcs Hk Hpc Hte Hce Hsi Hpid Hb1 Hlk Hload
   k_norm_g [create_ret_2a]
   have hr1 : createRegs k (ientry kd) ansv A.ty A.major A.minor R1 :=
     createRegs_cs k _ _ _ _ _ _ R1 hcs (createRegs_set k _ _ _ _ _ R 1#5 _ createFound_caller1 hr)
@@ -1861,7 +1860,7 @@ theorem createFound_entry (NP : NPAR_WRAP_ERA) (IL : ILOCK) (IUP : IUNLOCKPUT) (
   case gK => k_norm_g; try exact create_slots_nameiparent _ hS.hK
   case gn => k_norm_g; try exact hS.hnoff
   case gt => k_norm_g; try exact hS.htier
-  iintro %cpu
+  iintro %cpu Hlc
   unfold nparWrapEraPost
   iintro %spie1 %spp1 %R1 %n1 %Sb1 %ok %nf %ipv %w %hcs Hk Hpc Hte Hce Hsb Hsi Hcore Hpath Hnm
     Hbs %hled Hop Htx Harms

@@ -60,7 +60,7 @@ theorem wpLoop_s_instr_clk [CurCtx] (cpu : CPU) (c c' : MConf) (tier : KTier) (r
     instr pc is_rvc i ∗ confCells cpu (DFrac.own 1) Privilege.Supervisor c ∗ clockCells cpu ∗ pcIs cpu pc ∗
     transTok cpu tier root ∗ P ∗
     (▷ (confCells cpu (DFrac.own 1) Privilege.Supervisor c' -∗ clockCells cpu -∗ pcIs cpu npc -∗
-        transTok cpu tier root -∗ Q -∗ wpLoop cpu) ∧
+        transTok cpu tier root -∗ Q -∗ £ 1 -∗ wpLoop cpu) ∧
       trapBranch cpu c tier root sie pc P)
     ⊢ wpLoop cpu := by
   iintro ⟨HI, HmConf, Hclock, Hpc, HT, HP, HΦ⟩
@@ -78,8 +78,8 @@ theorem wpLoop_s_instr_clk [CurCtx] (cpu : CPU) (c c' : MConf) (tier : KTier) (r
     isplit
     · icases HΦ with ⟨HΦ, -⟩
       inext
-      iintro HmConf Hclock Hpc HT _ HQ
-      iapply HΦ $$ HmConf Hclock Hpc HT HQ
+      iintro HmConf Hclock Hpc HT _ HQ Hlc
+      iapply HΦ $$ HmConf Hclock Hpc HT HQ Hlc
     · icases HΦ with ⟨-, HTrap⟩
       iexact HTrap
   | F_RVC h =>
@@ -95,8 +95,8 @@ theorem wpLoop_s_instr_clk [CurCtx] (cpu : CPU) (c c' : MConf) (tier : KTier) (r
     isplit
     · icases HΦ with ⟨HΦ, -⟩
       inext
-      iintro HmConf Hclock Hpc HT _ HQ
-      iapply HΦ $$ HmConf Hclock Hpc HT HQ
+      iintro HmConf Hclock Hpc HT _ HQ Hlc
+      iapply HΦ $$ HmConf Hclock Hpc HT HQ Hlc
     · icases HΦ with ⟨-, HTrap⟩
       iexact HTrap
   | F_Error e => exact (by simp [decodesTo] at hdec : False).elim
@@ -288,11 +288,11 @@ theorem wp_s_rdtime [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx
     iintro %hs
     exact absurd hs Bool.false_ne_true
   inext
-  iintro HmConf Hclock Hpc HT HQ
+  iintro HmConf Hclock Hpc HT HQ Hlc
   icases HQ with ⟨%t, HF⟩
   unfold transTok
   icases HT with ⟨Htrans, Htok⟩
-  ihave HΦ' := wpNext_off _ _ _ $$ HΦ
+  ihave HΦ' := wpNext_off _ _ _ $$ HΦ Hlc
   ihave HConf := kConf_intro cpu curTier k.root false k.spie k.spp ms mdl mepc stc lf ⟨hsm, hsr, hmdl, hlf⟩ $$ HmConf
   have htp := tpPin_set cpu k.regs rd t hrd.2.2
   have hsp := KCtx.setReg_sp k rd t hrd.2.1
@@ -343,10 +343,10 @@ theorem wp_s_csrw_stimecmp [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k
     iintro %hs
     exact absurd hs Bool.false_ne_true
   inext
-  iintro HmConf Hclock Hpc HT HF
+  iintro HmConf Hclock Hpc HT HF Hlc
   unfold transTok
   icases HT with ⟨Htrans, Htok⟩
-  ihave HΦ' := wpNext_off _ _ _ $$ HΦ
+  ihave HΦ' := wpNext_off _ _ _ $$ HΦ Hlc
   ihave HConf := kConf_intro cpu curTier k.root false k.spie k.spp ms mdl mepc
     ((tpPin cpu k.regs).get rs1) lf ⟨hsm, hsr, hmdl, hlf⟩ $$ HmConf
   iapply HΦ' $$ [HConf HF Hstack Htrans Harm Hcpu Htok Hclock] Hpc

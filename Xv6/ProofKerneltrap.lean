@@ -135,9 +135,9 @@ theorem kerneltrap_proof (DI : DEVINTR) (MP : MYPROC) (YI : YIELD) : KERNELTRAP 
     k_step (wp_s_pop c _ (KA.«kerneltrap» + 0x48#64) true 48#12 6 imm_p48) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [hR2, KCtx.pop_pushed _ _ _ h6, sp_restore48]
     iintro Hk Hpc
-    k_step (wp_s_ret c _ (KA.«kerneltrap» + 0x4a#64) true 1#5) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    k_step (wp_s_ret c _ (KA.«kerneltrap» + 0x4a#64) true 1#5) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] £ Hlc
     iintro Hk Hpc
-    ihave HΦ' := wpNext_at _ _ _ c _ (fun h => hpin (h.resolve_left (by decide))) $$ HΦ
+    ihave HΦ' := wpNext_at _ _ _ c _ (fun h => hpin (h.resolve_left (by decide))) $$ HΦ Hlc
     ihave Hcsrs : trapCsrsAt c epc sc' tv' $$ [Hsepc Hscause Hstval]
     case' _ => unfold trapCsrsAt; iframe Hsepc Hscause Hstval
     iapply HΦ' $$ %_ %sc' %tv' Hk Hpc Hcsrs Hclaim Hres

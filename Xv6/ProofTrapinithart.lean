@@ -51,7 +51,7 @@ theorem trapinithart_proof : TRAPINITHART := ⟨fun {GF} _ _ cpu k tv0 hsie hK =
   k_norm
   iframe
   inext
-  iintro Hk Hpc
+  iintro Hk Hpc _
   iapply HΦ $$ %_ Hk Hpc Hstv
   ipureintro
   unfold calleeSaved; simp [RegMap.set_apply]

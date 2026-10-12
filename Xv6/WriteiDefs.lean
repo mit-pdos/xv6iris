@@ -460,7 +460,7 @@ def wiContEb (k : KCtx) (A : WiArgs) : IProp GF :=
     ⌜calleeSaved k.regs R'⌝ -∗
     ⌜WriteiOut fscCov fscLogst fscBmapstart A.inum icfgIst A.bm A.data A.dn A.dn0 A.user A.off
       A.n A.sbs A.V A.M (k.regs 12#5) A.ncount A.Sb (R' 10#5) tot bm' data' dn' dn0' n' wrote
-      dist dstb P' Sb'⌝ -∗
+      dist dstb P' Sb'⌝ -∗ £ 1 -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     wiCells A -∗ inodeMeta A.ip dn' -∗ inodeMap fscFs A.ip bm' -∗ inodeBlocks fscFs bm' data' -∗

@@ -439,7 +439,7 @@ theorem sys_unlink_w5_dir (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : 
   case inf => k_norm_g; exact ok.hnoff
   case it => k_norm_g; exact ok.htier
   case ia => k_norm_g [hpins.2.2.1]
-  iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hdev Hinum Hmeta Hmap Hdi Hb2 Hop
+  iintro %cpu Hlc %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hdev Hinum Hmeta Hmap Hdi Hb2 Hop
   k_norm_g [sys_unlink_ret_156, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysUnlinkPins_cs k _ R1 (ientry kd) (ientry ks) (sysUnlinkDe (k.regs 2#5))
     (sysUnlinkPins_set k _ _ _ _ 1#5 _ (sysUnlinkPins_set k _ _ _ _ 10#5 _

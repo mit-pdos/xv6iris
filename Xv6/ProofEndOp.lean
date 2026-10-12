@@ -576,8 +576,9 @@ theorem endOp_proof (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   ihave HΦ : ∀ c' : CPU, eoPost k pidv dqp c' $$ [Hnext]
   · iintro %c'
     unfold eoPost
+    iintro Hlc
     iapply wpNext_at true k.proc cpu c' _ (fun hc => Or.elim hc (fun hx => absurd hx (by decide))
-      (fun hx => absurd (hproc ▸ hx) (procAddr_nonzero hj))) $$ Hnext
+      (fun hx => absurd (hproc ▸ hx) (procAddr_nonzero hj))) $$ Hnext Hlc
   iapply (eo_entry BR BW BE MM WH IT AC RE WK Γ cpu k γ γl γb V γdl γfs pd pav pu j logstart
     dev u pidv dqp hj hproc hK hwf hnoff hlocks htier hintena hgeom hdev hcl hdt hpd)
   iframe Hk Hpc Hpi Hte Hce Hbc Hdc Hpe Hctx Hpid Hop HΦ

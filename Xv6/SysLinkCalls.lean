@@ -73,7 +73,7 @@ theorem sys_link_argstr (AS : ARGSTR) (Γ : SchedNames) (cpu : CPU) (k' : KCtx) 
     kctx cpu k' ∗ pcIs cpu KA.«argstr» ∗
     trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv Γ ∗
     procPrivBareAt curCtx pa pid V M ∗ byteBuf buf (DFrac.own 1) old ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (bs : List (BitVec 8)) (kv : Nat),
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (bs : List (BitVec 8)) (kv : Nat),
       ⌜calleeSaved k'.regs R' ∧ V.upt.extSz V.sz P' ∧
         fetchstrRet (viewLazy V.upt V.sz M) v.toNat old bs (R' 10#5)⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
@@ -96,12 +96,12 @@ theorem sys_link_argstr (AS : ARGSTR) (Γ : SchedNames) (cpu : CPU) (k' : KCtx) 
   iapply h
   iframe Hk Hpc Hblk Hbuf
   iframe #
-  iapply wpNext_intro_pin
-  iintro %c %hpin %spie %spp %R' %- Hk Hpc ⟨%P', %bs, %kv, %hf, %hkv, Hblk, Hbuf⟩ %hcs
+  iapply wpNext_intro_pin_lc
+  iintro %c %hpin Hlc %spie %spp %R' %- Hk Hpc ⟨%P', %bs, %kv, %hf, %hkv, Hblk, Hbuf⟩ %hcs
   have hpin' : k'.sie = false → c = cpu := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
-  iapply HK $$ %c %spie %spp %R' %P' %bs %kv [] Hk Hpc Hte Hce %hkv Hblk Hbuf
+  iapply HK $$ %c Hlc %spie %spp %R' %P' %bs %kv [] Hk Hpc Hte Hce %hkv Hblk Hbuf
   ipureintro
   exact ⟨hcs, hf.1, hf.2⟩
 
@@ -352,7 +352,7 @@ theorem sys_link_iunlock (IU : IUNLOCK) (Γ : SchedNames) (cpu : CPU) (k' : KCtx
     icLoaded fscFs fscIreg fscCov fscLogst kk inum dn bm ∗
     ityShot g dn.diType ∗ ifreezeOff inum.toNat ∗
     wordPointsTo (pPid pj) 4 pidPriv pidv ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap),
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c se -∗ cpuClaimExt c se pj -∗
@@ -377,12 +377,12 @@ theorem sys_link_iunlock (IU : IUNLOCK) (Γ : SchedNames) (cpu : CPU) (k' : KCtx
   iapply h
   iframe Hk Hpc Hsl Hdep Hoff Hdev Hinum Hval Hload Hshot Hfrz Hpid
   iframe #
-  iapply wpNext_intro_pin
-  iintro %c %hpin %spie %spp %R' %- Hk Hpc %hcs Hpid Hshr Htx
+  iapply wpNext_intro_pin_lc
+  iintro %c %hpin Hlc %spie %spp %R' %- Hk Hpc %hcs Hpid Hshr Htx
   have hpin' : k'.sie = false → c = cpu := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
-  iapply HK $$ %c %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hshr Htx
+  iapply HK $$ %c Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hshr Htx
 
 /-! ## iupdate: the link-minting and link-spending flushes -/
 
@@ -408,7 +408,7 @@ theorem sys_link_iupdate_link (IU : IUPDATE) (Γ : SchedNames) [ClaimIs GF Γ]
     inodeMeta (ientry kk) dn ∗ inodeMap fscFs (ientry kk) bm ∗
     dinodeAt fscIreg inum dn0 ∗ iregLinkPin pin inum.toNat dn0 ∗
     wordPointsTo (pPid pj) 4 pidPriv pidv ∗ bslots 2 ∗ logOpS icfgLog (u + 1) Sb ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap),
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c se -∗ cpuClaimExt c se pj -∗
@@ -445,11 +445,11 @@ theorem sys_link_iupdate_link (IU : IUPDATE) (Γ : SchedNames) [ClaimIs GF Γ]
   iframe #
   isplitl [Hdev Hinum Hmeta Hmap]
   · unfold iuCells; iframe Hdev Hinum Hmeta Hmap; iframe #
-  iapply wpNext_intro_pin
-  iintro %c %_ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hcells Hdi ⟨%w, ⟨%hw, -⟩, Htok⟩ Hpin Hbs Hop
+  iapply wpNext_intro_pin_lc
+  iintro %c %_ Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hcells Hdi ⟨%w, ⟨%hw, -⟩, Htok⟩ Hpin Hbs Hop
   unfold iuCells
   icases Hcells with ⟨Hdev, Hinum, Hmeta, Hmap, -⟩
-  iapply HK $$ %c %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hdev Hinum Hmeta Hmap Hdi [Htok] Hpin Hbs
+  iapply HK $$ %c Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hdev Hinum Hmeta Hmap Hdi [Htok] Hpin Hbs
     Hop
   iexists w
   iframe Htok
@@ -482,7 +482,7 @@ theorem sys_link_iunlockput_sconf (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs 
     ityShot g dn.diType ∗ ifreezeOff inum.toNat ∗
     inodeRefShortGenlo kk (qi + s) qi icfgDev inum g lo ∗ runitAny inum.toNat ∗
     wordPointsTo (pPid pj) 4 pidPriv pidv ∗ bslots 3 ∗ logOpb icfgLog n ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (n' : Nat),
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (n' : Nat),
       ⌜calleeSaved k'.regs R' ∧ n - iputUnits ≤ n' ∧ n' ≤ n⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c se -∗ cpuClaimExt c se pj -∗
@@ -517,9 +517,9 @@ theorem sys_link_iunlockput_sconf (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs 
   iframe #
   isplitl [Hkeep Hru]
   · unfold inodeRefpShort; iframe
-  iapply wpNext_intro_pin
-  iintro %c %_ %spie %spp %R' %n' %hcs Hk Hpc Hte Hce Hpid - - Hbs %hf Hop Hslot
-  iapply HK $$ %c %spie %spp %R' %n' [] Hk Hpc Hte Hce Hpid Hbs Hop Hslot
+  iapply wpNext_intro_pin_lc
+  iintro %c %_ Hlc %spie %spp %R' %n' %hcs Hk Hpc Hte Hce Hpid - - Hbs %hf Hop Hslot
+  iapply HK $$ %c Hlc %spie %spp %R' %n' [] Hk Hpc Hte Hce Hpid Hbs Hop Hslot
   ipureintro
   exact ⟨hcs, hf⟩
 
@@ -550,7 +550,7 @@ theorem sys_link_iunlockput_gen (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF
     ityShot g dn.diType ∗ ifreezeOff inum.toNat ∗
     inodeRefShort kk (qi + s) qi icfgDev inum ∗ runitAny inum.toNat ∗
     wordPointsTo (pPid pj) 4 pidPriv pidv ∗ bslots 3 ∗ logOpSe icfgLog n Sb e0 ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (n' : Nat) (Sb' : List Nat) (w : Bool),
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (n' : Nat) (Sb' : List Nat) (w : Bool),
       ⌜calleeSaved k'.regs R' ∧ ((∀ x ∈ Sb, x ∈ Sb') ∧ (w = true → fscBmapstart ∈ Sb') ∧
         (crb = true → w = false) ∧ n - ipSpendW w cru false ≤ n' ∧ n' ≤ n)⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
@@ -587,9 +587,9 @@ theorem sys_link_iunlockput_gen (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF
   · unfold inodeRefpShort; iframe
   isplitl []
   · simp only [Bool.false_eq_true, if_false]; iempintro
-  iapply wpNext_intro_pin
-  iintro %c %_ %spie %spp %R' %n' %Sb' %w %hcs Hk Hpc Hte Hce Hpid - - Hbs %hf Hops Htx Hslot
-  iapply HK $$ %c %spie %spp %R' %n' %Sb' %w [] Hk Hpc Hte Hce Hpid Hbs Hops Htx Hslot
+  iapply wpNext_intro_pin_lc
+  iintro %c %_ Hlc %spie %spp %R' %n' %Sb' %w %hcs Hk Hpc Hte Hce Hpid - - Hbs %hf Hops Htx Hslot
+  iapply HK $$ %c Hlc %spie %spp %R' %n' %Sb' %w [] Hk Hpc Hte Hce Hpid Hbs Hops Htx Hslot
   ipureintro
   exact ⟨hcs, hf⟩
 
@@ -607,7 +607,7 @@ theorem sys_link_iput (IP : IPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     isSleeplockGen γil γisl (iLock (ientry kk)) (icSlp fscIc kk) (slhTok (icfgIsl kk)) ∗
     inodeRefp kk q icfgDev inum ∗
     wordPointsTo (pPid pj) 4 pidPriv pidv ∗ bslots 3 ∗ logOp icfgLog n ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (n' : Nat),
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (n' : Nat),
       ⌜calleeSaved k'.regs R' ∧ n - iputUnits ≤ n' ∧ n' ≤ n⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c se -∗ cpuClaimExt c se pj -∗
@@ -635,9 +635,9 @@ theorem sys_link_iput (IP : IPUT) (Γ : SchedNames) [ClaimIs GF Γ]
   iapply h
   iframe Hk Hpc Hte Hce Href Hpid Hbs Hop
   iframe #
-  iapply wpNext_intro_pin
-  iintro %c %_ %spie %spp %R' %n' %hcs Hk Hpc Hte Hce Hpid - - Hbs %hf Hop Hslot
-  iapply HK $$ %c %spie %spp %R' %n' [] Hk Hpc Hte Hce Hpid Hbs Hop Hslot
+  iapply wpNext_intro_pin_lc
+  iintro %c %_ Hlc %spie %spp %R' %n' %hcs Hk Hpc Hte Hce Hpid - - Hbs %hf Hop Hslot
+  iapply HK $$ %c Hlc %spie %spp %R' %n' [] Hk Hpc Hte Hce Hpid Hbs Hop Hslot
   ipureintro
   exact ⟨hcs, hf⟩
 

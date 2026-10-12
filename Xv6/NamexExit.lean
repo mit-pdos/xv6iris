@@ -171,7 +171,7 @@ theorem namex_notdir (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     namexLk A ik q g lo tl inum dn γil γisl ∗ icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
     irefSlots 1 ∗ namexKeep k A ∗ namexPath k A ∗ byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) ∗
     bslots 3 ∗ logOpS icfgLog ncur Scur ∗
-    (∀ c' : CPU, namexPostA k A c')
+    (∀ c' : CPU, £ 1 -∗ namexPostA k A c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 := namex_slots_12 _ hs.hK
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Henv, Hlk, Hload, Hs1, Hkeep, Hpath, Hnm, Hbs, Hop, Hnext⟩
@@ -222,7 +222,7 @@ theorem namex_nlink (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     namexLk A ik q g lo tl inum dn γil γisl ∗ icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
     irefSlots 1 ∗ namexKeep k A ∗ namexPath k A ∗ byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) ∗
     bslots 3 ∗ logOpS icfgLog ncur Scur ∗
-    (∀ c' : CPU, namexPostA k A c')
+    (∀ c' : CPU, £ 1 -∗ namexPostA k A c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 := namex_slots_12 _ hs.hK
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Henv, Hlk, Hload, Hs1, Hkeep, Hpath, Hnm, Hbs, Hop, Hnext⟩
@@ -277,7 +277,7 @@ theorem namex_miss (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     namexLk A ik q g lo tl inum dn γil γisl ∗ icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
     irefSlots 1 ∗ namexKeep k A ∗ namexPath k A ∗ byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) ∗
     bslots 3 ∗ nlzObs inum.toNat e0 ∗ logOpSe icfgLog ncur Scur e0 ∗
-    (∀ c' : CPU, namexPostA k A c')
+    (∀ c' : CPU, £ 1 -∗ namexPostA k A c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 := namex_slots_12 _ hs.hK
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Henv, Hlk, Hload, Hs1, Hkeep, Hpath, Hnm, Hbs, #Hobs, Hop,
@@ -353,7 +353,7 @@ theorem namex_par (IU : IUNLOCK) (Γ : SchedNames) [ClaimIs GF Γ]
     namexLk A ik q g lo tl inum dn γil γisl ∗ icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
     irefSlots 1 ∗ namexKeep k A ∗ namexPath k A ∗ byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) ∗
     bslots 3 ∗ logOpSe icfgLog ncur Scur e0 ∗
-    (∀ c' : CPU, namexPostA k A c')
+    (∀ c' : CPU, £ 1 -∗ namexPostA k A c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 := namex_slots_12 _ hs.hK
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Henv, Hlk, Hload, Hs1, Hkeep, Hpath, Hnm, Hbs, Hop, Hnext⟩
@@ -383,7 +383,7 @@ theorem namex_par (IU : IUNLOCK) (Γ : SchedNames) [ClaimIs GF Γ]
   case gl => k_norm_g; try exact hs.hlocks
   case gt => k_norm_g; try exact hs.htier
   case ga => k_norm_g; try exact hf.h20
-  iintro %c %spie' %spp' %R' %hcs Hk Hpc Hte Hce Hpid Hshr Htx
+  iintro %c Hlc %spie' %spp' %R' %hcs Hk Hpc Hte Hce Hpid Hshr Htx
   obtain ⟨c2, -, -, -, -, c20, -, -, -, -, -, -, c27⟩ := hcs
   let cpu := c
   ihave Hk := kctx_eq_mono c _ (((k.withSpie spie' spp').pushed 12).withRegs R')
@@ -422,7 +422,7 @@ theorem namex_done (IP : IPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0x144#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     namexEnv Γ A ∗ namexWalk k A ipv ncur Scur nf ∗
-    (∀ c' : CPU, namexPostA k A c')
+    (∀ c' : CPU, £ 1 -∗ namexPostA k A c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 := namex_slots_12 _ hs.hK
   obtain ⟨r2, r8, r9, r19, r20, r21, r22, r23, r24, r25, r27⟩ := id hr

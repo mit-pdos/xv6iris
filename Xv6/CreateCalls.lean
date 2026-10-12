@@ -132,7 +132,7 @@ theorem create_iupdate_unlink (IU : IUPDATE) (Γ : SchedNames) [ClaimIs GF Γ]
     FsStateLink.linkToks (fsGammaL fscFs) (inum.toNat : Int)
       (FsStateLink.linkReps (iregDotDelta dn.diType.toNat dn.diNlink.toNat) uty) ∗
     wordPointsTo (pPid k'.proc) 4 pidPriv pidv ∗ bslots 2 ∗ logOpS icfgLog (u + 1) Sb ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap),
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c k'.sie -∗ cpuClaimExt c k'.sie k'.proc -∗
@@ -158,11 +158,11 @@ theorem create_iupdate_unlink (IU : IUPDATE) (Γ : SchedNames) [ClaimIs GF Γ]
   iframe #
   isplitl [Hdev Hinum Hmeta Hmap Hsi]
   · unfold iuCells; iframe Hdev Hinum Hmeta Hmap Hsi
-  iapply wpNext_intro_pin
-  iintro %c %_ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hcells Hdi Hbs Hop
+  iapply wpNext_intro_pin_lc
+  iintro %c %_ Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hcells Hdi Hbs Hop
   unfold iuCells
   icases Hcells with ⟨Hdev, Hinum, Hmeta, Hmap, Hsi⟩
-  iapply HK $$ %c %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hdev Hinum Hmeta Hmap Hsi Hdi Hbs Hop
+  iapply HK $$ %c Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hdev Hinum Hmeta Hmap Hsi Hdi Hbs Hop
 
 end Env
 

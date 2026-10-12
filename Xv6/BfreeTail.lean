@@ -179,10 +179,10 @@ theorem bf_tail (LW : LOG_WRITE) (BE : BRELSE)
   k_norm_g
   iframe
   inext
-  k_next_e
+  k_next_e £ Hlc
   iintro Hk Hpc
   ihave HΦ := wpNext_at true k.proc c0 cpu _
-    (fun h => h.elim (fun h => absurd h (by decide)) (fun h => absurd h hp0)) $$ Hnext
+    (fun h => h.elim (fun h => absurd h (by decide)) (fun h => absurd h hp0)) $$ Hnext Hlc
   iapply HΦ $$ %spie3 %spp3 %_ [] Hk Hpc Hte Hce Hpid Hsb Hsl Hope
   ipureintro
   exact bc_calleeSaved_epi2 k.regs R3

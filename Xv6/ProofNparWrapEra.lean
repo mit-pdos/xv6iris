@@ -75,11 +75,11 @@ theorem nparWrapEra_main (NE : NPAR_ERA)
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK2 := nparWrapEra_slots_2 _ hK
   -- the caller's continuation is hart-free (a park's crossing, at a proc)
-  ihave HΦ : ∀ c : CPU, nparWrapEraPost k plen pfun n Sb P Pmiss pid V M dqb dqs dqpv c
+  ihave HΦ : ∀ c : CPU, £ 1 -∗ nparWrapEraPost k plen pfun n Sb P Pmiss pid V M dqb dqs dqpv c
     $$ [Hnext]
-  · iintro %c
+  · iintro %c Hlc
     iapply wpNext_at true k.proc cpu c _ (fun hc => Or.elim hc (fun hx => absurd hx (by decide))
-      (fun hx => absurd (hproc ▸ hx) (procAddr_nonzero hj))) $$ Hnext
+      (fun hx => absurd (hproc ▸ hx) (procAddr_nonzero hj))) $$ Hnext Hlc
   simp only [nameiparentAddr]
   -- +0x00 .. +0x06  the prologue
   iapply (wp_prologue2_gen cpu k KA.«nameiparent» hK2) $$ [- $Hk $Hpc]
@@ -141,15 +141,15 @@ theorem nparWrapEra_main (NE : NPAR_ERA)
   k_norm_g
   iframe
   inext
-  iapply wpNext_intro_pin
-  iintro %c %hpin
+  iapply wpNext_intro_pin_lc
+  iintro %c %hpin Hlc
   have hpin' : k.sie = false → c = c' := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
   iintro Hk Hpc
   k_norm_g
   unfold nparWrapEraPost
-  iapply HΦ $$ %c %spie %spp %_ %n' %Sb' %ok %nf %ipv %w [] Hk Hpc Hte Hce Hsb Hsi Hcore
+  iapply HΦ $$ %c Hlc %spie %spp %_ %n' %Sb' %ok %nf %ipv %w [] Hk Hpc Hte Hce Hsb Hsi Hcore
     Hpath Hname Hbs %hf Hop Htx [Hok]
   · ipureintro
     unfold calleeSaved

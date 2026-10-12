@@ -403,12 +403,12 @@ theorem wp_prologue_dirlink [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (
   iintro Hk Hpc Hf56
   k_step_gen (wp_s_sd c5 _ (pc + 10#64) true 16#12 2#5 22#5 (by decide) w₈) $$ [- $Hk $Hpc] next c6 hp6
   iintro Hk Hpc Hf64
-  k_step_gen (wp_s_addi c6 _ (pc + 12#64) true 80#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c7 hp7
+  k_step_gen (wp_s_addi c6 _ (pc + 12#64) true 80#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c7 hp7 £ Hlc
   iintro Hk Hpc
   k_norm_g
   ihave HΦ' := wpNext_at _ _ _ c7 _
     (fun h => (hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans
-      ((hp2 h).trans (hp1 h))))))) $$ HΦ
+      ((hp2 h).trans (hp1 h))))))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc [Hf8 Hf16 Hf24 Hf32 Hf40 Hf48 Hf56 Hf64 Hf72 Hf80]
   iexists w₃, w₅, w₆, w₉, w₁₀
   unfold dirlinkFrame
@@ -462,12 +462,12 @@ theorem wp_epilogue_dirlink [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (
   k_step_gen (wp_s_pop c5 _ (pc + 10#64) true 80#12 10 MachCSL.imm_p80) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c6 hp6
   iintro Hk Hpc
-  k_step_gen (wp_s_ret c6 _ (pc + 12#64) true 1#5) $$ [- $Hk $Hpc] next c7 hp7
+  k_step_gen (wp_s_ret c6 _ (pc + 12#64) true 1#5) $$ [- $Hk $Hpc] next c7 hp7 £ Hlc
   iintro Hk Hpc
   k_norm_g
   ihave HΦ' := wpNext_at _ _ _ c7 _
     (fun h => (hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans
-      ((hp2 h).trans (hp1 h))))))) $$ HΦ
+      ((hp2 h).trans (hp1 h))))))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc
 
 end

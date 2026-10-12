@@ -452,19 +452,19 @@ theorem sys_open_fail_ret (k : KCtx) (A : SysOpenArgs GF) (P2 : UPtd) (nsj : Nat
         procPrivFd (GF := GF) A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2)) ∗
       irefSlots nsj ∗ fdSlot ∗ fdFrags A.V.fdg A.sts ∗
       sysOpenResidue A pl inum dn bm data ∗
-      (∀ c' : CPU, sysOpenPostP k A c') ⊢
+      (∀ c' : CPU, £ 1 -∗ sysOpenPostP k A c') ⊢
     sysOpenRet k (fun r => iprop(⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ sysOpenPid A ∗
       bslots 3 ∗ irefSlot)) := by
   iintro ⟨Hpback, Hisl, Hfds, Hfrags, Hres, Hpost⟩
   unfold sysOpenRet
-  iintro %c' %spie' %spp' %R' %hcs Hk Hpc Hte Hce ⟨%hr, Hpid, Hbs, Hiru⟩
+  iintro %c' Hlc %spie' %spp' %R' %hcs Hk Hpc Hte Hce ⟨%hr, Hpid, Hbs, Hiru⟩
   ihave Hpriv := Hpback $$ Hpid
   ihave Hiru := (show irefSlot (GF := GF) ⊢ irefSlots 1 from .rfl) $$ Hiru
   ihave Hisl := (irefSlots_op nsj 1).2 $$ [$Hisl $Hiru]
   rw [hns]
   unfold sysOpenResidue
   icases Hres with ⟨%hpl, HP, Hobs, Htc⟩
-  ispecialize Hpost $$ %c'
+  ispecialize Hpost $$ %c' Hlc
   unfold sysOpenPostP sysOpenK
   iapply Hpost $$ %spie' %spp' %R' %P2 %A.V.ev %hcs %hP2 %(Nat.le_refl _) Hk Hpc Hte Hce Hbs Hisl
   iapply (sys_open_arm_fail A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid

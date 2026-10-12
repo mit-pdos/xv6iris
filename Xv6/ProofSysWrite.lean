@@ -83,7 +83,7 @@ theorem swr_ok_back (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bit
     filewriteEnvOut γl γu st ∗ (filewriteEnvOut γl γu st -∗ filewriteFsOut (GF := GF)) ∗
     filewriteArms V.gen V.upt st (argZ v2) (writerImg V.upt M) v1 Q Qe (R 10#5) ∗
     fwConsOut st γu (writerImg V.upt M) v1 (R 10#5) ∗
-    (∀ c : CPU, sysWritePost k γ γu j pid V M sts v v1 v2 Q Qe c)
+    (∀ c : CPU, £ 1 -∗ sysWritePost k γ γu j pid V M sts v v1 v2 Q Qe c)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hra, Hs0, Hcells, Hte, Hce, Hcore, Howe, Href, Hauth, Hfr, Henvo, Henvb, Harms,
     #HO, HΦ⟩
@@ -97,9 +97,9 @@ theorem swr_ok_back (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bit
   iapply (swr_tail cpu k spie spp R hK6 hr) $$ [- $Hk $Hpc $Hframe $Hte $Hce]
   rotate_right 1
   iframe
-  iintro %c' %R' %⟨hcs, h10⟩ Hk Hpc Hte Hce
+  iintro %c' Hlc %R' %⟨hcs, h10⟩ Hk Hpc Hte Hce
   unfold sysWritePost
-  iapply HΦ $$ %c' %spie %spp %R' %P' %kv [] [] Hk Hpc Hte Hce %hkv [Hcore Howe] Hfr Hfso [Harms]
+  iapply HΦ $$ %c' Hlc %spie %spp %R' %P' %kv [] [] Hk Hpc Hte Hce %hkv [Hcore Howe] Hfr Hfso [Harms]
   · ipureintro
     refine ⟨hcs, hext, ?_⟩
     rw [sysFdSt_some v V.ofile sts fd0 (fnode kk) st hsome hsts, h10]; exact hcnt
@@ -133,7 +133,7 @@ theorem swr_ok_jal (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs GF Γ]
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ fdFrags V.fdg sts ∗
     filewriteFsEnv ∗
     sysWriteIn pmv szv lzv V v sts (argZ v2) (writerImg V.upt M) v1 Q Qe ∗
-    (∀ c : CPU, sysWritePost k γ γu j pid V M sts v v1 v2 Q Qe c)
+    (∀ c : CPU, £ 1 -∗ sysWritePost k γ γu j pid V M sts v v1 v2 Q Qe c)
     ⊢ wpLoop (GF := GF) cpu := by
   have hK110 := hK
   rw [sysWriteSlots_eq] at hK110
@@ -185,7 +185,7 @@ theorem swr_ok_jal (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs GF Γ]
   case has => k_norm_g; exact h10
   case han => k_norm_g; exact h12
   -- ===== back from filewrite (at any hart) =====
-  iintro %cpu
+  iintro %cpu Hlc
   unfold filewritePost
   iintro %spie3 %spp3 %R3 %P' %kv %⟨hcs3, hext, hcnt⟩ #HO Hk Hpc Hte Hce Href %hkv Hcore Henvo Harms
   k_norm_g [swr_ret_40, h11, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
@@ -222,7 +222,7 @@ theorem swr_ok_loads (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs GF Γ]
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ fdFrags V.fdg sts ∗
     filewriteFsEnv ∗
     sysWriteIn pmv szv lzv V v sts (argZ v2) (writerImg V.upt M) v1 Q Qe ∗
-    (∀ c : CPU, sysWritePost k γ γu j pid V M sts v v1 v2 Q Qe c)
+    (∀ c : CPU, £ 1 -∗ sysWritePost k γ γu j pid V M sts v v1 v2 Q Qe c)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, #Henv, Hra, Hs0, Hcells, Hte, Hce, Hcore, Howe, Hfr, Hfs, Hin, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -284,7 +284,7 @@ theorem swr_fail_arm (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bi
     procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ fdFrags V.fdg sts ∗
     filewriteFsEnv ∗
-    (∀ c : CPU, sysWritePost k γ γu j pid V M sts v v1 v2 Q Qe c)
+    (∀ c : CPU, £ 1 -∗ sysWritePost k γ γu j pid V M sts v v1 v2 Q Qe c)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hra, Hs0, Hcells, Hte, Hce, Hcore, Howe, Hfr, Hfs, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -297,7 +297,7 @@ theorem swr_fail_arm (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bi
   iintro Hk Hpc
   -- +0x2c  bltz a5 : taken
   k_step_e (wp_s_branch cpu _ (KA.«sys_write» + 0x2c#64) false 20#13 15#5 0#5 (by decide) bop.BLT)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, MachCSL.bltz_m1]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, MachCSL.bltz_m1] £ Hlc
   iintro Hk Hpc
   ihave Hframe := swr_frame_close (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) _ _ _ $$ [Hra Hs0 Hcells]
   · iframe
@@ -307,9 +307,9 @@ theorem swr_fail_arm (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bi
   iapply (swr_tail cpu k spie spp _ hK6 hr3) $$ [- $Hk $Hpc $Hframe $Hte $Hce]
   rotate_right 1
   iframe
-  iintro %c' %R' %⟨hcs, h10'⟩ Hk Hpc Hte Hce
+  iintro %c' Hlc %R' %⟨hcs, h10'⟩ Hk Hpc Hte Hce
   unfold sysWritePost
-  iapply HΦ $$ %c' %spie %spp %R' %V.upt %V.ev [] [] Hk Hpc Hte Hce %(Nat.le_refl V.ev) [Hcore Howe] Hfr [Hfs] []
+  iapply HΦ $$ %c' Hlc %spie %spp %R' %V.upt %V.ev [] [] Hk Hpc Hte Hce %(Nat.le_refl V.ev) [Hcore Howe] Hfr [Hfs] []
   · ipureintro
     refine ⟨hcs, UMemL.extSz_refl _ _, fun _ h => ?_⟩
     rw [sysFdSt_none v V.ofile sts hnone] at h; cases h
@@ -344,7 +344,7 @@ theorem swr_argfd_call (AF : ARGFD) (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs 
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ fdFrags V.fdg sts ∗
     filewriteFsEnv ∗
     sysWriteIn pmv szv lzv V v sts (argZ v2) (writerImg V.upt M) v1 Q Qe ∗
-    (∀ c : CPU, sysWritePost k γ γu j pid V M sts v v1 v2 Q Qe c)
+    (∀ c : CPU, £ 1 -∗ sysWritePost k γ γu j pid V M sts v v1 v2 Q Qe c)
     ⊢ wpLoop (GF := GF) cpu := by
   have hK110 := hK
   rw [sysWriteSlots_eq] at hK110
@@ -382,7 +382,7 @@ theorem swr_argfd_call (AF : ARGFD) (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs 
   isplitl [Hpfd]
   · iexact Hpfd
   -- ===== back from argfd =====
-  iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hcore Howe Hpost
+  iintro %cpu Hlc %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hcore Howe Hpost
   k_norm_g [swr_ret_28, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   have hr2 : swrRegs k R2 := by
     refine swrRegs_cs _ _ _ ?_ hcs2
@@ -428,7 +428,7 @@ theorem swr_argint_call (AI : ARGINT) (AF : ARGFD) (FW : FILEWRITE) (Γ : SchedN
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ fdFrags V.fdg sts ∗
     filewriteFsEnv ∗
     sysWriteIn pmv szv lzv V v sts (argZ v2) (writerImg V.upt M) v1 Q Qe ∗
-    (∀ c : CPU, sysWritePost k γ γu j pid V M sts v v1 v2 Q Qe c)
+    (∀ c : CPU, £ 1 -∗ sysWritePost k γ γu j pid V M sts v v1 v2 Q Qe c)
     ⊢ wpLoop (GF := GF) cpu := by
   have hK110 := hK
   rw [sysWriteSlots_eq] at hK110
@@ -460,7 +460,7 @@ theorem swr_argint_call (AI : ARGINT) (AF : ARGFD) (FW : FILEWRITE) (Γ : SchedN
   case an => k_norm_g; exact hnoff
   case aK => k_norm_g; unfold argintSlots argrawSlots; omega
   -- ===== back from argint =====
-  iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Htf Htfp Hn
+  iintro %cpu Hlc %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Htf Htfp Hn
   k_norm_g [swr_ret_1c, Xv6.srd_n_addr, hr.2.1, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   have hr1 : swrRegs k R1 := by
     refine swrRegs_cs _ _ _ ?_ hcs1
@@ -504,9 +504,9 @@ theorem sys_write_main (AA : ARGADDR) (AI : ARGINT) (AF : ARGFD) (FW : FILEWRITE
   have ht0 : curTier = KTier.kpt := hct.symm.trans htier
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- THE CONTRACT'S CONTINUATION, hart-free
-  ihave HΦ : (∀ c : CPU, sysWritePost k γ γu j pid V M sts v v1 v2 Q Qe c) $$ [Hnext]
-  · iintro %c
-    iapply wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext
+  ihave HΦ : (∀ c : CPU, £ 1 -∗ sysWritePost k γ γu j pid V M sts v v1 v2 Q Qe c) $$ [Hnext]
+  · iintro %c Hlc
+    iapply wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext Hlc
   icases (procPrivFd_split γ (procAddr j) pid V M).1 $$ Hblk with ⟨Hcore, Howe⟩
   simp only [sysWriteAddr]
   -- +0x00 .. +0x06  the prologue
@@ -546,7 +546,7 @@ theorem sys_write_main (AA : ARGADDR) (AI : ARGINT) (AF : ARGFD) (FW : FILEWRITE
   case hna => k_norm_g; omega
   case hKa => k_norm_g; unfold argaddrSlots argrawSlots; omega
   -- ===== back from argaddr =====
-  iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Htf Htfp Hp
+  iintro %cpu Hlc %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Htf Htfp Hp
   k_norm_g [swr_ret_12, MachCSL.add_sext_4056, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   have hr1 : swrRegs k R1 := by
     refine swrRegs_cs _ _ _ ?_ hcs1

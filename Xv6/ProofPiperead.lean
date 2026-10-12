@@ -89,10 +89,14 @@ macro_rules
 
 /-- `k_next_e` shadowing `c`. -/
 syntax "k_next_prc" : tactic
+syntax "k_next_prc" " £ " ident : tactic
 set_option hygiene false in
 macro_rules
   | `(tactic| k_next_prc) =>
     `(tactic| (k_next_pin c hpin
+               k_ext_move))
+  | `(tactic| k_next_prc £ $hlc:ident) =>
+    `(tactic| (k_next_pin_lc c hpin $hlc
                k_ext_move))
 
 section
@@ -491,7 +495,7 @@ theorem pr_post_at (cpu c : CPU) (k : KCtx) (γp : PipeNames) (w : Bool) (q : Qp
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
     (Q : List (BitVec 8) → IProp GF) (Qe : List (BitVec 8) → PipeSt → IProp GF)
     (hj : j < NPROC) (hkproc : k.proc = procAddr j) :
-    wpNext true k.proc cpu (prPost (GF := GF) k γp w q j pid V M n Q Qe) ⊢
+    wpNext true k.proc cpu (prPost (GF := GF) k γp w q j pid V M n Q Qe) ⊢ £ 1 -∗
       ∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (M' : Nat → List (BitVec 8)) (d : Nat)
         (bsW : List (BitVec 8)) (k' : Nat),
       ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ (d : Int) ≤ max 0 n ∧ pipeReadRet d (R' 10#5) ∧
@@ -507,10 +511,10 @@ theorem pr_post_at (cpu c : CPU) (k : KCtx) (γp : PipeNames) (w : Bool) (q : Qp
         iprop(killShot V.gen ∗ □ MachFixedGS.killCred (GF := GF)) n.toNat d
         (fun i => bsW.getD i 0#8) (R' 10#5) -∗
       wpLoop c := by
-  iintro H
+  iintro H Hlc
   ihave H := wpNext_at true k.proc cpu c _
     (fun h => h.elim (fun h => absurd h (by decide))
-      (fun h => absurd h (by rw [hkproc]; exact procAddr_nonzero hj))) $$ H
+      (fun h => absurd h (by rw [hkproc]; exact procAddr_nonzero hj))) $$ H Hlc
   iapply prPost_elim $$ H
 
 /-! ## Prologue, epilogue, and the shrink-wrapped saves/restores -/
@@ -557,12 +561,12 @@ theorem wp_prologuePr_gen (cpu : CPU) (k : KCtx) (pc : BitVec 64) (hK : 12 ≤ k
   iintro Hk Hpc Hf48
   k_step_gen (wp_s_sd c7 _ (pc + 14#64) true 40#12 2#5 21#5 (by decide) w₇) $$ [- $Hk $Hpc] next c8 hp8
   iintro Hk Hpc Hf56
-  k_step_gen (wp_s_addi c8 _ (pc + 16#64) true 96#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c9 hp9
+  k_step_gen (wp_s_addi c8 _ (pc + 16#64) true 96#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c9 hp9 £ Hlc
   iintro Hk Hpc
   k_norm_g
   ihave HΦ' := wpNext_at _ _ _ c9 _
     (fun h => (hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans
-      ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))))))) $$ HΦ
+      ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))))))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc [Hf8 Hf16 Hf24 Hf32 Hf40 Hf48 Hf56 Hf64 Hf72 Hf80 Hf88 Hf96]
   iexists w₈, w₉, w₁₀, w₁₁, w₁₂
   unfold prFrame
@@ -620,12 +624,12 @@ theorem wp_epiloguePr_gen (cpu : CPU) (k : KCtx) (pc : BitVec 64) (hK : 12 ≤ k
   k_step_gen (wp_s_pop c7 _ (pc + 14#64) true 96#12 12 pr_imm_p96) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c8 hp8
   iintro Hk Hpc
-  k_step_gen (wp_s_ret c8 _ (pc + 16#64) true 1#5) $$ [- $Hk $Hpc] next c9 hp9
+  k_step_gen (wp_s_ret c8 _ (pc + 16#64) true 1#5) $$ [- $Hk $Hpc] next c9 hp9 £ Hlc
   iintro Hk Hpc
   k_norm_g
   ihave HΦ' := wpNext_at _ _ _ c9 _
     (fun h => (hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans
-      ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))))))) $$ HΦ
+      ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))))))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc
 
 set_option maxHeartbeats 4000000 in
@@ -652,10 +656,10 @@ theorem pr_save3 (c : CPU) (kb : KCtx) (R : RegMap) (pc : BitVec 64) (hsie0 : kb
   iintro Hk Hpc Hf7
   k_step (wp_s_sd c _ (pc + 2#64) true 24#12 2#5 23#5 (by decide) v8) $$ [- $Hk $Hpc] with [hR2]
   iintro Hk Hpc Hf8
-  k_step (wp_s_sd c _ (pc + 4#64) true 16#12 2#5 24#5 (by decide) v9) $$ [- $Hk $Hpc] with [hR2]
+  k_step (wp_s_sd c _ (pc + 4#64) true 16#12 2#5 24#5 (by decide) v9) $$ [- $Hk $Hpc] with [hR2] £ Hlc
   iintro Hk Hpc Hf9
   k_norm_g
-  ihave HΦ' := wpNext_at _ _ _ c _ (fun _ => rfl) $$ HΦ
+  ihave HΦ' := wpNext_at _ _ _ c _ (fun _ => rfl) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc Hf7 Hf8 Hf9
 
 set_option maxHeartbeats 4000000 in
@@ -684,10 +688,10 @@ theorem pr_restore3 (c : CPU) (kb : KCtx) (R : RegMap) (pc : BitVec 64)
     $$ [- $Hk $Hpc] with [hR2] next c2 hp2
   iintro Hk Hpc Hf8
   k_step_gen (wp_s_ld c2 _ (pc + 4#64) true 16#12 24#5 2#5 (by decide) (by decide) (DFrac.own 1) v9)
-    $$ [- $Hk $Hpc] with [hR2] next c3 hp3
+    $$ [- $Hk $Hpc] with [hR2] next c3 hp3 £ Hlc
   iintro Hk Hpc Hf9
   k_norm_g
-  ihave HΦ' := wpNext_at _ _ _ c3 _ (fun h => (hp3 h).trans ((hp2 h).trans (hp1 h))) $$ HΦ
+  ihave HΦ' := wpNext_at _ _ _ c3 _ (fun h => (hp3 h).trans ((hp2 h).trans (hp1 h))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc Hf7 Hf8 Hf9
 
 set_option maxHeartbeats 4000000 in
@@ -733,10 +737,10 @@ theorem pr_epi (cpu c : CPU) (k : KCtx) (γp : PipeNames) (w : Bool) (q : Qp) (j
   iframe
   inext
   k_norm_g
-  k_next_prc
+  k_next_prc £ Hlc
   iintro Hk Hpc
   ihave HK := pr_post_at cpu c k γp w q j pid V M n Q Qe hj hkproc $$ Hnext
-  iapply HK $$ %spie %spp %_ %P' %M' %d %bsW %kv [] Hk Hpc Hte Hce Href %hkv Hpriv Hgen [Hpost]
+  iapply HK $$ Hlc %spie %spp %_ %P' %M' %d %bsW %kv [] Hk Hpc Hte Hce Href %hkv Hpriv Hgen [Hpost]
   · ipureintro
     refine ⟨?_, hext, hd, ?_, hlen, hM, hmap⟩
     · unfold calleeSaved
@@ -2203,10 +2207,10 @@ theorem piperead_proof (MP : MYPROC) (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK :
   have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hwf.2.2.2.1; omega)
   ihave HΦ := pr_post_of_spec cpu k γp w q j pid V M n Q Qe $$ HΦ
   -- the caller's continuation is hart-free (a park's crossing, at a proc)
-  ihave HΦ : ∀ c : CPU, prPost k γp w q j pid V M n Q Qe c $$ [HΦ]
-  · iintro %c
+  ihave HΦ : ∀ c : CPU, £ 1 -∗ prPost k γp w q j pid V M n Q Qe c $$ [HΦ]
+  · iintro %c Hlc
     iapply wpNext_at true k.proc cpu c _ (fun hc => Or.elim hc (fun hx => absurd hx (by decide))
-      (fun hx => absurd (hproc ▸ hx) (procAddr_nonzero hj))) $$ HΦ
+      (fun hx => absurd (hproc ▸ hx) (procAddr_nonzero hj))) $$ HΦ Hlc
   ihave Hpriv := pw_bare_to_ext curCtx (procAddr j) pid V M $$ Hpriv
   ihave Hpriv : (∃ kv : Nat, ⌜V.ev ≤ kv⌝ ∗
       procPrivBareAt curCtx (procAddr j) pid { V.updEv kv with upt := V.upt } M) $$ [Hpriv]
@@ -2276,7 +2280,7 @@ theorem piperead_proof (MP : MYPROC) (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK :
   iintro %spieA %sppA %RA %_ Hk Hpc %hcsA Hlocked HR _ Harm Href
   -- the acquire's arm and the complement: the whole bundle
   icases armExt_join cpu k.sie k.proc $$ [$Harm $Hte $Hce] with ⟨Htc, Hcl, Hir⟩
-  ihave HΦ := wpNext_intro true k.proc cpu _ $$ HΦ
+  ihave HΦ := wpNext_intro_lc true k.proc cpu _ $$ HΦ
   k_norm_g [hb.locks, hregs, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, prj_46f8]
   rw [hregs] at hcsA
   have hA : prPre k j n (RA.set 20#5 (k.regs 10#5 + 536#64)) := by

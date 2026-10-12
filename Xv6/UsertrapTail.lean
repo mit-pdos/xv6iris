@@ -124,7 +124,8 @@ theorem ut_exit (A : UtArgs GF) (c : CPU) (R1 : RegMap) (V2 : ProcPriv) (M2 : Na
   k_norm_g
   iframe
   inext
-  iapply wpNext_off_intro
+  iapply wpNext_off_intro_lc
+  iintro Hlc
   iintro Hk Hpc
   k_norm_g
   iapply (ut_close PT Γ A c

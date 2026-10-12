@@ -324,11 +324,11 @@ theorem mappages_iter [WchG GF] (W : WALK) [CurCtx]
       with [MachCSL.beq_zero _ hz] next c6 hp6
     iintro Hk Hpc
     k_step_gen (wp_s_addi c6 _ (KA.«mappages» + 0x9a#64) true 4095#12 10#5 0#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hp7
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hp7 £ Hlc
     iintro Hk Hpc
     have hpinZ : k.sie = false ∨ k.proc = 0#64 → c7 = cur := fun h =>
       (hp7 h).trans ((hp6 h).trans (hpinA h))
-    ihave HΦ' := wpNext_at _ _ _ c7 _ hpinZ $$ HΦ
+    ihave HΦ' := wpNext_at _ _ _ c7 _ hpinZ $$ HΦ Hlc
     rw [← hmf1]
     iapply HΦ' $$ %spie2 %spp2 %_ %fresh %_ %hsp2 Hk Hpc Hlend Htree Hav [Hrc]
     · -- the failed walk's null receipt
@@ -421,13 +421,13 @@ theorem mappages_iter [WchG GF] (W : WALK) [CurCtx]
     -- beq s1,s2 : the last page?
     k_step_gen (wp_s_branch c15 _ (KA.«mappages» + 0x62#64) false 80#13 9#5 18#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [h9', h18', mp_beq_last va n i hi hvr] next c16 hp16
+      with [h9', h18', mp_beq_last va n i hi hvr] next c16 hp16 £ Hlc
     iintro Hk Hpc
     have hpinZ : k.sie = false ∨ k.proc = 0#64 → c16 = cur := fun h =>
       (hp16 h).trans ((hp15 h).trans ((hp14 h).trans ((hp13 h).trans ((hp12 h).trans
         ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans
           ((hp6 h).trans (hpinA h)))))))))))
-    ihave HΦ' := wpNext_at _ _ _ c16 _ hpinZ $$ HΦ
+    ihave HΦ' := wpNext_at _ _ _ c16 _ hpinZ $$ HΦ Hlc
     rw [← hmo1]
     iapply HΦ' $$ %spie2 %spp2 %_ %fresh %_ %hsp2 Hk Hpc Hlend Htree Hav []
     · -- the walk succeeded: this is not the `-1` exit
@@ -502,10 +502,10 @@ theorem mappages_loop [WchG GF] (W : WALK) [CurCtx]
     rotate_right 1
     iframe #
     case hb => simpa using hblock 0 (by omega)
-    iapply wpNext_intro_pin
-    iintro %c6 %hp6 %spie2 %spp2 %R2 %fresh %pcv %hsp2 Hk Hpc Hlend Htree Hav Hrc %hpost
+    iapply wpNext_intro_pin_lc
+    iintro %c6 %hp6 Hlc %spie2 %spp2 %R2 %fresh %pcv %hsp2 Hk Hpc Hlend Htree Hav Hrc %hpost
     obtain ⟨hcs, hsup, hfrnd, hfrpg, hrest⟩ := hpost
-    ihave HΦ' := wpNext_at _ _ _ c6 _ hp6 $$ HΦ
+    ihave HΦ' := wpNext_at _ _ _ c6 _ hp6 $$ HΦ Hlc
     rw [hni]
     rcases hrest with ⟨hpc, hlen, hcomp⟩ | ⟨hpc, hm1, hzz, hnc⟩
     · subst hpc
@@ -547,14 +547,14 @@ theorem mappages_loop [WchG GF] (W : WALK) [CurCtx]
     rotate_right 1
     iframe #
     case hb => simpa using hblock 0 (by omega)
-    iapply wpNext_intro_pin
-    iintro %c6 %hp6 %spie2 %spp2 %R2 %fresh %pcv %hsp2 Hk Hpc Hlend Htree Hav Hrc %hpost
+    iapply wpNext_intro_pin_lc
+    iintro %c6 %hp6 Hlc %spie2 %spp2 %R2 %fresh %pcv %hsp2 Hk Hpc Hlend Htree Hav Hrc %hpost
     obtain ⟨hcs, hsup, hfrnd, hfrpg, hrest⟩ := hpost
     have hni : n - i = (n - (i + 1)) + 1 := by omega
     rcases hrest with ⟨hpc, hlen, hcomp⟩ | ⟨hpc, hm1, hzz, hnc⟩
     case inr =>
       subst hpc
-      ihave HΦ' := wpNext_at _ _ _ c6 _ hp6 $$ HΦ
+      ihave HΦ' := wpNext_at _ _ _ c6 _ hp6 $$ HΦ Hlc
       have hmf1 : (t.mapRun (vpnOf va + BitVec.ofNat 27 i)
           (BitVec.extractLsb' 12 44 pa + BitVec.ofNat 44 i) perm 1 fresh).1
             = (t.fill 2 (vpnOf va + BitVec.ofNat 27 i) fresh).1 := by
@@ -860,12 +860,12 @@ theorem mappages_epi [CurCtx] (cpu cur : CPU) (k : KCtx) (γk : KmemNames)
     with [KCtx.pop_pushed _ _ _ hK', hR2] next c10 hp10
   iintro Hk Hpc
   k_step_gen (wp_s_ret c10 _ (KA.«mappages» + 0xb0#64) true 1#5)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c11 hp11
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c11 hp11 £ Hlc
   iintro Hk Hpc
   have hpinZ : k.sie = false ∨ k.proc = 0#64 → c11 = cpu := fun h =>
     (hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans
       ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans ((hp1 h).trans (hpin h)))))))))))
-  ihave HΦ' := wpNext_at _ _ _ c11 _ hpinZ $$ HΦ
+  ihave HΦ' := wpNext_at _ _ _ c11 _ hpinZ $$ HΦ Hlc
   iapply HΦ' $$ %spie %spp %_ %hsp Hk Hpc Htree Hav
   ipureintro
   refine ⟨?_, ?_⟩

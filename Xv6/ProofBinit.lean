@@ -355,7 +355,7 @@ theorem bi_iter (IS : INITSLEEPLOCK) [CurCtx] (k : KCtx) (hK : 12 ≤ k.avail)
   -- bne s1,s3 : another buffer?
   k_step_gen (wp_s_branch c11 _ (KA.«binit» + 0x72#64) false 8158#13 9#5 19#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [f19, bi_bne_last i hi] next c12 hp12
+    with [f19, bi_bne_last i hi] next c12 hp12 £ Hlc
   iintro Hk Hpc
   ihave Hnode : biPrevNode (GF := GF) i $$ [Hpend]
   case' _ => unfold biPrevNode; iexact Hpend
@@ -364,7 +364,7 @@ theorem bi_iter (IS : INITSLEEPLOCK) [CurCtx] (k : KCtx) (hK : 12 ≤ k.avail)
   ihave HΦ' := wpNext_at _ _ _ c12 _ (fun h : k.sie = false ∨ k.proc = 0#64 =>
     (hp12 h).trans ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans
       ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans
-        (hp1 h))))))))))) ) $$ HΦ
+        (hp1 h))))))))))) ) $$ HΦ Hlc
   iapply HΦ' $$ %_ Hk Hpc Hhn Hprev Hnode Hrest
   ipureintro
   refine ⟨?_, ?_⟩
@@ -406,15 +406,15 @@ theorem bi_loop (IS : INITSLEEPLOCK) [CurCtx] (k : KCtx) (hK : 12 ≤ k.avail) (
     icases bi_peelIn bufIn 29 0 $$ Hin with ⟨Hb, _⟩
     iapply (bi_iter IS k hK 29 (by omega) R h9 h18 h19 h20 cur) $$ [- $Hk $Hpc $Hhn $Hpend $Hb]
     iframe #
-    iapply wpNext_intro_pin
-    iintro %c1 %hp1 %R2 Hk Hpc Hhn Hpend Hnode Hrest %hpost
+    iapply wpNext_intro_pin_lc
+    iintro %c1 %hp1 Hlc %R2 Hk Hpc Hhn Hpend Hnode Hrest %hpost
     rw [if_pos (show 29 + 1 = 30 from rfl)]
     obtain ⟨hkept, hcur⟩ := hpost
     ihave Hnodes := bi_snoc biPrevNode 29 $$ [Hnodes Hnode]
     case' _ => iframe
     ihave Hrests := bi_snoc biRest 29 $$ [Hrests Hrest]
     case' _ => iframe
-    ihave HΦ' := wpNext_at _ _ _ c1 _ hp1 $$ HΦ
+    ihave HΦ' := wpNext_at _ _ _ c1 _ hp1 $$ HΦ Hlc
     iapply HΦ' $$ %R2 Hk Hpc Hhn Hpend Hnodes Hrests
     ipureintro
     exact hkept
@@ -517,10 +517,10 @@ theorem bi_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c7 hp7
   iintro Hk Hpc
   k_step_gen (wp_s_ret c7 _ (KA.«binit» + 0x84#64) true 1#5)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c8 hp8
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c8 hp8 £ Hlc
   iintro Hk Hpc
   ihave HΦ' := wpNext_at _ _ _ c8 _ (fun h => (hp8 h).trans ((hp7 h).trans ((hp6 h).trans
-    ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans ((hp1 h).trans (hpin h))))))))) $$ HΦ
+    ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans ((hp1 h).trans (hpin h))))))))) $$ HΦ Hlc
   iapply HΦ' $$ %_ Hk Hpc HQ
   ipureintro
   unfold calleeSaved

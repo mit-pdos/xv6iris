@@ -200,11 +200,11 @@ theorem vmfault_ret [CurCtx] (c : CPU) (k : KCtx) (hK : 6 ≤ k.avail) (R : RegM
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c5 hp5
   iintro Hk Hpc
   k_step_gen (wp_s_ret c5 _ (KA.«vmfault» + 0x1a#64) true 1#5)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c6 hp6
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c6 hp6 £ Hlc
   iintro Hk Hpc
   ihave HΦ' := wpNext_at _ _ _ c6 _
     (fun h => (hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans
-      ((hp2 h).trans (hp1 h)))))) $$ HΦ
+      ((hp2 h).trans (hp1 h)))))) $$ HΦ Hlc
   iapply HΦ' $$ %_ Hk Hpc
   ipureintro
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩

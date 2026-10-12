@@ -343,10 +343,10 @@ theorem wp_s_csrr_sstatus_full [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU
     iintro %hs
     exact absurd hs Bool.false_ne_true
   inext
-  iintro HmConf Hclock Hpc HT HF
+  iintro HmConf Hclock Hpc HT HF Hlc
   unfold transTok
   icases HT with ⟨Htrans, Htok⟩
-  ihave HΦ' := wpNext_off _ _ _ $$ HΦ
+  ihave HΦ' := wpNext_off _ _ _ $$ HΦ Hlc
   ihave HConf := kConf_intro cpu curTier k.root false k.spie k.spp ms mdl mepc stc lf ⟨hsm, hsr, hmdl, hlf⟩ $$ HmConf
   have hv := sstatusFull_of_lower ms false k.spie k.spp hsm hsr
   have hsp := KCtx.setReg_sp k rd (lower_mstatus ms) hrd.2.1
@@ -503,10 +503,10 @@ theorem wp_s_csrw_sstatus_off [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU)
     iintro %hs
     exact absurd hs Bool.false_ne_true
   inext
-  iintro HmConf Hclock Hpc HT HF
+  iintro HmConf Hclock Hpc HT HF Hlc
   unfold transTok
   icases HT with ⟨Htrans, Htok⟩
-  ihave HΦ' := wpNext_off _ _ _ $$ HΦ
+  ihave HΦ' := wpNext_off _ _ _ $$ HΦ Hlc
   have hr : (tpPin cpu k.regs).get rs1 = k.rget cpu rs1 := rfl
   simp only [sConfOf_setMs, sConfOf_mstatus, hr]
   ihave HConf := kConf_intro cpu curTier k.root false spie' spp' (sstatusWrite ms (k.rget cpu rs1)) mdl mepc stc lf

@@ -63,7 +63,7 @@ theorem il_after (LD : IlLoadEb)
     inodeIdent kk (DFrac.own s) icfgDev inum ∗ liveGenlo kk s g lo ∗
     reference (icfgBox kk) (some (icfgDev, inum)) mst ∗
     icDepSide d ∗ iregWdLic o g inum.toNat ∗
-    (∀ c : CPU, ilockPostDepEb k γisl kk s g d o inum pidv dqp dqs Tl c)
+    (∀ c : CPU, £ 1 -∗ ilockPostDepEb k γisl kk s g d o inum pidv dqp dqs Tl c)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpe, #Hbc, #Hdc, #Hinv, #Hesc, #Hireg, Hframe, Hpid,
     Hsb, Hbsl, Hslk, Hslot, #Hflt, Hid, Hlv, Href, Hside, Hlic, HΦ⟩
@@ -219,11 +219,11 @@ theorem il_main (AS : ACQUIRESLEEP_LLB) (LD : IlLoadEb)
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hwf.2.2.2.1; omega)
   -- the caller's continuation is hart-free (a park's crossing, at a proc)
-  ihave HΦ : ∀ c : CPU, ilockPostDepEb k γisl kk s g d o inum pidv dqp dqs Tl c $$ [HΦ]
-  · iintro %c
+  ihave HΦ : ∀ c : CPU, £ 1 -∗ ilockPostDepEb k γisl kk s g d o inum pidv dqp dqs Tl c $$ [HΦ]
+  · iintro %c Hlc
     iapply (wpNext_at true k.proc cpu c _
       (fun h => h.elim (fun h => absurd h (by decide))
-        (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj)))) $$ HΦ
+        (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj)))) $$ HΦ Hlc
   -- the prologue
   iapply (wp_prologue4s1_gen cpu k KA.«ilock» hK4)
   k_code (text_instr _ _ _ _ rfl rfl) Htext

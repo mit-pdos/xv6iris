@@ -61,7 +61,7 @@ theorem fwr_begin_op (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs GF Γ] (c : CPU)
     kctx c k' ∗ pcIs c KA.«begin_op» ∗ procsInv Γ ∗
     trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗ fsReady ∗
     wordPointsTo (pPid k'.proc) 4 dqp pidv ∗
-    (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap),
+    (∀ (c' : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c' ((k'.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗
@@ -77,9 +77,9 @@ theorem fwr_begin_op (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs GF Γ] (c : CPU)
   ihave #Hlc := fsReady_log $$ Hfs
   iapply h
   iframe Hk Hpc Hpi Hte Hce Hlc Hpid
-  iapply wpNext_intro
-  iintro %c' %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hop
-  iapply HK $$ %c' %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hop
+  iapply wpNext_intro_lc
+  iintro %c' Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hop
+  iapply HK $$ %c' Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hop
 
 set_option maxHeartbeats 4000000 in
 /-- `end_op()` at `+0xc4`: the transaction closes at whatever the chunk left
@@ -91,7 +91,7 @@ theorem fwr_end_op (EO : END_OP) (Γ : SchedNames) [ClaimIs GF Γ] (c : CPU)
     kctx c k' ∗ pcIs c KA.«end_op» ∗ procsInv Γ ∗
     trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗ panicEnv ∗ fsReady ∗
     wordPointsTo (pPid k'.proc) 4 dqp pidv ∗ logOp icfgLog u ∗
-    (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap),
+    (∀ (c' : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c' ((k'.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗
@@ -113,9 +113,9 @@ theorem fwr_end_op (EO : END_OP) (Γ : SchedNames) [ClaimIs GF Γ] (c : CPU)
   ihave #Hcert := fsReady_gen $$ Hfs
   iapply h
   iframe Hk Hpc Hpi Hte Hce Hbc Hdc Hpe Hlc Hseam Hcert Hpid Hop
-  iapply wpNext_intro
-  iintro %c' %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid
-  iapply HK $$ %c' %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid
+  iapply wpNext_intro_lc
+  iintro %c' Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid
+  iapply HK $$ %c' Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid
 
 /-- What ilock's write arm hands back that stays unchanged until iunlock
 (the lock, the tx descriptor, the identity halves, the valid cell, the
@@ -145,7 +145,7 @@ theorem fwr_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF Γ] (c : CPU)
     isSleeplockGen γil γisl (iLock (ientry ik)) (icSlp fscIc ik) (slhTok (icfgIsl ik)) ∗
     credFloor lo tl ∗ ityShot g ty ∗ inodeShrGenlo ik s icfgDev inum g lo ∗
     wordPointsTo (pPid k'.proc) 4 pidPriv pid ∗ bslot ∗ logTx icfgLog ∗ topLb Tl ∗
-    (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap) (dn : Dinode) (bm : Blkmap) (K : Nat),
+    (∀ (c' : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (dn : Dinode) (bm : Blkmap) (K : Nat),
       ⌜calleeSaved k'.regs R' ∧ Tl ≤ K⌝ -∗ ctxFloor curCtx K -∗
       kctx c' ((k'.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗
@@ -173,12 +173,12 @@ theorem fwr_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF Γ] (c : CPU)
   iframe #
   isplitr
   · unfold iregWdLic; iexact Hshot
-  iapply wpNext_intro
-  iintro %c'
+  iapply wpNext_intro_lc
+  iintro %c' Hlc
   unfold ilockPostTxEb
   iintro %spie %spp %R' %dn %bm %filled %hcs ⟨%K, %hK', #Hflr⟩ Hk Hpc Hte Hce Hpid - Hbs Hsl Hdep
     Hoff Hdev Hinum Hval Hload Hshot' Hfrz %- - %-
-  iapply HK $$ %c' %spie %spp %R' %dn %bm %K [] Hflr Hk Hpc Hte Hce Hpid Hbs [Hsl Hdep Hdev Hinum Hval
+  iapply HK $$ %c' Hlc %spie %spp %R' %dn %bm %K [] Hflr Hk Hpc Hte Hce Hpid Hbs [Hsl Hdep Hdev Hinum Hval
     Hfrz] Hoff Hload Hshot'
   · ipureintro; exact ⟨hcs, hK'⟩
   · unfold fwrLk; iframe
@@ -199,7 +199,7 @@ theorem fwr_iunlock (IU : IUNLOCK) (Γ : SchedNames) (cpu : CPU) (k' : KCtx) (ik
     credFloor lo tl ∗ fwrLk ik s g lo inum γisl pid ∗ (∃ T : Nat, offRowsDep offCfg ik T) ∗
     icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗ ityShot g dn.diType ∗
     wordPointsTo (pPid k'.proc) 4 pidPriv pid ∗
-    (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap),
+    (∀ (c' : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c' ((k'.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗
@@ -220,12 +220,12 @@ theorem fwr_iunlock (IU : IUNLOCK) (Γ : SchedNames) (cpu : CPU) (k' : KCtx) (ik
   iapply h
   iframe Hk Hpc Hsl Hdep Hoff Hdev Hinum Hval Hload Hshot Hfrz Hpid
   iframe #
-  iapply wpNext_intro_pin
-  iintro %c' %hpin %spie %spp %R' %- Hk Hpc %hcs Hpid Hshr Htx
+  iapply wpNext_intro_pin_lc
+  iintro %c' %hpin Hlc %spie %spp %R' %- Hk Hpc %hcs Hpid Hshr Htx
   have hpin' : k'.sie = false → c' = cpu := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
-  iapply HK $$ %c' %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hshr Htx
+  iapply HK $$ %c' Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hshr Htx
 
 set_option maxHeartbeats 8000000 in
 /-- `writei(f->ip, 1, addr + i, f->off, n1)` at `+0xa8`: the set-form
@@ -255,7 +255,7 @@ theorem fwr_writei (WI : WRITEI) (Γ : SchedNames) [ClaimIs GF Γ]
     inodeMeta (ientry ik) dn ∗ inodeMap fscFs (ientry ik) bm ∗ inodeBlocks fscFs bm data ∗
     dinodeAt fscIreg inum dn ∗
     procPrivExtEv (procAddr j) pid V P Mv ∗ bslots 3 ∗ logOpS icfgLog MAXOPBLOCKS Sb ∗
-    (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap)
+    (∀ (c' : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap)
         (tot : Nat) (bm' : Blkmap) (data' : Nat → List (BitVec 8)) (dn' dn0' : Dinode)
         (n' : Nat) (wrote : Nat → BitVec 8) (dist : Nat) (dstb : Nat → BitVec 8) (P' : UPtd)
         (Sb' : List Nat),
@@ -299,13 +299,13 @@ theorem fwr_writei (WI : WRITEI) (Γ : SchedNames) [ClaimIs GF Γ]
   iapply h
   iframe Hk Hpc Hpi Hte Hce Hpe Hbc Hlc Hdc Hkl Hav Hdev Hin Hmeta Hmap Hblk Hsi Hss Hsb Hbmi
     Hinv Hdi Hpriv Hbs Hop
-  iapply wpNext_intro
-  iintro %c' %spie %spp %R' %tot %bm' %data' %dn' %dn0' %n' %wrote %dist %dstb %P' %Sb' %hcs
+  iapply wpNext_intro_lc
+  iintro %c' Hlc %spie %spp %R' %tot %bm' %data' %dn' %dn0' %n' %wrote %dist %dstb %P' %Sb' %hcs
     %hout Hk Hpc Hte Hce Hdev Hin Hmeta Hmap Hblk - - - Hdi ⟨%kc, %hkc, Hpriv⟩ Hbs Hop
   -- the block back at the count the writei raised it to (permit sweep L1b)
   ihave Hpriv := (procPrivExt_conv ht (procAddr j) pid (V.updEv kc) P' (viewFaulted P P' Mv)).1 $$ Hpriv
   ihave Hpriv := procPrivExtEv_intro _ _ _ _ _ kc (Nat.le_trans hkv hkc) $$ Hpriv
-  iapply HK $$ %c' %spie %spp %R' %tot %bm' %data' %dn' %dn0' %n' %wrote %dist %dstb %P' %Sb' []
+  iapply HK $$ %c' Hlc %spie %spp %R' %tot %bm' %data' %dn' %dn0' %n' %wrote %dist %dstb %P' %Sb' []
     Hk Hpc Hte Hce Hdev Hin Hmeta Hmap Hblk Hdi Hpriv Hbs Hop
   ipureintro; exact ⟨hcs, { hout with }⟩
 
@@ -327,7 +327,7 @@ theorem fwr_pipewrite (PW : PIPEWRITE) (Γ : SchedNames) [ClaimIs GF Γ]
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     procPrivExt (procAddr j) pid V V.upt M ∗ genHalvesPriv (procAddr j) pid V.gen ∗
     pipeWpay γp.pnQueue (writerImg V.upt M) (k'.regs 11#5) Q Qe n.toNat ∗
-    (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd),
+    (∀ (c' : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd),
       ⌜calleeSaved k'.regs R' ∧ V.upt.extSz V.sz P' ∧ pipeRwRet n (R' 10#5)⌝ -∗
       kctx c' ((k'.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗
@@ -346,11 +346,11 @@ theorem fwr_pipewrite (PW : PIPEWRITE) (Γ : SchedNames) [ClaimIs GF Γ]
   ihave Hpriv := (procPrivExt_conv0 ht (procAddr j) pid V M).2 $$ Hpriv
   iapply h
   iframe Hk Hpc Hpi Hte Hce Hpp Href Hkl Hav Hpriv Hgen Hpay
-  iapply wpNext_intro
-  iintro %c' %spie %spp %R' %P' %kv %hp Hk Hpc Hte Hce Href %hkv Hpriv Hgen Hpost
+  iapply wpNext_intro_lc
+  iintro %c' Hlc %spie %spp %R' %P' %kv %hp Hk Hpc Hte Hce Href %hkv Hpriv Hgen Hpost
   ihave Hpriv := (procPrivExt_conv ht (procAddr j) pid (V.updEv kv) P' (viewFaulted V.upt P' M)).1 $$ Hpriv
   ihave Hpriv := procPrivExtEv_intro _ _ _ _ _ kv hkv $$ Hpriv
-  iapply HK $$ %c' %spie %spp %R' %P' %hp Hk Hpc Hte Hce Href Hpriv Hgen Hpost
+  iapply HK $$ %c' Hlc %spie %spp %R' %P' %hp Hk Hpc Hte Hce Href Hpriv Hgen Hpost
 
 set_option maxHeartbeats 8000000 in
 /-- `devsw[CONSOLE].write(1, addr, n)` -- consolewrite -- at `+0x86`
@@ -370,7 +370,7 @@ theorem fwr_consolewrite (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs GF Γ]
     consOutChain (genId (GF := GF) + 1) (writerImg V.upt M) (k'.regs 11#5) Q 0 n.toNat ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     procPrivExt (procAddr j) pid V V.upt M ∗
-    (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (i : Nat),
+    (∀ (c' : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (i : Nat),
       ⌜calleeSaved k'.regs R' ∧ V.upt.extSz V.sz P' ∧ R' 10#5 = BitVec.ofNat 64 i ∧
         (i : Int) ≤ max 0 n ∧ ((i : Int) < n → writeConsShort V.upt (k'.regs 11#5) i n) ∧
         consWriteCnt V.upt P' (k'.regs 11#5) n i⌝ -∗
@@ -387,11 +387,11 @@ theorem fwr_consolewrite (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs GF Γ]
   ihave Hpriv := (procPrivExt_conv0 ht (procAddr j) pid V M).2 $$ Hpriv
   iapply h
   iframe Hk Hpc Hpi Hte Hce Hport Hch Hkl Hav Hpriv
-  iapply wpNext_intro
-  iintro %c' %spie %spp %R' %P' %i %kv %hp HO Hk Hpc Hte Hce %hkv Hpriv HQ
+  iapply wpNext_intro_lc
+  iintro %c' Hlc %spie %spp %R' %P' %i %kv %hp HO Hk Hpc Hte Hce %hkv Hpriv HQ
   ihave Hpriv := (procPrivExt_conv ht (procAddr j) pid (V.updEv kv) P' (viewFaulted V.upt P' M)).1 $$ Hpriv
   ihave Hpriv := procPrivExtEv_intro _ _ _ _ _ kv hkv $$ Hpriv
-  iapply HK $$ %c' %spie %spp %R' %P' %i %hp HO Hk Hpc Hte Hce Hpriv HQ
+  iapply HK $$ %c' Hlc %spie %spp %R' %P' %i %hp HO Hk Hpc Hte Hce Hpriv HQ
 
 end
 

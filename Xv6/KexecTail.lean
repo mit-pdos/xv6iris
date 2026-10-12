@@ -743,14 +743,14 @@ theorem kxc_exit_m1 (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) �
   k_norm_g
   iframe Hk Hpc Hfr
   inext
-  iapply wpNext_intro_pin
-  iintro %c %hpin Hk Hpc
+  iapply wpNext_intro_pin_lc
+  iintro %c %hpin Hlc Hk Hpc
   have hpin' : k.sie = false → c = cpu := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
   unfold kexecCloser
   k_norm_g
-  iapply Hcl $$ %c %spie %spp %(R.set 1#5 (k.regs 1#5) |>.set 8#5 (k.regs 8#5) |>.set 9#5 (k.regs 9#5)
+  iapply Hcl $$ %c Hlc %spie %spp %(R.set 1#5 (k.regs 1#5) |>.set 8#5 (k.regs 8#5) |>.set 9#5 (k.regs 9#5)
       |>.set 18#5 (k.regs 18#5) |>.set 2#5 (k.regs 2#5)) %A.V %A.M %0#64 %0#64 %0#64 [] [] Hk Hpc Hte Hce Hpriv Hbufs Hbs Hirs
   · ipureintro; exact hcs
   · ipureintro

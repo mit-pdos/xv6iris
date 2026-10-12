@@ -226,7 +226,7 @@ theorem sys_chdir_iunlock (IU : IUNLOCK) (Γ : SchedNames) (cpu : CPU) (k' : KCt
     icLoaded fscFs fscIreg fscCov fscLogst kk inum dn bm ∗
     ityShot g dn.diType ∗ ifreezeOff inum.toNat ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap),
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c se -∗ cpuClaimExt c se pj -∗
@@ -251,12 +251,12 @@ theorem sys_chdir_iunlock (IU : IUNLOCK) (Γ : SchedNames) (cpu : CPU) (k' : KCt
   iapply h
   iframe Hk Hpc Hsl Hdep Hoff Hdev Hinum Hval Hload Hshot Hfrz Hpid
   iframe #
-  iapply wpNext_intro_pin
-  iintro %c %hpin %spie %spp %R' %- Hk Hpc %hcs Hpid Hshr Htx
+  iapply wpNext_intro_pin_lc
+  iintro %c %hpin Hlc %spie %spp %R' %- Hk Hpc %hcs Hpid Hshr Htx
   have hpin' : k'.sie = false → c = cpu := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
-  iapply HK $$ %c %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hshr Htx
+  iapply HK $$ %c Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hshr Htx
 
 /-! ## iput (the old cwd), iunlockput (the refused node) -/
 
@@ -274,7 +274,7 @@ theorem sys_chdir_iput (IP : IPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     isSleeplockGen γil γisl (iLock (ientry kk)) (icSlp fscIc kk) (slhTok (icfgIsl kk)) ∗
     inodeRefp kk q icfgDev inum ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗ bslots 3 ∗ logOp icfgLog n ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (n' : Nat),
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (n' : Nat),
       ⌜calleeSaved k'.regs R' ∧ n - iputUnits ≤ n' ∧ n' ≤ n⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c se -∗ cpuClaimExt c se pj -∗
@@ -302,9 +302,9 @@ theorem sys_chdir_iput (IP : IPUT) (Γ : SchedNames) [ClaimIs GF Γ]
   iapply h
   iframe Hk Hpc Hte Hce Href Hpid Hbs Hop
   iframe #
-  iapply wpNext_intro_pin
-  iintro %c %_ %spie %spp %R' %n' %hcs Hk Hpc Hte Hce Hpid - - Hbs %hf Hop Hslot
-  iapply HK $$ %c %spie %spp %R' %n' [] Hk Hpc Hte Hce Hpid Hbs Hop Hslot
+  iapply wpNext_intro_pin_lc
+  iintro %c %_ Hlc %spie %spp %R' %n' %hcs Hk Hpc Hte Hce Hpid - - Hbs %hf Hop Hslot
+  iapply HK $$ %c Hlc %spie %spp %R' %n' [] Hk Hpc Hte Hce Hpid Hbs Hop Hslot
   ipureintro
   exact ⟨hcs, hf⟩
 

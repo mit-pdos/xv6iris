@@ -223,11 +223,11 @@ theorem uartinitone_body [CurCtx] (cpu : CPU) (k : KCtx) (R : RegMap)
   · iframe #; iframe
   k_step_gen (wp_uart_sb c19 _ (KA.«uartinitone» + 0x3e#64) false 1#12 14#5 15#5 (by decide) (by decide)
       i 1 (by omega) ?hb20 (by decide) (dlabOwn γ false))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c20 hp20
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c20 hp20 £ Hlc
   iintro Hk Hpc Hdlab
   case hb20 => k_norm_g
   have hpin : k.sie = false ∨ k.proc = 0#64 → c20 = cpu := fun h => (hp20 h).trans ((hp19 h).trans ((hp18 h).trans ((hp17 h).trans ((hp16 h).trans ((hp15 h).trans ((hp14 h).trans ((hp13 h).trans ((hp12 h).trans ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))))))))))))))))
-  ihave HΦ' := wpNext_at _ _ _ c20 _ hpin $$ HΦ
+  ihave HΦ' := wpNext_at _ _ _ c20 _ hpin $$ HΦ Hlc
   iapply HΦ' $$ %_ Hk Hpc
     %(by intro r h14 h15; simp only [RegMap.set_apply, if_neg h14, if_neg h15])
     Htx Hdlab Hrtok

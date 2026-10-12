@@ -175,7 +175,7 @@ theorem iunlockput_main (IU : IUNLOCK) (IP : IPUT)
   have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hwf.2.2.2.1; omega)
   have hK4 : 4 ≤ k.avail := by unfold iunlockputSlots at hK; omega
   -- the caller's continuation is hart-free (a park's crossing, at a proc)
-  ihave HΦ : ∀ c : CPU, (∀ (spie spp : Bool) (R' : RegMap) (n' : Nat) (Sb' : List Nat) (w : Bool),
+  ihave HΦ : ∀ c : CPU, £ 1 -∗ (∀ (spie spp : Bool) (R' : RegMap) (n' : Nat) (Sb' : List Nat) (w : Bool),
       ⌜calleeSaved k.regs R'⌝ -∗
       kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
@@ -188,9 +188,9 @@ theorem iunlockput_main (IU : IUNLOCK) (IP : IPUT)
       logOpS icfgLog n' Sb' -∗
       irefSlot -∗
       icDepSide d -∗ wpLoop c) $$ [Hnext]
-  · iintro %c
+  · iintro %c Hlc
     iapply wpNext_at true k.proc cpu c _ (fun hc => Or.elim hc (fun hx => absurd hx (by decide))
-      (fun hx => absurd (hproc ▸ hx) (procAddr_nonzero hj))) $$ Hnext
+      (fun hx => absurd (hproc ▸ hx) (procAddr_nonzero hj))) $$ Hnext Hlc
   -- +0x00 the prologue
   iapply (wp_prologue4s1_gen cpu k KA.«iunlockput» hK4) $$ [- $Hk $Hpc]
   k_code (text_instr _ _ _ _ rfl rfl) Htext
@@ -277,15 +277,15 @@ theorem iunlockput_main (IU : IUNLOCK) (IP : IPUT)
   k_norm_g
   iframe
   inext
-  iapply wpNext_intro_pin
-  iintro %c %hpin
+  iapply wpNext_intro_pin_lc
+  iintro %c %hpin Hlc
   have hpin' : k.sie = false → c = c' := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
   iintro Hk Hpc
   k_norm_g
   rw [← icDepSide_ofTx d tid qtx hside]
-  iapply HΦ $$ %c %spie %spp %_ %n' %Sb' %w [] Hk Hpc Hte Hce Hpid Hsb Hsi Hbs %hf Hops Hslot
+  iapply HΦ $$ %c Hlc %spie %spp %_ %n' %Sb' %w [] Hk Hpc Hte Hce Hpid Hsb Hsi Hbs %hf Hops Hslot
     Hside
   ipureintro
   unfold calleeSaved

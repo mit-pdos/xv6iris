@@ -102,7 +102,7 @@ macro "cycle_retire_t" : tactic =>
                  conf_intro HmConf
                  ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip
                  ihave Hpc := pcIs_introW _ _ $$ HPC HnextPC
-                 iapply HΦ $$ HmConf Hclock Hpc HT HR HQ
+                 iapply HΦ $$ HmConf Hclock Hpc HT HR HQ Hlc
              · swp_run 40
                (try split)
                all_goals
@@ -114,7 +114,7 @@ macro "cycle_retire_t" : tactic =>
                  iintro %mcycle' %mtime' %mip' HmConf Hmcycle Hmtime Hmip
                  ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip
                  ihave Hpc := pcIs_introW _ _ $$ HPC HnextPC
-                 iapply HΦ $$ HmConf Hclock Hpc HT HR HQ))
+                 iapply HΦ $$ HmConf Hclock Hpc HT HR HQ Hlc))
 
 set_option hygiene false in
 /-- The retire stage after a trap (nothing retired): the pc lands on the

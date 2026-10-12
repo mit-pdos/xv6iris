@@ -149,7 +149,7 @@ theorem sys_open_tails_end_op (EO : END_OP) (Γ : SchedNames) [ClaimIs GF Γ]
     kctx cpu k' ∗ pcIs cpu KA.«end_op» ∗
     trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysOpenEnv Γ A ∗
     sysOpenPid A ∗ logOp icfgLog u ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap),
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c se -∗ cpuClaimExt c se pj -∗ sysOpenPid A -∗ wpLoop c)
@@ -179,7 +179,7 @@ theorem sys_open_tails_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs 
     sysOpenLk γil γisl loc tlc A.pid kk s g inum dn ∗
     icLoaded fscFs fscIreg fscCov fscLogst kk inum dn bm ∗ sysOpenKeep kk s g inum ∗
     sysOpenPid A ∗ bslots 3 ∗ logOpb icfgLog n ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (n' : Nat),
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (n' : Nat),
       ⌜calleeSaved k'.regs R' ∧ n - iputUnits ≤ n' ∧ n' ≤ n⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c se -∗ cpuClaimExt c se pj -∗
@@ -211,7 +211,7 @@ theorem sys_open_tails_iunlock (IU : IUNLOCK) (Γ : SchedNames) (cpu : CPU) (k' 
     trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysOpenEnv Γ A ∗
     sysOpenLk γil γisl loc tlc A.pid kk s g inum dn ∗
     icLoaded fscFs fscIreg fscCov fscLogst kk inum dn bm ∗ sysOpenPid A ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap),
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c se -∗ cpuClaimExt c se pj -∗ sysOpenPid A -∗
@@ -238,12 +238,12 @@ theorem sys_open_tails_iunlock (IU : IUNLOCK) (Γ : SchedNames) (cpu : CPU) (k' 
   iapply h
   iframe Hk Hpc Hsl Hdep Hoff Hdev Hinum Hval Hload Hshot Hfrz Hpid
   iframe #
-  iapply wpNext_intro_pin
-  iintro %c %hpin %spie %spp %R' %- Hk Hpc %hcs Hpid Hshr Htx
+  iapply wpNext_intro_pin_lc
+  iintro %c %hpin Hlc %spie %spp %R' %- Hk Hpc %hcs Hpid Hshr Htx
   have hpin' : k'.sie = false → c = cpu := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
-  iapply HK $$ %c %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hshr Htx
+  iapply HK $$ %c Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hshr Htx
 
 set_option maxHeartbeats 4000000 in
 /-- `fileclose(f)` at +0x128 on the UNTYPED file filealloc handed out
@@ -257,7 +257,7 @@ theorem sys_open_tails_fileclose_none (FC : FILECLOSE) (Γ : SchedNames) [ClaimI
     kctx cpu k' ∗ pcIs cpu KA.«fileclose» ∗
     trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysOpenEnv Γ A ∗
     fileRef A.γ kf 1 .closed ∗ sysOpenPid A ∗ irefSlot ∗ actLend (procAddr A.j) ke ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap),
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c se -∗ cpuClaimExt c se pj -∗ sysOpenPid A -∗
@@ -274,9 +274,9 @@ theorem sys_open_tails_fileclose_none (FC : FILECLOSE) (Γ : SchedNames) [ClaimI
   iapply (fileclose_call FC Γ cpu k' A.γl A.γ kf 1 .closed A.j 0 ⟨0, 0⟩ none A.pid pidPriv iprop(emp)
     ke se hs (procAddr A.j) hpj hK hnoff htier ha0)
   iframe Hk Hpc Hte Hce Hft Hpe Hf Hpid Hiru Henvf Hcpay Hlend
-  iapply wpNext_intro_pin
-  iintro %c %_ %spie %spp %R' %hcs Hk Hpc Hlend Hte Hce Hpid Hfd Hiru - -
-  iapply HK $$ %c %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hlend Hfd Hiru
+  iapply wpNext_intro_pin_lc
+  iintro %c %_ Hlc %spie %spp %R' %hcs Hk Hpc Hlend Hte Hce Hpid Hfd Hiru - -
+  iapply HK $$ %c Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hlend Hfd Hiru
 
 /-! ## ARM A-FAIL and ARM B-FAIL -/
 
@@ -303,7 +303,7 @@ theorem sys_open_tail_a (EO : END_OP) (Γ : SchedNames) [ClaimIs GF Γ] (k : KCt
   case eK => k_norm_g; exact hKe
   case en => k_norm_g; exact hS.hnoff
   case et => k_norm_g; exact hS.htier
-  iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid
+  iintro %cpu Hlc %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid
   k_norm_g [sys_open_tails_ret_d6, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysOpenPins_cs k _ R1 _ _ _ (sysOpenPins_set k R _ _ _ 1#5 _ hpins (Or.inl rfl)) hcs1
   -- +0xd6  li a0,-1
@@ -328,9 +328,9 @@ theorem sys_open_tail_a (EO : END_OP) (Γ : SchedNames) [ClaimIs GF Γ] (k : KCt
   · unfold sysOpenCells; iframe
   iapply (sys_open_exit cpu k spie1 spp1 _ (k.regs 9#5) w4 w5 w6 lo om w24 hS.hK hp2 hal)
     $$ [$Hk $Hpc $Hcells $Hbuf $Hte $Hce Hret Hpid]
-  iintro %c' %R' %⟨hcs', h10⟩ Hk Hpc Hte Hce
+  iintro %c' Hlc %R' %⟨hcs', h10⟩ Hk Hpc Hte Hce
   unfold sysOpenRet
-  iapply Hret $$ %c' %spie1 %spp1 %R' %hcs' Hk Hpc Hte Hce
+  iapply Hret $$ %c' Hlc %spie1 %spp1 %R' %hcs' Hk Hpc Hte Hce
   dsimp only
   iframe Hpid
   ipureintro
@@ -360,7 +360,7 @@ theorem sys_open_tail_b (EO : END_OP) (Γ : SchedNames) [ClaimIs GF Γ] (k : KCt
   case eK => k_norm_g; exact hKe
   case en => k_norm_g; exact hS.hnoff
   case et => k_norm_g; exact hS.htier
-  iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid
+  iintro %cpu Hlc %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid
   k_norm_g [sys_open_tails_ret_110, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysOpenPins_cs k _ R1 _ _ _ (sysOpenPins_set k R _ _ _ 1#5 _ hpins (Or.inl rfl)) hcs1
   -- +0x110  li a0,-1
@@ -385,9 +385,9 @@ theorem sys_open_tail_b (EO : END_OP) (Γ : SchedNames) [ClaimIs GF Γ] (k : KCt
   · unfold sysOpenCells; iframe
   iapply (sys_open_exit cpu k spie1 spp1 _ (k.regs 9#5) w4 w5 w6 lo om w24 hS.hK hp2 hal)
     $$ [$Hk $Hpc $Hcells $Hbuf $Hte $Hce Hret Hpid]
-  iintro %c' %R' %⟨hcs', h10⟩ Hk Hpc Hte Hce
+  iintro %c' Hlc %R' %⟨hcs', h10⟩ Hk Hpc Hte Hce
   unfold sysOpenRet
-  iapply Hret $$ %c' %spie1 %spp1 %R' %hcs' Hk Hpc Hte Hce
+  iapply Hret $$ %c' Hlc %spie1 %spp1 %R' %hcs' Hk Hpc Hte Hce
   dsimp only
   iframe Hpid
   ipureintro
@@ -425,7 +425,7 @@ theorem sys_open_tail_c (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
   case un => k_norm_g; exact hS.hnoff
   case ut => k_norm_g; exact hS.htier
   case ua => k_norm_g
-  iintro %cpu %spie1 %spp1 %R1 %n' %⟨hcs1, -⟩ Hk Hpc Hte Hce Hpid Hbs Hop Hslot
+  iintro %cpu Hlc %spie1 %spp1 %R1 %n' %⟨hcs1, -⟩ Hk Hpc Hte Hce Hpid Hbs Hop Hslot
   k_norm_g [sys_open_tails_ret_102, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysOpenPins_cs k _ R1 _ _ _ (sysOpenPins_set k _ _ _ _ 1#5 _
     (sysOpenPins_set k R _ _ _ 10#5 _ hpins (by decide)) (Or.inl rfl)) hcs1
@@ -441,7 +441,7 @@ theorem sys_open_tail_c (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
   case eK => k_norm_g; exact hKe
   case en => k_norm_g; exact hS.hnoff
   case et => k_norm_g; exact hS.htier
-  iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid
+  iintro %cpu Hlc %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid
   k_norm_g [sys_open_tails_ret_106, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp2 := sysOpenPins_cs k _ R2 _ _ _ (sysOpenPins_set k R1 _ _ _ 1#5 _ hp1 (Or.inl rfl)) hcs2
   -- 0x106  li a0,-1
@@ -466,9 +466,9 @@ theorem sys_open_tail_c (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
   · unfold sysOpenCells; iframe
   iapply (sys_open_exit cpu k spie2 spp2 _ (k.regs 9#5) w4 w5 w6 lo om w24 hS.hK hp3 hal)
     $$ [$Hk $Hpc $Hcells $Hbuf $Hte $Hce Hret Hpid Hbs Hslot]
-  iintro %c' %R' %⟨hcs', h10⟩ Hk Hpc Hte Hce
+  iintro %c' Hlc %R' %⟨hcs', h10⟩ Hk Hpc Hte Hce
   unfold sysOpenRet
-  iapply Hret $$ %c' %spie2 %spp2 %R' %hcs' Hk Hpc Hte Hce
+  iapply Hret $$ %c' Hlc %spie2 %spp2 %R' %hcs' Hk Hpc Hte Hce
   dsimp only
   iframe Hpid Hbs Hslot
   ipureintro
@@ -503,7 +503,7 @@ theorem sys_open_tail_d (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
   case un => k_norm_g; exact hS.hnoff
   case ut => k_norm_g; exact hS.htier
   case ua => k_norm_g
-  iintro %cpu %spie1 %spp1 %R1 %n' %⟨hcs1, -⟩ Hk Hpc Hte Hce Hpid Hbs Hop Hslot
+  iintro %cpu Hlc %spie1 %spp1 %R1 %n' %⟨hcs1, -⟩ Hk Hpc Hte Hce Hpid Hbs Hop Hslot
   k_norm_g [sys_open_tails_ret_11c, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysOpenPins_cs k _ R1 _ _ _ (sysOpenPins_set k _ _ _ _ 1#5 _
     (sysOpenPins_set k R _ _ _ 10#5 _ hpins (by decide)) (Or.inl rfl)) hcs1
@@ -519,7 +519,7 @@ theorem sys_open_tail_d (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
   case eK => k_norm_g; exact hKe
   case en => k_norm_g; exact hS.hnoff
   case et => k_norm_g; exact hS.htier
-  iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid
+  iintro %cpu Hlc %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid
   k_norm_g [sys_open_tails_ret_120, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp2 := sysOpenPins_cs k _ R2 _ _ _ (sysOpenPins_set k R1 _ _ _ 1#5 _ hp1 (Or.inl rfl)) hcs2
   -- 0x120  li a0,-1
@@ -544,9 +544,9 @@ theorem sys_open_tail_d (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
   · unfold sysOpenCells; iframe
   iapply (sys_open_exit cpu k spie2 spp2 _ (k.regs 9#5) w4 w5 w6 lo om w24 hS.hK hp3 hal)
     $$ [$Hk $Hpc $Hcells $Hbuf $Hte $Hce Hret Hpid Hbs Hslot]
-  iintro %c' %R' %⟨hcs', h10⟩ Hk Hpc Hte Hce
+  iintro %c' Hlc %R' %⟨hcs', h10⟩ Hk Hpc Hte Hce
   unfold sysOpenRet
-  iapply Hret $$ %c' %spie2 %spp2 %R' %hcs' Hk Hpc Hte Hce
+  iapply Hret $$ %c' Hlc %spie2 %spp2 %R' %hcs' Hk Hpc Hte Hce
   dsimp only
   iframe Hpid Hbs Hslot
   ipureintro
@@ -585,7 +585,7 @@ theorem sys_open_tail_e (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
   case un => k_norm_g; exact hS.hnoff
   case ut => k_norm_g; exact hS.htier
   case ua => k_norm_g
-  iintro %cpu %spie1 %spp1 %R1 %n' %⟨hcs1, -⟩ Hk Hpc Hte Hce Hpid Hbs Hop Hslot
+  iintro %cpu Hlc %spie1 %spp1 %R1 %n' %⟨hcs1, -⟩ Hk Hpc Hte Hce Hpid Hbs Hop Hslot
   k_norm_g [sys_open_tails_ret_134, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysOpenPins_cs k _ R1 _ _ _ (sysOpenPins_set k _ _ _ _ 1#5 _
     (sysOpenPins_set k R _ _ _ 10#5 _ hpins (by decide)) (Or.inl rfl)) hcs1
@@ -601,7 +601,7 @@ theorem sys_open_tail_e (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
   case eK => k_norm_g; exact hKe
   case en => k_norm_g; exact hS.hnoff
   case et => k_norm_g; exact hS.htier
-  iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid
+  iintro %cpu Hlc %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid
   k_norm_g [sys_open_tails_ret_138, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp2 := sysOpenPins_cs k _ R2 _ _ _ (sysOpenPins_set k R1 _ _ _ 1#5 _ hp1 (Or.inl rfl)) hcs2
   -- +0x138  li a0,-1
@@ -632,9 +632,9 @@ theorem sys_open_tail_e (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Clai
   · unfold sysOpenCells; iframe
   iapply (sys_open_exit cpu k spie2 spp2 _ (k.regs 9#5) (k.regs 18#5) w5 w6 lo om w24 hS.hK hp5 hal)
     $$ [$Hk $Hpc $Hcells $Hbuf $Hte $Hce Hret Hpid Hbs Hslot]
-  iintro %c' %R' %⟨hcs', h10⟩ Hk Hpc Hte Hce
+  iintro %c' Hlc %R' %⟨hcs', h10⟩ Hk Hpc Hte Hce
   unfold sysOpenRet
-  iapply Hret $$ %c' %spie2 %spp2 %R' %hcs' Hk Hpc Hte Hce
+  iapply Hret $$ %c' Hlc %spie2 %spp2 %R' %hcs' Hk Hpc Hte Hce
   dsimp only
   iframe Hpid Hbs Hslot
   ipureintro
@@ -675,7 +675,7 @@ theorem sys_open_tail_f (IUP : IUNLOCKPUT) (EO : END_OP) (FC : FILECLOSE) (Γ : 
   case fn => k_norm_g; exact hS.hnoff
   case ft => k_norm_g; exact hS.htier
   case fa => k_norm_g
-  iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hlend Hfd Hiru
+  iintro %cpu Hlc %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hlend Hfd Hiru
   k_norm_g [sys_open_tails_ret_12c, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysOpenPins_cs k _ R1 _ _ _ (sysOpenPins_set k _ _ _ _ 1#5 _
     (sysOpenPins_set k R _ _ _ 10#5 _ hpins (by decide)) (Or.inl rfl)) hcs1
@@ -695,11 +695,11 @@ theorem sys_open_tail_f (IUP : IUNLOCKPUT) (EO : END_OP) (FC : FILECLOSE) (Γ : 
     %kk %s %g %inum %dn %bm %u %⟨hkk, hnib, hle, hu⟩ %hp2 %hal Hk Hpc Hte Hce Henv Hcells Hbuf Hlk
     Hload Hkeep Hpid Hbs Hop [Hret Hfd Hiru Hlend]
   unfold sysOpenRet
-  iintro %c %spie' %spp' %R' %hcs Hk Hpc Hte Hce ⟨%hr, Hpid, Hbs, Hslot⟩
+  iintro %c Hlc %spie' %spp' %R' %hcs Hk Hpc Hte Hce ⟨%hr, Hpid, Hbs, Hslot⟩
   ihave Hiru := (show irefSlot (GF := GF) ⊢ irefSlots 1 from .rfl) $$ Hiru
   ihave Hslot := (show irefSlot (GF := GF) ⊢ irefSlots 1 from .rfl) $$ Hslot
   ihave Hir2 := (irefSlots_op 1 1).2 $$ [$Hiru $Hslot]
-  iapply Hret $$ %c %spie' %spp' %R' %hcs Hk Hpc Hte Hce
+  iapply Hret $$ %c Hlc %spie' %spp' %R' %hcs Hk Hpc Hte Hce
   dsimp only
   iframe Hpid Hbs Hir2 Hfd Hlend
   ipureintro; exact hr
@@ -736,7 +736,7 @@ theorem sys_open_tail_s (IU : IUNLOCK) (EO : END_OP) (Γ : SchedNames) [ClaimIs 
   case iun => k_norm_g; exact hS.hnoff
   case iut => k_norm_g; exact hS.htier
   case iua => k_norm_g
-  iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hshr Htx
+  iintro %cpu Hlc %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hshr Htx
   k_norm_g [sys_open_tails_ret_be, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysOpenPins_cs k _ R1 _ _ _ (sysOpenPins_set k _ _ _ _ 1#5 _
     (sysOpenPins_set k R _ _ _ 10#5 _ hpins (by decide)) (Or.inl rfl)) hcs1
@@ -753,7 +753,7 @@ theorem sys_open_tail_s (IU : IUNLOCK) (EO : END_OP) (Γ : SchedNames) [ClaimIs 
   case eK => k_norm_g; exact hKe
   case en => k_norm_g; exact hS.hnoff
   case et => k_norm_g; exact hS.htier
-  iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid
+  iintro %cpu Hlc %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid
   k_norm_g [sys_open_tails_ret_c2, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp2 := sysOpenPins_cs k _ R2 _ _ _ (sysOpenPins_set k R1 _ _ _ 1#5 _ hp1 (Or.inl rfl)) hcs2
   -- +0xc2  mv a0,s3
@@ -787,9 +787,9 @@ theorem sys_open_tail_s (IU : IUNLOCK) (EO : END_OP) (Γ : SchedNames) [ClaimIs 
   iapply (sys_open_exit cpu k spie2 spp2 _ (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) w6 lo om w24
       hS.hK hp6 hal)
     $$ [$Hk $Hpc $Hcells $Hbuf $Hte $Hce Hret Hpid Hshr]
-  iintro %c' %R' %⟨hcs', h10⟩ Hk Hpc Hte Hce
+  iintro %c' Hlc %R' %⟨hcs', h10⟩ Hk Hpc Hte Hce
   unfold sysOpenRet
-  iapply Hret $$ %c' %spie2 %spp2 %R' %hcs' Hk Hpc Hte Hce
+  iapply Hret $$ %c' Hlc %spie2 %spp2 %R' %hcs' Hk Hpc Hte Hce
   dsimp only
   iframe Hpid Hshr
   ipureintro

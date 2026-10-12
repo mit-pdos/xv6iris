@@ -82,8 +82,8 @@ theorem fkr_tail_close [X : CurCtx] (PR : PREPARE_RETURN) (UC : USERRET_CLOSED) 
     (h.avail_ge _ fkr_prep_slots) h.s1 hlen hct)
   rw [hs]
   iframe Hk Hpc Hte Hce Hpv
-  iapply wpNext_intro
-  iintro %c' %R' %hR Hk Hpc Hsepc Hsc Htv Hstv Hcl Hpv
+  iapply wpNext_intro_lc
+  iintro %c' Hlc %R' %hR Hk Hpc Hsepc Hsc Htv Hstv Hcl Hpv
   iapply (fkr_close UC W Γ c' kb R' eb root ksp N Vx Mx sts gn cs Wk hΓ hj h hksp hR hgn hlen hrk hct)
   iframe Hk Hpc Hsepc Hsc Htv Hstv Hcl Hpv Hfr Hglob HG Hdone HW Hco Hsin Hclose
 

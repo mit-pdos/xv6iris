@@ -87,7 +87,7 @@ theorem il_epi_eb [Fscfg] [Icfg] [CurCtx] (cpu : CPU) (k : KCtx) (spie spp : Boo
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     ilDone γisl kk s g d o inum pidv dqs Tl dn bm filled ∗
-    (∀ c : CPU, ilockPostDepEb k γisl kk s g d o inum pidv dqp dqs Tl c)
+    (∀ c : CPU, £ 1 -∗ ilockPostDepEb k γisl kk s g d o inum pidv dqp dqs Tl c)
     ⊢ wpLoop (GF := GF) cpu := by
   have hK4 : 4 ≤ k.avail := by unfold ilockSlots breadSlots panicSlots at hK; omega
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Hpid, Hdone, HΦ⟩
@@ -105,12 +105,12 @@ theorem il_epi_eb [Fscfg] [Icfg] [CurCtx] (cpu : CPU) (k : KCtx) (spie spp : Boo
   k_norm_g
   iframe
   inext
-  k_next_e
+  k_next_e £ Hlc
   iintro Hk Hpc
   unfold ilockPostDepEb ilDone
   icases Hdone with ⟨Hfl, Hsb, Hsl, Hslk, Hdep, Hoff, Hidev, Hinum, Hval, Hload, Hshot, Hfoff,
     %hfr, Hwb, %hpost⟩
-  iapply HΦ $$ %cpu %spie %spp %_ %dn %bm %filled [] Hfl Hk Hpc Hte Hce Hpid Hsb Hsl Hslk Hdep
+  iapply HΦ $$ %cpu Hlc %spie %spp %_ %dn %bm %filled [] Hfl Hk Hpc Hte Hce Hpid Hsb Hsl Hslk Hdep
     Hoff Hidev Hinum Hval Hload Hshot Hfoff [] Hwb []
   · ipureintro
     exact ilk_calleeSaved_epi k R hpins
@@ -151,7 +151,7 @@ def IlLoadEb : Prop :=
       inodeRaw (ientry kk) ∗ ipoolShapeNp fscFs fscIreg fscCov fscLogst inum ∗
       ityPending g ∗ ifreezeOff inum.toNat ∗ iregWdLic o g inum.toNat ∗
       ilPass γisl kk s d pidv Tl ∗
-      (∀ c : CPU, ilockPostDepEb k γisl kk s g d o inum pidv dqp dqs Tl c)
+      (∀ c : CPU, £ 1 -∗ ilockPostDepEb k γisl kk s g d o inum pidv dqp dqs Tl c)
       ⊢ wpLoop (GF := GF) cpu)
 
 end Xv6

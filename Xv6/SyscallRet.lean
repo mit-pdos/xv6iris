@@ -231,11 +231,11 @@ theorem syscall_epilogue_tail (PT : SchedNames → IProp GF) (Γ : SchedNames)
   k_norm_g
   iframe
   inext
-  k_next_e
+  k_next_e £ Hlc
   iintro Hk Hpc
   ihave HΦ := syscall_post_at k.proc hpn c0 cpu _ $$ Hnext
   unfold syscallPost
-  iapply HΦ $$ %spie %spp %_ %V2 %M2 %sts' %cs' [] [] Hk Hpc Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr
+  iapply HΦ $$ Hlc %spie %spp %_ %V2 %M2 %sts' %cs' [] [] Hk Hpc Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr
     Hch Hxo Hso Hfo Hwo Heo
   · ipureintro
     exact bc_calleeSaved_epi2 k.regs R p19 p20 p21 p22 p23 p24 p25 p26 p27

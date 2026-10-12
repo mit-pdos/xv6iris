@@ -94,13 +94,13 @@ theorem ireclaim_epilogue [Fscfg] [Icfg] [CurCtx] (cpu : CPU) (k : KCtx) (spie s
   iintro Hk Hpc
   -- +0xc4  ret
   k_step_e (wp_s_ret cpu _ (KA.«ireclaim» + 0xc4#64) true 1#5)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] £ Hlc
   iintro Hk Hpc
   unfold ireclaimCont
   ispecialize Hnext $$ %cpu
   obtain ⟨p23, p24, p25, p26, p27⟩ := hp
   have hcs := ireclaim_calleeSaved_epi k.regs R p23 p24 p25 p26 p27
-  iapply Hnext $$ %spie %spp %_ %hcs Hk Hpc Hte Hce Hsn Hsi Hsb Hpid Hsl Hiref Hboot
+  iapply Hnext $$ Hlc %spie %spp %_ %hcs Hk Hpc Hte Hce Hsn Hsi Hsb Hpid Hsl Hiref Hboot
 
 set_option maxHeartbeats 8000000 in
 /-- **`+0x6e .. +0x7a`: THE STEP** (Rocq's `irc_step`).  `inum++`, reload

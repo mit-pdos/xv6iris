@@ -146,7 +146,7 @@ theorem createFail_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF �
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     wordPointsTo (pPid k'.proc) 4 pidPriv pidv ∗ bslots 3 ∗ logOpS icfgLog n Sb ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (n' : Nat) (Sb' : List Nat) (w : Bool),
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (n' : Nat) (Sb' : List Nat) (w : Bool),
       ⌜calleeSaved k'.regs R' ∧ ((∀ x ∈ Sb, x ∈ Sb') ∧ (w = true → fscBmapstart ∈ Sb') ∧
         (crb = true → w = false) ∧ n - ipSpendW w cru false ≤ n' ∧ n' ≤ n)⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
@@ -181,10 +181,10 @@ theorem createFail_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF �
   · unfold inodeRefpShort; iframe
   isplitl []
   · simp only [Bool.false_eq_true, if_false]; iempintro
-  iapply wpNext_intro_pin
-  iintro %c %_ %spie %spp %R' %n' %Sb' %w %hcs Hk Hpc Hte Hce Hpid Hsb Hsi Hbs %hf Hops Hslot Hside
+  iapply wpNext_intro_pin_lc
+  iintro %c %_ Hlc %spie %spp %R' %n' %Sb' %w %hcs Hk Hpc Hte Hce Hpid Hsb Hsi Hbs %hf Hops Hslot Hside
   unfold icDepSide icDepSideTx txPinO
-  iapply HK $$ %c %spie %spp %R' %n' %Sb' %w [] Hk Hpc Hte Hce Hpid Hsb Hsi Hbs Hops Hslot Hside
+  iapply HK $$ %c Hlc %spie %spp %R' %n' %Sb' %w [] Hk Hpc Hte Hce Hpid Hsb Hsi Hbs Hops Hslot Hside
   ipureintro
   exact ⟨hcs, hf⟩
 
@@ -443,7 +443,7 @@ theorem createFail_parent_tail (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF 
       (creChild ty.toNat major.toNat minor.toNat) Nm
         (P (nparElems (bview plen pfun)).length) Farm) Fok ∗
     creUnarmFired Fun cinum.toNat ∗
-    (∀ c' : CPU, createPost k plen pfun ty major minor γ pid V M u Sb ns
+    (∀ c' : CPU, £ 1 -∗ createPost k plen pfun ty major minor γ pid V M u Sb ns
       dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hK10 := create_slots_10 _ hS.hK
@@ -479,7 +479,7 @@ theorem createFail_parent_tail (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF 
   case ht => k_norm_g; try exact hS.htier
   case ha0 => k_norm_g [b9]
   -- back from iunlockput(dp), at +0x15c
-  iintro %cpu %spie3 %spp3 %R3 %n6 %Sb6 %w2 %hf2 Hk Hpc Hte Hce Hpid Hsbb Hsbi Hbsl Hop Hisl2
+  iintro %cpu Hlc %spie3 %spp3 %R3 %n6 %Sb6 %w2 %hf2 Hk Hpc Hte Hce Hpid Hsbb Hsbi Hbsl Hop Hisl2
     Htq2
   obtain ⟨hcs3, hsb6, -, -, -, hn6hi⟩ := hf2
   have hR3 : createRegs3 k (ientry kd) 0#64 (ientry kslot) ty major minor R3 :=
@@ -509,7 +509,7 @@ theorem createFail_parent_tail (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF 
   · unfold createFrame; iframe
   -- ===== +0x15e  c.j +0x70 : THE FUNNEL =====
   k_step_e (wp_s_j cpu _ (KA.«create» + 0x15e#64) true 2096914#21)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] £ Hcrd
   iintro Hk Hpc
   have hR4 := createRegs3_s3 k _ _ _ (k.regs 19#5) ty major minor R3 (k.regs 19#5) rfl hR3
   ihave Hnb14 : byteBuf (GF := GF) (createBuf (k.regs 2#5)) (DFrac.own 1) (bview 14 nf) $$ [Hnb14]
@@ -517,7 +517,7 @@ theorem createFail_parent_tail (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF 
   iapply (create_tail cpu k spie3 spp3 (R3.set 19#5 (k.regs 19#5)) (k.regs 19#5) nf tl hK10
       hal.1 hal.2 (createTregs_of_regs3 k _ _ ty major minor _ hR4))
   iframe Hk Hpc Hframe Hnb14 Hnb2 Hte Hce
-  iintro %c' %R' %hfin Hk Hpc Hte Hce
+  iintro %c' Hlc %R' %hfin Hk Hpc Hte Hce
   obtain ⟨hcsf, ha0f⟩ := hfin
   -- ARM FAIL: the do-then-undo PAIR, the cursor and the observation home
   ihave Hcf := create_fail_of_pair (fsGammaL fscFs) fscFs V.rti ty.toNat major.toNat
@@ -531,7 +531,7 @@ theorem createFail_parent_tail (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF 
   · iframe
   ispecialize Hcont $$ %c'
   unfold createPost
-  iapply Hcont $$ %spie3 %spp3 %R' %false %false %0 %(1 : Qp) %(1 : Qp) %γl %(0#32) %dnp %bmp
+  iapply Hcont $$ Hcrd %spie3 %spp3 %R' %false %false %0 %(1 : Qp) %(1 : Qp) %γl %(0#32) %dnp %bmp
     %n6 %Sb6 %(1 + (1 + (ns - 2))) [] Hk Hpc Hte Hce Hsbn Hsbi Hsbs Hsbb Hpriv Hpath Hbsl []
     Hisl [] Hop
   · ipureintro; exact hcsf
@@ -628,7 +628,7 @@ theorem create_fail_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedNames)
   case gt => k_norm_g; try exact hS.htier
   case ga0 => k_norm_g [r19]
   -- back from iupdate, at +0x150
-  iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hcidev Hciinum Hcmeta Hcmap Hsbi
+  iintro %cpu Hlc %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hcidev Hciinum Hcmeta Hcmap Hsbi
     Hcdiat Hb2 Hop
   try simp only [if_true, ↓reduceIte]
   have hR1 : createRegs3 k (ientry kd) 0#64 (ientry kslot) ty major minor R1 :=
@@ -680,7 +680,7 @@ theorem create_fail_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedNames)
   case ht => k_norm_g; try exact hS.htier
   case ha0 => k_norm_g [a19]
   -- back from iunlockput(ip), at +0x156
-  iintro %cpu %spie2 %spp2 %R2 %n5 %Sb5 %w1 %hf1 Hk Hpc Hte Hce Hpid Hsbb Hsbi Hbsl Hop Hisl1
+  iintro %cpu Hlc %spie2 %spp2 %R2 %n5 %Sb5 %w1 %hf1 Hk Hpc Hte Hce Hpid Hsbb Hsbi Hbsl Hop Hisl1
     Htq1
   obtain ⟨hcs2, hsb5, hw5, hw5c, hn5lo, hn5hi⟩ := hf1
   have hR2 : createRegs3 k (ientry kd) 0#64 (ientry kslot) ty major minor R2 :=

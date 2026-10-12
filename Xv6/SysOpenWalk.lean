@@ -136,7 +136,7 @@ theorem sys_open_walk_tested (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
     procPrivFd A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) ∗
     logOpb icfgLog u ∗ bslots 3 ∗ irefSlots nsj ∗ fdSlot ∗ fdFrags A.V.fdg A.sts ∗
     sysOpenResidue A pl inum dn bm data ∗
-    (∀ c' : CPU, sysOpenPostP k A c')
+    (∀ c' : CPU, £ 1 -∗ sysOpenPostP k A c')
     ⊢ wpLoop (GF := GF) cpu := by
   unfold sysOpenJoinBody at hJ
   unfold sysOpenAllocBody at hAl
@@ -250,7 +250,7 @@ theorem sys_open_walk_dead (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
     nameiWalkDeadEra fscFs A.V.rti A.P A.Pmiss pl ∗
     pfAt (aopenCommitAt (fsGammaL fscFs) appE) A.Fo ∗
     openTruncPiece (fsGammaL fscFs) A.vom (truncTermAt pl A.P) A.Ft ∗
-    (∀ c' : CPU, sysOpenPostP k A c')
+    (∀ c' : CPU, £ 1 -∗ sysOpenPostP k A c')
     ⊢ wpLoop (GF := GF) cpu := by
   unfold sysOpenTailBBody at hTB
   simp only [sysOpenAddr] at hTB
@@ -274,12 +274,12 @@ theorem sys_open_walk_dead (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
     Hce Henv Hcells Hbuf Hpid Hop
   case hp => exact sysOpenPins_s1 k R _ _ _ _ hpins
   unfold sysOpenRet
-  iintro %c' %spie' %spp' %R' %hcs Hk Hpc Hte Hce ⟨%hr, Hpid⟩
+  iintro %c' Hlc %spie' %spp' %R' %hcs Hk Hpc Hte Hce ⟨%hr, Hpid⟩
   ihave Hpriv := Hpback $$ Hpid
   ihave Hisl := (irefSlots_op 2 (A.ns - 2)).2 $$ [$Hir2 $Hirr]
   have e : 2 + (A.ns - 2) = A.ns := by omega
   rw [e]
-  ispecialize Hpost $$ %c'
+  ispecialize Hpost $$ %c' Hlc
   unfold sysOpenPostP sysOpenK
   iapply Hpost $$ %spie' %spp' %R' %P2 %A.V.ev %hcs %hP2 %(Nat.le_refl _) Hk Hpc Hte Hce Hbs Hisl
   iapply (sys_open_arm_dead A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid
@@ -313,7 +313,7 @@ theorem sys_open_walk_found (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF Γ]
     inodeHeldAt ipv iL ∗ A.P (pathElems pl).length iL ∗
     pfAt (aopenCommitAt (fsGammaL fscFs) appE) A.Fo ∗
     openTruncPiece (fsGammaL fscFs) A.vom (truncTermAt pl A.P) A.Ft ∗
-    (∀ c' : CPU, sysOpenPostP k A c')
+    (∀ c' : CPU, £ 1 -∗ sysOpenPostP k A c')
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hcells, Hbuf, Hpriv, HopS, Htx, Hbs, Hir1, Hirr, Hfds, Hfrags,
     Hheld, HP, Hoc, Htc, Hpost⟩

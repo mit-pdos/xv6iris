@@ -174,7 +174,7 @@ theorem sys_chdir_tail_68 (EO : END_OP) (Γ : SchedNames) [ClaimIs GF Γ] (cpu :
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv Γ ∗
     sysChdirRows (procAddr A.j) A.pid A.V.cwd A.V.cwi ∗
     sysChdirHole A.γ (procAddr A.j) A.pid (sysChdirV1 A P2) (sysChdirM1 A P2) ∗
-    (∀ c : CPU, sysChdirPostA k A c) ∗ bslots 3 ∗ irefSlots 2 ∗ logOp icfgLog u ∗
+    (∀ c : CPU, £ 1 -∗ sysChdirPostA k A c) ∗ bslots 3 ∗ irefSlots 2 ∗ logOp icfgLog u ∗
     chdirPostFail (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.P A.Pmiss A.Fo
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hbuf, Hte, Hce, #Henv, Hrows, Hhole, HΦ, Hbs, Hir, Hop, Hfail⟩
@@ -195,7 +195,7 @@ theorem sys_chdir_tail_68 (EO : END_OP) (Γ : SchedNames) [ClaimIs GF Γ] (cpu :
   case eK => k_norm_g; exact hKe
   case en => k_norm_g; exact hnoff
   case et => k_norm_g; exact htier
-  iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid
+  iintro %cpu Hlc %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid
   k_norm_g [sys_chdir_ret_6c, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysChdirPins_cs k _ R1 _ _ (sysChdirPins_set k R _ _ 1#5 _ hpins (Or.inl rfl)) hcs1
   -- +0x6c  li a0,-1
@@ -254,7 +254,7 @@ theorem sys_chdir_tail_70 (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Cl
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv Γ ∗
     sysChdirRows (procAddr A.j) A.pid A.V.cwd A.V.cwi ∗
     sysChdirHole A.γ (procAddr A.j) A.pid (sysChdirV1 A P2) (sysChdirM1 A P2) ∗
-    (∀ c : CPU, sysChdirPostA k A c) ∗
+    (∀ c : CPU, £ 1 -∗ sysChdirPostA k A c) ∗
     sysChdirLocked kk q g lo tl γil γisl inum A.pid dn bm ∗
     bslots 3 ∗ irefSlots 1 ∗ logOpS icfgLog n Sb ∗
     chdirPostFail (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.P A.Pmiss A.Fo
@@ -287,7 +287,7 @@ theorem sys_chdir_tail_70 (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Cl
   case un => k_norm_g; exact hnoff
   case ut => k_norm_g; exact htier
   case ua => k_norm_g
-  iintro %cpu %spie1 %spp1 %R1 %n' %⟨hcs1, -⟩ Hk Hpc Hte Hce Hpid Hbs Hop Hslot
+  iintro %cpu Hlc %spie1 %spp1 %R1 %n' %⟨hcs1, -⟩ Hk Hpc Hte Hce Hpid Hbs Hop Hslot
   k_norm_g [sys_chdir_ret_76, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysChdirPins_cs k _ R1 _ _
     (sysChdirPins_set k _ _ _ 1#5 _ (sysChdirPins_set k R _ _ 10#5 _ hpins (by decide)) (Or.inl rfl))
@@ -305,7 +305,7 @@ theorem sys_chdir_tail_70 (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Cl
   case eK => k_norm_g; exact hKe
   case en => k_norm_g; exact hnoff
   case et => k_norm_g; exact htier
-  iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid
+  iintro %cpu Hlc %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid
   k_norm_g [sys_chdir_ret_7a, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp2 := sysChdirPins_cs k _ R2 _ _ (sysChdirPins_set k R1 _ _ 1#5 _ hp1 (Or.inl rfl)) hcs2
   -- +0x7a  li a0,-1
@@ -379,7 +379,7 @@ theorem sys_chdir_tail_swap (IP : IPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv Γ ∗
     sysChdirRows (procAddr A.j) A.pid A.V.cwd A.V.cwi ∗
     sysChdirHole A.γ (procAddr A.j) A.pid (sysChdirV1 A P2) (sysChdirM1 A P2) ∗
-    (∀ c : CPU, sysChdirPostA k A c) ∗
+    (∀ c : CPU, £ 1 -∗ sysChdirPostA k A c) ∗
     inodeHeldAt (ientry kk) inum.toNat ∗
     bslots 3 ∗ irefSlots 1 ∗ logOp icfgLog n ∗
     A.P L inum.toNat ∗ A.Fo.pfRecv av inum.toNat ⟨.ADir e, nl⟩
@@ -413,7 +413,7 @@ theorem sys_chdir_tail_swap (IP : IPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs
   case pn => k_norm_g; exact hnoff
   case pt => k_norm_g; exact htier
   case pa => k_norm_g; exact hcwe
-  iintro %cpu %spie1 %spp1 %R1 %n1 %⟨hcs1, -⟩ Hk Hpc Hte Hce Hpid Hbs Hop Hslot
+  iintro %cpu Hlc %spie1 %spp1 %R1 %n1 %⟨hcs1, -⟩ Hk Hpc Hte Hce Hpid Hbs Hop Hslot
   k_norm_g [sys_chdir_ret_50, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysChdirPins_cs k _ R1 _ _
     (sysChdirPins_set k _ _ _ 1#5 _ (sysChdirPins_set k R _ _ 10#5 _ hpins (by decide)) (Or.inl rfl))
@@ -431,7 +431,7 @@ theorem sys_chdir_tail_swap (IP : IPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs
   case eK => k_norm_g; exact hKe
   case en => k_norm_g; exact hnoff
   case et => k_norm_g; exact htier
-  iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid
+  iintro %cpu Hlc %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid
   k_norm_g [sys_chdir_ret_54, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp2 := sysChdirPins_cs k _ R2 _ _ (sysChdirPins_set k R1 _ _ 1#5 _ hp1 (Or.inl rfl)) hcs2
   -- +0x54  sd s1,336(s2)  -- p->cwd = ip
@@ -489,7 +489,7 @@ theorem sys_chdir_tail_ok (IU : IUNLOCK) (IP : IPUT) (EO : END_OP) (Γ : SchedNa
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv Γ ∗
     sysChdirRows (procAddr A.j) A.pid A.V.cwd A.V.cwi ∗
     sysChdirHole A.γ (procAddr A.j) A.pid (sysChdirV1 A P2) (sysChdirM1 A P2) ∗
-    (∀ c : CPU, sysChdirPostA k A c) ∗
+    (∀ c : CPU, £ 1 -∗ sysChdirPostA k A c) ∗
     sysChdirLocked kk q g lo tl γil γisl inum A.pid dn bm ∗
     bslots 3 ∗ irefSlots 1 ∗ logOpS icfgLog n Sb ∗
     A.P L inum.toNat ∗ A.Fo.pfRecv av inum.toNat ⟨.ADir e, nl⟩
@@ -519,7 +519,7 @@ theorem sys_chdir_tail_ok (IU : IUNLOCK) (IP : IPUT) (EO : END_OP) (Γ : SchedNa
   case un => k_norm_g; exact hnoff
   case ut => k_norm_g; exact htier
   case ua => k_norm_g
-  iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hshr Htx
+  iintro %cpu Hlc %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hshr Htx
   k_norm_g [sys_chdir_ret_48, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysChdirPins_cs k _ R1 _ _
     (sysChdirPins_set k _ _ _ 1#5 _ (sysChdirPins_set k R _ _ 10#5 _ hpins (by decide)) (Or.inl rfl))

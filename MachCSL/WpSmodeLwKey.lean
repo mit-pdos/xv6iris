@@ -113,10 +113,10 @@ theorem wpLoop_k_memX [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KC
       inext
       iexact HΦ
     inext
-    iintro HmConf Hclock Hpc HT ⟨%v, HF, HQ⟩
+    iintro HmConf Hclock Hpc HT ⟨%v, HF, HQ⟩ Hlc
     unfold transTok
     icases HT with ⟨Htrans, Htok⟩
-    ihave HΦ' := wpNext_at _ _ _ cpu' _ hpin $$ HΦ
+    ihave HΦ' := wpNext_at _ _ _ cpu' _ hpin $$ HΦ Hlc
     ihave HConf := kConf_intro cpu' curTier k.root k.sie k.spie k.spp ms mdl mepc stc lf ⟨hsm, hsr, hmdl, hlf⟩ $$ HmConf
     iapply HΦ' $$ %v [HConf HF Hstack Htrans Harm Hcpu Htok Hclock] Hpc HQ
     iapply (kctx_intro' cpu' (k.withRegs (R' v)) ((KCtx.wf_withRegs k (R' v)).mpr hwf))

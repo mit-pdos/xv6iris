@@ -256,14 +256,14 @@ ends on), beside the two rows the caller lent -- `p->pid`'s half and the
 generation row, which the loop's `killed()` reads (NI M3 no-kill K1). -/
 def spPostAll (k : KCtx) (tfp : BitVec 44) (ws : List (BitVec 64)) (dqt : DFrac) : IProp GF :=
   iprop(∃ (pid : BitVec 32) (gn : GName), wordPointsTo (pPid k.proc) 4 pidPriv pid ∗
-    genHalvesPriv k.proc pid gn ∗ ∀ c : CPU, spPost k tfp ws dqt pid gn c)
+    genHalvesPriv k.proc pid gn ∗ ∀ c : CPU, £ 1 -∗ spPost k tfp ws dqt pid gn c)
 
 /-- ...and at the exit answering `r`: the reason a `-1` answer owes (the
 kill shot `killed()` read; vacuous at `0`). -/
 def spPostAllK (k : KCtx) (tfp : BitVec 44) (ws : List (BitVec 64)) (dqt : DFrac) (r : BitVec 64) :
     IProp GF :=
   iprop(∃ (pid : BitVec 32) (gn : GName), wordPointsTo (pPid k.proc) 4 pidPriv pid ∗
-    genHalvesPriv k.proc pid gn ∗ (⌜r = -1#64⌝ -∗ killShot gn) ∗ ∀ c : CPU, spPost k tfp ws dqt pid gn c)
+    genHalvesPriv k.proc pid gn ∗ (⌜r = -1#64⌝ -∗ killShot gn) ∗ ∀ c : CPU, £ 1 -∗ spPost k tfp ws dqt pid gn c)
 
 /-- The post is claimable at any hart: `k.proc ≠ 0`. -/
 theorem spPostAll_of_spec (cpu : CPU) (k : KCtx) (j : Nat) (tfp : BitVec 44) (ws : List (BitVec 64))
@@ -283,10 +283,10 @@ theorem spPostAll_of_spec (cpu : CPU) (k : KCtx) (j : Nat) (tfp : BitVec 44) (ws
   iintro ⟨Hpid, Hgen, H⟩
   iexists pid, gn
   iframe Hpid Hgen
-  iintro %c
+  iintro %c Hlc
   iapply wpNext_at true k.proc cpu c _
     (fun h => h.elim (fun h => absurd h (by decide))
-      (fun h => absurd h (by rw [hkproc]; exact procAddr_nonzero hj))) $$ H
+      (fun h => absurd h (by rw [hkproc]; exact procAddr_nonzero hj))) $$ H Hlc
 
 /-- At the `0` exit the reason is vacuous. -/
 theorem spPostAll_ret0 (k : KCtx) (tfp : BitVec 44) (ws : List (BitVec 64)) (dqt : DFrac) :
@@ -523,11 +523,11 @@ theorem sp_exit (cpu : CPU) (k kb : KCtx) (hb : SpBase k kb) (j : Nat)
   k_norm_g
   iframe
   inext
-  k_next_e
+  k_next_e £ Hlc
   iintro Hk Hpc
   unfold spPostAllK
   icases HΦ with ⟨%pid, %gn, Hpid, Hgen, Hwhy, HΦ⟩
-  ispecialize HΦ $$ %cpu
+  ispecialize HΦ $$ %cpu Hlc
   ihave HΦ := spPost_elim cpu k tfp ws dqt pid gn $$ HΦ
   k_norm_g
   iapply HΦ $$ %a %b %_ [] [Hwhy] Hk Hpc Hte Hce Htf Htp Hpid Hgen

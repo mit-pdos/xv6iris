@@ -37,7 +37,7 @@ theorem namex_tail (cpu : CPU) (k : KCtx) (A : NamexArgs) (spie spp : Bool) (R :
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0x60#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     namexOut k A n' Sb' ok nf ipv w (R 20#5) ∗
-    (∀ c' : CPU, namexPostA k A c')
+    (∀ c' : CPU, £ 1 -∗ namexPostA k A c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hK' : 12 ≤ (k.withSpie spie spp).avail := hK
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Hout, Hnext⟩
@@ -56,10 +56,10 @@ theorem namex_tail (cpu : CPU) (k : KCtx) (A : NamexArgs) (spie spp : Bool) (R :
   k_norm_g
   iframe
   inext
-  k_next_e
+  k_next_e £ Hlc
   iintro Hk Hpc
   k_norm_g
-  ispecialize Hnext $$ %cpu
+  ispecialize Hnext $$ %cpu Hlc
   iapply (namexPostA_elim k A cpu spie spp _ n' Sb' ok nf ipv w ?hcs) $$ Hnext Hk Hpc Hte Hce
   · unfold calleeSaved
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>

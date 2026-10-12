@@ -240,11 +240,11 @@ theorem freewalk_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
     with [KCtx.pop_pushed _ _ _ hK', hR2] next c6 hp6
   iintro Hk Hpc
   k_step_gen (wp_s_ret c6 _ (KA.«freewalk» + 0x5a#64) true 1#5) from (text_instr _ _ _ _ rfl rfl) Htext
-    $$ [- $Hk $Hpc] next c7 hp7
+    $$ [- $Hk $Hpc] next c7 hp7 £ Hlc
   iintro Hk Hpc
   ihave HΦ' := wpNext_at _ _ _ c7 _
     (fun h => (hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans
-      ((hp2 h).trans ((hp1 h).trans (hpin h)))))))) $$ HΦ
+      ((hp2 h).trans ((hp1 h).trans (hpin h)))))))) $$ HΦ Hlc
   iapply HΦ' $$ %spie %spp %_ %hsp Hk Hpc
   ipureintro
   unfold calleeSaved
@@ -349,9 +349,9 @@ theorem freewalk_next [CurCtx] (k : KCtx) (t : PTree) (i : Nat) (hi : i < 512)
   -- beq s1,s2
   k_step_gen (wp_s_branch c1 _ (KA.«freewalk» + 0x26#64) false 34#13 9#5 18#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [h18, fw_branch_last t.base i hi] next c2 hp2
+    with [h18, fw_branch_last t.base i hi] next c2 hp2 £ Hlc
   iintro Hk Hpc
-  ihave HΦ' := wpNext_at _ _ _ c2 _ (fun h => (hp2 h).trans (hp1 h)) $$ HΦ
+  ihave HΦ' := wpNext_at _ _ _ c2 _ (fun h => (hp2 h).trans (hp1 h)) $$ HΦ Hlc
   iapply HΦ' $$ %spie %spp %_ %(fun _ => ⟨rfl, rfl⟩) Hk Hpc
   ipureintro
   refine ⟨?_, ?_⟩
@@ -421,9 +421,9 @@ theorem freewalk_iter [WchG GF] [CurCtx] (lvl : Nat) (t : PTree)
     ihave HΦ := wpNext_shift _ _ _ _ _ hpin3 $$ HΦ
     iapply (freewalk_next k t i hi spie spp _ ?g9 ?g18 c3) $$ [- $Hk $Hpc]
     rotate_right 1
-    · iapply wpNext_intro_pin
-      iintro %c4 %hp4 %spie3 %spp3 %R3 %hsp3 Hk Hpc %hsaved3
-      ihave HΦ' := wpNext_at _ _ _ c4 _ hp4 $$ HΦ
+    · iapply wpNext_intro_pin_lc
+      iintro %c4 %hp4 Hlc %spie3 %spp3 %R3 %hsp3 Hk Hpc %hsaved3
+      ihave HΦ' := wpNext_at _ _ _ c4 _ hp4 $$ HΦ Hlc
       iapply HΦ' $$ %spie3 %spp3 %R3 %hsp3 Hk Hpc Hlend Hw
       ipureintro
       refine ⟨fwSaved_trans ?_ hsaved3.1, hsaved3.2⟩
@@ -498,9 +498,9 @@ theorem freewalk_iter [WchG GF] [CurCtx] (lvl : Nat) (t : PTree)
     ihave HΦ := wpNext_shift _ _ _ _ _ hpin11 $$ HΦ
     iapply (freewalk_next k t i hi spie2 spp2 R2 e9 e18 c11) $$ [- $Hk $Hpc]
     rotate_right 1
-    iapply wpNext_intro_pin
-    iintro %c12 %hp12 %spie3 %spp3 %R3 %hsp3 Hk Hpc %hsaved3
-    ihave HΦ' := wpNext_at _ _ _ c12 _ hp12 $$ HΦ
+    iapply wpNext_intro_pin_lc
+    iintro %c12 %hp12 Hlc %spie3 %spp3 %R3 %hsp3 Hk Hpc %hsaved3
+    ihave HΦ' := wpNext_at _ _ _ c12 _ hp12 $$ HΦ Hlc
     have hsp' : k.sie = false → spie3 = spie ∧ spp3 = spp := by
       intro h
       obtain ⟨g1, g2⟩ := hsp3 h

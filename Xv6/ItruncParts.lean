@@ -528,7 +528,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [Bioslot
 `SIE`, the complement in place of the bundle, at every hart). -/
 def itContE (k : KCtx) (ip : BitVec 64) (inum : BitVec 32) (dn : Dinode)
     (pidv : BitVec 32) (dqp dqd dqn dqb dqs : DFrac) (L : IProp GF) : IProp GF :=
-  iprop(∀ (cpu' : CPU) (spie spp : Bool) (R' : RegMap),
+  iprop(∀ (cpu' : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
@@ -548,9 +548,9 @@ theorem itContE_mono (k : KCtx) (ip : BitVec 64) (inum : BitVec 32) (dn : Dinode
     itContE (GF := GF) k ip inum dn pidv dqp dqd dqn dqb dqs L ⊢
       (L' -∗ L) -∗ itContE k ip inum dn pidv dqp dqd dqn dqb dqs L' := by
   unfold itContE
-  iintro H Hw %c %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hd Hi Hsb Hsi Hm Hmap Hblk Hdn Hsl HL
+  iintro H Hw %c Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hd Hi Hsb Hsi Hm Hmap Hblk Hdn Hsl HL
   ihave HL := Hw $$ HL
-  iapply H $$ %c %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hd Hi Hsb Hsi Hm Hmap Hblk Hdn Hsl HL
+  iapply H $$ %c Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hd Hi Hsb Hsi Hm Hmap Hblk Hdn Hsl HL
 
 end
 

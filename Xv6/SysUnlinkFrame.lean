@@ -375,10 +375,10 @@ theorem wp_prologue_sys_unlink [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU
   iintro Hk Hpc Hf8
   k_step_gen (wp_s_sd c2 _ (pc + 4#64) true 224#12 2#5 8#5 (by decide) w₂) $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc Hf16
-  k_step_gen (wp_s_addi c3 _ (pc + 6#64) true 240#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c4 hp4
+  k_step_gen (wp_s_addi c3 _ (pc + 6#64) true 240#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c4 hp4 £ Hlc
   iintro Hk Hpc
   k_norm_g
-  ihave HΦ' := wpNext_at _ _ _ c4 _ (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ
+  ihave HΦ' := wpNext_at _ _ _ c4 _ (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc [Hf8 Hf16 Hf24 Hf32 Hf40] %hal Hbufs
   iexists w₃, w₄, w₅
   unfold sysUnlinkCells
@@ -416,10 +416,10 @@ theorem wp_epilogue_sys_unlink [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU
   k_step_gen (wp_s_pop c2 _ (pc + 4#64) true 240#12 30 sys_unlink_imm_p240) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c3 hp3
   iintro Hk Hpc
-  k_step_gen (wp_s_ret c3 _ (pc + 6#64) true 1#5) $$ [- $Hk $Hpc] next c4 hp4
+  k_step_gen (wp_s_ret c3 _ (pc + 6#64) true 1#5) $$ [- $Hk $Hpc] next c4 hp4 £ Hlc
   iintro Hk Hpc
   ihave HΦ' := wpNext_at _ _ _ c4 _
-    (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ
+    (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc
 
 end
@@ -645,7 +645,7 @@ theorem sys_unlink_exit (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF)
     sysUnlinkCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) w₃ w₄ w₅ ∗
     sysUnlinkBufs (k.regs 2#5) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    sysUnlinkOut A r ∗ (∀ c : CPU, sysUnlinkPostA k A c)
+    sysUnlinkOut A r ∗ (∀ c : CPU, £ 1 -∗ sysUnlinkPostA k A c)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hbufs, Hte, Hce, Hout, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
@@ -663,8 +663,8 @@ theorem sys_unlink_exit (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF)
   k_norm_g
   iframe
   inext
-  iapply wpNext_intro_pin
-  iintro %c %hpin Hk Hpc
+  iapply wpNext_intro_pin_lc
+  iintro %c %hpin Hlc Hk Hpc
   have hpin' : k.sie = false → c = cpu := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
@@ -673,7 +673,7 @@ theorem sys_unlink_exit (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF)
   subst hr
   ispecialize HΦ $$ %c
   unfold sysUnlinkPostA sysUnlinkPost
-  iapply HΦ $$ %spie %spp %_ %P' %A.V.ev %hcs %hP' %(Nat.le_refl _) Hk Hpc Hte Hce Hbs Hir Hblk
+  iapply HΦ $$ Hlc %spie %spp %_ %P' %A.V.ev %hcs %hP' %(Nat.le_refl _) Hk Hpc Hte Hce Hbs Hir Hblk
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   iexact Harms
 

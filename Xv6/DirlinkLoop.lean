@@ -51,7 +51,7 @@ theorem dirlink_read (RD : READI) (SN : STRNCPY) (WI : WRITEI) (PA : PANIC)
     bslots 3 ∗ irefSlot ∗ dlinks fscFs dinum.toNat dn bm data ∗
     logOpS icfgLog ncount Sb ∗ txPin icfgLog tid qtx ∗
     dirlinkEnv Γ γl pd pav pu γkl γk ∗
-    (∀ c' : CPU, dirlinkPost k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
+    (∀ c' : CPU, £ 1 -∗ dirlinkPost k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
       dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr c') ∗
     dirlinkLoop Γ γl pd pav pu γkl γk k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
       dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr fuel

@@ -79,7 +79,7 @@ theorem il_mid (MM : MEMMOVE) (BL : BRELSE) (PA : PANIC)
       bioLocked fscBio (fsView fscFs fscDisk icfgDev fscCov) kb pidv icfgDev bno bs bsd db) ∗
     ilFillOut fscFs fscIreg fscCov fscLogst o g inum dn ∗ ityShot g dn.diType ∗
     ifreezeOff inum.toNat ∗ ilPass γisl kk s d pidv Tl ∗
-    (∀ c : CPU, ilockPostDepEb k γisl kk s g d o inum pidv dqp dqs Tl c)
+    (∀ c : CPU, £ 1 -∗ ilockPostDepEb k γisl kk s g d o inum pidv dqp dqs Tl c)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpe, #Hbc, Hframe, Hpid, Hidev, Hinum, Hsb, Hval, Hraw,
     Hslot, Hsback, Hrest, #Hshot, Hfoff, Hpass, HΦ⟩

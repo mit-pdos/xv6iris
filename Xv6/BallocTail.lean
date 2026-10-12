@@ -94,11 +94,11 @@ theorem ba_epilogue (cpu c0 : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (rv
   iintro Hk Hpc
   -- +0x88  ret
   k_step_e (wp_s_ret cpu _ (KA.«balloc» + 0x88#64) true 1#5)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] £ Hlc
   iintro Hk Hpc
   unfold baCont
   ihave HΦ := wpNext_at true k.proc c0 cpu _
-    (fun h => h.elim (fun h => absurd h (by decide)) (fun h => absurd h hp0)) $$ Hnext
+    (fun h => h.elim (fun h => absurd h (by decide)) (fun h => absurd h hp0)) $$ Hnext Hlc
   iapply HΦ $$ %spie %spp %_ [] Hk Hpc Hte Hce Hpid Hsz Hbms Hsl [Harms]
   · ipureintro
     obtain ⟨p25, p26, p27⟩ := hp

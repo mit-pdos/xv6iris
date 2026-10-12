@@ -290,10 +290,10 @@ theorem namex_post_of_spec (k : KCtx) (A : NamexArgs) (cpu : CPU) (hj : A.j < NP
     (hproc : k.proc = procAddr A.j) :
     wpNext true k.proc cpu (namexPost k A.plen A.pfun A.npar A.n A.Sb A.pidv A.cwdv A.cwi
       A.dqp A.dqc A.dqb A.dqs A.dqpv A.rootv A.rti A.dqr) ⊢
-      ∀ c : CPU, namexPostA (GF := GF) k A c := by
-  iintro H %c
+      ∀ c : CPU, £ 1 -∗ namexPostA (GF := GF) k A c := by
+  iintro H %c Hlc
   unfold namexPostA
-  iapply wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ H
+  iapply wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ H Hlc
 
 /-! ## THE WALK'S STATEMENT at `+0xf4` (Rocq's `nx_loop_body`) -/
 
@@ -305,7 +305,7 @@ def namexLoop (k : KCtx) (A : NamexArgs) (fuel : Nat) : IProp GF := iprop(
     pcIs c (KA.«namex» + 0xf8#64) -∗
     namexFrame k -∗ trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
     namexWalk k A ipv ncur Scur nf -∗
-    (∀ c' : CPU, namexPostA k A c') -∗ wpLoop c)
+    (∀ c' : CPU, £ 1 -∗ namexPostA k A c') -∗ wpLoop c)
 
 theorem namexLoop_elim (k : KCtx) (A : NamexArgs) (fuel : Nat) :
     namexLoop (GF := GF) k A fuel ⊢
@@ -316,7 +316,7 @@ theorem namexLoop_elim (k : KCtx) (A : NamexArgs) (fuel : Nat) :
       pcIs c (KA.«namex» + 0xf8#64) -∗
       namexFrame k -∗ trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
       namexWalk k A ipv ncur Scur nf -∗
-      (∀ c' : CPU, namexPostA k A c') -∗ wpLoop c := by
+      (∀ c' : CPU, £ 1 -∗ namexPostA k A c') -∗ wpLoop c := by
   unfold namexLoop; iintro H; iexact H
 
 theorem namexLoop_intro (k : KCtx) (A : NamexArgs) (fuel : Nat) :
@@ -327,7 +327,7 @@ theorem namexLoop_intro (k : KCtx) (A : NamexArgs) (fuel : Nat) :
       pcIs c (KA.«namex» + 0xf8#64) -∗
       namexFrame k -∗ trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
       namexWalk k A ipv ncur Scur nf -∗
-      (∀ c' : CPU, namexPostA k A c') -∗ wpLoop c) ⊢ namexLoop (GF := GF) k A fuel := by
+      (∀ c' : CPU, £ 1 -∗ namexPostA k A c') -∗ wpLoop c) ⊢ namexLoop (GF := GF) k A fuel := by
   unfold namexLoop; iintro H; iexact H
 
 end

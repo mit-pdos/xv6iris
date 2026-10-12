@@ -1117,11 +1117,11 @@ theorem bo_exit_body (RE : RELEASE) (cpu : CPU) (k : KCtx) (γ : LogNames) (γb 
   k_norm_g
   iframe
   inext
-  k_next_e
+  k_next_e £ Hlc
   iintro Hk Hpc
   ihave Hpost := wpNext_at true k.proc _ cpu _
     (fun h => h.elim (fun h => absurd h (by decide))
-      (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hjp))) $$ Hnext
+      (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hjp))) $$ Hnext Hlc
   ihave Hpost := boPost_elim k γ pidv dqp cpu $$ Hpost
   ihave Hk := bo_kctx_ws cpu k _ $$ Hk
   iapply Hpost $$ %(k.spie) %(k.spp) %_ [] Hk Hpc Hte Hce Hpid Hop

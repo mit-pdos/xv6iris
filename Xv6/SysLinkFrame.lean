@@ -218,10 +218,10 @@ theorem wp_prologue_sys_link [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) 
   iintro Hk Hpc Hf8
   k_step_gen (wp_s_sd c2 _ (pc + 4#64) true 288#12 2#5 8#5 (by decide) w₂) $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc Hf16
-  k_step_gen (wp_s_addi c3 _ (pc + 6#64) true 304#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c4 hp4
+  k_step_gen (wp_s_addi c3 _ (pc + 6#64) true 304#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c4 hp4 £ Hlc
   iintro Hk Hpc
   k_norm_g
-  ihave HΦ' := wpNext_at _ _ _ c4 _ (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ
+  ihave HΦ' := wpNext_at _ _ _ c4 _ (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc [Hf8 Hf16 Hf24 Hf32] %hal Hbufs
   iexists w₃, w₄
   unfold sysLinkCells
@@ -263,10 +263,10 @@ theorem wp_epilogue_sys_link [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) 
   k_step_gen (wp_s_pop c2 _ (pc + 6#64) true 304#12 38 sys_link_imm_p304) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c3 hp3
   iintro Hk Hpc
-  k_step_gen (wp_s_ret c3 _ (pc + 8#64) true 1#5) $$ [- $Hk $Hpc] next c4 hp4
+  k_step_gen (wp_s_ret c3 _ (pc + 8#64) true 1#5) $$ [- $Hk $Hpc] next c4 hp4 £ Hlc
   iintro Hk Hpc
   ihave HΦ' := wpNext_at _ _ _ c4 _
-    (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans ((hp1 h).trans (hp0 h))))) $$ HΦ
+    (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans ((hp1 h).trans (hp0 h))))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc
 
 end
@@ -450,7 +450,7 @@ theorem sys_link_exit (cpu : CPU) (k : KCtx) (A : SysLinkArgs GF)
     kctx cpu (((k.withSpie spie spp).pushed 38).withRegs R) ∗ pcIs cpu (KA.«sys_link» + 0x11a#64) ∗
     sysLinkCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) w₃ w₄ ∗ sysLinkBufs (k.regs 2#5) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    sysLinkOut A r ∗ (∀ c : CPU, sysLinkPostA k A c)
+    sysLinkOut A r ∗ (∀ c : CPU, £ 1 -∗ sysLinkPostA k A c)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hbufs, Hte, Hce, Hout, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
@@ -467,8 +467,8 @@ theorem sys_link_exit (cpu : CPU) (k : KCtx) (A : SysLinkArgs GF)
   k_norm_g
   iframe
   inext
-  iapply wpNext_intro_pin
-  iintro %c %hpin Hk Hpc
+  iapply wpNext_intro_pin_lc
+  iintro %c %hpin Hlc Hk Hpc
   have hpin' : k.sie = false → c = cpu := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
@@ -478,7 +478,7 @@ theorem sys_link_exit (cpu : CPU) (k : KCtx) (A : SysLinkArgs GF)
   ihave %hret := linkArms_ret _ _ _ _ _ $$ Harms
   ispecialize HΦ $$ %c
   unfold sysLinkPostA sysLinkPost
-  iapply HΦ $$ %spie %spp %_ %P' %A.V.ev %hcs %hP' %(Nat.le_refl _) Hk Hpc Hte Hce Hbs Hir Hblk [] [Harms]
+  iapply HΦ $$ Hlc %spie %spp %_ %P' %A.V.ev %hcs %hP' %(Nat.le_refl _) Hk Hpc Hte Hce Hbs Hir Hblk [] [Harms]
   · ipureintro
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
     exact hret

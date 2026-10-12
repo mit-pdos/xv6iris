@@ -651,7 +651,7 @@ theorem fp_tail [X : CurCtx]
   k_norm
   iframe
   inext
-  iintro Hk Hpc
+  iintro Hk Hpc _
   have hself : k.withSpie k.spie k.spp = k := KCtx.withSpie_self' k _ _ rfl rfl
   ihave HPhi := HPhi $$ %k.spie %k.spp
   rw [hself]
@@ -1167,7 +1167,7 @@ theorem freeproc_led_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE
     · -- taken: skip kfree
       k_step (wp_s_branch cpu _ (KA.«freeproc» + 0xe#64) true 6#13 10#5 0#5 (by decide) bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-        with [fp_beq_taken V.trapframe htf]
+        with [fp_beq_taken V.trapframe htf] £ Hlc
       iintro Hk Hpc
       iclear Htfarm
       iapply (fp_after_tf KF PFP AC RE Γ cpu k γl γp γk j hj st ch kl xs pid pidb V.trapframe V M
@@ -1185,7 +1185,7 @@ theorem freeproc_led_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE
         ipureintro; exact Nat.le_refl ke
       unfold fpContLedL
       k_norm
-      iexact HPhi
+      iapply HPhi $$ Hlc
     · -- not taken: kfree(p->trapframe)
       k_step (wp_s_branch cpu _ (KA.«freeproc» + 0xe#64) true 6#13 10#5 0#5 (by decide) bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -1210,7 +1210,8 @@ theorem freeproc_led_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE
       case hlkk => k_norm; exact hlk
       case hpv => k_norm; exact htfa.2
       -- past kfree
-      iapply wpNext_off_intro
+      iapply wpNext_off_intro_lc
+      iintro Hlc
       iintro %spie %spp %R' %hsp Hk Hpc Hlend Hav0 %hcs
       obtain ⟨rfl, rfl⟩ := hsp trivial
       ihave Hav : kallocAvail γk none $$ [Hav0]
@@ -1236,7 +1237,7 @@ theorem freeproc_led_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE
         iexact Hlend
       unfold fpContLedL
       k_norm
-      iexact HPhi
+      iapply HPhi $$ Hlc
 
 /-- A landed continuation serves as a led one: the receipt is dropped. -/
 theorem fp_cont_led {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]

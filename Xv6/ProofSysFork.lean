@@ -123,10 +123,10 @@ theorem sys_fork_kforkB [SG : UexecSG GF] (Γ : SchedNames) [ClaimIs GF Γ]
   k_norm_g
   iframe
   inext
-  iapply wpNext_intro_pin
-  iintro %cz %hpz Hk Hpc
+  iapply wpNext_intro_pin_lc
+  iintro %cz %hpz Hlc Hk Hpc
   ihave Hnext := wpNext_shift _ _ _ _ _ hpz $$ Hnext
-  ihave Hnext := wpNext_at k.sie k.proc cz cz _ (fun _ => rfl) $$ Hnext
+  ihave Hnext := wpNext_at k.sie k.proc cz cz _ (fun _ => rfl) $$ Hnext Hlc
   k_norm_g
   iapply Hnext $$ %spie %spp %_ %rv [] Hk Hpc Hblk
   ipureintro

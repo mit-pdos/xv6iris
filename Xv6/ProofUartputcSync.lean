@@ -164,7 +164,7 @@ theorem ups_poll {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (kb : KCtx) (hsie : kb.sie = false) (i : UartId) (γ : UartNames)
     (l : List (BitVec 8)) (R0 : RegMap) (h14 : R0 14#5 = uartBaseAddr i + BitVec.ofNat 64 5) :
     uartInv i γ ∗
-    (∀ R' : RegMap, ⌜∀ j, j ≠ 15#5 → R' j = R0 j⌝ -∗
+    (£ 1 -∗ ∀ R' : RegMap, ⌜∀ j, j ≠ 15#5 → R' j = R0 j⌝ -∗
       kctx cpu (kb.withRegs R') -∗ pcIs cpu (KA.«uartputc_sync» + 0x4a#64) -∗
       txOwn γ l -∗ outLb γ l -∗ wpLoop cpu)
     ⊢ ∀ Rc : RegMap, ⌜∀ j, j ≠ 15#5 → Rc j = R0 j⌝ -∗
@@ -198,12 +198,12 @@ theorem ups_poll {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
   by_cases hthre : Uart.thre u = true
   · -- THRE: fall through to 0x800009f6
     k_step (wp_s_branch cpu _ (KA.«uartputc_sync» + 0x48#64) true 8184#13 15#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [ups_beqz_thre u hthre]
+      from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [ups_beqz_thre u hthre] £ Hlc
     iintro Hk Hpc
     have hout : u.out = l := by
       rw [out_eq_acc_of_tx_nil u ((thre_iff u).1 hthre)]; exact hacc
     rw [hout] at *
-    iapply HΦ $$ %_ %_ Hk Hpc Htok Hlb
+    iapply HΦ $$ Hlc %_ %_ Hk Hpc Htok Hlb
     intro j hj
     simp only [RegMap.set_apply, hj, ite_false]
     exact hinv j hj
@@ -335,7 +335,7 @@ theorem uartputc_sync_proof (AC : ACQUIRE) (RE : RELEASE) : UARTPUTC_SYNC :=
   iframe #
   case hsp2 => k_norm
   case h14 => k_norm
-  iintro %R4 %h4 Hk Hpc Htok #Hlb
+  iintro _ %R4 %h4 Hk Hpc Htok #Hlb
   have h4_2 : R4 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFC0#64 := by
     rw [h4 2#5 (by decide)]; k_norm; exact h3_2
   have h4_9 : R4 9#5 = txLockAddr i := by
@@ -413,9 +413,10 @@ theorem uartputc_sync_proof (AC : ACQUIRE) (RE : RELEASE) : UARTPUTC_SYNC :=
   iframe
   inext
   k_norm
-  iapply wpNext_off_intro
+  iapply wpNext_off_intro_lc
+  iintro Hlc
   iintro Hk Hpc
-  iapply Hnext $$ %_ Hk Hpc %?hcsf Hsub2 HP
+  iapply Hnext $$ Hlc %_ Hk Hpc %?hcsf Hsub2 HP
   case hcsf =>
     unfold calleeSaved
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]

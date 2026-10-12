@@ -793,12 +793,12 @@ theorem sys_open_cr_post_fresh (k : KCtx) (A : SysOpenArgs GF)
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (pl : List (BitVec 8)) (i0 nl0 : Nat) (hpl : argPathOf (sysOpenIm A) A.v.toNat pl) :
     ⊢ sysOpenCrFresh (fsGammaL fscFs) A.vom A.P Farm Fun Fok Fex A.Fo pl i0 -∗
-      (∀ c : CPU, sysOpenPostC k A Farm Fun Fok Fex c) -∗
-      ∀ c : CPU, sysOpenPostP k
+      (∀ c : CPU, £ 1 -∗ sysOpenPostC k A Farm Fun Fok Fex c) -∗
+      ∀ c : CPU, £ 1 -∗ sysOpenPostP k
         (sysOpenCrA A (sysOpenCrP i0) sysOpenCrPm (sysOpenCrFoPure i0 ⟨.AFile [], nl0⟩)
           (sysOpenCrFt (fsGammaL fscFs) pl A.P Farm Fok Fex i0 A.Ft)) c := by
-  iintro HR HΦ %c
-  ispecialize HΦ $$ %c
+  iintro HR HΦ %c Hlc
+  ispecialize HΦ $$ %c Hlc
   iapply (sysOpenK_mono_fupd k A.ns A.V A.M _ _ c) $$ HΦ
   iintro %VW %MW %r H
   iapply (sys_open_cr_arms_fresh A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j)
@@ -813,12 +813,12 @@ theorem sys_open_cr_post_exists (k : KCtx) (A : SysOpenArgs GF)
     (hnd : ∀ (ents : Std.ExtTreeMap Fname Nat compare) (nl : Nat), a0 ≠ ⟨.ADir ents, nl⟩) :
     ⊢ sysOpenCrExists (fsGammaL fscFs) A.vom (nparNm (sysOpenIm A) A.v.toNat) A.P Farm Fun
         Fok Fex pl i0 -∗
-      (∀ c : CPU, sysOpenPostC k A Farm Fun Fok Fex c) -∗
-      ∀ c : CPU, sysOpenPostP k
+      (∀ c : CPU, £ 1 -∗ sysOpenPostC k A Farm Fun Fok Fex c) -∗
+      ∀ c : CPU, £ 1 -∗ sysOpenPostP k
         (sysOpenCrA A (sysOpenCrP i0) sysOpenCrPm (sysOpenCrFoTag i0 a0 A.Fo)
           (sysOpenCrFtEx (fsGammaL fscFs) pl A.P Farm Fex i0 A.Ft)) c := by
-  iintro HR HΦ %c
-  ispecialize HΦ $$ %c
+  iintro HR HΦ %c Hlc
+  ispecialize HΦ $$ %c Hlc
   iapply (sysOpenK_mono_fupd k A.ns A.V A.M _ _ c) $$ HΦ
   iintro %VW %MW %r H
   iapply (sys_open_cr_arms_exists A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j)

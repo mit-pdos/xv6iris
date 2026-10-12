@@ -641,11 +641,11 @@ theorem wp_prologue_sys_open [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) 
   iintro Hk Hpc Hf8
   k_step_gen (wp_s_sd c2 _ (pc + 4#64) true 176#12 2#5 8#5 (by decide) w2) $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc Hf16
-  k_step_gen (wp_s_addi c3 _ (pc + 6#64) true 192#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c4 hp4
+  k_step_gen (wp_s_addi c3 _ (pc + 6#64) true 192#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c4 hp4 £ Hlc
   iintro Hk Hpc
   k_norm_g
   ihave HΦ' := wpNext_at _ _ _ c4 _
-    (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ
+    (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc [Hf8 Hf16 H3 H4 H5 H6 Hlo Hom H24] %hal Hbuf
   iexists w3, w4, w5, w6, lo, om, w24
   iframe
@@ -685,10 +685,10 @@ theorem wp_epilogue_sys_open [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) 
   k_step_gen (wp_s_pop c2 _ (pc + 4#64) true 192#12 24 Xv6.imm_p192) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c3 hp3
   iintro Hk Hpc
-  k_step_gen (wp_s_ret c3 _ (pc + 6#64) true 1#5) $$ [- $Hk $Hpc] next c4 hp4
+  k_step_gen (wp_s_ret c3 _ (pc + 6#64) true 1#5) $$ [- $Hk $Hpc] next c4 hp4 £ Hlc
   iintro Hk Hpc
   ihave HΦ' := wpNext_at _ _ _ c4 _
-    (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ
+    (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc
 
 end Frame
@@ -784,7 +784,7 @@ theorem sys_open_exit (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
     sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) w3 w4 w5 w6 lo om w24 ∗
     sysOpenAny (sysOpenPath (k.regs 2#5)) 128 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    (∀ (c' : CPU) (R' : RegMap), ⌜calleeSaved k.regs R' ∧ R' 10#5 = R 10#5⌝ -∗
+    (∀ (c' : CPU), £ 1 -∗ ∀ (R' : RegMap), ⌜calleeSaved k.regs R' ∧ R' 10#5 = R 10#5⌝ -∗
       kctx c' ((k.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) cpu := by
@@ -804,12 +804,12 @@ theorem sys_open_exit (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
   k_norm_g
   iframe
   inext
-  iapply wpNext_intro_pin
-  iintro %c %hpin Hk Hpc
+  iapply wpNext_intro_pin_lc
+  iintro %c %hpin Hlc Hk Hpc
   have hpin' : k.sie = false → c = cpu := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
-  iapply HΦ $$ %c %_ [] Hk Hpc Hte Hce
+  iapply HΦ $$ %c Hlc %_ [] Hk Hpc Hte Hce
   ipureintro
   refine ⟨hcs, ?_⟩
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
@@ -921,10 +921,10 @@ process pins nothing; `CreateSharedBody.create_post_pin`). -/
 theorem sys_open_post_pin (k : KCtx) (A : SysOpenArgs GF) (hS : SysOpenStatic k A)
     (cpu : CPU) (ARMS : ProcPriv → (Nat → List (BitVec 8)) → BitVec 64 → IProp GF) :
     wpNext true k.proc cpu (sysOpenK k A.ns A.V A.M ARMS) ⊢
-      ∀ c : CPU, sysOpenK k A.ns A.V A.M ARMS c := by
-  iintro H %c
+      ∀ c : CPU, £ 1 -∗ sysOpenK k A.ns A.V A.M ARMS c := by
+  iintro H %c Hlc
   iapply (wpNext_at true k.proc cpu c _ (fun h => h.elim (fun h => absurd h (by decide))
-    (fun h => absurd h (by rw [hS.hproc]; exact procAddr_nonzero hS.hj)))) $$ H
+    (fun h => absurd h (by rw [hS.hproc]; exact procAddr_nonzero hS.hj)))) $$ H Hlc
 
 /-- THE CONTINUATION AT A RAISED COUNT (permit sweep L1b, Rocq's `UA` in
 `ProofSysOpen`): argstr hands the block back at `V.updEv kv`, and the rest
@@ -958,7 +958,7 @@ _ => ∀ mf, ⌜callee_saved m mf⌝ -∗ … -∗ WP)`): at the returned regist
 callee-saved against the entry, whatever the tail hands back keyed on the
 returned `a0`.  Hart-free. -/
 def sysOpenRet (k : KCtx) (Φ : BitVec 64 → IProp GF) : IProp GF :=
-  iprop(∀ (c : CPU) (spie spp : Bool) (R' : RegMap), ⌜calleeSaved k.regs R'⌝ -∗
+  iprop(∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap), ⌜calleeSaved k.regs R'⌝ -∗
     kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ Φ (R' 10#5) -∗ wpLoop c)
 
@@ -1134,7 +1134,7 @@ theorem sys_open_argstr (AS : ARGSTR) (Γ : SchedNames) (A : SysOpenArgs GF) (cp
     kctx cpu k' ∗ pcIs cpu KA.«argstr» ∗
     trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysOpenEnv Γ A ∗
     procPrivBareAt curCtx pa A.pid V M ∗ byteBuf (k'.regs 11#5) (DFrac.own 1) old ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (bs : List (BitVec 8)) (kv : Nat),
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (bs : List (BitVec 8)) (kv : Nat),
       ⌜calleeSaved k'.regs R' ∧ V.upt.extSz V.sz P' ∧
         fetchstrRet (viewLazy V.upt V.sz M) v.toNat old bs (R' 10#5)⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
@@ -1157,12 +1157,12 @@ theorem sys_open_argstr (AS : ARGSTR) (Γ : SchedNames) (A : SysOpenArgs GF) (cp
   iapply h
   iframe Hk Hpc Hblk Hbuf
   iframe #
-  iapply wpNext_intro_pin
-  iintro %c %hpin %spie %spp %R' %- Hk Hpc ⟨%P', %bs, %kv, %hf, %hkv, Hblk, Hbuf⟩ %hcs
+  iapply wpNext_intro_pin_lc
+  iintro %c %hpin Hlc %spie %spp %R' %- Hk Hpc ⟨%P', %bs, %kv, %hf, %hkv, Hblk, Hbuf⟩ %hcs
   have hpin' : k'.sie = false → c = cpu := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
-  iapply HK $$ %c %spie %spp %R' %P' %bs %kv [] Hk Hpc Hte Hce %hkv Hblk Hbuf
+  iapply HK $$ %c Hlc %spie %spp %R' %P' %bs %kv [] Hk Hpc Hte Hce %hkv Hblk Hbuf
   ipureintro
   exact ⟨hcs, hf.1, hf.2⟩
 
@@ -1397,7 +1397,7 @@ def sysOpenPubBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp GF 
       foffPubT A.omo t -∗
       openPostOkPlain A.omo (fsGammaL fscFs) A.γ (procAddr A.j) A.pid (sysOpenIm A) A.v.toNat A.vom
         A.P A.Fo A.Ft A.sts (sysOpenV2 A P2) (sysOpenM2 A P2) r) -∗
-    (∀ c' : CPU, sysOpenPostP k A c') -∗
+    (∀ c' : CPU, £ 1 -∗ sysOpenPostP k A c') -∗
     wpLoop c)
 
 /-- **+0x88 .. +0xb4 AND THE +0x14e itrunc BLOCK** (Rocq `so_stores_au`):
@@ -1441,7 +1441,7 @@ def sysOpenStoresBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp 
     fdFrags A.V.fdg A.sts -∗ fdStAuth A.V.fdg fd .closed -∗
     -- THE AU RESIDUE: the cursor, the FIRED observation, the trunc commit
     sysOpenResidue A pl inum dn bm data -∗
-    (∀ c' : CPU, sysOpenPostP k A c') -∗
+    (∀ c' : CPU, £ 1 -∗ sysOpenPostP k A c') -∗
     wpLoop c)
 
 /-- **+0x5e .. +0x84 AND THE +0x140 FD_DEVICE BLOCK** (Rocq `so_alloc_au`):
@@ -1470,7 +1470,7 @@ def sysOpenAllocBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp G
     procPrivFd A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) -∗
     logOpb icfgLog u -∗ bslots 3 -∗ irefSlots nsj -∗ fdSlot -∗ fdFrags A.V.fdg A.sts -∗
     sysOpenResidue A pl inum dn bm data -∗
-    (∀ c' : CPU, sysOpenPostP k A c') -∗
+    (∀ c' : CPU, £ 1 -∗ sysOpenPostP k A c') -∗
     wpLoop c)
 
 /-- **THE JOIN AT +0x4a AND ARM D-FAIL** (Rocq `so_join_au`): the `lhu` +
@@ -1495,7 +1495,7 @@ def sysOpenJoinBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp GF
     procPrivFd A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) -∗
     logOpb icfgLog u -∗ bslots 3 -∗ irefSlots nsj -∗ fdSlot -∗ fdFrags A.V.fdg A.sts -∗
     sysOpenResidue A pl inum dn bm data -∗
-    (∀ c' : CPU, sysOpenPostP k A c') -∗
+    (∀ c' : CPU, £ 1 -∗ sysOpenPostP k A c') -∗
     wpLoop c)
 
 /-- **THE else ARM, +0xdc .. +0xfa, AND ARMS B-FAIL / C-FAIL** (Rocq
@@ -1527,7 +1527,7 @@ def sysOpenEntryNBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp 
     pfAt (aopenCommitAt (fsGammaL fscFs) appE) A.Fo -∗
     -- the truncate's permit is the walk's terminal cursor (Rocq TRUNC-PERMIT)
     openTruncPiece (fsGammaL fscFs) A.vom (truncTermAt (bview plen bp) A.P) A.Ft -∗
-    (∀ c' : CPU, sysOpenPostP k A c') -∗
+    (∀ c' : CPU, £ 1 -∗ sysOpenPostP k A c') -∗
     wpLoop c)
 
 /-- **THE O_CREATE ARM, +0x38 .. +0x48, AND ARM A-FAIL** (Rocq
@@ -1561,7 +1561,7 @@ def sysOpenEntryCBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
     openTruncPiece (fsGammaL fscFs) A.vom
       (crePermit (fsGammaL fscFs) (bview plen bp) A.P Farm Fok Fex) A.Ft -∗
     creChildUnfired (fsGammaL fscFs) (.AFile []) Farm Fun -∗
-    (∀ c' : CPU, sysOpenPostC k A Farm Fun Fok Fex c') -∗
+    (∀ c' : CPU, £ 1 -∗ sysOpenPostC k A Farm Fun Fok Fex c') -∗
     wpLoop c)
 
 end Bodies

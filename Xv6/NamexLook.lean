@@ -125,7 +125,7 @@ theorem namex_look (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimI
     namexLk A ik q g lo tl inum dn γil γisl ∗ icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
     irefSlots 1 ∗ namexKeep k A ∗ namexPath k A ∗ byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) ∗
     bslots 3 ∗ nlzObs inum.toNat e0 ∗ logOpSe icfgLog ncur Scur e0 ∗
-    (∀ c' : CPU, namexPostA k A c') ∗ namexLoop k A fuel
+    (∀ c' : CPU, £ 1 -∗ namexPostA k A c') ∗ namexLoop k A fuel
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 := namex_slots_12 _ hs.hK
   have hr := hf.hregs

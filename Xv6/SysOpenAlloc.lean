@@ -150,7 +150,7 @@ theorem sys_open_alloc_filealloc (FA : FILEALLOC) (Γ : SchedNames) (cpu : CPU) 
     (hK : 14 ≤ k'.avail) (hnoff : k'.noff = 0) :
     kctx cpu k' ∗ pcIs cpu KA.«filealloc» ∗
     trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysOpenEnv Γ A ∗ fdSlot ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap),
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c se -∗ cpuClaimExt c se pj -∗ fileallocPost A.γ (R' 10#5) -∗ wpLoop c)
@@ -166,12 +166,12 @@ theorem sys_open_alloc_filealloc (FA : FILEALLOC) (Γ : SchedNames) (cpu : CPU) 
   simp only [fileallocAddr] at h
   iapply h
   iframe Hk Hpc Hft Hfd
-  iapply wpNext_intro_pin
-  iintro %c %hpin %spie %spp %R' %- Hk Hpc %hcs Hpost
+  iapply wpNext_intro_pin_lc
+  iintro %c %hpin Hlc %spie %spp %R' %- Hk Hpc %hcs Hpost
   have hpin' : k'.sie = false → c = cpu := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
-  iapply HK $$ %c %spie %spp %R' %hcs Hk Hpc Hte Hce Hpost
+  iapply HK $$ %c Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hpost
 
 set_option maxHeartbeats 4000000 in
 /-- `fdalloc(f)` at +0x6a (Rocq `Fdalloc.wp_fdalloc_sconf`): over the
@@ -183,7 +183,7 @@ theorem sys_open_alloc_fdalloc (FD : FDALLOC) (cpu : CPU) (k' : KCtx) (se : Bool
     (hnoff : k'.noff = 0) :
     kctx cpu k' ∗ pcIs cpu KA.«fdalloc» ∗
     trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ procOfilesOwe A.γ A.V.fdg pa fs D ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap),
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c se -∗ cpuClaimExt c se pj -∗
@@ -198,12 +198,12 @@ theorem sys_open_alloc_fdalloc (FD : FDALLOC) (cpu : CPU) (k' : KCtx) (se : Bool
   rw [hpa] at h
   iapply h
   iframe Hk Hpc Hofs
-  iapply wpNext_intro_pin
-  iintro %c %hpin %spie %spp %R' %- Hk Hpc %hcs Hpost
+  iapply wpNext_intro_pin_lc
+  iintro %c %hpin Hlc %spie %spp %R' %- Hk Hpc %hcs Hpost
   have hpin' : k'.sie = false → c = cpu := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
-  iapply HK $$ %c %spie %spp %R' %hcs Hk Hpc Hte Hce Hpost
+  iapply HK $$ %c Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hpost
 
 /-- The slot's free off word, as the free-store rule's resource (Rocq
 `proto_store_free`). -/
@@ -233,12 +233,12 @@ theorem sys_open_alloc_fail_ret_f (k : KCtx) (A : SysOpenArgs GF) (P2 : UPtd) (n
             (sysOpenM2 A P2)) ∗
       irefSlots (nsj - 1) ∗ fdFrags A.V.fdg A.sts ∗
       sysOpenResidue A pl inum dn bm data ∗
-      (∀ c' : CPU, sysOpenPostP k A c') ⊢
+      (∀ c' : CPU, £ 1 -∗ sysOpenPostP k A c') ⊢
     sysOpenRet k (fun r => iprop(⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ sysOpenPid A ∗
       bslots 3 ∗ irefSlots 2 ∗ fdSlot ∗ ∃ k1 : Nat, ⌜A.V.ev ≤ k1⌝ ∗ actLend (procAddr A.j) k1)) := by
   iintro ⟨Hpback, Hisl, Hfrags, Hres, Hpost⟩
   unfold sysOpenRet
-  iintro %c' %spie' %spp' %R' %hcs Hk Hpc Hte Hce ⟨%hr, Hpid, Hbs, Hir2, Hfds, Hlend⟩
+  iintro %c' Hlc %spie' %spp' %R' %hcs Hk Hpc Hte Hce ⟨%hr, Hpid, Hbs, Hir2, Hfds, Hlend⟩
   -- the block back at the count fileclose handed back (permit sweep L1b)
   icases Hpback $$ Hpid Hlend with ⟨%k2, %hk2, Hpriv⟩
   ihave Hisl := (irefSlots_op (nsj - 1) 2).2 $$ [$Hisl $Hir2]
@@ -246,7 +246,7 @@ theorem sys_open_alloc_fail_ret_f (k : KCtx) (A : SysOpenArgs GF) (P2 : UPtd) (n
   rw [e]
   unfold sysOpenResidue
   icases Hres with ⟨%hpl, HP, Hobs, Htc⟩
-  ispecialize Hpost $$ %c'
+  ispecialize Hpost $$ %c' Hlc
   unfold sysOpenPostP sysOpenK
   iapply Hpost $$ %spie' %spp' %R' %P2 %k2 %hcs %hP2 %hk2 Hk Hpc Hte Hce Hbs Hisl
   iapply (sys_open_arm_fail A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid
@@ -290,7 +290,7 @@ theorem sys_open_alloc_types (Γ : SchedNames) [ClaimIs GF Γ] (k : KCtx)
       logOpb icfgLog u -∗ bslots 3 -∗ irefSlots nsj -∗ fdSlot -∗
       fdFrags A.V.fdg A.sts -∗ fdStAuth A.V.fdg fd .closed -∗
       sysOpenResidue A pl inum dn bm data -∗
-      (∀ c' : CPU, sysOpenPostP k A c') -∗
+      (∀ c' : CPU, £ 1 -∗ sysOpenPostP k A c') -∗
       wpLoop (GF := GF) cpu := by
   unfold sysOpenStoresBody at hSt
   simp only [sysOpenAddr] at hSt
@@ -448,7 +448,7 @@ theorem sys_open_alloc_fd (FD : FDALLOC) (Γ : SchedNames) [ClaimIs GF Γ] (k : 
       procPrivFd A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) -∗
       logOpb icfgLog u -∗ bslots 3 -∗ irefSlots nsj -∗ fdFrags A.V.fdg A.sts -∗
       sysOpenResidue A pl inum dn bm data -∗
-      (∀ c' : CPU, sysOpenPostP k A c') -∗
+      (∀ c' : CPU, £ 1 -∗ sysOpenPostP k A c') -∗
       wpLoop (GF := GF) cpu := by
   unfold sysOpenTailFBody at hTF
   simp only [sysOpenAddr] at hTF
@@ -482,7 +482,7 @@ theorem sys_open_alloc_fd (FD : FDALLOC) (Γ : SchedNames) [ClaimIs GF Γ] (k : 
   case fa0 => k_norm_g [h10]
   case fK => k_norm_g; exact hKfd
   case fn => k_norm_g; exact hS.hnoff
-  iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpost
+  iintro %cpu Hlc %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpost
   k_norm_g [sys_open_alloc_ret_6e, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysOpenPins_cs k _ R1 _ _ _ (sysOpenPins_set k R _ _ _ 1#5 _ hpins (Or.inl rfl)) hcs1
   unfold fdallocPost
@@ -575,7 +575,7 @@ theorem sys_open_alloc (FA : FILEALLOC) (FD : FDALLOC) (Γ : SchedNames) [ClaimI
   k_norm_g [sys_open_alloc_ret_64]
   case aK => k_norm_g; exact hK14
   case an => k_norm_g; exact hS.hnoff
-  iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpost
+  iintro %cpu Hlc %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpost
   k_norm_g [sys_open_alloc_ret_64, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysOpenPins_cs k _ R1 _ _ _ (sysOpenPins_set k R _ _ _ 1#5 _ hpins (Or.inl rfl)) hcs1
   unfold fileallocPost
