@@ -638,7 +638,7 @@
     "Xv6.InodeDefs",
     "Xv6.LogDefs",
     "Xv6.SystemSlot"],
-   "axioms": ["Quot.sound"]},
+   "axioms": ["Classical.choice", "Quot.sound"]},
   {"opaques":
    ["Iris.fixpointP",
     "LeanRV64D.Functions.xv6_resv_is_valid",
