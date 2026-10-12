@@ -139,16 +139,17 @@ sequential obligation and gets back the timeless token to park in its slot,
 at a key the channel chooses, and the persistent receipt handle. -/
 theorem crashPerm_deposit (gd : Nat) (γP : GName) (w : DiskWr) (Q : IProp GF) (E : CoPset)
     (hE : (↑crashPermN : CoPset) ⊆ E) :
-    crashPermInv gd γP ∗ diskSeqPermit gd w Q ⊢@{IProp GF} |={E}=>
+    crashPermInv gd γP ∗ diskSeqPermit gd w Q ∗ £ 1 ⊢@{IProp GF} |={E}=>
       ∃ (k : Nat) (γq : GName),
         crashPermTok γP k true γq w (List.range (wrNsectors w)) ∗ crashPermReceipt γq Q := by
   unfold crashPermInv diskSeqPermit
-  iintro ⟨#Hinv, Hperm⟩
+  iintro ⟨#Hinv, Hperm, Hlcp⟩
   imod (saved_prop_alloc Q DFrac.discard DFrac.valid_discard) with ⟨%γq, #Hsp⟩
   imod (inv_acc (E := E) (N := crashPermN) (P := crashPermInvBody gd γP) hE) $$ Hinv
     with ⟨Hbody, Hclose⟩
+  imod lc_fupd_elim_later $$ Hlcp Hbody with Hbody
   unfold crashPermInvBody
-  icases Hbody with ⟨%m, %nx, >Hauth, >%hfr, Hents⟩
+  icases Hbody with ⟨%m, %nx, Hauth, %hfr, Hents⟩
   imod ghost_map_insert nx (((true, γq), (w, List.range (wrNsectors w))) : CrashPermVal)
     (hfr nx (Nat.le_refl _)) $$ Hauth with ⟨Hauth, Htok⟩
   imod Hclose $$ [Hauth Hents Hperm]
@@ -181,7 +182,7 @@ sectors still to land. -/
 theorem crashPerm_step (gd : Nat) (γP : GName) (k : Nat) (γq : GName) (w : DiskWr)
     (todo : List Nat) (i : Nat) (dk : Nat → BitVec 8) (n : Nat) (hi : i ∈ todo) (hn : n = gd + 1) :
     crashPermInvBody gd γP ∗ crashPermTok γP k true γq w todo ∗ startAuth n ∗ diskFixedAuth dk ∗
-      ▷ MachFixedGS.crashPred (GF := GF) ⊢@{IProp GF} |={∅}=>
+      MachFixedGS.crashPred (GF := GF) ⊢@{IProp GF} |={∅}=>
       (crashPermInvBody gd γP ∗ crashPermTok γP k true γq w (todo.erase i) ∗ startAuth n ∗
         diskFixedAuth (wrApply (wrSector w i) dk) ∗ ▷ MachFixedGS.crashPred (GF := GF)) := by
   unfold crashPermInvBody crashPermTok
@@ -222,7 +223,7 @@ client's receipt and puts the cell in the done state. -/
 theorem crashPerm_consume (gd : Nat) (γP : GName) (k : Nat) (γq : GName) (w : DiskWr)
     (dk : Nat → BitVec 8) (n : Nat) (hn : n = gd + 1) :
     crashPermInvBody gd γP ∗ crashPermTok γP k true γq w [] ∗ startAuth n ∗ diskFixedAuth dk ∗
-      ▷ MachFixedGS.crashPred (GF := GF) ⊢@{IProp GF} |={∅}=>
+      MachFixedGS.crashPred (GF := GF) ⊢@{IProp GF} |={∅}=>
       (crashPermInvBody gd γP ∗ crashPermTok γP k false γq w [] ∗ startAuth n ∗
         diskFixedAuth (wrApply none dk) ∗ ▷ MachFixedGS.crashPred (GF := GF)) := by
   unfold crashPermInvBody crashPermTok
@@ -273,7 +274,7 @@ instance (γP : GName) (kq : Nat × GName) (w : DiskWr) :
 theorem crashPerm_step_kq (gd : Nat) (γP : GName) (kq : Nat × GName) (w : DiskWr)
     (todo : List Nat) (i : Nat) (dk : Nat → BitVec 8) (n : Nat) (hi : i ∈ todo) (hn : n = gd + 1) :
     crashPermInvBody gd γP ∗ crashPermPend γP kq w todo ∗ startAuth n ∗ diskFixedAuth dk ∗
-      ▷ MachFixedGS.crashPred (GF := GF) ⊢@{IProp GF} |={∅}=>
+      MachFixedGS.crashPred (GF := GF) ⊢@{IProp GF} |={∅}=>
       (crashPermInvBody gd γP ∗ crashPermPend γP kq w (todo.erase i) ∗ startAuth n ∗
         diskFixedAuth (wrApply (wrSector w i) dk) ∗ ▷ MachFixedGS.crashPred (GF := GF)) :=
   crashPerm_step gd γP kq.1 kq.2 w todo i dk n hi hn
@@ -281,7 +282,7 @@ theorem crashPerm_step_kq (gd : Nat) (γP : GName) (kq : Nat × GName) (w : Disk
 theorem crashPerm_consume_kq (gd : Nat) (γP : GName) (kq : Nat × GName) (w : DiskWr)
     (dk : Nat → BitVec 8) (n : Nat) (hn : n = gd + 1) :
     crashPermInvBody gd γP ∗ crashPermPend γP kq w [] ∗ startAuth n ∗ diskFixedAuth dk ∗
-      ▷ MachFixedGS.crashPred (GF := GF) ⊢@{IProp GF} |={∅}=>
+      MachFixedGS.crashPred (GF := GF) ⊢@{IProp GF} |={∅}=>
       (crashPermInvBody gd γP ∗ crashPermDone γP kq w ∗ startAuth n ∗
         diskFixedAuth (wrApply none dk) ∗ ▷ MachFixedGS.crashPred (GF := GF)) :=
   crashPerm_consume gd γP kq.1 kq.2 w dk n hn
@@ -289,7 +290,7 @@ theorem crashPerm_consume_kq (gd : Nat) (γP : GName) (kq : Nat × GName) (w : D
 /-- The pair form of the deposit (Rocq `perm_deposit_kq`). -/
 theorem crashPerm_deposit_kq (gd : Nat) (γP : GName) (w : DiskWr) (Q : IProp GF) (E : CoPset)
     (hE : (↑crashPermN : CoPset) ⊆ E) :
-    crashPermInv gd γP ∗ diskSeqPermit gd w Q ⊢@{IProp GF} |={E}=>
+    crashPermInv gd γP ∗ diskSeqPermit gd w Q ∗ £ 1 ⊢@{IProp GF} |={E}=>
       ∃ kq : Nat × GName,
         crashPermPend γP kq w (List.range (wrNsectors w)) ∗ crashPermReceipt kq.2 Q := by
   iintro H
@@ -311,16 +312,16 @@ theorem crashPerm_rewrite (P Q : IProp GF) :
 /-- Over the invariant, in a plain fupd: TWO laters (Rocq `perm_collect`). -/
 theorem crashPerm_collect (gd : Nat) (γP : GName) (k : Nat) (γq : GName) (w : DiskWr)
     (Q : IProp GF) (E : CoPset) (hE : (↑crashPermN : CoPset) ⊆ E) :
-    crashPermInv gd γP ∗ crashPermReceipt γq Q ∗ crashPermTok γP k false γq w [] ⊢@{IProp GF}
+    crashPermInv gd γP ∗ crashPermReceipt γq Q ∗ crashPermTok γP k false γq w [] ∗ £ 1 ⊢@{IProp GF}
       |={E}=> ▷ ▷ Q := by
   unfold crashPermInv
-  iintro ⟨#Hinv, #Hrc, Htok⟩
+  iintro ⟨#Hinv, #Hrc, Htok, Hlcp⟩
   imod (inv_acc (E := E) (N := crashPermN) (P := crashPermInvBody gd γP) hE) $$ Hinv
     with ⟨Hbody, Hclose⟩
+  imod lc_fupd_elim_later $$ Hlcp Hbody with Hbody
   unfold crashPermInvBody crashPermTok crashPermReceipt
-  icases Hbody with ⟨%m, %nx, >Hauth, >%hfr, Hents⟩
+  icases Hbody with ⟨%m, %nx, Hauth, %hfr, Hents⟩
   ihave %hk := ghost_map_lookup $$ Hauth Htok
-  ihave Hents := BigSepM.bigSepM_later.1 $$ Hents
   icases (BigSepM.bigSepM_delete hk).1 $$ Hents with ⟨Hent, Hents⟩
   imod ghost_map_delete k _ $$ Hauth Htok with Hauth
   imod Hclose $$ [Hauth Hents]

@@ -614,12 +614,12 @@ runs the channel step `hF` with the durable authority lent. -/
 theorem diskLend_spend (γ : DiskNames) (P Q : IProp GF) (dk dk' : Nat → BitVec 8)
     (hF : crashPermInvBody (genId (GF := GF)) γ.cperm ∗ P ∗
         startAuth (genId (GF := GF) + 1) ∗ diskFixedAuth dk ∗
-        ▷ MachFixedGS.crashPred (GF := GF) ⊢@{IProp GF} |={∅}=>
+        MachFixedGS.crashPred (GF := GF) ∗ £ 1 ⊢@{IProp GF} |={∅}=>
       (crashPermInvBody (genId (GF := GF)) γ.cperm ∗
         startAuth (genId (GF := GF) + 1) ∗ diskFixedAuth dk' ∗
         ▷ MachFixedGS.crashPred (GF := GF) ∗ Q)) :
     diskDrainEnv (GF := GF) γ ∗ P ⊢@{IProp GF}
-      |={⊤ \ ↑diskN, ∅}=> ▷ (diskLend dk ={∅, ⊤ \ ↑diskN}=∗ (diskLend dk' ∗ Q)) := by
+      |={⊤ \ ↑diskN, ∅}=> ▷ (diskLend dk -∗ £ 1 ={∅, ⊤ \ ↑diskN}=∗ (diskLend dk' ∗ Q)) := by
   unfold diskDrainEnv crashInv crashPermInv
   iintro ⟨⟨#Hci, #Hpi⟩, HP⟩
   imod (inv_acc (E := ⊤ \ ↑diskN) (N := crashPermN)
@@ -630,11 +630,11 @@ theorem diskLend_spend (γ : DiskNames) (P Q : IProp GF) (dk dk' : Nat → BitVe
     with ⟨HC, Hcclose⟩
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
-  iintro !> Hl
+  iintro !> Hl Hlcd
   unfold diskLend
   icases Hl with ⟨Hdk, Hst⟩
-  imod hF $$ [Hpb HP Hst Hdk HC] with ⟨Hpb, Hst, Hdk, HC, HQ⟩
-  · iframe Hpb HP Hst Hdk HC
+  imod hF $$ [Hpb HP Hst Hdk HC Hlcd] with ⟨Hpb, Hst, Hdk, HC, HQ⟩
+  · iframe Hpb HP Hst Hdk HC Hlcd
   imod Hmask
   imod Hcclose $$ HC
   imod Hpclose $$ Hpb
@@ -647,14 +647,14 @@ machine moves FROM, and -- if it was the request's last sector -- its leaf
 too. -/
 theorem diskDrain_step (γ : DiskNames) (v : VirtioState) (k : Nat) :
     iprop(diskDrainEnv (GF := GF) γ ∗ diskRoot γ ∗ diskProto γ v) ⊢@{IProp GF}
-      |={⊤ \ ↑diskN, ∅}=> ▷ (diskLend v.disk ={∅, ⊤ \ ↑diskN}=∗
+      |={⊤ \ ↑diskN, ∅}=> ▷ (diskLend v.disk -∗ £ 1 ={∅, ⊤ \ ↑diskN}=∗
         (diskLend (Virtio.drain v k).disk ∗ diskProto γ (Virtio.drain v k) ∗ diskRoot γ)) := by
   iintro ⟨#Henv, HC, HR⟩
   icases diskProto_drain_acc γ v k $$ HR with
     (⟨%hdk, HR⟩ | ⟨%kq, %w, %j, %todo, %hjd, Hpend, Hback⟩)
   · iapply fupd_mask_intro LawfulSet.empty_subset
     iintro Hmask
-    iintro !> Hl
+    iintro !> Hl _
     imod Hmask
     imodintro
     rw [hdk]
@@ -670,13 +670,16 @@ theorem diskDrain_step (γ : DiskNames) (v : VirtioState) (k : Nat) :
       ?hF)
     rotate_left
     · iframe Henv Hpend Hback HC
-    iintro ⟨Hpb, ⟨Hpend, Hback, HC⟩, Hst, Hdk, HP⟩
+    iintro ⟨Hpb, ⟨Hpend, Hback, HC⟩, Hst, Hdk, HP, Hlcd⟩
     imod crashPerm_step_kq (genId (GF := GF)) γ.cperm kq w todo j v.disk
         (genId (GF := GF) + 1) hj rfl $$ [Hpb Hpend Hst Hdk HP]
       with ⟨Hpb, Hpend, Hst, Hdk, HP⟩
     · iframe Hpb Hpend Hst Hdk HP
     by_cases he : todo.erase j = []
     · isimp only [he] at Hpend
+      -- the completion's identity permit, in the same step: the step's credit strips the
+      -- crash predicate's later the sector permit left
+      imod lc_fupd_elim_later $$ Hlcd HP with HP
       imod crashPerm_consume_kq (genId (GF := GF)) γ.cperm kq w
           (wrApply (wrSector w j) v.disk) (genId (GF := GF) + 1) rfl
           $$ [Hpb Hpend Hst Hdk HP] with ⟨Hpb, Hdone, Hst, Hdk, HP⟩
@@ -699,13 +702,13 @@ it with the durable authority lent -- it moves no disk byte. -/
 theorem diskProtoLeaf_step (γ : DiskNames) (v : VirtioState) (dk dk' : Nat → BitVec 8)
     (C : IProp GF) (hdk : dk' = dk) :
     iprop(diskDrainEnv (GF := GF) γ ∗ diskProtoLeaf γ v ∗ C) ⊢@{IProp GF}
-      |={⊤ \ ↑diskN, ∅}=> ▷ (diskLend dk ={∅, ⊤ \ ↑diskN}=∗ (diskLend dk' ∗ diskProto γ v ∗ C)) := by
+      |={⊤ \ ↑diskN, ∅}=> ▷ (diskLend dk -∗ £ 1 ={∅, ⊤ \ ↑diskN}=∗ (diskLend dk' ∗ diskProto γ v ∗ C)) := by
   rw [hdk]
   unfold diskProtoLeaf
   iintro ⟨#Henv, HR | ⟨%kq, %w, Hpend, Hback⟩, HC⟩
   · iapply fupd_mask_intro LawfulSet.empty_subset
     iintro Hmask
-    iintro !> Hl
+    iintro !> Hl _
     imod Hmask
     imodintro
     iframe Hl HR HC
@@ -713,7 +716,7 @@ theorem diskProtoLeaf_step (γ : DiskNames) (v : VirtioState) (dk dk' : Nat → 
         (crashPermDone γ.cperm kq w -∗ diskProto γ v) ∗ C) iprop(diskProto γ v ∗ C) dk dk ?hF)
     rotate_left
     · iframe Henv Hpend Hback HC
-    iintro ⟨Hpb, ⟨Hpend, Hback, HC⟩, Hst, Hdk, HP⟩
+    iintro ⟨Hpb, ⟨Hpend, Hback, HC⟩, Hst, Hdk, HP, _⟩
     imod crashPerm_consume_kq (genId (GF := GF)) γ.cperm kq w dk
         (genId (GF := GF) + 1) rfl $$ [Hpb Hpend Hst Hdk HP]
       with ⟨Hpb, Hdone, Hst, Hdk, HP⟩

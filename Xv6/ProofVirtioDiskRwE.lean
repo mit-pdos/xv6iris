@@ -375,12 +375,12 @@ theorem vdrw_P5 (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     k_step (wp_s_branch cpu _ (KA.«virtio_disk_rw» + 0x1b0#64) false 34#13 15#5 11#5
         (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [vdrwK_sie, ha1, vdrw5_bne_one d hd1]
+      with [vdrwK_sie, ha1, vdrw5_bne_one d hd1] £ Hlcp
     iintro Hk Hpc
     iapply HΦ $$ %cpu %(k.spie) %(k.spp) %_
     iapply vdrwP5Exit_self Γ cpu k γ γl pd pav pu bno dataBuf dataDisk wr c y _
     unfold vdrwP5Exit
-    iframe Hk Hpc Hpi Htc Hcc Hir Hcaps Hlocked Hpay Hth Hkm Hkt Hbno Hsv Hidx Hnext
+    iframe Hk Hpc Hpi Htc Hcc Hir Hcaps Hlocked Hpay Hth Hkm Hkt Hbno Hsv Hidx Hnext Hlcp
     isplitl []
     · ipureintro
       refine ⟨?_, hcwf, hbp, hblk⟩

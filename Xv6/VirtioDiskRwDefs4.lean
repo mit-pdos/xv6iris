@@ -344,7 +344,8 @@ def vdrwP5Exit (Γ : SchedNames) [ClaimIs GF Γ]
   wordPointsTo (aBufBlockno c.bp) 4 (DFrac.own (1 : Qp).half) bno ∗
   vdrwSaved k ∗
   idxCells (k.regs 2#5) (BitVec.ofNat 32 c.hd) (BitVec.ofNat 32 c.md) (BitVec.ofNat 32 c.tl) y ∗
-  vdrwNext k γ bno wr dataBuf dataDisk (some c.kq.2) cpu
+  vdrwNext k γ bno wr dataBuf dataDisk (some c.kq.2) cpu ∗
+  £ 1
 
 theorem vdrwP5Exit_self (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64)
@@ -371,14 +372,14 @@ theorem vdrwNext_collect (k : KCtx) (γ : DiskNames) (bno : BitVec 32) (wr : Boo
     (hE : (↑crashPermN : CoPset) ⊆ E) :
     crashPermInv (genId (GF := GF)) γ.cperm ∗
       crashPermDone γ.cperm c.kq (chainWr c) ∗
-      vdrwNext k γ bno wr dataBuf dataDisk (some c.kq.2) cpu ⊢@{IProp GF}
+      vdrwNext k γ bno wr dataBuf dataDisk (some c.kq.2) cpu ∗ £ 1 ⊢@{IProp GF}
       |={E}=> ∃ Q : IProp GF, ▷ ▷ Q ∗
         wpNext true k.proc cpu (vdrwPostQ k γ bno wr dataBuf dataDisk Q) := by
   unfold vdrwNext vdrwTok crashPermDone
-  iintro ⟨#Hpi, Hdone, %Q, #Hrc, Hn⟩
+  iintro ⟨#Hpi, Hdone, ⟨%Q, #Hrc, Hn⟩, Hlcp⟩
   imod crashPerm_collect (genId (GF := GF)) γ.cperm c.kq.1 c.kq.2 (chainWr c) Q E hE
-    $$ [Hpi Hrc Hdone] with HQ
-  · iframe Hpi Hrc Hdone
+    $$ [Hpi Hrc Hdone Hlcp] with HQ
+  · iframe Hpi Hrc Hdone Hlcp
   imodintro
   iexists Q
   iframe HQ Hn

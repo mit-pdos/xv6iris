@@ -130,7 +130,7 @@ inductive DevM.LeaseD {S T : Type} (dk : S → Nat → BitVec 8) (Env : IProp GF
   | stepD (C C' : IProp GF) (g : S → Option (S × List DevObs)) (k : Unit → DevM S T Unit)
       (hs : ∀ s s' os, g s = some (s', os) →
         iprop(Env ∗ C ∗ R s) ⊢
-          |={E, ∅}=> ▷ (diskLend (dk s) ={∅, E}=∗ (diskLend (dk s') ∗ R s' ∗ C')))
+          |={E, ∅}=> ▷ (diskLend (dk s) -∗ £ 1 ={∅, E}=∗ (diskLend (dk s') ∗ R s' ∗ C')))
       (hk : LeaseD dk Env E R Lt Ce C' (k ())) : LeaseD dk Env E R Lt Ce C (.op (.step g) k)
   | get (C : IProp GF) {X : Type} (C' : S → X → IProp GF) (k : S → DevM S T Unit)
       (hknow : ∀ s, iprop(C ∗ R s) ⊢ |==> (R s ∗ ∃ x, C' s x))
@@ -372,8 +372,8 @@ theorem wpDev_dmaD (N : Namespace) (Env : IProp GF) [Persistent Env]
         rw [hg] at hgg
         simp only [Option.some.injEq, Prod.mk.injEq] at hgg
         obtain ⟨rfl, rfl⟩ := hgg
-        -- the second phase, handed the lent authorities
-        imod HΦ $$ [Hdk Hst] with ⟨Hl, HR, HC⟩
+        -- the second phase, handed the lent authorities and the step's credit
+        imod HΦ $$ [Hdk Hst] Hcred with ⟨Hl, HR, HC⟩
         · unfold diskLend
           rw [show virtioDisk (σ.devs.st .virtio) = diskOf σ.devs from rfl]
           iframe Hdk Hst

@@ -1159,7 +1159,7 @@ theorem ss_entry (AC : ACQUIRE) (RE : RELEASE) (Γ : SchedNames) [ClaimIs GF Γ]
     iintro Hk Hpc
     k_step (wp_s_lw cpu _ (KA.«sys_sync» + 0x22#64) false 2112#12 15#5 15#5 (by decide)
         (by decide) (DFrac.own 1) (BitVec.ofNat 32 out))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ssK_sie (k.withSpie s0 p0), ss_lout]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ssK_sie (k.withSpie s0 p0), ss_lout] £ Hlcg
     iintro Hk Hpc Hout
     isimp only [← wordAtN_cur] at Hout
     isimp only [← wordAtN_cur] at Hcmt
@@ -1175,7 +1175,7 @@ theorem ss_entry (AC : ACQUIRE) (RE : RELEASE) (Γ : SchedNames) [ClaimIs GF Γ]
       · ipureintro; first | exact hout0 | trivial
       icases Hq with ⟨%L, %M, Hquiet, Hstok, Hback⟩
       ihave Hhs := ss_hook_list oQ $$ Hhook
-      iapply (logGhostCommit_loop cpu oQ.toList γ γb γfs cov ls dev L M) $$ Hctx Hquiet Hstok Hhs
+      iapply (logGhostCommit_loop cpu oQ.toList γ γb γfs cov ls dev L M) $$ Hctx Hlcg Hquiet Hstok Hhs
       iintro Hquiet Hstok HQs
       ihave HQ := ss_q_list oQ $$ HQs
       ihave HQ := (BI.later_intro (PROP := IProp GF) (P := qOpt oQ)) $$ HQ

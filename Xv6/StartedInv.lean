@@ -122,8 +122,8 @@ instance startedIdx_timeless (γ : GName) (t : Nat) : Timeless (startedIdx (GF :
 /-- The ARMED arm: the one store at `t`, its position frozen, the record
 stamped at or below it carrying the deposit. -/
 def startedArmed (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) : IProp GF := iprop%
-  ∃ t T : Nat, wordCell startedAddr 4 0 startedClear [⟨t, hartAgent startedPrimary, startedSet⟩] ∗
-    startedIdx γ t ∗ ⌜T ≤ t⌝ ∗ ctxStamped ξd T ∗ P ξd
+  (∃ t T : Nat, wordCell startedAddr 4 0 startedClear [⟨t, hartAgent startedPrimary, startedSet⟩] ∗
+    startedIdx γ t ∗ ⌜T ≤ t⌝ ∗ ctxStamped ξd T) ∗ P ξd
 
 /-- The UNARMED arm. -/
 def startedUnarmed (γ : GName) (ξd : CtxId) : IProp GF := iprop%
@@ -271,7 +271,7 @@ theorem started_readAUr (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) [∀
   imod (inv_acc (E := ⊤) (N := startedN) (P := startedBody γ ξd P) (CoPset.subseteq_top)) $$ Hinv
     with ⟨Hbody, Hclose⟩
   unfold startedBody startedUnarmed startedArmed
-  icases Hbody with (⟨>Hw, >Hg, >Hst⟩ | ⟨%t, %T, >Hw, >Hidx, >%hT, >Hst, HP⟩)
+  icases Hbody with (⟨>Hw, >Hg, >Hst⟩ | ⟨⟨%t, %T, >Hw, >Hidx, >%hT, >Hst⟩, HP⟩)
   · icases wordCell_cases _ 4 0 startedClear [] $$ Hw with ⟨%Hold, Hb, %htail⟩
     iapply fupd_mask_intro LawfulSet.empty_subset
     iintro Hmask
@@ -309,8 +309,9 @@ theorem started_readAUr (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) [∀
     imod Hclose $$ [Hw Hst]
     · inext
       iright
+      iframe HP
       iexists t, T
-      iframe Hw Hidx Hst HP
+      iframe Hw Hidx Hst
       ipureintro; exact hT
     imodintro
     dsimp only; unfold startedSeen
@@ -336,7 +337,7 @@ theorem started_absorb [CurCtx] (E : CoPset) (γ : GName) (ξd : CtxId) (P : Ctx
   unfold startedInv
   imod (inv_acc (E := E) (N := startedN) (P := startedBody γ ξd P) hE) $$ Hinv with ⟨Hbody, Hclose⟩
   unfold startedBody startedUnarmed startedArmed
-  icases Hbody with (⟨>Hw, >Hg, >Hst⟩ | ⟨%t', %T, >Hw, >Hidx', >%hT, >Hst, HPd⟩)
+  icases Hbody with (⟨>Hw, >Hg, >Hst⟩ | ⟨⟨%t', %T, >Hw, >Hidx', >%hT, >Hst⟩, HPd⟩)
   · iexfalso
     unfold startedIdx
     ihave %h := ghost_var_agree γ _ _ _ _ $$ Hg Hidx
@@ -350,8 +351,9 @@ theorem started_absorb [CurCtx] (E : CoPset) (γ : GName) (ξd : CtxId) (P : Ctx
     imod Hclose $$ [Hw Hst]
     · inext
       iright
+      iframe HP
       iexists t', T
-      iframe Hw Hidx' Hst HP
+      iframe Hw Hidx' Hst
       ipureintro; exact hT
     imodintro
     iframe Hrun HP'
@@ -378,7 +380,7 @@ theorem started_deposit_open [CurCtx] (γ : GName) (ξd : CtxId) (P : CtxId → 
   imod (inv_acc (E := ⊤) (N := startedN) (P := startedBody γ ξd P) CoPset.subseteq_top) $$ Hinv
     with ⟨Hbody, Hclose⟩
   unfold startedBody startedUnarmed startedArmed
-  icases Hbody with (⟨>Hw, >Hg, >Hst⟩ | ⟨%t, %T, >Hw, >Hidx, >%hT, >Hst, HPd⟩)
+  icases Hbody with (⟨>Hw, >Hg, >Hst⟩ | ⟨⟨%t, %T, >Hw, >Hidx, >%hT, >Hst⟩, HPd⟩)
   · imod started_deposit cpu ξd P $$ [$Hrun $Hst $HP] with ⟨Hrun, %T, Hst, -, #HPd⟩
     imod Hclose $$ [Hw Hg Hst]
     · inext
@@ -401,7 +403,7 @@ theorem started_writeAUT (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) [�
   imod (inv_acc (E := ⊤) (N := startedN) (P := startedBody γ ξd P) CoPset.subseteq_top) $$ Hinv
     with ⟨Hbody, Hclose⟩
   unfold startedBody startedUnarmed startedArmed
-  icases Hbody with (⟨>Hw, >Hg, >⟨%T0, Hst⟩⟩ | ⟨%t, %T, >Hw, >Hidx, >%hT, >Hst, HPd⟩)
+  icases Hbody with (⟨>Hw, >Hg, >⟨%T0, Hst⟩⟩ | ⟨⟨%t, %T, >Hw, >Hidx, >%hT, >Hst⟩, HPd⟩)
   · icases wordCell_cases _ 4 0 startedClear [] $$ Hw with ⟨%Hold, Hb, %htail⟩
     icases startedStamped_topLb ξd T0 $$ Hst with ⟨Hst, #HT⟩
     iapply fupd_mask_intro LawfulSet.empty_subset
@@ -419,8 +421,9 @@ theorem started_writeAUT (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) [�
     imod Hclose $$ [Hw Hst]
     · inext
       iright
+      iframe HP
       iexists t, T0
-      iframe Hw Hst HP
+      iframe Hw Hst
       isplit
       · unfold startedIdx; iexact H1
       · ipureintro; exact hTt

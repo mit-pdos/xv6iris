@@ -60,13 +60,13 @@ the token come back unchanged, beside each hook's `Q`. -/
 theorem logGhostCommit (cpu : CPU) (m : SailM Unit) (Qs : List (IProp GF))
     (γ : LogNames) (γb : BcacheNames) (γfs : FsNames) (cov : ExtTreeSet Nat compare) (ls : Nat)
     (dev : BitVec 32) (L : BlockMap) (M : LogMirror) :
-    logCtx (GF := GF) γ γb γfs cov ls dev ⊢
+    logCtx (GF := GF) γ γb γfs cov ls dev ⊢ £ 1 -∗
       logQuiet γ γfs cov ls L M -∗ eraSyncTok (GF := GF) -∗
       ([∗list] Q ∈ Qs, eraSyncHook (GF := GF) Q) -∗
       (logQuiet γ γfs cov ls L M -∗ eraSyncTok (GF := GF) -∗
         ([∗list] Q ∈ Qs, Q) -∗ wpHart cpu m) -∗
       wpHart cpu m := by
-  iintro #Hctx Hq HT HQs Hk
+  iintro #Hctx Hlcc Hq HT HQs Hk
   ihave #Hcinv := logCtx_crashInv γ γb γfs cov ls dev $$ Hctx
   ihave #Hcert := logCtx_genCert γ γb γfs cov ls dev $$ Hctx
   ihave #Hparts := genCert_parts $$ Hcert
@@ -77,17 +77,17 @@ theorem logGhostCommit (cpu : CPU) (m : SailM Unit) (Qs : List (IProp GF))
   ihave #Hlg := logCtx_snapLawGhost γ γb γfs cov ls dev $$ Hctx
   icases snapLawGhost_run γ γfs cov ls _ _ _ $$ Hlg with ⟨%G, #Hseam, #Hlaw⟩
   iapply wpHart_crash_fupd cpu m iprop(logQuiet γ γfs cov ls L M ∗
-      eraSyncTok (GF := GF) ∗ ([∗list] Q ∈ Qs, Q)) $$ Hcinv [Hq HT HQs]
+      eraSyncTok (GF := GF) ∗ ([∗list] Q ∈ Qs, Q)) $$ Hcinv Hlcc [Hq HT HQs]
   · iintro %n %hn Hsa Hc
     -- ---- 1. the crash slot, through the seam, into the record and the old guest
     unfold fsCrashSeamAt
     icases Hseam with ⟨#Hto, #Hfrom⟩
-    ihave Hc : iprop(▷ ∃ gt : GName, pFsAnyAt gt cov ls ∗ G gt) $$ [Hc]
-    · inext
-      ihave Hc2 := Hto $$ Hc
+    ihave Hc : iprop(∃ gt : GName, pFsAnyAt gt cov ls ∗ G gt) $$ [Hc]
+    · ihave Hc2 := Hto $$ Hc
       iapply (pFsComp_unfold G cov ls).1 $$ Hc2
-    imod later_exists_except0 $$ Hc with ⟨%gt_o, Hc⟩
-    icases later_sep.1 $$ Hc with ⟨>Hany, HG⟩
+    icases Hc with ⟨%gt_o, Hany, HG⟩
+    ihave HG : ▷ G gt_o $$ [HG]
+    · inext; iexact HG
     ihave ⟨%dk, Himg, %hext, Hrec⟩ :=
       (pFsNamedAt_unfold gt_o _ _ _ _ _ cov ls).1 $$ Hany
     -- ---- 2. the record's snapshot slot at the quiescent picture
@@ -149,7 +149,7 @@ theorem logGhostCommit (cpu : CPU) (m : SailM Unit) (Qs : List (IProp GF))
 theorem logGhostCommit_loop (cpu : CPU) (Qs : List (IProp GF))
     (γ : LogNames) (γb : BcacheNames) (γfs : FsNames) (cov : ExtTreeSet Nat compare) (ls : Nat)
     (dev : BitVec 32) (L : BlockMap) (M : LogMirror) :
-    logCtx (GF := GF) γ γb γfs cov ls dev ⊢
+    logCtx (GF := GF) γ γb γfs cov ls dev ⊢ £ 1 -∗
       logQuiet γ γfs cov ls L M -∗ eraSyncTok (GF := GF) -∗
       ([∗list] Q ∈ Qs, eraSyncHook (GF := GF) Q) -∗
       (logQuiet γ γfs cov ls L M -∗ eraSyncTok (GF := GF) -∗
