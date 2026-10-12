@@ -1,12 +1,14 @@
 /-
-Weak: **W5 CORE — M1's composition, PLUMBING conditional on F9's disk rows** (allocproc plan
-`notes/weak-allocproc-plan.md` §C W5 / "W5 CORE", rev 29; [R21.4]).  Lean-only (no Rocq source).
+Weak: **W5 CORE — M1's composition** (allocproc plan `notes/weak-allocproc-plan.md` §C W5 /
+"W5 CORE", rev 29; [R21.4]; F9's disk rows discharged by W4 F9, `MachOfPf.simDisk`).  Lean-only
+(no Rocq source).
 
 INTERNAL MILESTONE M1 (NOT published, [OWN.2]); kernel-only BY PREMISE (D21: M1's fetch clause
 `candKfetch bcRoLo bcRoHi`); loads single-copy atomic at or above the TsoMem floor BY PREMISE
-(`candScaT cohSrc`).  NOT registered as a root (`roots-weak.txt` / `baseline-weak.json`), not
-counted as M1: the theorem is CONDITIONAL on F9's interface `diskRows`, which is unsatisfiable
-until W4 F9 lands (plan [R21.4]).  M1 is registered and reported when F9 discharges it.
+(`candScaT cohSrc`).  NOT registered as a root here (`roots-weak.txt` / `baseline-weak.json`;
+the orchestrator registers M1).  Since W4 F9 the theorem is NO LONGER conditional on the disk
+rows (the former `diskRows` / `DR` hypotheses are gone; [OWN.40] made the pf disk program stall
+on an OUT buffer wrapping past `2^64`, so no disk side condition remains either).
 
 ## The composition
 
@@ -27,8 +29,7 @@ the premises' `ds`):
      read through `Xv6.textWin_get` (`SrvwmoXv6Adequacy.winOfText`);
    * `fi`   = from the NAMED premise `sailCycleOrder` [OWN.35] by the one-fold lemma
      `SrvwmoXv6Adequacy.fiArmLastCyc` over `shStepF` (`SrvwmoXv6Adequacy.fiOfSco`);
-   * `disk` = the EXPLICIT hypothesis `SrvwmoXv6Adequacy.diskRows` (F9's interface, verbatim the
-     type of `MachOfPf.Hyps.disk`), with its virtio relation `DR` and `DR none [DevLoop 0 .virtio]`;
+   * the disk rows are no longer a parameter: W4 F9 proves them (`MachOfPf.simDisk`);
 3. the closed xv6 theorems conclude at the realized run: `Reducible` and `xv6TracePure`
    (`xv6FsAdequacy_closed`), `xv6NiPhi` (`xv6NiAdequacy`), `unionPhiSync`
    (`unionAdequacyClosed`), the pristine window (`xv6TextAdequacy_closed`, at `SimRel.pow`), and
@@ -38,8 +39,8 @@ the premises' `ds`):
 
 `SimRel` is used ONLY through `machRunOfPfRun`'s `MRun`/`pfObsOf`, through `cutOfPristine` (its
 `pow`/`mem`/`auth` fields, inside W4's file) and `SimRel.pow` (the pristine-window conjunct);
-its device clause (F9 changes it) is never unfolded.  `SimRel` appears in `diskRows` and in the
-conclusion as an opaque relation.
+its device clause (F9's `R-dev`) is never unfolded.  `SimRel` appears in the conclusion as an
+opaque relation.
 
 ## `sailCycleOrder` [OWN.35] — the named ISA-model premise, LABEL-LIST form [R21.s1]
 
@@ -57,18 +58,15 @@ W-SCO (after M1) proves it for xv6's kernel text and removes it from M1.
 * M1's premise set `srvwmoXv6M1Premises σ0 c pst dv` (satisfiable: `srvwmoXv6M1Satisfiable`);
 * the MachCSL boot state `g0`: `g0.gen = 0`, `g0.pow = false`, `σ0.wgdev = g0.m.devs.reset`,
   `diskOf g0.m.devs = fsImgDisk` (always constructible: `SrvwmoXv6Adequacy.bootStateOf`);
-* F9's interface: `DR`, `DR none [DevLoop 0 .virtio]`, `diskRows (candKfetch …) DR g0 (wpInit …)`;
 * `sailCycleOrder` [OWN.35].
 
 ## Deviations from the plan text
 
 1. The plan's §C W5 says W5 CORE also corrects `MachOfPf.lean`'s header deviation 3 ("its owner
-   is OPEN") to [OWN.35]; the W5 CORE brief forbids editing any other file ("New file; edit
-   nothing else"; "do NOT edit Weak/MachOfPf.lean"), so that header (and `PfStepTsoView.lean`'s
-   deviation (4)) is NOT corrected here — left to the orchestrator / F9.
-2. `diskRows` is a COPY of `MachOfPf.Hyps.disk`'s type (no projection of a structure field's
-   type exists); if F9 changes that field, `diskRows` is re-copied (checked by the `disk :=`
-   field of `m1Hyps`, which is a definitional match).
+   is OPEN") to [OWN.35]; W4 F9 made that correction in `MachOfPf.lean`'s header
+   (`PfStepTsoView.lean`'s deviation (4) is left to the orchestrator).
+2. (W4 F9) The former `diskRows` (a copy of `MachOfPf.Hyps.disk`'s type) and its `DR`
+   parameter are DELETED with that field.
 3. `allocprocAns` is a COPY of `Xv6.allocprocTraceAns`'s conclusion (proved by `exact`).
 
 Every helper is `Weak.SrvwmoXv6Adequacy.*`; `Weak.sailCycleOrder` and `Weak.srvwmoXv6M1Core` are
@@ -182,21 +180,7 @@ theorem SrvwmoXv6Adequacy.fiOfSco (hsco : sailCycleOrder)
   rw [e]
   rfl
 
-/-! ## (2) F9's interface, the fetch cut, the boot state -/
-
-/-- **F9's interface** (`MachOfPf.Hyps.disk`, verbatim): every disk-PROGRAM step from a related,
-boot-reachable state is simulated by silent MachCSL steps re-establishing `SimRel` (whose virtio
-part is `DR`).  The ONE hypothesis W4 F9 discharges. -/
-def SrvwmoXv6Adequacy.diskRows (fok : Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop)
-    (DR : Option (DM Dres) → List Expr → Prop) (g0 : GState) (c0 : Wpcfg Pexv6 Efab) : Prop :=
-  ∀ (st rest : List (Nat × Wlabel)) (c c' : Wpcfg Pexv6 Efab) (t : List Expr) (g : GState)
-    (n : Nat) (κ : List Obs) (l : Wlabel),
-    pfRunST pstepEv pclsEv fok TsoShadow.cohSrc c0 st c → MachOfPf.MRun n ([Expr.power], g0) κ (t, g) →
-    MachOfPf.SimRel DR c st t g → wpPfStep pstepEv pclsEv NCPU l c c' → pfStepFacts fok c NCPU l →
-    pfLoadFactsT TsoShadow.cohSrc st c NCPU l → MachOfPf.kindOk c NCPU l c' .disk →
-    pairAdjacent (st ++ (NCPU, l) :: rest) →
-    ∃ (m : Nat) (t' : List Expr) (g' : GState),
-      MachOfPf.MRun m (t, g) [] (t', g') ∧ MachOfPf.SimRel DR c' (st ++ [(NCPU, l)]) t' g'
+/-! ## (2) The fetch cut, the boot state -/
 
 /-- `cutOfPristine`'s window hypothesis, from W3's sibling root: whenever the power is on, every
 byte of `[bcRoLo, bcRoHi)` holds the fresh era's history. -/
@@ -214,22 +198,19 @@ theorem SrvwmoXv6Adequacy.winOfText (g0 : GState) (hg0 : g0.gen = 0) (hp0 : g0.p
 theorem SrvwmoXv6Adequacy.bcRoHiLe : Xv6.bcRoHi ≤ ramEnd := by decide
 
 /-- **`MachOfPf.Hyps` at M1** (`fok = candKfetch bcRoLo bcRoHi`, the pf boot configuration):
-`tso`, `safe`, `cut`, `fi` discharged; `disk` = F9's interface. -/
+`tso`, `safe`, `cut`, `fi` discharged (the disk rows are W4 F9's `MachOfPf.simDisk`, no longer a
+field). -/
 theorem SrvwmoXv6Adequacy.m1Hyps (σ0 : WGState) (g0 : GState) (hg0 : g0.gen = 0)
     (hp0 : g0.pow = false) (hfs : diskOf g0.m.devs = Xv6.fsImgDisk)
-    (DR : Option (DM Dres) → List Expr → Prop)
-    (hdisk : SrvwmoXv6Adequacy.diskRows (candKfetch (Xv6.bcRoLo : Int) (Xv6.bcRoHi : Int)) DR g0
-      (wpInit (imgZ σ0.wgimg) (efInit σ0.wgdev) (epsInit σ0)))
     (hsco : sailCycleOrder) :
-    MachOfPf.Hyps (candKfetch (Xv6.bcRoLo : Int) (Xv6.bcRoHi : Int)) DR g0
+    MachOfPf.Hyps (candKfetch (Xv6.bcRoLo : Int) (Xv6.bcRoHi : Int)) g0
       (wpInit (imgZ σ0.wgimg) (efInit σ0.wgdev) (epsInit σ0)) where
   tso := pfStepTsoProposed _
   safe := fun n κs t g hm =>
     (Xv6.xv6FsAdequacy_closed (hlc := Iris.HasLC.hasLC) g0 hg0 hp0 hfs n κs t g hm).1
   cut := MachOfPf.cutOfPristine Xv6.bcRoLo Xv6.bcRoHi (Nat.le_refl _) SrvwmoXv6Adequacy.bcRoHiLe
-    DR g0 _ (SrvwmoXv6Adequacy.winOfText g0 hg0 hp0 hfs)
+    g0 _ (SrvwmoXv6Adequacy.winOfText g0 hg0 hp0 hfs)
   fi := SrvwmoXv6Adequacy.fiOfSco hsco _ σ0
-  disk := hdisk
 
 /-- The MachCSL machine-off state `srvwmoXv6M1Core` starts from exists for every M1 premise set
 (from the premises' `ds`): the extra boot hypotheses are never vacuous. -/
@@ -284,10 +265,9 @@ theorem SrvwmoXv6Adequacy.xv6Concl (g0 : GState) (hg0 : g0.gen = 0) (hp0 : g0.po
 
 /-! ## (4) THE COMPOSITION -/
 
-/-- **W5 CORE — M1's composition, conditional on F9's disk rows** (plan §C W5, [R21.4]; NOT a
-milestone until F9 discharges `diskRows`).  From M1's premise set (W5-pre), a MachCSL machine off
-`g0` matching the pf boot (generation 0, power off, `fs.img`, `σ0`'s devices its reset), F9's
-interface (`DR`, its boot value, `diskRows`) and the named premise `sailCycleOrder` [OWN.35]:
+/-- **W5 CORE — M1's composition** (plan §C W5, [R21.4]; the disk rows by W4 F9).  From M1's
+premise set (W5-pre), a MachCSL machine off `g0` matching the pf boot (generation 0, power off,
+`fs.img`, `σ0`'s devices its reset) and the named premise `sailCycleOrder` [OWN.35]:
 the shaped pf run `srvwmoXv6M1PfRun` gives (with its projections), its run record `r`, and a
 MachCSL run of `([power], g0)` observing `powerOn :: pfObsOf r` to `(t, g)`, related to the pf
 run's end by `SimRel`, at which every thread is reducible (panics and the two spin arms not
@@ -297,9 +277,6 @@ theorem srvwmoXv6M1Core (σ0 : WGState) (c : Cand) (pst : Nat → List Pexv6) (d
     (hP : srvwmoXv6M1Premises σ0 c pst dv)
     (g0 : GState) (hg0 : g0.gen = 0) (hp0 : g0.pow = false) (hgd : σ0.wgdev = g0.m.devs.reset)
     (hfs : diskOf g0.m.devs = Xv6.fsImgDisk)
-    (DR : Option (DM Dres) → List Expr → Prop) (hDR : DR none [DevLoop 0 .virtio])
-    (hdisk : SrvwmoXv6Adequacy.diskRows (candKfetch (Xv6.bcRoLo : Int) (Xv6.bcRoHi : Int)) DR g0
-      (wpInit (imgZ σ0.wgimg) (efInit σ0.wgdev) (epsInit σ0)))
     (hsco : sailCycleOrder) :
     ∃ (cf : Wpcfg Pexv6 Efab) (st : List (Nat × Wlabel)) (r : List MachOfPf.PfRec) (n : Nat)
       (t : List Expr) (g : GState),
@@ -315,7 +292,7 @@ theorem srvwmoXv6M1Core (σ0 : WGState) (c : Cand) (pst : Nat → List Pexv6) (d
         (wpInit (imgZ σ0.wgimg) (efInit σ0.wgdev) (epsInit σ0)) [] r cf ∧
       MachOfPf.recLabels r = st ∧
       MachOfPf.MRun n ([Expr.power], g0) (Obs.powerOn :: MachOfPf.pfObsOf r) (t, g) ∧
-      MachOfPf.SimRel DR cf st t g ∧
+      MachOfPf.SimRel cf st t g ∧
       -- the closed xv6 theorems at that run
       (∀ e, e ∈ t → PrimStep.Reducible (e, g)) ∧
       Xv6.xv6TracePure Xv6.fsimgCov Xv6.fsimgSb.sbLogstart g ∧
@@ -325,9 +302,9 @@ theorem srvwmoXv6M1Core (σ0 : WGState) (c : Cand) (pst : Nat → List Pexv6) (d
       SrvwmoXv6Adequacy.allocprocAns (Obs.powerOn :: MachOfPf.pfObsOf r) := by
   have hb : wbootFacts σ0 := hP.1
   obtain ⟨cf, st, hrun, hadj, h1, h2, h3, h4⟩ := srvwmoXv6M1PfRun σ0 c pst dv hP
-  have hH := SrvwmoXv6Adequacy.m1Hyps σ0 g0 hg0 hp0 hfs DR hdisk hsco
+  have hH := SrvwmoXv6Adequacy.m1Hyps σ0 g0 hg0 hp0 hfs hsco
   obtain ⟨r, hr, hl, n, t, g, hm, hR⟩ :=
-    MachOfPf.machRunOfPfRun _ DR σ0 g0.m.devs g0 hb hgd hg0 hp0 rfl hDR hH st cf hrun hadj
+    MachOfPf.machRunOfPfRun _ σ0 g0.m.devs g0 hb hgd hg0 hp0 rfl hH st cf hrun hadj
   obtain ⟨hred, hpure, hni, hun, htext, hap⟩ :=
     SrvwmoXv6Adequacy.xv6Concl g0 hg0 hp0 hfs n _ t g hm
   exact ⟨cf, st, r, n, t, g, hrun, hadj, h1, h2, h3, h4, hr, hl, hm, hR, hred, hpure, hni, hun,

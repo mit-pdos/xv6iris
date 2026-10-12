@@ -76,7 +76,8 @@ identity and a lost request is an own-guard skip.
     3 × DRead descriptor (16 bytes each, `descOf`) ;
     DRead type ; DRead sector                                     -- no
       (a malformed chain: DRet DStall, a self-loop)               -- no
-    OUT: DRead payload (elided at `len = 0`)                      -- no
+    OUT: (buf + len wraps past 2^64: DRet DStall, [OWN.40])       -- no
+         DRead payload (elided at `len = 0`)                      -- no
          status DWriteDev, pre = check ; .fetched ; taken guard ;
                                  cache move + .served             -- YES
     IN, len ≠ 0: fill DWriteDev, pre = check ; .fetched ;
@@ -147,6 +148,7 @@ order, to completion before the next pop -- plan §B(11) (viii), [OWN.33]; STRON
 and than MachCSL, the sound direction pf ⊆ MachCSL).  ONE pf-only node: the `DFence` before the
 used-index write (`dusedTail`; 0 MachCSL steps -- `serve` goes from the used element to the
 used index directly), on which the plan's §A(†) rule-4 ordering of (R1)'s disk use rests.
+An OUT capture buffer wrapping past `2^64` stalls the request (Rocq deviation 6; [OWN.40]).
 Also: the avail-index read keeps the M5 ACQUIRE bit (`aq = true`; MachCSL's DMA reads are at
 the top of the store order, so the bit is pf-side only).
 
@@ -172,6 +174,11 @@ the top of the store order, so the bit is pf-side only).
 5. `runDm` threads the FABRIC state as well as the flat memory (a `DWriteDev` / `DPop` reads
    and moves it); the result is `Option A` (`none` = the burst ended without a result: an abort
    or a refused pop).
+6. ([OWN.40], W4 F9) An OUT request whose capture buffer would wrap past `2^64`
+   (`VirtioProg.outWraps`) STALLS (`DRet DStall`) instead of reading: FAITHFUL to the PMAs (no
+   physical memory past the top of the address space), STRONGER than MachCSL's `serve` (whose
+   `dmaRead` wraps its `PAddr`); the sound direction pf ⊆ MachCSL (the MachCSL task is simply
+   never scheduled again).  Unreachable under xv6 (its buffers are 1 KiB, in DRAM).
 
 ## Name map (Rocq → Lean)
 
@@ -189,7 +196,7 @@ the top of the store order, so the bit is pf-side only).
 read), `avail_idx_at` `availIdxAt`, `avail_ring_at` `availRingAt`, `req_at` `reqAt` (at a
 head), `virtio_pending` `virtioPending`.
 Lean-only (all `VirtioProg.`): `popState`, `drainAll`, `reqGuard`, `idxGuard`,
-`preCaptureHead` (= the plan's `pre₁`), `captureMove`, `preCapture`, `preFill`, `preServed`,
+`preCaptureHead` (= the plan's `pre₁`), `outWraps`, `captureMove`, `preCapture`, `preFill`, `preServed`,
 `preNoData`, `preGate`, `usedElemWord`, `idxNode`, `fillNode`, `fetchProg`; the constructors
 `DWriteDev`, `DPop`, `DStall`; `DmWf.writeDev`/`.pop`; `dmWfIdxNode`, `dmWfFillNode`,
 `dmWfFetchProg`, the pre-check lemmas `preCaptureHeadOut` … `preGateOut`, `runDreadDescEq`.
@@ -407,9 +414,17 @@ def VirtioProg.fillNode (h : BitVec 16) (r : VioReq) : DM Dres :=
     (fun s => Virtio.diskRead (Virtio.cacheView s) (Virtio.reqOff r) r.len.toNat)
     (fun _ => dtail h r (preServed h r))
 
+/-- An OUT payload buffer that would WRAP past the top of the physical address space
+(`buf + len > 2^64`; [OWN.40]): no physical memory is there (the PMAs), and the pf read
+(Int addresses, `imgZ` aliasing the boot image past `2^64`) and MachCSL's (wrapping `PAddr`
+arithmetic) would disagree. -/
+def VirtioProg.outWraps (r : VioReq) : Bool := decide (2 ^ 64 < r.buf.toNat + r.len.toNat)
+
 /-- THE SERVICE of a decoded request, from after its fetch to its completion. -/
 def dcomplete (h : BitVec 16) (r : VioReq) : DM Dres :=
   if r.type.toNat = Virtio.blkTOut then
+    -- a capture buffer wrapping past `2^64` STALLS the request ([OWN.40], deviation 6)
+    if VirtioProg.outWraps r then DRet DStall else
     -- THE CAPTURE: the payload read (elided at `len = 0`), folded into the status `pre`
     dreadData r.buf r.len.toNat (fun bs => dtail h r (preCapture h r bs))
   else if r.type.toNat = Virtio.blkTIn ∧ r.len.toNat ≠ 0 then
@@ -635,7 +650,9 @@ theorem VirtioProg.dmWfFillNode (h : BitVec 16) (r : VioReq) (hn : r.len.toNat �
 theorem dmWfDcomplete (h : BitVec 16) (r : VioReq) : DmWf (dcomplete h r) := by
   unfold dcomplete
   split
-  · exact dmWfDreadData _ _ _ (fun _ => dmWfDtail _ _ _)
+  · split
+    · exact .ret _
+    · exact dmWfDreadData _ _ _ (fun _ => dmWfDtail _ _ _)
   · split
     · next hin => exact VirtioProg.dmWfFillNode h r hin.2
     · exact dmWfDtail _ _ _
