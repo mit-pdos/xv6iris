@@ -599,7 +599,7 @@ def csr_name_map_backwards (arg_ : String) : SailM (BitVec 12) := do
   | .some result => (pure result)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def csr_name_write_callback (name : String) (value : (BitVec 64)) : SailM Unit := do

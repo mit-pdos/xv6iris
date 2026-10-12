@@ -225,7 +225,7 @@ def privileged_isa_version_name_backwards (arg_ : String) : SailM Privileged_ISA
   | "1.13" => (pure Privileged_ISA_1_13)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def privileged_isa_version_name_forwards_matches (arg_ : Privileged_ISA_Version) : Bool :=

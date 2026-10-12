@@ -227,7 +227,7 @@ def split_access (addr : (BitVec k_n)) (width : Nat) : SailM (Int × Int) := do
   let width_align := (BitVec.countTrailingZeros (to_bits (l := (12 +i 1)) width))
   let bytes_per_access := (2 ^i (Min.min addr_align width_align))
   let num_accesses := (Int.tdiv width bytes_per_access)
-  assert (width == (num_accesses *i bytes_per_access)) "sys/split_access_utils.sail:53.49-53.50"
+  (assert (width == (num_accesses *i bytes_per_access)) "sys/split_access_utils.sail:53.49-53.50")
   (pure (num_accesses, bytes_per_access))
 
 /-- Type quantifiers: width : Nat, 0 < width ∧ width ≤ max_mem_access -/
@@ -286,7 +286,7 @@ def split_on_page_boundary (addr : (BitVec k_n)) (width : Nat) : SailM (Int × I
     (do
       let nbytes_to_boundary :=
         ((2 ^i 3) -i (BitVec.toNatInt (Sail.BitVec.extractLsb addr (3 -i 1) 0)))
-      assert (nbytes_to_boundary <b width) "sys/split_access_utils.sail:111.37-111.38"
+      (assert (nbytes_to_boundary <b width) "sys/split_access_utils.sail:111.37-111.38")
       (pure (nbytes_to_boundary, (width -i nbytes_to_boundary))))
 
 /-- Type quantifiers: width : Nat, is_mem_width(width) -/

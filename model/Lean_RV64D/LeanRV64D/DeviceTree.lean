@@ -208,7 +208,7 @@ open Architecture
 open AmocasOddRegisterReservedBehavior
 
 def mmu_type (_ : Unit) : SailM String := do
-  assert (xlen == 64) "postlude/device_tree.sail:14.21-14.22"
+  (assert (xlen == 64) "postlude/device_tree.sail:14.21-14.22")
   if ((hartSupports Ext_Sv57) : Bool)
   then (pure "sv57")
   else

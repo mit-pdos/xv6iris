@@ -290,7 +290,7 @@ def pmpMatchAddr (typ_0 : physaddr) (width : (BitVec 64)) (ent : (BitVec 8)) (pm
           addr width)))
   | .NA4 =>
     (do
-      assert (sys_pmp_grain <b 1) "NA4 cannot be selected when PMP grain G >= 1."
+      (assert (sys_pmp_grain <b 1) "NA4 cannot be selected when PMP grain G >= 1.")
       let begin := ((BitVec.toNatInt pmpaddr) *i 4)
       (pure (pmpRangeMatch begin (begin +i 4) addr width)))
   | .NAPOT =>

@@ -282,7 +282,7 @@ def vmem_read_addr (vaddr : virtaddr) (width : Nat) (access : (MemoryAccessType 
     if ((sys_misaligned_order_decreasing && do_split_access) : Bool)
     then
       (do
-        assert (not res) "sys/vmem_utils.sail:118.19-118.20"
+        (assert (not res) "sys/vmem_utils.sail:118.19-118.20")
         let access_addr := (Virtaddr (BitVec.addInt vaddr_bits in_page_bytes))
         match (← (translate_and_read_value access_addr next_page_bytes access aq rl res)) with
         | .Err e => SailME.throw ((Err e) : (Result (BitVec (8 * width)) ExecutionResult))
@@ -301,7 +301,7 @@ def vmem_read_addr (vaddr : virtaddr) (width : Nat) (access : (MemoryAccessType 
         if (res : Bool)
         then
           (do
-            assert (width == access_width) "sys/vmem_utils.sail:136.36-136.37"
+            (assert (width == access_width) "sys/vmem_utils.sail:136.36-136.37")
             (load_reservation (bits_of_physaddr paddr) width))
         else (pure ())
         (pure (Sail.BitVec.updateSubrange data ((8 *i access_width) -i 1) 0 v))) ) : SailME
@@ -310,7 +310,7 @@ def vmem_read_addr (vaddr : virtaddr) (width : Nat) (access : (MemoryAccessType 
     if (((not sys_misaligned_order_decreasing) && do_split_access) : Bool)
     then
       (do
-        assert (not res) "sys/vmem_utils.sail:145.19-145.20"
+        (assert (not res) "sys/vmem_utils.sail:145.19-145.20")
         let access_addr := (Virtaddr (BitVec.addInt vaddr_bits in_page_bytes))
         match (← (translate_and_read_value access_addr next_page_bytes access aq rl res)) with
         | .Err e => SailME.throw ((Err e) : (Result (BitVec (8 * width)) ExecutionResult))
@@ -365,7 +365,7 @@ def vmem_write_addr (vaddr : virtaddr) (width : Nat) (data : (BitVec (8 * width)
     if ((sys_misaligned_order_decreasing && do_split_access) : Bool)
     then
       (do
-        assert (not (is_store_conditional access)) "sys/vmem_utils.sail:215.44-215.45"
+        (assert (not (is_store_conditional access)) "sys/vmem_utils.sail:215.44-215.45")
         let access_addr := (Virtaddr (BitVec.addInt vaddr_bits in_page_bytes))
         let write_value := (Sail.BitVec.extractLsb data ((8 *i width) -i 1) (8 *i in_page_bytes))
         match (← (translate_and_write_value access_addr next_page_bytes write_value access aq rl
@@ -384,7 +384,7 @@ def vmem_write_addr (vaddr : virtaddr) (width : Nat) (data : (BitVec (8 * width)
           (pure (Err (← (memory_exception vaddr e)))))
     | .Ok (paddr, pbmt, _) =>
       (do
-        assert (res == (is_store_conditional access)) "sys/vmem_utils.sail:231.48-231.49"
+        (assert (res == (is_store_conditional access)) "sys/vmem_utils.sail:231.48-231.49")
         if ((res && (not (match_reservation (bits_of_physaddr paddr)))) : Bool)
         then
           (do
@@ -416,7 +416,7 @@ def vmem_write_addr (vaddr : virtaddr) (width : Nat) (data : (BitVec (8 * width)
     if (((not sys_misaligned_order_decreasing) && do_split_access) : Bool)
     then
       (do
-        assert (not (is_store_conditional access)) "sys/vmem_utils.sail:266.44-266.45"
+        (assert (not (is_store_conditional access)) "sys/vmem_utils.sail:266.44-266.45")
         let access_addr := (Virtaddr (BitVec.addInt vaddr_bits in_page_bytes))
         let write_value := (Sail.BitVec.extractLsb data ((8 *i width) -i 1) (8 *i in_page_bytes))
         match (← (translate_and_write_value access_addr next_page_bytes write_value access aq rl

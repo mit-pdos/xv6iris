@@ -1163,11 +1163,11 @@ def rvfi_halt_exec_packet (_ : Unit) : SailM Unit := do
   writeReg rvfi_inst_data (Sail.BitVec.updateSubrange (← readReg rvfi_inst_data) 143 136 0x01#8)
 
 def rvfi_get_int_data (_ : Unit) : SailM (BitVec 320) := do
-  assert (← readReg rvfi_int_data_present) "reading uninitialized data"
+  (assert (← readReg rvfi_int_data_present) "reading uninitialized data")
   readReg rvfi_int_data
 
 def rvfi_get_mem_data (_ : Unit) : SailM (BitVec 704) := do
-  assert (← readReg rvfi_mem_data_present) "reading uninitialized data"
+  (assert (← readReg rvfi_mem_data_present) "reading uninitialized data")
   readReg rvfi_mem_data
 
 /-- Type quantifiers: width : Nat, 0 < width ∧ width ≤ 32 -/

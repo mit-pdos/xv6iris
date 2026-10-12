@@ -189,6 +189,33 @@ new = """  match x with
 assert old in s, "unwrapValue shape changed; update tools/regen_sail_model.sh"
 open(p, 'w').write(s.replace(old, new))
 PY
+#  6. Lean 4.34 made `assert` a do-element of the experimental intrinsic-verification
+#     syntax, which hijacks the backend's `assert cond "msg"` statements (they parse as the
+#     intrinsic assert applied to `cond "msg"`).  Parenthesising them, `(assert cond "msg")`,
+#     restores the Sail function call; the term is unchanged.
+python3 - "$OUT_DIR"/Lean_RV64D/LeanRV64D/*.lean <<'PY'
+import re, sys
+for path in sys.argv[1:]:
+    lines = open(path, encoding="utf-8").read().split("\n")
+    out, i, changed = [], 0, 0
+    while i < len(lines):
+        m = re.match(r'^(\s*)assert (.*)$', lines[i])
+        if not m:
+            # a branch whose body is the assert: `then assert c "m"` (one line)
+            l2, k = re.subn(r'\b(then|else|=>) assert (.*")$', r'\1 (assert \2)', lines[i])
+            out.append(l2); changed += k; i += 1; continue
+        indent, rest = m.groups()
+        j = i; depth = rest.count("(") - rest.count(")")
+        while depth > 0 and j + 1 < len(lines):           # a statement that spans several lines
+            j += 1; depth += lines[j].count("(") - lines[j].count(")")
+        if j == i:
+            out.append(f"{indent}(assert {rest})")
+        else:
+            out.append(f"{indent}(assert {rest}"); out.extend(lines[i + 1:j]); out.append(lines[j] + ")")
+        changed += 1; i = j + 1
+    if changed:
+        open(path, "w", encoding="utf-8").write("\n".join(out)); pass
+PY
 # The installed copy of Xv6Extras.lean must be the master copy verbatim
 # (sail only substitutes THE_MODULE_NAME, which the master does not use).
 cmp -s "$XV6_EXTRAS" "$OUT_DIR/Lean_RV64D/LeanRV64D/Xv6Extras.lean" || {

@@ -213,7 +213,7 @@ def zbb_rtypew_mnemonic_backwards (arg_ : String) : SailM bropw_zbb := do
   | "rorw" => (pure RORW)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def zbb_rtypew_mnemonic_forwards_matches (arg_ : bropw_zbb) : Bool :=
@@ -240,7 +240,7 @@ def zbb_rtype_mnemonic_backwards (arg_ : String) : SailM brop_zbb := do
   | "ror" => (pure ROR)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def zbb_rtype_mnemonic_forwards_matches (arg_ : brop_zbb) : Bool :=
@@ -275,7 +275,7 @@ def zbb_extop_mnemonic_backwards (arg_ : String) : SailM extop_zbb := do
   | "zext.h" => (pure ZEXTH)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def zbb_extop_mnemonic_forwards_matches (arg_ : extop_zbb) : Bool :=

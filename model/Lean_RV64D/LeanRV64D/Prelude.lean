@@ -323,9 +323,9 @@ def to_bits {l : _} (n : Nat) : (BitVec l) :=
 /-- Type quantifiers: n : Int, l : Nat, l ≥ 0, l ≥ 0 -/
 def to_bits_checked {l : _} (n : Int) : SailM (BitVec l) := do
   let bv := (get_slice_int l n 0)
-  assert ((BitVec.toNatInt bv) == n) (HAppend.hAppend "Couldn't convert integer "
+  (assert ((BitVec.toNatInt bv) == n) (HAppend.hAppend "Couldn't convert integer "
     (HAppend.hAppend (Int.repr n)
-      (HAppend.hAppend " to " (HAppend.hAppend (Int.repr l) " bits without overflow."))))
+      (HAppend.hAppend " to " (HAppend.hAppend (Int.repr l) " bits without overflow.")))))
   (pure bv)
 
 /-- Type quantifiers: n : Int, l : Nat, l ≥ 0, l ≥ 0 -/

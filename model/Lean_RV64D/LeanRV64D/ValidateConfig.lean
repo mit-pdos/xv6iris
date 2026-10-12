@@ -267,7 +267,7 @@ def require_Sv39 (ext_name : String) : Bool :=
   else true
 
 def require_virtual_memory (ext_name : String) : SailM Bool := do
-  assert (xlen == 64) "postlude/validate_config.sail:53.19-53.20"
+  (assert (xlen == 64) "postlude/validate_config.sail:53.19-53.20")
   (pure (require_Sv39 ext_name))
 
 def check_mmu_config (_ : Unit) : SailM Bool := do

@@ -294,7 +294,7 @@ def count_ones (x : (BitVec k_n)) : SailM Nat := do
       then
         (do
           let new_count := (count +i 1)
-          assert (new_count ≤b (Sail.BitVec.length x)) "core/arithmetic.sail:85.28-85.29"
+          (assert (new_count ≤b (Sail.BitVec.length x)) "core/arithmetic.sail:85.28-85.29")
           (pure new_count))
       else (pure count)
   (pure loop_vars)

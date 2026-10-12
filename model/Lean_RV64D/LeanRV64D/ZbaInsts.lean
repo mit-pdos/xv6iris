@@ -215,7 +215,7 @@ def zba_rtypeuw_mnemonic_backwards (arg_ : String) : SailM (BitVec 2) := do
   | "sh3add.uw" => (pure 0b11#2)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def zba_rtypeuw_mnemonic_forwards_matches (arg_ : (BitVec 2)) : Bool :=
@@ -241,7 +241,7 @@ def zba_rtype_mnemonic_backwards (arg_ : String) : SailM (BitVec 2) := do
   | "sh3add" => (pure 0b11#2)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def zba_rtype_mnemonic_forwards_matches (arg_ : (BitVec 2)) : Bool :=

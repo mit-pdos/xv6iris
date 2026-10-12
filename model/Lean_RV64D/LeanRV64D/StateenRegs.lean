@@ -231,7 +231,7 @@ def stateen_bit_index_backwards (arg_ : Nat) : SailM stateen_bit := do
   | 1 => (pure STATEEN_FCSR)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def stateen_bit_index_forwards_matches (arg_ : stateen_bit) : Bool :=

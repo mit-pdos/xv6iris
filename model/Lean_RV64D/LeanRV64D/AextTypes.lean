@@ -264,7 +264,7 @@ def amo_mnemonic_backwards (arg_ : String) : SailM amoop := do
   | "amocas" => (pure AMOCAS)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def amo_mnemonic_forwards_matches (arg_ : amoop) : Bool :=
@@ -309,7 +309,7 @@ def maybe_aqrl_backwards (arg_ : String) : SailM (Bool × Bool) := do
   | "" => (pure (false, false))
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def maybe_aqrl_forwards_matches (arg_ : (Bool × Bool)) : Bool :=

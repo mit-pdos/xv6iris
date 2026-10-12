@@ -765,7 +765,7 @@ def trap_handler (del_priv : Privilege) (c : TrapCause) (pc : (BitVec 64)) (info
       (prepare_trap_vector del_priv (← readReg mcause)))
   | .Supervisor =>
     (do
-      assert (← (currentlyEnabled Ext_S)) "no supervisor mode present for delegation"
+      (assert (← (currentlyEnabled Ext_S)) "no supervisor mode present for delegation")
       writeReg scause (Sail.BitVec.updateSubrange (← readReg scause) (64 -i 1) (64 -i 1)
         (bool_to_bit is_interrupt))
       writeReg scause (Sail.BitVec.updateSubrange (← readReg scause) (64 -i 2) 0

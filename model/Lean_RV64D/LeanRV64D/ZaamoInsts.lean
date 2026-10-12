@@ -221,7 +221,7 @@ def encdec_amoop_backwards (arg_ : (BitVec 5)) : SailM amoop := do
   | 0b00101 => (pure AMOCAS)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def encdec_amoop_forwards_matches (arg_ : amoop) : Bool :=

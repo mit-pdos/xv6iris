@@ -221,7 +221,7 @@ def ext_exc_type_bits_backwards (arg_ : (BitVec 6)) : SailM Unit := do
   | 0b011000 => (pure ())
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def ext_exc_type_bits_forwards_matches (arg_ : Unit) : Bool :=

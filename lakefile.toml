@@ -1,12 +1,13 @@
 name = "machcsl"
 defaultTargets = ["MachCSL", "Xv6"]
 
-# iris-lean lives in the `Iris/` subdirectory of the upstream monorepo.
+# Transfinite Iris-Lean (fork dongjaelee1/iris-lean, branch `transfinite`), as a PATH dependency on a
+# built worktree while the port is in progress: /work/wt/iris-lean-tf-nat (nat step-index choice,
+# branch agent/tf-nat) or /work/wt/iris-lean-tf-ordinal (ordinal choice, branch agent/tf-ordinal).
+# LANDING CHECKLIST: re-pin by git (url + rev of the fork, subDir = "Iris") before merging into `lean`.
 [[require]]
 name = "iris"
-git = "https://github.com/leanprover-community/iris-lean"
-rev = "728a17140939e49af9236f7cb0d037da9ec52435"
-subDir = "Iris"
+path = "/work/wt/iris-lean-tf-nat/Iris"
 
 # lean-sail with the free-monad concurrency interface (see vendor/lean-sail/README.md).
 [[require]]
@@ -18,6 +19,9 @@ path = "vendor/lean-sail"
 name = "Lean_RV64D"
 path = "model/Lean_RV64D"
 
+# `maxRecDepth = 100000` tree-wide (Lean >= 4.34): the default 512 is too small for `simp` on the
+# `k_step` goals of the kernel proofs and for the kernel's own bound (which now follows this
+# option) on the long proof-mode proofs; the heavy theorems used to set it one by one.
 # `linter.unusedVariables` / `linter.unusedSectionVars` are off tree-wide:
 # a Spec statement names its preconditions for the reader (and after Rocq)
 # though the declaration itself never mentions them, and the section
@@ -26,12 +30,12 @@ path = "model/Lean_RV64D"
 # warning in the build log is worth reading.
 [[lean_lib]]
 name = "MachCSL"
-leanOptions = { autoImplicit = false, relaxedAutoImplicit = false, linter.unusedVariables = false, linter.unusedSectionVars = false }
+leanOptions = { maxRecDepth = 100000, autoImplicit = false, relaxedAutoImplicit = false, linter.unusedVariables = false, linter.unusedSectionVars = false }
 
 # The xv6 kernel proofs, kept separate from the MachCSL framework.
 [[lean_lib]]
 name = "Xv6"
-leanOptions = { autoImplicit = false, relaxedAutoImplicit = false, linter.unusedVariables = false, linter.unusedSectionVars = false }
+leanOptions = { maxRecDepth = 100000, autoImplicit = false, relaxedAutoImplicit = false, linter.unusedVariables = false, linter.unusedSectionVars = false }
 
 # The device-conformance suite (vtest-lean/): the machine model re-checked
 # against behaviours captured from QEMU.  NOT a default target: a red test is
@@ -40,4 +44,4 @@ leanOptions = { autoImplicit = false, relaxedAutoImplicit = false, linter.unused
 [[lean_lib]]
 name = "Vtest"
 srcDir = "vtest-lean"
-leanOptions = { autoImplicit = false, relaxedAutoImplicit = false, linter.unusedVariables = false, linter.unusedSectionVars = false }
+leanOptions = { maxRecDepth = 100000, autoImplicit = false, relaxedAutoImplicit = false, linter.unusedVariables = false, linter.unusedSectionVars = false }

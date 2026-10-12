@@ -214,7 +214,7 @@ def encdec_cbop_zicbop_backwards (arg_ : (BitVec 5)) : SailM cbop_zicbop := do
   | 0b00011 => (pure PREFETCH_W)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def encdec_cbop_zicbop_forwards_matches (arg_ : cbop_zicbop) : Bool :=
@@ -237,7 +237,7 @@ def prefetch_mnemonic_backwards (arg_ : String) : SailM cbop_zicbop := do
   | "prefetch.w" => (pure PREFETCH_W)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def prefetch_mnemonic_forwards_matches (arg_ : cbop_zicbop) : Bool :=

@@ -331,7 +331,7 @@ def check_PTE_permission (access : (MemoryAccessType mem_payload)) (priv : Privi
   let pte_R := (bit_to_bool (_get_PTE_Flags_R pte_flags))
   let pte_W := (bit_to_bool (_get_PTE_Flags_W pte_flags))
   let pte_X := (bit_to_bool (_get_PTE_Flags_X pte_flags))
-  assert (zopz0zJzJzK pte_W (pte_R || (not pte_X))) "sys/vmem_pte.sail:149.39-149.40"
+  (assert (zopz0zJzJzK pte_W (pte_R || (not pte_X))) "sys/vmem_pte.sail:149.39-149.40")
   let priv_ok ← (( do
     match priv with
     | .User => (pure pte_U)
@@ -347,7 +347,7 @@ def check_PTE_permission (access : (MemoryAccessType mem_payload)) (priv : Privi
       if (((not pte_R) && (pte_W && (not pte_X))) : Bool)
       then
         (do
-          assert (bool_bit_backwards (_get_MEnvcfg_SSE (← readReg menvcfg))) "sys/vmem_pte.sail:168.33-168.34"
+          (assert (bool_bit_backwards (_get_MEnvcfg_SSE (← readReg menvcfg))) "sys/vmem_pte.sail:168.33-168.34")
           let shadow_stack_ok ← (( do
             match access with
             | .InstructionFetch () => (pure false)

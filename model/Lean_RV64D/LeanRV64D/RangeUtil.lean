@@ -210,15 +210,15 @@ def range_subset (a_begin : (BitVec k_n)) (a_size : (BitVec k_n)) (b_begin : (Bi
   ((zopz0zIzJ_u a_begin b_end) && ((zopz0zIzJ_u a_end b_end) && (zopz0zIzJ_u a_begin a_end)))
 
 def test_range_subset (_ : Unit) : SailM Unit := do
-  assert (range_subset 0x0#4 0x0#4 0x0#4 0x0#4) "core/range_util.sail:27.41-27.42"
-  assert (range_subset 0x1#4 0x0#4 0x1#4 0x0#4) "core/range_util.sail:28.41-28.42"
-  assert (range_subset 0x0#4 0x0#4 0x0#4 0x1#4) "core/range_util.sail:29.41-29.42"
-  assert (range_subset 0x1#4 0x0#4 0x0#4 0x1#4) "core/range_util.sail:30.41-30.42"
-  assert (range_subset 0x8#4 0xC#4 0x8#4 0xC#4) "core/range_util.sail:31.41-31.42"
-  assert (not (range_subset 0x8#4 0xC#4 0x9#4 0xC#4)) "core/range_util.sail:32.46-32.47"
-  assert (not (range_subset 0x8#4 0xC#4 0x8#4 0xB#4)) "core/range_util.sail:33.46-33.47"
-  assert (not (range_subset 0x3E#8 0xE0#8 0xC1#8 0x9F#8)) "core/range_util.sail:34.50-34.51"
-  assert (not (range_subset 0xC1#8 0x9F#8 0x3E#8 0xE0#8)) "core/range_util.sail:35.50-35.51"
+  (assert (range_subset 0x0#4 0x0#4 0x0#4 0x0#4) "core/range_util.sail:27.41-27.42")
+  (assert (range_subset 0x1#4 0x0#4 0x1#4 0x0#4) "core/range_util.sail:28.41-28.42")
+  (assert (range_subset 0x0#4 0x0#4 0x0#4 0x1#4) "core/range_util.sail:29.41-29.42")
+  (assert (range_subset 0x1#4 0x0#4 0x0#4 0x1#4) "core/range_util.sail:30.41-30.42")
+  (assert (range_subset 0x8#4 0xC#4 0x8#4 0xC#4) "core/range_util.sail:31.41-31.42")
+  (assert (not (range_subset 0x8#4 0xC#4 0x9#4 0xC#4)) "core/range_util.sail:32.46-32.47")
+  (assert (not (range_subset 0x8#4 0xC#4 0x8#4 0xB#4)) "core/range_util.sail:33.46-33.47")
+  (assert (not (range_subset 0x3E#8 0xE0#8 0xC1#8 0x9F#8)) "core/range_util.sail:34.50-34.51")
+  (assert (not (range_subset 0xC1#8 0x9F#8 0x3E#8 0xE0#8)) "core/range_util.sail:35.50-35.51")
 
 def range_subset_equals (a_begin : (BitVec 8)) (a_size : (BitVec 8)) (b_begin : (BitVec 8)) (b_size : (BitVec 8)) : Bool :=
   (zopz0zJzJzK

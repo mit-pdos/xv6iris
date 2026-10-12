@@ -279,7 +279,7 @@ def nfields_string_backwards (arg_ : String) : SailM Int := do
   | "seg8" => (pure 8)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 /-- Type quantifiers: arg_ : Nat, arg_ > 0 ∧ arg_ ≤ 8 -/
@@ -315,7 +315,7 @@ def encdec_nfields_pow2_forwards (arg_ : (BitVec 3)) : SailM Int := do
   | 0b111 => (pure 8)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 /-- Type quantifiers: arg_ : Nat, arg_ ∈ {1, 2, 4, 8} -/
@@ -359,7 +359,7 @@ def nfields_pow2_string_backwards (arg_ : String) : SailM Int := do
   | "8" => (pure 8)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 /-- Type quantifiers: arg_ : Nat, arg_ ∈ {1, 2, 4, 8} -/

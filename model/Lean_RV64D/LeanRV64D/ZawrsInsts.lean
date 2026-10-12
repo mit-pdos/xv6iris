@@ -213,7 +213,7 @@ def encdec_wrsop_backwards (arg_ : (BitVec 12)) : SailM wrsop := do
   | 0b000000001101 => (pure WRS_NTO)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def encdec_wrsop_forwards_matches (arg_ : wrsop) : Bool :=

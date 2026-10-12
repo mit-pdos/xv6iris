@@ -235,7 +235,7 @@ def float_class_onehot_bits_backwards (arg_ : (BitVec 10)) : SailM float_class :
   | 0b1000000000 => (pure float_class_qnan)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def float_class_onehot_bits_forwards_matches (arg_ : float_class) : Bool :=

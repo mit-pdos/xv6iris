@@ -233,7 +233,7 @@ def ntl_name_backwards (arg_ : String) : SailM ntl_type := do
   | "all" => (pure NTL_ALL)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def ntl_name_forwards_matches (arg_ : ntl_type) : Bool :=
@@ -259,7 +259,7 @@ def encdec_ntl_backwards (arg_ : (BitVec 5)) : SailM ntl_type := do
   | 0b00101 => (pure NTL_ALL)
   | _ =>
     (do
-      assert false "Pattern match failure at unknown location"
+      (assert false "Pattern match failure at unknown location")
       throw Error.Exit)
 
 def encdec_ntl_forwards_matches (arg_ : ntl_type) : Bool :=
