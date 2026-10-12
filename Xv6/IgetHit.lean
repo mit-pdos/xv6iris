@@ -265,10 +265,10 @@ theorem ig_hit (RH : RELEASE_HOOK) (c cpu : CPU) (k : KCtx) (spie spp : Bool) (h
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [c9, h9] next c3 hp3
   iintro Hk Hpc
   k_step_gen (wp_s_j c3 _ (KA.«iget» + 0x68#64) true 36#21)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4 £ Hlc
   iintro Hk Hpc
   unfold igTailC
-  ihave Htail := wpNext_at _ _ _ c4 _ (fun hh => (hp4 hh).trans ((hp3 hh).trans (hpr hh))) $$ Htail
+  ihave Htail := wpNext_at _ _ _ c4 _ (fun hh => (hp4 hh).trans ((hp3 hh).trans (hpr hh))) $$ Htail Hlc
   obtain ⟨p21, p22, p23, p24, p25, p26, p27⟩ := hpins
   iapply Htail $$ %_ %j %qn [] Hk Hpc Href Hlic
   ipureintro

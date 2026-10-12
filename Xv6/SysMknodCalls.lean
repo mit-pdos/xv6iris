@@ -99,7 +99,7 @@ theorem sys_mknod_create (CR : CREATE) (Γ : SchedNames) [ClaimIs GF Γ]
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) Fex ∗
     creCommits (fsGammaL fscFs) T_DEVICE_w.toNat major.toNat minor.toNat
       Nm Nd (P (nparElems (bview plen pfun)).length) Farm (pfamTriv (fun _ _ _ _ => iprop(True))) Fun Fok ∗
-    (∀ c : CPU, sysMknodCreateK k' plen pfun major minor γ pid V M u Sb ns Nm Nd P Pmiss Farm Fun Fok Fex c)
+    (∀ c : CPU, £ 1 -∗ sysMknodCreateK k' plen pfun major minor γ pid V M u Sb ns Nm Nd P Pmiss Farm Fun Fok Fex c)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hblk, Hpath, Hbs, Hir, Hop, Htx, Hst, Hdl, Hcre, HK⟩
   unfold sysfileEnv
@@ -123,10 +123,9 @@ theorem sys_mknod_create (CR : CREATE) (Γ : SchedNames) [ClaimIs GF Γ]
   iapply h
   iframe Hk Hpc Hte Hce Hblk Hpath Hbs Hir Hop Htx Hst Hdl Hcre
   iframe #
-  iapply wpNext_intro_pin
-  iintro %c %_
-  iapply HK $$ %c
-
+  iapply wpNext_intro_pin_lc
+  iintro %c %_ Hlc
+  iapply HK $$ %c Hlc
 /-! ## iunlockput (the node create returned) -/
 
 end

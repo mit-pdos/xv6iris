@@ -124,9 +124,9 @@ theorem sscpy_loop (kb : KCtx) (dst src : BitVec 64) (bss : List (BitVec 8)) (dq
     -- beq a1,a3 : taken (a1 = src + 15 = a3)
     k_step_gen (wp_s_branch cpu _ (KA.«safestrcpy» + 0x18#64) false 18#13 11#5 13#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-      with [h11, h13, ss_beq_ite src 15 (by omega)] next c1 hp1
+      with [h11, h13, ss_beq_ite src 15 (by omega)] next c1 hp1 £ Hlc
     iintro Hk Hpc
-    ihave HΦ' := wpNext_at _ _ _ c1 _ (fun h => hp1 h) $$ HΦ
+    ihave HΦ' := wpNext_at _ _ _ c1 _ (fun h => hp1 h) $$ HΦ Hlc
     iapply HΦ' $$ %R %cur %15 Hk Hpc Hdst Hsrc
     ipureintro
     exact ⟨hcur, by rw [h15], by omega, ssKept_refl R⟩
@@ -173,7 +173,7 @@ theorem sscpy_loop (kb : KCtx) (dst src : BitVec 64) (bss : List (BitVec 8)) (dq
     -- bnez a4,80000e84
     k_step_gen (wp_s_branch c5 _ (KA.«safestrcpy» + 0x28#64) true 8176#13 14#5 0#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-      with [RegMap.set_apply, Xv6.ite_bne_byte bk] next c6 hp6
+      with [RegMap.set_apply, Xv6.ite_bne_byte bk] next c6 hp6 £ Hlc
     iintro Hk Hpc
     have hpin6 : kb.sie = false ∨ kb.proc = 0#64 → c6 = cpu :=
       fun h => (hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))
@@ -181,7 +181,7 @@ theorem sscpy_loop (kb : KCtx) (dst src : BitVec 64) (bss : List (BitVec 8)) (dq
     · -- the byte is 0: exit to the terminator
       ihave Hpc := (show pcIs (GF := GF) c6 (if bk = 0#8 then (KA.«safestrcpy» + 0x2a#64) else (KA.«safestrcpy» + 0x18#64)) ⊢
           pcIs c6 (KA.«safestrcpy» + 0x2a#64) from by rw [if_pos hbk0]) $$ Hpc
-      ihave HΦ' := wpNext_at _ _ _ c6 _ hpin6 $$ HΦ
+      ihave HΦ' := wpNext_at _ _ _ c6 _ hpin6 $$ HΦ Hlc
       iapply HΦ' $$ %_ %(cur.set k bk) %(k + 1) Hk Hpc Hdst Hsrc
       ipureintro
       refine ⟨by rw [List.length_set]; exact hcur, ?_, by omega, ?_⟩

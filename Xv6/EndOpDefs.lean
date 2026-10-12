@@ -187,12 +187,12 @@ theorem eo_prologue (cpu : CPU) (k : KCtx) (hK : 8 ≤ k.avail) :
     $$ [- $Hk $Hpc] next c4 hp4
   iintro Hk Hpc F3
   k_step_gen (wp_s_addi c4 _ (KA.«end_op» + 0xa#64) true 64#12 8#5 2#5 (by decide))
-    $$ [- $Hk $Hpc] next c5 hp5
+    $$ [- $Hk $Hpc] next c5 hp5 £ Hlc
   iintro Hk Hpc
   k_norm_g
   ihave HΦ := wpNext_at _ _ _ c5 _
     (fun h => (hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans ((hp1 h).trans (hp0 h))))))
-    $$ HΦ
+    $$ HΦ Hlc
   iapply HΦ $$ Hk Hpc [F0 F1 F2 F3] [F4 F5 F6 F7]
   · unfold eoFrame4
     iframe F0 F1 F2 F3
@@ -241,12 +241,12 @@ theorem eo_epilogue (cpu : CPU) (k : KCtx) (hK : 8 ≤ k.avail) (R : RegMap)
   k_step_gen (wp_s_pop d4 _ (KA.«end_op» + 0x9a#64) true 64#12 8 MachCSL.imm_p64) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next d5 hq5
   iintro Hk Hpc
-  k_step_gen (wp_s_ret d5 _ (KA.«end_op» + 0x9c#64) true 1#5) $$ [- $Hk $Hpc] next d6 hq6
+  k_step_gen (wp_s_ret d5 _ (KA.«end_op» + 0x9c#64) true 1#5) $$ [- $Hk $Hpc] next d6 hq6 £ Hlc
   iintro Hk Hpc
   k_norm_g
   ihave HΦ := wpNext_at _ _ _ d6 _
     (fun h => (hq6 h).trans ((hq5 h).trans ((hq4 h).trans ((hq3 h).trans ((hq2 h).trans (hq1 h))))))
-    $$ HΦ
+    $$ HΦ Hlc
   iapply HΦ $$ Hk Hpc
 
 end
@@ -818,14 +818,14 @@ variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLin
 /-- The caller's continuation, at whichever hart the thread ends on.
 NOTHING LOG-SPECIFIC COMES BACK: the operation is retired. -/
 def eoPost (k : KCtx) (pidv : BitVec 32) (dqp : DFrac) : CPU → IProp GF :=
-  fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+  fun cpu' => iprop(£ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗ wpLoop cpu')
 
 theorem eoPost_elim (k : KCtx) (pidv : BitVec 32) (dqp : DFrac) (cpu' : CPU) :
-    eoPost (GF := GF) k pidv dqp cpu' ⊢ ∀ (spie spp : Bool) (R' : RegMap),
+    eoPost (GF := GF) k pidv dqp cpu' ⊢ £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k.regs R'⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗

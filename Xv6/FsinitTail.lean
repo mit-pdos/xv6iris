@@ -69,7 +69,7 @@ of `Xv6.wp_fsinit_eb_body`, at EVERY hart -- a `true` crossing at a process
 across a park. -/
 def fsinitCont [Fscfg] [Icfg] [CurCtx] (k : KCtx) (pidv : BitVec 32) (dqp : DFrac)
     (vMagic vSize vNblocks vNlog : BitVec 32) (bsSb : List (BitVec 8)) : IProp GF :=
-  iprop(∀ (cpu' : CPU) (spie spp : Bool) (R' : RegMap),
+  iprop(∀ (cpu' : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
@@ -107,9 +107,9 @@ theorem fsinit_cont_of_spec [Fscfg] [Icfg] [CurCtx] {j : Nat} (hj : j < NPROC) (
       bslots 3 -∗ irefSlot -∗ iregBoot -∗ wpLoop cpu'))
     ⊢ fsinitCont (GF := GF) k pidv dqp vMagic vSize vNblocks vNlog bsSb := by
   unfold fsinitCont
-  iintro H %c
+  iintro H %c Hlc
   iapply wpNext_at true k.proc cpu c _ (fun h => h.elim (fun h => absurd h (by decide))
-    (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))) $$ H
+    (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))) $$ H Hlc
 
 set_option maxHeartbeats 8000000 in
 /-- **`+0x58 .. +0x62`: THE ONLY EXIT** (Rocq's `fsi_epilogue`). -/
@@ -148,13 +148,13 @@ theorem fsinit_epilogue [Fscfg] [Icfg] [CurCtx] (cpu : CPU) (k : KCtx) (spie spp
   k_norm_g
   iframe
   inext
-  k_next_e
+  k_next_e £ Hcr
   iintro Hk Hpc
   unfold fsinitCont fsinitCells
   icases Hcells with ⟨C0, C1, C2, C3, C4, C5, C6, C7⟩
   ispecialize Hnext $$ %cpu
   have hcs := bc_calleeSaved_epi2 k.regs R p19 p20 p21 p22 p23 p24 p25 p26 p27
-  iapply Hnext $$ %spie %spp %_ %hcs [Hk] Hpc Hte Hce Hpid C0 C1 C2 C3 C4 C5 C6 C7 Hlc
+  iapply Hnext $$ Hcr %spie %spp %_ %hcs [Hk] Hpc Hte Hce Hpid C0 C1 C2 C3 C4 C5 C6 C7 Hlc
     Hsl Hiref Hboot
   iexact Hk
 

@@ -93,7 +93,7 @@ theorem srd_fail_arm (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bi
     procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ fdFrags V.fdg sts ∗
     filereadFsEnv ∗ sysReadIn V v sts (argZ v2) F Rd Rin Rp Rpe P ∗ P ∗
-    (∀ c : CPU, sysReadPost k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P c)
+    (∀ c : CPU, £ 1 -∗ sysReadPost k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P c)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hte, Hce, Hcore, Howe, Hfr, Henv, Hin, HP, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -106,7 +106,7 @@ theorem srd_fail_arm (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bi
   iintro Hk Hpc
   -- +0x2c  bltz a5 : taken
   k_step_e (wp_s_branch cpu _ (KA.«sys_read» + 0x2c#64) false 20#13 15#5 0#5 (by decide) bop.BLT)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, MachCSL.bltz_m1]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, MachCSL.bltz_m1] £ Hlc
   iintro Hk Hpc
   ihave Hframe := srdCells_close _ _ _ wf lo hi wp hal $$ Hcells
   ihave Hblk := (procPrivFd_split γ (procAddr j) pid V M).2 $$ [Hcore Howe]
@@ -120,11 +120,11 @@ theorem srd_fail_arm (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bi
   rotate_right 1
   k_norm_g
   iframe
-  iintro %c' %R' %⟨hcs, h10'⟩ Hk Hpc Hte Hce
+  iintro %c' Hlc %R' %⟨hcs, h10'⟩ Hk Hpc Hte Hce
   have hm1 : R' 10#5 = 0xFFFFFFFFFFFFFFFF#64 := by
     rw [h10']; try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true]
   unfold sysReadPost
-  iapply HΦ $$ %c' %spie %spp %R' %V.upt %M %0 %V.ev [] Hk Hpc Hte Hce %(Nat.le_refl V.ev) Hblk Hfr Hfso [HP]
+  iapply HΦ $$ %c' Hlc %spie %spp %R' %V.upt %M %0 %V.ev [] Hk Hpc Hte Hce %(Nat.le_refl V.ev) Hblk Hfr Hfso [HP]
   · ipureintro
     refine ⟨hcs, UMemL.extSz_refl _ _, by omega, Or.inr (by rw [hm1]; decide),
       UMemL.umemWrote_refl _ _ _⟩
@@ -157,7 +157,7 @@ theorem srd_ok_back (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bit
     fileRef γ kk q st ∗ fdStAuth V.fdg fd0 st ∗ fdFrags V.fdg sts ∗
     filereadEnvOut st ∗ (filereadEnvOut st -∗ filereadFsOut) ∗
     filereadArms V.gen V.upt st (argZ v2) F Rd Rin Rp Rpe P (R 10#5) M' a1 ∗
-    (∀ c : CPU, sysReadPost k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P c)
+    (∀ c : CPU, £ 1 -∗ sysReadPost k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P c)
     ⊢ wpLoop (GF := GF) cpu := by
   subst a1
   iintro ⟨Hk, Hpc, Hcells, Hte, Hce, Hcore, Howe, Href, Hauth, Hfr, Henvo, Henvb, Harms, HΦ⟩
@@ -171,10 +171,10 @@ theorem srd_ok_back (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bit
   iapply (srd_tail cpu k spie spp R hK6 hr) $$ [- $Hk $Hpc $Hframe $Hte $Hce]
   rotate_right 1
   iframe
-  iintro %c' %R' %⟨hcs, h10⟩ Hk Hpc Hte Hce
+  iintro %c' Hlc %R' %⟨hcs, h10⟩ Hk Hpc Hte Hce
   unfold sysReadPost
   rw [← h10] at hr10
-  iapply HΦ $$ %c' %spie %spp %R' %P' %M' %d %kv [] Hk Hpc Hte Hce %hkv [Hcore Howe] Hfr Hfso [Harms]
+  iapply HΦ $$ %c' Hlc %spie %spp %R' %P' %M' %d %kv [] Hk Hpc Hte Hce %hkv [Hcore Howe] Hfr Hfso [Harms]
   · ipureintro; exact ⟨hcs, hext, hd, hr10, hwin⟩
   · iapply (procPrivFd_split γ (procAddr j) pid { V.updEv kv with upt := P' } M').2
     iframe Hcore Howe
@@ -207,7 +207,7 @@ theorem srd_ok_jal (FR : FILEREAD) (Γ : SchedNames) [ClaimIs GF Γ]
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ fdFrags V.fdg sts ∗
     filereadFsEnv ∗ consoleReadyApp ∗
     sysReadIn V v sts (argZ v2) F Rd Rin Rp Rpe P ∗ P ∗
-    (∀ c : CPU, sysReadPost k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P c)
+    (∀ c : CPU, £ 1 -∗ sysReadPost k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P c)
     ⊢ wpLoop (GF := GF) cpu := by
   have hK' : 6 + filereadSlots ≤ k.avail := hK
   have hK6 : 6 ≤ k.avail := by rw [filereadSlots_eq] at hK'; omega
@@ -250,7 +250,7 @@ theorem srd_ok_jal (FR : FILEREAD) (Γ : SchedNames) [ClaimIs GF Γ]
   case ha0 => k_norm_g; exact h10
   case ha2 => k_norm_g; exact h12
   -- ===== back from fileread (at any hart) =====
-  iintro %cpu
+  iintro %cpu Hlc
   unfold filereadPost
   iintro %spie3 %spp3 %R3 %P' %M' %d %kv %⟨hcs3, hext, hdle, hr10, hwin⟩ Hk Hpc Hte Hce Href %hkv
     Hcore Henvo Harms
@@ -289,7 +289,7 @@ theorem srd_ok_loads (FR : FILEREAD) (Γ : SchedNames) [ClaimIs GF Γ]
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ fdFrags V.fdg sts ∗
     filereadFsEnv ∗ consoleReadyApp ∗
     sysReadIn V v sts (argZ v2) F Rd Rin Rp Rpe P ∗ P ∗
-    (∀ c : CPU, sysReadPost k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P c)
+    (∀ c : CPU, £ 1 -∗ sysReadPost k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P c)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, #Hpi, #Hpe, #Hkl, #Hav, Hcells, Hte, Hce, Hcore, Howe, Hfr, Henv, #Hready, Hin,
     HP, HΦ⟩
@@ -361,7 +361,7 @@ theorem srd_argfd_call (AF : ARGFD) (FR : FILEREAD) (Γ : SchedNames) [ClaimIs G
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ fdFrags V.fdg sts ∗
     filereadFsEnv ∗ consoleReadyApp ∗
     sysReadIn V v sts (argZ v2) F Rd Rin Rp Rpe P ∗ P ∗
-    (∀ c : CPU, sysReadPost k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P c)
+    (∀ c : CPU, £ 1 -∗ sysReadPost k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P c)
     ⊢ wpLoop (GF := GF) cpu := by
   have hK' : 6 + filereadSlots ≤ k.avail := hK
   have hK6 : 6 ≤ k.avail := by rw [filereadSlots_eq] at hK'; omega
@@ -402,7 +402,7 @@ theorem srd_argfd_call (AF : ARGFD) (FR : FILEREAD) (Γ : SchedNames) [ClaimIs G
   isplitl [Hpfd]
   · iexact Hpfd
   -- ===== back from argfd =====
-  iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hcore Howe Hpost
+  iintro %cpu Hlc %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hcore Howe Hpost
   k_norm_g [srd_ret_28, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   have hr2 : srdRegs k R2 := by
     refine srdRegs_cs _ _ _ ?_ hcs2
@@ -452,7 +452,7 @@ theorem srd_argint_call (AI : ARGINT) (AF : ARGFD) (FR : FILEREAD) (Γ : SchedNa
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ fdFrags V.fdg sts ∗
     filereadFsEnv ∗ consoleReadyApp ∗
     sysReadIn V v sts (argZ v2) F Rd Rin Rp Rpe P ∗ P ∗
-    (∀ c : CPU, sysReadPost k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P c)
+    (∀ c : CPU, £ 1 -∗ sysReadPost k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P c)
     ⊢ wpLoop (GF := GF) cpu := by
   have hK' : 6 + filereadSlots ≤ k.avail := hK
   iintro ⟨Hk, Hpc, #Hpi, #Hpe, #Hkl, #Hav, Hcells, Hte, Hce, Hcore, Howe, Hfr, Henv, #Hready, Hin,
@@ -488,7 +488,7 @@ theorem srd_argint_call (AI : ARGINT) (AF : ARGFD) (FR : FILEREAD) (Γ : SchedNa
     have := hK; rw [sysReadSlots_eq] at this
     unfold argintSlots argrawSlots; omega
   -- ===== back from argint =====
-  iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Htf Htfp Hn
+  iintro %cpu Hlc %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Htf Htfp Hn
   k_norm_g [srd_ret_1c, srd_n_addr, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   have hr1 : srdRegs k R1 := by
     refine srdRegs_cs _ _ _ ?_ hcs1
@@ -531,9 +531,9 @@ theorem sys_read_main (AA : ARGADDR) (AI : ARGINT) (AF : ARGFD) (FR : FILEREAD)
   have ht0 : curTier = KTier.kpt := hct.symm.trans htier
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- THE CONTRACT'S CONTINUATION, hart-free
-  ihave HΦ : (∀ c : CPU, sysReadPost k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P c) $$ [Hnext]
-  · iintro %c
-    iapply wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext
+  ihave HΦ : (∀ c : CPU, £ 1 -∗ sysReadPost k γ j pid V M sts v v1 v2 F Rd Rin Rp Rpe P c) $$ [Hnext]
+  · iintro %c Hlc
+    iapply wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext Hlc
   icases (procPrivFd_split γ (procAddr j) pid V M).1 $$ Hblk with ⟨Hcore, Howe⟩
   simp only [sysReadAddr]
   -- +0x00 .. +0x06  the prologue
@@ -576,7 +576,7 @@ theorem sys_read_main (AA : ARGADDR) (AI : ARGINT) (AF : ARGFD) (FR : FILEREAD)
     have := hK; rw [sysReadSlots_eq] at this
     unfold argaddrSlots argrawSlots; omega
   -- ===== back from argaddr =====
-  iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Htf Htfp Hp
+  iintro %cpu Hlc %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Htf Htfp Hp
   k_norm_g [srd_ret_12, MachCSL.add_sext_4056, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   have hr1 : srdRegs k R1 := by
     refine srdRegs_cs _ _ _ ?_ hcs1

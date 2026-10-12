@@ -483,7 +483,7 @@ theorem wh_tail (BW : BWRITE) (BE : BRELSE)
        ⌜hdrDec bsq = (n, W.map (fun w => w.toNat))⌝ -∗
        diskSeqPermit (genId (GF := GF)) (some (1024 * logHdrBno logstart, bsq))
          (Q bsq)) ∗
-    (∀ (cpu' : CPU) (spie spp : Bool) (R' : RegMap) (bsq : List (BitVec 8)),
+    (∀ (cpu' : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (bsq : List (BitVec 8)),
       ⌜calleeSaved k.regs R'⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
@@ -602,9 +602,9 @@ theorem wh_tail (BW : BWRITE) (BE : BRELSE)
   k_norm_g
   iframe
   inext
-  k_next_e
+  k_next_e £ Hlc
   iintro Hk Hpc
-  iapply HΦ $$ %cpu %spie3 %spp3 %_ %bs' [] Hk Hpc [Hte] [Hce] [Hpid] [HlhN] [HW] [Hauth] [Hch]
+  iapply HΦ $$ %cpu Hlc %spie3 %spp3 %_ %bs' [] Hk Hpc [Hte] [Hce] [Hpid] [HlhN] [HW] [Hauth] [Hch]
     [] [Hslot] [HQ]
   · ipureintro
     exact bc_calleeSaved_epi2 k.regs R3
@@ -654,7 +654,7 @@ theorem writeHead_proof (BD : BREAD) (BW : BWRITE) (BE : BRELSE) : WRITE_HEAD :=
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hwf.2.2.2.1; omega)
   -- the caller's continuation is hart-free (a park's crossing, at a proc)
-  ihave HΦ : ∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (bs' : List (BitVec 8)),
+  ihave HΦ : ∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (bs' : List (BitVec 8)),
       ⌜calleeSaved k.regs R'⌝ -∗
       kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
@@ -665,9 +665,9 @@ theorem writeHead_proof (BD : BREAD) (BW : BWRITE) (BE : BRELSE) : WRITE_HEAD :=
       fsChalf γfs (logHdrBno logstart) bs' -∗
       ⌜bs'.length = BSIZE ∧ hdrN bs' = n ∧ hdrDec bs' = (n, W.map (fun w => w.toNat))⌝ -∗
       bslot -∗ ▷ Q bs' -∗ wpLoop c $$ [Hnext]
-  · iintro %c
+  · iintro %c Hlc
     iapply wpNext_at true k.proc cpu c _ (fun hc => Or.elim hc (fun hx => absurd hx (by decide))
-      (fun hx => absurd (hproc ▸ hx) (procAddr_nonzero hj))) $$ Hnext
+      (fun hx => absurd (hproc ▸ hx) (procAddr_nonzero hj))) $$ Hnext Hlc
   icases (show logFrozen (GF := GF) logstart dev ⊢
       wordPointsTo lDev 4 DFrac.discard dev ∗
       wordPointsTo lStart 4 DFrac.discard (BitVec.ofNat 32 logstart) from by

@@ -458,11 +458,11 @@ theorem wp_prologue_sys_exec [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) 
   iintro Hk Hpc Hf8
   k_step_gen (wp_s_sd c2 _ (pc + 4#64) true 464#12 2#5 8#5 (by decide) w2) $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc Hf16
-  k_step_gen (wp_s_addi c3 _ (pc + 6#64) true 480#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c4 hp4
+  k_step_gen (wp_s_addi c3 _ (pc + 6#64) true 480#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c4 hp4 £ Hlc
   iintro Hk Hpc
   k_norm_g
   ihave HΦ' := wpNext_at _ _ _ c4 _
-    (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ
+    (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc %hal [Hf8 Hf16] Hsp H10 Hpath Hargv H59 H60
   iframe
 
@@ -499,10 +499,10 @@ theorem wp_epilogue_sys_exec [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) 
   k_step_gen (wp_s_pop c2 _ (pc + 4#64) true 480#12 60 sys_exec_imm_p480) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c3 hp3
   iintro Hk Hpc
-  k_step_gen (wp_s_ret c3 _ (pc + 6#64) true 1#5) $$ [- $Hk $Hpc] next c4 hp4
+  k_step_gen (wp_s_ret c3 _ (pc + 6#64) true 1#5) $$ [- $Hk $Hpc] next c4 hp4 £ Hlc
   iintro Hk Hpc
   ihave HΦ' := wpNext_at _ _ _ c4 _
-    (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ
+    (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc
 
 end Code
@@ -590,7 +590,7 @@ theorem sys_exec_exit (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
     kctx cpu (((k.withSpie spie spp).pushed 60).withRegs R) ∗ pcIs cpu (sysExecAddr + 0x104#64) ∗
     sysExecRaS0 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗ sysExecRest (k.regs 2#5) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    (∀ (c' : CPU) (R' : RegMap), ⌜calleeSaved k.regs R' ∧ R' 10#5 = R 10#5⌝ -∗
+    (∀ (c' : CPU), £ 1 -∗ ∀ (R' : RegMap), ⌜calleeSaved k.regs R' ∧ R' 10#5 = R 10#5⌝ -∗
       kctx c' ((k.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) cpu := by
@@ -610,12 +610,12 @@ theorem sys_exec_exit (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
   k_norm_g
   iframe
   inext
-  iapply wpNext_intro_pin
-  iintro %c %hpin Hk Hpc
+  iapply wpNext_intro_pin_lc
+  iintro %c %hpin Hlc Hk Hpc
   have hpin' : k.sie = false → c = cpu := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
-  iapply HΦ $$ %c %_ [] Hk Hpc Hte Hce
+  iapply HΦ $$ %c Hlc %_ [] Hk Hpc Hte Hce
   ipureintro
   refine ⟨hcs, ?_⟩
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
@@ -950,10 +950,10 @@ def sysExecBadSt (k : KCtx) (A : SysExecArgs) (spie spp : Bool) (R : RegMap) (P 
 process pins nothing; `SysOpenParts.sys_open_post_pin`). -/
 theorem sys_exec_post_pin (k : KCtx) (A : SysExecArgs) (hS : SysExecStatic k A) (cpu : CPU)
     (K : CPU → IProp GF) :
-    wpNext true k.proc cpu K ⊢ ∀ c : CPU, K c := by
-  iintro H %c
+    wpNext true k.proc cpu K ⊢ ∀ c : CPU, £ 1 -∗ K c := by
+  iintro H %c Hlc
   iapply (wpNext_at true k.proc cpu c _ (fun h => h.elim (fun h => absurd h (by decide))
-    (fun h => absurd h (by rw [hS.hproc]; exact procAddr_nonzero hS.hj)))) $$ H
+    (fun h => absurd h (by rw [hS.hproc]; exact procAddr_nonzero hS.hj)))) $$ H Hlc
 
 end Vocab
 
@@ -1023,13 +1023,13 @@ def sysExecHeadBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) : IProp GF :=
   iprop(∀ c : CPU,
     kctx c k -∗ pcIs c sysExecAddr -∗ trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
     sysExecEnv Γ A -∗ procPrivFd A.γ (procAddr A.j) A.pid A.V A.M -∗
-    ((∀ (c' : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (kv : Nat),
+    ((∀ (c' : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (kv : Nat),
         ⌜calleeSaved k.regs R' ∧ R' 10#5 = 0xFFFFFFFFFFFFFFFF#64 ∧ A.V.upt.extSz A.V.sz P' ∧
           A.V.ev ≤ kv⌝ -∗
         kctx c' ((k.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k.regs 1#5)) -∗
         trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗
         procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P' kv) (sysExecM2 A P') -∗ wpLoop c') ∧
-     (∀ (c' : CPU) (spie spp : Bool) (R : RegMap) (P' : UPtd) (kv : Nat) (pl rest : List (BitVec 8)),
+     (∀ (c' : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R : RegMap) (P' : UPtd) (kv : Nat) (pl rest : List (BitVec 8)),
         ⌜sysExecPinsE k R ∧ A.V.upt.extSz A.V.sz P' ∧ A.V.ev ≤ kv ∧ pl.length < 128 ∧
           argPathOf (sysExecIm A) A.v0.toNat pl ∧ (k.regs 2#5).toNat % 8 = 0⌝ -∗
         kctx c' (((k.withSpie spie spp).pushed 60).withRegs R) -∗ pcIs c' (sysExecAddr + 0x28#64) -∗
@@ -1053,7 +1053,7 @@ def sysExecSetupBody (k : KCtx) : IProp GF :=
     kctx c (((k.withSpie spie spp).pushed 60).withRegs R) -∗ pcIs c (sysExecAddr + 0x28#64) -∗
     trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
     sysExecSpillsFree (k.regs 2#5) -∗ sysfileAny (sysExecArgv (k.regs 2#5)) 256 -∗
-    (∀ (c' : CPU) (R' : RegMap), ⌜sysExecLoopPins k R' 0⌝ -∗
+    (∀ (c' : CPU), £ 1 -∗ ∀ (R' : RegMap), ⌜sysExecLoopPins k R' 0⌝ -∗
       kctx c' (((k.withSpie spie spp).pushed 60).withRegs R') -∗ pcIs c' (sysExecAddr + 0x56#64) -∗
       trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗
       sysExecSpills (k.regs 2#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5)
@@ -1077,7 +1077,7 @@ def sysExecStepBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) : IProp GF :=
     sysExecLoopSt k A spie spp R P kv i pg alen afun uvf pl rest (sysExecAddr + 0x56#64)
       c -∗
     sysExecEnv Γ A -∗
-    (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (kv' : Nat) (i' : Nat)
+    (∀ (c' : CPU), £ 1 -∗ ∀ (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (kv' : Nat) (i' : Nat)
         (pg' : Nat → BitVec 64)
         (alen' : Nat → Nat) (afun' : Nat → Nat → BitVec 8) (uvf' : Nat → BitVec 64),
       ((⌜i' = i + 1⌝ ∗ sysExecLoopSt k A spie' spp' R' P' kv' i' pg' alen' afun' uvf' pl
@@ -1100,7 +1100,7 @@ def sysExecLoopBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) : IProp GF :=
     sysExecLoopSt k A spie spp R P kv i pg alen afun uvf pl rest (sysExecAddr + 0x56#64)
       c -∗
     sysExecEnv Γ A -∗
-    (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (kv' : Nat) (i' : Nat)
+    (∀ (c' : CPU), £ 1 -∗ ∀ (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (kv' : Nat) (i' : Nat)
         (pg' : Nat → BitVec 64)
         (alen' : Nat → Nat) (afun' : Nat → Nat → BitVec 8) (uvf' : Nat → BitVec 64),
       ((⌜bytesToWord (umemRead (sysExecIm A) (A.v1 + BitVec.ofNat 64 (8 * i')).toNat 8) = 0#64⌝ ∗
@@ -1134,7 +1134,7 @@ def sysExecFreeBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) (base ea : Bi
     sysExecArgvFrom (k.regs 2#5) m t pg -∗ sysExecPages pg afun m t -∗
     -- the running proc's lend (permit sweep L3b): each kfree steps it
     actLend k.proc ke -∗
-    (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap) (pcx : BitVec 64),
+    (∀ (c' : CPU), £ 1 -∗ ∀ (spie' spp' : Bool) (R' : RegMap) (pcx : BitVec 64),
       ⌜pcx = sysExecAddr + ea ∨ pcx = sysExecAddr + base + 14#64⌝ -∗ ⌜sysExecKeepS1 R R'⌝ -∗
       kctx c' (((k.withSpie spie' spp').pushed 60).withRegs R') -∗ pcIs c' pcx -∗
       trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗
@@ -1152,7 +1152,7 @@ def sysExecBadTailBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) : IProp GF
       (pg : Nat → BitVec 64)
       (afun : Nat → Nat → BitVec 8) (pl rest : List (BitVec 8)),
     sysExecBadSt k A spie spp R P kv t pg afun pl rest c -∗ sysExecEnv Γ A -∗
-    (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap) (kv' : Nat),
+    (∀ (c' : CPU), £ 1 -∗ ∀ (spie' spp' : Bool) (R' : RegMap) (kv' : Nat),
       ⌜calleeSaved k.regs R' ∧ R' 10#5 = 0xFFFFFFFFFFFFFFFF#64 ∧ A.V.upt.extSz A.V.sz P ∧
         A.V.ev ≤ kv'⌝ -∗
       kctx c' ((k.withSpie spie' spp').withRegs R') -∗ pcIs c' (jumpPc (k.regs 1#5)) -∗
@@ -1177,7 +1177,7 @@ def sysExecSuccTailBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) : IProp G
     sysExecArgvArr (k.regs 2#5) (sysExecArgvL pg t) -∗ sysExecPages pg afun 0 t -∗
     -- the running proc's lend, borrowed by the break from kexec's block (L3b)
     actLend k.proc ke -∗
-    (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap), ⌜calleeSaved k.regs R' ∧ R' 10#5 = rv⌝ -∗
+    (∀ (c' : CPU), £ 1 -∗ ∀ (spie' spp' : Bool) (R' : RegMap), ⌜calleeSaved k.regs R' ∧ R' 10#5 = rv⌝ -∗
       kctx c' ((k.withSpie spie' spp').withRegs R') -∗ pcIs c' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗
       (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) -∗ wpLoop c') -∗
@@ -1206,7 +1206,7 @@ def sysExecBreakBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) (U : SysExec
     myPay U.gn U.Q -∗
     sysExecAuPre U.Fs (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.V.pvSecc U.Q U.P U.Pmiss U.Fo (sysExecIm A)
       A.v0 A.v1 U.sts U.cs A.pid -∗
-    (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap) (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
+    (∀ (c' : CPU), £ 1 -∗ ∀ (spie' spp' : Bool) (R' : RegMap) (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
       ⌜calleeSaved k.regs R'⌝ -∗ ⌜execArgsOf (sysExecIm A) A.v1 i alen afun⌝ -∗
       ⌜A.V.upt.extSz A.V.sz P⌝ -∗
       -- the count the argument fetches left the block at (deviation 9);
@@ -1258,8 +1258,8 @@ theorem sys_exec_compose (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx
   iapply hhead $$ %cpu Hk Hpc Hte Hce Henv Hblk
   isplit
   · -- ---- argstr failed: -1, BEFORE kexec, the bundle unspent ----
-    iintro %c' %spie %spp %R' %P' %kv %⟨hcs, ha0, hext, hkv⟩ Hk Hpc Hte Hce Hblk
-    iapply HΦ $$ %c' %spie %spp %R' %P' %kv %hcs %hext %hkv Hk Hpc Hte Hce Hbs Hir
+    iintro %c' Hlc %spie %spp %R' %P' %kv %⟨hcs, ha0, hext, hkv⟩ Hk Hpc Hte Hce Hblk
+    iapply HΦ $$ %c' Hlc %spie %spp %R' %P' %kv %hcs %hext %hkv Hk Hpc Hte Hce Hbs Hir
     unfold sysExecArms
     iexists sysExecV2 A P' kv, sysExecM2 A P'
     iframe Hblk
@@ -1270,11 +1270,11 @@ theorem sys_exec_compose (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx
     ileft
     iexact Hau
   · -- ---- the path is in: run the rest of the function ----
-    iintro %c1 %spie %spp %R %P' %kv %pl %rest %⟨hpins, hext, hkv, hpl, hpath, hal⟩ Hk Hpc Hte Hce
+    iintro %c1 Hlc %spie %spp %R %P' %kv %pl %rest %⟨hpins, hext, hkv, hpl, hpath, hal⟩ Hk Hpc Hte Hce
       Hblk Hrs
       Hsp H10 Hpb Hargv H59 H60
     iapply hsetup $$ %c1 %spie %spp %R %⟨hpins, hal⟩ Hk Hpc Hte Hce Hsp Hargv
-    iintro %c2 %R2 %hp2 Hk Hpc Hte Hce Hsp Harr
+    iintro %c2 Hlc %R2 %hp2 Hk Hpc Hte Hce Hsp Harr
     iapply hloop $$ %c2 %spie %spp %R2 %P' %kv %0 %(fun _ => 0#64) %(fun _ => 0) %(fun _ _ => 0#8)
       %(fun _ => 0#64) %pl %rest [Hk Hpc Hte Hce Hblk Hrs Hsp H10 Hpb H59 H60 Harr] Henv
     · unfold sysExecLoopSt sysExecCarry sysExecPages
@@ -1287,12 +1287,12 @@ theorem sys_exec_compose (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx
       · simp only [Nat.sub_self, List.range'_zero]
         iapply BigSepL.bigSepL_nil.2
         iempintro
-    iintro %c3 %spie3 %spp3 %R3 %P3 %k3 %i3 %pg3 %al3 %af3 %uv3 (⟨%hnul, Hbrk⟩ | Hbadst)
+    iintro %c3 Hlc %spie3 %spp3 %R3 %P3 %k3 %i3 %pg3 %al3 %af3 %uv3 (⟨%hnul, Hbrk⟩ | Hbadst)
     · -- ---- the break: argv[i] = 0, then kexec ----
       iapply hbreak $$ %c3 %spie3 %spp3 %R3 %P3 %k3 %i3 %pg3 %al3 %af3 %uv3 %pl %rest %hnul
         %⟨hpl, hpath⟩ Hbrk Henv Hbs Hir Hpay Hau
-      iintro %c4 %spie4 %spp4 %R4 %V' %M' %hcs4 %hargs %hext3 %hk3 Harms Hk Hpc Hte Hce Hbs Hir Hblk
-      iapply HΦ $$ %c4 %spie4 %spp4 %R4 %P3 %k3 %hcs4 %hext3 %hk3 Hk Hpc Hte Hce Hbs Hir
+      iintro %c4 Hlc %spie4 %spp4 %R4 %V' %M' %hcs4 %hargs %hext3 %hk3 Harms Hk Hpc Hte Hce Hbs Hir Hblk
+      iapply HΦ $$ %c4 Hlc %spie4 %spp4 %R4 %P3 %k3 %hcs4 %hext3 %hk3 Hk Hpc Hte Hce Hbs Hir
       unfold sysExecArms
       iexists V', M'
       iframe Hblk
@@ -1314,8 +1314,8 @@ theorem sys_exec_compose (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx
         ipureintro; exact ⟨hpath, hargs⟩
     · -- ---- bad: free what was allocated and return -1 ----
       iapply hbad $$ %c3 %spie3 %spp3 %R3 %P3 %k3 %i3 %pg3 %af3 %pl %rest Hbadst Henv
-      iintro %c4 %spie4 %spp4 %R4 %k4 %⟨hcs4, ha0, hext3, hk4⟩ Hk Hpc Hte Hce Hblk
-      iapply HΦ $$ %c4 %spie4 %spp4 %R4 %P3 %k4 %hcs4 %hext3 %hk4 Hk Hpc Hte Hce Hbs Hir
+      iintro %c4 Hlc %spie4 %spp4 %R4 %k4 %⟨hcs4, ha0, hext3, hk4⟩ Hk Hpc Hte Hce Hblk
+      iapply HΦ $$ %c4 Hlc %spie4 %spp4 %R4 %P3 %k4 %hcs4 %hext3 %hk4 Hk Hpc Hte Hce Hbs Hir
       unfold sysExecArms
       iexists sysExecV2 A P3 k4, sysExecM2 A P3
       iframe Hblk

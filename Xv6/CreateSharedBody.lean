@@ -176,10 +176,10 @@ theorem create_post_pin {j : Nat} (hj : j < NPROC) (cpu : CPU) (k : KCtx)
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) :
     wpNext true k.proc cpu (createPost k plen pfun ty major minor γ pid V M u Sb ns
         dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex) ⊢
-      ∀ c : CPU, createPost k plen pfun ty major minor γ pid V M u Sb ns
+      ∀ c : CPU, £ 1 -∗ createPost k plen pfun ty major minor γ pid V M u Sb ns
         dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex c := by
-  iintro H %c
-  iapply (wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu)) $$ H
+  iintro H %c Hlc
+  iapply (wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu)) $$ H Hlc
 
 end Env
 
@@ -578,7 +578,7 @@ theorem create_tail (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (v3 : 
     byteBuf (createBuf (k.regs 2#5)) (DFrac.own 1) (bview 14 nf) ∗
     byteBuf (k.regs 2#5 + 0xFFFFFFFFFFFFFFBE#64) (DFrac.own 1) tl ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    (∀ (c' : CPU) (R' : RegMap), ⌜calleeSaved k.regs R' ∧ R' 10#5 = R 18#5⌝ -∗
+    (∀ (c' : CPU), £ 1 -∗ ∀ (R' : RegMap), ⌜calleeSaved k.regs R' ∧ R' 10#5 = R 18#5⌝ -∗
       kctx c' ((k.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) cpu := by
@@ -602,10 +602,10 @@ theorem create_tail (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (v3 : 
   k_norm_g
   iframe
   inext
-  k_next_e
+  k_next_e £ Hlc
   iintro Hk Hpc
   k_norm_g
-  iapply Hnext $$ %cpu %_ [] Hk Hpc Hte Hce
+  iapply Hnext $$ %cpu Hlc %_ [] Hk Hpc Hte Hce
   ipureintro
   refine ⟨?_, ?_⟩
   · unfold calleeSaved
@@ -706,7 +706,7 @@ def createAllocBody (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (ty major 
     creCommits (fsGammaL fscFs) ty.toNat major.toNat minor.toNat
       Nm Nd (P (nparElems (bview plen pfun)).length) Farm Fdots Fun Fok -∗
     -- the contract's own continuation, hart-free
-    (∀ c' : CPU, createPost k plen pfun ty major minor γ pid V M u Sb ns
+    (∀ c' : CPU, £ 1 -∗ createPost k plen pfun ty major minor γ pid V M u Sb ns
       dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex c') -∗
     wpLoop c)
 
@@ -829,7 +829,7 @@ def createMkdirBody (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (ty major 
     pfAt (acreCommitAtGenNm (fsGammaL fscFs) appE
       (creChild ty.toNat major.toNat minor.toNat) Nm
         (P (nparElems (bview plen pfun)).length) Farm) Fok -∗
-    (∀ c' : CPU, createPost k plen pfun ty major minor γ pid V M u Sb ns
+    (∀ c' : CPU, £ 1 -∗ createPost k plen pfun ty major minor γ pid V M u Sb ns
       dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex c') -∗
     wpLoop c)
 
@@ -957,7 +957,7 @@ def createFailBody (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (ty major m
     pfAt (acreCommitAtGenNm (fsGammaL fscFs) appE
       (creChild ty.toNat major.toNat minor.toNat) Nm
         (P (nparElems (bview plen pfun)).length) Farm) Fok -∗
-    (∀ c' : CPU, createPost k plen pfun ty major minor γ pid V M u Sb ns
+    (∀ c' : CPU, £ 1 -∗ createPost k plen pfun ty major minor γ pid V M u Sb ns
       dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex c') -∗
     wpLoop c)
 
@@ -1075,7 +1075,7 @@ def createFailMkdirBody (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8)
     pfAt (acreCommitAtGenNm (fsGammaL fscFs) appE
       (creChild ty.toNat major.toNat minor.toNat) Nm
         (P (nparElems (bview plen pfun)).length) Farm) Fok -∗
-    (∀ c' : CPU, createPost k plen pfun ty major minor γ pid V M u Sb ns
+    (∀ c' : CPU, £ 1 -∗ createPost k plen pfun ty major minor γ pid V M u Sb ns
       dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex c') -∗
     wpLoop c)
 

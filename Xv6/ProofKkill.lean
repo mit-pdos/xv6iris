@@ -279,11 +279,11 @@ theorem kk_rel_nomatch (RE : RELEASE) {GF : BundledGFunctors.{0}}
   -- bne s1,s3
   k_step_gen (wp_s_branch c4 _ (KA.«kkill» + 0x38#64) false 8170#13 9#5 19#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [h19', kk_bne_last i hi] next c5 hq5
+    with [h19', kk_bne_last i hi] next c5 hq5 £ Hlc
   iintro Hk Hpc
   have hpinZ : k.sie = false ∨ k.proc = 0#64 → c5 = cur := fun h =>
     (hq5 h).trans ((hq4 h).trans ((hq3 h).trans (hpin h)))
-  ihave HPhi := wpNext_at _ _ _ c5 _ hpinZ $$ HPhi
+  ihave HPhi := wpNext_at _ _ _ c5 _ hpinZ $$ HPhi Hlc
   ihave Hpc := kl_pcIs_cast c5 (if i + 1 = NPROC then (KA.«kkill» + 0x3c#64) else (KA.«kkill» + 0x22#64))
     (if (false : Bool) then (KA.«kkill» + 0x54#64) else
       if i + 1 = NPROC then (KA.«kkill» + 0x3c#64) else (KA.«kkill» + 0x22#64)) rfl $$ Hpc
@@ -371,11 +371,11 @@ theorem kk_rel_found (RE : RELEASE) {GF : BundledGFunctors.{0}}
   have hkept3 : kkKept Rr R3 := ⟨d2, d20, d21, d22, d23, d24, d25, d26, d27⟩
   -- c.li a0,0
   k_step_gen (wp_s_addi c3 _ (KA.«kkill» + 0x52#64) true 0#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hq4
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hq4 £ Hlc
   iintro Hk Hpc
   have hpinZ : k.sie = false ∨ k.proc = 0#64 → c4 = cur := fun h =>
     (hq4 h).trans ((hq3 h).trans (hpin h))
-  ihave HPhi := wpNext_at _ _ _ c4 _ hpinZ $$ HPhi
+  ihave HPhi := wpNext_at _ _ _ c4 _ hpinZ $$ HPhi Hlc
   ihave Hpc := kl_pcIs_cast c4 (KA.«kkill» + 0x54#64)
     (if (true : Bool) then (KA.«kkill» + 0x54#64) else
       if i + 1 = NPROC then (KA.«kkill» + 0x3c#64) else (KA.«kkill» + 0x22#64)) rfl $$ Hpc
@@ -661,14 +661,14 @@ theorem kk_loop (AC : ACQUIRE) (RE : RELEASE) {GF : BundledGFunctors.{0}}
       $$ [- $Hk $Hpc]
     rotate_right 1
     iframe #
-    iapply wpNext_intro_pin
-    iintro %c1 %hq1 %spie2 %spp2 %R2 %done %hsp2 Hk Hpc %hpost
+    iapply wpNext_intro_pin_lc
+    iintro %c1 %hq1 Hlc %spie2 %spp2 %R2 %done %hsp2 Hk Hpc %hpost
     cases done with
     | true =>
       ihave Hpc := kl_pcIs_cast c1
         (if (true : Bool) then (KA.«kkill» + 0x54#64) else
           if i + 1 = NPROC then (KA.«kkill» + 0x3c#64) else (KA.«kkill» + 0x22#64)) (KA.«kkill» + 0x54#64) rfl $$ Hpc
-      ihave HPhi := wpNext_at _ _ _ c1 _ hq1 $$ HPhi
+      ihave HPhi := wpNext_at _ _ _ c1 _ hq1 $$ HPhi Hlc
       iapply HPhi $$ %spie2 %spp2 %R2 %hsp2 Hk Hpc
       ipureintro
       exact ⟨hpost.1, Or.inl (hpost.2.1 rfl)⟩
@@ -685,11 +685,11 @@ theorem kk_loop (AC : ACQUIRE) (RE : RELEASE) {GF : BundledGFunctors.{0}}
       iintro Hk Hpc
       -- c.j the epilogue
       k_step_gen (wp_s_j c2 _ (KA.«kkill» + 0x3e#64) true 22#21)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hq3
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hq3 £ Hlc
       iintro Hk Hpc
       have hpinZ : k.sie = false ∨ k.proc = 0#64 → c3 = cur := fun h =>
         (hq3 h).trans ((hq2 h).trans (hq1 h))
-      ihave HPhi := wpNext_at _ _ _ c3 _ hpinZ $$ HPhi
+      ihave HPhi := wpNext_at _ _ _ c3 _ hpinZ $$ HPhi Hlc
       iapply HPhi $$ %spie2 %spp2 %_ %hsp2 Hk Hpc
       ipureintro
       refine ⟨?_, ?_⟩
@@ -708,14 +708,14 @@ theorem kk_loop (AC : ACQUIRE) (RE : RELEASE) {GF : BundledGFunctors.{0}}
       $$ [- $Hk $Hpc]
     rotate_right 1
     iframe #
-    iapply wpNext_intro_pin
-    iintro %c1 %hq1 %spie2 %spp2 %R2 %done %hsp2 Hk Hpc %hpost
+    iapply wpNext_intro_pin_lc
+    iintro %c1 %hq1 Hlc %spie2 %spp2 %R2 %done %hsp2 Hk Hpc %hpost
     cases done with
     | true =>
       ihave Hpc := kl_pcIs_cast c1
         (if (true : Bool) then (KA.«kkill» + 0x54#64) else
           if i + 1 = NPROC then (KA.«kkill» + 0x3c#64) else (KA.«kkill» + 0x22#64)) (KA.«kkill» + 0x54#64) rfl $$ Hpc
-      ihave HPhi := wpNext_at _ _ _ c1 _ hq1 $$ HPhi
+      ihave HPhi := wpNext_at _ _ _ c1 _ hq1 $$ HPhi Hlc
       iapply HPhi $$ %spie2 %spp2 %R2 %hsp2 Hk Hpc
       ipureintro
       exact ⟨hpost.1, Or.inl (hpost.2.1 rfl)⟩
@@ -796,12 +796,12 @@ theorem kk_epi {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     with [KCtx.pop_pushed _ _ _ hK', hR2] next c6 hq6
   iintro Hk Hpc
   k_step_gen (wp_s_ret c6 _ (KA.«kkill» + 0x60#64) true 1#5)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hq7
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hq7 £ Hlc
   iintro Hk Hpc
   have hpinZ : k.sie = false ∨ k.proc = 0#64 → c7 = cpu := fun h =>
     (hq7 h).trans ((hq6 h).trans ((hq5 h).trans ((hq4 h).trans ((hq3 h).trans
       ((hq2 h).trans ((hq1 h).trans (hpin h)))))))
-  ihave HPhi := wpNext_at _ _ _ c7 _ hpinZ $$ HPhi
+  ihave HPhi := wpNext_at _ _ _ c7 _ hpinZ $$ HPhi Hlc
   iapply HPhi $$ %spie %spp %_ %hsp Hk Hpc
   ipureintro
   refine ⟨?_, ?_⟩
@@ -837,11 +837,11 @@ theorem kkill_proof (AC : ACQUIRE) (RE : RELEASE) : KKILL :=
       with [KCtx.rget_eq, KCtx.setReg_eq_withRegs] next z2 hz2
     iintro Hk Hpc
     k_step_gen (wp_s_ret z2 _ (KA.«kkill» + 0x6a#64) true 1#5)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next z3 hz3
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next z3 hz3 £ Hlc
     iintro Hk Hpc
     have hpinZ : k.sie = false ∨ k.proc = 0#64 → z3 = cpu := fun h =>
       (hz3 h).trans ((hz2 h).trans (hz1 h))
-    ihave HPhi := wpNext_at _ _ _ z3 _ hpinZ $$ HPhi
+    ihave HPhi := wpNext_at _ _ _ z3 _ hpinZ $$ HPhi Hlc
     ihave HPhi := HPhi $$ %k.spie %k.spp
     rw [KCtx.withSpie_self' k _ _ rfl rfl]
     iapply HPhi $$ %_ %(fun _ => ⟨rfl, rfl⟩) Hk Hpc

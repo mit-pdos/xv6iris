@@ -71,7 +71,7 @@ theorem dirlookup_name (NC : NAMECMP) (IG : IGET) (Γ : SchedNames)
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     dirlookupKeep k ip dinum bm data dn dr fn pidv dqp dqd dqn ∗ dirlookupIn hasp (k.regs 12#5) pofv ∗
     dirlookupEnv Γ γl pd pav pu γkl γk ∗
-    (∀ c' : CPU, dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c') ∗
+    (∀ c' : CPU, £ 1 -∗ dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c') ∗
     dirlookupLoop k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn fuel
     ⊢ wpLoop (GF := GF) cpu := by
   have hbz := dirlookup_beqz_half (dirInum data i)

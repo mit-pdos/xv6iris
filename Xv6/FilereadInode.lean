@@ -66,10 +66,10 @@ theorem frd_rest2 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) 
     $$ [- $Hk $Hpc] with [hR2] next c1 hp1
   iintro Hk Hpc Hf24
   k_step_gen (wp_s_ld c1 _ (pc + 2#64) true 8#12 19#5 2#5 (by decide) (by decide) (DFrac.own 1) s3)
-    $$ [- $Hk $Hpc] with [hR2] next c2 hp2
+    $$ [- $Hk $Hpc] with [hR2] next c2 hp2 £ Hlc
   iintro Hk Hpc Hf40
   k_norm_g
-  ihave HΦ' := wpNext_at _ _ _ c2 _ (fun h => (hp2 h).trans (hp1 h)) $$ HΦ
+  ihave HΦ' := wpNext_at _ _ _ c2 _ (fun h => (hp2 h).trans (hp1 h)) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc
   iframe
 
@@ -89,7 +89,7 @@ theorem frd_tail (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (v18 w1 w
     pcIs cpu (KA.«fileread» + 0x5e#64) ∗
     frame6s3 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) w1 (k.regs 18#5) w3 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    (∀ (c' : CPU) (R' : RegMap), ⌜calleeSaved k.regs R' ∧ R' 10#5 = v18⌝ -∗
+    (∀ (c' : CPU), £ 1 -∗ ∀ (R' : RegMap), ⌜calleeSaved k.regs R' ∧ R' 10#5 = v18⌝ -∗
       kctx c' ((k.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) cpu := by
@@ -104,10 +104,10 @@ theorem frd_tail (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (v18 w1 w
   k_norm_g
   iframe
   inext
-  k_next_e
+  k_next_e £ Hlc
   iintro Hk Hpc
   k_norm_g
-  iapply Hnext $$ %cpu %_ [] Hk Hpc Hte Hce
+  iapply Hnext $$ %cpu Hlc %_ [] Hk Hpc Hte Hce
   ipureintro
   refine ⟨frd_cs_epi k v18 R hr, ?_⟩
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
@@ -121,7 +121,7 @@ def frdK (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) (j : Nat
     (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (Rd : Nat → Nat → IProp GF)
     (Rin : List (List Obs × BitVec 8) → IProp GF)
     (Rp : List (BitVec 8) → IProp GF) (Rpe : List (BitVec 8) → PipeSt → IProp GF) (P : IProp GF) : IProp GF :=
-  iprop(∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (M' : Nat → List (BitVec 8)) (d : Nat),
+  iprop(∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (M' : Nat → List (BitVec 8)) (d : Nat),
     ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ (d : Int) ≤ max 0 n ∧
       (R' 10#5 = BitVec.ofNat 64 d ∨ R' 10#5 = -1#64) ∧
       umemWrote V.upt M (k.regs 11#5) d P' M'⌝ -∗
@@ -269,7 +269,7 @@ theorem frd_seg_lock (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF Γ]
     wordPointsTo (fnode fk + 24#64) 8 (DFrac.own q) ipv ∗
     isSleeplockGen γil γisl (iLock (ientry ik)) (icSlp fscIc ik) (slhTok (icfgIsl ik)) ∗
     credFloor lo tl ∗ ityShot g ty ∗ inodeShrGenlo ik s icfgDev inum g lo ∗ bslot ∗ topLb Tl ∗
-    (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap) (dn : Dinode) (bm : Blkmap) (K : Nat),
+    (∀ (c' : CPU), £ 1 -∗ ∀ (spie' spp' : Bool) (R' : RegMap) (dn : Dinode) (bm : Blkmap) (K : Nat),
       ⌜frdRegs k v9 v18 v19 R' ∧ Tl ≤ K⌝ -∗
       ctxFloor curCtx K -∗
       kctx c' (((k.withSpie spie' spp').pushed 6).withRegs R') -∗
@@ -310,14 +310,14 @@ theorem frd_seg_lock (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF Γ]
   case itier => k_norm_g; exact htier
   case ia0 => k_norm_g; exact hip
   -- ===== back from ilock =====
-  iintro %cpu %spie2 %spp2 %R2 %dn %bm %K %⟨hcs2, hK2⟩ #Hflr Hk Hpc Hte Hce Hpid Hbs Hlk Hoff Hload
+  iintro %cpu Hlc %spie2 %spp2 %R2 %dn %bm %K %⟨hcs2, hK2⟩ #Hflr Hk Hpc Hte Hce Hpid Hbs Hlk Hoff Hload
     #Hshot'
   k_norm_g [frd_ret_3a, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hr2 : frdRegs k v9 v18 v19 R2 := by
     refine frdRegs_cs _ _ _ _ _ _ ?_ (by k_norm_g at hcs2; exact hcs2)
     refine frdRegs_set _ _ _ _ _ _ _ ?_ (by decide)
     exact frdRegs_set _ _ _ _ _ _ _ hr (by decide)
-  iapply HK $$ %cpu %spie2 %spp2 %R2 %dn %bm %K [] Hflr Hk Hpc Hte Hce Hpid Hip Hbs Hlk Hoff Hload
+  iapply HK $$ %cpu Hlc %spie2 %spp2 %R2 %dn %bm %K [] Hflr Hk Hpc Hte Hce Hpid Hip Hbs Hlk Hoff Hload
     Hshot'
   ipureintro; exact ⟨hr2, hK2⟩
 
@@ -345,7 +345,7 @@ theorem frd_seg_read (RD : READI) (Γ : SchedNames) [ClaimIs GF Γ]
     inodeMeta (ientry ik) dn ∗ inodeMapQ fscFs (DFrac.own Qp.quarter) (ientry ik) bm ∗
     inodeBlocksQ fscFs (DFrac.own Qp.quarter) bm data ∗
     procPrivExt (procAddr j) pid V V.upt M ∗ bslot ∗
-    (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap) (tot dd : Nat) (P' : UPtd)
+    (∀ (c' : CPU), £ 1 -∗ ∀ (spie' spp' : Bool) (R' : RegMap) (tot dd : Nat) (P' : UPtd)
         (M' : Nat → List (BitVec 8)) (a0 : BitVec 64),
       ⌜frdRegs k (fnode fk) a0 (BitVec.ofInt 64 n) R' ∧ tot ≤ rdClamp dn.diSize v.toNat n.toNat ∧
         ((a0 = -1#64 ∧ dd = 0 ∧ rdFailWhy V.upt (k.regs 11#5) n.toNat) ∨
@@ -409,7 +409,7 @@ theorem frd_seg_read (RD : READI) (Γ : SchedNames) [ClaimIs GF Γ]
   case wa3 => k_norm_g; simp
   case wa4 => k_norm_g
   -- ===== back from readi =====
-  iintro %cpu %spie1 %spp1 %R1 %tot %P' %M' %⟨hcs1, hle, hret, hext, himg⟩ Hk Hpc Hte Hce Hdev
+  iintro %cpu Hlc %spie1 %spp1 %R1 %tot %P' %M' %⟨hcs1, hle, hret, hext, himg⟩ Hk Hpc Hte Hce Hdev
     Hmeta Hmap Hblk Hpriv Hbs
   k_norm_g [frd_ret_48, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed] at himg
   k_norm_g [frd_ret_48, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed] at hret
@@ -445,7 +445,7 @@ theorem frd_seg_read (RD : READI) (Γ : SchedNames) [ClaimIs GF Γ]
       · rcases hz with hm | h0'
         · exact absurd (h1.1.symm.trans hm) (srd_ofNat_ne_m1 tot (by omega))
         · exact Or.inr ⟨h1.1, h1.2, h0'.symm⟩
-    iapply HK $$ %cpu %spie1 %spp1 %_ %tot %0 %P' %M' %(R1 10#5) [] Hk Hpc Hte Hce Hip [Hoff] Hdev
+    iapply HK $$ %cpu Hlc %spie1 %spp1 %_ %tot %0 %P' %M' %(R1 10#5) [] Hk Hpc Hte Hce Hip [Hoff] Hdev
       Hmeta Hmap Hblk Hpriv Hbs
     · ipureintro; exact ⟨hr2, hle, harm, hext, himg⟩
     · rw [filerwOffW_zero]; iexact Hoff
@@ -475,7 +475,7 @@ theorem frd_seg_read (RD : READI) (Γ : SchedNames) [ClaimIs GF Γ]
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [s9, hpos.1, filerw_offadd v tot (by omega)]
     iintro Hk Hpc Hoff
-    iapply HK $$ %cpu %spie1 %spp1 %_ %tot %tot %P' %M' %(R1 10#5) [] Hk Hpc Hte Hce Hip Hoff Hdev
+    iapply HK $$ %cpu Hlc %spie1 %spp1 %_ %tot %tot %P' %M' %(R1 10#5) [] Hk Hpc Hte Hce Hip Hoff Hdev
       Hmeta Hmap Hblk Hpriv Hbs
     ipureintro
     refine ⟨?_, hle, Or.inr ⟨hpos.1, hpos.2, rfl⟩, hext, himg⟩
@@ -504,7 +504,7 @@ theorem frd_seg_unlock (IU : IUNLOCK) (Γ : SchedNames)
     credFloor lo tl ∗ frdLk ik s g lo inum γisl pid ∗ (∃ T : Nat, offRowsDep offCfg ik T) ∗
     icDepHeld fscFs fscIreg fscCov fscLogst (.depRd s icfgDev inum g lo) ik inum dn bm ∗
     ityShot g dn.diType ∗ wordPointsTo (pPid k.proc) 4 pidPriv pid ∗
-    (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap),
+    (∀ (c' : CPU), £ 1 -∗ ∀ (spie' spp' : Bool) (R' : RegMap),
       ⌜frdRegs k w1 v18 w3 R'⌝ -∗
       kctx c' (((k.withSpie spie' spp').pushed 6).withRegs R') -∗
       pcIs c' (KA.«fileread» + 0x5e#64) -∗
@@ -543,7 +543,7 @@ theorem frd_seg_unlock (IU : IUNLOCK) (Γ : SchedNames)
   case utier => k_norm_g; exact htier
   case ua0 => k_norm_g; exact hip
   -- ===== back from iunlock =====
-  iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hshr
+  iintro %cpu Hlc %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hshr
   k_norm_g [frd_ret_5a, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hr1 : frdRegs k (fnode fk) v18 v19 R1 := by
     refine frdRegs_cs _ _ _ _ _ _ ?_ (by k_norm_g at hcs1; exact hcs1)
@@ -560,7 +560,7 @@ theorem frd_seg_unlock (IU : IUNLOCK) (Γ : SchedNames)
   k_next_e
   iintro Hk Hpc Hframe
   k_norm_g
-  iapply HK $$ %cpu %spie1 %spp1 %_ [] Hk Hpc Hframe Hte Hce Hpid Hip Hshr
+  iapply HK $$ %cpu Hlc %spie1 %spp1 %_ [] Hk Hpc Hframe Hte Hce Hpid Hip Hshr
   ipureintro
   exact frdRegs_rest2 k (fnode fk) v18 v19 w1 w3 R1 hr1
 

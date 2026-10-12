@@ -586,11 +586,11 @@ theorem cr_post_at (cpu c : CPU) (k : KCtx) (j : Nat) (pid : BitVec 32) (V : Pro
     (M : Nat → List (BitVec 8)) (n : Int) (cn : ConsNames) (Wd : IProp GF) (ord : Option Nat)
     (Rin : List (List Obs × BitVec 8) → IProp GF) (hj : j < NPROC) (hkproc : k.proc = procAddr j) :
     wpNext true k.proc cpu (crPost (GF := GF) k j pid V M n cn Wd ord Rin) ⊢
-      crPost k j pid V M n cn Wd ord Rin c := by
-  iintro H
+      £ 1 -∗ crPost k j pid V M n cn Wd ord Rin c := by
+  iintro H Hlc
   iapply wpNext_at true k.proc cpu c _
     (fun h => h.elim (fun h => absurd h (by decide))
-      (fun h => absurd h (by rw [hkproc]; exact procAddr_nonzero hj))) $$ H
+      (fun h => absurd h (by rw [hkproc]; exact procAddr_nonzero hj))) $$ H Hlc
 
 /-- The console context's pieces. -/
 theorem cr_env_lock (cn : ConsNames) (Wd : IProp GF) (γc : GName) (ord : Option Nat) :
@@ -654,8 +654,8 @@ theorem cr_epi (cpu cE : CPU) (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcPr
   iframe
   inext
   k_norm_g
-  iapply wpNext_intro_pin
-  iintro %cE' %hpin
+  iapply wpNext_intro_pin_lc
+  iintro %cE' %hpin Hlc
   ihave Hte := trapCsrsExt_move cE cE' k.sie (fun h => hpin (Or.inl h)) $$ Hte
   ihave Hce := cpuClaimExt_move cE cE' k.sie k.proc (fun h => hpin (Or.inl h)) $$ Hce
   iintro Hk Hpc
@@ -663,7 +663,7 @@ theorem cr_epi (cpu cE : CPU) (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcPr
   unfold crOut crFault
   icases Hout with ⟨%cur, %sl, #Hsl, Hwin, Hco⟩
   unfold crPost
-  iapply HK $$ %spie %spp %_ %P' %M' %d %dc %cur %bs %hs %sl %kv [] [Hks] Htags Hsl Hwin Hco Hk Hpc Hte Hce
+  iapply HK $$ Hlc %spie %spp %_ %P' %M' %d %dc %cur %bs %hs %sl %kv [] [Hks] Htags Hsl Hwin Hco Hk Hpc Hte Hce
     %hkv Hpriv Hgh
   rotate_left 1
   · iintro %h

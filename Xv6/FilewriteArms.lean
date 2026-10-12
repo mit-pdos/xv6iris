@@ -72,7 +72,7 @@ theorem fwr_arm_neg (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl :
   iintro Hk Hpc
   -- +0x11c  c.j +0xf4
   k_step_e (wp_s_j cpu _ (KA.«filewrite» + 0x11c#64) true 2097112#21)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] £ Hlc
   iintro Hk Hpc
   have hr' := fwrRegs_set k fk n _ _ _ _ _ _ R 10#5 0xFFFFFFFFFFFFFFFF#64 hr (by decide)
   iapply (fwr_tail cpu k spie spp _ fk n w2 w4 w5 w8 w9 w10 w11 hK hr')
@@ -80,14 +80,14 @@ theorem fwr_arm_neg (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl :
   rotate_right 1
   k_norm_g
   iframe
-  iintro %c' %R' %⟨hcs, h10⟩ Hk Hpc Hte Hce
+  iintro %c' Hlc %R' %⟨hcs, h10⟩ Hk Hpc Hte Hce
   have ha0 : R' 10#5 = -1#64 := by
     simp only [h10, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; decide
   ihave Hpriv := fwr_priv_self (procAddr j) pid V M $$ Hpriv
   ihave Henv := filewrite_env_out_of_env γl γu st $$ Henv
   unfold fwrK
   ihave Hpriv := procPrivExtEv_of _ _ _ _ _ $$ Hpriv
-  iapply HΦ $$ %c' %spie %spp %R' %V.upt [] [] Hk Hpc Hte Hce Href Hpriv Henv [Hin]
+  iapply HΦ $$ %c' Hlc %spie %spp %R' %V.upt [] [] Hk Hpc Hte Hce Href Hpriv Henv [Hin]
   · ipureintro; exact ⟨hcs, UMemL.extSz_refl _ _, fun _ _ => ⟨fun _ => ha0, fun h => absurd h (by omega)⟩⟩
   · iapply fwConsOut_neg; exact ha0
   · unfold filewriteArms
@@ -148,7 +148,7 @@ theorem fwr_arm_zero (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl 
   iintro Hk Hpc
   -- +0x128  c.j +0xf4
   k_step_e (wp_s_j cpu _ (KA.«filewrite» + 0x128#64) true 2097100#21)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] £ Hlc
   iintro Hk Hpc
   have hr' := fwrRegs_set k fk 0 _ _ _ _ _ _ R 10#5 (BitVec.ofInt 64 0) hr (by decide)
   iapply (fwr_tail cpu k spie spp _ fk 0 w2 w4 w5 w8 w9 w10 w11 hK hr')
@@ -156,14 +156,14 @@ theorem fwr_arm_zero (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl 
   rotate_right 1
   k_norm_g
   iframe
-  iintro %c' %R' %⟨hcs, h10⟩ Hk Hpc Hte Hce
+  iintro %c' Hlc %R' %⟨hcs, h10⟩ Hk Hpc Hte Hce
   have ha0 : R' 10#5 = BitVec.ofInt 64 0 := by
     simp only [h10, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   ihave Hpriv := fwr_priv_self (procAddr j) pid V M $$ Hpriv
   ihave Henv := filewrite_env_out_of_env γl γu _ $$ Henv
   unfold fwrK
   ihave Hpriv := procPrivExtEv_of _ _ _ _ _ $$ Hpriv
-  iapply HΦ $$ %c' %spie %spp %R' %V.upt [] [] Hk Hpc Hte Hce Href Hpriv Henv [Hin]
+  iapply HΦ $$ %c' Hlc %spie %spp %R' %V.upt [] [] Hk Hpc Hte Hce Href Hpriv Henv [Hin]
   · ipureintro; exact ⟨hcs, UMemL.extSz_refl _ _, fun _ h => by cases h⟩
   · iapply fwConsOut_off; intro _ h; cases h
   · -- the chain at the writer's table, at EITHER mode (Rocq L2: the
@@ -247,7 +247,7 @@ theorem fwr_arm_pipe (PW : PIPEWRITE) (Γ : SchedNames) [ClaimIs GF Γ]
   case ptier => k_norm_g; exact htier
   case pn => k_norm_g; exact h12
   -- ===== back from pipewrite =====
-  iintro %cpu %spie1 %spp1 %R1 %P' %⟨hcs1, hext, hret⟩ Hk Hpc Hte Hce Hpref Hpriv Hgen Hpost
+  iintro %cpu Hlc %spie1 %spp1 %R1 %P' %⟨hcs1, hext, hret⟩ Hk Hpc Hte Hce Hpref Hpriv Hgen Hpost
   ihave HΦ := fwrKG_elim $$ HΦG Hgen
   k_norm_g [fwr_ret_62, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hr1 : fwrRegs k fk n (k.regs 9#5) (k.regs 19#5) (k.regs 20#5) (k.regs 23#5) (k.regs 24#5)
@@ -257,20 +257,20 @@ theorem fwr_arm_pipe (PW : PIPEWRITE) (Γ : SchedNames) [ClaimIs GF Γ]
     exact hr
   -- +0x62  c.j +0xf4
   k_step_e (wp_s_j cpu _ (KA.«filewrite» + 0x62#64) true 146#21)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] £ Hlc
   iintro Hk Hpc
   iapply (fwr_tail cpu k spie1 spp1 _ fk n w2 w4 w5 w8 w9 w10 w11 (by omega) hr1)
     $$ [- $Hk $Hpc $Hframe $Hte $Hce]
   rotate_right 1
   k_norm_g
   iframe
-  iintro %c' %R' %⟨hcs, h10'⟩ Hk Hpc Hte Hce
+  iintro %c' Hlc %R' %⟨hcs, h10'⟩ Hk Hpc Hte Hce
   ihave Hpay := Hpback $$ Hpref
   ihave Hfields := Hfw $$ Hpcell
   ihave Href := filerw_ref_close γ fk q (.open rb true (.pipe γp)) C $$ [Htok Hfields Hpay]
   · iframe
   unfold fwrK
-  iapply HΦ $$ %c' %spie1 %spp1 %R' %P' [] [] Hk Hpc Hte Hce Href Hpriv [] [Hpost]
+  iapply HΦ $$ %c' Hlc %spie1 %spp1 %R' %P' [] [] Hk Hpc Hte Hce Href Hpriv [] [Hpost]
   · ipureintro; exact ⟨hcs, hext, fun _ h => by cases h⟩
   · iapply fwConsOut_off; intro _ h; cases h
   · unfold filewriteEnvOut; iempintro
@@ -336,23 +336,23 @@ theorem fwr_dev_m1 (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl : 
     frefTok γ fk q ∗ fileFieldsAt curCtx fk q C ∗ filePaySt γ fk q C (.open rb true (.device mj)) ∗
     procPrivExt (procAddr j) pid V V.upt M ∗ filewriteDevEnv γl γu mj ∗
     filewriteIn pmv szv lzv (.open rb true (.device mj)) n (writerImg V.upt M) (k.regs 11#5) Q Qe ∗
-    fwrK k γl γu γ fk q (.open rb true (.device mj)) j pid V M n Q Qe
+    fwrK k γl γu γ fk q (.open rb true (.device mj)) j pid V M n Q Qe ∗ £ 1
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Htok, Hfields, Hpay, Hpriv, #Henv, Hin, HΦ⟩
+  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Htok, Hfields, Hpay, Hpriv, #Henv, Hin, HΦ, Hlc⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   iapply (fwr_tail cpu k spie spp _ fk n w2 w4 w5 w8 w9 w10 w11 hK hr)
     $$ [- $Hk $Hpc $Hframe $Hte $Hce]
   rotate_right 1
   k_norm_g
   iframe
-  iintro %c' %R' %⟨hcs, h10'⟩ Hk Hpc Hte Hce
+  iintro %c' Hlc %R' %⟨hcs, h10'⟩ Hk Hpc Hte Hce
   have ha0 : R' 10#5 = -1#64 := by rw [h10', h10]
   ihave Hpriv := fwr_priv_self (procAddr j) pid V M $$ Hpriv
   ihave Href := filerw_ref_close γ fk q _ C $$ [Htok Hfields Hpay]
   · iframe
   unfold fwrK
   ihave Hpriv := procPrivExtEv_of _ _ _ _ _ $$ Hpriv
-  iapply HΦ $$ %c' %spie %spp %R' %V.upt [] [] Hk Hpc Hte Hce Href Hpriv [] [Hin]
+  iapply HΦ $$ %c' Hlc %spie %spp %R' %V.upt [] [] Hk Hpc Hte Hce Href Hpriv [] [Hin]
   · ipureintro; exact ⟨hcs, UMemL.extSz_refl _ _, fun _ h => absurd (by cases h; rfl) hnc⟩
   · iapply fwConsOut_neg; exact ha0
   · unfold filewriteEnvOut; iexact Henv
@@ -423,7 +423,7 @@ theorem fwr_arm_dev (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs GF Γ]
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     k_step_e (wp_s_j cpu _ (KA.«filewrite» + 0x120#64) true 2097108#21)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] £ Hlc
     iintro Hk Hpc
     have hnc : mj ≠ CONSOLE := by unfold CONSOLE; omega
     iapply (fwr_dev_m1 cpu k spie spp _ γl γu γ fk q C rb mj j pid V M n Q Qe pmv szv lzv w2 w4 w5 w8 w9 w10 w11
@@ -477,7 +477,7 @@ theorem fwr_arm_dev (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs GF Γ]
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     k_step_e (wp_s_j cpu _ (KA.«filewrite» + 0x124#64) true 2097104#21)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] £ Hlc
     iintro Hk Hpc
     iapply (fwr_dev_m1 cpu k spie spp _ γl γu γ fk q C rb mj j pid V M n Q Qe pmv szv lzv w2 w4 w5 w8 w9 w10 w11
       (by omega) hc ?hrn ?h10n) $$ [- $Hk $Hpc]
@@ -521,7 +521,7 @@ theorem fwr_arm_dev (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs GF Γ]
   case cuser => k_norm_g; decide
   case cn => k_norm_g; exact h12
   -- ===== back from consolewrite =====
-  iintro %cpu %spie1 %spp1 %R1 %P' %i %⟨hcs1, hext, hret, hi, hwhy, hcnt⟩ #HO Hk Hpc Hte Hce Hpriv HQ
+  iintro %cpu Hlc %spie1 %spp1 %R1 %P' %i %⟨hcs1, hext, hret, hi, hwhy, hcnt⟩ #HO Hk Hpc Hte Hce Hpriv HQ
   k_norm_g [fwr_ret_88, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hr1 : fwrRegs k fk n (k.regs 9#5) (k.regs 19#5) (k.regs 20#5) (k.regs 23#5) (k.regs 24#5)
       (k.regs 25#5) R1 := by
@@ -530,19 +530,19 @@ theorem fwr_arm_dev (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs GF Γ]
     exact hr
   -- +0x88  c.j +0xf4
   k_step_e (wp_s_j cpu _ (KA.«filewrite» + 0x88#64) true 108#21)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] £ Hlc
   iintro Hk Hpc
   iapply (fwr_tail cpu k spie1 spp1 _ fk n w2 w4 w5 w8 w9 w10 w11 (by omega) hr1)
     $$ [- $Hk $Hpc $Hframe $Hte $Hce]
   rotate_right 1
   k_norm_g
   iframe
-  iintro %c' %R' %⟨hcs, h10'⟩ Hk Hpc Hte Hce
+  iintro %c' Hlc %R' %⟨hcs, h10'⟩ Hk Hpc Hte Hce
   ihave Href := filerw_ref_close γ fk q _ C $$ [Htok Hfields Hpay]
   · iframe
   have hin : (i : Int) ≤ n := by omega
   unfold fwrK
-  iapply HΦ $$ %c' %spie1 %spp1 %R' %P' [] [] Hk Hpc Hte Hce Href Hpriv [] [HQ]
+  iapply HΦ $$ %c' Hlc %spie1 %spp1 %R' %P' [] [] Hk Hpc Hte Hce Href Hpriv [] [HQ]
   · ipureintro
     exact ⟨hcs, hext, fun _ _ => ⟨fun h => absurd h (by omega), fun _ => ⟨i, by rw [h10', hret], hin, hcnt⟩⟩⟩
   · iapply fwConsOut_cons _ _ _ _ _ i (by rw [h10', hret]); iexact HO

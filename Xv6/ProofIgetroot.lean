@@ -175,14 +175,14 @@ theorem igetroot_main (IG : IGET) (cpu : CPU) (k : KCtx)
   k_norm_g
   iframe
   inext
-  iapply wpNext_intro_pin
-  iintro %cpu %hpin
+  iapply wpNext_intro_pin_lc
+  iintro %cpu %hpin Hlc
   try simp only [k_norm_simps] at hpin
   ihave Hnext := wpNext_shift _ _ _ _ _ hpin $$ Hnext
   clear hpin
   iintro Hk Hpc
   k_norm_g
-  ihave HΦ := wpNext_at k.sie k.proc cpu cpu _ (fun _ => rfl) $$ Hnext
+  ihave HΦ := wpNext_at k.sie k.proc cpu cpu _ (fun _ => rfl) $$ Hnext Hlc
   iapply HΦ $$ %spie %spp %_ %(ientry kk) %hsp Hk Hpc []
   · ipureintro
     refine ⟨?_, by simp [RegMap.set_apply, ha0]⟩

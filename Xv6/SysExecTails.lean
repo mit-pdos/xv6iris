@@ -190,7 +190,7 @@ theorem sys_exec_tail_exit (c : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (
     sysExecCarry k pl rest ∗ sysExecArgvFree (k.regs 2#5) ∗
     wordPointsTo (sysExecUargv (k.regs 2#5)) 8 (DFrac.own 1) w59 ∗
     (∃ w : BitVec 64, wordPointsTo (sysExecUarg (k.regs 2#5)) 8 (DFrac.own 1) w) ∗
-    (∀ (c' : CPU) (R' : RegMap), ⌜calleeSaved k.regs R' ∧ R' 10#5 = R 10#5⌝ -∗
+    (∀ (c' : CPU), £ 1 -∗ ∀ (R' : RegMap), ⌜calleeSaved k.regs R' ∧ R' 10#5 = R 10#5⌝ -∗
       kctx c' ((k.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) c := by
@@ -233,7 +233,7 @@ theorem sys_exec_bad_tail (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) (hS : S
     refine ⟨by omega, by omega, ht, hpg, ?_, ?_⟩
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; rw [a9, sysExecTails_at0]
     · simp only [RegMap.set_apply, ite_true]
-  iintro %c2 %spie2 %spp2 %R2 %pcx %hpcx %hkeep Hk Hpc Hte Hce ⟨%k1, %hk1, Hl⟩ Harr
+  iintro %c2 Hlc %spie2 %spp2 %R2 %pcx %hpcx %hkeep Hk Hpc Hte Hce ⟨%k1, %hk1, Hl⟩ Harr
   ihave Hl := actLend_congr hS.hproc k1 $$ Hl
   icases Hlb $$ %k1 %hk1 Hl with ⟨%kv1, %hkv1, Hcnt⟩
   ihave Hblk := Hblk $$ %kv1 Hcnt
@@ -270,8 +270,8 @@ theorem sys_exec_bad_tail (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) (hS : S
     iapply (sys_exec_tail_exit c3 k spie2 spp2 _ (sysExecAddr + 0xf6#64 + 14#64) (by decide) pl rest
       A.v1 hS.hK hpins hal)
     iframe
-    iintro %c4 %R4 %⟨hcs, h10⟩ Hk Hpc Hte Hce
-    iapply HΦ $$ %c4 %spie2 %spp2 %R4 %kv1 %⟨hcs, h10.trans ha0, hext, hkv'⟩ Hk Hpc Hte Hce Hblk
+    iintro %c4 Hlc %R4 %⟨hcs, h10⟩ Hk Hpc Hte Hce
+    iapply HΦ $$ %c4 Hlc %spie2 %spp2 %R4 %kv1 %⟨hcs, h10.trans ha0, hext, hkv'⟩ Hk Hpc Hte Hce Hblk
   · -- ---- +0xa4 (the cursor ran out): li a0,-1 ; the reloads ; c.j +0x104 ----
     rw [sys_exec_bad_pc]
     k_step_e (wp_s_addi c2 _ (sysExecAddr + 0xa4#64) true 4095#12 10#5 0#5 (by decide))
@@ -289,8 +289,8 @@ theorem sys_exec_bad_tail (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) (hS : S
     iapply (sys_exec_tail_exit cpu k spie2 spp2 _ (sysExecAddr + 0x104#64) rfl pl rest A.v1 hS.hK
       hpins hal)
     iframe
-    iintro %c4 %R4 %⟨hcs, h10⟩ Hk Hpc Hte Hce
-    iapply HΦ $$ %c4 %spie2 %spp2 %R4 %kv1 %⟨hcs, h10.trans ha0, hext, hkv'⟩ Hk Hpc Hte Hce Hblk
+    iintro %c4 Hlc %R4 %⟨hcs, h10⟩ Hk Hpc Hte Hce
+    iapply HΦ $$ %c4 Hlc %spie2 %spp2 %R4 %kv1 %⟨hcs, h10.trans ha0, hext, hkv'⟩ Hk Hpc Hte Hce Hblk
 
 /-! ## §5.  THE SUCCESS TAIL (Rocq `sx_succ_tail`) -/
 
@@ -327,7 +327,7 @@ theorem sys_exec_succ_tail (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) (hS : 
     refine ⟨by omega, by omega, ht, hpg, ?_, ?_⟩
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; rw [a9, sysExecTails_at0]
     · simp only [RegMap.set_apply, ite_true]
-  iintro %c2 %spie2 %spp2 %R2 %pcx %hpcx %hkeep Hk Hpc Hte Hce Hl Harr
+  iintro %c2 Hlc %spie2 %spp2 %R2 %pcx %hpcx %hkeep Hk Hpc Hte Hce Hl Harr
   obtain ⟨k2, k8, k18, k19, k20, k21, k22, k23, k24, k25, k26, k27⟩ := hkeep
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at k2 k8 k18 k24 k25 k26 k27
   have hq := sys_exec_succ_pc pcx hpcx
@@ -363,8 +363,8 @@ theorem sys_exec_succ_tail (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) (hS : 
   iapply (sys_exec_tail_exit cpu k spie2 spp2 _ (sysExecAddr + 0x104#64) rfl pl rest A.v1 hS.hK
     hpins hal)
   iframe
-  iintro %c4 %R4 %⟨hcs, h10⟩ Hk Hpc Hte Hce
-  iapply HΦ $$ %c4 %spie2 %spp2 %R4 %⟨hcs, h10.trans ha0⟩ Hk Hpc Hte Hce Hl
+  iintro %c4 Hlc %R4 %⟨hcs, h10⟩ Hk Hpc Hte Hce
+  iapply HΦ $$ %c4 Hlc %spie2 %spp2 %R4 %⟨hcs, h10.trans ha0⟩ Hk Hpc Hte Hce Hl
 
 end Tails
 

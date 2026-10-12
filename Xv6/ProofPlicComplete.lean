@@ -161,7 +161,7 @@ theorem plic_complete_proof (CI : CPUID) : PLIC_COMPLETE :=
   k_norm
   iframe
   inext
-  iintro Hk Hpc
+  iintro Hk Hpc _
   iapply HΦ $$ %_ Hk Hpc
   ipureintro
   unfold calleeSaved at hcs2 ⊢

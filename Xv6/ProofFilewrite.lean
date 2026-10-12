@@ -326,9 +326,9 @@ theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK
   icases Hpg with ⟨Hft, HQ, Hxs, Hgen⟩
   ihave HΦG : fwrKG k γl γu γ fk q st j pid V M n Q Qe $$ [Hnext Hcwd Hrtr Hft HQ Hxs]
   · unfold fwrKG fwrK filewritePost
-    iintro Hgen %c %spie %spp %R' %P' %hp HO Hk Hpc Hte Hce Href Hpriv Henv Harms
+    iintro Hgen %c Hlc %spie %spp %R' %P' %hp HO Hk Hpc Hte Hce Href Hpriv Henv Harms
     icases procPrivExtEv_elim _ _ _ _ _ $$ Hpriv with ⟨%kv, %hkv, Hpriv⟩
-    ihave HK := wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext
+    ihave HK := wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext Hlc
     ihave Hpriv := (filerw_core_conv ht0 (procAddr j) pid (V.updEv kv) P' _).2 $$ [Hpriv Hcwd Hrtr Hft HQ Hxs Hgen]
     · unfold procGenAt
       iframe
@@ -358,7 +358,7 @@ theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK
     iintro Hk Hpc
     -- +0x13c  c.jr ra
     k_step_e (wp_s_ret cpu _ (KA.«filewrite» + 0x13c#64) true 1#5)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] £ Hlc
     iintro Hk Hpc
     ihave Hk := ek _ _ $$ Hk
     ihave Href := filerw_ref_close γ fk q st C $$ [Htok Hfields Hpay]
@@ -369,7 +369,7 @@ theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK
     ihave HΦ := fwrKG_elim $$ HΦG Hgen
     unfold fwrK
     ihave Hpriv := procPrivExtEv_of _ _ _ _ _ $$ Hpriv
-    iapply HΦ $$ %cpu %k.spie %k.spp %_ %V.upt [] [] Hk Hpc Hte Hce Href Hpriv Henv []
+    iapply HΦ $$ %cpu Hlc %k.spie %k.spp %_ %V.upt [] [] Hk Hpc Hte Hce Href Hpriv Henv []
     · ipureintro
       refine ⟨?_, UMemL.extSz_refl _ _, fun rb hst => ?_⟩
       · simp [calleeSaved, RegMap.set_apply]

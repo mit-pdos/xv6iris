@@ -168,7 +168,7 @@ theorem sys_unlink_w4_loop (RD : READI) (PA : PANIC) (Γ : SchedNames) [ClaimIs 
   case ra3 => k_norm_g [hpins.2.2.2.2.1]
   case ra4 => k_norm_g [sys_unlink_li32_16]
   case rda => k_norm_g [hpins.2.1, sys_unlink_del_addr]
-  iintro %cpu %spie1 %spp1 %R1 %tot %⟨hcs1, h10, htot⟩ Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk Hdel
+  iintro %cpu Hlc %spie1 %spp1 %R1 %tot %⟨hcs1, h10, htot⟩ Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk Hdel
     Hpid Hb1
   k_norm_g [sys_unlink_ret_116, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   ihave Hbs := bslots_cons 2 $$ [$Hb1 $Hb2]
@@ -395,7 +395,7 @@ def sysUnlinkAt8a (Γ : SchedNames) (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF
   suAny (sysUnlinkDel (k.regs 2#5)) 16 ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv Γ ∗
   wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ sysUnlinkHole A k.proc P2 ∗
-  (∀ c : CPU, sysUnlinkPostA k A c) ∗
+  (∀ c : CPU, £ 1 -∗ sysUnlinkPostA k A c) ∗
   sysUnlinkLkAt A.pid kd q g lo tl dinum dnd γil γisl t (1 : Qp).half.half ∗
   sysUnlinkOpen kd dinum dnd bmd datd ∗
   sysUnlinkLkAt A.pid ks qi gi loi tli (BitVec.setWidth 32 (dirInum datd kk)) dni γili γisli t
@@ -439,7 +439,7 @@ theorem sys_unlink_w3_e (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     byteBuf (sysUnlinkNameTl (k.regs 2#5)) (DFrac.own 1) tln ∗
     suAny (sysUnlinkPath (k.regs 2#5)) 128 ∗
     wordPointsTo (sysUnlinkOff (k.regs 2#5)) 4 (DFrac.own 1) (BitVec.ofNat 32 (16 * kk)) ∗
-    sysfileEnv Γ ∗ sysUnlinkHole A k.proc P2 ∗ (∀ c : CPU, sysUnlinkPostA k A c) ∗
+    sysfileEnv Γ ∗ sysUnlinkHole A k.proc P2 ∗ (∀ c : CPU, £ 1 -∗ sysUnlinkPostA k A c) ∗
     sysUnlinkLkAt A.pid kd q g lo tl dinum dnd γil γisl t (1 : Qp).half.half ∗
     sysUnlinkOpen kd dinum dnd bmd datd ∗
     sysUnlinkLkAtX A.pid ks qi gi loi tli (BitVec.setWidth 32 (dirInum datd kk)) dni γili γisli t
@@ -544,7 +544,7 @@ theorem sys_unlink_w3_dir (RD : READI) (PA : PANIC) (IUP : IUNLOCKPUT) (EO : END
     suAny (sysUnlinkDel (k.regs 2#5)) 16 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv Γ ∗
     wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ sysUnlinkHole A k.proc P2 ∗
-    (∀ c : CPU, sysUnlinkPostA k A c) ∗
+    (∀ c : CPU, £ 1 -∗ sysUnlinkPostA k A c) ∗
     sysUnlinkLkAt A.pid kd q g lo tl dinum dnd γil γisl t (1 : Qp).half.half ∗
     sysUnlinkOpen kd dinum dnd bmd datd ∗
     sysUnlinkLkAt A.pid ks qi gi loi tli (BitVec.setWidth 32 (dirInum datd kk)) dni γili γisli t
@@ -604,7 +604,7 @@ theorem sys_unlink_w3_dir (RD : READI) (PA : PANIC) (IUP : IUNLOCKPUT) (EO : END
         suAny (sysUnlinkPath (k.regs 2#5)) 128 ∗
         wordPointsTo (sysUnlinkOff (k.regs 2#5)) 4 (DFrac.own 1) (BitVec.ofNat 32 (16 * kk)) ∗
         sysfileEnv Γ ∗ sysUnlinkHole A k.proc P2 ∗
-        (∀ c : CPU, sysUnlinkPostA k A c) ∗
+        (∀ c : CPU, £ 1 -∗ sysUnlinkPostA k A c) ∗
         sysUnlinkLkAt A.pid kd q g lo tl dinum dnd γil γisl t (1 : Qp).half.half ∗
         sysUnlinkOpen kd dinum dnd bmd datd ∗
         sysUnlinkLkAtX A.pid ks qi gi loi tli (BitVec.setWidth 32 (dirInum datd kk)) dni γili γisli
@@ -664,7 +664,7 @@ theorem sys_unlink_w3_dir (RD : READI) (PA : PANIC) (IUP : IUNLOCKPUT) (EO : END
         suAny (sysUnlinkPath (k.regs 2#5)) 128 ∗
         wordPointsTo (sysUnlinkOff (k.regs 2#5)) 4 (DFrac.own 1) (BitVec.ofNat 32 (16 * kk)) ∗
         sysfileEnv Γ ∗ sysUnlinkHole A k.proc P2 ∗
-        (∀ c : CPU, sysUnlinkPostA k A c) ∗
+        (∀ c : CPU, £ 1 -∗ sysUnlinkPostA k A c) ∗
         sysUnlinkLkAt A.pid kd q g lo tl dinum dnd γil γisl t (1 : Qp).half.half ∗
         sysUnlinkOpen kd dinum dnd bmd datd ∗
         sysUnlinkLkAtX A.pid ks qi gi loi tli (BitVec.setWidth 32 (dirInum datd kk)) dni γili γisli
@@ -773,7 +773,7 @@ theorem sys_unlink_w3 (IL : ILOCK) (RD : READI) (PA : PANIC) (IUP : IUNLOCKPUT) 
   case la => k_norm_g [h10]
   iframe
   unfold sysfileEnv; iframe #
-  iintro %cpu %spie1 %spp1 %R1 %dni %bmi %γili %γisli %gi %loi %tli %⟨hcs1, hlei⟩ Hk Hpc Hte Hce
+  iintro %cpu Hlc %spie1 %spp1 %R1 %dni %bmi %γili %γisli %gi %loi %tli %⟨hcs1, hlei⟩ Hk Hpc Hte Hce
     Hpid Hb1 Hlki Hloadi
   k_norm_g [sys_unlink_ret_78, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   ihave Hbs := bslots_cons 2 $$ [$Hb1 $Hb2]

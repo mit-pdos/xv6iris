@@ -153,11 +153,16 @@ macro_rules
 /-- A level-0 step at either `SIE` (`k_step_gen`): the new hart shadows the
 name `c`, and the client's continuation `Hcl` follows it (`kf_shift`). -/
 syntax "kf_gstep" ident term:max " $$ " specPat " with " "[" term,* "]" : tactic
+syntax "kf_gstep" ident term:max " $$ " specPat " with " "[" term,* "]" " £ " ident : tactic
 set_option hygiene false in
 macro_rules
   | `(tactic| kf_gstep $c:ident $rule:term $$ $pat:specPat with [$extra,*]) =>
     `(tactic| (k_step_gen $rule:term from (text_instr _ _ _ _ rfl rfl) Htext $$ $pat:specPat
                  with [$extra,*] next $c hpin
+               kf_shift [$extra,*]))
+  | `(tactic| kf_gstep $c:ident $rule:term $$ $pat:specPat with [$extra,*] £ $hlc:ident) =>
+    `(tactic| (k_step_gen $rule:term from (text_instr _ _ _ _ rfl rfl) Htext $$ $pat:specPat
+                 with [$extra,*] next $c hpin £ $hlc
                kf_shift [$extra,*]))
 
 /-- Enter a callee's `wpNext` continuation at a fresh hart shadowing `c`,
@@ -1744,9 +1749,9 @@ theorem kf_epilogue [CurCtx] (j : Nat) (B : BitVec 32 → IProp GF)
     $$ [- $Hk $Hpc] with [KCtx.pop_pushed _ _ _ hKK, hR2]
   iintro Hk Hpc
   kf_gstep c (wp_s_ret c _ (KA.«kfork» + 0x11c#64) true 1#5)
-    $$ [- $Hk $Hpc] with [KCtx.rget_eq]
+    $$ [- $Hk $Hpc] with [KCtx.rget_eq] £ Hlc
   iintro Hk Hpc
-  ihave Kc := wpNext_at k.sie k.proc c c _ (fun _ => rfl) $$ Hcl
+  ihave Kc := wpNext_at k.sie k.proc c c _ (fun _ => rfl) $$ Hcl Hlc
   unfold kforkPostB
   iapply Kc $$ %a %b
     %((((((R'.set 10#5 (R' 9#5)).set 1#5 (k.regs 1#5)).set 8#5 (k.regs 8#5)).set 9#5 (k.regs 9#5)).set
@@ -1849,9 +1854,9 @@ theorem kf_epilogue' [CurCtx] (j : Nat) (B : BitVec 32 → IProp GF)
   iintro Hk Hpc
   -- c.jr ra
   kf_gstep c (wp_s_ret c _ (KA.«kfork» + 0x11c#64) true 1#5)
-    $$ [- $Hk $Hpc] with [KCtx.rget_setReg', KCtx.rget_withRegs']
+    $$ [- $Hk $Hpc] with [KCtx.rget_setReg', KCtx.rget_withRegs'] £ Hlc
   iintro Hk Hpc
-  ihave Kc := wpNext_at k.sie k.proc c c _ (fun _ => rfl) $$ Hcl
+  ihave Kc := wpNext_at k.sie k.proc c c _ (fun _ => rfl) $$ Hcl Hlc
   unfold kforkPostB
   iapply Kc $$ %ke.spie %ke.spp %(((((((((ke.regs.set 18#5 (k.regs 18#5)).set 19#5 (k.regs 19#5)).set 20#5 (k.regs 20#5)).set 10#5 (ke.regs 9#5)).set 1#5 (k.regs 1#5)).set 8#5 (k.regs 8#5)).set 9#5 (k.regs 9#5)).set 21#5 (k.regs 21#5)).set 2#5 (k.regs 2#5)) %rv %?hpure Hk Hpc Hpriv
   case hpure =>

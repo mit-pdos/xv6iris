@@ -221,13 +221,13 @@ theorem itrunc_tail (IU : IUPDATE) (Γ : SchedNames) [ClaimIs GF Γ]
   k_norm_g
   iframe
   inext
-  k_next_e
+  k_next_e £ Hlc
   iintro Hk Hpc
   unfold itContE
   unfold iuCells
   icases HF with ⟨Hidev, Hinum, Hmeta, Hmap, Hsi⟩
   ihave Hblk := itrunc_blocks_emptyAny (GF := GF) fscFs (fun _ => List.replicate BSIZE 0)
-  iapply Hcont $$ %cpu %spie2 %spp2 %_ [] Hk Hpc Hte Hce Hpid Hidev Hinum Hsb Hsi Hmeta Hmap Hblk
+  iapply Hcont $$ %cpu Hlc %spie2 %spp2 %_ [] Hk Hpc Hte Hce Hpid Hidev Hinum Hsb Hsi Hmeta Hmap Hblk
     Hdn Hsl Hop
   ipureintro
   exact calleeSaved_epi6s3 k.regs R2 (e20.trans r20) (e21.trans r21) (e22.trans r22)

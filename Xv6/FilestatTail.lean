@@ -39,7 +39,7 @@ theorem filestat_tail (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (fk 
     fstatFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) v2 v3 (k.regs 20#5) v9 ∗
     fstatCells (k.regs 2#5) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    (∀ (c' : CPU) (R' : RegMap), ⌜calleeSaved k.regs R' ∧ R' 10#5 = R 10#5⌝ -∗
+    (∀ (c' : CPU), £ 1 -∗ ∀ (R' : RegMap), ⌜calleeSaved k.regs R' ∧ R' 10#5 = R 10#5⌝ -∗
       kctx c' ((k.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) cpu := by
@@ -53,10 +53,10 @@ theorem filestat_tail (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (fk 
   k_norm_g
   iframe
   inext
-  k_next_e
+  k_next_e £ Hlc
   iintro Hk Hpc
   k_norm_g
-  iapply Hnext $$ %cpu %_ [] Hk Hpc Hte Hce
+  iapply Hnext $$ %cpu Hlc %_ [] Hk Hpc Hte Hce
   ipureintro
   refine ⟨fstat_cs_epi k fk R hr, ?_⟩
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
@@ -93,7 +93,7 @@ theorem filestat_err (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (fk :
   iintro Hk Hpc
   -- +0x64  c.j +0x56
   k_step_e (wp_s_j cpu _ (KA.«filestat» + 0x64#64) true 2097138#21)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] £ Hlc
   iintro Hk Hpc
   have hr' := fstatRegs_set k fk (k.regs 18#5) (k.regs 19#5) R 10#5 0xFFFFFFFFFFFFFFFF#64 hr
     (by decide)
@@ -102,9 +102,9 @@ theorem filestat_err (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (fk :
   rotate_right 1
   k_norm_g
   iframe
-  iintro %c' %R' %⟨hcs, h10⟩ Hk Hpc Hte Hce
+  iintro %c' Hlc %R' %⟨hcs, h10⟩ Hk Hpc Hte Hce
   unfold fstatK
-  iapply HΦ $$ %c' %spie %spp %R' %V.upt %M %0 %V.ev [] Hk Hpc Hte Hce Href %(Nat.le_refl V.ev) Hpriv Henv
+  iapply HΦ $$ %c' Hlc %spie %spp %R' %V.upt %M %0 %V.ev [] Hk Hpc Hte Hce Href %(Nat.le_refl V.ev) Hpriv Henv
   ipureintro
   refine ⟨hcs, ?_, UMemL.extSz_refl _ _, Nat.zero_le _, UMemL.umemWrote_refl _ _ _⟩
   right

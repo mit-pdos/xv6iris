@@ -431,7 +431,7 @@ theorem vdis_exit (RE : RELEASE) (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : 
     (hK : virtioDiskIntrSlots ≤ k.avail) (hlk : "virtio_disk" ∉ k.locks) :
     diskCaps γ γl pd pav pu ∗
     frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
-    (∀ R' : RegMap, kctx cpu (k.withRegs R') -∗ pcIs cpu (jumpPc (k.regs 1#5)) -∗
+    (£ 1 -∗ ∀ R' : RegMap, kctx cpu (k.withRegs R') -∗ pcIs cpu (jumpPc (k.regs 1#5)) -∗
       ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu)
     ⊢ ∀ R : RegMap, kctx cpu ((vdisK k).withRegs R) -∗
       pcIs cpu (KA.«virtio_disk_intr» + 0x8a#64) -∗ locked γl cpu -∗
@@ -488,8 +488,8 @@ theorem vdis_exit (RE : RELEASE) (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : 
   k_norm
   iframe
   inext
-  iintro Hk Hpc
-  iapply HΦ $$ %_ Hk Hpc
+  iintro Hk Hpc Hlc
+  iapply HΦ $$ Hlc %_ Hk Hpc
   ipureintro
   unfold calleeSaved
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, if_true, true_and, and_true]

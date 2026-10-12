@@ -78,7 +78,7 @@ theorem namex_rest (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKU
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0xb2#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     namexEnv Γ A ∗ namexWalk k A ipv ncur Scur nf ∗
-    (∀ c' : CPU, namexPostA k A c') ∗ namexLoop k A fuel
+    (∀ c' : CPU, £ 1 -∗ namexPostA k A c') ∗ namexLoop k A fuel
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨r2, r8, r9, r19, r20, r21, r22, r23, r24, r25, r27⟩ := id hr
   have hstop' : A.pfun A.plen ≠ SLASH := by rw [hs.hterm]; decide
@@ -165,7 +165,7 @@ theorem namex_memmove (MM : MEMMOVE) (cpu : CPU) (k' : KCtx) (src dst : BitVec 6
     kctx cpu k' ∗ pcIs cpu KA.«memmove» ∗
     trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗
     byteBuf src dq bs ∗ byteBuf dst (DFrac.own 1) olds ∗
-    (∀ (c : CPU) (R' : RegMap), ⌜calleeSaved k'.regs R'⌝ -∗
+    (∀ (c : CPU), £ 1 -∗ ∀ (R' : RegMap), ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c (k'.withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c k'.sie -∗ cpuClaimExt c k'.sie k'.proc -∗
       byteBuf src dq bs -∗ byteBuf dst (DFrac.own 1) bs -∗ wpLoop c)
@@ -177,12 +177,12 @@ theorem namex_memmove (MM : MEMMOVE) (cpu : CPU) (k' : KCtx) (src dst : BitVec 6
   iintro ⟨Hk, Hpc, Hte, Hce, Hsrc, Hdst, HK⟩
   iapply h
   iframe Hk Hpc Hsrc Hdst
-  iapply wpNext_intro_pin
-  iintro %c %hpin %R' Hk Hpc Hsrc Hdst %⟨hcs, -⟩
+  iapply wpNext_intro_pin_lc
+  iintro %c %hpin Hlc %R' Hk Hpc Hsrc Hdst %⟨hcs, -⟩
   have hpin' : k'.sie = false → c = cpu := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
-  iapply HK $$ %c %R' %hcs Hk Hpc Hte Hce Hsrc Hdst
+  iapply HK $$ %c Hlc %R' %hcs Hk Hpc Hte Hce Hsrc Hdst
 
 /-- The window's bytes are NUL-free (they sit strictly inside the string). -/
 theorem namex_win_nonul [Fscfg] {k : KCtx} {A : NamexArgs} (hs : NamexStatic k A) (a e : Nat)
@@ -229,7 +229,7 @@ theorem namex_long (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK)
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0xa6#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     namexEnv Γ A ∗ namexWalk k A ipv ncur Scur nf ∗
-    (∀ c' : CPU, namexPostA k A c') ∗ namexLoop k A fuel
+    (∀ c' : CPU, £ 1 -∗ namexPostA k A c') ∗ namexLoop k A fuel
     ⊢ wpLoop (GF := GF) cpu := by
   have hr := hf.hregs
   obtain ⟨r2, r8, r9, r19, r20, r21, r22, r23, r24, r25, r27⟩ := id hr
@@ -265,7 +265,7 @@ theorem namex_long (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK)
   case gn => k_norm_g; try rw [r25]; try rfl
   case g11 => k_norm_g; try exact r9
   case g10 => k_norm_g; try exact r21
-  iintro %c %R' %hcs Hk Hpc Hte Hce Hwin Hnm
+  iintro %c Hlc %R' %hcs Hk Hpc Hte Hce Hwin Hnm
   let cpu := c
   ihave Hpath := Hpback $$ Hwin
   k_norm_g [namex_ret_ac']
@@ -313,7 +313,7 @@ theorem namex_short (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0x130#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     namexEnv Γ A ∗ namexWalk k A ipv ncur Scur nf ∗
-    (∀ c' : CPU, namexPostA k A c') ∗ namexLoop k A fuel
+    (∀ c' : CPU, £ 1 -∗ namexPostA k A c') ∗ namexLoop k A fuel
     ⊢ wpLoop (GF := GF) cpu := by
   have hr := hf.hregs
   obtain ⟨r2, r8, r9, r19, r20, r21, r22, r23, r24, r25, r27⟩ := id hr
@@ -352,7 +352,7 @@ theorem namex_short (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK
   case gn => k_norm_g
   case g11 => k_norm_g; try exact r9
   case g10 => k_norm_g; try exact r21
-  iintro %c %R' %hcs Hk Hpc Hte Hce Hwin Hdst
+  iintro %c Hlc %R' %hcs Hk Hpc Hte Hce Hwin Hdst
   let cpu := c
   ihave Hpath := Hpback $$ Hwin
   ihave Hnm := Hnback $$ %(bview (e - a) (fun i => A.pfun (a + i))) %(bview_length _ _) Hdst
@@ -423,7 +423,7 @@ theorem namex_elem (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK)
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0x9a#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     namexEnv Γ A ∗ namexWalk k A ipv ncur Scur nf ∗
-    (∀ c' : CPU, namexPostA k A c') ∗ namexLoop k A fuel
+    (∀ c' : CPU, £ 1 -∗ namexPostA k A c') ∗ namexLoop k A fuel
     ⊢ wpLoop (GF := GF) cpu := by
   have hr := hf.hregs
   obtain ⟨r2, r8, r9, r19, r20, r21, r22, r23, r24, r25, r27⟩ := id hr

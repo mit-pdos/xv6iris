@@ -191,16 +191,16 @@ failure disjunct; the success arm is refuted by the plug. -/
 theorem kxau_close_fail (k : KCtx) (A : KexecArgs) (Fs : Pfam GF (Uvis → IProp GF))
     (sts : List FdState) (gn : GName) (cs : Std.ExtTreeSet GName compare) (Qpay : Int → IProp GF)
     (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (c : CPU) :
-    kexecK k A Fs sts gn cs Qpay P Pmiss Fo c ⊢
+    (£ 1 -∗ kexecK k A Fs sts gn cs Qpay P Pmiss Fo c) ⊢
       execPostFail Fs (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.V.pvSecc Qpay P Pmiss Fo
         (bview A.plen A.pfun) A.na A.alen A.afun sts cs A.pidv -∗
       kexecCloser kxauQ (fun _ => True) k A c := by
   iintro Hret Hfail
   unfold kexecCloser
-  iintro %spie %spp %R' %V' %M' %entry %spv %szv' %hcs %hq Hk Hpc Hte Hce Hpriv Hbufs Hbs Hirs
+  iintro Hlc %spie %spp %R' %V' %M' %entry %spv %szv' %hcs %hq Hk Hpc Hte Hce Hpriv Hbufs Hbs Hirs
   rcases hq with ⟨hr, hV, -, -, hM⟩ | ⟨hF, -⟩
   · unfold kexecK
-    iapply Hret $$ %spie %spp %R' %V' %M' %hcs [Hfail] Hk Hpc Hte Hce Hpriv Hbufs Hbs Hirs
+    iapply Hret $$ Hlc %spie %spp %R' %V' %M' %hcs [Hfail] Hk Hpc Hte Hce Hpriv Hbufs Hbs Hirs
     unfold execArms
     ileft
     iframe Hfail
@@ -222,16 +222,16 @@ theorem kxau_close_at (k : KCtx) (A : KexecArgs) (Fs : Pfam GF (Uvis → IProp G
     (hag : kexecLoadable f → ∀ j, j < 64 → ef[j]! = f[j]!)
     (htflen : A.V.tf.length = 36) (hna : A.na ≤ MAXARG) (c : CPU) :
     myPay gn Qpay ⊢
-      kexecK k A Fs sts gn cs Qpay P Pmiss Fo c -∗
+      (£ 1 -∗ kexecK k A Fs sts gn cs Qpay P Pmiss Fo c) -∗
       Fo.pfRecv av zi a -∗ P (pathElems (bview A.plen A.pfun)).length zi -∗
       pfAt (fun S => execSlotPre S Qpay (P (pathElems (bview A.plen A.pfun)).length) Fo.pfRecv A.V.cwi A.V.pvSecc
         A.na A.alen A.afun sts cs A.pidv) Fs -∗
       kexecCloser (execBuiltQ f ef A.na A.alen A.afun) (kxauQFp f A.na A.alen) k A c := by
   iintro #Hmp Hret HΦ HP Hsl
   unfold kexecCloser
-  iintro %spie %spp %R' %V' %M' %entry %spv %szv' %hcs %hq Hk Hpc Hte Hce Hpriv Hbufs Hbs Hirs
+  iintro Hlc %spie %spp %R' %V' %M' %entry %spv %szv' %hcs %hq Hk Hpc Hte Hce Hpriv Hbufs Hbs Hirs
   unfold kexecK
-  iapply Hret $$ %spie %spp %R' %V' %M' %hcs [HΦ HP Hsl] Hk Hpc Hte Hce Hpriv Hbufs Hbs Hirs
+  iapply Hret $$ Hlc %spie %spp %R' %V' %M' %hcs [HΦ HP Hsl] Hk Hpc Hte Hce Hpriv Hbufs Hbs Hirs
   unfold execArms
   rcases hcls with ⟨nl, rfl, hload⟩ | hnl
   · -- A LOADABLE FILE: arm (a) on success; `EfNoMem`/`EfArgsFit` on a failure
@@ -328,7 +328,7 @@ theorem kxau_close (k : KCtx) (A : KexecArgs) (Fs : Pfam GF (Uvis → IProp GF))
     (hef : ∀ j, j < 64 → ef[j]! = fileByte data j)
     (htflen : A.V.tf.length = 36) (hna : A.na ≤ MAXARG) (c : CPU) :
     myPay gn Qpay ⊢
-      kexecK k A Fs sts gn cs Qpay P Pmiss Fo c -∗
+      (£ 1 -∗ kexecK k A Fs sts gn cs Qpay P Pmiss Fo c) -∗
       kxaReceipt Fs P Fo Qpay A.V.cwi A.V.pvSecc (pathElems (bview A.plen A.pfun)).length zi A.na A.alen A.afun
         sts cs A.pidv dn bm data -∗
       kexecCloser (execBuiltQ (kxcFb data dn) ef A.na A.alen A.afun)
@@ -371,15 +371,15 @@ theorem wp_kexec_main (MP : MYPROC) (BO : BEGIN_OP) (NE : NAMEI_ERA) (IL : ILOCK
   -- the entry trapframe's length, read off the block ONCE
   icases kxau_tf_len A.γ k.proc A.pidv A.V A.M $$ Hpriv with ⟨%htflen, Hpriv⟩
   -- THE CONTRACT'S CONTINUATION, hart-free
-  ihave Hret : (∀ c : CPU, kexecK k A Fs sts gn cs Qpay P Pmiss Fo c) $$ [Hnext]
-  · iintro %c
-    iapply wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext
+  ihave Hret : (∀ c : CPU, £ 1 -∗ kexecK k A Fs sts gn cs Qpay P Pmiss Fo c) $$ [Hnext]
+  · iintro %c Hlc
+    iapply wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext Hlc
   -- THE BUNDLE, OPENED: the walk premise, the one observation, the slot piece
   unfold execAuPre
   icases Hau with ⟨Hstart, Hoc, Hsl⟩
   -- PHASE A, at `Q := False` below +0x090
   iapply (kxc_phaseA_au MP BO NE IL RD IUP EO Γ Fs kxauQ (fun _ => True) Qpay sts cs P Pmiss Fo
-    (kexecK k A Fs sts gn cs Qpay P Pmiss Fo) cpu k A ⟨.noMem, trivial⟩ hK hnoff htier
+    (fun c => iprop(£ 1 -∗ kexecK k A Fs sts gn cs Qpay P Pmiss Fo c)) cpu k A ⟨.noMem, trivial⟩ hK hnoff htier
     hj hproc hnn hterm hplen)
   iframe Hk Hpc Hte Hce Hfab Hstart Hoc Hsl Hpriv Hbufs Hbs Hirs Hret
   isplitl []

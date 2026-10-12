@@ -66,7 +66,7 @@ theorem fwr_seg_open (BO : BEGIN_OP) (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF 
     wordPointsTo (fnode fk + 24#64) 8 (DFrac.own q) ipv ∗
     isSleeplockGen γil γisl (iLock (ientry ik)) (icSlp fscIc ik) (slhTok (icfgIsl ik)) ∗
     credFloor lo tl ∗ ityShot g ty ∗ inodeShrGenlo ik s icfgDev inum g lo ∗ bslot ∗ topLb Tl ∗
-    (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap) (dn : Dinode) (bm : Blkmap) (K : Nat)
+    (∀ (c' : CPU), £ 1 -∗ ∀ (spie' spp' : Bool) (R' : RegMap) (dn : Dinode) (bm : Blkmap) (K : Nat)
         (Sb : List Nat),
       ⌜fwrRegs k fk n v9 (BitVec.ofNat 64 c) v20 v23 v24 v25 R' ∧ Tl ≤ K⌝ -∗
       ctxFloor curCtx K -∗
@@ -106,7 +106,7 @@ theorem fwr_seg_open (BO : BEGIN_OP) (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF 
   case bnoff => k_norm_g; exact hnoff
   case btier => k_norm_g; exact htier
   -- ===== back from begin_op: the reservation, opened at its set =====
-  iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hop
+  iintro %cpu Hlc %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hop
   k_norm_g [fwr_ret_90, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   icases logOp_openS icfgLog MAXOPBLOCKS $$ Hop with ⟨%Sb, HopS, Htx⟩
   have hr1 : fwrRegs k fk n v9 (BitVec.ofNat 64 c) v20 v23 v24 v25 R1 := by
@@ -138,14 +138,14 @@ theorem fwr_seg_open (BO : BEGIN_OP) (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF 
   case itier => k_norm_g; exact htier
   case ia0 => k_norm_g; exact hip
   -- ===== back from ilock =====
-  iintro %cpu %spie2 %spp2 %R2 %dn %bm %K %⟨hcs2, hK2⟩ #Hflr Hk Hpc Hte Hce Hpid Hbs Hlk Hoff Hload
+  iintro %cpu Hlc %spie2 %spp2 %R2 %dn %bm %K %⟨hcs2, hK2⟩ #Hflr Hk Hpc Hte Hce Hpid Hbs Hlk Hoff Hload
     #Hshot'
   k_norm_g [fwr_ret_98, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hr2 : fwrRegs k fk n v9 (BitVec.ofNat 64 c) v20 v23 v24 v25 R2 := by
     refine fwrRegs_cs _ _ _ _ _ _ _ _ _ _ _ ?_ (by k_norm_g at hcs2; exact hcs2)
     refine fwrRegs_set _ _ _ _ _ _ _ _ _ _ _ _ ?_ (by decide)
     exact fwrRegs_set _ _ _ _ _ _ _ _ _ _ _ _ hr1 (by decide)
-  iapply HK $$ %cpu %spie2 %spp2 %R2 %dn %bm %K %Sb [] Hflr Hk Hpc Hte Hce Hpid Hip Hbs Hlk Hoff Hload
+  iapply HK $$ %cpu Hlc %spie2 %spp2 %R2 %dn %bm %K %Sb [] Hflr Hk Hpc Hte Hce Hpid Hip Hbs Hlk Hoff Hload
     Hshot' HopS
   ipureintro; exact ⟨hr2, hK2⟩
 
@@ -175,7 +175,7 @@ theorem fwr_seg_write (WI : WRITEI) (Γ : SchedNames) [ClaimIs GF Γ]
     inodeMeta (ientry ik) dn ∗ inodeMap fscFs (ientry ik) bm ∗ inodeBlocks fscFs bm data ∗
     dinodeAt fscIreg inum dn ∗
     procPrivExtEv (procAddr j) pid V P Mv ∗ bslots 3 ∗ logOpS icfgLog MAXOPBLOCKS Sb ∗
-    (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap)
+    (∀ (c' : CPU), £ 1 -∗ ∀ (spie' spp' : Bool) (R' : RegMap)
         (tot : Nat) (bm' : Blkmap) (data' : Nat → List (BitVec 8)) (dn' dn0' : Dinode)
         (n' : Nat) (wrote : Nat → BitVec 8) (dist : Nat) (dstb : Nat → BitVec 8) (P' : UPtd)
         (Sb' : List Nat) (a0 : BitVec 64),
@@ -244,7 +244,7 @@ theorem fwr_seg_write (WI : WRITEI) (Γ : SchedNames) [ClaimIs GF Γ]
   case wa3 => k_norm_g
   case wa4 => k_norm_g
   -- ===== back from writei =====
-  iintro %cpu %spie1 %spp1 %R1 %tot %bm' %data' %dn' %dn0' %n' %wrote %dist %dstb %P' %Sb'
+  iintro %cpu Hlc %spie1 %spp1 %R1 %tot %bm' %data' %dn' %dn0' %n' %wrote %dist %dstb %P' %Sb'
     %⟨hcs1, hout⟩ Hk Hpc Hte Hce Hdev Hin Hmeta Hmap Hblk Hdi Hpriv Hbs Hop
   k_norm_g [fwr_ret_ac, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed] at hout
   k_norm_g [fwr_ret_ac, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
@@ -273,7 +273,7 @@ theorem fwr_seg_write (WI : WRITEI) (Γ : SchedNames) [ClaimIs GF Γ]
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hb]
     iintro Hk Hpc
     have hv : filerwOffW v tot = v := by rw [hz]; exact filerwOffW_zero v
-    iapply HK $$ %cpu %spie1 %spp1 %_ %tot %bm' %data' %dn' %dn0' %n' %wrote %dist %dstb %P' %Sb'
+    iapply HK $$ %cpu Hlc %spie1 %spp1 %_ %tot %bm' %data' %dn' %dn0' %n' %wrote %dist %dstb %P' %Sb'
       %(R1 10#5) [] Hk Hpc Hte Hce Hip [Hoff] Hdev Hin Hmeta Hmap Hblk Hdi Hpriv Hbs Hop
     · ipureintro; exact ⟨hr2, hout⟩
     · rw [hv]; iexact Hoff
@@ -300,7 +300,7 @@ theorem fwr_seg_write (WI : WRITEI) (Γ : SchedNames) [ClaimIs GF Γ]
     k_step_e (wp_s_sw cpu _ (KA.«filewrite» + 0xb8#64) false 32#12 18#5 15#5 (by decide) v)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [s18, hpos.1, filerw_offadd v tot (by omega)]
     iintro Hk Hpc Hoff
-    iapply HK $$ %cpu %spie1 %spp1 %_ %tot %bm' %data' %dn' %dn0' %n' %wrote %dist %dstb %P' %Sb'
+    iapply HK $$ %cpu Hlc %spie1 %spp1 %_ %tot %bm' %data' %dn' %dn0' %n' %wrote %dist %dstb %P' %Sb'
       %(R1 10#5) [] Hk Hpc Hte Hce Hip Hoff Hdev Hin Hmeta Hmap Hblk Hdi Hpriv Hbs Hop
     ipureintro
     refine ⟨?_, hout⟩
@@ -331,7 +331,7 @@ theorem fwr_seg_close (IU : IUNLOCK) (EO : END_OP) (Γ : SchedNames) [ClaimIs GF
     credFloor lo tl ∗ fwrLk ik s g lo inum γisl pid ∗ (∃ T : Nat, offRowsDep offCfg ik T) ∗
     icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗ ityShot g dn.diType ∗
     wordPointsTo (pPid k.proc) 4 pidPriv pid ∗ logOpS icfgLog u Sb ∗
-    (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap),
+    (∀ (c' : CPU), £ 1 -∗ ∀ (spie' spp' : Bool) (R' : RegMap),
       ⌜fwrRegs k fk n v9 v19 v20 v23 v24 v25 R'⌝ -∗
       kctx c' (((k.withSpie spie' spp').pushed 12).withRegs R') -∗
       pcIs c' (KA.«filewrite» + 0xc8#64) -∗
@@ -369,7 +369,7 @@ theorem fwr_seg_close (IU : IUNLOCK) (EO : END_OP) (Γ : SchedNames) [ClaimIs GF
   case utier => k_norm_g; exact htier
   case ua0 => k_norm_g; exact hip
   -- ===== back from iunlock: the share and the token home =====
-  iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hshr Htx
+  iintro %cpu Hlc %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hshr Htx
   k_norm_g [fwr_ret_c4, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   ihave Hop := logOpS_op icfgLog u Sb $$ Hop Htx
   have hr1 : fwrRegs k fk n v9 v19 v20 v23 v24 v25 R1 := by
@@ -393,13 +393,13 @@ theorem fwr_seg_close (IU : IUNLOCK) (EO : END_OP) (Γ : SchedNames) [ClaimIs GF
   case enoff => k_norm_g; exact hnoff
   case etier => k_norm_g; exact htier
   -- ===== back from end_op =====
-  iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid
+  iintro %cpu Hlc %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid
   k_norm_g [fwr_ret_c8, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hr2 : fwrRegs k fk n v9 v19 v20 v23 v24 v25 R2 := by
     refine fwrRegs_cs _ _ _ _ _ _ _ _ _ _ _ ?_ (by k_norm_g at hcs2; exact hcs2)
     repeat (refine fwrRegs_set _ _ _ _ _ _ _ _ _ _ _ _ ?_ (by decide))
     exact hr1
-  iapply HK $$ %cpu %spie2 %spp2 %R2 %hr2 Hk Hpc Hte Hce Hpid Hip Hshr
+  iapply HK $$ %cpu Hlc %spie2 %spp2 %R2 %hr2 Hk Hpc Hte Hce Hpid Hip Hshr
 
 end
 

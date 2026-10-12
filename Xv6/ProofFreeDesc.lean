@@ -275,7 +275,7 @@ theorem free_desc_proof (WK : WAKEUP) : FREE_DESC :=
   k_norm
   iframe
   inext
-  iintro Hk Hpc
+  iintro Hk Hpc _
   iapply HΦ $$ %_ Hk Hpc [] [Hfree] [Hd0 Hd8 Hd12 Hd14]
   case' _ =>
     ipureintro

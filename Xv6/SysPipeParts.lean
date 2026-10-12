@@ -734,13 +734,13 @@ theorem sys_pipe_exit (cpu cr : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (
     $$ [- $Hk $Hpc $Hframe]
   isplitl [Hpost Hu0 Hu1 Hir]
   · iframe Hpost Hu0 Hu1 Hir
-  iapply wpNext_intro_pin
-  iintro %c %hc %R'' Hk Hpc %hfacts ⟨Hpost, Hu0, Hu1, Hir⟩
+  iapply wpNext_intro_pin_lc
+  iintro %c %hc Hlc %R'' Hk Hpc %hfacts ⟨Hpost, Hu0, Hu1, Hir⟩
   have hc' : k.sie = false ∨ k.proc = 0#64 → c = cpu := fun h => (hc h).trans (hpin h)
   ihave Hte := trapCsrsExt_move _ _ _ (fun h => hc' (Or.inl h)) $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ (fun h => hc' (Or.inl h)) $$ Hce
   ihave HΦ := wpNext_at true k.proc cpu c _
-    (fun h => hc' (h.elim (fun e => absurd e (by decide)) Or.inr)) $$ Hnext
+    (fun h => hc' (h.elim (fun e => absurd e (by decide)) Or.inr)) $$ Hnext Hlc
   k_norm_g
   iapply HΦ $$ %spie %spp %R'' %V.ev [] Hk Hpc Hte Hce %(Nat.le_refl V.ev) [Hpost] Hu0 Hu1 Hir
   · ipureintro; exact hfacts.1

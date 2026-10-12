@@ -141,7 +141,7 @@ theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {GF} _ _ cpu k hsie hnoff h
   iintro Hk Hpc
   -- addiw a5,a5,-1
   k_step (wp_s_addiw cpu _ (KA.«pop_off» + 0x1a#64) true 4095#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [addiw_pred k.noff hnoff hn31]
+    with [addiw_pred k.noff hnoff hn31] £ Hlc
   iintro Hk Hpc
   have hA : aCpuIntena cpu = cpuAddr cpu + 124#64 := rfl
   by_cases hn1 : k.noff = 1
@@ -219,7 +219,7 @@ theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {GF} _ _ cpu k hsie hnoff h
     have hr : reen = false := by rw [hreen, hint]; simp
     simp only [hr, KCtx.popExit_false, popArm_false]
     k_norm
-    ihave HΦ' := wpNext_off _ _ _ $$ HΦ
+    ihave HΦ' := wpNext_off _ _ _ $$ HΦ Hlc
     have hsx : BitVec.signExtend 64 (intenaVal false) = 0#64 := rfl
     k_step (wp_s_sw_noff_lend cpu _ ?hs ?hn (KA.«pop_off» + 0x1c#64) true 120#12 10#5 15#5 ?haddr ?hval false ?hwf') from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [h10, withCpu_popOff2_one k _ hn1 hint]
@@ -258,7 +258,7 @@ theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {GF} _ _ cpu k hsie hnoff h
     k_norm
     iframe
     inext
-    iintro Hk Hpc
+    iintro Hk Hpc _
     iapply HΦ' $$ %_ Hk Hpc
     ipureintro
     obtain ⟨hs2, _, h9, h18, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩ := hcs2
@@ -272,7 +272,7 @@ theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {GF} _ _ cpu k hsie hnoff h
     have hr : reen = false := by rw [hreen]; simp [hn1]
     simp only [hr, KCtx.popExit_false, popArm_false]
     k_norm
-    ihave HΦ' := wpNext_off _ _ _ $$ HΦ
+    ihave HΦ' := wpNext_off _ _ _ $$ HΦ Hlc
     k_step (wp_s_sw_noff cpu _ ?hs (KA.«pop_off» + 0x1c#64) true 120#12 10#5 15#5 ?haddr (k.noff - 1) ?hval ?hpin ?hwf') from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [h10, withCpu_popOff2]
     case haddr => k_norm [h10]; rfl
@@ -296,7 +296,7 @@ theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {GF} _ _ cpu k hsie hnoff h
     k_norm
     iframe
     inext
-    iintro Hk Hpc
+    iintro Hk Hpc _
     iapply HΦ' $$ %_ Hk Hpc
     ipureintro
     obtain ⟨hs2, _, h9, h18, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩ := hcs2

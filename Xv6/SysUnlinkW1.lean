@@ -228,7 +228,7 @@ def sysUnlinkAt30 (Γ : SchedNames) (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF
   suAny (sysUnlinkDel (k.regs 2#5)) 16 ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv Γ ∗
   wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ sysUnlinkHole A k.proc P2 ∗
-  (∀ c : CPU, sysUnlinkPostA k A c) ∗
+  (∀ c : CPU, £ 1 -∗ sysUnlinkPostA k A c) ∗
   inodeHeldTyAt dpv T_DIR iL ∗ A.P (npElems pl).length iL ∗
   bslots 3 ∗ irefSlots 1 ∗ logOpS icfgLog n Sb ∗ logTx icfgLog ∗
   sysUnlinkCommits A pl
@@ -262,7 +262,7 @@ theorem sys_unlink_w1_walk (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) (EO : END_OP) (�
     procPrivCoreNoctxAt curCtx (procAddr A.j) A.pid { A.V with upt := P2 }
       (viewFaulted A.V.upt P2 A.M) ∗
     procOfilesOwe A.γ A.V.fdg (procAddr A.j) A.V.ofile [] ∗
-    (∀ c : CPU, sysUnlinkPostA k A c) ∗
+    (∀ c : CPU, £ 1 -∗ sysUnlinkPostA k A c) ∗
     bslots 3 ∗ irefSlots sysUnlinkSlots ∗ sysUnlinkAuA A
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hjunk, Hde, Hnm, Hpath, Hoff, Hdel, Hte, Hce, #Henv, Hcore, Howe, HΦ,
@@ -294,7 +294,7 @@ theorem sys_unlink_w1_walk (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) (EO : END_OP) (�
   case bK => k_norm_g; exact hKb
   case bn => k_norm_g; exact ok.hnoff
   case bt => k_norm_g; exact ok.htier
-  iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hop
+  iintro %cpu Hlc %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hop
   k_norm_g [sys_unlink_ret_20, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysUnlinkPins_cs k _ R1 (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
     (sysUnlinkPins_set k R _ _ _ 1#5 _ hpins (Or.inl rfl)) hcs1
@@ -433,7 +433,7 @@ theorem sys_unlink_w1_args (AS : ARGSTR_W) (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) 
     sysUnlinkCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) w₃ w₄ w₅ ∗ sysUnlinkBufs (k.regs 2#5) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid A.V A.M ∗
-    (∀ c : CPU, sysUnlinkPostA k A c) ∗
+    (∀ c : CPU, £ 1 -∗ sysUnlinkPostA k A c) ∗
     bslots 3 ∗ irefSlots sysUnlinkSlots ∗ sysUnlinkAuA A
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hbufs, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hau⟩
@@ -472,7 +472,7 @@ theorem sys_unlink_w1_args (AS : ARGSTR_W) (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) 
   case gK => k_norm_g; exact hKas
   case gmx => k_norm_g [hold]
   case gba => k_norm_g [hpins.2.1, sys_unlink_bufpath]
-  iintro %cpu %spie1 %spp1 %R1 %P2 %bs %kv %hf1 Hk Hpc Hte Hce %hkv Hbare Hpath
+  iintro %cpu Hlc %spie1 %spp1 %R1 %P2 %bs %kv %hf1 Hk Hpc Hte Hce %hkv Hbare Hpath
   obtain ⟨hcs1, hext, hret, hlen⟩ := hf1
   k_norm_g [sys_unlink_ret_16, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysUnlinkPins_cs k _ R1 (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
@@ -490,9 +490,9 @@ theorem sys_unlink_w1_args (AS : ARGSTR_W) (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) 
   ihave Howe := (show procOfilesOwe (GF := GF) A.γ A.V.fdg (procAddr A.j) A.V.ofile [] ⊢
     procOfilesOwe (A.raise kv).γ (A.raise kv).V.fdg (procAddr (A.raise kv).j) (A.raise kv).V.ofile []
     from .rfl) $$ Howe
-  ihave HΦ : (∀ c : CPU, sysUnlinkPostA k (A.raise kv) c) $$ [HΦ]
-  · iintro %c
-    ispecialize HΦ $$ %c
+  ihave HΦ : (∀ c : CPU, £ 1 -∗ sysUnlinkPostA k (A.raise kv) c) $$ [HΦ]
+  · iintro %c Hlc
+    ispecialize HΦ $$ %c Hlc
     iapply (sysUnlinkPost_raise k A.γ (procAddr A.j) A.pid A.V A.M A.v0.toNat A.P A.Pmiss A.Fent
       A.Ftgt A.Fex A.Fmiss c kv hkv) $$ HΦ
   ihave Hau := (show sysUnlinkAuA (GF := GF) A ⊢ sysUnlinkAuA (A.raise kv) from .rfl)
@@ -562,10 +562,10 @@ theorem sys_unlink_w1 (AS : ARGSTR_W) (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) (EO :
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave #Henv : sysfileEnv Γ $$ []
   · unfold sysfileEnv; iframe #
-  ihave HΦ : (∀ c : CPU, sysUnlinkPostA k A c) $$ [Hnext]
-  · iintro %c
+  ihave HΦ : (∀ c : CPU, £ 1 -∗ sysUnlinkPostA k A c) $$ [Hnext]
+  · iintro %c Hlc
     unfold sysUnlinkCont
-    iapply wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext
+    iapply wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext Hlc
   simp only [sysUnlinkAddr]
   iapply (wp_prologue_sys_unlink cpu k KA.«sys_unlink» (sysUnlinkK_30 _ hK))
   k_code (text_instr _ _ _ _ rfl rfl) Htext

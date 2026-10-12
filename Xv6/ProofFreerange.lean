@@ -230,10 +230,10 @@ theorem freerange_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
     $$ [- $Hk $Hpc] with [KCtx.pop_pushed _ _ _ hK', hR2] next c4 hp4
   iintro Hk Hpc
   k_step_gen (wp_s_ret c4 _ (KA.«freerange» + 0x46#64) true 1#5) from (text_instr _ _ _ _ rfl rfl) Htext
-    $$ [- $Hk $Hpc] next c5 hp5
+    $$ [- $Hk $Hpc] next c5 hp5 £ Hlc
   iintro Hk Hpc
   ihave HΦ' := wpNext_at _ _ _ c5 _
-    (fun h => (hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans ((hp1 h).trans (hpin h)))))) $$ HΦ
+    (fun h => (hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans ((hp1 h).trans (hpin h)))))) $$ HΦ Hlc
   iapply HΦ' $$ %spie %spp %_ %hsp Hk Hpc Hav
   ipureintro
   unfold calleeSaved
@@ -325,10 +325,10 @@ theorem freerange_iter [WchG GF] (KF : KFREE) [CurCtx]
   -- bgeu s2,s1 : another page?
   k_step_gen (wp_s_branch c4 _ (KA.«freerange» + 0x34#64) false 8182#13 18#5 9#5 (by decide) bop.BGEU)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [e18, fr_branch (k.regs 11#5) base n i hi hb1 hb2 hb4] next c5 hp5
+    with [e18, fr_branch (k.regs 11#5) base n i hi hb1 hb2 hb4] next c5 hp5 £ Hlc
   iintro Hk Hpc
   ihave HΦ' := wpNext_at _ _ _ c5 _
-    (fun h => (hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))) $$ HΦ
+    (fun h => (hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))) $$ HΦ Hlc
   iapply HΦ' $$ %spie2 %spp2 %_ %hsp2 Hk Hpc Hav
   ipureintro
   simp only [frSaved, RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]

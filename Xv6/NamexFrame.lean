@@ -93,13 +93,13 @@ theorem wp_prologue_namex [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k 
   iintro Hk Hpc Hf88
   k_step_gen (wp_s_sd c12 _ (pc + 24#64) true 0#12 2#5 26#5 (by decide) w₁₂) $$ [- $Hk $Hpc] next c13 hp13
   iintro Hk Hpc Hf96
-  k_step_gen (wp_s_addi c13 _ (pc + 26#64) true 96#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c14 hp14
+  k_step_gen (wp_s_addi c13 _ (pc + 26#64) true 96#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c14 hp14 £ Hlc
   iintro Hk Hpc
   k_norm_g
   ihave HΦ' := wpNext_at _ _ _ c14 _
     (fun h => (hp14 h).trans ((hp13 h).trans ((hp12 h).trans ((hp11 h).trans ((hp10 h).trans
       ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans
-        ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))))))))))) $$ HΦ
+        ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))))))))))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc [Hf8 Hf16 Hf24 Hf32 Hf40 Hf48 Hf56 Hf64 Hf72 Hf80 Hf88 Hf96]
   unfold frame12
   iframe
@@ -181,13 +181,13 @@ theorem wp_epilogue_namex [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k 
   k_step_gen (wp_s_pop c12 _ (pc + 24#64) true 96#12 12 imm_p96) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c13 hp13
   iintro Hk Hpc
-  k_step_gen (wp_s_ret c13 _ (pc + 26#64) true 1#5) $$ [- $Hk $Hpc] next c14 hp14
+  k_step_gen (wp_s_ret c13 _ (pc + 26#64) true 1#5) $$ [- $Hk $Hpc] next c14 hp14 £ Hlc
   iintro Hk Hpc
   k_norm_g
   ihave HΦ' := wpNext_at _ _ _ c14 _
     (fun h => (hp14 h).trans ((hp13 h).trans ((hp12 h).trans ((hp11 h).trans ((hp10 h).trans
       ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans
-        ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))))))))))) $$ HΦ
+        ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))))))))))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc
 
 end

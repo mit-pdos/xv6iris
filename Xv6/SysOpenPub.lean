@@ -214,7 +214,7 @@ theorem sys_open_pub (Γ : SchedNames) [ClaimIs GF Γ] (k : KCtx) (A : SysOpenAr
     %inum %dn %bm %u %(BitVec.ofNat 64 fd) %⟨hkk, hinb, hle⟩ %hpins %hal Hk Hpc Hte Hce Henv Hcells
     Hbuf Hlk Hload Hpid Hop
   unfold sysOpenRet
-  iintro %c' %spie' %spp' %R' %hcs Hk Hpc Hte Hce ⟨%hr, Hpid, Hshr⟩
+  iintro %c' Hlc %spie' %spp' %R' %hcs Hk Hpc Hte Hce ⟨%hr, Hpid, Hshr⟩
   ihave Hcore := Hcback $$ Hpid
   -- ---- THE PUBLICATION: one ghost step ----
   ihave Hs := sys_open_shr_held kk s g inum loc tlc hkk hinb hle $$ [$Hfl $Hshr]
@@ -245,7 +245,7 @@ theorem sys_open_pub (Γ : SchedNames) [ClaimIs GF Γ] (k : KCtx) (A : SysOpenAr
   ihave Hiru := (show irefSlot (GF := GF) ⊢ irefSlots 1 from .rfl) $$ Hiru
   ihave Hisl := (irefSlots_op nsj 1).2 $$ [$Hisl $Hiru]
   rw [hns]
-  ispecialize Hpost $$ %c'
+  ispecialize Hpost $$ %c' Hlc
   iapply Hpost $$ %spie' %spp' %R' %P2 %A.V.ev %hcs %hP2 %(Nat.le_refl _) Hk Hpc Hte Hce Hbs Hisl
   unfold openArmsPlain
   iframe Hfds

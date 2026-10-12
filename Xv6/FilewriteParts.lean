@@ -139,12 +139,12 @@ theorem wp_prologue_filewrite [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU)
   iintro Hk Hpc Hf56
   k_step_gen (wp_s_sd c5 _ (pc + 10#64) true 32#12 2#5 22#5 (by decide) w₈) $$ [- $Hk $Hpc] next c6 hp6
   iintro Hk Hpc Hf64
-  k_step_gen (wp_s_addi c6 _ (pc + 12#64) true 96#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c7 hp7
+  k_step_gen (wp_s_addi c6 _ (pc + 12#64) true 96#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c7 hp7 £ Hlc
   iintro Hk Hpc
   k_norm_g
   ihave HΦ' := wpNext_at _ _ _ c7 _
     (fun h => (hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans
-      ((hp2 h).trans (hp1 h))))))) $$ HΦ
+      ((hp2 h).trans (hp1 h))))))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc [Hf8 Hf16 Hf24 Hf32 Hf40 Hf48 Hf56 Hf64 Hf72 Hf80 Hf88 Hf96]
   iexists w₃, w₅, w₆, w₉, w₁₀, w₁₁, w₁₂
   unfold frame12
@@ -183,12 +183,12 @@ theorem fwr_spill6 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
   iintro Hk Hpc Hf72
   k_step_gen (wp_s_sd c4 _ (pc + 8#64) true 16#12 2#5 24#5 (by decide) w9) $$ [- $Hk $Hpc] with [hR2] next c5 hp5
   iintro Hk Hpc Hf80
-  k_step_gen (wp_s_sd c5 _ (pc + 10#64) true 8#12 2#5 25#5 (by decide) w10) $$ [- $Hk $Hpc] with [hR2] next c6 hp6
+  k_step_gen (wp_s_sd c5 _ (pc + 10#64) true 8#12 2#5 25#5 (by decide) w10) $$ [- $Hk $Hpc] with [hR2] next c6 hp6 £ Hlc
   iintro Hk Hpc Hf88
   k_norm_g
   ihave HΦ' := wpNext_at _ _ _ c6 _
     (fun h => (hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans
-      (hp1 h)))))) $$ HΦ
+      (hp1 h)))))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc
   iframe
 
@@ -232,12 +232,12 @@ theorem fwr_restore6 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
     $$ [- $Hk $Hpc] with [hR2] next c5 hp5
   iintro Hk Hpc Hf80
   k_step_gen (wp_s_ld c5 _ (pc + 10#64) true 8#12 25#5 2#5 (by decide) (by decide) (DFrac.own 1) s9)
-    $$ [- $Hk $Hpc] with [hR2] next c6 hp6
+    $$ [- $Hk $Hpc] with [hR2] next c6 hp6 £ Hlc
   iintro Hk Hpc Hf88
   k_norm_g
   ihave HΦ' := wpNext_at _ _ _ c6 _
     (fun h => (hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans
-      (hp1 h)))))) $$ HΦ
+      (hp1 h)))))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc
   iframe
 
@@ -286,12 +286,12 @@ theorem wp_epilogue_filewrite [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU)
   k_step_gen (wp_s_pop c5 _ (pc + 10#64) true 96#12 12 imm_p96) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c6 hp6
   iintro Hk Hpc
-  k_step_gen (wp_s_ret c6 _ (pc + 12#64) true 1#5) $$ [- $Hk $Hpc] next c7 hp7
+  k_step_gen (wp_s_ret c6 _ (pc + 12#64) true 1#5) $$ [- $Hk $Hpc] next c7 hp7 £ Hlc
   iintro Hk Hpc
   k_norm_g
   ihave HΦ' := wpNext_at _ _ _ c7 _
     (fun h => (hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans
-      ((hp2 h).trans (hp1 h))))))) $$ HΦ
+      ((hp2 h).trans (hp1 h))))))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc
 
 end Frame

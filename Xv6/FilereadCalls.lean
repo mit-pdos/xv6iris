@@ -87,7 +87,7 @@ theorem frd_piperead (PR : PIPEREAD) (Γ : SchedNames) [ClaimIs GF Γ]
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     procPrivExt (procAddr j) pid V V.upt M ∗ genHalvesPriv (procAddr j) pid V.gen ∗
     pipeRpay γp.pnQueue Rp Rpe n.toNat ∗
-    (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (M' : Nat → List (BitVec 8)) (d : Nat),
+    (∀ (c' : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (M' : Nat → List (BitVec 8)) (d : Nat),
       ⌜calleeSaved k'.regs R' ∧ V.upt.extSz V.sz P' ∧ (d : Int) ≤ max 0 n ∧
         pipeReadRet d (R' 10#5) ∧ umemWrote V.upt M (k'.regs 11#5) d P' M'⌝ -∗
       kctx c' ((k'.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
@@ -106,15 +106,15 @@ theorem frd_piperead (PR : PIPEREAD) (Γ : SchedNames) [ClaimIs GF Γ]
   ihave Hpriv := (procPrivExt_conv0 ht (procAddr j) pid V M).2 $$ Hpriv
   iapply h
   iframe Hk Hpc Hpi Hte Hce Hpp Href Hkl Hav Hpriv Hgen Hpay
-  iapply wpNext_intro
-  iintro %c' %spie %spp %R' %P' %M' %d %bsW %kv %⟨hcs, hext, hdle, hret, hlen, hM, hmap⟩ Hk Hpc Hte Hce
+  iapply wpNext_intro_lc
+  iintro %c' Hlc %spie %spp %R' %P' %M' %d %bsW %kv %⟨hcs, hext, hdle, hret, hlen, hM, hmap⟩ Hk Hpc Hte Hce
     Href %hkv Hpriv Hgen Hpost
   ihave Hpriv := (procPrivExt_conv ht (procAddr j) pid (V.updEv kv) P' M').1 $$ Hpriv
   icases frd_pageLen (procAddr j) pid (V.updEv kv) P' M' $$ Hpriv with ⟨%hpl, Hpriv⟩
   ihave Hpriv := procPrivExtEv_intro _ _ _ _ _ kv hkv $$ Hpriv
   ihave Hpost := frd_rpost_img V.upt γp.pnQueue (k'.regs 11#5) Rp Rpe _ n.toNat d bsW (R' 10#5) P'
     (viewFaulted V.upt P' M) M' hlen hM hmap hpl $$ Hpost
-  iapply HK $$ %c' %spie %spp %R' %P' %M' %d [] Hk Hpc Hte Hce Href Hpriv Hgen Hpost
+  iapply HK $$ %c' Hlc %spie %spp %R' %P' %M' %d [] Hk Hpc Hte Hce Href Hpriv Hgen Hpost
   ipureintro
   exact ⟨hcs, hext, hdle, hret, ⟨bsW, hlen, hM, hmap⟩⟩
 
@@ -135,7 +135,7 @@ theorem frd_consoleread (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs GF Γ]
     consReadPay (genId (GF := GF) + 1) Rin ∗ uartInv .uart0 fscCons.uart ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     procPrivExt (procAddr j) pid V V.upt M ∗ genHalvesPriv (procAddr j) pid V.gen ∗
-    (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd)
+    (∀ (c' : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
       (M' : Nat → List (BitVec 8)) (d dc cur : Nat) (bs : Nat → BitVec 8) (hs : List (List Obs))
       (sl : List (List Obs × BitVec 8)),
       ⌜calleeSaved k'.regs R' ∧ V.upt.extSz V.sz P' ∧ (d : Int) ≤ max 0 n ∧ consReadRet d (R' 10#5) ∧
@@ -167,12 +167,12 @@ theorem frd_consoleread (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs GF Γ]
   ihave Hpriv := (procPrivExt_conv0 ht (procAddr j) pid V M).2 $$ Hpriv
   iapply h
   iframe Hk Hpc Hpi Hte Hce Hcl Hpay Hrin Hui Hkl Hav Hpriv Hgen
-  iapply wpNext_intro
-  iintro %c' %spie %spp %R' %P' %M' %d %dc %cur %bs %hs %sl %kv %hp Hks Hts Hlb Hwin Hout Hk Hpc Hte Hce
+  iapply wpNext_intro_lc
+  iintro %c' Hlc %spie %spp %R' %P' %M' %d %dc %cur %bs %hs %sl %kv %hp Hks Hts Hlb Hwin Hout Hk Hpc Hte Hce
     %hkv Hpriv Hgen
   ihave Hpriv := (procPrivExt_conv ht (procAddr j) pid (V.updEv kv) P' M').1 $$ Hpriv
   ihave Hpriv := procPrivExtEv_intro _ _ _ _ _ kv hkv $$ Hpriv
-  iapply HK $$ %c' %spie %spp %R' %P' %M' %d %dc %cur %bs %hs %sl %hp Hks Hts Hlb Hwin Hout Hk Hpc Hte
+  iapply HK $$ %c' Hlc %spie %spp %R' %P' %M' %d %dc %cur %bs %hs %sl %hp Hks Hts Hlb Hwin Hout Hk Hpc Hte
     Hce Hpriv Hgen
 
 /-- What ilock's read arm hands back that stays unchanged until iunlock
@@ -203,7 +203,7 @@ theorem frd_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF Γ] (c : CPU)
     isSleeplockGen γil γisl (iLock (ientry ik)) (icSlp fscIc ik) (slhTok (icfgIsl ik)) ∗
     credFloor lo tl ∗ ityShot g ty ∗ inodeShrGenlo ik s icfgDev inum g lo ∗
     wordPointsTo (pPid k'.proc) 4 pidPriv pid ∗ bslot ∗ topLb Tl ∗
-    (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap) (dn : Dinode) (bm : Blkmap) (K : Nat),
+    (∀ (c' : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (dn : Dinode) (bm : Blkmap) (K : Nat),
       ⌜calleeSaved k'.regs R' ∧ Tl ≤ K⌝ -∗ ctxFloor curCtx K -∗
       kctx c' ((k'.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗
@@ -233,12 +233,12 @@ theorem frd_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF Γ] (c : CPU)
   · unfold icDepSide icDepSideTx txPinO; iempintro
   isplitr
   · unfold iregWdLic; iexact Hshot
-  iapply wpNext_intro
-  iintro %c'
+  iapply wpNext_intro_lc
+  iintro %c' Hlc
   unfold ilockPostDepEb
   iintro %spie %spp %R' %dn %bm %filled %hcs ⟨%K, %hK', #Hflr⟩ Hk Hpc Hte Hce Hpid - Hbs Hsl Hdep
     Hoff Hdev Hinum Hval Hload Hshot' Hfrz %- - %-
-  iapply HK $$ %c' %spie %spp %R' %dn %bm %K [] Hflr Hk Hpc Hte Hce Hpid Hbs [Hsl Hdep Hdev Hinum Hval
+  iapply HK $$ %c' Hlc %spie %spp %R' %dn %bm %K [] Hflr Hk Hpc Hte Hce Hpid Hbs [Hsl Hdep Hdev Hinum Hval
     Hfrz] Hoff Hload Hshot'
   · ipureintro; exact ⟨hcs, hK'⟩
   · unfold frdLk; iframe
@@ -260,7 +260,7 @@ theorem frd_iunlock (IU : IUNLOCK) (Γ : SchedNames) (c : CPU) (k' : KCtx) (ik :
     credFloor lo tl ∗ frdLk ik s g lo inum γisl pid ∗ (∃ T : Nat, offRowsDep offCfg ik T) ∗
     icDepHeld fscFs fscIreg fscCov fscLogst (.depRd s icfgDev inum g lo) ik inum dn bm ∗
     ityShot g dn.diType ∗ wordPointsTo (pPid k'.proc) 4 pidPriv pid ∗
-    (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap),
+    (∀ (c' : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c' ((k'.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗
@@ -281,12 +281,12 @@ theorem frd_iunlock (IU : IUNLOCK) (Γ : SchedNames) (c : CPU) (k' : KCtx) (ik :
   iapply h
   iframe Hk Hpc Hsl Hdep Hoff Hdev Hinum Hval Hload Hshot Hfrz Hpid
   iframe #
-  iapply wpNext_intro_pin
-  iintro %c' %hpin %spie %spp %R' %- Hk Hpc %hcs Hpid Hshr -
+  iapply wpNext_intro_pin_lc
+  iintro %c' %hpin Hlc %spie %spp %R' %- Hk Hpc %hcs Hpid Hshr -
   have hpin' : k'.sie = false → c' = c := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
-  iapply HK $$ %c' %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hshr
+  iapply HK $$ %c' Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hshr
 
 set_option maxHeartbeats 8000000 in
 /-- `readi(f->ip, 1, addr, f->off, n)` at `+0x44`: the USER arm, at the
@@ -312,7 +312,7 @@ theorem frd_readi (RD : READI) (Γ : SchedNames) [ClaimIs GF Γ]
     inodeMapQ fscFs (DFrac.own Qp.quarter) (ientry ik) bm ∗
     inodeBlocksQ fscFs (DFrac.own Qp.quarter) bm data ∗
     procPrivExt (procAddr j) pid V V.upt M ∗ bslot ∗
-    (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap) (tot : Nat) (P' : UPtd) (M' : Nat → List (BitVec 8)),
+    (∀ (c' : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (tot : Nat) (P' : UPtd) (M' : Nat → List (BitVec 8)),
       ⌜calleeSaved k'.regs R' ∧ tot ≤ rdClamp dn.diSize off n.toNat ∧
         ((R' 10#5 = -1#64 ∧ rdFailWhy V.upt (k'.regs 12#5) n.toNat) ∨
           (R' 10#5 = BitVec.ofNat 64 tot ∧ tot = rdClamp dn.diSize off n.toNat)) ∧
@@ -347,13 +347,13 @@ theorem frd_readi (RD : READI) (Γ : SchedNames) [ClaimIs GF Γ]
   isplitl [Hpriv]
   · iapply (show procPrivExt (GF := GF) (procAddr j) pid V V.upt M ⊢ procPrivRun (procAddr j) pid V M
       from .rfl) $$ Hpriv
-  iapply wpNext_intro
-  iintro %c' %spie %spp %R' %tot %hcs %hle %hret Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk
+  iapply wpNext_intro_lc
+  iintro %c' Hlc %spie %spp %R' %tot %hcs %hle %hret Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk
     ⟨%P', %M', %kv, %⟨hext, himg⟩, %hkv, Hpriv⟩ Hbs
   ihave Hpriv := (show procPrivRun (GF := GF) (procAddr j) pid { V.updEv kv with upt := P' } M' ⊢
       procPrivExt (procAddr j) pid (V.updEv kv) P' M' from .rfl) $$ Hpriv
   ihave Hpriv := procPrivExtEv_intro _ _ _ _ _ kv hkv $$ Hpriv
-  iapply HK $$ %c' %spie %spp %R' %tot %P' %M' [] Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk Hpriv Hbs
+  iapply HK $$ %c' Hlc %spie %spp %R' %tot %P' %M' [] Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk Hpriv Hbs
   ipureintro
   refine ⟨hcs, hle, ?_, hext, himg⟩
   rcases hret with ⟨h1, -, hw⟩ | h2

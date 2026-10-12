@@ -215,7 +215,7 @@ theorem createMkdir_dirlink (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs GF Γ]
     bslots 3 ∗ irefSlot ∗
     dlinks fscFs dinum.toNat dn bm data ∗
     logOpS icfgLog ncount Sb ∗ txPin icfgLog tid qtx ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (found : Bool)
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (found : Bool)
       (bm' : Blkmap) (data' : Nat → List (BitVec 8)) (dn' dn0' : Dinode) (n' : Nat)
       (Sb' : List Nat) (tot : Nat),
       ⌜calleeSaved k'.regs R' ∧
@@ -255,10 +255,10 @@ theorem createMkdir_dirlink (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs GF Γ]
   iframe Hk Hpc Hte Hce Hdev Hinum Hmeta Hmap Hblk Hnm Hsi Hss Hsb Hdi Hpid Hsh Hru Hrt Hrh Hbs
     Hslot Hdl Hop Htx
   iframe #
-  iapply wpNext_intro_pin
-  iintro %c %_ %spie %spp %R' %found %bm' %data' %dn' %dn0' %n' %Sb' %tot %hcs %hout Hk Hpc Hte Hce
+  iapply wpNext_intro_pin_lc
+  iintro %c %_ Hlc %spie %spp %R' %found %bm' %data' %dn' %dn0' %n' %Sb' %tot %hcs %hout Hk Hpc Hte Hce
     Hdev Hinum Hmeta Hmap Hblk Hnm Hsi Hss Hsb Hdi Hpid Hsh Hru Hrt Hrh Hbs Hslot Hdl Hop Htx
-  iapply HK $$ %c %spie %spp %R' %found %bm' %data' %dn' %dn0' %n' %Sb' %tot [] Hk Hpc Hte Hce Hdev
+  iapply HK $$ %c Hlc %spie %spp %R' %found %bm' %data' %dn' %dn0' %n' %Sb' %tot [] Hk Hpc Hte Hce Hdev
     Hinum Hmeta Hmap Hblk Hnm Hsi Hss Hsb Hdi Hpid Hsh Hru Hrt Hrh Hbs Hslot Hdl Hop Htx
   ipureintro
   exact ⟨hcs, hout⟩
@@ -292,7 +292,7 @@ theorem createMkdir_iupdate (IU : IUPDATE) (Γ : SchedNames) [ClaimIs GF Γ]
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     dinodeAt fscIreg inum dn0 ∗
     wordPointsTo (pPid k'.proc) 4 pidPriv pidv ∗ bslots 2 ∗ logOpS icfgLog (u + 1) Sb ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (w : Ity),
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (w : Ity),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c k'.sie -∗ cpuClaimExt c k'.sie k'.proc -∗
@@ -323,14 +323,14 @@ theorem createMkdir_iupdate (IU : IUPDATE) (Γ : SchedNames) [ClaimIs GF Γ]
   · unfold iuCells; iframe Hdev Hinum Hmeta Hmap Hsi
   isplitl []
   · unfold iregLinkPin; simp only [Bool.false_eq_true, if_false]; ipureintro; exact hlive
-  iapply wpNext_intro_pin
-  iintro %c %_ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hcells Hdi ⟨%w, -, Htok⟩ - Hbs Hop
+  iapply wpNext_intro_pin_lc
+  iintro %c %_ Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hcells Hdi ⟨%w, -, Htok⟩ - Hbs Hop
   unfold iuCells
   icases Hcells with ⟨Hdev, Hinum, Hmeta, Hmap, Hsi⟩
   rw [iregDotDelta_live _ _ hlive, FsStateLink.linkReps_1] at *
   simp only [if_true]
   unfold FsStateLink.linkTok
-  iapply HK $$ %c %spie %spp %R' %w %hcs Hk Hpc Hte Hce Hpid Hdev Hinum Hmeta Hmap Hsi Hdi Htok
+  iapply HK $$ %c Hlc %spie %spp %R' %w %hcs Hk Hpc Hte Hce Hpid Hdev Hinum Hmeta Hmap Hsi Hdi Htok
     Hbs Hop
 
 set_option maxHeartbeats 8000000 in
@@ -370,7 +370,7 @@ theorem createMkdir_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF 
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     wordPointsTo (pPid k'.proc) 4 pidPriv pidv ∗ bslots 3 ∗ logOpS icfgLog n Sb ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (n' : Nat) (Sb' : List Nat) (w : Bool),
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (n' : Nat) (Sb' : List Nat) (w : Bool),
       ⌜calleeSaved k'.regs R' ∧ ((∀ x ∈ Sb, x ∈ Sb') ∧ (w = true → fscBmapstart ∈ Sb') ∧
         (crb = true → w = false) ∧ n - ipSpendW w cru false ≤ n' ∧ n' ≤ n)⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
@@ -406,10 +406,10 @@ theorem createMkdir_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF 
   · unfold inodeRefpShort; iframe
   isplitl []
   · simp only [Bool.false_eq_true, if_false]; iempintro
-  iapply wpNext_intro_pin
-  iintro %c %_ %spie %spp %R' %n' %Sb' %w %hcs Hk Hpc Hte Hce Hpid Hsb Hsi Hbs %hf Hops Hslot Hside
+  iapply wpNext_intro_pin_lc
+  iintro %c %_ Hlc %spie %spp %R' %n' %Sb' %w %hcs Hk Hpc Hte Hce Hpid Hsb Hsi Hbs %hf Hops Hslot Hside
   unfold icDepSide icDepSideTx txPinO
-  iapply HK $$ %c %spie %spp %R' %n' %Sb' %w [] Hk Hpc Hte Hce Hpid Hsb Hsi Hbs Hops Hslot Hside
+  iapply HK $$ %c Hlc %spie %spp %R' %n' %Sb' %w [] Hk Hpc Hte Hce Hpid Hsb Hsi Hbs Hops Hslot Hside
   ipureintro
   exact ⟨hcs, hf⟩
 
@@ -538,7 +538,7 @@ def createMkdirKeep (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (ty major 
     P (nparElems (bview plen pfun)).length dind.toNat ∗
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) Fex ∗
     pfAt (aunarmOfArmNd (fsGammaL fscFs) appE Nd Farm) Fun ∗
-    (∀ c' : CPU, createPost k plen pfun ty major minor γ pid V M u Sb ns
+    (∀ c' : CPU, £ 1 -∗ createPost k plen pfun ty major minor γ pid V M u Sb ns
       dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex c') ∗
     isSleeplockGen γil γisl (iLock (ientry kd)) (icSlp fscIc kd) (slhTok (icfgIsl kd)) ∗
     sleeplockedQ γisl qd.half (iLock (ientry kd)) pid ∗
@@ -1721,7 +1721,7 @@ theorem create_mkdir_name (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs GF Γ]
   case da0 => k_norm_g [r9]
   case da2 => k_norm_g [r19]; exact create_a2_low16 cinum hc16
   -- back from dirlink, at +0x130
-  iintro %cpu %spie1 %spp1 %R1 %found %bm3 %dat3 %dp3 %dp03 %n6 %Sb6 %tot %hp Hk Hpc Hte Hce
+  iintro %cpu Hlc %spie1 %spp1 %R1 %found %bm3 %dat3 %dp3 %dp03 %n6 %Sb6 %tot %hp Hk Hpc Hte Hce
     Hdev Hinum Hmeta Hmap Hblk Hnm Hsi Hss Hsb Hdi Hpid Hshr Hru Hrt Hrh Hbs Hslot Hdl Hop Htxs
   k_norm_g
   ihave Hkb := Hkback $$ Hshr Hru Hrt Hrh Hpid
@@ -2124,7 +2124,7 @@ theorem create_mkdir_dotdot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs GF Γ]
   case da0 => k_norm_g [r19]
   case da2 => k_norm_g; exact create_a2_low16 dind hd16
   -- back from dirlink, at +0x11e
-  iintro %cpu %spie1 %spp1 %R1 %found %bm2 %dat2 %dc2 %dc02 %n5 %Sb5 %tot %hp Hk Hpc Hte Hce
+  iintro %cpu Hlc %spie1 %spp1 %R1 %found %bm2 %dat2 %dc2 %dc02 %n5 %Sb5 %tot %hp Hk Hpc Hte Hce
     Hcdev Hcinum Hcmeta Hcmap Hcblk Hnmd Hsi Hss Hsb Hcdi Hpid Hshr Hcru Hrt Hrh Hbs Hslot Hcdl Hop
     Htxs
   k_norm_g
@@ -2405,7 +2405,7 @@ theorem create_mkdir_dot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs GF Γ]
   case da0 => k_norm_g [r19]
   case da2 => k_norm_g; exact create_a2_low16 cinum hc16
   -- back from dirlink, at +0x10a
-  iintro %cpu %spie1 %spp1 %R1 %found %bm1 %dat1 %dc1 %dc01 %n4 %Sb4 %tot %hp Hk Hpc Hte Hce
+  iintro %cpu Hlc %spie1 %spp1 %R1 %found %bm1 %dat1 %dc1 %dc01 %n4 %Sb4 %tot %hp Hk Hpc Hte Hce
     Hcdev Hcinum Hcmeta Hcmap Hcblk Hnmd Hsi Hss Hsb Hcdi Hpid Hshr Hcru Hrt Hrh Hbs Hslot Hcdls Hop
     Htxs
   k_norm_g
@@ -2583,7 +2583,7 @@ theorem create_mkdir_cok (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
   case ut => k_norm_g; try exact hS.htier
   case ua0 => k_norm_g [r9]
   -- back from iunlockput, at +0xe6
-  iintro %cpu %spie1 %spp1 %R1 %n7 %Sb7 %w %hp Hk Hpc Hte Hce Hpid Hsb Hsi Hbs Hop Hslot2 Htq
+  iintro %cpu Hlc %spie1 %spp1 %R1 %n7 %Sb7 %w %hp Hk Hpc Hte Hce Hpid Hsb Hsi Hbs Hop Hslot2 Htq
   obtain ⟨hcs1, hsub7, -, hcrb7, hsp7, hn7⟩ := hp
   k_norm_g [create_ret_e6]
   unfold calleeSaved at hcs1
@@ -2605,14 +2605,14 @@ theorem create_mkdir_cok (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
   · iexact H40
   -- ===== +0xea  c.j +0x70 =====
   k_step_e (wp_s_j cpu _ (KA.«create» + 0xea#64) true 2097030#21)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [createMkdir_j70]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [createMkdir_j70] £ Hcrd
   iintro Hk Hpc
   have hTR : createTregs k (((R1.set 18#5 (ientry kslot)).set 19#5 (k.regs 19#5))) := by
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
       simp [RegMap.set_apply, e2, r2, e23, r23, e24, r24, e25, r25, e26, r26, e27, r27]
   iapply (create_tail cpu k spie1 spp1 _ (k.regs 19#5) nf tl hK10 hal.1 hal.2 hTR)
   iframe Hk Hpc Hframe Hnm Htl Hte Hce
-  iintro %c' %R' %hfin Hk Hpc Hte Hce
+  iintro %c' Hlc %R' %hfin Hk Hpc Hte Hce
   obtain ⟨hcsf, ha0f⟩ := hfin
   simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true] at ha0f
   -- THE CHILD'S ARM GROWS BACK TO THE HALF (the parent's parked quarter) and
@@ -2653,7 +2653,7 @@ theorem create_mkdir_cok (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
   · ileft; iexact Hdots
   ispecialize Hcont $$ %c'
   unfold createPost
-  iapply Hcont $$ %spie1 %spp1 %R' %true %true %kslot %q.half %q.half %g %cinum %dc2 %bm2 %n7
+  iapply Hcont $$ Hcrd %spie1 %spp1 %R' %true %true %kslot %q.half %q.half %g %cinum %dc2 %bm2 %n7
     %Sb7 %(ns - 1) %hcsf Hk Hpc Hte Hce Hsbn Hsi Hss Hsb Hpriv Hpath Hbs [] Hisl [] Hop
   · ipureintro; simp only [if_true]; omega
   · ipureintro
@@ -2786,7 +2786,7 @@ theorem create_mkdir_bump (IU : IUPDATE) (Γ : SchedNames) [ClaimIs GF Γ]
   case it => k_norm_g; try exact hS.htier
   case ia0 => k_norm_g [r9]
   -- back from iupdate, at +0x144
-  iintro %cpu %spie1 %spp1 %R1 %w %hcs1 Hk Hpc Hte Hce Hpid Hdev Hinum Hmeta Hmap Hsi Hdi Hvend
+  iintro %cpu Hlc %spie1 %spp1 %R1 %w %hcs1 Hk Hpc Hte Hce Hpid Hdev Hinum Hmeta Hmap Hsi Hdi Hvend
     Hb2 Hop
   k_norm_g [create_ret_144]
   unfold calleeSaved at hcs1

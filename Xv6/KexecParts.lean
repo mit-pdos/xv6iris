@@ -317,12 +317,12 @@ theorem wp_prologue_kexec [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k 
   iintro Hk Hpc Hf24
   k_step_gen (wp_s_sd c4 _ (pc + 16#64) false 512#12 2#5 18#5 (by decide) w₄) $$ [- $Hk $Hpc] next c5 hp5
   iintro Hk Hpc Hf32
-  k_step_gen (wp_s_addi c5 _ (pc + 20#64) true 544#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c6 hp6
+  k_step_gen (wp_s_addi c5 _ (pc + 20#64) true 544#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c6 hp6 £ Hlc
   iintro Hk Hpc
   k_norm_g
   ihave HΦ' := wpNext_at _ _ _ c6 _
     (fun h => (hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans
-      (hp1 h)))))) $$ HΦ
+      (hp1 h)))))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc
   unfold kxcFrame
   iframe Hf8 Hf16 Hf24 Hf32 Hrest
@@ -390,12 +390,12 @@ theorem wp_epilogue_kexec [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k 
   k_step_gen (wp_s_pop c4 _ (pc + 16#64) false 544#12 68 kxc_imm_p544) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c5 hp5
   iintro Hk Hpc
-  k_step_gen (wp_s_ret c5 _ (pc + 20#64) true 1#5) $$ [- $Hk $Hpc] next c6 hp6
+  k_step_gen (wp_s_ret c5 _ (pc + 20#64) true 1#5) $$ [- $Hk $Hpc] next c6 hp6 £ Hlc
   iintro Hk Hpc
   k_norm_g
   ihave HΦ' := wpNext_at _ _ _ c6 _
     (fun h => (hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans
-      (hp1 h)))))) $$ HΦ
+      (hp1 h)))))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc
 
 set_option maxHeartbeats 4000000 in

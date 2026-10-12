@@ -182,15 +182,15 @@ theorem sw_exit (cpu cr : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitV
   isplitl [Hte Hce Hblk Hans Hch]
   · iframe Hte Hce Hblk Hans Hch
   k_norm_g
-  iapply wpNext_intro_pin
-  iintro %cz %hpz Hk Hpc HP
+  iapply wpNext_intro_pin_lc
+  iintro %cz %hpz Hlc Hk Hpc HP
   icases HP with ⟨Hte, Hce, Hblk, Hans, Hch⟩
   have hcz : k.sie = false → cz = cr := fun h => hpz (Or.inl h)
   ihave Hte := trapCsrsExt_move cr cz k.sie hcz $$ Hte
   ihave Hce := cpuClaimExt_move cr cz k.sie k.proc hcz $$ Hce
   ihave Hnext := wpNext_at true k.proc cpu cz _
     (fun h => h.elim (fun h => absurd h (by decide))
-      (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))) $$ Hnext
+      (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))) $$ Hnext Hlc
   iapply Hnext $$ %spie %spp %_ %P' %rv %xw %d %cs' %k' [] Hans Hch Hk Hpc Hte Hce %hk' Hblk
   ipureintro
   refine ⟨MachCSL.calleeSaved_mk _ _ p9 p18 p19 p20 p21 p22 p23 p24 p25 p26 p27, ?_, hext, hd, hans, hmap⟩

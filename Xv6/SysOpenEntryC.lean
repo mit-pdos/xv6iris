@@ -277,7 +277,7 @@ theorem sys_open_ec_fail (Γ : SchedNames) [ClaimIs GF Γ] (k : KCtx)
     pfAt (aopenCommitAt (fsGammaL fscFs) appE) A.Fo ∗
     openTruncPiece (fsGammaL fscFs) A.vom (crePermit (fsGammaL fscFs) pl A.P Farm Fok Fex)
       A.Ft ∗
-    (∀ c' : CPU, sysOpenPostC k A Farm Fun Fok Fex c')
+    (∀ c' : CPU, £ 1 -∗ sysOpenPostC k A Farm Fun Fok Fex c')
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hcells, Hbuf, Hblk, Hop, Hbs, Hir, Hfd, Hfr, Hcf, Hoc, Htc, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -298,9 +298,9 @@ theorem sys_open_ec_fail (Γ : SchedNames) [ClaimIs GF Γ] (k : KCtx)
   iapply hTA $$ %cpu %spie %spp %(R.set 9#5 0#64) %0#64 %w4 %w5 %w6 %lo %(sysOpenOm A) %w24 %u
     %hp1 %hal Hk Hpc Hte Hce Henv Hcells Hbuf Hpid Hop
   unfold sysOpenRet
-  iintro %c' %spie' %spp' %R' %hcs Hk Hpc Hte Hce ⟨%hr, Hpid⟩
+  iintro %c' Hlc %spie' %spp' %R' %hcs Hk Hpc Hte Hce ⟨%hr, Hpid⟩
   ihave Hblk := Hback $$ Hpid
-  ispecialize HΦ $$ %c'
+  ispecialize HΦ $$ %c' Hlc
   unfold sysOpenPostC sysOpenK
   iapply HΦ $$ %spie' %spp' %R' %P2 %A.V.ev %hcs %hP2 %(Nat.le_refl _) Hk Hpc Hte Hce Hbs Hir
   unfold openArmsCreate
@@ -349,7 +349,7 @@ theorem sys_open_ec_fresh (Γ : SchedNames) [ClaimIs GF Γ] (k : KCtx)
     pfAt (aopenCommitAt (fsGammaL fscFs) appE) A.Fo ∗
     openTruncPiece (fsGammaL fscFs) A.vom (crePermit (fsGammaL fscFs) pl A.P Farm Fok Fex)
       A.Ft ∗
-    (∀ c' : CPU, sysOpenPostC k A Farm Fun Fok Fex c')
+    (∀ c' : CPU, £ 1 -∗ sysOpenPostC k A Farm Fun Fok Fex c')
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hcells, Hbuf, Hlk, Hflat, Hkeep, Hblk, Hop, Hbs, Hir, Hfd, Hfr,
     Hcauf, Hoc, Htc, HΦ⟩
@@ -431,7 +431,7 @@ theorem sys_open_ec_exists (Γ : SchedNames) [ClaimIs GF Γ] (k : KCtx)
     pfAt (aopenCommitAt (fsGammaL fscFs) appE) A.Fo ∗
     openTruncPiece (fsGammaL fscFs) A.vom (crePermit (fsGammaL fscFs) pl A.P Farm Fok Fex)
       A.Ft ∗
-    (∀ c' : CPU, sysOpenPostC k A Farm Fun Fok Fex c')
+    (∀ c' : CPU, £ 1 -∗ sysOpenPostC k A Farm Fun Fok Fex c')
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hcells, Hbuf, Hlk, Hflat, Hkeep, Hblk, Hop, Hbs, Hir, Hfd, Hfr,
     Hcauf, Hoc, Htc, HΦ⟩
@@ -517,7 +517,7 @@ theorem sys_open_ec_ok (Γ : SchedNames) [ClaimIs GF Γ] (k : KCtx)
     pfAt (aopenCommitAt (fsGammaL fscFs) appE) A.Fo ∗
     openTruncPiece (fsGammaL fscFs) A.vom (crePermit (fsGammaL fscFs) pl A.P Farm Fok Fex)
       A.Ft ∗
-    (∀ c' : CPU, sysOpenPostC k A Farm Fun Fok Fex c')
+    (∀ c' : CPU, £ 1 -∗ sysOpenPostC k A Farm Fun Fok Fex c')
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hcells, Hbuf, Hblk, Hop, Hbs, Hir, Hfd, Hfr, Hlocked, Hcauf,
     Hoc, Htc, HΦ⟩

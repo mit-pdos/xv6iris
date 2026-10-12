@@ -89,8 +89,8 @@ theorem consputc_finish [CurCtx] (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (
   k_norm
   iframe
   inext
-  iintro Hk Hpc
-  iapply HΦ $$ %_ %cs Hk Hpc [] Hsub HP
+  iintro Hk Hpc Hlc
+  iapply HΦ $$ Hlc %_ %cs Hk Hpc [] Hsub HP
   · ipureintro
     unfold calleeSaved
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>

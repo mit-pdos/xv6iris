@@ -180,7 +180,7 @@ theorem sys_exec_kfree [WchG GF] (KF : KFREE) (cpu : CPU) (k' : KCtx) (se : Bool
     kctx cpu k' ∗ pcIs cpu KA.«kfree» ∗ trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ pageOwn (k'.regs 10#5) ∗ kallocAvail γk none ∗
     actLend pj kc ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap), ⌜calleeSaved k'.regs R'⌝ -∗
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap), ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c se -∗ cpuClaimExt c se pj -∗ actLend pj (kc + 1) -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) cpu := by
@@ -191,12 +191,12 @@ theorem sys_exec_kfree [WchG GF] (KF : KFREE) (cpu : CPU) (k' : KCtx) (se : Bool
   iintro ⟨Hk, Hpc, Hte, Hce, Hlk, Hpg, Hav, Hl, HK⟩
   iapply h
   iframe Hk Hpc Hlk Hpg Hav Hl
-  iapply wpNext_intro_pin
-  iintro %c %hpin %spie %spp %R' %- Hk Hpc Hl - %hcs
+  iapply wpNext_intro_pin_lc
+  iintro %c %hpin Hlc %spie %spp %R' %- Hk Hpc Hl - %hcs
   have hpin' : k'.sie = false → c = cpu := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
-  iapply HK $$ %c %spie %spp %R' %hcs Hk Hpc Hte Hce Hl
+  iapply HK $$ %c Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hl
 
 end Kfree
 
@@ -220,7 +220,7 @@ theorem sysExecEnv_kmem (Γ : SchedNames) (A : SysExecArgs) :
 /-- The free loop's continuation (the `∀ c'` of `sysExecFreeBody`, at the
 symbolic exits `pe` / `p + 14`). -/
 abbrev sysExecFreeK (k : KCtx) (R : RegMap) (p pe : BitVec 64) (ke : Nat) : IProp GF :=
-  iprop(∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap) (pcx : BitVec 64),
+  iprop(∀ (c' : CPU), £ 1 -∗ ∀ (spie' spp' : Bool) (R' : RegMap) (pcx : BitVec 64),
     ⌜pcx = pe ∨ pcx = p + 14#64⌝ -∗ ⌜sysExecKeepS1 R R'⌝ -∗
     kctx c' (((k.withSpie spie' spp').pushed 60).withRegs R') -∗ pcIs c' pcx -∗
     trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗
@@ -255,11 +255,11 @@ theorem sys_exec_free_exit (k : KCtx) (p pe : BitVec 64) (ci : BitVec 13)
   iintro Hk Hpc Hcell
   -- +2 c.beqz a0: TAKEN
   k_step_e (wp_s_branch cpu _ (p + 2#64) true ci 10#5 0#5 (by decide) bop.BEQ)
-    from hi2 Htext $$ [- $Hk $Hpc] with [MachCSL.beqz_zero, hce]
+    from hi2 Htext $$ [- $Hk $Hpc] with [MachCSL.beqz_zero, hce] £ Hlc
   iintro Hk Hpc
   ihave Harr := Hback $$ %0#64 Hcell
   ihave Harr := sysExecFree_arr_free (GF := GF) (k.regs 2#5) ws t 0#64 hl $$ Harr
-  iapply HΦ $$ %cpu %spie %spp %_ %pe %(Or.inl rfl) %(sysExecKeepS1_set10 R 0#64) Hk Hpc Hte Hce Hl Harr
+  iapply HΦ $$ %cpu Hlc %spie %spp %_ %pe %(Or.inl rfl) %(sysExecKeepS1_set10 R 0#64) Hk Hpc Hte Hce Hl Harr
 
 set_option maxHeartbeats 16000000 in
 /-- **THE FREE LOOP at a symbolic base** (Rocq `sx_free_loop`): the five
@@ -342,7 +342,7 @@ theorem sys_exec_free_gen (KF : KFREE) (Γ : SchedNames) (k : KCtx) (A : SysExec
     case hKf => k_norm_g; omega
     case hlk => rw [hlocks]; simp
     case hp => k_norm_g; exact hpv
-    iintro %cpu %spie2 %spp2 %R2 %hcs Hk Hpc Hte Hce Hl
+    iintro %cpu Hlc %spie2 %spp2 %R2 %hcs Hk Hpc Hte Hce Hl
     -- the lend comes back stepped
     ihave Hl := actLend_ret_step k.proc hk1 $$ Hl
     k_norm_g [hret, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, KCtx.withSpie_withRegs]
@@ -362,7 +362,7 @@ theorem sys_exec_free_gen (KF : KFREE) (Γ : SchedNames) (k : KCtx) (A : SysExec
         with [c20, hR20, sysExecFree_bne (k.regs 2#5) m hm, hd]
       iintro Hk Hpc
       ihave Harr := sysExecFree_arr_free (GF := GF) (k.regs 2#5) ws m (pg m) hl $$ Harr
-      iapply HΦ $$ %cpu %spie2 %spp2 %_ %(p + 14#64) %(Or.inr rfl) %hkeep Hk Hpc Hte Hce Hl Harr
+      iapply HΦ $$ %cpu Hlc %spie2 %spp2 %_ %(p + 14#64) %(Or.inr rfl) %hkeep Hk Hpc Hte Hce Hl Harr
     · -- the BACK EDGE
       have hd : decide (m + 1 ≠ 32) = true := by simp [hend]
       k_step_e (wp_s_branch cpu _ (p + 10#64) false 8182#13 9#5 20#5 (by decide) bop.BNE)
@@ -377,8 +377,8 @@ theorem sys_exec_free_gen (KF : KFREE) (Γ : SchedNames) (k : KCtx) (A : SysExec
           exact sysExecFree_cursor _ _
         · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
           exact c20.trans hR20
-      iintro %c' %spie' %spp' %R' %pcx %hpcx %hk' Hk Hpc Hte Hce Hl Harr
-      iapply HΦ $$ %c' %spie' %spp' %R' %pcx %hpcx %(sysExecKeepS1_trans _ _ _ hkeep hk') Hk Hpc Hte
+      iintro %c' Hlc %spie' %spp' %R' %pcx %hpcx %hk' Hk Hpc Hte Hce Hl Harr
+      iapply HΦ $$ %c' Hlc %spie' %spp' %R' %pcx %hpcx %(sysExecKeepS1_trans _ _ _ hkeep hk') Hk Hpc Hte
         Hce Hl Harr
 
 /-! ## §5.  THE TWO INSTANCES -/

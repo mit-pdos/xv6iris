@@ -101,7 +101,7 @@ theorem kvminithart_proof : KVMINITHART := ⟨fun {GF} _ X cpu k tlb0 rootAddr d
     KCtx.toKpt_avail, KCtx.toKpt_root, KCtx.toKpt_sp]
   iframe
   inext
-  iintro Hk Hpc
+  iintro Hk Hpc _
   iapply HΦ $$ %_ Hk Hpc Hstv Hroot
   ipureintro
   unfold calleeSaved; simp [RegMap.set_apply]⟩

@@ -84,13 +84,13 @@ theorem frd_dev_m1_post (k : KCtx) (spie spp : Bool) (γ : FileNames) (fk : Nat)
     filereadIn (.open true wb (.device mj)) n F Rd Rin Rp Rpe P ∗ P ∗
     frdK k γ fk q (.open true wb (.device mj)) j pid V M n F Rd Rin Rp Rpe P ∗
     kctx c' ((k.withSpie spie spp).withRegs R') ∗ pcIs c' (jumpPc (k.regs 1#5)) ∗
-    trapCsrsExt c' k.sie ∗ cpuClaimExt c' k.sie k.proc ⊢ wpLoop (GF := GF) c' := by
-  iintro ⟨Href, Hpriv, Hgen, Henv, Hin, HP, HΦ, Hk, Hpc, Hte, Hce⟩
+    trapCsrsExt c' k.sie ∗ cpuClaimExt c' k.sie k.proc ∗ £ 1 ⊢ wpLoop (GF := GF) c' := by
+  iintro ⟨Href, Hpriv, Hgen, Henv, Hin, HP, HΦ, Hk, Hpc, Hte, Hce, Hlc⟩
   ihave Hex := filereadExtra_dev_m1 V.gen V.upt F Rd Rin P Rp Rpe true wb mj n M (k.regs 11#5) hne $$ Hin HP
   ihave Henv := frd_envout_dev true wb mj $$ Henv
   unfold frdK
   ihave Hpriv := procPrivExtEv_of _ _ _ _ _ $$ Hpriv
-  iapply HΦ $$ %c' %spie %spp %R' %V.upt %M %0 [] Hk Hpc Hte Hce Href Hpriv Hgen Henv [Hex]
+  iapply HΦ $$ %c' Hlc %spie %spp %R' %V.upt %M %0 [] Hk Hpc Hte Hce Href Hpriv Hgen Henv [Hex]
   · ipureintro
     exact ⟨hcs, UMemL.extSz_refl _ _, by omega, Or.inr h10, Xv6.UMemL.umemWrote_refl _ _ _⟩
   · unfold filereadArms
@@ -193,7 +193,7 @@ theorem frd_arm_dev (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs GF Γ]
     rotate_right 1
     k_norm_g
     iframe
-    iintro %c' %R' %⟨hcs, h10'⟩ Hk Hpc Hte Hce
+    iintro %c' Hlc %R' %⟨hcs, h10'⟩ Hk Hpc Hte Hce
     iapply (frd_dev_m1_post k spie spp γ fk q wb mj j pid V M n F Rd Rin Rp Rpe P hne c' R' hcs
       (by rw [h10']; decide))
     iframe
@@ -278,7 +278,7 @@ theorem frd_arm_dev (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs GF Γ]
     rotate_right 1
     k_norm_g
     iframe
-    iintro %c' %R' %⟨hcs, h10'⟩ Hk Hpc Hte Hce
+    iintro %c' Hlc %R' %⟨hcs, h10'⟩ Hk Hpc Hte Hce
     iapply (frd_dev_m1_post k spie spp γ fk q wb mj j pid V M n F Rd Rin Rp Rpe P hne c' R' hcs
       (by rw [h10']; decide))
     iframe
@@ -326,7 +326,7 @@ theorem frd_arm_dev (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs GF Γ]
   case cuser => k_norm_g; decide
   case cn => k_norm_g; exact h12
   -- ===== back from consoleread =====
-  iintro %cpu %spie1 %spp1 %R1 %P' %M' %d %dc %cur %bs %hs %sl
+  iintro %cpu Hlc %spie1 %spp1 %R1 %P' %M' %d %dc %cur %bs %hs %sl
     %⟨hcs1, hext, hdle, hret, hM, hmap, hb1, hb4, htag⟩ Hks #Hts #Hlb Hwin Hout Hk Hpc Hte Hce
     Hpriv Hgen
   k_norm_g [frd_ret_9c, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed] at hM
@@ -359,14 +359,14 @@ theorem frd_arm_dev (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs GF Γ]
   have hr3 := frdRegs_rest2 k (fnode fk) (R1 10#5) (BitVec.ofInt 64 n) (k.regs 9#5) (k.regs 19#5) _ hr2
   -- +0xa2  c.j +0x5e
   k_step_e (wp_s_j cpu _ (KA.«fileread» + 0xa2#64) true 2097084#21)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] £ Hlc
   iintro Hk Hpc
   iapply (frd_tail cpu k spie1 spp1 _ (R1 10#5) (k.regs 9#5) (k.regs 19#5) hK6 hr3)
     $$ [- $Hk $Hpc $Hframe $Hte $Hce]
   rotate_right 1
   k_norm_g
   iframe
-  iintro %c' %R' %⟨hcs, h10'⟩ Hk Hpc Hte Hce
+  iintro %c' Hlc %R' %⟨hcs, h10'⟩ Hk Hpc Hte Hce
   icases frd_pageLenEv (procAddr j) pid V P' M' $$ Hpriv with ⟨%hpl, Hpriv⟩
   have hd63 : d < 2 ^ 63 := by omega
   have hr10 : R' 10#5 = BitVec.ofNat 64 d ∨ R' 10#5 = -1#64 := by
@@ -378,7 +378,7 @@ theorem frd_arm_dev (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs GF Γ]
     ⟨(List.range d).map bs, by simp, hM, hmap⟩
   ihave Henv := frd_envout_dev true wb CONSOLE $$ Henv
   unfold frdK
-  iapply HΦ $$ %c' %spie1 %spp1 %R' %P' %M' %d [] Hk Hpc Hte Hce Href Hpriv Hgen Henv
+  iapply HΦ $$ %c' Hlc %spie1 %spp1 %R' %P' %M' %d [] Hk Hpc Hte Hce Href Hpriv Hgen Henv
     [HP Hrd Hwin Hks]
   · ipureintro; exact ⟨hcs, hext, hdle, hr10, hwin⟩
   unfold filereadArms

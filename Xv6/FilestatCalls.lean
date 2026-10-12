@@ -54,7 +54,7 @@ set_option maxHeartbeats 4000000 in
 theorem fstat_myproc (MP : MYPROC) (c : CPU) (k' : KCtx)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 10 ≤ k'.avail) :
     kctx c k' ∗ pcIs c KA.«myproc» ∗ trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗
-    (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap),
+    (∀ (c' : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.proc⌝ -∗
       kctx c' ((k'.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗ wpLoop c')
@@ -65,12 +65,12 @@ theorem fstat_myproc (MP : MYPROC) (c : CPU) (k' : KCtx)
   iintro ⟨Hk, Hpc, Hte, Hce, HK⟩
   iapply h
   iframe Hk Hpc
-  iapply wpNext_intro_pin
-  iintro %c' %hpin %spie %spp %R' %- Hk Hpc %hcs
+  iapply wpNext_intro_pin_lc
+  iintro %c' %hpin Hlc %spie %spp %R' %- Hk Hpc %hcs
   have hpin' : k'.sie = false → c' = c := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
-  iapply HK $$ %c' %spie %spp %R' %hcs Hk Hpc Hte Hce
+  iapply HK $$ %c' Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce
 
 /-- What ilock hands back for filestat's read arm (all but the pid cell and
 the slot unit), exactly iunlock's precondition. -/
@@ -100,7 +100,7 @@ theorem fstat_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF Γ] (c : CPU)
     isSleeplockGen γil γisl (iLock (ientry ik)) (icSlp fscIc ik) (slhTok (icfgIsl ik)) ∗
     credFloor lo tl ∗ ityShot g ty ∗ inodeShrGenlo ik s icfgDev inum g lo ∗
     wordPointsTo (pPid k'.proc) 4 pidPriv pid ∗ bslot ∗
-    (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap) (dn : Dinode) (bm : Blkmap),
+    (∀ (c' : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (dn : Dinode) (bm : Blkmap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c' ((k'.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗
@@ -130,12 +130,12 @@ theorem fstat_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF Γ] (c : CPU)
   · unfold icDepSide icDepSideTx txPinO; iempintro
   isplitr
   · unfold iregWdLic; iexact Hshot
-  iapply wpNext_intro_pin
-  iintro %c' %_
+  iapply wpNext_intro_pin_lc
+  iintro %c' %_ Hlc
   unfold ilockPostDepEb
   iintro %spie %spp %R' %dn %bm %filled %hcs - Hk Hpc Hte Hce Hpid - Hbs Hsl Hdep Hoff Hdev
     Hinum Hval Hload Hshot' Hfrz %- - %-
-  iapply HK $$ %c' %spie %spp %R' %dn %bm %hcs Hk Hpc Hte Hce Hpid Hbs
+  iapply HK $$ %c' Hlc %spie %spp %R' %dn %bm %hcs Hk Hpc Hte Hce Hpid Hbs
   unfold fstatLk
   iframe
 
@@ -148,7 +148,7 @@ theorem fstat_stati (ST : STATI) (c : CPU) (k' : KCtx) (ip st : BitVec 64) (dev 
     wordPointsTo (iDev ip) 4 (DFrac.own (1 : Qp).half) dev ∗
     wordPointsTo (iInum ip) 4 (DFrac.own (1 : Qp).half) inum ∗
     inodeMeta ip dn ∗ statAt st dev0 ino0 ty0 nl0 sz0 ∗
-    (∀ (c' : CPU) (R' : RegMap),
+    (∀ (c' : CPU), £ 1 -∗ ∀ (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c' (k'.withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗
@@ -164,12 +164,12 @@ theorem fstat_stati (ST : STATI) (c : CPU) (k' : KCtx) (ip st : BitVec 64) (dev 
   iintro ⟨Hk, Hpc, Hte, Hce, Hdev, Hinum, Hmeta, Hst, HK⟩
   iapply h
   iframe Hk Hpc Hdev Hinum Hmeta Hst
-  iapply wpNext_intro_pin
-  iintro %c' %hpin %R' Hk Hpc Hdev Hinum Hmeta Hst %hcs
+  iapply wpNext_intro_pin_lc
+  iintro %c' %hpin Hlc %R' Hk Hpc Hdev Hinum Hmeta Hst %hcs
   have hpin' : k'.sie = false → c' = c := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
-  iapply HK $$ %c' %R' %hcs Hk Hpc Hte Hce Hdev Hinum Hmeta Hst
+  iapply HK $$ %c' Hlc %R' %hcs Hk Hpc Hte Hce Hdev Hinum Hmeta Hst
 
 set_option maxHeartbeats 8000000 in
 /-- `iunlock(ip)` at filestat's call site: the generic form at the read
@@ -185,7 +185,7 @@ theorem fstat_iunlock (IU : IUNLOCK) (Γ : SchedNames) (c : CPU) (k' : KCtx) (ik
     isSleeplockGen γil γisl (iLock (ientry ik)) (icSlp fscIc ik) (slhTok (icfgIsl ik)) ∗
     credFloor lo tl ∗ fstatLk ik s g lo inum dn bm γisl pid ∗
     wordPointsTo (pPid k'.proc) 4 pidPriv pid ∗
-    (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap),
+    (∀ (c' : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c' ((k'.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗
@@ -207,12 +207,12 @@ theorem fstat_iunlock (IU : IUNLOCK) (Γ : SchedNames) (c : CPU) (k' : KCtx) (ik
   iapply h
   iframe Hk Hpc Hsl Hdep Hoff Hdev Hinum Hval Hload Hshot Hfrz Hpid
   iframe #
-  iapply wpNext_intro_pin
-  iintro %c' %hpin %spie %spp %R' %- Hk Hpc %hcs Hpid Hshr -
+  iapply wpNext_intro_pin_lc
+  iintro %c' %hpin Hlc %spie %spp %R' %- Hk Hpc %hcs Hpid Hshr -
   have hpin' : k'.sie = false → c' = c := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
-  iapply HK $$ %c' %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hshr
+  iapply HK $$ %c' Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hshr
 
 set_option maxHeartbeats 4000000 in
 /-- `copyout(pt, sz, addr, &st, 24)` at filestat's call site. -/
@@ -225,7 +225,7 @@ theorem fstat_copyout (CO : COPYOUT) (c : CPU) (k' : KCtx) (γl : GName) (γk : 
     kctx c k' ∗ pcIs c KA.«copyout» ∗ trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     procPtAt P M ∗ byteBuf (k'.regs 13#5) (DFrac.own 1) bs ∗ actLend p ke ∗
-    (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (M' : Nat → List (BitVec 8)),
+    (∀ (c' : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (M' : Nat → List (BitVec 8)),
       ⌜calleeSaved k'.regs R' ∧ P.extSz (k'.regs 11#5) P' ∧
         ((R' 10#5 = 0#64 ∧ M' = umemWrite (viewFaulted P P' M) (k'.regs 12#5).toNat bs ∧
             umMapped P' (k'.regs 12#5).toNat bs.length) ∨
@@ -246,12 +246,12 @@ theorem fstat_copyout (CO : COPYOUT) (c : CPU) (k' : KCtx) (γl : GName) (γk : 
   iapply h
   iframe Hk Hpc Hpt Hbuf Hlend
   iframe #
-  iapply wpNext_intro_pin
-  iintro %c' %hpin %spie %spp %R' %- Hk Hpc Hlend Hbuf ⟨%P', %M', %hw, Hpt⟩ %hcs
+  iapply wpNext_intro_pin_lc
+  iintro %c' %hpin Hlc %spie %spp %R' %- Hk Hpc Hlend Hbuf ⟨%P', %M', %hw, Hpt⟩ %hcs
   have hpin' : k'.sie = false → c' = c := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
-  iapply HK $$ %c' %spie %spp %R' %P' %M' [] Hk Hpc Hte Hce Hlend Hbuf Hpt
+  iapply HK $$ %c' Hlc %spie %spp %R' %P' %M' [] Hk Hpc Hte Hce Hlend Hbuf Hpt
   ipureintro; exact ⟨hcs, hw⟩
 
 end

@@ -163,10 +163,10 @@ theorem rd_join (cpu c0 : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (rv : B
   k_norm_g
   iframe
   inext
-  k_next_e
+  k_next_e £ Hlc
   iintro Hk Hpc
   k_norm_g
-  ihave HΦ := wpNext_at true k.proc c0 cpu _ (rd_pin hj k hproc cpu c0) $$ Hnext
+  ihave HΦ := wpNext_at true k.proc c0 cpu _ (rd_pin hj k hproc cpu c0) $$ Hnext Hlc
   ihave HΦ := rdPost_elim _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ $$ HΦ
   ihave Hdst := rdDst_post k user j pidv Vp M P Mi dqp data olds off tot hproc hok $$ Hdst
   iapply HΦ $$ %spie %spp %_ %tot [] [] [] Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk Hdst Hsl

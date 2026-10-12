@@ -215,13 +215,13 @@ theorem sncpy_pad_loop (kb : KCtx) (dst : BitVec 64) (n : Nat) (hn31 : n < 2 ^ 3
     have hz : n - (j + 1) = 0 := by omega
     k_step_gen (wp_s_branch0 c3 _ (KA.«strncpy» + 0x3a#64) false 8182#13 13#5 (by decide) bop.BLT)
       from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-      with [RegMap.set_apply, sy_ite_bgtz (n - (j + 1)) (by omega)] next c4 hp4
+      with [RegMap.set_apply, sy_ite_bgtz (n - (j + 1)) (by omega)] next c4 hp4 £ Hlc
     iintro Hk Hpc
     ihave Hpc := (show pcIs (GF := GF) c4
         (if n - (j + 1) = 0 then (KA.«strncpy» + 0x3e#64) else (KA.«strncpy» + 0x30#64)) ⊢
         pcIs c4 (KA.«strncpy» + 0x3e#64) from by rw [if_pos hz]) $$ Hpc
     ihave HΦ' := wpNext_at _ _ _ c4 _
-      (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ
+      (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ Hlc
     iapply HΦ' $$ %_ %(cur.set j 0#8) Hk Hpc Hdst
     ipureintro
     refine ⟨by rw [List.length_set]; exact hcur, ?_, ?_, ?_⟩
@@ -333,12 +333,12 @@ theorem sncpy_copy_loop (kb : KCtx) (dst src : BitVec 64) (dq : DFrac)
     -- blez a2 : taken (the count ran out)
     k_step_gen (wp_s_branch0 cpu _ (KA.«strncpy» + 0xe#64) false 48#13 12#5 (by decide) bop.BGE)
       from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-      with [h12, sy_ite_blez (n - i) (by omega)] next c1 hp1
+      with [h12, sy_ite_blez (n - i) (by omega)] next c1 hp1 £ Hlc
     iintro Hk Hpc
     ihave Hpc := (show pcIs (GF := GF) c1
         (if n - i = 0 then (KA.«strncpy» + 0x3e#64) else (KA.«strncpy» + 0x12#64)) ⊢
         pcIs c1 (KA.«strncpy» + 0x3e#64) from by rw [if_pos hz]) $$ Hpc
-    ihave HΦ' := wpNext_at _ _ _ c1 _ hp1 $$ HΦ
+    ihave HΦ' := wpNext_at _ _ _ c1 _ hp1 $$ HΦ Hlc
     iapply HΦ' $$ %R %cur Hk Hdst Hsrc
     · ipureintro; exact ⟨hcur, syKept_refl R⟩
     · unfold sncpyCopyPost
@@ -402,7 +402,7 @@ theorem sncpy_copy_loop (kb : KCtx) (dst src : BitVec 64) (dq : DFrac)
     -- bnez a4,e32
     k_step_gen (wp_s_branch c7 _ (KA.«strncpy» + 0x24#64) true 8168#13 14#5 0#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-      with [RegMap.set_apply, Xv6.ite_bne_byte bss[i]] next c8 hp8
+      with [RegMap.set_apply, Xv6.ite_bne_byte bss[i]] next c8 hp8 £ Hlc
     iintro Hk Hpc
     have hpin8 : kb.sie = false ∨ kb.proc = 0#64 → c8 = cpu :=
       fun h => (hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans
@@ -412,7 +412,7 @@ theorem sncpy_copy_loop (kb : KCtx) (dst src : BitVec 64) (dq : DFrac)
       ihave Hpc := (show pcIs (GF := GF) c8
           (if bss[i] = 0#8 then (KA.«strncpy» + 0x26#64) else (KA.«strncpy» + 0xc#64)) ⊢
           pcIs c8 (KA.«strncpy» + 0x26#64) from by rw [if_pos hb0]) $$ Hpc
-      ihave HΦ' := wpNext_at _ _ _ c8 _ hpin8 $$ HΦ
+      ihave HΦ' := wpNext_at _ _ _ c8 _ hpin8 $$ HΦ Hlc
       iapply HΦ' $$ %_ %(cur.set i bss[i]) Hk Hdst Hsrc
       · ipureintro
         refine ⟨by rw [List.length_set]; exact hcur, ?_⟩

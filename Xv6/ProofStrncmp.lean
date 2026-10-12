@@ -122,14 +122,14 @@ theorem strncmp_loop (kb : KCtx)
     -- beqz a5,e14
     k_step_gen (wp_s_branch c1 _ (KA.«strncmp» + 0xe#64) true 26#13 15#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-      with [RegMap.set_apply, Xv6.ite_beq_byte bs1[i]] next c2 hp2
+      with [RegMap.set_apply, Xv6.ite_beq_byte bs1[i]] next c2 hp2 £ Hlc
     iintro Hk Hpc
     by_cases hz : bs1[i] = 0#8
     · -- a NUL in p: stop here
       ihave Hpc := (show pcIs (GF := GF) c2
           (if bs1[i] = 0#8 then (KA.«strncmp» + 0x28#64) else (KA.«strncmp» + 0x10#64)) ⊢
           pcIs c2 (KA.«strncmp» + 0x28#64) from by rw [if_pos hz]) $$ Hpc
-      ihave HΦ' := wpNext_at _ _ _ c2 _ (fun h => (hp2 h).trans (hp1 h)) $$ HΦ
+      ihave HΦ' := wpNext_at _ _ _ c2 _ (fun h => (hp2 h).trans (hp1 h)) $$ HΦ Hlc
       iapply HΦ' $$ %_ Hk Hbuf1 Hbuf2
       · ipureintro; intro r _ _ _ _ h15; simp [RegMap.set_apply, h15]
       · unfold strncmpLoopPost
@@ -150,7 +150,7 @@ theorem strncmp_loop (kb : KCtx)
       -- bne a4,a5,e14
       k_step_gen (wp_s_branch c3 _ (KA.«strncmp» + 0x14#64) false 20#13 14#5 15#5 (by decide) bop.BNE)
         from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-        with [RegMap.set_apply, sn_ite_bne_bytes bs2[i] bs1[i]] next c4 hp4
+        with [RegMap.set_apply, sn_ite_bne_bytes bs2[i] bs1[i]] next c4 hp4 £ Hlc
       iintro Hk Hpc
       by_cases hab : bs2[i] = bs1[i]
       · -- the bytes agree: the count runs out here
@@ -172,14 +172,14 @@ theorem strncmp_loop (kb : KCtx)
         have hzero : n - i - 1 = 0 := by omega
         k_step_gen (wp_s_branch c7 _ (KA.«strncmp» + 0x1e#64) true 8172#13 12#5 0#5 (by decide) bop.BNE)
           from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-          with [RegMap.set_apply, sn_ite_bne_ofNat (n - i - 1) (by omega)] next c8 hp8
+          with [RegMap.set_apply, sn_ite_bne_ofNat (n - i - 1) (by omega)] next c8 hp8 £ Hlc
         iintro Hk Hpc
         ihave Hpc := (show pcIs (GF := GF) c8
             (if n - i - 1 = 0 then (KA.«strncmp» + 0x20#64) else (KA.«strncmp» + 0xa#64)) ⊢
             pcIs c8 (KA.«strncmp» + 0x20#64) from by rw [if_pos hzero]) $$ Hpc
         ihave HΦ' := wpNext_at _ _ _ c8 _
           (fun h => (hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans
-            ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))))) $$ HΦ
+            ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))))) $$ HΦ Hlc
         iapply HΦ' $$ %_ Hk Hbuf1 Hbuf2
         · ipureintro; intro r h10' h11' h12' h14' h15'
           simp [RegMap.set_apply, h10', h11', h12', h14', h15']
@@ -198,7 +198,7 @@ theorem strncmp_loop (kb : KCtx)
             (if bs2[i] = bs1[i] then (KA.«strncmp» + 0x18#64) else (KA.«strncmp» + 0x28#64)) ⊢
             pcIs c4 (KA.«strncmp» + 0x28#64) from by rw [if_neg hab]) $$ Hpc
         ihave HΦ' := wpNext_at _ _ _ c4 _
-          (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ
+          (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ Hlc
         iapply HΦ' $$ %_ Hk Hbuf1 Hbuf2
         · ipureintro; intro r _ _ _ h14 h15; simp [RegMap.set_apply, h14, h15]
         · unfold strncmpLoopPost
@@ -222,13 +222,13 @@ theorem strncmp_loop (kb : KCtx)
     ihave Hbuf1 := Hclose1 $$ Hb1
     k_step_gen (wp_s_branch c1 _ (KA.«strncmp» + 0xe#64) true 26#13 15#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-      with [RegMap.set_apply, Xv6.ite_beq_byte bs1[i]] next c2 hp2
+      with [RegMap.set_apply, Xv6.ite_beq_byte bs1[i]] next c2 hp2 £ Hlc
     iintro Hk Hpc
     by_cases hz : bs1[i] = 0#8
     · ihave Hpc := (show pcIs (GF := GF) c2
           (if bs1[i] = 0#8 then (KA.«strncmp» + 0x28#64) else (KA.«strncmp» + 0x10#64)) ⊢
           pcIs c2 (KA.«strncmp» + 0x28#64) from by rw [if_pos hz]) $$ Hpc
-      ihave HΦ' := wpNext_at _ _ _ c2 _ (fun h => (hp2 h).trans (hp1 h)) $$ HΦ
+      ihave HΦ' := wpNext_at _ _ _ c2 _ (fun h => (hp2 h).trans (hp1 h)) $$ HΦ Hlc
       iapply HΦ' $$ %_ Hk Hbuf1 Hbuf2
       · ipureintro; intro r _ _ _ _ h15; simp [RegMap.set_apply, h15]
       · unfold strncmpLoopPost
@@ -247,7 +247,7 @@ theorem strncmp_loop (kb : KCtx)
       ihave Hbuf2 := Hclose2 $$ Hb2
       k_step_gen (wp_s_branch c3 _ (KA.«strncmp» + 0x14#64) false 20#13 14#5 15#5 (by decide) bop.BNE)
         from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
-        with [RegMap.set_apply, sn_ite_bne_bytes bs2[i] bs1[i]] next c4 hp4
+        with [RegMap.set_apply, sn_ite_bne_bytes bs2[i] bs1[i]] next c4 hp4 £ Hlc
       iintro Hk Hpc
       by_cases hab : bs2[i] = bs1[i]
       · ihave Hpc := (show pcIs (GF := GF) c4
@@ -307,7 +307,7 @@ theorem strncmp_loop (kb : KCtx)
             (if bs2[i] = bs1[i] then (KA.«strncmp» + 0x18#64) else (KA.«strncmp» + 0x28#64)) ⊢
             pcIs c4 (KA.«strncmp» + 0x28#64) from by rw [if_neg hab]) $$ Hpc
         ihave HΦ' := wpNext_at _ _ _ c4 _
-          (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ
+          (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ Hlc
         iapply HΦ' $$ %_ Hk Hbuf1 Hbuf2
         · ipureintro; intro r _ _ _ h14 h15; simp [RegMap.set_apply, h14, h15]
         · unfold strncmpLoopPost

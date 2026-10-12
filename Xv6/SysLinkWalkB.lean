@@ -182,7 +182,7 @@ theorem sys_link_tail_g (IUP : IUNLOCKPUT) (IP : IPUT) (EO : END_OP)
     sysLinkCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     sysLinkBufs (k.regs 2#5) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv Γ ∗
-    sysLinkRows k.proc A.pid A.V ∗ sysLinkHole A k.proc P2 ∗ (∀ c : CPU, sysLinkPostA k A c) ∗
+    sysLinkRows k.proc A.pid A.V ∗ sysLinkHole A k.proc P2 ∗ (∀ c : CPU, £ 1 -∗ sysLinkPostA k A c) ∗
     sysLinkIpHeld kk q g lo tl γil γisl inum ∗
     sysLinkLocked kd qd gd lod tld γild γisld dinum A.pid dnd bmd ∗
     ltgtFired A.Ftgt inum.toNat ∗ lentFired A.Fent dinum.toNat nm inum.toNat ∗
@@ -221,7 +221,7 @@ theorem sys_link_tail_g (IUP : IUNLOCKPUT) (IP : IPUT) (EO : END_OP)
   case un => k_norm_g; exact hnoff
   case ut => k_norm_g; exact htier
   case ua => k_norm_g
-  iintro %cpu %spie1 %spp1 %R1 %n4 %Sb4 %w %⟨hcs1, -, -, hcrw, hn4, -⟩ Hk Hpc Hte Hce Hpid Hbs Hops Htx
+  iintro %cpu Hlc %spie1 %spp1 %R1 %n4 %Sb4 %w %⟨hcs1, -, -, hcrw, hn4, -⟩ Hk Hpc Hte Hce Hpid Hbs Hops Htx
     Hslot
   k_norm_g [sys_link_ret_aa, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysLinkPins_cs k _ R1 (ientry kk) (ientry kd)
@@ -260,7 +260,7 @@ theorem sys_link_tail_g (IUP : IUNLOCKPUT) (IP : IPUT) (EO : END_OP)
   case pn => k_norm_g; exact hnoff
   case pt => k_norm_g; exact htier
   case pa => k_norm_g
-  iintro %cpu %spie2 %spp2 %R2 %n5 %⟨hcs2, -⟩ Hk Hpc Hte Hce Hpid Hbs Hop Hslot2
+  iintro %cpu Hlc %spie2 %spp2 %R2 %n5 %⟨hcs2, -⟩ Hk Hpc Hte Hce Hpid Hbs Hop Hslot2
   k_norm_g [sys_link_ret_b0, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp2 := sysLinkPins_cs k _ R2 (ientry kk) (ientry kd)
     (sysLinkPins_set k _ _ _ 1#5 _ (sysLinkPins_set k R1 _ _ 10#5 _ hp1 (by decide)) (Or.inl rfl))
@@ -278,7 +278,7 @@ theorem sys_link_tail_g (IUP : IUNLOCKPUT) (IP : IPUT) (EO : END_OP)
   case eK => k_norm_g; exact hKe
   case en => k_norm_g; exact hnoff
   case et => k_norm_g; exact htier
-  iintro %cpu %spie3 %spp3 %R3 %hcs3 Hk Hpc Hte Hce Hpid
+  iintro %cpu Hlc %spie3 %spp3 %R3 %hcs3 Hk Hpc Hte Hce Hpid
   k_norm_g [sys_link_ret_b4, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp3 := sysLinkPins_cs k _ R3 (ientry kk) (ientry kd)
     (sysLinkPins_set k R2 _ _ 1#5 _ hp2 (Or.inl rfl)) hcs3
@@ -337,7 +337,7 @@ theorem sys_link_to_bad (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END
     wordPointsTo (pCwd k.proc) 8 (DFrac.own 1) A.V.cwd ∗
     (inodeHeldAt A.V.cwd A.V.cwi ∗ wordPointsTo (pRoot k.proc) 8 (DFrac.own 1) A.V.root ∗
       inodeHeldAt A.V.root A.V.rti) ∗
-    sysLinkHole A k.proc P2 ∗ (∀ c : CPU, sysLinkPostA k A c) ∗
+    sysLinkHole A k.proc P2 ∗ (∀ c : CPU, £ 1 -∗ sysLinkPostA k A c) ∗
     sysLinkIpHeld kk q g lo tl γil γisl inum ∗ ityShot g ty ∗
     FsStateLink.linkTok (fsGammaL fscFs) (inum.toNat : Int) .tFile ∗
     pfAt (utgtCommitAt (fsGammaL fscFs) appE) A.Funt ∗
@@ -395,7 +395,7 @@ theorem sys_link_walk_dp (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
     sysLinkNameBuf (k.regs 2#5) nf ∗ sysfileAny (sysLinkNew (k.regs 2#5)) 128 ∗
     sysfileAny (sysLinkOld (k.regs 2#5)) 128 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv Γ ∗
-    sysLinkRows k.proc A.pid A.V ∗ sysLinkHole A k.proc P2 ∗ (∀ c : CPU, sysLinkPostA k A c) ∗
+    sysLinkRows k.proc A.pid A.V ∗ sysLinkHole A k.proc P2 ∗ (∀ c : CPU, £ 1 -∗ sysLinkPostA k A c) ∗
     sysLinkIpHeld kk q g lo tl γil γisl inum ∗ ityShot g ty ∗
     FsStateLink.linkTok (fsGammaL fscFs) (inum.toNat : Int) .tFile ∗
     credFloor lod tld ∗ inodeRefGenlo kd qd icfgDev dinum gd lod ∗ ityShot gd T_DIR ∗

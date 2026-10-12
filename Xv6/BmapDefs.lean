@@ -450,10 +450,14 @@ macro_rules
                try (case hs => k_norm_g)))
 
 syntax "bm_next" : tactic
+syntax "bm_next" " £ " ident : tactic
 set_option hygiene false in
 macro_rules
   | `(tactic| bm_next) =>
     `(tactic| (k_next_pin c hpin
+               k_ext_move))
+  | `(tactic| bm_next £ $hlc:ident) =>
+    `(tactic| (k_next_pin_lc c hpin $hlc
                k_ext_move))
 
 /-! ## The kit, the continuation -/

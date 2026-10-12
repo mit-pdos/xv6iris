@@ -134,9 +134,9 @@ theorem memset_iter {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
   iintro Hk Hpc
   -- bne a5,a4,c8e
   k_step_gen (wp_s_branch c2 _ (KA.«memset» + 0x1a#64) false 8186#13 15#5 14#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
-    $$ [- $Hk $Hpc] with [h14, ite_bne_eq_ms, add_succ_eq_iff_ms d i n (by omega) hn32] next c3 hp3
+    $$ [- $Hk $Hpc] with [h14, ite_bne_eq_ms, add_succ_eq_iff_ms d i n (by omega) hn32] next c3 hp3 £ Hlc
   iintro Hk Hpc
-  ihave HΦ' := wpNext_at _ _ _ c3 _ (fun h => (hp3 h).trans ((hp2 h).trans (hp1 h))) $$ HΦ
+  ihave HΦ' := wpNext_at _ _ _ c3 _ (fun h => (hp3 h).trans ((hp2 h).trans (hp1 h))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc Hdst
 
 set_option maxHeartbeats 4000000 in
@@ -370,9 +370,9 @@ theorem memset_free_iter {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
   iintro Hk Hpc
   -- bne a5,a4,c8e
   k_step_gen (wp_s_branch c2 _ (KA.«memset» + 0x1a#64) false 8186#13 15#5 14#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
-    $$ [- $Hk $Hpc] with [h14, ite_bne_eq_ms, add_succ_eq_iff_ms d i n (by omega) hn32] next c3 hp3
+    $$ [- $Hk $Hpc] with [h14, ite_bne_eq_ms, add_succ_eq_iff_ms d i n (by omega) hn32] next c3 hp3 £ Hlc
   iintro Hk Hpc
-  ihave HΦ' := wpNext_at _ _ _ c3 _ (fun h => (hp3 h).trans ((hp2 h).trans (hp1 h))) $$ HΦ
+  ihave HΦ' := wpNext_at _ _ _ c3 _ (fun h => (hp3 h).trans ((hp2 h).trans (hp1 h))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc Hpre Hsuf
 
 set_option maxHeartbeats 4000000 in

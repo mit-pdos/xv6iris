@@ -54,7 +54,7 @@ theorem namex_mid (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) 
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0x10a#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     namexEnv Γ A ∗ namexWalk k A ipv ncur Scur nf ∗
-    (∀ c' : CPU, namexPostA k A c') ∗ namexLoop k A fuel
+    (∀ c' : CPU, £ 1 -∗ namexPostA k A c') ∗ namexLoop k A fuel
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨r2, r8, r9, r19, r20, r21, r22, r23, r24, r25, r27⟩ := id hr
   have hbz := namex_beqz_byte (A.pfun a)
@@ -136,7 +136,7 @@ theorem namex_turn (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK)
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0xf8#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     namexEnv Γ A ∗ namexWalk k A ipv ncur Scur nf ∗
-    (∀ c' : CPU, namexPostA k A c') ∗ namexLoop k A fuel
+    (∀ c' : CPU, £ 1 -∗ namexPostA k A c') ∗ namexLoop k A fuel
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨hr, hfu, hoff, hes0, hbud, hW, hSb⟩ := hinv
   obtain ⟨r2, r8, r9, r19, r20, r21, r22, r23, r24, r25, r27⟩ := id hr

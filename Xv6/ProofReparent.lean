@@ -323,11 +323,11 @@ theorem rp_iter (WK : WAKEUP) [X : CurCtx]
     -- beq s1,s3
     k_step_gen (wp_s_branch c7 _ (KA.«reparent» + 0x30#64) false 22#13 9#5 19#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [g19, rp_beq_last i hi] next c8 hp8
+      with [g19, rp_beq_last i hi] next c8 hp8 £ Hlc
     iintro Hk Hpc
     have hpinZ : k.sie = false ∨ k.proc = 0#64 → c8 = cur := fun h =>
       (hp8 h).trans ((hp7 h).trans ((hp6 h).trans (hpinW h)))
-    ihave HPhi := wpNext_at _ _ _ c8 _ hpinZ $$ HPhi
+    ihave HPhi := wpNext_at _ _ _ c8 _ hpinZ $$ HPhi Hlc
     iapply HPhi $$ %spieW %sppW %_ %hspW Hk Hpc HW
     ipureintro
     refine ⟨?_, ?_⟩
@@ -357,11 +357,11 @@ theorem rp_iter (WK : WAKEUP) [X : CurCtx]
     -- beq s1,s3
     k_step_gen (wp_s_branch c3 _ (KA.«reparent» + 0x30#64) false 22#13 9#5 19#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [h19, rp_beq_last i hi] next c4 hp4
+      with [h19, rp_beq_last i hi] next c4 hp4 £ Hlc
     iintro Hk Hpc
     have hpinZ : k.sie = false ∨ k.proc = 0#64 → c4 = cur := fun h =>
       (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))
-    ihave HPhi := wpNext_at _ _ _ c4 _ hpinZ $$ HPhi
+    ihave HPhi := wpNext_at _ _ _ c4 _ hpinZ $$ HPhi Hlc
     iapply HPhi $$ %spie %spp %_ %(fun _ => ⟨rfl, rfl⟩) Hk Hpc HW
     ipureintro
     refine ⟨?_, ?_⟩
@@ -402,13 +402,13 @@ theorem rp_loop (WK : WAKEUP) [CurCtx]
       $$ [- $Hk $Hpc $HW]
     rotate_right 1
     iframe #
-    iapply wpNext_intro_pin
-    iintro %c1 %hq1 %spie2 %spp2 %R2 %hsp2 Hk Hpc HW %hpost
+    iapply wpNext_intro_pin_lc
+    iintro %c1 %hq1 Hlc %spie2 %spp2 %R2 %hsp2 Hk Hpc HW %hpost
     rw [if_pos hlast]
     ihave HW := waitResAt_eq curCtx _ (reparentedUpto parents p ip NPROC)
       (show reparentedUpto parents p ip (i + 1) = reparentedUpto parents p ip NPROC by rw [hlast])
       $$ HW
-    ihave HPhi := wpNext_at _ _ _ c1 _ hq1 $$ HPhi
+    ihave HPhi := wpNext_at _ _ _ c1 _ hq1 $$ HPhi Hlc
     iapply HPhi $$ %spie2 %spp2 %R2 %hsp2 Hk Hpc HW
     ipureintro
     exact hpost.1
@@ -527,12 +527,12 @@ theorem rp_epi [CurCtx] (cpu cur : CPU) (k : KCtx) (rr : Nat → BitVec 64)
     with [KCtx.pop_pushed _ _ _ hK', hR2] next c7 hq7
   iintro Hk Hpc
   k_step_gen (wp_s_ret c7 _ (KA.«reparent» + 0x54#64) true 1#5)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c8 hq8
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c8 hq8 £ Hlc
   iintro Hk Hpc
   have hpinZ : k.sie = false ∨ k.proc = 0#64 → c8 = cpu := fun h =>
     (hq8 h).trans ((hq7 h).trans ((hq6 h).trans ((hq5 h).trans ((hq4 h).trans ((hq3 h).trans
       ((hq2 h).trans ((hq1 h).trans (hpin h))))))))
-  ihave HPhi := wpNext_at _ _ _ c8 _ hpinZ $$ HPhi
+  ihave HPhi := wpNext_at _ _ _ c8 _ hpinZ $$ HPhi Hlc
   iapply HPhi $$ %spie %spp %_ %hsp Hk Hpc HW
   ipureintro
   unfold calleeSaved

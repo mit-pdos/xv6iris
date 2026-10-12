@@ -68,11 +68,11 @@ theorem bm_epilogue (c cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (rv 
   k_norm_g
   iframe
   inext
-  bm_next
+  bm_next £ Hlc
   iintro Hk Hpc
   k_norm_g
   unfold bmCont
-  ihave HΦ := wpNext_at true k.proc cpu c _ (bm_pin hpz c cpu) $$ Hnext
+  ihave HΦ := wpNext_at true k.proc cpu c _ (bm_pin hpz c cpu) $$ Hnext Hlc
   obtain ⟨p21, p22, p23, p24, p25, p26, p27⟩ := hp
   iapply HΦ $$ %spie %spp %_ %bm' %n' %data' %Sb' %rv [] Hk Hpc Hte Hce Hpid Hdev Hmap Hblk
     Hsl Hkit

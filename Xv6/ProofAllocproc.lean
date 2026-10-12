@@ -779,9 +779,9 @@ theorem ap_scan_acq (AC : ACQUIRE) {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G
   iintro Hk Hpc Hstate
   -- c.beqz a5,0x80001baa
   k_step (wp_s_branch c _ (KA.«allocproc» + 0x24#64) true 20#13 15#5 0#5 (by decide) bop.BEQ)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] £ Hlc
   iintro Hk Hpc
-  ihave HΦ := wpNext_at _ _ _ c _ (fun h => (hp h).trans ((hp2 h).trans (hp1 h))) $$ HΦ
+  ihave HΦ := wpNext_at _ _ _ c _ (fun h => (hp h).trans ((hp2 h).trans (hp1 h))) $$ HΦ Hlc
   k_norm [ap_bcond_state, decide_eq_true_eq, KCtx.pushOffAt_withRegs, MachCSL.KCtx.withSpie_pushOffAt,
     KCtx.pushOffAt_pushed, hK4]
   iapply HΦ $$ %spie2 %spp2 %(R2.set 15#5 (BitVec.signExtend 64 st)) %st %ch %kl %xs %pid0 []
@@ -870,12 +870,12 @@ theorem ap_scan_rel (RE : RELEASE) {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G
     exact ⟨ht, by simp only [trapRes]; omega⟩
   isplitl [Harm]
   · iapply (popArm_sie c _ _ (by rfl)) $$ Harm
-  iapply wpNext_intro_pin
-  iintro %c3 %hp3 %R3 Hk Hpc %hcs3
+  iapply wpNext_intro_pin_lc
+  iintro %c3 %hp3 Hlc %R3 Hk Hpc %hcs3
   k_norm_g [hfilt, KCtx.pushOffAt_popExit _ spie2 spp2 hwf, MachCSL.KCtx.withSpie_pushOffAt,
     MachCSL.KCtx.withSpie_twice, KCtx.pushOffAt_withRegs, KCtx.pushOffAt_pushed, hK4, ap_ret_b0c,
     ap_relctx]
-  ihave HΦ := wpNext_at _ _ _ c3 _ hp3 $$ HΦ
+  ihave HΦ := wpNext_at _ _ _ c3 _ hp3 $$ HΦ Hlc
   ihave Hk2 : kctx (GF := GF) c3 (((k.pushed 4).withSpie spie2 spp2).withRegs R3) $$ [Hk]
   case' _ => rw [← ap_relctx]; iexact Hk
   iapply HΦ $$ %R3 [] Hk2 Hpc
@@ -2603,7 +2603,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
         iintro Hk Hpc
         -- 0x80001c42 c.sd a5,104(s1) : context[1] = kstack + PGSIZE
         k_step_gen (wp_s_sd cf _ (KA.«allocproc» + 0xd0#64) true 104#12 9#5 15#5 (by decide) 0#64)
-          from (text_instr _ _ _ _ rfl rfl) Htextm $$ [- $Hk $Hpc] with [hRm9, ap_pContext1] next cg hpg
+          from (text_instr _ _ _ _ rfl rfl) Htextm $$ [- $Hk $Hpc] with [hRm9, ap_pContext1] next cg hpg £ Hlc
         iintro Hk Hpc Hcw1
         -- fold the sp value and reassemble the 14 context words
         ihave Hctx : contextCells (GF := GF) (procAddr n) (DFrac.own 1)
@@ -2687,7 +2687,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
           (hpg (Or.inl rfl)).trans ((hpf (Or.inl rfl)).trans ((hpe (Or.inl rfl)).trans
             ((hpd (Or.inl rfl)).trans ((hpc (Or.inl rfl)).trans ((hpb (Or.inl rfl)).trans
               ((hpa (Or.inl rfl)).trans (hpm (Or.inl rfl))))))))
-        ihave HΦ := wpNext_at k.sie k.proc c cg (apCont Γ k γk on pav tk Q ke) (fun _ => hgc) $$ HΦ
+        ihave HΦ := wpNext_at k.sie k.proc c cg (apCont Γ k γk on pav tk Q ke) (fun _ => hgc) $$ HΦ Hlc
         -- telescope the balanced pid-lock pair
         have hwf4 : (k.pushed 4).wf := hwf
         have hwfpid : (((k.pushed 4).pushOffAt spie3 spp3).withLocks ("proc" :: k.locks)).wf := by

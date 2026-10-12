@@ -650,11 +650,11 @@ theorem ss_tail (RE : RELEASE) (Γ : SchedNames) [ClaimIs GF Γ]
   k_norm_g
   iframe
   inext
-  k_next_e
+  k_next_e £ Hlc
   iintro Hk Hpc
   ihave Hpost := wpNext_at true k.proc _ cpu _
     (fun h => h.elim (fun h => absurd h (by decide))
-      (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hjp))) $$ Hnext
+      (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hjp))) $$ Hnext Hlc
   ihave Hpost := ssPost_elim k γ pidv dqp oQ cpu $$ Hpost
   ihave Hk := ss_kctx_ws cpu k _ $$ Hk
   iapply Hpost $$ %(k.spie) %(k.spp) %_ [] Hk Hpc Hte Hce HQ Hpid

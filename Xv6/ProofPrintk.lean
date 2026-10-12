@@ -160,11 +160,11 @@ theorem printk_release_tail (RE : RELEASE) {GF : BundledGFunctors.{0}} [MachGS G
     with [hsie, h22, KCtx.pop_pushed _ _ _ hav, sp_restore] next c6 hp6
   iintro Hk Hpc
   -- ret
-  k_step_gen (wp_s_ret c6 _ (KA.«printk» + 0x26a#64) true 1#5) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hsie] next c7 hp7
+  k_step_gen (wp_s_ret c6 _ (KA.«printk» + 0x26a#64) true 1#5) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hsie] next c7 hp7 £ Hlc
   iintro Hk Hpc
   have hpin : pkReen k = false ∨ k.proc = 0#64 → c7 = cpu :=
     fun h => (hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))))
-  ihave HΦ' := wpNext_at _ _ _ c7 _ hpin $$ HΦ
+  ihave HΦ' := wpNext_at _ _ _ c7 _ hpin $$ HΦ Hlc
   iapply HΦ' $$ %_ %cs0 Hk Hpc Hbuf Hdescs Hsent
   ipureintro
   obtain ⟨c2_2, c2_8, c2_9, c2_18, c2_19, c2_20, c2_21, c2_22, c2_23, c2_24, c2_25, c2_26, c2_27⟩ := hcs2

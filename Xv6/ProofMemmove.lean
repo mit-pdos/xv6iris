@@ -229,10 +229,10 @@ theorem memmove_fwd_iter {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
       byteBuf d (DFrac.own 1) (mixF bs olds (i + 1)) by rw [mixF_set bs olds i b hb (by omega)]) $$ Hdst
   -- bne a5,a1,cf2
   k_step_gen (wp_s_branch c4 _ (KA.«memmove» + 0x24#64) false 8180#13 15#5 11#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
-    $$ [- $Hk $Hpc] with [h15, ite_bne_eq, add_ofNat_succ_eq_iff s n i hn32 (by omega)] next c5 hp5
+    $$ [- $Hk $Hpc] with [h15, ite_bne_eq, add_ofNat_succ_eq_iff s n i hn32 (by omega)] next c5 hp5 £ Hlc
   iintro Hk Hpc
   ihave HΦ' := wpNext_at _ _ _ c5 _
-    (fun h => (hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))) $$ HΦ
+    (fun h => (hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc Hsrc Hdst
 
 set_option maxHeartbeats 4000000 in
@@ -341,10 +341,10 @@ theorem memmove_bwd_iter {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
       byteBuf d (DFrac.own 1) (mixB bs olds (i - 1)) by rw [mixB_set bs olds i hi1 b hb (by omega) (by omega)]) $$ Hdst
   -- bne a5,a4,d28
   k_step_gen (wp_s_branch c4 _ (KA.«memmove» + 0x5a#64) false 8180#13 15#5 14#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
-    $$ [- $Hk $Hpc] with [h15, ite_bne_eq, self_eq_add_ofNat_iff s (i - 1) (by omega)] next c5 hp5
+    $$ [- $Hk $Hpc] with [h15, ite_bne_eq, self_eq_add_ofNat_iff s (i - 1) (by omega)] next c5 hp5 £ Hlc
   iintro Hk Hpc
   ihave HΦ' := wpNext_at _ _ _ c5 _
-    (fun h => (hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))) $$ HΦ
+    (fun h => (hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc Hsrc Hdst
 
 set_option maxHeartbeats 4000000 in

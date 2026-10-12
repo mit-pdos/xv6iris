@@ -119,7 +119,7 @@ def sysUnlinkAt72 (Γ : SchedNames) (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF
   suAny (sysUnlinkDel (k.regs 2#5)) 16 ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv Γ ∗
   wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ sysUnlinkHole A k.proc P2 ∗
-  (∀ c : CPU, sysUnlinkPostA k A c) ∗
+  (∀ c : CPU, £ 1 -∗ sysUnlinkPostA k A c) ∗
   sysUnlinkLkTx A.pid kd q g lo tl dinum dnd γil γisl ∗ sysUnlinkOpen kd dinum dnd bmd datd ∗
   inodeRef ks qq icfgDev (BitVec.setWidth 32 (dirInum datd kk)) ∗
   runitAny (BitVec.setWidth 32 (dirInum datd kk)).toNat ∗
@@ -152,7 +152,7 @@ theorem sys_unlink_w2_dot (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     suAny (sysUnlinkDel (k.regs 2#5)) 16 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv Γ ∗
     wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ sysUnlinkHole A k.proc P2 ∗
-    (∀ c : CPU, sysUnlinkPostA k A c) ∗
+    (∀ c : CPU, £ 1 -∗ sysUnlinkPostA k A c) ∗
     sysUnlinkLkTx A.pid kd q g lo tl dinum dn γil γisl ∗
     icLoaded fscFs fscIreg fscCov fscLogst kd dinum dn bm ∗
     A.P (npElems pl).length dinum.toNat ∗
@@ -216,7 +216,7 @@ theorem sys_unlink_w2_look (DL : DIRLOOKUP) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ
     suAny (sysUnlinkDel (k.regs 2#5)) 16 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv Γ ∗
     wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ sysUnlinkHole A k.proc P2 ∗
-    (∀ c : CPU, sysUnlinkPostA k A c) ∗
+    (∀ c : CPU, £ 1 -∗ sysUnlinkPostA k A c) ∗
     sysUnlinkLkTx A.pid kd q g lo tl dinum dnd γil γisl ∗
     icLoaded fscFs fscIreg fscCov fscLogst kd dinum dnd bmd ∗
     A.P (npElems pl).length dinum.toNat ∗
@@ -441,7 +441,7 @@ theorem sys_unlink_w2 (IL : ILOCK) (NC : NAMECMP) (DL : DIRLOOKUP) (IUP : IUNLOC
   case inf => k_norm_g; exact ok.hnoff
   case it => k_norm_g; exact ok.htier
   case ia => k_norm_g [h10]
-  iintro %cpu %spie1 %spp1 %R1 %dnd %bmd %γil %γisl %hcs1 Hk Hpc Hte Hce Hpid Hb1 Hlk Hload
+  iintro %cpu Hlc %spie1 %spp1 %R1 %dnd %bmd %γil %γisl %hcs1 Hk Hpc Hte Hce Hpid Hb1 Hlk Hload
   k_norm_g [sys_unlink_ret_34, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysUnlinkPins_cs k _ R1 (ientry kd) (k.regs 18#5) (k.regs 19#5)
     (sysUnlinkPins_set k R _ _ _ 1#5 _ hpins (Or.inl rfl)) hcs1

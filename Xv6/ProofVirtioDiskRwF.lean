@@ -488,7 +488,7 @@ theorem vdrw_P6 (FD : FREE_DESC) (RE : RELEASE)
   k_norm_g
   iframe
   inext
-  k_next_e
+  k_next_e £ Hlc
   iintro Hk Hpc
   have hcsfin : calleeSaved k.regs
       (Rf.set 1#5 (k.regs 1#5) |>.set 8#5 (k.regs 8#5) |>.set 9#5 (k.regs 9#5)
@@ -520,7 +520,7 @@ theorem vdrw_P6 (FD : FREE_DESC) (RE : RELEASE)
   ihave Hnext := Hnext $$ %cpu
   ihave HΦq := wpNext_here k.proc cpu (vdrwPostQ k γ bno wr dataBuf dataDisk Q) $$ Hnext
   isimp only [vdrwPostQ] at HΦq
-  ihave HΦp := HΦq $$ HQ
+  ihave HΦp := HΦq $$ Hlc HQ
   isimp only [vdrwPostK] at HΦp
   ihave HΦ2 := HΦp $$ %(k.spie) %(k.spp)
   isimp only [KCtx.withSpie_self' k k.spie k.spp rfl rfl] at HΦ2

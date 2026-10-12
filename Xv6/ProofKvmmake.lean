@@ -682,8 +682,8 @@ theorem km_regions (KM : KVMMAP) [CurCtx] (c : CPU) (kb : KCtx) (γl : GName) (�
     exact Nat.lt_of_le_of_lt (Nat.le_of_eq (count_of_sOk hs5 0x3FFFFFF#27 1 2
       dcounts.2.2.2.2.2.2)) (km_cnt6 hnb)
   k_norm_g [km_ret_120c, km_v6]
-  iapply wpNext_intro_pin
-  iintro %c59 %hp59 %spie6 %spp6 %R6 %fr6 %hsp6 Hk Hpc Htree Hav %hpost
+  iapply wpNext_intro_pin_lc
+  iintro %c59 %hp59 Hlc %spie6 %spp6 %R6 %fr6 %hsp6 Hk Hpc Htree Hav %hpost
   obtain ⟨hcs, hlen6, hfull6, hnodup6, hpg6⟩ := hpost
   have hc6 : _ = 1 := congrArg Prod.snd hfull6
   have hlen6n : fr6.length = 2 :=
@@ -715,7 +715,7 @@ theorem km_regions (KM : KVMMAP) [CurCtx] (c : CPU) (kb : KCtx) (γl : GName) (�
       ((hsp2 h).2.trans ((hsp1a h).2.trans (hsp1 h).2)))))⟩
   rw [km_nb102 nb]
   simp only [MachCSL.KCtx.withSpie_twice]
-  ihave Hnext := wpNext_at _ _ _ c59 _ hpinr6 $$ Hnext
+  ihave Hnext := wpNext_at _ _ _ c59 _ hpinr6 $$ Hnext Hlc
   simp only [kvmRegionsCont]
   iapply Hnext $$ %spie6 %spp6 %_ %_ %hspF Hk Hpc Htree Hav HRes1 HRes2
   ipureintro

@@ -349,16 +349,16 @@ theorem uwPost_elim (k : KCtx) (γ : UartNames) (dq : DFrac) (bs L0 cs : List (B
 
 theorem uw_post_at (cpu c : CPU) (k : KCtx) (γ : UartNames) (dq : DFrac) (bs L0 cs : List (BitVec 8))
     (Φ : IProp GF) (j : Nat) (hj : j < NPROC) (hkproc : k.proc = procAddr j) :
-    wpNext true k.proc cpu (uwPost (GF := GF) k γ dq bs L0 cs Φ) ⊢
+    wpNext true k.proc cpu (uwPost (GF := GF) k γ dq bs L0 cs Φ) ⊢ £ 1 -∗
       ∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k.regs R'⌝ -∗
       kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
       byteBuf (k.regs 11#5) dq cs -∗ uartSentSub γ (bs ++ cs) -∗ (∃ ps, uartSentRun γ L0 ps cs) -∗ Φ -∗ wpLoop c := by
-  iintro H
+  iintro H Hlc
   ihave H := wpNext_at true k.proc cpu c _
     (fun h => h.elim (fun h => absurd h (by decide))
-      (fun h => absurd h (by rw [hkproc]; exact procAddr_nonzero hj))) $$ H
+      (fun h => absurd h (by rw [hkproc]; exact procAddr_nonzero hj))) $$ H Hlc
   iapply uwPost_elim $$ H
 
 /-! ## The epilogue at `+0x78` -/
@@ -397,11 +397,11 @@ theorem uw_epi (c0 cpu : CPU) (k kb : KCtx) (hb : UwBase k kb)
   k_norm_g
   iframe
   inext
-  k_next_e
+  k_next_e £ Hlc
   iintro Hk Hpc
   ihave HΦ := uw_post_at c0 cpu k γ dq bs L0 cs Φ j hj hkproc $$ HΦ
   k_norm_g
-  iapply HΦ $$ %a %b %_ [] Hk Hpc Hte Hce Hbuf [Hsub] [Hrun] HP
+  iapply HΦ $$ Hlc %a %b %_ [] Hk Hpc Hte Hce Hbuf [Hsub] [Hrun] HP
   · ipureintro
     unfold calleeSaved
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
@@ -908,13 +908,13 @@ theorem uartwrite_proof (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL :
       with [hn, hn2, uw_blez n (by omega), decide_eq_true hn0]
     iintro Hk Hpc
     k_step_e (wp_s_ret cpu _ (KA.«uartwrite» + 0x8c#64) true 1#5)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] £ Hlc
     iintro Hk Hpc
     ihave Hk := uw_self_intro cpu k $$ Hk
     ihave HΦ' := uw_post_at _ cpu k γ dq bs L0 [] Φ j hj hproc $$ HΦ
     k_norm_g [hra]
     rw [storeChain.eq_1]
-    iapply HΦ' $$ %(k.spie) %(k.spp) %(k.regs) [] Hk Hpc Hte Hce Hbuf [Hsub] [Hrun0] Hch
+    iapply HΦ' $$ Hlc %(k.spie) %(k.spp) %(k.regs) [] Hk Hpc Hte Hce Hbuf [Hsub] [Hrun0] Hch
     · ipureintro
       unfold calleeSaved
       exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩

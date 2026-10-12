@@ -75,7 +75,7 @@ theorem sys_chroot_tested (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPUT) (EO : EN
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv Γ ∗
     sysChrootRows (procAddr A.j) A.pid A.V.root A.V.rti ∗
     sysChrootHole A.γ (procAddr A.j) A.pid (sysChrootV1 A P2) (sysChrootM1 A P2) ∗
-    (∀ c : CPU, sysChrootPostA (GF := GF) k A c) ∗
+    (∀ c : CPU, £ 1 -∗ sysChrootPostA (GF := GF) k A c) ∗
     sysChdirLocked kk q g lo tl γil γisl inum A.pid dn bm ∗
     bslots 3 ∗ irefSlots 1 ∗ logOpS icfgLog n Sb
     ⊢ wpLoop (GF := GF) cpu := by
@@ -154,7 +154,7 @@ theorem sys_chroot_miss (EO : END_OP) (Γ : SchedNames) [ClaimIs GF Γ]
     byteBuf (sysfileRestAddr (sysChdirBuf (k.regs 2#5)) pl.length) (DFrac.own 1) rest ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysChrootV1 A P2) (sysChrootM1 A P2) ∗
-    (∀ c : CPU, sysChrootPostA (GF := GF) k A c) ∗ bslots 3 ∗ irefSlots 2 ∗
+    (∀ c : CPU, £ 1 -∗ sysChrootPostA (GF := GF) k A c) ∗ bslots 3 ∗ irefSlots 2 ∗
     logOpS icfgLog n Sb ∗ logTx icfgLog
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hp, Hrest, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Htx⟩
@@ -205,7 +205,7 @@ theorem sys_chroot_found (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKP
     byteBuf (sysfileRestAddr (sysChdirBuf (k.regs 2#5)) pl.length) (DFrac.own 1) rest ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysChrootV1 A P2) (sysChrootM1 A P2) ∗
-    (∀ c : CPU, sysChrootPostA (GF := GF) k A c) ∗ bslots 3 ∗ irefSlots 1 ∗
+    (∀ c : CPU, £ 1 -∗ sysChrootPostA (GF := GF) k A c) ∗ bslots 3 ∗ irefSlots 1 ∗
     logOpS icfgLog n Sb ∗ logTx icfgLog ∗ inodeHeld ipv
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hp, Hrest, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Htx, Hheld⟩
@@ -290,7 +290,7 @@ theorem sys_chroot_fetched (NI : NAMEI) (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT)
     byteBuf (sysChdirBuf (k.regs 2#5)) (DFrac.own 1) bs ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysChrootV1 A P2) (sysChrootM1 A P2) ∗
-    (∀ c : CPU, sysChrootPostA (GF := GF) k A c) ∗ bslots 3 ∗ irefSlots 2 ∗
+    (∀ c : CPU, £ 1 -∗ sysChrootPostA (GF := GF) k A c) ∗ bslots 3 ∗ irefSlots 2 ∗
     logOp icfgLog MAXOPBLOCKS
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hbuf, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop⟩
@@ -394,7 +394,7 @@ theorem sys_chroot_args (AS : ARGSTR) (NI : NAMEI) (IL : ILOCK) (IU : IUNLOCK) (
     sysfileAny (sysChdirBuf (k.regs 2#5)) 128 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid A.V A.M ∗
-    (∀ c : CPU, sysChrootPostA (GF := GF) k A c) ∗ bslots 3 ∗ irefSlots 2 ∗
+    (∀ c : CPU, £ 1 -∗ sysChrootPostA (GF := GF) k A c) ∗ bslots 3 ∗ irefSlots 2 ∗
     logOp icfgLog MAXOPBLOCKS
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hbuf, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop⟩
@@ -433,7 +433,7 @@ theorem sys_chroot_args (AS : ARGSTR) (NI : NAMEI) (IL : ILOCK) (IU : IUNLOCK) (
   case gn => k_norm_g; omega
   case gK => k_norm_g; exact hKas
   case gmx => k_norm_g [hold]
-  iintro %cpu %spie1 %spp1 %R1 %P2 %bs %kv %⟨hcs1, hext, hret⟩ Hk Hpc Hte Hce %hkv Hbare Hbuf
+  iintro %cpu Hlc %spie1 %spp1 %R1 %P2 %bs %kv %⟨hcs1, hext, hret⟩ Hk Hpc Hte Hce %hkv Hbare Hbuf
   k_norm_g [sys_chroot_ret_22, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   ihave Hbuf := (show byteBuf (GF := GF) (k.regs 2#5 + 18446744073709551456#64) (DFrac.own 1) bs ⊢
     byteBuf (sysChdirBuf (k.regs 2#5)) (DFrac.own 1) bs from .rfl) $$ Hbuf
@@ -444,9 +444,9 @@ theorem sys_chroot_args (AS : ARGSTR) (NI : NAMEI) (IL : ILOCK) (IU : IUNLOCK) (
       (viewFaulted A.V.upt P2 A.M) ⊢
     procPrivFd (A.raise kv).γ (procAddr (A.raise kv).j) (A.raise kv).pid (sysChrootV1 (A.raise kv) P2)
       (sysChrootM1 (A.raise kv) P2) from .rfl) $$ Hblk
-  ihave HΦ : (∀ c : CPU, sysChrootPostA (GF := GF) k (A.raise kv) c) $$ [HΦ]
-  · iintro %c
-    ispecialize HΦ $$ %c
+  ihave HΦ : (∀ c : CPU, £ 1 -∗ sysChrootPostA (GF := GF) k (A.raise kv) c) $$ [HΦ]
+  · iintro %c Hlc
+    ispecialize HΦ $$ %c Hlc
     iapply (sysChrootK_raise k A.γ (procAddr A.j) A.pid A.V A.M c kv hkv) $$ HΦ
   have hp1 : sysChdirPins k R1 (k.regs 9#5) (procAddr A.j) := by
     refine sysChdirPins_cs k _ R1 _ _ ?_ hcs1
@@ -483,10 +483,10 @@ theorem sys_chroot_main (MP : MYPROC) (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI)
   ihave #Henv : sysfileEnv Γ $$ []
   · unfold sysfileEnv; iframe #
   -- THE CONTRACT'S CONTINUATION, hart-free
-  ihave HΦ : (∀ c : CPU, sysChrootPostA (GF := GF) k (⟨γ, j, pid, V, M⟩ : SysChrootArgs) c)
+  ihave HΦ : (∀ c : CPU, £ 1 -∗ sysChrootPostA (GF := GF) k (⟨γ, j, pid, V, M⟩ : SysChrootArgs) c)
     $$ [Hnext]
-  · iintro %c
-    iapply wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext
+  · iintro %c Hlc
+    iapply wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext Hlc
   ihave Hce := (show cpuClaimExt (GF := GF) cpu k.sie k.proc ⊢ cpuClaimExt cpu k.sie (procAddr j)
     from by rw [hproc]) $$ Hce
   simp only [sysChrootAddr]
@@ -543,7 +543,7 @@ theorem sys_chroot_main (MP : MYPROC) (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI)
   case bK => k_norm_g; exact hKbo
   case bn => k_norm_g; exact hnoff
   case bt => k_norm_g; exact htier
-  iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid Hop
+  iintro %cpu Hlc %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid Hop
   k_norm_g [sys_chroot_ret_14, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   ihave Hblk := sys_chroot_hole_close _ _ _ _ _ $$ [Hhole Hpid Hrt Hrtr]
   · unfold sysChrootRows; iframe

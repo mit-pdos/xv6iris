@@ -47,7 +47,7 @@ theorem namexEra_tail (cpu : CPU) (k : KCtx) (A : NamexArgs) (P Pmiss : Nat → 
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0x60#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     namexEraOut k A P Pmiss n' Sb' ok nf ipv w (R 20#5) ∗
-    (∀ c' : CPU, namexEraPostR k A P Pmiss c')
+    (∀ c' : CPU, £ 1 -∗ namexEraPostR k A P Pmiss c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hK' : 12 ≤ (k.withSpie spie spp).avail := hK
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Hout, Hnext⟩
@@ -66,10 +66,10 @@ theorem namexEra_tail (cpu : CPU) (k : KCtx) (A : NamexArgs) (P Pmiss : Nat → 
   k_norm_g
   iframe
   inext
-  k_next_e
+  k_next_e £ Hlc
   iintro Hk Hpc
   k_norm_g
-  ispecialize Hnext $$ %cpu
+  ispecialize Hnext $$ %cpu Hlc
   iapply (namexEraPostR_elim k A P Pmiss cpu spie spp _ n' Sb' ok nf ipv w ?hcs)
     $$ Hnext Hk Hpc Hte Hce
   · unfold calleeSaved
@@ -120,7 +120,7 @@ theorem namexEra_notdir (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     namexLk A ik q g lo tl inum dn γil γisl ∗ icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
     irefSlots 1 ∗ namexKeep k A ∗ namexPath k A ∗ byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) ∗
     bslots 3 ∗ logOpS icfgLog ncur Scur ∗ namexEraDead A P Pmiss ∗
-    (∀ c' : CPU, namexEraPostR k A P Pmiss c')
+    (∀ c' : CPU, £ 1 -∗ namexEraPostR k A P Pmiss c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 := namex_slots_12 _ hs.hK
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Henv, Hlk, Hload, Hs1, Hkeep, Hpath, Hnm, Hbs, Hop, Hdead,
@@ -172,7 +172,7 @@ theorem namexEra_nlink (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     namexLk A ik q g lo tl inum dn γil γisl ∗ icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
     irefSlots 1 ∗ namexKeep k A ∗ namexPath k A ∗ byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) ∗
     bslots 3 ∗ logOpS icfgLog ncur Scur ∗ namexEraDead A P Pmiss ∗
-    (∀ c' : CPU, namexEraPostR k A P Pmiss c')
+    (∀ c' : CPU, £ 1 -∗ namexEraPostR k A P Pmiss c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 := namex_slots_12 _ hs.hK
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Henv, Hlk, Hload, Hs1, Hkeep, Hpath, Hnm, Hbs, Hop, Hdead,
@@ -229,7 +229,7 @@ theorem namexEra_miss (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     namexLk A ik q g lo tl inum dn γil γisl ∗ icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
     irefSlots 1 ∗ namexKeep k A ∗ namexPath k A ∗ byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) ∗
     bslots 3 ∗ nlzObs inum.toNat e0 ∗ logOpSe icfgLog ncur Scur e0 ∗ namexEraDead A P Pmiss ∗
-    (∀ c' : CPU, namexEraPostR k A P Pmiss c')
+    (∀ c' : CPU, £ 1 -∗ namexEraPostR k A P Pmiss c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 := namex_slots_12 _ hs.hK
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Henv, Hlk, Hload, Hs1, Hkeep, Hpath, Hnm, Hbs, #Hobs, Hop,
@@ -307,7 +307,7 @@ theorem namexEra_par (IU : IUNLOCK) (Γ : SchedNames) [ClaimIs GF Γ]
     namexLk A ik q g lo tl inum dn γil γisl ∗ icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
     irefSlots 1 ∗ namexKeep k A ∗ namexPath k A ∗ byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) ∗
     bslots 3 ∗ logOpSe icfgLog ncur Scur e0 ∗ P kk inum.toNat ∗
-    (∀ c' : CPU, namexEraPostR k A P Pmiss c')
+    (∀ c' : CPU, £ 1 -∗ namexEraPostR k A P Pmiss c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 := namex_slots_12 _ hs.hK
   obtain ⟨es, e, hes, hbn⟩ := hnp
@@ -339,7 +339,7 @@ theorem namexEra_par (IU : IUNLOCK) (Γ : SchedNames) [ClaimIs GF Γ]
   case gl => k_norm_g; try exact hs.hlocks
   case gt => k_norm_g; try exact hs.htier
   case ga => k_norm_g; try exact hf.h20
-  iintro %c %spie' %spp' %R' %hcs Hk Hpc Hte Hce Hpid Hshr Htx
+  iintro %c Hlc %spie' %spp' %R' %hcs Hk Hpc Hte Hce Hpid Hshr Htx
   obtain ⟨c2, -, -, -, -, c20, -, -, -, -, -, -, c27⟩ := hcs
   let cpu := c
   ihave Hk := kctx_eq_mono c _ (((k.withSpie spie' spp').pushed 12).withRegs R')
@@ -391,7 +391,7 @@ theorem namexEra_done (IP : IPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0x144#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     namexEnv Γ A ∗ namexEraWalk k A P Pmiss ipv dcur es0.length ncur Scur nf ∗
-    (∀ c' : CPU, namexEraPostR k A P Pmiss c')
+    (∀ c' : CPU, £ 1 -∗ namexEraPostR k A P Pmiss c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 := namex_slots_12 _ hs.hK
   obtain ⟨r2, r8, r9, r19, r20, r21, r22, r23, r24, r25, r27⟩ := id hr

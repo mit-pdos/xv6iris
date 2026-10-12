@@ -301,7 +301,7 @@ def namexEraLoop (k : KCtx) (A : NamexArgs) (P Pmiss : Nat → Nat → IProp GF)
     pcIs c (KA.«namex» + 0xf8#64) -∗
     namexFrame k -∗ trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
     namexEraWalk k A P Pmiss ipv dcur es0.length ncur Scur nf -∗
-    (∀ c' : CPU, namexEraPostR k A P Pmiss c') -∗ wpLoop c)
+    (∀ c' : CPU, £ 1 -∗ namexEraPostR k A P Pmiss c') -∗ wpLoop c)
 
 theorem namexEraLoop_elim (k : KCtx) (A : NamexArgs) (P Pmiss : Nat → Nat → IProp GF)
     (fuel : Nat) :
@@ -314,7 +314,7 @@ theorem namexEraLoop_elim (k : KCtx) (A : NamexArgs) (P Pmiss : Nat → Nat → 
       pcIs c (KA.«namex» + 0xf8#64) -∗
       namexFrame k -∗ trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
       namexEraWalk k A P Pmiss ipv dcur es0.length ncur Scur nf -∗
-      (∀ c' : CPU, namexEraPostR k A P Pmiss c') -∗ wpLoop c := by
+      (∀ c' : CPU, £ 1 -∗ namexEraPostR k A P Pmiss c') -∗ wpLoop c := by
   unfold namexEraLoop; iintro H; iexact H
 
 theorem namexEraLoop_intro (k : KCtx) (A : NamexArgs) (P Pmiss : Nat → Nat → IProp GF)
@@ -327,7 +327,7 @@ theorem namexEraLoop_intro (k : KCtx) (A : NamexArgs) (P Pmiss : Nat → Nat →
       pcIs c (KA.«namex» + 0xf8#64) -∗
       namexFrame k -∗ trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
       namexEraWalk k A P Pmiss ipv dcur es0.length ncur Scur nf -∗
-      (∀ c' : CPU, namexEraPostR k A P Pmiss c') -∗ wpLoop c) ⊢
+      (∀ c' : CPU, £ 1 -∗ namexEraPostR k A P Pmiss c') -∗ wpLoop c) ⊢
     namexEraLoop (GF := GF) k A P Pmiss fuel := by
   unfold namexEraLoop; iintro H; iexact H
 
@@ -376,10 +376,10 @@ theorem namexEra_post_of_spec (k : KCtx) (A : NamexArgs) (P Pmiss : Nat → Nat 
     wpNext true k.proc cpu
         (namexEraPost k A.plen A.pfun A.n A.Sb P Pmiss pid V M A.dqb A.dqs A.dqpv) ∗
       namexEraClose k pid V M ⊢
-    ∀ c : CPU, namexEraPostR (GF := GF) k A P Pmiss c := by
+    ∀ c : CPU, £ 1 -∗ namexEraPostR (GF := GF) k A P Pmiss c := by
   obtain ⟨hpid, hcwd, hcwi, hdqp, hdqc, hroot, hrti, hdqr⟩ := hrows
-  iintro ⟨H, Hcl⟩ %c
-  ihave H := wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ H
+  iintro ⟨H, Hcl⟩ %c Hlc
+  ihave H := wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ H Hlc
   unfold namexEraPostR
   iintro %spie %spp %R' %n' %Sb' %ok %nf %ipv %w %hcs Hk Hpc Hte Hce Hout
   unfold namexEraOut namexKeep namexPath
@@ -403,10 +403,10 @@ theorem nparEra_post_of_spec (k : KCtx) (A : NamexArgs) (P Pmiss : Nat → Nat �
     wpNext true k.proc cpu
         (nparEraPost k A.plen A.pfun A.n A.Sb P Pmiss pid V M A.dqb A.dqs A.dqpv) ∗
       namexEraClose k pid V M ⊢
-    ∀ c : CPU, namexEraPostR (GF := GF) k A P Pmiss c := by
+    ∀ c : CPU, £ 1 -∗ namexEraPostR (GF := GF) k A P Pmiss c := by
   obtain ⟨hpid, hcwd, hcwi, hdqp, hdqc, hroot, hrti, hdqr⟩ := hrows
-  iintro ⟨H, Hcl⟩ %c
-  ihave H := wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ H
+  iintro ⟨H, Hcl⟩ %c Hlc
+  ihave H := wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ H Hlc
   unfold namexEraPostR
   iintro %spie %spp %R' %n' %Sb' %ok %nf %ipv %w %hcs Hk Hpc Hte Hce Hout
   unfold namexEraOut namexKeep namexPath

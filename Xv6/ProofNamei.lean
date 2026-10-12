@@ -108,11 +108,11 @@ theorem namei_main (NX : NAMEX)
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK4 := namei_slots_4 _ hK
   -- the caller's continuation is hart-free (a park's crossing, at a proc)
-  ihave HΦ : ∀ c : CPU, nameiPost k plen pfun n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv rootv rti dqr c
+  ihave HΦ : ∀ c : CPU, £ 1 -∗ nameiPost k plen pfun n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv rootv rti dqr c
     $$ [Hnext]
-  · iintro %c
+  · iintro %c Hlc
     iapply wpNext_at true k.proc cpu c _ (fun hc => Or.elim hc (fun hx => absurd hx (by decide))
-      (fun hx => absurd (hproc ▸ hx) (procAddr_nonzero hj))) $$ Hnext
+      (fun hx => absurd (hproc ▸ hx) (procAddr_nonzero hj))) $$ Hnext Hlc
   -- +0x00 .. +0x06  the prologue
   iapply (wp_prologue_namei cpu k KA.«namei» hK4) $$ [- $Hk $Hpc]
   k_code (text_instr _ _ _ _ rfl rfl) Htext
@@ -189,15 +189,15 @@ theorem namei_main (NX : NAMEX)
   k_norm_g
   iframe
   inext
-  iapply wpNext_intro_pin
-  iintro %c %hpin
+  iapply wpNext_intro_pin_lc
+  iintro %c %hpin Hlc
   have hpin' : k.sie = false → c = c' := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
   iintro Hk Hpc
   k_norm_g
   unfold nameiPost
-  iapply HΦ $$ %c %spie %spp %_ %n' %Sb' %ok %ipv %w [] Hk Hpc Hte Hce Hsb Hsi Hpid Hcwd Hcwr Hrtc Hrtr
+  iapply HΦ $$ %c Hlc %spie %spp %_ %n' %Sb' %ok %ipv %w [] Hk Hpc Hte Hce Hsb Hsi Hpid Hcwd Hcwr Hrtc Hrtr
     Hpath Hbs %hf Hop Htx [Hok]
   · ipureintro
     unfold calleeSaved

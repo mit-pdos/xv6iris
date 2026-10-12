@@ -90,7 +90,7 @@ theorem sys_mkdir_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     byteBuf (sysfileRestAddr (sysMkdirBuf (k.regs 2#5)) pl.length) (DFrac.own 1) rest ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysMkdirV1 A P2) (sysMkdirM1 A P2) ∗
-    (∀ c : CPU, sysMkdirPostA k A c) ∗ bslots 3 ∗ irefSlots ns' ∗ logOpS icfgLog u' Sb' ∗
+    (∀ c : CPU, £ 1 -∗ sysMkdirPostA k A c) ∗ bslots 3 ∗ irefSlots ns' ∗ logOpS icfgLog u' Sb' ∗
     (if ok then
       iprop(⌜R 10#5 = ientry kk ∧ kk < NINODE ∧ 0 < inum.toNat ∧ inum.toNat < 16 * icfgNib ∧
           creOkPure T_DIR (0#16) (0#16) made dn⌝ ∗
@@ -164,7 +164,7 @@ theorem sys_mkdir_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
     byteBuf (sysMkdirBuf (k.regs 2#5)) (DFrac.own 1) bs ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysMkdirV1 A P2) (sysMkdirM1 A P2) ∗
-    (∀ c : CPU, sysMkdirPostA k A c) ∗ bslots 3 ∗ irefSlots A.ns ∗ logOp icfgLog MAXOPBLOCKS ∗
+    (∀ c : CPU, £ 1 -∗ sysMkdirPostA k A c) ∗ bslots 3 ∗ irefSlots A.ns ∗ logOp icfgLog MAXOPBLOCKS ∗
     mkdirAuAt (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v.toNat
       A.P A.Pmiss A.Farm A.Fdots A.Fun A.Fok A.Fex
     ⊢ wpLoop (GF := GF) cpu := by
@@ -296,7 +296,7 @@ theorem sys_mkdir_args (AS : ARGSTR) (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_
     sysfileAny (sysMkdirBuf (k.regs 2#5)) 128 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid A.V A.M ∗
-    (∀ c : CPU, sysMkdirPostA k A c) ∗ bslots 3 ∗ irefSlots A.ns ∗ logOp icfgLog MAXOPBLOCKS ∗
+    (∀ c : CPU, £ 1 -∗ sysMkdirPostA k A c) ∗ bslots 3 ∗ irefSlots A.ns ∗ logOp icfgLog MAXOPBLOCKS ∗
     mkdirAuAt (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v.toNat
       A.P A.Pmiss A.Farm A.Fdots A.Fun A.Fok A.Fex
     ⊢ wpLoop (GF := GF) cpu := by
@@ -336,7 +336,7 @@ theorem sys_mkdir_args (AS : ARGSTR) (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_
   case gn => k_norm_g; omega
   case gK => k_norm_g; exact hKas
   case gmx => k_norm_g [hold]
-  iintro %cpu %spie1 %spp1 %R1 %P2 %bs %kv %⟨hcs1, hext, hret⟩ Hk Hpc Hte Hce %hkv Hbare Hbuf
+  iintro %cpu Hlc %spie1 %spp1 %R1 %P2 %bs %kv %⟨hcs1, hext, hret⟩ Hk Hpc Hte Hce %hkv Hbare Hbuf
   k_norm_g [sys_mkdir_ret_1a, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   ihave Hbuf := (show byteBuf (GF := GF) (k.regs 2#5 + 0xFFFFFFFFFFFFFF70#64) (DFrac.own 1) bs ⊢
     byteBuf (sysMkdirBuf (k.regs 2#5)) (DFrac.own 1) bs from .rfl) $$ Hbuf
@@ -347,9 +347,9 @@ theorem sys_mkdir_args (AS : ARGSTR) (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_
       (viewFaulted A.V.upt P2 A.M) ⊢
     procPrivFd (A.raise kv).γ (procAddr (A.raise kv).j) (A.raise kv).pid (sysMkdirV1 (A.raise kv) P2)
       (sysMkdirM1 (A.raise kv) P2) from .rfl) $$ Hblk
-  ihave HΦ : (∀ c : CPU, sysMkdirPostA k (A.raise kv) c) $$ [HΦ]
-  · iintro %c
-    ispecialize HΦ $$ %c
+  ihave HΦ : (∀ c : CPU, £ 1 -∗ sysMkdirPostA k (A.raise kv) c) $$ [HΦ]
+  · iintro %c Hlc
+    ispecialize HΦ $$ %c Hlc
     iapply (sysMkdirK_raise k A.γ (procAddr A.j) A.pid A.V A.M A.ns A.v.toNat A.P A.Pmiss A.Farm
       A.Fdots A.Fun A.Fok A.Fex c kv hkv) $$ HΦ
   ihave Hir := (show irefSlots (GF := GF) A.ns ⊢ irefSlots (A.raise kv).ns from .rfl) $$ Hir
@@ -397,9 +397,9 @@ theorem sys_mkdir_main (AS : ARGSTR) (BO : BEGIN_OP) (CR : CREATE) (IUP : IUNLOC
   · unfold sysfileEnv; iframe #
   let A : SysMkdirArgs GF := ⟨γ, j, pid, V, M, v, ns, P, Pmiss, Farm, Fdots, Fun, Fok, Fex⟩
   -- THE CONTRACT'S CONTINUATION, hart-free
-  ihave HΦ : (∀ c : CPU, sysMkdirPostA k A c) $$ [Hnext]
-  · iintro %c
-    iapply wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext
+  ihave HΦ : (∀ c : CPU, £ 1 -∗ sysMkdirPostA k A c) $$ [Hnext]
+  · iintro %c Hlc
+    iapply wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext Hlc
   ihave Hce := (show cpuClaimExt (GF := GF) cpu k.sie k.proc ⊢ cpuClaimExt cpu k.sie (procAddr j)
     from by rw [hproc]) $$ Hce
   simp only [sysMkdirAddr]
@@ -431,7 +431,7 @@ theorem sys_mkdir_main (AS : ARGSTR) (BO : BEGIN_OP) (CR : CREATE) (IUP : IUNLOC
   case bK => k_norm_g; exact hKbo
   case bn => k_norm_g; exact hnoff
   case bt => k_norm_g; exact htier
-  iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid Hop
+  iintro %cpu Hlc %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid Hop
   k_norm_g [sys_mkdir_ret_0c, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   ihave Hblk := Hback $$ Hpid
   have hp2 : sysMkdirPins k R2 := by

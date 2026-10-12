@@ -117,15 +117,15 @@ theorem bwrite_proof (HS : HOLDINGSLEEP) (VR : VIRTIO_DISK_RW) : BWRITE := ⟨
   have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hwf.2.2.2.1; omega)
   have hK4 : 4 ≤ k.avail := by unfold bwriteSlots virtioDiskRwSlots sleepSlots at hK; omega
   -- the caller's continuation is hart-free (a park's crossing, at a proc)
-  ihave HΦ : ∀ c : CPU, (∀ (spie spp : Bool) (R' : RegMap),
+  ihave HΦ : ∀ c : CPU, £ 1 -∗ (∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k.regs R'⌝ -∗
       kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
       wordPointsTo (pPid k.proc) 4 dqp pidv -∗
       bufHold0 γ V kk pidv dev bno bs bs -∗ ▷ Q -∗ wpLoop c) $$ [Hnext]
-  · iintro %c
+  · iintro %c Hlc
     iapply wpNext_at true k.proc cpu c _ (fun hc => Or.elim hc (fun hx => absurd hx (by decide))
-      (fun hx => absurd (hproc ▸ hx) (procAddr_nonzero hj))) $$ Hnext
+      (fun hx => absurd (hproc ▸ hx) (procAddr_nonzero hj))) $$ Hnext Hlc
   ihave #Hslk := bioCtx_buf γl γ V kk hkk $$ Hbc
   icases (show bufHold0 (GF := GF) γ V kk pidv dev bno bs bsd ⊢
       ⌜kk < NBUF ∧ bno.toNat ∈ V.cov ∧ dev = V.dev ∧ bs.length = BSIZE ∧ bsd.length = BSIZE⌝ ∗
@@ -222,9 +222,9 @@ theorem bwrite_proof (HS : HOLDINGSLEEP) (VR : VIRTIO_DISK_RW) : BWRITE := ⟨
   k_norm_g
   iframe
   inext
-  k_next_e
+  k_next_e £ Hlc
   iintro Hk Hpc
-  iapply HΦ $$ %cpu %spie2 %spp2 %_ [] Hk Hpc [Hte] [Hce] [Hpid]
+  iapply HΦ $$ %cpu Hlc %spie2 %spp2 %_ [] Hk Hpc [Hte] [Hce] [Hpid]
     [Hsl Htok Hrt Hhd Hval Hdev Hbuf Hblk] HQ
   · ipureintro
     exact bc_calleeSaved_epi k.regs R2

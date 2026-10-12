@@ -145,12 +145,12 @@ theorem wp_prologue_filestat [CurCtx] [KernelGeom] [KernelImage GF] {lent : Bool
   iintro Hk Hpc Hf24
   k_step_gen (wp_s_sd c4 _ (pc + 8#64) true 32#12 2#5 20#5 (by decide) w₆) $$ [- $Hk $Hpc] next c5 hp5
   iintro Hk Hpc Hf48
-  k_step_gen (wp_s_addi c5 _ (pc + 10#64) true 80#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c6 hp6
+  k_step_gen (wp_s_addi c5 _ (pc + 10#64) true 80#12 8#5 2#5 (by decide)) $$ [- $Hk $Hpc] next c6 hp6 £ Hlc
   iintro Hk Hpc
   k_norm_g
   ihave HΦ' := wpNext_at _ _ _ c6 _
     (fun h => (hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans
-      (hp1 h)))))) $$ HΦ
+      (hp1 h)))))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc [Hf8 Hf16 Hf24 Hf32 Hf40 Hf48 Hf80] [Hf56 Hf64 Hf72]
   · iexists w₄, w₅, w₁₀
     unfold fstatFrame
@@ -204,12 +204,12 @@ theorem wp_epilogue_filestat [CurCtx] [KernelGeom] [KernelImage GF] {lent : Bool
   k_step_gen (wp_s_pop c4 _ (pc + 8#64) true 80#12 10 MachCSL.imm_p80) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c5 hp5
   iintro Hk Hpc
-  k_step_gen (wp_s_ret c5 _ (pc + 10#64) true 1#5) $$ [- $Hk $Hpc] next c6 hp6
+  k_step_gen (wp_s_ret c5 _ (pc + 10#64) true 1#5) $$ [- $Hk $Hpc] next c6 hp6 £ Hlc
   iintro Hk Hpc
   k_norm_g
   ihave HΦ' := wpNext_at _ _ _ c6 _
     (fun h => (hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans
-      (hp1 h)))))) $$ HΦ
+      (hp1 h)))))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc
 
 end
@@ -543,7 +543,7 @@ closure the proof builds), with the hart quantified: a `true` crossing at a
 process may be consumed on any hart. -/
 def fstatK (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) : IProp GF :=
-  iprop(∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (M' : Nat → List (BitVec 8))
+  iprop(∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (M' : Nat → List (BitVec 8))
       (d : Nat) (k' : Nat),
     ⌜calleeSaved k.regs R' ∧ filestatRet (R' 10#5) ∧ V.upt.extSz V.sz P' ∧ d ≤ 24 ∧
       umemWrote V.upt M (k.regs 11#5) d P' M'⌝ -∗

@@ -194,12 +194,12 @@ theorem fkr_head [X : CurCtx] (MP : MYPROC) (RE : RELEASE) (Γ : SchedNames) [Cl
   case hKr => k_norm; simp [resumedK, forkretStack, trapRes, kvFrameSlots]
   case hpR => k_norm; try simp [resumedK]
   case ha0R => k_norm [KCtx.rget_eq]; try simp [resumedK, h10]
-  iapply wpNext_intro_pin
-  iintro %c1 %hp1
+  iapply wpNext_intro_pin_lc
+  iintro %c1 %hp1 Hlc
   ihave Hte := trapCsrsExt_move c c1 eb (fun h => hp1 (Or.inl h)) $$ Hte
   ihave Hce := cpuClaimExt_move c c1 eb _ (fun h => hp1 (Or.inl h)) $$ Hce
   iintro %R3 Hk Hpc %hcs3
-  ihave Hn := wpNext_at eb (procAddr j) c c1 _ hp1 $$ Hnext
+  ihave Hn := wpNext_at eb (procAddr j) c c1 _ hp1 $$ Hnext Hlc
   unfold calleeSaved at hcs3
   k_norm at hcs3
   obtain ⟨c3_2, c3_8, c3_9, -⟩ := hcs3
@@ -260,10 +260,10 @@ theorem fkr_first_steady [CurCtx] (c : CPU) (kr : KCtx) (eb : Bool) (root : BitV
   -- +0x1c  beqz a5,+0x54
   k_step_gen (wp_s_branch c2 _ (KA.«forkret» + 0x1c#64) true 56#13 15#5 0#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [KCtx.rget_eq, KCtx.setReg_regs, RegMap.set_apply] next c3 hp3
+    with [KCtx.rget_eq, KCtx.setReg_regs, RegMap.set_apply] next c3 hp3 £ Hlc
   iintro Hk Hpc
   simp only [KCtx.setReg_sie, KCtx.setReg_proc, hs, hp] at hp1 hp2 hp3
-  ihave Hn := wpNext_at eb pa c c3 _ (fun h => (hp3 h).trans ((hp2 h).trans (hp1 h))) $$ Hnext
+  ihave Hn := wpNext_at eb pa c c3 _ (fun h => (hp3 h).trans ((hp2 h).trans (hp1 h))) $$ Hnext Hlc
   simp only [MachCSL.beqz_zero, if_true]
   iapply Hn $$ %_ %?_ Hk Hpc
   exact (h.setReg 15#5 _ (by decide) (by decide) (by decide)).setReg 15#5 _ (by decide) (by decide) (by decide)
@@ -291,10 +291,10 @@ theorem fkr_first_boot [CurCtx] (c : CPU) (kr : KCtx) (eb : Bool) (root : BitVec
   iintro Hk Hpc Hf
   k_step_gen (wp_s_branch c2 _ (KA.«forkret» + 0x1c#64) true 56#13 15#5 0#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [KCtx.rget_eq, KCtx.setReg_regs, RegMap.set_apply] next c3 hp3
+    with [KCtx.rget_eq, KCtx.setReg_regs, RegMap.set_apply] next c3 hp3 £ Hlc
   iintro Hk Hpc
   simp only [KCtx.setReg_sie, KCtx.setReg_proc, hs, hp] at hp1 hp2 hp3
-  ihave Hn := wpNext_at eb pa c c3 _ (fun h => (hp3 h).trans ((hp2 h).trans (hp1 h))) $$ Hnext
+  ihave Hn := wpNext_at eb pa c c3 _ (fun h => (hp3 h).trans ((hp2 h).trans (hp1 h))) $$ Hnext Hlc
   simp only [MachCSL.bcond_beq_one, Bool.false_eq_true, if_false]
   iapply Hn $$ %_ %?_ Hk Hpc Hf
   exact (h.setReg 15#5 _ (by decide) (by decide) (by decide)).setReg 15#5 _ (by decide) (by decide) (by decide)

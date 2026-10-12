@@ -81,7 +81,7 @@ theorem plicinit_proof : PLICINIT := ⟨fun {GF} _ _ _ cpu k γ0 γ1 hsie hK => 
   k_norm
   iframe
   inext
-  iintro Hk Hpc
+  iintro Hk Hpc _
   iapply HΦ $$ %_ Hk Hpc
   ipureintro
   unfold calleeSaved

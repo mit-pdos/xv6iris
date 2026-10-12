@@ -528,7 +528,7 @@ is then left with the continuation it had before the premise existed (the
 lend comes back at `k' := ke`).  Stated over the continuation's first three
 premises and its tail as higher-order patterns, so one lemma serves every
 shape (deviation 10). -/
-theorem actLend_cont_frame (sie : Bool) (p : BitVec 64) (cpu : CPU) (p' : BitVec 64) (ke : Nat)
+theorem actLend_cont_frame [MachGS GF] (sie : Bool) (p : BitVec 64) (cpu : CPU) (p' : BitVec 64) (ke : Nat)
     (A B C T : CPU → Bool → Bool → RegMap → IProp GF) :
     wpNext sie p cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       A cpu' spie spp R' -∗ B cpu' spie spp R' -∗ C cpu' spie spp R' -∗
@@ -537,8 +537,8 @@ theorem actLend_cont_frame (sie : Bool) (p : BitVec 64) (cpu : CPU) (p' : BitVec
     wpNext sie p cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       A cpu' spie spp R' -∗ B cpu' spie spp R' -∗ C cpu' spie spp R' -∗ T cpu' spie spp R')) := by
   unfold wpNext
-  iintro H Hl %cpu' %h %spie %spp %R' HA HB HC
-  iapply H $$ %cpu' %h %spie %spp %R' HA HB HC
+  iintro H Hl %cpu' %h Hlc %spie %spp %R' HA HB HC
+  iapply H $$ %cpu' %h Hlc %spie %spp %R' HA HB HC
   iexists ke
   iframe Hl
   ipureintro; exact Nat.le_refl ke
@@ -564,7 +564,7 @@ theorem actLend_ret_weaken (p : BitVec 64) {ke k1 : Nat} (h : ke ≤ k1) :
 /-- `actLend_cont_frame` for a lend ALREADY in the returned shape (`∃ k' ≥
 ke`, what a ring member holds after a callee that took it; permit sweep
 L2): framed into the continuation of a callee that does not take it. -/
-theorem actLend_cont_frame_ret (sie : Bool) (p : BitVec 64) (cpu : CPU) (p' : BitVec 64) (ke : Nat)
+theorem actLend_cont_frame_ret [MachGS GF] (sie : Bool) (p : BitVec 64) (cpu : CPU) (p' : BitVec 64) (ke : Nat)
     (A B C T : CPU → Bool → Bool → RegMap → IProp GF) :
     wpNext sie p cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       A cpu' spie spp R' -∗ B cpu' spie spp R' -∗ C cpu' spie spp R' -∗
@@ -573,8 +573,8 @@ theorem actLend_cont_frame_ret (sie : Bool) (p : BitVec 64) (cpu : CPU) (p' : Bi
     wpNext sie p cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       A cpu' spie spp R' -∗ B cpu' spie spp R' -∗ C cpu' spie spp R' -∗ T cpu' spie spp R')) := by
   unfold wpNext
-  iintro H Hl %cpu' %h %spie %spp %R' HA HB HC
-  iapply H $$ %cpu' %h %spie %spp %R' HA HB HC Hl
+  iintro H Hl %cpu' %h Hlc %spie %spp %R' HA HB HC
+  iapply H $$ %cpu' %h Hlc %spie %spp %R' HA HB HC Hl
 
 /-- **THE STEP** (permit sweep L3b, no Rocq counterpart; design
 ni-strong-instance.md §7): what an allocator event costs.  At `p = 0` (the
@@ -606,7 +606,7 @@ theorem actLend_ret_step (p : BitVec 64) {ke k1 : Nat} (h : ke ≤ k1) :
 of `actLend_cont_frame` with the returned lend at an exact count.  The
 allocator's led forms step the lend at entry and give the stepped lend
 here, so the rest of their proofs see the continuation they had before. -/
-theorem actLend_cont_give (sie : Bool) (p : BitVec 64) (cpu : CPU) (p' : BitVec 64) (k : Nat)
+theorem actLend_cont_give [MachGS GF] (sie : Bool) (p : BitVec 64) (cpu : CPU) (p' : BitVec 64) (k : Nat)
     (A B C T : CPU → Bool → Bool → RegMap → IProp GF) :
     wpNext sie p cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       A cpu' spie spp R' -∗ B cpu' spie spp R' -∗ C cpu' spie spp R' -∗
@@ -615,13 +615,13 @@ theorem actLend_cont_give (sie : Bool) (p : BitVec 64) (cpu : CPU) (p' : BitVec 
     wpNext sie p cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       A cpu' spie spp R' -∗ B cpu' spie spp R' -∗ C cpu' spie spp R' -∗ T cpu' spie spp R')) := by
   unfold wpNext
-  iintro H Hl %cpu' %h %spie %spp %R' HA HB HC
-  iapply H $$ %cpu' %h %spie %spp %R' HA HB HC Hl
+  iintro H Hl %cpu' %h Hlc %spie %spp %R' HA HB HC
+  iapply H $$ %cpu' %h Hlc %spie %spp %R' HA HB HC Hl
 
 /-- `actLend_cont_frame_ret` at a lend a callee STEPPED (permit sweep L3b):
 the caller lent `k1 ≥ ke` to `kalloc` / `kfree` and got `k1 + 1` back; the
 stepped lend is framed into a continuation that wants `∃ k' ≥ ke`. -/
-theorem actLend_cont_frame_step (sie : Bool) (p : BitVec 64) (cpu : CPU) (p' : BitVec 64)
+theorem actLend_cont_frame_step [MachGS GF] (sie : Bool) (p : BitVec 64) (cpu : CPU) (p' : BitVec 64)
     {ke k1 : Nat} (h : ke ≤ k1) (A B C T : CPU → Bool → Bool → RegMap → IProp GF) :
     wpNext sie p cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       A cpu' spie spp R' -∗ B cpu' spie spp R' -∗ C cpu' spie spp R' -∗

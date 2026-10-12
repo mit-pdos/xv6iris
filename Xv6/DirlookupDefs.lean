@@ -192,10 +192,10 @@ theorem dirlookup_spec_free {j : Nat} (hj : j < NPROC) (cpu : CPU) (k : KCtx)
     (rootv : BitVec 64) (rti : Nat) (dqr : DFrac) :
     wpNext true k.proc cpu (fun cpu' => dirlookupSpecPost (GF := GF) k ip dinum bm data dn dr fn
       hasp pofv pidv dqp dqd dqn kd sd rootv rti dqr cpu')
-    ⊢ ∀ c : CPU, dirlookupSpecPost (GF := GF) k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd
+    ⊢ ∀ c : CPU, £ 1 -∗ dirlookupSpecPost (GF := GF) k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd
       dqn kd sd rootv rti dqr c := by
-  iintro H %c
-  iapply wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ H
+  iintro H %c Hlc
+  iapply wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ H Hlc
 
 /-- **THE BRIDGE** (Rocq's: the scan runs on the OLD-SHAPE continuation): the
 contract's continuation, with the share, its unit, the root's cell and
@@ -205,15 +205,15 @@ theorem dirlookup_post_of_spec (k : KCtx) (ip : BitVec 64) (dinum : BitVec 32)
     (hasp : Bool) (pofv pidv : BitVec 32) (dqp dqd dqn : DFrac) (kd : Nat) (sd : Qp)
     (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
     (hns : ¬ dlSelf (bname 14 fn) dinum rti) :
-    (∀ c : CPU, dirlookupSpecPost (GF := GF) k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd
+    (∀ c : CPU, £ 1 -∗ dirlookupSpecPost (GF := GF) k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd
         dqn kd sd rootv rti dqr c) ∗
       inodeShr kd sd icfgDev dinum ∗ runitAny dinum.toNat ∗
       wordPointsTo (pRoot k.proc) 8 dqr rootv ∗ inodeHeldAt rootv rti
-    ⊢ ∀ c : CPU, dirlookupPost (GF := GF) k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c := by
-  iintro ⟨H, Hshr, Hru, Hrc, Hrr⟩ %c
+    ⊢ ∀ c : CPU, £ 1 -∗ dirlookupPost (GF := GF) k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c := by
+  iintro ⟨H, Hshr, Hru, Hrc, Hrr⟩ %c Hlc
   unfold dirlookupPost
   iintro %spie %spp %R' %found %kk %kslot %q %hcs Hk Hpc Hte Hce Hkeep Harm
-  ispecialize H $$ %c
+  ispecialize H $$ %c Hlc
   unfold dirlookupSpecPost
   unfold dirlookupKeep
   icases Hkeep with ⟨Hdev, Hmeta, Hmap, Hblk, Hnm, Hpid, Hsl, Hlk, Hdi⟩
@@ -262,7 +262,7 @@ def dirlookupLoop (k : KCtx) (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap)
     trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
     dirlookupKeep k ip dinum bm data dn dr fn pidv dqp dqd dqn -∗
     dirlookupIn hasp (k.regs 12#5) pofv -∗
-    (∀ c' : CPU, dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c') -∗
+    (∀ c' : CPU, £ 1 -∗ dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c') -∗
     wpLoop c)
 
 theorem dirlookupLoop_elim (k : KCtx) (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap)
@@ -280,7 +280,7 @@ theorem dirlookupLoop_elim (k : KCtx) (ip : BitVec 64) (dinum : BitVec 32) (bm :
       trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
       dirlookupKeep k ip dinum bm data dn dr fn pidv dqp dqd dqn -∗
       dirlookupIn hasp (k.regs 12#5) pofv -∗
-      (∀ c' : CPU, dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c') -∗
+      (∀ c' : CPU, £ 1 -∗ dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c') -∗
       wpLoop c := by
   unfold dirlookupLoop; iintro H; iexact H
 
@@ -298,7 +298,7 @@ theorem dirlookupLoop_intro (k : KCtx) (ip : BitVec 64) (dinum : BitVec 32) (bm 
       trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
       dirlookupKeep k ip dinum bm data dn dr fn pidv dqp dqd dqn -∗
       dirlookupIn hasp (k.regs 12#5) pofv -∗
-      (∀ c' : CPU, dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c') -∗
+      (∀ c' : CPU, £ 1 -∗ dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c') -∗
       wpLoop c) ⊢
     dirlookupLoop (GF := GF) k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn fuel := by
   unfold dirlookupLoop; iintro H; iexact H

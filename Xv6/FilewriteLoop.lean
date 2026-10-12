@@ -245,7 +245,7 @@ theorem fwr_test (cpu : CPU) (k : KCtx) (fk : Nat) (n : Int) (spie spp : Bool) (
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗
     pcIs cpu (KA.«filewrite» + 0xd4#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ F ∗
-    (∀ (c' : CPU) (R' : RegMap),
+    (∀ (c' : CPU), £ 1 -∗ ∀ (R' : RegMap),
       ⌜fwrRegs k fk n v9 (BitVec.ofNat 64 (fwrChunk n.toNat t)) (BitVec.ofNat 64 t) 3072#64 1#64
         3072#64 R'⌝ -∗
       kctx c' (((k.withSpie spie spp).pushed 12).withRegs R') -∗
@@ -268,10 +268,10 @@ theorem fwr_test (cpu : CPU) (k : KCtx) (fk : Nat) (n : Int) (spie spp : Bool) (
     have hb : bcond bop.BGE 3072#64 (BitVec.ofNat 64 (n.toNat - t)) = true := by
       rw [fwr_bge_cap _ (by omega)]; simp [hle]
     k_step_e (wp_s_branch cpu _ (KA.«filewrite» + 0xda#64) false 8112#13 23#5 15#5 (by decide) bop.BGE)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r23, hb]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r23, hb] £ Hlc
     iintro Hk Hpc
     have hc : fwrChunk n.toNat t = n.toNat - t := by unfold fwrChunk; omega
-    iapply HK $$ %cpu %_ [] Hk Hpc Hte Hce HF
+    iapply HK $$ %cpu Hlc %_ [] Hk Hpc Hte Hce HF
     ipureintro
     rw [hc]
     exact fwrRegs_s3 k fk n v9 v19 (BitVec.ofNat 64 t) 3072#64 1#64 3072#64 _ _
@@ -288,10 +288,10 @@ theorem fwr_test (cpu : CPU) (k : KCtx) (fk : Nat) (n : Int) (spie spp : Bool) (
     iintro Hk Hpc
     -- +0xe0  c.j +0x8a
     k_step_e (wp_s_j cpu _ (KA.«filewrite» + 0xe0#64) true 2097066#21)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] £ Hlc
     iintro Hk Hpc
     have hc : fwrChunk n.toNat t = 3072 := by unfold fwrChunk; omega
-    iapply HK $$ %cpu %_ [] Hk Hpc Hte Hce HF
+    iapply HK $$ %cpu Hlc %_ [] Hk Hpc Hte Hce HF
     ipureintro
     rw [hc]
     exact fwrRegs_s3 k fk n v9 _ (BitVec.ofNat 64 t) 3072#64 1#64 3072#64 _ _
@@ -346,7 +346,7 @@ theorem fwr_iter (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO :
       hA.hj hA.hproc hA.hnoff hA.htier hik hnib hle hip (by omega) hr)
   iframe Hk Hpc Hte Hce Hpid Hip Hshr Hbs1
   iframe #
-  iintro %cpu %spie1 %spp1 %R1 %dn %bm %K %Sb %⟨hr1, hK1⟩ #Hflr Hk Hpc Hte Hce Hpid Hip Hbs1 Hlk
+  iintro %cpu Hlc %spie1 %spp1 %R1 %dn %bm %K %Sb %⟨hr1, hK1⟩ #Hflr Hk Hpc Hte Hce Hpid Hip Hbs1 Hlk
     Hoff Hload #Hshot' Hop
   -- the lock-held ghost steps before writei: type pin, open, checkout
   iapply wpLoop_fupd
@@ -371,7 +371,7 @@ theorem fwr_iter (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO :
       hnib hok hip hwf hcle hr1)
   iframe Hk Hpc Hte Hce Hip Hcell Hdev Hin Hmeta Hmap Hblk Hdi Hpriv Hbs Hop
   iframe #
-  iintro %cpu %spie2 %spp2 %R2 %tot %bm' %data' %dn' %dn0' %n' %wrote %dist %dstb %P' %Sb' %a0
+  iintro %cpu Hlc %spie2 %spp2 %R2 %tot %bm' %data' %dn' %dn0' %n' %wrote %dist %dstb %P' %Sb' %a0
     %⟨hr2, hout⟩ Hk Hpc Hte Hce Hip Hcell Hdev Hin Hmeta Hmap Hblk Hdi Hpriv Hbs Hop
   obtain ⟨hty', hnl', hok', hdn0, hcap, htotc, harms⟩ := fwr_join inum bm bm' data data' dn dn' dn0'
     v.toNat (fwrChunk A.n.toNat t) { A.V with upt := P } A.img (BitVec.ofNat 64 t + k.regs 11#5) Sb
@@ -418,7 +418,7 @@ theorem fwr_iter (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO :
       1#64 3072#64 hA.hK hA.hj hA.hproc hA.hnoff hA.hlocks hA.htier hik hle hip hr2)
   iframe Hk Hpc Hte Hce Hip Hlk Hrows Hload Hpid Hop
   iframe #
-  iintro %cpu %spie3 %spp3 %R3 %hr3 Hk Hpc Hte Hce Hpid Hip Hshr
+  iintro %cpu Hlc %spie3 %spp3 %R3 %hr3 Hk Hpc Hte Hce Hpid Hip Hshr
   ihave Hpid : wordPointsTo (pPid (procAddr A.j)) 4 pidPriv A.pid $$ [Hpid]
   · rw [← hA.hproc]; iexact Hpid
   ihave Hpriv := Hpback $$ Hpid
@@ -465,7 +465,7 @@ theorem fwr_loop (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO :
     iapply (fwr_test cpu k A.fk A.n spie spp R t v9 v19 (fwrHead Γ k A Q Qe t p P v11) htn
       hA.hn.2 hr)
     iframe
-    iintro %c' %R' %hr' Hk Hpc Hte Hce HF
+    iintro %c' Hlc %R' %hr' Hk Hpc Hte Hce HF
     iapply (fwr_iter BO IL WI IU EO Γ k A hA Q Qe W IH c' spie spp R' t p P v9 v11 hfuel htn htie hext hr')
     iframe
 

@@ -167,7 +167,7 @@ process (`ireclaim_cont_of_spec`), so it is hart-free and the scan may carry
 it across any step or park. -/
 def ireclaimCont [Fscfg] [Icfg] [CurCtx] (k : KCtx) (pidv : BitVec 32)
     (dqp dqb dqs dqn : DFrac) : IProp GF :=
-  iprop(∀ (cpu' : CPU) (spie spp : Bool) (R' : RegMap),
+  iprop(∀ (cpu' : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
@@ -196,9 +196,9 @@ theorem ireclaim_cont_of_spec [Fscfg] [Icfg] [CurCtx] {j : Nat} (hj : j < NPROC)
       iregBoot -∗ wpLoop cpu'))
     ⊢ ireclaimCont (GF := GF) k pidv dqp dqb dqs dqn := by
   unfold ireclaimCont
-  iintro H %c
+  iintro H %c Hlc
   iapply wpNext_at true k.proc cpu c _ (fun h => h.elim (fun h => absurd h (by decide))
-    (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))) $$ H
+    (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))) $$ H Hlc
 
 /-- The resources every block between two turns carries, beside the pc and
 the machine context: the complement at the running hart, the three

@@ -255,11 +255,11 @@ theorem ii_iter (IS : INITSLEEPLOCK) [CurCtx] (k : KCtx) (hK : 12 ≤ k.avail)
   iintro Hk Hpc
   k_step_gen (wp_s_branch c5 _ (KA.«iinit» + 0x46#64) false 8180#13 9#5 19#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [h19', ii_bne_last i hi] next c6 hp6
+    with [h19', ii_bne_last i hi] next c6 hp6 £ Hlc
   iintro Hk Hpc
   have hpinZ : k.sie = false ∨ k.proc = 0#64 → c6 = cur := fun h =>
     (hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))
-  ihave HΦ' := wpNext_at _ _ _ c6 _ hpinZ $$ HΦ
+  ihave HΦ' := wpNext_at _ _ _ c6 _ hpinZ $$ HΦ Hlc
   iapply HΦ' $$ %_ Hk Hpc Hout
   ipureintro
   refine ⟨?_, ?_⟩
@@ -293,13 +293,13 @@ theorem ii_loop (IS : INITSLEEPLOCK) [CurCtx] (k : KCtx) (hK : 12 ≤ k.avail) (
     iintro ⟨Hk, Hpc, Htodo, Hdone, HΦ⟩
     icases ii_todo_peel i hi $$ Htodo with ⟨Hin, _⟩
     iapply (ii_iter IS k hK i hi R h9 h18 h19 cur) $$ [- $Hk $Hpc $Hin]
-    iapply wpNext_intro_pin
-    iintro %c1 %hp1 %R2 Hk Hpc Hout %hpost
+    iapply wpNext_intro_pin_lc
+    iintro %c1 %hp1 Hlc %R2 Hk Hpc Hout %hpost
     rw [if_pos hlast]
     obtain ⟨hkept, _⟩ := hpost
     ihave Hdone := ii_done_succ i 50 hlast $$ [Hdone Hout]
     case' _ => iframe
-    ihave HΦ' := wpNext_at _ _ _ c1 _ hp1 $$ HΦ
+    ihave HΦ' := wpNext_at _ _ _ c1 _ hp1 $$ HΦ Hlc
     iapply HΦ' $$ %R2 Hk Hpc Hdone
     ipureintro
     exact hkept
@@ -375,11 +375,11 @@ theorem ii_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
     with [KCtx.pop_pushed _ _ _ hK, hR2] next c6 hp6
   iintro Hk Hpc
   k_step_gen (wp_s_ret c6 _ (KA.«iinit» + 0x56#64) true 1#5)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hp7
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hp7 £ Hlc
   iintro Hk Hpc
   ihave HΦ' := wpNext_at _ _ _ c7 _
     (fun h => (hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans
-      ((hp2 h).trans ((hp1 h).trans (hpin h)))))))) $$ HΦ
+      ((hp2 h).trans ((hp1 h).trans (hpin h)))))))) $$ HΦ Hlc
   iapply HΦ' $$ %_ Hk Hpc HQ
   ipureintro
   unfold calleeSaved

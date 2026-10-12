@@ -139,10 +139,10 @@ theorem ig_tail (cpu : CPU) (k : KCtx) (hK : 6 ≤ k.avail) (spie spp : Bool)
   k_norm_g
   iframe
   inext
-  iapply wpNext_intro_pin
-  iintro %c2 %hp2 Hk Hpc
+  iapply wpNext_intro_pin_lc
+  iintro %c2 %hp2 Hlc Hk Hpc
   unfold igPost
-  ihave HΦ := wpNext_at _ _ _ c2 _ (fun h => (hp2 h).trans ((hp1 h).trans (hcr h))) $$ HΦ
+  ihave HΦ := wpNext_at _ _ _ c2 _ (fun h => (hp2 h).trans ((hp1 h).trans (hcr h))) $$ HΦ Hlc
   iapply HΦ $$ %spie %spp %_ %hsp Hk Hpc [] %kk %q [] Href Hlic
   · ipureintro
     obtain ⟨p21, p22, p23, p24, p25, p26, p27⟩ := hpins

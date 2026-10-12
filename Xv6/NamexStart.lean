@@ -76,7 +76,7 @@ theorem namex_consts (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOC
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0x3c#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     namexEnv Γ A ∗ namexWalk k A ipv A.n A.Sb nf ∗
-    (∀ c' : CPU, namexPostA k A c')
+    (∀ c' : CPU, £ 1 -∗ namexPostA k A c')
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨r2, r8, r9, r20, r21, r22, r27⟩ := id hr
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Henv, Hwalk, Hnext⟩
@@ -172,7 +172,7 @@ theorem namex_rel (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) 
     kctx cpu (((k.withSpie k.spie k.spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0x2e#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     namexEnv Γ A ∗ namexPre k A nf ∗
-    (∀ c' : CPU, namexPostA k A c')
+    (∀ c' : CPU, £ 1 -∗ namexPostA k A c')
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Henv, Hpre, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -274,7 +274,7 @@ theorem namex_abs (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) 
     kctx cpu (((k.withSpie k.spie k.spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0x48#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     namexEnv Γ A ∗ namexPre k A nf ∗
-    (∀ c' : CPU, namexPostA k A c')
+    (∀ c' : CPU, £ 1 -∗ namexPostA k A c')
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Henv, Hpre, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -379,7 +379,7 @@ theorem namex_entry (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK
     pcIs cpu (KA.«namex» + 0x1c#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     namexEnv Γ A ∗ namexPre k A nf ∗
-    (∀ c' : CPU, namexPostA k A c')
+    (∀ c' : CPU, £ 1 -∗ namexPostA k A c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hacc := namex_path_lookup A.plen 0 A.pfun (Nat.zero_le _)
   have hbs := namex_beq_slash (A.pfun 0)

@@ -113,8 +113,8 @@ theorem prputc_proof (UP : UARTPUTC_SYNC) : PRPUTC :=
   k_norm
   iframe
   inext
-  iintro Hk Hpc
-  iapply HΦ $$ %_ %([BitVec.extractLsb' 0 8 (k.regs 10#5)]) Hk Hpc
+  iintro Hk Hpc Hlc
+  iapply HΦ $$ Hlc %_ %([BitVec.extractLsb' 0 8 (k.regs 10#5)]) Hk Hpc
   · ipureintro
     unfold calleeSaved
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>

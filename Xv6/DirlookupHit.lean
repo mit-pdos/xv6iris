@@ -174,7 +174,7 @@ theorem dirlookup_found_iget (IG : IGET) (cpu : CPU) (k : KCtx) (spie spp : Bool
     (if hasp then wordPointsTo (k.regs 12#5) 4 (DFrac.own 1) (BitVec.ofNat 32 (16 * i)) else emp) ∗
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
     itableInv ∗ iregInv fscIreg fscFs icfgIst icfgNib ∗ panicEnv ∗
-    (∀ c' : CPU, dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c')
+    (∀ c' : CPU, £ 1 -∗ dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
     fun _ _ _ _ _ => rfl
@@ -282,7 +282,7 @@ theorem dirlookup_found (IG : IGET) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R 
     dirlookupKeep k ip dinum bm data dn dr fn pidv dqp dqd dqn ∗ dirlookupIn hasp (k.regs 12#5) pofv ∗
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
     itableInv ∗ iregInv fscIreg fscFs icfgIst icfgNib ∗ panicEnv ∗
-    (∀ c' : CPU, dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c')
+    (∀ c' : CPU, £ 1 -∗ dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hmaxb := Xv6.rd_maxbytes
   have hi31 : 16 * i < 2 ^ 31 := by

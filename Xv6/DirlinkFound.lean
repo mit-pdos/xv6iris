@@ -136,7 +136,7 @@ theorem dirlink_found (IP : IPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     bslots 3 ∗ dlinks fscFs dinum.toNat dn bm data ∗
     logOpS icfgLog ncount Sb ∗ txPin icfgLog tid qtx ∗
     dirlinkEnv Γ γl pd pav pu γkl γk ∗
-    (∀ c' : CPU, dirlinkPost k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
+    (∀ c' : CPU, £ 1 -∗ dirlinkPost k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
       dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
@@ -217,8 +217,8 @@ theorem dirlink_found (IP : IPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     | (simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, b2, b9, b19,
         b20, b23, b24, b25, b26, b27, r2, r9, r19, r20, r23, r24, r25, r26, r27]; done)
     | skip
-  · iintro %c' %R' %⟨hcs', ha0'⟩ Hk Hpc Hte Hce
-    ispecialize Hpost $$ %c'
+  · iintro %c' Hlc %R' %⟨hcs', ha0'⟩ Hk Hpc Hte Hce
+    ispecialize Hpost $$ %c' Hlc
     ihave HΦ := dirlinkPost_elim _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ $$ Hpost
     iapply HΦ $$ %spie1 %spp1 %R' %true %bm %data %dn %dn0 %n' %Sb' %0 %hcs' [] Hk Hpc Hte Hce
       [Hdev Hin Hmeta Hmap Hblk Hnm Hsi Hss Hsb Hdi Hpid Hdr] Hbs Hslot Hlk Hop Htx

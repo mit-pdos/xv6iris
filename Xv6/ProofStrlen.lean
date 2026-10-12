@@ -97,9 +97,9 @@ theorem strlen_iter {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
   ihave Hbuf := Hclose $$ Hb
   -- bnez a4,e16
   k_step_gen (wp_s_branch c3 _ (KA.«strlen» + 0x1a#64) true 8184#13 14#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) HT
-    $$ [- $Hk $Hpc] with [h15, ite_bne_byte] next c4 hp4
+    $$ [- $Hk $Hpc] with [h15, ite_bne_byte] next c4 hp4 £ Hlc
   iintro Hk Hpc
-  ihave HΦ' := wpNext_at _ _ _ c4 _ (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ
+  ihave HΦ' := wpNext_at _ _ _ c4 _ (fun h => (hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc Hbuf
 
 set_option maxHeartbeats 4000000 in

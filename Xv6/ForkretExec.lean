@@ -164,7 +164,7 @@ theorem fkr_kexec_call [CurCtx] (KX : KEXEC) (Γ : SchedNames) [ClaimIs GF Γ]
     bslots 3 ∗ irefSlots 2 ∗ myPay V.gen (fun _ => iprop(True)) ∗
     execAuPre ⟨uslot (SG := SG), R⟩ (fsGammaL fscFs) fscFs V.rti V.cwi V.pvSecc
       (fun _ => iprop(True)) P Pmiss Fo initBootPath 1 (fun _ => 5) (fun _ => initBootBytes) sts cs pid ∗
-    (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap) (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
+    (∀ (c' : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
       ⌜calleeSaved k.regs R'⌝ -∗
       execArms ⟨uslot (SG := SG), R⟩ (fsGammaL fscFs) fscFs V.rti V.cwi V.pvSecc
         (fun _ => iprop(True)) P Pmiss Fo initBootPath 1 (fun _ => 5) (fun _ => initBootBytes) sts V.gen
@@ -201,10 +201,10 @@ theorem fkr_kexec_call [CurCtx] (KX : KEXEC) (Γ : SchedNames) [ClaimIs GF Γ]
       iframe Hw0 Hw1
     · iapply fkr_argstrs γ j pid V M pd pav pu
       iexact Hbuf2
-  iapply wpNext_intro
-  iintro %c' %spie %spp %R' %V' %M' %hcs Harms Hk Hpc Hte Hce Hpv ⟨-, Hav, -⟩ Hbs Hir
+  iapply wpNext_intro_lc
+  iintro %c' Hlc %spie %spp %R' %V' %M' %hcs Harms Hk Hpc Hte Hce Hpv ⟨-, Hav, -⟩ Hbs Hir
   icases (fkr_argv_two av γ j pid V M pd pav pu).1 $$ Hav with ⟨Hw0, Hw1⟩
-  iapply Hcont $$ %c' %spie %spp %R' %V' %M' %hcs Harms Hk Hpc Hte Hce Hpv Hw0 Hw1
+  iapply Hcont $$ %c' Hlc %spie %spp %R' %V' %M' %hcs Harms Hk Hpc Hte Hce Hpv Hw0 Hw1
 
 /-- The block's trapframe pointer and its `a0` word, out and back at any
 value (the `c.ld a5,88(s1)` / `c.sd a0,112(a5)` pair). -/
@@ -315,7 +315,7 @@ theorem fkr_exec_tail [X : CurCtx] (PN : PANIC) (c : CPU) (kx : KCtx) (eb : Bool
   -- +0x50  beq a4,a5,+0x8a
   k_step_gen (wp_s_branch c5 _ (KA.«forkret» + 0x50#64) false 58#13 14#5 15#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [KCtx.rget_eq, KCtx.setReg_regs, RegMap.set_apply] next c6 hp6
+    with [KCtx.rget_eq, KCtx.setReg_regs, RegMap.set_apply] next c6 hp6 £ Hlc
   iintro Hk Hpc
   simp only [KCtx.setReg_sie, KCtx.setReg_proc, hs, hp] at hp1 hp2 hp3 hp4 hp5 hp6
   rcases hr with rfl | rfl
@@ -346,7 +346,7 @@ theorem fkr_exec_tail [X : CurCtx] (PN : PANIC) (c : CPU) (kx : KCtx) (eb : Bool
     simp only [fkr_bcond_1, Bool.false_eq_true, if_false]
     ihave Hn := Hcont $$ %(by first | rfl | trivial)
     ihave Hn := wpNext_at eb pa c c6 _ (fun e => (hp6 e).trans ((hp5 e).trans ((hp4 e).trans
-      ((hp3 e).trans ((hp2 e).trans (hp1 e)))))) $$ Hn
+      ((hp3 e).trans ((hp2 e).trans (hp1 e)))))) $$ Hn Hlc
     iapply Hn $$ %_ %?_ Hk Hpc Hpv
     exact ((((h.setReg 15#5 _ (by decide) (by decide) (by decide)).setReg 15#5 _ (by decide) (by decide)
       (by decide)).setReg 14#5 _ (by decide) (by decide) (by decide)).setReg 15#5 _ (by decide) (by decide)
@@ -462,7 +462,7 @@ theorem fkr_boot_exec [X : CurCtx] (KX : KEXEC) (PN : PANIC) (Γ : SchedNames) [
   isplitl [Hir]; · iexact Hir
   isplitr; · iexact Hmp
   isplitl [Hau]; · iexact Hau
-  iintro %c8 %spie %spp %R' %V' %M' %hcs Harms Hk Hpc Hte Hce Hpv Hf0 Hf1
+  iintro %c8 Hlc %spie %spp %R' %V' %M' %hcs Harms Hk Hpc Hte Hce Hpv Hf0 Hf1
   icases execArms_landed_keep _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ $$ Harms
     with ⟨%hkok, Harms⟩
   obtain ⟨entry, spv, szv', hkok⟩ := hkok

@@ -172,7 +172,7 @@ theorem swr_tail (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (hK : 6 �
     pcIs cpu (KA.«sys_write» + 0x40#64) ∗
     frame6s0 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    (∀ (c' : CPU) (R' : RegMap), ⌜calleeSaved k.regs R' ∧ R' 10#5 = R 10#5⌝ -∗
+    (∀ (c' : CPU), £ 1 -∗ ∀ (R' : RegMap), ⌜calleeSaved k.regs R' ∧ R' 10#5 = R 10#5⌝ -∗
       kctx c' ((k.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) cpu := by
@@ -186,10 +186,10 @@ theorem swr_tail (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (hK : 6 �
   k_norm_g
   iframe
   inext
-  k_next_e
+  k_next_e £ Hlc
   iintro Hk Hpc
   k_norm_g
-  iapply Hnext $$ %cpu %_ [] Hk Hpc Hte Hce
+  iapply Hnext $$ %cpu Hlc %_ [] Hk Hpc Hte Hce
   ipureintro
   refine ⟨swr_cs_epi k R hr, ?_⟩
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
@@ -232,7 +232,7 @@ theorem swr_filewrite (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs GF Γ]
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     filewriteEnv γl γu st ∗ foffRow st ∗
     filewriteIn pmv szv lzv st n (writerImg V.upt M) (k'.regs 11#5) Q Qe ∗
-    (∀ c' : CPU, filewritePost k' γl γu γ fk q st j pid V M n Q Qe c')
+    (∀ c' : CPU, £ 1 -∗ filewritePost k' γl γu γ fk q st j pid V M n Q Qe c')
     ⊢ wpLoop (GF := GF) c := by
   have h := FW.wp_filewrite_eb (GF := GF) Γ c k' γ fk q st j pid V M γkl γk γl γu n Q Qe
     pmv szv lzv hK hfk hj hproc hnoff htier ha0 ha2 hn htb
@@ -241,9 +241,9 @@ theorem swr_filewrite (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs GF Γ]
   iintro ⟨Hk, Hpc, Hpi, Hte, Hce, Hpe, Href, Hpriv, Hkl, Hav, Henv, Hrow, Hin, HK⟩
   iapply h
   iframe Hk Hpc Hpi Hte Hce Hpe Href Hpriv Hkl Hav Henv Hrow Hin
-  iapply wpNext_intro_pin
-  iintro %c' %-
-  iapply HK
+  iapply wpNext_intro_pin_lc
+  iintro %c' %- Hlc
+  iapply HK $$ %c' Hlc
 
 end
 

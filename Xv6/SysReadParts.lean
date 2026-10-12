@@ -180,7 +180,7 @@ theorem srd_tail (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (hK : 6 �
     pcIs cpu (KA.«sys_read» + 0x40#64) ∗
     frame6s0 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    (∀ (c' : CPU) (R' : RegMap), ⌜calleeSaved k.regs R' ∧ R' 10#5 = R 10#5⌝ -∗
+    (∀ (c' : CPU), £ 1 -∗ ∀ (R' : RegMap), ⌜calleeSaved k.regs R' ∧ R' 10#5 = R 10#5⌝ -∗
       kctx c' ((k.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) cpu := by
@@ -194,10 +194,10 @@ theorem srd_tail (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (hK : 6 �
   k_norm_g
   iframe
   inext
-  k_next_e
+  k_next_e £ Hlc
   iintro Hk Hpc
   k_norm_g
-  iapply Hnext $$ %cpu %_ [] Hk Hpc Hte Hce
+  iapply Hnext $$ %cpu Hlc %_ [] Hk Hpc Hte Hce
   ipureintro
   refine ⟨srd_cs_epi k R hr, ?_⟩
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
@@ -233,7 +233,7 @@ theorem srd_fileread (FR : FILEREAD) (Γ : SchedNames) [ClaimIs GF Γ]
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     filereadEnv st ∗ foffRow st ∗
     filereadIn st n F Rd Rin Rp Rpe P ∗ P ∗
-    (∀ c' : CPU, filereadPost k' γ fk q st j pid V M n F Rd Rin Rp Rpe P c')
+    (∀ c' : CPU, £ 1 -∗ filereadPost k' γ fk q st j pid V M n F Rd Rin Rp Rpe P c')
     ⊢ wpLoop (GF := GF) c := by
   have h := FR.wp_fileread_eb (GF := GF) Γ c k' γ fk q st j pid V M γkl γk n F Rd Rin Rp Rpe P
     hK hfk hj hproc hnoff htier ha0 ha2 hn
@@ -242,9 +242,9 @@ theorem srd_fileread (FR : FILEREAD) (Γ : SchedNames) [ClaimIs GF Γ]
   iintro ⟨Hk, Hpc, Hpi, Hte, Hce, Hpe, Href, Hpriv, Hkl, Hav, Henv, Hfoff, Hin, HP, HK⟩
   iapply h
   iframe Hk Hpc Hpi Hte Hce Hpe Href Hpriv Hkl Hav Henv Hfoff Hin HP
-  iapply wpNext_intro_pin
-  iintro %c' %-
-  iapply HK
+  iapply wpNext_intro_pin_lc
+  iintro %c' %- Hlc
+  iapply HK $$ %c' Hlc
 
 end
 

@@ -302,13 +302,13 @@ theorem pa_exit (cr : CPU) (k : KCtx) (γ : FileNames) (γk : KmemNames) (on : O
     $$ [- $Hk $Hpc $Hframe]
   isplitl [Hpost Hpid Hir Hlend]
   · iframe Hpost Hpid Hir Hlend
-  iapply wpNext_intro_pin
-  iintro %c %hpin %R'' Hk Hpc %hfacts ⟨Hpost, Hpid, Hir, Hlend⟩
+  iapply wpNext_intro_pin_lc
+  iintro %c %hpin Hlc %R'' Hk Hpc %hfacts ⟨Hpost, Hpid, Hir, Hlend⟩
   have hpin' : k.sie = false → c = cr := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
   ihave HΦ := wpNext_at true k.proc cr c _
-    (fun h => hpin (h.elim (fun e => absurd e (by decide)) Or.inr)) $$ Hnext
+    (fun h => hpin (h.elim (fun e => absurd e (by decide)) Or.inr)) $$ Hnext Hlc
   k_norm_g
   iapply HΦ $$ %spie %spp %R'' [] Hk Hpc Hlend Hte Hce [Hpost] Hpid Hir
   · ipureintro; exact hfacts.1

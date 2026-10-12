@@ -990,7 +990,8 @@ theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) (IR : IGETROOT) (ID : IDU
     iframe
     inext
     k_norm
-    iapply wpNext_off_intro
+    iapply wpNext_off_intro_lc
+    iintro Hlc
     iintro Hk Hpc
     ihave Hk := ui_kctx_withSpie cpu k _ $$ Hk
     ihave HPhi := wpNext_off (GF := GF) k.proc cpu _ $$ HPhi
@@ -1003,7 +1004,7 @@ theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) (IR : IGETROOT) (ID : IDU
           $$ Hinitp
       iexists V.gen
       iframe Hsgd Hgpid Hipis
-    iapply HPhi $$ %(k.spie) %(k.spp) %_ %(procAddr j) %g
+    iapply HPhi $$ Hlc %(k.spie) %(k.spp) %_ %(procAddr j) %g
       %(⟨fun _ => ⟨rfl, rfl⟩, ui_calleeSaved_epi k.regs R5 (k.regs 1#5) hhi, hgle,
          ⟨j, hj, rfl⟩⟩) Hk Hpc Hid Hkav Hpav
   case ha0 => k_norm_g; exact hrj

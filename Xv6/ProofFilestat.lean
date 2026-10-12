@@ -96,8 +96,8 @@ theorem filestat_main (MP : MYPROC) (IL : ILOCK) (ST : STATI) (IU : IUNLOCK) (CO
   icases (filerw_core_conv ht0 (procAddr j) pid V V.upt M).1 $$ Hpriv with ⟨Hpriv, Hcwd⟩
   ihave HΦ : fstatK k γ fk q st (procAddr j) pid V M $$ [Hnext Hcwd]
   · unfold fstatK filestatPost
-    iintro %c %spie %spp %R' %P' %M' %d %kv %hp Hk Hpc Hte Hce Href %hkv Hpriv Henv
-    ihave HK := wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext
+    iintro %c Hlc %spie %spp %R' %P' %M' %d %kv %hp Hk Hpc Hte Hce Href %hkv Hpriv Henv
+    ihave HK := wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext Hlc
     ihave Hpriv := (filerw_core_conv ht0 (procAddr j) pid (V.updEv kv) P' M').2 $$ [Hpriv Hcwd]
     · iframe
     iapply HK $$ %spie %spp %R' %P' %M' %d %kv %hp Hk Hpc Hte Hce Href %hkv Hpriv Henv
@@ -130,7 +130,7 @@ theorem filestat_main (MP : MYPROC) (IL : ILOCK) (ST : STATI) (IU : IUNLOCK) (CO
   case hn => k_norm_g; omega
   case hKm => k_norm_g; omega
   -- ===== back from myproc =====
-  iintro %c1 %spie1 %spp1 %R1 %⟨hcs, h10⟩ Hk Hpc Hte Hce
+  iintro %c1 Hlc %spie1 %spp1 %R1 %⟨hcs, h10⟩ Hk Hpc Hte Hce
   k_norm_g [filestat_ret_14, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hr1 : fstatRegs k fk (k.regs 18#5) (k.regs 19#5) R1 := by
     refine fstatRegs_cs _ _ _ _ _ _ ?_ hcs

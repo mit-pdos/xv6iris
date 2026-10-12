@@ -101,7 +101,7 @@ theorem dirlookup_read (RD : READI) (NC : NAMECMP) (IG : IGET) (PA : PANIC)
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     dirlookupKeep k ip dinum bm data dn dr fn pidv dqp dqd dqn ∗ dirlookupIn hasp (k.regs 12#5) pofv ∗
     dirlookupEnv Γ γl pd pav pu γkl γk ∗
-    (∀ c' : CPU, dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c') ∗
+    (∀ c' : CPU, £ 1 -∗ dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c') ∗
     dirlookupLoop k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn fuel
     ⊢ wpLoop (GF := GF) cpu := by
   have hmaxb := Xv6.rd_maxbytes
@@ -261,7 +261,7 @@ theorem dirlookup_scan (RD : READI) (NC : NAMECMP) (IG : IGET) (PA : PANIC)
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     dirlookupKeep k ip dinum bm data dn dr fn pidv dqp dqd dqn ∗ dirlookupIn hasp (k.regs 12#5) pofv ∗
     dirlookupEnv Γ γl pd pav pu γkl γk ∗
-    (∀ c' : CPU, dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c')
+    (∀ c' : CPU, £ 1 -∗ dirlookupPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hmaxb := Xv6.rd_maxbytes
   have hsz := hs.hsz

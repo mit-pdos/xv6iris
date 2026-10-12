@@ -209,7 +209,7 @@ theorem create_ialloc (IA : IALLOC) (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     wordPointsTo (pPid k'.proc) 4 dqp pidv ∗ bslots 2 ∗ irefSlot ∗
     logOpS icfgLog (u + 1) Sb ∗ txPin icfgLog t qc ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (alloc : Bool) (kslot : Nat) (q : Qp)
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (alloc : Bool) (kslot : Nat) (q : Qp)
         (inum : BitVec 32) (dn' : Dinode),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
@@ -239,10 +239,10 @@ theorem create_ialloc (IA : IALLOC) (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU
   iapply h
   iframe Hk Hpc Hte Hce Hsn Hsi Hpid Hbs Hisl Hop Htc
   iframe #
-  iapply wpNext_intro_pin
-  iintro %c %_
+  iapply wpNext_intro_pin_lc
+  iintro %c %_ Hlc
   iintro %spie %spp %R' %alloc %kslot %q %inum %dn' %hcs Hk Hpc Hte Hce Hsn Hsi Hpid Hbs Harm
-  iapply HK $$ %c %spie %spp %R' %alloc %kslot %q %inum %dn' %hcs Hk Hpc Hte Hce Hsn Hsi Hpid
+  iapply HK $$ %c Hlc %spie %spp %R' %alloc %kslot %q %inum %dn' %hcs Hk Hpc Hte Hce Hsn Hsi Hpid
     Hbs Harm
 
 set_option maxHeartbeats 8000000 in
@@ -265,7 +265,7 @@ theorem create_ilock_claim (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF Γ] (cpu :
     inodeClaimed ty kslot q icfgDev inum t qc ∗ txPin icfgLog t qt ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     wordPointsTo (pPid k'.proc) 4 dqp pidv ∗ bslot ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (g : GName) (lo tl : Nat) (γil γisl : GName)
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (g : GName) (lo tl : Nat) (γil γisl : GName)
         (dn : Dinode) (bm : Blkmap),
       ⌜calleeSaved k'.regs R' ∧ lo ≤ tl ∧ dn.diType = ty ∧ freshShape dn⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
@@ -309,8 +309,8 @@ theorem create_ilock_claim (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF Γ] (cpu :
   iframe #
   isplitl [Htx]
   · unfold icDepSide icDepSideTx txPinO; iexact Htx
-  iapply wpNext_intro_pin
-  iintro %c %_
+  iapply wpNext_intro_pin_lc
+  iintro %c %_ Hlc
   unfold ilockPostDepEb
   iintro %spie %spp %R' %dn %bm %filled %hcs - Hk Hpc Hte Hce Hpid Hsi Hb1 Hsl Hdep Hoff Hdev
     Hinum Hval Hload #Hshot Hfrz %hfr Hback %hpost
@@ -322,7 +322,7 @@ theorem create_ilock_claim (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF Γ] (cpu :
   · unfold runitAny; iexact Hru
   unfold icDepHeld
   simp only [icDepRd, Bool.false_eq_true, if_false]
-  iapply HK $$ %c %spie %spp %R' %g %lo %tl %γil %γisl %dn %bm [] Hk Hpc Hte Hce Hsi Hpid Hb1 Hslk
+  iapply HK $$ %c Hlc %spie %spp %R' %g %lo %tl %γil %γisl %dn %bm [] Hk Hpc Hte Hce Hsi Hpid Hb1 Hslk
     Hsl Hfl Hdep Hoff Hdev Hinum Hval Hload Hshot Hfrz Hpar Hru Htc
   ipureintro
   exact ⟨hcs, hle, hty, hfresh⟩
@@ -360,7 +360,7 @@ theorem create_fresh_ty (IA : IALLOC) (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF
     inodeHeldAt rootv rti ∗ bslots 3 ∗ irefSlot ∗
     wordPointsTo (iDev (ientry kd)) 4 dqd icfgDev ∗
     txPin icfgLog t qt ∗ txPin icfgLog t qc ∗ logOpS icfgLog (u + 1) Sb ∗
-    (∀ c : CPU, createFreshPost k R ty kd dqd u Sb t qt qc pidv dqp dqs dqn rootv rti c)
+    (∀ c : CPU, £ 1 -∗ createFreshPost k R ty kd dqd u Sb t qt qc pidv dqp dqs dqn rootv rti c)
     ⊢ wpLoop (GF := GF) cpu := by
   have hdev0 : iDev (ientry kd) = ientry kd := by simp [iDev]
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hsn, Hsi, Hpid, Hrh, Hbs, Hisl, Hdev, Htx, Htc, Hop, Hpost⟩
@@ -395,7 +395,7 @@ theorem create_fresh_ty (IA : IALLOC) (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF
   case ga0 => k_norm_g
   case ga1 => k_norm_g [hs4]
   -- back from ialloc, at +0xac
-  iintro %cpu %spie1 %spp1 %R1 %alloc %kslot %q %inum %dn' %hcs1 Hk Hpc Hte Hce Hsn Hsi Hpid
+  iintro %cpu Hlc %spie1 %spp1 %R1 %alloc %kslot %q %inum %dn' %hcs1 Hk Hpc Hte Hce Hsn Hsi Hpid
     Hb2 Harm
   k_norm_g [create_ret_ac]
   unfold calleeSaved at hcs1
@@ -411,7 +411,7 @@ theorem create_fresh_ty (IA : IALLOC) (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF
     simp only [Bool.false_eq_true, if_false]
     icases Harm with ⟨%ha0, Hisl, Htc, Hop⟩
     k_step_e (wp_s_branch cpu _ (KA.«create» + 0xae#64) true 62#13 10#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0, MachCSL.beqz_zero]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0, MachCSL.beqz_zero] £ Hlc
     iintro Hk Hpc
     ihave Hk := kctx_eq_mono cpu _ ((k.withSpie spie1 spp1).withRegs (R1.set 19#5 0#64))
       (by kctx_ext) $$ Hk
@@ -419,7 +419,7 @@ theorem create_fresh_ty (IA : IALLOC) (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF
     · iframe
     ispecialize Hpost $$ %cpu
     unfold createFreshPost createFreshFail
-    iapply Hpost $$ %spie1 %spp1 %(R1.set 19#5 0#64) %false %0 %1 %γl %0 %0 %inum %γl %γl
+    iapply Hpost $$ Hlc %spie1 %spp1 %(R1.set 19#5 0#64) %false %0 %1 %γl %0 %0 %inum %γl %γl
       %dn' %default [] Hk Hte Hce Hsn Hsi Hpid Hrh Hbs Hdev
     · ipureintro
       refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
@@ -465,7 +465,7 @@ theorem create_fresh_ty (IA : IALLOC) (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF
     iintro Hk Hpc
     -- +0xb0  jal ilock
     k_step_e (wp_s_jal cpu _ (KA.«create» + 0xb0#64) false 2090302#21 1#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_ilock]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_ilock] £ Hlc
     iintro Hk Hpc
     iapply (create_ilock_claim IL Γ cpu _ j γl pd pav pu ty kslot q inum t qt qc pidv dqp dqs hj
         ?lp ?lK ?ln ?lt hkk hgeom hcov hnib hpd ?la0)
@@ -480,7 +480,7 @@ theorem create_fresh_ty (IA : IALLOC) (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF
     case lt => k_norm_g; try exact htier
     case la0 => k_norm_g [ha0]
     -- back from ilock, at +0xb4
-    iintro %cpu %spie2 %spp2 %R2 %g %lo %tl %γil %γisl %dn %bm %hp2 Hk Hpc Hte Hce Hsi Hpid Hb1
+    iintro %cpu Hlc %spie2 %spp2 %R2 %g %lo %tl %γil %γisl %dn %bm %hp2 Hk Hpc Hte Hce Hsi Hpid Hb1
       Hslk Hsl Hfl Hdep Hoff Hdevc Hinum Hval Hload Hshot Hfrz Hpar Hru Htc
     obtain ⟨hcs2, hle, htyeq, hfresh⟩ := hp2
     k_norm_g [create_ret_b4]
@@ -492,7 +492,7 @@ theorem create_fresh_ty (IA : IALLOC) (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF
     · iframe
     ispecialize Hpost $$ %cpu
     unfold createFreshPost createFreshAlloc
-    iapply Hpost $$ %spie2 %spp2 %R2 %true %kslot %q %g %lo %tl %inum %γil %γisl %dn %bm
+    iapply Hpost $$ Hlc %spie2 %spp2 %R2 %true %kslot %q %g %lo %tl %inum %γil %γisl %dn %bm
       [] Hk Hte Hce Hsn Hsi Hpid Hrh Hbs Hdev
     · ipureintro
       exact ⟨by simp [f2, e2], by simp [f8, e8], by simp [f9, e9], by simp [f18, e18],

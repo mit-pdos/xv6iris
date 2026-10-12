@@ -254,7 +254,7 @@ theorem kernelvec_proof (KT : KERNELTRAP) : KERNELVEC :=
   case' _ => stack_cells; iframe
   have h32 : 32 ≤ kt.avail := by omega
   k_step (wp_s_pop c1 _ (KA.«kernelvec» + 0x4a#64) true 256#12 32 imm_p256) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [h22, KCtx.pop_pushed _ _ _ h32, sp_restore256]
+    with [h22, KCtx.pop_pushed _ _ _ h32, sp_restore256] £ Hlc
   iintro Hk Hpc
   -- sret: back to the interrupted context, interrupts on
   iapply (wp_s_sret c1 _ ?hs ?hsp ?hpp (KA.«kernelvec» + 0x4c#64) false pc sc' tv' k.spie k.spp ?hres ?hwf')
@@ -291,7 +291,7 @@ theorem kernelvec_proof (KT : KERNELTRAP) : KERNELVEC :=
     rcases h with h | h
     · exact absurd h (by decide)
     · simp only [hproc, h, _root_.or_true]
-  ihave HK := wpNext_at _ _ _ c1 _ hp1' $$ Hcont
+  ihave HK := wpNext_at _ _ _ c1 _ hp1' $$ Hcont Hlc
   unfold kctxL
   iapply HK $$ Hk Hpc⟩
 

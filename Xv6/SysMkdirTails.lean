@@ -135,7 +135,7 @@ theorem sys_mkdir_tail_40 (EO : END_OP) (Γ : SchedNames) [ClaimIs GF Γ] (cpu :
     sysfileAny (sysMkdirBuf (k.regs 2#5)) 128 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysMkdirV1 A P2) (sysMkdirM1 A P2) ∗
-    (∀ c : CPU, sysMkdirPostA k A c) ∗ bslots 3 ∗ irefSlots A.ns ∗ logOp icfgLog u ∗
+    (∀ c : CPU, £ 1 -∗ sysMkdirPostA k A c) ∗ bslots 3 ∗ irefSlots A.ns ∗ logOp icfgLog u ∗
     sysMkdirFail A
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hbuf, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Hfail⟩
@@ -155,7 +155,7 @@ theorem sys_mkdir_tail_40 (EO : END_OP) (Γ : SchedNames) [ClaimIs GF Γ] (cpu :
   case eK => k_norm_g; exact hKe
   case en => k_norm_g; exact hnoff
   case et => k_norm_g; exact htier
-  iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid
+  iintro %cpu Hlc %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid
   k_norm_g [sys_mkdir_ret_44, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysMkdirPins_cs k _ R1 (sysMkdirPins_set k R 1#5 _ hpins (Or.inl rfl)) hcs1
   -- +0x44  li a0,-1
@@ -199,7 +199,7 @@ theorem sys_mkdir_tail_ok (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     sysfileAny (sysMkdirBuf (k.regs 2#5)) 128 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysMkdirV1 A P2) (sysMkdirM1 A P2) ∗
-    (∀ c : CPU, sysMkdirPostA k A c) ∗ bslots 3 ∗ irefSlots ns' ∗ logOpS icfgLog u' Sb' ∗
+    (∀ c : CPU, £ 1 -∗ sysMkdirPostA k A c) ∗ bslots 3 ∗ irefSlots ns' ∗ logOpS icfgLog u' Sb' ∗
     createLocked A.pid kk qi s g inum dn bm ∗
     creOkArms (fsGammaL fscFs) T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) A.P A.Farm A.Fdots A.Fun A.Fok A.Fex
       pl true i
@@ -229,7 +229,7 @@ theorem sys_mkdir_tail_ok (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   case un => k_norm_g; exact hnoff
   case ut => k_norm_g; exact htier
   case ua => k_norm_g [h10]
-  iintro %cpu %spie1 %spp1 %R1 %n' %⟨hcs1, -⟩ Hk Hpc Hte Hce Hpid Hbs Hop Hslot
+  iintro %cpu Hlc %spie1 %spp1 %R1 %n' %⟨hcs1, -⟩ Hk Hpc Hte Hce Hpid Hbs Hop Hslot
   k_norm_g [sys_mkdir_ret_32, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysMkdirPins_cs k _ R1 (sysMkdirPins_set k R 1#5 _ hpins (Or.inl rfl)) hcs1
   -- +0x32  jal end_op
@@ -245,7 +245,7 @@ theorem sys_mkdir_tail_ok (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   case eK => k_norm_g; exact hKe
   case en => k_norm_g; exact hnoff
   case et => k_norm_g; exact htier
-  iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid
+  iintro %cpu Hlc %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid
   k_norm_g [sys_mkdir_ret_36, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp2 := sysMkdirPins_cs k _ R2 (sysMkdirPins_set k R1 1#5 _ hp1 (Or.inl rfl)) hcs2
   -- +0x36  li a0,0

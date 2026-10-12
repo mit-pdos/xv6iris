@@ -273,7 +273,7 @@ theorem wp_pi_epilogue (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     kctxL lent cpu ((k.pushed 8).withRegs R) ∗ pcIs cpu pc ∗
     pintFrame (k.regs 2#5) ra s0 s2 ∗ piBuf (k.regs 2#5 + 0xFFFFFFFFFFFFFFC8#64) ∗
     ▷ (kctxL lent cpu (k.withRegs ((((R.set 1#5 ra).set 8#5 s0).set 18#5 s2).set 2#5 (k.regs 2#5))) -∗
-        pcIs cpu (jumpPc ra) -∗ wpLoop cpu)
+        pcIs cpu (jumpPc ra) -∗ £ 1 -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
   unfold pintFrame
   iintro ⟨#Hi0, #Hi2, #Hi4, #Hi6, #Hi8, Hk, Hpc, ⟨Hf8, Hf16, ⟨%w₃, Hf24⟩, Hf32, ⟨%w₈, Hf64⟩⟩,
@@ -295,9 +295,9 @@ theorem wp_pi_epilogue (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
   k_step (wp_s_pop cpu _ (pc + 6#64) true 64#12 8 imm_p64) $$ [- $Hk $Hpc]
     with [KCtx.pop_pushed _ _ _ hK, hR2]
   iintro Hk Hpc
-  k_step (wp_s_ret cpu _ (pc + 8#64) true 1#5) $$ [- $Hk $Hpc]
+  k_step (wp_s_ret cpu _ (pc + 8#64) true 1#5) $$ [- $Hk $Hpc] £ Hlc
   iintro Hk Hpc
-  iapply HΦ $$ Hk Hpc
+  iapply HΦ $$ Hk Hpc Hlc
 
 /-! ## Instruction-level arithmetic -/
 
@@ -771,7 +771,7 @@ theorem pi_out (PP : PRPUTC) [Xv6G GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = fa
     kctx cpu ((k.pushed 8).withRegs R) ∗ pcIs cpu (KA.«printint» + 0x5c#64) ∗
     pintFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 18#5) ∗
     piBuf (k.regs 2#5 + 0xFFFFFFFFFFFFFFC8#64) ∗ isTxLock γl γd ∗ uartSentSub γd bs ∗
-    (∀ (R' : RegMap) (cs : List (BitVec 8)), kctx cpu (k.withRegs R') -∗
+    (£ 1 -∗ ∀ (R' : RegMap) (cs : List (BitVec 8)), kctx cpu (k.withRegs R') -∗
       pcIs cpu (jumpPc (k.regs 1#5)) -∗ ⌜calleeSaved k.regs R'⌝ -∗
       uartSentSub γd (bs ++ cs) -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
@@ -856,8 +856,8 @@ theorem pi_out (PP : PRPUTC) [Xv6G GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = fa
   k_norm
   iframe
   inext
-  iintro Hk Hpc
-  iapply HΦ $$ %_ %cs Hk Hpc
+  iintro Hk Hpc Hlc
+  iapply HΦ $$ Hlc %_ %cs Hk Hpc
   · ipureintro
     unfold calleeSaved
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
@@ -899,7 +899,7 @@ theorem pi_setup (PP : PRPUTC) [Xv6G GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = 
     pintFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 18#5) ∗
     piBuf (k.regs 2#5 + 0xFFFFFFFFFFFFFFC8#64) ∗
     byteBuf KA.«digits» DFrac.discard digitsStr ∗ isTxLock γl γd ∗ uartSentSub γd bs ∗
-    (∀ (R' : RegMap) (cs : List (BitVec 8)), kctx cpu (k.withRegs R') -∗
+    (£ 1 -∗ ∀ (R' : RegMap) (cs : List (BitVec 8)), kctx cpu (k.withRegs R') -∗
       pcIs cpu (jumpPc (k.regs 1#5)) -∗ ⌜calleeSaved k.regs R'⌝ -∗
       uartSentSub γd (bs ++ cs) -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by

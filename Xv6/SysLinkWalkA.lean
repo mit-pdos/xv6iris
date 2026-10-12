@@ -172,7 +172,7 @@ theorem sys_link_walk_ip (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
     sysfileAny (sysLinkName (k.regs 2#5)) 16 ∗ sysLinkPath (sysLinkNew (k.regs 2#5)) plen2 pfun2 ∗
     sysfileAny (sysLinkOld (k.regs 2#5)) 128 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv Γ ∗
-    sysLinkRows k.proc A.pid A.V ∗ sysLinkHole A k.proc P2 ∗ (∀ c : CPU, sysLinkPostA k A c) ∗
+    sysLinkRows k.proc A.pid A.V ∗ sysLinkHole A k.proc P2 ∗ (∀ c : CPU, £ 1 -∗ sysLinkPostA k A c) ∗
     inodeRefp kk q icfgDev inum ∗
     linkCommits (fsGammaL fscFs) A.Ftgt A.Fent A.Funt ∗
     bslots 3 ∗ irefSlots 2 ∗ logOpS icfgLog n1 Sb1 ∗ logTx icfgLog
@@ -372,7 +372,7 @@ theorem sys_link_walk_ip (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
   case un => k_norm_g; exact hnoff
   case ut => k_norm_g; exact htier
   case ua => k_norm_g
-  iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid Hdev Hinum Hmeta Hmap Hdi ⟨%w, %hw, Htok⟩
+  iintro %cpu Hlc %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid Hdev Hinum Hmeta Hmap Hdi ⟨%w, %hw, Htok⟩
     Hpin Hb2 Hop
   k_norm_g [sys_link_ret_6a, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp4 := sysLinkPins_cs k _ R2 (ientry kk) (k.regs 18#5)
@@ -438,7 +438,7 @@ theorem sys_link_walk_ip (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
   case inf => k_norm_g; exact hnoff
   case it => k_norm_g; exact htier
   case ia => k_norm_g
-  iintro %cpu %spie3 %spp3 %R3 %hcs3 Hk Hpc Hte Hce Hpid Hshr Htx
+  iintro %cpu Hlc %spie3 %spp3 %R3 %hcs3 Hk Hpc Hte Hce Hpid Hshr Htx
   k_norm_g [sys_link_ret_70, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp5 := sysLinkPins_cs k _ R3 (ientry kk) (k.regs 18#5)
     (sysLinkPins_set k _ _ _ 1#5 _ (sysLinkPins_set k R2 _ _ 10#5 _ hp4 (by decide)) (Or.inl rfl))
@@ -575,7 +575,7 @@ theorem sys_link_walk_ns (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) (IU : IUPDATE
     sysfileAny (sysLinkName (k.regs 2#5)) 16 ∗ sysLinkPath (sysLinkNew (k.regs 2#5)) plen2 pfun2 ∗
     sysLinkPath (sysLinkOld (k.regs 2#5)) plen1 pfun1 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv Γ ∗
-    sysLinkRows k.proc A.pid A.V ∗ sysLinkHole A k.proc P2 ∗ (∀ c : CPU, sysLinkPostA k A c) ∗
+    sysLinkRows k.proc A.pid A.V ∗ sysLinkHole A k.proc P2 ∗ (∀ c : CPU, £ 1 -∗ sysLinkPostA k A c) ∗
     linkCommits (fsGammaL fscFs) A.Ftgt A.Fent A.Funt ∗
     bslots 3 ∗ irefSlots sysLinkIrefs
     ⊢ wpLoop (GF := GF) cpu := by
@@ -607,7 +607,7 @@ theorem sys_link_walk_ns (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) (IU : IUPDATE
   case bK => k_norm_g; exact hKbo
   case bn => k_norm_g; exact hnoff
   case bt => k_norm_g; exact htier
-  iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hop
+  iintro %cpu Hlc %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hop
   k_norm_g [sys_link_ret_36, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysLinkPins_cs k _ R1 (k.regs 9#5) (k.regs 18#5)
     (sysLinkPins_set k R _ _ 1#5 _ hpins (Or.inl rfl)) hcs1
@@ -709,7 +709,7 @@ theorem sys_link_walk_a (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) 
     kctx cpu (((k.withSpie spie spp).pushed 38).withRegs R) ∗ pcIs cpu (KA.«sys_link» + 0x8#64) ∗
     sysLinkCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) w₃ w₄ ∗ sysLinkBufs (k.regs 2#5) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv Γ ∗
-    procPrivFd A.γ (procAddr A.j) A.pid A.V A.M ∗ (∀ c : CPU, sysLinkPostA k A c) ∗
+    procPrivFd A.γ (procAddr A.j) A.pid A.V A.M ∗ (∀ c : CPU, £ 1 -∗ sysLinkPostA k A c) ∗
     linkCommits (fsGammaL fscFs) A.Ftgt A.Fent A.Funt ∗
     bslots 3 ∗ irefSlots sysLinkIrefs
     ⊢ wpLoop (GF := GF) cpu := by
@@ -749,7 +749,7 @@ theorem sys_link_walk_a (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) 
   case an => k_norm_g; exact hnoff
   case aK => k_norm_g; exact hKas
   case am => k_norm_g; rw [hbo]
-  iintro %cpu %spie1 %spp1 %R1 %P1 %bs1 %kv1 %⟨hcs1, hP1, hret1⟩ Hk Hpc Hte Hce %hkv1 Hbare Hold
+  iintro %cpu Hlc %spie1 %spp1 %R1 %P1 %bs1 %kv1 %⟨hcs1, hP1, hret1⟩ Hk Hpc Hte Hce %hkv1 Hbare Hold
   k_norm_g [sys_link_ret_16, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp1 := sysLinkPins_cs k _ R1 (k.regs 9#5) (k.regs 18#5)
     (sysLinkPins_set k _ _ _ 1#5 _ (sysLinkPins_set k _ _ _ 10#5 _ (sysLinkPins_set k _ _ _ 11#5 _
@@ -774,9 +774,9 @@ theorem sys_link_walk_a (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) 
     -- the exit at the record argstr handed back (permit sweep L1b)
     ihave Hout : sysLinkOut (A.raise kv1) (-1#64) $$ [Hblk Hbs Hir Harms]
     · unfold sysLinkOut; iframe Hbs Hir Harms; iexists P1; iframe Hblk; ipureintro; exact hP1
-    ihave HΦ : (∀ c : CPU, sysLinkPostA k (A.raise kv1) c) $$ [HΦ]
-    · iintro %c
-      ispecialize HΦ $$ %c
+    ihave HΦ : (∀ c : CPU, £ 1 -∗ sysLinkPostA k (A.raise kv1) c) $$ [HΦ]
+    · iintro %c Hlc
+      ispecialize HΦ $$ %c Hlc
       iapply (sysLinkPost_raise k A.γ (procAddr A.j) A.pid A.V A.M A.Ftgt A.Fent A.Funt c kv1 hkv1)
         $$ HΦ
     iapply (sys_link_exit cpu k (A.raise kv1) spie1 spp1 _ w₃ w₄ _ hK hp1'
@@ -819,7 +819,7 @@ theorem sys_link_walk_a (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) 
   case bn => k_norm_g; exact hnoff
   case bK => k_norm_g; exact hKas
   case bm => k_norm_g; rw [hbw]
-  iintro %cpu %spie2 %spp2 %R2 %P2 %bs2 %kv2 %⟨hcs2, hP2, hret2⟩ Hk Hpc Hte Hce %hkv2 Hbare Hnew
+  iintro %cpu Hlc %spie2 %spp2 %R2 %P2 %bs2 %kv2 %⟨hcs2, hP2, hret2⟩ Hk Hpc Hte Hce %hkv2 Hbare Hnew
   k_norm_g [sys_link_ret_2a, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   have hp2 := sysLinkPins_cs k _ R2 (k.regs 9#5) (k.regs 18#5)
     (sysLinkPins_set k _ _ _ 1#5 _ (sysLinkPins_set k _ _ _ 10#5 _ (sysLinkPins_set k _ _ _ 11#5 _
@@ -836,9 +836,9 @@ theorem sys_link_walk_a (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) 
       procPrivFd (A.raise kv2).γ (procAddr (A.raise kv2).j) (A.raise kv2).pid
         { (A.raise kv2).V with upt := P2 } (viewFaulted (A.raise kv2).V.upt P2 (A.raise kv2).M) from by
     rw [hM2]) $$ Hblk
-  ihave HΦ : (∀ c : CPU, sysLinkPostA k (A.raise kv2) c) $$ [HΦ]
-  · iintro %c
-    ispecialize HΦ $$ %c
+  ihave HΦ : (∀ c : CPU, £ 1 -∗ sysLinkPostA k (A.raise kv2) c) $$ [HΦ]
+  · iintro %c Hlc
+    ispecialize HΦ $$ %c Hlc
     iapply (sysLinkPost_raise k A.γ (procAddr A.j) A.pid A.V A.M A.Ftgt A.Fent A.Funt c kv2 hkv12)
       $$ HΦ
   ihave Hcm := (show linkCommits (GF := GF) (fsGammaL fscFs) A.Ftgt A.Fent A.Funt ⊢

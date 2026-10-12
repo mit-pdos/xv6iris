@@ -226,11 +226,11 @@ theorem wk_rel (RE : RELEASE) {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] 
   -- beq s1,s3
   k_step_gen (wp_s_branch c4 _ (KA.«wakeup» + 0x34#64) false 32#13 9#5 19#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [h19', wk_beq_last i hi] next c5 hq5
+    with [h19', wk_beq_last i hi] next c5 hq5 £ Hlc
   iintro Hk Hpc
   have hpinZ : k.sie = false ∨ k.proc = 0#64 → c5 = cur := fun h =>
     (hq5 h).trans ((hq4 h).trans ((hq3 h).trans (hpin h)))
-  ihave HPhi := wpNext_at _ _ _ c5 _ hpinZ $$ HPhi
+  ihave HPhi := wpNext_at _ _ _ c5 _ hpinZ $$ HPhi Hlc
   iapply HPhi $$ %spie1 %spp1 %_ %hsp1 Hk Hpc
   ipureintro
   refine ⟨?_, ?_⟩
@@ -453,10 +453,10 @@ theorem wk_loop (AC : ACQUIRE) (RE : RELEASE) {GF : BundledGFunctors.{0}}
       $$ [- $Hk $Hpc]
     rotate_right 1
     iframe #
-    iapply wpNext_intro_pin
-    iintro %c1 %hq1 %spie2 %spp2 %R2 %hsp2 Hk Hpc %hpost
+    iapply wpNext_intro_pin_lc
+    iintro %c1 %hq1 Hlc %spie2 %spp2 %R2 %hsp2 Hk Hpc %hpost
     rw [if_pos hlast]
-    ihave HPhi := wpNext_at _ _ _ c1 _ hq1 $$ HPhi
+    ihave HPhi := wpNext_at _ _ _ c1 _ hq1 $$ HPhi Hlc
     iapply HPhi $$ %spie2 %spp2 %R2 %hsp2 Hk Hpc
     ipureintro
     exact hpost.1
@@ -589,12 +589,12 @@ theorem wk_epi {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     with [KCtx.pop_pushed _ _ _ hK', hR2] next c8 hq8
   iintro Hk Hpc
   k_step_gen (wp_s_ret c8 _ (KA.«wakeup» + 0x64#64) true 1#5)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c9 hq9
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c9 hq9 £ Hlc
   iintro Hk Hpc
   have hpinZ : k.sie = false ∨ k.proc = 0#64 → c9 = cpu := fun h =>
     (hq9 h).trans ((hq8 h).trans ((hq7 h).trans ((hq6 h).trans ((hq5 h).trans ((hq4 h).trans
       ((hq3 h).trans ((hq2 h).trans ((hq1 h).trans (hpin h)))))))))
-  ihave HPhi := wpNext_at _ _ _ c9 _ hpinZ $$ HPhi
+  ihave HPhi := wpNext_at _ _ _ c9 _ hpinZ $$ HPhi Hlc
   iapply HPhi $$ %spie %spp %_ %hsp Hk Hpc
   ipureintro
   unfold calleeSaved

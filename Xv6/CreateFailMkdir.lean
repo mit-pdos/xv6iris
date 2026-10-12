@@ -142,7 +142,7 @@ theorem createFailMkdir_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames)
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     wordPointsTo (pPid k'.proc) 4 pidPriv pidv ∗ bslots 3 ∗ logOpS icfgLog n Sb ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (n' : Nat) (Sb' : List Nat) (w : Bool),
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (n' : Nat) (Sb' : List Nat) (w : Bool),
       ⌜calleeSaved k'.regs R' ∧ ((∀ x ∈ Sb, x ∈ Sb') ∧ (w = true → fscBmapstart ∈ Sb') ∧
         (crb = true → w = false) ∧ n - ipSpendW w cru false ≤ n' ∧ n' ≤ n)⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
@@ -177,11 +177,11 @@ theorem createFailMkdir_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames)
   · unfold inodeRefpShort; iframe
   isplitl []
   · simp only [Bool.false_eq_true, if_false]; iempintro
-  iapply wpNext_intro_pin
-  iintro %c %_ %spie %spp %R' %n' %Sb' %w %hcs Hk Hpc Hte Hce Hpid Hsb Hsi Hbs %hf Hops Hslot
+  iapply wpNext_intro_pin_lc
+  iintro %c %_ Hlc %spie %spp %R' %n' %Sb' %w %hcs Hk Hpc Hte Hce Hpid Hsb Hsi Hbs %hf Hops Hslot
     Hside
   rw [icDepSide_ofTx _ t qt rfl]
-  iapply HK $$ %c %spie %spp %R' %n' %Sb' %w [] Hk Hpc Hte Hce Hpid Hsb Hsi Hbs Hops Hslot Hside
+  iapply HK $$ %c Hlc %spie %spp %R' %n' %Sb' %w [] Hk Hpc Hte Hce Hpid Hsb Hsi Hbs Hops Hslot Hside
   ipureintro
   exact ⟨hcs, hf⟩
 
@@ -345,7 +345,7 @@ theorem create_fail_mkdir_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedName
   case un => k_norm_g; try exact hS.hnoff
   case ut => k_norm_g; try exact hS.htier
   case ua => k_norm_g [hR.2.2.2.2.1]
-  iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hdevc Hinumc Hcmeta Hcmap Hsbi Hcdiat
+  iintro %cpu Hlc %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hdevc Hinumc Hcmeta Hcmap Hsbi Hcdiat
     Hb2 Hop
   k_norm_g [create_ret_150]
   have hR1 : createRegs3 k (ientry kd) 0#64 (ientry kslot) ty major minor R1 :=
@@ -391,7 +391,7 @@ theorem create_fail_mkdir_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedName
   case inn => k_norm_g; try exact hS.hnoff
   case it => k_norm_g; try exact hS.htier
   case ia => k_norm_g [hR1.2.2.2.2.1]
-  iintro %cpu %spie2 %spp2 %R2 %n5 %Sb5 %w1 %hp2 Hk Hpc Hte Hce Hpid Hsbb Hsbi Hbs Hop Hs1 Htq1
+  iintro %cpu Hlc %spie2 %spp2 %R2 %n5 %Sb5 %w1 %hp2 Hk Hpc Hte Hce Hpid Hsbb Hsbi Hbs Hop Hs1 Htq1
   k_norm_g [create_ret_156]
   obtain ⟨hcs2, hsb5, -, hw5c, hn5, hn5u⟩ := hp2
   have hR2 : createRegs3 k (ientry kd) 0#64 (ientry kslot) ty major minor R2 :=
@@ -441,7 +441,7 @@ theorem create_fail_mkdir_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedName
   case dnoff => k_norm_g; try exact hS.hnoff
   case dt => k_norm_g; try exact hS.htier
   case da => k_norm_g [hR2.2.2.1]
-  iintro %cpu %spie3 %spp3 %R3 %n6 %Sb6 %w2 %hp3 Hk Hpc Hte Hce Hpid Hsbb Hsbi Hbs Hop Hs2 Htq2
+  iintro %cpu Hlc %spie3 %spp3 %R3 %n6 %Sb6 %w2 %hp3 Hk Hpc Hte Hce Hpid Hsbb Hsbi Hbs Hop Hs2 Htq2
   k_norm_g [create_ret_15c]
   obtain ⟨hcs3, hsb6, -, -, -, hn6u⟩ := hp3
   have hR3 : createRegs3 k (ientry kd) 0#64 (ientry kslot) ty major minor R3 :=
@@ -475,7 +475,7 @@ theorem create_fail_mkdir_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedName
   iapply (create_tail cpu k spie3 spp3 (R3.set 19#5 (k.regs 19#5)) (k.regs 19#5) nf tl
     (create_slots_10 _ hS.hK) hal.1 hal.2 hT4)
   iframe Hk Hpc Hframe Hnm Htl Hte Hce
-  iintro %c' %R' %hfin Hk Hpc Hte Hce
+  iintro %c' Hlc %R' %hfin Hk Hpc Hte Hce
   obtain ⟨hcsf, ha0f⟩ := hfin
   -- the slot ledger, whole
   unfold irefSlot
@@ -492,7 +492,7 @@ theorem create_fail_mkdir_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedName
   have hled : (∀ x ∈ Sb, x ∈ Sb6) ∧ n6 ≤ u ∧ (false = true → iputUnits ≤ n6) :=
     ⟨create_sub3 _ _ _ _ hsb4 (create_sub_cons Sb4 _) (Xv6.namex_sub_trans _ _ _ hsb5 hsb6),
       by have := hn4.2; omega, fun h => absurd h (by decide)⟩
-  ispecialize Hpost $$ %c'
+  ispecialize Hpost $$ %c' Hlc
   unfold createPost
   iapply Hpost $$ %spie3 %spp3 %R' %false %false %0 %1 %1 %g %(0#32) %dp %bmp %n6 %Sb6
     %(1 + 1 + (ns - 2)) %hcsf Hk Hpc Hte Hce Hsbn Hsbi Hsbs Hsbb Hpriv Hpath Hbs %hns' Hsl %hled Hop

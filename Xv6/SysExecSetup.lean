@@ -54,7 +54,7 @@ theorem sys_exec_memset (MS : MEMSET) (cpu : CPU) (k' : KCtx) (se : Bool) (hs : 
     (hn : k'.regs 12#5 = BitVec.ofNat 64 n) (hn32 : n < 2 ^ 32) (hl : olds.length = n) :
     kctx cpu k' ∗ pcIs cpu KA.«memset» ∗ trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗
     byteBuf (k'.regs 10#5) (DFrac.own 1) olds ∗
-    (∀ (c : CPU) (R' : RegMap), ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.regs 10#5⌝ -∗
+    (∀ (c : CPU), £ 1 -∗ ∀ (R' : RegMap), ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.regs 10#5⌝ -∗
       kctx c (k'.withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c se -∗ cpuClaimExt c se pj -∗
       byteBuf (k'.regs 10#5) (DFrac.own 1) (List.replicate n (BitVec.extractLsb' 0 8 (k'.regs 11#5))) -∗
@@ -67,12 +67,12 @@ theorem sys_exec_memset (MS : MEMSET) (cpu : CPU) (k' : KCtx) (se : Bool) (hs : 
   iintro ⟨Hk, Hpc, Hte, Hce, Hbuf, HK⟩
   iapply h
   iframe Hk Hpc Hbuf
-  iapply wpNext_intro_pin
-  iintro %c %hpin %R' Hk Hpc Hbuf %hcs
+  iapply wpNext_intro_pin_lc
+  iintro %c %hpin Hlc %R' Hk Hpc Hbuf %hcs
   have hpin' : k'.sie = false → c = cpu := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
-  iapply HK $$ %c %R' %hcs Hk Hpc Hte Hce Hbuf
+  iapply HK $$ %c Hlc %R' %hcs Hk Hpc Hte Hce Hbuf
 
 end
 
@@ -161,7 +161,7 @@ theorem sys_exec_setup (MS : MEMSET) (k : KCtx) (hK : sysExecSlots ≤ k.avail) 
   iframe
   case mK => k_norm_g; omega
   case mn => k_norm_g
-  iintro %cpu %R2 %⟨hcs2, ha02⟩ Hk Hpc Hte Hce Hargv
+  iintro %cpu Hlc %R2 %⟨hcs2, ha02⟩ Hk Hpc Hte Hce Hargv
   k_norm_g [sys_exec_ret_46]
   obtain ⟨c2, c8, c9, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27⟩ := hcs2
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, k_norm_simps] at c2 c8 c9 c18 c19 c20 c21 c22 c23 c24 c25 c26 c27
@@ -188,13 +188,13 @@ theorem sys_exec_setup (MS : MEMSET) (k : KCtx) (hK : sysExecSlots ≤ k.avail) 
   iintro Hk Hpc
   -- +0x52  li s7,32
   k_step_e (wp_s_addi cpu _ (KA.«sys_exec» + 0x52#64) false 32#12 23#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] £ Hlc
   iintro Hk Hpc
   ihave Hargv := (show byteBuf (GF := GF) (k.regs 2#5 + 18446744073709551152#64) (DFrac.own 1)
       (List.replicate 256 0#8) ⊢
     byteBuf (sysExecArgv (k.regs 2#5)) (DFrac.own 1) (List.replicate (8 * 32) 0#8) from .rfl) $$ Hargv
   ihave Harr := sys_exec_argv_zero (GF := GF) (k.regs 2#5) hal $$ Hargv
-  iapply HΦ $$ %cpu %_ [] Hk Hpc Hte Hce [H1 H2 H3 H4 H5 H6 H7] Harr
+  iapply HΦ $$ %cpu Hlc %_ [] Hk Hpc Hte Hce [H1 H2 H3 H4 H5 H6 H7] Harr
   · ipureintro
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, sysExecArgvAt, sysExecArgv,

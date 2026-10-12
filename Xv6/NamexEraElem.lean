@@ -53,7 +53,7 @@ theorem namexEra_rest (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLO
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0xb2#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     namexEnv Γ A ∗ namexEraWalk k A P Pmiss ipv dcur es0.length ncur Scur nf ∗
-    (∀ c' : CPU, namexEraPostR k A P Pmiss c') ∗ namexEraLoop k A P Pmiss fuel
+    (∀ c' : CPU, £ 1 -∗ namexEraPostR k A P Pmiss c') ∗ namexEraLoop k A P Pmiss fuel
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨r2, r8, r9, r19, r20, r21, r22, r23, r24, r25, r27⟩ := id hr
   have hstop' : A.pfun A.plen ≠ SLASH := by rw [hs.hterm]; decide
@@ -101,7 +101,7 @@ theorem namexEra_long (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLO
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0xa6#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     namexEnv Γ A ∗ namexEraWalk k A P Pmiss ipv dcur es0.length ncur Scur nf ∗
-    (∀ c' : CPU, namexEraPostR k A P Pmiss c') ∗ namexEraLoop k A P Pmiss fuel
+    (∀ c' : CPU, £ 1 -∗ namexEraPostR k A P Pmiss c') ∗ namexEraLoop k A P Pmiss fuel
     ⊢ wpLoop (GF := GF) cpu := by
   have hr := hf.hregs
   obtain ⟨r2, r8, r9, r19, r20, r21, r22, r23, r24, r25, r27⟩ := id hr
@@ -137,7 +137,7 @@ theorem namexEra_long (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLO
   case gn => k_norm_g; try rw [r25]; try rfl
   case g11 => k_norm_g; try exact r9
   case g10 => k_norm_g; try exact r21
-  iintro %c %R' %hcs Hk Hpc Hte Hce Hwin Hnm
+  iintro %c Hlc %R' %hcs Hk Hpc Hte Hce Hwin Hnm
   let cpu := c
   ihave Hpath := Hpback $$ Hwin
   k_norm_g [namex_ret_ac']
@@ -183,7 +183,7 @@ theorem namexEra_short (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNL
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0x130#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     namexEnv Γ A ∗ namexEraWalk k A P Pmiss ipv dcur es0.length ncur Scur nf ∗
-    (∀ c' : CPU, namexEraPostR k A P Pmiss c') ∗ namexEraLoop k A P Pmiss fuel
+    (∀ c' : CPU, £ 1 -∗ namexEraPostR k A P Pmiss c') ∗ namexEraLoop k A P Pmiss fuel
     ⊢ wpLoop (GF := GF) cpu := by
   have hr := hf.hregs
   obtain ⟨r2, r8, r9, r19, r20, r21, r22, r23, r24, r25, r27⟩ := id hr
@@ -222,7 +222,7 @@ theorem namexEra_short (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNL
   case gn => k_norm_g
   case g11 => k_norm_g; try exact r9
   case g10 => k_norm_g; try exact r21
-  iintro %c %R' %hcs Hk Hpc Hte Hce Hwin Hdst
+  iintro %c Hlc %R' %hcs Hk Hpc Hte Hce Hwin Hdst
   let cpu := c
   ihave Hpath := Hpback $$ Hwin
   ihave Hnm := Hnback $$ %(bview (e - a) (fun i => A.pfun (a + i))) %(bview_length _ _) Hdst
@@ -293,7 +293,7 @@ theorem namexEra_elem (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLO
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0x9a#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     namexEnv Γ A ∗ namexEraWalk k A P Pmiss ipv dcur es0.length ncur Scur nf ∗
-    (∀ c' : CPU, namexEraPostR k A P Pmiss c') ∗ namexEraLoop k A P Pmiss fuel
+    (∀ c' : CPU, £ 1 -∗ namexEraPostR k A P Pmiss c') ∗ namexEraLoop k A P Pmiss fuel
     ⊢ wpLoop (GF := GF) cpu := by
   have hr := hf.hregs
   obtain ⟨r2, r8, r9, r19, r20, r21, r22, r23, r24, r25, r27⟩ := id hr

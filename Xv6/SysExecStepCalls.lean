@@ -176,7 +176,7 @@ theorem sys_exec_fetchaddr (FA : FETCHADDR) (cpu : CPU) (k' : KCtx) (se : Bool) 
     kctx cpu k' ∗ pcIs cpu KA.«fetchaddr» ∗ trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗
     fsReady ∗ procPrivExt (procAddr j) pid V P M ∗
     wordPointsTo (k'.regs 11#5) 8 (DFrac.own 1) oldv ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (w : BitVec 64) (kv : Nat),
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (w : BitVec 64) (kv : Nat),
       ⌜calleeSaved k'.regs R' ∧ P.extSz V.sz P' ∧
         fetchaddrAns (viewLazy P V.sz M) (k'.regs 10#5) V.sz oldv (R' 10#5) w⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
@@ -197,12 +197,12 @@ theorem sys_exec_fetchaddr (FA : FETCHADDR) (cpu : CPU) (k' : KCtx) (se : Bool) 
   iapply h
   iframe Hk Hpc Hblk Hcell
   iframe #
-  iapply wpNext_intro_pin
-  iintro %c %hpin %spie %spp %R' %- Hk Hpc ⟨%P', %w, %kv, %hf, %hkv, Hblk, Hcell⟩ %hcs
+  iapply wpNext_intro_pin_lc
+  iintro %c %hpin Hlc %spie %spp %R' %- Hk Hpc ⟨%P', %w, %kv, %hf, %hkv, Hblk, Hcell⟩ %hcs
   have hpin' : k'.sie = false → c = cpu := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
-  iapply HK $$ %c %spie %spp %R' %P' %w %kv [] Hk Hpc Hte Hce %hkv Hblk Hcell
+  iapply HK $$ %c Hlc %spie %spp %R' %P' %w %kv [] Hk Hpc Hte Hce %hkv Hblk Hcell
   ipureintro
   exact ⟨hcs, hf.1, hf.2⟩
 
@@ -214,7 +214,7 @@ theorem sys_exec_kalloc (KL : KALLOC) (cpu : CPU) (k' : KCtx) (se : Bool) (hs : 
     (pj : BitVec 64) (hpj : k'.proc = pj) (hnoff : k'.noff = 0) (hK : 14 ≤ k'.avail) (kc : Nat) :
     kctx cpu k' ∗ pcIs cpu KA.«kalloc» ∗ trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗
     fsReady ∗ actLend pj kc ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap), ⌜calleeSaved k'.regs R'⌝ -∗
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap), ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c se -∗ cpuClaimExt c se pj -∗ actLend pj (kc + 1) -∗
       kallocPost fsReadyKmem none (R' 10#5) -∗ wpLoop c)
@@ -230,13 +230,13 @@ theorem sys_exec_kalloc (KL : KALLOC) (cpu : CPU) (k' : KCtx) (se : Bool) (hs : 
   iapply h
   iframe Hk Hpc Hl
   iframe #
-  iapply wpNext_intro_pin
-  iintro %c %hpin %spie %spp %R' %- Hk Hpc Hl Hpost %hcs
+  iapply wpNext_intro_pin_lc
+  iintro %c %hpin Hlc %spie %spp %R' %- Hk Hpc Hl Hpost %hcs
   ihave Hpost := kallocPostLed_post fsReadyKmem none k'.proc (R' 10#5) $$ Hpost
   have hpin' : k'.sie = false → c = cpu := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
-  iapply HK $$ %c %spie %spp %R' %hcs Hk Hpc Hte Hce Hl Hpost
+  iapply HK $$ %c Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hl Hpost
 
 set_option maxHeartbeats 8000000 in
 /-- `fetchstr(addr, buf, max)` (Rocq `Fetchstr.wp_fetchstr_sconf`): the
@@ -250,7 +250,7 @@ theorem sys_exec_fetchstr (FS : FETCHSTR) (cpu : CPU) (k' : KCtx) (se : Bool) (h
     kctx cpu k' ∗ pcIs cpu KA.«fetchstr» ∗ trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗
     fsReady ∗ procPrivBareAt curCtx pa pid V M ∗
     byteBuf (k'.regs 11#5) (DFrac.own 1) old ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (bs : List (BitVec 8)) (kv : Nat),
+    (∀ (c : CPU), £ 1 -∗ ∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (bs : List (BitVec 8)) (kv : Nat),
       ⌜calleeSaved k'.regs R' ∧ V.upt.extSz V.sz P' ∧
         fetchstrRet (viewLazy V.upt V.sz M) (k'.regs 10#5).toNat old bs (R' 10#5)⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
@@ -271,12 +271,12 @@ theorem sys_exec_fetchstr (FS : FETCHSTR) (cpu : CPU) (k' : KCtx) (se : Bool) (h
   iapply h
   iframe Hk Hpc Hblk Hbuf
   iframe #
-  iapply wpNext_intro_pin
-  iintro %c %hpin %spie %spp %R' %- Hk Hpc ⟨%P', %bs, %kv, %hf, %hkv, Hblk, Hbuf⟩ %hcs
+  iapply wpNext_intro_pin_lc
+  iintro %c %hpin Hlc %spie %spp %R' %- Hk Hpc ⟨%P', %bs, %kv, %hf, %hkv, Hblk, Hbuf⟩ %hcs
   have hpin' : k'.sie = false → c = cpu := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
-  iapply HK $$ %c %spie %spp %R' %P' %bs %kv [] Hk Hpc Hte Hce %hkv Hblk Hbuf
+  iapply HK $$ %c Hlc %spie %spp %R' %P' %bs %kv [] Hk Hpc Hte Hce %hkv Hblk Hbuf
   ipureintro
   exact ⟨hcs, hf.1, hf.2⟩
 

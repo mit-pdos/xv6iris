@@ -454,7 +454,7 @@ theorem pms_iter (KAL : KALLOC) (KM : KVMMAP) [CurCtx]
     iintro Hk Hpc
     k_step_gen (wp_s_branch c17 _ (KA.«proc_mapstacks» + 0x76#64) false 8150#13 9#5 21#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [h21'', pms_bne_last i hi] next c18 hp18
+      with [h21'', pms_bne_last i hi] next c18 hp18 £ Hlc
     iintro Hk Hpc
     -- the page joins the stacks; the pages are distinct
     ihave Hbuf2 : byteBuf (pageAddr (BitVec.extractLsb' 12 44 (R2 10#5))) (DFrac.own 1)
@@ -495,7 +495,7 @@ theorem pms_iter (KAL : KALLOC) (KM : KVMMAP) [CurCtx]
         ((hp13 h).trans ((hp12 h).trans ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans
           ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans
             ((hp3 h).trans ((hp2 h).trans (hp1 h)))))))))))))))))
-    ihave HΦ' := wpNext_at _ _ _ c18 _ hpinZ $$ HΦ
+    ihave HΦ' := wpNext_at _ _ _ c18 _ hpinZ $$ HΦ Hlc
     iapply HΦ' $$ %spie3 %spp3 %_ %fresh %_ %hsp' Hk Hpc Htree Hpages Hav
     ipureintro
     refine ⟨?_, ?_, hinv2⟩
@@ -552,11 +552,11 @@ theorem pms_loop (KAL : KALLOC) (KM : KVMMAP) [CurCtx]
       h9 h18 h19 h20 h21 h22 h23 h24 cur) $$ [- $Hk $Hpc $Htree $Hav $Hpages]
     rotate_right 1
     iframe #
-    iapply wpNext_intro_pin
-    iintro %c1 %hp1 %spie2 %spp2 %R2 %fresh %p %hsp2 Hk Hpc Htree Hpages Hav %hpost
+    iapply wpNext_intro_pin_lc
+    iintro %c1 %hp1 Hlc %spie2 %spp2 %R2 %fresh %p %hsp2 Hk Hpc Htree Hpages Hav %hpost
     rw [if_pos hlast]
     obtain ⟨hkept, hcur, hinv2⟩ := hpost
-    ihave HΦ' := wpNext_at _ _ _ c1 _ hp1 $$ HΦ
+    ihave HΦ' := wpNext_at _ _ _ c1 _ hp1 $$ HΦ Hlc
     rw [show nb - (i+1) - (fr ++ fresh).length = nb - 64 - (fr ++ fresh).length from by
       rw [hlast], show List.range (i+1) = List.range 64 from by rw [hlast]] at *
     iapply HΦ' $$ %spie2 %spp2 %R2 %_ %_ %(fr ++ fresh) %hsp2 Hk Hpc Htree Hpages Hav
@@ -710,13 +710,13 @@ theorem pms_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
     with [KCtx.pop_pushed _ _ _ hK', hR2] next c11 hp11
   iintro Hk Hpc
   k_step_gen (wp_s_ret c11 _ (KA.«proc_mapstacks» + 0x90#64) true 1#5)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c12 hp12
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c12 hp12 £ Hlc
   iintro Hk Hpc
   have hpinZ : k.sie = false ∨ k.proc = 0#64 → c12 = cpu := fun h =>
     (hp12 h).trans ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans
       ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans
         ((hp1 h).trans (hpin h))))))))))))
-  ihave HΦ' := wpNext_at _ _ _ c12 _ hpinZ $$ HΦ
+  ihave HΦ' := wpNext_at _ _ _ c12 _ hpinZ $$ HΦ Hlc
   iapply HΦ' $$ %spie %spp %_ %hsp Hk Hpc HQ
   ipureintro
   unfold calleeSaved

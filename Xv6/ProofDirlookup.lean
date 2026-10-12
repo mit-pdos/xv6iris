@@ -125,7 +125,7 @@ theorem dirlookup_self (RD : READI) (NC : NAMECMP) (IG : IGET) (PA : PANIC) (ID 
     dirlookupEnv Γ γl pd pav pu γkl γk ∗
     inodeShr kd sd icfgDev dinum ∗ runitAny dinum.toNat ∗
     wordPointsTo (pRoot k.proc) 8 dqr rootv ∗ inodeHeldAt rootv rti ∗
-    (∀ c' : CPU, dirlookupSpecPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn kd sd
+    (∀ c' : CPU, £ 1 -∗ dirlookupSpecPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn kd sd
       rootv rti dqr c')
     ⊢ wpLoop (GF := GF) cpu := by
   have h2' : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFA0#64 := h2
@@ -217,8 +217,8 @@ theorem dirlookup_self (RD : READI) (NC : NAMECMP) (IG : IGET) (PA : PANIC) (ID 
       $$ [Hnext Hkeep Hshr Hru Hnew Hru2 Hpf Hrc Hrr]
     · iintro %c'
       unfold dirlookupRet
-      iintro %R' %⟨hcs', ha0'⟩ Hk Hpc Hte Hce
-      ispecialize Hnext $$ %c'
+      iintro Hlc %R' %⟨hcs', ha0'⟩ Hk Hpc Hte Hce
+      ispecialize Hnext $$ %c' Hlc
       unfold dirlookupKeep
       icases Hkeep with ⟨Hdev, Hmeta, Hmap, Hblk, Hnm, Hpid, Hbsl, Hlk, Hdi⟩
       iapply Hnext $$ %spie' %spp' %R' %true %0 %kd %qn %true %hcs' Hk Hpc Hte Hce Hdev Hmeta Hmap
@@ -281,7 +281,7 @@ theorem dirlookup_selftest (RD : READI) (NC : NAMECMP) (IG : IGET) (PA : PANIC) 
     dirlookupEnv Γ γl pd pav pu γkl γk ∗
     inodeShr kd sd icfgDev dinum ∗ runitAny dinum.toNat ∗
     wordPointsTo (pRoot k.proc) 8 dqr rootv ∗ inodeHeldAt rootv rti ∗
-    (∀ c' : CPU, dirlookupSpecPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn kd sd
+    (∀ c' : CPU, £ 1 -∗ dirlookupSpecPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn kd sd
       rootv rti dqr c')
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, Hde, Hte, Hce, Hkeep, Hin, #Henv, Hshr, Hru, Hrc, Hrr, Hnext⟩
@@ -385,7 +385,7 @@ theorem dirlookup_entry (RD : READI) (NC : NAMECMP) (IG : IGET) (PA : PANIC) (MP
     dirlookupEnv Γ γl pd pav pu γkl γk ∗
     inodeShr kd sd icfgDev dinum ∗ runitAny dinum.toNat ∗
     wordPointsTo (pRoot k.proc) 8 dqr rootv ∗ inodeHeldAt rootv rti ∗
-    (∀ c' : CPU, dirlookupSpecPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn kd sd
+    (∀ c' : CPU, £ 1 -∗ dirlookupSpecPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn kd sd
       rootv rti dqr c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hty : BitVec.signExtend 64 dn.diType = BitVec.signExtend 64 T_DIR := by rw [hs.htype]

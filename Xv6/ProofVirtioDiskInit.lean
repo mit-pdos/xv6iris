@@ -2063,9 +2063,10 @@ theorem virtio_disk_init_proof (IL : INITLOCK) (KAL : KALLOC)
   k_norm
   iframe Hk Hpc Hframe
   inext
-  iapply wpNext_off_intro
+  iapply wpNext_off_intro_lc
+  iintro Hlc
   iintro Hk Hpc
-  iapply HΦ $$ %_ %pd %pav %pu Hk Hpc %?hcs Hav Hgeom Hwname Hfresh Hres
+  iapply HΦ $$ Hlc %_ %pd %pav %pu Hk Hpc %?hcs Hav Hgeom Hwname Hfresh Hres
   case hcs =>
     unfold calleeSaved
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>

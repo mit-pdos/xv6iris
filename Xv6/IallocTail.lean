@@ -77,11 +77,11 @@ theorem ialloc_epilogue [Fscfg] [Icfg] [CurCtx] (cpu c0 : CPU) (k : KCtx) (spie 
   iintro Hk Hpc
   -- +0x86  ret
   k_step_e (wp_s_ret cpu _ (KA.«ialloc» + 0x86#64) true 1#5)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] £ Hlc
   iintro Hk Hpc
   unfold iallocCont
   ihave HΦ := wpNext_at true k.proc c0 cpu _
-    (fun h => h.elim (fun h => absurd h (by decide)) (fun h => absurd h hpn)) $$ Hnext
+    (fun h => h.elim (fun h => absurd h (by decide)) (fun h => absurd h hpn)) $$ Hnext Hlc
   have hcs : calleeSaved k.regs (((R.set 1#5 (k.regs 1#5)).set 8#5 (k.regs 8#5)).set 2#5
       (k.regs 2#5)) := by
     obtain ⟨p23, p24, p25, p26, p27⟩ := hp

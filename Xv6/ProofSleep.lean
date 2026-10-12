@@ -279,13 +279,13 @@ theorem sleep_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : S
   have hK4 : 4 ≤ k.avail := by unfold sleepSlots at hK; omega
   ihave #Hlk := procsInv_lookup Γ j hj $$ Hpinv
   -- the caller's continuation is hart-free (a park's crossing, at a proc)
-  ihave HΦ : ∀ c : CPU, (∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
+  ihave HΦ : ∀ c : CPU, £ 1 -∗ (∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie (procAddr j) -∗ ⌜calleeSaved k.regs R'⌝ -∗ wpLoop c) $$ [Hnext]
-  · iintro %c
+  · iintro %c Hlc
     rw [← hproc]
     iapply wpNext_at true k.proc cpu c _ (fun hc => Or.elim hc (fun hx => absurd hx (by decide))
-      (fun hx => absurd (hproc ▸ hx) (procAddr_nonzero hj))) $$ Hnext
+      (fun hx => absurd (hproc ▸ hx) (procAddr_nonzero hj))) $$ Hnext Hlc
   -- the prologue
   iapply (wp_prologue4s1_gen cpu k KA.«sleep» hK4)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
@@ -376,7 +376,7 @@ theorem sleep_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : S
   iintro Hk Hpc Hchan
   -- beqz a5
   k_step (wp_s_branch cpu _ (KA.«sleep» + 0x16#64) true 10#13 15#5 0#5 (by decide) bop.BEQ)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.ite_beq]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.ite_beq] £ Hlc
   iintro Hk Hpc
   by_cases hch : ch = 0#64
   · -- THE CHANNEL IS GONE: a wakeup got here first, so release and return
@@ -394,7 +394,7 @@ theorem sleep_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : S
     k_norm_g
     iframe Hk Hpc Hpinv Hused Hlocked Hpstw Hstate Hchan Hrest Hcells Hfull Hvc Hzs Hframe Htc Hir
     iintro %c' %R' Hk Hpc Hte Hce %hcs
-    iapply HΦ $$ %c' %a %b %R' Hk Hpc Hte Hce %hcs
+    iapply HΦ $$ %c' Hlc %a %b %R' Hk Hpc Hte Hce %hcs
   · -- THE PARK: p->state = SLEEPING and into the scheduler
     ihave Hpc := MachCSL.pcIs_neg cpu _ _ _ hch $$ Hpc
     -- li a5,2
@@ -454,8 +454,8 @@ theorem sleep_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : S
     · iintro _
       iempintro
     -- into the scheduler; back on the hart that resumed us
-    iapply wpNext_intro_pin
-    iintro %h %_
+    iapply wpNext_intro_pin_lc
+    iintro %h %_ Hlc
     iintro %R9 %spie %spp %ch' %hcsS Hk Hpc Hheld Htc Hir Hcells Hfull Hvc
     k_norm_g [sl_ret_f84]
     have hhiS := sl_savedHigh_of_calleeSaved hcsS
@@ -476,6 +476,6 @@ theorem sleep_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : S
     k_norm_g
     iframe Hk Hpc Hpinv Hused Hlocked Hpstw Hstate Hchan Hrest Hcells Hfull Hvc Hzs Hframe Htc Hir
     iintro %c' %R' Hk Hpc Hte Hce %hcs
-    iapply HΦ $$ %c' %spie %spp %R' Hk Hpc Hte Hce %hcs⟩
+    iapply HΦ $$ %c' Hlc %spie %spp %R' Hk Hpc Hte Hce %hcs⟩
 
 end Xv6

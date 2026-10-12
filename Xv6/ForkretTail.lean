@@ -248,10 +248,10 @@ theorem fkr_tail [X : CurCtx] (PR : PREPARE_RETURN) (c : CPU) (k : KCtx) (γ : F
   iintro Hk Hpc
   -- +0x7e  jalr a5
   k_step (wp_s_jalr c2 _ (KA.«forkret» + 0x7e#64) true 15#5 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] £ Hlc
   iintro Hk Hpc
   rw [fkr_userret_va']
-  ihave Hn := wpNext_at k.sie pa c c2 _ (fun h => (hpin h).trans (hp1 (by rw [hproc]; exact h))) $$ Hnext
+  ihave Hn := wpNext_at k.sie pa c c2 _ (fun h => (hpin h).trans (hp1 (by rw [hproc]; exact h))) $$ Hnext Hlc
   ihave Hsepc := (show Register.sepc ↦ᵣ[c2] (tfW V.tf 3 &&& 0xFFFFFFFFFFFFFFFE#64) ⊢
       Register.sepc ↦ᵣ[c2] tfResumePc V.tf from by rw [fkr_sepc]) $$ Hsepc
   ihave Hk := kctx_eq_mono c2 _ _ (fkr_ctx_setReg k 1#5 (KA.«forkret» + 88#64) true false _) $$ Hk

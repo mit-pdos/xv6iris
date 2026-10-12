@@ -128,9 +128,9 @@ theorem iput_main (AC : ACQUIRE_LLB) (HN : IputTailNeSpec) (HE : IputEntrySpec)
   -- the caller's continuation is hart-free (a park's crossing, at a proc)
   ihave Hpost : iputPost (GF := GF) k n Sb crb cru crz tid qtx pidv dqp dqb dqs rg $$ [Hpost]
   · unfold iputPost
-    iintro %c
+    iintro %c Hlc
     iapply wpNext_at true k.proc cpu c _ (fun hc => Or.elim hc (fun hx => absurd hx (by decide))
-      (fun hx => absurd (hproc ▸ hx) (procAddr_nonzero hj))) $$ Hpost
+      (fun hx => absurd (hproc ▸ hx) (procAddr_nonzero hj))) $$ Hpost Hlc
   have hK6 : 6 ≤ k.avail := by unfold iputSlots itruncSlots at hK; omega
   have hK16 : 16 ≤ k.avail := by
     unfold iputSlots itruncSlots bfreeSlots at hK; omega

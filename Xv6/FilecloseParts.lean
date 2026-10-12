@@ -302,8 +302,8 @@ theorem fc_lend_frame (sie : Bool) (p : BitVec 64) (cpu : CPU) (p' : BitVec 64) 
     wpNext sie p cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       A cpu' spie spp R' -∗ B cpu' spie spp R' -∗ C cpu' spie spp R' -∗ T cpu' spie spp R')) := by
   unfold wpNext
-  iintro H Hl %cpu' %h %spie %spp %R' HA HB HC
-  iapply H $$ %cpu' %h %spie %spp %R' HA HB HC Hl
+  iintro H Hl %cpu' %h Hlc %spie %spp %R' HA HB HC
+  iapply H $$ %cpu' %h Hlc %spie %spp %R' HA HB HC Hl
 
 /-- THE CLOSE PAYMENT'S RECEIPT, folded into the caller's continuation (Rocq
 threads `fileclose_cpost` to the post directly): the continuation that takes
@@ -363,13 +363,13 @@ theorem fc_exit [Fscfg] [Icfg] [CurCtx] (cr : CPU) (k : KCtx) (γ : FileNames) (
   k_norm_g
   iframe
   inext
-  iapply wpNext_intro_pin
-  iintro %c %hpin Hk Hpc
+  iapply wpNext_intro_pin_lc
+  iintro %c %hpin Hlc Hk Hpc
   have hpin' : k.sie = false → c = cr := fun h => hpin (Or.inl h)
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
   ihave HΦ := wpNext_at true k.proc cr c _
-    (fun h => hpin (h.elim (fun e => absurd e (by decide)) Or.inr)) $$ Hnext
+    (fun h => hpin (h.elim (fun e => absurd e (by decide)) Or.inr)) $$ Hnext Hlc
   k_norm_g
   iapply HΦ $$ %spie %spp %_ [] Hk Hpc Hte Hce Hpid Hfd Hir Hout
   ipureintro

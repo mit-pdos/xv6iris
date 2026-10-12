@@ -74,10 +74,10 @@ theorem frd_spill2 [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
   k_step_gen (wp_s_sd cpu _ pc true 24#12 2#5 9#5 (by decide) w1) $$ [- $Hk $Hpc] with [hR2] next c1 hp1
   iintro Hk Hpc Hf24
   k_step_gen (wp_s_sd c1 _ (pc + 2#64) true 8#12 2#5 19#5 (by decide) w3) $$ [- $Hk $Hpc]
-    with [hR2] next c2 hp2
+    with [hR2] next c2 hp2 £ Hlc
   iintro Hk Hpc Hf40
   k_norm_g
-  ihave HΦ' := wpNext_at _ _ _ c2 _ (fun h => (hp2 h).trans (hp1 h)) $$ HΦ
+  ihave HΦ' := wpNext_at _ _ _ c2 _ (fun h => (hp2 h).trans (hp1 h)) $$ HΦ Hlc
   iapply HΦ' $$ Hk Hpc
   iframe
 
@@ -268,9 +268,9 @@ theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (
   icases Hpg with ⟨Hft, HQ, Hxs, Hgen⟩
   ihave HΦ : frdK k γ fk q st j pid V M n F Rd Rin Rp Rpe P $$ [Hnext Hcwd Hrtr Hft HQ Hxs]
   · unfold frdK filereadPost
-    iintro %c %spie %spp %R' %P' %M' %d %hp Hk Hpc Hte Hce Href Hpriv Hgen Henv Harms
+    iintro %c Hlc %spie %spp %R' %P' %M' %d %hp Hk Hpc Hte Hce Href Hpriv Hgen Henv Harms
     icases procPrivExtEv_elim _ _ _ _ _ $$ Hpriv with ⟨%kv, %hkv, Hpriv⟩
-    ihave HK := wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext
+    ihave HK := wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext Hlc
     ihave Hpriv := (filerw_core_conv ht0 (procAddr j) pid (V.updEv kv) P' M').2 $$ [Hpriv Hcwd Hrtr Hft HQ Hxs Hgen]
     · unfold procGenAt
       iframe
@@ -311,14 +311,14 @@ theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (
     rotate_right 1
     k_norm_g
     iframe
-    iintro %c' %R' %⟨hcs, h10⟩ Hk Hpc Hte Hce
+    iintro %c' Hlc %R' %⟨hcs, h10⟩ Hk Hpc Hte Hce
     ihave Href := filerw_ref_close γ fk q st C $$ [Htok Hfields Hpay]
     · iframe
     ihave Henv := fileread_env_out_of_env st $$ Henv
     ihave HP := filereadIn_unreadable F Rd Rin P Rp Rpe inumC γoC omC γpC C st n hok hrz $$ Hin HP
     unfold frdK
     ihave Hpriv := procPrivExtEv_of _ _ _ _ _ $$ Hpriv
-    iapply HΦ $$ %c' %k.spie %k.spp %R' %V.upt %M %0 [] Hk Hpc Hte Hce Href Hpriv Hgen Henv [HP]
+    iapply HΦ $$ %c' Hlc %k.spie %k.spp %R' %V.upt %M %0 [] Hk Hpc Hte Hce Href Hpriv Hgen Henv [HP]
     · ipureintro
       exact ⟨hcs, UMemL.extSz_refl _ _, by omega, Or.inr h10, Xv6.UMemL.umemWrote_refl _ _ _⟩
     · unfold filereadArms
@@ -384,7 +384,7 @@ theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (
     rotate_right 1
     k_norm_g
     iframe
-    iintro %c' %R' %⟨hcs, h10⟩ Hk Hpc Hte Hce
+    iintro %c' Hlc %R' %⟨hcs, h10⟩ Hk Hpc Hte Hce
     ihave Href := filerw_ref_close γ fk q st C $$ [Htok Hfields Hpay]
     · iframe
     ihave Henv := fileread_env_out_of_env st $$ Henv
@@ -393,7 +393,7 @@ theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (
     imodintro
     unfold frdK
     ihave Hpriv := procPrivExtEv_of _ _ _ _ _ $$ Hpriv
-    iapply HΦ $$ %c' %k.spie %k.spp %R' %V.upt %M %0 [] Hk Hpc Hte Hce Href Hpriv Hgen Henv [Hex]
+    iapply HΦ $$ %c' Hlc %k.spie %k.spp %R' %V.upt %M %0 [] Hk Hpc Hte Hce Href Hpriv Hgen Henv [Hex]
     · ipureintro
       exact ⟨hcs, UMemL.extSz_refl _ _, by omega, Or.inr h10, Xv6.UMemL.umemWrote_refl _ _ _⟩
     · unfold filereadArms

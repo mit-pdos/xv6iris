@@ -149,10 +149,10 @@ theorem iu_tail (LW : LOG_WRITE) (BE : BRELSE)
   k_norm_g
   iframe
   inext
-  k_next_e
+  k_next_e £ Hlc
   iintro Hk Hpc
   ihave HΦ := wpNext_at true k.proc c0 cpu _
-    (fun h => h.elim (fun h => absurd h (by decide)) (fun h => absurd h hpn)) $$ Hnext
+    (fun h => h.elim (fun h => absurd h (by decide)) (fun h => absurd h hpn)) $$ Hnext Hlc
   ihave Hsl := iu_slots_join fscBio $$ [Hsl1 Hsl2]
   · iframe Hsl1 Hsl2
   iapply HΦ $$ %spie3 %spp3 %_ [] Hk Hpc Hte Hce Hpid HF Hout Hsl HopS Hwit

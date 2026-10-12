@@ -308,11 +308,11 @@ theorem eo_exit (cpu : CPU) (k : KCtx) (a b : Bool) (pidv : BitVec 32) (dqp : DF
   k_norm_g
   iframe
   inext
-  k_next_e
+  k_next_e £ Hlc
   iintro Hk Hpc
   ihave Hpost := eoPost_elim k pidv dqp cpu $$ [HΦ]
   · iapply HΦ
-  iapply Hpost $$ %a %b %_ [] Hk Hpc Hte Hce Hpid
+  iapply Hpost $$ Hlc %a %b %_ [] Hk Hpc Hte Hce Hpid
   · ipureintro
     exact eo_calleeSaved_epi k.regs R h19 h20 h21 h22 h23 h24 h25 h26 h27
 

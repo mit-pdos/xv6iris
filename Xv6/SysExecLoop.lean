@@ -52,7 +52,7 @@ theorem sys_exec_loop_fuel (Γ : SchedNames) (k : KCtx) (A : SysExecArgs)
       sysExecLoopSt k A spie spp R P kv i pg alen afun uvf pl rest (sysExecAddr + 0x56#64)
         c -∗
       sysExecEnv Γ A -∗
-      (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (kv' : Nat) (i' : Nat)
+      (∀ (c' : CPU), £ 1 -∗ ∀ (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (kv' : Nat) (i' : Nat)
           (pg' : Nat → BitVec 64)
           (alen' : Nat → Nat) (afun' : Nat → Nat → BitVec 8) (uvf' : Nat → BitVec 64),
         ((⌜bytesToWord (umemRead (sysExecIm A) (A.v1 + BitVec.ofNat 64 (8 * i')).toNat 8) = 0#64⌝ ∗
@@ -72,14 +72,14 @@ theorem sys_exec_loop_fuel (Γ : SchedNames) (k : KCtx) (A : SysExecArgs)
   | succ W ih =>
     iintro %c %spie %spp %R %P %kv %i %pg %alen %afun %uvf %pl %rest %hW Hst #Henv Hout
     iapply hstep $$ %c %spie %spp %R %P %kv %i %pg %alen %afun %uvf %pl %rest Hst Henv
-    iintro %c' %spie' %spp' %R' %P' %kv' %i' %pg' %alen' %afun' %uvf' (⟨%hi, Hhead⟩ | Hbrk | Hbad)
+    iintro %c' Hlc %spie' %spp' %R' %P' %kv' %i' %pg' %alen' %afun' %uvf' (⟨%hi, Hhead⟩ | Hbrk | Hbad)
     · -- the BACK EDGE, re-entered at the hart the iteration ended on
       iapply ih $$ %c' %spie' %spp' %R' %P' %kv' %i' %pg' %alen' %afun' %uvf' %pl %rest %(by omega)
         Hhead Henv Hout
-    · iapply Hout $$ %c' %spie' %spp' %R' %P' %kv' %i' %pg' %alen' %afun' %uvf'
+    · iapply Hout $$ %c' Hlc %spie' %spp' %R' %P' %kv' %i' %pg' %alen' %afun' %uvf'
       ileft
       iexact Hbrk
-    · iapply Hout $$ %c' %spie' %spp' %R' %P' %kv' %i' %pg' %alen' %afun' %uvf'
+    · iapply Hout $$ %c' Hlc %spie' %spp' %R' %P' %kv' %i' %pg' %alen' %afun' %uvf'
       iright
       iexact Hbad
 

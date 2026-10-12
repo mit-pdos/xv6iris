@@ -77,15 +77,15 @@ theorem sfs_fail_exit (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : B
     pcIs cpu (KA.«sys_fstat» + 0x32#64) ∗ frame4s0 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     procPrivFd γ (procAddr j) pid V M ∗ filestatFsEnv ∗
-    (∀ c : CPU, sysFstatPost k γ j pid V M v v1 c)
+    (∀ c : CPU, £ 1 -∗ sysFstatPost k γ j pid V M v v1 c)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Hblk, Henv, HΦ⟩
   iapply (sfs_tail cpu k spie spp R hK4 hr) $$ [- $Hk $Hpc $Hframe $Hte $Hce]
   rotate_right 1
   iframe
-  iintro %c' %R' %⟨hcs, h10'⟩ Hk Hpc Hte Hce
+  iintro %c' Hlc %R' %⟨hcs, h10'⟩ Hk Hpc Hte Hce
   unfold sysFstatPost
-  iapply HΦ $$ %c' %spie %spp %R' %V.upt %M %0 %V.ev [] Hk Hpc Hte Hce %(Nat.le_refl V.ev) Hblk
+  iapply HΦ $$ %c' Hlc %spie %spp %R' %V.upt %M %0 %V.ev [] Hk Hpc Hte Hce %(Nat.le_refl V.ev) Hblk
   · ipureintro
     refine ⟨hcs, Or.inl ⟨h10'.trans h10, hnone⟩, UMemL.extSz_refl _ _, Nat.zero_le _,
       UMemL.umemWrote_refl _ _ _⟩
@@ -109,7 +109,7 @@ theorem sfs_ok_exit (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bit
     procPrivCoreNoctxAt curCtx (procAddr j) pid { V.updEv kv with upt := P' } M' ∗
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [fd0] ∗
     fileRef γ kk q st ∗ fdStAuth V.fdg fd0 st ∗ filestatFsOut (GF := GF) ∗
-    (∀ c : CPU, sysFstatPost k γ j pid V M v v1 c)
+    (∀ c : CPU, £ 1 -∗ sysFstatPost k γ j pid V M v v1 c)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Hcore, Howe, Href, Hauth, Hfso, HΦ⟩
   ihave Howe := procOfilesOwe_repay γ V.fdg (procAddr j) V.ofile [] fd0 kk q st (by simp) hfv hkk hst
@@ -118,9 +118,9 @@ theorem sfs_ok_exit (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bit
   iapply (sfs_tail cpu k spie spp R hK4 hr) $$ [- $Hk $Hpc $Hframe $Hte $Hce]
   rotate_right 1
   iframe
-  iintro %c' %R' %⟨hcs, h10⟩ Hk Hpc Hte Hce
+  iintro %c' Hlc %R' %⟨hcs, h10⟩ Hk Hpc Hte Hce
   unfold sysFstatPost
-  iapply HΦ $$ %c' %spie %spp %R' %P' %M' %d %kv [] Hk Hpc Hte Hce %hkv [Hcore Howe] Hfso
+  iapply HΦ $$ %c' Hlc %spie %spp %R' %P' %M' %d %kv [] Hk Hpc Hte Hce %hkv [Hcore Howe] Hfso
   · ipureintro
     exact ⟨hcs, Or.inr ⟨fd0, fnode kk, hsome, h10 ▸ hret⟩, hext, hd, hwin⟩
   · iapply (procPrivFd_split γ (procAddr j) pid { V.updEv kv with upt := P' } M').2
@@ -144,7 +144,7 @@ theorem sfs_fail_arm (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bi
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ filestatFsEnv ∗
-    (∀ c : CPU, sysFstatPost k γ j pid V M v v1 c)
+    (∀ c : CPU, £ 1 -∗ sysFstatPost k γ j pid V M v v1 c)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hra, Hs0, Hcf, Hcs, Hte, Hce, Hcore, Howe, Henv, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -192,7 +192,7 @@ theorem sfs_ok_back (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bit
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [fd0] ∗
     fileRef γ kk q st ∗ fdStAuth V.fdg fd0 st ∗ filestatEnvOut st ∗
     (filestatEnvOut st -∗ filestatFsOut (GF := GF)) ∗
-    (∀ c : CPU, sysFstatPost k γ j pid V M v v1 c)
+    (∀ c : CPU, £ 1 -∗ sysFstatPost k γ j pid V M v v1 c)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hra, Hs0, Hcf, Hcs, Hte, Hce, Hcore, Howe, Href, Hauth, Henvo, Henvb, HΦ⟩
   ihave Hfso := Henvb $$ Henvo
@@ -225,7 +225,7 @@ theorem sfs_ok_jal (FS : FILESTAT) (Γ : SchedNames) [ClaimIs GF Γ]
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ filestatFsEnv ∗
-    (∀ c : CPU, sysFstatPost k γ j pid V M v v1 c)
+    (∀ c : CPU, £ 1 -∗ sysFstatPost k γ j pid V M v v1 c)
     ⊢ wpLoop (GF := GF) cpu := by
   have hK80 := hK
   rw [sysFstatSlots_eq] at hK80
@@ -254,7 +254,7 @@ theorem sfs_ok_jal (FS : FILESTAT) (Γ : SchedNames) [ClaimIs GF Γ]
   case hts => k_norm_g; exact htier
   case has => k_norm_g; exact h10
   -- ===== back from filestat (at any hart) =====
-  iintro %cpu
+  iintro %cpu Hlc
   unfold filestatPost
   iintro %spie3 %spp3 %R3 %P' %M' %d %kv %⟨hcs3, hret, hext, hd, hwin⟩ Hk Hpc Hte Hce Href %hkv Hpriv
     Henvo
@@ -289,7 +289,7 @@ theorem sfs_ok_loads (FS : FILESTAT) (Γ : SchedNames) [ClaimIs GF Γ]
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ filestatFsEnv ∗
-    (∀ c : CPU, sysFstatPost k γ j pid V M v v1 c)
+    (∀ c : CPU, £ 1 -∗ sysFstatPost k γ j pid V M v v1 c)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, #Hpi, #Hpe, #Hkl, #Hav, Hra, Hs0, Hcf, Hcs, Hte, Hce, Hcore, Howe, Henv, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -344,7 +344,7 @@ theorem sfs_argfd_call (AF : ARGFD) (FS : FILESTAT) (Γ : SchedNames) [ClaimIs G
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ filestatFsEnv ∗
-    (∀ c : CPU, sysFstatPost k γ j pid V M v v1 c)
+    (∀ c : CPU, £ 1 -∗ sysFstatPost k γ j pid V M v v1 c)
     ⊢ wpLoop (GF := GF) cpu := by
   have hK80 := hK
   rw [sysFstatSlots_eq] at hK80
@@ -380,7 +380,7 @@ theorem sfs_argfd_call (AF : ARGFD) (FS : FILESTAT) (Γ : SchedNames) [ClaimIs G
   isplitl [Hpfd]
   · iexact Hpfd
   -- ===== back from argfd =====
-  iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hcore Howe Hpost
+  iintro %cpu Hlc %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hcore Howe Hpost
   k_norm_g [sfs_ret_1e, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   have hr2 : sfsRegs k R2 := by
     refine sfsRegs_cs _ _ _ ?_ hcs2
@@ -418,9 +418,9 @@ theorem sys_fstat_main (AA : ARGADDR) (AF : ARGFD) (FS : FILESTAT)
   have ht0 : curTier = KTier.kpt := hct.symm.trans htier
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- THE CONTRACT'S CONTINUATION, hart-free
-  ihave HΦ : (∀ c : CPU, sysFstatPost k γ j pid V M v v1 c) $$ [Hnext]
-  · iintro %c
-    iapply wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext
+  ihave HΦ : (∀ c : CPU, £ 1 -∗ sysFstatPost k γ j pid V M v v1 c) $$ [Hnext]
+  · iintro %c Hlc
+    iapply wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext Hlc
   icases (procPrivFd_split γ (procAddr j) pid V M).1 $$ Hblk with ⟨Hcore, Howe⟩
   simp only [sysFstatAddr]
   -- +0x00 .. +0x06  the prologue
@@ -460,7 +460,7 @@ theorem sys_fstat_main (AA : ARGADDR) (AF : ARGFD) (FS : FILESTAT)
   case hna => k_norm_g; omega
   case hKa => k_norm_g; unfold argaddrSlots argrawSlots; omega
   -- ===== back from argaddr =====
-  iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Htf Htfp Hcs
+  iintro %cpu Hlc %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Htf Htfp Hcs
   k_norm_g [sfs_ret_12, sfs_st_addr, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed, MachCSL.KCtx.withSpie_withRegs]
   have hr1 : sfsRegs k R1 := by
     refine sfsRegs_cs _ _ _ ?_ hcs1

@@ -505,10 +505,10 @@ theorem vdrw6_fd (FD : FREE_DESC) (Γ : SchedNames) (c : CPU) (k' : KCtx) (γ : 
 /-- With interrupts off the continuation is at THIS hart, whatever the
 `wpNext` flag says. -/
 theorem wpNext_here (p : BitVec 64) (cpu : CPU) (K : CPU → IProp GF) :
-    wpNext (GF := GF) true p cpu K ⊢ K cpu := by
+    wpNext (GF := GF) true p cpu K ⊢ £ 1 -∗ K cpu := by
   unfold wpNext
-  iintro H
-  iapply H $$ %cpu %(fun _ => rfl)
+  iintro H Hlc
+  iapply H $$ %cpu %(fun _ => rfl) Hlc
 
 end calls
 

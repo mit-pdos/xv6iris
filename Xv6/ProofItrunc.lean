@@ -229,11 +229,11 @@ theorem itrunc_main (BR : BREAD) (BF : BFREE) (BE : BRELSE) (IU : IUPDATE)
   ihave Hcont : itContE (GF := GF) k ip inum dn pidv dqp dqd dqn dqb dqs
       (itLedger crb cru u Sb inum) $$ [Hnext]
   · unfold itContE itLedger
-    iintro %c'
+    iintro %c' Hlc
     iapply (wpNext_at true k.proc cpu c' _ (fun h => by
       rcases h with h | h
       · exact absurd h (by decide)
-      · rw [hproc] at h; exact absurd h (procAddr_nonzero hj))) $$ Hnext
+      · rw [hproc] at h; exact absurd h (procAddr_nonzero hj))) $$ Hnext Hlc
   ihave Hk := (show kctx (GF := GF) cpu k ⊢ kctx cpu (k.withSpie k.spie k.spp) from by
     rw [KCtx.withSpie_self' k k.spie k.spp rfl rfl]) $$ Hk
   -- +0x00 .. +0x0c  the prologue

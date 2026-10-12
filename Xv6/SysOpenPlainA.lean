@@ -195,7 +195,7 @@ def sysOpenAt36 (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) (EXTRA : IProp
     procPrivFd A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) -∗
     logOpS icfgLog MAXOPBLOCKS Sb -∗ logTx icfgLog -∗
     bslots 3 -∗ irefSlots A.ns -∗ fdSlot -∗ fdFrags A.V.fdg A.sts -∗
-    EXTRA -∗ (∀ c' : CPU, sysOpenK k A.ns A.V A.M ARMS c') -∗
+    EXTRA -∗ (∀ c' : CPU, £ 1 -∗ sysOpenK k A.ns A.V A.M ARMS c') -∗
     wpLoop c)
 
 /-- ARM 0's receipt, per side: the bundle comes home UNSPENT beside the block
@@ -230,7 +230,7 @@ theorem sys_open_fetched (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs GF Γ]
     byteBuf (sysOpenPath (k.regs 2#5)) (DFrac.own 1) bs ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) ∗
     bslots 3 ∗ irefSlots A.ns ∗ fdSlot ∗ fdFrags A.V.fdg A.sts ∗
-    EXTRA ∗ (∀ c' : CPU, sysOpenK k A.ns A.V A.M ARMS c')
+    EXTRA ∗ (∀ c' : CPU, £ 1 -∗ sysOpenK k A.ns A.V A.M ARMS c')
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hcells, Hbuf, Hblk, Hbs, Hir, Hfd, Hfr, Hx, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -277,7 +277,7 @@ theorem sys_open_fetched (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs GF Γ]
     case bK => k_norm_g; exact hKbo
     case bn => k_norm_g; exact hS.hnoff
     case bt => k_norm_g; exact hS.htier
-    iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hop
+    iintro %cpu Hlc %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hop
     k_norm_g [sys_open_ret_2e, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
     ihave Hpid := (show wordPointsTo (GF := GF) (pPid k.proc) 4 pidPriv A.pid ⊢
       wordPointsTo (pPid (procAddr A.j)) 4 pidPriv A.pid from by rw [hS.hproc]) $$ Hpid
@@ -336,13 +336,13 @@ theorem sys_open_fetched (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs GF Γ]
       pcIs cpu (sysOpenAddr + 0xca#64) from .rfl) $$ Hpc
     have hp1 := sysOpenPins_set k _ _ _ _ 10#5 18446744073709551615#64
       (sysOpenPins_set k _ _ _ _ 15#5 18446744073709551615#64 hpins (by decide)) (by decide)
-    ihave HK : (∀ (c' : CPU) (R' : RegMap),
+    ihave HK : (∀ (c' : CPU), £ 1 -∗ ∀ (R' : RegMap),
         ⌜calleeSaved k.regs R' ∧ R' 10#5 =
           ((R.set 15#5 18446744073709551615#64).set 10#5 18446744073709551615#64) 10#5⌝ -∗
         kctx c' ((k.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k.regs 1#5)) -∗
         trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗ wpLoop c') $$ [HΦ Hx Hblk Hfr Hfd Hbs Hir]
-    · iintro %c' %R' %⟨hcs, ha0⟩ Hk Hpc Hte Hce
-      ispecialize HΦ $$ %c'
+    · iintro %c' Hlc %R' %⟨hcs, ha0⟩ Hk Hpc Hte Hce
+      ispecialize HΦ $$ %c' Hlc
       ihave HΦ := sysOpenK_same k A.ns A.V A.M ARMS c' $$ HΦ
       have ha0' : R' 10#5 = 0xFFFFFFFFFFFFFFFF#64 := by
         rw [ha0]; simp only [RegMap.set_apply, ite_true]
@@ -375,7 +375,7 @@ theorem sys_open_args (AI : ARGINT) (AS : ARGSTR) (BO : BEGIN_OP) (Γ : SchedNam
     sysOpenAny (sysOpenPath (k.regs 2#5)) 128 ∗
     procPrivFd A.γ (procAddr A.j) A.pid A.V A.M ∗
     bslots 3 ∗ irefSlots A.ns ∗ fdSlot ∗ fdFrags A.V.fdg A.sts ∗
-    EXTRA ∗ (∀ c' : CPU, sysOpenK k A.ns A.V A.M ARMS c')
+    EXTRA ∗ (∀ c' : CPU, £ 1 -∗ sysOpenK k A.ns A.V A.M ARMS c')
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hcells, Hbuf, Hblk, Hbs, Hir, Hfd, Hfr, Hx, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -410,7 +410,7 @@ theorem sys_open_args (AI : ARGINT) (AS : ARGSTR) (BO : BEGIN_OP) (Γ : SchedNam
   case a0 => k_norm_g
   case an => k_norm_g; exact hS.hnoff
   case aK => k_norm_g; exact hKai
-  iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Htf Hpg Hom
+  iintro %cpu Hlc %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Htf Hpg Hom
   k_norm_g [sys_open_ret_12, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe k.proc) 8
       (DFrac.own (1 : Qp).half.half) (pageAddr A.V.upt.tfp) ⊢
@@ -459,17 +459,17 @@ theorem sys_open_args (AI : ARGINT) (AS : ARGSTR) (BO : BEGIN_OP) (Γ : SchedNam
   case gn => k_norm_g; exact hS.hnoff
   case gK => k_norm_g; exact hKas
   case gmx => k_norm_g [hold]
-  iintro %cpu %spie1 %spp1 %R1 %P2 %bs %kv %⟨hcs1, hext, hret⟩ Hk Hpc Hte Hce %hkv Hbare Hbuf
+  iintro %cpu Hlc %spie1 %spp1 %R1 %P2 %bs %kv %⟨hcs1, hext, hret⟩ Hk Hpc Hte Hce %hkv Hbare Hbuf
   k_norm_g [sys_open_ret_20, MachCSL.KCtx.withSpie_twice, MachCSL.KCtx.withSpie_pushed]
   ihave Hbuf := (show byteBuf (GF := GF) (k.regs 2#5 + 18446744073709551440#64) (DFrac.own 1) bs ⊢
     byteBuf (sysOpenPath (k.regs 2#5)) (DFrac.own 1) bs from .rfl) $$ Hbuf
   ihave Hblk := Hclose $$ %P2 %(viewFaulted A.V.upt P2 A.M) %kv Hbare
   -- argstr lent the block's counter (permit sweep L1b): the rest of the run
   -- is at the record it came back at (Rocq's `UA`)
-  ihave HΦ : (∀ c' : CPU, sysOpenK k (A.raise kv).ns (A.raise kv).V (A.raise kv).M
+  ihave HΦ : (∀ c' : CPU, £ 1 -∗ sysOpenK k (A.raise kv).ns (A.raise kv).V (A.raise kv).M
       ARMS c') $$ [HΦ]
-  · iintro %c'
-    ispecialize HΦ $$ %c'
+  · iintro %c' Hlc
+    ispecialize HΦ $$ %c' Hlc
     iapply (sysOpenK_raise k A.ns A.V A.M ARMS c' kv hkv) $$ HΦ
   ihave Hpc := (show pcIs (GF := GF) cpu (KA.«sys_open» + 32#64) ⊢
     pcIs cpu (sysOpenAddr + 0x20#64) from .rfl) $$ Hpc
