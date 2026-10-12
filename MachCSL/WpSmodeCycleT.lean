@@ -76,7 +76,7 @@ theorem wpLoop_sT_base (cpu : CPU) (c c' : MConf) (hok : SConfPhys (GF := GF) c 
     (hfetch : fetchSpecS cpu (DFrac.own 1) c pc T R (FetchResult.F_Base w))
     (hdec : decodes32P (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c w ast)
     (hexec : execSpecClkPP cpu (DFrac.own 1) Privilege.Supervisor c p' c' ast pc (pc + 4#64) npc
-      iprop(T ∗ P) Q) :
+      iprop(T ∗ P) Q) (hT : resvOut cpu T) :
     confCells cpu (DFrac.own 1) Privilege.Supervisor c ∗ clockCells cpu ∗ pcIs cpu pc ∗ T ∗ R ∗ P ∗
     ▷ (confCells cpu (DFrac.own 1) p' c' -∗ clockCells cpu -∗ pcIs cpu npc -∗ R -∗ Q -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
@@ -84,9 +84,11 @@ theorem wpLoop_sT_base (cpu : CPU) (c c' : MConf) (hok : SConfPhys (GF := GF) c 
   ihave ⟨%mi, %minstret, %mcycle, %mtime, %mip, Hminstret_increment, Hminstret, Hmcycle, Hmtime, Hmip⟩ :=
     clockCells_cases _ $$ Hclock
   ihave ⟨HPC, HnextPC⟩ := pcIs_cases _ _ $$ Hpc
-  iapply wpLoop_restart
+  iapply wpLoop_restartO cpu T hT
+  iframe HT
   iintro %tick
   inext
+  iintro HT
   unfold riscvStep
   iapply swp_wpHart
   conf_cases HmConf
@@ -143,7 +145,7 @@ theorem wpLoop_sT_rvc (cpu : CPU) (c c' : MConf) (hok : SConfPhys (GF := GF) c f
     (hdec : decodes16P (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c h ast)
     (hexp : Functions.execute ast = pure (ExecutionResult.ExecuteAs ast'))
     (hexec : execSpecClkPP cpu (DFrac.own 1) Privilege.Supervisor c p' c' ast' pc (pc + 2#64) npc
-      iprop(T ∗ P) Q) :
+      iprop(T ∗ P) Q) (hT : resvOut cpu T) :
     confCells cpu (DFrac.own 1) Privilege.Supervisor c ∗ clockCells cpu ∗ pcIs cpu pc ∗ T ∗ R ∗ P ∗
     ▷ (confCells cpu (DFrac.own 1) p' c' -∗ clockCells cpu -∗ pcIs cpu npc -∗ R -∗ Q -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
@@ -151,9 +153,11 @@ theorem wpLoop_sT_rvc (cpu : CPU) (c c' : MConf) (hok : SConfPhys (GF := GF) c f
   ihave ⟨%mi, %minstret, %mcycle, %mtime, %mip, Hminstret_increment, Hminstret, Hmcycle, Hmtime, Hmip⟩ :=
     clockCells_cases _ $$ Hclock
   ihave ⟨HPC, HnextPC⟩ := pcIs_cases _ _ $$ Hpc
-  iapply wpLoop_restart
+  iapply wpLoop_restartO cpu T hT
+  iframe HT
   iintro %tick
   inext
+  iintro HT
   unfold riscvStep
   iapply swp_wpHart
   conf_cases HmConf

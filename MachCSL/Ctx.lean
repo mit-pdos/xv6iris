@@ -292,9 +292,10 @@ def ownCtxAt (E : EraGS) (cpu : CPU) (ξ : CtxId) : IProp GF := iprop%
 
 /-- What a hart's memory operations thread: its running context and its
 reservation fragment at ANY state (Rocq `resv_any`): some reservation or none
--- a page walk's exclusive re-read, or a user `LR` whose `SC` comes in a later
-cycle, leaves one standing, and every store clears it -- and either pending
-acquire bit (an `lr.aq` sets it; the paired write, or any store, clears it). -/
+-- an exclusive read leaves one standing until a store or the end of its
+instruction (the boundary clears it, W-RSV: a user `LR` whose `SC` comes in a
+later cycle has lost it by then) -- and either pending acquire bit (an `lr.aq`
+sets it; the paired write, or any store, clears it). -/
 def ctxTokAt (E : EraGS) (cpu : CPU) (ξ : CtxId) : IProp GF := iprop%
   ownCtxAt E cpu ξ ∗ ∃ r : Option Resv, resvFragAnyAt E cpu r
 

@@ -61,7 +61,8 @@ theorem userret_kstep [CurCtx] (cpu : CPU) (c c' : MConf) (kroot : BitVec 44)
   subst hnpc
   iintro ⟨#HI, HmConf, Hclock, Hpc, Htt, #Hcl, HP, HΦ⟩
   iapply (wpLoop_sT_instr cpu c c' hok.phys hmie hmenv Privilege.Supervisor (Or.inl rfl) pc (paOf trampPpn pc)
-    (pc + 4#64) false i iprop(transTok cpu KTier.kpt kroot ∗ urTrampCl) P Q htr htr2 hexec)
+    (pc + 4#64) false i iprop(transTok cpu KTier.kpt kroot ∗ urTrampCl) P Q htr htr2 hexec
+    (resvOut_sepL _ (resvOut_transTok cpu KTier.kpt kroot)))
   iframe HI HmConf Hclock Hpc HP HΦ
   iframe Htt
   iexact Hcl
@@ -114,7 +115,8 @@ theorem userret_wstep [CurCtx] (cpu : CPU) (c : MConf) (kroot : BitVec 44) (P : 
     (pc + 4#64) false urSfence
     iprop(pt2Win cpu kroot P ∗ □ urTrampCl ∗ □ kmapStatic ∗ ctxTok cpu curCtx) (gprFile cpu R)
     iprop((uptSlot cpu P ∗ □ urTrampCl ∗ □ kmapStatic ∗ ctxTok cpu curCtx) ∗ gprFile cpu R) htr htr2
-    (userret_exec_sfence_win cpu c hok.phys kroot P pc (pc + 4#64) R _))
+    (userret_exec_sfence_win cpu c hok.phys kroot P pc (pc + 4#64) R _)
+    (resvOut_sepR _ (resvOut_sepR _ (resvOut_sepR _ (resvOut_ctxTok cpu curCtx)))))
   iframe HI HmConf Hclock Hpc HR
   isplitl [Hwin Htok]
   · iframe Hwin Htok

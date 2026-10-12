@@ -30,9 +30,11 @@ A port of the Rocq prototype's TSO machine (`RiscvLang.mnode_step`,
   fence with a W-only successor (`fence rw,w`, `w,w`, `r,w`) is a no-op:
   W→W and R→W order come free from the single order.
 * **Exclusive / AMO accesses.**  An exclusive read reads memory at the top
-  and records a *reservation* (a snapshot of the bytes); while a hart holds
-  a reservation, every other hart's store or exclusive read overlapping it
-  is blocked (the hart self-loops).  The paired write appends like any store;
+  and records a *reservation* (a snapshot of the bytes); within the issuing
+  instruction (an AMO, or a page walk's Svadu A/D pair -- the reservation is
+  cleared at the hart's instruction boundary, W-RSV), every other hart's
+  store or exclusive read overlapping it is blocked (the hart self-loops).
+  The paired write appends like any store;
   an acquire pair (`.aq`) takes the floor past its own append.
 * **The non-coherent instruction cache.**  A fetch reads at a view at or
   above the hart's *instruction view* `itv`, as an agent that never authors

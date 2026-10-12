@@ -175,9 +175,11 @@ theorem uk_engine (π : Nat → Option UPerm) (sz : Nat) (Qp : Int → IProp GF)
   have hRtU : ∀ s', ukRt ret C pt T sz m' pc' M' s' → s'.file .cur_privilege = Privilege.User :=
     fun s' h' => h'.2.choose_spec.1.1.priv
   unfold ukontF
-  iapply wpLoop_ucStep
+  iapply wpLoop_ucStep _ (resvOut_uFr (ufRegF h C) (ubFrame curCtx D) s0)
+  iframe Hfr
   iintro %tick
   inext
+  iintro Hfr
   icases HKc with ⟨#Hmy, HKc⟩
   iapply swp_mono
   isplitr [Hfr HX]

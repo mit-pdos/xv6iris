@@ -86,7 +86,7 @@ No interrupt is ever *taken* here: `run_hart_waiting` does not dispatch (only
 the wake condition ever holds. -/
 theorem wpLoop_wait_wfi (cpu : CPU) (p : Privilege)
     (hp : p = Privilege.Machine ∨ p = Privilege.Supervisor) (c : MConf)
-    (bits : BitVec 32) (pc npc : BitVec 64) (F : IProp GF) :
+    (bits : BitVec 32) (pc npc : BitVec 64) (F : IProp GF) (hF : resvOut cpu F) :
     confCellsHS cpu (DFrac.own 1) p c (HartState.HART_WAITING (WaitReason.WAIT_WFI, bits)) ∗
     clockCells cpu ∗ Register.PC ↦ᵣ[cpu] pc ∗ Register.nextPC ↦ᵣ[cpu] npc ∗ F ∗
     (confCells cpu (DFrac.own 1) p c -∗ clockCells cpu -∗ pcIs cpu npc -∗ F -∗ wpLoop cpu)
@@ -95,9 +95,11 @@ theorem wpLoop_wait_wfi (cpu : CPU) (p : Privilege)
   iloeb as IH
   ihave ⟨%mi, %minstret, %mcycle, %mtime, %mip, Hminstret_increment, Hminstret, Hmcycle, Hmtime, Hmip⟩ :=
     clockCells_cases _ $$ Hclock
-  iapply wpLoop_restart
+  iapply wpLoop_restartO cpu F hF
+  iframe HF
   iintro %tick
   inext
+  iintro HF
   unfold riscvStep
   iapply swp_wpHart
   confhs_cases HmConf
@@ -173,9 +175,11 @@ theorem wpLoop_s_wfi_cycle [CurCtx] (cpu : CPU) (c : MConf) (tier : KTier) (root
   ihave ⟨%mi, %minstret, %mcycle, %mtime, %mip, Hminstret_increment, Hminstret, Hmcycle, Hmtime, Hmip⟩ :=
     clockCells_cases _ $$ Hclock
   ihave ⟨HPC, HnextPC⟩ := pcIs_cases _ _ $$ Hpc
-  iapply wpLoop_restart
+  iapply wpLoop_restartT cpu tier root
+  iframe HT
   iintro %tick
   inext
+  iintro HT
   unfold riscvStep
   iapply swp_wpHart
   conf_cases HmConf
@@ -227,7 +231,7 @@ theorem wpLoop_s_wfi_cycle [CurCtx] (cpu : CPU) (c : MConf) (tier : KTier) (root
     confhs_intro HmConf
     ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip
     iapply (wpLoop_wait_wfi cpu Privilege.Supervisor hp' c w pc (pc + 4#64)
-      iprop(transTok cpu tier root ∗ R))
+      iprop(transTok cpu tier root ∗ R) (resvOut_sepL R (resvOut_transTok cpu tier root)))
     iframe HmConf Hclock HPC HnextPC HT HR Hcont
   · swp_run 5
     confhs_intro HmConf
@@ -237,7 +241,7 @@ theorem wpLoop_s_wfi_cycle [CurCtx] (cpu : CPU) (c : MConf) (tier : KTier) (root
     iintro %mcycle' %mtime' %mip' HmConf Hmcycle Hmtime Hmip
     ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip
     iapply (wpLoop_wait_wfi cpu Privilege.Supervisor hp' c w pc (pc + 4#64)
-      iprop(transTok cpu tier root ∗ R))
+      iprop(transTok cpu tier root ∗ R) (resvOut_sepL R (resvOut_transTok cpu tier root)))
     iframe HmConf Hclock HPC HnextPC HT HR Hcont
 
 /-! ## The rule on the kernel execution context -/

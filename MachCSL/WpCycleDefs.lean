@@ -36,6 +36,31 @@ def execSpecPP (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) (p' : Privil
         Φ (ExecutionResult.Retire_Success ()))
     ⊢ swp cpu (Functions.execute ast) Φ
 
+/-- A frame on the left of an execute stage's resources. -/
+theorem execSpecPP.frameL {cpu : CPU} {dq : DFrac} {p : Privilege} {c : MConf} {p' : Privilege} {c' : MConf}
+    {ast : instruction} {pc npc₀ npc : BitVec 64} {P Q : IProp GF}
+    (h : execSpecPP cpu dq p c p' c' ast pc npc₀ npc P Q) (F : IProp GF) :
+    execSpecPP cpu dq p c p' c' ast pc npc₀ npc iprop(F ∗ P) iprop(F ∗ Q) := by
+  intro Φ
+  iintro ⟨HmConf, HPC, HnextPC, ⟨HF, HP⟩, HΦ⟩
+  iapply (h Φ)
+  iframe HmConf HPC HnextPC HP
+  inext
+  iintro HmConf HPC HnextPC HQ
+  iapply HΦ $$ HmConf HPC HnextPC [HF HQ]
+  iframe
+
+/-- Strengthening an execute stage's precondition. -/
+theorem execSpecPP.pre {cpu : CPU} {dq : DFrac} {p : Privilege} {c : MConf} {p' : Privilege} {c' : MConf}
+    {ast : instruction} {pc npc₀ npc : BitVec 64} {P Q : IProp GF}
+    (h : execSpecPP cpu dq p c p' c' ast pc npc₀ npc P Q) (P' : IProp GF) (hP : P' ⊢ P) :
+    execSpecPP cpu dq p c p' c' ast pc npc₀ npc P' Q := by
+  intro Φ
+  iintro ⟨HmConf, HPC, HnextPC, HP, HΦ⟩
+  iapply (h Φ)
+  iframe HmConf HPC HnextPC HΦ
+  iapply hP $$ HP
+
 /-- `execSpecPP` started in machine mode. -/
 abbrev execSpecP (cpu : CPU) (dq : DFrac) (c : MConf) (p' : Privilege) (c' : MConf) (ast : instruction)
     (pc npc₀ npc : BitVec 64) (P Q : IProp GF) : Prop :=

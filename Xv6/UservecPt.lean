@@ -57,7 +57,8 @@ theorem uservec_ux [CurCtx] (cpu : CPU) (c : MConf) (P : UPtd) (hc : urConfOk GF
     iprop((uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx) ∗ gprFile cpu R' ∗ E')
     (uptTransSpecX_tramp cpu c false P hok pc hlt hv)
     (by rw [← urPa2 pc hpc']; exact uptTransSpecX_tramp cpu c false P hok (pc + 2#64) hlt2 hv2)
-    (hexec.frameL _))
+    (hexec.frameL _)
+    (resvOut_sepR _ (resvOut_sepR _ (resvOut_ctxTok cpu curCtx))))
   iframe HI HmConf Hclock Hpc
   isplitl [Hslot Htok]
   · iframe Hslot Htok
@@ -134,7 +135,8 @@ theorem uservec_usd [CurCtx] (cpu : CPU) (c : MConf) (P : UPtd) (hc : urConfOk G
     (uptTransSpecX_tramp cpu c false P hok pc hlt hvp)
     (by rw [← urPa2 pc hpc']; exact uptTransSpecX_tramp cpu c false P hok (pc + 2#64) hlt2 hvp2)
     (userret_exec_conseq hexec
-      (by iintro ⟨⟨Hs, #Hk, Ht⟩, HF, Hb⟩; iframe Hs Ht HF Hb; iexact Hk) .rfl))
+      (by iintro ⟨⟨Hs, #Hk, Ht⟩, HF, Hb⟩; iframe Hs Ht HF Hb; iexact Hk) .rfl)
+    (resvOut_sepR _ (resvOut_sepR _ (resvOut_ctxTok cpu curCtx))))
   iframe HI HmConf Hclock Hpc HF Hb
   isplitl [Hslot Htok]
   · iframe Hslot Htok
@@ -217,7 +219,8 @@ theorem uservec_uld [CurCtx] (cpu : CPU) (c : MConf) (P : UPtd) (hc : urConfOk G
     (uptTransSpecX_tramp cpu c false P hok pc hlt hvp)
     (by rw [← urPa2 pc hpc']; exact uptTransSpecX_tramp cpu c false P hok (pc + 2#64) hlt2 hvp2)
     (userret_exec_conseq hexec
-      (by iintro ⟨⟨Hs, #Hk, Ht⟩, HF, Hb⟩; iframe Hs Ht HF Hb; iexact Hk) .rfl))
+      (by iintro ⟨⟨Hs, #Hk, Ht⟩, HF, Hb⟩; iframe Hs Ht HF Hb; iexact Hk) .rfl)
+    (resvOut_sepR _ (resvOut_sepR _ (resvOut_ctxTok cpu curCtx))))
   iframe HI HmConf Hclock Hpc HF Hb
   isplitl [Hslot Htok]
   · iframe Hslot Htok

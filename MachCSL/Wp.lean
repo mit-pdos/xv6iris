@@ -380,27 +380,6 @@ theorem swp_wpHart (cpu : CPU) (m : SailM Unit) :
 
 /-! ## The per-event rules -/
 
-/-- The cycle boundary: to be safe forever it suffices to be safe for the next
-cycle, whichever way the clock-tick choice goes. -/
-theorem wpLoop_restart (cpu : CPU) :
-    (∀ tick : Bool, ▷ wpHart cpu (riscvStep tick)) ⊢@{IProp GF} wpLoop cpu := by
-  unfold wpLoop
-  iintro H
-  iapply wpHart_lift
-  iintro %σ Hσ
-  iapply fupd_mask_intro LawfulSet.empty_subset
-  iintro Hclose
-  isplit
-  · ipureintro
-    exact ⟨rfl, riscvStep false, σ, false, rfl, rfl⟩
-  inext
-  iintro %m' %σ' %Hs _
-  obtain ⟨tick, rfl, rfl⟩ := Hs
-  imod Hclose
-  imodintro
-  iframe Hσ
-  iexact H
-
 /-- Extract one hart's register interpretation from the state
 interpretation, with a closing wand that accepts an updated register file. -/
 theorem machInterp_acc (σ : MState) (cpu : CPU) :
@@ -1251,6 +1230,41 @@ theorem memModel_resv (σ : MState) (cpu : CPU) (r : Option Resv) (b : Bool) :
   have := Option.some.inj Hl
   exact ⟨congrArg Prod.fst this, congrArg Prod.snd this⟩
 
+/-- A dropped reservation (a blocked exclusive read, or -- W-RSV -- the
+instruction boundary): the hart's reservation, whatever it was, is dropped. -/
+theorem hartViews_dropResv (σ : MState) (cpu c : CPU) :
+    hartViewsAt (GF := GF) E (σ.dropResv cpu) c = hartViewsAt E σ c := by
+  unfold hartViewsAt
+  rfl
+
+theorem memModel_dropResv (σ : MState) (cpu : CPU) (r : Option Resv) (b : Bool) :
+    memModelAt E σ ∗ resvFragAt E cpu r b ⊢@{IProp GF}
+      |==> (memModelAt E (σ.dropResv cpu) ∗ resvFragAt E cpu none b) := by
+  iintro ⟨Hmm, Hfrag⟩
+  ihave %hres : ⌜σ.resv cpu = r ∧ (σ.hr cpu).acq = b⌝ $$ [Hmm Hfrag]
+  · iapply memModel_resv E σ cpu r b $$ [Hmm Hfrag]
+    iframe
+  unfold memModelAt
+  rw [rsvModelAt_congr E (σ := σ) (σ' := σ.dropResv cpu) rfl]
+  icases Hmm with ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
+  unfold resvFragAt
+  imod ghost_map_update ((none, b) : ResvVal) $$ Hresv Hfrag with ⟨Hresv, Hfrag⟩
+  imodintro
+  have hresv : resvMap (σ.dropResv cpu) = Iris.Std.PartialMap.insert (resvMap σ) cpu.val (none, b) :=
+    resvMap_upd σ _ cpu _ _ (by simp [updCpu, hres.2]) (fun c hc => by simp [updCpu, hc])
+  rw [hresv]
+  iframe Hfrag Htop Hauth Hresv Hrsv
+  isplitl [Hviews]
+  · rw [BigSepL.bigSepL_eq (fun {_ c} _ => hartViews_dropResv E σ cpu c)]
+    iexact Hviews
+  · ipureintro
+    obtain ⟨h1, h2, h3, h4⟩ := hmm
+    refine ⟨h1, h2, fun c r hr => ?_, h4⟩
+    simp only [updCpu] at hr
+    split at hr
+    · cases hr
+    · exact h3 c r hr
+
 /-- Take one hart's view mirrors out of the big-sep, to be put back at a state
 that agrees with `σ` on the other harts. -/
 theorem hartViews_acc (σ : MState) (cpu : CPU) :
@@ -1974,5 +1988,137 @@ theorem swp_sail_barrier (cpu : CPU) (b : barrier_kind) (Φ : Unit → IProp GF)
     iexact HΦ
 
 end bytes
+
+/-! ## The cycle boundary (W-RSV, D19 (b) form (i-a))
+
+At the instruction boundary (`hartStep`'s `.pure` arm) the hart's reservation
+is CLEARED (`σ.dropResv cpu`; Zalrsc: a reservation may be invalidated at any
+time; the pf twin's `instrPost` does the same), so restarting the cycle needs
+the hart's reservation fragment and hands it back at `none`. -/
+
+section restart
+variable [MachGS hlc GF]
+
+/-- The cycle boundary at a known acquire bit: to be safe forever it suffices
+to be safe for the next cycle, whichever way the clock-tick choice goes, with
+the hart's reservation cleared (the pending acquire bit is kept). -/
+theorem wpLoop_restartB (cpu : CPU) (r : Option Resv) (b : Bool) :
+    resvFrag cpu r b ∗ (∀ tick : Bool, ▷ (resvFrag cpu none b -∗ wpHart cpu (riscvStep tick)))
+    ⊢@{IProp GF} wpLoop cpu := by
+  unfold wpLoop
+  iintro ⟨Hf, H⟩
+  iapply wpHart_lift
+  iintro %σ Hσ
+  icases Hσ with ⟨Hregs, Hmem, Hmm, Hdev⟩
+  imod memModel_dropResv _ σ cpu r b $$ [$Hmm $Hf] with ⟨Hmm, Hf⟩
+  iapply fupd_mask_intro LawfulSet.empty_subset
+  iintro Hclose
+  isplit
+  · ipureintro
+    exact ⟨rfl, riscvStep false, σ.dropResv cpu, false, rfl, rfl⟩
+  inext
+  iintro %m' %σ' %Hs _
+  obtain ⟨tick, rfl, rfl⟩ := Hs
+  imod Hclose
+  imodintro
+  isplitl [Hregs Hmem Hmm Hdev]
+  · unfold machInterp
+    iframe
+  · ispecialize H $$ %tick
+    iapply H
+    iexact Hf
+
+/-- The cycle boundary (the form the cycle rules use): the hart's reservation
+fragment, at any reservation, comes back cleared. -/
+theorem wpLoop_restart (cpu : CPU) (r : Option Resv) :
+    resvFragAny cpu r ∗ (∀ tick : Bool, ▷ (resvFragAny cpu none -∗ wpHart cpu (riscvStep tick)))
+    ⊢@{IProp GF} wpLoop cpu := by
+  iintro ⟨Hf, H⟩
+  icases resvFragAny_cases cpu r $$ Hf with ⟨%b, Hf⟩
+  iapply wpLoop_restartB cpu r b
+  iframe Hf
+  iintro %tick
+  ispecialize H $$ %tick
+  inext
+  iintro Hf
+  iapply H
+  iapply resvFragAny_of cpu none b $$ Hf
+
+/-- The cycle boundary with the reservation fragment inside a context token
+(`ctxTok = ownCtx ∗ ∃ r, resvFragAny cpu r`): the token is lent to the
+boundary and comes back re-formed (its fragment cleared). -/
+theorem wpLoop_restartC (cpu : CPU) (ξ : CtxId) :
+    ctxTok cpu ξ ∗ (∀ tick : Bool, ▷ (ctxTok cpu ξ -∗ wpHart cpu (riscvStep tick)))
+    ⊢@{IProp GF} wpLoop cpu := by
+  iintro ⟨Htok, H⟩
+  icases ctxTok_cases cpu ξ $$ Htok with ⟨Hown, ⟨%r, Hf⟩⟩
+  iapply wpLoop_restart cpu r
+  iframe Hf
+  iintro %tick
+  ispecialize H $$ %tick
+  inext
+  iintro Hf
+  iapply H
+  iapply ctxTok_intro cpu ξ none $$ [$Hown $Hf]
+
+/-- `T` holds the hart's reservation fragment, extractable and replaceable by
+the cleared one (W-RSV): what a cycle rule over an abstract resource `T`
+(the trampoline's translation resource, a wait's frame) asks of `T` so the
+boundary can clear the reservation. -/
+def resvOut (cpu : CPU) (T : IProp GF) : Prop :=
+  T ⊢ (∃ r : Option Resv, resvFragAny cpu r) ∗ (resvFragAny cpu none -∗ T)
+
+theorem resvOut_frag (cpu : CPU) : resvOut (GF := GF) cpu iprop(∃ r : Option Resv, resvFragAny cpu r) := by
+  unfold resvOut
+  iintro Hf
+  iframe Hf
+  iintro Hf
+  iexists none
+  iexact Hf
+
+theorem resvOut_ctxTok (cpu : CPU) (ξ : CtxId) : resvOut (GF := GF) cpu (ctxTok cpu ξ) := by
+  unfold resvOut
+  iintro Htok
+  icases ctxTok_cases cpu ξ $$ Htok with ⟨Hown, Hf⟩
+  iframe Hf
+  iintro Hf
+  iapply ctxTok_intro cpu ξ none $$ [$Hown $Hf]
+
+theorem resvOut_sepL {cpu : CPU} {A : IProp GF} (B : IProp GF) (h : resvOut cpu A) :
+    resvOut cpu iprop(A ∗ B) := by
+  unfold resvOut at *
+  iintro ⟨HA, HB⟩
+  ihave ⟨Hf, HA⟩ := h $$ HA
+  iframe Hf
+  iintro Hf
+  iframe HB
+  iapply HA $$ Hf
+
+theorem resvOut_sepR {cpu : CPU} (A : IProp GF) {B : IProp GF} (h : resvOut cpu B) :
+    resvOut cpu iprop(A ∗ B) := by
+  unfold resvOut at *
+  iintro ⟨HA, HB⟩
+  ihave ⟨Hf, HB⟩ := h $$ HB
+  iframe Hf
+  iintro Hf
+  iframe HA
+  iapply HB $$ Hf
+
+/-- The cycle boundary over a resource holding the fragment. -/
+theorem wpLoop_restartO (cpu : CPU) (T : IProp GF) (hT : resvOut cpu T) :
+    T ∗ (∀ tick : Bool, ▷ (T -∗ wpHart cpu (riscvStep tick))) ⊢@{IProp GF} wpLoop cpu := by
+  unfold resvOut at hT
+  iintro ⟨HT, H⟩
+  ihave ⟨⟨%r, Hf⟩, HT⟩ := hT $$ HT
+  iapply wpLoop_restart cpu r
+  iframe Hf
+  iintro %tick
+  ispecialize H $$ %tick
+  inext
+  iintro Hf
+  iapply H
+  iapply HT $$ Hf
+
+end restart
 
 end MachCSL

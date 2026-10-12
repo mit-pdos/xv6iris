@@ -13,7 +13,10 @@ Rocq's `wp_spin_body` takes `mmode_config q`, `pmpcfg_n ↦ᵣ{q} pmpcfg0` with
 `pmp_allows_all pmpcfg0`, `pc_is pc_spin`, `gpr_file m` and `kernel_text`.
 Here the configuration and its PMP condition are `mConf cpu dq c` with
 `MConf.ok c`, and the clock cells are their own resource (`clockCells`, as in
-every machine-mode contract of this port).
+every machine-mode contract of this port).  The hart's reservation fragment
+(`∃ r, resvFragAny cpu r`) is a resource too (W-RSV, D19 (b) form (i-a)):
+every instruction boundary clears the hart's reservation, so every cycle
+rule is lent the fragment.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
@@ -33,7 +36,8 @@ def spinAddr : BitVec 64 := KA.«spin»
 runs forever. -/
 def wp_spin_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
     (cpu : CPU) (dq : DFrac) (c : MConf) (_hok : MConf.ok (GF := GF) c) (R : RegMap) : Prop :=
-  mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu spinAddr ∗ gprFile cpu R ∗ kernelText
+  mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu spinAddr ∗ gprFile cpu R ∗
+  (∃ r : Option Resv, resvFragAny cpu r) ∗ kernelText
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `spin` (Rocq `Module Type SPIN`). -/

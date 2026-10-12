@@ -30,7 +30,8 @@ parked half (`fnOk`).
   of the parked `LFence true true false true` is the identity, `viewRelPark`); the boundary, the
   silent nodes, register reads and writes (`LSilent`/`LRegW`/`LCtrl`, all `lbInert`) = 1
   `primStep` with `σ' = σ` / `setReg`, `R_mem` by `memFrame` (W2a `pfFrameRowMem`, W2b
-  `viewRelInert`); MMIO = 1 step (`devRead`/`devWrite`, the whole-footprint `devBytes` from HSafe,
+  `viewRelInert`) -- at the boundary `σ' = σ.dropResv cpu` (W-RSV: the reservation is cleared,
+  `rmemDropResv`); MMIO = 1 step (`devRead`/`devWrite`, the whole-footprint `devBytes` from HSafe,
   `devOfSafe`); RAM read/write, barrier, announce/marker = 1 step through `pfStepTso`, its
   hypotheses discharged here: `ramBytes` from HSafe (`ramOfSafe`, `notOthers` from `R-resv` and
   the adjacency), (1) from the full run's `pairAdjacent`, (2) from `SimRel`, (3) from `Hyps.cut`,
@@ -666,6 +667,19 @@ theorem memFrame {c c' : Wpcfg Pexv6 Efab} {st rest : List (Nat × Wlabel)} {i :
   · exact viewRelInert _ σ σ' st i l hin hV hsr
   · exact viewRelSame (viewRelPark i hV) hsr
 
+/-- `R-resv` survives the instruction boundary's reservation clearing (W-RSV: `hartStep`'s `.pure`
+arm is `σ.dropResv cpu`, the pf twin's `instrPost` clears `wRes` alike). -/
+theorem rmemDropResv {P D : Type} {c : Wpcfg P D} {st : List (Nat × Wlabel)} {σ : MState} (cpu : CPU)
+    (h : rmem c st σ) : rmem c st (σ.dropResv cpu) := by
+  obtain ⟨hl, hi, hh, hr⟩ := h
+  refine ⟨hl, hi, hh, fun c' => ?_⟩
+  by_cases hc : c' = cpu
+  · subst hc
+    left
+    simp [updCpu]
+  · have := hr c'
+    simpa [updCpu, hc] using this
+
 /-! ## The hypotheses W4 is parametric in -/
 
 /-- **W4's parameters** (all but `tso` MachCSL-side or run-level facts):
@@ -938,7 +952,8 @@ theorem lbInertErw (w : ErwKind) : lbInert (erwLabel w) = true ∧ frameLbl (erw
 
 /-- **THE HART ROWS** (F4 + F5; census table B6): a hart's own node step is 0 MachCSL steps (the
 parked-fence fire, the lost-SC retry) or exactly 1 `primStep` of thread `cpu + 1`: the boundary
-(`hartStep .pure`), the silent nodes and register reads/writes (`σ' = σ` / `setReg`), MMIO
+(`hartStep .pure`, `σ' = σ.dropResv cpu`), the silent nodes and register reads/writes (`σ' = σ` /
+`setReg`), MMIO
 (`devRead`/`devWrite`, the footprint from HSafe), and the RAM/fence/announce nodes through
 `pfStepTso`. -/
 theorem simNode {fok : Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop}
@@ -1037,12 +1052,13 @@ theorem simNode {fok : Image → List Wmsg → Nat → Int → List (Nat × BitV
   generalize hm : H cpu = mm at hn hlkc
   cases mm with
   | pure a =>
-    -- THE BOUNDARY
+    -- THE BOUNDARY: the hart's reservation is cleared (W-RSV)
     obtain ⟨tick, rfl, rfl, rfl, rfl, hd'', -, -⟩ := hn
     obtain ⟨hm1, hv1, -, -⟩ := memFrame (σ' := g.m) hs trivial (Or.inl rfl) hadj hmem hview hauth
       hcoh rfl rfl rfl (sameReadRefl _)
-    exact post _ none g.m 1 rfl (by omega) (fun _ h => by cases h) rfl (fun _ _ => rfl) (by rw [hd'']; exact hDS)
-      hm1 hv1 (hartRun ht hgen hpow cpu (by rw [hm]; exact hlkc)
+    exact post _ none (g.m.dropResv cpu) 1 rfl (by omega) (fun _ h => by cases h) rfl (fun _ _ => rfl)
+      (by rw [hd'']; exact hDS) (rmemDropResv cpu hm1) (viewRelSame hv1 (sameReadDropResv g.m cpu))
+      (hartRun ht hgen hpow cpu (by rw [hm]; exact hlkc)
         (by rw [hm]; exact ⟨tick, rfl, rfl⟩))
   | impure e k =>
   cases e with

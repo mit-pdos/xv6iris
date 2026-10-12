@@ -198,8 +198,15 @@ theorem wp_m_sd [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (G
     ⊢ wpLoop cpu := by
   iintro ⟨HI, HmConf, Hclock, Hpc, Hrs1, Hrs2, Htok, Hw, HΦ⟩
   icases pwordPointsTo_cases _ _ _ _ $$ Hw with ⟨%⟨hram, hal⟩, Hbytes⟩
+  icases ctxTok_cases cpu curCtx $$ Htok with ⟨Hown, Hf⟩
   iapply wpLoop_m_instr cpu dq c c hok pc _ is_rvc _ _ _
-    (execSpec_sd cpu dq c hok pc _ imm rs1 rs2 hrs1 hrs2 a v old hram hal)
+    ((execSpec_sd cpu dq c hok pc _ imm rs1 rs2 hrs1 hrs2 a v old hram hal).pre
+      iprop(resvFragAny cpu none ∗ gpr cpu rs1 (DFrac.own 1) a ∗ gpr cpu rs2 (DFrac.own 1) v ∗
+        ownCtx cpu curCtx ∗ bytesPointsTo (a + BitVec.signExtend 64 imm) 8 (DFrac.own 1) old)
+      (by
+        iintro ⟨Hf, Hrs1, Hrs2, Hown, Hb⟩
+        iframe Hrs1 Hrs2 Hb
+        iapply ctxTok_intro cpu curCtx none $$ [$Hown $Hf]))
   iframe
   inext
   iintro HmConf Hclock Hpc ⟨Hrs1, Hrs2, Htok, Hbytes⟩
@@ -220,8 +227,15 @@ theorem wp_m_ld [CurCtx] (cpu : CPU) (dq dq' : DFrac) (c : MConf) (hok : MConf.o
     ⊢ wpLoop cpu := by
   iintro ⟨HI, HmConf, Hclock, Hpc, Hrd, Hrs1, Htok, Hw, HΦ⟩
   icases pwordPointsTo_cases _ _ _ _ $$ Hw with ⟨%⟨hram, hal⟩, Hbytes⟩
+  icases ctxTok_cases cpu curCtx $$ Htok with ⟨Hown, Hf⟩
   iapply wpLoop_m_instr cpu dq c c hok pc _ is_rvc _ _ _
-    (execSpec_ld cpu dq dq' c hok pc _ imm rd rs1 hrd hrs1 v a data hram hal)
+    ((execSpec_ld cpu dq dq' c hok pc _ imm rd rs1 hrd hrs1 v a data hram hal).pre
+      iprop(resvFragAny cpu none ∗ gpr cpu rd (DFrac.own 1) v ∗ gpr cpu rs1 (DFrac.own 1) a ∗
+        ownCtx cpu curCtx ∗ bytesPointsTo (a + BitVec.signExtend 64 imm) 8 dq' data)
+      (by
+        iintro ⟨Hf, Hrd, Hrs1, Hown, Hb⟩
+        iframe Hrd Hrs1 Hb
+        iapply ctxTok_intro cpu curCtx none $$ [$Hown $Hf]))
   iframe
   inext
   iintro HmConf Hclock Hpc ⟨Hrd, Hrs1, Htok, Hbytes⟩

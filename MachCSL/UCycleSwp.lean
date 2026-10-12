@@ -357,17 +357,28 @@ theorem swp_ucTick (hT : UcTickFoot D) (s : UWSt) (hm : UcMisa D s) (Φ : Unit �
   unfold uFr
   iframe
 
+/-- The user frames hold the hart's reservation fragment (the walker
+`ctxTok`'s `uResvTok`, whatever the bookkeeping bit). -/
+theorem resvOut_uFr (s : UWSt) : resvOut cpu (uFr RF BF s) := by
+  unfold uFr uResvTok
+  exact resvOut_sepR _ (resvOut_sepR _ (resvOut_sepR _ (resvOut_frag cpu)))
+
 /-- The machine step, as the loop sees it: the cycle, then the tick if the
-machine chose one. -/
-theorem wpLoop_ucStep :
-    (∀ tick : Bool, ▷ swp cpu (try_step 0 false)
-        (fun _ => swp cpu (if tick then tick_clock () else pure ()) (fun _ => wpLoop cpu)))
+machine chose one.  The boundary clears the hart's reservation (W-RSV): `T`
+(in practice the user frames, `resvOut_uFr`) lends it the fragment and comes
+back with it cleared. -/
+theorem wpLoop_ucStep (T : IProp GF) (hT : resvOut cpu T) :
+    T ∗ (∀ tick : Bool, ▷ (T -∗ swp cpu (try_step 0 false)
+        (fun _ => swp cpu (if tick then tick_clock () else pure ()) (fun _ => wpLoop cpu))))
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro H
-  iapply wpLoop_restart
+  iintro ⟨HT, H⟩
+  iapply wpLoop_restartO cpu T hT
+  iframe HT
   iintro %tick
   ispecialize H $$ %tick
   inext
+  iintro HT
+  ispecialize H $$ HT
   iapply swp_wpHart
   unfold riscvStep
   iapply swp_bind
@@ -390,9 +401,11 @@ theorem wpLoop_uwStep (hD : UcFoot D) (hW : UwFoot D) (hT : UcTickFoot D) (s : U
     ⊢ wpLoop cpu := by
   have hmL : UcMisa D (uwLand wr s).2 := ⟨hm.rd, by rw [uwLand_misa, hm.val]⟩
   iintro ⟨Hfr, HK⟩
-  iapply wpLoop_ucStep
+  iapply wpLoop_ucStep _ (resvOut_uFr RF BF s)
+  iframe Hfr
   iintro %tick
   inext
+  iintro Hfr
   iapply swp_uwTryStep RF BF hD hW s wr ib h
   iframe Hfr
   iintro Hfr

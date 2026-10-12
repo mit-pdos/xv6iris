@@ -283,7 +283,7 @@ theorem wpLoop_sT_instr (cpu : CPU) (c c' : MConf) (hok : SConfPhys (GF := GF) c
     (pc pa npc : BitVec 64) (is_rvc : Bool) (i : instruction) (T P Q : IProp GF)
     (htr : transSpecX cpu c T pc pa) (htr2 : transSpecX cpu c T (pc + 2#64) (pa + 2#64))
     (hexec : execSpecPP cpu (DFrac.own 1) Privilege.Supervisor c p' c' i pc (pc + instrLen is_rvc) npc
-      iprop(T ∗ P) Q) :
+      iprop(T ∗ P) Q) (hT : resvOut cpu T) :
     instrX pc pa is_rvc i ∗ confCells cpu (DFrac.own 1) Privilege.Supervisor c ∗ clockCells cpu ∗
     pcIs cpu pc ∗ T ∗ P ∗
     ▷ (confCells cpu (DFrac.own 1) p' c' -∗ clockCells cpu -∗ pcIs cpu npc -∗ Q -∗ wpLoop cpu)
@@ -298,7 +298,7 @@ theorem wpLoop_sT_instr (cpu : CPU) (c c' : MConf) (hok : SConfPhys (GF := GF) c
     simp only [instrLen] at hexec
     iapply (wpLoop_sT_base cpu c c' hok hmie p' hp' pc npc w i T (instrBytesX pc pa (FetchResult.F_Base w)) P Q
       (fetchSpecS_instrBytesX_base cpu c false hok T pc pa htr htr2 w) (hdec.2 cpu (DFrac.own 1) c hmenv)
-      hexec.clk)
+      hexec.clk hT)
     iframe HmConf Hclock Hpc HT HP
     iframe #
     inext
@@ -311,7 +311,7 @@ theorem wpLoop_sT_instr (cpu : CPU) (c c' : MConf) (hok : SConfPhys (GF := GF) c
     simp only [instrLen] at hexec
     iapply (wpLoop_sT_rvc cpu c c' hok hmie p' hp' pc npc h i₀ i T (instrBytesX pc pa (FetchResult.F_RVC h)) P Q
       (fetchSpecS_instrBytesX_rvc cpu c false hok T pc pa htr h) (hdec16.2 cpu (DFrac.own 1) c hmenv) hexp
-      hexec.clk)
+      hexec.clk hT)
     iframe HmConf Hclock Hpc HT HP
     iframe #
     inext

@@ -139,7 +139,8 @@ abbrev MState.afterExcl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : Bi
            hr := updCpu σ.hr cpu ((σ.hr cpu).afterExcl σ.top acq),
            resv := updCpu σ.resv cpu (some (snapOf pa n w)) }
 
-/-- A blocked exclusive read abandons the hart's own reservation. -/
+/-- A blocked exclusive read abandons the hart's own reservation; so does the
+instruction boundary (`hartStep`'s `.pure` arm). -/
 abbrev MState.dropResv (σ : MState) (cpu : CPU) : MState :=
   { σ with resv := updCpu σ.resv cpu none }
 
@@ -529,10 +530,17 @@ theorem hartObs_regWrite_quiet (cpu : CPU) (σ : MState) (r : Register) (w : Reg
 
 /-- `hartStep cpu m σ m' σ'`: hart `cpu`, with `m` left to run in state `σ`,
 consumes one event (or restarts the cycle at the boundary, or is blocked and
-retries the event) and continues with `m'` in state `σ'`. -/
+retries the event) and continues with `m'` in state `σ'`.
+
+At the boundary (`.pure`) the hart's reservation is CLEARED (W-RSV, D19 (b)
+form (i-a)): Zalrsc lets an implementation invalidate a reservation at any
+time, and the pf twin does the same (`instrPost … wRes := none`).  So no
+reservation outlives the instruction that took it: the `evStep` guards and
+`blockedStep`'s arms below range over IN-FLIGHT reservations only (an AMO's,
+or a page walk's Svadu A/D pair). -/
 def hartStep (cpu : CPU) (m : SailM Unit) (σ : MState) (m' : SailM Unit) (σ' : MState) : Prop :=
   match m with
-  | .pure _ => ∃ tick : Bool, m' = riscvStep tick ∧ σ' = σ
+  | .pure _ => ∃ tick : Bool, m' = riscvStep tick ∧ σ' = σ.dropResv cpu
   | .impure (.error _) _ => False
   | .impure (.ok o) k =>
       (∃ v : o.ret, m' = k v ∧ evStep cpu o σ v σ') ∨ (blockedStep cpu o σ σ' ∧ m' = m)

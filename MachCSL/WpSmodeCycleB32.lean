@@ -39,9 +39,11 @@ theorem wpLoop_s_base [CurCtx] (cpu : CPU) (c c' : MConf) (tier : KTier) (root :
   ihave ⟨%mi, %minstret, %mcycle, %mtime, %mip, Hminstret_increment, Hminstret, Hmcycle, Hmtime, Hmip⟩ :=
     clockCells_cases _ $$ Hclock
   ihave ⟨HPC, HnextPC⟩ := pcIs_cases _ _ $$ Hpc
-  iapply wpLoop_restart
+  iapply wpLoop_restartT cpu tier root
+  iframe HT
   iintro %tick
   inext
+  iintro HT
   unfold riscvStep
   iapply swp_wpHart
   conf_cases HmConf

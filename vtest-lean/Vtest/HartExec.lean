@@ -3,7 +3,8 @@ Vtest: ONE EVENT OF ONE HART, executably, and the proof that it is a step of
 the language.
 
 `hartExec pol cpu m x` takes the hart whose remaining computation is `m` one
-step: at the cycle boundary it restarts the model's cycle, and otherwise it
+step: at the cycle boundary it restarts the model's cycle (clearing the
+hart's reservation, as the language's `.pure` arm does -- W-RSV), and otherwise it
 answers the event at the head of `m` from the executable state `x`.  The
 language's relation (`MachCSL.hartStep`) leaves several things open -- the
 clock tick at a boundary, the view a load or a fetch reads at, the value of a
@@ -450,7 +451,7 @@ theorem blockedExec_sound (cpu : CPU) (x : XState) (o : Outcome Register Registe
 /-- One step of hart `cpu`, whose remaining computation is `m`. -/
 def hartExec (pol : HPol) (cpu : CPU) (m : SailM Unit) (x : XState) : Option (SailM Unit × XState) :=
   match m with
-  | .pure _ => some (riscvStep pol.tick, x)
+  | .pure _ => some (riscvStep pol.tick, x.dropResv cpu)
   | .impure (.error _) _ => none
   | .impure (.ok o) k =>
     match evExec pol cpu x o with
@@ -467,7 +468,7 @@ theorem hartExec_sound (pol : HPol) (cpu : CPU) (m : SailM Unit) (x : XState) (m
   | pure u =>
     simp only [hartExec, Option.some.injEq, Prod.mk.injEq] at h
     obtain ⟨rfl, rfl⟩ := h
-    exact ⟨pol.tick, rfl, rfl⟩
+    exact ⟨pol.tick, rfl, XState.abs_dropResv ..⟩
   | impure call k =>
     cases call with
     | error e => simp [hartExec] at h

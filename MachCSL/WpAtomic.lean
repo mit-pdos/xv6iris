@@ -39,41 +39,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors}
 section fixed
 variable [MachFixedGS hlc GF] (E : EraGS)
 
-theorem hartViews_dropResv (σ : MState) (cpu c : CPU) :
-    hartViewsAt (GF := GF) E (σ.dropResv cpu) c = hartViewsAt E σ c := by
-  unfold hartViewsAt
-  rfl
-
-/-- After a blocked exclusive read: the hart's reservation, whatever it was,
-is dropped. -/
-theorem memModel_dropResv (σ : MState) (cpu : CPU) (r : Option Resv) (b : Bool) :
-    memModelAt E σ ∗ resvFragAt E cpu r b ⊢@{IProp GF}
-      |==> (memModelAt E (σ.dropResv cpu) ∗ resvFragAt E cpu none b) := by
-  iintro ⟨Hmm, Hfrag⟩
-  ihave %hres : ⌜σ.resv cpu = r ∧ (σ.hr cpu).acq = b⌝ $$ [Hmm Hfrag]
-  · iapply memModel_resv E σ cpu r b $$ [Hmm Hfrag]
-    iframe
-  unfold memModelAt
-  rw [rsvModelAt_congr E (σ := σ) (σ' := σ.dropResv cpu) rfl]
-  icases Hmm with ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
-  unfold resvFragAt
-  imod ghost_map_update ((none, b) : ResvVal) $$ Hresv Hfrag with ⟨Hresv, Hfrag⟩
-  imodintro
-  have hresv : resvMap (σ.dropResv cpu) = Iris.Std.PartialMap.insert (resvMap σ) cpu.val (none, b) :=
-    resvMap_upd σ _ cpu _ _ (by simp [updCpu, hres.2]) (fun c hc => by simp [updCpu, hc])
-  rw [hresv]
-  iframe Hfrag Htop Hauth Hresv Hrsv
-  isplitl [Hviews]
-  · rw [BigSepL.bigSepL_eq (fun {_ c} _ => hartViews_dropResv E σ cpu c)]
-    iexact Hviews
-  · ipureintro
-    obtain ⟨h1, h2, h3, h4⟩ := hmm
-    refine ⟨h1, h2, fun c r hr => ?_, h4⟩
-    simp only [updCpu] at hr
-    split at hr
-    · cases hr
-    · exact h3 c r hr
-
 /-- An exclusive read: the read side goes to the top, the floor too iff an
 acquire, and the snapshot of the (top) bytes becomes the reservation. -/
 theorem memModel_read_excl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))

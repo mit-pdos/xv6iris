@@ -55,19 +55,27 @@ theorem execSpecPP.clk {cpu : CPU} {dq : DFrac} {p : Privilege} {c : MConf} {p' 
   iexists ip, mt
   iframe
 
-/-- A frame on the left of an execute stage's resources. -/
-theorem execSpecPP.frameL {cpu : CPU} {dq : DFrac} {p : Privilege} {c : MConf} {p' : Privilege} {c' : MConf}
-    {ast : instruction} {pc npc₀ npc : BitVec 64} {P Q : IProp GF}
-    (h : execSpecPP cpu dq p c p' c' ast pc npc₀ npc P Q) (F : IProp GF) :
-    execSpecPP cpu dq p c p' c' ast pc npc₀ npc iprop(F ∗ P) iprop(F ∗ Q) := by
-  intro Φ
-  iintro ⟨HmConf, HPC, HnextPC, ⟨HF, HP⟩, HΦ⟩
-  iapply (h Φ)
-  iframe HmConf HPC HnextPC HP
+/-- The cycle boundary with the reservation fragment inside the translation
+token (`transTok = transSlotAt ∗ ctxTok`, W-RSV): the token is lent to the
+boundary, which clears the fragment, and comes back re-formed. -/
+theorem wpLoop_restartT [CurCtx] (cpu : CPU) (tier : KTier) (root : BitVec 44) :
+    transTok cpu tier root ∗ (∀ tick : Bool, ▷ (transTok cpu tier root -∗ wpHart cpu (riscvStep tick)))
+    ⊢@{IProp GF} wpLoop cpu := by
+  iintro ⟨HT, H⟩
+  icases transTok_cases cpu tier root $$ HT with ⟨Hslot, Htok⟩
+  iapply wpLoop_restartC cpu curCtx
+  iframe Htok
+  iintro %tick
+  ispecialize H $$ %tick
   inext
-  iintro HmConf HPC HnextPC HQ
-  iapply HΦ $$ HmConf HPC HnextPC [HF HQ]
-  iframe
+  iintro Htok
+  iapply H
+  iapply transTok_intro cpu tier root $$ [$Hslot $Htok]
+
+theorem resvOut_transTok [CurCtx] (cpu : CPU) (tier : KTier) (root : BitVec 44) :
+    resvOut (GF := GF) cpu (transTok cpu tier root) := by
+  unfold transTok
+  exact resvOut_sepR _ (resvOut_ctxTok cpu curCtx)
 
 /-- The trap branch of a cycle: when interrupts are on, the trap CSRs and
 the vector (direct mode) come out, and, from the trapped configuration with
