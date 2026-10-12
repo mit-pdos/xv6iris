@@ -1,6 +1,36 @@
 # allocproc on RVWMO: target theorem, gap analysis, roadmap (design advisor, 2026-10-09)
 
-**Status: rev 36 (2026-10-12) = rev 35 + review R32 (4 required changes, tags [R32.n]; NOT SATISFIED — [R32.1] a soundness/vacuity
+**Status: rev 37 (2026-10-12) = rev 36 + review R33 (1 required change, tag [R33.1]; NOT SATISFIED — S: a second register the
+`cycleOkBoot` filter must pin; adopted [R33.s2]–[R33.s5]; [R33.s1] was the coordinator's prompt, regenerated at launch) + RESULTS (W13 (I)
+DONE, W8-β′ DONE, W-RSV DONE) + [OWN.45] (Q-SCO-PMA RULED (α)).**  What changed: **[R33.1] `cycleOkBoot` with `Rboot` pinning ONLY
+`pma_regions` is still FALSE**: after `pmaCheck` passes, `checked_mem_read` (`model/Lean_RV64D/LeanRV64D/Mem.lean:437-446`) routes the
+ifetch through `within_mmio_readable` (`Platform.lean:718-728`), whose HTIF arm `within_htif_writable :243-249` READS the register
+`htif_tohost_base` (`Option (BitVec 64)`, `Defs.lean:1561`); under an arbitrary `some base` in RAM the fetch is answered by `htif_load`
+from the `htif_tohost` register with NO `.memRead` node, so any word (e.g. `0x12000073`) is announced at phase `.instr` and `good`'s
+`.instrAnnounce` arm (`SailCycleOrderK.lean:154-156`) fails — [R32.1]'s shape one register further along the same path.  Fix: `Rboot` pins
+BOTH `pma_regions = bootPMA` AND `htif_tohost_base = none` (both in `bootPost`, `BootInitModel.lean:39,41`; `hwVal` `HwConfig.lean:48-57`
+lists both as frozen at reset; `enable_htif` has no caller), the `regWrite` arm excludes both, the run invariant carries both, "the ONE
+place precise about a value" → TWO (the PMA lookup and `within_mmio_readable`) — **APPLIED AT LAUNCH: W-SCO (A) launched 2026-10-12 in w4
+with [R33.1] + [R33.s2] in its brief (`../weak-orch/allocproc_WSCO_A_prompt.txt`), RUNNING; its §C-top brief carries the change tagged**.
+The run-level restatement stays TRUE (`bootFin_bootProg` → `bootPost` for every landing file); M1/M2's statements, names and the
+`baseline-weak.json` entry unchanged.  **[OWN.45] Q-SCO-PMA RULED (α)** (16:56): the fact is stated under `wbootFacts σ0`.  Adopted:
+[R33.s2] base lemma `bootFin_bootProg`/`resetRegsRun_of_run` (not `bootRun_bootLand`), [R33.s3] `Rboot` by `match` (no `cast`), [R33.s4]
+cites (`tick_clock` is `model/…/Platform.lean:549`; `writeReg pma_regions` also at `model/…/LeanRV64D.lean:265` `sail_model_init`;
+`nodeStep :273`'s `regRead` case; `good`'s arms `:145-150`/`:154-156`/`:157`), [R33.s5] `barrier_kind_of_num`'s `Barrier_RISCV_i` fallback
+(`PhysMemInterface.lean:262-275`) — `FENCE`'s per-clause lemma cases on the kind.  **RESULTS (all MERGED in the tip)**: **W13 (I) DONE**
+(both halves: `gfexecConfIO` with contact membership `gisIo ∨ dvi ≠ dvo ∨ tq k`, the interim `.PDisk` clause GONE, `hblkQ` folding
+GENERALIZED, `GraphFabResidue.gfIoDevOfConf`, `GraphFetchSpike.emZifencei`; deviations: `hemitf`/`hartConff` gain `tq`,
+`gfexecConfOfQconf`/`cycleKillOfF` take `∀ i, devQuiet (boot i)`; §C top/§C W13 (I)); **W8-β′ DONE** (157 static locks + `cpus[h]`
+reserved; `Xv6/AccessDiscipline.lean`, `SystemAdequacyDisc.lean`, `LinkDiscAdequacy.lean`, root `Xv6.xv6DiscAdequacy_closed` REGISTERED
+`roots.txt:20`; deviations: four existing roots' `tcb/expected.json` module sets GROW (Reserved/WordHistDefs), `powerInterp_accessDiscβ`
+takes `rsvStatic = KernelRsv.static`; §C W8); **W-RSV DONE** (`hartStep` `.pure` arm `σ.dropResv cpu` `Lang.lean:543`; `wpLoop_restart(B/C/O)`
+`Wp.lean:2005-2108`; 34 `wp_m_*` gain `[CurCtx]` + `ctxTok`; deviations: S-mode rules unchanged (fragment from `transTok`'s `ctxTok`),
+`resvOut :2068` side condition on `sT_*`/`wait_wfi`/`ucStep`, the boundary does NOT clear `hr.acq` [R12.s2], `SPIN` gains `∃ r,
+resvFragAny cpu r` (`SpecSpin.lean:40`); 20 MachCSL + 11 `Xv6/` + 2 `Weak/` + 1 `Vtest` files; §C W-RSV).  **W8 (f2-ctx) is LAUNCHABLE
+NOW** (deps W8-β′ + W-RSV MERGED; §C top launch paragraph, rebase surface against the tip).  Serial lane: W8-β′ ✓ → W-RSV ✓ → **W8
+(f2-ctx)**.  M2 CLOSE now waits ONLY for W-SCO (A).  No new owner question (R33: none missing).  History: rev 37 — R33 (1 req., 0 alt,
+applied at launch; s2–s5 adopted) + RESULTS (W13 (I), W8-β′, W-RSV) + [OWN.45]; W8 (f2-ctx) launch paragraph.
+**Rev 36 (2026-10-12) = rev 35 + review R32 (4 required changes, tags [R32.n]; NOT SATISFIED — [R32.1] a soundness/vacuity
 defect in the named premise, [R32.2]–[R32.4] S text/records; adopted [R32.s1]–[R32.s4], [R32.s6]–[R32.s8]; [R32.s5] is the coordinator's
 prompt, not plan text).**  What changed: **[R32.1] `sailCycleOrder` (`Weak/SrvwmoXv6Adequacy.lean:126-137`) is FALSE as stated** — closed
 over EVERY `σ0 : WGState` with no boot hypothesis, so `epsInit σ0` seats a hart on an ARBITRARY register file; with `pma_regions` marking an
@@ -12,7 +42,7 @@ device arm is "any answer", `:146-150`) — the rev-35 brief asked for a proof o
 boot PMA table `bootPMA` (`MachCSL/Platform.lean:199-250`: both I/O regions `executable := false`, RAM `executable := true`; no match ⇒
 `pmaCheck` faults, `Mem.lean:265-268`; `override_PMA` never touches `executable`, `Pma.lean:313-319`) is pinned by `wbootFacts σ0`
 (`WeakLang.lean:482-490` → `bootPost … pma_regions = pma`, `BootInitModel.lean:41`), which M1 AND M2 already assume and the model never
-writes (`writeReg pma_regions` only at `ArchReset.lean:125`).  **Q-SCO-PMA adopted PROVISIONALLY as (α), awaiting ruling (§D, FIRST
+writes (`writeReg pma_regions` only at `ArchReset.lean:125` and `model/…/LeanRV64D.lean:265` `sail_model_init`, both outside the cycle [R33.s4]).  **Q-SCO-PMA adopted PROVISIONALLY as (α), awaiting ruling (§D, FIRST
 item)**: `sailCycleOrder` restated under `wbootFacts σ0` (the shape `sailCycleOrderK :92-93` has), `good` gains a register filter,
 `cycleOkBoot` replaces `cycleOkAll` as W-SCO (A)'s deliverable (1) — its FIRST commit; names and the `baseline-weak.json` entry unchanged
 (registration by NAME [R21.4]); "FAITHFUL (true of the model by inspection)" → "TRUE of the model FROM THIS PLATFORM'S RESET; FALSE over
@@ -399,6 +429,8 @@ rev 32 (2026-10-12) R28 (5 req., all S text: W5 CLOSE-OUT's exact `baseline-weak
 rev 33 (2026-10-12) R29 (2 req., both S text: W5d's M2 cut clause carried by the new trivially-instantiated parameter `fcutT` as `pfRunST.snoc`'s third fact `pfCutFactsT` — M1's statement TEXT changes, its entry does not; W5d's parameter threading is its FIRST commit, after W-SCO's `Hyps.fi` widening [R29.1]; the stale serial-lane sentence → W8-β′ → W-RSV → W8 (f2-ctx) [R29.2]; s1 (`fetchIsImage` PAST-fetch recipe, NOTE in W-SCO) + s5 adopted; s2/s3 deferred to the running workers' merge review).
 rev 34 (2026-10-12) R30 (1 req., S text: `itvOf` free in `srvwmoXv6M2Premises`, its cut/recurrence/frame carried by a second per-index parameter `fcutE`, `True` at M1 — no shared definition gains a non-trivial conjunct [R30.1]; s1/s3/s6 adopted).
 rev 35 (2026-10-12) R31 (1 req.: the M2 `fcutE` instance carries the `fiArm` STATE — route (i), a free `fiOf` beside `itvOf`, DELIVERED in W5d's file [R31.1]; s1–s3 applied) + RESULTS (W5 CLOSE-OUT → **M1 DONE**, registered; W5d M2 core `Weak/PfRunUnpinned.lean` in w5; W-SCO shape (0) + generic half `Weak/SailCycleOrderK.lean`, per-word half blocked; W13 (I) realization half, bundle half blocked) + [OWN.42] (W-SCO = (A): `cycleOkAll` for every instruction, `sailCycleOrder` a theorem for all text) + [OWN.43] (W13 (I): `gfDev` membership by fabric CONTACT, `hblkQ` folding generalized) + [OWN.44] (next batch approved); [R29.s2][R29.s3][R30.s4] closed.
+rev 36 (2026-10-12) R32 (4 req.: `sailCycleOrder` FALSE over arbitrary `σ0` — restated under `wbootFacts σ0`, `good` gains a register filter, `cycleOkBoot` replaces `cycleOkAll`, M1/M2 VACUOUS until W-SCO (A)'s commit 1 [R32.1]; w5/W-SCO files MERGED [R32.2]; `emZifencei` collision → launch addendum [R32.3]; W-SCO (A) brief rewritten with the whole cycle [R32.4]; s1–s4, s6–s8) + Q-SCO-PMA (provisionally (α)) + W13 (I) bundle half LAUNCHED.
+rev 37 (2026-10-12) R33 (1 req.: `Rboot` ALSO pins `htif_tohost_base = none` — `within_mmio_readable`/`htif_load` answer an ifetch with no `.memRead` node [R33.1], applied at W-SCO (A)'s launch; s2–s5 adopted) + [OWN.45] (Q-SCO-PMA RULED (α)) + RESULTS (W13 (I) DONE, W8-β′ DONE, W-RSV DONE) + W8 (f2-ctx) LAUNCHABLE (§C top); OPEN owner questions: NONE.
 
 **The kernel [OWN.4][R1.9]: xv6-riscv `b72cbac1`, branch `verified`** (`notes/STATUS.md:8-11`, `README.md:89-90`)
 = upstream plus (a) a per-process root (`p->root`, `sys_chroot`, `igetroot`, root-aware `dirlookup`/walk) and
@@ -443,7 +475,8 @@ reservations, a non-coherent i-cache view `itv` + `fence.i`.  **What it forbids 
 store–store reordering and load buffering (stores never early) — the weak tier's sRVWMO residue (rule 14,
 `Weak/WeakAxiomatic3.lean:2050-2071`; litmus divergences LB and reader-fence-only MP, `Weak/WeakSrvwmoLitmus.lean:
 1663-1695`), checked by reading: nothing relates TsoMem to `srvwmoConsistent`, and §B(10) does not need it [R2.s2];
-(ii) **reservation serialisation**: a foreign store or exclusive read overlapping a held reservation is BLOCKED
+(ii) **reservation serialisation — GONE (W-RSV DONE 2026-10-12, rev 37: the reservation is cleared at the instruction boundary,
+`Lang.lean:543`; record)**: a foreign store or exclusive read overlapping a held reservation is BLOCKED
 (`blockedStep`, `MachCSL/Lang.lean:366-378,395-403`; DMA `anyReserve`, `:539,562`); the reservation persists until the
 holder's next store of ANY address (`:147-153`) or a blocked exclusive read, surviving fences (`:155-163`); RVWMO's
 atomicity axiom constrains only SUCCESSFUL pairs (D19 Spec); the kernel uses only `amoswap.w.aq` (`Xv6/ProofAcquire.
@@ -492,8 +525,8 @@ fused into that write, `Virtio.lean:552-555`) — plus five conditional ones ((M
 marks and the "moves the fabric?" column in its header), so there is now ONE device model (MachCSL's) and these deviations
 have LEFT the honesty lists; §B(11)'s "Machine-model choices" keep MachCSL's own device-model strengthenings PERMANENTLY
 [R16.5].**
-Dependency order (ppo 9–13) is absent in TsoMem — the sound direction.  Honestly (today, after W-COH and W-DISK): "xv6 on
-sRVWMO + reservation serialisation (until W-RSV)" — the pf disk program's drift is GONE (W-DISK DONE 2026-10-12); **[rev 31] and
+Dependency order (ppo 9–13) is absent in TsoMem — the sound direction.  Honestly (today, after W-COH, W-DISK and W-RSV [rev 37]): "xv6 on
+sRVWMO" (reservation serialisation GONE — W-RSV DONE 2026-10-12) — the pf disk program's drift is GONE (W-DISK DONE 2026-10-12); **[rev 31] and
 this sentence is now a THEOREM for kernel-only, pinned candidates — M1's `srvwmoXv6M1Core` (`Weak/SrvwmoXv6Adequacy.lean:276`,
 §A), under the named `sailCycleOrder` [OWN.35] and the candidate restrictions `candKfetch`/`candScaT`/`candDiskLat`**.  **Under [OWN.2] this is an INPUT,
 not the result**: the published theorem is at RVWMO proper, by robustness (§B(9)).
@@ -545,8 +578,8 @@ riscv.cat-tier validation of the handle-based lock protocol; do NOT extend it.
    (`tools/audit/baseline.json:11-14`), no `sorry`; trusted base named: Sail model (its cycle-order fact `sailCycleOrder` was a NAMED PREMISE
    [OWN.35] §B(11) — **[OWN.42][rev 35] W-SCO (A) PROVES it for every instruction (`SailCycleOrderK.sailCycleOrderOfCycle`
    from `cycleOkBoot` [R32.1]), after which it is a THEOREM and NOT a trusted item; [R32.1] it is TRUE of the model FROM THIS
-   PLATFORM'S RESET (the boot PMA table forbids instruction fetch from I/O regions) and FALSE over arbitrary register files, so it is
-   STATED under `wbootFacts σ0` (Q-SCO-PMA (α), provisional) — until W-SCO (A)'s first commit lands, `srvwmoXv6M1Core`/`srvwmoXv6M2Core`
+   PLATFORM'S RESET (the boot PMA table forbids instruction fetch from I/O regions and the HTIF window is disabled [R33.1]) and FALSE over arbitrary register files, so it is
+   STATED under `wbootFacts σ0` (Q-SCO-PMA (α), RULED [OWN.45]) — until W-SCO (A)'s first commit lands, `srvwmoXv6M1Core`/`srvwmoXv6M2Core`
    are VACUOUS**), image dump, the TAGGED cat
    transcription and its tagged conformance text `gdexecQconfT` (new trusted-SURFACE text — covering I/O items' sources
    under D50 (b), W13 (F-dep), and [OWN.31][R22.2] the sentence "the device's request-service RAM stores are fabric
@@ -977,7 +1010,7 @@ directly after a memory event (re-check `t2linAux`'s cut selection).
 ledger handles wrap/collision retries, `Xv6/ProofAllocproc.lean:16-24`; text facts by `rfl`/`decide`; real
 `stackOwn`/`kctx` resources).
 
-**(9) THE gap: TsoMem is sRVWMO + reservation serialisation; the target is RVWMO proper** [R1.7][OWN.2].
+**(9) THE gap: TsoMem is sRVWMO (+ reservation serialisation until W-RSV — GONE, rev 37); the target is RVWMO proper** [R1.7][OWN.2].
 *Inventory of weaker models in the Lean tree.*  (α) `WeakMem` pf machine = sRVWMO operational (T1
 `srvwmoRealizable`, `Weak/WeakAxiomatic3.lean:2088` [R16.s1]; T2 `t2Ev`, `Weak/WeakEvInst.lean:2046`) — TsoMem's strength
 class; (β) `WeakPromise*` (`Weak/WeakPromise.lean:1-16`) — LB reachable, RVWMO fidelity BY INSPECTION only; (γ) PSO
@@ -1294,7 +1327,7 @@ rev ≤ 18's "`pr.locking`/`panicked`" named flags that DO NOT EXIST in this ima
 exist (transmit is synchronous: `uartwrite` writes THR under `tx_lock` and sleeps on a busy LSR, no tx ring).
 **User-row gaps under [OWN.3]** [R6.2] (D35/D36 RULED (a) [OWN.13]): rule 7 RCpc and forwarded plain `LLoad aq`, both
 vacuous for kernel rows.  Strengthenings carried INTERNALLY by TsoMem/sRVWMO (gone once (9d) lands): "stores never
-early"; reservation serialisation (gone EARLIER, once W-RSV lands — D19 RULED (b) [OWN.19]); footprint coherence
+early"; reservation serialisation — GONE (W-RSV DONE 2026-10-12, rev 37; D19 RULED (b) [OWN.19]); footprint coherence
 stamping — GONE (W-COH landed 2026-10-11, §0 F1 (iii)).  **RESOLVED (W-DISK DONE 2026-10-12, rev 28) — the pf DISK PROGRAM's drift
 from the device model of record (E-D1 RULED (a) [OWN.29]; §0 F1, §C W-DISK), kept as the RECORD of what the program WAS**: `virtioProg` reports the used element's `len` as
 the DATA length (`r.len`; virtio 1.x: bytes written = data + status for IN, 1 for OUT — UNFAITHFUL, MachCSL's `usedLen`
@@ -1362,10 +1395,11 @@ Barrier_RISCV_i` node the latest own `LInstr`/`LIFetch` step is `LInstr`, and at
 `LIFetch` — stated on the label list, NOT through `tsoShadow`'s internal `fiArm` bit (W5 derives `MachOfPf.Hyps.fi :635`
 from it by a one-fold lemma over `shStepF`, `TsoShadow.lean:310-318`), i.e. "the Sail cycle fetches, then announces,
 then executes, and fetches nothing while executing" (`Step.lean:331-404`); **[R32.1] TRUE of the model FROM THIS PLATFORM'S RESET
-(the boot PMA table `bootPMA` `Platform.lean:199-250` forbids instruction fetch from I/O regions, `pmaCheck` `Mem.lean:263-274`); FALSE
+(the boot PMA table `bootPMA` `Platform.lean:199-250` forbids instruction fetch from I/O regions, `pmaCheck` `Mem.lean:263-274`, and the HTIF window is disabled — `htif_tohost_base = none`,
+`within_mmio_readable` `Mem.lean:437-446` [R33.1]); FALSE
 over arbitrary register files — a fetch from a device address is an `LDev` step (`pnodeStep` `WeakEvInst.lean:315-321`), not an
 `LIFetch`, so the SFENCE.VMA clause fails; R21's grep (no `execute_*` uses `InstructionFetch`) looked at `execute`, never at `fetch` to a
-device — hence the premise is STATED under `wbootFacts σ0` (Q-SCO-PMA (α), provisional); its rev-35 text (`:126-137`, every `σ0`) is
+device — hence the premise is STATED under `wbootFacts σ0` (Q-SCO-PMA (α), RULED [OWN.45]); its rev-35 text (`:126-137`, every `σ0`) is
 REFUTABLE and M1/M2 are VACUOUS until W-SCO (A)'s first commit**; RVWMO/riscv.cat/Zifencei silent on in-cycle order, the PMAs put
 EXECUTABILITY in the platform's table; a premise of `machRunOfPfRun`, M1, M2
 and §A's statement, the shape `bootImageSealed` has; **[OWN.42][rev 35] option (a) IS TAKEN: W-SCO (A) proves
@@ -1515,12 +1549,15 @@ generic half** (`MachOfPf.lean`: `HypsC.fi :703-715` widened (`HypsC :686`, `Hyp
 :140`, shape arms `True`, release lemmas on RAM-only anchors; §C W13 (I)).  **W5d M2 CORE** — MERGED in the tip (`Weak.lean:636`,
 byte-identical to w5's; NOT registered — M2 closes after W-RSV and [R32.1]) [R32.2] (`Weak/PfRunUnpinned.lean` 780 — `srvwmoXv6M2Core
 :652`, VACUOUS until [R32.1] lands; the threading as generic twins, M1's text unchanged; §C W5d).
-IN FLIGHT: **W8-β′** (serial MachCSL; increment 1 green, 2–4 in progress, `../xv6iris-weak-w2/PROGRESS-W8beta.md`; brief UNCHANGED).
+IN FLIGHT (rev 36): **W8-β′** (serial MachCSL; increment 1 green, 2–4 in progress, `../xv6iris-weak-w2/PROGRESS-W8beta.md`; brief UNCHANGED)
+— **DONE and MERGED 2026-10-12 [rev 37] (§C W8 Deps records the landed form)**.
 BLOCKED → RULED: W-SCO's per-word half ([OWN.42] (A)), W13 (I)'s bundle half ([OWN.43] (a)).  **NEXT BATCH — APPROVED [OWN.44],
 launched right after this review loop reaches SATISFIED, in PARALLEL (no shared file)**:
 **W-SCO (A) — RELAUNCH [OWN.42]; brief REWRITTEN at rev 36 [R32.1][R32.4] (L ≈ 1.7–3.3k; `Weak/` lane; the worker RESUMES from
 `../weak-orch/parked/PROGRESS-WSCO.md` and the spike `PROGRESS-WSCO-spike.lean.txt` — NOT merged [OWN.10], re-created in the workspace;
-LAUNCHABLE once this paragraph is in its brief, addendum form is fine).**  *Deps*: W-SCO (0) + generic half MERGED; M1 DONE (VACUOUS until
+**LAUNCHED 2026-10-12 in w4 — RUNNING [rev 37]**: `../weak-orch/allocproc_WSCO_A_prompt.txt` names this paragraph + [OWN.45] + the
+addenda [R33.1] (second pinned register, below) and [R33.s2] (base lemma) [R33.s1]; the brief is NOT changed while the worker runs — the
+rev-37 edits below are tagged and are what the addendum says).**  *Deps*: W-SCO (0) + generic half MERGED; M1 DONE (VACUOUS until
 commit 1 below); `SailCycleOrderK.lean`/`PfRunUnpinned.lean` imported (`Weak.lean:635-636`), neither registered [R32.2].
 **COMMIT 1 — THE PREMISE RESTATEMENT [R32.1] (S–M ≈ 200–400 lines; `SrvwmoXv6Adequacy.lean`, `SailCycleOrderK.lean`, `PfRunUnpinned.lean`,
 `MachOfPf.lean` header text).**  *Why*: `sailCycleOrder :126-137` is closed over EVERY `σ0` with no boot hypothesis — `epsInit σ0`
@@ -1528,7 +1565,8 @@ commit 1 below); `SailCycleOrderK.lean`/`PfRunUnpinned.lean` imported (`Weak.lea
 address `LDev` whatever its kind (`WeakEvInst.lean:315-321`, `devAddr` tested BEFORE `akIfetch`); so under a `pma_regions` marking the PLIC
 executable the cycle FETCHES an SFENCE.VMA word `0x12000073` from a PLIC enable register (M-mode, `pmpcfg = 0`, `pmaCheck` answers
 `executable = true`, `Mem.lean:274`), announces it with `lastCyc = some .LInstr`, and the second clause (`:136-137`) is FALSE.  The same
-tree path refutes `cycleOkAll`/`cycleOkK` (`good`'s device arm `:146-150` is "any answer, same phase"; `.regRead :156` is "any answer");
+tree path refutes `cycleOkAll`/`cycleOkK` (`good`'s `.memRead` arm `:145-150`, device conjunct `:149-150`, is "any answer, same phase";
+`.regRead :157` is "any answer" [R33.s4]);
 `sailCycleOrderOfCycle :470`/`sailCycleOrderKOfCycle :536` are sound with FALSE premises.  Rewrite `PROGRESS-WSCO.md`'s "What remains is
 ONE closed proposition … `cycleOkK`" section FIRST [R32.s8].  *(i) Restate under the boot hypothesis — option (α), PROVISIONAL (§D
 Q-SCO-PMA)*: `sailCycleOrder := ∀ fok σ0, wbootFacts σ0 → ∀ st c, pfRunST … → …` (the shape `sailCycleOrderK :92-93` has); `fiOfSco :176`
@@ -1538,24 +1576,38 @@ it in their premise sets, `SrvwmoXv6Witness.lean:599`, `PfRunUnpinned.lean:596`)
 [R21.4]/§B(12); the premise got WEAKER, the theorems STRONGER and non-vacuous).  (β) `∀ c, (σ0.wgregs c) pma_regions = bootPMA` alone still
 needs the never-written invariant and saves nothing; (γ) refusing `akIfetch` in `pnodeStep`'s device arm is the recorded alternative, not
 taken.  *(ii) Give `good` a register filter*: `good A R Q ph m`, `R : ∀ r : Register, RegisterType r → Prop`; `.regRead r, k ↦ ∀ v, R r v →
-good … (k v)`; `.regWrite r v, k ↦ r ≠ pma_regions ∧ ∀ u, good … (k u)` (the walk PROVES the model never writes `pma_regions`; the only
-`writeReg pma_regions` is init, `MachCSL/ArchReset.lean:125`); `Rboot r v := r = pma_regions → v = bootPMA` (dependent equality at
-`RegisterType pma_regions = List PMA_Region`, `Defs.lean:1553`); **`cycleOkBoot := ∀ tick, good (fun _ _ => True) Rboot (fun _ _ => True)
-.instr (riscvStep tick)` REPLACES `cycleOkAll` as deliverable (1)** (`cycleOkAll`/`cycleOkK` deleted, or kept with the header note "FALSE —
-fetch from MMIO; superseded"); the run invariant `inv :264` gains "every hart's `rs pma_regions = bootPMA`" (base: `wbootFacts σ0` →
-`bootPost … pma_regions = pma`, `BootInitModel.lean:41`, `bootRun_bootLand` `BootReset.lean:118`; step: `pnodeStep`'s `regWrite` arm
-`rs.set r v` with `r ≠ pma_regions` from `good`); `invStep :359`'s `regRead` case (`:335-338`) instantiates `v := rs r`; `invRun :430`,
+good … (k v)`; `.regWrite r v, k ↦ r ≠ pma_regions ∧ r ≠ htif_tohost_base ∧ ∀ u, good … (k u)` **[R33.1]** (the walk PROVES the model never writes
+either: the only `writeReg pma_regions` are init — `MachCSL/ArchReset.lean:125`, `model/…/LeanRV64D.lean:265` `sail_model_init` [R33.s4] —
+and `enable_htif` (`Platform.lean:217-218`) has NO caller in `model/` or `MachCSL/`; `Register` derives `DecidableEq`, `Defs.lean:1542`);
+**`Rboot : ∀ r, RegisterType r → Prop | .pma_regions, v => v = bootPMA | .htif_tohost_base, v => v = none | _, _ => True` [R33.1][R33.s3]**
+(the `match` form avoids the `cast` a `r = pma_regions → v = bootPMA` statement needs at `RegisterType pma_regions = List PMA_Region`,
+`Defs.lean:1553` / `RegisterType htif_tohost_base = Option (BitVec 64)`, `:1561`, and lets `simp` close the `_` arms); **`cycleOkBoot := ∀ tick,
+good (fun _ _ => True) Rboot (fun _ _ => True) .instr (riscvStep tick)` REPLACES `cycleOkAll` as deliverable (1)** (`cycleOkAll`/`cycleOkK` deleted, or kept with the header note "FALSE —
+fetch from MMIO; superseded"); the run invariant `inv :264` gains "every hart's `rs pma_regions = bootPMA ∧ rs htif_tohost_base = none`" [R33.1] (base: `wbootFacts
+σ0` (`WeakLang.lean:488`: `bootRun (bootProg (bootHid c) bootPMA) f₀ = some ((), σ0.wgregs c)`) → **`bootFin_bootProg` (`BootReset.lean:62-70`)
+through the `resetRegsRun_of_run` pattern (`:107-115`: rewrite the `BootFin` witness with the equation) [R33.s2]** — `bootRun_bootLand :118`
+only names the landing file and carries no `bootPost` — → `bootPost … htif_tohost_base = none ∧ … pma_regions = pma`,
+`BootInitModel.lean:39,41`; step: `pnodeStep`'s `regWrite` arm `rs.set r v` (`WeakEvInst.lean:313`) with the two `≠` from `good`, and the
+PLIC wire `pinSet` (`:473,:486`) touches `sig_meip`/`sig_seip` only — the ONLY two sites with `ors = some _`, `pstepEv :594-600`);
+`nodeStep :273`'s `regRead` case (`:335-338`, called by `invStep :359` [R33.s4]) instantiates `v := rs r`; `invRun :430`,
 `scoOfInv :450`, `sailCycleOrderOfCycle :470 : cycleOkBoot → sailCycleOrder` (restated), `sailCycleOrderKOfCycle :536` adapt; `goodBind
 :174`/`goodMono :196` thread `R`.  *(iii) The PMA lemma the cycle needs* (S; `decide`/`bv_decide` over the literal table):
 `matching_pma_region bootPMA pa w = some r → r.attributes.executable = true → 0x80000000 ≤ pa.toNat` (`bootPMA` `Platform.lean:199-250`:
 `[0x1000, 0x2000)` and `[0x0200_0000, 0x1200_0000)` IOMemory `executable := false`, `[0x8000_0000, 0x8800_0000)` MainMemory `executable :=
 true`) and `… = none → pmaCheck throws` (`Mem.lean:265-268`); `override_PMA` (`Pma.lean:313-319`) never changes `executable`, so the `pbmt`
 override is immaterial; hence under `Rboot` every `InstructionFetch` `.memRead` node of `fetch_bytes` (`Fetch.lean:217-226`, BOTH halfwords)
-has `devAddr = false` and `good`'s FIRST arm applies — the device arm is never reached by an ifetch.  **The ONE place where the footprint
-walk must be PRECISE about a VALUE (the PMA result), not just about event kinds — the spike's `nctPmaCheck` is a footprint lemma and does
-NOT give it.**  *(iv) Text*: `SrvwmoXv6Adequacy.lean`'s header (`:18`, `:80`) and `MachOfPf.lean`'s `fi` docstring (`:5-6`, `:679-680`)
-say "TRUE of the model from this platform's reset (the boot PMA table forbids instruction fetch from I/O regions); FALSE over arbitrary
-register files; stated under `wbootFacts σ0`"; `PfStepTsoView.lean:67`'s `sailCycleOrderK_holds` → `sailCycleOrder_holds` [R32.s2].
+has `devAddr = false` and `good`'s FIRST arm (`:145-150` [R33.s4]) applies — the device arm is never reached by an ifetch.  **[R33.1] TWO
+places where the footprint walk must be PRECISE about a VALUE, not just about event kinds: (1) the PMA lookup (`matching_pma_region bootPMA
+… = some r ∧ r.executable ⇒ 0x8000_0000 ≤ pa`, so the ifetch `.memRead` has `devAddr = false`); (2) `within_mmio_readable` on that `pa`
+(`Mem.lean:437-446`, BETWEEN the PMA check and `read_ram`; `Platform.lean:718-728`): `within_clint :221-229`/`within_sig :232-240` false by
+constant arithmetic (`plat_clint_base = 0x0200_0000`/`plat_clint_size = 0xC0000`, `plat_have_sig = false`, `PlatformConfig.lean:4476-4486`),
+`within_htif_readable :252` = `within_htif_writable :243-249` false by `htif_tohost_base = none` — the `uma_within_mmio_readable_ram` shape
+(`MachCSL/UMemPhys.lean:169-171`, used `UMemRam.lean:86,113`; `WeakFetch2.lean:323` carries the same `hhtif`) — so the fetch reaches
+`read_ram rk paddr …` (`PhysMemInterface.lean:338`, the `.memRead` node) and NOT `htif_load` (`:598-620`, register reads only, no node).
+Without (2) the path `some 0x8000_1000` answers the fetch from the `htif_tohost` register and announces any word at phase `.instr`:
+`cycleOkBoot` refutable.  The spike's `nctPmaCheck` is a footprint lemma and gives neither.**  Everything else in the walk is footprint-only.  *(iv) Text*: `SrvwmoXv6Adequacy.lean`'s header (`:18`, `:80`) and `MachOfPf.lean`'s `fi` docstring (`:5-6`, `:679-680`)
+say "TRUE of the model from this platform's reset (the boot PMA table forbids instruction fetch from I/O regions and the HTIF window is
+disabled [R33.1]); FALSE over arbitrary register files; stated under `wbootFacts σ0`"; `PfStepTsoView.lean:67`'s `sailCycleOrderK_holds` → `sailCycleOrder_holds` [R32.s2].
 **THEN (1) `SailCycleOrderK.cycleOkBoot_holds : cycleOkBoot`** via the spike's CPS kit (`gPure`/`gBind`/`gRBind`/`gIte`/`gDite`/`gCatch`/…,
 the "no cycle event" footprint `ncG`/`ncT` — RAM reads non-ifetch, no announce, no `Barrier_RISCV_i`, no `pma_regions` write —, the
 `nct_auto` dispatcher; spike sizing `maxHeartbeats` 1M for `nctPmpCheck`/`nctPmaCheck`, 2M for `nctJal`): (a) footprint lemmas for the
@@ -1565,7 +1617,9 @@ handlers, `lpad`/`checkPC`, interrupt dispatch, `tick_clock`, `run_hart_waiting`
 `def execute_*` in `model/Lean_RV64D/LeanRV64D/InstsEnd.lean` = the 122 arms of the dispatcher `def execute` (`:18769`); no F/D/V (present:
 Zicond, Zba/Zbb/Zbs, Zimop/Zcmop, Zicbo*, shadow-stack `SS*`, `C_*`); 124 is WRONG [R32.s5]** — symbolic in operands; `FENCEI`
 (`:18295-18297`, `sail_barrier Barrier_RISCV_i; RETIRE_SUCCESS`) proves "exactly one `Barrier_RISCV_i`, no fetch/announce" (the barrier
-clause needs phase `.instr`, which the cycle's announce established); `SFENCE_VMA` (`:18009`, `flush_TLB`, no barrier) by hand — its
+clause needs phase `.instr`, which the cycle's announce established) — **[R33.s5] NOT "no other clause emits one": `barrier_kind_of_num`
+(`PhysMemInterface.lean:262-275`) falls back to `| _ => Barrier_RISCV_i`, so `execute_FENCE`'s lemma CASES on the kind (harmless for `good`:
+its barrier arm needs only phase `.instr`) rather than assuming `≠ Barrier_RISCV_i`**; `SFENCE_VMA` (`:18009`, `flush_TLB`, no barrier) by hand — its
 announce IS the `sfAnnB` marker and comes from the cycle at phase `.fetch`; the 46 `ExecuteAs` sites (the compressed `C_*` clauses) are
 one-liners reducing to the base clause; **(c) the instruction-independent cycle [R32.4]**: `riscvStep tick = try_step 0 false >>= λ _, (if
 tick then tick_clock () else pure ())` (`MachCSL/Lang.lean:241-243`); `try_step` (`Step.lean:416-440`) = `ext_pre_step_hook`,
@@ -1577,7 +1631,8 @@ marker), pure decode, `is_landing_pad_expected`/`trap`, `nextPC`, `uxaExecAs` = 
 (`UExecAluGpr.lean:281-284`) — the ∀-clause lemma is applied TWICE per cycle) → `ucFinish`'s arms (interrupt trap `handle_interrupt`, fetch
 fault `handle_exception`/`ext_handle_fetch_check_error`, execute trap `exception_handler`/`set_next_pc`, illegal, wait `assert`, retire) →
 `ucEpilogue` (`tick_pc`, `minstret` bump; `UCycleDefs.lean:123-130`, `ucPrelude :55-59`) → `ext_post_step_hook`; then `tick_clock`
-(`Platform.lean:549-554`: `mcycle`/`mtime` bumps, `clint_dispatch false` — register-only, a footprint lemma nonetheless); the equations
+(`model/Lean_RV64D/LeanRV64D/Platform.lean:549-554` [R33.s4] — NOT `MachCSL/Platform.lean`, `bootPMA`'s file: `mcycle`/`mtime` bumps,
+`clint_dispatch false` — register-only, a footprint lemma nonetheless); the equations
 `uc_tryStep_eq`/`uc_runHartActive_eq` (`UCycleDefs.lean:11-17`) cut the cycle into these stretches.  Footprint lemmas for ALL of these.
 (2) `theorem sailCycleOrder_holds : sailCycleOrder := sailCycleOrderOfCycle cycleOkBoot_holds`; (3) the corollaries **`srvwmoXv6M1`** =
 `srvwmoXv6M1Core … sailCycleOrder_holds` (M1's statement WITHOUT `hsco`, by DIRECT application — the (i′)/(iv) detour `sailCycleOrderK`/
@@ -1594,12 +1649,26 @@ only (no reservation guard in these files).  *Acceptance*: `lake build MachCSL X
 `Weak.srvwmoXv6M1` registered and `srvwmoXv6M1Core`'s entry UNCHANGED; `#print axioms sailCycleOrder_holds` = `propext`/`Classical.choice`/
 `Quot.sound` (+ counted certificates), no `sorry`, no new opaque; `cycleOkBoot_holds` CLOSED — no hypothesis beyond the restated premise's
 `wbootFacts σ0`, no restriction on the fetched word (option (a) of §B(11); TRUE of the Sail model from this platform's reset); the file
-header carries the 122-clause census, the two-halfword fetch note and the [R32.1] platform note; `PROGRESS-WSCO.md` updated.  *Risks*:
+header carries the 122-clause census, the two-halfword fetch note and the [R32.1]/[R33.1] platform note (TWO pinned registers); `PROGRESS-WSCO.md` updated.  *Risks*:
 elaboration budget (split files); the recursive walkers (fuel induction); the breadth of the trap/finish handlers; threading `R` through
-the kit; a clause that RESISTS cannot be excluded by a candidate restriction (the cycle executes any word) — report it, the owner re-rules.
-**W13 (I) bundle half — RELAUNCH [OWN.43] — LAUNCHED at rev 36 in `../xv6iris-weak-w3` with [R32.3] as a LAUNCH ADDENDUM
-(`../weak-orch/allocproc_W13I_bundle_prompt.txt`; the brief below is NOT rewritten, rev-36 notes tagged) (M on the fabric side; graph
-lane; the worker RESUMES from `../weak-orch/parked/PROGRESS-W13I.md`).**  *Deps*: (I)'s realization half MERGED; W-DISK ✓ (`pdevEv :604`, `pdevEvOk :1792`, `devQuiet`
+the kit; a clause that RESISTS cannot be excluded by a candidate restriction (the cycle executes any word) — report it, the owner re-rules;
+**[R33.1] a THIRD configuration register on the ifetch path would be found by the walk as a `.regRead` whose answer the proof needs — pin it
+from `hwVal` (`HwConfig.lean:48-57`: `misa`, `mseccfg`, `pma_regions`, `htif_tohost_base`, `elp`, `senvcfg`, `mstateen0`, `sstateen0`) in
+`Rboot` the same way; do NOT weaken `good`**.
+**W13 (I) bundle half — DONE and MERGED 2026-10-12 (w3; `../weak-orch/parked/PROGRESS-W13I.md`) [rev 37]**: `gfexecConfIO` (replaces
+`gfexecConf`, deleted; `WeakRvwmoFab.lean`) = `fab 0 = d0` ∧ Nodup ∧ bounds ∧ per row `∃ em dvi dvo tq, hartConff … ∧ (∀ k < |row|, (i,k) ∈
+gfDev ↔ gisIo (i,k) ∨ dvi k ≠ dvo k ∨ tq k) ∧ pins ∧ emZifencei img em ∧ deps` — the contact bit `tq : Nat → Bool` is [R32.s3]'s third
+per-item function (named `tq`, not `tch`; each admin run is `WeakRvwmoFab.admRunT`, returning "some step is `pdevEv`-true"); the interim
+`.PDisk` clause GONE; `hemitfStatesQ`/`hartConffStatesQ` have NO start-state hypothesis (`tq k = false → dvo k = dvi k ∧ lbIsIo = false ∧
+∀ d, hblkQ … d d …` — the folding GENERALIZED from `pdevEvOk`); `fconfRowsPin`/`fconfRows`/`fconfSupply` lose the quiet-boot hypothesis,
+`supplyOfFconf` unchanged; `GraphFabResidue.gfIoDev` restated to the graph-visible half `gisIo (i,k) → (i,k) ∈ gfDev`, derived by
+`gfIoDevOfConf :187`; `gisIo` moved to `WeakRvwmoFab`; `emZifencei` = the slot with content `emFetchImg` [R28.s5], the spike's def renamed
+`GraphFetchSpike.emZifencei` [R32.3]; `xv6RvwmoSafeModuloF` builds on `gfexecConfIO`; `epsInitQuiet` deleted.  **Deviations**: `hemitf`/
+`hartConff` gain `tq` (`hemitHemitf`/`hartConfHemitf` give `∃ tq`); `gfexecConfOfQconf` and `FabInd.cycleKillOfF :669` take `∀ i, devQuiet
+(boot i)` (a quiescent boot pool; discharged at xv6's boot); `WeakRvwmoFabInd` O1/O2 take `tq`, `gfexecConfRen`/`gfexecConfHull` transport
+the contact clause.  Build/lint/`audit.sh --weak` green, no new axiom/opaque; registered Weak roots unchanged in statement.  W5d-G G1–G5's
+gate (the `Fab`/`Supply` text) is MET.  The launch brief follows as the RECORD.**  *(rev 36 brief)* RELAUNCH [OWN.43] — LAUNCHED at rev 36 in
+`../xv6iris-weak-w3` with [R32.3] as a LAUNCH ADDENDUM (`../weak-orch/allocproc_W13I_bundle_prompt.txt`; M on the fabric side; graph lane).  *Deps*: (I)'s realization half MERGED; W-DISK ✓ (`pdevEv :604`, `pdevEvOk :1792`, `devQuiet`
 `WeakRvwmoSupply.lean:177`).  *Deliverables*: (1) `gfexecConfIO` = `gfexecConf` (`WeakRvwmoFab.lean:620`) with the `isDevBlock` clause
 REPLACED by the CONTACT criterion `(i,k) ∈ GF.gfDev ↔ (gisIo (i,k) = true ∨ dvi k ≠ dvo k ∨ blockTouches em k)`, `blockTouches em k` :=
 the BLOCK of item k (admin run + tagged step, `hemitf` `HFone`/`HFpair` `:253-275`) contains a `pstepEv p d l p' d'` step with `pdevEv p l
@@ -1625,15 +1694,66 @@ green, `audit.sh --weak` unchanged (no new axiom/opaque), `xv6RvwmoSafeModuloF` 
 ("membership by fabric contact [OWN.43]; non-members are `pdevEv`-quiet, hence blind — `pdevEvOk`"), the `.PDisk` interim clause GONE,
 `hblkQ`'s folding present in GENERALIZED form; marks in the header: FAITHFUL to RVWMO (no ISA order added), EQUAL to [R22.2] on every
 xv6 run, STRONGER as generic trusted text only by unreachable non-moving fabric-touching blocks ((R3) orders them).
-**W-RSV [OWN.41] — launches when W8-β′ MERGES** (serial MachCSL; brief = §C W-RSV "Launch (rev 32)" — deps, the ≈ 8-file rebase
+**W-RSV — DONE and MERGED 2026-10-12 (w2) [rev 37]** (D19 (b), form (i-a) [OWN.22][OWN.23]): `hartStep`'s `.pure` arm is `σ' = σ.dropResv
+cpu` (`MachCSL/Lang.lean:543`; `dropResv :144` = `resv := updCpu σ.resv cpu none`); the boundary rules `wpLoop_restartB/_restart/_restartC/
+_restartO` (`Wp.lean:2005-2108`; `memModel_dropResv :1240`, `hartViews_dropResv :1235`) and `wpLoop_restartT` (`WpSmodeCycleBase.lean:61`);
+34 `wp_m_*` statements gain `[CurCtx]` + `ctxTok` (the M-mode lane, as censused); `ctxTok_cases :406-407` yields `∃ r, resvFragAny cpu r`.
+**Deviations**: S-mode rules UNCHANGED in statement (the fragment comes from `transTok`'s `ctxTok`); a `resvOut` side condition (`Wp.lean:2068`:
+the lent resource holds no reservation fragment) on `sT_*`/`wait_wfi`/`ucStep` (`wpLoop_ucStep`, `resvOut_uFr`, `UCycleSwp.lean:362-404`);
+the boundary does NOT clear `hr.acq` ([R12.s2]'s alternative — `pairAdjacent` pairs every `LExStore` with its own `LExLoad`; `clearAcq` stays
+the store's, `Lang.lean:157`); `SPIN` gains `∃ r, resvFragAny cpu r` (`Xv6/SpecSpin.lean:17,40`).  20 MachCSL + 11 `Xv6/` (incl. `ProofSpin`,
+`SpecSpin`, `UserretEntryPt`, `ProofStart`'s `ctxTok cpu curCtx` threading) + 2 `Weak/` (`MachOfPf.lean` guard sites — 7 `othersReserve`/
+`anyReserve` lines remain, supplied by `pairAdjacent`; `WeakLang.lean:52`) + 1 `Vtest` (`XState.dropResv :262`, `abs_dropResv :265`) files;
+`TsoMem.lean:33-34` says "within the issuing instruction" [R11.s2].  Build `MachCSL Xv6 Weak Vtest`, lint, audit, `--weak`, tcb green;
+registered roots (incl. `Weak.srvwmoXv6M1Core`) unchanged in statement.  §0 F1 (ii), the "Honestly" line and §B(11)'s internal list now
+say "reservation serialisation GONE"; D19's mark: FAITHFUL for AMOs / WEAKER for user LR/SC (as today).  The rev-36 launch paragraph
+follows as the RECORD.**  *(rev 36)* W-RSV [OWN.41] — launches when W8-β′ MERGES (serial MachCSL; brief = §C W-RSV "Launch (rev 32)" — deps, the ≈ 8-file rebase
 surface, the W4/W2 re-proof inside, acceptance — PLUS the rev-35 delta: M1 is REGISTERED, so the acceptance's "REGISTERED root(s)
 green" is live for `Weak.srvwmoXv6M1Core` (and `Weak.srvwmoXv6M1` if W-SCO (A) has closed); the `Weak/` rebuild adds
 `Weak/SailCycleOrderK.lean` (no reservation guard; rebuild only) and `Weak/PfRunUnpinned.lean` (MERGED [R32.2]; its rows rest on
 `HypsC.cut`; the guard sites are the SAME — grep `othersReserve`/`anyReserve`/`resv` in `MachOfPf.lean`: 16 lines in the tip after the
 twins, the listed 13 predate W5d/W-SCO [R32.s7])).
-**WAITS**: **M2 CLOSE** for W-RSV's W4 re-proof (D26) and — under [OWN.42] — W-SCO (A)'s `sailCycleOrder_holds`
-discharging `srvwmoXv6M2Core`'s `hsco` (w5 MERGED [R32.2]; `srvwmoXv6M2` is STATED by W-SCO (A) [R32.s4]); **W8 (f2-ctx)** for W-RSV; **W5d-G G1–G5** for W13 (I)'s bundle half (`Fab`/`Supply` text);
-W14 for W13 (I)/(W) + W5d-G; W11 (iv)c for W13 (L).  The rev-31 record follows.
+**W8 (f2-ctx) — LAUNCHABLE NOW [rev 37] [OWN.37][OWN.38][OWN.39][OWN.41]** (the serial MachCSL lane's next and last planned item; L–XL
+≈ 6.5–9.5k, 3–4 full-cone rebuilds, green increments; brief = §C W8 (4)/(6)/Acceptance + `notes/W8-Rctx.md` §1–§6 (BINDING over
+`notes/W8-design.md` §4/§5/§8, which state the superseded scalar design [R28.s8]; its "serial before W-RSV" is superseded by [OWN.41]) + this
+paragraph).  *Deps — ALL MET*: W8-β′ MERGED (`Xv6/AccessDiscipline.lean` 197: `Cust :53`, provisional `custAt :89` (ignores `σ`/`t`),
+`xv6LockWord :98`, `lockWordDiscAt :104`, `cpuStaticAt :109`, `xv6AccessDisc :115`, `xv6LockWord_registered :153`, `powerInterp_accessDiscβ :186`;
+`SystemAdequacyDisc.lean:35`; root `LinkDiscAdequacy.lean:26` REGISTERED `roots.txt:20`/`baseline.json:67`/`tcb/expected.json:2323`); W-RSV
+MERGED (above); R-ctx PASSED ((f1) list EMPTY); M1 ✓.  *Deliverables*: (1) the PER-AUTHOR chain vector `chain ξ : CPU → Nat` + causal
+closure BESIDE the unchanged scalar floor (`ctxFloor` `Ctx.lean:179`, `keyAt :187`), maintained at `ctx_absorb :480`/`ctx_stamp :520`/
+`ctx_unstamp :552` (join the releaser's vector at the release → acquire hop)/`ctxStamped_raise :577`/`ctx_park :760`/`ctx_resume :788`/
+`ctx_move :848` (`CtxLaws.lean`), `kctx_floor_of_view` (`KCtxMove.lean:303`); (2) `CtxBox.lean` (2,131 lines) stamps/registers lifted to
+join-vectors + row X2 (`boxRows :1117-1121`); (3) X1 — hooks re-floored from the releaser's own vector (`lockHook_llb` `Lock.lean:597`,
+`WpLock.lean:1141,1345` absorb at the stamp `T`; rows 13–18, 24–25), X3 — a birth key for a lock born after boot in `lkFresh :1115`/`isLock
+:861` (`lock_pay_take :541`, `lock_pay_born :660`; `LockBornHook`, `PipeBirth`, `ProofInitlog`'s `"log"` lock), X4 — the device-only absorb
+(`ProofVirtioDiskIntr`, `DiskInvDefs`), X5 — `ACQUIRE_LLB` (`SpecAcquire.lean:123`)/`ACQUIRESLEEP_LLB` (`SpecAcquiresleep.lean:170`) withdrawn,
+the 31 consumer files of `W8-Rctx.md` §5 re-routed through X1/X2; (4) the load rule establishing a MachCSL-generic, registry-parametrised
+chain invariant, `chainOkAt` derived `Xv6/`-side [R26.s4]; `WpPtWalkOwn`'s user-table A/D write-back under the `pte` arm [OWN.39]; (5)
+`xv6AccessDisc` strengthened to the FULL skeleton (σ-readable `custAt`/`xv6LockWord` — β′'s deviation 6 —, `chainOkAt` with the `.pte`
+exemption for BOTH tables, `pteDiscAt`), exported by the SAME root `xv6DiscAdequacy_closed` (statement strengthened, registration by NAME
+unchanged; `tcb/expected.json` module sets may grow as β′'s did — say so in the report); the PIPE part of `lockWordDiscAt` (dynamic
+registration at `wp_s_sw_mint`/`wp_s_sd_mint`, `WpSmodeMint.lean`) is the recorded open design point — a PURE σ↔`reg` tie `memModelAt` can
+carry, or another export: REPORT the choice, do not custody silently.  *Files*: 12 MachCSL (`Ctx`, `CtxLaws`, `CtxBox`, `Lock`, `WpLock`,
+`SwtchCtx`, `KCtxMove`, `LockBornHook`, `WpDma`, `WpDmaCtx`, `WpSmodeLwKey`, `WpPtWalkOwn`) + ≈ 52 `Xv6/` (the 21 of `W8-Rctx.md` §2 + the 31
+of §5 + `IputParts`/`ProofAcquiresleep`/`StartedInv`'s outside sites) + `Xv6/AccessDiscipline.lean`/`SystemAdequacyDisc.lean`.  *Rebase surface
+(the tip at rev 37)*: W8-β′'s — `Lock.lean` (1,239: `lockRsvW`, `lockBodyM`, `lkRsvIn`, `isLock :861`, `newlock_written :1002`, `lkFresh :1115`),
+`WpLock.lean` (3,531: reserved-mode AUs with the companion word), `KCtx.lean` (`cpuCell`), `LockBornHook`, `WpLockInit.lean` (NEW),
+`Resources.lean` (`rsvModelAt` in `memModelAt`); W-RSV's — `Ctx.lean` (`ctxTokAt :299`, `ctxTok :320`, `ctxTok_cases :406-407` yields `∃ r,
+resvFragAny cpu r`: the thread (f2-ctx) rebases on), `Wp.lean` (`wpLoop_restart*` `:2005-2108`, `resvOut :2068`), `WpPtWalkOwn`, `WpStoreOrd`,
+`WpDma` guard sites, the 34 `wp_m_*` `[CurCtx]`+`ctxTok` statements, `Xv6/SpecSpin.lean:40`; with W-SCO (A) (w4: `Weak/SailCycleOrder*.lean`,
+appends to `MachOfPf`/`SrvwmoXv6Adequacy`/`PfRunUnpinned`): NO shared file — but every MachCSL merge rebuilds `Weak/`, so (f2-ctx)'s
+3–4 cone rebuilds land between W-SCO (A)'s green increments (rebuild only, no edit, for W-SCO).  *Acceptance*: `lake build MachCSL Xv6
+Weak Vtest` ([R14.1]), `tools/ci/lint.sh`, `audit.sh`, `audit.sh --weak`, `tcb.sh` green; `xv6DiscAdequacy_closed` registered with the
+strengthened `xv6AccessDisc`, axiom set = `xv6FsAdequacy_closed`'s; every registered root unchanged in statement; the file headers name
+F0's vector + causal closure, X1–X5, the (f1) list EMPTY; `W8-Rctx.md`'s 31 rows closed CHAINED/DEVICE-KEY/PTE-KEY — a row that RESISTS
+during the proof is REPORTED (spec-first options: FAITHFUL/STRONGER/WEAKER), not custodied; `PROGRESS-W8ctx.md`.  *Size*: L–XL ≈ 6.5–9.5k,
+3–4 rebuilds (order: F0 vector + `CtxBox` first, one rebuild; X1/X3/X4 second; X5 + the 31 consumers last).  *Risks*: the vector's
+maintenance proofs (`ctx_unstamp`'s join, X1's "the releaser's own vector covers the hook stamp", X2's invariance under parks/deposits/
+mints), `CtxBox`'s elaboration, the pipe-lock export; the `Xv6` cone (≈ 0.66M lines) per rebuild.
+**WAITS (rev 37)**: **M2 CLOSE** ONLY for W-SCO (A)'s `sailCycleOrder_holds` discharging `srvwmoXv6M2Core`'s `hsco` (W-RSV's W4 re-proof is
+DONE; `srvwmoXv6M2` is STATED by W-SCO (A) [R32.s4]) — then register `Weak.srvwmoXv6M2` (§C W5d); **W5d-G G1–G5**: gate MET (W13 (I)'s
+`Fab`/`Supply` text landed) — graph lane; needs its launch paragraph and the owner's batch approval ([OWN.44] covered W-SCO (A), W13 (I),
+W-RSV only); W14 for W13 (I)/(W) + W5d-G; W11 (iv)c for W13 (L).  The rev-31 record follows.
 **Rev 31 RESULTS (2026-10-12) and the rev-31 launch set.**  DONE and MERGED: **W4 F9** (`Weak/MachOfPfDisk.lean` NEW 1290 lines +
 `Weak/MachOfPf.lean` 1659 → 2979 — `simDisk :2603` proves the disk rows; `SimRel :342` lost its `DR` parameter, its device clause is
 `R-dev` (`diskSide :331` / `MachOfPfDisk.devAgree :429` / `VRel.holds :349`: every device but the disk EQUAL, the disk EQUAL (all
@@ -2671,8 +2791,9 @@ redesigned (§B(10)); spikes DONE** [R2.s4][R4.2][R5.1][R6.4a][OWN.16][W2s].  Fi
   `sailCycleOrder :126-137` FALSE as stated** — an instruction fetch from a device address is an `LDev` step under an arbitrary
   `pma_regions` (`pnodeStep` `WeakEvInst.lean:315-321`), so a hart can announce `sfence.vma` with `lastCyc = some .LInstr`;
   `sailCycleOrderOfCycle`/`sailCycleOrderKOfCycle` are sound with FALSE premises; M1/M2 VACUOUS until the restatement under `wbootFacts σ0`
-  (Q-SCO-PMA (α), provisional) lands as W-SCO (A)'s FIRST commit.  **Remaining work = the rev-36 launch paragraph at §C top** (commit 1 =
-  the restatement, `good`'s register filter `Rboot`, the `bootPMA` executability lemma; deliverables (1) `cycleOkBoot_holds` — shared-piece
+  (Q-SCO-PMA (α), RULED [OWN.45]) lands as W-SCO (A)'s FIRST commit.  **Remaining work = the rev-36 launch paragraph at §C top — LAUNCHED 2026-10-12 (w4), RUNNING [rev 37]** (commit 1 =
+  the restatement, `good`'s register filter `Rboot` pinning `pma_regions = bootPMA` AND `htif_tohost_base = none` [R33.1], the `bootPMA`
+  executability lemma and the `within_mmio_readable`-false-on-RAM lemma; deliverables (1) `cycleOkBoot_holds` — shared-piece
   footprints incl. `tick_clock`/`run_hart_waiting`/the `ExecuteAs` redirect [R32.4], 122 `execute_*` lemmas, `fence.i`/SFENCE.VMA by hand,
   the instruction-independent cycle —, (2) `sailCycleOrder_holds`, (3) `srvwmoXv6M1` and `srvwmoXv6M2` [R32.s4] by direct application,
   (4) registration; files, rebase surface, acceptance, risks); `sailCycleOrderK`/`srvwmoXv6M1OfK` become REDUNDANT (worker's choice at the CLOSE).
@@ -2680,7 +2801,7 @@ redesigned (§B(10)); spikes DONE** [R2.s4][R4.2][R5.1][R6.4a][OWN.16][W2s].  Fi
   text; M2's CLOSE instantiates `srvwmoXv6M2Core`'s `hsco` with `sailCycleOrder_holds`.  Everything above the ruling (shape (0), the
   generic half, the reductions) is option-independent and LANDED.
 - **The SERIAL MachCSL items — all RULED, no gate left [OWN.21]–[OWN.23][OWN.30][OWN.36][OWN.37] (one worker at a time;
-  one `Xv6`-cone rebuild each, W8 (f2-ctx) 3–4): **W-COH ✓ → W-DMA0 ✓ → W8-β′ (RUNNING) → W-RSV → W8 (f2-ctx) [OWN.41][R28.5]**
+  one `Xv6`-cone rebuild each, W8 (f2-ctx) 3–4): **W-COH ✓ → W-DMA0 ✓ → W8-β′ ✓ → W-RSV ✓ → W8 (f2-ctx) (LAUNCHABLE, rev 37) [OWN.41][R28.5]**
   (M1 — W-RSV's gate marker, NOT a MachCSL item — closed in parallel, §C top; W8 (f2-ctx) waits for W-RSV and rebases on its
   `resvFragAny` thread at `ctxTok`, `Ctx.lean:298-299`) [R16.3][R21.1][OWN.37].**  **W8-β′** (M–L ≈ 1.3–2.3k [R26.2]; the
   reserved-region change — the era ghost `rsvName` + the static list `KernelRsv.static` registered at the `PowerOn` mint
@@ -2690,7 +2811,7 @@ redesigned (§B(10)); spikes DONE** [R2.s4][R4.2][R5.1][R6.4a][OWN.16][W2s].  Fi
   `xv6DiscAdequacy_closed` at the provisional conjunction (the twin paid ONCE; ≈ +0.3–0.5k — its rebuild then buys a
   ROOT-level fact); ≤ 30 `Xv6/` files as `lkFresh`/`wordCell` become fraction-parametric (30 files [R25.s3]), ≈ 11 cpu-cell rule
   uses, the two `MachGS` literals and `Weak/WeakAdequacy.lean`'s; ONE rebuild;
-  launches NOW — **RUNNING since 2026-10-12 10:26 [rev 31]**) then **W8 (f2-ctx)** (**[rev 31][OWN.38][OWN.39] L–XL ≈ 6.5–9.5k** (was ≈ 4–6.5k after β′ takes the twin [R25.2]; [OWN.36]'s one-rebuild sizing SUPERSEDED by [OWN.37]): refines the CLEAN
+  launches NOW — **RUNNING since 2026-10-12 10:26 [rev 31]; DONE and MERGED 2026-10-12 [rev 37]**) then **W8 (f2-ctx)** (**[rev 31][OWN.38][OWN.39] L–XL ≈ 6.5–9.5k** (was ≈ 4–6.5k after β′ takes the twin [R25.2]; [OWN.36]'s one-rebuild sizing SUPERSEDED by [OWN.37]): refines the CLEAN
   context key so it carries a sync chain — **a PER-AUTHOR vector bound `chain ξ : CPU → Nat` beside the unchanged scalar TSO floor,
   joined at each hop (F0, R-ctx §1; the scalar "every foreign entry `t ≤ bound ξ` is chained" is FALSE at one lock hand-off)** — in
   `Ctx.lean`, `CtxLaws.lean` (`ctx_unstamp :552`, `ctx_move :848`, `ctx_park`/
@@ -2912,7 +3033,8 @@ redesigned (§B(10)); spikes DONE** [R2.s4][R4.2][R5.1][R6.4a][OWN.16][W2s].  Fi
   `audit.sh --weak` green with the REGISTERED root(s), `tools/ci/vtest.sh check` (the `Vtest` `hartStep` twin,
   `vtest-lean/Vtest/HartExec.lean`), the `TsoMem.lean:27-31` header and §0 F1 (ii) as already written.  Critical path [R12.1]:
   W-RSV is the LONGEST serial MachCSL item; it gates M2 (W5d) only through the W4 re-proof, and Stage 2's graph lane
-  (W12/W12b/W5d-G/W13) runs beside it.
+  (W12/W12b/W5d-G/W13) runs beside it.  **DONE and MERGED 2026-10-12 [rev 37] — the landed form, deviations and file counts are at §C top's
+  rev-37 W-RSV paragraph; the W4 re-proof is inside, so M2 CLOSE now waits on W-SCO (A) only.**
 
 **Stage 1b — M2, the fork path on the pf side (part of the target [OWN.3]).**
 - **W5d `Weak/PfRunUnpinned.lean`** (L) [R2.1-alt][R3.1][OWN.3][R4.2][R6.4b].  The pf half ONLY: `execWfPfRunProgF`
@@ -3133,7 +3255,8 @@ nothing non-trivial enters M1's premise, `itvOf` is no shared parameter; M1 repl
   `gfexecConfIO`, the interim-clause deletion, `hblkQ`'s fate (GENERALIZED), `emFetchImg → emZifencei` in `gfexecConfIO`, and W5d-G
   G1–G5's `Fab`/`Supply` text.  **Remaining work = the rev-35 launch paragraph at §C top** (deliverables (1)–(6), files, rebase surface,
   acceptance) — **LAUNCHED at rev 36 (w3) with [R32.3] as a launch addendum; [R32.s3] (the `tch` carrier) and [R32.s6] (cites) recorded
-  in that paragraph.**
+  in that paragraph — DONE and MERGED 2026-10-12 [rev 37]: the landed form (the carrier is named `tq`; `gfexecConfIO` REPLACES `gfexecConf`;
+  `gfIoDevOfConf`; deviations `tq` on `hemitf`/`hartConff`, `∀ i, devQuiet (boot i)` on `gfexecConfOfQconf`/`cycleKillOfF`) is recorded at §C top.**
   **(L)** T2-1c″ (M–L): `ptraceRelIO := ptraceRel ∪ gmo|IO` (`Lin2.lean:
   124`); I/O events are rule-14 ANCHORS like writes — `gnxw` (`Lin.lean:440`) → `gnxa` "next own write or I/O event",
   `glinEids :455`, `linCand :471`; **[W2s] under G3-Q (a″) DISK-ROW READS are anchors too (`gnxa` ∋ row-`NCPU` reads;
@@ -3605,9 +3728,20 @@ nothing non-trivial enters M1's premise, `itvOf` is no shared parameter; M1 repl
   the ghost registration of a lock born mid-run, and "reachable from the open-file table" is not MachCSL-expressible — (f2-ctx) must
   either find a PURE σ↔`reg` tie `memModelAt` can carry or export the pipe part another way (an open design point, not a gate; W13 (K)
   needs only live STATIC locks); **[R26.s4] (f2-ctx)'s load rule establishes a MachCSL-generic, registry-parametrised chain
-  invariant, `chainOkAt` derived `Xv6/`-side** (R-ctx cannot settle this).  **Deps [R28.5]**: W8-β′ — none (RUNNING); R-ctx — DONE;
-  **W-RSV — W8-β′ MERGED + M1 ✓ (D26)** (Q-RSV-order RULED (b) [OWN.41]; §C W-RSV "Launch (rev 32)"); **W8 (f2-ctx) — W-RSV MERGED**
-  (R-ctx PASSED), rebasing on W-RSV's `resvFragAny` thread (`ctxTok`, `Ctx.lean:298-299`) and on `Resources.lean`/`WpLock.lean`.
+  invariant, `chainOkAt` derived `Xv6/`-side** (R-ctx cannot settle this).  **Deps [R28.5] — ALL MET at rev 37**: W8-β′ — DONE and MERGED 2026-10-12 (`../weak-orch/parked/PROGRESS-W8beta.md`: increments 1–4;
+  `KernelRsv.static` = all 157 image spinlocks (both ports' `uarts[i].lock`, `cons`, `pr`, `kmem`, `pid_lock`, `wait_lock`, the 64 `proc[i].lock`,
+  `tickslock`, `bcache.lock`, the 30 buffers' and 50 inodes' sleeplock inner locks, `itable.lock`, `log.lock`, `ftable.lock`, `disk.vdisk_lock`)
+  + NCPU cpu regions, address-sorted, `decide +kernel`; pipe locks stay dynamic; `Xv6/AccessDiscipline.lean` 197 (`Cust :53`, `custAt :89`,
+  `xv6LockWord :98`, `lockWordDiscAt :104`, `cpuStaticAt :109`, `xv6AccessDisc :115`, `xv6LockWord_registered :153`, `powerInterp_accessDiscβ :186`
+  taking `MachFixedGS.rsvStatic = KernelRsv.static` — deviation 3), `SystemAdequacyDisc.lean:35`, `LinkDiscAdequacy.lean:26` root REGISTERED
+  (`roots.txt:20`, `baseline.json:67`, `tcb/expected.json:2323`; axioms = `xv6FsAdequacy_closed`'s, 0 `sorryAx`); deviations: `reservedOk`/
+  `staticIn` take the list explicitly, `lockRegionOk`'s owner pointer is a kind parameter (`RsvKind.lock cpusBase`), `custAt`/`xv6LockWord`
+  ignore `σ`/`t` in β′ ((f2-ctx) makes them σ-readable), **four existing roots' `tcb/expected.json` module sets GROW** (`riscvPowerAdequacy` +
+  `Reserved`/`RsvMint`/`WordHistDefs`; `xv6PowerAdequacy` + `Reserved`/`WordHistDefs`/`Geom`/`KernelRsv`; `xv6FsAdequacy_xv6GF`, `userProof` +
+  `Reserved`/`WordHistDefs` — the reserved conjunct lives in `memModelAt` and `MachFixedGS` carries `rsvStatic`; no module leaves,
+  axioms/opaques unchanged)); R-ctx — DONE; **W-RSV — DONE and MERGED** (§C top rev-37 paragraph); **W8 (f2-ctx) — LAUNCHABLE NOW**,
+  rebasing on W-RSV's `resvFragAny` thread (`ctxTokAt :299`/`ctxTok :320`, `ctxTok_cases :406-407`) and on β′'s `Resources.lean`/`Lock.lean`/
+  `WpLock.lean` — the LAUNCH PARAGRAPH (deps, deliverables, files, rebase surface against the tip, acceptance, size) is at §C top [rev 37].
   **[R28.s8]** the (f2-ctx) brief's first line tells the worker that `notes/W8-design.md` §4/§5/§8 state the SUPERSEDED scalar
   design (rev 30/31: per-author vector bound [OWN.38], X1–X5, `WpPtWalkOwn` [OWN.39]) — this plan's §C W8 (4)/(6) governs;
   **[R28.s6]** R-ctx's note was briefed as `notes/R-ctx.md` and written as `notes/W8-Rctx.md` (its header `:5-6`) — the plan's name.
@@ -3658,6 +3792,13 @@ nothing non-trivial enters M1's premise, `itvOf` is no shared parameter; M1 repl
 
 **Stage 3 — AxSL tier: retired** [OWN.1].  One-paragraph note on Theorem 2 (D6).
 
+**Status of the launch (rev 37, 2026-10-12) [OWN.45]:** DONE since rev 36 — **W13 (I)** (both halves; `gfexecConfIO`, contact membership,
+`.PDisk` clause gone; §C top), **W8-β′** (157 static locks + `cpus[h]`; root `Xv6.xv6DiscAdequacy_closed` REGISTERED; §C W8), **W-RSV**
+(`.pure` arm `dropResv`; `resvFragAny` threaded; `TsoMem` header updated; §C top).  **IN FLIGHT: W-SCO (A)** (w4; commit 1 = the restatement
+with `Rboot` pinning `pma_regions` AND `htif_tohost_base` [R33.1]; M1/M2 vacuous until it lands).  **LAUNCHABLE NOW: W8 (f2-ctx)** (serial
+MachCSL; §C top paragraph).  **Gated**: M2 CLOSE on W-SCO (A) only; W5d-G G1–G5 gate MET (launch paragraph pending); W14 on W13 (I)/(W) +
+W5d-G; W11 (iv)c on W13 (L).  **Serial MachCSL**: W-COH ✓ → W-DMA0 ✓ → W8-β′ ✓ → W-RSV ✓ → **W8 (f2-ctx)**.  **OPEN owner questions: NONE**
+(Q-SCO-PMA RULED (α) [OWN.45]).  The rev-36 record follows.
 **Status of the launch (rev 36, 2026-10-12) [OWN.42]–[OWN.44]:** DONE since rev 31 — **W5 CLOSE-OUT → M1 DONE** (registered,
 `roots-weak.txt:20`; INTERNAL [OWN.2]; **VACUOUS until W-SCO (A)'s first commit lands [R32.1]**), **W-SCO shape (0) + generic half**
 (`SailCycleOrderK.lean`, imported, unregistered; its targets `cycleOkAll`/`cycleOkK` are FALSE as defined [R32.1]), **W13 (I) realization
@@ -3666,7 +3807,7 @@ vacuous as M1).  **IN FLIGHT: W8-β′** (increments 2–4, w2), **W13 (I) bundl
 **NEXT: W-SCO (A)** [OWN.42] — launchable with the rev-36 §C-top brief (commit 1 = the premise restatement under `wbootFacts σ0`).
 **Gated**: **W-RSV** on W8-β′'s MERGE [OWN.41]; W8 (f2-ctx) on W-RSV; M2 CLOSE on W-RSV's W4 re-proof + W-SCO (A); W5d-G G1–G5 on (I)'s
 bundle half; W14 on W13 (I)/(W) + W5d-G; W11 (iv)c on W13 (L).  **Serial MachCSL**: W-COH ✓ → W-DMA0 ✓ → **W8-β′ (RUNNING)** → **W-RSV** →
-W8 (f2-ctx) [OWN.41].  **OPEN owner questions: ONE — Q-SCO-PMA, adopted PROVISIONALLY as (α), awaiting ruling (§D, first item)**.  The
+W8 (f2-ctx) [OWN.41].  **OPEN owner questions: ONE — Q-SCO-PMA, adopted PROVISIONALLY as (α) (RULED (α) [OWN.45] at rev 37)**.  The
 rev-31 record follows.
 **Status of the launch (rev 31, 2026-10-12) [OWN.38–40]:** DONE since rev 28 — **W4 F9** (`Weak/MachOfPfDisk.lean` 1290 NEW +
 `MachOfPf.lean` 2979; `simDisk`, `R-dev` = `diskSide`/`devAgree`/`VRel.holds`, `cacheWf`, `devrt` untracked; no disk hypothesis;
@@ -3767,16 +3908,22 @@ costs after.  Shared Sail/PMA facts: `execute_FENCE` keys on the low two bits of
 (`LeanRV64D/Defs.lean:549-566`); the platform table types `[0x2000000, 0x12000000)` `IOMemory`, non-idempotent
 (`MachCSL/Platform.lean:220-239`; RAM `MainMemory :240-254`), consulted only through `matching_pma_ram`
 (`PlatformFacts.lean:24`); Sail has NO device/DMA model (`MachCSL/Dev/*.lean`); PMA strong ordering is within ONE channel only.**
-**OPEN (rev 36): Q-SCO-PMA — adopted PROVISIONALLY as (α) [R32.1] (the premise `sailCycleOrder` stated under `wbootFacts σ0`), FIRST below.**
-- **Q-SCO-PMA — OPEN, adopted PROVISIONALLY as (α), awaiting ruling (rev 36; raised by R32 [R32.1]).  What may the Sail-cycle fact
-  `sailCycleOrder` assume about the platform's memory map?**  *Spec (FIRST).*  RVWMO and riscv.cat order loads and stores and say nothing
+**RULED 16:56 2026-10-12 (rev 37): Q-SCO-PMA = (α) [OWN.45] — the Sail cycle-order fact (`sailCycleOrder`/`good`/`cycleOkBoot`) is stated
+under `wbootFacts σ0` (the board after reset: device regions non-executable, HTIF window disabled [R33.1]); FIRST below.  OPEN: NONE (rev 37).**
+- **Q-SCO-PMA — RULED (α) [OWN.45] (16:56 2026-10-12, rev 37; rev 36 OPEN, adopted provisionally; raised by R32 [R32.1]).  What may the
+  Sail-cycle fact `sailCycleOrder` assume about the platform's memory map AND HTIF window (`pma_regions`, `htif_tohost_base`, both pinned by
+  `bootPost`, `BootInitModel.lean:39,41`) [R33.1]?**  *Spec (FIRST).*  RVWMO and riscv.cat order loads and stores and say nothing
   about the order of fetch, announce and execute inside one instruction (Q-FIARM).  Zifencei says what `fence.i` orders, not whether a hart
   may fetch from a device.  The privileged spec's PMAs make EXECUTABILITY a per-region PLATFORM attribute (an I/O region may or may not
   support instruction fetch); the Sail model in this tree checks it in `pmaCheck` (`model/Lean_RV64D/LeanRV64D/Mem.lean:263-274`) from the
   `pma_regions` register — a platform table, not architectural state — which the board sets at reset (`MachCSL/Platform.lean:199-250`
   `bootPMA`: the two I/O regions `executable := false`, RAM `executable := true`; `BootInitModel.lean:41`) and no instruction ever writes
-  (`writeReg pma_regions` only at `ArchReset.lean:125`).  The Sail model with OTHER register contents CAN fetch from a device; the model as
-  booted on this board cannot.  *Plain language.*  The proof needs "after a hart announces an instruction it does not fetch, and an
+  (`writeReg pma_regions` only at `ArchReset.lean:125` and `model/…/LeanRV64D.lean:265` `sail_model_init`, both outside the cycle [R33.s4]).  The Sail model with OTHER register contents CAN fetch from a device; the model as
+  booted on this board cannot.  **[R33.1] A second platform register sits on the same path: `within_mmio_readable` (`Mem.lean:437-446`,
+  between the PMA check and the RAM read) consults `htif_tohost_base` — the Sail model's host-interface (HTIF) window, NOT an ISA or PMA
+  notion; `none` on this board (`BootBoard.lean:31`, `HwConfig.lean:53`), its only writer `enable_htif` uncalled — and with `some base` in
+  RAM an instruction fetch is answered from the `htif_tohost` REGISTER with no memory read at all.  Pinning it is a platform hypothesis of
+  the same kind as `bootPMA`, already inside `wbootFacts`; FAITHFUL to the model as booted; the trusted base gains nothing.**  *Plain language.*  The proof needs "after a hart announces an instruction it does not fetch, and an
   `sfence.vma` announce comes right after its own fetch".  That holds when every fetch comes from RAM.  If a hart could fetch its
   instruction from a DEVICE register (the PLIC, a UART, the virtio window), our graph alphabet would record the fetch as an I/O read
   (`LDev`), not as an instruction fetch (`LIFetch`), and the fact would be false.  On this board the memory map forbids executing from
@@ -3787,16 +3934,18 @@ costs after.  Shared Sail/PMA facts: `execute_FENCE` keys on the low two bits of
   `sailCycleOrder`'s second clause fails; the registered `srvwmoXv6M1Core` and `srvwmoXv6M2Core`, whose hypothesis `hsco` IS that fact over
   EVERY `σ0`, then say nothing.  *Definitions.*  `sailCycleOrder` (`Weak/SrvwmoXv6Adequacy.lean:126`) = that fact, at rev 35 stated over
   every pf run from ANY `σ0`; `wbootFacts σ0` (`Weak/WeakLang.lean:482`) = "`σ0` is the board after reset" (boot image, empty log, each
-  hart's registers the output of the boot program with `bootPMA`); `pma_regions` = the Sail register holding the memory map; `pnodeStep`
+  hart's registers the output of the boot program with `bootPMA`); `pma_regions` = the Sail register holding the memory map; `htif_tohost_base` = the Sail register locating the HTIF window (`Option
+  (BitVec 64)`; `none` = disabled) [R33.1]; `pnodeStep`
   (`Weak/WeakEvInst.lean:294`) = how one Sail event becomes a graph label (a read at a device address is `LDev` whatever its kind,
   `:315-321`); `good`/`cycleOkAll` (`Weak/SailCycleOrderK.lean:139,232`) = the tree-level obligation W-SCO (A) proves; `cycleOkBoot` = the
-  same with the register filter `Rboot` (`pma_regions = bootPMA`); M1/M2 = the internal composition milestones
+  same with the register filter `Rboot` (`pma_regions = bootPMA` AND `htif_tohost_base = none` [R33.1]); M1/M2 = the internal composition milestones
   `srvwmoXv6M1Core`/`srvwmoXv6M2Core`.  *Why it matters.*  Today `sailCycleOrder` is quantified over EVERY `σ0`, so it is FALSE and M1/M2
   are VACUOUS; W-SCO (A) as briefed at rev 35 would try to prove a false tree fact.  The published theorem must say which PLATFORM facts it
   relies on, and a reader must be able to see that the trusted base did not grow.  *Options.*  **(α) RECOMMENDED, ADOPTED PROVISIONALLY —
   state the fact under `wbootFacts σ0`** (M1/M2 already assume it in their premise sets, `SrvwmoXv6Witness.lean:599`/
   `PfRunUnpinned.lean:596`; `sailCycleOrderK :92-93` already does): what changes — `sailCycleOrder`'s TEXT gains `wbootFacts σ0 →`,
-  `fiOfSco`/`m1Hyps`/`m2Hyps` take it, `good` gains a register filter, W-SCO (A) proves `cycleOkBoot` instead of `cycleOkAll`; names and
+  `fiOfSco`/`m1Hyps`/`m2Hyps` take it, `good` gains a register filter pinning `pma_regions = bootPMA` and `htif_tohost_base = none`
+  [R33.1], W-SCO (A) proves `cycleOkBoot` instead of `cycleOkAll`; names and
   the `baseline-weak.json` entry unchanged.  FAITHFUL to the Sail model AS BOOTED on this board — in practice the trusted base gains NOTHING
   (the boot table was already inside `wbootFacts`); a platform hypothesis, not an ISA strengthening (another board with an executable I/O
   region would need its own table).  Cost S–M (W-SCO (A)'s first commit, ≈ 200–400 lines).  Unblocks W-SCO (A); risk none.  **(β) state it
@@ -3805,8 +3954,8 @@ costs after.  Shared Sail/PMA facts: `execute_FENCE` keys on the low two bits of
   address is not a step** (`pnodeStep`'s device arm refuses `akIfetch`, `WeakEvInst.lean:315-321`): EQUAL to the model from reset, WEAKER
   than the Sail model with arbitrary registers (removes a behaviour the model has); keeps `sailCycleOrder` closed over all `σ0`; cost M (the
   arm + every W2/W4 row that cases on it); risk: a second place where the pf model is narrower than Sail, to be named in §B(11).  The plan
-  adopts (α) WITHOUT waiting (it is the hypothesis M1/M2 already carry); the question is listed so the owner sees why the premise's text
-  changes and can redirect to (β)/(γ) before W-SCO (A)'s first commit merges.
+  adopted (α) WITHOUT waiting (it is the hypothesis M1/M2 already carry); **RULED (α) [OWN.45] 16:56 2026-10-12 — W-SCO (A) launched with
+  it in its brief.**  [R33.1] changes the TREE filter (two pinned registers instead of one), not the premise — no further ruling needed.
 - **Q-RSV-order — RULED (b) [OWN.41] (11:09 2026-10-12; rev 31 OPEN, raised by the re-check of W-RSV's gate, §C top (4)) [R28.5]:
   the serial lane is W8-β′ → W-RSV → W8 (f2-ctx); W-RSV launches when β′ merges (§C W-RSV "Launch (rev 32)").  The question as
   put: now that M1 has landed FIRST, does W-RSV go on the serial MachCSL lane right after W8-β′, or after W8 (f2-ctx) as
@@ -4066,8 +4215,8 @@ costs after.  Shared Sail/PMA facts: `execute_FENCE` keys on the low two bits of
   FAITHFUL; no cheaper than (A), proves less (kernel text only).  **(C)** pin the second halfword to `pa + 2` by a TLB-register
   invariant: FAITHFUL; L+, fragile.  **(D)** restrict M1's candidates to adjacent halves: WEAKER than Sail (excludes runs the model has),
   M1's statement changes; rejected.  §C W-SCO is the RELAUNCH brief.  **[R32.1] (rev 36): `cycleOkAll` as defined is FALSE (a fetch from MMIO under an arbitrary
-  `pma_regions`); (A) is proved as `cycleOkBoot` under the boot PMA table — Q-SCO-PMA (α), provisional.**
-- **Q-GFDEV-contact — RULED (a) [OWN.43] (13:59 2026-10-12, rev 35; raised by the W13 (I) worker, `../weak-orch/parked/PROGRESS-W13I.md`).
+  `pma_regions`); (A) is proved as `cycleOkBoot` under the boot PMA table — Q-SCO-PMA (α), RULED [OWN.45].**
+- **Q-GFDEV-contact — RULED (a) [OWN.43] (13:59 2026-10-12, rev 35; raised by the W13 (I) worker, `../weak-orch/parked/PROGRESS-W13I.md`; LANDED — W13 (I) bundle half DONE, rev 37).
   Which row items are `gfDev` members in the published conformance bundle?**  *Spec (FIRST).*  RVWMO/riscv.cat/Sail have no
   device-internal events; Zifencei and the PMAs are silent; virtio 1.x says nothing about when the device re-reads its state — `gfDev`
   and (R1)–(R3) are device-MODEL/trusted-surface text (D45/D49 class); no ISA order is at stake; every option is beyond the spec's
@@ -4110,8 +4259,8 @@ costs after.  Shared Sail/PMA facts: `execute_FENCE` keys on the low two bits of
   result) → decode (pure) → `execute` (`:370-371` / `:404-405`), and nothing in `execute` is an instruction fetch;
   `try_step :416` wraps it; `MachCSL/UCycleDefs.lean:11-17` already re-states this cycle by EQUATIONS (`uc_tryStep_eq`,
   `uc_runHartActive_eq`: `fetch () >>= ucAfterFetch`).  PMAs silent.  So the fact is TRUE OF THE MODEL **from this platform's reset — [R32.1]: the boot PMA table forbids
-  instruction fetch from I/O regions; over arbitrary register files it is FALSE (a fetch from a device address is an `LDev` step,
-  `WeakEvInst.lean:315-321`), so the premise is stated under `wbootFacts σ0` (Q-SCO-PMA (α), provisional)**;
+  instruction fetch from I/O regions and the HTIF window is disabled [R33.1]; over arbitrary register files it is FALSE (a fetch from a device address is an `LDev` step,
+  `WeakEvInst.lean:315-321`), so the premise is stated under `wbootFacts σ0` (Q-SCO-PMA (α), RULED [OWN.45])**;
   the question is how the proof OBTAINS it.  *Plain language.*  The published theorem's hart rows are proved one EVENT at
   a time (a bus read, a store, a barrier …) through `pfStepTso` (`Weak/PfStepTso.lean:301`), which relates the pf hart
   (the weak-memory side's hart: a Sail program emitting labelled events) to MachCSL's TsoMem hart.  TsoMem keeps an
