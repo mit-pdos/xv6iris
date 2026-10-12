@@ -715,7 +715,8 @@ theorem disk_ring_write [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : CPU
           authoredBy t (hartAgent cpu) ∗ topLb t ∗
           histBytes (availRingAt pav (np % NUM)) 2 (fun _ => DFrac.own (1 : Qp).half)
             (pushed (n := 2) Hs t (hartAgent cpu) h)) := by
-  unfold diskInv devInvR writeAU
+  refine BI.Entails.trans ?_ (writeAU_of_own _ _ _ _ _)
+  unfold diskInv devInvR writeAUOwn
   iintro ⟨#Hinv, #Hgeom, Hpub, Hstg, Htok, Hd⟩
   icases diskGeom_cfg γ pd pav pu $$ Hgeom with ⟨%c0, #Hfr, %hg⟩
   icases ctxBytes_forget curCtx (availRingAt pav (np % NUM)) 2 (DFrac.own (1 : Qp).half) w0 $$ Hd
@@ -801,7 +802,8 @@ theorem disk_avail_idx_write [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu 
           authoredBy t (hartAgent cpu) ∗ topLb t ∗
           histBytes (availIdxAt pav) 2 (fun _ => DFrac.own (1 : Qp).half)
             (pushed (n := 2) Hs t (hartAgent cpu) (wrap16 (np + 1)))) := by
-  unfold diskInv devInvR writeAU
+  refine BI.Entails.trans ?_ (writeAU_of_own _ _ _ _ _)
+  unfold diskInv devInvR writeAUOwn
   iintro ⟨#Hinv, #Hgeom, Hpub, Hstg, Htok, Hd⟩
   icases diskGeom_cfg γ pd pav pu $$ Hgeom with ⟨%c0, #Hfr, %hg⟩
   icases ctxBytes_forget curCtx (availIdxAt pav) 2 (DFrac.own (1 : Qp).half) (wrap16 np) $$ Hd

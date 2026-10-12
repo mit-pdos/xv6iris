@@ -239,7 +239,8 @@ theorem iput_lk_retire_au (cpu : CPU) (Mt : RegMapF (Qp × PosNat)) (kk : Nat) (
     writeAU cpu (iRef (ientry kk)) 4 (0#32 : BitVec 32) (iputLkRetOut cpu kk Mt inum rg tst) := by
   have hin : (inum.toNat : Int) < 16 * (icfgNib : Int) := by omega
   iintro ⟨#Hinv, #Hrinv, Hhalf, Hfrg, Hslh, Hsel, Hisl, Hru, Hpre, Hcnt, Hmir, Hst⟩
-  unfold writeAU
+  iapply writeAU_of_own
+  unfold writeAUOwn
   imod iref_close_last_frz_store_pinw_au (hlc := hlc) ⊤ fscIreg fscFs icfgIst icfgNib Mt kk inum q
       bfl rg tst CoPset.subseteq_top CoPset.subseteq_top hin hMk
     $$ Hinv Hrinv Hhalf Hfrg Hslh Hsel Hisl Hru Hpre Hcnt Hmir Hst with ⟨%g, %lo, %hlot, Hrows, Hcl⟩

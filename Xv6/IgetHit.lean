@@ -131,7 +131,8 @@ theorem ig_hit_au (c : CPU) (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 3
   imodintro
   iexists qj'.half
   -- the store's accessor
-  unfold writeAU
+  iapply writeAU_of_own
+  unfold writeAUOwn
   imod iref_incr_store_pinw_au (hlc := hlc) ⊤ fscIreg fscFs icfgIst icfgNib M j inum l qj qj'.half nj
       tst CoPset.subseteq_top CoPset.subseteq_top CoPset.subseteq_top hnib' hMj
       (ig_frac_lt qj qj' hq) hno'

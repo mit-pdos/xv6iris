@@ -265,9 +265,8 @@ def wp_fsinit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
   icSleeplocks fscIc ∗
   -- initlog's RAW struct log cells, threaded straight through
   kmapId logAddr ∗ kmapId (logAddr + 16#64) ∗
-  wordPointsTo logAddr 4 (DFrac.own 1) vlock ∗
+  lkRaw logAddr vlock vcpu ∗
   wordPointsTo (logAddr + 8#64) 8 (DFrac.own 1) vname ∗
-  wordPointsTo (logAddr + 16#64) 8 (DFrac.own 1) vcpu ∗
   wordPointsTo lStart 4 (DFrac.own 1) vStart ∗
   wordPointsTo lDev 4 (DFrac.own 1) vDev ∗
   wordPointsTo lOut 4 (DFrac.own 1) 0#32 ∗

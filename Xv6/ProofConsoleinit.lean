@@ -10,6 +10,7 @@ only (`SIE` literally `false`), as `uartinit` is.
 -/
 import Xv6.SpecConsoleinit
 import Xv6.SpecInitlock
+import Xv6.LockRsv
 import Xv6.CodeTactics
 
 namespace Xv6
@@ -57,12 +58,11 @@ set_option maxHeartbeats 1000000 in
 /-- `initlock`'s contract as a rule, with the lock and name pointers named. -/
 theorem ci_initlock_call (IL : INITLOCK) [CurCtx] (c : CPU) (k' : KCtx)
     (vlock : BitVec 32) (vname vcpu : BitVec 64) (hK' : 2 ≤ k'.avail)
-    (lk nm : BitVec 64) (h10 : k'.regs 10#5 = lk) (h11 : k'.regs 11#5 = nm) :
+    (lk nm : BitVec 64) (h10 : k'.regs 10#5 = lk) (h11 : k'.regs 11#5 = nm):
     kctx c k' ∗ pcIs c KA.«initlock» ∗
     kmapId lk ∗ kmapId (lk + 16#64) ∗
-    wordPointsTo lk 4 (DFrac.own 1) vlock ∗
+    lkRaw lk vlock vcpu ∗
     wordPointsTo (lk + 8#64) 8 (DFrac.own 1) vname ∗
-    wordPointsTo (lk + 16#64) 8 (DFrac.own 1) vcpu ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
       kctx cpu' (k'.withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       wordPointsTo (lk + 8#64) 8 (DFrac.own 1) nm -∗
@@ -152,7 +152,7 @@ theorem consoleinit_proof (IL : INITLOCK) (UI : UARTINIT) : CONSOLEINIT :=
   ⟨fun {hlc GF} _ _ _ cpu k γ0 γ1 l0 l1 k0 k1 vlock0 vlock1 vname0 vcpu0 vname1 vcpu1
       vclock vcname vccpu vread vwrite hsie hK => by
   unfold wp_consoleinit_body
-  iintro ⟨Hk, Hpc, #Hcl, #Hcl', Hwlock, Hwname, Hwcpu, Hpre0, Hpre1, Hread, Hwrite, Hrest, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hcl, #Hcl', Hwlock, Hwname, Hpre0, Hpre1, Hread, Hwrite, Hrest, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   simp only [consoleinitAddr]
   k_norm_g
@@ -187,7 +187,7 @@ theorem consoleinit_proof (IL : INITLOCK) (UI : UARTINIT) : CONSOLEINIT :=
   rotate_right 1
   k_norm_g
   iframe #
-  iframe Hwlock Hwname Hwcpu
+  iframe Hwlock Hwname
   case hKi => k_norm_g; omega
   case ha0 => k_norm_g [ci_br_11fec]
   case ha1 => k_norm_g [ci_br_6bcc]

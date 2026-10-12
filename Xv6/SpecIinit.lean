@@ -25,7 +25,7 @@ def inodeNameAddr : BitVec 64 := KStr.«inode»
 /-- The specification of `iinit`. -/
 def wp_iinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (vlock : BitVec 32) (vname vcpu : BitVec 64) (hK : 12 ≤ k.avail) : Prop :=
-  kctx cpu k ∗ pcIs cpu iinitAddr ∗ lockWords itableLockAddr vlock vname vcpu ∗
+  kctx cpu k ∗ pcIs cpu iinitAddr ∗ lockWordsR itableLockAddr vlock vname vcpu ∗
   ([∗list] i ∈ List.range 50, sleepLockIn (inodeAddr i)) ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
     kctx cpu' (k.withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗

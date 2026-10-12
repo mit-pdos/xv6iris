@@ -20,6 +20,7 @@ its cancellable lock, and the invariant `isPipe`.
 A definitional/lemma file: it never touches a `Code*` file.
 -/
 import Xv6.PipeInv
+import Xv6.LockRsv
 
 namespace Xv6
 
@@ -268,7 +269,8 @@ theorem pipe_ends_alloc :
 /-- **THE BIRTH** (the Lean port of Rocq `new_pipe`): a fresh lock, the
 initialised fields, the data and the slack become a well-formed `struct pipe`
 and the two end references its creator keeps. -/
-theorem newPipe (cpu : CPU) (pi : BitVec 64) (hpv : pageValid pi) (vname : BitVec 64)
+theorem newPipe (cpu : CPU) (pi : BitVec 64) (hpv : pageValid pi)
+    (hm : ¬ lkRsvIn (hlc := hlc) (GF := GF) pi) (vname : BitVec 64)
     (bs : List (BitVec 8)) (hlen : bs.length = PIPESIZE) (E : CoPset) :
     kmapId (GF := GF) pi ∗ kmapId (pi + 16#64) ∗ ownCtx cpu curCtx ∗ lkFresh pi ∗
     wordPointsTo (pipeLockName pi) 8 (DFrac.own 1) vname ∗
@@ -278,8 +280,10 @@ theorem newPipe (cpu : CPU) (pi : BitVec 64) (hpv : pageValid pi) (vname : BitVe
     ⊢ |={E}=> (ownCtx cpu curCtx ∗ ∃ (γl : GName) (γp : PipeNames),
         isPipe γl γp pi ∗ pipeRef γp false 1 ∗ pipeRef γp true 1 ∗ pipeQfrag γp.pnQueue pst0) := by
   unfold lkFresh
-  iintro ⟨#Hcl, #Hcl', Hrun, ⟨%hok, ⟨%lo, %lc, Hw, #Hflo, Hc, #Hflc⟩⟩,
-    Hnm, Hnr, Hnw, Hro, Hwo, Hdat, Hslack⟩
+  iintro ⟨#Hcl, #Hcl', Hrun, ⟨%hok, Hfr⟩, Hnm, Hnr, Hnw, Hro, Hwo, Hdat, Hslack⟩
+  icases Hfr with (⟨%_, %lo, %lc, Hw, #Hflo, Hc, #Hflc⟩ | ⟨%hr, _⟩)
+  rotate_left
+  · exfalso; exact hm hr
   imod pipe_ends_alloc with ⟨%γp, Hf0, Hf1, Hm0, Hm1, Hqa, Hqf⟩
   ihave Hst0 := pipeEndstate_open_intro γp false 1#32 pflag_one_open $$ Hm0
   ihave Hst1 := pipeEndstate_open_intro γp true 1#32 pflag_one_open $$ Hm1
@@ -333,7 +337,7 @@ theorem newPipe (cpu : CPU) (pi : BitVec 64) (hpv : pageValid pi) (vname : BitVe
     isplit
     · ipureintro; exact hok
     isplit
-    · ipureintro; exact hpv
+    · ipureintro; exact ⟨hpv, hm⟩
     isplit
     · iexact Hcl
     isplit
@@ -348,7 +352,7 @@ theorem newPipe (cpu : CPU) (pi : BitVec 64) (hpv : pageValid pi) (vname : BitVe
 
 /-- The same at the kernel execution context (which carries the running
 context inside its `ctxTok`), under a fancy update. -/
-theorem kctx_newPipe [KernelImage GF] {lent : Bool} (cpu : CPU) (k : KCtx) (pi : BitVec 64)
+theorem kctx_newPipe {lent : Bool} (cpu : CPU) (k : KCtx) (pi : BitVec 64)
     (hpv : pageValid pi)
     (vname : BitVec 64) (bs : List (BitVec 8)) (hlen : bs.length = PIPESIZE) :
     kctxL lent cpu k ∗ kmapId (GF := GF) pi ∗ kmapId (pi + 16#64) ∗ lkFresh pi ∗
@@ -359,10 +363,11 @@ theorem kctx_newPipe [KernelImage GF] {lent : Bool} (cpu : CPU) (k : KCtx) (pi :
     ⊢ |={⊤}=> (kctxL lent cpu k ∗ ∃ (γl : GName) (γp : PipeNames),
         isPipe γl γp pi ∗ pipeRef γp false 1 ∗ pipeRef γp true 1 ∗ pipeQfrag γp.pnQueue pst0) := by
   iintro ⟨Hk, #Hcl, #Hcl', Hfresh, Hnm, Hnr, Hnw, Hropen, Hwopen, Hdat, Hslack⟩
+  icases kctx_lkHigh cpu k (lk := pi) hpv.2.1 $$ Hk with ⟨%hm, Hk⟩
   icases kctx_cases cpu k $$ Hk with
     ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
   icases ctxTok_cases cpu curCtx $$ Htok with ⟨Hctx, %r, Hfrag⟩
-  imod newPipe cpu pi hpv vname bs hlen ⊤
+  imod newPipe cpu pi hpv hm vname bs hlen ⊤
     $$ [Hctx Hfresh Hnm Hnr Hnw Hropen Hwopen Hdat Hslack]
     with ⟨Hctx, ⟨%γl, %γp, #Hpipe, Hr0, Hr1, Hqf⟩⟩
   · iframe Hcl Hcl' Hctx Hfresh Hnm Hnr Hnw Hropen Hwopen Hdat Hslack

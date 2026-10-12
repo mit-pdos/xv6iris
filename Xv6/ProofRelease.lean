@@ -311,7 +311,7 @@ caller holds only the lock token, so the holding check
 lock -- consuming the destroy licence and handing back the two reclaimed
 byte histories plus the carry-out `Out`. -/
 theorem release_cancel_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_CANCEL := ⟨
-  fun {hlc GF} _ _ cpu k γ s R _ D Out _ hrefuteCore hrefuteHalf hsie hnoff hK reen hreen hon => by
+  fun {hlc GF} _ _ cpu k γ s R _ D Out _ hrefuteCore hrefuteHalf hdyn hsie hnoff hK reen hreen hon => by
   unfold wp_release_cancel_body
   iintro ⟨Hk, Hpc, #Hlk, Hlocked, HR, Hlic, Harm, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -369,7 +369,7 @@ theorem release_cancel_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_CANCEL := �
   k_step (wp_s_fence_rw_w cpu _ (KA.«release» + 0x16#64) false 0#5 0#5) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- sw zero,0(s1): the lock is free
-  k_step (wp_s_sw_zero_release_cancel cpu _ ?hs (KA.«release» + 0x1a#64) false 0#12 9#5 γ (k.regs 10#5) s R D Out hrefuteHalf ?haddr) from (text_instr _ _ _ _ rfl rfl) Htext
+  k_step (wp_s_sw_zero_release_cancel cpu _ ?hs (KA.«release» + 0x1a#64) false 0#12 9#5 γ (k.regs 10#5) s R D Out hrefuteHalf ?haddr hdyn) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc $Hlp $Hheld $HR $Hlic]
   case haddr => k_norm [h29]
   iintro Hk Hpc %hmem Hword Hcpu HOut

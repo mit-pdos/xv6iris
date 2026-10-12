@@ -12,6 +12,7 @@ is the plain `k.withRegs R'`.
 -/
 import Xv6.SpecIinit
 import Xv6.SpecInitlock
+import Xv6.LockRsv
 import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
 import Xv6.UPtPptLemmas
@@ -165,12 +166,11 @@ set_option maxHeartbeats 1000000 in
 /-- `initlock`'s contract as a rule, with the lock and name pointers named. -/
 theorem ii_initlock_call (IL : INITLOCK) [CurCtx] (c : CPU) (k' : KCtx)
     (vlock : BitVec 32) (vname vcpu : BitVec 64) (hK' : 2 ≤ k'.avail)
-    (lk nm : BitVec 64) (h10 : k'.regs 10#5 = lk) (h11 : k'.regs 11#5 = nm) :
+    (lk nm : BitVec 64) (h10 : k'.regs 10#5 = lk) (h11 : k'.regs 11#5 = nm):
     kctx c k' ∗ pcIs c KA.«initlock» ∗
     kmapId lk ∗ kmapId (lk + 16#64) ∗
-    wordPointsTo lk 4 (DFrac.own 1) vlock ∗
+    lkRaw lk vlock vcpu ∗
     wordPointsTo (lk + 8#64) 8 (DFrac.own 1) vname ∗
-    wordPointsTo (lk + 16#64) 8 (DFrac.own 1) vcpu ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
       kctx cpu' (k'.withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       wordPointsTo (lk + 8#64) 8 (DFrac.own 1) nm -∗
@@ -402,8 +402,8 @@ theorem iinit_br_42b6 : KA.«iinit» + 0x42b6#64 = KStr.«itable» := by decide
 set_option maxHeartbeats 4000000 in
 theorem iinit_proof (IL : INITLOCK) (IS : INITSLEEPLOCK) : IINIT :=
   ⟨fun {hlc GF} _ _ cpu k vlock vname vcpu hK => by
-  unfold wp_iinit_body lockWords
-  iintro ⟨Hk, Hpc, ⟨#Hcl, #Hcl', Hwlock, Hwname, Hwcpu⟩, Htodo, HΦ⟩
+  unfold wp_iinit_body lockWordsR
+  iintro ⟨Hk, Hpc, ⟨#Hcl, #Hcl', Hwlock, Hwname⟩, Htodo, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   simp only [iinitAddr]
   k_norm_g
@@ -457,7 +457,7 @@ theorem iinit_proof (IL : INITLOCK) (IS : INITSLEEPLOCK) : IINIT :=
   rotate_right 1
   k_norm_g
   iframe #
-  iframe Hwlock Hwname Hwcpu
+  iframe Hwlock Hwname
   case hKi => k_norm_g; omega
   case ha0 => k_norm_g; rfl
   case ha1 => k_norm_g; rfl

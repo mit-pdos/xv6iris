@@ -77,7 +77,8 @@ theorem wp_s_sd_mint [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
     iframe HmConf HPC HnextPC HT HF Hcl
     isplitl [Hb]
     · iintro Hctx
-      unfold writeAU
+      iapply writeAU_of_own
+      unfold writeAUOwn
       iapply fupd_mask_intro LawfulSet.empty_subset
       iintro Hmask
       iexists Hs
@@ -163,7 +164,8 @@ theorem wp_s_sw_mint [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
     iframe HmConf HPC HnextPC HT HF Hcl
     isplitl [Hb]
     · iintro Hctx
-      unfold writeAU
+      iapply writeAU_of_own
+      unfold writeAUOwn
       iapply fupd_mask_intro LawfulSet.empty_subset
       iintro Hmask
       iexists Hs

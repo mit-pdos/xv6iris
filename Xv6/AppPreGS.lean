@@ -53,7 +53,7 @@ is `m`: the literal `AppIface.bootFixedGS` at the trivial interface and names
   { regName := fun _ => 0, heapName := 0, metaName := 0, viewName := fun _ => 0,
     iviewName := fun _ => 0, rviewName := fun _ => 0, topName := 0, authName := 0, resvName := 0,
     lockSetName := fun _ => 0, kmapName := 0, kptRootName := 0, devName := fun _ => 0,
-    mirrorName := 0, gen := 0, claimP := fun _ _ => iprop(True), claim_idle := fun _ => BI.true_intro }
+    mirrorName := 0, rsvName := 0, gen := 0, claimP := fun _ _ => iprop(True), claim_idle := fun _ => BI.true_intro }
 
 /-- **THE PRE-ERA INSTANCE**: `preGSAt` at the pre-structure's own counter. -/
 @[reducible] def appPreGS [P : MachGpreS hlc GF] : MachGS hlc GF :=

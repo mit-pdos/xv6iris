@@ -89,10 +89,14 @@ section records
 
 variable {hlc : HasLC} {GF : BundledGFunctors}
 
+/-- The SC record's reserved regions (W8-β′): none -- the weak adequacy runs no
+`PowerOn` mint and reads no reserved-region discipline. -/
+def WeakAdequacy.rsvNone : KernelRsv := ⟨[], ⟨List.nodup_nil, fun a ha => by simp [rsvBytes] at ha⟩⟩
+
 /-- The fixed record: the adequacy's invariant world, placeholder names, trivial client slots. -/
 @[reducible] def weakAdeqFixedGS [MachGpreS hlc GF] (Hinv : InvGS_gen hlc GF) :
     MachFixedGS hlc GF :=
-  bootFixedGS Hinv 0 0 0 0 0 0 iprop(True) (fun _ => iprop(True)) (fun _ Q => Q) 0 []
+  @bootFixedGS hlc GF _ WeakAdequacy.rsvNone Hinv 0 0 0 0 0 0 iprop(True) (fun _ => iprop(True)) (fun _ Q => Q) 0 []
     iprop(True) 0
     rxTagTriv (fun _ => inferInstance) (fun _ => inferInstance)
     killCredTriv inferInstance inferInstance
@@ -122,6 +126,7 @@ other name a placeholder. -/
   kptRootName := 0
   devName := dn
   mirrorName := 0
+  rsvName := 0
   gen := gen
   claimP := fun _ _ => iprop(True)
   claim_idle := fun _ => true_intro

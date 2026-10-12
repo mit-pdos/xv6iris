@@ -64,6 +64,7 @@ Imports only definitional files.
 -/
 import Xv6.BootHart
 import Xv6.SpecMain
+import Xv6.BootRsv
 
 namespace Xv6
 
@@ -149,8 +150,9 @@ and the `proc` / `noff`+`intena` windows of `cpus[c]`, RAW (context-free;
 deviation 1), and its parked save area `cpuCtxFree c`, minted. -/
 def bootHartBss (c : CPU) : IProp GF := iprop%
   bootRan (imgFlat bootImage) (bhStackLo c) (bhStackLo c + 4096) ∗
-  bootRan (imgFlat bootImage) (bhCpuLo c) (bhCpuLo c + 8) ∗
-  bootRan (imgFlat bootImage) (bhCpuLo c + 120) (bhCpuLo c + 128) ∗
+  -- W8-β′: `cpus[c]`'s cells are RESERVED -- the client's halves, the region registered
+  rsvRegionHalfC (MachGS.era (hlc := hlc) (GF := GF)) ⟨cpuAddr c, .cpu c⟩ (imgFlat bootImage) ∗
+  ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static⌝ ∗
   cpuCtxFree c
 
 /-- A top-down word family: the `n` words below `T`, slot `i` at
@@ -345,63 +347,93 @@ theorem bootCpuCtxFree (c : CPU) :
   iframe Hs Hv Hc
   ipureintro; simp
 
-/-- **`cpus[c]`'s own cells, carved at the hart's context** (Rocq
+/-- **`cpus[c]`'s own cells, at the hart's context** (Rocq
 `boot_cpu_slot_raw`'s `proc`/`noff`/`intena` rows, `boot_hart_pre`'s
-`cur_proc`): what `Xv6.bootBridge` takes, at their `.bss` zeros. -/
-theorem bootCpuCells [CurCtx] (c : CPU) :
-    kmapStatic (GF := GF) ⊢ bootRan (imgFlat bootImage) (bhCpuLo c) (bhCpuLo c + 8) -∗
-      bootRan (imgFlat bootImage) (bhCpuLo c + 120) (bhCpuLo c + 128) -∗
-      wordPointsTo (aCpuProc c) 8 (DFrac.own 1) 0#64 ∗
-      wordPointsTo (aCpuNoff c) 4 (DFrac.own 1) 0#32 ∗
-      (∃ b : Bool, wordPointsTo (aCpuIntena c) 4 (DFrac.own 1) (intenaVal b)) := by
+`cur_proc`): what `Xv6.bootBridge` takes, at their `.bss` zeros -- RESERVED
+cells (W8-β′), out of the client's halves of the region. -/
+theorem bootCpuCells [CurCtx] (c : CPU) (hin : cpuRsvIn (hlc := hlc) (GF := GF) c) :
+    kmapStatic (GF := GF) ⊢
+      rsvRegionHalfC (MachGS.era (hlc := hlc) (GF := GF)) ⟨cpuAddr c, .cpu c⟩ (imgFlat bootImage) -∗
+      cpuCell c (aCpuProc c) 8 0#64 ∗
+      cpuCell c (aCpuNoff c) 4 0#32 ∗
+      (∃ b : Bool, cpuCell c (aCpuIntena c) 4 (intenaVal b)) := by
   have hc := c.isLt
   unfold NCPU at hc
   have hC : bhCpuLo c = 0x80012530 + 128 * c.val := by unfold bhCpuLo; rw [bh_cpus_val]
-  have hp : (aCpuProc c).toNat = bhCpuLo c := by
-    unfold aCpuProc; rw [cpuField_toNat c procOff (by decide), bh_cpusBase_toNat, hC]; rfl
-  have hn : (aCpuNoff c).toNat = bhCpuLo c + 120 := by
-    unfold aCpuNoff; rw [cpuField_toNat c noffOff (by decide), bh_cpusBase_toNat, hC]; rfl
-  have hi : (aCpuIntena c).toNat = bhCpuLo c + 124 := by
-    unfold aCpuIntena; rw [cpuField_toNat c intenaOff (by decide), bh_cpusBase_toNat, hC]; rfl
-  iintro #Hk Hp Hni
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) _ (bhCpuLo c + 124) _ (by omega) (by omega)).1 $$ Hni
-    with ⟨Hn, Hi⟩
-  ihave Hp := bootBss_wordAt (aCpuProc c) 8 (bhCpuLo c) _ hp rfl
-    (by rw [hC]; omega) (by rw [hC]; omega) (by rw [hC]; omega) $$ Hk Hp
-  ihave Hn := bootBss_wordAt (aCpuNoff c) 4 (bhCpuLo c + 120) _ hn rfl
-    (by rw [hC]; omega) (by rw [hC]; omega) (by rw [hC]; omega) $$ Hk Hn
-  ihave Hi := bootBss_wordAt (aCpuIntena c) 4 (bhCpuLo c + 124) _ hi
-    (by omega) (by rw [hC]; omega) (by rw [hC]; omega) (by rw [hC]; omega) $$ Hk Hi
-  iframe Hp Hn
+  have ha0 : (cpuAddr c).toNat = bhCpuLo c := by
+    rw [cpuAddr_toNat, bh_cpusBase_toNat, hC]
+  have ep : aCpuProc c = cpuAddr c := aCpuProc_eq c
+  have en : aCpuNoff c = cpuAddr c + 120#64 := rfl
+  have ei : aCpuIntena c = cpuAddr c + 124#64 := rfl
+  have hn : (cpuAddr c + 120#64).toNat = bhCpuLo c + 120 := by
+    rw [← en]; unfold aCpuNoff; rw [cpuField_toNat c noffOff (by decide), bh_cpusBase_toNat, hC]; rfl
+  have hi : (cpuAddr c + 124#64).toNat = bhCpuLo c + 124 := by
+    rw [← ei]; unfold aCpuIntena; rw [cpuField_toNat c intenaOff (by decide), bh_cpusBase_toNat, hC]; rfl
+  obtain ⟨wp, wn, wi⟩ := cpuWords_mem c
+  have kp : kmapClass (vpnOf (cpuAddr c)).toNat = some .rw := bc_kmapClass_rw _ (by omega) (by omega)
+  have kn : kmapClass (vpnOf (cpuAddr c + 120#64)).toNat = some .rw := bc_kmapClass_rw _ (by omega) (by omega)
+  have ki : kmapClass (vpnOf (cpuAddr c + 124#64)).toNat = some .rw := bc_kmapClass_rw _ (by omega) (by omega)
+  rw [ep, en, ei]
+  rw [ep] at wp
+  rw [en] at wn
+  rw [ei] at wi
+  iintro #Hk H
+  unfold rsvRegionHalfC
+  rw [show RsvRegion.words ⟨cpuAddr c, .cpu c⟩ =
+    [(cpuAddr c, 8), (cpuAddr c + 120#64, 4), (cpuAddr c + 124#64, 4)] from rfl]
+  icases BigSepL.bigSepL_cons.1 $$ H with ⟨Hp, H⟩
+  icases BigSepL.bigSepL_cons.1 $$ H with ⟨Hn, H⟩
+  icases BigSepL.bigSepL_cons.1 $$ H with ⟨Hi, -⟩
+  ihave Hp := bootRsv_wordHalf (cpuAddr c) 8 (bhCpuLo c) ha0 (by decide)
+    (by rw [hC, bc_bss_val]; omega) (by rw [hC, bc_end_val]; omega) (by rw [hC]; omega) $$ Hk Hp
+  ihave Hn := bootRsv_wordHalf (cpuAddr c + 120#64) 4 (bhCpuLo c + 120) hn (by decide)
+    (by rw [hC, bc_bss_val]; omega) (by rw [hC, bc_end_val]; omega) (by rw [hC]; omega) $$ Hk Hn
+  ihave Hi := bootRsv_wordHalf (cpuAddr c + 124#64) 4 (bhCpuLo c + 124) hi (by decide)
+    (by rw [hC, bc_bss_val]; omega) (by rw [hC, bc_end_val]; omega) (by rw [hC]; omega) $$ Hk Hi
+  ihave #Hkp := kmapStatic_rw _ kp $$ Hk
+  ihave #Hkn := kmapStatic_rw _ kn $$ Hk
+  ihave #Hki := kmapStatic_rw _ ki $$ Hk
+  isplitl [Hp]
+  · iapply cpuCell_intro _ _ _ _ ⟨hin, wp⟩ $$ Hkp Hp
+  isplitl [Hn]
+  · iapply cpuCell_intro _ _ _ _ ⟨hin, wn⟩ $$ Hkn Hn
   iexists false
+  iapply cpuCell_intro _ _ _ _ ⟨hin, wi⟩ $$ Hki
   rw [show intenaVal false = 0#(8 * 4) from rfl]
   iexact Hi
 
 /-- **One hart's `.bss` share, carved** (Rocq `boot_hart_bss_of_raw` over
 the two families' per-element outputs, with `boot_hart_pre`'s
 `cpu_ctx_free` mint). -/
-theorem bootHartBss_carve (c : CPU) :
+theorem bootHartBss_carve (c : CPU) (hin : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) :
     kmapStatic (GF := GF) ⊢ viewLb c 0 -∗
       bootRan (imgFlat bootImage) (bhStackLo c) (bhStackLo c + 4096) -∗
-      bootRan (imgFlat bootImage) (bhCpuLo c) (bhCpuLo c + 128) -∗ |==> bootHartBss c := by
-  iintro #Hk #Hv Hs Hc
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) _ (bhCpuLo c + 8) _ (by omega) (by omega)).1 $$ Hc
-    with ⟨Hp, Hc⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) _ (bhCpuLo c + 120) _ (by omega) (by omega)).1 $$ Hc
-    with ⟨Hx, Hni⟩
+      bootRan (rsvErase KernelRsv.static (imgFlat bootImage)) (bhCpuLo c) (bhCpuLo c + 128) -∗
+      rsvRegionHalfC (MachGS.era (hlc := hlc) (GF := GF)) ⟨cpuAddr c, .cpu c⟩ (imgFlat bootImage) -∗
+      |==> bootHartBss c := by
+  iintro #Hk #Hv Hs Hc Hh
+  icases (bootRan_split (GF := GF) (rsvErase KernelRsv.static (imgFlat bootImage)) _ (bhCpuLo c + 8) _
+    (by omega) (by omega)).1 $$ Hc with ⟨-, Hc⟩
+  icases (bootRan_split (GF := GF) (rsvErase KernelRsv.static (imgFlat bootImage)) _ (bhCpuLo c + 120) _
+    (by omega) (by omega)).1 $$ Hc with ⟨Hx, -⟩
+  ihave Hx := bootRan_rsvErase_le (imgFlat bootImage) (bhCpuLo c + 8) (bhCpuLo c + 120)
+    (fun a ha => by unfold bhCpuLo; exact xv6Rsv_ctx_off c a ha) $$ Hx
   imod (bootCpuCtxFree c) $$ Hk Hv Hx with Hf
   imodintro
   unfold bootHartBss
-  iframe Hs Hp Hni Hf
+  iframe Hs Hh Hf
+  ipureintro; exact hin
 
 /-- **ALL EIGHT HARTS' `.bss` SHARES** (Rocq `boot_bss_carve`'s two stride
 families, `boot_cran_stride_family_seq` over `hart_stack_raw` and
 `cpu_slot_raw`, re-indexed by `big_sepL_cpu_of_nat`): `stack0[8][4096]` and
 `cpus[8]`, carved once for all harts. -/
-theorem bootCarve_harts :
+theorem bootCarve_harts (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) :
     kmapStatic (GF := GF) ⊢ ([∗list] c ∈ cpus, viewLb c 0) -∗
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«stack0» (MachCSL.KernelSyms.«stack0» + 4096 * NCPU) -∗
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«cpus» (MachCSL.KernelSyms.«cpus» + 128 * NCPU) -∗
+      bootRan (rsvErase KernelRsv.static (imgFlat bootImage)) MachCSL.KernelSyms.«cpus»
+        (MachCSL.KernelSyms.«cpus» + 128 * NCPU) -∗
+      ([∗list] c ∈ cpus, rsvRegionHalfC (MachGS.era (hlc := hlc) (GF := GF)) ⟨cpuAddr c, .cpu c⟩ (imgFlat bootImage)) -∗
       |==> [∗list] c ∈ cpus, bootHartBss c := by
   have hS : bootRan (GF := GF) (imgFlat bootImage) MachCSL.KernelSyms.«stack0»
       (MachCSL.KernelSyms.«stack0» + 4096 * NCPU) ⊢
@@ -409,24 +441,27 @@ theorem bootCarve_harts :
     have h := bootRan_stride (GF := GF) (imgFlat bootImage) MachCSL.KernelSyms.«stack0» 4096 NCPU
     rw [bh_range_cpus, BigSepL.bigSepL_map] at h
     exact h
-  have hC : bootRan (GF := GF) (imgFlat bootImage) MachCSL.KernelSyms.«cpus»
+  have hC : bootRan (GF := GF) (rsvErase KernelRsv.static (imgFlat bootImage)) MachCSL.KernelSyms.«cpus»
       (MachCSL.KernelSyms.«cpus» + 128 * NCPU) ⊢
-      [∗list] c ∈ cpus, bootRan (imgFlat bootImage) (bhCpuLo c) (bhCpuLo c + 128) := by
-    have h := bootRan_stride (GF := GF) (imgFlat bootImage) MachCSL.KernelSyms.«cpus» 128 NCPU
+      [∗list] c ∈ cpus, bootRan (rsvErase KernelRsv.static (imgFlat bootImage)) (bhCpuLo c) (bhCpuLo c + 128) := by
+    have h := bootRan_stride (GF := GF) (rsvErase KernelRsv.static (imgFlat bootImage))
+      MachCSL.KernelSyms.«cpus» 128 NCPU
     rw [bh_range_cpus, BigSepL.bigSepL_map] at h
     exact h
-  iintro #Hk Hv Hs Hc
+  iintro #Hk Hv Hs Hc Hh
   ihave Hs := hS $$ Hs
   ihave Hc := hC $$ Hc
-  ihave H := BigSepL.bigSepL_sep_eqv.2 $$ [Hs Hc]
-  · iframe Hs Hc
+  ihave H := BigSepL.bigSepL_sep_eqv.2 $$ [Hc Hh]
+  · iframe Hc Hh
+  ihave H := BigSepL.bigSepL_sep_eqv.2 $$ [Hs H]
+  · iframe Hs H
   ihave H := BigSepL.bigSepL_sep_eqv.2 $$ [Hv H]
   · iframe Hv H
   iapply BigSepL.bigSepL_bupd
   iapply BigSepL.bigSepL_impl $$ H
   imodintro
-  iintro %k %c %_ ⟨Hv1, Hs1, Hc1⟩
-  iapply bootHartBss_carve c $$ Hk Hv1 Hs1 Hc1
+  iintro %k %c %_ ⟨Hv1, Hs1, Hc1, Hh1⟩
+  iapply bootHartBss_carve c hrsv $$ Hk Hv1 Hs1 Hc1 Hh1
 
 /-! ## §3 The hart's side, at its own context -/
 
@@ -445,16 +480,17 @@ theorem bootHartBss_open [CurCtx] (c : CPU) :
       pwordPointsTo (spOf c - 24#64) 8 (DFrac.own 1) 0#64 ∗
       ([∗list] i ∈ List.range 508,
         ∃ w : BitVec 64, pwordPointsTo (spOf c - 16#64 - 8#64 * BitVec.ofNat 64 (i + 3)) 8 (DFrac.own 1) w) ∗
-      wordPointsTo (aCpuProc c) 8 (DFrac.own 1) 0#64 ∗
-      wordPointsTo (aCpuNoff c) 4 (DFrac.own 1) 0#32 ∗
-      (∃ b : Bool, wordPointsTo (aCpuIntena c) 4 (DFrac.own 1) (intenaVal b)) ∗
-      cpuCtxFree c := by
+      cpuCell c (aCpuProc c) 8 0#64 ∗
+      cpuCell c (aCpuNoff c) 4 0#32 ∗
+      (∃ b : Bool, cpuCell c (aCpuIntena c) 4 (intenaVal b)) ∗
+      cpuCtxFree c ∗ ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static⌝ := by
   unfold bootHartBss
-  iintro ⟨#Hk, #Hg, Hs, Hp, Hni, Hf⟩
+  iintro ⟨#Hk, #Hg, Hs, Hh, %hin, Hf⟩
   ihave Hw := bootGot_word $$ Hg
   icases bootStack_carve c $$ Hs with ⟨H16, H8, H32, H24, Hr⟩
-  icases bootCpuCells c $$ Hk Hp Hni with ⟨Hp, Hn, Hi⟩
+  icases bootCpuCells c (xv6CpuRsvIn hin c) $$ Hk Hh with ⟨Hp, Hn, Hi⟩
   iframe Hw H16 H8 H32 H24 Hr Hp Hn Hi Hf
+  ipureintro; exact hin
 
 /-! ## §4 The per-hart bundle -/
 

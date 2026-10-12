@@ -303,23 +303,18 @@ theorem bootCarve_fileEntries [CurCtx] (ξ : CtxId) :
   iapply bootCarve_fileEntry ξ k hk' $$ Hk Hi
 
 /-- **The whole `ftable` symbol, carved** (Rocq `main_locks_raw`'s ftable
-row plus `boot_file_entries`, deviation 4): `[ftable, ftable + 0xfb8)`,
-which ends exactly at `<disk>`, is `fileinit`'s lock words and the
-`NFILE` raw entries. -/
+row plus `boot_file_entries`, deviation 4): `[ftable + 24, ftable + 0xfb8)`
+(past the lock, a registered lock, W8-β′), which ends exactly at `<disk>`,
+is the `NFILE` raw entries. -/
 theorem bootCarve_ftable [CurCtx] (ξ : CtxId) :
     kmapStatic (GF := GF) ⊢
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«ftable» (MachCSL.KernelSyms.«ftable» + 0xfb8) -∗
-      lockWords ftableLockAddr 0#32 0#64 0#64 ∗ [∗list] k ∈ List.range NFILE, fentryRaw ξ k := by
+      bootRan (imgFlat bootImage) (MachCSL.KernelSyms.«ftable» + 24) (MachCSL.KernelSyms.«ftable» + 0xfb8) -∗
+      [∗list] k ∈ List.range NFILE, fentryRaw ξ k := by
   have hF : MachCSL.KernelSyms.«ftable» = 0x80022a18 := rfl
-  have hlk : ftableLockAddr.toNat = 0x80022a18 := rfl
   have h0 : fileB 0 = 0x80022a18 + 24 := rfl
   have hN : NFILE = 100 := rfl
   rw [hF]
   iintro #Hk H
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) 0x80022a18 (0x80022a18 + 24) (0x80022a18 + 0xfb8)
-    (by omega) (by omega)).1 $$ H with ⟨Hl, H⟩
-  ihave Hl := bootCarve_lockWords (GF := GF) ftableLockAddr _ hlk (by omega) (by omega) (by omega) $$ Hk Hl
-  iframe Hl
   iapply bootCarve_fileEntries ξ $$ Hk
   rw [h0, hN]
   iexact H

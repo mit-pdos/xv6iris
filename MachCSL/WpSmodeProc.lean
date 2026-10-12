@@ -10,6 +10,7 @@ and the change would have to be paid for; xv6 never does it there.)
 -/
 import MachCSL.WpSmodeCycle
 import MachCSL.WpSmodeMemSd
+import MachCSL.RsvCell
 
 namespace MachCSL
 
@@ -115,16 +116,23 @@ theorem wp_s_sd_proc [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
     ⊢ wpLoop cpu := by
   iintro ⟨HI, Hk, Hpc, HΦ⟩
   iapply (wpLoop_k_proc (lent := lent) cpu k hsie pc (pc + instrLen is_rvc) is_rvc _ p'
-    (wordPointsTo (aCpuProc cpu) 8 (DFrac.own 1) k.proc)
-    (wordPointsTo (aCpuProc cpu) 8 (DFrac.own 1) p')
+    iprop(wordPointsTo (aCpuProc cpu) 8 (DFrac.own (1 : Qp).half) k.proc ∗
+      kmapId (aCpuProc cpu) ∗ ⌜rsvWordOk (hlc := hlc) (GF := GF) cpu (aCpuProc cpu) 8 p'⌝)
+    (wordPointsTo (aCpuProc cpu) 8 (DFrac.own (1 : Qp).half) p')
     (by
       unfold cpuCells
       iintro ⟨Hp, Hn, Hi⟩
-      iframe Hp
+      icases cpuCell_cases $$ Hp with ⟨Hp, #Hid, %hin⟩
+      isplitl [Hp]
+      · iframe Hp
+        isplit
+        · iexact Hid
+        · ipureintro; exact cpuCellOk_wordOk hin _
       iintro Hp
-      iframe)
+      iframe Hn Hi
+      iapply cpuCell_intro _ _ _ _ hin $$ Hid Hp)
     (fun c hok _ => by
-      have e := execSpecF_sd (GF := GF) cpu (DFrac.own 1) c false k.root hok pc (pc + instrLen is_rvc) imm rs1 rs2
+      have e := execSpecF_sd_rsv (GF := GF) cpu (DFrac.own 1) c false k.root hok pc (pc + instrLen is_rvc) imm rs1 rs2
         (tpPin cpu k.regs) k.proc
       simp only [KCtx.rget] at haddr hval
       rw [haddr, hval] at e

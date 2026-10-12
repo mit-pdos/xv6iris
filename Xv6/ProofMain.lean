@@ -129,13 +129,13 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 SpecMain's `mainLocksRaw` / `mainGlobalsRaw`, `mainSbRaw`, `mainLogRaw` and
 `first`). -/
 def mnKptFs [Y : CurCtx] : IProp GF := iprop%
-  mainLkRaw bcacheLockAddr ∗
+  mainLkRawR bcacheLockAddr ∗
   (∃ (vhp vhn : BitVec 64), wordPointsTo (bcacheHeadAddr + 72#64) 8 (DFrac.own 1) vhp ∗
     wordPointsTo (bcacheHeadAddr + 80#64) 8 (DFrac.own 1) vhn) ∗
   ([∗list] i ∈ List.range NBUF, bufIn i) ∗ ([∗list] i ∈ List.range NBUF, bdBss curCtx i) ∗
-  mainLkRaw itableLockAddr ∗ ([∗list] i ∈ List.range NINODE, sleepLockIn (inodeAddr i)) ∗
+  mainLkRawR itableLockAddr ∗ ([∗list] i ∈ List.range NINODE, sleepLockIn (inodeAddr i)) ∗
   ([∗list] k ∈ List.range NINODE, ientryRaw k) ∗
-  mainLkRaw ftableLockAddr ∗ ([∗list] k ∈ List.range NFILE, fentryRaw curCtx k) ∗ irefSlots NFILE ∗
+  mainLkRawR ftableLockAddr ∗ ([∗list] k ∈ List.range NFILE, fentryRaw curCtx k) ∗ irefSlots NFILE ∗
   (∃ v0 : BitVec 64, wordPointsTo initprocAddr 8 (DFrac.own 1) v0) ∗
   mainSbRaw ∗ mainLogRaw ∗ wordPointsTo firstAddr 4 (DFrac.own 1) 1#32
 
@@ -300,11 +300,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 public cells, the `nextpid` / `wait_lock` / `tickslock` payloads, the
 console ring). -/
 def mnKptB [Y : CurCtx] (cn : ConsNames) : IProp GF := iprop%
-  mainLkRaw pidLockAddr ∗ mainLkRaw waitLockAddr ∗
-  kmapId tickslockAddr ∗ kmapId (tickslockAddr + 16#64) ∗
-  (∃ (vl : BitVec 32) (vn vc : BitVec 64),
-    wordPointsTo tickslockAddr 4 (DFrac.own 1) vl ∗ wordPointsTo (tickslockAddr + 8#64) 8 (DFrac.own 1) vn ∗
-    wordPointsTo (tickslockAddr + 16#64) 8 (DFrac.own 1) vc) ∗
+  mainLkRawR pidLockAddr ∗ mainLkRawR waitLockAddr ∗ mainLkRawR tickslockAddr ∗
   ([∗list] i ∈ List.range NPROC, procRaw i) ∗
   ([∗list] i ∈ List.range NPROC,
     (∃ ch : BitVec 64, wordPointsTo (pChan (procAddr i)) 8 (DFrac.own 1) ch) ∗
@@ -378,8 +374,9 @@ theorem mn_phaseB (PR : PROCINIT) (TI : TRAPINIT) (TIH : TRAPINITHART) (PLI : PL
   iintro ⟨Hk, Hpc, HB, Hpb, Htlf, Hclf, Hcfr, Hstk, #Hsmap, #Hw, Hstv, Hfs, Hboot, Hav, Hdinv, Hcc, Hcfg,
     Hgh, Hcells, Hpav, Hipt, Hbundle, Hrdr, Hco, Hinv, Hprim, Hrec, Hbare, Hcsrs, Hfree⟩
   unfold mnKptB
-  icases HB with ⟨Hpl, Hwl, #Ht0, #Ht16, ⟨%tvl, %tvn, %tvc, Htw, Htn, Htc⟩, Hraw, Hpub, Hpq, Hpar, Hfd, Hir,
+  icases HB with ⟨Hpl, Hwl, Htkr, Hraw, Hpub, Hpq, Hpar, Hfd, Hir,
     Hbs, Htres, Hcres, Hclean, Hnp⟩
+  icases mainLkRawR_open tickslockAddr $$ Htkr with ⟨%tvl, %tvn, %tvc, #Ht0, #Ht16, Htw, Htn⟩
   unfold mnProcBoot
   icases Hpb with ⟨Hhart, Hps, Hsf, Hlk, Hrows⟩
   unfold childrenBootRows
@@ -408,7 +405,7 @@ theorem mn_phaseB (PR : PROCINIT) (TI : TRAPINIT) (TIH : TRAPINITHART) (PLI : PL
   imodintro
   -- +0x7e  trapinit, and the ticks lock
   iapply (mn_trapinit TI startedPrimary k R1 hsie hsl.2.1 γt tvl tvn tvc)
-  iframe Hk Hpc Ht0 Ht16 Htw Htn Htc Htlf Htres Htk
+  iframe Hk Hpc Ht0 Ht16 Htw Htn Htlf Htres Htk
   iintro %R2 Hk Hpc #Htl
   -- +0x82  trapinithart
   iapply (mn_trapinithart TIH startedPrimary k R2 hsie hsl.2.2)
@@ -444,17 +441,17 @@ theorem mn_splitKpt [Y : CurCtx] (cn : ConsNames) :
     wordPointsTo firstAddr 4 (DFrac.own 1) 1#32 ∗ wordPointsTo nextpidAddr 4 (DFrac.own 1) 1#32
     ⊢ mnKptB (GF := GF) cn ∗ mnKptFs ∗ consReader cn 0 := by
   unfold mainLocksRaw mainGlobalsRaw mnKptB mnKptFs
-  iintro ⟨⟨Hpl, Hwl, #Ht0, #Ht16, Ht, Hbl, Hil, Hfl⟩,
+  iintro ⟨⟨Hpl, Hwl, Ht, Hbl, Hil, Hfl⟩,
     ⟨Hraw, Hpub, Hpq, Hpar, Hfd, Hir, Hfent, Hirf, Hbs, Hinit, Htres, Hhead, Hbin, Hbss, Hsin, Hient,
       Hcres, Hrdr, Hcl⟩, Hsb, Hlog, Hfw, Hnp⟩
-  iframe Hpl Hwl Ht0 Ht16 Ht Hraw Hpub Hpq Hpar Hfd Hir Hbs Htres Hcres Hcl Hnp
+  iframe Hpl Hwl Ht Hraw Hpub Hpq Hpar Hfd Hir Hbs Htres Hcres Hcl Hnp
   iframe Hbl Hhead Hbin Hbss Hil Hsin Hient Hfl Hfent Hirf Hinit Hsb Hlog Hfw Hrdr
 
 theorem mn_mainSlots_ge : 114 ≤ mainSlots := by
   unfold mainSlots schedulerSlots kvFrameSlots; omega
 
 theorem mn_lkFresh_toKpt (X : CurCtx) (lk : BitVec 64) :
-    @lkFresh hlc GF _ X lk ⊢ @lkFresh hlc GF _ X.toKpt lk := .rfl
+    @lkFresh hlc GF _ _ X lk ⊢ @lkFresh hlc GF _ _ X.toKpt lk := .rfl
 
 set_option maxHeartbeats 16000000 in
 /-- **`main`'s boot arm** (Rocq `wp_main_boot_sconf`): the Bare phase --
@@ -473,7 +470,7 @@ theorem main_proof (CI : CPUID) (CN : CONSOLEINIT) (PI : PRINTKINIT) (PK : PRINT
   subst hcpu hl0 hl1
   unfold wp_main_boot_body mainHartRaw mainLocksBare mainGlobalsBare mainAddr
   iintro ⟨Hk, Hpc, Hfree, ⟨Htlb, Hcsrs⟩, #Hinv, Hprim, #Hrec, #Hecho,
-    ⟨#Hc0, #Hc16, ⟨%vcl, %vcn, %vcc, Hcw, Hcn, Hcc⟩, Hpr, #Hkm0, #Hkm16, ⟨%vkl, %vkn, %vkc, Hkw, Hkn, Hkc⟩⟩,
+    ⟨#Hc0, #Hc16, ⟨%vcl, %vcn, %vcc, Hcw, Hcn⟩, Hpr, #Hkm0, #Hkm16, ⟨%vkl, %vkn, %vkc, Hkw, Hkn⟩⟩,
     ⟨⟨%dr, %dw, Hdr, Hdw⟩, Hdrest, Hfl, ⟨%kpt0, Hkpt0⟩⟩, HLraw, HGraw, Hsb, Hlog, Hfw, Hnp,
     Hhart, Hps, Hpav, Hsf, Hchb, Hγc, Hγl0, Hγl1, Hγt, Hlks, Hsup, Hmir, Hirb, Hira, Hbs, #Hcert, #Hseam, #Hcinv,
     Hbundle, Hco, #Hu0, #Hu1, #Hplic, #Hdinv, #Hcrash, #Hwire, #Hanc, Hur0, Hur1, Hcfg, Hgh, Hcells, Hroot, Hauth,
@@ -513,13 +510,13 @@ theorem main_proof (CI : CPUID) (CN : CONSOLEINIT) (PI : PRINTKINIT) (PK : PRINT
   icases Hur1 with ⟨⟨%vl1, %vn1, %vc1, Hpre1⟩, #Hs1, Hh1, Hg1, Ha1⟩
   iapply (mn_console CN startedPrimary (k.pushed 2) R1 (by simp [hsie]) (by simp; omega) γ0 γ1 [] [] rfl
     vl0 vl1 vn0 vc0 vn1 vc1 vcl vcn vcc dr dw)
-  iframe Hk Hpc Hplic Hc0 Hc16 Hcw Hcn Hcc Hpre0 Hpre1 Hdr Hdw Hdrest Hh0 Hg0 Ha0 Hh1 Hg1 Ha1
+  iframe Hk Hpc Hplic Hc0 Hc16 Hcw Hcn Hpre0 Hpre1 Hdr Hdw Hdrest Hh0 Hg0 Ha0 Hh1 Hg1 Ha1
   iintro %R2 Hk Hpc Hout
   unfold mnConsOut
   icases Hout with ⟨-, Hcfr, Htx0, #Hdo0, -, Htf0, Htx1, #Hdo1, -, Htf1, #Htbl, #Hin0, #Hin1, #Hb0, #Hrw0,
     #Hb1, #Hrw1⟩
   -- +0x46  printkinit, and the three Bare-phase births
-  unfold mainLkRaw
+  unfold mainLkRawR
   icases Hpr with ⟨%vpl, %vpn, %vpc, Hprw⟩
   iapply (mn_prinit PI startedPrimary (k.pushed 2) R2 (by simp [hsie]) (by simp; omega) vpl vpn vpc
     fscPrintk γl0 γl1 γ0 γ1 [] [])
@@ -547,7 +544,7 @@ theorem main_proof (CI : CPUID) (CN : CONSOLEINIT) (PI : PRINTKINIT) (PK : PRINT
   -- +0x6e  kinit
   iapply (mn_kinit KI startedPrimary (k.pushed 2) R6 hs2 (by simp; omega) hn2 hl2 (by simp [hproc]) fscKalloc fsReadyKmem
     vkl vkn vkc)
-  iframe Hk Hpc Hkm0 Hkm16 Hkw Hkn Hkc Hfl Hpages Hklf Hkav0 Hkauth
+  iframe Hk Hpc Hkm0 Hkm16 Hkw Hkn Hfl Hpages Hklf Hkav0 Hkauth
   iintro %R7 Hk Hpc #Hkml Hkav
   -- +0x72  kvminit
   iapply (mn_kvminit KV startedPrimary (k.pushed 2) R7 hs2 (by simp; omega) hn2 hl2 (by simp [hproc]) fscKalloc fsReadyKmem

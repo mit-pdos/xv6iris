@@ -57,16 +57,15 @@ theorem mn_kinit (KI : KINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsi
     (γl : GName) (γk : KmemNames) (vl : BitVec 32) (vn vc : BitVec 64) :
     kctx cpu (k.withRegs R0) ∗ pcIs cpu (KA.«main» + 110#64) ∗
     kmapId kmemLockAddr ∗ kmapId (kmemLockAddr + 16#64) ∗
-    wordPointsTo kmemLockAddr 4 (DFrac.own 1) vl ∗
+    lkRaw kmemLockAddr vl vc ∗
     wordPointsTo (kmemLockAddr + 8#64) 8 (DFrac.own 1) vn ∗
-    wordPointsTo (kmemLockAddr + 16#64) 8 (DFrac.own 1) vc ∗
     wordPointsTo kmemFreelistAddr 8 (DFrac.own 1) 0#64 ∗
     pageRange kinitBase kinitPages ∗
     lockFreeTok γl ∗ kallocAvail γk (some 0) ∗ kmemAuth γk 0 ∗
     (∀ R : RegMap, kctx cpu (k.withRegs R) -∗ pcIs cpu (KA.«main» + 114#64) -∗
       isLock γl kmemLockAddr "kmem" (kmemRes γk) -∗ kallocAvail γk (some kinitPages) -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hk, Hpc, #Hm0, #Hm16, Hw, Hn, Hc, Hfl, Hpr, Hlf, Hav, Hau, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hm0, #Hm16, Hw, Hn, Hfl, Hpr, Hlf, Hav, Hau, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   k_step (wp_s_jal cpu _ (KA.«main» + 110#64) false 2096142#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_6e]
@@ -76,7 +75,7 @@ theorem mn_kinit (KI : KINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsi
   unfold wp_kinit_body at hki
   simp only [kinitAddr] at hki
   iapply hki
-  iframe Hk Hpc Hm0 Hm16 Hw Hn Hc Hfl Hpr Hlf Hav Hau
+  iframe Hk Hpc Hm0 Hm16 Hw Hn Hfl Hpr Hlf Hav Hau
   simp only [KCtx.withRegs_sie, KCtx.withRegs_proc, hsie]
   iapply wpNext_off_intro
   iintro %spie %spp %R' %hsp Hk Hpc #Hlk Hav _ %_
@@ -206,7 +205,7 @@ set_option maxHeartbeats 4000000 in
 theorem mn_procinit (PR : PROCINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsie : k.sie = false)
     (hK : 10 ≤ k.avail) :
     kctx cpu (k.withRegs R0) ∗ pcIs cpu (KA.«main» + 122#64) ∗
-    mainLkRaw pidLockAddr ∗ mainLkRaw waitLockAddr ∗
+    mainLkRawR pidLockAddr ∗ mainLkRawR waitLockAddr ∗
     ([∗list] i ∈ List.range NPROC, procRaw i) ∗
     fdSlots (NPROC * (NOFILE + FDSPARE)) ∗ irefSlots (NPROC * (IREFHOME + IREFSPARE)) ∗ bslots (NPROC * 3) ∗
     (∀ R : RegMap, kctx cpu (k.withRegs R) -∗ pcIs cpu (KA.«main» + 126#64) -∗
@@ -223,7 +222,7 @@ theorem mn_procinit (PR : PROCINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap
   unfold wp_procinit_body at hpi
   simp only [procinitAddr] at hpi
   iapply hpi
-  unfold mainLkRaw
+  unfold mainLkRawR
   iframe Hk Hpc Hpl Hwl Hraw Hfd Hir Hbs
   simp only [KCtx.withRegs_sie, KCtx.withRegs_proc, hsie]
   iapply wpNext_off_intro

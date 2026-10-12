@@ -60,6 +60,7 @@ import Xv6.InitlogHead
 import MachCSL.WpSmodeFrame6c
 import Xv6.FsCallSites
 import Xv6.SpecInitlock
+import Xv6.LockRsv
 import Xv6.SpecWriteHead
 import Xv6.BallocDefs
 
@@ -166,12 +167,11 @@ pointer travels as `k'.regs 11#5`: this port's lock predicate does not read
 the string, so the literal never has to be relocated). -/
 theorem il_initlock_call (IL : INITLOCK) (c : CPU) (k' : KCtx)
     (vlock : BitVec 32) (vname vcpu : BitVec 64) (hK' : 2 ≤ k'.avail)
-    (lk : BitVec 64) (h10 : k'.regs 10#5 = lk) :
+    (lk : BitVec 64) (h10 : k'.regs 10#5 = lk):
     kctx c k' ∗ pcIs c KA.«initlock» ∗
     kmapId lk ∗ kmapId (lk + 16#64) ∗
-    wordPointsTo lk 4 (DFrac.own 1) vlock ∗
+    lkRaw lk vlock vcpu ∗
     wordPointsTo (lk + 8#64) 8 (DFrac.own 1) vname ∗
-    wordPointsTo (lk + 16#64) 8 (DFrac.own 1) vcpu ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
       kctx cpu' (k'.withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       wordPointsTo (lk + 8#64) 8 (DFrac.own 1) (k'.regs 11#5) -∗
@@ -498,7 +498,7 @@ theorem initlog_proof
   unfold wp_initlog_eb_body
   simp only [initlogAddr]
   iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hbc, #Hdc, #Hpe, #Hseam, #Hcert, Hborn, Hpid, #Hbinv, Hexc,
-    Htok, Hsb, #Hm1, #Hm2, Hlock, Hname, Hcpu, HlStart, HlDev, Hout, Hcmt, Hnc, HlhN, Hjunk,
+    Htok, Hsb, #Hm1, #Hm2, Hlock, Hname, HlStart, HlDev, Hout, Hcmt, Hnc, HlhN, Hjunk,
     HL, HD, Hd, Hhdr, Hslots, Hpool0, Hb1, #Hlawf, #Hlawgf, #Hcinv, Hnext⟩
   icases genCert_parts $$ Hcert with ⟨-, -, #Hreg⟩
   icases (show logMirrorBorn (hlc := hlc) (GF := GF) M ⊢
@@ -567,7 +567,7 @@ theorem initlog_proof
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_br_initlock]
   iintro Hk Hpc
   iapply (il_initlock_call IL cpu _ vlock vname vcpu ?iK logAddr ?ia0)
-    $$ [- $Hk $Hpc $Hm1 $Hm2 $Hlock $Hname $Hcpu]
+    $$ [- $Hk $Hpc $Hm1 $Hm2 $Hlock $Hname]
   rotate_right 1
   k_norm_g [il_ret_28]
   iframe #

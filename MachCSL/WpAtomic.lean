@@ -54,14 +54,15 @@ theorem memModel_dropResv (σ : MState) (cpu : CPU) (r : Option Resv) (b : Bool)
   · iapply memModel_resv E σ cpu r b $$ [Hmm Hfrag]
     iframe
   unfold memModelAt
-  icases Hmm with ⟨Htop, Hauth, Hviews, Hresv, %hmm⟩
+  rw [rsvModelAt_congr E (σ := σ) (σ' := σ.dropResv cpu) rfl]
+  icases Hmm with ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
   unfold resvFragAt
   imod ghost_map_update ((none, b) : ResvVal) $$ Hresv Hfrag with ⟨Hresv, Hfrag⟩
   imodintro
   have hresv : resvMap (σ.dropResv cpu) = Iris.Std.PartialMap.insert (resvMap σ) cpu.val (none, b) :=
     resvMap_upd σ _ cpu _ _ (by simp [updCpu, hres.2]) (fun c hc => by simp [updCpu, hc])
   rw [hresv]
-  iframe Hfrag Htop Hauth Hresv
+  iframe Hfrag Htop Hauth Hresv Hrsv
   isplitl [Hviews]
   · rw [BigSepL.bigSepL_eq (fun {_ c} _ => hartViews_dropResv E σ cpu c)]
     iexact Hviews
@@ -81,7 +82,8 @@ theorem memModel_read_excl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w :
       |==> (memModelAt E (σ.afterExcl cpu pa n w acq) ∗ resvFragAt E cpu (some (snapOf pa n w)) acq) := by
   iintro ⟨Hmm, Hfrag⟩
   unfold memModelAt
-  icases Hmm with ⟨Htop, Hauth, Hviews, Hresv, %hmm⟩
+  rw [rsvModelAt_congr E (σ := σ) (σ' := σ.afterExcl cpu pa n w acq) rfl]
+  icases Hmm with ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
   unfold resvFragAt
   imod ghost_map_update ((some (snapOf pa n w), acq) : ResvVal) $$ Hresv Hfrag with ⟨Hresv, Hfrag⟩
   icases hartViews_acc E σ cpu $$ Hviews with ⟨Hc, Hclose⟩
@@ -93,7 +95,7 @@ theorem memModel_read_excl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w :
   imod MonoNat.own_update _ (.ofNat (σ.hr cpu).rv) (.ofNat σ.top)
     (by simp only [MaxNat.le_toNat]; omega) $$ Hr with ⟨Hr, _⟩
   imodintro
-  iframe Hfrag Htop Hauth
+  iframe Hfrag Htop Hauth Hrsv
   have hresv : resvMap (σ.afterExcl cpu pa n w acq) =
       Iris.Std.PartialMap.insert (resvMap σ) cpu.val (some (snapOf pa n w), acq) :=
     resvMap_upd σ _ cpu _ _ (by simp [updCpu, HRead.afterExcl])
@@ -160,7 +162,10 @@ theorem memModel_read_excl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w :
 reservation and the acquire bit; an acquire pair's floor passes its own
 append). -/
 theorem memModel_store_excl_any (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (r : Option Resv) (acq : Bool) (hram : ramBytes pa n) (hno : ¬ othersReserve σ.resv cpu pa n) :
+    (r : Option Resv) (acq : Bool) (hram : ramBytes pa n) (hno : ¬ othersReserve σ.resv cpu pa n)
+    (hrsv : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem →
+      rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))
+        (σ.mem.writeBytes pa n w (σ.top + 1) (hartAgent cpu))) :
     memModelAt E σ ∗ resvFragAt E cpu r acq ⊢@{IProp GF} |==>
       (memModelAt E (σ.store cpu pa n w true) ∗ resvFragAt E cpu none false ∗
        authoredByAt E (σ.top + 1) (hartAgent cpu) ∗ topLbAt E (σ.top + 1) ∗
@@ -170,7 +175,8 @@ theorem memModel_store_excl_any (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
   · iapply memModel_resv E σ cpu r acq $$ [Hmm Hfrag]
     iframe
   unfold memModelAt
-  icases Hmm with ⟨Htop, Hauth, Hviews, Hresv, %hmm⟩
+  icases Hmm with ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
+  ihave Hrsv := rsvModel_mono E σ (σ.store cpu pa n w true) hrsv $$ Hrsv
   imod MonoNat.own_update _ (.ofNat σ.top) (.ofNat (σ.top + 1))
     (by simp only [MaxNat.le_toNat]; omega) $$ Htop with ⟨Htop, #Htoplb⟩
   imod ghost_map_insert_persist (σ.top + 1) (hartAgent cpu)
@@ -189,8 +195,9 @@ theorem memModel_store_excl_any (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
       (fun c hc => by simp [updCpu, hc])
   rw [hresv]
   iframe Hfrag Hresv
-  isplitl [Htop Hauth Hv Hi Hr Hclose]
-  · rw [show (σ.store cpu pa n w true).top = σ.top + 1 by simp [MState.top],
+  isplitl [Htop Hauth Hv Hi Hr Hclose Hrsv]
+  · iframe Hrsv
+    rw [show (σ.store cpu pa n w true).top = σ.top + 1 by simp [MState.top],
         show (σ.store cpu pa n w true).log = σ.log ++ [hartAgent cpu] from rfl, authMap_snoc]
     iframe Htop Hauth
     isplitl [Hv Hi Hr Hclose]
@@ -219,12 +226,15 @@ theorem memModel_store_excl_any (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
 /-- The write half of an exclusive pair, after the read half (its snapshot
 reservation). -/
 theorem memModel_store_excl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (r : Resv) (acq : Bool) (hram : ramBytes pa n) (hno : ¬ othersReserve σ.resv cpu pa n) :
+    (r : Resv) (acq : Bool) (hram : ramBytes pa n) (hno : ¬ othersReserve σ.resv cpu pa n)
+    (hrsv : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem →
+      rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))
+        (σ.mem.writeBytes pa n w (σ.top + 1) (hartAgent cpu))) :
     memModelAt E σ ∗ resvFragAt E cpu (some r) acq ⊢@{IProp GF} |==>
       (memModelAt E (σ.store cpu pa n w true) ∗ resvFragAt E cpu none false ∗
        authoredByAt E (σ.top + 1) (hartAgent cpu) ∗ topLbAt E (σ.top + 1) ∗
        (if acq then viewLbAt E cpu (σ.top + 1) else emp)) :=
-  memModel_store_excl_any E σ cpu pa n w (some r) acq hram hno
+  memModel_store_excl_any E σ cpu pa n w (some r) acq hram hno hrsv
 
 /-! ## Authorship of the entries of a history
 
@@ -429,12 +439,64 @@ def readAU (cpu : CPU) (pa : PAddr) (n K : Nat) (ts : List (Nat × Agent))
     ▷ (∀ (w : BitVec (8 * n)) (tvn : Nat), ⌜K ≤ tvn⌝ -∗ ⌜readsAre (hartAgent cpu) tvn Hs n w⌝ -∗
         ⌜authorsAre ts n Hs⌝ -∗ histBytes pa n dqs Hs ={∅,⊤}=∗ Ψ w))
 
-/-- The accessor of a plain store of `w'` by `cpu`: the continuation gets
-the histories grown by the hart's entries at the next position `t`. -/
-def writeAU (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) (Ψ : IProp GF) : IProp GF := iprop%
+/-- The accessor of a plain store of `w'` by `cpu` into OWNED bytes (the
+pre-W8-β′ `writeAU`): the continuation gets the histories grown by the hart's
+entries at the next position `t`. -/
+def writeAUOwn (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) (Ψ : IProp GF) : IProp GF := iprop%
   |={⊤,∅}=> ∃ Hs : Nat → Hist, histBytes pa n (fun _ => DFrac.own 1) Hs ∗
     ▷ (∀ t : Nat, histBytes pa n (fun _ => DFrac.own 1) (pushed Hs t (hartAgent cpu) w') -∗
         authoredBy t (hartAgent cpu) -∗ topLb t ={∅,⊤}=∗ Ψ)
+
+/-- A reserved-mode store's COMPANIONS: other words (address, width,
+histories) whose histories the store's discipline argument reads (a lock's
+lock word and owner word are one region). -/
+abbrev RsvComps := List (PAddr × Nat × (Nat → Hist))
+
+/-- The companions' read-only halves. -/
+def compBytes (cs : RsvComps) : IProp GF := iprop%
+  [∗list] c ∈ cs, histBytes c.1 c.2.1 (fun _ => DFrac.own (1 : Qp).half) c.2.2
+
+/-- **What a reserved-mode store must show** (W8-β′): the window is word `k`
+of static region `i`, and writing `w'` there by `cpu` at any later position
+keeps the region's discipline, given the window's and the companions'
+histories. -/
+def rsvStoreOk (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) (Hs : Nat → Hist)
+    (cs : RsvComps) : Prop :=
+  ∃ (i k : Nat) (R : RsvRegion), (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))[i]? = some R ∧
+    R.words[k]? = some (pa, n) ∧
+    ∀ (m : FlatMem) (t : Nat), 0 < t → histsAt m pa n Hs → (∀ c ∈ cs, histsAt m c.1 c.2.1 c.2.2) →
+      regionOk m R → regionOk (m.writeBytes pa n w' t (hartAgent cpu)) R
+
+/-- The accessor of a plain store into a RESERVED word (W8-β′): the client
+holds half of the window (the state interpretation the other half), lends its
+companions, and proves the store keeps the region's discipline. -/
+def writeAURsv (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) (Ψ : IProp GF) : IProp GF := iprop%
+  |={⊤,∅}=> ∃ (Hs : Nat → Hist) (cs : RsvComps), histBytes pa n (fun _ => DFrac.own (1 : Qp).half) Hs ∗
+    compBytes cs ∗ ⌜rsvStoreOk (hlc := hlc) (GF := GF) cpu pa n w' Hs cs⌝ ∗
+    ▷ (∀ t : Nat, ⌜0 < t⌝ -∗
+        histBytes pa n (fun _ => DFrac.own (1 : Qp).half) (pushed Hs t (hartAgent cpu) w') -∗
+        compBytes cs -∗ authoredBy t (hartAgent cpu) -∗ topLb t ={∅,⊤}=∗ Ψ)
+
+/-- The accessor of a plain store of `w'` by `cpu`: into owned bytes, or into
+a reserved word (W8-β′). -/
+def writeAU (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) (Ψ : IProp GF) : IProp GF := iprop%
+  |={⊤,∅}=>
+    ((∃ Hs : Nat → Hist, histBytes pa n (fun _ => DFrac.own 1) Hs ∗
+      ▷ (∀ t : Nat, histBytes pa n (fun _ => DFrac.own 1) (pushed Hs t (hartAgent cpu) w') -∗
+          authoredBy t (hartAgent cpu) -∗ topLb t ={∅,⊤}=∗ Ψ)) ∨
+     (∃ (Hs : Nat → Hist) (cs : RsvComps), histBytes pa n (fun _ => DFrac.own (1 : Qp).half) Hs ∗
+      compBytes cs ∗ ⌜rsvStoreOk (hlc := hlc) (GF := GF) cpu pa n w' Hs cs⌝ ∗
+      ▷ (∀ t : Nat, ⌜0 < t⌝ -∗
+          histBytes pa n (fun _ => DFrac.own (1 : Qp).half) (pushed Hs t (hartAgent cpu) w') -∗
+          compBytes cs -∗ authoredBy t (hartAgent cpu) -∗ topLb t ={∅,⊤}=∗ Ψ)))
+
+theorem writeAU_of_own (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) (Ψ : IProp GF) :
+    writeAUOwn cpu pa n w' Ψ ⊢ writeAU cpu pa n w' Ψ := by
+  unfold writeAU writeAUOwn; iintro H; imod H with H; imodintro; ileft; iexact H
+
+theorem writeAU_of_rsv (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) (Ψ : IProp GF) :
+    writeAURsv cpu pa n w' Ψ ⊢ writeAU cpu pa n w' Ψ := by
+  unfold writeAU writeAURsv; iintro H; imod H with H; imodintro; iright; iexact H
 
 /-- The accessor of the read half of an exclusive pair: the value is the
 heads of the histories. -/
@@ -447,12 +509,46 @@ def exclReadAU (pa : PAddr) (n : Nat) (Ψ : BitVec (8 * n) → IProp GF) : IProp
 `w0`: the heads still spell `w0`; the histories grow by the hart's entries
 at the next position `t`, which passes any position `T` the accessor
 names; an acquire pair's view reaches `t`. -/
-def exclWriteAU (cpu : CPU) (pa : PAddr) (n : Nat) (acq : Bool) (w0 w' : BitVec (8 * n)) (Ψ : IProp GF) :
+def exclWriteAUOwn (cpu : CPU) (pa : PAddr) (n : Nat) (acq : Bool) (w0 w' : BitVec (8 * n)) (Ψ : IProp GF) :
     IProp GF := iprop%
   |={⊤,∅}=> ∃ (Hs : Nat → Hist) (T : Nat), histBytes pa n (fun _ => DFrac.own 1) Hs ∗ topLb T ∗
     ▷ (∀ t : Nat, ⌜T ≤ t⌝ -∗ ⌜headsAre Hs n w0⌝ -∗ (if acq then viewLb cpu t else emp) -∗
         histBytes pa n (fun _ => DFrac.own 1) (pushed Hs t (hartAgent cpu) w') -∗
         authoredBy t (hartAgent cpu) -∗ topLb t ={∅,⊤}=∗ Ψ)
+
+/-- The write half of an exclusive pair into a RESERVED word (W8-β′, the
+`writeAURsv` shape). -/
+def exclWriteAURsv (cpu : CPU) (pa : PAddr) (n : Nat) (acq : Bool) (w0 w' : BitVec (8 * n)) (Ψ : IProp GF) :
+    IProp GF := iprop%
+  |={⊤,∅}=> ∃ (Hs : Nat → Hist) (T : Nat) (cs : RsvComps),
+    histBytes pa n (fun _ => DFrac.own (1 : Qp).half) Hs ∗ topLb T ∗ compBytes cs ∗
+    ⌜rsvStoreOk (hlc := hlc) (GF := GF) cpu pa n w' Hs cs⌝ ∗
+    ▷ (∀ t : Nat, ⌜T ≤ t⌝ -∗ ⌜0 < t⌝ -∗ ⌜headsAre Hs n w0⌝ -∗ (if acq then viewLb cpu t else emp) -∗
+        histBytes pa n (fun _ => DFrac.own (1 : Qp).half) (pushed Hs t (hartAgent cpu) w') -∗
+        compBytes cs -∗ authoredBy t (hartAgent cpu) -∗ topLb t ={∅,⊤}=∗ Ψ)
+
+/-- The accessor of the write half of an exclusive pair: owned, or reserved. -/
+def exclWriteAU (cpu : CPU) (pa : PAddr) (n : Nat) (acq : Bool) (w0 w' : BitVec (8 * n)) (Ψ : IProp GF) :
+    IProp GF := iprop%
+  |={⊤,∅}=>
+    ((∃ (Hs : Nat → Hist) (T : Nat), histBytes pa n (fun _ => DFrac.own 1) Hs ∗ topLb T ∗
+      ▷ (∀ t : Nat, ⌜T ≤ t⌝ -∗ ⌜headsAre Hs n w0⌝ -∗ (if acq then viewLb cpu t else emp) -∗
+          histBytes pa n (fun _ => DFrac.own 1) (pushed Hs t (hartAgent cpu) w') -∗
+          authoredBy t (hartAgent cpu) -∗ topLb t ={∅,⊤}=∗ Ψ)) ∨
+     (∃ (Hs : Nat → Hist) (T : Nat) (cs : RsvComps),
+      histBytes pa n (fun _ => DFrac.own (1 : Qp).half) Hs ∗ topLb T ∗ compBytes cs ∗
+      ⌜rsvStoreOk (hlc := hlc) (GF := GF) cpu pa n w' Hs cs⌝ ∗
+      ▷ (∀ t : Nat, ⌜T ≤ t⌝ -∗ ⌜0 < t⌝ -∗ ⌜headsAre Hs n w0⌝ -∗ (if acq then viewLb cpu t else emp) -∗
+          histBytes pa n (fun _ => DFrac.own (1 : Qp).half) (pushed Hs t (hartAgent cpu) w') -∗
+          compBytes cs -∗ authoredBy t (hartAgent cpu) -∗ topLb t ={∅,⊤}=∗ Ψ)))
+
+theorem exclWriteAU_of_own (cpu : CPU) (pa : PAddr) (n : Nat) (acq : Bool) (w0 w' : BitVec (8 * n))
+    (Ψ : IProp GF) : exclWriteAUOwn cpu pa n acq w0 w' Ψ ⊢ exclWriteAU cpu pa n acq w0 w' Ψ := by
+  unfold exclWriteAU exclWriteAUOwn; iintro H; imod H with H; imodintro; ileft; iexact H
+
+theorem exclWriteAU_of_rsv (cpu : CPU) (pa : PAddr) (n : Nat) (acq : Bool) (w0 w' : BitVec (8 * n))
+    (Ψ : IProp GF) : exclWriteAURsv cpu pa n acq w0 w' Ψ ⊢ exclWriteAU cpu pa n acq w0 w' Ψ := by
+  unfold exclWriteAU exclWriteAURsv; iintro H; imod H with H; imodintro; iright; iexact H
 
 /-- The accessor of a whole AMO swap writing `w'`: the read half, then the
 write half at the value read. -/
@@ -533,8 +629,112 @@ theorem swp_sail_mem_read_plain_au (cpu : CPU) {n vasize : Nat}
   · rw [hk'.2] at hex'
     exact absurd hex' (by decide)
 
-/-- A plain store into bytes inside an accessor: the histories grow by the
-hart's entries at the next position. -/
+/-! ## The reserved regions at the leaves (W8-β′) -/
+
+/-- An own-1 window holds no reserved byte. -/
+theorem memModel_notRsv_hist (σ : MState) (pa : PAddr) (Hs : Nat → Hist) :
+    ∀ n : Nat, memModel σ ∗ histBytes pa n (fun _ => DFrac.own 1) Hs
+      ⊢@{IProp GF} ⌜∀ j, j < n → pa + BitVec.ofNat 64 j ∉ rsvBytes (rsvList (hlc := hlc) (GF := GF))⌝
+  | 0 => by
+    iintro _
+    ipureintro
+    intro j hj; omega
+  | n + 1 => by
+    unfold histBytes
+    rw [List.range_succ]
+    iintro ⟨Hmm, Hb⟩
+    icases BigSepL.bigSepL_snoc.1 $$ Hb with ⟨Hb1, Hb2⟩
+    ihave %h1 := memModel_notRsv_hist σ pa Hs n $$ [Hmm Hb1]
+    · unfold histBytes; iframe
+    ihave %h2 := memModel_notRsv σ _ _ $$ [Hmm Hb2]
+    · iframe
+    ipureintro
+    intro j hj
+    rcases Nat.lt_succ_iff_lt_or_eq.1 hj with h | rfl
+    · exact h1 j h
+    · exact h2
+
+theorem compBytes_valid (m : FlatMem) : ∀ cs : RsvComps,
+    genHeapInterp m ∗ compBytes cs ⊢@{IProp GF} ⌜∀ c ∈ cs, histsAt m c.1 c.2.1 c.2.2⌝
+  | [] => by
+    iintro _
+    ipureintro
+    intro c hc; cases hc
+  | c0 :: cs => by
+    unfold compBytes
+    iintro ⟨Hm, Hc⟩
+    icases BigSepL.bigSepL_cons.1 $$ Hc with ⟨H0, Hc⟩
+    ihave %h0 := histBytes_valid m c0.1 c0.2.1 _ c0.2.2 $$ [Hm H0]
+    · iframe
+    ihave %hs := compBytes_valid m cs $$ [Hm Hc]
+    · unfold compBytes; iframe
+    ipureintro
+    intro c hc
+    rcases List.mem_cons.1 hc with rfl | hc
+    · exact h0
+    · exact hs c hc
+
+/-- The interpretation's half of one reserved word, opened. -/
+theorem memModel_rsvHalf_acc (σ : MState) {i k : Nat} {R : RsvRegion} {pa : PAddr} {n : Nat}
+    (hi : (rsvList (hlc := hlc) (GF := GF))[i]? = some R) (hk : R.words[k]? = some (pa, n)) :
+    memModel σ ⊢@{IProp GF}
+      rsvWordHalfAt (MachGS.era (hlc := hlc) (GF := GF)) pa n ∗
+      (rsvWordHalfAt (MachGS.era (hlc := hlc) (GF := GF)) pa n -∗ memModel σ) := by
+  unfold memModel memModelAt rsvModelAt
+  iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hreg, Hh⟩
+  icases rsvHalves_acc _ _ hi hk $$ Hh with ⟨Hw, Hc⟩
+  iframe Hw
+  iintro Hw
+  iframe Htop Hauth Hviews Hresv Hreg
+  isplit
+  · ipureintro; exact hmm
+  · iapply Hc $$ Hw
+
+theorem rsvWordHalf_intro (pa : PAddr) (n : Nat) (Hs : Nat → Hist) :
+    histBytes pa n (fun _ => DFrac.own (1 : Qp).half) Hs ⊢@{IProp GF}
+      rsvWordHalfAt (MachGS.era (hlc := hlc) (GF := GF)) pa n := by
+  unfold rsvWordHalfAt histBytes
+  iintro H
+  iexists Hs
+  iexact H
+
+theorem rsvJoinHalf (pa : PAddr) (n : Nat) (Hs : Nat → Hist) :
+    histBytes pa n (fun _ => DFrac.own (1 : Qp).half) Hs ∗
+      rsvWordHalfAt (MachGS.era (hlc := hlc) (GF := GF)) pa n ⊢@{IProp GF}
+      histBytes pa n (fun _ => DFrac.own 1) Hs := by
+  unfold rsvWordHalfAt histBytes
+  iintro ⟨H1, ⟨%Hs', H2⟩⟩
+  ihave H := (BigSepL.bigSepL_sep_eqv
+    (Φ := fun _ (j : Nat) => iprop((pa + BitVec.ofNat 64 j) ↦ₕ{DFrac.own (1 : Qp).half} Hs j))
+    (Ψ := fun _ (j : Nat) => iprop((pa + BitVec.ofNat 64 j) ↦ₕ{DFrac.own (1 : Qp).half} Hs' j))
+    (l := List.range n)).2 $$ [H1 H2]
+  · iframe
+  iapply BigSepL.bigSepL_mono_of_forall _ $$ H
+  intro _ j
+  have h := pointsTo_combine (GF := GF) (L := PAddr) (V := Hist) (H := MemF)
+    (l := pa + BitVec.ofNat 64 j) (dq₁ := DFrac.own (1 : Qp).half) (dq₂ := DFrac.own (1 : Qp).half)
+    (v₁ := Hs j) (v₂ := Hs' j)
+  rw [DFrac.op_own, Qp.half_add_half] at h
+  refine h.trans ?_
+  iintro ⟨H, _⟩
+  iexact H
+
+theorem rsvSplitHalf (pa : PAddr) (n : Nat) (Hs : Nat → Hist) :
+    histBytes pa n (fun _ => DFrac.own 1) Hs ⊢@{IProp GF}
+      histBytes pa n (fun _ => DFrac.own (1 : Qp).half) Hs ∗
+      histBytes pa n (fun _ => DFrac.own (1 : Qp).half) Hs := by
+  unfold histBytes
+  refine .trans (BigSepL.bigSepL_mono_of_forall
+    (Ψ := fun _ (j : Nat) => iprop(((pa + BitVec.ofNat 64 j) ↦ₕ{DFrac.own (1 : Qp).half} Hs j) ∗
+      ((pa + BitVec.ofNat 64 j) ↦ₕ{DFrac.own (1 : Qp).half} Hs j))) ?_)
+    BigSepL.bigSepL_sep_eqv.1
+  intro _ j
+  have h := (Fractional.fractional (Φ := fun q => iprop((pa + BitVec.ofNat 64 j) ↦ₕ{DFrac.own q} Hs j))
+    (1 : Qp).half (1 : Qp).half)
+  rw [Qp.half_add_half] at h
+  exact h.1
+
+/-- A plain store inside an accessor: owned or reserved. -/
 theorem swp_sail_mem_write_plain_au (cpu : CPU) {n vasize : Nat}
     (req : Mem_write_request n vasize Arch.pa Arch.translation Arch.arch_ak)
     (w' : BitVec (8 * n)) (hv : req.value = some w')
@@ -573,37 +773,86 @@ theorem swp_sail_mem_write_plain_au (cpu : CPU) {n vasize : Nat}
       isplitl [Hregs Hmem Hmm Hclose]
       · iapply Hclose $$ %σ %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
       · iapply IH $$ Hfrag H
-  · imod H with ⟨%Hs, Hb, Hcont⟩
-    ihave %hget : ⌜histsAt σ.mem req.pa n Hs⌝ $$ [Hmem Hb]
-    · iapply histBytes_valid σ.mem req.pa n _ Hs $$ [Hmem Hb]
-      iframe
-    have hram : ramBytes req.pa n := ramBytes_of_cells hmm.2.2.2.1 (fun j hj => ⟨Hs j, hget j hj⟩)
-    imodintro
-    isplit
-    · ipureintro
-      exact Or.inl ⟨.Ok (some true), _, Or.inr ⟨hram, w', hv, hno, rfl, rfl⟩⟩
-    inext
-    iintro %σ'
-    isplit
-    · iintro %v %Hev
-      rcases Hev with ⟨hdev, w₀, ds₀, _, hdw, _, _⟩ | ⟨_, w'', hv', _, rfl, rfl⟩
-      · exact absurd hdev (not_devBytes_of_ramBytes hram (devWrite_pos hdw))
-      rw [hv] at hv'
-      obtain rfl := Option.some.inj hv'
-      icases resvFragAny_cases cpu r $$ Hfrag with ⟨%b, Hfrag⟩
-      imod memModel_store_plain _ σ cpu req.pa n w' r b hram hno $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag, #Hau, #Htop'⟩
-      imod histBytes_update σ.mem req.pa n Hs (σ.top + 1) (hartAgent cpu) w' $$ [$Hmem $Hb]
-        with ⟨Hmem, Hb⟩
-      imod Hcont $$ %(σ.top + 1) Hb Hau Htop' with HΦ
-      rw [hk]
+  · imod H with (⟨%Hs, Hb, Hcont⟩ | ⟨%Hs, %cs, Hb, Hc, %hok, Hcont⟩)
+    · -- OWNED bytes
+      ihave %hget : ⌜histsAt σ.mem req.pa n Hs⌝ $$ [Hmem Hb]
+      · iapply histBytes_valid σ.mem req.pa n _ Hs $$ [Hmem Hb]
+        iframe
+      ihave %hnr := memModel_notRsv_hist σ req.pa Hs n $$ [Hmm Hb]
+      · iframe
+      have hram : ramBytes req.pa n := ramBytes_of_cells hmm.2.2.2.1 (fun j hj => ⟨Hs j, hget j hj⟩)
       imodintro
-      isplitl [Hregs Hmem Hmm Hclose]
-      · iapply Hclose $$ %(σ.store cpu req.pa n w' false) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
-      · iapply swp_ret
-        iapply HΦ $$ Hfrag
-    · iintro %Hbk
-      obtain ⟨hno', _⟩ := Hbk
-      exact absurd hno' hno
+      isplit
+      · ipureintro
+        exact Or.inl ⟨.Ok (some true), _, Or.inr ⟨hram, w', hv, hno, rfl, rfl⟩⟩
+      inext
+      iintro %σ'
+      isplit
+      · iintro %v %Hev
+        rcases Hev with ⟨hdev, w₀, ds₀, _, hdw, _, _⟩ | ⟨_, w'', hv', _, rfl, rfl⟩
+        · exact absurd hdev (not_devBytes_of_ramBytes hram (devWrite_pos hdw))
+        rw [hv] at hv'
+        obtain rfl := Option.some.inj hv'
+        icases resvFragAny_cases cpu r $$ Hfrag with ⟨%b, Hfrag⟩
+        imod memModel_store_plain _ σ cpu req.pa n w' r b hram hno
+          (rsvAllOk_store_off w' (σ.top + 1) (hartAgent cpu) hnr) $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag, #Hau, #Htop'⟩
+        imod histBytes_update σ.mem req.pa n Hs (σ.top + 1) (hartAgent cpu) w' $$ [$Hmem $Hb]
+          with ⟨Hmem, Hb⟩
+        imod Hcont $$ %(σ.top + 1) Hb Hau Htop' with HΦ
+        rw [hk]
+        imodintro
+        isplitl [Hregs Hmem Hmm Hclose]
+        · iapply Hclose $$ %(σ.store cpu req.pa n w' false) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
+        · iapply swp_ret
+          iapply HΦ $$ Hfrag
+      · iintro %Hbk
+        obtain ⟨hno', _⟩ := Hbk
+        exact absurd hno' hno
+    · -- a RESERVED word (W8-β′)
+      obtain ⟨i, k, R, hi, hk', hpres⟩ := hok
+      ihave %hget : ⌜histsAt σ.mem req.pa n Hs⌝ $$ [Hmem Hb]
+      · iapply histBytes_valid σ.mem req.pa n _ Hs $$ [Hmem Hb]
+        iframe
+      ihave %hcget : ⌜∀ c ∈ cs, histsAt σ.mem c.1 c.2.1 c.2.2⌝ $$ [Hmem Hc]
+      · iapply compBytes_valid σ.mem cs $$ [Hmem Hc]
+        iframe
+      have hram : ramBytes req.pa n := ramBytes_of_cells hmm.2.2.2.1 (fun j hj => ⟨Hs j, hget j hj⟩)
+      imodintro
+      isplit
+      · ipureintro
+        exact Or.inl ⟨.Ok (some true), _, Or.inr ⟨hram, w', hv, hno, rfl, rfl⟩⟩
+      inext
+      iintro %σ'
+      isplit
+      · iintro %v %Hev
+        rcases Hev with ⟨hdev, w₀, ds₀, _, hdw, _, _⟩ | ⟨_, w'', hv', _, rfl, rfl⟩
+        · exact absurd hdev (not_devBytes_of_ramBytes hram (devWrite_pos hdw))
+        rw [hv] at hv'
+        obtain rfl := Option.some.inj hv'
+        icases resvFragAny_cases cpu r $$ Hfrag with ⟨%b, Hfrag⟩
+        icases memModel_rsvHalf_acc σ hi hk' $$ Hmm with ⟨Hh, Hmmc⟩
+        ihave Hb := rsvJoinHalf req.pa n Hs $$ [Hb Hh]
+        · iframe
+        imod histBytes_update σ.mem req.pa n Hs (σ.top + 1) (hartAgent cpu) w' $$ [$Hmem $Hb]
+          with ⟨Hmem, Hb⟩
+        icases rsvSplitHalf req.pa n _ $$ Hb with ⟨Hb, Hh⟩
+        ihave Hmm := Hmmc $$ [Hh]
+        · iapply rsvWordHalf_intro $$ Hh
+        imod memModel_store_plain _ σ cpu req.pa n w' r b hram hno
+          (rsvAllOk_store_in w' (σ.top + 1) (hartAgent cpu)
+            (MachFixedGS.rsvStatic_wf (hlc := hlc) (GF := GF)).1 hi (List.mem_of_getElem? hk')
+            (hpres σ.mem (σ.top + 1) (by omega) hget hcget)) $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag, #Hau, #Htop'⟩
+        imod Hcont $$ %(σ.top + 1) %(by omega) Hb Hc Hau Htop' with HΦ
+        rw [hk]
+        imodintro
+        isplitl [Hregs Hmem Hmm Hclose]
+        · iapply Hclose $$ %(σ.store cpu req.pa n w' false) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
+        · iapply swp_ret
+          iapply HΦ $$ Hfrag
+      · iintro %Hbk
+        obtain ⟨hno', _⟩ := Hbk
+        exact absurd hno' hno
+
 
 /-- The read half of an exclusive pair inside an accessor: the value is the
 heads of the histories, and the snapshot becomes the reservation. -/
@@ -707,7 +956,7 @@ theorem swp_sail_mem_read_excl_au (cpu : CPU) {n vasize : Nat}
   ihave HG := swp_sail_mem_read_excl_au_gen cpu req acq hk hacq hn Φ
   iapply HG $$ %r Hfrag H
 
-/-- The write half of an exclusive pair inside an accessor. -/
+/-- The write half of an exclusive pair inside an accessor: owned or reserved. -/
 theorem swp_sail_mem_write_excl_au (cpu : CPU) {n vasize : Nat}
     (req : Mem_write_request n vasize Arch.pa Arch.translation Arch.arch_ak)
     (w0 w' : BitVec (8 * n)) (acq : Bool) (hv : req.value = some w')
@@ -745,49 +994,109 @@ theorem swp_sail_mem_write_excl_au (cpu : CPU) {n vasize : Nat}
       isplitl [Hregs Hmem Hmm Hclose]
       · iapply Hclose $$ %σ %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
       · iapply IH $$ Hfrag H
-  · imod H with ⟨%Hs, %T, Hb, #HT, Hcont⟩
-    ihave %hget : ⌜histsAt σ.mem req.pa n Hs⌝ $$ [Hmem Hb]
-    · iapply histBytes_valid σ.mem req.pa n _ Hs $$ [Hmem Hb]
-      iframe
-    ihave %hres : ⌜σ.resv cpu = some (snapOf req.pa n w0) ∧ (σ.hr cpu).acq = acq⌝ $$ [Hmm Hfrag]
-    · iapply memModel_resv _ σ cpu _ acq $$ [Hmm Hfrag]
-      iframe
-    ihave %hT : ⌜T ≤ σ.top⌝ $$ [Hmm HT]
-    · iapply memModel_topLb _ σ T $$ [Hmm HT]
-      iframe Hmm
-      iexact HT
-    have hheads : headsAre Hs n w0 := by
-      intro j hj
-      have h := hmm.2.2.1 cpu _ hres.1 _ (nthByte w0 j) (snapOf_get? req.pa n w0 hn j hj)
-      rw [hget j hj, Option.bind_some] at h
-      exact h
-    have hram : ramBytes req.pa n := ramBytes_of_cells hmm.2.2.2.1 (fun j hj => ⟨Hs j, hget j hj⟩)
-    imodintro
-    isplit
-    · ipureintro
-      exact Or.inl ⟨.Ok (some true), _, Or.inr ⟨hram, w', hv, hno, rfl, rfl⟩⟩
-    inext
-    iintro %σ'
-    isplit
-    · iintro %v %Hev
-      rcases Hev with ⟨hdev, w₀, ds₀, _, hdw, _, _⟩ | ⟨_, w'', hv', _, rfl, rfl⟩
-      · exact absurd hdev (not_devBytes_of_ramBytes hram (devWrite_pos hdw))
-      rw [hv] at hv'
-      obtain rfl := Option.some.inj hv'
-      imod memModel_store_excl _ σ cpu req.pa n w' _ acq hram hno $$ [$Hmm $Hfrag]
-        with ⟨Hmm, Hfrag, #Hau, #Htop', Hvlb⟩
-      imod histBytes_update σ.mem req.pa n Hs (σ.top + 1) (hartAgent cpu) w' $$ [$Hmem $Hb]
-        with ⟨Hmem, Hb⟩
-      imod Hcont $$ %(σ.top + 1) %(by omega) %hheads Hvlb Hb Hau Htop' with HΦ
-      rw [hk]
+  · imod H with (⟨%Hs, %T, Hb, #HT, Hcont⟩ | ⟨%Hs, %T, %cs, Hb, #HT, Hc, %hok, Hcont⟩)
+    · -- OWNED bytes
+      ihave %hget : ⌜histsAt σ.mem req.pa n Hs⌝ $$ [Hmem Hb]
+      · iapply histBytes_valid σ.mem req.pa n _ Hs $$ [Hmem Hb]
+        iframe
+      ihave %hnr := memModel_notRsv_hist σ req.pa Hs n $$ [Hmm Hb]
+      · iframe
+      ihave %hres : ⌜σ.resv cpu = some (snapOf req.pa n w0) ∧ (σ.hr cpu).acq = acq⌝ $$ [Hmm Hfrag]
+      · iapply memModel_resv _ σ cpu _ acq $$ [Hmm Hfrag]
+        iframe
+      ihave %hT : ⌜T ≤ σ.top⌝ $$ [Hmm HT]
+      · iapply memModel_topLb _ σ T $$ [Hmm HT]
+        iframe Hmm
+        iexact HT
+      have hheads : headsAre Hs n w0 := by
+        intro j hj
+        have h := hmm.2.2.1 cpu _ hres.1 _ (nthByte w0 j) (snapOf_get? req.pa n w0 hn j hj)
+        rw [hget j hj, Option.bind_some] at h
+        exact h
+      have hram : ramBytes req.pa n := ramBytes_of_cells hmm.2.2.2.1 (fun j hj => ⟨Hs j, hget j hj⟩)
       imodintro
-      isplitl [Hregs Hmem Hmm Hclose]
-      · iapply Hclose $$ %(σ.store cpu req.pa n w' true) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
-      · iapply swp_ret
-        iapply HΦ $$ Hfrag
-    · iintro %Hbk
-      obtain ⟨hno', _⟩ := Hbk
-      exact absurd hno' hno
+      isplit
+      · ipureintro
+        exact Or.inl ⟨.Ok (some true), _, Or.inr ⟨hram, w', hv, hno, rfl, rfl⟩⟩
+      inext
+      iintro %σ'
+      isplit
+      · iintro %v %Hev
+        rcases Hev with ⟨hdev, w₀, ds₀, _, hdw, _, _⟩ | ⟨_, w'', hv', _, rfl, rfl⟩
+        · exact absurd hdev (not_devBytes_of_ramBytes hram (devWrite_pos hdw))
+        rw [hv] at hv'
+        obtain rfl := Option.some.inj hv'
+        imod memModel_store_excl _ σ cpu req.pa n w' _ acq hram hno
+          (rsvAllOk_store_off w' (σ.top + 1) (hartAgent cpu) hnr) $$ [$Hmm $Hfrag]
+          with ⟨Hmm, Hfrag, #Hau, #Htop', Hvlb⟩
+        imod histBytes_update σ.mem req.pa n Hs (σ.top + 1) (hartAgent cpu) w' $$ [$Hmem $Hb]
+          with ⟨Hmem, Hb⟩
+        imod Hcont $$ %(σ.top + 1) %(by omega) %hheads Hvlb Hb Hau Htop' with HΦ
+        rw [hk]
+        imodintro
+        isplitl [Hregs Hmem Hmm Hclose]
+        · iapply Hclose $$ %(σ.store cpu req.pa n w' true) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
+        · iapply swp_ret
+          iapply HΦ $$ Hfrag
+      · iintro %Hbk
+        obtain ⟨hno', _⟩ := Hbk
+        exact absurd hno' hno
+    · -- a RESERVED word (W8-β′)
+      obtain ⟨i, k, R, hi, hk', hpres⟩ := hok
+      ihave %hget : ⌜histsAt σ.mem req.pa n Hs⌝ $$ [Hmem Hb]
+      · iapply histBytes_valid σ.mem req.pa n _ Hs $$ [Hmem Hb]
+        iframe
+      ihave %hcget : ⌜∀ c ∈ cs, histsAt σ.mem c.1 c.2.1 c.2.2⌝ $$ [Hmem Hc]
+      · iapply compBytes_valid σ.mem cs $$ [Hmem Hc]
+        iframe
+      ihave %hres : ⌜σ.resv cpu = some (snapOf req.pa n w0) ∧ (σ.hr cpu).acq = acq⌝ $$ [Hmm Hfrag]
+      · iapply memModel_resv _ σ cpu _ acq $$ [Hmm Hfrag]
+        iframe
+      ihave %hT : ⌜T ≤ σ.top⌝ $$ [Hmm HT]
+      · iapply memModel_topLb _ σ T $$ [Hmm HT]
+        iframe Hmm
+        iexact HT
+      have hheads : headsAre Hs n w0 := by
+        intro j hj
+        have h := hmm.2.2.1 cpu _ hres.1 _ (nthByte w0 j) (snapOf_get? req.pa n w0 hn j hj)
+        rw [hget j hj, Option.bind_some] at h
+        exact h
+      have hram : ramBytes req.pa n := ramBytes_of_cells hmm.2.2.2.1 (fun j hj => ⟨Hs j, hget j hj⟩)
+      imodintro
+      isplit
+      · ipureintro
+        exact Or.inl ⟨.Ok (some true), _, Or.inr ⟨hram, w', hv, hno, rfl, rfl⟩⟩
+      inext
+      iintro %σ'
+      isplit
+      · iintro %v %Hev
+        rcases Hev with ⟨hdev, w₀, ds₀, _, hdw, _, _⟩ | ⟨_, w'', hv', _, rfl, rfl⟩
+        · exact absurd hdev (not_devBytes_of_ramBytes hram (devWrite_pos hdw))
+        rw [hv] at hv'
+        obtain rfl := Option.some.inj hv'
+        icases memModel_rsvHalf_acc σ hi hk' $$ Hmm with ⟨Hh, Hmmc⟩
+        ihave Hb := rsvJoinHalf req.pa n Hs $$ [Hb Hh]
+        · iframe
+        imod histBytes_update σ.mem req.pa n Hs (σ.top + 1) (hartAgent cpu) w' $$ [$Hmem $Hb]
+          with ⟨Hmem, Hb⟩
+        icases rsvSplitHalf req.pa n _ $$ Hb with ⟨Hb, Hh⟩
+        ihave Hmm := Hmmc $$ [Hh]
+        · iapply rsvWordHalf_intro $$ Hh
+        imod memModel_store_excl _ σ cpu req.pa n w' _ acq hram hno
+          (rsvAllOk_store_in w' (σ.top + 1) (hartAgent cpu)
+            (MachFixedGS.rsvStatic_wf (hlc := hlc) (GF := GF)).1 hi (List.mem_of_getElem? hk')
+            (hpres σ.mem (σ.top + 1) (by omega) hget hcget)) $$ [$Hmm $Hfrag]
+          with ⟨Hmm, Hfrag, #Hau, #Htop', Hvlb⟩
+        imod Hcont $$ %(σ.top + 1) %(by omega) %(by omega) %hheads Hvlb Hb Hc Hau Htop' with HΦ
+        rw [hk]
+        imodintro
+        isplitl [Hregs Hmem Hmm Hclose]
+        · iapply Hclose $$ %(σ.store cpu req.pa n w' true) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
+        · iapply swp_ret
+          iapply HΦ $$ Hfrag
+      · iintro %Hbk
+        obtain ⟨hno', _⟩ := Hbk
+        exact absurd hno' hno
 
 
 /-! ## Monotonicity of the accessors (the stage lemmas compose them with
@@ -815,15 +1124,27 @@ theorem writeAU_wand (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) (�
     writeAU cpu pa n w' Ψ ⊢ ▷ (Ψ -∗ Ψ') -∗ writeAU cpu pa n w' Ψ' := by
   unfold writeAU
   iintro H HW
-  imod H with ⟨%Hs, Hb, Hcont⟩
-  imodintro
-  iexists Hs
-  iframe Hb
-  inext
-  iintro %t Hb Hau Htop
-  imod Hcont $$ %t Hb Hau Htop with HΨ
-  imodintro
-  iapply HW $$ HΨ
+  imod H with (⟨%Hs, Hb, Hcont⟩ | ⟨%Hs, %cs, Hb, Hc, %hok, Hcont⟩)
+  · imodintro
+    ileft
+    iexists Hs
+    iframe Hb
+    inext
+    iintro %t Hb Hau Htop
+    imod Hcont $$ %t Hb Hau Htop with HΨ
+    imodintro
+    iapply HW $$ HΨ
+  · imodintro
+    iright
+    iexists Hs, cs
+    iframe Hb Hc
+    isplit
+    · ipureintro; exact hok
+    inext
+    iintro %t %ht Hb Hc Hau Htop
+    imod Hcont $$ %t %ht Hb Hc Hau Htop with HΨ
+    imodintro
+    iapply HW $$ HΨ
 
 theorem exclReadAU_wand (pa : PAddr) (n : Nat) (Ψ Ψ' : BitVec (8 * n) → IProp GF) :
     exclReadAU pa n Ψ ⊢ ▷ (∀ w, Ψ w -∗ Ψ' w) -∗ exclReadAU pa n Ψ' := by
@@ -846,17 +1167,31 @@ theorem exclWriteAU_wand (cpu : CPU) (pa : PAddr) (n : Nat) (acq : Bool) (w0 w' 
     exclWriteAU cpu pa n acq w0 w' Ψ ⊢ ▷ (Ψ -∗ Ψ') -∗ exclWriteAU cpu pa n acq w0 w' Ψ' := by
   unfold exclWriteAU
   iintro H HW
-  imod H with ⟨%Hs, %T, Hb, #HT, Hcont⟩
-  imodintro
-  iexists Hs, T
-  iframe Hb
-  isplit
-  · iexact HT
-  inext
-  iintro %t %h1 %h2 Hv Hb Hau Htop
-  imod Hcont $$ %t %h1 %h2 Hv Hb Hau Htop with HΨ
-  imodintro
-  iapply HW $$ HΨ
+  imod H with (⟨%Hs, %T, Hb, #HT, Hcont⟩ | ⟨%Hs, %T, %cs, Hb, #HT, Hc, %hok, Hcont⟩)
+  · imodintro
+    ileft
+    iexists Hs, T
+    iframe Hb
+    isplit
+    · iexact HT
+    inext
+    iintro %t %h1 %h2 Hv Hb Hau Htop
+    imod Hcont $$ %t %h1 %h2 Hv Hb Hau Htop with HΨ
+    imodintro
+    iapply HW $$ HΨ
+  · imodintro
+    iright
+    iexists Hs, T, cs
+    iframe Hb Hc
+    isplit
+    · iexact HT
+    isplit
+    · ipureintro; exact hok
+    inext
+    iintro %t %h1 %h0 %h2 Hv Hb Hc Hau Htop
+    imod Hcont $$ %t %h1 %h0 %h2 Hv Hb Hc Hau Htop with HΨ
+    imodintro
+    iapply HW $$ HΨ
 
 end ambient
 

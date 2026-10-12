@@ -180,7 +180,8 @@ theorem xv6PowerAdequacyGenUT (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTre
     (hsteps : ([Expr.power], g) -<κs>->ₜₚ^[n] (t2, g2)) :
     (∀ e2, e2 ∈ t2 → Reducible (e2, g2)) ∧ phi g2 κs := by
   obtain ⟨hcovin, hlogsub, hls2⟩ := covFacts_ofImage _ _ sb nib cov Himg
-  refine riscvPowerAdequacyT (hlc := hlc) (GF := GF) bcRoLo bcRoHi XV6_DISK_BYTES g CT Cls Clt Born Hbirth
+  refine riscvPowerAdequacyT (hlc := hlc) (GF := GF) bcRoLo bcRoHi
+    (rsvOff_sound (rs := KernelRsv.static) (lo := bcRoLo) (hi := bcRoHi) (by decide +kernel)) XV6_DISK_BYTES g CT Cls Clt Born Hbirth
     (fun γd γsw γreg γst c => xv6Slot N appFs appOkc cov sb.sbLogstart γd γsw γreg γst c)
     (xv6Slot_alloc N appFs appOkc Cls (diskOf g.m.devs) sb nib cov Himg Happ_init)
     Tk Hk

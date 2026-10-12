@@ -157,7 +157,7 @@ theorem powerAdequacyCore [MachGpreS hlc GF] (g : GState) (phi : GState → List
 so that `Hboot` can be told its shape: every functor instance from
 `MachGpreS`, the invariant world, the fixed gnames, the run's trace `T`, the
 trace predicate `Ptp`, and the application's slots. -/
-@[reducible] def bootFixedGS [MachGpreS hlc GF] (Hinv : InvGS_gen hlc GF)
+@[reducible] def bootFixedGS [MachGpreS hlc GF] [KernelRsv] (Hinv : InvGS_gen hlc GF)
     (γgen γstart γreg γdisk : GName) (ndisk : Nat) (γswap : GName) (Pcp : IProp GF)
     (Tkp : Nat → IProp GF) (Hkp : Nat → IProp GF → IProp GF)
     (γobs : GName) (T : List Obs) (Ptp : IProp GF) (γhist : GName)
@@ -224,6 +224,8 @@ trace predicate `Ptp`, and the application's slots. -/
   syncHook := Hkp
   swapName := γswap
   mirrorG := MachGpreS.mirror_pre
+  rsvStatic := KernelRsv.static
+  rsvStatic_wf := KernelRsv.wf
 
 theorem crashN_obsN : (↑obsN : CoPset) ⊆ ⊤ \ ↑crashN := by
   have hd : (↑obsN : CoPset) ## ↑crashN := ndot_ne_disjoint nroot (by decide)
@@ -263,7 +265,7 @@ The hooks, in Rocq's order:
   and the lent resource; the booted machine's `bootFacts` are at the
   language's boot image `bootImage` (Rocq's `boot_image`): no premise on the
   initial state's memory. -/
-theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GState)
+theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] [KernelRsv] (ndisk : Nat) (g : GState)
     -- THE BIRTH, its yield split between the two slots (Rocq sync SY3-A1):
     -- `Cls c` to the crash slot's birth (`HPc`), `Clt c` to the trace slot's
     -- (`HPt`); handed the machine's four fixed gnames, `Born` what it says of
@@ -443,7 +445,7 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
           (Tk c) (Hk c) γobs T (Pt γobs c) γhist
       (Tg c) (HTg c) (HTgt c) (Kc c) (HKc c) (HKct c) (Cres c) (HCrest c)
           (Wd c) (HWd c) (HWdt c) (Rw c) (HRw c) (HRwt c) Uf (Ucr c) (Ucx c) (Uco c)
-          (Ue c) (HUe c) (Uet c) (Uea c) (HUea c)).withInv Hinv) _
+          (Ue c) (HUe c) (Uet c) (Uea c) (HUea c)).withInv Hinv) _ _ rfl
       Ppure (fun dk => Hproj γdisk γswap γreg γstart c dk)
       Mof (Rb c) (Tn c) (Tn' c) (Tn'' c) (fun E gen dk => Hswap γdisk γswap γreg γstart c hborn E gen dk)
       (fun h on dk hs => Hobs γdisk γobs c h on dk hs)
@@ -487,9 +489,26 @@ theorem powerInterp_mmOk (g : GState) :
     intro h; cases h
   · iintro ⟨_, _, ⟨%R, _, _, %E, _, Hera⟩, _⟩
     unfold eraInterp memModelAt
-    icases Hera with ⟨_, _, ⟨_, _, _, _, %hok⟩, _⟩
+    icases Hera with ⟨_, _, ⟨_, _, _, _, %hok, _⟩, _⟩
     ipureintro
     exact fun _ => hok
+
+/-- **The reserved regions' discipline, extracted** (W8-β′, plan [R25.2] (ii)'s
+MachCSL side, on `powerInterp_mmOk`'s pattern [R26.s1]): pure in the state
+interpretation while the power is on. -/
+theorem powerInterp_rsvOk (g : GState) :
+    powerInterp g ⊢@{IProp GF}
+      ⌜g.pow = true → rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) g.m.mem⌝ := by
+  unfold powerInterp eraCur
+  cases hpw : g.pow
+  · iintro _
+    ipureintro
+    intro h; cases h
+  · iintro ⟨_, _, ⟨%R, _, _, %E, _, Hera⟩, _⟩
+    unfold eraInterp memModelAt rsvModelAt
+    icases Hera with ⟨_, _, ⟨_, _, _, _, _, ⟨%reg, _, %⟨hin, _, hok⟩⟩, _⟩, _⟩
+    ipureintro
+    exact fun _ => all_of_reservedOk hin hok
 
 end helpers
 

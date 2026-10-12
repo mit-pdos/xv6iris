@@ -140,6 +140,14 @@ theorem frame2_toKpt (sp ra s0 : BitVec 64) :
   · iapply wordPointsTo_toKpt X $$ Hra
   · iapply wordPointsTo_toKpt X $$ Hs0
 
+/-- A `cpus[cpu]` cell travels to the kernel table (W8-β′). -/
+theorem cpuCell_toKpt [KernelGeom] (cpu : CPU) (va : PAddr) (n : Nat) (v : BitVec (8 * n)) :
+    @cpuCell hlc GF _ X _ cpu va n v ⊢ @cpuCell hlc GF _ X.toKpt _ cpu va n v := by
+  unfold cpuCell
+  iintro ⟨H, Hid, Hin⟩
+  iframe Hid Hin
+  iapply wordPointsTo_toKpt X $$ H
+
 /-- The `c->intena` cell travels to the kernel table. -/
 theorem intenaCell_toKpt [KernelGeom] (cpu : CPU) (lent sie : Bool) (noff : Nat) (intena : Bool) :
     @intenaCell hlc GF _ X _ cpu lent sie noff intena ⊢
@@ -150,11 +158,11 @@ theorem intenaCell_toKpt [KernelGeom] (cpu : CPU) (lent sie : Bool) (noff : Nat)
       simp only [intenaCell_zero]
       iintro ⟨%b, H⟩
       iexists b
-      iapply wordPointsTo_toKpt X $$ H
+      iapply cpuCell_toKpt X $$ H
     | succ m =>
       simp only [intenaCell_succ]
       iintro H
-      iapply wordPointsTo_toKpt X $$ H
+      iapply cpuCell_toKpt X $$ H
   · simp only [intenaCell_lent]
     iintro H
     iexact H
@@ -166,9 +174,9 @@ theorem cpuCells_toKpt [KernelGeom] (cpu : CPU) (lent sie : Bool) (noff : Nat) (
   unfold cpuCells
   iintro ⟨Hp, Hn, Hi⟩
   isplitl [Hp]
-  · iapply wordPointsTo_toKpt X $$ Hp
+  · iapply cpuCell_toKpt X $$ Hp
   isplitl [Hn]
-  · iapply wordPointsTo_toKpt X $$ Hn
+  · iapply cpuCell_toKpt X $$ Hn
   · iapply intenaCell_toKpt X cpu lent sie noff intena $$ Hi
 
 /-- The per-cpu bookkeeping travels to the kernel table (the lock set and

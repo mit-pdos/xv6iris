@@ -221,7 +221,8 @@ theorem wp_s_sw_free [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
     iframe HmConf HPC HnextPC HT HF Hcl
     isplitl [Hcell]
     · iintro Hctx
-      unfold writeAU
+      iapply writeAU_of_own
+      unfold writeAUOwn
       iapply fupd_mask_intro LawfulSet.empty_subset
       iintro Hmask
       iexists Hs

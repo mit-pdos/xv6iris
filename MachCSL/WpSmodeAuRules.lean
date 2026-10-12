@@ -415,7 +415,8 @@ theorem wp_s_sw_au_inv_sanity [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU)
   iapply (wp_s_sw_au cpu k hsie pc is_rvc imm rs1 rs2 va haddr hram hal emp)
   iframe HI Hk Hpc Hcl
   isplitl []
-  · unfold writeAU
+  · iapply writeAU_of_own
+    unfold writeAUOwn
     iinv Hinv with Hbody Hclose
     icases Hbody with ⟨%Hs, >Hb⟩
     iapply fupd_mask_intro LawfulSet.empty_subset

@@ -11,6 +11,7 @@ touches the interrupt state, so the exit context is the plain
 -/
 import Xv6.SpecFileinit
 import Xv6.SpecInitlock
+import Xv6.LockRsv
 import Xv6.CodeTactics
 
 namespace Xv6
@@ -41,12 +42,11 @@ set_option maxHeartbeats 1000000 in
 /-- `initlock`'s contract as a rule, with the lock and name pointers named. -/
 theorem fi_initlock_call (IL : INITLOCK) [CurCtx] (c : CPU) (k' : KCtx)
     (vlock : BitVec 32) (vname vcpu : BitVec 64) (hK' : 2 ≤ k'.avail)
-    (lk nm : BitVec 64) (h10 : k'.regs 10#5 = lk) (h11 : k'.regs 11#5 = nm) :
+    (lk nm : BitVec 64) (h10 : k'.regs 10#5 = lk) (h11 : k'.regs 11#5 = nm):
     kctx c k' ∗ pcIs c KA.«initlock» ∗
     kmapId lk ∗ kmapId (lk + 16#64) ∗
-    wordPointsTo lk 4 (DFrac.own 1) vlock ∗
+    lkRaw lk vlock vcpu ∗
     wordPointsTo (lk + 8#64) 8 (DFrac.own 1) vname ∗
-    wordPointsTo (lk + 16#64) 8 (DFrac.own 1) vcpu ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
       kctx cpu' (k'.withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       wordPointsTo (lk + 8#64) 8 (DFrac.own 1) nm -∗
@@ -105,8 +105,8 @@ theorem fileinit_br_3372 : KA.«fileinit» + 0x3372#64 = KStr.«ftable» := by d
 set_option maxHeartbeats 4000000 in
 theorem fileinit_proof (IL : INITLOCK) : FILEINIT :=
   ⟨fun {hlc GF} _ _ cpu k vlock vname vcpu hK => by
-  unfold wp_fileinit_body lockWords
-  iintro ⟨Hk, Hpc, ⟨#Hcl, #Hcl', Hwlock, Hwname, Hwcpu⟩, HΦ⟩
+  unfold wp_fileinit_body lockWordsR
+  iintro ⟨Hk, Hpc, ⟨#Hcl, #Hcl', Hwlock, Hwname⟩, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   simp only [fileinitAddr]
   k_norm_g
@@ -143,7 +143,7 @@ theorem fileinit_proof (IL : INITLOCK) : FILEINIT :=
   rotate_right 1
   k_norm_g
   iframe #
-  iframe Hwlock Hwname Hwcpu
+  iframe Hwlock Hwname
   case hKi => k_norm_g; omega
   case ha0 => k_norm_g; rfl
   case ha1 => k_norm_g; rfl

@@ -14,6 +14,7 @@ the plain `k.withRegs R'`.
 import MachCSL.WpSmodeAlu4
 import Xv6.SpecProcinit
 import Xv6.SpecInitlock
+import Xv6.LockRsv
 import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame8
 import Xv6.ByteCursor
@@ -318,9 +319,8 @@ theorem pi_initlock_call (IL : INITLOCK) [CurCtx] (c : CPU) (k' : KCtx)
     (lk nm : BitVec 64) (h10 : k'.regs 10#5 = lk) (h11 : k'.regs 11#5 = nm) :
     kctx c k' ∗ pcIs c KA.«initlock» ∗
     kmapId lk ∗ kmapId (lk + 16#64) ∗
-    wordPointsTo lk 4 (DFrac.own 1) vlock ∗
+    lkRaw lk vlock vcpu ∗
     wordPointsTo (lk + 8#64) 8 (DFrac.own 1) vname ∗
-    wordPointsTo (lk + 16#64) 8 (DFrac.own 1) vcpu ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
       kctx cpu' (k'.withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       wordPointsTo (lk + 8#64) 8 (DFrac.own 1) nm -∗
@@ -337,13 +337,12 @@ theorem pi_in_open [CurCtx] (i : Nat) :
     procFieldsIn (GF := GF) i ⊢
       iprop(∃ (vlock : BitVec 32) (vname vcpu : BitVec 64) (vstate : BitVec 32) (vks : BitVec 64),
         kmapId (procAddr i) ∗ kmapId (procAddr i + 16#64) ∗
-        wordPointsTo (procAddr i) 4 (DFrac.own 1) vlock ∗
+        lkRaw (procAddr i) vlock vcpu ∗
         wordPointsTo (procAddr i + 8#64) 8 (DFrac.own 1) vname ∗
-        wordPointsTo (procAddr i + 16#64) 8 (DFrac.own 1) vcpu ∗
         wordPointsTo (procAddr i + 24#64) 4 (DFrac.own 1) vstate ∗
         wordPointsTo (procAddr i + 64#64) 8 (DFrac.own 1) vks) := by
-  unfold procFieldsIn lockWords
-  iintro ⟨%vlock, %vname, %vcpu, %vstate, %vks, ⟨#H1, #H2, H3, H4, H5⟩, H6, H7⟩
+  unfold procFieldsIn lockWordsR
+  iintro ⟨%vlock, %vname, %vcpu, %vstate, %vks, ⟨#H1, #H2, H3, H4⟩, H6, H7⟩
   iexists vlock
   iexists vname
   iexists vcpu
@@ -398,7 +397,7 @@ theorem pi_iter (IL : INITLOCK) [CurCtx] (k : KCtx) (hK : 10 ≤ k.avail)
   iintro ⟨Hk, Hpc, Hin, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases pi_in_open i $$ Hin with
-    ⟨%vlock, %vname, %vcpu, %vstate, %vks, #Hid0, #Hid16, Hlk, Hnm, Hcp, Hst, Hks⟩
+    ⟨%vlock, %vname, %vcpu, %vstate, %vks, #Hid0, #Hid16, Hlk, Hnm, Hst, Hks⟩
   -- c.mv a1,s6 ; c.mv a0,s1 ; jal ra, initlock
   k_step_gen (wp_s_add cur _ (KA.«procinit» + 0x72#64) true 11#5 0#5 22#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h22] next c1 hp1
@@ -414,7 +413,7 @@ theorem pi_iter (IL : INITLOCK) [CurCtx] (k : KCtx) (hK : 10 ≤ k.avail)
   rotate_right 1
   k_norm_g
   iframe #
-  iframe Hlk Hnm Hcp
+  iframe Hlk Hnm
   case hKi => k_norm_g; omega
   case ha0 => k_norm_g
   case ha1 => k_norm_g
@@ -484,14 +483,13 @@ theorem pi_iter (IL : INITLOCK) [CurCtx] (k : KCtx) (hK : 10 ≤ k.avail)
   · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
 
 theorem pi_lock_open [CurCtx] (lk : BitVec 64) :
-    iprop(∃ vlock vname vcpu, lockWords (GF := GF) lk vlock vname vcpu) ⊢
+    iprop(∃ vlock vname vcpu, lockWordsR (GF := GF) lk vlock vname vcpu) ⊢
       iprop(∃ (vlock : BitVec 32) (vname vcpu : BitVec 64),
         kmapId lk ∗ kmapId (lk + 16#64) ∗
-        wordPointsTo lk 4 (DFrac.own 1) vlock ∗
-        wordPointsTo (lk + 8#64) 8 (DFrac.own 1) vname ∗
-        wordPointsTo (lk + 16#64) 8 (DFrac.own 1) vcpu) := by
-  unfold lockWords
-  iintro ⟨%vlock, %vname, %vcpu, ⟨#H1, #H2, H3, H4, H5⟩⟩
+        lkRaw lk vlock vcpu ∗
+        wordPointsTo (lk + 8#64) 8 (DFrac.own 1) vname) := by
+  unfold lockWordsR
+  iintro ⟨%vlock, %vname, %vcpu, ⟨#H1, #H2, H3, H4⟩⟩
   iexists vlock
   iexists vname
   iexists vcpu
@@ -588,8 +586,8 @@ and routes the shares (`pi_route`). -/
 def procinitCellsBody {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) : Prop :=
   kctx cpu k ∗ pcIs cpu procinitAddr ∗
-  (∃ vlock vname vcpu, lockWords pidLockAddr vlock vname vcpu) ∗
-  (∃ vlock vname vcpu, lockWords waitLockAddr vlock vname vcpu) ∗
+  (∃ vlock vname vcpu, lockWordsR pidLockAddr vlock vname vcpu) ∗
+  (∃ vlock vname vcpu, lockWordsR waitLockAddr vlock vname vcpu) ∗
   ([∗list] i ∈ List.range 64, procFieldsIn i) ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
     kctx cpu' (k.withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -605,8 +603,8 @@ theorem procinit_cells (IL : INITLOCK) {hlc : HasLC} {GF : BundledGFunctors} [Ma
   simp only [procinitAddr]
   iintro ⟨Hk, Hpc, Hpid, Hwait, Hlist, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  icases pi_lock_open pidLockAddr $$ Hpid with ⟨%vl1, %vn1, %vc1, #Hpi0, #Hpi16, Hp1, Hp2, Hp3⟩
-  icases pi_lock_open waitLockAddr $$ Hwait with ⟨%vl2, %vn2, %vc2, #Hwa0, #Hwa16, Hw1, Hw2, Hw3⟩
+  icases pi_lock_open pidLockAddr $$ Hpid with ⟨%vl1, %vn1, %vc1, #Hpi0, #Hpi16, Hp1, Hp2⟩
+  icases pi_lock_open waitLockAddr $$ Hwait with ⟨%vl2, %vn2, %vc2, #Hwa0, #Hwa16, Hw1, Hw2⟩
   have hK8 : 8 ≤ k.avail := by omega
   k_norm_g
   -- the prologue
@@ -638,7 +636,7 @@ theorem procinit_cells (IL : INITLOCK) {hlc : HasLC} {GF : BundledGFunctors} [Ma
   rotate_right 1
   k_norm_g
   iframe #
-  iframe Hp1 Hp2 Hp3
+  iframe Hp1 Hp2
   case hK1 => k_norm_g; omega
   case ha0 => k_norm_g; rfl
   case ha1 => k_norm_g; rfl
@@ -669,7 +667,7 @@ theorem procinit_cells (IL : INITLOCK) {hlc : HasLC} {GF : BundledGFunctors} [Ma
   rotate_right 1
   k_norm_g
   iframe #
-  iframe Hw1 Hw2 Hw3
+  iframe Hw1 Hw2
   case hK2 => k_norm_g; omega
   case hb0 => k_norm_g; rfl
   case hb1 => k_norm_g; rfl
@@ -808,11 +806,11 @@ theorem pi_supply_split (S : Nat → IProp GF) (hs : ∀ a b, S (a + b) ⊢ S a 
 theorem pi_claims (i : Nat) :
     procFieldsIn (GF := GF) i ⊢
       procFieldsIn i ∗ (kmapId (procAddr i) ∗ kmapId (procAddr i + 16#64)) := by
-  unfold procFieldsIn lockWords
-  iintro ⟨%vl, %vn, %vc, %vs, %vk, ⟨#H1, #H2, Hl, Hn, Hc⟩, Hs, Hk⟩
-  isplitl [Hl Hn Hc Hs Hk]
+  unfold procFieldsIn lockWordsR
+  iintro ⟨%vl, %vn, %vc, %vs, %vk, ⟨#H1, #H2, Hl, Hn⟩, Hs, Hk⟩
+  isplitl [Hl Hn Hs Hk]
   · iexists vl, vn, vc, vs, vk
-    iframe H1 H2 Hl Hn Hc Hs Hk
+    iframe H1 H2 Hl Hn Hs Hk
   · isplitl []
     · iexact H1
     · iexact H2

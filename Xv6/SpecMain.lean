@@ -168,6 +168,18 @@ existential (Rocq `lk_raw`). -/
 def mainLkRaw (lk : BitVec 64) : IProp GF := iprop%
   ∃ (vlock : BitVec 32) (vname vcpu : BitVec 64), lockWords lk vlock vname vcpu
 
+/-- A REGISTERED static spinlock's raw cells (W8-β′: `lockWordsR`, the two
+lock words as the client's half cells), contents existential. -/
+def mainLkRawR (lk : BitVec 64) : IProp GF := iprop%
+  ∃ (vlock : BitVec 32) (vname vcpu : BitVec 64), lockWordsR lk vlock vname vcpu
+
+/-- A registered lock's raw row, opened. -/
+theorem mainLkRawR_open (lk : BitVec 64) :
+    mainLkRawR (GF := GF) lk ⊢ ∃ (vl : BitVec 32) (vn vc : BitVec 64),
+      kmapId lk ∗ kmapId (lk + 16#64) ∗ lkRaw lk vl vc ∗ wordPointsTo (lk + 8#64) 8 (DFrac.own 1) vn := by
+  unfold mainLkRawR lockWordsR
+  exact .rfl
+
 /-- **The spinlocks the init sequence brings up BEFORE the tier switch,
 raw** (Rocq `main_locks_raw`'s `cons` / `pr` / `kmem` rows; deviation 5):
 `cons` and `kmem` spelled as their callees' premises.  The two transmit
@@ -175,25 +187,19 @@ locks ride `uartinitonePre`. -/
 def mainLocksBare : IProp GF := iprop%
   kmapId consAddr ∗ kmapId (consAddr + 16#64) ∗
   (∃ (vl : BitVec 32) (vn vc : BitVec 64),
-    wordPointsTo consAddr 4 (DFrac.own 1) vl ∗ wordPointsTo (consAddr + 8#64) 8 (DFrac.own 1) vn ∗
-    wordPointsTo (consAddr + 16#64) 8 (DFrac.own 1) vc) ∗
-  mainLkRaw prLock ∗
+    lkRaw consAddr vl vc ∗ wordPointsTo (consAddr + 8#64) 8 (DFrac.own 1) vn) ∗
+  mainLkRawR prLock ∗
   kmapId kmemLockAddr ∗ kmapId (kmemLockAddr + 16#64) ∗
   (∃ (vl : BitVec 32) (vn vc : BitVec 64),
-    wordPointsTo kmemLockAddr 4 (DFrac.own 1) vl ∗ wordPointsTo (kmemLockAddr + 8#64) 8 (DFrac.own 1) vn ∗
-    wordPointsTo (kmemLockAddr + 16#64) 8 (DFrac.own 1) vc)
+    lkRaw kmemLockAddr vl vc ∗ wordPointsTo (kmemLockAddr + 8#64) 8 (DFrac.own 1) vn)
 
 /-- **The spinlocks brought up AFTER the switch, raw** (the rest of Rocq
 `main_locks_raw`): `pid_lock`, `wait_lock`, `tickslock` (spelled as
 trapinit's premise), `bcache`, `itable`, `ftable`.  The vdisk lock rides
 `diskInitCells`. -/
 def mainLocksRaw : IProp GF := iprop%
-  mainLkRaw pidLockAddr ∗ mainLkRaw waitLockAddr ∗
-  kmapId tickslockAddr ∗ kmapId (tickslockAddr + 16#64) ∗
-  (∃ (vl : BitVec 32) (vn vc : BitVec 64),
-    wordPointsTo tickslockAddr 4 (DFrac.own 1) vl ∗ wordPointsTo (tickslockAddr + 8#64) 8 (DFrac.own 1) vn ∗
-    wordPointsTo (tickslockAddr + 16#64) 8 (DFrac.own 1) vc) ∗
-  mainLkRaw bcacheLockAddr ∗ mainLkRaw itableLockAddr ∗ mainLkRaw ftableLockAddr
+  mainLkRawR pidLockAddr ∗ mainLkRawR waitLockAddr ∗ mainLkRawR tickslockAddr ∗
+  mainLkRawR bcacheLockAddr ∗ mainLkRawR itableLockAddr ∗ mainLkRawR ftableLockAddr
 
 /-- **The 32 dead `.bss` bytes of the static superblock** (Rocq
 `main_sb_raw`, in `FirstTok.firstFsinit`'s `byteBuf` spelling): fsinit's
@@ -205,7 +211,7 @@ def mainSbRaw : IProp GF := iprop%
 the six scalar fields (`outstanding`/`committing` at their loader zero)
 and the thirty header words. -/
 def mainLogRaw : IProp GF := iprop%
-  mainLkRaw logAddr ∗
+  mainLkRawR logAddr ∗
   (∃ (vs vd vnc vn : BitVec 32),
     wordPointsTo lStart 4 (DFrac.own 1) vs ∗ wordPointsTo lDev 4 (DFrac.own 1) vd ∗
     wordPointsTo lOut 4 (DFrac.own 1) 0#32 ∗ wordPointsTo lCmt 4 (DFrac.own 1) 0#32 ∗

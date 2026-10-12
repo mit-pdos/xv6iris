@@ -17,6 +17,7 @@ import MachCSL.WpSmodeDev4
 import MachCSL.WpSmodeAlu4
 import Xv6.SpecVirtioDiskInit
 import Xv6.SpecInitlock
+import Xv6.LockRsv
 import Xv6.SpecKalloc
 import Xv6.SpecMemset
 import Xv6.CodeTactics
@@ -170,12 +171,11 @@ set_option maxHeartbeats 1000000 in
 /-- `initlock`'s contract as a rule, with the lock and name pointers named. -/
 theorem vdi_initlock_call (IL : INITLOCK) [CurCtx] (c : CPU) (k' : KCtx) (hsie : k'.sie = false)
     (vlock : BitVec 32) (vname vcpu : BitVec 64) (hK' : 2 ≤ k'.avail)
-    (lk nm : BitVec 64) (h10 : k'.regs 10#5 = lk) (h11 : k'.regs 11#5 = nm) :
+    (lk nm : BitVec 64) (h10 : k'.regs 10#5 = lk) (h11 : k'.regs 11#5 = nm):
     kctx c k' ∗ pcIs c KA.«initlock» ∗
     kmapId lk ∗ kmapId (lk + 16#64) ∗
-    wordPointsTo lk 4 (DFrac.own 1) vlock ∗
+    lkRaw lk vlock vcpu ∗
     wordPointsTo (lk + 8#64) 8 (DFrac.own 1) vname ∗
-    wordPointsTo (lk + 16#64) 8 (DFrac.own 1) vcpu ∗
     (∀ R' : RegMap, kctx c (k'.withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       wordPointsTo (lk + 8#64) 8 (DFrac.own 1) nm -∗
       lkFresh lk -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop c)
@@ -183,10 +183,10 @@ theorem vdi_initlock_call (IL : INITLOCK) [CurCtx] (c : CPU) (k' : KCtx) (hsie :
   have h := IL.wp_initlock (hlc := hlc) (GF := GF) c k' vlock vname vcpu hK'
   unfold wp_initlock_body at h
   simp only [initlockAddr, h10, h11] at h
-  iintro ⟨Hk, Hpc, #Hc1, #Hc2, Hw1, Hw2, Hw3, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hc1, #Hc2, Hw1, Hw2, HΦ⟩
   iapply h
   iframe #
-  iframe Hk Hpc Hw1 Hw2 Hw3
+  iframe Hk Hpc Hw1 Hw2
   rw [hsie]
   iapply wpNext_off_intro
   iexact HΦ
@@ -1944,7 +1944,7 @@ theorem virtio_disk_init_proof (IL : INITLOCK) (KAL : KALLOC)
   unfold wp_virtio_disk_init_body diskInitCells
   simp only [virtioDiskInitAddr, vdi_aDescPtr, vdi_aAvailPtr, vdi_aUsedPtr, vdi_aUsedIdx]
   iintro ⟨Hk, Hpc, #Hlock, Hav, #Hinv, Htok, HG,
-    ⟨%hfree, Hopsc, Hinfc, #Hidl, #Hidl16, Hwlock, Hwname, Hwcpu, Hd, Ha, Hu, Hfree, Hui⟩, HΦ⟩
+    ⟨%hfree, Hopsc, Hinfc, #Hidl, #Hidl16, Hwlock, Hwname, Hd, Ha, Hu, Hfree, Hui⟩, HΦ⟩
   ihave HΦ := wpNext_self k.sie k.proc cpu _ $$ HΦ
   icases vdi_free_split free0 hfree $$ Hfree with
     ⟨%v0, %v1, %v2, %v3, %v4, %v5, %v6, %v7, Hf0, Hf1, Hf2, Hf3, Hf4, Hf5, Hf6, Hf7⟩
@@ -1985,7 +1985,7 @@ theorem virtio_disk_init_proof (IL : INITLOCK) (KAL : KALLOC)
   rotate_right 1
   k_norm
   iframe #
-  iframe Hwlock Hwname Hwcpu
+  iframe Hwlock Hwname
   case hs0 => k_norm
   case hKi => k_norm; omega
   case ha0 => k_norm [vdi_lock_addr]

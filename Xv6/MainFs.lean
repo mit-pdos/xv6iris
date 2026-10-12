@@ -79,14 +79,14 @@ set_option maxHeartbeats 4000000 in
 theorem mn_binit (BI : BINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsie : k.sie = false)
     (hK : 12 ≤ k.avail) (γl : GName) (γ : BcacheNames) (V : BioView GF) (hcov0 : (0 : Nat) ∉ V.cov) :
     kctx cpu (k.withRegs R0) ∗ pcIs cpu (KA.«main» + 142#64) ∗
-    mainLkRaw bcacheLockAddr ∗
+    mainLkRawR bcacheLockAddr ∗
     (∃ (vhp vhn : BitVec 64), wordPointsTo (bcacheHeadAddr + 72#64) 8 (DFrac.own 1) vhp ∗
       wordPointsTo (bcacheHeadAddr + 80#64) 8 (DFrac.own 1) vhn) ∗
     ([∗list] i ∈ List.range NBUF, bufIn i) ∗ ([∗list] i ∈ List.range NBUF, bdBss curCtx i) ∗
     bioFreeTok γl γ ∗ ([∗set] b ∈ V.cov, poolBlk V b) ∗
     (∀ R : RegMap, kctx cpu (k.withRegs R) -∗ pcIs cpu (KA.«main» + 146#64) -∗ bioCtx γl γ V -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
-  unfold mainLkRaw
+  unfold mainLkRawR
   iintro ⟨Hk, Hpc, ⟨%vl, %vn, %vc, Hlw⟩, ⟨%vhp, %vhn, Hhp, Hhn⟩, Hin, Hbss, Hfree, Hpool, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave Hin := (show ([∗list] i ∈ List.range NBUF, bufIn (GF := GF) i) ⊢
@@ -169,12 +169,12 @@ set_option maxHeartbeats 4000000 in
 theorem mn_iinit (II : IINIT) [Fscfg] [Icfg] [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap)
     (hsie : k.sie = false) (hK : 12 ≤ k.avail) :
     kctx cpu (k.withRegs R0) ∗ pcIs cpu (KA.«main» + 146#64) ∗
-    mainLkRaw itableLockAddr ∗ ([∗list] i ∈ List.range NINODE, sleepLockIn (inodeAddr i)) ∗
+    mainLkRawR itableLockAddr ∗ ([∗list] i ∈ List.range NINODE, sleepLockIn (inodeAddr i)) ∗
     ([∗list] k ∈ List.range NINODE, ientryRaw k) ∗ irefSlotsAuth ∗
     ([∗list] k ∈ List.range NINODE, offSetAuth offCfg k ∅) ∗ mnIcacheKit ∗
     (∀ R : RegMap, kctx cpu (k.withRegs R) -∗ pcIs cpu (KA.«main» + 150#64) -∗ mnIcacheRows -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
-  unfold mainLkRaw
+  unfold mainLkRawR
   iintro ⟨Hk, Hpc, ⟨%vl, %vn, %vc, Hlw⟩, Hin, Hraw, Hsup, Hoffa, Hkit, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave Hin := (show ([∗list] i ∈ List.range NINODE, sleepLockIn (GF := GF) (inodeAddr i)) ⊢
@@ -241,11 +241,11 @@ set_option maxHeartbeats 4000000 in
 theorem mn_fileinit (FI : FILEINIT) [Icfg] [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap)
     (hsie : k.sie = false) (hK : 4 ≤ k.avail) :
     kctx cpu (k.withRegs R0) ∗ pcIs cpu (KA.«main» + 150#64) ∗
-    mainLkRaw ftableLockAddr ∗ ([∗list] k ∈ List.range NFILE, fentryRaw curCtx k) ∗ irefSlots NFILE ∗
+    mainLkRawR ftableLockAddr ∗ ([∗list] k ∈ List.range NFILE, fentryRaw curCtx k) ∗ irefSlots NFILE ∗
     (∀ R : RegMap, kctx cpu (k.withRegs R) -∗ pcIs cpu (KA.«main» + 154#64) -∗
       (∃ (γft : GName) (γ : FileNames), isFtable γft γ) -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
-  unfold mainLkRaw
+  unfold mainLkRawR
   iintro ⟨Hk, Hpc, ⟨%vl, %vn, %vc, Hlw⟩, Hraw, Hir, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   k_step (wp_s_jal cpu _ (KA.«main» + 150#64) false 12970#21 1#5 (by decide))
@@ -458,15 +458,15 @@ theorem mn_firstFsinit [Fscfg] [Icfg] [CurCtx] (dk : Nat → BitVec 8) (sb : FsS
     mainSbRaw ∗ mainLogRaw ∗ logMirrorBorn (hlc := hlc) (mirrorOf (fsBlocks dk)) ∗
     irefSlots IREFBOOT ∗ bslots mainBslotsFs
     ⊢ firstFsinit (hlc := hlc) := by
-  unfold mainSbRaw mainLogRaw mainLkRaw lockWords firstFsinit
-  iintro ⟨Hkit, ⟨%sbOld, %hsb, Hsb⟩, ⟨⟨%vl, %vn, %vc, #H0, #H16, Hw, Hn, Hc⟩,
+  unfold mainSbRaw mainLogRaw mainLkRawR lockWordsR firstFsinit
+  iintro ⟨Hkit, ⟨%sbOld, %hsb, Hsb⟩, ⟨⟨%vl, %vn, %vc, #H0, #H16, Hw, Hn⟩,
     ⟨%vs, %vd, %vnc, %vnn, Hs, Hd, Ho, Hcm, Hnc, Hhn⟩, Hblk⟩, Hmir, Hir, Hbs⟩
   ihave Hir := (show irefSlots (GF := GF) IREFBOOT ⊢ irefSlots 2 from .rfl) $$ Hir
   ihave Hbs := (show bslots (GF := GF) mainBslotsFs ⊢ bslots ((LOGBLOCKS + 2) + 2 + 1) from .rfl) $$ Hbs
   iexists dk, sb, Rspent, Pb, vl, vs, vd, vnc, vnn, vn, vc, sbOld
   isplitr
   · ipureintro; exact hp
-  iframe Hkit Hsb Hw Hn Hc Hs Hd Ho Hcm Hnc Hhn Hblk Hmir Hir Hbs H0 H16
+  iframe Hkit Hsb Hw Hn Hs Hd Ho Hcm Hnc Hhn Hblk Hmir Hir Hbs H0 H16
   ipureintro; exact hsb
 
 /-- **Rocq `first_boot_persist`, assembled**: every row persistent and in

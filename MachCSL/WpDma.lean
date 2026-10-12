@@ -67,12 +67,15 @@ consume and no view big-sep to take apart.  The write is of at least one
 byte (`hn`): a zero-byte DMA write appends nothing (`MState.storeDma_zero`),
 so there is no position to mint receipts for. -/
 theorem memModel_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (hram : ramBytes pa n) (hno : ¬ anyReserve σ.resv pa n) (hn : n ≠ 0) :
+    (hram : ramBytes pa n) (hno : ¬ anyReserve σ.resv pa n) (hn : n ≠ 0)
+    (hrsv : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem →
+      rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (σ.storeDma pa n w).mem) :
     memModelAt E σ ⊢@{IProp GF} |==>
       (memModelAt E (σ.storeDma pa n w) ∗
        authoredByAt E (σ.top + 1) diskAgent ∗ topLbAt E (σ.top + 1)) := by
   unfold memModelAt
-  iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm⟩
+  iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
+  ihave Hrsv := rsvModel_mono E σ (σ.storeDma pa n w) hrsv $$ Hrsv
   imod MonoNat.own_update _ (.ofNat σ.top) (.ofNat (σ.top + 1))
     (by simp only [MaxNat.le_toNat]; omega) $$ Htop with ⟨Htop, #Htoplb⟩
   imod ghost_map_insert_persist (σ.top + 1) diskAgent
@@ -81,8 +84,9 @@ theorem memModel_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * 
   have hresv : resvMap (σ.storeDma pa n w) = resvMap σ := resvMap_congr _ _ (fun c => ⟨rfl, rfl⟩)
   rw [hresv]
   iframe Hresv
-  isplitl [Htop Hauth Hviews]
-  · rw [show (σ.storeDma pa n w).top = σ.top + 1 by
+  isplitl [Htop Hauth Hviews Hrsv]
+  · iframe Hrsv
+    rw [show (σ.storeDma pa n w).top = σ.top + 1 by
           simp [MState.top, hn],
         MState.storeDma_log_of_ne σ pa n w hn, authMap_snoc]
     iframe Htop Hauth
@@ -156,8 +160,15 @@ theorem machInterp_storeDma (σ : MState) (pa : PAddr) (n : Nat) (Hs : Nat → H
   ihave %hram : ⌜ramBytes pa n⌝ $$ [Hmem Hmm Hb]
   · iapply histBytes_ramBytes σ pa n _ Hs $$ [Hmem Hmm Hb]
     iframe
+  ihave %hnr := memModel_notRsv_hist σ pa Hs n $$ [Hmm Hb]
+  · iframe
+  have hrsv : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem →
+      rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (σ.storeDma pa n w).mem := by
+    intro h
+    rw [MState.storeDma_of_ne σ pa n w hn]
+    exact rsvAllOk_store_off w (σ.top + 1) diskAgent hnr h
   imod histBytes_update σ.mem pa n Hs (σ.top + 1) diskAgent w $$ [$Hmem $Hb] with ⟨Hmem, Hb⟩
-  imod memModel_storeDma _ σ pa n w hram hno hn $$ Hmm with ⟨Hmm, #Hau, #Htop⟩
+  imod memModel_storeDma _ σ pa n w hram hno hn hrsv $$ Hmm with ⟨Hmm, #Hau, #Htop⟩
   imodintro
   iframe Hb Hau Htop
   iapply machInterp_of_storeDma σ pa n w hn

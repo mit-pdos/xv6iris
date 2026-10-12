@@ -93,6 +93,8 @@ theorem swp_sail_mem_write_plain_auT (cpu : CPU) {n vasize : Nat}
       · iapply Hclose $$ %σ %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
       · iapply IH $$ Hfrag H
   · imod H with ⟨%Hs, %T, Hb, #HT, Hcont⟩
+    ihave %hnr := memModel_notRsv_hist σ req.pa Hs n $$ [Hmm Hb]
+    · iframe
     ihave %hget : ⌜histsAt σ.mem req.pa n Hs⌝ $$ [Hmem Hb]
     · iapply histBytes_valid σ.mem req.pa n _ Hs $$ [Hmem Hb]
       iframe
@@ -114,7 +116,8 @@ theorem swp_sail_mem_write_plain_auT (cpu : CPU) {n vasize : Nat}
       rw [hv] at hv'
       obtain rfl := Option.some.inj hv'
       icases resvFragAny_cases cpu r $$ Hfrag with ⟨%b, Hfrag⟩
-      imod memModel_store_plain _ σ cpu req.pa n w' r b hram hno $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag, #Hau, #Htop'⟩
+      imod memModel_store_plain _ σ cpu req.pa n w' r b hram hno
+        (rsvAllOk_store_off w' (σ.top + 1) (hartAgent cpu) hnr) $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag, #Hau, #Htop'⟩
       imod histBytes_update σ.mem req.pa n Hs (σ.top + 1) (hartAgent cpu) w' $$ [$Hmem $Hb]
         with ⟨Hmem, Hb⟩
       imod Hcont $$ %(σ.top + 1) %(by omega) Hb Hau Htop' with HΦ

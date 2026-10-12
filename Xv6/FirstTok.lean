@@ -247,9 +247,8 @@ def firstFsinit [Fscfg] [Icfg] [CurCtx] : IProp GF := iprop(
     -- rows (A): the raw cells fsinit / initlog write
     ⌜sbOld.length = 32⌝ ∗ byteBuf KA.«sb» (DFrac.own 1) sbOld ∗
     kmapId logAddr ∗ kmapId (logAddr + 16#64) ∗
-    wordPointsTo logAddr 4 (DFrac.own 1) vlock ∗
+    lkRaw logAddr vlock vcpu ∗
     wordPointsTo (logAddr + 8#64) 8 (DFrac.own 1) vname ∗
-    wordPointsTo (logAddr + 16#64) 8 (DFrac.own 1) vcpu ∗
     wordPointsTo lStart 4 (DFrac.own 1) vStart ∗
     wordPointsTo lDev 4 (DFrac.own 1) vDev ∗
     wordPointsTo lOut 4 (DFrac.own 1) 0#32 ∗
@@ -286,9 +285,8 @@ theorem firstFsinit_open [Fscfg] [Icfg] [CurCtx] :
         bitmapReg fscFs fscBmapstart fscCov fscLogst fscSize ∗
         iregBoot ∗
         kmapId logAddr ∗ kmapId (logAddr + 16#64) ∗
-        wordPointsTo logAddr 4 (DFrac.own 1) vlock ∗
+        lkRaw logAddr vlock vcpu ∗
         wordPointsTo (logAddr + 8#64) 8 (DFrac.own 1) vname ∗
-        wordPointsTo (logAddr + 16#64) 8 (DFrac.own 1) vcpu ∗
         wordPointsTo lStart 4 (DFrac.own 1) vStart ∗
         wordPointsTo lDev 4 (DFrac.own 1) vDev ∗
         wordPointsTo lOut 4 (DFrac.own 1) 0#32 ∗
@@ -310,7 +308,7 @@ theorem firstFsinit_open [Fscfg] [Icfg] [CurCtx] :
         fsabsEnv (hlc := hlc) := by
   unfold firstFsinit
   iintro ⟨%dk, %sb, %Rspent, %Pb, %vlock, %vStart, %vDev, %vNc, %vN, %vname, %vcpu, %sbOld, %hp,
-    Hkit, %hold, Hsb, Hk0, Hk16, Hlk, Hnm, Hcpu, Hst, Hdv, Hout, Hcmt, Hnc, Hn, Hblk, Hmir, Hiref,
+    Hkit, %hold, Hsb, Hk0, Hk16, Hlk, Hnm, Hst, Hdv, Hout, Hcmt, Hnc, Hn, Hblk, Hmir, Hiref,
     Hbsl⟩
   icases fsKitFsinitGhost_open (fsBlocks dk) Rspent Pb (hdrWset (fsBlocks dk) fscLogst) $$ Hkit
     with ⟨Hlog, Hboot, #Hireg, Hb1, Hauths, Hdty, Hhdr, Hslots, #Hbmres, Hrem, #Hbinv, Hxo, #Henv,
@@ -319,7 +317,7 @@ theorem firstFsinit_open [Fscfg] [Icfg] [CurCtx] :
   isplitr; · ipureintro; exact hp
   isplitr; · ipureintro; exact hold
   isplitr; · iexact Hdurl
-  iframe Hmir Hlog Hbinv Hb1 Hsb Hxo Hireg Hbmres Hboot Hk0 Hk16 Hlk Hnm Hcpu Hst Hdv Hout Hcmt
+  iframe Hmir Hlog Hbinv Hb1 Hsb Hxo Hireg Hbmres Hboot Hk0 Hk16 Hlk Hnm Hst Hdv Hout Hcmt
     Hnc Hn Hblk Hauths Hdty Hhdr Hslots Hbsl Hiref Hrem
   unfold fsabsEnv
   iexact Henv

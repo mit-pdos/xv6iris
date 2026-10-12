@@ -45,9 +45,8 @@ def wp_consoleinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
     (hsie : k.sie = false) (hK : 8 ≤ k.avail) : Prop :=
   kctx cpu k ∗ pcIs cpu consoleinitAddr ∗
   kmapId consAddr ∗ kmapId (consAddr + 16#64) ∗
-  wordPointsTo consAddr 4 (DFrac.own 1) vclock ∗
+  lkRaw consAddr vclock vccpu ∗
   wordPointsTo (consAddr + 8#64) 8 (DFrac.own 1) vcname ∗
-  wordPointsTo (consAddr + 16#64) 8 (DFrac.own 1) vccpu ∗
   uartinitonePre .uart0 γ0 l0 k0 vlock0 vname0 vcpu0 ∗ uartinitonePre .uart1 γ1 l1 k1 vlock1 vname1 vcpu1 ∗
   wordPointsTo devswConsoleRead 8 (DFrac.own 1) vread ∗
   wordPointsTo devswConsoleWrite 8 (DFrac.own 1) vwrite ∗ devswRest ∗

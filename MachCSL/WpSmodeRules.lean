@@ -19,6 +19,7 @@ import MachCSL.WpSmodeMemLw
 import MachCSL.WpSmodeMemSb
 import MachCSL.WpSmodeMemSd
 import MachCSL.WpSmodeMemSw
+import MachCSL.RsvCell
 
 
 namespace MachCSL
@@ -893,21 +894,21 @@ theorem intenaCell_move [CurCtx] [KernelGeom] (cpu : CPU) (s : Bool) (n n' : Nat
     | succ j => simp only [intenaCell_succ]; iintro H; iexact H
 
 @[simp] theorem intenaCell_one [CurCtx] [KernelGeom] (cpu : CPU) (sie : Bool) (intena : Bool) :
-    intenaCell (GF := GF) cpu false sie 1 intena = wordPointsTo (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal intena) := rfl
+    intenaCell (GF := GF) cpu false sie 1 intena = cpuCell cpu (aCpuIntena cpu) 4 (intenaVal intena) := rfl
 
 /-- The `c->intena` cell a client holds while it is lent out of the bundle. -/
 def pinRes [CurCtx] [KernelGeom] (cpu : CPU) (lent : Bool) (b : Bool) : IProp GF :=
-  if lent then wordPointsTo (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal b) else emp
+  if lent then cpuCell cpu (aCpuIntena cpu) 4 (intenaVal b) else emp
 
 @[simp] theorem pinRes_false [CurCtx] [KernelGeom] (cpu : CPU) (b : Bool) : pinRes (GF := GF) cpu false b = emp := rfl
 @[simp] theorem pinRes_true [CurCtx] [KernelGeom] (cpu : CPU) (b : Bool) :
-    pinRes (GF := GF) cpu true b = wordPointsTo (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal b) := rfl
+    pinRes (GF := GF) cpu true b = cpuCell cpu (aCpuIntena cpu) 4 (intenaVal b) := rfl
 
 /-- Lending the depth-0 `c->intena` cell out of the bundle (push_off, before
 its `c->intena = old` store). -/
 theorem kctx_lend [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hn : k.noff = 0) (hs : k.sie = false) :
     kctx (GF := GF) cpu k ⊢
-      ∃ b : Bool, kctxL true cpu k ∗ wordPointsTo (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal b) := by
+      ∃ b : Bool, kctxL true cpu k ∗ cpuCell cpu (aCpuIntena cpu) 4 (intenaVal b) := by
   iintro Hk
   icases kctx_cases cpu k $$ Hk with ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
   unfold cpuOwn cpuCells
@@ -926,7 +927,7 @@ theorem kctx_lend [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) 
 
 /-- Returning the lent cell (pop_off, after its `c->intena` read). -/
 theorem kctx_return [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (b : Bool) :
-    kctxL (GF := GF) true cpu k ∗ wordPointsTo (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal b) ⊢ kctx cpu k := by
+    kctxL (GF := GF) true cpu k ∗ cpuCell cpu (aCpuIntena cpu) 4 (intenaVal b) ⊢ kctx cpu k := by
   iintro ⟨Hk, Hc⟩
   icases kctx_cases cpu k $$ Hk with ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
   unfold cpuOwn cpuCells
@@ -979,16 +980,18 @@ theorem wp_s_lw_noff [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
   have hsx := signExtend_noff k hwf
   iapply (wpLoop_k_cpu (lent := lent) cpu k hsie pc (pc + instrLen is_rvc) is_rvc _ (k.regs.set rd (BitVec.ofNat 64 k.noff))
     (RegMap.set_other _ _ _ _ (Ne.symm hrd.2.1)) k.noff k.intena (by rw [KCtx.withCpu_self]; exact hwf)
-    (wordPointsTo (aCpuNoff cpu) 4 (DFrac.own 1) (BitVec.ofNat 32 k.noff))
-    (wordPointsTo (aCpuNoff cpu) 4 (DFrac.own 1) (BitVec.ofNat 32 k.noff))
+    (wordPointsTo (aCpuNoff cpu) 4 (DFrac.own (1 : Qp).half) (BitVec.ofNat 32 k.noff))
+    (wordPointsTo (aCpuNoff cpu) 4 (DFrac.own (1 : Qp).half) (BitVec.ofNat 32 k.noff))
     (by
       unfold cpuCells
       iintro ⟨Hp, Hn, Hi⟩
+      icases cpuCell_cases $$ Hn with ⟨Hn, #Hid, %hin⟩
       iframe Hn
       iintro Hn
-      iframe)
+      iframe Hp Hi
+      iapply cpuCell_intro _ _ _ _ hin $$ Hid Hn)
     (fun c hok _ => by
-      have e := execSpecF_lw (GF := GF) cpu (DFrac.own 1) (DFrac.own 1) c false k.root hok pc (pc + instrLen is_rvc) imm rd rs1
+      have e := execSpecF_lw (GF := GF) cpu (DFrac.own 1) (DFrac.own (1 : Qp).half) c false k.root hok pc (pc + instrLen is_rvc) imm rd rs1
         hrd.1 (tpPin cpu k.regs) (BitVec.ofNat 32 k.noff)
       rw [hsx, htp] at e
       simp only [KCtx.rget] at haddr
@@ -1018,17 +1021,19 @@ theorem wp_s_lw_intena [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : K
   iapply (wpLoop_k_cpu (lent := false) cpu k hsie pc (pc + instrLen is_rvc) is_rvc _
     (k.regs.set rd (if k.intena then 1#64 else 0#64))
     (RegMap.set_other _ _ _ _ (Ne.symm hrd.2.1)) k.noff k.intena (by rw [KCtx.withCpu_self]; exact hwf)
-    (wordPointsTo (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal k.intena))
-    (wordPointsTo (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal k.intena))
+    (wordPointsTo (aCpuIntena cpu) 4 (DFrac.own (1 : Qp).half) (intenaVal k.intena))
+    (wordPointsTo (aCpuIntena cpu) 4 (DFrac.own (1 : Qp).half) (intenaVal k.intena))
     (by
       unfold cpuCells
       simp only [hm, intenaCell_succ]
       iintro ⟨Hp, Hn, Hi⟩
+      icases cpuCell_cases $$ Hi with ⟨Hi, #Hid, %hin⟩
       iframe Hi
       iintro Hi
-      iframe)
+      iframe Hp Hn
+      iapply cpuCell_intro _ _ _ _ hin $$ Hid Hi)
     (fun c hok _ => by
-      have e := execSpecF_lw (GF := GF) cpu (DFrac.own 1) (DFrac.own 1) c false k.root hok pc (pc + instrLen is_rvc) imm rd rs1
+      have e := execSpecF_lw (GF := GF) cpu (DFrac.own 1) (DFrac.own (1 : Qp).half) c false k.root hok pc (pc + instrLen is_rvc) imm rd rs1
         hrd.1 (tpPin cpu k.regs) (intenaVal k.intena)
       rw [hsx, htp] at e
       simp only [KCtx.rget] at haddr
@@ -1054,17 +1059,24 @@ theorem wp_s_sw_noff [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
     ⊢ wpLoop cpu := by
   iintro ⟨HI, Hk, Hpc, HΦ⟩
   iapply (wpLoop_k_cpu (lent := false) cpu k hsie pc (pc + instrLen is_rvc) is_rvc _ k.regs rfl n' k.intena hwf'
-    (wordPointsTo (aCpuNoff cpu) 4 (DFrac.own 1) (BitVec.ofNat 32 k.noff))
-    (wordPointsTo (aCpuNoff cpu) 4 (DFrac.own 1) (BitVec.ofNat 32 n'))
+    iprop(wordPointsTo (aCpuNoff cpu) 4 (DFrac.own (1 : Qp).half) (BitVec.ofNat 32 k.noff) ∗
+      kmapId (aCpuNoff cpu) ∗ ⌜rsvWordOk (hlc := hlc) (GF := GF) cpu (aCpuNoff cpu) 4 (BitVec.ofNat 32 n')⌝)
+    (wordPointsTo (aCpuNoff cpu) 4 (DFrac.own (1 : Qp).half) (BitVec.ofNat 32 n'))
     (by
       unfold cpuCells
       iintro ⟨Hp, Hn, Hi⟩
-      iframe Hn
+      icases cpuCell_cases $$ Hn with ⟨Hn, #Hid, %hin⟩
+      isplitl [Hn]
+      · iframe Hn
+        isplit
+        · iexact Hid
+        · ipureintro; exact cpuCellOk_wordOk hin _
       iintro Hn
+      ihave Hn := cpuCell_intro _ _ _ _ hin $$ Hid Hn
       iframe Hp Hn
       iapply intenaCell_move cpu k.sie k.noff n' k.intena hpin $$ Hi)
     (fun c hok _ => by
-      have e := execSpecF_sw (GF := GF) cpu (DFrac.own 1) c false k.root hok pc (pc + instrLen is_rvc) imm rs1 rs2
+      have e := execSpecF_sw_rsv (GF := GF) cpu (DFrac.own 1) c false k.root hok pc (pc + instrLen is_rvc) imm rs1 rs2
         (tpPin cpu k.regs) (BitVec.ofNat 32 k.noff)
       simp only [KCtx.rget] at haddr hval
       rw [haddr, hval] at e
@@ -1087,17 +1099,24 @@ theorem wp_s_sw_intena [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : K
   iintro ⟨HI, Hk, Hpc, HΦ⟩
   obtain ⟨m, hm⟩ : ∃ m, k.noff = m + 1 := ⟨k.noff - 1, by omega⟩
   iapply (wpLoop_k_cpu (lent := false) cpu k hsie pc (pc + instrLen is_rvc) is_rvc _ k.regs rfl k.noff b' hwf'
-    (wordPointsTo (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal k.intena))
-    (wordPointsTo (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal b'))
+    iprop(wordPointsTo (aCpuIntena cpu) 4 (DFrac.own (1 : Qp).half) (intenaVal k.intena) ∗
+      kmapId (aCpuIntena cpu) ∗ ⌜rsvWordOk (hlc := hlc) (GF := GF) cpu (aCpuIntena cpu) 4 (intenaVal b')⌝)
+    (wordPointsTo (aCpuIntena cpu) 4 (DFrac.own (1 : Qp).half) (intenaVal b'))
     (by
       unfold cpuCells
       simp only [hm, intenaCell_succ]
       iintro ⟨Hp, Hn, Hi⟩
-      iframe Hi
+      icases cpuCell_cases $$ Hi with ⟨Hi, #Hid, %hin⟩
+      isplitl [Hi]
+      · iframe Hi
+        isplit
+        · iexact Hid
+        · ipureintro; exact cpuCellOk_wordOk hin _
       iintro Hi
-      iframe)
+      iframe Hp Hn
+      iapply cpuCell_intro _ _ _ _ hin $$ Hid Hi)
     (fun c hok _ => by
-      have e := execSpecF_sw (GF := GF) cpu (DFrac.own 1) c false k.root hok pc (pc + instrLen is_rvc) imm rs1 rs2
+      have e := execSpecF_sw_rsv (GF := GF) cpu (DFrac.own 1) c false k.root hok pc (pc + instrLen is_rvc) imm rs1 rs2
         (tpPin cpu k.regs) (intenaVal k.intena)
       simp only [KCtx.rget] at haddr hval
       rw [haddr, hval] at e
@@ -1123,14 +1142,21 @@ theorem wp_s_sw_noff_inc [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k :
   iintro ⟨HI, Hk, Hpc, HE, HΦ⟩
   iapply (wpLoop_k_cpuE (lent := lent) (lent' := false) cpu k hsie pc (pc + instrLen is_rvc) is_rvc _ k.regs rfl
     (k.noff + 1) b hwf'
-    (wordPointsTo (aCpuNoff cpu) 4 (DFrac.own 1) (BitVec.ofNat 32 k.noff))
-    (wordPointsTo (aCpuNoff cpu) 4 (DFrac.own 1) (BitVec.ofNat 32 (k.noff + 1)))
+    iprop(wordPointsTo (aCpuNoff cpu) 4 (DFrac.own (1 : Qp).half) (BitVec.ofNat 32 k.noff) ∗
+      kmapId (aCpuNoff cpu) ∗ ⌜rsvWordOk (hlc := hlc) (GF := GF) cpu (aCpuNoff cpu) 4 (BitVec.ofNat 32 (k.noff + 1))⌝)
+    (wordPointsTo (aCpuNoff cpu) 4 (DFrac.own (1 : Qp).half) (BitVec.ofNat 32 (k.noff + 1)))
     (pinRes cpu lent b) emp
     (by
       unfold cpuCells pinRes
       iintro ⟨⟨Hp, Hn, Hi⟩, HE⟩
-      iframe Hn
+      icases cpuCell_cases $$ Hn with ⟨Hn, #Hid, %hin⟩
+      isplitl [Hn]
+      · iframe Hn
+        isplit
+        · iexact Hid
+        · ipureintro; exact cpuCellOk_wordOk hin _
       iintro Hn
+      ihave Hn := cpuCell_intro _ _ _ _ hin $$ Hid Hn
       iframe Hp Hn
       simp only [intenaCell_succ]
       cases lent
@@ -1142,7 +1168,7 @@ theorem wp_s_sw_noff_inc [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k :
         icases Hi with %_
         iframe HE)
     (fun c hok _ => by
-      have e := execSpecF_sw (GF := GF) cpu (DFrac.own 1) c false k.root hok pc (pc + instrLen is_rvc) imm rs1 rs2
+      have e := execSpecF_sw_rsv (GF := GF) cpu (DFrac.own 1) c false k.root hok pc (pc + instrLen is_rvc) imm rs1 rs2
         (tpPin cpu k.regs) (BitVec.ofNat 32 k.noff)
       simp only [KCtx.rget] at haddr hval
       rw [haddr, hval] at e
@@ -1165,25 +1191,32 @@ theorem wp_s_sw_noff_lend [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k 
     kctx cpu k ∗ pcIs cpu pc ∗
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
         iprop(kctxL true cpu' (k.withCpu k.regs 0 b') -∗ pcIs cpu' (pc + instrLen is_rvc) -∗
-          wordPointsTo (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal k.intena) -∗ wpLoop cpu'))
+          cpuCell cpu (aCpuIntena cpu) 4 (intenaVal k.intena) -∗ wpLoop cpu'))
     ⊢ wpLoop cpu := by
   iintro ⟨HI, Hk, Hpc, HΦ⟩
   iapply (wpLoop_k_cpuE (lent := false) (lent' := true) cpu k hsie pc (pc + instrLen is_rvc) is_rvc _ k.regs rfl
     0 b' hwf'
-    (wordPointsTo (aCpuNoff cpu) 4 (DFrac.own 1) (BitVec.ofNat 32 k.noff))
-    (wordPointsTo (aCpuNoff cpu) 4 (DFrac.own 1) 0#32)
-    emp (wordPointsTo (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal k.intena))
+    iprop(wordPointsTo (aCpuNoff cpu) 4 (DFrac.own (1 : Qp).half) (BitVec.ofNat 32 k.noff) ∗
+      kmapId (aCpuNoff cpu) ∗ ⌜rsvWordOk (hlc := hlc) (GF := GF) cpu (aCpuNoff cpu) 4 0#32⌝)
+    (wordPointsTo (aCpuNoff cpu) 4 (DFrac.own (1 : Qp).half) 0#32)
+    emp (cpuCell cpu (aCpuIntena cpu) 4 (intenaVal k.intena))
     (by
       unfold cpuCells
       iintro ⟨⟨Hp, Hn, Hi⟩, _⟩
-      iframe Hn
+      icases cpuCell_cases $$ Hn with ⟨Hn, #Hid, %hin⟩
+      isplitl [Hn]
+      · iframe Hn
+        isplit
+        · iexact Hid
+        · ipureintro; exact cpuCellOk_wordOk hin _
       iintro Hn
+      ihave Hn := cpuCell_intro _ _ _ _ hin $$ Hid Hn
       iframe Hp Hn
       simp only [hn, intenaCell_one, intenaCell_lent]
       iframe Hi
       ipureintro; exact ⟨trivial, hsie⟩)
     (fun c hok _ => by
-      have e := execSpecF_sw (GF := GF) cpu (DFrac.own 1) c false k.root hok pc (pc + instrLen is_rvc) imm rs1 rs2
+      have e := execSpecF_sw_rsv (GF := GF) cpu (DFrac.own 1) c false k.root hok pc (pc + instrLen is_rvc) imm rs1 rs2
         (tpPin cpu k.regs) (BitVec.ofNat 32 k.noff)
       simp only [KCtx.rget] at haddr hval
       rw [haddr, hval] at e
@@ -1211,16 +1244,18 @@ theorem wp_s_ld_proc [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
   have htp := tpPin_set cpu k.regs rd k.proc hrd.2.2
   iapply (wpLoop_k_cpu (lent := lent) cpu k hsie pc (pc + instrLen is_rvc) is_rvc _ (k.regs.set rd k.proc)
     (RegMap.set_other _ _ _ _ (Ne.symm hrd.2.1)) k.noff k.intena (by rw [KCtx.withCpu_self]; exact hwf)
-    (wordPointsTo (aCpuProc cpu) 8 (DFrac.own 1) k.proc)
-    (wordPointsTo (aCpuProc cpu) 8 (DFrac.own 1) k.proc)
+    (wordPointsTo (aCpuProc cpu) 8 (DFrac.own (1 : Qp).half) k.proc)
+    (wordPointsTo (aCpuProc cpu) 8 (DFrac.own (1 : Qp).half) k.proc)
     (by
       unfold cpuCells
       iintro ⟨Hp, Hn, Hi⟩
+      icases cpuCell_cases $$ Hp with ⟨Hp, #Hid, %hin⟩
       iframe Hp
       iintro Hp
-      iframe)
+      iframe Hn Hi
+      iapply cpuCell_intro _ _ _ _ hin $$ Hid Hp)
     (fun c hok _ => by
-      have e := execSpecF_ld (GF := GF) cpu (DFrac.own 1) (DFrac.own 1) c false k.root hok pc (pc + instrLen is_rvc) imm rd rs1
+      have e := execSpecF_ld (GF := GF) cpu (DFrac.own 1) (DFrac.own (1 : Qp).half) c false k.root hok pc (pc + instrLen is_rvc) imm rd rs1
         hrd.1 (tpPin cpu k.regs) k.proc
       rw [htp] at e
       simp only [KCtx.rget] at haddr
@@ -1230,5 +1265,68 @@ theorem wp_s_ld_proc [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
   inext
   simp only [KCtx.withCpu_self, ← KCtx.setReg_eq_withRegs]
   iexact HΦ
+
+
+/-- `sw rs2, imm(rs1)` into a `cpus[cpu]` cell the proof holds outside the
+bundle (push_off's `c->intena = old` into the LENT cell, W8-β′: the cell is
+reserved -- held at half --, so the generic `wp_s_sw` cannot take it).
+`wp_s_sw`'s shape, interrupts off (the store is this hart's). -/
+theorem wp_s_sw_cpuCell [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
+    (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rs1 rs2 : BitVec 5) (hrs1 : rs1 ≠ 4#5) (old : BitVec 32) :
+    instr (GF := GF) pc is_rvc (instruction.STORE (imm, regidx.Regidx rs2, regidx.Regidx rs1, 4)) ∗
+    kctxL lent cpu k ∗ pcIs cpu pc ∗
+    cpuCell cpu (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 old ∗
+    ▷ wpNext k.sie k.proc cpu (fun cpu' =>
+        iprop(kctxL lent cpu' k -∗ pcIs cpu' (pc + instrLen is_rvc) -∗
+          cpuCell cpu (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4
+            (BitVec.extractLsb' 0 32 (k.rget cpu' rs2)) -∗ wpLoop cpu'))
+    ⊢ wpLoop cpu := by
+  iintro ⟨HI, Hk, Hpc, Hc, HΦ⟩
+  icases cpuCell_cases $$ Hc with ⟨Hw, #Hid, %hin⟩
+  iapply (wpLoop_k_keep_mem (lent := lent) cpu k pc (fun _ => pc + instrLen is_rvc) is_rvc _
+    iprop(wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 (DFrac.own (1 : Qp).half) old ∗
+      kmapId (k.rget cpu rs1 + BitVec.signExtend 64 imm) ∗
+      ⌜rsvWordOk (hlc := hlc) (GF := GF) cpu (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4
+        (BitVec.extractLsb' 0 32 (k.rget cpu rs2))⌝)
+    (fun cpu' => wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 (DFrac.own (1 : Qp).half)
+      (BitVec.extractLsb' 0 32 (k.rget cpu' rs2)))
+    (fun cpu' c hpin hok _ => by
+      have hc := hpin (Or.inl hsie)
+      subst hc
+      exact execSpecF_sw_rsv (GF := GF) cpu' (DFrac.own 1) c k.sie k.root hok pc (pc + instrLen is_rvc)
+        imm rs1 rs2 (tpPin cpu' k.regs) old))
+  iframe HI Hk Hpc
+  isplitl [Hw]
+  · iframe Hw
+    isplit
+    · iexact Hid
+    · ipureintro; exact cpuCellOk_wordOk hin _
+  inext
+  iapply wpNext_mono _ _ _ _ _ $$ HΦ
+  iintro %cpu' HK Hk Hpc Hw
+  iapply HK $$ Hk Hpc [Hw]
+  iapply cpuCell_intro _ _ _ _ hin $$ Hid Hw
+
+/-- `lw rd, imm(rs1)` of a `cpus[cpu]` cell the proof holds outside the
+bundle (pop_off's read of the LENT `c->intena`): `wp_s_lw` at the cell's half. -/
+theorem wp_s_lw_cpuCell [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
+    (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rd rs1 : BitVec 5) (hrs1 : rs1 ≠ 4#5) (hrd : rdOk rd)
+    (w : BitVec 32) :
+    instr (GF := GF) pc is_rvc (instruction.LOAD (imm, regidx.Regidx rs1, regidx.Regidx rd, false, 4)) ∗
+    kctxL lent cpu k ∗ pcIs cpu pc ∗
+    cpuCell cpu (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 w ∗
+    ▷ wpNext k.sie k.proc cpu (fun cpu' =>
+        iprop(kctxL lent cpu' (k.setReg rd (BitVec.signExtend 64 w)) -∗ pcIs cpu' (pc + instrLen is_rvc) -∗
+          cpuCell cpu (k.rget cpu rs1 + BitVec.signExtend 64 imm) 4 w -∗ wpLoop cpu'))
+    ⊢ wpLoop cpu := by
+  iintro ⟨HI, Hk, Hpc, Hc, HΦ⟩
+  icases cpuCell_cases $$ Hc with ⟨Hw, #Hid, %hin⟩
+  iapply (wp_s_lw (lent := lent) cpu k pc is_rvc imm rd rs1 hrs1 hrd (DFrac.own (1 : Qp).half) w)
+  iframe HI Hk Hpc Hw
+  inext
+  iapply wpNext_mono _ _ _ _ _ $$ HΦ
+  iintro %cpu' HK Hk Hpc Hw
+  iapply HK $$ Hk Hpc [Hw]
+  iapply cpuCell_intro _ _ _ _ hin $$ Hid Hw
 
 end MachCSL

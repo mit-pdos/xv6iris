@@ -37,6 +37,7 @@ Deviations from Rocq: L3b, no Rocq counterpart (Rocq's
 
 Imports only definitional files.
 -/
+import MachCSL.WpLockInit
 import MachCSL.WpSmodeCtl
 import Xv6.Image
 import Xv6.DiskInvDefs
@@ -81,9 +82,8 @@ def diskInitCells {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     wordPointsTo (aInfoB i) 8 (DFrac.own 1) (0 : BitVec (8 * 8)) ∗
     wordPointsTo (aInfoStatus i) 1 (DFrac.own 1) (0 : BitVec (8 * 1))) ∗
   kmapId aVdiskLock ∗ kmapId (aVdiskLock + 16#64) ∗
-  wordPointsTo aVdiskLock 4 (DFrac.own 1) vlock ∗
+  lkRaw aVdiskLock vlock vcpu ∗
   wordPointsTo (aVdiskLock + 8#64) 8 (DFrac.own 1) vname ∗
-  wordPointsTo (aVdiskLock + 16#64) 8 (DFrac.own 1) vcpu ∗
   wordPointsTo aDescPtr 8 (DFrac.own 1) pd0 ∗
   wordPointsTo aAvailPtr 8 (DFrac.own 1) pav0 ∗
   wordPointsTo aUsedPtr 8 (DFrac.own 1) pu0 ∗

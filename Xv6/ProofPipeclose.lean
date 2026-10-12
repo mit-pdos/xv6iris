@@ -126,6 +126,7 @@ import Xv6.SpecPipeclose
 import Xv6.PipeInv
 import Xv6.SpecAcquire
 import Xv6.SpecRelease
+import Xv6.LockRsv
 import Xv6.SpecWakeup
 import Xv6.SpecKfree
 import Xv6.PipeQstep
@@ -219,7 +220,7 @@ theorem pc_release_cancel (RE : RELEASE_CANCEL) (c : CPU) (k' : KCtx)
     (hsie' : k'.sie = false) (hnoff' : 1 ≤ k'.noff) (hK' : 10 ≤ k'.avail)
     (reen : Bool) (hreen : reen = (decide (k'.noff = 1) && k'.intena))
     (hon : reen = true → k'.tier = .kpt ∧ trapRes true + 6 ≤ k'.avail)
-    (ha0 : k'.regs 10#5 = pi) :
+    (ha0 : k'.regs 10#5 = pi) (hdyn : ¬ lkRsvIn (hlc := hlc) (GF := GF) pi) :
     kctx c k' ∗ pcIs c KA.«release» ∗
     lockOpenable γl pi "pipe" (pipeResAt γp pi) (pipeDead γl γp) ∗
     locked γl c ∗ pipeResAt γp pi curCtx ∗
@@ -233,7 +234,7 @@ theorem pc_release_cancel (RE : RELEASE_CANCEL) (c : CPU) (k' : KCtx)
       pipeBytes pi -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   have h := RE.wp_release_cancel (hlc := hlc) (GF := GF) c k' γl "pipe" (pipeResAt γp pi)
-    (pipeDead γl γp) (pipeBytes pi) hrefuteCore hrefuteHalf hsie' hnoff' hK' reen hreen hon
+    (pipeDead γl γp) (pipeBytes pi) hrefuteCore hrefuteHalf (ha0 ▸ hdyn) hsie' hnoff' hK' reen hreen hon
   unfold wp_release_cancel_body at h
   simp only [releaseAddr] at h
   rw [ha0] at h
@@ -470,6 +471,7 @@ theorem pc_free (RelC : RELEASE_CANCEL) (Kf : KFREE_FREE) (cpu c : CPU) (k : KCt
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, #Hopen, #Hm1, #Hm2, #Hs0, #Hs1, Hlocked, HR, Hframe, #Hkl, Hav, Harm, Hlend, HPhi⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
+  icases kctx_lkHigh _ _ (lk := pi) hpv.2.1 $$ Hk with ⟨%hdyn, Hk⟩
   have hK4 : 4 ≤ k.avail := by unfold pipecloseSlots at hK; omega
   have hsie : (k.pushOffAt spie spp).sie = false := rfl
   -- c.mv a0,s1
@@ -482,7 +484,7 @@ theorem pc_free (RelC : RELEASE_CANCEL) (Kf : KFREE_FREE) (cpu c : CPU) (k : KCt
   iintro Hk Hpc
   ihave Hlic := pc_licence γl γp pi $$ Hs0 Hs1
   iapply (pc_release_cancel RelC c _ γl γp pi (lockedCore_dead γl γp c)
-      (fun B => lockHalf_some_dead γl γp c false B) ?hsr ?hnr ?hKr k.sie ?hrr ?hor ?ha0)
+      (fun B => lockHalf_some_dead γl γp c false B) ?hsr ?hnr ?hKr k.sie ?hrr ?hor ?ha0 hdyn)
     $$ [- $Hk $Hpc $Hlocked $HR $Hlic]
   rotate_right 1
   k_norm_g [pc_withLocks_self, pc_filter_pipe k.locks hpipe,

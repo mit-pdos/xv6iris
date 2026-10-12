@@ -157,8 +157,7 @@ theorem mn_console (CN : CONSOLEINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegM
     (vcl : BitVec 32) (vcn vcc vr vw : BitVec 64) :
     kctx cpu (k.withRegs R0) ∗ pcIs cpu (KA.«main» + 0x42#64) ∗ plicInv γ0 γ1 ∗
     kmapId consAddr ∗ kmapId (consAddr + 16#64) ∗
-    wordPointsTo consAddr 4 (DFrac.own 1) vcl ∗ wordPointsTo (consAddr + 8#64) 8 (DFrac.own 1) vcn ∗
-    wordPointsTo (consAddr + 16#64) 8 (DFrac.own 1) vcc ∗
+    lkRaw consAddr vcl vcc ∗ wordPointsTo (consAddr + 8#64) 8 (DFrac.own 1) vcn ∗
     uartinitonePre .uart0 γ0 l0 0 vl0 vn0 vc0 ∗ uartinitonePre .uart1 γ1 l1 0 vl1 vn1 vc1 ∗
     wordPointsTo devswConsoleRead 8 (DFrac.own 1) vr ∗ wordPointsTo devswConsoleWrite 8 (DFrac.own 1) vw ∗
     devswRest ∗
@@ -167,7 +166,7 @@ theorem mn_console (CN : CONSOLEINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegM
     (∀ R : RegMap, kctx cpu (k.withRegs R) -∗ pcIs cpu (KA.«main» + 0x46#64) -∗
       mnConsOut γ0 γ1 l0 l1 -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hk, Hpc, #Hplic, #Hc0, #Hc16, Hcw, Hcn, Hcc, Hu0, Hu1, Hdr, Hdw, Hdrest,
+  iintro ⟨Hk, Hpc, #Hplic, #Hc0, #Hc16, Hcw, Hcn, Hu0, Hu1, Hdr, Hdw, Hdrest,
     Hh0, Hg0, Ha0, Hh1, Hg1, Ha1, HΦ⟩
   icases (show uartinitonePre (GF := GF) .uart0 γ0 l0 0 vl0 vn0 vc0 ⊢
       uartBaseWord .uart0 ∗ uartRxWord .uart0 ∗ uartinitonePre .uart0 γ0 l0 0 vl0 vn0 vc0 from by
@@ -185,7 +184,7 @@ theorem mn_console (CN : CONSOLEINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegM
   unfold wp_consoleinit_body at hci
   simp only [consoleinitAddr] at hci
   iapply hci
-  iframe Hk Hpc Hc0 Hc16 Hcw Hcn Hcc Hu0 Hu1 Hdr Hdw Hdrest
+  iframe Hk Hpc Hc0 Hc16 Hcw Hcn Hu0 Hu1 Hdr Hdw Hdrest
   simp only [KCtx.withRegs_sie, KCtx.withRegs_proc, hsie]
   iapply wpNext_off_intro
   iintro %R' Hk Hpc %_ Hnm Hfr Hp0 Hp1 #Htbl
@@ -286,7 +285,7 @@ theorem mn_prinit (PI : PRINTKINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap
     (hsie : k.sie = false) (hK : 4 ≤ k.avail) (vpl : BitVec 32) (vpn vpc : BitVec 64)
     (γpr γl0 γl1 : GName) (γ0 γ1 : UartNames) (l0 l1 : List (BitVec 8)) :
     kctx cpu (k.withRegs R0) ∗ pcIs cpu (KA.«main» + 0x46#64) ∗
-    lockWords prLock vpl vpn vpc ∗ lockFreeTok γpr ∗
+    lockWordsR prLock vpl vpn vpc ∗ lockFreeTok γpr ∗
     lockFreeTok γl0 ∗ txOwn γ0 l0 ∗ lkFresh (txLockAddr .uart0) ∗
     lockFreeTok γl1 ∗ txOwn γ1 l1 ∗ lkFresh (txLockAddr .uart1) ∗
     (∀ R : RegMap, kctx cpu (k.withRegs R) -∗ pcIs cpu (KA.«main» + 0x4a#64) -∗

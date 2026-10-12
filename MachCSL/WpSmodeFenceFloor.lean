@@ -91,7 +91,8 @@ theorem memModel_load_rv (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (h
     memModelAt E σ ⊢@{IProp GF}
       |==> (memModelAt E (σ.afterLoad cpu pa n tvn) ∗ rviewLbAt E cpu tvn) := by
   unfold memModelAt
-  iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm⟩
+  rw [rsvModelAt_congr E (σ := σ) (σ' := σ.afterLoad cpu pa n tvn) rfl]
+  iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
   icases hartViews_acc E σ cpu $$ Hviews with ⟨Hc, Hclose⟩
   icases hartViewsAt_cases E σ cpu $$ Hc with ⟨Hv, Hi, Hr⟩
   imod MonoNat.own_update _ (.ofNat (σ.hr cpu).rv) (.ofNat (max (σ.hr cpu).rv tvn))
@@ -105,8 +106,8 @@ theorem memModel_load_rv (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (h
       · rename_i hc; subst hc; simp [HRead.afterLoad]
       · simp)
   rw [hresv]
-  isplitl [Htop Hauth Hresv Hv Hi Hr Hclose]
-  · iframe Htop Hauth Hresv
+  isplitl [Htop Hauth Hresv Hv Hi Hr Hclose Hrsv]
+  · iframe Htop Hauth Hresv Hrsv
     isplitl [Hv Hi Hr Hclose]
     · iapply Hclose $$ %(σ.afterLoad cpu pa n tvn)
       · ipureintro

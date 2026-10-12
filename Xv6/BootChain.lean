@@ -83,8 +83,10 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 /-- The kernel image `kctx` owns (Xv6's `KernelImage` instance), out of the
 text and the rodata. -/
-theorem bootChain_ro : kernelText (GF := GF) ⊢ kernelData -∗ KernelImage.ro := by
-  have e : (KernelImage.ro : IProp GF) = iprop(kernelText ∗ kernelData ∗ kmapStatic) := rfl
+theorem bootChain_ro (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) :
+    kernelText (GF := GF) ⊢ kernelData -∗ KernelImage.ro := by
+  have e : (KernelImage.ro : IProp GF) = iprop(kernelText ∗ kernelData ∗ kmapStatic ∗
+      ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static⌝) := rfl
   rw [e]
   iintro #Ht #Hd
   ihave #Hk := kernelText_kmapStatic $$ Ht
@@ -92,7 +94,9 @@ theorem bootChain_ro : kernelText (GF := GF) ⊢ kernelData -∗ KernelImage.ro 
   · iexact Ht
   isplitl []
   · iexact Hd
+  isplitl []
   · iexact Hk
+  · ipureintro; exact hrsv
 
 /-! ## §1 The M-mode half, run and bridged -/
 
@@ -136,17 +140,17 @@ theorem bootEntryBridge [X : CurCtx] (hX : X.curTier = KTier.bare) (f : RegFile)
   simp only [bootChainR_sp] at hbr
   iintro #Ht #Hd Hres Htok Hcont
   ihave #Hk := kernelText_kmapStatic $$ Ht
-  ihave #Hro := bootChain_ro $$ Ht Hd
   unfold bootHartRes
   icases Hres with
     ⟨Hm, Hh, Hck, Hpc, H1, H2, H4, H8, H10, H11, H14, H15, Hgpr, Hstv, Hcsr, Hraw, Hl, #Hg, Hb⟩
   icases bootHartBss_open cpu $$ [Hb] with
-    ⟨Hw, H16, H8', H32, H24, Hr, Hp, Hn, Hi, Hf⟩
+    ⟨Hw, H16, H8', H32, H24, Hr, Hp, Hn, Hi, Hf, %hrsv⟩
   · isplitl []
     · iexact Hk
     isplitl []
     · iexact Hg
     · iexact Hb
+  ihave #Hro := bootChain_ro hrsv $$ Ht Hd
   iapply hb
   iframe Hm Hh Hck Htok Ht Hw Hpc H1 H2 H4 H8 H10 H11 H14 H15 H16 H8' H32 H24
   iintro %t %lf %hlf Hconf _Hh Hck Htok _Hw Hpc H1 H2 H4 H8 H10 H11 H14 H15 _H16 _H8 H32 H24

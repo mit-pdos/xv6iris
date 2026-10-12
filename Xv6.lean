@@ -2115,3 +2115,6 @@ import Xv6.ProofSpin
 import Xv6.LinkSpin
 import Xv6.Ustep
 import Xv6.UstepEcho
+import Xv6.AccessDiscipline
+import Xv6.SystemAdequacyDisc
+import Xv6.LinkDiscAdequacy

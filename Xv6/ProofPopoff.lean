@@ -172,7 +172,7 @@ theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {hlc GF} _ _ cpu k hsie hno
         $$ [- $Hk $Hpc] with [h0, MachCSL.bcond_bne_zero, KCtx.popOffZ_sie, KCtx.popOffZ_proc]
       iintro Hk Hpc
       -- lw a5,124(a0): the lent cell, 1
-      k_step (wp_s_lw cpu _ (KA.«pop_off» + 0x20#64) true 124#12 15#5 10#5 (by decide) (by decide) (DFrac.own 1) (intenaVal true)) from (text_instr _ _ _ _ rfl rfl) Htext
+      k_step (wp_s_lw_cpuCell cpu _ (KA.«pop_off» + 0x20#64) true 124#12 15#5 10#5 (by decide) (by decide) (intenaVal true)) from (text_instr _ _ _ _ rfl rfl) Htext
         $$ [- $Hk $Hpc] with [h10, hA, hsx1, hi, KCtx.popOffZ_sie, KCtx.popOffZ_proc]
       iintro Hk Hpc Hcell
       -- beqz a5, c22: not taken
@@ -238,7 +238,7 @@ theorem pop_off_proof (M : MYCPU) : POPOFF := ⟨fun {hlc GF} _ _ cpu k hsie hno
       $$ [- $Hk $Hpc] with [h0, MachCSL.bcond_bne_zero]
     iintro Hk Hpc
     -- lw a5,124(a0): the lent cell, 0
-    k_step (wp_s_lw cpu _ (KA.«pop_off» + 0x20#64) true 124#12 15#5 10#5 (by decide) (by decide) (DFrac.own 1) (intenaVal false)) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step (wp_s_lw_cpuCell cpu _ (KA.«pop_off» + 0x20#64) true 124#12 15#5 10#5 (by decide) (by decide) (intenaVal false)) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [h10, hA, hsx, hint]
     iintro Hk Hpc Hcell
     -- beqz a5, c22: taken

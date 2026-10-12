@@ -56,13 +56,12 @@ theorem mn_trapinit [WchG GF] (TI : TRAPINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R
     (hK : 4 ≤ k.avail) (γt : GName) (vl : BitVec 32) (vn vc : BitVec 64) :
     kctx cpu (k.withRegs R0) ∗ pcIs cpu (KA.«main» + 126#64) ∗
     kmapId tickslockAddr ∗ kmapId (tickslockAddr + 16#64) ∗
-    wordPointsTo tickslockAddr 4 (DFrac.own 1) vl ∗
+    lkRaw tickslockAddr vl vc ∗
     wordPointsTo (tickslockAddr + 8#64) 8 (DFrac.own 1) vn ∗
-    wordPointsTo (tickslockAddr + 16#64) 8 (DFrac.own 1) vc ∗
     lockFreeTok γt ∗ ticksResAt curCtx ∗ tickCnt 0 ∗
     (∀ R : RegMap, kctx cpu (k.withRegs R) -∗ pcIs cpu (KA.«main» + 130#64) -∗ isTickslock γt -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hk, Hpc, #H0, #H16, Hw, Hn, Hc, Hlf, Hres, Htk, HΦ⟩
+  iintro ⟨Hk, Hpc, #H0, #H16, Hw, Hn, Hlf, Hres, Htk, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   k_step (wp_s_jal cpu _ (KA.«main» + 126#64) false 5588#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_7e]
@@ -72,7 +71,7 @@ theorem mn_trapinit [WchG GF] (TI : TRAPINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R
   unfold wp_trapinit_body at hti
   simp only [trapinitAddr] at hti
   iapply hti
-  iframe Hk Hpc H0 H16 Hw Hn Hc
+  iframe Hk Hpc H0 H16 Hw Hn
   simp only [KCtx.withRegs_sie, KCtx.withRegs_proc, hsie]
   iapply wpNext_off_intro
   iintro %R' Hk Hpc _ Hfr %_

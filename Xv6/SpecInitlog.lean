@@ -145,9 +145,8 @@ def wp_initlog_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G 
   wordPointsTo (sb + 20#64) 4 dqs (BitVec.ofNat 32 logstart) ∗
   -- the RAW spinlock cells of struct log (&log.lock = &log)
   kmapId logAddr ∗ kmapId (logAddr + 16#64) ∗
-  wordPointsTo logAddr 4 (DFrac.own 1) vlock ∗
+  lkRaw logAddr vlock vcpu ∗
   wordPointsTo (logAddr + 8#64) 8 (DFrac.own 1) vname ∗
-  wordPointsTo (logAddr + 16#64) 8 (DFrac.own 1) vcpu ∗
   -- the rest of struct log
   wordPointsTo lStart 4 (DFrac.own 1) vStart ∗
   wordPointsTo lDev 4 (DFrac.own 1) vDev ∗
@@ -250,9 +249,8 @@ def wp_initlog_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
   wordPointsTo (sb + 20#64) 4 dqs (BitVec.ofNat 32 logstart) ∗
   -- the RAW spinlock cells of struct log (&log.lock = &log)
   kmapId logAddr ∗ kmapId (logAddr + 16#64) ∗
-  wordPointsTo logAddr 4 (DFrac.own 1) vlock ∗
+  lkRaw logAddr vlock vcpu ∗
   wordPointsTo (logAddr + 8#64) 8 (DFrac.own 1) vname ∗
-  wordPointsTo (logAddr + 16#64) 8 (DFrac.own 1) vcpu ∗
   -- the rest of struct log
   wordPointsTo lStart 4 (DFrac.own 1) vStart ∗
   wordPointsTo lDev 4 (DFrac.own 1) vDev ∗

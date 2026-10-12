@@ -6,6 +6,7 @@ claims from at power-on.  The trampoline and the kernel stacks are not
 identity mappings and are inserted at the switch.
 -/
 import MachCSL.KMap
+import Xv6.KernelRsv
 
 namespace Xv6
 

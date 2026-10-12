@@ -280,7 +280,8 @@ theorem kpt_exclWriteAU [CurCtx] (cpu : CPU) (t : PTree) (M : RegMapF (BitVec 64
   unfold kptOn
   iintro ⟨%hf, _, _, %fl, #Hinv, #Hkeys⟩
   obtain ⟨i, hi⟩ := List.getElem?_of_mem hmem
-  unfold exclWriteAU
+  iapply exclWriteAU_of_own
+  unfold exclWriteAUOwn
   iinv Hinv with Hbody Hclose
   icases Hbody with >Hbody
   icases kptBody_acc t fl i addr c hi $$ Hbody with ⟨Hcell, Hback⟩

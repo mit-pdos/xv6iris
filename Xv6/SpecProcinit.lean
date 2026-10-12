@@ -43,6 +43,7 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.ProcDefs
 import Xv6.Image
+import MachCSL.WpLockInit
 import MachCSL.AluFacts
 
 namespace Xv6
@@ -76,6 +77,14 @@ def lockWords (lk : BitVec 64) (vlock : BitVec 32) (vname vcpu : BitVec 64) : IP
   wordPointsTo (lk + 8#64) 8 (DFrac.own 1) vname ∗
   wordPointsTo (lk + 16#64) 8 (DFrac.own 1) vcpu
 
+/-- **A static lock's words, by the address** (W8-β′): the identity claims,
+the name word owned, and the two raw words (`MachCSL.lkRaw`: owned at a
+dynamic lock, the half cells at a registered one). -/
+def lockWordsR (lk : BitVec 64) (vlock : BitVec 32) (vname vcpu : BitVec 64) : IProp GF := iprop%
+  kmapId lk ∗ kmapId (lk + 16#64) ∗
+  lkRaw lk vlock vcpu ∗
+  wordPointsTo (lk + 8#64) 8 (DFrac.own 1) vname
+
 /-- A lock's words as `initlock` leaves them: the name word and `lkFresh`. -/
 def lockInited (lk name : BitVec 64) : IProp GF := iprop%
   wordPointsTo (lk + 8#64) 8 (DFrac.own 1) name ∗ lkFresh lk
@@ -83,7 +92,7 @@ def lockInited (lk name : BitVec 64) : IProp GF := iprop%
 /-- Process `i`'s fields `procinit` touches, before. -/
 def procFieldsIn (i : Nat) : IProp GF := iprop%
   ∃ (vlock : BitVec 32) (vname vcpu : BitVec 64) (vstate : BitVec 32) (vks : BitVec 64),
-    lockWords (procAddr i) vlock vname vcpu ∗
+    lockWordsR (procAddr i) vlock vname vcpu ∗
     wordPointsTo (procAddr i + 24#64) 4 (DFrac.own 1) vstate ∗
     wordPointsTo (procAddr i + 64#64) 8 (DFrac.own 1) vks
 
@@ -114,8 +123,8 @@ def procReady (i : Nat) : IProp GF := iprop%
 /-- The specification of `procinit` (Rocq `wp_procinit_sconf_body`). -/
 def wp_procinit_body (cpu : CPU) (k : KCtx) (hK : 10 ≤ k.avail) : Prop :=
   kctx cpu k ∗ pcIs cpu procinitAddr ∗
-  (∃ vlock vname vcpu, lockWords pidLockAddr vlock vname vcpu) ∗
-  (∃ vlock vname vcpu, lockWords waitLockAddr vlock vname vcpu) ∗
+  (∃ vlock vname vcpu, lockWordsR pidLockAddr vlock vname vcpu) ∗
+  (∃ vlock vname vcpu, lockWordsR waitLockAddr vlock vname vcpu) ∗
   ([∗list] i ∈ List.range NPROC, procRaw i) ∗
   fdSlots (NPROC * (NOFILE + FDSPARE)) ∗
   irefSlots (NPROC * (IREFHOME + IREFSPARE)) ∗

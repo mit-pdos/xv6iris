@@ -11,6 +11,7 @@ at either interrupt index, as `freerange` is.
 -/
 import Xv6.SpecKinit
 import Xv6.SpecInitlock
+import Xv6.LockRsv
 import Xv6.CodeTactics
 
 namespace Xv6
@@ -55,12 +56,11 @@ set_option maxHeartbeats 1000000 in
 /-- `initlock`'s contract as a rule, with the lock and name pointers named. -/
 theorem ki_initlock_call (IL : INITLOCK) [CurCtx] (c : CPU) (k' : KCtx)
     (vlock : BitVec 32) (vname vcpu : BitVec 64) (hK' : 2 ≤ k'.avail)
-    (lk nm : BitVec 64) (h10 : k'.regs 10#5 = lk) (h11 : k'.regs 11#5 = nm) :
+    (lk nm : BitVec 64) (h10 : k'.regs 10#5 = lk) (h11 : k'.regs 11#5 = nm):
     kctx c k' ∗ pcIs c KA.«initlock» ∗
     kmapId lk ∗ kmapId (lk + 16#64) ∗
-    wordPointsTo lk 4 (DFrac.own 1) vlock ∗
+    lkRaw lk vlock vcpu ∗
     wordPointsTo (lk + 8#64) 8 (DFrac.own 1) vname ∗
-    wordPointsTo (lk + 16#64) 8 (DFrac.own 1) vcpu ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
       kctx cpu' (k'.withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       wordPointsTo (lk + 8#64) 8 (DFrac.own 1) nm -∗
@@ -169,7 +169,7 @@ set_option maxHeartbeats 4000000 in
 theorem kinit_proof (IL : INITLOCK) (FR : FREERANGE) : KINIT :=
   ⟨fun {hlc GF} _ _ _ _ cpu k γl γk vlock vname vcpu hnoff hK hlk hp0 => by
   unfold wp_kinit_body
-  iintro ⟨Hk, Hpc, #Hcl, #Hcl', Hwlock, Hwname, Hwcpu, Hfl, Hpages, Hlkf, Hav, Hauth, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hcl, #Hcl', Hwlock, Hwname, Hfl, Hpages, Hlkf, Hav, Hauth, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   simp only [kinitAddr]
   k_norm_g
@@ -206,7 +206,7 @@ theorem kinit_proof (IL : INITLOCK) (FR : FREERANGE) : KINIT :=
   rotate_right 1
   k_norm_g
   iframe #
-  iframe Hwlock Hwname Hwcpu
+  iframe Hwlock Hwname
   case hKi => k_norm_g; omega
   case ha0 => k_norm_g; rfl
   case ha1 => k_norm_g; rfl

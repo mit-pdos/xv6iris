@@ -33,6 +33,7 @@ boot premise).
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
+import MachCSL.WpLockInit
 import MachCSL.LockBornHook
 import Xv6.SpecFreerange
 
@@ -58,9 +59,8 @@ def wp_kinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
     (hp0 : k.proc = 0#64) : Prop :=
   kctx cpu k ∗ pcIs cpu kinitAddr ∗
   kmapId kmemLockAddr ∗ kmapId (kmemLockAddr + 16#64) ∗
-  wordPointsTo kmemLockAddr 4 (DFrac.own 1) vlock ∗
+  lkRaw kmemLockAddr vlock vcpu ∗
   wordPointsTo (kmemLockAddr + 8#64) 8 (DFrac.own 1) vname ∗
-  wordPointsTo (kmemLockAddr + 16#64) 8 (DFrac.own 1) vcpu ∗
   wordPointsTo kmemFreelistAddr 8 (DFrac.own 1) 0#64 ∗
   pageRange kinitBase kinitPages ∗
   -- the "kmem" lock's ghost, unbuilt (what `kctx_newlockAt` fills), and the

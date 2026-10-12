@@ -70,6 +70,7 @@ Rocq's header on the record, kept because the reasons are the content:
 import Xv6.UartLinks
 import Xv6.FsAbsDefs
 import MachCSL.Adequacy
+import Xv6.KernelRsv
 
 namespace Xv6
 

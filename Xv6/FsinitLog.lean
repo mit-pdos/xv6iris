@@ -35,9 +35,8 @@ def fsinitLogRes [Fscfg] [Icfg] [CurCtx] (bsHdr : List (BitVec 8)) (L : BlockMap
     (vStart vDev vNc vN : BitVec 32) : IProp GF := iprop%
   logFreeTok icfgLog ∗
   kmapId logAddr ∗ kmapId (logAddr + 16#64) ∗
-  wordPointsTo logAddr 4 (DFrac.own 1) vlock ∗
+  lkRaw logAddr vlock vcpu ∗
   wordPointsTo (logAddr + 8#64) 8 (DFrac.own 1) vname ∗
-  wordPointsTo (logAddr + 16#64) 8 (DFrac.own 1) vcpu ∗
   wordPointsTo lStart 4 (DFrac.own 1) vStart ∗
   wordPointsTo lDev 4 (DFrac.own 1) vDev ∗
   wordPointsTo lOut 4 (DFrac.own 1) 0#32 ∗
@@ -140,7 +139,7 @@ theorem fsinit_log (IL : INITLOG) (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
   iintro Hk Hpc
   unfold fsinitEnv fsinitLogRes
   icases Henv with ⟨#Hpe, #Hpi, #Hbc, #Hdc, #Hreg, #Hbreg, #Hit2, #Hiti, #Hslks, #Hseam, #Hcert⟩
-  icases Hlog with ⟨Hfree, #Hkm0, #Hkm16, Hl0, Hl8, Hl16, Hls, Hld, Hlo, Hlc, Hlnc, Hlhn, Hlhb,
+  icases Hlog with ⟨Hfree, #Hkm0, #Hkm16, Hl0, Hl8, Hls, Hld, Hlo, Hlc, Hlnc, Hlhn, Hlhb,
     HauthL, HauthD, Hdirty, Hhdr, Hslots⟩
   -- the boot dirty map is `false` on the covered range
   icases fsinit_dirty_all_false fscFs D fscCov.toList $$ HauthD Hdirty with ⟨%hclean, HauthD, Hdirty⟩
@@ -148,7 +147,7 @@ theorem fsinit_log (IL : INITLOG) (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
       vNc vN pidv dqp (DFrac.own 1) M bsSb sbrec Xv hcrash hj ?dproc ?dK ?dnoff ?dtier hgeom ?da0 ?da1
       hhdrLen hhdrNodup (fun b hb => (hhdrHome b hb).1)
       (fun b hb => hclean b (Std.ExtTreeSet.mem_toList.2 hb)) hpd)
-    $$ [- $Hk $Hpc $Hpi $Hpe $Hbc $Hdc $Hseam $Hcert $Hxo $Hfree $C5 $Hkm0 $Hkm16 $Hl0 $Hl8 $Hl16 $Hls
+    $$ [- $Hk $Hpc $Hpi $Hpe $Hbc $Hdc $Hseam $Hcert $Hxo $Hfree $C5 $Hkm0 $Hkm16 $Hl0 $Hl8 $Hls
         $Hld $Hlo $Hlc $Hlnc $Hlhn $Hlhb $HauthL $HauthD $Hdirty $Hhdr $Hslots $Hsl $Hcr $Hfsb]
   rotate_right 1
   k_norm_g [fsinit_ret_52]

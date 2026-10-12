@@ -51,13 +51,13 @@ theorem uic_memModel_iviewLb (σ : MState) (cpu : CPU) (K : Nat) :
 theorem uic_memModel_iviewLb_get (σ : MState) (cpu : CPU) :
     memModelAt E σ ⊢@{IProp GF} memModelAt E σ ∗ iviewLbAt E cpu (σ.itv cpu) := by
   unfold memModelAt
-  iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm⟩
+  iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
   icases hartViews_acc E σ cpu $$ Hviews with ⟨Hc, Hclose⟩
   icases hartViewsAt_cases E σ cpu $$ Hc with ⟨Hv, Hi, Hr⟩
   ihave #Hilb := MonoNat.lb_own_get $$ Hi
   ihave #Htoplb := MonoNat.lb_own_get $$ Htop
-  isplitl [Htop Hauth Hresv Hv Hi Hr Hclose]
-  · iframe Htop Hauth Hresv
+  isplitl [Htop Hauth Hresv Hv Hi Hr Hclose Hrsv]
+  · iframe Htop Hauth Hresv Hrsv
     isplitl [Hv Hi Hr Hclose]
     · iapply Hclose $$ %σ
       · ipureintro

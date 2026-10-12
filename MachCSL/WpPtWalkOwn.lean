@@ -131,7 +131,8 @@ the machine lets the conditional write through whenever no other hart
 reserves the footprint, whatever this hart holds; an acquire pair's view
 receipt is dropped. -/
 theorem ctx_store_excl (σ : MState) (cpu : CPU) (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (r : Option Resv) (hram : ramBytes pa n) (hno : ¬ othersReserve σ.resv cpu pa n) :
+    (r : Option Resv) (hram : ramBytes pa n) (hno : ¬ othersReserve σ.resv cpu pa n)
+    (hnr : ∀ j, j < n → pa + BitVec.ofNat 64 j ∉ rsvBytes (rsvList (hlc := hlc) (GF := GF))) :
     memModel σ ∗ ownCtx cpu ξ ∗ resvFragAny cpu r ⊢@{IProp GF} |==>
       (memModel (σ.store cpu pa n w true) ∗ ownCtx cpu ξ ∗ resvFrag cpu none false ∗
        keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ (σ.top + 1)) := by
@@ -141,7 +142,8 @@ theorem ctx_store_excl (σ : MState) (cpu : CPU) (ξ : CtxId) (pa : PAddr) (n : 
   · iapply memModel_topLb _ σ W $$ [Hmm HW]
     iframe Hmm
     iexact HW
-  imod memModel_store_excl_any _ σ cpu pa n w r acq hram hno $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag, #Hau, #Htop', _⟩
+  imod memModel_store_excl_any _ σ cpu pa n w r acq hram hno
+    (rsvAllOk_store_off w (σ.top + 1) (hartAgent cpu) hnr) $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag, #Hau, #Htop', _⟩
   unfold ctxAt
   icases Hctx with ⟨Hbound, Hdirty⟩
   have hfresh : get? D (σ.top + 1) = none := by
@@ -235,7 +237,9 @@ theorem swp_sail_mem_write_excl_ctx (cpu : CPU) {n vasize : Nat}
     · exact absurd hdev (not_devBytes_of_ramBytes hram (devWrite_pos hdw))
     rw [hv] at hv'
     obtain rfl := Option.some.inj hv'
-    imod ctx_store_excl σ cpu ξ req.pa n w' r hram hno $$ [$Hmm $Hctx $Hfrag] with ⟨Hmm, Hctx, Hfrag, #Hkey⟩
+    ihave %hnr := memModel_notRsv_ctxBytes σ ξ req.pa n w $$ [Hmm Hb]
+    · iframe
+    imod ctx_store_excl σ cpu ξ req.pa n w' r hram hno hnr $$ [$Hmm $Hctx $Hfrag] with ⟨Hmm, Hctx, Hfrag, #Hkey⟩
     imod ctxBytes_update ξ σ.mem req.pa n w w' (σ.top + 1) (hartAgent cpu) $$ [$Hkey $Hmem $Hb]
       with ⟨Hmem, Hb⟩
     imod Hmask

@@ -107,6 +107,14 @@ open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 section rows
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
+/-- **The boot memory row** (W8-β′): the cells of every unreserved byte, the
+client's halves of the reserved ones (`MachCSL.powerBootRes`), and which list
+was reserved. -/
+def bootMemRes (σ : MState) : IProp GF := iprop%
+  memCells (MachGS.era (hlc := hlc) (GF := GF)) (rsvErase KernelRsv.static σ.mem) ∗
+  rsvHalvesC (MachGS.era (hlc := hlc) (GF := GF)) KernelRsv.static σ.mem ∗
+  ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static⌝
+
 /-- **The power thread's boot rows at the AMBIENT forms** (Rocq
 `power_boot_res_unpack`'s right-hand side): `MachCSL.powerBootRes` less the
 client's lent resource `Rb`, every era-explicit row spelled at the ambient
@@ -116,7 +124,7 @@ def powerBootRows (Mof : (Nat → BitVec 8) → LogMirror) (σ : MState) : IProp
   (∃ r : BitVec 44, MachGS.kptRootName (hlc := hlc) (GF := GF) ↪VAR r) ∗
   genCert ∗
   ([∗list] cpu ∈ cpus, regCellsNoPins (regName (hlc := hlc) (GF := GF) cpu) (σ.regs cpu)) ∗
-  memCells (MachGS.era (hlc := hlc) (GF := GF)) σ.mem ∗
+  bootMemRes σ ∗
   ([∗list] cpu ∈ cpus, ∃ ξ : CtxId, ctxTok (hlc := hlc) (GF := GF) cpu ξ) ∗
   ([∗list] cpu ∈ cpus, lockSet (hlc := hlc) (GF := GF) cpu []) ∗
   (MachGS.kmapName (hlc := hlc) (GF := GF) ↪●MAP KernelMap.static) ∗ kmapStatic (hlc := hlc) (GF := GF) ∗
@@ -142,6 +150,14 @@ theorem bs_pull {PROP : Type _} [BI PROP] [BIAffine PROP]
   iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, Ht, Ho, Hk, H12, H13, Hr, Hc⟩
   iframe Hr Ht Ho Hk H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 Hc
 
+/-- Gather `powerBootRes`'s reserved-region rows (W8-β′) into the memory row:
+the pure list row first, the client's halves after the cells. -/
+theorem bs_gatherRsv {PROP : Type _} [BI PROP] [BIAffine PROP] (φ : Prop) (a1 a2 a3 a4 x tl : PROP) :
+    iprop(⌜φ⌝ ∗ a1 ∗ a2 ∗ a3 ∗ a4 ∗ x ∗ tl) ⊢ iprop(a1 ∗ a2 ∗ a3 ∗ (a4 ∗ x ∗ ⌜φ⌝) ∗ tl) := by
+  iintro ⟨%h, H1, H2, H3, H4, Hx, H⟩
+  iframe H1 H2 H3 H4 Hx H
+  ipureintro; exact h
+
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
 
 /-- **Rocq `power_boot_res_unpack`**: at `Hboot`'s era instance
@@ -156,7 +172,7 @@ theorem powerBootRes_unpack (Mof : (Nat → BitVec 8) → LogMirror)
       @powerBootRows hlc GF (MachGS.ofEra E gen cP cI) Mof σ ∗ Rb gen (diskOf σ.devs) ∗
         Tn (gen + 1) ∗ MachFixedGS.uClaimO (hlc := hlc) (GF := GF) ∗
         MachFixedGS.uEraTok (hlc := hlc) (GF := GF) (gen + 1) :=
-  bs_pull _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+  (bs_gatherRsv _ _ _ _ _ _ _).trans (bs_pull _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _)
 
 end unpack
 
@@ -171,25 +187,99 @@ steps: `boot_bytes_split`, `boot_text_persist`, `kernel_text_intro`,
 kernel's read-only image, the GOT row every hart reads, `.data`'s four
 windows, `.bss` whole and the free RAM run. -/
 theorem bootShared_image (σ : MState) (hbf : bootFacts σ) :
-    kmapStatic (GF := GF) ∗ memCells (MachGS.era (hlc := hlc) (GF := GF)) σ.mem ⊢
+    kmapStatic (GF := GF) ∗ memCells (MachGS.era (hlc := hlc) (GF := GF)) (rsvErase KernelRsv.static σ.mem) ⊢
       |==> (kernelText ∗ kernelData ∗ bootGotRo ∗
         bootRan (imgFlat bootImage) MachCSL.KernelSyms.«first_1» (MachCSL.KernelSyms.«first_1» + 4) ∗
         bootRan (imgFlat bootImage) MachCSL.KernelSyms.«nextpid» (MachCSL.KernelSyms.«nextpid» + 4) ∗
-        bootRan (imgFlat bootImage) (bcpUart .uart0) (bcpUart .uart0 + 40) ∗
-        bootRan (imgFlat bootImage) (bcpUart .uart1) (bcpUart .uart1 + 40) ∗
-        bootRan (imgFlat bootImage) MachCSL.KernelSyms.«_bss» MachCSL.KernelSyms.«end» ∗
+        bootRan (rsvErase KernelRsv.static (imgFlat bootImage)) (bcpUart .uart0) (bcpUart .uart0 + 40) ∗
+        bootRan (rsvErase KernelRsv.static (imgFlat bootImage)) (bcpUart .uart1) (bcpUart .uart1 + 40) ∗
+        bootRan (rsvErase KernelRsv.static (imgFlat bootImage)) MachCSL.KernelSyms.«_bss» MachCSL.KernelSyms.«end» ∗
         bootRan (imgFlat bootImage) 0x80024000 ramEnd) := by
   rw [hbf.1]
-  refine (bootCarve_image (GF := GF)).trans ?_
+  refine (bootCarve_imageR (GF := GF)).trans ?_
   iintro H
   imod H with ⟨⟨#Ht, #Hd, -⟩, Hown⟩
-  icases bootCarve_owned (GF := GF) (imgFlat bootImage) $$ Hown with ⟨Hdata, Hbss, Hfree⟩
-  have hw := bcpDataWindows (GF := GF) (imgFlat bootImage)
+  icases bootCarve_owned (GF := GF) _ $$ Hown with ⟨Hdata, Hbss, Hfree⟩
+  ihave Hfree := bootRan_rsvErase_off_le (imgFlat bootImage) _ _ (by decide +kernel) $$ Hfree
+  -- `.data`: the GOT and what follows hold no reserved byte; `uarts[]` does
+  -- (the two transmit locks, W8-β′), so its windows stay erased
+  icases (bootRan_split (GF := GF) _ _ bhGot _ (by decide) (by decide)).1 $$ Hdata with ⟨Hdata, Hgot⟩
+  ihave Hgot := bootRan_rsvErase_off_le (imgFlat bootImage) _ _ (by decide +kernel) $$ Hgot
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) _ (bhGot + 8) _ (by decide) (by decide)).1 $$ Hgot
+    with ⟨Hg, -⟩
+  imod (bootRan_persist (GF := GF) (imgFlat bootImage) bhGot (bhGot + 8)) $$ Hg with #Hg
+  have hw := bcpDataWindows (GF := GF) (rsvErase KernelRsv.static (imgFlat bootImage))
   rw [show (0x8000a3e8 : Nat) = bhGot from rfl] at hw
-  imod bootCarve_gotRo (GF := GF) $$ Hdata with ⟨Hdata, #Hg, -⟩
   icases hw $$ Hdata with ⟨H1, H2, H3, H4⟩
+  ihave H1 := bootRan_rsvErase_off_le (imgFlat bootImage) _ _ (by decide +kernel) $$ H1
+  ihave H2 := bootRan_rsvErase_off_le (imgFlat bootImage) _ _ (by decide +kernel) $$ H2
   imodintro
+  unfold bootGotRo
   iframe Ht Hd Hg H1 H2 H3 H4 Hbss Hfree
+
+/-- **`.bss`'s windows over the erased map** (W8-β′): every window holding
+no reserved byte is the full image's; the registered locks' 24-byte windows,
+`cpus[]`'s and the proc table's stay erased. -/
+theorem bcpBssWindowsR :
+    bootRan (GF := GF) (rsvErase KernelRsv.static (imgFlat bootImage)) MachCSL.KernelSyms.«_bss» MachCSL.KernelSyms.«end» ⊢
+      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«started» (MachCSL.KernelSyms.«started» + 4) ∗
+      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«kernel_pagetable» (MachCSL.KernelSyms.«kernel_pagetable» + 8) ∗
+      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«initproc» (MachCSL.KernelSyms.«initproc» + 8) ∗
+      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«ticks» (MachCSL.KernelSyms.«ticks» + 4) ∗
+      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«stack0» (MachCSL.KernelSyms.«stack0» + 4096 * NCPU) ∗
+      bootRan (rsvErase KernelRsv.static (imgFlat bootImage)) MachCSL.KernelSyms.«cons» (MachCSL.KernelSyms.«cons» + 24) ∗
+      bootRan (imgFlat bootImage) (MachCSL.KernelSyms.«cons» + 24) (MachCSL.KernelSyms.«cons» + 164) ∗
+      bootRan (rsvErase KernelRsv.static (imgFlat bootImage)) MachCSL.KernelSyms.«pr» (MachCSL.KernelSyms.«pr» + 24) ∗
+      bootRan (rsvErase KernelRsv.static (imgFlat bootImage)) MachCSL.KernelSyms.«kmem» (MachCSL.KernelSyms.«kmem» + 24) ∗
+      bootRan (imgFlat bootImage) (MachCSL.KernelSyms.«kmem» + 24) (MachCSL.KernelSyms.«kmem» + 32) ∗
+      bootRan (rsvErase KernelRsv.static (imgFlat bootImage)) MachCSL.KernelSyms.«pid_lock» (MachCSL.KernelSyms.«pid_lock» + 24) ∗
+      bootRan (rsvErase KernelRsv.static (imgFlat bootImage)) MachCSL.KernelSyms.«wait_lock» (MachCSL.KernelSyms.«wait_lock» + 24) ∗
+      bootRan (rsvErase KernelRsv.static (imgFlat bootImage)) MachCSL.KernelSyms.«cpus» (MachCSL.KernelSyms.«cpus» + 128 * NCPU) ∗
+      bootRan (rsvErase KernelRsv.static (imgFlat bootImage)) MachCSL.KernelSyms.«proc» (MachCSL.KernelSyms.«proc» + 376 * NPROC) ∗
+      bootRan (rsvErase KernelRsv.static (imgFlat bootImage)) MachCSL.KernelSyms.«tickslock» (MachCSL.KernelSyms.«tickslock» + 24) ∗
+      bootRan (rsvErase KernelRsv.static (imgFlat bootImage)) MachCSL.KernelSyms.«bcache» (MachCSL.KernelSyms.«bcache» + 24) ∗
+      bootRan (rsvErase KernelRsv.static (imgFlat bootImage)) (MachCSL.KernelSyms.«bcache» + 24) (MachCSL.KernelSyms.«bcache» + 24 + 1112 * 30) ∗
+      bootRan (imgFlat bootImage) (MachCSL.KernelSyms.«bcache» + 24 + 1112 * 30) (MachCSL.KernelSyms.«bcache» + 0x86c0) ∗
+      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«sb» (MachCSL.KernelSyms.«sb» + 32) ∗
+      bootRan (rsvErase KernelRsv.static (imgFlat bootImage)) MachCSL.KernelSyms.«itable» (MachCSL.KernelSyms.«itable» + 24) ∗
+      bootRan (rsvErase KernelRsv.static (imgFlat bootImage)) (MachCSL.KernelSyms.«itable» + 24) (MachCSL.KernelSyms.«itable» + 0x1aa8) ∗
+      bootRan (rsvErase KernelRsv.static (imgFlat bootImage)) MachCSL.KernelSyms.«log» (MachCSL.KernelSyms.«log» + 24) ∗
+      bootRan (imgFlat bootImage) (MachCSL.KernelSyms.«log» + 24) (MachCSL.KernelSyms.«log» + 168) ∗
+      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«devsw» (MachCSL.KernelSyms.«devsw» + 16 * 10) ∗
+      bootRan (rsvErase KernelRsv.static (imgFlat bootImage)) MachCSL.KernelSyms.«ftable» (MachCSL.KernelSyms.«ftable» + 24) ∗
+      bootRan (imgFlat bootImage) (MachCSL.KernelSyms.«ftable» + 24) (MachCSL.KernelSyms.«ftable» + 0xfb8) ∗
+      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«disk» (MachCSL.KernelSyms.«disk» + 296) ∗
+      bootRan (rsvErase KernelRsv.static (imgFlat bootImage)) (MachCSL.KernelSyms.«disk» + 296) (MachCSL.KernelSyms.«disk» + 0x140) := by
+  iintro H
+  icases bcpBssWindows (GF := GF) _ $$ H with
+    ⟨H0, H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, H19, H20, H21⟩
+  icases (bootRan_split (GF := GF) _ MachCSL.KernelSyms.«bcache» (MachCSL.KernelSyms.«bcache» + 24) (MachCSL.KernelSyms.«bcache» + 0x86c0)
+    (by omega) (by omega)).1 $$ H15 with ⟨H15, H15b⟩
+  icases (bootRan_split (GF := GF) _ (MachCSL.KernelSyms.«bcache» + 24) (MachCSL.KernelSyms.«bcache» + 24 + 1112 * 30) (MachCSL.KernelSyms.«bcache» + 0x86c0)
+    (by omega) (by omega)).1 $$ H15b with ⟨H15b, H15c⟩
+  icases (bootRan_split (GF := GF) _ MachCSL.KernelSyms.«itable» (MachCSL.KernelSyms.«itable» + 24) (MachCSL.KernelSyms.«itable» + 0x1aa8)
+    (by omega) (by omega)).1 $$ H17 with ⟨H17, H17b⟩
+  icases (bootRan_split (GF := GF) _ MachCSL.KernelSyms.«log» (MachCSL.KernelSyms.«log» + 24) (MachCSL.KernelSyms.«log» + 168)
+    (by omega) (by omega)).1 $$ H18 with ⟨H18, H18b⟩
+  icases (bootRan_split (GF := GF) _ MachCSL.KernelSyms.«ftable» (MachCSL.KernelSyms.«ftable» + 24) (MachCSL.KernelSyms.«ftable» + 0xfb8)
+    (by omega) (by omega)).1 $$ H20 with ⟨H20, H20b⟩
+  icases (bootRan_split (GF := GF) _ MachCSL.KernelSyms.«disk» (MachCSL.KernelSyms.«disk» + 296) (MachCSL.KernelSyms.«disk» + 0x140)
+    (by omega) (by omega)).1 $$ H21 with ⟨H21a, H21⟩
+  ihave H0 := bootRan_rsvErase_off_le (imgFlat bootImage) _ _ (by decide +kernel) $$ H0
+  ihave H1 := bootRan_rsvErase_off_le (imgFlat bootImage) _ _ (by decide +kernel) $$ H1
+  ihave H2 := bootRan_rsvErase_off_le (imgFlat bootImage) _ _ (by decide +kernel) $$ H2
+  ihave H3 := bootRan_rsvErase_off_le (imgFlat bootImage) _ _ (by decide +kernel) $$ H3
+  ihave H4 := bootRan_rsvErase_off_le (imgFlat bootImage) _ _ (by decide +kernel) $$ H4
+  ihave H6 := bootRan_rsvErase_off_le (imgFlat bootImage) _ _ (by decide +kernel) $$ H6
+  ihave H9 := bootRan_rsvErase_off_le (imgFlat bootImage) _ _ (by decide +kernel) $$ H9
+  ihave H15c := bootRan_rsvErase_off_le (imgFlat bootImage) _ _ (by decide +kernel) $$ H15c
+  ihave H16 := bootRan_rsvErase_off_le (imgFlat bootImage) _ _ (by decide +kernel) $$ H16
+  ihave H18b := bootRan_rsvErase_off_le (imgFlat bootImage) _ _ (by decide +kernel) $$ H18b
+  ihave H19 := bootRan_rsvErase_off_le (imgFlat bootImage) _ _ (by decide +kernel) $$ H19
+  ihave H20b := bootRan_rsvErase_off_le (imgFlat bootImage) _ _ (by decide +kernel) $$ H20b
+  ihave H21a := bootRan_rsvErase_off_le (imgFlat bootImage) _ _ (by decide +kernel) $$ H21a
+  iframe H0 H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H15b H15c H16 H17 H17b H18 H18b H19 H20 H20b
+    H21a H21
 
 /-- `cpus` starts at the boot hart. -/
 theorem bootShared_cpus : cpus = startedPrimary :: cpus.tail := rfl
@@ -207,18 +297,21 @@ theorem bootShared_peel (Φ : CPU → IProp GF) :
 `boot_hart_pre`, `boot_hart_pre_combine`): the power thread's per-hart
 register rows, held-lock sets and running tokens, the GOT row, and the
 `stack0` / `cpus` windows, as one `bootHartRes` per hart beside its token. -/
-theorem bootShared_harts (σ : MState) (hbf : bootFacts σ) :
+theorem bootShared_harts (σ : MState) (hbf : bootFacts σ)
+    (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) :
     kmapStatic (GF := GF) ∗ bootGotRo ⊢
       ([∗list] cpu ∈ cpus, ∃ ξ : CtxId, ctxTok (hlc := hlc) (GF := GF) cpu ξ) -∗
       ([∗list] cpu ∈ cpus, regCellsNoPins (regName (hlc := hlc) (GF := GF) cpu) (σ.regs cpu)) -∗
       ([∗list] cpu ∈ cpus, lockSet (hlc := hlc) (GF := GF) cpu []) -∗
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«stack0» (MachCSL.KernelSyms.«stack0» + 4096 * NCPU) -∗
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«cpus» (MachCSL.KernelSyms.«cpus» + 128 * NCPU) -∗
+      bootRan (rsvErase KernelRsv.static (imgFlat bootImage)) MachCSL.KernelSyms.«cpus»
+        (MachCSL.KernelSyms.«cpus» + 128 * NCPU) -∗
+      ([∗list] c ∈ cpus, rsvRegionHalfC (MachGS.era (hlc := hlc) (GF := GF)) ⟨cpuAddr c, .cpu c⟩ (imgFlat bootImage)) -∗
       |==> [∗list] c ∈ cpus, (∃ ξ : CtxId, ctxTok (hlc := hlc) (GF := GF) c ξ) ∗
         bootHartRes (σ.regs c) c := by
-  iintro ⟨#Hk, #Hg⟩ Ht Hr Hl Hs Hc
+  iintro ⟨#Hk, #Hg⟩ Ht Hr Hl Hs Hc Hh
   icases ctxTokAt_viewLb0_list (MachGS.era (hlc := hlc) (GF := GF)) cpus $$ Ht with ⟨Ht, Hv⟩
-  imod bootCarve_harts (GF := GF) $$ Hk Hv Hs Hc with Hb
+  imod bootCarve_harts (GF := GF) hrsv $$ Hk Hv Hs Hc Hh with Hb
   ihave H := BigSepL.bigSepL_sep_eqv.2 $$ [Hl Hb]
   · iframe Hl Hb
   ihave H := BigSepL.bigSepL_sep_eqv.2 $$ [Hr H]
@@ -260,14 +353,13 @@ SpecMain deviation 5): the pre-switch locks and globals, both ports'
 `uarts[i]` cells, and kinit's page run. -/
 theorem bootShared_bareRows [CurCtx] :
     kmapStatic (GF := GF) ⊢
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«cons» (MachCSL.KernelSyms.«cons» + 24) -∗
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«pr» (MachCSL.KernelSyms.«pr» + 24) -∗
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«kmem» (MachCSL.KernelSyms.«kmem» + 24) -∗
+      bootLockWin KA.«cons» MachCSL.KernelSyms.«cons» -∗
+      bootLockWin KA.«pr» MachCSL.KernelSyms.«pr» -∗
+      bootLockWin KA.«kmem» MachCSL.KernelSyms.«kmem» -∗
       bootRan (imgFlat bootImage) (MachCSL.KernelSyms.«kmem» + 24) (MachCSL.KernelSyms.«kmem» + 32) -∗
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«devsw» (MachCSL.KernelSyms.«devsw» + 16 * 10) -∗
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«kernel_pagetable» (MachCSL.KernelSyms.«kernel_pagetable» + 8) -∗
-      bootRan (imgFlat bootImage) (bcpUart .uart0) (bcpUart .uart0 + 40) -∗
-      bootRan (imgFlat bootImage) (bcpUart .uart1) (bcpUart .uart1 + 40) -∗
+      bootUartWin .uart0 -∗ bootUartWin .uart1 -∗
       bootRan (imgFlat bootImage) 0x80024000 ramEnd -∗
       |==> (mainLocksBare ∗ mainGlobalsBare ∗ bcpUartCells .uart0 ∗ bcpUartCells .uart1 ∗
         pageRange kinitBase kinitPages) := by
@@ -292,21 +384,27 @@ rows, `main_globals_raw`, `main_sb_raw`, `main_log_raw`, `main_data_raw`'s
 windows, the ring's boot ghosts and the slot supplies' proc-layer shares. -/
 theorem bootShared_kptRows [CurCtx] (cn : ConsNames) :
     kmapStatic (GF := GF) ⊢
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«proc» (MachCSL.KernelSyms.«proc» + 376 * NPROC) -∗
+      bootProcWin -∗
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«initproc» (MachCSL.KernelSyms.«initproc» + 8) -∗
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«ticks» (MachCSL.KernelSyms.«ticks» + 4) -∗
       bootRan (imgFlat bootImage) (MachCSL.KernelSyms.«cons» + 24) (MachCSL.KernelSyms.«cons» + 164) -∗
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«first_1» (MachCSL.KernelSyms.«first_1» + 4) -∗
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«nextpid» (MachCSL.KernelSyms.«nextpid» + 4) -∗
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«pid_lock» (MachCSL.KernelSyms.«pid_lock» + 24) -∗
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«wait_lock» (MachCSL.KernelSyms.«wait_lock» + 24) -∗
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«tickslock» (MachCSL.KernelSyms.«tickslock» + 24) -∗
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«bcache» (MachCSL.KernelSyms.«bcache» + 0x86c0) -∗
+      bootLockWin KA.«pid_lock» MachCSL.KernelSyms.«pid_lock» -∗
+      bootLockWin KA.«wait_lock» MachCSL.KernelSyms.«wait_lock» -∗
+      bootLockWin KA.«tickslock» MachCSL.KernelSyms.«tickslock» -∗
+      bootLockWin KA.«bcache» MachCSL.KernelSyms.«bcache» -∗
+      bootBufsWin -∗
+      bootRan (imgFlat bootImage) (MachCSL.KernelSyms.«bcache» + 24 + 1112 * 30) (MachCSL.KernelSyms.«bcache» + 0x86c0) -∗
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«sb» (MachCSL.KernelSyms.«sb» + 32) -∗
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«itable» (MachCSL.KernelSyms.«itable» + 0x1aa8) -∗
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«log» (MachCSL.KernelSyms.«log» + 168) -∗
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«ftable» (MachCSL.KernelSyms.«ftable» + 0xfb8) -∗
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«disk» (MachCSL.KernelSyms.«disk» + 0x140) -∗
+      bootLockWin KA.«itable» MachCSL.KernelSyms.«itable» -∗
+      bootInodesWin -∗
+      bootLockWin KA.«log» MachCSL.KernelSyms.«log» -∗
+      bootRan (imgFlat bootImage) (MachCSL.KernelSyms.«log» + 24) (MachCSL.KernelSyms.«log» + 168) -∗
+      bootLockWin KA.«ftable» MachCSL.KernelSyms.«ftable» -∗
+      bootRan (imgFlat bootImage) (MachCSL.KernelSyms.«ftable» + 24) (MachCSL.KernelSyms.«ftable» + 0xfb8) -∗
+      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«disk» (MachCSL.KernelSyms.«disk» + 296) -∗
+      bootLockWin rsvDiskLk (MachCSL.KernelSyms.«disk» + 296) -∗
       consGhostsBoot cn -∗
       fdSlots (NPROC * (NOFILE + FDSPARE)) -∗ irefSlots (NPROC * (IREFHOME + IREFSPARE)) -∗
       irefSlots NFILE -∗ bslots (NPROC * 3) -∗
@@ -314,17 +412,18 @@ theorem bootShared_kptRows [CurCtx] (cn : ConsNames) :
       wordPointsTo firstAddr 4 (DFrac.own 1) 1#32 ∗ wordPointsTo nextpidAddr 4 (DFrac.own 1) 1#32 ∗
       (∃ (vl : BitVec 32) (vn vc pd0 pav0 pu0 : BitVec 64) (free0 : List (BitVec 8)),
         diskInitCells vl vn vc pd0 pav0 pu0 free0) := by
-  iintro #Hk Hpr Hi Ht Hring H1 H2 Hpl Hwl Htl Hbc Hsb Hit Hlog Hft Hdk Hg Hfd Hir Hirf Hbs
+  iintro #Hk Hpr Hi Ht Hring H1 H2 Hpl Hwl Htl Hbcl Hbw Hbc Hsb Hitl Hit Hlogl Hlog Hftl Hft Hdk Hdkl Hg Hfd Hir
+    Hirf Hbs
   ihave HR := bootCarveProc_rows (GF := GF) cn $$ Hk Hpr Hi Ht Hring Hg
   ihave HF := bootCarveProc_first (GF := GF) $$ Hk H1
   ihave HN := bootCarveProc_nextpid (GF := GF) $$ Hk H2
-  icases bootCarveFs_bcache (GF := GF) curCtx $$ Hk Hbc with ⟨Hbl, Hhd, Hbi, Hbd⟩
-  icases bootCarveFs_itable (GF := GF) $$ Hk Hit with ⟨Hil, Hsl, Hie⟩
-  icases bootCarve_ftable (GF := GF) curCtx $$ Hk Hft with ⟨Hfl, Hfe⟩
-  ihave HL := bootCarveFs_mainLocksRaw (GF := GF) $$ Hk Hpl Hwl Htl Hbl Hil Hfl
+  icases bootCarveFs_bcache (GF := GF) curCtx $$ Hk Hbw Hbc with ⟨Hhd, Hbi, Hbd⟩
+  icases bootCarveFs_itable (GF := GF) $$ Hk Hit with ⟨Hsl, Hie⟩
+  ihave Hfe := bootCarve_ftable (GF := GF) curCtx $$ Hk Hft
+  ihave HL := bootCarveFs_mainLocksRaw (GF := GF) $$ Hk Hpl Hwl Htl Hbcl Hitl Hftl
   ihave HS := bootCarveFs_sb (GF := GF) $$ Hk Hsb
-  ihave HLg := bootCarveFs_log (GF := GF) $$ Hk Hlog
-  ihave HD := bootCarveFs_diskEx (GF := GF) $$ Hk Hdk
+  ihave HLg := bootCarveFs_log (GF := GF) $$ Hk Hlogl Hlog
+  ihave HD := bootCarveFs_diskEx (GF := GF) $$ Hk Hdk Hdkl
   ihave HG := bootCarveProc_mainGlobalsRaw (GF := GF) cn $$ HR Hfd Hir Hfe Hirf Hbs Hhd Hbi Hbd Hsl Hie
   iframe HL HG HS HLg HF HN HD
 
@@ -341,21 +440,27 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 /-- The `.bss`/`.data` windows the kernel-tier rows are carved from
 (`bootShared_kptRows`' premises, in its order). -/
 def bsKptWin : IProp GF := iprop%
-  bootRan (imgFlat bootImage) MachCSL.KernelSyms.«proc» (MachCSL.KernelSyms.«proc» + 376 * NPROC) ∗
+  bootProcWin ∗
   bootRan (imgFlat bootImage) MachCSL.KernelSyms.«initproc» (MachCSL.KernelSyms.«initproc» + 8) ∗
   bootRan (imgFlat bootImage) MachCSL.KernelSyms.«ticks» (MachCSL.KernelSyms.«ticks» + 4) ∗
   bootRan (imgFlat bootImage) (MachCSL.KernelSyms.«cons» + 24) (MachCSL.KernelSyms.«cons» + 164) ∗
   bootRan (imgFlat bootImage) MachCSL.KernelSyms.«first_1» (MachCSL.KernelSyms.«first_1» + 4) ∗
   bootRan (imgFlat bootImage) MachCSL.KernelSyms.«nextpid» (MachCSL.KernelSyms.«nextpid» + 4) ∗
-  bootRan (imgFlat bootImage) MachCSL.KernelSyms.«pid_lock» (MachCSL.KernelSyms.«pid_lock» + 24) ∗
-  bootRan (imgFlat bootImage) MachCSL.KernelSyms.«wait_lock» (MachCSL.KernelSyms.«wait_lock» + 24) ∗
-  bootRan (imgFlat bootImage) MachCSL.KernelSyms.«tickslock» (MachCSL.KernelSyms.«tickslock» + 24) ∗
-  bootRan (imgFlat bootImage) MachCSL.KernelSyms.«bcache» (MachCSL.KernelSyms.«bcache» + 0x86c0) ∗
+  bootLockWin KA.«pid_lock» MachCSL.KernelSyms.«pid_lock» ∗
+  bootLockWin KA.«wait_lock» MachCSL.KernelSyms.«wait_lock» ∗
+  bootLockWin KA.«tickslock» MachCSL.KernelSyms.«tickslock» ∗
+  bootLockWin KA.«bcache» MachCSL.KernelSyms.«bcache» ∗
+  bootBufsWin ∗
+  bootRan (imgFlat bootImage) (MachCSL.KernelSyms.«bcache» + 24 + 1112 * 30) (MachCSL.KernelSyms.«bcache» + 0x86c0) ∗
   bootRan (imgFlat bootImage) MachCSL.KernelSyms.«sb» (MachCSL.KernelSyms.«sb» + 32) ∗
-  bootRan (imgFlat bootImage) MachCSL.KernelSyms.«itable» (MachCSL.KernelSyms.«itable» + 0x1aa8) ∗
-  bootRan (imgFlat bootImage) MachCSL.KernelSyms.«log» (MachCSL.KernelSyms.«log» + 168) ∗
-  bootRan (imgFlat bootImage) MachCSL.KernelSyms.«ftable» (MachCSL.KernelSyms.«ftable» + 0xfb8) ∗
-  bootRan (imgFlat bootImage) MachCSL.KernelSyms.«disk» (MachCSL.KernelSyms.«disk» + 0x140)
+  bootLockWin KA.«itable» MachCSL.KernelSyms.«itable» ∗
+  bootInodesWin ∗
+  bootLockWin KA.«log» MachCSL.KernelSyms.«log» ∗
+  bootRan (imgFlat bootImage) (MachCSL.KernelSyms.«log» + 24) (MachCSL.KernelSyms.«log» + 168) ∗
+  bootLockWin KA.«ftable» MachCSL.KernelSyms.«ftable» ∗
+  bootRan (imgFlat bootImage) (MachCSL.KernelSyms.«ftable» + 24) (MachCSL.KernelSyms.«ftable» + 0xfb8) ∗
+  bootRan (imgFlat bootImage) MachCSL.KernelSyms.«disk» (MachCSL.KernelSyms.«disk» + 296) ∗
+  bootLockWin rsvDiskLk (MachCSL.KernelSyms.«disk» + 296)
 
 /-- **What the carve hands on** (Rocq `boot_bss_carve` + `main_data_raw` +
 the image steps): the read-only image, the boot hart's token and bundle,
@@ -378,20 +483,74 @@ memory cells, the per-hart rows and tokens; hart 0's token is destructed
 FIRST and its context is where every Bare-tier cell is carved (brief §4.2
 step 7). -/
 theorem bootShared_carve (σ : MState) (hbf : bootFacts σ) :
-    kmapStatic (GF := GF) ∗ memCells (MachGS.era (hlc := hlc) (GF := GF)) σ.mem ∗
+    kmapStatic (GF := GF) ∗ bootMemRes σ ∗
       ([∗list] cpu ∈ cpus, ∃ ξ : CtxId, ctxTok (hlc := hlc) (GF := GF) cpu ξ) ∗
       ([∗list] cpu ∈ cpus, regCellsNoPins (regName (hlc := hlc) (GF := GF) cpu) (σ.regs cpu)) ∗
       ([∗list] cpu ∈ cpus, lockSet (hlc := hlc) (GF := GF) cpu []) ⊢
       |==> ∃ ξ0 : CtxId, bsCarveOut σ ξ0 := by
-  iintro ⟨#Hk, Hmem, Ht, Hr, Hl⟩
+  unfold bootMemRes
+  rw [hbf.1]
+  iintro ⟨#Hk, ⟨Hmem, Hhalf, %hrsv⟩, Ht, Hr, Hl⟩
   imod bootShared_image σ hbf $$ [Hmem] with
     ⟨#Htx, #Hd, #Hg, Hw1, Hw2, Hu0, Hu1, Hbss, Hfree⟩
-  · iframe Hk Hmem
-  icases bcpBssWindows (GF := GF) (imgFlat bootImage) $$ Hbss with
-    ⟨Hst, Hkp, Hip, Htk, Hs0, Hc, Hring, Hpr, Hkm, Hkm2, Hpl, Hwl, Hcpus, Hproc, Htl, Hbc, Hsb, Hit,
-      Hlog, Hdv, Hft, Hdk⟩
-  imod bootShared_harts σ hbf $$ [] Ht Hr Hl Hs0 Hcpus with Hh
+  · rw [hbf.1]; iframe Hk Hmem
+  icases bcpBssWindowsR (GF := GF) $$ Hbss with
+    ⟨Hst, Hkp, Hip, Htk, Hs0, Hc, Hring, Hpr, Hkm, Hkm2, Hpl, Hwl, Hcpus, Hproc, Htl, Hbcl, Hbc, Hbc2, Hsb, Hitl,
+      Hit, Hlogl, Hlog, Hdv, Hftl, Hft, Hdk, Hdkl⟩
+  icases bootRsvHalves _ _ $$ Hhalf with ⟨Hpre, Hhc, Hhpr, Hpost⟩
+  unfold bootPreHalves bootPostHalves
+  icases Hpre with ⟨Hhu0, Hhu1, Hhcons, Hhprk, Hhkm, Hhp, Hhw⟩
+  icases Hpost with ⟨Hhtl, Hhbc, Hhbufs, Hhit, Hhinodes, Hhlog, Hhft, Hhdk⟩
+  imod bootShared_harts σ hbf hrsv $$ [] Ht Hr Hl Hs0 Hcpus Hhc with Hh
   · iframe Hk Hg
+  ihave Hc := bootLockWin_intro KA.«cons» MachCSL.KernelSyms.«cons» hrsv $$ [Hc Hhcons]
+  · iframe Hc Hhcons
+  ihave Hpr := bootLockWin_intro KA.«pr» MachCSL.KernelSyms.«pr» hrsv $$ [Hpr Hhprk]
+  · iframe Hpr Hhprk
+  ihave Hkm := bootLockWin_intro KA.«kmem» MachCSL.KernelSyms.«kmem» hrsv $$ [Hkm Hhkm]
+  · iframe Hkm Hhkm
+  ihave Hpl := bootLockWin_intro KA.«pid_lock» MachCSL.KernelSyms.«pid_lock» hrsv $$ [Hpl Hhp]
+  · iframe Hpl Hhp
+  ihave Hwl := bootLockWin_intro KA.«wait_lock» MachCSL.KernelSyms.«wait_lock» hrsv $$ [Hwl Hhw]
+  · iframe Hwl Hhw
+  ihave Htl := bootLockWin_intro KA.«tickslock» MachCSL.KernelSyms.«tickslock» hrsv $$ [Htl Hhtl]
+  · iframe Htl Hhtl
+  ihave Hbcl := bootLockWin_intro KA.«bcache» MachCSL.KernelSyms.«bcache» hrsv $$ [Hbcl Hhbc]
+  · iframe Hbcl Hhbc
+  ihave Hitl := bootLockWin_intro KA.«itable» MachCSL.KernelSyms.«itable» hrsv $$ [Hitl Hhit]
+  · iframe Hitl Hhit
+  ihave Hbc := bootBufsWin_intro hrsv $$ [Hbc Hhbufs]
+  · iframe Hbc Hhbufs
+  ihave Hit := bootInodesWin_intro hrsv $$ [Hit Hhinodes]
+  · iframe Hit Hhinodes
+  ihave Hlogl := bootLockWin_intro KA.«log» MachCSL.KernelSyms.«log» hrsv $$ [Hlogl Hhlog]
+  · iframe Hlogl Hhlog
+  ihave Hftl := bootLockWin_intro KA.«ftable» MachCSL.KernelSyms.«ftable» hrsv $$ [Hftl Hhft]
+  · iframe Hftl Hhft
+  ihave Hdkl := (show bootRan (GF := GF) (rsvErase KernelRsv.static (imgFlat bootImage)) (MachCSL.KernelSyms.«disk» + 296) (MachCSL.KernelSyms.«disk» + 0x140) ⊢
+      bootRan (GF := GF) (rsvErase KernelRsv.static (imgFlat bootImage)) (MachCSL.KernelSyms.«disk» + 296) (MachCSL.KernelSyms.«disk» + 296 + 24) from .rfl) $$ Hdkl
+  ihave Hdkl := bootLockWin_intro rsvDiskLk (MachCSL.KernelSyms.«disk» + 296) hrsv $$ [Hdkl Hhdk]
+  · iframe Hdkl Hhdk
+  ihave Hhu0 := (show rsvRegionHalfC (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) (xv6LockR (rsvUartLk 0))
+      (imgFlat bootImage) ⊢ rsvRegionHalfC (MachGS.era (hlc := hlc) (GF := GF)) (xv6LockR (txLockAddr .uart0))
+      (imgFlat bootImage) from .rfl) $$ Hhu0
+  ihave Hu0 : iprop(bootUartWin (GF := GF) .uart0) $$ [Hu0 Hhu0]
+  · unfold bootUartWin
+    iframe Hu0 Hhu0
+    ipureintro; exact hrsv
+  ihave Hhu1 := (show rsvRegionHalfC (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) (xv6LockR (rsvUartLk 1))
+      (imgFlat bootImage) ⊢ rsvRegionHalfC (MachGS.era (hlc := hlc) (GF := GF)) (xv6LockR (txLockAddr .uart1))
+      (imgFlat bootImage) from .rfl) $$ Hhu1
+  ihave Hu1 : iprop(bootUartWin (GF := GF) .uart1) $$ [Hu1 Hhu1]
+  · unfold bootUartWin
+    iframe Hu1 Hhu1
+    ipureintro; exact hrsv
+  ihave Hproc := (show bootRan (GF := GF) (rsvErase KernelRsv.static (imgFlat bootImage)) MachCSL.KernelSyms.«proc»
+      (MachCSL.KernelSyms.«proc» + 376 * NPROC) ⊢
+      bootRan (rsvErase KernelRsv.static (imgFlat bootImage)) MachCSL.KernelSyms.«proc»
+        (MachCSL.KernelSyms.«proc» + 376 * 64) from .rfl) $$ Hproc
+  ihave Hproc := bootProcWin_intro hrsv $$ [Hproc Hhpr]
+  · iframe Hproc Hhpr
   icases bootShared_peel _ $$ Hh with ⟨⟨⟨%ξ0, Ht0⟩, Hb0⟩, Hrest⟩
   have hB := (letI : CurCtx := bootSharedX ξ0; bootShared_bareRows (GF := GF))
   imod hB $$ Hk Hc Hpr Hkm Hkm2 Hdv Hkp Hu0 Hu1 Hfree with ⟨HL, HG, HU0, HU1, HP⟩
@@ -399,8 +558,8 @@ theorem bootShared_carve (σ : MState) (hbf : bootFacts σ) :
   imodintro
   iexists ξ0
   unfold bsCarveOut bsKptWin
-  iframe Htx Hd Ht0 Hb0 Hrest HL HG HU0 HU1 HP Hproc Hip Htk Hring Hw1 Hw2 Hpl Hwl Htl Hbc Hsb Hit
-    Hlog Hft Hdk Hsc
+  iframe Htx Hd Ht0 Hb0 Hrest HL HG HU0 HU1 HP Hproc Hip Htk Hring Hw1 Hw2 Hpl Hwl Htl Hbcl Hbc Hbc2 Hsb Hitl
+    Hit Hlogl Hlog Hftl Hft Hdk Hdkl Hsc
 
 end carveAll
 
@@ -562,7 +721,7 @@ theorem bootSharedAlloc (σ : MState) (hbf : bootFacts σ) (ds0 : DevStates) (hd
   · iframe Hkst Hmem Htoks Hregs Hlocks
   unfold bsCarveOut bsKptWin
   icases Hc with ⟨#Htx, #Hd, Ht0, Hb0, Hrest, HL, HG, HU0, HU1, HP, ⟨W1, W2, W3, W4, W5, W6, W7, W8,
-    W9, W10, W11, W12, W13, W14, W15⟩, Hsc⟩
+    W9, W10, W11, W12, W13, W14, W15, W16, W17, W18, W19, W20, W21⟩, Hsc⟩
   -- the devices
   imod bootSharedDev_devs (hlc := hlc) (GF := GF) (bootSharedX ξ0) ds0 (ndisk / BSIZE) $$
     [Hdevs Hch HU0 HU1] with ⟨%γ0, %γ1, %cn, %γd, Hdv⟩
@@ -573,7 +732,7 @@ theorem bootSharedAlloc (σ : MState) (hbf : bootFacts σ) (ds0 : DevStates) (hd
   icases Hn with ⟨Hh, Hs, Hav, Hsf, Hchb, Htc, Htl0, Htl1, Htt, Hlks, Hfd, Hi1, Hi2, Hi3, Hia, Hb1, Hb2⟩
   -- the kernel-tier rows
   have hK := (letI : CurCtx := (bootSharedX ξ0).toKpt; bootShared_kptRows (GF := GF) cn)
-  ihave HK := hK $$ Hkst W1 W2 W3 W4 W5 W6 W7 W8 W9 W10 W11 W12 W13 W14 W15 Hg Hfd Hi1 Hi2 Hb1
+  ihave HK := hK $$ Hkst W1 W2 W3 W4 W5 W6 W7 W8 W9 W10 W11 W12 W13 W14 W15 W16 W17 W18 W19 W20 W21 Hg Hfd Hi1 Hi2 Hb1
   icases HK with ⟨HLr, HGr, HSb, HLog, HF, HNp, HDk⟩
   -- the file system
   have hF := (letI : CurCtx := bootSharedX ξ0; bootSharedFs (hlc := hlc) (GF := GF) γ0 γd cn

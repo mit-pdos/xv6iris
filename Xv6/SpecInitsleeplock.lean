@@ -29,7 +29,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 def sleepLockIn (lk : BitVec 64) : IProp GF := iprop%
   ∃ (vlocked : BitVec 32) (vlock : BitVec 32) (vname vcpu : BitVec 64) (vn : BitVec 64) (vpid : BitVec 32),
     wordPointsTo lk 4 (DFrac.own 1) vlocked ∗
-    lockWords (lk + 8#64) vlock vname vcpu ∗
+    lockWordsR (lk + 8#64) vlock vname vcpu ∗
     wordPointsTo (lk + 32#64) 8 (DFrac.own 1) vn ∗
     wordPointsTo (lk + 40#64) 4 (DFrac.own 1) vpid
 

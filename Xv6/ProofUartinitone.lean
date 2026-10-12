@@ -10,6 +10,7 @@ the hart never migrates; the frame is the standard two slots.
 import MachCSL.WpSmodeSltu
 import Xv6.SpecUartinitone
 import Xv6.SpecInitlock
+import Xv6.LockRsv
 import Xv6.CodeTactics
 import MachCSL.WpSmodeDev
 
@@ -250,12 +251,11 @@ set_option maxHeartbeats 1000000 in
 /-- `initlock`'s contract as a rule, with the lock and name pointers named. -/
 theorem uio_initlock_call (IL : INITLOCK) [CurCtx] (c : CPU) (k' : KCtx)
     (vlock : BitVec 32) (vname vcpu : BitVec 64) (hK' : 2 ≤ k'.avail)
-    (lk nm : BitVec 64) (h10 : k'.regs 10#5 = lk) (h11 : k'.regs 11#5 = nm) :
+    (lk nm : BitVec 64) (h10 : k'.regs 10#5 = lk) (h11 : k'.regs 11#5 = nm):
     kctx c k' ∗ pcIs c KA.«initlock» ∗
     kmapId lk ∗ kmapId (lk + 16#64) ∗
-    wordPointsTo lk 4 (DFrac.own 1) vlock ∗
+    lkRaw lk vlock vcpu ∗
     wordPointsTo (lk + 8#64) 8 (DFrac.own 1) vname ∗
-    wordPointsTo (lk + 16#64) 8 (DFrac.own 1) vcpu ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
       kctx cpu' (k'.withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       wordPointsTo (lk + 8#64) 8 (DFrac.own 1) nm -∗
@@ -278,7 +278,7 @@ theorem uartinitone_proof (IL : INITLOCK) : UARTINITONE :=
   ⟨fun {hlc GF} _ _ _ cpu k i γ l kp vlock vname vcpu hsie hK ha0 => by
   unfold wp_uartinitone_body uartinitonePre uartinitonePost
   iintro ⟨Hk, Hpc, ⟨#Hinv, Hbase, Hrxw, Hdlab, Htx, #Hlb, Hrtok, #Hid0, #Hid16,
-    Hwlock, Hwname, Hwcpu⟩, HΦ⟩
+    Hwlock, Hwname⟩, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   simp only [uartinitoneAddr]
   k_norm_g
@@ -318,7 +318,7 @@ theorem uartinitone_proof (IL : INITLOCK) : UARTINITONE :=
   rotate_right 1
   k_norm_g
   iframe #
-  iframe Hwlock Hwname Hwcpu
+  iframe Hwlock Hwname
   case hKi => k_norm_g; omega
   case ha0' => k_norm_g; exact (uartElt_lock i).symm
   case ha1' => k_norm_g [h11']

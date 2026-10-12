@@ -46,6 +46,7 @@ import Iris.BI.Lib.MonoNat
 import Iris.Instances.Lib.GhostVar
 import Iris.ProgramLogic.WeakestPre
 import MachCSL.FrameFilter
+import MachCSL.Reserved
 
 namespace MachCSL
 
@@ -146,6 +147,12 @@ structure EraGS where
   boot.  Which era's name the arm holds is pinned by the swap counter
   (`MachFixedGS.swapName`). -/
   mirrorName : GName
+  /-- THE RESERVED-REGION REGISTRY (W8-β′, plan rev 30 [R26.2]): the era's
+  ghost map region base ↦ its index in the fixed record's static list
+  (`MachFixedGS.rsvStatic`), allocated at the `PowerOn` mint over the whole
+  list (`staticIn`).  The camera is the author log's (`Nat ↦ Agent = Nat`);
+  the region itself is read off the list (`rsvExact`). -/
+  rsvName : GName
 
 /-- The functors the machine needs (for adequacy: what a `BundledGFunctors`
 must contain). -/
@@ -381,6 +388,12 @@ class MachFixedGS (hlc : outParam HasLC) (GF : BundledGFunctors) where
   instance of `GhostVarG GF LogMirror`; the NAME is per-era
   (`EraGS.mirrorName`). -/
   mirrorG : GhostVarG GF LogMirror
+  /-- THE STATIC RESERVED REGIONS (W8-β′): the client's `KernelRsv.static`,
+  filled by the adequacy's record (`bootFixedGS`); every era reserves them at
+  its `PowerOn` mint (`MachCSL.rsvModelAt`). -/
+  rsvStatic : List RsvRegion
+  /-- ...byte-distinct image bytes (`rsvWf`). -/
+  rsvStatic_wf : rsvWf rsvStatic
 
 attribute [reducible, instance] MachFixedGS.reg
 attribute [reducible, instance] MachFixedGS.memPre
@@ -440,6 +453,8 @@ class MachGS (hlc : outParam HasLC) (GF : BundledGFunctors) where
   devName : DevId → GName
   /-- the era's durable-disk mirror (see `EraGS.mirrorName`) -/
   mirrorName : GName
+  /-- the era's reserved-region registry (see `EraGS.rsvName`) -/
+  rsvName : GName
   gen : Nat
   /-- the running-proc claim of a hart (`MachCSL.KCtx.cpuClaim`): the client
   chooses it when it instantiates the machine (the xv6 client: the claimed
@@ -475,7 +490,8 @@ field projection.) -/
    MachGS.authName (hlc := hlc) (GF := GF), MachGS.resvName (hlc := hlc) (GF := GF),
    MachGS.lockSetName (hlc := hlc) (GF := GF), MachGS.kmapName (hlc := hlc) (GF := GF),
    MachGS.kptRootName (hlc := hlc) (GF := GF),
-   MachGS.devName (hlc := hlc) (GF := GF), MachGS.mirrorName (hlc := hlc) (GF := GF)⟩
+   MachGS.devName (hlc := hlc) (GF := GF), MachGS.mirrorName (hlc := hlc) (GF := GF),
+   MachGS.rsvName (hlc := hlc) (GF := GF)⟩
 
 /-- The register-map ghost name of hart `cpu` in the ambient era. -/
 def regName [MachGS hlc GF] (cpu : CPU) : GName := MachGS.regName (hlc := hlc) (GF := GF) cpu
@@ -947,13 +963,69 @@ theorem hartViewsAt_intro [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (cpu : 
     hartViewsAt E σ cpu := by
   unfold hartViewsAt; iintro H; iexact H
 
+/-! ## The reserved regions (W8-β′)
+
+The registry `reg` (era ghost `rsvName`, base ↦ index into the static list
+`rs`) holds exactly the static list (`staticIn`, `rsvExact`); `reservedOk`
+is the regions' discipline (`MachCSL.regionOk`) at every registered region;
+the interpretation keeps HALF of every reserved byte's points-to
+(`rsvHalvesAt`), which is what keeps every generic (`own 1`) writer off the
+regions. -/
+
+/-- Every static region is registered at its index (plan [R27.s6]: the
+registry may GROW past the static list without changing this conjunct). -/
+def staticIn (rs : List RsvRegion) (reg : RegMapF Agent) : Prop :=
+  ∀ (i : Nat) (R : RsvRegion), rs[i]? = some R → get? reg R.base.toNat = some i
+
+/-- In β′ the registry holds nothing else (the dynamic part is W8 (f2-ctx)'s). -/
+def rsvExact (rs : List RsvRegion) (reg : RegMapF Agent) : Prop :=
+  ∀ (k i : Nat), get? reg k = some i → ∃ R, rs[i]? = some R ∧ R.base.toNat = k
+
+/-- **Every registered region keeps its discipline** at the machine `σ`. -/
+def reservedOk (rs : List RsvRegion) (σ : MState) (reg : RegMapF Agent) : Prop :=
+  ∀ (k i : Nat) (R : RsvRegion), get? reg k = some i → rs[i]? = some R → regionOk σ.mem R
+
+theorem reservedOk_of_all {rs : List RsvRegion} {σ : MState} {reg : RegMapF Agent}
+    (hex : rsvExact rs reg) (h : rsvAllOk rs σ.mem) : reservedOk rs σ reg := by
+  intro k i R hk hi
+  exact h i R hi
+
+theorem all_of_reservedOk {rs : List RsvRegion} {σ : MState} {reg : RegMapF Agent}
+    (hin : staticIn rs reg) (h : reservedOk rs σ reg) : rsvAllOk rs σ.mem := by
+  intro i R hi
+  exact h _ i R (hin i R hi) hi
+
+/-- Half of the `n` bytes at `pa`, histories unknown, in era `E`'s heap. -/
+def rsvWordHalfAt [MachFixedGS hlc GF] (E : EraGS) (pa : PAddr) (n : Nat) : IProp GF := iprop%
+  ∃ Hs : Nat → Hist, [∗list] j ∈ List.range n, pointsTo (G := E.mem) (pa + BitVec.ofNat 64 j)
+    (DFrac.own (1 : Qp).half) (Hs j)
+
+/-- The interpretation's halves of every byte of the regions `rs`. -/
+def rsvHalvesAt [MachFixedGS hlc GF] (E : EraGS) (rs : List RsvRegion) : IProp GF := iprop%
+  [∗list] R ∈ rs, [∗list] w ∈ R.words, rsvWordHalfAt E w.1 w.2
+
+/-- **The reserved-region conjunct** of era `E`'s interpretation (plan [R25.2]
+deliverable (i): `⌜staticIn reg ∧ reservedOk σ reg⌝` beside `⌜mmOk σ⌝`). -/
+def rsvModelAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) : IProp GF := iprop%
+  (∃ reg : RegMapF Agent, (E.rsvName ↪●MAP reg) ∗
+    ⌜staticIn (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) reg ∧
+      rsvExact (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) reg ∧
+      reservedOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ reg⌝) ∗
+  rsvHalvesAt E (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))
+
 /-- Era `E`'s memory-model mirrors at the machine `σ`. -/
 def memModelAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) : IProp GF := iprop%
   MonoNat.auth_own E.topName (DFrac.own 1) (.ofNat σ.top) ∗
   (E.authName ↪●MAP authMap σ.log) ∗
   ([∗list] cpu ∈ cpus, hartViewsAt E σ cpu) ∗
   (E.resvName ↪●MAP resvMap σ) ∗
-  ⌜mmOk σ⌝
+  ⌜mmOk σ⌝ ∗ rsvModelAt E σ
+
+/-- The reserved conjunct reads only the memory. -/
+theorem rsvModelAt_congr [MachFixedGS hlc GF] (E : EraGS) {σ σ' : MState} (h : σ'.mem = σ.mem) :
+    rsvModelAt (GF := GF) E σ' = rsvModelAt E σ := by
+  unfold rsvModelAt reservedOk
+  rw [h]
 
 /-- `cpus` lists every hart at its own index. -/
 theorem cpus_get? (cpu : CPU) : cpus[cpu.val]? = some cpu := by

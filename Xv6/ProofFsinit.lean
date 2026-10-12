@@ -91,7 +91,7 @@ theorem fsinit_entry (BD : BREAD) (MM : MEMMOVE) (BE : BRELSE) (IL : INITLOG) (I
   unfold wp_fsinit_eb_body
   iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpe, #Hbc, #Hdc, Hpid, #Hdurl, #Hcert, #Hcinv, Hborn, Hfree,
     #Hbinv, Hfsb, Hold, Hxo, #Hreg, #Hbreg,
-    Hboot, #Hit2, #Hiti, #Hslks, #Hkm0, #Hkm16, Hl0, Hl8, Hl16, Hls, Hld, Hlo, Hlc, Hlnc, Hlhn,
+    Hboot, #Hit2, #Hiti, #Hslks, #Hkm0, #Hkm16, Hl0, Hl8, Hls, Hld, Hlo, Hlc, Hlnc, Hlhn,
     Hlhb, HauthL, HauthD, Hdirty, Hhdr, Hslots, Hsl, Hiref, Hnext⟩
   -- the arity-free seam initlog and ireclaim take, off the one at the
   -- application's guest (Rocq `fs_crash_seam_of_at`)
@@ -152,10 +152,10 @@ theorem fsinit_entry (BD : BREAD) (MM : MEMMOVE) (BE : BRELSE) (IL : INITLOG) (I
   -- the bundles the stages thread
   ihave #Henv : fsinitEnv (hlc := hlc) Γ γl pd pav pu $$ []
   · unfold fsinitEnv; iframe #
-  ihave Hlog : fsinitLogRes bsHdr L D vlock vname vcpu vStart vDev vNc vN $$ [Hfree Hl0 Hl8 Hl16
+  ihave Hlog : fsinitLogRes bsHdr L D vlock vname vcpu vStart vDev vNc vN $$ [Hfree Hl0 Hl8
       Hls Hld Hlo Hlc Hlnc Hlhn Hlhb HauthL HauthD Hdirty Hhdr Hslots]
   · unfold fsinitLogRes
-    iframe Hfree Hl0 Hl8 Hl16 Hls Hld Hlo Hlc Hlnc Hlhn Hlhb HauthL HauthD Hdirty Hhdr Hslots
+    iframe Hfree Hl0 Hl8 Hls Hld Hlo Hlc Hlnc Hlhn Hlhb HauthL HauthD Hdirty Hhdr Hslots
     iframe #
   -- one slot for readsb's bread, 34 for initlog
   icases bslots_uncons ((LOGBLOCKS + 2) + 2) $$ Hsl with ⟨Hsl1, Hsl⟩

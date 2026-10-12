@@ -102,7 +102,7 @@ theorem fkr_fsinit_call [CurCtx] (FS : FSINIT) (Γ : SchedNames) [ClaimIs (hlc :
   ihave %hpd := fsReady_descPage fscDisk fscDlock pd pav pu $$ Hdc
   icases firstFsinit_open (hlc := hlc) $$ Hfsi with ⟨%dk, %sb, %Rspent, %Pb, %vlock, %vStart, %vDev,
     %vNc, %vN, %vname, %vcpu, %sbOld, %hp, %hold, Hdurl, Hmir, Hlf, Hbinv, Hb1, Hsb, Hxo,
-    Hireg', Hbm', Hboot, Hk0, Hk16, Hlk, Hnm, Hcpu, Hst, Hdv, Hout, Hcmt, Hnc, Hn, Hblk,
+    Hireg', Hbm', Hboot, Hk0, Hk16, Hlk, Hnm, Hst, Hdv, Hout, Hcmt, Hnc, Hn, Hblk,
     ⟨%L, %D, %hLdk, HL, HD⟩, Hdty, Hhdr, Hslots, Hbsl, Hirs, -, #Henv⟩
   obtain ⟨⟨vMagic, vNblocks, vNlog, himg, hmagic⟩, h1, hparse, hok, hcg, hbm, hsz, hlen, hnd, hhome,
     hslot⟩ := firstFsinitPures_fsinit dk sb Pb hp
@@ -126,7 +126,7 @@ theorem fkr_fsinit_call [CurCtx] (FS : FSINIT) (Γ : SchedNames) [ClaimIs (hlc :
   simp only [fsinitAddr] at h
   iapply h
   iframe Hk Hpc Hpinv Hte Hce Hpe Hbio Hdc Hpid Hdurl Hcert Hcinv Hmir Hlf Hbinv Hb1 Hsb Hxo Hireg'
-    Hbm' Hboot Hit2 Hitb Hslk Hk0 Hk16 Hlk Hnm Hcpu Hst Hdv Hout Hcmt Hnc Hn Hblk HL HD Hdty Hhdr
+    Hbm' Hboot Hit2 Hitb Hslk Hk0 Hk16 Hlk Hnm Hst Hdv Hout Hcmt Hnc Hn Hblk HL HD Hdty Hhdr
     Hslots Hbsl Hir1
   iapply wpNext_intro
   iintro %c' %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hmg Hsz Hnb Hni Hnl Hls Hist Hbms #Hlctx Hbs3

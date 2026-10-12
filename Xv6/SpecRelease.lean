@@ -96,6 +96,7 @@ def wp_release_cancel_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
     (D Out : IProp GF) [Timeless D]
     (hrefuteCore : ⊢ lockedCore γ cpu -∗ D -∗ (False : IProp GF))
     (hrefuteHalf : ∀ B : Nat, ⊢ lockHalf γ (some (cpu, false)) B -∗ D -∗ (False : IProp GF))
+    (hdyn : ¬ lkRsvIn (hlc := hlc) (GF := GF) (k.regs 10#5))
     (hsie : k.sie = false)
     (hnoff : 1 ≤ k.noff) (hK : 10 ≤ k.avail)
     (reen : Bool) (hreen : reen = (decide (k.noff = 1) && k.intena))
@@ -115,8 +116,8 @@ def wp_release_cancel_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 structure RELEASE_CANCEL : Prop where
   wp_release_cancel : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γ : GName) (s : String) (R : CtxId → IProp GF) [CtxMorph R] (D Out : IProp GF) [Timeless D]
-    hrefuteCore hrefuteHalf hsie hnoff hK reen hreen hon,
-    wp_release_cancel_body (hlc := hlc) (GF := GF) cpu k γ s R D Out hrefuteCore hrefuteHalf hsie hnoff hK reen hreen hon
+    hrefuteCore hrefuteHalf hdyn hsie hnoff hK reen hreen hon,
+    wp_release_cancel_body (hlc := hlc) (GF := GF) cpu k γ s R D Out hrefuteCore hrefuteHalf hdyn hsie hnoff hK reen hreen hon
 
 /-- **The self-refuting NON-freeing form of `release`.**  Like
 `wp_release_gen_body`, but instead of a separate credential `Tc` refuting the

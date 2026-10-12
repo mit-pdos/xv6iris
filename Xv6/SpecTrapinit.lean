@@ -3,7 +3,8 @@ Specification of `trapinit` (kernel/trap.c): the public contract, stated
 once, in the kernel execution context.
 
 `trapinit()` is `initlock(&tickslock, "time")`: the caller brings the
-three words of `tickslock` and gets back the name word and `lkFresh`
+name word of `tickslock` and its two raw words (`MachCSL.lkRaw`: the half
+cells of a registered lock, W8-β′) and gets back the name word and `lkFresh`
 (the two zeroed words with their floors), from which the lock is made
 once its payload (the `ticks` counter) is chosen.  The function needs 4
 of the caller's stack slots (its frame of 2, then `initlock`'s 2) and
@@ -15,6 +16,7 @@ import Xv6.Image
 import Xv6.Geom
 import MachCSL.WpSmodeFrame
 import MachCSL.Lock
+import MachCSL.WpLockInit
 
 namespace Xv6
 
@@ -33,9 +35,8 @@ def wp_trapinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurC
     (cpu : CPU) (k : KCtx) (vlock : BitVec 32) (vname vcpu : BitVec 64) (hK : 4 ≤ k.avail) : Prop :=
   kctx cpu k ∗ pcIs cpu trapinitAddr ∗
   kmapId tickslockAddr ∗ kmapId (tickslockAddr + 16#64) ∗
-  wordPointsTo tickslockAddr 4 (DFrac.own 1) vlock ∗
+  lkRaw tickslockAddr vlock vcpu ∗
   wordPointsTo (tickslockAddr + 8#64) 8 (DFrac.own 1) vname ∗
-  wordPointsTo (tickslockAddr + 16#64) 8 (DFrac.own 1) vcpu ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
     kctx cpu' (k.withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     wordPointsTo (tickslockAddr + 8#64) 8 (DFrac.own 1) timeNameAddr -∗

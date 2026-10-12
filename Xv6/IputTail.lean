@@ -202,7 +202,8 @@ theorem iput_tail_ne_au (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU)
   imodintro
   -- the store's accessor
   ihave Hru := (show runitAny (GF := GF) cinum.toNat ⊢ runit false cinum.toNat from .rfl) $$ Hru
-  unfold writeAU
+  iapply writeAU_of_own
+  unfold writeAUOwn
   imod iref_close_store_pinw_au (hlc := hlc) ⊤ fscIreg fscFs icfgIst icfgNib Mt kk cinum false
       q qt qrest m g lo tst CoPset.subseteq_top CoPset.subseteq_top hin hMk hqrest
     $$ Hinv Hrinv Hhalf [Hfrag Hlv Hslh] Hisl Hru Hicnt Hst Hllbt with ⟨%hlot, Hpin, Hcl⟩
@@ -402,7 +403,8 @@ theorem iput_tail_one_au (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU
   ihave Hru := (show runitAny (GF := GF) inum.toNat ⊢ runit false inum.toNat from .rfl) $$ Hru
   imodintro
   -- THE RETIRE STORE's accessor
-  unfold writeAU
+  iapply writeAU_of_own
+  unfold writeAUOwn
   imod iref_close_last_store_pinw_au (hlc := hlc) ⊤ fscIreg fscFs icfgIst icfgNib Mt kk inum q
       false .frzOff g lo tst CoPset.subseteq_top CoPset.subseteq_top hin hMk
     $$ Hinv Hrinv Hhalf [Hfrag Hlv Hslh] Hlvh Hsel Hisl Hru [Hoff] Hicnt [] Hst

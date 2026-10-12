@@ -120,9 +120,8 @@ theorem fsinit_initlog_call (IL : INITLOG) [Fscfg] [Icfg] [CurCtx]
     wordPointsTo sbLogstartAddr 4 dqs (BitVec.ofNat 32 fscLogst) ∗
     -- the RAW spinlock cells of struct log (&log.lock = &log)
     kmapId logAddr ∗ kmapId (logAddr + 16#64) ∗
-    wordPointsTo logAddr 4 (DFrac.own 1) vlock ∗
+    lkRaw logAddr vlock vcpu ∗
     wordPointsTo (logAddr + 8#64) 8 (DFrac.own 1) vname ∗
-    wordPointsTo (logAddr + 16#64) 8 (DFrac.own 1) vcpu ∗
     -- the rest of struct log
     wordPointsTo lStart 4 (DFrac.own 1) vStart ∗
     wordPointsTo lDev 4 (DFrac.own 1) vDev ∗
@@ -153,7 +152,7 @@ theorem fsinit_initlog_call (IL : INITLOG) [Fscfg] [Icfg] [CurCtx]
       ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨hLM, hsbok, hsbparse, hxslot⟩ := hcrash
   iintro ⟨Hk, Hpc, Hpi, Hte, Hce, Hbc, Hdc, Hpe, Hpid, #Hseam, #Hcert, Hxo, Hfree, Hsb, Hm0, Hm16,
-    Hl0, Hl8, Hl16, Hls, Hld, Hlo, Hlc, Hlnc, Hlhn, Hlhb, HauthL, HauthD, Hdirty, Hhdr, Hslots,
+    Hl0, Hl8, Hls, Hld, Hlo, Hlc, Hlnc, Hlhn, Hlhb, HauthL, HauthD, Hdirty, Hhdr, Hslots,
     Hpool, Hcr, Hfsb, Hnext⟩
   unfold fsinitCrash
   icases Hcr with ⟨Hborn, #Hlaw, #Hlawg, #Hcinv, #Hbinv⟩
@@ -167,7 +166,7 @@ theorem fsinit_initlog_call (IL : INITLOG) [Fscfg] [Icfg] [CurCtx]
   ihave Hfsb := (show fsblock (GF := GF) fscFs.bytes 1 bsSb ⊢ fsblock fscFs.bytes SB_BNO bsSb
     from .rfl) $$ Hfsb
   iapply h
-  iframe Hk Hpc Hpi Hte Hce Hbc Hdc Hpe Hpid Hbinv Hborn Hxo Hfree Hsb Hm0 Hm16 Hl0 Hl8 Hl16
+  iframe Hk Hpc Hpi Hte Hce Hbc Hdc Hpe Hpid Hbinv Hborn Hxo Hfree Hsb Hm0 Hm16 Hl0 Hl8
     Hls Hld Hlo Hlc Hlnc Hlhn Hlhb HauthL HauthD Hdirty Hhdr Hslots Hpool Hfsb Hnext
   isplitr
   · iexact Hseam

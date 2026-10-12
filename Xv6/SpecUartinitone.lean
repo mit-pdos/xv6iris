@@ -35,6 +35,7 @@ implication instead (the FIFO clear bit of `FCR := 7` always fires).
 
 Imports only definitional files.
 -/
+import MachCSL.WpLockInit
 import Xv6.Image
 import Xv6.UartInv
 import MachCSL.AluFacts
@@ -54,9 +55,8 @@ def uartinitonePre {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
   uartInv i γ ∗ uartBaseWord i ∗ uartRxWord i ∗ dlabOwn γ false ∗ txOwn γ l ∗ outLb γ l ∗
   (∃ hl : Option (List Obs), rxTok γ k hl) ∗
   kmapId (txLockAddr i) ∗ kmapId (txLockAddr i + 16#64) ∗
-  wordPointsTo (txLockAddr i) 4 (DFrac.own 1) vlock ∗
-  wordPointsTo (txLockAddr i + 8#64) 8 (DFrac.own 1) vname ∗
-  wordPointsTo (txLockAddr i + 16#64) 8 (DFrac.own 1) vcpu)
+  lkRaw (txLockAddr i) vlock vcpu ∗
+  wordPointsTo (txLockAddr i + 8#64) 8 (DFrac.own 1) vname)
 
 def uartinitonePost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (i : UartId) (γ : UartNames) (l : List (BitVec 8)) (name : BitVec 64) : IProp GF := iprop(

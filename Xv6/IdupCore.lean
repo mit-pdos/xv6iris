@@ -278,7 +278,8 @@ theorem idup_store_au [Fscfg] [Icfg] [CurCtx] (cpu : CPU) (M : RegMapF (Qp × Po
     icntHalf inum.toNat n.val ∗ (idStoreOut M k inum qt qn s n g lo -∗ P) ⊢
     writeAU cpu (iRef (ientry k)) 4 (BitVec.ofNat 32 n.succ.val) P := by
   iintro ⟨#Hinv, #Hrinv, Hhalf, Hst, #Hllb, Hlv, Hisl, Hmir, Hru, Hcnt, Hclose⟩
-  unfold writeAU
+  iapply writeAU_of_own
+  unfold writeAUOwn
   imod iref_upgrade_mir_store_pinw_au (hlc := hlc) ⊤ fscIreg fscFs icfgIst icfgNib M k inum false
       qt qn s n g lo tst CoPset.subseteq_top CoPset.subseteq_top hin hMk hq hno
     $$ Hinv Hrinv Hhalf Hlv Hisl Hmir Hru Hcnt Hst Hllb with ⟨%hlot, Hrows, Hcl⟩

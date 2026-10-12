@@ -1163,9 +1163,31 @@ variable [MachFixedGS hlc GF] (E : EraGS)
 
 theorem memModel_mmOk (σ : MState) : memModelAt E σ ⊢@{IProp GF} ⌜mmOk σ⌝ := by
   unfold memModelAt
-  iintro ⟨_, _, _, _, %h⟩
+  iintro ⟨_, _, _, _, %h, _⟩
   ipureintro
   exact h
+
+/-- The reserved regions' discipline at the machine (W8-β′). -/
+theorem memModel_rsvOk (σ : MState) :
+    memModelAt E σ ⊢@{IProp GF} ⌜rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem⌝ := by
+  unfold memModelAt rsvModelAt
+  iintro ⟨_, _, _, _, _, ⟨%reg, _, %⟨hin, _, hok⟩⟩, _⟩
+  ipureintro
+  exact all_of_reservedOk hin hok
+
+/-- The reserved conjunct moves with the memory, given the regions'
+discipline does. -/
+theorem rsvModel_mono (σ σ' : MState)
+    (h : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem →
+      rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ'.mem) :
+    rsvModelAt E σ ⊢@{IProp GF} rsvModelAt E σ' := by
+  unfold rsvModelAt
+  iintro ⟨⟨%reg, Hreg, %⟨hin, hex, hok⟩⟩, Hh⟩
+  iframe Hh
+  iexists reg
+  iframe Hreg
+  ipureintro
+  exact ⟨hin, hex, reservedOk_of_all hex (h (all_of_reservedOk hin hok))⟩
 
 /-- The mirrors move with the task bookkeeping (only the pure conjunct
 `devRtOk` of `mmOk` sees `devrt` at all). -/
@@ -1177,11 +1199,11 @@ theorem memModel_setRt (σ : MState) (d : DevId) (rt : DevRt)
       (E.authName ↪●MAP authMap σ.log) ∗
       ([∗list] cpu ∈ cpus, hartViewsAt (GF := GF) E σ cpu) ∗
       (E.resvName ↪●MAP resvMap σ) ∗
-      ⌜mmOk (σ.setRt d rt)⌝) := rfl
+      ⌜mmOk (σ.setRt d rt)⌝ ∗ rsvModelAt E σ) := rfl
   rw [e]
   unfold memModelAt
-  iintro ⟨Htop, Hauth, Hviews, Hresv, %h⟩
-  iframe Htop Hauth Hviews Hresv
+  iintro ⟨Htop, Hauth, Hviews, Hresv, %h, Hrsv⟩
+  iframe Htop Hauth Hviews Hresv Hrsv
   ipureintro
   exact mmOk_setRt σ d rt hnext h
 
@@ -1256,7 +1278,8 @@ theorem hartViews_acc (σ : MState) (cpu : CPU) :
 theorem memModel_load (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv : tvn ≤ σ.top) :
     memModelAt E σ ⊢@{IProp GF} |==> memModelAt E (σ.afterLoad cpu pa n tvn) := by
   unfold memModelAt
-  iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm⟩
+  rw [rsvModelAt_congr E (σ := σ) (σ' := σ.afterLoad cpu pa n tvn) rfl]
+  iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
   icases hartViews_acc E σ cpu $$ Hviews with ⟨Hc, Hclose⟩
   icases hartViewsAt_cases E σ cpu $$ Hc with ⟨Hv, Hi, Hr⟩
   imod MonoNat.own_update _ (.ofNat (σ.hr cpu).rv) (.ofNat (max (σ.hr cpu).rv tvn))
@@ -1269,7 +1292,7 @@ theorem memModel_load (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv 
       · rename_i hc; subst hc; simp [HRead.afterLoad]
       · simp)
   rw [hresv]
-  iframe Htop Hauth Hresv
+  iframe Htop Hauth Hresv Hrsv
   isplitl [Hv Hi Hr Hclose]
   · iapply Hclose $$ %(σ.afterLoad cpu pa n tvn)
     · ipureintro
@@ -1287,7 +1310,8 @@ theorem memModel_fence (σ : MState) (cpu : CPU) (b : barrier_kind) :
     memModelAt E σ ⊢@{IProp GF}
       |==> (memModelAt E (σ.fence cpu b) ∗ viewLbAt E cpu ((σ.fence cpu b).tv cpu)) := by
   unfold memModelAt
-  iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm⟩
+  rw [rsvModelAt_congr E (σ := σ) (σ' := σ.fence cpu b) rfl]
+  iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
   icases hartViews_acc E σ cpu $$ Hviews with ⟨Hc, Hclose⟩
   icases hartViewsAt_cases E σ cpu $$ Hc with ⟨Hv, Hi, Hr⟩
   have hmm' := mmOk_fence σ cpu b hmm
@@ -1308,8 +1332,8 @@ theorem memModel_fence (σ : MState) (cpu : CPU) (b : barrier_kind) :
   imodintro
   have hresv : resvMap (σ.fence cpu b) = resvMap σ := resvMap_congr _ _ (fun c => ⟨rfl, rfl⟩)
   rw [hresv]
-  isplitl [Htop Hauth Hresv Hv Hi Hr Hclose]
-  · iframe Htop Hauth Hresv
+  isplitl [Htop Hauth Hresv Hv Hi Hr Hclose Hrsv]
+  · iframe Htop Hauth Hresv Hrsv
     isplitl [Hv Hi Hr Hclose]
     · iapply Hclose $$ %(σ.fence cpu b)
       · ipureintro
@@ -1341,7 +1365,10 @@ theorem hartViews_store_plain (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (
 whose authorship and position become persistent facts; the hart's
 reservation and pending acquire bit, whatever they were, are cleared. -/
 theorem memModel_store_plain (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (r : Option Resv) (b : Bool) (hram : ramBytes pa n) (hno : ¬ othersReserve σ.resv cpu pa n) :
+    (r : Option Resv) (b : Bool) (hram : ramBytes pa n) (hno : ¬ othersReserve σ.resv cpu pa n)
+    (hrsv : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem →
+      rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))
+        (σ.mem.writeBytes pa n w (σ.top + 1) (hartAgent cpu))) :
     memModelAt E σ ∗ resvFragAt E cpu r b ⊢@{IProp GF} |==>
       (memModelAt E (σ.store cpu pa n w false) ∗ resvFragAt E cpu none false ∗
        authoredByAt E (σ.top + 1) (hartAgent cpu) ∗ topLbAt E (σ.top + 1)) := by
@@ -1350,7 +1377,8 @@ theorem memModel_store_plain (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w
   · iapply memModel_resv E σ cpu r b $$ [Hmm Hfrag]
     iframe
   unfold memModelAt
-  icases Hmm with ⟨Htop, Hauth, Hviews, Hresv, %hmm⟩
+  icases Hmm with ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
+  ihave Hrsv := rsvModel_mono E σ (σ.store cpu pa n w false) hrsv $$ Hrsv
   imod MonoNat.own_update _ (.ofNat σ.top) (.ofNat (σ.top + 1))
     (by simp only [MaxNat.le_toNat]; omega) $$ Htop with ⟨Htop, #Htoplb⟩
   imod ghost_map_insert_persist (σ.top + 1) (hartAgent cpu)
@@ -1364,8 +1392,9 @@ theorem memModel_store_plain (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w
       (fun c hc => by simp [updCpu, hc])
   rw [hresv]
   iframe Hfrag Hresv
-  isplitl [Htop Hauth Hviews]
-  · rw [show (σ.store cpu pa n w false).top = σ.top + 1 by
+  isplitl [Htop Hauth Hviews Hrsv]
+  · iframe Hrsv
+    rw [show (σ.store cpu pa n w false).top = σ.top + 1 by
           simp [MState.top],
         show (σ.store cpu pa n w false).log = σ.log ++ [hartAgent cpu] from rfl, authMap_snoc]
     iframe Htop Hauth
@@ -1583,10 +1612,95 @@ theorem readBytes_unique (m : FlatMem) (h : Agent) (tv : Nat) (pa : PAddr) (n : 
   have := h1 j hj; have := h2 j hj
   simp_all
 
+/-! ### The reserved regions' halves (W8-β′) -/
+
+/-- The static reserved list of the ambient fixed record. -/
+abbrev rsvList : List RsvRegion := MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)
+
+/-- A byte of a reserved region, located: its region's index, the word's
+index in the region and the byte's index in the word. -/
+theorem rsvBytes_locate {rs : List RsvRegion} {a : PAddr} (ha : a ∈ rsvBytes rs) :
+    ∃ (i : Nat) (R : RsvRegion) (k : Nat) (w : PAddr × Nat) (j : Nat),
+      rs[i]? = some R ∧ R.words[k]? = some w ∧ j < w.2 ∧ a = w.1 + BitVec.ofNat 64 j := by
+  obtain ⟨R, hR, hb⟩ := List.mem_flatMap.1 ha
+  obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 hR
+  obtain ⟨w, hw, hwb⟩ := List.mem_flatMap.1 hb
+  obtain ⟨k, hk⟩ := List.mem_iff_getElem?.1 hw
+  obtain ⟨j, hj, rfl⟩ := List.mem_map.1 hwb
+  exact ⟨i, R, k, w, j, hi, hk, List.mem_range.1 hj, rfl⟩
+
+/-- The interpretation's halves, opened at one word of one region. -/
+theorem rsvHalves_acc (E : EraGS) (rs : List RsvRegion) {i k : Nat} {R : RsvRegion} {w : PAddr × Nat}
+    (hi : rs[i]? = some R) (hk : R.words[k]? = some w) :
+    rsvHalvesAt (GF := GF) E rs ⊢ rsvWordHalfAt E w.1 w.2 ∗ (rsvWordHalfAt E w.1 w.2 -∗ rsvHalvesAt E rs) := by
+  unfold rsvHalvesAt
+  iintro H
+  icases (BigSepL.bigSepL_lookup_acc (Φ := fun _ R => iprop([∗list] w ∈ R.words, rsvWordHalfAt (GF := GF) E w.1 w.2))
+    hi).1 $$ H with ⟨HR, Hc⟩
+  icases (BigSepL.bigSepL_lookup_acc (Φ := fun _ w => rsvWordHalfAt (GF := GF) E w.1 w.2) hk).1 $$ HR with ⟨Hw, Hc'⟩
+  iframe Hw
+  iintro Hw
+  ihave HR := Hc' $$ %w Hw
+  rw [rsvSetSelf hk]
+  ihave H := Hc $$ %R HR
+  rw [rsvSetSelf hi]
+  iexact H
+
+/-- An own-1 byte is no reserved byte: the interpretation holds half of every
+reserved byte. -/
+theorem memModel_notRsv (σ : MState) (a : PAddr) (H : Hist) :
+    memModel σ ∗ a ↦ₕ H ⊢@{IProp GF} ⌜a ∉ rsvBytes (rsvList (hlc := hlc) (GF := GF))⌝ := by
+  by_cases ha : a ∈ rsvBytes (rsvList (hlc := hlc) (GF := GF))
+  · obtain ⟨i, R, k, w, j, hi, hk, hj, rfl⟩ := rsvBytes_locate ha
+    unfold memModel memModelAt rsvModelAt
+    iintro ⟨⟨_, _, _, _, _, _, Hh⟩, Hpt⟩
+    icases rsvHalves_acc _ _ hi hk $$ Hh with ⟨Hw, _⟩
+    unfold rsvWordHalfAt
+    icases Hw with ⟨%Hs, Hw⟩
+    icases BigSepL.bigSepL_lookup (Φ := fun _ (j : Nat) => pointsTo (L := PAddr) (V := Hist) (H := MemF)
+      (G := (MachGS.era (hlc := hlc) (GF := GF)).mem) (w.1 + BitVec.ofNat 64 j) (DFrac.own (1 : Qp).half) (Hs j))
+      (i := j) (x := j) (by simp [hj]) $$ Hw with Hb
+    icases pointsTo_ne $$ Hpt Hb with %hne
+    exact absurd rfl hne
+  · iintro _
+    ipureintro
+    exact ha
+
+/-- The bytes of an own-1 context window are no reserved bytes. -/
+theorem memModel_notRsv_ctx (σ : MState) (ξ : CtxId) (pa : PAddr) (bs : Nat → BitVec 8) :
+    ∀ n : Nat, memModel σ ∗ ([∗list] j ∈ List.range n, ctxByte ξ (pa + BitVec.ofNat 64 j) (DFrac.own 1) (bs j))
+      ⊢@{IProp GF} ⌜∀ j, j < n → pa + BitVec.ofNat 64 j ∉ rsvBytes (rsvList (hlc := hlc) (GF := GF))⌝
+  | 0 => by
+    iintro _
+    ipureintro
+    intro j hj; omega
+  | n + 1 => by
+    rw [List.range_succ]
+    iintro ⟨Hmm, Hb⟩
+    icases BigSepL.bigSepL_snoc.1 $$ Hb with ⟨Hb1, Hb2⟩
+    ihave %h1 := memModel_notRsv_ctx σ ξ pa bs n $$ [Hmm Hb1]
+    · iframe
+    unfold ctxByte
+    icases Hb2 with ⟨%e, %H, Hpt, _⟩
+    ihave %h2 := memModel_notRsv σ _ _ $$ [Hmm Hpt]
+    · iframe
+    ipureintro
+    intro j hj
+    rcases Nat.lt_succ_iff_lt_or_eq.1 hj with h | rfl
+    · exact h1 j h
+    · exact h2
+
+theorem memModel_notRsv_ctxBytes (σ : MState) (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
+    memModel σ ∗ ctxBytes ξ pa n (DFrac.own 1) w
+      ⊢@{IProp GF} ⌜∀ j, j < n → pa + BitVec.ofNat 64 j ∉ rsvBytes (rsvList (hlc := hlc) (GF := GF))⌝ := by
+  unfold ctxBytes
+  exact memModel_notRsv_ctx σ ξ pa (nthByte w) n
+
 /-- A store by the running context: the memory model moves, the new timestamp
 enters ξ's dirty set (authored on `cpu`), and ξ's token is re-established. -/
 theorem ctx_store (σ : MState) (cpu : CPU) (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (r : Option Resv) (hram : ramBytes pa n) (hno : ¬ othersReserve σ.resv cpu pa n) :
+    (r : Option Resv) (hram : ramBytes pa n) (hno : ¬ othersReserve σ.resv cpu pa n)
+    (hnr : ∀ j, j < n → pa + BitVec.ofNat 64 j ∉ rsvBytes (rsvList (hlc := hlc) (GF := GF))) :
     memModel σ ∗ ownCtx cpu ξ ∗ resvFragAny cpu r ⊢@{IProp GF} |==>
       (memModel (σ.store cpu pa n w false) ∗ ownCtx cpu ξ ∗ resvFrag cpu none false ∗
        keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ (σ.top + 1)) := by
@@ -1596,7 +1710,8 @@ theorem ctx_store (σ : MState) (cpu : CPU) (ξ : CtxId) (pa : PAddr) (n : Nat) 
   · iapply memModel_topLb _ σ W $$ [Hmm HW]
     iframe Hmm
     iexact HW
-  imod memModel_store_plain _ σ cpu pa n w r b hram hno $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag, #Hau, #Htop'⟩
+  imod memModel_store_plain _ σ cpu pa n w r b hram hno
+    (rsvAllOk_store_off w (σ.top + 1) (hartAgent cpu) hnr) $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag, #Hau, #Htop'⟩
   unfold ctxAt
   icases Hctx with ⟨Hbound, Hdirty⟩
   have hfresh : get? D (σ.top + 1) = none := by
@@ -1809,7 +1924,9 @@ theorem swp_sail_mem_write_plain (cpu : CPU) {n vasize : Nat}
     rw [hv] at hv'
     obtain rfl := Option.some.inj hv'
     icases ctxTok_cases cpu ξ $$ Htok with ⟨Hctx, %r, Hfrag⟩
-    imod ctx_store σ cpu ξ req.pa n w' r hram hno $$ [$Hmm $Hctx $Hfrag] with ⟨Hmm, Hctx, Hfrag, #Hkey⟩
+    ihave %hnr := memModel_notRsv_ctxBytes σ ξ req.pa n w $$ [Hmm Hb]
+    · iframe
+    imod ctx_store σ cpu ξ req.pa n w' r hram hno hnr $$ [$Hmm $Hctx $Hfrag] with ⟨Hmm, Hctx, Hfrag, #Hkey⟩
     imod ctxBytes_update ξ σ.mem req.pa n w w' (σ.top + 1) (hartAgent cpu) $$ [$Hkey $Hmem $Hb]
       with ⟨Hmem, Hb⟩
     imod Hmask

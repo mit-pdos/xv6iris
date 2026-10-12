@@ -42,6 +42,7 @@ led form over `UvmCallSites.uc_kalloc_lend_call`).
 import Xv6.SpecPipealloc
 import Xv6.SpecFilealloc
 import Xv6.SpecInitlock
+import Xv6.LockRsv
 import Xv6.FileFrac
 import Xv6.PipeRw
 import Xv6.PipeBirth
@@ -197,8 +198,17 @@ theorem pa_kalloc (KAL : KALLOC) (c : CPU) (k' : KCtx) (γkl : GName) (γk : Kme
     ⊢ wpLoop (GF := GF) c :=
   uc_kalloc_lend_call KAL c k' γkl γk on ke hnoff hK hlk
 
+/-- A kalloc page lies above every registered lock (W8-β′). -/
+theorem pa_lkOut (p : BitVec 64) (hpv : pageValid p) : ¬ rsvLockAt p := by
+  intro hm
+  have h1 := xv6RsvStatic_lockLow hm
+  have h3 := hpv.2.1
+  unfold kernelEndAddr at h3
+  simp only [BitVec.ult, decide_eq_true_eq] at h1 h3
+  omega
+
 theorem pa_initlock (IL : INITLOCK) (c : CPU) (k' : KCtx) (vlock : BitVec 32) (vname vcpu : BitVec 64)
-    (hK : 2 ≤ k'.avail) :
+    (hK : 2 ≤ k'.avail) (hout : ¬ rsvLockAt (k'.regs 10#5)) :
     kctx c k' ∗ pcIs c KA.«initlock» ∗
     kmapId (k'.regs 10#5) ∗ kmapId (k'.regs 10#5 + 16#64) ∗
     wordPointsTo (k'.regs 10#5) 4 (DFrac.own 1) vlock ∗
@@ -209,8 +219,8 @@ theorem pa_initlock (IL : INITLOCK) (c : CPU) (k' : KCtx) (vlock : BitVec 32) (v
       wordPointsTo (k'.regs 10#5 + 8#64) 8 (DFrac.own 1) (k'.regs 11#5) -∗
       lkFresh (k'.regs 10#5) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := IL.wp_initlock (hlc := hlc) (GF := GF) c k' vlock vname vcpu hK
-  unfold wp_initlock_body at h
+  have h := wp_initlock_own (hlc := hlc) (GF := GF) IL c k' vlock vname vcpu hK hout
+  unfold wp_initlock_own_body at h
   simp only [initlockAddr] at h
   exact h
 
@@ -549,12 +559,13 @@ theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γ
   k_step_gen (wp_s_jal c8 _ (KA.«pipealloc» + 0x50#64) false 2082174#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipealloc_br_ffffffffffffc5ce] next c9 hp9
   iintro Hk Hpc
-  iapply (pa_initlock IL c9 _ vl vn vc ?hKi) $$ [- $Hk $Hpc]
+  iapply (pa_initlock IL c9 _ vl vn vc ?hKi ?hout) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g [pa_ret_44e6, h10]
   iframe Hid0 Hid16 Hlk Hnm Hcpu
   iframe #
   case hKi => k_norm_g; unfold pipeallocSlots at hK; have := filecloseSlots_callees.2.2.2; omega
+  case hout => k_norm_g [h10]; exact pa_lkOut pi hpv
   -- past initlock: the pipe is born
   iapply wpNext_intro_pin
   iintro %cA %hpA %RA Hk Hpc Hnm Hfresh %hcsA

@@ -52,7 +52,7 @@ def bufOut (i : Nat) : IProp GF := iprop%
 /-- The specification of `binit`. -/
 def wp_binit_body (cpu : CPU) (k : KCtx) (vlock : BitVec 32) (vname vcpu vhp vhn : BitVec 64)
     (hK : 12 ≤ k.avail) : Prop :=
-  kctx cpu k ∗ pcIs cpu binitAddr ∗ lockWords bcacheLockAddr vlock vname vcpu ∗
+  kctx cpu k ∗ pcIs cpu binitAddr ∗ lockWordsR bcacheLockAddr vlock vname vcpu ∗
   wordPointsTo (bcacheHeadAddr + 72#64) 8 (DFrac.own 1) vhp ∗
   wordPointsTo (bcacheHeadAddr + 80#64) 8 (DFrac.own 1) vhn ∗
   ([∗list] i ∈ List.range 30, bufIn i) ∗

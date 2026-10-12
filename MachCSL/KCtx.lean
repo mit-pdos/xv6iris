@@ -530,6 +530,40 @@ def aCpuIntena [KernelGeom] (cpu : CPU) : BitVec 64 := cpuAddr cpu + BitVec.ofNa
 /-- `c->intena` as the kernel stores it. -/
 def intenaVal (eb : Bool) : BitVec 32 := if eb then 1#32 else 0#32
 
+/-- `cpus[cpu]`'s cells are a static reserved region of the ambient record
+(W8-β′): the fact the dedicated rules' reserved-mode stores rest on. -/
+def cpuRsvIn [KernelGeom] (cpu : CPU) : Prop :=
+  ∃ i : Nat, (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))[i]? = some ⟨cpuAddr cpu, .cpu cpu⟩
+
+/-- A cell's side facts: the region is registered and `(va, n)` is one of its words. -/
+def cpuCellOk [KernelGeom] (cpu : CPU) (va : PAddr) (n : Nat) : Prop :=
+  cpuRsvIn (hlc := hlc) (GF := GF) cpu ∧ (va, n) ∈ RsvRegion.words ⟨cpuAddr cpu, .cpu cpu⟩
+
+/-- **One of `cpus[cpu]`'s cells** (W8-β′): HALF of the word -- the state
+interpretation holds the other half (`MachCSL.rsvModelAt`), so no generic
+store reaches it --, the address's identity claim, and the cell's side facts. -/
+def cpuCell [CurCtx] [KernelGeom] (cpu : CPU) (va : PAddr) (n : Nat) (v : BitVec (8 * n)) : IProp GF := iprop%
+  wordPointsTo va n (DFrac.own (1 : Qp).half) v ∗ kmapId va ∗ ⌜cpuCellOk (hlc := hlc) (GF := GF) cpu va n⌝
+
+instance cpuCell_timeless [CurCtx] [KernelGeom] (cpu : CPU) (va : PAddr) (n : Nat) (v : BitVec (8 * n)) :
+    Timeless (PROP := IProp GF) (cpuCell cpu va n v) := by
+  unfold cpuCell wordPointsTo; infer_instance
+
+theorem cpuCell_cases [CurCtx] [KernelGeom] (cpu : CPU) (va : PAddr) (n : Nat) (v : BitVec (8 * n)) :
+    cpuCell (GF := GF) cpu va n v ⊢
+      wordPointsTo va n (DFrac.own (1 : Qp).half) v ∗ kmapId va ∗ ⌜cpuCellOk (hlc := hlc) (GF := GF) cpu va n⌝ := by
+  unfold cpuCell; iintro H; iexact H
+
+theorem cpuCell_intro [CurCtx] [KernelGeom] (cpu : CPU) (va : PAddr) (n : Nat) (v : BitVec (8 * n))
+    (hin : cpuCellOk (hlc := hlc) (GF := GF) cpu va n) :
+    kmapId va ⊢ wordPointsTo va n (DFrac.own (1 : Qp).half) v -∗ cpuCell (GF := GF) cpu va n v := by
+  unfold cpuCell
+  iintro #Hid Hw
+  iframe Hw
+  isplit
+  · iexact Hid
+  · ipureintro; exact hin
+
 /-- The `c->intena` cell of the bundle: pinned to the saved enable state at
 depth ≥ 1, scratch at depth 0 (as in the prototype's `cpu_cells`: a trap
 handler's own push_off overwrites it, so an interrupted thread cannot be
@@ -539,24 +573,24 @@ window between their `c->intena` access and their `c->noff` write. -/
 def intenaCell [CurCtx] [KernelGeom] (cpu : CPU) (lent sie : Bool) (noff : Nat) (intena : Bool) : IProp GF :=
   if lent then iprop(⌜noff = 0 ∧ sie = false⌝)
   else match noff with
-    | 0 => iprop(∃ b : Bool, wordPointsTo (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal b))
-    | _ + 1 => wordPointsTo (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal intena)
+    | 0 => iprop(∃ b : Bool, cpuCell cpu (aCpuIntena cpu) 4 (intenaVal b))
+    | _ + 1 => cpuCell cpu (aCpuIntena cpu) 4 (intenaVal intena)
 
 @[simp] theorem intenaCell_lent [CurCtx] [KernelGeom] (cpu : CPU) (sie : Bool) (noff : Nat) (intena : Bool) :
     intenaCell (GF := GF) cpu true sie noff intena = iprop(⌜noff = 0 ∧ sie = false⌝) := rfl
 @[simp] theorem intenaCell_zero [CurCtx] [KernelGeom] (cpu : CPU) (sie : Bool) (intena : Bool) :
     intenaCell (GF := GF) cpu false sie 0 intena =
-      iprop(∃ b : Bool, wordPointsTo (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal b)) := rfl
+      iprop(∃ b : Bool, cpuCell cpu (aCpuIntena cpu) 4 (intenaVal b)) := rfl
 @[simp] theorem intenaCell_succ [CurCtx] [KernelGeom] (cpu : CPU) (sie : Bool) (n : Nat) (intena : Bool) :
     intenaCell (GF := GF) cpu false sie (n + 1) intena =
-      wordPointsTo (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal intena) := rfl
+      cpuCell cpu (aCpuIntena cpu) 4 (intenaVal intena) := rfl
 
 /-- This hart's `struct cpu` cells: `c->proc` at the running proc, `c->noff`
 at the depth, and the `c->intena` cell (`intenaCell`). -/
 def cpuCells [CurCtx] [KernelGeom] (cpu : CPU) (lent sie : Bool) (noff : Nat) (intena : Bool) (p : BitVec 64) :
     IProp GF := iprop%
-  wordPointsTo (aCpuProc cpu) 8 (DFrac.own 1) p ∗
-  wordPointsTo (aCpuNoff cpu) 4 (DFrac.own 1) (BitVec.ofNat 32 noff) ∗
+  cpuCell cpu (aCpuProc cpu) 8 p ∗
+  cpuCell cpu (aCpuNoff cpu) 4 (BitVec.ofNat 32 noff) ∗
   intenaCell cpu lent sie noff intena
 
 /-- At depth 0 the ghost `intena` is a canonical placeholder: the cell does

@@ -239,7 +239,7 @@ theorem push_off_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cur
     -- store `old = 0` into it and keep it until the depth is written
     have hA : aCpuIntena cpu = cpuAddr cpu + 124#64 := rfl
     icases kctx_lend cpu _ (by k_norm; exact hn0) (by k_norm) $$ Hk with ⟨%b, Hk, Hcell⟩
-    k_step (wp_s_sw cpu _ (KA.«push_off» + 0x36#64) true 124#12 10#5 15#5 (by decide) (intenaVal b)) from (text_instr _ _ _ _ rfl rfl) Htext
+    k_step (wp_s_sw_cpuCell cpu _ (by k_norm) (KA.«push_off» + 0x36#64) true 124#12 10#5 15#5 (by decide) (intenaVal b)) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [h10', hA]
     iintro Hk Hpc Hcell
     rw [← hA]

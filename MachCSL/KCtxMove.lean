@@ -61,6 +61,15 @@ instance instCtxMorphStackOwn (tier : KTier) (sp : BitVec 64) (n : Nat) :
       @wordPointsTo hlc GF _ ⟨ξ, tier⟩ (sp - 8#64 * BitVec.ofNat 64 (i + 1)) 8 (DFrac.own 1) w))
     (fun _ i => @instCtxMorphExists hlc GF _ _ _ (fun _ => instCtxMorphWordAt _ _ _ _ _))
 
+/-- One `cpus[cpu]` cell at a fixed tier (W8-β′: the half word, its identity
+claim and its registration; only the word mentions the context). -/
+instance instCtxMorphCpuCell [KernelGeom] (tier : KTier) (cpu : CPU) (va : PAddr) (n : Nat)
+    (v : BitVec (8 * n)) :
+    CtxMorph (GF := GF) (fun ξ => @cpuCell hlc GF _ ⟨ξ, tier⟩ _ cpu va n v) :=
+  @instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
+    (instCtxMorphConst iprop(kmapAt (GF := GF) (vpnOf va) (kLeaf (idPpn (vpnOf va)) .rw 0#1 0#1) ∗
+      ⌜cpuCellOk (hlc := hlc) (GF := GF) cpu va n⌝))
+
 /-- The `c->intena` cell at a fixed tier. -/
 instance instCtxMorphIntenaCell [KernelGeom] (tier : KTier) (cpu : CPU) (lent sie : Bool)
     (noff : Nat) (intena : Bool) :
@@ -69,17 +78,17 @@ instance instCtxMorphIntenaCell [KernelGeom] (tier : KTier) (cpu : CPU) (lent si
   · cases noff with
     | zero =>
       exact @instCtxMorphExists hlc GF _ _
-        (fun (b : Bool) ξ => @wordPointsTo hlc GF _ ⟨ξ, tier⟩ (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal b))
-        (fun _ => instCtxMorphWordAt _ _ _ _ _)
-    | succ m => exact instCtxMorphWordAt _ _ _ _ _
+        (fun (b : Bool) ξ => @cpuCell hlc GF _ ⟨ξ, tier⟩ _ cpu (aCpuIntena cpu) 4 (intenaVal b))
+        (fun _ => instCtxMorphCpuCell _ _ _ _ _)
+    | succ m => exact instCtxMorphCpuCell _ _ _ _ _
   · exact instCtxMorphConst _
 
 /-- The `struct cpu` cells at a fixed tier. -/
 instance instCtxMorphCpuCells [KernelGeom] (tier : KTier) (cpu : CPU) (lent sie : Bool)
     (noff : Nat) (intena : Bool) (p : BitVec 64) :
     CtxMorph (GF := GF) (fun ξ => @cpuCells hlc GF _ ⟨ξ, tier⟩ _ cpu lent sie noff intena p) :=
-  @instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
-    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
+  @instCtxMorphSep hlc GF _ _ _ (instCtxMorphCpuCell _ _ _ _ _)
+    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphCpuCell _ _ _ _ _)
       (instCtxMorphIntenaCell _ _ _ _ _ _))
 
 /-- The per-cpu bookkeeping at a fixed tier (the lock set and the hart CSRs

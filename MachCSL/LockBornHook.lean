@@ -80,40 +80,85 @@ theorem newlockAt_llb [CurCtx] (cpu : CPU) (E : CoPset) (γ : GName) (lk : BitVe
       topLb tl ∗ Rdep curCtx ⊢
       |={E}=> (ownCtx cpu curCtx ∗ isLock (GF := GF) γ lk s R) := by
   unfold lockFreeTok lkFresh
-  iintro ⟨⟨%B, H1, H2⟩, #Hcl, #Hcl', Hrun, ⟨%hok, ⟨%lo, %lc, Hw, #Hflo, Hc, #Hflc⟩⟩, #Htl, HR⟩
+  iintro ⟨⟨%B, H1, H2⟩, #Hcl, #Hcl', Hrun, ⟨%hok, Hfr⟩, #Htl, HR⟩
   ihave #Hhook := lockHook_llb Rdep R tl hfold $$ Htl
   imod lock_pay_born_hook cpu R Rdep $$ [$Hrun $HR $Hhook] with ⟨Hrun, Hpay⟩
-  imod inv_alloc lockN E (lockBody γ lk s R lo lc) $$ [Hw Hc H1 H2 Hpay] with #Hinv
-  · inext
-    unfold lockBody
-    iexists [], [], none, B
-    iframe Hw Hc H1
-    isplit
-    · ipureintro
-      refine ⟨rfl, fun e he => absurd he (by simp), fun c _ e hl => ?_, fun _ h => by cases h⟩
-      obtain ⟨W1, W2, hW, _, _⟩ := hl
-      cases W1 <;> cases hW
-    isplitr [H2 Hpay]
-    · unfold lkCpuFrag; iempintro
-    · ileft
+  icases Hfr with (⟨%hm, ⟨%lo, %lc, Hw, #Hflo, Hc, #Hflc⟩⟩ | ⟨%hm, Hfr⟩)
+  · imod inv_alloc lockN E (lockBody γ lk s R lo lc) $$ [Hw Hc H1 H2 Hpay] with #Hinv
+    · inext
+      unfold lockBody
+      iexists [], [], none, B
+      iframe Hw Hc H1
       isplit
-      · ipureintro; rfl
-      iframe H2 Hpay
-  imodintro
-  iframe Hrun
-  unfold isLock
-  isplit
-  · ipureintro; exact hok
-  isplit
-  · iexact Hcl
-  isplit
-  · iexact Hcl'
-  iexists lo, lc
-  isplit
-  · iexact Hinv
-  isplit
-  · iexact Hflo
-  · iexact Hflc
+      · ipureintro
+        refine ⟨rfl, fun e he => absurd he (by simp), fun c _ e hl => ?_, fun _ h => by cases h⟩
+        obtain ⟨W1, W2, hW, _, _⟩ := hl
+        cases W1 <;> cases hW
+      isplitr [H2 Hpay]
+      · unfold lkCpuFrag; iempintro
+      · ileft
+        isplit
+        · ipureintro; rfl
+        iframe H2 Hpay
+    imodintro
+    iframe Hrun
+    unfold isLock
+    simp only [lockBodyM_dyn hm]
+    isplit
+    · ipureintro; exact hok
+    isplit
+    · iexact Hcl
+    isplit
+    · iexact Hcl'
+    iexists lo, lc
+    isplit
+    · iexact Hinv
+    isplit
+    · iexact Hflo
+    · iexact Hflc
+  · -- a RESERVED lock (W8-β′)
+    unfold lkFreshR
+    icases Hfr with ⟨%W, %W', Hw, Hc, %⟨hW, hW'⟩⟩
+    imod inv_alloc lockN E (lockBodyR γ lk s R) $$ [Hw Hc H1 H2 Hpay] with #Hinv
+    · inext
+      unfold lockBodyR
+      iexists W, W', none, B
+      iframe Hw Hc H1
+      isplit
+      · ipureintro
+        refine ⟨?_, fun e he => Or.inl (hW' e he).2.2, fun c _ e hl => ?_, fun _ h => by cases h⟩
+        · show curVal W 0 = 0
+          cases W with
+          | nil => rfl
+          | cons e W => exact (hW e List.mem_cons_self).2.2
+        · obtain ⟨W1, W2, hW2, _, _⟩ := hl
+          exact (hW' e (by rw [hW2]; exact List.mem_append_right _ List.mem_cons_self)).2.2
+      isplit
+      · ipureintro
+        exact ⟨hm, fun e he => ⟨(hW e he).1, (hW e he).2.1, Or.inl (hW e he).2.2⟩,
+          fun e he => ⟨(hW' e he).1, (hW' e he).2.1⟩, lkFold_zeros (fun e he => (hW e he).2.2)⟩
+      isplitr [H2 Hpay]
+      · unfold lkCpuFrag; iempintro
+      · ileft
+        isplit
+        · ipureintro; rfl
+        iframe H2 Hpay
+    imodintro
+    iframe Hrun
+    unfold isLock
+    simp only [lockBodyM_rsv hm]
+    isplit
+    · ipureintro; exact hok
+    isplit
+    · iexact Hcl
+    isplit
+    · iexact Hcl'
+    iexists 0, 0
+    isplit
+    · iexact Hinv
+    isplit
+    · unfold lkFloor; iapply keyAt_0
+    · unfold lkFloor; iapply keyAt_0
 
 /-- **THE BIRTH AT A PRE-ALLOCATED GNAME, AT THE KERNEL EXECUTION CONTEXT**
 (Rocq `WpLockAt.newlock_at` as `ProofInitlog.v` uses it): `newlockAt_llb`

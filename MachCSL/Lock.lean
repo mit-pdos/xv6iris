@@ -42,17 +42,8 @@ def lockN : Namespace := ndot nroot "xv6spinlock"
 
 /-! ## The word's pin -/
 
-/-- The value a taken lock word holds. -/
-def lkOne : BitVec 32 := 1#32
-
-/-- Since the winning store at `B` (by hart `i`), every store wrote 1. -/
-def wordPin (W : WordHist 4) (B : Nat) (i : CPU) : Prop :=
-  ∃ W1 W2, W = W1 ++ ⟨B, hartAgent i, lkOne⟩ :: W2 ∧ ∀ e ∈ W1, e.v = lkOne
-
-/-- The word's discipline at each state. -/
-def lockWordAt : LockState → Nat → WordHist 4 → Prop
-  | none, _, W => curVal W 0 = 0
-  | some (i, _), B, W => wordPin W B i
+-- `lkOne`, `wordPin`, `lockWordAt` live in `MachCSL.Reserved` (W8-β′: the
+-- state interpretation's reserved-region discipline is stated with them).
 
 theorem wordPin_push {W : WordHist 4} {B : Nat} {i : CPU} (hpin : wordPin W B i) (t : Nat) (h : Agent) :
     wordPin (⟨t, h, lkOne⟩ :: W) B i := by
@@ -172,9 +163,7 @@ theorem hartAgent_inj {c c' : CPU} (h : hartAgent c = hartAgent c') : c = c' :=
 /-- An entry of the owner word: 0, or the writer's own `&cpus[c]`. -/
 def cpuEntOk (e : WEnt 8) : Prop := e.v = 0 ∨ ∃ c : CPU, e.tid = hartAgent c ∧ e.v = cpuAddr c
 
-/-- `e` is `h`'s latest own entry of `W`. -/
-def latestOwn (W : WordHist 8) (h : Agent) (e : WEnt 8) : Prop :=
-  ∃ W1 W2, W = W1 ++ e :: W2 ∧ e.tid = h ∧ ∀ x ∈ W1, x.tid ≠ h
+-- `latestOwn` lives in `MachCSL.Reserved`.
 
 /-- The owner word's discipline at each state. -/
 def lkCpuAt (st : LockState) (W : WordHist 8) : Prop :=
@@ -297,6 +286,189 @@ theorem lkCpu_read_not_mine {W : WordHist 8} {st : LockState} (h : lkCpuAt st W)
       rw [this] at hw
       exact cpuAddr_ne_zero c' hw.symm
   · exact cpuAddr_ne_zero c hw.symm
+
+/-! ## The reserved discipline's transitions (W8-β′)
+
+A STATIC lock's two words are a reserved region of the state interpretation
+(`MachCSL.lockRegionOk`): beside the kit's per-state facts its body carries
+`lockRsvW` (every entry after power-on a hart's, the lock word 0/1, the
+holder fold `lkFold` at the state's holder), kept by every lock step. -/
+
+/-- What a RESERVED lock's body adds to `lockWordAt`/`lkCpuAt`. -/
+def lockRsvW (st : LockState) (W : WordHist 4) (W' : WordHist 8) : Prop :=
+  (∀ e ∈ W, e.t ≠ 0 ∧ e.tid < NCPU ∧ (e.v = 0 ∨ e.v = lkOne)) ∧ (∀ e ∈ W', e.t ≠ 0 ∧ e.tid < NCPU) ∧
+  lkFold W = some (st.map Prod.fst)
+
+theorem lockDiscW_of {st : LockState} {B : Nat} {W : WordHist 4} {W' : WordHist 8}
+    (hst : lockWordAt st B W ∧ lkCpuAt st W') (hx : lockRsvW st W W') : lockDiscW cpuAddr st B W W' :=
+  ⟨hx.1, hx.2.1, hx.2.2, hst.1, hst.2⟩
+
+theorem lkOne_ne_zero : (lkOne : BitVec (8 * 4)) ≠ 0 := by decide
+
+/-- The winning AMO. -/
+theorem lockRsvW_take {W : WordHist 4} {W' : WordHist 8} (hx : lockRsvW none W W') {t : Nat} (ht : t ≠ 0)
+    (c : CPU) : lockRsvW (some (c, false)) (⟨t, hartAgent c, lkOne⟩ :: W) W' := by
+  obtain ⟨h1, h2, h3⟩ := hx
+  refine ⟨fun e he => ?_, h2, ?_⟩
+  · rcases List.mem_cons.1 he with rfl | he
+    · exact ⟨ht, c.isLt, Or.inr rfl⟩
+    · exact h1 e he
+  · simp only [lkFold, h3, Option.map_none, Option.bind_some, lkStepR, Option.map_some]
+    rw [if_neg lkOne_ne_zero, dif_pos (show hartAgent c < NCPU from c.isLt)]
+    rfl
+
+/-- A spinner's failed AMO. -/
+theorem lockRsvW_spin {i : CPU} {b : Bool} {W : WordHist 4} {W' : WordHist 8} (hx : lockRsvW (some (i, b)) W W')
+    {t : Nat} (ht : t ≠ 0) {h : Agent} (hh : h < NCPU) :
+    lockRsvW (some (i, b)) (⟨t, h, lkOne⟩ :: W) W' := by
+  obtain ⟨h1, h2, h3⟩ := hx
+  refine ⟨fun e he => ?_, h2, ?_⟩
+  · rcases List.mem_cons.1 he with rfl | he
+    · exact ⟨ht, hh, Or.inr rfl⟩
+    · exact h1 e he
+  · simp only [Option.map_some] at h3
+    simp only [lkFold, h3, Option.bind_some, lkStepR, Option.map_some]
+    rw [if_neg lkOne_ne_zero]
+
+/-- The holder stores its pointer to `lk->cpu`. -/
+theorem lockRsvW_set {c : CPU} {W : WordHist 4} {W' : WordHist 8} (hx : lockRsvW (some (c, false)) W W')
+    {t : Nat} (ht : t ≠ 0) : lockRsvW (some (c, true)) W (⟨t, hartAgent c, cpuAddr c⟩ :: W') := by
+  obtain ⟨h1, h2, h3⟩ := hx
+  refine ⟨h1, fun e he => ?_, by simpa using h3⟩
+  rcases List.mem_cons.1 he with rfl | he
+  · exact ⟨ht, c.isLt⟩
+  · exact h2 e he
+
+/-- The holder clears `lk->cpu`. -/
+theorem lockRsvW_clear {c : CPU} {W : WordHist 4} {W' : WordHist 8} (hx : lockRsvW (some (c, true)) W W')
+    {t : Nat} (ht : t ≠ 0) : lockRsvW (some (c, false)) W (⟨t, hartAgent c, 0#64⟩ :: W') := by
+  obtain ⟨h1, h2, h3⟩ := hx
+  refine ⟨h1, fun e he => ?_, by simpa using h3⟩
+  rcases List.mem_cons.1 he with rfl | he
+  · exact ⟨ht, c.isLt⟩
+  · exact h2 e he
+
+/-- The holder's release store. -/
+theorem lockRsvW_release {c : CPU} {W : WordHist 4} {W' : WordHist 8} (hx : lockRsvW (some (c, false)) W W')
+    {t : Nat} (ht : t ≠ 0) : lockRsvW none (⟨t, hartAgent c, 0#32⟩ :: W) W' := by
+  obtain ⟨h1, h2, h3⟩ := hx
+  refine ⟨fun e he => ?_, h2, ?_⟩
+  · rcases List.mem_cons.1 he with rfl | he
+    · exact ⟨ht, c.isLt, Or.inl rfl⟩
+    · exact h1 e he
+  · simp only [Option.map_some] at h3
+    simp only [lkFold, h3, Option.bind_some, lkStepR, Option.map_none]
+    rw [if_pos (show (0#32 : BitVec (8 * 4)) = 0 from rfl), if_pos trivial]
+
+/-! ### Where a word store's bytes go -/
+
+theorem rsvAddr_inj {pa : PAddr} {j j' : Nat} (hj : j < 2 ^ 64) (hj' : j' < 2 ^ 64)
+    (h : pa + BitVec.ofNat 64 j = pa + BitVec.ofNat 64 j') : j = j' := by
+  have := congrArg BitVec.toNat h
+  simp only [BitVec.toNat_add, BitVec.toNat_ofNat] at this
+  have hp := pa.isLt
+  omega
+
+/-- The store's own bytes, after it. -/
+theorem foldl_push_at {n : Nat} (pa : PAddr) (w : BitVec (8 * n)) (t : Nat) (h : Agent) :
+    ∀ (l : List Nat), (∀ j ∈ l, j < 2 ^ 64) → l.Nodup → ∀ (m : FlatMem) (j : Nat), j ∈ l →
+      (l.foldl (fun (m : FlatMem) j => m.push (pa + BitVec.ofNat 64 j) ⟨t, h, nthByte w j⟩) m)[pa + BitVec.ofNat 64 j]? =
+        some (⟨t, h, nthByte w j⟩ :: m.getD (pa + BitVec.ofNat 64 j) [])
+  | [], _, _, _, _, hj => by simp at hj
+  | j0 :: l, hb, hnd, m, j, hj => by
+    simp only [List.foldl_cons]
+    rw [List.nodup_cons] at hnd
+    have hb' : ∀ x ∈ l, x < 2 ^ 64 := fun x hx => hb x (List.mem_cons_of_mem _ hx)
+    rcases List.mem_cons.1 hj with rfl | hj
+    · have hj64 : j < 2 ^ 64 := hb j List.mem_cons_self
+      have key : ∀ (l : List Nat), (∀ x ∈ l, x < 2 ^ 64) → j ∉ l → ∀ m' : FlatMem,
+          (l.foldl (fun (m : FlatMem) j => m.push (pa + BitVec.ofNat 64 j) ⟨t, h, nthByte w j⟩) m')[pa + BitVec.ofNat 64 j]? =
+            m'[pa + BitVec.ofNat 64 j]? := by
+        intro l
+        induction l with
+        | nil => intros; rfl
+        | cons x l ih =>
+          intro hb hn m'
+          simp only [List.foldl_cons]
+          rw [ih (fun y hy => hb y (List.mem_cons_of_mem _ hy)) (fun h' => hn (List.mem_cons_of_mem _ h'))]
+          apply FlatMem.push_get?_ne
+          intro he
+          have := rsvAddr_inj (pa := pa) hj64 (hb x List.mem_cons_self) he
+          exact hn (this ▸ List.mem_cons_self)
+      rw [key l hb' hnd.1 _, FlatMem.push_get?_eq]
+    · rw [foldl_push_at pa w t h l hb' hnd.2 _ j hj]
+      congr 2
+      unfold FlatMem.push
+      rw [Std.ExtTreeMap.getD_insert]
+      have hne : ¬ (compare (pa + BitVec.ofNat 64 j0) (pa + BitVec.ofNat 64 j) = .eq) := by
+        intro he
+        have := Std.LawfulEqCmp.eq_of_compare he
+        exact hnd.1 (rsvAddr_inj (hb j0 List.mem_cons_self) (hb' j hj) this ▸ hj)
+      simp [hne]
+
+/-- A word store's bytes, after it. -/
+theorem writeBytes_at {n : Nat} (m : FlatMem) (pa : PAddr) (w : BitVec (8 * n)) (t : Nat) (h : Agent)
+    (hn : n ≤ 2 ^ 64) {j : Nat} (hj : j < n) (H : Hist) (hH : m[pa + BitVec.ofNat 64 j]? = some H) :
+    (m.writeBytes pa n w t h)[pa + BitVec.ofNat 64 j]? = some (⟨t, h, nthByte w j⟩ :: H) := by
+  unfold FlatMem.writeBytes
+  rw [foldl_push_at pa w t h (List.range n) (fun x hx => by have := List.mem_range.1 hx; omega)
+    List.nodup_range m j (List.mem_range.2 hj)]
+  rw [Std.ExtTreeMap.getD_eq_getD_getElem?, hH]
+  rfl
+
+/-- **A store into a reserved lock's lock word keeps the region's
+discipline**, given the new state's facts. -/
+theorem lockRegion_storeW {lk : BitVec 64} (h : Agent) (w : BitVec (8 * 4)) (W : WordHist 4) (W' : WordHist 8)
+    (Hold Hold' : Nat → Hist) (htail : tailOk 4 0 0 Hold) (htail' : tailOk 8 0 0 Hold')
+    (hnew : ∀ t, 0 < t → ∃ (st : LockState) (B : Nat), lockWordAt st B (⟨t, h, w⟩ :: W) ∧ lkCpuAt st W' ∧
+      lockRsvW st (⟨t, h, w⟩ :: W) W')
+    (m : FlatMem) (t : Nat) (ht : 0 < t) (hs : histsAt m lk 4 (W.hist Hold))
+    (hc : histsAt m (lk + 16#64) 8 (W'.hist Hold')) :
+    regionOk (m.writeBytes lk 4 w t h) ⟨lk, .lock KernelGeom.cpusBase⟩ := by
+  obtain ⟨st, B, h1, h2, h3⟩ := hnew t ht
+  unfold regionOk
+  refine ⟨⟨t, h, w⟩ :: W, W', Hold, Hold', st, B, ⟨fun j hj => ?_, fun j hj => ?_⟩,
+    ⟨fun j hj => ?_, fun j hj => ?_⟩, lockDiscW_of ⟨h1, h2⟩ h3⟩
+  · show (m.writeBytes lk 4 w t h)[lk + BitVec.ofNat 64 j]? = _
+    rw [writeBytes_at m lk w t h (by decide) hj _ (hs j hj)]
+    rfl
+  · obtain ⟨e, H, hH, _, het⟩ := htail j hj
+    exact ⟨e, H, hH, het⟩
+  · rw [FlatMem.writeBytes_get?_notin _ _ _ _ _ _ (fun j' hj' he => by
+      have := congrArg BitVec.toNat he
+      simp only [BitVec.toNat_add, BitVec.toNat_ofNat] at this
+      have hp := lk.isLt
+      omega)]
+    exact hc j hj
+  · obtain ⟨e, H, hH, _, het⟩ := htail' j hj
+    exact ⟨e, H, hH, het⟩
+
+/-- **A store into a reserved lock's owner word keeps the region's
+discipline**, given the new state's facts. -/
+theorem lockRegion_storeC {lk : BitVec 64} (h : Agent) (w : BitVec (8 * 8)) (W : WordHist 4) (W' : WordHist 8)
+    (Hold Hold' : Nat → Hist) (htail : tailOk 4 0 0 Hold) (htail' : tailOk 8 0 0 Hold')
+    (hnew : ∀ t, 0 < t → ∃ (st : LockState) (B : Nat), lockWordAt st B W ∧ lkCpuAt st (⟨t, h, w⟩ :: W') ∧
+      lockRsvW st W (⟨t, h, w⟩ :: W'))
+    (m : FlatMem) (t : Nat) (ht : 0 < t) (hs : histsAt m (lk + 16#64) 8 (W'.hist Hold'))
+    (hc : histsAt m lk 4 (W.hist Hold)) :
+    regionOk (m.writeBytes (lk + 16#64) 8 w t h) ⟨lk, .lock KernelGeom.cpusBase⟩ := by
+  obtain ⟨st, B, h1, h2, h3⟩ := hnew t ht
+  unfold regionOk
+  refine ⟨W, ⟨t, h, w⟩ :: W', Hold, Hold', st, B, ⟨fun j hj => ?_, fun j hj => ?_⟩,
+    ⟨fun j hj => ?_, fun j hj => ?_⟩, lockDiscW_of ⟨h1, h2⟩ h3⟩
+  · rw [FlatMem.writeBytes_get?_notin _ _ _ _ _ _ (fun j' hj' he => by
+      have := congrArg BitVec.toNat he
+      simp only [BitVec.toNat_add, BitVec.toNat_ofNat] at this
+      have hp := lk.isLt
+      omega)]
+    exact hc j hj
+  · obtain ⟨e, H, hH, _, het⟩ := htail j hj
+    exact ⟨e, H, hH, het⟩
+  · show (m.writeBytes (lk + 16#64) 8 w t h)[lk + 16#64 + BitVec.ofNat 64 j]? = _
+    rw [writeBytes_at m (lk + 16#64) w t h (by decide) hj _ (hs j hj)]
+    rfl
+  · obtain ⟨e, H, hH, _, het⟩ := htail' j hj
+    exact ⟨e, H, hH, het⟩
 
 end geom
 
@@ -598,12 +770,97 @@ def lockBody (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF)
 def lockAddrOk (lk : BitVec 64) : Prop :=
   inRam lk 4 ∧ lk.toNat % 4 = 0 ∧ inRam (lk + 16#64) 8 ∧ (lk + 16#64).toNat % 8 = 0
 
+/-! ### Reserved (static) locks (W8-β′)
+
+A lock whose two words are a static reserved region of the ambient record
+(`lkRsvIn`) keeps HALF cells over the image tails (`wordCellH`: the state
+interpretation holds the other halves) and the reserved discipline's facts
+(`lockRsvW`); every other lock keeps `lockBody`.  Which one is a pure fact
+of the address (`lockBodyM`). -/
+
+/-- The lock's words are a static reserved region of the ambient record. -/
+def lkRsvIn (lk : BitVec 64) : Prop :=
+  (⟨lk, .lock KernelGeom.cpusBase⟩ : RsvRegion) ∈ MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)
+
+instance (lk : BitVec 64) : Decidable (lkRsvIn (hlc := hlc) (GF := GF) lk) := by
+  unfold lkRsvIn; infer_instance
+
+/-- A reserved word's half cell: half of `W`'s projections over the image's
+zero tails (timestamp 0). -/
+def wordCellH (pa : PAddr) (n : Nat) (W : WordHist n) : IProp GF := iprop%
+  ∃ Hold : Nat → Hist, histBytes pa n (fun _ => DFrac.own (1 : Qp).half) (W.hist Hold) ∗ ⌜tailOk n 0 0 Hold⌝
+
+instance wordCellH_timeless (pa : PAddr) (n : Nat) (W : WordHist n) :
+    Timeless (wordCellH (GF := GF) pa n W) := by
+  unfold wordCellH; infer_instance
+
+theorem wordCellH_cases (pa : PAddr) (n : Nat) (W : WordHist n) :
+    wordCellH (GF := GF) pa n W ⊢ ∃ Hold : Nat → Hist,
+      histBytes pa n (fun _ => DFrac.own (1 : Qp).half) (W.hist Hold) ∗ ⌜tailOk n 0 0 Hold⌝ := by
+  unfold wordCellH; iintro H; iexact H
+
+theorem wordCellH_intro (pa : PAddr) (n : Nat) (W : WordHist n) (Hold : Nat → Hist) (htail : tailOk n 0 0 Hold) :
+    histBytes (GF := GF) pa n (fun _ => DFrac.own (1 : Qp).half) (W.hist Hold) ⊢ wordCellH pa n W := by
+  unfold wordCellH; iintro H; iexists Hold; iframe H; ipureintro; exact htail
+
+theorem wordCellH_push (pa : PAddr) (n : Nat) (W : WordHist n) (Hold : Nat → Hist) (htail : tailOk n 0 0 Hold)
+    (t : Nat) (h : Agent) (w : BitVec (8 * n)) :
+    histBytes (GF := GF) pa n (fun _ => DFrac.own (1 : Qp).half) (pushed (W.hist Hold) t h w) ⊢
+      wordCellH pa n (⟨t, h, w⟩ :: W) := by
+  rw [WordHist.hist_push]
+  exact wordCellH_intro pa n _ Hold htail
+
+/-- **The body of a RESERVED lock's invariant**: `lockBody`'s shape, at half
+cells over the image tails, with the reserved discipline's facts. -/
+def lockBodyR (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF) : IProp GF := iprop%
+  ∃ (W : WordHist 4) (W' : WordHist 8) (st : LockState) (B : Nat),
+    wordCellH lk 4 W ∗ wordCellH (lk + 16#64) 8 W' ∗
+    ⌜lockWordAt st B W ∧ lkCpuAt st W'⌝ ∗ ⌜lkRsvIn (hlc := hlc) (GF := GF) lk ∧ lockRsvW st W W'⌝ ∗
+    lockHalf γ st B ∗ lkCpuFrag st s ∗
+    ((⌜st = none⌝ ∗ lockHalf γ none B ∗ lockPay R) ∨ ⌜st ≠ none⌝)
+
+/-- **The lock's invariant body**: reserved or not, by the address. -/
+def lockBodyM (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF) (lo lc : Nat) :
+    IProp GF :=
+  if lkRsvIn (hlc := hlc) (GF := GF) lk then lockBodyR γ lk s R else lockBody γ lk s R lo lc
+
+theorem lockBodyM_dyn {γ : GName} {lk : BitVec 64} {s : String} {R : CtxId → IProp GF} {lo lc : Nat}
+    (hm : ¬ lkRsvIn (hlc := hlc) (GF := GF) lk) : lockBodyM γ lk s R lo lc = lockBody γ lk s R lo lc := by
+  unfold lockBodyM; rw [if_neg hm]
+
+theorem lockBodyM_rsv {γ : GName} {lk : BitVec 64} {s : String} {R : CtxId → IProp GF} {lo lc : Nat}
+    (hm : lkRsvIn (hlc := hlc) (GF := GF) lk) : lockBodyM γ lk s R lo lc = lockBodyR γ lk s R := by
+  unfold lockBodyM; rw [if_pos hm]
+
+/-- A reserved lock-word store's obligation (`MachCSL.rsvStoreOk`), from the
+new state's facts. -/
+theorem lkRsv_storeOkW {lk : BitVec 64} (hm : lkRsvIn (hlc := hlc) (GF := GF) lk) (cpu : CPU)
+    (w : BitVec (8 * 4)) (W : WordHist 4) (W' : WordHist 8)
+    (Hold Hold' : Nat → Hist) (htail : tailOk 4 0 0 Hold) (htail' : tailOk 8 0 0 Hold')
+    (hnew : ∀ t, 0 < t → ∃ (st : LockState) (B : Nat), lockWordAt st B (⟨t, hartAgent cpu, w⟩ :: W) ∧
+      lkCpuAt st W' ∧ lockRsvW st (⟨t, hartAgent cpu, w⟩ :: W) W') :
+    rsvStoreOk (hlc := hlc) (GF := GF) cpu lk 4 w (W.hist Hold) [(lk + 16#64, 8, W'.hist Hold')] := by
+  obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 hm
+  exact ⟨i, 0, _, hi, rfl, fun m t ht h1 h2 _ =>
+    lockRegion_storeW (hartAgent cpu) w W W' Hold Hold' htail htail' hnew m t ht h1 (h2 _ List.mem_cons_self)⟩
+
+/-- A reserved owner-word store's obligation. -/
+theorem lkRsv_storeOkC {lk : BitVec 64} (hm : lkRsvIn (hlc := hlc) (GF := GF) lk) (cpu : CPU)
+    (w : BitVec (8 * 8)) (W : WordHist 4) (W' : WordHist 8)
+    (Hold Hold' : Nat → Hist) (htail : tailOk 4 0 0 Hold) (htail' : tailOk 8 0 0 Hold')
+    (hnew : ∀ t, 0 < t → ∃ (st : LockState) (B : Nat), lockWordAt st B W ∧
+      lkCpuAt st (⟨t, hartAgent cpu, w⟩ :: W') ∧ lockRsvW st W (⟨t, hartAgent cpu, w⟩ :: W')) :
+    rsvStoreOk (hlc := hlc) (GF := GF) cpu (lk + 16#64) 8 w (W'.hist Hold') [(lk, 4, W.hist Hold)] := by
+  obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 hm
+  exact ⟨i, 1, _, hi, rfl, fun m t ht h1 h2 _ =>
+    lockRegion_storeC (hartAgent cpu) w W W' Hold Hold' htail htail' hnew m t ht h1 (h2 _ List.mem_cons_self)⟩
+
 /-- The lock predicate (persistent): the two words are identity-mapped
 kernel RAM (the claims the loads and stores translate through), and the invariant at some floor the
 ambient context has passed. -/
 def isLock [CurCtx] (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF) : IProp GF := iprop%
   ⌜lockAddrOk lk⌝ ∗ kmapId lk ∗ kmapId (lk + 16#64) ∗
-  ∃ lo lc : Nat, inv lockN (lockBody γ lk s R lo lc) ∗ lkFloor curCtx lo ∗ lkFloor curCtx lc
+  ∃ lo lc : Nat, inv lockN (lockBodyM γ lk s R lo lc) ∗ lkFloor curCtx lo ∗ lkFloor curCtx lc
 
 /-- A lock HANDLE transports: it is persistent, and its only context
 dependence is the pair of floors its creator certified (`lkFloor`). -/
@@ -614,7 +871,7 @@ instance instCtxMorphIsLock (tier : KTier) (γ : GName) (lk : BitVec 64) (s : St
     (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
       (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
         (@instCtxMorphExists hlc GF _ _
-          (fun (lo : Nat) ξ => iprop(∃ lc : Nat, inv lockN (lockBody γ lk s R lo lc) ∗
+          (fun (lo : Nat) ξ => iprop(∃ lc : Nat, inv lockN (lockBodyM γ lk s R lo lc) ∗
             lkFloor ξ lo ∗ lkFloor ξ lc))
           (fun _ => @instCtxMorphExists hlc GF _ _ _ (fun _ =>
             @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
@@ -628,8 +885,28 @@ instance isLock_persistent [CurCtx] (γ : GName) (lk : BitVec 64) (s : String) (
 theorem isLock_cases [CurCtx] (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF) :
     isLock (GF := GF) γ lk s R ⊢
       ⌜lockAddrOk lk⌝ ∗ kmapId lk ∗ kmapId (lk + 16#64) ∗
-      ∃ lo lc : Nat, inv lockN (lockBody γ lk s R lo lc) ∗ lkFloor curCtx lo ∗ lkFloor curCtx lc := by
+      ∃ lo lc : Nat, inv lockN (lockBodyM γ lk s R lo lc) ∗ lkFloor curCtx lo ∗ lkFloor curCtx lc := by
   unfold isLock; iintro H; iexact H
+
+/-- `isLock_cases` at a lock that is not reserved. -/
+theorem isLock_cases_dyn [CurCtx] (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF)
+    (hm : ¬ lkRsvIn (hlc := hlc) (GF := GF) lk) :
+    isLock (GF := GF) γ lk s R ⊢
+      ⌜lockAddrOk lk⌝ ∗ kmapId lk ∗ kmapId (lk + 16#64) ∗
+      ∃ lo lc : Nat, inv lockN (lockBody γ lk s R lo lc) ∗ lkFloor curCtx lo ∗ lkFloor curCtx lc := by
+  unfold isLock
+  simp only [lockBodyM_dyn hm]
+  iintro H; iexact H
+
+/-- `isLock_cases` at a reserved lock. -/
+theorem isLock_cases_rsv [CurCtx] (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF)
+    (hm : lkRsvIn (hlc := hlc) (GF := GF) lk) :
+    isLock (GF := GF) γ lk s R ⊢
+      ⌜lockAddrOk lk⌝ ∗ kmapId lk ∗ kmapId (lk + 16#64) ∗
+      ∃ lo lc : Nat, inv lockN (lockBodyR γ lk s R) ∗ lkFloor curCtx lo ∗ lkFloor curCtx lc := by
+  unfold isLock
+  simp only [lockBodyM_rsv hm]
+  iintro H; iexact H
 
 /-- **The CANCELLABLE lock handle** (Rocq `WpLock.lock_openable`).  Like
 `isLock`, the two words are identity-mapped kernel RAM at a floor the ambient
@@ -642,7 +919,7 @@ where the dead branch is unreachable. -/
 def lockOpenable [CurCtx] (γ : GName) (lk : BitVec 64) (s : String)
     (R : CtxId → IProp GF) (D : IProp GF) : IProp GF := iprop%
   ⌜lockAddrOk lk⌝ ∗ kmapId lk ∗ kmapId (lk + 16#64) ∗
-  ∃ lo lc : Nat, inv lockN (iprop(lockBody γ lk s R lo lc ∨ D)) ∗
+  ∃ lo lc : Nat, inv lockN (iprop(lockBodyM γ lk s R lo lc ∨ D)) ∗
     lkFloor curCtx lo ∗ lkFloor curCtx lc
 
 instance lockOpenable_persistent [CurCtx] (γ : GName) (lk : BitVec 64) (s : String)
@@ -655,21 +932,64 @@ theorem lockOpenable_cases [CurCtx] (γ : GName) (lk : BitVec 64) (s : String)
     (R : CtxId → IProp GF) (D : IProp GF) :
     lockOpenable (GF := GF) γ lk s R D ⊢
       ⌜lockAddrOk lk⌝ ∗ kmapId lk ∗ kmapId (lk + 16#64) ∗
-      ∃ lo lc : Nat, inv lockN (iprop(lockBody γ lk s R lo lc ∨ D)) ∗
+      ∃ lo lc : Nat, inv lockN (iprop(lockBodyM γ lk s R lo lc ∨ D)) ∗
         lkFloor curCtx lo ∗ lkFloor curCtx lc := by
   unfold lockOpenable; iintro H; iexact H
+
+/-- `lockOpenable_cases` at a lock that is not reserved. -/
+theorem lockOpenable_cases_dyn [CurCtx] (γ : GName) (lk : BitVec 64) (s : String)
+    (R : CtxId → IProp GF) (D : IProp GF) (hm : ¬ lkRsvIn (hlc := hlc) (GF := GF) lk) :
+    lockOpenable (GF := GF) γ lk s R D ⊢
+      ⌜lockAddrOk lk⌝ ∗ kmapId lk ∗ kmapId (lk + 16#64) ∗
+      ∃ lo lc : Nat, inv lockN (iprop(lockBody γ lk s R lo lc ∨ D)) ∗
+        lkFloor curCtx lo ∗ lkFloor curCtx lc := by
+  unfold lockOpenable
+  simp only [lockBodyM_dyn hm]
+  iintro H; iexact H
+
+/-- `lockOpenable_cases` at a reserved lock. -/
+theorem lockOpenable_cases_rsv [CurCtx] (γ : GName) (lk : BitVec 64) (s : String)
+    (R : CtxId → IProp GF) (D : IProp GF) (hm : lkRsvIn (hlc := hlc) (GF := GF) lk) :
+    lockOpenable (GF := GF) γ lk s R D ⊢
+      ⌜lockAddrOk lk⌝ ∗ kmapId lk ∗ kmapId (lk + 16#64) ∗
+      ∃ lo lc : Nat, inv lockN (iprop(lockBodyR γ lk s R ∨ D)) ∗
+        lkFloor curCtx lo ∗ lkFloor curCtx lc := by
+  unfold lockOpenable
+  simp only [lockBodyM_rsv hm]
+  iintro H; iexact H
+
+/-- A lock handle is a cancellable handle with no dead branch. -/
+theorem isLock_openable [CurCtx] (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF) :
+    isLock (GF := GF) γ lk s R ⊢ lockOpenable γ lk s R iprop(False) := by
+  unfold isLock lockOpenable
+  iintro ⟨%hok, #H1, #H2, %lo, %lc, #Hinv, #Hflo, #Hflc⟩
+  isplitr
+  · ipureintro; exact hok
+  iframe H1 H2
+  iexists lo, lc
+  iframe Hflo Hflc
+  iapply (inv_alter lockN (lockBodyM γ lk s R lo lc) iprop(lockBodyM γ lk s R lo lc ∨ False)) $$ Hinv
+  inext
+  imodintro
+  iintro HB
+  isplitl [HB]
+  · ileft; iexact HB
+  · iintro (HB | HF)
+    · iexact HB
+    · iexfalso; iexact HF
 
 /-- The cancellable producer: an invariant with a dead branch, plus the two
 floors and geometry, gives the openable handle. -/
 theorem lockOpenable_of_dead [CurCtx] (γ : GName) (lk : BitVec 64) (s : String)
     (R : CtxId → IProp GF) (D : IProp GF) (lo lc : Nat)
-    (hok : lockAddrOk lk) :
+    (hok : lockAddrOk lk) (hm : ¬ lkRsvIn (hlc := hlc) (GF := GF) lk) :
     kmapId lk -∗ kmapId (lk + 16#64) -∗
     inv lockN (iprop(lockBody γ lk s R lo lc ∨ D)) -∗
     lkFloor curCtx lo -∗ lkFloor curCtx lc -∗
     lockOpenable (GF := GF) γ lk s R D := by
   iintro #Hm1 #Hm2 #Hinv #Hflo #Hflc
   unfold lockOpenable
+  simp only [lockBodyM_dyn hm]
   isplit
   · ipureintro; exact hok
   iframe Hm1 Hm2
@@ -680,7 +1000,7 @@ theorem lockOpenable_of_dead [CurCtx] (γ : GName) (lk : BitVec 64) (s : String)
 written): each word cell is certified at its own position, as a key of the
 creator's context; the payload is deposited at the creator's context. -/
 theorem newlock_written [CurCtx] (cpu : CPU) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF)
-    [CtxMorph R] (hok : lockAddrOk lk) (lo lc : Nat) (E : CoPset) :
+    [CtxMorph R] (hok : lockAddrOk lk) (hm : ¬ lkRsvIn (hlc := hlc) (GF := GF) lk) (lo lc : Nat) (E : CoPset) :
     kmapId lk ∗ kmapId (lk + 16#64) ∗ ownCtx cpu curCtx ∗ R curCtx ∗
     wordCell lk 4 lo 0 [] ∗ lkFloor curCtx lo ∗
     wordCell (lk + 16#64) 8 lc 0 [] ∗ lkFloor curCtx lc
@@ -708,6 +1028,7 @@ theorem newlock_written [CurCtx] (cpu : CPU) (lk : BitVec 64) (s : String) (R : 
   iframe Hrun
   iexists γ
   unfold isLock
+  simp only [lockBodyM_dyn hm]
   isplit
   · ipureintro; exact hok
   isplit
@@ -721,21 +1042,105 @@ theorem newlock_written [CurCtx] (cpu : CPU) (lk : BitVec 64) (s : String) (R : 
   · iexact Hflo
   · iexact Hflc
 
+/-- A reserved lock's fresh words: every entry since power-on a hart's zero. -/
+def lkZeroW {n : Nat} (W : WordHist n) : Prop := ∀ e ∈ W, e.t ≠ 0 ∧ e.tid < NCPU ∧ e.v = 0
+
+theorem lkFold_zeros : ∀ {W : WordHist 4}, (∀ e ∈ W, e.v = 0) → lkFold W = some none
+  | [], _ => rfl
+  | e :: W, h => by
+    simp only [lkFold, lkFold_zeros (fun x hx => h x (List.mem_cons_of_mem _ hx)), Option.bind_some, lkStepR]
+    rw [if_pos (h e List.mem_cons_self)]
+
+/-- **A RESERVED lock is born** (W8-β′) from its two words as `initlock`
+leaves them: half cells over the image tails, every entry a hart's zero.
+The floors are at 0 (the tails are the image's). -/
+theorem newlockR_written [CurCtx] (cpu : CPU) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF)
+    [CtxMorph R] (hok : lockAddrOk lk) (hm : lkRsvIn (hlc := hlc) (GF := GF) lk)
+    (W : WordHist 4) (W' : WordHist 8) (hW : lkZeroW W) (hW' : lkZeroW W') (E : CoPset) :
+    kmapId lk ∗ kmapId (lk + 16#64) ∗ ownCtx cpu curCtx ∗ R curCtx ∗
+    wordCellH lk 4 W ∗ wordCellH (lk + 16#64) 8 W'
+    ⊢ |={E}=> (ownCtx cpu curCtx ∗ ∃ γ, isLock (GF := GF) γ lk s R) := by
+  iintro ⟨#Hcl, #Hcl', Hrun, HR, Hw', Hc'⟩
+  imod lock_pay_born cpu R $$ [$Hrun $HR] with ⟨Hrun, Hpay⟩
+  imod lockHalf_alloc with ⟨%γ, H1, H2⟩
+  imod inv_alloc lockN E (lockBodyR γ lk s R) $$ [Hw' Hc' H1 H2 Hpay] with #Hinv
+  · inext
+    unfold lockBodyR
+    iexists W, W', none, 0
+    iframe Hw' Hc' H1
+    isplit
+    · ipureintro
+      refine ⟨?_, fun e he => Or.inl (hW' e he).2.2, fun c _ e hl => ?_, fun _ h => by cases h⟩
+      · show curVal W 0 = 0
+        cases W with
+        | nil => rfl
+        | cons e W => exact (hW e List.mem_cons_self).2.2
+      · obtain ⟨W1, W2, hW2, _, _⟩ := hl
+        exact (hW' e (by rw [hW2]; exact List.mem_append_right _ List.mem_cons_self)).2.2
+    isplit
+    · ipureintro
+      refine ⟨hm, fun e he => ⟨(hW e he).1, (hW e he).2.1, Or.inl (hW e he).2.2⟩,
+        fun e he => ⟨(hW' e he).1, (hW' e he).2.1⟩, lkFold_zeros (fun e he => (hW e he).2.2)⟩
+    isplitr [H2 Hpay]
+    · unfold lkCpuFrag; iempintro
+    · ileft
+      isplit
+      · ipureintro; rfl
+      iframe H2 Hpay
+  imodintro
+  iframe Hrun
+  iexists γ
+  unfold isLock
+  simp only [lockBodyM_rsv hm]
+  isplit
+  · ipureintro; exact hok
+  isplit
+  · iexact Hcl
+  isplit
+  · iexact Hcl'
+  iexists 0, 0
+  isplit
+  · iexact Hinv
+  isplit
+  · unfold lkFloor; iapply keyAt_0
+  · unfold lkFloor; iapply keyAt_0
+
+/-- A reserved lock's two words as `initlock` leaves them (W8-β′). -/
+def lkFreshR (lk : BitVec 64) : IProp GF := iprop%
+  ∃ (W : WordHist 4) (W' : WordHist 8), wordCellH lk 4 W ∗ wordCellH (lk + 16#64) 8 W' ∗ ⌜lkZeroW W ∧ lkZeroW W'⌝
+
 /-- The two word cells a freshly initialised lock hands over: each at its
 own position, certified at the creator's context, at an address a lock may
-live at. -/
+live at -- or, at a RESERVED lock (W8-β′), its half cells. -/
 def lkFresh [CurCtx] (lk : BitVec 64) : IProp GF := iprop%
-  ⌜lockAddrOk lk⌝ ∗ ∃ lo lc : Nat, wordCell lk 4 lo 0 [] ∗ lkFloor curCtx lo ∗
-    wordCell (lk + 16#64) 8 lc 0 [] ∗ lkFloor curCtx lc
+  ⌜lockAddrOk lk⌝ ∗
+  ((⌜¬ lkRsvIn (hlc := hlc) (GF := GF) lk⌝ ∗ ∃ lo lc : Nat, wordCell lk 4 lo 0 [] ∗ lkFloor curCtx lo ∗
+      wordCell (lk + 16#64) 8 lc 0 [] ∗ lkFloor curCtx lc) ∨
+   (⌜lkRsvIn (hlc := hlc) (GF := GF) lk⌝ ∗ lkFreshR lk))
 
-theorem lkFresh_intro [CurCtx] (lk : BitVec 64) (hok : lockAddrOk lk) (lo lc : Nat) :
+theorem lkFresh_intro [CurCtx] (lk : BitVec 64) (hok : lockAddrOk lk) (hm : ¬ lkRsvIn (hlc := hlc) (GF := GF) lk)
+    (lo lc : Nat) :
     wordCell (GF := GF) lk 4 lo 0 [] ∗ lkFloor curCtx lo ∗
       wordCell (lk + 16#64) 8 lc 0 [] ∗ lkFloor curCtx lc ⊢ lkFresh lk := by
   unfold lkFresh
   iintro H
   isplitr [H]
   · ipureintro; exact hok
-  · iexists lo, lc
+  · ileft
+    isplitr
+    · ipureintro; exact hm
+    iexists lo, lc
+    iexact H
+
+theorem lkFresh_introR [CurCtx] (lk : BitVec 64) (hok : lockAddrOk lk) (hm : lkRsvIn (hlc := hlc) (GF := GF) lk) :
+    lkFreshR (GF := GF) lk ⊢ lkFresh lk := by
+  unfold lkFresh
+  iintro H
+  isplitr [H]
+  · ipureintro; exact hok
+  · iright
+    isplitr
+    · ipureintro; exact hm
     iexact H
 
 /-- The lock is born from a freshly initialised `struct spinlock`. -/
@@ -744,12 +1149,16 @@ theorem newlock_of_fresh [CurCtx] (cpu : CPU) (lk : BitVec 64) (s : String) (R :
     kmapId lk ∗ kmapId (lk + 16#64) ∗ ownCtx cpu curCtx ∗ R curCtx ∗ lkFresh lk
     ⊢ |={E}=> (ownCtx cpu curCtx ∗ ∃ γ, isLock (GF := GF) γ lk s R) := by
   unfold lkFresh
-  iintro ⟨#Hcl, #Hcl', Hrun, HR, %hok, ⟨%lo, %lc, Hw, #Hflo, Hc, #Hflc⟩⟩
-  iapply newlock_written cpu lk s R hok lo lc E
-  iframe Hcl Hcl' Hrun HR Hw Hc
-  isplit
-  · iexact Hflo
-  · iexact Hflc
+  iintro ⟨#Hcl, #Hcl', Hrun, HR, %hok, (⟨%hm, ⟨%lo, %lc, Hw, #Hflo, Hc, #Hflc⟩⟩ | ⟨%hm, Hf⟩)⟩
+  · iapply newlock_written cpu lk s R hok hm lo lc E
+    iframe Hcl Hcl' Hrun HR Hw Hc
+    isplit
+    · iexact Hflo
+    · iexact Hflc
+  · unfold lkFreshR
+    icases Hf with ⟨%W, %W', Hw, Hc, %⟨hW, hW'⟩⟩
+    iapply newlockR_written cpu lk s R hok hm W W' hW hW' E
+    iframe Hcl Hcl' Hrun HR Hw Hc
 
 /-- The same at the kernel execution context (which carries the running
 context inside its `ctxTok`), under a fancy update. -/

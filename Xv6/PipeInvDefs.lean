@@ -556,7 +556,7 @@ Persistent, so every holder of either end shares it.  Built via
 `lockOpenable_of_dead`: the lock's invariant has a DEAD arm, and the licence
 to open it is a resource (a reference, or the lock token). -/
 def isPipe (γl : GName) (γp : PipeNames) (pi : BitVec 64) : IProp GF := iprop%
-  ⌜lockAddrOk pi⌝ ∗ ⌜pageValid pi⌝ ∗ kmapId pi ∗ kmapId (pi + 16#64) ∗
+  ⌜lockAddrOk pi⌝ ∗ ⌜pageValid pi ∧ ¬ lkRsvIn (hlc := hlc) (GF := GF) pi⌝ ∗ kmapId pi ∗ kmapId (pi + 16#64) ∗
   ∃ lo lc : Nat,
     inv lockN (iprop(lockBody γl pi "pipe" (pipeResAt γp pi) lo lc ∨ pipeDead γl γp)) ∗
     lkFloor curCtx lo ∗ lkFloor curCtx lc
@@ -575,7 +575,15 @@ theorem isPipe_pageValid (γl : GName) (γp : PipeNames) (pi : BitVec 64) :
     isPipe (GF := GF) γl γp pi -∗ ⌜pageValid pi⌝ := by
   unfold isPipe
   iintro ⟨_, %h, _⟩
-  ipureintro; exact h
+  ipureintro; exact h.1
+
+/-- A pipe's lock is a DYNAMIC (unreserved) lock (W8-β′: a kalloc page is
+outside every static reserved region). -/
+theorem isPipe_dyn (γl : GName) (γp : PipeNames) (pi : BitVec 64) :
+    isPipe (GF := GF) γl γp pi -∗ ⌜¬ lkRsvIn (hlc := hlc) (GF := GF) pi⌝ := by
+  unfold isPipe
+  iintro ⟨_, %h, _⟩
+  ipureintro; exact h.2
 
 /-- The two lock words' identity-map claims (what the freed-page reassembly needs). -/
 theorem isPipe_kmaps (γl : GName) (γp : PipeNames) (pi : BitVec 64) :
@@ -590,8 +598,8 @@ theorem isPipe_openable (γl : GName) (γp : PipeNames) (pi : BitVec 64) :
     isPipe (GF := GF) γl γp pi -∗
     lockOpenable γl pi "pipe" (pipeResAt γp pi) (pipeDead γl γp) := by
   unfold isPipe
-  iintro ⟨%hok, %_, #Hm1, #Hm2, %lo, %lc, #Hinv, #Hflo, #Hflc⟩
-  iapply (lockOpenable_of_dead γl pi "pipe" (pipeResAt γp pi) (pipeDead γl γp) lo lc hok)
+  iintro ⟨%hok, %hpv, #Hm1, #Hm2, %lo, %lc, #Hinv, #Hflo, #Hflc⟩
+  iapply (lockOpenable_of_dead γl pi "pipe" (pipeResAt γp pi) (pipeDead γl γp) lo lc hok hpv.2)
     $$ Hm1 Hm2 Hinv Hflo Hflc
 
 end

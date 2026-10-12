@@ -212,9 +212,9 @@ theorem bootBridge [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (t : BitVe
       ([∗list] i ∈ List.range n,
         ∃ w : BitVec 64, pwordPointsTo (R 2#5 - 8#64 * BitVec.ofNat 64 (i + 1)) 8 (DFrac.own 1) w) ∗
       (∃ v : BitVec 64, Register.stvec ↦ᵣ[cpu] v) ∗
-      wordPointsTo (aCpuProc cpu) 8 (DFrac.own 1) 0#64 ∗
-      wordPointsTo (aCpuNoff cpu) 4 (DFrac.own 1) 0#32 ∗
-      (∃ b : Bool, wordPointsTo (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal b)) ∗
+      cpuCell cpu (aCpuProc cpu) 8 0#64 ∗
+      cpuCell cpu (aCpuNoff cpu) 4 0#32 ∗
+      (∃ b : Bool, cpuCell cpu (aCpuIntena cpu) 4 (intenaVal b)) ∗
       lockSet cpu [] ∗ hartCsrs cpu ∗ ctxToken cpu ∗ clockCells cpu ⊢
     kctx cpu (bootKCtx R n) := by
   have hR : tpPin cpu R = R := by
