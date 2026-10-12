@@ -246,7 +246,7 @@ theorem blkSec1_take0 (old bs : List (BitVec 8)) (ho : Virtio.sectorSize ≤ old
 theorem blkSec0_take0 (old bs : List (BitVec 8)) (hb : bs.length = BSIZE) :
     (blkSec0 old bs).take Virtio.sectorSize = bs.take Virtio.sectorSize := by
   unfold blkSec0
-  rw [List.take_append_of_le_length (by rw [sector0_len bs hb]),
+  rw [List.take_append_of_le_length (by rw [sector0_len bs hb]; exact Nat.le_refl _),
     List.take_take, Nat.min_self]
 
 /-- SECTOR 0 THEN SECTOR 1 (Rocq `blk_sec_01`). -/

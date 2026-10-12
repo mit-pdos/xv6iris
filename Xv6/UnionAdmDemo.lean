@@ -721,6 +721,7 @@ theorem demo_sync_cut_neg (W : List (Fstate × Option Srec)) : ¬ unionPhiSyncBo
           rw [cyc_sa]
           show (ulinesCyc segS0 ++ []).length ≤ 3
           rw [List.append_nil, ulinesCyc, ulinesIn_length, segOf_ins, s0_nlines]
+          exact Nat.le_refl 3
         rw [hlast] at hb
         have heq : w1.1 = T := by
           apply Std.ExtTreeMap.ext_getElem?

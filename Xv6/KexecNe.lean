@@ -24,7 +24,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsTopG GF] [FsBytesG GF]
 
 omit [MachGS GF] in
 /-- **Rocq `exec_slot_pre_ne`**: the slot piece is non-expansive in `S`. -/
-theorem execSlotPre_ne (n : Nat) (S S' : Uvis → IProp GF) (Q : Int → IProp GF)
+theorem execSlotPre_ne (n : Iris.SI) (S S' : Uvis → IProp GF) (Q : Int → IProp GF)
     (Pfin : Nat → IProp GF) (Φo : Aview → Nat → Anode → IProp GF) (cw : Nat) (secc : BitVec 64) (na : Nat)
     (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (sts : List FdState)
     (cs : Std.ExtTreeSet GName compare) (pidv : BitVec 32) (HS : ∀ W, S W ≡{n}≡ S' W) :

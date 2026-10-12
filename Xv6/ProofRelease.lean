@@ -44,12 +44,12 @@ theorem release_hook_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_HOOK := ⟨
   k_step (wp_s_add cpu _ (KA.«release» + 0xa#64) true 9#5 0#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- jal holding
-  k_step (wp_s_jal cpu _ (KA.«release» + 0xc#64) false 2096902#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [release_br_ffffffffffffff12]
+  k_step (wp_s_jal cpu _ (KA.«release» + 0xc#64) false 2096902#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [release_br_ffffffffffffff12] £ Hlcr
   iintro Hk Hpc
   have hho : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hK' : 6 ≤ k'.avail),
       kctx cpu k' ∗ pcIs cpu KA.«holding» ∗ isLock γ (k'.regs 10#5) s R ∗
       locked γ cpu ∗
-      (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
+      £ 1 ∗ (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R' ∧ R' 10#5 = 1#64⌝ -∗ locked γ cpu -∗ wpLoop cpu) ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hK'
     have h := HO.wp_holding_locked (GF := GF) cpu k' γ s R hsie' hK'
@@ -62,6 +62,7 @@ theorem release_hook_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_HOOK := ⟨
   iframe #
   case hs => k_norm
   case hK => k_norm; omega
+  iframe Hlcr
   iintro %R2 Hk Hpc %⟨hcs2, h10⟩ Hlocked
   have hret1 : jumpPc (KA.«release» + 0x10#64) = (KA.«release» + 0x10#64) := by decide
   k_norm [hret1]
@@ -72,7 +73,7 @@ theorem release_hook_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_HOOK := ⟨
     exact this
   -- beqz a0, panic: not taken (holding answered 1)
   k_step (wp_s_branch cpu _ (KA.«release» + 0x10#64) true 28#13 10#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
-    $$ [- $Hk $Hpc] with [h10, bcond_beq_one]
+    $$ [- $Hk $Hpc] with [h10, bcond_beq_one] £ Hlcr
   iintro Hk Hpc
   icases locked_cases γ cpu $$ Hlocked with ⟨Hlc, Hheld⟩
   -- sd zero,16(s1): lk->cpu = 0
@@ -81,7 +82,7 @@ theorem release_hook_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_HOOK := ⟨
   case haddr => k_norm [h29]
   iintro Hk Hpc Hlp
   -- fence rw,w
-  k_step (wp_s_fence_rw_w cpu _ (KA.«release» + 0x16#64) false 0#5 0#5) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_fence_rw_w cpu _ (KA.«release» + 0x16#64) false 0#5 0#5) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] £ Hlcr3
   iintro Hk Hpc
   -- sw zero,0(s1): the lock is free
   k_step (wp_s_sw_zero_release_hook cpu _ ?hs (KA.«release» + 0x1a#64) false 0#12 9#5 γ (k.regs 10#5) s R Rin ?haddr) from (text_instr _ _ _ _ rfl rfl) Htext
@@ -186,12 +187,12 @@ theorem release_gen_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_GEN := ⟨
   k_step (wp_s_add cpu _ (KA.«release» + 0xa#64) true 9#5 0#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- jal holding
-  k_step (wp_s_jal cpu _ (KA.«release» + 0xc#64) false 2096902#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [release_br_ffffffffffffff12]
+  k_step (wp_s_jal cpu _ (KA.«release» + 0xc#64) false 2096902#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [release_br_ffffffffffffff12] £ Hlcr
   iintro Hk Hpc
   have hho : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hK' : 6 ≤ k'.avail),
       kctx cpu k' ∗ pcIs cpu KA.«holding» ∗ lockOpenable γ (k'.regs 10#5) s R D ∗ Tc ∗
       locked γ cpu ∗
-      (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
+      £ 1 ∗ (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R' ∧ R' 10#5 = 1#64⌝ -∗ locked γ cpu -∗ Tc -∗ wpLoop cpu) ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hK'
     have h := HO.wp_holding_locked_gen (GF := GF) cpu k' γ s R D Tc hrefute hsie' hK'
@@ -204,6 +205,7 @@ theorem release_gen_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_GEN := ⟨
   iframe #
   case hs => k_norm
   case hK => k_norm; omega
+  iframe Hlcr
   iintro %R2 Hk Hpc %⟨hcs2, h10⟩ Hlocked Hcred
   have hret1 : jumpPc (KA.«release» + 0x10#64) = (KA.«release» + 0x10#64) := by decide
   k_norm [hret1]
@@ -214,7 +216,7 @@ theorem release_gen_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_GEN := ⟨
     exact this
   -- beqz a0, panic: not taken (holding answered 1)
   k_step (wp_s_branch cpu _ (KA.«release» + 0x10#64) true 28#13 10#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
-    $$ [- $Hk $Hpc] with [h10, bcond_beq_one]
+    $$ [- $Hk $Hpc] with [h10, bcond_beq_one] £ Hlcr
   iintro Hk Hpc
   icases locked_cases γ cpu $$ Hlocked with ⟨Hlc, Hheld⟩
   -- sd zero,16(s1): lk->cpu = 0
@@ -223,7 +225,7 @@ theorem release_gen_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_GEN := ⟨
   case haddr => k_norm [h29]
   iintro Hk Hpc ⟨Hlp, Hcred⟩
   -- fence rw,w
-  k_step (wp_s_fence_rw_w cpu _ (KA.«release» + 0x16#64) false 0#5 0#5) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_fence_rw_w cpu _ (KA.«release» + 0x16#64) false 0#5 0#5) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] £ Hlcr3
   iintro Hk Hpc
   -- sw zero,0(s1): the lock is free
   k_step (wp_s_sw_zero_release_gen cpu _ ?hs (KA.«release» + 0x1a#64) false 0#12 9#5 γ (k.regs 10#5) s R D Tc hrefute ?haddr) from (text_instr _ _ _ _ rfl rfl) Htext
@@ -329,12 +331,12 @@ theorem release_cancel_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_CANCEL := �
   k_step (wp_s_add cpu _ (KA.«release» + 0xa#64) true 9#5 0#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- jal holding
-  k_step (wp_s_jal cpu _ (KA.«release» + 0xc#64) false 2096902#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [release_br_ffffffffffffff12]
+  k_step (wp_s_jal cpu _ (KA.«release» + 0xc#64) false 2096902#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [release_br_ffffffffffffff12] £ Hlcr
   iintro Hk Hpc
   have hho : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hK' : 6 ≤ k'.avail),
       kctx cpu k' ∗ pcIs cpu KA.«holding» ∗ lockOpenable γ (k'.regs 10#5) s R D ∗
       locked γ cpu ∗
-      (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
+      £ 1 ∗ (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R' ∧ R' 10#5 = 1#64⌝ -∗ locked γ cpu -∗ wpLoop cpu) ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hK'
     have h := HO.wp_holding_locked_refute (GF := GF) cpu k' γ s R D hrefuteCore hsie' hK'
@@ -347,6 +349,7 @@ theorem release_cancel_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_CANCEL := �
   iframe #
   case hs => k_norm
   case hK => k_norm; omega
+  iframe Hlcr
   iintro %R2 Hk Hpc %⟨hcs2, h10⟩ Hlocked
   have hret1 : jumpPc (KA.«release» + 0x10#64) = (KA.«release» + 0x10#64) := by decide
   k_norm [hret1]
@@ -357,7 +360,7 @@ theorem release_cancel_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_CANCEL := �
     exact this
   -- beqz a0, panic: not taken (holding answered 1)
   k_step (wp_s_branch cpu _ (KA.«release» + 0x10#64) true 28#13 10#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
-    $$ [- $Hk $Hpc] with [h10, bcond_beq_one]
+    $$ [- $Hk $Hpc] with [h10, bcond_beq_one] £ Hlcr
   iintro Hk Hpc
   icases locked_cases γ cpu $$ Hlocked with ⟨Hlc, Hheld⟩
   -- sd zero,16(s1): lk->cpu = 0
@@ -366,7 +369,7 @@ theorem release_cancel_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_CANCEL := �
   case haddr => k_norm [h29]
   iintro Hk Hpc Hlp
   -- fence rw,w
-  k_step (wp_s_fence_rw_w cpu _ (KA.«release» + 0x16#64) false 0#5 0#5) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_fence_rw_w cpu _ (KA.«release» + 0x16#64) false 0#5 0#5) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] £ Hlcr3
   iintro Hk Hpc
   -- sw zero,0(s1): the lock is free
   k_step (wp_s_sw_zero_release_cancel cpu _ ?hs (KA.«release» + 0x1a#64) false 0#12 9#5 γ (k.regs 10#5) s R D Out hrefuteHalf ?haddr) from (text_instr _ _ _ _ rfl rfl) Htext
@@ -474,12 +477,12 @@ theorem release_refute_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_REFUTE := �
   k_step (wp_s_add cpu _ (KA.«release» + 0xa#64) true 9#5 0#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- jal holding
-  k_step (wp_s_jal cpu _ (KA.«release» + 0xc#64) false 2096902#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [release_br_ffffffffffffff12]
+  k_step (wp_s_jal cpu _ (KA.«release» + 0xc#64) false 2096902#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [release_br_ffffffffffffff12] £ Hlcr
   iintro Hk Hpc
   have hho : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hK' : 6 ≤ k'.avail),
       kctx cpu k' ∗ pcIs cpu KA.«holding» ∗ lockOpenable γ (k'.regs 10#5) s R D ∗
       locked γ cpu ∗
-      (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
+      £ 1 ∗ (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R' ∧ R' 10#5 = 1#64⌝ -∗ locked γ cpu -∗ wpLoop cpu) ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hK'
     have h := HO.wp_holding_locked_refute (GF := GF) cpu k' γ s R D hrefuteCore hsie' hK'
@@ -492,6 +495,7 @@ theorem release_refute_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_REFUTE := �
   iframe #
   case hs => k_norm
   case hK => k_norm; omega
+  iframe Hlcr
   iintro %R2 Hk Hpc %⟨hcs2, h10⟩ Hlocked
   have hret1 : jumpPc (KA.«release» + 0x10#64) = (KA.«release» + 0x10#64) := by decide
   k_norm [hret1]
@@ -502,7 +506,7 @@ theorem release_refute_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_REFUTE := �
     exact this
   -- beqz a0, panic: not taken (holding answered 1)
   k_step (wp_s_branch cpu _ (KA.«release» + 0x10#64) true 28#13 10#5 0#5 (by decide) bop.BEQ) from (text_instr _ _ _ _ rfl rfl) Htext
-    $$ [- $Hk $Hpc] with [h10, bcond_beq_one]
+    $$ [- $Hk $Hpc] with [h10, bcond_beq_one] £ Hlcr
   iintro Hk Hpc
   icases locked_cases γ cpu $$ Hlocked with ⟨Hlc, Hheld⟩
   -- sd zero,16(s1): lk->cpu = 0
@@ -511,7 +515,7 @@ theorem release_refute_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_REFUTE := �
   case haddr => k_norm [h29]
   iintro Hk Hpc Hlp
   -- fence rw,w
-  k_step (wp_s_fence_rw_w cpu _ (KA.«release» + 0x16#64) false 0#5 0#5) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  k_step (wp_s_fence_rw_w cpu _ (KA.«release» + 0x16#64) false 0#5 0#5) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] £ Hlcr3
   iintro Hk Hpc
   -- sw zero,0(s1): the lock is free
   k_step (wp_s_sw_zero_release_refute cpu _ ?hs (KA.«release» + 0x1a#64) false 0#12 9#5 γ (k.regs 10#5) s R D hrefuteHalf ?haddr) from (text_instr _ _ _ _ rfl rfl) Htext

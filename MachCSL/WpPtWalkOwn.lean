@@ -113,7 +113,7 @@ theorem ctxBytes_exclReadAU (ξ : CtxId) (pa : PAddr) (n : Nat) (dq : DFrac) (w 
   isplit
   · ipureintro; exact fun j hj => (h j hj).1
   inext
-  iintro %w0 %hheads Hh
+  iintro %w0 %hheads Hh _
   imod Hmask
   imodintro
   isplit

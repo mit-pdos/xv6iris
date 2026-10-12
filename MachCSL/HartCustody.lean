@@ -104,17 +104,20 @@ theorem wpHart_startAuth_fupd (cpu : CPU) (m : SailM Unit) (P : IProp GF) :
 /-- **Rocq `wp_crash_fupd`**: custody with the crash invariant opened at `⊤`
 inside it (the invariant's second opener). -/
 theorem wpHart_crash_fupd (cpu : CPU) (m : SailM Unit) (P : IProp GF) :
-    crashInv (GF := GF) ⊢@{IProp GF}
+    crashInv (GF := GF) ⊢@{IProp GF} £ 1 -∗
       (∀ n : Nat, ⌜n = genId (GF := GF) + 1⌝ -∗ startAuth n -∗
-        ▷ MachFixedGS.crashPred (GF := GF) ={⊤ \ ↑crashN}=∗
+        MachFixedGS.crashPred (GF := GF) ={⊤ \ ↑crashN}=∗
         startAuth n ∗ ▷ MachFixedGS.crashPred (GF := GF) ∗ P) -∗
       (P -∗ wpHart cpu m) -∗ wpHart cpu m := by
-  iintro #Hinv Hhook Hk
-  iapply wpHart_startAuth_fupd cpu m P $$ [Hhook] Hk
+  iintro #Hinv Hlcc Hhook Hk
+  iapply wpHart_startAuth_fupd cpu m P $$ [Hhook Hlcc] Hk
   iintro %n %hn Hs
   unfold crashInv
   imod inv_acc (E := ⊤) (N := crashN) (P := MachFixedGS.crashPred (GF := GF))
     CoPset.subseteq_top $$ Hinv with ⟨Hc, Hclose⟩
+  -- the crash invariant's body is the client's (not timeless): the credit strips its later,
+  -- and the hook takes it unlatered (its output stays latered)
+  imod lc_fupd_elim_later $$ Hlcc Hc with Hc
   imod Hhook $$ %n %hn Hs Hc with ⟨Hs, Hc, HP⟩
   imod Hclose $$ Hc
   imodintro

@@ -114,11 +114,10 @@ theorem fsPermit_ofRec (G : GName → IProp GF) (cov : ExtTreeSet Nat compare) (
   iintro %dk %n Hsa %hn Ha HP
   unfold fsCrashSeamAt
   icases Hseam with ⟨#Hfwd, #Hbwd⟩
-  ihave HP : ▷ pFsComp G cov ls $$ [HP]
-  · inext; iapply Hfwd $$ HP
+  ihave HP : pFsComp G cov ls $$ [HP]
+  · iapply Hfwd $$ HP
   unfold pFsComp
   icases HP with ⟨%gt, HP, HG⟩
-  imod HP
   ihave ⟨%dk0, Hfr, %hext, HPr⟩ := (pFsNamedAt_unfold gt _ _ _ _ _ cov ls).1 $$ HP
   unfold diskFixedAuth
   ihave ⟨%hrd, Ha, Hfr⟩ := pFsCrashRead _ _ dk dk0 $$ [Ha Hfr]

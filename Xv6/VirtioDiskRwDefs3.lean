@@ -425,16 +425,16 @@ theorem vdrwNext_deposit (k : KCtx) (γ : DiskNames) (bno : BitVec 32) (wr : Boo
     (dataBuf dataDisk : List (BitVec 8)) (cpu : CPU) (E : CoPset)
     (hE : (↑crashPermN : CoPset) ⊆ E) :
     crashPermInv (genId (GF := GF)) γ.cperm ∗
-      vdrwNext k γ bno wr dataBuf dataDisk none cpu ⊢@{IProp GF}
+      vdrwNext k γ bno wr dataBuf dataDisk none cpu ∗ £ 1 ⊢@{IProp GF}
       |={E}=> ∃ kq : Nat × Nat,
         crashPermPend γ.cperm kq (vdrwWr wr bno dataBuf)
           (List.range (wrNsectors (vdrwWr wr bno dataBuf))) ∗
         vdrwNext k γ bno wr dataBuf dataDisk (some kq.2) cpu := by
   unfold vdrwNext vdrwTok
-  iintro ⟨#Hpi, %Q, Hperm, Hn⟩
+  iintro ⟨#Hpi, ⟨%Q, Hperm, Hn⟩, Hlcp⟩
   imod crashPerm_deposit_kq (genId (GF := GF)) γ.cperm (vdrwWr wr bno dataBuf) Q E hE
-    $$ [Hpi Hperm] with ⟨%kq, Hpend, #Hrc⟩
-  · iframe Hpi Hperm
+    $$ [Hpi Hperm Hlcp] with ⟨%kq, Hpend, #Hrc⟩
+  · iframe Hpi Hperm Hlcp
   imodintro
   iexists kq
   iframe Hpend

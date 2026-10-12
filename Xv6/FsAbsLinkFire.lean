@@ -150,11 +150,11 @@ theorem lfTgt_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset)
     (habs' : fnType nt' ≠ 0 ∧ absRow nt' = ⟨(absRow nt).anNode, fnNlink nt + 1⟩) :
     ⊢@{IProp GF} ftopInv γfs -∗ appInv γfs -∗
       pfAt (ltgtCommitAt (fsGammaL γfs) appE) Ftgt -∗
-      topFrag (fsGammaL γfs) t nt ={E}=∗
+      topFrag (fsGammaL γfs) t nt -∗ £ 1 ={E}=∗
         topFrag (fsGammaL γfs) t nt' ∗
         ∃ av : Aview, ⌜arowAt av t (absRow nt)⌝ ∗ ⌜linkTgtOk (absRow nt).anNode⌝ ∗
           Ftgt.pfRecv av t (absRow nt) := by
-  iintro #Hi #Hai Hcm Hf
+  iintro #Hi #Hai Hcm Hf Hcr
   -- THE PIECE IS SPENT: the fire eliminates to the AU side.
   ihave Hcm := pfAt_au _ _ $$ Hcm
   unfold ftopInv
@@ -174,7 +174,7 @@ theorem lfTgt_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset)
   imod (fupd_mask_mono hsub) $$ Hcm with ⟨Ha, Hstep, Hph2⟩
   -- THE MOVE, at the whole authority: the application's half comes out of
   -- `appN` beside its claim, which the caller's step re-establishes.
-  imod (appTopUpdate (E \ ↑ftopN) γfs I t nt nt' hsub) $$ Hai [Hstep] Ha Hf with ⟨Ha, Hf⟩
+  imod (appTopUpdate (E \ ↑ftopN) γfs I t nt nt' hsub) $$ Hai [Hstep] Ha Hf Hcr with ⟨Ha, Hf⟩
   · iintro %_ Hp
     iapply (appStep_at t I _ nt' hdelta) $$ Hstep Hp
   ihave Hph2 := Hph2 $$ %(PartialMap.insert I t nt') %hdelta Ha
@@ -203,11 +203,11 @@ theorem lfEnt_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset)
     (habsp' : absOf np' = some ⟨.ADir ((dirEntries np).insert nm t), fnNlink np⟩) :
     ⊢@{IProp GF} ftopInv γfs -∗ appInv γfs -∗
       pfAt (lentCommitAt (fsGammaL γfs) appE) Fent -∗
-      topFrag (fsGammaL γfs) d np ={E}=∗
+      topFrag (fsGammaL γfs) d np -∗ £ 1 ={E}=∗
         topFrag (fsGammaL γfs) d np' ∗
         ∃ av : Aview, ⌜PartialMap.get? av d = some ⟨.ADir (dirEntries np), fnNlink np⟩⌝ ∗
           ⌜(dirEntries np)[nm]? = none⌝ ∗ Fent.pfRecv av d nm t := by
-  iintro #Hi #Hai Hcm Hf
+  iintro #Hi #Hai Hcm Hf Hcr
   ihave Hcm := pfAt_au _ _ $$ Hcm
   unfold ftopInv
   imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs)
@@ -226,7 +226,7 @@ theorem lfEnt_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset)
   unfold lentCommitAt
   ihave Hcm := Hcm $$ %I %d %t %nm %(dirEntries np) %(fnNlink np) %hrowp %hnm Ha
   imod (fupd_mask_mono hsub) $$ Hcm with ⟨Ha, Hstep, Hph2⟩
-  imod (appTopUpdate (E \ ↑ftopN) γfs I d np np' hsub) $$ Hai [Hstep] Ha Hf with ⟨Ha, Hf⟩
+  imod (appTopUpdate (E \ ↑ftopN) γfs I d np np' hsub) $$ Hai [Hstep] Ha Hf Hcr with ⟨Ha, Hf⟩
   · iintro %_ Hp
     iapply (appStep_at d I _ np' hdelta) $$ Hstep Hp
   ihave Hph2 := Hph2 $$ %(PartialMap.insert I d np') %hdelta Ha

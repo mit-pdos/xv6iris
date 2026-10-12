@@ -159,7 +159,7 @@ theorem vdrw_P4 (Γ : SchedNames) [ClaimIs GF Γ]
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdrw4_availIdx pav]
   iintro Hk Hpc Hidxw
   k_step (wp_s_addiw cpu _ (KA.«virtio_disk_rw» + 0x190#64) true 1#12 15#5 15#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] £ Hlcp
   iintro Hk Hpc
   -- the publication view shift: head `c.hd` is armed with `c`
   ihave Hblk := (show diskBlock (GF := GF) γ bno.toNat dataDisk ⊢ diskBlock γ c.blk dataDisk
@@ -168,8 +168,8 @@ theorem vdrw_P4 (Γ : SchedNames) [ClaimIs GF Γ]
   -- the caller's permit goes into the channel, at a key the channel chooses
   ihave #Hcpi := vdrwCaps_perm γ γl pd pav pu $$ Hcaps
   imod vdrwNext_deposit k γ bno wr dataBuf dataDisk cpu ⊤ (fun p hp => CoPset.subseteq_top p hp)
-    $$ [Hcpi Hnext] with ⟨%kq, Hpend, Hnext⟩
-  · iframe Hcpi Hnext
+    $$ [Hcpi Hnext Hlcp] with ⟨%kq, Hpend, Hnext⟩
+  · iframe Hcpi Hnext Hlcp
   ihave Hpend : iprop(crashPermPend (GF := GF) γ.cperm (c.arm np pw curCtx kq).kq
       (chainWr (c.arm np pw curCtx kq)) (List.range (wrNsectors (chainWr (c.arm np pw curCtx kq)))))
     $$ [Hpend]

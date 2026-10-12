@@ -260,7 +260,7 @@ theorem kpt_exclReadAU [CurCtx] (t : PTree) (M : RegMapF (BitVec 64)) (addr c : 
   isplit
   · ipureintro; exact fun j hj => WordHist.hist_ne_nilT W Hold htail j hj
   inext
-  iintro %w0 %hheads Hb
+  iintro %w0 %hheads Hb _
   imod Hmask
   ihave Hw := wordCellT_intro addr 8 (fl i) v0 W Hold htail $$ Hb
   ihave Hcell := pteCell_intro addr c (fl i) v0 W hpin $$ Hw

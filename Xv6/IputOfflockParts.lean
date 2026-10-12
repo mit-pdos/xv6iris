@@ -109,18 +109,18 @@ theorem iput_ofl_au [Fscfg] [Icfg] (inum : BitVec 32) (dn : Dinode) (ds : List D
     iregInv fscIreg fscFs icfgIst icfgNib ∗
       escAInv fscFs ge gr gd inum.toNat rg ∗
       ipoolInv fscIc fscFs fscIreg fscCov fscLogst icfgNib ∗
-      crpElem inum.toNat (.crpPre t q) ∗ dinodeAt fscIreg inum dn ∗ redeemTicketA gd ⊢
+      crpElem inum.toNat (.crpPre t q) ∗ dinodeAt fscIreg inum dn ∗ redeemTicketA gd ∗ £ 1 ⊢
       dislotWriteAu (GF := GF) inum (iputOflZ dn) ds e0
         iprop(committedA ge ∗ iregRegime rg.1 ∗ iregFpin rg ∗ txPin icfgLog t q) := by
   unfold dislotWriteAu
-  iintro ⟨#Hinv, #Hesc, #Hpinv, Hcel, Hdn, Hdep⟩
+  iintro ⟨#Hinv, #Hesc, #Hpinv, Hcel, Hdn, Hdep, Hcr⟩
   iapply lwAuRec icfgLog fscFs (IBLOCK inum icfgIst) (⊤ \ ↑iregN) (islot inum) (diblkBytes ds)
     (dinodeBytes (iputOflZ dn)) _ e0
   iapply (iregFreeDeposit_au ⊤ fscIc fscIreg fscFs icfgIst fscCov fscLogst icfgNib
     inum dn (iputOflZ dn) (diblkBytes ds) ge gr gd rg t q CoPset.subseteq_top
     (iput_ofl_mask_esc _) (iput_ofl_mask_pool _) (iput_ofl_mask_ftop _) (by omega)
     (iputOflZ_wf dn hdn) rfl hbare (iputOflZ_nlst dn hnl0))
-    $$ Hinv Hesc Hpinv Hcel Hdn Hdep
+    $$ Hinv Hesc Hpinv Hcel Hdn Hdep Hcr
 
 end
 

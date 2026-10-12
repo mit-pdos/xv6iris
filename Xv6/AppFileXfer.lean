@@ -303,8 +303,10 @@ theorem fileMerge (c : FileFixed) (gen : Nat)
       syncBody c ⟨rc0, rd, rt, re, rγ, gen + 1, rb, rp⟩ av ls Ls) $$ [Hsy]
   · inext
     iapply syncClaim_elim c ⟨rc0, rd, rt, re, rγ, gen + 1, rb, rp⟩ av $$ Hsy
-  icases later_exists.mpr $$ Hsy with ⟨%ls, Hsy⟩
-  icases later_exists.mpr $$ Hsy with ⟨%Ls, Hsy⟩
+  -- the body is timeless (`syncBody_timeless`), so the existentials leave the later
+  -- at every step index (the proof mode's timeless fallback)
+  icases Hsy with ⟨%ls, Hsy⟩
+  icases Hsy with ⟨%Ls, Hsy⟩
   ihave Hsy : iprop(▷ (syncReg c (gen + 1) rγ ∗ flLb c ls ∗ ⌜syncChain ls Ls⌝
       ∗ ⌜uadm ls (slast Ls) (fcontOf av)⌝
       ∗ syncRole c ⟨rc0, rd, rt, re, rγ, gen + 1, rb, rp⟩ Ls)) $$ [Hsy]
@@ -361,8 +363,10 @@ theorem fileMerge (c : FileFixed) (gen : Nat)
   iintro %n %hn Hsa Hold
   subst hn
   ihave Hsa := hst1 (gen + 1) $$ Hsa
-  icases later_exists.mpr $$ Hold with ⟨%r_o, Hold⟩
-  icases later_exists.mpr $$ Hold with ⟨%av_o, Hold⟩
+  -- the old copy's body is timeless (the file era's claim), so its existentials
+  -- leave the later at every step index
+  icases Hold with ⟨%r_o, Hold⟩
+  icases Hold with ⟨%av_o, Hold⟩
   icases Hold with ⟨#Hrco, Hold⟩
   ihave Hold : iprop(▷ (fileTaint c ∨ (⌜fileFsPure av_o⌝ ∗ consState r_o.fnCons av_o
       ∗ fState c r_o av_o ∗ syncClaim c r_o av_o))) $$ [Hold]
@@ -383,8 +387,8 @@ theorem fileMerge (c : FileFixed) (gen : Nat)
       syncBody c r_o av_o ls_o Ls_o) $$ [Hso]
   · inext
     iapply syncClaim_elim c r_o av_o $$ Hso
-  icases later_exists.mpr $$ Hso with ⟨%ls_o, Hso⟩
-  icases later_exists.mpr $$ Hso with ⟨%Ls_o, Hso⟩
+  icases Hso with ⟨%ls_o, Hso⟩
+  icases Hso with ⟨%Ls_o, Hso⟩
   ihave Hso : iprop(▷ (syncReg c r_o.fnEra r_o.fnSync ∗ syncRole c r_o Ls_o))
     $$ [Hso]
   · inext

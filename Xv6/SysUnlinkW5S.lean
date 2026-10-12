@@ -214,7 +214,7 @@ theorem sys_unlink_w5_spine (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ 
   iapply wpLoop_fupd
   imod (ufUtgt_fire fscFs ⊤ A.Ftgt iinum.toNat (eraNode dni bmi dati)
       (eraNode (sysUnlinkDni2 dni) bmi dati) ufNd_top hloc hnl1 habs' hoki.2.2.2.1)
-    $$ Hftop Happ Hct Htopi with ⟨Htopi, %av1, %hav1, Hrcv⟩
+    $$ Hftop Happ Hct Htopi Hlc with ⟨Htopi, %av1, %hav1, Hrcv⟩
   imodintro
   -- the target re-parked at the lowered record
   icases (show inodeMap (GF := GF) fscFs (ientry ks) bmi ⊢

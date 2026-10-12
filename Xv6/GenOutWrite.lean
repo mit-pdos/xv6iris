@@ -106,7 +106,7 @@ theorem gclPure_write_first (M : LModel) (sd : M.lmSt) (k : Nat) (ho : List Obs)
       exact List.eq_nil_of_length_eq_zero (by rw [hq]; rfl)
     · exact absurd ⟨hwnil, by rw [hEnil]; rfl⟩ hne
   refine ⟨hf0nil, hEnil, hwnil, hpsnil, hcsnil, ?_⟩
-  refine gclPure_out M sd k ho so _ H b (by rw [hcsnil]) (by rw [hEnil])
+  refine gclPure_out M sd k ho so _ H b (by rw [hcsnil]; exact Nat.le_refl _) (by rw [hEnil])
     ?_ ?_ ?_ ?_ hall0
   · refine ⟨?_, ?_, ?_, ?_, ?_, ?_, lmAltsPre_nil M s0 [], ?_, ?_, Nat.zero_le _, Or.inl rfl, ?_,
       ?_, hfok⟩

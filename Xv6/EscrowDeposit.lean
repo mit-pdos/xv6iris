@@ -213,7 +213,7 @@ theorem iregFreeDeposit_au [Icfg] (E : CoPset) (icn : IcNames) (γi : GName) (γ
       ipoolInv icn γfs γi cov logstart nib -∗
       crpElem inum.toNat (.crpPre t q) -∗
       dinodeAt γi inum dn -∗
-      redeemTicketA gd -∗
+      redeemTicketA gd -∗ £ 1 -∗
       |={E, E \ ↑iregN}=> ∃ recOld : List (BitVec 8),
         ⌜recOld.length = 64⌝ ∗
         FsView.byteRange (fsGammaL γfs) (IBLOCK inum inodestart) (64 * islot inum) recOld ∗
@@ -224,7 +224,7 @@ theorem iregFreeDeposit_au [Icfg] (E : CoPset) (icn : IcNames) (γi : GName) (γ
   have hsl := islot_lt inum
   have hnl0' : dn'.diNlink.toNat = 0 := hnl.2 hz
   have hnl0 : dn.diNlink.toNat = 0 := by rw [← hnl.1]; exact hnl0'
-  iintro #Hinv #Hesc #Hpinv Hel Hdn Hdep
+  iintro #Hinv #Hesc #Hpinv Hel Hdn Hdep Hcr
   ihave #Hftopi := iregInv_ftop γi γfs inodestart nib $$ Hinv
   ihave #Happi := iregInv_app γi γfs inodestart nib $$ Hinv
   imod iregInv_slot_acc E γi γfs inodestart nib inum hE hin $$ Hinv with
@@ -280,7 +280,7 @@ theorem iregFreeDeposit_au [Icfg] (E : CoPset) (icn : IcNames) (γi : GName) (γ
       absOf_bare _ (fnBare_freeNode dn' hbare hnl0')]
   imod iregTopRetag_same ((E \ ↑iregN) \ ↑(escAN inum.toNat)) γfs inum.toNat ntop
     (freeNode dn') hEftop habs (inodeLocal_freeNode inum.toNat dn' hbare hnl0' hz) $$
-    Hftopi Happi Htop with Htop
+    Hftopi Happi Htop Hcr with Htop
   ihave Hpark := iregTopPark_free γfs inum.toNat dn' hbare $$ Htop
   unfold ifreezePost ifreezeOff
   ihave %hfz := iregRcol_freeze_agree inum.toNat cl rl fz cn _ (.frzPost rg) $$ Hla Hfz

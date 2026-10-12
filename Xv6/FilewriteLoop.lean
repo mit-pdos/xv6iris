@@ -399,8 +399,8 @@ theorem fwr_iter (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO :
     (fwrChunk A.n.toNat t) dn dn' dn0' bm bm' data data' v tot dist wrote dstb a0 hip hik hq htn htie
     hcpos (fwrChunk_wchunkAt A.n t p htn htie) hout.w16at htyF hty' hnl' hok.2.2.2.2.2.1 hout.holes hok.2.2.2.2.1 hcap htotc hout.distLe
     hout.distFull hwhy hout.range harms hchunk hok' hrl' hnd' hdn0
-    $$ [Hrun Htop Hgv Hst Hcell Hout Hdi Hmeta Hmap Hblk] with ⟨Hrun, Hoffd, Hrows, Hload, Hst⟩
-  · iframe Hrun Htop Hgv Hst Hcell Hout Hdi Hmeta Hmap Hblk
+    $$ [Hrun Htop Hgv Hst Hcell Hout Hdi Hmeta Hmap Hblk Hlc] with ⟨Hrun, Hoffd, Hrows, Hload, Hst⟩
+  · iframe Hrun Htop Hgv Hst Hcell Hout Hdi Hmeta Hmap Hblk Hlc
     iframe #
   ihave Hk := Hkb $$ Hrun
   imodintro

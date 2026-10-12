@@ -69,11 +69,19 @@ def skeyEq (W W' : Uvis) : Prop :=
 
 /-! ## The class -/
 
+/-- THE FAMILY'S UNIVERSE IS `IProp GF`'s: the xv6 family (`UexecExecInst.Xfam`)
+carries `IProp`-valued fields, and at the ordinal step-index choice
+`Iris.SI := Ordinal.{3} : Type 4`, so `IProp GF : Type 4`.  A class field
+cannot take a free universe here (the spec structures quantify over
+`[SG : UexecSG GF]` inside `Prop` fields), so the level is written out; this
+check fails, at this one place, if the base logic's universe ever moves. -/
+example (GF : BundledGFunctors.{0}) : Type 4 := IProp GF
+
 /-- **Rocq `uexecSG`**, indexed by `CtokG` (the generic-family law hands a
 slot `myPay`).  Field order and content are Rocq's. -/
 class UexecSG (GF : BundledGFunctors.{0}) [CtokG GF] where
   /-- the process's choice of families, for every syscall at once -/
-  sfam : Type
+  sfam : Type 4
   /-- a point of it, for the arms that carry no deposit -/
   sfamPt : sfam
   /-- THE FORK PAYLOAD: what the child's exit at status `xs` owes back -/
@@ -104,9 +112,9 @@ class UexecSG (GF : BundledGFunctors.{0}) [CtokG GF] where
   view, working directory, children) -/
   spostAt : (Uvis → IProp GF) → Int → sfam → Uvis → BitVec 64 → ElfMem → List FdState → Nat →
     Std.ExtTreeSet GName compare → IProp GF
-  sbundleAt_ne : ∀ (k : Nat) (X Y : Uvis → IProp GF), (∀ W, X W ≡{k}≡ Y W) →
+  sbundleAt_ne : ∀ (k : Iris.SI) (X Y : Uvis → IProp GF), (∀ W, X W ≡{k}≡ Y W) →
     ∀ (n : Int) (f : sfam) (W : Uvis), sbundleAt X n f W ≡{k}≡ sbundleAt Y n f W
-  spostAt_ne : ∀ (k : Nat) (X Y : Uvis → IProp GF), (∀ W, X W ≡{k}≡ Y W) →
+  spostAt_ne : ∀ (k : Iris.SI) (X Y : Uvis → IProp GF), (∀ W, X W ≡{k}≡ Y W) →
     ∀ (n : Int) (f : sfam) (W : Uvis) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat)
       (cs' : Std.ExtTreeSet GName compare),
       spostAt X n f W r M' fdv' cw' cs' ≡{k}≡ spostAt Y n f W r M' fdv' cw' cs'

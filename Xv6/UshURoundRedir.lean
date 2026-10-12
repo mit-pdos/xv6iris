@@ -239,7 +239,7 @@ theorem uHchild_redir (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : USH_FPRINTF) (SP : 
       have hlst : (vf.feBase ++ ulinesIn I).getLast? = some (Uline.LEchoF ws file) := by
         rw [List.getLast?_append, ulinesIn_last I hpos, hul]; rfl
       have hnp : (vf.feBase ++ ulinesIn I).length ≤ vf.feBase.length + nlines I := by
-        rw [List.length_append, ulinesIn_length]
+        rw [List.length_append, ulinesIn_length]; exact Nat.le_refl _
       -- THE ROUND POSITION, advanced to the line's count
       unfold urpos
       icases Hup with ⟨%vf0, %n0, #Hvf0, Hposh, %hn0, #Hrr⟩

@@ -91,15 +91,19 @@ theorem FileWrite.fileClaimRead [inst : Appcfg GF] (γfs : FsNames) (c : FileFix
   imod (inv_acc (E := appE) (N := appN) (P := appBody (GF := GF) γfs) (fun _ h => h)) $$ Hinv
     with ⟨Hbody, Hclose⟩
   unfold appBody
-  icases Hbody with ⟨%I0, >Hh, Hp, >%hdom⟩
+  -- the file era's claim is timeless, so the whole body is and its later strips as
+  -- one (ordinal step index; Rocq's port, `exist_timeless` needs no finite index)
+  have htl : ∀ av : Aview, Timeless (appPred appRun av : IProp GF) := by
+    intro av; subst heq; exact filePred_timeless (GF := GF) c r av
   subst heq
+  imod Hbody
+  icases Hbody with ⟨%I0, Hh, Hp, %hdom⟩
   ihave %hI := ghost_map_auth_agree _ _ _ _ _ $$ Hka Hh
   subst hI
-  imod (@timeless_except0 _ _ _ (filePred_timeless (GF := GF) c r (absView I))).mp $$ Hp with Hp
   ihave ⟨Hp, Hd, Hfact⟩ := Hlaw $$ %(absView I) %s Hd Hp
   imod Hclose $$ [Hh Hp]
   · inext
-    dsimp only
+    try dsimp only
     iexists I
     iframe Hh
     isplitl [Hp]

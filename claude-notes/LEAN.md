@@ -27,3 +27,17 @@ How the Rocq vocabulary in these notes maps to this tree:
 | `Print Assumptions` audits, `tools/tcb` | `tools/ci/audit.sh`, `tools/ci/tcb.sh` |
 | `tools/proof_coverage.py`, `proof_profile.py`, `iris/find_dead.py` | same names under `tools/` (Lean-native), run by `tools/ci/run_all.sh` |
 | Iris proof mode (`iIntros`, `iApply`, …) | iris-lean's proof mode (`iintro`, `iapply`, …) |
+
+## The base logic: Transfinite Iris at the ordinal step index
+
+The tree runs on the fork's Transfinite Iris-Lean (`Iris.SI := Ordinals.Ordinal.{3}`), while the
+notes were written for Iris step-indexed by the natural numbers.  What their Iris reasoning has to
+be read with:
+
+- A later commutes with `∗` and `∃` only over timeless or persistent parts (the proof mode does this
+  through fallback instances).  A body with a client predicate under `▷ ∃` (most invariant openers
+  in the notes) is opened with a LATER CREDIT: `lc_fupd_elim_later` right after the opening, the
+  credit coming from the program step (`wpNext` carries one per step; `k_step … £ H` keeps it).
+- Step-index binders (`≡{n}≡`, contractivity) range over `Iris.SI`, not `Nat`; `IProp GF : Type 4`.
+- The resolution of every opener family, and the deviations from the Rocq rulings, are in
+  `notes/design-rulings.md` ("The ordinal step index").

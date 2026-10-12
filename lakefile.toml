@@ -7,7 +7,7 @@ defaultTargets = ["MachCSL", "Xv6"]
 # LANDING CHECKLIST: re-pin by git (url + rev of the fork, subDir = "Iris") before merging into `lean`.
 [[require]]
 name = "iris"
-path = "/work/wt/iris-lean-tf-nat/Iris"
+path = "/work/wt/iris-lean-tf-ordinal/Iris"
 
 # lean-sail with the free-monad concurrency interface (see vendor/lean-sail/README.md).
 [[require]]

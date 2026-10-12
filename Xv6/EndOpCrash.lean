@@ -187,14 +187,14 @@ by the file system).  RECOVERY IS DONE (the seal), so the tie has no
 exception and the collection reads the whole cache map off the byte view. -/
 theorem eo_snapLaw_ofAuth (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32) (L : BlockMap) :
-    logCtx (GF := GF) γ γb γfs cov ls dev ⊢ fsCacheAuth γfs L -∗ logTxAuth γ ∅ -∗
+    logCtx (GF := GF) γ γb γfs cov ls dev ⊢ fsCacheAuth γfs L -∗ logTxAuth γ ∅ -∗ £ 1 -∗
       -- the era's token, checked out of `logResAt` with the batch (sync K3-3):
       -- the law puts it into the pair
       eraSyncTok (GF := GF) -∗
       |={⊤}=> ((∃ G : GName → IProp GF, fsCrashSeamAt G cov ls ∗
           snapLawOut G (eraSyncTok (GF := GF)) (genId (GF := GF)) L (fsHomeList cov ls)) ∗
         fsCacheAuth γfs L ∗ logTxAuth γ ∅) := by
-  iintro #Hctx HcL Ht HT
+  iintro #Hctx HcL Ht Hcr HT
   ihave #Hlaw := logCtx_snapLaw γ γb γfs cov ls dev $$ Hctx
   ihave #Hseal := logCtx_seal γ γb γfs cov ls dev $$ Hctx
   ihave #Hrow := logCtx_bytes γ γb γfs cov ls dev $$ Hctx
@@ -215,7 +215,7 @@ theorem eo_snapLaw_ofAuth (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
   ihave %hsub := ghost_map_lookup_big C $$ HcL HC
   have hdom : ∀ b, (∃ bs, PartialMap.get? C b = some bs) ↔ fsHome cov ls b := by
     intro b; rw [hok.dom b, mem_fsHomeList]
-  imod snapLaw_run γ γfs cov ls _ _ Lb C hdom hok.lens htie hok.bdom $$ Hlaw Ha Ht HT
+  imod snapLaw_run γ γfs cov ls _ _ Lb C hdom hok.lens htie hok.bdom $$ Hlaw Ha Ht Hcr HT
     with ⟨⟨%G, #Hseam, Hout⟩, Ha, Ht⟩
   imod Hclose $$ [Ha HC Hxa] with -
   · inext

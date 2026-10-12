@@ -95,7 +95,7 @@ def uslotF (X : Uvis → IProp GF) (W : Uvis) : IProp GF :=
 /-! ### Non-expansiveness, and the fixpoint -/
 
 section Ne
-variable (k : Nat) (X Y : Uvis → IProp GF) (HX : ∀ W, X W ≡{k}≡ Y W)
+variable (k : Iris.SI) (X Y : Uvis → IProp GF) (HX : ∀ W, X W ≡{k}≡ Y W)
 include HX
 
 omit [MachGS GF] in

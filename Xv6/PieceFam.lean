@@ -71,7 +71,9 @@ open Iris Iris.BI Iris.ProofMode
 /-! ## 1.  The pair -/
 
 /-- Rocq's `pfam Σ A`: a one-shot piece's receipt family beside its refund. -/
-structure Pfam (GF : BundledGFunctors.{0}) (A : Type) where
+-- `A : Type _`: at the ordinal step-index choice `IProp GF : Type 4`, and the families range over
+-- `IProp`-valued functions
+structure Pfam (GF : BundledGFunctors.{0}) (A : Type _) where
   pfRecv : A
   pfRefund : IProp GF
 
@@ -80,13 +82,13 @@ structure Pfam (GF : BundledGFunctors.{0}) (A : Type) where
 /-- `pfAt AU F` is the one-shot piece `AU` at the family `F`, CONJOINED with
 `F`'s refund (Rocq's `pf_at`) -- the `AU ∧ R` of the ruling.  `AU` is the
 piece with its receipt slot ABSTRACTED. -/
-def pfAt {GF : BundledGFunctors.{0}} {A : Type} (AU : A → IProp GF) (F : Pfam GF A) : IProp GF :=
+def pfAt {GF : BundledGFunctors.{0}} {A : Type _} (AU : A → IProp GF) (F : Pfam GF A) : IProp GF :=
   iprop(AU F.pfRecv ∧ F.pfRefund)
 
 /-! ## 2.  The trivial pair -/
 
 /-- Rocq's `pfam_triv`: the caller's receipt beside `True`. -/
-def pfamTriv {GF : BundledGFunctors.{0}} {A : Type} (Φ : A) : Pfam GF A :=
+def pfamTriv {GF : BundledGFunctors.{0}} {A : Type _} (Φ : A) : Pfam GF A :=
   ⟨Φ, iprop(True)⟩
 
 /-! ## 3.  The transport under the conjunction -/
@@ -117,20 +119,20 @@ theorem refund_ref (A R : IProp GF) : iprop(A ∧ R) ⊢ R := by
   iexact H
 
 /-- What a FIRE takes (Rocq's `pf_at_au`). -/
-theorem pfAt_au {A : Type} (AU : A → IProp GF) (F : Pfam GF A) : pfAt AU F ⊢ AU F.pfRecv :=
+theorem pfAt_au {A : Type _} (AU : A → IProp GF) (F : Pfam GF A) : pfAt AU F ⊢ AU F.pfRecv :=
   refund_au _ _
 
 /-- What a caller that did not get its fire eliminates the returned piece to
 (Rocq's `pf_at_refund`). -/
-theorem pfAt_refund {A : Type} (AU : A → IProp GF) (F : Pfam GF A) : pfAt AU F ⊢ F.pfRefund :=
+theorem pfAt_refund {A : Type _} (AU : A → IProp GF) (F : Pfam GF A) : pfAt AU F ⊢ F.pfRefund :=
   refund_ref _ _
 
 /-- The intro a discharger uses (Rocq's `pf_at_intro`). -/
-theorem pfAt_intro {A : Type} (AU : A → IProp GF) (F : Pfam GF A) :
+theorem pfAt_intro {A : Type _} (AU : A → IProp GF) (F : Pfam GF A) :
     iprop(AU F.pfRecv ∧ F.pfRefund) ⊢ pfAt AU F := .rfl
 
 /-- The discharger's shape at the TRIVIAL PAIR (Rocq's `pf_at_triv`). -/
-theorem pfAt_triv {A : Type} (Φ : A) (AU : A → IProp GF) :
+theorem pfAt_triv {A : Type _} (Φ : A) (AU : A → IProp GF) :
     AU Φ ⊢ pfAt AU (pfamTriv Φ) := by
   iintro H
   unfold pfAt pfamTriv
@@ -139,13 +141,13 @@ theorem pfAt_triv {A : Type} (Φ : A) (AU : A → IProp GF) :
   · ipureintro; trivial
 
 /-- The mover, at `pfAt` (Rocq's `pf_at_mono`). -/
-theorem pfAt_mono {A : Type} (AU AU' : A → IProp GF) (F : Pfam GF A) :
+theorem pfAt_mono {A : Type _} (AU AU' : A → IProp GF) (F : Pfam GF A) :
     ⊢ (AU F.pfRecv -∗ AU' F.pfRecv) -∗ pfAt AU F -∗ pfAt AU' F := by
   unfold pfAt
   exact refund_mono _ _ _
 
 /-- ...between TWO pairs that share a refund (Rocq's `pf_at_mono_pair`). -/
-theorem pfAt_mono_pair {A B : Type} (AU : A → IProp GF) (AU' : B → IProp GF)
+theorem pfAt_mono_pair {A B : Type _} (AU : A → IProp GF) (AU' : B → IProp GF)
     (F : Pfam GF A) (G : Pfam GF B) (hR : F.pfRefund = G.pfRefund) :
     ⊢ (AU F.pfRecv -∗ AU' G.pfRecv) -∗ pfAt AU F -∗ pfAt AU' G := by
   unfold pfAt

@@ -449,13 +449,13 @@ theorem sched_proof (SW : SWTCH) (MP : MYPROC) (HO : HOLDING) : SCHED :=
   iintro Hk Hpc
   -- jal holding
   k_step (wp_s_jal cpu _ (KA.«sched» + 0x14#64) false 2092274#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sched_br_ffffffffffffed06]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sched_br_ffffffffffffed06] £ Hlcr
   iintro Hk Hpc
   have hho : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hK' : 6 ≤ k'.avail) (pa : BitVec 64)
       (ha0 : k'.regs 10#5 = pa),
       kctx cpu k' ∗ pcIs cpu KA.«holding» ∗ isLock (Γ.lock j) pa "proc" (procLockPay Γ j) ∗
       locked (Γ.lock j) cpu ∗
-      (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
+      £ 1 ∗ (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R' ∧ R' 10#5 = 1#64⌝ -∗ locked (Γ.lock j) cpu -∗ wpLoop cpu)
       ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hK' pa ha0
@@ -471,6 +471,7 @@ theorem sched_proof (SW : SWTCH) (MP : MYPROC) (HO : HOLDING) : SCHED :=
   case hsH => k_norm
   case hKH => k_norm; unfold schedSlots at hK; omega
   case ha0H => k_norm [h10, hproc]
+  iframe Hlcr
   iintro %R3 Hk Hpc %⟨hcs3, h10'⟩ Hlocked
   have hret58 : jumpPc (KA.«sched» + 0x18#64) = (KA.«sched» + 0x18#64) := by decide
   k_norm [hret58]

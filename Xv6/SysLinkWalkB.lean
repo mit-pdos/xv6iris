@@ -620,7 +620,7 @@ theorem sys_link_walk_dp (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
     rcases hbl with ⟨ha0z, ht16⟩ | ⟨ha0m, htlt⟩
     · -- ===== ARM G: the whole record went in =====
       k_step_e (wp_s_branch cpu _ (KA.«sys_link» + 0xa0#64) false 78#13 10#5 0#5 (by decide) bop.BLT)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0z, sys_link_bltz_0]
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0z, sys_link_bltz_0] £ Hcr
       iintro Hk Hpc
       -- THE DOT NAMES ARE MISSED: dirlink's own dirlookup came back empty
       obtain ⟨hnd1, hnd2⟩ := dirDots_miss_not_dots dinum.toNat dnd datd (bname 14 nf) hdtyz hnl0 hddixd
@@ -662,7 +662,7 @@ theorem sys_link_walk_dp (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
       iapply wpLoop_fupd
       imod (lfEnt_fire fscFs ⊤ A.Fent dinum.toNat inum.toNat (bname 14 nf)
           (eraNode dnd bmd datd) (eraNode dn' bm' data') ufNd_top hloc' hdir hnlp hentnone hprow)
-        $$ Hftop Happ Hlent Htd with ⟨Htd, %av, %hav, %hav2, Hrcv⟩
+        $$ Hftop Happ Hlent Htd Hcr with ⟨Htd, %av, %hav, %hav2, Hrcv⟩
       imodintro
       ihave Hlentf : lentFired A.Fent dinum.toNat (bname 14 nf) inum.toNat $$ [Hrcv]
       · unfold lentFired
@@ -684,7 +684,7 @@ theorem sys_link_walk_dp (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
     · -- ===== ARM F-0: the EMPTY append =====
       have htot0 : tot = 0 := by rcases hatom with h | h <;> omega
       k_step_e (wp_s_branch cpu _ (KA.«sys_link» + 0xa0#64) false 78#13 10#5 0#5 (by decide) bop.BLT)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0m, MachCSL.bltz_m1]
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0m, MachCSL.bltz_m1] £ Hcr
       iintro Hk Hpc
       -- THE ENTRY UNITS RIDE WITH IT: nothing was written
       have heqent := dirEntries_dirlinkNopEq dnd dn' bmd bm' datd data'
@@ -702,7 +702,7 @@ theorem sys_link_walk_dp (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
           (by rw [Xv6.cafEra_nlink, Xv6.cafEra_nlink, hnleq]) heqent.symm
       iapply wpLoop_fupd
       imod (iregTopRetag_same ⊤ fscFs dinum.toNat (eraNode dnd bmd datd)
-          (eraNode dn' bm' data') ufNd_top habsd hloc') $$ Hftop Happ Htd with Htd
+          (eraNode dn' bm' data') ufNd_top habsd hloc') $$ Hftop Happ Htd Hcr with Htd
       imodintro
       ihave Hloadd := icMkLoaded fscFs fscIreg fscCov fscLogst kd dinum dn' bm' data' hok' hrl' hdok'
         hddix' hdoc' hduq' $$ Hdld' Hdid Hmetad Had' Hrd' Hbd Htd

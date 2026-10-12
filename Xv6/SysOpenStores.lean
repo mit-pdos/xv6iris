@@ -402,7 +402,7 @@ theorem sys_open_stores_trunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs GF Γ]
     (eraNode (diTrunc dn) bmEmpty (fun _ => List.replicate BSIZE 0)) CoPset.subseteq_top hloc
     (opfEra_file_typed dn bm data hfile) (opfEra_file_row dn bm data hfile)
     (opfEra_file_typed (diTrunc dn) bmEmpty _ hfile)
-    (opfTrunc_row dn bm bmEmpty data _ hfile) $$ Hftop Happ Htc Htop with ⟨Htop, Htr2⟩
+    (opfTrunc_row dn bm bmEmpty data _ hfile) $$ Hftop Happ Htc Htop Hlc with ⟨Htop, Htr2⟩
   -- the kept family's receipt IS the caller's (`SysOpenDefs.creFtKept`)
   rw [creFtKept_pfRecv]
   imodintro

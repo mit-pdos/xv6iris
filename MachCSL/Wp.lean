@@ -550,6 +550,65 @@ theorem swp_event_step_dep (cpu : CPU) {X : Type} (o : Outcome Register Register
     rw [← hC]
     iapply Hswp $$ %C %hC Hcont
 
+/-- `swp_event_step_dep`, handing the step's later credit (`wpHart_lift`'s `£ 1`) to both
+continuations: for a leaf whose accessor opens an invariant AFTER the event (the write half of
+an exclusive pair). -/
+theorem swp_event_step_dep_lc (cpu : CPU) {X : Type} (o : Outcome Register RegisterType)
+    (k : o.ret → SailM X) (Φ : X → IProp GF) :
+    (∀ σ, machInterp σ ={⊤,∅}=∗
+      ⌜hartObs cpu o σ = [] ∧ ((∃ v σ', evStep cpu o σ v σ') ∨ (∃ σ', blockedStep cpu o σ σ'))⌝ ∗
+      ▷ ∀ σ', (∀ (v : o.ret), ⌜evStep cpu o σ v σ'⌝ -∗ £ 1 -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (k v) Φ) ∧
+              (⌜blockedStep cpu o σ σ'⌝ -∗ £ 1 -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (.impure (.ok o) k) Φ))
+    ⊢ swp cpu (.impure (.ok o) k) Φ := by
+  unfold swp
+  iintro H %C %hC Hcont
+  rw [hC]
+  iapply wpHart_lift
+  iintro %σ Hσ
+  imod H $$ %σ Hσ with ⟨%⟨hsil, Hred⟩, H⟩
+  imodintro
+  isplit
+  · ipureintro
+    refine ⟨hsil, ?_⟩
+    rcases Hred with ⟨v, σ', hs⟩ | ⟨σ', hb⟩
+    · exact ⟨C (k v), σ', Or.inl ⟨v, rfl, hs⟩⟩
+    · exact ⟨_, σ', Or.inr ⟨hb, rfl⟩⟩
+  inext
+  iintro %m' %σ' %Hs Hlc
+  unfold hartStep at Hs
+  rcases Hs with ⟨v, rfl, hs⟩ | ⟨hb, rfl⟩
+  · ispecialize H $$ %σ'
+    ihave H := BI.and_elim_l $$ H
+    imod H $$ %v %hs Hlc with ⟨Hσ, Hswp⟩
+    imodintro
+    iframe Hσ
+    iapply Hswp $$ %C %hC Hcont
+  · ispecialize H $$ %σ'
+    ihave H := BI.and_elim_r $$ H
+    imod H $$ %hb Hlc with ⟨Hσ, Hswp⟩
+    imodintro
+    iframe Hσ
+    rw [← hC]
+    iapply Hswp $$ %C %hC Hcont
+
+/-- `swp_event_step`, handing the step's later credit to both continuations. -/
+theorem swp_event_step_lc (cpu : CPU) {X : Type} (o : Outcome Register RegisterType)
+    (k : o.ret → SailM X) (Φ : X → IProp GF)
+    (hsil : ∀ σ, hartObs cpu o σ = [] := by intro; rfl) :
+    (∀ σ, machInterp σ ={⊤,∅}=∗
+      ⌜(∃ v σ', evStep cpu o σ v σ') ∨ (∃ σ', blockedStep cpu o σ σ')⌝ ∗
+      ▷ ∀ σ', (∀ (v : o.ret), ⌜evStep cpu o σ v σ'⌝ -∗ £ 1 -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (k v) Φ) ∧
+              (⌜blockedStep cpu o σ σ'⌝ -∗ £ 1 -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (.impure (.ok o) k) Φ))
+    ⊢ swp cpu (.impure (.ok o) k) Φ := by
+  iintro H
+  iapply swp_event_step_dep_lc cpu o k Φ
+  iintro %σ Hσ
+  imod H $$ %σ Hσ with ⟨%Hred, H⟩
+  imodintro
+  isplit
+  · ipureintro; exact ⟨hsil σ, Hred⟩
+  iexact H
+
 /-- The per-event rule, for an event that is silent at every machine (every
 event but a register write, by computation: `hsil`'s default). -/
 theorem swp_event_step (cpu : CPU) {X : Type} (o : Outcome Register RegisterType)

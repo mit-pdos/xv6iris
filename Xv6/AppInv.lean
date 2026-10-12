@@ -473,15 +473,20 @@ theorem appTopUpdate [MachGS GF] [FsTopG GF] [Appcfg GF] [Icfg]
       (⌜PartialMap.get? I i = some n⌝ -∗
         ▷ appPred appRun (absView I) -∗
         |==> ▷ appPred appRun (absView (PartialMap.insert I i n'))) -∗
-      (γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I) -∗ (γfs.top ↪◯MAP[i] n) -∗
+      (γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I) -∗ (γfs.top ↪◯MAP[i] n) -∗ £ 1 -∗
       |={E}=> ((γfs.top ↪●MAP{DFrac.own (1 : Qp).half} (PartialMap.insert I i n')) ∗
         (γfs.top ↪◯MAP[i] n')) := by
-  iintro #Hinv Hstep Hk Hf
+  iintro #Hinv Hstep Hk Hf Hcr
   unfold appInv
   imod (inv_acc (E := E) (N := appN) (P := appBody (GF := GF) γfs) hE) $$ Hinv
     with ⟨Hbody, Hclose⟩
+  -- the step's credit strips the body's later (ordinal step index): the witness
+  -- and the authority come out, and the claim is handed to the step re-latered
+  imod lc_fupd_elim_later $$ Hcr Hbody with Hbody
   unfold appBody
-  icases Hbody with ⟨%I', >Hh, Hp, >%hd⟩
+  icases Hbody with ⟨%I', Hh, Hp, %hd⟩
+  ihave Hp : ▷ appPred appRun (absView I') $$ [Hp]
+  · inext; iexact Hp
   ihave %heq := ghost_map_auth_agree _ _ _ _ _ $$ Hk Hh
   subst heq
   ihave %hi := ghost_map_lookup $$ Hk Hf
@@ -547,13 +552,47 @@ theorem appClaimUpdate [MachGS GF] [FsTopG GF] [Appcfg GF] [Icfg]
     ⊢@{IProp GF} appInv γfs -∗
       □ (∀ av : Aview, R -∗ ▷ appPred appRun av -∗
           |={E \ ↑appN}=> (▷ appPred appRun av ∗ Q)) -∗
+      R -∗ £ 1 -∗ |={E}=> Q := by
+  iintro #Hinv #Hstep HR Hcr
+  unfold appInv
+  imod (inv_acc (E := E) (N := appN) (P := appBody (GF := GF) γfs) hE) $$ Hinv
+    with ⟨Hbody, Hclose⟩
+  -- the step's credit strips the body's later (ordinal step index)
+  imod lc_fupd_elim_later $$ Hcr Hbody with Hbody
+  unfold appBody
+  icases Hbody with ⟨%I, Hh, Hp, %hd⟩
+  ihave Hp : ▷ appPred appRun (absView I) $$ [Hp]
+  · inext; iexact Hp
+  imod Hstep $$ %(absView I) HR Hp with ⟨Hp, HQ⟩
+  imod Hclose $$ [Hh Hp]
+  · inext
+    iexists I
+    iframe Hh Hp
+    ipureintro; exact hd
+  imodintro
+  iexact HQ
+
+/-- `appClaimUpdate` WITHOUT A CREDIT, AT A TIMELESS CLAIM (Rocq's
+`UInitConsK.app_claim_update_tl`).  When the application's claim is
+timeless at every view (the file era's, `AppFile.filePred_timeless`) the
+whole body is, and its later strips as one (`exists_timeless` needs no
+finite index); the seal openers of the file era use this form. -/
+theorem appClaimUpdate_tl [MachGS GF] [FsTopG GF] [Appcfg GF] [Icfg]
+    (E : CoPset) (γfs : FsNames) (R Q : IProp GF) (hE : (↑appN : CoPset) ⊆ E)
+    (htl : ∀ av : Aview, Timeless (appPred appRun av : IProp GF)) :
+    ⊢@{IProp GF} appInv γfs -∗
+      □ (∀ av : Aview, R -∗ ▷ appPred appRun av -∗
+          |={E \ ↑appN}=> (▷ appPred appRun av ∗ Q)) -∗
       R -∗ |={E}=> Q := by
   iintro #Hinv #Hstep HR
   unfold appInv
   imod (inv_acc (E := E) (N := appN) (P := appBody (GF := GF) γfs) hE) $$ Hinv
     with ⟨Hbody, Hclose⟩
   unfold appBody
-  icases Hbody with ⟨%I, >Hh, Hp, >%hd⟩
+  imod Hbody
+  icases Hbody with ⟨%I, Hh, Hp, %hd⟩
+  ihave Hp : ▷ appPred appRun (absView I) $$ [Hp]
+  · inext; iexact Hp
   imod Hstep $$ %(absView I) HR Hp with ⟨Hp, HQ⟩
   imod Hclose $$ [Hh Hp]
   · inext

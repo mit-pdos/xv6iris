@@ -493,7 +493,7 @@ theorem fwrSt_fire_full (om : OffMode) (γfs : FsNames) (E : CoPset) (i : Nat) (
     ⊢@{IProp GF} ftopInv γfs -∗ appInv γfs -∗
       fwrSt om (fsGammaL γfs) i γo P n M ua Q t p 0 -∗
       topFrag (fsGammaL γfs) i nd -∗
-      offLink γo (off : Int) ={E}=∗
+      offLink γo (off : Int) -∗ £ 1 ={E}=∗
         topFrag (fsGammaL γfs) i nd' ∗
         offLink γo ((off + bs.length : Nat) : Int) ∗
         fwrSt om (fsGammaL γfs) i γo P n M ua Q (t + bs.length) (p + 1) 0 := by
@@ -504,21 +504,21 @@ theorem fwrSt_fire_full (om : OffMode) (γfs : FsNames) (E : CoPset) (i : Nat) (
   cases om with
   | parked =>
     dsimp only [fwrSt]
-    iintro #Hi #Hai ⟨#Hsup, Hau⟩ Hf Hg
+    iintro #Hi #Hai ⟨#Hsup, Hau⟩ Hf Hg Hcr
     icases fwrRaw_take (fsGammaL γfs) i γo P n M ua Q t p htn htie $$ Hau with ⟨Hcm, Hback⟩
     ihave Hs := fwrSupply_off E γo off bs.length hfoff $$ Hsup
     imod wrfAwrite_fire_gen γfs E i γo M ua n p _ iprop(True) off bs bs0 nl nd nd'
-      hE hloc hpos hoff hcap hnz habs hnz' habs' hbyk hlen $$ Hi Hai Hs Hcm Hf Hg
+      hE hloc hpos hoff hcap hnz habs hnz' habs' hbyk hlen $$ Hi Hai Hs Hcm Hf Hg Hcr
       with ⟨Hf, Hg, -, Htail⟩
     imodintro
     iframe Hf Hg Hsup
     iapply Hback $$ %bs %hby Htail
   | held =>
     dsimp only [fwrSt]
-    iintro #Hi #Hai (Hau | ⟨#Hsup, Hau⟩) Hf Hg
+    iintro #Hi #Hai (Hau | ⟨#Hsup, Hau⟩) Hf Hg Hcr
     · icases fwrAdv_take (fsGammaL γfs) i γo P n M ua Q t p htn htie $$ Hau with ⟨Hcm, Hback⟩
       imod wrfAwrite_fire_adv γfs E i γo M ua n p _ off bs bs0 nl nd nd'
-        hE hloc hpos hoff hcap hnz habs hnz' habs' hbyk hlen $$ Hi Hai Hcm Hf Hg
+        hE hloc hpos hoff hcap hnz habs hnz' habs' hbyk hlen $$ Hi Hai Hcm Hf Hg Hcr
         with ⟨Hf, Hg, Htail⟩
       imodintro
       iframe Hf Hg
@@ -527,7 +527,7 @@ theorem fwrSt_fire_full (om : OffMode) (γfs : FsNames) (E : CoPset) (i : Nat) (
     · icases fwrRaw_take (fsGammaL γfs) i γo P n M ua Q t p htn htie $$ Hau with ⟨Hcm, Hback⟩
       ihave Hs := fwrSupply_off E γo off bs.length hfoff $$ Hsup
       imod wrfAwrite_fire_gen γfs E i γo M ua n p _ iprop(True) off bs bs0 nl nd nd'
-        hE hloc hpos hoff hcap hnz habs hnz' habs' hbyk hlen $$ Hi Hai Hs Hcm Hf Hg
+        hE hloc hpos hoff hcap hnz habs hnz' habs' hbyk hlen $$ Hi Hai Hs Hcm Hf Hg Hcr
         with ⟨Hf, Hg, -, Htail⟩
       imodintro
       iframe Hf Hg
@@ -553,7 +553,7 @@ theorem fwrSt_fire_part (om : OffMode) (γfs : FsNames) (E : CoPset) (i : Nat) (
     ⊢@{IProp GF} ftopInv γfs -∗ appInv γfs -∗
       fwrSt om (fsGammaL γfs) i γo P n M ua Q t p 0 -∗
       topFrag (fsGammaL γfs) i nd -∗
-      offLink γo (off : Int) ={E}=∗
+      offLink γo (off : Int) -∗ £ 1 ={E}=∗
         topFrag (fsGammaL γfs) i nd' ∗
         offLink γo ((off + r : Nat) : Int) ∗
         fwrSt om (fsGammaL γfs) i γo P n M ua Q t p 1 := by
@@ -561,22 +561,22 @@ theorem fwrSt_fire_part (om : OffMode) (γfs : FsNames) (E : CoPset) (i : Nat) (
   cases om with
   | parked =>
     dsimp only [fwrSt]
-    iintro #Hi #Hai ⟨#Hsup, Hau⟩ Hf Hg
+    iintro #Hi #Hai ⟨#Hsup, Hau⟩ Hf Hg Hcr
     icases fwrRaw_spendPart (fsGammaL γfs) i γo P n M ua Q t p htn htie $$ Hau with ⟨Hcm, Hback⟩
     ihave Hs := fwrSupply_off E γo off r hfoff $$ Hsup
     imod wrfApart_fire_gen γfs E i γo M ua P n p _ iprop(True) off r bs bs0 nl nd nd'
       hE hloc hpos hoff hcap hr hgap hnz habs hnz' habs' hby hshort hwhy hsb1
-      $$ Hi Hai Hs Hcm Hf Hg with ⟨Hf, Hg, -, Htail⟩
+      $$ Hi Hai Hs Hcm Hf Hg Hcr with ⟨Hf, Hg, -, Htail⟩
     imodintro
     iframe Hf Hg Hsup
     iapply Hback $$ Htail
   | held =>
     dsimp only [fwrSt]
-    iintro #Hi #Hai (Hau | ⟨#Hsup, Hau⟩) Hf Hg
+    iintro #Hi #Hai (Hau | ⟨#Hsup, Hau⟩) Hf Hg Hcr
     · icases fwrAdv_spendPart (fsGammaL γfs) i γo P n M ua Q t p htn htie $$ Hau with ⟨Hcm, Hback⟩
       imod wrfApart_fire_adv γfs E i γo M ua P n p _ off r bs bs0 nl nd nd'
         hE hloc hpos hoff hcap hr hgap hnz habs hnz' habs' hby hshort hwhy hsb1
-        $$ Hi Hai Hcm Hf Hg with ⟨Hf, Hg, Htail⟩
+        $$ Hi Hai Hcm Hf Hg Hcr with ⟨Hf, Hg, Htail⟩
       imodintro
       iframe Hf Hg
       ileft
@@ -585,7 +585,7 @@ theorem fwrSt_fire_part (om : OffMode) (γfs : FsNames) (E : CoPset) (i : Nat) (
       ihave Hs := fwrSupply_off E γo off r hfoff $$ Hsup
       imod wrfApart_fire_gen γfs E i γo M ua P n p _ iprop(True) off r bs bs0 nl nd nd'
         hE hloc hpos hoff hcap hr hgap hnz habs hnz' habs' hby hshort hwhy hsb1
-        $$ Hi Hai Hs Hcm Hf Hg with ⟨Hf, Hg, -, Htail⟩
+        $$ Hi Hai Hs Hcm Hf Hg Hcr with ⟨Hf, Hg, -, Htail⟩
       imodintro
       iframe Hf Hg
       iright

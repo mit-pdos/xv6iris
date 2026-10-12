@@ -262,7 +262,7 @@ def parkTokenF (Γ : SchedNames) (X : IProp GF) : IProp GF :=
 /-! ## §3 Contractivity -/
 
 section Ne
-variable (n : Nat) (X Y : IProp GF) (HX : X ≡{n}≡ Y)
+variable (n : Iris.SI) (X Y : IProp GF) (HX : X ≡{n}≡ Y)
 include HX
 
 theorem parkResumeK_ne (URB : ParkURB GF) (N : UtNames) (g γch : GName) (cw : Nat) (sts : List FdState)

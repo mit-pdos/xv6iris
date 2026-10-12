@@ -55,12 +55,14 @@ theorem isLock_payIff [CurCtx] (γ : GName) (lk : BitVec 64) (s : String) (R R' 
   iframe Hc0 Hc16
   iexists lo, lc
   iframe Hflo Hflc
-  iapply (inv_alter lockN (lockBody γ lk s R lo lc) (lockBody γ lk s R' lo lc)) $$ Hinv
+  -- `inv_alter` needs a finite step index (it splits `▷ (Q ∗ (Q -∗ P))`); `inv_iff` holds at every
+  -- index, and the payload change is an iff
+  iapply (inv_iff lockN (lockBody γ lk s R lo lc) (lockBody γ lk s R' lo lc)) $$ Hinv
   inext
   imodintro
-  iintro HB
-  isplitl [HB]
-  · iapply lockBody_payIff γ lk s R R' lo lc $$ H1 HB
+  isplit
+  · iintro HB
+    iapply lockBody_payIff γ lk s R R' lo lc $$ H1 HB
   · iintro HB
     iapply lockBody_payIff γ lk s R' R lo lc $$ H2 HB
 

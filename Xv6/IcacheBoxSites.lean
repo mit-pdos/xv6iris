@@ -159,7 +159,7 @@ theorem icRecycleWithdraw [Icfg] [CurCtx] (cpu : CPU) (cn : IcNames) (γfs : FsN
   imod stampsFrag_empty (GF := GF) (Id := IcBid) (icfgBox k) with Hf0
   imod boxWithdrawL1 (icBoxPay cn γfs γi cov logstart k) (ndot icBoxN k) (icfgBox k) cpu ξ
       ⟨td, false, none, rx⟩ 0 ∅ Kd 0 E (nclose_subseteq' k hE) rfl
-      (by rw [qsum_empty]; rfl) hKd (by rw [maxStamp_empty])
+      (by rw [qsum_empty]; rfl) hKd (by rw [maxStamp_empty]; exact Nat.le_refl 0)
       $$ [Hrun Hrd Hc Hf0 Hqr] with ⟨Hrun, Hc, %x0, %T0, %hT0, Hrd, Hhdr⟩
   · isplitr
     · iexact Hbox

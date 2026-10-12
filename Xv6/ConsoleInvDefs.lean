@@ -538,8 +538,7 @@ theorem consCredPay (cn : ConsNames) (Wd : IProp GF) (E : CoPset) (hE : ↑consN
     imod Hclose $$ [] with -
     · inext; iright; iframe Hlb Hcred
     imodintro; iexact Hlb
-  · ihave Hd := later_sep.1 $$ Hd
-    icases Hd with ⟨>#Hlb, -⟩
+  · icases Hd with ⟨>#Hlb, -⟩
     imod Hclose $$ [] with -
     · inext; iright; iframe Hlb Hcred
     imodintro; iexact Hlb
@@ -559,8 +558,7 @@ theorem consCredRead (cn : ConsNames) (Wd : IProp GF) (E : CoPset) (hE : ↑cons
     exfalso
     have := (MaxNat.le_toNat _ _).mp h.2
     exact absurd this (by decide)
-  · ihave Hd := later_sep.1 $$ Hd
-    icases Hd with ⟨-, #Hcred⟩
+  · icases Hd with ⟨-, #Hcred⟩
     imod Hclose $$ [] with -
     · inext; iright; iframe Hlb Hcred
     imodintro; iexact Hcred

@@ -147,7 +147,7 @@ theorem holding_notheld_proof (MC : MYCPU) {GF : BundledGFunctors.{0}} [MachGS G
     (hsie : k.sie = false) (hK : 6 ≤ k.avail) (hs : s ∉ k.locks) :
     wp_holding_notheld_body (GF := GF) cpu k γ s R hsie hK hs := by
   unfold wp_holding_notheld_body
-  iintro ⟨Hk, Hpc, #Hlk, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hlk, Hlcr, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   ihave Hk := (show kctx cpu k ⊢ kctx cpu (k.withRegs k.regs) from by rw [KCtx.withRegs_self]) $$ Hk
@@ -177,12 +177,12 @@ theorem holding_notheld_proof (MC : MYCPU) {GF : BundledGFunctors.{0}} [MachGS G
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   · -- the word is nonzero: read the owner word, which is not ours
     k_step (wp_s_branch cpu _ (KA.«holding» + 0x2#64) true 6#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
-      $$ [- $Hk $Hpc] with [MachCSL.bcond_bne_sext_ne w hw]
+      $$ [- $Hk $Hpc] with [MachCSL.bcond_bne_sext_ne w hw] £ Hlcr2
     iintro Hk Hpc
     iapply (holding_tail MC cpu (k.withRegs (k.regs.set 15#5 (BitVec.signExtend 64 w))) hsie hK
-      (isLock γ (k.regs 10#5) s R) (fun w' => iprop(⌜w' ≠ cpuAddr cpu⌝)) 0#64 ?hld ?hans)
+      (iprop(£ 1 ∗ isLock γ (k.regs 10#5) s R)) (fun w' => iprop(⌜w' ≠ cpuAddr cpu⌝)) 0#64 ?hld ?hans)
     rotate_right 1
-    · iframe Hk Hpc
+    · iframe Hk Hpc Hlcr2
       iframe #
       iintro %R' %w' Hk Hpc %hcs %_
       k_norm
@@ -194,12 +194,13 @@ theorem holding_notheld_proof (MC : MYCPU) {GF : BundledGFunctors.{0}} [MachGS G
       simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_false] at hcs
       exact hcs
     case hld =>
-      iintro ⟨#Hi, Hk, Hpc, #Hlk, HΦ'⟩
+      iintro ⟨#Hi, Hk, Hpc, ⟨Hlcr2, #Hlk⟩, HΦ'⟩
       iapply (wp_s_ld_lkcpu_notheld cpu (holdingFrameCtx (k.withRegs (k.regs.set 15#5 (BitVec.signExtend 64 w))))
         (by k_norm [holdingFrameCtx]) (KA.«holding» + 0x12#64) true 16#12 15#5 10#5 (by decide) γ
         (k.regs 10#5) s R (by k_norm [holdingFrameCtx]) (by k_norm [holdingFrameCtx]; exact hs))
       iframe Hk Hpc
       iframe #
+      iframe Hlcr2
       inext
       iapply wpNext_mono $$ HΦ'
       iintro %cpu' HK %w' Hk Hpc %hne
@@ -224,7 +225,7 @@ theorem holding_notheld_gen_proof (MC : MYCPU) {GF : BundledGFunctors.{0}} [Mach
     (hsie : k.sie = false) (hK : 6 ≤ k.avail) (hs : s ∉ k.locks) :
     wp_holding_notheld_gen_body (GF := GF) cpu k γ s R D Tc hrefute hsie hK hs := by
   unfold wp_holding_notheld_gen_body
-  iintro ⟨Hk, Hpc, #Hlk, Hcred, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hlk, Hcred, Hlcr, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   ihave Hk := (show kctx cpu k ⊢ kctx cpu (k.withRegs k.regs) from by rw [KCtx.withRegs_self]) $$ Hk
@@ -254,12 +255,12 @@ theorem holding_notheld_gen_proof (MC : MYCPU) {GF : BundledGFunctors.{0}} [Mach
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   · -- the word is nonzero: read the owner word, which is not ours; Tc rides in Q
     k_step (wp_s_branch cpu _ (KA.«holding» + 0x2#64) true 6#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
-      $$ [- $Hk $Hpc] with [MachCSL.bcond_bne_sext_ne w hw]
+      $$ [- $Hk $Hpc] with [MachCSL.bcond_bne_sext_ne w hw] £ Hlcr2
     iintro Hk Hpc
     iapply (holding_tail MC cpu (k.withRegs (k.regs.set 15#5 (BitVec.signExtend 64 w))) hsie hK
-      (iprop(lockOpenable γ (k.regs 10#5) s R D ∗ Tc)) (fun w' => iprop(⌜w' ≠ cpuAddr cpu⌝ ∗ Tc)) 0#64 ?hld ?hans)
+      (iprop(£ 1 ∗ lockOpenable γ (k.regs 10#5) s R D ∗ Tc)) (fun w' => iprop(⌜w' ≠ cpuAddr cpu⌝ ∗ Tc)) 0#64 ?hld ?hans)
     rotate_right 1
-    · iframe Hk Hpc Hcred
+    · iframe Hk Hpc Hcred Hlcr2
       iframe #
       iintro %R' %w' Hk Hpc %hcs ⟨%_, Hcred⟩
       k_norm
@@ -271,12 +272,13 @@ theorem holding_notheld_gen_proof (MC : MYCPU) {GF : BundledGFunctors.{0}} [Mach
       simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_false] at hcs
       exact hcs
     case hld =>
-      iintro ⟨#Hi, Hk, Hpc, ⟨#Hlk, Hcred⟩, HΦ'⟩
+      iintro ⟨#Hi, Hk, Hpc, ⟨Hlcr2, #Hlk, Hcred⟩, HΦ'⟩
       iapply (wp_s_ld_lkcpu_notheld_gen cpu (holdingFrameCtx (k.withRegs (k.regs.set 15#5 (BitVec.signExtend 64 w))))
         (by k_norm [holdingFrameCtx]) (KA.«holding» + 0x12#64) true 16#12 15#5 10#5 (by decide) γ
         (k.regs 10#5) s R D Tc hrefute (by k_norm [holdingFrameCtx]) (by k_norm [holdingFrameCtx]; exact hs))
       iframe Hk Hpc Hcred
       iframe #
+      iframe Hlcr2
       inext
       iapply wpNext_mono $$ HΦ'
       iintro %cpu' HK %w' Hk Hpc %hne Hcred
@@ -299,7 +301,7 @@ theorem holding_locked_proof (MC : MYCPU) {GF : BundledGFunctors.{0}} [MachGS GF
     (hsie : k.sie = false) (hK : 6 ≤ k.avail) :
     wp_holding_locked_body (GF := GF) cpu k γ s R hsie hK := by
   unfold wp_holding_locked_body
-  iintro ⟨Hk, Hpc, #Hlk, Hlocked, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hlk, Hlocked, Hlcr, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   ihave Hk := (show kctx cpu k ⊢ kctx cpu (k.withRegs k.regs) from by rw [KCtx.withRegs_self]) $$ Hk
@@ -312,13 +314,13 @@ theorem holding_locked_proof (MC : MYCPU) {GF : BundledGFunctors.{0}} [MachGS GF
   iintro %w Hk Hpc %hw Hlc
   subst hw
   k_step (wp_s_branch cpu _ (KA.«holding» + 0x2#64) true 6#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
-    $$ [- $Hk $Hpc] with [MachCSL.bcond_bne_lkOne]
+    $$ [- $Hk $Hpc] with [MachCSL.bcond_bne_lkOne] £ Hlcr2
   iintro Hk Hpc
   iapply (holding_tail MC cpu (k.withRegs (k.regs.set 15#5 (BitVec.signExtend 64 lkOne))) hsie hK
-    iprop(isLock γ (k.regs 10#5) s R ∗ lockedCore γ cpu) (fun w' => iprop(⌜w' = cpuAddr cpu⌝ ∗ lockedCore γ cpu))
+    iprop(£ 1 ∗ isLock γ (k.regs 10#5) s R ∗ lockedCore γ cpu) (fun w' => iprop(⌜w' = cpuAddr cpu⌝ ∗ lockedCore γ cpu))
     1#64 ?hld ?hans)
   rotate_right 1
-  · iframe Hk Hpc Hlc
+  · iframe Hk Hpc Hlc Hlcr2
     iframe #
     iintro %R' %w' Hk Hpc %hcs ⟨%_, Hlc⟩
     k_norm
@@ -331,12 +333,13 @@ theorem holding_locked_proof (MC : MYCPU) {GF : BundledGFunctors.{0}} [MachGS GF
       exact hcs
     · iapply locked_intro; iframe Hlc Hheld
   case hld =>
-    iintro ⟨#Hi, Hk, Hpc, ⟨#Hlk, Hlc⟩, HΦ'⟩
+    iintro ⟨#Hi, Hk, Hpc, ⟨Hlcr2, #Hlk, Hlc⟩, HΦ'⟩
     iapply (wp_s_ld_lkcpu_locked cpu (holdingFrameCtx (k.withRegs (k.regs.set 15#5 (BitVec.signExtend 64 lkOne))))
       (by k_norm [holdingFrameCtx]) (KA.«holding» + 0x12#64) true 16#12 15#5 10#5 (by decide) γ
       (k.regs 10#5) s R (by k_norm [holdingFrameCtx]))
     iframe Hk Hpc Hlc
     iframe #
+    iframe Hlcr2
     inext
     iapply wpNext_mono $$ HΦ'
     iintro %cpu' HK Hk Hpc Hlc
@@ -364,7 +367,7 @@ theorem holding_locked_gen_proof (MC : MYCPU) {GF : BundledGFunctors.{0}} [MachG
     (hsie : k.sie = false) (hK : 6 ≤ k.avail) :
     wp_holding_locked_gen_body (GF := GF) cpu k γ s R D Tc hrefute hsie hK := by
   unfold wp_holding_locked_gen_body
-  iintro ⟨Hk, Hpc, #Hlk, Hcred, Hlocked, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hlk, Hcred, Hlocked, Hlcr, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   ihave Hk := (show kctx cpu k ⊢ kctx cpu (k.withRegs k.regs) from by rw [KCtx.withRegs_self]) $$ Hk
@@ -377,14 +380,14 @@ theorem holding_locked_gen_proof (MC : MYCPU) {GF : BundledGFunctors.{0}} [MachG
   iintro %w Hk Hpc %hw Hlc Hcred
   subst hw
   k_step (wp_s_branch cpu _ (KA.«holding» + 0x2#64) true 6#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
-    $$ [- $Hk $Hpc] with [MachCSL.bcond_bne_lkOne]
+    $$ [- $Hk $Hpc] with [MachCSL.bcond_bne_lkOne] £ Hlcr2
   iintro Hk Hpc
   iapply (holding_tail MC cpu (k.withRegs (k.regs.set 15#5 (BitVec.signExtend 64 lkOne))) hsie hK
-    iprop(lockOpenable γ (k.regs 10#5) s R D ∗ lockedCore γ cpu ∗ Tc)
+    iprop(£ 1 ∗ lockOpenable γ (k.regs 10#5) s R D ∗ lockedCore γ cpu ∗ Tc)
     (fun w' => iprop(⌜w' = cpuAddr cpu⌝ ∗ lockedCore γ cpu ∗ Tc))
     1#64 ?hld ?hans)
   rotate_right 1
-  · iframe Hk Hpc Hlc Hcred
+  · iframe Hk Hpc Hlc Hcred Hlcr2
     iframe #
     iintro %R' %w' Hk Hpc %hcs ⟨%_, Hlc, Hcred⟩
     k_norm
@@ -398,12 +401,13 @@ theorem holding_locked_gen_proof (MC : MYCPU) {GF : BundledGFunctors.{0}} [MachG
     simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_false] at hcs
     exact hcs
   case hld =>
-    iintro ⟨#Hi, Hk, Hpc, ⟨#Hlk, Hlc, Hcred⟩, HΦ'⟩
+    iintro ⟨#Hi, Hk, Hpc, ⟨Hlcr2, #Hlk, Hlc, Hcred⟩, HΦ'⟩
     iapply (wp_s_ld_lkcpu_locked_gen cpu (holdingFrameCtx (k.withRegs (k.regs.set 15#5 (BitVec.signExtend 64 lkOne))))
       (by k_norm [holdingFrameCtx]) (KA.«holding» + 0x12#64) true 16#12 15#5 10#5 (by decide) γ
       (k.regs 10#5) s R D Tc hrefute (by k_norm [holdingFrameCtx]))
     iframe Hk Hpc Hlc Hcred
     iframe #
+    iframe Hlcr2
     inext
     iapply wpNext_mono $$ HΦ'
     iintro %cpu' HK Hk Hpc Hlc Hcred
@@ -426,7 +430,7 @@ theorem holding_locked_refute_proof (MC : MYCPU) {GF : BundledGFunctors.{0}} [Ma
     (hsie : k.sie = false) (hK : 6 ≤ k.avail) :
     wp_holding_locked_refute_body (GF := GF) cpu k γ s R D hrefute hsie hK := by
   unfold wp_holding_locked_refute_body
-  iintro ⟨Hk, Hpc, #Hlk, Hlocked, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hlk, Hlocked, Hlcr, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   ihave Hk := (show kctx cpu k ⊢ kctx cpu (k.withRegs k.regs) from by rw [KCtx.withRegs_self]) $$ Hk
@@ -439,13 +443,13 @@ theorem holding_locked_refute_proof (MC : MYCPU) {GF : BundledGFunctors.{0}} [Ma
   iintro %w Hk Hpc %hw Hlc
   subst hw
   k_step (wp_s_branch cpu _ (KA.«holding» + 0x2#64) true 6#13 15#5 0#5 (by decide) bop.BNE) from (text_instr _ _ _ _ rfl rfl) Htext
-    $$ [- $Hk $Hpc] with [MachCSL.bcond_bne_lkOne]
+    $$ [- $Hk $Hpc] with [MachCSL.bcond_bne_lkOne] £ Hlcr2
   iintro Hk Hpc
   iapply (holding_tail MC cpu (k.withRegs (k.regs.set 15#5 (BitVec.signExtend 64 lkOne))) hsie hK
-    iprop(lockOpenable γ (k.regs 10#5) s R D ∗ lockedCore γ cpu) (fun w' => iprop(⌜w' = cpuAddr cpu⌝ ∗ lockedCore γ cpu))
+    iprop(£ 1 ∗ lockOpenable γ (k.regs 10#5) s R D ∗ lockedCore γ cpu) (fun w' => iprop(⌜w' = cpuAddr cpu⌝ ∗ lockedCore γ cpu))
     1#64 ?hld ?hans)
   rotate_right 1
-  · iframe Hk Hpc Hlc
+  · iframe Hk Hpc Hlc Hlcr2
     iframe #
     iintro %R' %w' Hk Hpc %hcs ⟨%_, Hlc⟩
     k_norm
@@ -458,12 +462,13 @@ theorem holding_locked_refute_proof (MC : MYCPU) {GF : BundledGFunctors.{0}} [Ma
       exact hcs
     · iapply locked_intro; iframe Hlc Hheld
   case hld =>
-    iintro ⟨#Hi, Hk, Hpc, ⟨#Hlk, Hlc⟩, HΦ'⟩
+    iintro ⟨#Hi, Hk, Hpc, ⟨Hlcr2, #Hlk, Hlc⟩, HΦ'⟩
     iapply (wp_s_ld_lkcpu_locked_refute cpu (holdingFrameCtx (k.withRegs (k.regs.set 15#5 (BitVec.signExtend 64 lkOne))))
       (by k_norm [holdingFrameCtx]) (KA.«holding» + 0x12#64) true 16#12 15#5 10#5 (by decide) γ
       (k.regs 10#5) s R D hrefute (by k_norm [holdingFrameCtx]))
     iframe Hk Hpc Hlc
     iframe #
+    iframe Hlcr2
     inext
     iapply wpNext_mono $$ HΦ'
     iintro %cpu' HK Hk Hpc Hlc

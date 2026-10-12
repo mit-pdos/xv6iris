@@ -220,7 +220,7 @@ theorem vdrw_P6 (FD : FREE_DESC) (RE : RELEASE)
   have hsie : (vdrwK k).sie = false := rfl
   unfold vdrwP5Exit
   iintro ⟨%⟨hR6, hcwf, hbp, hblk⟩, Hk, Hpc, #Hpi, Htc, Hcc, Hir, #Hcaps, Hlocked, Hpay, Hth,
-    Hcl, ⟨%n, #Hdone, #Hlbn⟩, Hkm, Hkt, Hbno, Hsv, Hidx, Hnext⟩
+    Hcl, ⟨%n, #Hdone, #Hlbn⟩, Hkm, Hkt, Hbno, Hsv, Hidx, Hnext, Hlcp⟩
   obtain ⟨hh, hmlt, htlt, hnhm, hnmt, hnht, -⟩ := id hcwf
   have hmne : c.md ≠ c.hd := Ne.symm hnhm
   have htne1 : c.tl ≠ c.hd := Ne.symm hnht
@@ -284,8 +284,8 @@ theorem vdrw_P6 (FD : FREE_DESC) (RE : RELEASE)
   -- the receipt: the spent leaf against the thread's own receipt
   ihave #Hcpi := vdrwCaps_perm γ γl pd pav pu $$ Hcaps
   imod vdrwNext_collect k γ bno wr dataBuf dataDisk c cpu ⊤ (fun p hp => CoPset.subseteq_top p hp)
-    $$ [Hcpi Hdone Hnext] with ⟨%Q, HQ, Hnext⟩
-  · iframe Hcpi Hdone Hnext
+    $$ [Hcpi Hdone Hnext Hlcp] with ⟨%Q, HQ, Hnext⟩
+  · iframe Hcpi Hdone Hnext Hlcp
   imodintro
   ihave Hpay := Hpback $$ Hnr Hrl
   isimp only [hpay] at Hbuf Hblkd

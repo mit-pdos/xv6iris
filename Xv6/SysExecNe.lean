@@ -19,7 +19,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsTopG GF] [FsBytesG GF]
 
 omit [MachGS GF] in
 /-- **Rocq `sys_exec_slot_pre_ne`**. -/
-theorem sysExecSlotPre_ne (n : Nat) (S S' : Uvis → IProp GF) (Q : Int → IProp GF)
+theorem sysExecSlotPre_ne (n : Iris.SI) (S S' : Uvis → IProp GF) (Q : Int → IProp GF)
     (P : Nat → Nat → IProp GF) (Φo : Aview → Nat → Anode → IProp GF) (cw : Nat) (secc : BitVec 64)
     (M : Nat → List (BitVec 8)) (pv av : BitVec 64) (sts : List FdState)
     (cs : Std.ExtTreeSet GName compare) (pidv : BitVec 32) (HS : ∀ W, S W ≡{n}≡ S' W) :
@@ -35,7 +35,7 @@ theorem sysExecSlotPre_ne (n : Nat) (S S' : Uvis → IProp GF) (Q : Int → IPro
   exact execSlotPre_ne n S S' Q _ Φo cw secc na alen afun sts cs pidv HS
 
 /-- **Rocq `sys_exec_au_pre_ne`**, at the pair `⟨S, Rs⟩`. -/
-theorem sysExecAuPre_ne (n : Nat) (S S' : Uvis → IProp GF) (Rs : IProp GF) (Γ : FsViewNames GF)
+theorem sysExecAuPre_ne (n : Iris.SI) (S S' : Uvis → IProp GF) (Rs : IProp GF) (Γ : FsViewNames GF)
     (γfs : FsNames) (rt cw : Nat) (secc : BitVec 64) (Q : Int → IProp GF) (P Pmiss : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (M : Nat → List (BitVec 8))
     (pv av : BitVec 64) (sts : List FdState) (cs : Std.ExtTreeSet GName compare)

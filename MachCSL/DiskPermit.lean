@@ -90,7 +90,7 @@ variable {GF : BundledGFunctors.{0}} [MachFixedGS GF]
 def diskWritePermit (gd : Nat) (w : DiskWr) (Q : IProp GF) : IProp GF := iprop%
   ∀ (dk : Nat → BitVec 8) (n : Nat),
     startAuth n -∗ ⌜n = gd + 1⌝ -∗ diskFixedAuth dk -∗
-    ▷ MachFixedGS.crashPred (GF := GF) ={∅}=∗
+    MachFixedGS.crashPred (GF := GF) ={∅}=∗
       diskFixedAuth (wrApply w dk) ∗ ▷ MachFixedGS.crashPred (GF := GF) ∗
       startAuth n ∗ Q
 

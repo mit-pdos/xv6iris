@@ -769,15 +769,15 @@ theorem iregTopRetag_gen [Icfg] (E : CoPset) (γfs : FsNames) (i : Nat) (n n' : 
       (∀ I : RegMapF FsNode, ⌜PartialMap.get? I i = some n⌝ -∗
         ▷ appPred appRun (absView I) -∗
         ▷ appPred appRun (absView (PartialMap.insert I i n'))) -∗
-      topFrag (fsGammaL γfs) i n -∗ |={E}=> topFrag (fsGammaL γfs) i n' := by
-  iintro #Hi #Hai Hstep Hf
+      topFrag (fsGammaL γfs) i n -∗ £ 1 -∗ |={E}=> topFrag (fsGammaL γfs) i n' := by
+  iintro #Hi #Hai Hstep Hf Hcr
   unfold ftopInv
   imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs)
     (ftopN_sub_app E hE)) $$ Hi with ⟨Hb, Hclose⟩
   unfold ftopBody
   icases Hb with ⟨%I, %A, Ha, Hla, Hpark, %hcl⟩
   unfold topFrag fsGammaL
-  imod (appTopUpdate (E \ ↑ftopN) γfs I i n n' (appN_sub_ftop E hE)) $$ Hai [Hstep] Ha Hf
+  imod (appTopUpdate (E \ ↑ftopN) γfs I i n n' (appN_sub_ftop E hE)) $$ Hai [Hstep] Ha Hf Hcr
     with ⟨Ha, Hf⟩
   · iintro %hi Hp
     imodintro
@@ -799,9 +799,9 @@ theorem iregTopRetag_gen [Icfg] (E : CoPset) (γfs : FsNames) (i : Nat) (n n' : 
 theorem iregTopRetag_same [Icfg] (E : CoPset) (γfs : FsNames) (i : Nat) (n n' : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (habs : absOf n = absOf n') (hloc : InodeLocal i n') :
     ⊢@{IProp GF} ftopInv γfs -∗ appInv γfs -∗
-      topFrag (fsGammaL γfs) i n -∗ |={E}=> topFrag (fsGammaL γfs) i n' := by
-  iintro #Hi #Hai Hf
-  iapply (iregTopRetag_gen E γfs i n n' hE hloc) $$ Hi Hai [] Hf
+      topFrag (fsGammaL γfs) i n -∗ £ 1 -∗ |={E}=> topFrag (fsGammaL γfs) i n' := by
+  iintro #Hi #Hai Hf Hcr
+  iapply (iregTopRetag_gen E γfs i n n' hE hloc) $$ Hi Hai [] Hf Hcr
   iintro %I %hin Hp
   rw [absView_insert_same I i n n' hin habs]
   iexact Hp
@@ -817,9 +817,9 @@ theorem iregTopRetag_armed_gen [Icfg] (E : CoPset) (γfs : FsNames) (k t : Nat) 
       (∀ I : RegMapF FsNode, ⌜PartialMap.get? I i = some n⌝ -∗
         ▷ appPred appRun (absView I) -∗
         ▷ appPred appRun (absView (PartialMap.insert I i n'))) -∗
-      topFrag (fsGammaL γfs) i n -∗
+      topFrag (fsGammaL γfs) i n -∗ £ 1 -∗
       |={E}=> (iregArmed k t q S ∗ topFrag (fsGammaL γfs) i n') := by
-  iintro #Hi #Hai Hrec Hstep Hf
+  iintro #Hi #Hai Hrec Hstep Hf Hcr
   unfold ftopInv iregArmed
   imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs)
     (ftopN_sub_app E hE)) $$ Hi with ⟨Hb, Hclose⟩
@@ -827,7 +827,7 @@ theorem iregTopRetag_armed_gen [Icfg] (E : CoPset) (γfs : FsNames) (k t : Nat) 
   icases Hb with ⟨%I, %A, Ha, Hla, Hpark, %hcl⟩
   ihave %hAt := ghost_map_lookup $$ Hla Hrec
   unfold topFrag fsGammaL
-  imod (appTopUpdate (E \ ↑ftopN) γfs I i n n' (appN_sub_ftop E hE)) $$ Hai [Hstep] Ha Hf
+  imod (appTopUpdate (E \ ↑ftopN) γfs I i n n' (appN_sub_ftop E hE)) $$ Hai [Hstep] Ha Hf Hcr
     with ⟨Ha, Hf⟩
   · iintro %hi Hp
     imodintro
@@ -851,10 +851,10 @@ theorem iregTopRetag_armed_same [Icfg] (E : CoPset) (γfs : FsNames) (k t : Nat)
     (S : Std.ExtTreeSet Nat compare) (i : Nat) (n n' : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hin : i ∈ S) (habs : absOf n = absOf n') :
     ⊢@{IProp GF} ftopInv γfs -∗ appInv γfs -∗ iregArmed k t q S -∗
-      topFrag (fsGammaL γfs) i n -∗
+      topFrag (fsGammaL γfs) i n -∗ £ 1 -∗
       |={E}=> (iregArmed k t q S ∗ topFrag (fsGammaL γfs) i n') := by
-  iintro #Hi #Hai Hrec Hf
-  iapply (iregTopRetag_armed_gen E γfs k t q S i n n' hE hin) $$ Hi Hai Hrec [] Hf
+  iintro #Hi #Hai Hrec Hf Hcr
+  iapply (iregTopRetag_armed_gen E γfs k t q S i n n' hE hin) $$ Hi Hai Hrec [] Hf Hcr
   iintro %I %hlk Hp
   rw [absView_insert_same I i n n' hlk habs]
   iexact Hp

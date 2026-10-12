@@ -224,7 +224,7 @@ theorem createFail_child_park (kslot : Nat) (cinum : BitVec 32) (ty major minor 
       topFrag (fsGammaL (GF := GF) fscFs) cinum.toNat
         (eraNode (createSetf dnc major minor 1#16) bmc datc) -∗
       creArmFired Farm cinum.toNat -∗
-      pfAt (aunarmOfArmNd (fsGammaL fscFs) appE Nd Farm) Fun -∗
+      pfAt (aunarmOfArmNd (fsGammaL fscFs) appE Nd Farm) Fun -∗ £ 1 -∗
       |={⊤}=> icLoaded fscFs fscIreg fscCov fscLogst kslot cinum
           (createSetf dnc major minor 0#16) bmc ∗
         creUnarmFired Fun cinum.toNat := by
@@ -246,12 +246,12 @@ theorem createFail_child_park (kslot : Nat) (cinum : BitVec 32) (ty major minor 
     exact cafMade_row ty major minor bmc datc htynz
   have hnone := cafEra_none_nl0 (createSetf dnc major minor 0#16) bmc datc
     (by rw [createSetf_nlink]; rfl)
-  iintro #Hinv Hdi Hmeta Hmap Hblk Htop Harm Hun
+  iintro #Hinv Hdi Hmeta Hmap Hblk Htop Harm Hun Hcr
   ihave #Hft := iregInv_ftop $$ Hinv
   ihave #Hap := iregInv_app $$ Hinv
   ihave Hun := aunarmOfArmNd_open (fsGammaL fscFs) appE Nd Farm Fun cinum.toNat $$ Harm Hun
   imod (create_unarm_fire_nd fscFs ⊤ cinum.toNat _ Nd Fun _ _ CoPset.subseteq_top hloc
-    hrow hnone hNd) $$ Hft Hap Hun Htop with ⟨Htop, Hr⟩
+    hrow hnone hNd) $$ Hft Hap Hun Htop Hcr with ⟨Htop, Hr⟩
   ihave Hdl := dlinks_notDir (GF := GF) fscFs cinum.toNat _ bmc datc htz
   unfold inodeMap
   icases Hmap with ⟨Ha, Hi⟩
@@ -288,7 +288,7 @@ theorem createFail_parent_park (kd : Nat) (dind cinum : BitVec 32) (nf : Nat →
       dlinks fscFs dind.toNat dn bm data -∗ dinodeAt fscIreg dind dn' -∗
       inodeMeta (ientry kd) dn' -∗ inodeMap fscFs (ientry kd) bm' -∗
       inodeBlocks fscFs bm' data' -∗
-      topFrag (fsGammaL (GF := GF) fscFs) dind.toNat (eraNode dn bm data) -∗
+      topFrag (fsGammaL (GF := GF) fscFs) dind.toNat (eraNode dn bm data) -∗ £ 1 -∗
       |={⊤}=> icLoaded fscFs fscIreg fscCov fscLogst kd dind dn' bm' := by
   have hty' : dn'.diType = dn.diType := by rw [hdn']; rfl
   have hnl' : dn'.diNlink = dn.diNlink := by rw [hdn']; rfl
@@ -333,7 +333,7 @@ theorem createFail_parent_park (kd : Nat) (dind cinum : BitVec 32) (nf : Nat →
     absOf_dir_same _ _ hdir htyn hnln heq.symm
   have hloc' := inodeLocal_ofOkRec dind.toNat fscCov fscLogst dn' bm' data' hiok' hrl' hduq' hddix'
   have hdoc := create_doc_of_live dn dn' data' hnl' hnl0
-  iintro #Hinv Hdl Hdi Hmeta Hmap Hblk Htop
+  iintro #Hinv Hdl Hdi Hmeta Hmap Hblk Htop Hcr
   ihave #Hft := iregInv_ftop $$ Hinv
   ihave #Hap := iregInv_app $$ Hinv
   icases dlinks_open fscFs dind.toNat dn bm data $$ Hdl with ⟨%D, %hDx, Hetk⟩
@@ -349,7 +349,7 @@ theorem createFail_parent_park (kd : Nat) (dind cinum : BitVec 32) (nf : Nat →
       (by simp only [fnNlink, eraNode_rec, hnl']) hx0
   ihave Hdl := dlinks_intro fscFs dind.toNat dn' bm' data' D hdok0' hx0' $$ Hetk
   imod (iregTopRetag_same ⊤ fscFs dind.toNat _ _ CoPset.subseteq_top habs hloc')
-    $$ Hft Hap Htop with Htop
+    $$ Hft Hap Htop Hcr with Htop
   unfold inodeMap
   icases Hmap with ⟨Ha, Hi⟩
   ihave Hload := icMkLoaded fscFs fscIreg fscCov fscLogst kd dind dn' bm' data' hiok' hrl' hdok'
@@ -647,16 +647,16 @@ theorem create_fail_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedNames)
   iintro Hk Hpc
   -- ===== +0x152  jal iunlockput(ip) : THE PUT THAT FREES =====
   k_step_e (wp_s_jal cpu _ (KA.«create» + 0x152#64) false 2090736#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_iunlockput]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_iunlockput] £ Hcr
   iintro Hk Hpc
-  -- THE TWO RE-PARKS: the UNARM fires at the child, the parent retags
+  -- THE TWO RE-PARKS (their credits: iupdate's return and the jal's): the UNARM fires at the child, the parent retags
   iapply wpLoop_fupd
   ihave Hpk := createFail_child_park kslot cinum ty major minor dnc bmc datc Nm Nd Farm Fun
-    htd htyc hfresh hrlc hciok hcdok (hNdF htd) $$ Hinv Hcdiat Hcmeta Hcmap Hcblocks Hctop Harmr Hun
+    htd htyc hfresh hrlc hciok hcdok (hNdF htd) $$ Hinv Hcdiat Hcmeta Hcmap Hcblocks Hctop Harmr Hun Hlc
   imod Hpk with ⟨Hcload, Hunr⟩
   ihave Hpk := createFail_parent_park kd dind cinum nf dn dnp bm bmp data datap
     htydir hnl0 hiok hdok hddix hduq hrl hcnib hS.h16 hwf' hholes' haddr' hcov' hszcap' hsized'
-    hdn' hrng $$ Hinv Hdlnk Hdiat Hmeta Hmap Hblocks Htop
+    hdn' hrng $$ Hinv Hdlnk Hdiat Hmeta Hmap Hblocks Htop Hcr
   imod Hpk with Hload
   imodintro
   icases Hcdep with ⟨%locc, %tlcc, %hlecc, Hflcc, Hcdep⟩

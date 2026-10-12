@@ -265,10 +265,10 @@ theorem opfAtrunc_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset)
       -- was paid where what pays it was still in hand
       -- (`SysOpenDefs.openTruncAt`)
       pfAt (atruncCommitI (fsGammaL γfs) appE i) Ft -∗
-      topFrag (fsGammaL γfs) i n ={E}=∗
+      topFrag (fsGammaL γfs) i n -∗ £ 1 ={E}=∗
         topFrag (fsGammaL γfs) i n' ∗
         ∃ av : Aview, ⌜arowAt av i ⟨.AFile bs0, nl⟩⌝ ∗ Ft.pfRecv av i bs0 := by
-  iintro #Hi #Hai Hcm Hf
+  iintro #Hi #Hai Hcm Hf Hcr
   ihave Hcm := pfAt_au _ _ $$ Hcm
   unfold ftopInv
   imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs)
@@ -296,7 +296,7 @@ theorem opfAtrunc_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset)
   ihave Hcm := Hcm $$ %I %bs0 %nl %hrow Ha
   imod (fupd_mask_mono hsub) $$ Hcm with ⟨Ha, Hstep, Hph2⟩
   -- THE MOVE, at the whole authority (`AppInv.appTopUpdate`)
-  imod (appTopUpdate (E \ ↑ftopN) γfs I i n n' hsub) $$ Hai [Hstep] Ha Hf with ⟨Ha, Hf⟩
+  imod (appTopUpdate (E \ ↑ftopN) γfs I i n n' hsub) $$ Hai [Hstep] Ha Hf Hcr with ⟨Ha, Hf⟩
   · iintro %_ Hp
     iapply (appStep_at i I _ n' hdelta) $$ Hstep Hp
   ihave Hph2 := Hph2 $$ %(PartialMap.insert I i n') %hdelta Ha

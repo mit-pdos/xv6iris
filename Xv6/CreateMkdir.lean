@@ -1295,7 +1295,7 @@ theorem createMkdir_par_nop (plen : Nat) (pfun : Nat → BitVec 8) (kd : Nat)
     CreateMkdirFmPar kd dind dp3 bm3 dat3 ∧
       (iregInv fscIreg fscFs icfgIst icfgNib ⊢
         dlinks fscFs dind.toNat dn bm data -∗
-        topFrag (fsGammaL (GF := GF) fscFs) dind.toNat (eraNode dn bm data) -∗
+        topFrag (fsGammaL (GF := GF) fscFs) dind.toNat (eraNode dn bm data) -∗ £ 1 -∗
         |={⊤}=> dlinks fscFs dind.toNat dp3 bm3 dat3 ∗
           topFrag (fsGammaL fscFs) dind.toNat (eraNode dp3 bm3 dat3)) := by
   have htz : dn.diType.toNat = T_DIR_z := by rw [hpar.hty]; rfl
@@ -1324,7 +1324,7 @@ theorem createMkdir_par_nop (plen : Nat) (pfun : Nat → BitVec 8) (kd : Nat)
   have hloc3 := inodeLocal_ofOkRec dind.toNat fscCov fscLogst dp3 bm3 dat3 hiok3 hrl3 hduq3 hddix3
   refine ⟨⟨hpar.hkd, hpar.hdib, by rw [hty]; exact hpar.hty, by rw [hnl]; exact hpar.hnl0, hiok3,
     hdok3, hddix3, hduq3, hrl3⟩, ?_⟩
-  iintro #Hinv Hdl Htop
+  iintro #Hinv Hdl Htop Hcr
   ihave #Hft := iregInv_ftop $$ Hinv
   ihave #Hap := iregInv_app $$ Hinv
   icases dlinks_open fscFs dind.toNat dn bm data $$ Hdl with ⟨%D, %hDx, Hetk⟩
@@ -1339,7 +1339,7 @@ theorem createMkdir_par_nop (plen : Nat) (pfun : Nat → BitVec 8) (kd : Nat)
     nodeExact_cong _ _ D (by unfold fnIsDir; rw [← htyn]) hnln.symm hx0
   ihave Hdl := dlinks_intro fscFs dind.toNat dp3 bm3 dat3 D hdok0' hx0' $$ Hetk
   imod (iregTopRetag_same ⊤ fscFs dind.toNat _ _ CoPset.subseteq_top habs hloc3)
-    $$ Hft Hap Htop with Htop
+    $$ Hft Hap Htop Hcr with Htop
   imodintro
   iframe Hdl Htop
 
@@ -1790,13 +1790,14 @@ theorem create_mkdir_name (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs GF Γ]
     ihave #Hap := iregInv_app $$ Hinv
     k_step_e (wp_s_branch cpu _ (KA.«create» + 0x130#64) false 22#13 10#5 0#5 (by decide) bop.BLT)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [ha0, Xv6.kxcC_blt_m1', createMkdir_b146c]
+      with [ha0, Xv6.kxcC_blt_m1', createMkdir_b146c] £ Hcr
     iintro Hk Hpc
     iapply wpLoop_fupd
-    imod hpark $$ Hinv Hdl Htop with ⟨Hdl, Htop⟩
+    -- the two ghost moves spend dirlink's return credit and the branch's
+    imod hpark $$ Hinv Hdl Htop Hlc with ⟨Hdl, Htop⟩
     -- THE DOTS FIRE at both: they landed before the parent's append failed
     imod (create_dirty_dots ⊤ t cinum.toNat dind.toNat true Fdots _ _
-        CoPset.subseteq_top hdd.row0 hdd.row2) $$ Hft Hap Hdirty Hdotsc Hctop
+        CoPset.subseteq_top hdd.row0 hdd.row2) $$ Hft Hap Hdirty Hdotsc Hctop Hcr
       with ⟨Hdirty, Hctop, Hdotsr⟩
     imodintro
     ihave Hpile := createMkdir_pile ty cinum.toNat _ htd $$ [Htok1 Htok2]
@@ -2201,12 +2202,12 @@ theorem create_mkdir_dotdot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs GF Γ]
     ihave #Hap := iregInv_app $$ Hinv
     k_step_e (wp_s_branch cpu _ (KA.«create» + 0x11e#64) false 40#13 10#5 0#5 (by decide) bop.BLT)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [ha0, Xv6.kxcC_blt_m1', createMkdir_b146b]
+      with [ha0, Xv6.kxcC_blt_m1', createMkdir_b146b] £ Hcr
     iintro Hk Hpc
     iapply wpLoop_fupd
     -- THE DOTS FIRE at the `"."` alone
     imod (create_dirty_dots ⊤ t cinum.toNat dind.toNat false Fdots _ _
-        CoPset.subseteq_top hdot.row0 hrow2f) $$ Hft Hap Hdirty Hdotsc Hctop
+        CoPset.subseteq_top hdot.row0 hrow2f) $$ Hft Hap Hdirty Hdotsc Hctop Hcr
       with ⟨Hdirty, Hctop, Hdotsr⟩
     imodintro
     ihave Hpile := createMkdir_pile ty cinum.toNat _ htd $$ [Hdt Htok]
@@ -2488,12 +2489,12 @@ theorem create_mkdir_dot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs GF Γ]
           dirEntries_size_0 _ (by unfold fnSize; rw [eraNode_rec]; exact hsz1)]
     k_step_e (wp_s_branch cpu _ (KA.«create» + 0x10a#64) false 60#13 10#5 0#5 (by decide) bop.BLT)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [ha0, Xv6.kxcC_blt_m1', createMkdir_b146a]
+      with [ha0, Xv6.kxcC_blt_m1', createMkdir_b146a] £ Hcr
     iintro Hk Hpc
     iapply wpLoop_fupd
     -- VIEW-PRESERVING: no dot landed, the child is a bare directory on both sides
     imod (create_dirty_retag_same ⊤ t cinum.toNat _ _ CoPset.subseteq_top habs1)
-      $$ Hft Hap Hdirty Hctop with ⟨Hdirty, Hctop⟩
+      $$ Hft Hap Hdirty Hctop Hcr with ⟨Hdirty, Hctop⟩
     imodintro
     ihave Hdotsx : ((∃ full : Bool, creDotsFired Fdots cinum.toNat dind.toNat full) ∨
         creDotsLeg (fsGammaL fscFs) ty.toNat Fdots) $$ [Hdotsc]
@@ -2757,7 +2758,7 @@ theorem create_mkdir_bump (IU : IUPDATE) (Γ : SchedNames) [ClaimIs GF Γ]
   ihave Hmeta := Hmback $$ %(dp3.diNlink + 1#16) Hnl
   -- ===== +0x13e  c.mv a0,s1 =====
   k_step_e (wp_s_add cpu _ (KA.«create» + 0x13e#64) true 10#5 0#5 9#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r9]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r9] £ Hcr
   iintro Hk Hpc
   -- ===== +0x140  jal iupdate(dp) : THE SECOND MINT =====
   k_step_e (wp_s_jal cpu _ (KA.«create» + 0x140#64) false 2089978#21 1#5 (by decide))
@@ -2786,7 +2787,8 @@ theorem create_mkdir_bump (IU : IUPDATE) (Γ : SchedNames) [ClaimIs GF Γ]
   case it => k_norm_g; try exact hS.htier
   case ia0 => k_norm_g [r9]
   -- back from iupdate, at +0x144
-  iintro %cpu Hlc %spie1 %spp1 %R1 %w %hcs1 Hk Hpc Hte Hce Hpid Hdev Hinum Hmeta Hmap Hsi Hdi Hvend
+  -- (iupdate's return credit is `Hcrd`: `Hlc` is the environment's log context below)
+  iintro %cpu Hcrd %spie1 %spp1 %R1 %w %hcs1 Hk Hpc Hte Hce Hpid Hdev Hinum Hmeta Hmap Hsi Hdi Hvend
     Hb2 Hop
   k_norm_g [create_ret_144]
   unfold calleeSaved at hcs1
@@ -2822,7 +2824,7 @@ theorem create_mkdir_bump (IU : IUPDATE) (Γ : SchedNames) [ClaimIs GF Γ]
     happ.hdok
   have hddixb := dirDotsIx_eq dind.toNat dp3
     (createSetf dp3 dp3.diMajor dp3.diMinor (dp3.diNlink + 1#16)) dat3 dat3
-    (createSetf_type _ _ _ _) (fun _ => hlive3) (by rw [createSetf_size]) rfl
+    (createSetf_type _ _ _ _) (fun _ => hlive3) (by rw [createSetf_size]; exact Nat.le_refl _) rfl
     happ.hddix
   have hduqb := dirUniq_cong dp3 (createSetf dp3 dp3.diMajor dp3.diMinor (dp3.diNlink + 1#16)) dat3
     (createSetf_type _ _ _ _) (createSetf_size _ _ _ _) happ.hduq
@@ -2857,7 +2859,7 @@ theorem create_mkdir_bump (IU : IUPDATE) (Γ : SchedNames) [ClaimIs GF Γ]
   -- THE DOTS FIRE FIRST: the child's row moves to its two dots and its
   -- registry arm comes home (Rocq's `cr_dirty_clear_dots`)
   imod (create_dirty_clear_dots ⊤ t cinum.toNat dind.toNat true Fdots _ _
-      CoPset.subseteq_top hlocc hdd.row0 hdd.row2) $$ Hft Hap Hdirty Hdotsc Hctop
+      CoPset.subseteq_top hlocc hdd.row0 hdd.row2) $$ Hft Hap Hdirty Hdotsc Hctop Hcr
     with ⟨Htx, Hctop, Hdotsr⟩
   -- THE PARENT LEG FIRES (Rocq's `caf_acre_fire`)
   ihave Hctop : topFragQ (fsGammaL fscFs) (DFrac.own 1) cinum.toNat (eraNode dc2 bm2 dat2) $$ [Hctop]
@@ -2871,7 +2873,7 @@ theorem create_mkdir_bump (IU : IUPDATE) (Γ : SchedNames) [ClaimIs GF Γ]
       dind.toNat cinum.toNat (bname 14 nf) (DFrac.own 1) (eraNode dn bm data) _ _
       CoPset.subseteq_top (hNmL _ (Xv6.sys_unlink_last_of_npar _ nf hpar.hnp)) hlocp hdir hnl0' happ.hnonep
       (createMkdir_nm_not_dots plen pfun kd dind dn bm data nf hpar) habsp habsc)
-    $$ Hft Hap Hacre Harm HPpar Htop Hctop with ⟨Htop, Hctop, HPpar, ⟨%av, %hpre, HFok⟩⟩
+    $$ Hft Hap Hacre Harm HPpar Htop Hctop Hcrd with ⟨Htop, Hctop, HPpar, ⟨%av, %hpre, HFok⟩⟩
   ihave Hkeep := Hkeep $$ HPpar
   ihave Hctop : topFrag (fsGammaL fscFs) cinum.toNat (eraNode dc2 bm2 dat2) $$ [Hctop]
   · rw [topFrag_1]; iexact Hctop

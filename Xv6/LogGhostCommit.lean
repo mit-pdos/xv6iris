@@ -56,17 +56,22 @@ variable [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx] [FsLinkG GF] 
 wpHart cpu m` rule.  At ANY point of a hart of this generation, with the
 batch quiescent (the loan in hand) and the era's token, fire the waiters'
 hooks at a fresh durable pair at the unchanged committed map.  The loan and
-the token come back unchanged, beside each hook's `Q`. -/
+the token come back unchanged, beside each hook's `Q`.
+
+TWO LATER CREDITS (ordinal step index): the first strips the crash
+invariant's later (`wpHart_crash_fupd`), the second is the hooked law's
+(`LogSnapLaw.snapLawGhostAt`, Rocq's option (a)): the law opens the
+application's invariant. -/
 theorem logGhostCommit (cpu : CPU) (m : SailM Unit) (Qs : List (IProp GF))
     (γ : LogNames) (γb : BcacheNames) (γfs : FsNames) (cov : ExtTreeSet Nat compare) (ls : Nat)
     (dev : BitVec 32) (L : BlockMap) (M : LogMirror) :
-    logCtx (GF := GF) γ γb γfs cov ls dev ⊢
+    logCtx (GF := GF) γ γb γfs cov ls dev ⊢ £ 1 -∗ £ 1 -∗
       logQuiet γ γfs cov ls L M -∗ eraSyncTok (GF := GF) -∗
       ([∗list] Q ∈ Qs, eraSyncHook (GF := GF) Q) -∗
       (logQuiet γ γfs cov ls L M -∗ eraSyncTok (GF := GF) -∗
         ([∗list] Q ∈ Qs, Q) -∗ wpHart cpu m) -∗
       wpHart cpu m := by
-  iintro #Hctx Hq HT HQs Hk
+  iintro #Hctx Hlcc Hlcl Hq HT HQs Hk
   ihave #Hcinv := logCtx_crashInv γ γb γfs cov ls dev $$ Hctx
   ihave #Hcert := logCtx_genCert γ γb γfs cov ls dev $$ Hctx
   ihave #Hparts := genCert_parts $$ Hcert
@@ -77,17 +82,17 @@ theorem logGhostCommit (cpu : CPU) (m : SailM Unit) (Qs : List (IProp GF))
   ihave #Hlg := logCtx_snapLawGhost γ γb γfs cov ls dev $$ Hctx
   icases snapLawGhost_run γ γfs cov ls _ _ _ $$ Hlg with ⟨%G, #Hseam, #Hlaw⟩
   iapply wpHart_crash_fupd cpu m iprop(logQuiet γ γfs cov ls L M ∗
-      eraSyncTok (GF := GF) ∗ ([∗list] Q ∈ Qs, Q)) $$ Hcinv [Hq HT HQs]
+      eraSyncTok (GF := GF) ∗ ([∗list] Q ∈ Qs, Q)) $$ Hcinv Hlcc [Hq HT HQs Hlcl]
   · iintro %n %hn Hsa Hc
     -- ---- 1. the crash slot, through the seam, into the record and the old guest
     unfold fsCrashSeamAt
     icases Hseam with ⟨#Hto, #Hfrom⟩
-    ihave Hc : iprop(▷ ∃ gt : GName, pFsAnyAt gt cov ls ∗ G gt) $$ [Hc]
-    · inext
-      ihave Hc2 := Hto $$ Hc
+    ihave Hc : iprop(∃ gt : GName, pFsAnyAt gt cov ls ∗ G gt) $$ [Hc]
+    · ihave Hc2 := Hto $$ Hc
       iapply (pFsComp_unfold G cov ls).1 $$ Hc2
-    imod later_exists_except0 $$ Hc with ⟨%gt_o, Hc⟩
-    icases later_sep.1 $$ Hc with ⟨>Hany, HG⟩
+    icases Hc with ⟨%gt_o, Hany, HG⟩
+    ihave HG : ▷ G gt_o $$ [HG]
+    · inext; iexact HG
     ihave ⟨%dk, Himg, %hext, Hrec⟩ :=
       (pFsNamedAt_unfold gt_o _ _ _ _ _ cov ls).1 $$ Hany
     -- ---- 2. the record's snapshot slot at the quiescent picture
@@ -113,7 +118,7 @@ theorem logGhostCommit (cpu : CPU) (m : SailM Unit) (Qs : List (IProp GF))
     have hdom : ∀ b, (∃ bs, PartialMap.get? C b = some bs) ↔ fsHome cov ls b := by
       intro b; rw [hok.dom b, mem_fsHomeList]
     -- ---- 4. the hooked law
-    imod Hlaw $$ %Lb %C %Qs %gt_o %n %hdom %hok.lens %hbt %hok.bdom Ha Htx HG HT %hn Hsa HQs
+    imod Hlaw $$ %Lb %C %Qs %gt_o %n %hdom %hok.lens %hbt %hok.bdom Ha Htx HG HT %hn Hsa Hlcl HQs
       with ⟨⟨%gt, Hdur, HG⟩, HT, Hsa, HQs, Ha, Htx⟩
     imod Hclose $$ [Ha HC Hxa] with -
     · inext
@@ -149,7 +154,7 @@ theorem logGhostCommit (cpu : CPU) (m : SailM Unit) (Qs : List (IProp GF))
 theorem logGhostCommit_loop (cpu : CPU) (Qs : List (IProp GF))
     (γ : LogNames) (γb : BcacheNames) (γfs : FsNames) (cov : ExtTreeSet Nat compare) (ls : Nat)
     (dev : BitVec 32) (L : BlockMap) (M : LogMirror) :
-    logCtx (GF := GF) γ γb γfs cov ls dev ⊢
+    logCtx (GF := GF) γ γb γfs cov ls dev ⊢ £ 1 -∗ £ 1 -∗
       logQuiet γ γfs cov ls L M -∗ eraSyncTok (GF := GF) -∗
       ([∗list] Q ∈ Qs, eraSyncHook (GF := GF) Q) -∗
       (logQuiet γ γfs cov ls L M -∗ eraSyncTok (GF := GF) -∗

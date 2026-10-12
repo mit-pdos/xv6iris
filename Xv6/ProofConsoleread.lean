@@ -757,7 +757,7 @@ theorem cr_exit (RE : RELEASE) (c0 c : CPU) (k kb : KCtx) (hb : CrBase k kb) (γ
   · iapply popArm_sie c k _ (by k_norm_g; exact hb.proc) $$ Harm
   case ha0 => k_norm_g
   case hsr => k_norm_g
-  case hnr => k_norm_g; rw [hb.noff]
+  case hnr => k_norm_g; rw [hb.noff]; decide
   case hKr => k_norm_g; unfold consolereadSlots eitherCopyoutSlots at hK; omega
   case hrr => k_norm_g; simp [hb.intena, hb.noff]
   case hor =>
@@ -872,7 +872,7 @@ theorem cr_minus1 (RE : RELEASE) (c0 c : CPU) (k kb : KCtx) (hb : CrBase k kb) (
   · iapply popArm_sie c k _ (by k_norm_g; exact hb.proc) $$ Harm
   case ha0 => k_norm_g
   case hsr => k_norm_g
-  case hnr => k_norm_g; rw [hb.noff]
+  case hnr => k_norm_g; rw [hb.noff]; decide
   case hKr => k_norm_g; unfold consolereadSlots eitherCopyoutSlots at hK; omega
   case hrr => k_norm_g; simp [hb.intena, hb.noff]
   case hor =>
@@ -1780,7 +1780,7 @@ theorem cr_empty_body (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
   · iapply popArm_sie c k _ (by k_norm_g; exact hb.proc) $$ Harm
   case ha0 => k_norm_g
   case hsr => k_norm_g
-  case hnr => k_norm_g; rw [hb.noff]
+  case hnr => k_norm_g; rw [hb.noff]; decide
   case hKr => k_norm_g; unfold consolereadSlots eitherCopyoutSlots at hK; omega
   case hrr => k_norm_g; simp [hb.intena, hb.noff]
   case hor =>

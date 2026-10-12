@@ -553,7 +553,7 @@ def xv6Spost (_X : Uvis → IProp GF) (n : Int) (f : Xfam GF) (W : Uvis) (r : Bi
 /-! ### Non-expansiveness, the key congruence, monotonicity -/
 
 /-- **Rocq `exec_sbundle_ne`** (D33: `SysExecNe.sysExecAuPre_ne`). -/
-theorem xrowExec_ne (k : Nat) (X Y : Uvis → IProp GF) (h : ∀ W, X W ≡{k}≡ Y W) (Q : Int → IProp GF)
+theorem xrowExec_ne (k : Iris.SI) (X Y : Uvis → IProp GF) (h : ∀ W, X W ≡{k}≡ Y W) (Q : Int → IProp GF)
     (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (Rs : IProp GF)
     (W : Uvis) :
     xrowExec X Q P Pmiss Fo Rs W ≡{k}≡ xrowExec Y Q P Pmiss Fo Rs W := by
@@ -563,7 +563,7 @@ theorem xrowExec_ne (k : Nat) (X Y : Uvis → IProp GF) (h : ∀ W, X W ≡{k}�
       (xkA W 0) (xkA W 1) W.fd W.ch W.pid h))))
 
 /-- **Rocq `xv6_sbundle_ne`**: exec's branch, and the identity elsewhere. -/
-theorem xv6Sbundle_ne (k : Nat) (X Y : Uvis → IProp GF) (h : ∀ W, X W ≡{k}≡ Y W) (n : Int)
+theorem xv6Sbundle_ne (k : Iris.SI) (X Y : Uvis → IProp GF) (h : ∀ W, X W ≡{k}≡ Y W) (n : Int)
     (f : Xfam GF) (W : Uvis) :
     xv6Sbundle X n f W ≡{k}≡ xv6Sbundle Y n f W := by
   unfold xv6Sbundle
@@ -572,7 +572,7 @@ theorem xv6Sbundle_ne (k : Nat) (X Y : Uvis → IProp GF) (h : ∀ W, X W ≡{k}
   · exact .rfl
 
 /-- **Rocq `xv6_spost_ne`**: no post concludes at the slot family. -/
-theorem xv6Spost_ne (k : Nat) (X Y : Uvis → IProp GF) (h : ∀ W, X W ≡{k}≡ Y W) (n : Int)
+theorem xv6Spost_ne (k : Iris.SI) (X Y : Uvis → IProp GF) (h : ∀ W, X W ≡{k}≡ Y W) (n : Int)
     (f : Xfam GF) (W : Uvis) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat)
     (cs' : ExtTreeSet GName compare) :
     xv6Spost X n f W r M' fdv' cw' cs' ≡{k}≡ xv6Spost Y n f W r M' fdv' cw' cs' :=

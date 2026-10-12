@@ -1085,7 +1085,7 @@ theorem pr_tail (WK : WAKEUP) (RE : RELEASE_GEN) (Γ : SchedNames)
   isplitl [Harm]
   · iapply popArm_sie c k _ (by k_norm_g [hb.proc]) $$ Harm
   case hsr => k_norm_g
-  case hnr => k_norm_g; rw [hb.noff]
+  case hnr => k_norm_g; rw [hb.noff]; decide
   case hKr => k_norm_g; unfold pipereadSlots at hK; omega
   case hrr => k_norm_g; simp [hb.intena, hb.noff]
   case hor =>
@@ -1185,7 +1185,7 @@ theorem pr_minus1 (RE : RELEASE_GEN)
   isplitl [Harm]
   · iapply popArm_sie c k _ (by k_norm_g [hb.proc]) $$ Harm
   case hsr => k_norm_g
-  case hnr => k_norm_g; rw [hb.noff]
+  case hnr => k_norm_g; rw [hb.noff]; decide
   case hKr => k_norm_g; unfold pipereadSlots at hK; omega
   case hrr => k_norm_g; simp [hb.intena, hb.noff]
   case hor =>
@@ -2031,7 +2031,7 @@ theorem pr_empty_body (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : 
   isplitl [Harm]
   · iapply popArm_sie c k _ (by k_norm_g [hb.proc]) $$ Harm
   case hsr => k_norm_g
-  case hnr => k_norm_g; rw [hb.noff]
+  case hnr => k_norm_g; rw [hb.noff]; decide
   case hKr => k_norm_g; unfold pipereadSlots at hK; omega
   case hrr => k_norm_g; simp [hb.intena, hb.noff]
   case hor =>

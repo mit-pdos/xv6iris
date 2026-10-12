@@ -22,6 +22,56 @@ originals are in git history: `git show 5c27ea7e4:notes/briefs/<file>` / `git sh
   ideas, change them deliberately and update the notes); one function per Spec/Proof/Link triple; one capacity instance per camera; full root build
   before every push; eb-generic contracts.
 
+## The ordinal step index (Transfinite Iris, Oct 2026)
+
+At `Iris.SI := Ordinals.Ordinal.{3}` a later commutes with `∗` and `∃` only over timeless or
+persistent parts (the Iris fork's proof-mode fallbacks `intoSep_later_timeless`,
+`intoSep_later_persistent_l/r`, `intoExists_later_timeless`; `later_or` holds at every index), so
+every invariant opener whose body hides a client predicate under `▷ ∃` needed a route.  The Rocq
+port (origin/transfinite of xv6iris, 2026-09-29..10-01) is the map; its rulings carried over except
+where noted.
+
+- **Credits are always available.** `MachGS` is specialised to `HasLC.hasLC`; `wpNext` carries the
+  step's credit (`∀ cpu', ⌜pin⌝ → £ 1 -∗ K cpu'`): introductions drop it, the `_lc` forms
+  (`k_step … £ H`, `k_next_e £ H`, `k_next_pin_lc`, `wpNext_intro(_pin)_lc`) keep it, eliminations
+  pay it.  A lemma that opens a latered body takes `£ 1` (usually last, after the fragment premise)
+  and spends it with `lc_fupd_elim_later` right after `inv_acc`/`iinv`; its callers forward the
+  credit and the nearest program step pays (a call's return credit, a branch's, a `jal`'s).
+- **Lock rules (WpLock)** take `£ 1` in their precondition.  DEVIATION from Rocq's credit-free
+  "▷-tolerant" memory rules: Lean's `readAU`/`writeAU` hand the byte histories over BEFORE the step
+  (the read's reducibility needs those cells), so nothing outside the invariant witnesses them.
+  The `HOLDING` contract's bodies take `£ 1`, paid by the callers' `jal`.
+- **Crash permits and custody.** `crashPerm_deposit`/`_collect` take `£ 1`; the disk permit and
+  `crashPerm_step`/`_consume` take `MachFixedGS.crashPred` UNLATERED; the device step's credit reaches
+  the drain through `LeaseD.stepD`.  `wpHart_crash_fupd` takes `£ 1` and hands its hook the crash
+  predicate unlatered.  The log's ghost commit takes TWO credits (custody, hooked law).
+- **StartedInv** (credit-free, as Rocq): the armed arm's persistent payload `P ξd` does not depend
+  on the existential's witnesses, so `startedArmed := (∃ t T, …timeless…) ∗ P ξd` and the
+  proof-mode fallbacks take the body apart under its later.  **FsCrashSeam**: since the disk permit
+  takes the crash predicate unlatered, `fsPermit_ofRec` destructs the composite directly.
+- **The application invariant.** `appTopUpdate` and `appClaimUpdate` take `£ 1`;
+  `appClaimUpdate_tl` is credit-free at a timeless claim (the file era).  The cascade: the region's
+  retags (`iregTopRetag_*`), the create/mknod/link/unlink/open/write fires and their ghost wrappers
+  take `£ 1`; the program proofs pay from the step before the fire (`sysUnlinkAtAe` carries the
+  +0xaa branch's credit; `iput_ofl_body` and `il_blk_open` take bread's return credit).  Direct
+  openers at a TIMELESS instance strip the whole body (`AppFileEra`, `FileWriteNode`); those that
+  only READ a pure-or-persistent fact use a persistent assertion (`ihave … $$ [#]`), which sees the
+  body and the caller's resources and consumes nothing (`PinnedObs`).
+- **The snapshot laws** (`snapLawAt`, `snapLawGhostAt`) take `£ 1` (the Rocq owner's option (a),
+  2026-10-01): `fsCollectDur`/`fsCollectGhost` need the claim at the kernel's map while the kernel's
+  half stays outside.  Runners pay: the commit arm's `sw` at end_op+0x34, `eo_tail`'s `jal acquire`,
+  sys_sync's +0x1e.
+- **Power-on.** `wp_power`'s and `riscvPowerAdequacy`'s custody hook `Hswap` takes the crash slot
+  UNLATERED; the PowerOn arm spends the power step's own credit on `crashInv`'s later.
+  `xv6Slot_project` stays credit-free (a persistent assertion reads the timeless file-system half).
+  `appDurAt` carries its later on the claim only; `appDurRaw_open` opens an unlatered guest.
+- **Universes.** `IProp GF : Type 4` at the ordinal choice: `Pfam`, its operations and `pdevQh`
+  range over `Type _`; `UexecSG.sfam : Type 4` (a class field cannot take a free universe, since the
+  spec structures quantify over `[SG : UexecSG GF]` inside `Prop` fields; an `example` beside the
+  class fails if the base logic's universe moves); step-index binders are `Iris.SI`, not `Nat`.
+- **Trusted base.** The ordinal order instance (`Iris.instSIdxSI`) depends on `Classical.choice`,
+  which therefore enters `xv6FsAdequacy_closed`'s statement (the other roots already reached it).
+
 ## From `notes/briefs/crash_layer.md`
 
 **USER RULINGS (2026-09-25):** D35 = fully Rocq-literal. D37 = generic application slot, as Rocq. D36, D38–D45 = approved as recommended.

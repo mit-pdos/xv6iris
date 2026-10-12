@@ -162,7 +162,7 @@ theorem gclPure_rd_stage (k : Nat) (ho : List Obs) (so : GStage M) (H : ConsHist
   rw [hcsl]
   split
   · rename_i hd
-    rw [ll_nlines_removelast _ hd.2]
+    rw [ll_nlines_removelast _ hd.2]; exact Nat.le_refl _
   · exact nlines_prefix _ _ (Xv6.ll_removelast_prefix _)
 
 /-! ### The event steps of the pure part -/

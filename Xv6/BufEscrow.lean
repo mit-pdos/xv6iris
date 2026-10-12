@@ -425,7 +425,7 @@ theorem bufEscrow_withdraw (γ : BcacheNames) (V : BioView GF) (γbk : BoxNames)
   imod stampsFrag_empty (GF := GF) (Id := BufId) γbk with Hf0
   imod boxWithdrawL1 (bufBoxPay γ V k qd qb) (ndot bioxN k) γbk cpu curCtx r 0
       (∅ : StampMap BufId) Kd 0 E (nclose_subseteq' k hE) hw (by rw [qsum_empty]; rfl) hKd
-      (by rw [maxStamp_empty]) $$ [Hbox Hrun Hfld Hrd Hc Hf0]
+      (by rw [maxStamp_empty]; exact Nat.le_refl 0) $$ [Hbox Hrun Hfld Hrd Hc Hf0]
     with ⟨Hrun, Hc, ⟨%x0, %T0, %hT0, Hrd, Hhdr⟩⟩
   · iframe Hbox Hrun Hrd Hc Hf0
     isplit

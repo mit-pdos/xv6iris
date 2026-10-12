@@ -28,9 +28,9 @@ alternative).
 1. Rocq's section parameters `g r Heq` are explicit arguments; `Heq` is
    `HfpFileClaimsP.fileAppIs g.fgnCl r` (the equation on the ambient
    `Appcfg`).  Inums are `Nat`; `OffHeld` is `OffMode.held`.
-2. **`redir_K_inum` opens the invariant through `AppInv.appClaimUpdate`**
-   (the landed "update of the claim that does not move the map"), not by
-   hand; same statement.
+2. **`redir_K_inum` opens the invariant through `AppInv.appClaimUpdate_tl`**
+   (the landed "update of the claim that does not move the map", at the
+   file era's timeless claim, so credit-free), not by hand; same statement.
 3. **`Hopen_hand`'s walk is `UshMainStubs.sh_stub_open`** (usys.S's three
    instructions walked once by `UkStub.stubLaw`, engine `UL : UK_LEAVES`),
    with `UkFileOpen.wp_uk_ecall_open_create_deed_d` in the middle -- as
@@ -238,10 +238,12 @@ theorem redirK_inum (g : FileGn) (r : FileAppNames) (heq : fileAppIs (GF := GF) 
     · iright; iexact HT
   unfold fown
   icases Hown with ⟨Hd, Htk⟩
-  ihave Hup := appClaimUpdate (GF := GF) E fscFs (fdeed r (s.insert nm (i, [])))
+  have htl : ∀ av : Aview, Timeless (appPred appRun av : IProp GF) := by
+    intro av; subst heq; exact filePred_timeless (GF := GF) g.fgnCl r av
+  ihave Hup := appClaimUpdate_tl (GF := GF) E fscFs (fdeed r (s.insert nm (i, [])))
     iprop(fdeed r (s.insert nm (i, [])) ∗
       (⌜i ≠ INIT_INO ∧ i ≠ SH_INO ∧ i ≠ ECHO_INO ∧ i ≠ CAT_INO ∧ i ≠ GREP_INO ∧ i ≠ SECC_INO ∧ i ≠ SYNC_INO⌝
-        ∨ fileTaint g.fgnCl)) hE $$ Hinv
+        ∨ fileTaint g.fgnCl)) hE htl $$ Hinv
   imod Hup $$ [] Hd with ⟨Hd, Hres⟩
   · imodintro
     iintro %av Hd Hp

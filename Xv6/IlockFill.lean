@@ -185,11 +185,11 @@ theorem il_fill_box [Icfg] (γi : GName) (γfs : FsNames) (inodestart nib : Nat)
     (hnz : ds[islot inum]!.diType.toNat ≠ 0) :
     iregInv (GF := GF) γi γfs inodestart nib ⊢
       imark γi (inum.toNat : Int) -∗ iregWdLic o g inum.toNat -∗
-      (γfs.cache ↪◯MAP[IBLOCK inum inodestart]{DFrac.own (1 : Qp).half} (diblkBytes ds)) -∗
+      (γfs.cache ↪◯MAP[IBLOCK inum inodestart]{DFrac.own (1 : Qp).half} (diblkBytes ds)) -∗ £ 1 -∗
       |={⊤}=> ((γfs.cache ↪◯MAP[IBLOCK inum inodestart]{DFrac.own (1 : Qp).half}
           (diblkBytes ds)) ∗
         ilFillOut γfs γi cov ls o g inum ds[islot inum]!) := by
-  iintro #Hinv Hmk Hcl HL
+  iintro #Hinv Hmk Hcl HL Hcr
   imod iregWithdraw ⊤ γi γfs inodestart nib inum ds (IBLOCK inum inodestart) (diblkBytes ds)
     o g CoPset.subseteq_top logN_top hfills hin rfl hwf rfl hnz $$ Hinv Hmk Hcl HL
     with ⟨%hfr, %hty, %htyok, Hwb, Hdn, HL, %n0, %hn0, Htop⟩
@@ -210,7 +210,7 @@ theorem il_fill_box [Icfg] (γi : GName) (γfs : FsNames) (inodestart nib : Nat)
     exact hnl
   ihave #Hft := iregInv_ftop γi γfs inodestart nib $$ Hinv
   ihave #Hap := iregInv_app γi γfs inodestart nib $$ Hinv
-  imod iregTopRetag_same ⊤ γfs inum.toNat n0 _ CoPset.subseteq_top habs hloc $$ Hft Hap Htop
+  imod iregTopRetag_same ⊤ γfs inum.toNat n0 _ CoPset.subseteq_top habs hloc $$ Hft Hap Htop Hcr
     with Htop
   imodintro
   iframe HL
@@ -248,12 +248,12 @@ theorem il_fill [Icfg] (γi : GName) (γfs : FsNames) (inodestart nib : Nat)
     (hin : (inum.toNat : Int) < 16 * (nib : Int)) (hwf : diblkWf ds) :
     iregInv (GF := GF) γi γfs inodestart nib ⊢
       ipoolShapeNp γfs γi cov ls inum -∗ iregWdLic o g inum.toNat -∗
-      (γfs.cache ↪◯MAP[IBLOCK inum inodestart]{DFrac.own (1 : Qp).half} (diblkBytes ds)) -∗
+      (γfs.cache ↪◯MAP[IBLOCK inum inodestart]{DFrac.own (1 : Qp).half} (diblkBytes ds)) -∗ £ 1 -∗
       |={⊤}=> ((γfs.cache ↪◯MAP[IBLOCK inum inodestart]{DFrac.own (1 : Qp).half}
           (diblkBytes ds)) ∗
         ilFillOut γfs γi cov ls o g inum ds[islot inum]!) := by
   unfold ipoolShapeNp
-  iintro #Hinv Hpool Hcl HL
+  iintro #Hinv Hpool Hcl HL Hcr
   icases Hpool with (Hal | Hmk)
   · iapply il_fill_alloc γi γfs inodestart nib cov ls inum ds o g hfills hin hwf $$ Hinv Hal Hcl HL
   · by_cases ht0 : ds[islot inum]!.diType.toNat = 0
@@ -264,7 +264,7 @@ theorem il_fill [Icfg] (γi : GName) (γfs : FsNames) (inodestart nib : Nat)
       ipureintro
       exact ht0
     · iapply il_fill_box γi γfs inodestart nib cov ls inum ds o g hfills hin hwf ht0 $$ Hinv Hmk
-        Hcl HL
+        Hcl HL Hcr
 
 end Fill
 

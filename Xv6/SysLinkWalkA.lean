@@ -403,7 +403,7 @@ theorem sys_link_walk_ip (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
   icases Hcm with ⟨Hltgtc, Hlent, Hcmu⟩
   iapply wpLoop_fupd
   imod (lfTgt_fire fscFs ⊤ A.Ftgt inum.toNat (eraNode dn bm data)
-      (eraNode (sysLinkInc dn) bm data) ufNd_top hloc hnzt hokt habs') $$ Hftop Happ Hltgtc Ht
+      (eraNode (sysLinkInc dn) bm data) ufNd_top hloc hnzt hokt habs') $$ Hftop Happ Hltgtc Ht Hlc
     with ⟨Ht, %av, %hav, %hokav, Hrcv⟩
   imodintro
   ihave Hltgt : ltgtFired A.Ftgt inum.toNat $$ [Hrcv]

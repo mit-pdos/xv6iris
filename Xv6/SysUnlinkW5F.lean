@@ -166,7 +166,7 @@ theorem sys_unlink_w5f_ghost (Pd : Nat → IProp GF) (Fent : Pfam GF (Aview → 
       topFrag (fsGammaL fscFs) (BitVec.setWidth 32 (dirInum datd kk)).toNat (eraNode dni bmi dati) -∗
       pfAt (uentCommitAt (fsGammaL fscFs) appE Pd) Fent -∗
       -- THE PARENT CURSOR the walk handed back, lent to the leg (TL-3C)
-      Pd dinum.toNat -∗
+      Pd dinum.toNat -∗ £ 1 -∗
       |={⊤}=> (icLoaded fscFs fscIreg fscCov fscLogst kd dinum dnW bmW ∗ Pd dinum.toNat ∗
         dinodeAt fscIreg (BitVec.setWidth 32 (dirInum datd kk)) dni ∗
         topFrag (fsGammaL fscFs) (BitVec.setWidth 32 (dirInum datd kk)).toNat
@@ -177,7 +177,7 @@ theorem sys_unlink_w5f_ghost (Pd : Nat → IProp GF) (Fent : Pfam GF (Aview → 
             (dirEntries (eraNode dnd bmd datd)) (fnNlink (eraNode dnd bmd datd))
             (BitVec.setWidth 32 (dirInum datd kk)).toNat (absRow (eraNode dni bmi dati))⌝ ∗
           Fent.pfRecv av0 dinum.toNat (dirBname datd kk) (BitVec.setWidth 32 (dirInum datd kk)).toNat) := by
-  iintro #Hinv Hdl Hdi Hmeta Hmap Hblk Htop Hdii Htopi Hcm HPd
+  iintro #Hinv Hdl Hdi Hmeta Hmap Hblk Htop Hdii Htopi Hcm HPd Hcr
   have hop0 := hop
   obtain ⟨hok, hrl, hdok, hddix, hdoc, hduq⟩ := hop0
   obtain ⟨hok', hrl', hdok', hddix', hdoc', hduq'⟩ := hZ.ok
@@ -231,7 +231,7 @@ theorem sys_unlink_w5f_ghost (Pd : Nat → IProp GF) (Fent : Pfam GF (Aview → 
       (sys_unlink_ent_at dinum.toNat dnd bmd datd kk nf hop hty hfn) hnD hnDD
       (sys_unlink_nl1 dnd bmd datd hlive) (sys_unlink_nl1 dni bmi dati hnli)
       (sys_unlink_nondir_node _ hipnd) (sys_unlink_nondir_dec _ hipnd) habsp hoki.2.2.2.1)
-    $$ Hftop Happ Hcm HPd Htop Htopi with ⟨Htop, Htopi, HPd, %av0, %hpre, Hrecv⟩
+    $$ Hftop Happ Hcm HPd Htop Htopi Hcr with ⟨Htop, Htopi, HPd, %av0, %hpre, Hrecv⟩
   ihave Htopi := (show topFragQ (GF := GF) (fsGammaL fscFs) (DFrac.own 1)
         (BitVec.setWidth 32 (dirInum datd kk)).toNat (eraNode dni bmi dati) ⊢
       topFrag (fsGammaL fscFs) (BitVec.setWidth 32 (dirInum datd kk)).toNat
@@ -266,7 +266,7 @@ theorem sys_unlink_w5_file (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ :
   iintro ⟨%⟨hpins, htln, hname, hkd, hnib, hpos, hle, hty, hnd, hndd, hfn, hks, hlei, hnli, hisd,
     hop, hZ, hlive, hmem, h5⟩, Hk, Hpc, Hcells, Hjunk, Hde, Hnm, Htl, Hpath, Hoff, Hdel, Hte, Hce,
     #Henv, Hpid, Hhole, HΦ, Hlkd, Hdl, Hdi, Hmeta, Hmap, Hblk, Htop, Hlki, Hopi, Hres, HP, Hbs, Hop,
-    Hcm⟩
+    Hcm, Hcr⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have htyi : dni.diType.toNat ≠ T_DIR_z := hisd
   unfold sysUnlinkOpen
@@ -289,7 +289,7 @@ theorem sys_unlink_w5_file (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ :
   iapply wpLoop_fupd
   imod (sys_unlink_w5f_ghost (A.P (nparElems pl).length) A.Fent kd dinum dnd dnW bmd
       bmW datd datW kk nf dni bmi dati hop hZ hlive hty hnd hndd hfn hoki hnli hnibi htyi)
-    $$ Hinv Hdl Hdi Hmeta Hmap Hblk Htop Hdii Htopi He HP
+    $$ Hinv Hdl Hdi Hmeta Hmap Hblk Htop Hdii Htopi He HP Hcr
     with ⟨Hloadd, HP, Hdii, Htopi, ⟨%uty, Htok⟩, %av0, %hpre, Hrecv⟩
   imodintro
   -- +0xae  lh a4,68(s2) ; +0xb2  c.li a5,1 ; +0xb4  beq a4,a5 (FALLS)

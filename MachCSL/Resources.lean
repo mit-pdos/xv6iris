@@ -979,6 +979,12 @@ def devAuthAt [MachFixedGS GF] (E : EraGS) (d : DevId) (s : DevSt d) : IProp GF 
 def devFragAt [MachFixedGS GF] (E : EraGS) (d : DevId) (s : DevSt d) : IProp GF :=
   (E.devName d) ↪VAR{.own (1 : Qp).half} (⟨d, s⟩ : DevVal)
 
+/-- A ghost-variable half: timeless (stated so that the `▷`-destructuring fallbacks of the
+transfinite proof mode find it without unfolding `devFragAt`). -/
+instance devFragAt_timeless [MachFixedGS GF] (E : EraGS) (d : DevId) (s : DevSt d) :
+    Timeless (devFragAt (GF := GF) E d s) := by
+  unfold devFragAt; infer_instance
+
 /-- Every device's authoritative half, at the machine's states. -/
 def devInterpAt [MachFixedGS GF] (E : EraGS) (ds : DevStates) : IProp GF := iprop%
   [∗list] d ∈ DevId.all, devAuthAt E d (ds.st d)

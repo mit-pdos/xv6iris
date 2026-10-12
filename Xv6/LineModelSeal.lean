@@ -129,10 +129,10 @@ theorem lmProIdx_add (cs : List Nat) (n i : Nat) :
 theorem lmProIdx_mono (cs : List Nat) (i j : Nat) (hij : i ≤ j) :
     lmProIdx M cs i ≤ lmProIdx M cs j := by
   induction j with
-  | zero => rw [Nat.le_zero.mp hij]
+  | zero => rw [Nat.le_zero.mp hij]; exact Nat.le_refl _
   | succ j ih =>
     by_cases he : i = j + 1
-    · rw [he]
+    · rw [he]; exact Nat.le_refl _
     · have := ih (by omega)
       rw [lmProIdx_S]
       omega
