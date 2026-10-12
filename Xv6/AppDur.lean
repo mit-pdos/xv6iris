@@ -35,9 +35,8 @@ supplies.
    `gt ↪●MAP{DFrac.own (1 : Qp).half} I` (`snapGuest`'s spelling,
    `Xv6/FsDurSnap.lean` deviation 3); `abs_view` is `absView`, `app_pred` is
    `Appcfg.appPred`.
-2. `appDurRaw_open` pulls the two existentials through the later separately
-   (`later_exists_except0`, then `later_exists` over the inhabited node map),
-   where Rocq's one `bi.later_exist_except_0` plus `iDestruct` does both.
+2. `appDurRaw_open` opens an unlatered guest, as Rocq's ordinal port does
+   (the existentials do not leave a later at a limit index).
 3. (drift D3-app/S) `appDurLaws_seam` is a named lemma for Rocq's inline
    `fs_crash_seam_of_at` at the package's guest (BootSharedFs).
 4. (drift D3-app/S) `appDurRaw_merge` sits in its own section over
@@ -68,23 +67,23 @@ def appDurRaw {N : Type} (A : N → Aview → IProp GF) (Okc : N → Prop) (gt :
   iprop(∃ (r : N) (I : RegMapF FsNode),
     ⌜Okc r⌝ ∗ (gt ↪●MAP{DFrac.own (1 : Qp).half} I) ∗ A r (absView I))
 
-/-- OPENING A LATER-SHAPED GUEST: the half and the record's predicate are
-timeless and come out, the claim stays under its later (Rocq
-`app_dur_raw_open`). -/
+/-- OPENING A GUEST (Rocq `app_dur_raw_open`).  At ordinal step indices a
+LATER-shaped guest cannot be opened this way (its instance `r` is pinned by
+nothing timeless, so the existential does not leave the later); every guest
+that is opened arrives unlatered, its consumer having spent its step's
+credit.  The claim is handed on under a later, as before. -/
 theorem appDurRaw_open {N : Type} (A : N → Aview → IProp GF) (Okc : N → Prop) (gt : GName) :
-    ▷ appDurRaw A Okc gt ⊢
+    appDurRaw A Okc gt ⊢
       ◇ ∃ (r : N) (I : RegMapF FsNode),
         ⌜Okc r⌝ ∗ (gt ↪●MAP{DFrac.own (1 : Qp).half} I) ∗ ▷ A r (absView I) := by
   unfold appDurRaw
-  iintro H
-  imod later_exists_except0 $$ H with ⟨%r, H⟩
-  ihave ⟨%I, H⟩ := (later_exists (α := RegMapF FsNode)).2 $$ H
-  icases later_sep.1 $$ H with ⟨>%hr, H⟩
-  icases later_sep.1 $$ H with ⟨>Hh, Hp⟩
+  iintro ⟨%r, %I, %hr, Hh, Hp⟩
   imodintro
   iexists r, I
-  iframe Hh Hp
-  ipureintro; exact hr
+  iframe Hh
+  isplitr
+  · ipureintro; exact hr
+  · inext; iexact Hp
 
 /-- PACKING: the guest half beside a claim at the same map, under the later the
 transport left on the claim, at a record satisfying `Okc` (Rocq

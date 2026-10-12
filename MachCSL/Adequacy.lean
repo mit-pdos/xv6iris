@@ -296,7 +296,8 @@ theorem riscvPowerAdequacy [MachGpreS GF] [KernelMap] (ndisk : Nat) (g : GState)
       ∀ (E : EraGS) (gen : Nat) (dk : Nat → BitVec 8),
       (γreg ↪◯MAP[gen]{.discard} E) ∗ MonoNat.lb_own γst (.ofNat (gen + 1)) ∗
         MonoNat.auth_own γst (DFrac.own 1) (.ofNat (gen + 1)) ∗ diskImgAuthSized γdisk ndisk dk ∗
-        (E.mirrorName ↪VAR (Mof dk)) ∗ ▷ Pc γdisk γsw γreg γst c ∗ Tn c (gen + 1) ⊢@{IProp GF}
+        -- unlatered: see `wp_power`'s `Hswap`
+        (E.mirrorName ↪VAR (Mof dk)) ∗ Pc γdisk γsw γreg γst c ∗ Tn c (gen + 1) ⊢@{IProp GF}
       |==> ◇ (MonoNat.auth_own γst (DFrac.own 1) (.ofNat (gen + 1)) ∗
         diskImgAuthSized γdisk ndisk dk ∗ ▷ Pc γdisk γsw γreg γst c ∗
         (E.mirrorName ↪VAR{.own (1 : Qp).half} (Mof dk)) ∗

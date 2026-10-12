@@ -261,16 +261,18 @@ variable {GF : BundledGFunctors.{0}} [FsTopG GF]
 
 /-- THE DURABLE CLAIM AT A NAMED INSTANCE (Rocq `app_dur_at`): `appDurRaw`
 with the instance `r` exposed, which is what the LEND needs -- its boot
-resource is at the same `r` as the claim it travels with. -/
+resource is at the same `r` as the claim it travels with.  The later sits on
+the CLAIM only (Rocq's ordinal port, the census's `app_dur` D shape): the
+guest half is timeless and comes out at every step index, the claim is
+arbitrary. -/
 def appDurAt {N : Type} (A : N → Aview → IProp GF) (gt : GName) (r : N) : IProp GF :=
-  iprop(∃ I : RegMapF FsNode, (gt ↪●MAP{DFrac.own (1 : Qp).half} I) ∗ A r (absView I))
+  iprop(∃ I : RegMapF FsNode, (gt ↪●MAP{DFrac.own (1 : Qp).half} I) ∗ ▷ A r (absView I))
 
 /-- Rocq `app_dur_at_pack`. -/
 theorem appDurAt_pack {N : Type} (A : N → Aview → IProp GF) (gt : GName) (r : N)
     (I : RegMapF FsNode) :
-    (gt ↪●MAP{DFrac.own (1 : Qp).half} I) ⊢ ▷ A r (absView I) -∗ ▷ appDurAt A gt r := by
+    (gt ↪●MAP{DFrac.own (1 : Qp).half} I) ⊢ ▷ A r (absView I) -∗ appDurAt A gt r := by
   iintro Hh Hp
-  inext
   unfold appDurAt
   iexists I
   iframe Hh Hp
@@ -279,13 +281,12 @@ theorem appDurAt_pack {N : Type} (A : N → Aview → IProp GF) (gt : GName) (r 
 pins the lent claim to its own map; both shares come back. -/
 theorem appDurAt_agree {N : Type} (A : N → Aview → IProp GF) (gt : GName) (r : N)
     (q : Qp) (I : RegMapF FsNode) :
-    (gt ↪●MAP{DFrac.own q} I) ⊢ ▷ appDurAt A gt r -∗
+    (gt ↪●MAP{DFrac.own q} I) ⊢ appDurAt A gt r -∗
       ◇ ((gt ↪●MAP{DFrac.own q} I) ∗ (gt ↪●MAP{DFrac.own (1 : Qp).half} I) ∗
         ▷ A r (absView I)) := by
   iintro Hk Hg
   unfold appDurAt
-  imod later_exists_except0 $$ Hg with ⟨%I', Hg⟩
-  icases later_sep.1 $$ Hg with ⟨>Hh, Hp⟩
+  icases Hg with ⟨%I', Hh, Hp⟩
   ihave %heq := ghost_map_auth_agree _ _ _ _ _ $$ Hk Hh
   subst heq
   imodintro
@@ -324,20 +325,31 @@ theorem xv6Slot_project {CT : Type} (N : Type) (appFs : CT → N → Aview → I
       ◇ (diskImgAuthSized γd XV6_DISK_BYTES dk ∗ ▷ xv6Slot N appFs appOkc cov ls γd γsw γreg γst c ∗
         ⌜fsBootPure cov ls dk⌝) := by
   iintro ⟨Ha, HP⟩
-  unfold xv6Slot
-  ihave ⟨%gt, HP⟩ := (later_exists (α := GName)).2 $$ HP
-  icases later_sep.1 $$ HP with ⟨HP, HG⟩
-  imod pFs_project gt γd XV6_DISK_BYTES γsw γreg γst cov ls dk $$ Ha HP with ⟨Ha, HP, %hp⟩
+  -- CREDIT-FREE at every step index (Rocq's ordinal port): the slot's existential
+  -- cannot leave its later whole (the guest claim is not timeless), so only the pure
+  -- fact does -- a persistent assertion that reads the file system's half (timeless,
+  -- so its existential strips) against the auth and consumes nothing; the slot goes
+  -- back exactly as it came in
+  ihave Hp : iprop(◇ ⌜fsBootPure cov ls dk⌝) $$ [#]
+  · ihave Hfs : iprop(▷ ∃ gt : GName, pFsNamedAt gt γd XV6_DISK_BYTES γsw γreg γst cov ls) $$ [HP]
+    · inext
+      unfold xv6Slot
+      icases HP with ⟨%gt, HP, -⟩
+      iexists gt
+      iexact HP
+    imod Hfs
+    icases Hfs with ⟨%gt, Hfs⟩
+    imod pFs_project gt γd XV6_DISK_BYTES γsw γreg γst cov ls dk $$ Ha [Hfs] with ⟨-, -, %hp⟩
+    · inext; iexact Hfs
+    imodintro
+    ipureintro; exact hp
+  imod Hp with %hp
   -- placed by name, never framed: the record owns the durable disk's bytes
   imodintro
   isplitl [Ha]
   · iexact Ha
-  isplitl [HP HG]
-  · inext
-    iexists gt
-    isplitl [HP]
-    · iexact HP
-    · iexact HG
+  isplitl [HP]
+  · iexact HP
   · ipureintro; exact hp
 
 /-- `xv6Slot_alloc` at an ABSTRACT disk size (deviation 8): with the size a
@@ -415,7 +427,7 @@ and at a named instance `r`, and the era's boot resource at that `r`. -/
 def xv6Lend {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp GF)
     (appBoot : CT → Nat → N → IProp GF) (cov : ExtTreeSet Nat compare) (ls : Nat) (c : CT)
     (gen : Nat) (dk : Nat → BitVec 8) : IProp GF :=
-  iprop(∃ (gt : GName) (r : N), pFsLendAt gt cov ls dk ∗ ▷ appDurAt (appFs c) gt r ∗
+  iprop(∃ (gt : GName) (r : N), pFsLendAt gt cov ls dk ∗ appDurAt (appFs c) gt r ∗
     appBoot c (gen + 1) r)
 
 /-- THE POWER-ON SWAP, `Hswap`'s shape at `Mof := mirrorOf ∘ fsBlocks` and
@@ -437,7 +449,7 @@ theorem xv6Slot_swap {CT : Type} (N : Type) (appFs : CT → N → Aview → IPro
         MonoNat.auth_own γst (DFrac.own 1) (.ofNat (gen + 1)) ∗
         diskImgAuthSized γd XV6_DISK_BYTES dk ∗
         (E.mirrorName ↪VAR (mirrorOf (fsBlocks dk))) ∗
-        ▷ xv6Slot N appFs appOkc cov ls γd γsw γreg γst c ∗ Tn c (gen + 1) ⊢@{IProp GF}
+        xv6Slot N appFs appOkc cov ls γd γsw γreg γst c ∗ Tn c (gen + 1) ⊢@{IProp GF}
       |==> ◇ (MonoNat.auth_own γst (DFrac.own 1) (.ofNat (gen + 1)) ∗
         diskImgAuthSized γd XV6_DISK_BYTES dk ∗ ▷ xv6Slot N appFs appOkc cov ls γd γsw γreg γst c ∗
         (E.mirrorName ↪VAR{.own (1 : Qp).half} (mirrorOf (fsBlocks dk))) ∗
@@ -445,9 +457,12 @@ theorem xv6Slot_swap {CT : Type} (N : Type) (appFs : CT → N → Aview → IPro
         Tn' c (gen + 1)) := by
   iintro ⟨#Hreg, #Hst, Hsa, Ha, HM, HP, Htn⟩
   unfold xv6Slot
-  ihave ⟨%gt, HP⟩ := (later_exists (α := GName)).2 $$ HP
-  icases later_sep.1 $$ HP with ⟨HP, HG⟩
+  -- the slot comes in UNLATERED (the PowerOn arm spent its credit, Rocq's ordinal
+  -- port), so its guest opens directly: its instance is pinned by nothing timeless
+  icases HP with ⟨%gt, HP, HG⟩
   imod appDurRaw_open (appFs c) (appOkc c) gt $$ HG with ⟨%r, %I, %hr, Hh, Hcl⟩
+  ihave HP : ▷ pFsNamedAt gt γd XV6_DISK_BYTES γsw γreg γst cov ls $$ [HP]
+  · inext; iexact HP
   ihave Hh : snapGuest (GF := GF) gt I $$ [Hh]
   · unfold snapGuest; iexact Hh
   imod pFs_swap gt γd XV6_DISK_BYTES γsw γreg γst cov ls dk E gen I
@@ -512,7 +527,7 @@ theorem xv6LendUnpack {N : Type} (A : N → Aview → IProp GF) (cov : ExtTreeSe
     (hrec : fsRecovery (fsBlocks dk) D cov ls) (hhwf : hdrWf (fsBlocks dk) cov ls)
     (hcovin : fsCovIn cov ndisk) (hlogsub : ∀ b, logRegion ls b = true → b ∈ cov)
     (hls2 : ls = 2) :
-    pFsLendAt gt cov ls dk ∗ ▷ appDurAt A gt r ⊢
+    pFsLendAt gt cov ls dk ∗ appDurAt A gt r ⊢
       ◇ ∃ (gsn gln : GName) (S : FsStateRec),
         ⌜S.fssSb.sbLogstart = ls ∧
           fsBootSnapWf dk ndisk S (fsRecView (fsBlocks dk) D) S.fssSb (fsNib S) cov⌝ ∗

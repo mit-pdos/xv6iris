@@ -448,9 +448,13 @@ theorem wp_power [KernelMap]
     -- `Hback` (the trace slot once more, at the same history) makes `Tn''` of
     -- it, which `powerBootRes` carries to the boot
     (Tn Tn' Tn'' : Nat → IProp GF)
+    -- the crash slot UNLATERED (ordinal step index; Rocq's port): the PowerOn
+    -- arm spends the power step's own credit on `crashInv`'s later, so the
+    -- client need not strip it -- at a limit index it could not, its slot being
+    -- a timeless record beside an ARBITRARY guest
     (Hswap : ∀ (E : EraGS) (gen : Nat) (dk : Nat → BitVec 8),
       eraRegistered gen E ∗ genStarted gen ∗ startAuth (gen + 1) ∗ diskFixedAuth dk ∗
-        (E.mirrorName ↪VAR (Mof dk)) ∗ ▷ MachFixedGS.crashPred (GF := GF) ∗
+        (E.mirrorName ↪VAR (Mof dk)) ∗ MachFixedGS.crashPred (GF := GF) ∗
         Tn (gen + 1)
       ⊢@{IProp GF} |==> ◇ (startAuth (gen + 1) ∗ diskFixedAuth dk ∗
         ▷ MachFixedGS.crashPred (GF := GF) ∗
@@ -534,7 +538,8 @@ theorem wp_power [KernelMap]
       exact ⟨[.powerOn], .power, bootWitness g, powerFork g.gen,
         primStep_power_on hpow (bootShape_bootWitness g)⟩
     inext
-    iintro %e₂ %g₂ %eₜ %Hstep _
+    -- the power step's credit: spent on `crashInv`'s later at the custody hook below
+    iintro %e₂ %g₂ %eₜ %Hstep Hlcp
     obtain ⟨rfl, h⟩ := primStep_power_inv Hstep
     rcases h with ⟨hp, _, _, _⟩ | ⟨_, rfl, rfl, hgen, hpow', hbf, hdevs⟩
     · rw [hpow] at hp
@@ -577,6 +582,7 @@ theorem wp_power [KernelMap]
     imod (Hproj (diskOf g.m.devs)) $$ [Hdisk HPc] with ⟨Hdisk, HPc, %hpure⟩
     · iframe Hdisk HPc
     icases Hyield with ⟨Hyield, Hturn, Huo, Huet⟩
+    imod lc_fupd_elim_later $$ Hlcp HPc with HPc
     -- THE SWAP, LENT THE ERA'S TURN (Rocq sync SY3-A1)
     imod (Hswap ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir⟩ g.gen
       (diskOf g.m.devs)) $$ [Hreg Hstarted Hstart Hdisk Hmir HPc Hturn]
