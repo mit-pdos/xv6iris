@@ -45,7 +45,7 @@ theorem acquire_spin {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
   have hc9 : Rc 9#5 = lk := by rw [hinv 9#5 (by decide)]; exact h9
   have hc14 : Rc 14#5 = 1#64 := by rw [hinv 14#5 (by decide)]; exact h14
   -- mv a5,a4
-  k_step (wp_s_add cpu _ (KA.«acquire» + 0x1a#64) true 15#5 0#5 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hc14]
+  k_step (wp_s_add cpu _ (KA.«acquire» + 0x1a#64) true 15#5 0#5 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hc14] £ Hlcr
   iintro Hk Hpc
   -- amoswap.w.aq a5,a5,(s1)
   k_step (wp_s_amoswap_lock cpu _ ?hs (KA.«acquire» + 0x1c#64) false 15#5 9#5 15#5 (by decide) γ lk s R
@@ -116,12 +116,12 @@ theorem acquire_body (HO : HOLDING) (MC : MYCPU) {GF : BundledGFunctors.{0}} [Ma
   k_step (wp_s_add cpu _ (KA.«acquire» + 0x10#64) true 10#5 0#5 9#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9]
   iintro Hk Hpc
   -- jal holding
-  k_step (wp_s_jal cpu _ (KA.«acquire» + 0x12#64) false 2097032#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquire_br_ffffffffffffff9a]
+  k_step (wp_s_jal cpu _ (KA.«acquire» + 0x12#64) false 2097032#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquire_br_ffffffffffffff9a] £ Hlcr
   iintro Hk Hpc
   have hho : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hK' : 6 ≤ k'.avail)
       (hs' : s ∉ k'.locks),
       kctx cpu k' ∗ pcIs cpu KA.«holding» ∗ isLock γ (k'.regs 10#5) s R ∗
-      (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
+      £ 1 ∗ (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R' ∧ R' 10#5 = 0#64⌝ -∗ wpLoop cpu) ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hK' hs'
     have h := HO.wp_holding_notheld (GF := GF) cpu k' γ s R hsie' hK' hs'
@@ -135,6 +135,7 @@ theorem acquire_body (HO : HOLDING) (MC : MYCPU) {GF : BundledGFunctors.{0}} [Ma
   case hs => k_norm
   case hK => k_norm; omega
   case hnot => k_norm; exact hs
+  iframe Hlcr
   iintro %R3 Hk Hpc %⟨hcs3, h10⟩
   have hret2 : jumpPc (KA.«acquire» + 0x16#64) = (KA.«acquire» + 0x16#64) := by decide
   k_norm [hret2]
@@ -160,7 +161,7 @@ theorem acquire_body (HO : HOLDING) (MC : MYCPU) {GF : BundledGFunctors.{0}} [Ma
   iintro %R' Hk Hpc %hR' Hpre HR Hheld Hview
   k_norm
   -- jal mycpu
-  k_step (wp_s_jal cpu _ (KA.«acquire» + 0x24#64) false 3296#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquire_br_d04]
+  k_step (wp_s_jal cpu _ (KA.«acquire» + 0x24#64) false 3296#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquire_br_d04] £ Hlcr
   iintro Hk Hpc
   have hmc : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hK' : 2 ≤ k'.avail),
       kctx cpu k' ∗ pcIs cpu KA.«mycpu» ∗
@@ -324,7 +325,7 @@ theorem acquire_spin_gen {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
   have hc9 : Rc 9#5 = lk := by rw [hinv 9#5 (by decide)]; exact h9
   have hc14 : Rc 14#5 = 1#64 := by rw [hinv 14#5 (by decide)]; exact h14
   -- mv a5,a4
-  k_step (wp_s_add cpu _ (KA.«acquire» + 0x1a#64) true 15#5 0#5 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hc14]
+  k_step (wp_s_add cpu _ (KA.«acquire» + 0x1a#64) true 15#5 0#5 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [hc14] £ Hlcr
   iintro Hk Hpc
   -- amoswap.w.aq a5,a5,(s1)
   k_step (wp_s_amoswap_lock_gen cpu _ ?hs (KA.«acquire» + 0x1c#64) false 15#5 9#5 15#5 (by decide) γ lk s R D Tc hrefute
@@ -392,12 +393,12 @@ theorem acquire_body_gen (HO : HOLDING) (MC : MYCPU) {GF : BundledGFunctors.{0}}
   k_step (wp_s_add cpu _ (KA.«acquire» + 0x10#64) true 10#5 0#5 9#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9]
   iintro Hk Hpc
   -- jal holding
-  k_step (wp_s_jal cpu _ (KA.«acquire» + 0x12#64) false 2097032#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquire_br_ffffffffffffff9a]
+  k_step (wp_s_jal cpu _ (KA.«acquire» + 0x12#64) false 2097032#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquire_br_ffffffffffffff9a] £ Hlcr
   iintro Hk Hpc
   have hho : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hK' : 6 ≤ k'.avail)
       (hs' : s ∉ k'.locks),
       kctx cpu k' ∗ pcIs cpu KA.«holding» ∗ lockOpenable γ (k'.regs 10#5) s R D ∗ Tc ∗
-      (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
+      £ 1 ∗ (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R' ∧ R' 10#5 = 0#64⌝ -∗ Tc -∗ wpLoop cpu) ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hK' hs'
     have h := HO.wp_holding_notheld_gen (GF := GF) cpu k' γ s R D Tc hrefute hsie' hK' hs'
@@ -411,6 +412,7 @@ theorem acquire_body_gen (HO : HOLDING) (MC : MYCPU) {GF : BundledGFunctors.{0}}
   case hs => k_norm
   case hK => k_norm; omega
   case hnot => k_norm; exact hs
+  iframe Hlcr
   iintro %R3 Hk Hpc %⟨hcs3, h10⟩ Hcred
   have hret2 : jumpPc (KA.«acquire» + 0x16#64) = (KA.«acquire» + 0x16#64) := by decide
   k_norm [hret2]
@@ -436,7 +438,7 @@ theorem acquire_body_gen (HO : HOLDING) (MC : MYCPU) {GF : BundledGFunctors.{0}}
   iintro %R' Hk Hpc %hR' Hpre HR Hheld Hview Hcred
   k_norm
   -- jal mycpu
-  k_step (wp_s_jal cpu _ (KA.«acquire» + 0x24#64) false 3296#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquire_br_d04]
+  k_step (wp_s_jal cpu _ (KA.«acquire» + 0x24#64) false 3296#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquire_br_d04] £ Hlcr
   iintro Hk Hpc
   have hmc : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hK' : 2 ≤ k'.avail),
       kctx cpu k' ∗ pcIs cpu KA.«mycpu» ∗

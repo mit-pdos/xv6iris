@@ -434,7 +434,7 @@ theorem vdrwNext_deposit (k : KCtx) (γ : DiskNames) (bno : BitVec 32) (wr : Boo
   iintro ⟨#Hpi, ⟨%Q, Hperm, Hn⟩, Hlcp⟩
   imod crashPerm_deposit_kq (genId (GF := GF)) γ.cperm (vdrwWr wr bno dataBuf) Q E hE
     $$ [Hpi Hperm Hlcp] with ⟨%kq, Hpend, #Hrc⟩
-  · iframe Hpi Hperm
+  · iframe Hpi Hperm Hlcp
   imodintro
   iexists kq
   iframe Hpend

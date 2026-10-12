@@ -443,7 +443,7 @@ heads of the histories. -/
 def exclReadAU (pa : PAddr) (n : Nat) (Ψ : BitVec (8 * n) → IProp GF) : IProp GF := iprop%
   |={⊤,∅}=> ∃ (dqs : Nat → DFrac) (Hs : Nat → Hist),
     histBytes pa n dqs Hs ∗ ⌜∀ j, j < n → Hs j ≠ []⌝ ∗
-    ▷ (∀ w : BitVec (8 * n), ⌜headsAre Hs n w⌝ -∗ histBytes pa n dqs Hs ={∅,⊤}=∗ Ψ w)
+    ▷ (∀ w : BitVec (8 * n), ⌜headsAre Hs n w⌝ -∗ histBytes pa n dqs Hs -∗ £ 1 ={∅,⊤}=∗ Ψ w)
 
 /-- The accessor of the write half of an exclusive pair whose read half saw
 `w0`: the heads still spell `w0`; the histories grow by the hart's entries
@@ -626,7 +626,7 @@ theorem swp_sail_mem_read_excl_au_gen (cpu : CPU) {n vasize : Nat}
   iloeb as IH
   iintro %r Hfrag H
   icases resvFragAny_cases cpu r $$ Hfrag with ⟨%b, Hfrag⟩
-  iapply swp_event_step cpu (.memRead n vasize req) (fun v => FreeM.pure v) Φ
+  iapply swp_event_step_lc cpu (.memRead n vasize req) (fun v => FreeM.pure v) Φ
   iintro %σ Hσ
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
   ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
@@ -640,13 +640,13 @@ theorem swp_sail_mem_read_excl_au_gen (cpu : CPU) {n vasize : Nat}
     inext
     iintro %σ'
     isplit
-    · iintro %v %Hev
+    · iintro %v %Hev _
       rcases Hev with ⟨hdev, _⟩ | ⟨_, hif', _⟩ | ⟨_, hpl, _⟩ | ⟨_, _, hno', _⟩
       · exact absurd hdev (not_devBytes_of_othersReserve hmm.2.2.1 hmm.2.2.2.1 hno)
       · rw [hif] at hif'; exact absurd hif' (by decide)
       · simp [akPlain, hk] at hpl
       · exact absurd hno hno'
-    · iintro %Hbk
+    · iintro %Hbk _
       obtain ⟨_, _, hσ⟩ := Hbk
       subst σ'
       imod memModel_dropResv _ σ cpu r b $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag⟩
@@ -669,7 +669,7 @@ theorem swp_sail_mem_read_excl_au_gen (cpu : CPU) {n vasize : Nat}
     inext
     iintro %σ'
     isplit
-    · iintro %v %Hev
+    · iintro %v %Hev Hlc
       rcases Hev with ⟨hdev, w₀, ds₀, hdr, _, _⟩ | ⟨_, hif', _⟩ | ⟨_, hpl, _⟩ |
         ⟨_, _, _, w', htop', rfl, rfl⟩
       · exact absurd hdev (not_devBytes_of_ramBytes hram (devRead_pos hdr))
@@ -684,14 +684,14 @@ theorem swp_sail_mem_read_excl_au_gen (cpu : CPU) {n vasize : Nat}
         subst hww
         imod memModel_read_excl _ σ cpu req.pa n w' r b (akAcq req.access_kind) hn htop $$ [$Hmm $Hfrag]
           with ⟨Hmm, Hfrag⟩
-        imod Hcont $$ %w' %hheads Hb with HΦ
+        imod Hcont $$ %w' %hheads Hb Hlc with HΦ
         imodintro
         isplitl [Hregs Hmem Hmm Hclose]
         · iapply Hclose $$ %(σ.afterExcl cpu req.pa n w' (akAcq req.access_kind)) %⟨fun _ _ => rfl, rfl⟩
             Hregs Hmem Hmm
         · iapply swp_ret
           iapply HΦ $$ Hfrag
-    · iintro %Hbk
+    · iintro %Hbk _
       obtain ⟨_, hno', _⟩ := Hbk
       exact absurd hno' hno
 
@@ -838,8 +838,8 @@ theorem exclReadAU_wand (pa : PAddr) (n : Nat) (Ψ Ψ' : BitVec (8 * n) → IPro
   isplit
   · ipureintro; exact hne
   inext
-  iintro %w %h1 Hb
-  imod Hcont $$ %w %h1 Hb with HΨ
+  iintro %w %h1 Hb Hlc
+  imod Hcont $$ %w %h1 Hb Hlc with HΨ
   imodintro
   iapply HW $$ HΨ
 

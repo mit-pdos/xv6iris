@@ -267,13 +267,13 @@ theorem vdrw_P5_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SL
     k_step (wp_s_branch cpu5 _ (KA.«virtio_disk_rw» + 0x1ce#64) false 8166#13 15#5 18#5
         (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [vdrwK_sie, h18_3, vdrw5_beq_one d hd1]
+      with [vdrwK_sie, h18_3, vdrw5_beq_one d hd1] £ Hlcp
     iintro Hk Hpc
     iapply HΦ $$ %cpu5 %s4 %p4 %(R3.set 15#5 (BitVec.signExtend 64 d))
     unfold vdrwP5Exit
     isimp only [vdrw5_saved_ws, Xv6.vdrwPostK_withSpie, vdrwNext_withSpie, KCtx.withSpie_regs, KCtx.withSpie_proc]
     iframe #
-    iframe Hk Hpc Htc Hcc Hir Hlocked Hpay Hth Hkm Hkt Hbno Hsv Hidx Hnext
+    iframe Hk Hpc Htc Hcc Hir Hlocked Hpay Hth Hkm Hkt Hbno Hsv Hidx Hnext Hlcp
     isplitl []
     · ipureintro
       refine ⟨?_, hcwf, hbp', hblk⟩
