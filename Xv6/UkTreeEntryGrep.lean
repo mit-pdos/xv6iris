@@ -105,7 +105,7 @@ theorem grepImageEntryEnvC_holds (GS : GREP_START) : GrepImageEntryEnvC (GF := G
       exact hkey i hlt
   have hc' : Conforms E (grepTree ((grepArgs W').map uargBytes)) := by rw [hwords]; exact hc
   -- the frame is the key's own need
-  have hneed : grepStack (grepArgs W') ≤ grepNeed ws := by rw [grepStack_need, hwords]
+  have hneed : grepStack (grepArgs W') ≤ grepNeed ws := by rw [grepStack_need, hwords]; exact Nat.le_refl _
   -- the argv registers
   have ha0 : (tfResumeGpr0 W'.tf).get 10#5 = BitVec.ofNat 64 (grepArgs W').length := by
     rw [grepArgs, echoArgs_length]

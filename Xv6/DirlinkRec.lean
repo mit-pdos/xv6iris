@@ -44,7 +44,7 @@ theorem dirlink_strncpy (SN : STRNCPY) (c : CPU) (k' : KCtx) (bsd : List (BitVec
       byteBuf (k'.regs 11#5) dqn (bview 14 fn) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   have h := SN.wp_strncpy (GF := GF) c k' bsd (bview 14 fn) 14 dqn hK hn (by decide)
-    hld (by rw [bview_length])
+    hld (by rw [bview_length]; exact Nat.le_refl _)
   unfold wp_strncpy_body at h
   simp only [strncpyAddr] at h
   iintro ⟨Hk, Hpc, Hd, Hs, Hnext⟩

@@ -135,7 +135,7 @@ theorem pdev_chunk_byte (L bs : List (BitVec 8)) (c k : Nat) (hpre : bs <+: L.dr
 
 /-- **Rocq `pdev_qh`**: the halted writer's cursor -- the value at node 0,
 nothing past it. -/
-def pdevQh {PROP : Type} [BI PROP] (R : PROP) : Nat → PROP
+def pdevQh {PROP : Type _} [BI PROP] (R : PROP) : Nat → PROP
   | 0 => R
   | _ + 1 => iprop(False)
 

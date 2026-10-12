@@ -2822,7 +2822,7 @@ theorem create_mkdir_bump (IU : IUPDATE) (Γ : SchedNames) [ClaimIs GF Γ]
     happ.hdok
   have hddixb := dirDotsIx_eq dind.toNat dp3
     (createSetf dp3 dp3.diMajor dp3.diMinor (dp3.diNlink + 1#16)) dat3 dat3
-    (createSetf_type _ _ _ _) (fun _ => hlive3) (by rw [createSetf_size]) rfl
+    (createSetf_type _ _ _ _) (fun _ => hlive3) (by rw [createSetf_size]; exact Nat.le_refl _) rfl
     happ.hddix
   have hduqb := dirUniq_cong dp3 (createSetf dp3 dp3.diMajor dp3.diMinor (dp3.diNlink + 1#16)) dat3
     (createSetf_type _ _ _ _) (createSetf_size _ _ _ _) happ.hduq

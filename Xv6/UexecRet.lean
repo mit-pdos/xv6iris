@@ -340,7 +340,7 @@ instance ukillSc_dec (sc : BitVec 64) : Decidable (ukillSc sc) := by
 theorem ukillSc_ne_ecall {sc : BitVec 64} (h : ukillSc sc) : sc ≠ uecallScause := h.1
 
 /-- One `if` of IProps is non-expansive in its branches. -/
-theorem uexec_ite_ne {GF : BundledGFunctors.{0}} {k : Nat} {c : Prop} [Decidable c]
+theorem uexec_ite_ne {GF : BundledGFunctors.{0}} {k : Iris.SI} {c : Prop} [Decidable c]
     {a a' b b' : IProp GF} (h1 : c → a ≡{k}≡ a') (h2 : ¬ c → b ≡{k}≡ b') :
     (if c then a else b) ≡{k}≡ (if c then a' else b') := by
   by_cases h : c
@@ -631,7 +631,7 @@ theorem ukillCredAt_of_owed (X : Uvis → IProp GF) (gn : GName) (sc : BitVec 64
   · iintro H; iright; iexact H
   · iintro -; iempintro
 
-theorem ukillCredAt_ne (k : Nat) (X Y : Uvis → IProp GF) (HX : ∀ W, X W ≡{k}≡ Y W) (gn : GName)
+theorem ukillCredAt_ne (k : Iris.SI) (X Y : Uvis → IProp GF) (HX : ∀ W, X W ≡{k}≡ Y W) (gn : GName)
     (sc : BitVec 64) (W : Uvis) (f : sfam GF) :
     ukillCredAt X gn sc W f ≡{k}≡ ukillCredAt Y gn sc W f := by
   unfold ukillCredAt

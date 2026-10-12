@@ -211,7 +211,9 @@ instance instCtxMorphSep (R1 R2 : CtxId → IProp GF) [CtxMorph R1] [CtxMorph R2
     imodintro
     iframe
 
-instance instCtxMorphExists {A : Type} (R : A → CtxId → IProp GF) [∀ x, CtxMorph (R x)] :
+-- `A : Type _`: at the ordinal step-index choice `IProp GF : Type 4`, and the existential may range
+-- over `IProp`-valued functions (`instCtxMorphIntrResP`)
+instance instCtxMorphExists {A : Type _} (R : A → CtxId → IProp GF) [∀ x, CtxMorph (R x)] :
     CtxMorph (GF := GF) (fun ξ => iprop(∃ x, R x ξ)) where
   morph ξ ξ' := by
     iintro ⟨Hdom, ⟨%x, H⟩⟩

@@ -466,7 +466,7 @@ theorem asl_exit (RE : RELEASE) (MP : MYPROC) (c0 cpu : CPU) (k kb : KCtx) (hb :
       exact asl_calleeSaved_mk k.regs R5 e19 e20 e21 e22 e23 e24 e25 e26 e27
     case ha0 => k_norm_g [m18]
     case hsr => k_norm_g
-    case hnr => k_norm_g; rw [hb.noff]
+    case hnr => k_norm_g; rw [hb.noff]; omega
     case hKr => k_norm_g; unfold acquiresleepSlots sleepSlots at hK; omega
     case hrr => k_norm_g; simp [hb.intena, hb.noff]
     case hor =>
@@ -704,7 +704,7 @@ theorem asl_round (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLEEP_PREPAR
       case hslpp => k_norm_g; exact hb.proc
     case ha0 => k_norm_g [P18]
     case hsr => k_norm_g
-    case hnr => k_norm_g; rw [hb.noff]
+    case hnr => k_norm_g; rw [hb.noff]; omega
     case hKr => k_norm_g; unfold acquiresleepSlots sleepSlots at hK; omega
     case hrr => k_norm_g; simp [hb.intena, hb.noff]
     case hor =>
