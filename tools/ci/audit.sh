@@ -11,11 +11,14 @@
 #   --build   `lake build Xv6 MachCSL` first (Rocq's `make audit` vs `audit-only`).
 #             Without it a stale .lake/build is audited as it stands.
 #   --weak    audit the weak-memory tier's top theorems instead (Theorem 2 /
-#             Theorem 1 / certificate (a'), tools/ci/roots-weak.txt) against
-#             tools/audit/baseline-weak.json, importing Weak.AxSpinT2b and
-#             Weak.AxSpinT2c (Weak/ is not in the Xv6/MachCSL build CI audits);
-#             output in $XV6_CI_OUT/weak.  With --build, `lake build
-#             Weak.AxSpinT2b Weak.AxSpinT2c` first.
+#             Theorem 1 / the AxSpin certificates, and the allocproc plan's
+#             INTERNAL milestone M1 Weak.srvwmoXv6M1Core;
+#             tools/ci/roots-weak.txt) against tools/audit/baseline-weak.json,
+#             importing the modules of $XV6_AUDIT_MODULES below
+#             (Weak.AxSpinT2b ... Weak.AxSpinT2q4, Weak.SrvwmoXv6Adequacy;
+#             Weak/ is not in the Xv6/MachCSL build CI audits); output in
+#             $XV6_CI_OUT/weak.  With --build, `lake build` of those same
+#             modules first.
 #
 # EXIT STATUS: non-zero iff the audit fails (an axiom or opaque outside the
 # baseline, a stale baseline entry, a `sorryAx` anywhere in MachCSL/Xv6) or
@@ -41,14 +44,14 @@ for a in "$@"; do
 done
 if [ "$weak" -eq 1 ]; then
   export XV6_CI_OUT="$XV6_CI_OUT/weak"
-  export XV6_AUDIT_MODULES="Weak.AxSpinT2b,Weak.AxSpinT2b2,Weak.AxSpinT2c,Weak.AxSpinT2e3,Weak.AxSpinT2q1,Weak.AxSpinT2q3,Weak.AxSpinT2q2,Weak.AxSpinT2q4"
+  export XV6_AUDIT_MODULES="Weak.AxSpinT2b,Weak.AxSpinT2b2,Weak.AxSpinT2c,Weak.AxSpinT2e3,Weak.AxSpinT2q1,Weak.AxSpinT2q3,Weak.AxSpinT2q2,Weak.AxSpinT2q4,Weak.SrvwmoXv6Adequacy"
   export XV6_AUDIT_BASELINE="tools/audit/baseline-weak.json"
 fi
 mkdir -p "$XV6_CI_OUT"
 rm -f "$XV6_CI_OUT/audit.json" "$XV6_CI_OUT/audit.md"
 
 if [ "$build" -eq 1 ]; then
-  if [ "$weak" -eq 1 ]; then lake build Weak.AxSpinT2b Weak.AxSpinT2b2 Weak.AxSpinT2c Weak.AxSpinT2e3 Weak.AxSpinT2q1 Weak.AxSpinT2q3 Weak.AxSpinT2q2 Weak.AxSpinT2q4; else lake build Xv6 MachCSL; fi
+  if [ "$weak" -eq 1 ]; then lake build Weak.AxSpinT2b Weak.AxSpinT2b2 Weak.AxSpinT2c Weak.AxSpinT2e3 Weak.AxSpinT2q1 Weak.AxSpinT2q3 Weak.AxSpinT2q2 Weak.AxSpinT2q4 Weak.SrvwmoXv6Adequacy; else lake build Xv6 MachCSL; fi
 fi
 
 rc=0

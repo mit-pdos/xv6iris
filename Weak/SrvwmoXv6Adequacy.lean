@@ -5,10 +5,22 @@ Weak: **W5 CORE — M1's composition** (allocproc plan `notes/weak-allocproc-pla
 
 INTERNAL MILESTONE M1 (NOT published, [OWN.2]); kernel-only BY PREMISE (D21: M1's fetch clause
 `candKfetch bcRoLo bcRoHi`); loads single-copy atomic at or above the TsoMem floor BY PREMISE
-(`candScaT cohSrc`).  NOT registered as a root here (`roots-weak.txt` / `baseline-weak.json`;
-the orchestrator registers M1).  Since W4 F9 the theorem is NO LONGER conditional on the disk
+(`candScaT cohSrc`).  `srvwmoXv6M1Core` is registered in `roots-weak.txt` (with its
+`baseline-weak.json` entry, audited by `tools/ci/audit.sh --weak`; W5 CLOSE-OUT).  Since W4 F9 the theorem is NO LONGER conditional on the disk
 rows (the former `diskRows` / `DR` hypotheses are gone; [OWN.40] made the pf disk program stall
 on an OUT buffer wrapping past `2^64`, so no disk side condition remains either).
+
+## Status (D21)
+
+M1 — composition milestone, INTERNAL (not published [OWN.2]): kernel-only by premise
+`candKfetch`, loads single-copy-atomic at or above the TsoMem floor by premise `candScaT`,
+disk-row loads latest by premise `candDiskLat`, under the named ISA-model premise
+`sailCycleOrder` [OWN.35] (W-SCO demotes it for kernel text); the disk rows PROVED (W4 F9), no
+side condition; the realizing MachCSL run satisfies `xv6FsAdequacy_closed`'s conclusions,
+`xv6NiPhi`, `unionPhiSync`, `textPristine` and the allocproc shadow; axioms = the SC roots'
+(`propext`, `Classical.choice`, `Quot.sound`; opaques the two `resv` predicates +
+`MachCSL.bootImageSealed`) + the `bv_decide` certificates the audit counts (`audit.json`);
+non-vacuity: `srvwmoXv6M1Satisfiable` (QUIESCENT, D22/D44).
 
 ## The composition
 
@@ -64,7 +76,8 @@ W-SCO (after M1) proves it for xv6's kernel text and removes it from M1.
 
 1. The plan's §C W5 says W5 CORE also corrects `MachOfPf.lean`'s header deviation 3 ("its owner
    is OPEN") to [OWN.35]; W4 F9 made that correction in `MachOfPf.lean`'s header
-   (`PfStepTsoView.lean`'s deviation (4) is left to the orchestrator).
+   (`PfStepTsoView.lean`'s deviation (4) is corrected by the W5 CLOSE-OUT, naming
+   `sailCycleOrder` and W-SCO's `sailCycleOrderK_holds`).
 2. (W4 F9) The former `diskRows` (a copy of `MachOfPf.Hyps.disk`'s type) and its `DR`
    parameter are DELETED with that field.
 3. `allocprocAns` is a COPY of `Xv6.allocprocTraceAns`'s conclusion (proved by `exact`).

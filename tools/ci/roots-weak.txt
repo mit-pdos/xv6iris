@@ -4,7 +4,9 @@
 # (tools/ci/envfacts) and the default assumption audit load, so these roots
 # are kept apart: they are audited by `tools/ci/audit.sh --weak` against
 # tools/audit/baseline-weak.json, and tools/ci/lint.sh fails if the two lists
-# differ.
+# differ.  Two families: the AxSpin allocpid theorems and certificates
+# (AxSpinT2*), and the allocproc plan's INTERNAL milestone M1
+# (Weak.srvwmoXv6M1Core, SrvwmoXv6Adequacy; NOT published [OWN.2]).
 Weak.allocpidOpen             # THEOREM 2: two-hart allocpid pid distinctness + nextpid source, open third hart (AxSpinT2b)
 Weak.allocpid2Distinct        # THEOREM 1: its corollary with no third hart (AxSpinT2b)
 Weak.allocpidOpen2            # THEOREM 2, stage 2: no panic (no cut) on prefix rows + nextpid source + pid distinctness + a3 = pid at the final state (P4), open third hart (AxSpinT2b2)
@@ -15,3 +17,4 @@ Weak.allocpidRaceCert         # CERTIFICATE (b): an unlocked nextpid racer has n
 Weak.allocpidLkRaceCert       # CERTIFICATE (p-lk): a lock-forging racer has no WPd against the xv6 protocol, refuted through no-panic, on a concrete cut graph (AxSpinT2q3)
 Weak.allocpidStkRaceCert      # CERTIFICATE (p-stk): a stack-overwriting racer has no WPd against the xv6 protocol, refuted through no-reload-misread, on a concrete reload-cut graph (AxSpinT2q4)
 Weak.allocpidPrefixCert       # CERTIFICATE (a-): stage-2 Theorem 1 applied on PREFIX rows (A mid-critical-section, B after one failed claim), no cut, both incomplete, no hypotheses (AxSpinT2q2)
+Weak.srvwmoXv6M1Core          # M1 (INTERNAL milestone, NOT published [OWN.2]): the sRVWMO/kernel-only composition -- every M1-premised shaped pf run is realized by a MachCSL run from the machine off on which `xv6FsAdequacy_closed`/NI/union/text/`allocprocTraceAns` conclude; premises `srvwmoXv6M1Premises` + `g0` boot facts + `sailCycleOrder` [OWN.35] (SrvwmoXv6Adequacy)

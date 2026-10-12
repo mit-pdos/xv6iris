@@ -62,8 +62,9 @@ Deviations from the plan's text: (1) `R-log` (`σ.log = stAuthors st`) is a hypo
 (W2a's half); (2) a plain load's per-byte source agreement is the hypothesis `hsrc` (the seam with
 W2a, above); (3) the hart-index of the shadow is the agent `hartAgent cpu` (TsoShadow deviation 1);
 (4) `rowFence` needs the shadow's `fiArm` exactly at `fence.i` (`emFenceI`'s criterion) and
-`rowSfenceMarker` its negation — both facts of the step list's instruction structure, W4's to
-supply; (5) `LDev` is matched by a WILDCARD arm only (`lbInert`), so W13 (E)/(I)'s payload changes
+`rowSfenceMarker` its negation — facts of the Sail cycle's event order, the named premise
+`sailCycleOrder` [OWN.35] (`Weak/SrvwmoXv6Adequacy.lean`, derived for the shadow by `fiOfSco`);
+`sailCycleOrderK_holds` (W-SCO, `Weak/SailCycleOrderK.lean`) proves it for kernel text; (5) `LDev` is matched by a WILDCARD arm only (`lbInert`), so W13 (E)/(I)'s payload changes
 join without a rebase.
 -/
 import Weak.TsoShadow
