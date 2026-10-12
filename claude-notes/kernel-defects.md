@@ -221,6 +221,46 @@ SEMANTIC argument rather than the syntactic identity in-core `itrunc` enjoys.
 The `[ref--, free]` gap leaves a state no `iget` can reach, so preemption is
 harmless and a crash there is an ordinary crash-orphan.
 
+## Benign but load-bearing: `acquire` reads `lk->cpu` without the lock (a C11 data race)
+
+`acquire` calls `holding(lk)` BEFORE taking the lock, and `holding` is
+`lk->locked && lk->cpu == mycpu()`. So a hart that does NOT hold `lk` reads
+`lk->cpu` while the holder writes it with plain stores — `lk->cpu = mycpu()`
+right after the winning AMO (image: `sd a0,16(s1)` after `amoswap.w.aq`, no fence
+between) and `lk->cpu = 0` in `release`. In the image the read is
+`holding+0x12` (`0x80000c04`, `ld a5,16(a0)`), pinned `PResidue`
+(`Weak/KernelPins.lean`). Under RVWMO the reader may see the holder's pointer
+before the holder publishes it, an older holder's pointer, or 0.
+
+**Why it is benign:** `holding` only asks "is it MY pointer?", and a non-holder
+can never read its own: every store is 0 or the writer's own `&cpus[c]`, the
+reader's own latest store there is 0 (its last `release`), and per-location
+coherence forbids reading its own older store past it. `acquire` never
+false-panics. The proofs already carry exactly this argument
+(`lkCpu_read_not_mine`, `MachCSL/Lock.lean:18-22`; the weak-memory side's
+`lk->cpu` rules in `design/weak-memory-lb-axsl-spinlock.md`).
+
+**Why it is on the register anyway:**
+
+- **It is undefined behaviour in C.** `lk->cpu` is a plain field with a
+  concurrent writer and reader — a data race under the C11 model. It works only
+  because gcc emits single aligned 8-byte `ld`/`sd`, which RVWMO makes
+  single-copy atomic. Upstream xv6 has the same pattern.
+- **It is load-bearing for the weak-memory proof.** The robustness argument
+  cannot treat this byte as lock-protected: W8's access-discipline export
+  exempts the lock words and covers them by a separate rule, and the final
+  cycle-kill must route `lk->cpu` reads through it (plan rev 28;
+  `notes/W8-design.md` §0.7; full write-up `notes/xv6-holding-race.md`).
+  An earlier plan revision wrongly called the read lock-protected — do not
+  re-raise that.
+
+**The fix, if ever taken:** make `lk->cpu` a relaxed atomic
+(`__atomic_load_n`/`__atomic_store_n` with `__ATOMIC_RELAXED`) — on RV64 this
+should compile to the same `ld`/`sd` (**unverified**: diff the image before
+assuming no proof moves), and removes the C-level UB; or drop the `holding()`
+self-deadlock check from `acquire`. Either is a SOURCE change and goes through
+`durable-notes.md` §"Changing the kernel SOURCE".
+
 ## FIXED UPSTREAM (ded23f2, pinned 2026-09-09): `allocpid` wraps — the pid was a 32-bit counter with no bound
 
 **Upstream's fix** (`ded23f2 fix pid wraparound/reuse`): `allocpid` is now
