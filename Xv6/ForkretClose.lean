@@ -38,7 +38,7 @@ open LeanRV64D
 set_option linter.unusedSimpArgs false
 
 section Close
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
@@ -49,7 +49,7 @@ def fkrSlotIn (Wk : Option Uvis) (V : ProcPriv) (M : Nat → List (BitVec 8)) (s
     (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32) : IProp GF :=
   match Wk with
   | some _ => iprop(emp)
-  | none => uslot (hlc := hlc) (GF := GF) (SG := uexecSGXv6) (uvisOf V M sts gn cs pid)
+  | none => uslot (GF := GF) (SG := uexecSGXv6) (uvisOf V M sts gn cs pid)
 
 /-- forkret's frame, as the loop's `m = 6` slots below the stack top (Rocq
 "the frame merged back in", `stack_own ksp 6`). -/
@@ -82,7 +82,7 @@ set_option maxHeartbeats 4000000 in
 /-- **THE CLOSE**: the park's closer at the record prepare_return re-armed,
 then the closed loop. -/
 theorem fkr_close [X : CurCtx] (UC : USERRET_CLOSED) (W : IProp GF) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ] [NiFitIs (hlc := hlc) GF]
+    [ClaimIs GF Γ] [NiFitIs GF]
     (c : CPU) (k : KCtx) (R' : RegMap) (eb : Bool) (root : BitVec 44) (ksp : BitVec 64) (N : UtNames)
     (Vx : ProcPriv) (Mx : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (Wk : Option Uvis)
@@ -95,11 +95,11 @@ theorem fkr_close [X : CurCtx] (UC : USERRET_CLOSED) (W : IProp GF) (Γ : SchedN
     (∃ v : BitVec 64, Register.scause ↦ᵣ[c] v) ∗ (∃ v : BitVec 64, Register.stval ↦ᵣ[c] v) ∗
     Register.stvec ↦ᵣ[c] uservecTvec ∗ cpuClaim c (procAddr N.j) ∗
     procPrivFd N.f (procAddr N.j) N.pid (fkrPrep Vx k.root c) Mx ∗ fkrFrame ksp ∗
-    parkGlobals Γ N.w N.ft N.f N.ip ∗ utSysParkRows Γ ∗ firstDone (hlc := hlc) ∗ W ∗
-    MachFixedGS.uClaimO (hlc := hlc) (GF := GF) ∗
-    fkrSlotIn (hlc := hlc) Wk Vx Mx sts gn cs N.pid ∗
-    forkretCloser (hlc := hlc) (GF := GF) (SG := uexecSGXv6)
-      (fun j h Xc => usertrapResAt (hlc := hlc) (X := Xc) (parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6))
+    parkGlobals Γ N.w N.ft N.f N.ip ∗ utSysParkRows Γ ∗ firstDone ∗ W ∗
+    MachFixedGS.uClaimO (GF := GF) ∗
+    fkrSlotIn Wk Vx Mx sts gn cs N.pid ∗
+    forkretCloser (GF := GF) (SG := uexecSGXv6)
+      (fun j h Xc => usertrapResAt (X := Xc) (parkToken (GF := GF) (SG := uexecSGXv6))
         Γ j h) W N Vx.fdg Vx.chg Vx.cwi sts gn cs Wk
     ⊢ wpLoop (GF := GF) c := by
   obtain ⟨ξ, t⟩ := X
@@ -125,11 +125,11 @@ theorem fkr_close [X : CurCtx] (UC : USERRET_CLOSED) (W : IProp GF) (Γ : SchedN
       iintro ⟨%γtk, -, -, -, -, -, Hw, -, Htr, -⟩
       iframe Hw Htr) $$ HG
   icases Hwt with ⟨#Hwire, #Htr⟩
-  ihave #Hglob' := (show parkGlobals (hlc := hlc) (GF := GF) Γ N.w N.ft N.f N.ip ⊢
+  ihave #Hglob' := (show parkGlobals (GF := GF) Γ N.w N.ft N.f N.ip ⊢
       parkGlobals N.Γ N.w N.ft N.f N.ip from by rw [hΓ]) $$ Hglob
-  ihave #HG' := (show utSysParkRows (hlc := hlc) (GF := GF) Γ ⊢ utSysParkRows N.Γ from by rw [hΓ]) $$ HG
+  ihave #HG' := (show utSysParkRows (GF := GF) Γ ⊢ utSysParkRows N.Γ from by rw [hΓ]) $$ HG
   -- the resumer's handler environment row, from its globals and park world
-  ihave #Henv := handlerEnvAt_of_parkRows (hlc := hlc) (GF := GF) rfl N.Γ N.w N.ft N.f N.ip $$ [Hglob' HG']
+  ihave #Henv := handlerEnvAt_of_parkRows (GF := GF) rfl N.Γ N.w N.ft N.f N.ip $$ [Hglob' HG']
   · iframe Hglob' HG'
   unfold forkretCloser forkretResumeK
   ihave Hcl := (show cpuClaim (GF := GF) c (procAddr N.j) ⊢ cpuClaim c N.pj from .rfl) $$ Hcl
@@ -139,7 +139,7 @@ theorem fkr_close [X : CurCtx] (UC : USERRET_CLOSED) (W : IProp GF) (Γ : SchedN
     %rfl %hrk' Hglob' HG' Hdone HW Henv Htfk Hcl Hblk
   icases Hout with ⟨Hres, Hso⟩
   -- the slot, at the record the loop resumes
-  ihave Hslot : uslot (hlc := hlc) (GF := GF) (SG := uexecSGXv6)
+  ihave Hslot : uslot (GF := GF) (SG := uexecSGXv6)
       (uvisOf (fkrPrep Vx k.root c) Mx sts gn cs N.pid) $$ [Hso Hsin]
   · cases Wk with
     | some W0 =>
@@ -147,13 +147,13 @@ theorem fkr_close [X : CurCtx] (UC : USERRET_CLOSED) (W : IProp GF) (Γ : SchedN
       iexact Hso
     | none =>
       unfold fkrSlotIn
-      iapply (uslot_of_urunEq (hlc := hlc) (GF := GF) (SG := uexecSGXv6)
+      iapply (uslot_of_urunEq (GF := GF) (SG := uexecSGXv6)
         (Wk := uvisOf Vx Mx sts gn cs N.pid) (sts := sts) (gn := gn) (cs := cs) (pidv := N.pid)
         (urunEq_resume (urunEq_of Vx Mx sts gn cs N.pid) hu rfl rfl rfl rfl rfl rfl) rfl rfl rfl rfl).1
       iexact Hsin
   have hsp6 : ((k.intrOff true false).withRegs R').sp + 8#64 * BitVec.ofNat 64 6 = ksp := by
     simp only [KCtx.sp, KCtx.withRegs_regs, hR.2, h.sp]; bv_omega
-  have hl := UC.wp_userret_closed (hlc := hlc) (GF := GF) Γ N.j c
+  have hl := UC.wp_userret_closed (GF := GF) Γ N.j c
     ((k.intrOff true false).withRegs R') 6 (fkrPrep Vx k.root c).upt ksp (fkrPrep Vx k.root c) Mx sts gn cs
     N.pid (tfResumePc (fkrPrep Vx k.root c).tf) sc tv hj
     (by simp only [KCtx.withRegs_proc, KCtx.intrOff_proc]; exact h.proc) ⟨rfl, rfl, rfl⟩

@@ -29,7 +29,7 @@ open Std (ExtTreeSet)
 open UexecSG
 
 section UkRunSysWait
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -37,12 +37,12 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [S
 theorem wp_uk_ecall_wait_null_gen (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64)
     (avail : Nat) (Sc : ExtTreeSet GName compare) (P : BitVec 32 → IProp GF) (hn : usysno m = USYS_wait)
     (hz : (m.get 10#5).toNat = 0) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
-      udepw (hlc := hlc) N m pc USYS_wait -∗ uch N.ch Sc -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗
+      udepw N m pc USYS_wait -∗ uch N.ch Sc -∗
       (∀ pidv : BitVec 32, upidAuth N.pid (pidv.toNat : Int) -∗ upidAuth N.pid (pidv.toNat : Int) ∗ P pidv) -∗
       (∀ (h' : CPU) (r : BitVec 64) (Sc' : ExtTreeSet GName compare) (pidv : BitVec 32),
         P pidv -∗ ⌜r = -1#64 → Sc' = ∅⌝ -∗ uwaitAnsPid r Sc Sc' pidv -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ uch N.ch Sc' -∗ wpLoop h') -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ uch N.ch Sc' -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hrun Hsb Hch Hrd Hcont
   iapply urun_ecall UL N h m pc avail $$ Hi Hrun
@@ -96,11 +96,11 @@ only at an empty set. -/
 theorem wp_uk_ecall_wait_null_live (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64)
     (avail : Nat) (Sc : ExtTreeSet GName compare) (hn : usysno m = USYS_wait) (hz : (m.get 10#5).toNat = 0)
     (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
-      udepw (hlc := hlc) N m pc USYS_wait -∗ uch N.ch Sc -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗
+      udepw N m pc USYS_wait -∗ uch N.ch Sc -∗
       (∀ (h' : CPU) (r : BitVec 64) (Sc' : ExtTreeSet GName compare),
         ⌜r = -1#64 → Sc' = ∅⌝ -∗ uwaitAns r Sc Sc' -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ uch N.ch Sc' -∗ wpLoop h') -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ uch N.ch Sc' -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hrun Hsb Hch Hcont
   iapply wp_uk_ecall_wait_null_gen UL N h m pc avail Sc (fun _ => iprop(emp)) hn hz hal4 $$ Hi Hrun Hsb Hch
@@ -115,11 +115,11 @@ program knows. -/
 theorem wp_uk_ecall_wait_null_pid (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64)
     (avail : Nat) (Sc : ExtTreeSet GName compare) (p : Int) (hn : usysno m = USYS_wait)
     (hz : (m.get 10#5).toNat = 0) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
-      udepw (hlc := hlc) N m pc USYS_wait -∗ uch N.ch Sc -∗ upid N.pid p -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗
+      udepw N m pc USYS_wait -∗ uch N.ch Sc -∗ upid N.pid p -∗
       (∀ (h' : CPU) (r : BitVec 64) (Sc' : ExtTreeSet GName compare) (pidv : BitVec 32),
         ⌜(pidv.toNat : Int) = p⌝ -∗ upid N.pid p -∗ ⌜r = -1#64 → Sc' = ∅⌝ -∗ uwaitAnsPid r Sc Sc' pidv -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ uch N.ch Sc' -∗ wpLoop h') -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ uch N.ch Sc' -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hrun Hsb Hch Hpid Hcont
   iapply wp_uk_ecall_wait_null_gen UL N h m pc avail Sc
@@ -136,10 +136,10 @@ theorem wp_uk_ecall_wait_null_pid (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m
 theorem wp_uk_ecall_wait_null (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64)
     (avail : Nat) (Sc : ExtTreeSet GName compare) (hn : usysno m = USYS_wait) (hz : (m.get 10#5).toNat = 0)
     (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
-      udepw (hlc := hlc) N m pc USYS_wait -∗ uch N.ch Sc -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗
+      udepw N m pc USYS_wait -∗ uch N.ch Sc -∗
       (∀ (h' : CPU) (r : BitVec 64) (Sc' : ExtTreeSet GName compare), uwaitAns r Sc Sc' -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ uch N.ch Sc' -∗ wpLoop h') -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ uch N.ch Sc' -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hrun Hsb Hch Hcont
   iapply wp_uk_ecall_wait_null_live UL N h m pc avail Sc hn hz hal4 $$ Hi Hrun Hsb Hch

@@ -25,7 +25,7 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
 section UshPipeWait
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -34,12 +34,12 @@ theorem wp_ushWaitPidLater (UL : UK_LEAVES)
     (hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
     (N : UkNames GF) (h : CPU) (m : RegMap) (avail : Nat) (Sc : ExtTreeSet GName compare) (p : Int)
     (ha0 : (m.get 10#5).toNat = 0) :
-    ⊢ ushCode N.t -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«wait») avail -∗ uch N.ch Sc -∗
+    ⊢ ushCode N.t -∗ urun N h m (BitVec.ofNat 64 User.Sh.Sym.«wait») avail -∗ uch N.ch Sc -∗
       upid N.pid p -∗
       (∀ (ret : BitVec 64) (Sc' : ExtTreeSet GName compare) (pidv : BitVec 32),
         ⌜(pidv.toNat : Int) = p⌝ -∗ upid N.pid p -∗ ⌜ret = -1#64 → Sc' = ∅⌝ -∗ uwaitAnsPid ret Sc Sc' pidv -∗
         uch N.ch Sc' -∗
-        ▷ (∀ h' : CPU, urun (hlc := hlc) N h' (stubRet m 3 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h')) -∗
+        ▷ (∀ h' : CPU, urun N h' (stubRet m 3 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h')) -∗
       wpLoop h := by
   iintro #HC Hrun Hch Hpid Hk
   rw [show User.Sh.Sym.«wait» = 0xc6a from rfl]

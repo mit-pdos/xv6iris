@@ -29,7 +29,7 @@ theorem killed_br_ffffffffffffea12 : KA.«killed» + 0xffffffffffffea12#64 = KA.
 set_option maxHeartbeats 4000000 in
 /-- **`killed` meets its specification.** -/
 theorem killed_proof (AC : ACQUIRE) (RE : RELEASE) : KILLED :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ X Γ cpu k j Rout hj hp hnoff hK hlk htier => by
+  ⟨fun {GF} _ _ _ _ _ _ _ X Γ cpu k j Rout hj hp hnoff hK hlk htier => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_killed_r_body

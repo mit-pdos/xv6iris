@@ -35,7 +35,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -110,7 +110,7 @@ theorem namex_br_dl : KA.«namex» + 0xffffffffffffff10#64 = KA.«dirlookup» :=
 set_option maxHeartbeats 16000000 in
 /-- **`+0xde .. +0xf2`: THE LOOKUP**, the miss exit (`L_miss`) and the found
 arm's iunlockput and back edge into `+0xf4`. -/
-theorem namex_look (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem namex_look (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : NamexArgs) (hs : NamexStatic k A) (spie spp : Bool) (R : RegMap)
     (o2 ik : Nat) (q : Qp) (g : GName) (lo tl : Nat) (inum : BitVec 32) (dn : Dinode) (bm : Blkmap)
     (γil γisl : GName) (nf : Nat → BitVec 8) (ncur : Nat) (Scur : List Nat)
@@ -119,7 +119,7 @@ theorem namex_look (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimI
     (hty : dn.diType = T_DIR) (hnl : dn.diNlink.toNat ≠ 0) :
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0xe2#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    namexEnv (hlc := hlc) Γ A ∗
+    namexEnv Γ A ∗
     namexLk A ik q g lo tl inum dn γil γisl ∗ icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
     irefSlots 1 ∗ namexKeep k A ∗ namexPath k A ∗ byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) ∗
     bslots 3 ∗ nlzObs inum.toNat e0 ∗ logOpSe icfgLog ncur Scur e0 ∗

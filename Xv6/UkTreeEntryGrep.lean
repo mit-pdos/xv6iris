@@ -52,7 +52,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
 section UkTreeEntryGrep
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
@@ -60,7 +60,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fs
 /-- **Rocq `UkTreeEntry.grep_image_entry_env_c`**: grep's entry, its tree
 paid by an environment through an interface the caller supplies at the
 record the entry mints.  See the header for the parameter `GS`. -/
-theorem grepImageEntryEnvC_holds (GS : GREP_START) : GrepImageEntryEnvC (hlc := hlc) (GF := GF) := by
+theorem grepImageEntryEnvC_holds (GS : GREP_START) : GrepImageEntryEnvC (GF := GF) := by
   intro ws Me Mv sv t gn sts cw cs pidv Q Pay Dp I E ds hok hag himg hbytes hfdl hc hdp
   iintro #Henv #Hnpw #Hdep
   unfold imageEntry
@@ -135,7 +135,7 @@ theorem grepImageEntryEnvC_holds (GS : GREP_START) : GrepImageEntryEnvC (hlc := 
 
 /-- `GrepImageEntryEnvC` at the engine: grep's `start` walk from the landed
 link (`LinkGrep.grep_linked`), as echo's and cat's `_of_leaves`/`_holds`. -/
-theorem grepImageEntryEnvC_of_leaves (UL : UK_LEAVES) : GrepImageEntryEnvC (hlc := hlc) (GF := GF) :=
+theorem grepImageEntryEnvC_of_leaves (UL : UK_LEAVES) : GrepImageEntryEnvC (GF := GF) :=
   grepImageEntryEnvC_holds (grep_linked UL).2.2.2.2.2.2.2
 
 end UkTreeEntryGrep

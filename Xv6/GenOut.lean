@@ -77,7 +77,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode MachCSL
 
 /-- WHAT THE CLAIM READS OF AN APPLICATION (Rocq `gen_cparams`). -/
-structure GenCparams (hlc : HasLC) (GF : BundledGFunctors.{0}) [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+structure GenCparams (GF : BundledGFunctors.{0}) [MachGS GF] [Xv6G GF] [DiskG GF]
     [EchoOutG GF] (M : LModel) where
   gcL : LmLaws M
   gcK : LmHooks M
@@ -94,8 +94,8 @@ structure GenCparams (hlc : HasLC) (GF : BundledGFunctors.{0}) [MachGS hlc GF] [
 
 /-- THE STATE WITNESS'S AUTHORITY, and what the steps read off it (Rocq
 `gen_wa`).  `sd` is the instance's default state. -/
-structure GenWa {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
-    [EchoOutG GF] (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) where
+structure GenWa {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
+    [EchoOutG GF] (M : LModel) (G : GenCparams GF M) (sd : M.lmSt) where
   gwa : Nat → Option M.lmSt → IProp GF
   gwa_tl : ∀ k st, Timeless (gwa k st)
   /-- the writer's witness pins the state the stage reads -/
@@ -128,8 +128,8 @@ structure GenWa {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G 
   gpr_tl : ∀ k v I a, Timeless (gpr k v I a)
 
 section inst
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
-variable {M : LModel} (G : GenCparams hlc GF M) {sd : M.lmSt} (A : GenWa M G sd)
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {M : LModel} (G : GenCparams GF M) {sd : M.lmSt} (A : GenWa M G sd)
 
 instance GenCparams.gcT_persistent : Persistent G.gcT := G.gcT_pers
 instance GenCparams.gcT_timeless : Timeless G.gcT := G.gcT_tl
@@ -155,7 +155,7 @@ payload.  Paired with the choice list's authority (`gcsAuth`), so it rides
 every arm the authority does and grows exactly where it does. -/
 
 section gen_store
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 variable (R : Nat → EraPins → List (BitVec 8) → Nat → IProp GF)
 
 /-- ONE FILED ROUND (Rocq `gitem`): the payload at its alternative, and its
@@ -333,7 +333,7 @@ theorem gopPrefix_snoc_lookup {A : Type} (w l : List A) (b : A) (hp : w <+: l) (
     exact ⟨z, by simp⟩
 
 section genout
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 
 /-- AN EMPTY STAGE HAS AN EMPTY PROLOGUE RESOLUTION (Rocq
 `gop_empty_stage_ps`) -/
@@ -387,7 +387,7 @@ theorem lmStream_pro (M : LModel) (sd : M.lmSt) (so : GStage M) (a : Nat) (b : B
 /-! ## 1. The claim -/
 
 /-- THE CLAIM (Rocq `gcl`). -/
-def gcl (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) (A : GenWa M G sd)
+def gcl (M : LModel) (G : GenCparams GF M) (sd : M.lmSt) (A : GenWa M G sd)
     (k : Nat) (ho : List Obs) (H : ConsHist) : IProp GF :=
   iprop(G.gcT ∨ ∃ (v : EraPins) (so : GStage M),
     G.gcPIN k v ∗ A.gwa k so.gsSt ∗ A.gext k (lmStream M sd so) ∗
@@ -396,7 +396,7 @@ def gcl (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) (A : GenWa M G sd)
     dlCnt v (1 : Qp).half H.chDl.length ∗ dlListAuth v H.chDl ∗
     ⌜gclPure M sd k ho so H⌝)
 
-instance gcl_timeless (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) (A : GenWa M G sd)
+instance gcl_timeless (M : LModel) (G : GenCparams GF M) (sd : M.lmSt) (A : GenWa M G sd)
     (k : Nat) (ho : List Obs) (H : ConsHist) : Timeless (gcl M G sd A k ho H) := by
   unfold gcl; infer_instance
 

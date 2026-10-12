@@ -20,7 +20,7 @@ def ftableLockAddr : BitVec 64 := KA.«ftable»
 def ftableNameAddr : BitVec 64 := KStr.«ftable»
 
 /-- The specification of `fileinit`. -/
-def wp_fileinit_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+def wp_fileinit_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (vlock : BitVec 32) (vname vcpu : BitVec 64) (hK : 4 ≤ k.avail) : Prop :=
   kctx cpu k ∗ pcIs cpu fileinitAddr ∗ lockWords ftableLockAddr vlock vname vcpu ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
@@ -30,8 +30,8 @@ def wp_fileinit_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
 
 /-- The interface of `fileinit`. -/
 structure FILEINIT : Prop where
-  wp_fileinit : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+  wp_fileinit : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (vlock : BitVec 32) (vname vcpu : BitVec 64) hK,
-    wp_fileinit_body (hlc := hlc) (GF := GF) cpu k vlock vname vcpu hK
+    wp_fileinit_body (GF := GF) cpu k vlock vname vcpu hK
 
 end Xv6

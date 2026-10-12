@@ -28,7 +28,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -55,7 +55,7 @@ theorem iput_lk_a_take (c : CPU) (kk : Nat) (q : Qp) (inum : BitVec 32) (dn : Di
       [∗list] j ∈ List.range NINODE, itableSlotResLlb curCtx M' ci' j) ∗
     (∃ tst : Nat, istmpAuth kk (1 : Qp).half tst ∗ topLb tst) ∗
     irefSlotsAuth ∗ islPool Mt ∗
-    ipool (hlc := hlc) fscFs fscIreg fscCov fscLogst (regionInums icfgNib \ ciInums ci) ∅ ∗
+    ipool fscFs fscIreg fscCov fscLogst (regionInums icfgNib \ ciInums ci) ∅ ∗
     ([∗list] j ∈ List.range NINODE, islot2 curCtx fscIc Mt ci j) ⊢
     |={⊤}=> ownCtx c curCtx ∗ iputRin curCtx ∗ icRest kk (.icLoaded g1 dn bm) curCtx ∗
       icDeposit fscIc kk (.depFrz q icfgDev inum tid qp) ∗ icPinRest kk ∗ txPin icfgLog tid qp ∗
@@ -99,7 +99,7 @@ set_option maxHeartbeats 2000000 in
 theorem iput_lk_a_unpack (kk : Nat) (inum : BitVec 32) (dn : Dinode) (bm : Blkmap) (g1 : GName)
     (crz cru : Bool) (Sb : List Nat) (e0 : Nat) (hnib : inum.toNat < 16 * icfgNib)
     (hnl0 : dn.diNlink.toNat = 0) (he0 : 1 ≤ e0) :
-    iregInv (hlc := hlc) (GF := GF) fscIreg fscFs icfgIst icfgNib ∗
+    iregInv (GF := GF) fscIreg fscFs icfgIst icfgNib ∗
     icRest kk (.icLoaded g1 dn bm) curCtx ∗
     wordPointsTo (iNlink (ientry kk)) 2 (DFrac.own 1) dn.diNlink ∗
     icLoadedGhost fscFs fscIreg fscCov fscLogst inum dn bm ∗
@@ -130,7 +130,7 @@ theorem iput_lk_a_unpack (kk : Nat) (inum : BitVec 32) (dn : Dinode) (bm : Blkma
     unfold inodeMap; iframe Haddrs Hind
   · simp only [if_true, Bool.or_true]
     icases Hnlz with #Hobs
-    imod iregObs_use (hlc := hlc) ⊤ fscIreg fscFs icfgIst icfgNib inum dn icfgLog e0
+    imod iregObs_use ⊤ fscIreg fscFs icfgIst icfgNib inum dn icfgLog e0
         CoPset.subseteq_top hin rfl hnl0 he0 $$ Hireg Hdat Hobs with ⟨Hdat, %e, %hle, #Hwit⟩
     imodintro
     iexists data
@@ -161,7 +161,7 @@ theorem iput_lk_asl (ASN : ACQUIRESLEEP_NB) (c : CPU) (k' : KCtx)
       sleeplockedQ γisl q (iLock (ientry kk)) pidv -∗ slhAuth (icfgIsl kk) (some q) -∗
       icSlp fscIc kk curCtx -∗ wordPointsTo (pPid k'.proc) 4 dqp pidv -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := ASN.wp_acquiresleep_nb (hlc := hlc) (GF := GF) c k' γil γisl (icfgIsl kk)
+  have h := ASN.wp_acquiresleep_nb (GF := GF) c k' γil γisl (icfgIsl kk)
     (icSlp fscIc kk) q pidv dqp hK hsie hnoff hs htier
   unfold wp_acquiresleep_nb_body isSleeplockTok at h
   simp only [acquiresleepAddr] at h
@@ -174,7 +174,7 @@ theorem iput_lk_kctx_nb (c : CPU) (k : KCtx) (R2 : RegMap) :
     kctx c ((((k.pushOffAt k.spie k.spp).withLocks ("itable" :: k.locks)).pushed 6).withRegs R2) :=
   .rfl
 
-theorem iput_lk_env_io (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (γl : GName)
+theorem iput_lk_env_io (Γ : SchedNames) [ClaimIs GF Γ] (γl : GName)
     (pd pav pu : BitVec 64) (γil γisl : GName) (kk : Nat) :
     iputEnv (GF := GF) Γ γl pd pav pu γil γisl kk ⊢
       procsInv Γ ∗ panicEnv ∗ bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
@@ -186,7 +186,7 @@ theorem iput_lk_env_io (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (γl : GNa
 
 set_option maxHeartbeats 1000000 in
 /-- itrunc's credited contract at iput's call site (`dn0 := dn`). -/
-theorem iput_lk_itrunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem iput_lk_itrunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (ip : BitVec 64) (inum : BitVec 32) (dn : Dinode) (bm : Blkmap)
     (data : Nat → List (BitVec 8)) (u : Nat) (Sb : List Nat) (crb cru : Bool) (e0 : Nat)
@@ -213,7 +213,7 @@ theorem iput_lk_itrunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize ∗
-    iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn ∗
+    iregInv fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn ∗
     wordPointsTo (pPid k'.proc) 4 dqp pidv ∗
     bslots 3 ∗
     logCredit icfgLog cru Sb e0 (IBLOCK inum icfgIst) ∗
@@ -238,7 +238,7 @@ theorem iput_lk_itrunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
         logOpS icfgLog u' Sb') -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hs
-  have h := IT.wp_itrunc_gen_eb (hlc := hlc) (GF := GF) Γ c k' γl pd pav pu j ip inum dn dn bm data
+  have h := IT.wp_itrunc_gen_eb (GF := GF) Γ c k' γl pd pav pu j ip inum dn dn bm data
     u Sb crb cru e0 pidv dqp dqd dqn dqb dqs hj hproc hK hnoff htier hcrb hgeom hbg
     hcov hlog hnib hnz (diTypeStable_refl dn) (diNlinkStable_refl dn hnz) hwf hbel hsz hda hpd ha0
   unfold wp_itrunc_gen_eb_body at h
@@ -281,7 +281,7 @@ set_option maxHeartbeats 16000000 in
 /-- **PART A's WALK** (`+0x5a .. +0x6c`, then Part B at `+0x70`). -/
 theorem iput_lk_a (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_NB)
     (RSH : RELEASESLEEP_HOOK) (IT : ITRUNC) (HO : IputOfflockSpec)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat) (γil γisl : GName)
     (kk : Nat) (q : Qp) (inum : BitVec 32) (dn : Dinode) (bm : Blkmap) (g1 g2 : GName)
     (Mt : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × BitVec 32))
@@ -322,7 +322,7 @@ theorem iput_lk_a (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_NB)
     wordPointsTo (iNlink (ientry kk)) 2 (DFrac.own 1) dn.diNlink ∗
     frzsel kk (1 : Qp).half.half true ∗
     irefSlotsAuth ∗ islPool Mt ∗
-    ipool (hlc := hlc) fscFs fscIreg fscCov fscLogst (regionInums icfgNib \ ciInums ci) ∅ ∗
+    ipool fscFs fscIreg fscCov fscLogst (regionInums icfgNib \ ciInums ci) ∅ ∗
     ([∗list] j ∈ List.range NINODE, islot2 curCtx fscIc Mt ci j) ∗
     irefFrag kk q ∗ slhTok (icfgIsl kk) q ∗ inodeIdent kk (DFrac.own q) icfgDev inum ∗
     icId fscIc kk Qp.quarter true icfgDev inum ∗

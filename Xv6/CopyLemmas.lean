@@ -26,7 +26,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option maxRecDepth 8000
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 variable {lent : Bool}
 
 /-- `PGROUNDDOWN` in `Nat`. -/
@@ -102,7 +102,7 @@ theorem co_walkaddr_call (WA : WALKADDR) [Xv6G GF] [CurCtx]
       kctx cpu' (k'.withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ptreeOwn 2 dq t -∗
       ⌜calleeSaved k'.regs R' ∧ walkaddrRet L (k'.regs 11#5) (R' 10#5)⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := WA.wp_walkaddr (hlc := hlc) (GF := GF) c k' dq t L hK' hroot' hrep'
+  have h := WA.wp_walkaddr (GF := GF) c k' dq t L hK' hroot' hrep'
   unfold wp_walkaddr_body at h
   simp only [walkaddrAddr] at h
   exact h
@@ -125,7 +125,7 @@ theorem co_vmfault_call (VF : VMFAULT) [Xv6G GF] [WchG GF] [CurCtx]
             (viewZero M (vpnOf (k'.regs 12#5)).toNat))) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := VF.wp_vmfault (hlc := hlc) (GF := GF) c k' γl γk P M ke hnoff' hK' hlk' hroot' hsz'
+  have h := VF.wp_vmfault (GF := GF) c k' γl γk P M ke hnoff' hK' hlk' hroot' hsz'
   unfold wp_vmfault_body at h
   simp only [vmfaultAddr] at h
   -- the copy loops do not read the quiet conjunct (permit sweep T): dropped
@@ -150,7 +150,7 @@ theorem co_memmove_call (MM : MEMMOVE) [CurCtx]
       byteBuf (k'.regs 11#5) dqs cs -∗ byteBuf (k'.regs 10#5) (DFrac.own 1) cs -∗
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.regs 10#5⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := MM.wp_memmove (hlc := hlc) (GF := GF) c k' cs olds n dqs hK' hn hn32 hls hld
+  have h := MM.wp_memmove (GF := GF) c k' cs olds n dqs hK' hn hn32 hls hld
   unfold wp_memmove_body at h
   simp only [memmoveAddr] at h
   exact h

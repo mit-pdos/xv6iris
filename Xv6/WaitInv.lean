@@ -65,7 +65,7 @@ THE PURE MODEL.  reparent(p) rewrites every cell equal to `p` to
    `procAddr_inj` (SchedCtx, above) is taken as a HYPOTHESIS where the
    writers need it.
 6. **The tick mirror (`tickCnt` / `tickLb`, Rocq dd1843b7a) has its OWN
-   section** binding only `[MachGS hlc GF] [WchG GF]`: this file's main
+   section** binding only `[MachGS GF] [WchG GF]`: this file's main
    section binds the slot classes too, which Lean 4 would pull into every
    definition stated there, and `TicksDefs.isTickslock` must gain the
    `WchG` binder and nothing else.  Rocq states it in `WaitInv`'s section
@@ -236,7 +236,7 @@ theorem waitInv_range_acc {GF : BundledGFunctors.{0}} {A : Type} (n k : Nat) (hk
   iapply H $$ %(fun _ i => Φ' a i) Hbox HΦ'
 
 section WaitInv
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [WchG GF] [CtokG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [WchG GF] [CtokG GF]
 
 /-- every proc's `parent` cell, at context `ξ` (Rocq `parents_own_at`;
 deviation 1: it IS `WaitLock.waitResAt`). -/
@@ -658,7 +658,7 @@ theorem waitInv_ctxMorph_or (R1 R2 : CtxId → IProp GF) [CtxMorph R1] [CtxMorph
 
 instance initIdentAt_morph [CurCtx] (ip : BitVec 64) :
     CtxMorph (GF := GF) (fun ξ => initIdentAt ξ ip) :=
-  @instCtxMorphSep hlc GF _ (fun ξ => initIdentCell ξ ip)
+  @instCtxMorphSep GF _ (fun ξ => initIdentCell ξ ip)
     (fun _ => iprop(∃ g : GName, slotGen ip .discard g ∗ genPid g 1#32 ∗ initPidIs 1#32))
     (instCtxMorphWordAtN _ _ _ _) (instCtxMorphConst _)
 
@@ -671,15 +671,15 @@ instance orphAtInitAt_morph [CurCtx] (O : OrphMap) :
 
 instance childrenInvAt_morph [CurCtx] (ps : Nat → BitVec 64) (gs : Nat → GName) (m : ChMap)
     (O : OrphMap) : CtxMorph (GF := GF) (fun ξ => childrenInvAt ξ ps gs m O) :=
-  @instCtxMorphSep hlc GF _ (fun _ => genHalves ps gs)
+  @instCtxMorphSep GF _ (fun _ => genHalves ps gs)
     (fun ξ => iprop(⌜invPure ps gs m O⌝ ∗ orphAtInitAt ξ O)) (instCtxMorphConst _)
-    (@instCtxMorphSep hlc GF _ (fun _ => iprop(⌜invPure ps gs m O⌝)) (fun ξ => orphAtInitAt ξ O)
+    (@instCtxMorphSep GF _ (fun _ => iprop(⌜invPure ps gs m O⌝)) (fun ξ => orphAtInitAt ξ O)
       (instCtxMorphConst _) (orphAtInitAt_morph O))
 
 instance parentsResAt_morph [CurCtx] : CtxMorph (GF := GF) (parentsResAt (GF := GF)) :=
-  @instCtxMorphExists hlc GF _ _
+  @instCtxMorphExists GF _ _
     (fun (ps : Nat → BitVec 64) ξ => iprop(parentsOwnAt ξ ps ∗ ⌜∀ k, k < NPROC → ps k = 0#64⌝))
-    (fun ps => @instCtxMorphSep hlc GF _ (fun ξ => parentsOwnAt ξ ps)
+    (fun ps => @instCtxMorphSep GF _ (fun ξ => parentsOwnAt ξ ps)
       (fun _ => iprop(⌜∀ k, k < NPROC → ps k = 0#64⌝)) (parentsOwnAt_morph ps) (instCtxMorphConst _))
 
 end WaitInv
@@ -697,7 +697,7 @@ name) are bound, so `TicksDefs.isTickslock` gains `[WchG GF]` and nothing
 else. -/
 
 section TickLedger
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [WchG GF]
 
 /-- the mirror's whole authority at count `n` (Rocq `tick_cnt`). -/
 def tickCnt (n : Nat) : IProp GF := MonoNat.auth_own (WchG.wtkName GF) (DFrac.own 1) (.ofNat n)

@@ -83,7 +83,7 @@ theorem eo_tx_empty (T : RegMapF Unit) (om : RegMapF OpEntry)
   | some v => exact absurd h (eo_map_empty T hT0 c v)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx] [FsLinkG GF] [FsTopG GF]
 
 /-! ## 2.  What the quiescent lock resource lends -/
@@ -95,13 +95,13 @@ the law is stated at), and the era's mirror half with the two rows that make
 set. -/
 def logQuiet (γ : LogNames) (γfs : FsNames) (cov : ExtTreeSet Nat compare) (logstart : Nat)
     (L : BlockMap) (M : LogMirror) : IProp GF := iprop%
-  logTxAuth γ (∅ : RegMapF Unit) ∗ fsCacheAuth γfs L ∗ logMirrorHalf (hlc := hlc) M ∗
+  logTxAuth γ (∅ : RegMapF Unit) ∗ fsCacheAuth γfs L ∗ logMirrorHalf M ∗
   ⌜lmHdr M logstart = (0, [])⌝ ∗ ⌜logMirrorTieBody M L cov logstart []⌝
 
 theorem logQuiet_unfold (γ : LogNames) (γfs : FsNames) (cov : ExtTreeSet Nat compare)
     (logstart : Nat) (L : BlockMap) (M : LogMirror) :
-    logQuiet (hlc := hlc) (GF := GF) γ γfs cov logstart L M ⊣⊢ iprop(
-      logTxAuth γ (∅ : RegMapF Unit) ∗ fsCacheAuth γfs L ∗ logMirrorHalf (hlc := hlc) M ∗
+    logQuiet (GF := GF) γ γfs cov logstart L M ⊣⊢ iprop(
+      logTxAuth γ (∅ : RegMapF Unit) ∗ fsCacheAuth γfs L ∗ logMirrorHalf M ∗
       ⌜lmHdr M logstart = (0, [])⌝ ∗ ⌜logMirrorTieBody M L cov logstart []⌝) := .rfl
 
 /-- **THE READER'S ACCESSOR** (Rocq `log_res_quiet_acc`).  The three cells the
@@ -112,28 +112,28 @@ the slot alone (any arm), or -- when the cells read `outstanding = 0` and
 returned unchanged beside the cells and the slot. -/
 theorem logResAt_quietAcc (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : ExtTreeSet Nat compare) (logstart : Nat) (ξ : CtxId) :
-    logResAt (hlc := hlc) γ γb γfs cov logstart ξ ⊢
+    logResAt γ γb γfs cov logstart ξ ⊢
       ∃ (out : Nat) (cmt : Bool) (nc : BitVec 32),
         ⌜out ≤ 3⌝ ∗
         wordAtN ξ lOut 4 (DFrac.own 1) (BitVec.ofNat 32 out) ∗
         wordAtN ξ lCmt 4 (DFrac.own 1) (if cmt then 1#32 else 0#32) ∗
         wordAtN ξ lNcommit 4 (DFrac.own 1) nc ∗
-        logHelp (hlc := hlc) γ nc out cmt ∗
+        logHelp γ nc out cmt ∗
         ((wordAtN ξ lOut 4 (DFrac.own 1) (BitVec.ofNat 32 out) -∗
           wordAtN ξ lCmt 4 (DFrac.own 1) (if cmt then 1#32 else 0#32) -∗
           wordAtN ξ lNcommit 4 (DFrac.own 1) nc -∗
-          logHelp (hlc := hlc) γ nc out cmt -∗
-          logResAt (hlc := hlc) γ γb γfs cov logstart ξ) ∧
+          logHelp γ nc out cmt -∗
+          logResAt γ γb γfs cov logstart ξ) ∧
          (⌜out = 0⌝ -∗ ⌜cmt = false⌝ -∗
           ∃ (L : BlockMap) (M : LogMirror),
-            logQuiet (hlc := hlc) γ γfs cov logstart L M ∗ eraSyncTok (hlc := hlc) (GF := GF) ∗
-            (logQuiet (hlc := hlc) γ γfs cov logstart L M -∗
-             eraSyncTok (hlc := hlc) (GF := GF) -∗
+            logQuiet γ γfs cov logstart L M ∗ eraSyncTok (GF := GF) ∗
+            (logQuiet γ γfs cov logstart L M -∗
+             eraSyncTok (GF := GF) -∗
              wordAtN ξ lOut 4 (DFrac.own 1) (BitVec.ofNat 32 out) -∗
              wordAtN ξ lCmt 4 (DFrac.own 1) (if cmt then 1#32 else 0#32) -∗
              wordAtN ξ lNcommit 4 (DFrac.own 1) nc -∗
-             logHelp (hlc := hlc) γ nc out cmt -∗
-             logResAt (hlc := hlc) γ γb γfs cov logstart ξ))) := by
+             logHelp γ nc out cmt -∗
+             logResAt γ γb γfs cov logstart ξ))) := by
   iintro H
   unfold logResAt
   icases H with ⟨%out, %cmt, %nc, %om, %E, %X, %T, %nxo, %nxt, %nxl,
@@ -221,17 +221,17 @@ at any other name but the SAME map closes the record again.  The record's
 history, arm and disk image are not touched. -/
 theorem pFsRecQuiet_acc (gt : GName) (cov : ExtTreeSet Nat compare) (ls : Nat)
     (dk : Nat → BitVec 8) (n : Nat) (M : LogMirror) (L : BlockMap)
-    (hn : n = genId (hlc := hlc) (GF := GF) + 1) (hhdr : lmHdr M ls = (0, []))
+    (hn : n = genId (GF := GF) + 1) (hhdr : lmHdr M ls = (0, []))
     (htie : logMirrorTieBody M L cov ls []) :
-    eraRegistered (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF))
-      (MachGS.era (hlc := hlc) (GF := GF)) ⊢
-      swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
-      startAuth (hlc := hlc) (GF := GF) n -∗ logMirrorHalf (hlc := hlc) M -∗
-      pFsRecAt (hlc := hlc) gt cov ls dk -∗ |==>
-        (startAuth (hlc := hlc) (GF := GF) n ∗ logMirrorHalf (hlc := hlc) M ∗
+    eraRegistered (GF := GF) (genId (GF := GF))
+      (MachGS.era (GF := GF)) ⊢
+      swapLb (GF := GF) (genId (GF := GF) + 1) -∗
+      startAuth (GF := GF) n -∗ logMirrorHalf M -∗
+      pFsRecAt gt cov ls dk -∗ |==>
+        (startAuth (GF := GF) n ∗ logMirrorHalf M ∗
          pDurAt (GF := GF) gt (fsRestrict (dvOfD L) (fsHomeList cov ls)) ∗
          (∀ gt' : GName, pDurAt (GF := GF) gt' (fsRestrict (dvOfD L) (fsHomeList cov ls)) -∗
-           pFsRecAt (hlc := hlc) gt' cov ls dk)) := by
+           pFsRecAt gt' cov ls dk)) := by
   iintro #Hreg #Hswlb Hsa Hmir HP
   ihave ⟨%γs, %hseq, HPfs⟩ := (pFsRecNamedAt_unfold gt _ _ _ cov ls dk).1 $$ HP
   obtain ⟨hsw, hrg, hstn⟩ := hseq

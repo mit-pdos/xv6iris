@@ -44,7 +44,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section FileWriteCur
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [OffboxG GF]
 
 /-- THE CURSOR (Rocq `file_wq`): the deed and the ticket at the content
@@ -61,18 +61,18 @@ def fileWq (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (i : Nat)
       ⌜lineOk ws⌝ ∗
       ⌜selOk (echoChunks ws) sel⌝ ∗
       flLb c ls ∗ ⌜ls.getLast? = some (Uline.LEchoF ws N)⌝ ∗ fpos r ls.length)
-    ∨ fileTaint (hlc := hlc) c)
+    ∨ fileTaint c)
 
 instance fileWq_timeless (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (i : Nat)
     (ws : Wordline) (sel : List Nat) (off : Nat) :
-    Timeless (fileWq (hlc := hlc) (GF := GF) c r N s i ws sel off) := by
+    Timeless (fileWq (GF := GF) c r N s i ws sel off) := by
   unfold fileWq; infer_instance
 
 /-- the cursor's two arms, for `icases` (Rocq unfolds `file_wq` in place;
 deviation 3). -/
 theorem fileWq_cases (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (i : Nat)
     (ws : Wordline) (sel : List Nat) (off : Nat) :
-    fileWq (hlc := hlc) (GF := GF) c r N s i ws sel off ⊢
+    fileWq (GF := GF) c r N s i ws sel off ⊢
       iprop((∃ ls : List FlLine,
           (fdeed r (s.insert N (i, subseq (echoChunks ws) sel)) ∗
             ftkt r (s.insert N (i, subseq (echoChunks ws) sel))) ∗
@@ -80,7 +80,7 @@ theorem fileWq_cases (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (i
           ⌜lineOk ws⌝ ∗
           ⌜selOk (echoChunks ws) sel⌝ ∗
           flLb c ls ∗ ⌜ls.getLast? = some (Uline.LEchoF ws N)⌝ ∗ fpos r ls.length)
-        ∨ fileTaint (hlc := hlc) c) := by
+        ∨ fileTaint c) := by
   unfold fileWq fown
   exact .rfl
 
@@ -92,7 +92,7 @@ theorem fileWq_intro (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (i
     (hsel : selOk (echoChunks ws) sel) (hin : ls.getLast? = some (Uline.LEchoF ws N)) :
     ⊢@{IProp GF} fdeed r (s.insert N (i, subseq (echoChunks ws) sel)) -∗
       ftkt r (s.insert N (i, subseq (echoChunks ws) sel)) -∗ flLb c ls -∗ fpos r ls.length -∗
-      fileWq (hlc := hlc) c r N s i ws sel off := by
+      fileWq c r N s i ws sel off := by
   unfold fileWq fown
   iintro Hd Ht #Hlb Hpos
   ileft
@@ -118,7 +118,7 @@ theorem fileWq_intro_own (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst
     (hoff : off = (subseq (echoChunks ws) sel).length) (hline : lineOk ws)
     (hsel : selOk (echoChunks ws) sel) (hin : ls.getLast? = some (Uline.LEchoF ws N)) :
     ⊢@{IProp GF} fown r (s.insert N (i, subseq (echoChunks ws) sel)) -∗ flLb c ls -∗
-      fpos r ls.length -∗ fileWq (hlc := hlc) c r N s i ws sel off := by
+      fpos r ls.length -∗ fileWq c r N s i ws sel off := by
   unfold fown
   iintro ⟨Hd, Ht⟩ #Hlb Hpos
   iapply fileWq_intro c r N s i ws sel off ls hoff hline hsel hin $$ Hd Ht Hlb Hpos
@@ -126,7 +126,7 @@ theorem fileWq_intro_own (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst
 /-- the tainted arm's introduction -/
 theorem fileWq_taint (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (i : Nat)
     (ws : Wordline) (sel : List Nat) (off : Nat) :
-    ⊢@{IProp GF} fileTaint (hlc := hlc) c -∗ fileWq (hlc := hlc) c r N s i ws sel off := by
+    ⊢@{IProp GF} fileTaint c -∗ fileWq c r N s i ws sel off := by
   unfold fileWq
   iintro #Ht
   iright
@@ -136,21 +136,21 @@ theorem fileWq_taint (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (i
 at the content's length; or TAINTED, the half anywhere. -/
 def fileCur (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (i : Nat)
     (ws : Wordline) (sel : List Nat) (γo : GName) : IProp GF :=
-  iprop((fileWq (hlc := hlc) c r N s i ws sel (subseq (echoChunks ws) sel).length ∗
+  iprop((fileWq c r N s i ws sel (subseq (echoChunks ws) sel).length ∗
         uoff γo (subseq (echoChunks ws) sel).length)
-    ∨ (fileTaint (hlc := hlc) c ∗ ∃ p : Nat, uoff γo p))
+    ∨ (fileTaint c ∗ ∃ p : Nat, uoff γo p))
 
 instance fileCur_timeless (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (i : Nat)
     (ws : Wordline) (sel : List Nat) (γo : GName) :
-    Timeless (fileCur (hlc := hlc) (GF := GF) c r N s i ws sel γo) := by
+    Timeless (fileCur (GF := GF) c r N s i ws sel γo) := by
   unfold fileCur; infer_instance
 
 /-- the fired introduction (Rocq `file_cur_fired`) -/
 theorem fileCur_fired (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (i : Nat)
     (ws : Wordline) (sel : List Nat) (γo : GName) :
-    ⊢@{IProp GF} fileWq (hlc := hlc) c r N s i ws sel (subseq (echoChunks ws) sel).length -∗
+    ⊢@{IProp GF} fileWq c r N s i ws sel (subseq (echoChunks ws) sel).length -∗
       uoff γo (subseq (echoChunks ws) sel).length -∗
-      fileCur (hlc := hlc) c r N s i ws sel γo := by
+      fileCur c r N s i ws sel γo := by
   unfold fileCur
   iintro Hq Hu
   ileft
@@ -161,26 +161,26 @@ the length in place; deviation 3). -/
 theorem fileCur_fired_at (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (i : Nat)
     (ws : Wordline) (sel : List Nat) (γo : GName) (n : Nat)
     (hn : (subseq (echoChunks ws) sel).length = n) :
-    ⊢@{IProp GF} fileWq (hlc := hlc) c r N s i ws sel n -∗ uoff γo n -∗
-      fileCur (hlc := hlc) c r N s i ws sel γo := by
+    ⊢@{IProp GF} fileWq c r N s i ws sel n -∗ uoff γo n -∗
+      fileCur c r N s i ws sel γo := by
   subst hn
   exact fileCur_fired c r N s i ws sel γo
 
 /-- the pipe's two arms, for `icases` (deviation 3). -/
 theorem fileCur_cases (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (i : Nat)
     (ws : Wordline) (sel : List Nat) (γo : GName) :
-    fileCur (hlc := hlc) (GF := GF) c r N s i ws sel γo ⊢
-      iprop((fileWq (hlc := hlc) c r N s i ws sel (subseq (echoChunks ws) sel).length ∗
+    fileCur (GF := GF) c r N s i ws sel γo ⊢
+      iprop((fileWq c r N s i ws sel (subseq (echoChunks ws) sel).length ∗
             uoff γo (subseq (echoChunks ws) sel).length)
-        ∨ (fileTaint (hlc := hlc) c ∗ ∃ p : Nat, uoff γo p)) := by
+        ∨ (fileTaint c ∗ ∃ p : Nat, uoff γo p)) := by
   unfold fileCur
   exact .rfl
 
 /-- the tainted introduction (Rocq `file_cur_taint`) -/
 theorem fileCur_taint (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (i : Nat)
     (ws : Wordline) (sel : List Nat) (γo : GName) (p : Nat) :
-    ⊢@{IProp GF} fileTaint (hlc := hlc) c -∗ uoff γo p -∗
-      fileCur (hlc := hlc) c r N s i ws sel γo := by
+    ⊢@{IProp GF} fileTaint c -∗ uoff γo p -∗
+      fileCur c r N s i ws sel γo := by
   unfold fileCur
   iintro #Ht Hu
   iright
@@ -192,7 +192,7 @@ theorem fileCur_taint (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (
 /-- the half is there on EITHER arm (Rocq `file_cur_half`) -/
 theorem fileCur_half (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (i : Nat)
     (ws : Wordline) (sel : List Nat) (γo : GName) :
-    ⊢@{IProp GF} fileCur (hlc := hlc) c r N s i ws sel γo -∗ ∃ p : Nat, uoff γo p := by
+    ⊢@{IProp GF} fileCur c r N s i ws sel γo -∗ ∃ p : Nat, uoff γo p := by
   unfold fileCur
   iintro H
   icases H with (⟨-, Hu⟩ | ⟨-, Hu⟩)

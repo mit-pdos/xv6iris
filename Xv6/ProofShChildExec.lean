@@ -33,10 +33,10 @@ open Std (ExtTreeSet)
 theorem ushRoom_exec (toks : List (Nat × Nat)) : ushRoom (.exec toks) = 60 := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
-variable (E : UshExecEnv (hlc := hlc) (GF := GF))
+variable (E : UshExecEnv (GF := GF))
 
 /-- **Rocq `wp_kshm_child_x_holds` / `_x_v_holds`, ONE proof**. -/
 theorem shChildXGen_holds (UL : UK_LEAVES) (SP : SH_PARSECMD) (HM : SH_MALLOC) (SE : SH_RUNCMD_EXEC)
@@ -53,7 +53,7 @@ theorem shChildXGen_holds (UL : UK_LEAVES) (SP : SH_PARSECMD) (HM : SH_MALLOC) (
   have htlen := ushEchoToks_lt10_x ws hok
   have hbytes := ushEchoArgvBytesOfLineX_holds ws f 0 len hline
   rw [hf0] at hbytes
-  have hchain : ushMallocChain (hlc := hlc) N 1 (ushmFresh N sz) (usz N.s (sz + 65536)) :=
+  have hchain : ushMallocChain N 1 (ushmFresh N sz) (usz N.s (sz + 65536)) :=
     ⟨_, ushmMallocTyLe_mono N 65504 168 _ _ (by decide)
       (ushm_malloc_ok_holds HM hps N sz (by show 8328 + 16 ≤ sz; omega) hszal hszok), rfl⟩
   iintro #Hc #Hexs #Hcq #Hxl #Hcd #Hjt Hline Hws Hsy Hstd Hcwd Hch HM Hcr Hrun

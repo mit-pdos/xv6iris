@@ -89,7 +89,7 @@ theorem iput_main_ws_pushOffAt (k : KCtx) (a b : Bool) :
     (k.withSpie a b).pushOffAt (k.withSpie a b).spie (k.withSpie a b).spp = k.pushOffAt a b := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -98,7 +98,7 @@ set_option maxHeartbeats 16000000 in
 /-- **THE WALK** (Rocq `wp_iput_gen` 5076--5654): the prologue, the acquire,
 the exact `ref` read and the REF-1 split; each arm is its stage. -/
 theorem iput_main (AC : ACQUIRE_LLB) (HN : IputTailNeSpec) (HE : IputEntrySpec)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γil γisl : GName) (kk : Nat) (q : Qp) (inum : BitVec 32)
     (n : Nat) (Sb : List Nat) (crb cru crz : Bool) (e0 : Nat) (tid : Nat) (qtx : Qp)
@@ -114,7 +114,7 @@ theorem iput_main (AC : ACQUIRE_LLB) (HN : IputTailNeSpec) (HE : IputEntrySpec)
     (hlog : logRegion fscLogst (IBLOCK inum icfgIst) = false)
     (hnib : inum.toNat < 16 * icfgNib) (hbel : covBelow fscCov fscSize)
     (hn : iputUnits ≤ n) (hpd : descPageRw pd) (ha0 : k.regs 10#5 = ientry kk) :
-    wp_iput_gen_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk q inum
+    wp_iput_gen_eb_body (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk q inum
       n Sb crb cru crz e0 tid qtx pidv dqp dqb dqs rg
       hj hproc hK hnoff htier hkk hcrb hcru hgeom hbg hcov hlog hnib hbel hn hpd
       ha0 := by
@@ -302,7 +302,7 @@ end
 theorem iput_proof (AC : ACQUIRE_LLB) (RH : RELEASE_HOOK) (ASN : ACQUIRESLEEP_NB)
     (RSH : RELEASESLEEP_HOOK) (IT : ITRUNC) (BR : BREAD) (LW : LOG_WRITE) (BL : BRELSE) :
     IPUT := ⟨by
-  intro hlc GF
+  intro GF
   exact iput_main AC (iput_tail_ne_spec RH)
     (iput_entry_spec RH AC ASN RSH IT BR LW BL (iput_tail_one_spec RH)
       (iput_locked_spec RH AC ASN RSH IT BR LW BL (iput_offlock_spec BR LW BL)))⟩

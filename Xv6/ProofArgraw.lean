@@ -81,7 +81,7 @@ theorem ar_calleeSaved_mk (KR R : RegMap)
       | assumption
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-! ## The callee -/
 
@@ -93,7 +93,7 @@ theorem ar_myproc (MP : MYPROC) (c : CPU) (k' : KCtx)
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.proc⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := MP.wp_myproc (hlc := hlc) (GF := GF) c k' hnoff hK
+  have h := MP.wp_myproc (GF := GF) c k' hnoff hK
   unfold wp_myproc_body at h
   simp only [myprocAddr] at h
   exact h
@@ -183,7 +183,7 @@ theorem argraw_br_4f2e : KA.«argraw» + 0x4f2e#64 = argrawTbl := by decide
 
 set_option maxHeartbeats 16000000 in
 theorem argraw_proof (MP : MYPROC) : ARGRAW := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ cpu k i tfp ws v dqt hi ha0 hws hnoff hK => by
+  fun {GF} _ _ _ _ _ _ _ _ cpu k i tfp ws v dqt hi ha0 hws hnoff hK => by
   unfold wp_argraw_body
   simp only [argrawAddr]
   iintro ⟨Hk, Hpc, Htf, Hpage, Hnext⟩

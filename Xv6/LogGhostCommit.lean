@@ -43,13 +43,13 @@ theorem fsbN_sub_crash : (↑fsbN : CoPset) ⊆ ⊤ \ ↑crashN := by
   rw [CoPset.in_diff]
   exact ⟨CoPset.subseteq_top p hp, fun hc => hd p ⟨fsbN_logN p hp, hc⟩⟩
 
-theorem pFsComp_unfold {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [Xv6G GF]
+theorem pFsComp_unfold {GF : BundledGFunctors.{0}} [MachFixedGS GF] [Xv6G GF]
     [FsLinkG GF] [FsTopG GF] (G : GName → IProp GF) (cov : ExtTreeSet Nat compare) (ls : Nat) :
-    pFsComp (hlc := hlc) G cov ls ⊣⊢ iprop(∃ gt : GName, pFsAnyAt (hlc := hlc) gt cov ls ∗ G gt) :=
+    pFsComp G cov ls ⊣⊢ iprop(∃ gt : GName, pFsAnyAt gt cov ls ∗ G gt) :=
   .rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx] [FsLinkG GF] [FsTopG GF]
 
 /-- **THE GHOST COMMIT** (Rocq `log_ghost_commit`): a `wpHart cpu m -∗
@@ -61,9 +61,9 @@ theorem logGhostCommit (cpu : CPU) (m : SailM Unit) (Qs : List (IProp GF))
     (γ : LogNames) (γb : BcacheNames) (γfs : FsNames) (cov : ExtTreeSet Nat compare) (ls : Nat)
     (dev : BitVec 32) (L : BlockMap) (M : LogMirror) :
     logCtx (GF := GF) γ γb γfs cov ls dev ⊢
-      logQuiet (hlc := hlc) γ γfs cov ls L M -∗ eraSyncTok (hlc := hlc) (GF := GF) -∗
-      ([∗list] Q ∈ Qs, eraSyncHook (hlc := hlc) (GF := GF) Q) -∗
-      (logQuiet (hlc := hlc) γ γfs cov ls L M -∗ eraSyncTok (hlc := hlc) (GF := GF) -∗
+      logQuiet γ γfs cov ls L M -∗ eraSyncTok (GF := GF) -∗
+      ([∗list] Q ∈ Qs, eraSyncHook (GF := GF) Q) -∗
+      (logQuiet γ γfs cov ls L M -∗ eraSyncTok (GF := GF) -∗
         ([∗list] Q ∈ Qs, Q) -∗ wpHart cpu m) -∗
       wpHart cpu m := by
   iintro #Hctx Hq HT HQs Hk
@@ -76,13 +76,13 @@ theorem logGhostCommit (cpu : CPU) (m : SailM Unit) (Qs : List (IProp GF))
   ihave #Hrow := logCtx_bytes γ γb γfs cov ls dev $$ Hctx
   ihave #Hlg := logCtx_snapLawGhost γ γb γfs cov ls dev $$ Hctx
   icases snapLawGhost_run γ γfs cov ls _ _ _ $$ Hlg with ⟨%G, #Hseam, #Hlaw⟩
-  iapply wpHart_crash_fupd cpu m iprop(logQuiet (hlc := hlc) γ γfs cov ls L M ∗
-      eraSyncTok (hlc := hlc) (GF := GF) ∗ ([∗list] Q ∈ Qs, Q)) $$ Hcinv [Hq HT HQs]
+  iapply wpHart_crash_fupd cpu m iprop(logQuiet γ γfs cov ls L M ∗
+      eraSyncTok (GF := GF) ∗ ([∗list] Q ∈ Qs, Q)) $$ Hcinv [Hq HT HQs]
   · iintro %n %hn Hsa Hc
     -- ---- 1. the crash slot, through the seam, into the record and the old guest
     unfold fsCrashSeamAt
     icases Hseam with ⟨#Hto, #Hfrom⟩
-    ihave Hc : iprop(▷ ∃ gt : GName, pFsAnyAt (hlc := hlc) gt cov ls ∗ G gt) $$ [Hc]
+    ihave Hc : iprop(▷ ∃ gt : GName, pFsAnyAt gt cov ls ∗ G gt) $$ [Hc]
     · inext
       ihave Hc2 := Hto $$ Hc
       iapply (pFsComp_unfold G cov ls).1 $$ Hc2
@@ -150,9 +150,9 @@ theorem logGhostCommit_loop (cpu : CPU) (Qs : List (IProp GF))
     (γ : LogNames) (γb : BcacheNames) (γfs : FsNames) (cov : ExtTreeSet Nat compare) (ls : Nat)
     (dev : BitVec 32) (L : BlockMap) (M : LogMirror) :
     logCtx (GF := GF) γ γb γfs cov ls dev ⊢
-      logQuiet (hlc := hlc) γ γfs cov ls L M -∗ eraSyncTok (hlc := hlc) (GF := GF) -∗
-      ([∗list] Q ∈ Qs, eraSyncHook (hlc := hlc) (GF := GF) Q) -∗
-      (logQuiet (hlc := hlc) γ γfs cov ls L M -∗ eraSyncTok (hlc := hlc) (GF := GF) -∗
+      logQuiet γ γfs cov ls L M -∗ eraSyncTok (GF := GF) -∗
+      ([∗list] Q ∈ Qs, eraSyncHook (GF := GF) Q) -∗
+      (logQuiet γ γfs cov ls L M -∗ eraSyncTok (GF := GF) -∗
         ([∗list] Q ∈ Qs, Q) -∗ wpLoop cpu) -∗
       wpLoop cpu :=
   logGhostCommit cpu (pure ()) Qs γ γb γfs cov ls dev L M

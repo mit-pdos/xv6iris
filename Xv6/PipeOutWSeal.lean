@@ -31,12 +31,12 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 set_option synthInstance.maxSize 1024
 
 section PipesWildVSeal
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [PipeOutG GF]
 
 /-- Rocq `pwclV_close`: no arm is ever open in the wild era.  `hK3`:
 DEVIATION 2. -/
-theorem pwclV_close (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)
+theorem pwclV_close (g : PipeGn) (M : LModel) (G : GenCparams GF M) (sd : M.lmSt)
     (WA : GenWa M G sd) (WL : M.lmLine → Bool) (k : Nat) (ho : List Obs) (H : ConsHist)
     (hok : consHistOk H) (hev : consEvOk H .evClose)
     (hK3 : ∀ a, H.chArm = some a → caEcho a = [echoOf (caByte a)] → caSent a = 1) :
@@ -54,7 +54,7 @@ theorem pwclV_close (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.
     cases ha
 
 /-- Rocq `pwclV_step_byte`. -/
-theorem pwclV_step_byte (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M)
+theorem pwclV_step_byte (g : PipeGn) (M : LModel) (G : GenCparams GF M) (B : LmByteLaws M)
     (sd : M.lmSt) (WA : GenWa M G sd) (WL : M.lmLine → Bool) (L : LmLaws M) (k : Nat)
     (ho : List Obs) (CH : ConsHist) (b : BitVec 8) (hok : consHistOk CH)
     (hev : consEvOk CH (.evByte b)) :
@@ -74,7 +74,7 @@ theorem pwclV_step_byte (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B :
 
 /-- Rocq `pwclV_open`: the log is FROZEN in the wild era -- a new input
 would follow the wild line, which D4 forbids.  `hK1`/`hK2`: DEVIATION 2. -/
-theorem pwclV_open (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M)
+theorem pwclV_open (g : PipeGn) (M : LModel) (G : GenCparams GF M) (B : LmByteLaws M)
     (sd : M.lmSt) (WA : GenWa M G sd) (WL : M.lmLine → Bool) (HWL : ∀ l, WL l = true → lmWild M l)
     (k : Nat) (ho : List Obs) (H : ConsHist) (h : List Obs) (c : BitVec 8) (cs : List (BitVec 8))
     (hok : consHistOk H) (hev : consEvOk H (.evOpen h c cs))
@@ -121,7 +121,7 @@ theorem pwclV_open (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B : LmBy
     exact lmDisc_wild_last M h _ x hdh hsh hne hr (HWL _ hwl) hx
 
 /-- Rocq `pwclV_drain`: THE DRAIN. -/
-theorem pwclV_drain (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (L : LmLaws M)
+theorem pwclV_drain (g : PipeGn) (M : LModel) (G : GenCparams GF M) (L : LmLaws M)
     (B : LmByteLaws M) (sd : M.lmSt) (WA : GenWa M G sd) (WL : M.lmLine → Bool)
     (HWL : ∀ l, WL l = true → lmWild M l)
     (HWfree : ∀ k v I a, WL (lmLineAt M I) = true → ⊢ WA.gpr k v I a)

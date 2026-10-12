@@ -172,7 +172,7 @@ def gprIdxs : List (BitVec 5) :=
 theorem gprIdxs_get (k : Nat) (hk : k < 31) : gprIdxs[k]? = some (BitVec.ofNat 5 (k + 1)) := by
   revert k; decide
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- The whole register file of hart `cpu`, holding `m`. -/
 def gprFile (cpu : CPU) (m : RegMap) : IProp GF := iprop%

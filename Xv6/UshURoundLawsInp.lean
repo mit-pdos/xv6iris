@@ -82,7 +82,7 @@ theorem uwr_blk_dollar_at (ps cs : List Nat) (s : Fstate) (I : List (BitVec 8)) 
     exact Xv6.wrPrompt_tail
 
 section UShURoundLawsInp
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [DiskG GF] [EchoOutG GF]
@@ -103,8 +103,8 @@ variable (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
 /-- **Rocq `ulpr_inp`**, index 0 (deviation 2): the line credential's arms
 carry the input's bound, or are the era's head, or the taint. -/
 theorem ulpr_inp_line (k : Nat) (v : EraPins) (I : List (BitVec 8)) :
-    gwcLine (unionParamsAt (hlc := hlc) (GF := GF) ug s0) (unionXAt (hlc := hlc) ug s0) k v I ⊢
-      iprop(inpLb v I ∨ fileTaint (hlc := hlc) ug.ugnFile.fgnCl) := by
+    gwcLine (unionParamsAt (GF := GF) ug s0) (unionXAt ug s0) k v I ⊢
+      iprop(inpLb v I ∨ fileTaint ug.ugnFile.fgnCl) := by
   unfold gwcLine gwcPro gwcPost gcur unionXAt unionX pwcBlkU pwcBlkV
   rw [unionParamsAt_gH, unionParamsAt_gT]
   unfold fheadAt
@@ -121,26 +121,26 @@ theorem ulpr_inp_line (k : Nat) (v : EraPins) (I : List (BitVec 8)) :
 
 /-- **Rocq `ulpr_inp`** (deviation 2). -/
 theorem ulpr_inp (k : Nat) (v : EraPins) (I : List (BitVec 8)) (p : Nat) :
-    (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkLpr k v I p ⊢
-      iprop(inpLb v I ∨ fileTaint (hlc := hlc) ug.ugnFile.fgnCl) := by
+    (unionLinkInstAt (GF := GF) ug s0).lkLpr k v I p ⊢
+      iprop(inpLb v I ∨ fileTaint ug.ugnFile.fgnCl) := by
   match p with
   | 0 => exact ulpr_inp_line ug s0 k v I
   | 1 =>
-    show gwcSpT (unionParamsAt (hlc := hlc) (GF := GF) ug s0) k v I ⊢ _
+    show gwcSpT (unionParamsAt (GF := GF) ug s0) k v I ⊢ _
     unfold gwcSpT gcur
     rw [unionParamsAt_gT]
     iintro (⟨%ps, %cs, %s, %P, %hw, -, -, -, #HE, -⟩ | #HT)
     · ileft; iexact HE
     · iright; iexact HT
   | 2 =>
-    show gwcOpenT (unionParamsAt (hlc := hlc) (GF := GF) ug s0) k v I ⊢ _
+    show gwcOpenT (unionParamsAt (GF := GF) ug s0) k v I ⊢ _
     unfold gwcOpenT gcur
     rw [unionParamsAt_gT]
     iintro (⟨%ps, %cs, %s, %P, %hw, -, -, -, #HE, -⟩ | #HT)
     · ileft; iexact HE
     · iright; iexact HT
   | _ + 3 =>
-    show gwcBlk (unionParamsAt (hlc := hlc) (GF := GF) ug s0) k v I 0 0 ⊢ _
+    show gwcBlk (unionParamsAt (GF := GF) ug s0) k v I 0 0 ⊢ _
     unfold gwcBlk
     rw [unionParamsAt_gT]
     iintro (⟨%ps, %cs, %s, %P, %hw, -, -, -, #HE, -⟩ | #HT)
@@ -149,9 +149,9 @@ theorem ulpr_inp (k : Nat) (v : EraPins) (I : List (BitVec 8)) (p : Nat) :
 
 /-- The core of `uWcl_inp` (deviation 1). -/
 theorem uWcl_inp0 (I : List (BitVec 8)) (p : Nat) :
-    uWcl (hlc := hlc) (GF := GF) ug s0 I p ⊢
-      iprop((∃ v : EraPins, eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v ∗ inpLb v I)
-        ∨ fileTaint (hlc := hlc) ug.ugnFile.fgnCl) := by
+    uWcl (GF := GF) ug s0 I p ⊢
+      iprop((∃ v : EraPins, eraPin (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v ∗ inpLb v I)
+        ∨ fileTaint ug.ugnFile.fgnCl) := by
   iintro Hc
   icases uWcl_elim ug s0 I p $$ Hc with ⟨%v, #Hpin, Hc⟩
   icases ulpr_inp ug s0 _ v I p $$ Hc with (#HE | #HT)
@@ -164,18 +164,18 @@ theorem uWcl_inp0 (I : List (BitVec 8)) (p : Nat) :
 
 /-- **Rocq `uWcl_inp`**. -/
 theorem uWcl_inp :
-    ushWcInp (hlc := hlc) (GF := GF) (fgnEcho ug.ugnFile) (fileTaint (hlc := hlc) ug.ugnFile.fgnCl)
-      (uWcl (hlc := hlc) ug s0) :=
+    ushWcInp (GF := GF) (fgnEcho ug.ugnFile) (fileTaint ug.ugnFile.fgnCl)
+      (uWcl ug s0) :=
   fun I p => uinp_of0 (uWcl_inp0 ug s0 I p)
 
 /-- The core of `uWbl_inp` (deviation 1). -/
 theorem uWbl_inp0 (I : List (BitVec 8)) :
-    uWbl (hlc := hlc) (GF := GF) ug s0 I ⊢
-      iprop(((∃ v : EraPins, eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v ∗ inpLb v I)
-          ∗ ⌜restOf I = []⌝) ∨ fileTaint (hlc := hlc) ug.ugnFile.fgnCl) := by
+    uWbl (GF := GF) ug s0 I ⊢
+      iprop(((∃ v : EraPins, eraPin (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v ∗ inpLb v I)
+          ∗ ⌜restOf I = []⌝) ∨ fileTaint ug.ugnFile.fgnCl) := by
   unfold uWbl
   iintro ⟨%v, #Hpin, Hb⟩
-  icases (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkBan_inp _ v I $$ Hb with ⟨-, Hi⟩
+  icases (unionLinkInstAt (GF := GF) ug s0).lkBan_inp _ v I $$ Hb with ⟨-, Hi⟩
   rw [ufi_pin, ufi_T]
   icases Hi with (⟨#HE, %hr⟩ | #HT)
   · ileft
@@ -189,15 +189,15 @@ theorem uWbl_inp0 (I : List (BitVec 8)) :
 
 /-- **Rocq `uWbl_inp`**. -/
 theorem uWbl_inp :
-    ushWbInp (hlc := hlc) (GF := GF) (fgnEcho ug.ugnFile) (fileTaint (hlc := hlc) ug.ugnFile.fgnCl)
-      (uWbl (hlc := hlc) ug s0) :=
+    ushWbInp (GF := GF) (fgnEcho ug.ugnFile) (fileTaint ug.ugnFile.fgnCl)
+      (uWbl ug s0) :=
   fun I => uinp_of0 (uWbl_inp0 ug s0 I)
 
 /-- **Rocq `ushape_inp`**: THE WILD SHAPE carries the era's pin and the
 input's bound, off its token. -/
 theorem ushape_inp (I : List (BitVec 8)) :
-    ⊢ useccompShape (hlc := hlc) (GF := GF) ug I -∗
-      iprop((∃ v : EraPins, eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v ∗ inpLb v I)
+    ⊢ useccompShape (GF := GF) ug I -∗
+      iprop((∃ v : EraPins, eraPin (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v ∗ inpLb v I)
         ∗ ⌜restOf I = []⌝) := by
   unfold useccompShape useccTokAt seccTokAt
   rw [ucparams_gcPIN]
@@ -211,9 +211,9 @@ theorem ushape_inp (I : List (BitVec 8)) :
 
 /-- The core of `uWbf_inp` (deviation 1). -/
 theorem uWbf_inp0 (I : List (BitVec 8)) :
-    uWbf (hlc := hlc) (GF := GF) ug r s0 I ⊢
-      iprop(((∃ v : EraPins, eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v ∗ inpLb v I)
-          ∗ ⌜restOf I = []⌝) ∨ fileTaint (hlc := hlc) ug.ugnFile.fgnCl) := by
+    uWbf (GF := GF) ug r s0 I ⊢
+      iprop(((∃ v : EraPins, eraPin (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v ∗ inpLb v I)
+          ∗ ⌜restOf I = []⌝) ∨ fileTaint ug.ugnFile.fgnCl) := by
   unfold uWbf
   iintro (⟨Hb, -⟩ | #Hw)
   · iapply uWbl_inp0 ug s0 I $$ Hb
@@ -222,15 +222,15 @@ theorem uWbf_inp0 (I : List (BitVec 8)) :
 
 /-- **Rocq `uWbf_inp`**. -/
 theorem uWbf_inp :
-    ushWbInp (hlc := hlc) (GF := GF) (fgnEcho ug.ugnFile) (fileTaint (hlc := hlc) ug.ugnFile.fgnCl)
-      (uWbf (hlc := hlc) ug r s0) :=
+    ushWbInp (GF := GF) (fgnEcho ug.ugnFile) (fileTaint ug.ugnFile.fgnCl)
+      (uWbf ug r s0) :=
   fun I => uinp_of0 (uWbf_inp0 ug r s0 I)
 
 /-- The core of Rocq's `uWcf_inp` (deviation 1). -/
 theorem uWcf_inp0 (I : List (BitVec 8)) (p : Nat) :
-    uWcf (hlc := hlc) (GF := GF) ug r s0 I p ⊢
-      iprop((∃ v : EraPins, eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v ∗ inpLb v I)
-        ∨ fileTaint (hlc := hlc) ug.ugnFile.fgnCl) := by
+    uWcf (GF := GF) ug r s0 I p ⊢
+      iprop((∃ v : EraPins, eraPin (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v ∗ inpLb v I)
+        ∨ fileTaint ug.ugnFile.fgnCl) := by
   match p with
   | 0 =>
     rw [uWcf_0]
@@ -252,8 +252,8 @@ theorem uWcf_inp0 (I : List (BitVec 8)) (p : Nat) :
 
 /-- **Rocq `upterm_inp`** (deviation 1: the persistent core). -/
 theorem upterm_inp (I : List (BitVec 8)) (c : Nat) :
-    uptermShape (hlc := hlc) (GF := GF) ug I c ⊢
-      iprop(∃ v : EraPins, eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v ∗ inpLb v I) := by
+    uptermShape (GF := GF) ug I c ⊢
+      iprop(∃ v : EraPins, eraPin (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v ∗ inpLb v I) := by
   unfold uptermShape
   iintro ⟨%v, %γc, %γm, %dep, %i, %sw, %sR, %lR, -, #Hpin, #Hlb, -, -⟩
   iexists v
@@ -263,8 +263,8 @@ theorem upterm_inp (I : List (BitVec 8)) (c : Nat) :
 
 /-- **Rocq `updone_inp`** (deviation 1: the persistent core). -/
 theorem updone_inp (I : List (BitVec 8)) :
-    updoneShape (hlc := hlc) (GF := GF) ug I ⊢
-      iprop(∃ v : EraPins, eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v ∗ inpLb v I) := by
+    updoneShape (GF := GF) ug I ⊢
+      iprop(∃ v : EraPins, eraPin (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v ∗ inpLb v I) := by
   unfold updoneShape
   iintro ⟨%v, %γc, %γm, %dep, %sR, %lR, -, #Hpin, #Hlb, -, -⟩
   iexists v
@@ -274,9 +274,9 @@ theorem updone_inp (I : List (BitVec 8)) :
 
 /-- The core of `uWcu_inp` (deviation 1). -/
 theorem uWcu_inp0 (I : List (BitVec 8)) (p : Nat) :
-    uWcu (hlc := hlc) (GF := GF) ug r s0 (uptermShape ug) (updoneShape ug) I p ⊢
-      iprop((∃ v : EraPins, eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v ∗ inpLb v I)
-        ∨ fileTaint (hlc := hlc) ug.ugnFile.fgnCl) := by
+    uWcu (GF := GF) ug r s0 (uptermShape ug) (updoneShape ug) I p ⊢
+      iprop((∃ v : EraPins, eraPin (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v ∗ inpLb v I)
+        ∨ fileTaint ug.ugnFile.fgnCl) := by
   unfold uWcu
   iintro (Hc | ⟨-, Hsh⟩ | ⟨-, Hsh, -, -⟩ | #Hw)
   · iapply uWcf_inp0 ug r s0 I p $$ Hc
@@ -288,8 +288,8 @@ theorem uWcu_inp0 (I : List (BitVec 8)) (p : Nat) :
 
 /-- **Rocq `uWcu_inp`**: the widened credential's reading. -/
 theorem uWcu_inp :
-    ushWcInp (hlc := hlc) (GF := GF) (fgnEcho ug.ugnFile) (fileTaint (hlc := hlc) ug.ugnFile.fgnCl)
-      (uWcu (hlc := hlc) ug r s0 (uptermShape ug) (updoneShape ug)) :=
+    ushWcInp (GF := GF) (fgnEcho ug.ugnFile) (fileTaint ug.ugnFile.fgnCl)
+      (uWcu ug r s0 (uptermShape ug) (updoneShape ug)) :=
   fun I p => uinp_of0 (uWcu_inp0 ug r s0 I p)
 
 end UShURoundLawsInp

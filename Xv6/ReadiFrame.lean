@@ -29,7 +29,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 variable {lent : Bool}
 
 /-- readi's fourteen cells, from `sp-8` (`ra`) down to `sp-112` (never

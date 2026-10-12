@@ -67,7 +67,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 theorem dirlookup_ctx_entry (c : CPU) (k : KCtx) (R : RegMap) :
     kctx (GF := GF) c ((k.pushed 12).withRegs R) ⊢
@@ -76,7 +76,7 @@ theorem dirlookup_ctx_entry (c : CPU) (k : KCtx) (R : RegMap) :
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -102,7 +102,7 @@ set_option maxHeartbeats 16000000 in
 root->inum`: namecmp against `".."`; a miss joins the scan at `+0x30`
 under `¬ dlSelf`, a hit runs idup's SHARE form on dp and returns it. -/
 theorem dirlookup_self (RD : READI) (NC : NAMECMP) (IG : IGET) (PA : PANIC) (ID : IDUP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (j : Nat) (γl : GName) (pd pav pu : BitVec 64)
     (γkl : GName) (γk : KmemNames)
     (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
@@ -122,7 +122,7 @@ theorem dirlookup_self (RD : READI) (NC : NAMECMP) (IG : IGET) (PA : PANIC) (ID 
     dirlookupDe (k.regs 2#5) bs ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     dirlookupKeep k ip dinum bm data dn dr fn pidv dqp dqd dqn ∗ dirlookupIn hasp (k.regs 12#5) pofv ∗
-    dirlookupEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
+    dirlookupEnv Γ γl pd pav pu γkl γk ∗
     inodeShr kd sd icfgDev dinum ∗ runitAny dinum.toNat ∗
     wordPointsTo (pRoot k.proc) 8 dqr rootv ∗ inodeHeldAt rootv rti ∗
     (∀ c' : CPU, dirlookupSpecPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn kd sd
@@ -135,8 +135,8 @@ theorem dirlookup_self (RD : READI) (NC : NAMECMP) (IG : IGET) (PA : PANIC) (ID 
   icases kctx_kernelData _ _ $$ Hk with ⟨#HD, Hk⟩
   ihave #Hdd := dirlookup_dotdot_window $$ HS HD
   ihave ⟨#Hpi, #Hbc, #Hdc, #Hpe, #Hkl, #Hav, #Hit2, #Hiti, #Hinv⟩ :=
-    dirlookupEnv_open (hlc := hlc) Γ γl pd pav pu γkl γk $$ Henv
-  ihave #Hreg := iregInv_reg (hlc := hlc) fscIreg fscFs icfgIst icfgNib $$ Hinv
+    dirlookupEnv_open Γ γl pd pav pu γkl γk $$ Henv
+  ihave #Hreg := iregInv_reg fscIreg fscFs icfgIst icfgNib $$ Hinv
   -- +0x6c  auipc a1,0x4 ; +0x70  addi a1,a1,-1230 : a1 := &".."
   k_step_e (wp_s_auipc cpu _ (KA.«dirlookup» + 0x6c#64) false 4#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -184,7 +184,7 @@ theorem dirlookup_self (RD : READI) (NC : NAMECMP) (IG : IGET) (PA : PANIC) (ID 
     iintro Hk Hpc
     unfold dirlookupIn
     icases Hin with ⟨Hsl, Hpf⟩
-    have h := ID.wp_idup_shr (hlc := hlc) (GF := GF) cpu
+    have h := ID.wp_idup_shr (GF := GF) cpu
       ((((k.withSpie spie spp).pushed 12).withRegs
         (((R1.set 10#5 (R1 18#5)).set 1#5 (KA.«dirlookup» + 0x82#64))))) kd sd dinum
       (by show k.noff + 1 < 2 ^ 31; rw [hs.hnoff]; omega)
@@ -257,7 +257,7 @@ set_option maxHeartbeats 16000000 in
 off its cell, the root's inum off the root reference; `beq a5,s1` to the
 self arm, or the scan under `¬ dlSelf`. -/
 theorem dirlookup_selftest (RD : READI) (NC : NAMECMP) (IG : IGET) (PA : PANIC) (MP : MYPROC)
-    (ID : IDUP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (ID : IDUP) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (j : Nat) (γl : GName) (pd pav pu : BitVec 64)
     (γkl : GName) (γk : KmemNames)
     (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
@@ -278,7 +278,7 @@ theorem dirlookup_selftest (RD : READI) (NC : NAMECMP) (IG : IGET) (PA : PANIC) 
     dirlookupDe (k.regs 2#5) bs ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     dirlookupKeep k ip dinum bm data dn dr fn pidv dqp dqd dqn ∗ dirlookupIn hasp (k.regs 12#5) pofv ∗
-    dirlookupEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
+    dirlookupEnv Γ γl pd pav pu γkl γk ∗
     inodeShr kd sd icfgDev dinum ∗ runitAny dinum.toNat ∗
     wordPointsTo (pRoot k.proc) 8 dqr rootv ∗ inodeHeldAt rootv rti ∗
     (∀ c' : CPU, dirlookupSpecPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn kd sd
@@ -290,7 +290,7 @@ theorem dirlookup_selftest (RD : READI) (NC : NAMECMP) (IG : IGET) (PA : PANIC) 
   k_step_e (wp_s_jal cpu _ (KA.«dirlookup» + 0x22#64) false 2088992#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [dirlookup_br_myproc]
   iintro Hk Hpc
-  have h := MP.wp_myproc (hlc := hlc) (GF := GF) cpu
+  have h := MP.wp_myproc (GF := GF) cpu
     ((((k.withSpie spie spp).pushed 12).withRegs (R.set 1#5 (KA.«dirlookup» + 0x26#64))))
     (by show k.noff + 1 < 2 ^ 31; rw [hs.hnoff]; omega)
     (by show 10 ≤ k.avail - 12; exact dirlookup_slots_myproc _ hs.hK)
@@ -366,7 +366,7 @@ and THE SELF TEST** -- dp's inum off the lent share, `p->root` off its cell,
 the root's inum off the root reference; the `beq` dispatches to the self
 arm (`dirlookup_self`) or the scan (`dirlookup_scan`, under `¬ dlSelf`). -/
 theorem dirlookup_entry (RD : READI) (NC : NAMECMP) (IG : IGET) (PA : PANIC) (MP : MYPROC)
-    (ID : IDUP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (ID : IDUP) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γkl : GName) (γk : KmemNames)
     (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
@@ -382,7 +382,7 @@ theorem dirlookup_entry (RD : READI) (NC : NAMECMP) (IG : IGET) (PA : PANIC) (MP
     dirlookupDe (k.regs 2#5) bs ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     dirlookupKeep k ip dinum bm data dn dr fn pidv dqp dqd dqn ∗ dirlookupIn hasp (k.regs 12#5) pofv ∗
-    dirlookupEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
+    dirlookupEnv Γ γl pd pav pu γkl γk ∗
     inodeShr kd sd icfgDev dinum ∗ runitAny dinum.toNat ∗
     wordPointsTo (pRoot k.proc) 8 dqr rootv ∗ inodeHeldAt rootv rti ∗
     (∀ c' : CPU, dirlookupSpecPost k ip dinum bm data dn dr fn hasp pofv pidv dqp dqd dqn kd sd
@@ -466,7 +466,7 @@ follows it, and readi (the only sleeper) takes it at its eb contract.  The
 caller's continuation is a `true` crossing at a process, so it is hart-free
 from the start (`dirlookup_spec_free`). -/
 theorem dirlookup_main (RD : READI) (NC : NAMECMP) (IG : IGET) (PA : PANIC) (MP : MYPROC)
-    (ID : IDUP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (ID : IDUP) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γkl : GName) (γk : KmemNames)
     (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
@@ -487,7 +487,7 @@ theorem dirlookup_main (RD : READI) (NC : NAMECMP) (IG : IGET) (PA : PANIC) (MP 
     (hpd : descPageRw pd)
     (ha0 : k.regs 10#5 = ip) (hkd : ip = ientry kd) (hkdn : kd < NINODE)
     (hpoff : if hasp then k.regs 12#5 ≠ 0#64 else k.regs 12#5 = 0#64) :
-    wp_dirlookup_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γkl γk ip dinum bm data
+    wp_dirlookup_eb_body (GF := GF) Γ cpu k γl pd pav pu j γkl γk ip dinum bm data
       dn dr fn hasp pofv pidv dqp dqd dqn kd sd rootv rti dqr
       hj hproc hK hnoff htier htype hgeom hwf hcov hsz hholes hinums hdisj horph
       hdrnz hdrnl hpd ha0 hkd hkdn hpoff := by
@@ -505,7 +505,7 @@ theorem dirlookup_main (RD : READI) (NC : NAMECMP) (IG : IGET) (PA : PANIC) (MP 
   · unfold dirlookupKeep; iframe
   ihave Hin : dirlookupIn hasp (k.regs 12#5) pofv $$ [Hsl Hpf]
   · unfold dirlookupIn; iframe
-  ihave #Henv : dirlookupEnv (hlc := hlc) Γ γl pd pav pu γkl γk $$ []
+  ihave #Henv : dirlookupEnv Γ γl pd pav pu γkl γk $$ []
   · unfold dirlookupEnv; iframe #
   simp only [dirlookupAddr]
   -- +0x00 .. +0x06  the prologue

@@ -39,7 +39,7 @@ open Iris Iris.BI Iris.ProofMode Std MachCSL
 open Iris.Std Iris.Std.PartialMap
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsBlocksG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsBlocksG GF]
 
 /-! ## THE MINT
 

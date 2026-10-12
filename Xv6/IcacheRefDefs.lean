@@ -886,7 +886,7 @@ end IcacheIty
 /-! ## 4.  THE BOOT ALLOCATION -/
 
 section Alloc
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- One ghost per index, as a function (Rocq's four `*_fun_alloc`s, with
 their always-`0` start index dropped). -/

@@ -47,7 +47,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -59,7 +59,7 @@ set_option maxHeartbeats 32000000 in
 `li a5,1`, and the `bne` dispatching to the success tail (+0x42) or ARM C
 (+0x70). -/
 theorem sys_chroot_tested (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPUT) (EO : END_OP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : SysChrootArgs) (P2 : UPtd) (spie spp : Bool) (R : RegMap)
     (kk : Nat) (q : Qp) (g : GName) (lo tl : Nat) (γil γisl : GName)
     (inum : BitVec 32) (dn : Dinode) (bm : Blkmap) (n : Nat) (Sb : List Nat)
@@ -72,10 +72,10 @@ theorem sys_chroot_tested (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPUT) (EO : EN
     kctx cpu (((k.withSpie spie spp).pushed 20).withRegs R) ∗ pcIs cpu (KA.«sys_chroot» + 0x38#64) ∗
     sysChdirCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     sysfileAny (sysChdirBuf (k.regs 2#5)) 128 ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv Γ ∗
     sysChrootRows (procAddr A.j) A.pid A.V.root A.V.rti ∗
     sysChrootHole A.γ (procAddr A.j) A.pid (sysChrootV1 A P2) (sysChrootM1 A P2) ∗
-    (∀ c : CPU, sysChrootPostA (hlc := hlc) (GF := GF) k A c) ∗
+    (∀ c : CPU, sysChrootPostA (GF := GF) k A c) ∗
     sysChdirLocked kk q g lo tl γil γisl inum A.pid dn bm ∗
     bslots 3 ∗ irefSlots 1 ∗ logOpS icfgLog n Sb
     ⊢ wpLoop (GF := GF) cpu := by
@@ -140,7 +140,7 @@ theorem sys_chroot_tested (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPUT) (EO : EN
 set_option maxHeartbeats 16000000 in
 /-- **ARM B** (`+0x30 .. +0x32`, then `+0x66`): the walk DIED -- `mv s1,a0`,
 `beqz` taken, the slot-3 reload, and ARM A's tail. -/
-theorem sys_chroot_miss (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem sys_chroot_miss (EO : END_OP) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : SysChrootArgs) (P2 : UPtd) (spie spp : Bool) (R : RegMap)
     (pl rest : List (BitVec 8)) (n : Nat) (Sb : List Nat)
     (hj : A.j < NPROC) (hproc : k.proc = procAddr A.j) (hK : sysChrootSlots ≤ k.avail)
@@ -152,9 +152,9 @@ theorem sys_chroot_miss (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     sysChdirCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     byteBuf (sysChdirBuf (k.regs 2#5)) (DFrac.own 1) (bview (pl.length + 1) (sysfilePfun pl)) ∗
     byteBuf (sysfileRestAddr (sysChdirBuf (k.regs 2#5)) pl.length) (DFrac.own 1) rest ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysChrootV1 A P2) (sysChrootM1 A P2) ∗
-    (∀ c : CPU, sysChrootPostA (hlc := hlc) (GF := GF) k A c) ∗ bslots 3 ∗ irefSlots 2 ∗
+    (∀ c : CPU, sysChrootPostA (GF := GF) k A c) ∗ bslots 3 ∗ irefSlots 2 ∗
     logOpS icfgLog n Sb ∗ logTx icfgLog
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hp, Hrest, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Htx⟩
@@ -191,7 +191,7 @@ set_option maxHeartbeats 16000000 in
 the reference taken apart (shed, share named at its generation), and
 `ilock(ip)` at the write arm; then `sys_chroot_tested`. -/
 theorem sys_chroot_found (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPUT) (EO : END_OP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : SysChrootArgs) (P2 : UPtd) (spie spp : Bool) (R : RegMap)
     (pl rest : List (BitVec 8)) (n : Nat) (Sb : List Nat) (ipv : BitVec 64)
     (hj : A.j < NPROC) (hproc : k.proc = procAddr A.j) (hK : sysChrootSlots ≤ k.avail)
@@ -203,9 +203,9 @@ theorem sys_chroot_found (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKP
     sysChdirCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     byteBuf (sysChdirBuf (k.regs 2#5)) (DFrac.own 1) (bview (pl.length + 1) (sysfilePfun pl)) ∗
     byteBuf (sysfileRestAddr (sysChdirBuf (k.regs 2#5)) pl.length) (DFrac.own 1) rest ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysChrootV1 A P2) (sysChrootM1 A P2) ∗
-    (∀ c : CPU, sysChrootPostA (hlc := hlc) (GF := GF) k A c) ∗ bslots 3 ∗ irefSlots 1 ∗
+    (∀ c : CPU, sysChrootPostA (GF := GF) k A c) ∗ bslots 3 ∗ irefSlots 1 ∗
     logOpS icfgLog n Sb ∗ logTx icfgLog ∗ inodeHeld ipv
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hp, Hrest, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Htx, Hheld⟩
@@ -277,7 +277,7 @@ string did not fetch) or the path read as namei's buffer, `sd s1`,
 `addi a0,s0,-160` and `namei(path)` at the plain set-form contract; namei's
 two arms go to `sys_chroot_miss` / `sys_chroot_found`. -/
 theorem sys_chroot_fetched (NI : NAMEI) (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT)
-    (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : SysChrootArgs) (P2 : UPtd) (spie spp : Bool) (R : RegMap)
     (w₃ v : BitVec 64) (old bs : List (BitVec 8))
     (hj : A.j < NPROC) (hproc : k.proc = procAddr A.j) (hK : sysChrootSlots ≤ k.avail)
@@ -288,9 +288,9 @@ theorem sys_chroot_fetched (NI : NAMEI) (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT)
     kctx cpu (((k.withSpie spie spp).pushed 20).withRegs R) ∗ pcIs cpu (KA.«sys_chroot» + 0x22#64) ∗
     sysChdirCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) w₃ (k.regs 18#5) ∗
     byteBuf (sysChdirBuf (k.regs 2#5)) (DFrac.own 1) bs ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysChrootV1 A P2) (sysChrootM1 A P2) ∗
-    (∀ c : CPU, sysChrootPostA (hlc := hlc) (GF := GF) k A c) ∗ bslots 3 ∗ irefSlots 2 ∗
+    (∀ c : CPU, sysChrootPostA (GF := GF) k A c) ∗ bslots 3 ∗ irefSlots 2 ∗
     logOp icfgLog MAXOPBLOCKS
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hbuf, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop⟩
@@ -382,7 +382,7 @@ set_option maxHeartbeats 32000000 in
 `argstr(0, path, 128)` over the bare block (the block re-closes at argstr's
 grown descriptor and raised count); then `sys_chroot_fetched`. -/
 theorem sys_chroot_args (AS : ARGSTR) (NI : NAMEI) (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT)
-    (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : SysChrootArgs) (spie spp : Bool) (R : RegMap)
     (w₃ v : BitVec 64) (hv : A.V.tf[tfArgIdx 0]? = some v)
     (hj : A.j < NPROC) (hproc : k.proc = procAddr A.j) (hK : sysChrootSlots ≤ k.avail)
@@ -392,9 +392,9 @@ theorem sys_chroot_args (AS : ARGSTR) (NI : NAMEI) (IL : ILOCK) (IU : IUNLOCK) (
     kctx cpu (((k.withSpie spie spp).pushed 20).withRegs R) ∗ pcIs cpu (KA.«sys_chroot» + 0x14#64) ∗
     sysChdirCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) w₃ (k.regs 18#5) ∗
     sysfileAny (sysChdirBuf (k.regs 2#5)) 128 ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid A.V A.M ∗
-    (∀ c : CPU, sysChrootPostA (hlc := hlc) (GF := GF) k A c) ∗ bslots 3 ∗ irefSlots 2 ∗
+    (∀ c : CPU, sysChrootPostA (GF := GF) k A c) ∗ bslots 3 ∗ irefSlots 2 ∗
     logOp icfgLog MAXOPBLOCKS
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hbuf, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop⟩
@@ -444,7 +444,7 @@ theorem sys_chroot_args (AS : ARGSTR) (NI : NAMEI) (IL : ILOCK) (IU : IUNLOCK) (
       (viewFaulted A.V.upt P2 A.M) ⊢
     procPrivFd (A.raise kv).γ (procAddr (A.raise kv).j) (A.raise kv).pid (sysChrootV1 (A.raise kv) P2)
       (sysChrootM1 (A.raise kv) P2) from .rfl) $$ Hblk
-  ihave HΦ : (∀ c : CPU, sysChrootPostA (hlc := hlc) (GF := GF) k (A.raise kv) c) $$ [HΦ]
+  ihave HΦ : (∀ c : CPU, sysChrootPostA (GF := GF) k (A.raise kv) c) $$ [HΦ]
   · iintro %c
     ispecialize HΦ $$ %c
     iapply (sysChrootK_raise k A.γ (procAddr A.j) A.pid A.V A.M c kv hkv) $$ HΦ
@@ -465,12 +465,12 @@ contract's continuation made hart-free, the prologue (`+0x00 .. +0x08`),
 the pid quarter lent through the root seam; then `sys_chroot_args`. -/
 theorem sys_chroot_main (MP : MYPROC) (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK)
     (IU : IUNLOCK) (IP : IPUT) (IUP : IUNLOCKPUT) (EO : END_OP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx)
     (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (v : BitVec 64)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (htier : k.tier = KTier.kpt)
     (hnoff : k.noff = 0) (hK : sysChrootSlots ≤ k.avail) (hv : V.tf[tfArgIdx 0]? = some v) :
-    wp_sys_chroot_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ j pid V M v
+    wp_sys_chroot_eb_body (GF := GF) Γ cpu k γ j pid V M v
       hj hproc htier hnoff hK hv := by
   unfold wp_sys_chroot_eb_body
   have hK140 := hK
@@ -480,10 +480,10 @@ theorem sys_chroot_main (MP : MYPROC) (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI)
   icases kctx_tier cpu _ $$ Hk with ⟨%hct0, Hk⟩
   have hct : curTier = KTier.kpt := hct0.symm.trans htier
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  ihave #Henv : sysfileEnv (hlc := hlc) Γ $$ []
+  ihave #Henv : sysfileEnv Γ $$ []
   · unfold sysfileEnv; iframe #
   -- THE CONTRACT'S CONTINUATION, hart-free
-  ihave HΦ : (∀ c : CPU, sysChrootPostA (hlc := hlc) (GF := GF) k (⟨γ, j, pid, V, M⟩ : SysChrootArgs) c)
+  ihave HΦ : (∀ c : CPU, sysChrootPostA (GF := GF) k (⟨γ, j, pid, V, M⟩ : SysChrootArgs) c)
     $$ [Hnext]
   · iintro %c
     iapply wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext
@@ -508,7 +508,7 @@ theorem sys_chroot_main (MP : MYPROC) (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI)
   k_step_e (wp_s_jal cpu _ (KA.«sys_chroot» + 0xa#64) false 2081838#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_chroot_br_myproc]
   iintro Hk Hpc
-  have hmp := MP.wp_myproc (hlc := hlc) (GF := GF)
+  have hmp := MP.wp_myproc (GF := GF)
   unfold wp_myproc_body at hmp
   simp only [myprocAddr] at hmp
   iapply (hmp cpu _ ?hnM ?hKM) $$ [- $Hk $Hpc]

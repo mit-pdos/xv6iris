@@ -108,7 +108,7 @@ theorem sys_exec_pins_succ (k : KCtx) (R : RegMap) (i : Nat) (h : sysExecLoopPin
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false] <;> assumption
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -118,12 +118,12 @@ def sysExecStepOut (k : KCtx) (A : SysExecArgs) (i : Nat) (pl rest : List (BitVe
   iprop(∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (kv' : Nat) (i' : Nat)
         (pg' : Nat → BitVec 64)
         (alen' : Nat → Nat) (afun' : Nat → Nat → BitVec 8) (uvf' : Nat → BitVec 64),
-      ((⌜i' = i + 1⌝ ∗ sysExecLoopSt (hlc := hlc) k A spie' spp' R' P' kv' i' pg' alen' afun' uvf' pl
+      ((⌜i' = i + 1⌝ ∗ sysExecLoopSt k A spie' spp' R' P' kv' i' pg' alen' afun' uvf' pl
           rest (sysExecAddr + 0x56#64) c') ∨
        (⌜bytesToWord (umemRead (sysExecIm A) (A.v1 + BitVec.ofNat 64 (8 * i')).toNat 8) = 0#64⌝ ∗
-          sysExecLoopSt (hlc := hlc) k A spie' spp' R' P' kv' i' pg' alen' afun' uvf' pl rest
+          sysExecLoopSt k A spie' spp' R' P' kv' i' pg' alen' afun' uvf' pl rest
             (sysExecAddr + 0xb6#64) c') ∨
-       sysExecBadSt (hlc := hlc) k A spie' spp' R' P' kv' i' pg' afun' pl rest c') -∗
+       sysExecBadSt k A spie' spp' R' P' kv' i' pg' afun' pl rest c') -∗
       wpLoop c')
 
 set_option maxHeartbeats 32000000 in
@@ -147,7 +147,7 @@ theorem sys_exec_step_str (FS : FETCHSTR) (Γ : SchedNames) (k : KCtx) (A : SysE
     wordPointsTo (sysExecUarg (k.regs 2#5)) 8 (DFrac.own 1) u ∗
     sysExecArgvArr (k.regs 2#5) (sysExecArgvL (sysExecUpd pg i p) (i + 1)) ∗
     sysExecPages pg afun 0 i ∗ byteBuf p (DFrac.own 1) (List.replicate 4096 5#8) ∗
-    sysExecEnv (hlc := hlc) Γ A ∗ sysExecStepOut (hlc := hlc) k A i pl rest
+    sysExecEnv Γ A ∗ sysExecStepOut k A i pl rest
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hte, Hce, Hblk, Hcarry, H59, H60, Harr, Hpgs, Hpage, #Henv, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -317,7 +317,7 @@ theorem sys_exec_step_kalloc (KL : KALLOC) (FS : FETCHSTR) (Γ : SchedNames) (k 
     sysExecCarry k pl rest ∗ wordPointsTo (sysExecUargv (k.regs 2#5)) 8 (DFrac.own 1) A.v1 ∗
     wordPointsTo (sysExecUarg (k.regs 2#5)) 8 (DFrac.own 1) u ∗
     sysExecArgvArr (k.regs 2#5) (sysExecArgvL pg i) ∗ sysExecPages pg afun 0 i ∗
-    sysExecEnv (hlc := hlc) Γ A ∗ sysExecStepOut (hlc := hlc) k A i pl rest
+    sysExecEnv Γ A ∗ sysExecStepOut k A i pl rest
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hte, Hce, Hblk, Hcarry, H59, H60, Harr, Hpgs, #Henv, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -409,10 +409,10 @@ set_option maxHeartbeats 32000000 in
 round read, at the entry image), then `sys_exec_step_kalloc`. -/
 theorem sys_exec_step (FA : FETCHADDR) (KL : KALLOC) (FS : FETCHSTR) (Γ : SchedNames) (k : KCtx)
     (A : SysExecArgs) (hS : SysExecStatic k A) :
-    ⊢ sysExecStepBody (hlc := hlc) (GF := GF) Γ k A := by
+    ⊢ sysExecStepBody (GF := GF) Γ k A := by
   unfold sysExecStepBody
   iintro %cpu %spie %spp %R %P %kv %i %pg %alen %afun %uvf %pl %rest Hst #Henv HΦ
-  ihave HΦ : sysExecStepOut (hlc := hlc) k A i pl rest $$ [HΦ]
+  ihave HΦ : sysExecStepOut k A i pl rest $$ [HΦ]
   · unfold sysExecStepOut; iexact HΦ
   unfold sysExecLoopSt
   icases Hst with ⟨%hpure, Hk, Hpc, Hte, Hce, Hblk, Hcarry, H59, ⟨%w0, H60⟩, Harr, Hpgs⟩

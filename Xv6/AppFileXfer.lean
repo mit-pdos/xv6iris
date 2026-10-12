@@ -53,14 +53,14 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section AppFileXfer
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF]
 
 /-- The file state reads only its own names (Rocq `f_state_rec_eq`). -/
 theorem fState_recEq (c : FileFixed) (r r' : FileAppNames) (av : Aview)
     (h1 : r.fnDeed = r'.fnDeed) (h2 : r.fnTkt = r'.fnTkt) (h3 : r.fnEsc = r'.fnEsc)
     (h4 : r.fnRole = r'.fnRole) (h5 : r.fnPos = r'.fnPos) :
-    fState (hlc := hlc) (GF := GF) c r av ⊢ fState (hlc := hlc) c r' av := by
+    fState (GF := GF) c r av ⊢ fState c r' av := by
   rcases r with ⟨a1, b1, c1, d1, e1, f1, g1, p1⟩
   rcases r' with ⟨a2, b2, c2, d2, e2, f2, g2, p2⟩
   dsimp only at h1 h2 h3 h4 h5
@@ -84,15 +84,15 @@ theorem ftkt_recEq (r r' : FileAppNames) (s : Dst) (h : r.fnTkt = r'.fnTkt) :
 /-- THE POWER-ON TRANSPORT (Rocq `file_xfer_boot`). -/
 theorem fileXferBoot (c : FileFixed) (gen : Nat) (r : FileAppNames) (av : Aview) (γ : GName)
     (ls0 : List FlLine) (F : List Srec) (hr : r.fnRole = true) :
-    ⊢@{IProp GF} syncStAuth (hlc := hlc) c (gen + 1) -∗ slAuth γ 1 [] -∗ syncReg c (gen + 1) γ -∗
-      flLb c ls0 -∗ slLb c.ffHist F -∗ ▷ filePred (hlc := hlc) c r av ==∗
-      ◇ (syncStAuth (hlc := hlc) c (gen + 1) ∗ ▷ filePred (hlc := hlc) c (fnWith r γ (gen + 1) true) av ∗
+    ⊢@{IProp GF} syncStAuth c (gen + 1) -∗ slAuth γ 1 [] -∗ syncReg c (gen + 1) γ -∗
+      flLb c ls0 -∗ slLb c.ffHist F -∗ ▷ filePred c r av ==∗
+      ◇ (syncStAuth c (gen + 1) ∗ ▷ filePred c (fnWith r γ (gen + 1) true) av ∗
         ∃ (r' : FileAppNames) (ls : List FlLine),
           ⌜r'.fnEra = gen + 1 ∧ r'.fnRole = false ∧ r'.fnSync = γ⌝ ∗
-          ▷ filePred (hlc := hlc) c r' av ∗ fileBootAt (hlc := hlc) c (gen + 1) r' (fcontentOf av)
+          ▷ filePred c r' av ∗ fileBootAt c (gen + 1) r' (fcontentOf av)
           ∗ flLb c ls ∗
-          (fileTaint (hlc := hlc) c
-            ∨ (fposh r' ls.length ∗ unionTkb (hlc := hlc) c gen ∗ fTyped c (fcontentOf av)
+          (fileTaint c
+            ∨ (fposh r' ls.length ∗ unionTkb c gen ∗ fTyped c (fcontentOf av)
               ∗ runReg c (gen + 1) r'.fnPos r'.fnDeed
               ∗ ∃ Ls_c : List Srec, slLb γ Ls_c ∗ slLb c.ffHist Ls_c
                   ∗ ⌜F <+: Ls_c ∧ uadm ls (slast F) (fcontOf av)⌝))) := by
@@ -101,13 +101,13 @@ theorem fileXferBoot (c : FileFixed) (gen : Nat) (r : FileAppNames) (av : Aview)
   subst hr
   iintro Hst Hnew #Hreg #Hls0 #HF Hp
   iapply bupd_except0_elim
-  imod (@timeless_except0 _ _ _ (filePred_timeless (hlc := hlc) (GF := GF) c _ av)).mp $$ Hp with Hp
+  imod (@timeless_except0 _ _ _ (filePred_timeless (GF := GF) c _ av)).mp $$ Hp with Hp
   imodintro
   ihave ⟨He, Hrest⟩ := filePred_split c _ av $$ Hp
-  have hex := echoXferBoot (hlc := hlc) (GF := GF) c.ffEcho (gen + 1)
+  have hex := echoXferBoot (GF := GF) c.ffEcho (gen + 1)
   unfold appCloneRaw at hex
   ihave #Hex := hex
-  ihave He : iprop(▷ echoPred (hlc := hlc) c.ffEcho oc av) $$ [He]
+  ihave He : iprop(▷ echoPred c.ffEcho oc av) $$ [He]
   · inext; iexact He
   imod Hex $$ %oc %av He with ⟨He, %rc, He', Hb⟩
   imod (fnamesAlloc (GF := GF) rc (fcontentOf av) γ (gen + 1) false 0)
@@ -212,19 +212,19 @@ instance aviewInhabited : Inhabited Aview := ⟨∅⟩
 
 /-- Reading the claim (the proof mode sees no `∨` through a definition). -/
 theorem filePred_elim (c : FileFixed) (r : FileAppNames) (av : Aview) :
-    filePred (hlc := hlc) (GF := GF) c r av ⊢
-      fileTaint (hlc := hlc) c ∨ (⌜fileFsPure av⌝ ∗ consState r.fnCons av
-        ∗ fState (hlc := hlc) c r av ∗ syncClaim (hlc := hlc) c r av) := by
+    filePred (GF := GF) c r av ⊢
+      fileTaint c ∨ (⌜fileFsPure av⌝ ∗ consState r.fnCons av
+        ∗ fState c r av ∗ syncClaim c r av) := by
   unfold filePred; exact .rfl
 
 /-- THE MERGE (Rocq `file_merge`): the application's own `al_merge`. -/
 theorem fileMerge (c : FileFixed) (gen : Nat)
-    (hst1 : ∀ n, startAuth (hlc := hlc) (GF := GF) n ⊢ syncStAuth (hlc := hlc) c n)
-    (hst2 : ∀ n, syncStAuth (hlc := hlc) (GF := GF) c n ⊢ startAuth (hlc := hlc) n) :
-    ⊢@{IProp GF} appMergeRaw (hlc := hlc) (filePred (hlc := hlc) c) (fileOk c (gen + 1))
-      (fun r => r.fnRole = true) (unionTk (hlc := hlc) c gen) gen := by
-  have hex : ⊢@{IProp GF} appXferRaw (echoPred (hlc := hlc) c.ffEcho) :=
-    (echoXferBoot (hlc := hlc) (GF := GF) c.ffEcho 0).trans (appCloneRaw_raw _ _)
+    (hst1 : ∀ n, startAuth (GF := GF) n ⊢ syncStAuth c n)
+    (hst2 : ∀ n, syncStAuth (GF := GF) c n ⊢ startAuth n) :
+    ⊢@{IProp GF} appMergeRaw (filePred c) (fileOk c (gen + 1))
+      (fun r => r.fnRole = true) (unionTk c gen) gen := by
+  have hex : ⊢@{IProp GF} appXferRaw (echoPred c.ffEcho) :=
+    (echoXferBoot (GF := GF) c.ffEcho 0).trans (appCloneRaw_raw _ _)
   unfold appXferRaw at hex
   ihave #Hex := hex
   unfold appMergeRaw
@@ -233,8 +233,8 @@ theorem fileMerge (c : FileFixed) (gen : Nat)
   unfold fileOk at hok
   dsimp only at hok
   subst hok
-  ihave Hs : iprop(▷ (echoPred (hlc := hlc) c.ffEcho rc0 av ∗
-      fileRest (hlc := hlc) c ⟨rc0, rd, rt, re, rγ, gen + 1, rb, rp⟩ av)) $$ [Hp]
+  ihave Hs : iprop(▷ (echoPred c.ffEcho rc0 av ∗
+      fileRest c ⟨rc0, rd, rt, re, rγ, gen + 1, rb, rp⟩ av)) $$ [Hp]
   · inext
     iapply filePred_split c ⟨rc0, rd, rt, re, rγ, gen + 1, rb, rp⟩ av $$ Hp
   icases Hs with ⟨He, Hrest⟩
@@ -297,20 +297,20 @@ theorem fileMerge (c : FileFixed) (gen : Nat)
       iapply unionTkb_intro c gen γ Lt $$ Hregt Hqt Hcmt
   icases Hrest with ⟨#Hpure, Hf, Hsy⟩
   ihave Hsy : iprop(▷ ∃ (ls : List FlLine) (Ls : List Srec),
-      syncBody (hlc := hlc) c ⟨rc0, rd, rt, re, rγ, gen + 1, rb, rp⟩ av ls Ls) $$ [Hsy]
+      syncBody c ⟨rc0, rd, rt, re, rγ, gen + 1, rb, rp⟩ av ls Ls) $$ [Hsy]
   · inext
     iapply syncClaim_elim c ⟨rc0, rd, rt, re, rγ, gen + 1, rb, rp⟩ av $$ Hsy
   icases later_exists.mpr $$ Hsy with ⟨%ls, Hsy⟩
   icases later_exists.mpr $$ Hsy with ⟨%Ls, Hsy⟩
   ihave Hsy : iprop(▷ (syncReg c (gen + 1) rγ ∗ flLb c ls ∗ ⌜syncChain ls Ls⌝
       ∗ ⌜uadm ls (slast Ls) (fcontOf av)⌝
-      ∗ syncRole (hlc := hlc) c ⟨rc0, rd, rt, re, rγ, gen + 1, rb, rp⟩ Ls)) $$ [Hsy]
+      ∗ syncRole c ⟨rc0, rd, rt, re, rγ, gen + 1, rb, rp⟩ Ls)) $$ [Hsy]
   · inext
     iapply syncBody_elim c ⟨rc0, rd, rt, re, rγ, gen + 1, rb, rp⟩ av ls Ls $$ Hsy
   icases Hsy with ⟨#Hreg, #Hlb, #Hch, #Hw, Hro⟩
   -- the running claim's list is the token's
   ihave Hag : iprop(▷ ⌜rγ = γ ∧ Ls = Lt⌝ ∧
-      (▷ syncRole (hlc := hlc) c ⟨rc0, rd, rt, re, rγ, gen + 1, rb, rp⟩ Ls
+      (▷ syncRole c ⟨rc0, rd, rt, re, rγ, gen + 1, rb, rp⟩ Ls
         ∗ slAuth γ (1 : Qp).half.half Lt)) $$ [Hro Hqt]
   · isplit
     · inext
@@ -326,8 +326,8 @@ theorem fileMerge (c : FileFixed) (gen : Nat)
         ipureintro; exact ⟨hγ, hL⟩
     · iframe Hro Hqt
   icases Hag with ⟨#Hag, Hro, Hqt⟩
-  ihave Hff : iprop(▷ (fState (hlc := hlc) c ⟨rc0, rd, rt, re, rγ, gen + 1, rb, rp⟩ av
-      ∗ fState (hlc := hlc) c ⟨c1, d1, t1, e1, rγ, gen + 1, true, p1⟩ av))
+  ihave Hff : iprop(▷ (fState c ⟨rc0, rd, rt, re, rγ, gen + 1, rb, rp⟩ av
+      ∗ fState c ⟨c1, d1, t1, e1, rγ, gen + 1, true, p1⟩ av))
     $$ [Hf Ha1 Hd1 Ht1]
   · inext
     iapply fState_copy c ⟨rc0, rd, rt, re, rγ, gen + 1, rb, rp⟩ ⟨c1, d1, t1, e1, rγ, gen + 1, true, p1⟩ av $$ Ha1 Hd1 Ht1 Hf
@@ -361,8 +361,8 @@ theorem fileMerge (c : FileFixed) (gen : Nat)
   icases later_exists.mpr $$ Hold with ⟨%r_o, Hold⟩
   icases later_exists.mpr $$ Hold with ⟨%av_o, Hold⟩
   icases Hold with ⟨#Hrco, Hold⟩
-  ihave Hold : iprop(▷ (fileTaint (hlc := hlc) c ∨ (⌜fileFsPure av_o⌝ ∗ consState r_o.fnCons av_o
-      ∗ fState (hlc := hlc) c r_o av_o ∗ syncClaim (hlc := hlc) c r_o av_o))) $$ [Hold]
+  ihave Hold : iprop(▷ (fileTaint c ∨ (⌜fileFsPure av_o⌝ ∗ consState r_o.fnCons av_o
+      ∗ fState c r_o av_o ∗ syncClaim c r_o av_o))) $$ [Hold]
   · inext
     iapply filePred_elim c r_o av_o $$ Hold
   icases later_or.mp $$ Hold with (#Hto | Hold)
@@ -377,20 +377,20 @@ theorem fileMerge (c : FileFixed) (gen : Nat)
     · iapply hst2 $$ Hsa
   icases Hold with ⟨-, -, -, Hso⟩
   ihave Hso : iprop(▷ ∃ (ls_o : List FlLine) (Ls_o : List Srec),
-      syncBody (hlc := hlc) c r_o av_o ls_o Ls_o) $$ [Hso]
+      syncBody c r_o av_o ls_o Ls_o) $$ [Hso]
   · inext
     iapply syncClaim_elim c r_o av_o $$ Hso
   icases later_exists.mpr $$ Hso with ⟨%ls_o, Hso⟩
   icases later_exists.mpr $$ Hso with ⟨%Ls_o, Hso⟩
-  ihave Hso : iprop(▷ (syncReg c r_o.fnEra r_o.fnSync ∗ syncRole (hlc := hlc) c r_o Ls_o))
+  ihave Hso : iprop(▷ (syncReg c r_o.fnEra r_o.fnSync ∗ syncRole c r_o Ls_o))
     $$ [Hso]
   · inext
     icases syncBody_elim c r_o av_o ls_o Ls_o $$ Hso with ⟨Hr1, -, -, -, Hr2⟩
     iframe Hr1 Hr2
   icases Hso with ⟨#Hrego, Hroo⟩
   ihave Hag2 : iprop(▷ ⌜r_o.fnEra = gen + 1 ∧ r_o.fnSync = γ ∧ Ls_o = Lt⌝ ∧
-      (▷ syncRole (hlc := hlc) c r_o Ls_o ∗ slAuth γ (1 : Qp).half.half Lt
-        ∗ syncStAuth (hlc := hlc) c (gen + 1))) $$ [Hroo Hqt Hsa]
+      (▷ syncRole c r_o Ls_o ∗ slAuth γ (1 : Qp).half.half Lt
+        ∗ syncStAuth c (gen + 1))) $$ [Hroo Hqt Hsa]
   · isplit
     · inext
       icases Hrco with %hro

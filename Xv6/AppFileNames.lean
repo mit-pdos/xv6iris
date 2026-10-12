@@ -148,20 +148,20 @@ attribute [reducible, instance] FileAppG.deedG FileAppG.flG FileAppG.escG FileAp
   FileAppG.runG
 
 section AppFileNames
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF]
 
 /-! ## 1a. The taint, at the projection -/
 
 /-- Rocq `file_taint`. -/
-def fileTaint (c : FileFixed) : IProp GF := echoTaint (hlc := hlc) c.ffEcho
+def fileTaint (c : FileFixed) : IProp GF := echoTaint c.ffEcho
 
 instance fileTaint_persistent (c : FileFixed) :
-    Persistent (fileTaint (hlc := hlc) (GF := GF) c) := by
+    Persistent (fileTaint (GF := GF) c) := by
   unfold fileTaint; infer_instance
 
 instance fileTaint_timeless (c : FileFixed) :
-    Timeless (fileTaint (hlc := hlc) (GF := GF) c) := by
+    Timeless (fileTaint (GF := GF) c) := by
   unfold fileTaint; infer_instance
 
 /-! ## 1b. The line list -/
@@ -196,7 +196,7 @@ theorem flLb_lb (c : FileFixed) (ls ls' : List FlLine) :
 /-- THE BIRTH (Rocq `file_cl`): echo's counter and era map, and the line
 list empty. -/
 def fileCl (c : FileFixed) : IProp GF :=
-  iprop(echoCl (hlc := hlc) c.ffEcho ∗ flAuth c [])
+  iprop(echoCl c.ffEcho ∗ flAuth c [])
 
 end AppFileNames
 

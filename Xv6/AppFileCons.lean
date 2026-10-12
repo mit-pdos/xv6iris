@@ -74,15 +74,15 @@ theorem fileConsArm_nd : ∀ e : Std.ExtTreeMap Fname Nat compare, cdev ≠ .ADi
   consDev_nondir
 
 section AppFileCons
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF]
 
 /-! ## The claim's pure half -/
 
 /-- Rocq `file_fs_pure_acc`. -/
 theorem fileFsPure_acc (c : FileFixed) (r : FileAppNames) (av : Aview) :
-    ⊢@{IProp GF} filePred (hlc := hlc) c r av -∗
-      filePred (hlc := hlc) c r av ∗ (⌜fileFsPure av⌝ ∨ fileTaint (hlc := hlc) c) := by
+    ⊢@{IProp GF} filePred c r av -∗
+      filePred c r av ∗ (⌜fileFsPure av⌝ ∨ fileTaint c) := by
   unfold filePred
   iintro H
   icases H with (#Ht | ⟨%hp, Hcs, Hf, Hsy⟩)
@@ -97,8 +97,8 @@ theorem fileFsPure_acc (c : FileFixed) (r : FileAppNames) (av : Aview) :
 
 /-- Rocq `file_echo_fs_pure_acc`. -/
 theorem fileEchoFsPure_acc (c : FileFixed) (r : FileAppNames) (av : Aview) :
-    ⊢@{IProp GF} filePred (hlc := hlc) c r av -∗
-      filePred (hlc := hlc) c r av ∗ (⌜echoFsPure av⌝ ∨ fileTaint (hlc := hlc) c) := by
+    ⊢@{IProp GF} filePred c r av -∗
+      filePred c r av ∗ (⌜echoFsPure av⌝ ∨ fileTaint c) := by
   iintro Hp
   ihave ⟨Hp, Hr⟩ := fileFsPure_acc c r av $$ Hp
   iframe Hp
@@ -109,12 +109,12 @@ theorem fileEchoFsPure_acc (c : FileFixed) (r : FileAppNames) (av : Aview) :
 /-- THE DEED'S INUM IS NOT ONE OF THE IMAGE'S (Rocq `file_deed_inum_acc`). -/
 theorem fileDeedInum_acc (c : FileFixed) (r : FileAppNames) (av : Aview) (s : Dst) (N : Fname)
     (i : Nat) (bs : List (BitVec 8)) (hsN : s[N]? = some (i, bs)) (hlen : bs.length < lineMax) :
-    ⊢@{IProp GF} fdeed r s -∗ filePred (hlc := hlc) c r av -∗
-      filePred (hlc := hlc) c r av ∗ fdeed r s ∗
+    ⊢@{IProp GF} fdeed r s -∗ filePred c r av -∗
+      filePred c r av ∗ fdeed r s ∗
       (⌜i ≠ INIT_INO ∧ i ≠ SH_INO ∧ i ≠ ECHO_INO ∧ i ≠ CAT_INO ∧ i ≠ GREP_INO ∧
-        i ≠ SECC_INO ∧ i ≠ SYNC_INO⌝ ∨ fileTaint (hlc := hlc) c) := by
+        i ≠ SECC_INO ∧ i ≠ SYNC_INO⌝ ∨ fileTaint c) := by
   iintro Hd Hp
-  ihave #Hlaw := fileDeed_law (hlc := hlc) (GF := GF) c r
+  ihave #Hlaw := fileDeed_law (GF := GF) c r
   ihave ⟨Hp, Hpure⟩ := fileFsPure_acc c r av $$ Hp
   ihave ⟨Hp, Hd, Hres⟩ := Hlaw $$ %av %s Hd Hp
   iframe Hp Hd
@@ -130,10 +130,10 @@ theorem fileDeedInum_acc (c : FileFixed) (r : FileAppNames) (av : Aview) (s : Ds
 
 /-- The key's ABSENCE law (Rocq `file_cons_abs_law`). -/
 theorem fileConsAbs_law (c : FileFixed) (r : FileAppNames) :
-    ⊢@{IProp GF} □ (∀ v : Aview, consKey r.fnCons -∗ filePred (hlc := hlc) c r v -∗
-      filePred (hlc := hlc) c r v ∗ consKey r.fnCons ∗
-      (⌜consAbsent v⌝ ∨ fileTaint (hlc := hlc) c)) := by
-  ihave #Hl := echoConsAbs_law (hlc := hlc) (GF := GF) c.ffEcho r.fnCons
+    ⊢@{IProp GF} □ (∀ v : Aview, consKey r.fnCons -∗ filePred c r v -∗
+      filePred c r v ∗ consKey r.fnCons ∗
+      (⌜consAbsent v⌝ ∨ fileTaint c)) := by
+  ihave #Hl := echoConsAbs_law (GF := GF) c.ffEcho r.fnCons
   iintro !> %v Hk Hp
   ihave ⟨He, Hback⟩ := filePred_cons c r v $$ Hp
   ihave ⟨He, Hk, Hc⟩ := Hl $$ %v Hk He
@@ -146,9 +146,9 @@ theorem fileConsAbs_law (c : FileFixed) (r : FileAppNames) :
 /-- The SEAL's law (Rocq `file_cons_never_law`). -/
 theorem fileConsNever_law (c : FileFixed) (r : FileAppNames) :
     ⊢@{IProp GF} □ (consNever r.fnCons -∗
-      □ (∀ v : Aview, filePred (hlc := hlc) c r v -∗
-        filePred (hlc := hlc) c r v ∗ (⌜consAbsent v⌝ ∨ fileTaint (hlc := hlc) c))) := by
-  ihave #Hl := echoConsNever_law (hlc := hlc) (GF := GF) c.ffEcho r.fnCons
+      □ (∀ v : Aview, filePred c r v -∗
+        filePred c r v ∗ (⌜consAbsent v⌝ ∨ fileTaint c))) := by
+  ihave #Hl := echoConsNever_law (GF := GF) c.ffEcho r.fnCons
   iintro !> #Hn
   ihave #Hl' := Hl $$ Hn
   iintro !> %v Hp
@@ -161,11 +161,11 @@ theorem fileConsNever_law (c : FileFixed) (r : FileAppNames) :
 
 /-- The SEAL STEP (Rocq `file_cons_seal_step`). -/
 theorem fileConsSealStep (c : FileFixed) (r : FileAppNames) (av : Aview) :
-    ⊢@{IProp GF} consKey r.fnCons -∗ filePred (hlc := hlc) c r av ==∗
-      filePred (hlc := hlc) c r av ∗ (consNever r.fnCons ∨ fileTaint (hlc := hlc) c) := by
+    ⊢@{IProp GF} consKey r.fnCons -∗ filePred c r av ==∗
+      filePred c r av ∗ (consNever r.fnCons ∨ fileTaint c) := by
   iintro Hk Hp
   ihave ⟨He, Hback⟩ := filePred_cons c r av $$ Hp
-  imod echoConsSealStep (hlc := hlc) c.ffEcho r.fnCons av $$ [Hk He] with ⟨He, Hc⟩
+  imod echoConsSealStep c.ffEcho r.fnCons av $$ [Hk He] with ⟨He, Hc⟩
   · iframe Hk He
   imodintro
   isplitl [He Hback]
@@ -176,11 +176,11 @@ theorem fileConsSealStep (c : FileFixed) (r : FileAppNames) (av : Aview) :
 /-- The FLAG's birth (Rocq `file_cons_shoot`). -/
 theorem fileConsShoot (c : FileFixed) (r : FileAppNames) (av : Aview) (i : Nat)
     (hpr : consPresentAt i av) :
-    ⊢@{IProp GF} filePred (hlc := hlc) c r av ==∗
-      filePred (hlc := hlc) c r av ∗ (consMade r.fnCons i ∨ fileTaint (hlc := hlc) c) := by
+    ⊢@{IProp GF} filePred c r av ==∗
+      filePred c r av ∗ (consMade r.fnCons i ∨ fileTaint c) := by
   iintro Hp
   ihave ⟨He, Hback⟩ := filePred_cons c r av $$ Hp
-  imod echoConsShoot (hlc := hlc) c.ffEcho r.fnCons av i hpr $$ He with ⟨He, Hc⟩
+  imod echoConsShoot c.ffEcho r.fnCons av i hpr $$ He with ⟨He, Hc⟩
   imodintro
   isplitl [He Hback]
   · iapply Hback $$ He
@@ -193,7 +193,7 @@ theorem fileConsShoot (c : FileFixed) (r : FileAppNames) (av : Aview) (i : Nat)
 `file_cons_arm`). -/
 theorem fileConsArm (c : FileFixed) (r : FileAppNames) (av : Aview) (i : Nat)
     (hfree : PartialMap.get? av i = none) :
-    ⊢@{IProp GF} filePred (hlc := hlc) c r av -∗ filePred (hlc := hlc) c r (deltaArm i cdev av) :=
+    ⊢@{IProp GF} filePred c r av -∗ filePred c r (deltaArm i cdev av) :=
   fileStep_free c r av (deltaArm i cdev av)
     (fun hp => fileFsPure_arm i cdev av hfree hp)
     (fun hab => consAbsent_arm_nd i cdev av fileConsArm_nd hab)
@@ -204,11 +204,11 @@ theorem fileConsArm (c : FileFixed) (r : FileAppNames) (av : Aview) (i : Nat)
 theorem fileConsMknod (c : FileFixed) (r : FileAppNames) (av : Aview)
     (ents : Std.ExtTreeMap Fname Nat compare) (nl i : Nat)
     (hpre : crePre av ROOTINO fnameConsole ents nl i cdev) :
-    ⊢@{IProp GF} consKey r.fnCons -∗ filePred (hlc := hlc) c r av -∗
-      filePred (hlc := hlc) c r (deltaCreate ROOTINO fnameConsole i cdev av) := by
+    ⊢@{IProp GF} consKey r.fnCons -∗ filePred c r av -∗
+      filePred c r (deltaCreate ROOTINO fnameConsole i cdev av) := by
   iintro Hk Hp
   ihave ⟨He, Hres⟩ := filePred_split c r av $$ Hp
-  ihave He := echoConsMknod (hlc := hlc) c.ffEcho r.fnCons av ents nl i hpre $$ [Hk He]
+  ihave He := echoConsMknod c.ffEcho r.fnCons av ents nl i hpre $$ [Hk He]
   · iframe Hk He
   iapply filePred_join c r _ $$ He
   iapply fileRest_mono c r av (deltaCreate ROOTINO fnameConsole i cdev av)
@@ -230,38 +230,38 @@ instance consFlag_persistent (r : FileAppNames) (jo : Option Nat) :
 
 /-- THE CREDENTIAL THE FILE CLAIM'S CONSUMERS TAKE (Rocq `file_cons_cred`). -/
 def fileConsCred (c : FileFixed) (r : FileAppNames) (jo : Option Nat) : IProp GF :=
-  iprop(consFlag r jo ∨ fileTaint (hlc := hlc) c)
+  iprop(consFlag r jo ∨ fileTaint c)
 
 instance fileConsCred_persistent (c : FileFixed) (r : FileAppNames) (jo : Option Nat) :
-    Persistent (fileConsCred (hlc := hlc) (GF := GF) c r jo) := by
+    Persistent (fileConsCred (GF := GF) c r jo) := by
   unfold fileConsCred; infer_instance
 
 /-- Rocq `file_cons_cred_of_made`. -/
 theorem fileConsCred_of_made (c : FileFixed) (r : FileAppNames) (j : Nat) :
-    ⊢@{IProp GF} consMade r.fnCons j -∗ fileConsCred (hlc := hlc) c r (some j) := by
+    ⊢@{IProp GF} consMade r.fnCons j -∗ fileConsCred c r (some j) := by
   iintro #H
   unfold fileConsCred consFlag
   ileft; iexact H
 
 /-- Rocq `file_cons_cred_of_never`. -/
 theorem fileConsCred_of_never (c : FileFixed) (r : FileAppNames) :
-    ⊢@{IProp GF} consNever r.fnCons -∗ fileConsCred (hlc := hlc) c r none := by
+    ⊢@{IProp GF} consNever r.fnCons -∗ fileConsCred c r none := by
   iintro #H
   unfold fileConsCred consFlag
   ileft; iexact H
 
 /-- Rocq `file_cons_cred_of_taint`. -/
 theorem fileConsCred_of_taint (c : FileFixed) (r : FileAppNames) (jo : Option Nat) :
-    ⊢@{IProp GF} fileTaint (hlc := hlc) c -∗ fileConsCred (hlc := hlc) c r jo := by
+    ⊢@{IProp GF} fileTaint c -∗ fileConsCred c r jo := by
   iintro #H
   unfold fileConsCred
   iright; iexact H
 
 /-- THE LAW, at both flags (Rocq `file_cons_cred_law`). -/
 theorem fileConsCred_law (c : FileFixed) (r : FileAppNames) (jo : Option Nat) :
-    ⊢@{IProp GF} fileConsCred (hlc := hlc) c r jo -∗
-      □ (∀ v : Aview, filePred (hlc := hlc) c r v -∗
-        filePred (hlc := hlc) c r v ∗ (⌜consFact jo v⌝ ∨ fileTaint (hlc := hlc) c)) := by
+    ⊢@{IProp GF} fileConsCred c r jo -∗
+      □ (∀ v : Aview, filePred c r v -∗
+        filePred c r v ∗ (⌜consFact jo v⌝ ∨ fileTaint c)) := by
   iintro #Hc
   unfold fileConsCred
   icases Hc with (#Hf | #Ht)
@@ -272,7 +272,7 @@ theorem fileConsCred_law (c : FileFixed) (r : FileAppNames) (jo : Option Nat) :
   cases jo with
   | some j =>
     unfold consFlag
-    ihave #Hl := echoCons_law (hlc := hlc) (GF := GF) c.ffEcho r.fnCons j $$ Hf
+    ihave #Hl := echoCons_law (GF := GF) c.ffEcho r.fnCons j $$ Hf
     iintro !> %v Hp
     ihave ⟨He, Hback⟩ := filePred_cons c r v $$ Hp
     ihave ⟨He, Hc⟩ := Hl $$ %v He
@@ -282,7 +282,7 @@ theorem fileConsCred_law (c : FileFixed) (r : FileAppNames) (jo : Option Nat) :
     iexact Hc
   | none =>
     unfold consFlag
-    ihave #Hn := fileConsNever_law (hlc := hlc) (GF := GF) c r
+    ihave #Hn := fileConsNever_law (GF := GF) c r
     ihave #Hl := Hn $$ Hf
     unfold consFact
     iexact Hl

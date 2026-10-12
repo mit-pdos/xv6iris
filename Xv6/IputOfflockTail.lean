@@ -18,7 +18,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -27,7 +27,7 @@ set_option maxHeartbeats 16000000 in
 /-- `+0xbe .. +0xca`: the buffer released, the three frame restores, the
 jump to the epilogue. -/
 theorem iput_ofl_rel (BL : BRELSE)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (γil γisl : GName)
     (kk : Nat) (b : Nat) (bno : BitVec 32) (bs bsd : List (BitVec 8))
     (n : Nat) (Sb : List Nat) (crb cru crz : Bool) (tid : Nat) (qtx : Qp)
@@ -140,7 +140,7 @@ set_option maxHeartbeats 16000000 in
 /-- `+0xba`: `jal log_write`, the deposit riding its atomic update; then
 `iput_ofl_rel`. -/
 theorem iput_ofl_tail (LW : LOG_WRITE) (BL : BRELSE)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (γil γisl : GName)
     (kk : Nat) (b : Nat) (inum : BitVec 32) (dn : Dinode) (ds : List Dinode)
     (bsd : List (BitVec 8)) (d0 : Bool)

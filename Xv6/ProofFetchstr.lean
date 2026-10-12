@@ -73,7 +73,7 @@ def fetchstrPins (k : KCtx) (R : RegMap) : Prop :=
   R 26#5 = k.regs 26#5 ∧ R 27#5 = k.regs 27#5
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-! ## The block, opened at the two cells and the address space -/
 
@@ -127,7 +127,7 @@ theorem fetchstr_myproc (MP : MYPROC) (c : CPU) (k' : KCtx)
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.proc⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := MP.wp_myproc (hlc := hlc) (GF := GF) c k' hnoff hK
+  have h := MP.wp_myproc (GF := GF) c k' hnoff hK
   unfold wp_myproc_body at h
   simp only [myprocAddr] at h
   exact h
@@ -154,7 +154,7 @@ theorem fetchstr_copyinstr (CI : COPYINSTR) (c : CPU) (k' : KCtx) (γl : GName) 
         procPtAt P' (viewFaulted P P' M) ∗ byteBuf (k'.regs 12#5) (DFrac.own 1) bs') -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := CI.wp_copyinstr (hlc := hlc) (GF := GF) c k' γl γk P M old ke hnoff hK hlk hroot hsz hmax hmax'
+  have h := CI.wp_copyinstr (GF := GF) c k' γl γk P M old ke hnoff hK hlk hroot hsz hmax hmax'
   unfold wp_copyinstr_body at h
   simp only [copyinstrAddr] at h
   exact h
@@ -168,7 +168,7 @@ theorem fetchstr_strlen (SL : STRLEN) (c : CPU) (k' : KCtx) (s : List (BitVec 8)
       cstr (k'.regs 10#5) dq s -∗
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = BitVec.ofNat 64 s.length⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := SL.wp_strlen (hlc := hlc) (GF := GF) c k' s dq hK hn31
+  have h := SL.wp_strlen (GF := GF) c k' s dq hK hn31
   unfold wp_strlen_body at h
   simp only [strlenAddr] at h
   exact h
@@ -325,7 +325,7 @@ end
 
 set_option maxHeartbeats 16000000 in
 theorem fetchstr_proof (MP : MYPROC) (CI : COPYINSTR) (SL : STRLEN) : FETCHSTR :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ X cpu k γl γk pa pid V M old hproc htier hnoff hK hlk hmax hmax' => by
+  ⟨fun {GF} _ _ _ _ _ _ _ X cpu k γl γk pa pid V M old hproc htier hnoff hK hlk hmax hmax' => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_fetchstr_body

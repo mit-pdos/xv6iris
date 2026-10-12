@@ -16,7 +16,7 @@ namespace MachCSL
 
 open Iris Iris.BI Iris.ProofMode Std
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- The identity claim of a kernel address: its page maps to itself, read-write. -/
 abbrev kmapId [CurCtx] (va : BitVec 64) : IProp GF :=

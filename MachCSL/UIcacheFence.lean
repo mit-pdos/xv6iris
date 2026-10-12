@@ -28,7 +28,7 @@ open Sail Sail.ConcurrencyInterfaceV1
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- **A2, Rocq `ifence_step`**: a ghost step at a `fence.i`.  For every
 machine state `σ` (the post-fence one) and every instruction-view position
@@ -82,7 +82,7 @@ theorem swp_sail_barrier_fencei (cpu : CPU) (P : IProp GF) (Q : Nat → IProp GF
 /-- Every timestamp the running context justifies is under the hart's data
 view, or is the hart's own store. -/
 theorem uic_keyAt_le (σ : MState) (cpu : CPU) (ξ : CtxId) (t : Nat) :
-    memModel σ ∗ ownCtx cpu ξ ∗ keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ t ⊢@{IProp GF}
+    memModel σ ∗ ownCtx cpu ξ ∗ keyAt (MachGS.era (GF := GF)) ξ t ⊢@{IProp GF}
       ⌜t ≤ σ.tv cpu ∨ t ≤ ownPub (hartAgent cpu) σ.log⌝ := by
   unfold ownCtx ownCtxAt
   iintro ⟨Hmm, ⟨%B, %Kv, %W, %D, Hctx, HK, %hBK, _, %hdok, _⟩, Hkey⟩

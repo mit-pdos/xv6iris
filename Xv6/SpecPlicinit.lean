@@ -37,7 +37,7 @@ def plicinitAddr : BitVec 64 := KA.«plicinit»
 def plicinitSlots : Nat := 2
 
 /-- **WP of `plicinit`.** -/
-def wp_plicinit_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_plicinit_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ0 γ1 : UartNames)
     (hsie : k.sie = false) (hK : plicinitSlots ≤ k.avail) : Prop :=
   kctx cpu k ∗ pcIs cpu plicinitAddr ∗ plicInv γ0 γ1 ∗
@@ -47,8 +47,8 @@ def wp_plicinit_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
 
 /-- The interface of `plicinit`. -/
 structure PLICINIT : Prop where
-  wp_plicinit : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+  wp_plicinit : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ0 γ1 : UartNames) hsie hK,
-    wp_plicinit_body (hlc := hlc) (GF := GF) cpu k γ0 γ1 hsie hK
+    wp_plicinit_body (GF := GF) cpu k γ0 γ1 hsie hK
 
 end Xv6

@@ -32,7 +32,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section AppFileSyncClose
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF]
 
 /-- Rocq `sync_claim_rec_eq`: the sync part reads only an instance's sync
@@ -40,7 +40,7 @@ fields. -/
 theorem syncClaim_recEq (c : FileFixed) (r1 r2 : FileAppNames) (av : Aview)
     (h1 : r1.fnSync = r2.fnSync) (h2 : r1.fnEra = r2.fnEra) (h3 : r1.fnRole = r2.fnRole)
     (h4 : r1.fnPos = r2.fnPos) (h5 : r1.fnDeed = r2.fnDeed) :
-    syncClaim (hlc := hlc) (GF := GF) c r1 av ⊢ syncClaim (hlc := hlc) c r2 av := by
+    syncClaim (GF := GF) c r1 av ⊢ syncClaim c r2 av := by
   rcases r1 with ⟨a1, b1, c1, d1, e1, f1, g1, p1⟩
   rcases r2 with ⟨a2, b2, c2, d2, e2, f2, g2, p2⟩
   dsimp only at h1 h2 h3 h4 h5
@@ -51,7 +51,7 @@ theorem syncClaim_recEq (c : FileFixed) (r1 r2 : FileAppNames) (av : Aview)
 /-- A MOVE THAT LEAVES THE FILES (Rocq `sync_claim_same`). -/
 theorem syncClaim_same (c : FileFixed) (r : FileAppNames) (av av' : Aview)
     (he : fcontOf av = fcontOf av') :
-    syncClaim (hlc := hlc) (GF := GF) c r av ⊢ syncClaim (hlc := hlc) c r av' := by
+    syncClaim (GF := GF) c r av ⊢ syncClaim c r av' := by
   unfold syncClaim syncBody
   rw [he]
 
@@ -61,9 +61,9 @@ theorem unionHook_closes (c : FileFixed) (r' r : FileAppNames) (av : Aview) (gen
     (h1 : r'.fnRole = true) (h2 : r'.fnEra = gen + 1) (h3 : r.fnRole = false)
     (h4 : r.fnEra = gen + 1) (hlast : ls'.getLast? = some Uline.LSync) (hs : fcontOf av = s)
     (hn : n = ls'.length) :
-    ⊢@{IProp GF} syncClaim (hlc := hlc) c r' av -∗ syncBody (hlc := hlc) c r av ls Ls -∗
-      unionTkb (hlc := hlc) c gen -∗ flLb c ls' -∗ fpos r n ==∗
-      syncClaim (hlc := hlc) c r' av ∗ syncClaim (hlc := hlc) c r av ∗ unionTkb (hlc := hlc) c gen
+    ⊢@{IProp GF} syncClaim c r' av -∗ syncBody c r av ls Ls -∗
+      unionTkb c gen -∗ flLb c ls' -∗ fpos r n ==∗
+      syncClaim c r' av ∗ syncClaim c r av ∗ unionTkb c gen
       ∗ slLb c.ffHist (Ls ++ [(ls'.length, s)]) ∗ fpos r n := by
   rcases r' with ⟨gc, gd, gt, ge, gγ, gk, gb, gp⟩
   rcases r with ⟨rc, rd, rt, re, rγ, rk, rb, rp⟩
@@ -139,8 +139,8 @@ theorem syncClaim_redirStep (c : FileFixed) (r : FileAppNames) (av av' : Aview)
     (hrole : r.fnRole = false) (hj : ls_w[j]? = some (Uline.LEchoF ws N))
     (hlen : ls_w.length = j + 1) (hsel : selOk (echoChunks ws) sel) (hn : n = ls_w.length)
     (hav : fcontOf av' = (fcontOf av).insert N (subseq (echoChunks ws) sel)) :
-    ⊢@{IProp GF} syncBody (hlc := hlc) c r av ls Ls -∗ flLb c ls_w -∗ fposq r n -∗
-      (∃ L : List FlLine, syncBody (hlc := hlc) c r av' L Ls) ∗ fposq r n := by
+    ⊢@{IProp GF} syncBody c r av ls Ls -∗ flLb c ls_w -∗ fposq r n -∗
+      (∃ L : List FlLine, syncBody c r av' L Ls) ∗ fposq r n := by
   subst hn
   iintro Hb #Hlbw Hph
   icases syncBody_elim c r av ls Ls $$ Hb with ⟨#Hreg, #Hlb, %hch, %hw, Hr⟩
@@ -211,8 +211,8 @@ theorem fstate_insert_insert (S : Fstate) (N : List (BitVec 8)) (a b : List (Bit
 /-- ...and the move: the running claim at the new files, the quarter out
 (Rocq `sync_claim_redir`). -/
 theorem syncClaim_redir (c : FileFixed) (r : FileAppNames) (av av' : Aview) :
-    ⊢@{IProp GF} syncRedir c r (fcontOf av) (fcontOf av') -∗ syncClaim (hlc := hlc) c r av -∗
-      syncClaim (hlc := hlc) c r av' ∗ ∃ n : Nat, fposq r n := by
+    ⊢@{IProp GF} syncRedir c r (fcontOf av) (fcontOf av') -∗ syncClaim c r av -∗
+      syncClaim c r av' ∗ ∃ n : Nat, fposq r n := by
   unfold syncRedir
   iintro ⟨%ls_w, %ws, %N, %sel, %n, %hlast, %hsel, %hn, %hav, #Hlbw, Hq⟩ Hc
   icases syncClaim_elim c r av $$ Hc with ⟨%ls, %Ls, Hb⟩
@@ -229,7 +229,7 @@ theorem syncClaim_redir (c : FileFixed) (r : FileAppNames) (av av' : Aview) :
   ihave ⟨⟨%L, Hb⟩, Hq⟩ := syncClaim_redirStep c r av av' ls Ls ls_w (ls_w.length - 1) ws N sel n
     hrole hj hlen hsel hn hav $$ Hb Hlbw Hq
   isplitl [Hb]
-  · iapply (show syncBody (hlc := hlc) (GF := GF) c r av' L Ls ⊢ syncClaim (hlc := hlc) c r av'
+  · iapply (show syncBody (GF := GF) c r av' L Ls ⊢ syncClaim c r av'
       from by unfold syncClaim; iintro H; iexists L, Ls; iexact H) $$ Hb
   · iexists n
     iexact Hq
@@ -237,8 +237,8 @@ theorem syncClaim_redir (c : FileFixed) (r : FileAppNames) (av av' : Aview) :
 /-- THE ROUND POSITION ADVANCES (Rocq `sync_claim_advance`). -/
 theorem syncClaim_advance (c : FileFixed) (r : FileAppNames) (av : Aview) (n n' : Nat)
     (hle : n ≤ n') :
-    ⊢@{IProp GF} syncClaim (hlc := hlc) c r av -∗ fposh r n ==∗
-      syncClaim (hlc := hlc) c r av ∗ fposh r n' := by
+    ⊢@{IProp GF} syncClaim c r av -∗ fposh r n ==∗
+      syncClaim c r av ∗ fposh r n' := by
   iintro Hc Hpos
   icases syncClaim_elim c r av $$ Hc with ⟨%ls, %Ls, Hb⟩
   unfold fposh fpos fposq
@@ -264,18 +264,18 @@ theorem syncClaim_advance (c : FileFixed) (r : FileAppNames) (av : Aview) (n n' 
 /-- POWERON'S RE-BASE (Rocq `sync_claim_rebase`). -/
 theorem syncClaim_rebase (c : FileFixed) (r : FileAppNames) (av : Aview) (γ : GName)
     (gen : Nat) (F : List Srec) (d : GName) (hr : r.fnRole = true) :
-    ⊢@{IProp GF} syncClaim (hlc := hlc) c r av -∗ slAuth γ 1 [] -∗ syncReg c (gen + 1) γ -∗
-      slLb c.ffHist F -∗ syncStAuth (hlc := hlc) c (gen + 1) ==∗
+    ⊢@{IProp GF} syncClaim c r av -∗ slAuth γ 1 [] -∗ syncReg c (gen + 1) γ -∗
+      slLb c.ffHist F -∗ syncStAuth c (gen + 1) ==∗
       ∃ γp : GName,
-        syncClaim (hlc := hlc) c (fnWith r γ (gen + 1) true) av
-        ∗ syncClaim (hlc := hlc) c (fnRun r d γ (gen + 1) γp) av
-        ∗ unionTkb (hlc := hlc) c gen
+        syncClaim c (fnWith r γ (gen + 1) true) av
+        ∗ syncClaim c (fnRun r d γ (gen + 1) γp) av
+        ∗ unionTkb c gen
         ∗ (∃ (ls : List FlLine) (Ls_c : List Srec),
             flLb c ls ∗ slLb γ Ls_c ∗ slLb c.ffHist Ls_c
             ∗ ⌜F <+: Ls_c⌝ ∗ ⌜uadm ls (slast F) (fcontOf av)⌝
             ∗ fposh (fnRun r d γ (gen + 1) γp) ls.length
             ∗ runReg c (gen + 1) γp d)
-        ∗ syncStAuth (hlc := hlc) c (gen + 1) := by
+        ∗ syncStAuth c (gen + 1) := by
   rcases r with ⟨rc, rd, rt, re, rγ, rk, rb, rp⟩
   dsimp only at hr
   subst hr
@@ -343,8 +343,8 @@ theorem syncClaim_rebase (c : FileFixed) (r : FileAppNames) (av : Aview) (γ : G
 theorem syncClaim_birth (c : FileFixed) (r0 : FileAppNames) (av0 : Aview) (γ0 : GName)
     (ls : List FlLine) (h1 : r0.fnRole = true) (h2 : r0.fnEra = 0) (h3 : r0.fnSync = γ0)
     (h4 : fcontentOf av0 = ∅) :
-    ⊢@{IProp GF} syncReg c 0 γ0 -∗ slAuth γ0 (1 : Qp).half [] -∗ syncCmAuth (hlc := hlc) c 0 -∗
-      slAuth c.ffHist 1 [] -∗ runAuth c 0 -∗ flLb c ls ==∗ syncClaim (hlc := hlc) c r0 av0 := by
+    ⊢@{IProp GF} syncReg c 0 γ0 -∗ slAuth γ0 (1 : Qp).half [] -∗ syncCmAuth c 0 -∗
+      slAuth c.ffHist 1 [] -∗ runAuth c 0 -∗ flLb c ls ==∗ syncClaim c r0 av0 := by
   rcases r0 with ⟨rc, rd, rt, re, rγ, rk, rb, rp⟩
   dsimp only at h1 h2 h3
   subst h1 h2 h3

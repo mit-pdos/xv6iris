@@ -118,7 +118,7 @@ theorem create_lic_regen [Icfg] {GF : BundledGFunctors.{0}} [IcacheG GF] (ty : B
     iregWdLic (GF := GF) (.claimK ty t q) g1 z ⊢ iregWdLic (.claimK ty t q) g2 z := .rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -130,12 +130,12 @@ def createFreshEnv (Γ : SchedNames) (γl : GName) (pd pav pu : BitVec 64) : IPr
   bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
   logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
   diskCaps fscDisk fscDlock pd pav pu ∗
-  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
+  iregInv fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗ icSleeplocks fscIc
+  itableInv ∗ icSleeplocks fscIc
 
 instance createFreshEnv_persistent (Γ : SchedNames) (γl : GName) (pd pav pu : BitVec 64) :
-    Persistent (createFreshEnv (hlc := hlc) (GF := GF) Γ γl pd pav pu) := by
+    Persistent (createFreshEnv (GF := GF) Γ γl pd pav pu) := by
   unfold createFreshEnv; infer_instance
 
 /-- **THE ALLOCATE ARM's PAYOUT** at `+0xb4`: the child LOCKED and FILLED
@@ -192,7 +192,7 @@ def createFreshPost (k : KCtx) (R : RegMap) (ty : BitVec 16) (kd : Nat) (dqd : D
 
 set_option maxHeartbeats 8000000 in
 /-- `ialloc(dev, type)` at `+0xa8`: the eb set form, hart-free. -/
-theorem create_ialloc (IA : IALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU)
+theorem create_ialloc (IA : IALLOC) (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU)
     (k' : KCtx) (j : Nat) (γl : GName) (pd pav pu : BitVec 64) (ty : BitVec 16) (u : Nat)
     (Sb : List Nat) (t : Nat) (qc : Qp) (pidv : BitVec 32) (dqp dqs dqn : DFrac)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : iallocSlots ≤ k'.avail)
@@ -204,7 +204,7 @@ theorem create_ialloc (IA : IALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
     (ha1 : k'.regs 11#5 = BitVec.signExtend 64 ty) :
     kctx cpu k' ∗ pcIs cpu KA.«ialloc» ∗
     trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗
-    createFreshEnv (hlc := hlc) Γ γl pd pav pu ∗
+    createFreshEnv Γ γl pd pav pu ∗
     wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     wordPointsTo (pPid k'.proc) 4 dqp pidv ∗ bslots 2 ∗ irefSlot ∗
@@ -229,7 +229,7 @@ theorem create_ialloc (IA : IALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
           txPin icfgLog t qc ∗ logOpS icfgLog (u + 1) Sb)) -∗
       wpLoop c)
     ⊢ wpLoop (GF := GF) cpu := by
-  have h := IA.wp_ialloc_gen_eb (hlc := hlc) (GF := GF) Γ cpu k' γl pd pav pu j ty u Sb t qc
+  have h := IA.wp_ialloc_gen_eb (GF := GF) Γ cpu k' γl pd pav pu j ty u Sb t qc
     pidv dqp dqs dqn hj hproc hK hnoff htier hgeom hblk hn1 hnnib hn31 hty htyk hpd ha0 ha1
   unfold wp_ialloc_gen_eb_body at h
   simp only [iallocAddr] at h
@@ -251,7 +251,7 @@ the reference and `iregWdLic (.claimK ty t qc)`; the reference is named at its
 generation and shed; the descriptor is the write arm `depTx` at the caller's
 `(t, qt)`; `topLb 0` (nothing to present).  The post reads the claim arm's
 `ilkPost`: filled, at the claimed type, fresh-shaped. -/
-theorem create_ilock_claim (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU)
+theorem create_ilock_claim (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU)
     (k' : KCtx) (j : Nat) (γl : GName) (pd pav pu : BitVec 64) (ty : BitVec 16) (kslot : Nat)
     (q : Qp) (inum : BitVec 32) (t : Nat) (qt qc : Qp) (pidv : BitVec 32) (dqp dqs : DFrac)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : ilockSlots ≤ k'.avail)
@@ -261,7 +261,7 @@ theorem create_ilock_claim (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
     (ha0 : k'.regs 10#5 = ientry kslot) :
     kctx cpu k' ∗ pcIs cpu KA.«ilock» ∗
     trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗
-    createFreshEnv (hlc := hlc) Γ γl pd pav pu ∗
+    createFreshEnv Γ γl pd pav pu ∗
     inodeClaimed ty kslot q icfgDev inum t qc ∗ txPin icfgLog t qt ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     wordPointsTo (pPid k'.proc) 4 dqp pidv ∗ bslot ∗
@@ -298,8 +298,8 @@ theorem create_ilock_claim (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
   ihave #Hesc := icEscrows_lookup fscIc fscFs fscIreg fscCov fscLogst kslot hkk $$ Hescs
   icases icSleeplocks_lookup fscIc kslot hkk $$ Hslks with ⟨%γil, %γisl, #Hslk⟩
   ihave #Hcla := isItable2_claims $$ Hit2
-  ihave #Hl0 := topLbAt_0 (GF := GF) (MachGS.era (hlc := hlc) (GF := GF))
-  have h := IL.wp_ilock_dep_eb (hlc := hlc) (GF := GF) Γ cpu k' γl pd pav pu j γil γisl kslot q.half
+  ihave #Hl0 := topLbAt_0 (GF := GF) (MachGS.era (GF := GF))
+  have h := IL.wp_ilock_dep_eb (GF := GF) Γ cpu k' γl pd pav pu j γil γisl kslot q.half
     g lo tl (.depTx q.half icfgDev inum g lo t qt) (.claimK ty t qc) inum pidv dqp dqs 0 hj hproc
     hK hnoff htier rfl (fun h => by simp [icDepRd] at h) hkk hgeom hcov hnib hpd ha0 hle
   unfold wp_ilock_dep_eb_body at h
@@ -333,7 +333,7 @@ control at `+0xb4` (allocated, locked, filled at the claimed type) or `+0xec`
 (A-FAIL).  `ty` is pinned by `s4` (`hs4`), which is what makes the statement
 consistent; `s1` is the locked parent's entry, whose `dev` word the `lw`
 reads and hands straight back. -/
-theorem create_fresh_ty (IA : IALLOC) (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem create_fresh_ty (IA : IALLOC) (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (R : RegMap) (j : Nat) (γl : GName) (pd pav pu : BitVec 64)
     (ty : BitVec 16) (kd : Nat) (dqd : DFrac) (u : Nat) (Sb : List Nat) (t : Nat) (qt qc : Qp)
     (pidv : BitVec 32) (dqp dqs dqn : DFrac) (rootv : BitVec 64) (rti : Nat)
@@ -346,7 +346,7 @@ theorem create_fresh_ty (IA : IALLOC) (IL : ILOCK) (Γ : SchedNames) [ClaimIs (h
     (hs4 : R 20#5 = BitVec.signExtend 64 ty) (hs1 : R 9#5 = ientry kd) :
     kctx cpu (k.withRegs R) ∗ pcIs cpu (KA.«create» + 0xa4#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    createFreshEnv (hlc := hlc) Γ γl pd pav pu ∗
+    createFreshEnv Γ γl pd pav pu ∗
     wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
@@ -435,10 +435,10 @@ theorem create_fresh_ty (IA : IALLOC) (IL : ILOCK) (Γ : SchedNames) [ClaimIs (h
     obtain ⟨hcov, -⟩ := hblk inum hnib
     -- R1, WHILE THE CLAIM IS OUTSTANDING: the claim at `inum` and the root
     -- reference's plain unit at `rti` never share an inum.
-    ihave #Hireg : iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib $$ [Henv]
+    ihave #Hireg : iregReg fscIreg fscFs icfgIst icfgNib $$ [Henv]
     · unfold createFreshEnv
       icases Henv with ⟨-, -, -, -, -, Hinv, -, -, -, -⟩
-      ihave H := iregInv_reg (hlc := hlc) fscIreg fscFs icfgIst icfgNib $$ Hinv
+      ihave H := iregInv_reg fscIreg fscFs icfgIst icfgNib $$ Hinv
       iexact H
     unfold inodeClaimed
     icases Hcl with ⟨Href, Hruc, Hclaim⟩
@@ -447,7 +447,7 @@ theorem create_fresh_ty (IA : IALLOC) (IL : ILOCK) (Γ : SchedNames) [ClaimIs (h
     ihave Hrur := (show runitAny (GF := GF) inr.toNat ⊢ runitPlain rti by
       rw [hinrz]; exact .rfl) $$ Hrur
     iapply wpLoop_fupd
-    imod (ireg_claim_plain_ne (hlc := hlc) (GF := GF) ⊤ fscIreg fscFs icfgIst icfgNib inum ty t qc
+    imod (ireg_claim_plain_ne (GF := GF) ⊤ fscIreg fscFs icfgIst icfgNib inum ty t qc
       rti CoPset.subseteq_top (by omega)) $$ Hireg Hclaim Hrur with ⟨%hnrt, Hclaim, Hrur⟩
     imodintro
     ihave Hrur := (show runitPlain (GF := GF) rti ⊢ runitAny inr.toNat by

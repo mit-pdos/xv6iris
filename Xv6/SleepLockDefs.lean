@@ -59,7 +59,7 @@ def slNameField (slk : BitVec 64) : BitVec 64 := slk + 32#64
 def slPid (slk : BitVec 64) : BitVec 64 := slk + 40#64
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
 
 /-! ## The ghost -/
 
@@ -178,26 +178,26 @@ def slBody [CurCtx] (γ : GName) (slk : BitVec 64) (R : CtxId → IProp GF) (H :
 
 instance instCtxMorphSleeplockedQAt [CurCtx] (γ : GName) (q : Qp) (slk : BitVec 64) (pid : BitVec 32) :
     CtxMorph (GF := GF) (fun ξ => sleeplockedQAt ξ γ q slk pid) :=
-  @instCtxMorphSep hlc GF _ (fun _ => slHtok γ q) (fun ξ => wordAtN ξ (slPid slk) 4 (DFrac.own 1) pid)
+  @instCtxMorphSep GF _ (fun _ => slHtok γ q) (fun ξ => wordAtN ξ (slPid slk) 4 (DFrac.own 1) pid)
     (instCtxMorphConst _) (instCtxMorphWordAtN _ _ _ _)
 
 instance instCtxMorphSlFreeHoldAt [CurCtx] (γ : GName) (slk : BitVec 64) :
     CtxMorph (GF := GF) (fun ξ => slFreeHoldAt ξ γ slk) :=
-  @instCtxMorphExists hlc GF _ _ (fun (q : Qp) ξ => iprop(sleeplockedQAt ξ γ q slk 0#32 ∗ slHauth γ q))
-    (fun q => @instCtxMorphSep hlc GF _ _ _ (instCtxMorphSleeplockedQAt γ q slk 0#32) (instCtxMorphConst _))
+  @instCtxMorphExists GF _ _ (fun (q : Qp) ξ => iprop(sleeplockedQAt ξ γ q slk 0#32 ∗ slHauth γ q))
+    (fun q => @instCtxMorphSep GF _ _ _ (instCtxMorphSleeplockedQAt γ q slk 0#32) (instCtxMorphConst _))
 
 instance instCtxMorphSlBody [CurCtx] (γ : GName) (slk : BitVec 64) (R : CtxId → IProp GF) [CtxMorph R]
     (H : Qp → IProp GF) : CtxMorph (GF := GF) (slBody γ slk R H) := by
   unfold slBody
-  refine @instCtxMorphExists _ _ _ _ _ (fun v => ?_)
-  refine @instCtxMorphExists _ _ _ _ _ (fun vln => ?_)
-  refine @instCtxMorphExists _ _ _ _ _ (fun vn => ?_)
-  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAtN _ _ _ _) ?_
-  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAtN _ _ _ _) ?_
-  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAtN _ _ _ _) ?_
-  refine @instCtxMorphOr hlc GF _ _ _ ?_ (instCtxMorphConst _)
-  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
-  exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphSlFreeHoldAt γ slk) inferInstance
+  refine @instCtxMorphExists _ _ _ _ (fun v => ?_)
+  refine @instCtxMorphExists _ _ _ _ (fun vln => ?_)
+  refine @instCtxMorphExists _ _ _ _ (fun vn => ?_)
+  refine @instCtxMorphSep GF _ _ _ (instCtxMorphWordAtN _ _ _ _) ?_
+  refine @instCtxMorphSep GF _ _ _ (instCtxMorphWordAtN _ _ _ _) ?_
+  refine @instCtxMorphSep GF _ _ _ (instCtxMorphWordAtN _ _ _ _) ?_
+  refine @instCtxMorphOr GF _ _ _ ?_ (instCtxMorphConst _)
+  refine @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) ?_
+  exact @instCtxMorphSep GF _ _ _ (instCtxMorphSlFreeHoldAt γ slk) inferInstance
 
 /-- The whole sleeplock: the inner spinlock -- named "sleep lock", the literal
 `initsleeplock` passes to `initlock` -- over `slBody`.  Persistent. -/
@@ -411,7 +411,7 @@ end
 -- `Xv6.SleepLockGhost`.
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
 
 /-- The TRACKED sleeplock: the deposit is a share of the "may hold" right
 keyed by the OBJECT's gname `γt` (the icache keys it by the inode slot so

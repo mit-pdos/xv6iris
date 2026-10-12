@@ -143,7 +143,7 @@ theorem sysMkdirSlots_eq : sysMkdirSlots = 146 := by decide
 def sysMkdirRet (r : BitVec 64) : Prop := r = 0#64 ∨ r = 0xFFFFFFFFFFFFFFFF#64
 
 section Arms
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsTopG GF] [FsBytesG GF]
   [Appcfg GF]
 
 /-! ### THE PATH-FIXED BUNDLE (Rocq TL-3C item (M), `3e3a157ae`) --
@@ -167,9 +167,9 @@ def mkdirAuAt (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
     (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) : IProp GF :=
-  iprop((∀ pl : List (BitVec 8), ⌜argPathOf M pv pl⌝ -∗ epStart (hlc := hlc) γfs rt cw P Pmiss pl) ∗
-    pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
-    creCommits (hlc := hlc) Γ T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) (nparCur M pv P) Farm Fdots Fun Fok)
+  iprop((∀ pl : List (BitVec 8), ⌜argPathOf M pv pl⌝ -∗ epStart γfs rt cw P Pmiss pl) ∗
+    pfAt (dlookupCommitAt Γ appE) Fex ∗
+    creCommits Γ T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) (nparCur M pv P) Farm Fdots Fun Fok)
 
 /-- THE CURSOR'S TWO READINGS, as one move (Rocq's `mkdir_cre_inst`,
 `SpecSysMknod.mknodAcre_inst`'s twin at the whole four-leg bundle). -/
@@ -179,10 +179,10 @@ theorem mkdirCre_inst (Γ : FsViewNames GF) (M : Nat → List (BitVec 8)) (pv : 
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
     (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (hpl : argPathOf M pv pl) :
-    creCommits (hlc := hlc) Γ T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) (nparCur M pv P) Farm Fdots Fun Fok ⊢
-      creCommits (hlc := hlc) Γ T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) (P (nparElems pl).length) Farm Fdots Fun Fok := by
+    creCommits Γ T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) (nparCur M pv P) Farm Fdots Fun Fok ⊢
+      creCommits Γ T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) (P (nparElems pl).length) Farm Fdots Fun Fok := by
   iintro Hcre
-  iapply (creCommits_mono (hlc := hlc) Γ T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) (nparCur M pv P)
+  iapply (creCommits_mono Γ T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) (nparCur M pv P)
     (P (nparElems pl).length) Farm Fdots Fun Fok) $$ [] [] Hcre
   · iapply (nparCur_out M pv pl P hpl)
   · iapply (nparCur_in M pv pl P hpl)
@@ -192,7 +192,7 @@ nothing of mkdir's walk or its legs -- every hop says yes, every cursor is
 `True`, every commit is its own unit, paid off the SUPPLY. -/
 theorem mkdirAuAt_unit (γfs : FsNames) (rt cw : Nat) (M : Nat → List (BitVec 8)) (pv : Nat) :
     appSup (GF := GF) ⊢
-      mkdirAuAt (hlc := hlc) (fsGammaL γfs) γfs rt cw M pv (fun _ _ => iprop(True))
+      mkdirAuAt (fsGammaL γfs) γfs rt cw M pv (fun _ _ => iprop(True))
         (fun _ _ => iprop(True))
         (pfamTriv (fun _ _ => iprop(True))) (pfamTriv (fun _ _ _ _ => iprop(True)))
         (pfamTriv (fun _ _ => iprop(True))) (pfamTriv (fun _ _ _ _ => iprop(True)))
@@ -201,17 +201,17 @@ theorem mkdirAuAt_unit (γfs : FsNames) (rt cw : Nat) (M : Nat → List (BitVec 
   iintro #Hsup
   isplitr
   · iintro %pl %_
-    iapply (npStart_of_mknod (hlc := hlc) γfs rt cw (fun _ _ => iprop(True))
+    iapply (npStart_of_mknod γfs rt cw (fun _ _ => iprop(True))
       (fun _ _ => iprop(True)) pl)
     unfold nparWalkPreEra
     iintro %pl' %r _
     imodintro
     isplitr
     · ipureintro; trivial
-    · iapply (axHops_triv (hlc := hlc) (GF := GF) rt (elend (fsGammaL γfs)) (nparElems pl') 0)
+    · iapply (axHops_triv (GF := GF) rt (elend (fsGammaL γfs)) (nparElems pl') 0)
   isplitr
-  · iapply (creDlookup_unit (hlc := hlc) (fsGammaL γfs))
-  · iapply (creCommits_unit (hlc := hlc) γfs T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) _) $$ Hsup
+  · iapply (creDlookup_unit (fsGammaL γfs))
+  · iapply (creCommits_unit γfs T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) _) $$ Hsup
 
 /-- THE ARMED DISJUNCTION the continuation receives, keyed on a0 (Rocq's
 `mkdir_arms`).  ret 0: create MADE the directory -- its arm, its dots and
@@ -225,11 +225,11 @@ def mkdirArms (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
     (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (r : BitVec 64) : IProp GF :=
   iprop((⌜r = 0#64⌝ ∗ ∃ (pl : List (BitVec 8)) (i : Nat),
-      creOkArms (hlc := hlc) Γ T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) P Farm Fdots Fun Fok Fex pl true i) ∨
+      creOkArms Γ T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) P Farm Fdots Fun Fok Fex pl true i) ∨
     (⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗
-      (mkdirAuAt (hlc := hlc) Γ γfs rt cw M pv P Pmiss Farm Fdots Fun Fok Fex ∨
+      (mkdirAuAt Γ γfs rt cw M pv P Pmiss Farm Fdots Fun Fok Fex ∨
         ∃ pl : List (BitVec 8),
-          creFailArms (hlc := hlc) Γ γfs rt T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) P Pmiss Farm Fdots Fun Fok Fex pl)))
+          creFailArms Γ γfs rt T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) P Pmiss Farm Fdots Fun Fok Fex pl)))
 
 /-- The return blanket, read off the arms. -/
 theorem mkdirArms_ret (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
@@ -238,7 +238,7 @@ theorem mkdirArms_ret (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
     (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (r : BitVec 64) :
-    mkdirArms (hlc := hlc) Γ γfs rt cw M pv P Pmiss Farm Fdots Fun Fok Fex r ⊢ ⌜sysMkdirRet r⌝ := by
+    mkdirArms Γ γfs rt cw M pv P Pmiss Farm Fdots Fun Fok Fex r ⊢ ⌜sysMkdirRet r⌝ := by
   unfold mkdirArms sysMkdirRet
   iintro (⟨%hr, -⟩ | ⟨%hr, -⟩)
   · ipureintro; exact Or.inl hr
@@ -247,7 +247,7 @@ theorem mkdirArms_ret (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat)
 end Arms
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -280,7 +280,7 @@ def sysMkdirK (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V 
     procPrivFd γ pa pid { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) -∗
     ⌜sysMkdirRet (R' 10#5)⌝ -∗
     -- ...and the legs' receipts, keyed on that answer
-    mkdirArms (hlc := hlc) (fsGammaL fscFs) fscFs V.rti V.cwi (viewLazy V.upt V.sz M) pv
+    mkdirArms (fsGammaL fscFs) fscFs V.rti V.cwi (viewLazy V.upt V.sz M) pv
       P Pmiss Farm Fdots Fun Fok Fex (R' 10#5) -∗
     wpLoop cpu')
 
@@ -289,11 +289,11 @@ end
 /-- **WP of `sys_mkdir()`** (Rocq's `wp_sys_mkdir_sconf_body`), eb-generic at
 depth 0 (deviation 1).  The abstract state is read at the LIVE Γ,
 `fsGammaL fscFs`; the walk starts at the block's own cwd inum. -/
-def wp_sys_mkdir_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+def wp_sys_mkdir_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx)
     (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (v : BitVec 64) (ns : Nat) (P Pmiss : Nat → Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
@@ -308,7 +308,7 @@ def wp_sys_mkdir_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
     (hv : V.tf[tfArgIdx 0]? = some v) : Prop :=
   kctx cpu k ∗ pcIs cpu sysMkdirAddr ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-  procsInv Γ ∗ panicEnv ∗ fsReady (hlc := hlc) ∗
+  procsInv Γ ∗ panicEnv ∗ fsReady ∗
   bslots 3 ∗
   -- the process, whole, and the reference allowance
   irefSlots ns ∗
@@ -316,7 +316,7 @@ def wp_sys_mkdir_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
   -- THE APPLICATION'S SIDE: the walk's cursor pair, the exists observation
   -- and the four commits create's legs fire, at mkdir's own type index
   -- (at the PATH ARGUMENT 0 NAMES, read at the entry image: TL-3C)
-  mkdirAuAt (hlc := hlc) (fsGammaL fscFs) fscFs V.rti V.cwi (viewLazy V.upt V.sz M) v.toNat
+  mkdirAuAt (fsGammaL fscFs) fscFs V.rti V.cwi (viewLazy V.upt V.sz M) v.toNat
     P Pmiss Farm Fdots Fun Fok Fex ∗
   -- THE CROSSING IS THE LITERAL `true`: sys_mkdir parks in all four callees
   wpNext true k.proc cpu (sysMkdirK k γ (procAddr j) pid V M ns v.toNat P Pmiss Farm Fdots Fun
@@ -325,11 +325,11 @@ def wp_sys_mkdir_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
 
 /-- The interface of `sys_mkdir` (Rocq's `Module Type SYSMKDIR`). -/
 structure SYSMKDIR : Prop where
-  wp_sys_mkdir_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+  wp_sys_mkdir_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (v : BitVec 64) (ns : Nat)
     (P Pmiss : Nat → Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
@@ -337,7 +337,7 @@ structure SYSMKDIR : Prop where
     (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     hj hproc htier hnoff hK hns hv,
-    wp_sys_mkdir_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ j pid V M v ns P Pmiss Farm Fdots Fun
+    wp_sys_mkdir_eb_body (GF := GF) Γ cpu k γ j pid V M v ns P Pmiss Farm Fdots Fun
       Fok Fex hj hproc htier hnoff hK hns hv
 
 end Xv6

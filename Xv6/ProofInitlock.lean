@@ -25,7 +25,7 @@ theorem extract_zero32 : BitVec.extractLsb' 0 32 (0#64) = (0 : BitVec (8 * 4)) :
 
 /-! ## The proof -/
 
-theorem initlock_proof : INITLOCK := ⟨fun {hlc GF} _ _ cpu k vlock vname vcpu hK => by
+theorem initlock_proof : INITLOCK := ⟨fun {GF} _ _ cpu k vlock vname vcpu hK => by
   unfold wp_initlock_body
   iintro ⟨Hk, Hpc, #Hcl, #Hcl', Hwlock, Hwname, Hwcpu, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩

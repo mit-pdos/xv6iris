@@ -47,7 +47,7 @@ theorem ki_hargs : freerangeArgs KA.«end» 0x88000000#64 kinitBase kinitPages :
   ⟨by decide, by decide, by decide, by decide, by decide⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-! ## The callees, at their entry addresses -/
 
@@ -66,7 +66,7 @@ theorem ki_initlock_call (IL : INITLOCK) [CurCtx] (c : CPU) (k' : KCtx)
       wordPointsTo (lk + 8#64) 8 (DFrac.own 1) nm -∗
       lkFresh lk -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := IL.wp_initlock (hlc := hlc) (GF := GF) c k' vlock vname vcpu hK'
+  have h := IL.wp_initlock (GF := GF) c k' vlock vname vcpu hK'
   unfold wp_initlock_body at h
   simp only [initlockAddr, h10, h11] at h
   exact h
@@ -84,7 +84,7 @@ theorem ki_freerange_call [WchG GF] (FR : FREERANGE) [CurCtx] (c : CPU) (k' : KC
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       kallocAvail γk (availAdd on n) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := FR.wp_freerange (hlc := hlc) (GF := GF) c k' γl γk on base n hnoff hK hlk hargs hp0
+  have h := FR.wp_freerange (GF := GF) c k' γl γk on base n hnoff hK hlk hargs hp0
   unfold wp_freerange_body at h
   simp only [freerangeAddr] at h
   exact h
@@ -167,7 +167,7 @@ theorem kinit_br_64fe : KA.«kinit» + 0x64fe#64 = KStr.«kmem» := by decide
 
 set_option maxHeartbeats 4000000 in
 theorem kinit_proof (IL : INITLOCK) (FR : FREERANGE) : KINIT :=
-  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk vlock vname vcpu hnoff hK hlk hp0 => by
+  ⟨fun {GF} _ _ _ _ cpu k γl γk vlock vname vcpu hnoff hK hlk hp0 => by
   unfold wp_kinit_body
   iintro ⟨Hk, Hpc, #Hcl, #Hcl', Hwlock, Hwname, Hwcpu, Hfl, Hpages, Hlkf, Hav, Hauth, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩

@@ -194,7 +194,7 @@ theorem iput_calleeSaved_epi (KR R : RegMap)
 /-! ## The frame -/
 
 section Frame
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- iput's 48-byte frame with ALL SIX cells at known values: `ra`/`s0`/`s1`
 from the prologue, and the free path's lazily saved `s2` (+0x3e), `s3`
@@ -224,7 +224,7 @@ end Frame
 /-! ## The bundles -/
 
 section Bundles
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -233,20 +233,20 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 running-thread bundle's invariant, the panic credentials, the bio and log
 contexts, the disk fabric, the icache's persistent set, the region, the
 entry's sleeplock and the bitmap. -/
-def iputEnv (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (γl : GName) (pd pav pu : BitVec 64)
+def iputEnv (Γ : SchedNames) [ClaimIs GF Γ] (γl : GName) (pd pav pu : BitVec 64)
     (γil γisl : GName) (kk : Nat) : IProp GF :=
   iprop(procsInv Γ ∗ panicEnv ∗
     bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
     logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
     diskCaps fscDisk fscDlock pd pav pu ∗
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-    itableInv (hlc := hlc) ∗
+    itableInv ∗
     icEscrow fscIc fscFs fscIreg fscCov fscLogst kk ∗
-    iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+    iregInv fscIreg fscFs icfgIst icfgNib ∗
     isSleeplockGen γil γisl (iLock (ientry kk)) (icSlp fscIc kk) (slhTok (icfgIsl kk)) ∗
     bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize)
 
-instance iputEnv_persistent (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (γl : GName)
+instance iputEnv_persistent (Γ : SchedNames) [ClaimIs GF Γ] (γl : GName)
     (pd pav pu : BitVec 64) (γil γisl : GName) (kk : Nat) :
     Persistent (iputEnv (GF := GF) Γ γl pd pav pu γil γisl kk) := by
   unfold iputEnv; infer_instance
@@ -257,7 +257,7 @@ resources (its two pure rows ride as Lean hypotheses), exactly iget's
 def iputTab (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × BitVec 32)) : IProp GF :=
   iprop(itableHalf M ∗ ([∗list] j ∈ List.range NINODE, itableSlotRes curCtx M ci j) ∗
     irefSlotsAuth ∗ islPool M ∗ ([∗list] j ∈ List.range NINODE, islot2 curCtx fscIc M ci j) ∗
-    ipool (hlc := hlc) fscFs fscIreg fscCov fscLogst (regionInums icfgNib \ ciInums ci) ∅)
+    ipool fscFs fscIreg fscCov fscLogst (regionInums icfgNib \ ciInums ci) ∅)
 
 /-- What iput hands its caller besides the transaction share and the iref
 unit: the pid cell, the two superblock cells, the three slots, the ledger
@@ -355,7 +355,7 @@ end Bundles
 /-! ## The epilogue, `+0x30 .. +0x38`, and the contract's post -/
 
 section Epi
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -406,7 +406,7 @@ end Epi
 /-! ## The itable lock's two calls -/
 
 section Lock
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -445,7 +445,7 @@ theorem iput_acquire (AC : ACQUIRE_LLB) (c : CPU) (kb : KCtx) (tl : Nat) (hwf : 
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, #Hit, #Htl, Hte, Hce, Hcont⟩
   ihave #Hlk := isItable2_lock fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev $$ Hit
-  have h := AC.wp_acquire_llb (hlc := hlc) (GF := GF) c ((kb.pushed 6).withRegs R) fscItlock
+  have h := AC.wp_acquire_llb (GF := GF) c ((kb.pushed 6).withRegs R) fscItlock
     "itable" iputR tl ?hna ?hKa ?hla
   rotate_left
   case hna => k_norm_g; omega
@@ -497,7 +497,7 @@ theorem iput_release (RH : RELEASE_HOOK) (c : CPU) (kb : KCtx) (hwf : kb.wf)
   have hkb : (kb.withSpie kb.spie kb.spp).withLocks kb.locks = kb := by
     rw [KCtx.withSpie_self' kb _ _ rfl rfl]; rfl
   have hfilt := iput_filter_itable kb.locks hlk
-  have h := RH.wp_release_hook (hlc := hlc) (GF := GF) c
+  have h := RH.wp_release_hook (GF := GF) c
     ((((kb.pushOffAt kb.spie kb.spp).withLocks ("itable" :: kb.locks)).pushed 6).withRegs R)
     fscItlock "itable" iputR iputRin rfl ?hnr ?hKr kb.sie ?hrr ?hor
   rotate_left

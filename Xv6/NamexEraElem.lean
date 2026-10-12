@@ -27,7 +27,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -36,7 +36,7 @@ set_option maxHeartbeats 16000000 in
 /-- **`+0xae .. +0xbc`: THE JOIN** -- skipelem's trailing skip, and the
 level (`namexEra_level`) at the first non-separator `o2` of the rest. -/
 theorem namexEra_rest (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKUP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : NamexArgs) (hs : NamexStatic k A) (P Pmiss : Nat → Nat → IProp GF)
     (spie spp : Bool) (R : RegMap)
     (off a e : Nat) (ipv : BitVec 64) (dcur : Nat) (nf : Nat → BitVec 8) (ncur : Nat) (Scur : List Nat)
@@ -52,7 +52,7 @@ theorem namexEra_rest (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLO
     (hnm : bname 14 nf = (bview (e - a) (fun i => A.pfun (a + i))).take 14) :
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0xb2#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    namexEnv (hlc := hlc) Γ A ∗ namexEraWalk k A P Pmiss ipv dcur es0.length ncur Scur nf ∗
+    namexEnv Γ A ∗ namexEraWalk k A P Pmiss ipv dcur es0.length ncur Scur nf ∗
     (∀ c' : CPU, namexEraPostR k A P Pmiss c') ∗ namexEraLoop k A P Pmiss fuel
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨r2, r8, r9, r19, r20, r21, r22, r23, r24, r25, r27⟩ := id hr
@@ -92,7 +92,7 @@ set_option maxHeartbeats 16000000 in
 /-- **THE LONG BRANCH `+0xa2 .. +0xac`**: `memmove(name, s, 14)` with NO
 terminator, `path = s`, and the join at `+0xae`. -/
 theorem namexEra_long (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKUP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : NamexArgs) (hs : NamexStatic k A) (P Pmiss : Nat → Nat → IProp GF)
     (spie spp : Bool) (R : RegMap)
     (off a e : Nat) (ipv : BitVec 64) (dcur : Nat) (nf : Nat → BitVec 8) (ncur : Nat) (Scur : List Nat)
@@ -100,7 +100,7 @@ theorem namexEra_long (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLO
     (hf : NamexElemFacts k A R off a e ipv ncur Scur es0 wc fuel) (h14 : 14 ≤ e - a) :
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0xa6#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    namexEnv (hlc := hlc) Γ A ∗ namexEraWalk k A P Pmiss ipv dcur es0.length ncur Scur nf ∗
+    namexEnv Γ A ∗ namexEraWalk k A P Pmiss ipv dcur es0.length ncur Scur nf ∗
     (∀ c' : CPU, namexEraPostR k A P Pmiss c') ∗ namexEraLoop k A P Pmiss fuel
     ⊢ wpLoop (GF := GF) cpu := by
   have hr := hf.hregs
@@ -173,7 +173,7 @@ set_option maxHeartbeats 16000000 in
 /-- **THE SHORT BRANCH `+0x12c .. +0x13e`**: `memmove(name, s, len)`,
 `name[len] = 0`, `path = s`, and the join at `+0xae`. -/
 theorem namexEra_short (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKUP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : NamexArgs) (hs : NamexStatic k A) (P Pmiss : Nat → Nat → IProp GF)
     (spie spp : Bool) (R : RegMap)
     (off a e : Nat) (ipv : BitVec 64) (dcur : Nat) (nf : Nat → BitVec 8) (ncur : Nat) (Scur : List Nat)
@@ -182,7 +182,7 @@ theorem namexEra_short (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNL
     (h12 : R 12#5 = BitVec.ofNat 64 (e - a)) (h26 : R 26#5 = BitVec.ofNat 64 (e - a)) :
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0x130#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    namexEnv (hlc := hlc) Γ A ∗ namexEraWalk k A P Pmiss ipv dcur es0.length ncur Scur nf ∗
+    namexEnv Γ A ∗ namexEraWalk k A P Pmiss ipv dcur es0.length ncur Scur nf ∗
     (∀ c' : CPU, namexEraPostR k A P Pmiss c') ∗ namexEraLoop k A P Pmiss fuel
     ⊢ wpLoop (GF := GF) cpu := by
   have hr := hf.hregs
@@ -284,7 +284,7 @@ set_option maxHeartbeats 16000000 in
 `sext.w` (the identity: `plen < 2^31`), and the `bge` against 13 that picks
 the memmove shape. -/
 theorem namexEra_elem (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKUP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : NamexArgs) (hs : NamexStatic k A) (P Pmiss : Nat → Nat → IProp GF)
     (spie spp : Bool) (R : RegMap)
     (off a e : Nat) (ipv : BitVec 64) (dcur : Nat) (nf : Nat → BitVec 8) (ncur : Nat) (Scur : List Nat)
@@ -292,7 +292,7 @@ theorem namexEra_elem (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLO
     (hf : NamexElemFacts k A R off a e ipv ncur Scur es0 wc fuel) :
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0x9a#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    namexEnv (hlc := hlc) Γ A ∗ namexEraWalk k A P Pmiss ipv dcur es0.length ncur Scur nf ∗
+    namexEnv Γ A ∗ namexEraWalk k A P Pmiss ipv dcur es0.length ncur Scur nf ∗
     (∀ c' : CPU, namexEraPostR k A P Pmiss c') ∗ namexEraLoop k A P Pmiss fuel
     ⊢ wpLoop (GF := GF) cpu := by
   have hr := hf.hregs

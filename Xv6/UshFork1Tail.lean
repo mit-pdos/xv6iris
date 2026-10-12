@@ -44,15 +44,15 @@ theorem ushFork1Tm_other (mt : RegMap) (sp0 vra vs0 : BitVec 64) (q : BitVec 5) 
     ukWr_get_other _ _ _ _ h15]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-- The panic arm: `la a0, "fork" ; jal ra, panic`. -/
 theorem ush_fork1_panic (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (me : RegMap) (nn : Nat) :
-    ⊢ ushCode N.t -∗ urun (hlc := hlc) N h me (BitVec.ofNat 64 0x82) nn -∗
+    ⊢ ushCode N.t -∗ urun N h me (BitVec.ofNat 64 0x82) nn -∗
       (∀ (h' : CPU) (m' : RegMap), ⌜(m'.get 10#5).toNat = 0x1288⌝ -∗
-        urun (hlc := hlc) N h' m' (BitVec.ofNat 64 User.Sh.Sym.«panic») nn -∗ wpLoop h') -∗
+        urun N h' m' (BitVec.ofNat 64 User.Sh.Sym.«panic») nn -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hrun Hk
   iapply ushS_la UL N (ushRI_082 N.t) (by exact ushRI_086 N.t) 0x1288 h me nn $$ Hc Hrun
@@ -70,11 +70,11 @@ theorem ush_fork1_tail (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (mt : RegMap)
     (nn : Nat) (X : IProp GF) (hal : sp0.toNat % 8 = 0) (hroom : 16 ≤ sp0.toNat)
     (hsp : mt.get spIdx = sp0 + BitVec.ofInt 64 (-((8 * 2 : Nat) : Int))) :
     ⊢ ushCode N.t -∗ ushSaved N.d sp0.toNat [vra, vs0] -∗ ustack N.d (BitVec.ofNat 64 (sp0.toNat - 8 * 2)) 0 -∗
-      (X ∨ ⌜mt.get 10#5 = 0#64⌝) -∗ urun (hlc := hlc) N h mt (BitVec.ofNat 64 0x74) nn -∗
+      (X ∨ ⌜mt.get 10#5 = 0#64⌝) -∗ urun N h mt (BitVec.ofNat 64 0x74) nn -∗
       (∀ (h' : CPU) (m' : RegMap), ⌜(m'.get 10#5).toNat = 0x1288⌝ -∗ ⌜mt.get 10#5 = -1#64⌝ -∗ X -∗
-        urun (hlc := hlc) N h' m' (BitVec.ofNat 64 User.Sh.Sym.«panic») nn -∗ wpLoop h') -∗
+        urun N h' m' (BitVec.ofNat 64 User.Sh.Sym.«panic») nn -∗ wpLoop h') -∗
       (∀ h' : CPU, ⌜mt.get 10#5 ≠ -1#64⌝ -∗ (X ∨ ⌜mt.get 10#5 = 0#64⌝) -∗
-        urun (hlc := hlc) N h' (ushFork1Tm mt sp0 vra vs0) (retPc vra) (2 + nn) -∗ wpLoop h') -∗
+        urun N h' (ushFork1Tm mt sp0 vra vs0) (retPc vra) (2 + nn) -∗ wpLoop h') -∗
       wpLoop h := by
   unfold ushFork1Tm
   iintro #Hc Hsv Hloc HX Hrun Hpan Hret

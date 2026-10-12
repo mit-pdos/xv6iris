@@ -115,7 +115,7 @@ theorem uiPres_call (k : KCtx) (R R' : RegMap) (h : uiPres k R) (hcs : calleeSav
     c22.trans h22, c23.trans h23, c24.trans h24, c25.trans h25, c26.trans h26, c27.trans h27⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable {lent : Bool}
 
 /-! ## One byte load from a UART register -/
@@ -155,10 +155,10 @@ theorem ui_call_consoleintr (CI : CONSOLEINTR) [CurCtx]
     (hsie : k'.sie = false) (hnoff : k'.noff + 2 < 2 ^ 31) (hK : consoleintrSlots ≤ k'.avail)
     (hlk : "cons" ∉ k'.locks ∧ "proc" ∉ k'.locks ∧ "uart0" ∉ k'.locks)
     (htier : k'.tier = KTier.kpt) (ha0 : k'.regs 10#5 = BitVec.setWidth 64 cb)
-    (hends : obsEndsIn .uart0 hb cb) (hboots : obsBoots hb = genId (hlc := hlc) (GF := GF) + 1)
+    (hends : obsEndsIn .uart0 hb cb) (hboots : obsBoots hb = genId (GF := GF) + 1)
     (hx : ohistExt hh hb) (hxg : ohistExt hg hb) (hshb : traceShape hb true) (hnext : k1Next hg hb) :
     kctx cpu k' ∗ pcIs cpu KA.«consoleintr» ∗ procsInv Γ ∗ consoleCaps γc γl γ ∗
-    MachFixedGS.rxTag (hlc := hlc) (GF := GF) hb ∗ obsHistLb hb ∗
+    MachFixedGS.rxTag (GF := GF) hb ∗ obsHistLb hb ∗
     outLb γ (obsWire .uart0 (openSeg hb)) ∗
     rxHi γ (1 : Qp).half hh ∗ logHi γ (1 : Qp).half hg ∗ uartArm γ (1 : Qp).half none ∗
     (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗
@@ -166,7 +166,7 @@ theorem ui_call_consoleintr (CI : CONSOLEINTR) [CurCtx]
       (∃ hh' : Option (List Obs), rxHi γ (1 : Qp).half hh' ∗ ⌜ohistLe hh' (some hb)⌝) -∗
       logHi γ (1 : Qp).half (some hb) -∗ uartArm γ (1 : Qp).half none -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
-  have h := CI.wp_consoleintr (hlc := hlc) (GF := GF) Γ cpu k' γc γl γ hb cb hh hg hnoff hK hlk htier
+  have h := CI.wp_consoleintr (GF := GF) Γ cpu k' γc γl γ hb cb hh hg hnoff hK hlk htier
     ha0 hends hboots hx hxg hshb hnext
   unfold wp_consoleintr_body at h
   simp only [consoleintrAddr] at h
@@ -191,7 +191,7 @@ theorem ui_call_wakeup (WK : WAKEUP) [CurCtx]
     (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
-  have h := WK.wp_wakeup (hlc := hlc) (GF := GF) Γ cpu k' hnoff hK hlk htier
+  have h := WK.wp_wakeup (GF := GF) Γ cpu k' hnoff hK hlk htier
   unfold wp_wakeup_body at h
   simp only [wakeupAddr] at h
   iintro ⟨Hk, Hpc, HΓ, HΦ⟩
@@ -207,7 +207,7 @@ theorem ui_call_wakeup (WK : WAKEUP) [CurCtx]
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-! ## Unpacking the port's bundle and port 0's credentials -/
 
@@ -242,7 +242,7 @@ theorem ui_rhr_pop (i : UartId) (γ : UartNames) (k : Nat) (hl : Option (List Ob
           (obsIns i (openSeg h)).length = k + 1⌝ ∗ rxRider i γ h ∗ rxTok γ (k + 1) (some h) ∗
           (∃ hh : Option (List Obs), rxHi γ (1 : Qp).half hh ∗ ⌜ohistExt hh h⌝) ∗
           (∃ hg : Option (List Obs), logHi γ (1 : Qp).half hg ∗ ⌜ohistExt hg h⌝ ∗
-            ⌜uartLogAt (genId (hlc := hlc) (GF := GF) + 1) i hg hl⌝) ∗
+            ⌜uartLogAt (genId (GF := GF) + 1) i hg hl⌝) ∗
           uartArm γ (1 : Qp).half none)) := by
   iintro ⟨#Hinv, Hw, #Hlb, #Hoff⟩
   unfold uartRxWriter
@@ -265,7 +265,7 @@ theorem ui_rhr_pop (i : UartId) (γ : UartNames) (k : Nat) (hl : Option (List Ob
 
 /-- ...and the payload back together at the popped byte. -/
 theorem ui_writer_back (i : UartId) (γ : UartNames) (k : Nat) (h : List Obs) (hh hg : Option (List Obs))
-    (hhle : ohistLe hh (some h)) (hgat : uartLogAt (genId (hlc := hlc) (GF := GF) + 1) i hg (some h)) :
+    (hhle : ohistLe hh (some h)) (hgat : uartLogAt (genId (GF := GF) + 1) i hg (some h)) :
     rxTok (GF := GF) γ k (some h) ∗ rxHi γ (1 : Qp).half hh ∗ logHi γ (1 : Qp).half hg ∗
       uartArm γ (1 : Qp).half none ⊢ uartRxWriter i γ k (some h) := by
   unfold uartRxWriter
@@ -624,7 +624,7 @@ theorem ui_wake (CI : CONSOLEINTR) (WK : WAKEUP) [CurCtx]
 
 set_option maxHeartbeats 4000000 in
 theorem uartintr_proof (CI : CONSOLEINTR) (WK : WAKEUP) : UARTINTR :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ Γ cpu k i γc γl γ kp hl hsie hnoff hK hlk htier hid => by
+  ⟨fun {GF} _ _ _ _ _ _ _ _ Γ cpu k i γc γl γ kp hl hsie hnoff hK hlk htier hid => by
   unfold wp_uartintr_body
   simp only [uartintrAddr]
   iintro ⟨Hk, Hpc, #HΓ, #Hport, #Hrxw, Hrtok, #Hcaps, HΦ⟩

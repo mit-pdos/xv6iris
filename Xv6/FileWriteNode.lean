@@ -65,13 +65,13 @@ theorem fileWrite_dst_insert_insert (s : Dst) (N : Fname) (v w : Nat × List (Bi
   by_cases h : compare N k = .eq <;> simp [h]
 
 section FileWriteNode
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [OffboxG GF] [FsTopG GF] [Icfg]
 
 /-- the offset link's two arms, for `icases` (deviation 5). -/
 theorem fileWrite_offLink_cases (γo : GName) (z : Int) :
-    offLink (hlc := hlc) (GF := GF) γo z ⊢
-      iprop(offGv γo (1 : Qp).half z ∨ MachFixedGS.killCred (hlc := hlc) (GF := GF)) := by
+    offLink (GF := GF) γo z ⊢
+      iprop(offGv γo (1 : Qp).half z ∨ MachFixedGS.killCred (GF := GF)) := by
   unfold offLink
   exact .rfl
 
@@ -80,13 +80,13 @@ map the kernel lent it against the application's own half and reads `f`'s
 state off the claim.  LINEAR -- the deed goes in and comes back. -/
 theorem FileWrite.fileClaimRead [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed)
     (r : FileAppNames) (s : Dst) (I : RegMapF FsNode)
-    (heq : inst = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r }) :
-    ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗ fdeed r s -∗
+    (heq : inst = { appNames := FileAppNames, appPred := filePred c, appRun := r }) :
+    ⊢@{IProp GF} appInv γfs -∗ fdeed r s -∗
       (γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I) -∗
       |={appE}=> (γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I) ∗ fdeed r s ∗
-        ((⌜fOk (absView I) s⌝ ∗ fTyped c s) ∨ fileTaint (hlc := hlc) c) := by
+        ((⌜fOk (absView I) s⌝ ∗ fTyped c s) ∨ fileTaint c) := by
   iintro #Hinv Hd Hka
-  ihave #Hlaw := fileDeed_law (hlc := hlc) (GF := GF) c r
+  ihave #Hlaw := fileDeed_law (GF := GF) c r
   unfold appInv
   imod (inv_acc (E := appE) (N := appN) (P := appBody (GF := GF) γfs) (fun _ h => h)) $$ Hinv
     with ⟨Hbody, Hclose⟩
@@ -95,7 +95,7 @@ theorem FileWrite.fileClaimRead [inst : Appcfg GF] (γfs : FsNames) (c : FileFix
   subst heq
   ihave %hI := ghost_map_auth_agree _ _ _ _ _ $$ Hka Hh
   subst hI
-  imod (@timeless_except0 _ _ _ (filePred_timeless (hlc := hlc) (GF := GF) c r (absView I))).mp $$ Hp with Hp
+  imod (@timeless_except0 _ _ _ (filePred_timeless (GF := GF) c r (absView I))).mp $$ Hp with Hp
   ihave ⟨Hp, Hd, Hfact⟩ := Hlaw $$ %(absView I) %s Hd Hp
   imod Hclose $$ [Hh Hp]
   · inext
@@ -115,7 +115,7 @@ offset equation, 3 the chunk equation, 4 the six pinned binaries' inums. -/
 theorem fileAwritePhases [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed)
     (r : FileAppNames) (N : Fname) (s : Dst) (i : Nat) (ws : Wordline) (sel : List Nat)
     (jx : Nat) (off offk : Nat) (I : RegMapF FsNode) (bs bs0 : List (BitVec 8)) (nl : Nat)
-    (heq : inst = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r })
+    (heq : inst = { appNames := FileAppNames, appPred := filePred c, appRun := r })
     (hpre : wriPre (absView I) i offk bs bs0 nl)
     (_hnode : astep (absView I) ROOTINO N = some i)
     (hoffk : offk = off)
@@ -124,7 +124,7 @@ theorem fileAwritePhases [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed)
     (hlt : ∀ q ∈ sel, q < jx)
     (hi1 : i ≠ INIT_INO) (hi2 : i ≠ SH_INO) (hi3 : i ≠ ECHO_INO) (hi4 : i ≠ CAT_INO)
     (hi5 : i ≠ GREP_INO) (hi6 : i ≠ SECC_INO) (hi7 : i ≠ SYNC_INO) :
-    ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗ fileWq (hlc := hlc) c r N s i ws sel off -∗
+    ⊢@{IProp GF} appInv γfs -∗ fileWq c r N s i ws sel off -∗
       (γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I) -∗
       |={appE}=> (γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I) ∗
         appStep i I (deltaWrite i offk bs (absView I)) ∗
@@ -132,10 +132,10 @@ theorem fileAwritePhases [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed)
           ⌜absView I' = deltaWrite i offk bs (absView I)⌝ -∗
           (γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I') -∗
           |={appE}=> (γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I') ∗
-            fileWq (hlc := hlc) c r N s i ws (sel ++ [jx]) (off + bs.length)) := by
+            fileWq c r N s i ws (sel ++ [jx]) (off + bs.length)) := by
   subst hoffk
   iintro #Hinv Hq Hka
-  icases fileWq_cases (hlc := hlc) c r N s i ws sel offk $$ Hq with
+  icases fileWq_cases c r N s i ws sel offk $$ Hq with
     (⟨%ls, ⟨Hd, Htk⟩, %hoff, %hline, %hsel, #Hlb, %hlast, Hpos⟩ | #HT)
   rotate_left
   · -- THE TAINT: the step is free and the cursor comes back tainted
@@ -143,13 +143,13 @@ theorem fileAwritePhases [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed)
     isplitl [Hka]
     · iexact Hka
     isplitr
-    · iapply fileAppStep_taint (hlc := hlc) c r i I _ heq $$ HT
+    · iapply fileAppStep_taint c r i I _ heq $$ HT
     · iintro %I' %_ Hka'
       imodintro
       isplitl [Hka']
       · iexact Hka'
-      · iapply fileWq_taint (hlc := hlc) c r N s i ws (sel ++ [jx]) _ $$ HT
-  imod FileWrite.fileClaimRead (hlc := hlc) γfs c r
+      · iapply fileWq_taint c r N s i ws (sel ++ [jx]) _ $$ HT
+  imod FileWrite.fileClaimRead γfs c r
       (s.insert N (i, subseq (echoChunks ws) sel)) I heq $$ Hinv Hd Hka
     with ⟨Hka, Hd, (⟨%hok, #Hty⟩ | #HT)⟩
   rotate_left
@@ -158,12 +158,12 @@ theorem fileAwritePhases [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed)
     isplitl [Hka]
     · iexact Hka
     isplitr
-    · iapply fileAppStep_taint (hlc := hlc) c r i I _ heq $$ HT
+    · iapply fileAppStep_taint c r i I _ heq $$ HT
     · iintro %I' %_ Hka'
       imodintro
       isplitl [Hka']
       · iexact Hka'
-      · iapply fileWq_taint (hlc := hlc) c r N s i ws (sel ++ [jx]) _ $$ HT
+      · iapply fileWq_taint c r N s i ws (sel ++ [jx]) _ $$ HT
   -- THE EXACT ARM: the deed's content at `N` IS the row the fire is at
   have hs0N : (s.insert N (i, subseq (echoChunks ws) sel))[N]? =
       some (i, subseq (echoChunks ws) sel) := Std.ExtTreeMap.getElem?_insert_self
@@ -203,7 +203,7 @@ theorem fileAwritePhases [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed)
   isplitl [Hka]
   · iexact Hka
   isplitl [Hd Hre]
-  · iapply fileAppStep_park (hlc := hlc) c r i I _ _ _ heq
+  · iapply fileAppStep_park c r i I _ _ _ heq
       (fileFsPure_write i offk bs (absView I) hi1 hi2 hi3 hi4 hi5 hi6 hi7)
       (consAbsent_write i offk bs (absView I))
       (fun jc => consPresent_write jc i offk bs (absView I)) hstep $$ Hd Hty' Hre
@@ -220,15 +220,15 @@ theorem fileAwritePhases [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed)
     have h3 := congrArg List.length h2
     rw [hsnoc, List.length_append] at h3
     omega
-  imod fileResync (hlc := hlc) γfs c r _ _ ls.length I' appE (fun _ h => h) heq
+  imod fileResync γfs c r _ _ ls.length I' appE (fun _ h => h) heq
       (fOk_fcontent _ _ hokpost) hne $$ Hinv Htk Hq2 Hka' with ⟨Hka', Hout⟩
   imodintro
   isplitl [Hka']
   · iexact Hka'
   icases Hout with (⟨Hown, Hpos⟩ | ⟨-, #HT⟩)
-  · iapply fileWq_intro_own (hlc := hlc) c r N s i ws (sel ++ [jx]) _ ls
+  · iapply fileWq_intro_own c r N s i ws (sel ++ [jx]) _ ls
       (by rw [hsnoc, List.length_append, hoff]) hline hselok hlast $$ Hown Hlb Hpos
-  · iapply fileWq_taint (hlc := hlc) c r N s i ws (sel ++ [jx]) _ $$ HT
+  · iapply fileWq_taint c r N s i ws (sel ++ [jx]) _ $$ HT
 
 variable [FsBytesG GF]
 
@@ -239,45 +239,45 @@ read off the claim, relay 2 (the offset) off the program's half, relay 3
 theorem fileAwriteNode_adv [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed)
     (r : FileAppNames) (N : Fname) (s : Dst) (i : Nat) (ws : Wordline) (sel : List Nat)
     (jx : Nat) (γo : GName) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (nn : Int) (k : Nat)
-    (heq : inst = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r })
+    (heq : inst = { appNames := FileAppNames, appPred := filePred c, appRun := r })
     (hjx : jx < (echoChunks ws).length)
     (hlt : ∀ q ∈ sel, q < jx)
     (hi1 : i ≠ INIT_INO) (hi2 : i ≠ SH_INO) (hi3 : i ≠ ECHO_INO) (hi4 : i ≠ CAT_INO)
     (hi5 : i ≠ GREP_INO) (hi6 : i ≠ SECC_INO) (hi7 : i ≠ SYNC_INO)
     (hbsk : ubytesAt M (ua + BitVec.ofInt 64 (FW_MAX * (k : Int))) ((echoChunks ws)[jx]!))
     (hlenk : (((echoChunks ws)[jx]!).length : Int) = wchunkAt nn k) :
-    ⊢@{IProp GF} □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ fileTaint (hlc := hlc) c) -∗
-      appInv (hlc := hlc) γfs -∗ fileCur (hlc := hlc) c r N s i ws sel γo -∗
-      awriteFullAdv (hlc := hlc) (fsGammaL γfs) appE i γo M ua nn k
-        (fileCur (hlc := hlc) c r N s i ws (sel ++ [jx]) γo) := by
+    ⊢@{IProp GF} □ (MachFixedGS.killCred (GF := GF) -∗ fileTaint c) -∗
+      appInv γfs -∗ fileCur c r N s i ws sel γo -∗
+      awriteFullAdv (fsGammaL γfs) appE i γo M ua nn k
+        (fileCur c r N s i ws (sel ++ [jx]) γo) := by
   iintro #Hbr #Hinv Hcur
   unfold awriteFullAdv
-  have htop : (fsGammaL (hlc := hlc) (GF := GF) γfs).top = γfs.top := rfl
+  have htop : (fsGammaL (GF := GF) γfs).top = γfs.top := rfl
   rw [htop]
   iintro %I %off %bs %bs0 %nl %hpre %hby %hlen Hka Hg
   -- RELAY 3, CASHED
   have hbs : bs = (echoChunks ws)[jx]! :=
     ubytesAt_inj M _ bs _ hby hbsk (by omega)
   -- THE BOX'S ARM: the kernel's half, or the disconnect
-  icases fileWrite_offLink_cases (hlc := hlc) γo (off : Int) $$ Hg with (Hk | #HTa)
+  icases fileWrite_offLink_cases γo (off : Int) $$ Hg with (Hk | #HTa)
   rotate_left
   · -- DISCONNECTED: the step is free and the cursor comes back tainted,
     -- its half unmoved
     ihave #HTf := Hbr $$ HTa
-    icases fileCur_half (hlc := hlc) c r N s i ws sel γo $$ Hcur with ⟨%p, Hu⟩
+    icases fileCur_half c r N s i ws sel γo $$ Hcur with ⟨%p, Hu⟩
     imodintro
     isplitl [Hka]
     · iexact Hka
     isplitr
-    · iapply fileAppStep_taint (hlc := hlc) c r i I _ heq $$ HTf
+    · iapply fileAppStep_taint c r i I _ heq $$ HTf
     · iintro %I' %_ Hka'
       imodintro
       isplitl [Hka']
       · iexact Hka'
       isplitr
       · iapply offLink_taint $$ HTa
-      · iapply fileCur_taint (hlc := hlc) c r N s i ws (sel ++ [jx]) γo p $$ HTf Hu
-  icases fileCur_cases (hlc := hlc) c r N s i ws sel γo $$ Hcur with
+      · iapply fileCur_taint c r N s i ws (sel ++ [jx]) γo p $$ HTf Hu
+  icases fileCur_cases c r N s i ws sel γo $$ Hcur with
     (⟨Hq, Hu⟩ | ⟨#HTf, %p, Hu⟩)
   rotate_left
   · -- the cursor is already tainted: the step is free, the shadow moves
@@ -289,20 +289,20 @@ theorem fileAwriteNode_adv [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed)
     isplitl [Hka]
     · iexact Hka
     isplitr
-    · iapply fileAppStep_taint (hlc := hlc) c r i I _ heq $$ HTf
+    · iapply fileAppStep_taint c r i I _ heq $$ HTf
     · iintro %I' %_ Hka'
       imodintro
       isplitl [Hka']
       · iexact Hka'
       isplitl [Hk]
       · iapply offLink_of $$ Hk
-      · iapply fileCur_taint (hlc := hlc) c r N s i ws (sel ++ [jx]) γo _ $$ HTf Hu
+      · iapply fileCur_taint c r N s i ws (sel ++ [jx]) γo _ $$ HTf Hu
   -- THE FIRED ARM: the half pins `off` to the content's length ...
   ihave %hz := uoff_agree_k γo _ (off : Int) $$ Hu Hk
   have hoff : off = (subseq (echoChunks ws) sel).length := by omega
   subst hoff
   -- ... and RELAY 1 comes off the claim, read through the deed
-  icases fileWq_cases (hlc := hlc) c r N s i ws sel _ $$ Hq with
+  icases fileWq_cases c r N s i ws sel _ $$ Hq with
     (⟨%ls, ⟨Hd, Htk⟩, %hoff0, %hline, %hsel, #Hlb, %hin, Hpos⟩ | #HTf)
   rotate_left
   · -- the cursor's own taint arm
@@ -311,15 +311,15 @@ theorem fileAwriteNode_adv [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed)
     isplitl [Hka]
     · iexact Hka
     isplitr
-    · iapply fileAppStep_taint (hlc := hlc) c r i I _ heq $$ HTf
+    · iapply fileAppStep_taint c r i I _ heq $$ HTf
     · iintro %I' %_ Hka'
       imodintro
       isplitl [Hka']
       · iexact Hka'
       isplitl [Hk]
       · iapply offLink_of $$ Hk
-      · iapply fileCur_taint (hlc := hlc) c r N s i ws (sel ++ [jx]) γo _ $$ HTf Hu
-  imod FileWrite.fileClaimRead (hlc := hlc) γfs c r
+      · iapply fileCur_taint c r N s i ws (sel ++ [jx]) γo _ $$ HTf Hu
+  imod FileWrite.fileClaimRead γfs c r
       (s.insert N (i, subseq (echoChunks ws) sel)) I heq $$ Hinv Hd Hka
     with ⟨Hka, Hd, (⟨%hok, -⟩ | #HTf)⟩
   rotate_left
@@ -329,20 +329,20 @@ theorem fileAwriteNode_adv [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed)
     isplitl [Hka]
     · iexact Hka
     isplitr
-    · iapply fileAppStep_taint (hlc := hlc) c r i I _ heq $$ HTf
+    · iapply fileAppStep_taint c r i I _ heq $$ HTf
     · iintro %I' %_ Hka'
       imodintro
       isplitl [Hka']
       · iexact Hka'
       isplitl [Hk]
       · iapply offLink_of $$ Hk
-      · iapply fileCur_taint (hlc := hlc) c r N s i ws (sel ++ [jx]) γo _ $$ HTf Hu
+      · iapply fileCur_taint c r N s i ws (sel ++ [jx]) γo _ $$ HTf Hu
   have hnode : astep (absView I) ROOTINO N = some i :=
     (fOk_pin _ _ N i _ hok Std.ExtTreeMap.getElem?_insert_self).1
   -- the cursor goes back together for the phase lemma
-  ihave Hq := fileWq_intro (hlc := hlc) c r N s i ws sel _ ls hoff0 hline hsel hin
+  ihave Hq := fileWq_intro c r N s i ws sel _ ls hoff0 hline hsel hin
     $$ Hd Htk Hlb Hpos
-  imod fileAwritePhases (hlc := hlc) γfs c r N s i ws sel jx _ _ I bs bs0 nl heq hpre hnode
+  imod fileAwritePhases γfs c r N s i ws sel jx _ _ I bs bs0 nl heq hpre hnode
       rfl hbs hjx hlt hi1 hi2 hi3 hi4 hi5 hi6 hi7 $$ Hinv Hq Hka with ⟨Hka, Hstep, Hph2⟩
   imod uoff_advance γo _ bs.length $$ Hu Hk with ⟨Hk, Hu⟩
   imodintro
@@ -361,7 +361,7 @@ theorem fileAwriteNode_adv [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed)
   have hsnoc : (subseq (echoChunks ws) (sel ++ [jx])).length =
       (subseq (echoChunks ws) sel).length + bs.length := by
     rw [subseq_snoc, List.length_append, hbs]
-  iapply fileCur_fired_at (hlc := hlc) c r N s i ws (sel ++ [jx]) γo _ hsnoc $$ Hq' Hu
+  iapply fileCur_fired_at c r N s i ws (sel ++ [jx]) γo _ hsnoc $$ Hq' Hu
 
 end FileWriteNode
 

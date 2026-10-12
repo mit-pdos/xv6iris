@@ -59,7 +59,7 @@ statement here.
    `lkLcred_blk_open` the payload at every pin.  Rocq's `lk_wand_emp`,
    `lk_wand_emp2`, `lk_emp_valid` serve only the echo instance (not ported,
    item 2).
-4. The ghost classes: the record is stated at `[MachGS hlc GF] [Xv6G GF]
+4. The ghost classes: the record is stated at `[MachGS GF] [Xv6G GF]
    [DiskG GF] [EchoOutG GF]` (`Xv6/EchoOut.lean`'s camera note; Rocq's
    `echoOutG` + `riscvGS`).
 -/
@@ -86,10 +86,10 @@ def lkWildNone : List (BitVec 8) → Prop := fun _ => False
 theorem lkWildNone_not (I : List (BitVec 8)) : ¬ lkWildNone I := fun h => h
 
 section linkrec
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 
 /-- THE LINK RECORD (Rocq `LinkRec`). -/
-structure LinkRec (hlc : HasLC) (GF : BundledGFunctors.{0}) [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+structure LinkRec (GF : BundledGFunctors.{0}) [MachGS GF] [Xv6G GF] [DiskG GF]
     [EchoOutG GF] where
   -- ---- the era ----
   lkT : IProp GF
@@ -279,8 +279,8 @@ structure LinkRec (hlc : HasLC) (GF : BundledGFunctors.{0}) [MachGS hlc GF] [Xv6
 end linkrec
 
 section linkinst
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
-variable (L : LinkRec hlc GF)
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable (L : LinkRec GF)
 
 instance LinkRec.lkT_persistent : Persistent L.lkT := L.lkT_pers
 instance LinkRec.lkT_timeless : Timeless L.lkT := L.lkT_tl
@@ -329,8 +329,8 @@ end linkinst
 /-! ## The derived families and laws, proved ONCE over an arbitrary record -/
 
 section linkgen
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
-variable (L : LinkRec hlc GF)
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable (L : LinkRec GF)
 
 /-- the block written up to its prompt (Rocq `lk_post`) -/
 def lkPost (k : Nat) (v : EraPins) (I : List (BitVec 8)) (a : Nat) : IProp GF :=

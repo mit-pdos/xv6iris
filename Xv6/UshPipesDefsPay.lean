@@ -45,9 +45,9 @@ open Wid RdOut WrOut
 noncomputable section
 
 section Pay
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF] [PipesNG GF]
-variable (D : PdRound hlc GF)
+variable (D : PdRound GF)
 
 /-- **Rocq `wfin`**: a writer at its FINAL state -- unfired, or its whole
 source written (and no fork line: the round is not terminal at it). -/
@@ -82,7 +82,7 @@ def PdRound.sufN (j : Nat) (ro : RdOut) : IProp GF :=
 frozen resolution with it). -/
 def PdRound.terT (i : Nat) : IProp GF :=
   iprop(wcurN D.γc (WSh i) (1 : Qp).half 5 ∗ wmodeN D.γm (WSh i) (1 : Qp).half (some altForkc)
-    ∗ ptkV D.T D.v D.I (genId (hlc := hlc) (GF := GF) + 1))
+    ∗ ptkV D.T D.v D.I (genId (GF := GF) + 1))
 
 /-- **Rocq `sufT`**: THE TERMINAL shape -- and the stages the nodes between
 `j` and `i` waited for. -/
@@ -134,7 +134,7 @@ def PdRound.Qtop : IProp GF :=
 
 /-! ## Timeless instances -/
 
-instance pns_wfin_timeless (R : PnsRound hlc GF) (w : Wid) (o : Option (List (BitVec 8))) :
+instance pns_wfin_timeless (R : PnsRound GF) (w : Wid) (o : Option (List (BitVec 8))) :
     Timeless (pnsWfin R w o) := by
   cases o <;> simp only [pnsWfin] <;> infer_instance
 instance wfin_timeless (w : Wid) : Timeless (D.wfin w) := by

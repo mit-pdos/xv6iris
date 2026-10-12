@@ -29,7 +29,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -51,7 +51,7 @@ cell is LENT out of the block for the two calls (`Q` is the block less it:
 `hQ` puts it back); the pass-through rows go to the first close at the
 current hart, come back at its return hart, go to the second, and the
 exit's base is the second's return hart. -/
-theorem sys_pipe_close2_c8 (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu c : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
+theorem sys_pipe_close2_c8 (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs GF Γ] (cpu c : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
     (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (sts : List FdState) (v : BitVec 64) (γkl : GName) (γk : KmemNames) (spie spp : Bool) (R : RegMap)
     (k0 k1 : Nat) (γp : PipeNames) (hk0 : k0 < NFILE) (hk1 : k1 < NFILE)
@@ -62,7 +62,7 @@ theorem sys_pipe_close2_c8 (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := h
     -- the block's event counter rides beside the pid cell (permit sweep L1b):
     -- both closes take it as their lend, and `Q` rebuilds the block at the
     -- count they hand back
-    (hQ : Q ∗ @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
+    (hQ : Q ∗ @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
         (∃ k1 : Nat, ⌜V.ev ≤ k1⌝ ∗ actLend pa k1) ⊢
       ∃ k2 : Nat, ⌜V.ev ≤ k2⌝ ∗ sysPipePost γ V.fdg pa pid (V.updEv k2) M sts v 0xFFFFFFFFFFFFFFFF#64) :
     kctx c (((k.withSpie spie spp).pushed 8).withRegs R) ∗ pcIs c (KA.«sys_pipe» + 0xc8#64) ∗
@@ -73,7 +73,7 @@ theorem sys_pipe_close2_c8 (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := h
     fileRef γ k0 1 (.open true false (.pipe γp)) ∗ fileRef γ k1 1 (.open false true (.pipe γp)) ∗
     -- the pipe's exact fragment, which pays the two closes (Rocq `sp_close2`)
     pipeQfrag γp.pnQueue pst0 ∗
-    @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗ actLend pa V.ev ∗
+    @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗ actLend pa V.ev ∗
     Q ∗ sysPipeTurn cpu k γ V.fdg pa pid V M sts v
     ⊢ wpLoop (GF := GF) c := by
   unfold sysPipeTurn
@@ -167,7 +167,7 @@ theorem sys_pipe_close2_c8 (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := h
 set_option maxHeartbeats 16000000 in
 /-- The pair of closes at `+0xa0` (a copyout failed), and the jump to the
 exit (as `sys_pipe_close2_c8`). -/
-theorem sys_pipe_close2_a0 (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu c : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
+theorem sys_pipe_close2_a0 (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs GF Γ] (cpu c : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
     (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (sts : List FdState) (v : BitVec 64) (γkl : GName) (γk : KmemNames) (spie spp : Bool) (R : RegMap)
     (k0 k1 : Nat) (γp : PipeNames) (hk0 : k0 < NFILE) (hk1 : k1 < NFILE)
@@ -178,7 +178,7 @@ theorem sys_pipe_close2_a0 (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := h
     -- the block's event counter rides beside the pid cell (permit sweep L1b):
     -- both closes take it as their lend, and `Q` rebuilds the block at the
     -- count they hand back
-    (hQ : Q ∗ @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
+    (hQ : Q ∗ @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
         (∃ k1 : Nat, ⌜V.ev ≤ k1⌝ ∗ actLend pa k1) ⊢
       ∃ k2 : Nat, ⌜V.ev ≤ k2⌝ ∗ sysPipePost γ V.fdg pa pid (V.updEv k2) M sts v 0xFFFFFFFFFFFFFFFF#64) :
     kctx c (((k.withSpie spie spp).pushed 8).withRegs R) ∗ pcIs c (KA.«sys_pipe» + 0xa0#64) ∗
@@ -189,7 +189,7 @@ theorem sys_pipe_close2_a0 (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := h
     fileRef γ k0 1 (.open true false (.pipe γp)) ∗ fileRef γ k1 1 (.open false true (.pipe γp)) ∗
     -- the pipe's exact fragment, which pays the two closes (Rocq `sp_close2`)
     pipeQfrag γp.pnQueue pst0 ∗
-    @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗ actLend pa V.ev ∗
+    @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗ actLend pa V.ev ∗
     Q ∗ sysPipeTurn cpu k γ V.fdg pa pid V M sts v
     ⊢ wpLoop (GF := GF) c := by
   unfold sysPipeTurn
@@ -284,7 +284,7 @@ theorem sys_pipe_close2_a0 (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := h
 
 set_option maxHeartbeats 16000000 in
 /-- `+0xb4`: `fdalloc(wf)` failed; re-null `fd0` (the `fd0 >= 0` test holds), then the closes. -/
-theorem sys_pipe_unfd0 (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu c : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
+theorem sys_pipe_unfd0 (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs GF Γ] (cpu c : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
     (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (sts : List FdState) (v : BitVec 64) (γkl : GName) (γk : KmemNames) (spie spp : Bool) (R : RegMap)
     (k0 k1 fd0 : Nat) (γp : PipeNames) (hk0 : k0 < NFILE) (hk1 : k1 < NFILE) (hfd0 : fd0 < 16) (hz0 : V.ofile[fd0]? = some 0#64)
@@ -344,7 +344,7 @@ theorem sys_pipe_unfd0 (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
   icases procPrivCoreNoctxAt_pidLend curCtx pa pid V M $$ Hcore with ⟨Hpid, Hlend, Hcw⟩
   iapply (sys_pipe_close2_c8 FC Γ cpu c6 k γl γ pa pid V M sts v γkl γk spie spp _ k0 k1 γp
       hk0 hk1 hct hproc htier hnoff hK hpin6 (by sys_pipe_pins hpins) fa (BitVec.ofNat 32 fd0) w1
-      iprop((@wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid -∗
+      iprop((@wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid -∗
           (∃ k1 : Nat, ⌜V.ev ≤ k1⌝ ∗ actLend pa k1) -∗
           ∃ k2 : Nat, ⌜V.ev ≤ k2⌝ ∗ procPrivCoreNoctxAt curCtx pa pid (V.updEv k2) M) ∗
         procOfilesOwe γ V.fdg pa V.ofile [] ∗ fdFrags V.fdg sts)
@@ -364,7 +364,7 @@ theorem sys_pipe_unfd0 (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
 
 set_option maxHeartbeats 16000000 in
 /-- `+0x80`: a copyout failed; re-null both descriptors, then the closes. -/
-theorem sys_pipe_unfd2 (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu c : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
+theorem sys_pipe_unfd2 (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs GF Γ] (cpu c : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
     (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (sts : List FdState) (v : BitVec 64) (γkl : GName) (γk : KmemNames) (spie spp : Bool) (R : RegMap)
     (k0 k1 fd0 fd1 : Nat) (γp : PipeNames) (hk0 : k0 < NFILE) (hk1 : k1 < NFILE) (hfd0 : fd0 < 16) (hfd1 : fd1 < 16)
@@ -459,7 +459,7 @@ theorem sys_pipe_unfd2 (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
   iapply (sys_pipe_close2_a0 FC Γ cpu c10 k γl γ pa pid V M sts v γkl γk spie spp _ k0 k1 γp
       hk0 hk1 hct hproc htier hnoff hK hpin10 (by sys_pipe_pins hpins) fa (BitVec.ofNat 32 fd0)
       (BitVec.ofNat 32 fd1)
-      iprop((@wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid -∗
+      iprop((@wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid -∗
           (∃ k1 : Nat, ⌜V.ev ≤ k1⌝ ∗ actLend pa k1) -∗
           ∃ k2 : Nat, ⌜V.ev ≤ k2⌝ ∗ procPrivCoreNoctxAt curCtx pa pid { V.updEv k2 with upt := P' } M') ∗
         procOfilesOwe γ V.fdg pa V.ofile [] ∗ fdFrags V.fdg sts)

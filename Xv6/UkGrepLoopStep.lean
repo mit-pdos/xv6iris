@@ -26,7 +26,7 @@ set_option maxRecDepth 20000
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -38,24 +38,24 @@ theorem grepLoop_step (UL : UK_LEAVES) (SC : GREP_STRCHR) (MA : GREP_MATCH) (N :
     (hs3 : m.get 19#5 = kgrepB01 sk) (hs4 : m.get 20#5 = BitVec.ofNat 64 mv) (hs6 : m.get 22#5 = BitVec.ofNat 64 mv)
     (him : i ≤ mv ∧ mv ≤ 1023) (hFm : F mv = ubyte0) (hn : grepMhWords (grepBody ((List.range lr).map fr)) ≤ n2) :
     ⊢ grepCode N.t -∗ ustr N.d dqr ar lr fr -∗ ubytes N.d User.Grep.Sym.«buf» 1024 F -∗
-      treePay (hlc := hlc) N (grepProg N.t) (grepK ((List.range lr).map fr) fd rest
+      treePay N (grepProg N.t) (grepK ((List.range lr).map fr) fd rest
         (scan ((List.range lr).map fr) sk [] ((List.range (mv - i)).map (fun j => F (i + j))))) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x136) (4 + n2) -∗
+      urun N h m (BitVec.ofNat 64 0x136) (4 + n2) -∗
       ((∀ (h' : CPU) (m' : RegMap), ⌜grepGlRegs m0 sp0 ar fdv m'⌝ -∗
           ⌜m'.get 18#5 = BitVec.ofNat 64 (User.Grep.Sym.«buf» + i)⌝ -∗ ⌜m'.get 19#5 = kgrepB01 sk⌝ -∗
           ⌜m'.get 20#5 = BitVec.ofNat 64 mv⌝ -∗ ⌜m'.get 22#5 = BitVec.ofNat 64 mv⌝ -∗
           ustr N.d dqr ar lr fr -∗ ubytes N.d User.Grep.Sym.«buf» 1024 F -∗
-          treePay (hlc := hlc) N (grepProg N.t) (grepK ((List.range lr).map fr) fd rest
+          treePay N (grepProg N.t) (grepK ((List.range lr).map fr) fd rest
             (([], (List.range (mv - i)).map (fun j => F (i + j))), sk)) -∗
-          urun (hlc := hlc) N h' m' (BitVec.ofNat 64 0x16a) (4 + n2) -∗ wpLoop h') ∧
+          urun N h' m' (BitVec.ofNat 64 0x16a) (4 + n2) -∗ wpLoop h') ∧
         (∀ (h' : CPU) (m' : RegMap) (F' : Nat → BitVec 8) (i' : Nat), ⌜i < i' ∧ i' ≤ mv⌝ -∗
           ⌜grepGlRegs m0 sp0 ar fdv m'⌝ -∗
           ⌜m'.get 18#5 = BitVec.ofNat 64 (User.Grep.Sym.«buf» + i')⌝ -∗ ⌜m'.get 19#5 = kgrepB01 false⌝ -∗
           ⌜m'.get 20#5 = BitVec.ofNat 64 mv⌝ -∗ ⌜m'.get 22#5 = BitVec.ofNat 64 mv⌝ -∗ ⌜F' mv = ubyte0⌝ -∗
           ustr N.d dqr ar lr fr -∗ ubytes N.d User.Grep.Sym.«buf» 1024 F' -∗
-          treePay (hlc := hlc) N (grepProg N.t) (grepK ((List.range lr).map fr) fd rest
+          treePay N (grepProg N.t) (grepK ((List.range lr).map fr) fd rest
             (scan ((List.range lr).map fr) false [] ((List.range (mv - i')).map (fun j => F' (i' + j))))) -∗
-          urun (hlc := hlc) N h' m' (BitVec.ofNat 64 0x136) (4 + n2) -∗ wpLoop h')) -∗
+          urun N h' m' (BitVec.ofNat 64 0x136) (4 + n2) -∗ wpLoop h')) -∗
       wpLoop h := by
   have hgl' := hgl
   obtain ⟨g1, g2, g3, g4, g5, g6, g7, g8, g9⟩ := hgl'
@@ -161,10 +161,10 @@ theorem grepLoop_step (UL : UK_LEAVES) (SC : GREP_STRCHR) (MA : GREP_MATCH) (N :
       ⌜grepRkeep ([9] ++ grepWcaller) m mc⌝ -∗ ⌜mc.get 9#5 = BitVec.ofNat 64 (User.Grep.Sym.«buf» + i + k)⌝ -∗
       ⌜Fc mv = ubyte0⌝ -∗ ⌜∀ j, i + k < j → Fc j = F j⌝ -∗
       ustr N.d dqr ar lr fr -∗ ubytes N.d User.Grep.Sym.«buf» 1024 Fc -∗
-      treePay (hlc := hlc) N (grepProg N.t) (grepK ((List.range lr).map fr) fd rest
+      treePay N (grepProg N.t) (grepK ((List.range lr).map fr) fd rest
         (scan ((List.range lr).map fr) false []
           ((List.range (mv - (i + k + 1))).map (fun j => F (i + k + 1 + j))))) -∗
-      urun (hlc := hlc) N h' mc (BitVec.ofNat 64 0x130) (4 + n2) -∗ wpLoop h') $$ [Hk]
+      urun N h' mc (BitVec.ofNat 64 0x130) (4 + n2) -∗ wpLoop h') $$ [Hk]
   · iintro %h' %mc %Fc %hkc %hs1c %hFc %hFF Hre Hbuf Ht Hrun
     -- 0x130  addi s2,s1,1
     gfetch 0x130 false (.ITYPE (1#12, .Regidx 9#5, .Regidx 18#5, .ADDI))

@@ -117,7 +117,7 @@ theorem fwr_bge_n (x : Nat) (n : Int) (hx : x < 2 ^ 31) (hn : 0 ≤ n ∧ n < 2 
   by_cases h : n ≤ (x : Int) <;> simp [h] <;> omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -127,10 +127,10 @@ def fwrHead (Γ : SchedNames) (k : KCtx) (A : FwrA) (Q : Nat → IProp GF) (Qe :
     (v11 : BitVec 64) : IProp GF := iprop%
   frame12 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
     (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) v11 ∗
-  fwrEnv (hlc := hlc) Γ A ∗ fileRef A.γ A.fk A.q A.st ∗
+  fwrEnv Γ A ∗ fileRef A.γ A.fk A.q A.st ∗
   procPrivExtEv (procAddr A.j) A.pid A.V P A.img ∗ bslots 3 ∗
-  fwrSt (hlc := hlc) A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p 0 ∗
-  fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q Qe
+  fwrSt A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p 0 ∗
+  fwrK k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q Qe
 
 /-- **THE LOOP INVARIANT** at the bottom test `+0xd4`, over the fuel. -/
 def FwrLoopGoal (Γ : SchedNames) (k : KCtx) (A : FwrA) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (W : Nat) : Prop :=
@@ -140,13 +140,13 @@ def FwrLoopGoal (Γ : SchedNames) (k : KCtx) (A : FwrA) (Q : Nat → IProp GF) (
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗
     pcIs cpu (KA.«filewrite» + 0xd4#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fwrHead (hlc := hlc) Γ k A Q Qe t p P v11 ⊢ wpLoop (GF := GF) cpu
+    fwrHead Γ k A Q Qe t p P v11 ⊢ wpLoop (GF := GF) cpu
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0xc8 .. +0xd0`: the short-write break, `i += r`, the exhaustion
 test** (Rocq's `+0xc0 .. +0xc8`). -/
 theorem fwr_tests (Γ : SchedNames) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF)
-    (W : Nat) (IH : FwrLoopGoal (hlc := hlc) Γ k A Q Qe W)
+    (W : Nat) (IH : FwrLoopGoal Γ k A Q Qe W)
     (cpu : CPU) (spie spp : Bool) (R : RegMap) (t p c tot : Nat) (P : UPtd)
     (a0 v19 v11 : BitVec 64)
     (hfuel : A.n.toNat - t ≤ W + 1) (htn : (t : Int) < A.n) (htie : (t : Int) = FW_MAX * p)
@@ -158,13 +158,13 @@ theorem fwr_tests (Γ : SchedNames) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     frame12 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) v11 ∗
-    fwrEnv (hlc := hlc) Γ A ∗ fileRef A.γ A.fk A.q A.st ∗
+    fwrEnv Γ A ∗ fileRef A.γ A.fk A.q A.st ∗
     procPrivExtEv (procAddr A.j) A.pid A.V P A.img ∗ bslots 3 ∗
-    ((⌜tot = c⌝ ∗ fwrSt (hlc := hlc) A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q (t + c)
+    ((⌜tot = c⌝ ∗ fwrSt A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q (t + c)
         (p + 1) 0) ∨
      (⌜tot < c⌝ ∗ ∃ x : Nat, ⌜x ≤ 1⌝ ∗
-        fwrSt (hlc := hlc) A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p x)) ∗
-    fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q Qe
+        fwrSt A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p x)) ∗
+    fwrK k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q Qe
     ⊢ wpLoop (GF := GF) cpu := by
   have hn := hA.hn
   have hcle := fwrChunk_le A.n.toNat t
@@ -306,8 +306,8 @@ open segment (begin_op, ilock), the lock-held ghost steps before writei
 (`fwr_post_ghost`: the FIRE, the checkin, the re-park), the close segment
 (iunlock, end_op), the reference re-assembled, and the tests. -/
 theorem fwr_iter (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO : END_OP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCtx) (A : FwrA) (hA : FwrFacts k A)
-    (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (W : Nat) (IH : FwrLoopGoal (hlc := hlc) Γ k A Q Qe W)
+    (Γ : SchedNames) [ClaimIs GF Γ] (k : KCtx) (A : FwrA) (hA : FwrFacts k A)
+    (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (W : Nat) (IH : FwrLoopGoal Γ k A Q Qe W)
     (cpu : CPU) (spie spp : Bool) (R : RegMap) (t p : Nat) (P : UPtd) (v9 v11 : BitVec 64)
     (hfuel : A.n.toNat - t ≤ W + 1) (htn : (t : Int) < A.n) (htie : (t : Int) = FW_MAX * p)
     (hext : A.V.upt.extSz A.V.sz P)
@@ -316,7 +316,7 @@ theorem fwr_iter (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO :
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗
     pcIs cpu (KA.«filewrite» + 0x8a#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fwrHead (hlc := hlc) Γ k A Q Qe t p P v11 ⊢ wpLoop (GF := GF) cpu := by
+    fwrHead Γ k A Q Qe t p P v11 ⊢ wpLoop (GF := GF) cpu := by
   have hn := hA.hn
   have hcle := fwrChunk_le A.n.toNat t
   have hcrem := fwrChunk_le_rem A.n.toNat t
@@ -392,7 +392,7 @@ theorem fwr_iter (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO :
   -- the lock-held ghost steps after writei: THE FIRE, the checkin, the re-park
   iapply wpLoop_fupd
   icases kctx_token_acc _ _ $$ Hk with ⟨Hrun, Hkb⟩
-  ihave Hst : fwrSt (hlc := hlc) A.om (fsGammaL fscFs) inum.toNat A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p 0
+  ihave Hst : fwrSt A.om (fsGammaL fscFs) inum.toNat A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p 0
     $$ [Hst]
   · rw [← hi]; iexact Hst
   imod fwr_post_ghost A.om cpu ik A.fk A.q γb C m T0 Tr inum A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p
@@ -432,10 +432,10 @@ theorem fwr_iter (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO :
   ihave Hpay := Hback $$ Hshr Hoffd
   ihave Href := filerw_ref_close A.γ A.fk A.q A.st C $$ [Htok Hfields Hpay]
   · iframe
-  ihave Hst : ((⌜tot = fwrChunk A.n.toNat t⌝ ∗ fwrSt (hlc := hlc) A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img
+  ihave Hst : ((⌜tot = fwrChunk A.n.toNat t⌝ ∗ fwrSt A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img
         (k.regs 11#5) Q (t + fwrChunk A.n.toNat t) (p + 1) 0) ∨
       (⌜tot < fwrChunk A.n.toNat t⌝ ∗ ∃ x : Nat, ⌜x ≤ 1⌝ ∗
-        fwrSt (hlc := hlc) A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p x)) $$ [Hst]
+        fwrSt A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p x)) $$ [Hst]
   · rw [hi]; iexact Hst
   -- +0xc8 .. : the tests
   have ha0 : (a0 = -1#64 ∧ tot = 0) ∨ a0 = BitVec.ofNat 64 tot := by
@@ -451,8 +451,8 @@ theorem fwr_iter (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO :
 /-- **THE LOOP** (Rocq's `fw_loop`, the `[∀]`-fuel induction at `n - i`):
 the test, then one chunk, whose back edge is the induction hypothesis. -/
 theorem fwr_loop (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO : END_OP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCtx) (A : FwrA) (hA : FwrFacts k A)
-    (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) : ∀ W, FwrLoopGoal (hlc := hlc) Γ k A Q Qe W := by
+    (Γ : SchedNames) [ClaimIs GF Γ] (k : KCtx) (A : FwrA) (hA : FwrFacts k A)
+    (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) : ∀ W, FwrLoopGoal Γ k A Q Qe W := by
   intro W
   induction W with
   | zero =>
@@ -462,7 +462,7 @@ theorem fwr_loop (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO :
   | succ W IH =>
     intro cpu spie spp R t p P v9 v19 v11 hfuel htn htie hext hr
     iintro ⟨Hk, Hpc, Hte, Hce, HF⟩
-    iapply (fwr_test cpu k A.fk A.n spie spp R t v9 v19 (fwrHead (hlc := hlc) Γ k A Q Qe t p P v11) htn
+    iapply (fwr_test cpu k A.fk A.n spie spp R t v9 v19 (fwrHead Γ k A Q Qe t p P v11) htn
       hA.hn.2 hr)
     iframe
     iintro %c' %R' %hr' Hk Hpc Hte Hce HF

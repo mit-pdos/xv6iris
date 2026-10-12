@@ -242,14 +242,14 @@ end Pure
 /-! ## §3 The resource rows -/
 
 section Rows
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [WchG GF]
 open UexecSG
 
 /-- **Rocq `ut_sys_in`** (deviation 3): the process's deposit for the
 number it trapped at, owed only at an ecall. -/
 def utSysIn (f : sfam GF) (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (sts : List FdState) (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32) : IProp GF :=
-  iprop(⌜sc = uecallScause⌝ -∗ syscSysIn (hlc := hlc) f (utSysRec sep V) M sts gn cs pid)
+  iprop(⌜sc = uecallScause⌝ -∗ syscSysIn f (utSysRec sep V) M sts gn cs pid)
 
 /-- **Rocq `ut_sys_out`**: the armed post back, at the same key and
 families, at the exit record's a0 and resume view. -/
@@ -257,12 +257,12 @@ def utSysOut (f : sfam GF) (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List
     (sts : List FdState) (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32) (r : BitVec 64)
     (M' : ElfMem) (sts' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare) : IProp GF :=
   iprop(⌜sc = uecallScause⌝ -∗
-    syscSysOut (hlc := hlc) f (utSysRec sep V) M sts gn cs pid r M' sts' cw' cs')
+    syscSysOut f (utSysRec sep V) M sts gn cs pid r M' sts' cw' cs')
 
 /-- **Rocq `ut_fork_in`**: fork's slot deposit. -/
 def utForkIn (f : sfam GF) (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (sts : List FdState) : IProp GF :=
-  iprop(⌜sc = uecallScause⌝ -∗ syscForkIn (hlc := hlc) f (utSysRec sep V) M sts)
+  iprop(⌜sc = uecallScause⌝ -∗ syscForkIn f (utSysRec sep V) M sts)
 
 /-- **Rocq `ut_pay_in`**: the payment, UNGATED (every cause: usertrap's
 killed checks tear down at any cause), at the block's generation and the
@@ -287,22 +287,22 @@ def utExecOut (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8)) 
     (M' : Nat → List (BitVec 8)) (sts sts' : List FdState) (gn : GName) (cs : ExtTreeSet GName compare)
     (pid : BitVec 32) : IProp GF :=
   iprop(⌜sc = uecallScause⌝ -∗ ∃ ws : List (BitVec 64), ⌜tfUeq ws V'.tf⌝ ∗
-    syscExecOut (hlc := hlc) (utSysRec sep V) M { V' with tf := ws } M' sts sts' gn cs pid)
+    syscExecOut (utSysRec sep V) M { V' with tf := ws } M' sts sts' gn cs pid)
 
 /-- **Rocq `ut_kill_in`**: at a non-ecall cause, the process's additive
 pair (the kill deposit AND the resume slot); the key's generation is the
 block's and its table the trap's. -/
 def utKillIn (f : sfam GF) (sc : BitVec 64) (W : Uvis) (gn : GName) (sts : List FdState) : IProp GF :=
   iprop(⌜W.gen = gn ∧ W.fd = sts⌝ ∗
-    (if sc = uecallScause then iprop(emp) else uexecKillArm (hlc := hlc) sc W f))
+    (if sc = uecallScause then iprop(emp) else uexecKillArm sc W f))
 
 /-- **Rocq `ut_kill_out`**: on the resume path, the slot the kernel did not
 take. -/
 def utKillOut (sc : BitVec 64) (W : Uvis) : IProp GF :=
-  if sc = uecallScause then iprop(emp) else uslot (hlc := hlc) W
+  if sc = uecallScause then iprop(emp) else uslot W
 
 /-- Rocq `ut_kill_out_ecall`. -/
-theorem utKillOut_ecall (W : Uvis) : ⊢ utKillOut (hlc := hlc) (GF := GF) uecallScause W := by
+theorem utKillOut_ecall (W : Uvis) : ⊢ utKillOut (GF := GF) uecallScause W := by
   unfold utKillOut; rw [if_pos rfl]; iintro; iempintro
 
 /-- The out rows at a non-ecall cause owe nothing (Rocq `ut_sys_out_quiet`,
@@ -310,13 +310,13 @@ theorem utKillOut_ecall (W : Uvis) : ⊢ utKillOut (hlc := hlc) (GF := GF) uecal
 theorem utSysOut_quiet (f : sfam GF) (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (sts : List FdState) (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32) (r : BitVec 64)
     (M' : ElfMem) (sts' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare)
-    (h : sc ≠ uecallScause) : ⊢ utSysOut (hlc := hlc) f sc sep V M sts gn cs pid r M' sts' cw' cs' := by
+    (h : sc ≠ uecallScause) : ⊢ utSysOut f sc sep V M sts gn cs pid r M' sts' cw' cs' := by
   unfold utSysOut; iintro %hc; exact absurd hc h
 
 theorem utExecOut_quiet (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPriv)
     (M' : Nat → List (BitVec 8)) (sts sts' : List FdState) (gn : GName) (cs : ExtTreeSet GName compare)
     (pid : BitVec 32) (h : sc ≠ uecallScause) :
-    ⊢ utExecOut (hlc := hlc) (GF := GF) sc sep V M V' M' sts sts' gn cs pid := by
+    ⊢ utExecOut (GF := GF) sc sep V M V' M' sts sts' gn cs pid := by
   unfold utExecOut; iintro %hc; exact absurd hc h
 
 theorem utForkOut_quiet (f : sfam GF) (sc sep : BitVec 64) (V : ProcPriv) (r : BitVec 64)
@@ -334,7 +334,7 @@ end Rows
 /-! ## §4 The ledger evidence (NI M2-X2) -/
 
 section Ev
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [Fscfg]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF] [Fscfg]
 
 /-- **THE ROUND'S LEDGER EVIDENCE, AT USERTRAP'S POST** (NI M2-X2, design
 "M2-X design" §2(c)): at the ecall, `SpecSyscall.syscEvOut`'s first two
@@ -347,14 +347,14 @@ def utEvOut (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8)) (s
     (⌜syscNum (utSysRec sep V) ≠ USYS_uptime ∧ syscNum (utSysRec sep V) ≠ USYS_wait ∧
         syscNum (utSysRec sep V) ≠ USYS_fork ∧ syscNum (utSysRec sep V) ≠ USYS_sbrk ∧
         syscNum (utSysRec sep V) ≠ USYS_write⌝ ∨
-      (∃ (k : Nat) (ι : UIota), MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF)) ∗
+      (∃ (k : Nat) (ι : UIota), MachFixedGS.uEraAnchor (GF := GF) k (niNamesHere (GF := GF)) ∗
         niIotaLbs (niNamesHere (GF := GF)) ι ∗
         ⌜syscEvRow (utSysRec sep V) V' (syscImg (utSysRec sep V) M) (syscImg V' M') cs cs' sts ι⌝)))
 
 /-- Off the ecall the evidence is owed nothing. -/
 theorem utEvOut_nonecall (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
     (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) (h : sc ≠ uecallScause) :
-    ⊢ utEvOut (hlc := hlc) (GF := GF) sc sep V M sts V' M' cs cs' := by
+    ⊢ utEvOut (GF := GF) sc sep V M sts V' M' cs cs' := by
   unfold utEvOut; iintro %hc; exact absurd hc h
 
 end Ev
@@ -362,7 +362,7 @@ end Ev
 /-! ## §5 The contract -/
 
 section Contract
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [WchG GF]
     [CurCtx] [Xv6G GF] [Fscfg]
 
 /-- **Rocq `usertrap_post`**: userret's entry shape at the resuming hart
@@ -390,14 +390,14 @@ def usertrapPost (R : CPU → UPtd → BitVec 64 → ProcPriv → List FdState �
     (∃ v : BitVec 64, Register.scause ↦ᵣ[cpu'] v) -∗ (∃ v : BitVec 64, Register.stval ↦ᵣ[cpu'] v) -∗
     Register.stvec ↦ᵣ[cpu'] uservecTvec -∗
     procPtAt P' M' -∗ tfPageAt P'.tfp V'.tf -∗ R cpu' P' ksp V' sts' cs' pid -∗
-    utExecOut (hlc := hlc) sc sep V M V' M' sts sts' gn cs pid -∗
+    utExecOut sc sep V M V' M' sts sts' gn cs pid -∗
     utForkOut f sc sep V (tfW V'.tf (tfArgIdx 0)) cs cs' -∗
     utWaitOut sc sep V M (syscImg V' M') (tfW V'.tf (tfArgIdx 0)) cs cs' pid -∗
-    utKillOut (hlc := hlc) sc Wk -∗
-    utSysOut (hlc := hlc) f sc sep V M sts gn cs pid (tfW V'.tf (tfArgIdx 0)) (syscImg V' M') sts'
+    utKillOut sc Wk -∗
+    utSysOut f sc sep V M sts gn cs pid (tfW V'.tf (tfArgIdx 0)) (syscImg V' M') sts'
       V'.cwi cs' -∗
     -- THE ROUND'S LEDGER EVIDENCE (NI M2-X2), last
-    utEvOut (hlc := hlc) sc sep V M sts V' M' cs cs' -∗
+    utEvOut sc sep V M sts V' M' cs cs' -∗
     wpLoop cpu')
 
 /-- **WP of `usertrap`** (Rocq `wp_usertrap_body`), over an abstract residue
@@ -415,10 +415,10 @@ def wp_usertrap_body (R : CPU → UPtd → BitVec 64 → ProcPriv → List FdSta
   Register.stvec ↦ᵣ[cpu] uservecTvec ∗
   procPtAt P M ∗ tfPageAt P.tfp V.tf ∗ R cpu P ksp V sts cs pid ∗
   -- the deposits (Rocq `ut_sys_in`, `ut_fork_in`, `ut_pay_in`, `ut_kill_in`)
-  utSysIn (hlc := hlc) f sc sep V M sts gn cs pid ∗ utForkIn (hlc := hlc) f sc sep V M sts ∗
-  utPayIn f sc sep V ∗ utKillIn (hlc := hlc) f sc Wk gn sts ∗
+  utSysIn f sc sep V M sts gn cs pid ∗ utForkIn f sc sep V M sts ∗
+  utPayIn f sc sep V ∗ utKillIn f sc Wk gn sts ∗
   -- THE CROSSING (yield, and every sleeping syscall)
-  wpNext true k.proc cpu (usertrapPost (hlc := hlc) R k P ksp V M sts gn cs pid sep sc f Wk)
+  wpNext true k.proc cpu (usertrapPost R k P ksp V M sts gn cs pid sep sc f Wk)
   ⊢ wpLoop (GF := GF) cpu
 
 end Contract
@@ -430,17 +430,17 @@ proc table (`ClaimIs`), at the kernel's deposit instance (deviation 10).
 devintr's credentials are read from the residue's handler environment row
 (`utCaps`' `handlerEnvAt`, at its own names). -/
 structure USERTRAP : Prop where
-  wp_usertrap : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+  wp_usertrap : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [CtokG GF] [WchG GF] [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (j : Nat) (P : UPtd) (ksp : BitVec 64) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName) (cs : ExtTreeSet GName compare)
     (pid : BitVec 32) (sep sc tv : BitVec 64) (f : UexecSG.sfam GF) (Wk : Uvis)
     hj hproc hctx htier hnoff hstk hgn,
-    wp_usertrap_body (hlc := hlc) (GF := GF)
-      (fun h => usertrapResAt (hlc := hlc) (parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6)) Γ j h)
+    wp_usertrap_body (GF := GF)
+      (fun h => usertrapResAt (parkToken (GF := GF) (SG := uexecSGXv6)) Γ j h)
       cpu k j P ksp V M sts gn cs pid sep sc tv f Wk hj hproc hctx htier hnoff hstk hgn
 
 end Xv6

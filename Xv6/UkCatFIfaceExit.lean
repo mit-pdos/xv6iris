@@ -82,14 +82,14 @@ theorem cif_false_law {GF : BundledGFunctors.{0}} {A B C : IProp GF} : ⊢ A -�
   iexact H
 
 section CifExit
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [PipesNG GF] [CifRegG GF]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 namespace CifEnv
-variable (E : CifEnv (hlc := hlc) (GF := GF))
+variable (E : CifEnv (GF := GF))
 
 /-- **Rocq `cif_dev_final`**: a drained device, read at its kind. -/
 theorem dev_final (vs : RegMapF CfDev) (d : Nat) (kd : CfDev) (x : Dspec) (hv : get? vs d = some kd)
@@ -196,7 +196,7 @@ theorem exit (s : Int) (fdm : Fdmap) (files : List (BitVec 8) → Option (List (
     (paths : List (List (BitVec 8))) (dv : Nat → Dspec) (ds : ExtTreeSet Nat compare)
     (hdr : ∀ d, d ∈ ds → drained (dv d)) (hds : domOkP E.Dp fdm ds) :
     ⊢ E.fds fdm -∗ E.filesr files paths -∗ ([∗set] d ∈ ds, E.dev d (dv d)) -∗
-      exObl (hlc := hlc) E.N E.P s := by
+      exObl E.N E.P s := by
   haveI := E.hNc
   iintro Hfds _ Hdev
   ihave H := E.fds_elim fdm $$ Hfds
@@ -219,7 +219,7 @@ theorem exit (s : Int) (fdm : Fdmap) (files : List (BitVec 8) → Option (List (
 
 /-- **Rocq `cif_iface`**: `cat f`'s ONE endpoint interface -- the input and
 the producer device, `False` at every other kind. -/
-noncomputable def iface : EpIfaceP (hlc := hlc) E.N E.P E.Dp where
+noncomputable def iface : EpIfaceP E.N E.P E.Dp where
   eiFds := E.fds
   eiOut := fun _ _ => iprop(False)
   eiOuth := fun _ _ => iprop(False)

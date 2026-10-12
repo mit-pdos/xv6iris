@@ -28,7 +28,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode MachCSL
 
 section PipeOutNSteps
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [PipeOutG GF]
 
 /-! ## Curried agreement forms (the steps keep both sides) -/
@@ -63,7 +63,7 @@ theorem rblkLb_prefix_c (gb : GName) (l l' : List (BitVec 8)) :
 
 /-! ## (W-openN) THE ROUND'S FIRST BYTE -/
 
-theorem peclV_blkN_open_gen (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)
+theorem peclV_blkN_open_gen (g : PipeGn) (M : LModel) (G : GenCparams GF M) (sd : M.lmSt)
     (WA : GenWa M G sd) (hext : ∀ k l, WA.gext k l = pext g k l)
     (k : Nat) (v : EraPins) (P a : Nat) (b : BitVec 8) (ps0 cs0 : List Nat) (s0 : M.lmSt)
     (I0 : List (BitVec 8)) (ho : List Obs) (H : ConsHist)
@@ -169,7 +169,7 @@ theorem peclV_blkN_open_gen (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) 
 
 /-! ## (W-byteN) A FURTHER BYTE OF AN OPEN ROUND, by ANY of its writers -/
 
-theorem peclV_blkN_byte_gen (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)
+theorem peclV_blkN_byte_gen (g : PipeGn) (M : LModel) (G : GenCparams GF M) (sd : M.lmSt)
     (WA : GenWa M G sd) (hext : ∀ k l, WA.gext k l = pext g k l)
     (k : Nat) (v : EraPins) (w : PipeEra) (gb : GName) (tmi : Bool) (P r a : Nat) (b : BitVec 8)
     (pre0 : List (BitVec 8)) (ps0 cs0 : List Nat) (s0 : M.lmSt) (I0 : List (BitVec 8))
@@ -269,7 +269,7 @@ theorem peclV_blkN_byte_gen (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) 
 
 /-! ## (W-fileN) THE FILING, at the prompt's first byte -/
 
-theorem peclV_blkN_file (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M)
+theorem peclV_blkN_file (g : PipeGn) (M : LModel) (G : GenCparams GF M) (B : LmByteLaws M)
     (sd : M.lmSt) (WA : GenWa M G sd) (hext : ∀ k l, WA.gext k l = pext g k l)
     (k : Nat) (v : EraPins) (w : PipeEra) (gb : GName) (P r a : Nat) (b : BitVec 8)
     (pre0 : List (BitVec 8)) (ps0 cs0 : List Nat) (s0 : M.lmSt) (I0 : List (BitVec 8))

@@ -26,7 +26,7 @@ open LeanRV64D
 
 def procFreepagetableAddr : BitVec 64 := KA.«proc_freepagetable»
 
-def wp_proc_freepagetable_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+def wp_proc_freepagetable_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8)) (ke : Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : procPagetableSlots ≤ k.avail) (hlk : "kmem" ∉ k.locks)
     (hroot : k.regs 10#5 = pageAddr P.root) (hsz : (k.regs 11#5).toNat ≤ uvmMaxsz)
@@ -41,8 +41,8 @@ def wp_proc_freepagetable_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS
   ⊢ wpLoop (GF := GF) cpu
 
 structure PROC_FREEPAGETABLE : Prop where
-  wp_proc_freepagetable : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_proc_freepagetable : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8)) (ke : Nat) hnoff hK hlk hroot hsz hbelow,
-    wp_proc_freepagetable_body (hlc := hlc) (GF := GF) cpu k γl γk P M ke hnoff hK hlk hroot hsz hbelow
+    wp_proc_freepagetable_body (GF := GF) cpu k γl γk P M ke hnoff hK hlk hroot hsz hbelow
 
 end Xv6

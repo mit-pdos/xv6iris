@@ -19,7 +19,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- `sched`'s six-slot frame at `sp`: `ra`, `s0`, `s1`, `s2`, `s3` and the
 unused bottom slot. -/
@@ -388,7 +388,7 @@ theorem sched_br_fffffffffffffa90 : KA.«sched» + 0xfffffffffffffa90#64 = KA.«
 set_option maxHeartbeats 4000000 in
 /-- **`sched` meets its specification.** -/
 theorem sched_proof (SW : SWTCH) (MP : MYPROC) (HO : HOLDING) : SCHED :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ X Γ _ cpu k j st ch hj hpark hK hsie hnoff hlocks htier hproc => by
+  ⟨fun {GF} _ _ _ _ _ _ _ X Γ _ cpu k j st ch hj hpark hK hsie hnoff hlocks htier hproc => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_sched_body
@@ -420,7 +420,7 @@ theorem sched_proof (SW : SWTCH) (MP : MYPROC) (HO : HOLDING) : SCHED :=
         ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.proc⌝ -∗ wpLoop cpu)
       ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hnoff' hK'
-    have h := MP.wp_myproc (hlc := hlc) (GF := GF) cpu k' hnoff' hK'
+    have h := MP.wp_myproc (GF := GF) cpu k' hnoff' hK'
     unfold wp_myproc_body at h
     simp only [myprocAddr] at h
     iintro ⟨Hk, Hp, Hcont⟩
@@ -460,7 +460,7 @@ theorem sched_proof (SW : SWTCH) (MP : MYPROC) (HO : HOLDING) : SCHED :=
       ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hK' pa ha0
     subst ha0
-    have h := HO.wp_holding_locked (hlc := hlc) (GF := GF) cpu k' (Γ.lock j) "proc"
+    have h := HO.wp_holding_locked (GF := GF) cpu k' (Γ.lock j) "proc"
       (procLockPay Γ j) hsie' hK'
     unfold wp_holding_locked_body at h
     simp only [holdingAddr] at h
@@ -603,7 +603,7 @@ theorem sched_proof (SW : SWTCH) (MP : MYPROC) (HO : HOLDING) : SCHED :=
        else emp)
       ⊢ wpLoop (GF := GF) cpu := by
     intro k' back old_vs hlen h10s h11s hsie' hnoff' hlocks' htier' hproc'
-    have h := SW.wp_swtch (hlc := hlc) (GF := GF) (pSched Γ) (some cpu) none cpu k'
+    have h := SW.wp_swtch (GF := GF) (pSched Γ) (some cpu) none cpu k'
       (pContext (procAddr j) 0) (cpuCtxAddr cpu) old_vs back hlen h10s h11s
       (fun _ _ _ _ _ _ _ => instCtxMorphPSched _ _ _ _ _ _ _ _) (adm_pin cpu) (adm_none cpu)
       hsie' hnoff' hlocks' htier'
@@ -645,12 +645,12 @@ theorem sched_proof (SW : SWTCH) (MP : MYPROC) (HO : HOLDING) : SCHED :=
   · -- A RESUMABLE PARK: the caller comes back
     have hdec : decide (needsCtx st) = true := decide_eq_true hnc
     rw [if_pos hnc]
-    ihave Hpay : parkPayAt (hlc := hlc) (GF := GF) ξ0 (procAddr j) st $$ []
+    ihave Hpay : parkPayAt (GF := GF) ξ0 (procAddr j) st $$ []
     case' _ =>
       unfold parkPayAt
       rw [if_neg (needsCtx_not_invDormant hnc)]
       iempintro
-    have hto := pSched_to_cpu (hlc := hlc) (GF := GF) Γ ξ0 cpu j st ch hj hpark
+    have hto := pSched_to_cpu (GF := GF) Γ ξ0 cpu j st ch hj hpark
     rw [hdec] at hto
     ihave HP := hto $$ [$Htc $Hir $Hheld $Htag $Hpay]
     iapply (hsw ((k.pushed 6).withRegs (R6.set 1#5 (KA.«sched» + 0x72#64))) true vs hvlen
@@ -837,7 +837,7 @@ theorem sched_proof (SW : SWTCH) (MP : MYPROC) (HO : HOLDING) : SCHED :=
       bv_omega
     icases kctx_drain cpu ((k.pushed 6).withRegs (R6.set 1#5 (KA.«sched» + 0x72#64))) (by show k.sie = false; exact hsie)
       $$ Hk with ⟨Hstk, Hk⟩
-    ihave Hstk := (show stackOwn (hlc := hlc) (GF := GF) (((k.pushed 6).withRegs (R6.set 1#5 (KA.«sched» + 0x72#64))).sp) (((k.pushed 6).withRegs (R6.set 1#5 (KA.«sched» + 0x72#64))).avail) ⊢
+    ihave Hstk := (show stackOwn (GF := GF) (((k.pushed 6).withRegs (R6.set 1#5 (KA.«sched» + 0x72#64))).sp) (((k.pushed 6).withRegs (R6.set 1#5 (KA.«sched» + 0x72#64))).avail) ⊢
         stackOwn (k.regs 2#5 - 8#64 * BitVec.ofNat 64 6) (k.avail - 6) from by
       simp only [KCtx.sp_withRegs, RegMap.set_apply, BitVec.reduceEq, ite_false,
         KCtx.withRegs_avail, KCtx.pushed_avail, hsp6]
@@ -845,14 +845,14 @@ theorem sched_proof (SW : SWTCH) (MP : MYPROC) (HO : HOLDING) : SCHED :=
       iexact H) $$ Hstk
     ihave Hframe6 := schedFrame_stack (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5)
       (k.regs 18#5) (k.regs 19#5) $$ Hframe
-    ihave Hstack := stackOwn_join (hlc := hlc) (GF := GF) (k.regs 2#5) 6 (k.avail - 6)
+    ihave Hstack := stackOwn_join (GF := GF) (k.regs 2#5) 6 (k.avail - 6)
       $$ [$Hframe6 $Hstk]
-    ihave Hstack := (show stackOwn (hlc := hlc) (GF := GF) (k.regs 2#5) (6 + (k.avail - 6)) ⊢
+    ihave Hstack := (show stackOwn (GF := GF) (k.regs 2#5) (6 + (k.avail - 6)) ⊢
         stackOwn (k.regs 2#5) k.avail from by
       rw [show 6 + (k.avail - 6) = k.avail from by unfold schedSlots at hK; omega])
       $$ Hstack
     ihave Hpay := Hclose $$ Hstack
-    have hto := pSched_to_cpu (hlc := hlc) (GF := GF) Γ ξ0 cpu j st ch hj hpark
+    have hto := pSched_to_cpu (GF := GF) Γ ξ0 cpu j st ch hj hpark
     rw [hdec] at hto
     ihave HP := hto $$ [$Htc $Hir $Hheld $Htag $Hpay]
     iapply (hsw (((k.pushed 6).withRegs (R6.set 1#5 (KA.«sched» + 0x72#64))).withAvail 0) false vs hvlen ?h10z ?h11z ?hs1z ?hs2z ?hs3z ?hs4z ?hs5z)

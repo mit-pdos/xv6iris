@@ -79,8 +79,8 @@ def pipewriteAddr : BitVec 64 := KA.«pipewrite»
 def pipewriteSlots : Nat := 64
 
 /-- **WP of `pipewrite`.**  `a0 = pi`, `a1 = addr`, `a2 = n` (an `int`). -/
-def wp_pipewrite_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+def wp_pipewrite_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γp : PipeNames) (w : Bool) (q : Qp)
     (γkl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
@@ -95,7 +95,7 @@ def wp_pipewrite_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] 
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
   procPrivBareAt curCtx (procAddr j) pid V M ∗ genHalvesPriv (procAddr j) pid V.gen ∗
   -- THE BYTE QUEUE'S PAYMENT: one link per byte, or the taint
-  pipeWpay (hlc := hlc) γp.pnQueue (writerImg V.upt M) (k.regs 11#5) Q Qe n.toNat ∗
+  pipeWpay γp.pnQueue (writerImg V.upt M) (k.regs 11#5) Q Qe n.toNat ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (k' : Nat),
     ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ pipeRwRet n (R' 10#5)⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -108,8 +108,8 @@ def wp_pipewrite_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] 
     genHalvesPriv (procAddr j) pid V.gen -∗
     -- THE QUEUE'S POST: the chain at the stop cursor with the answer's reason,
     -- or the taint with the payment back
-    pipeWpost (hlc := hlc) V.upt γp.pnQueue (writerImg V.upt M) (k.regs 11#5) Q Qe
-      iprop(killShot V.gen ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF)) n.toNat (R' 10#5) -∗
+    pipeWpost V.upt γp.pnQueue (writerImg V.upt M) (k.regs 11#5) Q Qe
+      iprop(killShot V.gen ∗ □ MachFixedGS.killCred (GF := GF)) n.toNat (R' 10#5) -∗
     wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
@@ -120,8 +120,8 @@ brings the trap-CSR complement (`trapCsrsExt` / `cpuClaimExt`, `emp` at
 `acquire(&pi->lock)` mints the rest of the bundle its interior `sleep`
 needs.  Depth 0, so no spinlock is held (`KCtx.wf`).  It parks, so the
 crossing is the literal `true`. -/
-def wp_pipewrite_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+def wp_pipewrite_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γp : PipeNames) (w : Bool) (q : Qp)
     (γkl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
@@ -136,7 +136,7 @@ def wp_pipewrite_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
   procPrivBareAt curCtx (procAddr j) pid V M ∗ genHalvesPriv (procAddr j) pid V.gen ∗
   -- THE BYTE QUEUE'S PAYMENT: one link per byte, or the taint
-  pipeWpay (hlc := hlc) γp.pnQueue (writerImg V.upt M) (k.regs 11#5) Q Qe n.toNat ∗
+  pipeWpay γp.pnQueue (writerImg V.upt M) (k.regs 11#5) Q Qe n.toNat ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (k' : Nat),
     ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ pipeRwRet n (R' 10#5)⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -149,21 +149,21 @@ def wp_pipewrite_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
     genHalvesPriv (procAddr j) pid V.gen -∗
     -- THE QUEUE'S POST: the chain at the stop cursor with the answer's reason,
     -- or the taint with the payment back
-    pipeWpost (hlc := hlc) V.upt γp.pnQueue (writerImg V.upt M) (k.regs 11#5) Q Qe
-      iprop(killShot V.gen ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF)) n.toNat (R' 10#5) -∗
+    pipeWpost V.upt γp.pnQueue (writerImg V.upt M) (k.regs 11#5) Q Qe
+      iprop(killShot V.gen ∗ □ MachFixedGS.killCred (GF := GF)) n.toNat (R' 10#5) -∗
     wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `pipewrite`. -/
 structure PIPEWRITE : Prop where
-  wp_pipewrite_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+  wp_pipewrite_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γp : PipeNames) (w : Bool) (q : Qp)
     (γkl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
     (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) hw
     hj hproc hK hnoff htier hn hn',
-    wp_pipewrite_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γp w q γkl γk j pid V M n Q Qe hw
+    wp_pipewrite_eb_body (GF := GF) Γ cpu k γl γp w q γkl γk j pid V M n Q Qe hw
       hj hproc hK hnoff htier hn hn'
 
 end Xv6

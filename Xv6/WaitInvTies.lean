@@ -96,7 +96,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
 section WaitInvTies
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [WchG GF] [CtokG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [WchG GF] [CtokG GF]
 
 /-! ## What the three writers spend -/
 
@@ -790,29 +790,29 @@ def waitInvResAt [CurCtx] (ξ : CtxId) : IProp GF :=
       famLed ps gs)
 
 instance waitInvResAt_morph [CurCtx] : CtxMorph (GF := GF) (waitInvResAt (GF := GF)) :=
-  @instCtxMorphExists hlc GF _ _ (fun ps ξ => iprop(∃ (gs : Nat → GName) (m : ChMap) (O : OrphMap),
+  @instCtxMorphExists GF _ _ (fun ps ξ => iprop(∃ (gs : Nat → GName) (m : ChMap) (O : OrphMap),
       parentsOwnAt ξ ps ∗ childrenOwnAt m ∗ orphansOwn O ∗ childrenInvAt ξ ps gs m O ∗
         famLed ps gs))
-    (fun ps => @instCtxMorphExists hlc GF _ _ (fun gs ξ => iprop(∃ (m : ChMap) (O : OrphMap),
+    (fun ps => @instCtxMorphExists GF _ _ (fun gs ξ => iprop(∃ (m : ChMap) (O : OrphMap),
         parentsOwnAt ξ ps ∗ childrenOwnAt m ∗ orphansOwn O ∗ childrenInvAt ξ ps gs m O ∗
           famLed ps gs))
-      (fun gs => @instCtxMorphExists hlc GF _ _ (fun m ξ => iprop(∃ (O : OrphMap),
+      (fun gs => @instCtxMorphExists GF _ _ (fun m ξ => iprop(∃ (O : OrphMap),
           parentsOwnAt ξ ps ∗ childrenOwnAt m ∗ orphansOwn O ∗ childrenInvAt ξ ps gs m O ∗
             famLed ps gs))
-        (fun m => @instCtxMorphExists hlc GF _ _ (fun O ξ => iprop(
+        (fun m => @instCtxMorphExists GF _ _ (fun O ξ => iprop(
             parentsOwnAt ξ ps ∗ childrenOwnAt m ∗ orphansOwn O ∗ childrenInvAt ξ ps gs m O ∗
               famLed ps gs))
-          (fun O => @instCtxMorphSep hlc GF _ (fun ξ => parentsOwnAt ξ ps)
+          (fun O => @instCtxMorphSep GF _ (fun ξ => parentsOwnAt ξ ps)
             (fun ξ => iprop(childrenOwnAt m ∗ orphansOwn O ∗ childrenInvAt ξ ps gs m O ∗
               famLed ps gs))
             (parentsOwnAt_morph ps)
-            (@instCtxMorphSep hlc GF _ (fun _ => childrenOwnAt m)
+            (@instCtxMorphSep GF _ (fun _ => childrenOwnAt m)
               (fun ξ => iprop(orphansOwn O ∗ childrenInvAt ξ ps gs m O ∗ famLed ps gs))
               (instCtxMorphConst _)
-              (@instCtxMorphSep hlc GF _ (fun _ => orphansOwn O)
+              (@instCtxMorphSep GF _ (fun _ => orphansOwn O)
                 (fun ξ => iprop(childrenInvAt ξ ps gs m O ∗ famLed ps gs))
                 (instCtxMorphConst _)
-                (@instCtxMorphSep hlc GF _ (fun ξ => childrenInvAt ξ ps gs m O)
+                (@instCtxMorphSep GF _ (fun ξ => childrenInvAt ξ ps gs m O)
                   (fun _ => famLed ps gs)
                   (childrenInvAt_morph ps gs m O) (instCtxMorphConst _))))))))
 
@@ -995,10 +995,10 @@ at junk) and the pid counter's boot-era token (WHOLE) -- and the INSTANCE
 that names them (deviation 4), over the ambient cameras (NI M2-X2: the
 instance's `WchGpre` IS the ambient one, so the ledgers' lower bounds a
 citation carries are at the cameras the NI record reads). -/
-theorem childrenRes_alloc {hlc : HasLC} [MachGS hlc GF]
+theorem childrenRes_alloc [MachGS GF]
     (hinj : ∀ a b, a < NPROC → b < NPROC → procAddr a = procAddr b → a = b) :
     ⊢@{IProp GF} |==> ∃ W : WchG GF, ⌜W.toWchGpre = (inferInstance : WchGpre GF)⌝ ∗
-      @childrenBoot hlc GF _ W ∗ @nextpidPend GF W := by
+      @childrenBoot GF _ W ∗ @nextpidPend GF W := by
   imod ghost_map_alloc_empty (GF := GF) (K := GName) (V := BitVec 64 × ExtTreeSet GName compare)
     (H := RegMapF) with ⟨%γ, Ha⟩
   imod chRows_alloc γ NPROC $$ Ha with ⟨%m, Ha, %hm, Hrows⟩

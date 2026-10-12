@@ -69,7 +69,7 @@ theorem FkrAfter.avail_ge {k : KCtx} {eb : Bool} {root : BitVec 44} {pa ksp : Bi
   cases eb <;> simp only [trapRes, kvFrameSlots, Bool.false_eq_true, if_false, if_true] at this <;> omega
 
 section Boot
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
@@ -80,27 +80,27 @@ set_option maxHeartbeats 8000000 in
 `firstBootPersist` / `firstFsinit`, and back the sealed file system
 (`firstPersistPre`), the application's environment, three slot units and
 the two ledger units. -/
-theorem fkr_fsinit_call [CurCtx] (FS : FSINIT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem fkr_fsinit_call [CurCtx] (FS : FSINIT) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k : KCtx) (j : Nat) (pid : BitVec 32) (dq : DFrac)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : fsinitSlots ≤ k.avail) (hnoff : k.noff = 0)
     (htier : k.tier = KTier.kpt) (ha0 : k.regs 10#5 = 1#64) :
     kctx c k ∗ pcIs c KA.«fsinit» ∗ procsInv Γ ∗
     trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
     wordPointsTo (pPid k.proc) 4 dq pid ∗
-    firstBootPersist (hlc := hlc) ∗ kallocAvail fsReadyKmem none ∗ firstFsinit (hlc := hlc) ∗
+    firstBootPersist ∗ kallocAvail fsReadyKmem none ∗ firstFsinit ∗
     (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap), ⌜calleeSaved k.regs R'⌝ -∗
       kctx c' ((k.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗
       wordPointsTo (pPid k.proc) 4 dq pid -∗
-      fsReady (hlc := hlc) -∗ fsabsEnv (hlc := hlc) -∗ bslots 3 -∗ irefSlots 2 -∗ wpLoop c')
+      fsReady -∗ fsabsEnv -∗ bslots 3 -∗ irefSlots 2 -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, #Hpinv, Hte, Hce, Hpid, #Hbp, Hka, Hfsi, Hcont⟩
-  ihave Hpre := firstPersistPre (hlc := hlc) $$ Hbp Hka
+  ihave Hpre := firstPersistPre $$ Hbp Hka
   unfold firstBootPersist
   icases Hbp with ⟨#Hpe, ⟨%γl, #Hbio⟩, ⟨%pd, %pav, %pu, #Hdc⟩, #Hit2, #Hitb, #Hslk, #Hireg, #Hbm,
     #Hkmem, %hg, #Hseam0, #Hcert, #Hcinv⟩
   ihave %hpd := fsReady_descPage fscDisk fscDlock pd pav pu $$ Hdc
-  icases firstFsinit_open (hlc := hlc) $$ Hfsi with ⟨%dk, %sb, %Rspent, %Pb, %vlock, %vStart, %vDev,
+  icases firstFsinit_open $$ Hfsi with ⟨%dk, %sb, %Rspent, %Pb, %vlock, %vStart, %vDev,
     %vNc, %vN, %vname, %vcpu, %sbOld, %hp, %hold, Hdurl, Hmir, Hlf, Hbinv, Hb1, Hsb, Hxo,
     Hireg', Hbm', Hboot, Hk0, Hk16, Hlk, Hnm, Hcpu, Hst, Hdv, Hout, Hcmt, Hnc, Hn, Hblk,
     ⟨%L, %D, %hLdk, HL, HD⟩, Hdty, Hhdr, Hslots, Hbsl, Hirs, -, #Henv⟩
@@ -114,7 +114,7 @@ theorem fkr_fsinit_call [CurCtx] (FS : FSINIT) (Γ : SchedNames) [ClaimIs (hlc :
       rw [hLdk b hb, hv]
   have ha0' : k.regs 10#5 = BitVec.signExtend 64 icfgDev := by
     rw [ha0, hg.fgoRootdev]; exact fkr_rootdev
-  have h := FS.wp_fsinit_eb (hlc := hlc) (GF := GF) Γ c k γl pd pav pu j vMagic
+  have h := FS.wp_fsinit_eb (GF := GF) Γ c k γl pd pav pu j vMagic
     (BitVec.ofNat 32 fscSize) vNblocks vNlog (fsBlocks dk 1) sbOld (fsBlocks dk (logHdrBno fscLogst))
     L D vlock vname vcpu vStart vDev vNc vN pid dq (mirrorOf (fsBlocks dk)) sb Pb
     hj hproc hK hnoff htier hg.fgoLog h1 himg hparse hok hcg hbm hsz hmagic hg.fgoNinLo hg.fgoNinHi
@@ -155,19 +155,19 @@ theorem fkr_first_addr2' : KA.«forkret» + 35282#64 = firstAddr := by decide
 set_option maxHeartbeats 8000000 in
 /-- **+0x1e .. +0x2c**: `fsinit(ROOTDEV)`, then `first = 0`, persisted at
 once -- the token's steady arm, minted (Rocq `fkr_boot`'s first half). -/
-theorem fkr_boot_fsinit [CurCtx] (FS : FSINIT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem fkr_boot_fsinit [CurCtx] (FS : FSINIT) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (kr : KCtx) (eb : Bool) (root : BitVec 44) (j : Nat) (ksp : BitVec 64)
     (pid : BitVec 32) (dq : DFrac)
     (h : FkrAfter kr eb root (procAddr j) ksp) (hj : j < NPROC) :
     kctx c kr ∗ pcIs c (KA.«forkret» + 0x1e#64) ∗ wordPointsTo firstAddr 4 (DFrac.own 1) 1#32 ∗
     procsInv Γ ∗ trapCsrsExt c eb ∗ cpuClaimExt c eb (procAddr j) ∗
     wordPointsTo (pPid (procAddr j)) 4 dq pid ∗
-    firstBootPersist (hlc := hlc) ∗ kallocAvail fsReadyKmem none ∗ firstFsinit (hlc := hlc) ∗
+    firstBootPersist ∗ kallocAvail fsReadyKmem none ∗ firstFsinit ∗
     (∀ (c2 : CPU) (kr2 : KCtx), ⌜FkrAfter kr2 eb root (procAddr j) ksp⌝ -∗
       kctx c2 kr2 -∗ pcIs c2 (KA.«forkret» + 0x2c#64) -∗
       trapCsrsExt c2 eb -∗ cpuClaimExt c2 eb (procAddr j) -∗
       wordPointsTo (pPid (procAddr j)) 4 dq pid -∗
-      firstDone (hlc := hlc) -∗ bslots 3 -∗ irefSlots 2 -∗ wpLoop c2)
+      firstDone -∗ bslots 3 -∗ irefSlots 2 -∗ wpLoop c2)
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, Hf, #Hpinv, Hte, Hce, Hpid, #Hbp, Hka, Hfsi, Hcont⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩

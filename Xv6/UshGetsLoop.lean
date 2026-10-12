@@ -134,7 +134,7 @@ def ushGetsRegs (m : RegMap) (a Nb spz i : Nat) : Prop :=
   m.get 20#5 = BitVec.ofNat 64 Nb ∧ m.get 21#5 = BitVec.ofNat 64 1 ∧ m.get 22#5 = BitVec.ofNat 64 (spz - 81)
 
 section GetsLoop
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
@@ -145,9 +145,9 @@ theorem ushGets_sb (UL : UK_LEAVES) (N : UkNames GF) {C : IProp GF} [Persistent 
     (y : Nat) (h : CPU) (m : RegMap) (av : Nat) (a : Nat) (b0 : BitVec 8)
     (ha : ((m.get rs1).toNat : Int) + imm.toInt = a)
     (hy : x + (if rvc then 2 else 4) = y := by decide) :
-    ⊢ C -∗ ubyte N.d a b0 -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 x) av -∗
+    ⊢ C -∗ ubyte N.d a b0 -∗ urun N h m (BitVec.ofNat 64 x) av -∗
       (ubyte N.d a (nthByte (n := 8) (m.get rs2) 0) -∗ ∀ h' : CPU,
-        urun (hlc := hlc) N h' m (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗
+        urun N h' m (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #HC Hb Hrun Hk
   ihave #Hi := hi $$ HC
@@ -162,13 +162,13 @@ def ushGetsK (N : UkNames GF) (X : UshCtx GF) (Dl : Uline → Prop) (l : List Fd
     (mc : RegMap) : IProp GF :=
   iprop(∀ (h' : CPU) (mc' : RegMap) (i2 : Nat) (g : Nat → BitVec 8) (bc' : BitVec 8),
     ⌜i2 < Nb⌝ -∗ ⌜mc'.get 24#5 = BitVec.ofNat 64 i2⌝ -∗ ⌜∀ r, ushGetsKeep r = true → mc'.get r = mc.get r⌝ -∗
-    ubytes N.d a Nb g -∗ ubyte N.d (spz - 81) bc' -∗ ushStd N X l -∗ ushGetsDoneAt (hlc := hlc) N X Dl l i2 g -∗
-    urun (hlc := hlc) N h' mc' (BitVec.ofNat 64 0xadc) nn -∗ wpLoop h')
+    ubytes N.d a Nb g -∗ ubyte N.d (spz - 81) bc' -∗ ushStd N X l -∗ ushGetsDoneAt N X Dl l i2 g -∗
+    urun N h' mc' (BitVec.ofNat 64 0xadc) nn -∗ wpLoop h')
 
 /-- The exit, at a register file agreeing with the entry's on the keep set. -/
 theorem ushGetsK_mono (N : UkNames GF) (X : UshCtx GF) (Dl : Uline → Prop) (l : List FdState) (a Nb spz nn : Nat)
     (mc m2 : RegMap) (hk : ∀ r, ushGetsKeep r = true → m2.get r = mc.get r) :
-    ushGetsK (hlc := hlc) N X Dl l a Nb spz nn mc ⊢ ushGetsK (hlc := hlc) N X Dl l a Nb spz nn m2 := by
+    ushGetsK N X Dl l a Nb spz nn mc ⊢ ushGetsK N X Dl l a Nb spz nn m2 := by
   unfold ushGetsK
   iintro HK %h' %mc' %i2 %g %bc' %hi2 %h24 %hk' Hbs Hb Hstd Hd Hrun
   iapply HK $$ %h' %mc' %i2 %g %bc' %hi2 %h24 %(fun r hr => (hk' r hr).trans (hk r hr)) Hbs Hb Hstd Hd Hrun
@@ -182,15 +182,15 @@ def ushGetsAgain (N : UkNames GF) (X : UshCtx GF) (Dsc : List (BitVec 8) → Pro
     ⌜i < Nb⌝ -∗ ⌜J2.length = i⌝ -∗ ⌜ushGetsRegs m2 a Nb spz i⌝ -∗
     ⌜∀ r, ushGetsKeep r = true → m2.get r = mc.get r⌝ -∗
     ubytes N.d a Nb f2 -∗ ubyte N.d (spz - 81) b -∗ ushStd N X l -∗
-    ushGetsLineAt (hlc := hlc) N X Dsc l I0 J2 f2 -∗ (ushWcp X l I0 2 ∨ X.T) -∗
-    urun (hlc := hlc) N h2 m2 (BitVec.ofNat 64 0xaac) nn -∗ ushGetsK (hlc := hlc) N X Dl l a Nb spz nn mc -∗
+    ushGetsLineAt N X Dsc l I0 J2 f2 -∗ (ushWcp X l I0 2 ∨ X.T) -∗
+    urun N h2 m2 (BitVec.ofNat 64 0xaac) nn -∗ ushGetsK N X Dl l a Nb spz nn mc -∗
     wpLoop h2)
 
 /-- **THE BYTE ARM** (0xac6..0xada): store the byte, then `'\n'` ends the
 line, `'\r'` ends it too (refuted by the discipline), anything else goes
 round again. -/
 theorem ushGets_byte (UL : UK_LEAVES) (N : UkNames GF) (X : UshCtx GF) [Persistent X.T]
-    (L : UshLaws (hlc := hlc) N X) (Dsc : List (BitVec 8) → Prop) (Dl : Uline → Prop) (D : UshDisc Dsc Dl)
+    (L : UshLaws N X) (Dsc : List (BitVec 8) → Prop) (Dl : Uline → Prop) (D : UshDisc Dsc Dl)
     (a Nb spz i : Nat) (l : List FdState) (I0 J : List (BitVec 8)) (h : CPU) (m mc : RegMap)
     (f : Nat → BitVec 8) (b : BitVec 8) (nn : Nat)
     (hNb : Nb = shNbuf) (hi1 : i + 1 < Nb) (hiJ : i = J.length) (ha : a + Nb ≤ 2 ^ 38) (hsp : 96 ≤ spz)
@@ -201,11 +201,11 @@ theorem ushGets_byte (UL : UK_LEAVES) (N : UkNames GF) (X : UshCtx GF) [Persiste
     (hs6 : m.get 22#5 = BitVec.ofNat 64 (spz - 81))
     (hkeep : ∀ r, ushGetsKeep r = true → m.get r = mc.get r) :
     ⊢ ushCode N.t -∗ ubytes N.d a Nb f -∗ ubyte N.d (spz - 81) b -∗ ushStd N X l -∗
-      ((⌜Dsc ((I0 ++ J) ++ [b])⌝ ∗ ⌜ushFd0c l⌝ ∗ X.Pm ((I0 ++ J) ++ [b])) ∨ (X.T ∗ ushPos (hlc := hlc) N X)) -∗
+      ((⌜Dsc ((I0 ++ J) ++ [b])⌝ ∗ ⌜ushFd0c l⌝ ∗ X.Pm ((I0 ++ J) ++ [b])) ∨ (X.T ∗ ushPos N X)) -∗
       (⌜ushGlinePAt Dsc l I0 J f⌝ ∨ X.T) -∗ (ushWcp X l I0 2 ∨ X.T) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0xac6) nn -∗
-      ushGetsAgain (hlc := hlc) N X Dsc Dl l a Nb spz nn I0 (i + 1) mc -∗
-      ushGetsK (hlc := hlc) N X Dl l a Nb spz nn mc -∗ wpLoop h := by
+      urun N h m (BitVec.ofNat 64 0xac6) nn -∗
+      ushGetsAgain N X Dsc Dl l a Nb spz nn I0 (i + 1) mc -∗
+      ushGetsK N X Dl l a Nb spz nn mc -∗ wpLoop h := by
   iintro #Hc Hbs Hb Hstd Hans #Hrows Hwc Hrun Hagain HK
   have hbnd : b.toNat < 256 := b.isLt
   -- 0xac6  lbu a5,-81(s0)
@@ -250,10 +250,10 @@ theorem ushGets_byte (UL : UK_LEAVES) (N : UkNames GF) (X : UshCtx GF) [Persiste
   -- the exit at 0xada: mv s8,s3, then the line / the taint
   have hexit : ∀ (hx : CPU) (mx : RegMap) (x : Nat) (rvc : Bool),
       mx.get 19#5 = BitVec.ofNat 64 (i + 1) → (∀ r, ushGetsKeep r = true → mx.get r = mc.get r) →
-      ⊢ ushCode N.t -∗ urun (hlc := hlc) N hx mx (BitVec.ofNat 64 0xada) nn -∗
+      ⊢ ushCode N.t -∗ urun N hx mx (BitVec.ofNat 64 0xada) nn -∗
         (∀ (hy : CPU) (my : RegMap), ⌜my.get 24#5 = BitVec.ofNat 64 (i + 1)⌝ -∗
           ⌜∀ r, ushGetsKeep r = true → my.get r = mc.get r⌝ -∗
-          urun (hlc := hlc) N hy my (BitVec.ofNat 64 0xadc) nn -∗ wpLoop hy) -∗ wpLoop hx := by
+          urun N hy my (BitVec.ofNat 64 0xadc) nn -∗ wpLoop hy) -∗ wpLoop hx := by
     intro hx mx x rvc h19 hk
     iintro #Hc Hrun Hk
     iapply ushS_mv UL N (ushMI_ada N.t) 0xadc hx mx nn (BitVec.ofNat 64 (i + 1)) h19 $$ Hc Hrun
@@ -359,17 +359,17 @@ theorem ushGets_byte (UL : UK_LEAVES) (N : UkNames GF) (X : UshCtx GF) [Persiste
 /-- **ONE TURN, up to the read's answer** (0xaac..0xac2): the index, the
 buffer-full exit, the one-byte read, and the `blez` per arm of the answer. -/
 theorem ushGets_iter (UL : UK_LEAVES) (N : UkNames GF) (X : UshCtx GF) [Persistent X.T]
-    (L : UshLaws (hlc := hlc) N X) (Dsc : List (BitVec 8) → Prop) (Dl : Uline → Prop) (D : UshDisc Dsc Dl)
-    (cn : ConsNames) (HR : ∀ l : List FdState, ⊢ ushReadRecvLeafAt (hlc := hlc) N X Dsc cn l)
+    (L : UshLaws N X) (Dsc : List (BitVec 8) → Prop) (Dl : Uline → Prop) (D : UshDisc Dsc Dl)
+    (cn : ConsNames) (HR : ∀ l : List FdState, ⊢ ushReadRecvLeafAt N X Dsc cn l)
     (a Nb spz i : Nat) (l : List FdState) (hfd0 : ushFd0p l) (I0 J : List (BitVec 8)) (h : CPU) (mc : RegMap)
     (f : Nat → BitVec 8) (bc : BitVec 8) (nn : Nat)
     (hNb : Nb = shNbuf) (hi : i < Nb) (hiJ : i = J.length) (ha : a + Nb ≤ 2 ^ 38) (hsp : 96 ≤ spz)
     (hsp' : spz < 2 ^ 64) (hr : ushGetsRegs mc a Nb spz i) :
-    ⊢ ushTagLaw (hlc := hlc) X -∗ ushCode N.t -∗ ubytes N.d a Nb f -∗ ubyte N.d (spz - 81) bc -∗
-      ushStd N X l -∗ ushGetsLineAt (hlc := hlc) N X Dsc l I0 J f -∗ (ushWcp X l I0 2 ∨ X.T) -∗
-      urun (hlc := hlc) N h mc (BitVec.ofNat 64 0xaac) nn -∗
-      ushGetsAgain (hlc := hlc) N X Dsc Dl l a Nb spz nn I0 (i + 1) mc -∗
-      ushGetsK (hlc := hlc) N X Dl l a Nb spz nn mc -∗ wpLoop h := by
+    ⊢ ushTagLaw X -∗ ushCode N.t -∗ ubytes N.d a Nb f -∗ ubyte N.d (spz - 81) bc -∗
+      ushStd N X l -∗ ushGetsLineAt N X Dsc l I0 J f -∗ (ushWcp X l I0 2 ∨ X.T) -∗
+      urun N h mc (BitVec.ofNat 64 0xaac) nn -∗
+      ushGetsAgain N X Dsc Dl l a Nb spz nn I0 (i + 1) mc -∗
+      ushGetsK N X Dl l a Nb spz nn mc -∗ wpLoop h := by
   obtain ⟨hs0, hs1, hs2, hs4, hs5, hs6⟩ := hr
   have hNb100 : Nb = 100 := hNb
   iintro #Hlaw #Hc Hbs Hb Hstd Hline Hwc Hrun Hagain HK
@@ -447,11 +447,11 @@ theorem ushGets_iter (UL : UK_LEAVES) (N : UkNames GF) (X : UshCtx GF) [Persiste
   have h8_0 : m8.get 0#5 = 0#64 := RegMap.get_zero _
   have hb8 : ∀ (hx : CPU) (bb : BitVec 8), ⊢ ushCode N.t -∗ ubytes N.d a Nb f -∗ ubyte N.d (spz - 81) bb -∗
       ushStd N X l -∗
-      ((⌜Dsc ((I0 ++ J) ++ [bb])⌝ ∗ ⌜ushFd0c l⌝ ∗ X.Pm ((I0 ++ J) ++ [bb])) ∨ (X.T ∗ ushPos (hlc := hlc) N X)) -∗
+      ((⌜Dsc ((I0 ++ J) ++ [bb])⌝ ∗ ⌜ushFd0c l⌝ ∗ X.Pm ((I0 ++ J) ++ [bb])) ∨ (X.T ∗ ushPos N X)) -∗
       (⌜ushGlinePAt Dsc l I0 J f⌝ ∨ X.T) -∗ (ushWcp X l I0 2 ∨ X.T) -∗
-      urun (hlc := hlc) N hx m8 (BitVec.ofNat 64 0xac6) nn -∗
-      ushGetsAgain (hlc := hlc) N X Dsc Dl l a Nb spz nn I0 (i + 1) mc -∗
-      ushGetsK (hlc := hlc) N X Dl l a Nb spz nn mc -∗ wpLoop hx := fun hx bb =>
+      urun N hx m8 (BitVec.ofNat 64 0xac6) nn -∗
+      ushGetsAgain N X Dsc Dl l a Nb spz nn I0 (i + 1) mc -∗
+      ushGetsK N X Dl l a Nb spz nn mc -∗ wpLoop hx := fun hx bb =>
     ushGets_byte UL N X L Dsc Dl D a Nb spz i l I0 J hx m8 mc f bb nn hNb (by omega) hiJ ha hsp hsp'
       (by rw [hm8 _ (by decide) (by decide)]; ureg; exact hs0)
       (by rw [hm8 _ (by decide) (by decide)]; ureg)
@@ -509,16 +509,16 @@ theorem ushGets_iter (UL : UK_LEAVES) (N : UkNames GF) (X : UshCtx GF) [Persiste
 /-- **Rocq `wp_ksh_gets_loop`**: the loop, by induction on the bytes still
 to come. -/
 theorem ushGets_loop (UL : UK_LEAVES) (N : UkNames GF) (X : UshCtx GF) [Persistent X.T]
-    (L : UshLaws (hlc := hlc) N X) (Dsc : List (BitVec 8) → Prop) (Dl : Uline → Prop) (D : UshDisc Dsc Dl)
-    (cn : ConsNames) (HR : ∀ l : List FdState, ⊢ ushReadRecvLeafAt (hlc := hlc) N X Dsc cn l)
+    (L : UshLaws N X) (Dsc : List (BitVec 8) → Prop) (Dl : Uline → Prop) (D : UshDisc Dsc Dl)
+    (cn : ConsNames) (HR : ∀ l : List FdState, ⊢ ushReadRecvLeafAt N X Dsc cn l)
     (a Nb spz : Nat) (l : List FdState) (hfd0 : ushFd0p l) (I0 : List (BitVec 8)) (nn : Nat)
     (hNb : Nb = shNbuf) (ha : a + Nb ≤ 2 ^ 38) (hsp : 96 ≤ spz) (hsp' : spz < 2 ^ 64) :
     ∀ (k i : Nat) (J : List (BitVec 8)) (h : CPU) (mc : RegMap) (f : Nat → BitVec 8) (bc : BitVec 8),
     Nb = i + k → i < Nb → i = J.length → ushGetsRegs mc a Nb spz i →
-    ⊢ ushTagLaw (hlc := hlc) X -∗ ushCode N.t -∗ ubytes N.d a Nb f -∗ ubyte N.d (spz - 81) bc -∗
-      ushStd N X l -∗ ushGetsLineAt (hlc := hlc) N X Dsc l I0 J f -∗ (ushWcp X l I0 2 ∨ X.T) -∗
-      urun (hlc := hlc) N h mc (BitVec.ofNat 64 0xaac) nn -∗
-      ushGetsK (hlc := hlc) N X Dl l a Nb spz nn mc -∗ wpLoop h
+    ⊢ ushTagLaw X -∗ ushCode N.t -∗ ubytes N.d a Nb f -∗ ubyte N.d (spz - 81) bc -∗
+      ushStd N X l -∗ ushGetsLineAt N X Dsc l I0 J f -∗ (ushWcp X l I0 2 ∨ X.T) -∗
+      urun N h mc (BitVec.ofNat 64 0xaac) nn -∗
+      ushGetsK N X Dl l a Nb spz nn mc -∗ wpLoop h
   | 0, i, _, _, _, _, _, hk, hi, _, _ => absurd hi (by omega)
   | k + 1, i, J, h, mc, f, bc, hk, hi, hiJ, hr => by
     iintro #Hlaw #Hc Hbs Hb Hstd Hline Hwc Hrun HK

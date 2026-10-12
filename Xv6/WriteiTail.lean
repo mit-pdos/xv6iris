@@ -23,7 +23,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -153,7 +153,7 @@ theorem writei_ret_d8 : jumpPc (KA.«writei» + 0xd8#64) = KA.«writei» + 0xd8#
 set_option maxHeartbeats 16000000 in
 /-- **`+0xd2 .. +0xda`: iupdate, `a0 := tot`, restore `s3`** (Rocq's
 `wi_join`).  THREE PATHS JOIN HERE. -/
-theorem writei_join (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem writei_join (IU : IUPDATE) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (A : WiArgs) (hA : WiFactsEb k A)
     (tot : Nat) (bm' : Blkmap) (data' : Nat → List (BitVec 8)) (wrote : Nat → BitVec 8)
     (dist : Nat) (dstb : Nat → BitVec 8) (P' : UPtd) (u : Nat) (SbC : List Nat)
@@ -315,7 +315,7 @@ theorem writei_decide_f {p : Prop} [Decidable p] (h : ¬ p) : decide p = false :
 set_option maxHeartbeats 16000000 in
 /-- **`+0xbc .. +0xd0` and `+0xf2 .. +0xfc`: the size test, the store, the
 five conditional restores** (Rocq's `wi_size`), then the join. -/
-theorem writei_size (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem writei_size (IU : IUPDATE) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (A : WiArgs) (hA : WiFactsEb k A)
     (tot : Nat) (bm' : Blkmap) (data' : Nat → List (BitVec 8)) (wrote : Nat → BitVec 8)
     (dist : Nat) (dstb : Nat → BitVec 8) (P' : UPtd) (u : Nat) (SbC : List Nat)

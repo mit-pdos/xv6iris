@@ -35,7 +35,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -43,22 +43,22 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 /-- The loop at fuel `W` (Rocq `sx_loop`'s statement with its `(32 - i <= W)`
 premise). -/
 theorem sys_exec_loop_fuel (Γ : SchedNames) (k : KCtx) (A : SysExecArgs)
-    (hstep : ⊢ sysExecStepBody (hlc := hlc) (GF := GF) Γ k A) :
+    (hstep : ⊢ sysExecStepBody (GF := GF) Γ k A) :
     ∀ W : Nat, ⊢@{IProp GF} ∀ (c : CPU) (spie spp : Bool) (R : RegMap) (P : UPtd) (kv : Nat)
       (i : Nat)
       (pg : Nat → BitVec 64) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8)
       (uvf : Nat → BitVec 64) (pl rest : List (BitVec 8)),
       ⌜32 - i ≤ W⌝ -∗
-      sysExecLoopSt (hlc := hlc) k A spie spp R P kv i pg alen afun uvf pl rest (sysExecAddr + 0x56#64)
+      sysExecLoopSt k A spie spp R P kv i pg alen afun uvf pl rest (sysExecAddr + 0x56#64)
         c -∗
-      sysExecEnv (hlc := hlc) Γ A -∗
+      sysExecEnv Γ A -∗
       (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (kv' : Nat) (i' : Nat)
           (pg' : Nat → BitVec 64)
           (alen' : Nat → Nat) (afun' : Nat → Nat → BitVec 8) (uvf' : Nat → BitVec 64),
         ((⌜bytesToWord (umemRead (sysExecIm A) (A.v1 + BitVec.ofNat 64 (8 * i')).toNat 8) = 0#64⌝ ∗
-            sysExecLoopSt (hlc := hlc) k A spie' spp' R' P' kv' i' pg' alen' afun' uvf' pl rest
+            sysExecLoopSt k A spie' spp' R' P' kv' i' pg' alen' afun' uvf' pl rest
               (sysExecAddr + 0xb6#64) c') ∨
-         sysExecBadSt (hlc := hlc) k A spie' spp' R' P' kv' i' pg' afun' pl rest c') -∗
+         sysExecBadSt k A spie' spp' R' P' kv' i' pg' afun' pl rest c') -∗
         wpLoop c') -∗
       wpLoop c := by
   unfold sysExecStepBody at hstep
@@ -85,8 +85,8 @@ theorem sys_exec_loop_fuel (Γ : SchedNames) (k : KCtx) (A : SysExecArgs)
 
 /-- **THE FILL LOOP** (Rocq `sx_loop`): the step, iterated. -/
 theorem sys_exec_loop (Γ : SchedNames) (k : KCtx) (A : SysExecArgs)
-    (hstep : ⊢ sysExecStepBody (hlc := hlc) (GF := GF) Γ k A) :
-    ⊢ sysExecLoopBody (hlc := hlc) (GF := GF) Γ k A := by
+    (hstep : ⊢ sysExecStepBody (GF := GF) Γ k A) :
+    ⊢ sysExecLoopBody (GF := GF) Γ k A := by
   unfold sysExecLoopBody
   iintro %c %spie %spp %R %P %kv %i %pg %alen %afun %uvf %pl %rest Hst
   iapply (sys_exec_loop_fuel Γ k A hstep 32) $$ %c %spie %spp %R %P %kv %i %pg %alen %afun %uvf %pl

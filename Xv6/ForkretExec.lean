@@ -88,7 +88,7 @@ theorem fkr_msg_run : rodataRun KStr.«exec».toNat (fkrExecMsgStr ++ [0#8]) := 
   decide +kernel
 
 section Exec
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
@@ -146,7 +146,7 @@ set_option maxHeartbeats 4000000 in
 /-- **The call `kexec("/init", argv)`** at the bundle (Rocq `fkr_boot`'s
 `KX.wp_kexec_sconf` application): the record `fkrKA`, the key's generation
 the block's. -/
-theorem fkr_kexec_call [CurCtx] (KX : KEXEC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem fkr_kexec_call [CurCtx] (KX : KEXEC) (Γ : SchedNames) [ClaimIs GF Γ]
     {SG : UexecSG GF}
     (c : CPU) (k : KCtx) (eb : Bool) (pa : BitVec 64) (γ : FileNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (cs : ExtTreeSet GName compare)
@@ -157,16 +157,16 @@ theorem fkr_kexec_call [CurCtx] (KX : KEXEC) (Γ : SchedNames) [ClaimIs (hlc := 
     (htier : k.tier = KTier.kpt) (ha0 : k.regs 10#5 = KStr.«/init») (ha1 : k.regs 11#5 = av)
     (hav8 : av + 8#64 = av8) :
     kctx c k ∗ pcIs c KA.«kexec» ∗ trapCsrsExt c eb ∗ cpuClaimExt c eb pa ∗
-    fsFabric (hlc := hlc) Γ pd pav pu ∗ procPrivFd γ pa pid V M ∗
+    fsFabric Γ pd pav pu ∗ procPrivFd γ pa pid V M ∗
     byteBuf KStr.«/init» DFrac.discard (bview 6 initBootBytes) ∗
     byteBuf KStr.«/init» DFrac.discard (bview 6 initBootBytes) ∗
     wordPointsTo av 8 (DFrac.own 1) KStr.«/init» ∗ wordPointsTo av8 8 (DFrac.own 1) 0#64 ∗
     bslots 3 ∗ irefSlots 2 ∗ myPay V.gen (fun _ => iprop(True)) ∗
-    execAuPre (hlc := hlc) ⟨uslot (hlc := hlc) (SG := SG), R⟩ (fsGammaL fscFs) fscFs V.rti V.cwi V.pvSecc
+    execAuPre ⟨uslot (SG := SG), R⟩ (fsGammaL fscFs) fscFs V.rti V.cwi V.pvSecc
       (fun _ => iprop(True)) P Pmiss Fo initBootPath 1 (fun _ => 5) (fun _ => initBootBytes) sts cs pid ∗
     (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap) (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
       ⌜calleeSaved k.regs R'⌝ -∗
-      execArms (hlc := hlc) ⟨uslot (hlc := hlc) (SG := SG), R⟩ (fsGammaL fscFs) fscFs V.rti V.cwi V.pvSecc
+      execArms ⟨uslot (SG := SG), R⟩ (fsGammaL fscFs) fscFs V.rti V.cwi V.pvSecc
         (fun _ => iprop(True)) P Pmiss Fo initBootPath 1 (fun _ => 5) (fun _ => initBootBytes) sts V.gen
         cs pid V M V' M' (R' 10#5) -∗
       kctx c' ((k.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k.regs 1#5)) -∗
@@ -175,8 +175,8 @@ theorem fkr_kexec_call [CurCtx] (KX : KEXEC) (Γ : SchedNames) [ClaimIs (hlc := 
       wordPointsTo av 8 (DFrac.own 1) KStr.«/init» -∗ wordPointsTo av8 8 (DFrac.own 1) 0#64 -∗
       wpLoop c')
     ⊢ wpLoop (GF := GF) c := by
-  have h := KX.wp_kexec_eb (hlc := hlc) (GF := GF) Γ c k (fkrKA γ j pid V M pd pav pu)
-    ⟨uslot (hlc := hlc) (SG := SG), R⟩ sts V.gen cs (fun _ => iprop(True)) P Pmiss Fo hK hnoff htier hj
+  have h := KX.wp_kexec_eb (GF := GF) Γ c k (fkrKA γ j pid V M pd pav pu)
+    ⟨uslot (SG := SG), R⟩ sts V.gen cs (fun _ => iprop(True)) P Pmiss Fo hK hnoff htier hj
     (hproc.trans hpa) (fun i hi => by simp only [fkrKA] at hi ⊢; revert i; decide) initBootBytes_nul
     (by show 5 < 2 ^ 31; decide)
     (fun i hi => by
@@ -243,7 +243,7 @@ theorem fkr_panic [CurCtx] (PA : PANIC) (c : CPU) (k' : KCtx)
     (hpr : "pr" ∉ k'.locks) (huart : "uart1" ∉ k'.locks) :
     kctx c k' ∗ pcIs c KA.«panic» ∗ panicEnv ∗
     cstr KStr.«exec» DFrac.discard fkrExecMsgStr ⊢ wpLoop (GF := GF) c := by
-  have h := PA.wp_panic (hlc := hlc) (GF := GF) c k' (PkArgDesc.str DFrac.discard fkrExecMsgStr)
+  have h := PA.wp_panic (GF := GF) c k' (PkArgDesc.str DFrac.discard fkrExecMsgStr)
     hK rfl hnoff hpr huart
   unfold wp_panic_body at h
   simp only [panicAddr] at h
@@ -365,22 +365,22 @@ set_option maxHeartbeats 16000000 in
 bundle, the store of its return, the test; on success the tail's record is
 the stored one and the slot is kexec's receipt (Rocq `fkr_boot`'s second
 half). -/
-theorem fkr_boot_exec [X : CurCtx] (KX : KEXEC) (PN : PANIC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem fkr_boot_exec [X : CurCtx] (KX : KEXEC) (PN : PANIC) (Γ : SchedNames) [ClaimIs GF Γ]
     {SG : UexecSG GF}
     (c : CPU) (kr : KCtx) (eb : Bool) (root : BitVec 44) (j : Nat) (ksp : BitVec 64) (γ : FileNames)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
     (cs : ExtTreeSet GName compare)
     (h : FkrAfter kr eb root (procAddr j) ksp) (hj : j < NPROC) :
     kctx c kr ∗ pcIs c (KA.«forkret» + 0x2c#64) ∗ trapCsrsExt c eb ∗ cpuClaimExt c eb (procAddr j) ∗
-    fkrFrame ksp ∗ procsInv Γ ∗ panicEnv ∗ firstDone (hlc := hlc) ∗
+    fkrFrame ksp ∗ procsInv Γ ∗ panicEnv ∗ firstDone ∗
     procPrivFd γ (procAddr j) pid V M ∗ bslots 3 ∗ irefSlots 2 ∗ myPay V.gen (fun _ => iprop(True)) ∗
-    initBootBundle (hlc := hlc) (SG := SG) V.rti V.cwi V.pvSecc sts ∗ consReader fscCons 0 ∗
+    initBootBundle (SG := SG) V.rti V.cwi V.pvSecc sts ∗ consReader fscCons 0 ∗
     (∀ (c2 : CPU) (kb : KCtx) (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
       ⌜FkrAfter kb eb root (procAddr j) ksp⌝ -∗ ⌜FkrExecPins V V'⌝ -∗
       kctx c2 kb -∗ pcIs c2 (KA.«forkret» + 0x54#64) -∗
       trapCsrsExt c2 eb -∗ cpuClaimExt c2 eb (procAddr j) -∗ fkrFrame ksp -∗
       procPrivFd γ (procAddr j) pid V' M' -∗
-      uslot (hlc := hlc) (SG := SG) (uvisOf V' M' sts V.gen cs pid) -∗ wpLoop c2)
+      uslot (SG := SG) (uvisOf V' M' sts V.gen cs pid) -∗ wpLoop c2)
     ⊢ wpLoop (GF := GF) c := by
   unfold initBootBundle
   iintro ⟨Hk, Hpc, Hte, Hce, Hfr, #Hpinv, #Hpe, #Hdone, Hpv, Hbs, Hir, #Hmp, Hbun, Hrd, Hcont⟩
@@ -389,10 +389,10 @@ theorem fkr_boot_exec [X : CurCtx] (KX : KEXEC) (PN : PANIC) (Γ : SchedNames) [
   icases kctx_kernelData _ _ $$ Hk with ⟨#HD, Hk⟩
   ihave Hbuf := fkr_init_buf $$ HS HD
   ihave Hbuf2 := fkr_init_buf $$ HS HD
-  ihave #Hfsr := firstDone_ready (hlc := hlc) $$ Hdone
-  icases fsReady_disk (hlc := hlc) $$ Hfsr with ⟨%pd, %pav, %pu, #Hdc, %hpd⟩
-  ihave #Hfab := (show fsReady (hlc := hlc) (GF := GF) ∗ panicEnv ∗ procsInv Γ ∗
-      diskCaps fscDisk fscDlock pd pav pu ⊢ fsFabric (hlc := hlc) Γ pd pav pu from by
+  ihave #Hfsr := firstDone_ready $$ Hdone
+  icases fsReady_disk $$ Hfsr with ⟨%pd, %pav, %pu, #Hdc, %hpd⟩
+  ihave #Hfab := (show fsReady (GF := GF) ∗ panicEnv ∗ procsInv Γ ∗
+      diskCaps fscDisk fscDlock pd pav pu ⊢ fsFabric Γ pd pav pu from by
     unfold fsFabric; exact .rfl) $$ [Hfsr Hpe Hpinv Hdc]
   · iframe Hfsr Hpe Hpinv Hdc
   ihave Hb := Hbun $$ Hrd
@@ -463,7 +463,7 @@ theorem fkr_boot_exec [X : CurCtx] (KX : KEXEC) (PN : PANIC) (Γ : SchedNames) [
   isplitr; · iexact Hmp
   isplitl [Hau]; · iexact Hau
   iintro %c8 %spie %spp %R' %V' %M' %hcs Harms Hk Hpc Hte Hce Hpv Hf0 Hf1
-  icases execArms_landed_keep (hlc := hlc) _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ $$ Harms
+  icases execArms_landed_keep _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ $$ Harms
     with ⟨%hkok, Harms⟩
   obtain ⟨entry, spv, szv', hkok⟩ := hkok
   have h8 := FkrAfter.callee ((((((h.setReg 15#5 _ (by decide) (by decide) (by decide)).setReg 15#5 _

@@ -47,7 +47,7 @@ theorem mn_br_8a : KA.«main» + 18796#64 = KA.«plicinithart» := by decide
 theorem mn_ret_8e : jumpPc (KA.«main» + 142#64) = KA.«main» + 142#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 set_option maxHeartbeats 4000000 in
 /-- **+0x7e → +0x82**: `trapinit()` (`initlock(&tickslock, "time")`), then
@@ -67,7 +67,7 @@ theorem mn_trapinit [WchG GF] (TI : TRAPINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R
   k_step (wp_s_jal cpu _ (KA.«main» + 126#64) false 5588#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_7e]
   iintro Hk Hpc
-  have hti := TI.wp_trapinit (hlc := hlc) (GF := GF) cpu (k.withRegs (R0.set 1#5 (KA.«main» + 130#64)))
+  have hti := TI.wp_trapinit (GF := GF) cpu (k.withRegs (R0.set 1#5 (KA.«main» + 130#64)))
     vl vn vc (by simp; omega)
   unfold wp_trapinit_body at hti
   simp only [trapinitAddr] at hti
@@ -101,7 +101,7 @@ theorem mn_trapinithart (TIH : TRAPINITHART) [CurCtx] (cpu : CPU) (k : KCtx) (R0
   k_step (wp_s_jal cpu _ (KA.«main» + 130#64) false 5620#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_82]
   iintro Hk Hpc
-  have htih := TIH.wp_trapinithart (hlc := hlc) (GF := GF) cpu (k.withRegs (R0.set 1#5 (KA.«main» + 134#64)))
+  have htih := TIH.wp_trapinithart (GF := GF) cpu (k.withRegs (R0.set 1#5 (KA.«main» + 134#64)))
     tv0 (by simp [hsie]) (by simp; omega)
   unfold wp_trapinithart_body at htih
   simp only [trapinithartAddr] at htih
@@ -123,7 +123,7 @@ theorem mn_plic (PI : PLICINIT) (PIH : PLICINITHART) [CurCtx] (cpu : CPU) (k : K
   k_step (wp_s_jal cpu _ (KA.«main» + 134#64) false 18634#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_86]
   iintro Hk Hpc
-  have hpi := PI.wp_plicinit (hlc := hlc) (GF := GF) cpu (k.withRegs (R0.set 1#5 (KA.«main» + 138#64)))
+  have hpi := PI.wp_plicinit (GF := GF) cpu (k.withRegs (R0.set 1#5 (KA.«main» + 138#64)))
     γ0 γ1 (by simp [hsie]) (by simp; unfold plicinitSlots; omega)
   unfold wp_plicinit_body at hpi
   simp only [plicinitAddr] at hpi
@@ -134,7 +134,7 @@ theorem mn_plic (PI : PLICINIT) (PIH : PLICINITHART) [CurCtx] (cpu : CPU) (k : K
   k_step (wp_s_jal cpu _ (KA.«main» + 138#64) false 18658#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_8a]
   iintro Hk Hpc
-  have hpih := PIH.wp_plicinithart (hlc := hlc) (GF := GF) cpu (k.withRegs (R1.set 1#5 (KA.«main» + 142#64)))
+  have hpih := PIH.wp_plicinithart (GF := GF) cpu (k.withRegs (R1.set 1#5 (KA.«main» + 142#64)))
     γ0 γ1 (by simp [hsie]) (by simp; unfold plicinithartSlots; omega)
   unfold wp_plicinithart_body at hpih
   simp only [plicinithartAddr] at hpih

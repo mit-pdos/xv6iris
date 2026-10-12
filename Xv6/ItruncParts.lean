@@ -318,7 +318,7 @@ theorem itZ_get (bm : Blkmap) (n i : Nat) (hd : bm.bmDir.length = NDIRECT)
       congr 2; omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsBlocksG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsBlocksG GF]
 
 /-- Entering the loops: the bundle at `bm` IS the bundle at `itZ bm 0`. -/
 theorem itrunc_blocks_0 (γfs : FsNames) (bm : Blkmap) (data : Nat → List (BitVec 8))
@@ -390,7 +390,7 @@ end
 /-! ## (3) The budget: one bfree's step (Rocq's `bm_paidS_use`) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- THE ONE STEP bfree TAKES, and why the loops never case-split (Rocq's
@@ -438,7 +438,7 @@ end
 /-! ## (4) The callees at their call sites -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [Fscfg] [Icfg] [CurCtx]
 
 end
@@ -446,7 +446,7 @@ end
 /-! ## (5) The client continuation, named (Rocq's `it_cont`) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -463,11 +463,11 @@ continuation made HART-FREE (Rocq's `it_cont` after the entry's
 walk carries may be anchored at the entry hart. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- `Xv6.itrunc_bfree_eb` at either entry `SIE` (`BFREE.wp_bfree_eb`). -/
-theorem itrunc_bfree_eb (BF : BFREE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem itrunc_bfree_eb (BF : BFREE) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (bno : BitVec 32) (bs : List (BitVec 8)) (crb : Bool) (w : Nat) (Sb : List Nat) (e0 : Nat)
     (pidv : BitVec 32) (dqp dqb : DFrac)
@@ -502,7 +502,7 @@ theorem itrunc_bfree_eb (BF : BFREE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
   icases itrunc_paid_use crb w Sb e0 $$ Hpaid with ⟨%cr, %u', %Sq, %hf, Hop, Hback⟩
   obtain ⟨hcr, hu, -⟩ := hf
   ihave #Hcred := logCredit_own (GF := GF) icfgLog cr Sq e0 fscBmapstart hcr
-  have h := BF.wp_bfree_eb (hlc := hlc) (GF := GF) Γ c k' γl fscBio
+  have h := BF.wp_bfree_eb (GF := GF) Γ c k' γl fscBio
     (fsView fscFs fscDisk icfgDev fscCov) fscDlock pd pav pu j icfgLog fscFs fscLogst fscBmapstart
     fscSize icfgDev bno bs u' cr Sq e0 pidv dqp dqb hj hproc hK hnoff htier hgeom hbg
     rfl rfl rfl hbno hbs hpd ha0 ha1
@@ -520,7 +520,7 @@ theorem itrunc_bfree_eb (BF : BFREE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 

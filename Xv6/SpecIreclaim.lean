@@ -129,11 +129,11 @@ begin_op 24, brelse 26 (Rocq's `K_ireclaim = 88`). -/
 def ireclaimSlots : Nat := 8 + endOpSlots
 
 /-- **WP of `ireclaim(dev = a0)`** (Rocq's `wp_ireclaim_sconf_body`). -/
-def wp_ireclaim_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_ireclaim_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (pidv : BitVec 32) (dqp dqb dqs dqn : DFrac)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : ireclaimSlots ≤ k.avail)
@@ -155,7 +155,7 @@ def wp_ireclaim_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
   bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
   logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
   -- end_op's crash seam and era certificate (Rocq's)
-  fsCrashSeam (hlc := hlc) (GF := GF) fscCov fscLogst ∗ genCert (hlc := hlc) (GF := GF) ∗
+  fsCrashSeam (GF := GF) fscCov fscLogst ∗ genCert (GF := GF) ∗
   diskCaps fscDisk fscDlock pd pav pu ∗
   -- the three superblock fields, read and handed straight back
   wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) ∗
@@ -163,10 +163,10 @@ def wp_ireclaim_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
   wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
   -- THE INODE REGION (persistent) and THE BOOT-SHELTER TOKEN (exclusive,
   -- lent to iget's licence and to iput's regime, returned)
-  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ iregBoot ∗
+  iregInv fscIreg fscFs icfgIst icfgNib ∗ iregBoot ∗
   -- THE ICACHE, as iget / ilock / iput take it
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗
+  itableInv ∗
   -- THE FIFTY ENTRY SLEEPLOCKS, as a family
   icSleeplocks fscIc ∗
   -- itrunc's bitmap, through iput
@@ -194,11 +194,11 @@ def wp_ireclaim_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
 /-- The eb-generic form of `wp_ireclaim_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_ireclaim_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_ireclaim_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (pidv : BitVec 32) (dqp dqb dqs dqn : DFrac)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : ireclaimSlots ≤ k.avail)
@@ -220,7 +220,7 @@ def wp_ireclaim_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF
   bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
   logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
   -- end_op's crash seam and era certificate (Rocq's)
-  fsCrashSeam (hlc := hlc) (GF := GF) fscCov fscLogst ∗ genCert (hlc := hlc) (GF := GF) ∗
+  fsCrashSeam (GF := GF) fscCov fscLogst ∗ genCert (GF := GF) ∗
   diskCaps fscDisk fscDlock pd pav pu ∗
   -- the three superblock fields, read and handed straight back
   wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) ∗
@@ -228,10 +228,10 @@ def wp_ireclaim_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF
   wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
   -- THE INODE REGION (persistent) and THE BOOT-SHELTER TOKEN (exclusive,
   -- lent to iget's licence and to iput's regime, returned)
-  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ iregBoot ∗
+  iregInv fscIreg fscFs icfgIst icfgNib ∗ iregBoot ∗
   -- THE ICACHE, as iget / ilock / iput take it
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗
+  itableInv ∗
   -- THE FIFTY ENTRY SLEEPLOCKS, as a family
   icSleeplocks fscIc ∗
   -- itrunc's bitmap, through iput
@@ -258,15 +258,15 @@ def wp_ireclaim_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF
 
 /-- The interface of `ireclaim` (Rocq's `Module Type IRECLAIM`). -/
 structure IRECLAIM : Prop where
-  wp_ireclaim_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  wp_ireclaim_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (pidv : BitVec 32) (dqp dqb dqs dqn : DFrac)
     hj hproc hK hnoff htier hgeom hblk hbg hbel hn1 hnnib hn31 hpd ha0,
-    wp_ireclaim_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j pidv dqp dqb dqs dqn
+    wp_ireclaim_eb_body (GF := GF) Γ cpu k γl pd pav pu j pidv dqp dqb dqs dqn
       hj hproc hK hnoff htier hgeom hblk hbg hbel hn1 hnnib hn31 hpd ha0
 
 end Xv6

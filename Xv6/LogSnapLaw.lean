@@ -46,7 +46,7 @@ open Iris Iris.BI Iris.ProofMode Std MachCSL
 /-! ## The law -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [Xv6G GF] [FsBytesG GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF] [Xv6G GF] [FsBytesG GF]
   [FsLinkG GF] [FsTopG GF]
 
 /-- THE CONCLUSION, AS ONE NAME: the next epoch at the map the commit jumps to,
@@ -54,7 +54,7 @@ with the guest's MERGE (SY3-K2) and, inside it, the application's token `T`
 (sync K3-3) (Rocq `snap_law_out`). -/
 def snapLawOut (G : GName → IProp GF) (T : IProp GF) (gd : Nat) (C : BlockMap)
     (home : List Nat) : IProp GF :=
-  durPair (hlc := hlc) G T gd (fsRestrict (dvOfD C) home)
+  durPair G T gd (fsRestrict (dvOfD C) home)
 
 /-- THE LAW, at a NAMED mask and a NAMED guest (Rocq `snap_law_at`). -/
 def snapLawAt (γ : LogNames) (γfs : FsNames) (cov : ExtTreeSet Nat compare) (logstart : Nat)
@@ -66,7 +66,7 @@ def snapLawAt (γ : LogNames) (γfs : FsNames) (cov : ExtTreeSet Nat compare) (l
     ⌜bytesTie Lb C⌝ -∗
     ⌜bytesDom Lb (fsHomeList cov logstart)⌝ -∗
     (γfs.bytes ↪●MAP Lb) -∗ logTxAuth γ ∅ -∗ T ={E}=∗
-      snapLawOut (hlc := hlc) G T gd C (fsHomeList cov logstart) ∗ (γfs.bytes ↪●MAP Lb) ∗
+      snapLawOut G T gd C (fsHomeList cov logstart) ∗ (γfs.bytes ↪●MAP Lb) ∗
       logTxAuth γ ∅))
 
 /-- ...and the arity-free form the log carries: mask and guest closed over,
@@ -74,26 +74,26 @@ the seam at the same guest beside it (Rocq `snap_law`). -/
 def snapLaw (γ : LogNames) (γfs : FsNames) (cov : ExtTreeSet Nat compare) (logstart : Nat)
     (T : IProp GF) (gd : Nat) : IProp GF :=
   iprop(∃ (N : CoPset) (G : GName → IProp GF),
-    ⌜(↑fsbN : CoPset) ## N⌝ ∗ fsCrashSeamAt (hlc := hlc) G cov logstart ∗
-    snapLawAt (hlc := hlc) γ γfs cov logstart N G T gd)
+    ⌜(↑fsbN : CoPset) ## N⌝ ∗ fsCrashSeamAt G cov logstart ∗
+    snapLawAt γ γfs cov logstart N G T gd)
 
 instance snapLawAt_persistent (γ : LogNames) (γfs : FsNames) (cov : ExtTreeSet Nat compare)
     (logstart : Nat) (N : CoPset) (G : GName → IProp GF) (T : IProp GF) (gd : Nat) :
-    Persistent (snapLawAt (hlc := hlc) γ γfs cov logstart N G T gd) := by
+    Persistent (snapLawAt γ γfs cov logstart N G T gd) := by
   unfold snapLawAt; infer_instance
 
 instance snapLaw_persistent (γ : LogNames) (γfs : FsNames) (cov : ExtTreeSet Nat compare)
     (logstart : Nat) (T : IProp GF) (gd : Nat) :
-    Persistent (snapLaw (hlc := hlc) (GF := GF) γ γfs cov logstart T gd) := by
+    Persistent (snapLaw (GF := GF) γ γfs cov logstart T gd) := by
   unfold snapLaw; infer_instance
 
 /-- Rocq `snap_law_intro`. -/
 theorem snapLaw_intro (γ : LogNames) (γfs : FsNames) (cov : ExtTreeSet Nat compare)
     (logstart : Nat) (N : CoPset) (G : GName → IProp GF) (T : IProp GF) (gd : Nat)
     (hdj : (↑fsbN : CoPset) ## N) :
-    fsCrashSeamAt (hlc := hlc) G cov logstart ⊢
-      snapLawAt (hlc := hlc) γ γfs cov logstart N G T gd -∗
-        snapLaw (hlc := hlc) γ γfs cov logstart T gd := by
+    fsCrashSeamAt G cov logstart ⊢
+      snapLawAt γ γfs cov logstart N G T gd -∗
+        snapLaw γ γfs cov logstart T gd := by
   iintro #Hseam #H
   unfold snapLaw
   iexists N, G
@@ -110,10 +110,10 @@ theorem snapLaw_run (γ : LogNames) (γfs : FsNames) (cov : ExtTreeSet Nat compa
     (hdom : ∀ b, (∃ bs, PartialMap.get? C b = some bs) ↔ fsHome cov logstart b)
     (hlens : ∀ b bs, PartialMap.get? C b = some bs → bs.length = BSIZE)
     (htie : bytesTie Lb C) (hdm : bytesDom Lb (fsHomeList cov logstart)) :
-    snapLaw (hlc := hlc) (GF := GF) γ γfs cov logstart T gd ⊢
+    snapLaw (GF := GF) γ γfs cov logstart T gd ⊢
       (γfs.bytes ↪●MAP Lb) -∗ logTxAuth γ ∅ -∗ T ={⊤ \ ↑fsbN}=∗
-        (∃ G : GName → IProp GF, fsCrashSeamAt (hlc := hlc) G cov logstart ∗
-          snapLawOut (hlc := hlc) G T gd C (fsHomeList cov logstart)) ∗
+        (∃ G : GName → IProp GF, fsCrashSeamAt G cov logstart ∗
+          snapLawOut G T gd C (fsHomeList cov logstart)) ∗
         (γfs.bytes ↪●MAP Lb) ∗ logTxAuth γ ∅ := by
   iintro #Hlaw Hb Ht HT
   unfold snapLaw
@@ -156,10 +156,10 @@ def snapLawGhostAt (γ : LogNames) (γfs : FsNames) (cov : ExtTreeSet Nat compar
     ⌜bytesTie Lb C⌝ -∗
     ⌜bytesDom Lb (fsHomeList cov logstart)⌝ -∗
     (γfs.bytes ↪●MAP Lb) -∗ logTxAuth γ ∅ -∗ ▷ G gt_o -∗ T -∗
-    ⌜n = gd + 1⌝ -∗ startAuth (hlc := hlc) (GF := GF) n -∗
+    ⌜n = gd + 1⌝ -∗ startAuth (GF := GF) n -∗
     ([∗list] Q ∈ Qs, Hk Q) ={E}=∗
       (∃ gt : GName, pDurAt gt (fsRestrict (dvOfD C) (fsHomeList cov logstart)) ∗ ▷ G gt) ∗
-      T ∗ startAuth (hlc := hlc) (GF := GF) n ∗ ([∗list] Q ∈ Qs, Q) ∗ (γfs.bytes ↪●MAP Lb) ∗
+      T ∗ startAuth (GF := GF) n ∗ ([∗list] Q ∈ Qs, Q) ∗ (γfs.bytes ↪●MAP Lb) ∗
       logTxAuth γ ∅))
 
 /-- ...and its arity-free form, with the crash seam at the same guest (Rocq
@@ -168,27 +168,27 @@ def snapLawGhost (γ : LogNames) (γfs : FsNames) (cov : ExtTreeSet Nat compare)
     (T : IProp GF) (gd : Nat) (Hk : IProp GF → IProp GF) : IProp GF :=
   iprop(∃ (N : CoPset) (G : GName → IProp GF),
     ⌜(↑fsbN : CoPset) ## N⌝ ∗ ⌜(↑crashN : CoPset) ## N⌝ ∗
-    fsCrashSeamAt (hlc := hlc) G cov logstart ∗
-    snapLawGhostAt (hlc := hlc) γ γfs cov logstart N G T gd Hk)
+    fsCrashSeamAt G cov logstart ∗
+    snapLawGhostAt γ γfs cov logstart N G T gd Hk)
 
 instance snapLawGhostAt_persistent (γ : LogNames) (γfs : FsNames) (cov : ExtTreeSet Nat compare)
     (logstart : Nat) (N : CoPset) (G : GName → IProp GF) (T : IProp GF) (gd : Nat)
     (Hk : IProp GF → IProp GF) :
-    Persistent (snapLawGhostAt (hlc := hlc) γ γfs cov logstart N G T gd Hk) := by
+    Persistent (snapLawGhostAt γ γfs cov logstart N G T gd Hk) := by
   unfold snapLawGhostAt; infer_instance
 
 instance snapLawGhost_persistent (γ : LogNames) (γfs : FsNames) (cov : ExtTreeSet Nat compare)
     (logstart : Nat) (T : IProp GF) (gd : Nat) (Hk : IProp GF → IProp GF) :
-    Persistent (snapLawGhost (hlc := hlc) (GF := GF) γ γfs cov logstart T gd Hk) := by
+    Persistent (snapLawGhost (GF := GF) γ γfs cov logstart T gd Hk) := by
   unfold snapLawGhost; infer_instance
 
 /-- Rocq `snap_law_ghost_intro`. -/
 theorem snapLawGhost_intro (γ : LogNames) (γfs : FsNames) (cov : ExtTreeSet Nat compare)
     (logstart : Nat) (N : CoPset) (G : GName → IProp GF) (T : IProp GF) (gd : Nat)
     (Hk : IProp GF → IProp GF) (hdj : (↑fsbN : CoPset) ## N) (hdc : (↑crashN : CoPset) ## N) :
-    fsCrashSeamAt (hlc := hlc) G cov logstart ⊢
-      snapLawGhostAt (hlc := hlc) γ γfs cov logstart N G T gd Hk -∗
-        snapLawGhost (hlc := hlc) γ γfs cov logstart T gd Hk := by
+    fsCrashSeamAt G cov logstart ⊢
+      snapLawGhostAt γ γfs cov logstart N G T gd Hk -∗
+        snapLawGhost γ γfs cov logstart T gd Hk := by
   iintro #Hseam #H
   unfold snapLawGhost
   iexists N, G
@@ -205,8 +205,8 @@ at the law's guest, and the law itself at the mask a caller holding `fsbN`
 AND `crashN` open can offer. -/
 theorem snapLawGhost_run (γ : LogNames) (γfs : FsNames) (cov : ExtTreeSet Nat compare)
     (logstart : Nat) (T : IProp GF) (gd : Nat) (Hk : IProp GF → IProp GF) :
-    snapLawGhost (hlc := hlc) (GF := GF) γ γfs cov logstart T gd Hk ⊢
-      ∃ G : GName → IProp GF, fsCrashSeamAt (hlc := hlc) G cov logstart ∗
+    snapLawGhost (GF := GF) γ γfs cov logstart T gd Hk ⊢
+      ∃ G : GName → IProp GF, fsCrashSeamAt G cov logstart ∗
         □ (∀ (Lb : RegMapF (BitVec 8)) (C : BlockMap) (Qs : List (IProp GF)) (gt_o : GName)
             (n : Nat),
           ⌜∀ b, (∃ bs, PartialMap.get? C b = some bs) ↔ fsHome cov logstart b⌝ -∗
@@ -214,10 +214,10 @@ theorem snapLawGhost_run (γ : LogNames) (γfs : FsNames) (cov : ExtTreeSet Nat 
           ⌜bytesTie Lb C⌝ -∗
           ⌜bytesDom Lb (fsHomeList cov logstart)⌝ -∗
           (γfs.bytes ↪●MAP Lb) -∗ logTxAuth γ ∅ -∗ ▷ G gt_o -∗ T -∗
-          ⌜n = gd + 1⌝ -∗ startAuth (hlc := hlc) (GF := GF) n -∗
+          ⌜n = gd + 1⌝ -∗ startAuth (GF := GF) n -∗
           ([∗list] Q ∈ Qs, Hk Q) ={(⊤ \ ↑crashN) \ ↑fsbN}=∗
             (∃ gt : GName, pDurAt gt (fsRestrict (dvOfD C) (fsHomeList cov logstart)) ∗ ▷ G gt) ∗
-            T ∗ startAuth (hlc := hlc) (GF := GF) n ∗ ([∗list] Q ∈ Qs, Q) ∗ (γfs.bytes ↪●MAP Lb) ∗
+            T ∗ startAuth (GF := GF) n ∗ ([∗list] Q ∈ Qs, Q) ∗ (γfs.bytes ↪●MAP Lb) ∗
             logTxAuth γ ∅) := by
   iintro #Hlaw
   unfold snapLawGhost

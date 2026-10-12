@@ -16,7 +16,7 @@ namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- A fresh context, stamped at 0 (Rocq `ctx_stamped_alloc`): bound 0, empty
 dirty set. -/
@@ -48,7 +48,7 @@ namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF]
 
 /-- A fresh running context for hart `cpu` at boot: bound 0, empty dirty set,
 tied to the hart by its view receipt at 0 (the prototype's

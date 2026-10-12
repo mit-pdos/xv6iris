@@ -54,7 +54,7 @@ theorem ush_oom_nl : ushLit 0x1280 2 = altOom[13]! := by decide
 theorem ushLitOk_oom : ushLitOk 0x12c0 13 = true := by decide +kernel
 
 section UshOomPaid
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
@@ -62,9 +62,9 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [U
 on the wire paid through the diagnostic law at `altOom`. -/
 theorem wp_kshd_oom_paid (SP : SH_PANIC) (N : UkNames GF) [UknConst N] (Cr Cd : IProp GF) (l : List FdState)
     (h : CPU) (m : RegMap) (n : Nat) (hfd2 : ushFd2p l) (hmsg : m.get 10#5 = BitVec.ofNat 64 ushpOomStr) :
-    ⊢ ushExecfailLawAt (hlc := hlc) altOom 14 Cr Cd -∗ ushCode N.t -∗ ustd N.fd l -∗ Cr -∗
+    ⊢ ushExecfailLawAt altOom 14 Cr Cd -∗ ushCode N.t -∗ ustd N.fd l -∗ Cr -∗
       (ustd N.fd l -∗ Cd -∗ N.pay (-1)) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«panic») (ushDg + n) -∗ wpLoop h := by
+      urun N h m (BitVec.ofNat 64 User.Sh.Sym.«panic») (ushDg + n) -∗ wpLoop h := by
   iintro #Hlaw #Hc Hstd HCr Hpay Hrun
   unfold ushExecfailLawAt
   icases Hlaw $$ %N %l %hfd2 HCr with ⟨%Pf, HPf, #Hstep, #Hdone⟩
@@ -96,8 +96,8 @@ an exit paid from `Cd`, make `ushpOom` at the lend WITH THE LEDGER, at any
 budget panic's walk fits in. -/
 theorem ushp_oom_of_diag (SP : SH_PANIC) (N : UkNames GF) [UknConst N] (Cr Cd : IProp GF) (ld : List FdState)
     (K : Nat) (hK : ushDg ≤ K) (hfd2 : ushFd2p ld) :
-    ⊢ ushExecfailLawAt (hlc := hlc) altOom 14 Cr Cd -∗ □ (Cd -∗ N.pay (-1)) -∗ ushCode N.t -∗
-      ushpOom (hlc := hlc) N iprop(Cr ∗ ustd N.fd ld) K := by
+    ⊢ ushExecfailLawAt altOom 14 Cr Cd -∗ □ (Cd -∗ N.pay (-1)) -∗ ushCode N.t -∗
+      ushpOom N iprop(Cr ∗ ustd N.fd ld) K := by
   iintro #Hlaw #Hpay #Hc
   unfold ushpOom
   imodintro

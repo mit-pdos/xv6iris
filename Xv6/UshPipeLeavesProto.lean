@@ -31,7 +31,7 @@ namespace UShPipeLeaves
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section Proto
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF]
   [CtokG GF] [PipeProtoG GF]
 
 /-- **Rocq `pipe_pre`**: the body's own half at the initial state. -/

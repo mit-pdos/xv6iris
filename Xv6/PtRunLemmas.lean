@@ -651,7 +651,7 @@ theorem allIdx_getElem {k : Nat} {y : BitVec 9} (h : allIdx[k]? = some y) : y.to
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- Open a big separating conjunction over the 512 indices at one index,
 with a closing wand that accepts any replacement for that index's clause. -/

@@ -106,7 +106,7 @@ end AppDurRaw
 machine's started auth (Rocq SY3-A1). -/
 
 section AppDurMerge
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsTopG GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF] [FsTopG GF]
 
 /-- THE MERGE (the commit, SY3-K2; Rocq `app_dur_raw_merge`, main): run the
 merge on the running claim (which satisfies the era's record predicate
@@ -116,11 +116,11 @@ comes back on either arm; the started auth the wand is lent passes straight
 through to the application's own wand. -/
 theorem appDurRaw_merge {N : Type} (A : N → Aview → IProp GF) (Ok Okc : N → Prop)
     (T : IProp GF) (gd : Nat) (gt : GName) (I : RegMapF FsNode) (r : N) (hOk : Ok r) :
-    appMergeRaw (hlc := hlc) A Ok Okc T gd ⊢
+    appMergeRaw A Ok Okc T gd ⊢
       (gt ↪●MAP{DFrac.own (1 : Qp).half} I) -∗ ▷ A r (absView I) -∗ T ==∗
       ▷ A r (absView I) ∗
-      ((∀ (gt_o : GName) (n : Nat), ⌜n = gd + 1⌝ -∗ startAuth (hlc := hlc) (GF := GF) n -∗
-          ▷ appDurRaw A Okc gt_o ==∗ ▷ appDurRaw A Okc gt ∗ T ∗ startAuth (hlc := hlc) (GF := GF) n)
+      ((∀ (gt_o : GName) (n : Nat), ⌜n = gd + 1⌝ -∗ startAuth (GF := GF) n -∗
+          ▷ appDurRaw A Okc gt_o ==∗ ▷ appDurRaw A Okc gt ∗ T ∗ startAuth (GF := GF) n)
         ∧ T) := by
   iintro #Hm Hh Hp HT
   unfold appMergeRaw
@@ -162,7 +162,7 @@ end AppDur
 /-! ## THE ERA'S DURABLE SIDE, AS ONE PACKAGE (Rocq `app_dur_laws`, SY3-A3b) -/
 
 section AppDurLaws
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsLinkG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsLinkG GF]
   [FsTopG GF] [Appcfg GF]
 
 /-- THE CRASH SEAM AT THE ERA'S GUEST AND THE MERGE PACKAGE, closed over ONE
@@ -171,19 +171,19 @@ and the two must agree on it (the merge's wand reads `Okc` of the old copy
 the seam hands the header write). -/
 def appDurLaws (cov : ExtTreeSet Nat compare) (ls : Nat) : IProp GF :=
   iprop(∃ Okc : appNames (GF := GF) → Prop,
-    fsCrashSeamAt (hlc := hlc) (appGuest Okc) cov ls ∗ appMerge (hlc := hlc) Okc)
+    fsCrashSeamAt (appGuest Okc) cov ls ∗ appMerge Okc)
 
 instance appDurLaws_persistent (cov : ExtTreeSet Nat compare) (ls : Nat) :
-    Persistent (appDurLaws (hlc := hlc) (GF := GF) cov ls) := by
+    Persistent (appDurLaws (GF := GF) cov ls) := by
   unfold appDurLaws; infer_instance
 
 /-- The arity-free seam off the package (Rocq's inline
 `fs_crash_seam_of_at` at the package's guest). -/
 theorem appDurLaws_seam (cov : ExtTreeSet Nat compare) (ls : Nat) :
-    appDurLaws (hlc := hlc) (GF := GF) cov ls ⊢ fsCrashSeam (hlc := hlc) cov ls := by
+    appDurLaws (GF := GF) cov ls ⊢ fsCrashSeam cov ls := by
   unfold appDurLaws
   iintro ⟨%Okc, #Hseam, -⟩
-  iapply fsCrashSeam_ofAt (hlc := hlc) (GF := GF) (appGuest Okc) cov ls $$ Hseam
+  iapply fsCrashSeam_ofAt (GF := GF) (appGuest Okc) cov ls $$ Hseam
 
 end AppDurLaws
 

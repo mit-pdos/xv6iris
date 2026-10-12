@@ -114,7 +114,7 @@ theorem kxcB2_pte2pa_ne (w : BitVec 64) (h : pageValid (pte2pa w)) : pte2pa w �
   PtRun.pageValid_ne_zero _ h
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -158,7 +158,7 @@ theorem kxcB2_call_walkaddr (WA : WALKADDR) (cpu : CPU) (k : KCtx) (spie spp : B
   iintro ⟨#Hi, Hk, Hpc, Hte, Hce, Ht, HK⟩
   k_step_e (wp_s_jal cpu _ X false imm 1#5 (by decide)) $$ [- $Hk $Hpc $Hi] with [hX]
   iintro Hk Hpc
-  have h := WA.wp_walkaddr (hlc := hlc) (GF := GF) cpu
+  have h := WA.wp_walkaddr (GF := GF) cpu
     ((((k.withSpie spie spp).pushed 68).withRegs R).setReg 1#5 (X + 4#64)) (DFrac.own 1) t L
     (by k_norm_g; exact hK') (by k_norm_g; simp [RegMap.set_apply, hroot]) hrep
   unfold wp_walkaddr_body at h
@@ -194,7 +194,7 @@ theorem kxcB2_call_f2p (F2P : FLAGS2PERM) (cpu : CPU) (k : KCtx) (spie spp : Boo
   iintro ⟨#Hi, Hk, Hpc, Hte, Hce, HK⟩
   k_step_e (wp_s_jal cpu _ X false imm 1#5 (by decide)) $$ [- $Hk $Hpc $Hi] with [hX]
   iintro Hk Hpc
-  have h := F2P.wp_flags2perm (hlc := hlc) (GF := GF) cpu
+  have h := F2P.wp_flags2perm (GF := GF) cpu
     ((((k.withSpie spie spp).pushed 68).withRegs R).setReg 1#5 (X + 4#64)) (by k_norm_g; exact hK')
   unfold wp_flags2perm_body at h
   simp only [flags2permAddr] at h
@@ -227,7 +227,7 @@ theorem kxcB2_call_uvmalloc (UV : UVMALLOC) (Γ : SchedNames) (cpu : CPU) (k : K
     instr X false (instruction.JAL (imm, regidx.Regidx 1#5)) ∗
     kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu X ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗ procPtAt P Mi ∗ actLend k.proc ke ∗
+    fsFabric Γ A.pd A.pav A.pu ∗ procPtAt P Mi ∗ actLend k.proc ke ∗
     (∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap),
       ⌜calleeSaved (R.set 1#5 (X + 4#64)) R'⌝ -∗
       kctx c (((k.withSpie spie' spp').pushed 68).withRegs R') -∗ pcIs c (X + 4#64) -∗
@@ -250,7 +250,7 @@ set_option maxHeartbeats 8000000 in
 /-- **`jal readi` at `X`** (+0x0e6 / +0x13a; deviation 4): `KexecACode`'s
 kernel-arm call site at a general `off`, `n ≤ PGSIZE` and destination; the
 open inode lent to readi and handed back unchanged. -/
-theorem kxcB2_call_readi (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem kxcB2_call_readi (RD : READI) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : KexecArgs) (spie spp : Bool) (R : RegMap)
     (X : BitVec 64) (imm : BitVec 21) (hX : X + BitVec.signExtend 64 imm = KA.«readi»)
     (hret : jumpPc (X + 4#64) = X + 4#64)
@@ -265,7 +265,7 @@ theorem kxcB2_call_readi (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     instr X false (instruction.JAL (imm, regidx.Regidx 1#5)) ∗
     kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu X ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗ wordPointsTo (pPid k.proc) 4 pidPriv A.pidv ∗
+    fsFabric Γ A.pd A.pav A.pu ∗ wordPointsTo (pPid k.proc) 4 pidPriv A.pidv ∗
     kxcOpen A.pidv kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf ∗
     byteBuf dst (DFrac.own 1) olds ∗ bslot ∗
     (∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap) (tot : Nat),
@@ -299,7 +299,7 @@ theorem kxcB2_call_readi (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     intro h; rw [Xv6.rd_maxbytes] at hsz; omega
   k_step_e (wp_s_jal cpu _ X false imm 1#5 (by decide)) $$ [- $Hk $Hpc $Hi] with [hX]
   iintro Hk Hpc
-  have h := RD.wp_readi_eb (hlc := hlc) (GF := GF) Γ cpu
+  have h := RD.wp_readi_eb (GF := GF) Γ cpu
     ((((k.withSpie spie spp).pushed 68).withRegs R).setReg 1#5 (X + 4#64)) γbl fscBio
     (fsView fscFs fscDisk icfgDev fscCov) fscDlock pd pav pu A.j fscFs fscLogst icfgDev fscKalloc
     fsReadyKmem (ientry kf) bmf data dnf false off n olds A.pidv readiKVp (fun _ => []) pidPriv
@@ -347,7 +347,7 @@ s5..s11, `j +0x64` → `KexecTail.kxc_bad64`.  Its size bound is the coverage
 threading clause (the reloads restore what `kxc_bad64` keeps).  The cause
 is relayed (`hqf`). -/
 theorem kxc_bad31e (IUP : IUNLOCKPUT) (EO : END_OP) (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) (QF : KxfCause → Prop)
     (cpu : CPU) (k : KCtx) (A : KexecArgs) (spie spp : Bool) (R : RegMap)
     (kf : Nat) (qf sf : Qp) (gyf : GName) (loyf tlyf : Nat) (inumf : BitVec 32) (dnf : Dinode)
@@ -363,7 +363,7 @@ theorem kxc_bad31e (IUP : IUNLOCKPUT) (EO : END_OP) (PFP : PROC_FREEPAGETABLE) (
     (hbelow : umBelow szf P) (hcov : lazyFree P.um szf) :
     kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu (KA.«kexec» + 0x31e#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
+    fsFabric Γ A.pd A.pav A.pu ∗
     kxcResB k A kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 w63 szf w67 ef P Mi ∗
     (∀ c' : CPU, kexecCloser Q QF k A c')
     ⊢ wpLoop (GF := GF) cpu := by
@@ -471,7 +471,7 @@ theorem kxcB2_br_panic : KA.«kexec» + 0xd6#64 + BitVec.signExtend 64 2080242#2
   decide
 
 section Panic
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 set_option maxRecDepth 100000 in
 /-- Rocq `kxc_msg_str`. -/
@@ -492,7 +492,7 @@ theorem kxcB2_panic [CurCtx] (PA : PANIC) (c : CPU) (k' : KCtx)
     (hpr : "pr" ∉ k'.locks) (huart : "uart1" ∉ k'.locks) :
     kctx c k' ∗ pcIs c KA.«panic» ∗ panicEnv ∗
     cstr KStr.«loadseg: address should exist» DFrac.discard kxcB2MsgStr ⊢ wpLoop (GF := GF) c := by
-  have h := PA.wp_panic (hlc := hlc) (GF := GF) c k' (PkArgDesc.str DFrac.discard kxcB2MsgStr)
+  have h := PA.wp_panic (GF := GF) c k' (PkArgDesc.str DFrac.discard kxcB2MsgStr)
     hK rfl hnoff hpr huart
   unfold wp_panic_body at h
   simp only [panicAddr] at h
@@ -512,7 +512,7 @@ end Panic
 /-! ## THE LOADSEG LOOP -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -568,7 +568,7 @@ set_option maxHeartbeats 32000000 in
 short-read `bad:` exit (+0x0ea, cause `QF .noMem`, deviation 6), `i +=
 PGSIZE` and the exit test: out at +0x116 or round the back edge. -/
 theorem kxcB2_ls_da (RD : READI) (IUP : IUNLOCKPUT) (EO : END_OP) (PFP : PROC_FREEPAGETABLE)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) (QF : KxfCause → Prop)
     (cpu : CPU) (k : KCtx) (A : KexecArgs) (spie spp : Bool) (R : RegMap)
     (kf : Nat) (qf sf : Qp) (gyf : GName) (loyf tlyf : Nat) (inumf : BitVec 32) (dnf : Dinode)
@@ -592,7 +592,7 @@ theorem kxcB2_ls_da (RD : READI) (IUP : IUNLOCKPUT) (EO : END_OP) (PFP : PROC_FR
     (hkv : get? P.um kv = some w) (hkva : kv * 4096 = va.toNat + ii) :
     kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu (KA.«kexec» + 0xda#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
+    fsFabric Γ A.pd A.pav A.pu ∗
     kxcResB k A kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 w63 w65 w67 ef P Mi ∗
     (∀ c' : CPU, kexecCloser Q QF k A c') ∗
     kxcK116 Q QF k A kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 w63 w65 w67 ef P
@@ -797,7 +797,7 @@ set_option maxHeartbeats 32000000 in
 live panic arm at +0x0ce, and `n = min(filesz - i, PGSIZE)` on both arms of
 the +0x10e test; then `kxcB2_ls_da`. -/
 theorem kxcB2_ls_step (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT) (EO : END_OP)
-    (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames) [ClaimIs GF Γ]
     (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) (QF : KxfCause → Prop)
     (cpu : CPU) (k : KCtx) (A : KexecArgs) (spie spp : Bool) (R : RegMap)
     (kf : Nat) (qf sf : Qp) (gyf : GName) (loyf tlyf : Nat) (inumf : BitVec 32) (dnf : Dinode)
@@ -808,7 +808,7 @@ theorem kxcB2_ls_step (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPU
     (hj : A.j < NPROC) (hproc : k.proc = procAddr A.j) :
     kxcAtF6 k A cpu spie spp R kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 w63 w65 w67 ef P
       Mi Mb ip va fz po ii ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
+    fsFabric Γ A.pd A.pav A.pu ∗
     (∀ c' : CPU, kexecCloser Q QF k A c') ∗
     kxcK116 Q QF k A kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 w63 w65 w67 ef P
       Mb ip va fz po ∗
@@ -967,7 +967,7 @@ set_option maxHeartbeats 4000000 in
 +0x0ea `bad:` tail, or the live panic), by strong induction on the
 segment's remaining length `fz - ii` (deviation 3). -/
 theorem kxc_ls (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT) (EO : END_OP)
-    (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames) [ClaimIs GF Γ]
     (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) (QF : KxfCause → Prop)
     (k : KCtx) (A : KexecArgs)
     (kf : Nat) (qf sf : Qp) (gyf : GName) (loyf tlyf : Nat) (inumf : BitVec 32) (dnf : Dinode)
@@ -979,7 +979,7 @@ theorem kxc_ls (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT) (EO 
     ∀ (ii : Nat) (cpu : CPU) (spie spp : Bool) (R : RegMap) (Mi : Nat → List (BitVec 8)),
     kxcAtF6 k A cpu spie spp R kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 w63 w65 w67 ef P
       Mi Mb ip va fz po ii ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
+    fsFabric Γ A.pd A.pav A.pu ∗
     (∀ c' : CPU, kexecCloser Q QF k A c') ∗
     kxcK116 Q QF k A kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 w63 w65 w67 ef P
       Mb ip va fz po
@@ -988,7 +988,7 @@ theorem kxc_ls (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT) (EO 
       fz - ii = n →
       (kxcAtF6 k A cpu spie spp R kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 w63 w65 w67
         ef P Mi Mb ip va fz po ii ∗
-      fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
+      fsFabric Γ A.pd A.pav A.pu ∗
       (∀ c' : CPU, kexecCloser Q QF k A c') ∗
       kxcK116 Q QF k A kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 w63 w65 w67 ef P
         Mb ip va fz po

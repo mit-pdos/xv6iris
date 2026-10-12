@@ -434,14 +434,14 @@ end Heap
 /-! ## §4b Address bounds off the resource (Rocq `urun_ubytesq_bnd'`) -/
 
 section Bnd
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-- **Rocq `urun_ubytesq_bnd'`**: a nonempty run's last byte bounds it. -/
 theorem kgrep_urun_ubytesq_bnd (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail : Nat) (dq : DFrac)
     (a L : Nat) (f : Nat → BitVec 8) :
-    ⊢ urun (hlc := hlc) N h m pc avail -∗ ubytesq N.d dq a L f -∗ ⌜0 < L → a + L ≤ 2 ^ 38⌝ := by
+    ⊢ urun N h m pc avail -∗ ubytesq N.d dq a L f -∗ ⌜0 < L → a + L ≤ 2 ^ 38⌝ := by
   iintro Hrun Hs
   cases L with
   | zero => ipureintro; intro h0; omega
@@ -455,7 +455,7 @@ end Bnd
 /-! ## §5 The two-word frame (Rocq `wp_kgrep_pro2`, `wp_kgrep_epi2`) -/
 
 section Frame
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -468,11 +468,11 @@ theorem kgrep_pro2 (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (p n
       uinstrIs N.t (BitVec.ofNat 64 (p + 2)) true (.STORE (8#12, .Regidx 1#5, .Regidx 2#5, 8)) -∗
       uinstrIs N.t (BitVec.ofNat 64 (p + 4)) true (.STORE (0#12, .Regidx 8#5, .Regidx 2#5, 8)) -∗
       uinstrIs N.t (BitVec.ofNat 64 (p + 6)) true (.ITYPE (16#12, .Regidx 2#5, .Regidx 8#5, .ADDI)) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 p) (2 + n) -∗
+      urun N h m (BitVec.ofNat 64 p) (2 + n) -∗
       (∀ (h' : CPU) (m' : RegMap), ⌜(m.get spIdx).toNat % 8 = 0⌝ -∗ ⌜16 ≤ (m.get spIdx).toNat⌝ -∗
         ⌜m'.get 2#5 = m.get spIdx + BitVec.ofInt 64 (-((8 * 2 : Nat) : Int))⌝ -∗ ⌜grepRkeep [2, 8] m m'⌝ -∗
         uword N.d ((m.get spIdx).toNat - 8) (m.get 1#5) -∗ uword N.d ((m.get spIdx).toNat - 16) (m.get 8#5) -∗
-        urun (hlc := hlc) N h' m' (BitVec.ofNat 64 (p + 8)) n -∗ wpLoop h') -∗
+        urun N h' m' (BitVec.ofNat 64 (p + 8)) n -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #I0 #I1 #I2 #I3 Hrun Hcont
   ihave %hstk := urun_stack N h m _ _ $$ Hrun
@@ -530,9 +530,9 @@ theorem kgrep_epi2 (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (sp0
       uinstrIs N.t (BitVec.ofNat 64 (p + 4)) true (.ITYPE (16#12, .Regidx spIdx, .Regidx spIdx, .ADDI)) -∗
       uinstrIs N.t (BitVec.ofNat 64 (p + 6)) true (.JALR (0#12, .Regidx 1#5, .Regidx 0#5)) -∗
       uword N.d (sp0.toNat - 8) vra -∗ uword N.d (sp0.toNat - 16) vs0 -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 p) n -∗
+      urun N h m (BitVec.ofNat 64 p) n -∗
       (∀ (h' : CPU) (m' : RegMap), ⌜m'.get 2#5 = sp0⌝ -∗ ⌜m'.get 8#5 = vs0⌝ -∗ ⌜grepRkeep [1, 2, 8] m m'⌝ -∗
-        urun (hlc := hlc) N h' m' (retPc vra) (2 + n) -∗ wpLoop h') -∗
+        urun N h' m' (retPc vra) (2 + n) -∗ wpLoop h') -∗
       wpLoop h := by
   have hs16 : (m.get 2#5).toNat = sp0.toNat - 16 := by rw [hsp]; exact uv_avi_neg sp0 16 hlo
   iintro #I0 #I1 #I2 #I3 Hra Hs0 Hrun Hcont

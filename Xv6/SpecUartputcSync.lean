@@ -43,7 +43,7 @@ def uartputcSyncAddr : BitVec 64 := KA.«uartputc_sync»
 def uartputcSyncSlots : Nat := 18
 
 /-- **WP of `uartputc_sync`.**  `a0` is the port index, `a1` the byte. -/
-def wp_uartputc_sync_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_uartputc_sync_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (i : UartId) (γl : GName) (γ : UartNames) (bs : List (BitVec 8))
     (Φ : IProp GF)
     (hsie : k.sie = false) (hK : uartputcSyncSlots ≤ k.avail)
@@ -59,9 +59,9 @@ def wp_uartputc_sync_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc 
 
 /-- The interface of `uartputc_sync`. -/
 structure UARTPUTC_SYNC : Prop where
-  wp_uartputc_sync : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+  wp_uartputc_sync : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (i : UartId) (γl : GName) (γ : UartNames) (bs : List (BitVec 8))
     (Φ : IProp GF) hsie hK hnoff hlk hid,
-    wp_uartputc_sync_body (hlc := hlc) (GF := GF) cpu k i γl γ bs Φ hsie hK hnoff hlk hid
+    wp_uartputc_sync_body (GF := GF) cpu k i γl γ bs Φ hsie hK hnoff hlk hid
 
 end Xv6

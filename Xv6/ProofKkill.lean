@@ -110,7 +110,7 @@ theorem kkKept_trans {R R' R'' : RegMap} (h : kkKept R R') (h' : kkKept R' R'') 
 
 /-- `kkill`'s six-slot frame at `sp`: `ra`, `s0`, `s1`, `s2`, `s3` and the
 unused bottom word. -/
-def kkFrame {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+def kkFrame {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (sp v0 v1 v2 v3 v4 v5 : BitVec 64) : IProp GF := iprop%
   wordPointsTo (sp + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) v0 ∗
   wordPointsTo (sp + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) v1 ∗
@@ -119,7 +119,7 @@ def kkFrame {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
   wordPointsTo (sp + 0xFFFFFFFFFFFFFFD8#64) 8 (DFrac.own 1) v4 ∗
   wordPointsTo (sp + 0xFFFFFFFFFFFFFFD0#64) 8 (DFrac.own 1) v5
 
-theorem kkFrame_split {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem kkFrame_split {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (sp v0 v1 v2 v3 v4 v5 : BitVec 64) :
     kkFrame (GF := GF) sp v0 v1 v2 v3 v4 v5 ⊢
       iprop(wordPointsTo (sp + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) v0 ∗
@@ -130,7 +130,7 @@ theorem kkFrame_split {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] 
       wordPointsTo (sp + 0xFFFFFFFFFFFFFFD0#64) 8 (DFrac.own 1) v5) := by
   unfold kkFrame; iintro H; iexact H
 
-theorem kkFrame_join {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem kkFrame_join {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (sp v0 v1 v2 v3 v4 v5 : BitVec 64) :
     iprop(wordPointsTo (sp + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) v0 ∗
       wordPointsTo (sp + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) v1 ∗
@@ -142,7 +142,7 @@ theorem kkFrame_join {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
   unfold kkFrame; iintro H; iexact H
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-- **The wake step of `kkill`** (the port of `wakeup`'s): at SLEEPING the
 lock owns BOTH halves of the state mirror (`unclaimed SLEEPING`), so the
@@ -151,10 +151,10 @@ SLEEPING and RUNNABLE sit in the same guard class of the slot
 (`procSlots_recast`).  `p->chan` is untouched here. -/
 theorem kk_lockRes_wake (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) (ch : BitVec 64)
     (xs pid : BitVec 32) :
-    @wordPointsTo hlc GF _ ⟨ξl, KTier.kpt⟩ (pState pa) 4 (DFrac.own 1) RUNNABLE ∗
+    @wordPointsTo GF _ ⟨ξl, KTier.kpt⟩ (pState pa) 4 (DFrac.own 1) RUNNABLE ∗
     pstateLock Γ pa SLEEPING ∗
-    @wordPointsTo hlc GF _ ⟨ξl, KTier.kpt⟩ (pChan pa) 8 (DFrac.own 1) ch ∗
-    @procPubRest hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ pa 1#32 xs pid ∗
+    @wordPointsTo GF _ ⟨ξl, KTier.kpt⟩ (pChan pa) 8 (DFrac.own 1) ch ∗
+    @procPubRest GF _ ⟨ξl, KTier.kpt⟩ _ _ pa 1#32 xs pid ∗
     procSlotsAt Γ ξl pa SLEEPING ⊢ |==> procLockResAt Γ ξl pa := by
   iintro ⟨Hs, Hg, Hc, Hr, Hsl⟩
   ihave Hg := (pstateWhole_split (GF := GF) Γ pa SLEEPING).mpr $$ [Hg]
@@ -178,9 +178,9 @@ arm needs the pid it compared (nonzero: kkill refused `pid == 0`) to pay
 for the store on the killed row's LIVE arm. -/
 def kkResPid (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) (pid : BitVec 32) : IProp GF :=
   iprop(∃ (st : BitVec 32) (ch : BitVec 64) (kl xs : BitVec 32),
-    @wordPointsTo hlc GF _ ⟨ξl, KTier.kpt⟩ (pState pa) 4 (DFrac.own 1) st ∗ pstateLock Γ pa st ∗
-    @wordPointsTo hlc GF _ ⟨ξl, KTier.kpt⟩ (pChan pa) 8 (DFrac.own 1) ch ∗
-    @procPubRest hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ pa kl xs pid ∗ procSlotsAt Γ ξl pa st)
+    @wordPointsTo GF _ ⟨ξl, KTier.kpt⟩ (pState pa) 4 (DFrac.own 1) st ∗ pstateLock Γ pa st ∗
+    @wordPointsTo GF _ ⟨ξl, KTier.kpt⟩ (pChan pa) 8 (DFrac.own 1) ch ∗
+    @procPubRest GF _ ⟨ξl, KTier.kpt⟩ _ _ pa kl xs pid ∗ procSlotsAt Γ ξl pa st)
 
 /-- A matched pid is nonzero: the scan compares against a nonzero argument. -/
 theorem kk_pid_nz (pid : BitVec 32) (arg : BitVec 64) (hpm : BitVec.signExtend 64 pid = arg)
@@ -200,8 +200,8 @@ and the termination test.  The lock is still held, so the hart is pinned up
 to the release. -/
 theorem kkill_br_ffffffffffffeb2a : KA.«kkill» + 0xffffffffffffeb2a#64 = KA.«release» := by decide
 
-theorem kk_rel_nomatch (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors.{0}}
-    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+theorem kk_rel_nomatch (RE : RELEASE) {GF : BundledGFunctors.{0}}
+    [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (k : KCtx) (arg : BitVec 64) (hwf : k.wf) (hnoff : k.noff + 1 < 2 ^ 31)
     (hK : 16 ≤ k.avail) (hlk : "proc" ∉ k.locks)
     (i : Nat) (hi : i < NPROC) (spie spp spie1 spp1 : Bool) (R Rr : RegMap)
@@ -302,8 +302,8 @@ theorem kk_rel_nomatch (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors.{0}}
 
 set_option maxHeartbeats 4000000 in
 /-- The match tail at `+0x4c`: `release(&p->lock)` and `return 0`. -/
-theorem kk_rel_found (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors.{0}}
-    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+theorem kk_rel_found (RE : RELEASE) {GF : BundledGFunctors.{0}}
+    [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (k : KCtx) (arg : BitVec 64) (hwf : k.wf) (hnoff : k.noff + 1 < 2 ^ 31)
     (hK : 16 ≤ k.avail) (hlk : "proc" ∉ k.locks)
     (i : Nat) (hi : i < NPROC) (spie spp spie1 spp1 : Bool) (R Rr : RegMap)
@@ -394,8 +394,8 @@ theorem kk_rel_found (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors.{0}}
 set_option maxHeartbeats 4000000 in
 /-- The match arm at `+0x40`: `p->killed = 1`, and at SLEEPING
 `p->state = RUNNABLE`, then the release tail. -/
-theorem kk_found (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors.{0}}
-    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
+theorem kk_found (RE : RELEASE) {GF : BundledGFunctors.{0}}
+    [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
     (Γ : SchedNames) (k : KCtx) (arg : BitVec 64) (hwf : k.wf) (hnoff : k.noff + 1 < 2 ^ 31)
     (hK : 16 ≤ k.avail) (hlk : "proc" ∉ k.locks) (htier : k.tier = KTier.kpt)
     (i : Nat) (hi : i < NPROC) (spie spp spie1 spp1 : Bool) (R Rr : RegMap)
@@ -405,7 +405,7 @@ theorem kk_found (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors.{0}}
     (cur c : CPU) (hpin : k.sie = false ∨ k.proc = 0#64 → c = cur) :
     kctx c ((((k.pushOffAt spie1 spp1).withLocks ("proc" :: k.locks)).pushed 6).withRegs Rr) ∗
     pcIs c (KA.«kkill» + 0x40#64) ∗
-    isLock (Γ.lock i) (procAddr i) "proc" (procLockPay Γ i) ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF) ∗
+    isLock (Γ.lock i) (procAddr i) "proc" (procLockPay Γ i) ∗ □ MachFixedGS.killCred (GF := GF) ∗
     locked (Γ.lock i) c ∗ kkResPid Γ curCtx (procAddr i) pid ∗ sieArm c k.sie k.proc ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ (spie2 spp2 : Bool) (R2 : RegMap) (done : Bool),
       ⌜k.sie = false → spie2 = spie ∧ spp2 = spp⌝ -∗
@@ -431,7 +431,7 @@ theorem kk_found (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors.{0}}
   -- the store below is PAID with the killer's credential (the killed row's
   -- live arm: the matched pid is nonzero)
   iapply wpLoop_bupd
-  imod killPaid_kill (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pid kl 1#32 hpnz (by decide)
+  imod killPaid_kill (MachFixedGS.killCred (GF := GF)) pid kl 1#32 hpnz (by decide)
     $$ [Hkp] with Hkp
   · isplitr
     · iexact Hcred
@@ -518,8 +518,8 @@ theorem kkill_br_ffffffffffffeaa2 : KA.«kkill» + 0xffffffffffffeaa2#64 = KA.«
 set_option maxHeartbeats 4000000 in
 /-- The body at `+0x22` for slot `i`: `acquire(&p->lock)`, the pid
 test, and then either the match arm or the no-match release tail. -/
-theorem kk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors.{0}}
-    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
+theorem kk_iter (AC : ACQUIRE) (RE : RELEASE) {GF : BundledGFunctors.{0}}
+    [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
     (Γ : SchedNames) (k : KCtx) (arg : BitVec 64)
     (hwf : k.wf) (hnoff : k.noff + 1 < 2 ^ 31) (hK : 16 ≤ k.avail)
     (hlk : "proc" ∉ k.locks) (htier : k.tier = KTier.kpt)
@@ -527,7 +527,7 @@ theorem kk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
     (h9 : R 9#5 = procAddr i) (h18 : R 18#5 = arg) (h19 : R 19#5 = KA.«tickslock»)
     (harg : arg ≠ 0#64) (cur : CPU) :
     kctx cur (((k.withSpie spie spp).pushed 6).withRegs R) ∗ pcIs cur (KA.«kkill» + 0x22#64) ∗
-    procsInv Γ ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF) ∗
+    procsInv Γ ∗ □ MachFixedGS.killCred (GF := GF) ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ (spie2 spp2 : Bool) (R2 : RegMap) (done : Bool),
       ⌜k.sie = false → spie2 = spie ∧ spp2 = spp⌝ -∗
       kctx cpu' (((k.withSpie spie2 spp2).pushed 6).withRegs R2) -∗
@@ -635,15 +635,15 @@ set_option maxHeartbeats 4000000 in
 epilogue at `+0x54`, either through a match (`a0 = 0`) or off the end
 of the table (`a0 = -1`).  A bounded loop: induction on a `fuel` bounding
 the iterations left, with the hart quantified inside. -/
-theorem kk_loop (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors.{0}}
-    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+theorem kk_loop (AC : ACQUIRE) (RE : RELEASE) {GF : BundledGFunctors.{0}}
+    [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (k : KCtx) (arg : BitVec 64)
     (hwf : k.wf) (hnoff : k.noff + 1 < 2 ^ 31) (hK : 16 ≤ k.avail)
     (hlk : "proc" ∉ k.locks) (htier : k.tier = KTier.kpt) (harg : arg ≠ 0#64) (fuel : Nat) :
     ∀ (i : Nat) (_ : NPROC - i = fuel + 1) (spie spp : Bool) (R : RegMap)
       (_ : R 9#5 = procAddr i) (_ : R 18#5 = arg) (_ : R 19#5 = KA.«tickslock») (cur : CPU),
     kctx cur (((k.withSpie spie spp).pushed 6).withRegs R) ∗ pcIs cur (KA.«kkill» + 0x22#64) ∗
-    procsInv Γ ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF) ∗
+    procsInv Γ ∗ □ MachFixedGS.killCred (GF := GF) ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ (spie2 spp2 : Bool) (R2 : RegMap),
       ⌜k.sie = false → spie2 = spie ∧ spp2 = spp⌝ -∗
       kctx cpu' (((k.withSpie spie2 spp2).pushed 6).withRegs R2) -∗
@@ -748,7 +748,7 @@ theorem kk_loop (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
 set_option maxHeartbeats 4000000 in
 /-- The epilogue at `+0x54`: restore `ra`, `s0`..`s3`, pop the frame,
 return. -/
-theorem kk_epi {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem kk_epi {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu cur : CPU) (k : KCtx)
     (hpin : k.sie = false ∨ k.proc = 0#64 → cur = cpu) (hK : 6 ≤ k.avail)
     (spie spp : Bool) (hsp : k.sie = false → spie = k.spie ∧ spp = k.spp)
@@ -819,7 +819,7 @@ theorem kkill_br_1077a : KA.«kkill» + 0x1077a#64 = KA.«proc» := by decide
 set_option maxHeartbeats 4000000 in
 /-- **`kkill` meets its specification.** -/
 theorem kkill_proof (AC : ACQUIRE) (RE : RELEASE) : KKILL :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ Γ cpu k hnoff hK hlk htier => by
+  ⟨fun {GF} _ _ _ _ _ _ _ _ Γ cpu k hnoff hK hlk htier => by
   unfold wp_kkill_body
   simp only [kkillAddr]
   iintro ⟨Hk, Hpc, #Hpinv, #Hcred, HPhi⟩

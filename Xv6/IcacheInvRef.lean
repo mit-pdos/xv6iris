@@ -70,7 +70,7 @@ itable.lock's payload.
    (`Xv6/IcacheRefDefs.lean` deviation 12); `seq 0 NINODE` is
    `List.range NINODE`; `is_Some (M !! k)` is `∃ v, get? M k = some v`;
    inums in `frz_park` are `Nat` (`frzmH`'s key, brief §1 KEY-TYPE SEAM).
-8. **Binders.**  §5 binds `[MachGS hlc GF] [IcacheG GF]` (riscvGS /
+8. **Binders.**  §5 binds `[MachGS GF] [IcacheG GF]` (riscvGS /
    xv6G's icache members); the four lemmas that read the authority halves
    (`itableHalf_agree`, whose `Xv6/IcacheInvAlg.lean` section carries
    `[Xv6G GF] [SleepLockG GF]`) and `irefTokGenlo` add `[Xv6G GF] [SleepLockG GF]` (Rocq
@@ -220,14 +220,14 @@ theorem WordHist.read_head_vis {n : Nat} (W : WordHist n) (Hold : Nat → Hist) 
     exact tailOk_visible [] h ts htail hKt hvis hauth
 
 section res
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- A KEY of the running context is under the store order's top
 (Rocq: the `llb` of an arm store's own position; design §3's
 `ownCtx_key_topLb`).  A floor key is under a view receipt of the hart; a
 dirty key is under the token's watermark. -/
 theorem ownCtx_key_topLb (cpu : CPU) (ξ : CtxId) (t : Nat) :
-    ownCtx (GF := GF) cpu ξ ∗ keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ t ⊢
+    ownCtx (GF := GF) cpu ξ ∗ keyAt (MachGS.era (GF := GF)) ξ t ⊢
       ownCtx cpu ξ ∗ topLb t := by
   iintro ⟨Hctx, #Hkey⟩
   icases keyAt_cases _ ξ t $$ Hkey with ⟨#Hfl | ⟨%h, #Hd, #Hau⟩⟩
@@ -333,7 +333,7 @@ theorem iRef_ram_aligned (k : Nat) (hk : k < NINODE) :
   omega
 
 section Claims
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- A6.145: the read leaves' address claims, minted ONCE at boot off the
 pre-conversion cells and persistent forever after.  `is_itable2` carries
@@ -419,7 +419,7 @@ end Claims
 /-! ## 5b.  The merged per-slot row and the invariant -/
 
 section IstmpAuth
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- Rocq `mono_nat_auth_own (icfg_istmp k) q tst` (deviation 4): the A6.144
 exact-read stamp's authority.  Half in the live slot's row, half on
@@ -448,7 +448,7 @@ theorem istmpAuth_split [Icfg] (k : Nat) (q1 q2 : Qp) (tst : Nat) :
 end IstmpAuth
 
 section IcacheRefInv
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF]
 
 /-- A FREE slot keeps only the liveness unit (and the selector's whole
 `false`) -- its count cell rides itable.lock's payload as a plain ctx cell
@@ -516,7 +516,7 @@ def itableBody [Icfg] : IProp GF :=
 /-- Rocq `itable_inv` (and its alias `itable_inv_pinw`). -/
 def itableInv [Icfg] : IProp GF := inv icacheN (itableBody (GF := GF))
 
-instance itableInv_persistent [Icfg] : Persistent (itableInv (hlc := hlc) (GF := GF)) := by
+instance itableInv_persistent [Icfg] : Persistent (itableInv (GF := GF)) := by
   unfold itableInv; infer_instance
 
 instance itableBody_timeless [Icfg] : Timeless (itableBody (GF := GF)) := by
@@ -633,7 +633,7 @@ window across the load step.  The bounds on the read value come out of
 the OBLIGATION side (`IcachePinwObl`), not here. -/
 theorem iref_load_pinw_au [Icfg] (Eo : CoPset) (k : Nat) (s : Qp) (g : GName) (lo : Nat)
     (hE : (↑icacheN : CoPset) ⊆ Eo) (hk : k < NINODE) :
-    ⊢@{IProp GF} itableInv (hlc := hlc) -∗ liveGenlo k s g lo -∗
+    ⊢@{IProp GF} itableInv -∗ liveGenlo k s g lo -∗
       |={Eo, Eo \ ↑icacheN}=> ∃ (w : BitVec 32) (tst : Nat),
         irefPinRows k w lo tst ∗
         (irefPinRows k w lo tst ={Eo \ ↑icacheN, Eo}=∗ liveGenlo k s g lo) := by
@@ -666,7 +666,7 @@ cells in the payload -- a different, ordinary leaf.) -/
 theorem iref_load_locked_pinw_au [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] [Icfg] (Eo : CoPset) (M : RegMapF (Qp × PosNat)) (k : Nat)
     (tstp : Nat) (hE : (↑icacheN : CoPset) ⊆ Eo) (hk : k < NINODE)
     (his : ∃ v, PartialMap.get? M k = some v) :
-    ⊢@{IProp GF} itableInv (hlc := hlc) -∗ itableHalf M -∗ istmpAuth k (1 : Qp).half tstp -∗
+    ⊢@{IProp GF} itableInv -∗ itableHalf M -∗ istmpAuth k (1 : Qp).half tstp -∗
       |={Eo, Eo \ ↑icacheN}=> ∃ lo : Nat, ⌜lo ≤ tstp⌝ ∗
         irefPinRows k (irefWord M k) lo tstp ∗
         (irefPinRows k (irefWord M k) lo tstp ={Eo \ ↑icacheN, Eo}=∗
@@ -704,7 +704,7 @@ theorem iref_load_locked_pinw_au [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG
 /-- The slot-finder for a bare slice holder (SpecIdup's need), pinw-faced. -/
 theorem iref_share_lookup_pinw_au [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] [Icfg] (Eo : CoPset) (M : RegMapF (Qp × PosNat)) (k : Nat)
     (s : Qp) (g : GName) (lo : Nat) (hE : (↑icacheN : CoPset) ⊆ Eo) (hk : k < NINODE) :
-    ⊢@{IProp GF} itableInv (hlc := hlc) -∗ itableHalf M -∗ liveGenlo k s g lo -∗
+    ⊢@{IProp GF} itableInv -∗ itableHalf M -∗ liveGenlo k s g lo -∗
       |={Eo}=> ⌜∃ v, PartialMap.get? M k = some v⌝ ∗ itableHalf M ∗ liveGenlo k s g lo := by
   iintro #Hinv Hhalf Hlv
   unfold itableInv
@@ -734,7 +734,7 @@ merged body decides it slot-shaped: a true selector forces the frozen arm,
 whose FULL unit no outstanding slice can coexist with. -/
 theorem frz_slot_kill_pinw [Icfg] (Eo : CoPset) (k : Nat) (qs s' : Qp) (g : GName) (lo : Nat)
     (hE : (↑icacheN : CoPset) ⊆ Eo) (hk : k < NINODE) :
-    ⊢@{IProp GF} itableInv (hlc := hlc) -∗ frzsel k qs true -∗ liveGenlo k s' g lo -∗
+    ⊢@{IProp GF} itableInv -∗ frzsel k qs true -∗ liveGenlo k s' g lo -∗
       |={Eo}=> False := by
   iintro #Hinv Hsel Hlv
   unfold itableInv
@@ -811,7 +811,7 @@ nothing, so the pin persists through the phase. -/
 theorem frz_slot_freeze_pinw [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] [Icfg] (Eo : CoPset) (M : RegMapF (Qp × PosNat)) (k : Nat)
     (q : Qp) (n : PosNat) (g : GName) (lo : Nat) (hE : (↑icacheN : CoPset) ⊆ Eo)
     (hMk : PartialMap.get? M k = some (q, n)) :
-    ⊢@{IProp GF} itableInv (hlc := hlc) -∗ itableHalf M -∗ liveGenlo k q g lo -∗
+    ⊢@{IProp GF} itableInv -∗ itableHalf M -∗ liveGenlo k q g lo -∗
       liveGenlo k (1 : Qp).half g lo -∗ frzsel k (1 : Qp).half false -∗
       |={Eo}=> itableHalf M ∗ frzsel k (1 : Qp).half.half true ∗
         frzsel k (1 : Qp).half.half true := by
@@ -861,7 +861,7 @@ one-shots). -/
 theorem live_slot_regen_pinw [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] [Icfg] (Eo : CoPset) (M : RegMapF (Qp × PosNat)) (k : Nat)
     (qt : Qp) (n : PosNat) (g : GName) (lo : Nat) (hE : (↑icacheN : CoPset) ⊆ Eo)
     (hMk : PartialMap.get? M k = some (qt, n)) :
-    ⊢@{IProp GF} itableInv (hlc := hlc) -∗ itableHalf M -∗ liveGenlo k qt g lo -∗
+    ⊢@{IProp GF} itableInv -∗ itableHalf M -∗ liveGenlo k qt g lo -∗
       liveGenlo k (1 : Qp).half g lo -∗
       |={Eo}=> ∃ g' : GName, itableHalf M ∗ liveGenlo k qt g' lo ∗
         liveGenlo k (1 : Qp).half g' lo ∗ ityPending g' := by
@@ -991,7 +991,7 @@ quarter says the slot is frozen, and a frozen slot's unit is entire.
 address. -/
 theorem frzPark_shr_off [Icfg] (Eo : CoPset) (k z : Nat) (s : Qp) (g : GName) (lo : Nat)
     (hE : (↑icacheN : CoPset) ⊆ Eo) (hk : k < NINODE) :
-    ⊢@{IProp GF} itableInv (hlc := hlc) -∗ liveGenlo k s g lo -∗ frzPark k z -∗
+    ⊢@{IProp GF} itableInv -∗ liveGenlo k s g lo -∗ frzPark k z -∗
       |={Eo}=> liveGenlo k s g lo ∗ frzmH z false ∗ frzsel k (1 : Qp).half false ∗
         hpnFull k none := by
   iintro #Hinv Hs Hpark
@@ -1058,7 +1058,7 @@ code, but "unreachable" is not a fact any invariant here states.  Writing
 automatically at every split and no wf clause has to mention fractions. -/
 
 section IcacheTable
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- Rocq `islot_rest_at`: a live slot's retained identity share. -/
 def islotRestAt [CurCtx] (k : Nat) (q : Qp) (dev inum : BitVec 32) : IProp GF :=

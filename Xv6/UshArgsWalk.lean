@@ -112,7 +112,7 @@ theorem ushPexRegs_cs {m m' : RegMap} {fp t0 argc ps es p : Nat}
     by rw [hk _ rfl]; exact h25, by rw [hk _ rfl]; exact h26, by rw [hk _ rfl]; exact h27⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -217,11 +217,11 @@ theorem shPex_head (UL : UK_LEAVES) (SP : SH_PEEK) (N : UkNames GF) (h : CPU) (m
     (hps0 : 0 < ps) (hps8 : ps % 8 = 0) (hpsz : ps + 8 < 2 ^ 64)
     (hpk : refPeek len f cur [rbBar, rbRpar, rbAmp, rbSemi] = (stop, s)) :
     ⊢ ushCode N.t -∗ uword N.d ps (BitVec.ofNat 64 (s0 + cur)) -∗ ustr N.d dq s0 len f -∗
-      ustr N.d dw ushWsA 5 ushpWsF -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 0x5fe) (24 + nn) -∗
+      ustr N.d dw ushWsA 5 ushpWsF -∗ urun N h m (BitVec.ofNat 64 0x5fe) (24 + nn) -∗
       (∀ (h' : CPU) (m' : RegMap), ⌜∀ r, ucalleeSavedIdx r = true → m'.get r = m.get r⌝ -∗
         ⌜m'.get 10#5 = BitVec.ofNat 64 (if stop then 1 else 0)⌝ -∗
         uword N.d ps (BitVec.ofNat 64 (s0 + s)) -∗ ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
-        urun (hlc := hlc) N h' m' (BitVec.ofNat 64 0x608) (24 + nn) -∗ wpLoop h') -∗
+        urun N h' m' (BitVec.ofNat 64 0x608) (24 + nn) -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hcur Hstr Hws Hrun Hk
   iapply ushS_mv UL N (ushI_5fe N.t) 0x600 h m _ (BitVec.ofNat 64 ushTArg) hs6 $$ Hc Hrun
@@ -262,13 +262,13 @@ theorem shPex_gtk (UL : UK_LEAVES) (SG : SH_GETTOKEN) (N : UkNames GF) (h : CPU)
     (E : refGettoken len f s = (ret, q, e, fin)) :
     ⊢ ushCode N.t -∗ uword N.d ps (BitVec.ofNat 64 (s0 + s)) -∗ uword N.d (fp - 120) wq -∗
       uword N.d (fp - 128) weq -∗ ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
-      ustr N.d dv ushSymA 7 ushpSymF -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 0x60a) (24 + nn) -∗
+      ustr N.d dv ushSymA 7 ushpSymF -∗ urun N h m (BitVec.ofNat 64 0x60a) (24 + nn) -∗
       (∀ (h' : CPU) (m' : RegMap), ⌜∀ r, ucalleeSavedIdx r = true → m'.get r = m.get r⌝ -∗
         ⌜m'.get 10#5 = BitVec.ofInt 64 ret⌝ -∗
         uword N.d ps (BitVec.ofNat 64 (s0 + fin)) -∗ uword N.d (fp - 120) (BitVec.ofNat 64 (s0 + q)) -∗
         uword N.d (fp - 128) (BitVec.ofNat 64 (s0 + e)) -∗
         ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗ ustr N.d dv ushSymA 7 ushpSymF -∗
-        urun (hlc := hlc) N h' m' (BitVec.ofNat 64 0x616) (24 + nn) -∗ wpLoop h') -∗
+        urun N h' m' (BitVec.ofNat 64 0x616) (24 + nn) -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hcur Hq Heq Hstr Hws Hsy Hrun Hk
   have hqok : 0 < fp - 120 ∧ (fp - 120) % 8 = 0 ∧ fp - 120 + 8 < 2 ^ 64 := ⟨by omega, by omega, by omega⟩
@@ -308,7 +308,7 @@ theorem shPex_gtk (UL : UK_LEAVES) (SG : SH_GETTOKEN) (N : UkNames GF) (h : CPU)
 redirect is consumed, it is the redirect turns' law at `nn - 2`. -/
 theorem ushOom_ne_of_deep (N : UkNames GF) (Pex : IProp GF) (nn : Nat) (t : UshpCmd) (P : Prop)
     (hd : P → ushPexDeep t = 42) :
-    ushpOom (hlc := hlc) N Pex (16 + (24 + nn) - ushPexDeep t) ⊢ □ (⌜P⌝ -∗ ushpOom (hlc := hlc) N Pex (nn - 2)) := by
+    ushpOom N Pex (16 + (24 + nn) - ushPexDeep t) ⊢ □ (⌜P⌝ -∗ ushpOom N Pex (nn - 2)) := by
   iintro #H
   imodintro
   iintro %hp
@@ -318,7 +318,7 @@ theorem ushOom_ne_of_deep (N : UkNames GF) (Pex : IProp GF) (nn : Nat) (t : Ushp
 
 /-- The out-of-memory law under a guard, at a weaker guard. -/
 theorem ushOom_ne_weak (N : UkNames GF) (Pex : IProp GF) (K : Nat) (P Q : Prop) (hQP : Q → P) :
-    □ (⌜P⌝ -∗ ushpOom (hlc := hlc) N Pex K) ⊢ □ (⌜Q⌝ -∗ ushpOom (hlc := hlc) N Pex K) := by
+    □ (⌜P⌝ -∗ ushpOom N Pex K) ⊢ □ (⌜Q⌝ -∗ ushpOom N Pex K) := by
   iintro #H
   imodintro
   iintro %hq
@@ -335,21 +335,21 @@ theorem shPex_store (UL : UK_LEAVES) (SR : SH_PARSEREDIRS) (N : UkNames GF) (UM 
     (q e s1 fuel s2 : Nat) (f : Nat → BitVec 8) (rs1 : List Rredir) (nn : Nat)
     (hregs : ushPexRegs m fp t0 done.length ps (s0 + len) p) (ha0 : m.get 10#5 = BitVec.ofInt 64 rtWord)
     (hlen : done.length + 1 < 10) (hs1le : s1 ≤ len) (href : refRedirs len f fuel s1 [] = some (rs1, s2))
-    (hch : ushMallocChain (hlc := hlc) N rs1.length UM UM1) (hsc : rs1 ≠ [] → refSymScope len f)
+    (hch : ushMallocChain N rs1.length UM UM1) (hsc : rs1 ≠ [] → refSymScope len f)
     (hnn : rs1 ≠ [] → 12 ≤ nn) (hs64 : s0 + len < 2 ^ 64) (hps0 : 0 < ps) (hps8 : ps % 8 = 0)
     (hpsz : ps + 8 < 2 ^ 64) (hfp8 : fp % 8 = 0) (hfplo : 128 < fp) (hfphi : fp < 2 ^ 64)
     (hp8 : p % 8 = 0) (hpz : p + 168 < 2 ^ 64) :
     ⊢ ushCode N.t -∗ UM -∗ ushRedirsRes N rs1 dv Pex (nn - 2) -∗ ushExecPre N s0 p done -∗
       uword N.d (fp - 120) (BitVec.ofNat 64 (s0 + q)) -∗ uword N.d (fp - 128) (BitVec.ofNat 64 (s0 + e)) -∗
       uword N.d ps (BitVec.ofNat 64 (s0 + s1)) -∗ ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x616) (24 + nn) -∗
+      urun N h m (BitVec.ofNat 64 0x616) (24 + nn) -∗
       (∀ (t1 : Nat) (h' : CPU) (m' : RegMap), ⌜ushPexRegs m' fp t1 (done.length + 1) ps (s0 + len) p⌝ -∗
         ⌜∀ r, ucalleeSavedIdx r = true → r ≠ 9#5 → r ≠ 18#5 → r ≠ 19#5 → m'.get r = m.get r⌝ -∗
         ushExecPre N s0 p (done ++ [(q, e)]) -∗ ushRedirsAt N s0 t1 t0 rs1 -∗
         uword N.d (fp - 120) (BitVec.ofNat 64 (s0 + q)) -∗ uword N.d (fp - 128) (BitVec.ofNat 64 (s0 + e)) -∗
         uword N.d ps (BitVec.ofNat 64 (s0 + s2)) -∗ ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
         UM1 -∗ ushRedirsRes N rs1 dv Pex (nn - 2) -∗
-        urun (hlc := hlc) N h' m' (BitVec.ofNat 64 0x5fe) (24 + nn) -∗ wpLoop h') -∗
+        urun N h' m' (BitVec.ofNat 64 0x5fe) (24 + nn) -∗ wpLoop h') -∗
       wpLoop h := by
   obtain ⟨r8, r9, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27⟩ := hregs
   iintro #Hc HM Hres Hpre Hq Heq Hcur Hstr Hws Hrun Hk
@@ -454,19 +454,19 @@ theorem shPex_loop (UL : UK_LEAVES) (SP : SH_PEEK) (SG : SH_GETTOKEN) (SR : SH_P
     ∀ (fuel : Nat) (done toks : List (Nat × Nat)) (rs0 rs' : List Rredir) (t0 cur fin : Nat)
       (UM UM' : IProp GF) (h : CPU) (mc : RegMap) (wq weq : BitVec 64),
     refArgs len f fuel cur done rs0 = some (toks, rs0 ++ rs', fin) →
-    ushMallocChain (hlc := hlc) N rs'.length UM UM' → (rs' ≠ [] → 12 ≤ nn) → cur ≤ len →
+    ushMallocChain N rs'.length UM UM' → (rs' ≠ [] → 12 ≤ nn) → cur ≤ len →
     ushPexRegs mc fp t0 done.length ps (s0 + len) p →
-    ⊢ ushCode N.t -∗ UM -∗ Pex -∗ □ (⌜rs' ≠ []⌝ -∗ ushpOom (hlc := hlc) N Pex (nn - 2)) -∗ ushExecPre N s0 p done -∗
+    ⊢ ushCode N.t -∗ UM -∗ Pex -∗ □ (⌜rs' ≠ []⌝ -∗ ushpOom N Pex (nn - 2)) -∗ ushExecPre N s0 p done -∗
       ushRedirsAt N s0 t0 p rs0 -∗ uword N.d ps (BitVec.ofNat 64 (s0 + cur)) -∗ uword N.d (fp - 120) wq -∗
       uword N.d (fp - 128) weq -∗ ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
-      ustr N.d dv ushSymA 7 ushpSymF -∗ urun (hlc := hlc) N h mc (BitVec.ofNat 64 0x5fe) (24 + nn) -∗
+      ustr N.d dv ushSymA 7 ushpSymF -∗ urun N h mc (BitVec.ofNat 64 0x5fe) (24 + nn) -∗
       (∀ (t : Nat) (h' : CPU) (mc' : RegMap),
         ⌜∀ r, ucalleeSavedIdx r = true → r ≠ 9#5 → r ≠ 18#5 → r ≠ 19#5 → mc'.get r = mc.get r⌝ -∗
         ⌜mc'.get 18#5 = BitVec.ofNat 64 toks.length⌝ -∗ ⌜mc'.get 9#5 = BitVec.ofNat 64 t⌝ -∗
         ushExecPre N s0 p toks -∗ ushRedirsAt N s0 t p (rs0 ++ rs') -∗ uword N.d ps (BitVec.ofNat 64 (s0 + fin)) -∗
         (∃ w : BitVec 64, uword N.d (fp - 120) w) -∗ (∃ w : BitVec 64, uword N.d (fp - 128) w) -∗
         ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗ ustr N.d dv ushSymA 7 ushpSymF -∗
-        UM' -∗ Pex -∗ urun (hlc := hlc) N h' mc' (BitVec.ofNat 64 0x63e) (24 + nn) -∗ wpLoop h') -∗
+        UM' -∗ Pex -∗ urun N h' mc' (BitVec.ofNat 64 0x63e) (24 + nn) -∗ wpLoop h') -∗
       wpLoop h := by
   intro fuel
   induction fuel with

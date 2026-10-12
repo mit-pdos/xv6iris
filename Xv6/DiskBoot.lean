@@ -72,7 +72,7 @@ theorem diskBoot_blockView (v : VirtioState) (h : v.cache = []) (b : Nat) :
   rw [diskBoot_cacheView v h, Nat.mul_comm]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
 
 /-! ## Allocation helpers -/
 
@@ -181,8 +181,8 @@ state, the device's mirror becomes the dead disk invariant, and out come
 counter, and the image's first `nb` blocks. -/
 theorem diskBootAlloc (v : VirtioState) (nb : Nat) (hlive : Virtio.live v.cfg = false)
     (hinfl : v.inflight = []) (hcache : v.cache = []) (hui : v.usedIdx = 0#16) (hseen : v.seen = 0#16) :
-    devFrag (hlc := hlc) (GF := GF) .virtio v ⊢ |={⊤}=> ∃ γ : DiskNames,
-      diskInv γ ∗ crashPermInv (genId (hlc := hlc) (GF := GF)) γ.cperm ∗
+    devFrag (GF := GF) .virtio v ⊢ |={⊤}=> ∃ γ : DiskNames,
+      diskInv γ ∗ crashPermInv (genId (GF := GF)) γ.cperm ∗
       diskCfgOwn γ v.cfg ∗ diskInitGhosts γ ∗ diskRoot γ ∗
       [∗list] b ∈ List.range nb, diskBlock γ b (fsBlocks v.disk b) := by
   iintro Hf
@@ -203,12 +203,12 @@ theorem diskBootAlloc (v : VirtioState) (nb : Nat) (hlive : Virtio.live v.cfg = 
   imod (MonoList.own_alloc (GF := GF) ([] : List Nat)) with ⟨%gpos, Hpos, Hposl⟩
   imod (MonoList.own_alloc (GF := GF) ([] : List UsedRec)) with ⟨%gdone, Hdone, Hdonel⟩
   imod (ghost_var_alloc (GF := GF) (0 : Nat)) with ⟨%gbase, Hbase⟩
-  imod (crashPerm_ghost_alloc (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF)))
+  imod (crashPerm_ghost_alloc (GF := GF) (genId (GF := GF)))
     with ⟨%gcperm, Hcperm⟩
-  imod crashPermInv_alloc ⊤ (genId (hlc := hlc) (GF := GF)) gcperm $$ Hcperm with #Hcpinv
+  imod crashPermInv_alloc ⊤ (genId (GF := GF)) gcperm $$ Hcperm with #Hcpinv
   let γ : DiskNames := ⟨gcfg, gimg, ghead, gnp, gnc, glo, gnr, gnrlb, gstage, gperm, gnpm, gpos,
     gdone, gbase, gcperm⟩
-  imod (inv_alloc diskN ⊤ (iprop(∃ s : DevSt DevId.virtio, devFrag (hlc := hlc) (GF := GF) .virtio s ∗
+  imod (inv_alloc diskN ⊤ (iprop(∃ s : DevSt DevId.virtio, devFrag (GF := GF) .virtio s ∗
       diskProto γ s))) $$ [Hf Hcfg1 Himg Hlo1 Hnr1 Hst1 Hperm Hnpm Hnpml Hpos Hposl Hdone Hdonel Hbase]
     with #Hinv
   · inext

@@ -68,7 +68,7 @@ elab "amb_tier_rfl" : tactic => do
 
 section
 open Iris MachCSL
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- Pointwise rewriting of a transport (Rocq closes these by `rewrite /X`). -/
 theorem ctxMorph_congr {R R' : CtxId → IProp GF} (h : ∀ ξ, R ξ = R' ξ) (hR : CtxMorph R') :

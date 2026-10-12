@@ -67,7 +67,7 @@ theorem sleep_prepare_br_fffffffffffff9a8 : KA.«sleep_prepare» + 0xfffffffffff
 set_option maxHeartbeats 4000000 in
 /-- **`sleep_prepare` meets its specification.** -/
 theorem sleep_prepare_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) : SLEEP_PREPARE :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ X Γ _ cpu k j hj hproc hchan hnoff hK hlk htier => by
+  ⟨fun {GF} _ _ _ _ _ _ _ X Γ _ cpu k j hj hproc hchan hnoff hK hlk htier => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_sleep_prepare_body
@@ -104,7 +104,7 @@ theorem sleep_prepare_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) : SLEEP_
         ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.proc⌝ -∗ wpLoop cpu'))
       ⊢ wpLoop (GF := GF) cc := by
     intro cc k' hnoff' hK'
-    have h := MP.wp_myproc (hlc := hlc) (GF := GF) cc k' hnoff' hK'
+    have h := MP.wp_myproc (GF := GF) cc k' hnoff' hK'
     unfold wp_myproc_body at h
     simp only [myprocAddr] at h
     exact h
@@ -140,7 +140,7 @@ theorem sleep_prepare_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) : SLEEP_
         sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
       ⊢ wpLoop (GF := GF) cc := by
     intro cc k' hnoff' hK' hs'
-    have h := AC.wp_acquire (hlc := hlc) (GF := GF) cc k' (Γ.lock j) "proc" (procLockPay Γ j)
+    have h := AC.wp_acquire (GF := GF) cc k' (Γ.lock j) "proc" (procLockPay Γ j)
       hnoff' hK' hs'
     unfold wp_acquire_body at h
     simp only [acquireAddr] at h
@@ -200,7 +200,7 @@ theorem sleep_prepare_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) : SLEEP_
         pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
       ⊢ wpLoop (GF := GF) c := by
     intro k' hsie' hnoff' hK' reen hreen hon
-    have h := RE.wp_release (hlc := hlc) (GF := GF) c k' (Γ.lock j) "proc" (procLockPay Γ j)
+    have h := RE.wp_release (GF := GF) c k' (Γ.lock j) "proc" (procLockPay Γ j)
       hsie' hnoff' hK' reen hreen hon
     unfold wp_release_body at h
     simp only [releaseAddr] at h

@@ -25,7 +25,7 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -36,11 +36,11 @@ theorem grepMatch_loop (UL : UK_LEAVES) (MH : GREP_MATCHHERE) (N : UkNames GF) (
     mc.get 9#5 = BitVec.ofNat 64 ax → mc.get 18#5 = BitVec.ofNat 64 ar →
     grepMhWords ((List.range lr).map fr) ≤ n →
     ⊢ grepCode N.t -∗ ustr N.d dqr ar lr fr -∗ ustr N.d dqt ax lt ft -∗
-      urun (hlc := hlc) N h mc (BitVec.ofNat 64 0xce) n -∗
+      urun N h mc (BitVec.ofNat 64 0xce) n -∗
       (ustr N.d dqr ar lr fr -∗ ustr N.d dqt ax lt ft -∗ ∀ (h' : CPU) (mc' : RegMap),
         ⌜mc'.get 10#5 = kgrepB01 (matchAny ((List.range lr).map fr) ((List.range lt).map ft))⌝ -∗
         ⌜grepRkeep (9 :: grepWcaller) mc mc'⌝ -∗
-        urun (hlc := hlc) N h' mc' (BitVec.ofNat 64 0xec) n -∗ wpLoop h') -∗
+        urun N h' mc' (BitVec.ofNat 64 0xec) n -∗ wpLoop h') -∗
       wpLoop h := by
   intro lt
   refine Nat.strongRecOn lt ?_
@@ -180,7 +180,7 @@ theorem grepMatch_loop (UL : UK_LEAVES) (MH : GREP_MATCHHERE) (N : UkNames GF) (
     · ipureintro; exact grepRkeep_upd _ _ _ _ _ (by decide) hk4
 
 /-- **Rocq `wp_kgrep_match`**: the whole function. -/
-theorem wp_grepMatch (UL : UK_LEAVES) (MH : GREP_MATCHHERE) : wpGrepMatchBody (hlc := hlc) (GF := GF) := by
+theorem wp_grepMatch (UL : UK_LEAVES) (MH : GREP_MATCHHERE) : wpGrepMatchBody (GF := GF) := by
   intro N h m dqr dqt ar ax lr lt fr ft n ha0 ha1 hn
   obtain ⟨n1, rfl⟩ : ∃ n1, n = 4 + n1 := ⟨n - 4, by omega⟩
   rw [show User.Grep.Sym.«match» = 0xb2 from rfl]
@@ -291,10 +291,10 @@ theorem wp_grepMatch (UL : UK_LEAVES) (MH : GREP_MATCHHERE) : wpGrepMatchBody (h
       ⊢ grepCode N.t -∗ uword N.d ((m.get spIdx).toNat - 8) (m.get 1#5) -∗
         uword N.d ((m.get spIdx).toNat - 16) (m.get 8#5) -∗ uword N.d ((m.get spIdx).toNat - 24) (m.get 9#5) -∗
         uword N.d ((m.get spIdx).toNat - 32) (m.get 18#5) -∗
-        urun (hlc := hlc) N h' mc (BitVec.ofNat 64 0xec) n1 -∗
+        urun N h' mc (BitVec.ofNat 64 0xec) n1 -∗
         (∀ (h'' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗
           ⌜m'.get 10#5 = kgrepB01 (matchRe ((List.range lr).map fr) ((List.range lt).map ft))⌝ -∗
-          urun (hlc := hlc) N h'' m' (retPc (m.get 1#5)) (4 + n1) -∗ wpLoop h'') -∗ wpLoop h' := by
+          urun N h'' m' (retPc (m.get 1#5)) (4 + n1) -∗ wpLoop h'') -∗ wpLoop h' := by
     intro h' mc ha0c hkc
     iintro #Hc Hw1 Hw2 Hw3 Hw4 Hrun Hk
     have hspc : (mc.get 2#5).toNat = (m.get spIdx).toNat - 32 := by

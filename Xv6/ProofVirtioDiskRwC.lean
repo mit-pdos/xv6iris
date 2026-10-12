@@ -94,7 +94,7 @@ theorem vdrw3_flDataV (v : BitVec 64) :
   rw [vdrw3_seqz v, vdrw3_flData (decide (v ≠ 0#64))]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 set_option maxHeartbeats 6000000 in
 /-- **P3.**  From `Xv6.vdrwP2Exit` to `Xv6.vdrwP3Exit`.
@@ -103,7 +103,7 @@ The three descriptors' `disk.info[i]` windows come out of the payload
 with the slots themselves (`Xv6.freeSlotRes` carries `Xv6.infoWin`): the
 head's two cells go into the chain, the middle's and the tail's travel
 on to `Xv6.vdrwP3Exit`. -/
-theorem vdrw_P3 (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem vdrw_P3 (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64)
     (bno dsk0 : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool)
     (h m t : Nat) (y : BitVec 32) (R : RegMap)

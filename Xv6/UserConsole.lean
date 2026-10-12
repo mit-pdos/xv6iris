@@ -82,7 +82,7 @@ instance ccWbn_timeless {GF : BundledGFunctors.{0}} (Cr : ConsCred GF) (n : Nat)
   unfold ccWbn; infer_instance
 
 section UserConsole
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-! ## 1.  THE POSITION PAIR -/
 
@@ -92,10 +92,10 @@ def upos (γ : GName) (n : Nat) : IProp GF := γ ↪●MN{DFrac.own (1 : Qp).hal
 /-- **Rocq `upos_a`**: the half that RIDES IN THE PAYLOAD, beside the token. -/
 def uposA (γ : GName) (n : Nat) : IProp GF := γ ↪●MN{DFrac.own (1 : Qp).half} (MaxNat.ofNat n)
 
-instance upos_timeless (γ : GName) (n : Nat) : Timeless (upos (hlc := hlc) (GF := GF) γ n) := by
+instance upos_timeless (γ : GName) (n : Nat) : Timeless (upos (GF := GF) γ n) := by
   unfold upos; infer_instance
 
-instance uposA_timeless (γ : GName) (n : Nat) : Timeless (uposA (hlc := hlc) (GF := GF) γ n) := by
+instance uposA_timeless (γ : GName) (n : Nat) : Timeless (uposA (GF := GF) γ n) := by
   unfold uposA; infer_instance
 
 /-- the whole authority is the two halves -/
@@ -109,7 +109,7 @@ private theorem upos_halves (γ : GName) (m : MaxNat) :
 
 /-- **Rocq `upos_alloc`**: THE MINT, at the position the token stands at. -/
 theorem upos_alloc (n : Nat) :
-    ⊢ |==> ∃ γ : GName, upos (hlc := hlc) (GF := GF) γ n ∗ uposA (hlc := hlc) γ n := by
+    ⊢ |==> ∃ γ : GName, upos (GF := GF) γ n ∗ uposA γ n := by
   imod (MonoNat.own_alloc (GF := GF) (MaxNat.ofNat n)) with ⟨%γ, Ha, -⟩
   icases (upos_halves (GF := GF) γ (MaxNat.ofNat n)).1 $$ Ha with ⟨H1, H2⟩
   imodintro
@@ -120,7 +120,7 @@ theorem upos_alloc (n : Nat) :
 /-- **Rocq `upos_agree`**: the payload's position IS the one the program
 holds. -/
 theorem upos_agree (γ : GName) (n n' : Nat) :
-    ⊢ upos (hlc := hlc) (GF := GF) γ n -∗ uposA (hlc := hlc) γ n' -∗ ⌜n = n'⌝ := by
+    ⊢ upos (GF := GF) γ n -∗ uposA γ n' -∗ ⌜n = n'⌝ := by
   unfold upos uposA
   iintro H1 H2
   ihave %h := MonoNat.auth_own_agree (GF := GF) γ _ _ _ _ $$ H1 H2
@@ -130,8 +130,8 @@ theorem upos_agree (γ : GName) (n n' : Nat) :
 /-- **Rocq `upos_update`**: BOTH halves move it, which is what a read
 spends. -/
 theorem upos_update (γ : GName) (n n' : Nat) (hle : n ≤ n') :
-    ⊢ upos (hlc := hlc) (GF := GF) γ n -∗ uposA (hlc := hlc) γ n ==∗
-      upos (hlc := hlc) γ n' ∗ uposA (hlc := hlc) γ n' := by
+    ⊢ upos (GF := GF) γ n -∗ uposA γ n ==∗
+      upos γ n' ∗ uposA γ n' := by
   unfold upos uposA
   iintro H1 H2
   ihave H := (upos_halves (GF := GF) γ (MaxNat.ofNat n)).2 $$ [H1 H2]
@@ -150,28 +150,28 @@ of the pair and the reader's credential `Rd` beside it, or the
 application's taint `T`.  CONSTANT IN THE STATUS. -/
 def uconsPay (cn : ConsNames) (γ : GName) (T : IProp GF) (Rd : Nat → IProp GF) :
     Int → IProp GF :=
-  fun _ => iprop((∃ n : Nat, consReader cn n ∗ uposA (hlc := hlc) γ n ∗ Rd n) ∨ T)
+  fun _ => iprop((∃ n : Nat, consReader cn n ∗ uposA γ n ∗ Rd n) ∨ T)
 
 instance uconsPay_timeless (cn : ConsNames) (γ : GName) (T : IProp GF) (Rd : Nat → IProp GF)
     [Timeless T] [∀ n : Nat, Timeless (Rd n)] (xs : Int) :
-    Timeless (uconsPay (hlc := hlc) cn γ T Rd xs) := by
+    Timeless (uconsPay cn γ T Rd xs) := by
   unfold uconsPay; infer_instance
 
 /-- **Rocq `ucons_pay_const`**: the payload does not read the status. -/
 theorem uconsPay_const (cn : ConsNames) (γ : GName) (T : IProp GF) (Rd : Nat → IProp GF)
-    (x y : Int) : uconsPay (hlc := hlc) cn γ T Rd x = uconsPay (hlc := hlc) cn γ T Rd y := rfl
+    (x y : Int) : uconsPay cn γ T Rd x = uconsPay cn γ T Rd y := rfl
 
 /-- **Rocq `ucons_pay_eta`**: the payload IS the constant function at the
 resource it names. -/
 theorem uconsPay_eta (cn : ConsNames) (γ : GName) (T : IProp GF) (Rd : Nat → IProp GF) :
-    (fun _ : Int => uconsPay (hlc := hlc) cn γ T Rd (-1)) = uconsPay (hlc := hlc) cn γ T Rd :=
+    (fun _ : Int => uconsPay cn γ T Rd (-1)) = uconsPay cn γ T Rd :=
   rfl
 
 /-- **Rocq `ucons_pay_tok`**: the lender's constructor. -/
 theorem uconsPay_tok (cn : ConsNames) (γ : GName) (T : IProp GF) (Rd : Nat → IProp GF)
     (n : Nat) (xs : Int) :
-    ⊢ consReader cn n -∗ uposA (hlc := hlc) γ n -∗ Rd n -∗
-      uconsPay (hlc := hlc) cn γ T Rd xs := by
+    ⊢ consReader cn n -∗ uposA γ n -∗ Rd n -∗
+      uconsPay cn γ T Rd xs := by
   iintro Hr Hp Hd
   unfold uconsPay
   ileft
@@ -180,7 +180,7 @@ theorem uconsPay_tok (cn : ConsNames) (γ : GName) (T : IProp GF) (Rd : Nat → 
 
 /-- **Rocq `ucons_pay_taint`**: the tainted one's constructor. -/
 theorem uconsPay_taint (cn : ConsNames) (γ : GName) (T : IProp GF) (Rd : Nat → IProp GF)
-    (xs : Int) : ⊢ T -∗ uconsPay (hlc := hlc) cn γ T Rd xs := by
+    (xs : Int) : ⊢ T -∗ uconsPay cn γ T Rd xs := by
   iintro HT
   unfold uconsPay
   iright
@@ -190,7 +190,7 @@ theorem uconsPay_taint (cn : ConsNames) (γ : GName) (T : IProp GF) (Rd : Nat �
 payload's half of the pair is DROPPED. -/
 theorem uconsPay_redeem (cn : ConsNames) (γ : GName) (T : IProp GF) (Rd : Nat → IProp GF)
     (xs : Int) :
-    ⊢ uconsPay (hlc := hlc) cn γ T Rd xs -∗ iprop((∃ n : Nat, consReader cn n ∗ Rd n) ∨ T) := by
+    ⊢ uconsPay cn γ T Rd xs -∗ iprop((∃ n : Nat, consReader cn n ∗ Rd n) ∨ T) := by
   unfold uconsPay
   iintro (⟨%n, Hr, -, Hd⟩ | HT)
   · ileft
@@ -221,30 +221,30 @@ credential `C` handed over separately at that number (or the taint). -/
 theorem uinitLend_c (cn : ConsNames) (T : IProp GF) [Persistent T] (Rd C : Nat → IProp GF)
     (xs : Int) :
     ⊢ uinitTok cn T (fun n => iprop(Rd n ∗ C n)) ==∗
-      ∃ (γ : GName) (n : Nat), uconsPay (hlc := hlc) cn γ T Rd xs ∗ upos (hlc := hlc) γ n ∗
+      ∃ (γ : GName) (n : Nat), uconsPay cn γ T Rd xs ∗ upos γ n ∗
         iprop(C n ∨ T) := by
   unfold uinitTok
   iintro (⟨%n, Hr, Hd, Hc⟩ | #HT)
-  · imod (upos_alloc (hlc := hlc) (GF := GF) n) with ⟨%γ, Hp, Hpa⟩
+  · imod (upos_alloc (GF := GF) n) with ⟨%γ, Hp, Hpa⟩
     imodintro
     iexists γ, n
     iframe Hp
     isplitr [Hc]
-    · iapply (uconsPay_tok (hlc := hlc) cn γ T Rd n xs) $$ Hr Hpa Hd
+    · iapply (uconsPay_tok cn γ T Rd n xs) $$ Hr Hpa Hd
     · ileft
       iexact Hc
-  · imod (upos_alloc (hlc := hlc) (GF := GF) 0) with ⟨%γ, Hp, -⟩
+  · imod (upos_alloc (GF := GF) 0) with ⟨%γ, Hp, -⟩
     imodintro
     iexists γ, 0
     iframe Hp
     isplitr
-    · iapply (uconsPay_taint (hlc := hlc) cn γ T Rd xs) $$ HT
+    · iapply (uconsPay_taint cn γ T Rd xs) $$ HT
     · iright
       iexact HT
 
 /-- **Rocq `uinit_redeem`**: the redeem at the wait that reaps the shell. -/
 theorem uinitRedeem (cn : ConsNames) (γ : GName) (T : IProp GF) (Rd : Nat → IProp GF)
-    (xs : Int) : ⊢ uconsPay (hlc := hlc) cn γ T Rd xs -∗ uinitTok cn T Rd := by
+    (xs : Int) : ⊢ uconsPay cn γ T Rd xs -∗ uinitTok cn T Rd := by
   unfold uinitTok
   exact uconsPay_redeem cn γ T Rd xs
 

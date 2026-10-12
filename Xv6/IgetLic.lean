@@ -183,7 +183,7 @@ WHY NO COLUMN BOUND IS READ HERE EITHER: the bound the licence needs is
 the target's own slot (`iregLnk`). -/
 
 section Lic
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [IregG GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsBlocksG GF] [FsLinkG GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF] [IregG GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsBlocksG GF] [FsLinkG GF]
 
 /-- THE LICENCE.
 
@@ -277,7 +277,7 @@ end Lic
 (iclaim-ledger.md §2.6, executed as §3.1's RULING A) -/
 
 section Table
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [IregG GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsLinkG GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF] [IregG GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsLinkG GF]
 
 /-- THE LICENCE TABLE.  §2.6 wrote a five-row table -- "at a box the free
 path has frozen, EVERY runtime licence is refutable" -- and increment IIIb
@@ -454,7 +454,7 @@ end Table
 /-! ## 5.  THE `bufL` ROW's BLOCK TRANSPORT (durable-disk 1c-flip step 3) -/
 
 section BufList
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsBlocksG GF] [FsLinkG GF]
 
 /-- THE `bufL` ROW's BLOCK TRANSPORT, ON ITS OWN.  `iname_mintOk` used to
@@ -514,7 +514,7 @@ end BufList
 /-! ## 6.  THE TABLE AS AN ACCESSOR -/
 
 section FreezeOff
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- Rocq's inline `Hcp (islot inum) Hsl; rewrite -ireg_key_split`: the
@@ -543,7 +543,7 @@ licence and the token both come back. -/
 theorem iname_freezeOff [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames) (inodestart nib : Nat)
     (inum : BitVec 32) (l : Ilic) (ph : Frz) (hE : (↑iregN : CoPset) ⊆ E)
     (hin : (inum.toNat : Int) < 16 * (nib : Int)) :
-    ⊢@{IProp GF} iregReg (hlc := hlc) γi γfs inodestart nib -∗
+    ⊢@{IProp GF} iregReg γi γfs inodestart nib -∗
       iname γi γfs inodestart inum l -∗
       ifreeze ph inum.toNat -∗
       |={E}=> (⌜ph = .frzOff⌝ ∗ iname γi γfs inodestart inum l ∗ ifreeze ph inum.toNat) := by

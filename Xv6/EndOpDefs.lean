@@ -127,7 +127,7 @@ cells only on the arms that clobber them (`+0x68`, the panic, and `+0x9e`,
 the commit), and the cell at offset 0 is never touched at all. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- The four cells saved by the prologue. -/
 def eoFrame4 (sp ra s0 s1 s2 : BitVec 64) : IProp GF := iprop%
@@ -384,7 +384,7 @@ PEELS one entry at a time.  Both rows are index-free, so `List.range_succ`
 and `bigSepL_append` do all the work. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- An INDEXED row over a list, read as a `List.range` row: the values are
 forgotten and only the position survives. -/
@@ -566,7 +566,7 @@ theorem eo_cov_perm : ∀ (l c : List Nat), c.Nodup → l.Nodup → (∀ x ∈ l
     exact ⟨r, hperm.trans (List.Perm.cons x hr)⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsBlocksG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsBlocksG GF]
 
 /-- **The pin halves, split along the write set and rejoined ALL FALSE**
 (Rocq's `eo_cov_split` + `eo_cov_join`, as one accessor). -/
@@ -614,7 +614,7 @@ on-disk header away from clean and back, so it cannot ride a bundle held
 across `write_head`. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 def eoOpen (γb : BcacheNames) (γfs : FsNames) (cov : Std.ExtTreeSet Nat compare)
@@ -679,7 +679,7 @@ theorem eoOpen_of_batch (γb : BcacheNames) (γfs : FsNames)
         -- THE ERA'S MIRROR HALF LEAVES THE CHECKOUT AT A NAME, with its two rows
         ⌜lmHdr M0 logstart = (0, [])⌝ ∗
         ⌜logMirrorTieBody M0 L cov logstart (W.map (fun w => w.toNat))⌝ ∗
-        logMirrorHalf (hlc := hlc) M0 ∗
+        logMirrorHalf M0 ∗
         eoOpen γb γfs cov logstart n W L D eoNullLw 0 := by
   unfold logStateAt eoOpen
   iintro ⟨%W, %L, %D, %M0, %h1, %h2, %h3, %h4, Hn, Hblk, Hjunk, HL, HD, Hd, Hhdr, Hsl, Hpool,
@@ -721,7 +721,7 @@ theorem eoOpen_to_batch (γb : BcacheNames) (γfs : FsNames)
     (Lw : Nat → List (BitVec 8)) (t : Nat) (ht : t ≤ LOGBLOCKS) (pend : Nat → Prop)
     (M : LogMirror) (hMhdr : lmHdr M logstart = (0, []))
     (hMtie : logMirrorTieBody M L cov logstart []) :
-    logMirrorHalf (hlc := hlc) M ⊢ eoOpen (GF := GF) γb γfs cov logstart 0 [] L D Lw t -∗
+    logMirrorHalf M ⊢ eoOpen (GF := GF) γb γfs cov logstart 0 [] L D Lw t -∗
       logStateAt γb γfs cov logstart 0 [] pend curCtx := by
   unfold logStateAt eoOpen
   iintro Hmir ⟨Hn, Hblk, Hjunk, HL, HD, Hd, Hhdr, Hdone, Hrest, Hpool⟩
@@ -807,7 +807,7 @@ end
 /-! ## The lock's payload, and the caller's continuation -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 /-- The caller's continuation, at whichever hart the thread ends on.
@@ -837,7 +837,7 @@ def eoBatch (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     ⌜∀ i e, PartialMap.get? om i = some e → ∀ x ∈ e.set, x ∈ LB⌝ ∗
     ⌜∀ i p, PartialMap.get? X i = some p → p.1 = E → p.2 ∈ LB⌝ ∗
     ⌜out = 0 → n = 0⌝ ∗
-    eraSyncTok (hlc := hlc) (GF := GF) ∗
+    eraSyncTok (GF := GF) ∗
     logStateAt γb γfs cov ls n LB (opPending om) ξ
 
 theorem eoBatch_elim (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
@@ -849,7 +849,7 @@ theorem eoBatch_elim (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
         ⌜∀ i e, PartialMap.get? om i = some e → ∀ x ∈ e.set, x ∈ LB⌝ ∗
         ⌜∀ i p, PartialMap.get? X i = some p → p.1 = E → p.2 ∈ LB⌝ ∗
         ⌜out = 0 → n = 0⌝ ∗
-        eraSyncTok (hlc := hlc) (GF := GF) ∗
+        eraSyncTok (GF := GF) ∗
         logStateAt γb γfs cov ls n LB (opPending om) ξ := by
   unfold eoBatch; iintro H; iexact H
 
@@ -861,7 +861,7 @@ theorem eoBatch_intro (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (h2 : ∀ i e, PartialMap.get? om i = some e → ∀ x ∈ e.set, x ∈ LB)
     (h3 : ∀ i p, PartialMap.get? X i = some p → p.1 = E → p.2 ∈ LB)
     (hq : out = 0 → n = 0) :
-    eraSyncTok (hlc := hlc) (GF := GF) ∗ logStateAt (GF := GF) γb γfs cov ls n LB pend ξ ⊢
+    eraSyncTok (GF := GF) ∗ logStateAt (GF := GF) γb γfs cov ls n LB pend ξ ⊢
       eoBatch γ γb γfs cov ls om E X out ξ := by
   have hpend : logStateAt (GF := GF) γb γfs cov ls n LB (opPending om) ξ =
       logStateAt γb γfs cov ls n LB pend ξ := rfl
@@ -899,9 +899,9 @@ theorem eo_res_elim (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
       ⌜∀ i p, PartialMap.get? X i = some p → p.1 ≤ E⌝ ∗
       ⌜∀ i, nxt ≤ i → PartialMap.get? T i = none⌝ ∗
       ⌜(FiniteMap.toList T).length = (FiniteMap.toList om).length⌝ ∗
-      ((wordAtN ξ lCmt 4 (DFrac.own 1) (0#32 : BitVec 32) ∗ logHelp (hlc := hlc) γ nc out false ∗
+      ((wordAtN ξ lCmt 4 (DFrac.own 1) (0#32 : BitVec 32) ∗ logHelp γ nc out false ∗
           eoBatch γ γb γfs cov ls om E X out ξ) ∨
-        (wordAtN ξ lCmt 4 (DFrac.own 1) (1#32 : BitVec 32) ∗ logHelp (hlc := hlc) γ nc out true ∗
+        (wordAtN ξ lCmt 4 (DFrac.own 1) (1#32 : BitVec 32) ∗ logHelp γ nc out true ∗
           ⌜out = 0⌝)) := by
   unfold logResAt eoBatch
   iintro ⟨%out, %cmt, %nc, %om, %E, %X, %T, %nxo, %nxt, %nxl,
@@ -960,7 +960,7 @@ theorem eo_res_intro (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     wordAtN ξ lCmt 4 (DFrac.own 1) (if cmt then 1#32 else 0#32) ∗
     wordAtN ξ lNcommit 4 (DFrac.own 1) nc ∗
     (γ.ops ↪●MAP om) ∗ logEpochAuth γ E ∗ logRegAuth γ X ∗ logTxAuth γ T ∗
-    logHelp (hlc := hlc) γ nc out cmt ∗
+    logHelp γ nc out cmt ∗
     (if cmt then iprop(emp) else eoBatch γ γb γfs cov ls om E X out ξ)
     ⊢ logResAt (GF := GF) γ γb γfs cov ls ξ := by
   unfold logResAt eoBatch
@@ -1007,7 +1007,7 @@ theorem eo_res_intro_f (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     wordAtN ξ lCmt 4 (DFrac.own 1) (0#32 : BitVec 32) ∗
     wordAtN ξ lNcommit 4 (DFrac.own 1) nc ∗
     (γ.ops ↪●MAP om) ∗ logEpochAuth γ E ∗ logRegAuth γ X ∗ logTxAuth γ T ∗
-    logHelp (hlc := hlc) γ nc out false ∗
+    logHelp γ nc out false ∗
     eoBatch γ γb γfs cov ls om E X out ξ
     ⊢ logResAt (GF := GF) γ γb γfs cov ls ξ :=
   eo_res_intro γ γb γfs cov ls ξ out false nc om E X T nxo nxt nxl hlen
@@ -1033,7 +1033,7 @@ theorem eo_res_intro_t (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     wordAtN ξ lCmt 4 (DFrac.own 1) (1#32 : BitVec 32) ∗
     wordAtN ξ lNcommit 4 (DFrac.own 1) nc ∗
     (γ.ops ↪●MAP om) ∗ logEpochAuth γ E ∗ logRegAuth γ X ∗ logTxAuth γ T ∗
-    logHelp (hlc := hlc) γ nc out true
+    logHelp γ nc out true
     ⊢ logResAt (GF := GF) γ γb γfs cov ls ξ := by
   iintro ⟨Hout, Hcmt, Hnc, Hops, Hep, Hreg, Htx, Hhelp⟩
   iapply (eo_res_intro γ γb γfs cov ls ξ out true nc om E X T nxo nxt nxl hlen

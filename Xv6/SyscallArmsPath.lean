@@ -163,7 +163,7 @@ theorem syscPath_imgLazy (P : UPtd) (sz : BitVec 64) (M : Nat → List (BitVec 8
 /-! ## §2 The deposit laws (§4 template; deviation 1) -/
 
 section Laws
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [FsBlocksG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsTopG GF] [FsBlocksG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CtokG GF] [SG : UexecSG GF]
 open UexecSG
 
@@ -172,13 +172,13 @@ chdir's caller bundle at the key's cwd, and chdir's RECEIPT at the resume
 cwd pays the post. -/
 def SyscDepChdir : Prop :=
   ∀ (f : sfam GF) (W : Uvis),
-    sbundleAt (uslot (hlc := hlc)) 9 f W ⊢
+    sbundleAt (uslot) 9 f W ⊢
       ∃ (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)),
-        (∀ rt : Nat, chdirAuPre (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd P Pmiss Fo) ∗
+        (∀ rt : Nat, chdirAuPre (fsGammaL fscFs) fscFs rt W.cwd P Pmiss Fo) ∗
         (∀ (rt : Nat) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat)
             (cs' : ExtTreeSet GName compare),
-          chdirReceipt (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd P Pmiss Fo r cw' -∗
-            spostAt (uslot (hlc := hlc)) 9 f W r M' fdv' cw' cs')
+          chdirReceipt (fsGammaL fscFs) fscFs rt W.cwd P Pmiss Fo r cw' -∗
+            spostAt (uslot) 9 f W r M' fdv' cw' cs')
 
 /-- **Rocq `sysc_dep_unlink` + `sysc_out_unlink`** (deviation 2: the image
 guard; TL-3C made unlink's bundle path-fixed): branch 18 is unlink's caller
@@ -186,35 +186,35 @@ bundle at the key's cwd and the path at argument 0; unlink's arms
 (ghost-free) at the view it fired at pay the post. -/
 def SyscDepUnlink : Prop :=
   ∀ (f : sfam GF) (W : Uvis),
-    sbundleAt (uslot (hlc := hlc)) 18 f W ⊢
+    sbundleAt (uslot) 18 f W ⊢
       ∃ (P Pmiss : Nat → Nat → IProp GF)
         (Fent : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
         (Ftgt : Pfam GF (Aview → Nat → IProp GF))
         (Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
         (Fmiss : Pfam GF (Aview → Nat → Fname → IProp GF)),
         (∀ Mv : Nat → List (BitVec 8), ⌜∀ (a : Nat) (b : BitVec 8), W.M a = some b → umemByte Mv a = b⌝ -∗ ∀ rt : Nat,
-          unlinkAuAt (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
+          unlinkAuAt (fsGammaL fscFs) fscFs rt W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
             P Pmiss Fent Ftgt Fex Fmiss) ∗
         (∀ (Mv : Nat → List (BitVec 8)) (rt : Nat) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState)
             (cw' : Nat) (cs' : ExtTreeSet GName compare),
           ⌜∀ (a : Nat) (b : BitVec 8), W.M a = some b → umemByte Mv a = b⌝ -∗
-          unlinkArms (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
+          unlinkArms (fsGammaL fscFs) fscFs rt W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
               P Pmiss Fent Ftgt Fex Fmiss r -∗
-            spostAt (uslot (hlc := hlc)) 18 f W r M' fdv' cw' cs')
+            spostAt (uslot) 18 f W r M' fdv' cw' cs')
 
 /-- **Rocq `sysc_dep_link` + `sysc_out_link`**: branch 19 is link's three
 commits; link's arms pay the post. -/
 def SyscDepLink : Prop :=
   ∀ (f : sfam GF) (W : Uvis),
-    sbundleAt (uslot (hlc := hlc)) 19 f W ⊢
+    sbundleAt (uslot) 19 f W ⊢
       ∃ (Ftgt : Pfam GF (Aview → Nat → Anode → IProp GF))
         (Fent : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
         (Funt : Pfam GF (Aview → Nat → IProp GF)),
-        linkCommits (hlc := hlc) (fsGammaL fscFs) Ftgt Fent Funt ∗
+        linkCommits (fsGammaL fscFs) Ftgt Fent Funt ∗
         (∀ (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat)
             (cs' : ExtTreeSet GName compare),
-          linkArms (hlc := hlc) (fsGammaL fscFs) Ftgt Fent Funt r -∗
-            spostAt (uslot (hlc := hlc)) 19 f W r M' fdv' cw' cs')
+          linkArms (fsGammaL fscFs) Ftgt Fent Funt r -∗
+            spostAt (uslot) 19 f W r M' fdv' cw' cs')
 
 /-- **Rocq `sysc_dep_mkdir` + `sysc_out_mkdir`** (deviation 2: the image
 guard; TL-3C made mkdir's bundle path-fixed): branch 20 is mkdir's caller
@@ -222,20 +222,20 @@ bundle at the key's cwd and the path at argument 0; mkdir's arms at the view
 it fired at pay the post. -/
 def SyscDepMkdir : Prop :=
   ∀ (f : sfam GF) (W : Uvis),
-    sbundleAt (uslot (hlc := hlc)) 20 f W ⊢
+    sbundleAt (uslot) 20 f W ⊢
       ∃ (P Pmiss : Nat → Nat → IProp GF) (Farm : Pfam GF (Aview → Nat → IProp GF))
         (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
         (Fun : Pfam GF (Aview → Nat → IProp GF))
         (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)),
         (∀ Mv : Nat → List (BitVec 8), ⌜∀ (a : Nat) (b : BitVec 8), W.M a = some b → umemByte Mv a = b⌝ -∗ ∀ rt : Nat,
-          mkdirAuAt (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
+          mkdirAuAt (fsGammaL fscFs) fscFs rt W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
             P Pmiss Farm Fdots Fun Fok Fex) ∗
         (∀ (Mv : Nat → List (BitVec 8)) (rt : Nat) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState)
             (cw' : Nat) (cs' : ExtTreeSet GName compare),
           ⌜∀ (a : Nat) (b : BitVec 8), W.M a = some b → umemByte Mv a = b⌝ -∗
-          mkdirArms (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
+          mkdirArms (fsGammaL fscFs) fscFs rt W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
               P Pmiss Farm Fdots Fun Fok Fex r -∗
-            spostAt (uslot (hlc := hlc)) 20 f W r M' fdv' cw' cs')
+            spostAt (uslot) 20 f W r M' fdv' cw' cs')
 
 /-- **Rocq `sysc_dep_mknod` + `sysc_out_mknod`** (deviation 2: the image
 guard): branch 17 is mknod's caller bundle at EVERY page view `Mv` agreeing
@@ -244,19 +244,19 @@ device numbers at arguments 1/2; mknod's arms at the view it fired at pay
 the post. -/
 def SyscDepMknod : Prop :=
   ∀ (f : sfam GF) (W : Uvis),
-    sbundleAt (uslot (hlc := hlc)) 17 f W ⊢
+    sbundleAt (uslot) 17 f W ⊢
       ∃ (P Pmiss : Nat → Nat → IProp GF) (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
         (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)),
         (∀ Mv : Nat → List (BitVec 8), ⌜∀ (a : Nat) (b : BitVec 8), W.M a = some b → umemByte Mv a = b⌝ -∗ ∀ rt : Nat,
-          mknodAuAt (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
+          mknodAuAt (fsGammaL fscFs) fscFs rt W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
             (devArg (tfW W.tf (tfArgIdx 1))) (devArg (tfW W.tf (tfArgIdx 2))) P Pmiss Farm Fun Fok Fex) ∗
         (∀ (Mv : Nat → List (BitVec 8)) (rt : Nat) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState)
             (cw' : Nat) (cs' : ExtTreeSet GName compare),
           ⌜∀ (a : Nat) (b : BitVec 8), W.M a = some b → umemByte Mv a = b⌝ -∗
-          mknodArms (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
+          mknodArms (fsGammaL fscFs) fscFs rt W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
               (devArg (tfW W.tf (tfArgIdx 1))) (devArg (tfW W.tf (tfArgIdx 2))) P Pmiss Farm Fun Fok
               Fex r -∗
-            spostAt (uslot (hlc := hlc)) 17 f W r M' fdv' cw' cs')
+            spostAt (uslot) 17 f W r M' fdv' cw' cs')
 
 variable [OffboxG GF] in
 /-- **Rocq `sysc_dep_open` + `sysc_out_open`** (deviation 2: the image
@@ -269,36 +269,36 @@ bundle names it, and the kernel publishes at it.  (The receipt carries the
 handed half `foffPub`, hence the offset-box camera here.) -/
 def SyscDepOpen : Prop :=
   ∀ (f : sfam GF) (W : Uvis),
-    sbundleAt (uslot (hlc := hlc)) 15 f W ⊢
+    sbundleAt (uslot) 15 f W ⊢
       ∃ (omo : OffMode) (P Pmiss : Nat → Nat → IProp GF) (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
         (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
         (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
         (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)),
         (∀ Mv : Nat → List (BitVec 8), ⌜∀ (a : Nat) (b : BitVec 8), W.M a = some b → umemByte Mv a = b⌝ -∗ ∀ rt : Nat,
-          openIn (hlc := hlc) (fsGammaL fscFs) fscFs rt W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
+          openIn (fsGammaL fscFs) fscFs rt W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
             (tfW W.tf (tfArgIdx 1)) P Pmiss Farm Fun Fok Fex Fo Ft) ∗
         (∀ (Mv : Nat → List (BitVec 8)) (rt : Nat) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState)
             (cw' : Nat) (cs' : ExtTreeSet GName compare),
           ⌜∀ (a : Nat) (b : BitVec 8), W.M a = some b → umemByte Mv a = b⌝ -∗
-          openReceipt (hlc := hlc) omo (fsGammaL fscFs) fscFs rt W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
+          openReceipt omo (fsGammaL fscFs) fscFs rt W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
               (tfW W.tf (tfArgIdx 1)) P Pmiss Farm Fun Fok Fex Fo Ft W.fd r fdv' -∗
-            spostAt (uslot (hlc := hlc)) 15 f W r M' fdv' cw' cs')
+            spostAt (uslot) 15 f W r M' fdv' cw' cs')
 
 end Laws
 
 /-! ## §3 The arms -/
 
 section Arms
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
 
 set_option maxHeartbeats 4000000 in
 /-- **Rocq `sysc_arm_chdir`** (table index 9). -/
-theorem syscall_arm_chdir (SC : SYSCHDIR) (hdep : SyscDepChdir (hlc := hlc) (GF := GF))
+theorem syscall_arm_chdir (SC : SYSCHDIR) (hdep : SyscDepChdir (GF := GF))
     (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -320,13 +320,13 @@ theorem syscall_arm_chdir (SC : SYSCHDIR) (hdep : SyscDepChdir (hlc := hlc) (GF 
   ihave Hdep := syscSysIn_at f V M sts gn cs pid 9 hn9 (by decide) $$ Hsin
   icases hdep f (uvisOf V M sts gn cs pid) $$ Hdep with ⟨%P, %Pmiss, %Fo, Hau, Hout⟩
   ispecialize Hau $$ %V.rti
-  ihave Hau := (show chdirAuPre (hlc := hlc) (fsGammaL fscFs) fscFs V.rti (uvisOf V M sts gn cs pid).cwd P
+  ihave Hau := (show chdirAuPre (fsGammaL fscFs) fscFs V.rti (uvisOf V M sts gn cs pid).cwd P
       Pmiss Fo ⊢ chdirAuPre (fsGammaL fscFs) fscFs V.rti V.cwi P Pmiss Fo from .rfl) $$ Hau
   ihave #Hpe := syscallEnv_panic PT Γ γ $$ Henv
   ihave #Hrdy := syscallEnv_fsReady PT Γ γ $$ Henv
   icases (show irefSlots (GF := GF) IREFSPARE ⊢ irefSlots 2 ∗ irefSlots 2 from
     irefSlots_split 2 2) $$ Hir with ⟨Hir2, Hirk⟩
-  have hC := SC.wp_sys_chdir_eb (hlc := hlc) (GF := GF) Γ cpu
+  have hC := SC.wp_sys_chdir_eb (GF := GF) Γ cpu
     (((k.withSpie spie spp).pushed 4).withRegs R) γ j pid V M (tfW V.tf (tfArgIdx 0)) P Pmiss Fo hj
     ?hp ?ht ?hn ?hK (syscPath_arg V 0 hl (by decide))
   case hp => k_norm_g; exact hproc
@@ -342,7 +342,7 @@ theorem syscall_arm_chdir (SC : SYSCHDIR) (hdep : SyscDepChdir (hlc := hlc) (GF 
   iintro %c %_
   unfold sysChdirK
   iintro %spie2 %spp2 %R2 %P' %k' %hcs %hext %hk' Hk Hpc Hte Hce Hbs Hir2 Harms
-  icases chdirArms_split (hlc := hlc) (fsGammaL fscFs) fscFs γ (procAddr j) pid V.rti V.cwi P Pmiss Fo
+  icases chdirArms_split (fsGammaL fscFs) fscFs γ (procAddr j) pid V.rti V.cwi P Pmiss Fo
     { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) (R2 10#5) rfl $$ Harms with
     ⟨%V1, %hdisj, Hpriv, Hrc⟩
   ihave Hir := (show irefSlots (GF := GF) 2 ∗ irefSlots 2 ⊢ irefSlots IREFSPARE from
@@ -393,9 +393,9 @@ theorem syscall_arm_chdir (SC : SYSCHDIR) (hdep : SyscDepChdir (hlc := hlc) (GF 
 
 set_option maxHeartbeats 4000000 in
 /-- **Rocq `sysc_arm_unlink`** (table index 18). -/
-theorem syscall_arm_unlink (SU : SYSUNLINK) (hdep : SyscDepUnlink (hlc := hlc) (GF := GF))
+theorem syscall_arm_unlink (SU : SYSUNLINK) (hdep : SyscDepUnlink (GF := GF))
     (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -425,7 +425,7 @@ theorem syscall_arm_unlink (SU : SYSUNLINK) (hdep : SyscDepUnlink (hlc := hlc) (
   ihave #Hrdy := syscallEnv_fsReady PT Γ γ $$ Henv
   icases (show irefSlots (GF := GF) IREFSPARE ⊢ irefSlots sysUnlinkSlots ∗ irefSlots 2 from
     irefSlots_split 2 2) $$ Hir with ⟨Hir2, Hirk⟩
-  have hC := SU.wp_sys_unlink_eb (hlc := hlc) (GF := GF) Γ cpu
+  have hC := SU.wp_sys_unlink_eb (GF := GF) Γ cpu
     (((k.withSpie spie spp).pushed 4).withRegs R) γ j pid V M (tfW V.tf (tfArgIdx 0))
     P Pmiss Fent Ftgt Fex Fmiss hj ?hp ?ht ?hn ?hK (syscPath_arg V 0 hl (by decide))
   case hp => k_norm_g; exact hproc
@@ -477,9 +477,9 @@ theorem syscall_arm_unlink (SU : SYSUNLINK) (hdep : SyscDepUnlink (hlc := hlc) (
 
 set_option maxHeartbeats 4000000 in
 /-- **Rocq `sysc_arm_link`** (table index 19). -/
-theorem syscall_arm_link (SL : SYSLINK) (hdep : SyscDepLink (hlc := hlc) (GF := GF))
+theorem syscall_arm_link (SL : SYSLINK) (hdep : SyscDepLink (GF := GF))
     (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -504,7 +504,7 @@ theorem syscall_arm_link (SL : SYSLINK) (hdep : SyscDepLink (hlc := hlc) (GF := 
   ihave #Hrdy := syscallEnv_fsReady PT Γ γ $$ Henv
   icases (show irefSlots (GF := GF) IREFSPARE ⊢ irefSlots sysLinkIrefs ∗ irefSlots 1 from
     irefSlots_split 3 1) $$ Hir with ⟨Hir2, Hirk⟩
-  have hC := SL.wp_sys_link_eb (hlc := hlc) (GF := GF) Γ cpu
+  have hC := SL.wp_sys_link_eb (GF := GF) Γ cpu
     (((k.withSpie spie spp).pushed 4).withRegs R) γ j pid V M (tfW V.tf (tfArgIdx 0))
     (tfW V.tf (tfArgIdx 1)) Ftgt Fent Funt hj ?hp ?ht ?hn ?hK (syscPath_arg V 0 hl (by decide))
     (syscPath_arg V 1 hl (by decide))
@@ -557,9 +557,9 @@ theorem syscall_arm_link (SL : SYSLINK) (hdep : SyscDepLink (hlc := hlc) (GF := 
 
 set_option maxHeartbeats 4000000 in
 /-- **Rocq `sysc_arm_mkdir`** (table index 20). -/
-theorem syscall_arm_mkdir (SM : SYSMKDIR) (hdep : SyscDepMkdir (hlc := hlc) (GF := GF))
+theorem syscall_arm_mkdir (SM : SYSMKDIR) (hdep : SyscDepMkdir (GF := GF))
     (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -587,7 +587,7 @@ theorem syscall_arm_mkdir (SM : SYSMKDIR) (hdep : SyscDepMkdir (hlc := hlc) (GF 
   ihave Hau := Hau $$ %(viewLazy V.upt V.sz M) %(syscPath_imgLazy V.upt V.sz M) %V.rti
   ihave #Hpe := syscallEnv_panic PT Γ γ $$ Henv
   ihave #Hrdy := syscallEnv_fsReady PT Γ γ $$ Henv
-  have hC := SM.wp_sys_mkdir_eb (hlc := hlc) (GF := GF) Γ cpu
+  have hC := SM.wp_sys_mkdir_eb (GF := GF) Γ cpu
     (((k.withSpie spie spp).pushed 4).withRegs R) γ j pid V M (tfW V.tf (tfArgIdx 0)) IREFSPARE
     P Pmiss Farm Fdots Fun Fok Fex hj ?hp ?ht ?hn ?hK (by decide) (syscPath_arg V 0 hl (by decide))
   case hp => k_norm_g; exact hproc
@@ -636,9 +636,9 @@ theorem syscall_arm_mkdir (SM : SYSMKDIR) (hdep : SyscDepMkdir (hlc := hlc) (GF 
 
 set_option maxHeartbeats 4000000 in
 /-- **Rocq `sysc_arm_mknod`** (table index 17). -/
-theorem syscall_arm_mknod (SN : SYSMKNOD) (hdep : SyscDepMknod (hlc := hlc) (GF := GF))
+theorem syscall_arm_mknod (SN : SYSMKNOD) (hdep : SyscDepMknod (GF := GF))
     (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -666,7 +666,7 @@ theorem syscall_arm_mknod (SN : SYSMKNOD) (hdep : SyscDepMknod (hlc := hlc) (GF 
   ihave Hau := Hau $$ %(viewLazy V.upt V.sz M) %(syscPath_imgLazy V.upt V.sz M) %V.rti
   ihave #Hpe := syscallEnv_panic PT Γ γ $$ Henv
   ihave #Hrdy := syscallEnv_fsReady PT Γ γ $$ Henv
-  have hC := SN.wp_sys_mknod_eb (hlc := hlc) (GF := GF) Γ cpu
+  have hC := SN.wp_sys_mknod_eb (GF := GF) Γ cpu
     (((k.withSpie spie spp).pushed 4).withRegs R) γ j pid V M IREFSPARE (tfW V.tf (tfArgIdx 0))
     (tfW V.tf (tfArgIdx 1)) (tfW V.tf (tfArgIdx 2)) P Pmiss Farm Fun Fok Fex hj ?hp ?ht ?hn ?hK
     (by decide) (syscPath_arg V 0 hl (by decide)) (syscPath_arg V 1 hl (by decide))
@@ -794,9 +794,9 @@ theorem syscPath_openFdOk (V V' : ProcPriv) (P' : UPtd) (k' : Nat) (sts sts' : L
 
 set_option maxHeartbeats 4000000 in
 /-- **Rocq `sysc_arm_open`** (table index 15). -/
-theorem syscall_arm_open (SO : SYSOPEN) (hdep : SyscDepOpen (hlc := hlc) (GF := GF))
+theorem syscall_arm_open (SO : SYSOPEN) (hdep : SyscDepOpen (GF := GF))
     (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -828,7 +828,7 @@ theorem syscall_arm_open (SO : SYSOPEN) (hdep : SyscDepOpen (hlc := hlc) (GF := 
   icases syscallEnv_ftable PT Γ γ $$ Henv with ⟨%γl, #Hft⟩
   icases (show fdSlots (GF := GF) FDSPARE ⊢ fdSlot ∗ fdSlots 3 from fdSlots_uncons 3) $$ Hfd with
     ⟨Hfd1, Hfdk⟩
-  have hC := SO.wp_sys_open_eb (hlc := hlc) (GF := GF) omo Γ cpu
+  have hC := SO.wp_sys_open_eb (GF := GF) omo Γ cpu
     (((k.withSpie spie spp).pushed 4).withRegs R) γl γ j IREFSPARE (tfW V.tf (tfArgIdx 0))
     (tfW V.tf (tfArgIdx 1)) pid V M sts P Pmiss Farm Fun Fok Fex Fo Ft hj ?hp ?ht ?hn ?hK
     (by decide) (syscPath_arg V 0 hl (by decide)) (syscPath_arg V 1 hl (by decide))
@@ -845,7 +845,7 @@ theorem syscall_arm_open (SO : SYSOPEN) (hdep : SyscDepOpen (hlc := hlc) (GF := 
   iintro %c %_
   unfold sysOpenK
   iintro %spie2 %spp2 %R2 %P' %k' %hcs %hext %hk' Hk Hpc Hte Hce Hbs Hir Harms
-  icases openArms_split (hlc := hlc) omo (fsGammaL fscFs) fscFs V.rti V.cwi γ (procAddr j) pid
+  icases openArms_split omo (fsGammaL fscFs) fscFs V.rti V.cwi γ (procAddr j) pid
     (viewLazy V.upt V.sz M) (tfW V.tf (tfArgIdx 0)).toNat (tfW V.tf (tfArgIdx 1)) P Pmiss Farm Fun
     Fok Fex Fo Ft sts { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) (R2 10#5) $$ Harms with
     ⟨%V1, %sts', %hrow, Hpriv, Hfr, Hfd1, Hrc⟩

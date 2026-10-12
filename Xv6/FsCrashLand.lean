@@ -145,7 +145,7 @@ theorem fsClear_recWf (cov : ExtTreeSet Nat compare) (ls : Nat) (M0 : LogMirror)
   rw [fsRestrict_lookup, if_pos hbhome, hv]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
   [FsLinkG GF] [FsTopG GF]
 
 /-! ## The shared arm opening -/
@@ -155,21 +155,21 @@ re-indexed at the fixed layer's names through the seam equations, the squeeze
 runs, and the arm's closing wand comes back at those names. -/
 theorem fsLand_arm (γs : FsCrashNames) (cov : ExtTreeSet Nat compare) (ls : Nat)
     (dk : Nat → BitVec 8) (n : Nat) (M0 : LogMirror)
-    (hsw : γs.swap = MachFixedGS.swapName (hlc := hlc) (GF := GF))
-    (hrg : γs.reg = MachFixedGS.registryName (hlc := hlc) (GF := GF))
-    (hstn : γs.start = MachFixedGS.startName (hlc := hlc) (GF := GF))
-    (hn : n = genId (hlc := hlc) (GF := GF) + 1) :
-    eraRegistered (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF))
-      (MachGS.era (hlc := hlc) (GF := GF)) ⊢
-      swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
-      startAuth (hlc := hlc) (GF := GF) n -∗ logMirrorHalf (hlc := hlc) M0 -∗
+    (hsw : γs.swap = MachFixedGS.swapName (GF := GF))
+    (hrg : γs.reg = MachFixedGS.registryName (GF := GF))
+    (hstn : γs.start = MachFixedGS.startName (GF := GF))
+    (hn : n = genId (GF := GF) + 1) :
+    eraRegistered (GF := GF) (genId (GF := GF))
+      (MachGS.era (GF := GF)) ⊢
+      swapLb (GF := GF) (genId (GF := GF) + 1) -∗
+      startAuth (GF := GF) n -∗ logMirrorHalf M0 -∗
       fsArm γs cov ls dk -∗
-        ⌜logMirrorOk M0 (fsBlocks dk) cov ls⌝ ∗ startAuth (hlc := hlc) n ∗
+        ⌜logMirrorOk M0 (fsBlocks dk) cov ls⌝ ∗ startAuth n ∗
         (∀ (dk' : Nat → BitVec 8) (M' : LogMirror),
           ⌜logMirrorOk M' (fsBlocks dk') cov ls⌝ ==∗
-            fsArm γs cov ls dk' ∗ logMirrorHalf (hlc := hlc) M') := by
-  have h := fsArm_acc (GF := GF) γs cov ls dk (genId (hlc := hlc) (GF := GF))
-    (MachGS.era (hlc := hlc) (GF := GF)) n M0 hn
+            fsArm γs cov ls dk' ∗ logMirrorHalf M') := by
+  have h := fsArm_acc (GF := GF) γs cov ls dk (genId (GF := GF))
+    (MachGS.era (GF := GF)) n M0 hn
   unfold fsEraReg at h
   rw [hsw, hrg, hstn] at h
   unfold eraRegistered swapLb startAuth logMirrorHalf
@@ -185,13 +185,13 @@ theorem fsV_sector0_rec (G : GName → IProp GF) (cov : ExtTreeSet Nat compare) 
       fsRecWf r (fsBlocks dk) cov ls →
       fsRecWf r (fsBlocks (Virtio.diskWrite dk (blk * BSIZE + 0) (bs.take Virtio.sectorSize)))
         cov ls) :
-    eraRegistered (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF))
-      (MachGS.era (hlc := hlc) (GF := GF)) ⊢
-      swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
-      ▷ logMirrorHalf (hlc := hlc) M0 -∗
-      fsRecPermit (hlc := hlc) G cov ls (genId (hlc := hlc) (GF := GF))
+    eraRegistered (GF := GF) (genId (GF := GF))
+      (MachGS.era (GF := GF)) ⊢
+      swapLb (GF := GF) (genId (GF := GF) + 1) -∗
+      ▷ logMirrorHalf M0 -∗
+      fsRecPermit G cov ls (genId (GF := GF))
         (some (blk * BSIZE + 0, bs.take Virtio.sectorSize))
-        iprop(logMirrorHalf (hlc := hlc) (lmUpd M0 blk (blkSec0 (M0.view blk) bs)) ∗
+        iprop(logMirrorHalf (lmUpd M0 blk (blkSec0 (M0.view blk) bs)) ∗
           ⌜(M0.view blk).length = BSIZE⌝) := by
   have hfit : 0 + (bs.take Virtio.sectorSize).length ≤ BSIZE := by
     rw [sector0_len bs hlen, bsize_two_sectors]; omega
@@ -237,14 +237,14 @@ theorem fsV_sector1_rec (G : GName → IProp GF) (cov : ExtTreeSet Nat compare) 
       fsRecWf r (fsBlocks dk) cov ls →
       fsRecWf r (fsBlocks (Virtio.diskWrite dk (blk * BSIZE + Virtio.sectorSize)
         ((bs.drop Virtio.sectorSize).take Virtio.sectorSize))) cov ls) :
-    eraRegistered (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF))
-      (MachGS.era (hlc := hlc) (GF := GF)) ⊢
-      swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
-      ▷ logMirrorHalf (hlc := hlc) M0 -∗
-      fsRecPermit (hlc := hlc) G cov ls (genId (hlc := hlc) (GF := GF))
+    eraRegistered (GF := GF) (genId (GF := GF))
+      (MachGS.era (GF := GF)) ⊢
+      swapLb (GF := GF) (genId (GF := GF) + 1) -∗
+      ▷ logMirrorHalf M0 -∗
+      fsRecPermit G cov ls (genId (GF := GF))
         (some (blk * BSIZE + Virtio.sectorSize,
           (bs.drop Virtio.sectorSize).take Virtio.sectorSize))
-        iprop(logMirrorHalf (hlc := hlc) (lmUpd M0 blk (blkSec1 (M0.view blk) bs)) ∗
+        iprop(logMirrorHalf (lmUpd M0 blk (blkSec1 (M0.view blk) bs)) ∗
           ⌜(M0.view blk).length = BSIZE⌝) := by
   have hfit : Virtio.sectorSize + ((bs.drop Virtio.sectorSize).take Virtio.sectorSize).length
       ≤ BSIZE := by
@@ -301,14 +301,14 @@ theorem fsCommitL_sector0_rec (G : GName → IProp GF) (T : IProp GF) (cov : Ext
     (hoff : ∀ b, b ≠ logHdrBno ls → M0.view b = V b)
     (htie : ∀ b, fsHome cov ls b → b ∉ Ws → PartialMap.get? L b = some (V b))
     (hslot : ∀ i b, Ws[i]? = some b → PartialMap.get? L b = some (V (logSlotBno ls i))) :
-    eraRegistered (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF))
-      (MachGS.era (hlc := hlc) (GF := GF)) ⊢
-      swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
-      ▷ logMirrorHalf (hlc := hlc) M0 -∗
-      durPair (hlc := hlc) G T (genId (hlc := hlc) (GF := GF)) (fsRestrict (dvOfD L) (fsHomeList cov ls)) -∗
-      fsRecPermit (hlc := hlc) G cov ls (genId (hlc := hlc) (GF := GF))
+    eraRegistered (GF := GF) (genId (GF := GF))
+      (MachGS.era (GF := GF)) ⊢
+      swapLb (GF := GF) (genId (GF := GF) + 1) -∗
+      ▷ logMirrorHalf M0 -∗
+      durPair G T (genId (GF := GF)) (fsRestrict (dvOfD L) (fsHomeList cov ls)) -∗
+      fsRecPermit G cov ls (genId (GF := GF))
         (some (logHdrBno ls * BSIZE + 0, bs.take Virtio.sectorSize))
-        iprop(logMirrorHalf (hlc := hlc)
+        iprop(logMirrorHalf
             (lmUpd M0 (logHdrBno ls) (blkSec0 (M0.view (logHdrBno ls)) bs)) ∗ T ∗
           ⌜(M0.view (logHdrBno ls)).length = BSIZE⌝) := by
   have hfit : 0 + (bs.take Virtio.sectorSize).length ≤ BSIZE := by
@@ -336,7 +336,7 @@ theorem fsCommitL_sector0_rec (G : GName → IProp GF) (T : IProp GF) (cov : Ext
     rw [← hnew]; exact logMirrorOk_upd_sector M0 dk cov ls (logHdrBno ls) 0 _ hfit hok
   -- THE SNAPSHOT STEPS: the old copy dropped, the old guest MERGED into the
   -- new one, the token back
-  imod dsnapStep_merge G T (genId (hlc := hlc) (GF := GF)) gt r.frD
+  imod dsnapStep_merge G T (genId (GF := GF)) gt r.frD
     (fsRestrict (dvOfD L) (fsHomeList cov ls)) n hn1 $$ Hepoch Hdur Hsa HG
     with ⟨Hpair, HT, Hsa⟩
   icases Hpair with ⟨%gt', Hdur, HG⟩
@@ -369,13 +369,13 @@ theorem fsClearV_sector0_rec (G : GName → IProp GF) (cov : ExtTreeSet Nat comp
     (bs : List (BitVec 8)) (hlen : bs.length = BSIZE) (hn0 : hdrN bs = 0)
     (hM0 : lmHdr M0 ls = (nn, Ws)) (hoff : ∀ b, b ≠ logHdrBno ls → M0.view b = V b)
     (hcaught : ∀ j b, Ws[j]? = some b → V b = V (logSlotBno ls j)) :
-    eraRegistered (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF))
-      (MachGS.era (hlc := hlc) (GF := GF)) ⊢
-      swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
-      ▷ logMirrorHalf (hlc := hlc) M0 -∗
-      fsRecPermit (hlc := hlc) G cov ls (genId (hlc := hlc) (GF := GF))
+    eraRegistered (GF := GF) (genId (GF := GF))
+      (MachGS.era (GF := GF)) ⊢
+      swapLb (GF := GF) (genId (GF := GF) + 1) -∗
+      ▷ logMirrorHalf M0 -∗
+      fsRecPermit G cov ls (genId (GF := GF))
         (some (logHdrBno ls * BSIZE + 0, bs.take Virtio.sectorSize))
-        iprop(logMirrorHalf (hlc := hlc)
+        iprop(logMirrorHalf
             (lmUpd M0 (logHdrBno ls) (blkSec0 (M0.view (logHdrBno ls)) bs)) ∗
           ⌜(M0.view (logHdrBno ls)).length = BSIZE⌝) :=
   fsV_sector0_rec G cov ls (logHdrBno ls) bs M0 hlen (logHdr_in_ext cov ls)

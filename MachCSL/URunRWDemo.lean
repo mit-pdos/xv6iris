@@ -242,7 +242,7 @@ theorem urwDemo_ld (orc : UOrc) (rs : RegFile) (pg : BitVec 12 → BitVec 8) (rv
 /-! ## The Iris side: one `swp_runRW` per fact -/
 
 section iris
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- The RTYPE walk on the two-list footprint of the instruction. -/
 theorem urwDemo_addL (orc : UOrc) (rs : RegFile) (mm : BMap) (rv : Bool) :

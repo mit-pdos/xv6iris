@@ -21,7 +21,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-- Fresh allocator ghosts: the client tracks a count of `0`, the allocator
 holds its half and the empty ledger. -/

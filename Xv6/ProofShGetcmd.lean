@@ -42,7 +42,7 @@ theorem ushGetcmd_retval : ∀ b : BitVec 8,
       if b = 0#8 then BitVec.ofInt 64 (-1) else 0#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -53,8 +53,8 @@ theorem ushGetcmd_rtypew (UL : UK_LEAVES) (N : UkNames GF) {C : IProp GF} [Persi
     (y : Nat) (h : CPU) (m : RegMap) (av : Nat) (v : BitVec 64)
     (hv : ukRtypewVal op (m.get rs1) (m.get rs2) = v)
     (hy : x + (if rvc then 2 else 4) = y := by decide) (hns : unotSp rd := by unfold unotSp spIdx; decide) :
-    ⊢ C -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 x) av -∗
-      (∀ h' : CPU, urun (hlc := hlc) N h' (ukWr m rd v) (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗ wpLoop h := by
+    ⊢ C -∗ urun N h m (BitVec.ofNat 64 x) av -∗
+      (∀ h' : CPU, urun N h' (ukWr m rd v) (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗ wpLoop h := by
   iintro #HC Hrun Hk
   ihave #Hi := hi $$ HC
   iapply wp_uk_rtypew UL N h m _ rvc rs2 rs1 rd op av hns $$ Hi Hrun
@@ -65,7 +65,7 @@ theorem ushGetcmd_rtypew (UL : UK_LEAVES) (N : UkNames GF) {C : IProp GF} [Persi
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
@@ -75,9 +75,9 @@ the taint through the flagged deposit; either way the slot comes back at
 the prompt's end. -/
 theorem ushGetcmd_w (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) (X : UshCtx GF) [Persistent X.T]
     (l : List FdState) :
-    ⊢ □ (X.T -∗ shDeps (hlc := hlc)) -∗ ushPromptLaw (hlc := hlc) N X -∗ ushPosb (hlc := hlc) N X l 0 -∗
-      kshW (hlc := hlc) N (BitVec.ofNat 64 2) (BitVec.ofNat 64 shPromptPv) 2 (ushStd N X l)
-        iprop(ushStd N X l ∗ ushPosb (hlc := hlc) N X l 2) := by
+    ⊢ □ (X.T -∗ shDeps) -∗ ushPromptLaw N X -∗ ushPosb N X l 0 -∗
+      kshW N (BitVec.ofNat 64 2) (BitVec.ofNat 64 shPromptPv) 2 (ushStd N X l)
+        iprop(ushStd N X l ∗ ushPosb N X l 2) := by
   iintro #Hdp #Hplaw Hpos
   unfold ushPosb
   icases Hpos with (⟨%I, %hbnd, Hpm, Hwc⟩ | ⟨#HT, Hp⟩)
@@ -104,7 +104,7 @@ abbrev ushGetcmdRs : List (BitVec 5) := [1#5, 8#5, 9#5, 18#5]
 
 /-- **Rocq `wp_ksh_getcmd`**: the whole function. -/
 theorem wp_shGetcmd (UL : UK_LEAVES) (HS : UK_SYS_P) (MS : USH_MEMSET) (SGt : SH_GETS) :
-    wpShGetcmdBody (hlc := hlc) (GF := GF) := by
+    wpShGetcmdBody (GF := GF) := by
   intro N X _ Dsc Dl cn L D HR h m a Nb f l nn ha0 ha1 hNb h31 hfd0
   have hN0 : 0 < Nb := by rw [hNb]; decide
   rw [show User.Sh.Sym.«getcmd» = 0x0 from rfl]

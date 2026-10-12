@@ -50,7 +50,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std Iris.Algebra MachCSL
 
 section IregLinkNz
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- THE OPEN, shared by the accessors: the invariant and the slot at
@@ -59,7 +59,7 @@ back unchanged. -/
 theorem iregLinkNz_open [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames) (inodestart nib : Nat)
     (inum : BitVec 32) (hE : (↑iregN : CoPset) ⊆ E)
     (hin : (inum.toNat : Int) < 16 * (nib : Int)) :
-    ⊢@{IProp GF} iregInv (hlc := hlc) γi γfs inodestart nib -∗
+    ⊢@{IProp GF} iregInv γi γfs inodestart nib -∗
       |={E, E \ ↑iregN}=> ∃ (m : IregMapF Dinode) (ds : List Dinode),
         ⌜PartialMap.get? m (inum.toNat : Int) = some ds[islot inum]!⌝ ∗
         (γi ↪●MAP m) ∗ iregSlot γfs γi inum.toNat ds[islot inum]! ∗
@@ -97,7 +97,7 @@ child, and the two together ARE (D1).  Everything is borrowed. -/
 theorem iregInv_toks_agree [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames)
     (inodestart nib : Nat) (inum : BitVec 32) (dn : Dinode) (v v' : Ity)
     (hE : (↑iregN : CoPset) ⊆ E) (hin : (inum.toNat : Int) < 16 * (nib : Int)) :
-    ⊢@{IProp GF} iregInv (hlc := hlc) γi γfs inodestart nib -∗
+    ⊢@{IProp GF} iregInv γi γfs inodestart nib -∗
       dinodeAt γi inum dn -∗
       FsStateLink.linkTok (fsGammaL γfs) (inum.toNat : Int) v -∗
       FsStateLink.linkTok (fsGammaL γfs) (inum.toNat : Int) v' -∗
@@ -128,7 +128,7 @@ flush this fact licences. -/
 theorem iregInv_tok_nz [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames)
     (inodestart nib : Nat) (inum : BitVec 32) (dn : Dinode) (v : Ity)
     (hE : (↑iregN : CoPset) ⊆ E) (hin : (inum.toNat : Int) < 16 * (nib : Int)) :
-    ⊢@{IProp GF} iregInv (hlc := hlc) γi γfs inodestart nib -∗
+    ⊢@{IProp GF} iregInv γi γfs inodestart nib -∗
       dinodeAt γi inum dn -∗
       FsStateLink.linkTok (fsGammaL γfs) (inum.toNat : Int) v -∗
       |={E}=> (⌜dn.diNlink.toNat ≠ 0 ∧ iregRegOk dn.diType.toNat v⌝ ∗ dinodeAt γi inum dn ∗

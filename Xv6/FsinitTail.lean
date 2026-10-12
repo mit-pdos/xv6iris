@@ -30,7 +30,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF]
@@ -52,15 +52,15 @@ def fsinitEnv [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) (γl : GName) (pd pav pu
     IProp GF := iprop%
   panicEnv ∗ procsInv Γ ∗ bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
   diskCaps fscDisk fscDlock pd pav pu ∗
-  iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+  iregReg fscIreg fscFs icfgIst icfgNib ∗
   bitmapReg fscFs fscBmapstart fscCov fscLogst fscSize ∗
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗ icSleeplocks fscIc ∗
+  itableInv ∗ icSleeplocks fscIc ∗
   -- the arity-free crash seam and the era certificate (initlog's, end_op's)
-  fsCrashSeam (hlc := hlc) (GF := GF) fscCov fscLogst ∗ genCert (hlc := hlc) (GF := GF)
+  fsCrashSeam (GF := GF) fscCov fscLogst ∗ genCert (GF := GF)
 
 instance fsinitEnv_persistent [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) (γl : GName)
-    (pd pav pu : BitVec 64) : Persistent (fsinitEnv (hlc := hlc) (GF := GF) Γ γl pd pav pu) := by
+    (pd pav pu : BitVec 64) : Persistent (fsinitEnv (GF := GF) Γ γl pd pav pu) := by
   unfold fsinitEnv; infer_instance
 
 /-- **THE CLIENT'S CONTINUATION, NAMED** (Rocq's `fsi_cont`): the `wpNext`
@@ -164,7 +164,7 @@ RECOVERY IS DONE: initlog's seal (`Xv6.logCtx_seal`) upgrades the region
 and the bitmap from their PowerOn forms to the ones ireclaim takes (Rocq's
 `ireg_inv_of` / `bitmap_inv_of`). -/
 theorem fsinit_reclaim (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl : GName) (pd pav pu : BitVec 64)
     (j : Nat) (pidv : BitVec 32) (dqp : DFrac) (vMagic vSize vNblocks vNlog : BitVec 32)
     (bsSb : List (BitVec 8))
@@ -182,7 +182,7 @@ theorem fsinit_reclaim (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
     (p22 : R 22#5 = k.regs 22#5) (p23 : R 23#5 = k.regs 23#5) (p24 : R 24#5 = k.regs 24#5)
     (p25 : R 25#5 = k.regs 25#5) (p26 : R 26#5 = k.regs 26#5) (p27 : R 27#5 = k.regs 27#5) :
     kctx cpu (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cpu (KA.«fsinit» + 0x52#64) ∗
-    fsinitEnv (hlc := hlc) Γ γl pd pav pu ∗
+    fsinitEnv Γ γl pd pav pu ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
@@ -203,7 +203,7 @@ theorem fsinit_reclaim (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- RECOVERY IS DONE: the seal, and the two upgrades
   ihave #Hseal := logCtx_seal _ _ _ _ _ _ $$ Hlc
-  ihave #Hinv := iregInv_of (hlc := hlc) fscIreg fscFs icfgIst icfgNib $$ Hreg Hseal
+  ihave #Hinv := iregInv_of fscIreg fscFs icfgIst icfgNib $$ Hreg Hseal
   ihave #Hbmi := bitmapInv_of fscFs fscBmapstart fscCov fscLogst fscSize $$ Hbreg Hseal
   -- +0x52 c.mv a0,s2 ; +0x54 jal ireclaim
   k_step_e (wp_s_add cpu _ (KA.«fsinit» + 0x52#64) true 10#5 0#5 18#5 (by decide))

@@ -46,8 +46,8 @@ def acquiresleepAddr : BitVec 64 := KA.«acquiresleep»
 def acquiresleepSlots : Nat := 4 + sleepSlots
 
 /-- **WP of `acquiresleep(slk = a0)`**, over the deposit `H` at `q`. -/
-def wp_acquiresleep_gen_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
-    [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+def wp_acquiresleep_gen_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
+    [CurCtx] (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl γ : GName) (R : CtxId → IProp GF) [CtxMorph R] (H : Qp → IProp GF) (q : Qp)
     (j : Nat) (pid : BitVec 32) (dqp : DFrac)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : acquiresleepSlots ≤ k.avail)
@@ -66,8 +66,8 @@ def wp_acquiresleep_gen_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS h
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The untracked instance: nothing deposited, the token at `1`. -/
-def wp_acquiresleep_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
-    [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+def wp_acquiresleep_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
+    [CurCtx] (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl γ : GName) (R : CtxId → IProp GF) [CtxMorph R]
     (j : Nat) (pid : BitVec 32) (dqp : DFrac)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : acquiresleepSlots ≤ k.avail)
@@ -91,8 +91,8 @@ def wp_acquiresleep_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
 entry acquire pays out the bundle the interior sleep needs; the whole
 bundle at `sie = false`).  Depth 0, so no spinlock is held (`KCtx.wf`;
 Rocq's `locks_below lks "sleep lock"`). -/
-def wp_acquiresleep_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
-    [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+def wp_acquiresleep_gen_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
+    [CurCtx] (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl γ : GName) (R : CtxId → IProp GF) [CtxMorph R] (H : Qp → IProp GF) (q : Qp)
     (j : Nat) (pid : BitVec 32) (dqp : DFrac)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : acquiresleepSlots ≤ k.avail)
@@ -111,11 +111,11 @@ def wp_acquiresleep_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachG
 
 /-- The interface of `acquiresleep`. -/
 structure ACQUIRESLEEP : Prop where
-  wp_acquiresleep_gen_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
-    [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+  wp_acquiresleep_gen_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
+    [CurCtx] (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl γ : GName) (R : CtxId → IProp GF) [CtxMorph R] (H : Qp → IProp GF) (q : Qp)
     (j : Nat) (pid : BitVec 32) (dqp : DFrac) hj hproc hK hnoff htier,
-    wp_acquiresleep_gen_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ R H q j pid dqp
+    wp_acquiresleep_gen_eb_body (GF := GF) Γ cpu k γl γ R H q j pid dqp
       hj hproc hK hnoff htier
 
 /-! ## The store-order (`llb`) form (Rocq `wp_acquiresleep_genl_llb_sconf`)
@@ -130,8 +130,8 @@ wants of a reference minted before the sleeplock was taken (Rocq
 `bbox_checkout`'s row (C), i.e. `Xv6.bufEscrow_take`'s `hKt`).
 
 `wp_acquiresleep_gen_eb_body` is the `tl := 0` instance, derived below. -/
-def wp_acquiresleep_gen_llb_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [SleepLockG GF] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+def wp_acquiresleep_gen_llb_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+    [SleepLockG GF] [CurCtx] (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl γ : GName) (R : CtxId → IProp GF) [CtxMorph R] (H : Qp → IProp GF) (q : Qp)
     (j : Nat) (pid : BitVec 32) (dqp : DFrac) (tl : Nat)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : acquiresleepSlots ≤ k.avail)
@@ -149,8 +149,8 @@ def wp_acquiresleep_gen_llb_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [M
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interrupts-off store-order form (the pinned instance, derived). -/
-def wp_acquiresleep_gen_llb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
-    [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+def wp_acquiresleep_gen_llb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
+    [CurCtx] (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl γ : GName) (R : CtxId → IProp GF) [CtxMorph R] (H : Qp → IProp GF) (q : Qp)
     (j : Nat) (pid : BitVec 32) (dqp : DFrac) (tl : Nat)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : acquiresleepSlots ≤ k.avail)
@@ -170,17 +170,17 @@ def wp_acquiresleep_gen_llb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [Mach
 
 /-- The store-order interface of `acquiresleep`. -/
 structure ACQUIRESLEEP_LLB : Prop where
-  wp_acquiresleep_gen_llb_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [SleepLockG GF] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+  wp_acquiresleep_gen_llb_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+    [SleepLockG GF] [CurCtx] (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl γ : GName) (R : CtxId → IProp GF) [CtxMorph R] (H : Qp → IProp GF) (q : Qp)
     (j : Nat) (pid : BitVec 32) (dqp : DFrac) (tl : Nat) hj hproc hK hnoff htier,
-    wp_acquiresleep_gen_llb_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ R H q j pid dqp tl
+    wp_acquiresleep_gen_llb_eb_body (GF := GF) Γ cpu k γl γ R H q j pid dqp tl
       hj hproc hK hnoff htier
 
 /-- `ACQUIRESLEEP` is the `tl := 0` instance. -/
 theorem ACQUIRESLEEP_LLB.toACQUIRESLEEP (A : ACQUIRESLEEP_LLB) : ACQUIRESLEEP := ⟨by
-  intro hlc GF _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γ R _ H q j pid dqp hj hproc hK hnoff htier
-  have h := A.wp_acquiresleep_gen_llb_eb (hlc := hlc) (GF := GF) Γ cpu k γl γ R H q j pid dqp 0
+  intro GF _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γ R _ H q j pid dqp hj hproc hK hnoff htier
+  have h := A.wp_acquiresleep_gen_llb_eb (GF := GF) Γ cpu k γl γ R H q j pid dqp 0
     hj hproc hK hnoff htier
   unfold wp_acquiresleep_gen_llb_eb_body at h
   unfold wp_acquiresleep_gen_eb_body
@@ -211,7 +211,7 @@ caller leaves with `slhAuth γt (some q)` beside its holder token;
 `slh_return_last` turns that back into the zero once `releasesleep`
 returns the share.  THIS IS THE ONLY WAY TO TAKE A SLEEPLOCK WITH A
 SPINLOCK HELD. -/
-def wp_acquiresleep_nb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
+def wp_acquiresleep_nb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
     [CurCtx]
     (cpu : CPU) (k : KCtx) (γl γ γt : GName) (R : CtxId → IProp GF) [CtxMorph R] (q : Qp)
     (pid : BitVec 32) (dqp : DFrac)
@@ -230,10 +230,10 @@ def wp_acquiresleep_nb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hl
 
 /-- The non-blocking interface of `acquiresleep`. -/
 structure ACQUIRESLEEP_NB : Prop where
-  wp_acquiresleep_nb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
+  wp_acquiresleep_nb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
     [CurCtx]
     (cpu : CPU) (k : KCtx) (γl γ γt : GName) (R : CtxId → IProp GF) [CtxMorph R] (q : Qp)
     (pid : BitVec 32) (dqp : DFrac) hK hsie hnoff hs htier,
-    wp_acquiresleep_nb_body (hlc := hlc) (GF := GF) cpu k γl γ γt R q pid dqp hK hsie hnoff hs htier
+    wp_acquiresleep_nb_body (GF := GF) cpu k γl γ γt R q pid dqp hK hsie hnoff hs htier
 
 end Xv6

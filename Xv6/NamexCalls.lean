@@ -37,7 +37,7 @@ open LeanRV64D
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -65,7 +65,7 @@ theorem namex_back_plain (g : GName) (z : Nat) :
 
 set_option maxHeartbeats 8000000 in
 /-- `ilock(ip)` at a namex call site: the tx form, the plain licence, `Tl := 0`. -/
-theorem namex_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU)
+theorem namex_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU)
     (k' : KCtx) (A : NamexArgs) (ik : Nat) (q : Qp) (g : GName) (lo tl : Nat) (inum : BitVec 32)
     (γil γisl : GName)
     (hj : A.j < NPROC) (hproc : k'.proc = procAddr A.j) (hK : ilockSlots ≤ k'.avail)
@@ -74,7 +74,7 @@ theorem namex_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] 
     (hnib : inum.toNat < 16 * icfgNib) (hpd : descPageRw A.pd)
     (ha0 : k'.regs 10#5 = ientry ik) (hle : lo ≤ tl) :
     kctx cpu k' ∗ pcIs cpu KA.«ilock» ∗
-    trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗ namexEnv (hlc := hlc) Γ A ∗
+    trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗ namexEnv Γ A ∗
     isSleeplockGen γil γisl (iLock (ientry ik)) (icSlp fscIc ik) (slhTok (icfgIsl ik)) ∗
     icEscrow fscIc fscFs fscIreg fscCov fscLogst ik ∗ credFloor lo tl ∗
     inodeShrGenlo ik q.half icfgDev inum g lo ∗ runitAny inum.toNat ∗
@@ -95,16 +95,16 @@ theorem namex_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] 
       icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm -∗
       ityShot g dn.diType -∗ ifreezeOff inum.toNat -∗ runitAny inum.toNat -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) cpu := by
-  have h := IL.wp_ilock_tx_eb (hlc := hlc) (GF := GF) Γ cpu k' A.γl A.pd A.pav A.pu A.j γil γisl
+  have h := IL.wp_ilock_tx_eb (GF := GF) Γ cpu k' A.γl A.pd A.pav A.pu A.j γil γisl
     ik q.half g lo tl .plainK inum A.pidv A.dqp A.dqs 0 hj hproc hK hnoff htier hkk hgeom hcov
     hnib hpd ha0 hle
   unfold wp_ilock_tx_eb_body at h
   simp only [ilockAddr] at h
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, #Hslk, #Hesc, #Hfl, Hshr, Hru, Hsi, Hpid, Hbs, Htx, HK⟩
-  icases namexEnv_open (hlc := hlc) Γ A $$ Henv with
+  icases namexEnv_open Γ A $$ Henv with
     ⟨#Hpi, #Hpe, #Hbc, #Hlc, #Hdc, #Hkl, #Hav, #Hit2, #Hiti, #Hslks, #Hinv, #Hop, #Hbmi⟩
   ihave #Hcla := isItable2_claims $$ Hit2
-  ihave #Hl0 := topLbAt_0 (GF := GF) (MachGS.era (hlc := hlc) (GF := GF))
+  ihave #Hl0 := topLbAt_0 (GF := GF) (MachGS.era (GF := GF))
   iapply h
   iframe Hk Hpc Hte Hce Hshr Hsi Hpid Hbs Htx
   iframe #
@@ -135,7 +135,7 @@ def namexIupK (k' : KCtx) (A : NamexArgs) (ncur : Nat) (Scur : List Nat) (wc crz
 set_option maxHeartbeats 8000000 in
 /-- `iunlockput(ip)` at a namex call site: the tx form, `crb := wc`,
 `cru := false`, the caller's `crz`. -/
-theorem namex_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem namex_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k' : KCtx) (A : NamexArgs) (ik : Nat) (q : Qp) (g : GName) (lo tl : Nat)
     (inum : BitVec 32) (dn : Dinode) (bm : Blkmap) (γil γisl : GName) (ncur : Nat)
     (Scur : List Nat) (wc crz : Bool) (e0 : Nat)
@@ -150,7 +150,7 @@ theorem namex_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
     (hn : iputUnits ≤ ncur) (hpd : descPageRw A.pd) (ha0 : k'.regs 10#5 = ientry ik)
     (hle : lo ≤ tl) :
     kctx cpu k' ∗ pcIs cpu KA.«iunlockput» ∗
-    trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗ namexEnv (hlc := hlc) Γ A ∗
+    trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗ namexEnv Γ A ∗
     namexLk A ik q g lo tl inum dn γil γisl ∗ icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
     wordPointsTo sbBmapstartAddr 4 A.dqb (BitVec.ofNat 32 fscBmapstart) ∗
     wordPointsTo sbInodestart 4 A.dqs (BitVec.ofNat 32 icfgIst) ∗
@@ -158,7 +158,7 @@ theorem namex_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
     (if crz then nlzObs inum.toNat e0 else emp) ∗ logOpSe icfgLog ncur Scur e0 ∗
     namexIupK k' A ncur Scur wc crz
     ⊢ wpLoop (GF := GF) cpu := by
-  have h := IUP.wp_iunlockput_tx_gen_eb (hlc := hlc) (GF := GF) Γ cpu k' A.γl A.pd A.pav A.pu A.j
+  have h := IUP.wp_iunlockput_tx_gen_eb (GF := GF) Γ cpu k' A.γl A.pd A.pav A.pu A.j
     γil γisl ik q.half q.half g lo tl inum dn bm ncur Scur wc false crz e0 A.pidv A.dqp A.dqb A.dqs
     hj hproc hK hnoff htier hkk hcrb (fun h => absurd h (by decide)) hgeom hbg hcov hlog hnib hbel
     hn hpd ha0 hle
@@ -167,7 +167,7 @@ theorem namex_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
   unfold namexLk
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, ⟨#Hslk, #Hesc, #Hfl, Hsl, Hdep, Hoff, Hdev, Hinum, Hval, Hshot,
     Hfrz, Hkeep, Hru⟩, Hload, Hsb, Hsi, Hpid, Hbs, Hnlz, Hop, HK⟩
-  icases namexEnv_open (hlc := hlc) Γ A $$ Henv with
+  icases namexEnv_open Γ A $$ Henv with
     ⟨#Hpi, #Hpe, #Hbc, #Hlc, #Hdc, #Hkl, #Hav, #Hit2, #Hiti, #Hslks, #Hinv, #Hopen, #Hbmi⟩
   ihave #Hcla := isItable2_claims $$ Hit2
   ihave Hoff := offRows_to_dep offCfg ik curCtx $$ Hoff
@@ -188,14 +188,14 @@ theorem namex_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
 set_option maxHeartbeats 8000000 in
 /-- `iunlock(ip)` at `L_par` (+0x86): the tx form; iunlock does not thread
 the complement, so it is carried across its own crossing (the WIDE HOP). -/
-theorem namex_iunlock (IU : IUNLOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem namex_iunlock (IU : IUNLOCK) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k' : KCtx) (A : NamexArgs) (ik : Nat) (q : Qp) (g : GName) (lo tl : Nat)
     (inum : BitVec 32) (dn : Dinode) (bm : Blkmap) (γil γisl : GName)
     (hj : A.j < NPROC) (hproc : k'.proc = procAddr A.j) (hK : iunlockSlots ≤ k'.avail)
     (hnoff : k'.noff = 0) (hlocks : k'.locks = []) (htier : k'.tier = KTier.kpt)
     (hkk : ik < NINODE) (ha0 : k'.regs 10#5 = ientry ik) (hle : lo ≤ tl) :
     kctx cpu k' ∗ pcIs cpu KA.«iunlock» ∗
-    trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗ namexEnv (hlc := hlc) Γ A ∗
+    trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗ namexEnv Γ A ∗
     isSleeplockGen γil γisl (iLock (ientry ik)) (icSlp fscIc ik) (slhTok (icfgIsl ik)) ∗
     icEscrow fscIc fscFs fscIreg fscCov fscLogst ik ∗ credFloor lo tl ∗
     sleeplockedQ γisl q.half (iLock (ientry ik)) A.pidv ∗
@@ -213,14 +213,14 @@ theorem namex_iunlock (IU : IUNLOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
       wordPointsTo (pPid k'.proc) 4 A.dqp A.pidv -∗
       inodeShrGenlo ik q.half icfgDev inum g lo -∗ logTx icfgLog -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) cpu := by
-  have h := IU.wp_iunlock_tx (hlc := hlc) (GF := GF) Γ cpu k' γil γisl ik q.half g lo tl icfgDev
+  have h := IU.wp_iunlock_tx (GF := GF) Γ cpu k' γil γisl ik q.half g lo tl icfgDev
     inum dn bm A.pidv A.dqp (by rw [hnoff]; omega) hK hkk ha0 (by rw [hlocks]; simp)
     (by rw [hlocks]; simp) htier hle
   unfold wp_iunlock_tx_body at h
   simp only [iunlockAddr] at h
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, #Hslk, #Hesc, #Hfl, Hsl, Hdep, Hoff, Hdev, Hinum, Hval, Hload,
     Hshot, Hfrz, Hpid, HK⟩
-  icases namexEnv_open (hlc := hlc) Γ A $$ Henv with
+  icases namexEnv_open Γ A $$ Henv with
     ⟨#Hpi, #Hpe, #Hbc, #Hlc, #Hdc, #Hkl, #Hav, #Hit2, #Hiti, #Hslks, #Hinv, #Hopen, #Hbmi⟩
   ihave #Hcla := isItable2_claims $$ Hit2
   ihave Hoff := offRows_to_dep offCfg ik curCtx $$ Hoff
@@ -251,7 +251,7 @@ set_option maxHeartbeats 8000000 in
 /-- `iput(ip)` at `L_done` (+0x146): the credited set form UNCREDITED
 (`crb := wc`, `cru = crz = false`), the SEALED regime lent (RULING G), and
 half of the transaction's token parked for the call (B''-tx5). -/
-theorem namex_iput (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem namex_iput (IP : IPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k' : KCtx) (A : NamexArgs) (ipv : BitVec 64) (ncur : Nat) (Scur : List Nat)
     (wc : Bool)
     (hj : A.j < NPROC) (hproc : k'.proc = procAddr A.j) (hK : iputSlots ≤ k'.avail)
@@ -262,7 +262,7 @@ theorem namex_iput (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (hireg : iregBlocksOk icfgIst icfgNib fscCov fscLogst) (hbel : covBelow fscCov fscSize)
     (hn : iputUnits ≤ ncur) (hpd : descPageRw A.pd) (ha0 : k'.regs 10#5 = ipv) :
     kctx cpu k' ∗ pcIs cpu KA.«iput» ∗
-    trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗ namexEnv (hlc := hlc) Γ A ∗
+    trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗ namexEnv Γ A ∗
     inodeHeld ipv ∗
     wordPointsTo sbBmapstartAddr 4 A.dqb (BitVec.ofNat 32 fscBmapstart) ∗
     wordPointsTo sbInodestart 4 A.dqs (BitVec.ofNat 32 icfgIst) ∗
@@ -274,14 +274,14 @@ theorem namex_iput (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   unfold inodeHeld
   icases Hip with ⟨%ik, %q, %inum, %hie, %hik, %hnib, %hpos, Hrefp⟩
   obtain ⟨hcov, hlog⟩ := hireg inum hnib
-  icases namexEnv_open (hlc := hlc) Γ A $$ Henv with
+  icases namexEnv_open Γ A $$ Henv with
     ⟨#Hpi, #Hpe, #Hbc, #Hlc, #Hdc, #Hkl, #Hav, #Hit2, #Hiti, #Hslks, #Hinv, #Hopen, #Hbmi⟩
   ihave #Hescs := isItable2_escrows $$ Hit2
   ihave #Hesc := icEscrows_lookup fscIc fscFs fscIreg fscCov fscLogst ik hik $$ Hescs
   icases icSleeplocks_lookup fscIc ik hik $$ Hslks with ⟨%γil, %γisl, #Hslk⟩
   icases logOpS_named icfgLog ncur Scur $$ Hop with ⟨%e0, Hop⟩
   icases logTx_halve icfgLog $$ Htx with ⟨%t, Ht1, Ht2⟩
-  have h := IP.wp_iput_gen_eb (hlc := hlc) (GF := GF) Γ cpu k' A.γl A.pd A.pav A.pu A.j γil γisl
+  have h := IP.wp_iput_gen_eb (GF := GF) Γ cpu k' A.γl A.pd A.pav A.pu A.j γil γisl
     ik q inum ncur Scur wc false false e0 t (1 : Qp).half A.pidv A.dqp A.dqb A.dqs true
     hj hproc hK hnoff htier hik hcrb (fun h => absurd h (by decide)) hgeom hbg hcov hlog hnib hbel
     hn hpd (by rw [ha0, hie])
@@ -365,7 +365,7 @@ set_option maxHeartbeats 8000000 in
 locked: the LICENCE PREMISE's left disjunct is the nlink guard the walk just
 fell through (fs-fragments §7.5.6, TRACE G), the borrowed region record is
 the in-core one (premise (6')). -/
-theorem namex_dirlookup (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem namex_dirlookup (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k' : KCtx) (A : NamexArgs) (ik : Nat) (inum : BitVec 32) (bm : Blkmap)
     (data : Nat → List (BitVec 8)) (dn : Dinode) (nf : Nat → BitVec 8) (sd : Qp)
     (hj : A.j < NPROC) (hproc : k'.proc = procAddr A.j) (hK : dirlookupSlots ≤ k'.avail)
@@ -376,7 +376,7 @@ theorem namex_dirlookup (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     (hik : ik < NINODE) (hib : inum.toNat < 16 * icfgNib) (hip : 0 < inum.toNat)
     (hpd : descPageRw A.pd) (ha0 : k'.regs 10#5 = ientry ik) (ha2 : k'.regs 12#5 = 0#64) :
     kctx cpu k' ∗ pcIs cpu KA.«dirlookup» ∗
-    trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗ namexEnv (hlc := hlc) Γ A ∗
+    trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗ namexEnv Γ A ∗
     wordPointsTo (iDev (ientry ik)) 4 (DFrac.own (1 : Qp).half) icfgDev ∗
     inodeMeta (ientry ik) dn ∗ inodeMap fscFs (ientry ik) bm ∗ inodeBlocks fscFs bm data ∗
     inodeShr ik sd icfgDev inum ∗ runitAny inum.toNat ∗
@@ -389,7 +389,7 @@ theorem namex_dirlookup (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimIs (hlc := hlc)
   obtain ⟨hwf, hcov, -, hty0, hsz, hholes, -⟩ := hok
   have hty : dn.diType.toNat = T_DIR_z := by rw [htype]; rfl
   have hinums := dirOk_dir icfgNib dn data htype hdok
-  have h := DL.wp_dirlookup_eb (hlc := hlc) (GF := GF) Γ cpu k' A.γl A.pd A.pav A.pu A.j A.γkl
+  have h := DL.wp_dirlookup_eb (GF := GF) Γ cpu k' A.γl A.pd A.pav A.pu A.j A.γkl
     A.γk (ientry ik) inum bm data dn dn nf false 0#32 A.pidv A.dqp (DFrac.own (1 : Qp).half)
     (DFrac.own 1) ik sd A.rootv A.rti A.dqr hj hproc hK hnoff htier htype hgeom hwf hcov hsz hholes
     hinums (Or.inl hnl) horph hty0 rfl hpd ha0 rfl hik
@@ -398,7 +398,7 @@ theorem namex_dirlookup (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimIs (hlc := hlc)
   simp only [dirlookupAddr, Bool.false_eq_true, if_false] at h
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hdev, Hmeta, Hmap, Hblk, Hshr, Hru, Hnm, Hpid, Hrc, Hrr, Hbs,
     Hslot, Hlk, Hdi, HK⟩
-  icases namexEnv_open (hlc := hlc) Γ A $$ Henv with
+  icases namexEnv_open Γ A $$ Henv with
     ⟨#Hpi, #Hpe, #Hbc, #Hlc, #Hdc, #Hkl, #Hav, #Hit2, #Hiti, #Hslks, #Hinv, #Hopen, #Hbmi⟩
   iapply h
   iframe Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk Hshr Hru Hnm Hpid Hrc Hrr Hbs Hslot Hlk Hdi

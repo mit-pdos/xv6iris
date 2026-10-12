@@ -59,9 +59,9 @@ theorem gin_of_some (st : FdState) (gin : PipeNames) (h : gin_of st = some gin) 
 noncomputable section
 
 section Defs
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF] [PipesNG GF]
-variable (D : PdRound hlc GF) (Qfin Rtop : IProp GF)
+variable (D : PdRound GF) (Qfin Rtop : IProp GF)
 
 /-! ## §3 The node's resources -/
 
@@ -215,7 +215,7 @@ flow parameter -- the pipe is born empty, so its flow clause holds by its
 left arm. -/
 theorem pipe_inv_alloc_atU (pn : PNames) (gp : PipeNames) (U : IProp GF) [Timeless U] :
     ⊢ pipePre pn -∗ pipeQfrag gp.pnQueue pst0 ={⊤}=∗
-      pipeInvU pn gp D.L U ∗ pipeReg (hlc := hlc) (GF := GF) gp := by
+      pipeInvU pn gp D.L U ∗ pipeReg (GF := GF) gp := by
   unfold pipePre
   iintro ⟨Hh, Hw, Hr, He, Ho⟩ Hfrag
   imod inv_alloc pipeN ⊤ (pipeBodyU pn gp D.L U) $$ [Hfrag Hh Hw Hr He Ho] with #Hinv
@@ -233,7 +233,7 @@ theorem pipe_inv_alloc_atU (pn : PNames) (gp : PipeNames) (U : IProp GF) [Timele
     isplitl [Ho]
     · ileft; iexact Ho
     · ileft; ipureintro; trivial
-  ihave #Hreg := pipeReg_of_invU (hlc := hlc) pn gp D.L U $$ [Hinv]
+  ihave #Hreg := pipeReg_of_invU pn gp D.L U $$ [Hinv]
   · unfold pipeInvU; iexact Hinv
   imodintro
   unfold pipeInvU
@@ -243,7 +243,7 @@ theorem pipe_inv_alloc_atU (pn : PNames) (gp : PipeNames) (U : IProp GF) [Timele
 parameter. -/
 theorem node_registrar (k : Nat) :
     ⊢ pbundle (D.P k) -∗
-      ∀ γp : PipeNames, pipeQfrag γp.pnQueue pst0 ={⊤}=∗ pipeReg (hlc := hlc) (GF := GF) γp ∗ Rreg D k γp := by
+      ∀ γp : PipeNames, pipeQfrag γp.pnQueue pst0 ={⊤}=∗ pipeReg (GF := GF) γp ∗ Rreg D k γp := by
   unfold pbundle
   iintro ⟨Hpre, Hw, Hr, HsL, HsR⟩ %γp Hfrag
   imod pipe_inv_alloc_atU D (D.P k) γp (D.pflow k) $$ Hpre Hfrag with ⟨#Hinv, Hreg⟩

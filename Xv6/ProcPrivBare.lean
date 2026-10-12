@@ -31,7 +31,7 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- `procFieldsNoctx` minus the descriptor array. -/
 def procFieldsNoOfile (pa : BitVec 64) (dq : DFrac) (V : ProcPriv) : IProp GF := iprop%
@@ -54,16 +54,16 @@ def procPrivBareAt [WchG GF] (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V 
     (M : Nat → List (BitVec 8)) : IProp GF := iprop%
   ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧
     V.pagetable = pageAddr V.upt.root ∧ V.trapframe = pageAddr V.upt.tfp⌝ ∗
-  @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
-  @procFieldsNoOfile hlc GF _ ⟨ξ, KTier.kpt⟩ pa (DFrac.own 1) V ∗
-  @procPtAt hlc GF _ ⟨ξ, KTier.kpt⟩ V.upt M ∗
-  @tfPageAt hlc GF _ ⟨ξ, KTier.kpt⟩ V.upt.tfp V.tf ∗
+  @wordPointsTo GF _ ⟨ξ, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
+  @procFieldsNoOfile GF _ ⟨ξ, KTier.kpt⟩ pa (DFrac.own 1) V ∗
+  @procPtAt GF _ ⟨ξ, KTier.kpt⟩ V.upt M ∗
+  @tfPageAt GF _ ⟨ξ, KTier.kpt⟩ V.upt.tfp V.tf ∗
   ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ ∗
   actCnt pa V.ev
 
 /-- The event counter is not a cell: writing it moves none of the fields. -/
 theorem procFieldsNoOfile_updEv (X : CurCtx) (pa : BitVec 64) (dq : DFrac) (V : ProcPriv) (k : Nat) :
-    @procFieldsNoOfile hlc GF _ X pa dq { V with ev := k } = @procFieldsNoOfile hlc GF _ X pa dq V :=
+    @procFieldsNoOfile GF _ X pa dq { V with ev := k } = @procFieldsNoOfile GF _ X pa dq V :=
   rfl
 
 /-- **The counter, lent out of the bare block and taken back at any count**

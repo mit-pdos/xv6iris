@@ -25,7 +25,7 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -37,10 +37,10 @@ theorem shMalloc_more (UL : UK_LEAVES) (HS : SH_SBRK) (hps : ∀ k : Int, freeNu
     (hs4 : m.get 20#5 = BitVec.ofNat 64 65536) (hs5 : m.get 21#5 = BitVec.ofInt 64 (-1))
     (hok : uszOk (sz + 65536)) (hal : pgRoundUpN sz = sz) :
     ⊢ ukCode N.t User.Sh.code.byte -∗ uword N.d ushmFreep (BitVec.ofNat 64 ushmBase) -∗ usz N.s sz -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x120a) (2 + nn) -∗
+      urun N h m (BitVec.ofNat 64 0x120a) (2 + nn) -∗
       (∀ (h' : CPU) (m' : RegMap) (r : BitVec 64), ⌜ushmKeep ushmCaller m m'⌝ -∗ ⌜m'.get 10#5 = r⌝ -∗
         ushmSbrkAns N sz 65536 r -∗ uword N.d ushmFreep (BitVec.ofNat 64 ushmBase) -∗
-        urun (hlc := hlc) N h' m'
+        urun N h' m'
           (if r = BitVec.ofInt 64 (-1) then BitVec.ofNat 64 0x121c else BitVec.ofNat 64 0x11f4) (2 + nn) -∗
         wpLoop h') -∗
       wpLoop h := by

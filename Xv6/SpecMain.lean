@@ -151,7 +151,7 @@ def mainSlots : Nat := 2 + max schedulerSlots (max 52 userinitSlots)
 def mainBslotsFs : Nat := (LOGBLOCKS + 2) + 2 + 1
 
 section raw
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- **This hart's own raw translation and trap cells** (Rocq
 `main_hart_raw`): the TLB cell `kvminithart` flushes and the trap CSRs the
@@ -227,7 +227,7 @@ def mainGlobalsBare : IProp GF := iprop%
 end raw
 
 section globals
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
   [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Y : CurCtx]
 
 /-- **The rest of the raw global image the init sequence writes** (Rocq
@@ -263,7 +263,7 @@ def mainGlobalsRaw (cn : ConsNames) : IProp GF := iprop%
 end globals
 
 section boot
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
   [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
 
 /-- **THE DEPOSIT RECIPE** (the `□`-wand of Rocq's contract): out of the
@@ -277,12 +277,12 @@ def mainDepositRecipe (X : CurCtx) (Γ : SchedNames) (γ0 γ1 : UartNames) (γc 
   □ (∀ (γpr : GName) (rootAddr : BitVec 64) (t : PTree) (M : RegMapF (BitVec 64))
       (pd pav pu : BitVec 64),
       ⌜BitVec.extractLsb' 56 8 rootAddr = 0#8 ∧ t.base = BitVec.extractLsb' 12 44 rootAddr⌝ -∗
-      @isLock hlc GF _ _ ⟨X.curCtx, KTier.bare⟩ γpr prLock "pr" (fun _ => emp) -∗
-      @isTxLock hlc GF _ _ ⟨X.curCtx, KTier.bare⟩ γl1 γ1 -∗
+      @isLock GF _ _ ⟨X.curCtx, KTier.bare⟩ γpr prLock "pr" (fun _ => emp) -∗
+      @isTxLock GF _ _ ⟨X.curCtx, KTier.bare⟩ γl1 γ1 -∗
       uartSentSub γ1 [] -∗
-      @kptOn hlc GF _ ⟨X.curCtx, KTier.bare⟩ t M -∗
-      @pwordPointsTo hlc GF _ ⟨X.curCtx, KTier.bare⟩ kernelPagetableAddr 8 DFrac.discard rootAddr -∗
-      @devintrCaps hlc GF _ _ _ _ _ _ _ _ ⟨X.curCtx, KTier.kpt⟩ Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu -∗
+      @kptOn GF _ ⟨X.curCtx, KTier.bare⟩ t M -∗
+      @pwordPointsTo GF _ ⟨X.curCtx, KTier.bare⟩ kernelPagetableAddr 8 DFrac.discard rootAddr -∗
+      @devintrCaps GF _ _ _ _ _ _ _ _ ⟨X.curCtx, KTier.kpt⟩ Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu -∗
       P X.curCtx)
 
 /-- The UART bundle main is handed per port: `uartinitone`'s premise (the
@@ -299,7 +299,7 @@ def mainUartRaw (X : CurCtx) (i : UartId) (γ : UartNames) (l : List (BitVec 8))
 def wp_main_boot_body [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
     [IcboxG GF] [SleepLockG GF] [Appcfg GF] [BcacheG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF]
     [Fscfg] [Icfg] (X : CurCtx)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
     (cpu : CPU) (k : KCtx) (cn : ConsNames) (l0 l1 : List (BitVec 8)) (c0 : VirtioCfg)
     (dk : Nat → BitVec 8) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Nat compare) (ndisk : Nat)
@@ -317,7 +317,7 @@ def wp_main_boot_body [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG G
     -- the console ring's names carry the receive side's
     (hcn : cn.uart = γ0)
     -- ...and the ring is THIS era's (Rocq seccomp S2k follow-up)
-    (hcne : cn.era = genId (hlc := hlc) (GF := GF) + 1)
+    (hcne : cn.era = genId (GF := GF) + 1)
     -- the vdisk lock is born at the ambient name (kit 1's free token)
     (hdl : fscDlock = γdl)
     -- THE WHOLE SNAPSHOT HYPOTHESIS (Rocq `fs_boot_snap_wf`)
@@ -332,8 +332,8 @@ def wp_main_boot_body [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG G
   mainLocksBare ∗ mainGlobalsBare ∗
   mainLocksRaw (Y := X.toKpt) ∗ mainGlobalsRaw (Y := X.toKpt) cn ∗
   mainSbRaw (Y := X.toKpt) ∗ mainLogRaw (Y := X.toKpt) ∗
-  @wordPointsTo hlc GF _ X.toKpt firstAddr 4 (DFrac.own 1) 1#32 ∗
-  @wordPointsTo hlc GF _ X.toKpt nextpidAddr 4 (DFrac.own 1) 1#32 ∗
+  @wordPointsTo GF _ X.toKpt firstAddr 4 (DFrac.own 1) 1#32 ∗
+  @wordPointsTo GF _ X.toKpt nextpidAddr 4 (DFrac.own 1) 1#32 ∗
   -- the proc table's boot ghosts
   ([∗list] i ∈ List.range NPROC, hartFull Γ i startedPrimary) ∗
   ([∗list] i ∈ List.range NPROC, pstateFull Γ i UNUSED) ∗
@@ -344,27 +344,27 @@ def wp_main_boot_body [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG G
   lockFreeTok γc ∗ lockFreeTok γl0 ∗ lockFreeTok γl1 ∗ lockFreeTok γt ∗
   ([∗list] i ∈ List.range NPROC, lockFreeTok (Γ.lock i)) ∗
   -- THE FILE SYSTEM'S BOOT-ERA MINT (Rocq `fs_boot_supply`), and its companions
-  fsBootSupply (hlc := hlc) dk sb nib cov γ0 γd cn Rspent Pb (hdrWset (fsBlocks dk) sb.sbLogstart) ∗
+  fsBootSupply dk sb nib cov γ0 γd cn Rspent Pb (hdrWset (fsBlocks dk) sb.sbLogstart) ∗
   logMirrorBorn (mirrorOf (fsBlocks dk)) ∗
   irefSlots IREFBOOT ∗ irefSlotsAuth ∗ bslots mainBslotsFs ∗
   genCert ∗ fsCrashSeam cov sb.sbLogstart ∗ crashInv ∗
   -- THE FIRST PROCESS'S EXEC BUNDLE (Rocq `init_boot_bundle`), carried to userinit
-  initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO ROOTINO seccAll (List.replicate NOFILE FdState.closed) ∗
+  initBootBundle (SG := uexecSGXv6) ROOTINO ROOTINO seccAll (List.replicate NOFILE FdState.closed) ∗
   -- THE ERA'S ORIGIN TICKET (NI M2-W2d), carried to userinit's park beside it
-  MachFixedGS.uClaimO (hlc := hlc) (GF := GF) ∗
+  MachFixedGS.uClaimO (GF := GF) ∗
   -- the device fabric, from time 0, and the boot hart's tokens over it
   uartInv .uart0 γ0 ∗ uartInv .uart1 γ1 ∗ plicInv γ0 γ1 ∗ diskInv γd ∗ diskCrashCaps γd ∗
   wireInv ∗
   -- THE ERA'S ANCHOR (NI M2-X2): its ledger names, registered at the boot,
   -- carried to userinit's park beside `wireInv`
-  (∃ k : Nat, MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF))) ∗
+  (∃ k : Nat, MachFixedGS.uEraAnchor (GF := GF) k (niNamesHere (GF := GF))) ∗
   mainUartRaw X .uart0 γ0 l0 ∗ mainUartRaw X .uart1 γ1 l1 ∗
   diskCfgOwn γd c0 ∗ diskInitGhosts γd ∗
   (∃ (vl : BitVec 32) (vn vc pd0 pav0 pu0 : BitVec 64) (free0 : List (BitVec 8)),
-    @diskInitCells hlc GF _ X.toKpt vl vn vc pd0 pav0 pu0 free0) ∗
+    @diskInitCells GF _ X.toKpt vl vn vc pd0 pav0 pu0 free0) ∗
   -- the kernel page table's two one-shots (Rocq `kpt_unset`/`kptb_unset`, `kmap_auth kmap_M0`)
-  (∃ r : BitVec 44, MachGS.kptRootName (hlc := hlc) (GF := GF) ↪VAR r) ∗
-  (MachGS.kmapName (hlc := hlc) (GF := GF) ↪●MAP KernelMap.static) ∗
+  (∃ r : BitVec 44, MachGS.kptRootName (GF := GF) ↪VAR r) ∗
+  (MachGS.kmapName (GF := GF) ↪●MAP KernelMap.static) ∗
   -- kinit's free-page run
   pageRange kinitBase kinitPages
   ⊢ wpLoop (GF := GF) cpu
@@ -373,12 +373,12 @@ end boot
 
 /-- The interface of `main`'s boot arm (Rocq `MAIN`). -/
 structure MAIN : Prop where
-  wp_main_boot : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+  wp_main_boot : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
     [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
     [IcboxG GF] [SleepLockG GF] [Appcfg GF] [BcacheG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF]
     [Fscfg] [Icfg] (X : CurCtx)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [NiFitIs (hlc := hlc) GF]
+    (Γ : SchedNames) [ClaimIs GF Γ] [NiFitIs GF]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
     (cpu : CPU) (k : KCtx) (cn : ConsNames) (l0 l1 : List (BitVec 8)) (c0 : VirtioCfg)
     (dk : Nat → BitVec 8) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Nat compare) (ndisk : Nat)
@@ -386,7 +386,7 @@ structure MAIN : Prop where
     (tlb0 : Tlb) (γi : GName) (ξd : CtxId) (P : CtxId → IProp GF)
     [∀ ξ, Persistent (P ξ)] [CtxMorph P]
     hcpu hX hK hsie hnoff hlocks hproc hl0 hl1 hdead hcn hcne hdl hsnap,
-    wp_main_boot_body (hlc := hlc) (GF := GF) X Γ γ0 γ1 γc γl0 γl1 γd γdl γt cpu k cn
+    wp_main_boot_body (GF := GF) X Γ γ0 γ1 γc γl0 γl1 γd γdl γt cpu k cn
       l0 l1 c0 dk sb nib cov ndisk S Pb Rspent tlb0 γi ξd P hcpu hX hK hsie hnoff hlocks hproc hl0 hl1
       hdead hcn hcne hdl hsnap
 

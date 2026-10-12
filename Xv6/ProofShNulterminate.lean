@@ -29,7 +29,7 @@ open Std (ExtTreeSet)
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -41,10 +41,10 @@ theorem wp_shNul (UL : UK_LEAVES) (N : UkNames GF) (s0 len : Nat) (t : UshpCmd) 
     ∀ (h : CPU) (m : RegMap) (p : Nat) (a : UshPtr) (g : Nat → BitVec 8) (n : Nat),
     m.get 10#5 = BitVec.ofNat 64 p → 0 < s0 → s0 + len < 2 ^ 64 → ushpWalked t → ushpBounded len t →
     ⊢ ushCode N.t -∗ ushATree N s0 p t a -∗ ubytes N.d s0 (len + 1) g -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x7ca) (4 * ushpHt t + n) -∗
+      urun N h m (BitVec.ofNat 64 0x7ca) (4 * ushpHt t + n) -∗
       (ushATree N s0 p t a -∗ ubytes N.d s0 (len + 1) (ushZeroAt (refNulcut t) g) -∗
         ∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗ ⌜m'.get 10#5 = BitVec.ofNat 64 p⌝ -∗
-        urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (4 * ushpHt t + n) -∗ wpLoop h') -∗
+        urun N h' m' (retPc (m.get 1#5)) (4 * ushpHt t + n) -∗ wpLoop h') -∗
       wpLoop h := by
   induction t with
   | exec toks =>
@@ -106,7 +106,7 @@ theorem wp_shNul (UL : UK_LEAVES) (N : UkNames GF) (s0 len : Nat) (t : UshpCmd) 
     have hra : retPc (m3.get 1#5) = BitVec.ofNat 64 0x814 := by
       show retPc ((ukWr m2 1#5 _).get 1#5) = _
       rw [ukWr_get_same _ _ _ (by decide)]; exact ush_retPc _ (by decide) (by decide)
-    ihave Hrun : urun (hlc := hlc) N h4 m4 (BitVec.ofNat 64 0x814) (4 * ushpHt c + n) $$ [Hrun]
+    ihave Hrun : urun N h4 m4 (BitVec.ofNat 64 0x814) (4 * ushpHt c + n) $$ [Hrun]
     · rw [← hra]; iexact Hrun
     -- 0x814  ld a5,24(s1) : efile
     have h4s1 : m4.get 9#5 = BitVec.ofNat 64 p := by
@@ -174,7 +174,7 @@ theorem wp_shNul (UL : UK_LEAVES) (N : UkNames GF) (s0 len : Nat) (t : UshpCmd) 
     have eL : 4 * M + n = 4 * ushpHt l + (4 * (M - ushpHt l) + n) := by
       have : ushpHt l ≤ M := Nat.le_max_left _ _
       omega
-    ihave Hrun : urun (hlc := hlc) N h3 m3 (BitVec.ofNat 64 0x7ca) (4 * ushpHt l + (4 * (M - ushpHt l) + n))
+    ihave Hrun : urun N h3 m3 (BitVec.ofNat 64 0x7ca) (4 * ushpHt l + (4 * (M - ushpHt l) + n))
       $$ [Hrun]
     · rw [← eL]; iexact Hrun
     iapply ihl h3 m3 pl al g _ (by show (ukWr (ukWr m1 _ _) _ _).get 10#5 = _; ureg) hs0 hs64 hwl hbl
@@ -183,7 +183,7 @@ theorem wp_shNul (UL : UK_LEAVES) (N : UkNames GF) (s0 len : Nat) (t : UshpCmd) 
     have hra : retPc (m3.get 1#5) = BitVec.ofNat 64 0x82c := by
       show retPc ((ukWr m2 1#5 _).get 1#5) = _
       rw [ukWr_get_same _ _ _ (by decide)]; exact ush_retPc _ (by decide) (by decide)
-    ihave Hrun : urun (hlc := hlc) N h4 m4 (BitVec.ofNat 64 0x82c) (4 * M + n) $$ [Hrun]
+    ihave Hrun : urun N h4 m4 (BitVec.ofNat 64 0x82c) (4 * M + n) $$ [Hrun]
     · rw [← hra, eL]; iexact Hrun
     have hk3 : ∀ q : BitVec 5, ucalleeSavedIdx q = true → m3.get q = m1.get q := by
       intro q hq
@@ -202,7 +202,7 @@ theorem wp_shNul (UL : UK_LEAVES) (N : UkNames GF) (s0 len : Nat) (t : UshpCmd) 
     have eR : 4 * M + n = 4 * ushpHt r + (4 * (M - ushpHt r) + n) := by
       have : ushpHt r ≤ M := Nat.le_max_right _ _
       omega
-    ihave Hrun : urun (hlc := hlc) N h6 m6 (BitVec.ofNat 64 0x7ca) (4 * ushpHt r + (4 * (M - ushpHt r) + n))
+    ihave Hrun : urun N h6 m6 (BitVec.ofNat 64 0x7ca) (4 * ushpHt r + (4 * (M - ushpHt r) + n))
       $$ [Hrun]
     · rw [← eR]; iexact Hrun
     iapply ihr h6 m6 pr ar _ _ (by show (ukWr (ukWr m4 _ _) _ _).get 10#5 = _; ureg) hs0 hs64 hwr hbr
@@ -211,7 +211,7 @@ theorem wp_shNul (UL : UK_LEAVES) (N : UkNames GF) (s0 len : Nat) (t : UshpCmd) 
     have hra' : retPc (m6.get 1#5) = BitVec.ofNat 64 0x832 := by
       show retPc ((ukWr m5 1#5 _).get 1#5) = _
       rw [ukWr_get_same _ _ _ (by decide)]; exact ush_retPc _ (by decide) (by decide)
-    ihave Hrun : urun (hlc := hlc) N h7 m7 (BitVec.ofNat 64 0x832) (4 * M + n) $$ [Hrun]
+    ihave Hrun : urun N h7 m7 (BitVec.ofNat 64 0x832) (4 * M + n) $$ [Hrun]
     · rw [← hra', eR]; iexact Hrun
     -- 0x832  j 0x81a
     iapply ushS_j UL N (ushI_832 N.t) 0x81a h7 m7 _ $$ Hc Hrun

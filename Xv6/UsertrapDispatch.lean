@@ -58,7 +58,7 @@ theorem utd_ukill (sc : BitVec 64) (h8 : sc ≠ 8#64) (hs : ¬ sCauseOk sc) : uk
   refine ⟨h8, fun he => hs (Or.inr (by rw [he]; decide)), fun he => hs (Or.inl (by rw [he]; decide))⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
@@ -74,9 +74,9 @@ def utDispRes (A : UtArgs GF) (cpu : CPU) (tv : BitVec 64) : IProp GF := iprop(
   utFrame A ∗ Register.sepc ↦ᵣ[cpu] A.sep ∗ Register.stval ↦ᵣ[cpu] tv ∗
   Register.stvec ↦ᵣ[cpu] kernelvecAddr ∗ cpuClaim cpu A.k.proc ∗ utCaps A.N ∗
   utOwn (utRsys PT Γ A) A.N (utV1 A) A.M A.sts A.cs A.pid ∗
-  utSysIn (hlc := hlc) A.f A.sc A.sep A.V A.M A.sts A.gn A.cs A.pid ∗
-  utForkIn (hlc := hlc) A.f A.sc A.sep A.V A.M A.sts ∗ utPayIn A.f A.sc A.sep A.V ∗
-  utKillIn (hlc := hlc) A.f A.sc A.Wk A.gn A.sts ∗ utKont PT Γ A)
+  utSysIn A.f A.sc A.sep A.V A.M A.sts A.gn A.cs A.pid ∗
+  utForkIn A.f A.sc A.sep A.V A.M A.sts ∗ utPayIn A.f A.sc A.sep A.V ∗
+  utKillIn A.f A.sc A.Wk A.gn A.sts ∗ utKont PT Γ A)
 
 /-- **The dispatch** (Rocq `ut_dispatch`), at +0x30. -/
 def UT_DISPATCH : Prop :=
@@ -107,9 +107,9 @@ theorem ut_disp_open (A : UtArgs GF) (cpu : CPU) (tv : BitVec 64)
     Register.scause ↦ᵣ[cpu] A.sc ∗ utDispRes PT Γ A cpu tv ⊢
       utFrame A ∗ trapCsrsExt cpu false ∗ cpuClaimExt cpu false A.k.proc ∗ utCaps A.N ∗
       utOwn (utRsys PT Γ A) A.N (utV1 A) A.M A.sts A.cs A.pid ∗
-      utSysIn (hlc := hlc) A.f A.sc A.sep A.V A.M A.sts A.gn A.cs A.pid ∗
-      utForkIn (hlc := hlc) A.f A.sc A.sep A.V A.M A.sts ∗ utPayIn A.f A.sc A.sep A.V ∗
-      utKillIn (hlc := hlc) A.f A.sc A.Wk A.gn A.sts ∗ utKont PT Γ A := by
+      utSysIn A.f A.sc A.sep A.V A.M A.sts A.gn A.cs A.pid ∗
+      utForkIn A.f A.sc A.sep A.V A.M A.sts ∗ utPayIn A.f A.sc A.sep A.V ∗
+      utKillIn A.f A.sc A.Wk A.gn A.sts ∗ utKont PT Γ A := by
   have hf := ut_fold Γ A cpu A.sep A.sc tv hI hΓ
   unfold utDispRes
   iintro ⟨Hsc, Hfr, Hep, Htv, Hstv, Hcl, #Hcaps, Hown, Hsi, Hfi, Hpi, Hki, Hk⟩
@@ -120,8 +120,8 @@ theorem ut_disp_open (A : UtArgs GF) (cpu : CPU) (tv : BitVec 64)
 
 /-- The handler environment, copied out of the dispatch's resources. -/
 theorem ut_disp_env (A : UtArgs GF) (cpu : CPU) (tv : BitVec 64) (hΓ : A.N.Γ = Γ) :
-    utDispRes PT Γ A cpu tv ⊢ handlerEnvAt (hlc := hlc) (GF := GF) Γ curCtx ∗ utDispRes PT Γ A cpu tv := by
-  have e : handlerEnvAt (hlc := hlc) (GF := GF) A.N.Γ curCtx = handlerEnvAt Γ curCtx := by rw [hΓ]
+    utDispRes PT Γ A cpu tv ⊢ handlerEnvAt (GF := GF) Γ curCtx ∗ utDispRes PT Γ A cpu tv := by
+  have e : handlerEnvAt (GF := GF) A.N.Γ curCtx = handlerEnvAt Γ curCtx := by rw [hΓ]
   unfold utDispRes utCaps
   rw [e]
   iintro ⟨Hfr, Hep, Htv, Hstv, Hcl, ⟨#Hp, #He, #Hpe, #Hw, #Hft, #Hr, #Hig, #Hic⟩, Hrest⟩
@@ -148,7 +148,7 @@ theorem ut_devintr_at (DI : DEVINTR)
     (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
       Register.scause ↦ᵣ[cpu] sc -∗ ⌜calleeSaved k'.regs R' ∧ R' 10#5 = devintrRet sc⌝ -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
-  have h := DI.wp_devintr (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu
+  have h := DI.wp_devintr (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu
     cpu k' sc hsie' hnoff' hlocks' htier' hK'
   unfold wp_devintr_body at h
   simp only [devintrAddr] at h
@@ -157,7 +157,7 @@ theorem ut_devintr_at (DI : DEVINTR)
 set_option maxHeartbeats 4000000 in
 /-- **The device route** (+0x3a at a device cause): `devintr` answers 1 or 2,
 `mv s2,a0`, `bnez a0` taken, the cells folded -> `UT_EA`. -/
-theorem ut_disp_dev (DI : DEVINTR) (HEA : UT_EA (hlc := hlc) PT Γ)
+theorem ut_disp_dev (DI : DEVINTR) (HEA : UT_EA PT Γ)
     (hI : ∀ c : CPU, ⊢ □ kvIhs (GF := GF) Γ c)
     (A : UtArgs GF) (cpu : CPU) (R : RegMap) (tv : BitVec 64) (hok : UtOk Γ A) (hp : utPins A R)
     (hsc : sCauseOk A.sc) :
@@ -208,8 +208,8 @@ theorem ut_disp_dev (DI : DEVINTR) (HEA : UT_EA (hlc := hlc) PT Γ)
 
 /-- The kill row's paying half, at a cause usertrap kills at. -/
 theorem ut_killIn_cred (A : UtArgs GF) (hne : A.sc ≠ uecallScause) :
-    utKillIn (hlc := hlc) (GF := GF) A.f A.sc A.Wk A.gn A.sts ⊢
-      ⌜A.Wk.fd = A.sts⌝ ∗ ukillCredAt (hlc := hlc) uslot A.gn A.sc A.Wk A.f := by
+    utKillIn (GF := GF) A.f A.sc A.Wk A.gn A.sts ⊢
+      ⌜A.Wk.fd = A.sts⌝ ∗ ukillCredAt uslot A.gn A.sc A.Wk A.f := by
   unfold utKillIn
   rw [if_neg hne]
   iintro ⟨%⟨hg, hf⟩, H⟩
@@ -221,7 +221,7 @@ theorem ut_killIn_cred (A : UtArgs GF) (hne : A.sc ≠ uecallScause) :
 set_option maxHeartbeats 4000000 in
 /-- **The fault demultiplexer** (+0x42, devintr answered 0): scause 15 or
 13 -> `UT_D0`, anything else -> `UT_56`. -/
-theorem ut_disp_fault (HD0 : UT_D0 (hlc := hlc) PT Γ) (H56 : UT_56 (hlc := hlc) PT Γ)
+theorem ut_disp_fault (HD0 : UT_D0 PT Γ) (H56 : UT_56 PT Γ)
     (hI : ∀ c : CPU, ⊢ □ kvIhs (GF := GF) Γ c)
     (A : UtArgs GF) (cpu : CPU) (R : RegMap) (tv : BitVec 64) (hok : UtOk Γ A) (hp : utPins A R)
     (h8 : A.sc ≠ 8#64) (hsc : ¬ sCauseOk A.sc) :
@@ -294,7 +294,7 @@ set_option maxHeartbeats 4000000 in
 /-- **The exception route** (+0x3a at a non-device cause): devintr answers
 0 (`devintrRet_none`), `mv s2,a0`, `bnez a0` falls through to the fault
 demultiplexer. -/
-theorem ut_disp_exc (DI : DEVINTR) (HD0 : UT_D0 (hlc := hlc) PT Γ) (H56 : UT_56 (hlc := hlc) PT Γ)
+theorem ut_disp_exc (DI : DEVINTR) (HD0 : UT_D0 PT Γ) (H56 : UT_56 PT Γ)
     (hI : ∀ c : CPU, ⊢ □ kvIhs (GF := GF) Γ c)
     (A : UtArgs GF) (cpu : CPU) (R : RegMap) (tv : BitVec 64) (hok : UtOk Γ A) (hp : utPins A R)
     (h8 : A.sc ≠ 8#64) (hsc : ¬ sCauseOk A.sc) :
@@ -342,9 +342,9 @@ theorem ut_disp_exc (DI : DEVINTR) (HD0 : UT_D0 (hlc := hlc) PT Γ) (H56 : UT_56
 set_option maxHeartbeats 4000000 in
 /-- **THE DISPATCH** (Rocq `ut_dispatch`), +0x30. -/
 theorem usertrap_dispatch_proof (DI : DEVINTR) (KV : KERNELVEC)
-    (H90 : UT_90 (hlc := hlc) PT Γ) (HEA : UT_EA (hlc := hlc) PT Γ) (HD0 : UT_D0 (hlc := hlc) PT Γ)
-    (H56 : UT_56 (hlc := hlc) PT Γ) [ClaimIs (hlc := hlc) GF Γ] :
-    UT_DISPATCH (hlc := hlc) PT Γ := by
+    (H90 : UT_90 PT Γ) (HEA : UT_EA PT Γ) (HD0 : UT_D0 PT Γ)
+    (H56 : UT_56 PT Γ) [ClaimIs GF Γ] :
+    UT_DISPATCH PT Γ := by
   intro A cpu R tv hok hp h10
   have hI : ∀ c : CPU, ⊢ □ kvIhs (GF := GF) Γ c := fun c => kvIhs_of_kernelvec KV Γ c
   have hsie : A.k.sie = false := hok.hctx.1

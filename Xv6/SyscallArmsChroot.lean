@@ -31,7 +31,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
@@ -57,7 +57,7 @@ set_option maxHeartbeats 4000000 in
 /-- **Rocq `sysc_arm_chroot`** (table index 24). -/
 theorem syscall_arm_chroot (SCR : SYSCHROOT)
     (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -81,7 +81,7 @@ theorem syscall_arm_chroot (SCR : SYSCHROOT)
   ihave #Hrdy := syscallEnv_fsReady PT Γ γ $$ Henv
   icases (show irefSlots (GF := GF) IREFSPARE ⊢ irefSlots 2 ∗ irefSlots 2 from
     irefSlots_split 2 2) $$ Hir with ⟨Hir2, Hirk⟩
-  have hC := SCR.wp_sys_chroot_eb (hlc := hlc) (GF := GF) Γ cpu
+  have hC := SCR.wp_sys_chroot_eb (GF := GF) Γ cpu
     (((k.withSpie spie spp).pushed 4).withRegs R) γ j pid V M (tfW V.tf (tfArgIdx 0)) hj
     ?hp ?ht ?hn ?hK (syscPath_arg V 0 hl (by decide))
   case hp => k_norm_g; exact hproc

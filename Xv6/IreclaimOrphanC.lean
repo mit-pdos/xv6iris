@@ -32,7 +32,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF]
@@ -40,7 +40,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 set_option maxHeartbeats 16000000 in
 /-- **`+0x64 .. +0x6c`: iput, end_op, and the fall into the step.** -/
 theorem ireclaim_orphan_c (IP : IPUT) (EO : END_OP) [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx)
     (spie spp : Bool) (R : RegMap) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (pidv : BitVec 32) (dqp dqb dqs dqn : DFrac) (n : Nat)
     (kslot : Nat) (q : Qp) (Sb : List Nat)
@@ -55,10 +55,10 @@ theorem ireclaim_orphan_c (IP : IPUT) (EO : END_OP) [Fscfg] [Icfg] [CurCtx]
     (hkslot : kslot < NINODE)
     (IH : n + 1 < fscNinodes → ∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap),
       ireclaimLoopRegs k (n + 1) R' →
-      ireclaimLoopPre (hlc := hlc) Γ c' k spie' spp' R' γl pd pav pu pidv dqp dqb dqs dqn ⊢
+      ireclaimLoopPre Γ c' k spie' spp' R' γl pd pav pu pidv dqp dqb dqs dqn ⊢
         wpLoop (GF := GF) c') :
     kctx cpu (((k.withSpie spie spp).pushed 8).withRegs R) ∗ pcIs cpu (KA.«ireclaim» + 0x64#64) ∗
-    ireclaimEnv (hlc := hlc) Γ γl pd pav pu ∗ ireclaimTurn cpu k pidv dqp dqb dqs dqn ∗
+    ireclaimEnv Γ γl pd pav pu ∗ ireclaimTurn cpu k pidv dqp dqb dqs dqn ∗
     bslots 3 ∗ iregBoot ∗
     inodeRef kslot q icfgDev (BitVec.ofNat 32 n) ∗ runitPlain (BitVec.ofNat 32 n).toNat ∗
     logOpS icfgLog MAXOPBLOCKS Sb ∗ logTx icfgLog

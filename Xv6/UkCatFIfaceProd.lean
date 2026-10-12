@@ -30,7 +30,7 @@ open HfpPipeP HfpFileClaimsP
 open Std (ExtTreeSet)
 
 section CifProd
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [PipesNG GF] [CifRegG GF]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
@@ -53,7 +53,7 @@ theorem cif_prod_row_err (l : List FdState) (pn : PNames) (gp : PipeNames) (w : 
   · exact h
 
 namespace CifEnv
-variable (E : CifEnv (hlc := hlc) (GF := GF))
+variable (E : CifEnv (GF := GF))
 
 /-- The descriptors opened at a device's token (deviation 2). -/
 theorem fds_tok (fdm : Fdmap) (fd : Int) (d : Nat) (q : Qp) (kd : CfDev) (hfd : fdm fd = some d) :
@@ -84,7 +84,7 @@ theorem env_lookup_prod (vs : RegMapF CfDev) (d : Nat) (pn : PNames) (gp : PipeN
   E.env_lookup vs d _ hv
 
 /-- `T` out of the kill credential (Rocq: `rewrite -Hkill`). -/
-theorem T_of_kill : ⊢ MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ E.T := by
+theorem T_of_kill : ⊢ MachFixedGS.killCred (GF := GF) -∗ E.T := by
   iintro H
   unfold T
   rw [← E.OK.hkill]
@@ -134,7 +134,7 @@ theorem write_prod (fdm : Fdmap) (fd : Int) (d : Nat) (outs xs ds : List (List (
       ((E.fds fdm -∗ E.prod d [a.drop bs.length] [] ds -∗ K (bs.length : Int)) ∧
        (E.fds fdm -∗ E.prodHalt d ds -∗ K (-1)) ∧
        (∀ x, E.taint (fdDom fdm) -∗ K x)) -∗
-      wrObl (hlc := hlc) E.N E.P fd bs K := by
+      wrObl E.N E.P fd bs K := by
   iintro Hfds Hd HK
   unfold prod
   icases Hd with ⟨%pn, %gp, %w, %A, %X, Htk, Hb⟩
@@ -210,7 +210,7 @@ theorem write_prod_halt (fdm : Fdmap) (fd : Int) (d : Nat) (ds : List (List (Bit
     (hne : bs ≠ []) (hbnd : (bs.length : Int) < 2 ^ 31) (hfd : fdm fd = some d) (hfo : fd = prodOut) :
     ⊢ E.fds fdm -∗ E.prodHalt d ds -∗
       ((E.fds fdm -∗ E.prodHalt d ds -∗ K (-1)) ∧ (∀ x, E.taint (fdDom fdm) -∗ K x)) -∗
-      wrObl (hlc := hlc) E.N E.P fd bs K := by
+      wrObl E.N E.P fd bs K := by
   iintro Hfds Hd HK
   unfold prodHalt
   icases Hd with ⟨%pn, %gp, %w, %A, %X, Htk, Hh, Hcon⟩
@@ -242,7 +242,7 @@ theorem cons_write_con (w : Wid) (A : List (List (BitVec 8))) (l : List FdState)
     (hrow : l[2]? = some (.open rb true (.device CONSOLE))) (ha : a ∈ alts) (hpre : bs <+: a) :
     ⊢ ustd E.N.fd l -∗ pnsCon E.R w A alts -∗
       (ustd E.N.fd l -∗ pnsCon E.R w A [a.drop bs.length] -∗ K (bs.length : Int)) -∗
-      wrObl (hlc := hlc) E.N E.P ((2 : Nat) : Int) bs K := by
+      wrObl E.N E.P ((2 : Nat) : Int) bs K := by
   haveI := E.hPc
   exact consWrite E.UL E.N E.P E.FHH.sw (pnsCon E.R w A) (fun alts => pns_con_short E.R w A alts)
     (fun alts a ha => pns_con_sub E.R w A alts a ha) (fun x b hb => pns_con_step E.OK w A x b hb)
@@ -254,7 +254,7 @@ theorem cons_write_conX (w : Wid) (x : List (BitVec 8)) (l : List FdState) (rb :
     (hrow : l[2]? = some (.open rb true (.device CONSOLE))) (ha : a ∈ alts) (hpre : bs <+: a) :
     ⊢ ustd E.N.fd l -∗ cifConX E.R w x alts -∗
       (ustd E.N.fd l -∗ cifConX E.R w x [a.drop bs.length] -∗ K (bs.length : Int)) -∗
-      wrObl (hlc := hlc) E.N E.P ((2 : Nat) : Int) bs K := by
+      wrObl E.N E.P ((2 : Nat) : Int) bs K := by
   haveI := E.hPc
   exact consWrite E.UL E.N E.P E.FHH.sw (cifConX E.R w x) (fun alts => cif_conX_short E.R w x alts)
     (fun alts a ha => cif_conX_sub E.R w x alts a ha) (fun y b hb => cif_conX_step E.OK w x y b hb)
@@ -268,7 +268,7 @@ theorem write_prod_err (fdm : Fdmap) (fd : Int) (d : Nat) (outs xs ds : List (Li
     ⊢ E.fds fdm -∗ E.prod d outs xs ds -∗
       ((E.fds fdm -∗ E.prod d outs [] [a.drop bs.length] -∗ K (bs.length : Int)) ∧
        (∀ x, E.taint (fdDom fdm) -∗ K x)) -∗
-      wrObl (hlc := hlc) E.N E.P fd bs K := by
+      wrObl E.N E.P fd bs K := by
   iintro Hfds Hd HK
   unfold prod
   icases Hd with ⟨%pn, %gp, %w, %A, %X, Htk, Hb⟩
@@ -347,7 +347,7 @@ theorem write_prod_fail (fdm : Fdmap) (fd : Int) (d : Nat) (outs xs ds : List (L
     ⊢ E.fds fdm -∗ E.prod d outs xs ds -∗
       ((E.fds fdm -∗ E.prod d [[]] [] [a.drop bs.length] -∗ K (bs.length : Int)) ∧
        (∀ x, E.taint (fdDom fdm) -∗ K x)) -∗
-      wrObl (hlc := hlc) E.N E.P fd bs K := by
+      wrObl E.N E.P fd bs K := by
   iintro Hfds Hd HK
   unfold prod
   icases Hd with ⟨%pn, %gp, %w, %A, %X, Htk, Hb⟩
@@ -408,7 +408,7 @@ theorem write_prod_halt_err (fdm : Fdmap) (fd : Int) (d : Nat) (ds : List (List 
     ⊢ E.fds fdm -∗ E.prodHalt d ds -∗
       ((E.fds fdm -∗ E.prodHalt d [a.drop bs.length] -∗ K (bs.length : Int)) ∧
        (∀ x, E.taint (fdDom fdm) -∗ K x)) -∗
-      wrObl (hlc := hlc) E.N E.P fd bs K := by
+      wrObl E.N E.P fd bs K := by
   iintro Hfds Hd HK
   unfold prodHalt
   icases Hd with ⟨%pn, %gp, %w, %A, %X, Htk, Hh, Hcon⟩

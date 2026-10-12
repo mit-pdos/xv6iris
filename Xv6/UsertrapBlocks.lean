@@ -121,7 +121,7 @@ end Frame
 /-! ## §3 The residue's pieces, opened -/
 
 section Acc
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
@@ -178,7 +178,7 @@ theorem ut_a6_res_left [CurCtx] (Rsys : UtNames → BitVec 32 → IProp GF) (N :
     (gn : GName) :
     utOwn (GF := GF) Rsys N V M sts cs pid ⊢
       utOwn Rsys N V M sts cs pid ∨
-        (utOwnNm Rsys N V M sts cs pid ∗ killShot gn ∗ filecloseCpays (hlc := hlc) sts ∗ killOwed gn) :=
+        (utOwnNm Rsys N V M sts cs pid ∗ killShot gn ∗ filecloseCpays sts ∗ killOwed gn) :=
   or_intro_l
 
 /-- **The trapframe pointer (whole) and page** (Rocq `proc_priv_tf_upd`),
@@ -251,7 +251,7 @@ end Acc
 /-! ## §4 The context's kernel table, and the kexit closer -/
 
 section Ctx
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- **The kernel table's shared invariant, out of the context** (Rocq's
 `kpt_on` read off the KPT receipt): what `utTfk` keeps. -/
@@ -292,7 +292,7 @@ end Ctx
 /-! ## §4b The `killed` call site (the three kill checks share it) -/
 
 section Killed
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- `killed`'s contract with a reading, at its entry (the strong form
@@ -305,9 +305,9 @@ theorem ut_killed (Γ : SchedNames) (KI : KILLED) (c : CPU) (k' : KCtx) (j : Nat
     kctx c k' ∗ pcIs c KA.«killed» ∗ procsInv Γ ∗
     (∀ (pidr klr : BitVec 32),
       wordPointsTo (pPid (procAddr j)) 4 pidPub pidr -∗
-      killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pidr klr -∗
+      killPaidAt (MachFixedGS.killCred (GF := GF)) pidr klr -∗
       wordPointsTo (pPid (procAddr j)) 4 pidPub pidr ∗
-      killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pidr klr ∗ Rout klr) ∗
+      killPaidAt (MachFixedGS.killCred (GF := GF)) pidr klr ∗ Rout klr) ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ∀ kl : BitVec 32,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
@@ -315,7 +315,7 @@ theorem ut_killed (Γ : SchedNames) (KI : KILLED) (c : CPU) (k' : KCtx) (j : Nat
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = BitVec.signExtend 64 kl⌝ -∗ Rout kl -∗
       wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := KI.wp_killed_r (hlc := hlc) (GF := GF) Γ c k' j Rout hj hp hnoff' hK' hlk htier
+  have h := KI.wp_killed_r (GF := GF) Γ c k' j Rout hj hp hnoff' hK' hlk htier
   unfold wp_killed_r_body at h
   simp only [killedAddr] at h
   exact h
@@ -325,19 +325,19 @@ end Killed
 /-! ## §5 The block statements -/
 
 section Blocks
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
     (PT : SchedNames → IProp GF) (Γ : SchedNames)
 
 /-- The residue's syscall environment, at the args. -/
-abbrev utRsys (A : UtArgs GF) : UtNames → BitVec 32 → IProp GF := utSysEnvAt (hlc := hlc) PT Γ A.j
+abbrev utRsys (A : UtArgs GF) : UtNames → BitVec 32 → IProp GF := utSysEnvAt PT Γ A.j
 
 /-- **The caller's continuation, hart-free** (a `true` crossing at a real
 process pins nothing). -/
 def utKont (A : UtArgs GF) : IProp GF :=
-  iprop(∀ c : CPU, usertrapPost (hlc := hlc) (fun h => usertrapResAt (hlc := hlc) PT Γ A.j h)
+  iprop(∀ c : CPU, usertrapPost (fun h => usertrapResAt PT Γ A.j h)
     A.k A.P A.ksp A.V A.M A.sts A.gn A.cs A.pid A.sep A.sc A.f A.Wk c)
 
 /-- usertrap's own frame, at the entry's values. -/
@@ -353,7 +353,7 @@ abbrev utPay (A : UtArgs GF) : IProp GF := myPay A.gn (UexecSG.sexitPay A.f)
 tear-down's price (`utTear`, Rocq lane PQ-C): a third party's kill brings
 the shot, the marker and the killer's credential; a self-kill the closes of
 the table and its own death payload. -/
-def UT_KEXIT [ClaimIs (hlc := hlc) GF Γ] : Prop :=
+def UT_KEXIT [ClaimIs GF Γ] : Prop :=
   ∀ (A : UtArgs GF) (cpu : CPU) (kx : KCtx) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8))
     (sts2 : List FdState) (cs2 : ExtTreeSet GName compare) (a b c d : BitVec 64),
     UtOk Γ A → kx.regs 10#5 = -1#64 → kx.regs 2#5 = A.ksp + 0xFFFFFFFFFFFFFFE0#64 →
@@ -361,7 +361,7 @@ def UT_KEXIT [ClaimIs (hlc := hlc) GF Γ] : Prop :=
     V2.kstack = A.V.kstack → V2.gen = A.V.gen →
     (kctx cpu kx ∗ pcIs cpu kexitAddr ∗ frame4s2 A.ksp a b c d ∗
       trapCsrsExt cpu kx.sie ∗ cpuClaimExt cpu kx.sie A.k.proc ∗ utCaps A.N ∗
-      utOwnNm (utRsys PT Γ A) A.N V2 M2 sts2 cs2 A.pid ∗ utPay A ∗ utTear (hlc := hlc) A.gn sts2
+      utOwnNm (utRsys PT Γ A) A.N V2 M2 sts2 cs2 A.pid ∗ utPay A ∗ utTear A.gn sts2
       ⊢ wpLoop (GF := GF) cpu)
 
 /-- **Rocq `ut_ret`** (+0xae: prepare_return, MAKE_SATP, the epilogue, the
@@ -372,8 +372,8 @@ def UT_RET : Prop :=
     UtOk Γ A → utBase A.k kb → utPins A R → UtRows0 A V2 M2 sts2 cs2 → utLive A V2 cs2 →
     (kctx cpu ((kb.pushed 4).withRegs R) ∗ pcIs cpu (utPc 0xae#64) ∗ utFrame A ∗
       trapCsrsExt cpu kb.sie ∗ cpuClaimExt cpu kb.sie A.k.proc ∗ utCaps A.N ∗
-      utOwn (utRsys PT Γ A) A.N V2 M2 sts2 cs2 A.pid ∗ utOuts (hlc := hlc) A V2 M2 sts2 cs2 ∗
-      utKillOut (hlc := hlc) A.sc A.Wk ∗ utKont PT Γ A
+      utOwn (utRsys PT Γ A) A.N V2 M2 sts2 cs2 A.pid ∗ utOuts A V2 M2 sts2 cs2 ∗
+      utKillOut A.sc A.Wk ∗ utKont PT Γ A
       ⊢ wpLoop (GF := GF) cpu)
 
 /-- **Rocq `ut_a6`** (+0xa6: `if (killed(p)) { which_dev = 0; kexit(-1); }`,
@@ -391,9 +391,9 @@ def UT_A6 : Prop :=
       -- and the process's own death payload
       (utOwn (utRsys PT Γ A) A.N V2 M2 sts2 cs2 A.pid ∨
         (utOwnNm (utRsys PT Γ A) A.N V2 M2 sts2 cs2 A.pid ∗ killShot A.gn ∗
-          filecloseCpays (hlc := hlc) sts2 ∗ killOwed A.gn)) ∗
-      utOuts (hlc := hlc) A V2 M2 sts2 cs2 ∗
-      utLiveRes (hlc := hlc) A V2 cs2 ∗ utPay A ∗ utKont PT Γ A
+          filecloseCpays sts2 ∗ killOwed A.gn)) ∗
+      utOuts A V2 M2 sts2 cs2 ∗
+      utLiveRes A V2 cs2 ∗ utPay A ∗ utKont PT Γ A
       ⊢ wpLoop (GF := GF) cpu)
 
 /-- **Rocq `ut_fa`** (+0xfc: `if (which_dev == 2) yield();`, then +0xae),
@@ -404,8 +404,8 @@ def UT_FA : Prop :=
     UtOk Γ A → utPins A R → UtRows0 A V2 M2 sts2 cs2 → utLive A V2 cs2 →
     (kctx cpu ((A.k.pushed 4).withRegs R) ∗ pcIs cpu (utPc 0xfc#64) ∗ utFrame A ∗
       trapCsrsExt cpu false ∗ cpuClaimExt cpu false A.k.proc ∗ utCaps A.N ∗
-      utOwn (utRsys PT Γ A) A.N V2 M2 sts2 cs2 A.pid ∗ utOuts (hlc := hlc) A V2 M2 sts2 cs2 ∗
-      utKillOut (hlc := hlc) A.sc A.Wk ∗ utKont PT Γ A
+      utOwn (utRsys PT Γ A) A.N V2 M2 sts2 cs2 A.pid ∗ utOuts A V2 M2 sts2 cs2 ∗
+      utKillOut A.sc A.Wk ∗ utKont PT Γ A
       ⊢ wpLoop (GF := GF) cpu)
 
 /-- **Rocq `ut_e8`** (+0xea: the device arm's `killed(p)` check), at the
@@ -416,7 +416,7 @@ def UT_EA : Prop :=
     (kctx cpu ((A.k.pushed 4).withRegs R) ∗ pcIs cpu (utPc 0xea#64) ∗ utFrame A ∗
       trapCsrsExt cpu false ∗ cpuClaimExt cpu false A.k.proc ∗ utCaps A.N ∗
       utOwn (utRsys PT Γ A) A.N (utV1 A) A.M A.sts A.cs A.pid ∗
-      utKillIn (hlc := hlc) A.f A.sc A.Wk A.gn A.sts ∗ utPay A ∗ utKont PT Γ A
+      utKillIn A.f A.sc A.Wk A.gn A.sts ∗ utPay A ∗ utKont PT Γ A
       ⊢ wpLoop (GF := GF) cpu)
 
 /-- **Rocq `ut_56`** (+0x56: the two printks, `setkilled(p)`, then +0xa6),
@@ -433,7 +433,7 @@ def UT_56 : Prop :=
     (kctx cpu ((A.k.pushed 4).withRegs R) ∗ pcIs cpu (utPc 0x56#64) ∗ utFrame A ∗
       trapCsrsExt cpu false ∗ cpuClaimExt cpu false A.k.proc ∗ utCaps A.N ∗
       utOwn (utRsys PT Γ A) A.N ((utV1 A).updEv kv) A.M A.sts A.cs A.pid ∗
-      ukillCredAt (hlc := hlc) uslot A.gn A.sc A.Wk A.f ∗ utPay A ∗ utKont PT Γ A
+      ukillCredAt uslot A.gn A.sc A.Wk A.f ∗ utPay A ∗ utKont PT Γ A
       ⊢ wpLoop (GF := GF) cpu)
 
 /-- **Rocq `ut_d0`** (+0xd0: `vmfault(...)`, then +0xa6 or +0x56), at the
@@ -444,7 +444,7 @@ def UT_D0 : Prop :=
     (kctx cpu ((A.k.pushed 4).withRegs R) ∗ pcIs cpu (utPc 0xd0#64) ∗ utFrame A ∗
       trapCsrsExt cpu false ∗ cpuClaimExt cpu false A.k.proc ∗ utCaps A.N ∗
       utOwn (utRsys PT Γ A) A.N (utV1 A) A.M A.sts A.cs A.pid ∗
-      utKillIn (hlc := hlc) A.f A.sc A.Wk A.gn A.sts ∗ utPay A ∗ utKont PT Γ A
+      utKillIn A.f A.sc A.Wk A.gn A.sts ∗ utPay A ∗ utKont PT Γ A
       ⊢ wpLoop (GF := GF) cpu)
 
 /-- **Rocq `ut_90`** (+0x90: the syscall arm -- `killed`, `epc += 4`,
@@ -457,8 +457,8 @@ def UT_90 : Prop :=
     (kctx cpu ((A.k.pushed 4).withRegs R) ∗ pcIs cpu (utPc 0x90#64) ∗ utFrame A ∗
       trapCsrsExt cpu false ∗ cpuClaimExt cpu false A.k.proc ∗ utCaps A.N ∗
       utOwn (utRsys PT Γ A) A.N (utV1 A) A.M A.sts A.cs A.pid ∗
-      utSysIn (hlc := hlc) A.f A.sc A.sep A.V A.M A.sts A.gn A.cs A.pid ∗
-      utForkIn (hlc := hlc) A.f A.sc A.sep A.V A.M A.sts ∗ utPayIn A.f A.sc A.sep A.V ∗
+      utSysIn A.f A.sc A.sep A.V A.M A.sts A.gn A.cs A.pid ∗
+      utForkIn A.f A.sc A.sep A.V A.M A.sts ∗ utPayIn A.f A.sc A.sep A.V ∗
       utKont PT Γ A
       ⊢ wpLoop (GF := GF) cpu)
 

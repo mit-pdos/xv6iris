@@ -135,7 +135,7 @@ instance proc_ne {GF : BundledGFunctors.{0}} (Φ : Proc → IProp GF) : OFE.NonE
   ⟨fun {_ _ _} (h : _ = _) => h ▸ OFE.Dist.rfl⟩
 
 section UkTree
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -163,11 +163,11 @@ def wrObl (N : UkNames GF) (P : Uprog GF) (fd : Int) (bs : Bytes) (K : Int → I
     ⌜m.get 12#5 = BitVec.ofNat 64 bs.length⌝ -∗
     P.code -∗
     usrcAt N tx dq ua bs.length f -∗
-    urun (hlc := hlc) N h m (BitVec.ofNat 64 P.write) avail -∗
+    urun N h m (BitVec.ofNat 64 P.write) avail -∗
     (∀ (h' : CPU) (ret : BitVec 64),
       K ret.toInt -∗
       usrcAt N tx dq ua bs.length f -∗
-      urun (hlc := hlc) N h' (stubRet m 16 ret) (retPc (m.get 1#5)) avail -∗
+      urun N h' (stubRet m 16 ret) (retPc (m.get 1#5)) avail -∗
       wpLoop h') -∗
     wpLoop h)
 
@@ -179,12 +179,12 @@ def rdObl (N : UkNames GF) (P : Uprog GF) (fd : Int) (n : Nat) (K : RdAns → IP
     ⌜(BitVec.setWidth 32 (m.get 12#5)).toInt = (n : Int)⌝ -∗
     P.code -∗
     ubytes N.d a n f -∗
-    urun (hlc := hlc) N h m (BitVec.ofNat 64 P.read) avail -∗
+    urun N h m (BitVec.ofNat 64 P.read) avail -∗
     (∀ (h' : CPU) (ret : BitVec 64) (g : Nat → BitVec 8),
       ⌜readAnsOk n ret⌝ -∗
       K (rdAnsOf ret g) -∗
       ubytes N.d a n g -∗
-      urun (hlc := hlc) N h' (stubRet m 5 ret) (retPc (m.get 1#5)) avail -∗
+      urun N h' (stubRet m 5 ret) (retPc (m.get 1#5)) avail -∗
       wpLoop h') -∗
     wpLoop h)
 
@@ -196,12 +196,12 @@ def opObl (N : UkNames GF) (P : Uprog GF) (path : Bytes) (mode : Int) (K : Int �
     ⌜m.get 11#5 = BitVec.ofInt 64 mode⌝ -∗
     P.code -∗
     upathAt N tx pv path.length f -∗
-    urun (hlc := hlc) N h m (BitVec.ofNat 64 P.open) avail -∗
+    urun N h m (BitVec.ofNat 64 P.open) avail -∗
     (∀ (h' : CPU) (ret : BitVec 64),
       ⌜openAnsOk ret⌝ -∗
       K ret.toInt -∗
       upathAt N tx pv path.length f -∗
-      urun (hlc := hlc) N h' (stubRet m 15 ret) (retPc (m.get 1#5)) avail -∗
+      urun N h' (stubRet m 15 ret) (retPc (m.get 1#5)) avail -∗
       wpLoop h') -∗
     wpLoop h)
 
@@ -210,10 +210,10 @@ def clObl (N : UkNames GF) (P : Uprog GF) (fd : Int) (K : Int → IProp GF) : IP
   iprop(∀ (h : CPU) (m : RegMap) (avail : Nat),
     ⌜(BitVec.setWidth 32 (m.get 10#5)).toInt = fd⌝ -∗
     P.code -∗
-    urun (hlc := hlc) N h m (BitVec.ofNat 64 P.close) avail -∗
+    urun N h m (BitVec.ofNat 64 P.close) avail -∗
     (∀ (h' : CPU) (ret : BitVec 64),
       K ret.toInt -∗
-      urun (hlc := hlc) N h' (stubRet m 21 ret) (retPc (m.get 1#5)) avail -∗
+      urun N h' (stubRet m 21 ret) (retPc (m.get 1#5)) avail -∗
       wpLoop h') -∗
     wpLoop h)
 
@@ -223,20 +223,20 @@ def exObl (N : UkNames GF) (P : Uprog GF) (status : Int) : IProp GF :=
   iprop(∀ (h : CPU) (m : RegMap) (avail : Nat),
     ⌜(BitVec.setWidth 32 (m.get 10#5)).toInt = status⌝ -∗
     P.code -∗
-    urun (hlc := hlc) N h m (BitVec.ofNat 64 P.exit) avail -∗
+    urun N h m (BitVec.ofNat 64 P.exit) avail -∗
     wpLoop h)
 
 /-- **Rocq `ev_obl`**: the hole of an event. -/
 def evObl (N : UkNames GF) (P : Uprog GF) : (e : PEv) → (Ans e → IProp GF) → IProp GF
-  | .EOpen path mode, K => opObl (hlc := hlc) N P path mode K
-  | .EClose fd, K => clObl (hlc := hlc) N P fd K
-  | .ERead fd n, K => rdObl (hlc := hlc) N P fd n K
-  | .EWrite fd bs, K => wrObl (hlc := hlc) N P fd bs K
-  | .EExit s, _ => exObl (hlc := hlc) N P s
+  | .EOpen path mode, K => opObl N P path mode K
+  | .EClose fd, K => clObl N P fd K
+  | .ERead fd n, K => rdObl N P fd n K
+  | .EWrite fd bs, K => wrObl N P fd bs K
+  | .EExit s, _ => exObl N P s
 
 /-- **Rocq `ev_obl_mono`**: every hole is monotone in its continuation. -/
 theorem evObl_mono (N : UkNames GF) (P : Uprog GF) (e : PEv) (K K' : Ans e → IProp GF) :
-    ⊢ □ (∀ x, K x -∗ K' x) -∗ evObl (hlc := hlc) N P e K -∗ evObl (hlc := hlc) N P e K' := by
+    ⊢ □ (∀ x, K x -∗ K' x) -∗ evObl N P e K -∗ evObl N P e K' := by
   cases e with
   | EOpen path mode =>
     simp only [evObl]; unfold opObl
@@ -277,15 +277,15 @@ theorem evObl_mono (N : UkNames GF) (P : Uprog GF) (e : PEv) (K K' : Ans e → I
 def treeFOf (N : UkNames GF) (P : Uprog GF) (Q : Proc → IProp GF) : ITreeF Empty Proc → IProp GF
   | .ret v => v.elim
   | .tau t' => Q t'
-  | .vis e k => evObl (hlc := hlc) N P e (fun x => Q (k x))
+  | .vis e k => evObl N P e (fun x => Q (k x))
 
 /-- **Rocq `tree_F`**: the step functional. -/
 def treeF (N : UkNames GF) (P : Uprog GF) (Q : Proc → IProp GF) (t : Proc) : IProp GF :=
-  treeFOf (hlc := hlc) N P Q t.observe
+  treeFOf N P Q t.observe
 
 /-- **Rocq `tree_F_mono_law`**: the step functional is monotone. -/
 theorem treeF_mono_law (N : UkNames GF) (P : Uprog GF) (Q Q' : Proc → IProp GF) :
-    ⊢ □ (∀ t, Q t -∗ Q' t) -∗ ∀ t, treeF (hlc := hlc) N P Q t -∗ treeF (hlc := hlc) N P Q' t := by
+    ⊢ □ (∀ t, Q t -∗ Q' t) -∗ ∀ t, treeF N P Q t -∗ treeF N P Q' t := by
   iintro #HQ %t Ht
   unfold treeF
   generalize t.observe = o
@@ -302,32 +302,32 @@ theorem treeF_mono_law (N : UkNames GF) (P : Uprog GF) (Q Q' : Proc → IProp GF
     iapply HQ $$ Hx
 
 /-- Rocq `tree_F_mono` (the `BiMonoPred` instance; deviation 6). -/
-instance treeF_mono (N : UkNames GF) (P : Uprog GF) : BIMonoPred (treeF (hlc := hlc) N P) where
+instance treeF_mono (N : UkNames GF) (P : Uprog GF) : BIMonoPred (treeF N P) where
   mono_pred {Φ Ψ} _ _ := treeF_mono_law N P Φ Ψ
   mono_pred_ne {_} _ := proc_ne _
 
 /-- **Rocq `tree_pay`**: THE TREE'S PAYMENT, the greatest fixpoint. -/
 def treePay (N : UkNames GF) (P : Uprog GF) : Proc → IProp GF :=
-  bi_greatest_fixpoint (treeF (hlc := hlc) N P)
+  bi_greatest_fixpoint (treeF N P)
 
 /-- **Rocq `tree_pay_unfold`**. -/
 theorem treePay_unfold (N : UkNames GF) (P : Uprog GF) (t : Proc) :
-    treePay (hlc := hlc) N P t = treeF (hlc := hlc) N P (treePay (hlc := hlc) N P) t :=
+    treePay N P t = treeF N P (treePay N P) t :=
   greatest_fixpoint_unfold _
 
 /-- Rocq `tree_pay_unfold`, the two directions as entailments. -/
 theorem treePay_unfold_mp (N : UkNames GF) (P : Uprog GF) (t : Proc) :
-    treePay (hlc := hlc) N P t ⊢ treeF (hlc := hlc) N P (treePay (hlc := hlc) N P) t :=
+    treePay N P t ⊢ treeF N P (treePay N P) t :=
   greatest_fixpoint_unfold_mp _
 
 /-- **Rocq `tree_pay_tau`**. -/
 theorem treePay_tau (N : UkNames GF) (P : Uprog GF) (t : Proc) :
-    treePay (hlc := hlc) N P (.tau t) = treePay (hlc := hlc) N P t := by
+    treePay N P (.tau t) = treePay N P t := by
   rw [treePay_unfold]; rfl
 
 /-- **Rocq `tree_pay_vis`**. -/
 theorem treePay_vis (N : UkNames GF) (P : Uprog GF) (e : PEv) (k : Ans e → Proc) :
-    treePay (hlc := hlc) N P (.vis e k) = evObl (hlc := hlc) N P e (fun x => treePay (hlc := hlc) N P (k x)) := by
+    treePay N P (.vis e k) = evObl N P e (fun x => treePay N P (k x)) := by
   rw [treePay_unfold]
   unfold treeF
   rw [ITree.observe_vis]
@@ -336,8 +336,8 @@ theorem treePay_vis (N : UkNames GF) (P : Uprog GF) (e : PEv) (k : Ans e → Pro
 /-- **Rocq `tree_pay_coind`**: a payer's principle -- an invariant that
 funds one node and comes back funds the whole tree. -/
 theorem treePay_coind (N : UkNames GF) (P : Uprog GF) (I : Proc → IProp GF) :
-    ⊢ □ (∀ t, I t -∗ treeF (hlc := hlc) N P I t) -∗ ∀ t, I t -∗ treePay (hlc := hlc) N P t :=
-  greatest_fixpoint_coiter (F := treeF (hlc := hlc) N P) I
+    ⊢ □ (∀ t, I t -∗ treeF N P I t) -∗ ∀ t, I t -∗ treePay N P t :=
+  greatest_fixpoint_coiter (F := treeF N P) I
 
 end UkTree
 

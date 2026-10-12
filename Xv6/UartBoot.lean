@@ -49,7 +49,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-- The empty console history (the power-on step's founding point). -/
 abbrev uartBootHist : ConsHist := ⟨[], [], [], none⟩
@@ -75,7 +75,7 @@ accepted; the port's claim is founded on the power-on step's console
 resource. -/
 theorem uartGhostsAlloc (i : UartId) (u : UartState) (hrx : u.rx = []) (hrc : u.recvd = [])
     (hlb : Uart.loopback u = false) (hwo : u.wire = u.out) (hacc : Uart.acc u = []) :
-    chistAt (GF := GF) i (genId (hlc := hlc) (GF := GF) + 1) [] uartBootHist ⊢
+    chistAt (GF := GF) i (genId (GF := GF) + 1) [] uartBootHist ⊢
       |==> ∃ γ : UartNames,
         uartGhosts γ u ∗ uartColE i γ u ∗ consClaimAt i γ u ∗
         txOwn γ (Uart.acc u) ∗ uartSent γ (Uart.acc u) ∗ dlabOwn γ (Uart.dlab u) ∗
@@ -153,7 +153,7 @@ theorem uartGhostsAlloc (i : UartId) (u : UartState) (hrx : u.rx = []) (hrc : u.
 /-- **Rocq `WpUart.uart_inv_alloc`**: the port's invariant, sealed with the
 device's mirror. -/
 theorem uartInvAlloc (E : CoPset) (i : UartId) (γ : UartNames) (u : UartState) :
-    devFrag (hlc := hlc) (GF := GF) (.uart i) u ∗ uartBody i γ u ⊢ |={E}=> uartInv i γ := by
+    devFrag (GF := GF) (.uart i) u ∗ uartBody i γ u ⊢ |={E}=> uartInv i γ := by
   iintro ⟨Hf, Hb⟩
   unfold uartInv devInvR
   iapply inv_alloc (uartN i) E _
@@ -174,7 +174,7 @@ def uartBootRes (γ : UartNames) : IProp GF := iprop%
 
 /-- The kernel's port claims nothing (Rocq `cons_res_at_uart1`). -/
 theorem uartBoot_chist1 (k : Nat) (ho : List Obs) (H : ConsHist) :
-    ⊢@{IProp GF} chistAt (hlc := hlc) .uart1 k ho H := by
+    ⊢@{IProp GF} chistAt .uart1 k ho H := by
   show ⊢ iprop(emp)
   exact .rfl
 
@@ -185,8 +185,8 @@ theorem uartReset_dlab : Uart.dlab Uart.reset = false := rfl
 rows (Rocq `boot_shared_alloc`'s `uart_ghosts_alloc` + `uart_inv_alloc`
 at `Uart1`; at `Uart0` Rocq seals the invariant inside `dev_inv_alloc`). -/
 theorem uartBootAlloc (E : CoPset) (i : UartId) :
-    devFrag (hlc := hlc) (GF := GF) (.uart i) Uart.reset ∗
-      chistAt i (genId (hlc := hlc) (GF := GF) + 1) [] uartBootHist ⊢
+    devFrag (GF := GF) (.uart i) Uart.reset ∗
+      chistAt i (genId (GF := GF) + 1) [] uartBootHist ⊢
       |={E}=> ∃ γ : UartNames, uartInv i γ ∗ uartBootRes γ := by
   iintro ⟨Hf, Hres⟩
   imod uartGhostsAlloc i Uart.reset rfl rfl rfl rfl rfl $$ Hres with
@@ -213,9 +213,9 @@ theorem uartBootAlloc (E : CoPset) (i : UartId) :
 allocations of Rocq's `boot_shared_alloc`).  The kernel's port's claim is
 founded on nothing (`chistAt .uart1 = emp`). -/
 theorem uartsBootAlloc (E : CoPset) :
-    devFrag (hlc := hlc) (GF := GF) (.uart .uart0) Uart.reset ∗
-      devFrag (hlc := hlc) (GF := GF) (.uart .uart1) Uart.reset ∗
-      chistAt .uart0 (genId (hlc := hlc) (GF := GF) + 1) [] uartBootHist ⊢
+    devFrag (GF := GF) (.uart .uart0) Uart.reset ∗
+      devFrag (GF := GF) (.uart .uart1) Uart.reset ∗
+      chistAt .uart0 (genId (GF := GF) + 1) [] uartBootHist ⊢
       |={E}=> ∃ γ0 γ1 : UartNames,
         uartInv .uart0 γ0 ∗ uartInv .uart1 γ1 ∗ uartBootRes γ0 ∗ uartBootRes γ1 := by
   iintro ⟨Hf0, Hf1, Hres⟩

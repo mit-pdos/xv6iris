@@ -14,7 +14,7 @@ namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-! ## A device byte -/
 

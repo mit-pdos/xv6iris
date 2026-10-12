@@ -49,7 +49,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section AppFileEscrow
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF]
 
 /-! ## The one-shot -/
@@ -63,17 +63,17 @@ def escTok (g : GName) : IProp GF :=
 def escSpent (g : GName) : IProp GF :=
   MonoNat.lb_own g (.ofNat 1)
 
-instance escSpent_persistent (g : GName) : Persistent (escSpent (hlc := hlc) (GF := GF) g) := by
+instance escSpent_persistent (g : GName) : Persistent (escSpent (GF := GF) g) := by
   unfold escSpent; infer_instance
 
-instance escSpent_timeless (g : GName) : Timeless (escSpent (hlc := hlc) (GF := GF) g) := by
+instance escSpent_timeless (g : GName) : Timeless (escSpent (GF := GF) g) := by
   unfold escSpent; infer_instance
 
-instance escTok_timeless (g : GName) : Timeless (escTok (hlc := hlc) (GF := GF) g) := by
+instance escTok_timeless (g : GName) : Timeless (escTok (GF := GF) g) := by
   unfold escTok; infer_instance
 
 /-- Rocq `esc_alloc`. -/
-theorem escAlloc : ⊢@{IProp GF} |==> ∃ g : GName, escTok (hlc := hlc) g := by
+theorem escAlloc : ⊢@{IProp GF} |==> ∃ g : GName, escTok g := by
   unfold escTok
   imod (MonoNat.own_alloc (GF := GF) (.ofNat 0)) with ⟨%g, Ht, -⟩
   imodintro
@@ -81,7 +81,7 @@ theorem escAlloc : ⊢@{IProp GF} |==> ∃ g : GName, escTok (hlc := hlc) g := b
   iexact Ht
 
 /-- Rocq `esc_spend`. -/
-theorem escSpend (g : GName) : ⊢@{IProp GF} escTok (hlc := hlc) g ==∗ escSpent (hlc := hlc) g := by
+theorem escSpend (g : GName) : ⊢@{IProp GF} escTok g ==∗ escSpent g := by
   unfold escTok escSpent
   iintro Ht
   imod MonoNat.own_update g 0 1 ((MaxNat.le_toNat _ _).mpr (by decide)) $$ Ht with ⟨-, #Hlb⟩
@@ -91,7 +91,7 @@ theorem escSpend (g : GName) : ⊢@{IProp GF} escTok (hlc := hlc) g ==∗ escSpe
 /-- The refutation the truncate on the EXISTS run runs on (Rocq
 `esc_tok_spent`). -/
 theorem escTok_spent (g : GName) :
-    ⊢@{IProp GF} escTok (hlc := hlc) g -∗ escSpent (hlc := hlc) g -∗ False := by
+    ⊢@{IProp GF} escTok g -∗ escSpent g -∗ False := by
   unfold escTok escSpent
   iintro Ht Hlb
   ihave %h := MonoNat.auth_lb_own_valid g _ 0 1 $$ Ht Hlb
@@ -174,33 +174,33 @@ theorem escWit_head (h0 : List EscRec) (n : Nat) (s s0 : Dst) (g g0 : GName)
 /-- THE LEDGER'S INVARIANT: every escrow recorded is spent (Rocq
 `esc_recs`). -/
 def escRecs (h : List EscRec) : IProp GF :=
-  iprop([∗list] p ∈ h, escSpent (hlc := hlc) p.2)
+  iprop([∗list] p ∈ h, escSpent p.2)
 
 instance escRecs_persistent (h : List EscRec) :
-    Persistent (escRecs (hlc := hlc) (GF := GF) h) := by
+    Persistent (escRecs (GF := GF) h) := by
   unfold escRecs; infer_instance
 
 instance escRecs_timeless (h : List EscRec) :
-    Timeless (escRecs (hlc := hlc) (GF := GF) h) := by
+    Timeless (escRecs (GF := GF) h) := by
   unfold escRecs; infer_instance
 
 /-- Rocq `esc_recs_at`. -/
 theorem escRecs_at (h : List EscRec) (n : Nat) (s : Dst) (g : GName)
     (hn : h[n]? = some (s, g)) :
-    ⊢@{IProp GF} escRecs (hlc := hlc) h -∗ escSpent (hlc := hlc) g := by
+    ⊢@{IProp GF} escRecs h -∗ escSpent g := by
   unfold escRecs
   iintro #Hh
-  iapply (BigSepL.bigSepL_lookup (Φ := fun _ p => escSpent (hlc := hlc) (GF := GF) p.2) hn)
+  iapply (BigSepL.bigSepL_lookup (Φ := fun _ p => escSpent (GF := GF) p.2) hn)
   iexact Hh
 
 /-- Rocq `esc_recs_snoc`. -/
 theorem escRecs_snoc (h : List EscRec) (p : EscRec) :
-    ⊢@{IProp GF} escRecs (hlc := hlc) h -∗ escSpent (hlc := hlc) p.2 -∗
-      escRecs (hlc := hlc) (h ++ [p]) := by
+    ⊢@{IProp GF} escRecs h -∗ escSpent p.2 -∗
+      escRecs (h ++ [p]) := by
   unfold escRecs
   iintro #Hh #Hp
   have e := (BigSepL.bigSepL_snoc (PROP := IProp GF)
-    (Φ := fun _ q => escSpent (hlc := hlc) (GF := GF) q.2) (l := h) (x := p)).2
+    (Φ := fun _ q => escSpent (GF := GF) q.2) (l := h) (x := p)).2
   iapply e
   isplitl []
   · iexact Hh
@@ -209,14 +209,14 @@ theorem escRecs_snoc (h : List EscRec) (p : EscRec) :
 /-- THE KEY A PARKED HOLDER CARRIES: the ledger entry, or the taint (Rocq
 `esc_key`). -/
 def escKey (c : FileFixed) (r : FileAppNames) (n : Nat) (s : Dst) (g : GName) : IProp GF :=
-  iprop(escWit r n s g ∨ fileTaint (hlc := hlc) c)
+  iprop(escWit r n s g ∨ fileTaint c)
 
 instance escKey_persistent (c : FileFixed) (r : FileAppNames) (n : Nat) (s : Dst) (g : GName) :
-    Persistent (escKey (hlc := hlc) (GF := GF) c r n s g) := by
+    Persistent (escKey (GF := GF) c r n s g) := by
   unfold escKey; infer_instance
 
 instance escKey_timeless (c : FileFixed) (r : FileAppNames) (n : Nat) (s : Dst) (g : GName) :
-    Timeless (escKey (hlc := hlc) (GF := GF) c r n s g) := by
+    Timeless (escKey (GF := GF) c r n s g) := by
   unfold escKey; infer_instance
 
 /-- Fresh names, both halves of both ghosts, at any value, and the escrow

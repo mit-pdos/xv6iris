@@ -87,9 +87,9 @@ def initlogAddr : BitVec 64 := KA.«initlog»
 def initlogSlots : Nat := 6 + installTransSlots
 
 /-- **WP of `initlog(dev = a0, sb = a1)`**. -/
-def wp_initlog_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_initlog_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
     (γdl : GName) (γfs : FsNames) (pd pav pu : BitVec 64)
     (j : Nat) (logstart : Nat) (dev : BitVec 32) (sb : BitVec 64)
@@ -128,8 +128,8 @@ def wp_initlog_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [X
   -- THE CRASH SEAM, THE ERA CERTIFICATE AND THE ERA'S BORN-TRUE MIRROR (Rocq's):
   -- what lets initlog's writes -- the recovering installs and the closing
   -- clear -- carry REAL durability fupds
-  fsCrashSeam (hlc := hlc) (GF := GF) V.cov logstart ∗ genCert (hlc := hlc) (GF := GF) ∗
-  logMirrorBorn (hlc := hlc) M ∗
+  fsCrashSeam (GF := GF) V.cov logstart ∗ genCert (GF := GF) ∗
+  logMirrorBorn M ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   -- THE BYTE VIEW'S ROW AND THE WAL'S EXCEPTION HANDLE (Rocq
   -- `SpecInitlog.v:352`).  `initlog` is the function that SEALS the handle
@@ -171,14 +171,14 @@ def wp_initlog_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [X
   fsblock γfs.bytes SB_BNO bsSb ∗
   -- THE FILE SYSTEM'S LAW, MINUS BLOCK 1 (Rocq's): composed with the park, at
   -- the era's sync token (sync K3-3)
-  □ (sbPark γfs sbrec -∗ snapLaw (hlc := hlc) γ γfs V.cov logstart
-      (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF))) ∗
+  □ (sbPark γfs sbrec -∗ snapLaw γ γfs V.cov logstart
+      (eraSyncTok (GF := GF)) (genId (GF := GF))) ∗
   -- THE GHOST COMMIT'S TWO (Rocq sync K3-3): the HOOKED law, minus block 1's
   -- park for the same reason, and the crash invariant the ghost commit opens;
   -- both parked into `logCtx` beside `genCert`
-  □ (sbPark γfs sbrec -∗ snapLawGhost (hlc := hlc) γ γfs V.cov logstart
-      (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF)) (eraSyncHook (hlc := hlc) (GF := GF))) ∗
-  crashInv (hlc := hlc) (GF := GF) ∗
+  □ (sbPark γfs sbrec -∗ snapLawGhost γ γfs V.cov logstart
+      (eraSyncTok (GF := GF)) (genId (GF := GF)) (eraSyncHook (GF := GF))) ∗
+  crashInv (GF := GF) ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -192,9 +192,9 @@ def wp_initlog_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [X
 /-- The eb-generic form of `wp_initlog_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_initlog_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_initlog_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
     (γdl : GName) (γfs : FsNames) (pd pav pu : BitVec 64)
     (j : Nat) (logstart : Nat) (dev : BitVec 32) (sb : BitVec 64)
@@ -233,8 +233,8 @@ def wp_initlog_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
   -- THE CRASH SEAM, THE ERA CERTIFICATE AND THE ERA'S BORN-TRUE MIRROR (Rocq's):
   -- what lets initlog's writes -- the recovering installs and the closing
   -- clear -- carry REAL durability fupds
-  fsCrashSeam (hlc := hlc) (GF := GF) V.cov logstart ∗ genCert (hlc := hlc) (GF := GF) ∗
-  logMirrorBorn (hlc := hlc) M ∗
+  fsCrashSeam (GF := GF) V.cov logstart ∗ genCert (GF := GF) ∗
+  logMirrorBorn M ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   -- THE BYTE VIEW'S ROW AND THE WAL'S EXCEPTION HANDLE (Rocq
   -- `SpecInitlog.v:352`).  `initlog` is the function that SEALS the handle
@@ -276,14 +276,14 @@ def wp_initlog_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
   fsblock γfs.bytes SB_BNO bsSb ∗
   -- THE FILE SYSTEM'S LAW, MINUS BLOCK 1 (Rocq's): composed with the park, at
   -- the era's sync token (sync K3-3)
-  □ (sbPark γfs sbrec -∗ snapLaw (hlc := hlc) γ γfs V.cov logstart
-      (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF))) ∗
+  □ (sbPark γfs sbrec -∗ snapLaw γ γfs V.cov logstart
+      (eraSyncTok (GF := GF)) (genId (GF := GF))) ∗
   -- THE GHOST COMMIT'S TWO (Rocq sync K3-3): the HOOKED law, minus block 1's
   -- park for the same reason, and the crash invariant the ghost commit opens;
   -- both parked into `logCtx` beside `genCert`
-  □ (sbPark γfs sbrec -∗ snapLawGhost (hlc := hlc) γ γfs V.cov logstart
-      (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF)) (eraSyncHook (hlc := hlc) (GF := GF))) ∗
-  crashInv (hlc := hlc) (GF := GF) ∗
+  □ (sbPark γfs sbrec -∗ snapLawGhost γ γfs V.cov logstart
+      (eraSyncTok (GF := GF)) (genId (GF := GF)) (eraSyncHook (GF := GF))) ∗
+  crashInv (GF := GF) ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -296,9 +296,9 @@ def wp_initlog_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- The interface of `initlog`. -/
 structure INITLOG : Prop where
-  wp_initlog_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+  wp_initlog_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
     (γdl : GName) (γfs : FsNames) (pd pav pu : BitVec 64)
     (j : Nat) (logstart : Nat) (dev : BitVec 32) (sb : BitVec 64)
@@ -308,7 +308,7 @@ structure INITLOG : Prop where
     (pidv : BitVec 32) (dqp dqs : DFrac)
     hj hproc hK hnoff htier hgeom hdev hcl hdt ha0 ha1
     hhdrLen hhdrNodup hhdrHome hxslot hclean hLM hsbok hsbparse hpd,
-    wp_initlog_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ γl γb V γdl γfs pd pav pu j
+    wp_initlog_eb_body (GF := GF) Γ cpu k γ γl γb V γdl γfs pd pav pu j
       logstart dev sb bsHdr Xv L D M bsSb sbrec vlock vname vcpu vStart vDev vNc vN pidv dqp dqs
       hj hproc hK hnoff htier hgeom hdev hcl hdt ha0 ha1
       hhdrLen hhdrNodup hhdrHome hxslot hclean hLM hsbok hsbparse hpd

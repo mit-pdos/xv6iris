@@ -23,7 +23,7 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
@@ -48,9 +48,9 @@ theorem kinit_die_tail (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF) (N' :
     (hjp : BitVec.ofNat 64 (pc + 8) + BitVec.signExtend 64 jp = BitVec.ofNat 64 User.Init.Sym.«printf»)
     (hje : BitVec.ofNat 64 (pc + 14) + BitVec.signExtend 64 je = BitVec.ofNat 64 User.Init.Sym.«exit»)
     (hra : retPc (BitVec.ofNat 64 (pc + 12)) = BitVec.ofNat 64 (pc + 12)) :
-    ⊢ □ (∀ j : Nat, ⌜j < len⌝ -∗ kinitW1 (hlc := hlc) N' 1#64 (User.Init.initLit lit j) (Ch j) (Ch (j + 1))) -∗
+    ⊢ □ (∀ j : Nat, ⌜j < len⌝ -∗ kinitW1 N' 1#64 (User.Init.initLit lit j) (Ch j) (Ch (j + 1))) -∗
       Ch 0 -∗ (Ch len -∗ N'.pay (-1)) -∗ initCode N'.t -∗
-      urun (hlc := hlc) N' h m (BitVec.ofNat 64 pc) (12 + (12 + (4 + n))) -∗ wpLoop h := by
+      urun N' h m (BitVec.ofNat 64 pc) (12 + (12 + (4 + n))) -∗ wpLoop h := by
   iintro #Hw HCh Hfin #Hc Hrun
   ihave #Hstr := kinit_lit_str (GF := GF) N'.t lit len hok (by omega) $$ Hc
   iapply kinit_la UL N' h m pc 10#5 imm lit _ (by unfold unotSp spIdx; decide) (by decide) hv $$ [] [] Hrun
@@ -94,13 +94,13 @@ the link on the console row, the flagged deposit elsewhere; exit(1). -/
 theorem wp_kinit_main_die_df (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
     (N' : UkNames GF) [UknConst N'] (T : IProp GF) [Persistent T] (stc : FdState) (Wp Wb : Nat → IProp GF)
     (l : List FdState) (np : Nat) (h : CPU) (m : RegMap) (n : Nat) :
-    ⊢ N'.pay (-1) -∗ kinitWlaw (hlc := hlc) T -∗ kinitDiagLaw (hlc := hlc) stc Wp Wb -∗ initCode N'.t -∗
+    ⊢ N'.pay (-1) -∗ kinitWlaw T -∗ kinitDiagLaw stc Wp Wb -∗ initCode N'.t -∗
       ustd N'.fd l -∗ initLendCred T stc Wp Wb l np -∗
-      urun (hlc := hlc) N' h m (BitVec.ofNat 64 0x84) (12 + (12 + (4 + n))) -∗ wpLoop h := by
+      urun N' h m (BitVec.ofNat 64 0x84) (12 + (12 + (4 + n))) -∗ wpLoop h := by
   unfold kinitWlaw kinitDiagLaw
   iintro Hpay ⟨#Hwrl, #Hwcl⟩ ⟨#Hxlaw, #Hflaw⟩ #Hc Hstd Hcred Hrun
   ihave Hfam : iprop(∃ Ch : Nat → IProp GF,
-      □ (∀ j : Nat, ⌜j < 18⌝ -∗ kinitW1 (hlc := hlc) N' 1#64 (User.Init.initLit 0x9a0 j) (Ch j) (Ch (j + 1))) ∗
+      □ (∀ j : Nat, ⌜j < 18⌝ -∗ kinitW1 N' 1#64 (User.Init.initLit 0x9a0 j) (Ch j) (Ch (j + 1))) ∗
       Ch 0) $$ [Hstd Hcred]
   · unfold initLendCred
     icases Hcred with (⟨%hl, Hp⟩ | ⟨%hl, -⟩ | #HT)
@@ -140,20 +140,20 @@ child's, paid through the link on the console row; its exit pays the pair
 theorem wp_kinit_main_die_de (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
     (N' : UkNames GF) [UknConst N'] (T : IProp GF) [Persistent T] (stc : FdState) (Cr : ConsCred GF)
     (cn : ConsNames) (l : List FdState) (γ : GName) (np : Nat) (h : CPU) (m : RegMap) (n : Nat)
-    (hpeq : N'.pay = uconsPay (hlc := hlc) cn γ T (initRd Cr.ccRd (ccWbn Cr))) :
-    ⊢ kinitWlaw (hlc := hlc) T -∗ kinitDiagLaw (hlc := hlc) stc Cr.ccWp (ccWbn Cr) -∗ initCode N'.t -∗
-      initLendRef (hlc := hlc) cn T stc Cr N'.fd l γ np -∗
-      urun (hlc := hlc) N' h m (BitVec.ofNat 64 0xaa) (12 + (12 + (4 + n))) -∗ wpLoop h := by
+    (hpeq : N'.pay = uconsPay cn γ T (initRd Cr.ccRd (ccWbn Cr))) :
+    ⊢ kinitWlaw T -∗ kinitDiagLaw stc Cr.ccWp (ccWbn Cr) -∗ initCode N'.t -∗
+      initLendRef cn T stc Cr N'.fd l γ np -∗
+      urun N' h m (BitVec.ofNat 64 0xaa) (12 + (12 + (4 + n))) -∗ wpLoop h := by
   unfold kinitWlaw kinitDiagLaw initLendRef
   iintro ⟨#Hwrl, #Hwcl⟩ ⟨#Hxlaw, #Hflaw⟩ #Hc ⟨Hstd, Hpos, Hlease, Hcred⟩ Hrun
   -- the pair rebuilt at the lend's position, with a banner-owed credential
-  have Hback : ⊢ upos (hlc := hlc) γ np -∗ uconsPay (hlc := hlc) cn γ T Cr.ccRd (-1) -∗ ccWbn Cr np -∗
+  have Hback : ⊢ upos γ np -∗ uconsPay cn γ T Cr.ccRd (-1) -∗ ccWbn Cr np -∗
       N'.pay (-1) := by
     rw [hpeq]
     iintro Hpos Hlease Hb
     unfold uconsPay
     icases Hlease with (⟨%n', Hr, Hpa, Hd⟩ | HT)
-    · ihave %he := upos_agree (hlc := hlc) γ np n' $$ Hpos Hpa
+    · ihave %he := upos_agree γ np n' $$ Hpos Hpa
       subst he
       ileft
       iexists np
@@ -163,7 +163,7 @@ theorem wp_kinit_main_die_de (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
     · iright
       iexact HT
   ihave Hfam : iprop(∃ Ch : Nat → IProp GF,
-      □ (∀ j : Nat, ⌜j < 21⌝ -∗ kinitW1 (hlc := hlc) N' 1#64 (User.Init.initLit 0x9c0 j) (Ch j) (Ch (j + 1))) ∗
+      □ (∀ j : Nat, ⌜j < 21⌝ -∗ kinitW1 N' 1#64 (User.Init.initLit 0x9c0 j) (Ch j) (Ch (j + 1))) ∗
       Ch 0 ∗ (Ch 21 -∗ N'.pay (-1))) $$ [Hstd Hpos Hlease Hcred]
   · unfold initLendCred
     icases Hcred with (⟨%hl, Hp⟩ | ⟨%hl, Hb⟩ | #HT)
@@ -199,7 +199,7 @@ theorem wp_kinit_main_die_de (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
       · iempintro
       · iintro -
         rw [hpeq]
-        iapply uconsPay_taint (hlc := hlc) cn γ T _ (-1) $$ HT
+        iapply uconsPay_taint cn γ T _ (-1) $$ HT
   icases Hfam with ⟨%Ch, #Hw, HCh, Hfin⟩
   iapply kinit_die_tail UL HS HP N' 0xaa 0x9c0 21 0x916#12 0x71e#21 0x2ba#21 Ch h m n User.Init.lit_exec_ok
     (by decide) (by decide) (by decide) (by decide) udec% udec% udec%
@@ -211,14 +211,14 @@ lend and falls into the 0xaa diagnostic. -/
 theorem wp_kinit_main_child (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
     (T : IProp GF) [Persistent T] (stc : FdState) (cn : ConsNames) (Cr : ConsCred GF) (γ : GName) (np : Nat)
     (l : List FdState) (N' : UkNames GF) (h : CPU) (m : RegMap) (n : Nat)
-    (hpeq : N'.pay = uconsPay (hlc := hlc) cn γ T (initRd Cr.ccRd (ccWbn Cr))) :
-    ⊢ initDeps (hlc := hlc) T -∗ kinitDiagLaw (hlc := hlc) stc Cr.ccWp (ccWbn Cr) -∗ initCode N'.t -∗
-      initExecSupLend (hlc := hlc) cn T stc Cr -∗ initArgv N'.d -∗ ucwd N'.cwd ROOTINO -∗ uch N'.ch ∅ -∗
+    (hpeq : N'.pay = uconsPay cn γ T (initRd Cr.ccRd (ccWbn Cr))) :
+    ⊢ initDeps T -∗ kinitDiagLaw stc Cr.ccWp (ccWbn Cr) -∗ initCode N'.t -∗
+      initExecSupLend cn T stc Cr -∗ initArgv N'.d -∗ ucwd N'.cwd ROOTINO -∗ uch N'.ch ∅ -∗
       (∃ p : Int, ⌜p ≠ 1⌝ ∗ upid N'.pid p) -∗ ustdOk T N'.fd l -∗ ufdRow T stc l -∗
-      initLendCred T stc Cr.ccWp (ccWbn Cr) l np -∗ upos (hlc := hlc) γ np -∗
-      uconsPay (hlc := hlc) cn γ T Cr.ccRd (-1) -∗
-      urun (hlc := hlc) N' h m (BitVec.ofNat 64 0x96) (12 + (12 + (4 + n))) -∗ wpLoop h := by
-  haveI : UknConst N' := ukn_const_of_eq N' _ hpeq (uconsPay_const (hlc := hlc) cn γ T _)
+      initLendCred T stc Cr.ccWp (ccWbn Cr) l np -∗ upos γ np -∗
+      uconsPay cn γ T Cr.ccRd (-1) -∗
+      urun N' h m (BitVec.ofNat 64 0x96) (12 + (12 + (4 + n))) -∗ wpLoop h := by
+  haveI : UknConst N' := ukn_const_of_eq N' _ hpeq (uconsPay_const cn γ T _)
   unfold initDeps
   iintro ⟨#Hwl16, #Hwl15, #Hwl17⟩ #Hdlaw #Hc #Hxs #Hargv Hcwd Hch Hpid Hstd #Hrow Hcred Hpos Hlease Hrun
   -- 0x96 auipc a1 ; 0x9a addi a1 -- argv at 0x1000

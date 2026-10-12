@@ -14,7 +14,7 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- What `virtio_disk_rw` needs of `*b`: `blockno` (read, at a HALF), `disk`
 (written `1` then, by the handler, `0`), and the data.

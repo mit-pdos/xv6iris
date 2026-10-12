@@ -72,7 +72,7 @@ Rocq's header, kept because the reasons are the content:
    (1 : Qp).half} I`.  `is_Some (es !! nm)` is `(es[nm]?).isSome`.
 2. Class binders: Rocq's section list (`riscvGS, xv6G, bioslotG, fdslotG,
    fileG, irefslotG, pavG, wchG, CurCtx`) is replaced by exactly the
-   classes the statements use: `[MachGS hlc GF] [FsTopG GF]` (the fupd and
+   classes the statements use: `[MachGS GF] [FsTopG GF]` (the fupd and
    the authority), per-declaration `[Appcfg GF]` (the commits carry
    `appStep`) and `[FsBytesG GF]` (the `_unit`s' `fsGammaL`).  The
    `` `{XI : CurCtx} `` binder is read by nothing and is dropped.
@@ -121,7 +121,7 @@ def unlPre (av : Aview) (d : Nat) (nm : Fname) (ents : Std.ExtTreeMap Fname Nat 
 /-! ## 2.  The commits -/
 
 section UnlinkDefs
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsTopG GF]
 
 /-- INSTANT 1 -- the parent-row commit, two-phase at the raw map (Rocq's
 `uent_commit_at`; `acre_commit_at`'s mold: phase 1 observes the pre-state
@@ -152,7 +152,7 @@ def uentCommitAt [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (Pd : Nat → IP
 theorem uentCommitAt_mono [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (Pd Pd' : Nat → IProp GF)
     (Φ : Aview → Nat → Fname → Nat → IProp GF) :
     ⊢ iprop(□ (∀ d : Nat, Pd' d -∗ Pd d)) -∗ iprop(□ (∀ d : Nat, Pd d -∗ Pd' d)) -∗
-      uentCommitAt (hlc := hlc) Γ E Pd Φ -∗ uentCommitAt (hlc := hlc) Γ E Pd' Φ := by
+      uentCommitAt Γ E Pd Φ -∗ uentCommitAt Γ E Pd' Φ := by
   unfold uentCommitAt
   iintro #Hin #Hout H %I %d %t %nm %ents %nl %a %hpre HPd Ha
   ihave HPd := Hin $$ %d HPd
@@ -198,7 +198,7 @@ verbatim -- fired at the isdirempty refusal (arm iii-c). -/
 theorem uentCommitAt_unit [Appcfg GF] [FsBytesG GF] (γfs : FsNames) (E : CoPset)
     (Pd : Nat → IProp GF) :
     appSup (GF := GF) ⊢
-      uentCommitAt (hlc := hlc) (fsGammaL γfs) E Pd (fun _ _ _ _ => iprop(True)) := by
+      uentCommitAt (fsGammaL γfs) E Pd (fun _ _ _ _ => iprop(True)) := by
   iintro #Hsup
   unfold uentCommitAt
   iintro %I %d %t %nm %ents %nl %a %_ HPd Ha
@@ -211,7 +211,7 @@ theorem uentCommitAt_unit [Appcfg GF] [FsBytesG GF] (γfs : FsNames) (E : CoPset
 
 /-- Rocq's `utgt_commit_at_unit`. -/
 theorem utgtCommitAt_unit [Appcfg GF] [FsBytesG GF] (γfs : FsNames) (E : CoPset) :
-    appSup (GF := GF) ⊢ utgtCommitAt (hlc := hlc) (fsGammaL γfs) E (fun _ _ => iprop(True)) := by
+    appSup (GF := GF) ⊢ utgtCommitAt (fsGammaL γfs) E (fun _ _ => iprop(True)) := by
   iintro #Hsup
   unfold utgtCommitAt
   iintro %I %t %a %_ %_ Ha
@@ -224,7 +224,7 @@ theorem utgtCommitAt_unit [Appcfg GF] [FsBytesG GF] (γfs : FsNames) (E : CoPset
 
 /-- Rocq's `dmiss_commit_at_unit`: from nothing. -/
 theorem dmissCommitAt_unit (Γ : FsViewNames GF) (E : CoPset) :
-    ⊢ dmissCommitAt (hlc := hlc) Γ E (fun _ _ _ => iprop(True)) := by
+    ⊢ dmissCommitAt Γ E (fun _ _ _ => iprop(True)) := by
   unfold dmissCommitAt
   iintro %I %d %nm %ents %nl %_ %_ Ha
   imodintro

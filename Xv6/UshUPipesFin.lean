@@ -39,7 +39,7 @@ open Wid Pline'
 open UShPipesDefs UShPipesNode
 
 section Fin
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
@@ -50,18 +50,18 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Ic
 s0 PT PD`, `Wbu := uWbf ug r s0` at `PT := upterm_shape ug`, `PD :=
 updone_shape ug`). -/
 noncomputable abbrev Xu (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (γp : GName) : UshCtx GF :=
-  ushURoundCtx (hlc := hlc) ug r s0 (uptermShape ug) (updoneShape ug) γp
+  ushURoundCtx ug r s0 (uptermShape ug) (updoneShape ug) γp
 
 /-- The union's credential family, read off the record. -/
 theorem Xu_Wc (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (γp : GName) :
-    (Xu (hlc := hlc) (GF := GF) ug r s0 γp).Wc = uWcu ug r s0 (uptermShape ug) (updoneShape ug) := rfl
+    (Xu (GF := GF) ug r s0 γp).Wc = uWcu ug r s0 (uptermShape ug) (updoneShape ug) := rfl
 
 /-- THE ROUND the branch runs: `UShPipesDefs`'s section variables at the
 union (`pg := ugn_pipe ug`, `U`, `pview_unionU`, `CPU := ucparams ug`, `∅`,
 `WAU := uwa ug`). -/
 noncomputable def uD (ug : UnionGn) (v : EraPins) (I : List (BitVec 8)) (sR : Fstate) (lR : Pline')
     (L : List (BitVec 8)) (pr : Producer) (Rd : IProp GF) (γc γm : Wid → GName) (P : Nat → PNames)
-    (gF gG : Nat → GName) : PdRound hlc GF where
+    (gF gG : Nat → GName) : PdRound GF where
   g := ugnPipe ug
   M := ulmG
   V := pviewUnionU
@@ -89,8 +89,8 @@ variable (ug : UnionGn) (v : EraPins) (I : List (BitVec 8)) (sR : Fstate) (lR : 
   (gF gG : Nat → GName)
 
 theorem uD_FAM : (uD ug v I sR lR L pr Rd γc γm P gF gG).FAM =
-    blkNInv (hlc := hlc) (wids (lcats lR)) (runN (filesOf sR) lR) (pwcBlkU ug v I sR) termw (tokN (filesOf sR) lR)
-      (pdep (uD ug v I sR lR L pr Rd γc γm P gF gG)) pnsN (genId (hlc := hlc) (GF := GF) + 1) γc γm := rfl
+    blkNInv (wids (lcats lR)) (runN (filesOf sR) lR) (pwcBlkU ug v I sR) termw (tokN (filesOf sR) lR)
+      (pdep (uD ug v I sR lR L pr Rd γc γm P gF gG)) pnsN (genId (GF := GF) + 1) γc γm := rfl
 
 theorem uD_wdone (w : Wid) : (uD ug v I sR lR L pr Rd γc γm P gF gG).wdone w =
     iprop(∃ s : List (BitVec 8), (wcurN γc w (1 : Qp).half s.length ∗ wmodeN γm w (1 : Qp).half (some s))
@@ -98,10 +98,10 @@ theorem uD_wdone (w : Wid) : (uD ug v I sR lR L pr Rd γc γm P gF gG).wdone w =
 
 theorem uD_terT (i : Nat) : (uD ug v I sR lR L pr Rd γc γm P gF gG).terT i =
     iprop(wcurN γc (WSh i) (1 : Qp).half 5 ∗ wmodeN γm (WSh i) (1 : Qp).half (some altForkc)
-      ∗ ptkU (hlc := hlc) ug v I (genId (hlc := hlc) (GF := GF) + 1)) := rfl
+      ∗ ptkU ug v I (genId (GF := GF) + 1)) := rfl
 
 theorem uD_Qtop : (uD ug v I sR lR L pr Rd γc γm P gF gG).Qtop =
-    iprop(fileTaint (hlc := hlc) ug.ugnFile.fgnCl
+    iprop(fileTaint ug.ugnFile.fgnCl
       ∨ (([∗list] w ∈ wids (lcats lR), (uD ug v I sR lR L pr Rd γc γm P gF gG).wdone w) ∗ Rd)
       ∨ (∃ i : Nat, ⌜i < lcats lR⌝ ∗ (uD ug v I sR lR L pr Rd γc γm P gF gG).terT i
           ∗ [∗list] j ∈ List.range i, (uD ug v I sR lR L pr Rd γc γm P gF gG).wdone (WLeft j))) := rfl
@@ -157,8 +157,8 @@ theorem ufin (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
     (hlR : pviewUnionU.pvLine (lineV ulmG I) = some lR) (hfc : fcOk (pviewUnionU.pvFc sR))
     (ha : admUG lR = true) (hl : plOk lR) (hpos : 1 ≤ nlines I)
     (hdeed : iprop(Rk ∗ Rd) ⊢ ushDeedAt ug r upreTie s0 I) :
-    iprop((eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v ∗ inpLb v I
-        ∗ f0cw ug.ugnFile (genId (hlc := hlc) (GF := GF) + 1) s0 ∗ Rk)
+    iprop((eraPin (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v ∗ inpLb v I
+        ∗ f0cw ug.ugnFile (genId (GF := GF) + 1) s0 ∗ Rk)
       ∗ (uD ug v I sR lR L pr Rd γc γm P gF gG).FAM ∗ (uD ug v I sR lR L pr Rd γc γm P gF gG).Qtop)
       ⊢ ushfWq (Xu ug r s0 γp) I := by
   unfold ushfWq
@@ -225,12 +225,12 @@ theorem ufin (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
 
 /-- `uWcl … 3`, read at the record's block arm (deviation 4). -/
 theorem uWcl3_eq (ug : UnionGn) (s0 : Fstate) (I : List (BitVec 8)) :
-    uWcl (hlc := hlc) (GF := GF) ug s0 I 3 = iprop(∃ v : EraPins, eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v
+    uWcl (GF := GF) ug s0 I 3 = iprop(∃ v : EraPins, eraPin (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v
       ∗ ((∃ (ps cs : List Nat) (s0' : Fstate) (P : Nat), ⌜lmWrBlkT ulmG ps cs s0' I P⌝ ∗
           turn v P ∗ psLb v ps ∗ csLb v cs ∗ inpLb v I
-          ∗ f0wAt (hlc := hlc) ug.ugnFile s0 (genId (hlc := hlc) (GF := GF) + 1) s0'
-          ∗ (⌜(0 : Nat) ≠ 0⌝ ∨ upr (hlc := hlc) (GF := GF) ug (genId (hlc := hlc) (GF := GF) + 1) v I 0))
-        ∨ fileTaint (hlc := hlc) ug.ugnFile.fgnCl)) := by
+          ∗ f0wAt ug.ugnFile s0 (genId (GF := GF) + 1) s0'
+          ∗ (⌜(0 : Nat) ≠ 0⌝ ∨ upr (GF := GF) ug (genId (GF := GF) + 1) v I 0))
+        ∨ fileTaint ug.ugnFile.fgnCl)) := by
   rfl
 
 /-- **Rocq `uopen`**: THE LEND AT THE LOOP'S LINE INDEX AND THE DEED AT ITS
@@ -238,13 +238,13 @@ PRE TIE, as the family's allocation takes them: one choice list, one state
 -- or the taint. -/
 theorem uopen (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
     (I : List (BitVec 8)) :
-    ⊢ uWcl (hlc := hlc) (GF := GF) ug s0 I 3 -∗ ushPreAt ug r s0 I -∗
-      fileTaint (hlc := hlc) ug.ugnFile.fgnCl ∨ ∃ (v : EraPins) (cs : List Nat) (s : Dst),
+    ⊢ uWcl (GF := GF) ug s0 I 3 -∗ ushPreAt ug r s0 I -∗
+      fileTaint ug.ugnFile.fgnCl ∨ ∃ (v : EraPins) (cs : List Nat) (s : Dst),
         ⌜upreTie cs s0 I (dstContent s)⌝
-        ∗ eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v ∗ inpLb v I ∗ csLb v cs
-        ∗ f0cw ug.ugnFile (genId (hlc := hlc) (GF := GF) + 1) s0
-        ∗ fTyped ug.ugnFile.fgnCl s ∗ fown r s ∗ urpos (hlc := hlc) ug r I
-        ∗ pwcBlkU ug v I (dstContent s) (genId (hlc := hlc) (GF := GF) + 1) [] false := by
+        ∗ eraPin (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v ∗ inpLb v I ∗ csLb v cs
+        ∗ f0cw ug.ugnFile (genId (GF := GF) + 1) s0
+        ∗ fTyped ug.ugnFile.fgnCl s ∗ fown r s ∗ urpos ug r I
+        ∗ pwcBlkU ug v I (dstContent s) (genId (GF := GF) + 1) [] false := by
   unfold ushPreAt ushDeedAt
   rw [uWcl3_eq]
   iintro Hc ⟨Hpre, -⟩
@@ -258,7 +258,7 @@ theorem uopen (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
   unfold f0wAt f0w
   icases HW with ⟨⟨-, %vf, #Hfp, #Hflb⟩, %hs⟩
   subst s0'
-  ihave %hv := fileOut_eraPin_agree (GF := GF) (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v v'
+  ihave %hv := fileOut_eraPin_agree (GF := GF) (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v v'
     $$ Hpin Hpin'
   subst hv
   have hlen : cs.length = cs'.length := by
@@ -275,14 +275,14 @@ theorem uopen (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
     unfold upreTie ust at htie
     exact htie.2
   rw [hcon]
-  have hcw : ⊢ fileEraPin (GF := GF) ug.ugnFile (genId (hlc := hlc) (GF := GF) + 1) vf -∗ f0Lb (hlc := hlc) ug.ugnFile vf s0 -∗
-      f0cw ug.ugnFile (genId (hlc := hlc) (GF := GF) + 1) s0 := by
+  have hcw : ⊢ fileEraPin (GF := GF) ug.ugnFile (genId (GF := GF) + 1) vf -∗ f0Lb ug.ugnFile vf s0 -∗
+      f0cw ug.ugnFile (genId (GF := GF) + 1) s0 := by
     unfold f0cw
     iintro #A #B
     iexists vf
     iframe A B
   ihave #Hcw := hcw $$ Hfp Hflb
-  ihave HPW := pwcBlkU_entry ug v I (genId (hlc := hlc) (GF := GF) + 1) ps cs s0 P0 hw
+  ihave HPW := pwcBlkU_entry ug v I (genId (GF := GF) + 1) ps cs s0 P0 hw
     $$ Hpin Hcw [Htn] Hps Hcs HE
   · iexact Htn
   iframe Hpin HE Hcs Hcw Hty Hd Hup HPW
@@ -292,14 +292,14 @@ theorem uopen (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
 /-- **Rocq `uup_genw`**: the taint's generic continuation, off the cat
 slot, at the child. -/
 theorem uup_genw (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
-    (γp : GName) (hkill : MachFixedGS.killCred (hlc := hlc) (GF := GF) = fileTaint (hlc := hlc) ug.ugnFile.fgnCl)
+    (γp : GName) (hkill : MachFixedGS.killCred (GF := GF) = fileTaint ug.ugnFile.fgnCl)
     (N' : UkNames GF) (I : List (BitVec 8)) (v0 : EraPins)
     (hpeq : N'.pay = fun _ => ushfWq (Xu ug r s0 γp) I) :
-    ⊢ shCatSlot (hlc := hlc) (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) -∗
-      eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v0 -∗
-      □ (∀ W : Uvis, fileTaint (hlc := hlc) ug.ugnFile.fgnCl -∗ myPay W.gen N'.pay -∗ uslot (hlc := hlc) W) := by
-  have hkq : ⊢ eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v0 -∗
-      □ (uKillCred (hlc := hlc) (GF := GF) -∗ ushfWq (Xu ug r s0 γp) I) := by
+    ⊢ shCatSlot (fileTaint ug.ugnFile.fgnCl) -∗
+      eraPin (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v0 -∗
+      □ (∀ W : Uvis, fileTaint ug.ugnFile.fgnCl -∗ myPay W.gen N'.pay -∗ uslot W) := by
+  have hkq : ⊢ eraPin (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v0 -∗
+      □ (uKillCred (GF := GF) -∗ ushfWq (Xu ug r s0 γp) I) := by
     unfold ushfWq uKillCred
     dsimp only [Xu, ushURoundCtx]
     rw [hkill]
@@ -314,8 +314,8 @@ theorem uup_genw (ug : UnionGn) (r : FileAppNames) (s0 : Fstate)
 
 /-- **Rocq `uup_pin0`**. -/
 theorem uup_pin0 (ug : UnionGn) (s0 : Fstate) (I : List (BitVec 8)) :
-    ⊢ uWcl (hlc := hlc) (GF := GF) ug s0 I 3 -∗
-      uWcl (hlc := hlc) (GF := GF) ug s0 I 3 ∗ ∃ v0 : EraPins, eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v0 := by
+    ⊢ uWcl (GF := GF) ug s0 I 3 -∗
+      uWcl (GF := GF) ug s0 I 3 ∗ ∃ v0 : EraPins, eraPin (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v0 := by
   rw [uWcl3_eq]
   iintro ⟨%v0, #Hp, H⟩
   isplitl [H]

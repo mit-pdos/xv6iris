@@ -44,7 +44,7 @@ theorem ushpi_addi40 (sp0 : BitVec 64) (hlo : 40 ≤ sp0.toNat) :
   simpa using this
 
 section UshPipeArmG3
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -91,23 +91,23 @@ theorem ushpi_mid (UL : UK_LEAVES) (SC : SH_SYS_CLOSE) (SD : SH_SYS_DUP) (SF : S
     ⊢ ushCode N.t -∗ ushJtab N.t -∗ ushCmd N.d t (.pipe cl cr) -∗
       ubytes N.d (sp0.toNat - 40) 4 (nthByte (n := 4) (BitVec.ofNat 32 a)) -∗
       ubytes N.d (sp0.toNat - 40 + 4) 4 (nthByte (n := 4) (BitVec.ofNat 32 b)) -∗
-      usz N.s szv -∗ ustd N.fd ld -∗ ucwd N.cwd cwdv -∗ uch N.ch S1 -∗ ushCldep (hlc := hlc) st0 -∗
+      usz N.s szv -∗ ustd N.fd ld -∗ ucwd N.cwd cwdv -∗ uch N.ch S1 -∗ ushCldep st0 -∗
       ([∗map] fd ↦ st ∈ ushpiHs a b (.open true false (.pipe γp)) (.open false true (.pipe γp)), ufd N.fd fd st) -∗
-      ushCldep (hlc := hlc) (.open true false (.pipe γp)) -∗ ushCldep (hlc := hlc) (.open false true (.pipe γp)) -∗
-      □ (uKillCred (hlc := hlc) -∗ Qc (-1)) -∗ RcR -∗ Cx -∗ Wr -∗ ushWait0Law (hlc := hlc) N Wr Pw -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x14c) (2 + (Dg + av)) -∗
+      ushCldep (.open true false (.pipe γp)) -∗ ushCldep (.open false true (.pipe γp)) -∗
+      □ (uKillCred -∗ Qc (-1)) -∗ RcR -∗ Cx -∗ Wr -∗ ushWait0Law N Wr Pw -∗
+      urun N h m (BitVec.ofNat 64 0x14c) (2 + (Dg + av)) -∗
       (∀ (h' : CPU) (m' : RegMap) (r : BitVec 64), ⌜(m'.get 10#5).toNat = 0x1288⌝ -∗ ⌜r = -1#64⌝ -∗
         ushFork1Ans N S1 Qc RcR r -∗ ustd N.fd ld -∗ Cx -∗
-        urun (hlc := hlc) N h' m' (BitVec.ofNat 64 User.Sh.Sym.«panic») (Dg + av) -∗ wpLoop h') -∗
+        urun N h' m' (BitVec.ofNat 64 User.Sh.Sym.«panic») (Dg + av) -∗ wpLoop h') -∗
       (∀ (N' : UkNames GF) (h' : CPU) (m' : RegMap) (γ' : GName) (q : Nat),
         ⌜N'.pay = Qc⌝ -∗ ⌜m'.get 10#5 = BitVec.ofNat 64 q⌝ -∗ myPay γ' Qc -∗ ushCode N'.t -∗ ushJtab N'.t -∗
         ushCmd N'.d q cr -∗ usz N'.s szv -∗ ustd N'.fd (ld.set 0 (.open true false (.pipe γp))) -∗
         ucwd N'.cwd cwdv -∗ uch N'.ch ∅ -∗ ushPid N' -∗ RcR -∗
-        urun (hlc := hlc) N' h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (2 + (Dg + av)) -∗ wpLoop h') -∗
+        urun N' h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (2 + (Dg + av)) -∗ wpLoop h') -∗
       (∀ (h' : CPU) (m' : RegMap) (r2 rw1 rw2 : BitVec 64) (S2 S3 S4 : ExtTreeSet GName compare),
         ⌜r2 ≠ -1#64⌝ -∗ ushForkAns S1 S2 RcR Qc r2 -∗ Pw rw1 S2 S3 -∗ Pw rw2 S3 S4 -∗ uch N.ch S4 -∗
         usz N.s szv -∗ ustd N.fd ld -∗ ucwd N.cwd cwdv -∗ Cx -∗ Wr -∗
-        urun (hlc := hlc) N h' m' (BitVec.ofNat 64 0xea) (2 + (Dg + av)) -∗ wpLoop h') -∗
+        urun N h' m' (BitVec.ofNat 64 0xea) (2 + (Dg + av)) -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #HC #Hjt #Hcmd Hb0 Hb1 Hsz Hstd Hcwd Hch #Hd0 HD #HdR #HdW #Hkw HRcR HCx HWr #Hwl Hrun Hpan HcR Hpar
   -- 0x14c  c.bnez a0 -- taken
@@ -152,7 +152,7 @@ theorem ushpi_mid (UL : UK_LEAVES) (SC : SH_SYS_CLOSE) (SD : SH_SYS_DUP) (SF : S
 /-- **Rocq `wp_kshr_pipe_arm_g3`**: THE PIPE ARM, generic in its tails and
 its wait reading. -/
 theorem wp_ushPipeArmG3 (UL : UK_LEAVES) (_SW : SH_SYS_WAIT) (SC : SH_SYS_CLOSE) (SD : SH_SYS_DUP) (SF : SH_FORK1)
-    (hent : wpShRuncmdEntryBody (hlc := hlc) (GF := GF)) : wpShPipeArmG3Body (hlc := hlc) (GF := GF) := by
+    (hent : wpShRuncmdEntryBody (GF := GF)) : wpShPipeArmG3Body (GF := GF) := by
   intro Dg hps N _ cl cr h m t szv cwdv ld st0 st1 Sc av R RcL RcR Rk Cx Qc Cr Wr Pw hQc ha0 hl0 hl1 hne0 hne1 hnp1
   iintro #HC #Hjt #Htree Hsz Hstd #Hcd0 Hcwd Hch #Hkw Hcr Hsplit Hpipe HWr #Hwl #Hpanp #Hpanf1 #Hpanf2 Hrun HcL HcR
     Hpar
@@ -248,12 +248,12 @@ theorem wp_ushPipeArmG3 (UL : UK_LEAVES) (_SW : SH_SYS_WAIT) (SC : SH_SYS_CLOSE)
 the free instance -- the three tails on the free law, the waits at
 `uwaitAns` (deviations 1, 3). -/
 theorem wp_ushPipeArm (UL : UK_LEAVES) (SW : SH_SYS_WAIT) (SC : SH_SYS_CLOSE) (SD : SH_SYS_DUP) (SF : SH_FORK1)
-    (hent : wpShRuncmdEntryBody (hlc := hlc) (GF := GF)) : wpShPipeArmBody (hlc := hlc) (GF := GF) := by
+    (hent : wpShRuncmdEntryBody (GF := GF)) : wpShPipeArmBody (GF := GF) := by
   intro Dg hleaf hps N _ cl cr h m t szv cwdv ld st0 st1 Sc av R RcL RcR Rk Qc hQc hpx ha0 hl0 hl1 hne0 hne1 hnp0 hnp1
   iintro #Hdp #HC #Hjt #Htree Hsz Hstd Hcwd Hch #Hkw Hsplit Hpipe Hrun HcL HcR Hpar
   have hpanic : ∀ (h' : CPU) (m' : RegMap) (n : Nat), ushPanicMsg (m'.get 10#5).toNat →
-      ⊢ shDeps (hlc := hlc) -∗ ushCode N.t -∗ N.pay (-1) -∗
-        urun (hlc := hlc) N h' m' (BitVec.ofNat 64 User.Sh.Sym.«panic») (Dg + n) -∗ wpLoop h' := by
+      ⊢ shDeps -∗ ushCode N.t -∗ N.pay (-1) -∗
+        urun N h' m' (BitVec.ofNat 64 User.Sh.Sym.«panic») (Dg + n) -∗ wpLoop h' := by
     intro h' m' n hmsg
     iintro #Hdp #HC Hpay Hrun
     iapply hleaf N h' m' User.Sh.Sym.«panic» n (Or.inl ⟨rfl, hmsg⟩) $$ Hdp HC [] Hpay Hrun

@@ -23,7 +23,7 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
@@ -46,16 +46,16 @@ theorem wp_initMain (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
     (N : UkNames GF) [UknConst N] (hpayfree : ⊢ N.pay (-1))
     (hpsok : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
     (T Cns : IProp GF) [Persistent T] (stc : FdState) (Cr : ConsCred GF) (cn : ConsNames) (szv : Nat) (h : CPU)
-    (m : RegMap) (n : Nat) (hne : stc ≠ .closed) (hkt : ⊢ initKillLaw (hlc := hlc) T stc Cr.ccWp (ccWbn Cr)) :
-    ⊢ initDeps (hlc := hlc) T -∗ kinitBanLaw (hlc := hlc) N stc Cr.ccWp (ccWbn Cr) -∗
-      kinitDiagLaw (hlc := hlc) stc Cr.ccWp (ccWbn Cr) -∗ initCode N.t -∗
-      initConsSup (hlc := hlc) cn T Cns stc Cr -∗ initConsDance (hlc := hlc) N T Cns stc -∗
+    (m : RegMap) (n : Nat) (hne : stc ≠ .closed) (hkt : ⊢ initKillLaw T stc Cr.ccWp (ccWbn Cr)) :
+    ⊢ initDeps T -∗ kinitBanLaw N stc Cr.ccWp (ccWbn Cr) -∗
+      kinitDiagLaw stc Cr.ccWp (ccWbn Cr) -∗ initCode N.t -∗
+      initConsSup cn T Cns stc Cr -∗ initConsDance N T Cns stc -∗
       initArgv N.d -∗ usz N.s szv -∗ ustdOk T N.fd ufdL0 -∗ ucwd N.cwd ROOTINO -∗ uchAny N.ch -∗
-      uinitTok (hlc := hlc) cn T (initRd Cr.ccRd (ccWbn Cr)) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Init.Sym.«main») (4 + (12 + (12 + (4 + n)))) -∗ wpLoop h := by
+      uinitTok cn T (initRd Cr.ccRd (ccWbn Cr)) -∗
+      urun N h m (BitVec.ofNat 64 User.Init.Sym.«main») (4 + (12 + (12 + (4 + n)))) -∗ wpLoop h := by
   rw [show User.Init.Sym.«main» = 0 from rfl]
   iintro #Hdeps #Hblaw #Hdlaw #Hc #Hxs Hdance #Hargv Hsz Hstd Hcwd Hch Htk Hrun
-  ihave #Hwl17 : iprop(□ (T -∗ udepwLaw (hlc := hlc) 17)) $$ [Hdeps]
+  ihave #Hwl17 : iprop(□ (T -∗ udepwLaw 17)) $$ [Hdeps]
   · unfold initDeps
     icases Hdeps with ⟨-, -, #H⟩
     iexact H
@@ -209,7 +209,7 @@ theorem wp_initMain (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
       inext
       iintro %h11 Hrun
       rw [hbf, if_neg (by decide), ukPc 0x1a 0x1e false rfl]
-      ihave #Hxsl := initConsSup_taint (hlc := hlc) cn T Cns stc Cr $$ [] HT
+      ihave #Hxsl := initConsSup_taint cn T Cns stc Cr $$ [] HT
       · unfold initConsSup
         iframe Hw Ht
       iapply wp_kinit_main_from_1e UL HS HP hpsok N hpayfree T stc Cr cn szv h11 m10 n hne hkt $$ Hdeps Hblaw

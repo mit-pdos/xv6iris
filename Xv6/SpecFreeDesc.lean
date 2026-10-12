@@ -53,7 +53,7 @@ def freeDescSlots : Nat := 2 + wakeupSlots
 
 /-- **WP of `free_desc`**, at either `SIE` and at any lock depth that does
 not already hold `"proc"`.  `a0 = i`. -/
-def wp_free_desc_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
+def wp_free_desc_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
     [CurCtx] (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γ : DiskNames) (pd pav pu : BitVec 64)
     (i : Nat) (w : BitVec (8 * 16))
     (hi : i < NUM) (hpd : descPageRw pd) (ha0 : k.regs 10#5 = BitVec.ofNat 64 i)
@@ -68,10 +68,10 @@ def wp_free_desc_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] 
 
 /-- The interface of `free_desc`. -/
 structure FREE_DESC : Prop where
-  wp_free_desc : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
+  wp_free_desc : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
     [CurCtx] (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γ : DiskNames) (pd pav pu : BitVec 64)
     (i : Nat) (w : BitVec (8 * 16)) hi hpd ha0 hsie hnoff hK hlk htier,
-    wp_free_desc_body (hlc := hlc) (GF := GF) Γ cpu k γ pd pav pu i w
+    wp_free_desc_body (GF := GF) Γ cpu k γ pd pav pu i w
       hi hpd ha0 hsie hnoff hK hlk htier
 
 end Xv6

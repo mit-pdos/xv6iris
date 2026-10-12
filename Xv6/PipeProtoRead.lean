@@ -69,7 +69,7 @@ theorem pipeRd_take1_ne {L : List (BitVec 8)} (hL : L ≠ []) (h : L.take 1 <+: 
     simp at this
 
 section PipeProtoRead
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF]
   [CtokG GF] [PipeProtoG GF]
 
 /-! ## The body's end-of-file shot (deviation 3 of `PipeProto`; Rocq inline) -/
@@ -230,7 +230,7 @@ theorem pipeRchain_of_invU (pn : PNames) (γp : PipeNames) (L : List (BitVec 8))
 theorem pipeRpay_of_invU (pn : PNames) (γp : PipeNames) (L : List (BitVec 8)) (U : IProp GF)
     [Timeless U] (c cap : Nat) :
     pipeInvU pn γp L U ⊢ rcur pn c -∗
-      pipeRpay (hlc := hlc) γp.pnQueue (pipeRQ pn L c) (pipeRQe pn L c) cap := by
+      pipeRpay γp.pnQueue (pipeRQ pn L c) (pipeRQe pn L c) cap := by
   unfold pipeRpay
   iintro #Hinv Hr
   ileft
@@ -342,14 +342,14 @@ the EOF snapshot when it is 0), or `-1` at `d = 0` for one of three
 reasons. -/
 theorem pipeRpostLine (P : UPtd) (pn : PNames) (γp : PipeNames) (L : List (BitVec 8)) (c : Nat)
     (Rk : IProp GF) (n : Nat) (r : BitVec 64) (M' : Nat → List (BitVec 8)) (addr : BitVec 64) :
-    pipeRpostImg (hlc := hlc) P γp.pnQueue (pipeRQ pn L c) (pipeRQe pn L c) Rk n r M' addr ⊢
+    pipeRpostImg P γp.pnQueue (pipeRQ pn L c) (pipeRQe pn L c) Rk n r M' addr ⊢
       (∃ (acc : List (BitVec 8)) (d : Nat), ⌜acc.length ≤ n ∧ acc.length = d⌝ ∗
           ⌜pipeImgTie M' addr acc d⌝ ∗ pipeRQ pn L c acc ∗
           ((⌜r = BitVec.ofNat 64 d⌝ ∗ (⌜d = 0⌝ -∗ ⌜0 < n⌝ -∗ eofShot pn (L.take (c + d)))) ∨
             (⌜r = -1#64 ∧ d = 0⌝ ∗
               (⌜¬ uvaWmapped P (addr + BitVec.ofNat 64 d).toNat⌝ ∨ Rk ∨ ⌜n = 0⌝)))) ∨
-      (MachFixedGS.killCred (hlc := hlc) (GF := GF) ∗
-        pipeRpay (hlc := hlc) γp.pnQueue (pipeRQ pn L c) (pipeRQe pn L c) n) := by
+      (MachFixedGS.killCred (GF := GF) ∗
+        pipeRpay γp.pnQueue (pipeRQ pn L c) (pipeRQe pn L c) n) := by
   iintro H
   icases pipeRpostImg_cursor $$ H with
     (⟨%acc, %d, %h1, %h2, (⟨%hpure, %s, %hs, Hqe⟩ | ⟨%h3, Hno, HQ⟩)⟩ | H)

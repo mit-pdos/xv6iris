@@ -16,7 +16,7 @@ firing premise (`pipes_fire_ok`) in `Xv6/UshPipesDefsFire.lean`.
 Rocq's section context `g LM PV CP sd WA Hext Hcons v I sR lR HlR Hfc Hadmit
 Hplok L pr Rd γc γm P gF gG` is split as H-pipe's was:
 
-* `PdRound hlc GF` (data): `UkPipesIface`'s round fields, name for name
+* `PdRound GF` (data): `UkPipesIface`'s round fields, name for name
   (`g M V G sd WA v I sR lR L γc γm`), plus the producer `pr`, the
   producer's loan `Rd`, the pipes `P` and the one-shot names `gF gG`.
   `PdRound.toPns : PnsRound` is `UkPipesIface`'s round at `TERM := termw`,
@@ -96,13 +96,13 @@ theorem flow_down_idx (i j : Nat) (h : 1 ≤ i ∧ i ≤ j + 1) (hne : i ≠ j +
 
 /-- **Rocq `UShPipesDefs`'s section context (data)**: `UkPipesIface`'s round
 fields, the producer, its loan, the pipes and the one-shot names. -/
-structure PdRound (hlc : HasLC) (GF : BundledGFunctors.{0}) [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+structure PdRound (GF : BundledGFunctors.{0}) [MachGS GF] [Xv6G GF] [IcacheG GF]
     [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF] where
   /-- THE ROUND'S CLAIM at a line model with a pipeline view -/
   g : PipeGn
   M : LModel
   V : PView M
-  G : GenCparams hlc GF M
+  G : GenCparams GF M
   sd : M.lmSt
   WA : GenWa M G sd
   /-- the round: its pins, input, state and pipeline -/
@@ -126,9 +126,9 @@ structure PdRound (hlc : HasLC) (GF : BundledGFunctors.{0}) [MachGS hlc GF] [Xv6
   gG : Nat → GName
 
 section Round
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF]
-variable (D : PdRound hlc GF)
+variable (D : PdRound GF)
 
 /-- Rocq `T`. -/
 abbrev PdRound.T : IProp GF := D.G.gcT
@@ -340,7 +340,7 @@ instance pinv_persistent (j : Nat) : Persistent (D.pinv j) := by
 
 /-- **`UkPipesIface`'s round at this one**: `TERM := termw`, `TOK := TOKN`,
 `dep := pdep`. -/
-@[reducible] noncomputable def PdRound.toPns : PnsRound hlc GF where
+@[reducible] noncomputable def PdRound.toPns : PnsRound GF where
   g := D.g
   M := D.M
   V := D.V
@@ -361,8 +361,8 @@ instance pinv_persistent (j : Nat) : Persistent (D.pinv j) := by
 end Round
 
 /-- **Rocq `UShPipesDefs`'s section hypotheses** (deviation 1). -/
-structure PdRoundOk {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
-    [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF] (D : PdRound hlc GF) : Prop where
+structure PdRoundOk {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF]
+    [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF] (D : PdRound GF) : Prop where
   /-- Rocq `Hext` -/
   hext : ∀ k l, D.WA.gext k l = pext D.g k l
   /-- Rocq `Hcons` -/
@@ -377,14 +377,14 @@ structure PdRoundOk {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [X
   hplok : plOk D.lR
 
 section RoundOk
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF] [PipesNG GF]
-variable {D : PdRound hlc GF}
+variable {D : PdRound GF}
 
 /-- `UkPipesIface`'s hypotheses at `D.toPns`, from this round's and the two
 later ones (`Hkill`, `HL31`). -/
 theorem PdRoundOk.toPns (OK : PdRoundOk D)
-    (hkill : MachFixedGS.killCred (hlc := hlc) (GF := GF) = D.G.gcT) (hL31 : pnsShort D.L) :
+    (hkill : MachFixedGS.killCred (GF := GF) = D.G.gcT) (hL31 : pnsShort D.L) :
     PnsRoundOk D.toPns where
   hext := OK.hext
   hcons := OK.hcons
@@ -400,7 +400,7 @@ variable (D)
 
 /-- Rocq `FAM`: THE FAMILY, at the round (`= D.toPns.FAM` by `rfl`). -/
 noncomputable abbrev PdRound.FAM : IProp GF :=
-  blkNInv (hlc := hlc) D.wsN D.RUNN D.PWN termw D.TOKN (pdep D) pnsN (genId (hlc := hlc) (GF := GF) + 1)
+  blkNInv D.wsN D.RUNN D.PWN termw D.TOKN (pdep D) pnsN (genId (GF := GF) + 1)
     D.γc D.γm
 
 end RoundOk

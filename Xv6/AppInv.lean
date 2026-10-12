@@ -71,7 +71,7 @@ the Rocq tree's `claude-notes/projects/app-instances.md` sections 0-2 and
    `1/2` is `(1 : Qp).half`; `topAuth_halves` is the one-line split/join
    Rocq does inline with `Qp.half_half`.
 4. **CLASS BINDERS.**  Rocq's section binds `riscvGS Σ, fsTopG Σ, appcfg Σ,
-   icfg`.  Here `[MachGS hlc GF]` (the invariant class, Rocq's `riscvGS`),
+   icfg`.  Here `[MachGS GF]` (the invariant class, Rocq's `riscvGS`),
    `[FsTopG GF]`, `[Appcfg GF]` and `[Icfg]` are given PER DECLARATION,
    only where used (`Xv6/FsCfgDefs.lean` deviation 4): `appSup`,
    `appStep` and its lemmas need `[Appcfg GF]` alone; `[Icfg]`
@@ -194,7 +194,7 @@ end AppCredsRaw
 /-! ### 1c.  THE MERGE (Rocq `app_merge_raw`, SY3-K2 / SY3-A1 / SY3-A3b) -/
 
 section AppMergeRaw
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF]
 
 /-- THE COMMIT'S LAW (Rocq's `app_merge_raw`, main): the new durable copy is
 built from the running claim AND the old durable copy, curried at the
@@ -212,12 +212,12 @@ def appMergeRaw {N : Type} (A : N → Aview → IProp GF) (Ok Okc : N → Prop) 
     (gd : Nat) : IProp GF :=
   iprop(□ ∀ (r : N) (av : Aview), ⌜Ok r⌝ -∗ ▷ A r av -∗ T ==∗ ▷ A r av ∗
     ∃ r' : N, ⌜Ok r'⌝ ∗ ⌜Okc r'⌝ ∗
-      ((∀ n : Nat, ⌜n = gd + 1⌝ -∗ startAuth (hlc := hlc) (GF := GF) n -∗
+      ((∀ n : Nat, ⌜n = gd + 1⌝ -∗ startAuth (GF := GF) n -∗
           (▷ ∃ (r_o : N) (av_o : Aview), ⌜Okc r_o⌝ ∗ A r_o av_o) ==∗
-          ▷ A r' av ∗ T ∗ startAuth (hlc := hlc) (GF := GF) n) ∧ T))
+          ▷ A r' av ∗ T ∗ startAuth (GF := GF) n) ∧ T))
 
 instance appMergeRaw_persistent {N : Type} (A : N → Aview → IProp GF) (Ok Okc : N → Prop)
-    (T : IProp GF) (gd : Nat) : Persistent (appMergeRaw (hlc := hlc) A Ok Okc T gd) := by
+    (T : IProp GF) (gd : Nat) : Persistent (appMergeRaw A Ok Okc T gd) := by
   unfold appMergeRaw; infer_instance
 
 /-- EVERY TRANSPORT IS A MERGE, AT ANY TOKEN AND ANY ERA (Rocq's
@@ -226,7 +226,7 @@ hand the token and the loan back on either arm -- at a TOTAL `Ok` and
 `Okc`. -/
 theorem appMergeRaw_ofXfer {N : Type} (A : N → Aview → IProp GF) (Ok Okc : N → Prop)
     (T : IProp GF) (gd : Nat) (hOk : ∀ r, Ok r) (hOkc : ∀ r, Okc r)
-    (hx : ⊢ appXferRaw A) : ⊢ appMergeRaw (hlc := hlc) A Ok Okc T gd := by
+    (hx : ⊢ appXferRaw A) : ⊢ appMergeRaw A Ok Okc T gd := by
   ihave #Hx := hx
   unfold appXferRaw appMergeRaw
   imodintro
@@ -251,7 +251,7 @@ end AppMergeRaw
 /-! ### 1d.  THE SYNC RUNNER (Rocq `app_sync_run_raw`, sync K3-3 / SY3-A1 / SY3-A3b) -/
 
 section AppSyncRaw
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsTopG GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF] [FsTopG GF]
 
 /-- THE ONE PLACE A SYNC HOOK'S MEANING IS USED (Rocq's `app_sync_run_raw`,
 main): fired by the ghost commit with the fresh guest half, the new durable
@@ -269,13 +269,13 @@ def appSyncRunRaw {N : Type} (A : N → Aview → IProp GF) (Ok Okc : N → Prop
 
 instance appSyncRunRaw_persistent {N : Type} (A : N → Aview → IProp GF) (Ok Okc : N → Prop)
     (T : IProp GF) (Hk : IProp GF → IProp GF) :
-    Persistent (appSyncRunRaw (hlc := hlc) A Ok Okc T Hk) := by
+    Persistent (appSyncRunRaw A Ok Okc T Hk) := by
   unfold appSyncRunRaw; infer_instance
 
 /-- AN APPLICATION WITH NO SYNC LEDGER (Rocq's `app_sync_run_raw_triv`). -/
 theorem appSyncRunRaw_triv {N : Type} (A : N → Aview → IProp GF) (Ok Okc : N → Prop)
     (T : IProp GF) (Hk : IProp GF → IProp GF) (hid : ∀ Q : IProp GF, Hk Q ⊣⊢ Q) :
-    ⊢ appSyncRunRaw (hlc := hlc) A Ok Okc T Hk := by
+    ⊢ appSyncRunRaw A Ok Okc T Hk := by
   unfold appSyncRunRaw
   imodintro
   iintro %Q %gt %I %r %r' _ _ _ HQ Hh Hn Hp HT
@@ -287,7 +287,7 @@ theorem appSyncRunRaw_triv {N : Type} (A : N → Aview → IProp GF) (Ok Okc : N
 theorem appSyncRun_list {N : Type} (A : N → Aview → IProp GF) (Ok Okc : N → Prop)
     (T : IProp GF) (Hk : IProp GF → IProp GF) (E : CoPset) (Qs : List (IProp GF)) (gt : GName)
     (I : RegMapF FsNode) (r r' : N) (hr : Ok r) (hr' : Ok r') (hrc : Okc r') :
-    appSyncRunRaw (hlc := hlc) A Ok Okc T Hk ⊢ ([∗list] Q ∈ Qs, Hk Q) -∗
+    appSyncRunRaw A Ok Okc T Hk ⊢ ([∗list] Q ∈ Qs, Hk Q) -∗
       (gt ↪●MAP{DFrac.own (1 : Qp).half} I) -∗ ▷ A r' (absView I) -∗ ▷ A r (absView I) -∗
       T -∗ |={E}=> ((gt ↪●MAP{DFrac.own (1 : Qp).half} I) ∗ ▷ A r' (absView I) ∗
         ▷ A r (absView I) ∗ T ∗ ([∗list] Q ∈ Qs, Q)) := by
@@ -314,7 +314,7 @@ end AppSyncRaw
 /-! ## 2.  The invariant, at the ambient configuration -/
 
 section AppInv
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}}
+variable {GF : BundledGFunctors.{0}}
 
 /-- THE SUPPLY, PINNED (Rocq's `app_sup`): what the deposit class's
 `UexecSG.ssupply` is at the kernel's instance.  A CREDENTIAL, not a parked
@@ -340,25 +340,25 @@ included.  Only the ESCROWED proposition widens: the generic tier's supply
 law still pays `appSup`.  The era is the one the escrow is allocated in
 (`MainFs`), and the reader's console era is `genId + 1` -- the index of
 `consReadPay` at the same read. -/
-def appRdcred [MachGS hlc GF] [Appcfg GF] : IProp GF :=
-  iprop(appSup (GF := GF) ∨ MachFixedGS.rdwild (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1))
+def appRdcred [MachGS GF] [Appcfg GF] : IProp GF :=
+  iprop(appSup (GF := GF) ∨ MachFixedGS.rdwild (GF := GF) (genId (GF := GF) + 1))
 
-instance appRdcred_persistent [MachGS hlc GF] [Appcfg GF] :
-    Persistent (appRdcred (hlc := hlc) (GF := GF)) := by
+instance appRdcred_persistent [MachGS GF] [Appcfg GF] :
+    Persistent (appRdcred (GF := GF)) := by
   unfold appRdcred; infer_instance
 
 /-- Rocq `app_rdcred_of_sup`. -/
-theorem appRdcred_of_sup [MachGS hlc GF] [Appcfg GF] :
-    appSup (GF := GF) ⊢ appRdcred (hlc := hlc) (GF := GF) := by
+theorem appRdcred_of_sup [MachGS GF] [Appcfg GF] :
+    appSup (GF := GF) ⊢ appRdcred (GF := GF) := by
   unfold appRdcred
   iintro H
   ileft
   iexact H
 
 /-- Rocq `app_rdcred_of_rdwild`. -/
-theorem appRdcred_of_rdwild [MachGS hlc GF] [Appcfg GF] :
-    MachFixedGS.rdwild (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) ⊢
-      appRdcred (hlc := hlc) (GF := GF) := by
+theorem appRdcred_of_rdwild [MachGS GF] [Appcfg GF] :
+    MachFixedGS.rdwild (GF := GF) (genId (GF := GF) + 1) ⊢
+      appRdcred (GF := GF) := by
   unfold appRdcred
   iintro H
   iright
@@ -370,16 +370,16 @@ generation, both at ONE record predicate `Ok` the era's running record
 satisfies (existential, so `Appcfg` need not carry it), at the durable-copy
 predicate `Okc` (the package's parameter; `AppDur.appDurLaws` closes it with
 the crash seam). -/
-def appMerge [MachGS hlc GF] [FsTopG GF] [Appcfg GF] (Okc : appNames (GF := GF) → Prop) :
+def appMerge [MachGS GF] [FsTopG GF] [Appcfg GF] (Okc : appNames (GF := GF) → Prop) :
     IProp GF :=
   iprop(∃ Ok : appNames (GF := GF) → Prop, ⌜Ok (appRun (GF := GF))⌝ ∗
-    appMergeRaw (hlc := hlc) appPred Ok Okc (eraSyncTok (hlc := hlc) (GF := GF))
-      (genId (hlc := hlc) (GF := GF)) ∗
-    appSyncRunRaw (hlc := hlc) appPred Ok Okc (eraSyncTok (hlc := hlc) (GF := GF))
-      (eraSyncHook (hlc := hlc) (GF := GF)))
+    appMergeRaw appPred Ok Okc (eraSyncTok (GF := GF))
+      (genId (GF := GF)) ∗
+    appSyncRunRaw appPred Ok Okc (eraSyncTok (GF := GF))
+      (eraSyncHook (GF := GF)))
 
-instance appMerge_persistent [MachGS hlc GF] [FsTopG GF] [Appcfg GF]
-    (Okc : appNames (GF := GF) → Prop) : Persistent (appMerge (hlc := hlc) Okc) := by
+instance appMerge_persistent [MachGS GF] [FsTopG GF] [Appcfg GF]
+    (Okc : appNames (GF := GF) → Prop) : Persistent (appMerge Okc) := by
   unfold appMerge; infer_instance
 
 /-- THE DOMAIN ROW (round C; Rocq's `app_dom`).  The abstract map names
@@ -419,11 +419,11 @@ def appBody [FsTopG GF] [Appcfg GF] [Icfg] (γfs : FsNames) : IProp GF :=
     ⌜appDom I⌝)
 
 /-- Rocq's `app_inv`. -/
-def appInv [MachGS hlc GF] [FsTopG GF] [Appcfg GF] [Icfg] (γfs : FsNames) : IProp GF :=
+def appInv [MachGS GF] [FsTopG GF] [Appcfg GF] [Icfg] (γfs : FsNames) : IProp GF :=
   inv appN (appBody γfs)
 
-instance appInv_persistent [MachGS hlc GF] [FsTopG GF] [Appcfg GF] [Icfg] (γfs : FsNames) :
-    Persistent (appInv (hlc := hlc) (GF := GF) γfs) := by
+instance appInv_persistent [MachGS GF] [FsTopG GF] [Appcfg GF] [Icfg] (γfs : FsNames) :
+    Persistent (appInv (GF := GF) γfs) := by
   unfold appInv; infer_instance
 
 /-- The whole top-map authority is its two halves (Rocq does this inline
@@ -441,10 +441,10 @@ the authority the boot founded, the claim at the founded map --
 LATER-SHAPED, because it arrives from the durable instance through the
 transport (round C) and `inv_alloc` takes the later -- and the domain
 row. -/
-theorem appInv_alloc [MachGS hlc GF] [FsTopG GF] [Appcfg GF] [Icfg]
+theorem appInv_alloc [MachGS GF] [FsTopG GF] [Appcfg GF] [Icfg]
     (γfs : FsNames) (I : RegMapF FsNode) (E : CoPset) (hd : appDom I) :
     ⊢@{IProp GF} (γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I) -∗
-      ▷ appPred appRun (absView I) -∗ |={E}=> appInv (hlc := hlc) γfs := by
+      ▷ appPred appRun (absView I) -∗ |={E}=> appInv γfs := by
   iintro Hh Hp
   unfold appInv
   iapply (inv_alloc appN E (appBody (GF := GF) γfs))
@@ -466,10 +466,10 @@ claim there, `▷`-shaped, and owes the new one `▷`-shaped.  The three forms
 below are its readings. -/
 
 /-- Rocq's `app_top_update`. -/
-theorem appTopUpdate [MachGS hlc GF] [FsTopG GF] [Appcfg GF] [Icfg]
+theorem appTopUpdate [MachGS GF] [FsTopG GF] [Appcfg GF] [Icfg]
     (E : CoPset) (γfs : FsNames) (I : RegMapF FsNode) (i : Nat) (n n' : FsNode)
     (hE : (↑appN : CoPset) ⊆ E) :
-    ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗
+    ⊢@{IProp GF} appInv γfs -∗
       (⌜PartialMap.get? I i = some n⌝ -∗
         ▷ appPred appRun (absView I) -∗
         |==> ▷ appPred appRun (absView (PartialMap.insert I i n'))) -∗
@@ -542,9 +542,9 @@ unchanged, so no `appDom` obligation and no `appStep` arise.
 THE LATER IS THE CALLER'S: the body is under one and only the caller knows
 whether its own claim is timeless (echo's is), so the wand is handed
 `▷ appPred` and owes `▷ appPred` back. -/
-theorem appClaimUpdate [MachGS hlc GF] [FsTopG GF] [Appcfg GF] [Icfg]
+theorem appClaimUpdate [MachGS GF] [FsTopG GF] [Appcfg GF] [Icfg]
     (E : CoPset) (γfs : FsNames) (R Q : IProp GF) (hE : (↑appN : CoPset) ⊆ E) :
-    ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗
+    ⊢@{IProp GF} appInv γfs -∗
       □ (∀ av : Aview, R -∗ ▷ appPred appRun av -∗
           |={E \ ↑appN}=> (▷ appPred appRun av ∗ Q)) -∗
       R -∗ |={E}=> Q := by

@@ -28,11 +28,11 @@ committer has no client half for a home block (Rocq's `eo_pay_bs_auth`).
 The home block itself rides through untouched. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 /-- The loop's invariant at the head `+0xb4`. -/
-def eoLoopInv (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+def eoLoopInv (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls n : Nat) (W : List (BitVec 32))
     (pidv : BitVec 32) (dqp : DFrac) (G : GName → IProp GF) : IProp GF := iprop%
@@ -49,13 +49,13 @@ def eoLoopInv (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     eoOpen γb γfs cov ls n W L D Lw t -∗
-    logMirrorHalf (hlc := hlc) Mc -∗ durPair G (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF)) (fsRestrict (dvOfD L) (fsHomeList cov ls)) -∗
+    logMirrorHalf Mc -∗ durPair G (eraSyncTok (GF := GF)) (genId (GF := GF)) (fsRestrict (dvOfD L) (fsHomeList cov ls)) -∗
     eoFrame4 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) -∗
     eoFrameS (k.regs 2#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) -∗
     (∀ c' : CPU, eoPost k pidv dqp c') -∗
     wpLoop c
 
-theorem eoLoopInv_elim (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem eoLoopInv_elim (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls n : Nat) (W : List (BitVec 32))
     (pidv : BitVec 32) (dqp : DFrac) (G : GName → IProp GF) :
@@ -73,14 +73,14 @@ theorem eoLoopInv_elim (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
         trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
         wordPointsTo (pPid k.proc) 4 dqp pidv -∗
         eoOpen γb γfs cov ls n W L D Lw t -∗
-        logMirrorHalf (hlc := hlc) Mc -∗ durPair G (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF)) (fsRestrict (dvOfD L) (fsHomeList cov ls)) -∗
+        logMirrorHalf Mc -∗ durPair G (eraSyncTok (GF := GF)) (genId (GF := GF)) (fsRestrict (dvOfD L) (fsHomeList cov ls)) -∗
         eoFrame4 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) -∗
         eoFrameS (k.regs 2#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) -∗
         (∀ c' : CPU, eoPost k pidv dqp c') -∗
         wpLoop c := by
   unfold eoLoopInv; iintro H; iexact H
 
-theorem eoLoopInv_intro (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem eoLoopInv_intro (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls n : Nat) (W : List (BitVec 32))
     (pidv : BitVec 32) (dqp : DFrac) (G : GName → IProp GF) :
@@ -97,7 +97,7 @@ theorem eoLoopInv_intro (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
         trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
         wordPointsTo (pPid k.proc) 4 dqp pidv -∗
         eoOpen γb γfs cov ls n W L D Lw t -∗
-        logMirrorHalf (hlc := hlc) Mc -∗ durPair G (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF)) (fsRestrict (dvOfD L) (fsHomeList cov ls)) -∗
+        logMirrorHalf Mc -∗ durPair G (eraSyncTok (GF := GF)) (genId (GF := GF)) (fsRestrict (dvOfD L) (fsHomeList cov ls)) -∗
         eoFrame4 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) -∗
         eoFrameS (k.regs 2#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) -∗
         (∀ c' : CPU, eoPost k pidv dqp c') -∗
@@ -151,7 +151,7 @@ theorem eoOpen_peel (γb : BcacheNames) (γfs : FsNames) (cov : Std.ExtTreeSet N
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 /-- The `lh.n` cell, read out of the opened batch and put straight back
@@ -255,7 +255,7 @@ theorem eo_slot_ne (cov : Std.ExtTreeSet Nat compare) (ls i : Nat) (w : BitVec 3
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxRecDepth 100000 in
@@ -265,7 +265,7 @@ set_option maxHeartbeats 80000000 in
 and the back-edge test. -/
 theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (c0 cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
     (γdl : GName) (γfs : FsNames) (pd pav pu : BitVec 64) (j ls n : Nat) (dev : BitVec 32)
     (W : List (BitVec 32)) (pidv : BitVec 32) (dqp : DFrac)
@@ -290,14 +290,14 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     kctx cpu (((k.withSpie a b).pushed 8).withRegs R) ∗ pcIs cpu (KA.«end_op» + 0xb4#64) ∗
     procsInv Γ ∗ bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
     logCtx γ γb γfs V.cov ls dev ∗
-    fsCrashSeam (hlc := hlc) (GF := GF) V.cov ls ∗
-    eraRegistered (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF))
-      (MachGS.era (hlc := hlc) (GF := GF)) ∗
-    fsCrashSeamAt (hlc := hlc) G V.cov ls ∗
+    fsCrashSeam (GF := GF) V.cov ls ∗
+    eraRegistered (GF := GF) (genId (GF := GF))
+      (MachGS.era (GF := GF)) ∗
+    fsCrashSeamAt G V.cov ls ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     eoOpen γb γfs V.cov ls n W L D Lw t ∗
-    logMirrorHalf (hlc := hlc) Mc ∗ durPair G (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF)) (fsRestrict (dvOfD L) (fsHomeList V.cov ls)) ∗
+    logMirrorHalf Mc ∗ durPair G (eraSyncTok (GF := GF)) (genId (GF := GF)) (fsRestrict (dvOfD L) (fsHomeList V.cov ls)) ∗
     eoFrame4 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     eoFrameS (k.regs 2#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) ∗
     (∀ c' : CPU, eoPost k pidv dqp c') ∗
@@ -517,16 +517,16 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   -- comes back at `lmUpd Mc <slot t> bsD`
   ihave Hperm := fsLogfillV_seqPermit V.cov ls t Mc bsD hpD.2.2.2.1 htL hMchdr
     $$ Hseam Hreg Hswlb Hmir
-  ihave Hperm := (show diskSeqPermit (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF))
+  ihave Hperm := (show diskSeqPermit (GF := GF) (genId (GF := GF))
         (some (1024 * logSlotBno ls t, bsD))
-        (logMirrorHalf (hlc := hlc) (lmUpd Mc (logSlotBno ls t) bsD)) ⊢
-      diskSeqPermit (genId (hlc := hlc) (GF := GF))
+        (logMirrorHalf (lmUpd Mc (logSlotBno ls t) bsD)) ⊢
+      diskSeqPermit (genId (GF := GF))
         (some (BSIZE * (BitVec.ofNat 32 (logSlotBno ls t)).toNat, bsD))
-        (logMirrorHalf (hlc := hlc) (lmUpd Mc (logSlotBno ls t) bsD)) from by
+        (logMirrorHalf (lmUpd Mc (logSlotBno ls t) bsD)) from by
     rw [hbnoS]; exact .rfl) $$ Hperm
   iapply (eo_bwrite BW Γ cpu _ γl γb V γdl pd pav pu j kkL pidv dev
       (BitVec.ofNat 32 (logSlotBno ls t)) dqp bsD bsdL
-      (logMirrorHalf (hlc := hlc) (lmUpd Mc (logSlotBno ls t) bsD)) k.proc (by k_norm_g)
+      (logMirrorHalf (lmUpd Mc (logSlotBno ls t) bsD)) k.proc (by k_norm_g)
       k.sie (by k_norm_g) hj ?wproc ?wK ?wnoff ?wtier hpL.1 ?wa0 ?wbno hpL.2.2.2.2 hpd)
     $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hbc $Hdc $Hpid $HbufL $Hperm]
   rotate_right 1
@@ -652,8 +652,8 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   -- the chained picture, one fill further
   obtain ⟨hMchdr', hMcslot', hrow', hres⟩ :=
     eo_fill_facts W Lw Mc L V.cov ls t bsD htL hMchdr hMcslot hrow
-  ihave Hepoch := (show durPair (GF := GF) G (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF)) (fsRestrict (dvOfD L) (fsHomeList V.cov ls)) ⊢
-      durPair G (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF)) (fsRestrict (dvOfD (PartialMap.insert L (logSlotBno ls t) bsD))
+  ihave Hepoch := (show durPair (GF := GF) G (eraSyncTok (GF := GF)) (genId (GF := GF)) (fsRestrict (dvOfD L) (fsHomeList V.cov ls)) ⊢
+      durPair G (eraSyncTok (GF := GF)) (genId (GF := GF)) (fsRestrict (dvOfD (PartialMap.insert L (logSlotBno ls t) bsD))
         (fsHomeList V.cov ls)) from by rw [hres]) $$ Hepoch
   -- ===== +0xf8  addiw s2,s2,1 ; addi s5,s5,4 ; lw a5,44(s4) ; blt s2,a5
   k_step_e (wp_s_addiw cpu _ (KA.«end_op» + 0xf8#64) true 1#12 18#5 18#5 (by decide))
@@ -732,13 +732,13 @@ end
 /-! ## The loop, closed by Löb at the head `+0xb4` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
 theorem eo_loop (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
     (γdl : GName) (γfs : FsNames) (pd pav pu : BitVec 64) (j ls n : Nat) (dev : BitVec 32)
     (W : List (BitVec 32)) (pidv : BitVec 32) (dqp : DFrac)
@@ -753,10 +753,10 @@ theorem eo_loop (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     (G : GName → IProp GF) (hsb : ∀ w ∈ W, w.toNat ≠ SB_BNO) :
     procsInv (GF := GF) Γ -∗ bioCtx γl γb V -∗ diskCaps V.gd γdl pd pav pu -∗ panicEnv -∗
     logCtx γ γb γfs V.cov ls dev -∗
-    fsCrashSeam (hlc := hlc) (GF := GF) V.cov ls -∗
-    eraRegistered (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF))
-      (MachGS.era (hlc := hlc) (GF := GF)) -∗
-    fsCrashSeamAt (hlc := hlc) G V.cov ls -∗
+    fsCrashSeam (GF := GF) V.cov ls -∗
+    eraRegistered (GF := GF) (genId (GF := GF))
+      (MachGS.era (GF := GF)) -∗
+    fsCrashSeamAt G V.cov ls -∗
     eoLoopInv Γ cpu k γb γfs V.cov ls n W pidv dqp G := by
   iintro #Hpi #Hbc #Hdc #Hpe #Hctx #Hseam #Hreg #HseamG
   iloeb as IH

@@ -55,7 +55,7 @@ theorem ukOpened_preS {C : UCfg} {P : UPtd} {T : BMap} {m : RegMap} {pc : BitVec
     by rw [ucPreS_file_other _ _ (by decide)]; exact h.hnpc, h.view⟩
 
 section core
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- **The bundle's machine core** (see the header). -/
 def ukCore [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IProp GF) (sz : Nat) (M : ElfMem)

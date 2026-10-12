@@ -114,7 +114,7 @@ theorem kxc_rest_addr (sp0 : BitVec 64) :
   bv_omega_g
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 variable {lent : Bool}
 
 /-! ## The 55 low slots, and the three carves -/
@@ -411,7 +411,7 @@ theorem kxc_epi_frame [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hK : 68 ≤ 
           pcIs cpu' (jumpPc ra) -∗ wpLoop cpu'))
     ⊢ wpLoop cpu := by
   iintro ⟨Hk, Hpc, Hframe, HΦ⟩
-  icases kctx_kernelText (hlc := hlc) (GF := GF) (lent := lent) cpu ((k.pushed 68).withRegs R) $$ Hk
+  icases kctx_kernelText (GF := GF) (lent := lent) cpu ((k.pushed 68).withRegs R) $$ Hk
     with ⟨#Htext, Hk⟩
   iapply (wp_epilogue_kexec cpu k (KA.«kexec» + 0x72#64) hK R hR2 ra s0 s1 s2)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
@@ -430,7 +430,7 @@ theorem kxc_prologue [CurCtx] [KernelGeom] (cpu : CPU) (k : KCtx) (hK : 68 ≤ k
           wpLoop cpu'))
     ⊢ wpLoop cpu := by
   iintro ⟨Hk, Hpc, HΦ⟩
-  icases kctx_kernelText (hlc := hlc) (GF := GF) (lent := lent) cpu k $$ Hk with ⟨#Htext, Hk⟩
+  icases kctx_kernelText (GF := GF) (lent := lent) cpu k $$ Hk with ⟨#Htext, Hk⟩
   iapply (wp_prologue_kexec cpu k KA.«kexec» hK)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   iframe

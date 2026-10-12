@@ -16,7 +16,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [WchG GF]
 open UexecSG
 
 theorem ut_readCons_sys (sep : BitVec 64) (V : ProcPriv) (sts : List FdState)
@@ -34,11 +34,11 @@ set_option maxHeartbeats 1000000 in
 theorem ut_sys_live (hW : UtReadWhy (GF := GF)) (hP : UtPauseWhy (GF := GF)) (A : UtArgs GF) (V2 : ProcPriv)
     (M2 : Nat → List (BitVec 8)) (sts2 : List FdState) (cs2 : ExtTreeSet GName compare)
     (hsc : A.sc = uecallScause) (hgn : A.gn = A.V.gen) :
-    syscSysOut (hlc := hlc) A.f (utSysRec A.sep A.V) A.M A.sts A.gn A.cs A.pid (syscA0 V2)
+    syscSysOut A.f (utSysRec A.sep A.V) A.M A.sts A.gn A.cs A.pid (syscA0 V2)
         (syscImg V2 M2) sts2 V2.cwi cs2 ∗
       syscWaitOut (GF := GF) (utSysRec A.sep A.V) A.M (syscImg V2 M2) (syscA0 V2) A.cs cs2 A.pid ⊢
     □ (⌜utLive A V2 cs2⌝ ∨ killShot A.gn) ∗
-      syscSysOut (hlc := hlc) A.f (utSysRec A.sep A.V) A.M A.sts A.gn A.cs A.pid (syscA0 V2)
+      syscSysOut A.f (utSysRec A.sep A.V) A.M A.sts A.gn A.cs A.pid (syscA0 V2)
         (syscImg V2 M2) sts2 V2.cwi cs2 ∗
       syscWaitOut (GF := GF) (utSysRec A.sep A.V) A.M (syscImg V2 M2) (syscA0 V2) A.cs cs2 A.pid := by
   have hnp : usysEff A.V.pvSecc (utProTf A.sep A.V) = syscNum (utSysRec A.sep A.V) := (ut_sysNum _ _).symm

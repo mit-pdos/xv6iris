@@ -71,7 +71,7 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
 section UshExecDefs
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -99,18 +99,18 @@ structure UshExecEnv where
   wp_kshr_entry : ∀ (N : UkNames GF) (_ : UknConst N) (h : CPU) (m : RegMap) (t : Nat) (args : List UArg)
     (n : Nat), m.get 10#5 = BitVec.ofNat 64 t →
     ⊢ ushCode N.t -∗ ush_jtab N.t -∗ ush_cmd N.d t (UExec args) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (6 + n) -∗
+      urun N h m (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (6 + n) -∗
       (∀ (h' : CPU) (m' : RegMap), ⌜m'.get 9#5 = BitVec.ofNat 64 t⌝ -∗ ⌜m'.get 10#5 = BitVec.ofNat 64 t⌝ -∗
-        urun (hlc := hlc) N h' m' (BitVec.ofNat 64 0xce) n -∗ wpLoop h') -∗
+        urun N h' m' (BitVec.ofNat 64 0xce) n -∗ wpLoop h') -∗
       wpLoop h
   /-- Rocq `UkShSeam.ush_cmd_of_ref` at an EXEC node. -/
   ush_cmd_of_ref : ∀ (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail s0 p len : Nat)
     (f : Nat → BitVec 8) (toks : List (Nat × Nat)),
     refParsecmd len f = some (.exec toks) → (∀ j, j < len → f j ≠ ubyte0) → len < 2 ^ 31 → 0 < s0 →
     s0 + len < 2 ^ 38 →
-    ⊢ urun (hlc := hlc) N h m pc avail -∗ ushTree N s0 p (.exec toks) -∗
+    ⊢ urun N h m pc avail -∗ ushTree N s0 p (.exec toks) -∗
       ubytes N.d s0 (len + 1) (ushZeroAt (refNulcut (.exec toks)) (ushpExt len f)) -∗
-      |==> (urun (hlc := hlc) N h m pc avail ∗
+      |==> (urun N h m pc avail ∗
         ush_cmd N.d p (UExec (ushArgs s0 (ushZeroAt (refNulcut (.exec toks)) (ushpExt len f)) toks)))
   /-- Rocq `UkShDiag.ush_Dg`: the diagnostic's stack. -/
   ush_Dg : Nat
@@ -133,7 +133,7 @@ structure UshExecEnv where
       uwordq N.d DFrac.discard ((m.get 9#5).toNat + 8) (BitVec.ofNat 64 x.ptr) -∗
       (⌜0 < x.ptr ∧ x.ptr < 2 ^ 38⌝ ∗ ustr N.d DFrac.discard x.ptr x.len x.bytes) -∗
       ustd N.fd l -∗ Cr -∗ (ustd N.fd l -∗ Cd -∗ N.pay (-1)) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0xda) (ush_Dg + n) -∗ wpLoop h
+      urun N h m (BitVec.ofNat 64 0xda) (ush_Dg + n) -∗ wpLoop h
   /-- Rocq `UkShEcho.echo_execfail_bytes` (sh's `.rodata` literal around
   "echo"; needs sh-main's `shd_lit`). -/
   echo_execfail_bytes : ush_execfail_bytes altExecfail cmdEcho
@@ -141,7 +141,7 @@ structure UshExecEnv where
 attribute [instance] UshExecEnv.ush_cmd_persistent UshExecEnv.ush_jtab_persistent
   UshExecEnv.ush_execfail_law_at_persistent
 
-variable (E : UshExecEnv (hlc := hlc) (GF := GF))
+variable (E : UshExecEnv (GF := GF))
 
 /-- **Rocq `UkShDiag.ush_execfail_law`**: echo's instance of the law. -/
 def ushExecfailLaw (Cr Cd : IProp GF) : IProp GF := E.ush_execfail_law_at altExecfail 17 Cr Cd
@@ -215,7 +215,7 @@ def ushExecSupEchoGen (TabF : GName → List FdState → IProp GF) (Fd1 : List F
       (ld : List FdState),
     ⌜N'.pay = Q⌝ -∗ ⌜m.get 10#5 = BitVec.ofNat 64 s0⌝ -∗ ⌜m.get 11#5 = BitVec.ofNat 64 (t + 8)⌝ -∗
     ⌜ushEchoArgvBytes ws g⌝ -∗ ⌜Fd1 ld⌝ -∗ TabF N'.fd ld -∗ E.ush_cmd N'.d t (ushEchoCmd E ws s0 g) -∗ Cr -∗
-    udepwAtRefR (hlc := hlc) N' m pc ROOTINO iprop(TabF N'.fd ld ∗ Cr))
+    udepwAtRefR N' m pc ROOTINO iprop(TabF N'.fd ld ∗ Cr))
 
 instance ushExecSupEchoGen_persistent (TabF : GName → List FdState → IProp GF) (Fd1 : List FdState → Prop)
     (ws : List (List (BitVec 8))) (Q : Int → IProp GF) (Cr : IProp GF) :

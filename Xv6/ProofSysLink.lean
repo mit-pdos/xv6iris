@@ -43,7 +43,7 @@ eb-generic at depth 0. -/
 theorem sys_link_proof (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI) (NP : NAMEIPARENT) (IL : ILOCK)
     (IUN : IUNLOCK) (IU : IUPDATE) (DLK : DIRLINK) (IP : IPUT) (IUP : IUNLOCKPUT) (EO : END_OP) :
     SYSLINK := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ cpu k γ j pid V M v0 v1 Ftgt Fent Funt
+  fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ cpu k γ j pid V M v0 v1 Ftgt Fent Funt
       hj hproc htier hnoff hK hv0 hv1 => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
@@ -61,7 +61,7 @@ theorem sys_link_proof (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI) (NP : NAMEIPAR
     unfold sysLinkCont
     iapply wpNext_at true k.proc cpu c _ (fun hc => Or.elim hc (fun hx => absurd hx (by decide))
       (fun hx => absurd (hproc ▸ hx) (procAddr_nonzero hj))) $$ Hnext
-  ihave #Henv : sysfileEnv (hlc := hlc) Γ $$ []
+  ihave #Henv : sysfileEnv Γ $$ []
   · unfold sysfileEnv; iframe #
   -- +0x00 .. +0x06  the prologue
   iapply (wp_prologue_sys_link cpu k KA.«sys_link» (sysLinkSlots_38 _ hK)) $$ [- $Hk $Hpc]

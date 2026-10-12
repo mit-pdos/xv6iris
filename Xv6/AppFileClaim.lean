@@ -48,7 +48,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section AppFileClaim
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF]
 
 /-- THE CORE (Rocq `f_core`): the EXACT arm, or IN FLIGHT. -/
@@ -60,32 +60,32 @@ def fCore (c : FileFixed) (r : FileAppNames) (av : Aview) : IProp GF :=
 /-- NO LIVE ESCROW (Rocq `f_esc_wrap`): the ledger, every escrow in it
 spent. -/
 def fEscWrap (r : FileAppNames) : IProp GF :=
-  iprop(∃ h : List EscRec, escAuth r h ∗ escRecs (hlc := hlc) h)
+  iprop(∃ h : List EscRec, escAuth r h ∗ escRecs h)
 
 /-- THE ESCROW ARM (Rocq `f_esc_live`). -/
 def fEscLive (c : FileFixed) (r : FileAppNames) (av : Aview) : IProp GF :=
   iprop(∃ (h0 : List EscRec) (s : Dst) (g : GName),
-    escAuth r (h0 ++ [(s, g)]) ∗ escRecs (hlc := hlc) h0 ∗
+    escAuth r (h0 ++ [(s, g)]) ∗ escRecs h0 ∗
     fdeedWhole r s ∗ ftkt r s ∗ fTyped c s ∗ ⌜fOk av s⌝)
 
 /-- THE FILES' STATE (Rocq `f_state`). -/
 def fState (c : FileFixed) (r : FileAppNames) (av : Aview) : IProp GF :=
-  iprop((fEscWrap (hlc := hlc) r ∗ fCore c r av) ∨ fEscLive (hlc := hlc) c r av)
+  iprop((fEscWrap r ∗ fCore c r av) ∨ fEscLive c r av)
 
 instance fCore_timeless (c : FileFixed) (r : FileAppNames) (av : Aview) :
     Timeless (fCore (GF := GF) c r av) := by
   unfold fCore; infer_instance
 
 instance fEscWrap_timeless (r : FileAppNames) :
-    Timeless (fEscWrap (hlc := hlc) (GF := GF) r) := by
+    Timeless (fEscWrap (GF := GF) r) := by
   unfold fEscWrap; infer_instance
 
 instance fEscLive_timeless (c : FileFixed) (r : FileAppNames) (av : Aview) :
-    Timeless (fEscLive (hlc := hlc) (GF := GF) c r av) := by
+    Timeless (fEscLive (GF := GF) c r av) := by
   unfold fEscLive; infer_instance
 
 instance fState_timeless (c : FileFixed) (r : FileAppNames) (av : Aview) :
-    Timeless (fState (hlc := hlc) (GF := GF) c r av) := by
+    Timeless (fState (GF := GF) c r av) := by
   unfold fState; infer_instance
 
 /-- The core, built at the exact arm (Rocq `f_core_exact`). -/
@@ -102,7 +102,7 @@ theorem fCore_exact (c : FileFixed) (r : FileAppNames) (av : Aview) (s : Dst)
 /-- The claim's file state off a core, at the ledger as it stands (Rocq
 `f_state_of_core`). -/
 theorem fState_of_core (c : FileFixed) (r : FileAppNames) (av : Aview) :
-    ⊢@{IProp GF} fEscWrap (hlc := hlc) r -∗ fCore c r av -∗ fState (hlc := hlc) c r av := by
+    ⊢@{IProp GF} fEscWrap r -∗ fCore c r av -∗ fState c r av := by
   iintro Hw Hc
   unfold fState
   ileft
@@ -111,7 +111,7 @@ theorem fState_of_core (c : FileFixed) (r : FileAppNames) (av : Aview) :
 /-- Every arm of the file state reads the view at SOME deed state (Rocq
 `f_state_fok`). -/
 theorem fState_fok (c : FileFixed) (r : FileAppNames) (av : Aview) :
-    ⊢@{IProp GF} fState (hlc := hlc) c r av -∗ ⌜∃ s : Dst, fOk av s⌝ := by
+    ⊢@{IProp GF} fState c r av -∗ ⌜∃ s : Dst, fOk av s⌝ := by
   unfold fState fCore fEscLive
   iintro H
   icases H with (⟨-, (⟨%s, -, -, -, %hok⟩ | ⟨%s, %s', %n, -, -, -, %hok, -⟩)⟩
@@ -124,21 +124,21 @@ theorem fState_fok (c : FileFixed) (r : FileAppNames) (av : Aview) :
 image's AND the console is in one of its states AND the files are in the
 deed's state. -/
 def filePred (c : FileFixed) (r : FileAppNames) (av : Aview) : IProp GF :=
-  iprop(fileTaint (hlc := hlc) c
-    ∨ (⌜fileFsPure av⌝ ∗ consState r.fnCons av ∗ fState (hlc := hlc) c r av
-       ∗ syncClaim (hlc := hlc) c r av))
+  iprop(fileTaint c
+    ∨ (⌜fileFsPure av⌝ ∗ consState r.fnCons av ∗ fState c r av
+       ∗ syncClaim c r av))
 
 instance filePred_timeless (c : FileFixed) (r : FileAppNames) (av : Aview) :
-    Timeless (filePred (hlc := hlc) (GF := GF) c r av) := by
+    Timeless (filePred (GF := GF) c r av) := by
   unfold filePred; infer_instance
 
 /-- The exact arm, as the transports and the era mint build it; THE LEDGER
 IS A PREMISE (Rocq `file_pred_exact`). -/
 theorem filePred_exact (c : FileFixed) (r : FileAppNames) (av : Aview) (s : Dst)
     (hp : fileFsPure av) (hok : fOk av s) :
-    ⊢@{IProp GF} consState r.fnCons av -∗ fEscWrap (hlc := hlc) r -∗
-      fdeed r s -∗ ftkt r s -∗ fTyped c s -∗ syncClaim (hlc := hlc) c r av -∗
-      filePred (hlc := hlc) c r av := by
+    ⊢@{IProp GF} consState r.fnCons av -∗ fEscWrap r -∗
+      fdeed r s -∗ ftkt r s -∗ fTyped c s -∗ syncClaim c r av -∗
+      filePred c r av := by
   iintro Hc Hw Hd Ht #Hty Hsy
   unfold filePred
   iright
@@ -151,9 +151,9 @@ theorem filePred_exact (c : FileFixed) (r : FileAppNames) (av : Aview) (s : Dst)
 /-- THE ECHO APPLICATION'S CLAIM IS THIS ONE WITH THE FILE FORGOTTEN, as an
 accessor (Rocq `file_pred_cons`). -/
 theorem filePred_cons (c : FileFixed) (r : FileAppNames) (av : Aview) :
-    ⊢@{IProp GF} filePred (hlc := hlc) c r av -∗
-      echoPred (hlc := hlc) c.ffEcho r.fnCons av ∗
-      (echoPred (hlc := hlc) c.ffEcho r.fnCons av -∗ filePred (hlc := hlc) c r av) := by
+    ⊢@{IProp GF} filePred c r av -∗
+      echoPred c.ffEcho r.fnCons av ∗
+      (echoPred c.ffEcho r.fnCons av -∗ filePred c r av) := by
   unfold filePred echoPred fileTaint
   iintro H
   icases H with (#Ht | ⟨%hp, Hc, Hf, Hsy⟩)

@@ -39,13 +39,13 @@ open Std (ExtTreeSet)
 open UexecSG
 
 noncomputable section PnsRec
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
   [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [DiskG GF] [EchoOutG GF] [PnsRegG GF] [PipesNG GF] [FileAppG GF]
 
 namespace PnsCtx
-variable (C : PnsCtx hlc GF)
+variable (C : PnsCtx GF)
 
 /-- The device selector at the pipeline interface's fields. -/
 abbrev pnsSel : Nat → Dspec → IProp GF :=
@@ -58,7 +58,7 @@ theorem pns_dev_of (d : Nat) (x : Dspec) : C.pnsSel d x = pnsDev C.R C.Q.γreg d
   cases x <;> rfl
 
 /-- **Rocq `pipes_iface`**: THE RECORD, at the protected devices. -/
-def pipesIface (CK : PnsCtxOk C) [UknConst C.Q.N] : EpIfaceP (hlc := hlc) C.Q.N C.Q.P C.Q.Dp where
+def pipesIface (CK : PnsCtxOk C) [UknConst C.Q.N] : EpIfaceP C.Q.N C.Q.P C.Q.Dp where
   eiFds := pnsFds C.R C.Q
   eiOut := pnsOut C.R C.Q.γreg
   eiOuth := pnsOuth C.R C.Q.γreg
@@ -82,7 +82,7 @@ def pipesIface (CK : PnsCtxOk C) [UknConst C.Q.N] : EpIfaceP (hlc := hlc) C.Q.N 
   eiWriteNil := fun fdm fd d x K hfd => by
     show ⊢ pnsFds C.R C.Q fdm -∗ C.pnsSel d x -∗
       ((pnsFds C.R C.Q fdm -∗ C.pnsSel d x -∗ K 0) ∧ (pnsFds C.R C.Q fdm -∗ C.pnsSel d x -∗ K (-1)) ∧
-       (∀ y, pnsTaint C.R C.Q (fdDom fdm) -∗ K y)) -∗ wrObl (hlc := hlc) C.Q.N C.Q.P fd [] K
+       (∀ y, pnsTaint C.R C.Q (fdDom fdm) -∗ K y)) -∗ wrObl C.Q.N C.Q.P fd [] K
     rw [C.pns_dev_of d x]
     exact pns_write_nil CK fdm fd d x K hfd
   eiRead := by intros; iintro - Hf -; icases Hf with ⟨⟩
@@ -105,13 +105,13 @@ def pipesIface (CK : PnsCtxOk C) [UknConst C.Q.N] : EpIfaceP (hlc := hlc) C.Q.N 
   eiClose := fun fdm fd d x files paths K hfd hns hdr => by
     show ⊢ pnsFds C.R C.Q fdm -∗ pnsFilesr (GF := GF) files paths -∗ C.pnsSel d x -∗
       ((pnsFds C.R C.Q (fdDelete fdm fd) -∗ pnsFilesr (GF := GF) files paths -∗ K 0) ∧
-       (∀ y, pnsTaint C.R C.Q (fun z => fdDom fdm z ∧ z ≠ fd) -∗ K y)) -∗ clObl (hlc := hlc) C.Q.N C.Q.P fd K
+       (∀ y, pnsTaint C.R C.Q (fun z => fdDom fdm z ∧ z ≠ fd) -∗ K y)) -∗ clObl C.Q.N C.Q.P fd K
     rw [C.pns_dev_of d x]
     exact pns_close CK fdm fd d x files paths K hfd hns hdr
   eiCloseShared := fun fdm fd d K hfd hsh => pns_close_shared CK fdm fd d K hfd hsh
   eiExit := fun s fdm files paths dv ds hdr hdom => by
     show ⊢ pnsFds C.R C.Q fdm -∗ pnsFilesr (GF := GF) files paths -∗ ([∗set] d ∈ ds, C.pnsSel d (dv d)) -∗
-      exObl (hlc := hlc) C.Q.N C.Q.P s
+      exObl C.Q.N C.Q.P s
     simp only [C.pns_dev_of]
     exact pns_exit CK s fdm files paths dv ds hdr hdom
   eiWriteProd := by intros; iintro - Hf -; icases Hf with ⟨⟩

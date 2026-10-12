@@ -39,7 +39,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
   [FsLinkG GF] [FsTopG GF]
 
 /-- ONE LANDING ORDER (deviation 1): the first record permit, and from its
@@ -47,10 +47,10 @@ receipt the second (whose receipt is already the chain's `Q`), make the
 branch's machine permits. -/
 theorem fsSeq_branch (G : GName → IProp GF) (cov : ExtTreeSet Nat compare) (ls gd : Nat)
     (w0 w1 : DiskWr) (R Q : IProp GF) :
-    fsCrashSeamAt (hlc := hlc) G cov ls ⊢ fsRecPermit (hlc := hlc) G cov ls gd w0 R -∗
-      (R -∗ fsRecPermit (hlc := hlc) G cov ls gd w1 Q) -∗
-      diskWritePermit (hlc := hlc) gd w0
-        (diskWritePermit (hlc := hlc) gd w1 (diskWritePermit (hlc := hlc) gd none Q)) := by
+    fsCrashSeamAt G cov ls ⊢ fsRecPermit G cov ls gd w0 R -∗
+      (R -∗ fsRecPermit G cov ls gd w1 Q) -∗
+      diskWritePermit gd w0
+        (diskWritePermit gd w1 (diskWritePermit gd none Q)) := by
   iintro #Hseam Hp0 Hk
   iapply fsPermit_ofRec G cov ls gd w0 _ $$ Hseam
   iapply fsRecPermit_mono G cov ls gd w0 R _ $$ [Hk] Hp0
@@ -65,8 +65,8 @@ theorem fsSeq_branch (G : GName → IProp GF) (cov : ExtTreeSet Nat compare) (ls
 the wand is proved. -/
 theorem fsRecPermit_mono' (G : GName → IProp GF) (cov : ExtTreeSet Nat compare) (ls : Nat)
     (gd : Nat) (w : DiskWr) (R R' : IProp GF) :
-    fsRecPermit (hlc := hlc) G cov ls gd w R ⊢ (R -∗ R') -∗
-      fsRecPermit (hlc := hlc) G cov ls gd w R' := by
+    fsRecPermit G cov ls gd w R ⊢ (R -∗ R') -∗
+      fsRecPermit G cov ls gd w R' := by
   iintro Hp HR
   iapply fsRecPermit_mono G cov ls gd w R R' $$ HR Hp
 
@@ -76,14 +76,14 @@ theorem fsRecPermit_mono' (G : GName → IProp GF) (cov : ExtTreeSet Nat compare
 theorem fsLogfillV_seqPermit (cov : ExtTreeSet Nat compare) (ls i : Nat) (M0 : LogMirror)
     (bs : List (BitVec 8)) (hlen : bs.length = BSIZE) (hi : i < LOGBLOCKS)
     (hM0 : lmHdr M0 ls = (0, [])) :
-    fsCrashSeam (hlc := hlc) (GF := GF) cov ls ⊢
-      eraRegistered (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF))
-        (MachGS.era (hlc := hlc) (GF := GF)) -∗
-      swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
-      logMirrorHalf (hlc := hlc) M0 -∗
-      diskSeqPermit (hlc := hlc) (genId (hlc := hlc) (GF := GF))
+    fsCrashSeam (GF := GF) cov ls ⊢
+      eraRegistered (GF := GF) (genId (GF := GF))
+        (MachGS.era (GF := GF)) -∗
+      swapLb (GF := GF) (genId (GF := GF) + 1) -∗
+      logMirrorHalf M0 -∗
+      diskSeqPermit (genId (GF := GF))
         (some (1024 * logSlotBno ls i, bs))
-        (logMirrorHalf (hlc := hlc) (lmUpd M0 (logSlotBno ls i) bs)) := by
+        (logMirrorHalf (lmUpd M0 (logSlotBno ls i) bs)) := by
   have hne : logSlotBno ls i ≠ logHdrBno ls := logSlot_ne_hdr ls i
   have hext := logSlot_in_ext cov ls i hi
   have hf0 : 0 + (bs.take Virtio.sectorSize).length ≤ BSIZE := by
@@ -114,7 +114,7 @@ theorem fsLogfillV_seqPermit (cov : ExtTreeSet Nat compare) (ls i : Nat) (M0 : L
   isplit
   · -- SECTOR 0 FIRST
     iapply fsSeq_branch G cov ls _ _ _
-      iprop(logMirrorHalf (hlc := hlc)
+      iprop(logMirrorHalf
           (lmUpd M0 (logSlotBno ls i) (blkSec0 (M0.view (logSlotBno ls i)) bs)) ∗
         ⌜(M0.view (logSlotBno ls i)).length = BSIZE⌝) _ $$ Hseam [Hmir] []
     · iapply fsV_sector0_rec G cov ls _ bs M0 hlen hext (hwf0 M0 hM0) $$ Hreg Hswlb [Hmir]
@@ -128,7 +128,7 @@ theorem fsLogfillV_seqPermit (cov : ExtTreeSet Nat compare) (ls i : Nat) (M0 : L
         iexact Hm2
   · -- SECTOR 1 FIRST
     iapply fsSeq_branch G cov ls _ _ _
-      iprop(logMirrorHalf (hlc := hlc)
+      iprop(logMirrorHalf
           (lmUpd M0 (logSlotBno ls i) (blkSec1 (M0.view (logSlotBno ls i)) bs)) ∗
         ⌜(M0.view (logSlotBno ls i)).length = BSIZE⌝) _ $$ Hseam [Hmir] []
     · iapply fsV_sector1_rec G cov ls _ bs M0 hlen hext (hwf1 M0 hM0) $$ Hreg Hswlb [Hmir]
@@ -148,13 +148,13 @@ theorem fsInstallV_seqPermit (cov : ExtTreeSet Nat compare) (ls nn : Nat) (Ws : 
     (i b : Nat) (M0 : LogMirror) (bs : List (BitVec 8)) (hlen : bs.length = BSIZE)
     (hnd : Ws.Nodup) (hwlen : Ws.length ≤ LOGBLOCKS) (hi : Ws[i]? = some b) (hbc : b ∈ cov)
     (hb : logRegion ls b = false) (hM0 : lmHdr M0 ls = (nn, Ws)) :
-    fsCrashSeam (hlc := hlc) (GF := GF) cov ls ⊢
-      eraRegistered (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF))
-        (MachGS.era (hlc := hlc) (GF := GF)) -∗
-      swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
-      ▷ logMirrorHalf (hlc := hlc) M0 -∗
-      diskSeqPermit (hlc := hlc) (genId (hlc := hlc) (GF := GF)) (some (1024 * b, bs))
-        (logMirrorHalf (hlc := hlc) (lmUpd M0 b bs)) := by
+    fsCrashSeam (GF := GF) cov ls ⊢
+      eraRegistered (GF := GF) (genId (GF := GF))
+        (MachGS.era (GF := GF)) -∗
+      swapLb (GF := GF) (genId (GF := GF) + 1) -∗
+      ▷ logMirrorHalf M0 -∗
+      diskSeqPermit (genId (GF := GF)) (some (1024 * b, bs))
+        (logMirrorHalf (lmUpd M0 b bs)) := by
   have hne : b ≠ logHdrBno ls := home_ne_hdr ls b hb
   have hext : b ∈ cov ∨ logRegion ls b = true := Or.inl hbc
   have hf0 : 0 + (bs.take Virtio.sectorSize).length ≤ BSIZE := by
@@ -187,7 +187,7 @@ theorem fsInstallV_seqPermit (cov : ExtTreeSet Nat compare) (ls nn : Nat) (Ws : 
   isplit
   · -- SECTOR 0 FIRST
     iapply fsSeq_branch G cov ls _ _ _
-      iprop(logMirrorHalf (hlc := hlc) (lmUpd M0 b (blkSec0 (M0.view b) bs)) ∗
+      iprop(logMirrorHalf (lmUpd M0 b (blkSec0 (M0.view b) bs)) ∗
         ⌜(M0.view b).length = BSIZE⌝) _ $$ Hseam [Hmir] []
     · iapply fsV_sector0_rec G cov ls b bs M0 hlen hext (hwf0 M0 hM0) $$ Hreg Hswlb Hmir
     · iintro ⟨Hm, -⟩
@@ -199,7 +199,7 @@ theorem fsInstallV_seqPermit (cov : ExtTreeSet Nat compare) (ls nn : Nat) (Ws : 
         iexact Hm2
   · -- SECTOR 1 FIRST
     iapply fsSeq_branch G cov ls _ _ _
-      iprop(logMirrorHalf (hlc := hlc) (lmUpd M0 b (blkSec1 (M0.view b) bs)) ∗
+      iprop(logMirrorHalf (lmUpd M0 b (blkSec1 (M0.view b) bs)) ∗
         ⌜(M0.view b).length = BSIZE⌝) _ $$ Hseam [Hmir] []
     · iapply fsV_sector1_rec G cov ls b bs M0 hlen hext (hwf1 M0 hM0) $$ Hreg Hswlb Hmir
     · iintro ⟨Hm, %hlold⟩

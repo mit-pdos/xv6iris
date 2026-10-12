@@ -37,18 +37,18 @@ theorem ushGets_list_ext {α : Type} [Inhabited α] (u v : List α) (hl : u.leng
   exact e
 
 section GetsLine
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
 /-- **Rocq `ush_read_ans_1_at`** (deviation 1). -/
-theorem ushReadAns_1_at (N : UkNames GF) (X : UshCtx GF) [Persistent X.T] (L : UshLaws (hlc := hlc) N X)
+theorem ushReadAns_1_at (N : UkNames GF) (X : UshCtx GF) [Persistent X.T] (L : UshLaws N X)
     (Dsc : List (BitVec 8) → Prop) (cn : ConsNames) (l : List FdState) (r : BitVec 64) (I : List (BitVec 8))
     (g : Nat → BitVec 8) :
-    ⊢ ushTagLaw (hlc := hlc) X -∗ ushReadAnsAt (hlc := hlc) N X Dsc cn l r 1 I g -∗
+    ⊢ ushTagLaw X -∗ ushReadAnsAt N X Dsc cn l r 1 I g -∗
       ((⌜r = 1#64⌝ ∗ ⌜Dsc (I ++ [g 0])⌝ ∗ ⌜ushFd0c l⌝ ∗ X.Pm (I ++ [g 0])) ∨
         (⌜r = BitVec.ofInt 64 (-1)⌝ ∗ ⌜l[0]? = some .closed⌝ ∗ X.Pm I) ∨
-        (X.T ∗ ushPos (hlc := hlc) N X)) := by
+        (X.T ∗ ushPos N X)) := by
   iintro #Hlaw Hans
   unfold ushReadAnsAt
   icases Hans with (⟨%dd, %dc, %hs, %sl, %J, %hdr, %hdmax, %hb1, %hb4, %hch, -, -, %hwin, Hsw, %hJl, %hdisc,
@@ -94,13 +94,13 @@ theorem ushReadAns_1_at (N : UkNames GF) (X : UshCtx GF) [Persistent X.T] (L : U
     · iexact Hp
 
 /-- **Rocq `ush_gets_done_line_at`**: ONE LINE READ. -/
-theorem ushGetsDone_line_at (N : UkNames GF) (X : UshCtx GF) [Persistent X.T] (L : UshLaws (hlc := hlc) N X)
+theorem ushGetsDone_line_at (N : UkNames GF) (X : UshCtx GF) [Persistent X.T] (L : UshLaws N X)
     (Dsc : List (BitVec 8) → Prop) (Dl : Uline → Prop) (l : List FdState) (I0 J : List (BitVec 8)) (lu : Uline)
     (f : Nat → BitVec 8) (hp : ushGlinePAt Dsc l I0 J f) (hD : Dl lu) (hws : ulineWs lu = wlWords J)
     (hlen : (lineBytes lu).length = J.length + 1) (hli : ushLineAt lu f 0 (J.length + 1))
     (hfnl : f J.length = wlNl) :
     ⊢ ushWcp X l I0 2 -∗ X.Pm (I0 ++ J ++ [wlNl]) -∗
-      |={⊤}=> ushGetsDoneAt (hlc := hlc) N X Dl l (J.length + 1) f := by
+      |={⊤}=> ushGetsDoneAt N X Dl l (J.length + 1) f := by
   obtain ⟨hr0, hnl, -, -, hby, -⟩ := hp
   have hrest : restOf (I0 ++ J) = J := by
     have e : restOf (I0 ++ J) = restOf I0 ++ J := by simp only [restOf, wlCut_app_nonl I0 J hnl]

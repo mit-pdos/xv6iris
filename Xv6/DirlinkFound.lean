@@ -39,7 +39,7 @@ theorem dirlink_slots_iput (a : Nat) (h : dirlinkSlots ≤ a) : iputSlots ≤ a 
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -48,7 +48,7 @@ set_option maxHeartbeats 4000000 in
 /-- `iput(ip)` at its call site: the set-form contract at all three credits
 false and the RUNTIME regime, the slot's escrow and sleeplock projected
 out of the icache's two families. -/
-theorem dirlink_iput (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem dirlink_iput (IP : IPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (kk : Nat) (q : Qp) (inum : BitVec 32) (n : Nat) (Sb : List Nat) (e0 tid : Nat) (qtx : Qp)
     (pidv : BitVec 32) (dqp dqb dqs : DFrac)
@@ -66,7 +66,7 @@ theorem dirlink_iput (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
     diskCaps fscDisk fscDlock pd pav pu ∗
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-    itableInv (hlc := hlc) ∗ iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
+    itableInv ∗ iregInv fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
     icSleeplocks fscIc ∗ inodeRefp kk q icfgDev inum ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
@@ -86,7 +86,7 @@ theorem dirlink_iput (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
         n - ipSpendW w false false ≤ n' ∧ n' ≤ n⌝ -∗
       logOpS icfgLog n' Sb' -∗ txPin icfgLog tid qtx -∗ irefSlot -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := IP.wp_iput_gen_eb (hlc := hlc) (GF := GF) Γ c k' γl pd pav pu j
+  have h := IP.wp_iput_gen_eb (GF := GF) Γ c k' γl pd pav pu j
   iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpe, #Hbc, #Hlc, #Hdc, #Hit, #Hiti, #Hinv, #Hopen, #Hslks,
     Href, Hsb, Hsi, #Hbmi, Hpid, Hbs, Hop, Htx, Hnext⟩
   ihave #Hescs := isItable2_escrows _ _ _ _ _ _ _ _ $$ Hit
@@ -110,7 +110,7 @@ theorem dirlink_iput (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x1a .. +0x5e`: THE FOUND ARM** -- iput, `a0 := -1`, into the tail. -/
-theorem dirlink_found (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem dirlink_found (IP : IPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (j : Nat) (γl : GName)
     (pd pav pu : BitVec 64) (γkl : GName) (γk : KmemNames)
     (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
@@ -135,7 +135,7 @@ theorem dirlink_found (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     dirlinkKeep k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr ∗
     bslots 3 ∗ dlinks fscFs dinum.toNat dn bm data ∗
     logOpS icfgLog ncount Sb ∗ txPin icfgLog tid qtx ∗
-    dirlinkEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
+    dirlinkEnv Γ γl pd pav pu γkl γk ∗
     (∀ c' : CPU, dirlinkPost k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
       dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr c')
     ⊢ wpLoop (GF := GF) cpu := by
@@ -150,7 +150,7 @@ theorem dirlink_found (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   iintro ⟨Hk, Hpc, Hframe, Hde, Hte, Hce, Href, Hru, Hkeep, Hbs, Hlk, Hop, Htx, #Henv, Hpost⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave ⟨#Hpi, #Hbc, #Hlc, #Hdc, #Hpe, #Hkl, #Hav, #Hit, #Hiti, #Hinv, #Hopen, #Hslks, #Hbmi⟩ :=
-    dirlinkEnv_open (hlc := hlc) Γ γl pd pav pu γkl γk $$ Henv
+    dirlinkEnv_open Γ γl pd pav pu γkl γk $$ Henv
   -- +0x1a  c.bnez a0,+0x58 : TAKEN
   k_step_e (wp_s_branch cpu _ (KA.«dirlink» + 0x1a#64) true 62#13 10#5 0#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]

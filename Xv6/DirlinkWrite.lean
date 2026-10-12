@@ -123,7 +123,7 @@ theorem dirlink_out_append [Fscfg] [Icfg] (bm bm' : Blkmap) (data data' : Nat �
       · exact Or.inr ⟨h, h0⟩)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -131,7 +131,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 set_option maxHeartbeats 4000000 in
 /-- `writei(ip, 0, src, off, 16)` at its call site: the set-form contract on
 the KERNEL arm (the user arm refuted by `a1 = 0`). -/
-theorem dirlink_writei (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem dirlink_writei (WI : WRITEI) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γkl : GName) (γk : KmemNames)
     (ip : BitVec 64) (inum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
@@ -166,7 +166,7 @@ theorem dirlink_writei (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     wordPointsTo sbSizeAddr 4 dqz (BitVec.ofNat 32 fscSize) ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
     bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize ∗
-    iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
+    iregInv fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
     byteBuf (k'.regs 12#5) (DFrac.own 1) sbs ∗ wordPointsTo (pPid k'.proc) 4 dqp pidv ∗
     bslots 3 ∗ logOpS icfgLog ncount Sb ∗
     wpNext true k'.proc c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap)
@@ -188,7 +188,7 @@ theorem dirlink_writei (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
       byteBuf (k'.regs 12#5) (DFrac.own 1) sbs -∗ wordPointsTo (pPid k'.proc) 4 dqp pidv -∗
       bslots 3 -∗ logOpS icfgLog n' Sb' -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := WI.wp_writei_gen_eb (hlc := hlc) (GF := GF) Γ c k' γl pd pav pu j γkl γk ip inum bm
+  have h := WI.wp_writei_gen_eb (GF := GF) Γ c k' γl pd pav pu j γkl γk ip inum bm
     data dn dn0 false off 16 sbs readiKVp (fun _ => []) ncount Sb pidv dqp (DFrac.own 1) dqd dqn
     dqi dqb dqz hj hproc hK hnoff htier hcost hgeom hcov hlog hnib hda hnz hstab hnl hwf hhz
     hcovs hsum hsz hbg hsbs hpd ha0
@@ -211,7 +211,7 @@ theorem dirlink_writei (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x80 .. +0x9a`: THE APPEND** -- writei at `16 k0`, the branchless
 return, the lazy `s1` restore, into the tail. -/
-theorem dirlink_write (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem dirlink_write (WI : WRITEI) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (j : Nat) (γl : GName)
     (pd pav pu : BitVec 64) (γkl : GName) (γk : KmemNames)
     (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
@@ -231,7 +231,7 @@ theorem dirlink_write (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
     dirlinkKeep k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr ∗
     bslots 3 ∗ irefSlot ∗ dlinks fscFs dinum.toNat dn bm data ∗
     logOpS icfgLog ncount Sb ∗ txPin icfgLog tid qtx ∗
-    dirlinkEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
+    dirlinkEnv Γ γl pd pav pu γkl γk ∗
     (∀ c' : CPU, dirlinkPost k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
       dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr c')
     ⊢ wpLoop (GF := GF) cpu := by
@@ -250,7 +250,7 @@ theorem dirlink_write (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
   iintro ⟨Hk, Hpc, Hframe, Hde, Hte, Hce, Hkeep, Hbs, Hslot, Hlk, Hop, Htx, #Henv, Hpost⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave ⟨#Hpi, #Hbc, #Hlc, #Hdc, #Hpe, #Hkl, #Hav, #Hit, #Hiti, #Hinv, #Hopen, #Hslks, #Hbmi⟩ :=
-    dirlinkEnv_open (hlc := hlc) Γ γl pd pav pu γkl γk $$ Henv
+    dirlinkEnv_open Γ γl pd pav pu γkl γk $$ Henv
   -- +0x80 .. +0x8a  the arguments
   k_step_e (wp_s_addi cpu _ (KA.«dirlink» + 0x80#64) true 16#12 14#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]

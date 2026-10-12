@@ -83,16 +83,16 @@ theorem seccCode_rows (M : ElfMem) (π : Nat → Option UPerm) (hsub : uimgSub U
   exact ⟨hsub a b hab, (hx a (by omega)).1, (hx a (by omega)).2, by unfold uCap; omega⟩
 
 section UkSeccRows
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg]
 
 /-- The rows, index-wise below a table (deviation 6). -/
 theorem seccRows_below : ∀ (fdv v : List FdState), fdv.length = v.length →
     (∀ (k : Nat) (st : FdState), fdv[k]? = some st → v[k]? = some st ∨ st = .closed) →
-    seccRows (hlc := hlc) (GF := GF) v ⊢ seccRows fdv
+    seccRows (GF := GF) v ⊢ seccRows fdv
   | [], _, _, _ => by
     iintro -
-    iapply seccRows_of_free (hlc := hlc) (GF := GF) [] (by simp)
+    iapply seccRows_of_free (GF := GF) [] (by simp)
   | _ :: _, [], hl, _ => by simp at hl
   | a :: fdv, b :: v, hl, h => by
     unfold seccRows
@@ -113,16 +113,16 @@ theorem seccRows_below : ∀ (fdv v : List FdState), fdv.length = v.length →
 /-- **Rocq `secc_rows_tab_le`**: THE TABLE VIEW BOUNDS THE ROWS -- a slot the
 view shows open may have been closed, and a closed row is in the universe. -/
 theorem seccRows_tabLe (fdv v : List FdState) (hle : tabLe fdv v) :
-    seccRows (hlc := hlc) (GF := GF) v ⊢ seccRows fdv :=
+    seccRows (GF := GF) v ⊢ seccRows fdv :=
   seccRows_below fdv v hle.1 fun k st hk => (hle.2 k st hk).imp id And.left
 
 /-- **Rocq `secc_univ_of_mint`** (deviation 1): THE UNIVERSE AT THE KEY'S
 TABLE, out of the minter. -/
 theorem seccUniv_of_mint (sts : List FdState) :
-    seccConsPay (hlc := hlc) (GF := GF) ⊢ □ uexecWp (hlc := hlc) (GF := GF) -∗ seccRows (hlc := hlc) sts -∗
-      seccUniv (hlc := hlc) sts := by
+    seccConsPay (GF := GF) ⊢ □ uexecWp (GF := GF) -∗ seccRows sts -∗
+      seccUniv sts := by
   iintro #Hc #Hwp #Hr
-  ihave #Hmint := useccompMintOfCons (hlc := hlc) (GF := GF) $$ Hc Hwp
+  ihave #Hmint := useccompMintOfCons (GF := GF) $$ Hc Hwp
   unfold seccUniv
   imodintro
   iintro %W %hm %hle Hp
@@ -136,7 +136,7 @@ theorem seccUniv_of_mint (sts : List FdState) :
 end UkSeccRows
 
 section UkSeccEntry
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
@@ -151,18 +151,18 @@ def SeccImageEntry : Prop :=
     (∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k) → execOk ws → echoNodeImg ws M sv t gn →
     imgAgrees M Mv → ushEchoArgvBytes ws gn → sts.length = NOFILE →
     (sts.take NSTD)[2]? = some (.open rb2 true (.device CONSOLE)) →
-    ⊢ □ (∀ s : Int, Q s) -∗ □ uexecWp (hlc := hlc) (GF := GF) -∗ urunNopipe (hlc := hlc) sts -∗
-      udep (hlc := hlc) -∗
+    ⊢ □ (∀ s : Int, Q s) -∗ □ uexecWp (GF := GF) -∗ urunNopipe sts -∗
+      udep -∗
       imageEntry User.Seccomp.elf Mv (BitVec.ofNat 64 (t + 8)) sts cw seccAll cs pidv Q
-        iprop(MachFixedGS.wild (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1)
-          ∗ MachFixedGS.rdwild (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1)
-          ∗ seccRows (hlc := hlc) sts)
-        (uslot (hlc := hlc))
+        iprop(MachFixedGS.wild (GF := GF) (genId (GF := GF) + 1)
+          ∗ MachFixedGS.rdwild (GF := GF) (genId (GF := GF) + 1)
+          ∗ seccRows sts)
+        (uslot)
 
 /-- **Rocq `UkSeccEntry.secc_image_entry`**: THE ENTRY (deviations 1, 3). -/
 theorem seccImageEntry_holds (UL : UK_LEAVES) (GS : SECC_START)
-    (hlic : ∀ k, MachFixedGS.wild (hlc := hlc) (GF := GF) k ⊢ consLicenceAt (hlc := hlc) (GF := GF) k) :
-    SeccImageEntry (hlc := hlc) (GF := GF) := by
+    (hlic : ∀ k, MachFixedGS.wild (GF := GF) k ⊢ consLicenceAt (GF := GF) k) :
+    SeccImageEntry (GF := GF) := by
   intro ws M Mv sv t gn sts cw cs pidv Q rb2 hps hok himg hag hbytes hfdl hcons
   iintro #HQ #Hwp #Hnpw #Hdep
   iapply imageEntry_of_at
@@ -184,9 +184,9 @@ theorem seccImageEntry_holds (UL : UK_LEAVES) (GS : SECC_START)
   have hl2 : (W'.fd.take NSTD)[2]? = some (.open rb2 true (.device CONSOLE)) := by rw [hfd]; exact hcons
   -- the credentials: the console payer
   icases HPay with ⟨#Hw, #Hrw, #Hrows⟩
-  ihave #Hlic := hlic (genId (hlc := hlc) (GF := GF) + 1) $$ Hw
-  ihave #Hc := seccConsPayOfLic (hlc := hlc) (GF := GF) $$ Hlic Hrw
-  ihave #Hnpw' : urunNopipe (hlc := hlc) W'.fd $$ []
+  ihave #Hlic := hlic (genId (GF := GF) + 1) $$ Hw
+  ihave #Hc := seccConsPayOfLic (GF := GF) $$ Hlic Hrw
+  ihave #Hnpw' : urunNopipe W'.fd $$ []
   · rw [hfd]; iexact Hnpw
   -- the slot at the whole table's view
   iapply uslot_of_urun_ro_at W' 42 Q hal8 (show 8 * 42 ≤ (uvisSp W').toNat by omega) hstkrow hfdlen hstop
@@ -205,8 +205,8 @@ theorem seccImageEntry_holds (UL : UK_LEAVES) (GS : SECC_START)
 /-- `SeccImageEntry` at the engine: seccomp's `start` from the landed link
 (`SeccPrintfLink.secc_linked_ulib`, the row leaves `UkSysPHolds.ukSysP_holds`). -/
 theorem seccImageEntry_of_leaves (UL : UK_LEAVES)
-    (hlic : ∀ k, MachFixedGS.wild (hlc := hlc) (GF := GF) k ⊢ consLicenceAt (hlc := hlc) (GF := GF) k) :
-    SeccImageEntry (hlc := hlc) (GF := GF) :=
+    (hlic : ∀ k, MachFixedGS.wild (GF := GF) k ⊢ consLicenceAt (GF := GF) k) :
+    SeccImageEntry (GF := GF) :=
   seccImageEntry_holds UL (secc_linked_ulib UL (ukSysP_holds UL)).2 hlic
 
 end UkSeccEntry

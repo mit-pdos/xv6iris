@@ -35,7 +35,7 @@ open Iris.Algebra
 set_option linter.unusedSectionVars false
 
 section IcacheShortCarve
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF]
 
 /-- The count fragment's fraction is at most one (its camera's validity). -/

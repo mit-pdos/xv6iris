@@ -70,7 +70,7 @@ def cifHmOk (fdm : Fdmap) (vs : RegMapF CfDev) (hm : FhMapF FdState) : Prop :=
   ∀ fd, get? hm fd = (fdm fd).bind (cifHf vs)
 
 section CifEnvDef
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [PipesNG GF] [CifRegG GF]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
@@ -79,12 +79,12 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fi
 /-- **Rocq `UkCatFIface`'s section context** (deviation 1). -/
 structure CifEnv where
   /-- the pipeline's round (lane hfp-P2) and its hypotheses -/
-  R : PnsRound hlc GF
+  R : PnsRound GF
   OK : PnsRoundOk R
   /-- the file side: the claims (U1-F), `cf`, `rf`, Rocq's `Heq` -/
   cf : FileFixed
   rf : FileAppNames
-  heq : fileAppIs (hlc := hlc) (GF := GF) cf rf
+  heq : fileAppIs (GF := GF) cf rf
   /-- the program instance -/
   N : UkNames GF
   P : Uprog GF
@@ -95,7 +95,7 @@ structure CifEnv where
   Sup : IProp GF
   hKc : Persistent Kc
   hSup : Persistent Sup
-  FHH : FhHyps (hlc := hlc) N P Kc Sup
+  FHH : FhHyps N P Kc Sup
   SYS : UK_SYS_P
   FH : UK_SYS_FH
   hTKc : ⊢ □ (R.G.gcT -∗ Kc)
@@ -114,19 +114,19 @@ structure CifEnv where
 
 /-- **Rocq `cif_final`**, at the round and the exit's reading of a pipe
 (`pns_lexit`): a protected device's final state. -/
-def cifFinalOf (R : PnsRound hlc GF) : CfDev → IProp GF
+def cifFinalOf (R : PnsRound GF) : CfDev → IProp GF
   | .UDIn .. => iprop(True)
   | .UDProd pn _ w A X =>
     iprop(((pnsLexit R pn ∨ wcur pn 0) ∗ pnsConFinal R w A) ∨
       (∃ x : List (BitVec 8), ⌜x ∈ X⌝ ∗ pnsWfin R w (some x)))
 
 /-- **Rocq `cif_xkQ`**, at the round, the deed's names, fraction and content. -/
-def cifXkQOf (R : PnsRound hlc GF) 
+def cifXkQOf (R : PnsRound GF) 
     (rf : FileAppNames) (qf : Qp) (sf : Dst) (kl : List (Nat × CfDev)) (Q : Int → IProp GF) : IProp GF :=
   iprop((R.G.gcT ∨ (([∗list] dk ∈ kl, cifFinalOf R dk.2) ∗ fdq rf qf sf)) -∗ Q (-1))
 
 namespace CifEnv
-variable (E : CifEnv (hlc := hlc) (GF := GF))
+variable (E : CifEnv (GF := GF))
 
 /-- Rocq `T`. -/
 abbrev T : IProp GF := E.R.G.gcT
@@ -161,9 +161,9 @@ instance pkInv_persistent (kd : CfDev) : Persistent (E.pkInv kd) := by
 /-- **Rocq `cif_env`**: the file's taint readings, the image's invariant,
 the read leaves' credential, the producers' pipes. -/
 def env (vs : RegMapF CfDev) : IProp GF :=
-  iprop(□ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ fileTaint (hlc := hlc) E.cf) ∗
-    □ (fileTaint (hlc := hlc) E.cf -∗ MachFixedGS.killCred (hlc := hlc) (GF := GF)) ∗
-    appInv (hlc := hlc) fscFs ∗ (∃ jo : Option Nat, fileConsCred (hlc := hlc) E.cf E.rf jo) ∗
+  iprop(□ (MachFixedGS.killCred (GF := GF) -∗ fileTaint E.cf) ∗
+    □ (fileTaint E.cf -∗ MachFixedGS.killCred (GF := GF)) ∗
+    appInv fscFs ∗ (∃ jo : Option Nat, fileConsCred E.cf E.rf jo) ∗
     [∗map] _d ↦ kd ∈ vs, E.pkInv kd)
 
 instance env_persistent (vs : RegMapF CfDev) : Persistent (E.env vs) := by
@@ -208,7 +208,7 @@ theorem env_insert (vs : RegMapF CfDev) (d : Nat) (kd : CfDev) (hv : get? vs d =
   · iexact Hm
 
 /-- **Rocq `cif_T_of_file`**: the file's taint is the round's. -/
-theorem T_of_file (vs : RegMapF CfDev) : ⊢ fileTaint (hlc := hlc) E.cf -∗ E.env vs -∗ E.T := by
+theorem T_of_file (vs : RegMapF CfDev) : ⊢ fileTaint E.cf -∗ E.env vs -∗ E.T := by
   unfold env
   iintro #Ht ⟨-, #H2, -⟩
   rw [T, ← E.OK.hkill]
@@ -294,9 +294,9 @@ def taint (held : FdSet) : IProp GF := fhTaint E.T E.Kc E.Sup E.N held
 
 /-- The persistent context's four file-side parts. -/
 theorem env_parts (vs : RegMapF CfDev) :
-    ⊢ E.env vs -∗ □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ fileTaint (hlc := hlc) E.cf) ∗
-      □ (fileTaint (hlc := hlc) E.cf -∗ MachFixedGS.killCred (hlc := hlc) (GF := GF)) ∗
-      appInv (hlc := hlc) fscFs ∗ ∃ jo : Option Nat, fileConsCred (hlc := hlc) E.cf E.rf jo := by
+    ⊢ E.env vs -∗ □ (MachFixedGS.killCred (GF := GF) -∗ fileTaint E.cf) ∗
+      □ (fileTaint E.cf -∗ MachFixedGS.killCred (GF := GF)) ∗
+      appInv fscFs ∗ ∃ jo : Option Nat, fileConsCred E.cf E.rf jo := by
   unfold env
   iintro ⟨#H1, #H2, #H3, #H4, -⟩
   iframe H1 H2 H3 H4
@@ -435,7 +435,7 @@ theorem taint_of_fds (fdm : Fdmap) (l : List FdState) (vs : RegMapF CfDev) (hok 
 
 /-- **Rocq `cif_taint_pays`**. -/
 theorem taint_pays (held : FdSet) (t : Proc) (hs : SafeFds held t) :
-    ⊢ E.taint held -∗ treePay (hlc := hlc) E.N E.P t := by
+    ⊢ E.taint held -∗ treePay E.N E.P t := by
   haveI := E.hNc
   exact fh_taint_pays E.T E.Kc E.Sup E.SYS E.FH E.N E.P E.FHH held t hs
 

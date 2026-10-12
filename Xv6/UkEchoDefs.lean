@@ -59,7 +59,7 @@ theorem echo_uis (γt : GName) (pc : Nat) (rvc : Bool) (i : instruction)
 end Code
 
 section UkEcho
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -110,7 +110,7 @@ theorem ustack_eight (γd : GName) (sp : BitVec 64) :
 /-- **Rocq `urun_ubyte_bnd`**: a byte the program owns is below MAXVA. -/
 theorem urun_ubyte_bnd (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail : Nat) (dq : DFrac)
     (a : Nat) (b : BitVec 8) :
-    ⊢ urun (hlc := hlc) N h m pc avail -∗ ubyteq N.d dq a b -∗ ⌜a < 2 ^ 38⌝ := by
+    ⊢ urun N h m pc avail -∗ ubyteq N.d dq a b -∗ ⌜a < 2 ^ 38⌝ := by
   unfold urun
   iintro ⟨%xi, %C, %pt, %Rfd, %Rut, %sz, %M, %pm, %fdv, %cw, %gn, %cs, %pidv, -, -, -, -, -, Hh, -⟩ Hb
   ihave %hb := uheap_ubyte N.t N.d N.s M pm sz dq a b $$ Hh Hb
@@ -119,7 +119,7 @@ theorem urun_ubyte_bnd (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) 
 /-- **Rocq `urun_ustr_bnd`**: ...and so is a whole string with its NUL. -/
 theorem urun_ustr_bnd (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail : Nat) (dq : DFrac)
     (a len : Nat) (f : Nat → BitVec 8) :
-    ⊢ urun (hlc := hlc) N h m pc avail -∗ ustr N.d dq a len f -∗ ⌜a + len < 2 ^ 38⌝ := by
+    ⊢ urun N h m pc avail -∗ ustr N.d dq a len f -∗ ⌜a + len < 2 ^ 38⌝ := by
   iintro Hrun Hs
   icases ustr_nul N.d dq a len f $$ Hs with ⟨Hn, -⟩
   iapply urun_ubyte_bnd $$ Hrun Hn
@@ -127,7 +127,7 @@ theorem urun_ustr_bnd (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (
 /-- **Rocq `urun_uword_bnd`**. -/
 theorem urun_uword_bnd (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail : Nat) (dq : DFrac)
     (a : Nat) (w : BitVec 64) :
-    ⊢ urun (hlc := hlc) N h m pc avail -∗ uwordq N.d dq a w -∗ ⌜a + 8 ≤ 2 ^ 38⌝ := by
+    ⊢ urun N h m pc avail -∗ uwordq N.d dq a w -∗ ⌜a + 8 ≤ 2 ^ 38⌝ := by
   iintro Hrun Hw
   unfold uwordq
   icases ubytesq_acc N.d dq a 8 _ 7 (by decide) $$ Hw with ⟨H7, -⟩
@@ -142,7 +142,7 @@ def kechoExit (N : UkNames GF) (status : Int) : IProp GF :=
   iprop(∀ (h : CPU) (m : RegMap) (avail : Nat),
     ⌜(BitVec.setWidth 32 (m.get 10#5)).toInt = status⌝ -∗
     ukCode N.t User.Echo.code.byte -∗
-    urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Echo.Sym.«exit») avail -∗ wpLoop h)
+    urun N h m (BitVec.ofNat 64 User.Echo.Sym.«exit») avail -∗ wpLoop h)
 
 /-- **Rocq `kecho_w`**: ONE `write(1, ua, nb)` call, as a hole: carry `Ci`
 in, hand `Co` out; the stub returns to `ra` with a0 the answer and a7 the
@@ -151,14 +151,14 @@ def kechoW (N : UkNames GF) (ua : BitVec 64) (nb : Nat) (Ci Co : IProp GF) : IPr
   iprop(∀ (h : CPU) (m : RegMap) (avail : Nat),
     ⌜m.get 10#5 = 1#64⌝ -∗ ⌜m.get 11#5 = ua⌝ -∗ ⌜m.get 12#5 = BitVec.ofNat 64 nb⌝ -∗
     ukCode N.t User.Echo.code.byte -∗ Ci -∗
-    urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Echo.Sym.«write») avail -∗
+    urun N h m (BitVec.ofNat 64 User.Echo.Sym.«write») avail -∗
     (∀ (h' : CPU) (ret : BitVec 64), Co -∗
-      urun (hlc := hlc) N h' (stubRet m 16 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
+      urun N h' (stubRet m 16 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
     wpLoop h)
 
 /-- **Rocq `kecho_w_mono`**: the output side is monotone. -/
 theorem kechoW_mono (N : UkNames GF) (ua : BitVec 64) (nb : Nat) (Ci Co Co' : IProp GF) :
-    ⊢ (Co -∗ Co') -∗ kechoW (hlc := hlc) N ua nb Ci Co -∗ kechoW (hlc := hlc) N ua nb Ci Co' := by
+    ⊢ (Co -∗ Co') -∗ kechoW N ua nb Ci Co -∗ kechoW N ua nb Ci Co' := by
   iintro Hm Hw
   unfold kechoW
   iintro %h %m %avail %h0 %h1 %h2 #Hc HCi Hrun Hcont
@@ -178,17 +178,17 @@ spends -- `k` arguments still to print after `args[i]`, each followed by the
 separator, the last by the newline. -/
 def kechoPay (N : UkNames GF) (args : List UArg) : Nat → Nat → IProp GF → IProp GF → IProp GF
   | 0, i, Ci, Cend => iprop(∀ g : UArg, ⌜args[i]? = some g⌝ -∗
-      ∃ Cm : IProp GF, kechoW (hlc := hlc) N (BitVec.ofNat 64 g.ptr) g.len Ci Cm ∗
-        kechoW (hlc := hlc) N (BitVec.ofNat 64 echoNlPtr) 1 Cm Cend)
+      ∃ Cm : IProp GF, kechoW N (BitVec.ofNat 64 g.ptr) g.len Ci Cm ∗
+        kechoW N (BitVec.ofNat 64 echoNlPtr) 1 Cm Cend)
   | k + 1, i, Ci, Cend => iprop(∀ g : UArg, ⌜args[i]? = some g⌝ -∗
-      ∃ Cm Cn : IProp GF, kechoW (hlc := hlc) N (BitVec.ofNat 64 g.ptr) g.len Ci Cm ∗
-        kechoW (hlc := hlc) N (BitVec.ofNat 64 echoSepPtr) 1 Cm Cn ∗ kechoPay N args k (i + 1) Cn Cend)
+      ∃ Cm Cn : IProp GF, kechoW N (BitVec.ofNat 64 g.ptr) g.len Ci Cm ∗
+        kechoW N (BitVec.ofNat 64 echoSepPtr) 1 Cm Cn ∗ kechoPay N args k (i + 1) Cn Cend)
 
 /-- **Rocq `kecho_pay_all`**: at main's entry, where `argc ≤ 1` prints
 nothing: an additive conjunction, main decides the arm by a branch. -/
 def kechoPayAll (N : UkNames GF) (args : List UArg) (Ci Cend : IProp GF) : IProp GF :=
   iprop((⌜args.length ≤ 1⌝ -∗ Ci -∗ Cend) ∧
-    (⌜2 ≤ args.length⌝ -∗ kechoPay (hlc := hlc) N args (args.length - 2) 1 Ci Cend))
+    (⌜2 ≤ args.length⌝ -∗ kechoPay N args (args.length - 2) 1 Ci Cend))
 
 end UkEcho
 

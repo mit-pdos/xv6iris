@@ -69,7 +69,7 @@ def drefM : (r : Register) → Option (RegisterType r)
 
 /-! ## The read-frame congruence, at the `swp` level -/
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- `▷ Q` if an event was taken, else `Q`. -/
 def laterIf (b : Bool) (Q : IProp GF) : IProp GF := if b then iprop(▷ Q) else Q

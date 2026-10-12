@@ -72,7 +72,7 @@ open Iris.Std.PartialMap
 open Std (ExtTreeSet)
 
 section UInitShPay
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
@@ -104,21 +104,21 @@ structure ConsCredHoldsAt (cn : ConsNames) (T : IProp GF) (Dsc : List (BitVec 8)
     Prop where
   /-- (1) the read leaf sh runs on, AT THE DISCIPLINE (Rocq `Hrl`) -/
   rl : ∀ (γp : GName) (N : UkNames GF) (l : List FdState),
-    N.pay = uconsPay (hlc := hlc) cn γp T (initRd Cr.ccRd (ccWbn Cr)) →
-    ⊢ ushReadRecvLeafAt (hlc := hlc) N (initShCtx Cr γp T) Dsc cn l
+    N.pay = uconsPay cn γp T (initRd Cr.ccRd (ccWbn Cr)) →
+    ⊢ ushReadRecvLeafAt N (initShCtx Cr γp T) Dsc cn l
   /-- (2) the lease's first law (`Hpm1`, `UshLaws.pm_of_at`) -/
   pm1 : ∀ (γp : GName) (N : UkNames GF) (i : Nat),
-    N.pay = uconsPay (hlc := hlc) cn γp T (initRd Cr.ccRd (ccWbn Cr)) →
-    ⊢ ushAt (hlc := hlc) N (initShCtx Cr γp T) i -∗
-      ∃ I : List (BitVec 8), ⌜I.length = i⌝ ∗ ushLease (hlc := hlc) N (initShCtx Cr γp T) I
+    N.pay = uconsPay cn γp T (initRd Cr.ccRd (ccWbn Cr)) →
+    ⊢ ushAt N (initShCtx Cr γp T) i -∗
+      ∃ I : List (BitVec 8), ⌜I.length = i⌝ ∗ ushLease N (initShCtx Cr γp T) I
   /-- (3) the lease's second (`Hpm3`, `UshLaws.at_of_pm_taint`) -/
   pm3 : ∀ (γp : GName) (N : UkNames GF) (I : List (BitVec 8)),
-    N.pay = uconsPay (hlc := hlc) cn γp T (initRd Cr.ccRd (ccWbn Cr)) →
-    ⊢ T -∗ Cr.ccMid γp I -∗ ushAt (hlc := hlc) N (initShCtx Cr γp T) I.length
+    N.pay = uconsPay cn γp T (initRd Cr.ccRd (ccWbn Cr)) →
+    ⊢ T -∗ Cr.ccMid γp I -∗ ushAt N (initShCtx Cr γp T) I.length
   /-- (4) the lease's third (`Hpmwb`, `UshLaws.at_of_pm_wb`) -/
   pmwb : ∀ (γp : GName) (N : UkNames GF) (I : List (BitVec 8)),
-    N.pay = uconsPay (hlc := hlc) cn γp T (initRd Cr.ccRd (ccWbn Cr)) →
-    ⊢ Cr.ccMid γp I -∗ Cr.ccWb I -∗ ushAt (hlc := hlc) N (initShCtx Cr γp T) I.length
+    N.pay = uconsPay cn γp T (initRd Cr.ccRd (ccWbn Cr)) →
+    ⊢ Cr.ccMid γp I -∗ Cr.ccWb I -∗ ushAt N (initShCtx Cr γp T) I.length
   /-- (5) the loop's step at the line the read delivered, a fancy update
   (`Hwc`, `UshLaws.wc_read`) -/
   wc : ∀ (γp : GName) (I l : List (BitVec 8)), wlNl ∉ l →
@@ -131,18 +131,18 @@ structure ConsCredHoldsAt (cn : ConsNames) (T : IProp GF) (Dsc : List (BitVec 8)
     ⊢ Cr.ccMid γp (I ++ l ++ [wlNl]) -∗ Cr.ccWb I -∗ Cr.ccMid γp (I ++ l ++ [wlNl]) ∗ T
   /-- (8) the cursor's boundary (`Hbd`) -/
   bd : ∀ (γp : GName) (N : UkNames GF) (l : List FdState) (i : Nat),
-    N.pay = uconsPay (hlc := hlc) cn γp T (initRd Cr.ccRd (ccWbn Cr)) →
-    ⊢ upos (hlc := hlc) γp i -∗ uconsPay (hlc := hlc) cn γp T Cr.ccRd (-1) -∗
+    N.pay = uconsPay cn γp T (initRd Cr.ccRd (ccWbn Cr)) →
+    ⊢ upos γp i -∗ uconsPay cn γp T Cr.ccRd (-1) -∗
       ((∃ I : List (BitVec 8), ⌜I.length = i⌝ ∗ ushWcp (initShCtx Cr γp T) l I 0) ∨ T) -∗
-      ushPosb (hlc := hlc) N (initShCtx Cr γp T) l 0
+      ushPosb N (initShCtx Cr γp T) l 0
   /-- (9) the lend's conversion at the shell's entry (`Hpw`) -/
   pw : ∀ n : Nat, ⊢ Cr.ccWp n -∗ ∃ I : List (BitVec 8), ⌜I.length = n⌝ ∗ Cr.ccWc I 0
 
 /-- The seven laws UkSh's section assumes, at the round's record. -/
 theorem consCredHoldsAt_laws {cn : ConsNames} {T : IProp GF} {Dsc : List (BitVec 8) → Prop} {Cr : ConsCred GF}
-    (H : ConsCredHoldsAt (hlc := hlc) cn T Dsc Cr) (γp : GName) (N : UkNames GF)
-    (hpay : N.pay = uconsPay (hlc := hlc) cn γp T (initRd Cr.ccRd (ccWbn Cr))) :
-    UshLaws (hlc := hlc) N (initShCtx Cr γp T) where
+    (H : ConsCredHoldsAt cn T Dsc Cr) (γp : GName) (N : UkNames GF)
+    (hpay : N.pay = uconsPay cn γp T (initRd Cr.ccRd (ccWbn Cr))) :
+    UshLaws N (initShCtx Cr γp T) where
   wb_wc := H.wbwc
   pm_of_at n := H.pm1 γp N n hpay
   at_of_pm_taint I := H.pm3 γp N I hpay
@@ -156,22 +156,22 @@ reading. -/
 def shPayAt (Dl : Uline → Prop) (T : IProp GF) (Cr : ConsCred GF) (Rsh : GName → GName → GName → IProp GF)
     (n0 : Nat) : IProp GF :=
   iprop(shPayState Rsh n0 ∗
-    (∀ (γp : GName) (N : UkNames GF), ushRestLAt (hlc := hlc) N (initShCtx Cr γp T) Dl (Rsh N.t N.d N.s)) ∗
-    (∀ γp : GName, ushTagLaw (hlc := hlc) (initShCtx Cr γp T)))
+    (∀ (γp : GName) (N : UkNames GF), ushRestLAt N (initShCtx Cr γp T) Dl (Rsh N.t N.d N.s)) ∗
+    (∀ γp : GName, ushTagLaw (initShCtx Cr γp T)))
 
 /-- Rocq `sh_pay_at_persistent`. -/
 instance shPayAt_persistent (Dl : Uline → Prop) (T : IProp GF) (Cr : ConsCred GF)
     (Rsh : GName → GName → GName → IProp GF) (n0 : Nat) :
-    Persistent (shPayAt (hlc := hlc) Dl T Cr Rsh n0) := by
+    Persistent (shPayAt Dl T Cr Rsh n0) := by
   unfold shPayAt; infer_instance
 
 /-- **Rocq `sh_pay_of_parts_at`**. -/
 theorem sh_pay_of_parts_at (Dl : Uline → Prop) (T : IProp GF) (Cr : ConsCred GF)
     (Rsh : GName → GName → GName → IProp GF) (n0 : Nat) :
     ⊢ shPayState Rsh n0 -∗
-      (∀ (γp : GName) (N : UkNames GF), ushRestLAt (hlc := hlc) N (initShCtx Cr γp T) Dl (Rsh N.t N.d N.s)) -∗
-      (∀ γp : GName, ushTagLaw (hlc := hlc) (initShCtx Cr γp T)) -∗
-      shPayAt (hlc := hlc) Dl T Cr Rsh n0 := by
+      (∀ (γp : GName) (N : UkNames GF), ushRestLAt N (initShCtx Cr γp T) Dl (Rsh N.t N.d N.s)) -∗
+      (∀ γp : GName, ushTagLaw (initShCtx Cr γp T)) -∗
+      shPayAt Dl T Cr Rsh n0 := by
   iintro Hst Hre Htg
   unfold shPayAt
   iframe

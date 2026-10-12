@@ -40,7 +40,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -56,12 +56,12 @@ theorem iput_lk_ci_live (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 ×
 
 theorem iput_lk_ent_eq {P Q : IProp GF} (h : P = Q) : P ⊢ Q := h ▸ .rfl
 
-theorem iput_lk_env_parts (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (γl : GName)
+theorem iput_lk_env_parts (Γ : SchedNames) [ClaimIs GF Γ] (γl : GName)
     (pd pav pu : BitVec 64) (γil γisl : GName) (kk : Nat) :
     iputEnv (GF := GF) Γ γl pd pav pu γil γisl kk ⊢
       isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-      itableInv (hlc := hlc) ∗ icEscrow fscIc fscFs fscIreg fscCov fscLogst kk ∗
-      iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib := by
+      itableInv ∗ icEscrow fscIc fscFs fscIreg fscCov fscLogst kk ∗
+      iregInv fscIreg fscFs icfgIst icfgNib := by
   unfold iputEnv
   iintro ⟨-, -, -, -, -, #Hit, #Hinv, #Hesc, #Hireg, -, -⟩
   iframe Hit Hinv Hesc Hireg
@@ -84,7 +84,7 @@ def iputLkMid (kk : Nat) (Mt : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 
     (∀ M' : RegMapF (Qp × PosNat), ⌜∀ j, j ≠ kk → PartialMap.get? M' j = PartialMap.get? Mt j⌝ -∗
       islSlot M' kk -∗ islPool M') ∗
     irefSlotsAuth ∗
-    ipool (hlc := hlc) fscFs fscIreg fscCov fscLogst (regionInums icfgNib \ ciInums ci)
+    ipool fscFs fscIreg fscCov fscLogst (regionInums icfgNib \ ciInums ci)
       (PartialMap.singleton inum.toNat (tid, qp)) ∗
     icRegd kk r ∗ icCnt kk 1 ∗
     (∃ v : BitVec 32, wordPointsTo (iValid (ientry kk)) 4 (DFrac.own 1) v) ∗
@@ -101,8 +101,8 @@ theorem iput_lk_c_open (c : CPU) (kk : Nat) (hkk : kk < NINODE) (q : Qp) (inum :
     (hnib : inum.toNat < 16 * icfgNib) (rg : Frzidx) (tid : Nat) (qp : Qp) (Tp K : Nat)
     (hTpK : Tp ≤ K) :
     isItable2 (GF := GF) fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-    itableInv (hlc := hlc) ∗ icEscrow fscIc fscFs fscIreg fscCov fscLogst kk ∗
-    iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+    itableInv ∗ icEscrow fscIc fscFs fscIreg fscCov fscLogst kk ∗
+    iregInv fscIreg fscFs icfgIst icfgNib ∗
     ownCtx c curCtx ∗ iputR curCtx ∗ ctxFloor curCtx K ∗
     irefFrag kk q ∗ inodeIdent kk (DFrac.own q) icfgDev inum ∗
     reference (icfgBox kk) (some (icfgDev, inum))
@@ -145,13 +145,13 @@ theorem iput_lk_c_open (c : CPU) (kk : Nat) (hkk : kk < NINODE) (q : Qp) (inum :
   obtain ⟨hcd, hcn⟩ := hcdn
   subst cdev cinum
   -- B1: the count is one; the frozen park comes home
-  imod icnt_freeze_forces_one (hlc := hlc) ⊤ fscIreg fscFs icfgIst icfgNib inum cnt.val rg
+  imod icnt_freeze_forces_one ⊤ fscIreg fscFs icfgIst icfgNib inum cnt.val rg
       CoPset.subseteq_top hnib' $$ Hireg Hpre Hicnt with ⟨%hc1, Hpre, Hicnt⟩
   have hcnt : cnt = PosNat.one := PosNat.ext' hc1
   subst hcnt
   have hq : q = qt := hone rfl
   subst hq
-  imod frzPark_pre_reclaim (hlc := hlc) ⊤ fscIreg fscFs icfgIst icfgNib inum kk rg
+  imod frzPark_pre_reclaim ⊤ fscIreg fscFs icfgIst icfgNib inum kk rg
       CoPset.subseteq_top hnib' $$ Hireg Hpre Hpark with ⟨Hpre, Hmirt, Hselp⟩
   have hle : q ≤ (1 : Qp).half := by
     apply Qp.le_iff.mpr; rw [qpSub_some.mp hqr]
@@ -185,7 +185,7 @@ theorem iput_lk_c_open (c : CPU) (kk : Nat) (hkk : kk < NINODE) (q : Qp) (inum :
   icases Hhdr with ⟨-, Hvld, Hid, Hnlk, Hsele, HgidH, Hpre⟩
   -- the pool's quarter and the identity flip
   icases icId_quartersSplit fscIc kk true icfgDev inum $$ Hgid with ⟨Hgid, HgidT⟩
-  imod ipoolEvictLend (hlc := hlc) ⊤ fscIc fscFs fscIreg fscCov fscLogst icfgNib
+  imod ipoolEvictLend ⊤ fscIc fscFs fscIreg fscCov fscLogst icfgNib
       (regionInums icfgNib \ ciInums ci) kk inum.toNat icfgDev inum tid qp CoPset.subseteq_top hkk
       rfl $$ Hpinv Hpool Hgid with ⟨Hpool, Hgid, Hidback⟩
   ihave Hgid2 := icId_quartersJoin fscIc kk true icfgDev inum $$ HgidT HgidH
@@ -234,7 +234,7 @@ store, and the mover's `∀ P` close takes the pushed histories back as `P`. -/
 theorem iput_lk_retire_au (cpu : CPU) (Mt : RegMapF (Qp × PosNat)) (kk : Nat) (inum : BitVec 32)
     (q : Qp) (bfl : Bool) (rg : Frzidx) (tst : Nat)
     (hMk : PartialMap.get? Mt kk = some (q, PosNat.one)) (hnib : inum.toNat < 16 * icfgNib) :
-    itableInv (hlc := hlc) (GF := GF) ∗ iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+    itableInv (GF := GF) ∗ iregInv fscIreg fscFs icfgIst icfgNib ∗
     itableHalf Mt ∗ irefFrag kk q ∗ slhTok (icfgIsl kk) q ∗ frzsel kk (1 : Qp).half true ∗
     islSlot Mt kk ∗ runit bfl inum.toNat ∗ ifreezePre rg inum.toNat ∗ icntHalf inum.toNat 1 ∗
     frzmH inum.toNat true ∗ istmpAuth kk (1 : Qp).half tst ⊢
@@ -242,7 +242,7 @@ theorem iput_lk_retire_au (cpu : CPU) (Mt : RegMapF (Qp × PosNat)) (kk : Nat) (
   have hin : (inum.toNat : Int) < 16 * (icfgNib : Int) := by omega
   iintro ⟨#Hinv, #Hrinv, Hhalf, Hfrg, Hslh, Hsel, Hisl, Hru, Hpre, Hcnt, Hmir, Hst⟩
   unfold writeAU
-  imod iref_close_last_frz_store_pinw_au (hlc := hlc) ⊤ fscIreg fscFs icfgIst icfgNib Mt kk inum q
+  imod iref_close_last_frz_store_pinw_au ⊤ fscIreg fscFs icfgIst icfgNib Mt kk inum q
       bfl rg tst CoPset.subseteq_top CoPset.subseteq_top hin hMk
     $$ Hinv Hrinv Hhalf Hfrg Hslh Hsel Hisl Hru Hpre Hcnt Hmir Hst with ⟨%g, %lo, %hlot, Hrows, Hcl⟩
   icases irefPinRows_push kk (irefWord Mt kk) (BitVec.ofNat 32 PosNat.one.val) lo tst
@@ -280,7 +280,7 @@ theorem iput_lk_c_close_rows (c : CPU) (kk : Nat) (hkk : kk < NINODE)
       ([∗list] j ∈ List.range NINODE,
         islot2 curCtx fscIc (PartialMap.delete Mt kk) (PartialMap.delete ci kk) j) ∗
       irefSlotsAuth ∗
-      ipool (hlc := hlc) fscFs fscIreg fscCov fscLogst (regionInums icfgNib \ ciInums ci)
+      ipool fscFs fscIreg fscCov fscLogst (regionInums icfgNib \ ciInums ci)
         (PartialMap.singleton inum.toNat (tid, qp)) ∗
       ifreezePost rg inum.toNat ∗ icntHalf inum.toNat 0 ∗ frzmH inum.toNat false ∗
       irefSlot ∗ txPin icfgLog tid qp := by
@@ -361,7 +361,7 @@ theorem iput_lk_c_park (kk : Nat) (Mt : RegMapF (Qp × PosNat))
     isItable2 (GF := GF) fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
     ifreezePost rg inum.toNat ∗ icntHalf inum.toNat 0 ∗ frzmH inum.toNat false ∗
     topFrag (fsGammaL fscFs) inum.toNat nd ∗
-    ipool (hlc := hlc) fscFs fscIreg fscCov fscLogst (regionInums icfgNib \ ciInums ci)
+    ipool fscFs fscIreg fscCov fscLogst (regionInums icfgNib \ ciInums ci)
       (PartialMap.singleton inum.toNat (tid, qp)) ∗
     itableHalf (PartialMap.delete Mt kk) ∗
     ([∗list] j ∈ List.range NINODE,
@@ -371,7 +371,7 @@ theorem iput_lk_c_park (kk : Nat) (Mt : RegMapF (Qp × PosNat))
       islot2 curCtx fscIc (PartialMap.delete Mt kk) (PartialMap.delete ci kk) j) ∗
     irefSlotsAuth ⊢
     |={⊤}=> iputRin curCtx ∗ ∃ ge gr gd : GName,
-      escAInv (hlc := hlc) fscFs ge gr gd inum.toNat rg ∗ redeemTicketA gd ∗
+      escAInv fscFs ge gr gd inum.toNat rg ∗ redeemTicketA gd ∗
       crpElem inum.toNat (.crpPre tid qp) := by
   iintro ⟨#Hit, Hpost, Hcnt0, Hmir, Htop, Hpool, Hhalf, Hrows, Hipool, Hslots, Hiauth⟩
   ihave #Hpinv := isItable2_pool $$ Hit
@@ -383,7 +383,7 @@ theorem iput_lk_c_park (kk : Nat) (Mt : RegMapF (Qp × PosNat))
   ihave Hgap := ipoolShapeAwait fscFs fscIreg fscCov fscLogst inum ge gr gd rg $$ Hcnt0 Hmir Hescr Htkr
   have hin : inum.toNat ∈ ciInums ci := (ciInums_spec ci _).mpr ⟨kk, _, hcik, rfl⟩
   have hofn : BitVec.ofNat 32 inum.toNat = inum := BitVec.eq_of_toNat_eq (by simp)
-  imod ipoolPutCorpse (hlc := hlc) ⊤ fscIc fscFs fscIreg fscCov fscLogst icfgNib
+  imod ipoolPutCorpse ⊤ fscIc fscFs fscIreg fscCov fscLogst icfgNib
       (regionInums icfgNib \ ciInums ci) inum.toNat tid qp CoPset.subseteq_top
       (iput_notin_diff icfgNib _ ci hin) $$ Hpinv [Hgap] Hpool with ⟨Hpool, Hcel⟩
   · rw [hofn]; iexact Hgap
@@ -437,7 +437,7 @@ theorem iput_lk_sw_au [KernelGeom] [KernelImage GF] {lent : Bool} (cpu : CPU) (k
 set_option maxHeartbeats 8000000 in
 /-- **PART C's WALK** (`+0x86 .. +0x94`, then the successor at `+0x98`). -/
 theorem iput_lk_c (RH : RELEASE_HOOK) (HO : IputOfflockSpec)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k : KCtx) (s p : Bool) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γil γisl : GName) (kk : Nat) (q : Qp) (inum : BitVec 32) (dn : Dinode) (nd : FsNode)
     (n : Nat) (Sb : List Nat) (crb cru crz : Bool) (tid : Nat) (qtx : Qp)

@@ -115,7 +115,7 @@ theorem kxcC_nonul (m : Nat) (f : Nat → BitVec 8) (h : ∀ j, j < m → f j �
   exact h j hj
 
 section Str
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- An argument string's owned run, as the C string strlen reads and the
 `len + 1` bytes copyout reads. -/
@@ -243,7 +243,7 @@ theorem kxcC_round16_nonneg (x : Int) (h : 0 ≤ x) : 0 ≤ kxcRound16 x := by
 /-! ## §3 THE TWO `-1` STUBS (Rocq `kxc_c_exit_m1`, deviation 2) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -267,7 +267,7 @@ theorem kxcC_stub (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
     instr (X + 2#64) true (instruction.JAL (imm, regidx.Regidx 0#5)) ∗
     kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu X ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
+    fsFabric Γ A.pd A.pav A.pu ∗
     kxcCRes k A (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5)
       (k.regs 25#5) (k.regs 26#5) w13 w67 ef P Mi c sz1 ∗
     (∀ c' : CPU, kexecCloser Q QF k A c')
@@ -317,7 +317,7 @@ theorem kxcC_j_358 : KA.«kexec» + 0x356#64 + 2#64 + BitVec.signExtend 64 20967
     KA.«kexec» + 0x1d6#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -389,7 +389,7 @@ theorem kxcC_argv_tail (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
         (bview (A.alen ci + 1) (A.afun ci))) ∨ R 10#5 = -1#64) :
     kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu (KA.«kexec» + 0x24a#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
+    fsFabric Γ A.pd A.pav A.pu ∗
     kxcCRes k A (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5)
       (k.regs 25#5) (k.regs 26#5) w13 w67 ef P' M' ci sz1 ∗
     (∀ c' : CPU, kexecCloser Q QF k A c') ∗
@@ -524,7 +524,7 @@ theorem kxc_argv_step (SL : STRLEN) (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (�
     kxcAt21a k A cpu spie spp R (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)
       (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) w13 w67 fb ef P Mi oldsz sz1
       (k.regs 27#5) ci ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
+    fsFabric Γ A.pd A.pav A.pu ∗
     (∀ c' : CPU, kexecCloser Q QF k A c') ∗
     (∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (Mo : Nat → List (BitVec 8)),
       (kxcAt21a k A c spie' spp' R' (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)
@@ -751,7 +751,7 @@ theorem kxc_argv_loop (SL : STRLEN) (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (�
     kxcAt21a k A cpu spie spp R (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)
       (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) w13 w67 fb ef P Mi oldsz sz1
       (k.regs 27#5) ci ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
+    fsFabric Γ A.pd A.pav A.pu ∗
     (∀ c' : CPU, kexecCloser Q QF k A c') ∗
     (∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (Mo : Nat → List (BitVec 8)) (c' : Nat),
       kxcAt272 k A c spie' spp' R' (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)

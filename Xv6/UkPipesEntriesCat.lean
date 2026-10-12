@@ -13,13 +13,13 @@ open Iris.Std.PartialMap
 open Std (ExtTreeSet)
 
 section PseEntries
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF]
   [PipeOutG GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
   [DiskG GF] [EchoOutG GF] [PnsRegG GF] [PipesNG GF] [FileAppG GF]
-variable (X : PseCtx hlc GF)
+variable (X : PseCtx GF)
 
 /-- **Rocq `pse_copy_image_entry`**: A COPY STAGE (the middle cat, the last cat): one proof, the sink a parameter. -/
 theorem pse_copy_image_entry (Me : ElfMem) (Mv : Nat → List (BitVec 8)) (sv t : Nat) (gn : Nat → BitVec 8)
@@ -32,9 +32,9 @@ theorem pse_copy_image_entry (Me : ElfMem) (Mv : Nat → List (BitVec 8)) (sv t 
     (hl1 : (sts.take NSTD)[1]? = some (.open rb1 true (pnsSinkTy sk)))
     (hl2 : (sts.take NSTD)[2]? = some (.open rb2 true (.device CONSOLE)))
     (hnil : [] ∈ alts2) (hdg : pnsSinkH sk = true → catDgWrite ∈ alts2) :
-    ⊢ urunNopipe (hlc := hlc) sts -∗ udep (hlc := hlc) -∗
+    ⊢ urunNopipe sts -∗ udep -∗
       imageEntry User.Cat.elf Mv (BitVec.ofNat 64 (t + 8)) sts cw seccAll cs pidv Q
-        (pnsCopyLend X.R w2 A2 alts2 pin gin .FCat sk Q) (uslot (hlc := hlc)) := by
+        (pnsCopyLend X.R w2 A2 alts2 pin gin .FCat sk Q) (uslot) := by
   let wv : Nat → Pdev := fun d => match d with | 0 => .PDCon w2 A2 | _ => .PDCopy (pin, gin) .FCat sk
   let kds : List (Nat × Pdev) := [(0, .PDCon w2 A2), (1, .PDCopy (pin, gin) .FCat sk)]
   have hc : Conforms (copyEnv (.DCopy (filtPf .FCat) (pnsSinkH sk) [] X.R.L []) alts2 (fun _ => none) []) (catTree (filtWords .FCat)) := cat_copy_conforms fdWCat (pnsSinkH sk) X.R.L alts2 _ [] hnil hdg
@@ -75,9 +75,9 @@ theorem pse_mid_image_entry (Me : ElfMem) (Mv : Nat → List (BitVec 8)) (sv t :
     (hl1 : (sts.take NSTD)[1]? = some (.open rb1 true (.pipe gp)))
     (hl2 : (sts.take NSTD)[2]? = some (.open rb2 true (.device CONSOLE)))
     (hnil : [] ∈ alts2) (hdg : catDgWrite ∈ alts2) :
-    ⊢ urunNopipe (hlc := hlc) sts -∗ udep (hlc := hlc) -∗
+    ⊢ urunNopipe sts -∗ udep -∗
       imageEntry User.Cat.elf Mv (BitVec.ofNat 64 (t + 8)) sts cw seccAll cs pidv Q
-        (pnsCopyLend X.R w2 A2 alts2 pin gin .FCat (.CSPipe pn gp) Q) (uslot (hlc := hlc)) :=
+        (pnsCopyLend X.R w2 A2 alts2 pin gin .FCat (.CSPipe pn gp) Q) (uslot) :=
   pse_copy_image_entry X Me Mv sv t gn sts cw cs pidv Q w2 A2 alts2 (.CSPipe pn gp) pin gin wb rb1 rb2 hQc hok
     hag hnode hab hfdl hl0 hl1 hl2 hnil (fun _ => hdg)
 
@@ -91,9 +91,9 @@ theorem pse_last_image_entry_m (Me : ElfMem) (Mv : Nat → List (BitVec 8)) (sv 
     (hl0 : (sts.take NSTD)[0]? = some (.open true wb (.pipe gin)))
     (hl1 : (sts.take NSTD)[1]? = some (.open rb1 true (.device CONSOLE)))
     (hl2 : (sts.take NSTD)[2]? = some (.open rb2 true (.device CONSOLE))) :
-    ⊢ urunNopipe (hlc := hlc) sts -∗ udep (hlc := hlc) -∗
+    ⊢ urunNopipe sts -∗ udep -∗
       imageEntry User.Cat.elf Mv (BitVec.ofNat 64 (t + 8)) sts cw seccAll cs pidv Q
-        (pnsCopyLendM X.R pin gin .FCat (.CSCon wL) Q) (uslot (hlc := hlc)) := by
+        (pnsCopyLendM X.R pin gin .FCat (.CSCon wL) Q) (uslot) := by
   let wv : Nat → Pdev := fun d => match d with | 0 => .PDMute | _ => .PDCopy (pin, gin) .FCat (.CSCon wL)
   let kds : List (Nat × Pdev) := [(0, .PDMute), (1, .PDCopy (pin, gin) .FCat (.CSCon wL))]
   have hc : Conforms (copyEnv (.DCopy (filtPf .FCat) (pnsSinkH (.CSCon wL)) [] X.R.L []) [[]] (fun _ => none) []) (catTree (filtWords .FCat)) := cat_copy_conforms fdWCat false X.R.L [[]] _ [] (List.mem_singleton_self _) (fun h => absurd h (by decide))

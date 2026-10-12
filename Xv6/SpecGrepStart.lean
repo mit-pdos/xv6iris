@@ -38,7 +38,7 @@ theorem grepStack_main (args : List UArg) : grepStack args = 2 + grepMainWords a
   | _ :: _ :: _ :: _ => rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -48,17 +48,17 @@ def wpGrepStartBody : Prop :=
     (∀ (j : Nat) (g : UArg), args[j]? = some g → g.ptr ≠ 0) →
     m.get 10#5 = BitVec.ofNat 64 args.length → m.get 11#5 = BitVec.ofNat 64 av →
     grepStack args ≤ n →
-    ⊢ treePay (hlc := hlc) N (grepProg N.t) (grepTree (args.map uargBytes)) -∗
+    ⊢ treePay N (grepProg N.t) (grepTree (args.map uargBytes)) -∗
       grepCode N.t -∗ uargv N.d av args -∗ ubytes N.d User.Grep.Sym.«buf» 1024 f -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Grep.Sym.«start») n -∗
+      urun N h m (BitVec.ofNat 64 User.Grep.Sym.«start») n -∗
       wpLoop h
 
 end
 
 /-- The interface of grep's `start` (its entry point). -/
 structure GREP_START : Prop where
-  wp_grepStart : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+  wp_grepStart : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
-    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpGrepStartBody (hlc := hlc) (GF := GF)
+    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpGrepStartBody (GF := GF)
 
 end Xv6

@@ -23,7 +23,7 @@ open Std (ExtTreeSet)
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -33,11 +33,11 @@ theorem wp_shFree (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (p nu
     (hnu0 : 0 < nu) (hnu : nu < 2 ^ 31) (hphi : p + 16 * nu < 2 ^ 38) :
     ⊢ ukCode N.t User.Sh.code.byte -∗ uword N.d ushmFreep (BitVec.ofNat 64 ushmBase) -∗
       ushmHdr N.d ushmBase (BitVec.ofNat 64 ushmBase) 0 -∗ ushmHdr N.d p b0 nu -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«free») (2 + nn) -∗
+      urun N h m (BitVec.ofNat 64 User.Sh.Sym.«free») (2 + nn) -∗
       (∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗
         uword N.d ushmFreep (BitVec.ofNat 64 ushmBase) -∗
         ushmHdr N.d ushmBase (BitVec.ofNat 64 p) 0 -∗ ushmHdr N.d p (BitVec.ofNat 64 ushmBase) nu -∗
-        urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (2 + nn) -∗ wpLoop h') -∗
+        urun N h' m' (retPc (m.get 1#5)) (2 + nn) -∗ wpLoop h') -∗
       wpLoop h := by
   rw [show User.Sh.Sym.«free» = 0x10f2 from rfl]
   unfold ushmHdr

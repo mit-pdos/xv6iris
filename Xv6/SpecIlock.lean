@@ -128,7 +128,7 @@ acquiresleep wants 24, brelse 26, memmove 2 (Rocq's `K_ilock = 66`). -/
 def ilockSlots : Nat := 4 + breadSlots
 
 section Post
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
   [SleepLockG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
   [IcboxG GF] [OffboxG GF] [OffboxBoxG GF]
 
@@ -256,11 +256,11 @@ end Post
 
 /-- **WP of `ilock(ip = a0)`, the generic form** (Rocq's
 `wp_ilock_dep_sconf_body`), over the checkout descriptor `d`. -/
-def wp_ilock_dep_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_ilock_dep_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [Appcfg GF]
     [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γil γisl : GName) (kk : Nat) (s : Qp) (g : GName) (lo tl : Nat) (d : IcDep) (o : Ilkc)
     (inum : BitVec 32) (pidv : BitVec 32) (dqp dqs : DFrac) (Tl : Nat)
@@ -288,8 +288,8 @@ def wp_ilock_dep_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] 
   diskCaps fscDisk fscDlock pd pav pu ∗
   -- THE THREE PERSISTENT INVARIANTS: the `ref` words, the entry's content,
   -- the inode region
-  itableInv (hlc := hlc) ∗ icEscrow fscIc fscFs fscIreg fscCov fscLogst kk ∗
-  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+  itableInv ∗ icEscrow fscIc fscFs fscIreg fscCov fscLogst kk ∗
+  iregInv fscIreg fscFs icfgIst icfgNib ∗
   -- THE ENTRY'S SLEEPLOCK -- tracked, over the checkout token
   isSleeplockGen γil γisl (iLock (ientry kk)) (icSlp fscIc kk) (slhTok (icfgIsl kk)) ∗
   -- the racy read's credential: the floor receipt and the address claims
@@ -313,11 +313,11 @@ def wp_ilock_dep_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] 
 
 /-- The eb-generic form of `wp_ilock_dep_body` (Rocq: `cpu_own 0 eb`, the complement
 `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no spinlock held). -/
-def wp_ilock_dep_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_ilock_dep_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [Appcfg GF]
     [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γil γisl : GName) (kk : Nat) (s : Qp) (g : GName) (lo tl : Nat) (d : IcDep) (o : Ilkc)
     (inum : BitVec 32) (pidv : BitVec 32) (dqp dqs : DFrac) (Tl : Nat)
@@ -345,8 +345,8 @@ def wp_ilock_dep_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
   diskCaps fscDisk fscDlock pd pav pu ∗
   -- THE THREE PERSISTENT INVARIANTS: the `ref` words, the entry's content,
   -- the inode region
-  itableInv (hlc := hlc) ∗ icEscrow fscIc fscFs fscIreg fscCov fscLogst kk ∗
-  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+  itableInv ∗ icEscrow fscIc fscFs fscIreg fscCov fscLogst kk ∗
+  iregInv fscIreg fscFs icfgIst icfgNib ∗
   -- THE ENTRY'S SLEEPLOCK -- tracked, over the checkout token
   isSleeplockGen γil γisl (iLock (ientry kk)) (icSlp fscIc kk) (slhTok (icfgIsl kk)) ∗
   -- the racy read's credential: the floor receipt and the address claims
@@ -370,11 +370,11 @@ def wp_ilock_dep_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
 
 /-- **WP of `ilock(ip = a0)`, the transactional form** (Rocq's
 `wp_ilock_tx_sconf_body`): `logTx icfgLog` in, `icTxDep` out. -/
-def wp_ilock_tx_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_ilock_tx_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [Appcfg GF]
     [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γil γisl : GName) (kk : Nat) (s : Qp) (g : GName) (lo tl : Nat) (o : Ilkc)
     (inum : BitVec 32) (pidv : BitVec 32) (dqp dqs : DFrac) (Tl : Nat)
@@ -392,8 +392,8 @@ def wp_ilock_tx_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
   trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗ panicEnv ∗
   bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
   diskCaps fscDisk fscDlock pd pav pu ∗
-  itableInv (hlc := hlc) ∗ icEscrow fscIc fscFs fscIreg fscCov fscLogst kk ∗
-  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+  itableInv ∗ icEscrow fscIc fscFs fscIreg fscCov fscLogst kk ∗
+  iregInv fscIreg fscFs icfgIst icfgNib ∗
   isSleeplockGen γil γisl (iLock (ientry kk)) (icSlp fscIc kk) (slhTok (icfgIsl kk)) ∗
   credFloor lo tl ∗ irefClaims ∗
   inodeShrGenlo kk s icfgDev inum g lo ∗
@@ -409,11 +409,11 @@ def wp_ilock_tx_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
 
 /-- The eb-generic form of `wp_ilock_tx_body` (Rocq: `cpu_own 0 eb`, the complement
 `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no spinlock held). -/
-def wp_ilock_tx_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_ilock_tx_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [Appcfg GF]
     [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γil γisl : GName) (kk : Nat) (s : Qp) (g : GName) (lo tl : Nat) (o : Ilkc)
     (inum : BitVec 32) (pidv : BitVec 32) (dqp dqs : DFrac) (Tl : Nat)
@@ -431,8 +431,8 @@ def wp_ilock_tx_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ panicEnv ∗
   bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
   diskCaps fscDisk fscDlock pd pav pu ∗
-  itableInv (hlc := hlc) ∗ icEscrow fscIc fscFs fscIreg fscCov fscLogst kk ∗
-  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+  itableInv ∗ icEscrow fscIc fscFs fscIreg fscCov fscLogst kk ∗
+  iregInv fscIreg fscFs icfgIst icfgNib ∗
   isSleeplockGen γil γisl (iLock (ientry kk)) (icSlp fscIc kk) (slhTok (icfgIsl kk)) ∗
   credFloor lo tl ∗ irefClaims ∗
   inodeShrGenlo kk s icfgDev inum g lo ∗
@@ -452,21 +452,21 @@ def wp_ilock_tx_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF
 structure ILOCK : Prop where
   /-- THE GENERIC FORM: one proof of ilock's code, the checkout's descriptor
   chosen by the caller. -/
-  wp_ilock_dep_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+  wp_ilock_dep_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [Appcfg GF]
     [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γil γisl : GName) (kk : Nat) (s : Qp) (g : GName) (lo tl : Nat) (d : IcDep) (o : Ilkc)
     (inum : BitVec 32) (pidv : BitVec 32) (dqp dqs : DFrac) (Tl : Nat)
     hj hproc hK hnoff htier hshr hrdo hkk hgeom hcov hnib hpd ha0 hle,
-    wp_ilock_dep_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk s g lo tl d o
+    wp_ilock_dep_eb_body (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk s g lo tl d o
       inum pidv dqp dqs Tl hj hproc hK hnoff htier hshr hrdo hkk hgeom hcov hnib
       hpd ha0 hle
 
 section TxOfDep
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
   [SleepLockG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
   [IcboxG GF] [OffboxG GF] [OffboxBoxG GF]
 
@@ -487,22 +487,22 @@ theorem ilockPostDepEb_tx [Fscfg] [Icfg] [CurCtx] (k : KCtx) (γisl : GName) (kk
 
 end TxOfDep
 
-theorem ILOCK.wp_ilock_tx_eb (IL : ILOCK) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+theorem ILOCK.wp_ilock_tx_eb (IL : ILOCK) {GF : BundledGFunctors.{0}} [MachGS GF]
     [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [Appcfg GF]
     [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γil γisl : GName) (kk : Nat) (s : Qp) (g : GName) (lo tl : Nat) (o : Ilkc)
     (inum : BitVec 32) (pidv : BitVec 32) (dqp dqs : DFrac) (Tl : Nat)
     hj hproc hK hnoff htier hkk hgeom hcov hnib hpd ha0 hle :
-    wp_ilock_tx_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk s g lo tl o
+    wp_ilock_tx_eb_body (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk s g lo tl o
       inum pidv dqp dqs Tl hj hproc hK hnoff htier hkk hgeom hcov hnib hpd ha0 hle := by
   unfold wp_ilock_tx_eb_body
   iintro ⟨Hk, Hpc, Hpi, Hte, Hce, Hpe, Hbc, Hdc, Hit, Hesc, Hireg, Hslk, Hfl, Hclm, Hshr,
     Hlic, Hsb, Hpid, Hsl, Htx, Hllb, HΦ⟩
   icases logTx_halve icfgLog $$ Htx with ⟨%t, Ht1, Ht2⟩
-  have h := IL.wp_ilock_dep_eb (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk s g lo tl
+  have h := IL.wp_ilock_dep_eb (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk s g lo tl
     (.depTx s icfgDev inum g lo t (1 : Qp).half) o inum pidv dqp dqs Tl hj hproc hK hnoff
     htier rfl (fun h => by simp [icDepRd] at h) hkk hgeom hcov hnib hpd ha0 hle
   unfold wp_ilock_dep_eb_body at h

@@ -61,13 +61,13 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 set_option linter.unusedSimpArgs false
 
-theorem namex_ctx_entry {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem namex_ctx_entry {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (c : CPU) (k : KCtx) (R : RegMap) :
     kctx (GF := GF) c ((k.pushed 12).withRegs R) ⊢
       kctx c (((k.withSpie k.spie k.spp).pushed 12).withRegs R) := .rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -77,7 +77,7 @@ set_option maxHeartbeats 16000000 in
 `wp_namex_gen`). -/
 theorem namex_main (MP : MYPROC) (ID : IDUP) (IG : IGET) (MM : MEMMOVE) (IL : ILOCK)
     (IU : IUNLOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (IP : IPUT)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γkl : GName) (γk : KmemNames)
     (plen : Nat) (pfun nfun : Nat → BitVec 8) (npar : Bool) (n : Nat) (Sb : List Nat)
@@ -95,7 +95,7 @@ theorem namex_main (MP : MYPROC) (ID : IDUP) (IG : IGET) (MM : MEMMOVE) (IL : IL
     (hbud : walkNeed (pathElems (bview plen pfun)).length ≤ n)
     (hnpar : if npar then k.regs 11#5 ≠ 0#64 else k.regs 11#5 = 0#64)
     (hpd : descPageRw pd) :
-    wp_namex_gen_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γkl γk plen pfun nfun
+    wp_namex_gen_eb_body (GF := GF) Γ cpu k γl pd pav pu j γkl γk plen pfun nfun
       npar n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv rootv rti dqr
       hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud hnpar hpd := by
   unfold wp_namex_gen_eb_body
@@ -113,7 +113,7 @@ theorem namex_main (MP : MYPROC) (ID : IDUP) (IG : IGET) (MM : MEMMOVE) (IL : IL
       hroot := hroot, hnib0 := hnib0, hgeom := hgeom, hbg := hbg, hbel := hbel, hireg := hireg,
       hnn := hnn, hterm := hterm, hplen := hplen, hnpar := hnpar, hpd := hpd }
   ihave Hnext := namex_post_of_spec k A cpu hj hproc $$ Hnext
-  ihave #Henv : namexEnv (hlc := hlc) Γ A $$ []
+  ihave #Henv : namexEnv Γ A $$ []
   · unfold namexEnv; iframe #
   ihave Hpre : namexPre k A nfun $$ [Hsb Hsi Hpid Hcwd Hcwr Hrtc Hrtr Hpath Hnm Hbs Hs2 Hop Htx]
   · unfold namexPre namexKeep namexPath; iframe

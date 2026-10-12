@@ -64,7 +64,7 @@ Rocq's header, kept because the reasons are the content:
 4. The return words as `SysReadDefs` deviation 2 (`-1#64`).
 5. Class binders: Rocq's section list (`riscvGS, xv6G, bioslotG, fdslotG,
    fileG, irefslotG, pavG, wchG, CurCtx`) is replaced by exactly the classes
-   the statements use -- `[MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FsTopG
+   the statements use -- `[MachGS GF] [IcacheG GF] [Xv6G GF] [FsTopG
    GF] [FsBytesG GF] [OffboxG GF]` (what `ftopInv`, `topFrag`, `fsGammaL`
    and `offGv` need) plus per-declaration `[Icfg]`/`[Appcfg GF]`.  The
    `CurCtx` binder is read by nothing here and is dropped.
@@ -183,7 +183,7 @@ def readBufTie (a : Anode) (off d : Nat) (M' : Nat → List (BitVec 8)) (addr : 
 /-! ## 1.  The raw-map commit -/
 
 section ReadCommit
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsTopG GF] [OffboxG GF]
 
 /-- SINGLE-PHASE AND READ-ONLY at the RAW MAP, WITH THE OFFSET'S HALF LENT
 AND RETURNED UNMOVED (Rocq's `aread_commit_at`).  THE PIECE-SHAPE RULE: a
@@ -194,12 +194,12 @@ def areadCommitAt (Γ : FsViewNames GF) (E : CoPset) (i : Nat) (γo : GName)
     (Φ : Aview → Nat → Anode → Nat → IProp GF) : IProp GF :=
   iprop(∀ (I : RegMapF FsNode) (off : Nat) (a : Anode) (d : Nat),
     ⌜ardPre (absView I) i off a⌝ -∗
-    (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I) -∗ offLink (hlc := hlc) γo (off : Int) ={E}=∗
+    (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I) -∗ offLink γo (off : Int) ={E}=∗
     (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I) ∗
       -- THE HALF COMES BACK AT ONE OF TWO VALUES (Rocq lanes WRITE-RELAY /
       -- OFF-LINK-2): UNMOVED, or ADVANCED BY THE COUNT `d`; the LEND is the
       -- box's arm (`offLink`), which may be the taint
-      offRet (hlc := hlc) γo off d ∗
+      offRet γo off d ∗
       Φ (absView I) off a d)
 
 /-- satisfiability, FROM NOTHING (Rocq's `aread_commit_at_unit`): the borrow
@@ -222,14 +222,14 @@ def areadCommitAdv (Γ : FsViewNames GF) (E : CoPset) (i : Nat) (γo : GName)
     (Φ : Aview → Nat → Anode → Nat → IProp GF) : IProp GF :=
   iprop(∀ (I : RegMapF FsNode) (off : Nat) (a : Anode) (d : Nat),
     ⌜ardPre (absView I) i off a⌝ -∗
-    (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I) -∗ offLink (hlc := hlc) γo (off : Int) ={E}=∗
-    (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I) ∗ offLink (hlc := hlc) γo ((off + d : Nat) : Int) ∗
+    (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I) -∗ offLink γo (off : Int) ={E}=∗
+    (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I) ∗ offLink γo ((off + d : Nat) : Int) ∗
       Φ (absView I) off a d)
 
 /-- Rocq's `aread_commit_at_of_adv`. -/
 theorem areadCommitAt_of_adv (Γ : FsViewNames GF) (E : CoPset) (i : Nat) (γo : GName)
     (Φ : Aview → Nat → Anode → Nat → IProp GF) :
-    areadCommitAdv (hlc := hlc) Γ E i γo Φ ⊢ areadCommitAt (hlc := hlc) Γ E i γo Φ := by
+    areadCommitAdv Γ E i γo Φ ⊢ areadCommitAt Γ E i γo Φ := by
   unfold areadCommitAdv areadCommitAt
   iintro Hcm %I %off %a %d %hpre Ha Hk
   imod Hcm $$ %I %off %a %d %hpre Ha Hk with ⟨Ha, Hk, HΦ⟩
@@ -243,7 +243,7 @@ theorem areadCommitAt_of_adv (Γ : FsViewNames GF) (E : CoPset) (i : Nat) (γo :
 /-- Rocq's `pf_at_aread_commit_at_of_adv`: the same at the PIECE. -/
 theorem pfAt_areadCommitAt_of_adv (Γ : FsViewNames GF) (E : CoPset) (i : Nat) (γo : GName)
     (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) :
-    pfAt (areadCommitAdv (hlc := hlc) Γ E i γo) F ⊢ pfAt (areadCommitAt (hlc := hlc) Γ E i γo) F := by
+    pfAt (areadCommitAdv Γ E i γo) F ⊢ pfAt (areadCommitAt Γ E i γo) F := by
   iintro H
   iapply pfAt_mono _ _ F $$ [] H
   iintro H
@@ -324,9 +324,9 @@ commit beside the taint. -/
 def areadInOm (om : OffMode) (Γ : FsViewNames GF) (E : CoPset) (i : Nat) (γo : GName)
     (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) : IProp GF :=
   match om with
-  | .parked => pfAt (areadCommitAt (hlc := hlc) Γ E i γo) F
-  | .held => iprop(pfAt (areadCommitAdv (hlc := hlc) Γ E i γo) F ∨
-      (pfAt (areadCommitAt (hlc := hlc) Γ E i γo) F ∗ MachFixedGS.killCred (hlc := hlc) (GF := GF)))
+  | .parked => pfAt (areadCommitAt Γ E i γo) F
+  | .held => iprop(pfAt (areadCommitAdv Γ E i γo) F ∨
+      (pfAt (areadCommitAt Γ E i γo) F ∗ MachFixedGS.killCred (GF := GF)))
 
 end ReadCommit
 
@@ -339,7 +339,7 @@ theorem arfFoffN_sub (E : CoPset) (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) :
   nclose_subseteq' (N := appN) "foff" (fun p hp => hE p (CoPset.in_union.2 (Or.inr hp)))
 
 section ReadFire
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [FsTopG GF] [FsBytesG GF] [OffboxG GF]
 
 /-- THE FIRE, AT ANY SUPPLIER (Rocq's `arf_read_fire_gen`): ONE step,
@@ -352,12 +352,12 @@ theorem arfRead_fire_gen [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac) (R : 
     (off d : Nat) (n : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hoff : off ≤ MAXFILE * BSIZE)
     (hsz : anodeSizeOk (absRow n)) (hnz : fnType n ≠ 0) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ offSupply γo E off d R -∗
+    ⊢@{IProp GF} ftopInv γfs -∗ offSupply γo E off d R -∗
       pfAt (areadCommitAt (fsGammaL γfs) appE i γo) F -∗
       topFragQ (fsGammaL γfs) dq i n -∗
-      offLink (hlc := hlc) γo (off : Int) ={E}=∗
+      offLink γo (off : Int) ={E}=∗
         topFragQ (fsGammaL γfs) dq i n ∗
-        offLink (hlc := hlc) γo ((off + d : Nat) : Int) ∗ R ∗
+        offLink γo ((off + d : Nat) : Int) ∗ R ∗
         ∃ av : Aview, ⌜arowAt av i (absRow n)⌝ ∗ F.pfRecv av off (absRow n) d := by
   iintro #Hi Hsup Hcm Hf Hg
   -- THE PIECE IS SPENT: the fire eliminates to the AU side.
@@ -398,12 +398,12 @@ theorem arfRead_fire [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
     (off d : Nat) (n : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hoff : off ≤ MAXFILE * BSIZE)
     (hsz : anodeSizeOk (absRow n)) (hnz : fnType n ≠ 0) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ offUserInv (hlc := hlc) γo -∗
+    ⊢@{IProp GF} ftopInv γfs -∗ offUserInv γo -∗
       pfAt (areadCommitAt (fsGammaL γfs) appE i γo) F -∗
       topFragQ (fsGammaL γfs) dq i n -∗
-      offLink (hlc := hlc) γo (off : Int) ={E}=∗
+      offLink γo (off : Int) ={E}=∗
         topFragQ (fsGammaL γfs) dq i n ∗
-        offLink (hlc := hlc) γo ((off + d : Nat) : Int) ∗
+        offLink γo ((off + d : Nat) : Int) ∗
         ∃ av : Aview, ⌜arowAt av i (absRow n)⌝ ∗ F.pfRecv av off (absRow n) d := by
   iintro #Hi #Hoinv Hcm Hf Hg
   ihave Hsup := offSupply_parked E γo off d (arfFoffN_sub E hE) $$ Hoinv
@@ -420,12 +420,12 @@ theorem arfRead_fire_adv [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
     (off d : Nat) (n : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hoff : off ≤ MAXFILE * BSIZE)
     (hsz : anodeSizeOk (absRow n)) (hnz : fnType n ≠ 0) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗
+    ⊢@{IProp GF} ftopInv γfs -∗
       pfAt (areadCommitAdv (fsGammaL γfs) appE i γo) F -∗
       topFragQ (fsGammaL γfs) dq i n -∗
-      offLink (hlc := hlc) γo (off : Int) ={E}=∗
+      offLink γo (off : Int) ={E}=∗
         topFragQ (fsGammaL γfs) dq i n ∗
-        offLink (hlc := hlc) γo ((off + d : Nat) : Int) ∗
+        offLink γo ((off + d : Nat) : Int) ∗
         ∃ av : Aview, ⌜arowAt av i (absRow n)⌝ ∗ F.pfRecv av off (absRow n) d := by
   iintro #Hi Hcm Hf Hg
   ihave Hcm := pfAt_au _ _ $$ Hcm
@@ -462,25 +462,25 @@ theorem arfRead_fire_om [Icfg] [FileG GF] [SleepLockG GF] [IcboxG GF] [OffboxBox
     (off d : Nat) (rw ww : Bool) (n : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hoff : off ≤ MAXFILE * BSIZE)
     (hsz : anodeSizeOk (absRow n)) (hnz : fnType n ≠ 0) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ foffRow (hlc := hlc) (.open rw ww (.inode i γo om)) -∗
-      areadInOm (hlc := hlc) om (fsGammaL γfs) appE i γo F -∗
+    ⊢@{IProp GF} ftopInv γfs -∗ foffRow (.open rw ww (.inode i γo om)) -∗
+      areadInOm om (fsGammaL γfs) appE i γo F -∗
       topFragQ (fsGammaL γfs) dq i n -∗
-      offLink (hlc := hlc) γo (off : Int) ={E}=∗
+      offLink γo (off : Int) ={E}=∗
         topFragQ (fsGammaL γfs) dq i n ∗
-        offLink (hlc := hlc) γo ((off + d : Nat) : Int) ∗
+        offLink γo ((off + d : Nat) : Int) ∗
         ∃ av : Aview, ⌜arowAt av i (absRow n)⌝ ∗ F.pfRecv av off (absRow n) d := by
   cases om with
   | parked =>
     unfold areadInOm
     iintro #Hi #Hrow Hcm Hf Hg
-    ihave Hoinv := foffRow_inode_of (hlc := hlc) _ rw ww i γo rfl $$ Hrow
+    ihave Hoinv := foffRow_inode_of _ rw ww i γo rfl $$ Hrow
     iapply arfRead_fire γfs E dq F i γo off d n hE hoff hsz hnz $$ Hi Hoinv Hcm Hf Hg
   | held =>
     unfold areadInOm
     iintro #Hi _ Hcm Hf Hg
     icases Hcm with (Hcm | ⟨Hcm, #Ht⟩)
     · iapply arfRead_fire_adv γfs E dq F i γo off d n hE hoff hsz hnz $$ Hi Hcm Hf Hg
-    · ihave Hsup := offSupply_taint (hlc := hlc) E γo off d $$ Ht
+    · ihave Hsup := offSupply_taint E γo off d $$ Ht
       imod arfRead_fire_gen γfs E dq iprop(True) F i γo off d n hE hoff hsz hnz $$
         Hi Hsup Hcm Hf Hg with ⟨Hf, Hg, -, Hav⟩
       imodintro

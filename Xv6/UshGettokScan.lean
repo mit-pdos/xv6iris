@@ -93,7 +93,7 @@ theorem ushG_cs3 (mc : RegMap) (a b c : BitVec 64) (q : BitVec 5) (hq : ucalleeS
 macro "ushG_pc" : tactic => `(tactic| first | decide | omega | (simp; done) | (simp; omega))
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -118,11 +118,11 @@ theorem shGtk_call (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (p : Nat) 
     (h9 : mc.get 9#5 = BitVec.ofNat 64 (s0 + j)) (htr : mc.get tr = BitVec.ofNat 64 ta)
     (htr11 : tr ≠ 11#5 := by decide) :
     ⊢ ushCode N.t -∗ ustr N.d dq s0 len f -∗ ustr N.d dt ta tn tf -∗
-      urun (hlc := hlc) N h mc (BitVec.ofNat 64 p) (2 + n) -∗
+      urun N h mc (BitVec.ofNat 64 p) (2 + n) -∗
       (ustr N.d dq s0 len f -∗ ustr N.d dt ta tn tf -∗ ∀ (h' : CPU) (m' : RegMap),
         ⌜∀ q, ucalleeSavedIdx q = true → m'.get q = mc.get q⌝ -∗
         ⌜m'.get 10#5 = BitVec.ofInt 64 (ushpChr ta tn 0 tf (f j))⌝ -∗
-        urun (hlc := hlc) N h' m' (BitVec.ofNat 64 (p + 10)) (2 + n) -∗ wpLoop h') -∗
+        urun N h' m' (BitVec.ofNat 64 (p + 10)) (2 + n) -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hs Ht Hrun Hk
   icases ustr_byte N.d dq s0 len f j hj $$ Hs with ⟨Hb, Hcl⟩
@@ -170,11 +170,11 @@ theorem shGtk_ws_scan (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (p : Na
     mc.get 9#5 = BitVec.ofNat 64 (s0 + j) → mc.get 18#5 = BitVec.ofNat 64 (s0 + len) →
     mc.get 19#5 = BitVec.ofNat 64 ushWsA →
     ⊢ ushCode N.t -∗ ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
-      urun (hlc := hlc) N h mc (BitVec.ofNat 64 p) (2 + n) -∗
+      urun N h mc (BitVec.ofNat 64 p) (2 + n) -∗
       (ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗ ∀ (h' : CPU) (mc' : RegMap),
         ⌜∀ q, ucalleeSavedIdx q = true → q ≠ 9#5 → mc'.get q = mc.get q⌝ -∗
         ⌜mc'.get 9#5 = BitVec.ofNat 64 (s0 + (j + ushpSkipws (len - j) j f))⌝ -∗
-        urun (hlc := hlc) N h' mc' (BitVec.ofNat 64 (p + 20)) (2 + n) -∗ wpLoop h') -∗
+        urun N h' mc' (BitVec.ofNat 64 (p + 20)) (2 + n) -∗ wpLoop h') -∗
       wpLoop h := by
   intro r
   induction r with
@@ -258,11 +258,11 @@ theorem shGtk_ws_enter (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (q : N
     (h9 : mc.get 9#5 = BitVec.ofNat 64 (s0 + j)) (h18 : mc.get 18#5 = BitVec.ofNat 64 (s0 + len))
     (h19 : mc.get 19#5 = BitVec.ofNat 64 ushWsA) (hre : mc.get re = BitVec.ofNat 64 (s0 + len)) :
     ⊢ ushCode N.t -∗ ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
-      urun (hlc := hlc) N h mc (BitVec.ofNat 64 q) (2 + n) -∗
+      urun N h mc (BitVec.ofNat 64 q) (2 + n) -∗
       (ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗ ∀ (h' : CPU) (mc' : RegMap),
         ⌜∀ r, ucalleeSavedIdx r = true → r ≠ 9#5 → mc'.get r = mc.get r⌝ -∗
         ⌜mc'.get 9#5 = BitVec.ofNat 64 (s0 + (j + ushpSkipws (len - j) j f))⌝ -∗
-        urun (hlc := hlc) N h' mc' (BitVec.ofNat 64 (q + 4 + 20)) (2 + n) -∗ wpLoop h') -∗
+        urun N h' mc' (BitVec.ofNat 64 (q + 4 + 20)) (2 + n) -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hs Hws Hrun Hk
   by_cases hjl : j = len
@@ -295,13 +295,13 @@ theorem shGtk_tok_scan (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (dq dw
     mc.get 9#5 = BitVec.ofNat 64 (s0 + j) → mc.get 18#5 = BitVec.ofNat 64 (s0 + len) →
     mc.get 19#5 = BitVec.ofNat 64 ushWsA → mc.get 21#5 = BitVec.ofNat 64 ushSymA →
     ⊢ ushCode N.t -∗ ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗ ustr N.d dv ushSymA 7 ushpSymF -∗
-      urun (hlc := hlc) N h mc (BitVec.ofNat 64 0x3dc) (2 + n) -∗
+      urun N h mc (BitVec.ofNat 64 0x3dc) (2 + n) -∗
       (ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗ ustr N.d dv ushSymA 7 ushpSymF -∗
         ∀ (h' : CPU) (mc' : RegMap),
         ⌜∀ q, ucalleeSavedIdx q = true → q ≠ 9#5 → q ≠ 21#5 → mc'.get q = mc.get q⌝ -∗
         ⌜mc'.get 9#5 = BitVec.ofNat 64 (s0 + (j + ushpToklen (len - j) j f))⌝ -∗
         ⌜mc'.get 21#5 = BitVec.ofNat 64 97⌝ -∗
-        urun (hlc := hlc) N h' mc' (BitVec.ofNat 64 (ushTokExit len f j)) (2 + n) -∗ wpLoop h') -∗
+        urun N h' mc' (BitVec.ofNat 64 (ushTokExit len f j)) (2 + n) -∗ wpLoop h') -∗
       wpLoop h := by
   intro r
   induction r with
@@ -423,8 +423,8 @@ theorem shGtk_cell (UL : UK_LEAVES) (N : UkNames GF) (x : Nat) (rc : BitVec 5)
     (hx : x % 2 = 0) (hxb : x + 8 < 2 ^ 64)
     (qp : Nat) (w : BitVec 64) (h : CPU) (mc : RegMap) (av : Nat) (hrc : mc.get rc = BitVec.ofNat 64 qp)
     (hqb : qp < 2 ^ 64) :
-    ⊢ ushCode N.t -∗ ushCell N qp w -∗ urun (hlc := hlc) N h mc (BitVec.ofNat 64 x) av -∗
-      (ushCell N qp (mc.get 9#5) -∗ ∀ h' : CPU, urun (hlc := hlc) N h' mc (BitVec.ofNat 64 (x + 8)) av -∗ wpLoop h') -∗
+    ⊢ ushCode N.t -∗ ushCell N qp w -∗ urun N h mc (BitVec.ofNat 64 x) av -∗
+      (ushCell N qp (mc.get 9#5) -∗ ∀ h' : CPU, urun N h' mc (BitVec.ofNat 64 (x + 8)) av -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hcell Hrun Hk
   unfold ushCell
@@ -451,11 +451,11 @@ theorem shGtk_390 (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (dq dw : DF
     (f : Nat → BitVec 8) (n : Nat) (h : CPU) (mc : RegMap) (hj : j ≤ len) (hs64 : s0 + len < 2 ^ 64)
     (h9 : mc.get 9#5 = BitVec.ofNat 64 (s0 + j)) (h18 : mc.get 18#5 = BitVec.ofNat 64 (s0 + len)) :
     ⊢ ushCode N.t -∗ ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
-      urun (hlc := hlc) N h mc (BitVec.ofNat 64 0x36c) (2 + n) -∗
+      urun N h mc (BitVec.ofNat 64 0x36c) (2 + n) -∗
       (ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗ ∀ (h' : CPU) (mc' : RegMap),
         ⌜∀ r, ucalleeSavedIdx r = true → r ≠ 9#5 → r ≠ 19#5 → mc'.get r = mc.get r⌝ -∗
         ⌜mc'.get 9#5 = BitVec.ofNat 64 (s0 + (j + ushpSkipws (len - j) j f))⌝ -∗
-        urun (hlc := hlc) N h' mc' (BitVec.ofNat 64 0x38c) (2 + n) -∗ wpLoop h') -∗
+        urun N h' mc' (BitVec.ofNat 64 0x38c) (2 + n) -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hs Hws Hrun Hk
   iapply ushS_la UL N (ushI_36c N.t) (ushI_370 N.t) ushWsA h mc (2 + n) $$ Hc Hrun

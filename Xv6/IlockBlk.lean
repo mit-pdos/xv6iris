@@ -27,7 +27,7 @@ open LeanRV64D
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsBlocksG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsBlocksG GF]
 
 /-- Rocq's `il_addrs_buf_upd`: memmove's DESTINATION, the thirteen addrs
 cells as 52 contiguous bytes, back at any list of the same length. -/
@@ -49,7 +49,7 @@ end
 /-! ## The coupling, the fill, the one-shot, the slot -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
   [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF]
   [FsLinkG GF] [Appcfg GF]
 
@@ -58,7 +58,7 @@ set_option maxHeartbeats 8000000 in
 theorem il_blk_open [Icfg] [Fscfg] [CurCtx] (kb : Nat) (pidv : BitVec 32) (inum : BitVec 32)
     (bs bsd : List (BitVec 8)) (db : Bool) (o : Ilkc) (g : GName) (hfills : ilkFills o)
     (hnib : inum.toNat < 16 * icfgNib) (hib : IBLOCK inum icfgIst < 2 ^ 31) :
-    iregInv (hlc := hlc) (GF := GF) fscIreg fscFs icfgIst icfgNib ∗
+    iregInv (GF := GF) fscIreg fscFs icfgIst icfgNib ∗
     bioLocked fscBio (fsView fscFs fscDisk icfgDev fscCov) kb pidv icfgDev
       (BitVec.ofNat 32 (IBLOCK inum icfgIst)) bs bsd db ∗
     ipoolShapeNp fscFs fscIreg fscCov fscLogst inum ∗ iregWdLic o g inum.toNat ∗ ityPending g

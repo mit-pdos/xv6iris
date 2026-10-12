@@ -33,15 +33,15 @@ def spinAddr : BitVec 64 := KA.«spin»
 
 /-- **WP of `spin`** (Rocq `wp_spin_body`): a hart at `spin` in machine mode
 runs forever. -/
-def wp_spin_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+def wp_spin_body {GF : BundledGFunctors.{0}} [MachGS GF]
     (cpu : CPU) (dq : DFrac) (c : MConf) (_hok : MConf.ok (GF := GF) c) (R : RegMap) : Prop :=
   mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu spinAddr ∗ gprFile cpu R ∗ kernelText
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `spin` (Rocq `Module Type SPIN`). -/
 structure SPIN : Prop where
-  wp_spin : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+  wp_spin : ∀ {GF : BundledGFunctors.{0}} [MachGS GF]
     (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c) (R : RegMap),
-    wp_spin_body (hlc := hlc) (GF := GF) cpu dq c hok R
+    wp_spin_body (GF := GF) cpu dq c hok R
 
 end Xv6

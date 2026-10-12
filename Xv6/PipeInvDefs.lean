@@ -227,7 +227,7 @@ def pnEnd (γp : PipeNames) (w : Bool) : GName := if w then γp.pnWrite else γp
 def pnMark (γp : PipeNames) (w : Bool) : GName := if w then γp.pnMwrite else γp.pnMread
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-! ### THE reference: a share of one END of the pipe
 
@@ -393,10 +393,10 @@ theorem pflagBool_one : pflagBool 1#32 = true := pflagBool_true _ pflag_one_open
 def pipeQres (γp : PipeNames) (nr nw ro wo : BitVec 32) (bs : List (BitVec 8)) : IProp GF :=
   iprop((∃ (ws : List (BitVec 8)) (rp : Nat), ⌜pipeQueueOk ws rp nr nw bs⌝ ∗
       pipeQauth γp.pnQueue ⟨ws, rp, pflagBool ro, pflagBool wo⟩) ∨
-    MachFixedGS.killCred (hlc := hlc) (GF := GF))
+    MachFixedGS.killCred (GF := GF))
 
 instance pipeQres_timeless (γp : PipeNames) (nr nw ro wo : BitVec 32) (bs : List (BitVec 8)) :
-    Timeless (pipeQres (hlc := hlc) (GF := GF) γp nr nw ro wo bs) := by
+    Timeless (pipeQres (GF := GF) γp nr nw ro wo bs) := by
   unfold pipeQres; infer_instance
 
 end
@@ -404,7 +404,7 @@ end
 /-! ## The page bytes, the lock payload, the dead state -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [KernelGeom] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [KernelGeom] [CurCtx]
 
 /-- `pi->data[0..PIPESIZE)`, contents tracked, over an EXPLICIT context. -/
 def pipeDataAt (ξ : CtxId) (pi : BitVec 64) (bs : List (BitVec 8)) : IProp GF := iprop%
@@ -432,17 +432,17 @@ instance pipeSlack_timeless (pi : BitVec 64) : Timeless (pipeSlack (GF := GF) pi
 payload carries, so that the payload is a transport family (Rocq's
 `pipe_slack` is `byte_any`, context-free; FileMorph deviation 1). -/
 abbrev pipeSlackAt (ξ : CtxId) (pi : BitVec 64) : IProp GF :=
-  @pipeSlack hlc GF _ ⟨ξ, curTier⟩ pi
+  @pipeSlack GF _ ⟨ξ, curTier⟩ pi
 
 instance instCtxMorphPipeSlackAt (pi : BitVec 64) :
     CtxMorph (GF := GF) (fun ξ => pipeSlackAt ξ pi) := by
   unfold pipeSlackAt pipeSlack byteBuf
-  refine @instCtxMorphSep _ _ _ _ _ ?_ ?_
-  · refine @instCtxMorphExists _ _ _ _ _ (fun b1 => ?_)
-    refine @instCtxMorphSep _ _ _ _ _ (instCtxMorphConst _) ?_
+  refine @instCtxMorphSep _ _ _ _ ?_ ?_
+  · refine @instCtxMorphExists _ _ _ _ (fun b1 => ?_)
+    refine @instCtxMorphSep _ _ _ _ (instCtxMorphConst _) ?_
     exact ctxMorph_bigSepL b1 _ (fun _ _ => instCtxMorphWordAt _ _ _ _ _)
-  · refine @instCtxMorphExists _ _ _ _ _ (fun b2 => ?_)
-    refine @instCtxMorphSep _ _ _ _ _ (instCtxMorphConst _) ?_
+  · refine @instCtxMorphExists _ _ _ _ (fun b2 => ?_)
+    refine @instCtxMorphSep _ _ _ _ (instCtxMorphConst _) ?_
     exact ctxMorph_bigSepL b2 _ (fun _ _ => instCtxMorphWordAt _ _ _ _ _)
 
 /-- The resource `pi->lock` protects: every byte of the page except the lock's
@@ -462,7 +462,7 @@ def pipeResAt (γp : PipeNames) (pi : BitVec 64) (ξ : CtxId) : IProp GF := ipro
     pipeSlackAt ξ pi ∗
     -- ...AND THE BYTE QUEUE'S AUTHORITY, coupled to the ring or tainted
     -- (Rocq `pipe_qres`, the payload's last conjunct)
-    pipeQres (hlc := hlc) γp nr nw ro wo bs
+    pipeQres γp nr nw ro wo bs
 
 /-- The payload at the ambient context. -/
 def pipeRes (γp : PipeNames) (pi : BitVec 64) : IProp GF := pipeResAt γp pi curCtx
@@ -470,12 +470,12 @@ def pipeRes (γp : PipeNames) (pi : BitVec 64) : IProp GF := pipeResAt γp pi cu
 instance instCtxMorphPipeResAt (γp : PipeNames) (pi : BitVec 64) :
     CtxMorph (GF := GF) (pipeResAt γp pi) := by
   unfold pipeResAt
-  refine @instCtxMorphExists _ _ _ _ _ (fun nr => ?_)
-  refine @instCtxMorphExists _ _ _ _ _ (fun nw => ?_)
-  refine @instCtxMorphExists _ _ _ _ _ (fun ro => ?_)
-  refine @instCtxMorphExists _ _ _ _ _ (fun wo => ?_)
-  refine @instCtxMorphExists _ _ _ _ _ (fun vname => ?_)
-  refine @instCtxMorphExists _ _ _ _ _ (fun bs => ?_)
+  refine @instCtxMorphExists _ _ _ _ (fun nr => ?_)
+  refine @instCtxMorphExists _ _ _ _ (fun nw => ?_)
+  refine @instCtxMorphExists _ _ _ _ (fun ro => ?_)
+  refine @instCtxMorphExists _ _ _ _ (fun wo => ?_)
+  refine @instCtxMorphExists _ _ _ _ (fun vname => ?_)
+  refine @instCtxMorphExists _ _ _ _ (fun bs => ?_)
   infer_instance
 
 /-- Every byte of the page except the lock's two WORDS: what `pipeRes` is once

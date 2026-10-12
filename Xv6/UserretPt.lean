@@ -30,7 +30,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-! ## The steps -/
 
@@ -156,10 +156,10 @@ justification `uFit ox` of the event the `sret` emits; the claim it spends
 theorem userret_usret [CurCtx] (cpu : CPU) (c : MConf) (P : UPtd) (hc : urConfOk GF c P)
     (hspp : BitVec.extractLsb' 8 1 c.mstatus = 0#1) (pc : BitVec 64) (hpc : urPcOk pc) (R : RegMap)
     (epc : BitVec 64) (ox : Option (Nat × Obs))
-    (hf : MachFixedGS.uFit (hlc := hlc) (GF := GF) ox (Obs.uEnter cpu c.satp epc (gprList R))) :
+    (hf : MachFixedGS.uFit (GF := GF) ox (Obs.uEnter cpu c.satp epc (gprList R))) :
     instrX (GF := GF) pc (paOf trampPpn pc) false urSret ∗ kmapStatic ∗ wireInv ∗ uRcptOpt ox ∗
-    uClaimFor (hlc := hlc) (GF := GF) ox ∗
-    MachFixedGS.uEvid (hlc := hlc) (GF := GF) ox (Obs.uEnter cpu c.satp epc (gprList R)) ∗
+    uClaimFor (GF := GF) ox ∗
+    MachFixedGS.uEvid (GF := GF) ox (Obs.uEnter cpu c.satp epc (gprList R)) ∗
     urSt cpu c P pc R ∗
     Register.sepc ↦ᵣ[cpu] epc ∗
     ▷ (confCells cpu (DFrac.own 1) Privilege.User { c with mstatus := sretMs c.mstatus } -∗ clockCells cpu -∗
@@ -522,10 +522,10 @@ restored last, then user mode at `sepc &&& ~1`. -/
 theorem userret_exit [CurCtx] (cpu : CPU) (c : MConf) (P : UPtd) (hc : urConfOk GF c P)
     (hspp : BitVec.extractLsb' 8 1 c.mstatus = 0#1) (hv : pageValid (pageAddr P.tfp)) (R : RegMap)
     (ha0 : R 10#5 = TRAPFRAME) (ws : List (BitVec 64)) (epc : BitVec 64) (ox : Option (Nat × Obs))
-    (hf : MachFixedGS.uFit (hlc := hlc) (GF := GF) ox
+    (hf : MachFixedGS.uFit (GF := GF) ox
       (Obs.uEnter cpu c.satp epc (gprList (R.set 10#5 (tfW ws (4 + (10#5).toNat)))))) :
-    kernelText ∗ kmapStatic ∗ wireInv ∗ uRcptOpt ox ∗ uClaimFor (hlc := hlc) (GF := GF) ox ∗
-    MachFixedGS.uEvid (hlc := hlc) (GF := GF) ox
+    kernelText ∗ kmapStatic ∗ wireInv ∗ uRcptOpt ox ∗ uClaimFor (GF := GF) ox ∗
+    MachFixedGS.uEvid (GF := GF) ox
       (Obs.uEnter cpu c.satp epc (gprList (R.set 10#5 (tfW ws (4 + (10#5).toNat))))) ∗
     urSt cpu c P (urPc 0x11e#64) R ∗ tfPageAt P.tfp ws ∗
     Register.sepc ↦ᵣ[cpu] epc ∗

@@ -140,7 +140,7 @@ theorem usysWr_uMWrite (M : ElfMem) (a : BitVec 64) (bs : List (BitVec 8)) (g : 
     omega
 
 section UkRunSysWin
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -167,11 +167,11 @@ theorem wp_uk_ecall_window (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegM
     (hwin : usyswin m n = some (dst, cap)) (hck : cap ≤ k) (hcl : n ≠ USYS_close) (hdp : n ≠ USYS_dup)
     (hop : n ≠ USYS_open) (hpp : n ≠ USYS_pipe) (hwt : n ≠ USYS_wait) (hrng : 0 ≤ n ∧ n < 64)
     (h23 : n ≠ USYS_seccomp) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗ udepw (hlc := hlc) N m pc n -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗ udepw N m pc n -∗
       ubytes N.d dst.toNat k f -∗
       (∀ (h' : CPU) (r : BitVec 64) (d : Nat) (g : Nat → BitVec 8),
         ⌜d ≤ cap⌝ -∗ ⌜∀ j, d ≤ j → j < k → g j = f j⌝ -∗ ⌜n = USYS_read → usysReadRet (tfOf m pc) r⌝ -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ ubytes N.d dst.toNat k g -∗ wpLoop h') -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ ubytes N.d dst.toNat k g -∗ wpLoop h') -∗
       wpLoop h := by
   have hw : usysWin n (tfOf m pc) = some (dst, cap) := by rw [usyswin_tf_of]; exact hwin
   obtain ⟨hexit, hfork, hexec, hsbrk, hchd⟩ := usysWin_num hw
@@ -234,7 +234,7 @@ theorem wp_uk_ecall_window (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegM
 below MAXVA. -/
 theorem urun_ubytes_bound (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail a n : Nat)
     (f : Nat → BitVec 8) :
-    ⊢ urun (hlc := hlc) N h m pc avail -∗ ubytes N.d a n f -∗ ⌜n = 0 ∨ a < uCap⌝ := by
+    ⊢ urun N h m pc avail -∗ ubytes N.d a n f -∗ ⌜n = 0 ∨ a < uCap⌝ := by
   unfold urun
   iintro ⟨%xi, %C, %pt, %Rfd, %Rut, %sz, %M, %pm, %fdv, %cw, %gn, %cs, %pidv, -, -, -, -, -, Hh, -⟩ Hb
   ihave %hb := uheap_ubytes_at N.t N.d N.s M pm sz (DFrac.own 1) a n f $$ Hh Hb
@@ -257,11 +257,11 @@ reports a count no larger than the one asked for. -/
 theorem wp_uk_ecall_read (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (a cnt : Nat)
     (f : Nat → BitVec 8) (avail : Nat) (hn : usysno m = USYS_read) (ha1 : m.get 11#5 = BitVec.ofNat 64 a)
     (hcnt : (BitVec.setWidth 32 (m.get 12#5)).toInt = (cnt : Int)) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ ubytes N.d a cnt f -∗ urun (hlc := hlc) N h m pc avail -∗
-      udepw (hlc := hlc) N m pc USYS_read -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ ubytes N.d a cnt f -∗ urun N h m pc avail -∗
+      udepw N m pc USYS_read -∗
       (∀ (h' : CPU) (r : BitVec 64) (g : Nat → BitVec 8),
         ⌜r.toInt = -1 ∨ (0 ≤ r.toInt ∧ r.toInt ≤ (cnt : Int))⌝ -∗ ubytes N.d a cnt g -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hbs Hrun Hsb Hcont
   ihave %hbnd := urun_ubytes_bound N h m pc avail a cnt f $$ Hrun Hbs

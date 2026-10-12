@@ -69,7 +69,7 @@ theorem iunlockput_ret_16 :
 theorem iunlockput_slots_iunlock : iunlockSlots + 4 ≤ iunlockputSlots := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -87,7 +87,7 @@ theorem iunlockput_iunlock (IU : IUNLOCK) (Γ : SchedNames) (cpu : CPU) (k' : KC
     (hsl : "sleep lock" ∉ k'.locks) (hp : "proc" ∉ k'.locks) (htier : k'.tier = KTier.kpt)
     (hle : lo ≤ tl) :
     kctx cpu k' ∗ pcIs cpu KA.«iunlock» ∗ procsInv Γ ∗
-    itableInv (hlc := hlc) ∗ icEscrow fscIc fscFs fscIreg fscCov fscLogst kk ∗
+    itableInv ∗ icEscrow fscIc fscFs fscIreg fscCov fscLogst kk ∗
     isSleeplockGen γil γisl (iLock (ientry kk)) (icSlp fscIc kk) (slhTok (icfgIsl kk)) ∗
     sleeplockedQ γisl s (iLock (ientry kk)) pidv ∗ wordPointsTo (pPid pr) 4 dqp pidv ∗
     credFloor lo tl ∗ irefClaims ∗ icHandle fscIc kk d ∗
@@ -103,7 +103,7 @@ theorem iunlockput_iunlock (IU : IUNLOCK) (Γ : SchedNames) (cpu : CPU) (k' : KC
       inodeShrGenlo kk s dev inum g lo -∗ icDepSide d -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cpu := by
   subst hpr
-  have h := IU.wp_iunlock_dep (hlc := hlc) (GF := GF) Γ cpu k' γil γisl kk s g lo tl d dev inum
+  have h := IU.wp_iunlock_dep (GF := GF) Γ cpu k' γil γisl kk s g lo tl d dev inum
     dn bm pidv dqp hnoff hK hshr hkk ha0 hsl hp htier hle
   unfold wp_iunlock_dep_body at h
   simp only [iunlockAddr] at h
@@ -138,7 +138,7 @@ a level-0 stretch throughout (the complement follows the thread,
 `k_step_e`), iunlock at its own crossing, iput at its eb contract (which
 threads the complement and crosses at `true`). -/
 theorem iunlockput_main (IU : IUNLOCK) (IP : IPUT)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γil γisl : GName) (kk : Nat) (qi s : Qp) (g : GName) (lo tl : Nat) (d : IcDep)
     (inum : BitVec 32) (dn : Dinode) (bm : Blkmap)
@@ -161,7 +161,7 @@ theorem iunlockput_main (IU : IUNLOCK) (IP : IPUT)
     (hpd : descPageRw pd) (ha0 : k.regs 10#5 = ientry kk)
     (hside : icDepSideTx d = some (tid, qtx))
     (hle : lo ≤ tl) :
-    wp_iunlockput_dep_gen_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk
+    wp_iunlockput_dep_gen_eb_body (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk
       qi s g lo tl d inum dn bm n Sb crb cru crz e0 tid qtx pidv dqp dqb dqs
       hj hproc hK hnoff htier hshr hkk hcrb hcru hgeom hbg hcov hlog hnib hbel hn
       hpd ha0 hside hle := by
@@ -240,7 +240,7 @@ theorem iunlockput_main (IU : IUNLOCK) (IP : IPUT)
   k_step_e (wp_s_jal cpu _ (KA.«iunlockput» + 0x12#64) false 2096924#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iunlockput_br_iput]
   iintro Hk Hpc
-  have h := IP.wp_iput_gen_eb (hlc := hlc) (GF := GF) Γ cpu
+  have h := IP.wp_iput_gen_eb (GF := GF) Γ cpu
     (((k.withSpie a b).pushed 4).withRegs ((R2.set 10#5 (ientry kk)).set 1#5 (KA.«iunlockput» + 22#64)))
     γl pd pav pu j γil γisl kk (qi + s)
     inum n Sb crb cru crz e0 tid qtx pidv dqp dqb dqs true hj hproc
@@ -306,7 +306,7 @@ end
 /-- **THE SEAL**: iunlockput meets its interface (Rocq's `IunlockputProof`
 functor). -/
 theorem iunlockput_proof (IU : IUNLOCK) (IP : IPUT) : IUNLOCKPUT := ⟨by
-  intro hlc GF
+  intro GF
   exact iunlockput_main IU IP⟩
 
 end Xv6

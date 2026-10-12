@@ -117,7 +117,7 @@ def consWriteCnt (P P' : UPtd) (ua : BitVec 64) (n : Int) (i : Nat) : Prop :=
     ¬ uvaRmapped P (ua + BitVec.ofNat 64 d).toNat)
 
 section ConsOutChain
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-- **THE CALLER'S JUSTIFICATION FOR THE BYTES THIS CALL MAY PUSH** (Rocq
 `cons_out_chain`, lane OUT-FUPD F3): at cursor `j` with `cnt` bytes still
@@ -174,7 +174,7 @@ theorem consOutChain_run (k : Nat) (M : Nat → List (BitVec 8)) (ua : BitVec 64
 /-- THE GENERIC WRITE'S OWN (Rocq `cons_out_chain_of_licence`): a licensed
 writer claims nothing about the input, at every era. -/
 theorem consOutChain_of_licence (k : Nat) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (j cnt : Nat) :
-    consLicence (hlc := hlc) (GF := GF) ⊢ consOutChain k M ua (fun _ => iprop(True)) j cnt := by
+    consLicence (GF := GF) ⊢ consOutChain k M ua (fun _ => iprop(True)) j cnt := by
   induction cnt generalizing j with
   | zero => iintro _; unfold consOutChain; ipureintro; trivial
   | succ cnt ih =>
@@ -239,8 +239,8 @@ complement (`trapCsrsExt` / `cpuClaimExt`, `emp` at `sie = true`) in and
 out, handed to `uartwrite`'s eb contract across each park.  Depth 0 (no
 spinlock held, `KCtx.wf`); it parks, so the crossing is the literal
 `true`.  `a0 = user_src` (nonzero), `a1 = src`, `a2 = n`. -/
-def wp_consolewrite_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+def wp_consolewrite_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γ : UartNames)
     (γkl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) (Q : Nat → IProp GF)
@@ -251,7 +251,7 @@ def wp_consolewrite_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hl
   kctx cpu k ∗ pcIs cpu consolewriteAddr ∗ procsInv Γ ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
   uartPort .uart0 γl γ ∗
-  consOutChain (genId (hlc := hlc) (GF := GF) + 1) (writerImg V.upt M) (k.regs 11#5) Q 0 n.toNat ∗
+  consOutChain (genId (GF := GF) + 1) (writerImg V.upt M) (k.regs 11#5) Q 0 n.toNat ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
   procPrivBareAt curCtx (procAddr j) pid V M ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (i : Nat)
@@ -271,13 +271,13 @@ def wp_consolewrite_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hl
 
 /-- The interface of `consolewrite`. -/
 structure CONSOLEWRITE : Prop where
-  wp_consolewrite_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+  wp_consolewrite_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γ : UartNames)
     (γkl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) (Q : Nat → IProp GF)
     hj hproc hK hnoff htier huser hn hn',
-    wp_consolewrite_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ γkl γk j pid V M n Q hj hproc hK hnoff
+    wp_consolewrite_eb_body (GF := GF) Γ cpu k γl γ γkl γk j pid V M n Q hj hproc hK hnoff
       htier huser hn hn'
 
 end Xv6

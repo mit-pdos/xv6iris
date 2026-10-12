@@ -227,13 +227,13 @@ theorem gclPure_step_echo (M : LModel) (L : LmLaws M) (K : LmHooks M) (B : LmByt
     (lmDlOk_echo M K sd so _ CH.chDl hcsb' hweq hdlok) hall0⟩
 
 section genoutSeal
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 
 /-- THE DRAIN'S RECEIPT (Rocq `gdrain_ret`): the cycle's boot state and its
 good output, AT THE RESOLUTION THE STAGE NAMES (the filed choices `csf`,
 padded, `ex` the open or wild round's code, at most one), and -- sync
 SY3-A4 -- every filed round's input (a prefix of the cycle's) and payload. -/
-def gdrainRet (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) (A : GenWa M G sd)
+def gdrainRet (M : LModel) (G : GenCparams GF M) (sd : M.lmSt) (A : GenWa M G sd)
     (k : Nat) (seg : List Obs) : IProp GF :=
   iprop(G.gcT ∨ ∃ (s0 : M.lmSt) (csf ex : List Nat) (v : EraPins) (Is : List (List (BitVec 8))),
     ⌜lmGoodOutPad M G.gcK s0 seg (csf ++ ex)⌝ ∗ ⌜M.lmStOk s0⌝ ∗ A.gwaTy s0
@@ -243,14 +243,14 @@ def gdrainRet (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) (A : GenWa M 
 
 /-- the witness's authority at a FILED state hands the witness out (Rocq's
 `iEval (rewrite Hsome)` around `gwa_W`) -/
-theorem gdrainWa (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) (A : GenWa M G sd)
+theorem gdrainWa (M : LModel) (G : GenCparams GF M) (sd : M.lmSt) (A : GenWa M G sd)
     (k : Nat) (st : Option M.lmSt) (s0 : M.lmSt) (hs : st = some s0) :
     ⊢ A.gwa k st -∗ A.gwa k st ∗ G.gcW k s0 ∗ A.gwaTy s0 := by
   subst hs
   exact A.gwa_W k s0
 
 /-- Rocq `gcl_arm`: what the claim says about an open arm, read back out. -/
-theorem gcl_arm (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) (A : GenWa M G sd)
+theorem gcl_arm (M : LModel) (G : GenCparams GF M) (sd : M.lmSt) (A : GenWa M G sd)
     (k : Nat) (ho : List Obs) (CH : ConsHist) :
     ⊢ gcl M G sd A k ho CH -∗ gcl M G sd A k ho CH ∗ (G.gcT ∨ ⌜garmEra M k ho CH⌝) := by
   iintro Hcl
@@ -267,7 +267,7 @@ theorem gcl_arm (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) (A : GenWa 
     · iright; ipureintro; exact gclPure_arm M sd k ho so CH hall
 
 /-- Rocq `gcl_close`: FILING THE LOG ENTRY.  `hK3`: DEVIATION 2. -/
-theorem gcl_close (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) (A : GenWa M G sd)
+theorem gcl_close (M : LModel) (G : GenCparams GF M) (sd : M.lmSt) (A : GenWa M G sd)
     (k : Nat) (ho : List Obs) (H : ConsHist) (hok : consHistOk H) (hev : consEvOk H .evClose)
     (hK3 : ∀ a, H.chArm = some a → caEcho a = [echoOf (caByte a)] → caSent a = 1) :
     ⊢ gcl M G sd A k ho H -∗ gcl M G sd A k ho (consStep H .evClose) := by
@@ -283,7 +283,7 @@ theorem gcl_close (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) (A : GenW
     exact gclPure_close M sd k ho so H hok hev hK3 hall
 
 /-- Rocq `gcl_open`: OPENING ONE.  `hK1`/`hK2`: DEVIATION 2. -/
-theorem gcl_open (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M) (sd : M.lmSt)
+theorem gcl_open (M : LModel) (G : GenCparams GF M) (B : LmByteLaws M) (sd : M.lmSt)
     (A : GenWa M G sd) (k : Nat) (ho : List Obs) (H : ConsHist) (h : List Obs) (c : BitVec 8)
     (cs : List (BitVec 8)) (hok : consHistOk H) (hev : consEvOk H (.evOpen h c cs))
     (hK1 : ∃ f : Nat, flushLost h f
@@ -306,7 +306,7 @@ theorem gcl_open (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M) (sd :
 /-- Rocq `gcl_drain`: THE DRAIN -- the claim below a nonempty wire gives
 the output claim at the stage's filed state, at the resolution it names,
 with every filed round's item (sync SY3-A4). -/
-theorem gcl_drain (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M) (sd : M.lmSt)
+theorem gcl_drain (M : LModel) (G : GenCparams GF M) (B : LmByteLaws M) (sd : M.lmSt)
     (A : GenWa M G sd) (k : Nat) (h ho : List Obs) (CH : ConsHist) (seg : List Obs)
     (hsh : traceShape h true) (hk : obsBoots h = k) (hpre : ho <+: h)
     (hins : consIns seg = consIns (openSeg h)) (hwire : obsWire .uart0 seg <+: CH.chAcc)
@@ -372,7 +372,7 @@ theorem gcl_drain (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M) (sd 
       exact ⟨Nat.zero_le _, hIs, fun I hI => ((hIdl I hI).trans hdlE).trans hbytes⟩
 
 /-- Rocq `gcl_step_echo`: THE ECHO -- the claim grows by the echoed entry. -/
-theorem gcl_step_echo (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M) (sd : M.lmSt)
+theorem gcl_step_echo (M : LModel) (G : GenCparams GF M) (B : LmByteLaws M) (sd : M.lmSt)
     (A : GenWa M G sd) (k : Nat) (h : List Obs) (c : BitVec 8) (ho : List Obs) (CH : ConsHist)
     (hdisc : lmDisc M h) (hsh : traceShape h true) (hk : obsBoots h = k)
     (hends : obsEndsIn .uart0 h c) (hwire : obsWire .uart0 (openSeg h) <+: CH.chAcc)

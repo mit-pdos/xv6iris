@@ -145,7 +145,7 @@ theorem kxau_classify (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8
     · rw [opfEra_dev_row dn bm data hd ht] at heq; cases heq
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -191,8 +191,8 @@ failure disjunct; the success arm is refuted by the plug. -/
 theorem kxau_close_fail (k : KCtx) (A : KexecArgs) (Fs : Pfam GF (Uvis → IProp GF))
     (sts : List FdState) (gn : GName) (cs : Std.ExtTreeSet GName compare) (Qpay : Int → IProp GF)
     (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (c : CPU) :
-    kexecK (hlc := hlc) k A Fs sts gn cs Qpay P Pmiss Fo c ⊢
-      execPostFail (hlc := hlc) Fs (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.V.pvSecc Qpay P Pmiss Fo
+    kexecK k A Fs sts gn cs Qpay P Pmiss Fo c ⊢
+      execPostFail Fs (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.V.pvSecc Qpay P Pmiss Fo
         (bview A.plen A.pfun) A.na A.alen A.afun sts cs A.pidv -∗
       kexecCloser kxauQ (fun _ => True) k A c := by
   iintro Hret Hfail
@@ -222,7 +222,7 @@ theorem kxau_close_at (k : KCtx) (A : KexecArgs) (Fs : Pfam GF (Uvis → IProp G
     (hag : kexecLoadable f → ∀ j, j < 64 → ef[j]! = f[j]!)
     (htflen : A.V.tf.length = 36) (hna : A.na ≤ MAXARG) (c : CPU) :
     myPay gn Qpay ⊢
-      kexecK (hlc := hlc) k A Fs sts gn cs Qpay P Pmiss Fo c -∗
+      kexecK k A Fs sts gn cs Qpay P Pmiss Fo c -∗
       Fo.pfRecv av zi a -∗ P (pathElems (bview A.plen A.pfun)).length zi -∗
       pfAt (fun S => execSlotPre S Qpay (P (pathElems (bview A.plen A.pfun)).length) Fo.pfRecv A.V.cwi A.V.pvSecc
         A.na A.alen A.afun sts cs A.pidv) Fs -∗
@@ -328,7 +328,7 @@ theorem kxau_close (k : KCtx) (A : KexecArgs) (Fs : Pfam GF (Uvis → IProp GF))
     (hef : ∀ j, j < 64 → ef[j]! = fileByte data j)
     (htflen : A.V.tf.length = 36) (hna : A.na ≤ MAXARG) (c : CPU) :
     myPay gn Qpay ⊢
-      kexecK (hlc := hlc) k A Fs sts gn cs Qpay P Pmiss Fo c -∗
+      kexecK k A Fs sts gn cs Qpay P Pmiss Fo c -∗
       kxaReceipt Fs P Fo Qpay A.V.cwi A.V.pvSecc (pathElems (bview A.plen A.pfun)).length zi A.na A.alen A.afun
         sts cs A.pidv dn bm data -∗
       kexecCloser (execBuiltQ (kxcFb data dn) ef A.na A.alen A.afun)
@@ -353,7 +353,7 @@ theorem wp_kexec_main (MP : MYPROC) (BO : BEGIN_OP) (NE : NAMEI_ERA) (IL : ILOCK
     (IUP : IUNLOCKPUT) (EO : END_OP) (PPT : PROC_PAGETABLE) (PFP : PROC_FREEPAGETABLE)
     (WA : WALKADDR) (F2P : FLAGS2PERM) (UA : UVMALLOC) (UC : UVMCLEAR) (SL : STRLEN)
     (CO : COPYOUT) (SS : SAFESTRCPY_SRC) (PA : PANIC)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (A : KexecArgs)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx) (A : KexecArgs)
     (Fs : Pfam GF (Uvis → IProp GF)) (sts : List FdState) (gn : GName)
     (cs : Std.ExtTreeSet GName compare) (Qpay : Int → IProp GF) (P Pmiss : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
@@ -364,14 +364,14 @@ theorem wp_kexec_main (MP : MYPROC) (BO : BEGIN_OP) (NE : NAMEI_ERA) (IL : ILOCK
     (havfnz : ∀ i, i < A.na → A.avf i ≠ 0#64) (havf : A.avf A.na = 0#64) (hna : A.na < MAXARG)
     (hargs : ∀ i, i < A.na → A.alen i < A.aslen i ∧ (∀ j, j < A.alen i → A.afun i j ≠ 0#8) ∧
       A.afun i (A.alen i) = 0#8 ∧ A.alen i < 4096) :
-    wp_kexec_eb_body (hlc := hlc) (GF := GF) Γ cpu k A Fs sts gn cs Qpay P Pmiss Fo
+    wp_kexec_eb_body (GF := GF) Γ cpu k A Fs sts gn cs Qpay P Pmiss Fo
       hK hnoff htier hj hproc hnn hterm hplen havfnz havf hna hargs := by
   unfold wp_kexec_eb_body
   iintro ⟨Hk, Hpc, Hte, Hce, #Hfab, Hpriv, Hbufs, Hbs, Hirs, #Hmp, Hau, Hnext⟩
   -- the entry trapframe's length, read off the block ONCE
   icases kxau_tf_len A.γ k.proc A.pidv A.V A.M $$ Hpriv with ⟨%htflen, Hpriv⟩
   -- THE CONTRACT'S CONTINUATION, hart-free
-  ihave Hret : (∀ c : CPU, kexecK (hlc := hlc) k A Fs sts gn cs Qpay P Pmiss Fo c) $$ [Hnext]
+  ihave Hret : (∀ c : CPU, kexecK k A Fs sts gn cs Qpay P Pmiss Fo c) $$ [Hnext]
   · iintro %c
     iapply wpNext_at true k.proc cpu c _ (Xv6.rd_pin hj k hproc c cpu) $$ Hnext
   -- THE BUNDLE, OPENED: the walk premise, the one observation, the slot piece
@@ -379,14 +379,14 @@ theorem wp_kexec_main (MP : MYPROC) (BO : BEGIN_OP) (NE : NAMEI_ERA) (IL : ILOCK
   icases Hau with ⟨Hstart, Hoc, Hsl⟩
   -- PHASE A, at `Q := False` below +0x090
   iapply (kxc_phaseA_au MP BO NE IL RD IUP EO Γ Fs kxauQ (fun _ => True) Qpay sts cs P Pmiss Fo
-    (kexecK (hlc := hlc) k A Fs sts gn cs Qpay P Pmiss Fo) cpu k A ⟨.noMem, trivial⟩ hK hnoff htier
+    (kexecK k A Fs sts gn cs Qpay P Pmiss Fo) cpu k A ⟨.noMem, trivial⟩ hK hnoff htier
     hj hproc hnn hterm hplen)
   iframe Hk Hpc Hte Hce Hfab Hstart Hoc Hsl Hpriv Hbufs Hbs Hirs Hret
   isplitl []
   · -- arms (i) and (ii): the refund rides straight into the arms
     imodintro
     iintro %c HK Hfail
-    iapply (kxau_close_fail (hlc := hlc) k A Fs sts gn cs Qpay P Pmiss Fo c) $$ HK Hfail
+    iapply (kxau_close_fail k A Fs sts gn cs Qpay P Pmiss Fo c) $$ HK Hfail
   -- ---- +0x090: THE EXIT, CONVERTED AT THE RECEIPT ----
   iintro %c %spie %spp %R %kf %qf %sf %gyf %loyf %tlyf %inumf %dnf %bmf %data %gilf %gislf %n2 %ef
     Hs ⟨%zi, HR⟩ Hret
@@ -396,7 +396,7 @@ theorem wp_kexec_main (MP : MYPROC) (BO : BEGIN_OP) (NE : NAMEI_ERA) (IL : ILOCK
       (kxauQFp (kxcFb data dnf) A.na A.alen) k A c') $$ [Hret HR]
   · iintro %c'
     ihave Hx := Hret $$ %c'
-    iapply (kxau_close (hlc := hlc) k A Fs sts gn cs Qpay P Pmiss Fo zi dnf bmf data ef hef htflen
+    iapply (kxau_close k A Fs sts gn cs Qpay P Pmiss Fo zi dnf bmf data ef hef htflen
       (Nat.le_of_lt hna) c') $$ Hmp Hx HR
   -- ---- PHASES B .. D, at the plugs the receipt named ----
   iapply (kxc_from90 IUP EO PPT RD WA PA F2P UA MP UC SL CO PFP SS Γ

@@ -36,7 +36,7 @@ process, in `a0`; the context comes back as it was but for the registers
 and, when interrupts were on, the `SPIE`/`SPP` indices push_off pinned
 (`KCtx.withSpie`; the context's own when they were off), at whichever hart
 the thread landed on. -/
-def wp_myproc_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+def wp_myproc_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (hnoff : k.noff + 1 < 2 ^ 31) (hK : 10 ≤ k.avail) : Prop :=
   kctx cpu k ∗ pcIs cpu myprocAddr ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
@@ -47,7 +47,7 @@ def wp_myproc_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Cu
 
 /-- The interface of `myproc`. -/
 structure MYPROC : Prop where
-  wp_myproc : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx) hnoff hK,
-    wp_myproc_body (hlc := hlc) (GF := GF) cpu k hnoff hK
+  wp_myproc : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx] (cpu : CPU) (k : KCtx) hnoff hK,
+    wp_myproc_body (GF := GF) cpu k hnoff hK
 
 end Xv6

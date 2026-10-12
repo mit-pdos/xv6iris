@@ -167,7 +167,7 @@ def bdMsgStr : List (BitVec 8) :=
    0x62#8, 0x75#8, 0x66#8, 0x66#8, 0x65#8, 0x72#8, 0x73#8]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 set_option maxRecDepth 100000 in
 theorem bd_cstr_msg [CurCtx] :
@@ -181,7 +181,7 @@ end
 /-! ## The OPEN form of the `bcache.lock` resource -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
 variable [DiskG GF] [CurCtx]
 
 /-- Rocq's `bcache_scan2` with its six existentials NAMED: what both scans
@@ -242,7 +242,7 @@ end
 /-! ## The callees, at their call sites -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
 variable [SleepLockG GF] [DiskG GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
@@ -252,7 +252,7 @@ carries becomes the hart-free `MachCSL.ctxFloor curCtx T` the escrow's
 checkout wants.  At either entry `SIE` (`AS.wp_acquiresleep_gen_llb_eb`):
 the complement at a NAMED index `s` / proc `pj`, handed back at the
 resuming hart. -/
-theorem bd_aslp (AS : ACQUIRESLEEP_LLB) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem bd_aslp (AS : ACQUIRESLEEP_LLB) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γ : BcacheNames) (kk T j : Nat) (pid : BitVec 32) (dqp : DFrac)
     (s : Bool) (pj : BitVec 64) (hpj : k'.proc = pj) (hs : k'.sie = s)
     (haddr : k'.regs 10#5 = aBufLock (bnode kk))
@@ -269,7 +269,7 @@ theorem bd_aslp (AS : ACQUIRESLEEP_LLB) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
       ctxFloor curCtx T -∗ wordPointsTo (pPid pj) 4 dqp pid -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj hs
-  have h := AS.wp_acquiresleep_gen_llb_eb (hlc := hlc) (GF := GF) Γ c k' (γ.slk kk).1 (γ.slk kk).2
+  have h := AS.wp_acquiresleep_gen_llb_eb (GF := GF) Γ c k' (γ.slk kk).1 (γ.slk kk).2
     (bufSlpBox γ kk) slUntracked 1 j pid dqp T hj hproc hK hnoff htier
   unfold wp_acquiresleep_gen_llb_eb_body at h
   simp only [acquiresleepAddr] at h
@@ -293,7 +293,7 @@ theorem bd_panic (PA : PANIC) (c : CPU) (k' : KCtx)
     (hpr : "pr" ∉ k'.locks) (huart : "uart1" ∉ k'.locks) :
     kctx c k' ∗ pcIs c KA.«panic» ∗ panicEnv ∗
     cstr KStr.«bget: no buffers» DFrac.discard bdMsgStr ⊢ wpLoop (GF := GF) c := by
-  have h := PA.wp_panic (hlc := hlc) (GF := GF) c k' (PkArgDesc.str DFrac.discard bdMsgStr)
+  have h := PA.wp_panic (GF := GF) c k' (PkArgDesc.str DFrac.discard bdMsgStr)
     hK rfl hnoff hpr huart
   unfold wp_panic_body at h
   simp only [panicAddr] at h
@@ -364,7 +364,7 @@ theorem bd_ps_wl (k : KCtx) (a b : Bool) (n : Nat) :
     ((k.pushed n).withSpie a b).withLocks k.locks = (k.withSpie a b).pushed n := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 end
 

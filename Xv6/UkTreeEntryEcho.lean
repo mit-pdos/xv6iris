@@ -64,7 +64,7 @@ theorem echoCode_rows (M : ElfMem) (π : Nat → Option UPerm) (hsub : uimgSub U
   exact ⟨hsub a b hab, (hx a (by omega)).1, (hx a (by omega)).2, by unfold uCap; omega⟩
 
 section UkTreeEntryEcho
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
@@ -72,7 +72,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fs
 /-- **Rocq `UkTreeEntry.echo_image_entry_env_c`** (deviation 1): echo's
 entry, its tree paid by an environment through an interface the caller
 supplies at the record the entry mints. -/
-theorem echoImageEntryEnvC_holds (HS : ECHO_START) : EchoImageEntryEnvC (hlc := hlc) (GF := GF) := by
+theorem echoImageEntryEnvC_holds (HS : ECHO_START) : EchoImageEntryEnvC (GF := GF) := by
   intro ws Me Mv s0 t g sts cw cs pidv Q Pay Dp I E ds hline hag himg hbytes hfdl hc hs hdp
   iintro #Henv #Hnpw #Hdep
   iapply imageEntry_of_at
@@ -103,7 +103,7 @@ theorem echoImageEntryEnvC_holds (HS : ECHO_START) : EchoImageEntryEnvC (hlc := 
   have ha1 : (tfResumeGpr0 W'.tf).get 11#5 = BitVec.ofNat 64 (uvisAv W') :=
     (Xv6.ofNat_toNat_pc _).symm
   have hcode := echoCode_rows W'.M W'.perm hsub hx
-  ihave #Hnpw' : urunNopipe (hlc := hlc) W'.fd $$ []
+  ihave #Hnpw' : urunNopipe W'.fd $$ []
   · rw [hfd]; iexact Hnpw
   iapply uslot_of_urun_ro W' 12 Q hal8 hroom96 hstkrow hfdlen hstop hlzf hscf $$ Hdep Hnpw' Hmp
   rw [hpc, hfd, hcwv]
@@ -119,7 +119,7 @@ theorem echoImageEntryEnvC_holds (HS : ECHO_START) : EchoImageEntryEnvC (hlc := 
   iapply Henv $$ %N' %hpayeq Hstd Hcwf HPay
 
 /-- ...at the engine's leaves (`LinkEcho.echo_linked`). -/
-theorem echoImageEntryEnvC_of_leaves (UL : UK_LEAVES) : EchoImageEntryEnvC (hlc := hlc) (GF := GF) :=
+theorem echoImageEntryEnvC_of_leaves (UL : UK_LEAVES) : EchoImageEntryEnvC (GF := GF) :=
   echoImageEntryEnvC_holds (echo_linked UL).2.2
 
 end UkTreeEntryEcho

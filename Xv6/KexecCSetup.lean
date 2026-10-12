@@ -213,7 +213,7 @@ theorem kxcC_setup_rows {fb ef : List (BitVec 8)} {P P' : UPtd} {Mi M' : Nat →
       rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -427,7 +427,7 @@ theorem kxc_c_setup (MP : MYPROC) (UA : UVMALLOC) (UC : UVMCLEAR) (PFP : PROC_FR
     (htier : k.tier = KTier.kpt) :
     kxcAt1ae k A cpu spie spp R (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)
       (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) w13 w67 fb ef P Mi szv (k.regs 27#5) ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
+    fsFabric Γ A.pd A.pav A.pu ∗
     (∀ c' : CPU, kexecCloser Q QF k A c') ∗
     (∀ V1 : ProcPriv, ⌜evAfter A.V V1⌝ -∗
       ∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (Mo : Nat → List (BitVec 8))

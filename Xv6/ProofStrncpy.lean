@@ -161,7 +161,7 @@ theorem syKept_of_pad {R R' : RegMap} (h : syPadKept R R') : syKept R R' :=
   fun r _ _ h13 h14 _ _ => h r h13 h14
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-! ## The zero-fill loop -/
 
@@ -479,7 +479,7 @@ end
 /-! ## The function -/
 
 set_option maxHeartbeats 4000000 in
-theorem strncpy_proof : STRNCPY := ⟨fun {hlc GF} _ _ cpu k bsd bss n dq hK hn hn31 hld hls => by
+theorem strncpy_proof : STRNCPY := ⟨fun {GF} _ _ cpu k bsd bss n dq hK hn hn31 hld hls => by
   unfold wp_strncpy_body
   iintro ⟨Hk, Hpc, Hdst, Hsrc, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩

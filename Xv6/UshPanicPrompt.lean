@@ -38,7 +38,7 @@ ported/dropped lists.
    text write is `UshPanicStub.wp_ksh_write_chain_txt_ans` (over
    `UshMainStubs.wp_ksh_write_chain_txt_at` at `ushSysP_holds UL`), the
    post read at the instance by `UshPanicByte.ushp_post_cons2`, the
-   closed arm `UkWriteClosed.ksh_w_of_closed_at`.  `L : LinkRec hlc GF` is
+   closed arm `UkWriteClosed.ksh_w_of_closed_at`.  `L : LinkRec GF` is
    explicit (Rocq's section context).
 5. The deposit instance is `uexecSGXv6` (by instance, as in
    `UkWriteClosed`); `shPromptLaw`'s record quantifier (UshPromptLaw
@@ -58,7 +58,7 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
 section UshPanicPrompt
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [DiskG GF] [EchoOutG GF]
@@ -69,9 +69,9 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fs
 `F`. -/
 def promptStep (F : Nat → IProp GF) : IProp GF :=
   iprop(□ ∀ (p : Nat) (b : BitVec 8) (Φ : IProp GF), ⌜uPrompt[p]? = some b⌝ -∗ ⌜p < 2⌝ -∗
-    F p -∗ (F (p + 1) -∗ Φ) -∗ outLink .uart0 (genId (hlc := hlc) (GF := GF) + 1) b Φ)
+    F p -∗ (F (p + 1) -∗ Φ) -∗ outLink .uart0 (genId (GF := GF) + 1) b Φ)
 
-instance promptStep_persistent (F : Nat → IProp GF) : Persistent (promptStep (hlc := hlc) F) := by
+instance promptStep_persistent (F : Nat → IProp GF) : Persistent (promptStep F) := by
   unfold promptStep; infer_instance
 
 /-- **Rocq `prompt_chain`** (deviation 3): the console chain of the prompt's
@@ -80,7 +80,7 @@ theorem prompt_chain (F : Nat → IProp GF) (Mv : Nat → List (BitVec 8)) (ua :
     ∀ (c i : Nat), i + c ≤ 2 →
     (∀ j, i ≤ j → j < i + c → uPrompt[j]? = some (fb j)) →
     (∀ j, i ≤ j → j < i + c → umemByte Mv (ua + BitVec.ofNat 64 j).toNat = fb j) →
-    ⊢ promptStep (hlc := hlc) F -∗ F i -∗ consOutChain (genId (hlc := hlc) (GF := GF) + 1) Mv ua F i c := by
+    ⊢ promptStep F -∗ F i -∗ consOutChain (genId (GF := GF) + 1) Mv ua F i c := by
   intro c
   induction c with
   | zero =>
@@ -100,7 +100,7 @@ theorem prompt_chain (F : Nat → IProp GF) (Mv : Nat → List (BitVec 8)) (ua :
       have hb := hline i (by omega) (by omega)
       have hp : i < 2 := by omega
       unfold promptStep
-      iapply Hst $$ %i %(fb i) %(consOutChain (genId (hlc := hlc) (GF := GF) + 1) Mv ua F (i + 1) c) %hb %hp Hc
+      iapply Hst $$ %i %(fb i) %(consOutChain (genId (GF := GF) + 1) Mv ua F (i + 1) c) %hb %hp Hc
       iintro Hc
       iapply ih (i + 1) (by omega) (fun j h1 h2 => hline j (by omega) (by omega))
         (fun j h1 h2 => hM j (by omega) (by omega)) $$ [] Hc
@@ -113,8 +113,8 @@ theorem prompt_chain (F : Nat → IProp GF) (Mv : Nat → List (BitVec 8)) (ua :
 row it asks for. -/
 theorem kshW_of_link_prompt_fam (UL : UK_LEAVES) (N : UkNames GF) (F : Nat → IProp GF) (l v : List FdState)
     (rb : Bool) (hl2 : l[2]? = some (.open rb true (.device CONSOLE))) :
-    ⊢ promptStep (hlc := hlc) F -∗
-      kshW (hlc := hlc) N (BitVec.ofNat 64 2) (BitVec.ofNat 64 shPromptPv) 2
+    ⊢ promptStep F -∗
+      kshW N (BitVec.ofNat 64 2) (BitVec.ofNat 64 shPromptPv) 2
         iprop(ustdAt N.fd l v ∗ F 0) iprop(ustdAt N.fd l v ∗ F 2) := by
   iintro #Hst
   unfold kshW
@@ -137,11 +137,11 @@ theorem kshW_of_link_prompt_fam (UL : UK_LEAVES) (N : UkNames GF) (F : Nat → I
     rw [e _ (by decide), ha2]; decide
   ihave Hbs := User.utextImg_run (utext N.t) User.Sh.code.byte (m.get 11#5).toNat 2 (fun j => uPrompt[j]!)
     hbytes $$ Hcode
-  iapply wp_ksh_write_chain_txt_ans (hlc := hlc) UL N h m avail (kshFam N F) l v 2
+  iapply wp_ksh_write_chain_txt_ans UL N h m avail (kshFam N F) l v 2
     (fun j => uPrompt[j]!) (fun _ => F 2) (ushp_post_cons2 N F m l rb 2 hl2 ha0 ha2 (by decide))
     $$ Hcode Hrun [Hc] Hstd Hbs
   · -- THE DEPOSIT: sh's own chain at its own cursor
-    iapply uwrite_chain_sup (hlc := hlc) N F (ukWr m 17#5 (BitVec.ofInt 64 16)) _ l 2 rb CONSOLE hi0
+    iapply uwrite_chain_sup N F (ukWr m 17#5 (BitVec.ofInt 64 16)) _ l 2 rb CONSOLE hi0
       (by decide) hl2
     iintro %M %pm %sz Hh
     ihave Hbs2 := User.utextImg_run (utext N.t) User.Sh.code.byte (m.get 11#5).toNat 2 (fun j => uPrompt[j]!)
@@ -159,33 +159,33 @@ theorem kshW_of_link_prompt_fam (UL : UK_LEAVES) (N : UkNames GF) (F : Nat → I
 
 /-- **Rocq `prompt_step_lpr_at`**: the step at the widened boundary,
 `LinkRec`'s `lkLpr`. -/
-theorem promptStep_lpr_at (L : LinkRec hlc GF) (v : EraPins) (I : List (BitVec 8)) :
-    ⊢ (⌜¬ L.lkWild I⌝ ∨ L.lkT) -∗ L.lkPin (genId (hlc := hlc) (GF := GF) + 1) v -∗ L.lkLinks -∗
-      promptStep (hlc := hlc) (fun p => L.lkLpr (genId (hlc := hlc) (GF := GF) + 1) v I p) := by
+theorem promptStep_lpr_at (L : LinkRec GF) (v : EraPins) (I : List (BitVec 8)) :
+    ⊢ (⌜¬ L.lkWild I⌝ ∨ L.lkT) -∗ L.lkPin (genId (GF := GF) + 1) v -∗ L.lkLinks -∗
+      promptStep (fun p => L.lkLpr (genId (GF := GF) + 1) v I p) := by
   iintro #Hnw #Hpin #Hlk
   unfold promptStep
   imodintro
   iintro %p %b %Φ %hb %hp Hc HΦ
-  iapply lkLpr_step L (genId (hlc := hlc) (GF := GF) + 1) v I p b Φ hb hp $$ Hnw Hpin Hlk Hc HΦ
+  iapply lkLpr_step L (genId (GF := GF) + 1) v I p b Φ hb hp $$ Hnw Hpin Hlk Hc HΦ
 
 /-! ## S6 THE SAME CALL AT THE LOOP'S OWN CREDENTIAL, WIDENED -/
 
 /-- **Rocq `ksh_w_of_link_lcred_at`** (deviation 2): the era's pin travels
 INSIDE the credential; the call reads it out and puts it back. -/
-theorem kshW_of_link_lcred_at (UL : UK_LEAVES) (L : LinkRec hlc GF) (N : UkNames GF) (I : List (BitVec 8))
+theorem kshW_of_link_lcred_at (UL : UK_LEAVES) (L : LinkRec GF) (N : UkNames GF) (I : List (BitVec 8))
     (l v : List FdState) (rb : Bool) (hl2 : l[2]? = some (.open rb true (.device CONSOLE))) :
     ⊢ (⌜¬ L.lkWild I⌝ ∨ L.lkT) -∗ L.lkLinks -∗
-      kshW (hlc := hlc) N (BitVec.ofNat 64 2) (BitVec.ofNat 64 shPromptPv) 2
-        iprop(ustdAt N.fd l v ∗ lkLcred L (genId (hlc := hlc) (GF := GF) + 1) I 0)
-        iprop(ustdAt N.fd l v ∗ lkLcred L (genId (hlc := hlc) (GF := GF) + 1) I 2) := by
+      kshW N (BitVec.ofNat 64 2) (BitVec.ofNat 64 shPromptPv) 2
+        iprop(ustdAt N.fd l v ∗ lkLcred L (genId (GF := GF) + 1) I 0)
+        iprop(ustdAt N.fd l v ∗ lkLcred L (genId (GF := GF) + 1) I 2) := by
   iintro #Hnw #Hlk
   unfold kshW
   iintro %h %m %avail %ha0 %ha1 %ha2 #Hcode ⟨Hstd, Hc⟩ Hrun Hcont
   unfold lkLcred
   icases Hc with ⟨%v', #Hpin, Hc⟩
   ihave #Hst := promptStep_lpr_at L v' I $$ Hnw Hpin Hlk
-  have H1 := kshW_of_link_prompt_fam (hlc := hlc) UL N
-    (fun p => L.lkLpr (genId (hlc := hlc) (GF := GF) + 1) v' I p) l v rb hl2
+  have H1 := kshW_of_link_prompt_fam UL N
+    (fun p => L.lkLpr (genId (GF := GF) + 1) v' I p) l v rb hl2
   unfold kshW at H1
   ihave Hw := H1 $$ Hst
   iapply Hw $$ %h %m %avail %ha0 %ha1 %ha2 Hcode [Hstd Hc] Hrun
@@ -199,11 +199,11 @@ theorem kshW_of_link_lcred_at (UL : UK_LEAVES) (L : LinkRec hlc GF) (N : UkNames
 /-- **Rocq `sh_prompt_law_hold_line_at`**: the prompt law at a family whose
 holder carries the line's not-wild fact (seccomp design 10.10; the union's
 deed). -/
-theorem shPromptLaw_hold_line_at (UL : UK_LEAVES) (L : LinkRec hlc GF) (Hold : List (BitVec 8) → IProp GF)
+theorem shPromptLaw_hold_line_at (UL : UK_LEAVES) (L : LinkRec GF) (Hold : List (BitVec 8) → IProp GF)
     (Hnw : ∀ I, Hold I ⊢ iprop((⌜¬ L.lkWild I⌝ ∨ L.lkT) ∗ Hold I)) :
     ⊢ L.lkLinks -∗
-      shPromptLaw (hlc := hlc)
-        (fun I p => iprop(lkLcred L (genId (hlc := hlc) (GF := GF) + 1) I p ∗ Hold I)) := by
+      shPromptLaw
+        (fun I p => iprop(lkLcred L (genId (GF := GF) + 1) I p ∗ Hold I)) := by
   iintro #Hlk
   unfold shPromptLaw
   imodintro
@@ -217,7 +217,7 @@ theorem shPromptLaw_hold_line_at (UL : UK_LEAVES) (L : LinkRec hlc GF) (Hold : L
   isplitr
   · iintro %I %l %v %hfd2
     obtain ⟨rb, hl2⟩ := hfd2
-    have H1 := kshW_of_link_lcred_at (hlc := hlc) UL L N I l v rb hl2
+    have H1 := kshW_of_link_lcred_at UL L N I l v rb hl2
     unfold kshW at H1
     unfold kshW
     iintro %h %m %avail %ha0 %ha1 %ha2 #Hcode ⟨Hstd, Hc, Hh⟩ Hrun Hcont
@@ -229,7 +229,7 @@ theorem shPromptLaw_hold_line_at (UL : UK_LEAVES) (L : LinkRec hlc GF) (Hold : L
     iapply Hcont $$ %h' %ret [Hstd Hc Hh] Hrun
     iframe Hstd Hc Hh
   · iintro %l %v %hcl
-    iapply ksh_w_of_closed_at (hlc := hlc) UL (ushSysP_holds UL) N (BitVec.ofNat 64 2)
+    iapply ksh_w_of_closed_at UL (ushSysP_holds UL) N (BitVec.ofNat 64 2)
       (BitVec.ofNat 64 shPromptPv) 2 l v 2 sh_fd2_signed (by decide) hcl
 
 end UshPanicPrompt

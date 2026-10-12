@@ -46,7 +46,7 @@ def baScanRegs (k : KCtx) (dev : BitVec 32) (kk size bi : Nat) (R : RegMap) : Pr
   R 10#5 = BitVec.signExtend 64 (BitVec.ofNat 32 size)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 /-- The resources at a point of the loop body (Rocq's `ba_scan` precondition). -/
@@ -83,7 +83,7 @@ set_option maxHeartbeats 16000000 in
 /-- **`+0xdc .. +0xe6`: the bit is SET** -- on to the next index (`IH`), or,
 at `bi + 1 = BPB`, out of the loop to the exhaust arm. -/
 theorem ba_scan_next (BE : BRELSE) (PK : PRINTK)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu c0 : CPU) (k : KCtx)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu c0 : CPU) (k : KCtx)
     (spie spp : Bool) (R : RegMap)
     (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName) (pd pav pu : BitVec 64)
     (γ : LogNames) (γfs : FsNames) (logstart bmapstart size : Nat) (dev : BitVec 32)
@@ -163,7 +163,7 @@ set_option maxHeartbeats 16000000 in
 the bit test, and the three ways out -- the exhaust arm, the alloc arm, and
 the next iteration (`IH`). -/
 theorem ba_scan_step (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET) (PK : PRINTK)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu c0 : CPU) (k : KCtx)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu c0 : CPU) (k : KCtx)
     (spie spp : Bool) (R : RegMap)
     (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName) (pd pav pu : BitVec 64)
     (j : Nat) (γ : LogNames) (γfs : FsNames) (logstart bmapstart size : Nat) (dev : BitVec 32)
@@ -280,7 +280,7 @@ theorem ba_scan_step (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET) (
 
 /-- **THE SCAN, by fuel induction on `BPB - bi`** (Rocq's `ba_scan`). -/
 theorem ba_scan (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET) (PK : PRINTK)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c0 : CPU) (k : KCtx)
+    (Γ : SchedNames) [ClaimIs GF Γ] (c0 : CPU) (k : KCtx)
     (spie spp : Bool)
     (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName) (pd pav pu : BitVec 64)
     (j : Nat) (γ : LogNames) (γfs : FsNames) (logstart bmapstart size : Nat) (dev : BitVec 32)

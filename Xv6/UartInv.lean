@@ -60,7 +60,7 @@ theorem uartByteOk (i : UartId) (off : Nat) (hoff : off < 8) :
   cases i <;> (rcases off with _ | _ | _ | _ | _ | _ | _ | _ | off <;> first | decide | omega)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-- `uarts[i].base`, read-only after boot: the port's MMIO base. -/
 def uartBaseWord [CurCtx] (i : UartId) : IProp GF :=
@@ -144,7 +144,7 @@ byte INTO the machine, so only it mints a tag -- the application's family
 read at the history the byte arrived at. -/
 def uartTagOf (h κ : List Obs) : IProp GF :=
   match κ with
-  | [Obs.dev (.uartIn _ _)] => MachFixedGS.rxTag (hlc := hlc) (GF := GF) (h ++ κ)
+  | [Obs.dev (.uartIn _ _)] => MachFixedGS.rxTag (GF := GF) (h ++ κ)
   | _ => iprop(emp)
 
 instance uartTagOf_persistent (h κ : List Obs) : Persistent (uartTagOf (GF := GF) h κ) := by
@@ -160,7 +160,7 @@ input's TAG. -/
 def uartObsPermit (i : UartId) (γ : UartNames) : IProp GF := iprop%
   □ ∀ (h : List Obs) (os : List DevObs) (u u' : UartState),
     ⌜uartStep i u u' os ∧ traceShape h true ∧ obsWire i (openSeg h) = u.wire ∧ u.wire = u.out ∧
-      obsBoots h = genId (hlc := hlc) (GF := GF) + 1⌝ -∗
+      obsBoots h = genId (GF := GF) + 1⌝ -∗
     consClaimAt i γ u -∗ uartGhosts γ u' -∗ obsAuth h ={⊤ \ ↑(uartN i)}=∗
     consClaimAt i γ u ∗ uartGhosts γ u' ∗ obsAuth (h ++ os.map Obs.dev) ∗ uartTagOf h (os.map Obs.dev)
 
@@ -226,7 +226,7 @@ theorem uartObsPermit_step (i : UartId) (γ : UartNames) :
       icases outLb_get γ (Uart.accept u b) $$ Ho with ⟨Ho, #Hwlb⟩
       have hrider : obsWire i (openSeg (h ++ [Obs.dev (.uartIn i b)])) = (Uart.accept u b).out := by
         rw [obsWire_openSeg_in, hw, hwo]; rfl
-      have hbts' : obsBoots (h ++ [Obs.dev (.uartIn i b)]) = genId (hlc := hlc) (GF := GF) + 1 := by
+      have hbts' : obsBoots (h ++ [Obs.dev (.uartIn i b)]) = genId (GF := GF) + 1 := by
         rw [obsBoots_app, obsBoots_io [Obs.dev (.uartIn i b)] (by simp [isIo]), hbts]
       have hshn : traceShape (h ++ [Obs.dev (.uartIn i b)]) true :=
         traceShape_io h _ hsh (by simp [isIo])
@@ -251,7 +251,7 @@ theorem uartObsPermit_step (i : UartId) (γ : UartNames) :
 trace permit for the port (the Rocq `WpUart.wp_uart_loop`). -/
 theorem wpDev_uart_inv (i : UartId) (γ : UartNames) :
     uartInv i γ ∗ uartObsPermit i γ ∗ genCert ⊢@{IProp GF}
-      devWP (genId (hlc := hlc) (GF := GF)) (.uart i) rootTask (DevM.pure ()) := by
+      devWP (genId (GF := GF)) (.uart i) rootTask (DevM.pure ()) := by
   unfold uartInv
   iintro ⟨Hinv, #Hperm, Hcert⟩
   ihave #Hstep := uartObsPermit_step i γ $$ Hperm
@@ -273,8 +273,8 @@ theorem uart_obsN_mask (i : UartId) : (↑obsN : CoPset) ⊆ ⊤ \ ↑(uartN i) 
 the trivial application claims nothing of its input, so the tag the rx arm
 owes is `True` and the permit mints it out of nothing. -/
 theorem uartObsPermit_triv (i : UartId) (γ : UartNames)
-    (heq : MachFixedGS.obsPred (hlc := hlc) (GF := GF) = obsPredTriv)
-    (htag : MachFixedGS.rxTag (hlc := hlc) (GF := GF) = rxTagTriv) :
+    (heq : MachFixedGS.obsPred (GF := GF) = obsPredTriv)
+    (htag : MachFixedGS.rxTag (GF := GF) = rxTagTriv) :
     obsInv ⊢@{IProp GF} uartObsPermit i γ := by
   unfold uartObsPermit
   iintro #Hoinv !> %h %os %u %u' %_ Hcl HG Ha
@@ -315,20 +315,20 @@ returning the tag.  The tag family and the console resource the fixed
 record carries ARE the client's. -/
 theorem uartObsPermit_ledger (i : UartId) (R : List Obs → IProp GF) (Tg : List Obs → IProp GF)
     (Cres : Nat → List Obs → ConsHist → IProp GF) (γ : UartNames) [∀ h, Timeless (R h)]
-    (heq : MachFixedGS.obsPred (hlc := hlc) (GF := GF) = obsLedger R)
-    (htag : MachFixedGS.rxTag (hlc := hlc) (GF := GF) = Tg)
-    (hook : MachFixedGS.consRes (hlc := hlc) (GF := GF) = Cres)
+    (heq : MachFixedGS.obsPred (GF := GF) = obsLedger R)
+    (htag : MachFixedGS.rxTag (GF := GF) = Tg)
+    (hook : MachFixedGS.consRes (GF := GF) = Cres)
     (Htx : ⊢ iprop(□ ∀ (h : List Obs) (b : BitVec 8) (u u' : UartState) (ho : List Obs) (H : ConsHist),
       ⌜Uart.txPop u = some (b, u') ∧ Uart.loopback u = false ∧ traceShape h true ∧
-        obsWire i (openSeg h) = u.wire ∧ u.wire = u.out ∧ obsBoots h = genId (hlc := hlc) (GF := GF) + 1 ∧
+        obsWire i (openSeg h) = u.wire ∧ u.wire = u.out ∧ obsBoots h = genId (GF := GF) + 1 ∧
         ho <+: h ∧ H.chAcc = Uart.acc u⌝ -∗
-      cresAt Cres i (genId (hlc := hlc) (GF := GF) + 1) ho H -∗ uartGhosts γ u' -∗ R h
+      cresAt Cres i (genId (GF := GF) + 1) ho H -∗ uartGhosts γ u' -∗ R h
         ={(⊤ \ ↑(uartN i)) \ ↑obsN}=∗
-      cresAt Cres i (genId (hlc := hlc) (GF := GF) + 1) ho H ∗ uartGhosts γ u' ∗
+      cresAt Cres i (genId (GF := GF) + 1) ho H ∗ uartGhosts γ u' ∗
         R (h ++ [Obs.dev (.uartOut i b)])))
     (Hrx : ⊢ iprop(□ ∀ (h : List Obs) (b : BitVec 8) (u u' : UartState),
       ⌜u.rx.length < Uart.fifoDepth ∧ u' = Uart.accept u b ∧ traceShape h true ∧
-        obsBoots h = genId (hlc := hlc) (GF := GF) + 1⌝ -∗
+        obsBoots h = genId (GF := GF) + 1⌝ -∗
       uartGhosts γ u' -∗ R h ={(⊤ \ ↑(uartN i)) \ ↑obsN}=∗
       uartGhosts γ u' ∗ R (h ++ [Obs.dev (.uartIn i b)]) ∗ Tg (h ++ [Obs.dev (.uartIn i b)]))) :
     obsInv ⊢@{IProp GF} uartObsPermit i γ := by
@@ -984,7 +984,7 @@ theorem fcr_write_au (i : UartId) (γ : UartNames) (l : List (BitVec 8)) (k : Na
     uartInv i γ ∗ txOwn γ l ∗ outLb γ l ∗ rxTok γ k hl ⊢@{IProp GF}
       devWriteAU (.uart i) 2 1 b iprop(txOwn γ l ∗ ∃ (k' : Nat) (hl' : Option (List Obs)),
         rxTok γ k' hl' ∗ ⌜(b.getLsbD 1 = false ∧ hl' = hl) ∨
-          (l = [] → uartFlushed (genId (hlc := hlc) (GF := GF) + 1) i hl')⌝) := by
+          (l = [] → uartFlushed (genId (GF := GF) + 1) i hl')⌝) := by
   unfold uartInv devInvR devWriteAU
   iintro ⟨#Hinv, Htok, #Hlb, Hrx⟩
   iinv Hinv with Hbody Hclose
@@ -1098,14 +1098,14 @@ port the log's mark IS the popper's anchor (or nothing is logged yet and
 everything popped went to uartinit's flush). -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-- The popper's resource at count `k` and anchor `hl` (Rocq `uart_rx_writer`). -/
 def uartRxWriter (i : UartId) (γ : UartNames) (k : Nat) (hl : Option (List Obs)) : IProp GF := iprop%
   rxTok γ k hl ∗
   (∃ hh : Option (List Obs), rxHi γ (1 : Qp).half hh ∗ ⌜ohistLe hh hl⌝) ∗
   (∃ hg : Option (List Obs), logHi γ (1 : Qp).half hg ∗
-    ⌜uartLogAt (genId (hlc := hlc) (GF := GF) + 1) i hg hl⌝) ∗
+    ⌜uartLogAt (genId (GF := GF) + 1) i hg hl⌝) ∗
   uartArm γ (1 : Qp).half none
 
 /-- What a pending, unclaimed UART source hands its handler (Rocq
@@ -1132,7 +1132,7 @@ end
 /-! ## The receive accessors at the writer (what `uartintr` holds) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-- `lsr_read_rx_au` with the whole PLIC payload in hand. -/
 theorem lsr_read_rx_au_w (i : UartId) (γ : UartNames) (k : Nat) (hl : Option (List Obs)) :
@@ -1158,7 +1158,7 @@ credential, the frozen divisor latch and the port's base word.  All
 persistent, so one copy serves every caller. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 def uartPort [CurCtx] (i : UartId) (γl : GName) (γ : UartNames) : IProp GF := iprop%
   uartInv i γ ∗ isTxLockAt i γl γ ∗ dlabOff γ ∗ uartBaseWord i
@@ -1194,7 +1194,7 @@ flips the regime once, irreversibly, with `uartPreinit_deposit`.  Nothing
 in the `uartinit` cone mentions either: the flip happens beside it. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-- Port `γ`'s one-shot, unfired: an EXCLUSIVE whole (the boot client's). -/
 def uartPreinit (γ : UartNames) : IProp GF := γ.init ↪VAR{.own 1} false

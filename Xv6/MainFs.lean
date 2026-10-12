@@ -72,7 +72,7 @@ theorem mn_inodeAddr_iLock (k : Nat) : inodeAddr k = iLock (ientry k) := by
 /-! ## `binit()` and the buffer cache -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF]
 
 set_option maxHeartbeats 4000000 in
@@ -96,7 +96,7 @@ theorem mn_binit (BI : BINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsi
   k_step (wp_s_jal cpu _ (KA.«main» + 142#64) false 7384#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_8e]
   iintro Hk Hpc
-  have hbi := BI.wp_binit (hlc := hlc) (GF := GF) cpu (k.withRegs (R0.set 1#5 (KA.«main» + 146#64)))
+  have hbi := BI.wp_binit (GF := GF) cpu (k.withRegs (R0.set 1#5 (KA.«main» + 146#64)))
     vl vn vc vhp vhn (by simp; omega)
   unfold wp_binit_body at hbi
   simp only [binitAddr] at hbi
@@ -117,7 +117,7 @@ end
 /-! ## `iinit()` and the inode cache -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF]
   [WchG GF] [Appcfg GF]
@@ -160,7 +160,7 @@ theorem mn_kitRest_split [Fscfg] [Icfg] :
 take. -/
 def mnIcacheRows [Fscfg] [Icfg] [CurCtx] : IProp GF := iprop(
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗ icEscrows fscIc fscFs fscIreg fscCov fscLogst ∗ icSleeplocks fscIc)
+  itableInv ∗ icEscrows fscIc fscFs fscIreg fscCov fscLogst ∗ icSleeplocks fscIc)
 
 instance mnIcacheRows_persistent [Fscfg] [Icfg] [CurCtx] : Persistent (mnIcacheRows (GF := GF)) := by
   unfold mnIcacheRows; infer_instance
@@ -184,7 +184,7 @@ theorem mn_iinit (II : IINIT) [Fscfg] [Icfg] [CurCtx] (cpu : CPU) (k : KCtx) (R0
   k_step (wp_s_jal cpu _ (KA.«main» + 146#64) false 8746#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_92]
   iintro Hk Hpc
-  have hii := II.wp_iinit (hlc := hlc) (GF := GF) cpu (k.withRegs (R0.set 1#5 (KA.«main» + 150#64)))
+  have hii := II.wp_iinit (GF := GF) cpu (k.withRegs (R0.set 1#5 (KA.«main» + 150#64)))
     vl vn vc (by simp; omega)
   unfold wp_iinit_body at hii
   simp only [iinitAddr] at hii
@@ -225,7 +225,7 @@ end
 vdisk lock -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [OffboxG GF] [OffboxBoxG GF] [DiskG GF]
 
@@ -253,7 +253,7 @@ theorem mn_fileinit (FI : FILEINIT) [Icfg] [CurCtx] (cpu : CPU) (k : KCtx) (R0 :
   k_step (wp_s_jal cpu _ (KA.«main» + 150#64) false 12970#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_96]
   iintro Hk Hpc
-  have hfi := FI.wp_fileinit (hlc := hlc) (GF := GF) cpu (k.withRegs (R0.set 1#5 (KA.«main» + 154#64)))
+  have hfi := FI.wp_fileinit (GF := GF) cpu (k.withRegs (R0.set 1#5 (KA.«main» + 154#64)))
     vl vn vc (by simp; omega)
   unfold wp_fileinit_body at hfi
   simp only [fileinitAddr] at hfi
@@ -301,7 +301,7 @@ theorem mn_virtio (VD : VIRTIO_DISK_INIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : 
   k_step (wp_s_jal cpu _ (KA.«main» + 154#64) false 18884#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_9a]
   iintro Hk Hpc
-  have hvd := VD.wp_virtio_disk_init (hlc := hlc) (GF := GF) cpu
+  have hvd := VD.wp_virtio_disk_init (GF := GF) cpu
     (k.withRegs (R0.set 1#5 (KA.«main» + 158#64))) γd γkl γk nb c0 vl vn vc pd0 pav0 pu0 free0
     (by simp [hsie]) (by simp; omega) (by simp [hnoff]) (by simp [hlocks]) hnb hdead (by simp [hproc])
   unfold wp_virtio_disk_init_body at hvd
@@ -332,24 +332,24 @@ only through its floors); the read-only `.data` words move by
 `MachCSL.wordPointsTo_toKpt`. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 theorem mn_uartPort_toKpt (X : CurCtx) (i : UartId) (γl : GName) (γ : UartNames) :
-    @uartPort hlc GF _ _ X i γl γ ⊢ @uartPort hlc GF _ _ X.toKpt i γl γ := by
+    @uartPort GF _ _ X i γl γ ⊢ @uartPort GF _ _ X.toKpt i γl γ := by
   unfold uartPort uartBaseWord
   iintro ⟨Hi, Hl, Hd, Hb⟩
   iframe Hi Hd
   isplitl [Hl]
-  · iapply (show @isTxLockAt hlc GF _ _ X i γl γ ⊢ @isTxLockAt hlc GF _ _ X.toKpt i γl γ from .rfl) $$ Hl
+  · iapply (show @isTxLockAt GF _ _ X i γl γ ⊢ @isTxLockAt GF _ _ X.toKpt i γl γ from .rfl) $$ Hl
   · iapply wordPointsTo_toKpt X $$ Hb
 
 theorem mn_uartRxWord_toKpt (X : CurCtx) (i : UartId) :
-    @uartRxWord hlc GF _ X i ⊢ @uartRxWord hlc GF _ X.toKpt i := by
+    @uartRxWord GF _ X i ⊢ @uartRxWord GF _ X.toKpt i := by
   unfold uartRxWord
   exact wordPointsTo_toKpt X _ _ _ _
 
 theorem mn_devswTable_toKpt (X : CurCtx) :
-    @devswTable hlc GF _ X ⊢ @devswTable hlc GF _ X.toKpt := by
+    @devswTable GF _ X ⊢ @devswTable GF _ X.toKpt := by
   unfold devswTable
   refine BigSepL.bigSepL_mono_of_forall (fun {_ _} => ?_)
   iintro ⟨Hr, Hw⟩
@@ -358,13 +358,13 @@ theorem mn_devswTable_toKpt (X : CurCtx) :
   · iapply wordPointsTo_toKpt X $$ Hw
 
 theorem mn_pkEnv_toKpt (X : CurCtx) (γpr γl1 : GName) (γ1 : UartNames) :
-    @mnPkEnv hlc GF _ _ X γpr γl1 γ1 ⊢ @mnPkEnv hlc GF _ _ X.toKpt γpr γl1 γ1 := by
+    @mnPkEnv GF _ _ X γpr γl1 γ1 ⊢ @mnPkEnv GF _ _ X.toKpt γpr γl1 γ1 := by
   unfold mnPkEnv isTxLock
   iintro ⟨Hp, Ht, Hs⟩
   iframe Hs
   isplitl [Hp]
-  · iapply (show @isLock hlc GF _ _ X γpr prLock "pr" (fun _ => iprop(emp)) ⊢
-      @isLock hlc GF _ _ X.toKpt γpr prLock "pr" (fun _ => iprop(emp)) from .rfl) $$ Hp
+  · iapply (show @isLock GF _ _ X γpr prLock "pr" (fun _ => iprop(emp)) ⊢
+      @isLock GF _ _ X.toKpt γpr prLock "pr" (fun _ => iprop(emp)) from .rfl) $$ Hp
   · iapply mn_uartPort_toKpt X $$ Ht
 
 /-- printk's credential is `panicEnv` (its names existential). -/
@@ -380,7 +380,7 @@ end
 /-! ## The console (born after the switch) and the device complement -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF]
   [WchG GF] [Appcfg GF]
@@ -408,7 +408,7 @@ tier switch because the ring's payload is a kernel-tier fact): the lock is
 born at `γc` over the ring, the clean token buys the credential escrow, and
 the two bundles are assembled while the lock's name is concrete. -/
 theorem mn_consLock [Fscfg] [CurCtx] (cpu : CPU) (k : KCtx) (γc γl0 : GName) (γ0 : UartNames) (cn : ConsNames)
-    (hcn : cn.uart = γ0) (hcne : cn.era = genId (hlc := hlc) (GF := GF) + 1) (hcons : fscCons = cn) :
+    (hcn : cn.uart = γ0) (hcne : cn.era = genId (GF := GF) + 1) (hcons : fscCons = cn) :
     kctx cpu k ∗ lockFreeTok γc ∗ lkFresh consAddr ∗ consResAt cn curCtx ∗ consCleanTok cn ∗
     devswTable ∗ uartPort .uart0 γl0 γ0 ∗ consEchoShift
     ⊢ |={⊤}=> (kctx (GF := GF) cpu k ∗ mnConsole γc γl0 γ0) := by
@@ -417,7 +417,7 @@ theorem mn_consLock [Fscfg] [CurCtx] (cpu : CPU) (k : KCtx) (γc γl0 : GName) (
   icases mn_cons_kmap $$ HS with ⟨#Hc0, #Hc16⟩
   imod (kctx_newlockAt cpu k γc consAddr "cons" (consResAt cn)) $$ [Hk Hlf HR Hfr] with ⟨Hk, #Hlk⟩
   · iframe Hk Hlf HR Hfr Hc0 Hc16
-  imod consCredInv_alloc cn (appRdcred (hlc := hlc) (GF := GF)) ⊤ $$ Hcl with #Hcred
+  imod consCredInv_alloc cn (appRdcred (GF := GF)) ⊤ $$ Hcl with #Hcred
   imodintro
   iframe Hk
   unfold mnConsole consoleCaps consoleReadyApp
@@ -444,7 +444,7 @@ end
 `userinit()` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF]
   [WchG GF] [Appcfg GF]
@@ -456,10 +456,10 @@ boot chain's two iref units and the file system's 35 bio slots, with the
 pure block. -/
 theorem mn_firstFsinit [Fscfg] [Icfg] [CurCtx] (dk : Nat → BitVec 8) (sb : FsSb)
     (Rspent : ExtTreeSet Nat compare) (Pb : Nat → List (BitVec 8)) (hp : firstFsinitPures dk sb Pb) :
-    fsKitFsinitGhost (hlc := hlc) (GF := GF) (fsBlocks dk) Rspent Pb (hdrWset (fsBlocks dk) fscLogst) ∗
-    mainSbRaw ∗ mainLogRaw ∗ logMirrorBorn (hlc := hlc) (mirrorOf (fsBlocks dk)) ∗
+    fsKitFsinitGhost (GF := GF) (fsBlocks dk) Rspent Pb (hdrWset (fsBlocks dk) fscLogst) ∗
+    mainSbRaw ∗ mainLogRaw ∗ logMirrorBorn (mirrorOf (fsBlocks dk)) ∗
     irefSlots IREFBOOT ∗ bslots mainBslotsFs
-    ⊢ firstFsinit (hlc := hlc) := by
+    ⊢ firstFsinit := by
   unfold mainSbRaw mainLogRaw mainLkRaw lockWords firstFsinit
   iintro ⟨Hkit, ⟨%sbOld, %hsb, Hsb⟩, ⟨⟨%vl, %vn, %vc, #H0, #H16, Hw, Hn, Hc⟩,
     ⟨%vs, %vd, %vnc, %vnn, Hs, Hd, Ho, Hcm, Hnc, Hhn⟩, Hblk⟩, Hmir, Hir, Hbs⟩
@@ -476,12 +476,12 @@ hand at +0x9e. -/
 theorem mn_firstPersist [Fscfg] [Icfg] [CurCtx] (hg : FsGeomOk) :
     panicEnv (GF := GF) ∗ (∃ γl : GName, bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov)) ∗
     (∃ pd pav pu : BitVec 64, diskCaps fscDisk fscDlock pd pav pu) ∗ mnIcacheRows ∗
-    iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+    iregReg fscIreg fscFs icfgIst icfgNib ∗
     bitmapReg fscFs fscBmapstart fscCov fscLogst fscSize ∗
     isLock fscKalloc kmemLockAddr "kmem" (kmemRes fsReadyKmem) ∗
-    fsCrashSeam (hlc := hlc) (GF := GF) fscCov fscLogst ∗ genCert (hlc := hlc) (GF := GF) ∗
-    crashInv (hlc := hlc) (GF := GF)
-    ⊢ firstBootPersist (hlc := hlc) := by
+    fsCrashSeam (GF := GF) fscCov fscLogst ∗ genCert (GF := GF) ∗
+    crashInv (GF := GF)
+    ⊢ firstBootPersist := by
   unfold mnIcacheRows firstBootPersist
   iintro ⟨#Hp, #Hb, #Hd, ⟨#Hit, #Hiti, -, #Hsl⟩, #Hr, #Hm, #Hk, #Hseam, #Hcert, #Hcinv⟩
   iframe Hp Hb Hd Hit Hiti Hsl Hr Hm Hk Hseam Hcert Hcinv
@@ -491,7 +491,7 @@ set_option maxHeartbeats 4000000 in
 /-- **+0x9e → +0xa2**: `userinit()` (W8-P2's park contract, at the
 ambient allocator; it seals the count and assembles `firstBoot`). -/
 theorem mn_userinit (UI : USERINIT) [Fscfg] [Icfg] [FileG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [NiFitIs (hlc := hlc) GF]
+    (Γ : SchedNames) [ClaimIs GF Γ] [NiFitIs GF]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
     (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsie : k.sie = false) (hnoff : k.noff = 0)
     (hlocks : k.locks = []) (htier : k.tier = KTier.kpt) (hproc : k.proc = 0#64)
@@ -502,9 +502,9 @@ theorem mn_userinit (UI : USERINIT) [Fscfg] [Icfg] [FileG GF] [CurCtx]
     isLock fscKalloc kmemLockAddr "kmem" (kmemRes fsReadyKmem) ∗ isLock γp pidLockAddr "nextpid" pidLockPay ∗
     kallocAvail fsReadyKmem (some nb) ∗ procsAvailAt Γ (some (np + 1)) true ∗
     (∃ w : BitVec 64, wordPointsTo initprocAddr 8 (DFrac.own 1) w) ∗
-    wordPointsTo firstAddr 4 (DFrac.own 1) 1#32 ∗ firstBootPersist (hlc := hlc) ∗ firstFsinit (hlc := hlc) ∗
-    initPidTok 0#32 ∗ mnIcacheRows ∗ iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ panicEnv ∗
-    isFtable γft γ ∗ userinitPark (hlc := hlc) (SG := uexecSGXv6) Γ γw γtk ∗
+    wordPointsTo firstAddr 4 (DFrac.own 1) 1#32 ∗ firstBootPersist ∗ firstFsinit ∗
+    initPidTok 0#32 ∗ mnIcacheRows ∗ iregReg fscIreg fscFs icfgIst icfgNib ∗ panicEnv ∗
+    isFtable γft γ ∗ userinitPark (SG := uexecSGXv6) Γ γw γtk ∗
     (∀ R : RegMap, kctx cpu (k.withRegs R) -∗ pcIs cpu (KA.«main» + 162#64) -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, #Hpinv, #Hkml, #Hpml, Hav, Hpav, Hinit, Hfw, #Hfbp, Hffs, Hipt, #Hrows, #Hireg, #Hpe,
@@ -515,7 +515,7 @@ theorem mn_userinit (UI : USERINIT) [Fscfg] [Icfg] [FileG GF] [CurCtx]
   k_step (wp_s_jal cpu _ (KA.«main» + 158#64) false 3334#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_9e]
   iintro Hk Hpc
-  have hui := UI.wp_userinit (hlc := hlc) (GF := GF) Γ cpu
+  have hui := UI.wp_userinit (GF := GF) Γ cpu
     (k.withRegs (R0.set 1#5 (KA.«main» + 162#64))) γp γft γ γw γtk nb np
     (by simp [hnoff]) (by simp [hnoff]) (by simp; omega) (by simp [hlocks]) (by simp [hlocks])
     (by simp [hlocks]) (by simp [hlocks]) (by simp [htier]) (by simp [hproc]) (by simp [hsie]) hnb

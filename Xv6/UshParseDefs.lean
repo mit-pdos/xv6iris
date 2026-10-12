@@ -83,7 +83,7 @@ def ushTList : Nat := 0x1330
 def ushTNone : Nat := 0x1278
 
 section UshParseDefs
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -146,9 +146,9 @@ theorem ushS_lbuQ (UL : UK_LEAVES) (N : UkNames GF) {C : IProp GF} [Persistent C
     (y : Nat) (h : CPU) (m : RegMap) (av : Nat) (tx : Bool) (dq : DFrac) (a : Nat) (b : BitVec 8)
     (ha : ((m.get rs1).toNat : Int) + imm.toInt = a)
     (hy : x + (if rvc then 2 else 4) = y := by decide) (hns : unotSp rd := by unfold unotSp spIdx; decide) :
-    ⊢ C -∗ ushSbq N tx dq a b -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 x) av -∗
+    ⊢ C -∗ ushSbq N tx dq a b -∗ urun N h m (BitVec.ofNat 64 x) av -∗
       (ushSbq N tx dq a b -∗ ∀ h' : CPU,
-        urun (hlc := hlc) N h' (ukWr m rd (BitVec.setWidth 64 b)) (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗
+        urun N h' (ukWr m rd (BitVec.setWidth 64 b)) (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗
       wpLoop h := by
   cases tx
   · exact ushS_lbu UL N hi y h m av dq a b ha hy hns

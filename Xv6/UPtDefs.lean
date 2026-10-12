@@ -261,7 +261,7 @@ def _root_.MachCSL.PTree.noLeaves : Nat → PTree → Prop
   | lvl+1, t => ∀ i, match t.kids i with | some c => c.noLeaves lvl | none => True
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- The bytes of every user page, at the view `M` (keyed by `vpn.toNat`). -/
 def umPages (P : UPtd) (M : Nat → List (BitVec 8)) : IProp GF := iprop%

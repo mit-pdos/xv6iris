@@ -133,7 +133,7 @@ theorem ushf_lp0_echo (ws : List (List (BitVec 8))) (g : Nat → BitVec 8) (k le
   exact lineOk_head_byte0 ws hok
 
 section UshForkDefs
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
@@ -163,9 +163,9 @@ instance ushfWq_timeless (X : UshCtx GF) [hW : ∀ I p, Timeless (X.Wc I p)] (I 
 
 /-- **Rocq `ushf_kill_law`**: a killed child pays with the taint. -/
 def ushfKillLaw (X : UshCtx GF) : IProp GF :=
-  iprop(□ ∀ I : List (BitVec 8), uKillCred (hlc := hlc) -∗ X.Wc I 0)
+  iprop(□ ∀ I : List (BitVec 8), uKillCred -∗ X.Wc I 0)
 
-instance ushfKillLaw_persistent (X : UshCtx GF) : Persistent (ushfKillLaw (hlc := hlc) X) := by
+instance ushfKillLaw_persistent (X : UshCtx GF) : Persistent (ushfKillLaw X) := by
   unfold ushfKillLaw; infer_instance
 
 /-- **Rocq `ushf_child_law_at`**: THE CHILD'S WALK at the paid payload, from
@@ -182,15 +182,15 @@ def ushfChildLawAt (X : UshCtx GF) (Dg : Nat) (Lp : List (List (BitVec 8)) → (
     ushCode N'.t -∗ ushJtab N'.t -∗ ustr N'.d (DFrac.own 1) s0 len g -∗ ustr N'.d dw ushWsA 5 ushpWsF -∗
     ustr N'.d dv ushSymA 7 ushpSymF -∗ ushStd N' X ld -∗ ucwd N'.cwd ROOTINO -∗ uch N'.ch ∅ -∗ ushPid N' -∗
     ushmFresh N' sz -∗ X.Wc I 3 -∗
-    urun (hlc := hlc) N' h m (BitVec.ofNat 64 0x99c) (Dc + (8 + (Dg + n))) -∗ wpLoop h)
+    urun N' h m (BitVec.ofNat 64 0x99c) (Dc + (8 + (Dg + n))) -∗ wpLoop h)
 
 instance ushfChildLawAt_persistent (X : UshCtx GF) (Dg : Nat)
     (Lp : List (List (BitVec 8)) → (Nat → BitVec 8) → Nat → Nat → Prop) (Dc : Nat) :
-    Persistent (ushfChildLawAt (hlc := hlc) X Dg Lp Dc) := by
+    Persistent (ushfChildLawAt X Dg Lp Dc) := by
   unfold ushfChildLawAt; infer_instance
 
 /-- **Rocq `ushf_child_law`**: echo's line, echo's room. -/
-def ushfChildLaw (X : UshCtx GF) (Dg : Nat) : IProp GF := ushfChildLawAt (hlc := hlc) X Dg ushLineIs 60
+def ushfChildLaw (X : UshCtx GF) (Dg : Nat) : IProp GF := ushfChildLawAt X Dg ushLineIs 60
 
 /-- **Rocq `ushf_fans`** (main): what the fork left in the parent's hand --
 the token of the child it forked (the row's whole-lend arm, at `-1`, is
@@ -223,14 +223,14 @@ def ushfBodyLaw (N : UkNames GF) (X : UshCtx GF) (D : Uline → Prop) (sz : Nat)
     ⌜D lu⌝ -∗ ⌜ushLineAt lu f k len⌝ -∗ ⌜ushRegs m⌝ -∗ ⌜m.get 9#5 = BitVec.ofNat 64 (shBuf + k)⌝ -∗
     ⌜m.get 15#5 = BitVec.ofNat 64 (f k).toNat⌝ -∗ ⌜∀ j, j < len → f (k + j) ≠ ubyte0⌝ -∗
     ⌜f (k + len) = ubyte0⌝ -∗ ⌜k + len < shNbuf⌝ -∗
-    ⌜∀ n' : Nat, ⊢ ushAt (hlc := hlc) N X n' -∗ ∃ I : List (BitVec 8), ⌜I.length = n'⌝ ∗ ushLease (hlc := hlc) N X I⌝ -∗
-    ⌜∀ I : List (BitVec 8), ⊢ X.Pm I -∗ X.Wb I -∗ ushAt (hlc := hlc) N X I.length⌝ -∗
-    ⌜ushFd0p l⌝ -∗ ushGenSlot (hlc := hlc) N X -∗ ushCode N.t -∗ ushJtab N.t -∗ ushlHead (hlc := hlc) N X l sz -∗
-    ushBstate (hlc := hlc) N X l (ulineWs lu) -∗ ushlDat N.d -∗ usz N.s sz -∗ ubytes N.d shBuf shNbuf f -∗
-    urun (hlc := hlc) N h m (BitVec.ofNat 64 0x956) (16 + (ushDbody + n)) -∗ wpLoop h)
+    ⌜∀ n' : Nat, ⊢ ushAt N X n' -∗ ∃ I : List (BitVec 8), ⌜I.length = n'⌝ ∗ ushLease N X I⌝ -∗
+    ⌜∀ I : List (BitVec 8), ⊢ X.Pm I -∗ X.Wb I -∗ ushAt N X I.length⌝ -∗
+    ⌜ushFd0p l⌝ -∗ ushGenSlot N X -∗ ushCode N.t -∗ ushJtab N.t -∗ ushlHead N X l sz -∗
+    ushBstate N X l (ulineWs lu) -∗ ushlDat N.d -∗ usz N.s sz -∗ ubytes N.d shBuf shNbuf f -∗
+    urun N h m (BitVec.ofNat 64 0x956) (16 + (ushDbody + n)) -∗ wpLoop h)
 
 instance ushfBodyLaw_persistent (N : UkNames GF) (X : UshCtx GF) (D : Uline → Prop) (sz : Nat) :
-    Persistent (ushfBodyLaw (hlc := hlc) N X D sz) := by
+    Persistent (ushfBodyLaw N X D sz) := by
   unfold ushfBodyLaw; infer_instance
 
 end UshForkDefs

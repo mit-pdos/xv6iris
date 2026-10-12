@@ -30,9 +30,9 @@ namespace MachCSL
 open Iris Iris.BI Iris.ProofMode Std
 open LeanRV64D LeanRV64D.Functions
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
-local notation "era" => MachGS.era (hlc := hlc) (GF := GF)
+local notation "era" => MachGS.era (GF := GF)
 
 /-! ## Entries as value sets -/
 
@@ -129,8 +129,8 @@ the entry's POSITION in `t.entries 2`, not by its address: the seal
 chooses one function for the whole list by induction on it, which needs no
 argument that the addresses are distinct. -/
 def kptOn [CurCtx] (t : PTree) (M : RegMapF (BitVec 64)) : IProp GF := iprop%
-  ⌜kptFacts t M⌝ ∗ (MachGS.kmapName (hlc := hlc) (GF := GF) ↪●MAP{.discard} M) ∗
-  (MachGS.kptRootName (hlc := hlc) (GF := GF) ↪VAR{.discard} t.base) ∗
+  ⌜kptFacts t M⌝ ∗ (MachGS.kmapName (GF := GF) ↪●MAP{.discard} M) ∗
+  (MachGS.kptRootName (GF := GF) ↪VAR{.discard} t.base) ∗
   ∃ fl : Nat → Nat → Nat, inv kptN (kptBody t fl) ∗ kptKeys t fl
 
 instance kptOn_persistent [CurCtx] (t : PTree) (M : RegMapF (BitVec 64)) :
@@ -439,8 +439,8 @@ theorem kptOn_seal [CurCtx] (cpu : CPU) (t : PTree) (M : RegMapF (BitVec 64)) (r
     (hct : curTier = KTier.bare) (hf : kptFacts t M) :
     ownCtx (GF := GF) cpu curCtx ∗
       ([∗list] e ∈ t.entries 2, wordPointsTo e.1 8 (DFrac.own 1) e.2) ∗
-      (MachGS.kmapName (hlc := hlc) (GF := GF) ↪●MAP M) ∗
-      (MachGS.kptRootName (hlc := hlc) (GF := GF) ↪VAR r)
+      (MachGS.kmapName (GF := GF) ↪●MAP M) ∗
+      (MachGS.kptRootName (GF := GF) ↪VAR r)
     ⊢ |={⊤}=> (ownCtx cpu curCtx ∗ kptOn t M) := by
   iintro ⟨Hctx, Hents, Hauth, Hroot⟩
   ihave Hents := BigSepL.bigSepL_mono_of_forall

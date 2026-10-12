@@ -101,7 +101,7 @@ abbrev ParkURB (GF : BundledGFunctors.{0}) : Type _ :=
     BitVec 32 → IProp GF
 
 section ParkCap
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg]
@@ -116,7 +116,7 @@ def forkretStack : Nat := 512
 /-- The syscall side's park rows are persistent (UtResFits'
 `utSysParkRows`). -/
 instance utSysParkRows_persistent [CurCtx] (Γ : SchedNames) :
-    Persistent (utSysParkRows (hlc := hlc) (GF := GF) Γ) := by
+    Persistent (utSysParkRows (GF := GF) Γ) := by
   unfold utSysParkRows; infer_instance
 
 /-! ## §1 The pieces -/
@@ -129,7 +129,7 @@ the two quarters and the slot's half of `p->xstate` -- `procGenAt` minus its
 token, split, at the parker-chosen context. -/
 def parkBootBlock [CurCtx] (N : UtNames) (V : ProcPriv) (M : Nat → List (BitVec 8)) : IProp GF :=
   iprop(procPrivBareAt curCtx N.pj N.pid V M ∗ procOfiles N.f V.fdg N.pj V.ofile ∗
-    cwdRefAt V.cwd V.cwi ∗ rootRefAt V.root V.rti ∗ firstBoot (hlc := hlc) ∗
+    cwdRefAt V.cwd V.cwi ∗ rootRefAt V.root V.rti ∗ firstBoot ∗
     genKq V.gen N.pj N.pid (fun _ => iprop(True)) ∗ myPay V.gen (fun _ => iprop(True)) ∗
     genHalvesPriv N.pj N.pid V.gen ∗ (∃ xsv : BitVec 32, wordPointsTo (pXstate N.pj) 4 xsHalf xsv))
 
@@ -137,7 +137,7 @@ def parkBootBlock [CurCtx] (N : UtNames) (V : ProcPriv) (M : Nat → List (BitVe
 steady mode, split on the boot mode. -/
 def parkBlock [CurCtx] (steady : Bool) (N : UtNames) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
     IProp GF :=
-  if steady then procPrivFd N.f N.pj N.pid V M else parkBootBlock (hlc := hlc) N V M
+  if steady then procPrivFd N.f N.pj N.pid V M else parkBootBlock N V M
 
 /-- **The mode's payload** (Rocq `park_pkg`'s `match Wk`): `firstDone` on the
 steady mode (the evidence the boot arm is dead), the first process's exec
@@ -147,9 +147,9 @@ filing (kfork's child: the fork exit's child-origin claim; `<init>`: the
 power-on's). -/
 def parkMode [CurCtx] (rt cw : Nat) (secc : BitVec 64) (sts : List FdState) (Wk : Option Uvis) : IProp GF :=
   match Wk with
-  | some _ => iprop(firstDone (hlc := hlc) ∗ MachFixedGS.uClaimO (hlc := hlc) (GF := GF))
-  | none => iprop(initBootBundle (hlc := hlc) (SG := SG) rt cw secc sts ∗ consReader fscCons 0 ∗
-      MachFixedGS.uClaimO (hlc := hlc) (GF := GF))
+  | some _ => iprop(firstDone ∗ MachFixedGS.uClaimO (GF := GF))
+  | none => iprop(initBootBundle (SG := SG) rt cw secc sts ∗ consReader fscCons 0 ∗
+      MachFixedGS.uClaimO (GF := GF))
 
 /-- The slot a closer yields (Rocq `park_pkg`'s closer's `match Wk`): on the
 steady mode the slot AT THE RECORD THE RESUME LANDS ON, nothing on the boot
@@ -157,7 +157,7 @@ mode (the record's slot is kexec's receipt). -/
 def parkSlotOut (Wk : Option Uvis) (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (sts : List FdState)
     (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32) : IProp GF :=
   match Wk with
-  | some _ => uslot (hlc := hlc) (SG := SG) (uvisOf V' M' sts gn cs pid)
+  | some _ => uslot (SG := SG) (uvisOf V' M' sts gn cs pid)
   | none => iprop(emp)
 
 /-- The run-key pin a steady closer asks (Rocq `match Wk with Some W0 =>
@@ -178,18 +178,18 @@ def parkResumeK (URB : ParkURB GF) (W : IProp GF) (N : UtNames) (g γch : GName)
     [Xc : CurCtx] (h : CPU) (P' : UPtd) (V' : ProcPriv) (M' : Nat → List (BitVec 8)) : IProp GF :=
   iprop(⌜V'.upt = P'⌝ -∗ ⌜V'.fdg = g⌝ -∗ ⌜V'.chg = γch⌝ -∗ ⌜V'.gen = gn⌝ -∗ ⌜V'.cwi = cw⌝ -∗
     ⌜parkRunKey Wk V' M'⌝ -∗
-    parkGlobals N.Γ N.w N.ft N.f N.ip -∗ utSysParkRows N.Γ -∗ firstDone (hlc := hlc) -∗ W -∗
-    handlerEnvAt (hlc := hlc) N.Γ curCtx -∗ utTfk h (V'.kstack + 4096#64) V' -∗ cpuClaim h N.pj -∗
+    parkGlobals N.Γ N.w N.ft N.f N.ip -∗ utSysParkRows N.Γ -∗ firstDone -∗ W -∗
+    handlerEnvAt N.Γ curCtx -∗ utTfk h (V'.kstack + 4096#64) V' -∗ cpuClaim h N.pj -∗
     utBlock N.f N.pj N.pid V' -∗
     fdSlots FDSPARE -∗ irefSlots IREFSPARE -∗
     (URB N.j h Xc P' (V'.kstack + 4096#64) V' sts cs N.pid ∗
-      parkSlotOut (hlc := hlc) (SG := SG) Wk V' M' sts gn cs N.pid))
+      parkSlotOut (SG := SG) Wk V' M' sts gn cs N.pid))
 
 /-- The closer, ∀-quantified over the resumer. -/
 def parkCloser (URB : ParkURB GF) (W : IProp GF) (N : UtNames) (g γch : GName) (cw : Nat)
     (sts : List FdState) (gn : GName) (cs : ExtTreeSet GName compare) (Wk : Option Uvis) : IProp GF :=
   iprop(∀ (h : CPU) (Xc : CurCtx) (P' : UPtd) (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
-    parkResumeK (hlc := hlc) (SG := SG) URB W N g γch cw sts gn cs Wk (Xc := Xc) h P' V' M')
+    parkResumeK (SG := SG) URB W N g γch cw sts gn cs Wk (Xc := Xc) h P' V' M')
 
 /-- **THE PACKAGE** (Rocq `park_pkg`, deviation 2), at the parker's context
 `ξ`: the globals the resumer's forkret hands the closer, the slot marker,
@@ -201,8 +201,8 @@ def parkPkg (URB : ParkURB GF) (W : IProp GF) (N : UtNames) (ξ : CtxId) (ks : B
   letI : CurCtx := ⟨ξ, KTier.kpt⟩
   iprop(parkGlobals N.Γ N.w N.ft N.f N.ip ∗ utSysParkRows N.Γ ∗ slotUsed N.Γ N.pj ∗
     stackOwn (ks + 4096#64) forkretStack ∗
-    parkMode (hlc := hlc) (SG := SG) rt cw secc sts Wk ∗
-    ▷ parkCloser (hlc := hlc) (SG := SG) URB W N g γch cw sts gn cs Wk)
+    parkMode (SG := SG) rt cw secc sts Wk ∗
+    ▷ parkCloser (SG := SG) URB W N g γch cw sts gn cs Wk)
 
 /-- **THE CHILD'S OWN ROWS** (Rocq `park_child`): the saved context (`ra =
 forkret`, `sp` the kernel stack's top), the block at the mode's shape, the
@@ -211,7 +211,7 @@ def parkChild (ξ : CtxId) (N : UtNames) (rest : List (BitVec 64)) (V : ProcPriv
     (M : Nat → List (BitVec 8)) (steady : Bool) : IProp GF :=
   letI : CurCtx := ⟨ξ, KTier.kpt⟩
   iprop(contextCells N.pj (DFrac.own 1) (parkForkretPc :: (V.kstack + 4096#64) :: rest) ∗
-    parkBlock (hlc := hlc) steady N V M ∗ fdSlots FDSPARE ∗ irefSlots IREFSPARE)
+    parkBlock steady N V M ∗ fdSlots FDSPARE ∗ irefSlots IREFSPARE)
 
 /-- The package's run key on the `steady` mode: the parked record's own
 projection at a placeholder descriptor view (`urunEq` does not read it). -/
@@ -227,14 +227,14 @@ def parkCap (URB : ParkURB GF) (W : IProp GF) (Γ : SchedNames) : IProp GF :=
       (M : Nat → List (BitVec 8)) (sts : List FdState) (cs : ExtTreeSet GName compare) (steady : Bool),
     ⌜N.Γ = Γ ∧ utWf N ∧ rest.length = 12⌝ -∗
     ownCtx hp ξp -∗
-    parkPkg (hlc := hlc) (SG := SG) URB W N ξp V.kstack V.fdg V.chg V.rti V.cwi V.pvSecc sts V.gen cs
+    parkPkg (SG := SG) URB W N ξp V.kstack V.fdg V.chg V.rti V.cwi V.pvSecc sts V.gen cs
       (parkKey steady V M cs N.pid) -∗
     ▷ W -∗
-    parkChild (hlc := hlc) ξp N rest V M steady -∗
+    parkChild ξp N rest V M steady -∗
     |==> (ownCtx hp ξp ∗ procCtxAt Γ ξp N.pj))
 
 instance parkCap_persistent (URB : ParkURB GF) (W : IProp GF) (Γ : SchedNames) :
-    Persistent (parkCap (hlc := hlc) (SG := SG) URB W Γ) := by
+    Persistent (parkCap (SG := SG) URB W Γ) := by
   unfold parkCap; infer_instance
 
 /-- The residue's park row the channel quantifies (Lean's `G`, UtResFits
@@ -248,16 +248,16 @@ def parkChan (URB : ParkURB GF) (W : IProp GF) (Γ : SchedNames) : IProp GF :=
     ▷ (parkOwn -∗ utParkCaps N -∗
       ∀ (h : CPU) (Xc : CurCtx) (P' : UPtd) (V' : ProcPriv) (sts' : List FdState)
         (cs' : ExtTreeSet GName compare),
-        utParkResume (hlc := hlc) (URB N.j) W (parkG N) N (Xc := Xc) h P' V' sts' cs'))
+        utParkResume (URB N.j) W (parkG N) N (Xc := Xc) h P' V' sts' cs'))
 
 instance parkChan_persistent (URB : ParkURB GF) (W : IProp GF) (Γ : SchedNames) :
-    Persistent (parkChan (hlc := hlc) URB W Γ) := by
+    Persistent (parkChan URB W Γ) := by
   unfold parkChan; infer_instance
 
 /-- **THE TOKEN'S FUNCTIONAL** (Rocq `park_token_F`): some residue, its cap and
 its channel, both at `W := X`. -/
 def parkTokenF (Γ : SchedNames) (X : IProp GF) : IProp GF :=
-  iprop(∃ URB : ParkURB GF, parkCap (hlc := hlc) (SG := SG) URB X Γ ∗ parkChan (hlc := hlc) URB X Γ)
+  iprop(∃ URB : ParkURB GF, parkCap (SG := SG) URB X Γ ∗ parkChan URB X Γ)
 
 /-! ## §3 Contractivity -/
 
@@ -268,8 +268,8 @@ include HX
 theorem parkResumeK_ne (URB : ParkURB GF) (N : UtNames) (g γch : GName) (cw : Nat) (sts : List FdState)
     (gn : GName) (cs : ExtTreeSet GName compare) (Wk : Option Uvis) (Xc : CurCtx) (h : CPU) (P' : UPtd)
     (V' : ProcPriv) (M' : Nat → List (BitVec 8)) :
-    parkResumeK (hlc := hlc) (SG := SG) URB X N g γch cw sts gn cs Wk (Xc := Xc) h P' V' M' ≡{n}≡
-      parkResumeK (hlc := hlc) (SG := SG) URB Y N g γch cw sts gn cs Wk (Xc := Xc) h P' V' M' := by
+    parkResumeK (SG := SG) URB X N g γch cw sts gn cs Wk (Xc := Xc) h P' V' M' ≡{n}≡
+      parkResumeK (SG := SG) URB Y N g γch cw sts gn cs Wk (Xc := Xc) h P' V' M' := by
   unfold parkResumeK
   refine BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl
     (BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl
@@ -277,8 +277,8 @@ theorem parkResumeK_ne (URB : ParkURB GF) (N : UtNames) (g γch : GName) (cw : N
 
 theorem parkCloser_ne (URB : ParkURB GF) (N : UtNames) (g γch : GName) (cw : Nat) (sts : List FdState)
     (gn : GName) (cs : ExtTreeSet GName compare) (Wk : Option Uvis) :
-    parkCloser (hlc := hlc) (SG := SG) URB X N g γch cw sts gn cs Wk ≡{n}≡
-      parkCloser (hlc := hlc) (SG := SG) URB Y N g γch cw sts gn cs Wk := by
+    parkCloser (SG := SG) URB X N g γch cw sts gn cs Wk ≡{n}≡
+      parkCloser (SG := SG) URB Y N g γch cw sts gn cs Wk := by
   unfold parkCloser
   exact BI.forall_ne (fun h => BI.forall_ne (fun Xc => BI.forall_ne (fun P' => BI.forall_ne (fun V' =>
     BI.forall_ne (fun M' => parkResumeK_ne n X Y HX URB N g γch cw sts gn cs Wk Xc h P' V' M')))))
@@ -287,8 +287,8 @@ theorem utParkResume_ne (URB : CPU → CurCtx → UPtd → BitVec 64 → ProcPri
       ExtTreeSet GName compare → BitVec 32 → IProp GF) (G : CurCtx → IProp GF) (N : UtNames)
     (Xc : CurCtx) (h : CPU) (P' : UPtd) (V' : ProcPriv) (sts' : List FdState)
     (cs' : ExtTreeSet GName compare) :
-    utParkResume (hlc := hlc) URB X G N (Xc := Xc) h P' V' sts' cs' ≡{n}≡
-      utParkResume (hlc := hlc) URB Y G N (Xc := Xc) h P' V' sts' cs' := by
+    utParkResume URB X G N (Xc := Xc) h P' V' sts' cs' ≡{n}≡
+      utParkResume URB Y G N (Xc := Xc) h P' V' sts' cs' := by
   unfold utParkResume
   exact BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl
     (BI.wand_ne.ne HX .rfl))))
@@ -298,7 +298,7 @@ end Ne
 /-- **Rocq `park_token_F_contractive`**: both occurrences of the token are
 under `▷`. -/
 instance parkTokenF_contractive (Γ : SchedNames) :
-    OFE.Contractive (parkTokenF (hlc := hlc) (SG := SG) Γ) where
+    OFE.Contractive (parkTokenF (SG := SG) Γ) where
   distLater_dist := by
     intro n X Y HX
     unfold parkTokenF
@@ -327,16 +327,16 @@ instance parkTokenF_contractive (Γ : SchedNames) :
 /-! ## §4 The token -/
 
 /-- **Rocq `park_token`**: the fixpoint. -/
-def parkToken (Γ : SchedNames) : IProp GF := fixpoint (parkTokenF (hlc := hlc) (SG := SG) Γ)
+def parkToken (Γ : SchedNames) : IProp GF := fixpoint (parkTokenF (SG := SG) Γ)
 
 /-- **Rocq `park_token_unfold`**. -/
 theorem parkToken_unfold (Γ : SchedNames) :
-    parkToken (hlc := hlc) (SG := SG) Γ ⊣⊢ parkTokenF (hlc := hlc) (SG := SG) Γ (parkToken Γ) :=
+    parkToken (SG := SG) Γ ⊣⊢ parkTokenF (SG := SG) Γ (parkToken Γ) :=
   BI.equiv_iff.1 <| OFE.eq_dist_2 <|
-    fun _n => (fixpoint_unfold (f := (parkTokenF (hlc := hlc) (SG := SG) Γ).toContractiveHom)).dist
+    fun _n => (fixpoint_unfold (f := (parkTokenF (SG := SG) Γ).toContractiveHom)).dist
 
 /-- **Rocq `park_token_persistent`**. -/
-instance parkToken_persistent (Γ : SchedNames) : Persistent (parkToken (hlc := hlc) (SG := SG) Γ) where
+instance parkToken_persistent (Γ : SchedNames) : Persistent (parkToken (SG := SG) Γ) where
   persistent := by
     refine BI.Entails.trans (parkToken_unfold Γ).mp ?_
     refine BI.Entails.trans ?_ (BI.persistently_mono (parkToken_unfold Γ).mpr)
@@ -355,15 +355,15 @@ captured rows (both parkers' `▷` closer). -/
 theorem parkCloser_of_chan (URB : ParkURB GF) (W : IProp GF) (N : UtNames) (V : ProcPriv)
     (sts : List FdState) (cs : ExtTreeSet GName compare) (Wk : Option Uvis) (M : Nat → List (BitVec 8))
     (hslot : ∀ (V' : ProcPriv) (M' : Nat → List (BitVec 8)), parkRunKey Wk V' M' → V'.gen = V.gen →
-      parkSlotOut (hlc := hlc) (SG := SG) Wk V M sts V.gen cs N.pid ⊢
-        parkSlotOut (hlc := hlc) (SG := SG) Wk V' M' sts V.gen cs N.pid) :
+      parkSlotOut (SG := SG) Wk V M sts V.gen cs N.pid ⊢
+        parkSlotOut (SG := SG) Wk V' M' sts V.gen cs N.pid) :
     (parkOwn (GF := GF) -∗ utParkCaps N -∗
       ∀ (h : CPU) (Xc : CurCtx) (P' : UPtd) (V' : ProcPriv) (sts' : List FdState)
         (cs' : ExtTreeSet GName compare),
-        utParkResume (hlc := hlc) (URB N.j) W (parkG N) N (Xc := Xc) h P' V' sts' cs') ⊢
+        utParkResume (URB N.j) W (parkG N) N (Xc := Xc) h P' V' sts' cs') ⊢
       parkOwn -∗ utParkCaps N -∗ fdFrags V.fdg sts -∗ chFrag V.chg N.pj cs -∗
-      parkSlotOut (hlc := hlc) (SG := SG) Wk V M sts V.gen cs N.pid -∗
-      parkCloser (hlc := hlc) (SG := SG) URB W N V.fdg V.chg V.cwi sts V.gen cs Wk := by
+      parkSlotOut (SG := SG) Wk V M sts V.gen cs N.pid -∗
+      parkCloser (SG := SG) URB W N V.fdg V.chg V.cwi sts V.gen cs Wk := by
   iintro Hclose Hown Hcaps Hfr Hch Hslot
   ihave Hc := Hclose $$ Hown Hcaps
   unfold parkCloser parkResumeK
@@ -382,23 +382,23 @@ block split. -/
 theorem parkToken_park (hp : CPU) (ξ : CtxId) (N : UtNames) (rest : List (BitVec 64)) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (cs : ExtTreeSet GName compare)
     (hwf : utWf N) (hrest : rest.length = 12) :
-    ⊢ ownCtx hp ξ -∗ parkToken (hlc := hlc) (SG := SG) N.Γ -∗
+    ⊢ ownCtx hp ξ -∗ parkToken (SG := SG) N.Γ -∗
       (letI : CurCtx := ⟨ξ, KTier.kpt⟩
        iprop(parkGlobals N.Γ N.w N.ft N.f N.ip ∗ utSysParkRows N.Γ ∗
         stackOwn (V.kstack + 4096#64) forkretStack)) -∗
       slotUsed N.Γ N.pj -∗ parkOwn -∗ utParkCaps N -∗
       fdFrags V.fdg sts -∗ chFrag V.chg N.pj cs -∗
-      initBootBundle (hlc := hlc) (SG := SG) V.rti V.cwi V.pvSecc sts -∗ consReader fscCons 0 -∗
-      MachFixedGS.uClaimO (hlc := hlc) (GF := GF) -∗
-      parkChild (hlc := hlc) ξ N rest V M false -∗
+      initBootBundle (SG := SG) V.rti V.cwi V.pvSecc sts -∗ consReader fscCons 0 -∗
+      MachFixedGS.uClaimO (GF := GF) -∗
+      parkChild ξ N rest V M false -∗
       |==> (ownCtx hp ξ ∗ procCtxAt N.Γ ξ N.pj) := by
   iintro Hrun #Htok ⟨#Hglob, #HG, Hstk⟩ #Hused Hown #Hcaps Hfr Hch Hbun Hrd Hco Hchild
-  ihave Htok' := (parkToken_unfold (hlc := hlc) (SG := SG) N.Γ).mp $$ Htok
+  ihave Htok' := (parkToken_unfold (SG := SG) N.Γ).mp $$ Htok
   unfold parkTokenF
   icases Htok' with ⟨%URB, #Hcap, #Hchan⟩
   unfold parkChan
   ihave Hclose := Hchan $$ %N %rfl %hwf
-  ihave Hpkg : parkPkg (hlc := hlc) (SG := SG) URB (parkToken N.Γ) N ξ V.kstack V.fdg V.chg V.rti V.cwi V.pvSecc sts
+  ihave Hpkg : parkPkg (SG := SG) URB (parkToken N.Γ) N ξ V.kstack V.fdg V.chg V.rti V.cwi V.pvSecc sts
       V.gen cs (parkKey false V M cs N.pid) $$ [Hstk Hbun Hrd Hco Hclose Hown Hfr Hch]
   · unfold parkPkg parkKey
     simp only [Bool.false_eq_true, ↓reduceIte]
@@ -418,7 +418,7 @@ theorem parkToken_park (hp : CPU) (ξ : CtxId) (N : UtNames) (rest : List (BitVe
       (fun _ _ _ _ => by unfold parkSlotOut; exact .rfl) $$ Hclose Hown Hcaps Hfr Hch
     unfold parkSlotOut
     iempintro
-  ihave Hlw : ▷ parkToken (hlc := hlc) (SG := SG) N.Γ $$ []
+  ihave Hlw : ▷ parkToken (SG := SG) N.Γ $$ []
   · inext
     iexact Htok
   unfold parkCap
@@ -430,23 +430,23 @@ slot at the parked record, re-keyed at the resume; the package carries
 theorem parkToken_park_steady (hp : CPU) (ξ : CtxId) (N : UtNames) (rest : List (BitVec 64))
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (cs : ExtTreeSet GName compare)
     (hwf : utWf N) (hrest : rest.length = 12) :
-    ⊢ ownCtx hp ξ -∗ parkToken (hlc := hlc) (SG := SG) N.Γ -∗
+    ⊢ ownCtx hp ξ -∗ parkToken (SG := SG) N.Γ -∗
       (letI : CurCtx := ⟨ξ, KTier.kpt⟩
        iprop(parkGlobals N.Γ N.w N.ft N.f N.ip ∗ utSysParkRows N.Γ ∗
-        stackOwn (V.kstack + 4096#64) forkretStack ∗ firstDone (hlc := hlc))) -∗
+        stackOwn (V.kstack + 4096#64) forkretStack ∗ firstDone)) -∗
       slotUsed N.Γ N.pj -∗ parkOwn -∗ utParkCaps N -∗
       fdFrags V.fdg sts -∗ chFrag V.chg N.pj cs -∗
-      uslot (hlc := hlc) (SG := SG) (uvisOf V M sts V.gen cs N.pid) -∗
-      MachFixedGS.uClaimO (hlc := hlc) (GF := GF) -∗
-      parkChild (hlc := hlc) ξ N rest V M true -∗
+      uslot (SG := SG) (uvisOf V M sts V.gen cs N.pid) -∗
+      MachFixedGS.uClaimO (GF := GF) -∗
+      parkChild ξ N rest V M true -∗
       |==> (ownCtx hp ξ ∗ procCtxAt N.Γ ξ N.pj) := by
   iintro Hrun #Htok ⟨#Hglob, #HG, Hstk, #Hdone⟩ #Hused Hown #Hcaps Hfr Hch Hslot Hco Hchild
-  ihave Htok' := (parkToken_unfold (hlc := hlc) (SG := SG) N.Γ).mp $$ Htok
+  ihave Htok' := (parkToken_unfold (SG := SG) N.Γ).mp $$ Htok
   unfold parkTokenF
   icases Htok' with ⟨%URB, #Hcap, #Hchan⟩
   unfold parkChan
   ihave Hclose := Hchan $$ %N %rfl %hwf
-  ihave Hpkg : parkPkg (hlc := hlc) (SG := SG) URB (parkToken N.Γ) N ξ V.kstack V.fdg V.chg V.rti V.cwi V.pvSecc sts
+  ihave Hpkg : parkPkg (SG := SG) URB (parkToken N.Γ) N ξ V.kstack V.fdg V.chg V.rti V.cwi V.pvSecc sts
       V.gen cs (parkKey true V M cs N.pid) $$ [Hstk Hslot Hco Hclose Hown Hfr Hch]
   · unfold parkPkg parkKey
     simp only [↓reduceIte]
@@ -467,11 +467,11 @@ theorem parkToken_park_steady (hp : CPU) (ξ : CtxId) (N : UtNames) (rest : List
         -- (at the placeholder `[]`) is the slot's key (at `sts`) on every
         -- field it reads, and `uslot_of_urunEq` moves the slot onto the
         -- resumed record
-        exact (uslot_of_urunEq (hlc := hlc) (SG := SG) (Wk := uvisOf V M sts V.gen cs N.pid) hrk rfl
+        exact (uslot_of_urunEq (SG := SG) (Wk := uvisOf V M sts V.gen cs N.pid) hrk rfl
           rfl rfl rfl).mp) $$ Hclose Hown Hcaps Hfr Hch
     unfold parkSlotOut
     iexact Hslot
-  ihave Hlw : ▷ parkToken (hlc := hlc) (SG := SG) N.Γ $$ []
+  ihave Hlw : ▷ parkToken (SG := SG) N.Γ $$ []
   · inext
     iexact Htok
   unfold parkCap
@@ -485,11 +485,11 @@ caller: the cap is `forkret_park_paid` and the channel is
 `UtResFits.usertrapResAt_park`. -/
 theorem parkToken_intro_of (URB : ParkURB GF) (Γ : SchedNames)
     (hchan : ∀ N : UtNames, N.Γ = Γ →
-      utParkIntroBody (hlc := hlc) (URB N.j) (parkToken (hlc := hlc) (SG := SG) Γ) (parkG N) N) :
-    ⊢ parkCap (hlc := hlc) (SG := SG) URB (parkToken (hlc := hlc) (SG := SG) Γ) Γ -∗
-      parkToken (hlc := hlc) (SG := SG) Γ := by
+      utParkIntroBody (URB N.j) (parkToken (SG := SG) Γ) (parkG N) N) :
+    ⊢ parkCap (SG := SG) URB (parkToken (SG := SG) Γ) Γ -∗
+      parkToken (SG := SG) Γ := by
   iintro #Hcap
-  iapply (parkToken_unfold (hlc := hlc) (SG := SG) Γ).mpr
+  iapply (parkToken_unfold (SG := SG) Γ).mpr
   unfold parkTokenF
   iexists URB
   isplitr

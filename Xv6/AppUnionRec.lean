@@ -55,7 +55,7 @@ verbatim (sync SY3-A4); it reads the trace alone. -/
 def unionPhiApp : GState → List Obs → Prop := fun _ h => unionPhiSync h
 
 section UnionApp
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGpreS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGpreS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF] [PipeOutG GF]
 
 attribute [local instance] appPreGS
@@ -63,60 +63,60 @@ attribute [local instance] appPreGS
 /-! ## The four fields that are resources -/
 
 /-- Rocq `union_R`. -/
-noncomputable def unionR (ug : UnionGn) (h : List Obs) : IProp GF := unionLed (hlc := hlc) ug h
+noncomputable def unionR (ug : UnionGn) (h : List Obs) : IProp GF := unionLed ug h
 
 instance unionR_timeless (ug : UnionGn) (h : List Obs) :
-    Timeless (unionR (hlc := hlc) (GF := GF) ug h) := by
+    Timeless (unionR (GF := GF) ug h) := by
   unfold unionR; infer_instance
 
 /-- Rocq `union_tag`. -/
-noncomputable def unionTag (ug : UnionGn) (h : List Obs) : IProp GF := utag (hlc := hlc) ug h
+noncomputable def unionTag (ug : UnionGn) (h : List Obs) : IProp GF := utag ug h
 
 instance unionTag_persistent (ug : UnionGn) (h : List Obs) :
-    Persistent (unionTag (hlc := hlc) (GF := GF) ug h) := by
+    Persistent (unionTag (GF := GF) ug h) := by
   unfold unionTag; infer_instance
 instance unionTag_timeless (ug : UnionGn) (h : List Obs) :
-    Timeless (unionTag (hlc := hlc) (GF := GF) ug h) := by
+    Timeless (unionTag (GF := GF) ug h) := by
   unfold unionTag; infer_instance
 
 /-- Rocq `union_kill`: the file claim's taint. -/
-def unionKill (ug : UnionGn) : IProp GF := fileTaint (hlc := hlc) ug.ugnFile.fgnCl
+def unionKill (ug : UnionGn) : IProp GF := fileTaint ug.ugnFile.fgnCl
 
-instance unionKill_persistent (ug : UnionGn) : Persistent (unionKill (hlc := hlc) (GF := GF) ug) := by
+instance unionKill_persistent (ug : UnionGn) : Persistent (unionKill (GF := GF) ug) := by
   unfold unionKill; infer_instance
-instance unionKill_timeless (ug : UnionGn) : Timeless (unionKill (hlc := hlc) (GF := GF) ug) := by
+instance unionKill_timeless (ug : UnionGn) : Timeless (unionKill (GF := GF) ug) := by
   unfold unionKill; infer_instance
 
 /-- Rocq `union_cons`. -/
 noncomputable def unionCons (ug : UnionGn) : Nat → List Obs → ConsHist → IProp GF :=
-  ucl (hlc := hlc) ug
+  ucl ug
 
 instance unionCons_timeless (ug : UnionGn) (k : Nat) (h : List Obs) (H : ConsHist) :
-    Timeless (unionCons (hlc := hlc) (GF := GF) ug k h H) := by
+    Timeless (unionCons (GF := GF) ug k h H) := by
   unfold unionCons; infer_instance
 
 /-- **THE INTERFACE'S LICENCE LAW** (Rocq `union_cons_lic`): a tainted claim
 answers any boundary event out of its taint. -/
 theorem unionCons_lic (ug : UnionGn) :
-    unionKill (hlc := hlc) (GF := GF) ug ⊢
+    unionKill (GF := GF) ug ⊢
       iprop(□ ∀ (k : Nat) (h : List Obs) (H : ConsHist) (ev : ConsEv),
-        unionCons (hlc := hlc) ug k h H ==∗ unionCons (hlc := hlc) ug k h (consStep H ev)) := by
+        unionCons ug k h H ==∗ unionCons ug k h (consStep H ev)) := by
   unfold unionKill unionCons
   iintro #Ht
   imodintro
   iintro %k %h %H %ev Ho
-  iapply (ucl_sup (hlc := hlc) (GF := GF) ug k h H ev) $$ Ht Ho
+  iapply (ucl_sup (GF := GF) ug k h H ev) $$ Ht Ho
 
 /-- **THE WILD LICENCE** (Rocq `union_wild_lic`, seccomp design 10.2): the
 era's wild token steps its own era's claim by the two process events. -/
 theorem unionWild_lic (ug : UnionGn) (k : Nat) :
-    useccTok (hlc := hlc) (GF := GF) ug k ⊢
+    useccTok (GF := GF) ug k ⊢
       iprop(□ ∀ (h : List Obs) (H : ConsHist) (ev : ConsEv),
         ⌜wildEv ev⌝ -∗ ⌜consEvOk H ev⌝ -∗
-        unionCons (hlc := hlc) ug k h H ==∗ unionCons (hlc := hlc) ug k h (consStep H ev)) := by
+        unionCons ug k h H ==∗ unionCons ug k h (consStep H ev)) := by
   unfold unionCons
   iintro #Htok
-  ihave #Hl := (ucl_wild_lic (hlc := hlc) (GF := GF) ug k) $$ Htok
+  ihave #Hl := (ucl_wild_lic (GF := GF) ug k) $$ Htok
   imodintro
   iintro %h %H %ev %hw %hev Ho
   have hw' : (∃ b, ev = .evOut b) ∨ (∃ ws, ev = .evRead ws) := by
@@ -127,20 +127,20 @@ theorem unionWild_lic (ug : UnionGn) (k : Nat) :
 licence, the claim, the era's wild token and its licence (seccomp design
 10.1), and the tokenless masked reader's credential (10.12, lane S5b). -/
 noncomputable def unionIfc (ug : UnionGn) : AppIface GF where
-  tag := unionTag (hlc := hlc) ug
+  tag := unionTag ug
   tag_persistent := fun _ => inferInstance
   tag_timeless := fun _ => inferInstance
-  kill := unionKill (hlc := hlc) ug
+  kill := unionKill ug
   kill_persistent := inferInstance
   kill_timeless := inferInstance
-  cons := unionCons (hlc := hlc) ug
+  cons := unionCons ug
   cons_timeless := fun _ _ _ => inferInstance
   lic := unionCons_lic ug
-  wild := useccTok (hlc := hlc) ug
+  wild := useccTok ug
   wild_persistent := fun _ => inferInstance
   wild_timeless := fun _ => inferInstance
   wild_lic := unionWild_lic ug
-  rdwild := urdwild (hlc := hlc) ug
+  rdwild := urdwild ug
   rdwild_persistent := fun _ => inferInstance
   rdwild_timeless := fun _ => inferInstance
 
@@ -151,61 +151,61 @@ boot resource and names; the union's ledger, interface, turn and
 conclusion. -/
 noncomputable def appUnion : Xv6App GF where
   fixed := UnionGn
-  cl := unionClAll (hlc := hlc)
+  cl := unionClAll
   names := FileAppNames
-  pred := fun c => filePred (hlc := hlc) c.ugnFile.fgnCl
-  boot := unionBoot (hlc := hlc)
-  R := unionR (hlc := hlc)
-  ifc := unionIfc (hlc := hlc)
+  pred := fun c => filePred c.ugnFile.fgnCl
+  boot := unionBoot
+  R := unionR
+  ifc := unionIfc
   -- THE TURN IN ITS FOUR STAGES (Rocq sync SY3-A3bc)
   turn := uturn (GF := GF)
-  turn' := uturn' (hlc := hlc)
-  turn'' := uturn'' (hlc := hlc)
+  turn' := uturn'
+  turn'' := uturn''
   iturn := uturnI (GF := GF)
   -- the birth's crash-slot part, what it keeps of the machine's names, the
   -- era's and the durable copy's record predicates, the token and the hook
   -- family (sync SY3-A3bc)
-  cls := unionCls (hlc := hlc)
+  cls := unionCls
   born := unionBorn
   ok := fun _ k r => r.fnEra = k
   okc := fun _ r => r.fnRole = true
-  tk := fun c k => unionTk (hlc := hlc) c.ugnFile.fgnCl k
-  hk := fun c k Q => unionHk (hlc := hlc) (filePred (hlc := hlc)) c.ugnFile.fgnCl k Q
+  tk := fun c k => unionTk c.ugnFile.fgnCl k
+  hk := fun c k Q => unionHk (filePred) c.ugnFile.fgnCl k Q
   phi := unionPhiApp
 
 /-- Rocq `union_al_Rt`. -/
-theorem union_al_Rt (c : (appUnion (hlc := hlc) (GF := GF)).fixed) (h : List Obs) :
-    Timeless ((appUnion (hlc := hlc) (GF := GF)).R c h) :=
-  unionR_timeless (hlc := hlc) c h
+theorem union_al_Rt (c : (appUnion (GF := GF)).fixed) (h : List Obs) :
+    Timeless ((appUnion (GF := GF)).R c h) :=
+  unionR_timeless c h
 
 /-- Rocq `union_al_kill`: the supply buys the kill credential (the file
 claim's reading). -/
-theorem union_al_kill (c : (appUnion (hlc := hlc) (GF := GF)).fixed)
-    (r : (appUnion (hlc := hlc) (GF := GF)).names) :
-    appSupRaw ((appUnion (hlc := hlc) (GF := GF)).pred c) r ⊢
-      iprop(□ (appUnion (hlc := hlc) (GF := GF)).kill c) := by
+theorem union_al_kill (c : (appUnion (GF := GF)).fixed)
+    (r : (appUnion (GF := GF)).names) :
+    appSupRaw ((appUnion (GF := GF)).pred c) r ⊢
+      iprop(□ (appUnion (GF := GF)).kill c) := by
   -- Lean ≥ 4.34: `r`'s type must be `FileAppNames` syntactically for `appSupRaw_persistent` to apply
   change FileAppNames at r
-  show appSupRaw (filePred (hlc := hlc) c.ugnFile.fgnCl) r ⊢ iprop(□ fileTaint (hlc := hlc) c.ugnFile.fgnCl)
+  show appSupRaw (filePred c.ugnFile.fgnCl) r ⊢ iprop(□ fileTaint c.ugnFile.fgnCl)
   iintro #Hs
   imodintro
-  iapply (fileTaint_of_sup (hlc := hlc) (GF := GF) c.ugnFile.fgnCl r) $$ Hs
+  iapply (fileTaint_of_sup (GF := GF) c.ugnFile.fgnCl r) $$ Hs
 
 /-- Rocq `union_al_sup`: the supply buys the console licence. -/
-theorem union_al_sup (c : (appUnion (hlc := hlc) (GF := GF)).fixed)
-    (r : (appUnion (hlc := hlc) (GF := GF)).names) :
-    appSupRaw ((appUnion (hlc := hlc) (GF := GF)).pred c) r ⊢
+theorem union_al_sup (c : (appUnion (GF := GF)).fixed)
+    (r : (appUnion (GF := GF)).names) :
+    appSupRaw ((appUnion (GF := GF)).pred c) r ⊢
       iprop(□ ∀ (k : Nat) (h : List Obs) (H : ConsHist) (ev : ConsEv),
-        (appUnion (hlc := hlc) (GF := GF)).cons c k h H ==∗
-          (appUnion (hlc := hlc) (GF := GF)).cons c k h (consStep H ev)) := by
+        (appUnion (GF := GF)).cons c k h H ==∗
+          (appUnion (GF := GF)).cons c k h (consStep H ev)) := by
   -- Lean ≥ 4.34: `r`'s type must be `FileAppNames` syntactically for `appSupRaw_persistent` to apply
   change FileAppNames at r
-  show appSupRaw (filePred (hlc := hlc) c.ugnFile.fgnCl) r ⊢
+  show appSupRaw (filePred c.ugnFile.fgnCl) r ⊢
       iprop(□ ∀ (k : Nat) (h : List Obs) (H : ConsHist) (ev : ConsEv),
-        unionCons (hlc := hlc) c k h H ==∗ unionCons (hlc := hlc) c k h (consStep H ev))
+        unionCons c k h H ==∗ unionCons c k h (consStep H ev))
   iintro #Hs
-  ihave #Ht := (fileTaint_of_sup (hlc := hlc) (GF := GF) c.ugnFile.fgnCl r) $$ Hs
-  have hl := unionCons_lic (hlc := hlc) (GF := GF) c
+  ihave #Ht := (fileTaint_of_sup (GF := GF) c.ugnFile.fgnCl r) $$ Hs
+  have hl := unionCons_lic (GF := GF) c
   unfold unionKill at hl
   iapply hl
   iexact Ht
@@ -215,22 +215,22 @@ of the birth's crash-slot part: the file application's. -/
 theorem union_Happ_init (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Nat compare)
     (himg : fsBootImageWf (diskOf g.m.devs) XV6_DISK_BYTES sb nib cov)
     (hdk : fsBlocks (diskOf g.m.devs) = fsimgP) (hsb : sb = fsimgSb) (hcov : cov = fsimgCov)
-    (c : (appUnion (hlc := hlc) (GF := GF)).fixed) :
-    (appUnion (hlc := hlc) (GF := GF)).cls c ⊢@{IProp GF} |==> ∃ r : (appUnion (hlc := hlc) (GF := GF)).names,
-      ⌜(appUnion (hlc := hlc) (GF := GF)).okc c r⌝ ∗
-      (appUnion (hlc := hlc) (GF := GF)).pred c r
+    (c : (appUnion (GF := GF)).fixed) :
+    (appUnion (GF := GF)).cls c ⊢@{IProp GF} |==> ∃ r : (appUnion (GF := GF)).names,
+      ⌜(appUnion (GF := GF)).okc c r⌝ ∗
+      (appUnion (GF := GF)).pred c r
         (absView (imgState (fsBlocks (diskOf g.m.devs)) sb nib).fssInodes) := by
-  show unionCls (hlc := hlc) c ⊢ |==> ∃ r : FileAppNames, ⌜r.fnRole = true⌝ ∗
-    filePred (hlc := hlc) c.ugnFile.fgnCl r (absView (imgState (fsBlocks (diskOf g.m.devs)) sb nib).fssInodes)
+  show unionCls c ⊢ |==> ∃ r : FileAppNames, ⌜r.fnRole = true⌝ ∗
+    filePred c.ugnFile.fgnCl r (absView (imgState (fsBlocks (diskOf g.m.devs)) sb nib).fssInodes)
   unfold unionCls
   iintro ⟨%γ0, #Hreg, Hh, Hcm, Hhi, Hra, #Hlb⟩
-  iapply (fileInit_img (hlc := hlc) c.ugnFile.fgnCl (diskOf g.m.devs) XV6_DISK_BYTES sb nib cov γ0
+  iapply (fileInit_img c.ugnFile.fgnCl (diskOf g.m.devs) XV6_DISK_BYTES sb nib cov γ0
     himg hdk hsb hcov) $$ Hreg Hh Hcm Hhi Hra Hlb
 
 /-- Rocq `union_Hphi_R`: the conclusion's one ingredient. -/
-theorem union_Hphi_R (c : (appUnion (hlc := hlc) (GF := GF)).fixed) (g : GState) (h : List Obs) :
-    (appUnion (hlc := hlc) (GF := GF)).R c h ⊢ ⌜(appUnion (hlc := hlc) (GF := GF)).phi g h⌝ :=
-  unionLed_phi (hlc := hlc) c h
+theorem union_Hphi_R (c : (appUnion (GF := GF)).fixed) (g : GState) (h : List Obs) :
+    (appUnion (GF := GF)).R c h ⊢ ⌜(appUnion (GF := GF)).phi g h⌝ :=
+  unionLed_phi c h
 
 end UnionApp
 

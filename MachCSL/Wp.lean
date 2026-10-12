@@ -58,7 +58,7 @@ open LeanRV64D
 /-! ## The corpse rule -/
 
 section dead
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF]
 
 theorem eraCur_true {R : RegMapF EraGS} {g : GState} (h : g.pow = true) :
     eraCur (GF := GF) R g = iprop(∃ E, ⌜get? R g.gen = some E⌝ ∗ eraInterp E g.m) := by
@@ -114,15 +114,15 @@ theorem wp_dead (gen : Nat) (cpu : CPU) (m : SailM Unit) :
 
 end dead
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-! ## The state interpretation of the ambient era -/
 
 /-- The ambient era's memory-model mirrors. -/
-abbrev memModel (σ : MState) : IProp GF := memModelAt (MachGS.era (hlc := hlc) (GF := GF)) σ
+abbrev memModel (σ : MState) : IProp GF := memModelAt (MachGS.era (GF := GF)) σ
 
 /-- The ambient era's device mirrors. -/
-abbrev devInterp (ds : DevStates) : IProp GF := devInterpAt (MachGS.era (hlc := hlc) (GF := GF)) ds
+abbrev devInterp (ds : DevStates) : IProp GF := devInterpAt (MachGS.era (GF := GF)) ds
 
 /-- The ambient era's interpretation of the machine: every hart's register
 map agrees with its register file, the memory heap is the byte histories,
@@ -133,7 +133,7 @@ abbrev machInterp (σ : MState) : IProp GF := iprop%
   devInterp σ.devs
 
 theorem eraInterp_ambient (σ : MState) :
-    eraInterp (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) σ = machInterp σ := rfl
+    eraInterp (GF := GF) (MachGS.era (GF := GF)) σ = machInterp σ := rfl
 
 /-- Re-assemble the interpretation after a register update. -/
 theorem machInterp_of_regs (σ : MState) (f : CPU → RegFile) :
@@ -150,7 +150,7 @@ theorem machInterp_of_regs (σ : MState) (f : CPU → RegFile) :
 current cycle (and then forever), given the generation's certificate.  No
 postcondition: the hart never terminates. -/
 def wpHart (cpu : CPU) (m : SailM Unit) : IProp GF := iprop%
-  genCert -∗ hartWP (genId (hlc := hlc) (GF := GF)) cpu m
+  genCert -∗ hartWP (genId (GF := GF)) cpu m
 
 /-- The paper's `wp CpuLoop`: it is safe to run hart `cpu` from a cycle boundary. -/
 def wpLoop (cpu : CPU) : IProp GF := wpHart (GF := GF) cpu (pure ())
@@ -185,7 +185,7 @@ half of the history lives in the client's trace predicate, so a caller
 extending it is a caller with the client's consent (`swp_writeReg_uexit`/`_uenter`).
 The era bookkeeping is dispatched here. -/
 theorem wpHart_lift_obs (cpu : CPU) (m : SailM Unit) :
-    (∀ (g : GState) (h : List Obs), ⌜obsWf h g ∧ threadLive g (genId (hlc := hlc) (GF := GF))⌝ -∗
+    (∀ (g : GState) (h : List Obs), ⌜obsWf h g ∧ threadLive g (genId (GF := GF))⌝ -∗
       machInterp g.m ∗ obsAuth h ={⊤,∅}=∗
       ⌜∃ m' σ', hartStep cpu m g.m m' σ'⌝ ∗
       ▷ ∀ m' σ', ⌜hartStep cpu m g.m m' σ'⌝ -∗ £ 1 ={∅,⊤}=∗
@@ -203,19 +203,19 @@ theorem wpHart_lift_obs (cpu : CPU) (m : SailM Unit) :
   icases Hσ with ⟨Hgen, Hstart, ⟨%R, HR, %Hok, Hcur⟩, Hdisk⟩
   ihave %Hb' := genAuth_born _ _ $$ Hgen Hborn
   ihave %Hs' := startAuth_started _ _ $$ Hstart Hstarted
-  by_cases hge : g.gen = genId (hlc := hlc) (GF := GF)
+  by_cases hge : g.gen = genId (GF := GF)
   · -- current generation: the started certificate says the power is on
     have hpow : g.pow = true := by
       cases h : g.pow
       · simp [startCount, h] at Hs'; omega
       · rfl
-    have hl : threadLive g (genId (hlc := hlc) (GF := GF)) := ⟨hpow, hge⟩
+    have hl : threadLive g (genId (GF := GF)) := ⟨hpow, hge⟩
     rw [eraCur_true hpow]
     icases Hcur with ⟨%E, %HE, Hera⟩
     ihave %HRg := eraRegistered_lookup _ _ _ $$ HR Hreg
-    have HRg' : get? R g.gen = some (MachGS.era (hlc := hlc) (GF := GF)) := by
+    have HRg' : get? R g.gen = some (MachGS.era (GF := GF)) := by
       rw [hge]; exact HRg
-    have hEq : E = MachGS.era (hlc := hlc) (GF := GF) := by
+    have hEq : E = MachGS.era (GF := GF) := by
       rw [HE] at HRg'
       exact Option.some.inj HRg'
     subst hEq
@@ -245,7 +245,7 @@ theorem wpHart_lift_obs (cpu : CPU) (m : SailM Unit) :
       rw [show startCount { g with m := σ' } = startCount g from rfl]
       iframe Hgen Hstart
       -- the durable disk: a hart step never moves it
-      have hdk : diskFixedInterp (hlc := hlc) (GF := GF) { g with m := σ' } = diskFixedInterp g := by
+      have hdk : diskFixedInterp (GF := GF) { g with m := σ' } = diskFixedInterp g := by
         unfold diskFixedInterp; rw [show diskOf σ'.devs = diskOf g.m.devs from hartStep_diskOf hs]
       rw [hdk]
       iframe Hdisk
@@ -256,7 +256,7 @@ theorem wpHart_lift_obs (cpu : CPU) (m : SailM Unit) :
         · ipureintro
           exact Hok
         rw [eraCur_true (g := { g with m := σ' }) hpow]
-        iexists (MachGS.era (hlc := hlc) (GF := GF))
+        iexists (MachGS.era (GF := GF))
         isplit
         · ipureintro
           exact HRg'
@@ -268,9 +268,9 @@ theorem wpHart_lift_obs (cpu : CPU) (m : SailM Unit) :
       · exact BigSepL.bigSepL_nil_intro
     · exact absurd hl hnl
   · -- a passed generation: derive the death certificate and self-loop
-    have hlt : genId (hlc := hlc) (GF := GF) < g.gen := by omega
+    have hlt : genId (GF := GF) < g.gen := by omega
     ihave #Hdead := genAuth_get_dead _ _ hlt $$ Hgen
-    have hnl : ¬ threadLive g (genId (hlc := hlc) (GF := GF)) := fun h => hge h.2
+    have hnl : ¬ threadLive g (genId (GF := GF)) := fun h => hge h.2
     iapply fupd_mask_intro LawfulSet.empty_subset
     iintro Hclose
     isplit
@@ -725,7 +725,7 @@ the interpretation at `g.m`, and hands it back extended by the event's own
 observations `hartObs cpu o g.m`. -/
 theorem swp_event_obs (cpu : CPU) {X : Type} (o : Outcome Register RegisterType)
     (k : o.ret → SailM X) (Φ : X → IProp GF) (hnb : ∀ σ σ', ¬ blockedStep cpu o σ σ') :
-    (∀ (g : GState) (h : List Obs), ⌜obsWf h g ∧ threadLive g (genId (hlc := hlc) (GF := GF))⌝ -∗
+    (∀ (g : GState) (h : List Obs), ⌜obsWf h g ∧ threadLive g (genId (GF := GF))⌝ -∗
       machInterp g.m ∗ obsAuth h ={⊤,∅}=∗
       ⌜∃ v σ', evStep cpu o g.m v σ'⌝ ∗
       ▷ ∀ (v : o.ret) σ', ⌜evStep cpu o g.m v σ'⌝ -∗
@@ -1141,7 +1141,7 @@ open Sail Sail.ConcurrencyInterfaceV1
 open Sail.ArchSem (FreeM)
 open LeanRV64D
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}}
+variable {GF : BundledGFunctors.{0}}
 
 /-! ## The memory model's ghost bridges
 
@@ -1150,7 +1150,7 @@ arm re-establishes them.  Stated at an explicit era, so the power thread can
 use them too. -/
 
 section memmodel
-variable [MachFixedGS hlc GF] (E : EraGS)
+variable [MachFixedGS GF] (E : EraGS)
 
 theorem memModel_mmOk (σ : MState) : memModelAt E σ ⊢@{IProp GF} ⌜mmOk σ⌝ := by
   unfold memModelAt
@@ -1375,7 +1375,7 @@ end memmodel
 /-! ## Byte-level bridges -/
 
 section bytes
-variable [MachGS hlc GF]
+variable [MachGS GF]
 
 theorem mem_insert_eq {V : Type} (m : MemF V) (k : PAddr) (v : V) :
     Iris.Std.PartialMap.insert (M := MemF) m k v = m.insert k v := by
@@ -1511,7 +1511,7 @@ theorem imgBytes_readable (m : FlatMem) (pa : PAddr) (n : Nat) (w : BitVec (8 * 
 entry, justified at ξ by `keyAt ξ t`. -/
 theorem ctxBytes_update' (ξ : CtxId) (m : FlatMem) (pa : PAddr) (bs bs' : Nat → BitVec 8) (t : Nat)
     (h : Agent) : ∀ n : Nat,
-    keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ t ∗ genHeapInterp m ∗
+    keyAt (MachGS.era (GF := GF)) ξ t ∗ genHeapInterp m ∗
       ([∗list] j ∈ List.range n, ctxByte ξ (pa + BitVec.ofNat 64 j) (DFrac.own 1) (bs j)) ⊢@{IProp GF}
       |==> (genHeapInterp ((List.range n).foldl
               (fun (m : FlatMem) j => FlatMem.push m (pa + BitVec.ofNat 64 j) ⟨t, h, bs' j⟩) m) ∗
@@ -1550,7 +1550,7 @@ theorem ctxBytes_update' (ξ : CtxId) (m : FlatMem) (pa : PAddr) (bs bs' : Nat �
 
 theorem ctxBytes_update (ξ : CtxId) (m : FlatMem) (pa : PAddr) (n : Nat) (w w' : BitVec (8 * n)) (t : Nat)
     (h : Agent) :
-    keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ t ∗ genHeapInterp m ∗ ctxBytes ξ pa n (DFrac.own 1) w ⊢@{IProp GF}
+    keyAt (MachGS.era (GF := GF)) ξ t ∗ genHeapInterp m ∗ ctxBytes ξ pa n (DFrac.own 1) w ⊢@{IProp GF}
       |==> (genHeapInterp (m.writeBytes pa n w' t h) ∗ ctxBytes ξ pa n (DFrac.own 1) w') :=
   ctxBytes_update' ξ m pa (nthByte w) (nthByte w') t h n
 
@@ -1580,7 +1580,7 @@ theorem ctx_store (σ : MState) (cpu : CPU) (ξ : CtxId) (pa : PAddr) (n : Nat) 
     (r : Option Resv) (hram : ramBytes pa n) (hno : ¬ othersReserve σ.resv cpu pa n) :
     memModel σ ∗ ownCtx cpu ξ ∗ resvFragAny cpu r ⊢@{IProp GF} |==>
       (memModel (σ.store cpu pa n w false) ∗ ownCtx cpu ξ ∗ resvFrag cpu none false ∗
-       keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ (σ.top + 1)) := by
+       keyAt (MachGS.era (GF := GF)) ξ (σ.top + 1)) := by
   unfold ownCtx ownCtxAt resvFragAny resvFragAnyAt resvFrag memModel
   iintro ⟨Hmm, ⟨%B, %K, %W, %D, Hctx, #HK, %hBK, #HW, %hDW, #Hels⟩, %b, Hfrag⟩
   ihave %hW : ⌜W ≤ σ.top⌝ $$ [Hmm HW]

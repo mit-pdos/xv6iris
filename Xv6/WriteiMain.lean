@@ -120,7 +120,7 @@ theorem writei_zero_ok (A : WiArgs) (k : KCtx) (hA : WiFactsEb k A) (hn : A.n = 
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -170,7 +170,7 @@ theorem writei_exit_range (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) 
 set_option maxHeartbeats 8000000 in
 /-- **`+0xee .. +0xf0`: `n = 0`** (Rocq's `wp_writei_gen`, its `beqz s6`
 arm): `tot := n`, then the join, with no loop and no size test. -/
-theorem writei_zero (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem writei_zero (IU : IUPDATE) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (A : WiArgs) (hA : WiFactsEb k A)
     (x1 x8 x9 x10 x11 : BitVec 64)
     (hn : A.n = 0) (hoffle : A.off ≤ A.dn.diSize.toNat) (hrng : A.off + A.n ≤ MAXFILE * BSIZE)
@@ -217,7 +217,7 @@ set_option maxHeartbeats 8000000 in
 /-- **`+0x38 .. +0x4a`: the five lazy saves, the loop constants, into the
 loop** (Rocq's `wp_writei_gen`, its call to `wi_loop`). -/
 theorem writei_saves (IU : IUPDATE) (BM : BMAP) (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE)
-    (EC : EITHER_COPYIN) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (EC : EITHER_COPYIN) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (A : WiArgs) (hA : WiFactsEb k A)
     (w1 w8 w9 w10 w11 : BitVec 64)
     (hn : 0 < A.n) (hoffle : A.off ≤ A.dn.diSize.toNat) (hrng : A.off + A.n ≤ MAXFILE * BSIZE)
@@ -268,7 +268,7 @@ theorem writei_saves (IU : IUPDATE) (BM : BMAP) (BR : BREAD) (LW : LOG_WRITE) (B
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   have hlp := writei_loop_enter A k hA hn hoffle
-  have hloop := writei_loop (hlc := hlc) (GF := GF) IU BM BR LW BE EC Γ k A hA hrng hoffle
+  have hloop := writei_loop (GF := GF) IU BM BR LW BE EC Γ k A hA hrng hoffle
     (wiBlocks A.off A.n)
   iapply (hloop cpu spie spp (((R.set 19#5 0#64).set 25#5 1024#64).set 24#5 18446744073709551615#64) 0 A.bm A.data (fun _ => 0#8) A.V.upt A.ncount A.Sb hlp ?lr)
   all_goals first | (unfold wiLoopRes wiFrameK wiFrame; iframe; iframe #; done) | skip

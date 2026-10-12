@@ -39,7 +39,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF]
@@ -47,7 +47,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 set_option maxHeartbeats 16000000 in
 /-- **`+0xaa .. +0xc0`: begin_op, iput, end_op, the restore, the exit.** -/
 theorem fc_inode (BO : BEGIN_OP) (IP : IPUT) (EO : END_OP) [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (γk : KmemNames) (on : Option Nat) (st : FdState)
     (j : Nat) (pidv : BitVec 32) (dqp : DFrac) (v : BitVec 64)
     (spie spp : Bool) (R : RegMap) (w4 w5 w6 w7 : BitVec 64)
@@ -60,7 +60,7 @@ theorem fc_inode (BO : BEGIN_OP) (IP : IPUT) (EO : END_OP) [Fscfg] [Icfg] [CurCt
     kctx cpu (((k.withSpie spie spp).pushed 8).withRegs R) ∗ pcIs cpu (KA.«fileclose» + 0xaa#64) ∗
     fcSpilled (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w4 w5 w6 w7 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    panicEnv ∗ procsInv Γ ∗ fsReady (hlc := hlc) ∗ bslots 3 ∗
+    panicEnv ∗ procsInv Γ ∗ fsReady ∗ bslots 3 ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗ fdSlot ∗ inodeHeld v ∗
     wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k.regs R'⌝ -∗

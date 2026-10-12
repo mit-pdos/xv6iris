@@ -35,13 +35,13 @@ open Std (ExtTreeSet)
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-- **Rocq `wp_ref_parseexec`**: the whole function. -/
 theorem wp_shParseexec (UL : UK_LEAVES) (SP : SH_PEEK) (SG : SH_GETTOKEN) (SE : SH_EXECCMD)
-    (SR : SH_PARSEREDIRS) : wpShParseexecBody (hlc := hlc) (GF := GF) := by
+    (SR : SH_PARSEREDIRS) : wpShParseexecBody (GF := GF) := by
   intro N h m dq dw dv ps s0 len off fuel fin f w0 t UM UM' Pex nn ha0 ha1 hoff hw0 hsc href hch hhas hs64 hps0
     hps8 hpsz
   subst hw0

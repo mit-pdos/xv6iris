@@ -31,13 +31,13 @@ variable {GF : BundledGFunctors.{0}}
 
 /-- `putc`'s contract at a call site: the descriptor and the byte read off
 the call's registers, the return address named. -/
-theorem ulibPutc_callAt {hlc : HasLC} [MachGS hlc GF] (P : ULIB_PUTC) (L : UlibRun GF) (base : BitVec 64) (hb : base.toNat % 2 = 0)
+theorem ulibPutc_callAt [MachGS GF] (P : ULIB_PUTC) (L : UlibRun GF) (base : BitVec 64) (hb : base.toNat % 2 = 0)
     (M : RegMap) (n : Nat) (fd : BitVec 64) (c : BitVec 8) (Ci Co : IProp GF)
     (h10 : M 10#5 = fd) (h11 : (M 11#5).extractLsb' 0 8 = c) (r : BitVec 64) (hr : retPc (M 1#5) = r) :
     ⊢ ulibPutcWb L base fd c Ci Co -∗ ulibPutcCode L base -∗ Ci -∗ L.urun M base (4 + n) -∗
       (∀ m' : RegMap, ⌜ulibCalleeSaved M m'⌝ -∗ Co -∗ L.urun m' r (4 + n) -∗ L.goal) -∗ L.goal := by
   subst h10 h11 hr
-  exact P.wp_ulibPutc (hlc := hlc) L base M n Ci Co hb
+  exact P.wp_ulibPutc L base M n Ci Co hb
 
 /-- The text byte at index `j ≤ len`: the body byte, or the terminator. -/
 theorem ulibTextStr_at (L : UlibRunP GF) (a len : Nat) (f : Nat → BitVec 8) (j : Nat) (hj : j ≤ len) :
@@ -123,7 +123,7 @@ theorem ulibVprintf_epi (L : UlibRunP GF) (base : BitVec 64) (m0 m : RegMap) (n 
         exact hkeep _ (by decide)
 
 /-- **ONE PLAIN ROUND**, `+0x112 → +0x10e` (Rocq `wp_kcat_vprintf_step`). -/
-theorem ulibVprintf_step {hlc : HasLC} [MachGS hlc GF] (P : ULIB_PUTC) (L : UlibRunP GF) (base : BitVec 64) (hb : base.toNat % 2 = 0)
+theorem ulibVprintf_step [MachGS GF] (P : ULIB_PUTC) (L : UlibRunP GF) (base : BitVec 64) (hb : base.toNat % 2 = 0)
     (m0 m : RegMap) (a : Nat) (fd ap : BitVec 64) (i : Nat) (c0 c1 : BitVec 8) (n : Nat) (Ci Co : IProp GF)
     (hbnd : a + i + 2 < 2 ^ 31) (hpct : c0.toNat ≠ 37) (hinv : ulibVpInv m0 m a fd ap 0#64 i)
     (hs1 : m 9#5 = c0.zeroExtend 64) :
@@ -159,7 +159,7 @@ theorem ulibVprintf_step {hlc : HasLC} [MachGS hlc GF] (P : ULIB_PUTC) (L : Ulib
   iapply (ulibS_call L _ (ulibVprintf_i0f6 L.toUlibRun base) 0xfa rfl base (ulibPc_back _ _ _ (by decide))
     ((lsb0_iff_even base).2 hb) _ _) $$ Hc Hrun
   iintro Hrun
-  iapply (ulibPutc_callAt (hlc := hlc) P L.toUlibRun base hb _ n fd c0 Ci Co (by ulib_regs) (by ulib_regs; exact ulibZext_low c0)
+  iapply (ulibPutc_callAt P L.toUlibRun base hb _ n fd c0 Ci Co (by ulib_regs) (by ulib_regs; exact ulibZext_low c0)
     (base + 0xfa#64) (by ulib_regs; exact ulibRetPc_at base hb 0xfa (by decide))) $$ Hw Hpc HCi Hrun
   iintro %m1 %hcs HCo Hrun
   have hinv1 : ulibVpInv m0 m1 a fd ap 0#64 i :=
@@ -202,7 +202,7 @@ theorem ulibPaySeq_zero_elim (L : UlibRun GF) (base fd : BitVec 64) (f : Nat →
 /-- **THE LOOP** to the terminator and out through the epilogue (Rocq
 `wp_kcat_vprintf_loop`): `k + 1` characters left from index `i`, none of
 them `%`. -/
-theorem ulibVprintf_loop {hlc : HasLC} [MachGS hlc GF] (P : ULIB_PUTC) (L : UlibRunP GF) (base : BitVec 64)
+theorem ulibVprintf_loop [MachGS GF] (P : ULIB_PUTC) (L : UlibRunP GF) (base : BitVec 64)
     (hb : base.toNat % 2 = 0) (m0 : RegMap) (a len : Nat) (f : Nat → BitVec 8) (fd ap : BitVec 64)
     (lo n : Nat) (hbnd : a + len + 2 < 2 ^ 31) (hpct : ∀ j, lo ≤ j → j < len → (f j).toNat ≠ 37)
     (hal : (m0 2#5).toNat % 8 = 0) (hlo : 96 ≤ (m0 2#5).toNat) :
@@ -218,7 +218,7 @@ theorem ulibVprintf_loop {hlc : HasLC} [MachGS hlc GF] (P : ULIB_PUTC) (L : Ulib
     rw [ulibPaySeq_succ]
     iintro ⟨%Cm, Hw, Hrest⟩ #Hpc #Hc #Hs HCi HF Hrun Hk
     ihave #Hb1 := ulibTextStr_at L a len f (i + 1) (by omega) $$ Hs
-    iapply (ulibVprintf_step (hlc := hlc) P L base hb m0 m a fd ap i (f i) _ n Ci Cm (by omega)
+    iapply (ulibVprintf_step P L base hb m0 m a fd ap i (f i) _ n Ci Cm (by omega)
       (hpct i hi (by omega)) hinv hs1) $$ Hw Hpc Hc Hb1 HCi Hrun
     iintro %m1 %hinv1 %hs1' HCm Hrun
     rw [if_neg (by omega)] at hs1'
@@ -236,7 +236,7 @@ theorem ulibVprintf_loop {hlc : HasLC} [MachGS hlc GF] (P : ULIB_PUTC) (L : Ulib
     iintro ⟨%Cm, Hw, Hrest⟩ #Hpc #Hc #Hs HCi HF Hrun Hk
     ihave %hnn := ulibTextStr_nonul L a len f $$ Hs
     ihave #Hb1 := ulibTextStr_at L a len f (i + 1) (by omega) $$ Hs
-    iapply (ulibVprintf_step (hlc := hlc) P L base hb m0 m a fd ap i (f i) _ n Ci Cm (by omega)
+    iapply (ulibVprintf_step P L base hb m0 m a fd ap i (f i) _ n Ci Cm (by omega)
       (hpct i hi (by omega)) hinv hs1) $$ Hw Hpc Hc Hb1 HCi Hrun
     iintro %m1 %hinv1 %hs1' HCm Hrun
     rw [if_pos (by omega)] at hs1'
@@ -244,13 +244,13 @@ theorem ulibVprintf_loop {hlc : HasLC} [MachGS hlc GF] (P : ULIB_PUTC) (L : Ulib
     iapply (ulibS_brN L _ (ulibVprintf_i10e L.toUlibRun base) 0x112 rfl _ _
       (by ulib_regs; rw [hs1']; exact ulibZ_beq0 _ (hnn _ (by omega)))) $$ Hc Hrun
     iintro Hrun
-    iapply (ulibVprintf_loop (hlc := hlc) P L base hb m0 a len f fd ap lo n hbnd hpct hal hlo k (i + 1) m1
+    iapply (ulibVprintf_loop P L base hb m0 a len f fd ap lo n hbnd hpct hal hlo k (i + 1) m1
       Cm Co (by omega) (by omega) hinv1 hs1') $$ Hrest Hpc Hc Hs HCm HF Hrun Hk
 
 /-- **A RUN OF PLAIN CHARACTERS UP TO THE DIRECTIVE**, `+0x112 → +0x112`
 (Rocq `UkCatVprintfS.wp_kcat_vprintf_seg`): `k` characters from index `i`
 to the `%` at `q`, the loop still to run. -/
-theorem ulibVprintf_seg {hlc : HasLC} [MachGS hlc GF] (P : ULIB_PUTC) (L : UlibRunP GF) (base : BitVec 64)
+theorem ulibVprintf_seg [MachGS GF] (P : ULIB_PUTC) (L : UlibRunP GF) (base : BitVec 64)
     (hb : base.toNat % 2 = 0) (m0 : RegMap) (a len : Nat) (f : Nat → BitVec 8) (fd ap : BitVec 64)
     (q n : Nat) (hbnd : a + len + 2 < 2 ^ 31) (hq : q < len) (hpct : ∀ j, j < q → (f j).toNat ≠ 37) :
     ∀ (k i : Nat) (m : RegMap) (Ci Cm1 : IProp GF), i + k = q →
@@ -272,13 +272,13 @@ theorem ulibVprintf_seg {hlc : HasLC} [MachGS hlc GF] (P : ULIB_PUTC) (L : UlibR
     iintro ⟨%Cm, Hw, Hrest⟩ #Hpc #Hc #Hs HCi Hrun Hk
     ihave %hnn := ulibTextStr_nonul L a len f $$ Hs
     ihave #Hb1 := ulibTextStr_byte L a len f (i + 1) (by omega) $$ Hs
-    iapply (ulibVprintf_step (hlc := hlc) P L base hb m0 m a fd ap i (f i) _ n Ci Cm (by omega)
+    iapply (ulibVprintf_step P L base hb m0 m a fd ap i (f i) _ n Ci Cm (by omega)
       (hpct i (by omega)) hinv hs1) $$ Hw Hpc Hc Hb1 HCi Hrun
     iintro %m1 %hinv1 %hs1' HCm Hrun
     iapply (ulibS_brN L _ (ulibVprintf_i10e L.toUlibRun base) 0x112 rfl _ _
       (by ulib_regs; rw [hs1']; exact ulibZ_beq0 _ (hnn _ (by omega)))) $$ Hc Hrun
     iintro Hrun
-    iapply (ulibVprintf_seg (hlc := hlc) P L base hb m0 a len f fd ap q n hbnd hq hpct k (i + 1) m1
+    iapply (ulibVprintf_seg P L base hb m0 a len f fd ap q n hbnd hq hpct k (i + 1) m1
       Cm Cm1 (by omega) hinv1 hs1') $$ Hrest Hpc Hc Hs HCm Hrun Hk
 
 end

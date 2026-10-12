@@ -60,7 +60,7 @@ theorem writerImg_back (Pv P' : UPtd) (M : Nat → List (BitVec 8)) (kp : Nat) (
   | none => simp [hk]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 theorem procPtAt_congr (P : UPtd) (M M' : Nat → List (BitVec 8))
     (h : ∀ kp w, Iris.Std.PartialMap.get? P.um kp = some w → M kp = M' kp) :

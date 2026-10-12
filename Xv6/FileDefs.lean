@@ -351,7 +351,7 @@ invariants. -/
 def fileipN : Namespace := ndot nroot "fileip"
 
 section InodeCore
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF]
   [SleepLockG GF] [IcboxG GF]
 
 /-- What `inodePay`'s cancellable invariant parks (Rocq `inode_core`): the
@@ -370,7 +370,7 @@ instance inodeCore_timeless [Icfg] (v : BitVec 64) (Q : Qp) (inum : BitVec 32) :
 end InodeCore
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF]
   [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF]
   [Icfg] [CurCtx]
 

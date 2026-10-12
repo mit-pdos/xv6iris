@@ -45,7 +45,7 @@ theorem bm_cells_restore_dir (bm : Blkmap) (j : Nat) (hlen : bm.bmDir.length = N
   exact List.set_getElem_self hlt
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
@@ -136,7 +136,7 @@ theorem bm_direct_ok (c cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
 set_option maxHeartbeats 16000000 in
 /-- **`+0x28 .. +0x30`: THE DIRECT balloc**, and its failure arm (return 0,
 nothing moved). -/
-theorem bm_direct_alloc (BA : BALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem bm_direct_alloc (BA : BALLOC) (Γ : SchedNames) [ClaimIs GF Γ]
     (c cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
     (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName) (pd pav pu : BitVec 64)
     (j : Nat) (γfs : FsNames) (logstart : Nat) (dev : BitVec 32) (a : BmAlloc) (ip : BitVec 64)
@@ -254,7 +254,7 @@ set_option maxHeartbeats 16000000 in
 direct arm, up to the allocation). -/
 theorem bm_direct (ak : Option BmAlloc)
     (hba : ak.isSome = true → BALLOC)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c cpu : CPU)
+    (Γ : SchedNames) [ClaimIs GF Γ] (c cpu : CPU)
     (k : KCtx) (spie spp : Bool) (R : RegMap)
     (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName) (pd pav pu : BitVec 64)
     (j : Nat) (γfs : FsNames) (logstart : Nat) (dev : BitVec 32) (ip : BitVec 64)

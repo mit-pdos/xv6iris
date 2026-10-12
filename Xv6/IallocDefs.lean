@@ -48,7 +48,7 @@ set_option linter.unusedSimpArgs false
 /-! ## The frame -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- ialloc's 64-byte frame, from `sp-8` down to `sp-64`: `ra`, `s0` (saved
 at `+0x02..+0x04`) and `s1..s6` (saved at `+0x16..+0x20`, only after the
@@ -125,7 +125,7 @@ theorem iallocBody_callee [Icfg] (k : KCtx) (ty : BitVec 16) (R R' : RegMap)
 continuation (Rocq's `ia_cont`) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF]
 
@@ -174,7 +174,7 @@ end
 /-- iget's reference at the CLAIM licence, split into the two rows
 `inodeClaimed` carries beside the receipt (Rocq's `change (runit (is_claim
 (ClaimL ty t qt)) …) with (runit_claim …)`). -/
-theorem ialloc_refb_claim {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Icfg] [CurCtx]
+theorem ialloc_refb_claim {GF : BundledGFunctors.{0}} [MachGS GF] [Icfg] [CurCtx]
     [IcacheG GF] [IregG GF] [FsBlocksG GF] [FsLinkG GF] [LogG GF] [SleepLockG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [FsTopG GF] [Appcfg GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcboxG GF] (ty : BitVec 16) (t : Nat) (qt : Qp) (kk : Nat) (q : Qp)
     (dev inum : BitVec 32) :
@@ -187,7 +187,7 @@ theorem ialloc_refb_claim {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc 
 /-! ## The claim's atomic update (the ghost step log_write runs) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- **THE CLAIM** (Rocq 1532–1536): `lwAuRec` ∘ `iregClaim_au`.  No resource
@@ -198,14 +198,14 @@ theorem ialloc_claim_au [Fscfg] [Icfg] (inum : BitVec 32) (ty : BitVec 16) (ds :
     (hnib : inum.toNat < 16 * icfgNib) (hwf : diblkWf ds)
     (ht0 : ds[islot inum]!.diType.toNat = 0) (hty : ty.toNat ≠ 0)
     (htyk : iregTyOk (iallocFresh ty)) :
-    iregInv (hlc := hlc) (GF := GF) fscIreg fscFs icfgIst icfgNib ⊢
+    iregInv (GF := GF) fscIreg fscFs icfgIst icfgNib ⊢
       iregOpen -∗ txPin icfgLog t qt -∗
       dislotWriteAu inum (iallocFresh ty) ds e0 (iclaim inum.toNat ty t qt) := by
   unfold dislotWriteAu
   iintro #Hinv #Hopen Htx
   iapply lwAuRec icfgLog fscFs (IBLOCK inum icfgIst) (⊤ \ ↑iregN) (islot inum) (diblkBytes ds)
     (dinodeBytes (iallocFresh ty)) (iclaim inum.toNat ty t qt) e0
-  have h := iregClaim_au (hlc := hlc) (GF := GF) ⊤ fscIreg fscFs icfgIst icfgNib inum
+  have h := iregClaim_au (GF := GF) ⊤ fscIreg fscFs icfgIst icfgNib inum
     (iallocFresh ty) ds t qt CoPset.subseteq_top (by omega) hwf ht0 (iallocFresh_shape ty hty) htyk
   rw [iallocFresh_type] at h
   iapply h $$ Hinv Hopen Htx
@@ -215,7 +215,7 @@ end
 /-! ## The callees, at their call sites (at the ambient view) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
   [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [SleepLockG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF]
 
@@ -231,7 +231,7 @@ theorem ialloc_iget [Fscfg] [Icfg] [CurCtx] (IG : IGET) (c : CPU) (k' : KCtx) (i
     (hit : "itable" ∉ k'.locks) (hpr : "pr" ∉ k'.locks) (huart : "uart1" ∉ k'.locks) :
     kctx c k' ∗ pcIs c KA.«iget» ∗
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-    itableInv (hlc := hlc) ∗ iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ panicEnv ∗
+    itableInv ∗ iregReg fscIreg fscFs icfgIst icfgNib ∗ panicEnv ∗
     irefSlot ∗ iname fscIreg fscFs icfgIst inum l ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
@@ -241,7 +241,7 @@ theorem ialloc_iget [Fscfg] [Icfg] [CurCtx] (IG : IGET) (c : CPU) (k' : KCtx) (i
       inodeRefb (isClaim l) kk q icfgDev inum -∗
       iname fscIreg fscFs icfgIst inum l -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := IG.wp_iget (hlc := hlc) (GF := GF) c k' inum l hK hnoff hnib hpos ha0 ha1 hit hpr
+  have h := IG.wp_iget (GF := GF) c k' inum l hK hnoff hnib hpos ha0 ha1 hit hpr
     huart
   unfold wp_iget_body at h
   simp only [igetAddr] at h
@@ -252,7 +252,7 @@ end
 /-! ## Slot units -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [DiskG GF] [CurCtx]
 
 end

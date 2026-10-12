@@ -37,7 +37,7 @@ open LeanRV64D
 theorem ut_xstateOf_neg1 : xstateOf (-1#64) = -1 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
@@ -45,12 +45,12 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 
 set_option maxHeartbeats 4000000 in
 /-- **Rocq `ut_kexit`**. -/
-theorem usertrap_kexit_proof [ClaimIs (hlc := hlc) GF Γ] (KE : KEXIT) : UT_KEXIT PT Γ := by
+theorem usertrap_kexit_proof [ClaimIs GF Γ] (KE : KEXIT) : UT_KEXIT PT Γ := by
   intro A cpu kx V2 M2 sts2 cs2 a b c d hok h10 hsp hpr hnoff htier hav hks hgen
   have hK : kexitSlots ≤ kx.avail := by
     rw [kexitSlots_eq]; unfold trapRes kvFrameSlots at hav; split at hav <;> omega
   have hproc : kx.proc = procAddr A.j := hpr.trans hok.hproc
-  have hU := fun Q => KE.wp_kexit_eb (hlc := hlc) (GF := GF) Γ cpu kx A.N.w A.N.ft A.N.f fscKalloc
+  have hU := fun Q => KE.wp_kexit_eb (GF := GF) Γ cpu kx A.N.w A.N.ft A.N.f fscKalloc
     fsReadyKmem none A.j A.pid V2 M2 A.N.ip cs2 sts2 Q hok.hj hproc hK hnoff htier
   unfold wp_kexit_eb_body at hU
   have hpj : A.N.pj = procAddr A.j := hok.pj

@@ -136,7 +136,7 @@ is nameiparent's -- when it runs, `ip` is already held. -/
 def sysLinkIrefs : Nat := 3
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -167,7 +167,7 @@ def sysLinkPost (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
     procPrivFd γ pa pid { V.updEv k' with upt := P' } (viewFaulted V.upt P' M) -∗
     ⌜sysLinkRet (R' 10#5)⌝ -∗
     -- ...and the legs' receipts, keyed on that answer
-    linkArms (hlc := hlc) (fsGammaL fscFs) Ftgt Fent Funt (R' 10#5) -∗ wpLoop cpu')
+    linkArms (fsGammaL fscFs) Ftgt Fent Funt (R' 10#5) -∗ wpLoop cpu')
 
 /-- The `true` crossing: sys_link sleeps in every one of its callees. -/
 def sysLinkCont (cpu : CPU) (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
@@ -179,7 +179,7 @@ def sysLinkCont (cpu : CPU) (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : 
 
 /-- **WP of `sys_link()`** (Rocq's `wp_sys_link_sconf_body`), eb-generic at
 depth 0. -/
-def wp_sys_link_eb_body (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx)
+def wp_sys_link_eb_body (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx)
     (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (v0 v1 : BitVec 64)
     (Ftgt : Pfam GF (Aview → Nat → Anode → IProp GF))
@@ -191,14 +191,14 @@ def wp_sys_link_eb_body (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CP
     (hv0 : V.tf[tfArgIdx 0]? = some v0) (hv1 : V.tf[tfArgIdx 1]? = some v1) : Prop :=
   kctx cpu k ∗ pcIs cpu sysLinkAddr ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-  procsInv Γ ∗ panicEnv ∗ fsReady (hlc := hlc) ∗
+  procsInv Γ ∗ panicEnv ∗ fsReady ∗
   bslots 3 ∗
   -- the process, and the reference allowance the two walks need
   irefSlots sysLinkIrefs ∗
   procPrivFd γ (procAddr j) pid V M ∗
   -- THE APPLICATION'S SIDE: the three commits link's legs fire at their
   -- three instants
-  linkCommits (hlc := hlc) (fsGammaL fscFs) Ftgt Fent Funt ∗
+  linkCommits (fsGammaL fscFs) Ftgt Fent Funt ∗
   sysLinkCont cpu k γ (procAddr j) pid V M Ftgt Fent Funt
   ⊢ wpLoop (GF := GF) cpu
 
@@ -206,17 +206,17 @@ end
 
 /-- The interface of `sys_link` (Rocq's `Module Type SYSLINK`). -/
 structure SYSLINK : Prop where
-  wp_sys_link_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+  wp_sys_link_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (v0 v1 : BitVec 64)
     (Ftgt : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Fent : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Funt : Pfam GF (Aview → Nat → IProp GF))
     hj hproc htier hnoff hK hv0 hv1,
-    wp_sys_link_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ j pid V M v0 v1 Ftgt Fent Funt
+    wp_sys_link_eb_body (GF := GF) Γ cpu k γ j pid V M v0 v1 Ftgt Fent Funt
       hj hproc htier hnoff hK hv0 hv1
 
 end Xv6

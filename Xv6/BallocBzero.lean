@@ -34,7 +34,7 @@ theorem ba_ret_6a : jumpPc (KA.«balloc» + 0x6a#64) = KA.«balloc» + 0x6a#64 :
 theorem ba_ret_70 : jumpPc (KA.«balloc» + 0x70#64) = KA.«balloc» + 0x70#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
@@ -200,7 +200,7 @@ set_option maxHeartbeats 16000000 in
 /-- **`+0x4c .. +0x6c`: THE INLINED bzero** (Rocq's `ba_bzero`), from the
 bitmap buffer's `brelse` to the seven restores. -/
 theorem ba_bzero (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu c0 : CPU) (k : KCtx)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu c0 : CPU) (k : KCtx)
     (spie spp : Bool) (R : RegMap)
     (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName) (pd pav pu : BitVec 64)
     (j : Nat) (γ : LogNames) (γfs : FsNames) (logstart bmapstart size : Nat) (dev : BitVec 32)

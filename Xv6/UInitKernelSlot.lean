@@ -79,7 +79,7 @@ theorem initCode_rows (M : ElfMem) (π : Nat → Option UPerm) (hsub : uimgSub U
   exact ⟨hsub a b hab, (hx a (by omega)).1, (hx a (by omega)).2, by unfold uCap; omega⟩
 
 section UInitKernelSlot
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
@@ -89,13 +89,13 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [U
 name -- the miss route's two pinned leaves with the KEY, or the flag
 route's pinned open and its credential-free mknod with the credential. -/
 def initConsDanceAll (T Cns : IProp GF) (stc : FdState) : IProp GF :=
-  iprop((∃ K : IProp GF, □ (∀ N : UkNames GF, initConsLeaves (hlc := hlc) N T K Cns stc) ∗ K) ∨
-    (□ (∀ N : UkNames GF, □ ukiOpenConsoleLeaf (hlc := hlc) N T stc ∗
-        □ ukiMknodHitLeaf (hlc := hlc) N T Cns stc) ∗ Cns))
+  iprop((∃ K : IProp GF, □ (∀ N : UkNames GF, initConsLeaves N T K Cns stc) ∗ K) ∨
+    (□ (∀ N : UkNames GF, □ ukiOpenConsoleLeaf N T stc ∗
+        □ ukiMknodHitLeaf N T Cns stc) ∗ Cns))
 
 /-- **Rocq `init_cons_dance_at`**. -/
 theorem initConsDanceAt (N : UkNames GF) (T Cns : IProp GF) (stc : FdState) :
-    ⊢ initConsDanceAll (hlc := hlc) T Cns stc -∗ initConsDance (hlc := hlc) N T Cns stc := by
+    ⊢ initConsDanceAll T Cns stc -∗ initConsDance N T Cns stc := by
   unfold initConsDanceAll
   iintro (⟨%K, #Hl, HK⟩ | ⟨#Hh, HC⟩)
   · iapply initConsDance_miss N T K Cns stc $$ [] HK
@@ -108,8 +108,8 @@ theorem initConsDanceAt (N : UkNames GF) (T Cns : IProp GF) (stc : FdState) :
 
 /-- **Rocq `init_cons_dance_all_miss`**. -/
 theorem initConsDanceAll_miss (T Cns K : IProp GF) (stc : FdState) :
-    ⊢ □ (∀ N : UkNames GF, initConsLeaves (hlc := hlc) N T K Cns stc) -∗ K -∗
-      initConsDanceAll (hlc := hlc) T Cns stc := by
+    ⊢ □ (∀ N : UkNames GF, initConsLeaves N T K Cns stc) -∗ K -∗
+      initConsDanceAll T Cns stc := by
   iintro #Hl HK
   unfold initConsDanceAll
   ileft
@@ -118,9 +118,9 @@ theorem initConsDanceAll_miss (T Cns K : IProp GF) (stc : FdState) :
 
 /-- **Rocq `init_cons_dance_all_hit`**. -/
 theorem initConsDanceAll_hit (T Cns : IProp GF) (stc : FdState) :
-    ⊢ □ (∀ N : UkNames GF, □ ukiOpenConsoleLeaf (hlc := hlc) N T stc ∗
-        □ ukiMknodHitLeaf (hlc := hlc) N T Cns stc) -∗ Cns -∗
-      initConsDanceAll (hlc := hlc) T Cns stc := by
+    ⊢ □ (∀ N : UkNames GF, □ ukiOpenConsoleLeaf N T stc ∗
+        □ ukiMknodHitLeaf N T Cns stc) -∗ Cns -∗
+      initConsDanceAll T Cns stc := by
   iintro #Hh HC
   unfold initConsDanceAll
   iright
@@ -132,7 +132,7 @@ theorem initConsDanceAll_hit (T Cns : IProp GF) (stc : FdState) :
 See the header for the deviations. -/
 theorem initUexecSlot (HS : INIT_START) (T Cns : IProp GF) [Persistent T] (stc : FdState) (Cr : ConsCred GF)
     (cn : ConsNames) (W : Uvis) (n0 : Nat)
-    (hne : stc ≠ .closed) (hkt : ⊢ initKillLaw (hlc := hlc) T stc Cr.ccWp (ccWbn Cr))
+    (hne : stc ≠ .closed) (hkt : ⊢ initKillLaw T stc Cr.ccWp (ccWbn Cr))
     (hpc : tfResumePc W.tf = BitVec.ofNat 64 User.Init.Sym.«start»)
     (hsub : uimgSub User.Init.code.byte W.M) (hdat : uimgSub initArgvMap W.M)
     (hx : ∀ a, a < 4096 → uxAddr W.perm a ∧ ¬ uwAddr W.perm a)
@@ -149,11 +149,11 @@ theorem initUexecSlot (HS : INIT_START) (T Cns : IProp GF) [Persistent T] (stc :
     (hstop : ∀ p q, W.perm p = some q → p * 4096 < pgRoundUpN W.sz)
     (hcwd : W.cwd = ROOTINO) (hpsok : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
     (hlz : W.lazy = false) (hsc : W.secc = seccAll) :
-    ⊢ initDeps (hlc := hlc) T -∗ udep (hlc := hlc) -∗ initConsSup (hlc := hlc) cn T Cns stc Cr -∗
-      initConsDanceAll (hlc := hlc) T Cns stc -∗ consReader cn 0 -∗ Cr.ccRd 0 -∗ ccWbn Cr 0 -∗
-      □ (∀ (n : Nat) (N' : UkNames GF), ccWbn Cr n -∗ kinitBanner0 (hlc := hlc) N' stc (Cr.ccWp n)) -∗
-      kinitDiagLaw (hlc := hlc) stc Cr.ccWp (ccWbn Cr) -∗
-      myPay W.gen (fun _ => iprop(True)) -∗ uslot (hlc := hlc) W := by
+    ⊢ initDeps T -∗ udep -∗ initConsSup cn T Cns stc Cr -∗
+      initConsDanceAll T Cns stc -∗ consReader cn 0 -∗ Cr.ccRd 0 -∗ ccWbn Cr 0 -∗
+      □ (∀ (n : Nat) (N' : UkNames GF), ccWbn Cr n -∗ kinitBanner0 N' stc (Cr.ccWp n)) -∗
+      kinitDiagLaw stc Cr.ccWp (ccWbn Cr) -∗
+      myPay W.gen (fun _ => iprop(True)) -∗ uslot W := by
   have hcode := initCode_rows W.M W.perm hsub hx
   -- the argument vector's bytes, in the data below the frame
   have hargv : ∀ j, j < 16 →
@@ -166,8 +166,8 @@ theorem initUexecSlot (HS : INIT_START) (T Cns : IProp GF) [Persistent T] (stc :
     simp only [Option.bind_some, decide_eq_true_eq]
     rw [if_pos (by omega)]
   iintro Hdp #Hdep Hxs Hdn Hrd Hrd0 Hbn #Hblaw Hdlaw Hmp
-  ihave #Hnp : urunNopipe (hlc := hlc) W.fd $$ []
-  · iapply (urunNopipe_intro (hlc := hlc) (GF := GF) W.fd hnpk)
+  ihave #Hnp : urunNopipe W.fd $$ []
+  · iapply (urunNopipe_intro (GF := GF) W.fd hnpk)
   iapply uslot_of_urun_all_at W _ (fun _ => iprop(True)) hal8 hroom hstk hfdlen hstop hlz hsc $$ Hdep Hnp Hmp
   rw [hpc]
   iintro %N %h %hpay %_ Hszf #Ht Hstd Hcwf Hchf - Dlo - Hrun
@@ -213,18 +213,18 @@ caller's rows. -/
 theorem initSlotOfKexec (HS : INIT_START) (T Cns : IProp GF) [Persistent T] (stc : FdState)
     (Cr : ConsCred GF) (cn : ConsNames) (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8)
     (sts : List FdState) (W' : Uvis) (n0 : Nat)
-    (hne : stc ≠ .closed) (hkt : ⊢ initKillLaw (hlc := hlc) T stc Cr.ccWp (ccWbn Cr))
+    (hne : stc ≠ .closed) (hkt : ⊢ initKillLaw T stc Cr.ccWp (ccWbn Cr))
     (hok : kexecImageOk User.Init.elf na alen afun sts W')
     (hroom : (kexecSz User.Init.elf : Int) - 4096 + 8 * ((2 + (4 + (12 + (12 + (4 + n0)))) : Nat) : Int) ≤
       kxcSpFinal (kexecSz User.Init.elf : Int) alen na)
     (hlen : sts.length = NOFILE) (hl0 : sts.take NSTD = ufdL0) (hnpk : fdvNopipe sts) (hvok : ushViewOk sts)
     (hcwd : W'.cwd = ROOTINO) (hpsok : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
     (hlz : W'.lazy = false) (hsc : W'.secc = seccAll) :
-    ⊢ initDeps (hlc := hlc) T -∗ udep (hlc := hlc) -∗ initConsSup (hlc := hlc) cn T Cns stc Cr -∗
-      initConsDanceAll (hlc := hlc) T Cns stc -∗ consReader cn 0 -∗ Cr.ccRd 0 -∗ ccWbn Cr 0 -∗
-      □ (∀ (n : Nat) (N' : UkNames GF), ccWbn Cr n -∗ kinitBanner0 (hlc := hlc) N' stc (Cr.ccWp n)) -∗
-      kinitDiagLaw (hlc := hlc) stc Cr.ccWp (ccWbn Cr) -∗
-      myPay W'.gen (fun _ => iprop(True)) -∗ uslot (hlc := hlc) W' := by
+    ⊢ initDeps T -∗ udep -∗ initConsSup cn T Cns stc Cr -∗
+      initConsDanceAll T Cns stc -∗ consReader cn 0 -∗ Cr.ccRd 0 -∗ ccWbn Cr 0 -∗
+      □ (∀ (n : Nat) (N' : UkNames GF), ccWbn Cr n -∗ kinitBanner0 N' stc (Cr.ccWp n)) -∗
+      kinitDiagLaw stc Cr.ccWp (ccWbn Cr) -∗
+      myPay W'.gen (fun _ => iprop(True)) -∗ uslot W' := by
   -- the map stops at the break, the pc, the table
   have hstop := kexecImageOk_below hok
   have hpc := kexecImageOk_pc hok User.Init.elf_entry
@@ -279,24 +279,24 @@ carries -- the dance, the reader token, the application's read credential
 and the banner-owed credential at 0, and the banner's and diagnostics'
 persistent conversions. -/
 def initBootPay (T Cns : IProp GF) (cn : ConsNames) (stc : FdState) (Cr : ConsCred GF) : IProp GF :=
-  iprop(initConsDanceAll (hlc := hlc) T Cns stc ∗ consReader cn 0 ∗ Cr.ccRd 0 ∗ ccWbn Cr 0 ∗
-    □ (∀ (n : Nat) (N' : UkNames GF), ccWbn Cr n -∗ kinitBanner0 (hlc := hlc) N' stc (Cr.ccWp n)) ∗
-    kinitDiagLaw (hlc := hlc) stc Cr.ccWp (ccWbn Cr))
+  iprop(initConsDanceAll T Cns stc ∗ consReader cn 0 ∗ Cr.ccRd 0 ∗ ccWbn Cr 0 ∗
+    □ (∀ (n : Nat) (N' : UkNames GF), ccWbn Cr n -∗ kinitBanner0 N' stc (Cr.ccWp n)) ∗
+    kinitDiagLaw stc Cr.ccWp (ccWbn Cr))
 
 /-- **Rocq `init_boot_con`**: `initSlotOfKexec` packaged as a `□` over the
 key, the shape `PinnedExecBundle.pinnedExecBundle_boot` fires. -/
 theorem initBootCon (HS : INIT_START) (T Cns : IProp GF) [Persistent T] (stc : FdState) (Cr : ConsCred GF)
     (cn : ConsNames) (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (sts : List FdState)
     (n0 : Nat)
-    (hne : stc ≠ .closed) (hkt : ⊢ initKillLaw (hlc := hlc) T stc Cr.ccWp (ccWbn Cr))
+    (hne : stc ≠ .closed) (hkt : ⊢ initKillLaw T stc Cr.ccWp (ccWbn Cr))
     (hroom : (kexecSz User.Init.elf : Int) - 4096 + 8 * ((2 + (4 + (12 + (12 + (4 + n0)))) : Nat) : Int) ≤
       kxcSpFinal (kexecSz User.Init.elf : Int) alen na)
     (hlen : sts.length = NOFILE) (hl0 : sts.take NSTD = ufdL0) (hnpk : fdvNopipe sts) (hvok : ushViewOk sts)
     (hpsok : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k) :
-    ⊢ □ initDeps (hlc := hlc) T -∗ udep (hlc := hlc) -∗ initConsSup (hlc := hlc) cn T Cns stc Cr -∗
+    ⊢ □ initDeps T -∗ udep -∗ initConsSup cn T Cns stc Cr -∗
       □ (∀ W' : Uvis, ⌜kexecImageOk User.Init.elf na alen afun sts W'⌝ -∗ ⌜W'.cwd = ROOTINO⌝ -∗
         ⌜W'.lazy = false⌝ -∗ ⌜W'.secc = seccAll⌝ -∗ myPay W'.gen (fun _ => iprop(True)) -∗
-        initBootPay (hlc := hlc) T Cns cn stc Cr -∗ uslot (hlc := hlc) W') := by
+        initBootPay T Cns cn stc Cr -∗ uslot W') := by
   iintro #Hdp #Hdep #Hxs !> %W' %hok %hcw %hlz %hsc #Hmp HP
   unfold initBootPay
   icases HP with ⟨Hdn, Hrd, Hrd0, Hbn, #Hblaw, Hdlaw⟩

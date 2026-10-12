@@ -48,7 +48,7 @@ open Std (ExtTreeSet)
 namespace UkIoSysP
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -62,8 +62,8 @@ def wpUkEcallReadRecvAt : Prop :=
     (BitVec.setWidth 32 (m.get 12#5)).toInt = cnt →
     cnt.toNat ≤ k →
     (pc + 4#64) &&& 1#64 = 0#64 →
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
-      UshSysP.udepwfStd (hlc := hlc) N m pc USYS_read fdep l -∗ ustdAt N.fd l v -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗
+      UshSysP.udepwfStd N m pc USYS_read fdep l -∗ ustdAt N.fd l v -∗
       ubytes N.d (m.get 11#5).toNat k f -∗
       (∀ (h' : CPU) (r : BitVec 64) (d : Nat) (g : Nat → BitVec 8) (W : Uvis) (M' : ElfMem)
           (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare),
@@ -79,8 +79,8 @@ def wpUkEcallReadRecvAt : Prop :=
         ⌜W.fd.take NSTD = l⌝ -∗ ⌜W.lazy = false⌝ -∗
         ⌜uexecLiveOk USYS_read W.tf W.fd r cs'⌝ -∗
         ustdAt N.fd l v -∗
-        UexecSG.spostAt (uslot (hlc := hlc)) USYS_read fdep W r M' fdv' cw' cs' -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗
+        UexecSG.spostAt (uslot) USYS_read fdep W r M' fdv' cw' cs' -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗
         ubytes N.d (m.get 11#5).toNat k g -∗
         wpLoop h') -∗
       wpLoop h
@@ -93,8 +93,8 @@ def wpUkEcallWriteChainBuf : Prop :=
     (l : List FdState) (dq : DFrac) (nb : Nat) (f : Nat → BitVec 8),
     UkSysP.usysno m = 16 →
     (pc + 4#64) &&& 1#64 = 0#64 →
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
-      UshSysP.udepwfStd (hlc := hlc) N m pc 16 fdep l -∗ ustd N.fd l -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗
+      UshSysP.udepwfStd N m pc 16 fdep l -∗ ustd N.fd l -∗
       ubytesq N.d dq (m.get 11#5).toNat nb f -∗
       (∀ (h' : CPU) (r : BitVec 64) (W : Uvis) (cw' : Nat) (cs' : ExtTreeSet GName compare),
         ⌜tfW W.tf (tfArgIdx 0) = m.get 10#5⌝ -∗ ⌜tfW W.tf (tfArgIdx 1) = m.get 11#5⌝ -∗
@@ -103,8 +103,8 @@ def wpUkEcallWriteChainBuf : Prop :=
           lazyFree P.um (BitVec.ofNat 64 W.sz) → j < nb →
           uvaRmapped P (m.get 11#5 + BitVec.ofNat 64 j).toNat⌝ -∗
         ustd N.fd l -∗ ubytesq N.d dq (m.get 11#5).toNat nb f -∗
-        UexecSG.spostAt (uslot (hlc := hlc)) 16 fdep W r W.M W.fd cw' cs' -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        UexecSG.spostAt (uslot) 16 fdep W r W.M W.fd cw' cs' -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h
 
 /-- **Rocq `wp_uk_ecall_write_chain_buf_at`**: the same at a named table
@@ -114,8 +114,8 @@ def wpUkEcallWriteChainBufAt : Prop :=
     (l v : List FdState) (dq : DFrac) (nb : Nat) (f : Nat → BitVec 8),
     UkSysP.usysno m = 16 →
     (pc + 4#64) &&& 1#64 = 0#64 →
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
-      UshSysP.udepwfStd (hlc := hlc) N m pc 16 fdep l -∗ ustdAt N.fd l v -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗
+      UshSysP.udepwfStd N m pc 16 fdep l -∗ ustdAt N.fd l v -∗
       ubytesq N.d dq (m.get 11#5).toNat nb f -∗
       (∀ (h' : CPU) (r : BitVec 64) (W : Uvis) (cw' : Nat) (cs' : ExtTreeSet GName compare),
         ⌜tfW W.tf (tfArgIdx 0) = m.get 10#5⌝ -∗ ⌜tfW W.tf (tfArgIdx 1) = m.get 11#5⌝ -∗
@@ -124,8 +124,8 @@ def wpUkEcallWriteChainBufAt : Prop :=
           lazyFree P.um (BitVec.ofNat 64 W.sz) → j < nb →
           uvaRmapped P (m.get 11#5 + BitVec.ofNat 64 j).toNat⌝ -∗
         ustdAt N.fd l v -∗ ubytesq N.d dq (m.get 11#5).toNat nb f -∗
-        UexecSG.spostAt (uslot (hlc := hlc)) 16 fdep W r W.M W.fd cw' cs' -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        UexecSG.spostAt (uslot) 16 fdep W r W.M W.fd cw' cs' -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h
 
 /-- **Rocq `wp_uk_ecall_write_chain_txt`**: the chain write at the TEXT
@@ -135,8 +135,8 @@ def wpUkEcallWriteChainTxt : Prop :=
     (l : List FdState) (nb : Nat) (f : Nat → BitVec 8),
     UkSysP.usysno m = 16 →
     (pc + 4#64) &&& 1#64 = 0#64 →
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
-      UshSysP.udepwfStd (hlc := hlc) N m pc 16 fdep l -∗ ustd N.fd l -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗
+      UshSysP.udepwfStd N m pc 16 fdep l -∗ ustd N.fd l -∗
       ([∗list] j ∈ List.range nb, utext N.t ((m.get 11#5).toNat + j) (f j)) -∗
       (∀ (h' : CPU) (r : BitVec 64) (W : Uvis) (cw' : Nat) (cs' : ExtTreeSet GName compare),
         ⌜tfW W.tf (tfArgIdx 0) = m.get 10#5⌝ -∗ ⌜tfW W.tf (tfArgIdx 1) = m.get 11#5⌝ -∗
@@ -145,8 +145,8 @@ def wpUkEcallWriteChainTxt : Prop :=
           lazyFree P.um (BitVec.ofNat 64 W.sz) → j < nb →
           uvaRmapped P (m.get 11#5 + BitVec.ofNat 64 j).toNat⌝ -∗
         ustd N.fd l -∗ ([∗list] j ∈ List.range nb, utext N.t ((m.get 11#5).toNat + j) (f j)) -∗
-        UexecSG.spostAt (uslot (hlc := hlc)) 16 fdep W r W.M W.fd cw' cs' -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        UexecSG.spostAt (uslot) 16 fdep W r W.M W.fd cw' cs' -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h
 
 end
@@ -156,21 +156,21 @@ end UkIoSysP
 /-- **The read/write leaves the H-io handlers take** (see the header):
 UkRunSys's rows, a parameter until UkRunSys is ported. -/
 structure UK_SYS_IO : Prop where
-  readRecvAt : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+  readRecvAt : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
     [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int],
-    UkIoSysP.wpUkEcallReadRecvAt (hlc := hlc) (GF := GF)
-  writeChainBuf : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+    UkIoSysP.wpUkEcallReadRecvAt (GF := GF)
+  writeChainBuf : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
     [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int],
-    UkIoSysP.wpUkEcallWriteChainBuf (hlc := hlc) (GF := GF)
-  writeChainBufAt : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+    UkIoSysP.wpUkEcallWriteChainBuf (GF := GF)
+  writeChainBufAt : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
     [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int],
-    UkIoSysP.wpUkEcallWriteChainBufAt (hlc := hlc) (GF := GF)
-  writeChainTxt : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+    UkIoSysP.wpUkEcallWriteChainBufAt (GF := GF)
+  writeChainTxt : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
     [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int],
-    UkIoSysP.wpUkEcallWriteChainTxt (hlc := hlc) (GF := GF)
+    UkIoSysP.wpUkEcallWriteChainTxt (GF := GF)
 
 end Xv6

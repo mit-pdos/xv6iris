@@ -41,7 +41,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 theorem yield_pState (i : Nat) : procAddr i + 24#64 = pState (procAddr i) := rfl
 
@@ -60,7 +60,7 @@ theorem yield_br_fffffffffffff9d4 : KA.«yield» + 0xfffffffffffff9d4#64 = KA.«
 
 set_option maxHeartbeats 4000000 in
 theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : YIELD :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ X Γ _ cpu k j hj hproc hK hsie hnoff hlocks htier => by
+  ⟨fun {GF} _ _ _ _ _ _ _ X Γ _ cpu k j hj hproc hK hsie hnoff hlocks htier => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_yield_body
@@ -92,7 +92,7 @@ theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : Y
         ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.proc⌝ -∗ wpLoop cpu)
       ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hnoff' hK'
-    have h := MP.wp_myproc (hlc := hlc) (GF := GF) cpu k' hnoff' hK'
+    have h := MP.wp_myproc (GF := GF) cpu k' hnoff' hK'
     unfold wp_myproc_body at h
     simp only [myprocAddr] at h
     iintro ⟨Hk, Hp, Hcont⟩
@@ -135,7 +135,7 @@ theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : Y
       ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hnoff' hK' hs' pa ha0
     subst ha0
-    have h := AC.wp_acquire (hlc := hlc) (GF := GF) cpu k' (Γ.lock j) "proc" (procLockPay Γ j)
+    have h := AC.wp_acquire (GF := GF) cpu k' (Γ.lock j) "proc" (procLockPay Γ j)
       hnoff' hK' hs'
     unfold wp_acquire_body at h
     simp only [acquireAddr] at h
@@ -167,7 +167,7 @@ theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : Y
   icases procLockRes_elim Γ ξ0 (procAddr j) $$ HR with
     ⟨%st, %ch, Hstate, Hpsl, Hchan, ⟨%kl, %xs, %pid, Hrest⟩, Hslots⟩
   k_norm_g [hproc]
-  ihave Hcl := (show cpuClaim (hlc := hlc) (GF := GF) cpu (procAddr j) ⊢
+  ihave Hcl := (show cpuClaim (GF := GF) cpu (procAddr j) ⊢
       pstateHlf Γ j RUNNING ∗ hartHlf Γ j cpu from by
       rw [cpuClaim_eq Γ]; exact procClaim_elim Γ cpu j hj) $$ Hclaim
   icases Hcl with ⟨Hpst, Hhart⟩
@@ -219,7 +219,7 @@ theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : Y
         ▷ schedVcAt Γ cpu' (cpuCtxAddr cpu') (procAddr j) -∗ wpLoop cpu'))
       ⊢ wpLoop (GF := GF) cpu := by
     intro k' ch' hK' hsie' hnoff' hlocks' htier' hproc'
-    have h := SC.wp_sched (hlc := hlc) (GF := GF) Γ cpu k' j RUNNABLE ch' hj
+    have h := SC.wp_sched (GF := GF) Γ cpu k' j RUNNABLE ch' hj
       (by decide : parkOk RUNNABLE) hK' hsie' hnoff' hlocks' htier' hproc'
     unfold wp_sched_body at h
     rw [if_pos (show needsCtx RUNNABLE from by decide)] at h
@@ -273,7 +273,7 @@ theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : Y
   ihave HR2 := (show procLockResAt (GF := GF) Γ ξ0 (procAddr j) ⊢ procLockPay Γ j curCtx from by
       unfold procLockPay; iintro H; iexact H) $$ HR2
   ihave Hclaim2 := (show pstateAtHlf (GF := GF) Γ (procAddr j) RUNNING ∗ hartHlf Γ j h1 ⊢
-      cpuClaim (hlc := hlc) (GF := GF) h1 (procAddr j) from by
+      cpuClaim (GF := GF) h1 (procAddr j) from by
       rw [cpuClaim_eq Γ]
       iintro ⟨Hs, Hh⟩
       iapply procClaim_intro Γ h1 j hj
@@ -302,7 +302,7 @@ theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : Y
     have hreen : false = (decide (k'.noff = 1) && k'.intena) := by rw [hint']; simp
     have hon : (false : Bool) = true → k'.tier = KTier.kpt ∧ trapRes true + 6 ≤ k'.avail := by
       intro hc; exact absurd hc (by decide)
-    have h := RE.wp_release (hlc := hlc) (GF := GF) h1 k' (Γ.lock j) "proc" (procLockPay Γ j)
+    have h := RE.wp_release (GF := GF) h1 k' (Γ.lock j) "proc" (procLockPay Γ j)
       hsie' hnoff' hK' false hreen hon
     unfold wp_release_body at h
     simp only [releaseAddr, KCtx.popExit_false, popArm_false,

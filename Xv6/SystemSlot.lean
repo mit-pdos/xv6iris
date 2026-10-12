@@ -247,9 +247,9 @@ theorem appTriv_found {CT : Type} (c : CT) (k : Nat) (T : IProp GF) :
   iframe HT
 
 /-- ...and the trivial RUNNER (Rocq `app_triv_sync_run`). -/
-theorem appTriv_syncRun {hlc : HasLC} [MachFixedGS hlc GF] [FsTopG GF] {CT N : Type}
+theorem appTriv_syncRun [MachFixedGS GF] [FsTopG GF] {CT N : Type}
     (A : N → Aview → IProp GF) (Ok Okc : N → Prop) (c : CT) (k : Nat) :
-    ⊢ appSyncRunRaw (hlc := hlc) A Ok Okc (appTrivTk c k) (appTrivHk c k) :=
+    ⊢ appSyncRunRaw A Ok Okc (appTrivTk c k) (appTrivHk c k) :=
   appSyncRunRaw_triv A Ok Okc _ _ (fun _ => .rfl)
 
 end AppTrivSync
@@ -300,7 +300,7 @@ end AppDurAt
 /-! ## 4.  The composite crash slot -/
 
 section Slot
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGpreS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGpreS GF] [Xv6G GF]
   [FsLinkG GF] [FsTopG GF]
 
 /-- THE COMPOSITE CRASH SLOT (Rocq `xv6_slot`): the file system's durability
@@ -429,7 +429,7 @@ theorem xv6Slot_swap {CT : Type} (N : Type) (appFs : CT → N → Aview → IPro
     (appBoot : CT → Nat → N → IProp GF) (cov : ExtTreeSet Nat compare) (ls : Nat)
     (Born : GName → GName → GName → GName → CT → Prop) (Tn Tn' : CT → Nat → IProp GF)
     (Happ_boot : ∀ (c : CT) (gen : Nat) (γd γsw γreg γst : GName), Born γd γsw γreg γst c →
-      ⊢@{IProp GF} appXferBootRaw (MachGpreS.mono_pre (hlc := hlc)) (appFs c) (appOkc c)
+      ⊢@{IProp GF} appXferBootRaw (MachGpreS.mono_pre) (appFs c) (appOkc c)
         (appBoot c (gen + 1)) (Tn c (gen + 1)) (Tn' c (gen + 1)) γst gen)
     (γd γsw γreg γst : GName) (c : CT) (hborn : Born γd γsw γreg γst c)
     (E : EraGS) (gen : Nat) (dk : Nat → BitVec 8) :
@@ -561,7 +561,7 @@ end Lend
 /-! ## 6.  The trace hooks -/
 
 section Trace
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGpreS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGpreS GF] [Xv6G GF]
   [FsLinkG GF] [FsTopG GF]
 
 /-- THE DISK HALF OF THE TRACE HOOK (Rocq `fs_trace_hook`): at the machine's
@@ -569,7 +569,7 @@ record literal with the composite slot, `diskProjTrace` promotes
 `xv6Slot_project` to the end-of-run shape. -/
 theorem fsTraceHook {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp GF)
     (appOkc : CT → N → Prop)
-    (cov : ExtTreeSet Nat compare) (ls : Nat) (Ai : AppIface GF) (Hinv : InvGS_gen hlc GF)
+    (cov : ExtTreeSet Nat compare) (ls : Nat) (Ai : AppIface GF) (Hinv : InvGS GF)
     (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT) (T : List Obs)
     (Ptp : IProp GF) (Tkp : Nat → IProp GF) (Hkp : Nat → IProp GF → IProp GF)
     (Uf : Option (Nat × Obs) → Obs → Prop)
@@ -577,11 +577,11 @@ theorem fsTraceHook {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp
     (Ue : Option (Nat × Obs) → Obs → IProp GF) (HUe : ∀ ox e, Persistent (Ue ox e))
     (Uet : Nat → IProp GF) (Uea : Nat → List GName → IProp GF) (HUea : ∀ k ns, Persistent (Uea k ns))
     (g' : GState) :
-    @powerInterp hlc GF (Ai.bootFixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
+    @powerInterp GF (Ai.bootFixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
         (xv6Slot N appFs appOkc cov ls γd γsw γreg γstart c) Tkp Hkp γobs T Ptp γhist Uf Ucr Ucx Uco Ue HUe Uet Uea HUea) g' ∗
       ▷ xv6Slot N appFs appOkc cov ls γd γsw γreg γstart c ⊢@{IProp GF}
       ◇ ⌜fsBootPure cov ls (diskOf g'.m.devs)⌝ :=
-  @diskProjTrace hlc GF (Ai.bootFixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
+  @diskProjTrace GF (Ai.bootFixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
       (xv6Slot N appFs appOkc cov ls γd γsw γreg γstart c) Tkp Hkp γobs T Ptp γhist Uf Ucr Ucx Uco Ue HUe Uet Uea HUea)
     XV6_DISK_BYTES γd (xv6Slot N appFs appOkc cov ls γd γsw γreg γstart c) (fsBootPure cov ls)
     (fun dk => xv6Slot_project N appFs appOkc cov ls γd γsw γreg γstart c dk) rfl rfl g'
@@ -591,7 +591,7 @@ the era conjunct (pure, nothing spent), then the disk's reading off the crash
 invariant. -/
 theorem xv6TraceHook {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp GF)
     (appOkc : CT → N → Prop)
-    (cov : ExtTreeSet Nat compare) (ls : Nat) (Ai : AppIface GF) (Hinv : InvGS_gen hlc GF)
+    (cov : ExtTreeSet Nat compare) (ls : Nat) (Ai : AppIface GF) (Hinv : InvGS GF)
     (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT) (T : List Obs)
     (Ptp : IProp GF) (Tkp : Nat → IProp GF) (Hkp : Nat → IProp GF → IProp GF)
     (Uf : Option (Nat × Obs) → Obs → Prop)
@@ -599,12 +599,12 @@ theorem xv6TraceHook {CT : Type} (N : Type) (appFs : CT → N → Aview → IPro
     (Ue : Option (Nat × Obs) → Obs → IProp GF) (HUe : ∀ ox e, Persistent (Ue ox e))
     (Uet : Nat → IProp GF) (Uea : Nat → List GName → IProp GF) (HUea : ∀ k ns, Persistent (Uea k ns))
     (g' : GState) :
-    @powerInterp hlc GF (Ai.bootFixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
+    @powerInterp GF (Ai.bootFixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
         (xv6Slot N appFs appOkc cov ls γd γsw γreg γstart c) Tkp Hkp γobs T Ptp γhist Uf Ucr Ucx Uco Ue HUe Uet Uea HUea) g' ∗
       ▷ xv6Slot N appFs appOkc cov ls γd γsw γreg γstart c ⊢@{IProp GF}
       ◇ ⌜xv6TracePure cov ls g'⌝ := by
   iintro ⟨Hsi, HP⟩
-  ihave %hresv := (@powerInterp_mmOk hlc GF (Ai.bootFixedGS Hinv γgen γstart γreg γd
+  ihave %hresv := (@powerInterp_mmOk GF (Ai.bootFixedGS Hinv γgen γstart γreg γd
     XV6_DISK_BYTES γsw (xv6Slot N appFs appOkc cov ls γd γsw γreg γstart c) Tkp Hkp γobs T Ptp γhist Uf Ucr Ucx Uco Ue HUe Uet Uea HUea) g')
     $$ Hsi
   imod fsTraceHook N appFs appOkc cov ls Ai Hinv γgen γstart γreg γd γsw γobs γhist c T Ptp Tkp Hkp Uf Ucr Ucx Uco Ue HUe Uet Uea HUea g'

@@ -108,7 +108,7 @@ theorem km_cnt5 {nb : Nat} (h : 166 < nb) : 63 < nb - 1 - 2 - 0 - 0 - 32 - 2 := 
 theorem km_cnt6 {nb : Nat} (h : 166 < nb) : 2 < nb - 1 - 2 - 0 - 0 - 32 - 2 - 63 := by omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF]
 
 /-! ## The callees, at their entry addresses -/
 
@@ -123,7 +123,7 @@ theorem km_memset_call (MS : MEMSET) [CurCtx] (c : CPU) (k' : KCtx) (os : List (
         (List.replicate 4096 (BitVec.extractLsb' 0 8 (k'.regs 11#5))) -∗
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.regs 10#5⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := MS.wp_memset (hlc := hlc) (GF := GF) c k' os 4096 hK hn (by decide) hl
+  have h := MS.wp_memset (GF := GF) c k' os 4096 hK hn (by decide) hl
   unfold wp_memset_body at h
   simp only [memsetAddr] at h
   exact h
@@ -154,7 +154,7 @@ theorem km_kvmmap_call (KM : KVMMAP) [CurCtx] (c : CPU) (k' : KCtx)
           = ([], n) ∧
         fresh.Nodup ∧ (∀ b ∈ fresh, pageValid (pageAddr b) ∧ b ∉ t.pages 2)⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := KM.wp_kvmmap (hlc := hlc) (GF := GF) c k' γl γk nb t n (permBits perm) hnoff hK hlk
+  have h := KM.wp_kvmmap (GF := GF) c k' γl γk nb t n (permBits perm) hnoff hK hlk
     hroot hargs hperm (by cases perm <;> decide) (by cases perm <;> decide) (PTree.wf_wfU 2 t hwf) hnd hpgt
     hcount hp0
   unfold wp_kvmmap_body at h
@@ -185,7 +185,7 @@ theorem km_mapstacks_call (PM : PROC_MAPSTACKS) [CurCtx] (c : CPU) (k' : KCtx)
         (∀ b ∈ fresh ++ (List.range 64).map pas, pageValid (pageAddr b) ∧ b ∉ t.pages 2)⌝ -∗
       wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := PM.wp_proc_mapstacks (hlc := hlc) (GF := GF) c k' γl γk nb t hnoff hK hlk hroot
+  have h := PM.wp_proc_mapstacks (GF := GF) c k' γl γk nb t hnoff hK hlk hroot
     (PTree.wf_wfU 2 t hwf) hnd hpgt hunm hcount hp0
   unfold wp_proc_mapstacks_body at h
   simp only [procMapstacksAddr] at h
@@ -729,7 +729,7 @@ end
 /-! ## kvmmake itself: the root, the seven regions, the stacks, the epilogue -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF]
 
 /-! ## The caller's continuation, named -/
 
@@ -756,7 +756,7 @@ theorem kvmmake_br_fffffffffffffa1e : KA.«kvmmake» + 0xfffffffffffffa1e#64 = K
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 theorem kvmmake_proof (KAL : KALLOC) (MS : MEMSET) (KM : KVMMAP) (PM : PROC_MAPSTACKS) : KVMMAKE :=
-  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk nb hnoff hK hlk hcount hp0 => by
+  ⟨fun {GF} _ _ _ _ cpu k γl γk nb hnoff hK hlk hcount hp0 => by
   unfold wp_kvmmake_body
   simp only [kvmmakeAddr]
   iintro ⟨Hk, Hpc, #Hlk, Hav, HΦ⟩

@@ -21,7 +21,7 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
 section UkSyncStubs
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -34,14 +34,14 @@ theorem sync_usysno (m : RegMap) (k : Int) (hk : (BitVec.extractLsb' 0 32 (BitVe
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- sync's exit stub @0x2c8. -/
 theorem sync_stub_exit (UL : UK_LEAVES) (N : UkNames GF) :
-    ⊢ exitStubLaw (hlc := hlc) N (ukCode N.t User.Sync.code.byte) User.Sync.Sym.«exit» :=
+    ⊢ exitStubLaw N (ukCode N.t User.Sync.code.byte) User.Sync.Sym.«exit» :=
   exit_stub_of_text UL N User.Sync.textOk _ 2#12 (by decide) udec% udec%
     (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- sync's sync stub @0x368. -/
 theorem sync_stub_sync (UL : UK_LEAVES) (N : UkNames GF) :
-    ⊢ stubLaw (hlc := hlc) N (ukCode N.t User.Sync.code.byte) 22 User.Sync.Sym.«sync» :=
+    ⊢ stubLaw N (ukCode N.t User.Sync.code.byte) 22 User.Sync.Sym.«sync» :=
   stub_of_text UL N User.Sync.textOk 22 _ 22#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
@@ -51,9 +51,9 @@ whatever status a0 carries. -/
 theorem wp_ksync_exit (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) [hc : UknConst N]
     (h : CPU) (m : RegMap) (avail : Nat) :
     ⊢ ukCode N.t User.Sync.code.byte -∗ N.pay (-1) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sync.Sym.«exit») avail -∗ wpLoop h := by
+      urun N h m (BitVec.ofNat 64 User.Sync.Sym.«exit») avail -∗ wpLoop h := by
   iintro #Hc Hpay Hrun
-  ihave #HL := sync_stub_exit (hlc := hlc) UL N
+  ihave #HL := sync_stub_exit UL N
   unfold exitStubLaw
   iapply HL $$ %h %m %avail Hc Hrun
   iintro %h1 #Hi Hrun
@@ -66,14 +66,14 @@ LEAF's (`ksyncLeaf`, sync K4): the hook goes in, and what comes back to the
 continuation is its receipt `qOpt oQ`. -/
 theorem wp_ksync_sync (UL : UK_LEAVES) (N : UkNames GF) (oQ : Option (IProp GF)) (h : CPU)
     (m : RegMap) (avail : Nat) (c : Nat) :
-    ⊢ ukCode N.t User.Sync.code.byte -∗ ksyncLeaf (hlc := hlc) N oQ -∗
-      hookOpt (hlc := hlc) (genId (hlc := hlc) (GF := GF)) oQ -∗ ucwd N.cwd c -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sync.Sym.«sync») avail -∗
+    ⊢ ukCode N.t User.Sync.code.byte -∗ ksyncLeaf N oQ -∗
+      hookOpt (genId (GF := GF)) oQ -∗ ucwd N.cwd c -∗
+      urun N h m (BitVec.ofNat 64 User.Sync.Sym.«sync») avail -∗
       (∀ (h' : CPU) (ret : BitVec 64),
-        qOpt oQ -∗ urun (hlc := hlc) N h' (stubRet m 22 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
+        qOpt oQ -∗ urun N h' (stubRet m 22 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hleaf Hhook Hcwd Hrun Hcont
-  ihave #HL := sync_stub_sync (hlc := hlc) UL N
+  ihave #HL := sync_stub_sync UL N
   unfold stubLaw
   iapply HL $$ %h %m %avail Hc Hrun
   iintro %h1 %hpc %_ #Hi Hrun Hk

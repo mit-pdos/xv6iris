@@ -41,20 +41,20 @@ open Wid
 open UShPipesDefs
 
 section StageW
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
   [DiskG GF] [EchoOutG GF] [PipesNG GF]
-variable (D : PdRound hlc GF)
+variable (D : PdRound GF)
 
 /-- The writer's state at each index of the diagnostic (deviation 2; Rocq's
 `set Pf`). -/
 noncomputable def exfPf (w : Wid) (s : List (BitVec 8)) (R : IProp GF) : Nat → IProp GF
   | 0 => iprop(R ∗ wcurN D.γc w (1 : Qp).half 0 ∗ wmodeN D.γm w (1 : Qp).half none ∗ pdep D w s)
   | p + 1 => iprop(R ∗ wcurN D.γc w (1 : Qp).half (p + 1) ∗ wmodeN D.γm w (1 : Qp).half (some s)
-      ∗ (⌜termw w s = false⌝ ∨ ptkV D.T D.v D.I (genId (hlc := hlc) (GF := GF) + 1)))
+      ∗ (⌜termw w s = false⌝ ∨ ptkV D.T D.v D.I (genId (GF := GF) + 1)))
 
 /-- **Rocq `exf_writer`**: `ush_execfail_law_at` at writer `w`'s source `s`. -/
 theorem exf_writer (OK : PdRoundOk D) (UL : UK_LEAVES) (w : Wid) (s dg : List (BitVec 8)) (n : Nat)
@@ -67,8 +67,8 @@ theorem exf_writer (OK : PdRoundOk D) (UL : UK_LEAVES) (w : Wid) (s dg : List (B
       □ (∀ w' s', ⌜EX w' s'⌝ -∗ pdep D w' s' -∗ pdep D w s ={↑pipeN}=∗ False) -∗
       □ (Cr -∗ R ∗ wcurN D.γc w (1 : Qp).half 0 ∗ wmodeN D.γm w (1 : Qp).half none ∗ pdep D w s) -∗
       □ (R -∗ wcurN D.γc w (1 : Qp).half n -∗ wmodeN D.γm w (1 : Qp).half (some s) -∗
-          (⌜termw w s = false⌝ ∨ ptkV D.T D.v D.I (genId (hlc := hlc) (GF := GF) + 1)) -∗ Cd) -∗
-      ushExecfailLawAt (hlc := hlc) dg n Cr Cd := by
+          (⌜termw w s = false⌝ ∨ ptkV D.T D.v D.I (genId (GF := GF) + 1)) -∗ Cd) -∗
+      ushExecfailLawAt dg n Cr Cd := by
   obtain ⟨n', rfl⟩ : ∃ n', n = n' + 1 := ⟨n - 1, by omega⟩
   iintro #Hinv #Hex #Hsplit #Hend
   unfold ushExecfailLawAt
@@ -83,7 +83,7 @@ theorem exf_writer (OK : PdRoundOk D) (UL : UK_LEAVES) (w : Wid) (s dg : List (B
   isplitl []
   · imodintro
     iintro %p %b %hb %hp
-    iapply kshW1_of_step (hlc := hlc) UL N (exfPf D w s R p) (exfPf D w s R (p + 1)) l rb b hl2
+    iapply kshW1_of_step UL N (exfPf D w s R p) (exfPf D w s R (p + 1)) l rb b hl2
     imodintro
     iintro %Φ HF HΦ
     cases p with
@@ -91,7 +91,7 @@ theorem exf_writer (OK : PdRoundOk D) (UL : UK_LEAVES) (w : Wid) (s dg : List (B
       simp only [exfPf]
       icases HF with ⟨HR, Hc, Hm, Hd⟩
       iapply (pipesV_fire D.g D.M D.V D.G D.sd D.WA OK.hcons D.v D.I D.sR D.lR OK.hlR OK.hfc OK.hadmit
-        OK.hplok pnsN (↑pipeN) (genId (hlc := hlc) (GF := GF) + 1) D.γc D.γm termw D.TOKN (pdep D)
+        OK.hplok pnsN (↑pipeN) (genId (GF := GF) + 1) D.γc D.γm termw D.TOKN (pdep D)
         w s b EX Φ pnsN_uart pnsN_pipeN hw (hdg 0 b hp hb) hok) $$ Hex Hinv Hc Hm Hd
       iintro Hc Hm #HT
       iapply HΦ
@@ -100,7 +100,7 @@ theorem exf_writer (OK : PdRoundOk D) (UL : UK_LEAVES) (w : Wid) (s dg : List (B
       simp only [exfPf]
       icases HF with ⟨HR, Hc, Hm, #HT⟩
       iapply (pipesV_cstep D.g D.M D.V D.G D.sd D.WA OK.hcons D.v D.I D.sR D.lR OK.hlR OK.hfc OK.hadmit
-        OK.hplok pnsN (genId (hlc := hlc) (GF := GF) + 1) D.γc D.γm termw D.TOKN (pdep D)
+        OK.hplok pnsN (genId (GF := GF) + 1) D.γc D.γm termw D.TOKN (pdep D)
         w s (p' + 1) b Φ pnsN_uart hw (by omega) (hdg (p' + 1) b hp hb) (hst (p' + 1) ⟨by omega, hp⟩))
         $$ Hinv Hc Hm
       iintro Hc Hm -

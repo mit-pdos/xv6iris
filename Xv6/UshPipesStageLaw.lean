@@ -37,13 +37,13 @@ open Wid
 open UShPipesDefs
 
 section Law
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
   [DiskG GF] [EchoOutG GF] [PipesNG GF]
-variable (D : PdRound hlc GF)
+variable (D : PdRound GF)
 
 /-- **Rocq `prod_stage_law`**: WHAT NODE 0'S LEFT CHILD DOES, whatever the
 producer -- sh's exec arm at the stage's command `args0`, on node 0's lend
@@ -56,7 +56,7 @@ noncomputable def prod_stage_law (args0 : List UArg) : IProp GF :=
     ushCode N'.t -∗ ushJtab N'.t -∗ ushCmd N'.d q (.exec args0) -∗
     usz N'.s szv -∗ ustd N'.fd ld -∗ ucwd N'.cwd ROOTINO -∗ uch N'.ch ∅ -∗
     echo_raw D γp -∗ D.Rd -∗
-    urun (hlc := hlc) N' h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (2 + (ushDg + av)) -∗
+    urun N' h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (2 + (ushDg + av)) -∗
     wpLoop h')
 
 instance prod_stage_law_persistent (args0 : List UArg) : Persistent (prod_stage_law D args0) := by

@@ -115,7 +115,7 @@ theorem sysExecKeepS1_round (R R2 : RegMap) (a b v : BitVec 64)
 /-! ## §2.  The list surgery (standalone, Rocq's header) -/
 
 section Surgery
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- The page at the cursor out of the run (Rocq `sx_pages_peel`). -/
 theorem sysExecFree_peel (pg : Nat → BitVec 64) (afun : Nat → Nat → BitVec 8) (m t : Nat)
@@ -166,7 +166,7 @@ end Surgery
 /-! ## §3.  kfree, carried across its own crossing -/
 
 section Kfree
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
 
 set_option maxHeartbeats 8000000 in
 /-- `kfree(pa)` (Rocq `Kfree.wp_kfree_sconf`): kfree does not thread the
@@ -185,7 +185,7 @@ theorem sys_exec_kfree [WchG GF] (KF : KFREE) (cpu : CPU) (k' : KCtx) (se : Bool
       trapCsrsExt c se -∗ cpuClaimExt c se pj -∗ actLend pj (kc + 1) -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj
-  have h := KF.wp_kfree_led (hlc := hlc) (GF := GF) cpu k' γl γk none kc (by rw [hnoff]; decide) hK hlk hp
+  have h := KF.wp_kfree_led (GF := GF) cpu k' γl γk none kc (by rw [hnoff]; decide) hK hlk hp
   unfold wp_kfree_led_body at h
   simp only [kfreeAddr] at h
   iintro ⟨Hk, Hpc, Hte, Hce, Hlk, Hpg, Hav, Hl, HK⟩
@@ -203,7 +203,7 @@ end Kfree
 /-! ## §4.  THE LOOP at a symbolic base -/
 
 section Loop
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -211,7 +211,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 /-- The allocator pair out of the environment (Rocq `kalloc_env fsc_kalloc
 None`). -/
 theorem sysExecEnv_kmem (Γ : SchedNames) (A : SysExecArgs) :
-    sysExecEnv (hlc := hlc) (GF := GF) Γ A ⊢
+    sysExecEnv (GF := GF) Γ A ⊢
       isLock fscKalloc kmemLockAddr "kmem" (kmemRes fsReadyKmem) ∗ kallocAvail fsReadyKmem none := by
   unfold sysExecEnv fsFabric
   iintro ⟨#Hrdy, -⟩
@@ -241,7 +241,7 @@ theorem sys_exec_free_exit (k : KCtx) (p pe : BitVec 64) (ci : BitVec 13)
     kctx c (((k.withSpie spie spp).pushed 60).withRegs R) ∗ pcIs c p ∗
     trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗ sysExecArgvFrom (k.regs 2#5) t t pg ∗
     (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) ∗
-    sysExecFreeK (hlc := hlc) k R p pe ke
+    sysExecFreeK k R p pe ke
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, Hte, Hce, Harr, Hl, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -284,10 +284,10 @@ theorem sys_exec_free_gen (KF : KFREE) (Γ : SchedNames) (k : KCtx) (A : SysExec
       ⌜t - m ≤ W ∧ m ≤ t ∧ m < 32 ∧ t ≤ 32 ∧ sysExecPgOk pg t ∧
         R 9#5 = sysExecArgvAt (k.regs 2#5) m ∧ R 20#5 = sysExecPath (k.regs 2#5)⌝ -∗
       kctx c (((k.withSpie spie spp).pushed 60).withRegs R) -∗ pcIs c p -∗
-      trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysExecEnv (hlc := hlc) Γ A -∗
+      trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysExecEnv Γ A -∗
       sysExecArgvFrom (k.regs 2#5) m t pg -∗ sysExecPages pg afun m t -∗
       (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k.proc k1) -∗
-      sysExecFreeK (hlc := hlc) k R p pe ke -∗
+      sysExecFreeK k R p pe ke -∗
       wpLoop c := by
   obtain ⟨hK60, -, -, -, -, -, hK14, -⟩ := sys_exec_K _ hS.hK
   intro W
@@ -412,7 +412,7 @@ theorem sys_exec_free_body (KF : KFREE) (Γ : SchedNames) (k : KCtx) (A : SysExe
       (instruction.ITYPE (8#12, regidx.Regidx 9#5, regidx.Regidx 9#5, iop.ADDI)))
     (hi10 : kernelText (GF := GF) ⊢ instr (sysExecAddr + base + 10#64) false
       (instruction.BTYPE (8182#13, regidx.Regidx 20#5, regidx.Regidx 9#5, bop.BNE))) :
-    ⊢ sysExecFreeBody (hlc := hlc) (GF := GF) Γ k A base ea := by
+    ⊢ sysExecFreeBody (GF := GF) Γ k A base ea := by
   unfold sysExecFreeBody
   iintro %c %spie %spp %R %pg %afun %m %t %ke %⟨hmt, hm, ht, hpg, hR9, hR20⟩ Hk Hpc Hte Hce Henv Harr
     Hpgs Hl HΦ
@@ -423,14 +423,14 @@ theorem sys_exec_free_body (KF : KFREE) (Γ : SchedNames) (k : KCtx) (A : SysExe
 
 /-- **bad:'s free loop, +0x096** (exits +0x0f4 / +0x0a4). -/
 theorem sys_exec_free_bad (KF : KFREE) (Γ : SchedNames) (k : KCtx) (A : SysExecArgs)
-    (hS : SysExecStatic k A) : ⊢ sysExecFreeBody (hlc := hlc) (GF := GF) Γ k A 0x96#64 0xf4#64 :=
+    (hS : SysExecStatic k A) : ⊢ sysExecFreeBody (GF := GF) Γ k A 0x96#64 0xf4#64 :=
   sys_exec_free_body KF Γ k A hS 0x96#64 0xf4#64 92#13 2077752#21 sys_exec_free_ce96
     sys_exec_free_ji96 sys_exec_free_ret96 (text_instr _ _ _ _ rfl rfl) (text_instr _ _ _ _ rfl rfl)
     (text_instr _ _ _ _ rfl rfl) (text_instr _ _ _ _ rfl rfl) (text_instr _ _ _ _ rfl rfl)
 
 /-- **The success tail's free loop, +0x0d4** (both exits +0x0e2). -/
 theorem sys_exec_free_succ (KF : KFREE) (Γ : SchedNames) (k : KCtx) (A : SysExecArgs)
-    (hS : SysExecStatic k A) : ⊢ sysExecFreeBody (hlc := hlc) (GF := GF) Γ k A 0xd4#64 0xe2#64 :=
+    (hS : SysExecStatic k A) : ⊢ sysExecFreeBody (GF := GF) Γ k A 0xd4#64 0xe2#64 :=
   sys_exec_free_body KF Γ k A hS 0xd4#64 0xe2#64 12#13 2077690#21 sys_exec_free_ced4
     sys_exec_free_jid4 sys_exec_free_retd4 (text_instr _ _ _ _ rfl rfl) (text_instr _ _ _ _ rfl rfl)
     (text_instr _ _ _ _ rfl rfl) (text_instr _ _ _ _ rfl rfl) (text_instr _ _ _ _ rfl rfl)

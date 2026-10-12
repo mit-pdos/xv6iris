@@ -52,14 +52,14 @@ theorem echoMain_bge (L : Nat) (h31 : L < 2 ^ 31) :
   by_cases h : L ≤ 1 <;> simp [h] <;> omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-- The exit path at 0x76 (Rocq `wp_kecho_main_exit_at`): `li a0,0; jal exit`. -/
 theorem echoMain_exitAt (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (mc : RegMap) (n : Nat) :
-    ⊢ ukCode N.t User.Echo.code.byte -∗ kechoExit (hlc := hlc) N 0 -∗
-      urun (hlc := hlc) N h mc (BitVec.ofNat 64 0x76) n -∗ wpLoop h := by
+    ⊢ ukCode N.t User.Echo.code.byte -∗ kechoExit N 0 -∗
+      urun N h mc (BitVec.ofNat 64 0x76) n -∗ wpLoop h := by
   iintro #Hc Hex Hrun
   ihave Hi := echo_uis N.t 0x76 true (.ITYPE (0#12, .Regidx 0#5, .Regidx 10#5, .ADDI)) udec%
     (by decide) $$ Hc
@@ -96,10 +96,10 @@ theorem echoMain_body (UL : UK_LEAVES) (HS : ECHO_STRLEN) (N : UkNames GF) (av :
     (hg : args[i]? = some g) (hav : av + 8 * args.length ≤ 2 ^ 38)
     (hs1 : mc.get 9#5 = BitVec.ofNat 64 (av + 8 * i)) (hs3 : mc.get 19#5 = BitVec.ofNat 64 1)
     (hs5 : mc.get 21#5 = BitVec.ofNat 64 (av + 8 * args.length - 8)) :
-    ⊢ kechoW (hlc := hlc) N (BitVec.ofNat 64 g.ptr) g.len Ci Co -∗ ukCode N.t User.Echo.code.byte -∗
-      uargv N.d av args -∗ Ci -∗ urun (hlc := hlc) N h mc (BitVec.ofNat 64 0x4e) (2 + n) -∗
+    ⊢ kechoW N (BitVec.ofNat 64 g.ptr) g.len Ci Co -∗ ukCode N.t User.Echo.code.byte -∗
+      uargv N.d av args -∗ Ci -∗ urun N h mc (BitVec.ofNat 64 0x4e) (2 + n) -∗
       (∀ (h' : CPU) (mc' : RegMap), ⌜∀ r : BitVec 5, ucalleeSavedIdx r = true → r ≠ 18#5 → mc'.get r = mc.get r⌝ -∗
-        Co -∗ urun (hlc := hlc) N h' mc'
+        Co -∗ urun N h' mc'
           (if i + 1 = args.length then BitVec.ofNat 64 0x66 else BitVec.ofNat 64 0x3e) (2 + n) -∗ wpLoop h') -∗
       wpLoop h := by
   iintro Hw #Hc #Hargv HCi Hrun Hcont
@@ -237,11 +237,11 @@ theorem echoMain_sep (UL : UK_LEAVES) (N : UkNames GF) (av : Nat) (args : List U
     (hs1 : mc.get 9#5 = BitVec.ofNat 64 (av + 8 * i)) (hs3 : mc.get 19#5 = BitVec.ofNat 64 1)
     (hs4 : mc.get 20#5 = BitVec.ofNat 64 (av + 8 * args.length))
     (hs6 : mc.get 22#5 = BitVec.ofNat 64 echoSepPtr) :
-    ⊢ kechoW (hlc := hlc) N (BitVec.ofNat 64 echoSepPtr) 1 Ci Co -∗ ukCode N.t User.Echo.code.byte -∗ Ci -∗
-      urun (hlc := hlc) N h mc (BitVec.ofNat 64 0x3e) (2 + n) -∗
+    ⊢ kechoW N (BitVec.ofNat 64 echoSepPtr) 1 Ci Co -∗ ukCode N.t User.Echo.code.byte -∗ Ci -∗
+      urun N h mc (BitVec.ofNat 64 0x3e) (2 + n) -∗
       (∀ (h' : CPU) (mc' : RegMap), ⌜mc'.get 9#5 = BitVec.ofNat 64 (av + 8 * (i + 1))⌝ -∗
         ⌜∀ r : BitVec 5, ucalleeSavedIdx r = true → r ≠ 9#5 → mc'.get r = mc.get r⌝ -∗
-        Co -∗ urun (hlc := hlc) N h' mc' (BitVec.ofNat 64 0x4e) (2 + n) -∗ wpLoop h') -∗
+        Co -∗ urun N h' mc' (BitVec.ofNat 64 0x4e) (2 + n) -∗ wpLoop h') -∗
       wpLoop h := by
   iintro Hw #Hc HCi Hrun Hcont
   -- 0x3e  mv a2,s3
@@ -339,9 +339,9 @@ theorem echoMain_loop (UL : UK_LEAVES) (HS : ECHO_STRLEN) (N : UkNames GF) (av :
     mc.get 20#5 = BitVec.ofNat 64 (av + 8 * args.length) →
     mc.get 21#5 = BitVec.ofNat 64 (av + 8 * args.length - 8) →
     mc.get 22#5 = BitVec.ofNat 64 echoSepPtr →
-    ⊢ kechoPay (hlc := hlc) N args k i Ci Cend -∗ (Cend -∗ kechoExit (hlc := hlc) N 0) -∗
+    ⊢ kechoPay N args k i Ci Cend -∗ (Cend -∗ kechoExit N 0) -∗
       ukCode N.t User.Echo.code.byte -∗ uargv N.d av args -∗ Ci -∗
-      urun (hlc := hlc) N h mc (BitVec.ofNat 64 0x4e) (2 + n) -∗ wpLoop h := by
+      urun N h mc (BitVec.ofNat 64 0x4e) (2 + n) -∗ wpLoop h := by
   intro k
   induction k with
   | zero =>
@@ -436,9 +436,9 @@ theorem echoMain_loop (UL : UK_LEAVES) (HS : ECHO_STRLEN) (N : UkNames GF) (av :
 theorem wp_echoMain (UL : UK_LEAVES) (HS : ECHO_STRLEN) (N : UkNames GF) (h : CPU) (m : RegMap) (av : Nat)
     (args : List UArg) (n : Nat) (Ci Cend : IProp GF)
     (ha0 : m.get 10#5 = BitVec.ofNat 64 args.length) (ha1 : m.get 11#5 = BitVec.ofNat 64 av) :
-    ⊢ kechoPayAll (hlc := hlc) N args Ci Cend -∗ (Cend -∗ kechoExit (hlc := hlc) N 0) -∗
+    ⊢ kechoPayAll N args Ci Cend -∗ (Cend -∗ kechoExit N 0) -∗
       ukCode N.t User.Echo.code.byte -∗ uargv N.d av args -∗ Ci -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Echo.Sym.«main») (8 + (2 + n)) -∗ wpLoop h := by
+      urun N h m (BitVec.ofNat 64 User.Echo.Sym.«main») (8 + (2 + n)) -∗ wpLoop h := by
   rw [show User.Echo.Sym.«main» = 0 from rfl]
   iintro Hpay Hend #Hc #Hargv HCi Hrun
   ihave %hstk := urun_stack N h m _ _ $$ Hrun

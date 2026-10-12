@@ -38,7 +38,7 @@ the depth incremented (`KCtx.pushOffAt`); with them on at entry, the
 context's arm (the trap CSRs, the running claim, the installed handler) is
 the caller's afterwards, the `SPIE`/`SPP` indices are the pinned bits, and
 the thread may have moved harts before the `csrrci`. -/
-def wp_push_off_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+def wp_push_off_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (hnoff : k.noff + 1 < 2 ^ 31) (hK : 6 ≤ k.avail) : Prop :=
   kctx cpu k ∗ pcIs cpu pushOffAddr ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
@@ -49,7 +49,7 @@ def wp_push_off_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
 
 /-- The interface of `push_off`. -/
 structure PUSHOFF : Prop where
-  wp_push_off : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx) hnoff hK,
-    wp_push_off_body (hlc := hlc) (GF := GF) cpu k hnoff hK
+  wp_push_off : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx] (cpu : CPU) (k : KCtx) hnoff hK,
+    wp_push_off_body (GF := GF) cpu k hnoff hK
 
 end Xv6

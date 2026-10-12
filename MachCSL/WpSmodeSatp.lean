@@ -13,7 +13,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D LeanRV64D.Functions
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 variable {lent : Bool}
 
 /-- The PPN field update of `legalize_satp` is the identity on a 44-bit
@@ -113,7 +113,7 @@ variable (X : CurCtx)
 /-- **A word travels to the kernel table**: the kpt tier pins nothing, and
 neither the claim nor the bytes mention the tier. -/
 theorem wordPointsTo_toKpt (va : PAddr) (n : Nat) (dq : DFrac) (w : BitVec (8 * n)) :
-    @wordPointsTo hlc GF _ X va n dq w ⊢ @wordPointsTo hlc GF _ X.toKpt va n dq w := by
+    @wordPointsTo GF _ X va n dq w ⊢ @wordPointsTo GF _ X.toKpt va n dq w := by
   unfold wordPointsTo
   iintro ⟨%ppn, #Hcl, %⟨-, hlt, hram, hal⟩, Hb⟩
   iexists ppn
@@ -125,7 +125,7 @@ theorem wordPointsTo_toKpt (va : PAddr) (n : Nat) (dq : DFrac) (w : BitVec (8 * 
 
 /-- A stack region travels to the kernel table. -/
 theorem stackOwn_toKpt (sp : BitVec 64) (n : Nat) :
-    @stackOwn hlc GF _ X sp n ⊢ @stackOwn hlc GF _ X.toKpt sp n := by
+    @stackOwn GF _ X sp n ⊢ @stackOwn GF _ X.toKpt sp n := by
   unfold stackOwn
   refine BigSepL.bigSepL_mono_of_forall ?_
   intro k i
@@ -135,7 +135,7 @@ theorem stackOwn_toKpt (sp : BitVec 64) (n : Nat) :
 
 /-- A two-slot frame travels to the kernel table. -/
 theorem frame2_toKpt (sp ra s0 : BitVec 64) :
-    @frame2 hlc GF _ X sp ra s0 ⊢ @frame2 hlc GF _ X.toKpt sp ra s0 := by
+    @frame2 GF _ X sp ra s0 ⊢ @frame2 GF _ X.toKpt sp ra s0 := by
   unfold frame2
   iintro ⟨Hra, Hs0⟩
   isplitl [Hra]
@@ -144,8 +144,8 @@ theorem frame2_toKpt (sp ra s0 : BitVec 64) :
 
 /-- The `c->intena` cell travels to the kernel table. -/
 theorem intenaCell_toKpt [KernelGeom] (cpu : CPU) (lent sie : Bool) (noff : Nat) (intena : Bool) :
-    @intenaCell hlc GF _ X _ cpu lent sie noff intena ⊢
-      @intenaCell hlc GF _ X.toKpt _ cpu lent sie noff intena := by
+    @intenaCell GF _ X _ cpu lent sie noff intena ⊢
+      @intenaCell GF _ X.toKpt _ cpu lent sie noff intena := by
   cases lent
   · cases noff with
     | zero =>
@@ -163,8 +163,8 @@ theorem intenaCell_toKpt [KernelGeom] (cpu : CPU) (lent sie : Bool) (noff : Nat)
 
 /-- The `struct cpu` cells travel to the kernel table. -/
 theorem cpuCells_toKpt [KernelGeom] (cpu : CPU) (lent sie : Bool) (noff : Nat) (intena : Bool) (p : BitVec 64) :
-    @cpuCells hlc GF _ X _ cpu lent sie noff intena p ⊢
-      @cpuCells hlc GF _ X.toKpt _ cpu lent sie noff intena p := by
+    @cpuCells GF _ X _ cpu lent sie noff intena p ⊢
+      @cpuCells GF _ X.toKpt _ cpu lent sie noff intena p := by
   unfold cpuCells
   iintro ⟨Hp, Hn, Hi⟩
   isplitl [Hp]
@@ -177,8 +177,8 @@ theorem cpuCells_toKpt [KernelGeom] (cpu : CPU) (lent sie : Bool) (noff : Nat) (
 the hart CSRs do not mention the ambient context). -/
 theorem cpuOwn_toKpt [KernelGeom] (cpu : CPU) (lent sie : Bool) (noff : Nat) (intena : Bool) (p : BitVec 64)
     (locks : List String) :
-    @cpuOwn hlc GF _ X _ cpu lent sie noff intena p locks ⊢
-      @cpuOwn hlc GF _ X.toKpt _ cpu lent sie noff intena p locks := by
+    @cpuOwn GF _ X _ cpu lent sie noff intena p locks ⊢
+      @cpuOwn GF _ X.toKpt _ cpu lent sie noff intena p locks := by
   unfold cpuOwn
   iintro ⟨Hc, Hl, Hh⟩
   iframe Hl Hh

@@ -113,7 +113,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std Iris.Algebra MachCSL
 
 section EscrowDeposit
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- The registry, lent out of what stays behind at a slot opening (the
@@ -207,9 +207,9 @@ theorem iregFreeDeposit_au [Icfg] (E : CoPset) (icn : IcNames) (γi : GName) (γ
     (hin : (inum.toNat : Int) < 16 * (nib : Int))
     (hdn' : dinodeWf dn') (hz : dn'.diType.toNat = 0) (hbare : iregBare dn')
     (hnl : diNlinkStable dn' dn) :
-    ⊢@{IProp GF} iregInv (hlc := hlc) γi γfs inodestart nib -∗
-      escAInv (hlc := hlc) γfs ge gr gd inum.toNat rg -∗
-      ipoolInv (hlc := hlc) icn γfs γi cov logstart nib -∗
+    ⊢@{IProp GF} iregInv γi γfs inodestart nib -∗
+      escAInv γfs ge gr gd inum.toNat rg -∗
+      ipoolInv icn γfs γi cov logstart nib -∗
       crpElem inum.toNat (.crpPre t q) -∗
       dinodeAt γi inum dn -∗
       redeemTicketA gd -∗

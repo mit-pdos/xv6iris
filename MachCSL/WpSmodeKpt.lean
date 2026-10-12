@@ -21,7 +21,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D LeanRV64D.Functions
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- The context at the Kpt tier with root `root`. -/
 def KCtx.toKpt (k : KCtx) (root : BitVec 44) : KCtx :=
@@ -54,7 +54,7 @@ theorem sConfOf_setSatp (tier : KTier) (root root' : BitVec 44) (ms mdl mepc stc
 
 /-- The installed table does not look at the tier. -/
 theorem kptOn_toKpt (X : CurCtx) (t : PTree) (M : RegMapF (BitVec 64)) :
-    @kptOn hlc GF _ X t M = @kptOn hlc GF _ X.toKpt t M := rfl
+    @kptOn GF _ X t M = @kptOn GF _ X.toKpt t M := rfl
 
 set_option maxHeartbeats 4000000 in
 /-- `csrw satp, rs1` with `rs1` holding the Sv39 word of `root`, from the

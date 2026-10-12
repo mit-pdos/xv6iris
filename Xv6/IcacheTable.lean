@@ -261,7 +261,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 /-! ## A ξ-constant row transports (deviation 6) -/
 
 section MorphEq
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- A family that is the same proposition at every context transports
 trivially (the rows whose ambient is tier-only: `irefClaims`, `icEscrows`,
@@ -278,7 +278,7 @@ end MorphEq
 /-! ## §6.  THE itable LOCK'S RESOURCE, v2: the slot rows -/
 
 section IcacheTableSlot
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF]
 
 /-- Rocq's `islot_rest_at (XI := ξ)` (deviation 1). -/
 def islotRestAtCtx [CurCtx] (ξ : CtxId) (k : Nat) (q : Qp) (dev inum : BitVec 32) : IProp GF :=
@@ -361,9 +361,9 @@ instance islotFreeAtCtx_morph [CurCtx] (k : Nat) (dev inum : BitVec 32) :
 instance islotEmpty_morph [Icfg] [CurCtx] (cn : IcNames) (k : Nat) :
     CtxMorph (GF := GF) (fun ξ => islotEmpty ξ cn k) := by
   unfold islotEmpty
-  refine @instCtxMorphExists hlc GF _ _ _ (fun dev => ?_)
-  refine @instCtxMorphExists hlc GF _ _ _ (fun inum => ?_)
-  exact @instCtxMorphSep hlc GF _ _ _ (islotFreeAtCtx_morph k dev inum) (instCtxMorphConst _)
+  refine @instCtxMorphExists GF _ _ _ (fun dev => ?_)
+  refine @instCtxMorphExists GF _ _ _ (fun inum => ?_)
+  exact @instCtxMorphSep GF _ _ _ (islotFreeAtCtx_morph k dev inum) (instCtxMorphConst _)
 
 /-- Rocq's `islot2_morph`. -/
 instance islot2_morph [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Icfg] [CurCtx] (cn : IcNames) (M : RegMapF (Qp × PosNat))
@@ -376,14 +376,14 @@ instance islot2_morph [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG
   · exact instCtxMorphConst _
   · exact instCtxMorphConst _
   · unfold islotLive
-    exact @instCtxMorphSep hlc GF _ _ _ (islotRestAtCtx_morph k q dev inum) (instCtxMorphConst _)
+    exact @instCtxMorphSep GF _ _ _ (islotRestAtCtx_morph k q dev inum) (instCtxMorphConst _)
 
 end IcacheTableSlot
 
 /-! ## §6.  The per-slot PAYLOAD rows (A6.145, R3 M-6/F17) -/
 
 section IcacheTableRow
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcboxG GF]
 
 /-- The slot's count in `M` (0 when not live; Rocq's `icM_count`). -/
 def icMCount (M : RegMapF (Qp × PosNat)) (k : Nat) : Nat :=
@@ -626,22 +626,22 @@ besides the floors) -/
 instance itableSlotFree_morph [Icfg] [CurCtx] (k : Nat) :
     CtxMorph (GF := GF) (fun ξ => itableSlotFree ξ k) := by
   unfold itableSlotFree
-  refine @instCtxMorphExists hlc GF _ _ _ (fun tst => ?_)
-  exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAtN (GF := GF) _ _ _ _) (instCtxMorphConst _)
+  refine @instCtxMorphExists GF _ _ _ (fun tst => ?_)
+  exact @instCtxMorphSep GF _ _ _ (instCtxMorphWordAtN (GF := GF) _ _ _ _) (instCtxMorphConst _)
 
 instance icSlotRowFl_morph [Icfg] (k : Nat) (oi : IcBid) (c : Nat) :
     CtxMorph (GF := GF) (fun ξ => icSlotRowFl ξ k oi c) := by
   unfold icSlotRowFl
-  refine @instCtxMorphExists hlc GF _ _ _ (fun tb => ?_)
-  exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (instCtxMorphFloor (GF := GF) tb))
+  refine @instCtxMorphExists GF _ _ _ (fun tb => ?_)
+  exact @instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+    (@instCtxMorphSep GF _ _ _ (instCtxMorphConst _) (instCtxMorphFloor (GF := GF) tb))
 
 instance itableSlotLive_morph [Icfg] (k : Nat) :
     CtxMorph (GF := GF) (fun ξ => itableSlotLive ξ k) := by
   unfold itableSlotLive
-  refine @instCtxMorphExists hlc GF _ _ _ (fun tst => ?_)
-  exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (instCtxMorphFloor (GF := GF) tst))
+  refine @instCtxMorphExists GF _ _ _ (fun tst => ?_)
+  exact @instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+    (@instCtxMorphSep GF _ _ _ (instCtxMorphConst _) (instCtxMorphFloor (GF := GF) tst))
 
 /-- Rocq's `itable_slot_res_llb_morph`. -/
 instance itableSlotResLlb_morph [Icfg] [CurCtx] (M : RegMapF (Qp × PosNat))
@@ -649,8 +649,8 @@ instance itableSlotResLlb_morph [Icfg] [CurCtx] (M : RegMapF (Qp × PosNat))
     CtxMorph (GF := GF) (fun ξ => itableSlotResLlb ξ M ci k) := by
   unfold itableSlotResLlb
   rcases PartialMap.get? M k with _ | v
-  · exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (itableSlotFree_morph (GF := GF) k)
-  · dsimp only; exact @instCtxMorphConst hlc GF _ _
+  · exact @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) (itableSlotFree_morph (GF := GF) k)
+  · dsimp only; exact @instCtxMorphConst GF _ _
 
 /-- Rocq's `itable_slot_res_morph`. -/
 instance itableSlotRes_morph [Icfg] [CurCtx] (M : RegMapF (Qp × PosNat))
@@ -658,8 +658,8 @@ instance itableSlotRes_morph [Icfg] [CurCtx] (M : RegMapF (Qp × PosNat))
     CtxMorph (GF := GF) (fun ξ => itableSlotRes ξ M ci k) := by
   unfold itableSlotRes
   rcases PartialMap.get? M k with _ | v
-  · exact @instCtxMorphSep hlc GF _ _ _ (icSlotRowFl_morph (GF := GF) _ _ _) (itableSlotFree_morph (GF := GF) k)
-  · exact @instCtxMorphSep hlc GF _ _ _ (icSlotRowFl_morph (GF := GF) _ _ _) (itableSlotLive_morph (GF := GF) k)
+  · exact @instCtxMorphSep GF _ _ _ (icSlotRowFl_morph (GF := GF) _ _ _) (itableSlotFree_morph (GF := GF) k)
+  · exact @instCtxMorphSep GF _ _ _ (icSlotRowFl_morph (GF := GF) _ _ _) (itableSlotLive_morph (GF := GF) k)
 
 /-- Rocq's `itable_slot_res_bare_morph`. -/
 instance itableSlotResBare_morph [Icfg] [CurCtx] (tl : Nat) (M : RegMapF (Qp × PosNat))
@@ -667,8 +667,8 @@ instance itableSlotResBare_morph [Icfg] [CurCtx] (tl : Nat) (M : RegMapF (Qp × 
     CtxMorph (GF := GF) (fun ξ => itableSlotResBare ξ tl M ci k) := by
   unfold itableSlotResBare
   rcases PartialMap.get? M k with _ | v
-  · exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (itableSlotFree_morph (GF := GF) k)
-  · dsimp only; exact @instCtxMorphConst hlc GF _ _
+  · exact @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) (itableSlotFree_morph (GF := GF) k)
+  · dsimp only; exact @instCtxMorphConst GF _ _
 
 /-! ### THE A6.144 RELEASE HOOK's per-row step -/
 
@@ -741,7 +741,7 @@ end IcacheTableRow
 /-! ## §6.  THE TABLE: `itable_res2` and its two release forms -/
 
 section IcacheTableRes
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF]
   [FsBlocksG GF] [FsTopG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcboxG GF] [SleepLockG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-- Rocq's `itable_res2`: the lock holder's half of the count authority,
@@ -867,51 +867,51 @@ instance itableRes2_morph [Icfg] [CurCtx] (cn : IcNames) (γfs : FsNames) (γi :
     (cov : ExtTreeSet Nat compare) (logstart nib : Nat) (dv : BitVec 32) :
     CtxMorph (GF := GF) (fun ξ => itableRes2 ξ cn γfs γi cov logstart nib dv) := by
   unfold itableRes2
-  refine @instCtxMorphExists hlc GF _ _ _ (fun M => ?_)
-  refine @instCtxMorphExists hlc GF _ _ _ (fun ci => ?_)
-  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
-  refine @instCtxMorphSep hlc GF _ _ _
+  refine @instCtxMorphExists GF _ _ _ (fun M => ?_)
+  refine @instCtxMorphExists GF _ _ _ (fun ci => ?_)
+  refine @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) ?_
+  refine @instCtxMorphSep GF _ _ _
     (ctxMorph_bigSepL (List.range NINODE) (fun _ k ξ => itableSlotRes (GF := GF) ξ M ci k)
       (fun _ k => itableSlotRes_morph M ci k)) ?_
-  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
-  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
-  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
-  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
-  exact @instCtxMorphSep hlc GF _ _ _ (islots2_morph cn M ci) (instCtxMorphConst _)
+  refine @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) ?_
+  refine @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) ?_
+  refine @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) ?_
+  refine @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) ?_
+  exact @instCtxMorphSep GF _ _ _ (islots2_morph cn M ci) (instCtxMorphConst _)
 
 /-- Rocq's `itable_res2_llb_morph`. -/
 instance itableRes2Llb_morph [Icfg] [CurCtx] (cn : IcNames) (γfs : FsNames) (γi : GName)
     (cov : ExtTreeSet Nat compare) (logstart nib : Nat) (dv : BitVec 32) :
     CtxMorph (GF := GF) (fun ξ => itableRes2Llb ξ cn γfs γi cov logstart nib dv) := by
   unfold itableRes2Llb
-  refine @instCtxMorphExists hlc GF _ _ _ (fun M => ?_)
-  refine @instCtxMorphExists hlc GF _ _ _ (fun ci => ?_)
-  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
-  refine @instCtxMorphSep hlc GF _ _ _
+  refine @instCtxMorphExists GF _ _ _ (fun M => ?_)
+  refine @instCtxMorphExists GF _ _ _ (fun ci => ?_)
+  refine @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) ?_
+  refine @instCtxMorphSep GF _ _ _
     (ctxMorph_bigSepL (List.range NINODE) (fun _ k ξ => itableSlotResLlb (GF := GF) ξ M ci k)
       (fun _ k => itableSlotResLlb_morph M ci k)) ?_
-  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
-  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
-  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
-  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
-  exact @instCtxMorphSep hlc GF _ _ _ (islots2_morph cn M ci) (instCtxMorphConst _)
+  refine @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) ?_
+  refine @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) ?_
+  refine @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) ?_
+  refine @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) ?_
+  exact @instCtxMorphSep GF _ _ _ (islots2_morph cn M ci) (instCtxMorphConst _)
 
 /-- Rocq's `itable_res2_bare_morph`. -/
 instance itableRes2Bare_morph [Icfg] [CurCtx] (tl : Nat) (cn : IcNames) (γfs : FsNames)
     (γi : GName) (cov : ExtTreeSet Nat compare) (logstart nib : Nat) (dv : BitVec 32) :
     CtxMorph (GF := GF) (fun ξ => itableRes2Bare ξ tl cn γfs γi cov logstart nib dv) := by
   unfold itableRes2Bare
-  refine @instCtxMorphExists hlc GF _ _ _ (fun M => ?_)
-  refine @instCtxMorphExists hlc GF _ _ _ (fun ci => ?_)
-  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
-  refine @instCtxMorphSep hlc GF _ _ _
+  refine @instCtxMorphExists GF _ _ _ (fun M => ?_)
+  refine @instCtxMorphExists GF _ _ _ (fun ci => ?_)
+  refine @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) ?_
+  refine @instCtxMorphSep GF _ _ _
     (ctxMorph_bigSepL (List.range NINODE) (fun _ k ξ => itableSlotResBare (GF := GF) ξ tl M ci k)
       (fun _ k => itableSlotResBare_morph tl M ci k)) ?_
-  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
-  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
-  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
-  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
-  exact @instCtxMorphSep hlc GF _ _ _ (islots2_morph cn M ci) (instCtxMorphConst _)
+  refine @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) ?_
+  refine @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) ?_
+  refine @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) ?_
+  refine @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) ?_
+  exact @instCtxMorphSep GF _ _ _ (islots2_morph cn M ci) (instCtxMorphConst _)
 
 /-- Rocq's `islots2_acc_upd`: the slot accessor a WRITER needs -- BOTH pure
 maps may come back changed, provided they changed only at `k`. -/
@@ -997,7 +997,7 @@ theorem isItable2_pool [Icfg] [CurCtx] (γl : GName) (cn : IcNames) (γfs : FsNa
 end IcacheTableRes
 
 /-- Rocq's `ic_escrows_lookup`. -/
-theorem icEscrows_lookup {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF]
+theorem icEscrows_lookup {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF]
     [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcboxG GF]
     [Icfg] [CurCtx] (cn : IcNames) (γfs : FsNames) (γi : GName) (cov : ExtTreeSet Nat compare)
     (logstart k : Nat) (hk : k < NINODE) :
@@ -1009,7 +1009,7 @@ theorem icEscrows_lookup {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
 /-! ## §6b.  EVERY ENTRY'S INODE SLEEPLOCK -/
 
 section IcacheSleeplocks
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
   [IcacheG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF]
 
 /-- Rocq's `ic_sleeplocks` (deviation 4: no name conjunct). -/
@@ -1035,7 +1035,7 @@ end IcacheSleeplocks
 /-! ## §6c.  THE TWO ICACHE ENVIRONMENT ROWS' TRANSPORT OBLIGATIONS -/
 
 section IcacheEnvMorph
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
   [IcacheG GF] [IcboxG GF]
 
 /-- One slot's sleeplock handle transports: the payload `slBody … (icSlp cn
@@ -1045,8 +1045,8 @@ private theorem icSleeplock_morph [OffboxG GF] [OffboxBoxG GF] [Icfg] (t : KTier
     CtxMorph (GF := GF) (fun ξ => iprop(∃ γil γisl : GName,
       letI : CurCtx := ⟨ξ, t⟩
       isSleeplockGen (GF := GF) γil γisl (iLock (ientry k)) (icSlp cn k) (slhTok (icfgIsl k)))) := by
-  refine @instCtxMorphExists hlc GF _ _ _ (fun γil => ?_)
-  refine @instCtxMorphExists hlc GF _ _ _ (fun γisl => ?_)
+  refine @instCtxMorphExists GF _ _ _ (fun γil => ?_)
+  refine @instCtxMorphExists GF _ _ _ (fun γisl => ?_)
   exact show CtxMorph (GF := GF) (fun ξ =>
       letI : CurCtx := ⟨ξ, t⟩
       isLock (GF := GF) γil (slLk (iLock (ientry k))) "sleep lock"
@@ -1075,21 +1075,21 @@ instance isItable2_morph [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLink
       letI : CurCtx := ⟨ξ, t⟩
       isItable2 (GF := GF) γl cn γfs γi cov logstart nib dv) := by
   unfold isItable2
-  refine @instCtxMorphSep hlc GF _ _ _ ?_ ?_
+  refine @instCtxMorphSep GF _ _ _ ?_ ?_
   · exact show CtxMorph (GF := GF) (fun ξ =>
         letI : CurCtx := ⟨ξ, t⟩
         isLock (GF := GF) γl itableLock "itable"
           (fun ζ => letI : CurCtx := ⟨ζ, t⟩; itableRes2 (GF := GF) ζ cn γfs γi cov logstart nib dv))
       from instCtxMorphIsLock _ _ _ _ _
-  refine @instCtxMorphSep hlc GF _ _ _ (ctxMorph_ofEq _ (fun _ _ => rfl)) ?_
-  exact @instCtxMorphSep hlc GF _ _ _ (ctxMorph_ofEq _ (fun _ _ => rfl)) (instCtxMorphConst _)
+  refine @instCtxMorphSep GF _ _ _ (ctxMorph_ofEq _ (fun _ _ => rfl)) ?_
+  exact @instCtxMorphSep GF _ _ _ (ctxMorph_ofEq _ (fun _ _ => rfl)) (instCtxMorphConst _)
 
 end IcacheEnvMorph
 
 /-! ## §7.  ALLOCATION OF THE TOKEN FAMILIES -/
 
 section IcacheEscrowAlloc
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF]
 
 /-- THE CHECKOUT DESCRIPTOR's family (§14.8), at `depNone`: at boot no
 entry is checked out, and a whole variable at the neutral descriptor IS

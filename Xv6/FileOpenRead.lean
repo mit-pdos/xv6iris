@@ -50,18 +50,18 @@ theorem moi_le (z : Int) (hz : 0 ≤ z) : ((BitVec.ofInt 64 z).toNat : Int) ≤ 
   omega
 
 section FileOpenRead
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [OffboxG GF] [FsTopG GF] [FsBytesG GF] [Appcfg GF] [Icfg]
 
 /-- THE READ PIECE, the offset's half in hand (Rocq `file_read_piece_adv`). -/
 theorem fileReadPiece_adv (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (q : Qp)
     (jo : Option Nat) (s : Dst) (i : Nat) (γo : GName) (p : Nat)
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r }) :
-    ⊢@{IProp GF} □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ fileTaint (hlc := hlc) c) -∗
-      □ (fileTaint (hlc := hlc) c -∗ MachFixedGS.killCred (hlc := hlc) (GF := GF)) -∗
-      appInv (hlc := hlc) γfs -∗ fileConsCred (hlc := hlc) c r jo -∗ fdq r q s -∗ uoff γo p -∗
-      pfAt (areadCommitAdv (hlc := hlc) (fsGammaL γfs) appE i γo)
-        (fileReadRecvHand (hlc := hlc) c r q jo s γo p) := by
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred c, appRun := r }) :
+    ⊢@{IProp GF} □ (MachFixedGS.killCred (GF := GF) -∗ fileTaint c) -∗
+      □ (fileTaint c -∗ MachFixedGS.killCred (GF := GF)) -∗
+      appInv γfs -∗ fileConsCred c r jo -∗ fdq r q s -∗ uoff γo p -∗
+      pfAt (areadCommitAdv (fsGammaL γfs) appE i γo)
+        (fileReadRecvHand c r q jo s γo p) := by
   unfold pfAt areadCommitAdv fileReadRecvHand offLink
   simp only [fileOpen_fsGammaL_top]
   iintro #Hbr #Hrb #Hinv #Hm Hd Hu
@@ -108,12 +108,12 @@ theorem fileReadPostOk_learn_hand (c : FileFixed) (r : FileAppNames) (q : Qp)
     (hlin : ∀ j : Nat, j < k → (addr + BitVec.ofNat 64 j).toNat = addr.toNat + j)
     (himg : ∀ j : Nat, j < k → umemByte M' (addr + BitVec.ofNat 64 j).toNat = g j)
     (hnk : n.toNat ≤ k) :
-    ⊢@{IProp GF} readPostOk i n (fileReadRecvHand (hlc := hlc) c r q jo s γo p) rv M' addr -∗
+    ⊢@{IProp GF} readPostOk i n (fileReadRecvHand c r q jo s γo p) rv M' addr -∗
       ⌜rv.toNat ≤ n.toNat⌝ ∗
       ((⌜rv.toNat = ardCount n.toNat p bs.length⌝ ∗
           ⌜∀ j : Nat, j < rv.toNat → g j = bs[p + j]!⌝ ∗
           uoff γo (p + rv.toNat) ∗ fdq r q s)
-        ∨ (uoff γo p ∗ fdq r q s ∗ fileTaint (hlc := hlc) c)) := by
+        ∨ (uoff γo p ∗ fdq r q s ∗ fileTaint c)) := by
   unfold readPostOk fileReadRecvHand
   iintro ⟨%av, %off, %a, %d, %hpre, %hn, %htie, %hdr, %hbytes, Hc⟩
   have hbnd : rv.toNat ≤ n.toNat := by
@@ -169,13 +169,13 @@ theorem fileReadArms_learn_mapped_hand (Γ : FsViewNames GF) (c : FileFixed) (r 
     (himg : ∀ j : Nat, j < k → umemByte M' (addr + BitVec.ofNat 64 j).toNat = g j)
     (hn : 0 ≤ n) (hnk : n.toNat ≤ k)
     (hmap : ∀ j : Nat, j < k → uvaWmapped P (addr + BitVec.ofNat 64 j).toNat) :
-    ⊢@{IProp GF} readArms Γ i γo P n (fileReadRecvHand (hlc := hlc) c r q jo s γo p) rv M' addr -∗
+    ⊢@{IProp GF} readArms Γ i γo P n (fileReadRecvHand c r q jo s γo p) rv M' addr -∗
       ⌜rv.toNat ≤ n.toNat⌝ ∗
       ((⌜rv.toNat = ardCount n.toNat p bs.length⌝ ∗
           ⌜∀ j : Nat, j < rv.toNat → g j = bs[p + j]!⌝ ∗
           uoff γo (p + rv.toNat) ∗ fdq r q s)
-        ∨ (uoff γo p ∗ fdq r q s ∗ fileTaint (hlc := hlc) c)) :=
-  entails_wand ((readArms_mapped (hlc := hlc) Γ i γo P n _ rv M' addr k hn hnk hmap).trans
+        ∨ (uoff γo p ∗ fdq r q s ∗ fileTaint c)) :=
+  entails_wand ((readArms_mapped Γ i γo P n _ rv M' addr k hn hnk hmap).trans
     (wand_entails (fileReadPostOk_learn_hand c r q jo i bs N s n γo p rv M' addr k g hsN hlin
       himg hnk)))
 

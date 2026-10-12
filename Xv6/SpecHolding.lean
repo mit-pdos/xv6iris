@@ -38,7 +38,7 @@ open LeanRV64D
 def holdingAddr : BitVec 64 := KA.«holding»
 
 /-- **WP of `holding`, not held by the caller.**  `lk` in `a0`; returns 0. -/
-def wp_holding_notheld_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+def wp_holding_notheld_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : GName) (s : String) (R : CtxId → IProp GF)
     (hsie : k.sie = false) (hK : 6 ≤ k.avail) (hs : s ∉ k.locks) : Prop :=
   kctx cpu k ∗ pcIs cpu holdingAddr ∗ isLock γ (k.regs 10#5) s R ∗
@@ -51,7 +51,7 @@ def wp_holding_notheld_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hl
 `Tc` that refutes `D`; `Tc` is threaded through and handed back in the
 continuation.  The `D := False`, `Tc := emp` case recovers
 `wp_holding_notheld_body`. -/
-def wp_holding_notheld_gen_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+def wp_holding_notheld_gen_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : GName) (s : String) (R : CtxId → IProp GF)
     (D : IProp GF) [Timeless D] (Tc : IProp GF) (hrefute : ⊢ Tc -∗ D -∗ (False : IProp GF))
     (hsie : k.sie = false) (hK : 6 ≤ k.avail) (hs : s ∉ k.locks) : Prop :=
@@ -62,7 +62,7 @@ def wp_holding_notheld_gen_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachG
 
 /-- **WP of `holding`, held by the caller.**  `lk` in `a0`; returns 1; the
 holder token comes back. -/
-def wp_holding_locked_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+def wp_holding_locked_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : GName) (s : String) (R : CtxId → IProp GF)
     (hsie : k.sie = false) (hK : 6 ≤ k.avail) : Prop :=
   kctx cpu k ∗ pcIs cpu holdingAddr ∗ isLock γ (k.regs 10#5) s R ∗
@@ -76,7 +76,7 @@ def wp_holding_locked_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc
 `Tc` that refutes `D`; the holder token `locked γ cpu` and `Tc` both come
 back in the continuation.  The `D := False`, `Tc := emp` case recovers
 `wp_holding_locked_body`. -/
-def wp_holding_locked_gen_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+def wp_holding_locked_gen_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : GName) (s : String) (R : CtxId → IProp GF)
     (D : IProp GF) [Timeless D] (Tc : IProp GF) (hrefute : ⊢ Tc -∗ D -∗ (False : IProp GF))
     (hsie : k.sie = false) (hK : 6 ≤ k.avail) : Prop :=
@@ -91,7 +91,7 @@ through `lockOpenable γ lk s R D`, ruling out the dead branch with the HELD
 `lockedCore` token it already carries for the reads -- no separate
 credential (this is the destroy path, where the caller holds only the lock
 token).  The holder token `locked γ cpu` comes back in the continuation. -/
-def wp_holding_locked_refute_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+def wp_holding_locked_refute_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : GName) (s : String) (R : CtxId → IProp GF)
     (D : IProp GF) [Timeless D] (hrefute : ⊢ lockedCore γ cpu -∗ D -∗ (False : IProp GF))
     (hsie : k.sie = false) (hK : 6 ≤ k.avail) : Prop :=
@@ -103,20 +103,20 @@ def wp_holding_locked_refute_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [Mac
 
 /-- The interface of `holding`. -/
 structure HOLDING : Prop where
-  wp_holding_notheld : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_holding_notheld : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γ : GName) (s : String) (R : CtxId → IProp GF) hsie hK hs,
-    wp_holding_notheld_body (hlc := hlc) (GF := GF) cpu k γ s R hsie hK hs
-  wp_holding_locked : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx)
+    wp_holding_notheld_body (GF := GF) cpu k γ s R hsie hK hs
+  wp_holding_locked : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γ : GName) (s : String) (R : CtxId → IProp GF) hsie hK,
-    wp_holding_locked_body (hlc := hlc) (GF := GF) cpu k γ s R hsie hK
-  wp_holding_notheld_gen : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx)
+    wp_holding_locked_body (GF := GF) cpu k γ s R hsie hK
+  wp_holding_notheld_gen : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γ : GName) (s : String) (R : CtxId → IProp GF) (D : IProp GF) [Timeless D] (Tc : IProp GF) hrefute hsie hK hs,
-    wp_holding_notheld_gen_body (hlc := hlc) (GF := GF) cpu k γ s R D Tc hrefute hsie hK hs
-  wp_holding_locked_gen : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx)
+    wp_holding_notheld_gen_body (GF := GF) cpu k γ s R D Tc hrefute hsie hK hs
+  wp_holding_locked_gen : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γ : GName) (s : String) (R : CtxId → IProp GF) (D : IProp GF) [Timeless D] (Tc : IProp GF) hrefute hsie hK,
-    wp_holding_locked_gen_body (hlc := hlc) (GF := GF) cpu k γ s R D Tc hrefute hsie hK
-  wp_holding_locked_refute : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx)
+    wp_holding_locked_gen_body (GF := GF) cpu k γ s R D Tc hrefute hsie hK
+  wp_holding_locked_refute : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γ : GName) (s : String) (R : CtxId → IProp GF) (D : IProp GF) [Timeless D] hrefute hsie hK,
-    wp_holding_locked_refute_body (hlc := hlc) (GF := GF) cpu k γ s R D hrefute hsie hK
+    wp_holding_locked_refute_body (GF := GF) cpu k γ s R D hrefute hsie hK
 
 end Xv6

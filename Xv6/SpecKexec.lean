@@ -109,7 +109,7 @@ open LeanRV64D
 /-! ## 2.  THE AU BUNDLE AND THE ARMS -/
 
 section KexecAU
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsTopG GF] [FsBytesG GF]
   [Appcfg GF] [CtokG GF]
 
 /-- **Rocq `exec_slot_pre`: THE CALLER'S WP, conditional on what was
@@ -139,8 +139,8 @@ def execAuPre (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames GF) (γfs : F
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (pl : List (BitVec 8)) (na : Nat)
     (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (sts : List FdState)
     (cs : Std.ExtTreeSet GName compare) (pidv : BitVec 32) : IProp GF :=
-  iprop(exStart (hlc := hlc) γfs rt cw P Pmiss pl ∗
-    pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∗
+  iprop(exStart γfs rt cw P Pmiss pl ∗
+    pfAt (aopenCommitAt Γ appE) Fo ∗
     pfAt (fun S => execSlotPre S Q (P (pathElems pl).length) Fo.pfRecv cw secc na alen afun sts cs pidv)
       Fs)
 
@@ -153,7 +153,7 @@ theorem execAuPre_triv_at (S : Uvis → IProp GF) (Γ : FsViewNames GF) (γfs : 
     (pl : List (BitVec 8)) (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8)
     (sts : List FdState) (cs : Std.ExtTreeSet GName compare) (pidv : BitVec 32) :
     ⊢ □ (∀ W : Uvis, myPay W.gen (fun _ => iprop(True)) -∗ S W) -∗
-      execAuPre (hlc := hlc) ⟨S, iprop(True)⟩ Γ γfs rt cw secc (fun _ => iprop(True))
+      execAuPre ⟨S, iprop(True)⟩ Γ γfs rt cw secc (fun _ => iprop(True))
         (fun _ _ => iprop(True)) (fun _ _ => iprop(True)) (pfamTriv (fun _ _ _ => iprop(True)))
         pl na alen afun sts cs pidv := by
   iintro #HS
@@ -207,8 +207,8 @@ def execPostFail (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames GF) (γfs 
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (pl : List (BitVec 8)) (na : Nat)
     (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (sts : List FdState)
     (cs : Std.ExtTreeSet GName compare) (pidv : BitVec 32) : IProp GF :=
-  iprop(execAuPre (hlc := hlc) Fs Γ γfs rt cw secc Q P Pmiss Fo pl na alen afun sts cs pidv ∨
-    ((nameiWalkDeadEra (hlc := hlc) γfs rt P Pmiss pl ∗ pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∗
+  iprop(execAuPre Fs Γ γfs rt cw secc Q P Pmiss Fo pl na alen afun sts cs pidv ∨
+    ((nameiWalkDeadEra γfs rt P Pmiss pl ∗ pfAt (aopenCommitAt Γ appE) Fo ∗
         pfAt (fun S => execSlotPre S Q (P (pathElems pl).length) Fo.pfRecv cw secc na alen afun sts cs pidv)
           Fs) ∨
      (∃ (i : Nat) (av : Aview) (a : Anode) (c : ExecFailCause),
@@ -224,7 +224,7 @@ theorem execPostFail_refund (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (pl : List (BitVec 8)) (na : Nat)
     (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (sts : List FdState)
     (cs : Std.ExtTreeSet GName compare) (pidv : BitVec 32) :
-    execPostFail (hlc := hlc) Fs Γ γfs rt cw secc Q P Pmiss Fo pl na alen afun sts cs pidv ⊢ Fs.pfRefund := by
+    execPostFail Fs Γ γfs rt cw secc Q P Pmiss Fo pl na alen afun sts cs pidv ⊢ Fs.pfRefund := by
   unfold execPostFail execAuPre
   iintro (⟨-, -, Hs⟩ | (⟨-, -, Hs⟩ | ⟨%i, %av, %a, %c, -, -, -, -, Hs⟩))
   · iapply (pfAt_refund _ Fs) $$ Hs
@@ -241,7 +241,7 @@ def execArms (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames GF) (γfs : Fs
     (M : Nat → List (BitVec 8)) (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (r : BitVec 64) :
     IProp GF :=
   iprop((⌜r = 0xFFFFFFFFFFFFFFFF#64 ∧ evAfter V V' ∧ M' = M⌝ ∗
-      execPostFail (hlc := hlc) Fs Γ γfs rt cw secc Q P Pmiss Fo pl na alen afun sts cs pidv) ∨
+      execPostFail Fs Γ γfs rt cw secc Q P Pmiss Fo pl na alen afun sts cs pidv) ∨
     execPostOk Fs na alen afun sts gn cs pidv V V' M' r)
 
 /-- **Rocq `exec_arms_landed`: SANITY** -- the arms imply the landed result
@@ -252,7 +252,7 @@ theorem execArms_landed (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames GF)
     (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (sts : List FdState) (gn : GName)
     (cs : Std.ExtTreeSet GName compare) (pidv : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (r : BitVec 64) :
-    execArms (hlc := hlc) Fs Γ γfs rt cw secc Q P Pmiss Fo pl na alen afun sts gn cs pidv V M V' M' r ⊢
+    execArms Fs Γ γfs rt cw secc Q P Pmiss Fo pl na alen afun sts gn cs pidv V M V' M' r ⊢
       ⌜∃ entry spv szv' : BitVec 64, kexecOk V V' r entry spv szv' na alen⌝ := by
   unfold execArms execPostOk
   iintro (⟨%h, -⟩ | ⟨%i, %av, %a, -, (⟨%f, %nl, -, -, %hok, -, -⟩ | ⟨-, %hok, -⟩)⟩)
@@ -272,12 +272,12 @@ theorem execArms_landed_keep (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewName
     (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (sts : List FdState) (gn : GName)
     (cs : Std.ExtTreeSet GName compare) (pidv : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (r : BitVec 64) :
-    execArms (hlc := hlc) Fs Γ γfs rt cw secc Q P Pmiss Fo pl na alen afun sts gn cs pidv V M V' M' r ⊢
+    execArms Fs Γ γfs rt cw secc Q P Pmiss Fo pl na alen afun sts gn cs pidv V M V' M' r ⊢
       iprop(⌜∃ entry spv szv' : BitVec 64, kexecOk V V' r entry spv szv' na alen⌝ ∧
-        execArms (hlc := hlc) Fs Γ γfs rt cw secc Q P Pmiss Fo pl na alen afun sts gn cs pidv V M V' M' r) := by
+        execArms Fs Γ γfs rt cw secc Q P Pmiss Fo pl na alen afun sts gn cs pidv V M V' M' r) := by
   iintro H
   isplit
-  · iapply (execArms_landed (hlc := hlc)) $$ H
+  · iapply (execArms_landed) $$ H
   · iexact H
 
 /-- **Rocq `exec_post_ok_recv`: THE SLOT OUT OF A SUCCESS, whichever arm
@@ -304,7 +304,7 @@ end KexecAU
 /-! ## 3.  THE MACHINE CONTRACT: KexecDefs's frame + the AU -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -320,7 +320,7 @@ def kexecK (k : KCtx) (A : KexecArgs) (Fs : Pfam GF (Uvis → IProp GF)) (sts : 
     (cpu' : CPU) : IProp GF :=
   iprop(∀ (spie spp : Bool) (R' : RegMap) (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
     ⌜calleeSaved k.regs R'⌝ -∗
-    execArms (hlc := hlc) Fs (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.V.pvSecc Q P Pmiss Fo (bview A.plen A.pfun) A.na
+    execArms Fs (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.V.pvSecc Q P Pmiss Fo (bview A.plen A.pfun) A.na
       A.alen A.afun sts gn cs A.pidv A.V A.M V' M' (R' 10#5) -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
@@ -335,11 +335,11 @@ over `wp_kexec_frame`, deviation 4), eb-generic at depth 0.  The abstract
 state is read at the LIVE Γ (`fsGammaL fscFs`); the descriptor view `sts`
 is the caller's (kexec never opens the descriptor block); the resume key is
 built at the caller's generation `gn`, children `cs` and pid. -/
-def wp_kexec_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+def wp_kexec_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [CtokG GF] [WchG GF] [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (A : KexecArgs)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx) (A : KexecArgs)
     (Fs : Pfam GF (Uvis → IProp GF)) (sts : List FdState) (gn : GName)
     (cs : Std.ExtTreeSet GName compare) (Q : Int → IProp GF) (P Pmiss : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
@@ -352,32 +352,32 @@ def wp_kexec_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
       A.afun i (A.alen i) = 0#8 ∧ A.alen i < 4096) : Prop :=
   kctx cpu k ∗ pcIs cpu KA.«kexec» ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-  fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
+  fsFabric Γ A.pd A.pav A.pu ∗
   procPrivFd A.γ k.proc A.pidv A.V A.M ∗
   kxcBufs k A ∗ bslots 3 ∗ irefSlots 2 ∗
   -- ---- THE BUNDLE (the one addition to the premise list): the pay fact
   -- and the AU ----
   myPay gn Q ∗
-  execAuPre (hlc := hlc) Fs (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.V.pvSecc Q P Pmiss Fo (bview A.plen A.pfun) A.na
+  execAuPre Fs (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.V.pvSecc Q P Pmiss Fo (bview A.plen A.pfun) A.na
     A.alen A.afun sts cs A.pidv ∗
   -- THE CROSSING IS THE LITERAL `true`: kexec parks (namei, ilock, readi, …)
-  wpNext true k.proc cpu (kexecK (hlc := hlc) k A Fs sts gn cs Q P Pmiss Fo)
+  wpNext true k.proc cpu (kexecK k A Fs sts gn cs Q P Pmiss Fo)
   ⊢ wpLoop (GF := GF) cpu
 
 /-! ## 4.  THE SEAL -/
 
 /-- The interface of `kexec` (Rocq's `Module Type KEXEC`). -/
 structure KEXEC : Prop where
-  wp_kexec_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+  wp_kexec_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [CtokG GF] [WchG GF] [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (A : KexecArgs)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx) (A : KexecArgs)
     (Fs : Pfam GF (Uvis → IProp GF)) (sts : List FdState) (gn : GName)
     (cs : Std.ExtTreeSet GName compare) (Q : Int → IProp GF) (P Pmiss : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     hK hnoff htier hj hproc hnn hterm hplen havfnz havf hna hargs,
-    wp_kexec_eb_body (hlc := hlc) (GF := GF) Γ cpu k A Fs sts gn cs Q P Pmiss Fo
+    wp_kexec_eb_body (GF := GF) Γ cpu k A Fs sts gn cs Q P Pmiss Fo
       hK hnoff htier hj hproc hnn hterm hplen havfnz havf hna hargs
 
 end Xv6

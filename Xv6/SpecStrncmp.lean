@@ -55,7 +55,7 @@ def strncmpRes (bs1 bs2 : List (BitVec 8)) (n : Nat) (res : BitVec 64) : Prop :=
      ((∀ j, j < n → bs1[j]? = bs2[j]? ∧ bs1[j]? ≠ some 0#8) ∧ res = 0#64)))
 
 /-- **WP of `strncmp`.** -/
-def wp_strncmp_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+def wp_strncmp_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (bs1 bs2 : List (BitVec 8)) (n : Nat) (dq1 dq2 : DFrac)
     (hK : 2 ≤ k.avail) (hn : k.regs 12#5 = BitVec.ofNat 64 n) (hn31 : n < 2 ^ 31)
     (hl1 : n ≤ bs1.length) (hl2 : n ≤ bs2.length) : Prop :=
@@ -69,9 +69,9 @@ def wp_strncmp_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [C
 
 /-- The interface of `strncmp`. -/
 structure STRNCMP : Prop where
-  wp_strncmp : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+  wp_strncmp : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (bs1 bs2 : List (BitVec 8)) (n : Nat) (dq1 dq2 : DFrac)
     hK hn hn31 hl1 hl2,
-    wp_strncmp_body (hlc := hlc) (GF := GF) cpu k bs1 bs2 n dq1 dq2 hK hn hn31 hl1 hl2
+    wp_strncmp_body (GF := GF) cpu k bs1 bs2 n dq1 dq2 hK hn hn31 hl1 hl2
 
 end Xv6

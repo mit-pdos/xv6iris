@@ -131,7 +131,7 @@ theorem not_bcached (bnos : Nat → BitVec 32) (b : Nat)
     exact absurd he (h j hj)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
 
 /-! ## The payloads -/
 

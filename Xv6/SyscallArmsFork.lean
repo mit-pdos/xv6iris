@@ -92,7 +92,7 @@ theorem syscRows_fork (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List F
   · exact syscPipeOk_quiet V _ _ _ sts sts (hn 4 (by decide))
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
@@ -134,10 +134,10 @@ theorem syscArmFork_ev (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List 
     (M' : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare) (gn : GName) (rv : BitVec 32)
     (γc : GName) (act : BitVec 64) (ke : Nat)
     (hn : syscNum V = 1) (ha : syscA0 V' = BitVec.signExtend 64 rv) :
-    MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) ke (niNamesHere (GF := GF)) ⊢
+    MachFixedGS.uEraAnchor (GF := GF) ke (niNamesHere (GF := GF)) ⊢
       pidAllocRcpt act rv -∗ kAllocRcpt fsReadyKmem act -∗
       (∃ (hz : List Zev) (i : Nat), zombReceipt hz (.ZFork act i rv γc)) -∗
-      |==> syscEvOut (hlc := hlc) V M sts V' M' cs (cs ∪ {γc}) gn := by
+      |==> syscEvOut V M sts V' M' cs (cs ∪ {γc}) gn := by
   unfold pidAllocRcpt kAllocRcpt ledReceipt
   iintro #Ha ⟨%h, #Hp, %hpick⟩ ⟨%hk, #Hk, %-⟩ ⟨%hz, %i, #Hz⟩
   have hrv : BitVec.ofNat 32 (pidPick PIDMAX h) = rv := by rw [← hpick]; exact BitVec.ofNat_toNat _ _
@@ -195,9 +195,9 @@ cited: `forkOk` fails at either, and the row's reason is the cited event. -/
 theorem syscArmFork_evNeg (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (V' : ProcPriv)
     (M' : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare) (gn : GName) (act : BitVec 64)
     (ke : Nat) (hn : syscNum V = 1) (ha : syscA0 V' = -1#64) :
-    MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) ke (niNamesHere (GF := GF)) ⊢
+    MachFixedGS.uEraAnchor (GF := GF) ke (niNamesHere (GF := GF)) ⊢
       (kNullRcpt fsReadyKmem act ∨ sFullRcpt act) -∗
-      |==> syscEvOut (hlc := hlc) V M sts V' M' cs cs gn := by
+      |==> syscEvOut V M sts V' M' cs cs gn := by
   iintro #Ha Hr
   icases Hr with (Hk | Hs)
   · unfold kNullRcpt ledReceipt
@@ -245,7 +245,7 @@ theorem syscArmFork_evNeg (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : Li
 /-- The syscall side's park rows (the park world, the ticks and nextpid
 locks, the console), off the environment. -/
 theorem syscallEnv_parkRows (PT : SchedNames → IProp GF) (Γ : SchedNames) (γ : FileNames) :
-    syscallEnv (hlc := hlc) PT Γ γ ⊢ utSysParkRows Γ := by
+    syscallEnv PT Γ γ ⊢ utSysParkRows Γ := by
   unfold syscallEnv syscProcEnv utSysParkRows syscParkExtra syscPidLock
   iintro ⟨⟨%γp, %γw, %γft, %γtk, #Hnp, #Hpav, -, -, #Htk⟩, #Hcons, -, -, #Hw, -⟩
   iexists γtk
@@ -260,8 +260,8 @@ set_option maxHeartbeats 4000000 in
 header (flagged). -/
 theorem syscall_arm_fork (SF : SYSFORK)
     (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)]
-    (hPTk : ∀ Γ', PT Γ' ⊢ parkToken (hlc := hlc) (SG := SG) Γ') (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    (hPTk : ∀ Γ', PT Γ' ⊢ parkToken (SG := SG) Γ') (Γ : SchedNames)
+    [ClaimIs GF Γ]
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -301,7 +301,7 @@ theorem syscall_arm_fork (SF : SYSFORK)
   ihave #HG := syscallEnv_parkRows PT Γ γ $$ Henv
   ihave #HT := syscallEnv_token PT Γ γ $$ Henv
   ihave #HT := hPTk Γ $$ HT
-  ihave Hpk : kforkPark (hlc := hlc) (SG := SG) Γ V M sts (UexecSG.sforkPay f) (UexecSG.sforkLend f)
+  ihave Hpk : kforkPark (SG := SG) Γ V M sts (UexecSG.sforkPay f) (UexecSG.sforkLend f)
       $$ [Hlend Hco Hslotw]
   · unfold kforkPark kforkChild
     unfold syscForkChild at *
@@ -311,7 +311,7 @@ theorem syscall_arm_fork (SF : SYSFORK)
     iframe Hlend Hco
     iexact Hslotw
   -- (NI M2-X2 with G2b) THE LED sys_fork: the success arm's two receipts
-  have hU := SF.wp_sys_fork_led_eb (hlc := hlc) (GF := GF) Γ cpu
+  have hU := SF.wp_sys_fork_led_eb (GF := GF) Γ cpu
     (((k.withSpie spie spp).pushed 4).withRegs R) γw γp fscKalloc fsReadyKmem γft γ j pid V M sts
     (UexecSG.sforkPay f) cs (UexecSG.sforkLend f) hj hprocK
     (by k_norm_g; have : sysForkSlots + 4 ≤ syscallSlots := by decide

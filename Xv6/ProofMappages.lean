@@ -178,7 +178,7 @@ theorem mp_last_val (size va : BitVec 64) (n : Nat) (hs : size = BitVec.ofNat 64
   bv_omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-! ## The call to `walk` -/
 
@@ -205,7 +205,7 @@ theorem mp_walk_call [WchG GF] (W : WALK) [CurCtx] (c : CPU) (k' : KCtx) (γl : 
         walkRet (t'.fill 2 (vpnOf (k'.regs 11#5)) fresh).1 (vpnOf (k'.regs 11#5)) (R' 10#5) ∧
         (R' 10#5 = 0#64 → availZero (availSub on' fresh.length))⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := W.wp_walk (hlc := hlc) (GF := GF) c k' γl γk on' t' ke hnoff' hK' hlk' hroot' hva'
+  have h := W.wp_walk (GF := GF) c k' γl γk on' t' ke hnoff' hK' hlk' hroot' hva'
     halloc' hwf' hnd' hpgt'
   unfold wp_walk_body at h
   simp only [walkAddr] at h
@@ -879,7 +879,7 @@ theorem mappages_epi [CurCtx] (cpu cur : CPU) (k : KCtx) (γk : KmemNames)
 
 set_option maxHeartbeats 4000000 in
 theorem mappages_any_proof (W : WALK) : MAPPAGES_ANY :=
-  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk on t n perm ke hnoff hK hlk hroot hargs hperm hmask hrwx hwf hnd
+  ⟨fun {GF} _ _ _ _ cpu k γl γk on t n perm ke hnoff hK hlk hroot hargs hperm hmask hrwx hwf hnd
       hpgt => by
   obtain ⟨hvaal, hpaal, hsize, hn1, hvr, hpr, hblk⟩ := hargs
   unfold wp_mappages_any_body
@@ -1093,10 +1093,10 @@ theorem mappages_any_proof (W : WALK) : MAPPAGES_ANY :=
 failed would have emptied the allocator, and a run consumes at most the
 nodes `missingRun` counts. -/
 theorem mappages_of_any (MA : MAPPAGES_ANY) : MAPPAGES :=
-  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk nb t n perm ke hnoff hK hlk hroot hargs hperm hmask hrwx hwf hnd
+  ⟨fun {GF} _ _ _ _ cpu k γl γk nb t n perm ke hnoff hK hlk hroot hargs hperm hmask hrwx hwf hnd
       hpgt hcount => by
   unfold wp_mappages_body
-  have hany := MA.wp_mappages_any (hlc := hlc) (GF := GF) cpu k γl γk (some nb) t n perm ke hnoff hK
+  have hany := MA.wp_mappages_any (GF := GF) cpu k γl γk (some nb) t n perm ke hnoff hK
     hlk hroot hargs hperm hmask hrwx hwf hnd hpgt
   unfold wp_mappages_any_body at hany
   iintro ⟨Hk, Hpc, #Hlk, Htree, Hav, Hlend, HΦ⟩

@@ -64,7 +64,7 @@ open Iris.Algebra
 theorem id_ent_of_eq {PROP : Type _} [BI PROP] {P Q : PROP} (h : P = Q) : P ⊢ Q := h ▸ .rfl
 
 section IdupCore
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
   [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsBlocksG GF] [FsTopG GF] [LogG GF] [IregG GF]
   [FsLinkG GF] [Appcfg GF]
 
@@ -116,7 +116,7 @@ theorem id_ciwf_insert (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × 
 and the `lw`, in Rocq's order.  See the file header. -/
 theorem idup_open [Fscfg] [Icfg] [CurCtx] (k : Nat) (hk : k < NINODE) (s : Qp)
     (inum : BitVec 32) :
-    itableInv (hlc := hlc) (GF := GF) ∗ icEscrow fscIc fscFs fscIreg fscCov fscLogst k ∗
+    itableInv (GF := GF) ∗ icEscrow fscIc fscFs fscIreg fscCov fscLogst k ∗
     itableRes2 curCtx fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
     inodeShr k s icfgDev inum ∗ runitAny inum.toNat ∗ irefSlot ⊢
     |={⊤}=> ∃ (M : RegMapF (Qp × PosNat)) (qt qn : Qp) (n : PosNat) (g : GName) (lo tst : Nat),
@@ -132,7 +132,7 @@ theorem idup_open [Fscfg] [Icfg] [CurCtx] (k : Nat) (hk : k < NINODE) (s : Qp)
   unfold inodeShr liveFracc
   icases Hshr with ⟨Hrident, ⟨%g, %lo, %tl, Hrlive, %hlotl, #Hfl⟩, Hrslh, Hrst⟩
   -- THE SHARE FINDS THE SLOT (a fupd: the open closes with nothing moved)
-  imod iref_share_lookup_pinw_au (hlc := hlc) ⊤ M k s g lo CoPset.subseteq_top hk
+  imod iref_share_lookup_pinw_au ⊤ M k s g lo CoPset.subseteq_top hk
     $$ Hinv Hhalf Hrlive with ⟨%hMk0, Hhalf, Hrlive⟩
   obtain ⟨⟨qt, n⟩, hMk⟩ := hMk0
   -- `ci` records exactly the live slots
@@ -160,7 +160,7 @@ theorem idup_open [Fscfg] [Icfg] [CurCtx] (k : Nat) (hk : k < NINODE) (s : Qp)
     simp only at h
     omega
   -- THE FROZEN PARK, DECIDED OFF BY THE CALLER'S OWN SHARE
-  imod frzPark_shr_off (hlc := hlc) ⊤ k inum.toNat s g lo CoPset.subseteq_top hk
+  imod frzPark_shr_off ⊤ k inum.toNat s g lo CoPset.subseteq_top hk
     $$ Hinv Hrlive Hpark with ⟨Hrlive, Hmir, Hsel, Hpin⟩
   -- the iref-slot conservation law
   ihave Hiu : iprop(irefSlots (GF := GF) n.succ.val) $$ [Hiu Hislot]
@@ -274,14 +274,14 @@ theorem idup_store_au [Fscfg] [Icfg] [CurCtx] (cpu : CPU) (M : RegMapF (Qp × Po
     (k : Nat) (inum : BitVec 32) (qt qn s : Qp) (n : PosNat) (g : GName) (lo tst : Nat)
     (P : IProp GF) (hMk : PartialMap.get? M k = some (qt, n)) (hq : qt + qn < (1 : Qp).half)
     (hno : n.succ.val ≤ IREFSLOTS) (hin : (inum.toNat : Int) < 16 * (icfgNib : Int)) :
-    itableInv (hlc := hlc) (GF := GF) ∗ iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+    itableInv (GF := GF) ∗ iregReg fscIreg fscFs icfgIst icfgNib ∗
     itableHalf M ∗ istmpAuth k (1 : Qp).half tst ∗ topLb tst ∗
     liveGenlo k s g lo ∗ islSlot M k ∗ frzmH inum.toNat false ∗ runit false inum.toNat ∗
     icntHalf inum.toNat n.val ∗ (idStoreOut M k inum qt qn s n g lo -∗ P) ⊢
     writeAU cpu (iRef (ientry k)) 4 (BitVec.ofNat 32 n.succ.val) P := by
   iintro ⟨#Hinv, #Hrinv, Hhalf, Hst, #Hllb, Hlv, Hisl, Hmir, Hru, Hcnt, Hclose⟩
   unfold writeAU
-  imod iref_upgrade_mir_store_pinw_au (hlc := hlc) ⊤ fscIreg fscFs icfgIst icfgNib M k inum false
+  imod iref_upgrade_mir_store_pinw_au ⊤ fscIreg fscFs icfgIst icfgNib M k inum false
       qt qn s n g lo tst CoPset.subseteq_top CoPset.subseteq_top hin hMk hq hno
     $$ Hinv Hrinv Hhalf Hlv Hisl Hmir Hru Hcnt Hst Hllb with ⟨%hlot, Hrows, Hcl⟩
   icases irefPinRows_push k (irefWord M k) (BitVec.ofNat 32 n.succ.val) lo tst

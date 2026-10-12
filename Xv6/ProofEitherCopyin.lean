@@ -23,7 +23,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option maxRecDepth 8000
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-! ## `either_copyin` -/
 
@@ -35,7 +35,7 @@ theorem either_copyin_br_fffffffffffff5b6 : KA.«either_copyin» + 0xfffffffffff
 
 set_option maxHeartbeats 4000000 in
 theorem either_copyin_proof (MP : MYPROC) (CI : COPYIN) (MM : MEMMOVE) : EITHER_COPYIN :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ cpu k γl γk j pid V P M user dqs bs old hj hproc hnoff hK hlk huser
+  ⟨fun {GF} _ _ _ _ _ _ _ _ cpu k γl γk j pid V P M user dqs bs old hj hproc hnoff hK hlk huser
       hlen hlen' hbs => by
   unfold wp_either_copyin_body
   simp only [eitherCopyinAddr]

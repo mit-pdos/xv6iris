@@ -14,13 +14,13 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section Holds
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx] [FsBytesG GF] [EchoOutG GF] [FileAppG GF]
 
 /-- **`HfpFileOpenP` holds** at U1-F's lemmas. -/
-theorem hfpFileOpen_holds : HfpFileOpenP (hlc := hlc) (GF := GF) where
+theorem hfpFileOpen_holds : HfpFileOpenP (GF := GF) where
   fileOpenPlainAu := fileOpenPlain_au
   fileOpenRecvFile := fileOpenRecv_file
   fileOpenMissAu := fileOpenMiss_au

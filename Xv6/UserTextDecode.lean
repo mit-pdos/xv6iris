@@ -173,7 +173,7 @@ reference registers (`MachCSL.swp_runRead`). -/
 
 section Step
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- A full word: its window, and its decode step. -/
 theorem utext_step_base (dref : (r : Register) → Option (RegisterType r)) {t : UTextTree}

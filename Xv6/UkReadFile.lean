@@ -34,19 +34,19 @@ def readFileFam {GF : BundledGFunctors.{0}} (Q : Int → IProp GF) (F : Pfam GF 
   xfamRdf Q F
 
 section UkReadFile
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
-local notation "SGX" => uexecSGXv6 (hlc := hlc)
+local notation "SGX" => uexecSGXv6
 
 /-- **Rocq `udepwf_st_read_file_held`**: at a HELD row the caller's
 client-advanced commit is the link arm of `areadInOm .held`. -/
 theorem udepwf_st_read_file_held (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (wb : Bool) (i : Nat)
     (γo : GName) (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) :
-    pfAt (areadCommitAdv (hlc := hlc) (fsGammaL fscFs) appE i γo) F ⊢
-      udepwfSt (hlc := hlc) (SG := SGX) N m pc USYS_read (readFileFam N.pay F)
+    pfAt (areadCommitAdv (fsGammaL fscFs) appE i γo) F ⊢
+      udepwfSt (SG := SGX) N m pc USYS_read (readFileFam N.pay F)
         (.open true wb (.inode i γo .held)) := by
   unfold udepwfSt
   iintro Hau
@@ -54,7 +54,7 @@ theorem udepwf_st_read_file_held (N : UkNames GF) (m : RegMap) (pc : BitVec 64) 
   · ipureintro; rfl
   iintro %M %pm %sz %fdv %cw %gn %cs %pidv %hkey - Hh Hf
   iframe Hh Hf
-  iapply sbundleAt_read_intro (hlc := hlc) (uslot (hlc := hlc) (SG := SGX)) (readFileFam N.pay F)
+  iapply sbundleAt_read_intro (uslot (SG := SGX)) (readFileFam N.pay F)
     (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) (m.get 10#5) (m.get 12#5) fdv
     (Xv6.tfOf_a0 m pc) (Xv6.tfOf_a2 m pc) rfl
   rw [hkey]

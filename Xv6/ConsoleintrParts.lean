@@ -153,7 +153,7 @@ theorem ciK_popExit (k : KCtx) (a b : Bool) (hwf : k.wf) (hK : 6 ≤ k.avail) :
     omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-! ## The caller's continuation, at the critical section's hart -/
 
@@ -185,7 +185,7 @@ theorem ci_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γc : GName) (cn : Cons
       locked γc cpu' -∗ consResCur cn -∗ (∃ K : Nat, viewLb cpu' K) -∗
       sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γc "cons" (consResAt cn) hnoff hK hs
+  have h := AC.wp_acquire (GF := GF) c k' γc "cons" (consResAt cn) hnoff hK hs
   unfold wp_acquire_body at h
   simp only [acquireAddr] at h
   rw [ha0] at h
@@ -203,7 +203,7 @@ theorem ci_release (RE : RELEASE) (c : CPU) (k' : KCtx) (γc : GName) (cn : Cons
       kctx cpu' (((k'.popExit reen).withRegs R').withLocks (k'.locks.filter (fun x => x ≠ "cons"))) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γc "cons" (consResAt cn) hsie hnoff hK reen hreen hon
+  have h := RE.wp_release (GF := GF) c k' γc "cons" (consResAt cn) hsie hnoff hK reen hreen hon
   unfold wp_release_body at h
   simp only [releaseAddr] at h
   rw [ha0] at h
@@ -221,7 +221,7 @@ theorem ci_consputc (CP : CONSPUTC) (c : CPU) (k' : KCtx) (γl : GName) (γ : Ua
     (∀ R' : RegMap, kctx c (k'.withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ Φ -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) c := by
-  have h := CP.wp_consputc (hlc := hlc) (GF := GF) c k' γl γ [] Φ hsie hK hnoff huart
+  have h := CP.wp_consputc (GF := GF) c k' γl γ [] Φ hsie hK hnoff huart
   unfold wp_consputc_body at h
   simp only [consputcAddr] at h
   iintro ⟨Hk, Hpc, #Hport, Hch, HΦ⟩
@@ -245,7 +245,7 @@ theorem ci_wakeup (WK : WAKEUP) (Γ : SchedNames) (c : CPU) (k' : KCtx)
     (∀ R' : RegMap, kctx c (k'.withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) c := by
-  have h := WK.wp_wakeup (hlc := hlc) (GF := GF) Γ c k' hnoff hK hlk htier
+  have h := WK.wp_wakeup (GF := GF) Γ c k' hnoff hK hlk htier
   unfold wp_wakeup_body at h
   simp only [wakeupAddr] at h
   iintro ⟨Hk, Hpc, HΓ, HΦ⟩

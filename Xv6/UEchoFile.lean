@@ -59,7 +59,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section UEchoFile
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [OffboxG GF]
 
 /-! ## §1 the cursor: the deed and the fragment at one position -/
@@ -67,34 +67,34 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Di
 /-- **Rocq `efq`** (RULING EFQ): `FileWrite.file_cur` at this entry's claim. -/
 def efq (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (i : Nat) (γo : GName) (ws : Wordline)
     (sel : List Nat) : IProp GF :=
-  fileCur (hlc := hlc) c r N s i ws sel γo
+  fileCur c r N s i ws sel γo
 
 /-- **Rocq `efcur`**: the chain cursor, indexed by the node number `k` the
 kernel is at -- EXACT: `k` decides the selection. -/
 def efcur (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (i : Nat) (γo : GName) (ws : Wordline)
     (sel0 : List Nat) (j : Nat) : Nat → IProp GF :=
-  fun k => efq (hlc := hlc) c r N s i γo ws (match k with
+  fun k => efq c r N s i γo ws (match k with
     | 0 => sel0
     | _ + 1 => sel0 ++ [j])
 
 theorem efcur_zero (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (i : Nat) (γo : GName)
     (ws : Wordline) (sel0 : List Nat) (j : Nat) :
-    efcur (hlc := hlc) (GF := GF) c r N s i γo ws sel0 j 0 = efq (hlc := hlc) c r N s i γo ws sel0 := rfl
+    efcur (GF := GF) c r N s i γo ws sel0 j 0 = efq c r N s i γo ws sel0 := rfl
 
 theorem efcur_succ (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (i : Nat) (γo : GName)
     (ws : Wordline) (sel0 : List Nat) (j k : Nat) :
-    efcur (hlc := hlc) (GF := GF) c r N s i γo ws sel0 j (k + 1) =
-      efq (hlc := hlc) c r N s i γo ws (sel0 ++ [j]) := rfl
+    efcur (GF := GF) c r N s i γo ws sel0 j (k + 1) =
+      efq c r N s i γo ws (sel0 ++ [j]) := rfl
 
 /-- **Rocq `efany`**: the cursor at SOME selection below `b`. -/
 def efany (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (i : Nat) (γo : GName) (ws : Wordline)
     (b : Nat) : IProp GF :=
-  iprop(∃ sel : List Nat, ⌜∀ q ∈ sel, q < b⌝ ∗ efq (hlc := hlc) c r N s i γo ws sel)
+  iprop(∃ sel : List Nat, ⌜∀ q ∈ sel, q < b⌝ ∗ efq c r N s i γo ws sel)
 
 /-- **Rocq `efany_of`**. -/
 theorem efany_of (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (i : Nat) (γo : GName)
     (ws : Wordline) (b : Nat) (sel : List Nat) (hf : ∀ q ∈ sel, q < b) :
-    ⊢@{IProp GF} efq (hlc := hlc) c r N s i γo ws sel -∗ efany (hlc := hlc) c r N s i γo ws b := by
+    ⊢@{IProp GF} efq c r N s i γo ws sel -∗ efany c r N s i γo ws b := by
   unfold efany
   iintro Hq
   iexists sel
@@ -107,7 +107,7 @@ lent, and the cursor at WHATEVER prefix of the chunks landed.  Status
 independent. -/
 def efExit (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (Wq : IProp GF) (i : Nat) (γo : GName)
     (ws : Wordline) : IProp GF :=
-  iprop(Wq ∗ ∃ sel : List Nat, efq (hlc := hlc) c r N s i γo ws sel)
+  iprop(Wq ∗ ∃ sel : List Nat, efq c r N s i γo ws sel)
 
 /-! ## §8 the exec crossing -/
 
@@ -117,7 +117,7 @@ empty selection (the fd-1 row is a pure fact about the table the exec channel
 carries). -/
 def efPay (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst) (Wq : IProp GF) (i : Nat) (γo : GName)
     (ws : Wordline) : IProp GF :=
-  iprop(Wq ∗ efq (hlc := hlc) c r N s i γo ws [])
+  iprop(Wq ∗ efq c r N s i γo ws [])
 
 /-! ## §4 one chunk, as a chain node -/
 
@@ -127,7 +127,7 @@ variable [FsTopG GF] [Icfg] [FsBytesG GF] [Fscfg]
 client-advanced one: the fragment goes in at `off` and comes out at
 `off + |chunk|`). -/
 theorem efNode [inst : Appcfg GF] (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst)
-    (heq : inst = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r })
+    (heq : inst = { appNames := FileAppNames, appPred := filePred c, appRun := r })
     (i : Nat) (γo : GName) (ws : Wordline) (sel : List Nat) (jx : Nat) (M : Nat → List (BitVec 8))
     (ua : BitVec 64) (n : Int) (k : Nat)
     (hjx : jx < (echoChunks ws).length) (hlt : ∀ q ∈ sel, q < jx)
@@ -135,10 +135,10 @@ theorem efNode [inst : Appcfg GF] (c : FileFixed) (r : FileAppNames) (N : Fname)
     (hi5 : i ≠ GREP_INO) (hi6 : i ≠ SECC_INO) (hi7 : i ≠ SYNC_INO)
     (hbsk : ubytesAt M (ua + BitVec.ofInt 64 (FW_MAX * (k : Int))) ((echoChunks ws)[jx]!))
     (hlenk : (((echoChunks ws)[jx]!).length : Int) = wchunkAt n k) :
-    ⊢@{IProp GF} □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ fileTaint (hlc := hlc) c) -∗
-      appInv (hlc := hlc) fscFs -∗ efq (hlc := hlc) c r N s i γo ws sel -∗
-      awriteFullAdv (hlc := hlc) (fsGammaL fscFs) appE i γo M ua n k
-        (efq (hlc := hlc) c r N s i γo ws (sel ++ [jx])) := by
+    ⊢@{IProp GF} □ (MachFixedGS.killCred (GF := GF) -∗ fileTaint c) -∗
+      appInv fscFs -∗ efq c r N s i γo ws sel -∗
+      awriteFullAdv (fsGammaL fscFs) appE i γo M ua n k
+        (efq c r N s i γo ws (sel ++ [jx])) := by
   unfold efq
   exact fileAwriteNode_adv fscFs c r N s i ws sel jx γo M ua n k heq hjx hlt hi1 hi2 hi3 hi4 hi5 hi6 hi7 hbsk hlenk
 
@@ -148,7 +148,7 @@ and `FW_MAX` is 3072).  The partial arm is built from the SAME cursor
 (`FileWritePart.fileAwritePart_adv`), refuted where the cursor is fired,
 paid where it is tainted (deviation 3: two images). -/
 theorem efChain [inst : Appcfg GF] (c : FileFixed) (r : FileAppNames) (N : Fname) (s : Dst)
-    (heq : inst = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r })
+    (heq : inst = { appNames := FileAppNames, appPred := filePred c, appRun := r })
     (i : Nat) (γo : GName) (ws : Wordline) (sel : List Nat) (jx : Nat) (Mi : ElfMem)
     (M : Nat → List (BitVec 8)) (pm : Nat → Option UPerm) (sz : Nat) (P : UPtd) (ua : BitVec 64) (nb : Nat)
     (f : Nat → BitVec 8) (n : Int)
@@ -159,10 +159,10 @@ theorem efChain [inst : Appcfg GF] (c : FileFixed) (r : FileAppNames) (N : Fname
     (hby : ubytesAt M ua ((echoChunks ws)[jx]!)) (hlenb : ((echoChunks ws)[jx]!).length = nb)
     (hi1 : i ≠ INIT_INO) (hi2 : i ≠ SH_INO) (hi3 : i ≠ ECHO_INO) (hi4 : i ≠ CAT_INO)
     (hi5 : i ≠ GREP_INO) (hi6 : i ≠ SECC_INO) (hi7 : i ≠ SYNC_INO) :
-    ⊢@{IProp GF} □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ fileTaint (hlc := hlc) c) -∗
-      appInv (hlc := hlc) fscFs -∗ efq (hlc := hlc) c r N s i γo ws sel -∗
-      awriteChainAdv (hlc := hlc) (fsGammaL fscFs) appE i γo M ua P n
-        (efcur (hlc := hlc) c r N s i γo ws sel jx) 0 (wchunks n) := by
+    ⊢@{IProp GF} □ (MachFixedGS.killCred (GF := GF) -∗ fileTaint c) -∗
+      appInv fscFs -∗ efq c r N s i γo ws sel -∗
+      awriteChainAdv (fsGammaL fscFs) appE i γo M ua P n
+        (efcur c r N s i γo ws sel jx) 0 (wchunks n) := by
   -- EVERY ONE OF ECHO'S WRITES IS ONE CHUNK
   have hone : wchunks n = 1 := wchunks_one n (by omega) (by omega)
   have hmap : ∀ j : Nat, j < n.toNat → uvaRmapped P (ua + BitVec.ofNat 64 j).toNat :=

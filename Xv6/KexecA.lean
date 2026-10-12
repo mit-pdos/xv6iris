@@ -124,7 +124,7 @@ theorem kxa_not_loadable (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVe
     rw [Nat.zero_add, hag j (by omega), hf, fileBytes_lookup data _ j (by omega)]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -153,11 +153,11 @@ theorem kxa_fail_dead (Fs : Pfam GF (Uvis → IProp GF)) (rt cw : Nat) (secc : B
     (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (sts : List FdState)
     (cs : Std.ExtTreeSet GName compare) (pidv : BitVec 32) (pl : List (BitVec 8)) :
-    nameiWalkDeadEra (hlc := hlc) fscFs rt P Pmiss pl ∗
-      (pfAt (aopenCommitAt (hlc := hlc) (fsGammaL fscFs) appE) Fo ∗
+    nameiWalkDeadEra fscFs rt P Pmiss pl ∗
+      (pfAt (aopenCommitAt (fsGammaL fscFs) appE) Fo ∗
        pfAt (fun S => execSlotPre S Qpay (P (pathElems pl).length) Fo.pfRecv cw secc na alen afun sts cs pidv)
          Fs) ⊢
-      execPostFail (hlc := hlc) Fs (fsGammaL fscFs) fscFs rt cw secc Qpay P Pmiss Fo pl na alen afun sts cs
+      execPostFail Fs (fsGammaL fscFs) fscFs rt cw secc Qpay P Pmiss Fo pl na alen afun sts cs
         pidv := by
   iintro ⟨Hd, Hoc, Hsl⟩
   unfold execPostFail
@@ -174,7 +174,7 @@ theorem kxa_fail_obs (Fs : Pfam GF (Uvis → IProp GF)) (rt cw : Nat) (secc : Bi
     (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8)) (ef : List (BitVec 8))
     (hbad : kxcBadCause dn ef data) :
     kxaReceipt Fs P Fo Qpay cw secc (pathElems pl).length zi na alen afun sts cs pidv dn bm data ⊢
-      execPostFail (hlc := hlc) Fs (fsGammaL fscFs) fscFs rt cw secc Qpay P Pmiss Fo pl na alen afun sts cs
+      execPostFail Fs (fsGammaL fscFs) fscFs rt cw secc Qpay P Pmiss Fo pl na alen afun sts cs
         pidv := by
   unfold kxaReceipt execPostFail
   iintro ⟨%av, %hav, %hrow, HΦ, HP, Hsl⟩
@@ -194,7 +194,7 @@ set_option maxHeartbeats 8000000 in
 core, the whole transaction, the caller's one-shot handed DOWN unfired; back:
 at most two units spent, the answer's arm -- the reference AT ITS INUM with
 the cursor at the last hop, or the era death receipt. -/
-theorem kxcA_call_namei_era (NE : NAMEI_ERA) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem kxcA_call_namei_era (NE : NAMEI_ERA) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : KexecArgs) (spie spp : Bool) (R : RegMap)
     (X : BitVec 64) (imm : BitVec 21) (hX : X + BitVec.signExtend 64 imm = KA.«namei»)
     (hret : jumpPc (X + 4#64) = X + 4#64) (P Pmiss : Nat → Nat → IProp GF)
@@ -205,10 +205,10 @@ theorem kxcA_call_namei_era (NE : NAMEI_ERA) (Γ : SchedNames) [ClaimIs (hlc := 
     instr X false (instruction.JAL (imm, regidx.Regidx 1#5)) ∗
     kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu X ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗ procPrivCoreNoctxAt curCtx k.proc A.pidv A.V A.M ∗
+    fsFabric Γ A.pd A.pav A.pu ∗ procPrivCoreNoctxAt curCtx k.proc A.pidv A.V A.M ∗
     byteBuf (k.regs 10#5) A.dqpv (bview (A.plen + 1) A.pfun) ∗
     bslots 3 ∗ irefSlots 2 ∗ logOp icfgLog MAXOPBLOCKS ∗
-    exStart (hlc := hlc) fscFs A.V.rti A.V.cwi P Pmiss (bview A.plen A.pfun) ∗
+    exStart fscFs A.V.rti A.V.cwi P Pmiss (bview A.plen A.pfun) ∗
     (∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap) (n' : Nat) (ok : Bool) (ipv : BitVec 64),
       ⌜calleeSaved (R.set 1#5 (X + 4#64)) R' ∧ (ok = true → iputUnits ≤ n')⌝ -∗
       kctx c (((k.withSpie spie' spp').pushed 68).withRegs R') -∗ pcIs c (X + 4#64) -∗
@@ -221,7 +221,7 @@ theorem kxcA_call_namei_era (NE : NAMEI_ERA) (Γ : SchedNames) [ClaimIs (hlc := 
           P (pathElems (bview A.plen A.pfun)).length zi ∗ irefSlots 1)
        else
         iprop(⌜R' 10#5 = 0#64⌝ ∗ irefSlots 2 ∗
-          nameiWalkDeadEra (hlc := hlc) fscFs A.V.rti P Pmiss (bview A.plen A.pfun))) -∗
+          nameiWalkDeadEra fscFs A.V.rti P Pmiss (bview A.plen A.pfun))) -∗
       wpLoop c)
     ⊢ wpLoop (GF := GF) cpu := by
   have hK' : nameiSlots ≤ k.avail - 68 := by
@@ -242,7 +242,7 @@ theorem kxcA_call_namei_era (NE : NAMEI_ERA) (Γ : SchedNames) [ClaimIs (hlc := 
   icases Hlog with ⟨⟨%Sb, Hop⟩, Htx⟩
   k_step_e (wp_s_jal cpu _ X false imm 1#5 (by decide)) $$ [- $Hk $Hpc $Hi] with [hX]
   iintro Hk Hpc
-  have h := NE.wp_namei_era_eb (hlc := hlc) (GF := GF) Γ cpu
+  have h := NE.wp_namei_era_eb (GF := GF) Γ cpu
     ((((k.withSpie spie spp).pushed 68).withRegs R).setReg 1#5 (X + 4#64)) γbl pd pav pu A.j
     fscKalloc fsReadyKmem A.plen A.pfun MAXOPBLOCKS Sb P Pmiss A.pidv A.V A.M
     DFrac.discard DFrac.discard A.dqpv hj (by k_norm_g; exact hproc) (by k_norm_g; exact hK')
@@ -296,7 +296,7 @@ namei-null tail at +0x088** (`jal end_op ; c.li a0,-1 ; c.j +0x72` →
 fall-through is the +0x032 seam with the walk's cursor and `AU` back, and
 the exit handed on. -/
 theorem kxc_a1_au (MP : MYPROC) (BO : BEGIN_OP) (NE : NAMEI_ERA) (EO : END_OP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) (QF : KxfCause → Prop)
     (P Pmiss : Nat → Nat → IProp GF) (AU FAIL : IProp GF) (KEX : CPU → IProp GF)
     (cpu : CPU) (k : KCtx) (A : KexecArgs)
@@ -305,10 +305,10 @@ theorem kxc_a1_au (MP : MYPROC) (BO : BEGIN_OP) (NE : NAMEI_ERA) (EO : END_OP)
     (hnn : ∀ i, i < A.plen → A.pfun i ≠ 0#8) (hterm : A.pfun A.plen = 0#8)
     (hplen : A.plen < 2 ^ 31) :
     kctx cpu k ∗ pcIs cpu KA.«kexec» ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
+    fsFabric Γ A.pd A.pav A.pu ∗
     procPrivFd A.γ k.proc A.pidv A.V A.M ∗ kxcBufs k A ∗ bslots 3 ∗ irefSlots 2 ∗
-    exStart (hlc := hlc) fscFs A.V.rti A.V.cwi P Pmiss (bview A.plen A.pfun) ∗ AU ∗
-    (nameiWalkDeadEra (hlc := hlc) fscFs A.V.rti P Pmiss (bview A.plen A.pfun) ∗ AU -∗ FAIL) ∗
+    exStart fscFs A.V.rti A.V.cwi P Pmiss (bview A.plen A.pfun) ∗ AU ∗
+    (nameiWalkDeadEra fscFs A.V.rti P Pmiss (bview A.plen A.pfun) ∗ AU -∗ FAIL) ∗
     (∀ c' : CPU, KEX c') ∗
     □ (∀ c : CPU, KEX c -∗ FAIL -∗ kexecCloser Q QF k A c) ∗
     (∀ (c : CPU) (spie spp : Bool) (R : RegMap) (ipv : BitVec 64) (zi n1 : Nat),
@@ -469,7 +469,7 @@ SPENDS the caller's commit off the payload's own era leg
 (`kxa_fail_obs`), the namei-null tail the era refund (`kxa_fail_dead`), and
 the +0x090 fall-through carries the receipt. -/
 theorem kxc_phaseA_au (MP : MYPROC) (BO : BEGIN_OP) (NE : NAMEI_ERA) (IL : ILOCK) (RD : READI)
-    (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs GF Γ]
     (Fs : Pfam GF (Uvis → IProp GF))
     (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) (QF : KxfCause → Prop)
     (Qpay : Int → IProp GF) (sts : List FdState) (cs : Std.ExtTreeSet GName compare)
@@ -481,15 +481,15 @@ theorem kxc_phaseA_au (MP : MYPROC) (BO : BEGIN_OP) (NE : NAMEI_ERA) (IL : ILOCK
     (hnn : ∀ i, i < A.plen → A.pfun i ≠ 0#8) (hterm : A.pfun A.plen = 0#8)
     (hplen : A.plen < 2 ^ 31) :
     kctx cpu k ∗ pcIs cpu KA.«kexec» ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
-    exStart (hlc := hlc) fscFs A.V.rti A.V.cwi P Pmiss (bview A.plen A.pfun) ∗
-    pfAt (aopenCommitAt (hlc := hlc) (fsGammaL fscFs) appE) Fo ∗
+    fsFabric Γ A.pd A.pav A.pu ∗
+    exStart fscFs A.V.rti A.V.cwi P Pmiss (bview A.plen A.pfun) ∗
+    pfAt (aopenCommitAt (fsGammaL fscFs) appE) Fo ∗
     pfAt (fun S => execSlotPre S Qpay (P (pathElems (bview A.plen A.pfun)).length) Fo.pfRecv A.V.cwi A.V.pvSecc
       A.na A.alen A.afun sts cs A.pidv) Fs ∗
     procPrivFd A.γ k.proc A.pidv A.V A.M ∗ kxcBufs k A ∗ bslots 3 ∗ irefSlots 2 ∗
     (∀ c' : CPU, KEX c') ∗
     □ (∀ c : CPU, KEX c -∗
-        execPostFail (hlc := hlc) Fs (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.V.pvSecc Qpay P Pmiss Fo
+        execPostFail Fs (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.V.pvSecc Qpay P Pmiss Fo
           (bview A.plen A.pfun) A.na A.alen A.afun sts cs A.pidv -∗
         kexecCloser Q QF k A c) ∗
     (∀ (c : CPU) (spie spp : Bool) (R : RegMap) (kf : Nat) (qf sf : Qp) (gyf : GName)
@@ -502,16 +502,16 @@ theorem kxc_phaseA_au (MP : MYPROC) (BO : BEGIN_OP) (NE : NAMEI_ERA) (IL : ILOCK
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hte, Hce, #Hfab, Hstart, Hoc, Hsl, Hpriv, Hbufs, Hbs, Hirs, Hex, #Hkw, HK⟩
   -- the region invariant carries `ftopInv`; the fire below opens it
-  ihave #Hft : ftopInv (hlc := hlc) fscFs $$ []
+  ihave #Hft : ftopInv fscFs $$ []
   · unfold fsFabric
     icases Hfab with ⟨#Hrdy, -, -, -⟩
     icases fsReady_region $$ Hrdy with ⟨#Hinv, -⟩
     iapply iregInv_ftop _ _ _ _ $$ Hinv
   iapply (kxc_a1_au MP BO NE EO Γ Q QF P Pmiss
-    (iprop(pfAt (aopenCommitAt (hlc := hlc) (fsGammaL fscFs) appE) Fo ∗
+    (iprop(pfAt (aopenCommitAt (fsGammaL fscFs) appE) Fo ∗
       pfAt (fun S => execSlotPre S Qpay (P (pathElems (bview A.plen A.pfun)).length) Fo.pfRecv A.V.cwi A.V.pvSecc
         A.na A.alen A.afun sts cs A.pidv) Fs))
-    (execPostFail (hlc := hlc) Fs (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.V.pvSecc Qpay P Pmiss Fo
+    (execPostFail Fs (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.V.pvSecc Qpay P Pmiss Fo
       (bview A.plen A.pfun) A.na A.alen A.afun sts cs A.pidv)
     KEX cpu k A hqf hK hnoff htier hj hproc hnn hterm hplen)
   iframe Hk Hpc Hte Hce Hfab Hpriv Hbufs Hbs Hirs Hstart Hex Hkw
@@ -520,7 +520,7 @@ theorem kxc_phaseA_au (MP : MYPROC) (BO : BEGIN_OP) (NE : NAMEI_ERA) (IL : ILOCK
   isplitl []
   · -- arm (ii): the refund rides straight into the arms
     iintro ⟨Hd, Hau⟩
-    iapply (kxa_fail_dead (hlc := hlc) Fs A.V.rti A.V.cwi A.V.pvSecc Qpay P Pmiss Fo A.na A.alen A.afun sts cs A.pidv
+    iapply (kxa_fail_dead Fs A.V.rti A.V.cwi A.V.pvSecc Qpay P Pmiss Fo A.na A.alen A.afun sts cs A.pidv
       (bview A.plen A.pfun)) $$ [Hd Hau]
     iframe
   -- ---- the seam at +0x032: `kxc_a2_r` takes it, at the receipt ----
@@ -537,7 +537,7 @@ theorem kxc_phaseA_au (MP : MYPROC) (BO : BEGIN_OP) (NE : NAMEI_ERA) (IL : ILOCK
     -- own era leg; the leg comes straight back (an intact redeem is a READ)
     unfold kxcOracle
     iintro %dn %bm %data %hok Htop
-    imod (opfOpen_fire_1 (hlc := hlc) fscFs ⊤ Fo zi (eraNode dn bm data) CoPset.subseteq_top
+    imod (opfOpen_fire_1 fscFs ⊤ Fo zi (eraNode dn bm data) CoPset.subseteq_top
       (opfEra_typed_ok _ _ dn bm data hok)) $$ Hft Hoc Htop with ⟨Htop, %av, %hav, HΦ⟩
     imodintro
     iframe Htop
@@ -556,7 +556,7 @@ theorem kxc_phaseA_au (MP : MYPROC) (BO : BEGIN_OP) (NE : NAMEI_ERA) (IL : ILOCK
     imodintro
     iintro %c' %dn %bm %dt %ef %hbad Hx HR
     iapply Hkw $$ %c' Hx
-    iapply (kxa_fail_obs (hlc := hlc) Fs A.V.rti A.V.cwi A.V.pvSecc Qpay P Pmiss Fo zi A.na A.alen A.afun sts cs A.pidv
+    iapply (kxa_fail_obs Fs A.V.rti A.V.cwi A.V.pvSecc Qpay P Pmiss Fo zi A.na A.alen A.afun sts cs A.pidv
       (bview A.plen A.pfun) dn bm dt ef hbad) $$ HR
   -- ---- and the +0x090 exit: the frozen seam, plus the receipt ----
   iintro %c2 %spie2 %spp2 %R2 %kf %qf %sf %gyf %loyf %tlyf %inumf %dnf %bmf %data %gilf %gislf %n2

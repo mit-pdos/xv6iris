@@ -135,7 +135,7 @@ theorem parkOk_not_RUNNING {st : BitVec 32} (h : parkOk st) : st ≠ RUNNING := 
 @[simp] theorem unclaimed_RUNNING : ¬ unclaimed RUNNING := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-! ## Transport
 
@@ -143,7 +143,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 parked record's token re-indexes) now live in `MachCSL.CtxLaws`, beside
 the relation itself. -/
 
-local notation "era" => MachGS.era (hlc := hlc) (GF := GF)
+local notation "era" => MachGS.era (GF := GF)
 
 /-- A payload that is a disjunction of two transporting payloads. -/
 instance instCtxMorphOr (R1 R2 : CtxId → IProp GF) [CtxMorph R1] [CtxMorph R2] :
@@ -164,18 +164,18 @@ instance instCtxMorphOr (R1 R2 : CtxId → IProp GF) [CtxMorph R1] [CtxMorph R2]
 
 /-- The lock's "context held" row. -/
 instance instCtxMorphLockCtxHeld (tier : KTier) :
-    CtxMorph (GF := GF) (fun ξ => @lockCtxHeld hlc GF _ ⟨ξ, tier⟩) :=
-  @instCtxMorphExists hlc GF _ _ (fun (ξL : CtxId) ξ => iprop(ctxParked ξL ξ))
+    CtxMorph (GF := GF) (fun ξ => @lockCtxHeld GF _ ⟨ξ, tier⟩) :=
+  @instCtxMorphExists GF _ _ (fun (ξL : CtxId) ξ => iprop(ctxParked ξL ξ))
     (fun ξL => instCtxMorphParked ξL)
 
 /-- The holder token of a spinlock (Rocq `locked_morph`). -/
 instance instCtxMorphLocked (tier : KTier) (γ : GName) (i : CPU) :
-    CtxMorph (GF := GF) (fun ξ => @locked hlc GF _ ⟨ξ, tier⟩ γ i) :=
-  @instCtxMorphSep hlc GF _
-    (fun ξ => @lockedCore hlc GF _ ⟨ξ, tier⟩ γ i) (fun ξ => @lockCtxHeld hlc GF _ ⟨ξ, tier⟩)
-    (@instCtxMorphExists hlc GF _ _
+    CtxMorph (GF := GF) (fun ξ => @locked GF _ ⟨ξ, tier⟩ γ i) :=
+  @instCtxMorphSep GF _
+    (fun ξ => @lockedCore GF _ ⟨ξ, tier⟩ γ i) (fun ξ => @lockCtxHeld GF _ ⟨ξ, tier⟩)
+    (@instCtxMorphExists GF _ _
       (fun (B : Nat) ξ => iprop(lockHalf γ (some (i, true)) B ∗ ctxFloor ξ B))
-      (fun _ => @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (instCtxMorphFloor _)))
+      (fun _ => @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) (instCtxMorphFloor _)))
     (instCtxMorphLockCtxHeld tier)
 
 /-! ## The hart tag (Rocq `ProcGeom.hart_own`) -/
@@ -344,12 +344,12 @@ change the bit are the two that cross UNUSED (`pstateWhole_occ`,
 `pstateWhole_vac`). -/
 def pstateLock (Γ : SchedNames) (pa : BitVec 64) (st : BitVec 32) : IProp GF := iprop%
   pstateAtHlf Γ pa st ∗ (if unclaimed st then pstateAtHlf Γ pa st else emp) ∗
-  soElem (hlc := hlc) pa (occBit st)
+  soElem pa (occBit st)
 
 /-- What a lock HOLDER owns of the mirror: the whole variable, at every
 state, with the slot's occupancy element (NI joint fork lane F1). -/
 def pstateWhole (Γ : SchedNames) (pa : BitVec 64) (st : BitVec 32) : IProp GF := iprop%
-  pstateAt Γ pa 1 st ∗ soElem (hlc := hlc) pa (occBit st)
+  pstateAt Γ pa 1 st ∗ soElem pa (occBit st)
 
 /-- **The split at release** (Rocq `pstate_whole_split`): the lock's share
 comes off, and on a claimed state the claimant's half is left over. -/
@@ -463,8 +463,8 @@ occupied slot's mirror reads the slot-occupancy column into the scan's
 accumulator (`SlotLed.slotScan_visit`) and goes back untouched. -/
 theorem pstateLock_visit (Γ : SchedNames) (n : Nat) (hn : n < NPROC) (st : BitVec 32)
     (hst : st ≠ UNUSED) :
-    slotScan (hlc := hlc) (GF := GF) n ∗ pstateLock Γ (procAddr n) st ⊢
-      |={⊤}=> (slotScan (hlc := hlc) (n + 1) ∗ pstateLock Γ (procAddr n) st) := by
+    slotScan (GF := GF) n ∗ pstateLock Γ (procAddr n) st ⊢
+      |={⊤}=> (slotScan (n + 1) ∗ pstateLock Γ (procAddr n) st) := by
   unfold pstateLock
   rw [occBit_of_ne hst]
   iintro ⟨Hsc, H1, H2, Hs⟩
@@ -507,18 +507,18 @@ theorem procClaim_elim (Γ : SchedNames) (cpu : CPU) (j : Nat) (hj : j < NPROC) 
 `claimP := procClaim Γ`, and the instance is `rfl`.  Every wave-2 contract
 takes it, which is how `MachCSL.cpuClaim` -- the thing the interrupt arm
 carries -- becomes the proc table's own claim. -/
-class ClaimIs (GF : BundledGFunctors.{0}) [MachGS hlc GF] [Xv6G GF] (Γ : SchedNames) : Prop where
-  eq : ∀ (cpu : CPU) (p : BitVec 64), cpuClaim (hlc := hlc) (GF := GF) cpu p = procClaim Γ cpu p
+class ClaimIs (GF : BundledGFunctors.{0}) [MachGS GF] [Xv6G GF] (Γ : SchedNames) : Prop where
+  eq : ∀ (cpu : CPU) (p : BitVec 64), cpuClaim (GF := GF) cpu p = procClaim Γ cpu p
 
-theorem cpuClaim_eq (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (p : BitVec 64) :
-    cpuClaim (hlc := hlc) (GF := GF) cpu p = procClaim Γ cpu p := ClaimIs.eq cpu p
+theorem cpuClaim_eq (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (p : BitVec 64) :
+    cpuClaim (GF := GF) cpu p = procClaim Γ cpu p := ClaimIs.eq cpu p
 
 end
 
 /-! ## The public cells (Rocq `SchedCtx.proc_pub`) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 section PubRest
 variable [CtokG GF] [WchG GF]
@@ -531,7 +531,7 @@ def procPubRest (pa : BitVec 64) (killed xstate pid : BitVec 32) : IProp GF := i
   wordPointsTo (pKilled pa) 4 (DFrac.own 1) killed ∗
   wordPointsTo (pXstate pa) 4 xsHalf xstate ∗
   wordPointsTo (pPid pa) 4 pidPub pid ∗
-  killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pid killed
+  killPaidAt (MachFixedGS.killCred (GF := GF)) pid killed
 
 end PubRest
 
@@ -646,7 +646,7 @@ end
 /-! ## The records and the slot invariant -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-- `&cpus[h].context`. -/
 def cpuCtxAddr (h : CPU) : BitVec 64 := cpuAddr h + 8#64
@@ -664,20 +664,20 @@ the dispatch (`procSlots_dispatch`), and the resumed proc puts it back
 it out in `FdTable.procPrivNocwd`.) -/
 def procHeldAt (Γ : SchedNames) (ξ : CtxId) (h : CPU) (j : Nat) (st : BitVec 32) (ch : BitVec 64) :
     IProp GF := iprop%
-  @locked hlc GF _ ⟨ξ, KTier.kpt⟩ (Γ.lock j) h ∗
+  @locked GF _ ⟨ξ, KTier.kpt⟩ (Γ.lock j) h ∗
   pstateWhole Γ (procAddr j) st ∗
-  (∃ kl xs pid : BitVec 32, @procPub hlc GF _ ⟨ξ, KTier.kpt⟩ _ _ (procAddr j) st ch kl xs pid) ∗
+  (∃ kl xs pid : BitVec 32, @procPub GF _ ⟨ξ, KTier.kpt⟩ _ _ (procAddr j) st ch kl xs pid) ∗
   (if zsHeld st then zsElem (procAddr j) none else iprop(emp))
 
 /-- Any state: the pieces and the element if the state carries one. -/
 theorem procHeldAt_gen_cases (Γ : SchedNames) (ξ : CtxId) (h : CPU) (j : Nat) (st : BitVec 32)
     (ch : BitVec 64) :
     procHeldAt (GF := GF) Γ ξ h j st ch ⊢
-      (@locked hlc GF _ ⟨ξ, KTier.kpt⟩ (Γ.lock j) h ∗ pstateWhole Γ (procAddr j) st ∗
+      (@locked GF _ ⟨ξ, KTier.kpt⟩ (Γ.lock j) h ∗ pstateWhole Γ (procAddr j) st ∗
       ∃ kl xs pid : BitVec 32,
-        @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pState (procAddr j)) 4 (DFrac.own 1) st ∗
-        @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pChan (procAddr j)) 8 (DFrac.own 1) ch ∗
-        @procPubRest hlc GF _ ⟨ξ, KTier.kpt⟩ _ _ (procAddr j) kl xs pid) ∗
+        @wordPointsTo GF _ ⟨ξ, KTier.kpt⟩ (pState (procAddr j)) 4 (DFrac.own 1) st ∗
+        @wordPointsTo GF _ ⟨ξ, KTier.kpt⟩ (pChan (procAddr j)) 8 (DFrac.own 1) ch ∗
+        @procPubRest GF _ ⟨ξ, KTier.kpt⟩ _ _ (procAddr j) kl xs pid) ∗
       (if zsHeld st then zsElem (procAddr j) none else iprop(emp)) := by
   unfold procHeldAt procPub procPubRest
   iintro ⟨Hl, Hp, H, Hz⟩
@@ -687,10 +687,10 @@ theorem procHeldAt_gen_cases (Γ : SchedNames) (ξ : CtxId) (h : CPU) (j : Nat) 
 
 theorem procHeldAt_gen_intro (Γ : SchedNames) (ξ : CtxId) (h : CPU) (j : Nat) (st : BitVec 32)
     (ch : BitVec 64) (kl xs pid : BitVec 32) :
-    @locked hlc GF _ ⟨ξ, KTier.kpt⟩ (Γ.lock j) h ∗ pstateWhole Γ (procAddr j) st ∗
-      @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pState (procAddr j)) 4 (DFrac.own 1) st ∗
-      @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pChan (procAddr j)) 8 (DFrac.own 1) ch ∗
-      @procPubRest hlc GF _ ⟨ξ, KTier.kpt⟩ _ _ (procAddr j) kl xs pid ∗
+    @locked GF _ ⟨ξ, KTier.kpt⟩ (Γ.lock j) h ∗ pstateWhole Γ (procAddr j) st ∗
+      @wordPointsTo GF _ ⟨ξ, KTier.kpt⟩ (pState (procAddr j)) 4 (DFrac.own 1) st ∗
+      @wordPointsTo GF _ ⟨ξ, KTier.kpt⟩ (pChan (procAddr j)) 8 (DFrac.own 1) ch ∗
+      @procPubRest GF _ ⟨ξ, KTier.kpt⟩ _ _ (procAddr j) kl xs pid ∗
       (if zsHeld st then zsElem (procAddr j) none else iprop(emp)) ⊢
       procHeldAt Γ ξ h j st ch := by
   unfold procHeldAt procPub procPubRest
@@ -703,21 +703,21 @@ theorem procHeldAt_gen_intro (Γ : SchedNames) (ξ : CtxId) (h : CPU) (j : Nat) 
 theorem procHeldAt_live_cases (Γ : SchedNames) (ξ : CtxId) (h : CPU) (j : Nat) (st : BitVec 32)
     (ch : BitVec 64) (hz : zsHeld st) :
     procHeldAt (GF := GF) Γ ξ h j st ch ⊢
-      (@locked hlc GF _ ⟨ξ, KTier.kpt⟩ (Γ.lock j) h ∗ pstateWhole Γ (procAddr j) st ∗
+      (@locked GF _ ⟨ξ, KTier.kpt⟩ (Γ.lock j) h ∗ pstateWhole Γ (procAddr j) st ∗
       ∃ kl xs pid : BitVec 32,
-        @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pState (procAddr j)) 4 (DFrac.own 1) st ∗
-        @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pChan (procAddr j)) 8 (DFrac.own 1) ch ∗
-        @procPubRest hlc GF _ ⟨ξ, KTier.kpt⟩ _ _ (procAddr j) kl xs pid) ∗ zsElem (procAddr j) none := by
+        @wordPointsTo GF _ ⟨ξ, KTier.kpt⟩ (pState (procAddr j)) 4 (DFrac.own 1) st ∗
+        @wordPointsTo GF _ ⟨ξ, KTier.kpt⟩ (pChan (procAddr j)) 8 (DFrac.own 1) ch ∗
+        @procPubRest GF _ ⟨ξ, KTier.kpt⟩ _ _ (procAddr j) kl xs pid) ∗ zsElem (procAddr j) none := by
   have h := procHeldAt_gen_cases (GF := GF) Γ ξ h j st ch
   rw [if_pos hz] at h
   exact h
 
 theorem procHeldAt_live_intro (Γ : SchedNames) (ξ : CtxId) (h : CPU) (j : Nat) (st : BitVec 32)
     (ch : BitVec 64) (kl xs pid : BitVec 32) (hz : zsHeld st) :
-    @locked hlc GF _ ⟨ξ, KTier.kpt⟩ (Γ.lock j) h ∗ pstateWhole Γ (procAddr j) st ∗
-      @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pState (procAddr j)) 4 (DFrac.own 1) st ∗
-      @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pChan (procAddr j)) 8 (DFrac.own 1) ch ∗
-      @procPubRest hlc GF _ ⟨ξ, KTier.kpt⟩ _ _ (procAddr j) kl xs pid ∗ zsElem (procAddr j) none ⊢
+    @locked GF _ ⟨ξ, KTier.kpt⟩ (Γ.lock j) h ∗ pstateWhole Γ (procAddr j) st ∗
+      @wordPointsTo GF _ ⟨ξ, KTier.kpt⟩ (pState (procAddr j)) 4 (DFrac.own 1) st ∗
+      @wordPointsTo GF _ ⟨ξ, KTier.kpt⟩ (pChan (procAddr j)) 8 (DFrac.own 1) ch ∗
+      @procPubRest GF _ ⟨ξ, KTier.kpt⟩ _ _ (procAddr j) kl xs pid ∗ zsElem (procAddr j) none ⊢
       procHeldAt Γ ξ h j st ch := by
   have h := procHeldAt_gen_intro (GF := GF) Γ ξ h j st ch kl xs pid
   rw [if_pos hz] at h
@@ -726,11 +726,11 @@ theorem procHeldAt_live_intro (Γ : SchedNames) (ξ : CtxId) (h : CPU) (j : Nat)
 theorem procHeldAt_cases (Γ : SchedNames) (ξ : CtxId) (h : CPU) (j : Nat) (st : BitVec 32)
     (ch : BitVec 64) (hr : ¬ zsHeld st) :
     procHeldAt (GF := GF) Γ ξ h j st ch ⊢
-      @locked hlc GF _ ⟨ξ, KTier.kpt⟩ (Γ.lock j) h ∗ pstateWhole Γ (procAddr j) st ∗
+      @locked GF _ ⟨ξ, KTier.kpt⟩ (Γ.lock j) h ∗ pstateWhole Γ (procAddr j) st ∗
       ∃ kl xs pid : BitVec 32,
-        @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pState (procAddr j)) 4 (DFrac.own 1) st ∗
-        @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pChan (procAddr j)) 8 (DFrac.own 1) ch ∗
-        @procPubRest hlc GF _ ⟨ξ, KTier.kpt⟩ _ _ (procAddr j) kl xs pid := by
+        @wordPointsTo GF _ ⟨ξ, KTier.kpt⟩ (pState (procAddr j)) 4 (DFrac.own 1) st ∗
+        @wordPointsTo GF _ ⟨ξ, KTier.kpt⟩ (pChan (procAddr j)) 8 (DFrac.own 1) ch ∗
+        @procPubRest GF _ ⟨ξ, KTier.kpt⟩ _ _ (procAddr j) kl xs pid := by
   unfold procHeldAt procPub procPubRest
   rw [if_neg hr]
   iintro ⟨Hl, Hp, H, -⟩
@@ -739,10 +739,10 @@ theorem procHeldAt_cases (Γ : SchedNames) (ξ : CtxId) (h : CPU) (j : Nat) (st 
 
 theorem procHeldAt_intro (Γ : SchedNames) (ξ : CtxId) (h : CPU) (j : Nat) (st : BitVec 32)
     (ch : BitVec 64) (kl xs pid : BitVec 32) (hr : ¬ zsHeld st) :
-    @locked hlc GF _ ⟨ξ, KTier.kpt⟩ (Γ.lock j) h ∗ pstateWhole Γ (procAddr j) st ∗
-      @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pState (procAddr j)) 4 (DFrac.own 1) st ∗
-      @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pChan (procAddr j)) 8 (DFrac.own 1) ch ∗
-      @procPubRest hlc GF _ ⟨ξ, KTier.kpt⟩ _ _ (procAddr j) kl xs pid ⊢
+    @locked GF _ ⟨ξ, KTier.kpt⟩ (Γ.lock j) h ∗ pstateWhole Γ (procAddr j) st ∗
+      @wordPointsTo GF _ ⟨ξ, KTier.kpt⟩ (pState (procAddr j)) 4 (DFrac.own 1) st ∗
+      @wordPointsTo GF _ ⟨ξ, KTier.kpt⟩ (pChan (procAddr j)) 8 (DFrac.own 1) ch ∗
+      @procPubRest GF _ ⟨ξ, KTier.kpt⟩ _ _ (procAddr j) kl xs pid ⊢
       procHeldAt Γ ξ h j st ch := by
   unfold procHeldAt procPub procPubRest
   rw [if_neg hr]
@@ -757,53 +757,53 @@ theorem procHeldAt_intro (Γ : SchedNames) (ξ : CtxId) (h : CPU) (j : Nat) (st 
 at a resumable park, the dormant block (minus the context cells the swtch
 is about to write) at the ZOMBIE park. -/
 def parkPayAt (ξ : CtxId) (pa : BitVec 64) (st : BitVec 32) : IProp GF :=
-  if invDormant st then @procDormantNoctx hlc GF _ ⟨ξ, KTier.kpt⟩ _ _ _ _ _ _ pa st else iprop(emp)
+  if invDormant st then @procDormantNoctx GF _ ⟨ξ, KTier.kpt⟩ _ _ _ _ _ _ pa st else iprop(emp)
 
 theorem parkPay_live (ξ : CtxId) (pa : BitVec 64) (st : BitVec 32) (h : ¬ invDormant st) :
-    ⊢ parkPayAt (hlc := hlc) (GF := GF) ξ pa st := by
+    ⊢ parkPayAt (GF := GF) ξ pa st := by
   unfold parkPayAt
   rw [if_neg h]
   iempintro
 
 theorem parkPay_needsCtx (ξ : CtxId) (pa : BitVec 64) (st : BitVec 32) (h : needsCtx st) :
-    ⊢ parkPayAt (hlc := hlc) (GF := GF) ξ pa st :=
+    ⊢ parkPayAt (GF := GF) ξ pa st :=
   parkPay_live ξ pa st (needsCtx_not_invDormant h)
 
 /-! ### `CtxMorph` of the pieces -/
 
 instance instCtxMorphOfileCells (tier : KTier) (pa : BitVec 64) (dq : DFrac) (fs : List (BitVec 64)) :
-    CtxMorph (GF := GF) (fun ξ => @ofileCells hlc GF _ ⟨ξ, tier⟩ pa dq fs) :=
-  @instCtxMorphSep hlc GF _ (fun _ => iprop(⌜fs.length = NOFILE⌝)) _ (instCtxMorphConst _)
-    (ctxMorph_bigSepL fs (fun j f ξ => @wordPointsTo hlc GF _ ⟨ξ, tier⟩ (pOfile pa j) 8 dq f)
+    CtxMorph (GF := GF) (fun ξ => @ofileCells GF _ ⟨ξ, tier⟩ pa dq fs) :=
+  @instCtxMorphSep GF _ (fun _ => iprop(⌜fs.length = NOFILE⌝)) _ (instCtxMorphConst _)
+    (ctxMorph_bigSepL fs (fun j f ξ => @wordPointsTo GF _ ⟨ξ, tier⟩ (pOfile pa j) 8 dq f)
       (fun _ _ => instCtxMorphWordAt _ _ _ _ _))
 
 instance instCtxMorphByteBuf (tier : KTier) (a : BitVec 64) (dq : DFrac) (bs : List (BitVec 8)) :
-    CtxMorph (GF := GF) (fun ξ => @byteBuf hlc GF _ ⟨ξ, tier⟩ a dq bs) :=
+    CtxMorph (GF := GF) (fun ξ => @byteBuf GF _ ⟨ξ, tier⟩ a dq bs) :=
   ctxMorph_bigSepL bs
-    (fun j b ξ => @wordPointsTo hlc GF _ ⟨ξ, tier⟩ (a + BitVec.ofNat 64 j) 1 dq b)
+    (fun j b ξ => @wordPointsTo GF _ ⟨ξ, tier⟩ (a + BitVec.ofNat 64 j) 1 dq b)
     (fun _ _ => instCtxMorphWordAt _ _ _ _ _)
 
 instance instCtxMorphPnameCells (tier : KTier) (pa : BitVec 64) (dq : DFrac) (bs : List (BitVec 8)) :
-    CtxMorph (GF := GF) (fun ξ => @pnameCells hlc GF _ ⟨ξ, tier⟩ pa dq bs) :=
-  @instCtxMorphSep hlc GF _ (fun _ => iprop(⌜pnameWf bs⌝)) _ (instCtxMorphConst _)
+    CtxMorph (GF := GF) (fun ξ => @pnameCells GF _ ⟨ξ, tier⟩ pa dq bs) :=
+  @instCtxMorphSep GF _ (fun _ => iprop(⌜pnameWf bs⌝)) _ (instCtxMorphConst _)
     (instCtxMorphByteBuf _ _ _ _)
 
 /-- A node page's 512 entry words re-index. -/
 theorem ctxMorph_nodeOwn (tier : KTier) (dq : DFrac) (t : PTree) :
-    CtxMorph (GF := GF) (fun ξ => @nodeOwn hlc GF _ ⟨ξ, tier⟩ dq t) :=
+    CtxMorph (GF := GF) (fun ξ => @nodeOwn GF _ ⟨ξ, tier⟩ dq t) :=
   ctxMorph_bigSepL allIdx
-    (fun _ i ξ => @wordPointsTo hlc GF _ ⟨ξ, tier⟩ (pteAddr t.base i) 8 dq (t.ents i))
+    (fun _ i ξ => @wordPointsTo GF _ ⟨ξ, tier⟩ (pteAddr t.base i) 8 dq (t.ents i))
     (fun _ _ => instCtxMorphWordAt _ _ _ _ _)
 
 /-- A whole page-table tree re-indexes (by induction on the level). -/
 theorem ctxMorph_ptreeOwn (tier : KTier) : ∀ (lvl : Nat) (dq : DFrac) (t : PTree),
-    CtxMorph (GF := GF) (fun ξ => @ptreeOwn hlc GF _ ⟨ξ, tier⟩ lvl dq t)
+    CtxMorph (GF := GF) (fun ξ => @ptreeOwn GF _ ⟨ξ, tier⟩ lvl dq t)
   | 0, dq, t => ctxMorph_nodeOwn tier dq t
   | lvl+1, dq, t =>
-    @instCtxMorphSep hlc GF _ _ _ (ctxMorph_nodeOwn tier dq t)
+    @instCtxMorphSep GF _ _ _ (ctxMorph_nodeOwn tier dq t)
       (ctxMorph_bigSepL allIdx
         (fun _ i ξ => match t.kids i with
-          | some c => @ptreeOwn hlc GF _ ⟨ξ, tier⟩ lvl dq c
+          | some c => @ptreeOwn GF _ ⟨ξ, tier⟩ lvl dq c
           | none => iprop(emp))
         (fun _ i => by
           cases h : t.kids i with
@@ -811,93 +811,93 @@ theorem ctxMorph_ptreeOwn (tier : KTier) : ∀ (lvl : Nat) (dq : DFrac) (t : PTr
           | some c => simp only []; exact ctxMorph_ptreeOwn tier lvl dq c))
 
 instance instCtxMorphPtreeOwn (tier : KTier) (lvl : Nat) (dq : DFrac) (t : PTree) :
-    CtxMorph (GF := GF) (fun ξ => @ptreeOwn hlc GF _ ⟨ξ, tier⟩ lvl dq t) :=
+    CtxMorph (GF := GF) (fun ξ => @ptreeOwn GF _ ⟨ξ, tier⟩ lvl dq t) :=
   ctxMorph_ptreeOwn tier lvl dq t
 
 instance instCtxMorphUmPages (tier : KTier) (P : UPtd) (M : Nat → List (BitVec 8)) :
-    CtxMorph (GF := GF) (fun ξ => @umPages hlc GF _ ⟨ξ, tier⟩ P M) :=
+    CtxMorph (GF := GF) (fun ξ => @umPages GF _ ⟨ξ, tier⟩ P M) :=
   ctxMorph_bigSepM P.um
     (fun k w ξ => iprop(⌜(M k).length = 4096⌝ ∗
-      @byteBuf hlc GF _ ⟨ξ, tier⟩ (pte2pa w) (DFrac.own 1) (M k)))
-    (fun k _ => @instCtxMorphSep hlc GF _ (fun _ => iprop(⌜(M k).length = 4096⌝)) _
+      @byteBuf GF _ ⟨ξ, tier⟩ (pte2pa w) (DFrac.own 1) (M k)))
+    (fun k _ => @instCtxMorphSep GF _ (fun _ => iprop(⌜(M k).length = 4096⌝)) _
       (instCtxMorphConst _) (instCtxMorphByteBuf _ _ _ _))
 
 instance instCtxMorphPtOwnRep (tier : KTier) (root : BitVec 44) (L : RegMapF (BitVec 64)) :
-    CtxMorph (GF := GF) (fun ξ => @ptOwnRep hlc GF _ ⟨ξ, tier⟩ root L) :=
-  @instCtxMorphExists hlc GF _ _
+    CtxMorph (GF := GF) (fun ξ => @ptOwnRep GF _ ⟨ξ, tier⟩ root L) :=
+  @instCtxMorphExists GF _ _
     (fun (t : PTree) ξ => iprop(⌜t.base = root ∧ ptRep t L⌝ ∗
-      @ptreeOwn hlc GF _ ⟨ξ, tier⟩ 2 (DFrac.own 1) t))
-    (fun t => @instCtxMorphSep hlc GF _ (fun _ => iprop(⌜t.base = root ∧ ptRep t L⌝)) _
+      @ptreeOwn GF _ ⟨ξ, tier⟩ 2 (DFrac.own 1) t))
+    (fun t => @instCtxMorphSep GF _ (fun _ => iprop(⌜t.base = root ∧ ptRep t L⌝)) _
       (instCtxMorphConst _) (instCtxMorphPtreeOwn _ _ _ _))
 
 instance instCtxMorphProcPtAt (tier : KTier) (P : UPtd) (M : Nat → List (BitVec 8)) :
-    CtxMorph (GF := GF) (fun ξ => @procPtAt hlc GF _ ⟨ξ, tier⟩ P M) :=
-  @instCtxMorphSep hlc GF _ (fun _ => iprop(⌜uptWf P⌝)) _ (instCtxMorphConst _)
-    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphPtOwnRep _ _ _) (instCtxMorphUmPages _ _ _))
+    CtxMorph (GF := GF) (fun ξ => @procPtAt GF _ ⟨ξ, tier⟩ P M) :=
+  @instCtxMorphSep GF _ (fun _ => iprop(⌜uptWf P⌝)) _ (instCtxMorphConst _)
+    (@instCtxMorphSep GF _ _ _ (instCtxMorphPtOwnRep _ _ _) (instCtxMorphUmPages _ _ _))
 
 instance instCtxMorphTfPageAt (tier : KTier) (tfp : BitVec 44) (ws : List (BitVec 64)) :
-    CtxMorph (GF := GF) (fun ξ => @tfPageAt hlc GF _ ⟨ξ, tier⟩ tfp ws) :=
-  @instCtxMorphSep hlc GF _ (fun _ => iprop(⌜ws.length = 36⌝)) _ (instCtxMorphConst _)
-    (@instCtxMorphSep hlc GF _ _ _
-      (ctxMorph_bigSepL ws (fun j w ξ => @wordPointsTo hlc GF _ ⟨ξ, tier⟩
+    CtxMorph (GF := GF) (fun ξ => @tfPageAt GF _ ⟨ξ, tier⟩ tfp ws) :=
+  @instCtxMorphSep GF _ (fun _ => iprop(⌜ws.length = 36⌝)) _ (instCtxMorphConst _)
+    (@instCtxMorphSep GF _ _ _
+      (ctxMorph_bigSepL ws (fun j w ξ => @wordPointsTo GF _ ⟨ξ, tier⟩
           (pageAddr tfp + BitVec.ofNat 64 (8 * j)) 8 (DFrac.own 1) w)
         (fun _ _ => instCtxMorphWordAt _ _ _ _ _))
-      (@instCtxMorphExists hlc GF _ _
+      (@instCtxMorphExists GF _ _
         (fun (bs : List (BitVec 8)) ξ => iprop(⌜bs.length = 4096 - 288⌝ ∗
-          @byteBuf hlc GF _ ⟨ξ, tier⟩ (pageAddr tfp + 288#64) (DFrac.own 1) bs))
-        (fun bs => @instCtxMorphSep hlc GF _ (fun _ => iprop(⌜bs.length = 4096 - 288⌝)) _
+          @byteBuf GF _ ⟨ξ, tier⟩ (pageAddr tfp + 288#64) (DFrac.own 1) bs))
+        (fun bs => @instCtxMorphSep GF _ (fun _ => iprop(⌜bs.length = 4096 - 288⌝)) _
           (instCtxMorphConst _) (instCtxMorphByteBuf _ _ _ _))))
 
 instance instCtxMorphDormantSpace (tier : KTier) (st : BitVec 32) (V : ProcPriv) (pid : BitVec 32) :
-    CtxMorph (GF := GF) (fun ξ => @dormantSpace hlc GF _ ⟨ξ, tier⟩ st V pid) := by
+    CtxMorph (GF := GF) (fun ξ => @dormantSpace GF _ ⟨ξ, tier⟩ st V pid) := by
   unfold dormantSpace
   by_cases h : st = UNUSED
   · simp only [if_pos h]
-    exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (MachCSL.instCtxMorphStackOwn _ _ _)
+    exact @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) (MachCSL.instCtxMorphStackOwn _ _ _)
   · simp only [if_neg h]
-    exact @instCtxMorphExists hlc GF _ _ _
-      (fun _ => @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-        (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphProcPtAt _ _ _)
-          (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphTfPageAt _ _ _)
+    exact @instCtxMorphExists GF _ _ _
+      (fun _ => @instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+        (@instCtxMorphSep GF _ _ _ (instCtxMorphProcPtAt _ _ _)
+          (@instCtxMorphSep GF _ _ _ (instCtxMorphTfPageAt _ _ _)
             (MachCSL.instCtxMorphStackOwn _ _ _))))
 
 instance instCtxMorphProcFieldsNoctx (tier : KTier) (pa : BitVec 64) (dq : DFrac) (V : ProcPriv) :
-    CtxMorph (GF := GF) (fun ξ => @procFieldsNoctx hlc GF _ ⟨ξ, tier⟩ pa dq V) :=
-  @instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
-    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
-      (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
-        (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
-          (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphOfileCells _ _ _ _)
-            (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
-              (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphPnameCells _ _ _ _)
-                (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
+    CtxMorph (GF := GF) (fun ξ => @procFieldsNoctx GF _ ⟨ξ, tier⟩ pa dq V) :=
+  @instCtxMorphSep GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
+    (@instCtxMorphSep GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
+      (@instCtxMorphSep GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
+        (@instCtxMorphSep GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
+          (@instCtxMorphSep GF _ _ _ (instCtxMorphOfileCells _ _ _ _)
+            (@instCtxMorphSep GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
+              (@instCtxMorphSep GF _ _ _ (instCtxMorphPnameCells _ _ _ _)
+                (@instCtxMorphSep GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
                   (instCtxMorphWordAt _ _ _ _ _))))))))
 
 instance instCtxMorphProcDormantNoctx (tier : KTier) (pa : BitVec 64) (st : BitVec 32) :
-    CtxMorph (GF := GF) (fun ξ => @procDormantNoctx hlc GF _ ⟨ξ, tier⟩ _ _ _ _ _ _ pa st) :=
-  @instCtxMorphSep hlc GF _ (fun _ => iprop(⌜st = UNUSED ∨ st = ZOMBIE⌝)) _ (instCtxMorphConst _)
-    (@instCtxMorphExists hlc GF _ _
+    CtxMorph (GF := GF) (fun ξ => @procDormantNoctx GF _ ⟨ξ, tier⟩ _ _ _ _ _ _ pa st) :=
+  @instCtxMorphSep GF _ (fun _ => iprop(⌜st = UNUSED ∨ st = ZOMBIE⌝)) _ (instCtxMorphConst _)
+    (@instCtxMorphExists GF _ _
       (fun (V : ProcPriv) ξ => iprop(∃ pid : BitVec 32,
         ⌜V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64 ∧ V.root = 0#64 ∧ V.sz.toNat ≤ uvmMaxsz ∧
       V.pvLazy = true⌝ ∗
-        @wordPointsTo hlc GF _ ⟨ξ, tier⟩ (pPid pa) 4 pidPriv pid ∗
-        @procFieldsNoctx hlc GF _ ⟨ξ, tier⟩ pa (DFrac.own 1) V ∗
+        @wordPointsTo GF _ ⟨ξ, tier⟩ (pPid pa) 4 pidPriv pid ∗
+        @procFieldsNoctx GF _ ⟨ξ, tier⟩ pa (DFrac.own 1) V ∗
         dormantAllow ∗ chFrag V.chg pa ∅ ∗ actCnt pa V.ev ∗ genHalvesDorm pa pid V.gen st ∗
-        (∃ xsv : BitVec 32, @wordPointsTo hlc GF _ ⟨ξ, tier⟩ (pXstate pa) 4 xsHalf xsv ∗
+        (∃ xsv : BitVec 32, @wordPointsTo GF _ ⟨ξ, tier⟩ (pXstate pa) 4 xsHalf xsv ∗
           (if st = ZOMBIE then exitTok V.gen pid (xstateVal xsv) ∗ zsElem pa (some (pid, xstateVal xsv))
         else iprop(emp))) ∗
-        @dormantSpace hlc GF _ ⟨ξ, tier⟩ st V pid))
-      (fun _ => @instCtxMorphExists hlc GF _ _ _
-        (fun _ => @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-          (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
-            (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphProcFieldsNoctx _ _ _ _)
-              (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-                (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-                  (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-                   (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-                    (@instCtxMorphSep hlc GF _ _ _
-                      (@instCtxMorphExists hlc GF _ _ _ (fun _ =>
-                        @instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _) (instCtxMorphConst _)))
+        @dormantSpace GF _ ⟨ξ, tier⟩ st V pid))
+      (fun _ => @instCtxMorphExists GF _ _ _
+        (fun _ => @instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+          (@instCtxMorphSep GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
+            (@instCtxMorphSep GF _ _ _ (instCtxMorphProcFieldsNoctx _ _ _ _)
+              (@instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+                (@instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+                  (@instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+                   (@instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+                    (@instCtxMorphSep GF _ _ _
+                      (@instCtxMorphExists GF _ _ _ (fun _ =>
+                        @instCtxMorphSep GF _ _ _ (instCtxMorphWordAt _ _ _ _ _) (instCtxMorphConst _)))
                       (instCtxMorphDormantSpace _ _ _ _)))))))))))
 
 /-- **`procPriv` minus the 14 context words** (Rocq's `proc_priv`: the
@@ -913,10 +913,10 @@ def procPrivNoctxAt (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPri
     (M : Nat → List (BitVec 8)) : IProp GF := iprop%
   ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧
     V.pagetable = pageAddr V.upt.root ∧ V.trapframe = pageAddr V.upt.tfp⌝ ∗
-  @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
-  @procFieldsNoctx hlc GF _ ⟨ξ, KTier.kpt⟩ pa (DFrac.own 1) V ∗
-  @procPtAt hlc GF _ ⟨ξ, KTier.kpt⟩ V.upt M ∗
-  @tfPageAt hlc GF _ ⟨ξ, KTier.kpt⟩ V.upt.tfp V.tf ∗
+  @wordPointsTo GF _ ⟨ξ, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
+  @procFieldsNoctx GF _ ⟨ξ, KTier.kpt⟩ pa (DFrac.own 1) V ∗
+  @procPtAt GF _ ⟨ξ, KTier.kpt⟩ V.upt M ∗
+  @tfPageAt GF _ ⟨ξ, KTier.kpt⟩ V.upt.tfp V.tf ∗
   ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ ∗
   actCnt pa V.ev
 
@@ -924,12 +924,12 @@ instance instCtxMorphProcPrivNoctxAt (pa : BitVec 64) (pid : BitVec 32) (V : Pro
     (M : Nat → List (BitVec 8)) :
     CtxMorph (GF := GF) (fun ξ => procPrivNoctxAt ξ pa pid V M) := by
   unfold procPrivNoctxAt
-  exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
-      (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphProcFieldsNoctx _ _ _ _)
-        (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphProcPtAt _ _ _)
-          (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphTfPageAt _ _ _)
-            (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (instCtxMorphConst _))))))
+  exact @instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+    (@instCtxMorphSep GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
+      (@instCtxMorphSep GF _ _ _ (instCtxMorphProcFieldsNoctx _ _ _ _)
+        (@instCtxMorphSep GF _ _ _ (instCtxMorphProcPtAt _ _ _)
+          (@instCtxMorphSep GF _ _ _ (instCtxMorphTfPageAt _ _ _)
+            (@instCtxMorphSep GF _ _ _ (instCtxMorphConst _) (instCtxMorphConst _))))))
 
 /-- **The event counter, lent out of the cells form** (permit sweep L1a; the
 cells twin of `procPrivBareAt_evAcc`, `SchedCtx.procPrivNoctxAt`'s last
@@ -939,8 +939,8 @@ theorem procPrivNoctxAt_evAcc (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V
     (M : Nat → List (BitVec 8)) :
     procPrivNoctxAt (GF := GF) ξ pa pid V M ⊢
       actCnt pa V.ev ∗ (∀ k : Nat, actCnt pa k -∗ procPrivNoctxAt ξ pa pid (V.updEv k) M) := by
-  have hf : ∀ k : Nat, @procFieldsNoctx hlc GF _ ⟨ξ, KTier.kpt⟩ pa (DFrac.own 1) (V.updEv k) =
-      @procFieldsNoctx hlc GF _ ⟨ξ, KTier.kpt⟩ pa (DFrac.own 1) V := fun _ => rfl
+  have hf : ∀ k : Nat, @procFieldsNoctx GF _ ⟨ξ, KTier.kpt⟩ pa (DFrac.own 1) (V.updEv k) =
+      @procFieldsNoctx GF _ ⟨ξ, KTier.kpt⟩ pa (DFrac.own 1) V := fun _ => rfl
   unfold procPrivNoctxAt
   simp only [hf]
   iintro ⟨%h, Hpid, Hf, Hpt, Htfp, %hlz, Hev⟩
@@ -950,82 +950,82 @@ theorem procPrivNoctxAt_evAcc (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V
   ipureintro; exact ⟨h, hlz⟩
 
 instance instCtxMorphContextCells (tier : KTier) (pa : BitVec 64) (dq : DFrac) (ws : List (BitVec 64)) :
-    CtxMorph (GF := GF) (fun ξ => @contextCells hlc GF _ ⟨ξ, tier⟩ pa dq ws) :=
-  @instCtxMorphSep hlc GF _ (fun _ => iprop(⌜ws.length = 14⌝)) _ (instCtxMorphConst _)
-    (ctxMorph_bigSepL ws (fun j w ξ => @wordPointsTo hlc GF _ ⟨ξ, tier⟩ (pContext pa j) 8 dq w)
+    CtxMorph (GF := GF) (fun ξ => @contextCells GF _ ⟨ξ, tier⟩ pa dq ws) :=
+  @instCtxMorphSep GF _ (fun _ => iprop(⌜ws.length = 14⌝)) _ (instCtxMorphConst _)
+    (ctxMorph_bigSepL ws (fun j w ξ => @wordPointsTo GF _ ⟨ξ, tier⟩ (pContext pa j) 8 dq w)
       (fun _ _ => instCtxMorphWordAt _ _ _ _ _))
 
 instance instCtxMorphProcFields (tier : KTier) (pa : BitVec 64) (dq : DFrac) (V : ProcPriv) :
-    CtxMorph (GF := GF) (fun ξ => @procFields hlc GF _ ⟨ξ, tier⟩ pa dq V) :=
-  @instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
-    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
-      (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
-        (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
-          (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphContextCells _ _ _ _)
-            (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphOfileCells _ _ _ _)
-              (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
-                (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphPnameCells _ _ _ _)
-                  (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
+    CtxMorph (GF := GF) (fun ξ => @procFields GF _ ⟨ξ, tier⟩ pa dq V) :=
+  @instCtxMorphSep GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
+    (@instCtxMorphSep GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
+      (@instCtxMorphSep GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
+        (@instCtxMorphSep GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
+          (@instCtxMorphSep GF _ _ _ (instCtxMorphContextCells _ _ _ _)
+            (@instCtxMorphSep GF _ _ _ (instCtxMorphOfileCells _ _ _ _)
+              (@instCtxMorphSep GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
+                (@instCtxMorphSep GF _ _ _ (instCtxMorphPnameCells _ _ _ _)
+                  (@instCtxMorphSep GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
                     (instCtxMorphWordAt _ _ _ _ _)))))))))
 
 instance instCtxMorphProcDormant (tier : KTier) (pa : BitVec 64) (st : BitVec 32) :
-    CtxMorph (GF := GF) (fun ξ => @procDormant hlc GF _ ⟨ξ, tier⟩ _ _ _ _ _ _ pa st) :=
-  @instCtxMorphSep hlc GF _ (fun _ => iprop(⌜st = UNUSED ∨ st = ZOMBIE⌝)) _ (instCtxMorphConst _)
-    (@instCtxMorphExists hlc GF _ _
+    CtxMorph (GF := GF) (fun ξ => @procDormant GF _ ⟨ξ, tier⟩ _ _ _ _ _ _ pa st) :=
+  @instCtxMorphSep GF _ (fun _ => iprop(⌜st = UNUSED ∨ st = ZOMBIE⌝)) _ (instCtxMorphConst _)
+    (@instCtxMorphExists GF _ _
       (fun (V : ProcPriv) ξ => iprop(∃ pid : BitVec 32,
         ⌜V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64 ∧ V.root = 0#64 ∧ V.sz.toNat ≤ uvmMaxsz ∧
       V.pvLazy = true⌝ ∗
-        @wordPointsTo hlc GF _ ⟨ξ, tier⟩ (pPid pa) 4 pidPriv pid ∗
-        @procFields hlc GF _ ⟨ξ, tier⟩ pa (DFrac.own 1) V ∗
+        @wordPointsTo GF _ ⟨ξ, tier⟩ (pPid pa) 4 pidPriv pid ∗
+        @procFields GF _ ⟨ξ, tier⟩ pa (DFrac.own 1) V ∗
         dormantAllow ∗ chFrag V.chg pa ∅ ∗ actCnt pa V.ev ∗ genHalvesDorm pa pid V.gen st ∗
-        (∃ xsv : BitVec 32, @wordPointsTo hlc GF _ ⟨ξ, tier⟩ (pXstate pa) 4 xsHalf xsv ∗
+        (∃ xsv : BitVec 32, @wordPointsTo GF _ ⟨ξ, tier⟩ (pXstate pa) 4 xsHalf xsv ∗
           (if st = ZOMBIE then exitTok V.gen pid (xstateVal xsv) ∗ zsElem pa (some (pid, xstateVal xsv))
         else iprop(emp))) ∗
-        @dormantSpace hlc GF _ ⟨ξ, tier⟩ st V pid))
-      (fun _ => @instCtxMorphExists hlc GF _ _ _
-        (fun _ => @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-          (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
-            (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphProcFields _ _ _ _)
-              (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-                (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-                  (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-                   (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-                    (@instCtxMorphSep hlc GF _ _ _
-                      (@instCtxMorphExists hlc GF _ _ _ (fun _ =>
-                        @instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _) (instCtxMorphConst _)))
+        @dormantSpace GF _ ⟨ξ, tier⟩ st V pid))
+      (fun _ => @instCtxMorphExists GF _ _ _
+        (fun _ => @instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+          (@instCtxMorphSep GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
+            (@instCtxMorphSep GF _ _ _ (instCtxMorphProcFields _ _ _ _)
+              (@instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+                (@instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+                  (@instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+                   (@instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+                    (@instCtxMorphSep GF _ _ _
+                      (@instCtxMorphExists GF _ _ _ (fun _ =>
+                        @instCtxMorphSep GF _ _ _ (instCtxMorphWordAt _ _ _ _ _) (instCtxMorphConst _)))
                       (instCtxMorphDormantSpace _ _ _ _)))))))))))
 
 instance instCtxMorphParkPay (pa : BitVec 64) (st : BitVec 32) :
-    CtxMorph (GF := GF) (fun ξ => parkPayAt (hlc := hlc) ξ pa st) := by
+    CtxMorph (GF := GF) (fun ξ => parkPayAt ξ pa st) := by
   unfold parkPayAt
   by_cases h : invDormant st
   · simp only [if_pos h]; exact instCtxMorphProcDormantNoctx _ _ _
   · simp only [if_neg h]; exact instCtxMorphConst _
 
 instance instCtxMorphProcPubRest (tier : KTier) (pa : BitVec 64) (kl xs pid : BitVec 32) :
-    CtxMorph (GF := GF) (fun ξ => @procPubRest hlc GF _ ⟨ξ, tier⟩ _ _ pa kl xs pid) :=
-  @instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
-    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
-      (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _) (instCtxMorphConst _)))
+    CtxMorph (GF := GF) (fun ξ => @procPubRest GF _ ⟨ξ, tier⟩ _ _ pa kl xs pid) :=
+  @instCtxMorphSep GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
+    (@instCtxMorphSep GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
+      (@instCtxMorphSep GF _ _ _ (instCtxMorphWordAt _ _ _ _ _) (instCtxMorphConst _)))
 
 instance instCtxMorphProcPub (tier : KTier) (pa : BitVec 64) (st : BitVec 32) (ch : BitVec 64)
     (kl xs pid : BitVec 32) :
-    CtxMorph (GF := GF) (fun ξ => @procPub hlc GF _ ⟨ξ, tier⟩ _ _ pa st ch kl xs pid) :=
-  @instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
-    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
-      (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
-        (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
-          (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _) (instCtxMorphConst _)))))
+    CtxMorph (GF := GF) (fun ξ => @procPub GF _ ⟨ξ, tier⟩ _ _ pa st ch kl xs pid) :=
+  @instCtxMorphSep GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
+    (@instCtxMorphSep GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
+      (@instCtxMorphSep GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
+        (@instCtxMorphSep GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
+          (@instCtxMorphSep GF _ _ _ (instCtxMorphWordAt _ _ _ _ _) (instCtxMorphConst _)))))
 
 instance instCtxMorphProcHeld (Γ : SchedNames) (h : CPU) (j : Nat) (st : BitVec 32) (ch : BitVec 64) :
-    CtxMorph (GF := GF) (fun ξ => procHeldAt (hlc := hlc) Γ ξ h j st ch) := by
+    CtxMorph (GF := GF) (fun ξ => procHeldAt Γ ξ h j st ch) := by
   unfold procHeldAt
-  exact @instCtxMorphSep hlc GF _ _ _
+  exact @instCtxMorphSep GF _ _ _
     (instCtxMorphLocked KTier.kpt (Γ.lock j) h)
-    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-      (@instCtxMorphSep hlc GF _ _ _
-        (@instCtxMorphExists hlc GF _ _ _ (fun _ => @instCtxMorphExists hlc GF _ _ _
-          (fun _ => @instCtxMorphExists hlc GF _ _ _ (fun _ => instCtxMorphProcPub _ _ _ _ _ _ _))))
+    (@instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+      (@instCtxMorphSep GF _ _ _
+        (@instCtxMorphExists GF _ _ _ (fun _ => @instCtxMorphExists GF _ _ _
+          (fun _ => @instCtxMorphExists GF _ _ _ (fun _ => instCtxMorphProcPub _ _ _ _ _ _ _))))
         (instCtxMorphConst _)))
 
 /-! ### Address disjointness: `cpus[]` and `proc[]` -/
@@ -1079,7 +1079,7 @@ RESUMING hart; the two disjuncts are discriminated by the resumed context's
 own address `c`: the CPU context (a proc parking) or a proc context (the
 scheduler dispatching). -/
 def pSched (Γ : SchedNames) : VcPay GF := fun h A' c cret tpv p back ξ => iprop%
-  ⌜tpv = hartId h⌝ ∗ trapCsrs h ∗ @intrRes hlc GF _ ⟨ξ, KTier.kpt⟩ _ _ h ∗
+  ⌜tpv = hartId h⌝ ∗ trapCsrs h ∗ @intrRes GF _ ⟨ξ, KTier.kpt⟩ _ _ h ∗
   ((⌜c = cpuCtxAddr h ∧ A' = none⌝ ∗
      ∃ (j : Nat) (st : BitVec 32) (ch : BitVec 64),
        ⌜cret = pContext (procAddr j) 0 ∧ p = procAddr j ∧ j < NPROC ∧ parkOk st ∧
@@ -1100,7 +1100,7 @@ instance instCtxMorphPSched (Γ : SchedNames) (h : CPU) (A' : CtxAdm) (c cret tp
 /-- Build the PARKING proc's payload (what `sched` supplies at its swtch). -/
 theorem pSched_to_cpu (Γ : SchedNames) (ξ : CtxId) (i : CPU) (j : Nat) (st : BitVec 32)
     (ch : BitVec 64) (hj : j < NPROC) (hst : parkOk st) :
-    trapCsrs (GF := GF) i ∗ @intrRes hlc GF _ ⟨ξ, KTier.kpt⟩ _ _ i ∗ procHeldAt Γ ξ i j st ch ∗
+    trapCsrs (GF := GF) i ∗ @intrRes GF _ ⟨ξ, KTier.kpt⟩ _ _ i ∗ procHeldAt Γ ξ i j st ch ∗
       hartFull Γ j i ∗ parkPayAt ξ (procAddr j) st ⊢
       pSched Γ i none (cpuCtxAddr i) (pContext (procAddr j) 0) (hartId i) (procAddr j)
         (decide (needsCtx st)) ξ := by
@@ -1120,7 +1120,7 @@ theorem pSched_to_cpu (Γ : SchedNames) (ξ : CtxId) (i : CPU) (j : Nat) (st : B
 /-- Build the DISPATCH payload (what the scheduler supplies at its swtch). -/
 theorem pSched_to_proc (Γ : SchedNames) (ξ : CtxId) (i : CPU) (j : Nat) (ch : BitVec 64)
     (hj : j < NPROC) :
-    trapCsrs (GF := GF) i ∗ @intrRes hlc GF _ ⟨ξ, KTier.kpt⟩ _ _ i ∗ procHeldAt Γ ξ i j RUNNING ch ∗
+    trapCsrs (GF := GF) i ∗ @intrRes GF _ ⟨ξ, KTier.kpt⟩ _ _ i ∗ procHeldAt Γ ξ i j RUNNING ch ∗
       hartFull Γ j i ⊢
       pSched Γ i (some i) (pContext (procAddr j) 0) (cpuCtxAddr i) (hartId i) (procAddr j) true ξ := by
   unfold pSched
@@ -1139,7 +1139,7 @@ theorem pSched_at_proc (Γ : SchedNames) (ξ : CtxId) (i : CPU) (A' : CtxAdm) (j
     (cret tpv p : BitVec 64) (back : Bool) (hj : j < NPROC) :
     pSched (GF := GF) Γ i A' (pContext (procAddr j) 0) cret tpv p back ξ ⊢
       ⌜tpv = hartId i ∧ cret = cpuCtxAddr i ∧ p = procAddr j ∧ A' = some i ∧ back = true⌝ ∗
-      trapCsrs i ∗ @intrRes hlc GF _ ⟨ξ, KTier.kpt⟩ _ _ i ∗
+      trapCsrs i ∗ @intrRes GF _ ⟨ξ, KTier.kpt⟩ _ _ i ∗
       ∃ ch : BitVec 64, procHeldAt Γ ξ i j RUNNING ch ∗ hartFull Γ j i := by
   unfold pSched
   iintro ⟨%htp, Htc, Hir, ⟨⟨%hc, _⟩ | ⟨%j', %ch, %hf, Hheld, Htag⟩⟩⟩
@@ -1158,7 +1158,7 @@ theorem pSched_at_cpu (Γ : SchedNames) (ξ : CtxId) (i : CPU) (A' : CtxAdm) (j 
     (cret tpv : BitVec 64) (back : Bool) (hj : j < NPROC) :
     pSched (GF := GF) Γ i A' (cpuCtxAddr i) cret tpv (procAddr j) back ξ ⊢
       ⌜tpv = hartId i ∧ cret = pContext (procAddr j) 0 ∧ A' = none⌝ ∗ trapCsrs i ∗
-      @intrRes hlc GF _ ⟨ξ, KTier.kpt⟩ _ _ i ∗
+      @intrRes GF _ ⟨ξ, KTier.kpt⟩ _ _ i ∗
       ∃ (st : BitVec 32) (ch : BitVec 64),
         ⌜parkOk st ∧ back = decide (needsCtx st)⌝ ∗
         procHeldAt Γ ξ i j st ch ∗ hartFull Γ j i ∗ parkPayAt ξ (procAddr j) st := by
@@ -1204,8 +1204,8 @@ def procCtxAt (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) : IProp GF := ipr
 instance instCtxMorphProcCtxAt (Γ : SchedNames) (pa : BitVec 64) :
     CtxMorph (GF := GF) (fun ξ => procCtxAt Γ ξ pa) := by
   unfold procCtxAt
-  exact @instCtxMorphExists hlc GF _ _ _
-    (fun ξp => @instCtxMorphSep hlc GF _ _ _ (instCtxMorphParked ξp) (instCtxMorphConst _))
+  exact @instCtxMorphExists GF _ _ _
+    (fun ξp => @instCtxMorphSep GF _ _ _ (instCtxMorphParked ξp) (instCtxMorphConst _))
 
 /-- ...and what a park hands the resumed scheduler IS the slot. -/
 theorem procCtx_of_tok (Γ : SchedNames) (ξl ξo : CtxId) (pa : BitVec 64) :
@@ -1220,13 +1220,13 @@ theorem procCtx_of_tok (Γ : SchedNames) (ξl ξo : CtxId) (pa : BitVec 64) :
 /-- The RUNNING arm: the proc's own save area, raw, and that hart's parked
 scheduler record. -/
 def runSlotAt (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) : IProp GF := iprop%
-  @ownCtxCells hlc GF _ ⟨ξl, KTier.kpt⟩ (pContext pa 0) ∗
+  @ownCtxCells GF _ ⟨ξl, KTier.kpt⟩ (pContext pa 0) ∗
   ∃ h : CPU, hartAt Γ pa (1 : Qp).half h ∗ ▷ schedVcAt Γ h (cpuCtxAddr h) pa
 
 instance instCtxMorphRunSlotAt (Γ : SchedNames) (pa : BitVec 64) :
     CtxMorph (GF := GF) (fun ξ => runSlotAt Γ ξ pa) := by
   unfold runSlotAt
-  exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphOwnCtxCells _ _) (instCtxMorphConst _)
+  exact @instCtxMorphSep GF _ _ _ (instCtxMorphOwnCtxCells _ _) (instCtxMorphConst _)
 
 /-! ## The slot (Rocq `proc_slots_at`) -/
 
@@ -1323,7 +1323,7 @@ an element for a reaped ZOMBIE, so kwait puts it back at its re-close). -/
 def procSlotsAt (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) (st : BitVec 32) : IProp GF := iprop%
   (if needsCtx st then procCtxAt Γ ξl pa else emp) ∗
   (if isRunning st then runSlotAt Γ ξl pa else emp) ∗
-  (if invDormant st then @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ _ pa st else emp) ∗
+  (if invDormant st then @procDormant GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ _ pa st else emp) ∗
   (if notRunning st then hartAtAny Γ pa else emp) ∗
   pavSlot Γ pa st ∗
   (if st = ZOMBIE then emp else zsElem pa none)
@@ -1340,9 +1340,9 @@ theorem procSlots_used (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) (st : Bi
 instance instCtxMorphProcSlotsAt (Γ : SchedNames) (pa : BitVec 64) (st : BitVec 32) :
     CtxMorph (GF := GF) (fun ξ => procSlotsAt Γ ξ pa st) := by
   unfold procSlotsAt
-  refine @instCtxMorphSep hlc GF _ _ _ ?_ (@instCtxMorphSep hlc GF _ _ _ ?_
-    (@instCtxMorphSep hlc GF _ _ _ ?_ (@instCtxMorphSep hlc GF _ _ _ ?_
-      (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (instCtxMorphConst _)))))
+  refine @instCtxMorphSep GF _ _ _ ?_ (@instCtxMorphSep GF _ _ _ ?_
+    (@instCtxMorphSep GF _ _ _ ?_ (@instCtxMorphSep GF _ _ _ ?_
+      (@instCtxMorphSep GF _ _ _ (instCtxMorphConst _) (instCtxMorphConst _)))))
   · by_cases h : needsCtx st
     · simp only [if_pos h]; exact instCtxMorphProcCtxAt _ _
     · simp only [if_neg h]; exact instCtxMorphConst _
@@ -1406,7 +1406,7 @@ theorem procSlots_park_gen (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) (st 
     (hst : parkOk st) :
     slotUsed Γ pa ∗
     (if needsCtx st then procCtxAt (GF := GF) Γ ξl pa
-     else @ownCtxCells hlc GF _ ⟨ξl, KTier.kpt⟩ (pContext pa 0)) ∗
+     else @ownCtxCells GF _ ⟨ξl, KTier.kpt⟩ (pContext pa 0)) ∗
     hartAtAny Γ pa ∗ parkPayAt ξl pa st ∗ (if zsHeld st then zsElem pa none else iprop(emp)) ⊢
       procSlotsAt Γ ξl pa st := by
   have hnu : ¬ isUnused st := not_isUnused_of_parkOk hst
@@ -1431,7 +1431,7 @@ theorem procSlots_park_gen (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) (st 
     isplitl []
     · iempintro
     iframe Htag Hu
-    iapply (@procDormant_split hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ _ pa ZOMBIE).mpr
+    iapply (@procDormant_split GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ _ pa ZOMBIE).mpr
     iframe Hpay Hc
 
 /-- **The slot a park hands back**, in the shape the crossing produces:
@@ -1443,7 +1443,7 @@ theorem procSlots_park_gen' (Γ : SchedNames) (ξl : CtxId) (n : Nat) (hn : n < 
      (if (decide (needsCtx st) : Bool) then
         ∃ ξo : CtxId, parkTokAt (GF := GF) ξl none ξo ∗
           ▷ validCtx (pSched Γ) ⟨none, pContext (procAddr n) 0, procAddr n, ξo⟩
-      else @ownCtxCells hlc GF _ ⟨ξl, KTier.kpt⟩ (pContext (procAddr n) 0)) ∗
+      else @ownCtxCells GF _ ⟨ξl, KTier.kpt⟩ (pContext (procAddr n) 0)) ∗
     hartFull Γ n h ∗ parkPayAt ξl (procAddr n) st ∗
     (if zsHeld st then zsElem (procAddr n) none else iprop(emp))) ⊢ procSlotsAt Γ ξl (procAddr n) st := by
   by_cases hnc : needsCtx st
@@ -1475,7 +1475,7 @@ RUNNING and collapses the arm's existential hart to the caller's own. -/
 theorem procSlots_running (Γ : SchedNames) (ξl : CtxId) (j : Nat) (h : CPU) (st : BitVec 32)
     (hj : j < NPROC) :
     hartHlf (GF := GF) Γ j h ∗ procSlotsAt Γ ξl (procAddr j) st ⊢
-      ⌜st = RUNNING⌝ ∗ hartFull Γ j h ∗ @ownCtxCells hlc GF _ ⟨ξl, KTier.kpt⟩ (pContext (procAddr j) 0) ∗
+      ⌜st = RUNNING⌝ ∗ hartFull Γ j h ∗ @ownCtxCells GF _ ⟨ξl, KTier.kpt⟩ (pContext (procAddr j) 0) ∗
       ▷ schedVcAt Γ h (cpuCtxAddr h) (procAddr j) ∗ zsElem (procAddr j) none := by
   unfold procSlotsAt
   by_cases hnr : notRunning st
@@ -1501,7 +1501,7 @@ theorem procSlots_running (Γ : SchedNames) (ξl : CtxId) (j : Nat) (h : CPU) (s
 /-- The converse, for the release side. -/
 theorem procSlots_running_intro (Γ : SchedNames) (ξl : CtxId) (j : Nat) (h : CPU) (hj : j < NPROC) :
     slotUsed Γ (procAddr j) ∗
-    hartHlf (GF := GF) Γ j h ∗ @ownCtxCells hlc GF _ ⟨ξl, KTier.kpt⟩ (pContext (procAddr j) 0) ∗
+    hartHlf (GF := GF) Γ j h ∗ @ownCtxCells GF _ ⟨ξl, KTier.kpt⟩ (pContext (procAddr j) 0) ∗
       ▷ schedVcAt Γ h (cpuCtxAddr h) (procAddr j) ∗ zsElem (procAddr j) none ⊢
       procSlotsAt Γ ξl (procAddr j) RUNNING := by
   unfold procSlotsAt runSlotAt pavSlot
@@ -1528,10 +1528,10 @@ theorem procSlots_running_intro (Γ : SchedNames) (ξl : CtxId) (j : Nat) (h : C
 /-- The resource `p->lock` protects (Rocq `proc_lock_res_at`). -/
 def procLockResAt (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) : IProp GF := iprop%
   ∃ (st : BitVec 32) (ch : BitVec 64),
-    @wordPointsTo hlc GF _ ⟨ξl, KTier.kpt⟩ (pState pa) 4 (DFrac.own 1) st ∗
+    @wordPointsTo GF _ ⟨ξl, KTier.kpt⟩ (pState pa) 4 (DFrac.own 1) st ∗
     pstateLock Γ pa st ∗
-    @wordPointsTo hlc GF _ ⟨ξl, KTier.kpt⟩ (pChan pa) 8 (DFrac.own 1) ch ∗
-    (∃ kl xs pid : BitVec 32, @procPubRest hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ pa kl xs pid) ∗
+    @wordPointsTo GF _ ⟨ξl, KTier.kpt⟩ (pChan pa) 8 (DFrac.own 1) ch ∗
+    (∃ kl xs pid : BitVec 32, @procPubRest GF _ ⟨ξl, KTier.kpt⟩ _ _ pa kl xs pid) ∗
     procSlotsAt Γ ξl pa st
 
 /-- The λ-payload the lock kit wants. -/
@@ -1541,13 +1541,13 @@ def procLockPay (Γ : SchedNames) (j : Nat) : CtxId → IProp GF :=
 instance instCtxMorphProcLockResAt (Γ : SchedNames) (pa : BitVec 64) :
     CtxMorph (GF := GF) (fun ξ => procLockResAt Γ ξ pa) := by
   unfold procLockResAt
-  exact @instCtxMorphExists hlc GF _ _ _ (fun st => @instCtxMorphExists hlc GF _ _ _
-    (fun _ => @instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
-      (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-        (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
-          (@instCtxMorphSep hlc GF _ _ _
-            (@instCtxMorphExists hlc GF _ _ _ (fun _ => @instCtxMorphExists hlc GF _ _ _
-              (fun _ => @instCtxMorphExists hlc GF _ _ _
+  exact @instCtxMorphExists GF _ _ _ (fun st => @instCtxMorphExists GF _ _ _
+    (fun _ => @instCtxMorphSep GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
+      (@instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+        (@instCtxMorphSep GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
+          (@instCtxMorphSep GF _ _ _
+            (@instCtxMorphExists GF _ _ _ (fun _ => @instCtxMorphExists GF _ _ _
+              (fun _ => @instCtxMorphExists GF _ _ _
                 (fun _ => instCtxMorphProcPubRest _ _ _ _ _))))
             (instCtxMorphProcSlotsAt _ _ st))))))
 
@@ -1557,10 +1557,10 @@ instance instCtxMorphProcLockPay (Γ : SchedNames) (j : Nat) :
 /-- Reassemble the payload -- what every release does. -/
 theorem procLockRes_intro (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) (st : BitVec 32)
     (ch : BitVec 64) (kl xs pid : BitVec 32) :
-    @wordPointsTo hlc GF _ ⟨ξl, KTier.kpt⟩ (pState pa) 4 (DFrac.own 1) st ∗
+    @wordPointsTo GF _ ⟨ξl, KTier.kpt⟩ (pState pa) 4 (DFrac.own 1) st ∗
     pstateLock Γ pa st ∗
-    @wordPointsTo hlc GF _ ⟨ξl, KTier.kpt⟩ (pChan pa) 8 (DFrac.own 1) ch ∗
-    @procPubRest hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ pa kl xs pid ∗
+    @wordPointsTo GF _ ⟨ξl, KTier.kpt⟩ (pChan pa) 8 (DFrac.own 1) ch ∗
+    @procPubRest GF _ ⟨ξl, KTier.kpt⟩ _ _ pa kl xs pid ∗
     procSlotsAt Γ ξl pa st ⊢ procLockResAt Γ ξl pa := by
   unfold procLockResAt
   iintro ⟨Hs, Hg, Hc, Hr, Hsl⟩
@@ -1572,10 +1572,10 @@ theorem procLockRes_intro (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) (st :
 theorem procLockRes_elim (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) :
     procLockResAt (GF := GF) Γ ξl pa ⊢
       ∃ (st : BitVec 32) (ch : BitVec 64),
-        @wordPointsTo hlc GF _ ⟨ξl, KTier.kpt⟩ (pState pa) 4 (DFrac.own 1) st ∗
+        @wordPointsTo GF _ ⟨ξl, KTier.kpt⟩ (pState pa) 4 (DFrac.own 1) st ∗
         pstateLock Γ pa st ∗
-        @wordPointsTo hlc GF _ ⟨ξl, KTier.kpt⟩ (pChan pa) 8 (DFrac.own 1) ch ∗
-        (∃ kl xs pid : BitVec 32, @procPubRest hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ pa kl xs pid) ∗
+        @wordPointsTo GF _ ⟨ξl, KTier.kpt⟩ (pChan pa) 8 (DFrac.own 1) ch ∗
+        (∃ kl xs pid : BitVec 32, @procPubRest GF _ ⟨ξl, KTier.kpt⟩ _ _ pa kl xs pid) ∗
         procSlotsAt Γ ξl pa st := by
   unfold procLockResAt; iintro H; iexact H
 
@@ -1583,7 +1583,7 @@ theorem procLockRes_elim (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) :
 the scheduler itself runs). -/
 def cpuCtxFree (h : CPU) : IProp GF := iprop%
   ∃ (vs : List (BitVec 64)) (ξ : CtxId) (T : Nat), ⌜vs.length = 14⌝ ∗
-    ctxStamped ξ T ∗ viewLb h T ∗ @ctxCells hlc GF _ ⟨ξ, KTier.kpt⟩ (cpuCtxAddr h) vs
+    ctxStamped ξ T ∗ viewLb h T ∗ @ctxCells GF _ ⟨ξ, KTier.kpt⟩ (cpuCtxAddr h) vs
 
 section
 variable [CurCtx]
@@ -1594,7 +1594,7 @@ abbrev procHeld (Γ : SchedNames) (h : CPU) (j : Nat) (st : BitVec 32) (ch : Bit
 
 /-- `park_pay` at the ambient context. -/
 abbrev parkPay (pa : BitVec 64) (st : BitVec 32) : IProp GF :=
-  parkPayAt (hlc := hlc) (GF := GF) curCtx pa st
+  parkPayAt (GF := GF) curCtx pa st
 
 /-- **The proc table's invariant**: every slot's lock over its payload, and
 every slot's (write-once) kernel-stack address.  Persistent. -/
@@ -1670,14 +1670,14 @@ can name `devintrCaps`; what belongs here is the table's own transport. -/
 /-- `procsInv` mentions the context only through its lock handles, so it
 transports along a domination. -/
 instance instCtxMorphProcsInv (Γ : SchedNames) :
-    CtxMorph (GF := GF) (fun ξ => @procsInv hlc GF _ _ _ _ _ _ _ ⟨ξ, KTier.kpt⟩ Γ) :=
+    CtxMorph (GF := GF) (fun ξ => @procsInv GF _ _ _ _ _ _ _ ⟨ξ, KTier.kpt⟩ Γ) :=
   ctxMorph_bigSepL (List.range NPROC)
-    (fun _ j ξ => @isLock hlc GF _ _ ⟨ξ, KTier.kpt⟩ (Γ.lock j) (procAddr j) "proc" (procLockPay Γ j))
+    (fun _ j ξ => @isLock GF _ _ ⟨ξ, KTier.kpt⟩ (Γ.lock j) (procAddr j) "proc" (procLockPay Γ j))
     (fun _ _ => instCtxMorphIsLock _ _ _ _ _)
 
 /-- The tier is irrelevant to the table's invariant. -/
 theorem procsInv_toKpt (X : CurCtx) (Γ : SchedNames) :
-    @procsInv hlc GF _ _ _ _ _ _ _ X Γ = @procsInv hlc GF _ _ _ _ _ _ _ ⟨X.curCtx, KTier.kpt⟩ Γ := rfl
+    @procsInv GF _ _ _ _ _ _ _ X Γ = @procsInv GF _ _ _ _ _ _ _ ⟨X.curCtx, KTier.kpt⟩ Γ := rfl
 
 end
 

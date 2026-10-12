@@ -34,7 +34,7 @@ open Std (ExtTreeSet)
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -49,11 +49,11 @@ theorem wp_shPeek (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (h : CPU) (
     (htl : tl = (List.range tlen).map tf) (hpk : refPeek len f off tl = (hit, s)) :
     ⊢ ushCode N.t -∗ uword N.d ps w0 -∗ ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
       ushSstr N tt dt toks tlen tf -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«peek») (8 + (2 + n)) -∗
+      urun N h m (BitVec.ofNat 64 User.Sh.Sym.«peek») (8 + (2 + n)) -∗
       (uword N.d ps (BitVec.ofNat 64 (s0 + s)) -∗ ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
         ushSstr N tt dt toks tlen tf -∗ ∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗
         ⌜m'.get 10#5 = BitVec.ofNat 64 (if hit then 1 else 0)⌝ -∗
-        urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (8 + (2 + n)) -∗ wpLoop h') -∗
+        urun N h' m' (retPc (m.get 1#5)) (8 + (2 + n)) -∗ wpLoop h') -∗
       wpLoop h := by
   rw [show User.Sh.Sym.«peek» = 0x424 from rfl]
   iintro #Hc Hps Hs Hws Htk Hrun Hk
@@ -143,10 +143,10 @@ theorem wp_shPeek (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (h : CPU) (
       me.get 10#5 = BitVec.ofNat 64 (if hit then 1 else 0) →
       ⊢ ushCode N.t -∗ ushSaved N.d (m.get spIdx).toNat ([1#5, 8#5, 9#5, 18#5, 19#5, 20#5, 21#5].map m.get) -∗
         ustack N.d (BitVec.ofNat 64 ((m.get spIdx).toNat - 8 * [1#5, 8#5, 9#5, 18#5, 19#5, 20#5, 21#5].length)) 1 -∗
-        urun (hlc := hlc) N h8 me (BitVec.ofNat 64 0x46a) (2 + n) -∗
+        urun N h8 me (BitVec.ofNat 64 0x46a) (2 + n) -∗
         (∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗
           ⌜m'.get 10#5 = BitVec.ofNat 64 (if hit then 1 else 0)⌝ -∗
-          urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (8 + (2 + n)) -∗ wpLoop h') -∗ wpLoop h8 := by
+          urun N h' m' (retPc (m.get 1#5)) (8 + (2 + n)) -∗ wpLoop h') -∗ wpLoop h8 := by
     intro h8 me hsp hkeep' hans
     iintro #Hc Hsv Hloc Hrun Hk
     iapply ush_frame_epi UL N 8 [1#5, 8#5, 9#5, 18#5, 19#5, 20#5, 21#5] 1 0x46a

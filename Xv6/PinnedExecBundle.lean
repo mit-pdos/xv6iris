@@ -22,7 +22,7 @@ CONE (re-walked on the pinned globs: PinnedExec 4/8 reached): `pin_resolves`
 
 ## Deviations from Rocq
 
-1. **CLASS BINDERS** are `PinnedObs`'s (`[MachGS hlc GF] [FsTopG GF]
+1. **CLASS BINDERS** are `PinnedObs`'s (`[MachGS GF] [FsTopG GF]
    [FsBytesG GF] [Appcfg GF] [Icfg]`, its deviation 2) plus `[CtokG GF]`
    (the pay fact), not Rocq's whole-system list.
 2. As `ExecBundle` deviations 2-3 (numbers, `⟨.AFile f, nl⟩`, `⟨X, Pay⟩`).
@@ -39,7 +39,7 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 open Std (ExtTreeSet)
 
 section PinnedExecBundle
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsTopG GF] [FsBytesG GF]
   [Appcfg GF] [Icfg] [CtokG GF]
 
 /-- **Rocq `pobs_node_id`**: THE PIN AS A SUPPLIER OF (W)'s THIRD PIECE --
@@ -70,11 +70,11 @@ theorem pinnedExecBundle_boot_at (γfs : FsNames) (X : Uvis → IProp GF) (Pin :
     (cs : ExtTreeSet GName compare) (pidv : BitVec 32)
     (hres : pinResolves Pin rt cw pl hops ino f nl) (hload : kexecLoadable f) :
     ⊢ iprop(□ ∀ v : Aview, appPred appRun v -∗ appPred appRun v ∗ (⌜Pin v⌝ ∨ T)) -∗
-      appInv (hlc := hlc) γfs -∗
+      appInv γfs -∗
       iprop(□ ∀ W' : Uvis, ⌜kexecImageOk f na alen afun sts W'⌝ -∗ ⌜W'.cwd = cw⌝ -∗
         ⌜W'.lazy = false⌝ -∗ ⌜W'.secc = secc⌝ -∗ myPay W'.gen Q -∗ Pay -∗ X W') -∗
       iprop(□ ∀ W' : Uvis, T -∗ myPay W'.gen Q -∗ X W') -∗ Pay -∗
-      execAuPre (hlc := hlc) ⟨X, Pay⟩ (fsGammaL (hlc := hlc) γfs) γfs rt cw secc Q (pobsP T hops)
+      execAuPre ⟨X, Pay⟩ (fsGammaL γfs) γfs rt cw secc Q (pobsP T hops)
         (pobsPmiss T) (pobsFo Pin T) pl na alen afun sts cs pidv := by
   iintro #Hcl #Hinv #Hcon #Hgen HPay
   iapply execBundle_of_at γfs X T (pobsP T hops) (pobsPmiss T) (pobsFo Pin T) rt cw secc pl f nl Pay Q
@@ -99,13 +99,13 @@ theorem pinnedExecBundle_boot (γfs : FsNames) (X : Uvis → IProp GF) (Pin : Av
     (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (sts : List FdState)
     (hres : pinResolves Pin rt cw pl hops ino f nl) (hload : kexecLoadable f) :
     ⊢ iprop(□ ∀ v : Aview, appPred appRun v -∗ appPred appRun v ∗ (⌜Pin v⌝ ∨ T)) -∗
-      appInv (hlc := hlc) γfs -∗
+      appInv γfs -∗
       iprop(□ ∀ W' : Uvis, ⌜kexecImageOk f na alen afun sts W'⌝ -∗ ⌜W'.cwd = cw⌝ -∗
         ⌜W'.lazy = false⌝ -∗ ⌜W'.secc = secc⌝ -∗ myPay W'.gen Q -∗ Pay -∗ X W') -∗
       iprop(□ ∀ W' : Uvis, T -∗ myPay W'.gen Q -∗ X W') -∗ Pay -∗
       ∃ (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (R : IProp GF),
         ∀ (cs : ExtTreeSet GName compare) (pidv : BitVec 32),
-          execAuPre (hlc := hlc) ⟨X, R⟩ (fsGammaL (hlc := hlc) γfs) γfs rt cw secc Q P Pmiss Fo
+          execAuPre ⟨X, R⟩ (fsGammaL γfs) γfs rt cw secc Q P Pmiss Fo
             pl na alen afun sts cs pidv := by
   iintro #Hcl #Hinv #Hcon #Hgen HPay
   iexists (pobsP T hops), (pobsPmiss T), (pobsFo Pin T), Pay

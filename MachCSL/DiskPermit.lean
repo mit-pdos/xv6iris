@@ -82,7 +82,7 @@ def wrSectorBytes (w : DiskWr) (i : Nat) : List (BitVec 8) :=
   | none => []
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF]
 
 /-! ## The write permit -/
 
@@ -90,8 +90,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF]
 def diskWritePermit (gd : Nat) (w : DiskWr) (Q : IProp GF) : IProp GF := iprop%
   ∀ (dk : Nat → BitVec 8) (n : Nat),
     startAuth n -∗ ⌜n = gd + 1⌝ -∗ diskFixedAuth dk -∗
-    ▷ MachFixedGS.crashPred (hlc := hlc) (GF := GF) ={∅}=∗
-      diskFixedAuth (wrApply w dk) ∗ ▷ MachFixedGS.crashPred (hlc := hlc) (GF := GF) ∗
+    ▷ MachFixedGS.crashPred (GF := GF) ={∅}=∗
+      diskFixedAuth (wrApply w dk) ∗ ▷ MachFixedGS.crashPred (GF := GF) ∗
       startAuth n ∗ Q
 
 /-- THE IDENTITY PERMIT is free (Rocq `disk_write_permit_trivial`). -/

@@ -26,12 +26,12 @@ open Std (ExtTreeSet)
 theorem shdDieLits_54 : shdDieLits 0x54 1#20 556#12 4152#21 3070#21 0x1280 3 0 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
 theorem wp_shPanicChain (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : USH_FPRINTF) :
-    wpShPanicChainBody (hlc := hlc) (GF := GF) := by
+    wpShPanicChainBody (GF := GF) := by
   intro N _ tx dqs sa slen sf C1 C2 C3 h m n hsa ha0 e1 e2
   iintro #Hb1 #Hb2 #Hb3 HC #Hc Hsstr Hpay Hrun
   rw [show User.Sh.Sym.«panic» = 0x4a from rfl]

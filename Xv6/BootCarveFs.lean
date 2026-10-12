@@ -79,7 +79,7 @@ theorem bootCarveFs_range_get {n k x : Nat} (h : (List.range n)[k]? = some x) : 
   exact ⟨rfl, hlt⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- `bootRan_stride` at a window whose end is only EQUAL to the stride's. -/
 theorem bootCarveFs_stride (m : MemF Hist) (base stride N hi : Nat) (h : hi = base + stride * N) :

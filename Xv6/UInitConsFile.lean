@@ -107,7 +107,7 @@ theorem cre_pre_astep_none (av : Aview) (d : Nat) (nmn : Fname) (ents : Std.ExtT
   exact h.2.1
 
 section UInitConsFile
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx] [PS : UprogSG GF]
@@ -123,7 +123,7 @@ theorem file_cons_unarm_efp (g : FileGn) (r : FileAppNames) (av0 av : Aview) (i 
     (hfree : PartialMap.get? av0 i = none) (hp0 : echoFsPure av0)
     (hrow : PartialMap.get? av i = some ⟨cn, 1⟩) (hcn : cn = cdev)
     (hsep : ∀ j : Nat, consPresentAt j av → i ≠ j) :
-    ⊢@{IProp GF} filePred (hlc := hlc) g.fgnCl r av -∗ filePred (hlc := hlc) g.fgnCl r (deltaUnarm i av) := by
+    ⊢@{IProp GF} filePred g.fgnCl r av -∗ filePred g.fgnCl r (deltaUnarm i av) := by
   have hroot := echo_fs_pure_unarm_root av0 i hfree hp0
   -- ...AND NO FILE OF THE DEED IS THIS ROW
   have hdeed : ∀ s : Dst, fOk av s → ∀ (N : Fname) (j : Nat) (bs : List (BitVec 8)),
@@ -143,7 +143,7 @@ theorem file_cons_unarm_efp (g : FileGn) (r : FileAppNames) (av0 av : Aview) (i 
 theorem file_cons_unarm_efp_absent (g : FileGn) (r : FileAppNames) (av0 av : Aview) (i : Nat) (cn : Absnode)
     (hfree : PartialMap.get? av0 i = none) (hp0 : echoFsPure av0)
     (hrow : PartialMap.get? av i = some ⟨cn, 1⟩) (hcn : cn = cdev) (hab : consAbsent av) :
-    ⊢@{IProp GF} filePred (hlc := hlc) g.fgnCl r av -∗ filePred (hlc := hlc) g.fgnCl r (deltaUnarm i av) := by
+    ⊢@{IProp GF} filePred g.fgnCl r av -∗ filePred g.fgnCl r (deltaUnarm i av) := by
   refine file_cons_unarm_efp g r av0 av i cn hfree hp0 hrow hcn ?_
   intro j hpr
   exfalso
@@ -157,7 +157,7 @@ theorem file_cons_unarm_efp_present (g : FileGn) (r : FileAppNames) (av0 av : Av
     (cn : Absnode) (hfree : PartialMap.get? av0 i = none) (hp0 : echoFsPure av0)
     (hrow : PartialMap.get? av i = some ⟨cn, 1⟩) (hcn : cn = cdev)
     (hpv0 : consPresentAt i0 av0) (hpv : consPresentAt i0 av) :
-    ⊢@{IProp GF} filePred (hlc := hlc) g.fgnCl r av -∗ filePred (hlc := hlc) g.fgnCl r (deltaUnarm i av) := by
+    ⊢@{IProp GF} filePred g.fgnCl r av -∗ filePred g.fgnCl r (deltaUnarm i av) := by
   refine file_cons_unarm_efp g r av0 av i cn hfree hp0 hrow hcn ?_
   intro j hpr
   have hj : j = i0 := Option.some.inj ((consPresentAstep j av hpr).symm.trans (consPresentAstep i0 av hpv))
@@ -171,12 +171,12 @@ theorem file_cons_unarm_efp_present (g : FileGn) (r : FileAppNames) (av0 av : Av
 /-- **Rocq `init_cons_never_abs_law_file`**: the seal's absence law at the
 file era. -/
 theorem init_cons_never_abs_law_file (g : FileGn) (r : FileAppNames)
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) g.fgnCl, appRun := r }) :
-    ⊢ initConsAbsLaw (GF := GF) (fileTaint (hlc := hlc) g.fgnCl) (consNever r.fnCons) := by
-  have hap := fileOpen_appPred (hlc := hlc) g.fgnCl r heq
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred g.fgnCl, appRun := r }) :
+    ⊢ initConsAbsLaw (GF := GF) (fileTaint g.fgnCl) (consNever r.fnCons) := by
+  have hap := fileOpen_appPred g.fgnCl r heq
   unfold initConsAbsLaw initConsPinLaw
   simp only [hap]
-  ihave #Hl := fileConsNever_law (hlc := hlc) (GF := GF) g.fgnCl r
+  ihave #Hl := fileConsNever_law (GF := GF) g.fgnCl r
   iintro !> %v #Hn Hp
   ihave #Hl' := Hl $$ Hn
   ihave ⟨Hp, Hc⟩ := Hl' $$ %v Hp
@@ -189,14 +189,14 @@ theorem init_cons_never_abs_law_file (g : FileGn) (r : FileAppNames)
 /-- **Rocq `init_cons_seal_law_file`** (deviation 5): the STEP that mints the
 seal (`AppFileCons.file_cons_seal_step`). -/
 theorem init_cons_seal_law_file (g : FileGn) (r : FileAppNames)
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) g.fgnCl, appRun := r }) :
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred g.fgnCl, appRun := r }) :
     ⊢@{IProp GF} □ (∀ av : Aview, consKey r.fnCons -∗ ▷ appPred appRun av -∗
-        |={⊤ \ ↑appN}=> (▷ appPred appRun av ∗ (consNever r.fnCons ∨ fileTaint (hlc := hlc) g.fgnCl))) := by
-  have hap := fileOpen_appPred (hlc := hlc) g.fgnCl r heq
+        |={⊤ \ ↑appN}=> (▷ appPred appRun av ∗ (consNever r.fnCons ∨ fileTaint g.fgnCl))) := by
+  have hap := fileOpen_appPred g.fgnCl r heq
   simp only [hap]
   iintro !> %av HK Hp
   imod Hp
-  imod (fileConsSealStep (hlc := hlc) (GF := GF) g.fgnCl r av) $$ HK Hp with ⟨Hp, Hn⟩
+  imod (fileConsSealStep (GF := GF) g.fgnCl r av) $$ HK Hp with ⟨Hp, Hn⟩
   imodintro
   isplitl [Hp]
   · inext
@@ -206,24 +206,24 @@ theorem init_cons_seal_law_file (g : FileGn) (r : FileAppNames)
 /-- **Rocq `init_cons_seal_out_file`**: WHAT A FAILED MKNOD LEAVES AT THE
 KEY ARM. -/
 theorem init_cons_seal_out_file (UL : UK_LEAVES) (g : FileGn) (r : FileAppNames) (N : UkNames GF)
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) g.fgnCl, appRun := r }) :
-    ⊢ appInv (hlc := hlc) fscFs -∗
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred g.fgnCl, appRun := r }) :
+    ⊢ appInv fscFs -∗
       □ (consKey r.fnCons ={⊤}=∗
-        ukiMknodOut (hlc := hlc) N (fileTaint (hlc := hlc) g.fgnCl)
-          (initConsCred (fileTaint (hlc := hlc) g.fgnCl) r.fnCons) initConsFd) := by
+        ukiMknodOut N (fileTaint g.fgnCl)
+          (initConsCred (fileTaint g.fgnCl) r.fnCons) initConsFd) := by
   iintro #Hinv
-  ihave #Habs := init_cons_never_abs_law_file (hlc := hlc) g r heq
-  ihave #Hstep := init_cons_seal_law_file (hlc := hlc) g r heq
+  ihave #Habs := init_cons_never_abs_law_file g r heq
+  ihave #Hstep := init_cons_seal_law_file g r heq
   imodintro
   iintro HK
-  imod (appClaimUpdate (hlc := hlc) ⊤ fscFs (consKey r.fnCons)
-      iprop(consNever r.fnCons ∨ fileTaint (hlc := hlc) g.fgnCl) CoPset.subseteq_top) $$ Hinv Hstep HK with Hn
+  imod (appClaimUpdate ⊤ fscFs (consKey r.fnCons)
+      iprop(consNever r.fnCons ∨ fileTaint g.fgnCl) CoPset.subseteq_top) $$ Hinv Hstep HK with Hn
   imodintro
   unfold ukiMknodOut
   icases Hn with (#Hn | #HT)
   · iright; ileft
     iexists consNever r.fnCons
-    ihave #Hlf := init_open_absent_leaf_holds (hlc := hlc) UL N (fileTaint (hlc := hlc) g.fgnCl)
+    ihave #Hlf := init_open_absent_leaf_holds UL N (fileTaint g.fgnCl)
       (consNever r.fnCons) $$ Habs Hinv
     isplitr
     · iexact Hlf
@@ -235,25 +235,25 @@ theorem init_cons_seal_out_file (UL : UK_LEAVES) (g : FileGn) (r : FileAppNames)
 /-- **Rocq `init_cons_cred_made_file`**: the credential the FLAG arm hands
 the shell. -/
 theorem init_cons_cred_made_file (g : FileGn) (r : FileAppNames) (i0 : Nat) :
-    ⊢@{IProp GF} consMade r.fnCons i0 -∗ initConsCred (fileTaint (hlc := hlc) g.fgnCl) r.fnCons :=
+    ⊢@{IProp GF} consMade r.fnCons i0 -∗ initConsCred (fileTaint g.fgnCl) r.fnCons :=
   init_cons_cred_of_made _ r.fnCons i0
 
 /-- **Rocq `sh_cons_absent_file`** (deviation 3): sh's ABSENT arm, generic
 in the credential -- `UShConsK.sh_open_absent_leaf_holds` verbatim. -/
 theorem sh_cons_absent_file (UL : UK_LEAVES) (g : FileGn) (r : FileAppNames) (K : IProp GF)
     [Persistent K] [Timeless K]
-    (_heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) g.fgnCl, appRun := r }) :
-    ⊢ shConsNeverLaw (fileTaint (hlc := hlc) g.fgnCl) K -∗ appInv (hlc := hlc) fscFs -∗
-      □ (∀ (N : UkNames GF) (X : UshCtx GF), ⌜X.T = fileTaint (hlc := hlc) g.fgnCl⌝ -∗
-        ushOpenAbsentLeaf (hlc := hlc) N X K) := by
+    (_heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred g.fgnCl, appRun := r }) :
+    ⊢ shConsNeverLaw (fileTaint g.fgnCl) K -∗ appInv fscFs -∗
+      □ (∀ (N : UkNames GF) (X : UshCtx GF), ⌜X.T = fileTaint g.fgnCl⌝ -∗
+        ushOpenAbsentLeaf N X K) := by
   iintro #Hlaw #Hinv
   imodintro
   iintro %N %X %hX
   obtain ⟨γp, T, Wc, Wb, Pm⟩ := X
   simp only at hX
   subst hX
-  ihave #H := sh_open_absent_leaf_holds (hlc := hlc) UL fscFs (shConsOpenCalls_holds (hlc := hlc) UL) N
-    ⟨γp, fileTaint (hlc := hlc) g.fgnCl, Wc, Wb, Pm⟩ K $$ Hlaw Hinv
+  ihave #H := sh_open_absent_leaf_holds UL fscFs (shConsOpenCalls_holds UL) N
+    ⟨γp, fileTaint g.fgnCl, Wc, Wb, Pm⟩ K $$ Hlaw Hinv
   iexact H
 
 /-! ## §3  THE CREATE LEG CONJUNCT (g) ASKS FOR -/
@@ -263,8 +263,8 @@ deed's own separation. -/
 theorem file_cons_create_other_deed (g : FileGn) (r : FileAppNames) (av : Aview) (d : Nat) (nmn : Fname)
     (ents : Std.ExtTreeMap Fname Nat compare) (nl i : Nat) (hpre : crePre av d nmn ents nl i cdev)
     (hcons : d ≠ ROOTINO ∨ nmn ≠ fnameConsole) (hf : d ≠ ROOTINO ∨ ¬ uname nmn) :
-    ⊢@{IProp GF} filePred (hlc := hlc) g.fgnCl r av -∗
-      filePred (hlc := hlc) g.fgnCl r (deltaCreate d nmn i cdev av) :=
+    ⊢@{IProp GF} filePred g.fgnCl r av -∗
+      filePred g.fgnCl r (deltaCreate d nmn i cdev av) :=
   fileStep_free g.fgnCl r av (deltaCreate d nmn i cdev av)
     (fun hp => fileFsPure_create d nmn ents nl i cdev av hpre fileConsArm_nd hp)
     (fun hab => consAbsent_create_nd d nmn ents nl i cdev av hpre fileConsArm_nd hcons hab)
@@ -278,18 +278,18 @@ def fileConsCreateLeg (g : FileGn) (r : FileAppNames) : IProp GF :=
     ⌜crePre av d nmn ents nl i cdev⌝ -∗
     ⌜d ≠ ROOTINO ∨ nmn ≠ fnameConsole⌝ -∗
     ⌜d ≠ ROOTINO ∨ ¬ uname nmn⌝ -∗
-    filePred (hlc := hlc) g.fgnCl r av -∗
-    filePred (hlc := hlc) g.fgnCl r (deltaCreate d nmn i cdev av)))
+    filePred g.fgnCl r av -∗
+    filePred g.fgnCl r (deltaCreate d nmn i cdev av)))
 
 /-- Rocq `file_cons_create_leg_persistent`. -/
 instance fileConsCreateLeg_persistent (g : FileGn) (r : FileAppNames) :
-    Persistent (fileConsCreateLeg (hlc := hlc) (GF := GF) g r) := by
+    Persistent (fileConsCreateLeg (GF := GF) g r) := by
   unfold fileConsCreateLeg; infer_instance
 
 /-- **Rocq `file_cons_create_leg_holds`**: the repaired conjunct (g) is a
 theorem at the file claim. -/
 theorem file_cons_create_leg_holds (g : FileGn) (r : FileAppNames) :
-    ⊢ fileConsCreateLeg (hlc := hlc) (GF := GF) g r := by
+    ⊢ fileConsCreateLeg (GF := GF) g r := by
   unfold fileConsCreateLeg
   iintro !> %av %d %nmn %ents %nl %i %hpre %hnc %hnf Hp
   iapply file_cons_create_other_deed g r av d nmn ents nl i hpre hnc hnf $$ Hp
@@ -299,10 +299,10 @@ VACUOUS -- `console` already resolves. -/
 theorem file_cons_mknod_present (g : FileGn) (r : FileAppNames) (av : Aview)
     (ents : Std.ExtTreeMap Fname Nat compare) (nl i j : Nat)
     (hpre : crePre av ROOTINO fnameConsole ents nl i cdev) :
-    ⊢@{IProp GF} consMade r.fnCons j -∗ filePred (hlc := hlc) g.fgnCl r av -∗
-      filePred (hlc := hlc) g.fgnCl r (deltaCreate ROOTINO fnameConsole i cdev av) := by
+    ⊢@{IProp GF} consMade r.fnCons j -∗ filePred g.fgnCl r av -∗
+      filePred g.fgnCl r (deltaCreate ROOTINO fnameConsole i cdev av) := by
   iintro #Hm Hp
-  ihave #Hl := fileCons_law (hlc := hlc) g.fgnCl r j $$ Hm
+  ihave #Hl := fileCons_law g.fgnCl r j $$ Hm
   ihave ⟨Hp, Hc⟩ := Hl $$ %av Hp
   icases Hc with (%hpr | #Ht)
   · exfalso
@@ -317,11 +317,11 @@ theorem file_cons_mknod_present (g : FileGn) (r : FileAppNames) (av : Aview)
 /-- **Rocq `init_cons_laws_efp_file_of_leg`**: the nine laws at the file
 claim, at the ABSENT arm and the echo reading of the pure half. -/
 theorem init_cons_laws_efp_file_of_leg (g : FileGn) (r : FileAppNames)
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) g.fgnCl, appRun := r }) :
-    ⊢ fileConsCreateLeg (hlc := hlc) (GF := GF) g r -∗
-      initConsLaws (fileTaint (hlc := hlc) g.fgnCl) (consKey r.fnCons) r.fnCons := by
-  have hap := fileOpen_appPred (hlc := hlc) g.fgnCl r heq
-  ihave #Hsup := fileTaint_sup (hlc := hlc) g.fgnCl r heq
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred g.fgnCl, appRun := r }) :
+    ⊢ fileConsCreateLeg (GF := GF) g r -∗
+      initConsLaws (fileTaint g.fgnCl) (consKey r.fnCons) r.fnCons := by
+  have hap := fileOpen_appPred g.fgnCl r heq
+  ihave #Hsup := fileTaint_sup g.fgnCl r heq
   unfold initConsLaws initConsLawsAt initConsPinLaw fileConsCreateLeg
   simp only [hap]
   iintro #Hg
@@ -331,7 +331,7 @@ theorem init_cons_laws_efp_file_of_leg (g : FileGn) (r : FileAppNames)
   · iintro !> %v Hp
     iapply fileEchoFsPure_acc g.fgnCl r v $$ Hp
   isplitr
-  · iapply fileConsAbs_law (hlc := hlc) (GF := GF) g.fgnCl r
+  · iapply fileConsAbs_law (GF := GF) g.fgnCl r
   isplitr
   · iintro !> %av %i %hfree Hp
     iapply fileConsArm g.fgnCl r av i hfree $$ Hp
@@ -347,20 +347,20 @@ theorem init_cons_laws_efp_file_of_leg (g : FileGn) (r : FileAppNames)
   · iintro !> %av %i %hpr Hp
     iapply fileConsShoot g.fgnCl r av i hpr $$ Hp
   · iintro !> %i #Hm
-    iapply fileCons_law (hlc := hlc) g.fgnCl r i $$ Hm
+    iapply fileCons_law g.fgnCl r i $$ Hm
 
 /-- **Rocq `init_cons_laws_made_efp_file_of_leg`**: ...at the FLAG arm. -/
 theorem init_cons_laws_made_efp_file_of_leg (g : FileGn) (r : FileAppNames) (i0 : Nat)
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) g.fgnCl, appRun := r }) :
-    ⊢ fileConsCreateLeg (hlc := hlc) (GF := GF) g r -∗ consMade r.fnCons i0 -∗
-      initConsLawsAt echoFsPure (consMade r.fnCons) (consPresentAt i0) (fileTaint (hlc := hlc) g.fgnCl)
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred g.fgnCl, appRun := r }) :
+    ⊢ fileConsCreateLeg (GF := GF) g r -∗ consMade r.fnCons i0 -∗
+      initConsLawsAt echoFsPure (consMade r.fnCons) (consPresentAt i0) (fileTaint g.fgnCl)
         (consMade r.fnCons i0) := by
-  have hap := fileOpen_appPred (hlc := hlc) g.fgnCl r heq
-  ihave #Hsup := fileTaint_sup (hlc := hlc) g.fgnCl r heq
+  have hap := fileOpen_appPred g.fgnCl r heq
+  ihave #Hsup := fileTaint_sup g.fgnCl r heq
   unfold initConsLawsAt initConsPinLaw fileConsCreateLeg
   simp only [hap]
   iintro #Hg #Hm
-  ihave #Hl := fileCons_law (hlc := hlc) g.fgnCl r i0 $$ Hm
+  ihave #Hl := fileCons_law g.fgnCl r i0 $$ Hm
   isplitr
   · iexact Hsup
   isplitr
@@ -389,62 +389,62 @@ theorem init_cons_laws_made_efp_file_of_leg (g : FileGn) (r : FileAppNames) (i0 
   · iintro !> %av %i %hpr Hp
     iapply fileConsShoot g.fgnCl r av i hpr $$ Hp
   · iintro !> %i #Hm2
-    iapply fileCons_law (hlc := hlc) g.fgnCl r i $$ Hm2
+    iapply fileCons_law g.fgnCl r i $$ Hm2
 
 /-- The claim is timeless at the file era's record. -/
 theorem initConsFile_htl (g : FileGn) (r : FileAppNames)
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) g.fgnCl, appRun := r })
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred g.fgnCl, appRun := r })
     (v : Aview) : Timeless (appPred (GF := GF) appRun v) := by
-  rw [fileOpen_appPred (hlc := hlc) g.fgnCl r heq v]
+  rw [fileOpen_appPred g.fgnCl r heq v]
   infer_instance
 
 /-- **Rocq `init_cons_leaves_file_of_leg`**: THE MISS ARM'S PAIR. -/
 theorem init_cons_leaves_file_of_leg (UL : UK_LEAVES) (g : FileGn) (r : FileAppNames)
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) g.fgnCl, appRun := r }) :
-    ⊢ fileConsCreateLeg (hlc := hlc) (GF := GF) g r -∗ appInv (hlc := hlc) fscFs -∗
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred g.fgnCl, appRun := r }) :
+    ⊢ fileConsCreateLeg (GF := GF) g r -∗ appInv fscFs -∗
       □ (∀ N : UkNames GF,
-        initConsLeaves (hlc := hlc) N (fileTaint (hlc := hlc) g.fgnCl) (consKey r.fnCons)
-          (initConsCred (fileTaint (hlc := hlc) g.fgnCl) r.fnCons) initConsFd) := by
-  have HTL := initConsFile_htl (hlc := hlc) (GF := GF) g r heq
+        initConsLeaves N (fileTaint g.fgnCl) (consKey r.fnCons)
+          (initConsCred (fileTaint g.fgnCl) r.fnCons) initConsFd) := by
+  have HTL := initConsFile_htl (GF := GF) g r heq
   iintro #Hg #Hinv
-  ihave #Hlaws := init_cons_laws_efp_file_of_leg (hlc := hlc) g r heq $$ Hg
+  ihave #Hlaws := init_cons_laws_efp_file_of_leg g r heq $$ Hg
   imodintro
   iintro %N
   unfold initConsLeaves
   isplitr
-  · iapply init_open_absent_leaf_holds (hlc := hlc) UL N (fileTaint (hlc := hlc) g.fgnCl)
+  · iapply init_open_absent_leaf_holds UL N (fileTaint g.fgnCl)
       (consKey r.fnCons) $$ [] Hinv
     unfold initConsLaws initConsLawsAt
     icases Hlaws with ⟨-, -, #Hc, -⟩
     unfold initConsAbsLaw
     iexact Hc
-  · ihave #Hout := init_cons_seal_out_file (hlc := hlc) UL g r N heq $$ Hinv
+  · ihave #Hout := init_cons_seal_out_file UL g r N heq $$ Hinv
     unfold initConsLaws
-    iapply init_mknod_leaf_holds (hlc := hlc) UL N consAbsent (fileTaint (hlc := hlc) g.fgnCl)
+    iapply init_mknod_leaf_holds UL N consAbsent (fileTaint g.fgnCl)
       (consKey r.fnCons) r.fnCons $$ Hlaws Hout Hinv
 
 /-- **Rocq `init_cons_hit_file_of_leg`**: THE FLAG ARM'S PAIR -- the node is
 already there. -/
 theorem init_cons_hit_file_of_leg (UL : UK_LEAVES) (g : FileGn) (r : FileAppNames) (i0 : Nat)
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) g.fgnCl, appRun := r }) :
-    ⊢ fileConsCreateLeg (hlc := hlc) (GF := GF) g r -∗ consMade r.fnCons i0 -∗ appInv (hlc := hlc) fscFs -∗
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred g.fgnCl, appRun := r }) :
+    ⊢ fileConsCreateLeg (GF := GF) g r -∗ consMade r.fnCons i0 -∗ appInv fscFs -∗
       □ (∀ N : UkNames GF,
-        □ ukiOpenConsoleLeaf (hlc := hlc) N (fileTaint (hlc := hlc) g.fgnCl) initConsFd ∗
-        □ ukiMknodHitLeaf (hlc := hlc) N (fileTaint (hlc := hlc) g.fgnCl)
-            (initConsCred (fileTaint (hlc := hlc) g.fgnCl) r.fnCons) initConsFd) := by
-  have HTL := initConsFile_htl (hlc := hlc) (GF := GF) g r heq
+        □ ukiOpenConsoleLeaf N (fileTaint g.fgnCl) initConsFd ∗
+        □ ukiMknodHitLeaf N (fileTaint g.fgnCl)
+            (initConsCred (fileTaint g.fgnCl) r.fnCons) initConsFd) := by
+  have HTL := initConsFile_htl (GF := GF) g r heq
   iintro #Hg #Hm #Hinv
-  ihave #Hlaws := init_cons_laws_made_efp_file_of_leg (hlc := hlc) g r i0 heq $$ Hg Hm
-  ihave #Hcred := init_cons_cred_made_file (hlc := hlc) g r i0 $$ Hm
+  ihave #Hlaws := init_cons_laws_made_efp_file_of_leg g r i0 heq $$ Hg Hm
+  ihave #Hcred := init_cons_cred_made_file g r i0 $$ Hm
   imodintro
   iintro %N
-  ihave #Hopen := init_open_console_leaf_holds (hlc := hlc) UL N (consPresentAt i0)
-    (fileTaint (hlc := hlc) g.fgnCl) (consMade r.fnCons i0) r.fnCons i0 $$ Hlaws Hm Hinv
+  ihave #Hopen := init_open_console_leaf_holds UL N (consPresentAt i0)
+    (fileTaint g.fgnCl) (consMade r.fnCons i0) r.fnCons i0 $$ Hlaws Hm Hinv
   isplitr
   · imodintro; iexact Hopen
   · imodintro
-    ihave #Hfl : iprop(□ (consMade r.fnCons i0 ={⊤}=∗ ukiMknodOut (hlc := hlc) N (fileTaint (hlc := hlc) g.fgnCl)
-        (initConsCred (fileTaint (hlc := hlc) g.fgnCl) r.fnCons) initConsFd)) $$ []
+    ihave #Hfl : iprop(□ (consMade r.fnCons i0 ={⊤}=∗ ukiMknodOut N (fileTaint g.fgnCl)
+        (initConsCred (fileTaint g.fgnCl) r.fnCons) initConsFd)) $$ []
     · imodintro
       iintro #Hm'
       imodintro
@@ -453,27 +453,27 @@ theorem init_cons_hit_file_of_leg (UL : UK_LEAVES) (g : FileGn) (r : FileAppName
       isplitr
       · iexact Hopen
       · iexact Hcred
-    ihave #Hleaf := init_mknod_leaf_holds (hlc := hlc) UL N (consPresentAt i0)
-      (fileTaint (hlc := hlc) g.fgnCl) (consMade r.fnCons i0) r.fnCons $$ Hlaws Hfl Hinv
-    iapply ukiMknodHit_of_leaf (hlc := hlc) N (fileTaint (hlc := hlc) g.fgnCl) (consMade r.fnCons i0)
-      (initConsCred (fileTaint (hlc := hlc) g.fgnCl) r.fnCons) initConsFd $$ Hleaf Hm
+    ihave #Hleaf := init_mknod_leaf_holds UL N (consPresentAt i0)
+      (fileTaint g.fgnCl) (consMade r.fnCons i0) r.fnCons $$ Hlaws Hfl Hinv
+    iapply ukiMknodHit_of_leaf N (fileTaint g.fgnCl) (consMade r.fnCons i0)
+      (initConsCred (fileTaint g.fgnCl) r.fnCons) initConsFd $$ Hleaf Hm
 
 /-- **Rocq `sh_cons_console_file_of_leg`** (deviation 3): WHAT SH'S CONSOLE
 ARM IS HANDED. -/
 theorem sh_cons_console_file_of_leg (UL : UK_LEAVES) (g : FileGn) (r : FileAppNames) (i : Nat)
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) g.fgnCl, appRun := r }) :
-    ⊢ fileConsCreateLeg (hlc := hlc) (GF := GF) g r -∗ consMade r.fnCons i -∗ appInv (hlc := hlc) fscFs -∗
-      □ (∀ (N : UkNames GF) (X : UshCtx GF), ⌜X.T = fileTaint (hlc := hlc) g.fgnCl⌝ -∗
-        ushOpenConsoleLeaf (hlc := hlc) N X) := by
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred g.fgnCl, appRun := r }) :
+    ⊢ fileConsCreateLeg (GF := GF) g r -∗ consMade r.fnCons i -∗ appInv fscFs -∗
+      □ (∀ (N : UkNames GF) (X : UshCtx GF), ⌜X.T = fileTaint g.fgnCl⌝ -∗
+        ushOpenConsoleLeaf N X) := by
   iintro #Hg #Hmade #Hinv
-  ihave #Hlaws := init_cons_laws_efp_file_of_leg (hlc := hlc) g r heq $$ Hg
+  ihave #Hlaws := init_cons_laws_efp_file_of_leg g r heq $$ Hg
   imodintro
   iintro %N %X %hX
   obtain ⟨γp, T, Wc, Wb, Pm⟩ := X
   simp only at hX
   subst hX
-  ihave #H := sh_open_console_leaf_holds (hlc := hlc) UL fscFs (shConsOpenCalls_holds (hlc := hlc) UL) N
-    ⟨γp, fileTaint (hlc := hlc) g.fgnCl, Wc, Wb, Pm⟩ (consKey r.fnCons) r.fnCons i $$ Hlaws Hmade Hinv
+  ihave #H := sh_open_console_leaf_holds UL fscFs (shConsOpenCalls_holds UL) N
+    ⟨γp, fileTaint g.fgnCl, Wc, Wb, Pm⟩ (consKey r.fnCons) r.fnCons i $$ Hlaws Hmade Hinv
   iexact H
 
 end UInitConsFile

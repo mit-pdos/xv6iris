@@ -37,13 +37,13 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
 /-- **The park loop** at `+0x1b4`: park on `b`, drop the lock, sleep,
 take the lock again and read `b->disk`; go round while it is `1`. -/
 theorem vdrw_P5_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) (jp : Nat)
     (bno : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool) (c : Chain)
     (y : BitVec 32)
@@ -286,7 +286,7 @@ theorem vdrw_P5_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SL
 set_option maxHeartbeats 8000000 in
 /-- **P5.**  From `Xv6.vdrwP4Exit` to `Xv6.vdrwP5Exit`. -/
 theorem vdrw_P5 (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) (jp : Nat)
     (bno : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool) (c : Chain)
     (y : BitVec 32) (R : RegMap)

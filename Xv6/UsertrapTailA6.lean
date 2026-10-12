@@ -44,14 +44,14 @@ theorem ut_fa_ret_106 : jumpPc (KA.«usertrap» + 0x106#64) = KA.«usertrap» + 
 theorem ut_bne_sext0 : bcond bop.BNE (BitVec.signExtend 64 (0#32)) 0#64 = false := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
     (PT : SchedNames → IProp GF) (Γ : SchedNames)
 
 /-- `yield`'s contract at its entry. -/
-theorem ut_yield [ClaimIs (hlc := hlc) GF Γ] (YI : YIELD) (c : CPU) (k' : KCtx) (j : Nat)
+theorem ut_yield [ClaimIs GF Γ] (YI : YIELD) (c : CPU) (k' : KCtx) (j : Nat)
     (hj' : j < NPROC) (hproc' : k'.proc = procAddr j)
     (hK' : yieldSlots ≤ k'.avail) (hsie' : k'.sie = false) (hnoff' : k'.noff = 0)
     (hlocks' : k'.locks = []) (htier' : k'.tier = KTier.kpt) :
@@ -61,7 +61,7 @@ theorem ut_yield [ClaimIs (hlc := hlc) GF Γ] (YI : YIELD) (c : CPU) (k' : KCtx)
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       trapCsrs cpu' -∗ cpuClaim cpu' k'.proc -∗ intrRes cpu' -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := YI.wp_yield (hlc := hlc) (GF := GF) Γ c k' j hj' hproc' hK' hsie' hnoff' hlocks' htier'
+  have h := YI.wp_yield (GF := GF) Γ c k' j hj' hproc' hK' hsie' hnoff' hlocks' htier'
   unfold wp_yield_body at h
   simp only [yieldAddr] at h
   exact h
@@ -80,15 +80,15 @@ theorem ut_base_avail_ge {Γ : SchedNames} {A : UtArgs GF} {kb : KCtx} (hok : Ut
 set_option maxHeartbeats 4000000 in
 /-- **+0xac onward**, after `killed` returned its reading: the `c.bnez`,
 then +0xae or the kexit dead end. -/
-theorem usertrap_a6_after [ClaimIs (hlc := hlc) GF Γ] (HR : UT_RET PT Γ) (HK : UT_KEXIT PT Γ)
+theorem usertrap_a6_after [ClaimIs GF Γ] (HR : UT_RET PT Γ) (HK : UT_KEXIT PT Γ)
     (A : UtArgs GF) (cpu : CPU) (kb : KCtx) (R : RegMap) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8))
     (sts2 : List FdState) (cs2 : ExtTreeSet GName compare) (kl : BitVec 32)
     (hok : UtOk Γ A) (hb : utBase A.k kb) (hpins : utPins A R) (hrows : UtRows0 A V2 M2 sts2 cs2)
     (h10 : R 10#5 = BitVec.signExtend 64 kl) :
     kctx cpu ((kb.pushed 4).withRegs R) ∗ pcIs cpu (KA.«usertrap» + 0xac#64) ∗ utFrame A ∗
       trapCsrsExt cpu kb.sie ∗ cpuClaimExt cpu kb.sie A.k.proc ∗ utCaps A.N ∗
-      utOwn (utRsys PT Γ A) A.N V2 M2 sts2 cs2 A.pid ∗ utOuts (hlc := hlc) A V2 M2 sts2 cs2 ∗
-      utKillRead (hlc := hlc) A.gn iprop(utKillOut (hlc := hlc) A.sc A.Wk ∗ ⌜utLive A V2 cs2⌝) kl ∗
+      utOwn (utRsys PT Γ A) A.N V2 M2 sts2 cs2 A.pid ∗ utOuts A V2 M2 sts2 cs2 ∗
+      utKillRead A.gn iprop(utKillOut A.sc A.Wk ∗ ⌜utLive A V2 cs2⌝) kl ∗
       utPay A ∗ utKont PT Γ A
       ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Hcaps, Hown, Houts, Hrd, #Hpay, Hkont⟩
@@ -115,7 +115,7 @@ theorem usertrap_a6_after [ClaimIs (hlc := hlc) GF Γ] (HR : UT_RET PT Γ) (HK :
     · exact absurd he hk0
     -- THE TEAR-DOWN'S PRICE: the marker off the block, the killer's credential
     icases (utOwn_unmark _ _ _ _ _ _ _).1 $$ Hown with ⟨Hown, Hmk⟩
-    ihave Htear : utTear (hlc := hlc) (GF := GF) A.gn sts2 $$ [Hmk]
+    ihave Htear : utTear (GF := GF) A.gn sts2 $$ [Hmk]
     · unfold utTear; ileft; iframe Hsh Hcr
       iapply (show takenAt (GF := GF) V2.gen ⊢ takenAt A.gn from by rw [hrows.gen, hok.hgn]) $$ Hmk
     -- +0xf4  c.li s2,0 ; +0xf6  c.li a0,-1 ; +0xf8  jal kexit
@@ -152,14 +152,14 @@ the marker-less block lends its pid half and registration eighth beside the
 fired shot, so `killed` reads the flag nonzero (`ut_kill_lend_shot`); the
 `c.bnez` is taken and the dead end is paid by the trap's own closes and
 death payload (`utTear`'s right side). -/
-theorem usertrap_a6_self [ClaimIs (hlc := hlc) GF Γ] (KI : KILLED) (HK : UT_KEXIT PT Γ)
+theorem usertrap_a6_self [ClaimIs GF Γ] (KI : KILLED) (HK : UT_KEXIT PT Γ)
     (A : UtArgs GF) (cpu : CPU) (kb : KCtx) (R : RegMap) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8))
     (sts2 : List FdState) (cs2 : ExtTreeSet GName compare)
     (hok : UtOk Γ A) (hb : utBase A.k kb) (hpins : utPins A R) (hrows : UtRows0 A V2 M2 sts2 cs2) :
     kctx cpu ((kb.pushed 4).withRegs R) ∗ pcIs cpu (utPc 0xa6#64) ∗ utFrame A ∗
       trapCsrsExt cpu kb.sie ∗ cpuClaimExt cpu kb.sie A.k.proc ∗ utCaps A.N ∗
       utOwnNm (utRsys PT Γ A) A.N V2 M2 sts2 cs2 A.pid ∗ killShot A.gn ∗
-      filecloseCpays (hlc := hlc) sts2 ∗ killOwed A.gn ∗ utPay A
+      filecloseCpays sts2 ∗ killOwed A.gn ∗ utPay A
       ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Hcaps, Hown, #Hsh, Hcp, Hq, #Hpay⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -170,12 +170,12 @@ theorem usertrap_a6_self [ClaimIs (hlc := hlc) GF Γ] (KI : KILLED) (HK : UT_KEX
   have hgn2 : V2.gen = A.gn := hrows.gen.trans hok.hgn.symm
   have h9 : R 9#5 = procAddr A.j := hpins.2.1
   icases utOwnNm_priv _ A.N V2 M2 sts2 cs2 A.pid $$ Hown with ⟨Hpriv, Hfr, Hch, Hsy, Hownb⟩
-  have hacc := ut_privNm_pid (hlc := hlc) (GF := GF) hct A.N.f A.N.pj A.pid V2 M2
+  have hacc := ut_privNm_pid (GF := GF) hct A.N.f A.N.pj A.pid V2 M2
   rw [hgn2, hok.pj] at hacc
   ihave Hpriv := (show procPrivUnmarked (GF := GF) A.N.f A.N.pj A.pid V2 M2 ⊢
       procPrivUnmarked A.N.f (procAddr A.j) A.pid V2 M2 from by rw [hok.pj]) $$ Hpriv
   icases hacc $$ Hpriv with ⟨%hnz, Hqp, Hrg, Hprivb⟩
-  ihave Hlend := ut_kill_lend_shot (hlc := hlc) A.j A.pid A.gn hnz $$ [Hqp Hrg]
+  ihave Hlend := ut_kill_lend_shot A.j A.pid A.gn hnz $$ [Hqp Hrg]
   · iframe Hqp Hrg Hsh
   unfold utCaps
   icases Hcaps with ⟨#Hpi, #Hcr⟩
@@ -227,7 +227,7 @@ theorem usertrap_a6_self [ClaimIs (hlc := hlc) GF Γ] (KI : KILLED) (HK : UT_KEX
     have hbav' := ut_base_avail hok hb'
     have hav' := ut_base_avail_ge hok hb'
     have e3 : trapRes (kb.withSpie spie spp).sie + ((kb.withSpie spie spp).avail - 4) = 508 := by omega
-    ihave Htear : utTear (hlc := hlc) (GF := GF) A.gn sts2 $$ [Hcp Hq]
+    ihave Htear : utTear (GF := GF) A.gn sts2 $$ [Hcp Hq]
     · unfold utTear; iright; iframe Hcp Hq
     iapply (HK A cpu (((kb.withSpie spie spp).pushed 4).withRegs
         (((R'.set 18#5 0#64).set 10#5 0xFFFFFFFFFFFFFFFF#64).set 1#5 (KA.«usertrap» + 0xfc#64)))
@@ -252,7 +252,7 @@ theorem usertrap_a6_self [ClaimIs (hlc := hlc) GF Γ] (KI : KILLED) (HK : UT_KEX
 
 set_option maxHeartbeats 4000000 in
 /-- **Rocq `ut_a6`**. -/
-theorem usertrap_a6_proof [ClaimIs (hlc := hlc) GF Γ] (KI : KILLED) (HR : UT_RET PT Γ)
+theorem usertrap_a6_proof [ClaimIs GF Γ] (KI : KILLED) (HR : UT_RET PT Γ)
     (HK : UT_KEXIT PT Γ) : UT_A6 PT Γ := by
   intro A cpu kb R V2 M2 sts2 cs2 hok hb hpins hrows
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Hcaps, Hres, Houts, Hlr, #Hpay, Hkont⟩
@@ -271,15 +271,15 @@ theorem usertrap_a6_proof [ClaimIs (hlc := hlc) GF Γ] (KI : KILLED) (HR : UT_RE
   have h9 : R 9#5 = procAddr A.j := hpins.2.1
   -- open the block: the pid half, the registration eighth
   icases utOwn_priv _ A.N V2 M2 sts2 cs2 A.pid $$ Hown with ⟨Hpriv, Hfr, Hch, Hsy, Hownb⟩
-  have hacc := ut_priv_pid_mk (hlc := hlc) (GF := GF) hct A.N.f A.N.pj A.pid V2 M2
+  have hacc := ut_priv_pid_mk (GF := GF) hct A.N.f A.N.pj A.pid V2 M2
   rw [hgn2, hok.pj] at hacc
   ihave Hpriv := (show procPrivFd (GF := GF) A.N.f A.N.pj A.pid V2 M2 ⊢
       procPrivFd A.N.f (procAddr A.j) A.pid V2 M2 from by rw [hok.pj]) $$ Hpriv
   icases hacc $$ Hpriv with ⟨%hnz, Hqp, Hrg, Hmk, Hprivb⟩
-  ihave Hlr : iprop((utKillOut (hlc := hlc) A.sc A.Wk ∗ ⌜utLive A V2 cs2⌝) ∨ killShot A.gn) $$ [Hlr]
+  ihave Hlr : iprop((utKillOut A.sc A.Wk ∗ ⌜utLive A V2 cs2⌝) ∨ killShot A.gn) $$ [Hlr]
   · unfold utLiveRes; iexact Hlr
-  ihave Hlend := ut_kill_lend (hlc := hlc) A.j A.pid A.gn
-    iprop(utKillOut (hlc := hlc) A.sc A.Wk ∗ ⌜utLive A V2 cs2⌝) hnz $$ [Hqp Hrg Hmk Hlr]
+  ihave Hlend := ut_kill_lend A.j A.pid A.gn
+    iprop(utKillOut A.sc A.Wk ∗ ⌜utLive A V2 cs2⌝) hnz $$ [Hqp Hrg Hmk Hlr]
   · iframe Hqp Hrg Hmk Hlr
   unfold utCaps
   icases Hcaps with ⟨#Hpi, #Hcr⟩
@@ -292,8 +292,8 @@ theorem usertrap_a6_proof [ClaimIs (hlc := hlc) GF Γ] (KI : KILLED) (HR : UT_RE
   k_step_e (wp_s_jal cpu _ (KA.«usertrap» + 0xa8#64) false 2095854#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ut_a6_killed_tgt]
   iintro Hk Hpc
-  iapply (ut_killed Γ KI cpu _ A.j (fun kl => iprop(utKillRead (hlc := hlc) A.gn
-      iprop(utKillOut (hlc := hlc) A.sc A.Wk ∗ ⌜utLive A V2 cs2⌝) kl ∗
+  iapply (ut_killed Γ KI cpu _ A.j (fun kl => iprop(utKillRead A.gn
+      iprop(utKillOut A.sc A.Wk ∗ ⌜utLive A V2 cs2⌝) kl ∗
       wordPointsTo (pPid (procAddr A.j)) 4 pidPriv A.pid ∗ pidReg A.pid (.own qeighth) A.gn ∗
       takenAt A.gn))
       hok.hj ?hp ?hn ?hK ?hl ?ht) $$ [- $Hk $Hpc $Hpi $Hlend]
@@ -324,7 +324,7 @@ theorem usertrap_a6_proof [ClaimIs (hlc := hlc) GF Γ] (KI : KILLED) (HR : UT_RE
 
 set_option maxHeartbeats 4000000 in
 /-- **Rocq `ut_fa`**. -/
-theorem usertrap_fa_proof [ClaimIs (hlc := hlc) GF Γ] (YI : YIELD) (HR : UT_RET PT Γ) : UT_FA PT Γ := by
+theorem usertrap_fa_proof [ClaimIs GF Γ] (YI : YIELD) (HR : UT_RET PT Γ) : UT_FA PT Γ := by
   intro A cpu R V2 M2 sts2 cs2 hok hpins hrows hlive
   have hsie : A.k.sie = false := hok.hctx.1
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Hcaps, Hown, Houts, Hko, Hkont⟩

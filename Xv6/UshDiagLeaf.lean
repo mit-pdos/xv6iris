@@ -46,7 +46,7 @@ theorem ushDiag_ldOff (s : Nat) (k : Nat) (imm : BitVec 12) (hk : imm.toInt = (k
     ((s : Nat) : Int) + imm.toInt = ((s + k : Nat) : Int) := by rw [hk]; push_cast; rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
@@ -61,10 +61,10 @@ theorem wp_kshd_execfail_paid_at (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : USH_FPRI
     (hw1 : ∀ p, p < 5 → ushLit 0x1298 p = dg[p]!)
     (harg : ∀ j, j < cmd.length → cmd[j]! = dg[5 + j]!)
     (hw2 : ∀ p, 7 ≤ p → p < 15 → ushLit 0x1298 p = dg[p + (cmd.length - 2)]!) :
-    ⊢ ushExecfailLawAt (hlc := hlc) dg (13 + cmd.length) Cr Cd -∗ ushCode N.t -∗
+    ⊢ ushExecfailLawAt dg (13 + cmd.length) Cr Cd -∗ ushCode N.t -∗
       ushPtr N.d ((m.get 9#5).toNat + 8) x.ptr -∗ ushStr N.d x -∗ ustd N.fd l -∗ Cr -∗
       (ustd N.fd l -∗ Cd -∗ N.pay (-1)) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0xda) (ushDg + n) -∗ wpLoop h := by
+      urun N h m (BitVec.ofNat 64 0xda) (ushDg + n) -∗ wpLoop h := by
   iintro #Hlaw #Hc Hw Hx Hstd HCr Hpay Hrun
   unfold ushExecfailLawAt
   icases Hlaw $$ %N %l %hfd2 HCr with ⟨%Pf, HPf, #Hstep, #Hdone⟩

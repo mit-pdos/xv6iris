@@ -140,7 +140,7 @@ theorem inodeRef_spos (w : BitVec 32) (h0 : 0 < w.toNat) (h1 : w.toNat < 2 ^ 31)
   rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsBlocksG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsBlocksG GF]
 
 /-! ## The cells at NO particular value
 

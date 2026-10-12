@@ -38,7 +38,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option maxRecDepth 8000
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF]
 
 /-! ## `vmfault` -/
 
@@ -78,7 +78,7 @@ set_option maxHeartbeats 4000000 in
 at `(KernelSyms.«vmfault» + 0x1c)` with the three spare slots still free. -/
 theorem vmfault_proof (IM : ISMAPPED) (KAL : KALLOC) (KF : KFREE) (MS : MEMSET)
     (MA : MAPPAGES_ANY) : VMFAULT :=
-  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk P M ke hnoff hK hlk hroot hsz => by
+  ⟨fun {GF} _ _ _ _ cpu k γl γk P M ke hnoff hK hlk hroot hsz => by
   unfold wp_vmfault_body
   simp only [vmfaultAddr]
   iintro ⟨Hk, Hpc, #Hlk, #Hav, Hpt, Hlend, HΦ⟩

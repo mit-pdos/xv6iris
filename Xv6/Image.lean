@@ -11,7 +11,7 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- The kernel's read-only image, as `kctx` owns it: the text, the rodata,
 and the static mapping claims. -/

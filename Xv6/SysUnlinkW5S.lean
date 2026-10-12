@@ -51,7 +51,7 @@ theorem sys_unlink_dec_store (h : BitVec 16) :
 theorem sys_unlink_li0_d8 : BitVec.signExtend 64 0#12 = 0#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -78,7 +78,7 @@ def sysUnlinkAtB8 (Γ : SchedNames) (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF
   pcIs cpu (KA.«sys_unlink» + 0xb8#64) ∗
   sysUnlinkCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) ∗
   sysUnlinkBufs (k.regs 2#5) ∗
-  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv (hlc := hlc) Γ ∗
+  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv Γ ∗
   wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ sysUnlinkHole A k.proc P2 ∗
   (∀ c : CPU, sysUnlinkPostA k A c) ∗
   sysUnlinkLkAt A.pid kd q g lo tl dinum dnX γil γisl t (1 : Qp).half.half ∗
@@ -93,23 +93,23 @@ def sysUnlinkAtB8 (Γ : SchedNames) (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF
   txPin icfgLog t (1 : Qp).half ∗ bslots 3 ∗ logOpS icfgLog nw Sbw ∗
   A.P (nparElems pl).length dinum.toNat ∗
   A.Fent.pfRecv av0 dinum.toNat nm iinum.toNat ∗
-  pfAt (utgtCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Ftgt ∗
-  pfAt (dlookupCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fex ∗
-  pfAt (dmissCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fmiss
+  pfAt (utgtCommitAt (fsGammaL fscFs) appE) A.Ftgt ∗
+  pfAt (dlookupCommitAt (fsGammaL fscFs) appE) A.Fex ∗
+  pfAt (dmissCommitAt (fsGammaL fscFs) appE) A.Fmiss
 
 set_option maxHeartbeats 64000000 in
 /-- **+0xb8 .. +0x168**: `iunlockput(dp)`, `ip->nlink--`, `iupdate(ip)` and
 INSTANT 2 (`ufUtgt_fire`), `iunlockput(ip)`, the transaction whole again,
 `end_op`, `a0 = 0`, the three reloads, the join point with the ret-0 arm. -/
 theorem sys_unlink_w5_spine (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF) (ok : SuOk k A)
+    [ClaimIs GF Γ] (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF) (ok : SuOk k A)
     (spie spp : Bool) (R : RegMap) (P2 : UPtd) (pl : List (BitVec 8)) (kd : Nat) (q : Qp)
     (g : GName) (lo tl : Nat) (dinum : BitVec 32) (dnX : Dinode) (bmX : Blkmap) (γil γisl : GName)
     (ks : Nat) (qi : Qp) (gi : GName) (loi tli : Nat) (iinum : BitVec 32) (dni : Dinode)
     (bmi : Blkmap) (dati : Nat → List (BitVec 8)) (γili γisli : GName) (t : Nat) (nw : Nat)
     (Sbw : List Nat) (uty : Ity) (av0 : Aview) (nm : Fname)
     (ents : Std.ExtTreeMap Fname Nat compare) (nl : Nat) :
-    sysUnlinkAtB8 (hlc := hlc) Γ cpu k A spie spp R P2 pl kd q g lo tl dinum dnX bmX γil γisl ks qi
+    sysUnlinkAtB8 Γ cpu k A spie spp R P2 pl kd q g lo tl dinum dnX bmX γil γisl ks qi
       gi loi tli iinum dni bmi dati γili γisli t nw Sbw uty av0 nm ents nl
     ⊢ wpLoop (GF := GF) cpu := by
   unfold sysUnlinkAtB8
@@ -212,7 +212,7 @@ theorem sys_unlink_w5_spine (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ 
     (sysfile_setnl_minor dni _)
     (sys_unlink_nlink_down dni (sysUnlinkDni2 dni) bmi bmi dati dati hnli (by omega))
   iapply wpLoop_fupd
-  imod (ufUtgt_fire (hlc := hlc) fscFs ⊤ A.Ftgt iinum.toNat (eraNode dni bmi dati)
+  imod (ufUtgt_fire fscFs ⊤ A.Ftgt iinum.toNat (eraNode dni bmi dati)
       (eraNode (sysUnlinkDni2 dni) bmi dati) ufNd_top hloc hnl1 habs' hoki.2.2.2.1)
     $$ Hftop Happ Hct Htopi with ⟨Htopi, %av1, %hav1, Hrcv⟩
   imodintro
@@ -234,7 +234,7 @@ theorem sys_unlink_w5_spine (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_br_iunlockput]
   iintro Hk Hpc
   ihave Hbs := bslots_cons 2 $$ [$Hb1 $Hb2]
-  ihave #Henv : sysfileEnv (hlc := hlc) Γ $$ []
+  ihave #Henv : sysfileEnv Γ $$ []
   · unfold sysfileEnv; iframe #
   iapply (sys_unlink_iunlockput_dep IUP Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j A.pid
       ks qi gi loi tli iinum (sysUnlinkDni2 dni) bmi γili γisli t (1 : Qp).half.half u
@@ -306,7 +306,7 @@ theorem sys_unlink_w5_spine (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ 
       (k.regs 18#5) (k.regs 19#5) $$ [Hra Hs0 H3 H4 H5]
   · unfold sysUnlinkCells; iframe
   -- ret 0: BOTH receipts, and the instant-2 pin on the target
-  ihave Harms := unlinkArms_ok (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
+  ihave Harms := unlinkArms_ok (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
       A.v0.toNat A.P A.Pmiss A.Fent A.Ftgt
     A.Fex A.Fmiss pl av0 av1 dinum.toNat iinum.toNat nm ents nl (absRow (eraNode dni bmi dati)) hlast
     hpre ⟨hpos, hnibi⟩ hav1 $$ [$HP $Hx $Hm $He $Hrcv]

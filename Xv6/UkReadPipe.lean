@@ -68,7 +68,7 @@ theorem ustd_after_none (l : List FdState) (st : FdState) (h : fdLowestClosed l 
   unfold ustdAfter; rw [h]
 
 section Pure
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg]
 
 /-- **Rocq `uread_pipe_core`**: the post's pipe arm, the match at one
@@ -76,9 +76,9 @@ constructor. -/
 theorem uread_pipe_core (gn : GName) (pt : UPtd) (st : FdState) (wb : Bool) (γp : PipeNames) (n : Int)
     (fm : Xfam GF) (Rp : List (BitVec 8) → IProp GF) (Rpe : List (BitVec 8) → PipeSt → IProp GF)
     (r : BitVec 64) (M' : Nat → List (BitVec 8)) (addr : BitVec 64) (hst : st = .open true wb (.pipe γp)) :
-    filereadExtraCore (hlc := hlc) gn pt st n fm.rF fm.rRd fm.rRin Rp Rpe r M' addr ⊢
-      pipeRpostImg (hlc := hlc) pt γp.pnQueue Rp Rpe
-        iprop(killShot gn ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF)) n.toNat r M' addr := by
+    filereadExtraCore gn pt st n fm.rF fm.rRd fm.rRin Rp Rpe r M' addr ⊢
+      pipeRpostImg pt γp.pnQueue Rp Rpe
+        iprop(killShot gn ∗ □ MachFixedGS.killCred (GF := GF)) n.toNat r M' addr := by
   subst hst; exact .rfl
 
 end Pure
@@ -102,22 +102,22 @@ theorem upipe_ends_handles (γf : GName) (l : List FdState) (a b : Nat) (γp : P
 end Handles
 
 section Supply
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
-local notation "SGX" => uexecSGXv6 (hlc := hlc)
+local notation "SGX" => uexecSGXv6
 
 end Supply
 
 section PipeEnd
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
-local notation "SGX" => uexecSGXv6 (hlc := hlc)
+local notation "SGX" => uexecSGXv6
 
 /-- Rocq `wp_uk_pipe_read_end`'s inline residue `Rp'`: on success, the
 post's own two slots and names, and the caller's successor of the
@@ -130,7 +130,7 @@ def upipeResidue (Rp : PipeNames → IProp GF) (W : Uvis) (r : BitVec 64) (fdv' 
 /-- **Rocq `srow_reg_of_pipe_reg`**: at the instance, a pipe row's
 registration IS the pipe's. -/
 theorem srowReg_of_pipeReg_xv6 (rd wr : Bool) (γp : PipeNames) :
-    pipeReg (hlc := hlc) (GF := GF) γp ⊢ @UexecSG.srowReg GF _ SGX (.open rd wr (.pipe γp)) := .rfl
+    pipeReg (GF := GF) γp ⊢ @UexecSG.srowReg GF _ SGX (.open rd wr (.pipe γp)) := .rfl
 
 /-- Row 4's post at the instance, as an equation (Rocq `spost_at_pipe_elim`'s
 reading; the row-5/16 twins are `UexecExecInst.spostAt_xv6_read/_write`). -/
@@ -144,12 +144,12 @@ fragment registered as the pipe's close payment, and the two new rows go
 in registered; on a failed call the table did not move and the run's own
 reading answers. -/
 theorem upipe_registrar (Rp : PipeNames → IProp GF) :
-    (∀ γp : PipeNames, pipeQfrag γp.pnQueue pst0 ={⊤}=∗ pipeReg (hlc := hlc) (GF := GF) γp ∗ Rp γp) ⊢
+    (∀ γp : PipeNames, pipeQfrag γp.pnQueue pst0 ={⊤}=∗ pipeReg (GF := GF) γp ∗ Rp γp) ⊢
       ∀ (fdep : UexecSG.sfam GF) (W : Uvis) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat)
         (cs' : ExtTreeSet GName compare),
-        ⌜r.toNat ≠ 0 → fdv' = W.fd⌝ -∗ urunNopipe (hlc := hlc) (SG := SGX) W.fd -∗
-        @UexecSG.spostAt GF _ SGX (uslot (hlc := hlc) (SG := SGX)) USYS_pipe fdep W r M' fdv' cw' cs' ={⊤}=∗
-        urunNopipe (hlc := hlc) (SG := SGX) fdv' ∗ upipeResidue Rp W r fdv' := by
+        ⌜r.toNat ≠ 0 → fdv' = W.fd⌝ -∗ urunNopipe (SG := SGX) W.fd -∗
+        @UexecSG.spostAt GF _ SGX (uslot (SG := SGX)) USYS_pipe fdep W r M' fdv' cw' cs' ={⊤}=∗
+        urunNopipe (SG := SGX) fdv' ∗ upipeResidue Rp W r fdv' := by
   iintro Hreg %fdep %W %r %M' %fdv' %cw' %cs' %hfail Hnpw
   -- read the post at the instance BEFORE it enters the context (introducing
   -- the class-level post directly costs a kernel timeout)
@@ -165,11 +165,11 @@ theorem upipe_registrar (Rp : PipeNames → IProp GF) :
     isplitl [Hnpw]
     · -- the two rows go in REGISTERED, read end first
       rw [hfdv2]
-      ihave Hra := srowReg_of_pipeReg_xv6 (hlc := hlc) true false γp2 $$ Hpr
-      ihave Hrb := srowReg_of_pipeReg_xv6 (hlc := hlc) false true γp2 $$ Hpr
-      ihave Hnp1 := urunNopipe_insert_reg (hlc := hlc) (SG := SGX) W.fd a2 (.open true false (.pipe γp2))
+      ihave Hra := srowReg_of_pipeReg_xv6 true false γp2 $$ Hpr
+      ihave Hrb := srowReg_of_pipeReg_xv6 false true γp2 $$ Hpr
+      ihave Hnp1 := urunNopipe_insert_reg (SG := SGX) W.fd a2 (.open true false (.pipe γp2))
         $$ Hra Hnpw
-      iapply urunNopipe_insert_reg (hlc := hlc) (SG := SGX) _ b2 (.open false true (.pipe γp2)) $$ Hrb Hnp1
+      iapply urunNopipe_insert_reg (SG := SGX) _ b2 (.open false true (.pipe γp2)) $$ Hrb Hnp1
     · unfold upipeResidue
       iintro -
       iexists a2, b2, γp2
@@ -191,9 +191,9 @@ keeps what its registrar made of the byte queue's birth fragment. -/
 theorem wp_uk_pipe_read_end (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64)
     (l : List FdState) (f : Nat → BitVec 8) (avail : Nat) (Rp : PipeNames → IProp GF)
     (hn : usysno m = USYS_pipe) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) (hnone : fdLowestClosed l = none) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) (SG := SGX) N h m pc avail -∗
-      udepw (hlc := hlc) (SG := SGX) N m pc USYS_pipe -∗
-      (∀ γp : PipeNames, pipeQfrag γp.pnQueue pst0 ={⊤}=∗ pipeReg (hlc := hlc) (GF := GF) γp ∗ Rp γp) -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (SG := SGX) N h m pc avail -∗
+      udepw (SG := SGX) N m pc USYS_pipe -∗
+      (∀ γp : PipeNames, pipeQfrag γp.pnQueue pst0 ={⊤}=∗ pipeReg (GF := GF) γp ∗ Rp γp) -∗
       ustd N.fd l -∗ ubytes N.d (m.get 10#5).toNat 8 f -∗
       (∀ (h' : CPU) (r : BitVec 64) (g : Nat → BitVec 8),
         ((∃ (a b : Nat) (γp : PipeNames),
@@ -203,12 +203,12 @@ theorem wp_uk_pipe_read_end (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Reg
             ufd N.fd a (.open true false (.pipe γp)) ∗ ufd N.fd b (.open false true (.pipe γp)) ∗
             ustd N.fd l ∗ Rp γp) ∨
           (⌜r = -1#64⌝ ∗ ustd N.fd l)) -∗
-        urun (hlc := hlc) (SG := SGX) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗
+        urun (SG := SGX) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗
         ubytes N.d (m.get 10#5).toNat 8 g -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hrun Hsb Hreg Hstd Hbuf Hcont
-  ihave Hreg := upipe_registrar (hlc := hlc) Rp $$ Hreg
-  iapply wp_uk_ecall_pipe (hlc := hlc) (SG := SGX) UL N h m pc l f avail
+  ihave Hreg := upipe_registrar Rp $$ Hreg
+  iapply wp_uk_ecall_pipe (SG := SGX) UL N h m pc l f avail
     (fun _ W r _ fdv' _ _ => upipeResidue Rp W r fdv') hn hal4 $$ Hi Hrun Hsb Hreg Hstd Hbuf
   iintro %h' %r %g %W %fdep %M' %fdv' %cw' %cs' Harm HRp Hrun Hbuf
   iapply Hcont $$ %h' %r %g [Harm HRp] Hrun Hbuf

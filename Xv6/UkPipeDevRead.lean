@@ -41,29 +41,29 @@ open Std (ExtTreeSet)
 open UexecSG
 
 section Read
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CtokG GF] [SG : UexecSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CtokG GF] [SG : UexecSG GF]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-- **Rocq `pdev_ecall_read`** (deviation 1). -/
-theorem pdev_ecall_read (UL : UK_LEAVES) (DK : PipeDevK hlc GF) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64)
+theorem pdev_ecall_read (UL : UK_LEAVES) (DK : PipeDevK GF) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64)
     (k cap : Nat) (f : Nat → BitVec 8) (avail : Nat) (l : List FdState) (fd : Nat) (wb : Bool) (γp : PipeNames)
     (ua : BitVec 64) (Rp : List (BitVec 8) → IProp GF) (Rpe : List (BitVec 8) → PipeSt → IProp GF)
     (hn : UkSysP.usysno m = USYS_read) (h0 : argZ (m.get 10#5) = (fd : Int)) (hlt : fd < NSTD)
     (hl : l[fd]? = some (.open true wb (.pipe γp))) (h2 : argZ (m.get 12#5) = (cap : Int)) (hck : cap ≤ k)
     (hal4 : (pc + 4#64) &&& 1#64 = 0#64) (hua : m.get 11#5 = ua) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗ ustd N.fd l -∗
-      pipeRpay (hlc := hlc) γp.pnQueue Rp Rpe cap -∗ ubytes N.d ua.toNat k f -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗ ustd N.fd l -∗
+      pipeRpay γp.pnQueue Rp Rpe cap -∗ ubytes N.d ua.toNat k f -∗
       (∀ (h' : CPU) (r : BitVec 64) (d : Nat) (g : Nat → BitVec 8) (M' : ElfMem) (Pt : UPtd) (gn : GName),
         ⌜d ≤ cap⌝ -∗ ⌜∀ j, d ≤ j → j < k → g j = f j⌝ -∗ ⌜ureadPipeAns cap r⌝ -∗
         ⌜∀ i, i < k → (ua + BitVec.ofNat 64 i).toNat = ua.toNat + i⌝ -∗
         ⌜∀ j, j < k → M' (ua + BitVec.ofNat 64 j).toNat = some (g j)⌝ -∗
         ⌜∀ j, j < k → uvaWmapped Pt (ua + BitVec.ofNat 64 j).toNat⌝ -∗
         (∃ Mv : Nat → List (BitVec 8), ⌜imgAgrees M' Mv⌝ ∗
-          pipeRpostImg (hlc := hlc) Pt γp.pnQueue Rp Rpe
-            iprop(killShot gn ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF)) cap r Mv ua) -∗
-        ustd N.fd l -∗ urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ ubytes N.d ua.toNat k g -∗
+          pipeRpostImg Pt γp.pnQueue Rp Rpe
+            iprop(killShot gn ∗ □ MachFixedGS.killCred (GF := GF)) cap r Mv ua) -∗
+        ustd N.fd l -∗ urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ ubytes N.d ua.toNat k g -∗
         wpLoop h') -∗
       wpLoop h := by
   subst hua
@@ -107,7 +107,7 @@ theorem pdev_ecall_read (UL : UK_LEAVES) (DK : PipeDevK hlc GF) (N : UkNames GF)
 /-- **Rocq `pdev_ubytes_bnd`** (deviation 2). -/
 theorem pdev_ubytes_bnd (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail : Nat) (a nb : Nat)
     (fb : Nat → BitVec 8) :
-    ⊢ urun (hlc := hlc) N h m pc avail -∗ ubytes N.d a nb fb -∗ ⌜∀ j, j < nb → a + j < uCap⌝ := by
+    ⊢ urun N h m pc avail -∗ ubytes N.d a nb fb -∗ ⌜∀ j, j < nb → a + j < uCap⌝ := by
   unfold urun
   iintro Hrun Hbs
   icases Hrun with ⟨%xi, %C, %pt, %Rfd, %Rut, %sz, %M, %pm, %fdv, %cw, %gn, %cs, %pidv, -, -, -, -, -,
@@ -119,12 +119,12 @@ theorem pdev_ubytes_bnd (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64)
 
 /-- **Rocq `pipe_close`**: `UkHandler.eiClose`'s shape at a LEDGER slot,
 paid by the registry. -/
-theorem pipe_close (DK : PipeDevK hlc GF) (N : UkNames GF) (P : Uprog GF)
-    (Hsc : ⊢ stubLaw (hlc := hlc) N P.code 21 P.close)
+theorem pipe_close (DK : PipeDevK GF) (N : UkNames GF) (P : Uprog GF)
+    (Hsc : ⊢ stubLaw N P.code 21 P.close)
     (γp : PipeNames) (l : List FdState) (fd : Nat) (rb wb : Bool) (K : Int → IProp GF)
     (hlt : fd < NSTD) (hl : l[fd]? = some (.open rb wb (.pipe γp))) :
-    ⊢ pipeReg (hlc := hlc) γp -∗ ustd N.fd l -∗ (ustd N.fd (l.set fd .closed) -∗ K 0) -∗
-      clObl (hlc := hlc) N P (fd : Int) K := by
+    ⊢ pipeReg γp -∗ ustd N.fd l -∗ (ustd N.fd (l.set fd .closed) -∗ K 0) -∗
+      clObl N P (fd : Int) K := by
   unfold clObl
   iintro #Hreg Hstd HK %h %m %avail %ha0 Hcode Hrun Hcont
   ihave Hs := Hsc

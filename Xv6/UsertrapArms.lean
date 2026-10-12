@@ -52,13 +52,13 @@ end Pure
 /-! ## §2 The kill rows -/
 
 section KillRows
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [WchG GF]
     [CurCtx]
 
 /-- Off the ecall the kill deposit is the additive pair. -/
 theorem utA_killIn_arm (f : UexecSG.sfam GF) (sc : BitVec 64) (W : Uvis) (gn : GName)
     (sts : List FdState) (hne : sc ≠ uecallScause) :
-    utKillIn (hlc := hlc) f sc W gn sts ⊢ ⌜W.gen = gn⌝ ∗ uexecKillArm (hlc := hlc) sc W f := by
+    utKillIn f sc W gn sts ⊢ ⌜W.gen = gn⌝ ∗ uexecKillArm sc W f := by
   unfold utKillIn
   rw [if_neg hne]
   iintro ⟨%h, H⟩
@@ -68,19 +68,19 @@ theorem utA_killIn_arm (f : UexecSG.sfam GF) (sc : BitVec 64) (W : Uvis) (gn : G
 /-- ...with the key's table (what the self-kill's exit row is read at). -/
 theorem utA_killIn_arm2 (f : UexecSG.sfam GF) (sc : BitVec 64) (W : Uvis) (gn : GName)
     (sts : List FdState) (hne : sc ≠ uecallScause) :
-    utKillIn (hlc := hlc) f sc W gn sts ⊢ ⌜W.gen = gn ∧ W.fd = sts⌝ ∗ uexecKillArm (hlc := hlc) sc W f := by
+    utKillIn f sc W gn sts ⊢ ⌜W.gen = gn ∧ W.fd = sts⌝ ∗ uexecKillArm sc W f := by
   unfold utKillIn
   rw [if_neg hne]
 
 /-- ...and off the ecall the kill row owed back is the slot. -/
 theorem utA_killOut_slot (sc : BitVec 64) (W : Uvis) (hne : sc ≠ uecallScause) :
-    uslot (hlc := hlc) (GF := GF) W ⊢ utKillOut (hlc := hlc) sc W := by
+    uslot (GF := GF) W ⊢ utKillOut sc W := by
   unfold utKillOut; rw [if_neg hne]
 
 end KillRows
 
 section Own
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -107,7 +107,7 @@ theorem utA_ea_kexit : KA.«usertrap» + 18446744073709550156#64 = KA.«kexit» 
 theorem utA_ea_ret : jumpPc (KA.«usertrap» + 0xf0#64) = KA.«usertrap» + 0xf0#64 := by decide
 
 section EA
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
@@ -115,7 +115,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 
 set_option maxHeartbeats 4000000 in
 /-- **Rocq `ut_e8`**: the device arm's `killed(p)` check. -/
-theorem usertrap_ea_proof [ClaimIs (hlc := hlc) GF Γ] (KI : KILLED) (HF : UT_FA PT Γ)
+theorem usertrap_ea_proof [ClaimIs GF Γ] (KI : KILLED) (HF : UT_FA PT Γ)
     (HK : UT_KEXIT PT Γ) : UT_EA PT Γ := by
   intro A cpu R hok hpins hs2 hsc
   have hsie : A.k.sie = false := hok.hctx.1
@@ -142,7 +142,7 @@ theorem usertrap_ea_proof [ClaimIs (hlc := hlc) GF Γ] (KI : KILLED) (HF : UT_FA
   iintro Hk Hpc
   ihave Hrg := (show pidReg (GF := GF) A.pid (.own qeighth) (utV1 A).gen ⊢ pidReg A.pid (.own qeighth) A.gn
     from by rw [hok.hgn]) $$ Hrg
-  iapply (ut_killed Γ KI cpu _ A.j (fun kl => iprop(utKillRead (hlc := hlc) A.gn emp kl ∗
+  iapply (ut_killed Γ KI cpu _ A.j (fun kl => iprop(utKillRead A.gn emp kl ∗
       wordPointsTo (pPid (procAddr A.j)) 4 pidPriv A.pid ∗ pidReg A.pid (.own qeighth) A.gn ∗ takenAt A.gn))
       hok.hj ?hp ?hn ?hK ?hl ?ht) $$ [- $Hk $Hpc $Hpi]
   rotate_right 1
@@ -203,7 +203,7 @@ theorem usertrap_ea_proof [ClaimIs (hlc := hlc) GF Γ] (KI : KILLED) (HF : UT_FA
     ihave Hpc := (show pcIs (GF := GF) cpu KA.«kexit» ⊢ pcIs cpu kexitAddr from .rfl) $$ Hpc
     -- THE TEAR-DOWN'S PRICE: the marker off the block, the killer's credential
     icases (utOwn_unmark _ _ _ _ _ _ _).1 $$ Hown with ⟨Hown, Hmk⟩
-    ihave Htear : utTear (hlc := hlc) (GF := GF) A.gn A.sts $$ [Hmk]
+    ihave Htear : utTear (GF := GF) A.gn A.sts $$ [Hmk]
     · unfold utTear; ileft; iframe Hshot Hcr
       iapply (show takenAt (GF := GF) (utV1 A).gen ⊢ takenAt A.gn from by rw [hok.hgn]) $$ Hmk
     iapply (HK A cpu _ (utV1 A) A.M A.sts A.cs _ _ _ _ hok ?k10 ?k2 ?kp ?kn ?kt ?kav rfl rfl)

@@ -133,7 +133,7 @@ theorem colDiff_empty (E : CoPset) : E \ colEscNs [] = E := by
   exact ⟨fun h => h.1, fun h => ⟨h, CoPset.mem_empty⟩⟩
 
 section Open
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
   [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF]
 
@@ -196,7 +196,7 @@ theorem colRegMap_id [Icfg] (I : RegMapF FsNode) (hd : appDom I) : colRegMap icf
 /-! ## 4.  THE MINT, AND THE APPLICATION'S CROSSING (deviation 2) -/
 
 section Mint
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsLinkG GF] [FsTopG GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF] [FsLinkG GF] [FsTopG GF]
   [Appcfg GF]
 
 /-- THE TRANSPORT IS THE MINT'S CALLER, and the application's MERGE runs on
@@ -210,13 +210,13 @@ theorem colMint_out (Γ : FsViewNames GF) (hex : phiExcl Γ) (A : IProp GF)
     (C : BlockMap) (home : List Nat) (v : Ity) (T : IProp GF) (Ok Okc : appNames (GF := GF) → Prop) (gd : Nat)
     (hOk : Ok (appRun (GF := GF))) (hI : S.fssInodes = I)
     (hsh : SnapShape S (colView C home)) (hle : M ⊆ fsDbytes (colView C home)) :
-    appMergeRaw (hlc := hlc) (GF := GF) appPred Ok Okc T gd ⊢ A -∗
+    appMergeRaw (GF := GF) appPred Ok Okc T gd ⊢ A -∗
       fsState Γ (DFrac.own Qp.threeQuarters) S -∗
       iOwn (F := constOF FsLinkUR) Γ.link (FsStateLink.linkTokElem (ROOTINO : Int) v) -∗
       ▷ appPred appRun (absView I) -∗ T ==∗
       A ∗ fsState Γ (DFrac.own Qp.threeQuarters) S ∗
       iOwn (F := constOF FsLinkUR) Γ.link (FsStateLink.linkTokElem (ROOTINO : Int) v) ∗
-      ▷ appPred appRun (absView I) ∗ snapLawOut (hlc := hlc) (appGuest Okc) T gd C home := by
+      ▷ appPred appRun (absView I) ∗ snapLawOut (appGuest Okc) T gd C home := by
   iintro #Hm HA HS Ht Hpa HT
   imod pDurAlloc_xfer Γ hex A M hag Qp.threeQuarters S (colView C home) v qpHalfLt34 hsh hle
     $$ HA HS Ht with ⟨HA, HS, Ht, %gt, Hdur, Hguest⟩
@@ -243,17 +243,17 @@ theorem colMint_ghost (Γ : FsViewNames GF) (hex : phiExcl Γ) (A : IProp GF)
     (Qs : List (IProp GF)) (gt_o : GName) (E : CoPset) (Ok Okc : appNames (GF := GF) → Prop) (gd : Nat) (n : Nat) (hn : n = gd + 1)
     (hOk : Ok (appRun (GF := GF))) (hI : S.fssInodes = I)
     (hsh : SnapShape S (colView C home)) (hle : M ⊆ fsDbytes (colView C home)) :
-    appMergeRaw (hlc := hlc) (GF := GF) appPred Ok Okc T gd ⊢
-      appSyncRunRaw (hlc := hlc) appPred Ok Okc T Hk -∗
+    appMergeRaw (GF := GF) appPred Ok Okc T gd ⊢
+      appSyncRunRaw appPred Ok Okc T Hk -∗
       A -∗ fsState Γ (DFrac.own Qp.threeQuarters) S -∗
       iOwn (F := constOF FsLinkUR) Γ.link (FsStateLink.linkTokElem (ROOTINO : Int) v) -∗
       ▷ appPred appRun (absView I) -∗ ▷ appGuest Okc gt_o -∗ T -∗
-      startAuth (hlc := hlc) (GF := GF) n -∗ ([∗list] Q ∈ Qs, Hk Q) -∗
+      startAuth (GF := GF) n -∗ ([∗list] Q ∈ Qs, Hk Q) -∗
       |={E}=> (A ∗ fsState Γ (DFrac.own Qp.threeQuarters) S ∗
         iOwn (F := constOF FsLinkUR) Γ.link (FsStateLink.linkTokElem (ROOTINO : Int) v) ∗
         ▷ appPred appRun (absView I) ∗
         (∃ gt : GName, pDurAt gt (colView C home) ∗ ▷ appGuest Okc gt) ∗
-        T ∗ startAuth (hlc := hlc) (GF := GF) n ∗ ([∗list] Q ∈ Qs, Q)) := by
+        T ∗ startAuth (GF := GF) n ∗ ([∗list] Q ∈ Qs, Q)) := by
   unfold appMergeRaw
   iintro #Hm #Hrun HA HS Ht Hpa Hold HT Hsa HQs
   imod pDurAlloc_xfer Γ hex A M hag Qp.threeQuarters S (colView C home) v qpHalfLt34 hsh hle
@@ -290,7 +290,7 @@ end Mint
 /-! ## 4b.  THE ASSEMBLY -/
 
 section Assembly
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
   [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [Appcfg GF]
 
@@ -314,12 +314,12 @@ theorem fsCollectDur [Icfg] [CurCtx] (E : CoPset) (cn : IcNames) (γfs : FsNames
     (hbm : (↑bitmapN : CoPset) ⊆ E) (hsbn : (↑sbN : CoPset) ⊆ E)
     (hip : (↑ipoolN : CoPset) ⊆ E) (hie : (↑icEscN : CoPset) ⊆ E)
     (hOk : Ok (appRun (GF := GF))) :
-    appMergeRaw (hlc := hlc) (GF := GF) appPred Ok Okc T gd ⊢
-      iregReg (hlc := hlc) γi γfs sb.sbInodestart icfgNib -∗
+    appMergeRaw (GF := GF) appPred Ok Okc T gd ⊢
+      iregReg γi γfs sb.sbInodestart icfgNib -∗
       bitmapReg γfs sb.sbBmapstart cov ls sb.sbSize -∗ icEscrows cn γfs γi cov ls -∗
       ipoolInv cn γfs γi cov ls icfgNib -∗ sbPark γfs sb -∗
       colAuth γfs Lb C (fsHomeList cov ls) -∗ logTxAuth icfgLog (∅ : RegMapF Unit) -∗ T ={E}=∗
-      snapLawOut (hlc := hlc) (appGuest Okc) T gd C (fsHomeList cov ls) ∗
+      snapLawOut (appGuest Okc) T gd C (fsHomeList cov ls) ∗
       colAuth γfs Lb C (fsHomeList cov ls) ∗ logTxAuth icfgLog (∅ : RegMapF Unit) := by
   -- the masks (Rocq's `solve_ndisj`)
   have dFA : (↑ftopN : CoPset) ## ↑appN := ndot_ne_disjoint nroot (by decide)
@@ -408,7 +408,7 @@ theorem fsCollectDur [Icfg] [CurCtx] (E : CoPset) (cn : IcNames) (γfs : FsNames
   icases Hkeep with ⟨%kv, Hkeep⟩
   ihave Hkeep := (colKeep_root γfs kv).1 $$ Hkeep
   -- THE TRANSPORT IS THE MINT'S CALLER, and the application's crossing
-  imod colMint_out (hlc := hlc) (fsGammaL γfs) (fsGammaL_excl γfs)
+  imod colMint_out (fsGammaL γfs) (fsGammaL_excl γfs)
       (colAuth γfs Lb C (fsHomeList cov ls)) Lb (colAgree γfs Lb C (fsHomeList cov ls)) S I C
       (fsHomeList cov ls) kv T Ok Okc gd hOk hSI hsh hle $$ Hxfer Hauth HS Hkeep Hpa HT
     with ⟨Hauth, HS, Hkeep, Hpa, Hout⟩
@@ -453,16 +453,16 @@ theorem fsCollectGhost [Icfg] [CurCtx] (E : CoPset) (cn : IcNames) (γfs : FsNam
     (hbm : (↑bitmapN : CoPset) ⊆ E) (hsbn : (↑sbN : CoPset) ⊆ E)
     (hip : (↑ipoolN : CoPset) ⊆ E) (hie : (↑icEscN : CoPset) ⊆ E)
     (hn : n = gd + 1) (hOk : Ok (appRun (GF := GF))) :
-    appMergeRaw (hlc := hlc) (GF := GF) appPred Ok Okc T gd ⊢
-      appSyncRunRaw (hlc := hlc) appPred Ok Okc T Hk -∗
-      iregReg (hlc := hlc) γi γfs sb.sbInodestart icfgNib -∗
+    appMergeRaw (GF := GF) appPred Ok Okc T gd ⊢
+      appSyncRunRaw appPred Ok Okc T Hk -∗
+      iregReg γi γfs sb.sbInodestart icfgNib -∗
       bitmapReg γfs sb.sbBmapstart cov ls sb.sbSize -∗ icEscrows cn γfs γi cov ls -∗
       ipoolInv cn γfs γi cov ls icfgNib -∗ sbPark γfs sb -∗
       colAuth γfs Lb C (fsHomeList cov ls) -∗ logTxAuth icfgLog (∅ : RegMapF Unit) -∗
-      ▷ appGuest Okc gt_o -∗ T -∗ startAuth (hlc := hlc) (GF := GF) n -∗
+      ▷ appGuest Okc gt_o -∗ T -∗ startAuth (GF := GF) n -∗
       ([∗list] Q ∈ Qs, Hk Q) ={E}=∗
       (∃ gt : GName, pDurAt gt (colView C (fsHomeList cov ls)) ∗ ▷ appGuest Okc gt) ∗
-      T ∗ startAuth (hlc := hlc) (GF := GF) n ∗ ([∗list] Q ∈ Qs, Q) ∗
+      T ∗ startAuth (GF := GF) n ∗ ([∗list] Q ∈ Qs, Q) ∗
       colAuth γfs Lb C (fsHomeList cov ls) ∗ logTxAuth icfgLog (∅ : RegMapF Unit) := by
   -- the masks (Rocq's `solve_ndisj`)
   have dFA : (↑ftopN : CoPset) ## ↑appN := ndot_ne_disjoint nroot (by decide)
@@ -551,7 +551,7 @@ theorem fsCollectGhost [Icfg] [CurCtx] (E : CoPset) (cn : IcNames) (γfs : FsNam
   icases Hkeep with ⟨%kv, Hkeep⟩
   ihave Hkeep := (colKeep_root γfs kv).1 $$ Hkeep
   -- THE TRANSPORT IS THE MINT'S CALLER, and the application's crossing
-  imod colMint_ghost (hlc := hlc) (fsGammaL γfs) (fsGammaL_excl γfs)
+  imod colMint_ghost (fsGammaL γfs) (fsGammaL_excl γfs)
       (colAuth γfs Lb C (fsHomeList cov ls)) Lb (colAgree γfs Lb C (fsHomeList cov ls)) S I C
       (fsHomeList cov ls) kv T Hk Qs gt_o _ Ok Okc gd n hn hOk hSI hsh hle
       $$ Hxfer Hrun Hauth HS Hkeep Hpa Hold HT Hsa HQs
@@ -586,7 +586,7 @@ end Assembly
 /-! ## 5.  THE LAW, DISCHARGED -/
 
 section Law
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
   [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [Appcfg GF] [MonoListG GF BlockMap]
 
@@ -657,12 +657,12 @@ theorem fsSnapLawBuild [Icfg] [CurCtx] (γ : LogNames) (cn : IcNames) (γfs : Fs
     (Ok Okc : appNames (GF := GF) → Prop) (gd : Nat)
     (hγ : γ = icfgLog) (hnib : nib = icfgNib)
     (hgeom : ColGeom sb sb.sbInodestart nib (fsHomeList cov ls)) (hOk : Ok (appRun (GF := GF))) :
-    fsCrashSeamAt (hlc := hlc) (GF := GF) (appGuest Okc) cov ls ⊢
-      appMergeRaw (hlc := hlc) appPred Ok Okc T gd -∗
-      iregReg (hlc := hlc) γi γfs sb.sbInodestart nib -∗
+    fsCrashSeamAt (GF := GF) (appGuest Okc) cov ls ⊢
+      appMergeRaw appPred Ok Okc T gd -∗
+      iregReg γi γfs sb.sbInodestart nib -∗
       bitmapReg γfs sb.sbBmapstart cov ls sb.sbSize -∗ icEscrows cn γfs γi cov ls -∗
       ipoolInv cn γfs γi cov ls nib -∗ sbPark γfs sb -∗
-      snapLaw (hlc := hlc) γ γfs cov ls T gd := by
+      snapLaw γ γfs cov ls T gd := by
   subst hγ hnib
   iintro #Hseam #Hx #Hir #Hbm #Hesc #Hpool #Hpark
   iapply snapLaw_intro icfgLog γfs cov ls colLawN (appGuest Okc) T gd colLawN_fsbN $$ Hseam
@@ -712,13 +712,13 @@ theorem fsSnapLawGhostBuild [Icfg] [CurCtx] (γ : LogNames) (cn : IcNames) (γfs
     (Ok Okc : appNames (GF := GF) → Prop) (gd : Nat)
     (Hk : IProp GF → IProp GF) (hγ : γ = icfgLog) (hnib : nib = icfgNib)
     (hgeom : ColGeom sb sb.sbInodestart nib (fsHomeList cov ls)) (hOk : Ok (appRun (GF := GF))) :
-    fsCrashSeamAt (hlc := hlc) (GF := GF) (appGuest Okc) cov ls ⊢
-      appMergeRaw (hlc := hlc) appPred Ok Okc T gd -∗
-      appSyncRunRaw (hlc := hlc) appPred Ok Okc T Hk -∗
-      iregReg (hlc := hlc) γi γfs sb.sbInodestart nib -∗
+    fsCrashSeamAt (GF := GF) (appGuest Okc) cov ls ⊢
+      appMergeRaw appPred Ok Okc T gd -∗
+      appSyncRunRaw appPred Ok Okc T Hk -∗
+      iregReg γi γfs sb.sbInodestart nib -∗
       bitmapReg γfs sb.sbBmapstart cov ls sb.sbSize -∗ icEscrows cn γfs γi cov ls -∗
       ipoolInv cn γfs γi cov ls nib -∗ sbPark γfs sb -∗
-      snapLawGhost (hlc := hlc) γ γfs cov ls T gd Hk := by
+      snapLawGhost γ γfs cov ls T gd Hk := by
   subst hγ hnib
   iintro #Hseam #Hx #Hrun #Hir #Hbm #Hesc #Hpool #Hpark
   iapply snapLawGhost_intro icfgLog γfs cov ls colLawN (appGuest Okc) T gd Hk colLawN_fsbN

@@ -62,7 +62,7 @@ end Helpers
 /-! ## 7.  A FREE INUM'S BUNDLE -/
 
 section Free
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsBlocksG GF] [IregG GF] [FsTopG GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF] [FsBlocksG GF] [IregG GF] [FsTopG GF]
 
 /-- A FREE inum owns no block and no indirect block, so the bundle is the
 record proxy beside the TIED abstract fragment (Rocq's
@@ -99,7 +99,7 @@ end Free
 /-! ## THE DOOR: ONE REGION SLOT, AT A QUIESCENT TRANSACTION LEDGER -/
 
 section Slot
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
   [FsBlocksG GF] [FsTopG GF] [FsLinkG GF]
 

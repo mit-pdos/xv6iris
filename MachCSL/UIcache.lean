@@ -29,12 +29,12 @@ open Sail Sail.ConcurrencyInterfaceV1
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}}
+variable {GF : BundledGFunctors.{0}}
 
 /-! ## The instruction-view receipt against the memory model -/
 
 section memmodel
-variable [MachFixedGS hlc GF] (E : EraGS)
+variable [MachFixedGS GF] (E : EraGS)
 
 /-- A receipt of `cpu`'s instruction view is under the model's `itv`. -/
 theorem uic_memModel_iviewLb (σ : MState) (cpu : CPU) (K : Nat) :
@@ -79,7 +79,7 @@ theorem uic_memModel_iviewLb_get (σ : MState) (cpu : CPU) :
 end memmodel
 
 section ambient
-variable [MachGS hlc GF]
+variable [MachGS GF]
 
 /-! ## A1: forgetting the stamp -/
 

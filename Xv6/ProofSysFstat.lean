@@ -60,7 +60,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -76,7 +76,7 @@ theorem sfs_fail_exit (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : B
     kctx cpu (((k.withSpie spie spp).pushed 4).withRegs R) ∗
     pcIs cpu (KA.«sys_fstat» + 0x32#64) ∗ frame4s0 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    procPrivFd γ (procAddr j) pid V M ∗ filestatFsEnv (hlc := hlc) ∗
+    procPrivFd γ (procAddr j) pid V M ∗ filestatFsEnv ∗
     (∀ c : CPU, sysFstatPost k γ j pid V M v v1 c)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Hblk, Henv, HΦ⟩
@@ -143,7 +143,7 @@ theorem sfs_fail_arm (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bi
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) w2 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
-    procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ filestatFsEnv (hlc := hlc) ∗
+    procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ filestatFsEnv ∗
     (∀ c : CPU, sysFstatPost k γ j pid V M v v1 c)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hra, Hs0, Hcf, Hcs, Hte, Hce, Hcore, Howe, Henv, HΦ⟩
@@ -207,7 +207,7 @@ set_option maxHeartbeats 16000000 in
 (`procOfilesOwe_lend`, Rocq `proc_priv_lend`) and the core (filestat's
 block, `procPrivFd_split`'s left half), with the environment the state
 selects (`filestat_env_split`); filestat's return goes to `sfs_ok_back`. -/
-theorem sfs_ok_jal (FS : FILESTAT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem sfs_ok_jal (FS : FILESTAT) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (v v1 : BitVec 64) (γkl : GName) (γk : KmemNames)
     (spie spp : Bool) (R : RegMap) (fd0 : Nat) (fv : BitVec 64)
@@ -224,7 +224,7 @@ theorem sfs_ok_jal (FS : FILESTAT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) v1 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
-    procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ filestatFsEnv (hlc := hlc) ∗
+    procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ filestatFsEnv ∗
     (∀ c : CPU, sysFstatPost k γ j pid V M v v1 c)
     ⊢ wpLoop (GF := GF) cpu := by
   have hK80 := hK
@@ -272,7 +272,7 @@ set_option maxHeartbeats 16000000 in
 /-- **`+0x1e .. +0x2a`, argfd SUCCEEDED** (`a0 = 0`): `mv a5,a0`, the
 hoisted `li a0,-1`, `bltz` falls through, the two loads (`a1 := st`,
 `a0 := f`); then `sfs_ok_jal`. -/
-theorem sfs_ok_loads (FS : FILESTAT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem sfs_ok_loads (FS : FILESTAT) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (v v1 : BitVec 64) (γkl : GName) (γk : KmemNames)
     (spie spp : Bool) (R : RegMap) (fd0 : Nat) (fv : BitVec 64)
@@ -288,7 +288,7 @@ theorem sfs_ok_loads (FS : FILESTAT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) v1 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
-    procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ filestatFsEnv (hlc := hlc) ∗
+    procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ filestatFsEnv ∗
     (∀ c : CPU, sysFstatPost k γ j pid V M v v1 c)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, #Hpi, #Hpe, #Hkl, #Hav, Hra, Hs0, Hcf, Hcs, Hte, Hce, Hcore, Howe, Henv, HΦ⟩
@@ -326,7 +326,7 @@ theorem sfs_ok_loads (FS : FILESTAT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x12 .. +0x1a`: `argfd(0, 0, &f)`** (`pfd` null, `pf = &f`), and
 its answer dispatched to the two arms (`sfs_fail_arm`, `sfs_ok_loads`). -/
-theorem sfs_argfd_call (AF : ARGFD) (FS : FILESTAT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem sfs_argfd_call (AF : ARGFD) (FS : FILESTAT) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (v v1 : BitVec 64) (γkl : GName) (γk : KmemNames)
     (spie spp : Bool) (R : RegMap) (wf : BitVec 64)
@@ -343,7 +343,7 @@ theorem sfs_argfd_call (AF : ARGFD) (FS : FILESTAT) (Γ : SchedNames) [ClaimIs (
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) v1 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
-    procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ filestatFsEnv (hlc := hlc) ∗
+    procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ filestatFsEnv ∗
     (∀ c : CPU, sysFstatPost k γ j pid V M v v1 c)
     ⊢ wpLoop (GF := GF) cpu := by
   have hK80 := hK
@@ -401,13 +401,13 @@ set_option maxHeartbeats 16000000 in
 /-- **`sys_fstat` meets its specification**, at either entry `SIE`: the
 prologue and `argaddr(1, &st)`; then `sfs_argfd_call`. -/
 theorem sys_fstat_main (AA : ARGADDR) (AF : ARGFD) (FS : FILESTAT)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (v v1 : BitVec 64) (γkl : GName) (γk : KmemNames)
     (hv : V.tf[tfArgIdx 0]? = some v) (hv1 : V.tf[tfArgIdx 1]? = some v1)
     (hK : sysFstatSlots ≤ k.avail) (hj : j < NPROC) (hproc : k.proc = procAddr j)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) :
-    wp_sys_fstat_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ j pid V M v v1 γkl γk
+    wp_sys_fstat_eb_body (GF := GF) Γ cpu k γ j pid V M v v1 γkl γk
       hv hv1 hK hj hproc hnoff htier := by
   unfold wp_sys_fstat_eb_body
   have hK80 := hK

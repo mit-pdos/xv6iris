@@ -60,7 +60,7 @@ theorem namexEra_par_len (pl : List (BitVec 8)) (es0 : List Fname) (el : Fname)
   unfold npElems; rw [hes, List.dropLast_concat]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -71,7 +71,7 @@ cursor -- type, nlink (and the receipt's mint), nameiparent's early stop --
 dispatching to `L_notdir`, `L_nlink` (LEFT deaths), `L_par` (the parent's
 PIN) or the lookup (the fire). -/
 theorem namexEra_tests (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKUP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : NamexArgs) (hs : NamexStatic k A) (P Pmiss : Nat → Nat → IProp GF)
     (spie spp : Bool) (R : RegMap)
     (o2 ik : Nat) (q : Qp) (g : GName) (lo tl : Nat) (inum : BitVec 32) (dn : Dinode) (bm : Blkmap)
@@ -81,7 +81,7 @@ theorem namexEra_tests (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKUP)
     (hns2 : A.pfun o2 ≠ SLASH) :
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0xca#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    namexEnv (hlc := hlc) Γ A ∗
+    namexEnv Γ A ∗
     namexLk A ik q g lo tl inum dn γil γisl ∗ icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
     irefSlots 1 ∗ namexKeep k A ∗ namexPath k A ∗ byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) ∗
     bslots 3 ∗ logOpS icfgLog ncur Scur ∗
@@ -150,7 +150,7 @@ theorem namexEra_tests (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKUP)
   iintro Hk Hpc
   have hnl := namex_nlink_nz dn.diNlink hnz
   -- ===== THE RECEIPT'S MINT =====
-  icases namexEnv_open (hlc := hlc) Γ A $$ Henv with
+  icases namexEnv_open Γ A $$ Henv with
     ⟨#Hpi, #Hpe, #Hbc, #Hlc, #Hdc, #Hkl, #Hav, #Hit2, #Hiti, #Hslks, #Hinv, #Hopen, #Hbmi⟩
   icases logOpS_named icfgLog ncur Scur $$ Hop with ⟨%e0, Hop⟩
   ihave #Hlb := logOpSe_lb icfgLog ncur Scur e0 $$ Hop
@@ -231,7 +231,7 @@ set_option maxHeartbeats 16000000 in
 THE CURSOR (`dcur` is the locked directory's inum from here on); then the
 tests (`namexEra_tests`). -/
 theorem namexEra_level (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKUP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : NamexArgs) (hs : NamexStatic k A) (P Pmiss : Nat → Nat → IProp GF)
     (spie spp : Bool) (R : RegMap)
     (o2 : Nat) (ipv : BitVec 64) (dcur : Nat) (nf : Nat → BitVec 8) (ncur : Nat) (Scur : List Nat)
@@ -244,7 +244,7 @@ theorem namexEra_level (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRL
     (hfu : A.plen - o2 < fuel) (hns2 : A.pfun o2 ≠ SLASH) :
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0xc4#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    namexEnv (hlc := hlc) Γ A ∗ namexEraWalk k A P Pmiss ipv dcur es0.length ncur Scur nf ∗
+    namexEnv Γ A ∗ namexEraWalk k A P Pmiss ipv dcur es0.length ncur Scur nf ∗
     (∀ c' : CPU, namexEraPostR k A P Pmiss c') ∗ namexEraLoop k A P Pmiss fuel
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Henv, Hwalk, Hnext, IH⟩
@@ -262,7 +262,7 @@ theorem namexEra_level (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRL
   -- THE SHED, at the reference's own generation
   icases (inodeRef_gen_intro ik q icfgDev inum).1 $$ Href with ⟨%g, %lo, %tl, %hle, #Hfl, Href⟩
   icases (inodeRefGenlo_shed ik q icfgDev inum g lo).1 $$ Href with ⟨Hpar, Hshr⟩
-  icases namexEnv_open (hlc := hlc) Γ A $$ Henv with
+  icases namexEnv_open Γ A $$ Henv with
     ⟨#Hpi, #Hpe, #Hbc, #Hlc, #Hdc, #Hkl, #Hav, #Hit2, #Hiti, #Hslks, #Hinv, #Hopen, #Hbmi⟩
   ihave #Hescs := isItable2_escrows $$ Hit2
   ihave #Hesc := icEscrows_lookup fscIc fscFs fscIreg fscCov fscLogst ik hik $$ Hescs

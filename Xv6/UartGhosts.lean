@@ -43,7 +43,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-! ## The transmit side (Rocq `uart_ghosts`) -/
 
@@ -422,8 +422,8 @@ STAMP, and THAT THE MACHINE WAS ON (Rocq relax-d2 lane K1: with the era
 stamp it makes one byte's open SEGMENT a prefix of a later byte's, which is
 how the flush's witness travels forward). -/
 def rxRider (i : UartId) (γ : UartNames) (h : List Obs) : IProp GF := iprop%
-  MachFixedGS.rxTag (hlc := hlc) (GF := GF) h ∗ obsHistLb h ∗ outLb γ (obsWire i (openSeg h)) ∗
-  ⌜obsBoots h = genId (hlc := hlc) (GF := GF) + 1⌝ ∗ ⌜traceShape h true⌝
+  MachFixedGS.rxTag (GF := GF) h ∗ obsHistLb h ∗ outLb γ (obsWire i (openSeg h)) ∗
+  ⌜obsBoots h = genId (GF := GF) + 1⌝ ∗ ⌜traceShape h true⌝
 
 instance rxRider_persistent (i : UartId) (γ : UartNames) (h : List Obs) :
     Persistent (rxRider (GF := GF) i γ h) := by
@@ -436,7 +436,7 @@ instance rxRider_timeless (i : UartId) (γ : UartNames) (h : List Obs) :
 def uartCol (i : UartId) (γ : UartNames) (u : UartState) (ins : List (BitVec 8))
     (hs : List (List Obs)) (k : Nat) (hl ht : Option (List Obs)) : IProp GF := iprop%
   rxInAuth γ ins ∗ rxPopAuth γ k hl ∗ ([∗list] h ∈ hs, rxRider i γ h) ∗ obsHistLbO ht ∗
-  ⌜colTopEra (genId (hlc := hlc) (GF := GF) + 1) ht⌝ ∗ ⌜uartColOk i u ins hs k hl ht⌝
+  ⌜colTopEra (genId (GF := GF) + 1) ht⌝ ∗ ⌜uartColOk i u ins hs k hl ht⌝
 
 /-- THE COLUMN, as the invariant carries it (Rocq `uart_colE`). -/
 def uartColE (i : UartId) (γ : UartNames) (u : UartState) : IProp GF := iprop%
@@ -704,7 +704,7 @@ theorem uartCol_push (i : UartId) (γ : UartNames) (u u' : UartState) (ins : Lis
 console port's is the fixed record's `consRes`; the kernel's own port claims
 nothing. -/
 def chistAt : UartId → Nat → List Obs → ConsHist → IProp GF
-  | .uart0, k, ho, H => MachFixedGS.consRes (hlc := hlc) (GF := GF) k ho H
+  | .uart0, k, ho, H => MachFixedGS.consRes (GF := GF) k ho H
   | .uart1, _, _, _ => iprop(emp)
 
 instance chistAt_timeless (i : UartId) (k : Nat) (ho : List Obs) (H : ConsHist) :
@@ -902,12 +902,12 @@ the machine's, the history's well-formedness, and THE LOG IS COMPLETE UP TO
 ITS TOP (`consLogIns`, relax-d2 lane K1). -/
 def consClaimAt (i : UartId) (γ : UartNames) (u : UartState) : IProp GF := iprop%
   ∃ (o : Option (List Obs)) (H : ConsHist),
-    obsHistLbO o ∗ chistAt i (genId (hlc := hlc) (GF := GF) + 1) (o.getD []) H ∗
+    obsHistLbO o ∗ chistAt i (genId (GF := GF) + 1) (o.getD []) H ∗
     logHi γ (1 : Qp).half (logTop H.chLog) ∗ uartDeliv γ (1 : Qp).half H.chDl ∗
     uartDlcnt γ (1 : Qp).half H.chDl.length ∗
     inLogAuth γ H.chLog ∗ uartLogm γ (1 : Qp).half H.chLog ∗ uartArm γ (1 : Qp).half H.chArm ∗
     ⌜H.chAcc = Uart.acc u⌝ ∗ ⌜consHistOk H⌝ ∗
-    ⌜consLogIns (genId (hlc := hlc) (GF := GF) + 1) i H.chLog⌝
+    ⌜consLogIns (genId (GF := GF) + 1) i H.chLog⌝
 
 instance consClaimAt_timeless (i : UartId) (γ : UartNames) (u : UartState) :
     Timeless (consClaimAt (GF := GF) i γ u) := by

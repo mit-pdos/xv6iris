@@ -115,7 +115,7 @@ theorem sys_exec_uargv_i (v : BitVec 64) (i : Nat) (hi : i < 32) :
 /-! ## The pages -/
 
 section Pages
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- **Rocq `sx_pages_close`**: this round's page joins the run, at the
 updated page / byte functions. -/
@@ -147,12 +147,12 @@ theorem sysExecPages_push (pg : Nat → BitVec 64) (afun : Nat → Nat → BitVe
 end Pages
 
 /-- The allocator and the rest of `fsReady` out of the fabric. -/
-theorem sysExecEnv_ready {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+theorem sysExecEnv_ready {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [CtokG GF] [WchG GF] [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames)
     (A : SysExecArgs) :
-    sysExecEnv (hlc := hlc) (GF := GF) Γ A ⊢ fsReady (hlc := hlc) := by
+    sysExecEnv (GF := GF) Γ A ⊢ fsReady := by
   unfold sysExecEnv fsFabric
   iintro ⟨H, -⟩
   iexact H
@@ -160,7 +160,7 @@ theorem sysExecEnv_ready {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
 /-! ## The three callees -/
 
 section Calls
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -174,7 +174,7 @@ theorem sys_exec_fetchaddr (FA : FETCHADDR) (cpu : CPU) (k' : KCtx) (se : Bool) 
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hnoff : k'.noff = 0)
     (hK : fetchaddrSlots ≤ k'.avail) :
     kctx cpu k' ∗ pcIs cpu KA.«fetchaddr» ∗ trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗
-    fsReady (hlc := hlc) ∗ procPrivExt (procAddr j) pid V P M ∗
+    fsReady ∗ procPrivExt (procAddr j) pid V P M ∗
     wordPointsTo (k'.regs 11#5) 8 (DFrac.own 1) oldv ∗
     (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (w : BitVec 64) (kv : Nat),
       ⌜calleeSaved k'.regs R' ∧ P.extSz V.sz P' ∧
@@ -190,7 +190,7 @@ theorem sys_exec_fetchaddr (FA : FETCHADDR) (cpu : CPU) (k' : KCtx) (se : Bool) 
   iintro ⟨Hk, Hpc, Hte, Hce, #Hrdy, Hblk, Hcell, HK⟩
   icases sysfile_nolocks cpu k' hnoff $$ Hk with ⟨%hlocks, Hk⟩
   icases fsReady_kmem $$ Hrdy with ⟨#Hkl, #Hav⟩
-  have h := FA.wp_fetchaddr (hlc := hlc) (GF := GF) cpu k' fscKalloc fsReadyKmem j pid V P M oldv
+  have h := FA.wp_fetchaddr (GF := GF) cpu k' fscKalloc fsReadyKmem j pid V P M oldv
     hj hproc (by rw [hnoff]; omega) hK (by rw [hlocks]; simp)
   unfold wp_fetchaddr_body at h
   simp only [fetchaddrAddr] at h
@@ -213,7 +213,7 @@ receipt dropped). -/
 theorem sys_exec_kalloc (KL : KALLOC) (cpu : CPU) (k' : KCtx) (se : Bool) (hs : k'.sie = se)
     (pj : BitVec 64) (hpj : k'.proc = pj) (hnoff : k'.noff = 0) (hK : 14 ≤ k'.avail) (kc : Nat) :
     kctx cpu k' ∗ pcIs cpu KA.«kalloc» ∗ trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗
-    fsReady (hlc := hlc) ∗ actLend pj kc ∗
+    fsReady ∗ actLend pj kc ∗
     (∀ (c : CPU) (spie spp : Bool) (R' : RegMap), ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c se -∗ cpuClaimExt c se pj -∗ actLend pj (kc + 1) -∗
@@ -223,7 +223,7 @@ theorem sys_exec_kalloc (KL : KALLOC) (cpu : CPU) (k' : KCtx) (se : Bool) (hs : 
   iintro ⟨Hk, Hpc, Hte, Hce, #Hrdy, Hl, HK⟩
   icases sysfile_nolocks cpu k' hnoff $$ Hk with ⟨%hlocks, Hk⟩
   icases fsReady_kmem $$ Hrdy with ⟨#Hkl, #Hav⟩
-  have h := KL.wp_kalloc_led (hlc := hlc) (GF := GF) cpu k' fscKalloc fsReadyKmem none kc
+  have h := KL.wp_kalloc_led (GF := GF) cpu k' fscKalloc fsReadyKmem none kc
     (by rw [hnoff]; omega) hK (by rw [hlocks]; simp)
   unfold wp_kalloc_led_body at h
   simp only [kallocAddr] at h
@@ -248,7 +248,7 @@ theorem sys_exec_fetchstr (FS : FETCHSTR) (cpu : CPU) (k' : KCtx) (se : Bool) (h
     (hK : fetchstrSlots ≤ k'.avail)
     (hmax : k'.regs 12#5 = BitVec.ofNat 64 old.length) (hmax' : old.length < 2 ^ 31) :
     kctx cpu k' ∗ pcIs cpu KA.«fetchstr» ∗ trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗
-    fsReady (hlc := hlc) ∗ procPrivBareAt curCtx pa pid V M ∗
+    fsReady ∗ procPrivBareAt curCtx pa pid V M ∗
     byteBuf (k'.regs 11#5) (DFrac.own 1) old ∗
     (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (bs : List (BitVec 8)) (kv : Nat),
       ⌜calleeSaved k'.regs R' ∧ V.upt.extSz V.sz P' ∧
@@ -264,7 +264,7 @@ theorem sys_exec_fetchstr (FS : FETCHSTR) (cpu : CPU) (k' : KCtx) (se : Bool) (h
   iintro ⟨Hk, Hpc, Hte, Hce, #Hrdy, Hblk, Hbuf, HK⟩
   icases sysfile_nolocks cpu k' hnoff $$ Hk with ⟨%hlocks, Hk⟩
   icases fsReady_kmem $$ Hrdy with ⟨#Hkl, #Hav⟩
-  have h := FS.wp_fetchstr (hlc := hlc) (GF := GF) cpu k' fscKalloc fsReadyKmem pa pid V M old
+  have h := FS.wp_fetchstr (GF := GF) cpu k' fscKalloc fsReadyKmem pa pid V M old
     hproc htier (by rw [hnoff]; omega) hK (by rw [hlocks]; simp) hmax hmax'
   unfold wp_fetchstr_body at h
   simp only [fetchstrAddr] at h

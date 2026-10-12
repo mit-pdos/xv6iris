@@ -34,7 +34,7 @@ theorem flags2perm_beq (x : BitVec 64) : bcond bop.BEQ (x &&& 2#64) 0#64 = !x.ge
   cases hb : x.getLsbD 1 <;> simp_all [bcond]
 
 set_option maxHeartbeats 4000000 in
-theorem flags2perm_proof : FLAGS2PERM := ⟨fun {hlc GF} _ _ cpu k hK => by
+theorem flags2perm_proof : FLAGS2PERM := ⟨fun {GF} _ _ cpu k hK => by
   unfold wp_flags2perm_body
   iintro ⟨Hk, Hpc, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩

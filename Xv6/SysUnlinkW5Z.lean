@@ -144,7 +144,7 @@ theorem sys_unlink_zeroed [Fscfg] [Icfg] (inum : Nat) (dnd dnW dn0W : Dinode) (b
   · exact dirUniq_zero dnd dnW datd datW kk hty' (le_of_eq (by rw [hsz'])) hzer hduq
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -178,7 +178,7 @@ def sysUnlinkAtAe (Γ : SchedNames) (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF
   suAny (sysUnlinkPath (k.regs 2#5)) 128 ∗
   wordPointsTo (sysUnlinkOff (k.regs 2#5)) 4 (DFrac.own 1) (BitVec.ofNat 32 (16 * kk)) ∗
   suAny (sysUnlinkDel (k.regs 2#5)) 16 ∗
-  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv (hlc := hlc) Γ ∗
+  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv Γ ∗
   wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ sysUnlinkHole A k.proc P2 ∗
   (∀ c : CPU, sysUnlinkPostA k A c) ∗
   sysUnlinkLkAt A.pid kd q g lo tl dinum dnd γil γisl t (1 : Qp).half.half ∗
@@ -204,7 +204,7 @@ set_option maxHeartbeats 64000000 in
 /-- **+0x8a .. +0xae**: the memset, the zeroing writei, its two refusals
 (one live panic), and the +0xae seam. -/
 theorem sys_unlink_w5_zero (WI : WRITEI) (MS : MEMSET) (PA : PANIC) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF) (ok : SuOk k A)
+    [ClaimIs GF Γ] (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF) (ok : SuOk k A)
     (spie spp : Bool) (R : RegMap) (s3v : BitVec 64) (nf : Nat → BitVec 8) (tln : List (BitVec 8))
     (P2 : UPtd) (pl : List (BitVec 8)) (kd : Nat) (q : Qp) (g : GName) (lo tl : Nat)
     (dinum : BitVec 32) (dnd : Dinode) (bmd : Blkmap) (datd : Nat → List (BitVec 8))
@@ -213,10 +213,10 @@ theorem sys_unlink_w5_zero (WI : WRITEI) (MS : MEMSET) (PA : PANIC) (Γ : SchedN
     (Sb : List Nat) (isdir : Bool)
     (hZ : ∀ (cpu : CPU) (spie spp : Bool) (R : RegMap) (dnW : Dinode) (bmW : Blkmap)
         (datW : Nat → List (BitVec 8)) (nw : Nat) (Sbw : List Nat),
-      sysUnlinkAtAe (hlc := hlc) Γ cpu k A spie spp R nf tln P2 pl kd q g lo tl dinum dnd bmd datd
+      sysUnlinkAtAe Γ cpu k A spie spp R nf tln P2 pl kd q g lo tl dinum dnd bmd datd
         γil γisl kk ks qi gi loi tli dni bmi dati γili γisli t dnW bmW datW nw Sbw isdir
         ⊢ wpLoop cpu) :
-    sysUnlinkAt8a (hlc := hlc) Γ cpu k A spie spp R s3v nf tln P2 pl kd q g lo tl dinum dnd bmd datd
+    sysUnlinkAt8a Γ cpu k A spie spp R s3v nf tln P2 pl kd q g lo tl dinum dnd bmd datd
       γil γisl kk ks qi gi loi tli dni bmi dati γili γisli t n Sb isdir
     ⊢ wpLoop (GF := GF) cpu := by
   unfold sysUnlinkAt8a

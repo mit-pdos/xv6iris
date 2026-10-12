@@ -16,7 +16,7 @@ open Std (ExtTreeSet)
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -25,9 +25,9 @@ theorem wp_catStart (UL : UK_LEAVES) (HM : CAT_MAIN) (N : UkNames GF) (h : CPU) 
     (args : List UArg) (f : Nat → BitVec 8) (n : Nat) (Ci Cend : IProp GF)
     (hptr : ∀ (j : Nat) (g : UArg), args[j]? = some g → g.ptr ≠ 0)
     (ha0 : m.get 10#5 = BitVec.ofNat 64 args.length) (ha1 : m.get 11#5 = BitVec.ofNat 64 av) :
-    ⊢ kcatPayAll (hlc := hlc) N args Ci Cend -∗ (Cend -∗ kcatExit (hlc := hlc) N 0) -∗
+    ⊢ kcatPayAll N args Ci Cend -∗ (Cend -∗ kcatExit N 0) -∗
       ukCode N.t User.Cat.code.byte -∗ uargv N.d av args -∗ Ci -∗ ubytes N.d User.Cat.Sym.«buf» 512 f -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Cat.Sym.«start»)
+      urun N h m (BitVec.ofNat 64 User.Cat.Sym.«start»)
         (2 + (6 + (8 + (10 + (12 + (4 + n)))))) -∗ wpLoop h := by
   rw [show User.Cat.Sym.«start» = 0xf6 from rfl]
   iintro Hpay Hend #Hc #Hargv HCi Hbuf Hrun

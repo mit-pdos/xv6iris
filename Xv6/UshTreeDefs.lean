@@ -63,7 +63,7 @@ inductive UshPtr : Type
   | pipe (pl pr : Nat) (l r : UshPtr)
 
 section UshTreeDefs
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -152,15 +152,15 @@ lent the walk -- at ANY budget from `K` up (so one copy serves every call
 depth, `ushpOom_mono`). -/
 def ushpOom (N : UkNames GF) (Pex : IProp GF) (K : Nat) : IProp GF :=
   iprop(□ (∀ (h : CPU) (m : RegMap) (k : Nat), ⌜K ≤ k⌝ -∗ ⌜m.get 10#5 = BitVec.ofNat 64 ushpOomStr⌝ -∗ Pex -∗
-    urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«panic») k -∗ wpLoop h))
+    urun N h m (BitVec.ofNat 64 User.Sh.Sym.«panic») k -∗ wpLoop h))
 
 instance ushpOom_persistent (N : UkNames GF) (Pex : IProp GF) (K : Nat) :
-    Persistent (ushpOom (hlc := hlc) N Pex K) := by
+    Persistent (ushpOom N Pex K) := by
   unfold ushpOom; infer_instance
 
 /-- **Rocq `ushp_oom_mono`**. -/
 theorem ushpOom_mono (N : UkNames GF) (Pex : IProp GF) (K K' : Nat) (hK : K ≤ K') :
-    ushpOom (hlc := hlc) N Pex K ⊢ ushpOom (hlc := hlc) N Pex K' := by
+    ushpOom N Pex K ⊢ ushpOom N Pex K' := by
   unfold ushpOom
   iintro #H
   imodintro
@@ -169,7 +169,7 @@ theorem ushpOom_mono (N : UkNames GF) (Pex : IProp GF) (K K' : Nat) (hK : K ≤ 
 
 /-- **Rocq `ushp_oom_wand`**: contravariant in the lend. -/
 theorem ushpOom_wand (N : UkNames GF) (Pex Pex' : IProp GF) (K : Nat) :
-    ⊢ □ (Pex' -∗ Pex) -∗ ushpOom (hlc := hlc) N Pex K -∗ ushpOom (hlc := hlc) N Pex' K := by
+    ⊢ □ (Pex' -∗ Pex) -∗ ushpOom N Pex K -∗ ushpOom N Pex' K := by
   unfold ushpOom
   iintro #Hw #H
   imodintro
@@ -183,7 +183,7 @@ out-of-memory law at `K` -- lent only when a redirect is consumed. -/
 def ushRedirsRes (N : UkNames GF) (rs : List Rredir) (dv : DFrac) (Pex : IProp GF) (K : Nat) : IProp GF :=
   match rs with
   | [] => iprop(emp)
-  | _ :: _ => iprop(ustr N.d dv ushSymA 7 ushpSymF ∗ Pex ∗ ushpOom (hlc := hlc) N Pex K)
+  | _ :: _ => iprop(ustr N.d dv ushSymA 7 ushpSymF ∗ Pex ∗ ushpOom N Pex K)
 
 /-- **Rocq `ushp_atree`**: the tree at `p` with every child pointer NAMED by
 `a` and the constructors' bounds kept. -/
@@ -203,12 +203,12 @@ def ushOTree (N : UkNames GF) (s0 p : Nat) (t : UshpCmd) : IProp GF :=
 /-- **Rocq `UkShRedirs.ushp_malloc_chain`**: `k` calls, chained. -/
 def ushMallocChain (N : UkNames GF) : Nat → IProp GF → IProp GF → Prop
   | 0, UM, UM' => UM = UM'
-  | k + 1, UM, UM' => ∃ UM1 : IProp GF, ushmMallocTyLe (hlc := hlc) N 168 UM UM1 ∧ ushMallocChain N k UM1 UM'
+  | k + 1, UM, UM' => ∃ UM1 : IProp GF, ushmMallocTyLe N 168 UM UM1 ∧ ushMallocChain N k UM1 UM'
 
 /-- **Rocq `ushp_malloc_chain_split`**. -/
 theorem ushMallocChain_split (N : UkNames GF) :
-    ∀ (k k' : Nat) (UM UM' : IProp GF), ushMallocChain (hlc := hlc) N (k + k') UM UM' →
-      ∃ UM1, ushMallocChain (hlc := hlc) N k UM UM1 ∧ ushMallocChain (hlc := hlc) N k' UM1 UM'
+    ∀ (k k' : Nat) (UM UM' : IProp GF), ushMallocChain N (k + k') UM UM' →
+      ∃ UM1, ushMallocChain N k UM UM1 ∧ ushMallocChain N k' UM1 UM'
   | 0, k', UM, UM', h => ⟨UM, rfl, by simpa using h⟩
   | k + 1, k', UM, UM', h => by
     rw [Nat.add_right_comm] at h
@@ -222,9 +222,9 @@ def wpUshMemsetBody : Prop :=
   ∀ (N : UkNames GF) (h : CPU) (m : RegMap) (a Nb : Nat) (f : Nat → BitVec 8) (n : Nat),
     m.get 10#5 = BitVec.ofNat 64 a → m.get 12#5 = BitVec.ofNat 64 Nb → 0 < Nb → Nb < 2 ^ 31 →
     ⊢ ushCode N.t -∗ ubytes N.d a Nb f -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«memset») (2 + n) -∗
+      urun N h m (BitVec.ofNat 64 User.Sh.Sym.«memset») (2 + n) -∗
       (ubytes N.d a Nb (fun _ => nthByte (n := 8) (m.get 11#5) 0) -∗ ∀ (h' : CPU) (m' : RegMap),
-        ⌜ucalleeSaved m m'⌝ -∗ urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (2 + n) -∗ wpLoop h') -∗
+        ⌜ucalleeSaved m m'⌝ -∗ urun N h' m' (retPc (m.get 1#5)) (2 + n) -∗ wpLoop h') -∗
       wpLoop h
 
 /-- **Rocq `UkSh.wp_ksh_memset_null`**: memset at a TEXT address (NULL) --
@@ -233,7 +233,7 @@ def wpUshMemsetNullBody : Prop :=
   ∀ (N : UkNames GF) (h : CPU) (m : RegMap) (a Nb : Nat) (b0 : BitVec 8) (n : Nat),
     a + Nb < 2 ^ 38 → m.get 10#5 = BitVec.ofNat 64 a → m.get 12#5 = BitVec.ofNat 64 Nb → 0 < Nb → Nb < 2 ^ 31 →
     ⊢ ushCode N.t -∗ utext N.t a b0 -∗ N.pay (-1) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«memset») (2 + n) -∗ wpLoop h
+      urun N h m (BitVec.ofNat 64 User.Sh.Sym.«memset») (2 + n) -∗ wpLoop h
 
 end UshTreeDefs
 
@@ -241,11 +241,11 @@ end UshTreeDefs
 Rocq `UkSh.wp_ksh_memset` and `wp_ksh_memset_null`, proved by the sh-main
 lane. -/
 structure USH_MEMSET : Prop where
-  wp_ushMemset : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+  wp_ushMemset : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
-    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpUshMemsetBody (hlc := hlc) (GF := GF)
-  wp_ushMemsetNull : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
+    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpUshMemsetBody (GF := GF)
+  wp_ushMemsetNull : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF]
     [UprogSG GF] [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
-    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpUshMemsetNullBody (hlc := hlc) (GF := GF)
+    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpUshMemsetNullBody (GF := GF)
 
 end Xv6

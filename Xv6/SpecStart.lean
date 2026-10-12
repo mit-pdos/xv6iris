@@ -55,7 +55,7 @@ in supervisor mode at `main` with `tp = a5 = sext32(hartid)`,
 frame holding the saved `ra`/`s0`, `timerinit`'s frame below it holding
 `start`'s `s0`/`ra`, and the configuration `startConf t`.  The 32 bytes
 below `sp₀` are the two frames. -/
-def wp_start_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+def wp_start_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (dq : DFrac) (hartid ret sp₀ v4 v8 v14 v15 f0 f8 g0 g8 : BitVec 64) :
     Prop :=
   mBoot cpu (DFrac.own 1) ∗
@@ -86,8 +86,8 @@ def wp_start_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Cur
 
 /-- The interface of `start`. -/
 structure START : Prop where
-  wp_start : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+  wp_start : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (dq : DFrac) (hartid ret sp₀ v4 v8 v14 v15 f0 f8 g0 g8 : BitVec 64),
-    wp_start_body (hlc := hlc) (GF := GF) cpu dq hartid ret sp₀ v4 v8 v14 v15 f0 f8 g0 g8
+    wp_start_body (GF := GF) cpu dq hartid ret sp₀ v4 v8 v14 v15 f0 f8 g0 g8
 
 end Xv6

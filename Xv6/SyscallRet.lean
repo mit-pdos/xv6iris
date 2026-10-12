@@ -141,7 +141,7 @@ theorem syscRows_secc (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List F
 
 /-- The block's trapframe page, out for a store and back at any word list
 (the ambient-context form of `procPrivFd_tfUpd`; the tier is the kernel's). -/
-theorem syscall_tf_acc {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+theorem syscall_tf_acc {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF]
     [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [X : CurCtx] (hct : curTier = KTier.kpt)
@@ -161,7 +161,7 @@ theorem syscall_tf_acc {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- The block's trapframe has its 36 words (`tfPageAt`'s length row), the
 block kept -- what `syscRows_keep` / `syscStore_a0` need. -/
-theorem syscall_tf_len {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+theorem syscall_tf_len {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF]
     [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx] (hct : curTier = KTier.kpt)
@@ -180,7 +180,7 @@ theorem syscall_tf_len {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
   ipureintro; exact hl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
@@ -199,14 +199,14 @@ theorem syscall_epilogue_tail (PT : SchedNames → IProp GF) (Γ : SchedNames)
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     bslots 3 ∗ syscInitId ip ∗ fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
-    syscallEnv (hlc := hlc) PT Γ γ ∗
+    syscallEnv PT Γ γ ∗
     procPrivFd γ (procAddr j) pid V2 M2 ∗ fdFrags V.fdg sts' ∗ chFrag V.chg (procAddr j) cs' ∗
-    syscExecOut (hlc := hlc) V M V2 M2 sts sts' gn cs pid ∗
-    syscSysOut (hlc := hlc) f V M sts gn cs pid (syscA0 V2) (syscImg V2 M2) sts' V2.cwi cs' ∗
+    syscExecOut V M V2 M2 sts sts' gn cs pid ∗
+    syscSysOut f V M sts gn cs pid (syscA0 V2) (syscImg V2 M2) sts' V2.cwi cs' ∗
     syscForkOut f V (syscA0 V2) cs cs' ∗
     syscWaitOut V M (syscImg V2 M2) (syscA0 V2) cs cs' pid ∗
-    syscEvOut (hlc := hlc) V M sts V2 M2 cs cs' gn ∗
-    wpNext true k.proc c0 (syscallPost (hlc := hlc) PT Γ k γ j pid V M sts gn cs ip f)
+    syscEvOut V M sts V2 M2 cs cs' gn ∗
+    wpNext true k.proc c0 (syscallPost PT Γ k γ j pid V M sts gn cs ip f)
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨h2, p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := hpins
   have hK4 : 4 ≤ k.avail := by
@@ -257,15 +257,15 @@ theorem syscall_ret_tail (PT : SchedNames → IProp GF) (Γ : SchedNames)
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     bslots 3 ∗ syscInitId ip ∗ fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
-    syscallEnv (hlc := hlc) PT Γ γ ∗
+    syscallEnv PT Γ γ ∗
     procPrivFd γ (procAddr j) pid V1 M1 ∗ fdFrags V.fdg sts' ∗ chFrag V.chg (procAddr j) cs' ∗
-    syscExecOut (hlc := hlc) V M (syscStore V1 (R 10#5)) M1 sts sts' gn cs pid ∗
-    syscSysOut (hlc := hlc) f V M sts gn cs pid (syscA0 (syscStore V1 (R 10#5)))
+    syscExecOut V M (syscStore V1 (R 10#5)) M1 sts sts' gn cs pid ∗
+    syscSysOut f V M sts gn cs pid (syscA0 (syscStore V1 (R 10#5)))
       (syscImg (syscStore V1 (R 10#5)) M1) sts' V1.cwi cs' ∗
     syscForkOut f V (syscA0 (syscStore V1 (R 10#5))) cs cs' ∗
     syscWaitOut V M (syscImg (syscStore V1 (R 10#5)) M1) (syscA0 (syscStore V1 (R 10#5))) cs cs' pid ∗
-    syscEvOut (hlc := hlc) V M sts (syscStore V1 (R 10#5)) M1 cs cs' gn ∗
-    wpNext true k.proc c0 (syscallPost (hlc := hlc) PT Γ k γ j pid V M sts gn cs ip f)
+    syscEvOut V M sts (syscStore V1 (R 10#5)) M1 cs cs' gn ∗
+    wpNext true k.proc c0 (syscallPost PT Γ k γ j pid V M sts gn cs ip f)
     ⊢ wpLoop (GF := GF) cpu := by
   have hpins' := hpins
   obtain ⟨h2, -⟩ := hpins'

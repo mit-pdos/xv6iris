@@ -90,7 +90,7 @@ theorem ups_filter_cons (s : String) (l : List String) (h : s ∉ l) :
   exact List.filter_eq_self.2 (fun x hx => by simp; intro e; subst e; exact h hx)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 theorem ups_txRes_elim [CurCtx] (γ : UartNames) :
     txRes (GF := GF) γ ⊢ ∃ l : List (BitVec 8), txOwn γ l := by
@@ -111,7 +111,7 @@ end
 
 set_option maxHeartbeats 1000000 in
 /-- `acquire`'s contract at the call site, for the transmit lock. -/
-theorem ups_acquire (AC : ACQUIRE) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+theorem ups_acquire (AC : ACQUIRE) {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (c : CPU) (k' : KCtx) (i : UartId) (γl : GName) (γ : UartNames)
     (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 10 ≤ k'.avail) (hs' : txLockName i ∉ k'.locks)
     (haddr : k'.regs 10#5 = txLockAddr i) :
@@ -122,7 +122,7 @@ theorem ups_acquire (AC : ACQUIRE) {hlc : HasLC} {GF : BundledGFunctors.{0}} [Ma
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗
       locked γl cpu' -∗ txRes γ -∗ (∃ K : Nat, viewLb cpu' K) -∗ sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γl (txLockName i) (fun _ => txRes γ) hnoff' hK' hs'
+  have h := AC.wp_acquire (GF := GF) c k' γl (txLockName i) (fun _ => txRes γ) hnoff' hK' hs'
   unfold wp_acquire_body at h
   simp only [acquireAddr] at h
   unfold isTxLockAt
@@ -131,7 +131,7 @@ theorem ups_acquire (AC : ACQUIRE) {hlc : HasLC} {GF : BundledGFunctors.{0}} [Ma
 
 set_option maxHeartbeats 1000000 in
 /-- `release`'s contract at the call site, for the transmit lock. -/
-theorem ups_release (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+theorem ups_release (RE : RELEASE) {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (c : CPU) (k' : KCtx) (i : UartId) (γl : GName) (γ : UartNames)
     (hsie' : k'.sie = false) (hnoff' : 1 ≤ k'.noff) (hK' : 10 ≤ k'.avail)
     (reen : Bool) (hreen : reen = (decide (k'.noff = 1) && k'.intena))
@@ -144,7 +144,7 @@ theorem ups_release (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors.{0}} [Ma
         (k'.locks.filter (fun x => x ≠ txLockName i))) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γl (txLockName i) (fun _ => txRes γ)
+  have h := RE.wp_release (GF := GF) c k' γl (txLockName i) (fun _ => txRes γ)
     hsie' hnoff' hK' reen hreen hon
   unfold wp_release_body at h
   simp only [releaseAddr] at h
@@ -158,7 +158,7 @@ set_option maxHeartbeats 4000000 in
 /-- The spin at `0x800009ec`: `lbu a5,0(a4); andi a5,a5,32; beqz a5` runs
 until LSR's THRE bit is set, with `a4 = base+5` and the transmit token in
 hand; on exit the token's trace is a prefix of what has gone out. -/
-theorem ups_poll {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+theorem ups_poll {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (kb : KCtx) (hsie : kb.sie = false) (i : UartId) (γ : UartNames)
     (l : List (BitVec 8)) (R0 : RegMap) (h14 : R0 14#5 = uartBaseAddr i + BitVec.ofNat 64 5) :
     uartInv i γ ∗
@@ -219,7 +219,7 @@ theorem ups_poll {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G
 
 set_option maxHeartbeats 4000000 in
 theorem uartputc_sync_proof (AC : ACQUIRE) (RE : RELEASE) : UARTPUTC_SYNC :=
-  ⟨fun {hlc GF} _ _ _ cpu k i γl γ bs Φ hsie hK hnoff hlk hid => by
+  ⟨fun {GF} _ _ _ cpu k i γl γ bs Φ hsie hK hnoff hlk hid => by
   unfold wp_uartputc_sync_body
   simp only [uartputcSyncAddr, storeChain]
   iintro ⟨Hk, Hpc, #Hport, #Hsub, Hch, Hnext⟩

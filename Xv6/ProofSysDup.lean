@@ -73,7 +73,7 @@ def sdPins (k : KCtx) (R : RegMap) : Prop :=
   R 25#5 = k.regs 25#5 ∧ R 26#5 = k.regs 26#5 ∧ R 27#5 = k.regs 27#5
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
 /-! ## The callees -/
 
@@ -86,7 +86,7 @@ theorem sd_fdalloc (FD : FDALLOC) (c : CPU) (k' : KCtx) (γ : FileNames) (γd : 
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ fdallocPost γ γd k'.proc fs D kk (R' 10#5) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := FD.wp_fdalloc (hlc := hlc) (GF := GF) c k' γ γd kk fs D ha0 hkk hnoff hK
+  have h := FD.wp_fdalloc (GF := GF) c k' γ γd kk fs D ha0 hkk hnoff hK
   unfold wp_fdalloc_body at h
   simp only [fdallocAddr] at h
   exact h
@@ -101,7 +101,7 @@ theorem sd_filedup (FU : FILEDUP) (c : CPU) (k' : KCtx) (γl : GName) (γ : File
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = fnode kk⌝ -∗
       fileRef γ kk q.half st -∗ fileRef γ kk q.half st -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := FU.wp_filedup (hlc := hlc) (GF := GF) c k' γl γ kk q st hnoff hK hlk ha0
+  have h := FU.wp_filedup (GF := GF) c k' γl γ kk q st hnoff hK hlk ha0
   unfold wp_filedup_body at h
   simp only [filedupAddr] at h
   exact h
@@ -229,7 +229,7 @@ theorem sys_dup_br_fffffffffffffe02 : KA.«sys_dup» + 0xfffffffffffffe02#64 = K
 
 set_option maxHeartbeats 64000000 in
 theorem sys_dup_proof (AF : ARGFD) (FD : FDALLOC) (FU : FILEDUP) : SYSDUP := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X cpu k γl γ pa pid V M sts v hv hproc htier hsp hnoff hK hlk => by
+  fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X cpu k γl γ pa pid V M sts v hv hproc htier hsp hnoff hK hlk => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_sys_dup_body

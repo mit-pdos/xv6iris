@@ -47,7 +47,7 @@ open Wid Pline'
 open UShPipesDefs UShPipesStage UShPipesNode
 
 section Kit
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
@@ -66,24 +66,24 @@ structure UPipesEng : Prop where
   HF : USH_FPRINTF
   US : USER
   hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k
-  hudep : ⊢ udep (hlc := hlc) (GF := GF)
-  hlic : ⊢ uKillCred (hlc := hlc) (GF := GF) -∗ consLicence (hlc := hlc) (GF := GF)
+  hudep : ⊢ udep (GF := GF)
+  hlic : ⊢ uKillCred (GF := GF) -∗ consLicence (GF := GF)
 
 namespace UPipesEng
 /-- sh's parser, linked (`LinkShParse.shParsecmd_linked`). -/
-theorem SPc (E : UPipesEng (hlc := hlc) (GF := GF)) : SH_PARSECMD := shParsecmd_linked E.UL E.MS
+theorem SPc (E : UPipesEng (GF := GF)) : SH_PARSECMD := shParsecmd_linked E.UL E.MS
 /-- sh's runcmd, linked (`LinkShRun.shRuncmd_linked`). -/
-theorem SR (E : UPipesEng (hlc := hlc) (GF := GF)) : SH_RUNCMD := shRuncmd_linked E.UL
+theorem SR (E : UPipesEng (GF := GF)) : SH_RUNCMD := shRuncmd_linked E.UL
 /-- fork1, linked (`LinkShRun.shFork1_linked`). -/
-theorem SF (E : UPipesEng (hlc := hlc) (GF := GF)) : SH_FORK1 := shFork1_linked E.UL
+theorem SF (E : UPipesEng (GF := GF)) : SH_FORK1 := shFork1_linked E.UL
 /-- runcmd's exec arm, linked (`LinkShExec.shRuncmdExec_linked`). -/
-theorem RX (E : UPipesEng (hlc := hlc) (GF := GF)) : SH_RUNCMD_EXEC := shRuncmdExec_linked E.UL
+theorem RX (E : UPipesEng (GF := GF)) : SH_RUNCMD_EXEC := shRuncmdExec_linked E.UL
 /-- the child's exec, linked (`LinkShExec.shChildExec_linked`). -/
-theorem SC (E : UPipesEng (hlc := hlc) (GF := GF)) : SH_CHILD_EXEC := shChildExec_linked E.UL E.MS E.HM
+theorem SC (E : UPipesEng (GF := GF)) : SH_CHILD_EXEC := shChildExec_linked E.UL E.MS E.HM
 /-- runcmd's entry, off the linked runcmd (as R-round's redirect child). -/
-theorem hent (E : UPipesEng (hlc := hlc) (GF := GF)) : wpShRuncmdEntryBody (hlc := hlc) (GF := GF) := E.SR.wp_shRuncmdEntry
+theorem hent (E : UPipesEng (GF := GF)) : wpShRuncmdEntryBody (GF := GF) := E.SR.wp_shRuncmdEntry
 /-- the syscall rows (`UkSysPHolds.ukSysP_holds`). -/
-theorem HS (E : UPipesEng (hlc := hlc) (GF := GF)) : UK_SYS_P := ukSysP_holds E.UL
+theorem HS (E : UPipesEng (GF := GF)) : UK_SYS_P := ukSysP_holds E.UL
 end UPipesEng
 
 variable (ug : UnionGn) (v : EraPins) (I : List (BitVec 8)) (sR : Fstate) (lR : Pline')
@@ -92,10 +92,10 @@ variable (ug : UnionGn) (v : EraPins) (I : List (BitVec 8)) (sR : Fstate) (lR : 
 
 /-- The family, from `pipesV_alloc`'s names (a cast). -/
 theorem uD_FAM_of_alloc (γc' γm' : Wid → GName) (Rd' : IProp GF) :
-    blkNInv (hlc := hlc) (wids (lcats lR)) (runN (pviewUnionU.pvFc sR) lR)
-        (pwcBlkV (ugnPipe ug) ulmG (ucparams (hlc := hlc) (GF := GF) ug).gcPIN (ucparams ug).gcW
+    blkNInv (wids (lcats lR)) (runN (pviewUnionU.pvFc sR) lR)
+        (pwcBlkV (ugnPipe ug) ulmG (ucparams (GF := GF) ug).gcPIN (ucparams ug).gcW
           (ucparams ug).gcT v I sR) termw (tokN (pviewUnionU.pvFc sR) lR)
-        (pdep (uD ug v I sR lR L pr Rd' γc' γm' P gF gG)) pnsN (genId (hlc := hlc) (GF := GF) + 1) γc γm
+        (pdep (uD ug v I sR lR L pr Rd' γc' γm' P gF gG)) pnsN (genId (GF := GF) + 1) γc γm
       ⊢ (uD ug v I sR lR L pr Rd γc γm P gF gG).FAM := .rfl
 
 /-- The family's halves, as the node law takes them (a cast). -/
@@ -113,21 +113,21 @@ theorem uD_nodes :
 
 /-- The family's credential at the round's state (a cast). -/
 theorem uD_pwc (k : Nat) :
-    pwcBlkU (hlc := hlc) (GF := GF) ug v I sR k [] false ⊢
-      pwcBlkV (ugnPipe ug) ulmG (ucparams (hlc := hlc) (GF := GF) ug).gcPIN (ucparams ug).gcW
+    pwcBlkU (GF := GF) ug v I sR k [] false ⊢
+      pwcBlkV (ugnPipe ug) ulmG (ucparams (GF := GF) ug).gcPIN (ucparams ug).gcW
         (ucparams ug).gcT v I sR k [] false := .rfl
 
 /-- Any statement at the round's taint (a cast). -/
 theorem uD_T_cast (Φ : IProp GF → IProp GF) :
-    Φ (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) ⊢ Φ (uD ug v I sR lR L pr Rd γc γm P gF gG).T := .rfl
+    Φ (fileTaint ug.ugnFile.fgnCl) ⊢ Φ (uD ug v I sR lR L pr Rd γc γm P gF gG).T := .rfl
 
 /-- The stage slots at the round's taint (a cast). -/
 theorem uD_slots (fs : List Filt) :
-    shStageSlots (hlc := hlc) fs (fileTaint (hlc := hlc) ug.ugnFile.fgnCl)
-      ⊢ shStageSlots (hlc := hlc) fs (uD ug v I sR lR L pr Rd γc γm P gF gG).T := .rfl
+    shStageSlots fs (fileTaint ug.ugnFile.fgnCl)
+      ⊢ shStageSlots fs (uD ug v I sR lR L pr Rd γc γm P gF gG).T := .rfl
 
 /-- `UShPipesDefs`'s round hypotheses at the union. -/
-theorem uPdOk (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug)
+theorem uPdOk (hcons : MachFixedGS.consRes (GF := GF) = ucl ug)
     (hlR : pviewUnionU.pvLine (lineV ulmG I) = some lR) (hfc : fcOk (pviewUnionU.pvFc sR))
     (hadmit : pnsAdmV pviewUnionU lR) (hplok : plOk lR) :
     PdRoundOk (uD ug v I sR lR L pr Rd γc γm P gF gG) where
@@ -139,7 +139,7 @@ theorem uPdOk (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc :=
   hplok := hplok
 
 /-- The stage laws' context at the union. -/
-noncomputable def uStgEnv (E : UPipesEng (hlc := hlc) (GF := GF)) :
+noncomputable def uStgEnv (E : UPipesEng (GF := GF)) :
     StgEnv (uD ug v I sR lR L pr Rd γc γm P gF gG) where
   UL := E.UL
   HS := E.HS
@@ -154,9 +154,9 @@ noncomputable def uStgEnv (E : UPipesEng (hlc := hlc) (GF := GF)) :
   lawO := ue_lawO
 
 /-- The stage laws' hypotheses at the union. -/
-theorem uStgOk (E : UPipesEng (hlc := hlc) (GF := GF)) (r : FileAppNames)
-    (heq : HfpFileClaimsP.fileAppIs (hlc := hlc) (GF := GF) ug.ugnFile.fgnCl r)
-    (hkill : MachFixedGS.killCred (hlc := hlc) (GF := GF) = fileTaint (hlc := hlc) ug.ugnFile.fgnCl)
+theorem uStgOk (E : UPipesEng (GF := GF)) (r : FileAppNames)
+    (heq : HfpFileClaimsP.fileAppIs (GF := GF) ug.ugnFile.fgnCl r)
+    (hkill : MachFixedGS.killCred (GF := GF) = fileTaint ug.ugnFile.fgnCl)
     (OK : PdRoundOk (uD ug v I sR lR L pr Rd γc γm P gF gG)) (hL31 : pnsShort L)
     (hfire : HfireP (uD ug v I sR lR L pr Rd γc γm P gF gG)) :
     StgOk (uD ug v I sR lR L pr Rd γc γm P gF gG) (uStgEnv ug v I sR lR L pr Rd γc γm P gF gG E) where
@@ -170,7 +170,7 @@ theorem uStgOk (E : UPipesEng (hlc := hlc) (GF := GF)) (r : FileAppNames)
 end Kit
 
 section Slots
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
@@ -185,15 +185,15 @@ theorem ushCmd_stages (γ : GName) (q sa len : Nat) (gb : Nat → BitVec 8) (pw 
           :: uREST pw F fs' len gb sa)) := .rfl
 
 /-- The grep slot is persistent. -/
-instance ushGrepSlot_persistent (T : IProp GF) : Persistent (shGrepSlot (hlc := hlc) T) := by
+instance ushGrepSlot_persistent (T : IProp GF) : Persistent (shGrepSlot T) := by
   unfold shGrepSlot; infer_instance
 
 /-- Rocq `UShExecPin.sh_stage_slots_of` at R-prog's landed cat slot. -/
 theorem ush_stage_slots (fs : List Filt) (T : IProp GF) :
-    ⊢ shCatSlot (hlc := hlc) T -∗ shGrepSlot (hlc := hlc) T -∗ shStageSlots (hlc := hlc) fs T := by
+    ⊢ shCatSlot T -∗ shGrepSlot T -∗ shStageSlots fs T := by
   unfold shStageSlots shGrepSlot
   iintro Hc #Hg
-  ihave #Hc' := (shCatSlot_unfold (hlc := hlc) T).1 $$ Hc
+  ihave #Hc' := (shCatSlot_unfold T).1 $$ Hc
   imodintro
   iintro %F -
   iapply shFiltSlot_pin F T $$ Hc' Hg

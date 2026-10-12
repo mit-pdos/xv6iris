@@ -73,7 +73,7 @@ def eitherCopyinSlots : Nat := 56
 /-- `either_copyin(dst a0, user_src a1, src a2, len a3)`: `old` is the
 kernel destination buffer; the source is the process's memory at `src`
 (the `user` arm) or the kernel buffer at `src` (`bs`). -/
-def wp_either_copyin_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+def wp_either_copyin_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (P : UPtd) (M : Nat → List (BitVec 8)) (user : Bool) (dqs : DFrac)
     (bs old : List (BitVec 8))
@@ -106,12 +106,12 @@ def wp_either_copyin_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc 
 
 /-- The interface of `either_copyin`. -/
 structure EITHER_COPYIN : Prop where
-  wp_either_copyin : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+  wp_either_copyin : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (P : UPtd) (M : Nat → List (BitVec 8)) (user : Bool) (dqs : DFrac)
     (bs old : List (BitVec 8))
     hj hproc hnoff hK hlk huser hlen hlen' hbs,
-    wp_either_copyin_body (hlc := hlc) (GF := GF) cpu k γl γk j pid V P M user dqs bs old
+    wp_either_copyin_body (GF := GF) cpu k γl γk j pid V P M user dqs bs old
       hj hproc hnoff hK hlk huser hlen hlen' hbs
 
 end Xv6

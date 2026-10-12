@@ -355,7 +355,7 @@ theorem urc_keyBoot (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (sc
     hfdrow hpidrow hr hsce hcls hfit
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
@@ -370,12 +370,12 @@ theorem urc_deposit (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (gn
     (hM : umemLazy V.upt V.sz.toNat Mp = W.M) (hpi : W.perm = permOf V.upt.um V.sz.toNat)
     (hsz : W.sz = V.sz.toNat) (hcw : W.cwd = V.cwi) (hgn : W.gen = gn) (hch : W.ch = cs)
     (hpid : W.pid = pid) (hlz : W.lazy = V.pvLazy) (hsc : W.secc = V.pvSecc) (hVgn : V.gen = gn)
-    [NiFitIs (hlc := hlc) GF] (i : Nat) (x : Obs) (hx : exitFits x sc W) :
-    uexecDep (hlc := hlc) sc W f ∗ uexecArm sc W f ∗ MachFixedGS.uClaimX (hlc := hlc) (GF := GF) i x ⊢
-      utSysIn (hlc := hlc) f sc (tfW W.tf tfEpcIdx) (urcV0 V W) Mp W.fd gn cs pid ∗
-      utForkIn (hlc := hlc) f sc (tfW W.tf tfEpcIdx) (urcV0 V W) Mp W.fd ∗
+    [NiFitIs GF] (i : Nat) (x : Obs) (hx : exitFits x sc W) :
+    uexecDep sc W f ∗ uexecArm sc W f ∗ MachFixedGS.uClaimX (GF := GF) i x ⊢
+      utSysIn f sc (tfW W.tf tfEpcIdx) (urcV0 V W) Mp W.fd gn cs pid ∗
+      utForkIn f sc (tfW W.tf tfEpcIdx) (urcV0 V W) Mp W.fd ∗
       utPayIn f sc (tfW W.tf tfEpcIdx) (urcV0 V W) ∗
-      utKillIn (hlc := hlc) f sc (uvisRun W) gn W.fd ∗
+      utKillIn f sc (uvisRun W) gn W.fd ∗
       (if sc = uecallScause then uexecArm sc W f else iprop(emp)) := by
   have hu := urc_proTf_run W V hl
   have hnum : syscNum (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)) = uvisNum W := by
@@ -395,7 +395,7 @@ theorem urc_deposit (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (gn
       iintro ⟨⟨Hpay, Hd⟩, Harm, HcX⟩
       -- THE FORK'S CHILD-ORIGIN CLAIM (NI M2-W2d): the exit was a fork
       -- ecall, so its extra claim is an origin ticket, for the child's park
-      ihave Hco := uClaimO_of_fork (hlc := hlc) i x (niForkExit_of_fits hx hec hfk) $$ HcX
+      ihave Hco := uClaimO_of_fork i x (niForkExit_of_fits hx hec hfk) $$ HcX
       ihave Hpay := hpay $$ Hpay
       iframe Hpay Harm
       isplitl []
@@ -491,14 +491,14 @@ theorem urc_post (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (gn : 
     (hrp : utRetPid sc V.pvSecc (urcV0 V W).tf V'.tf pid)
     (hlive : utLiveOut sc V.pvSecc (utProTf (tfW W.tf tfEpcIdx) (urcV0 V W)) W.fd (tfW V'.tf (tfArgIdx 0))
       cs') :
-    utExecOut (hlc := hlc) sc (tfW W.tf tfEpcIdx) (urcV0 V W) Mp V' M' W.fd sts' gn cs pid ∗
+    utExecOut sc (tfW W.tf tfEpcIdx) (urcV0 V W) Mp V' M' W.fd sts' gn cs pid ∗
     utForkOut f sc (tfW W.tf tfEpcIdx) (urcV0 V W) (tfW V'.tf (tfArgIdx 0)) cs cs' ∗
     utWaitOut (GF := GF) sc (tfW W.tf tfEpcIdx) (urcV0 V W) Mp (syscImg V' M') (tfW V'.tf (tfArgIdx 0)) cs cs' pid ∗
-    utKillOut (hlc := hlc) sc (uvisRun W) ∗
-    utSysOut (hlc := hlc) f sc (tfW W.tf tfEpcIdx) (urcV0 V W) Mp W.fd gn cs pid (tfW V'.tf (tfArgIdx 0))
+    utKillOut sc (uvisRun W) ∗
+    utSysOut f sc (tfW W.tf tfEpcIdx) (urcV0 V W) Mp W.fd gn cs pid (tfW V'.tf (tfArgIdx 0))
       (syscImg V' M') sts' V'.cwi cs' ∗
     (if sc = uecallScause then uexecArm sc W f else iprop(emp))
-    ⊢ uslot (hlc := hlc) (uvisOf V' M' sts' gn cs' pid) := by
+    ⊢ uslot (uvisOf V' M' sts' gn cs' pid) := by
   have hu := urc_proTf_run W V hl
   have hnum : syscNum (utSysRec (tfW W.tf tfEpcIdx) (urcV0 V W)) = usysEff W.secc (uvisRun W).tf := by
     rw [urc_num W V hl, ← hsc]; exact usysEff_numCong _ _ _ (uvisRun_num W).symm
@@ -537,12 +537,12 @@ theorem urc_post (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (gn : 
   have HR := uexecRet_roundSlot_of sc W f (tfResumeGpr0 W.tf) (tfW W.tf tfEpcIdx) V' M' sts' cs' hlw rfl rfl
     hfd hchrow hfdrow hpiperow hpidrow hliverow hr
   rw [hgn, hpid, ← hrun] at HR
-  have hx1 : utExecOut (hlc := hlc) (GF := GF) sc (tfW W.tf tfEpcIdx) (urcV0 V W) Mp V' M' W.fd sts' gn cs pid ⊢
+  have hx1 : utExecOut (GF := GF) sc (tfW W.tf tfEpcIdx) (urcV0 V W) Mp V' M' W.fd sts' gn cs pid ⊢
       ⌜sc = uecallScause ∧ usysEff W.secc (uvisRun W).tf = USYS_exec⌝ -∗
         (⌜∃ r : BitVec 64, uroundBumpOk (uvisRun W).tf V'.tf r ∧
             usysMemOk USYS_exec (uvisRun W).tf r W.M W.perm W.sz W.lazy (umemLazy V'.upt V'.sz.toNat M')
               (permOf V'.upt.um V'.sz.toNat) V'.sz.toNat V'.pvLazy ∧ sts' = W.fd⌝ ∨
-          uslot (hlc := hlc) (uvisOf V' M' sts' gn cs' pid)) := by
+          uslot (uvisOf V' M' sts' gn cs' pid)) := by
     unfold utExecOut syscExecOut
     iintro Hxo %⟨hec, hx⟩
     ispecialize Hxo $$ %hec
@@ -580,7 +580,7 @@ theorem urc_post (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (gn : 
     iexists _, _, rv, _
     iframe Ha
     ipureintro; exact hr0
-  have hx4 : utSysOut (hlc := hlc) f sc (tfW W.tf tfEpcIdx) (urcV0 V W) Mp W.fd gn cs pid (tfW V'.tf (tfArgIdx 0))
+  have hx4 : utSysOut f sc (tfW W.tf tfEpcIdx) (urcV0 V W) Mp W.fd gn cs pid (tfW V'.tf (tfArgIdx 0))
       (syscImg V' M') sts' V'.cwi cs' ⊢
       ⌜sc = uecallScause ∧ usysEff W.secc (uvisRun W).tf ≠ USYS_exit ∧ usysEff W.secc (uvisRun W).tf ≠ USYS_fork⌝ -∗
         spostAt uslot (usysEff W.secc (uvisRun W).tf) f (uvisRun W) (tfW V'.tf (tfArgIdx 0))
@@ -591,7 +591,7 @@ theorem urc_post (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (gn : 
     ispecialize Hso $$ %(usysEff W.secc (uvisRun W).tf) %⟨hnum, hnx, hnf⟩
     iapply (spostAt_cong uslot _ f _ _ _ _ _ _ _ hkeyr).mp
     iexact Hso
-  have hx5 : utKillOut (hlc := hlc) sc (uvisRun W) ∗
+  have hx5 : utKillOut sc (uvisRun W) ∗
       (if sc = uecallScause then uexecArm sc W f else iprop(emp)) ⊢
       (if sc = uecallScause then uexecArm sc W f else uslot (uvisRun W)) := by
     unfold utKillOut

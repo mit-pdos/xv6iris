@@ -196,7 +196,7 @@ def grepGframe (γd : GName) (sp0 : BitVec 64) (m0 : RegMap) : IProp GF :=
 end Heap
 
 section Walks
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -205,11 +205,11 @@ thirteen spills, and the six constants the loop keeps in callee-saved
 registers. -/
 theorem grepLoop_pro (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (ar : Nat) (fdv : BitVec 64) (n2 : Nat)
     (ha0 : m.get 10#5 = BitVec.ofNat 64 ar) (ha1 : m.get 11#5 = fdv) :
-    ⊢ grepCode N.t -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Grep.Sym.«grep») (14 + (4 + n2)) -∗
+    ⊢ grepCode N.t -∗ urun N h m (BitVec.ofNat 64 User.Grep.Sym.«grep») (14 + (4 + n2)) -∗
       (∀ (h' : CPU) (m' : RegMap), ⌜(m.get spIdx).toNat % 8 = 0⌝ -∗ ⌜112 ≤ (m.get spIdx).toNat⌝ -∗
         ⌜grepGlRegs m (m.get spIdx) ar fdv m'⌝ -∗ ⌜m'.get 19#5 = kgrepB01 false⌝ -∗
         ⌜m'.get 22#5 = BitVec.ofNat 64 0⌝ -∗ grepGframe N.d (m.get spIdx) m -∗
-        urun (hlc := hlc) N h' m' (BitVec.ofNat 64 0x16e) (4 + n2) -∗ wpLoop h') -∗
+        urun N h' m' (BitVec.ofNat 64 0x16e) (4 + n2) -∗ wpLoop h') -∗
       wpLoop h := by
   rw [show User.Grep.Sym.«grep» = 0xf8 from rfl]
   iintro #Hc Hrun Hcont
@@ -409,9 +409,9 @@ reloads, the pop, the return. -/
 theorem grepLoop_epi (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m m0 : RegMap) (sp0 : BitVec 64) (ar : Nat)
     (fdv : BitVec 64) (n2 : Nat) (hsp0 : m0.get spIdx = sp0) (hal8 : sp0.toNat % 8 = 0) (hlo : 112 ≤ sp0.toNat)
     (hgl : grepGlRegs m0 sp0 ar fdv m) :
-    ⊢ grepCode N.t -∗ grepGframe N.d sp0 m0 -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 0x1b2) (4 + n2) -∗
+    ⊢ grepCode N.t -∗ grepGframe N.d sp0 m0 -∗ urun N h m (BitVec.ofNat 64 0x1b2) (4 + n2) -∗
       (∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m0 m'⌝ -∗
-        urun (hlc := hlc) N h' m' (retPc (m0.get 1#5)) (14 + (4 + n2)) -∗ wpLoop h') -∗
+        urun N h' m' (retPc (m0.get 1#5)) (14 + (4 + n2)) -∗ wpLoop h') -∗
       wpLoop h := by
   obtain ⟨g1, g2, g3, -, -, -, -, -, -⟩ := hgl
   unfold grepGframe

@@ -68,7 +68,7 @@ theorem procAddr_eq (i : Nat) : procAddr i = KA.«proc» + BitVec.ofNat 64 (376 
 def kstackVa (i : Nat) : BitVec 64 := 0x3ffffff000#64 - BitVec.ofNat 64 ((i + 1) * 8192)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- The three words of a `struct spinlock` at `lk`, owned, with the
 identity claims `initlock` needs. -/
@@ -98,7 +98,7 @@ def procFieldsOut (i : Nat) : IProp GF := iprop%
 end
 
 section Slots
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- **One process, before** (Rocq `proc_raw`): its lock's three words, the
@@ -133,8 +133,8 @@ end Slots
 
 /-- The interface of `procinit`. -/
 structure PROCINIT : Prop where
-  wp_procinit : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+  wp_procinit : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx) hK,
-    wp_procinit_body (hlc := hlc) (GF := GF) cpu k hK
+    wp_procinit_body (GF := GF) cpu k hK
 
 end Xv6

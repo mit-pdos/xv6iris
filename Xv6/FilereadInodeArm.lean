@@ -21,7 +21,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -39,7 +39,7 @@ theorem frd_inode_arms (i : Nat) (γo : GName) (n : Int) (F : Pfam GF (Aview →
     (hM : M' = umemWrite Vw addr.toNat (rdBytes data off tot)) (hmap : umMapped P' addr.toNat tot)
     (hpl : ∀ kp w, Iris.Std.PartialMap.get? P'.um kp = some w → (M' kp).length = 4096) :
     F.pfRecv av off (absRow (eraNode dn bm data)) dd ⊢
-      readArms (hlc := hlc) (fsGammaL fscFs) i γo pt n F a0 M' addr := by
+      readArms (fsGammaL fscFs) i γo pt n F a0 M' addr := by
   have hsz := arfSize_ok_era dn bm data hok.2.2.2.2.1
   have hpre : ardPre av i off (absRow (eraNode dn bm data)) := ⟨hrow, hoff, hsz⟩
   unfold readArms
@@ -77,7 +77,7 @@ set_option maxHeartbeats 32000000 in
 /-- **`+0x34 .. +0x5c` and the tail: THE FD_INODE ARM** (Rocq's FD_INODE
 block). -/
 theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
+    [ClaimIs GF Γ] (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
     (γ : FileNames) (fk : Nat) (q : Qp) (wb : Bool) (i : Nat) (γo : GName) (om : OffMode) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (γkl : GName) (γk : KmemNames)
     (n : Int) (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (Rd : Nat → Nat → IProp GF)
@@ -91,13 +91,13 @@ theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
     pcIs cpu (KA.«fileread» + 0x34#64) ∗
     frame6s3 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    procsInv Γ ∗ panicEnv ∗ fsReady (hlc := hlc) ∗
+    procsInv Γ ∗ panicEnv ∗ fsReady ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     foffRow (GF := GF) (.open true wb (.inode i γo om)) ∗
     fileRef γ fk q (.open true wb (.inode i γo om)) ∗ procPrivExt (procAddr j) pid V V.upt M ∗
     genHalvesPriv (procAddr j) pid V.gen ∗ bslot ∗ P ∗
-    areadInOm (hlc := hlc) om (fsGammaL fscFs) appE i γo F ∗
-    frdK (hlc := hlc) k γ fk q (.open true wb (.inode i γo om)) j pid V M n F Rd Rin Rp Rpe P
+    areadInOm om (fsGammaL fscFs) appE i γo F ∗
+    frdK k γ fk q (.open true wb (.inode i γo om)) j pid V M n F Rd Rin Rp Rpe P
     ⊢ wpLoop (GF := GF) cpu := by
   have hK' : 6 + readiSlots ≤ k.avail := hK
   have hK6 : 6 ≤ k.avail := by unfold readiSlots bmapSlots ballocSlots breadSlots panicSlots at hK'; omega

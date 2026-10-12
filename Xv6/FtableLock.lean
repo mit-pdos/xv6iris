@@ -39,7 +39,7 @@ def faPins (k : KCtx) (R : RegMap) : Prop :=
   R 26#5 = k.regs 26#5 ∧ R 27#5 = k.regs 27#5
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
 
 /-! ## The callees -/
 
@@ -54,7 +54,7 @@ theorem fa_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γl : GName) (γ : File
       locked γl cpu' -∗ ftableResAt γ curCtx -∗ (∃ K : Nat, viewLb cpu' K) -∗
       sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γl "ftable" (ftableResAt γ) hnoff' hK' hs'
+  have h := AC.wp_acquire (GF := GF) c k' γl "ftable" (ftableResAt γ) hnoff' hK' hs'
   unfold wp_acquire_body at h
   simp only [acquireAddr] at h
   rw [haddr] at h
@@ -71,7 +71,7 @@ theorem fa_release (RE : RELEASE) (c : CPU) (k' : KCtx) (γl : GName) (γ : File
       kctx cpu' (((k'.popExit reen).withRegs R').withLocks (k'.locks.filter (fun x => x ≠ "ftable"))) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γl "ftable" (ftableResAt γ) hsie' hnoff' hK' reen hreen hon
+  have h := RE.wp_release (GF := GF) c k' γl "ftable" (ftableResAt γ) hsie' hnoff' hK' reen hreen hon
   unfold wp_release_body at h
   simp only [releaseAddr] at h
   rw [haddr] at h

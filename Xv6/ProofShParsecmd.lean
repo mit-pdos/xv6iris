@@ -50,7 +50,7 @@ theorem ushPc_zext32 (x : Nat) (hx : x < 2 ^ 32) :
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -72,7 +72,7 @@ abbrev ushPcRs : List (BitVec 5) := [1#5, 8#5, 9#5, 18#5, 19#5]
 
 /-- **Rocq `wp_ref_parsecmd`**: the whole function. -/
 theorem wp_shParsecmd (UL : UK_LEAVES) (SS : SH_STRLEN) (SPL : SH_PARSELINE) (SP : SH_PEEK)
-    (SN : SH_NULTERMINATE) : wpShParsecmdBody (hlc := hlc) (GF := GF) := by
+    (SN : SH_NULTERMINATE) : wpShParsecmdBody (GF := GF) := by
   intro N h m dw dv s0 len f t UM UM' Pex nn ha0 hsc href hcat hch hs0 hs64
   -- the reference's answer: parseline consumed the line
   have hbnd := refParsecmd_bounded len f t href
@@ -291,7 +291,7 @@ theorem wp_shParsecmd (UL : UK_LEAVES) (SS : SH_STRLEN) (SPL : SH_PARSELINE) (SP
 
 /-- **Rocq `wp_ref_parser`**: THE PARSER THEOREM, the tree closed. -/
 theorem wp_shParser (UL : UK_LEAVES) (SS : SH_STRLEN) (SPL : SH_PARSELINE) (SP : SH_PEEK)
-    (SN : SH_NULTERMINATE) : wpShParserBody (hlc := hlc) (GF := GF) := by
+    (SN : SH_NULTERMINATE) : wpShParserBody (GF := GF) := by
   intro N h m dw dv s0 len f t UM UM' Pex nn ha0 hsc href hcat hch hs0 hs64
   iintro #Hc Hstr Hws Hsy HM #Hpx Hpay Hrun Hk
   iapply wp_shParsecmd UL SS SPL SP SN N h m dw dv s0 len f t UM UM' Pex nn ha0 hsc href hcat hch hs0 hs64

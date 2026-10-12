@@ -36,7 +36,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
@@ -45,7 +45,7 @@ set_option maxHeartbeats 4000000 in
 /-- **Arm 10, `sys_dup`** (Rocq `sysc_arm_dup`). -/
 theorem syscall_arm_dup (SD : SYSDUP)
     (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -69,7 +69,7 @@ theorem syscall_arm_dup (SD : SYSDUP)
   icases syscKctx_sp cpu (((k.withSpie spie spp).pushed 4).withRegs R) (by
       k_norm_g; have := syscallSlots_val; omega) $$ Hk with ⟨%hsp, Hk⟩
   have hn10 : syscNum V = (10 : Int) := hnum
-  have hD := SD.wp_sys_dup (hlc := hlc) (GF := GF) cpu (((k.withSpie spie spp).pushed 4).withRegs R)
+  have hD := SD.wp_sys_dup (GF := GF) cpu (((k.withSpie spie spp).pushed 4).withRegs R)
     γft γ (procAddr j) pid V M sts (tfW V.tf (tfArgIdx 0)) (syscArg V hl 0 (by decide))
     ?hp ?ht hsp ?hn ?hK ?hlk
   case hp => k_norm_g; exact hproc
@@ -139,7 +139,7 @@ set_option maxHeartbeats 4000000 in
 /-- **Arm 8, `sys_fstat`** (Rocq `sysc_arm_fstat`). -/
 theorem syscall_arm_fstat (SF : SYSFSTAT)
     (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -161,7 +161,7 @@ theorem syscall_arm_fstat (SF : SYSFSTAT)
   have hct : curTier = KTier.kpt := by rw [← hti]; exact htier
   icases syscall_tf_len hct γ (procAddr j) pid V M $$ Hpriv with ⟨%hl, Hpriv⟩
   have hn8 : syscNum V = (8 : Int) := hnum
-  have hF := SF.wp_sys_fstat_eb (hlc := hlc) (GF := GF) Γ cpu (((k.withSpie spie spp).pushed 4).withRegs R)
+  have hF := SF.wp_sys_fstat_eb (GF := GF) Γ cpu (((k.withSpie spie spp).pushed 4).withRegs R)
     γ j pid V M (tfW V.tf (tfArgIdx 0)) (tfW V.tf (tfArgIdx 1)) fscKalloc fsReadyKmem
     (syscArg V hl 0 (by decide)) (syscArg V hl 1 (by decide)) ?hK hj ?hp ?hn ?ht
   case hp => k_norm_g; exact hproc
@@ -217,8 +217,8 @@ set_option maxHeartbeats 4000000 in
 /-- **Arm 21, `sys_close`** (Rocq `sysc_arm_close`). -/
 theorem syscall_arm_close (SC : SYSCLOSE)
     (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
-    (hDC : SyscDepClose (hlc := hlc) (GF := GF))
+    [ClaimIs GF Γ]
+    (hDC : SyscDepClose (GF := GF))
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -241,7 +241,7 @@ theorem syscall_arm_close (SC : SYSCLOSE)
   ihave #Hpe := syscallEnv_panic PT Γ γ $$ Henv
   ihave #Hpipe := syscallEnv_fileclosePipeEnv PT Γ γ $$ Henv Hpi
   ihave HfsE := syscallEnv_filecloseFsEnv PT Γ γ j hj $$ Henv Hpi Hbs
-  ihave HfsE := (show filecloseFsEnv (hlc := hlc) (GF := GF) Γ j (procAddr j) ⊢
+  ihave HfsE := (show filecloseFsEnv (GF := GF) Γ j (procAddr j) ⊢
       filecloseFsEnv Γ j k.proc from by rw [hproc]) $$ HfsE
   ihave Hir := (show irefSlots (GF := GF) IREFSPARE ⊢ irefSlots 1 ∗ irefSlots 3 from
     irefSlots_split 1 3) $$ Hir
@@ -253,7 +253,7 @@ theorem syscall_arm_close (SC : SYSCLOSE)
   · iframe
   icases syscKctx_sp cpu (((k.withSpie spie spp).pushed 4).withRegs R) (by
       k_norm_g; have := syscallSlots_val; omega) $$ Hk with ⟨%hsp, Hk⟩
-  have hC := SC.wp_sys_close_eb (hlc := hlc) (GF := GF) Γ cpu (((k.withSpie spie spp).pushed 4).withRegs R)
+  have hC := SC.wp_sys_close_eb (GF := GF) Γ cpu (((k.withSpie spie spp).pushed 4).withRegs R)
     γft γ (procAddr j) pid V M sts (tfW V.tf (tfArgIdx 0)) j fscKalloc fsReadyKmem none Pc
     (syscArg V hl 0 (by decide)) ?hp ?ht hsp ?hn ?hK
   case hp => k_norm_g; exact hproc

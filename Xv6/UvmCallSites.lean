@@ -18,7 +18,7 @@ theorem uc_beq_ne {α : Type} (x : BitVec 64) (h : x ≠ 0#64) (p q : α) :
   rw [if_neg (by simp only [bcond, beq_iff_eq]; exact h)]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 set_option maxHeartbeats 1000000 in
 /-- `kalloc`'s contract as a rule, AT THE BOOT (`hp0`; permit sweep L3b: the
@@ -34,7 +34,7 @@ theorem uc_kalloc_call [WchG GF] (KAL : KALLOC) [CurCtx] (c : CPU) (k' : KCtx)
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       kallocPost γk on (R' 10#5) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := KAL.wp_kalloc (hlc := hlc) (GF := GF) c k' γl γk on hnoff hK hlk hp0
+  have h := KAL.wp_kalloc (GF := GF) c k' γl γk on hnoff hK hlk hp0
   unfold wp_kalloc_body at h
   simp only [kallocAddr] at h
   exact h
@@ -81,7 +81,7 @@ theorem uc_kalloc_led_call [WchG GF] (KAL : KALLOC) [CurCtx] (c : CPU) (k' : KCt
       kallocPost γk on (R' 10#5) -∗ kRcpt γk k'.proc (R' 10#5) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := KAL.wp_kalloc_led (hlc := hlc) (GF := GF) c k' γl γk on ke hnoff hK hlk
+  have h := KAL.wp_kalloc_led (GF := GF) c k' γl γk on ke hnoff hK hlk
   unfold wp_kalloc_led_body at h
   simp only [kallocAddr] at h
   iintro ⟨Hk, Hpc, #Hlk, Hav, Hl, Hnext⟩
@@ -138,7 +138,7 @@ theorem uc_kfree_lend_call [WchG GF] (KF : KFREE) [CurCtx] (c : CPU) (k' : KCtx)
       actLend k'.proc (ke + 1) -∗
       kallocAvail γk (availInc on) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := KF.wp_kfree_led (hlc := hlc) (GF := GF) c k' γl γk on ke hnoff hK hlk hp
+  have h := KF.wp_kfree_led (GF := GF) c k' γl γk on ke hnoff hK hlk hp
   unfold wp_kfree_led_body at h
   simp only [kfreeAddr] at h
   iintro ⟨Hk, Hpc, #Hlk, Hpage, Hav, Hl, Hnext⟩

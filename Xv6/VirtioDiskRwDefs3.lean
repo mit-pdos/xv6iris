@@ -105,7 +105,7 @@ theorem descZero_flags : BitVec.extractLsb' 96 16 (0 : BitVec (8 * 16)) = 0#16 :
 theorem descZero_next : BitVec.extractLsb' 112 16 (0 : BitVec (8 * 16)) = 0#16 := by decide
 
 section cells
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- A zeroed descriptor, as its four cells. -/
 theorem descCells_zero (pd : PAddr) (i : Nat) :
@@ -149,7 +149,7 @@ theorem opsSec_facts (i : Nat) (hi : i < NUM) :
 /-! ## `disk.ops[i]`, as the three cells the driver stores through -/
 
 section ops
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 /-- **The request-header window, opened**: `type` (4), `reserved` (4),
 `sector` (8). -/
@@ -226,7 +226,7 @@ same counters, the same `avail->idx` half and the same eight ring cells;
 at that payload. -/
 
 section payloadA
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 theorem diskResA_open (γ : DiskNames) (pd pav pu : PAddr) (ξ : CtxId) (tk : Nat → Bool) :
     diskResA (GF := GF) γ pd pav pu ξ tk ⊢
@@ -382,7 +382,7 @@ tactics leave are `KA.«disk»` and `KA.«disk» + 8#64`, which are
 `Xv6.aDescPtr` and `Xv6.aAvailPtr` by evaluation. -/
 
 section geom
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 theorem vdrw3_geom_desc (γ : DiskNames) (pd pav pu : PAddr) :
     diskGeom (GF := GF) γ pd pav pu ⊢ wordPointsTo KA.«disk» 8 DFrac.discard pd := by
@@ -403,7 +403,7 @@ end geom
 /-! ## The credentials, unbundled -/
 
 section caps
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 theorem vdrwCaps_inv (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) :
     vdrwCaps (GF := GF) γ γl pd pav pu ⊢ diskInv γ := by
@@ -424,7 +424,7 @@ TIMELESS token comes out for the disk invariant's row. -/
 theorem vdrwNext_deposit (k : KCtx) (γ : DiskNames) (bno : BitVec 32) (wr : Bool)
     (dataBuf dataDisk : List (BitVec 8)) (cpu : CPU) (E : CoPset)
     (hE : (↑crashPermN : CoPset) ⊆ E) :
-    crashPermInv (genId (hlc := hlc) (GF := GF)) γ.cperm ∗
+    crashPermInv (genId (GF := GF)) γ.cperm ∗
       vdrwNext k γ bno wr dataBuf dataDisk none cpu ⊢@{IProp GF}
       |={E}=> ∃ kq : Nat × Nat,
         crashPermPend γ.cperm kq (vdrwWr wr bno dataBuf)
@@ -432,7 +432,7 @@ theorem vdrwNext_deposit (k : KCtx) (γ : DiskNames) (bno : BitVec 32) (wr : Boo
         vdrwNext k γ bno wr dataBuf dataDisk (some kq.2) cpu := by
   unfold vdrwNext vdrwTok
   iintro ⟨#Hpi, %Q, Hperm, Hn⟩
-  imod crashPerm_deposit_kq (genId (hlc := hlc) (GF := GF)) γ.cperm (vdrwWr wr bno dataBuf) Q E hE
+  imod crashPerm_deposit_kq (genId (GF := GF)) γ.cperm (vdrwWr wr bno dataBuf) Q E hE
     $$ [Hpi Hperm] with ⟨%kq, Hpend, #Hrc⟩
   · iframe Hpi Hperm
   imodintro
@@ -456,7 +456,7 @@ theorem vdrw_chainWr_arm (c : Chain) (wr : Bool) (bno : BitVec 32) (dataBuf : Li
 
 /-- The era's crash-permit channel, out of the bundle. -/
 theorem vdrwCaps_perm (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) :
-    vdrwCaps (GF := GF) γ γl pd pav pu ⊢ crashPermInv (genId (hlc := hlc) (GF := GF)) γ.cperm := by
+    vdrwCaps (GF := GF) γ γl pd pav pu ⊢ crashPermInv (genId (GF := GF)) γ.cperm := by
   unfold vdrwCaps
   iintro ⟨#H1, #H2, #H3, #H4⟩
   iexact H4
@@ -466,7 +466,7 @@ end caps
 /-! ## The seams -/
 
 section seams
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 /-- **The seam between P3 and P4** (`virtio_disk_rw + 0x176`, the `ld` of
 `disk.avail`): the chain `c` is formatted, and its cells are in exactly
@@ -478,7 +478,7 @@ receipts still `.inactive`, and the payload at `Xv6.tk3 h m t`.
 `infoWin curCtx c.md` and `infoWin curCtx c.tl` came out of the payload
 with the two slots (`Xv6.freeSlotRes`) and go back into it at the
 publication, when the two become MEMBERS of the chain. -/
-def vdrwP3Exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+def vdrwP3Exit (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64)
     (bno : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool)
     (c : Chain) (y : BitVec 32) (R : RegMap) : IProp GF := iprop%
@@ -518,7 +518,7 @@ back here (`Xv6.headTokQ`): they are what the publisher carries across
 its park inside `sleep`, and agreement with the payload's quarters is
 what says, when it wakes and re-acquires the lock, that the slots it is
 about to collect are still ITS chain. -/
-def vdrwP4Exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+def vdrwP4Exit (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64)
     (bno : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool)
     (c : Chain) (y : BitVec 32) (R : RegMap) : IProp GF := iprop%
@@ -568,7 +568,7 @@ two wrappers take the equation as a side goal, the way the address
 `haddr` already is. -/
 
 section rules
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 variable {lent : Bool}
 
 theorem vdrw4_sh_au [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
@@ -775,7 +775,7 @@ theorem vdrw4_bump (n : Nat) :
 /-! ## `disk_ring_write` with the head as a `Nat` -/
 
 section ring
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 /-- What the ring store returns: the counters, the receipt, and the
 driver's half of the cell at the raw tier. -/

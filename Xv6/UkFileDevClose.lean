@@ -17,7 +17,7 @@ open HfpFileClaimsP UkFileOpen UkFileDev
 open Std (ExtTreeSet)
 
 section Close
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
@@ -28,14 +28,14 @@ namespace UkFileDev
 theorem fdev_ret0 (r : BitVec 64) (h : r.toNat = 0) : r.toInt = 0 := by
   rw [fdev_signed_small r (by omega), h]; rfl
 
-variable (SYSD : UkFileDevSysP (hlc := hlc) (GF := GF))
+variable (SYSD : UkFileDevSysP (GF := GF))
 include SYSD
 
 /-- **Rocq `file_close`**: `ei_close` at a tail handle whose state is no
 pipe end. -/
-theorem file_close (N : UkNames GF) (Pr : Uprog GF) (STB : FdevStubs (hlc := hlc) N Pr) (fd : Nat) (st : FdState)
+theorem file_close (N : UkNames GF) (Pr : Uprog GF) (STB : FdevStubs N Pr) (fd : Nat) (st : FdState)
     (K : Int → IProp GF) (hnp : fdstNopipe st) :
-    ⊢ ufd N.fd fd st -∗ K 0 -∗ clObl (hlc := hlc) N Pr (fd : Int) K := by
+    ⊢ ufd N.fd fd st -∗ K 0 -∗ clObl N Pr (fd : Int) K := by
   unfold clObl
   iintro Hh HK %h %m %avail %ha0 Hcode Hrun Hcont
   have ha0r : (BitVec.setWidth 32 ((ukWr m 17#5 (BitVec.ofInt 64 21)).get 10#5)).toInt = (fd : Int) := by
@@ -59,10 +59,10 @@ theorem file_close (N : UkNames GF) (Pr : Uprog GF) (STB : FdevStubs (hlc := hlc
 /-- **Rocq `file_close_in`**: ...at the input device: the deed's fraction
 comes home. -/
 theorem file_close_in (sf : Dst) (nm : Fname) (r : FileAppNames) (N : UkNames GF) (Pr : Uprog GF)
-    (STB : FdevStubs (hlc := hlc) N Pr) (fd : Nat) (wb : Bool) (i : Nat) (γo : GName) (q : Qp)
+    (STB : FdevStubs N Pr) (fd : Nat) (wb : Bool) (i : Nat) (γo : GName) (q : Qp)
     (content S : List (BitVec 8)) (K : Int → IProp GF) :
     ⊢ ufd N.fd fd (.open true wb (.inode i γo .held)) -∗ fileIn sf nm r i γo q content S -∗
-      (fdq r q sf -∗ K 0) -∗ clObl (hlc := hlc) N Pr (fd : Int) K := by
+      (fdq r q sf -∗ K 0) -∗ clObl N Pr (fd : Int) K := by
   unfold fileIn
   iintro Hh ⟨%p, -, -, -, Hd⟩ HK
   iapply file_close SYSD N Pr STB fd (.open true wb (.inode i γo .held)) K trivial $$ Hh [HK Hd]
@@ -70,10 +70,10 @@ theorem file_close_in (sf : Dst) (nm : Fname) (r : FileAppNames) (N : UkNames GF
 
 /-- **Rocq `file_close_std`**: the standard-slot twin -- the slot goes to
 `closed` and the ledger comes back with it. -/
-theorem file_close_std (N : UkNames GF) (Pr : Uprog GF) (STB : FdevStubs (hlc := hlc) N Pr) (fd : Nat)
+theorem file_close_std (N : UkNames GF) (Pr : Uprog GF) (STB : FdevStubs N Pr) (fd : Nat)
     (l : List FdState) (st : FdState) (K : Int → IProp GF) (hs : fd < NSTD) (hl : l[fd]? = some st)
     (hne : st ≠ .closed) (hnp : fdstNopipe st) :
-    ⊢ ustd N.fd l -∗ (ustd N.fd (l.set fd .closed) -∗ K 0) -∗ clObl (hlc := hlc) N Pr (fd : Int) K := by
+    ⊢ ustd N.fd l -∗ (ustd N.fd (l.set fd .closed) -∗ K 0) -∗ clObl N Pr (fd : Int) K := by
   unfold clObl
   iintro Hstd HK %h %m %avail %ha0 Hcode Hrun Hcont
   have ha0r : (BitVec.setWidth 32 ((ukWr m 17#5 (BitVec.ofInt 64 21)).get 10#5)).toInt = (fd : Int) := by
@@ -97,11 +97,11 @@ theorem file_close_std (N : UkNames GF) (Pr : Uprog GF) (STB : FdevStubs (hlc :=
 
 /-- **Rocq `file_close_in_std`**. -/
 theorem file_close_in_std (sf : Dst) (nm : Fname) (r : FileAppNames) (N : UkNames GF) (Pr : Uprog GF)
-    (STB : FdevStubs (hlc := hlc) N Pr) (fd : Nat) (l : List FdState) (wb : Bool) (i : Nat) (γo : GName) (q : Qp)
+    (STB : FdevStubs N Pr) (fd : Nat) (l : List FdState) (wb : Bool) (i : Nat) (γo : GName) (q : Qp)
     (content S : List (BitVec 8)) (K : Int → IProp GF) (hs : fd < NSTD)
     (hl : l[fd]? = some (.open true wb (.inode i γo .held))) :
     ⊢ ustd N.fd l -∗ fileIn sf nm r i γo q content S -∗
-      (ustd N.fd (l.set fd .closed) -∗ fdq r q sf -∗ K 0) -∗ clObl (hlc := hlc) N Pr (fd : Int) K := by
+      (ustd N.fd (l.set fd .closed) -∗ fdq r q sf -∗ K 0) -∗ clObl N Pr (fd : Int) K := by
   unfold fileIn
   iintro Hstd ⟨%p, -, -, -, Hd⟩ HK
   iapply file_close_std SYSD N Pr STB fd l _ K hs hl (by simp) trivial $$ Hstd [HK Hd]

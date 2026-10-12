@@ -36,7 +36,7 @@ theorem syscArmExit_sp4 (x : BitVec 64) :
     x - 8#64 * BitVec.ofNat 64 4 = x + 0xFFFFFFFFFFFFFFE0#64 := by bv_decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- **Rocq `kstack_closer_frame`**: syscall's four frame cells joined onto
 the dispatch's closer give the callee's, anchored 32 bytes lower. -/
@@ -55,7 +55,7 @@ theorem syscArmExit_closer [CurCtx] (sp ra s0 s1 s2 : BitVec 64) (n : Nat) (T : 
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
@@ -64,7 +64,7 @@ set_option maxHeartbeats 4000000 in
 /-- **Arm 2, `sys_exit`** (Rocq `sysc_arm_exit`): the right conjunct. -/
 theorem syscall_arm_exit (SX : SYSEXIT)
     (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ] (hDX : SyscDepExit (hlc := hlc) (GF := GF))
+    [ClaimIs GF Γ] (hDX : SyscDepExit (GF := GF))
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -107,7 +107,7 @@ theorem syscall_arm_exit (SX : SYSEXIT)
     rw [show 4 + (trapRes k.sie + (k.avail - 4)) = trapRes k.sie + k.avail by omega]
     unfold KCtx.sp
     iexact Hcl
-  have hU := SX.wp_sys_exit_eb (hlc := hlc) (GF := GF) Γ cpu
+  have hU := SX.wp_sys_exit_eb (GF := GF) Γ cpu
     (((k.withSpie spie spp).pushed 4).withRegs R) γw γft γ fscKalloc fsReadyKmem none j pid V M ip v cs sts
     (UexecSG.sexitPay f) hj hprocK hv
     (by k_norm_g; have : sysExitSlots + 4 ≤ syscallSlots := by decide

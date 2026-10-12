@@ -33,7 +33,7 @@ theorem ua_ret_127e : jumpPc (KA.«uvmdealloc» + 0x42#64) = (KA.«uvmdealloc» 
   decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF]
 
 /-! ## `uvmdealloc`: the shared tail at `(KernelSyms.«uvmdealloc» + 0x26)` -/
 
@@ -85,7 +85,7 @@ theorem uvmdealloc_br_ffffffffffffff76 : KA.«uvmdealloc» + 0xffffffffffffff76#
 
 set_option maxHeartbeats 4000000 in
 theorem uvmdealloc_proof (UM : UVMUNMAP) : UVMDEALLOC :=
-  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk P M ke hnoff hK hlk hroot hold => by
+  ⟨fun {GF} _ _ _ _ cpu k γl γk P M ke hnoff hK hlk hroot hold => by
   unfold wp_uvmdealloc_body
   simp only [uvmdeallocAddr]
   iintro ⟨Hk, Hpc, #Hlk, Hav, HP, Hlend, HΦ⟩
@@ -262,7 +262,7 @@ theorem uvmdealloc_proof (UM : UVMUNMAP) : UVMDEALLOC :=
             ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
           ⊢ wpLoop (GF := GF) cc := by
         intro cc k' P' M' n hnoff' hK' hlk' hroot' hal' hn' hrange' hfree'
-        have h := UM.wp_uvmunmap_free (hlc := hlc) (GF := GF) cc k' γl γk P' M' n ke hnoff' hK'
+        have h := UM.wp_uvmunmap_free (GF := GF) cc k' γl γk P' M' n ke hnoff' hK'
           hlk' hroot' hal' hn' hrange' hfree'
         unfold wp_uvmunmap_free_body at h
         simp only [uvmunmapAddr] at h

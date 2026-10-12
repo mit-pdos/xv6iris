@@ -92,7 +92,7 @@ theorem startConf_sConfOf (t : BitVec 64) (lf : SLeft) :
 /-- **The configuration `start` leaves is `kConf` at the Bare tier,
 interrupts off** (Rocq `sconf_intro` + `boot_csrs_reset`'s five facts, here
 all by computation on `start`'s constants). -/
-theorem kConf_boot {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] (cpu : CPU) (t : BitVec 64)
+theorem kConf_boot {GF : BundledGFunctors.{0}} [MachGS GF] (cpu : CPU) (t : BitVec 64)
     (lf : SLeft) (hlf : lf.ok) :
     sConf (GF := GF) cpu (DFrac.own 1) (startConf t lf) ⊢ kConf cpu .bare 0#44 false false false := by
   unfold kConf
@@ -112,7 +112,7 @@ theorem bootTp_hartId (cpu : CPU) :
 /-! ## The stack, physical to kernel -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- **The boot stack, from the M-mode tier to the kernel's** (Rocq
 `stack_own_phys_to_stack`): physical words at read-write static pages are the
@@ -148,7 +148,7 @@ def bootRegMap (f : RegFile) (v1 v2 v4 v8 v10 v11 v14 v15 : BitVec 64) : RegMap 
   | 28 => f .x28 | 29 => f .x29 | 30 => f .x30 | 31 => f .x31 | _ => 0#64
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- **The whole GPR file at `main`'s entry** (Rocq `boot_gpr_file`, which
 Rocq needs one step earlier because its M-mode contract takes the file

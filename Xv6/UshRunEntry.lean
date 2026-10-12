@@ -58,12 +58,12 @@ theorem ushRunRow_facts (c : Ushcmd) :
     by decide⟩
 
 section UshRunEntry
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-- **Rocq `wp_kshr_entry`**: runcmd's prologue and dispatch. -/
-theorem wp_ushRuncmdEntry (UL : UK_LEAVES) : wpShRuncmdEntryBody (hlc := hlc) (GF := GF) := by
+theorem wp_ushRuncmdEntry (UL : UK_LEAVES) : wpShRuncmdEntryBody (GF := GF) := by
   intro N c h m t n ha0
   rw [show User.Sh.Sym.«runcmd» = 0x8e from rfl]
   obtain ⟨F1, F2, F3, F4, F5, F6, F7, F8, F9⟩ := ushRunRow_facts c

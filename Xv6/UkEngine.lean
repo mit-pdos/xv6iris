@@ -76,7 +76,7 @@ def ukRt (ret : Bool) (C : UCfg) (P : UPtd) (T : BMap) (sz : Nat) (m' : RegMap) 
 def ukEx (ret : Bool) (e : ExceptionType) (exc : sync_exception) : Prop := ret = false ∧ exc.trap = e
 
 section engine
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF]
 
 /-! ## §2 The bundle, taken apart and put together -/
 
@@ -124,7 +124,7 @@ def ukLeafGoal (π : Nat → Option UPerm) (sz : Nat) (Qp : Int → IProp GF) (K
     (m : RegMap) (pc : BitVec 64) (Kc : IProp GF) : IProp GF :=
   iprop(□ ∀ (h : CPU) (xi : CurCtx) (C : UCfg) (pt : UPtd) (Rfd : List FdState → IProp GF)
       (Rut : UPtd → IProp GF),
-    ⌜∀ pt' : UPtd, Rut pt' ⊢ @ctxToken hlc GF _ xi h ∗ (@ctxToken hlc GF _ xi h -∗ Rut pt')⌝ -∗
+    ⌜∀ pt' : UPtd, Rut pt' ⊢ @ctxToken GF _ xi h ∗ (@ctxToken GF _ xi h -∗ Rut pt')⌝ -∗
     ⌜loopOk C pt⌝ -∗ ⌜permOf pt.um sz = π⌝ -∗ ⌜lazyFree pt.um (BitVec.ofNat 64 sz)⌝ -∗
     uvb (xi := xi) h C pt Rfd Rut sz π K.fdv K.cw K.gn K.cs K.pid false seccAll M m pc -∗
     ▷ (myPay K.gn Qp ∗ Kc) -∗ wpLoop h)

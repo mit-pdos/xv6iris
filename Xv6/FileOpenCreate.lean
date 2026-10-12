@@ -39,7 +39,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section FileOpenCreate
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [OffboxG GF] [FsTopG GF] [FsBytesG GF] [Appcfg GF] [Icfg]
 
 /-! ## §3b. The arm leg: free, and it MINTS THE PERMIT -/
@@ -47,11 +47,11 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Di
 /-- Rocq `file_arm_commit`. -/
 theorem fileArm_commit (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (jo : Option Nat)
     (n : Nat) (s : Dst) (g : GName) (np : Nat) (bsc : List (BitVec 8))
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r }) :
-    ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗ fileConsCred (hlc := hlc) c r jo -∗
-      escKey (hlc := hlc) c r n s g -∗ fescRes (hlc := hlc) r s g np -∗
-      aarmCommitAt (hlc := hlc) (fsGammaL γfs) appE (.AFile bsc)
-        (fileArmFam (hlc := hlc) c r jo s g np).pfRecv := by
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred c, appRun := r }) :
+    ⊢@{IProp GF} appInv γfs -∗ fileConsCred c r jo -∗
+      escKey c r n s g -∗ fescRes r s g np -∗
+      aarmCommitAt (fsGammaL γfs) appE (.AFile bsc)
+        (fileArmFam c r jo s g np).pfRecv := by
   have hnd : ∀ e : Std.ExtTreeMap Fname Nat compare, Absnode.AFile bsc ≠ .ADir e :=
     fun _ h => by cases h
   unfold aarmCommitAt fileArmFam fescRes
@@ -64,7 +64,7 @@ theorem fileArm_commit (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (jo :
     imodintro
     iframe Hka
     isplitl []
-    · iapply (fileAppStep_free_at (hlc := hlc) c r i I _ heq
+    · iapply (fileAppStep_free_at c r i I _ heq
         (fun _ => fileFsPure_arm i _ _ hnone hpure) (consAbsent_arm_nd i _ _ hnd)
         (fun j => consPresent_arm_nd j i _ _ hnone) (fun s' => fOk_arm i _ _ s' hnone hnd))
     · iintro %I' %_hav Hka'
@@ -76,7 +76,7 @@ theorem fileArm_commit (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (jo :
   · imodintro
     iframe Hka
     isplitl []
-    · iapply (fileAppStep_taint (hlc := hlc) c r i I _ heq) $$ HT
+    · iapply (fileAppStep_taint c r i I _ heq) $$ HT
     · iintro %I' %_hav Hka'
       imodintro
       iframe Hka'
@@ -87,11 +87,11 @@ theorem fileArm_commit (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (jo :
 /-- Rocq `file_unarm_commit`. -/
 theorem fileUnarm_commit (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (jo : Option Nat)
     (n : Nat) (s : Dst) (g : GName) (np : Nat)
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r }) :
-    ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗ fileConsCred (hlc := hlc) c r jo -∗
-      escKey (hlc := hlc) c r n s g -∗
-      aunarmOfArm (hlc := hlc) (fsGammaL γfs) appE (fileArmFam (hlc := hlc) c r jo s g np)
-        (fileUnarmFam (hlc := hlc) c r s g np).pfRecv := by
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred c, appRun := r }) :
+    ⊢@{IProp GF} appInv γfs -∗ fileConsCred c r jo -∗
+      escKey c r n s g -∗
+      aunarmOfArm (fsGammaL γfs) appE (fileArmFam c r jo s g np)
+        (fileUnarmFam c r s g np).pfRecv := by
   unfold aunarmOfArm creArmFired aunarmCommitAt fileArmFam fileUnarmFam fescRes
   simp only [fileOpen_fsGammaL_top]
   iintro #Hinv #Hm #Hwit %i ⟨%av0, %hfree, Hrec⟩ %I %c0 %_hrow Hka
@@ -104,7 +104,7 @@ theorem fileUnarm_commit (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (jo
       imodintro
       iframe Hka
       isplitl []
-      · iapply (fileAppStep_free_at (hlc := hlc) c r i I _ heq
+      · iapply (fileAppStep_free_at c r i I _ heq
           (fun _ => fileFsPure_unarm_fresh i av0 _ hfree hpure0 hpure)
           (consAbsent_unarm i _)
           (fun j hj => by
@@ -122,7 +122,7 @@ theorem fileUnarm_commit (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (jo
     · imodintro
       iframe Hka
       isplitl []
-      · iapply (fileAppStep_taint (hlc := hlc) c r i I _ heq) $$ HT
+      · iapply (fileAppStep_taint c r i I _ heq) $$ HT
       · iintro %I' %_hav Hka'
         imodintro
         iframe Hka'
@@ -130,7 +130,7 @@ theorem fileUnarm_commit (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (jo
   · imodintro
     iframe Hka
     isplitl []
-    · iapply (fileAppStep_taint (hlc := hlc) c r i I _ heq) $$ HT
+    · iapply (fileAppStep_taint c r i I _ heq) $$ HT
     · iintro %I' %_hav Hka'
       imodintro
       iframe Hka'
@@ -141,14 +141,14 @@ theorem fileUnarm_commit (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (jo
 /-- Rocq `file_acre_commit`. -/
 theorem fileAcre_commit (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (jo : Option Nat)
     (n : Nat) (N : Fname) (s : Dst) (g : GName) (np : Nat) (ls : List FlLine) (ws : Wordline)
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r })
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred c, appRun := r })
     (hN : uname N) (hlast : ls.getLast? = some (Uline.LEchoF ws N)) (hnp : np = ls.length)
     (hokw : lineOk ws) :
-    ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗ fileConsCred (hlc := hlc) c r jo -∗
-      escKey (hlc := hlc) c r n s g -∗ flLb c ls -∗
-      acreCommitAtGenNm (hlc := hlc) (fsGammaL γfs) appE (fun _ _ => .AFile []) (redirAt N)
-        (fun d : Nat => iprop(⌜d = ROOTINO⌝)) (fileArmFam (hlc := hlc) c r jo s g np)
-        (fileCreFam (hlc := hlc) c r jo N s g np).pfRecv := by
+    ⊢@{IProp GF} appInv γfs -∗ fileConsCred c r jo -∗
+      escKey c r n s g -∗ flLb c ls -∗
+      acreCommitAtGenNm (fsGammaL γfs) appE (fun _ _ => .AFile []) (redirAt N)
+        (fun d : Nat => iprop(⌜d = ROOTINO⌝)) (fileArmFam c r jo s g np)
+        (fileCreFam c r jo N s g np).pfRecv := by
   have hin := flRedirs_last ls ws N hlast
   subst hnp
   unfold acreCommitAtGenNm creArmFired fileArmFam fileCreFam fileCreRecv fescRes
@@ -176,7 +176,7 @@ theorem fileAcre_commit (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (jo 
       isplitr
       · ipureintro; rfl
       isplitl [Htok Hre]
-      · iapply (fileAppStep_escrow (hlc := hlc) c r ROOTINO I _ n s (s.insert nm (i, [])) g heq
+      · iapply (fileAppStep_escrow c r ROOTINO I _ n s (s.insert nm (i, [])) g heq
           (fun _ => hp1) hp2 hp3 (fun _ => hp4)) $$ Hwit Htok [] Hre
         have hty := fTyped_some (GF := GF) c s ls nm ws [] i hN hin hokw (selOk_nil _)
         rw [subseq_nil] at hty
@@ -188,7 +188,7 @@ theorem fileAcre_commit (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (jo 
           simp [hsN] at h2
         have hcont : fcontentOf (absView I') = s.insert nm (i, []) := by
           rw [hav]; exact fOk_fcontent _ _ hp4
-        imod (fileResync (hlc := hlc) γfs c r s (s.insert nm (i, [])) ls.length I' appE
+        imod (fileResync γfs c r s (s.insert nm (i, [])) ls.length I' appE
           (fun _ h => h) heq hcont hne) $$ Hinv Htk Hq2 Hka' with ⟨Hka', Hres⟩
         imodintro
         iframe Hka'
@@ -202,7 +202,7 @@ theorem fileAcre_commit (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (jo 
       isplitr
       · ipureintro; rfl
       isplitl []
-      · iapply (fileAppStep_taint (hlc := hlc) c r ROOTINO I _ heq) $$ HT
+      · iapply (fileAppStep_taint c r ROOTINO I _ heq) $$ HT
       · iintro %I' %_hav Hka'
         imodintro
         iframe Hka'
@@ -212,7 +212,7 @@ theorem fileAcre_commit (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (jo 
     isplitr
     · ipureintro; rfl
     isplitl []
-    · iapply (fileAppStep_taint (hlc := hlc) c r ROOTINO I _ heq) $$ HT
+    · iapply (fileAppStep_taint c r ROOTINO I _ heq) $$ HT
     · iintro %I' %_hav Hka'
       imodintro
       iframe Hka'
@@ -223,10 +223,10 @@ theorem fileAcre_commit (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (jo 
 /-- THE EXISTS OBSERVATION'S PIECE (Rocq `file_dlk_piece`). -/
 theorem fileDlk_piece (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (n : Nat) (s : Dst)
     (g : GName)
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r }) :
-    ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗ escKey (hlc := hlc) c r n s g -∗
-      pfAt (dlookupCommitAt (hlc := hlc) (fsGammaL γfs) appE)
-        (fileDlkFam (hlc := hlc) c r n s g) := by
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred c, appRun := r }) :
+    ⊢@{IProp GF} appInv γfs -∗ escKey c r n s g -∗
+      pfAt (dlookupCommitAt (fsGammaL γfs) appE)
+        (fileDlkFam c r n s g) := by
   unfold pfAt dlookupCommitAt fileDlkFam fileDlkRecv
   simp only [fileOpen_fsGammaL_top]
   iintro #Hinv #Hwit
@@ -254,10 +254,10 @@ theorem fileDlk_piece (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (n : N
 read at the instant the kernel reports the found node's type. -/
 theorem fileOdlk_piece (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (n : Nat) (s : Dst)
     (g : GName)
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r }) :
-    ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗ escKey (hlc := hlc) c r n s g -∗
-      pfAt (aopenCommitAt (hlc := hlc) (fsGammaL γfs) appE)
-        (fileOdlkFam (hlc := hlc) c r n s g) := by
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred c, appRun := r }) :
+    ⊢@{IProp GF} appInv γfs -∗ escKey c r n s g -∗
+      pfAt (aopenCommitAt (fsGammaL γfs) appE)
+        (fileOdlkFam c r n s g) := by
   unfold pfAt aopenCommitAt fileOdlkFam fileOdlkRecv
   simp only [fileOpen_fsGammaL_top]
   iintro #Hinv #Hwit

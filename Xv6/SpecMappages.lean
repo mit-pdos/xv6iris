@@ -68,7 +68,7 @@ def mappagesArgs (t : PTree) (va size pa : BitVec 64) (n : Nat) : Prop :=
 /-- The general specification of `mappages` (uncounted): the run stops at
 the first page whose path `walk` could not complete, and the function then
 returns `-1` with the allocator empty. -/
-def wp_mappages_any_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
+def wp_mappages_any_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (on : Option Nat) (t : PTree) (n : Nat)
     (perm : BitVec 64) (ke : Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 32 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
@@ -101,14 +101,14 @@ def wp_mappages_any_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
 
 /-- The general interface of `mappages`. -/
 structure MAPPAGES_ANY : Prop where
-  wp_mappages_any : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_mappages_any : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γl : GName) (γk : KmemNames) (on : Option Nat) (t : PTree) (n : Nat) (perm : BitVec 64)
     (ke : Nat) hnoff hK hlk hroot hargs hperm hmask hrwx hwf hnd hpg,
-    wp_mappages_any_body (hlc := hlc) (GF := GF) cpu k γl γk on t n perm ke hnoff hK hlk hroot hargs
+    wp_mappages_any_body (GF := GF) cpu k γl γk on t n perm ke hnoff hK hlk hroot hargs
       hperm hmask hrwx hwf hnd hpg
 
 /-- The specification of `mappages` (counted mode). -/
-def wp_mappages_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
+def wp_mappages_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (nb : Nat) (t : PTree) (n : Nat)
     (perm : BitVec 64) (ke : Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 32 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
@@ -137,10 +137,10 @@ def wp_mappages_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
 
 /-- The interface of `mappages`. -/
 structure MAPPAGES : Prop where
-  wp_mappages : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_mappages : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γl : GName) (γk : KmemNames) (nb : Nat) (t : PTree) (n : Nat) (perm : BitVec 64)
     (ke : Nat) hnoff hK hlk hroot hargs hperm hmask hrwx hwf hnd hpg hcount,
-    wp_mappages_body (hlc := hlc) (GF := GF) cpu k γl γk nb t n perm ke hnoff hK hlk hroot hargs
+    wp_mappages_body (GF := GF) cpu k γl γk nb t n perm ke hnoff hK hlk hroot hargs
       hperm hmask hrwx hwf hnd hpg hcount
 
 end Xv6

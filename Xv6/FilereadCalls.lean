@@ -38,7 +38,7 @@ open LeanRV64D
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -51,8 +51,8 @@ theorem frd_rpost_img (P : UPtd) (γ : GName) (addr : BitVec 64) (Q : List (BitV
     (r : BitVec 64) (P' : UPtd) (Vw M' : Nat → List (BitVec 8)) (hlen : bsW.length = d)
     (hM : M' = umemWrite Vw addr.toNat bsW) (hmap : umMapped P' addr.toNat d)
     (hpl : umPageLen P' M') :
-    pipeRpost (hlc := hlc) P γ addr Q Qe Rk n d (fun i => bsW.getD i 0#8) r ⊢
-      pipeRpostImg (hlc := hlc) P γ Q Qe Rk n r M' addr := by
+    pipeRpost P γ addr Q Qe Rk n d (fun i => bsW.getD i 0#8) r ⊢
+      pipeRpostImg P γ Q Qe Rk n r M' addr := by
   have hbs : (List.range d).map (fun i => bsW.getD i 0#8) = bsW := by
     apply List.ext_getElem
     · simp [hlen]
@@ -72,7 +72,7 @@ set_option maxHeartbeats 8000000 in
 /-- `piperead(f->pipe, addr, n)` at `+0x6c`: the eb contract, the block
 converted at the kernel-page-table tier; the generation halves lent and
 returned; the queue's post read at the resume image (`frd_rpost_img`). -/
-theorem frd_piperead (PR : PIPEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem frd_piperead (PR : PIPEREAD) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (γp : PipeNames) (w : Bool) (q : Qp)
     (γkl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (n : Int)
@@ -86,7 +86,7 @@ theorem frd_piperead (PR : PIPEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     isPipe γl γp (k'.regs 10#5) ∗ pipeRef γp w q ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     procPrivExt (procAddr j) pid V V.upt M ∗ genHalvesPriv (procAddr j) pid V.gen ∗
-    pipeRpay (hlc := hlc) γp.pnQueue Rp Rpe n.toNat ∗
+    pipeRpay γp.pnQueue Rp Rpe n.toNat ∗
     (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (M' : Nat → List (BitVec 8)) (d : Nat),
       ⌜calleeSaved k'.regs R' ∧ V.upt.extSz V.sz P' ∧ (d : Int) ≤ max 0 n ∧
         pipeReadRet d (R' 10#5) ∧ umemWrote V.upt M (k'.regs 11#5) d P' M'⌝ -∗
@@ -94,11 +94,11 @@ theorem frd_piperead (PR : PIPEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
       trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗
       pipeRef γp w q -∗ procPrivExtEv (procAddr j) pid V P' M' -∗
       genHalvesPriv (procAddr j) pid V.gen -∗
-      pipeRpostImg (hlc := hlc) V.upt γp.pnQueue Rp Rpe
-        iprop(killShot V.gen ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF)) n.toNat (R' 10#5) M'
+      pipeRpostImg V.upt γp.pnQueue Rp Rpe
+        iprop(killShot V.gen ∗ □ MachFixedGS.killCred (GF := GF)) n.toNat (R' 10#5) M'
         (k'.regs 11#5) -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) c := by
-  have h := PR.wp_piperead_eb (hlc := hlc) (GF := GF) Γ c k' γl γp w q γkl γk j pid V M n Rp Rpe hw
+  have h := PR.wp_piperead_eb (GF := GF) Γ c k' γl γp w q γkl γk j pid V M n Rp Rpe hw
     hj hproc hK hnoff htier hn hn'
   unfold wp_piperead_eb_body at h
   simp only [pipereadAddr] at h
@@ -121,7 +121,7 @@ theorem frd_piperead (PR : PIPEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
 set_option maxHeartbeats 8000000 in
 /-- `devsw[CONSOLE].read(1, addr, n)` at `+0x9a` (the INDIRECT call):
 consoleread's eb contract, the block converted. -/
-theorem frd_consoleread (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem frd_consoleread (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γc : GName) (ord : Option Nat)
     (Rin : List (List Obs × BitVec 8) → IProp GF)
     (γkl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
@@ -131,8 +131,8 @@ theorem frd_consoleread (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs (hlc := hl
     (hn : k'.regs 12#5 = BitVec.ofInt 64 n) (hn' : -2 ^ 31 ≤ n ∧ n < 2 ^ 31) :
     kctx c k' ∗ pcIs c KA.«consoleread» ∗ procsInv Γ ∗
     trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗
-    isConslock fscCons (appRdcred (hlc := hlc) (GF := GF)) γc ∗ consPay fscCons (appRdcred (hlc := hlc) (GF := GF)) ord ∗
-    consReadPay (genId (hlc := hlc) (GF := GF) + 1) Rin ∗ uartInv .uart0 fscCons.uart ∗
+    isConslock fscCons (appRdcred (GF := GF)) γc ∗ consPay fscCons (appRdcred (GF := GF)) ord ∗
+    consReadPay (genId (GF := GF) + 1) Rin ∗ uartInv .uart0 fscCons.uart ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     procPrivExt (procAddr j) pid V V.upt M ∗ genHalvesPriv (procAddr j) pid V.gen ∗
     (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd)
@@ -145,21 +145,21 @@ theorem frd_consoleread (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs (hlc := hl
         (R' 10#5 = BitVec.ofInt 64 (d : Int) → d = 0 → 0 < n → dc = d + 1) ∧
         consTagged bs hs d⌝ -∗
       (⌜R' 10#5 = -1#64⌝ -∗ killShot V.gen) -∗
-      ([∗list] h ∈ hs, MachFixedGS.rxTag (hlc := hlc) (GF := GF) h) -∗
+      ([∗list] h ∈ hs, MachFixedGS.rxTag (GF := GF) h) -∗
       consStoredLb fscCons sl -∗
       ((⌜consWindow sl cur d bs hs⌝ ∗ ⌜consChain sl⌝ ∗
          consSwallow fscCons (¬ uvaWmapped V.upt ((k'.regs 11#5) + BitVec.ofNat 64 d).toNat) sl d dc ∗
          (∃ sl' ws : List (List Obs × BitVec 8),
             consStoredLb fscCons sl' ∗ ⌜sl <+: sl'⌝ ∗ ⌜sl'.length = cur + dc⌝ ∗ ⌜ws.length = dc⌝ ∗
             ⌜∀ i : Nat, i < dc → ws[i]? = sl'[cur + i]?⌝ ∗ Rin ws)) ∨
-        (consDirtyCred (appRdcred (hlc := hlc) (GF := GF)) ∗ ⌜consChain sl⌝ ∗
+        (consDirtyCred (appRdcred (GF := GF)) ∗ ⌜consChain sl⌝ ∗
           ⌜consPlaced sl cur fscCons.era d hs⌝ ∗ consSwallowPlaced sl cur fscCons.era d dc)) -∗
-      consOut fscCons (appRdcred (hlc := hlc) (GF := GF)) ord cur dc -∗
+      consOut fscCons (appRdcred (GF := GF)) ord cur dc -∗
       kctx c' ((k'.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗
       procPrivExtEv (procAddr j) pid V P' M' -∗ genHalvesPriv (procAddr j) pid V.gen -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) c := by
-  have h := CR.wp_consoleread_eb (hlc := hlc) (GF := GF) Γ c k' γc fscCons (appRdcred (hlc := hlc) (GF := GF)) ord Rin γkl γk j
+  have h := CR.wp_consoleread_eb (GF := GF) Γ c k' γc fscCons (appRdcred (GF := GF)) ord Rin γkl γk j
     pid V M n hj hproc hK hnoff htier huser hn hn'
   unfold wp_consoleread_eb_body at h
   simp only [consolereadAddr] at h
@@ -191,7 +191,7 @@ set_option maxHeartbeats 8000000 in
 /-- `ilock(f->ip)` at `+0x36`: THE READ ARM (`depRd`), the `shotK ty`
 licence, the store-order receipt `topLb Tl` presented (the fd's off-box
 stamps), the environment out of `fsReady`. -/
-theorem frd_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU)
+theorem frd_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF Γ] (c : CPU)
     (k' : KCtx) (j ik : Nat) (s : Qp) (g : GName) (lo tl : Nat) (ty : BitVec 16)
     (inum : BitVec 32) (γil γisl : GName) (pid : BitVec 32) (Tl : Nat)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : ilockSlots ≤ k'.avail)
@@ -199,7 +199,7 @@ theorem frd_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c
     (hnib : inum.toNat < 16 * icfgNib) (ha0 : k'.regs 10#5 = ientry ik) (hle : lo ≤ tl) :
     kctx c k' ∗ pcIs c KA.«ilock» ∗
     trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗ procsInv Γ ∗ panicEnv ∗
-    fsReady (hlc := hlc) ∗
+    fsReady ∗
     isSleeplockGen γil γisl (iLock (ientry ik)) (icSlp fscIc ik) (slhTok (icfgIsl ik)) ∗
     credFloor lo tl ∗ ityShot g ty ∗ inodeShrGenlo ik s icfgDev inum g lo ∗
     wordPointsTo (pPid k'.proc) 4 pidPriv pid ∗ bslot ∗ topLb Tl ∗
@@ -221,7 +221,7 @@ theorem frd_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c
   ihave #Hesc := fsReady_escrow ik hkk $$ Hfs
   ihave #Hcla := isItable2_claims $$ Hit2
   icases fsReady_sb_four $$ Hfs with ⟨-, #Hsi, -⟩
-  have h := IL.wp_ilock_dep_eb (hlc := hlc) (GF := GF) Γ c k' γl pd pav pu j γil γisl ik s g lo tl
+  have h := IL.wp_ilock_dep_eb (GF := GF) Γ c k' γl pd pav pu j γil γisl ik s g lo tl
     (.depRd s icfgDev inum g lo) (.shotK ty) inum pid pidPriv DFrac.discard Tl hj hproc hK hnoff
     htier rfl (fun _ => ⟨ty, rfl⟩) hkk hgo.fgoLog (hgo.iblockCov inum hnib) hnib hpd ha0 hle
   unfold wp_ilock_dep_eb_body at h
@@ -255,7 +255,7 @@ theorem frd_iunlock (IU : IUNLOCK) (Γ : SchedNames) (c : CPU) (k' : KCtx) (ik :
     (htier : k'.tier = KTier.kpt) (hkk : ik < NINODE) (ha0 : k'.regs 10#5 = ientry ik)
     (hle : lo ≤ tl) :
     kctx c k' ∗ pcIs c KA.«iunlock» ∗
-    trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗ procsInv Γ ∗ fsReady (hlc := hlc) ∗
+    trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗ procsInv Γ ∗ fsReady ∗
     isSleeplockGen γil γisl (iLock (ientry ik)) (icSlp fscIc ik) (slhTok (icfgIsl ik)) ∗
     credFloor lo tl ∗ frdLk ik s g lo inum γisl pid ∗ (∃ T : Nat, offRowsDep offCfg ik T) ∗
     icDepHeld fscFs fscIreg fscCov fscLogst (.depRd s icfgDev inum g lo) ik inum dn bm ∗
@@ -267,7 +267,7 @@ theorem frd_iunlock (IU : IUNLOCK) (Γ : SchedNames) (c : CPU) (k' : KCtx) (ik :
       wordPointsTo (pPid k'.proc) 4 pidPriv pid -∗
       inodeShrGenlo ik s icfgDev inum g lo -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) c := by
-  have h := IU.wp_iunlock_dep (hlc := hlc) (GF := GF) Γ c k' γil γisl ik s g lo tl
+  have h := IU.wp_iunlock_dep (GF := GF) Γ c k' γil γisl ik s g lo tl
     (.depRd s icfgDev inum g lo) icfgDev inum dn bm pid pidPriv (by rw [hnoff]; omega) hK rfl hkk
     ha0 (by rw [hlocks]; simp) (by rw [hlocks]; simp) htier hle
   unfold wp_iunlock_dep_body at h
@@ -292,7 +292,7 @@ set_option maxHeartbeats 8000000 in
 /-- `readi(f->ip, 1, addr, f->off, n)` at `+0x44`: the USER arm, at the
 reader's quarter of the map and the blocks, the environment out of
 `fsReady`; the post's block at the ambient form. -/
-theorem frd_readi (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem frd_readi (RD : READI) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (j : Nat) (γkl : GName) (γk : KmemNames) (ik : Nat)
     (bm : Blkmap) (data : Nat → List (BitVec 8)) (dn : Dinode) (off : Nat) (n : Int)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (pid : BitVec 32)
@@ -305,7 +305,7 @@ theorem frd_readi (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (ha3 : k'.regs 13#5 = BitVec.signExtend 64 (BitVec.ofNat 32 off))
     (ha4 : k'.regs 14#5 = BitVec.ofInt 64 n) :
     kctx c k' ∗ pcIs c KA.«readi» ∗ procsInv Γ ∗
-    trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗ panicEnv ∗ fsReady (hlc := hlc) ∗
+    trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗ panicEnv ∗ fsReady ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     wordPointsTo (iDev (ientry ik)) 4 (DFrac.own (1 : Qp).half) icfgDev ∗
     inodeMeta (ientry ik) dn ∗
@@ -332,7 +332,7 @@ theorem frd_readi (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   icases fsReady_disk $$ Hfs with ⟨%pd, %pav, %pu, #Hdc, %hpd⟩
   ihave #Hany := fsReady_bytes $$ Hfs
   have hmb : MAXFILE * BSIZE = 274432 := rfl
-  have h := RD.wp_readi_eb (hlc := hlc) (GF := GF) Γ c k' γl fscBio
+  have h := RD.wp_readi_eb (GF := GF) Γ c k' γl fscBio
     (fsView fscFs fscDisk icfgDev fscCov) fscDlock pd pav pu j fscFs fscLogst icfgDev γkl γk
     (ientry ik) bm data dn true off n.toNat [] pid V M pidPriv (DFrac.own Qp.quarter)
     (DFrac.own (1 : Qp).half) hj hproc hK hnoff htier hgo.fgoLog hwf hcovs hcap (by omega)
@@ -369,7 +369,7 @@ def frdMsgStr : List (BitVec 8) :=
   [0x66#8, 0x69#8, 0x6c#8, 0x65#8, 0x72#8, 0x65#8, 0x61#8, 0x64#8]
 
 section Panic
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 set_option maxRecDepth 100000 in
 /-- Rocq's `fr_msg_str`. -/
@@ -387,7 +387,7 @@ theorem frd_panic [CurCtx] (PA : PANIC) (c : CPU) (k' : KCtx)
     (hpr : "pr" ∉ k'.locks) (huart : "uart1" ∉ k'.locks) :
     kctx c k' ∗ pcIs c KA.«panic» ∗ panicEnv ∗
     cstr KStr.«fileread» DFrac.discard frdMsgStr ⊢ wpLoop (GF := GF) c := by
-  have h := PA.wp_panic (hlc := hlc) (GF := GF) c k' (PkArgDesc.str DFrac.discard frdMsgStr)
+  have h := PA.wp_panic (GF := GF) c k' (PkArgDesc.str DFrac.discard frdMsgStr)
     hK rfl hnoff hpr huart
   unfold wp_panic_body at h
   simp only [panicAddr] at h

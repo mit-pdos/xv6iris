@@ -85,7 +85,7 @@ theorem sys_mknod_ite_f {GF : BundledGFunctors.{0}} (X Y : IProp GF) : (if false
   simp only [Bool.false_eq_true, ite_false]; exact .rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -129,7 +129,7 @@ set_option maxHeartbeats 16000000 in
 with create's ARM C-OK read at `T_DEVICE` (`creOkPure_dev` forces `made`).
 -/
 theorem sys_mknod_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : SysMknodArgs GF) (P2 : UPtd) (spie spp : Bool) (R : RegMap)
     (pl rest : List (BitVec 8)) (ok made : Bool) (kk : Nat) (qi s : Qp) (g : GName)
     (inum : BitVec 32) (dn : Dinode) (bm : Blkmap) (u' : Nat) (Sb' : List Nat) (ns' : Nat)
@@ -145,18 +145,18 @@ theorem sys_mknod_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     byteBuf (sysMknodBuf (k.regs 2#5)) (DFrac.own 1) (bview (pl.length + 1) (sysfilePfun pl)) ∗
     byteBuf (sysfileRestAddr (sysMknodBuf (k.regs 2#5)) pl.length) (DFrac.own 1) rest ∗
     sysMknodLow (k.regs 2#5) ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysMknodV1 A P2) (sysMknodM1 A P2) ∗
     (∀ c : CPU, sysMknodPostA k A c) ∗ bslots 3 ∗ irefSlots ns' ∗ logOpS icfgLog u' Sb' ∗
     (if ok then
       iprop(⌜R 10#5 = ientry kk ∧ kk < NINODE ∧ 0 < inum.toNat ∧ inum.toNat < 16 * icfgNib ∧
           creOkPure T_DEVICE_w (sysMknodHw A.v1) (sysMknodHw A.v2) made dn⌝ ∗
         createLocked A.pid kk qi s g inum dn bm ∗
-        creOkArms (hlc := hlc) (fsGammaL fscFs) T_DEVICE_w.toNat (devArg A.v1) (devArg A.v2) (nparNm (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat) (fun c => c = .ADev (devArg A.v1) (devArg A.v2)) A.P
+        creOkArms (fsGammaL fscFs) T_DEVICE_w.toNat (devArg A.v1) (devArg A.v2) (nparNm (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat) (fun c => c = .ADev (devArg A.v1) (devArg A.v2)) A.P
           A.Farm (pfamTriv (fun _ _ _ _ => iprop(True))) A.Fun A.Fok A.Fex pl made inum.toNat)
      else
       iprop(⌜R 10#5 = 0#64⌝ ∗ logTx icfgLog ∗
-        creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti T_DEVICE_w.toNat (devArg A.v1)
+        creFailArms (fsGammaL fscFs) fscFs A.V.rti T_DEVICE_w.toNat (devArg A.v1)
           (devArg A.v2) (nparNm (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat) (fun c => c = .ADev (devArg A.v1) (devArg A.v2)) A.P A.Pmiss A.Farm (pfamTriv (fun _ _ _ _ => iprop(True))) A.Fun A.Fok
           A.Fex pl))
     ⊢ wpLoop (GF := GF) cpu := by
@@ -172,9 +172,9 @@ theorem sys_mknod_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, MachCSL.beqz_zero]
     iintro Hk Hpc
     ihave Hop := logOpS_op icfgLog u' Sb' $$ Hop Htx
-    ihave Hcf := creFailArms_dev (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti (devArg A.v1) (devArg A.v2)
+    ihave Hcf := creFailArms_dev (fsGammaL fscFs) fscFs A.V.rti (devArg A.v1) (devArg A.v2)
       (nparNm (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat) (fun c => c = .ADev (devArg A.v1) (devArg A.v2)) A.P A.Pmiss A.Farm (pfamTriv (fun _ _ _ _ => iprop(True))) A.Fun A.Fok A.Fex pl $$ Hcf
-    ihave Hfail : mknodPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
+    ihave Hfail : mknodPostFail (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
         A.v0.toNat (devArg A.v1) (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok
         A.Fex $$ [Hcf]
     · unfold mknodPostFail
@@ -198,9 +198,9 @@ theorem sys_mknod_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     k_step_e (wp_s_branch cpu _ (KA.«sys_mknod» + 0x44#64) true 20#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, Xv6.dirlookup_beqz, hd]
     iintro Hk Hpc
-    ihave Hcok := creOkArms_dev (hlc := hlc) (fsGammaL fscFs) (devArg A.v1) (devArg A.v2) (nparNm (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat) (fun c => c = .ADev (devArg A.v1) (devArg A.v2)) A.P
+    ihave Hcok := creOkArms_dev (fsGammaL fscFs) (devArg A.v1) (devArg A.v2) (nparNm (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat) (fun c => c = .ADev (devArg A.v1) (devArg A.v2)) A.P
       A.Farm (pfamTriv (fun _ _ _ _ => iprop(True))) A.Fun A.Fok A.Fex pl inum.toNat $$ Hcok
-    ihave Hok : mknodPostOk (hlc := hlc) (fsGammaL fscFs) (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
+    ihave Hok : mknodPostOk (fsGammaL fscFs) (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
         (devArg A.v1) (devArg A.v2) A.P A.Farm A.Fun A.Fok A.Fex $$ [Hcok]
     · unfold mknodPostOk
       iexists pl, inum.toNat
@@ -223,7 +223,7 @@ arm) or the two halfword reads, `li a1,3`, `addi a0,s0,-144` and
 at the path argstr read (`mknodAuAt_inst`); create's answer goes to
 `sys_mknod_created`. -/
 theorem sys_mknod_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : SysMknodArgs GF) (P2 : UPtd) (spie spp : Bool) (R : RegMap)
     (old bs : List (BitVec 8))
     (hj : A.j < NPROC) (hproc : k.proc = procAddr A.j) (hK : sysMknodSlots ≤ k.avail)
@@ -238,10 +238,10 @@ theorem sys_mknod_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
     sysMknodCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
     byteBuf (sysMknodBuf (k.regs 2#5)) (DFrac.own 1) bs ∗
     sysMknodInts (k.regs 2#5) (BitVec.extractLsb' 0 32 A.v1) (BitVec.extractLsb' 0 32 A.v2) ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysMknodV1 A P2) (sysMknodM1 A P2) ∗
     (∀ c : CPU, sysMknodPostA k A c) ∗ bslots 3 ∗ irefSlots A.ns ∗ logOp icfgLog MAXOPBLOCKS ∗
-    sysMknodAu (hlc := hlc) A
+    sysMknodAu A
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hbuf, Hints, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Hau⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -307,26 +307,26 @@ theorem sys_mknod_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
     iintro Hk Hpc
     icases sysfile_buf_split _ pl _ $$ Hbuf with ⟨Hp, Hrest⟩
     -- THE ONE-SHOT, HANDED DOWN UNFIRED, AT THE PATH THE CALLER PASSED
-    ihave Hau := mknodAuAt_inst (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
+    ihave Hau := mknodAuAt_inst (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
       A.v0.toNat pl (devArg A.v1) (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok A.Fex
       hpl $$ Hau
     unfold mknodAuPre
     icases Hau with ⟨Hst, Hac, Hdl, Hch⟩
     -- the child's pair at the NODE PREDICATE this syscall PINS (INIT-FILE)
-    ihave Hch := creChildUnfiredNdp_pin (hlc := hlc) (fsGammaL fscFs) (.ADev (devArg A.v1) (devArg A.v2))
+    ihave Hch := creChildUnfiredNdp_pin (fsGammaL fscFs) (.ADev (devArg A.v1) (devArg A.v2))
       A.Farm A.Fun $$ Hch
     -- THE BUNDLE AT THE DEVICE TYPE: no dots leg owed
-    ihave Hcre := creCommits_of_dev (hlc := hlc) (fsGammaL fscFs) (devArg A.v1) (devArg A.v2)
+    ihave Hcre := creCommits_of_dev (fsGammaL fscFs) (devArg A.v1) (devArg A.v2)
       (nparNm (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat) (fun c => c = .ADev (devArg A.v1) (devArg A.v2)) (A.P (nparElems pl).length) A.Farm A.Fun A.Fok $$ Hac Hch
-    ihave Hcre := (show creCommits (hlc := hlc) (GF := GF) (fsGammaL fscFs) T_DEVICE_w.toNat
+    ihave Hcre := (show creCommits (GF := GF) (fsGammaL fscFs) T_DEVICE_w.toNat
         (devArg A.v1) (devArg A.v2) (nparNm (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat) (fun c => c = .ADev (devArg A.v1) (devArg A.v2)) (A.P (nparElems pl).length) A.Farm
         (pfamTriv (fun _ _ _ _ => iprop(True))) A.Fun A.Fok ⊢
-      creCommits (hlc := hlc) (fsGammaL fscFs) T_DEVICE_w.toNat (sysMknodHw A.v1).toNat
+      creCommits (fsGammaL fscFs) T_DEVICE_w.toNat (sysMknodHw A.v1).toNat
         (sysMknodHw A.v2).toNat (nparNm (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat) (fun c => c = .ADev (devArg A.v1) (devArg A.v2)) (A.P (nparElems (bview pl.length (sysfilePfun pl))).length) A.Farm
         (pfamTriv (fun _ _ _ _ => iprop(True))) A.Fun A.Fok
       from by rw [sys_mknod_hw_dev, sys_mknod_hw_dev, sys_mknod_bview_self]) $$ Hcre
-    ihave Hst := (show epStart (hlc := hlc) (GF := GF) fscFs A.V.rti A.V.cwi A.P A.Pmiss pl ⊢
-      epStart (hlc := hlc) fscFs A.V.rti A.V.cwi A.P A.Pmiss (bview pl.length (sysfilePfun pl))
+    ihave Hst := (show epStart (GF := GF) fscFs A.V.rti A.V.cwi A.P A.Pmiss pl ⊢
+      epStart fscFs A.V.rti A.V.cwi A.P A.Pmiss (bview pl.length (sysfilePfun pl))
       from by rw [sys_mknod_bview_self]) $$ Hst
     icases logOp_openS icfgLog MAXOPBLOCKS $$ Hop with ⟨%Sb, HopS, Htx⟩
     ihave Hp := (show byteBuf (GF := GF) (sysMknodBuf (k.regs 2#5)) (DFrac.own 1)
@@ -394,7 +394,7 @@ theorem sys_mknod_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
     ihave Hbuf : sysfileAny (sysMknodBuf (k.regs 2#5)) 128 $$ [Hbuf]
     · unfold sysfileAny; iexists bs; iframe; ipureintro; omega
     ihave Hlow := sys_mknod_ints_close (k.regs 2#5) hal8 _ _ $$ Hints
-    ihave Hfail : mknodPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
+    ihave Hfail : mknodPostFail (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
         A.v0.toNat (devArg A.v1) (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok
         A.Fex $$ [Hau]
     · unfold mknodPostFail; ileft; iexact Hau
@@ -409,7 +409,7 @@ set_option maxHeartbeats 32000000 in
 `argstr(0, path, 128)` over the bare block (the block re-closes at argstr's
 grown descriptor); then `sys_mknod_fetched`. -/
 theorem sys_mknod_args (AS : ARGSTR) (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : SysMknodArgs GF) (spie spp : Bool) (R : RegMap)
     (hj : A.j < NPROC) (hproc : k.proc = procAddr A.j) (hK : sysMknodSlots ≤ k.avail)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) (hct : curTier = KTier.kpt)
@@ -421,10 +421,10 @@ theorem sys_mknod_args (AS : ARGSTR) (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_
     sysMknodCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
     sysfileAny (sysMknodBuf (k.regs 2#5)) 128 ∗
     sysMknodInts (k.regs 2#5) (BitVec.extractLsb' 0 32 A.v1) (BitVec.extractLsb' 0 32 A.v2) ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid A.V A.M ∗
     (∀ c : CPU, sysMknodPostA k A c) ∗ bslots 3 ∗ irefSlots A.ns ∗ logOp icfgLog MAXOPBLOCKS ∗
-    sysMknodAu (hlc := hlc) A
+    sysMknodAu A
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hbuf, Hints, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Hau⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -480,7 +480,7 @@ theorem sys_mknod_args (AS : ARGSTR) (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_
     iapply (sysMknodK_raise k A.γ (procAddr A.j) A.pid A.V A.M A.ns A.v0.toNat (devArg A.v1)
       (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok A.Fex c kv hkv) $$ HΦ
   ihave Hir := (show irefSlots (GF := GF) A.ns ⊢ irefSlots (A.raise kv).ns from .rfl) $$ Hir
-  ihave Hau := (show sysMknodAu (hlc := hlc) (GF := GF) A ⊢ sysMknodAu (A.raise kv) from .rfl) $$ Hau
+  ihave Hau := (show sysMknodAu (GF := GF) A ⊢ sysMknodAu (A.raise kv) from .rfl) $$ Hau
   have hp1 : sysMknodPins k R1 := by
     refine sysMknodPins_cs k _ R1 ?_ hcs1
     repeat (refine sysMknodPins_set _ _ _ _ ?_ (by decide))
@@ -498,7 +498,7 @@ contract's continuation made hart-free, the prologue (`+0x00 .. +0x06`),
 `int` cells, and `argint(1, &major)` / `argint(2, &minor)` (`+0x0c ..
 +0x1c`) with the trapframe lent; then `sys_mknod_args`. -/
 theorem sys_mknod_main (BO : BEGIN_OP) (AI : ARGINT) (AS : ARGSTR) (CR : CREATE) (IUP : IUNLOCKPUT)
-    (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx)
+    (EO : END_OP) (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx)
     (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (ns : Nat) (v0 v1 v2 : BitVec 64) (P Pmiss : Nat → Nat → IProp GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
@@ -507,7 +507,7 @@ theorem sys_mknod_main (BO : BEGIN_OP) (AI : ARGINT) (AS : ARGSTR) (CR : CREATE)
     (hnoff : k.noff = 0) (hK : sysMknodSlots ≤ k.avail) (hns : createIrefSlots ≤ ns)
     (hv0 : V.tf[tfArgIdx 0]? = some v0) (hv1 : V.tf[tfArgIdx 1]? = some v1)
     (hv2 : V.tf[tfArgIdx 2]? = some v2) :
-    wp_sys_mknod_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ j pid V M ns v0 v1 v2 P Pmiss
+    wp_sys_mknod_eb_body (GF := GF) Γ cpu k γ j pid V M ns v0 v1 v2 P Pmiss
       Farm Fun Fok Fex hj hproc htier hnoff hK hns hv0 hv1 hv2 := by
   unfold wp_sys_mknod_eb_body
   obtain ⟨hKai, -, hKbo, -⟩ := sys_mknod_K _ hK
@@ -515,7 +515,7 @@ theorem sys_mknod_main (BO : BEGIN_OP) (AI : ARGINT) (AS : ARGSTR) (CR : CREATE)
   icases kctx_tier cpu _ $$ Hk with ⟨%hct0, Hk⟩
   have hct : curTier = KTier.kpt := hct0.symm.trans htier
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  ihave #Henv : sysfileEnv (hlc := hlc) Γ $$ []
+  ihave #Henv : sysfileEnv Γ $$ []
   · unfold sysfileEnv; iframe #
   -- THE CONTRACT'S CONTINUATION, hart-free
   ihave HΦ : (∀ c : CPU, sysMknodPostA k

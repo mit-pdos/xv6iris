@@ -43,7 +43,7 @@ theorem ushGets_cs_keep (r : BitVec 5) (hr : ucalleeSavedIdx r = true) (hsp : r 
   all_goals first | decide | exact absurd rfl hsp | exact absurd (by simp) hm
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
@@ -102,10 +102,10 @@ theorem ushGets_epi (UL : UK_LEAVES) (N : UkNames GF) (X : UshCtx GF) (Dl : Ulin
       (∀ b : BitVec 8, ubyte N.d ((m.get spIdx).toNat - 81) b -∗
         ∃ w : BitVec 64, uword N.d ((m.get spIdx).toNat - 88) w) -∗
       ((∃ (g : Nat → BitVec 8) (i2 : Nat), ⌜i2 < Nb ∧ g i2 = ubyte0⌝ ∗ ubytes N.d a Nb g ∗ ushStd N X l ∗
-          ushGetsDoneAt (hlc := hlc) N X Dl l i2 g) -∗
+          ushGetsDoneAt N X Dl l i2 g) -∗
         ∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗
-          urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (12 + nn) -∗ wpLoop h') -∗
-      ushGetsK (hlc := hlc) N X Dl l a Nb ((m.get spIdx).toNat) nn mc0 := by
+          urun N h' m' (retPc (m.get 1#5)) (12 + nn) -∗ wpLoop h') -∗
+      ushGetsK N X Dl l a Nb ((m.get spIdx).toNat) nn mc0 := by
   iintro #Hc Hsv Hw96 Hclose Hk
   unfold ushGetsK
   iintro %h' %mc' %i2 %g %bc' %hi2 %h24 %hk Hbs Hb Hstd Hd Hrun
@@ -156,7 +156,7 @@ theorem ushGets_epi (UL : UK_LEAVES) (N : UkNames GF) (X : UshCtx GF) (Dl : Ulin
     exact hcs r hr hsp hmem
 
 /-- **Rocq `wp_ksh_gets`**. -/
-theorem wp_shGets (UL : UK_LEAVES) : wpShGetsBody (hlc := hlc) (GF := GF) := by
+theorem wp_shGets (UL : UK_LEAVES) : wpShGetsBody (GF := GF) := by
   intro N X _ Dsc Dl cn L D HR h m a Nb f l nn ha0 ha1 hNb hN31 hfd0
   iintro #Hlaw #Hc Hbs Hstd Hpos Hrun Hk
   have hNb100 : Nb = 100 := hNb

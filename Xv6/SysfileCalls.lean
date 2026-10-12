@@ -151,7 +151,7 @@ theorem sysfile_setnl_type_stable (dn : Dinode) (nl : BitVec 16) :
 /-! ## Slots and bytes, the path buffer -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- A buffer of `n` bytes at `a`, contents unknown. -/
 def sysfileAny [CurCtx] (a : BitVec 64) (n : Nat) : IProp GF :=
@@ -190,16 +190,16 @@ end
 /-! ## The environment and the call sites -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- The sysfile syscalls' persistent environment. -/
-def sysfileEnv (Γ : SchedNames) : IProp GF := iprop(procsInv Γ ∗ panicEnv ∗ fsReady (hlc := hlc))
+def sysfileEnv (Γ : SchedNames) : IProp GF := iprop(procsInv Γ ∗ panicEnv ∗ fsReady)
 
 instance sysfileEnv_persistent (Γ : SchedNames) :
-    Persistent (sysfileEnv (hlc := hlc) (GF := GF) Γ) := by
+    Persistent (sysfileEnv (GF := GF) Γ) := by
   unfold sysfileEnv; infer_instance
 
 /-- A context at depth 0 holds no lock (`KCtx.wf`). -/
@@ -231,7 +231,7 @@ theorem sysfile_argint (AI : ARGINT) (cpu : CPU) (k' : KCtx) (se : Bool) (hs : k
       wordPointsTo (k'.regs 11#5) 4 (DFrac.own 1) (BitVec.extractLsb' 0 32 v) -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj
-  have h := AI.wp_argint (hlc := hlc) (GF := GF) cpu k' i tfp ws v old dqt hi ha0 hws
+  have h := AI.wp_argint (GF := GF) cpu k' i tfp ws v old dqt hi ha0 hws
     (by rw [hnoff]; omega) hK
   unfold wp_argint_body at h
   simp only [argintAddr] at h
@@ -258,7 +258,7 @@ theorem sysfile_argstr (AS : ARGSTR) (Γ : SchedNames) (cpu : CPU) (k' : KCtx) (
     (hK : argstrSlots ≤ k'.avail)
     (hmax : k'.regs 12#5 = BitVec.ofNat 64 old.length) (hmax' : old.length < 2 ^ 31) :
     kctx cpu k' ∗ pcIs cpu KA.«argstr» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv Γ ∗
     procPrivBareAt curCtx pa pid V M ∗ byteBuf (k'.regs 11#5) (DFrac.own 1) old ∗
     (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (bs : List (BitVec 8)) (kv : Nat),
       ⌜calleeSaved k'.regs R' ∧ V.upt.extSz V.sz P' ∧
@@ -275,7 +275,7 @@ theorem sysfile_argstr (AS : ARGSTR) (Γ : SchedNames) (cpu : CPU) (k' : KCtx) (
   unfold sysfileEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
   icases fsReady_kmem $$ Hrdy with ⟨#Hkl, #Hav⟩
-  have h := AS.wp_argstr (hlc := hlc) (GF := GF) cpu k' fscKalloc fsReadyKmem pa pid V M i v old
+  have h := AS.wp_argstr (GF := GF) cpu k' fscKalloc fsReadyKmem pa pid V M i v old
     hi ha0 hv hproc htier (by rw [hnoff]; omega) hK (by rw [hlocks]; simp) hmax hmax'
   unfold wp_argstr_body at h
   simp only [argstrAddr] at h
@@ -293,13 +293,13 @@ theorem sysfile_argstr (AS : ARGSTR) (Γ : SchedNames) (cpu : CPU) (k' : KCtx) (
 
 set_option maxHeartbeats 8000000 in
 /-- `begin_op()`, the pid cell at a caller-named share. -/
-theorem sysfile_begin_op (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem sysfile_begin_op (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k' : KCtx) (se : Bool) (hs : k'.sie = se) (pj : BitVec 64)
     (hpj : k'.proc = pj) (j : Nat) (pidv : BitVec 32) (dqp : DFrac)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : beginOpSlots ≤ k'.avail)
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) :
     kctx cpu k' ∗ pcIs cpu KA.«begin_op» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv Γ ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗
     (∀ (c : CPU) (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
@@ -309,7 +309,7 @@ theorem sysfile_begin_op (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc)
       logOp icfgLog MAXOPBLOCKS -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj
-  have h := BO.wp_begin_op_eb (hlc := hlc) (GF := GF) Γ cpu k' icfgLog fscBio
+  have h := BO.wp_begin_op_eb (GF := GF) Γ cpu k' icfgLog fscBio
     (fsView fscFs fscDisk icfgDev fscCov) fscFs j fscLogst icfgDev pidv dqp
     hj hproc hK hnoff htier
   unfold wp_begin_op_eb_body at h
@@ -327,13 +327,13 @@ theorem sysfile_begin_op (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc)
 
 set_option maxHeartbeats 8000000 in
 /-- `end_op()`, the pid cell at a caller-named share. -/
-theorem sysfile_end_op (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem sysfile_end_op (EO : END_OP) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k' : KCtx) (se : Bool) (hs : k'.sie = se) (pj : BitVec 64)
     (hpj : k'.proc = pj) (j : Nat) (u : Nat) (pidv : BitVec 32) (dqp : DFrac)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : endOpSlots ≤ k'.avail)
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) :
     kctx cpu k' ∗ pcIs cpu KA.«end_op» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv Γ ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗ logOp icfgLog u ∗
     (∀ (c : CPU) (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
@@ -349,7 +349,7 @@ theorem sysfile_end_op (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
   icases fsReady_bio $$ Hrdy with ⟨%γbl, #Hbc⟩
   ihave #Hlc := fsReady_log $$ Hrdy
   icases fsReady_disk $$ Hrdy with ⟨%pd, %pav, %pu, #Hdc, %hpd⟩
-  have h := EO.wp_end_op_eb (hlc := hlc) (GF := GF) Γ cpu k' icfgLog γbl fscBio
+  have h := EO.wp_end_op_eb (GF := GF) Γ cpu k' icfgLog γbl fscBio
     (fsView fscFs fscDisk icfgDev fscCov) fscDlock fscFs pd pav pu j fscLogst icfgDev u pidv dqp
     hj hproc hK hnoff htier hg.fgoLog rfl rfl rfl hpd
   unfold wp_end_op_eb_body at h
@@ -368,7 +368,7 @@ set_option maxHeartbeats 8000000 in
 /-- `iunlockput(ip)`, the write arm, COUNTED (Rocq
 `Iunlockput.wp_iunlockput_tx_sconf`): the budget half in, the whole `logOp`
 out. -/
-theorem sysfile_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem sysfile_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k' : KCtx) (se : Bool) (hs : k'.sie = se) (pj : BitVec 64)
     (hpj : k'.proc = pj) (j : Nat) (dqp : DFrac) (γil γisl : GName) (kk : Nat) (qi s : Qp)
     (g : GName) (lo tl : Nat) (inum : BitVec 32) (dn : Dinode) (bm : Blkmap) (n : Nat)
@@ -378,7 +378,7 @@ theorem sysfile_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc :=
     (hnib : inum.toNat < 16 * icfgNib) (hn : iputUnits ≤ n) (ha0 : k'.regs 10#5 = ientry kk)
     (hle : lo ≤ tl) :
     kctx cpu k' ∗ pcIs cpu KA.«iunlockput» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv Γ ∗
     isSleeplockGen γil γisl (iLock (ientry kk)) (icSlp fscIc kk) (slhTok (icfgIsl kk)) ∗
     credFloor lo tl ∗
     sleeplockedQ γisl s (iLock (ientry kk)) pidv ∗
@@ -413,7 +413,7 @@ theorem sysfile_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc :=
   ihave #Hesc := fsReady_escrow kk hkk $$ Hrdy
   ihave #Hcla := isItable2_claims $$ Hit2
   ihave Hoff := offRows_to_dep offCfg kk curCtx $$ Hoff
-  have h := IUP.wp_iunlockput_tx_sconf_eb (hlc := hlc) (GF := GF) Γ cpu k' γbl pd pav pu j γil γisl
+  have h := IUP.wp_iunlockput_tx_sconf_eb (GF := GF) Γ cpu k' γbl pd pav pu j γil γisl
     kk qi s g lo tl inum dn bm n pidv dqp DFrac.discard DFrac.discard
     hj hproc hK hnoff htier hkk hg.fgoLog hg.fgoBitmap (hg.iblockCov inum hnib)
     (hg.iblockOut inum hnib) hnib hg.fgoCovBelow hn hpd ha0 hle
@@ -446,7 +446,7 @@ end
 /-! ## The block around argaddr / argfd (moved from SysFstatParts) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF]
   [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [X : CurCtx]
 
@@ -497,7 +497,7 @@ theorem sysfile_blk_bare_ev (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) 
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -518,7 +518,7 @@ theorem sysfile_argaddr (AA : ARGADDR) (c : CPU) (k' : KCtx) (i : Nat) (tfp : Bi
       wordPointsTo (pTrapframe k'.proc) 8 dqt (pageAddr tfp) -∗ tfPageAt tfp ws -∗
       wordPointsTo (k'.regs 11#5) 8 (DFrac.own 1) v -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) c := by
-  have h := AA.wp_argaddr (hlc := hlc) (GF := GF) c k' i tfp ws v old dqt hi ha0 hws hnoff hK
+  have h := AA.wp_argaddr (GF := GF) c k' i tfp ws v old dqt hi ha0 hws hnoff hK
   unfold wp_argaddr_body at h
   simp only [argaddrAddr] at h
   iintro ⟨Hk, Hpc, Hte, Hce, Htf, Htfp, Hst, HK⟩
@@ -549,7 +549,7 @@ theorem sysfile_argfd (AF : ARGFD) (c : CPU) (k' : KCtx) (γ : FileNames) (pa : 
       procPrivCoreNoctxAt curCtx pa pid V M -∗ procOfilesOwe γ V.fdg pa V.ofile D -∗
       argfdPost (k'.regs 11#5) (k'.regs 12#5) oldfd oldf v V.ofile (R' 10#5) -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) c := by
-  have h := AF.wp_argfd (hlc := hlc) (GF := GF) c k' γ pa pid V M D i v oldfd oldf hi ha0 hv hpf
+  have h := AF.wp_argfd (GF := GF) c k' γ pa pid V M D i v oldfd oldf hi ha0 hv hpf
     hproc htier hnoff hK
   unfold wp_argfd_body at h
   simp only [argfdAddr] at h
@@ -572,7 +572,7 @@ form the syscalls that keep the trap-CSR complement at the entry hart and
 move it by the pins use (sys_wait, sys_pipe; sys_dup, sys_close). -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- `argaddr(i, ip)` (Rocq `Argaddr.wp_argaddr_sconf`), unpacked. -/
@@ -590,7 +590,7 @@ theorem sysfile_argaddr_wp (AA : ARGADDR) (c : CPU) (k' : KCtx) (i : Nat) (tfp :
       wordPointsTo (pTrapframe k'.proc) 8 dqt (pageAddr tfp) -∗ tfPageAt tfp ws -∗
       wordPointsTo (k'.regs 11#5) 8 (DFrac.own 1) v -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AA.wp_argaddr (hlc := hlc) (GF := GF) c k' i tfp ws v old dqt hi ha0 hws hnoff hK
+  have h := AA.wp_argaddr (GF := GF) c k' i tfp ws v old dqt hi ha0 hws hnoff hK
   unfold wp_argaddr_body at h
   simp only [argaddrAddr] at h
   exact h
@@ -598,7 +598,7 @@ theorem sysfile_argaddr_wp (AA : ARGADDR) (c : CPU) (k' : KCtx) (i : Nat) (tfp :
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF]
   [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -619,7 +619,7 @@ theorem sysfile_argfd_wp (AF : ARGFD) (c : CPU) (k' : KCtx) (γ : FileNames) (pa
       procPrivCoreNoctxAt curCtx pa pid V M -∗ procOfilesOwe γ V.fdg pa V.ofile D -∗
       argfdPost (k'.regs 11#5) (k'.regs 12#5) oldfd oldf v V.ofile (R' 10#5) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AF.wp_argfd (hlc := hlc) (GF := GF) c k' γ pa pid V M D i v oldfd oldf hi ha0 hv hpf hproc htier hnoff hK
+  have h := AF.wp_argfd (GF := GF) c k' γ pa pid V M D i v oldfd oldf hi ha0 hv hpf hproc htier hnoff hK
   unfold wp_argfd_body at h
   simp only [argfdAddr] at h
   exact h

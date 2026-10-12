@@ -184,7 +184,7 @@ theorem ufNd_top : ((↑ftopN : CoPset) ∪ ↑appN) ⊆ ⊤ := CoPset.subseteq_
 /-! ## 2.  The fire points, `ftopN` opened and closed -/
 
 section UnlinkFire
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [FsTopG GF] [FsBytesG GF]
 
 /-- THE MISS, at dirlookup's `none` under the parent's lock (Rocq's
@@ -195,8 +195,8 @@ theorem ufDmiss_fire [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
     (Fmiss : Pfam GF (Aview → Nat → Fname → IProp GF)) (d : Nat) (nm : Fname) (n : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hdir : fnIsDir n = true)
     (hnm : (dirEntries n)[nm]? = none) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗
-      pfAt (dmissCommitAt (hlc := hlc) (fsGammaL γfs) appE) Fmiss -∗
+    ⊢@{IProp GF} ftopInv γfs -∗
+      pfAt (dmissCommitAt (fsGammaL γfs) appE) Fmiss -∗
       topFragQ (fsGammaL γfs) dq d n ={E}=∗
         topFragQ (fsGammaL γfs) dq d n ∗
         ∃ av : Aview, ⌜arowAt av d ⟨.ADir (dirEntries n), fnNlink n⟩⌝ ∗
@@ -240,8 +240,8 @@ theorem ufDex_fire [Icfg] (γfs : FsNames) (E : CoPset) (dqd dqt : DFrac)
     (nd nt : FsNode) (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E)
     (hdird : fnIsDir nd = true) (hnld : fnNlink nd ≠ 0) (hnm : (dirEntries nd)[nm]? = some t)
     (hdirt : fnIsDir nt = true) (hnlt : fnNlink nt ≠ 0) (hne : ¬ dotsOnly (dirEntries nt)) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗
-      pfAt (dlookupCommitAt (hlc := hlc) (fsGammaL γfs) appE) Fex -∗
+    ⊢@{IProp GF} ftopInv γfs -∗
+      pfAt (dlookupCommitAt (fsGammaL γfs) appE) Fex -∗
       topFragQ (fsGammaL γfs) dqd d nd -∗
       topFragQ (fsGammaL γfs) dqt t nt ={E}=∗
         topFragQ (fsGammaL γfs) dqd d nd ∗ topFragQ (fsGammaL γfs) dqt t nt ∗
@@ -295,8 +295,8 @@ theorem ufUent_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (dqt : DFra
     (hdec : unlDec (absRow nt).anNode = dec)
     (habsp' : absOf np' = some ⟨.ADir ((dirEntries np).erase nm), fnNlink np - dec⟩)
     (hnzt : fnType nt ≠ 0) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
-      pfAt (uentCommitAt (hlc := hlc) (fsGammaL γfs) appE Pd) Fent -∗
+    ⊢@{IProp GF} ftopInv γfs -∗ appInv γfs -∗
+      pfAt (uentCommitAt (fsGammaL γfs) appE Pd) Fent -∗
       -- THE PARENT CURSOR (TL-3K): READ by the commit and handed straight back
       Pd d -∗
       topFrag (fsGammaL γfs) d np -∗
@@ -358,8 +358,8 @@ theorem ufUtgt_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset)
     (hnl : 1 ≤ fnNlink nt)
     (habs' : fnType nt' ≠ 0 ∧ absRow nt' = ⟨(absRow nt).anNode, fnNlink nt - 1⟩)
     (hnzt : fnType nt ≠ 0) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
-      pfAt (utgtCommitAt (hlc := hlc) (fsGammaL γfs) appE) Ftgt -∗
+    ⊢@{IProp GF} ftopInv γfs -∗ appInv γfs -∗
+      pfAt (utgtCommitAt (fsGammaL γfs) appE) Ftgt -∗
       topFrag (fsGammaL γfs) t nt ={E}=∗
         topFrag (fsGammaL γfs) t nt' ∗
         ∃ av : Aview, ⌜PartialMap.get? av t = some (absRow nt)⌝ ∗ Ftgt.pfRecv av t := by

@@ -168,11 +168,11 @@ def sbImage (magic fssize nblocks ninodes nlog logstart inodestart bmapstart : B
 
 /-- **WP of `fsinit(dev = a0)`** at either entry `SIE` (Rocq's
 `wp_fsinit_sconf_body`). -/
-def wp_fsinit_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_fsinit_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     -- the image's block 1: the four fields no other contract names, and the run
     (vMagic vSize vNblocks vNlog : BitVec 32) (bsSb : List (BitVec 8))
@@ -239,12 +239,12 @@ def wp_fsinit_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] 
   -- (`fsSnapLawBuild`, `fsSnapLawGhostBuild`) and derives initlog's arity-free
   -- seam from the seam.  Then the era certificate and the era's BORN-TRUE
   -- mirror half.
-  appDurLaws (hlc := hlc) (GF := GF) fscCov fscLogst ∗
-  genCert (hlc := hlc) (GF := GF) ∗
+  appDurLaws (GF := GF) fscCov fscLogst ∗
+  genCert (GF := GF) ∗
   -- ...and THE CRASH INVARIANT (sync K3-3), off `firstBootPersist` beside the
   -- certificate: initlog parks it into `logCtx` for the ghost commit to open
-  crashInv (hlc := hlc) (GF := GF) ∗
-  logMirrorBorn (hlc := hlc) M ∗
+  crashInv (GF := GF) ∗
+  logMirrorBorn M ∗
   -- THE LOG'S FIVE GNAMES, AT THEIR GENESIS VALUES, AND THEY ARE `icfgLog`'s
   logFreeTok icfgLog ∗
   -- THE BYTE VIEW'S ROW, NAMED at `Xv` (straight into initlog)
@@ -257,13 +257,13 @@ def wp_fsinit_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] 
   -- spent once at the `readsb` crossing, then threaded into initlog
   excOwn fscFs.exc (hdrDec bsHdr).2 ∗
   -- THE REGION AND THE BITMAP AT POWERON (before recovery has run)
-  iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+  iregReg fscIreg fscFs icfgIst icfgNib ∗
   bitmapReg fscFs fscBmapstart fscCov fscLogst fscSize ∗
   -- THE BOOT-SHELTER TOKEN, handed to ireclaim and returned
   iregBoot ∗
   -- the icache, as ireclaim takes it
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗
+  itableInv ∗
   icSleeplocks fscIc ∗
   -- initlog's RAW struct log cells, threaded straight through
   kmapId logAddr ∗ kmapId (logAddr + 16#64) ∗
@@ -315,11 +315,11 @@ def wp_fsinit_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] 
 
 /-- The interface of `fsinit` (Rocq's `Module Type FSINIT`). -/
 structure FSINIT : Prop where
-  wp_fsinit_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  wp_fsinit_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (vMagic vSize vNblocks vNlog : BitVec 32) (bsSb : List (BitVec 8))
     (sbOld : List (BitVec 8))
@@ -329,7 +329,7 @@ structure FSINIT : Prop where
     (Xv : Nat → List (BitVec 8))
     hj hproc hK hnoff htier hgeom h1cov hsbImg hsbparse hsbok hcg hbmq hszq hmagic hn1 hnnib
     hn31 hblk hbg hbel hhdrLen hhdrNodup hhdrHome hxslot hLM hsbOld hpd ha0,
-    wp_fsinit_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j
+    wp_fsinit_eb_body (GF := GF) Γ cpu k γl pd pav pu j
       vMagic vSize vNblocks vNlog bsSb sbOld bsHdr L D vlock vname vcpu vStart vDev vNc vN
       pidv dqp M sbrec Xv hj hproc hK hnoff htier hgeom h1cov hsbImg hsbparse hsbok hcg hbmq hszq
       hmagic hn1 hnnib hn31 hblk hbg hbel hhdrLen hhdrNodup hhdrHome hxslot hLM hsbOld hpd ha0

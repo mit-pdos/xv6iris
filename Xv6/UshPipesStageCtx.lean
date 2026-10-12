@@ -66,7 +66,7 @@ open Wid
 open UShPipesDefs
 
 section Ctx
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
@@ -74,31 +74,31 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Ic
   [DiskG GF] [EchoOutG GF] [PnsRegG GF] [PipesNG GF] [FileAppG GF]
 
 /-- **The stage laws' context (data)** (deviation 1). -/
-structure StgEnv (D : PdRound hlc GF) where
+structure StgEnv (D : PdRound GF) where
   /-- the engine (DU2) and sh-run / sh-main's rows -/
   UL : UK_LEAVES
   HS : UK_SYS_P
   HF : USH_FPRINTF
-  hent : wpShRuncmdEntryBody (hlc := hlc) (GF := GF)
+  hent : wpShRuncmdEntryBody (GF := GF)
   /-- sh-exec's EXEC arm (Rocq `UkShEcho.wp_kshr_exec_x_at_holds`) -/
   RX : SH_RUNCMD_EXEC
   /-- H-pipe's entries: the free handler's supply and its minting laws -/
   Sup : IProp GF
   sup_pers : Persistent Sup
-  lawW : ⊢ Sup -∗ MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ udepwLaw (hlc := hlc) (GF := GF) 16
-  lawR : ⊢ Sup -∗ MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ udepwLaw (hlc := hlc) (GF := GF) 5
-  lawC : ⊢ MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ udepwLaw (hlc := hlc) (GF := GF) 21
-  lawO : ⊢ Sup -∗ udepwLaw (hlc := hlc) (GF := GF) 15
+  lawW : ⊢ Sup -∗ MachFixedGS.killCred (GF := GF) -∗ udepwLaw (GF := GF) 16
+  lawR : ⊢ Sup -∗ MachFixedGS.killCred (GF := GF) -∗ udepwLaw (GF := GF) 5
+  lawC : ⊢ MachFixedGS.killCred (GF := GF) -∗ udepwLaw (GF := GF) 21
+  lawO : ⊢ Sup -∗ udepwLaw (GF := GF) 15
 
 /-- sh-exec's record at the stage's rows. -/
-abbrev StgEnv.E {D : PdRound hlc GF} (S : StgEnv D) : UshExecEnv (hlc := hlc) (GF := GF) :=
+abbrev StgEnv.E {D : PdRound GF} (S : StgEnv D) : UshExecEnv (GF := GF) :=
   ushExecEnvOf S.UL S.HS S.HF S.hent
 
 /-- **The stage laws' hypotheses** (deviation 1). -/
-structure StgOk (D : PdRound hlc GF) (S : StgEnv D) : Prop where
+structure StgOk (D : PdRound GF) (S : StgEnv D) : Prop where
   OK : PdRoundOk D
   /-- Rocq `Hkill` -/
-  hkill : MachFixedGS.killCred (hlc := hlc) (GF := GF) = D.G.gcT
+  hkill : MachFixedGS.killCred (GF := GF) = D.G.gcT
   /-- Rocq `Hsup` -/
   hsup : ⊢ □ (D.T -∗ S.Sup)
   /-- Rocq `HL31` -/
@@ -106,10 +106,10 @@ structure StgOk (D : PdRound hlc GF) (S : StgEnv D) : Prop where
   /-- Rocq `Hfire` -/
   hfire : HfireP D
   /-- Rocq `UexecExecMint.udep_free` (deviation 3) -/
-  hudep : ⊢ udep (hlc := hlc) (GF := GF)
+  hudep : ⊢ udep (GF := GF)
 
 /-- H-pipe's entries' context at the round. -/
-@[reducible] noncomputable def StgEnv.pse {D : PdRound hlc GF} (S : StgEnv D) (K : StgOk D S) : PseCtx hlc GF where
+@[reducible] noncomputable def StgEnv.pse {D : PdRound GF} (S : StgEnv D) (K : StgOk D S) : PseCtx GF where
   R := D.toPns
   OK := K.OK.toPns K.hkill K.hL31
   UL := S.UL
@@ -121,7 +121,7 @@ structure StgOk (D : PdRound hlc GF) (S : StgEnv D) : Prop where
   lawC := S.lawC
   lawO := S.lawO
 
-variable {D : PdRound hlc GF}
+variable {D : PdRound GF}
 
 /-- **Rocq `pse_filt_mid_image_entry`**: A MIDDLE STAGE's ENTRY, at its
 program -- cat's (`UkPipesEntries.pse_mid_image_entry`) or grep's
@@ -137,9 +137,9 @@ theorem pse_filt_mid_image_entry (S : StgEnv D) (K : StgOk D S) (F : Filt) (Me :
     (hl1 : (sts.take NSTD)[1]? = some (.open rb1 true (.pipe gp)))
     (hl2 : (sts.take NSTD)[2]? = some (.open rb2 true (.device CONSOLE)))
     (hfok : fok F D.L) :
-    ⊢ urunNopipe (hlc := hlc) sts -∗
+    ⊢ urunNopipe sts -∗
       imageEntry (filtElf F) Mv (BitVec.ofNat 64 (t + 8)) sts cw seccAll cs pidv Q
-        (pnsCopyLend D.toPns w2 (mid_alts F) (mid_alts F) pin gin F (.CSPipe pn gp) Q) (uslot (hlc := hlc)) := by
+        (pnsCopyLend D.toPns w2 (mid_alts F) (mid_alts F) pin gin F (.CSPipe pn gp) Q) (uslot) := by
   cases F with
   | FCat =>
     simp only [filtElf, mid_alts]
@@ -167,9 +167,9 @@ theorem pse_filt_last_image_entry (S : StgEnv D) (K : StgOk D S) (F : Filt) (Me 
     (hl1 : (sts.take NSTD)[1]? = some (.open rb1 true (.device CONSOLE)))
     (hl2 : (sts.take NSTD)[2]? = some (.open rb2 true (.device CONSOLE)))
     (hfok : fok F D.L) :
-    ⊢ urunNopipe (hlc := hlc) sts -∗
+    ⊢ urunNopipe sts -∗
       imageEntry (filtElf F) Mv (BitVec.ofNat 64 (t + 8)) sts cw seccAll cs pidv Q
-        (pnsCopyLendM D.toPns pin gin F (.CSCon wL) Q) (uslot (hlc := hlc)) := by
+        (pnsCopyLendM D.toPns pin gin F (.CSCon wL) Q) (uslot) := by
   cases F with
   | FCat =>
     simp only [filtElf]
@@ -187,19 +187,19 @@ theorem pse_filt_last_image_entry (S : StgEnv D) (K : StgOk D S) (F : Filt) (Me 
 end Ctx
 
 section CtxD
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
   [DiskG GF] [EchoOutG GF] [PnsRegG GF] [PipesNG GF] [FileAppG GF]
-variable (D : PdRound hlc GF)
+variable (D : PdRound GF)
 
 /-- `pflow`, unfolded. -/
 theorem pflow_unfold (j : Nat) : D.pflow j = flowF D.L (fapp (lfilt D.lR j)) (D.prevP j) := rfl
 
 /-- the taint, from the kill credential (Rocq `rewrite Hkill`). -/
-theorem stg_T_of_kill (S : StgEnv D) (K : StgOk D S) : uKillCred (hlc := hlc) (GF := GF) ⊢ D.T := by
+theorem stg_T_of_kill (S : StgEnv D) (K : StgOk D S) : uKillCred (GF := GF) ⊢ D.T := by
   unfold PdRound.T uKillCred
   rw [K.hkill]
 

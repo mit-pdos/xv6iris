@@ -131,7 +131,7 @@ def bytesExcVal (L : RegMapF (BitVec 8)) (Xv : Nat → List (BitVec 8)) (X : Lis
   ∀ b ∈ X, mapSeq (b * BSZ) (Xv b) ⊆ L
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsBytesG GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF] [FsBytesG GF]
 
 /-! ## The exception handle and its seal -/
 
@@ -382,7 +382,7 @@ theorem lens_insert (C : BlockMap) (b : Nat) (v : List (BitVec 8))
     exact hlens b' bs' hb'
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsBlocksG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsBlocksG GF]
 
 /-! ## The body and the invariant -/
 

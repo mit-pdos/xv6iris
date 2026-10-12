@@ -41,7 +41,7 @@ theorem uc_ret_11a6 : jumpPc (KA.«uvmcreate» + 0x1a#64) = (KA.«uvmcreate» + 
   decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-! ## The callees, at their entry addresses -/
 
@@ -56,7 +56,7 @@ theorem uc_memset_call (MS : MEMSET) [CurCtx] (c : CPU) (k' : KCtx) (os : List (
         (List.replicate 4096 (BitVec.extractLsb' 0 8 (k'.regs 11#5))) -∗
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.regs 10#5⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := MS.wp_memset (hlc := hlc) (GF := GF) c k' os 4096 hK hn (by decide) hl
+  have h := MS.wp_memset (GF := GF) c k' os 4096 hK hn (by decide) hl
   unfold wp_memset_body at h
   simp only [memsetAddr] at h
   exact h
@@ -70,7 +70,7 @@ theorem uvmcreate_br_fffffffffffff944 : KA.«uvmcreate» + 0xfffffffffffff944#64
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 theorem uvmcreate_proof (KAL : KALLOC) (MS : MEMSET) : UVMCREATE :=
-  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk on ke hnoff hK hlk => by
+  ⟨fun {GF} _ _ _ _ cpu k γl γk on ke hnoff hK hlk => by
   unfold wp_uvmcreate_body
   simp only [uvmcreateAddr]
   have hK' : 18 ≤ k.avail := hK

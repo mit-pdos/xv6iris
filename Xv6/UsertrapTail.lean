@@ -47,7 +47,7 @@ theorem ut_ret_ctx (k kb : KCtx) (h : utBase k kb) (hk : 4 ≤ kb.avail) (R R' :
     simp [KCtx.intrOff, KCtx.pushed, KCtx.withRegs] <;> first | omega | rfl | (by_cases hs : kb.sie = true <;> simp [hs])
 
 section Tail
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
@@ -73,7 +73,7 @@ theorem ut_exit (A : UtArgs GF) (c : CPU) (R1 : RegMap) (V2 : ProcPriv) (M2 : Na
     (∃ v : BitVec 64, Register.scause ↦ᵣ[c] v) ∗ (∃ v : BitVec 64, Register.stval ↦ᵣ[c] v) ∗
     Register.stvec ↦ᵣ[c] uservecTvec ∗ cpuClaim c (procAddr A.j) ∗ utCaps A.N ∗
     utOwn (utRsys PT Γ A) A.N (utPrep V2 rt c) M2 sts2 cs2 A.pid ∗
-    utOuts (hlc := hlc) A V2 M2 sts2 cs2 ∗ utKillOut (hlc := hlc) A.sc A.Wk ∗ utKont PT Γ A
+    utOuts A V2 M2 sts2 cs2 ∗ utKillOut A.sc A.Wk ∗ utKont PT Γ A
     ⊢ wpLoop (GF := GF) c := by
   have hsie : (((A.k.intrOff true false).pushed 4).withRegs R1).sie = false := rfl
   have hpj : A.N.pj = procAddr A.j := hok.pj
@@ -165,7 +165,7 @@ theorem ut_prep_call (PR : PREPARE_RETURN) (c : CPU) (k' : KCtx) (γ : FileNames
         { V with tf := prepareReturnTf V.tf (satpOf KTier.kpt k'.root) (V.kstack + 4096#64) (hartId cpu') } M -∗
       wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := PR.wp_prepare_return (hlc := hlc) (GF := GF) c k' γ pa pid V M epc hproc hnoff htier hK hepc
+  have h := PR.wp_prepare_return (GF := GF) c k' γ pa pid V M epc hproc hnoff htier hK hepc
   unfold wp_prepare_return_body at h
   simp only [prepareReturnAddr] at h
   exact h
@@ -175,7 +175,7 @@ theorem ut_tf3 (ws : List (BitVec 64)) (h : ws.length = 36) : ws[3]? = some (tfW
 
 set_option maxHeartbeats 4000000 in
 /-- **Rocq `ut_ret`** (+0xae). -/
-theorem usertrap_ret_proof (PR : PREPARE_RETURN) : UT_RET (hlc := hlc) (GF := GF) PT Γ := by
+theorem usertrap_ret_proof (PR : PREPARE_RETURN) : UT_RET (GF := GF) PT Γ := by
   intro A cpu kb R V2 M2 sts2 cs2 hok hb hpins hrows hlive
   have hkb : 422 ≤ kb.avail := by
     have h := utBase_avail hb

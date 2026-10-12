@@ -31,7 +31,7 @@ The vocabulary:
 2. **THE `mono_nat` INSTANCE IS `MachGS`'s** (`MachFixedGS.mono`), Rocq's
    "mono_natG is ambient from riscvGS"; it is also the instance
    `IcacheRefDefs.icfgAlloc` mints the `icfgIep` counters with.  The section
-   binds `[MachGS hlc GF]` and no other `MonoNatG` source, so `committedA`'s
+   binds `[MachGS GF]` and no other `MonoNatG` source, so `committedA`'s
    element is pinned to it at definition time.  It is the ONLY `MonoNatG`
    instance: the log's epoch and the disk's counters use it too.
 3. `ST_EMPTY` / `ST_FILLED` / `ST_REDEEMED` are `abbrev`s (Rocq
@@ -66,7 +66,7 @@ abbrev ST_FILLED : Nat := 1
 abbrev ST_REDEEMED : Nat := 2
 
 section EscrowDefs
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF]
 
 /-- The one-shot "deposit happened" flag (`mono_nat`, deviation 2). -/
 def committedA (ge : GName) : IProp GF := MonoNat.lb_own ge (.ofNat ST_FILLED)

@@ -23,7 +23,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode MachCSL
 
 section PipesWritesV
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [PipeOutG GF]
 
 /-- the open round's writer count: its block has at least one byte out -/
@@ -38,7 +38,7 @@ theorem popenV_w_pos (M : LModel) (sd : M.lmSt) (k : Nat) (ho : List Obs) (so : 
 
 /-- (W) THE WRITE INSIDE A BLOCK OR A PROLOGUE ROUND (Rocq
 `peclV_step_write`). -/
-theorem peclV_step_write (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)
+theorem peclV_step_write (g : PipeGn) (M : LModel) (G : GenCparams GF M) (sd : M.lmSt)
     (WA : GenWa M G sd) (k : Nat) (v : EraPins) (P : Nat) (b : BitVec 8) (ps0 cs0 : List Nat)
     (s0 : M.lmSt) (I0 : List (BitVec 8)) (ho : List Obs) (H : ConsHist)
     (hn : nlines I0 ≤ cs0.length) (hpin0 : lmProPin M ps0 cs0 I0)
@@ -80,7 +80,7 @@ theorem peclV_step_write (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd
 /-- (W') THE WRITE AT A BLOCK'S FIRST BYTE, which FILES the alternative: a
 single-writer round (Rocq `peclV_step_write_blk`), the round's payload
 filed with it (sync SY3-A4). -/
-theorem peclV_step_write_blk (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M)
+theorem peclV_step_write_blk (g : PipeGn) (M : LModel) (G : GenCparams GF M) (B : LmByteLaws M)
     (sd : M.lmSt) (WA : GenWa M G sd) (k : Nat) (v : EraPins) (P a : Nat) (b : BitVec 8)
     (ps0 cs0 : List Nat) (s0 : M.lmSt) (I0 : List (BitVec 8)) (ho : List Obs) (H : ConsHist)
     (hne0 : I0 ≠ []) (hr0 : restOf I0 = []) (hdiv : nlines I0 ≤ cs0.length + 1)
@@ -120,7 +120,7 @@ theorem peclV_step_write_blk (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M)
 
 /-- (W-pro) THE WRITE AT A PROLOGUE ROUND'S CHOICE BYTE (Rocq
 `peclV_step_write_pro`). -/
-theorem peclV_step_write_pro (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)
+theorem peclV_step_write_pro (g : PipeGn) (M : LModel) (G : GenCparams GF M) (sd : M.lmSt)
     (WA : GenWa M G sd) (k : Nat) (v : EraPins) (P a : Nat) (b : BitVec 8) (ps0 cs0 : List Nat)
     (s0 : M.lmSt) (I0 : List (BitVec 8)) (ho : List Obs) (CH : ConsHist)
     (hP0 : 0 < P ∨ WA.gwaStrict ∨ WA.gwaFree)

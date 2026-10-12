@@ -36,7 +36,7 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 open Std (ExtTreeSet)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
@@ -50,22 +50,22 @@ def wpShdFprintfSChainBody : Prop :=
     (q + 3 < len → (f (q + 3)).toNat ≠ 100 ∧ (f (q + 3)).toNat ≠ 117 ∧ (f (q + 3)).toNat ≠ 120) →
     sa ≠ 0 → m.get 11#5 = BitVec.ofNat 64 a → m.get 12#5 = BitVec.ofNat 64 sa → m.get 10#5 = fdv →
     C1 q = C2 0 → C2 slen = C3 (q + 2) →
-    ⊢ □ (∀ p : Nat, ⌜p < q⌝ -∗ kshW1 (hlc := hlc) N fdv (f p) (C1 p) (C1 (p + 1))) -∗
-      □ (∀ p : Nat, ⌜p < slen⌝ -∗ kshW1 (hlc := hlc) N fdv (sf p) (C2 p) (C2 (p + 1))) -∗
-      □ (∀ p : Nat, ⌜q + 2 ≤ p ∧ p < len⌝ -∗ kshW1 (hlc := hlc) N fdv (f p) (C3 p) (C3 (p + 1))) -∗
+    ⊢ □ (∀ p : Nat, ⌜p < q⌝ -∗ kshW1 N fdv (f p) (C1 p) (C1 (p + 1))) -∗
+      □ (∀ p : Nat, ⌜p < slen⌝ -∗ kshW1 N fdv (sf p) (C2 p) (C2 (p + 1))) -∗
+      □ (∀ p : Nat, ⌜q + 2 ≤ p ∧ p < len⌝ -∗ kshW1 N fdv (f p) (C3 p) (C3 (p + 1))) -∗
       ushCode N.t -∗ utextStr N.t a len f -∗ ushSstr N tx dqs sa slen sf -∗ C1 0 -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«fprintf») (10 + (12 + (4 + n))) -∗
+      urun N h m (BitVec.ofNat 64 User.Sh.Sym.«fprintf») (10 + (12 + (4 + n))) -∗
       (∀ (h' : CPU) (m' : RegMap), ushSstr N tx dqs sa slen sf -∗ ⌜ucalleeSaved m m'⌝ -∗ C3 len -∗
-        urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (10 + (12 + (4 + n))) -∗ wpLoop h') -∗
+        urun N h' m' (retPc (m.get 1#5)) (10 + (12 + (4 + n))) -∗ wpLoop h') -∗
       wpLoop h
 
 end
 
 /-- **sh's fprintf, the parameter** (DU4; see the header). -/
 structure USH_FPRINTF : Prop where
-  wp_shdFprintfSChain : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
+  wp_shdFprintfSChain : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF]
     [UprogSG GF] [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
     [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF],
-    wpShdFprintfSChainBody (hlc := hlc) (GF := GF)
+    wpShdFprintfSChainBody (GF := GF)
 
 end Xv6

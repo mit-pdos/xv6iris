@@ -49,7 +49,7 @@ open Std (ExtTreeSet)
 open UexecSG
 
 section UkRunSysOpenImg
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -109,8 +109,8 @@ table view** (deviation 3: the one proof behind Rocq's
 theorem wp_uk_ecall_open_recv_gimg_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64)
     (l v : List FdState) (avail : Nat) (fdep : sfam GF) (c : Nat) (Img : ElfMem)
     (hn : usysno m = USYS_open) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ uimgView N Img -∗ urun (hlc := hlc) N h m pc avail -∗
-      ucwd N.cwd c -∗ udepwfAt (hlc := hlc) N m pc USYS_open fdep c -∗ ustdAt N.fd l v -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ uimgView N Img -∗ urun N h m pc avail -∗
+      ucwd N.cwd c -∗ udepwfAt N m pc USYS_open fdep c -∗ ustdAt N.fd l v -∗
       (∀ (h' : CPU) (r : BitVec 64) (W : Uvis) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat)
           (cs' : ExtTreeSet GName compare),
         ⌜∀ (a : Nat) (b : BitVec 8), Img a = some b → W.M a = some b⌝ -∗
@@ -118,8 +118,8 @@ theorem wp_uk_ecall_open_recv_gimg_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU
         ⌜tfW W.tf (tfArgIdx 0) = m.get 10#5⌝ -∗ ⌜tfW W.tf (tfArgIdx 1) = m.get 11#5⌝ -∗
         ⌜W.cwd = c⌝ -∗ ⌜W.fd.take NSTD = l⌝ -∗
         ukOpenFdArmAt N.fd l v W.fd fdv' r -∗
-        spostAt (uslot (hlc := hlc)) USYS_open fdep W r M' fdv' cw' cs' -∗
-        ucwd N.cwd c -∗ urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        spostAt (uslot) USYS_open fdep W r M' fdv' cw' cs' -∗
+        ucwd N.cwd c -∗ urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi #Himg Hrun Hcwd Hsb Hstd Hcont
   iapply urun_ecall UL N h m pc avail $$ Hi Hrun
@@ -185,8 +185,8 @@ view is a piece of its TEXT image, the ledger at a named table view. -/
 theorem wp_uk_ecall_open_recv_img_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64)
     (l v : List FdState) (avail : Nat) (fdep : sfam GF) (c : Nat) (Img : ElfMem)
     (hn : usysno m = USYS_open) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ User.utextImg (utext N.t) Img -∗ urun (hlc := hlc) N h m pc avail -∗
-      ucwd N.cwd c -∗ udepwfAt (hlc := hlc) N m pc USYS_open fdep c -∗ ustdAt N.fd l v -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ User.utextImg (utext N.t) Img -∗ urun N h m pc avail -∗
+      ucwd N.cwd c -∗ udepwfAt N m pc USYS_open fdep c -∗ ustdAt N.fd l v -∗
       (∀ (h' : CPU) (r : BitVec 64) (W : Uvis) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat)
           (cs' : ExtTreeSet GName compare),
         ⌜∀ (a : Nat) (b : BitVec 8), Img a = some b → W.M a = some b⌝ -∗
@@ -194,8 +194,8 @@ theorem wp_uk_ecall_open_recv_img_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU)
         ⌜tfW W.tf (tfArgIdx 0) = m.get 10#5⌝ -∗ ⌜tfW W.tf (tfArgIdx 1) = m.get 11#5⌝ -∗
         ⌜W.cwd = c⌝ -∗ ⌜W.fd.take NSTD = l⌝ -∗
         ukOpenFdArmAt N.fd l v W.fd fdv' r -∗
-        spostAt (uslot (hlc := hlc)) USYS_open fdep W r M' fdv' cw' cs' -∗
-        ucwd N.cwd c -∗ urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        spostAt (uslot) USYS_open fdep W r M' fdv' cw' cs' -∗
+        ucwd N.cwd c -∗ urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi #Ht Hrun Hcwd Hsb Hstd Hcont
   ihave #Himg := uimgView_text N Img $$ Ht
@@ -207,8 +207,8 @@ WHICHEVER HALF supplies it, at a ledger whose view nobody reads. -/
 theorem wp_uk_ecall_open_recv_gimg (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64)
     (l : List FdState) (avail : Nat) (fdep : sfam GF) (c : Nat) (Img : ElfMem)
     (hn : usysno m = USYS_open) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ uimgView N Img -∗ urun (hlc := hlc) N h m pc avail -∗
-      ucwd N.cwd c -∗ udepwfAt (hlc := hlc) N m pc USYS_open fdep c -∗ ustd N.fd l -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ uimgView N Img -∗ urun N h m pc avail -∗
+      ucwd N.cwd c -∗ udepwfAt N m pc USYS_open fdep c -∗ ustd N.fd l -∗
       (∀ (h' : CPU) (r : BitVec 64) (W : Uvis) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat)
           (cs' : ExtTreeSet GName compare),
         ⌜∀ (a : Nat) (b : BitVec 8), Img a = some b → W.M a = some b⌝ -∗
@@ -216,8 +216,8 @@ theorem wp_uk_ecall_open_recv_gimg (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (
         ⌜tfW W.tf (tfArgIdx 0) = m.get 10#5⌝ -∗ ⌜tfW W.tf (tfArgIdx 1) = m.get 11#5⌝ -∗
         ⌜W.cwd = c⌝ -∗ ⌜W.fd.take NSTD = l⌝ -∗
         ukOpenFdArm N.fd l W.fd fdv' r -∗
-        spostAt (uslot (hlc := hlc)) USYS_open fdep W r M' fdv' cw' cs' -∗
-        ucwd N.cwd c -∗ urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        spostAt (uslot) USYS_open fdep W r M' fdv' cw' cs' -∗
+        ucwd N.cwd c -∗ urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi #Himg Hrun Hcwd Hsb Hstd Hcont
   icases ustd_ustdAt N.fd l $$ Hstd with ⟨%v, Hstd⟩
@@ -248,14 +248,14 @@ theorem wp_uk_ecall_quiet_recv_img (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (
     (h8 : n ≠ USYS_fstat) (hcl : n ≠ USYS_close) (hdp : n ≠ USYS_dup) (hop : n ≠ USYS_open)
     (hcd : n ≠ USYS_chdir) (hrng : 0 ≤ n ∧ n < 64) (h23 : n ≠ USYS_seccomp)
     (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ User.utextImg (utext N.t) Img -∗ urun (hlc := hlc) N h m pc avail -∗
-      ucwd N.cwd c -∗ udepwfAt (hlc := hlc) N m pc n fdep c -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ User.utextImg (utext N.t) Img -∗ urun N h m pc avail -∗
+      ucwd N.cwd c -∗ udepwfAt N m pc n fdep c -∗
       (∀ (h' : CPU) (r : BitVec 64) (W : Uvis) (cs' : ExtTreeSet GName compare),
         ⌜∀ (a : Nat) (b : BitVec 8), Img a = some b → W.M a = some b⌝ -∗
         ⌜tfW W.tf (tfArgIdx 0) = m.get 10#5⌝ -∗ ⌜tfW W.tf (tfArgIdx 1) = m.get 11#5⌝ -∗
         ⌜tfW W.tf (tfArgIdx 2) = m.get 12#5⌝ -∗ ⌜W.cwd = c⌝ -∗
-        spostAt (uslot (hlc := hlc)) n fdep W r W.M W.fd c cs' -∗
-        ucwd N.cwd c -∗ urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        spostAt (uslot) n fdep W r W.M W.fd c cs' -∗
+        ucwd N.cwd c -∗ urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi #Ht Hrun Hcwd Hsb Hcont
   ihave #Himg := uimgView_text N Img $$ Ht
@@ -282,8 +282,8 @@ theorem wp_uk_ecall_quiet_recv_img (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (
   iapply uslot_bump_close N m pc M pm sz fdv fdv cw cw gn cs pidv r avail hx0 hal4
     $$ Hheap Hstk Hufd Hcwda Hids Hmy Hdep Hrows
   iintro %h' Hrun
-  have hP : spostAt (uslot (hlc := hlc)) n fdep (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) r M fdv
-      cw cs ⊢ spostAt (uslot (hlc := hlc)) n fdep (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) r
+  have hP : spostAt (uslot) n fdep (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) r M fdv
+      cw cs ⊢ spostAt (uslot) n fdep (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) r
       (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll).M
       (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll).fd cw cs := .rfl
   ihave Hpost := hP $$ Hpost

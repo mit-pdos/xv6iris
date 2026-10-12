@@ -68,7 +68,7 @@ theorem echo_nl_ro : User.Echo.code.byte echoNlPtr = some wlNl := by decide
 /-! `echoWords`' two unfoldings (deviation 4). -/
 
 section UkEchoTree
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -89,17 +89,17 @@ instance echoProg_code_persistent (N : UkNames GF) : Persistent (echoProg N).cod
 
 /-- The exit hole IS echo's (deviation 4). -/
 theorem kechoExit_exObl (N : UkNames GF) (s : Int) :
-    kechoExit (hlc := hlc) N s = exObl (hlc := hlc) N (echoProg N) s := rfl
+    kechoExit N s = exObl N (echoProg N) s := rfl
 
 /-- **Rocq `tree_pay_exit`** at echo's instance (deviation 4). -/
 theorem echoTreePay_exit (N : UkNames GF) (s : Int) :
-    treePay (hlc := hlc) N (echoProg N) (exit_ s) = exObl (hlc := hlc) N (echoProg N) s := by
+    treePay N (echoProg N) (exit_ s) = exObl N (echoProg N) s := by
   rw [exit_, treePay_vis]; rfl
 
 /-- A write node's payment is the write hole at its subtree's (deviation 4). -/
 theorem echoTp_wr (N : UkNames GF) (P : Uprog GF) (fd : Int) (bs : Bytes) (k : Int → Proc) :
-    treePay (hlc := hlc) N P (.vis (.EWrite fd bs) k) ⊢
-      wrObl (hlc := hlc) N P fd bs (fun r => treePay (hlc := hlc) N P (k r)) := by
+    treePay N P (.vis (.EWrite fd bs) k) ⊢
+      wrObl N P fd bs (fun r => treePay N P (k r)) := by
   rw [treePay_vis]; exact .rfl
 
 /-! ## §1 echo's sources, as the hole wants them -/
@@ -131,7 +131,7 @@ theorem usrc_lit (N : UkNames GF) (a : Nat) (b : BitVec 8) (h : User.Echo.code.b
 
 /-- **Rocq `kecho_w_mono_in`**: `kechoW` is monotone on its INPUT side too. -/
 theorem kechoW_mono_in (N : UkNames GF) (ua : BitVec 64) (nb : Nat) (Ci Ci' Co : IProp GF) :
-    ⊢ (Ci' -∗ Ci) -∗ kechoW (hlc := hlc) N ua nb Ci Co -∗ kechoW (hlc := hlc) N ua nb Ci' Co := by
+    ⊢ (Ci' -∗ Ci) -∗ kechoW N ua nb Ci Co -∗ kechoW N ua nb Ci' Co := by
   iintro Hm Hw
   unfold kechoW
   iintro %h %m %avail %h0 %h1 %h2 #Hc HCi Hrun Hcont
@@ -142,7 +142,7 @@ theorem kechoW_mono_in (N : UkNames GF) (ua : BitVec 64) (nb : Nat) (Ci Ci' Co :
 theorem kechoW_of_wrObl (N : UkNames GF) (ua : Nat) (bs : Bytes) (K : Int → IProp GF) (Co : IProp GF)
     (tx : Bool) (dq : DFrac) (f : Nat → BitVec 8) (hf : ukBytesOf bs f) :
     ⊢ □ usrcAt N tx dq ua bs.length f -∗ (∀ r : Int, K r -∗ Co) -∗
-      kechoW (hlc := hlc) N (BitVec.ofNat 64 ua) bs.length (wrObl (hlc := hlc) N (echoProg N) 1 bs K) Co := by
+      kechoW N (BitVec.ofNat 64 ua) bs.length (wrObl N (echoProg N) 1 bs K) Co := by
   iintro #Hs HK
   unfold kechoW wrObl
   simp only [echoProg_code, echoProg_write]
@@ -161,11 +161,11 @@ theorem kechoW_of_wrObl (N : UkNames GF) (ua : Nat) (bs : Bytes) (K : Int → IP
 theorem kechoW_of_tree (N : UkNames GF) (ua : Nat) (bs : Bytes) (rest : Proc) (tx : Bool) (dq : DFrac)
     (f : Nat → BitVec 8) (hf : ukBytesOf bs f) :
     ⊢ □ usrcAt N tx dq ua bs.length f -∗
-      kechoW (hlc := hlc) N (BitVec.ofNat 64 ua) bs.length
-        (treePay (hlc := hlc) N (echoProg N) (.vis (.EWrite 1 bs) (fun _ => rest)))
-        (treePay (hlc := hlc) N (echoProg N) rest) := by
+      kechoW N (BitVec.ofNat 64 ua) bs.length
+        (treePay N (echoProg N) (.vis (.EWrite 1 bs) (fun _ => rest)))
+        (treePay N (echoProg N) rest) := by
   iintro #Hs
-  iapply kechoW_mono_in N _ _ (wrObl (hlc := hlc) N (echoProg N) 1 bs (fun _ => treePay (hlc := hlc) N (echoProg N) rest))
+  iapply kechoW_mono_in N _ _ (wrObl N (echoProg N) 1 bs (fun _ => treePay N (echoProg N) rest))
     _ _ $$ []
   · iintro Ht
     ihave Ht := echoTp_wr N (echoProg N) 1 bs (fun _ => rest) $$ Ht
@@ -177,23 +177,23 @@ theorem kechoW_of_tree (N : UkNames GF) (ua : Nat) (bs : Bytes) (rest : Proc) (t
 /-! ## §3 the whole chain -/
 
 theorem kechoPay_zero (N : UkNames GF) (args : List UArg) (i : Nat) (Ci Cend : IProp GF) :
-    kechoPay (hlc := hlc) N args 0 i Ci Cend = iprop(∀ g : UArg, ⌜args[i]? = some g⌝ -∗
-      ∃ Cm : IProp GF, kechoW (hlc := hlc) N (BitVec.ofNat 64 g.ptr) g.len Ci Cm ∗
-        kechoW (hlc := hlc) N (BitVec.ofNat 64 echoNlPtr) 1 Cm Cend) := rfl
+    kechoPay N args 0 i Ci Cend = iprop(∀ g : UArg, ⌜args[i]? = some g⌝ -∗
+      ∃ Cm : IProp GF, kechoW N (BitVec.ofNat 64 g.ptr) g.len Ci Cm ∗
+        kechoW N (BitVec.ofNat 64 echoNlPtr) 1 Cm Cend) := rfl
 
 theorem kechoPay_succ (N : UkNames GF) (args : List UArg) (k i : Nat) (Ci Cend : IProp GF) :
-    kechoPay (hlc := hlc) N args (k + 1) i Ci Cend = iprop(∀ g : UArg, ⌜args[i]? = some g⌝ -∗
-      ∃ Cm Cn : IProp GF, kechoW (hlc := hlc) N (BitVec.ofNat 64 g.ptr) g.len Ci Cm ∗
-        kechoW (hlc := hlc) N (BitVec.ofNat 64 echoSepPtr) 1 Cm Cn ∗ kechoPay (hlc := hlc) N args k (i + 1) Cn Cend) :=
+    kechoPay N args (k + 1) i Ci Cend = iprop(∀ g : UArg, ⌜args[i]? = some g⌝ -∗
+      ∃ Cm Cn : IProp GF, kechoW N (BitVec.ofNat 64 g.ptr) g.len Ci Cm ∗
+        kechoW N (BitVec.ofNat 64 echoSepPtr) 1 Cm Cn ∗ kechoPay N args k (i + 1) Cn Cend) :=
   rfl
 
 /-- argv's string `g`, written: a node of the tree (the data half). -/
 theorem kechoW_arg_tree (N : UkNames GF) (g : UArg) (rest : Proc) :
     ⊢ □ usrcAt N false DFrac.discard g.ptr g.len g.bytes -∗
-      kechoW (hlc := hlc) N (BitVec.ofNat 64 g.ptr) g.len
-        (treePay (hlc := hlc) N (echoProg N) (.vis (.EWrite 1 (uargBytes g)) (fun _ => rest)))
-        (treePay (hlc := hlc) N (echoProg N) rest) := by
-  have H := kechoW_of_tree (hlc := hlc) N g.ptr (uargBytes g) rest false DFrac.discard g.bytes (uargBytes_of g)
+      kechoW N (BitVec.ofNat 64 g.ptr) g.len
+        (treePay N (echoProg N) (.vis (.EWrite 1 (uargBytes g)) (fun _ => rest)))
+        (treePay N (echoProg N) rest) := by
+  have H := kechoW_of_tree N g.ptr (uargBytes g) rest false DFrac.discard g.bytes (uargBytes_of g)
   rw [uargBytes_length] at H
   exact H
 
@@ -201,9 +201,9 @@ theorem kechoW_arg_tree (N : UkNames GF) (g : UArg) (rest : Proc) :
 theorem kechoPay_tree (N : UkNames GF) (av : Nat) (args : List UArg) :
     ∀ (k i : Nat) (rest : Proc) (Cend : IProp GF), args.length = i + k + 1 →
       ⊢ uargv N.d av args -∗ ukCode N.t User.Echo.code.byte -∗
-        (treePay (hlc := hlc) N (echoProg N) rest -∗ Cend) -∗
-        kechoPay (hlc := hlc) N args k i
-          (treePay (hlc := hlc) N (echoProg N) (echoWords ((args.drop i).map uargBytes) rest)) Cend
+        (treePay N (echoProg N) rest -∗ Cend) -∗
+        kechoPay N args k i
+          (treePay N (echoProg N) (echoWords ((args.drop i).map uargBytes) rest)) Cend
   | 0, i, rest, Cend, hlen => by
     have hi : i < args.length := by omega
     have e : echoWords ((args.drop i).map uargBytes) rest =
@@ -214,7 +214,7 @@ theorem kechoPay_tree (N : UkNames GF) (av : Nat) (args : List UArg) :
     obtain rfl : args[i] = g := by rw [List.getElem?_eq_getElem hi] at hg; exact Option.some.inj hg
     ihave #Hsg := usrc_arg N av args i args[i] hg $$ Hargv
     ihave #Hsn := usrc_lit N echoNlPtr wlNl echo_nl_ro $$ Hc
-    iexists treePay (hlc := hlc) N (echoProg N) (.vis (.EWrite 1 [wlNl]) (fun _ => rest))
+    iexists treePay N (echoProg N) (.vis (.EWrite 1 [wlNl]) (fun _ => rest))
     isplitl []
     · iapply kechoW_arg_tree $$ Hsg
     · iapply kechoW_mono N _ 1 _ _ _ $$ HC
@@ -231,9 +231,9 @@ theorem kechoPay_tree (N : UkNames GF) (av : Nat) (args : List UArg) :
     obtain rfl : args[i] = g := by rw [List.getElem?_eq_getElem hi] at hg; exact Option.some.inj hg
     ihave #Hsg := usrc_arg N av args i args[i] hg $$ Hargv
     ihave #Hss := usrc_lit N echoSepPtr wlSp echo_sep_ro $$ Hc
-    iexists treePay (hlc := hlc) N (echoProg N) (.vis (.EWrite 1 [wlSp])
+    iexists treePay N (echoProg N) (.vis (.EWrite 1 [wlSp])
         (fun _ => echoWords ((args.drop (i + 1)).map uargBytes) rest)),
-      treePay (hlc := hlc) N (echoProg N) (echoWords ((args.drop (i + 1)).map uargBytes) rest)
+      treePay N (echoProg N) (echoWords ((args.drop (i + 1)).map uargBytes) rest)
     isplitl []
     · iapply kechoW_arg_tree $$ Hsg
     isplitl []
@@ -243,8 +243,8 @@ theorem kechoPay_tree (N : UkNames GF) (av : Nat) (args : List UArg) :
 /-- **Rocq `kecho_pay_all_tree`**. -/
 theorem kechoPayAll_tree (N : UkNames GF) (av : Nat) (args : List UArg) :
     ⊢ uargv N.d av args -∗ ukCode N.t User.Echo.code.byte -∗
-      kechoPayAll (hlc := hlc) N args (treePay (hlc := hlc) N (echoProg N) (echoTree (args.map uargBytes)))
-        (exObl (hlc := hlc) N (echoProg N) 0) := by
+      kechoPayAll N args (treePay N (echoProg N) (echoTree (args.map uargBytes)))
+        (exObl N (echoProg N) 0) := by
   unfold kechoPayAll
   iintro #Hargv #Hc
   isplit
@@ -272,11 +272,11 @@ the walk's exit hole `kechoExit` at echo's instance. -/
 theorem wp_kecho_start_tree (HS : ECHO_START) (N : UkNames GF) (h : CPU) (m : RegMap) (av : Nat)
     (args : List UArg) (n : Nat)
     (ha0 : m.get 10#5 = BitVec.ofNat 64 args.length) (ha1 : m.get 11#5 = BitVec.ofNat 64 av) :
-    ⊢ treePay (hlc := hlc) N (echoProg N) (echoTree (args.map uargBytes)) -∗ ukCode N.t User.Echo.code.byte -∗
+    ⊢ treePay N (echoProg N) (echoTree (args.map uargBytes)) -∗ ukCode N.t User.Echo.code.byte -∗
       uargv N.d av args -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Echo.Sym.«start») (2 + (8 + (2 + n))) -∗ wpLoop h := by
+      urun N h m (BitVec.ofNat 64 User.Echo.Sym.«start») (2 + (8 + (2 + n))) -∗ wpLoop h := by
   iintro Ht #Hc #Hargv Hrun
-  iapply HS.wp_echoStart N h m av args n _ (exObl (hlc := hlc) N (echoProg N) 0) ha0 ha1
+  iapply HS.wp_echoStart N h m av args n _ (exObl N (echoProg N) 0) ha0 ha1
     $$ [] [] Hc Hargv Ht Hrun
   · iapply kechoPayAll_tree $$ Hargv Hc
   · rw [kechoExit_exObl]; iintro H; iexact H
@@ -286,12 +286,12 @@ theorem wp_kecho_start_tree (HS : ECHO_START) (N : UkNames GF) (h : CPU) (m : Re
 /-- **Rocq `wp_kecho_start_env`**: the tree paid by an ENVIRONMENT
 (`UkHandler.treePay_of_conforms_p`). -/
 theorem wp_kecho_start_env (HS : ECHO_START) {Dp : List Nat} (N : UkNames GF)
-    (I : EpIfaceP (hlc := hlc) N (echoProg N) Dp) (E : Penv) (ds : ExtTreeSet Nat compare) (h : CPU) (m : RegMap)
+    (I : EpIfaceP N (echoProg N) Dp) (E : Penv) (ds : ExtTreeSet Nat compare) (h : CPU) (m : RegMap)
     (av : Nat) (args : List UArg) (n : Nat) (hc : Conforms E (echoTree (args.map uargBytes)))
     (hs : SafeFds (fdDom E.fd) (echoTree (args.map uargBytes))) (hdp : dpIn Dp ds)
     (ha0 : m.get 10#5 = BitVec.ofNat 64 args.length) (ha1 : m.get 11#5 = BitVec.ofNat 64 av) :
     ⊢ envRes I E ds -∗ ukCode N.t User.Echo.code.byte -∗ uargv N.d av args -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Echo.Sym.«start») (2 + (8 + (2 + n))) -∗ wpLoop h := by
+      urun N h m (BitVec.ofNat 64 User.Echo.Sym.«start») (2 + (8 + (2 + n))) -∗ wpLoop h := by
   iintro Henv #Hc #Hargv Hrun
   iapply wp_kecho_start_tree HS N h m av args n ha0 ha1 $$ [Henv] Hc Hargv Hrun
   iapply treePay_of_conforms_p I E ds _ hc hs hdp $$ Henv

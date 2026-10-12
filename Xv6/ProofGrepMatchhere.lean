@@ -27,22 +27,22 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-- **Rocq `wp_kgrep_mh_call`**: the literal arm's RECURSIVE CALL, 0xa2..0xac:
 `c.addi a1,a1,1 ; addi a0,a5,1 ; jal matchhere ; c.j 0x82`. -/
 theorem grepMatchhere_call (UL : UK_LEAVES) (N : UkNames GF) (lr1 : Nat)
-    (IH : grepMhSpec (hlc := hlc) (GF := GF) lr1) (h : CPU) (mx : RegMap) (dqr dqt : DFrac) (ar ax lt1 : Nat)
+    (IH : grepMhSpec (GF := GF) lr1) (h : CPU) (mx : RegMap) (dqr dqt : DFrac) (ar ax lt1 : Nat)
     (c : BitVec 8) (fr1 ft : Nat → BitVec 8) (n : Nat) (htest : (bdec c cDot || bdec c (ft 0)) = true)
     (ha5 : mx.get 15#5 = BitVec.ofNat 64 ar) (ha1 : mx.get 11#5 = BitVec.ofNat 64 ax)
     (hn : grepMhWords ((List.range lr1).map fr1) ≤ n) :
     ⊢ grepCode N.t -∗ ustr N.d dqr (ar + 1) lr1 fr1 -∗ ustr N.d dqt ax (lt1 + 1) ft -∗
-      urun (hlc := hlc) N h mx (BitVec.ofNat 64 0xa2) n -∗
+      urun N h mx (BitVec.ofNat 64 0xa2) n -∗
       (ustr N.d dqr (ar + 1) lr1 fr1 -∗ ustr N.d dqt ax (lt1 + 1) ft -∗ ∀ (h' : CPU) (m' : RegMap),
         ⌜m'.get 10#5 = kgrepB01 (grepMhLit c ((List.range lr1).map fr1) ((List.range (lt1 + 1)).map ft))⌝ -∗
-        ⌜grepRkeep grepWcaller mx m'⌝ -∗ urun (hlc := hlc) N h' m' (BitVec.ofNat 64 0x82) n -∗ wpLoop h') -∗
+        ⌜grepRkeep grepWcaller mx m'⌝ -∗ urun N h' m' (BitVec.ofNat 64 0x82) n -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hre Htx Hrun Hcont
   ihave %htne := ustr_nonul N.d dqt ax (lt1 + 1) ft $$ Htx
@@ -101,15 +101,15 @@ theorem grepMatchhere_call (UL : UK_LEAVES) (N : UkNames GF) (lr1 : Nat)
 /-- **Rocq `wp_kgrep_mh_lit`**: matchhere's LITERAL ARM, 0x70..0x80 (and the
 recursive call at 0xa2).  a4 holds `re[0]`, a5 `re`. -/
 theorem grepMatchhere_lit (UL : UK_LEAVES) (N : UkNames GF) (lr1 : Nat)
-    (IH : grepMhSpec (hlc := hlc) (GF := GF) lr1) (h : CPU) (m : RegMap) (dqr dqt : DFrac) (ar ax lt : Nat)
+    (IH : grepMhSpec (GF := GF) lr1) (h : CPU) (m : RegMap) (dqr dqt : DFrac) (ar ax lt : Nat)
     (c : BitVec 8) (fr1 ft : Nat → BitVec 8) (n : Nat)
     (ha4 : m.get 14#5 = BitVec.setWidth 64 c) (ha5 : m.get 15#5 = BitVec.ofNat 64 ar)
     (ha1 : m.get 11#5 = BitVec.ofNat 64 ax) (hn : grepMhWords ((List.range lr1).map fr1) ≤ n) :
     ⊢ grepCode N.t -∗ ustr N.d dqr (ar + 1) lr1 fr1 -∗ ustr N.d dqt ax lt ft -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x70) n -∗
+      urun N h m (BitVec.ofNat 64 0x70) n -∗
       (ustr N.d dqr (ar + 1) lr1 fr1 -∗ ustr N.d dqt ax lt ft -∗ ∀ (h' : CPU) (m' : RegMap),
         ⌜m'.get 10#5 = kgrepB01 (grepMhLit c ((List.range lr1).map fr1) ((List.range lt).map ft))⌝ -∗
-        ⌜grepRkeep grepWcaller m m'⌝ -∗ urun (hlc := hlc) N h' m' (BitVec.ofNat 64 0x82) n -∗ wpLoop h') -∗
+        ⌜grepRkeep grepWcaller m m'⌝ -∗ urun N h' m' (BitVec.ofNat 64 0x82) n -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hre Htx Hrun Hcont
   ihave %hbnd := urun_ustr_bnd N h m _ _ dqt ax lt ft $$ Hrun Htx
@@ -215,15 +215,15 @@ theorem grepMatchhere_lit (UL : UK_LEAVES) (N : UkNames GF) (lr1 : Nat)
 /-- **Rocq `wp_kgrep_mh_star`**: matchhere's STAR ARM, 0x8a..0x96:
 `c.mv a2,a1 ; addi a1,a0,2 ; c.mv a0,a4 ; jal matchstar ; c.j 0x82`. -/
 theorem grepMatchhere_star (UL : UK_LEAVES) (N : UkNames GF) (lr2 : Nat)
-    (IHs : grepMsSpec (hlc := hlc) (GF := GF) lr2) (h : CPU) (m : RegMap) (dqr dqt : DFrac) (ar ax lt : Nat)
+    (IHs : grepMsSpec (GF := GF) lr2) (h : CPU) (m : RegMap) (dqr dqt : DFrac) (ar ax lt : Nat)
     (c : BitVec 8) (fr2 ft : Nat → BitVec 8) (n : Nat)
     (ha4 : m.get 14#5 = BitVec.setWidth 64 c) (ha0 : m.get 10#5 = BitVec.ofNat 64 ar)
     (ha1 : m.get 11#5 = BitVec.ofNat 64 ax) (hn : grepMsWords ((List.range lr2).map fr2) ≤ n) :
     ⊢ grepCode N.t -∗ ustr N.d dqr (ar + 2) lr2 fr2 -∗ ustr N.d dqt ax lt ft -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x8a) n -∗
+      urun N h m (BitVec.ofNat 64 0x8a) n -∗
       (ustr N.d dqr (ar + 2) lr2 fr2 -∗ ustr N.d dqt ax lt ft -∗ ∀ (h' : CPU) (m' : RegMap),
         ⌜m'.get 10#5 = kgrepB01 (matchstar c ((List.range lr2).map fr2) ((List.range lt).map ft))⌝ -∗
-        ⌜grepRkeep grepWcaller m m'⌝ -∗ urun (hlc := hlc) N h' m' (BitVec.ofNat 64 0x82) n -∗ wpLoop h') -∗
+        ⌜grepRkeep grepWcaller m m'⌝ -∗ urun N h' m' (BitVec.ofNat 64 0x82) n -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hre Htx Hrun Hcont
   -- 0x8a  c.mv a2,a1
@@ -288,7 +288,7 @@ INDUCTION -- from the contract at every shorter pattern (the literal arm
 recurses at `re+1`, the star arm hands matchstar `re+2`) to the contract
 here. -/
 theorem grepMatchhere_step (UL : UK_LEAVES) (MS : GREP_MATCHSTAR) (lr : Nat)
-    (IHall : ∀ l, l < lr → grepMhSpec (hlc := hlc) (GF := GF) l) : grepMhSpec (hlc := hlc) (GF := GF) lr := by
+    (IHall : ∀ l, l < lr → grepMhSpec (GF := GF) l) : grepMhSpec (GF := GF) lr := by
   intro N h m dqr dqt ar ax lt fr ft n ha0 ha1 hn
   rw [show User.Grep.Sym.«matchhere» = 0x4c from rfl]
   iintro #Hc Hre Htx Hrun Hcont
@@ -374,10 +374,10 @@ theorem grepMatchhere_step (UL : UK_LEAVES) (MS : GREP_MATCHSTAR) (lr : Nat)
         mc.get 2#5 = m1.get spIdx + BitVec.ofInt 64 (-((8 * 2 : Nat) : Int)) →
         ⊢ grepCode N.t -∗ uword N.d ((m1.get spIdx).toNat - 8) (m1.get 1#5) -∗
           uword N.d ((m1.get spIdx).toNat - 16) (m1.get 8#5) -∗
-          urun (hlc := hlc) N h' mc (BitVec.ofNat 64 0x82) n1 -∗
+          urun N h' mc (BitVec.ofNat 64 0x82) n1 -∗
           (∀ (h'' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗
             ⌜m'.get 10#5 = kgrepB01 (matchhere ((List.range (lr1 + 1)).map fr) ((List.range lt).map ft))⌝ -∗
-            urun (hlc := hlc) N h'' m' (retPc (m.get 1#5)) (2 + n1) -∗ wpLoop h'') -∗ wpLoop h' := by
+            urun N h'' m' (retPc (m.get 1#5)) (2 + n1) -∗ wpLoop h'') -∗ wpLoop h' := by
       intro h' mc hmc10 hkc hspc
       iintro #Hc Hwra Hws0 Hrun Hk
       gfetch 0x82 true (.LOAD (8#12, .Regidx 2#5, .Regidx 1#5, false, 8))
@@ -597,7 +597,7 @@ theorem grepMatchhere_step (UL : UK_LEAVES) (MS : GREP_MATCHSTAR) (lr : Nat)
 
 /-- **Rocq `mh_all`**: matchhere's contract at every pattern length. -/
 theorem grepMatchhere_all (UL : UK_LEAVES) (MS : GREP_MATCHSTAR) (lr : Nat) :
-    grepMhSpec (hlc := hlc) (GF := GF) lr := by
+    grepMhSpec (GF := GF) lr := by
   induction lr using Nat.strongRecOn with
   | ind lr IH => exact grepMatchhere_step UL MS lr IH
 

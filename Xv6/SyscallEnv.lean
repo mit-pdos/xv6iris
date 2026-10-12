@@ -113,7 +113,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -167,7 +167,7 @@ def parkWorld (Γ : SchedNames) : IProp GF :=
     consoleReadyApp ∗ syscPidLock ∗ procsAvailAt Γ none false ∗
     wireInv ∗
     -- THE ERA'S ANCHOR (NI M2-X2): the ledger names its boot registered
-    (∃ k : Nat, MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF))) ∗
+    (∃ k : Nat, MachFixedGS.uEraAnchor (GF := GF) k (niNamesHere (GF := GF))) ∗
     syscTrampCl ∗
     (∃ ip : BitVec 64, initIdentCell curCtx ip ∗ initGen ip 1#32))
 
@@ -190,19 +190,19 @@ instance syscProcEnv_persistent (Γ : SchedNames) (γ : FileNames) :
 
 /-- **Rocq `sysc_fs_env`** (deviation 2): THERE IS ONLY ONE FILE SYSTEM --
 `fsReady`, at the ambient names -- beside printk's credentials. -/
-def syscFsEnv : IProp GF := iprop(panicEnv ∗ fsReady (hlc := hlc))
+def syscFsEnv : IProp GF := iprop(panicEnv ∗ fsReady)
 
-instance syscFsEnv_persistent : Persistent (syscFsEnv (hlc := hlc) (GF := GF)) := by
+instance syscFsEnv_persistent : Persistent (syscFsEnv (GF := GF)) := by
   unfold syscFsEnv; infer_instance
 
 /-- **Rocq `syscall_env`** (D30: concrete), Rocq's conjunct order; `PT` is
 the park token (header). -/
 def syscallEnv (PT : SchedNames → IProp GF) (Γ : SchedNames) (γ : FileNames) : IProp GF :=
-  iprop(syscProcEnv Γ γ ∗ consoleReadyApp ∗ syscFsEnv (hlc := hlc) ∗ firstDone (hlc := hlc) ∗
+  iprop(syscProcEnv Γ γ ∗ consoleReadyApp ∗ syscFsEnv ∗ firstDone ∗
     parkWorld Γ ∗ PT Γ)
 
 instance syscallEnv_persistent (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)]
-    (Γ : SchedNames) (γ : FileNames) : Persistent (syscallEnv (hlc := hlc) PT Γ γ) := by
+    (Γ : SchedNames) (γ : FileNames) : Persistent (syscallEnv PT Γ γ) := by
   unfold syscallEnv; infer_instance
 
 /-! ## §3 The producer (Rocq `syscall_env_park`) -/
@@ -216,8 +216,8 @@ world and the token. -/
 theorem syscallEnv_park (PT : SchedNames → IProp GF) (Γ : SchedNames) (γ : FileNames)
     (γw γft γtk : GName) :
     syscParkExtra Γ γtk ⊢ isLock γw waitLockAddr "wait_lock" waitLockPay -∗ isFtable γft γ -∗
-      panicEnv -∗ firstDone (hlc := hlc) -∗ parkWorld Γ -∗ PT Γ -∗
-      syscallEnv (hlc := hlc) PT Γ γ := by
+      panicEnv -∗ firstDone -∗ parkWorld Γ -∗ PT Γ -∗
+      syscallEnv PT Γ γ := by
   unfold syscParkExtra syscallEnv syscProcEnv syscFsEnv syscPidLock
   iintro ⟨⟨%γp, #Hnp⟩, #Hpav, #Htk, #Hcons⟩ #Hwl #Hft #Hpe #Hdone Hw Ht
   ihave #Hdone' := Hdone
@@ -238,34 +238,34 @@ theorem syscallEnv_park (PT : SchedNames → IProp GF) (Γ : SchedNames) (γ : F
 variable (PT : SchedNames → IProp GF) (Γ : SchedNames) (γ : FileNames)
 
 /-- Rocq `syscall_env_console`. -/
-theorem syscallEnv_console : syscallEnv (hlc := hlc) PT Γ γ ⊢ consoleReadyApp := by
+theorem syscallEnv_console : syscallEnv PT Γ γ ⊢ consoleReadyApp := by
   unfold syscallEnv
   iintro ⟨-, H, -⟩
   iexact H
 
 /-- Rocq `syscall_env_first`. -/
-theorem syscallEnv_first : syscallEnv (hlc := hlc) PT Γ γ ⊢ firstDone (hlc := hlc) := by
+theorem syscallEnv_first : syscallEnv PT Γ γ ⊢ firstDone := by
   unfold syscallEnv
   iintro ⟨-, -, -, H, -⟩
   iexact H
 
 /-- Rocq `syscall_env_token`: the park, for fork's sake (W8-P2's kfork). -/
-theorem syscallEnv_token : syscallEnv (hlc := hlc) PT Γ γ ⊢ PT Γ := by
+theorem syscallEnv_token : syscallEnv PT Γ γ ⊢ PT Γ := by
   unfold syscallEnv
   iintro ⟨-, -, -, -, -, H⟩
   iexact H
 
 /-- **The era's anchor** (NI M2-X2), off the park world. -/
-theorem syscallEnv_anchor : syscallEnv (hlc := hlc) PT Γ γ ⊢
-    ∃ k : Nat, MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF)) := by
+theorem syscallEnv_anchor : syscallEnv PT Γ γ ⊢
+    ∃ k : Nat, MachFixedGS.uEraAnchor (GF := GF) k (niNamesHere (GF := GF)) := by
   unfold syscallEnv parkWorld
   iintro ⟨-, -, -, -, ⟨-, -, -, -, -, #H, -⟩, -⟩
   iexact H
 
 /-- ...and kept (the environment is handed back whole). -/
-theorem syscallEnv_anchor_keep : syscallEnv (hlc := hlc) PT Γ γ ⊢
-    (∃ k : Nat, MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF))) ∗
-      syscallEnv (hlc := hlc) PT Γ γ := by
+theorem syscallEnv_anchor_keep : syscallEnv PT Γ γ ⊢
+    (∃ k : Nat, MachFixedGS.uEraAnchor (GF := GF) k (niNamesHere (GF := GF))) ∗
+      syscallEnv PT Γ γ := by
   unfold syscallEnv
   iintro ⟨H1, H2, H3, H4, #Hw, H6⟩
   isplitl []
@@ -275,33 +275,33 @@ theorem syscallEnv_anchor_keep : syscallEnv (hlc := hlc) PT Γ γ ⊢
   · iframe H1 H2 H3 H4 Hw H6
 
 /-- The file system, off the fs row. -/
-theorem syscallEnv_fsReady : syscallEnv (hlc := hlc) PT Γ γ ⊢ fsReady (hlc := hlc) := by
+theorem syscallEnv_fsReady : syscallEnv PT Γ γ ⊢ fsReady := by
   unfold syscallEnv syscFsEnv
   iintro ⟨-, -, ⟨-, H⟩, -⟩
   iexact H
 
 /-- printk's credentials, off the fs row. -/
-theorem syscallEnv_panic : syscallEnv (hlc := hlc) PT Γ γ ⊢ panicEnv := by
+theorem syscallEnv_panic : syscallEnv PT Γ γ ⊢ panicEnv := by
   unfold syscallEnv syscFsEnv
   iintro ⟨-, -, ⟨H, -⟩, -⟩
   iexact H
 
 /-- The `ftable` handle alone (pipe, dup, close, exit). -/
-theorem syscallEnv_ftable : syscallEnv (hlc := hlc) PT Γ γ ⊢ ∃ γft : GName, isFtable γft γ := by
+theorem syscallEnv_ftable : syscallEnv PT Γ γ ⊢ ∃ γft : GName, isFtable γft γ := by
   unfold syscallEnv syscProcEnv
   iintro ⟨⟨%γp, %γw, %γft, %γtk, -, -, -, #Hft, -⟩, -⟩
   iexists γft
   iexact Hft
 
 /-- The ticks lock alone (pause, uptime). -/
-theorem syscallEnv_ticks : syscallEnv (hlc := hlc) PT Γ γ ⊢ ∃ γt : GName, isTickslock γt := by
+theorem syscallEnv_ticks : syscallEnv PT Γ γ ⊢ ∃ γt : GName, isTickslock γt := by
   unfold syscallEnv syscProcEnv
   iintro ⟨⟨%γp, %γw, %γft, %γtk, -, -, -, -, #Htk⟩, -⟩
   iexists γtk
   iexact Htk
 
 /-- The nextpid lock and the ledger (fork, wait). -/
-theorem syscallEnv_pid : syscallEnv (hlc := hlc) PT Γ γ ⊢
+theorem syscallEnv_pid : syscallEnv PT Γ γ ⊢
     (∃ γp : GName, isLock γp pidLockAddr "nextpid" pidLockPay) ∗ procsAvailAt Γ none false := by
   unfold syscallEnv syscProcEnv
   iintro ⟨⟨%γp, %γw, %γft, %γtk, #Hnp, #Hpav, -⟩, -⟩
@@ -310,7 +310,7 @@ theorem syscallEnv_pid : syscallEnv (hlc := hlc) PT Γ γ ⊢
   iexact Hnp
 
 /-- The allocator at `fsReady`'s names (Rocq `kalloc_env fsc_kalloc None`). -/
-theorem syscallEnv_kmem : syscallEnv (hlc := hlc) PT Γ γ ⊢
+theorem syscallEnv_kmem : syscallEnv PT Γ γ ⊢
     isLock fscKalloc kmemLockAddr "kmem" (kmemRes fsReadyKmem) ∗ kallocAvail fsReadyKmem none := by
   iintro H
   ihave #Hrdy := syscallEnv_fsReady PT Γ γ $$ H
@@ -322,7 +322,7 @@ and consoleinit's table out of `consoleReadyApp` -- AT THE ERA'S CONSOLE
 NAME (NI M3 NI-OUT, ruling OUT-R7): the park world pins the console port at
 `fscUart`, so the write arm's run receipts are at the era's sixth anchored
 name. -/
-theorem syscallEnv_devswAt : syscallEnv (hlc := hlc) PT Γ γ ⊢
+theorem syscallEnv_devswAt : syscallEnv PT Γ γ ⊢
     ∃ γl : GName, filewriteDevsw γl fscUart := by
   unfold syscallEnv parkWorld devintrCaps
   iintro ⟨-, #Hcons, -, -, ⟨⟨%γ0, %γ1, %γc, %γl0, %γl1, %γt, %pd, %pav, %pu, %hu,
@@ -337,14 +337,14 @@ theorem syscallEnv_devswAt : syscallEnv (hlc := hlc) PT Γ γ ⊢
 
 /-- **Rocq `sysc_fileread_env`**: fileread's fs row, one buffer slot drawn
 from the dispatch's `bslots 3`. -/
-theorem syscallEnv_filereadFsEnv : syscallEnv (hlc := hlc) PT Γ γ ⊢ bslot -∗ filereadFsEnv (hlc := hlc) := by
+theorem syscallEnv_filereadFsEnv : syscallEnv PT Γ γ ⊢ bslot -∗ filereadFsEnv := by
   unfold filereadFsEnv
   iintro H Hb
   ihave #Hrdy := syscallEnv_fsReady PT Γ γ $$ H
   iframe Hrdy Hb
 
 /-- **Rocq `sysc_filestat_env`**. -/
-theorem syscallEnv_filestatFsEnv : syscallEnv (hlc := hlc) PT Γ γ ⊢ bslot -∗ filestatFsEnv (hlc := hlc) := by
+theorem syscallEnv_filestatFsEnv : syscallEnv PT Γ γ ⊢ bslot -∗ filestatFsEnv := by
   unfold filestatFsEnv
   iintro H Hb
   ihave #Hrdy := syscallEnv_fsReady PT Γ γ $$ H
@@ -352,8 +352,8 @@ theorem syscallEnv_filestatFsEnv : syscallEnv (hlc := hlc) PT Γ γ ⊢ bslot -�
 
 /-- **Rocq `sysc_filewrite_env`**: filewrite's fs row, the dispatch's whole
 `bslots 3`. -/
-theorem syscallEnv_filewriteFsEnv : syscallEnv (hlc := hlc) PT Γ γ ⊢ bslots 3 -∗
-    filewriteFsEnv (hlc := hlc) := by
+theorem syscallEnv_filewriteFsEnv : syscallEnv PT Γ γ ⊢ bslots 3 -∗
+    filewriteFsEnv := by
   unfold filewriteFsEnv
   iintro H Hb
   ihave #Hrdy := syscallEnv_fsReady PT Γ γ $$ H
@@ -361,7 +361,7 @@ theorem syscallEnv_filewriteFsEnv : syscallEnv (hlc := hlc) PT Γ γ ⊢ bslots 
 
 /-- **Rocq `sysc_fclose_pipe_env`**: the FD_PIPE arm's environment, at the
 allocator's `fsReady` names and the sealed count. -/
-theorem syscallEnv_fileclosePipeEnv : syscallEnv (hlc := hlc) PT Γ γ ⊢ procsInv Γ -∗
+theorem syscallEnv_fileclosePipeEnv : syscallEnv PT Γ γ ⊢ procsInv Γ -∗
     fileclosePipeEnv Γ fscKalloc fsReadyKmem none := by
   unfold fileclosePipeEnv
   iintro H #Hpi
@@ -370,8 +370,8 @@ theorem syscallEnv_fileclosePipeEnv : syscallEnv (hlc := hlc) PT Γ γ ⊢ procs
 
 /-- **Rocq `sysc_fclose_fs_env`**: the FD_INODE/FD_DEVICE arm's
 environment, the dispatch's whole `bslots 3`. -/
-theorem syscallEnv_filecloseFsEnv (j : Nat) (hj : j < NPROC) : syscallEnv (hlc := hlc) PT Γ γ ⊢
-    procsInv Γ -∗ bslots 3 -∗ filecloseFsEnv (hlc := hlc) Γ j (procAddr j) := by
+theorem syscallEnv_filecloseFsEnv (j : Nat) (hj : j < NPROC) : syscallEnv PT Γ γ ⊢
+    procsInv Γ -∗ bslots 3 -∗ filecloseFsEnv Γ j (procAddr j) := by
   unfold filecloseFsEnv
   iintro H #Hpi Hb
   ihave #Hrdy := syscallEnv_fsReady PT Γ γ $$ H
@@ -382,8 +382,8 @@ theorem syscallEnv_filecloseFsEnv (j : Nat) (hj : j < NPROC) : syscallEnv (hlc :
 
 /-- **Rocq `sysc_fs_fabric`**: kexec's fabric at the ring pages `fsReady`
 quantifies (deviation 2), with the dispatch's `procsInv Γ`. -/
-theorem syscallEnv_fsFabric : syscallEnv (hlc := hlc) PT Γ γ ⊢ procsInv Γ -∗
-    ∃ pd pav pu : BitVec 64, fsFabric (hlc := hlc) Γ pd pav pu := by
+theorem syscallEnv_fsFabric : syscallEnv PT Γ γ ⊢ procsInv Γ -∗
+    ∃ pd pav pu : BitVec 64, fsFabric Γ pd pav pu := by
   unfold fsFabric
   iintro H #Hpi
   ihave #Hrdy := syscallEnv_fsReady PT Γ γ $$ H

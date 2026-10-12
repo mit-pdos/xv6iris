@@ -58,14 +58,14 @@ theorem lmDiscInput_U_no_cr (I : List (BitVec 8)) (j : Nat) (hd : lmDiscInput ul
   decide
 
 section UnionReadInst
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF] [PipeOutG GF] [Fscfg]
 
 /-- The era's read link off the bundle (Rocq `uri_rd`). -/
 theorem uri_rd (ug : UnionGn) (k n : Nat) (v : EraPins) (ws : List (List Obs × BitVec 8))
     (Φ : IProp GF) :
-    ⊢ unionLinks (hlc := hlc) ug -∗ eraPin (fgnEcho ug.ugnFile) k v -∗ dlCnt v (1 : Qp).half n -∗
-      (ureadRet (hlc := hlc) ug k v n ws -∗ Φ) -∗ consLink .uart0 k (.evRead ws) Φ := by
+    ⊢ unionLinks ug -∗ eraPin (fgnEcho ug.ugnFile) k v -∗ dlCnt v (1 : Qp).half n -∗
+      (ureadRet ug k v n ws -∗ Φ) -∗ consLink .uart0 k (.evRead ws) Φ := by
   iintro #Hlk #Hpin Hdl HΦ
   ihave #Hrdl := unionLinks_rd ug $$ Hlk
   unfold unionLinkRd
@@ -73,13 +73,13 @@ theorem uri_rd (ug : UnionGn) (k n : Nat) (v : EraPins) (ws : List (List Obs × 
 
 /-- ...and its taint route (Rocq `uri_rd_taint`). -/
 theorem uri_rd_taint (ug : UnionGn) (ws : List (List Obs × BitVec 8)) (Φ : IProp GF) :
-    ⊢ unionLinks (hlc := hlc) ug -∗ fileTaint (hlc := hlc) ug.ugnFile.fgnCl -∗
-      (fileTaint (hlc := hlc) ug.ugnFile.fgnCl -∗ Φ) -∗
-      consLink .uart0 (genId (hlc := hlc) (GF := GF) + 1) (.evRead ws) Φ := by
+    ⊢ unionLinks ug -∗ fileTaint ug.ugnFile.fgnCl -∗
+      (fileTaint ug.ugnFile.fgnCl -∗ Φ) -∗
+      consLink .uart0 (genId (GF := GF) + 1) (.evRead ws) Φ := by
   iintro #Hlk #HT HΦ
   ihave #Hrdt := unionLinks_rd_taint ug $$ Hlk
   unfold unionLinkRdTaint
-  iapply Hrdt $$ %(genId (hlc := hlc) (GF := GF) + 1) %ws %Φ HT HΦ
+  iapply Hrdt $$ %(genId (GF := GF) + 1) %ws %Φ HT HΦ
 
 /-- THE LAST CONSUMED ENTRY'S TAG (Rocq `uri_last_tag`, `FileReadInst`'s
 verbatim): the window's tags are the delivered bytes' and the swallow row
@@ -89,9 +89,9 @@ theorem uri_last_tag (cn : ConsNames) (I : List (BitVec 8)) (ws sl sl' : List (L
     (hddc : dd ≤ dc) (hlws : ws.length = dc) (hwin : consWindow sl I.length dd g0 hs)
     (hpre : sl <+: sl') (hwsj : ∀ j : Nat, j < dc → ws[j]? = sl'[I.length + j]?)
     (hlast : ws.getLast? = some y) :
-    ⊢ ([∗list] hh ∈ hs, MachFixedGS.rxTag (hlc := hlc) (GF := GF) hh) -∗
-      consSwallow (hlc := hlc) cn False sl dd dc -∗ consStoredLb cn sl' -∗
-      MachFixedGS.rxTag (hlc := hlc) (GF := GF) y.1 := by
+    ⊢ ([∗list] hh ∈ hs, MachFixedGS.rxTag (GF := GF) hh) -∗
+      consSwallow cn False sl dd dc -∗ consStoredLb cn sl' -∗
+      MachFixedGS.rxTag (GF := GF) y.1 := by
   obtain ⟨hsll, hhsl, hwj⟩ := hwin
   have hdc : 0 < dc := by
     rw [← hlws]
@@ -109,7 +109,7 @@ theorem uri_last_tag (cn : ConsNames) (I : List (BitVec 8)) (ws sl sl' : List (L
     have hsl' := MonoList.prefix_getElem? hpre hsl
     rw [← hy] at hsl'
     cases hsl'
-    iapply BigSepL.bigSepL_lookup (Φ := fun _ hh => MachFixedGS.rxTag (hlc := hlc) (GF := GF) hh) hh
+    iapply BigSepL.bigSepL_lookup (Φ := fun _ hh => MachFixedGS.rxTag (GF := GF) hh) hh
       $$ Htags
   · unfold consStoredLb
     ihave %hcmp := MonoList.lb_own_valid _ _ _ $$ Hlbs Hlb
@@ -130,23 +130,23 @@ disjunct carries the state's witness beside the writer's cursor, and the
 typed lines' witness at the far end is read off the last consumed byte's
 tag. -/
 theorem uri_arms (ug : UnionGn)
-    (htag : MachFixedGS.rxTag (hlc := hlc) (GF := GF) = utag (hlc := hlc) ug)
+    (htag : MachFixedGS.rxTag (GF := GF) = utag ug)
     (v : EraPins) (I : List (BitVec 8)) (ws sl sl' : List (List Obs × BitVec 8))
     (hs : List (List Obs)) (dd dc : Nat) (g0 : Nat → BitVec 8)
     (hddc : dd ≤ dc) (hlws : ws.length = dc) (hwinf : consWindow sl I.length dd g0 hs)
     (hpre2 : sl <+: sl') (hwsj : ∀ j : Nat, j < dc → ws[j]? = sl'[I.length + j]?) :
-    ⊢ eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v -∗ inpLb v I -∗
-      urresw (hlc := hlc) ug v I -∗
-      ureadRet (hlc := hlc) ug (genId (hlc := hlc) (GF := GF) + 1) v I.length ws -∗
-      ([∗list] hh ∈ hs, MachFixedGS.rxTag (hlc := hlc) (GF := GF) hh) -∗
-      consSwallow (hlc := hlc) fscCons False sl dd dc -∗
+    ⊢ eraPin (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v -∗ inpLb v I -∗
+      urresw ug v I -∗
+      ureadRet ug (genId (GF := GF) + 1) v I.length ws -∗
+      ([∗list] hh ∈ hs, MachFixedGS.rxTag (GF := GF) hh) -∗
+      consSwallow fscCons False sl dd dc -∗
       consStoredLb fscCons sl' -∗
       ((dlCnt v (1 : Qp).half (I.length + dc) ∗
         ∃ J : List (BitVec 8),
           ⌜J.length = dc⌝ ∗ ⌜lmDiscInput ulmG (I ++ J)⌝ ∗
           ⌜0 < dd → g0 0 = J[0]!⌝ ∗
-          inpLb v (I ++ J) ∗ urresw (hlc := hlc) ug v (I ++ J))
-       ∨ fileTaint (hlc := hlc) ug.ugnFile.fgnCl) := by
+          inpLb v (I ++ J) ∗ urresw ug v (I ++ J))
+       ∨ fileTaint ug.ugnFile.fgnCl) := by
   unfold urresw ureadRet
   iintro #Hpin #HE0 ⟨#Hres0, #Hw0, #Hwt0⟩ Hret #Htags #Hsw #Hlb2
   icases Hret with (⟨#HT, -⟩ | ⟨Hdlr, %pops, %dl, %hrok, %hdl, %hpref, %hidx, %hdsce, %hboots,
@@ -192,8 +192,8 @@ theorem uri_arms (ug : UnionGn)
     simp only [List.append_nil]
     iframe HE0 Hres0 Hw0 Hwt0
   ihave #Hwtn : iprop(⌜uwildAt (I ++ J)⌝ →
-      (useccTokAt (hlc := hlc) ug (genId (hlc := hlc) (GF := GF) + 1) (I ++ J)
-        ∗ uringAt (hlc := hlc) (I ++ J)) ∨ fileTaint (hlc := hlc) ug.ugnFile.fgnCl) $$ [Htok]
+      (useccTokAt ug (genId (GF := GF) + 1) (I ++ J)
+        ∗ uringAt (I ++ J)) ∨ fileTaint ug.ugnFile.fgnCl) $$ [Htok]
   · by_cases hwa : uwildAt (I ++ J)
     · obtain ⟨hne, hr, hw⟩ := hwa
       have hq : ureadWild ((dl ++ ws).map Prod.snd) ws := by
@@ -228,7 +228,7 @@ theorem uri_arms (ug : UnionGn)
     · iintro %hwa'
       exact absurd hwa' hwa
   -- THE GENERIC RESIDUE at the far end
-  ihave #Hresn : gwcRres (unionParams (hlc := hlc) ug) v (I ++ J) $$ []
+  ihave #Hresn : gwcRres (unionParams ug) v (I ++ J) $$ []
   · icases Hrest with (%hw0 | ⟨%cs0, %ps0, %s0, #Hcs, #Hps, #Hw, %hbd, #Htlb, %hrds⟩)
     · exact absurd hw0 hws0
     unfold gwcRres
@@ -254,7 +254,7 @@ theorem uri_arms (ug : UnionGn)
     | some y => exact ⟨y, rfl⟩
   ihave #Hty := uri_last_tag fscCons I ws sl sl' hs dd dc g0 y hddc hlws hwinf hpre2 hwsj hlast
     $$ Htags Hsw Hlb2
-  ihave #Hty' : utag (hlc := hlc) ug y.1 $$ []
+  ihave #Hty' : utag ug y.1 $$ []
   · rw [← htag]; iexact Hty
   unfold utag
   icases Hty' with ⟨%hsh, -, #Hfl, %vf, #Hvp, %hu⟩
@@ -263,9 +263,9 @@ theorem uri_arms (ug : UnionGn)
     exact hidx j x (MonoList.prefix_getElem? (hpref.map _) hx)
   have hlast' : (dl ++ ws).getLast? = some (y.1, y.2) := by
     simp [List.getLast?_append, hlast]
-  have hins := consumed_ins_last (genId (hlc := hlc) (GF := GF) + 1) (dl ++ ws) y.1 y.2 hidx'
+  have hins := consumed_ins_last (genId (GF := GF) + 1) (dl ++ ws) y.1 y.2 hidx'
     hrok.2.1 hboots hlast' hsh
-  have hby : obsBoots y.1 = genId (hlc := hlc) (GF := GF) + 1 :=
+  have hby : obsBoots y.1 = genId (GF := GF) + 1 :=
     hboots (y.1, y.2) (List.mem_of_getLast? hlast')
   have hu' : ulinesOf y.1 = vf.feBase ++ ulinesIn (I ++ J) := by
     rw [hu, ulastCyc_io y.1 hsh]; unfold ulinesCyc; rw [hins, ← hJ]

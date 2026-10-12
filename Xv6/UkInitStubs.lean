@@ -49,7 +49,7 @@ theorem kinit_usysno (m : RegMap) (v : BitVec 64) :
   rw [ukWr_ne0 _ _ _ (by decide), RegMap.set_same]
 
 section Stubs
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -57,43 +57,43 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [U
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 theorem init_stub_exit (UL : UK_LEAVES) (N : UkNames GF) :
-    ⊢ exitStubLaw (hlc := hlc) N (initCode N.t) User.Init.Sym.«exit» :=
+    ⊢ exitStubLaw N (initCode N.t) User.Init.Sym.«exit» :=
   exit_stub_of_text UL N User.Init.textOk _ 2#12 (by decide) udec% udec%
     (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 theorem init_stub_wait (UL : UK_LEAVES) (N : UkNames GF) :
-    ⊢ stubLaw (hlc := hlc) N (initCode N.t) 3 User.Init.Sym.«wait» :=
+    ⊢ stubLaw N (initCode N.t) 3 User.Init.Sym.«wait» :=
   stub_of_text UL N User.Init.textOk 3 _ 3#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 theorem init_stub_write (UL : UK_LEAVES) (N : UkNames GF) :
-    ⊢ stubLaw (hlc := hlc) N (initCode N.t) 16 User.Init.Sym.«write» :=
+    ⊢ stubLaw N (initCode N.t) 16 User.Init.Sym.«write» :=
   stub_of_text UL N User.Init.textOk 16 _ 16#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 theorem init_stub_exec (UL : UK_LEAVES) (N : UkNames GF) :
-    ⊢ stubLaw (hlc := hlc) N (initCode N.t) 7 User.Init.Sym.«exec» :=
+    ⊢ stubLaw N (initCode N.t) 7 User.Init.Sym.«exec» :=
   stub_of_text UL N User.Init.textOk 7 _ 7#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 theorem init_stub_open (UL : UK_LEAVES) (N : UkNames GF) :
-    ⊢ stubLaw (hlc := hlc) N (initCode N.t) 15 User.Init.Sym.«open» :=
+    ⊢ stubLaw N (initCode N.t) 15 User.Init.Sym.«open» :=
   stub_of_text UL N User.Init.textOk 15 _ 15#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 theorem init_stub_mknod (UL : UK_LEAVES) (N : UkNames GF) :
-    ⊢ stubLaw (hlc := hlc) N (initCode N.t) 17 User.Init.Sym.«mknod» :=
+    ⊢ stubLaw N (initCode N.t) 17 User.Init.Sym.«mknod» :=
   stub_of_text UL N User.Init.textOk 17 _ 17#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 theorem init_stub_dup (UL : UK_LEAVES) (N : UkNames GF) :
-    ⊢ stubLaw (hlc := hlc) N (initCode N.t) 10 User.Init.Sym.«dup» :=
+    ⊢ stubLaw N (initCode N.t) 10 User.Init.Sym.«dup» :=
   stub_of_text UL N User.Init.textOk 10 _ 10#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 
@@ -102,15 +102,15 @@ theorem init_stub_dup (UL : UK_LEAVES) (N : UkNames GF) :
 /-- **Rocq `wp_kinit_open`**: the taint arm's generic open, off 15's
 deposit law; the descriptor is dropped. -/
 theorem wp_kinit_open (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) (h : CPU) (m : RegMap) (avail : Nat) :
-    ⊢ udepwLaw (hlc := hlc) 15 -∗ initCode N.t -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Init.Sym.«open») avail -∗ ustdAny N.fd -∗
+    ⊢ udepwLaw 15 -∗ initCode N.t -∗
+      urun N h m (BitVec.ofNat 64 User.Init.Sym.«open») avail -∗ ustdAny N.fd -∗
       (∀ (h' : CPU) (ret : BitVec 64), ustdAny N.fd -∗
-        urun (hlc := hlc) N h' (stubRet m 15 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
+        urun N h' (stubRet m 15 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hw #Hc Hrun Hstd Hcont
   unfold ustdAny
   icases Hstd with ⟨%l, Hstd⟩
-  ihave Hs := init_stub_open (hlc := hlc) UL N
+  ihave Hs := init_stub_open UL N
   unfold stubLaw
   iapply Hs $$ %h %m %avail Hc Hrun
   iintro %h1 %hpc %hal #Hi Hrun Hmid
@@ -132,13 +132,13 @@ theorem wp_kinit_open (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) (h : CPU
 
 /-- **Rocq `wp_kinit_mknod`**: the QUIET row, off 17's deposit law. -/
 theorem wp_kinit_mknod (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) (h : CPU) (m : RegMap) (avail : Nat) :
-    ⊢ udepwLaw (hlc := hlc) 17 -∗ initCode N.t -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Init.Sym.«mknod») avail -∗
+    ⊢ udepwLaw 17 -∗ initCode N.t -∗
+      urun N h m (BitVec.ofNat 64 User.Init.Sym.«mknod») avail -∗
       (∀ (h' : CPU) (ret : BitVec 64),
-        urun (hlc := hlc) N h' (stubRet m 17 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
+        urun N h' (stubRet m 17 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hw #Hc Hrun Hcont
-  ihave Hs := init_stub_mknod (hlc := hlc) UL N
+  ihave Hs := init_stub_mknod UL N
   unfold stubLaw
   iapply Hs $$ %h %m %avail Hc Hrun
   iintro %h1 %hpc %hal #Hi Hrun Hmid
@@ -155,13 +155,13 @@ theorem wp_kinit_mknod (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) (h : CP
 
 /-- **Rocq `wp_kinit_write`**: the QUIET row, off 16's deposit law. -/
 theorem wp_kinit_write (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) (h : CPU) (m : RegMap) (avail : Nat) :
-    ⊢ udepwLaw (hlc := hlc) 16 -∗ initCode N.t -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Init.Sym.«write») avail -∗
+    ⊢ udepwLaw 16 -∗ initCode N.t -∗
+      urun N h m (BitVec.ofNat 64 User.Init.Sym.«write») avail -∗
       (∀ (h' : CPU) (ret : BitVec 64),
-        urun (hlc := hlc) N h' (stubRet m 16 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
+        urun N h' (stubRet m 16 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hw #Hc Hrun Hcont
-  ihave Hs := init_stub_write (hlc := hlc) UL N
+  ihave Hs := init_stub_write UL N
   unfold stubLaw
   iapply Hs $$ %h %m %avail Hc Hrun
   iintro %h1 %hpc %hal #Hi Hrun Hmid
@@ -178,7 +178,7 @@ theorem wp_kinit_write (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) (h : CP
 
 /-- **Rocq `kinit_w1_of_law`**: the flagged deposit pays any byte. -/
 theorem kinitW1_of_law (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) (fdv : BitVec 64) (b : BitVec 8) :
-    ⊢ udepwLaw (hlc := hlc) 16 -∗ kinitW1 (hlc := hlc) N fdv b iprop(emp) iprop(emp) := by
+    ⊢ udepwLaw 16 -∗ kinitW1 N fdv b iprop(emp) iprop(emp) := by
   iintro #Hw
   unfold kinitW1
   iintro %h %m %avail _ _ #Hc Hb _ Hrun Hcont
@@ -190,14 +190,14 @@ theorem kinitW1_of_law (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) (fdv : 
 /-- **Rocq `wp_kinit_dup`**: the UNTRACKED dup, at a ledger nobody names. -/
 theorem wp_kinit_dup (UL : UK_LEAVES) (HS : UK_SYS_P) (hpsok : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
     (N : UkNames GF) (h : CPU) (m : RegMap) (avail : Nat) :
-    ⊢ initCode N.t -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Init.Sym.«dup») avail -∗ ustdAny N.fd -∗
+    ⊢ initCode N.t -∗ urun N h m (BitVec.ofNat 64 User.Init.Sym.«dup») avail -∗ ustdAny N.fd -∗
       (∀ (h' : CPU) (ret : BitVec 64), ustdAny N.fd -∗
-        urun (hlc := hlc) N h' (stubRet m 10 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
+        urun N h' (stubRet m 10 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hrun Hstd Hcont
   unfold ustdAny
   icases Hstd with ⟨%l, Hstd⟩
-  ihave Hs := init_stub_dup (hlc := hlc) UL N
+  ihave Hs := init_stub_dup UL N
   unfold stubLaw
   iapply Hs $$ %h %m %avail Hc Hrun
   iintro %h1 %hpc %hal #Hi Hrun Hmid
@@ -205,7 +205,7 @@ theorem wp_kinit_dup (UL : UK_LEAVES) (HS : UK_SYS_P) (hpsok : ∀ k : Int, free
   iapply HS.dupUntracked N h1 (ukWr m 17#5 (BitVec.ofInt 64 10)) _ l avail (by rw [kinit_usysno]; decide)
     (by decide) $$ Hi Hrun [] Hstd
   · rw [show USYS_dup = (10 : Int) from rfl]
-    iapply udepw_of_psok (hlc := hlc) N _ _ 10 (hpsok 10 (by decide)) (by decide)
+    iapply udepw_of_psok N _ _ 10 (hpsok 10 (by decide)) (by decide)
   rw [hpc]
   iintro %h2 %r %l' Hl Hrun
   iapply Hmid $$ %h2 %r Hrun
@@ -222,15 +222,15 @@ theorem wp_kinit_dup_cons_at (UL : UK_LEAVES) (HS : UK_SYS_P)
     (N : UkNames GF) (h : CPU) (m : RegMap) (avail : Nat) (l v : List FdState) (fd0 : Nat) (st : FdState)
     (harg : (BitVec.setWidth 32 (m.get 10#5)).toInt = (fd0 : Int)) (hne : st ≠ .closed) (hlt : fd0 < NSTD)
     (hrow : l[fd0]? = some st) :
-    ⊢ initCode N.t -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Init.Sym.«dup») avail -∗ ustdAt N.fd l v -∗
+    ⊢ initCode N.t -∗ urun N h m (BitVec.ofNat 64 User.Init.Sym.«dup») avail -∗ ustdAt N.fd l v -∗
       (∀ (h' : CPU) (ret : BitVec 64),
         ((∃ fd1 : Nat, ⌜ret = BitVec.ofNat 64 fd1 ∧ fd1 < NOFILE⌝ ∗
             ∃ fdv : List FdState, ⌜tabLe fdv v ∧ fdv[fd0]? = some st⌝ ∗ uallocV N.fd l fd1 st (fdv.set fd1 st)) ∨
           (⌜ret = -1#64 ∧ fdLowestClosed l = none⌝ ∗ ustdAt N.fd l v)) -∗
-        urun (hlc := hlc) N h' (stubRet m 10 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
+        urun N h' (stubRet m 10 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hrun Hstd Hcont
-  ihave Hs := init_stub_dup (hlc := hlc) UL N
+  ihave Hs := init_stub_dup UL N
   unfold stubLaw
   iapply Hs $$ %h %m %avail Hc Hrun
   iintro %h1 %hpc %hal #Hi Hrun Hmid
@@ -238,7 +238,7 @@ theorem wp_kinit_dup_cons_at (UL : UK_LEAVES) (HS : UK_SYS_P)
   iapply HS.dupAt N h1 (ukWr m 17#5 (BitVec.ofInt 64 10)) _ l v fd0 st avail (by rw [kinit_usysno]; decide)
     (by rw [ukWr_get_other _ _ _ _ (by decide)]; exact harg) hne (by decide) $$ Hi Hrun [] Hstd []
   · rw [show USYS_dup = (10 : Int) from rfl]
-    iapply udepw_of_psok (hlc := hlc) N _ _ 10 (hpsok 10 (by decide)) (by decide)
+    iapply udepw_of_psok N _ _ 10 (hpsok 10 (by decide)) (by decide)
   · iapply Xv6.ufdOwn_std N.fd l fd0 st hlt hrow
   rw [hpc]
   iintro %h2 %r Hal Hrun
@@ -261,12 +261,12 @@ theorem wp_kinit_dup_closed_at (UL : UK_LEAVES) (HS : UK_SYS_P)
     (N : UkNames GF) (h : CPU) (m : RegMap) (avail : Nat) (l v : List FdState) (fd0 : Nat)
     (harg : (BitVec.setWidth 32 (m.get 10#5)).toInt = (fd0 : Int)) (hlt : fd0 < NSTD)
     (hrow : l[fd0]? = some .closed) :
-    ⊢ initCode N.t -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Init.Sym.«dup») avail -∗ ustdAt N.fd l v -∗
+    ⊢ initCode N.t -∗ urun N h m (BitVec.ofNat 64 User.Init.Sym.«dup») avail -∗ ustdAt N.fd l v -∗
       (∀ (h' : CPU) (ret : BitVec 64), ⌜ret = -1#64⌝ -∗ ustdAt N.fd l v -∗
-        urun (hlc := hlc) N h' (stubRet m 10 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
+        urun N h' (stubRet m 10 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hrun Hstd Hcont
-  ihave Hs := init_stub_dup (hlc := hlc) UL N
+  ihave Hs := init_stub_dup UL N
   unfold stubLaw
   iapply Hs $$ %h %m %avail Hc Hrun
   iintro %h1 %hpc %hal #Hi Hrun Hmid
@@ -274,7 +274,7 @@ theorem wp_kinit_dup_closed_at (UL : UK_LEAVES) (HS : UK_SYS_P)
   iapply HS.dupClosedAt N h1 (ukWr m 17#5 (BitVec.ofInt 64 10)) _ l v fd0 avail (by rw [kinit_usysno]; decide)
     (by rw [ukWr_get_other _ _ _ _ (by decide)]; exact harg) hlt hrow (by decide) $$ Hi Hrun [] Hstd
   · rw [show USYS_dup = (10 : Int) from rfl]
-    iapply udepw_of_psok (hlc := hlc) N _ _ 10 (hpsok 10 (by decide)) (by decide)
+    iapply udepw_of_psok N _ _ 10 (hpsok 10 (by decide)) (by decide)
   rw [hpc]
   iintro %h2 %r %hr Hl Hrun
   iapply Hmid $$ %h2 %r Hrun
@@ -286,10 +286,10 @@ theorem wp_kinit_dup_closed_at (UL : UK_LEAVES) (HS : UK_SYS_P)
 status. -/
 theorem wp_kinit_exit (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) [hc : UknConst N] (h : CPU)
     (m : RegMap) (avail : Nat) :
-    ⊢ initCode N.t -∗ N.pay (-1) -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Init.Sym.«exit») avail -∗
+    ⊢ initCode N.t -∗ N.pay (-1) -∗ urun N h m (BitVec.ofNat 64 User.Init.Sym.«exit») avail -∗
       wpLoop h := by
   iintro #Hc Hpay Hrun
-  ihave Hs := init_stub_exit (hlc := hlc) UL N
+  ihave Hs := init_stub_exit UL N
   unfold exitStubLaw
   iapply Hs $$ %h %m %avail Hc Hrun
   iintro %h1 #Hi Hrun
@@ -302,13 +302,13 @@ theorem wp_kinit_exit (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) [hc : Uk
 returns), at a supplier-named refund `R`. -/
 theorem wp_kinit_exec (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (avail : Nat) (c : Nat)
     (R : IProp GF) :
-    ⊢ initCode N.t -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Init.Sym.«exec») avail -∗ ucwd N.cwd c -∗
-      udepwAtRefRIds (hlc := hlc) N (ukWr m 17#5 (BitVec.ofInt 64 7)) (BitVec.ofNat 64 0x3ac) c R -∗
+    ⊢ initCode N.t -∗ urun N h m (BitVec.ofNat 64 User.Init.Sym.«exec») avail -∗ ucwd N.cwd c -∗
+      udepwAtRefRIds N (ukWr m 17#5 (BitVec.ofInt 64 7)) (BitVec.ofNat 64 0x3ac) c R -∗
       (∀ h' : CPU, ucwd N.cwd c -∗ R -∗
-        urun (hlc := hlc) N h' (stubRet m 7 (-1#64)) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
+        urun N h' (stubRet m 7 (-1#64)) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hrun Hcwd Hdep Hcont
-  ihave Hs := init_stub_exec (hlc := hlc) UL N
+  ihave Hs := init_stub_exec UL N
   unfold stubLaw
   iapply Hs $$ %h %m %avail Hc Hrun
   iintro %h1 %hpc %hal #Hi Hrun Hmid
@@ -331,13 +331,13 @@ theorem wp_kinit_wait (UL : UK_LEAVES) (HS : UK_SYS_P)
     (hpsok : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
     (N : UkNames GF) (h : CPU) (m : RegMap) (avail : Nat) (cs : ExtTreeSet GName compare)
     (ha0 : (m.get 10#5).toNat = 0) :
-    ⊢ initCode N.t -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Init.Sym.«wait») avail -∗ uch N.ch cs -∗
+    ⊢ initCode N.t -∗ urun N h m (BitVec.ofNat 64 User.Init.Sym.«wait») avail -∗ uch N.ch cs -∗
       (∀ (h' : CPU) (ret : BitVec 64) (cs' : ExtTreeSet GName compare), ⌜ret = -1#64 → cs' = ∅⌝ -∗
-        uwaitAns ret cs cs' -∗ urun (hlc := hlc) N h' (stubRet m 3 ret) (retPc (m.get 1#5)) avail -∗
+        uwaitAns ret cs cs' -∗ urun N h' (stubRet m 3 ret) (retPc (m.get 1#5)) avail -∗
         uch N.ch cs' -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hrun Hch Hcont
-  ihave Hs := init_stub_wait (hlc := hlc) UL N
+  ihave Hs := init_stub_wait UL N
   unfold stubLaw
   iapply Hs $$ %h %m %avail Hc Hrun
   iintro %h1 %hpc %hal #Hi Hrun Hmid
@@ -345,7 +345,7 @@ theorem wp_kinit_wait (UL : UK_LEAVES) (HS : UK_SYS_P)
   iapply HS.waitNullLive N h1 (ukWr m 17#5 (BitVec.ofInt 64 3)) _ avail cs (by rw [kinit_usysno]; decide)
     (by rw [ukWr_get_other _ _ _ _ (by decide)]; exact ha0) (by decide) $$ Hi Hrun [] Hch
   · rw [show USYS_wait = (3 : Int) from rfl]
-    iapply udepw_of_psok (hlc := hlc) N _ _ 3 (hpsok 3 (by decide)) (by decide)
+    iapply udepw_of_psok N _ _ 3 (hpsok 3 (by decide)) (by decide)
   rw [hpc]
   iintro %h2 %r %cs' %hr Hans Hrun Hch
   iapply Hmid $$ %h2 %r Hrun
@@ -359,7 +359,7 @@ theorem wp_kinit_wait (UL : UK_LEAVES) (HS : UK_SYS_P)
 off 17's deposit. -/
 theorem ukiMknodHit_of_taint (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) (T Cns : IProp GF)
     [Persistent T] (stc : FdState) :
-    ⊢ □ (T -∗ udepwLaw (hlc := hlc) 17) -∗ T -∗ ukiMknodHitLeaf (hlc := hlc) N T Cns stc := by
+    ⊢ □ (T -∗ udepwLaw 17) -∗ T -∗ ukiMknodHitLeaf N T Cns stc := by
   iintro #Hwl #HT
   unfold ukiMknodHitLeaf
   iintro %h %m %avail #Hc %hargs Hrun Hcwd Hcont
@@ -375,8 +375,8 @@ theorem ukiMknodHit_of_taint (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) (
 dance, collapsed to one post. -/
 theorem ukiOpen1_of_dance (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) (T Cns : IProp GF) [Persistent T]
     (stc : FdState) :
-    ⊢ □ (T -∗ udepwLaw (hlc := hlc) 17) -∗ initConsDance (hlc := hlc) N T Cns stc -∗
-      ukiOpen1 (hlc := hlc) N T Cns stc := by
+    ⊢ □ (T -∗ udepwLaw 17) -∗ initConsDance N T Cns stc -∗
+      ukiOpen1 N T Cns stc := by
   iintro #Hwl17 Hd
   unfold ukiOpen1
   iintro %h %m %avail #Hc %hargs Hrun Hcwd Hstd Hcont
@@ -419,7 +419,7 @@ theorem ukiOpen1_of_dance (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) (T C
 /-- **Rocq `uki_open2_taint_arm`**: under the taint, the generic open. -/
 theorem ukiOpen2_taint_arm (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) (T : IProp GF) [Persistent T]
     (stc : FdState) :
-    ⊢ □ (T -∗ udepwLaw (hlc := hlc) 15) -∗ T -∗ ukiOpen2 (hlc := hlc) N T stc := by
+    ⊢ □ (T -∗ udepwLaw 15) -∗ T -∗ ukiOpen2 N T stc := by
   iintro #Hwl #HT
   unfold ukiOpen2 ukiOpen2In
   iintro %h %m %avail #Hc %hargs Hrun Hcwd Hin Hcont
@@ -440,8 +440,8 @@ theorem ukiOpen2_taint_arm (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) (T 
 resolving pin. -/
 theorem ukiOpen2_of_console (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) (T : IProp GF) [Persistent T]
     (stc : FdState) :
-    ⊢ □ (T -∗ udepwLaw (hlc := hlc) 15) -∗ ukiOpenConsoleLeaf (hlc := hlc) N T stc -∗
-      ukiOpen2 (hlc := hlc) N T stc := by
+    ⊢ □ (T -∗ udepwLaw 15) -∗ ukiOpenConsoleLeaf N T stc -∗
+      ukiOpen2 N T stc := by
   iintro #Hwl Hlf
   unfold ukiOpen2
   iintro %h %m %avail #Hc %hargs Hrun Hcwd Hin Hcont
@@ -467,8 +467,8 @@ theorem ukiOpen2_of_console (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) (T
 /-- **Rocq `uki_open2_of_absent`**: the mknod failed, the MISS pin again. -/
 theorem ukiOpen2_of_absent (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) (T K : IProp GF) [Persistent T]
     (stc : FdState) :
-    ⊢ □ (T -∗ udepwLaw (hlc := hlc) 15) -∗ ukiOpenAbsentLeaf (hlc := hlc) N T K -∗ K -∗
-      ukiOpen2 (hlc := hlc) N T stc := by
+    ⊢ □ (T -∗ udepwLaw 15) -∗ ukiOpenAbsentLeaf N T K -∗ K -∗
+      ukiOpen2 N T stc := by
   iintro #Hwl Hlf HK
   unfold ukiOpen2
   iintro %h %m %avail #Hc %hargs Hrun Hcwd Hin Hcont
@@ -499,10 +499,10 @@ theorem wp_kinit_dup_headL (UL : UK_LEAVES) (HS : UK_SYS_P)
     (N : UkNames GF) (T : IProp GF) (stc : FdState) (l : List FdState) (k : Nat) (h : CPU) (m : RegMap)
     (avail : Nat) (hne : stc ≠ .closed) (hrow : l[0]? = some stc) (hk : fdLowestClosed l = some k)
     (harg : (BitVec.setWidth 32 (m.get 10#5)).toInt = ((0 : Nat) : Int)) :
-    ⊢ initCode N.t -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Init.Sym.«dup») avail -∗
+    ⊢ initCode N.t -∗ urun N h m (BitVec.ofNat 64 User.Init.Sym.«dup») avail -∗
       ufdHeadL T N.fd l -∗
       (∀ (h' : CPU) (ret : BitVec 64), ufdHeadL T N.fd (l.set k stc) -∗
-        urun (hlc := hlc) N h' (stubRet m 10 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
+        urun N h' (stubRet m 10 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hrun Hhd Hcont
   unfold ufdHeadL

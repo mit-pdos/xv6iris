@@ -40,7 +40,7 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
@@ -50,8 +50,8 @@ def kinitRestartHead (N : UkNames GF) (T : IProp GF) (stc : FdState) (Cr : ConsC
     (szv n : Nat) : IProp GF :=
   iprop(∀ (h : CPU) (m : RegMap), ⌜m.get 18#5 = BitVec.ofNat 64 kinitLitStart⌝ -∗ usz N.s szv -∗
     ufdHead T stc N.fd -∗ ucwd N.cwd ROOTINO -∗ uchAny N.ch -∗
-    uinitTok (hlc := hlc) cn T (initRd Cr.ccRd (ccWbn Cr)) -∗
-    urun (hlc := hlc) N h m (BitVec.ofNat 64 0x32) (12 + (12 + (4 + n))) -∗ wpLoop h)
+    uinitTok cn T (initRd Cr.ccRd (ccWbn Cr)) -∗
+    urun N h m (BitVec.ofNat 64 0x32) (12 + (12 + (4 + n))) -∗ wpLoop h)
 
 /-- The wait head's (the second conjunct): the shell init waits for. -/
 def kinitWaitHead (N : UkNames GF) (T : IProp GF) (stc : FdState) (Cr : ConsCred GF) (cn : ConsNames)
@@ -59,21 +59,21 @@ def kinitWaitHead (N : UkNames GF) (T : IProp GF) (stc : FdState) (Cr : ConsCred
   iprop(∀ (h : CPU) (m : RegMap) (cs : ExtTreeSet GName compare) (γ γsh : GName) (pidsh : BitVec 32),
     ⌜m.get 18#5 = BitVec.ofNat 64 kinitLitStart⌝ -∗ ⌜m.get 9#5 = BitVec.signExtend 64 pidsh⌝ -∗ ⌜γsh ∈ cs⌝ -∗
     ⌜BitVec.signExtend 64 pidsh ≠ -1#64⌝ -∗ usz N.s szv -∗ ufdHead T stc N.fd -∗ ucwd N.cwd ROOTINO -∗
-    uch N.ch cs -∗ childTok γsh pidsh (uconsPay (hlc := hlc) cn γ T (initRd Cr.ccRd (ccWbn Cr))) -∗
-    urun (hlc := hlc) N h m (BitVec.ofNat 64 0x44) (12 + (12 + (4 + n))) -∗ wpLoop h)
+    uch N.ch cs -∗ childTok γsh pidsh (uconsPay cn γ T (initRd Cr.ccRd (ccWbn Cr))) -∗
+    urun N h m (BitVec.ofNat 64 0x44) (12 + (12 + (4 + n))) -∗ wpLoop h)
 
 /-- **Rocq `wp_kinit_main_loop`**. -/
 theorem wp_kinit_main_loop (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
     (hpsok : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
     (N : UkNames GF) [UknConst N] (hpayfree : ⊢ N.pay (-1))
     (T : IProp GF) [Persistent T] (stc : FdState) (Cr : ConsCred GF) (cn : ConsNames) (szv n : Nat)
-    (hkt : ⊢ initKillLaw (hlc := hlc) T stc Cr.ccWp (ccWbn Cr)) :
-    ⊢ initDeps (hlc := hlc) T -∗ kinitBanLaw (hlc := hlc) N stc Cr.ccWp (ccWbn Cr) -∗
-      kinitDiagLaw (hlc := hlc) stc Cr.ccWp (ccWbn Cr) -∗ initCode N.t -∗
-      initExecSupLend (hlc := hlc) cn T stc Cr -∗ initArgv N.d -∗
-      iprop(kinitRestartHead (hlc := hlc) N T stc Cr cn szv n ∧ kinitWaitHead (hlc := hlc) N T stc Cr cn szv n) := by
+    (hkt : ⊢ initKillLaw T stc Cr.ccWp (ccWbn Cr)) :
+    ⊢ initDeps T -∗ kinitBanLaw N stc Cr.ccWp (ccWbn Cr) -∗
+      kinitDiagLaw stc Cr.ccWp (ccWbn Cr) -∗ initCode N.t -∗
+      initExecSupLend cn T stc Cr -∗ initArgv N.d -∗
+      iprop(kinitRestartHead N T stc Cr cn szv n ∧ kinitWaitHead N T stc Cr cn szv n) := by
   iintro #Hdeps #Hblaw #Hdlaw #Hc #Hxs #Hargv
-  ihave #Hwl : kinitWlaw (hlc := hlc) T $$ [Hdeps]
+  ihave #Hwl : kinitWlaw T $$ [Hdeps]
   · unfold initDeps
     icases Hdeps with ⟨H, -, -⟩
     iexact H
@@ -129,7 +129,7 @@ theorem wp_kinit_main_loop (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
     icases Hch with ⟨%Sc, Hch⟩
     -- THE MINT, once per round
     iapply wpLoop_bupd
-    imod uinitLend_c (hlc := hlc) cn T Cr.ccRd (initLendCred T stc Cr.ccWp (ccWbn Cr) l) (-1) $$ Htk
+    imod uinitLend_c cn T Cr.ccRd (initLendCred T stc Cr.ccWp (ccWbn Cr) l) (-1) $$ Htk
       with ⟨%γ, %np, HQ, Hpos, Hcred⟩
     imodintro
     ihave Hcred : initLendCred T stc Cr.ccWp (ccWbn Cr) l np $$ [Hcred]
@@ -299,7 +299,7 @@ theorem wp_kinit_main_loop (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
       iintro %h4 Hrun
       rw [hbt, if_pos rfl, show BitVec.ofNat 64 0x4a + BitVec.signExtend 64 0x1fe8#13 = BitVec.ofNat 64 0x32
         from by decide]
-      ihave Htk := uinitRedeem (hlc := hlc) cn γ T (initRd Cr.ccRd (ccWbn Cr)) xs $$ HQ
+      ihave Htk := uinitRedeem cn γ T (initRd Cr.ccRd (ccWbn Cr)) xs $$ HQ
       icases IH with ⟨IH1, -⟩
       unfold kinitRestartHead
       iapply IH1 $$ %h4 %mw3 [] Hsz Hstd Hcwd [Hch] Htk Hrun

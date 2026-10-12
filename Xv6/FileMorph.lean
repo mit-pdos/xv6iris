@@ -43,7 +43,7 @@ open LeanRV64D
 set_option linter.unusedSectionVars false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF]
   [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF]
   [Icfg]
 
@@ -65,10 +65,10 @@ instance inodePay_morph (t : KTier) (γx : GName) (Q : Qp) (g : GName) (inum : B
     (fdty : BitVec 32) (wr : Bool) (q : Qp) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; inodePay (GF := GF) γx Q g inum v fdty wr q) := by
   unfold inodePay
-  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
-  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
-  refine @instCtxMorphSep hlc GF _ _ _ (inodeRefSide_morph t v _ g inum) ?_
-  exact @instCtxMorphSep hlc GF _ _ _ (inodeShrHeldGen_morph t v _ g inum) (instCtxMorphConst _)
+  refine @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) ?_
+  refine @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) ?_
+  refine @instCtxMorphSep GF _ _ _ (inodeRefSide_morph t v _ g inum) ?_
+  exact @instCtxMorphSep GF _ _ _ (inodeShrHeldGen_morph t v _ g inum) (instCtxMorphConst _)
 
 instance fileCoreOff_morph (t : KTier) (k : Nat) (q : Qp) (pn : FPNames) (C : FContent) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; fileCoreOff (GF := GF) k q pn C) :=
@@ -94,7 +94,7 @@ instance fileCoreNoff_morph (t : KTier) (q : Qp) (pn : FPNames) (C : FContent) :
   unfold fileCoreNoff
   by_cases h1 : C.type = FD_PIPE
   · simp only [if_pos h1]
-    exact @instCtxMorphSep hlc GF _ _ _ (hpipe t pn.lock pn.pipe C.pipe) (instCtxMorphConst _)
+    exact @instCtxMorphSep GF _ _ _ (hpipe t pn.lock pn.pipe C.pipe) (instCtxMorphConst _)
   · simp only [if_neg h1]
     by_cases h2 : C.type = FD_INODE ∨ C.type = FD_DEVICE
     · simp only [if_pos h2]
@@ -106,30 +106,30 @@ instance fileCoreNoff_morph (t : KTier) (q : Qp) (pn : FPNames) (C : FContent) :
 instance fileCore_morph (t : KTier) (k : Nat) (q : Qp) (pn : FPNames) (C : FContent) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; fileCore (GF := GF) k q pn C) := by
   unfold fileCore
-  exact @instCtxMorphSep hlc GF _ _ _ (fileCoreNoff_morph t q pn C) (fileCoreOff_morph t k q pn C)
+  exact @instCtxMorphSep GF _ _ _ (fileCoreNoff_morph t q pn C) (fileCoreOff_morph t k q pn C)
 
 /-- Rocq `file_pay_morph`. -/
 instance filePay_morph (t : KTier) (γ : FileNames) (k : Nat) (q : Qp) (C : FContent) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; filePay (GF := GF) γ k q C) := by
   unfold filePay
-  refine @instCtxMorphExists hlc GF _ _ _ (fun pn => ?_)
-  exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (fileCore_morph t k q pn C)
+  refine @instCtxMorphExists GF _ _ _ (fun pn => ?_)
+  exact @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) (fileCore_morph t k q pn C)
 
 /-- Rocq `file_pay_st_morph`. -/
 instance filePaySt_morph (t : KTier) (γ : FileNames) (k : Nat) (q : Qp) (C : FContent) (st : FdState) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; filePaySt (GF := GF) γ k q C st) := by
   unfold filePaySt
-  refine @instCtxMorphExists hlc GF _ _ _ (fun pn => ?_)
-  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
-  exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (fileCore_morph t k q pn C)
+  refine @instCtxMorphExists GF _ _ _ (fun pn => ?_)
+  refine @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) ?_
+  exact @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) (fileCore_morph t k q pn C)
 
 /-- Rocq `file_ref_morph`. -/
 instance fileRef_morph (t : KTier) (γ : FileNames) (k : Nat) (q : Qp) (st : FdState) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; fileRef (GF := GF) γ k q st) := by
   unfold fileRef
-  refine @instCtxMorphExists hlc GF _ _ _ (fun C => ?_)
-  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
-  exact @instCtxMorphSep hlc GF _ _ _
+  refine @instCtxMorphExists GF _ _ _ (fun C => ?_)
+  refine @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) ?_
+  exact @instCtxMorphSep GF _ _ _
     (ctxMorph_ofAmb t (fun c ξ => letI : CurCtx := c; fileFieldsAt (GF := GF) ξ k q C)
       (fun c => letI : CurCtx := c; instCtxMorphFileFieldsAt k q C) (fun _ _ _ => rfl))
     (filePaySt_morph t γ k q C st)
@@ -138,13 +138,13 @@ instance fileRef_morph (t : KTier) (γ : FileNames) (k : Nat) (q : Qp) (st : FdS
 instance ofileSlot_morph (t : KTier) (γ : FileNames) (γd : GName) (pa : BitVec 64) (fd : Nat) (v : BitVec 64) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; ofileSlot (GF := GF) γ γd pa fd v) := by
   unfold ofileSlot
-  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt t _ _ _ _) ?_
-  refine @instCtxMorphOr hlc GF _ _ _ (instCtxMorphConst _) ?_
-  refine @instCtxMorphExists hlc GF _ _ _ (fun k => ?_)
-  refine @instCtxMorphExists hlc GF _ _ _ (fun q => ?_)
-  refine @instCtxMorphExists hlc GF _ _ _ (fun st => ?_)
-  refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
-  exact @instCtxMorphSep hlc GF _ _ _ (fileRef_morph t γ k q st) (instCtxMorphConst _)
+  refine @instCtxMorphSep GF _ _ _ (instCtxMorphWordAt t _ _ _ _) ?_
+  refine @instCtxMorphOr GF _ _ _ (instCtxMorphConst _) ?_
+  refine @instCtxMorphExists GF _ _ _ (fun k => ?_)
+  refine @instCtxMorphExists GF _ _ _ (fun q => ?_)
+  refine @instCtxMorphExists GF _ _ _ (fun st => ?_)
+  refine @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) ?_
+  exact @instCtxMorphSep GF _ _ _ (fileRef_morph t γ k q st) (instCtxMorphConst _)
 
 instance ofileLentOrSlot_morph (t : KTier) (γ : FileNames) (γd : GName) (pa : BitVec 64) (D : List Nat)
     (fd : Nat) (v : BitVec 64) :
@@ -152,7 +152,7 @@ instance ofileLentOrSlot_morph (t : KTier) (γ : FileNames) (γd : GName) (pa : 
   unfold ofileLentOrSlot
   by_cases h : fd ∈ D
   · simp only [if_pos h]
-    exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (instCtxMorphWordAt t _ _ _ _)
+    exact @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) (instCtxMorphWordAt t _ _ _ _)
   · simp only [if_neg h]
     exact ofileSlot_morph t γ γd pa fd v
 
@@ -160,7 +160,7 @@ instance procOfilesOwe_morph (t : KTier) (γ : FileNames) (γd : GName) (pa : Bi
     (fs : List (BitVec 64)) (D : List Nat) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; procOfilesOwe (GF := GF) γ γd pa fs D) := by
   unfold procOfilesOwe
-  exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
+  exact @instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
     (ctxMorph_bigSepL fs (fun fd v ξ => letI : CurCtx := ⟨ξ, t⟩; ofileLentOrSlot (GF := GF) γ γd pa D fd v)
       (fun fd v => ofileLentOrSlot_morph t γ γd pa D fd v))
 

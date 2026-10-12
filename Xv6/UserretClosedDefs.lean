@@ -184,7 +184,7 @@ structure UrcPins (j sz : Nat) (γfd : GName) (cw : Nat) (gn : GName) (lz : Bool
   secc : V.pvSecc = secc
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -199,7 +199,7 @@ def urcRut (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat) (cpu : CPU
     (secc : BitVec 64) (Wr : Uvis) : UPtd → IProp GF :=
   fun p => iprop(∃ (k : KCtx) (ksp : BitVec 64) (V : ProcPriv), ⌜UrcPins j sz γfd cw gn lz secc k ksp V⌝ ∗
     userretLeft cpu k ∗ tfPageAt p.tfp V.tf ∗
-    (∀ sts' : List FdState, fdFrags γfd sts' -∗ usertrapResAt (hlc := hlc) PT Γ j cpu p ksp V sts' cs pid) ∗
+    (∀ sts' : List FdState, fdFrags γfd sts' -∗ usertrapResAt PT Γ j cpu p ksp V sts' cs pid) ∗
     uhistAt Wr)
 
 /-- **Rocq `Rut_at_acc`**: the running token, borrowed. -/
@@ -225,11 +225,11 @@ obligation a slot's bundle carries, at the parked residue. -/
 def urcLoop (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat) : IProp GF :=
   iprop(□ ∀ (h : CPU) (C : UCfg) (pt : UPtd) (γfd : GName) (Wr : Uvis),
     ⌜loopOk C pt⌝ -∗ ⌜Wr.perm = permOf pt.um Wr.sz⌝ -∗ hwConfig h -∗
-    ukb (hlc := hlc) h C pt (fdFrags γfd)
+    ukb h C pt (fdFrags γfd)
       (urcRut PT Γ j h Wr.sz γfd Wr.cwd Wr.gen Wr.ch Wr.pid Wr.lazy Wr.secc Wr) Wr)
 
 instance urcLoop_persistent (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat) :
-    Persistent (urcLoop (hlc := hlc) (GF := GF) PT Γ j) := by
+    Persistent (urcLoop (GF := GF) PT Γ j) := by
   unfold urcLoop; infer_instance
 
 /-- The trapped frame, with its residue taken out (Rocq: "uservec must not
@@ -252,7 +252,7 @@ theorem urc_frame_rut (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp G
 /-- The table the residue is at is the record's own. -/
 theorem urc_res_upt (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat) (cpu : CPU) (P : UPtd)
     (ksp : BitVec 64) (V : ProcPriv) (sts : List FdState) (cs : ExtTreeSet GName compare) (pid : BitVec 32) :
-    usertrapResAt (hlc := hlc) (GF := GF) PT Γ j cpu P ksp V sts cs pid ⊢
+    usertrapResAt (GF := GF) PT Γ j cpu P ksp V sts cs pid ⊢
       usertrapResAt PT Γ j cpu P ksp V sts cs pid ∗ ⌜V.upt = P⌝ := by
   unfold usertrapResAt utResBare
   iintro ⟨%N, %hN, #Htfk, Hcl, #Hcaps, Hown⟩

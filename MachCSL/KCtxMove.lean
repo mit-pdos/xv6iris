@@ -29,9 +29,9 @@ namespace MachCSL
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open LeanRV64D
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
-local notation "era" => MachGS.era (hlc := hlc) (GF := GF)
+local notation "era" => MachGS.era (GF := GF)
 
 /-! ## The `CtxMorph` instances of the bundle's parts -/
 
@@ -47,31 +47,31 @@ instance instCtxMorphKeyAt (t : Nat) : CtxMorph (GF := GF) (fun ξ => keyAt era 
 
 /-- A kernel word at a fixed tier, as a function of the context. -/
 instance instCtxMorphWordAt (tier : KTier) (va : PAddr) (n : Nat) (dq : DFrac) (w : BitVec (8 * n)) :
-    CtxMorph (GF := GF) (fun ξ => @wordPointsTo hlc GF _ ⟨ξ, tier⟩ va n dq w) :=
-  @instCtxMorphExists hlc GF _ _
+    CtxMorph (GF := GF) (fun ξ => @wordPointsTo GF _ ⟨ξ, tier⟩ va n dq w) :=
+  @instCtxMorphExists GF _ _
     (fun (ppn : BitVec 44) ξ => iprop(kmapAt (vpnOf va) (kLeaf ppn .rw 0#1 0#1) ∗
       ⌜tierPin tier ppn va ∧ va.toNat < 2 ^ 38 ∧ inRam (paOf ppn va) n ∧ va.toNat % n = 0⌝ ∗
       ctxBytes ξ (paOf ppn va) n dq w))
-    (fun _ => @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-      (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (instCtxMorphBytes _ _ _ _)))
+    (fun _ => @instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+      (@instCtxMorphSep GF _ _ _ (instCtxMorphConst _) (instCtxMorphBytes _ _ _ _)))
 
 /-- A stack region at a fixed tier. -/
 instance instCtxMorphStackOwn (tier : KTier) (sp : BitVec 64) (n : Nat) :
-    CtxMorph (GF := GF) (fun ξ => @stackOwn hlc GF _ ⟨ξ, tier⟩ sp n) :=
+    CtxMorph (GF := GF) (fun ξ => @stackOwn GF _ ⟨ξ, tier⟩ sp n) :=
   ctxMorph_bigSepL (List.range n)
     (fun _ i ξ => iprop(∃ w : BitVec 64,
-      @wordPointsTo hlc GF _ ⟨ξ, tier⟩ (sp - 8#64 * BitVec.ofNat 64 (i + 1)) 8 (DFrac.own 1) w))
-    (fun _ i => @instCtxMorphExists hlc GF _ _ _ (fun _ => instCtxMorphWordAt _ _ _ _ _))
+      @wordPointsTo GF _ ⟨ξ, tier⟩ (sp - 8#64 * BitVec.ofNat 64 (i + 1)) 8 (DFrac.own 1) w))
+    (fun _ i => @instCtxMorphExists GF _ _ _ (fun _ => instCtxMorphWordAt _ _ _ _ _))
 
 /-- The `c->intena` cell at a fixed tier. -/
 instance instCtxMorphIntenaCell [KernelGeom] (tier : KTier) (cpu : CPU) (lent sie : Bool)
     (noff : Nat) (intena : Bool) :
-    CtxMorph (GF := GF) (fun ξ => @intenaCell hlc GF _ ⟨ξ, tier⟩ _ cpu lent sie noff intena) := by
+    CtxMorph (GF := GF) (fun ξ => @intenaCell GF _ ⟨ξ, tier⟩ _ cpu lent sie noff intena) := by
   cases lent
   · cases noff with
     | zero =>
-      exact @instCtxMorphExists hlc GF _ _
-        (fun (b : Bool) ξ => @wordPointsTo hlc GF _ ⟨ξ, tier⟩ (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal b))
+      exact @instCtxMorphExists GF _ _
+        (fun (b : Bool) ξ => @wordPointsTo GF _ ⟨ξ, tier⟩ (aCpuIntena cpu) 4 (DFrac.own 1) (intenaVal b))
         (fun _ => instCtxMorphWordAt _ _ _ _ _)
     | succ m => exact instCtxMorphWordAt _ _ _ _ _
   · exact instCtxMorphConst _
@@ -79,21 +79,21 @@ instance instCtxMorphIntenaCell [KernelGeom] (tier : KTier) (cpu : CPU) (lent si
 /-- The `struct cpu` cells at a fixed tier. -/
 instance instCtxMorphCpuCells [KernelGeom] (tier : KTier) (cpu : CPU) (lent sie : Bool)
     (noff : Nat) (intena : Bool) (p : BitVec 64) :
-    CtxMorph (GF := GF) (fun ξ => @cpuCells hlc GF _ ⟨ξ, tier⟩ _ cpu lent sie noff intena p) :=
-  @instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
-    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
+    CtxMorph (GF := GF) (fun ξ => @cpuCells GF _ ⟨ξ, tier⟩ _ cpu lent sie noff intena p) :=
+  @instCtxMorphSep GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
+    (@instCtxMorphSep GF _ _ _ (instCtxMorphWordAt _ _ _ _ _)
       (instCtxMorphIntenaCell _ _ _ _ _ _))
 
 /-- The per-cpu bookkeeping at a fixed tier (the lock set and the hart CSRs
 mention no context). -/
 instance instCtxMorphCpuOwn [KernelGeom] (tier : KTier) (cpu : CPU) (lent sie : Bool)
     (noff : Nat) (intena : Bool) (p : BitVec 64) (locks : List String) :
-    CtxMorph (GF := GF) (fun ξ => @cpuOwn hlc GF _ ⟨ξ, tier⟩ _ cpu lent sie noff intena p locks) :=
-  @instCtxMorphSep hlc GF _ _ _ (instCtxMorphCpuCells _ _ _ _ _ _ _) (instCtxMorphConst _)
+    CtxMorph (GF := GF) (fun ξ => @cpuOwn GF _ ⟨ξ, tier⟩ _ cpu lent sie noff intena p locks) :=
+  @instCtxMorphSep GF _ _ _ (instCtxMorphCpuCells _ _ _ _ _ _ _) (instCtxMorphConst _)
 
 /-- The table's per-byte keys. -/
 instance instCtxMorphKptKeys (tier : KTier) (t : PTree) (fl : Nat → Nat → Nat) :
-    CtxMorph (GF := GF) (fun ξ => @kptKeys hlc GF _ ⟨ξ, tier⟩ t fl) :=
+    CtxMorph (GF := GF) (fun ξ => @kptKeys GF _ ⟨ξ, tier⟩ t fl) :=
   ctxMorph_bigSepL (t.entries 2)
     (fun i (_ : BitVec 64 × BitVec 64) ξ => iprop([∗list] j ∈ List.range 8, keyAt (GF := GF) era ξ (fl i j)))
     (fun i _ => ctxMorph_bigSepL (List.range 8) (fun _ j ξ => keyAt (GF := GF) era ξ (fl i j))
@@ -101,74 +101,74 @@ instance instCtxMorphKptKeys (tier : KTier) (t : PTree) (fl : Nat → Nat → Na
 
 /-- The installed kernel table (persistent, but its keys are the context's). -/
 instance instCtxMorphKptOn (tier : KTier) (t : PTree) (M : RegMapF (BitVec 64)) :
-    CtxMorph (GF := GF) (fun ξ => @kptOn hlc GF _ ⟨ξ, tier⟩ t M) :=
-  @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-      (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-        (@instCtxMorphExists hlc GF _ _
-          (fun (fl : Nat → Nat → Nat) ξ => iprop(inv kptN (kptBody t fl) ∗ @kptKeys hlc GF _ ⟨ξ, tier⟩ t fl))
-          (fun _ => @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (instCtxMorphKptKeys _ _ _)))))
+    CtxMorph (GF := GF) (fun ξ => @kptOn GF _ ⟨ξ, tier⟩ t M) :=
+  @instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+    (@instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+      (@instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+        (@instCtxMorphExists GF _ _
+          (fun (fl : Nat → Nat → Nat) ξ => iprop(inv kptN (kptBody t fl) ∗ @kptKeys GF _ ⟨ξ, tier⟩ t fl))
+          (fun _ => @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) (instCtxMorphKptKeys _ _ _)))))
 
 /-- The hart's kernel-table slot. -/
 instance instCtxMorphKptSlot (tier : KTier) (cpu : CPU) (root : BitVec 44) :
-    CtxMorph (GF := GF) (fun ξ => @kptSlot hlc GF _ ⟨ξ, tier⟩ cpu root) :=
-  @instCtxMorphExists hlc GF _ _
-    (fun (t : PTree) ξ => iprop(∃ M : RegMapF (BitVec 64), @kptOn hlc GF _ ⟨ξ, tier⟩ t M ∗
+    CtxMorph (GF := GF) (fun ξ => @kptSlot GF _ ⟨ξ, tier⟩ cpu root) :=
+  @instCtxMorphExists GF _ _
+    (fun (t : PTree) ξ => iprop(∃ M : RegMapF (BitVec 64), @kptOn GF _ ⟨ξ, tier⟩ t M ∗
       ⌜t.base = root⌝ ∗ ∃ tlb : Tlb, Register.tlb ↦ᵣ[cpu] tlb ∗ ⌜tlbOk t tlb⌝))
-    (fun _ => @instCtxMorphExists hlc GF _ _ _
-      (fun _ => @instCtxMorphSep hlc GF _ _ _ (instCtxMorphKptOn _ _ _) (instCtxMorphConst _)))
+    (fun _ => @instCtxMorphExists GF _ _ _
+      (fun _ => @instCtxMorphSep GF _ _ _ (instCtxMorphKptOn _ _ _) (instCtxMorphConst _)))
 
 /-- The translation slot at a fixed tier. -/
 instance instCtxMorphTransSlotAt [KernelGeom] (tier : KTier) (cpu : CPU) (tr : KTier) (root : BitVec 44) :
-    CtxMorph (GF := GF) (fun ξ => @transSlotAt hlc GF _ ⟨ξ, tier⟩ cpu tr root) := by
+    CtxMorph (GF := GF) (fun ξ => @transSlotAt GF _ ⟨ξ, tier⟩ cpu tr root) := by
   cases tr
   · exact instCtxMorphConst _
   · exact instCtxMorphKptSlot _ _ _
 
 /-- The bundle's translation slot at a fixed tier. -/
 instance instCtxMorphTransSlot [KernelGeom] (tier : KTier) (cpu : CPU) (tr : KTier) (root : BitVec 44) :
-    CtxMorph (GF := GF) (fun ξ => @transSlot hlc GF _ ⟨ξ, tier⟩ cpu tr root) :=
-  @instCtxMorphSep hlc GF _ (fun _ => iprop(⌜tr = tier⌝))
-    (fun ξ => @transSlotAt hlc GF _ ⟨ξ, tier⟩ cpu tr root)
+    CtxMorph (GF := GF) (fun ξ => @transSlot GF _ ⟨ξ, tier⟩ cpu tr root) :=
+  @instCtxMorphSep GF _ (fun _ => iprop(⌜tr = tier⌝))
+    (fun ξ => @transSlotAt GF _ ⟨ξ, tier⟩ cpu tr root)
     (instCtxMorphConst _) (instCtxMorphTransSlotAt _ _ _ _)
 
 /-- The installed handler at a fixed tier: only the environment it carries
 depends on the context, and the environment carries its own re-homing
 witness (`MachCSL.CtxLaws.envAt`). -/
 instance instCtxMorphIntrResP (tier : KTier) (S : IhsIx GF → IProp GF) (cpu : CPU) :
-    CtxMorph (GF := GF) (fun ξ => @intrResP hlc GF _ ⟨ξ, tier⟩ S cpu) := by
+    CtxMorph (GF := GF) (fun ξ => @intrResP GF _ ⟨ξ, tier⟩ S cpu) := by
   -- the body's type is the unfolding of `intrResP` (Lean ≥ 4.34 does not unify through it)
   unfold intrResP
-  exact @instCtxMorphExists hlc GF _ _
+  exact @instCtxMorphExists GF _ _
     (fun (E : CtxId → IProp GF) ξ => iprop(∃ h : BitVec 64,
       ⌜stvecDirect h⌝ ∗ Register.stvec ↦ᵣ[cpu] h ∗ □ S ⟨E, cpu, h⟩ ∗ envAt E ξ))
-    (fun E => @instCtxMorphExists hlc GF _ _
+    (fun E => @instCtxMorphExists GF _ _
       (fun (h : BitVec 64) ξ => iprop(⌜stvecDirect h⌝ ∗ Register.stvec ↦ᵣ[cpu] h ∗ □ S ⟨E, cpu, h⟩ ∗ envAt E ξ))
-      (fun _ => @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-        (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-          (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (instCtxMorphEnvAt E)))))
+      (fun _ => @instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+        (@instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+          (@instCtxMorphSep GF _ _ _ (instCtxMorphConst _) (instCtxMorphEnvAt E)))))
 
 /-- The interrupt arm at a fixed tier. -/
 instance instCtxMorphSieArmP (tier : KTier) (S : IhsIx GF → IProp GF) (cpu : CPU) (sie : Bool)
     (p : BitVec 64) :
-    CtxMorph (GF := GF) (fun ξ => @sieArmP hlc GF _ ⟨ξ, tier⟩ S cpu sie p) := by
+    CtxMorph (GF := GF) (fun ξ => @sieArmP GF _ ⟨ξ, tier⟩ S cpu sie p) := by
   unfold sieArmP
   cases sie
   · simp only [Bool.false_eq_true, ite_false]
     exact instCtxMorphConst _
   · simp only [ite_true]
-    exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-      (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (instCtxMorphIntrResP tier S cpu))
+    exact @instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+      (@instCtxMorphSep GF _ _ _ (instCtxMorphConst _) (instCtxMorphIntrResP tier S cpu))
 
 /-- The bundle's interrupt arm at a fixed tier. -/
 instance instCtxMorphSieArm [KernelGeom] [KernelImage GF] (tier : KTier) (cpu : CPU) (sie : Bool)
     (p : BitVec 64) :
-    CtxMorph (GF := GF) (fun ξ => @sieArm hlc GF _ ⟨ξ, tier⟩ _ _ cpu sie p) :=
+    CtxMorph (GF := GF) (fun ξ => @sieArm GF _ ⟨ξ, tier⟩ _ _ cpu sie p) :=
   instCtxMorphSieArmP tier ihs cpu sie p
 
 /-- The installed handler. -/
 instance instCtxMorphIntrRes [KernelGeom] [KernelImage GF] (tier : KTier) (cpu : CPU) :
-    CtxMorph (GF := GF) (fun ξ => @intrRes hlc GF _ ⟨ξ, tier⟩ _ _ cpu) :=
+    CtxMorph (GF := GF) (fun ξ => @intrRes GF _ ⟨ξ, tier⟩ _ _ cpu) :=
   instCtxMorphIntrResP tier ihs cpu
 
 /-! ## Re-homing the bundle -/
@@ -180,23 +180,23 @@ running on `cpu`).  The tier does not change: a crossing happens with the
 kernel table installed on both sides. -/
 theorem kctx_rehome (tier : KTier) (ξ ξ' : CtxId) [KernelGeom] [KernelImage GF] {lent : Bool}
     (cpu : CPU) (k : KCtx) :
-    ownCtx cpu ξ' ∗ @kctxL hlc GF _ ⟨ξ, tier⟩ _ _ lent cpu k ⊢
-      |==> (ownCtx cpu ξ ∗ @kctxL hlc GF _ ⟨ξ', tier⟩ _ _ lent cpu k) := by
+    ownCtx cpu ξ' ∗ @kctxL GF _ ⟨ξ, tier⟩ _ _ lent cpu k ⊢
+      |==> (ownCtx cpu ξ ∗ @kctxL GF _ ⟨ξ', tier⟩ _ _ lent cpu k) := by
   iintro ⟨Hξ', Hk⟩
-  icases (@kctx_cases hlc GF _ ⟨ξ, tier⟩ _ _ lent cpu k) $$ Hk with
+  icases (@kctx_cases GF _ ⟨ξ, tier⟩ _ _ lent cpu k) $$ Hk with
     ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
   icases ctxTok_cases cpu ξ $$ Htok with ⟨Hξ, %r, Hfrag⟩
-  imod ctx_move (fun ζ => @stackOwn hlc GF _ ⟨ζ, tier⟩ k.sp (trapRes k.sie + k.avail)) cpu ξ ξ'
+  imod ctx_move (fun ζ => @stackOwn GF _ ⟨ζ, tier⟩ k.sp (trapRes k.sie + k.avail)) cpu ξ ξ'
     $$ [$Hξ $Hξ' $Hstack] with ⟨Hξ, Hξ', Hstack⟩
-  imod ctx_move (fun ζ => @transSlot hlc GF _ ⟨ζ, tier⟩ cpu k.tier k.root) cpu ξ ξ'
+  imod ctx_move (fun ζ => @transSlot GF _ ⟨ζ, tier⟩ cpu k.tier k.root) cpu ξ ξ'
     $$ [$Hξ $Hξ' $Htrans] with ⟨Hξ, Hξ', Htrans⟩
-  imod ctx_move (fun ζ => @cpuOwn hlc GF _ ⟨ζ, tier⟩ _ cpu lent k.sie k.noff k.intena k.proc k.locks) cpu ξ ξ'
+  imod ctx_move (fun ζ => @cpuOwn GF _ ⟨ζ, tier⟩ _ cpu lent k.sie k.noff k.intena k.proc k.locks) cpu ξ ξ'
     $$ [$Hξ $Hξ' $Hcpu] with ⟨Hξ, Hξ', Hcpu⟩
-  imod ctx_move (fun ζ => @sieArm hlc GF _ ⟨ζ, tier⟩ _ _ cpu k.sie k.proc) cpu ξ ξ'
+  imod ctx_move (fun ζ => @sieArm GF _ ⟨ζ, tier⟩ _ _ cpu k.sie k.proc) cpu ξ ξ'
     $$ [$Hξ $Hξ' $Harm] with ⟨Hξ, Hξ', Harm⟩
   imodintro
   iframe Hξ
-  iapply (@kctx_intro' hlc GF _ ⟨ξ', tier⟩ _ _ lent cpu k hwf)
+  iapply (@kctx_intro' GF _ ⟨ξ', tier⟩ _ _ lent cpu k hwf)
   iframe HConf HF Hstack Htrans Harm Hcpu Hclock
   isplitl [Hξ' Hfrag]
   · iapply ctxTok_intro cpu ξ' r

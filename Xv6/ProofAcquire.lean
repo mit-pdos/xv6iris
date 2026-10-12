@@ -27,7 +27,7 @@ set_option maxHeartbeats 4000000 in
 /-- The spin: from `0x80000c72` with `a4 = 1` and `s1 = lk`, the loop
 `mv a5,a4; amoswap.w.aq a5,a5,(s1); sext.w a5,a5; bnez a5` runs until the
 swap returns 0; the registers other than `a5` are those of `R0`. -/
-theorem acquire_spin {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem acquire_spin {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (kb : KCtx) (hsie : kb.sie = false)
     (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF) [CtxMorph R]
     (tl : Nat)
@@ -92,7 +92,7 @@ theorem acquire_br_d04 : KA.«acquire» + 0xd04#64 = KA.«mycpu» := by decide
 
 theorem acquire_br_ffffffffffffff9a : KA.«acquire» + 0xffffffffffffff9a#64 = KA.«holding» := by decide
 
-theorem acquire_body (HO : HOLDING) (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem acquire_body (HO : HOLDING) (MC : MYCPU) {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (kb : KCtx) (hsie : kb.sie = false) (hK : 10 ≤ kb.avail)
     (γ : GName) (s : String) (R : CtxId → IProp GF) [CtxMorph R]
     (tl : Nat)
@@ -124,7 +124,7 @@ theorem acquire_body (HO : HOLDING) (MC : MYCPU) {hlc : HasLC} {GF : BundledGFun
       (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R' ∧ R' 10#5 = 0#64⌝ -∗ wpLoop cpu) ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hK' hs'
-    have h := HO.wp_holding_notheld (hlc := hlc) (GF := GF) cpu k' γ s R hsie' hK' hs'
+    have h := HO.wp_holding_notheld (GF := GF) cpu k' γ s R hsie' hK' hs'
     unfold wp_holding_notheld_body at h
     simp only [holdingAddr] at h
     exact h
@@ -167,7 +167,7 @@ theorem acquire_body (HO : HOLDING) (MC : MYCPU) {hlc : HasLC} {GF : BundledGFun
       (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R' ∧ R' 10#5 = cpuAddr cpu⌝ -∗ wpLoop cpu) ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hK'
-    have h := MC.wp_mycpu (hlc := hlc) (GF := GF) (lent := false) cpu k' hsie' hK'
+    have h := MC.wp_mycpu (GF := GF) (lent := false) cpu k' hsie' hK'
     unfold wp_mycpu_body at h
     simp only [mycpuAddr] at h
     exact h
@@ -240,7 +240,7 @@ theorem acquire_br_ffffffffffffffc6 : KA.«acquire» + 0xffffffffffffffc6#64 = K
 
 set_option maxHeartbeats 4000000 in
 theorem acquire_llb_proof (PU : PUSHOFF) (HO : HOLDING) (MC : MYCPU) : ACQUIRE_LLB := ⟨
-  fun {hlc GF} _ _ cpu k γ s R _ tl hnoff hK hs => by
+  fun {GF} _ _ cpu k γ s R _ tl hnoff hK hs => by
   unfold wp_acquire_llb_body
   iintro ⟨Hk, Hpc, #Hlk, #Htl, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -270,7 +270,7 @@ theorem acquire_llb_proof (PU : PUSHOFF) (HO : HOLDING) (MC : MYCPU) : ACQUIRE_L
         kctx cpu' ((k'.pushOffAt spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R'⌝ -∗ sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu')) ⊢ wpLoop (GF := GF) c3 := by
     intro k' hnoff' hK'
-    have h := PU.wp_push_off (hlc := hlc) (GF := GF) c3 k' hnoff' hK'
+    have h := PU.wp_push_off (GF := GF) c3 k' hnoff' hK'
     unfold wp_push_off_body at h
     simp only [pushOffAddr] at h
     exact h
@@ -305,7 +305,7 @@ set_option maxHeartbeats 4000000 in
 loop entry (the conclusion's last premise), is consumed and returned by the
 `amoswap.w.aq` each iteration (`wp_s_amoswap_lock_gen`), re-supplied to the
 IH on a lost swap and handed to the won-continuation on a winning one. -/
-theorem acquire_spin_gen {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem acquire_spin_gen {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (kb : KCtx) (hsie : kb.sie = false)
     (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF) [CtxMorph R]
     (D : IProp GF) [Timeless D] (Tc : IProp GF) (hrefute : ⊢ Tc -∗ D -∗ (False : IProp GF))
@@ -368,7 +368,7 @@ set_option maxHeartbeats 4000000 in
 push_off, through the holding check (`HO.wp_holding_notheld_gen`), into
 `acquire_spin_gen`, through the owner store (`wp_s_sd_lkcpu_acquire_gen`),
 to the epilogue and continuation. -/
-theorem acquire_body_gen (HO : HOLDING) (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem acquire_body_gen (HO : HOLDING) (MC : MYCPU) {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (kb : KCtx) (hsie : kb.sie = false) (hK : 10 ≤ kb.avail)
     (γ : GName) (s : String) (R : CtxId → IProp GF) [CtxMorph R]
     (D : IProp GF) [Timeless D] (Tc : IProp GF) (hrefute : ⊢ Tc -∗ D -∗ (False : IProp GF))
@@ -400,7 +400,7 @@ theorem acquire_body_gen (HO : HOLDING) (MC : MYCPU) {hlc : HasLC} {GF : Bundled
       (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R' ∧ R' 10#5 = 0#64⌝ -∗ Tc -∗ wpLoop cpu) ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hK' hs'
-    have h := HO.wp_holding_notheld_gen (hlc := hlc) (GF := GF) cpu k' γ s R D Tc hrefute hsie' hK' hs'
+    have h := HO.wp_holding_notheld_gen (GF := GF) cpu k' γ s R D Tc hrefute hsie' hK' hs'
     unfold wp_holding_notheld_gen_body at h
     simp only [holdingAddr] at h
     exact h
@@ -443,7 +443,7 @@ theorem acquire_body_gen (HO : HOLDING) (MC : MYCPU) {hlc : HasLC} {GF : Bundled
       (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R' ∧ R' 10#5 = cpuAddr cpu⌝ -∗ wpLoop cpu) ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hK'
-    have h := MC.wp_mycpu (hlc := hlc) (GF := GF) (lent := false) cpu k' hsie' hK'
+    have h := MC.wp_mycpu (GF := GF) (lent := false) cpu k' hsie' hK'
     unfold wp_mycpu_body at h
     simp only [mycpuAddr] at h
     exact h
@@ -515,7 +515,7 @@ theorem acquire_body_gen (HO : HOLDING) (MC : MYCPU) {hlc : HasLC} {GF : Bundled
 
 set_option maxHeartbeats 4000000 in
 theorem acquire_gen_llb_proof (PU : PUSHOFF) (HO : HOLDING) (MC : MYCPU) : ACQUIRE_GEN_LLB := ⟨
-  fun {hlc GF} _ _ cpu k γ s R _ D _ Tc hrefute tl hnoff hK hs => by
+  fun {GF} _ _ cpu k γ s R _ D _ Tc hrefute tl hnoff hK hs => by
   unfold wp_acquire_gen_llb_body
   iintro ⟨Hk, Hpc, #Hlk, #Htl, Hcred, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -545,7 +545,7 @@ theorem acquire_gen_llb_proof (PU : PUSHOFF) (HO : HOLDING) (MC : MYCPU) : ACQUI
         kctx cpu' ((k'.pushOffAt spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
         ⌜calleeSaved k'.regs R'⌝ -∗ sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu')) ⊢ wpLoop (GF := GF) c3 := by
     intro k' hnoff' hK'
-    have h := PU.wp_push_off (hlc := hlc) (GF := GF) c3 k' hnoff' hK'
+    have h := PU.wp_push_off (GF := GF) c3 k' hnoff' hK'
     unfold wp_push_off_body at h
     simp only [pushOffAddr] at h
     exact h

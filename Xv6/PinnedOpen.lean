@@ -49,7 +49,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section PinnedOpen
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -79,13 +79,13 @@ theorem pinned_open_bundle_at (γfs : FsNames) (Pin : Aview → Prop) (T : IProp
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF))
     (hres : pinResolvesAt Pin rt cw pl hops ino a) (hpath : argPathOf M pv pl) :
     ⊢ iprop(□ ∀ v : Aview, appPred appRun v -∗ appPred appRun v ∗ (⌜Pin v⌝ ∨ T)) -∗
-      appInv (hlc := hlc) γfs -∗
-      openTruncPiece (hlc := hlc) (fsGammaL γfs) vom (truncTermArg M pv (pobsP T hops)) Ft -∗
-      openAuPlainAt (hlc := hlc) (fsGammaL γfs) γfs rt cw M pv vom (pobsP T hops) (pobsPmiss T)
+      appInv γfs -∗
+      openTruncPiece (fsGammaL γfs) vom (truncTermArg M pv (pobsP T hops)) Ft -∗
+      openAuPlainAt (fsGammaL γfs) γfs rt cw M pv vom (pobsP T hops) (pobsPmiss T)
         (pobsFo Pin T) Ft := by
   iintro #Hcl #Hinv Ht
   ihave Hmt := pobsMissTaint_Pmiss (GF := GF) T
-  icases pinned_obs (hlc := hlc) γfs Pin T (pobsPmiss T) rt cw pl hops ino a hres $$ Hmt Hcl Hinv
+  icases pinned_obs γfs Pin T (pobsPmiss T) rt cw pl hops ino a hres $$ Hmt Hcl Hinv
     with ⟨Hw, Ho, -⟩
   unfold openAuPlainAt
   iframe Ho Ht
@@ -105,9 +105,9 @@ theorem pinned_open_bundle (γfs : FsNames) (Pin : Aview → Prop) (T : IProp GF
     (hcr : omCreate vom = false) (hres : pinResolvesAt Pin rt cw pl hops ino a)
     (hpath : argPathOf M pv pl) :
     ⊢ iprop(□ ∀ v : Aview, appPred appRun v -∗ appPred appRun v ∗ (⌜Pin v⌝ ∨ T)) -∗
-      appInv (hlc := hlc) γfs -∗
-      openTruncPiece (hlc := hlc) (fsGammaL γfs) vom (truncTermArg M pv (pobsP T hops)) Ft -∗
-      openIn (hlc := hlc) (fsGammaL γfs) γfs rt cw M pv vom (pobsP T hops) (pobsPmiss T) Farm Fun Fok
+      appInv γfs -∗
+      openTruncPiece (fsGammaL γfs) vom (truncTermArg M pv (pobsP T hops)) Ft -∗
+      openIn (fsGammaL γfs) γfs rt cw M pv vom (pobsP T hops) (pobsPmiss T) Farm Fun Fok
         Fex (pobsFo Pin T) Ft := by
   unfold openIn
   simp only [hcr, Bool.false_eq_true, ite_false]
@@ -129,14 +129,14 @@ theorem pinned_open_dev (γfs : FsNames) (omo : OffMode) (Pin : Aview → Prop) 
     (sts : List FdState) (r : BitVec 64) (fdv' : List FdState)
     (hres : pinResolvesAt Pin rt cw pl hops ino ⟨.ADev ma mi, nl⟩) (hpath : argPathOf M pv pl)
     (htr : omTrunc vom = false) :
-    ⊢ openReceiptPlain (hlc := hlc) omo (fsGammaL γfs) γfs rt cw M pv vom (pobsP T hops) (pobsPmiss T)
+    ⊢ openReceiptPlain omo (fsGammaL γfs) γfs rt cw M pv vom (pobsP T hops) (pobsPmiss T)
         (pobsFo Pin T) Ft sts r fdv' -∗
       iprop(
         -- THE WALK MISSED, or the call failed after it: nothing moved
         (⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ ⌜fdv' = sts⌝) ∨
         -- THE CONSOLE: the descriptor is the PINNED device's
         (⌜openFdRcpt (omReadable vom) (omWritable vom) (.device ma) sts r fdv'⌝ ∗
-          openTruncAt (hlc := hlc) (fsGammaL γfs) vom ino Ft) ∨
+          openTruncAt (fsGammaL γfs) vom ino Ft) ∨
         -- ...or the application is tainted
         T) := by
   unfold openReceiptPlain pobsFo pfamTriv
@@ -151,7 +151,7 @@ theorem pinned_open_dev (γfs : FsNames) (omo : OffMode) (Pin : Aview → Prop) 
   icases Harm with (⟨%ma', %mi', %nl', %hrow, %hnd, Hrecv, Ht, %hfdr⟩ |
     ⟨%bs0, %nl', %hrow, Hrecv, -, -⟩ | ⟨%ents, %nl', %hrow, -, Hrecv, -, -⟩)
   · -- DEVICE: the identification names the major
-    ihave Ht := plainTruncKept_forget (hlc := hlc) (fsGammaL γfs) vom pl (pobsP T hops) i Ft $$ Ht
+    ihave Ht := plainTruncKept_forget (fsGammaL γfs) vom pl (pobsP T hops) i Ft $$ Ht
     icases pobs_node Pin T rt cw pl hops ino ⟨.ADev ma mi, nl⟩ av i ⟨.ADev ma' mi', nl'⟩ hres
       $$ HP Hrecv with (%hid | #HT)
     · obtain ⟨hino, hnode⟩ := hid
@@ -191,10 +191,10 @@ theorem pinned_open_bundle_dead_lin_at (γfs : FsNames) (Pin : Aview → Prop) (
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (hcr : omCreate vom = false) (hres : pinMissesAt Pin rt cw pl d0) (hpath : argPathOf M pv pl) :
     ⊢ iprop(□ ∀ v : Aview, K -∗ appPred appRun v -∗ appPred appRun v ∗ K ∗ (⌜Pin v⌝ ∨ T)) -∗
-      pobsMissTaint T Pmiss -∗ pobsMissHold K Pmiss -∗ appInv (hlc := hlc) γfs -∗ K -∗
+      pobsMissTaint T Pmiss -∗ pobsMissHold K Pmiss -∗ appInv γfs -∗ K -∗
       -- the truncate's piece, at the dead walk's own terminal permit
-      openTruncPiece (hlc := hlc) (fsGammaL γfs) vom (truncTermArg M pv (pobsPDeadLin T K d0)) Ft -∗
-      openIn (hlc := hlc) (fsGammaL γfs) γfs rt cw M pv vom (pobsPDeadLin T K d0) Pmiss Farm Fun Fok
+      openTruncPiece (fsGammaL γfs) vom (truncTermArg M pv (pobsPDeadLin T K d0)) Ft -∗
+      openIn (fsGammaL γfs) γfs rt cw M pv vom (pobsPDeadLin T K d0) Pmiss Farm Fun Fok
         Fex (pfamTriv (fun (_ : Aview) (_ : Nat) (_ : Anode) => iprop(True))) Ft := by
   unfold openIn
   simp only [hcr, Bool.false_eq_true, ite_false]
@@ -203,9 +203,9 @@ theorem pinned_open_bundle_dead_lin_at (γfs : FsNames) (Pin : Aview → Prop) (
   isplitl [HK]
   · iintro %pl' %hpath'
     rw [argPathOf_uniq M pv pl' pl hpath' hpath]
-    iapply (pobs_walk_dead_lin (hlc := hlc) γfs Pin T K Pmiss rt cw pl d0 hres) $$ Hcl Hmt Hmh Hinv HK
+    iapply (pobs_walk_dead_lin γfs Pin T K Pmiss rt cw pl d0 hres) $$ Hcl Hmt Hmh Hinv HK
   isplitr
-  · iapply (pobs_aopen_triv (hlc := hlc) (GF := GF) γfs)
+  · iapply (pobs_aopen_triv (GF := GF) γfs)
   · iexact Ht
 
 /-- **Rocq `pobs_dead_trunc_piece`** (lane TRUNC-PERMIT): THE PIECE AT A DEAD
@@ -217,7 +217,7 @@ theorem pobs_dead_trunc_piece (γfs : FsNames) (T K : IProp GF) [Persistent T] (
     (M : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64) (pl : List (BitVec 8))
     (hpath : argPathOf M pv pl) (hne : pathElems pl ≠ []) :
     ⊢ iprop(□ (T -∗ appSup (GF := GF))) -∗
-      openTruncPiece (hlc := hlc) (fsGammaL γfs) vom (truncTermArg M pv (pobsPDeadLin T K d0))
+      openTruncPiece (fsGammaL γfs) vom (truncTermArg M pv (pobsPDeadLin T K d0))
         (pfamTriv (fun (_ : Aview) (_ : Nat) (_ : List (BitVec 8)) => T)) := by
   have hlen : (pathElems pl).length ≠ 0 := fun hz => hne (List.eq_nil_of_length_eq_zero hz)
   iintro #Hsup
@@ -244,9 +244,9 @@ theorem pinned_open_bundle_dead_lin (γfs : FsNames) (Pin : Aview → Prop) (T :
     (hcr : omCreate vom = false) (hres : pinMissesAt Pin rt cw pl d0) (hpath : argPathOf M pv pl)
     (hne : pathElems pl ≠ []) :
     ⊢ iprop(□ ∀ v : Aview, K -∗ appPred appRun v -∗ appPred appRun v ∗ K ∗ (⌜Pin v⌝ ∨ T)) -∗
-      pobsMissTaint T Pmiss -∗ pobsMissHold K Pmiss -∗ appInv (hlc := hlc) γfs -∗
+      pobsMissTaint T Pmiss -∗ pobsMissHold K Pmiss -∗ appInv γfs -∗
       iprop(□ (T -∗ appSup (GF := GF))) -∗ K -∗
-      openIn (hlc := hlc) (fsGammaL γfs) γfs rt cw M pv vom (pobsPDeadLin T K d0) Pmiss Farm Fun Fok
+      openIn (fsGammaL γfs) γfs rt cw M pv vom (pobsPDeadLin T K d0) Pmiss Farm Fun Fok
         Fex (pfamTriv (fun (_ : Aview) (_ : Nat) (_ : Anode) => iprop(True)))
         (pfamTriv (fun (_ : Aview) (_ : Nat) (_ : List (BitVec 8)) => T)) := by
   iintro #Hcl #Hmt #Hmh #Hinv #Hsup HK
@@ -265,13 +265,13 @@ theorem pinned_open_bundle_dead_lin_notrunc (γfs : FsNames) (Pin : Aview → Pr
     (hcr : omCreate vom = false) (htr : omTrunc vom = false) (hres : pinMissesAt Pin rt cw pl d0)
     (hpath : argPathOf M pv pl) :
     ⊢ iprop(□ ∀ v : Aview, K -∗ appPred appRun v -∗ appPred appRun v ∗ K ∗ (⌜Pin v⌝ ∨ T)) -∗
-      pobsMissTaint T Pmiss -∗ pobsMissHold K Pmiss -∗ appInv (hlc := hlc) γfs -∗ K -∗
-      openIn (hlc := hlc) (fsGammaL γfs) γfs rt cw M pv vom (pobsPDeadLin T K d0) Pmiss Farm Fun Fok
+      pobsMissTaint T Pmiss -∗ pobsMissHold K Pmiss -∗ appInv γfs -∗ K -∗
+      openIn (fsGammaL γfs) γfs rt cw M pv vom (pobsPDeadLin T K d0) Pmiss Farm Fun Fok
         Fex (pfamTriv (fun (_ : Aview) (_ : Nat) (_ : Anode) => iprop(True))) Ft := by
   iintro #Hcl #Hmt #Hmh #Hinv HK
   iapply (pinned_open_bundle_dead_lin_at γfs Pin T K Pmiss rt cw pl d0 M pv vom Ft Farm Fun Fok Fex hcr
     hres hpath) $$ Hcl Hmt Hmh Hinv HK
-  iapply (openTruncPiece_none (hlc := hlc) (fsGammaL γfs) vom _ Ft htr)
+  iapply (openTruncPiece_none (fsGammaL γfs) vom _ Ft htr)
 
 /-- **Rocq `pinned_open_dead_lin`**: ...AND THE RECEIPT, READ: the call failed
 and the table did not move AND THE CREDENTIAL IS BACK, or the application is
@@ -289,7 +289,7 @@ theorem pinned_open_dead_lin (γfs : FsNames) (T K : IProp GF) (omo : OffMode) (
     (hpath : argPathOf M pv pl) (hne : pathElems pl ≠ [])
     (hft : omTrunc vom = true → ∀ (av : Aview) (i : Nat) (bs : List (BitVec 8)),
       Ft.pfRecv av i bs ⊢ T) :
-    ⊢ openReceiptPlain (hlc := hlc) omo (fsGammaL γfs) γfs rt cw M pv vom (pobsPDeadLin T K d0)
+    ⊢ openReceiptPlain omo (fsGammaL γfs) γfs rt cw M pv vom (pobsPDeadLin T K d0)
         (pobsPmissRef T K) Fo Ft sts r fdv' ={⊤}=∗
       iprop((⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ ⌜fdv' = sts⌝ ∗ K) ∨ T) := by
   have hlen : (pathElems pl).length ≠ 0 := fun hz => hne (List.eq_nil_of_length_eq_zero hz)
@@ -300,7 +300,7 @@ theorem pinned_open_dead_lin (γfs : FsNames) (T K : IProp GF) (omo : OffMode) (
     · unfold openAuPlainAt
       icases Hpre with ⟨Hw, -, -⟩
       ihave Hst := Hw $$ %pl %hpath
-      imod (pobs_dead_start_refund (hlc := hlc) γfs T K (pobsPmissRef T K) rt cw pl d0) $$ Hst with Hc
+      imod (pobs_dead_start_refund γfs T K (pobsPmissRef T K) rt cw pl d0) $$ Hst with Hc
       icases Hc with (HK | HT)
       · imodintro
         ileft
@@ -323,7 +323,7 @@ theorem pinned_open_dead_lin (γfs : FsNames) (T K : IProp GF) (omo : OffMode) (
           ipureintro; exact ⟨hr, hfd⟩
         · imodintro
           iright; iexact HT
-      · ihave HP := plainCur_of_kept (hlc := hlc) (fsGammaL γfs) vom pl (pobsPDeadLin T K d0) i Ft
+      · ihave HP := plainCur_of_kept (fsGammaL γfs) vom pl (pobsPDeadLin T K d0) i Ft
           $$ HP Ht
         imodintro
         iright
@@ -335,7 +335,7 @@ theorem pinned_open_dead_lin (γfs : FsNames) (T K : IProp GF) (omo : OffMode) (
     -- truncating FILE arm -- spent, and the receipt is the taint
     icases Harm with (⟨%ma, %mi, %nl, -, -, -, Ht, -⟩ | ⟨%bs0, %nl, -, -, Htr, -⟩ |
       ⟨%ents, %nl, -, -, -, Ht, -⟩)
-    · ihave HP := plainCur_of_kept (hlc := hlc) (fsGammaL γfs) vom pl (pobsPDeadLin T K d0) i Ft
+    · ihave HP := plainCur_of_kept (fsGammaL γfs) vom pl (pobsPDeadLin T K d0) i Ft
         $$ HP Ht
       iapply (pobs_dead_term_lin T K d0 (pathElems pl).length i hlen) $$ HP
     · by_cases hot : omTrunc vom = true
@@ -344,7 +344,7 @@ theorem pinned_open_dead_lin (γfs : FsNames) (T K : IProp GF) (omo : OffMode) (
         iapply (hft hot av' i bs0) $$ Hrv
       · ihave HP := pinned_open_cur_whole vom (pobsPDeadLin T K d0) _ i (by simpa using hot) $$ HP
         iapply (pobs_dead_term_lin T K d0 (pathElems pl).length i hlen) $$ HP
-    · ihave HP := plainCur_of_kept (hlc := hlc) (fsGammaL γfs) vom pl (pobsPDeadLin T K d0) i Ft
+    · ihave HP := plainCur_of_kept (fsGammaL γfs) vom pl (pobsPDeadLin T K d0) i Ft
         $$ HP Ht
       iapply (pobs_dead_term_lin T K d0 (pathElems pl).length i hlen) $$ HP
 

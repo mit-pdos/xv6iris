@@ -26,7 +26,7 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
@@ -42,12 +42,12 @@ theorem wp_kshd_die_chain (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : USH_FPRINTF) (N
     (hi3 : ushCode (GF := GF) N.t ⊢ uinstrIs N.t (BitVec.ofNat 64 (p0 + 10)) false (.JAL (j3, .Regidx 1#5)))
     (hi4 : ushCode (GF := GF) N.t ⊢ uinstrIs N.t (BitVec.ofNat 64 (p0 + 14)) true (.ITYPE (kx, .Regidx 0#5, .Regidx 10#5, .ADDI)))
     (hi5 : ushCode (GF := GF) N.t ⊢ uinstrIs N.t (BitVec.ofNat 64 (p0 + 16)) false (.JAL (j5, .Regidx 1#5))) :
-    ⊢ □ (∀ p : Nat, ⌜p < fq⌝ -∗ kshW1 (hlc := hlc) N (BitVec.ofNat 64 2) (ushLit fa p) (C1 p) (C1 (p + 1))) -∗
-      □ (∀ p : Nat, ⌜p < slen⌝ -∗ kshW1 (hlc := hlc) N (BitVec.ofNat 64 2) (sf p) (C2 p) (C2 (p + 1))) -∗
+    ⊢ □ (∀ p : Nat, ⌜p < fq⌝ -∗ kshW1 N (BitVec.ofNat 64 2) (ushLit fa p) (C1 p) (C1 (p + 1))) -∗
+      □ (∀ p : Nat, ⌜p < slen⌝ -∗ kshW1 N (BitVec.ofNat 64 2) (sf p) (C2 p) (C2 (p + 1))) -∗
       □ (∀ p : Nat, ⌜fq + 2 ≤ p ∧ p < flen⌝ -∗
-        kshW1 (hlc := hlc) N (BitVec.ofNat 64 2) (ushLit fa p) (C3 p) (C3 (p + 1))) -∗
+        kshW1 N (BitVec.ofNat 64 2) (ushLit fa p) (C3 p) (C3 (p + 1))) -∗
       C1 0 -∗ ushCode N.t -∗ ushSstr N tx dqs sa slen sf -∗ (C3 flen -∗ N.pay (-1)) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 p0) (10 + (12 + (4 + n))) -∗ wpLoop h := by
+      urun N h m (BitVec.ofNat 64 p0) (10 + (12 + (4 + n))) -∗ wpLoop h := by
   obtain ⟨hok, hnp, hfa, hq2, hpq, hps, hd1, hd2, hd3, hd4, hsym, hj3, hj5, hev, hlt⟩ := hl
   iintro #Hb1 #Hb2 #Hb3 HC #Hc Hsstr Hpay Hrun
   ihave #Hfs := shdFmtStr N.t fa flen hok (by omega) $$ Hc

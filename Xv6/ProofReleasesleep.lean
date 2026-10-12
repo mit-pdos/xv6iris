@@ -51,7 +51,7 @@ theorem rsl_withSpie_canon (k : KCtx) (l : List String) (a b : Bool) :
     (((k.pushOffAt a b).withLocks l).pushed 4).withSpie a b = ((k.pushOffAt a b).withLocks l).pushed 4 := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] [CurCtx]
 
 /-! ## The callees -/
 
@@ -68,7 +68,7 @@ theorem rsl_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γl γ : GName) (slk :
       locked γl cpu' -∗ slBody γ slk Rp H curCtx -∗ (∃ K : Nat, viewLb cpu' K) -∗
       sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γl "sleep lock" (slBody γ slk Rp H) hnoff hK hs
+  have h := AC.wp_acquire (GF := GF) c k' γl "sleep lock" (slBody γ slk Rp H) hnoff hK hs
   unfold wp_acquire_body at h
   simp only [acquireAddr] at h
   rw [ha0] at h
@@ -85,7 +85,7 @@ theorem rsl_wakeup (WK : WAKEUP) (Γ : SchedNames) (c : CPU) (k' : KCtx)
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := WK.wp_wakeup (hlc := hlc) (GF := GF) Γ c k' hnoff hK hlk htier
+  have h := WK.wp_wakeup (GF := GF) Γ c k' hnoff hK hlk htier
   unfold wp_wakeup_body at h
   simp only [wakeupAddr] at h
   exact h
@@ -104,7 +104,7 @@ theorem rsl_release (RE : RELEASE_HOOK) (c : CPU) (k' : KCtx) (γl γ : GName) (
         (k'.locks.filter (fun x => x ≠ "sleep lock"))) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RE.wp_release_hook (hlc := hlc) (GF := GF) c k' γl "sleep lock" (slBody γ slk Rp H)
+  have h := RE.wp_release_hook (GF := GF) c k' γl "sleep lock" (slBody γ slk Rp H)
     (slBody γ slk Rin H) hsie hnoff hK reen hreen hon
   unfold wp_release_hook_body at h
   simp only [releaseAddr] at h
@@ -331,7 +331,7 @@ theorem releasesleep_br_ffffffffffffcacc : KA.«releasesleep» + 0xffffffffffffc
 set_option maxHeartbeats 16000000 in
 theorem releasesleep_hook_proof (AC : ACQUIRE) (RE : RELEASE_HOOK) (WK : WAKEUP) :
     RELEASESLEEP_HOOK := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ X Γ cpu k γl γ Rp Rin _ _ H q pid hnoff hK hs hp htier => by
+  fun {GF} _ _ _ _ _ _ _ _ X Γ cpu k γl γ Rp Rin _ _ H q pid hnoff hK hs hp htier => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_releasesleep_gen_hook_body

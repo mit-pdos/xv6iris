@@ -44,7 +44,7 @@ open LeanRV64D
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -59,7 +59,7 @@ theorem fstat_myproc (MP : MYPROC) (c : CPU) (k' : KCtx)
       kctx c' ((k'.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) c := by
-  have h := MP.wp_myproc (hlc := hlc) (GF := GF) c k' hnoff hK
+  have h := MP.wp_myproc (GF := GF) c k' hnoff hK
   unfold wp_myproc_body at h
   simp only [myprocAddr] at h
   iintro ⟨Hk, Hpc, Hte, Hce, HK⟩
@@ -88,7 +88,7 @@ def fstatLk (ik : Nat) (s : Qp) (g : GName) (lo : Nat) (inum : BitVec 32) (dn : 
 set_option maxHeartbeats 8000000 in
 /-- `ilock(ip)` at filestat's call site: THE READ ARM (`depRd`), the
 `shotK ty` licence, `Tl := 0`, the environment out of `fsReady`. -/
-theorem fstat_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU)
+theorem fstat_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF Γ] (c : CPU)
     (k' : KCtx) (j ik : Nat) (s : Qp) (g : GName) (lo tl : Nat) (ty : BitVec 16)
     (inum : BitVec 32) (γil γisl : GName) (pid : BitVec 32)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : ilockSlots ≤ k'.avail)
@@ -96,7 +96,7 @@ theorem fstat_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] 
     (hnib : inum.toNat < 16 * icfgNib) (ha0 : k'.regs 10#5 = ientry ik) (hle : lo ≤ tl) :
     kctx c k' ∗ pcIs c KA.«ilock» ∗
     trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗ procsInv Γ ∗ panicEnv ∗
-    fsReady (hlc := hlc) ∗
+    fsReady ∗
     isSleeplockGen γil γisl (iLock (ientry ik)) (icSlp fscIc ik) (slhTok (icfgIsl ik)) ∗
     credFloor lo tl ∗ ityShot g ty ∗ inodeShrGenlo ik s icfgDev inum g lo ∗
     wordPointsTo (pPid k'.proc) 4 pidPriv pid ∗ bslot ∗
@@ -117,8 +117,8 @@ theorem fstat_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] 
   ihave #Hcla := isItable2_claims $$ Hit2
   ihave #Hsb := fsReady_sb_four $$ Hfs
   icases Hsb with ⟨-, #Hsi, -⟩
-  ihave #Hl0 := topLbAt_0 (GF := GF) (MachGS.era (hlc := hlc) (GF := GF))
-  have h := IL.wp_ilock_dep_eb (hlc := hlc) (GF := GF) Γ c k' γl pd pav pu j γil γisl ik s g lo tl
+  ihave #Hl0 := topLbAt_0 (GF := GF) (MachGS.era (GF := GF))
+  have h := IL.wp_ilock_dep_eb (GF := GF) Γ c k' γl pd pav pu j γil γisl ik s g lo tl
     (.depRd s icfgDev inum g lo) (.shotK ty) inum pid pidPriv DFrac.discard 0 hj hproc hK hnoff
     htier rfl (fun _ => ⟨ty, rfl⟩) hkk hgo.fgoLog (hgo.iblockCov inum hnib) hnib hpd ha0 hle
   unfold wp_ilock_dep_eb_body at h
@@ -157,7 +157,7 @@ theorem fstat_stati (ST : STATI) (c : CPU) (k' : KCtx) (ip st : BitVec 64) (dev 
       inodeMeta ip dn -∗
       statAt st dev inum dn.diType dn.diNlink (BitVec.setWidth 64 dn.diSize) -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) c := by
-  have h := ST.wp_stati (hlc := hlc) (GF := GF) c k' ip st dev inum dn dev0 ino0 ty0 nl0 sz0
+  have h := ST.wp_stati (GF := GF) c k' ip st dev inum dn dev0 ino0 ty0 nl0 sz0
     (DFrac.own (1 : Qp).half) (DFrac.own (1 : Qp).half) ha0 ha1 hK
   unfold wp_stati_body at h
   simp only [statiAddr] at h
@@ -181,7 +181,7 @@ theorem fstat_iunlock (IU : IUNLOCK) (Γ : SchedNames) (c : CPU) (k' : KCtx) (ik
     (htier : k'.tier = KTier.kpt) (hkk : ik < NINODE) (ha0 : k'.regs 10#5 = ientry ik)
     (hle : lo ≤ tl) :
     kctx c k' ∗ pcIs c KA.«iunlock» ∗
-    trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗ procsInv Γ ∗ fsReady (hlc := hlc) ∗
+    trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗ procsInv Γ ∗ fsReady ∗
     isSleeplockGen γil γisl (iLock (ientry ik)) (icSlp fscIc ik) (slhTok (icfgIsl ik)) ∗
     credFloor lo tl ∗ fstatLk ik s g lo inum dn bm γisl pid ∗
     wordPointsTo (pPid k'.proc) 4 pidPriv pid ∗
@@ -192,7 +192,7 @@ theorem fstat_iunlock (IU : IUNLOCK) (Γ : SchedNames) (c : CPU) (k' : KCtx) (ik
       wordPointsTo (pPid k'.proc) 4 pidPriv pid -∗
       inodeShrGenlo ik s icfgDev inum g lo -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) c := by
-  have h := IU.wp_iunlock_dep (hlc := hlc) (GF := GF) Γ c k' γil γisl ik s g lo tl
+  have h := IU.wp_iunlock_dep (GF := GF) Γ c k' γil γisl ik s g lo tl
     (.depRd s icfgDev inum g lo) icfgDev inum dn bm pid pidPriv (by rw [hnoff]; omega) hK rfl hkk
     ha0 (by rw [hlocks]; simp) (by rw [hlocks]; simp) htier hle
   unfold wp_iunlock_dep_body at h
@@ -238,7 +238,7 @@ theorem fstat_copyout (CO : COPYOUT) (c : CPU) (k' : KCtx) (γl : GName) (γk : 
       byteBuf (k'.regs 13#5) (DFrac.own 1) bs -∗ procPtAt P' M' -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) c := by
   subst hp
-  have h := CO.wp_copyout_nr (hlc := hlc) (GF := GF) c k' γl γk P M (DFrac.own 1) bs ke hnoff hK hlk
+  have h := CO.wp_copyout_nr (GF := GF) c k' γl γk P M (DFrac.own 1) bs ke hnoff hK hlk
     hroot hsz hlen hlen'
   unfold wp_copyout_nr_body at h
   simp only [copyoutAddr] at h

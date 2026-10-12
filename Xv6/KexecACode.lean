@@ -121,7 +121,7 @@ theorem kxcA_hdr_bytes (data : Nat → List (BitVec 8)) (olds : List (BitVec 8))
   simp [rdBytes]
 
 section Pid
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg]
 
 /-! ## The block's pid cell and working directory (Rocq `proc_priv_bare_cref`) -/
@@ -207,7 +207,7 @@ theorem kxcA_magic_ne (ef : List (BitVec 8))
   decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -232,7 +232,7 @@ theorem kxcA_call_myproc (MP : MYPROC) (cpu : CPU) (k : KCtx) (spie spp : Bool) 
   iintro ⟨#Hi, Hk, Hpc, Hte, Hce, HK⟩
   k_step_e (wp_s_jal cpu _ X false imm 1#5 (by decide)) $$ [- $Hk $Hpc $Hi] with [hX]
   iintro Hk Hpc
-  have h := MP.wp_myproc (hlc := hlc) (GF := GF) cpu
+  have h := MP.wp_myproc (GF := GF) cpu
     ((((k.withSpie spie spp).pushed 68).withRegs R).setReg 1#5 (X + 4#64))
     (by k_norm_g; omega) (by k_norm_g; exact hK')
   unfold wp_myproc_body at h
@@ -254,7 +254,7 @@ theorem kxcA_call_myproc (MP : MYPROC) (cpu : CPU) (k : KCtx) (spie spp : Bool) 
 
 set_option maxHeartbeats 8000000 in
 /-- **`jal begin_op` at `X`** (+0x026). -/
-theorem kxcA_call_beginop (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem kxcA_call_beginop (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : KexecArgs) (spie spp : Bool) (R : RegMap)
     (X : BitVec 64) (imm : BitVec 21) (hX : X + BitVec.signExtend 64 imm = KA.«begin_op»)
     (hret : jumpPc (X + 4#64) = X + 4#64)
@@ -263,7 +263,7 @@ theorem kxcA_call_beginop (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc
     instr X false (instruction.JAL (imm, regidx.Regidx 1#5)) ∗
     kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu X ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗ wordPointsTo (pPid k.proc) 4 pidPriv A.pidv ∗
+    fsFabric Γ A.pd A.pav A.pu ∗ wordPointsTo (pPid k.proc) 4 pidPriv A.pidv ∗
     (∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap),
       ⌜calleeSaved (R.set 1#5 (X + 4#64)) R'⌝ -∗
       kctx c (((k.withSpie spie' spp').pushed 68).withRegs R') -∗ pcIs c (X + 4#64) -∗
@@ -279,7 +279,7 @@ theorem kxcA_call_beginop (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc
   ihave #Hlc := fsReady_log $$ Hrdy
   k_step_e (wp_s_jal cpu _ X false imm 1#5 (by decide)) $$ [- $Hk $Hpc $Hi] with [hX]
   iintro Hk Hpc
-  have h := BO.wp_begin_op_eb (hlc := hlc) (GF := GF) Γ cpu
+  have h := BO.wp_begin_op_eb (GF := GF) Γ cpu
     ((((k.withSpie spie spp).pushed 68).withRegs R).setReg 1#5 (X + 4#64)) icfgLog fscBio
     (fsView fscFs fscDisk icfgDev fscCov) fscFs A.j fscLogst icfgDev A.pidv pidPriv
     hj (by k_norm_g; exact hproc) (by k_norm_g; exact hK') (by k_norm_g; exact hnoff)
@@ -305,7 +305,7 @@ ARM, the plain licence, `topLb 0`): namei's reference is shed into the short
 parent and a half share, the share locked under a named generation, and what
 comes back is exactly kexec's open-inode bundle `kxcOpen` at the payload's
 own `data` (`kxcLdat_of_loaded`). -/
-theorem kxcA_call_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem kxcA_call_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : KexecArgs) (spie spp : Bool) (R : RegMap)
     (X : BitVec 64) (imm : BitVec 21) (hX : X + BitVec.signExtend 64 imm = KA.«ilock»)
     (hret : jumpPc (X + 4#64) = X + 4#64)
@@ -316,7 +316,7 @@ theorem kxcA_call_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     instr X false (instruction.JAL (imm, regidx.Regidx 1#5)) ∗
     kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu X ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗ wordPointsTo (pPid k.proc) 4 pidPriv A.pidv ∗
+    fsFabric Γ A.pd A.pav A.pu ∗ wordPointsTo (pPid k.proc) 4 pidPriv A.pidv ∗
     inodeRefp kk q icfgDev inum ∗ bslot ∗ logTx icfgLog ∗
     (∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap) (g : GName) (lo tl : Nat) (dn : Dinode)
         (bm : Blkmap) (data : Nat → List (BitVec 8)) (gil gisl : GName),
@@ -340,7 +340,7 @@ theorem kxcA_call_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
   icases fsReady_sb_four $$ Hrdy with ⟨-, #Hsi, -, -⟩
   ihave #Hesc := fsReady_escrow kk hkk $$ Hrdy
   ihave #Hcla := isItable2_claims $$ Hit2
-  ihave #Hl0 := topLbAt_0 (GF := GF) (MachGS.era (hlc := hlc) (GF := GF))
+  ihave #Hl0 := topLbAt_0 (GF := GF) (MachGS.era (GF := GF))
   icases icSleeplocks_lookup fscIc kk hkk $$ Hslks with ⟨%γil, %γisl, #Hslk⟩
   unfold inodeRefp
   icases Href with ⟨Href, Hru⟩
@@ -348,7 +348,7 @@ theorem kxcA_call_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
   icases (inodeShr_gen_intro kk q.half icfgDev inum).1 $$ Hshr with ⟨%g, %lo, %tl, %hle, #Hfl, Hshr⟩
   k_step_e (wp_s_jal cpu _ X false imm 1#5 (by decide)) $$ [- $Hk $Hpc $Hi] with [hX]
   iintro Hk Hpc
-  have h := IL.wp_ilock_tx_eb (hlc := hlc) (GF := GF) Γ cpu
+  have h := IL.wp_ilock_tx_eb (GF := GF) Γ cpu
     ((((k.withSpie spie spp).pushed 68).withRegs R).setReg 1#5 (X + 4#64)) γbl pd pav pu A.j γil γisl
     kk q.half g lo tl .plainK inum A.pidv pidPriv DFrac.discard 0 hj (by k_norm_g; exact hproc)
     (by k_norm_g; exact hK') (by k_norm_g; exact hnoff) (by k_norm_g; exact htier) hkk hg.fgoLog
@@ -383,7 +383,7 @@ set_option maxHeartbeats 8000000 in
 arm, `readi(ip, 0, &elf, 0, 64)`): the open inode lent to readi at the full
 fraction of its map and blocks and handed back LITERALLY unchanged; the
 64-byte buffer comes back holding `rdDelivered data olds 0 tot`. -/
-theorem kxcA_call_readi (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem kxcA_call_readi (RD : READI) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : KexecArgs) (spie spp : Bool) (R : RegMap)
     (X : BitVec 64) (imm : BitVec 21) (hX : X + BitVec.signExtend 64 imm = KA.«readi»)
     (hret : jumpPc (X + 4#64) = X + 4#64)
@@ -396,7 +396,7 @@ theorem kxcA_call_readi (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     instr X false (instruction.JAL (imm, regidx.Regidx 1#5)) ∗
     kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu X ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗ wordPointsTo (pPid k.proc) 4 pidPriv A.pidv ∗
+    fsFabric Γ A.pd A.pav A.pu ∗ wordPointsTo (pPid k.proc) 4 pidPriv A.pidv ∗
     kxcOpen A.pidv kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf ∗
     byteBuf dst (DFrac.own 1) olds ∗ bslot ∗
     (∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap) (tot : Nat),
@@ -428,7 +428,7 @@ theorem kxcA_call_readi (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
   obtain ⟨hwf, hcov, -, -, hsz, -, -⟩ := hiok
   k_step_e (wp_s_jal cpu _ X false imm 1#5 (by decide)) $$ [- $Hk $Hpc $Hi] with [hX]
   iintro Hk Hpc
-  have h := RD.wp_readi_eb (hlc := hlc) (GF := GF) Γ cpu
+  have h := RD.wp_readi_eb (GF := GF) Γ cpu
     ((((k.withSpie spie spp).pushed 68).withRegs R).setReg 1#5 (X + 4#64)) γbl fscBio
     (fsView fscFs fscDisk icfgDev fscCov) fscDlock pd pav pu A.j fscFs fscLogst icfgDev fscKalloc
     fsReadyKmem (ientry kf) bmf data dnf false 0 64 olds A.pidv readiKVp (fun _ => []) pidPriv
@@ -506,7 +506,7 @@ a0,a5,bad`, then `lw a4,elf.magic ; lui/addi a5,ELF_MAGIC ; beq a4,a5,+0x90`),
 blind case splits reporting the tails' causes: each bad arm closes the opaque exit through the
 persistent wand at its cause and the receipt; the fall-through re-reads the
 receipt at the buffer (`Hconv`) and hands the exit on. -/
-theorem kxcA_tests_r (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem kxcA_tests_r (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs GF Γ]
     (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) (QF : KxfCause → Prop)
     (Rr : Dinode → Blkmap → (Nat → List (BitVec 8)) → IProp GF)
     (RX : List (BitVec 8) → Dinode → Blkmap → (Nat → List (BitVec 8)) → IProp GF)
@@ -525,7 +525,7 @@ theorem kxcA_tests_r (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs
     (hkeep : kxcKeeps k R [19#5, 21#5, 22#5, 23#5, 24#5, 25#5, 26#5, 27#5]) :
     kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu (KA.«kexec» + 0x4c#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
+    fsFabric Γ A.pd A.pav A.pu ∗
     kxcOpen A.pidv kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf ∗
     logOpb icfgLog n2 ∗ irefSlots 1 ∗ bslots 3 ∗
     procPrivFd A.γ k.proc A.pidv A.V A.M ∗ kxcBufs k A ∗
@@ -676,7 +676,7 @@ set_option maxHeartbeats 16000000 in
 (`kxcA_fire`: the payload open, readi not yet run), readi's 64-byte header
 read, and the two tests (`kxcA_tests_r`). -/
 theorem kxc_a2_r (IL : ILOCK) (RD : READI) (IUP : IUNLOCKPUT) (EO : END_OP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) (QF : KxfCause → Prop)
     (Rr : Dinode → Blkmap → (Nat → List (BitVec 8)) → IProp GF)
     (RX : List (BitVec 8) → Dinode → Blkmap → (Nat → List (BitVec 8)) → IProp GF)
@@ -685,7 +685,7 @@ theorem kxc_a2_r (IL : ILOCK) (RD : READI) (IUP : IUNLOCKPUT) (EO : END_OP)
     (zi n1 : Nat)
     (hqf : ∃ c, QF c) (hK : kexecSlots ≤ k.avail) (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
     (hj : A.j < NPROC) (hproc : k.proc = procAddr A.j) :
-    kxcAtA2 k A cpu spie spp R ipv zi n1 ∗ fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
+    kxcAtA2 k A cpu spie spp R ipv zi n1 ∗ fsFabric Γ A.pd A.pav A.pu ∗
     kxcOracle zi Rr ∗
     (∀ (ef : List (BitVec 8)) (dn : Dinode) (bm : Blkmap) (dt : Nat → List (BitVec 8)),
       ⌜∀ j, j < 64 → ef[j]! = fileByte dt j⌝ -∗ Rr dn bm dt -∗ RX ef dn bm dt) ∗

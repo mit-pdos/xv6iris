@@ -33,7 +33,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 set_option synthInstance.maxSize 1024
 
 section UShURoundShapes
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF] [PipeOutG GF] [PipesNG GF]
 
 /-- **Rocq `upterm_shape`**: A FORK FAILED at node `i` of the right spine --
@@ -46,11 +46,11 @@ noncomputable def uptermShape (ug : UnionGn) (I : List (BitVec 8)) (c : Nat) : I
       ∧ pviewUnionU.pvLine (lineV ulmG I) = some lR ∧ admUG lR = true
       ∧ plOk lR ∧ i < lcats lR ∧ 1 ≤ nlines I
       ∧ fcOk (pviewUnionU.pvFc sR)⌝
-    ∗ eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v
+    ∗ eraPin (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v
     ∗ inpLb v I
-    ∗ pwcForkExitN (hlc := hlc) (wids (lcats lR)) (runN (filesOf sR) lR)
-        (pwcBlkU (hlc := hlc) ug v I sR) (ptkU (hlc := hlc) ug v I) termw (tokN (filesOf sR) lR)
-        dep pnsN (genId (hlc := hlc) (GF := GF) + 1) γc γm (.WSh i) altForkc c
+    ∗ pwcForkExitN (wids (lcats lR)) (runN (filesOf sR) lR)
+        (pwcBlkU ug v I sR) (ptkU ug v I) termw (tokN (filesOf sR) lR)
+        dep pnsN (genId (GF := GF) + 1) γc γm (.WSh i) altForkc c
     ∗ [∗list] x ∈ heldN i sw,
         wcurN γc x.1.1 (1 : Qp).half x.2 ∗ wmodeN γm x.1.1 (1 : Qp).half (some x.1.2))
 
@@ -62,11 +62,11 @@ noncomputable def updoneShape (ug : UnionGn) (I : List (BitVec 8)) : IProp GF :=
     ⌜(∀ w s, Timeless (dep w s))
       ∧ pviewUnionU.pvLine (lineV ulmG I) = some lR ∧ admUG lR = true
       ∧ plOk lR ∧ fcOk (pviewUnionU.pvFc sR)⌝
-    ∗ eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v
+    ∗ eraPin (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v
     ∗ inpLb v I
-    ∗ blkNInv (hlc := hlc) (wids (lcats lR)) (runN (filesOf sR) lR)
-        (pwcBlkU (hlc := hlc) ug v I sR) termw (tokN (filesOf sR) lR) dep pnsN
-        (genId (hlc := hlc) (GF := GF) + 1) γc γm
+    ∗ blkNInv (wids (lcats lR)) (runN (filesOf sR) lR)
+        (pwcBlkU ug v I sR) termw (tokN (filesOf sR) lR) dep pnsN
+        (genId (GF := GF) + 1) γc γm
     ∗ [∗list] w ∈ wids (lcats lR),
         ∃ s : List (BitVec 8), wcurN γc w (1 : Qp).half s.length ∗ wmodeN γm w (1 : Qp).half (some s)
           ∗ ⌜termw w s = false⌝)

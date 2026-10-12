@@ -56,7 +56,7 @@ def sysCloseSlots : Nat := 4 + filecloseSlots
 theorem sysCloseSlots_eq : sysCloseSlots = 92 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -84,15 +84,15 @@ def sysCloseCont (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γ : FileNames) (γd 
     -- at a count at least the one it left at
     ⌜V.ev ≤ k'⌝ -∗
     sysClosePost γ γd pa pid (V.updEv k') M sts v (R' 10#5) -∗
-    filecloseCpostAny (hlc := hlc) (sysFdSt v V.ofile sts) Φc -∗
+    filecloseCpostAny (sysFdSt v V.ofile sts) Φc -∗
     -- the whole environment back (the page count may have moved)
-    (∃ on', fileclosePipeEnv (hlc := hlc) Γ γkl γk on') -∗
-    filecloseFsEnv (hlc := hlc) Γ j k.proc -∗
+    (∃ on', fileclosePipeEnv Γ γkl γk on') -∗
+    filecloseFsEnv Γ j k.proc -∗
     irefSlot -∗ wpLoop cpu'))
 
 /-- **WP of `sys_close()`** (Rocq `wp_sys_close_sconf_body`), eb-generic at
 depth 0. -/
-def wp_sys_close_eb_body (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx)
+def wp_sys_close_eb_body (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx)
     (γl : GName) (γ : FileNames)
     (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
     (v : BitVec 64) (j : Nat) (γkl : GName) (γk : KmemNames) (on : Option Nat) (Φc : IProp GF)
@@ -104,26 +104,26 @@ def wp_sys_close_eb_body (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : C
   isFtable γl γ ∗ panicEnv ∗
   procPrivFd γ pa pid V M ∗ fdFrags V.fdg sts ∗
   irefSlot ∗
-  fileclosePipeEnv (hlc := hlc) Γ γkl γk on ∗ filecloseFsEnv (hlc := hlc) Γ j k.proc ∗
+  fileclosePipeEnv Γ γkl γk on ∗ filecloseFsEnv Γ j k.proc ∗
   -- THE BYTE QUEUE'S CLOSE PAYMENT at the descriptor argument 0 names
   -- (Rocq `fileclose_cpay (sys_fd_st v (pv_ofile V) sts) Φc`, design/pipe.md
   -- "The byte queue"): a close link on a pipe descriptor, nothing elsewhere
-  filecloseCpay (hlc := hlc) (sysFdSt v V.ofile sts) Φc ∗
+  filecloseCpay (sysFdSt v V.ofile sts) Φc ∗
   sysCloseCont Γ cpu k γ V.fdg pa pid V M sts v j γkl γk Φc
   ⊢ wpLoop (GF := GF) cpu
 
 end
 
 structure SYSCLOSE : Prop where
-  wp_sys_close_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  wp_sys_close_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
     (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
     (v : BitVec 64) (j : Nat) (γkl : GName) (γk : KmemNames) (on : Option Nat) (Φc : IProp GF)
     hv hproc htier hsp hnoff hK,
-    wp_sys_close_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ pa pid V M sts v j γkl γk on Φc
+    wp_sys_close_eb_body (GF := GF) Γ cpu k γl γ pa pid V M sts v j γkl γk on Φc
       hv hproc htier hsp hnoff hK
 
 end Xv6

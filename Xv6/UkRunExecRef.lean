@@ -52,7 +52,7 @@ theorem usysExec_ne_fork : USYS_exec ≠ USYS_fork := by unfold USYS_exec USYS_f
 theorem usysExec_ne_wait : USYS_exec ≠ USYS_wait := by unfold USYS_exec USYS_wait; decide
 
 section UkRunExecRef
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -66,19 +66,19 @@ run's pipe rows LENT (persistent, so nothing comes back). -/
 def udepwAtRefR (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (c : Nat) (R : IProp GF) : IProp GF :=
   iprop(∀ (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (fdv : List FdState) (gn : GName)
       (cs : ExtTreeSet GName compare) (pidv : BitVec 32),
-    myPay gn N.pay -∗ urunRows (hlc := hlc) N fdv -∗ uheap N.t N.d N.s M pm sz -∗ ufdAuth N.fd fdv -∗
+    myPay gn N.pay -∗ urunRows N fdv -∗ uheap N.t N.d N.s M pm sz -∗ ufdAuth N.fd fdv -∗
     uheap N.t N.d N.s M pm sz ∗ ufdAuth N.fd fdv ∗
-      sbundlePayRefR (uslot (hlc := hlc)) N.pay R (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll))
+      sbundlePayRefR (uslot) N.pay R (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll))
 
 /-- **Rocq `udepw_at_refR_ids`**: ...with the identity authorities lent too
 (lane EXEC-SEAM). -/
 def udepwAtRefRIds (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (c : Nat) (R : IProp GF) : IProp GF :=
   iprop(∀ (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (fdv : List FdState) (gn : GName)
       (cs : ExtTreeSet GName compare) (pidv : BitVec 32),
-    myPay gn N.pay -∗ urunRows (hlc := hlc) N fdv -∗ uheap N.t N.d N.s M pm sz -∗ ufdAuth N.fd fdv -∗
+    myPay gn N.pay -∗ urunRows N fdv -∗ uheap N.t N.d N.s M pm sz -∗ ufdAuth N.fd fdv -∗
     urunIds N cs pidv -∗
     uheap N.t N.d N.s M pm sz ∗ ufdAuth N.fd fdv ∗ urunIds N cs pidv ∗
-      sbundlePayRefR (uslot (hlc := hlc)) N.pay R (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll))
+      sbundlePayRefR (uslot) N.pay R (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll))
 
 /-- The cwd agreement, as a wand (the halves are kept by the pure reading). -/
 theorem ucwd_agree_w (γc : GName) (c c' : Nat) :
@@ -98,12 +98,12 @@ theorem uexecRet_exec_refR (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (avail
     (cs : ExtTreeSet GName compare) (pidv : BitVec 32)
     (hn : usysno m = USYS_exec) (hx0 : m 0#5 = 0#64)
     (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ myPay gn N.pay -∗ udep (hlc := hlc) -∗ urunRows (hlc := hlc) N fdv -∗
+    ⊢ myPay gn N.pay -∗ udep -∗ urunRows N fdv -∗
       uheap N.t N.d N.s M pm sz -∗ ustack N.d (m.get spIdx) avail -∗ ufdAuth N.fd fdv -∗ ucwdAuth N.cwd c -∗
       urunIds N cs pidv -∗
-      sbundlePayRefR (uslot (hlc := hlc)) N.pay R (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll) -∗
-      (∀ h' : CPU, R -∗ urun (hlc := hlc) N h' (ukWr m 10#5 (-1#64)) (pc + 4#64) avail -∗ wpLoop h') -∗
-      uexecRet (hlc := hlc) uecallScause (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll) := by
+      sbundlePayRefR (uslot) N.pay R (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll) -∗
+      (∀ h' : CPU, R -∗ urun N h' (ukWr m 10#5 (-1#64)) (pc + 4#64) avail -∗ wpLoop h') -∗
+      uexecRet uecallScause (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll) := by
   have hnum : usysNum (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll).tf = USYS_exec := by
     show usysNum (tfOf m pc) = _
     rw [tfOf_num]; exact hn
@@ -157,10 +157,10 @@ program's working directory `c`, handing back the supplier-named refund. -/
 theorem wp_uk_ecall_exec_at_cwd_refR (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap)
     (pc : BitVec 64) (avail : Nat) (c : Nat) (R : IProp GF)
     (hn : usysno m = USYS_exec) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗ ucwd N.cwd c -∗
-      udepwAtRefR (hlc := hlc) N m pc c R -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗ ucwd N.cwd c -∗
+      udepwAtRefR N m pc c R -∗
       ▷ (∀ h' : CPU, ucwd N.cwd c -∗ R -∗
-          urun (hlc := hlc) N h' (ukWr m 10#5 (-1#64)) (pc + 4#64) avail -∗ wpLoop h') -∗
+          urun N h' (ukWr m 10#5 (-1#64)) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hrun Hcwd Hsb Hcont
   unfold urun
@@ -173,7 +173,7 @@ theorem wp_uk_ecall_exec_at_cwd_refR (UL : UK_LEAVES) (N : UkNames GF) (h : CPU)
   ihave %hui := uinstrIs_ukInstr N.t N.d N.s M pm sz pc false _ $$ Hheap Hi
   let S : UkSec GF := ⟨h, C, pt, Rfd, Rut, pm, sz, N.pay⟩
   let K : UkKey := ⟨fdv, cw, gn, cs, pidv⟩
-  have hS : @UkSec.ok hlc GF _ xi S := ⟨hlo, hpm, hRut, hlzf⟩
+  have hS : @UkSec.ok GF _ xi S := ⟨hlo, hpm, hRut, hlzf⟩
   have H := UL.wp_uk_ecall S K M m pc hS hui
   unfold ukUvb at H
   iapply H $$ Hb Hmy
@@ -189,10 +189,10 @@ reading the record's children set and pid off the lent authorities. -/
 theorem wp_uk_ecall_exec_at_cwd_refR_ids (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap)
     (pc : BitVec 64) (avail : Nat) (c : Nat) (R : IProp GF)
     (hn : usysno m = USYS_exec) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗ ucwd N.cwd c -∗
-      udepwAtRefRIds (hlc := hlc) N m pc c R -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗ ucwd N.cwd c -∗
+      udepwAtRefRIds N m pc c R -∗
       ▷ (∀ h' : CPU, ucwd N.cwd c -∗ R -∗
-          urun (hlc := hlc) N h' (ukWr m 10#5 (-1#64)) (pc + 4#64) avail -∗ wpLoop h') -∗
+          urun N h' (ukWr m 10#5 (-1#64)) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hrun Hcwd Hsb Hcont
   unfold urun
@@ -205,7 +205,7 @@ theorem wp_uk_ecall_exec_at_cwd_refR_ids (UL : UK_LEAVES) (N : UkNames GF) (h : 
   ihave %hui := uinstrIs_ukInstr N.t N.d N.s M pm sz pc false _ $$ Hheap Hi
   let S : UkSec GF := ⟨h, C, pt, Rfd, Rut, pm, sz, N.pay⟩
   let K : UkKey := ⟨fdv, cw, gn, cs, pidv⟩
-  have hS : @UkSec.ok hlc GF _ xi S := ⟨hlo, hpm, hRut, hlzf⟩
+  have hS : @UkSec.ok GF _ xi S := ⟨hlo, hpm, hRut, hlzf⟩
   have H := UL.wp_uk_ecall S K M m pc hS hui
   unfold ukUvb at H
   iapply H $$ Hb Hmy

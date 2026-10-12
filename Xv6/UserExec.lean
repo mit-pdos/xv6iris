@@ -171,7 +171,7 @@ def stvecBase (v : BitVec 64) : BitVec 64 := v &&& ~~~3#64
 /-! ## §2 The resources -/
 
 section UserExec
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- **Rocq `UserFrame.u_regs`**: the per-step mutable cells, as ONE bundle --
 hart state, privilege User, mstatus, the three trap CSRs, PC and nextPC
@@ -311,7 +311,7 @@ def userTrapFrame [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IP
     Register.mstatus ↦ᵣ[cpu] ms ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] stv ∗
     Register.sepc ↦ᵣ[cpu] sep ∗ pcIs cpu (stvecBase C.stvec) ∗ clockCells cpu ∗ gprFile cpu g ∗
     userPtAny cpu pt ∗ userCfg cpu C ∗ Rut pt ∗
-    uExitTok (hlc := hlc) (.uExit cpu (satpOf .kpt pt.root) sc sep (gprList g))
+    uExitTok (.uExit cpu (satpOf .kpt pt.root) sc sep (gprList g))
 
 /-- **Rocq `stvec_handler_wp`**: the kernel re-entry contract -- the handler
 at stvec (uservec) handles ANY trapped-out-of-user machine. -/
@@ -329,7 +329,7 @@ def umemLazy (P : UPtd) (sz : Nat) (M : Nat → List (BitVec 8)) : ElfMem :=
     else if n < pgRoundUpN sz then some 0#8 else none
 
 section UVocab
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- **Rocq `UserPtTree.user_ptm_inv`**: `userPtInv` at the LAZY view -- the
 page view `Mp` the ownership is at, read as `umemLazy P sz Mp` (UexecSlot's
@@ -370,7 +370,7 @@ def userTrapFrameAtm [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd →
   Register.mstatus ↦ᵣ[cpu] ms ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] stv ∗
   Register.sepc ↦ᵣ[cpu] sep ∗ pcIs cpu (stvecBase C.stvec) ∗ clockCells cpu ∗ gprFile cpu g ∗
   userPtmInv cpu pt sz M ∗ userCfg cpu C ∗ Rut pt ∗
-  uExitTok (hlc := hlc) (.uExit cpu (satpOf .kpt pt.root) sc sep (gprList g))
+  uExitTok (.uExit cpu (satpOf .kpt pt.root) sc sep (gprList g))
 
 /-- The GPR list does not read the map's slot `0` (NI M2-W2b). -/
 theorem gprList_ext (m m' : RegMap) (h : ∀ i, i ≠ 0#5 → m i = m' i) : gprList m = gprList m' := by
@@ -384,10 +384,10 @@ theorem gprList_ext (m m' : RegMap) (h : ∀ i, i ≠ 0#5 → m i = m' i) : gprL
   decide
 
 /-- The exit token at a GPR map is one at any map agreeing off slot `0`. -/
-theorem uRcpt_gprList_ext {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] (cpu : CPU)
+theorem uRcpt_gprList_ext {GF : BundledGFunctors.{0}} [MachGS GF] (cpu : CPU)
     (s sc sep : BitVec 64) (m m' : RegMap) (h : ∀ i, i ≠ 0#5 → m i = m' i) :
-    uExitTok (hlc := hlc) (GF := GF) (.uExit cpu s sc sep (gprList m)) ⊢
-      uExitTok (hlc := hlc) (.uExit cpu s sc sep (gprList m')) := by
+    uExitTok (GF := GF) (.uExit cpu s sc sep (gprList m)) ⊢
+      uExitTok (.uExit cpu s sc sep (gprList m')) := by
   rw [gprList_ext m m' h]
 
 /-- **Rocq `UmodeRegs.uv_regs`**: the per-step CSR cells with their values
@@ -401,7 +401,7 @@ def uvRegs (cpu : CPU) : IProp GF := iprop%
 /-- **Rocq `UmodeRegs.uv_amb`**: the hart's `hw_config`, the kernel's static
 map (deviation 9, not in Rocq) and the wire invariant (`minstret_inv` is
 `emp`, deviation 2). -/
-abbrev uvAmb (cpu : CPU) : IProp GF := iprop(hwConfig cpu ∗ kmapStatic (hlc := hlc) (GF := GF) ∗ wireInv)
+abbrev uvAmb (cpu : CPU) : IProp GF := iprop(hwConfig cpu ∗ kmapStatic (GF := GF) ∗ wireInv)
 
 instance uvAmb_persistent (cpu : CPU) : Persistent (uvAmb (GF := GF) cpu) := by
   unfold uvAmb; infer_instance

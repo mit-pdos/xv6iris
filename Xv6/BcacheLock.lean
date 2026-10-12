@@ -62,7 +62,7 @@ theorem bcPins_cs (k : KCtx) (R R' : RegMap) (h : bcPins k R) (hcs : calleeSaved
     c24.trans a24, c25.trans a25, c26.trans a26, c27.trans a27⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
 variable [DiskG GF] [CurCtx]
 
 theorem bc_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γl : GName) (γ : BcacheNames)
@@ -77,7 +77,7 @@ theorem bc_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γl : GName) (γ : Bcac
       locked γl cpu' -∗ bcacheResAt γ V curCtx -∗ (∃ K : Nat, viewLb cpu' K) -∗
       sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γl "bcache" (bcacheResAt γ V) hnoff' hK' hs'
+  have h := AC.wp_acquire (GF := GF) c k' γl "bcache" (bcacheResAt γ V) hnoff' hK' hs'
   unfold wp_acquire_body at h
   simp only [acquireAddr] at h
   rw [haddr] at h
@@ -95,7 +95,7 @@ theorem bc_release (RE : RELEASE) (c : CPU) (k' : KCtx) (γl : GName) (γ : Bcac
       kctx cpu' (((k'.popExit reen).withRegs R').withLocks (k'.locks.filter (fun x => x ≠ "bcache"))) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γl "bcache" (bcacheResAt γ V) hsie' hnoff' hK' reen hreen hon
+  have h := RE.wp_release (GF := GF) c k' γl "bcache" (bcacheResAt γ V) hsie' hnoff' hK' reen hreen hon
   unfold wp_release_body at h
   simp only [releaseAddr] at h
   rw [haddr] at h
@@ -118,7 +118,7 @@ theorem bc_release_hook (RE : RELEASE_HOOK) (c : CPU) (k' : KCtx) (γl : GName) 
       kctx cpu' (((k'.popExit reen).withRegs R').withLocks (k'.locks.filter (fun x => x ≠ "bcache"))) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RE.wp_release_hook (hlc := hlc) (GF := GF) c k' γl "bcache" (bcacheResAt γ V)
+  have h := RE.wp_release_hook (GF := GF) c k' γl "bcache" (bcacheResAt γ V)
     (bcacheResIn γ V tl) hsie' hnoff' hK' reen hreen hon
   unfold wp_release_hook_body at h
   simp only [releaseAddr] at h

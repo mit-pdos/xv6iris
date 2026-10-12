@@ -45,8 +45,8 @@ def sleepAddr : BitVec 64 := KA.«sleep»
 def sleepSlots : Nat := 20
 
 /-- **WP of `sleep`.** -/
-def wp_sleep_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+def wp_sleep_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (j : Nat)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : sleepSlots ≤ k.avail)
     (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
@@ -65,8 +65,8 @@ caller's complement (`trapCsrsExt` / `cpuClaimExt`, emp at `sie = true`),
 handed back at the resuming hart.  Entered at depth 0 (so, by `KCtx.wf`, no
 spinlock held: Rocq's `locks_below lks "proc"` is implied).  It parks, so
 the crossing is the literal `true`. -/
-def wp_sleep_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+def wp_sleep_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (j : Nat)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : sleepSlots ≤ k.avail)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) : Prop :=
@@ -80,9 +80,9 @@ def wp_sleep_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
 
 /-- The interface of `sleep`. -/
 structure SLEEP : Prop where
-  wp_sleep_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+  wp_sleep_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (j : Nat) hj hproc hK hnoff htier,
-    wp_sleep_eb_body (hlc := hlc) (GF := GF) Γ cpu k j hj hproc hK hnoff htier
+    wp_sleep_eb_body (GF := GF) Γ cpu k j hj hproc hK hnoff htier
 
 end Xv6

@@ -30,7 +30,7 @@ theorem pn_fmt_addr : KA.«panic» + 0x67e8#64 = KStr.«%s\n» := by decide
 theorem pn_br_printk : KA.«panic» + 0xfffffffffffffcee#64 = KA.«printk» := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-! ## The two read-only format strings -/
 
@@ -57,7 +57,7 @@ theorem pn_cstr_fmt [CurCtx] :
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-! ## `printk` at the two call sites -/
 
@@ -77,7 +77,7 @@ theorem pn_printk0 (PK : PRINTK) [CurCtx]
       uartSentSub γd (bs ++ cs) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, Hf, #Hlk, #Htx, Hsent, HPhi⟩
-  have h := PK.wp_printk (hlc := hlc) (GF := GF) c k' γpr γl γd bs dqf f [] hK hflen
+  have h := PK.wp_printk (GF := GF) c k' γpr γl γd bs dqf f [] hK hflen
     (by rw [hkinds]; rfl) (by decide) hnoff hpr huart
   unfold wp_printk_body at h
   simp only [printkAddr] at h
@@ -107,7 +107,7 @@ theorem pn_printk1 (PK : PRINTK) [CurCtx]
       uartSentSub γd (bs ++ cs) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, Hf, Hd, #Hlk, #Htx, Hsent, HPhi⟩
-  have h := PK.wp_printk (hlc := hlc) (GF := GF) c k' γpr γl γd bs dqf f [dm] hK hflen
+  have h := PK.wp_printk (GF := GF) c k' γpr γl γd bs dqf f [dm] hK hflen
     (by rw [hkinds]; simp only [List.map_cons, List.map_nil, hkind])
     (by simp only [List.length_cons, List.length_nil]; omega) hnoff hpr huart
   unfold wp_printk_body at h
@@ -126,7 +126,7 @@ theorem pn_printk1 (PK : PRINTK) [CurCtx]
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-! ## The self-jump
 
@@ -152,7 +152,7 @@ end
 
 set_option maxHeartbeats 16000000 in
 theorem panic_proof (PK : PRINTK) : PANIC := ⟨
-  fun {hlc GF} _ _ _ cpu k dm hK hkind hnoff hpr huart => by
+  fun {GF} _ _ _ cpu k dm hK hkind hnoff hpr huart => by
   unfold wp_panic_body
   simp only [panicAddr]
   iintro ⟨Hk, Hpc, #Henv, Hd⟩

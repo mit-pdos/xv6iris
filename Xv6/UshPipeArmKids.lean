@@ -50,7 +50,7 @@ theorem ushpi_key_wr (m : RegMap) (k : Nat) (hk : k < NOFILE) :
   rw [ukWr_get_same _ _ _ (by decide)]; exact ushpi_fd_key k hk
 
 section UshPipeArmKids
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -70,12 +70,12 @@ theorem ushpi_close2 (UL : UK_LEAVES) (SC : SH_SYS_CLOSE) (N : UkNames GF) {x : 
     (hst : ushSt m sp0 t) (hal : sp0.toNat % 8 = 0) (hlo : 48 ≤ sp0.toNat) (ha16 : a < NOFILE) (hb16 : b < NOFILE) :
     ⊢ ushCode N.t -∗ ubytes N.d (sp0.toNat - 40) 4 (nthByte (n := 4) (BitVec.ofNat 32 a)) -∗
       ubytes N.d (sp0.toNat - 40 + 4) 4 (nthByte (n := 4) (BitVec.ofNat 32 b)) -∗
-      ushCldep (hlc := hlc) sa -∗ ushCldep (hlc := hlc) sb -∗ ufd N.fd a sa -∗ ufd N.fd b sb -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 x) av -∗
+      ushCldep sa -∗ ushCldep sb -∗ ufd N.fd a sa -∗ ufd N.fd b sb -∗
+      urun N h m (BitVec.ofNat 64 x) av -∗
       (∀ (h' : CPU) (m' : RegMap), ⌜ushSt m' sp0 t⌝ -∗
         ubytes N.d (sp0.toNat - 40) 4 (nthByte (n := 4) (BitVec.ofNat 32 a)) -∗
         ubytes N.d (sp0.toNat - 40 + 4) 4 (nthByte (n := 4) (BitVec.ofNat 32 b)) -∗
-        urun (hlc := hlc) N h' m' (BitVec.ofNat 64 (x + 16)) av -∗ wpLoop h') -∗
+        urun N h' m' (BitVec.ofNat 64 (x + 16)) av -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #HC Hb0 Hb1 #Hda #Hdb Hha Hhb Hrun Hk
   iapply ushpi_lw UL N hl0 (x + 4) h m av _ _ (ushpi_a40 m sp0 hst.1 hlo) (by omega) (by simp) $$ HC Hb0 Hrun
@@ -108,11 +108,11 @@ theorem ushpi_left (UL : UK_LEAVES) (SC : SH_SYS_CLOSE) (SD : SH_SYS_DUP)
       ubytes N.d (sp0.toNat - 40) 4 (nthByte (n := 4) (BitVec.ofNat 32 a)) -∗
       ubytes N.d (sp0.toNat - 40 + 4) 4 (nthByte (n := 4) (BitVec.ofNat 32 b)) -∗ ustd N.fd ld -∗
       ([∗map] fd ↦ st ∈ ushpiHs a b (.open true false (.pipe γp)) (.open false true (.pipe γp)), ufd N.fd fd st) -∗
-      ushCldep (hlc := hlc) (.open true false (.pipe γp)) -∗ ushCldep (hlc := hlc) (.open false true (.pipe γp)) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x14c) av -∗
+      ushCldep (.open true false (.pipe γp)) -∗ ushCldep (.open false true (.pipe γp)) -∗
+      urun N h m (BitVec.ofNat 64 0x14c) av -∗
       (∀ (h' : CPU) (m' : RegMap) (q : Nat), ⌜m'.get 10#5 = BitVec.ofNat 64 q⌝ -∗ ushCmd N.d q cl -∗
         ustd N.fd (ld.set 1 (.open false true (.pipe γp))) -∗
-        urun (hlc := hlc) N h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») av -∗ wpLoop h') -∗
+        urun N h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») av -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #HC #Hcmd Hb0 Hb1 Hstd HD #HdR #HdW Hrun Hk
   ihave %hta := ushCmd_addr N.d t _ $$ Hcmd
@@ -179,13 +179,13 @@ theorem ushpi_right (UL : UK_LEAVES) (SC : SH_SYS_CLOSE) (SD : SH_SYS_DUP)
     ⊢ ushCode N.t -∗ ushCmd N.d t (.pipe cl cr) -∗
       ubytes N.d (sp0.toNat - 40) 4 (nthByte (n := 4) (BitVec.ofNat 32 a)) -∗
       ubytes N.d (sp0.toNat - 40 + 4) 4 (nthByte (n := 4) (BitVec.ofNat 32 b)) -∗ ustd N.fd ld -∗
-      ushCldep (hlc := hlc) st0 -∗
+      ushCldep st0 -∗
       ([∗map] fd ↦ st ∈ ushpiHs a b (.open true false (.pipe γp)) (.open false true (.pipe γp)), ufd N.fd fd st) -∗
-      ushCldep (hlc := hlc) (.open true false (.pipe γp)) -∗ ushCldep (hlc := hlc) (.open false true (.pipe γp)) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x182) av -∗
+      ushCldep (.open true false (.pipe γp)) -∗ ushCldep (.open false true (.pipe γp)) -∗
+      urun N h m (BitVec.ofNat 64 0x182) av -∗
       (∀ (h' : CPU) (m' : RegMap) (q : Nat), ⌜m'.get 10#5 = BitVec.ofNat 64 q⌝ -∗ ushCmd N.d q cr -∗
         ustd N.fd (ld.set 0 (.open true false (.pipe γp))) -∗
-        urun (hlc := hlc) N h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») av -∗ wpLoop h') -∗
+        urun N h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») av -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #HC #Hcmd Hb0 Hb1 Hstd #Hd0 HD #HdR #HdW Hrun Hk
   ihave %hta := ushCmd_addr N.d t _ $$ Hcmd
@@ -245,12 +245,12 @@ theorem ushpi_parent (UL : UK_LEAVES) (SC : SH_SYS_CLOSE)
     ⊢ ushCode N.t -∗ ubytes N.d (sp0.toNat - 40) 4 (nthByte (n := 4) (BitVec.ofNat 32 a)) -∗
       ubytes N.d (sp0.toNat - 40 + 4) 4 (nthByte (n := 4) (BitVec.ofNat 32 b)) -∗
       ([∗map] fd ↦ st ∈ ushpiHs a b (.open true false (.pipe γp)) (.open false true (.pipe γp)), ufd N.fd fd st) -∗
-      ushCldep (hlc := hlc) (.open true false (.pipe γp)) -∗ ushCldep (hlc := hlc) (.open false true (.pipe γp)) -∗
-      uch N.ch S2 -∗ Wr -∗ ushWait0Law (hlc := hlc) N Wr Pw -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x182) av -∗
+      ushCldep (.open true false (.pipe γp)) -∗ ushCldep (.open false true (.pipe γp)) -∗
+      uch N.ch S2 -∗ Wr -∗ ushWait0Law N Wr Pw -∗
+      urun N h m (BitVec.ofNat 64 0x182) av -∗
       (∀ (h' : CPU) (m' : RegMap) (rw1 rw2 : BitVec 64) (S3 S4 : ExtTreeSet GName compare),
         Pw rw1 S2 S3 -∗ Pw rw2 S3 S4 -∗ uch N.ch S4 -∗ Wr -∗
-        urun (hlc := hlc) N h' m' (BitVec.ofNat 64 0xea) av -∗ wpLoop h') -∗
+        urun N h' m' (BitVec.ofNat 64 0xea) av -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #HC Hb0 Hb1 HD #HdR #HdW Hch HWr #Hwl Hrun Hk
   icases ushpi_hs_out N.fd a b _ _ hab $$ HD with ⟨Hha, Hhb⟩

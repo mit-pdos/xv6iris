@@ -175,7 +175,7 @@ end Frame
 /-! ## §4 THE HOLES (Rocq `UkCat.v`) -/
 
 section UkCat
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -186,9 +186,9 @@ def kcatW (N : UkNames GF) (fdw ua : BitVec 64) (nb : Nat) (Ci Co : IProp GF) : 
   iprop(∀ (h : CPU) (m : RegMap) (avail : Nat),
     ⌜m.get 10#5 = fdw⌝ -∗ ⌜m.get 11#5 = ua⌝ -∗ ⌜m.get 12#5 = BitVec.ofNat 64 nb⌝ -∗
     ukCode N.t User.Cat.code.byte -∗ Ci -∗
-    urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Cat.Sym.«write») avail -∗
+    urun N h m (BitVec.ofNat 64 User.Cat.Sym.«write») avail -∗
     (∀ (h' : CPU) (ret : BitVec 64), Co -∗
-      urun (hlc := hlc) N h' (stubRet m 16 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
+      urun N h' (stubRet m 16 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
     wpLoop h)
 
 /-- **Rocq `kcat_wr`**: the same write, its output read at the RETURNED
@@ -198,20 +198,20 @@ def kcatWr (N : UkNames GF) (fdw ua : BitVec 64) (nb : Nat) (Ci : IProp GF) (Co 
   iprop(∀ (h : CPU) (m : RegMap) (avail : Nat),
     ⌜m.get 10#5 = fdw⌝ -∗ ⌜m.get 11#5 = ua⌝ -∗ ⌜m.get 12#5 = BitVec.ofNat 64 nb⌝ -∗
     ukCode N.t User.Cat.code.byte -∗ Ci -∗
-    urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Cat.Sym.«write») avail -∗
+    urun N h m (BitVec.ofNat 64 User.Cat.Sym.«write») avail -∗
     (∀ (h' : CPU) (ret : BitVec 64), Co ret -∗
-      urun (hlc := hlc) N h' (stubRet m 16 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
+      urun N h' (stubRet m 16 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
     wpLoop h)
 
 /-- **Rocq `kcat_wb`**: putc's one-byte write, at the byte `b` it stores in
 its own frame (the address quantified: no caller can name it). -/
 def kcatWb (N : UkNames GF) (fdw : BitVec 64) (b : BitVec 8) (Ci Co : IProp GF) : IProp GF :=
   iprop(∀ ua : BitVec 64,
-    kcatW (hlc := hlc) N fdw ua 1 iprop(Ci ∗ ubyte N.d ua.toNat b) iprop(Co ∗ ubyte N.d ua.toNat b))
+    kcatW N fdw ua 1 iprop(Ci ∗ ubyte N.d ua.toNat b) iprop(Co ∗ ubyte N.d ua.toNat b))
 
 /-- **Rocq `kcat_wb_mono_in`**: the input side is anti-monotone. -/
 theorem kcatWb_mono_in (N : UkNames GF) (fdw : BitVec 64) (b : BitVec 8) (Ci Ci' Co : IProp GF) :
-    ⊢ (Ci' -∗ Ci) -∗ kcatWb (hlc := hlc) N fdw b Ci Co -∗ kcatWb (hlc := hlc) N fdw b Ci' Co := by
+    ⊢ (Ci' -∗ Ci) -∗ kcatWb N fdw b Ci Co -∗ kcatWb N fdw b Ci' Co := by
   iintro Hm Hw
   unfold kcatWb kcatW
   iintro %ua %h %m %avail %h0 %h1 %h2 #Hc ⟨HCi, Hb⟩ Hrun Hcont
@@ -222,7 +222,7 @@ theorem kcatWb_mono_in (N : UkNames GF) (fdw : BitVec 64) (b : BitVec 8) (Ci Ci'
 /-- **Rocq `kcat_wb_frame`**: a caller holding the input half hands it over
 once. -/
 theorem kcatWb_frame (N : UkNames GF) (fdw : BitVec 64) (b : BitVec 8) (Ci Co C : IProp GF) :
-    ⊢ C -∗ kcatWb (hlc := hlc) N fdw b iprop(Ci ∗ C) Co -∗ kcatWb (hlc := hlc) N fdw b Ci Co := by
+    ⊢ C -∗ kcatWb N fdw b iprop(Ci ∗ C) Co -∗ kcatWb N fdw b Ci Co := by
   iintro HC Hw
   unfold kcatWb kcatW
   iintro %ua %h %m %avail %h0 %h1 %h2 #Hc ⟨HCi, Hb⟩ Hrun Hcont
@@ -235,22 +235,22 @@ zero must be satisfiable). -/
 def kcatPaySeq (N : UkNames GF) (fdw : BitVec 64) (fb : Nat → BitVec 8) :
     Nat → Nat → IProp GF → IProp GF → IProp GF
   | _, 0, Ci, Cend => iprop(Ci -∗ Cend)
-  | i, k + 1, Ci, Cend => iprop(∃ Cm : IProp GF, kcatWb (hlc := hlc) N fdw (fb i) Ci Cm ∗
+  | i, k + 1, Ci, Cend => iprop(∃ Cm : IProp GF, kcatWb N fdw (fb i) Ci Cm ∗
       kcatPaySeq N fdw fb (i + 1) k Cm Cend)
 
 theorem kcatPaySeq_zero (N : UkNames GF) (fdw : BitVec 64) (fb : Nat → BitVec 8) (i : Nat) (Ci Cend : IProp GF) :
-    kcatPaySeq (hlc := hlc) N fdw fb i 0 Ci Cend = iprop(Ci -∗ Cend) := rfl
+    kcatPaySeq N fdw fb i 0 Ci Cend = iprop(Ci -∗ Cend) := rfl
 
 theorem kcatPaySeq_succ (N : UkNames GF) (fdw : BitVec 64) (fb : Nat → BitVec 8) (i k : Nat)
-    (Ci Cend : IProp GF) : kcatPaySeq (hlc := hlc) N fdw fb i (k + 1) Ci Cend =
-      iprop(∃ Cm : IProp GF, kcatWb (hlc := hlc) N fdw (fb i) Ci Cm ∗
-        kcatPaySeq (hlc := hlc) N fdw fb (i + 1) k Cm Cend) := rfl
+    (Ci Cend : IProp GF) : kcatPaySeq N fdw fb i (k + 1) Ci Cend =
+      iprop(∃ Cm : IProp GF, kcatWb N fdw (fb i) Ci Cm ∗
+        kcatPaySeq N fdw fb (i + 1) k Cm Cend) := rfl
 
 /-- **Rocq `kcat_pay_seq_mono`**: the output side is monotone. -/
 theorem kcatPaySeq_mono (N : UkNames GF) (fdw : BitVec 64) (fb : Nat → BitVec 8) :
     ∀ (k i : Nat) (Ci Cend Cend' : IProp GF),
-      ⊢ (Cend -∗ Cend') -∗ kcatPaySeq (hlc := hlc) N fdw fb i k Ci Cend -∗
-        kcatPaySeq (hlc := hlc) N fdw fb i k Ci Cend'
+      ⊢ (Cend -∗ Cend') -∗ kcatPaySeq N fdw fb i k Ci Cend -∗
+        kcatPaySeq N fdw fb i k Ci Cend'
   | 0, i, Ci, Cend, Cend' => by
     rw [kcatPaySeq_zero, kcatPaySeq_zero]
     iintro Hm Hc HCi
@@ -266,8 +266,8 @@ theorem kcatPaySeq_mono (N : UkNames GF) (fdw : BitVec 64) (fb : Nat → BitVec 
 /-- **Rocq `kcat_pay_seq_frame`**: it frames at the head. -/
 theorem kcatPaySeq_frame (N : UkNames GF) (fdw : BitVec 64) (fb : Nat → BitVec 8) (k i : Nat)
     (Ci Cend C : IProp GF) :
-    ⊢ C -∗ kcatPaySeq (hlc := hlc) N fdw fb i k iprop(Ci ∗ C) Cend -∗
-      kcatPaySeq (hlc := hlc) N fdw fb i k Ci Cend := by
+    ⊢ C -∗ kcatPaySeq N fdw fb i k iprop(Ci ∗ C) Cend -∗
+      kcatPaySeq N fdw fb i k Ci Cend := by
   cases k with
   | zero =>
     rw [kcatPaySeq_zero, kcatPaySeq_zero]
@@ -284,8 +284,8 @@ theorem kcatPaySeq_frame (N : UkNames GF) (fdw : BitVec 64) (fb : Nat → BitVec
 /-- **Rocq `kcat_pay_seq_in`**: the input side is anti-monotone. -/
 theorem kcatPaySeq_in (N : UkNames GF) (fdw : BitVec 64) (fb : Nat → BitVec 8) (k i : Nat)
     (Ci Ci' Cend : IProp GF) :
-    ⊢ (Ci' -∗ Ci) -∗ kcatPaySeq (hlc := hlc) N fdw fb i k Ci Cend -∗
-      kcatPaySeq (hlc := hlc) N fdw fb i k Ci' Cend := by
+    ⊢ (Ci' -∗ Ci) -∗ kcatPaySeq N fdw fb i k Ci Cend -∗
+      kcatPaySeq N fdw fb i k Ci' Cend := by
   cases k with
   | zero =>
     rw [kcatPaySeq_zero, kcatPaySeq_zero]
@@ -305,7 +305,7 @@ def kcatExit (N : UkNames GF) (status : Int) : IProp GF :=
   iprop(∀ (h : CPU) (m : RegMap) (avail : Nat),
     ⌜(BitVec.setWidth 32 (m.get 10#5)).toInt = status⌝ -∗
     ukCode N.t User.Cat.code.byte -∗
-    urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Cat.Sym.«exit») avail -∗ wpLoop h)
+    urun N h m (BitVec.ofNat 64 User.Cat.Sym.«exit») avail -∗ wpLoop h)
 
 /-- **Rocq `kcat_r`**: ONE `read(fdv, a, cnt)` call, as a hole: the caller
 hands in the whole count as a run it owns and gets it back at SOME contents,
@@ -316,9 +316,9 @@ def kcatR (N : UkNames GF) (fdv : BitVec 64) (a cnt : Nat) (Ri : IProp GF)
     ⌜m.get 10#5 = fdv⌝ -∗ ⌜m.get 11#5 = BitVec.ofNat 64 a⌝ -∗
     ⌜(BitVec.setWidth 32 (m.get 12#5)).toInt = cnt⌝ -∗
     ukCode N.t User.Cat.code.byte -∗ Ri -∗ ubytes N.d a cnt f -∗
-    urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Cat.Sym.«read») avail -∗
+    urun N h m (BitVec.ofNat 64 User.Cat.Sym.«read») avail -∗
     (∀ (h' : CPU) (ret : BitVec 64) (g : Nat → BitVec 8), Ro ret g -∗ ubytes N.d a cnt g -∗
-      urun (hlc := hlc) N h' (stubRet m 5 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
+      urun N h' (stubRet m 5 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
     wpLoop h)
 
 /-- **Rocq `kcat_o`**: ONE `open(pv, O_RDONLY)` call, as a hole (the ledger
@@ -327,9 +327,9 @@ def kcatO (N : UkNames GF) (pv : BitVec 64) (Oi : IProp GF) (Oo : BitVec 64 → 
   iprop(∀ (h : CPU) (m : RegMap) (avail : Nat),
     ⌜m.get 10#5 = pv⌝ -∗ ⌜m.get 11#5 = 0#64⌝ -∗
     ukCode N.t User.Cat.code.byte -∗ Oi -∗
-    urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Cat.Sym.«open») avail -∗
+    urun N h m (BitVec.ofNat 64 User.Cat.Sym.«open») avail -∗
     (∀ (h' : CPU) (ret : BitVec 64), Oo ret -∗
-      urun (hlc := hlc) N h' (stubRet m 15 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
+      urun N h' (stubRet m 15 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
     wpLoop h)
 
 /-- **Rocq `kcat_cl`**: ONE `close(fd)` call, as a hole. -/
@@ -337,9 +337,9 @@ def kcatCl (N : UkNames GF) (fd : Nat) (Ci Co : IProp GF) : IProp GF :=
   iprop(∀ (h : CPU) (m : RegMap) (avail : Nat),
     ⌜(BitVec.setWidth 32 (m.get 10#5)).toInt = fd⌝ -∗
     ukCode N.t User.Cat.code.byte -∗ Ci -∗
-    urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Cat.Sym.«close») avail -∗
+    urun N h m (BitVec.ofNat 64 User.Cat.Sym.«close») avail -∗
     (∀ (h' : CPU) (ret : BitVec 64), Co -∗
-      urun (hlc := hlc) N h' (stubRet m 21 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
+      urun N h' (stubRet m 21 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
     wpLoop h)
 
 end UkCat
@@ -347,7 +347,7 @@ end UkCat
 /-! ## §5 `fprintf`, as cat calls it (deviation 2) -/
 
 section Fprintf
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -356,11 +356,11 @@ def wpCatFprintfBody : Prop :=
   ∀ (N : UkNames GF) (a len : Nat) (f : Nat → BitVec 8) (h : CPU) (m : RegMap) (n : Nat) (Ci Co : IProp GF),
     a + len + 2 < 2 ^ 31 → 0 < len → (∀ j, j < len → (f j).toNat ≠ 37) →
     m.get 11#5 = BitVec.ofNat 64 a →
-    ⊢ kcatPaySeq (hlc := hlc) N (m.get 10#5) f 0 len Ci Co -∗ ukCode N.t User.Cat.code.byte -∗
+    ⊢ kcatPaySeq N (m.get 10#5) f 0 len Ci Co -∗ ukCode N.t User.Cat.code.byte -∗
       utextStr N.t a len f -∗ Ci -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Cat.Sym.«fprintf») (10 + (12 + (4 + n))) -∗
+      urun N h m (BitVec.ofNat 64 User.Cat.Sym.«fprintf») (10 + (12 + (4 + n))) -∗
       (∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗ Co -∗
-        urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (10 + (12 + (4 + n))) -∗ wpLoop h') -∗
+        urun N h' m' (retPc (m.get 1#5)) (10 + (12 + (4 + n))) -∗ wpLoop h') -∗
       wpLoop h
 
 /-- **Rocq `UkCatFprintf.wp_kcat_fprintf_s`**: one `%s`, its argument the
@@ -374,13 +374,13 @@ def wpCatFprintfSBody : Prop :=
     (f (q + 2)).toNat ≠ 100 → (f (q + 2)).toNat ≠ 117 → (f (q + 2)).toNat ≠ 120 →
     (q + 3 < len → (f (q + 3)).toNat ≠ 100 ∧ (f (q + 3)).toNat ≠ 117 ∧ (f (q + 3)).toNat ≠ 120) →
     sa ≠ 0 → m.get 11#5 = BitVec.ofNat 64 a → m.get 12#5 = BitVec.ofNat 64 sa →
-    ⊢ kcatPaySeq (hlc := hlc) N (m.get 10#5) f 0 q Ci Cm1 -∗
-      kcatPaySeq (hlc := hlc) N (m.get 10#5) sf 0 slen Cm1 Cm2 -∗
-      kcatPaySeq (hlc := hlc) N (m.get 10#5) f (q + 2) (len - (q + 2)) Cm2 Co -∗
+    ⊢ kcatPaySeq N (m.get 10#5) f 0 q Ci Cm1 -∗
+      kcatPaySeq N (m.get 10#5) sf 0 slen Cm1 Cm2 -∗
+      kcatPaySeq N (m.get 10#5) f (q + 2) (len - (q + 2)) Cm2 Co -∗
       ukCode N.t User.Cat.code.byte -∗ utextStr N.t a len f -∗ ustr N.d DFrac.discard sa slen sf -∗ Ci -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Cat.Sym.«fprintf») (10 + (12 + (4 + n))) -∗
+      urun N h m (BitVec.ofNat 64 User.Cat.Sym.«fprintf») (10 + (12 + (4 + n))) -∗
       (∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗ Co -∗
-        urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (10 + (12 + (4 + n))) -∗ wpLoop h') -∗
+        urun N h' m' (retPc (m.get 1#5)) (10 + (12 + (4 + n))) -∗ wpLoop h') -∗
       wpLoop h
 
 end Fprintf
@@ -388,12 +388,12 @@ end Fprintf
 /-- **cat's `fprintf`, as an interface** (deviation 2): Rocq's two contracts
 at cat's printf.o, over `urun`. -/
 structure CAT_FPRINTF : Prop where
-  wp_catFprintf : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+  wp_catFprintf : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
-    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpCatFprintfBody (hlc := hlc) (GF := GF)
-  wp_catFprintfS : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpCatFprintfBody (GF := GF)
+  wp_catFprintfS : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
-    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpCatFprintfSBody (hlc := hlc) (GF := GF)
+    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpCatFprintfSBody (GF := GF)
 
 /-! ## §6 cat(fd)'s loop: the invariant and the ROUND (Rocq `UkCatCat.v`) -/
 
@@ -446,37 +446,37 @@ theorem cvInv_upd (m0 m : RegMap) (sp0 fdv : BitVec 64) (r : BitVec 5) (v : BitV
     exact hfr q hq hf
 
 section Round
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-- **Rocq `kcat_dg_cw`**: the `cat: write error` run at fd 2, ending in
 the exit hole at status 1. -/
 def kcatDgCw (N : UkNames GF) : IProp GF :=
-  kcatPaySeq (hlc := hlc) N (BitVec.ofNat 64 2) (User.Cat.catLit 0x9c0) 0 17 iprop(emp) (kcatExit (hlc := hlc) N 1)
+  kcatPaySeq N (BitVec.ofNat 64 2) (User.Cat.catLit 0x9c0) 0 17 iprop(emp) (kcatExit N 1)
 
 /-- **Rocq `kcat_dg_cr`**: the `cat: read error` run. -/
 def kcatDgCr (N : UkNames GF) : IProp GF :=
-  kcatPaySeq (hlc := hlc) N (BitVec.ofNat 64 2) (User.Cat.catLit 0x9d8) 0 16 iprop(emp) (kcatExit (hlc := hlc) N 1)
+  kcatPaySeq N (BitVec.ofNat 64 2) (User.Cat.catLit 0x9d8) 0 16 iprop(emp) (kcatExit N 1)
 
 /-- **Rocq `kcat_wpost`**: after the write of `nb` bytes, at the returned
 word: the invariant at the full count, the `write error` tail otherwise. -/
 def kcatWpost (N : UkNames GF) (nb : Nat) (I : IProp GF) (wret : BitVec 64) : IProp GF :=
-  iprop((⌜wret = BitVec.ofNat 64 nb⌝ -∗ I) ∧ (⌜wret ≠ BitVec.ofNat 64 nb⌝ -∗ kcatDgCw (hlc := hlc) N))
+  iprop((⌜wret = BitVec.ofNat 64 nb⌝ -∗ I) ∧ (⌜wret ≠ BitVec.ofNat 64 nb⌝ -∗ kcatDgCw N))
 
 /-- **Rocq `kcat_round`**: THE ROUND LAW -- one persistent obligation that
 funds a whole turn: the read, and at whatever it returned, the arm the
 return selects (read error, end of file, or the write of what was read). -/
 def kcatRound (N : UkNames GF) (fdv : BitVec 64) (I Cend : IProp GF) : IProp GF :=
-  iprop(□ kcatR (hlc := hlc) N fdv User.Cat.Sym.«buf» 512 I (fun ret g =>
-    iprop((⌜ret.toInt < 0⌝ -∗ kcatDgCr (hlc := hlc) N) ∧ (⌜ret.toInt = 0⌝ -∗ Cend) ∧
+  iprop(□ kcatR N fdv User.Cat.Sym.«buf» 512 I (fun ret g =>
+    iprop((⌜ret.toInt < 0⌝ -∗ kcatDgCr N) ∧ (⌜ret.toInt = 0⌝ -∗ Cend) ∧
       (∀ nb : Nat, ⌜ret.toInt = nb⌝ -∗ ⌜0 < nb⌝ -∗
-        kcatWr (hlc := hlc) N (BitVec.ofNat 64 1) (BitVec.ofNat 64 User.Cat.Sym.«buf») nb
+        kcatWr N (BitVec.ofNat 64 1) (BitVec.ofNat 64 User.Cat.Sym.«buf») nb
           (ubytes N.d User.Cat.Sym.«buf» 512 g)
-          (fun wret => iprop(kcatWpost (hlc := hlc) N nb I wret ∗ ubytes N.d User.Cat.Sym.«buf» 512 g))))))
+          (fun wret => iprop(kcatWpost N nb I wret ∗ ubytes N.d User.Cat.Sym.«buf» 512 g))))))
 
 instance kcatRound_persistent (N : UkNames GF) (fdv : BitVec 64) (I Cend : IProp GF) :
-    Persistent (kcatRound (hlc := hlc) N fdv I Cend) := by
+    Persistent (kcatRound N fdv I Cend) := by
   unfold kcatRound; infer_instance
 
 end Round
@@ -583,7 +583,7 @@ theorem cmInv_call (sp0 : BitVec 64) (av nargs i : Nat) (m m' : RegMap) (hcs : u
   · rw [hcs 19#5 (by decide)]; exact h19
 
 section Main
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -592,41 +592,41 @@ format up to the directive, the argument's bytes, the format after it --
 ending in the exit hole at status 1. -/
 def kcatDgOpen (N : UkNames GF) (g : UArg) : IProp GF :=
   iprop(∃ Cm1 Cm2 : IProp GF,
-    kcatPaySeq (hlc := hlc) N (BitVec.ofNat 64 2) cmLit 0 cmMsgQ iprop(emp) Cm1 ∗
-    kcatPaySeq (hlc := hlc) N (BitVec.ofNat 64 2) g.bytes 0 g.len Cm1 Cm2 ∗
-    kcatPaySeq (hlc := hlc) N (BitVec.ofNat 64 2) cmLit (cmMsgQ + 2) (cmMsgLen - (cmMsgQ + 2)) Cm2
-      (kcatExit (hlc := hlc) N 1))
+    kcatPaySeq N (BitVec.ofNat 64 2) cmLit 0 cmMsgQ iprop(emp) Cm1 ∗
+    kcatPaySeq N (BitVec.ofNat 64 2) g.bytes 0 g.len Cm1 Cm2 ∗
+    kcatPaySeq N (BitVec.ofNat 64 2) cmLit (cmMsgQ + 2) (cmMsgLen - (cmMsgQ + 2)) Cm2
+      (kcatExit N 1))
 
 /-- **Rocq `kcat_run0`**: ONE CALL OF `cat(fd)` -- a round law, the cursor
 it starts at, and what the round's normal exit leaves. -/
 def kcatRun0 (N : UkNames GF) (fdv : BitVec 64) (Co : IProp GF) : IProp GF :=
-  iprop(∃ I Cend : IProp GF, kcatRound (hlc := hlc) N fdv I Cend ∗ I ∗ (Cend -∗ Co))
+  iprop(∃ I Cend : IProp GF, kcatRound N fdv I Cend ∗ I ∗ (Cend -∗ Co))
 
 /-- **Rocq `kcat_file`**: ONE TURN of main's loop -- the open, then the arm
 the `bltz` picks (the diagnostic, or `cat(fd)` and the close). -/
 def kcatFile (N : UkNames GF) (g : UArg) (Ci Co : IProp GF) : IProp GF :=
-  kcatO (hlc := hlc) N (BitVec.ofNat 64 g.ptr) Ci (fun ret =>
-    iprop((⌜ret.toInt < 0⌝ -∗ kcatDgOpen (hlc := hlc) N g) ∧
+  kcatO N (BitVec.ofNat 64 g.ptr) Ci (fun ret =>
+    iprop((⌜ret.toInt < 0⌝ -∗ kcatDgOpen N g) ∧
       (⌜0 ≤ ret.toInt⌝ -∗ ∃ (fd : Nat) (Cm : IProp GF), ⌜ret = BitVec.ofNat 64 fd⌝ ∗ ⌜fd < NOFILE⌝ ∗
-        kcatRun0 (hlc := hlc) N (BitVec.ofNat 64 fd) Cm ∗ kcatCl (hlc := hlc) N fd Cm Co)))
+        kcatRun0 N (BitVec.ofNat 64 fd) Cm ∗ kcatCl N fd Cm Co)))
 
 /-- **Rocq `kcat_pay`**: the run of turns main's loop takes, `k` files from
 `args[i]`. -/
 def kcatPay (N : UkNames GF) (args : List UArg) : Nat → Nat → IProp GF → IProp GF → IProp GF
   | _, 0, Ci, Cend => iprop(Ci -∗ Cend)
   | i, k + 1, Ci, Cend => iprop(∃ (g : UArg) (Cm : IProp GF), ⌜args[i]? = some g⌝ ∗
-      kcatFile (hlc := hlc) N g Ci Cm ∗ kcatPay N args (i + 1) k Cm Cend)
+      kcatFile N g Ci Cm ∗ kcatPay N args (i + 1) k Cm Cend)
 
 theorem kcatPay_succ (N : UkNames GF) (args : List UArg) (i k : Nat) (Ci Cend : IProp GF) :
-    kcatPay (hlc := hlc) N args i (k + 1) Ci Cend = iprop(∃ (g : UArg) (Cm : IProp GF), ⌜args[i]? = some g⌝ ∗
-      kcatFile (hlc := hlc) N g Ci Cm ∗ kcatPay (hlc := hlc) N args (i + 1) k Cm Cend) := rfl
+    kcatPay N args i (k + 1) Ci Cend = iprop(∃ (g : UArg) (Cm : IProp GF), ⌜args[i]? = some g⌝ ∗
+      kcatFile N g Ci Cm ∗ kcatPay N args (i + 1) k Cm Cend) := rfl
 
 theorem kcatPay_zero (N : UkNames GF) (args : List UArg) (i : Nat) (Ci Cend : IProp GF) :
-    kcatPay (hlc := hlc) N args i 0 Ci Cend = iprop(Ci -∗ Cend) := rfl
+    kcatPay N args i 0 Ci Cend = iprop(Ci -∗ Cend) := rfl
 
 /-- The empty chain, spent. -/
 theorem kcatPay_zero_spend (N : UkNames GF) (args : List UArg) (i : Nat) (Ci Cend : IProp GF) :
-    ⊢ kcatPay (hlc := hlc) N args i 0 Ci Cend -∗ Ci -∗ Cend := by
+    ⊢ kcatPay N args i 0 Ci Cend -∗ Ci -∗ Cend := by
   rw [kcatPay_zero]
   iintro H HC
   iapply H $$ HC
@@ -634,8 +634,8 @@ theorem kcatPay_zero_spend (N : UkNames GF) (args : List UArg) (i : Nat) (Ci Cen
 /-- **Rocq `kcat_pay_all`**: at main's entry, where `argc ≤ 1` cats the
 standard input instead (an additive pair; main picks the arm by a branch). -/
 def kcatPayAll (N : UkNames GF) (args : List UArg) (Ci Cend : IProp GF) : IProp GF :=
-  iprop((⌜args.length ≤ 1⌝ -∗ ∃ Cm : IProp GF, kcatRun0 (hlc := hlc) N (BitVec.ofNat 64 0) Cm ∗ (Ci ∗ Cm -∗ Cend)) ∧
-    (⌜2 ≤ args.length⌝ -∗ kcatPay (hlc := hlc) N args 1 (args.length - 1) Ci Cend))
+  iprop((⌜args.length ≤ 1⌝ -∗ ∃ Cm : IProp GF, kcatRun0 N (BitVec.ofNat 64 0) Cm ∗ (Ci ∗ Cm -∗ Cend)) ∧
+    (⌜2 ≤ args.length⌝ -∗ kcatPay N args 1 (args.length - 1) Ci Cend))
 
 end Main
 

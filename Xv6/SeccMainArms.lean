@@ -27,7 +27,7 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -35,8 +35,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [S
 `auipc/addi a1,"usage…"; li a0,2; jal fprintf; li a0,1; jal exit`. -/
 theorem wp_ksecc_usage (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : SECC_FPRINTF)
     (N : UkNames GF) (h : CPU) (m : RegMap) (n : Nat) (l : List FdState) :
-    ⊢ □ (∀ s : Int, N.pay s) -∗ ukCode N.t User.Seccomp.code.byte -∗ seccWdep (hlc := hlc) N l -∗
-      ustd N.fd l -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 0x4e) (10 + (12 + (4 + n))) -∗ wpLoop h := by
+    ⊢ □ (∀ s : Int, N.pay s) -∗ ukCode N.t User.Seccomp.code.byte -∗ seccWdep N l -∗
+      ustd N.fd l -∗ urun N h m (BitVec.ofNat 64 0x4e) (10 + (12 + (4 + n))) -∗ wpLoop h := by
   iintro #Hq #Hc #Hwd Hstd Hrun
   -- 0x4e  auipc a1,0x1
   ihave Hi := secc_uis N.t 0x4e false (.UTYPE (1#20, .Regidx 11#5, .AUIPC)) udec%
@@ -106,8 +106,8 @@ theorem wp_ksecc_usage (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : SECC_FPRINTF)
 /-- **Rocq `wp_ksecc_forkfail`**: the fork diagnostic @0x62. -/
 theorem wp_ksecc_forkfail (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : SECC_FPRINTF)
     (N : UkNames GF) (h : CPU) (m : RegMap) (n : Nat) (l : List FdState) :
-    ⊢ □ (∀ s : Int, N.pay s) -∗ ukCode N.t User.Seccomp.code.byte -∗ seccWdep (hlc := hlc) N l -∗
-      ustd N.fd l -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 0x62) (10 + (12 + (4 + n))) -∗ wpLoop h := by
+    ⊢ □ (∀ s : Int, N.pay s) -∗ ukCode N.t User.Seccomp.code.byte -∗ seccWdep N l -∗
+      ustd N.fd l -∗ urun N h m (BitVec.ofNat 64 0x62) (10 + (12 + (4 + n))) -∗ wpLoop h := by
   iintro #Hq #Hc #Hwd Hstd Hrun
   -- 0x62  auipc a1,0x1
   ihave Hi := secc_uis N.t 0x62 false (.UTYPE (1#20, .Regidx 11#5, .AUIPC)) udec%
@@ -181,7 +181,7 @@ theorem wp_ksecc_parent (UL : UK_LEAVES) (HS : UK_SYS_P)
     (N : UkNames GF) (h : CPU) (m : RegMap) (avail : Nat) (pidv : BitVec 32) (cs : ExtTreeSet GName compare)
     (hrng : 1 ≤ pidv.toNat ∧ pidv.toNat ≤ PIDMAX) (ha0 : m.get 10#5 = BitVec.signExtend 64 pidv) :
     ⊢ □ (∀ s : Int, N.pay s) -∗ ukCode N.t User.Seccomp.code.byte -∗ uch N.ch cs -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x16) avail -∗ wpLoop h := by
+      urun N h m (BitVec.ofNat 64 0x16) avail -∗ wpLoop h := by
   iintro #Hq #Hc Hch Hrun
   -- 0x16  bltz a0,0x62 -- not taken
   ihave Hi := secc_uis N.t 0x16 false (.BTYPE (0x4c#13, .Regidx 0#5, .Regidx 10#5, .BLT)) udec%
@@ -246,8 +246,8 @@ theorem wp_ksecc_parent (UL : UK_LEAVES) (HS : UK_SYS_P)
 diagnostic. -/
 theorem wp_ksecc_forkneg (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : SECC_FPRINTF)
     (N : UkNames GF) (h : CPU) (m : RegMap) (n : Nat) (l : List FdState) (ha0 : m.get 10#5 = -1#64) :
-    ⊢ □ (∀ s : Int, N.pay s) -∗ ukCode N.t User.Seccomp.code.byte -∗ seccWdep (hlc := hlc) N l -∗
-      ustd N.fd l -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 0x16) (10 + (12 + (4 + n))) -∗ wpLoop h := by
+    ⊢ □ (∀ s : Int, N.pay s) -∗ ukCode N.t User.Seccomp.code.byte -∗ seccWdep N l -∗
+      ustd N.fd l -∗ urun N h m (BitVec.ofNat 64 0x16) (10 + (12 + (4 + n))) -∗ wpLoop h := by
   iintro #Hq #Hc #Hwd Hstd Hrun
   ihave Hi := secc_uis N.t 0x16 false (.BTYPE (0x4c#13, .Regidx 0#5, .Regidx 10#5, .BLT)) udec%
     (by decide) $$ Hc
@@ -264,11 +264,11 @@ mask literal and `seccomp(mask)` -- and there the child is the universe
 (ROW 23, the one place the literal enters: `UkSeccDefs.seccUniv_obl`). -/
 theorem wp_ksecc_child (UL : UK_LEAVES)
     (Hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
-    (HL : UkSysP.wpUkEcallSeccK (hlc := hlc) (utab (GF := GF)) tabLe)
+    (HL : UkSysP.wpUkEcallSeccK (utab (GF := GF)) tabLe)
     (N : UkNames GF) (h : CPU) (m : RegMap) (avail : Nat) (v : List FdState)
     (hpay : N.pay = fun _ => iprop(True)) (ha0 : m.get 10#5 = 0#64) :
-    ⊢ ukCode N.t User.Seccomp.code.byte -∗ seccUniv (hlc := hlc) v -∗ utab N.fd v -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x16) avail -∗ wpLoop h := by
+    ⊢ ukCode N.t User.Seccomp.code.byte -∗ seccUniv v -∗ utab N.fd v -∗
+      urun N h m (BitVec.ofNat 64 0x16) avail -∗ wpLoop h := by
   iintro #Hc #Hu Htab Hrun
   -- 0x16  bltz a0 -- not taken
   ihave Hi := secc_uis N.t 0x16 false (.BTYPE (0x4c#13, .Regidx 0#5, .Regidx 10#5, .BLT)) udec%

@@ -25,7 +25,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -96,7 +96,7 @@ theorem iput_lk_releasesleep (RS : RELEASESLEEP_HOOK)
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ slhTok (icfgIsl kk) s -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RS.wp_releasesleep_gen_hook (hlc := hlc) (GF := GF) Γ c k' γil γisl (icSlp cn kk)
+  have h := RS.wp_releasesleep_gen_hook (GF := GF) Γ c k' γil γisl (icSlp cn kk)
     (fun _ => icSlpDep cn kk Tc) (slhTok (icfgIsl kk)) s pidv hnoff hK hs hp htier
   unfold wp_releasesleep_gen_hook_body at h
   simp only [releasesleepAddr] at h
@@ -110,12 +110,12 @@ theorem iput_lk_releasesleep (RS : RELEASESLEEP_HOOK)
     (fun ξ => icSlp_fold cn kk Tc ξ)
   iexact Htop
 
-theorem iput_lk_env_pi (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (γl : GName)
+theorem iput_lk_env_pi (Γ : SchedNames) [ClaimIs GF Γ] (γl : GName)
     (pd pav pu : BitVec 64) (γil γisl : GName) (kk : Nat) :
     iputEnv (GF := GF) Γ γl pd pav pu γil γisl kk ⊢ procsInv Γ := by
   unfold iputEnv; iintro ⟨#H, -⟩; iexact H
 
-theorem iput_lk_env_slk (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (γl : GName)
+theorem iput_lk_env_slk (Γ : SchedNames) [ClaimIs GF Γ] (γl : GName)
     (pd pav pu : BitVec 64) (γil γisl : GName) (kk : Nat) :
     iputEnv (GF := GF) Γ γl pd pav pu γil γisl kk ⊢
       isSleeplockGen γil γisl (iLock (ientry kk)) (icSlp fscIc kk) (slhTok (icfgIsl kk)) := by
@@ -145,7 +145,7 @@ set_option maxHeartbeats 8000000 in
 /-- **PART B's WALK** (`+0x70 .. +0x82`, then Part C at `+0x86`). -/
 theorem iput_lk_b (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (RSH : RELEASESLEEP_HOOK)
     (HO : IputOfflockSpec)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k : KCtx) (s p : Bool) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γil γisl : GName) (kk : Nat) (q : Qp) (inum : BitVec 32) (dn : Dinode) (nd : FsNode)
     (g : GName)

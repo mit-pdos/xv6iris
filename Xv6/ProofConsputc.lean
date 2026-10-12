@@ -38,7 +38,7 @@ theorem consputc_ret_32 : jumpPc (KA.«consputc» + 0x32#64) = KA.«consputc» +
 theorem consputc_ret_3a : jumpPc (KA.«consputc» + 0x3a#64) = KA.«consputc» + 0x3a#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-- `uartputc_sync`'s contract as a rule at its entry address. -/
 theorem cp_uart_call (UP : UARTPUTC_SYNC) [CurCtx] (c : CPU) (k' : KCtx)
@@ -53,7 +53,7 @@ theorem cp_uart_call (UP : UARTPUTC_SYNC) [CurCtx] (c : CPU) (k' : KCtx)
       ⌜calleeSaved k'.regs R'⌝ -∗
       uartSentSub γ (bs ++ [b]) -∗ Φ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := UP.wp_uartputc_sync (hlc := hlc) (GF := GF) c k' i γl γ bs Φ hsie hK hnoff hlk hid
+  have h := UP.wp_uartputc_sync (GF := GF) c k' i γl γ bs Φ hsie hK hnoff hlk hid
   unfold wp_uartputc_sync_body at h
   simp only [uartputcSyncAddr] at h
   rw [hb] at h
@@ -103,7 +103,7 @@ end
 
 set_option maxHeartbeats 4000000 in
 theorem consputc_proof (UP : UARTPUTC_SYNC) : CONSPUTC :=
-  ⟨fun {hlc GF} _ _ _ cpu k γl γd bs Φ hsie hK hnoff huart => by
+  ⟨fun {GF} _ _ _ cpu k γl γd bs Φ hsie hK hnoff huart => by
   unfold wp_consputc_body
   iintro ⟨Hk, Hpc, #Hport, #Hsub, Hch, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩

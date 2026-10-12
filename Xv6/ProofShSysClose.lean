@@ -21,15 +21,15 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-- **Rocq `wp_kshpi_close_h`**. -/
-theorem wp_shSysCloseH (UL : UK_LEAVES) : wpShSysCloseHBody (hlc := hlc) (GF := GF) := by
+theorem wp_shSysCloseH (UL : UK_LEAVES) : wpShSysCloseHBody (GF := GF) := by
   intro N h m fd st avail harg
   iintro #Hc #Hdep Hh Hrun Hcont
-  ihave Hs := Xv6.sh_stub_close (hlc := hlc) UL N
+  ihave Hs := Xv6.sh_stub_close UL N
   unfold stubLaw
   iapply Hs $$ %h %m %avail Hc Hrun
   unfold stubRet
@@ -44,10 +44,10 @@ theorem wp_shSysCloseH (UL : UK_LEAVES) : wpShSysCloseHBody (hlc := hlc) (GF := 
   iapply Hcont $$ %h3 %r Hrun
 
 /-- **Rocq `wp_kshx_close_std_d`**. -/
-theorem wp_shSysCloseStd (UL : UK_LEAVES) : wpShSysCloseStdBody (hlc := hlc) (GF := GF) := by
+theorem wp_shSysCloseStd (UL : UK_LEAVES) : wpShSysCloseStdBody (GF := GF) := by
   intro N h m l fdn st avail harg hs hkl hne
   iintro #Hc #Hdep Hstd Hrun Hcont
-  ihave Hs := Xv6.sh_stub_close (hlc := hlc) UL N
+  ihave Hs := Xv6.sh_stub_close UL N
   unfold stubLaw
   iapply Hs $$ %h %m %avail Hc Hrun
   unfold stubRet

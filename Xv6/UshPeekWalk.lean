@@ -44,7 +44,7 @@ theorem ushPk_snez_nat (v : Nat) (hv : v < 2 ^ 64) :
     simp only [ukRtypeVal, e, h, if_false]; decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -55,11 +55,11 @@ theorem shPeek_scan (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (dq dw : 
     mc.get 9#5 = BitVec.ofNat 64 (s0 + j) → mc.get 18#5 = BitVec.ofNat 64 (s0 + len) →
     mc.get 19#5 = BitVec.ofNat 64 ushWsA →
     ⊢ ushCode N.t -∗ ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
-      urun (hlc := hlc) N h mc (BitVec.ofNat 64 0x44a) (2 + n) -∗
+      urun N h mc (BitVec.ofNat 64 0x44a) (2 + n) -∗
       (ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗ ∀ (h' : CPU) (mc' : RegMap),
         ⌜∀ q : BitVec 5, ucalleeSavedIdx q = true → q ≠ 9#5 → mc'.get q = mc.get q⌝ -∗
         ⌜mc'.get 9#5 = BitVec.ofNat 64 (s0 + (j + ushpSkipws (len - j) j f))⌝ -∗
-        urun (hlc := hlc) N h' mc' (BitVec.ofNat 64 0x45e) (2 + n) -∗ wpLoop h') -∗
+        urun N h' mc' (BitVec.ofNat 64 0x45e) (2 + n) -∗ wpLoop h') -∗
       wpLoop h := by
   intro r
   induction r with
@@ -170,11 +170,11 @@ theorem shPeek_enter (UL : UK_LEAVES) (SC : SH_STRCHR) (N : UkNames GF) (dq dw :
     (h9 : mc.get 9#5 = BitVec.ofNat 64 (s0 + j)) (h18 : mc.get 18#5 = BitVec.ofNat 64 (s0 + len))
     (h19 : mc.get 19#5 = BitVec.ofNat 64 ushWsA) (h11 : mc.get 11#5 = BitVec.ofNat 64 (s0 + len)) :
     ⊢ ushCode N.t -∗ ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
-      urun (hlc := hlc) N h mc (BitVec.ofNat 64 0x446) (2 + n) -∗
+      urun N h mc (BitVec.ofNat 64 0x446) (2 + n) -∗
       (ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗ ∀ (h' : CPU) (mc' : RegMap),
         ⌜∀ q : BitVec 5, ucalleeSavedIdx q = true → q ≠ 9#5 → mc'.get q = mc.get q⌝ -∗
         ⌜mc'.get 9#5 = BitVec.ofNat 64 (s0 + (j + ushpSkipws (len - j) j f))⌝ -∗
-        urun (hlc := hlc) N h' mc' (BitVec.ofNat 64 0x45e) (2 + n) -∗ wpLoop h') -∗
+        urun N h' mc' (BitVec.ofNat 64 0x45e) (2 + n) -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hs Hws Hrun Hk
   by_cases hjl : j = len

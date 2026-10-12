@@ -29,7 +29,7 @@ theorem satp_word (rootAddr : BitVec 64) (hhi : BitVec.extractLsb' 56 8 rootAddr
 theorem kvminithart_br_9486 : KA.«kvminithart» + 0x9486#64 = KA.«kernel_pagetable» := by decide
 
 set_option maxHeartbeats 4000000 in
-theorem kvminithart_proof : KVMINITHART := ⟨fun {hlc GF} _ X cpu k tlb0 rootAddr dqr t M hX hsie hK hhi hroot => by
+theorem kvminithart_proof : KVMINITHART := ⟨fun {GF} _ X cpu k tlb0 rootAddr dqr t M hX hsie hK hhi hroot => by
   unfold wp_kvminithart_body
   iintro ⟨Hk, Hpc, Htlb, Hroot, #Hkpt, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩

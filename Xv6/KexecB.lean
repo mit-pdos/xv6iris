@@ -174,7 +174,7 @@ theorem kxcB_ret_94 : jumpPc (KA.«kexec» + 0x94#64 + 4#64) = KA.«kexec» + 0x
 /-! ## The frame's field windows and the block's trapframe quarter -/
 
 section Win
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- `elf.phnum`'s window, at the `lhu a5,-376(s0)` address. -/
 theorem kxcB_win_phnum [CurCtx] (sp0 : BitVec 64) (ef : List (BitVec 8))
@@ -228,7 +228,7 @@ def kxcBFrame8 [CurCtx] (sp0 ra0 s00 s10 s20 pv av w6 w8 : BitVec 64) (ef : List
 end Win
 
 section Tf
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg]
 
 /-- **Rocq `kxc_priv_tf_ev`, at the pinned tier** (deviation 8): the
@@ -259,7 +259,7 @@ end Tf
 /-! ## THE CALL SITE -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -277,7 +277,7 @@ theorem kxcB_call_ppt (PPT : PROC_PAGETABLE) (Γ : SchedNames) (cpu : CPU) (k : 
     instr X false (instruction.JAL (imm, regidx.Regidx 1#5)) ∗
     kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu X ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗ wordPointsTo (pTrapframe pa) 8 dq tf ∗
+    fsFabric Γ A.pd A.pav A.pu ∗ wordPointsTo (pTrapframe pa) 8 dq tf ∗
     actLend k.proc ke ∗
     (∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap),
       ⌜calleeSaved (R.set 1#5 (X + 4#64)) R'⌝ -∗
@@ -300,7 +300,7 @@ theorem kxcB_call_ppt (PPT : PROC_PAGETABLE) (Γ : SchedNames) (cpu : CPU) (k : 
     exact List.eq_nil_of_length_eq_zero (by omega)
   k_step_e (wp_s_jal cpu _ X false imm 1#5 (by decide)) $$ [- $Hk $Hpc $Hi] with [hX]
   iintro Hk Hpc
-  have h := PPT.wp_proc_pagetable (hlc := hlc) (GF := GF) cpu
+  have h := PPT.wp_proc_pagetable (GF := GF) cpu
     ((((k.withSpie spie spp).pushed 68).withRegs R).setReg 1#5 (X + 4#64)) fscKalloc fsReadyKmem none
     tf dq ke (by k_norm_g; omega) (by k_norm_g; exact hK') (by k_norm_g; simp [hlocks]) htf htfv
   unfold wp_proc_pagetable_body at h
@@ -591,7 +591,7 @@ theorem kxcB_setup (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) →
 set_option maxHeartbeats 8000000 in
 /-- **proc_pagetable returned 0: +0x098 .. +0x318**, into `kxc_bad64` with
 cause `QF .noMem`. -/
-theorem kxcB_fail (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem kxcB_fail (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs GF Γ]
     (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) (QF : KxfCause → Prop)
     (cpu : CPU) (k : KCtx) (A : KexecArgs) (spie spp : Bool) (R : RegMap)
     (kf : Nat) (qf sf : Qp) (gyf : GName) (loyf tlyf : Nat) (inumf : BitVec 32) (dnf : Dinode)
@@ -609,7 +609,7 @@ theorem kxcB_fail (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs (h
     (hj : A.j < NPROC) (hproc : k.proc = procAddr A.j) :
     kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu (KA.«kexec» + 0x98#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
+    fsFabric Γ A.pd A.pav A.pu ∗
     kxcOpen A.pidv kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf ∗
     logOpb icfgLog n2 ∗ irefSlots 1 ∗ bslots 3 ∗
     procPrivFd A.γ k.proc A.pidv A.V A.M ∗ kxcBufs k A ∗
@@ -892,7 +892,7 @@ test; out through the +0x1f2 state (`elf.phnum = 0`, the loop skipped:
 into `kxc_bad64` with cause `QF .noMem` (this stretch's ONE `bad:` tail, so
 its cause on the nose).  Each successor receives the closer back. -/
 theorem kxc_b1 (IUP : IUNLOCKPUT) (EO : END_OP) (PPT : PROC_PAGETABLE) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) (QF : KxfCause → Prop)
     (cpu : CPU) (k : KCtx) (A : KexecArgs) (spie spp : Bool) (R : RegMap)
     (kf : Nat) (qf sf : Qp) (gyf : GName) (loyf tlyf : Nat) (inumf : BitVec 32) (dnf : Dinode)
@@ -901,7 +901,7 @@ theorem kxc_b1 (IUP : IUNLOCKPUT) (EO : END_OP) (PPT : PROC_PAGETABLE) (Γ : Sch
     (hqf : QF .noMem) (hK : kexecSlots ≤ k.avail) (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
     (hj : A.j < NPROC) (hproc : k.proc = procAddr A.j) :
     kxcAt90 k A cpu spie spp R kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 ef ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
+    fsFabric Γ A.pd A.pav A.pu ∗
     (∀ c' : CPU, kexecCloser Q QF k A c') ∗
     -- proc_pagetable took the block's counter (permit sweep L2): both
     -- outputs run at the record it came back at

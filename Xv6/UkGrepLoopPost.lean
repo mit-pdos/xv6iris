@@ -22,7 +22,7 @@ set_option maxRecDepth 20000
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -34,15 +34,15 @@ theorem grepLoop_post (UL : UK_LEAVES) (MM : GREP_MEMMOVE) (N : UkNames GF) (h :
     (hs3 : m.get 19#5 = kgrepB01 sk) (hs4 : m.get 20#5 = BitVec.ofNat 64 mv) (hs6 : m.get 22#5 = BitVec.ofNat 64 mv)
     (him : i ≤ mv ∧ mv ≤ 1023) (hmv : 0 < mv) :
     ⊢ grepCode N.t -∗ ubytes N.d User.Grep.Sym.«buf» 1024 F -∗
-      treePay (hlc := hlc) N (grepProg N.t) (grepK pat fd rest (([], (List.range (mv - i)).map (fun j => F (i + j))), sk)) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x16a) (4 + n2) -∗
+      treePay N (grepProg N.t) (grepK pat fd rest (([], (List.range (mv - i)).map (fun j => F (i + j))), sk)) -∗
+      urun N h m (BitVec.ofNat 64 0x16a) (4 + n2) -∗
       ▷ (∀ (h' : CPU) (m' : RegMap) (F' : Nat → BitVec 8) (skip' : Bool) (left' : Bytes),
           ⌜grepGlRegs m0 sp0 ar fdv m'⌝ -∗ ⌜m'.get 19#5 = kgrepB01 skip'⌝ -∗
           ⌜m'.get 22#5 = BitVec.ofNat 64 left'.length⌝ -∗ ⌜left'.length < 1023⌝ -∗
           ⌜(List.range left'.length).map F' = left'⌝ -∗
           ubytes N.d User.Grep.Sym.«buf» 1024 F' -∗
-          treePay (hlc := hlc) N (grepProg N.t) (grepGo pat fd skip' [] left' rest) -∗
-          urun (hlc := hlc) N h' m' (BitVec.ofNat 64 0x16e) (4 + n2) -∗ wpLoop h') -∗
+          treePay N (grepProg N.t) (grepGo pat fd skip' [] left' rest) -∗
+          urun N h' m' (BitVec.ofNat 64 0x16e) (4 + n2) -∗ wpLoop h') -∗
       wpLoop h := by
   have hgl' := hgl
   obtain ⟨g1, g2, g3, g4, g5, g6, g7, g8, g9⟩ := hgl'

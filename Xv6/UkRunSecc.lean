@@ -28,7 +28,7 @@ open Std (ExtTreeSet)
 open UexecSG
 
 section UkRunSecc
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -37,10 +37,10 @@ key whose mask is the full mask ANDed with a0 and whose table is below the
 program's view. -/
 theorem wp_uk_ecall_seccomp (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64)
     (avail : Nat) (v : List FdState) (hn : usysno m = USYS_seccomp) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
-      udepw (hlc := hlc) N m pc USYS_seccomp -∗ utab N.fd v -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗
+      udepw N m pc USYS_seccomp -∗ utab N.fd v -∗
       (∀ W : Uvis, ⌜W.secc = seccAll &&& m.get 10#5⌝ -∗ ⌜tabLe W.fd v⌝ -∗ myPay W.gen N.pay -∗
-        uslot (hlc := hlc) W) -∗
+        uslot W) -∗
       wpLoop h := by
   iintro #Hi Hrun Hsb Htab Hcont
   iapply urun_ecall UL N h m pc avail $$ Hi Hrun

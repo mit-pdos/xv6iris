@@ -172,7 +172,7 @@ theorem iblkOf_IBLOCK [Icfg] (inum : BitVec 32) :
     iblkOf inum.toNat = IBLOCK inum icfgIst := rfl
 
 section IepCounter
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- The per-inum observation counter's authority (Rocq
 `mono_nat_auth_own (icfg_iep z) 1 v`), pinned to `MachGS`'s `mono_nat`
@@ -221,7 +221,7 @@ theorem nlzObs_le [Icfg] (z e e' : Nat) (h : e' ≤ e) :
 end IepCounter
 
 section Receipt
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
 
 /-- THE RECEIPT.  THE `⌜v = 0⌝` DISJUNCT IS THE BOOT CORNER, not slack: the
 mkfs image is full of FREE inodes (type 0, nlink 0) for which no witness
@@ -670,7 +670,7 @@ FLUSH, which already opens the region.  The multiplicity arithmetic
 `Xv6/InodeRegion.lean`'s. -/
 
 section Lnk
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsBytesG GF] [FsLinkG GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF] [FsBytesG GF] [FsLinkG GF]
 
 /-- THE ROOT KEEP-ALIVE FRAGMENT.  `ent_tokenless` exempts the ROOT's `".."`
 -- which names the root -- so the image's `nlink = 1` at the root is
@@ -912,7 +912,7 @@ admits have a zero count -- a free record by (L3), a claim box by
 have (E2-V2's filter), which ilock's fill needs. -/
 
 section TopPark
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsBytesG GF] [FsTopG GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF] [FsBytesG GF] [FsTopG GF]
 
 def iregTopPark (γfs : FsNames) (z : Nat) (d : Dinode) : IProp GF :=
   iprop(∃ n : FsNode,
@@ -1042,7 +1042,7 @@ end Shp
 /-! ## 7.  THE SLOT -/
 
 section Slot
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBytesG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- THE REGION INVARIANT's PER-INUM CELL (the header lists the conjuncts and

@@ -57,14 +57,14 @@ theorem catArgs_lookup_lt (W : Uvis) (j : Nat) (g : UArg) (hj : (catArgs W)[j]? 
   exact ⟨hlt, (Option.some.inj hj).symm⟩
 
 section UkTreeEntryCat
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-- **Rocq `cat_image_entry_env_c`** (deviation 1: at cat's start
 interface). -/
-theorem catImageEntryEnvC_of_start (HS : CAT_START) : CatImageEntryEnvC (hlc := hlc) (GF := GF) := by
+theorem catImageEntryEnvC_of_start (HS : CAT_START) : CatImageEntryEnvC (GF := GF) := by
   intro ws Me Mv sv t gn sts cw cs pidv Q Pay Dp I E ds hok hag himg hbytes hfdl hc hs hdp
   iintro #Henv #Hnpw #Hdep
   iapply imageEntry_of_at
@@ -105,7 +105,7 @@ theorem catImageEntryEnvC_of_start (HS : CAT_START) : CatImageEntryEnvC (hlc := 
       exact hkey i (by rw [← hargcna]; exact hlt)
   have hc' : Conforms E (catTree ((catArgs W').map uargBytes)) := by rw [hwords]; exact hc
   have hs' : SafeFds (fdDom E.fd) (catTree ((catArgs W').map uargBytes)) := by rw [hwords]; exact hs
-  have hnp : urunNopipe (hlc := hlc) (GF := GF) sts ⊢ urunNopipe (hlc := hlc) (GF := GF) W'.fd := by rw [hfd]
+  have hnp : urunNopipe (GF := GF) sts ⊢ urunNopipe (GF := GF) W'.fd := by rw [hfd]
   ihave #Hnpw' := hnp $$ Hnpw
   iapply catEntryRun W' Q hpc hsub hx hroom336 hal8 hstkrow hbuf hargsrow havd havs hfdlen hstop hlzf hscf
     $$ Hdep Hnpw' Hmp
@@ -116,8 +116,8 @@ theorem catImageEntryEnvC_of_start (HS : CAT_START) : CatImageEntryEnvC (hlc := 
     exact (BitVec.ofNat_toNat 64 _).trans (BitVec.setWidth_eq _) |>.symm
   have ha1 : (tfResumeGpr0 W'.tf).get 11#5 = BitVec.ofNat 64 (uvisAv W') :=
     ((BitVec.ofNat_toNat 64 _).trans (BitVec.setWidth_eq _)).symm
-  have hr : urun (hlc := hlc) N' h (tfResumeGpr0 W'.tf) (BitVec.ofNat 64 User.Cat.Sym.«start») 42 ⊢
-      urun (hlc := hlc) N' h (tfResumeGpr0 W'.tf) (BitVec.ofNat 64 User.Cat.Sym.«start»)
+  have hr : urun N' h (tfResumeGpr0 W'.tf) (BitVec.ofNat 64 User.Cat.Sym.«start») 42 ⊢
+      urun N' h (tfResumeGpr0 W'.tf) (BitVec.ofNat 64 User.Cat.Sym.«start»)
         (2 + (6 + (8 + (10 + (12 + (4 + 0)))))) := .rfl
   ihave Hrun := hr $$ Hrun
   have hstd : ustd (GF := GF) N'.fd (W'.fd.take NSTD) ⊢ ustd N'.fd (sts.take NSTD) := by rw [hfd]
@@ -130,7 +130,7 @@ theorem catImageEntryEnvC_of_start (HS : CAT_START) : CatImageEntryEnvC (hlc := 
 
 /-- **Rocq `cat_image_entry_env_c`**, at the engine (deviation 1): the
 start walk from the landed link. -/
-theorem catImageEntryEnvC_holds (UL : UK_LEAVES) : CatImageEntryEnvC (hlc := hlc) (GF := GF) :=
+theorem catImageEntryEnvC_holds (UL : UK_LEAVES) : CatImageEntryEnvC (GF := GF) :=
   catImageEntryEnvC_of_start (cat_linked_ulib UL).2.2
 
 end UkTreeEntryCat

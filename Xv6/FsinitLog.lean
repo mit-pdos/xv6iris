@@ -26,7 +26,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF]
@@ -58,7 +58,7 @@ set_option maxHeartbeats 16000000 in
 /-- **`+0x30 .. +0x4e`: the magic test and `initlog`** (Rocq's
 `wp_fsinit_sconf`, its middle). -/
 theorem fsinit_log (IL : INITLOG) (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl : GName) (pd pav pu : BitVec 64)
     (j : Nat) (pidv : BitVec 32) (dqp : DFrac) (vMagic vSize vNblocks vNlog : BitVec 32)
     (bsSb : List (BitVec 8))
@@ -84,12 +84,12 @@ theorem fsinit_log (IL : INITLOG) (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
     (p22 : R 22#5 = k.regs 22#5) (p23 : R 23#5 = k.regs 23#5) (p24 : R 24#5 = k.regs 24#5)
     (p25 : R 25#5 = k.regs 25#5) (p26 : R 26#5 = k.regs 26#5) (p27 : R 27#5 = k.regs 27#5) :
     kctx cpu (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cpu (KA.«fsinit» + 0x30#64) ∗
-    fsinitEnv (hlc := hlc) Γ γl pd pav pu ∗
+    fsinitEnv Γ γl pd pav pu ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     fsinitCells vMagic vSize vNblocks vNlog ∗ fsblock fscFs.bytes 1 bsSb ∗
-    fsinitCrash (hlc := hlc) M sbrec Xv ∗
+    fsinitCrash M sbrec Xv ∗
     excOwn fscFs.exc (hdrDec bsHdr).2 ∗
     fsinitLogRes bsHdr L D vlock vname vcpu vStart vDev vNc vN ∗
     bslots ((LOGBLOCKS + 2) + 2) ∗ bslot ∗ irefSlot ∗ iregBoot ∗

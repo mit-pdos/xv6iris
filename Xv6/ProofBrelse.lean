@@ -39,7 +39,7 @@ theorem br_headaddr : KA.«brelse» + 0x1dbee#64 = bhead := by
   unfold bhead bcacheHeadAddr; decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
 
 /-! ## The two sleeplock callees, at this call site -/
@@ -60,7 +60,7 @@ theorem br_holdingsleep (HS : HOLDINGSLEEP) (c : CPU) (k' : KCtx) (γ : BcacheNa
       wordPointsTo (pPid pj) 4 dqp pidv -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj
-  have h := HS.wp_holdingsleep (hlc := hlc) (GF := GF) c k' (γ.slk kk).1 (γ.slk kk).2
+  have h := HS.wp_holdingsleep (GF := GF) c k' (γ.slk kk).1 (γ.slk kk).2
     (bufSlpBox γ kk) 1 pidv dqp hnoff hK hs htier
   unfold wp_holdingsleep_body at h
   simp only [holdingsleepAddr] at h
@@ -81,7 +81,7 @@ theorem br_releasesleep (RS : RELEASESLEEP_HOOK) (Γ : SchedNames) (c : CPU) (k'
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RS.wp_releasesleep_gen_hook (hlc := hlc) (GF := GF) Γ c k' (γ.slk kk).1 (γ.slk kk).2
+  have h := RS.wp_releasesleep_gen_hook (GF := GF) Γ c k' (γ.slk kk).1 (γ.slk kk).2
     (bufSlpBox γ kk) (bufSlpDep γ kk T') slUntracked 1 pidv hnoff hK hs hp htier
   unfold wp_releasesleep_gen_hook_body at h
   simp only [releasesleepAddr] at h
@@ -209,7 +209,7 @@ end
 set_option maxHeartbeats 16000000 in
 theorem brelse_proof (HS : HOLDINGSLEEP) (RS : RELEASESLEEP_HOOK) (AC : ACQUIRE)
     (RE : RELEASE_HOOK) : BRELSE := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ Γ cpu k γl γ V kk pidv dev bno dqp bs bsd d
+  fun {GF} _ _ _ _ _ _ _ _ _ _ _ Γ cpu k γl γ V kk pidv dev bno dqp bs bsd d
     hnoff hK hlk hsl hp htier hkk ha0 => by
   unfold wp_brelse_body
   simp only [brelseAddr]

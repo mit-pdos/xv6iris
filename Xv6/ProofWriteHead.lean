@@ -180,7 +180,7 @@ theorem wh_slot_addr (kk t : Nat) :
 /-! ## The buffer's bytes, out of the handle and back -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- The header's `n` word, at the address `c.sw a2,88(a0)` computes. -/
 theorem wh_hdr_acc (kk : Nat) (hkk : kk < NBUF) (bs : List (BitVec 8)) (hl : 4 ≤ bs.length) :
@@ -212,7 +212,7 @@ theorem wh_slot_acc (kk t : Nat) (hkk : kk < NBUF) (bs : List (BitVec 8))
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
 
 /-- Open the held buffer at its data bytes: the pure facts, the byte run,
@@ -247,7 +247,7 @@ end
 set_option maxHeartbeats 4000000 in
 /-- One turn of the header-copy do-while (`+0x3a .. +0x42`): entry `t` of
 `log.lh.block` lands in header word `t + 1`. -/
-theorem wh_loop_iter {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem wh_loop_iter {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (kb : KCtx) (s : Bool) (hsie : kb.sie = s) (pj : BitVec 64)
     (kk : Nat) (hkk : kk < NBUF) (n : Nat) (W : List (BitVec 32)) (bs0 : List (BitVec 8))
     (hn : n = W.length) (hnB : n ≤ LOGBLOCKS) (hl0 : bs0.length = BSIZE)
@@ -324,7 +324,7 @@ theorem wh_bne_ne (kk x y : Nat) (hx : x ≤ 30) (hy : y ≤ 30) (h : x ≠ y) :
 set_option maxHeartbeats 4000000 in
 /-- The copy loop from `+0x3a` with `t` entries copied runs to `+0x46` with
 the whole write set laid out; only `a3`, `a4`, `a5` change. -/
-theorem wh_loop {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem wh_loop {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (kb : KCtx) (s : Bool) (hsie : kb.sie = s) (pj : BitVec 64)
     (kk : Nat) (hkk : kk < NBUF) (n : Nat) (W : List (BitVec 32)) (bs0 : List (BitVec 8))
     (hn : n = W.length) (hnB : n ≤ LOGBLOCKS) (hl0 : bs0.length = BSIZE)
@@ -409,10 +409,10 @@ theorem wh_lhb0 : KA.«write_head» + 0x1ec90#64 = lhBlock 0 := by
 /-! ## The three callees, at their call sites -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
 
-theorem wh_bwrite (BW : BWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem wh_bwrite (BW : BWRITE) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j kk : Nat) (pidv dev bno : BitVec 32) (dqp : DFrac)
     (bs bsd : List (BitVec 8)) (Q : IProp GF) (pj : BitVec 64) (hpj : k'.proc = pj) (s : Bool)
@@ -427,7 +427,7 @@ theorem wh_bwrite (BW : BWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     bioCtx γl γ V ∗ diskCaps V.gd γdl pd pav pu ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗
     bufHold0 γ V kk pidv dev bno bs bsd ∗
-    diskSeqPermit (genId (hlc := hlc) (GF := GF)) (some (BSIZE * bno.toNat, bs)) Q ∗
+    diskSeqPermit (genId (GF := GF)) (some (BSIZE * bno.toNat, bs)) Q ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
@@ -436,7 +436,7 @@ theorem wh_bwrite (BW : BWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       bufHold0 γ V kk pidv dev bno bs bs -∗ ▷ Q -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj hs
-  have h := BW.wp_bwrite_eb (hlc := hlc) (GF := GF) Γ c k' γl γ V γdl pd pav pu j kk pidv dev bno
+  have h := BW.wp_bwrite_eb (GF := GF) Γ c k' γl γ V γdl pd pav pu j kk pidv dev bno
     dqp bs bsd Q hj hproc hK hnoff htier hkk ha0 hbno hbsd hpd
   unfold wp_bwrite_eb_body at h
   simp only [bwriteAddr] at h
@@ -448,9 +448,9 @@ end
 
 set_option maxHeartbeats 16000000 in
 theorem wh_tail (BW : BWRITE) (BE : BRELSE)
-    {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+    {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie1 spp1 : Bool) (R : RegMap)
     (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName) (γfs : FsNames)
     (pd pav pu : BitVec 64) (j kk : Nat) (logstart : Nat) (dev bno pidv : BitVec 32)
@@ -481,7 +481,7 @@ theorem wh_tail (BW : BWRITE) (BE : BRELSE)
     ([∗list] i ↦ w ∈ W, wordPointsTo (lhBlock i) 4 (DFrac.own 1) w) ∗
     (∀ bsq : List (BitVec 8), ⌜bsq.length = BSIZE⌝ -∗ ⌜hdrN bsq = n⌝ -∗
        ⌜hdrDec bsq = (n, W.map (fun w => w.toNat))⌝ -∗
-       diskSeqPermit (genId (hlc := hlc) (GF := GF)) (some (1024 * logHdrBno logstart, bsq))
+       diskSeqPermit (genId (GF := GF)) (some (1024 * logHdrBno logstart, bsq))
          (Q bsq)) ∗
     (∀ (cpu' : CPU) (spie spp : Bool) (R' : RegMap) (bsq : List (BitVec 8)),
       ⌜calleeSaved k.regs R'⌝ -∗
@@ -505,9 +505,9 @@ theorem wh_tail (BW : BWRITE) (BE : BRELSE)
     HlhN, HW, Hfam, HΦ⟩
   -- the permit, at the image the copy loop laid down (Rocq's family at `bs'`)
   ihave Hperm := Hfam $$ %bs' %hbs' %hhn %hhd
-  ihave Hperm := (show diskSeqPermit (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF))
+  ihave Hperm := (show diskSeqPermit (GF := GF) (genId (GF := GF))
         (some (1024 * logHdrBno logstart, bs')) (Q bs') ⊢
-      diskSeqPermit (genId (hlc := hlc) (GF := GF)) (some (BSIZE * bno.toNat, bs')) (Q bs') from by
+      diskSeqPermit (genId (GF := GF)) (some (BSIZE * bno.toNat, bs')) (Q bs') from by
     rw [hbnou]; exact .rfl) $$ Hperm
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- the payload, split into pieces that survive the write (Rocq's `wh_pay_split`)
@@ -633,7 +633,7 @@ theorem whBytes_zero (n : Nat) (W : List (BitVec 32)) (bs0 : List (BitVec 8)) :
 
 set_option maxHeartbeats 16000000 in
 theorem writeHead_proof (BD : BREAD) (BW : BWRITE) (BE : BRELSE) : WRITE_HEAD := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γb V γdl γfs pd pav pu j logstart dev n W L pidv dqp
+  fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γb V γdl γfs pd pav pu j logstart dev n W L pidv dqp
     Q hj hproc hK hnoff htier hgeom hdev hcl2 hdt2 hn hpd => by
   obtain ⟨hnW, hnB⟩ := hn
   have hcovhdr : logstart ∈ V.cov := hgeom.2 logstart (logRegion_hdr logstart)

@@ -59,7 +59,7 @@ set_option linter.unusedSimpArgs false
 abbrev sysLinkInc (dn : Dinode) : Dinode := sysfileSetnl dn (dn.diNlink + 1#16)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -156,7 +156,7 @@ with INSTANT 1's fire, `iunlock(ip)`, `nameiparent(new, name)`, and ARM E
 (`bad:`) or the parent (`sys_link_walk_dp`). -/
 theorem sys_link_walk_ip (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP)
     (DLK : DIRLINK) (IP : IPUT) (NP : NAMEIPARENT) (IUN : IUNLOCK)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : SysLinkArgs GF) (P2 : UPtd) (spie spp : Bool) (R : RegMap)
     (w₄ : BitVec 64) (kk : Nat) (q : Qp) (inum : BitVec 32) (plen2 : Nat) (pfun2 : Nat → BitVec 8)
     (n1 : Nat) (Sb1 : List Nat)
@@ -171,10 +171,10 @@ theorem sys_link_walk_ip (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
     sysLinkCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w₄ ∗
     sysfileAny (sysLinkName (k.regs 2#5)) 16 ∗ sysLinkPath (sysLinkNew (k.regs 2#5)) plen2 pfun2 ∗
     sysfileAny (sysLinkOld (k.regs 2#5)) 128 ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv Γ ∗
     sysLinkRows k.proc A.pid A.V ∗ sysLinkHole A k.proc P2 ∗ (∀ c : CPU, sysLinkPostA k A c) ∗
     inodeRefp kk q icfgDev inum ∗
-    linkCommits (hlc := hlc) (fsGammaL fscFs) A.Ftgt A.Fent A.Funt ∗
+    linkCommits (fsGammaL fscFs) A.Ftgt A.Fent A.Funt ∗
     bslots 3 ∗ irefSlots 2 ∗ logOpS icfgLog n1 Sb1 ∗ logTx icfgLog
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hnm, Hnew, Hold, Hte, Hce, #Henv, Hrows, Hhole, HΦ, Hrefp, Hcm, Hbs, Hir,
@@ -402,7 +402,7 @@ theorem sys_link_walk_ip (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
   unfold linkCommits
   icases Hcm with ⟨Hltgtc, Hlent, Hcmu⟩
   iapply wpLoop_fupd
-  imod (lfTgt_fire (hlc := hlc) fscFs ⊤ A.Ftgt inum.toNat (eraNode dn bm data)
+  imod (lfTgt_fire fscFs ⊤ A.Ftgt inum.toNat (eraNode dn bm data)
       (eraNode (sysLinkInc dn) bm data) ufNd_top hloc hnzt hokt habs') $$ Hftop Happ Hltgtc Ht
     with ⟨Ht, %av, %hav, %hokav, Hrcv⟩
   imodintro
@@ -561,7 +561,7 @@ by the two argstrs), `mv s1,a0`, and ARM B (`sys_link_tail_b`) or the target
 (`sys_link_walk_ip`). -/
 theorem sys_link_walk_ns (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT)
     (EO : END_OP) (DLK : DIRLINK) (IP : IPUT) (NP : NAMEIPARENT) (IUN : IUNLOCK)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : SysLinkArgs GF) (P2 : UPtd) (spie spp : Bool) (R : RegMap)
     (w₃ w₄ : BitVec 64) (plen1 : Nat) (pfun1 : Nat → BitVec 8) (plen2 : Nat) (pfun2 : Nat → BitVec 8)
     (hj : A.j < NPROC) (hproc : k.proc = procAddr A.j) (hK : sysLinkSlots ≤ k.avail)
@@ -574,9 +574,9 @@ theorem sys_link_walk_ns (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) (IU : IUPDATE
     sysLinkCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) w₃ w₄ ∗
     sysfileAny (sysLinkName (k.regs 2#5)) 16 ∗ sysLinkPath (sysLinkNew (k.regs 2#5)) plen2 pfun2 ∗
     sysLinkPath (sysLinkOld (k.regs 2#5)) plen1 pfun1 ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv Γ ∗
     sysLinkRows k.proc A.pid A.V ∗ sysLinkHole A k.proc P2 ∗ (∀ c : CPU, sysLinkPostA k A c) ∗
-    linkCommits (hlc := hlc) (fsGammaL fscFs) A.Ftgt A.Fent A.Funt ∗
+    linkCommits (fsGammaL fscFs) A.Ftgt A.Fent A.Funt ∗
     bslots 3 ∗ irefSlots sysLinkIrefs
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hnm, Hnew, Hold, Hte, Hce, #Henv, Hrows, Hhole, HΦ, Hcm, Hbs, Hir⟩
@@ -698,7 +698,7 @@ through the join point, `linkArms_none`), the block re-closed at the grown
 page table and its rows taken out, and `sys_link_walk_ns`. -/
 theorem sys_link_walk_a (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) (IU : IUPDATE)
     (IUP : IUNLOCKPUT) (EO : END_OP) (DLK : DIRLINK) (IP : IPUT) (NP : NAMEIPARENT) (IUN : IUNLOCK)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : SysLinkArgs GF) (spie spp : Bool) (R : RegMap)
     (w₃ w₄ v0 v1 : BitVec 64)
     (hj : A.j < NPROC) (hproc : k.proc = procAddr A.j) (hK : sysLinkSlots ≤ k.avail)
@@ -708,9 +708,9 @@ theorem sys_link_walk_a (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) 
     (hv0 : A.V.tf[tfArgIdx 0]? = some v0) (hv1 : A.V.tf[tfArgIdx 1]? = some v1) :
     kctx cpu (((k.withSpie spie spp).pushed 38).withRegs R) ∗ pcIs cpu (KA.«sys_link» + 0x8#64) ∗
     sysLinkCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) w₃ w₄ ∗ sysLinkBufs (k.regs 2#5) ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid A.V A.M ∗ (∀ c : CPU, sysLinkPostA k A c) ∗
-    linkCommits (hlc := hlc) (fsGammaL fscFs) A.Ftgt A.Fent A.Funt ∗
+    linkCommits (fsGammaL fscFs) A.Ftgt A.Fent A.Funt ∗
     bslots 3 ∗ irefSlots sysLinkIrefs
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hbufs, Hte, Hce, #Henv, Hblk, HΦ, Hcm, Hbs, Hir⟩
@@ -770,7 +770,7 @@ theorem sys_link_walk_a (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) 
     ihave Hbufs : sysLinkBufs (k.regs 2#5) $$ [Hnm Hnew Hold]
     · unfold sysLinkBufs; iframe
     ihave Hblk := Hbw $$ %P1 %_ %kv1 Hbare
-    ihave Harms := linkArms_none (hlc := hlc) (fsGammaL fscFs) A.Ftgt A.Fent A.Funt (-1#64) rfl $$ Hcm
+    ihave Harms := linkArms_none (fsGammaL fscFs) A.Ftgt A.Fent A.Funt (-1#64) rfl $$ Hcm
     -- the exit at the record argstr handed back (permit sweep L1b)
     ihave Hout : sysLinkOut (A.raise kv1) (-1#64) $$ [Hblk Hbs Hir Harms]
     · unfold sysLinkOut; iframe Hbs Hir Harms; iexists P1; iframe Hblk; ipureintro; exact hP1
@@ -841,8 +841,8 @@ theorem sys_link_walk_a (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) 
     ispecialize HΦ $$ %c
     iapply (sysLinkPost_raise k A.γ (procAddr A.j) A.pid A.V A.M A.Ftgt A.Fent A.Funt c kv2 hkv12)
       $$ HΦ
-  ihave Hcm := (show linkCommits (hlc := hlc) (GF := GF) (fsGammaL fscFs) A.Ftgt A.Fent A.Funt ⊢
-    linkCommits (hlc := hlc) (fsGammaL fscFs) (A.raise kv2).Ftgt (A.raise kv2).Fent (A.raise kv2).Funt
+  ihave Hcm := (show linkCommits (GF := GF) (fsGammaL fscFs) A.Ftgt A.Fent A.Funt ⊢
+    linkCommits (fsGammaL fscFs) (A.raise kv2).Ftgt (A.raise kv2).Fent (A.raise kv2).Funt
     from .rfl) $$ Hcm
   -- +0x2a  li a5,-1
   k_step_e (wp_s_addi cpu _ (KA.«sys_link» + 0x2a#64) true 4095#12 15#5 0#5 (by decide))
@@ -860,7 +860,7 @@ theorem sys_link_walk_a (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) 
     ihave Hold := sys_link_path_close _ pl1.length pfun1 hplen1 $$ Hold
     ihave Hbufs : sysLinkBufs (k.regs 2#5) $$ [Hnm Hnew Hold]
     · unfold sysLinkBufs; iframe
-    ihave Harms := linkArms_none (hlc := hlc) (fsGammaL fscFs) (A.raise kv2).Ftgt (A.raise kv2).Fent
+    ihave Harms := linkArms_none (fsGammaL fscFs) (A.raise kv2).Ftgt (A.raise kv2).Fent
       (A.raise kv2).Funt (-1#64) rfl $$ Hcm
     ihave Hout : sysLinkOut (A.raise kv2) (-1#64) $$ [Hblk Hbs Hir Harms]
     · unfold sysLinkOut; iframe Hbs Hir Harms; iexists P2; iframe Hblk; ipureintro; exact hP2'

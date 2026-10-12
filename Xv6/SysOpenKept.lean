@@ -72,14 +72,14 @@ theorem curKept_of (vom : BitVec 64) (P : Nat → Nat → IProp GF) (k d : Nat) 
 end CurKept
 
 section OpenKept
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [Appcfg GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsTopG GF] [Appcfg GF]
 
 /-- Rocq `plain_trunc_kept`: THE PLAIN SURFACE'S KEYED PIECE -- the commit
 at the node the walk reached, with the terminal cursor on the refund side. -/
 def plainTruncKept (Γ : FsViewNames GF) (vom : BitVec 64) (pl : List (BitVec 8))
     (P : Nat → Nat → IProp GF) (i : Nat)
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) : IProp GF :=
-  openTruncAt (hlc := hlc) Γ vom i (creFtKept (truncTermAt pl P) i Ft)
+  openTruncAt Γ vom i (creFtKept (truncTermAt pl P) i Ft)
 
 /-- PAYING THE PLAIN PERMIT (Rocq `plain_trunc_key`, the kernel's one move,
 at the join): the cursor splits into the permit's payment and what the arms
@@ -87,8 +87,8 @@ keep. -/
 theorem plainTruncKey (Γ : FsViewNames GF) (vom : BitVec 64) (pl : List (BitVec 8))
     (P : Nat → Nat → IProp GF) (i : Nat)
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) :
-    ⊢ openTruncPiece (hlc := hlc) Γ vom (truncTermAt pl P) Ft -∗ P (pathElems pl).length i -∗
-      iprop(curKept vom P (pathElems pl).length i ∗ plainTruncKept (hlc := hlc) Γ vom pl P i Ft) := by
+    ⊢ openTruncPiece Γ vom (truncTermAt pl P) Ft -∗ P (pathElems pl).length i -∗
+      iprop(curKept vom P (pathElems pl).length i ∗ plainTruncKept Γ vom pl P i Ft) := by
   iintro Ht HP
   unfold plainTruncKept
   ihave H : iprop(curKept vom P (pathElems pl).length i ∗
@@ -105,14 +105,14 @@ theorem plainTruncKey (Γ : FsViewNames GF) (vom : BitVec 64) (pl : List (BitVec
       · iempintro
   icases H with ⟨Hc, Hk⟩
   iframe Hc
-  iapply (openTruncAt_of_permit (hlc := hlc) Γ vom (truncTermAt pl P) i Ft) $$ Ht Hk
+  iapply (openTruncAt_of_permit Γ vom (truncTermAt pl P) i Ft) $$ Ht Hk
 
 /-- Rocq `plain_cur_of_kept`: READING IT BACK where the truncate did not
 fire -- the two halves together are the cursor. -/
 theorem plainCur_of_kept (Γ : FsViewNames GF) (vom : BitVec 64) (pl : List (BitVec 8))
     (P : Nat → Nat → IProp GF) (i : Nat)
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) :
-    ⊢ curKept vom P (pathElems pl).length i -∗ plainTruncKept (hlc := hlc) Γ vom pl P i Ft -∗
+    ⊢ curKept vom P (pathElems pl).length i -∗ plainTruncKept Γ vom pl P i Ft -∗
       P (pathElems pl).length i := by
   unfold curKept plainTruncKept openTruncAt
   by_cases hv : omTrunc vom = true
@@ -131,7 +131,7 @@ the cursor instead. -/
 theorem plainTruncKept_forget (Γ : FsViewNames GF) (vom : BitVec 64) (pl : List (BitVec 8))
     (P : Nat → Nat → IProp GF) (i : Nat)
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) :
-    plainTruncKept (hlc := hlc) Γ vom pl P i Ft ⊢ openTruncAt (hlc := hlc) Γ vom i Ft := by
+    plainTruncKept Γ vom pl P i Ft ⊢ openTruncAt Γ vom i Ft := by
   unfold plainTruncKept
   exact openTruncAt_kept_forget Γ vom _ i Ft
 
@@ -141,8 +141,8 @@ theorem plainTruncKept_pure (Γ : FsViewNames GF) (vom : BitVec 64) (pl : List (
     (P : Nat → Nat → IProp GF) (φ : Nat → Prop) (i : Nat)
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF))
     (hφ : ∀ (k d : Nat), P k d ⊢ ⌜φ d⌝) :
-    ⊢ curKept vom P (pathElems pl).length i -∗ plainTruncKept (hlc := hlc) Γ vom pl P i Ft -∗
-      iprop(⌜φ i⌝ ∗ plainTruncKept (hlc := hlc) Γ vom pl P i Ft) := by
+    ⊢ curKept vom P (pathElems pl).length i -∗ plainTruncKept Γ vom pl P i Ft -∗
+      iprop(⌜φ i⌝ ∗ plainTruncKept Γ vom pl P i Ft) := by
   unfold curKept plainTruncKept openTruncAt
   by_cases hv : omTrunc vom = true
   · simp only [if_pos hv]
@@ -167,7 +167,7 @@ read. -/
 def crePermit (Γ : FsViewNames GF) (pl : List (BitVec 8)) (P : Nat → Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) : Nat → IProp GF :=
-  truncPermitOf (hlc := hlc) Γ (truncTieAt pl P) Farm Fok Fex
+  truncPermitOf Γ (truncTieAt pl P) Farm Fok Fex
 
 /-- Rocq `cre_trunc_kept`: the piece an arm hands back once the permit has
 been paid. -/
@@ -175,20 +175,20 @@ def creTruncKept (Γ : FsViewNames GF) (vom : BitVec 64) (pl : List (BitVec 8))
     (P : Nat → Nat → IProp GF) (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (i : Nat)
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) : IProp GF :=
-  openTruncAt (hlc := hlc) Γ vom i (creFtKept (crePermit (hlc := hlc) Γ pl P Farm Fok Fex) i Ft)
+  openTruncAt Γ vom i (creFtKept (crePermit Γ pl P Farm Fok Fex) i Ft)
 
 /-- Rocq `cre_permit_ex`: THE BRANCH THE EXISTS ARM PAID (lane F-OPEN-6). -/
 def crePermitEx (Γ : FsViewNames GF) (pl : List (BitVec 8)) (P : Nat → Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) : Nat → IProp GF :=
-  truncPermitEx (hlc := hlc) Γ (truncTieAt pl P) Farm Fex
+  truncPermitEx Γ (truncTieAt pl P) Farm Fex
 
 /-- Rocq `cre_trunc_kept_ex`. -/
 def creTruncKeptEx (Γ : FsViewNames GF) (vom : BitVec 64) (pl : List (BitVec 8))
     (P : Nat → Nat → IProp GF) (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (i : Nat)
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) : IProp GF :=
-  openTruncAt (hlc := hlc) Γ vom i (creFtKept (crePermitEx (hlc := hlc) Γ pl P Farm Fex) i Ft)
+  openTruncAt Γ vom i (creFtKept (crePermitEx Γ pl P Farm Fex) i Ft)
 
 /-- Rocq `cre_trunc_kept_of_ex`: a consumer that does not read the branch
 weakens. -/
@@ -196,15 +196,15 @@ theorem creTruncKept_of_ex (Γ : FsViewNames GF) (vom : BitVec 64) (pl : List (B
     (P : Nat → Nat → IProp GF) (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (i : Nat)
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) :
-    creTruncKeptEx (hlc := hlc) Γ vom pl P Farm Fex i Ft ⊢
-      creTruncKept (hlc := hlc) Γ vom pl P Farm Fok Fex i Ft := by
+    creTruncKeptEx Γ vom pl P Farm Fex i Ft ⊢
+      creTruncKept Γ vom pl P Farm Fok Fex i Ft := by
   unfold creTruncKeptEx creTruncKept
   iintro H
-  iapply (openTruncAt_kept_mono (hlc := hlc) Γ vom (crePermit (hlc := hlc) Γ pl P Farm Fok Fex)
-    (crePermitEx (hlc := hlc) Γ pl P Farm Fex) i Ft) $$ [] H
+  iapply (openTruncAt_kept_mono Γ vom (crePermit Γ pl P Farm Fok Fex)
+    (crePermitEx Γ pl P Farm Fex) i Ft) $$ [] H
   unfold crePermit crePermitEx
   iintro H
-  iapply (truncPermitOf_ex (hlc := hlc) Γ (truncTieAt pl P) Farm Fok Fex i) $$ H
+  iapply (truncPermitOf_ex Γ (truncTieAt pl P) Farm Fok Fex i) $$ H
 
 /-- Rocq `cre_rcpt_kept`. -/
 def creRcptKept (vom : BitVec 64) (F : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
@@ -214,8 +214,8 @@ def creRcptKept (vom : BitVec 64) (F : Pfam GF (Aview → Nat → Fname → Nat 
 /-- Rocq `cre_child_kept`. -/
 def creChildKept (Γ : FsViewNames GF) (vom : BitVec 64)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF)) : IProp GF :=
-  if omTrunc vom then pfAt (aunarmOfArm (hlc := hlc) Γ appE Farm) Fun
-  else creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun
+  if omTrunc vom then pfAt (aunarmOfArm Γ appE Farm) Fun
+  else creChildUnfired Γ (.AFile []) Farm Fun
 
 /-- Rocq `cre_rcpt_kept_of`. -/
 theorem creRcptKept_of (vom : BitVec 64) (F : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
@@ -243,12 +243,12 @@ def creFailKept (Γ : FsViewNames GF) (vom : BitVec 64) (pl : List (BitVec 8))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (i : Nat)
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) : IProp GF :=
   if omTrunc vom then
-    iprop((creTruncKept (hlc := hlc) Γ vom pl P Farm Fok Fex i Ft ∗
-        pfAt (aunarmOfArm (hlc := hlc) Γ appE Farm) Fun) ∨
-      (openTruncPiece (hlc := hlc) Γ vom (crePermit (hlc := hlc) Γ pl P Farm Fok Fex) Ft ∗
-        (creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun ∨ ∃ ic : Nat, creChildPair Farm Fun ic)))
+    iprop((creTruncKept Γ vom pl P Farm Fok Fex i Ft ∗
+        pfAt (aunarmOfArm Γ appE Farm) Fun) ∨
+      (openTruncPiece Γ vom (crePermit Γ pl P Farm Fok Fex) Ft ∗
+        (creChildUnfired Γ (.AFile []) Farm Fun ∨ ∃ ic : Nat, creChildPair Farm Fun ic)))
   else
-    iprop(creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun ∨ ∃ ic : Nat, creChildPair Farm Fun ic)
+    iprop(creChildUnfired Γ (.AFile []) Farm Fun ∨ ∃ ic : Nat, creChildPair Farm Fun ic)
 
 /-- Rocq `cre_fail_kept_of_piece`: create's own failure fold -- the permit
 never paid. -/
@@ -256,9 +256,9 @@ theorem creFailKept_of_piece (Γ : FsViewNames GF) (vom : BitVec 64) (pl : List 
     (P : Nat → Nat → IProp GF) (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (i : Nat)
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) :
-    ⊢ openTruncPiece (hlc := hlc) Γ vom (crePermit (hlc := hlc) Γ pl P Farm Fok Fex) Ft -∗
-      iprop(creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun ∨ ∃ ic : Nat, creChildPair Farm Fun ic) -∗
-      creFailKept (hlc := hlc) Γ vom pl P Farm Fun Fok Fex i Ft := by
+    ⊢ openTruncPiece Γ vom (crePermit Γ pl P Farm Fok Fex) Ft -∗
+      iprop(creChildUnfired Γ (.AFile []) Farm Fun ∨ ∃ ic : Nat, creChildPair Farm Fun ic) -∗
+      creFailKept Γ vom pl P Farm Fun Fok Fex i Ft := by
   unfold creFailKept
   by_cases hv : omTrunc vom = true
   · simp only [if_pos hv]
@@ -275,9 +275,9 @@ theorem creFailKept_of_at (Γ : FsViewNames GF) (vom : BitVec 64) (pl : List (Bi
     (P : Nat → Nat → IProp GF) (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (i : Nat)
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) :
-    ⊢ creTruncKept (hlc := hlc) Γ vom pl P Farm Fok Fex i Ft -∗
-      creChildKept (hlc := hlc) Γ vom Farm Fun -∗
-      creFailKept (hlc := hlc) Γ vom pl P Farm Fun Fok Fex i Ft := by
+    ⊢ creTruncKept Γ vom pl P Farm Fok Fex i Ft -∗
+      creChildKept Γ vom Farm Fun -∗
+      creFailKept Γ vom pl P Farm Fun Fok Fex i Ft := by
   unfold creFailKept creChildKept
   by_cases hv : omTrunc vom = true
   · simp only [if_pos hv]

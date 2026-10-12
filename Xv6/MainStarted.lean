@@ -38,7 +38,7 @@ theorem mn_started_addr' : KA.«main» + 162#64 + 36864#64 + 1168#64 = KA.«star
 theorem mn_j_3e : KA.«main» + 178#64 + BitVec.signExtend 64 2097036#21 = KA.«main» + 62#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 set_option maxHeartbeats 4000000 in
 /-- **+0xa2 → +0x3e: `__sync_synchronize(); started = 1;`**, the handover
@@ -96,7 +96,7 @@ theorem mn_started [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsie : k.sie =
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
   [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
 
 set_option maxHeartbeats 4000000 in
@@ -104,7 +104,7 @@ set_option maxHeartbeats 4000000 in
 pages `virtio_disk_init` chose (`intrRes_of_kernelvec`), then
 `jal scheduler`. -/
 theorem mn_sched (SCH : SCHEDULER) (KV : KERNELVEC) [Y : CurCtx] (hY : curTier = KTier.kpt)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
     (pd pav pu : BitVec 64)
     (cpu : CPU) (k : KCtx) (R : RegMap) (hsie : k.sie = false) (hK : schedulerSlots ≤ k.avail)
@@ -123,7 +123,7 @@ theorem mn_sched (SCH : SCHEDULER) (KV : KERNELVEC) [Y : CurCtx] (hY : curTier =
   k_step (wp_s_jal cpu _ (KA.«main» + 62#64) false 3884#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ms_scheduler_br]
   iintro Hk Hpc
-  have hsch := SCH.wp_scheduler (hlc := hlc) (GF := GF) Γ cpu
+  have hsch := SCH.wp_scheduler (GF := GF) Γ cpu
     (k.withRegs (R.set 1#5 (KA.«main» + 66#64))) (by simp [hproc]) (by simp; omega)
     (by simp [hsie]) (by simp [hnoff]) (by simp [hlocks]) (by simp [htier])
   unfold wp_scheduler_body at hsch

@@ -101,7 +101,7 @@ theorem bigSepL_set_acc_congr (Φ Ψ : Nat → A → PROP) :
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
 
 /-! ## The descriptor states (FdSlots.v `fd_st_at` / `fd_st` / `fd_st_auth`)
 
@@ -624,7 +624,7 @@ theorem procOfilesOwe_close (γ : FileNames) (γd : GName) (pa : BitVec 64) (fs 
 theorem procPrivNoctxAt_split (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
     procPrivNoctxAt (GF := GF) ξ pa pid V M ⊣⊢
-      procPrivBareAt ξ pa pid V M ∗ @ofileCells hlc GF _ ⟨ξ, KTier.kpt⟩ pa (DFrac.own 1) V.ofile := by
+      procPrivBareAt ξ pa pid V M ∗ @ofileCells GF _ ⟨ξ, KTier.kpt⟩ pa (DFrac.own 1) V.ofile := by
   unfold procPrivNoctxAt procPrivBareAt procFieldsNoctx procFieldsNoOfile
   constructor
   · iintro ⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hof, Hcwd, Hnm, Hsc, Hrt⟩, Hpt, Htfp, %hlz, Hev⟩
@@ -658,7 +658,7 @@ Keyed at the generation `g` (the core passes `V.gen`, Rocq `pv_gen`).
 Ghost except the two cells (`firstTok`'s word, the xstate half). -/
 def procGenAt (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (g : GName) : IProp GF :=
   letI : CurCtx := ⟨ξ, KTier.kpt⟩
-  iprop(firstTok (hlc := hlc) ∗
+  iprop(firstTok ∗
     (∃ Q : Int → IProp GF, genKq g pa pid Q ∗ myPay g Q) ∗
     (∃ xsv : BitVec 32, wordPointsTo (pXstate pa) 4 xsHalf xsv) ∗
     genHalvesPriv pa pid g)
@@ -674,8 +674,8 @@ and LAST the generation row (`procGenAt`, D8).  No null arm: a process whose
 (`procPrivBareAt`), exactly as Rocq's `proc_priv_nocwd`. -/
 def procPrivCoreNoctxAt (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) : IProp GF := iprop%
-  procPrivBareAt ξ pa pid V M ∗ @cwdRefAt hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.cwd V.cwi ∗
-  @rootRefAt hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.root V.rti ∗
+  procPrivBareAt ξ pa pid V M ∗ @cwdRefAt GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.cwd V.cwi ∗
+  @rootRefAt GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.root V.rti ∗
   procGenAt ξ pa pid V.gen
 
 /-- The core is the bare block, the cwd reference, the root reference and
@@ -683,8 +683,8 @@ the generation row (`rfl`; Rocq `proc_priv_core_bare`). -/
 theorem procPrivCoreNoctxAt_bare (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
     procPrivCoreNoctxAt (GF := GF) ξ pa pid V M ⊣⊢
-      procPrivBareAt ξ pa pid V M ∗ @cwdRefAt hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.cwd V.cwi ∗
-        @rootRefAt hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.root V.rti ∗
+      procPrivBareAt ξ pa pid V M ∗ @cwdRefAt GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.cwd V.cwi ∗
+        @rootRefAt GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.root V.rti ∗
         procGenAt ξ pa pid V.gen := .rfl
 
 /-- **The event counter, lent out of the core and taken back at any count**
@@ -713,8 +713,8 @@ count the callee handed back -- at least the one it left at. -/
 theorem procPrivCoreNoctxAt_pidLend (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
     procPrivCoreNoctxAt (GF := GF) ξ pa pid V M ⊢
-      @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗ actLend pa V.ev ∗
-      (@wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pPid pa) 4 pidPriv pid -∗
+      @wordPointsTo GF _ ⟨ξ, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗ actLend pa V.ev ∗
+      (@wordPointsTo GF _ ⟨ξ, KTier.kpt⟩ (pPid pa) 4 pidPriv pid -∗
         (∃ k1 : Nat, ⌜V.ev ≤ k1⌝ ∗ actLend pa k1) -∗
         ∃ k2 : Nat, ⌜V.ev ≤ k2⌝ ∗ procPrivCoreNoctxAt ξ pa pid (V.updEv k2) M) := by
   unfold procPrivCoreNoctxAt procPrivBareAt
@@ -752,7 +752,7 @@ path"): `procGenAt` with the token-free `genHalvesAt` in place of
 `genHalvesPriv`. -/
 def procGenUnmarkedAt (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (g : GName) : IProp GF :=
   letI : CurCtx := ⟨ξ, KTier.kpt⟩
-  iprop(firstTok (hlc := hlc) ∗
+  iprop(firstTok ∗
     (∃ Q : Int → IProp GF, genKq g pa pid Q ∗ myPay g Q) ∗
     (∃ xsv : BitVec 32, wordPointsTo (pXstate pa) 4 xsHalf xsv) ∗
     genHalvesAt pa pid g)
@@ -771,8 +771,8 @@ theorem procGenAt_unmark (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (g : GN
 block, the cwd's reference, the root's, the generation row). -/
 def procPrivCoreUnmarkedAt (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) : IProp GF := iprop%
-  procPrivBareAt ξ pa pid V M ∗ @cwdRefAt hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.cwd V.cwi ∗
-  @rootRefAt hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.root V.rti ∗
+  procPrivBareAt ξ pa pid V M ∗ @cwdRefAt GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.cwd V.cwi ∗
+  @rootRefAt GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.root V.rti ∗
   procGenUnmarkedAt ξ pa pid V.gen
 
 /-- **THE BLOCK WITHOUT THE INCARNATION'S MARKER** (Rocq
@@ -1004,7 +1004,7 @@ def procPrivNocwd (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcP
 end
 
 section NocwdNull
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg]
 
 /-- `ProcDefs.procPriv` (the raw block, save area and descriptor cells
 included) is the bare block, the save area and the descriptor cells. -/
@@ -1093,7 +1093,7 @@ theorem procPrivNocwd_null_open [X : CurCtx] (h : curTier = KTier.kpt) (γ : Fil
 end NocwdNull
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
 
 end
 

@@ -305,7 +305,7 @@ end geom
 /-! ## The ghost state -/
 
 section res
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- One half of the lock's state pair: the state and the acquire position. -/
 def lockHalf (γ : GName) (st : LockState) (B : Nat) : IProp GF :=
@@ -466,9 +466,9 @@ theorem ownCtx_new (cpu : CPU) (ξ : CtxId) :
     ownCtx (GF := GF) cpu ξ ⊢ |==> (ownCtx cpu ξ ∗ ∃ ξ' : CtxId, ownCtx cpu ξ') := by
   iintro Hξ
   icases ownCtx_cases cpu ξ $$ Hξ with ⟨%B, %K, %W, %D, Hat, #HK, %hBK, #HW, %hok, #Hels⟩
-  ihave #H0 := viewLbAt_le (MachGS.era (hlc := hlc) (GF := GF)) cpu K 0 (Nat.zero_le _) $$ HK
-  ihave #Hlb := viewLbAt_lb (MachGS.era (hlc := hlc) (GF := GF)) cpu 0 $$ H0
-  imod ownCtx_boot (MachGS.era (hlc := hlc) (GF := GF)) cpu $$ Hlb with ⟨%ξ', Hξ'⟩
+  ihave #H0 := viewLbAt_le (MachGS.era (GF := GF)) cpu K 0 (Nat.zero_le _) $$ HK
+  ihave #Hlb := viewLbAt_lb (MachGS.era (GF := GF)) cpu 0 $$ H0
+  imod ownCtx_boot (MachGS.era (GF := GF)) cpu $$ Hlb with ⟨%ξ', Hξ'⟩
   imodintro
   isplitl [Hat]
   · iapply ownCtx_intro cpu ξ B K W D
@@ -529,7 +529,7 @@ way: its own store is not under its bound -- its view does not reach its
 own store position -- but it is a dirty key of its context, and a store of
 its own hart is visible to that hart at every view. -/
 def lkFloor (ξ : CtxId) (t : Nat) : IProp GF :=
-  keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ t
+  keyAt (MachGS.era (GF := GF)) ξ t
 
 instance lkFloor_persistent (ξ : CtxId) (t : Nat) : Persistent (lkFloor (GF := GF) ξ t) := by
   unfold lkFloor; infer_instance
@@ -611,16 +611,16 @@ def isLock [CurCtx] (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IP
 dependence is the pair of floors its creator certified (`lkFloor`). -/
 instance instCtxMorphIsLock (tier : KTier) (γ : GName) (lk : BitVec 64) (s : String)
     (R : CtxId → IProp GF) :
-    CtxMorph (GF := GF) (fun ξ => @isLock hlc GF _ _ ⟨ξ, tier⟩ γ lk s R) :=
-  @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-      (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-        (@instCtxMorphExists hlc GF _ _
+    CtxMorph (GF := GF) (fun ξ => @isLock GF _ _ ⟨ξ, tier⟩ γ lk s R) :=
+  @instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+    (@instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+      (@instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+        (@instCtxMorphExists GF _ _
           (fun (lo : Nat) ξ => iprop(∃ lc : Nat, inv lockN (lockBody γ lk s R lo lc) ∗
             lkFloor ξ lo ∗ lkFloor ξ lc))
-          (fun _ => @instCtxMorphExists hlc GF _ _ _ (fun _ =>
-            @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-              (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphLkFloor _) (instCtxMorphLkFloor _)))))))
+          (fun _ => @instCtxMorphExists GF _ _ _ (fun _ =>
+            @instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+              (@instCtxMorphSep GF _ _ _ (instCtxMorphLkFloor _) (instCtxMorphLkFloor _)))))))
 
 instance isLock_persistent [CurCtx] (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF) :
     Persistent (isLock (GF := GF) γ lk s R) := by

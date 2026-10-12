@@ -101,7 +101,7 @@ theorem xv6NiPhi_of {g : GState} {h : List Obs} {F : List NiEntry} (hF : niOk h 
 /-! ## §2 THE NI LEDGER beside the application's -/
 
 section ledger
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGpreS hlc GF] [Xv6G GF] [WchGpre GF]
+variable {GF : BundledGFunctors.{0}} [MachGpreS GF] [Xv6G GF] [WchGpre GF]
   [CtokG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
   [IcboxG GF] [SleepLockG GF] [BcacheG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF]
 
@@ -111,7 +111,7 @@ design §1: a second conjunct, `AppLaws` byte-identical). -/
 def niLedgerR (A : Xv6App GF) (c : A.fixed) (γ γe : GName) (h : List Obs) : IProp GF :=
   iprop(A.R c h ∗ niR γ γe h)
 
-instance niLedgerR_timeless (A : Xv6App GF) [AL : Xv6AppLaws (hlc := hlc) A] (c : A.fixed) (γ γe : GName)
+instance niLedgerR_timeless (A : Xv6App GF) [AL : Xv6AppLaws A] (c : A.fixed) (γ γe : GName)
     (h : List Obs) : Timeless (niLedgerR A c γ γe h) := by
   unfold niLedgerR; infer_instance
 
@@ -121,7 +121,7 @@ theorem isUEnter_of_uexit {e : Obs} (he : isUExit e = true) : isUEnter e = false
 /-- **THE BIRTH**: the application's, and the claim authority's and (NI
 M2-X3) the chain state's names (`niR_alloc`), kept in the fixed part; the
 ledger's empty history goes to the trace slot's part. -/
-theorem niBirth (A : Xv6App GF) [AL : Xv6AppLaws (hlc := hlc) A] (γd γsw γreg γst : GName) :
+theorem niBirth (A : Xv6App GF) [AL : Xv6AppLaws A] (γd γsw γreg γst : GName) :
     ⊢@{IProp GF} |==> ∃ p : A.fixed × GName × GName, ⌜A.born γd γsw γreg γst p.1⌝ ∗ A.cls p.1 ∗
       iprop(A.cl p.1 ∗ niR p.2.1 p.2.2 []) := by
   imod AL.al_birth γd γsw γreg γst with ⟨%c, %hb, Hs, Hc⟩
@@ -133,7 +133,7 @@ theorem niBirth (A : Xv6App GF) [AL : Xv6AppLaws (hlc := hlc) A] (γd γsw γreg
   iframe Hs Hc Hn
 
 /-- The ledger at the empty history, out of the birth's trace-slot part. -/
-theorem niLedger_R0 (A : Xv6App GF) [AL : Xv6AppLaws (hlc := hlc) A] (c : A.fixed) (γ γe : GName) :
+theorem niLedger_R0 (A : Xv6App GF) [AL : Xv6AppLaws A] (c : A.fixed) (γ γe : GName) :
     iprop(A.cl c ∗ niR γ γe []) ⊢@{IProp GF} |==> niLedgerR A c γ γe [] := by
   unfold niLedgerR
   iintro ⟨Hc, Hn⟩
@@ -144,7 +144,7 @@ theorem niLedger_R0 (A : Xv6App GF) [AL : Xv6AppLaws (hlc := hlc) A] (c : A.fixe
 /-- The power step: the application's; the filing blind at a power loss, and
 at a power-on minting initproc's claim, yielded as the era's origin ticket
 beside the application's turn, and (NI M2-X3) the era's registration ticket. -/
-theorem niLedger_pow (A : Xv6App GF) [AL : Xv6AppLaws (hlc := hlc) A] (c : A.fixed) (γ γe : GName)
+theorem niLedger_pow (A : Xv6App GF) [AL : Xv6AppLaws A] (c : A.fixed) (γ γe : GName)
     (h : List Obs) (on : Bool) (dk : Nat → BitVec 8) (hs : traceShape h on) :
     niLedgerR A c γ γe h ⊢@{IProp GF} |==> (niLedgerR A c γ γe (h ++ [powerEv on]) ∗
       (if on then iprop(emp)
@@ -170,7 +170,7 @@ theorem niLedger_pow (A : Xv6App GF) [AL : Xv6AppLaws (hlc := hlc) A] (c : A.fix
     · iempintro
 
 /-- The return path: the application's own step, the filing framed. -/
-theorem niLedger_back (A : Xv6App GF) [AL : Xv6AppLaws (hlc := hlc) A] (c : A.fixed) (γ γe : GName)
+theorem niLedger_back (A : Xv6App GF) [AL : Xv6AppLaws A] (c : A.fixed) (γ γe : GName)
     (h : List Obs) :
     ⊢@{IProp GF} niLedgerR A c γ γe (h ++ [Obs.powerOn]) -∗ A.turn' c (obsBoots h + 1) ==∗
       niLedgerR A c γ γe (h ++ [Obs.powerOn]) ∗ A.turn'' c (obsBoots h + 1) := by
@@ -183,7 +183,7 @@ theorem niLedger_back (A : Xv6App GF) [AL : Xv6AppLaws (hlc := hlc) A] (c : A.fi
 /-- **THE EXIT HOOK'S DISCHARGE, THE MINT**: a user exit steps the
 application's ledger (`al_user`) and mints the exit's round claim and, at a
 fork, the child's origin claim (`niR_exit`). -/
-theorem niLedger_exit (A : Xv6App GF) [AL : Xv6AppLaws (hlc := hlc) A] (c : A.fixed) (γ γe : GName)
+theorem niLedger_exit (A : Xv6App GF) [AL : Xv6AppLaws A] (c : A.fixed) (γ γe : GName)
     (h : List Obs) (e : Obs) (he : isUExit e = true) :
     niLedgerR A c γ γe h ⊢@{IProp GF}
       |==> (niLedgerR A c γ γe (h ++ [e]) ∗ roundClaim γ h.length ∗ niExitMint γ h.length e) := by
@@ -201,7 +201,7 @@ claim, or an origin ticket) and (NI M2-X3) the record's evidence (`niEvid
 cited lower bounds) is filed and its citation chained (`niR_enter`); the
 application's ledger steps by `al_user`.  The record's Prop `niFit ox e`
 (`_hf`) is subsumed by the evidence's (F2, ruling X-R5). -/
-theorem niLedger_enter (A : Xv6App GF) [AL : Xv6AppLaws (hlc := hlc) A] (c : A.fixed) (γ γe : GName)
+theorem niLedger_enter (A : Xv6App GF) [AL : Xv6AppLaws A] (c : A.fixed) (γ γe : GName)
     (h : List Obs) (e : Obs) (ox : Option (Nat × Obs)) (he : isUEnter e = true) (_hf : niFit ox e)
     (hv : ∀ i x, ox = some (i, x) → i < h.length ∧ h[i]? = some x) :
     uClaimForRaw (roundClaim γ) (niOriginTicket γ) ox ∗ niEvid γe ox e ∗ niLedgerR A c γ γe h ⊢@{IProp GF}
@@ -223,20 +223,20 @@ theorem niLedger_niR_snoc (γ γe : GName) (h : List Obs) (e : Obs) (he : isUEnt
   niR_snoc γ γe h e he
 
 /-- The drain at a port: the application's, the filing blind. -/
-theorem niLedger_tx (A : Xv6App GF) [AL : Xv6AppLaws (hlc := hlc) A] [MachGS hlc GF] [Fscfg]
+theorem niLedger_tx (A : Xv6App GF) [AL : Xv6AppLaws A] [MachGS GF] [Fscfg]
     (c : A.fixed) (γn γe : GName) (i : UartId) (γ : UartNames)
-    (hm : MachFixedGS.mono (hlc := hlc) (GF := GF) = MachGpreS.mono_pre (hlc := hlc))
+    (hm : MachFixedGS.mono (GF := GF) = MachGpreS.mono_pre)
     (hu : i = .uart0 → fscUart = γ) :
     ⊢@{IProp GF} iprop(□ ∀ (h : List Obs) (b : BitVec 8) (u u' : UartState) (ho : List Obs)
         (H : ConsHist),
       ⌜Uart.txPop u = some (b, u') ∧ Uart.loopback u = false ∧ traceShape h true ∧
         obsWire i (openSeg h) = u.wire ∧ u.wire = u.out ∧
-        obsBoots h = genId (hlc := hlc) (GF := GF) + 1 ∧
+        obsBoots h = genId (GF := GF) + 1 ∧
         ho <+: h ∧ H.chAcc = Uart.acc u⌝ -∗
-      cresAt (A.cons c) i (genId (hlc := hlc) (GF := GF) + 1) ho H -∗ uartGhosts γ u' -∗
+      cresAt (A.cons c) i (genId (GF := GF) + 1) ho H -∗ uartGhosts γ u' -∗
         niLedgerR A c γn γe h
         ={(⊤ \ ↑(uartN i)) \ ↑obsN}=∗
-      cresAt (A.cons c) i (genId (hlc := hlc) (GF := GF) + 1) ho H ∗ uartGhosts γ u' ∗
+      cresAt (A.cons c) i (genId (GF := GF) + 1) ho H ∗ uartGhosts γ u' ∗
         niLedgerR A c γn γe (h ++ [Obs.dev (.uartOut i b)])) := by
   have Htx := AL.al_tx c i γ hm hu
   unfold niLedgerR
@@ -246,16 +246,16 @@ theorem niLedger_tx (A : Xv6App GF) [AL : Xv6AppLaws (hlc := hlc) A] [MachGS hlc
   imod Ht $$ %h %b %u %u' %ho %H %hp Hc HG HR with ⟨Hc, HG, HR⟩
   imodintro
   iframe Hc HG HR
-  iapply niLedger_niR_snoc (hlc := hlc) γn γe h _ rfl $$ Hn
+  iapply niLedger_niR_snoc γn γe h _ rfl $$ Hn
 
 /-- The arrival at a port: the application's, the filing blind. -/
-theorem niLedger_rx (A : Xv6App GF) [AL : Xv6AppLaws (hlc := hlc) A] [MachGS hlc GF] [Fscfg]
+theorem niLedger_rx (A : Xv6App GF) [AL : Xv6AppLaws A] [MachGS GF] [Fscfg]
     (c : A.fixed) (γn γe : GName) (i : UartId) (γ : UartNames)
-    (hm : MachFixedGS.mono (hlc := hlc) (GF := GF) = MachGpreS.mono_pre (hlc := hlc))
+    (hm : MachFixedGS.mono (GF := GF) = MachGpreS.mono_pre)
     (hu : i = .uart0 → fscUart = γ) :
     ⊢@{IProp GF} iprop(□ ∀ (h : List Obs) (b : BitVec 8) (u u' : UartState),
       ⌜u.rx.length < Uart.fifoDepth ∧ u' = Uart.accept u b ∧ traceShape h true ∧
-        obsBoots h = genId (hlc := hlc) (GF := GF) + 1⌝ -∗
+        obsBoots h = genId (GF := GF) + 1⌝ -∗
       uartGhosts γ u' -∗ niLedgerR A c γn γe h ={(⊤ \ ↑(uartN i)) \ ↑obsN}=∗
       uartGhosts γ u' ∗ niLedgerR A c γn γe (h ++ [Obs.dev (.uartIn i b)]) ∗
         A.tag c (h ++ [Obs.dev (.uartIn i b)])) := by
@@ -267,14 +267,14 @@ theorem niLedger_rx (A : Xv6App GF) [AL : Xv6AppLaws (hlc := hlc) A] [MachGS hlc
   imod Hr $$ %h %b %u %u' %hp HG HR with ⟨HG, HR, Ht⟩
   imodintro
   iframe HG HR Ht
-  iapply niLedger_niR_snoc (hlc := hlc) γn γe h _ rfl $$ Hn
+  iapply niLedger_niR_snoc γn γe h _ rfl $$ Hn
 
 end ledger
 
 /-! ## §3 THE NI THEOREM, at a generic application -/
 
 section gen
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGpreS hlc GF] [Xv6G GF] [WchGpre GF]
+variable {GF : BundledGFunctors.{0}} [MachGpreS GF] [Xv6G GF] [WchGpre GF]
   [CtokG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
   [IcboxG GF] [SleepLockG GF] [BcacheG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF]
 
@@ -287,7 +287,7 @@ trace obeying the class law.  `xv6AppAdequacy`'s proof at THE NI RECORD
 claims, (NI M2-X3) its evidence, registration ticket and anchor, the trace
 slot `obsLedgerAt (niLedgerR A c γ γe)`). -/
 theorem xv6NiAppAdequacy (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Nat compare)
-    (A : Xv6App GF) [AL : Xv6AppLaws (hlc := hlc) A]
+    (A : Xv6App GF) [AL : Xv6AppLaws A]
     (Happ_init : ∀ c : A.fixed, A.cls c ⊢@{IProp GF} |==> ∃ r : A.names, ⌜A.okc c r⌝ ∗
       A.pred c r (absView (imgState (fsBlocks (diskOf g.m.devs)) sb nib).fssInodes))
     (Hgen0 : g.gen = 0) (Hpow0 : g.pow = false)
@@ -295,7 +295,7 @@ theorem xv6NiAppAdequacy (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet 
     (n : Nat) (κs : List Obs) (t2 : List Expr) (g2 : GState)
     (hsteps : ([Expr.power], g) -<κs>->ₜₚ^[n] (t2, g2)) :
     (∀ e2, e2 ∈ t2 → Reducible (e2, g2)) ∧ xv6NiPhi g2 κs := by
-  refine xv6PowerAdequacyGenU (hlc := hlc) (GF := GF) g sb nib cov
+  refine xv6PowerAdequacyGenU (GF := GF) g sb nib cov
     -- THE FIXED PART: the application's, the claim authority's name and the
     -- chain state's (NI M2-X3)
     (A.fixed × GName × GName) (fun p => A.cls p.1) (fun p => iprop(A.cl p.1 ∗ niR p.2.1 p.2.2 []))
@@ -362,14 +362,14 @@ theorem xv6NiAppAdequacy (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet 
     intro E gen cP cI
     exact H E gen cP cI
   · intro Hinv γgen γstart γreg γd γsw γobs γhist p T
-    letI : MachFixedGS hlc GF := xv6FixedGSU A.names (fun p => A.pred p.1) (fun p => A.okc p.1) cov
+    letI : MachFixedGS GF := xv6FixedGSU A.names (fun p => A.pred p.1) (fun p => A.okc p.1) cov
         sb.sbLogstart (A.ifc p.1) Hinv γgen γstart γreg γd γsw γobs γhist p T
         (obsLedgerAt (niLedgerR A p.1 p.2.1 p.2.2) γobs) (A.tk p.1) (A.hk p.1) niFit (roundClaim p.2.1)
         (niExitMint p.2.1) (niOriginTicket p.2.1)
         (niEvid p.2.2) (fun _ _ => inferInstance) (niEraTok p.2.2)
         (niEraAnchor p.2.2) (fun _ _ => inferInstance)
     intro E gen cP cI Fc i γ hu
-    letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
+    letI : MachGS GF := MachGS.ofEra E gen cP cI
     exact uartObsPermit_ledger i (niLedgerR A p.1 p.2.1 p.2.2) (A.tag p.1) (A.cons p.1) γ rfl rfl rfl
       (niLedger_tx A p.1 p.2.1 p.2.2 i γ rfl hu) (niLedger_rx A p.1 p.2.1 p.2.2 i γ rfl hu)
   · intro Hinv γgen γstart γreg γd γsw γobs γhist p T g' h

@@ -14,7 +14,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
@@ -22,8 +22,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 /-- The residue's pin, read off its syscall environment. -/
 theorem ut_own_pin (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat) (N : UtNames) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (cs : ExtTreeSet GName compare) (pid : BitVec 32) :
-    utOwn (GF := GF) (utSysEnvAt (hlc := hlc) PT Γ j) N V M sts cs pid ⊢
-      ⌜N.Γ = Γ ∧ N.j = j⌝ ∗ utOwn (utSysEnvAt (hlc := hlc) PT Γ j) N V M sts cs pid := by
+    utOwn (GF := GF) (utSysEnvAt PT Γ j) N V M sts cs pid ⊢
+      ⌜N.Γ = Γ ∧ N.j = j⌝ ∗ utOwn (utSysEnvAt PT Γ j) N V M sts cs pid := by
   unfold utOwn utSysEnvAt
   iintro ⟨Hb, Hfd, Hir, Hpv, Hfr, Hch, ⟨%hp, Hsy⟩⟩
   isplitl []
@@ -34,13 +34,13 @@ theorem ut_own_pin (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat) (N
 set_option maxHeartbeats 4000000 in
 /-- **The contract, opened onto the entry block** (`wp_usertrap_body`). -/
 theorem usertrap_open (MP : MYPROC) (PT : SchedNames → IProp GF) (Γ : SchedNames)
-    (HD : UT_DISPATCH (hlc := hlc) PT Γ)
+    (HD : UT_DISPATCH PT Γ)
     (cpu : CPU) (k : KCtx) (j : Nat) (P : UPtd) (ksp : BitVec 64) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName) (cs : ExtTreeSet GName compare)
     (pid : BitVec 32) (sep sc tv : BitVec 64) (f : UexecSG.sfam GF) (Wk : Uvis)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hctx : utCtxOk k) (htier : k.tier = KTier.kpt)
     (hnoff : k.noff = 0) (hstk : utStackTop k ksp) (hgn : gn = V.gen) :
-    wp_usertrap_body (hlc := hlc) (GF := GF) (fun h => usertrapResAt (hlc := hlc) PT Γ j h)
+    wp_usertrap_body (GF := GF) (fun h => usertrapResAt PT Γ j h)
       cpu k j P ksp V M sts gn cs pid sep sc tv f Wk hj hproc hctx htier hnoff hstk hgn := by
   unfold wp_usertrap_body
   iintro ⟨Hk, Hpc, Hsepc, Hsc, Htv, Hstv, Hpt, Htf, Hres, Hsi, Hfi, Hpi, Hki, Hnext⟩

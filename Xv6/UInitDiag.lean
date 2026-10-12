@@ -36,7 +36,7 @@ PORTED THOUGH THE WALK MARKS IT UNREACHED: `kinit_pro_timeless_at`
 ## Deviations from Rocq
 
 1. `UInitBanner`'s deviations 1, 2 (names; `UL : UK_LEAVES` and
-   `L : LinkRec hlc GF` explicit).  `pro_alts !!! a !! i` is
+   `L : LinkRec GF` explicit).  `pro_alts !!! a !! i` is
    `proAlts[a]![i]?`.
 2. **Byte literals** (`init_execfail_bytes_bool`, `init_forkfail_bytes_bool`):
    `List.all` over `List.range` decided on `proAlts` and init's image bytes
@@ -81,7 +81,7 @@ theorem init_forkfail_bytes (j : Nat) (hj : j < 18) :
   simpa using h
 
 section Diag
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [DiskG GF] [EchoOutG GF]
@@ -93,35 +93,35 @@ local notation "stcCons" => FdState.open true true (FdType.device CONSOLE)
 
 /-- **Rocq `pdg_at`**: the round's choice `a` filed with `i` of its bytes
 out, or the taint -- the record's prologue-diagnostic family. -/
-def pdgAt (L : LinkRec hlc GF) (v : EraPins) (I : List (BitVec 8)) (a i : Nat) : IProp GF :=
-  L.lkPdiag (genId (hlc := hlc) (GF := GF) + 1) v I a i
+def pdgAt (L : LinkRec GF) (v : EraPins) (I : List (BitVec 8)) (a i : Nat) : IProp GF :=
+  L.lkPdiag (genId (GF := GF) + 1) v I a i
 
 /-- **Rocq `kinit_w1_of_link_pdiag_at`**: `kinit_w1_of_link_at`'s mould with
 the diagnostic's step in the banner's place. -/
-theorem kinit_w1_of_link_pdiag_at (UL : UK_LEAVES) (L : LinkRec hlc GF) (N : UkNames GF) (v : EraPins)
+theorem kinit_w1_of_link_pdiag_at (UL : UK_LEAVES) (L : LinkRec GF) (N : UkNames GF) (v : EraPins)
     (I : List (BitVec 8)) (l vw : List FdState) (rb : Bool) (a i : Nat) (b : BitVec 8)
     (hl1 : l[1]? = some (.open rb true (.device CONSOLE))) (hb : (proAlts[a]!)[i]? = some b) :
-    ⊢ L.lkPin (genId (hlc := hlc) (GF := GF) + 1) v -∗ L.lkLinks -∗
-      kinitW1 (hlc := hlc) N 1#64 b iprop(ustdAt N.fd l vw ∗ pdgAt L v I a i)
+    ⊢ L.lkPin (genId (GF := GF) + 1) v -∗ L.lkLinks -∗
+      kinitW1 N 1#64 b iprop(ustdAt N.fd l vw ∗ pdgAt L v I a i)
         iprop(ustdAt N.fd l vw ∗ pdgAt L v I a (i + 1)) := by
   iintro #Hpin #Hlk
-  iapply kinit_w1_of_step (hlc := hlc) UL N _ _ l vw rb b hl1
+  iapply kinit_w1_of_step UL N _ _ l vw rb b hl1
   imodintro
   iintro %Φ Hc HΦ
   unfold pdgAt
-  iapply L.lkPdiag_step (genId (hlc := hlc) (GF := GF) + 1) v I a i b Φ hb $$ Hpin Hlk Hc HΦ
+  iapply L.lkPdiag_step (genId (GF := GF) + 1) v I a i b Φ hb $$ Hpin Hlk Hc HΦ
 
 /-! ## S3 THE CREDENTIAL THE BANNER LEAVES, EXACTLY -/
 
 /-- **Rocq `kinit_pro_at`**: the round's prologue open, the choice byte
 next, with the era's pin beside it. -/
-def kinitProAt (L : LinkRec hlc GF) (n : Nat) : IProp GF :=
+def kinitProAt (L : LinkRec GF) (n : Nat) : IProp GF :=
   iprop(∃ (v : EraPins) (I : List (BitVec 8)),
-    ⌜I.length = n⌝ ∗ L.lkPin (genId (hlc := hlc) (GF := GF) + 1) v ∗
-      L.lkPban (genId (hlc := hlc) (GF := GF) + 1) v I)
+    ⌜I.length = n⌝ ∗ L.lkPin (genId (GF := GF) + 1) v ∗
+      L.lkPban (genId (GF := GF) + 1) v I)
 
 /-- **Rocq `kinit_pro_timeless_at`** (see the header). -/
-instance kinitProAt_timeless (L : LinkRec hlc GF) (n : Nat) : Timeless (kinitProAt L n) := by
+instance kinitProAt_timeless (L : LinkRec GF) (n : Nat) : Timeless (kinitProAt L n) := by
   unfold kinitProAt
   haveI : ∀ k v I, Timeless (L.lkPban k v I) := L.lkPban_tl
   infer_instance
@@ -129,13 +129,13 @@ instance kinitProAt_timeless (L : LinkRec hlc GF) (n : Nat) : Timeless (kinitPro
 /-- **Rocq `kinit_banner_law_pro_holds_at`**: the banner's eighteenth byte
 leaves the prologue-open credential (`UInitBanner`'s law with the end shape
 not weakened). -/
-theorem kinit_banner_law_pro_holds_at (UL : UK_LEAVES) (L : LinkRec hlc GF) :
+theorem kinit_banner_law_pro_holds_at (UL : UK_LEAVES) (L : LinkRec GF) :
     ⊢ L.lkLinks -∗
       □ (∀ (n : Nat) (N : UkNames GF),
-          kinitBanAt L n -∗ kinitBanner0 (hlc := hlc) N stcCons (kinitProAt L n)) := by
-  have hd : ∀ v I, ⊢ bnrAt L v I 18 -∗ L.lkPban (genId (hlc := hlc) (GF := GF) + 1) v I := by
+          kinitBanAt L n -∗ kinitBanner0 N stcCons (kinitProAt L n)) := by
+  have hd : ∀ v I, ⊢ bnrAt L v I 18 -∗ L.lkPban (genId (GF := GF) + 1) v I := by
     intro v I
-    have h := L.lkPban_of_ban_done (genId (hlc := hlc) (GF := GF) + 1) v I
+    have h := L.lkPban_of_ban_done (genId (GF := GF) + 1) v I
     rw [show uBanner.length = 18 by decide] at h
     exact h
   iintro #Hlk
@@ -149,7 +149,7 @@ theorem kinit_banner_law_pro_holds_at (UL : UK_LEAVES) (L : LinkRec hlc GF) :
   isplitr
   · imodintro
     iintro %j %hj
-    iapply kinit_w1_of_link_at (hlc := hlc) UL L N v I (ufdL3 stcCons) vw true j
+    iapply kinit_w1_of_link_at UL L N v I (ufdL3 stcCons) vw true j
       (User.Init.initLit kinitLitStart j) (ufdL3_row1 stcCons) (init_banner_bytes j hj) $$ Hpin Hlk
   isplitl [Hl Hbnr]
   · unfold bnrAt
@@ -170,13 +170,13 @@ theorem kinit_banner_law_pro_holds_at (UL : UK_LEAVES) (L : LinkRec hlc GF) :
 /-- **Rocq `kinit_execfail_law_holds_at`**: "init: exec sh failed\n", 21
 bytes at fd 1, alternative 1; what is left is the NEXT sub-round's banner
 credential at the same count. -/
-theorem kinit_execfail_law_holds_at (UL : UK_LEAVES) (L : LinkRec hlc GF) :
+theorem kinit_execfail_law_holds_at (UL : UK_LEAVES) (L : LinkRec GF) :
     ⊢ L.lkLinks -∗
       □ (∀ (n : Nat) (N : UkNames GF),
           kinitProAt L n -∗
-          kinitBannerPay (hlc := hlc) N stcCons 21 (User.Init.initLit kinitLitExec) (kinitBanAt L n)) := by
-  have hd : ∀ v I, ⊢ pdgAt L v I 1 21 -∗ L.lkBan (genId (hlc := hlc) (GF := GF) + 1) v I 0 :=
-    fun v I => L.lkPdiag_done_1 (genId (hlc := hlc) (GF := GF) + 1) v I 21 (by decide)
+          kinitBannerPay N stcCons 21 (User.Init.initLit kinitLitExec) (kinitBanAt L n)) := by
+  have hd : ∀ v I, ⊢ pdgAt L v I 1 21 -∗ L.lkBan (genId (GF := GF) + 1) v I 0 :=
+    fun v I => L.lkPdiag_done_1 (genId (GF := GF) + 1) v I 21 (by decide)
   iintro #Hlk
   imodintro
   iintro %n %N Hpro
@@ -188,12 +188,12 @@ theorem kinit_execfail_law_holds_at (UL : UK_LEAVES) (L : LinkRec hlc GF) :
   isplitr
   · imodintro
     iintro %j %hj
-    iapply kinit_w1_of_link_pdiag_at (hlc := hlc) UL L N v I (ufdL3 stcCons) vw true 1 j
+    iapply kinit_w1_of_link_pdiag_at UL L N v I (ufdL3 stcCons) vw true 1 j
       (User.Init.initLit kinitLitExec j) (ufdL3_row1 stcCons) (init_execfail_bytes j hj) $$ Hpin Hlk
   isplitl [Hl Hc]
   · iframe Hl
     unfold pdgAt
-    iapply L.lkPdiag_0 (genId (hlc := hlc) (GF := GF) + 1) v I 1 $$ Hc
+    iapply L.lkPdiag_0 (genId (GF := GF) + 1) v I 1 $$ Hc
   iintro ⟨Hl, Hc⟩
   iframe Hl
   unfold kinitBanAt
@@ -207,11 +207,11 @@ theorem kinit_execfail_law_holds_at (UL : UK_LEAVES) (L : LinkRec hlc GF) :
 
 /-- **Rocq `kinit_forkfail_law_holds_at`**: "init: fork failed\n", 18 bytes
 at fd 1, alternative 2, the round terminal: nothing is left. -/
-theorem kinit_forkfail_law_holds_at (UL : UK_LEAVES) (L : LinkRec hlc GF) :
+theorem kinit_forkfail_law_holds_at (UL : UK_LEAVES) (L : LinkRec GF) :
     ⊢ L.lkLinks -∗
       □ (∀ (n : Nat) (N : UkNames GF),
           kinitProAt L n -∗
-          kinitBannerPay (hlc := hlc) N stcCons 18 (User.Init.initLit kinitLitFork) iprop(emp)) := by
+          kinitBannerPay N stcCons 18 (User.Init.initLit kinitLitFork) iprop(emp)) := by
   iintro #Hlk
   imodintro
   iintro %n %N Hpro
@@ -223,12 +223,12 @@ theorem kinit_forkfail_law_holds_at (UL : UK_LEAVES) (L : LinkRec hlc GF) :
   isplitr
   · imodintro
     iintro %j %hj
-    iapply kinit_w1_of_link_pdiag_at (hlc := hlc) UL L N v I (ufdL3 stcCons) vw true 2 j
+    iapply kinit_w1_of_link_pdiag_at UL L N v I (ufdL3 stcCons) vw true 2 j
       (User.Init.initLit kinitLitFork j) (ufdL3_row1 stcCons) (init_forkfail_bytes j hj) $$ Hpin Hlk
   isplitl [Hl Hc]
   · iframe Hl
     unfold pdgAt
-    iapply L.lkPdiag_0 (genId (hlc := hlc) (GF := GF) + 1) v I 2 $$ Hc
+    iapply L.lkPdiag_0 (genId (GF := GF) + 1) v I 2 $$ Hc
   iintro ⟨Hl, -⟩
   iframe Hl
 

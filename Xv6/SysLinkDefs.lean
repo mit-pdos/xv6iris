@@ -35,7 +35,7 @@ content:
 ## Deviations from Rocq
 
 1. Numbers, maps, the authority's spelling and the class binders as
-   `Xv6/SysUnlinkDefs.lean` deviations 1-2 (`[MachGS hlc GF] [FsTopG GF]`,
+   `Xv6/SysUnlinkDefs.lean` deviations 1-2 (`[MachGS GF] [FsTopG GF]`,
    per-declaration `[Appcfg GF]` / `[FsBytesG GF]`; the `CurCtx` binder is
    dropped).  `is_Some (I !! t)` is `(PartialMap.get? I t).isSome`.
 2. The return word: `mword 64` is `BitVec 64`, `mword_of_int (-1)` is
@@ -87,7 +87,7 @@ theorem linkTgtOk_not_dir (n : FsNode) (hd : fnIsDir n = false) :
   · trivial
 
 section SysLinkAbs
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsTopG GF]
 
 /-! ### The two NEW commits (the third is unlink's, reused) -/
 
@@ -132,7 +132,7 @@ def lentCommitAt [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset)
 /-- Rocq's `ltgt_commit_at_unit`. -/
 theorem ltgtCommitAt_unit [Appcfg GF] [FsBytesG GF] (γfs : FsNames) (E : CoPset) :
     appSup (GF := GF) ⊢
-      ltgtCommitAt (hlc := hlc) (fsGammaL γfs) E (fun _ _ _ => iprop(True)) := by
+      ltgtCommitAt (fsGammaL γfs) E (fun _ _ _ => iprop(True)) := by
   iintro #Hsup
   unfold ltgtCommitAt
   iintro %I %t %a %_ %_ %_ Ha
@@ -146,7 +146,7 @@ theorem ltgtCommitAt_unit [Appcfg GF] [FsBytesG GF] (γfs : FsNames) (E : CoPset
 /-- Rocq's `lent_commit_at_unit`. -/
 theorem lentCommitAt_unit [Appcfg GF] [FsBytesG GF] (γfs : FsNames) (E : CoPset) :
     appSup (GF := GF) ⊢
-      lentCommitAt (hlc := hlc) (fsGammaL γfs) E (fun _ _ _ _ => iprop(True)) := by
+      lentCommitAt (fsGammaL γfs) E (fun _ _ _ _ => iprop(True)) := by
   iintro #Hsup
   unfold lentCommitAt
   iintro %I %d %t %nm %ents %nl %_ %_ Ha
@@ -164,26 +164,26 @@ def linkCommits [Appcfg GF] (Γ : FsViewNames GF)
     (Ftgt : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Fent : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Funt : Pfam GF (Aview → Nat → IProp GF)) : IProp GF :=
-  iprop(pfAt (ltgtCommitAt (hlc := hlc) Γ appE) Ftgt ∗
-    pfAt (lentCommitAt (hlc := hlc) Γ appE) Fent ∗
-    pfAt (utgtCommitAt (hlc := hlc) Γ appE) Funt)
+  iprop(pfAt (ltgtCommitAt Γ appE) Ftgt ∗
+    pfAt (lentCommitAt Γ appE) Fent ∗
+    pfAt (utgtCommitAt Γ appE) Funt)
 
 /-- the whole bundle at the trivial families -- what the dispatcher hands
 down (Rocq's `link_commits_unit`) -/
 theorem linkCommits_unit [Appcfg GF] [FsBytesG GF] (γfs : FsNames) :
     appSup (GF := GF) ⊢
-      linkCommits (hlc := hlc) (fsGammaL γfs) (pfamTriv (fun _ _ _ => iprop(True)))
+      linkCommits (fsGammaL γfs) (pfamTriv (fun _ _ _ => iprop(True)))
         (pfamTriv (fun _ _ _ _ => iprop(True))) (pfamTriv (fun _ _ => iprop(True))) := by
   iintro #Hsup
   unfold linkCommits
   isplitr
   · iapply pfAt_triv
-    iapply (ltgtCommitAt_unit (hlc := hlc) γfs appE) $$ Hsup
+    iapply (ltgtCommitAt_unit γfs appE) $$ Hsup
   isplitr
   · iapply pfAt_triv
-    iapply (lentCommitAt_unit (hlc := hlc) γfs appE) $$ Hsup
+    iapply (lentCommitAt_unit γfs appE) $$ Hsup
   · iapply pfAt_triv
-    iapply (utgtCommitAt_unit (hlc := hlc) γfs appE) $$ Hsup
+    iapply (utgtCommitAt_unit γfs appE) $$ Hsup
 
 /-- instant 1's receipt with its pure facts (Rocq's `ltgt_fired`) -/
 def ltgtFired (Ftgt : Pfam GF (Aview → Nat → Anode → IProp GF)) (t : Nat) : IProp GF :=
@@ -221,18 +221,18 @@ def linkArms [Appcfg GF] (Γ : FsViewNames GF)
   iprop((⌜r = 0#64⌝ ∗
       ∃ (t d : Nat) (nm : Fname),
         ltgtFired Ftgt t ∗ lentFired Fent d nm t ∗
-        pfAt (utgtCommitAt (hlc := hlc) Γ appE) Funt) ∨
+        pfAt (utgtCommitAt Γ appE) Funt) ∨
     (⌜r = -1#64⌝ ∗
-      (linkCommits (hlc := hlc) Γ Ftgt Fent Funt ∨
+      (linkCommits Γ Ftgt Fent Funt ∨
         (∃ t : Nat, ltgtFired Ftgt t ∗ luntgtFired Funt t ∗
-          pfAt (lentCommitAt (hlc := hlc) Γ appE) Fent))))
+          pfAt (lentCommitAt Γ appE) Fent))))
 
 /-- Rocq's `link_arms_none`. -/
 theorem linkArms_none [Appcfg GF] (Γ : FsViewNames GF)
     (Ftgt : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Fent : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Funt : Pfam GF (Aview → Nat → IProp GF)) (r : BitVec 64) (hr : r = -1#64) :
-    linkCommits (hlc := hlc) Γ Ftgt Fent Funt ⊢ linkArms (hlc := hlc) Γ Ftgt Fent Funt r := by
+    linkCommits Γ Ftgt Fent Funt ⊢ linkArms Γ Ftgt Fent Funt r := by
   subst hr
   unfold linkArms
   iintro H
@@ -248,8 +248,8 @@ theorem linkArms_undone [Appcfg GF] (Γ : FsViewNames GF)
     (Fent : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Funt : Pfam GF (Aview → Nat → IProp GF)) (r : BitVec 64) (t : Nat) (hr : r = -1#64) :
     ⊢@{IProp GF} ltgtFired Ftgt t -∗ luntgtFired Funt t -∗
-      pfAt (lentCommitAt (hlc := hlc) Γ appE) Fent -∗
-      linkArms (hlc := hlc) Γ Ftgt Fent Funt r := by
+      pfAt (lentCommitAt Γ appE) Fent -∗
+      linkArms Γ Ftgt Fent Funt r := by
   subst hr
   unfold linkArms
   iintro H1 H2 H3
@@ -267,8 +267,8 @@ theorem linkArms_ok [Appcfg GF] (Γ : FsViewNames GF)
     (Funt : Pfam GF (Aview → Nat → IProp GF)) (r : BitVec 64) (t d : Nat) (nm : Fname)
     (hr : r = 0#64) :
     ⊢@{IProp GF} ltgtFired Ftgt t -∗ lentFired Fent d nm t -∗
-      pfAt (utgtCommitAt (hlc := hlc) Γ appE) Funt -∗
-      linkArms (hlc := hlc) Γ Ftgt Fent Funt r := by
+      pfAt (utgtCommitAt Γ appE) Funt -∗
+      linkArms Γ Ftgt Fent Funt r := by
   subst hr
   unfold linkArms
   iintro H1 H2 H3
@@ -284,7 +284,7 @@ theorem linkArms_ret [Appcfg GF] (Γ : FsViewNames GF)
     (Ftgt : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Fent : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Funt : Pfam GF (Aview → Nat → IProp GF)) (r : BitVec 64) :
-    linkArms (hlc := hlc) Γ Ftgt Fent Funt r ⊢ ⌜sysLinkRet r⌝ := by
+    linkArms Γ Ftgt Fent Funt r ⊢ ⌜sysLinkRet r⌝ := by
   unfold linkArms
   iintro H
   icases H with (⟨%h0, -⟩ | ⟨%hm1, -⟩)

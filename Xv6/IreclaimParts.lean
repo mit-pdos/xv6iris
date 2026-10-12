@@ -173,7 +173,7 @@ def ireclaimFmtStr : List (BitVec 8) :=
    0x64#8, 0x65#8, 0x20#8, 0x25#8, 0x64#8, 0x0a#8]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 set_option maxRecDepth 100000 in
 /-- Rocq's `irc_msg_bytes` + `kernel_data_string`. -/

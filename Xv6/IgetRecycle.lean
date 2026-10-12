@@ -162,7 +162,7 @@ theorem ig_ciwf_insert (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × 
     · simp only [e1, if_false] at h; exact hdv k p h
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
   [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [SleepLockG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -274,12 +274,12 @@ theorem ig_ireg_esc (z : Nat) : (↑iregN : CoPset) ## (↑(escAN z) : CoPset) :
     p ⟨h1, nclose_subseteq (ndot nroot "icescA") z p h2⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
   [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [SleepLockG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
 theorem lkFloor_keyAt (ξ : CtxId) (t : Nat) :
-    lkFloor (GF := GF) ξ t ⊢ keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ t := by
+    lkFloor (GF := GF) ξ t ⊢ keyAt (MachGS.era (GF := GF)) ξ t := by
   unfold lkFloor; exact .rfl
 
 /-- The recycled entry's whole identity cells: the header's half and two
@@ -318,9 +318,9 @@ theorem ig_rcy_ghost (c : CPU) (M : RegMapF (Qp × PosNat)) (e : Nat) (he : e < 
     wordCell (iRef (ientry e)) 4 t (BitVec.ofNat 32 1) [] ∗ lkFloor curCtx t ∗
     istmpAuth e 1 tstp ∗ topLb tstp ∗
     icId fscIc e Qp.quarter false devT inumT ∗ icId fscIc e Qp.quarter false devB inumB ∗
-    itableHalf M ∗ islSlot M e ∗ ipool (hlc := hlc) fscFs fscIreg fscCov fscLogst P ∅ ∗
+    itableHalf M ∗ islSlot M e ∗ ipool fscFs fscIreg fscCov fscLogst P ∅ ∗
     iname fscIreg fscFs icfgIst inum l ⊢
-    |={⊤}=> ownCtx c curCtx ∗ ipool (hlc := hlc) fscFs fscIreg fscCov fscLogst (P \ {inum.toNat}) ∅ ∗
+    |={⊤}=> ownCtx c curCtx ∗ ipool fscFs fscIreg fscCov fscLogst (P \ {inum.toNat}) ∅ ∗
       itableHalf (PartialMap.insert M e (Qp.quarter, PosNat.one)) ∗
       islSlot (PartialMap.insert M e (Qp.quarter, PosNat.one)) e ∗
       frzmH inum.toNat false ∗ frzsel e (1 : Qp).half false ∗
@@ -352,7 +352,7 @@ theorem ig_rcy_ghost (c : CPU) (M : RegMapF (Qp × PosNat)) (e : Nat) (he : e < 
   icases ownCtx_key_topLb c curCtx t $$ [Hrun Hkey] with ⟨Hrun, #Hllbt⟩
   · iframe Hrun; iapply lkFloor_keyAt; iexact Hkey
   -- the install
-  imod iref_alloc_pinw_install (hlc := hlc) ⊤ fscIreg fscFs icfgIst icfgNib M e inum l Qp.quarter
+  imod iref_alloc_pinw_install ⊤ fscIreg fscFs icfgIst icfgNib M e inum l Qp.quarter
       tstp t CoPset.subseteq_top CoPset.subseteq_top CoPset.subseteq_top hnib' he hM ig_quarter_lt
     $$ Hinv Hrinv Hhalf Hisl Hlic Hfoff Hicnt0 Hst Hllbp Hllbt Hrows
     with ⟨Hhalf, Hisl, ⟨%g, Htok, Hlv, Hpend⟩, Hsel, Hlic, Hfoff, Hicnt1, Hru,
@@ -405,7 +405,7 @@ theorem ig_rcy_close (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × Bi
     (∀ M' : RegMapF (Qp × PosNat), ⌜∀ j, j ≠ e → PartialMap.get? M' j = PartialMap.get? M j⌝ -∗
       islSlot M' e -∗ islPool M') ∗
     irefSlotsAuth ∗
-    ipool (hlc := hlc) fscFs fscIreg fscCov fscLogst ((regionInums icfgNib \ ciInums ci) \ {inum.toNat}) ∅ ∗
+    ipool fscFs fscIreg fscCov fscLogst ((regionInums icfgNib \ ciInums ci) \ {inum.toNat}) ∅ ∗
     (∀ (M' : RegMapF (Qp × PosNat)) (ci' : RegMapF (BitVec 32 × BitVec 32)),
       ⌜∀ j, j ≠ e → PartialMap.get? M' j = PartialMap.get? M j⌝ -∗
       ⌜∀ j, j ≠ e → PartialMap.get? ci' j = PartialMap.get? ci j⌝ -∗

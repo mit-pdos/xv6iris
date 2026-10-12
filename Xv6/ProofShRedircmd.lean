@@ -25,21 +25,21 @@ open Std (ExtTreeSet)
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-- **Rocq `wp_kshp_redircmd_n`**. -/
 theorem wp_shRedircmd (UL : UK_LEAVES) (SC : SH_CMDALLOC) (N : UkNames GF) (h : CPU) (m : RegMap) (s0 sub : Nat)
-    (mode fd : Int) (Sub : IProp GF) (q eq n : Nat) (UM UM' Pex : IProp GF) (hM : ushmMallocTyLe (hlc := hlc) N 168 UM UM')
+    (mode fd : Int) (Sub : IProp GF) (q eq n : Nat) (UM UM' Pex : IProp GF) (hM : ushmMallocTyLe N 168 UM UM')
     (ha0 : m.get 10#5 = BitVec.ofNat 64 sub) (ha1 : m.get 11#5 = BitVec.ofNat 64 (s0 + q))
     (ha2 : m.get 12#5 = BitVec.ofNat 64 (s0 + eq)) (ha3 : m.get 13#5 = BitVec.ofInt 64 mode)
     (ha4 : m.get 14#5 = BitVec.ofInt 64 fd) (hm0 : 0 ≤ mode) (hm1 : mode < 2 ^ 31) (hf0 : 0 ≤ fd) (hf1 : fd < 2 ^ 31) :
-    ⊢ ushCode N.t -∗ UM -∗ ushpOom (hlc := hlc) N Pex (10 + n) -∗ Pex -∗ Sub -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«redircmd») (8 + (4 + (10 + n))) -∗
+    ⊢ ushCode N.t -∗ UM -∗ ushpOom N Pex (10 + n) -∗ Pex -∗ Sub -∗
+      urun N h m (BitVec.ofNat 64 User.Sh.Sym.«redircmd») (8 + (4 + (10 + n))) -∗
       (∀ (h' : CPU) (m' : RegMap) (p : Nat), ⌜ucalleeSaved m m'⌝ -∗ ⌜m'.get 10#5 = BitVec.ofNat 64 p⌝ -∗
         ⌜0 < p ∧ p % 16 = 0 ∧ p + 40 < 2 ^ 38⌝ -∗ ushRedirNode N s0 p sub q eq mode fd -∗ Sub -∗ UM' -∗ Pex -∗
-        urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (8 + (4 + (10 + n))) -∗ wpLoop h') -∗
+        urun N h' m' (retPc (m.get 1#5)) (8 + (4 + (10 + n))) -∗ wpLoop h') -∗
       wpLoop h := by
   rw [show User.Sh.Sym.«redircmd» = 0x226 from rfl]
   iintro #Hc HM #Hoom Hpay HSub Hrun Hk

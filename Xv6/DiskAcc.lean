@@ -63,7 +63,7 @@ set_option linter.unusedSimpArgs false
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
 
 /-! ## The MMIO window, as the fabric sees it
 
@@ -1157,7 +1157,7 @@ def diskFlipIn [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) : IProp GF := iprop
   ctxBytes curCtx (availIdxAt pav) 2 (DFrac.own 1) (wrap16 0) ∗
   ([∗list] j ∈ List.range NUM,
     ctxBytes curCtx (availRingAt pav j) 2 (DFrac.own 1) (BitVec.ofNat 16 (ringInit j))) ∗
-  (∃ b : Nat, usedIdxCell (usedIdxAt pu) b [] ∗ keyAt (MachGS.era (hlc := hlc) (GF := GF)) curCtx b) ∗
+  (∃ b : Nat, usedIdxCell (usedIdxAt pu) b [] ∗ keyAt (MachGS.era (GF := GF)) curCtx b) ∗
   ([∗list] j ∈ List.range NUM,
     ctxBytes curCtx (usedElemAt pu j) 8 (DFrac.own 1) (0 : BitVec (8 * 8))) ∗
   wordAtN curCtx aUsedIdx 2 (DFrac.own 1) (wrap16 0) ∗
@@ -1180,7 +1180,7 @@ holder's own store), and the lock's handoffs transport it
 (`MachCSL.ctx_dom_key`); see `Xv6.diskPayFl`. -/
 theorem ctxBytes_usedIdxKey (ξ : CtxId) (pa : PAddr) :
     ctxBytes (GF := GF) ξ pa 2 (DFrac.own 1) (0 : BitVec (8 * 2)) ⊢
-      ∃ b : Nat, usedIdxCell pa b [] ∗ keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ b := by
+      ∃ b : Nat, usedIdxCell pa b [] ∗ keyAt (MachGS.era (GF := GF)) ξ b := by
   unfold ctxBytes usedIdxCell
   simp only [show List.range 2 = [0, 1] from rfl, Iris.Algebra.BigOpL.bigOpL_cons,
     Iris.Algebra.BigOpL.bigOpL_nil]

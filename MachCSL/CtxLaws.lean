@@ -29,9 +29,9 @@ namespace MachCSL
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std
 open LeanRV64D
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
-local notation "era" => MachGS.era (hlc := hlc) (GF := GF)
+local notation "era" => MachGS.era (GF := GF)
 
 /-! ## Vocabulary -/
 
@@ -274,7 +274,7 @@ domination (Rocq `IntrDefs.env_move`), since the family is abstract. -/
 def envMorph (E : CtxId → IProp GF) : IProp GF := iprop%
   □ ∀ (ξ ξ' : CtxId), ctxDom ξ ξ' -∗ □ E ξ -∗ |==> (ctxDom ξ ξ' ∗ □ E ξ')
 
-instance envMorph_persistent (E : CtxId → IProp GF) : Persistent (envMorph (hlc := hlc) (GF := GF) E) := by
+instance envMorph_persistent (E : CtxId → IProp GF) : Persistent (envMorph (GF := GF) E) := by
   unfold envMorph; infer_instance
 
 /-- The witness, applied. -/
@@ -287,7 +287,7 @@ theorem envMorph_use (E : CtxId → IProp GF) (ξ ξ' : CtxId) :
 /-- A persistent family that transports has its witness (Rocq's
 `kernelvec_env_move`, generically). -/
 theorem envMorph_of_ctxMorph (E : CtxId → IProp GF) [CtxMorph E] [∀ ξ, Persistent (E ξ)] :
-    ⊢ envMorph (hlc := hlc) (GF := GF) E := by
+    ⊢ envMorph (GF := GF) E := by
   unfold envMorph
   iintro !> %ξ %ξ' Hdom #He
   imod CtxMorph.morph (R := E) ξ ξ' $$ [$Hdom $He] with ⟨Hdom, #He'⟩
@@ -301,7 +301,7 @@ installed handler carries. -/
 def envAt (E : CtxId → IProp GF) (ξ : CtxId) : IProp GF := iprop(□ E ξ ∗ envMorph E)
 
 instance envAt_persistent (E : CtxId → IProp GF) (ξ : CtxId) :
-    Persistent (envAt (hlc := hlc) (GF := GF) E ξ) := by
+    Persistent (envAt (GF := GF) E ξ) := by
   unfold envAt; infer_instance
 
 theorem envAt_intro (E : CtxId → IProp GF) (ξ : CtxId) :
@@ -322,14 +322,14 @@ theorem envAt_of_ctxMorph (E : CtxId → IProp GF) [CtxMorph E] [∀ ξ, Persist
   · iexact He
   · iapply envMorph_of_ctxMorph E
 
-theorem envAt_env (E : CtxId → IProp GF) (ξ : CtxId) : envAt (hlc := hlc) (GF := GF) E ξ ⊢ E ξ := by
+theorem envAt_env (E : CtxId → IProp GF) (ξ : CtxId) : envAt (GF := GF) E ξ ⊢ E ξ := by
   unfold envAt
   iintro ⟨#He, _⟩
   iexact He
 
 /-- The environment transports: the witness moves it, and it is persistent
 at the destination. -/
-instance instCtxMorphEnvAt (E : CtxId → IProp GF) : CtxMorph (GF := GF) (envAt (hlc := hlc) (GF := GF) E) where
+instance instCtxMorphEnvAt (E : CtxId → IProp GF) : CtxMorph (GF := GF) (envAt (GF := GF) E) where
   morph ξ ξ' := by
     iintro ⟨Hdom, HE⟩
     icases (show envAt E ξ ⊢ iprop(□ E ξ ∗ envMorph E) from .rfl) $$ HE with ⟨#He, #Hm⟩

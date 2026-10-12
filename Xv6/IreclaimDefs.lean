@@ -46,7 +46,7 @@ set_option linter.unusedSimpArgs false
 /-! ## The frame -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- ireclaim's 64-byte frame, from `sp-8` down to `sp-64`: `ra`, `s0`,
 `s1..s6` (all saved at `+0x10 .. +0x1e`) -- Rocq's `irc_frame`. -/
@@ -138,7 +138,7 @@ def ireclaimLoopRegs [Icfg] (k : KCtx) (n : Nat) (R : RegMap) : Prop :=
 /-! ## The environment, the continuation, the loop's resources -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF]
@@ -150,15 +150,15 @@ def ireclaimEnv [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) (γl : GName) (pd pav 
   panicEnv ∗ procsInv Γ ∗ bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
   diskCaps fscDisk fscDlock pd pav pu ∗
   logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
-  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+  iregInv fscIreg fscFs icfgIst icfgNib ∗
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗ icSleeplocks fscIc ∗
+  itableInv ∗ icSleeplocks fscIc ∗
   bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize ∗
   -- end_op's crash seam and era certificate (the contract's, LAST)
-  fsCrashSeam (hlc := hlc) (GF := GF) fscCov fscLogst ∗ genCert (hlc := hlc) (GF := GF)
+  fsCrashSeam (GF := GF) fscCov fscLogst ∗ genCert (GF := GF)
 
 instance ireclaimEnv_persistent [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) (γl : GName)
-    (pd pav pu : BitVec 64) : Persistent (ireclaimEnv (hlc := hlc) (GF := GF) Γ γl pd pav pu) := by
+    (pd pav pu : BitVec 64) : Persistent (ireclaimEnv (GF := GF) Γ γl pd pav pu) := by
   unfold ireclaimEnv; infer_instance
 
 /-- **THE CLIENT'S CONTINUATION, NAMED** (Rocq's `irc_cont`): the `wpNext`
@@ -218,7 +218,7 @@ def ireclaimLoopPre [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) (c : CPU) (k : KCt
     (spie spp : Bool) (R : RegMap) (γl : GName) (pd pav pu : BitVec 64)
     (pidv : BitVec 32) (dqp dqb dqs dqn : DFrac) : IProp GF := iprop%
   kctx c (((k.withSpie spie spp).pushed 8).withRegs R) ∗ pcIs c (KA.«ireclaim» + 0x7c#64) ∗
-  ireclaimEnv (hlc := hlc) Γ γl pd pav pu ∗ ireclaimTurn c k pidv dqp dqb dqs dqn ∗
+  ireclaimEnv Γ γl pd pav pu ∗ ireclaimTurn c k pidv dqp dqb dqs dqn ∗
   bslots 3 ∗ irefSlot ∗ iregBoot
 
 end
@@ -226,7 +226,7 @@ end
 /-! ## The callees, at their call sites -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF]
@@ -249,7 +249,7 @@ theorem ireclaim_printk (PK : PRINTK) [CurCtx] (c : CPU) (k' : KCtx)
   icases (show panicEnv (GF := GF) ⊢ ∃ (γpr γlp : GName) (γd : UartNames),
       isLock γpr prLock "pr" (fun _ => emp) ∗ isTxLock γlp γd ∗ uartSentSub γd [] from by
     unfold panicEnv; iintro H; iexact H) $$ Hpe with ⟨%γpr, %γlp, %γd, #Hlk, #Htx, #Hsent⟩
-  have h := PK.wp_printk (hlc := hlc) (GF := GF) c k' γpr γlp γd [] DFrac.discard ireclaimFmtStr
+  have h := PK.wp_printk (GF := GF) c k' γpr γlp γd [] DFrac.discard ireclaimFmtStr
     [PkArgDesc.num] hK (by unfold ireclaimFmtStr; decide)
     (by rw [ireclaim_pkKinds]; rfl) (by decide) hnoff hpr huart
   unfold wp_printk_body at h
@@ -279,7 +279,7 @@ theorem ireclaim_iget [Fscfg] [Icfg] [CurCtx] (IG : IGET) (c : CPU) (k' : KCtx) 
     (hit : "itable" ∉ k'.locks) (hpr : "pr" ∉ k'.locks) (huart : "uart1" ∉ k'.locks) :
     kctx c k' ∗ pcIs c KA.«iget» ∗
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-    itableInv (hlc := hlc) ∗ iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ panicEnv ∗
+    itableInv ∗ iregReg fscIreg fscFs icfgIst icfgNib ∗ panicEnv ∗
     irefSlot ∗ iname fscIreg fscFs icfgIst inum l ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
@@ -289,7 +289,7 @@ theorem ireclaim_iget [Fscfg] [Icfg] [CurCtx] (IG : IGET) (c : CPU) (k' : KCtx) 
       inodeRefb (isClaim l) kk q icfgDev inum -∗
       iname fscIreg fscFs icfgIst inum l -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := IG.wp_iget (hlc := hlc) (GF := GF) c k' inum l hK hnoff hnib hpos ha0 ha1 hit hpr
+  have h := IG.wp_iget (GF := GF) c k' inum l hK hnoff hnib hpos ha0 ha1 hit hpr
     huart
   unfold wp_iget_body at h
   simp only [igetAddr] at h
@@ -298,7 +298,7 @@ theorem ireclaim_iget [Fscfg] [Icfg] [CurCtx] (IG : IGET) (c : CPU) (k' : KCtx) 
 set_option maxHeartbeats 1000000 in
 /-- `begin_op()` at `+0x54`: the reservation, whole. -/
 theorem ireclaim_begin_op [Fscfg] [Icfg] [CurCtx] (BO : BEGIN_OP) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ] (c : CPU) (k' : KCtx) (j : Nat) (pidv : BitVec 32) (dqp : DFrac)
+    [ClaimIs GF Γ] (c : CPU) (k' : KCtx) (j : Nat) (pidv : BitVec 32) (dqp : DFrac)
     (pj : BitVec 64) (hpj : k'.proc = pj) (s : Bool) (hs : k'.sie = s)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : beginOpSlots ≤ k'.avail)
     (hnoff : k'.noff = 0)
@@ -315,7 +315,7 @@ theorem ireclaim_begin_op [Fscfg] [Icfg] [CurCtx] (BO : BEGIN_OP) (Γ : SchedNam
       logOp icfgLog MAXOPBLOCKS -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj hs
-  have h := BO.wp_begin_op_eb (hlc := hlc) (GF := GF) Γ c k' icfgLog fscBio
+  have h := BO.wp_begin_op_eb (GF := GF) Γ c k' icfgLog fscBio
     (fsView fscFs fscDisk icfgDev fscCov) fscFs j fscLogst icfgDev pidv dqp
     hj hproc hK hnoff htier
   unfold wp_begin_op_eb_body at h
@@ -325,7 +325,7 @@ theorem ireclaim_begin_op [Fscfg] [Icfg] [CurCtx] (BO : BEGIN_OP) (Γ : SchedNam
 set_option maxHeartbeats 1000000 in
 /-- `end_op()` at `+0x6a`: the reservation retired. -/
 theorem ireclaim_end_op [Fscfg] [Icfg] [CurCtx] (EO : END_OP) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ] (c : CPU) (k' : KCtx) (γl : GName) (pd pav pu : BitVec 64)
+    [ClaimIs GF Γ] (c : CPU) (k' : KCtx) (γl : GName) (pd pav pu : BitVec 64)
     (j : Nat) (u : Nat) (pidv : BitVec 32) (dqp : DFrac)
     (pj : BitVec 64) (hpj : k'.proc = pj) (s : Bool) (hs : k'.sie = s)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : endOpSlots ≤ k'.avail)
@@ -337,7 +337,7 @@ theorem ireclaim_end_op [Fscfg] [Icfg] [CurCtx] (EO : END_OP) (Γ : SchedNames)
     diskCaps fscDisk fscDlock pd pav pu ∗ panicEnv ∗
     logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
     -- the crash seam and the era certificate (ireclaim's own premises)
-    fsCrashSeam (hlc := hlc) (GF := GF) fscCov fscLogst ∗ genCert (hlc := hlc) (GF := GF) ∗
+    fsCrashSeam (GF := GF) fscCov fscLogst ∗ genCert (GF := GF) ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗
     logOp icfgLog u ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
@@ -347,7 +347,7 @@ theorem ireclaim_end_op [Fscfg] [Icfg] [CurCtx] (EO : END_OP) (Γ : SchedNames)
       wordPointsTo (pPid pj) 4 dqp pidv -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj hs
-  have h := EO.wp_end_op_eb (hlc := hlc) (GF := GF) Γ c k' icfgLog γl fscBio
+  have h := EO.wp_end_op_eb (GF := GF) Γ c k' icfgLog γl fscBio
     (fsView fscFs fscDisk icfgDev fscCov) fscDlock fscFs pd pav pu j fscLogst icfgDev u pidv dqp
     hj hproc hK hnoff htier hgeom rfl rfl rfl hpd
   unfold wp_end_op_eb_body at h
@@ -358,7 +358,7 @@ set_option maxHeartbeats 1000000 in
 /-- `ilock(ip)` at `+0x5a`, THE TRANSACTIONAL FORM (Rocq 1702,
 `IL.wp_ilock_tx_sconf`). -/
 theorem ireclaim_ilock [Fscfg] [Icfg] [CurCtx] (IL : ILOCK) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γil γisl : GName) (kk : Nat) (s : Qp) (g : GName) (lo tl : Nat) (o : Ilkc)
     (inum : BitVec 32) (pidv : BitVec 32) (dqp dqs : DFrac) (Tl : Nat)
@@ -377,8 +377,8 @@ theorem ireclaim_ilock [Fscfg] [Icfg] [CurCtx] (IL : ILOCK) (Γ : SchedNames)
     trapCsrsExt c sie ∗ cpuClaimExt c sie k'.proc ∗ panicEnv ∗
     bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
     diskCaps fscDisk fscDlock pd pav pu ∗
-    itableInv (hlc := hlc) ∗ icEscrow fscIc fscFs fscIreg fscCov fscLogst kk ∗
-    iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+    itableInv ∗ icEscrow fscIc fscFs fscIreg fscCov fscLogst kk ∗
+    iregInv fscIreg fscFs icfgIst icfgNib ∗
     isSleeplockGen γil γisl (iLock (ientry kk)) (icSlp fscIc kk) (slhTok (icfgIsl kk)) ∗
     credFloor lo tl ∗ irefClaims ∗
     inodeShrGenlo kk s icfgDev inum g lo ∗
@@ -391,7 +391,7 @@ theorem ireclaim_ilock [Fscfg] [Icfg] [CurCtx] (IL : ILOCK) (Γ : SchedNames)
     wpNext true k'.proc c (ilockPostTxEb k' γisl kk s g lo o inum pidv dqp dqs Tl)
     ⊢ wpLoop (GF := GF) c := by
   subst hs
-  have h := IL.wp_ilock_tx_eb (hlc := hlc) (GF := GF) Γ c k' γl pd pav pu j γil γisl kk s g lo tl o
+  have h := IL.wp_ilock_tx_eb (GF := GF) Γ c k' γl pd pav pu j γil γisl kk s g lo tl o
     inum pidv dqp dqs Tl hj hproc hK hnoff htier hkk hgeom hcov hnib hpd ha0 hle
   unfold wp_ilock_tx_eb_body at h
   simp only [ilockAddr] at h
@@ -409,7 +409,7 @@ theorem ireclaim_iunlock [Fscfg] [Icfg] [CurCtx] (IU : IUNLOCK) (Γ : SchedNames
     (hsl : "sleep lock" ∉ k'.locks) (hp : "proc" ∉ k'.locks) (htier : k'.tier = KTier.kpt)
     (hle : lo ≤ tl) :
     kctx c k' ∗ pcIs c KA.«iunlock» ∗ procsInv Γ ∗
-    itableInv (hlc := hlc) ∗ icEscrow fscIc fscFs fscIreg fscCov fscLogst kk ∗
+    itableInv ∗ icEscrow fscIc fscFs fscIreg fscCov fscLogst kk ∗
     isSleeplockGen γil γisl (iLock (ientry kk)) (icSlp fscIc kk) (slhTok (icfgIsl kk)) ∗
     sleeplockedQ γisl s (iLock (ientry kk)) pidv ∗ wordPointsTo (pPid k'.proc) 4 dqp pidv ∗
     credFloor lo tl ∗ irefClaims ∗ icTxDep fscIc kk s dev inum g lo ∗
@@ -425,7 +425,7 @@ theorem ireclaim_iunlock [Fscfg] [Icfg] [CurCtx] (IU : IUNLOCK) (Γ : SchedNames
       ⌜calleeSaved k'.regs R'⌝ -∗ wordPointsTo (pPid k'.proc) 4 dqp pidv -∗
       inodeShrGenlo kk s dev inum g lo -∗ logTx icfgLog -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := IU.wp_iunlock_tx (hlc := hlc) (GF := GF) Γ c k' γil γisl kk s g lo tl dev inum dn bm
+  have h := IU.wp_iunlock_tx (GF := GF) Γ c k' γil γisl kk s g lo tl dev inum dn bm
     pidv dqp hnoff hK hkk ha0 hsl hp htier hle
   unfold wp_iunlock_tx_body at h
   simp only [iunlockAddr] at h
@@ -436,7 +436,7 @@ set_option maxHeartbeats 1000000 in
 (Rocq 1949: ireclaim is the one caller that freezes under the other arm, so
 it reads the indexed `wp_iput_gen`), uncredited (`crb = cru = crz = false`). -/
 theorem ireclaim_iput [Fscfg] [Icfg] [CurCtx] (IP : IPUT) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γil γisl : GName) (kk : Nat) (q : Qp) (inum : BitVec 32)
     (n : Nat) (Sb : List Nat) (e0 : Nat) (tid : Nat) (qtx : Qp)
@@ -459,9 +459,9 @@ theorem ireclaim_iput [Fscfg] [Icfg] [CurCtx] (IP : IPUT) (Γ : SchedNames)
     logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
     diskCaps fscDisk fscDlock pd pav pu ∗
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-    itableInv (hlc := hlc) ∗
+    itableInv ∗
     icEscrow fscIc fscFs fscIreg fscCov fscLogst kk ∗
-    iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+    iregInv fscIreg fscFs icfgIst icfgNib ∗
     iregBoot ∗
     isSleeplockGen γil γisl (iLock (ientry kk)) (icSlp fscIc kk) (slhTok (icfgIsl kk)) ∗
     inodeRefp kk q icfgDev inum ∗
@@ -486,7 +486,7 @@ theorem ireclaim_iput [Fscfg] [Icfg] [CurCtx] (IP : IPUT) (Γ : SchedNames)
       iregBoot -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hs
-  have h := IP.wp_iput_gen_eb (hlc := hlc) (GF := GF) Γ c k' γl pd pav pu j γil γisl kk q inum
+  have h := IP.wp_iput_gen_eb (GF := GF) Γ c k' γl pd pav pu j γil γisl kk q inum
     n Sb false false false e0 tid qtx pidv dqp dqb dqs false
     hj hproc hK hnoff htier hkk (fun h => absurd h (by simp))
     (fun h => absurd h (by simp)) hgeom hbg hcov hlog hnib hbel hn hpd ha0
@@ -508,7 +508,7 @@ end
 /-! ## Slot units -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [DiskG GF] [CurCtx]
 
 theorem ireclaim_slots_join3 (γ : BcacheNames) : bslot (GF := GF) ∗ bslots 2 ⊢ bslots 3 :=

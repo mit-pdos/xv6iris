@@ -35,14 +35,14 @@ def readiKVp : ProcPriv :=
     chg := 0, pvLazy := false, pvSecc := 0#64, ev := 0, root := 0#64, rti := 0 }
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
 set_option maxHeartbeats 4000000 in
 /-- `readi(ip, 0, dst, off, 16)`: the KERNEL arm (exact; the user arm is
 refuted by `a1 = 0`), at the full fraction. -/
-theorem readi_kcall (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem readi_kcall (RD : READI) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γkl : GName) (γk : KmemNames)
     (ip : BitVec 64) (bm : Blkmap) (data : Nat → List (BitVec 8)) (dn : Dinode)
@@ -76,7 +76,7 @@ theorem readi_kcall (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       wordPointsTo (pPid k'.proc) 4 dqp pidv -∗
       bslot -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RD.wp_readi_eb (hlc := hlc) (GF := GF) Γ c k' γl fscBio
+  have h := RD.wp_readi_eb (GF := GF) Γ c k' γl fscBio
     (fsView fscFs fscDisk icfgDev fscCov) fscDlock pd pav pu j fscFs fscLogst icfgDev γkl γk ip
     bm data dn false off 16 olds pidv readiKVp (fun _ => []) dqp (DFrac.own 1) dqd hj hproc hK
     hnoff htier hgeom hwf hcov hsz (by omega) (fun _ => by omega) rfl rfl rfl hpd ha0

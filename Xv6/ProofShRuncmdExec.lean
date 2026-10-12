@@ -32,10 +32,10 @@ theorem ushExec_ptr_ne0 (x : Nat) (h0 : 0 < x) (h38 : x < 2 ^ 38) : (BitVec.ofNa
   simp at this; omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
-variable (E : UshExecEnv (hlc := hlc) (GF := GF))
+variable (E : UshExecEnv (GF := GF))
 
 /-- **Rocq `wp_kshr_exec_x_at_holds` / `_v_holds`, ONE proof**. -/
 theorem shExecXAtGen_holds (UL : UK_LEAVES) (SX : SH_EXEC_AT_CWD) (TabF : GName → List FdState → IProp GF)
@@ -73,7 +73,7 @@ theorem shExecXAtGen_holds (UL : UK_LEAVES) (SX : SH_EXEC_AT_CWD) (TabF : GName 
   iintro %h5 Hrun
   rw [show (0xc9a : Nat) = User.Sh.Sym.«exec» from rfl]
   -- THE PINNED EXEC, at the root: the deposit, built first
-  iapply SX.wp_shExecAtCwd (hlc := hlc) iprop(TabF N.fd ld ∗ Cr) N hc h5 _ ROOTINO _
+  iapply SX.wp_shExecAtCwd iprop(TabF N.fd ld ∗ Cr) N hc h5 _ ROOTINO _
     $$ Hc Hrun Hcwd [Hstd Hcr]
   · unfold ushExecSupEchoGen
     iapply Hexs $$ %N %_ %_ %s0 %t %g %ld [] [] [] [] [] Hstd Htree Hcr

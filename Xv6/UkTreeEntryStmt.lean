@@ -51,7 +51,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
 section UkTreeEntryStmt
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
@@ -63,14 +63,14 @@ def EchoImageEntryEnvC : Prop :=
   ∀ (ws : List (List (BitVec 8))) (Me : ElfMem) (Mv : Nat → List (BitVec 8)) (s0 t : Nat)
     (g : Nat → BitVec 8) (sts : List FdState) (cw : Nat) (cs : ExtTreeSet GName compare)
     (pidv : BitVec 32) (Q : Int → IProp GF) (Pay : IProp GF) (Dp : List Nat)
-    (I : ∀ N' : UkNames GF, N'.pay = Q → EpIfaceP (hlc := hlc) N' (echoProg N') Dp)
+    (I : ∀ N' : UkNames GF, N'.pay = Q → EpIfaceP N' (echoProg N') Dp)
     (E : Penv) (ds : ExtTreeSet Nat compare),
     lineOk ws → imgAgrees Me Mv → echoNodeImg ws Me s0 t g → ushEchoArgvBytes ws g →
     sts.length = NOFILE → Conforms E (echoTree ws) → SafeFds (fdDom E.fd) (echoTree ws) → dpIn Dp ds →
     ⊢ □ (∀ (N' : UkNames GF) (hpq : N'.pay = Q),
           ustd N'.fd (sts.take NSTD) -∗ ucwd N'.cwd cw -∗ Pay -∗ envRes (I N' hpq) E ds) -∗
-      urunNopipe (hlc := hlc) sts -∗ udep (hlc := hlc) -∗
-      imageEntry User.Echo.elf Mv (BitVec.ofNat 64 (t + 8)) sts cw seccAll cs pidv Q Pay (uslot (hlc := hlc))
+      urunNopipe sts -∗ udep -∗
+      imageEntry User.Echo.elf Mv (BitVec.ofNat 64 (t + 8)) sts cw seccAll cs pidv Q Pay (uslot)
 
 /-- **Rocq `UkTreeEntry.cat_image_entry_env_c`**: cat's entry at the tree of
 the LINE (the key's argv is the line's words). -/
@@ -78,28 +78,28 @@ def CatImageEntryEnvC : Prop :=
   ∀ (ws : List (List (BitVec 8))) (Me : ElfMem) (Mv : Nat → List (BitVec 8)) (sv t : Nat)
     (gn : Nat → BitVec 8) (sts : List FdState) (cw : Nat) (cs : ExtTreeSet GName compare)
     (pidv : BitVec 32) (Q : Int → IProp GF) (Pay : IProp GF) (Dp : List Nat)
-    (I : ∀ N' : UkNames GF, N'.pay = Q → EpIfaceP (hlc := hlc) N' (catProg N') Dp)
+    (I : ∀ N' : UkNames GF, N'.pay = Q → EpIfaceP N' (catProg N') Dp)
     (E : Penv) (ds : ExtTreeSet Nat compare),
     execOk ws → imgAgrees Me Mv → echoNodeImg ws Me sv t gn → ushEchoArgvBytes ws gn →
     sts.length = NOFILE → Conforms E (catTree ws) → SafeFds (fdDom E.fd) (catTree ws) → dpIn Dp ds →
     ⊢ □ (∀ (N' : UkNames GF) (hpq : N'.pay = Q),
           ustd N'.fd (sts.take NSTD) -∗ ucwd N'.cwd cw -∗ Pay -∗ envRes (I N' hpq) E ds) -∗
-      urunNopipe (hlc := hlc) sts -∗ udep (hlc := hlc) -∗
-      imageEntry User.Cat.elf Mv (BitVec.ofNat 64 (t + 8)) sts cw seccAll cs pidv Q Pay (uslot (hlc := hlc))
+      urunNopipe sts -∗ udep -∗
+      imageEntry User.Cat.elf Mv (BitVec.ofNat 64 (t + 8)) sts cw seccAll cs pidv Q Pay (uslot)
 
 /-- **Rocq `UkTreeEntry.grep_image_entry_env_c`** (deviation 3). -/
 def GrepImageEntryEnvC : Prop :=
   ∀ (ws : List (List (BitVec 8))) (Me : ElfMem) (Mv : Nat → List (BitVec 8)) (sv t : Nat)
     (gn : Nat → BitVec 8) (sts : List FdState) (cw : Nat) (cs : ExtTreeSet GName compare)
     (pidv : BitVec 32) (Q : Int → IProp GF) (Pay : IProp GF) (Dp : List Nat)
-    (I : ∀ N' : UkNames GF, N'.pay = Q → EpIfaceP (hlc := hlc) N' (grepProg N'.t) Dp)
+    (I : ∀ N' : UkNames GF, N'.pay = Q → EpIfaceP N' (grepProg N'.t) Dp)
     (E : Penv) (ds : ExtTreeSet Nat compare),
     execOk ws → imgAgrees Me Mv → echoNodeImg ws Me sv t gn → ushEchoArgvBytes ws gn →
     sts.length = NOFILE → Conforms E (grepTree ws) → dpIn Dp ds →
     ⊢ □ (∀ (N' : UkNames GF) (hpq : N'.pay = Q),
           ustd N'.fd (sts.take NSTD) -∗ ucwd N'.cwd cw -∗ Pay -∗ envRes (I N' hpq) E ds) -∗
-      urunNopipe (hlc := hlc) sts -∗ udep (hlc := hlc) -∗
-      imageEntry User.Grep.elf Mv (BitVec.ofNat 64 (t + 8)) sts cw seccAll cs pidv Q Pay (uslot (hlc := hlc))
+      urunNopipe sts -∗ udep -∗
+      imageEntry User.Grep.elf Mv (BitVec.ofNat 64 (t + 8)) sts cw seccAll cs pidv Q Pay (uslot)
 
 end UkTreeEntryStmt
 

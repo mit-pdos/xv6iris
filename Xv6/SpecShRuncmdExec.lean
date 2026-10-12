@@ -34,10 +34,10 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 open Std (ExtTreeSet)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
-variable (E : UshExecEnv (hlc := hlc) (GF := GF))
+variable (E : UshExecEnv (GF := GF))
 
 /-- **Rocq `wp_kshr_exec_x_at` / `_x_at_v`, ONE body**: the arm at any
 exec'able word list, the child's table read through `TabF`. -/
@@ -51,7 +51,7 @@ def wpShExecXAtGenBody (TabF : GName → List FdState → IProp GF) (Fd1 : List 
       E.ush_execfail_law_at dg (13 + (ws[0]!).length) Cr Cd -∗ □ (Cd -∗ Q (-1)) -∗
       E.ush_jtab N.t -∗ E.ush_cmd N.d t (ushEchoCmd E ws s0 g) -∗ usz N.s szv -∗ TabF N.fd ld -∗
       ucwd N.cwd ROOTINO -∗ uchAny N.ch -∗ Cr -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (6 + (2 + (E.ush_Dg + n))) -∗ wpLoop h
+      urun N h m (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (6 + (2 + (E.ush_Dg + n))) -∗ wpLoop h
 
 /-- **Rocq `wp_kshr_exec_x_at`**: at the ledger. -/
 abbrev wpShExecXAtBody (Fd1 : List FdState → Prop) (ws : List (List (BitVec 8))) (dg : List (BitVec 8))
@@ -73,16 +73,16 @@ def wpShExecEchoAtBody (Fd1 : List FdState → Prop) (ws : List (List (BitVec 8)
     ⊢ ushCode N.t -∗ ushExecSupEchoAt E Fd1 ws Q Cr -∗ ushExecfailLaw E Cr Cd -∗ □ (Cd -∗ Q (-1)) -∗
       E.ush_jtab N.t -∗ E.ush_cmd N.d t (ushEchoCmd E ws s0 g) -∗ usz N.s szv -∗ ustd N.fd ld -∗
       ucwd N.cwd ROOTINO -∗ uchAny N.ch -∗ Cr -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (6 + (2 + (E.ush_Dg + n))) -∗ wpLoop h
+      urun N h m (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (6 + (2 + (E.ush_Dg + n))) -∗ wpLoop h
 
 end
 
 /-- The interface of runcmd's EXEC arm at the disciplined line, at any
 table predicate that reads back as the ledger. -/
 structure SH_RUNCMD_EXEC : Prop where
-  wp_shExecXAtGen : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+  wp_shExecXAtGen : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
-    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] (E : UshExecEnv (hlc := hlc) (GF := GF))
+    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] (E : UshExecEnv (GF := GF))
     (TabF : GName → List FdState → IProp GF), (∀ γ ld, TabF γ ld ⊢ ustd γ ld) →
     ∀ (Fd1 : List FdState → Prop) (ws : List (List (BitVec 8))) (dg : List (BitVec 8)) (Q : Int → IProp GF)
       (Cr Cd : IProp GF), wpShExecXAtGenBody E TabF Fd1 ws dg Q Cr Cd

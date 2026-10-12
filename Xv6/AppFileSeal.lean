@@ -45,7 +45,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section AppFileSeal
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF]
 
 /-! ## 1b. The line list -/
@@ -72,9 +72,9 @@ list empty -- handed the machine's started counter's name, which it stores.
 The sync registry, the commit-era counter (at 0), the run-long history (at
 `[]`) and the run registry (empty) are fresh; the birth's split founds them. -/
 theorem fileBirth (γst : GName) :
-    ⊢@{IProp GF} |==> ∃ c : FileFixed, ⌜c.ffSt = γst⌝ ∗ fileCl (hlc := hlc) c
-      ∗ syncRegAuth c ∅ ∗ syncCmAuth (hlc := hlc) c 0 ∗ slAuth c.ffHist 1 [] ∗ runAuth c 0 := by
-  imod (echoBirth (hlc := hlc) (GF := GF)) with ⟨%γ, He⟩
+    ⊢@{IProp GF} |==> ∃ c : FileFixed, ⌜c.ffSt = γst⌝ ∗ fileCl c
+      ∗ syncRegAuth c ∅ ∗ syncCmAuth c 0 ∗ slAuth c.ffHist 1 [] ∗ runAuth c 0 := by
+  imod (echoBirth (GF := GF)) with ⟨%γ, He⟩
   imod (MonoList.own_alloc (GF := GF) ([] : List FlLine)) with ⟨%g, Hl, -⟩
   imod (syncRegAuth_alloc (GF := GF)) with ⟨%greg, Hreg⟩
   imod (MonoNat.own_alloc (GF := GF) (.ofNat 0)) with ⟨%gcm, Hcm, -⟩
@@ -96,10 +96,10 @@ content, whatever arm the original is in, with an EMPTY ledger; the typed
 witness duplicates. -/
 theorem fState_copy (c : FileFixed) (r r' : FileAppNames) (av : Aview) :
     ⊢@{IProp GF} escAuth r' [] -∗ fdeed r' (fcontentOf av) -∗ ftkt r' (fcontentOf av) -∗
-      fState (hlc := hlc) c r av -∗
-      fState (hlc := hlc) c r av ∗ fState (hlc := hlc) c r' av := by
+      fState c r av -∗
+      fState c r av ∗ fState c r' av := by
   iintro Ha' Hd' Ht' Hf
-  ihave Hw' : fEscWrap (hlc := hlc) r' $$ [Ha']
+  ihave Hw' : fEscWrap r' $$ [Ha']
   · unfold fEscWrap
     iexists []
     iframe Ha'
@@ -158,8 +158,8 @@ theorem fState_copy (c : FileFixed) (r r' : FileAppNames) (av : Aview) :
 /-- The typed witness at the view's own content, off either arm (Rocq
 `f_state_typed_at`). -/
 theorem fState_typedAt (c : FileFixed) (r : FileAppNames) (av : Aview) :
-    ⊢@{IProp GF} fState (hlc := hlc) c r av -∗
-      fState (hlc := hlc) c r av ∗ fTyped c (fcontentOf av) := by
+    ⊢@{IProp GF} fState c r av -∗
+      fState c r av ∗ fTyped c (fcontentOf av) := by
   iintro Hf
   unfold fState
   icases Hf with (⟨Hw, Hc⟩ | Hl)

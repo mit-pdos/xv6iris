@@ -51,7 +51,7 @@ def uartinitoneAddr : BitVec 64 := KA.«uartinitone»
 
 /-- What one port's boot programming takes and gives (the two words, the
 ghosts, the lock's three raw cells). -/
-def uartinitonePre {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def uartinitonePre {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (i : UartId) (γ : UartNames) (l : List (BitVec 8)) (k : Nat) (vlock : BitVec 32) (vname vcpu : BitVec 64) : IProp GF := iprop(
   uartInv i γ ∗ uartBaseWord i ∗ uartRxWord i ∗ dlabOwn γ false ∗ txOwn γ l ∗ outLb γ l ∗
   (∃ hl : Option (List Obs), rxTok γ k hl) ∗
@@ -60,16 +60,16 @@ def uartinitonePre {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv
   wordPointsTo (txLockAddr i + 8#64) 8 (DFrac.own 1) vname ∗
   wordPointsTo (txLockAddr i + 16#64) 8 (DFrac.own 1) vcpu)
 
-def uartinitonePost {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def uartinitonePost {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (i : UartId) (γ : UartNames) (l : List (BitVec 8)) (name : BitVec 64) : IProp GF := iprop(
   txOwn γ l ∗ dlabOff γ ∗
   (∃ (k' : Nat) (hl' : Option (List Obs)), rxTok γ k' hl' ∗
-    ⌜l = [] → uartFlushed (genId (hlc := hlc) (GF := GF) + 1) i hl'⌝) ∗
+    ⌜l = [] → uartFlushed (genId (GF := GF) + 1) i hl'⌝) ∗
   wordPointsTo (txLockAddr i + 8#64) 8 (DFrac.own 1) name ∗ lkFresh (txLockAddr i))
 
 /-- **WP of `uartinitone`.**  `a0 = &uarts[i]`, `a1` the name.  Two stack
 slots of its own over `initlock`'s two. -/
-def wp_uartinitone_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_uartinitone_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (i : UartId) (γ : UartNames) (l : List (BitVec 8)) (kp : Nat)
     (vlock : BitVec 32) (vname vcpu : BitVec 64)
     (hsie : k.sie = false) (hK : 4 ≤ k.avail) (ha0 : k.regs 10#5 = uartElt i) : Prop :=
@@ -81,9 +81,9 @@ def wp_uartinitone_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF
 
 /-- The interface of `uartinitone`. -/
 structure UARTINITONE : Prop where
-  wp_uartinitone : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+  wp_uartinitone : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (i : UartId) (γ : UartNames) (l : List (BitVec 8)) (kp : Nat)
     (vlock : BitVec 32) (vname vcpu : BitVec 64) hsie hK ha0,
-    wp_uartinitone_body (hlc := hlc) (GF := GF) cpu k i γ l kp vlock vname vcpu hsie hK ha0
+    wp_uartinitone_body (GF := GF) cpu k i γ l kp vlock vname vcpu hsie hK ha0
 
 end Xv6

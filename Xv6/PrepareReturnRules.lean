@@ -27,7 +27,7 @@ open LeanRV64D LeanRV64D.Functions
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 variable {lent : Bool}
 
 /-! ## `csrr rd, satp` -/
@@ -151,7 +151,7 @@ theorem prepare_return_sstatus (spie spp : Bool) (v : BitVec 64) (hv : sstatusFu
 /-! ## The trapframe page and the private block -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- One word of the trapframe page out, for a STORE: whatever goes back in
 lands in the list. -/
@@ -178,7 +178,7 @@ theorem prepare_return_tf_store (tfp : BitVec 44) (ws : List (BitVec 64)) (j : N
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF]
   [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [X : CurCtx]
 
@@ -216,7 +216,7 @@ end
 /-! ## The flip's resources -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- After the `csrci`, at either entry index: the trap CSRs and the
 installed handler, at the hart the thread is on, and the claim to hand

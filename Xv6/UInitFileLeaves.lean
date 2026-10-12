@@ -67,7 +67,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
 section UInitFileLeaves
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx] [PS : UprogSG GF]
@@ -80,24 +80,24 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 /-- **Rocq `boot_at`** (deviation 3): THE BOOT FILING -- the deed's typed
 witness names the era's boot state; under the taint the state is empty. -/
 def initBootAt (g : FileGn) (s0 : Fstate) (s : Dst) : IProp GF :=
-  iprop((⌜s0 = dstContent s⌝ ∗ fTyped g.fgnCl s) ∨ (⌜s0 = ∅⌝ ∗ fileTaint (hlc := hlc) g.fgnCl))
+  iprop((⌜s0 = dstContent s⌝ ∗ fTyped g.fgnCl s) ∨ (⌜s0 = ∅⌝ ∗ fileTaint g.fgnCl))
 
 /-- Rocq `boot_at_persistent`. -/
 instance fileBootAt_persistent (g : FileGn) (s0 : Fstate) (s : Dst) :
-    Persistent (initBootAt (hlc := hlc) (GF := GF) g s0 s) := by
+    Persistent (initBootAt (GF := GF) g s0 s) := by
   unfold initBootAt; infer_instance
 
 /-- **Rocq `file_f0bw_of_boot`**: THE FILING, out of the boot ledger's
 authority and the era's BOOT FACT (`FileOut.f0Bt`, sync SY3-A4), filed
 beside it. -/
 theorem file_f0bw_of_boot (g : FileGn) (s0 : Fstate) :
-    ⊢@{IProp GF} fturn g (genId (hlc := hlc) (GF := GF) + 1) -∗
-      (∃ vf : FileEra, fileEraPin g (genId (hlc := hlc) (GF := GF) + 1) vf ∗
-        f0Bt (hlc := hlc) g vf s0) ==∗
-      fturnCore g (genId (hlc := hlc) (GF := GF) + 1) ∗
-        f0bw (hlc := hlc) g (genId (hlc := hlc) (GF := GF) + 1) s0 := by
+    ⊢@{IProp GF} fturn g (genId (GF := GF) + 1) -∗
+      (∃ vf : FileEra, fileEraPin g (genId (GF := GF) + 1) vf ∗
+        f0Bt g vf s0) ==∗
+      fturnCore g (genId (GF := GF) + 1) ∗
+        f0bw g (genId (GF := GF) + 1) s0 := by
   iintro Ht Hbt
-  imod (fturnFile (hlc := hlc) (GF := GF) g (genId (hlc := hlc) (GF := GF) + 1) s0) $$ [Ht Hbt]
+  imod (fturnFile (GF := GF) g (genId (GF := GF) + 1) s0) $$ [Ht Hbt]
     with ⟨Ht, %vf, #Hvf, #Hbl⟩
   · iframe Ht Hbt
   imodintro
@@ -134,8 +134,8 @@ theorem fileBoot_fstateOk (c : FileFixed) (s : Dst) : fTyped (GF := GF) c s ⊢ 
 /-- **Rocq `file_f0pre_at_of_bw`**: ...AND THE HEAD PRECONDITION, out of the
 witness beside it. -/
 theorem file_f0pre_at_of_bw (g : FileGn) (s0 : Fstate) (s : Dst) :
-    ⊢@{IProp GF} f0bw (hlc := hlc) g (genId (hlc := hlc) (GF := GF) + 1) s0 -∗
-      initBootAt (hlc := hlc) g s0 s -∗ f0preAt (hlc := hlc) g s0 := by
+    ⊢@{IProp GF} f0bw g (genId (GF := GF) + 1) s0 -∗
+      initBootAt g s0 s -∗ f0preAt g s0 := by
   iintro #Hbw Hb
   unfold initBootAt f0preAt
   icases Hb with (⟨%h0, #Hty⟩ | ⟨%h0, #HT⟩)
@@ -158,19 +158,19 @@ theorem file_f0pre_at_of_bw (g : FileGn) (s0 : Fstate) (s : Dst) :
 
 /-- **Rocq `file_sup_of_taint_at`**. -/
 theorem file_sup_of_taint_at (g : FileGn) (r : FileAppNames)
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) g.fgnCl, appRun := r }) :
-    ⊢@{IProp GF} □ (fileTaint (hlc := hlc) g.fgnCl -∗ appSup) :=
-  fileTaint_sup (hlc := hlc) g.fgnCl r heq
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred g.fgnCl, appRun := r }) :
+    ⊢@{IProp GF} □ (fileTaint g.fgnCl -∗ appSup) :=
+  fileTaint_sup g.fgnCl r heq
 
 /-- **Rocq `file_taint_of_sup_at`**. -/
 theorem file_taint_of_sup_at (g : FileGn) (r : FileAppNames)
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) g.fgnCl, appRun := r }) :
-    ⊢@{IProp GF} appSup -∗ fileTaint (hlc := hlc) g.fgnCl := by
-  have hap := fileOpen_appPred (hlc := hlc) g.fgnCl r heq
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred g.fgnCl, appRun := r }) :
+    ⊢@{IProp GF} appSup -∗ fileTaint g.fgnCl := by
+  have hap := fileOpen_appPred g.fgnCl r heq
   unfold appSup appSupRaw
   simp only [hap]
   iintro #Hs
-  iapply fileTaint_of_sup (hlc := hlc) g.fgnCl r
+  iapply fileTaint_of_sup g.fgnCl r
   unfold appSupRaw
   iexact Hs
 
@@ -178,20 +178,20 @@ theorem file_taint_of_sup_at (g : FileGn) (r : FileAppNames)
 
 /-- **Rocq `file_fs_pure_law`**. -/
 theorem file_fs_pure_law (g : FileGn) (r : FileAppNames)
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) g.fgnCl, appRun := r }) :
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred g.fgnCl, appRun := r }) :
     ⊢@{IProp GF} □ (∀ v : Aview, appPred appRun v -∗
-      appPred appRun v ∗ (⌜fileFsPure v⌝ ∨ fileTaint (hlc := hlc) g.fgnCl)) := by
-  have hap := fileOpen_appPred (hlc := hlc) g.fgnCl r heq
+      appPred appRun v ∗ (⌜fileFsPure v⌝ ∨ fileTaint g.fgnCl)) := by
+  have hap := fileOpen_appPred g.fgnCl r heq
   simp only [hap]
   iintro !> %v Hp
   iapply fileFsPure_acc g.fgnCl r v $$ Hp
 
 /-- **Rocq `file_era0_pins_law`**. -/
 theorem file_era0_pins_law (g : FileGn) (r : FileAppNames)
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) g.fgnCl, appRun := r }) :
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred g.fgnCl, appRun := r }) :
     ⊢@{IProp GF} □ (∀ v : Aview, appPred appRun v -∗
-      appPred appRun v ∗ (⌜era0Pins v⌝ ∨ fileTaint (hlc := hlc) g.fgnCl)) := by
-  ihave #Hfs := file_fs_pure_law (hlc := hlc) g r heq
+      appPred appRun v ∗ (⌜era0Pins v⌝ ∨ fileTaint g.fgnCl)) := by
+  ihave #Hfs := file_fs_pure_law g r heq
   iintro !> %v Hp
   ihave ⟨Hp, Hc⟩ := Hfs $$ %v Hp
   isplitl [Hp]
@@ -204,9 +204,9 @@ theorem file_era0_pins_law (g : FileGn) (r : FileAppNames)
 
 /-- **Rocq `file_init_deps_of_laws`**. -/
 theorem file_init_deps_of_laws (T : IProp GF) :
-    ⊢@{IProp GF} □ (T -∗ udepwLaw (hlc := hlc) 16) -∗ kinitWcl (hlc := hlc) (GF := GF) -∗
-      □ (T -∗ udepwLaw (hlc := hlc) 15) -∗ □ (T -∗ udepwLaw (hlc := hlc) 17) -∗
-      □ initDeps (hlc := hlc) T := by
+    ⊢@{IProp GF} □ (T -∗ udepwLaw 16) -∗ kinitWcl (GF := GF) -∗
+      □ (T -∗ udepwLaw 15) -∗ □ (T -∗ udepwLaw 17) -∗
+      □ initDeps T := by
   iintro #Hwr #Hwcl #H15 #H17
   imodintro
   unfold initDeps kinitWlaw
@@ -220,14 +220,14 @@ theorem file_init_deps_of_laws (T : IProp GF) :
 
 /-- **Rocq `file_init_deps`** (deviations 2, 4, 5). -/
 theorem file_init_deps (UL : UK_LEAVES) (g : FileGn) (r : FileAppNames)
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) g.fgnCl, appRun := r })
-    (hkill : uKillCred (hlc := hlc) (GF := GF) = fileTaint (hlc := hlc) g.fgnCl)
-    (hlic : ⊢ uKillCred (hlc := hlc) (GF := GF) -∗ consLicence (hlc := hlc) (GF := GF)) :
-    ⊢@{IProp GF} □ initDeps (hlc := hlc) (fileTaint (hlc := hlc) g.fgnCl) := by
-  have hk : fileTaint (hlc := hlc) g.fgnCl ⊢ uKillCred (hlc := hlc) (GF := GF) := by
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred g.fgnCl, appRun := r })
+    (hkill : uKillCred (GF := GF) = fileTaint g.fgnCl)
+    (hlic : ⊢ uKillCred (GF := GF) -∗ consLicence (GF := GF)) :
+    ⊢@{IProp GF} □ initDeps (fileTaint g.fgnCl) := by
+  have hk : fileTaint g.fgnCl ⊢ uKillCred (GF := GF) := by
     rw [hkill] <;> exact .rfl
-  ihave #Hsup := file_sup_of_taint_at (hlc := hlc) g r heq
-  iapply file_init_deps_of_laws (hlc := hlc) (fileTaint (hlc := hlc) g.fgnCl) $$ [] [] [] []
+  ihave #Hsup := file_sup_of_taint_at g r heq
+  iapply file_init_deps_of_laws (fileTaint g.fgnCl) $$ [] [] [] []
   · imodintro
     iintro #HT
     ihave #Hs := Hsup $$ HT
@@ -243,7 +243,7 @@ theorem file_init_deps (UL : UK_LEAVES) (g : FileGn) (r : FileAppNames)
   · unfold kinitWcl
     imodintro
     iintro %N0 %b %v
-    iapply kinit_w1_of_closed_l0 (hlc := hlc) UL N0 b v
+    iapply kinit_w1_of_closed_l0 UL N0 b v
   · imodintro
     iintro #HT
     ihave #Hs := Hsup $$ HT
@@ -262,21 +262,21 @@ theorem file_init_deps (UL : UK_LEAVES) (g : FileGn) (r : FileAppNames)
 /-- **Rocq `file_gen_mint`** (deviations 2, 4, 6): the arm every pinned exec
 falls back on once the era is off the discipline. -/
 theorem file_gen_mint (US : USER) (g : FileGn) (r : FileAppNames)
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) g.fgnCl, appRun := r })
-    (hkill : uKillCred (hlc := hlc) (GF := GF) = fileTaint (hlc := hlc) g.fgnCl)
-    (hlic : ⊢ uKillCred (hlc := hlc) (GF := GF) -∗ consLicence (hlc := hlc) (GF := GF)) :
-    ⊢@{IProp GF} □ (∀ (R : IProp GF) (W : Uvis), fileTaint (hlc := hlc) g.fgnCl -∗
-      myPay W.gen (fun _ => R) -∗ □ (uKillCred (hlc := hlc) (GF := GF) -∗ R) -∗ uslot (hlc := hlc) W) := by
-  have hgen : ⊢@{IProp GF} □ uexecWp (hlc := hlc) (GF := GF) := (UexecGen US).uexec_wp_gen
-  have hk : fileTaint (hlc := hlc) g.fgnCl ⊢ uKillCred (hlc := hlc) (GF := GF) := by
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred g.fgnCl, appRun := r })
+    (hkill : uKillCred (GF := GF) = fileTaint g.fgnCl)
+    (hlic : ⊢ uKillCred (GF := GF) -∗ consLicence (GF := GF)) :
+    ⊢@{IProp GF} □ (∀ (R : IProp GF) (W : Uvis), fileTaint g.fgnCl -∗
+      myPay W.gen (fun _ => R) -∗ □ (uKillCred (GF := GF) -∗ R) -∗ uslot W) := by
+  have hgen : ⊢@{IProp GF} □ uexecWp (GF := GF) := (UexecGen US).uexec_wp_gen
+  have hk : fileTaint g.fgnCl ⊢ uKillCred (GF := GF) := by
     rw [hkill] <;> exact .rfl
-  ihave #Hsup := file_sup_of_taint_at (hlc := hlc) g r heq
+  ihave #Hsup := file_sup_of_taint_at g r heq
   ihave #Hwp := hgen
   iintro !> %R %W #Ht Hp #HR
   ihave #Hs := Hsup $$ Ht
   ihave #Hkc := hk $$ Ht
   ihave #Hl := hlic $$ Hkc
-  ihave #Hm := uslotMint_all (hlc := hlc) (GF := GF) $$ Hs Hkc Hl Hwp
+  ihave #Hm := uslotMint_all (GF := GF) $$ Hs Hkc Hl Hwp
   iapply Hm $$ %R %W Hp HR
 
 /-! ## §6  THE BANNER WRITER FRAMES A RESOURCE -/
@@ -285,8 +285,8 @@ theorem file_gen_mint (US : USER) (g : FileGn) (r : FileAppNames)
 each step and hands it back beside the post. -/
 theorem kinit_banner_pay_frame (N : UkNames GF) (stc : FdState) (len : Nat) (f : Nat → BitVec 8)
     (Rt H : IProp GF) :
-    ⊢ kinitBannerPay (hlc := hlc) N stc len f Rt -∗ H -∗
-      kinitBannerPay (hlc := hlc) N stc len f iprop(Rt ∗ H) := by
+    ⊢ kinitBannerPay N stc len f Rt -∗ H -∗
+      kinitBannerPay N stc len f iprop(Rt ∗ H) := by
   unfold kinitBannerPay
   iintro Hp HH %v Hstd
   ihave ⟨%Ch, #Hst, H0, Hend⟩ := Hp $$ %v Hstd
@@ -296,7 +296,7 @@ theorem kinit_banner_pay_frame (N : UkNames GF) (stc : FdState) (len : Nat) (f :
     iintro %j %hj
     ihave Hw := Hst $$ %j []
     · ipureintro; exact hj
-    iapply kinitW1_frame (hlc := hlc) N 1#64 (f j) (Ch j) (Ch (j + 1)) H $$ Hw
+    iapply kinitW1_frame N 1#64 (f j) (Ch j) (Ch (j + 1)) H $$ Hw
   isplitl [H0 HH]
   · isplitl [H0]
     · iexact H0
@@ -314,34 +314,34 @@ theorem kinit_banner_pay_frame (N : UkNames GF) (stc : FdState) (len : Nat) (f :
 /-- **Rocq `file_cons_in_of_Cns`** (deviation 8): the console's two open
 leaves, out of /init's console credential, at the file claim. -/
 theorem file_cons_in_of_Cns (UL : UK_LEAVES) (g : FileGn) (r : FileAppNames)
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) g.fgnCl, appRun := r }) :
-    ⊢ appInv (hlc := hlc) fscFs -∗ initConsCred (fileTaint (hlc := hlc) g.fgnCl) r.fnCons -∗
-      ((□ (∀ (N : UkNames GF) (X : UshCtx GF), ⌜X.T = fileTaint (hlc := hlc) g.fgnCl⌝ -∗
-          ushOpenConsoleLeaf (hlc := hlc) N X)) ∨
-        ((□ (∀ (N : UkNames GF) (X : UshCtx GF), ⌜X.T = fileTaint (hlc := hlc) g.fgnCl⌝ -∗
-            ushOpenAbsentLeaf (hlc := hlc) N X (consNever r.fnCons))) ∗ consNever r.fnCons) ∨
-        fileTaint (hlc := hlc) g.fgnCl) := by
-  have hap := fileOpen_appPred (hlc := hlc) g.fgnCl r heq
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred g.fgnCl, appRun := r }) :
+    ⊢ appInv fscFs -∗ initConsCred (fileTaint g.fgnCl) r.fnCons -∗
+      ((□ (∀ (N : UkNames GF) (X : UshCtx GF), ⌜X.T = fileTaint g.fgnCl⌝ -∗
+          ushOpenConsoleLeaf N X)) ∨
+        ((□ (∀ (N : UkNames GF) (X : UshCtx GF), ⌜X.T = fileTaint g.fgnCl⌝ -∗
+            ushOpenAbsentLeaf N X (consNever r.fnCons))) ∗ consNever r.fnCons) ∨
+        fileTaint g.fgnCl) := by
+  have hap := fileOpen_appPred g.fgnCl r heq
   iintro #Hinv #Hc
   unfold initConsCred
   icases Hc with (#Hn | ⟨%i, #Hm⟩ | #HT)
   · iright; ileft
     isplitr
-    · iapply sh_cons_absent_file (hlc := hlc) UL g r (consNever r.fnCons) heq $$ [] Hinv
+    · iapply sh_cons_absent_file UL g r (consNever r.fnCons) heq $$ [] Hinv
       unfold shConsNeverLaw
       simp only [hap]
-      iapply fileConsNever_law (hlc := hlc) (GF := GF) g.fgnCl r
+      iapply fileConsNever_law (GF := GF) g.fgnCl r
     · iexact Hn
   · ileft
-    iapply sh_cons_console_file_of_leg (hlc := hlc) UL g r i heq $$ [] Hm Hinv
-    iapply file_cons_create_leg_holds (hlc := hlc) g r
+    iapply sh_cons_console_file_of_leg UL g r i heq $$ [] Hm Hinv
+    iapply file_cons_create_leg_holds g r
   · iright; iright; iexact HT
 
 /-- **Rocq `file_cons_cred_of_init`**: THE CREDENTIAL /init HANDS DOWN, READ
 AS THE FILE CLAIM'S. -/
 theorem file_cons_cred_of_init (g : FileGn) (r : FileAppNames) :
-    ⊢@{IProp GF} initConsCred (fileTaint (hlc := hlc) g.fgnCl) r.fnCons -∗
-      ∃ jo : Option Nat, fileConsCred (hlc := hlc) g.fgnCl r jo := by
+    ⊢@{IProp GF} initConsCred (fileTaint g.fgnCl) r.fnCons -∗
+      ∃ jo : Option Nat, fileConsCred g.fgnCl r jo := by
   iintro #Hc
   unfold initConsCred
   icases Hc with (#Hn | ⟨%j, #Hm⟩ | #HT)

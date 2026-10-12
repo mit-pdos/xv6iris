@@ -108,7 +108,7 @@ theorem ukn_const_of_eq {GF : BundledGFunctors.{0}} (N : UkNames GF) (Q : Int �
   ⟨fun x y => by rw [heq]; exact hQ x y⟩
 
 section UkRun
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -134,22 +134,22 @@ the taint (deviation 2). -/
 def udep : IProp GF :=
   iprop(□ UprogSG.Dsup ∗
     ⌜∀ (n : Int) (W : Uvis) (Q : Int → IProp GF), UprogSG.psok (GF := GF) n → n ≠ USYS_exec →
-      ⊢ □ UprogSG.Dsup ==∗ sbundlePay (uslot (hlc := hlc)) n Q W⌝ ∗
+      ⊢ □ UprogSG.Dsup ==∗ sbundlePay (uslot) n Q W⌝ ∗
     ⌜∀ (W : Uvis) (Q : Int → IProp GF), ukeyNonpipe W →
-      ⊢ □ UprogSG.Dsup (GF := GF) ==∗ sbundlePay (uslot (hlc := hlc)) 21 Q W⌝ ∗
+      ⊢ □ UprogSG.Dsup (GF := GF) ==∗ sbundlePay (uslot) 21 Q W⌝ ∗
     ⌜∀ (W : Uvis) (Q : Int → IProp GF),
       ⊢ □ UprogSG.Dsup (GF := GF) -∗ ([∗list] st ∈ W.fd, UexecSG.srowReg st) ==∗
-        sbundlePay (uslot (hlc := hlc)) USYS_exit Q W⌝ ∗
+        sbundlePay (uslot) USYS_exit Q W⌝ ∗
     ⌜∀ (W : Uvis) (Q : Int → IProp GF),
-      ⊢ □ UprogSG.Dsup (GF := GF) -∗ □ uKillCred (hlc := hlc) ==∗
-        sbundlePay (uslot (hlc := hlc)) USYS_exit Q W⌝)
+      ⊢ □ UprogSG.Dsup (GF := GF) -∗ □ uKillCred ==∗
+        sbundlePay (uslot) USYS_exit Q W⌝)
 
-instance udep_persistent : Persistent (udep (hlc := hlc) (GF := GF)) := by
+instance udep_persistent : Persistent (udep (GF := GF)) := by
   unfold udep; infer_instance
 
 /-- **Rocq `udep_dep`**: mint the deposit the ecall arm asks for. -/
 theorem udep_dep (n : Int) (W : Uvis) (Q : Int → IProp GF) (hok : UprogSG.psok (GF := GF) n)
-    (hne : n ≠ USYS_exec) : ⊢ udep (hlc := hlc) (GF := GF) -∗ |==> sbundlePay uslot n Q W := by
+    (hne : n ≠ USYS_exec) : ⊢ udep (GF := GF) -∗ |==> sbundlePay uslot n Q W := by
   unfold udep
   iintro ⟨#Hs, %hlaw, -⟩
   iapply (hlaw n W Q hok hne) $$ Hs
@@ -157,14 +157,14 @@ theorem udep_dep (n : Int) (W : Uvis) (Q : Int → IProp GF) (hok : UprogSG.psok
 /-- **Rocq `udep_close_dep`**: close's row, at a key whose argument 0 is not
 a pipe. -/
 theorem udep_close_dep (W : Uvis) (Q : Int → IProp GF) (hnp : ukeyNonpipe W) :
-    ⊢ udep (hlc := hlc) (GF := GF) -∗ |==> sbundlePay uslot 21 Q W := by
+    ⊢ udep (GF := GF) -∗ |==> sbundlePay uslot 21 Q W := by
   unfold udep
   iintro ⟨#Hs, -, %hlaw, -⟩
   iapply (hlaw W Q hnp) $$ Hs
 
 /-- **Rocq `udep_exit_regs`**: exit's row off the key table's registrations. -/
 theorem udep_exit_regs (W : Uvis) (Q : Int → IProp GF) :
-    ⊢ ([∗list] st ∈ W.fd, UexecSG.srowReg (GF := GF) st) -∗ udep (hlc := hlc) (GF := GF) -∗
+    ⊢ ([∗list] st ∈ W.fd, UexecSG.srowReg (GF := GF) st) -∗ udep (GF := GF) -∗
       |==> sbundlePay uslot USYS_exit Q W := by
   unfold udep
   iintro Hr ⟨#Hs, -, -, %hlaw, -⟩
@@ -181,7 +181,7 @@ theorem srow_regs_nopipe : ∀ (fdv : List FdState), fdvNopipe fdv →
 
 /-- **Rocq `udep_exit_taint`**: exit's row out of the taint, at any table. -/
 theorem udep_exit_taint (W : Uvis) (Q : Int → IProp GF) :
-    ⊢ □ uKillCred (hlc := hlc) (GF := GF) -∗ udep (hlc := hlc) (GF := GF) -∗
+    ⊢ □ uKillCred (GF := GF) -∗ udep (GF := GF) -∗
       |==> sbundlePay uslot USYS_exit Q W := by
   unfold udep
   iintro #Ht ⟨#Hs, -, -, -, %hlaw⟩
@@ -196,11 +196,11 @@ def udepw (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) : IProp GF :=
     myPay gn N.pay -∗ uheap N.t N.d N.s M pm sz -∗ ufdAuth N.fd fdv -∗
     uheap N.t N.d N.s M pm sz ∗ ufdAuth N.fd fdv ∗
       (⌜UprogSG.psok (GF := GF) n ∧ n ≠ USYS_exec⌝ ∨
-        sbundlePay (uslot (hlc := hlc)) n N.pay (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll)))
+        sbundlePay (uslot) n N.pay (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll)))
 
 /-- Rocq `udepw_of_psok`: the GENERIC route's supplier. -/
 theorem udepw_of_psok (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int)
-    (hok : UprogSG.psok (GF := GF) n) (hne : n ≠ USYS_exec) : ⊢ udepw (hlc := hlc) N m pc n := by
+    (hok : UprogSG.psok (GF := GF) n) (hne : n ≠ USYS_exec) : ⊢ udepw N m pc n := by
   unfold udepw
   iintro %M %pm %sz %fdv %cw %gn %cs %pidv _ Hh Hf
   iframe Hh Hf
@@ -209,14 +209,14 @@ theorem udepw_of_psok (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int)
 
 /-- **Rocq `udepw_law`**: the flagged deposit, at every record and key. -/
 def udepwLaw (n : Int) : IProp GF :=
-  iprop(□ ∀ (N : UkNames GF) (m : RegMap) (pc : BitVec 64), udepw (hlc := hlc) N m pc n)
+  iprop(□ ∀ (N : UkNames GF) (m : RegMap) (pc : BitVec 64), udepw N m pc n)
 
-instance udepwLaw_persistent (n : Int) : Persistent (udepwLaw (hlc := hlc) (GF := GF) n) := by
+instance udepwLaw_persistent (n : Int) : Persistent (udepwLaw (GF := GF) n) := by
   unfold udepwLaw; infer_instance
 
 /-- Rocq `udepw_of_law`. -/
 theorem udepw_of_law (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) :
-    ⊢ udepwLaw (hlc := hlc) (GF := GF) n -∗ udepw N m pc n := by
+    ⊢ udepwLaw (GF := GF) n -∗ udepw N m pc n := by
   unfold udepwLaw
   iintro #H
   iapply H
@@ -226,7 +226,7 @@ exec. -/
 theorem udepw_mint (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (M : ElfMem)
     (pm : Nat → Option UPerm) (sz : Nat) (fdv : List FdState) (cw : Nat) (gn : GName)
     (cs : ExtTreeSet GName compare) (pidv : BitVec 32) :
-    ⊢ udep (hlc := hlc) (GF := GF) -∗ myPay gn N.pay -∗ udepw N m pc n -∗
+    ⊢ udep (GF := GF) -∗ myPay gn N.pay -∗ udepw N m pc n -∗
       uheap N.t N.d N.s M pm sz -∗ ufdAuth N.fd fdv ==∗
       uheap N.t N.d N.s M pm sz ∗ ufdAuth N.fd fdv ∗
         sbundlePay uslot n N.pay (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) := by
@@ -249,17 +249,17 @@ theorem tfOf_a0 (m : RegMap) (pc : BitVec 64) : tfW (tfOf m pc) (tfArgIdx 0) = m
 /-- **Rocq `urun_nopipe`**: THE RUN'S PIPE ROW -- one registration per row of
 the table (`UexecSG.srowReg`), or the taint. -/
 def urunNopipe (fdv : List FdState) : IProp GF :=
-  iprop(([∗list] st ∈ fdv, UexecSG.srowReg (GF := GF) st) ∨ □ uKillCred (hlc := hlc) (GF := GF))
+  iprop(([∗list] st ∈ fdv, UexecSG.srowReg (GF := GF) st) ∨ □ uKillCred (GF := GF))
 
-instance urunNopipe_persistent (fdv : List FdState) : Persistent (urunNopipe (hlc := hlc) (GF := GF) fdv) := by
+instance urunNopipe_persistent (fdv : List FdState) : Persistent (urunNopipe (GF := GF) fdv) := by
   unfold urunNopipe; infer_instance
 
 /-- Rocq `urun_nopipe_regs`. -/
 theorem urunNopipe_regs (fdv : List FdState) :
-    ([∗list] st ∈ fdv, UexecSG.srowReg (GF := GF) st) ⊢ urunNopipe (hlc := hlc) fdv := BI.or_intro_l
+    ([∗list] st ∈ fdv, UexecSG.srowReg (GF := GF) st) ⊢ urunNopipe fdv := BI.or_intro_l
 
 /-- Rocq `urun_nopipe_intro`. -/
-theorem urunNopipe_intro (fdv : List FdState) (h : fdvNopipe fdv) : ⊢ urunNopipe (hlc := hlc) (GF := GF) fdv :=
+theorem urunNopipe_intro (fdv : List FdState) (h : fdvNopipe fdv) : ⊢ urunNopipe (GF := GF) fdv :=
   (srow_regs_nopipe fdv h).trans (urunNopipe_regs fdv)
 
 /-- **Rocq `urun_nopipe_regs_insert`**: a row overwritten by a registered one. -/
@@ -296,7 +296,7 @@ theorem urunNopipe_regs_lookup_total (fdv : List FdState) (k : Nat) :
 
 /-- **Rocq `urun_nopipe_insert_reg`**: the row a pipe puts in, registered. -/
 theorem urunNopipe_insert_reg (fdv : List FdState) (k : Nat) (st : FdState) :
-    ⊢ UexecSG.srowReg (GF := GF) st -∗ urunNopipe (hlc := hlc) fdv -∗ urunNopipe (hlc := hlc) (fdv.set k st) := by
+    ⊢ UexecSG.srowReg (GF := GF) st -∗ urunNopipe fdv -∗ urunNopipe (fdv.set k st) := by
   unfold urunNopipe
   iintro Hst (Hr | #Ht)
   · ileft
@@ -305,14 +305,14 @@ theorem urunNopipe_insert_reg (fdv : List FdState) (k : Nat) (st : FdState) :
 
 /-- Rocq `urun_nopipe_insert`: a non-pipe row set in. -/
 theorem urunNopipe_insert (fdv : List FdState) (k : Nat) (st : FdState) (h : fdstNopipe st) :
-    ⊢ urunNopipe (hlc := hlc) (GF := GF) fdv -∗ urunNopipe (hlc := hlc) (fdv.set k st) := by
+    ⊢ urunNopipe (GF := GF) fdv -∗ urunNopipe (fdv.set k st) := by
   iintro Hr
   iapply urunNopipe_insert_reg fdv k st $$ [] Hr
   iapply UexecSG.srowReg_nopipe st h
 
 /-- Rocq `urun_nopipe_dup`: the row a dup copies. -/
 theorem urunNopipe_dup (fdv : List FdState) (k j : Nat) (st : FdState) (hk : fdv[k]? = some st) :
-    ⊢ urunNopipe (hlc := hlc) (GF := GF) fdv -∗ urunNopipe (hlc := hlc) (fdv.set j st) := by
+    ⊢ urunNopipe (GF := GF) fdv -∗ urunNopipe (fdv.set j st) := by
   unfold urunNopipe
   iintro (#Hr | #Ht)
   · ileft
@@ -322,7 +322,7 @@ theorem urunNopipe_dup (fdv : List FdState) (k j : Nat) (st : FdState) (hk : fdv
 
 /-- Rocq `urun_nopipe_copy`. -/
 theorem urunNopipe_copy (fdv : List FdState) (k j : Nat) :
-    ⊢ urunNopipe (hlc := hlc) (GF := GF) fdv -∗ urunNopipe (hlc := hlc) (fdv.set j (fdv.getD k .closed)) := by
+    ⊢ urunNopipe (GF := GF) fdv -∗ urunNopipe (fdv.set j (fdv.getD k .closed)) := by
   unfold urunNopipe
   iintro (#Hr | #Ht)
   · ileft
@@ -332,38 +332,38 @@ theorem urunNopipe_copy (fdv : List FdState) (k j : Nat) :
 
 /-- **Rocq `urun_rows`**: THE RUN'S TABLE ROWS -- the pipe row (the offset
 half was deleted in Rocq, lanes OFF-HAND-6 / OFF-LINK-2). -/
-def urunRows (_N : UkNames GF) (fdv : List FdState) : IProp GF := urunNopipe (hlc := hlc) fdv
+def urunRows (_N : UkNames GF) (fdv : List FdState) : IProp GF := urunNopipe fdv
 
 instance urunRows_persistent (N : UkNames GF) (fdv : List FdState) :
-    Persistent (urunRows (hlc := hlc) N fdv) := by
+    Persistent (urunRows N fdv) := by
   unfold urunRows; infer_instance
 
 /-- Rocq `urun_rows_nopipe`. -/
 theorem urunRows_nopipe (N : UkNames GF) (fdv : List FdState) :
-    urunRows (hlc := hlc) N fdv ⊢ urunNopipe (hlc := hlc) fdv := .rfl
+    urunRows N fdv ⊢ urunNopipe fdv := .rfl
 
 /-- Rocq `urun_rows_insert`. -/
 theorem urunRows_insert (N : UkNames GF) (fdv : List FdState) (k : Nat) (st : FdState) (h : fdstNopipe st) :
-    ⊢ urunRows (hlc := hlc) N fdv -∗ urunRows (hlc := hlc) N (fdv.set k st) :=
+    ⊢ urunRows N fdv -∗ urunRows N (fdv.set k st) :=
   urunNopipe_insert fdv k st h
 
 /-- Rocq `urun_rows_dup`. -/
 theorem urunRows_dup (N : UkNames GF) (fdv : List FdState) (k j : Nat) (st : FdState) (hk : fdv[k]? = some st) :
-    ⊢ urunRows (hlc := hlc) N fdv -∗ urunRows (hlc := hlc) N (fdv.set j st) :=
+    ⊢ urunRows N fdv -∗ urunRows N (fdv.set j st) :=
   urunNopipe_dup fdv k j st hk
 
 /-- Rocq `urun_rows_copy`. -/
 theorem urunRows_copy (N : UkNames GF) (fdv : List FdState) (k j : Nat) :
-    ⊢ urunRows (hlc := hlc) N fdv -∗ urunRows (hlc := hlc) N (fdv.set j (fdv.getD k .closed)) :=
+    ⊢ urunRows N fdv -∗ urunRows N (fdv.set j (fdv.getD k .closed)) :=
   urunNopipe_copy fdv k j
 
 /-- **Rocq `udep_exit_run`**: EXIT'S DEPOSIT at the key a leaf destructed its
 run into, off the run's own `udep` and rows and nothing else. -/
 theorem udep_exit_run (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (M : ElfMem) (pm : Nat → Option UPerm)
     (sz : Nat) (fdv : List FdState) (cw : Nat) (gn : GName) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) :
-    ⊢ udep (hlc := hlc) (GF := GF) -∗ urunRows (hlc := hlc) N fdv ==∗
+    ⊢ udep (GF := GF) -∗ urunRows N fdv ==∗
       sbundlePay uslot USYS_exit N.pay (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) := by
-  have HR : ⊢ ([∗list] st ∈ fdv, UexecSG.srowReg (GF := GF) st) -∗ udep (hlc := hlc) (GF := GF) -∗
+  have HR : ⊢ ([∗list] st ∈ fdv, UexecSG.srowReg (GF := GF) st) -∗ udep (GF := GF) -∗
       |==> sbundlePay uslot USYS_exit N.pay (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) :=
     udep_exit_regs (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) N.pay
   iintro #Hdep Hrows
@@ -383,11 +383,11 @@ def udepwRow (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (st : FdSt
     ⌜ukFdStOfKey (m.get 10#5) fdv = st⌝ -∗ myPay gn N.pay -∗ uheap N.t N.d N.s M pm sz -∗ ufdAuth N.fd fdv -∗
     uheap N.t N.d N.s M pm sz ∗ ufdAuth N.fd fdv ∗
       (⌜UprogSG.psok (GF := GF) n ∧ n ≠ USYS_exec⌝ ∨
-        |==> sbundlePay (uslot (hlc := hlc)) n N.pay (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll)))
+        |==> sbundlePay (uslot) n N.pay (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll)))
 
 /-- Rocq `udepw_row_of_udepw`: the forgetful direction. -/
 theorem udepwRow_of_udepw (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (st : FdState) :
-    ⊢ udepw (hlc := hlc) N m pc n -∗ udepwRow N m pc n st := by
+    ⊢ udepw N m pc n -∗ udepwRow N m pc n st := by
   unfold udepw udepwRow
   iintro H %M %pm %sz %fdv %cw %gn %cs %pidv _ Hp Hh Hf
   icases H $$ %M %pm %sz %fdv %cw %gn %cs %pidv Hp Hh Hf with ⟨Hh, Hf, Hd⟩
@@ -400,7 +400,7 @@ theorem udepwRow_of_udepw (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : In
 theorem udepwRow_mint (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (st : FdState) (M : ElfMem)
     (pm : Nat → Option UPerm) (sz : Nat) (fdv : List FdState) (cw : Nat) (gn : GName)
     (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (hkey : ukFdStOfKey (m.get 10#5) fdv = st) :
-    ⊢ udep (hlc := hlc) (GF := GF) -∗ myPay gn N.pay -∗ udepwRow N m pc n st -∗
+    ⊢ udep (GF := GF) -∗ myPay gn N.pay -∗ udepwRow N m pc n st -∗
       uheap N.t N.d N.s M pm sz -∗ ufdAuth N.fd fdv ==∗
       uheap N.t N.d N.s M pm sz ∗ ufdAuth N.fd fdv ∗
         sbundlePay uslot n N.pay (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) := by
@@ -416,23 +416,23 @@ theorem udepwRow_mint (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (
 caller can have it -- the descriptor is known not to be a pipe (owes
 nothing), or a row-aware deposit at 21. -/
 def udepwCl (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (st : FdState) : IProp GF :=
-  iprop(⌜∀ (rb wb : Bool) (gp : PipeNames), st ≠ .open rb wb (.pipe gp)⌝ ∨ udepwRow (hlc := hlc) N m pc 21 st)
+  iprop(⌜∀ (rb wb : Bool) (gp : PipeNames), st ≠ .open rb wb (.pipe gp)⌝ ∨ udepwRow N m pc 21 st)
 
 /-- Rocq `udepw_cl_nonpipe`. -/
 theorem udepwCl_nonpipe (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (st : FdState)
     (h : ∀ (rb wb : Bool) (gp : PipeNames), st ≠ .open rb wb (.pipe gp)) :
-    ⊢ udepwCl (hlc := hlc) N m pc st := by
+    ⊢ udepwCl N m pc st := by
   unfold udepwCl
   ileft; ipureintro; exact h
 
 /-- Rocq `udepw_cl_nopipe`: the free route at the fact the open leaves export. -/
 theorem udepwCl_nopipe (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (st : FdState) (h : fdstNopipe st) :
-    ⊢ udepwCl (hlc := hlc) N m pc st :=
+    ⊢ udepwCl N m pc st :=
   udepwCl_nonpipe N m pc st (fun rb wb gp he => by rw [he] at h; exact h)
 
 /-- Rocq `udepw_cl_of_udepw`. -/
 theorem udepwCl_of_udepw (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (st : FdState) :
-    ⊢ udepw (hlc := hlc) N m pc 21 -∗ udepwCl N m pc st := by
+    ⊢ udepw N m pc 21 -∗ udepwCl N m pc st := by
   unfold udepwCl
   iintro H
   iright
@@ -442,7 +442,7 @@ theorem udepwCl_of_udepw (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (st : Fd
 theorem udepwCl_mint (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (st : FdState) (M : ElfMem)
     (pm : Nat → Option UPerm) (sz : Nat) (fdv : List FdState) (cw : Nat) (gn : GName)
     (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (hkey : ukFdStOfKey (m.get 10#5) fdv = st) :
-    ⊢ udep (hlc := hlc) (GF := GF) -∗ myPay gn N.pay -∗ udepwCl N m pc st -∗
+    ⊢ udep (GF := GF) -∗ myPay gn N.pay -∗ udepwCl N m pc st -∗
       uheap N.t N.d N.s M pm sz -∗ ufdAuth N.fd fdv ==∗
       uheap N.t N.d N.s M pm sz ∗ ufdAuth N.fd fdv ∗
         sbundlePay uslot 21 N.pay (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) := by
@@ -462,20 +462,20 @@ theorem udepwCl_mint (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (st : FdStat
 
 /-- **Rocq `uxsup_at`**: exec's bundle at EVERY key, at a named payload. -/
 def uxsupAt (Q : Int → IProp GF) : IProp GF :=
-  iprop(□ ∀ W : Uvis, sbundlePay (uslot (hlc := hlc)) USYS_exec Q W)
+  iprop(□ ∀ W : Uvis, sbundlePay (uslot) USYS_exec Q W)
 
-instance uxsupAt_persistent (Q : Int → IProp GF) : Persistent (uxsupAt (hlc := hlc) Q) := by
+instance uxsupAt_persistent (Q : Int → IProp GF) : Persistent (uxsupAt Q) := by
   unfold uxsupAt; infer_instance
 
 /-- **Rocq `uxsup`**: at the trivial payload. -/
-def uxsup : IProp GF := uxsupAt (hlc := hlc) (fun _ => iprop(True))
+def uxsup : IProp GF := uxsupAt (fun _ => iprop(True))
 
-instance uxsup_persistent : Persistent (uxsup (hlc := hlc) (GF := GF)) := by
+instance uxsup_persistent : Persistent (uxsup (GF := GF)) := by
   unfold uxsup; infer_instance
 
 /-- Rocq `udepw_of_uxsup_at`. -/
 theorem udepw_of_uxsupAt (N : UkNames GF) (m : RegMap) (pc : BitVec 64) :
-    ⊢ uxsupAt (hlc := hlc) N.pay -∗ udepw N m pc USYS_exec := by
+    ⊢ uxsupAt N.pay -∗ udepw N m pc USYS_exec := by
   unfold uxsupAt udepw
   iintro #Hx %M %pm %sz %fdv %cw %gn %cs %pidv _ Hh Hf
   iframe Hh Hf
@@ -492,7 +492,7 @@ def udepwfAt (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (fdep : Ue
       (cs : ExtTreeSet GName compare) (pidv : BitVec 32),
     myPay gn N.pay -∗ uheap N.t N.d N.s M pm sz -∗ ufdAuth N.fd fdv -∗
     uheap N.t N.d N.s M pm sz ∗ ufdAuth N.fd fdv ∗
-      UexecSG.sbundleAt (uslot (hlc := hlc)) n fdep (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll))
+      UexecSG.sbundleAt (uslot) n fdep (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll))
 
 /-- **Rocq `udepwf_std`**: the family-named explicit deposit at the tables
 whose standard-stream prefix is the ledger `l`. -/
@@ -503,7 +503,7 @@ def udepwfStd (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (fdep : U
       (cs : ExtTreeSet GName compare) (pidv : BitVec 32),
     ⌜fdv.take NSTD = l⌝ -∗ myPay gn N.pay -∗ uheap N.t N.d N.s M pm sz -∗ ufdAuth N.fd fdv -∗
     uheap N.t N.d N.s M pm sz ∗ ufdAuth N.fd fdv ∗
-      UexecSG.sbundleAt (uslot (hlc := hlc)) n fdep (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll))
+      UexecSG.sbundleAt (uslot) n fdep (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll))
 
 /-! ## §2 THE RUNNING PREDICATE -/
 
@@ -542,11 +542,11 @@ def urun (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail : Nat) 
       (sz : Nat) (M : ElfMem) (pm : Nat → Option UPerm) (fdv : List FdState) (cw : Nat) (gn : GName)
       (cs : ExtTreeSet GName compare) (pidv : BitVec 32),
     ⌜loopOk C pt⌝ ∗ ⌜permOf pt.um sz = pm⌝ ∗ ⌜lazyFree pt.um (BitVec.ofNat 64 sz)⌝ ∗
-    ⌜∀ pt' : UPtd, Rut pt' ⊢ @ctxToken hlc GF _ xi h ∗ (@ctxToken hlc GF _ xi h -∗ Rut pt')⌝ ∗
+    ⌜∀ pt' : UPtd, Rut pt' ⊢ @ctxToken GF _ xi h ∗ (@ctxToken GF _ xi h -∗ Rut pt')⌝ ∗
     ⌜m 0#5 = 0#64⌝ ∗
     uheap N.t N.d N.s M pm sz ∗ ustack N.d (m.get spIdx) avail ∗ ufdAuth N.fd fdv ∗ ucwdAuth N.cwd cw ∗
-    urunIds N cs pidv ∗ myPay gn N.pay ∗ udep (hlc := hlc) ∗ urunRows (hlc := hlc) N fdv ∗
-    @uvb hlc GF _ _ _ xi h C pt Rfd Rut sz pm fdv cw gn cs pidv false seccAll M m pc)
+    urunIds N cs pidv ∗ myPay gn N.pay ∗ udep ∗ urunRows N fdv ∗
+    @uvb GF _ _ _ xi h C pt Rfd Rut sz pm fdv cw gn cs pidv false seccAll M m pc)
 
 end UkRun
 
@@ -575,7 +575,7 @@ theorem ukWr_x0 (m : RegMap) (rd : BitVec 5) (v : BitVec 64) (h0 : m 0#5 = 0#64)
 /-! ## §3 THE CLOSE, THE GENERIC CONTINUATION, AND WHAT A LEAF READS -/
 
 section UkRunLeaf
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -586,9 +586,9 @@ theorem urun_close (N : UkNames GF) (M : ElfMem) (pm : Nat → Option UPerm) (sz
     (cw : Nat) (gn : GName) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (m : RegMap) (pc : BitVec 64)
     (avail : Nat) (h0 : m 0#5 = 0#64) :
     ⊢ uheap N.t N.d N.s M pm sz -∗ ustack N.d (m.get spIdx) avail -∗ ufdAuth N.fd fdv -∗
-      ucwdAuth N.cwd cw -∗ urunIds N cs pidv -∗ myPay gn N.pay -∗ udep (hlc := hlc) -∗
-      urunRows (hlc := hlc) N fdv -∗
-      (∀ h : CPU, urun (hlc := hlc) N h m pc avail -∗ wpLoop h) -∗
+      ucwdAuth N.cwd cw -∗ urunIds N cs pidv -∗ myPay gn N.pay -∗ udep -∗
+      urunRows N fdv -∗
+      (∀ h : CPU, urun N h m pc avail -∗ wpLoop h) -∗
       ukcq N.pay pm M sz fdv cw gn cs pidv m pc := by
   iintro Hheap Hstk Hufd Hcwd Hch #Hmy #Hdep #Hrows Hcont
   unfold ukcq
@@ -609,9 +609,9 @@ theorem urun_close_wr (N : UkNames GF) (M : ElfMem) (pm : Nat → Option UPerm) 
     (v : BitVec 64) (sz : Nat) (fdv : List FdState) (cw : Nat) (gn : GName) (cs : ExtTreeSet GName compare)
     (pidv : BitVec 32) (pc' : BitVec 64) (avail : Nat) (hns : unotSp rd) (h0 : m 0#5 = 0#64) :
     ⊢ uheap N.t N.d N.s M pm sz -∗ ustack N.d (m.get spIdx) avail -∗ ufdAuth N.fd fdv -∗
-      ucwdAuth N.cwd cw -∗ urunIds N cs pidv -∗ myPay gn N.pay -∗ udep (hlc := hlc) -∗
-      urunRows (hlc := hlc) N fdv -∗
-      (∀ h : CPU, urun (hlc := hlc) N h (ukWr m rd v) pc' avail -∗ wpLoop h) -∗
+      ucwdAuth N.cwd cw -∗ urunIds N cs pidv -∗ myPay gn N.pay -∗ udep -∗
+      urunRows N fdv -∗
+      (∀ h : CPU, urun N h (ukWr m rd v) pc' avail -∗ wpLoop h) -∗
       ukcq N.pay pm M sz fdv cw gn cs pidv (ukWr m rd v) pc' := by
   iintro Hheap Hstk
   rw [← unotSp_wr rd v m hns]
@@ -622,7 +622,7 @@ the slot at the running key IS the U-mode continuation, and a `urun`
 carries exactly the residue it takes; heap, stack and ledger are DROPPED. -/
 theorem urun_gen (N : UkNames GF) (T : IProp GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail : Nat)
     (hal : pc &&& 1#64 = 0#64) :
-    ⊢ □ (∀ W : Uvis, T -∗ myPay W.gen N.pay -∗ uslot (hlc := hlc) W) -∗ T -∗ urun N h m pc avail -∗ wpLoop h := by
+    ⊢ □ (∀ W : Uvis, T -∗ myPay W.gen N.pay -∗ uslot W) -∗ T -∗ urun N h m pc avail -∗ wpLoop h := by
   iintro #Hgen HT Hrun
   unfold urun
   icases Hrun with ⟨%xi, %C, %pt, %Rfd, %Rut, %sz, %M, %pm, %fdv, %cw, %gn, %cs, %pidv, %hlo, %hpm, %hlzf,
@@ -637,7 +637,7 @@ theorem urun_gen (N : UkNames GF) (T : IProp GF) (h : CPU) (m : RegMap) (pc : Bi
 /-- **Rocq `urun_stack`**: the two stack facts every prologue used to take
 as premises, read off the run. -/
 theorem urun_stack (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail : Nat) :
-    ⊢ urun (hlc := hlc) N h m pc avail -∗ ⌜(m.get spIdx).toNat % 8 = 0 ∧ 8 * avail ≤ (m.get spIdx).toNat⌝ := by
+    ⊢ urun N h m pc avail -∗ ⌜(m.get spIdx).toNat % 8 = 0 ∧ 8 * avail ≤ (m.get spIdx).toNat⌝ := by
   unfold urun
   iintro ⟨%xi, %C, %pt, %Rfd, %Rut, %sz, %M, %pm, %fdv, %cw, %gn, %cs, %pidv, -, -, -, -, -, -, Hstk, -⟩
   unfold ustack
@@ -668,7 +668,7 @@ theorem umemLazy_bound (P : UPtd) (sz : Nat) (Mp : Nat → List (BitVec 8)) (hwf
     · cases ha
 
 section UkEntry
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -700,7 +700,7 @@ theorem uslot_of_urun_all_at (W : Uvis) (avail : Nat) (Q : Int → IProp GF)
       (get? (udataLo W.M W.perm W.sz) ((ukeySp W).toNat - 8 * avail + j)).isSome)
     (hfdlen : W.fd.length = NOFILE) (hstop : ∀ p q, W.perm p = some q → p * 4096 < pgRoundUpN W.sz)
     (hlz : W.lazy = false) (hsc : W.secc = seccAll) :
-    ⊢ udep (hlc := hlc) (GF := GF) -∗ urunNopipe (hlc := hlc) W.fd -∗ myPay W.gen Q -∗
+    ⊢ udep (GF := GF) -∗ urunNopipe W.fd -∗ myPay W.gen Q -∗
       (∀ (N : UkNames GF) (h : CPU), ⌜N.pay = Q⌝ -∗ ⌜uszOk W.sz⌝ -∗ usz N.s W.sz -∗
         utextAll N.t W.M W.perm -∗ ustdAt N.fd (W.fd.take NSTD) W.fd -∗ ucwd N.cwd W.cwd -∗ uch N.ch W.ch -∗
         upid N.pid (W.pid.toNat : Int) -∗
@@ -708,8 +708,8 @@ theorem uslot_of_urun_all_at (W : Uvis) (avail : Nat) (Q : Int → IProp GF)
             (udataLo W.M W.perm W.sz), ubyte N.d k b) -∗
         ([∗map] k ↦ b ∈ PartialMap.filter (fun k _ => !decide (k < (ukeySp W).toNat))
             (udataLo W.M W.perm W.sz), ubyte N.d k b) -∗
-        urun (hlc := hlc) N h (tfResumeGpr0 W.tf) (tfResumePc W.tf) avail -∗ wpLoop h) -∗
-      uslot (hlc := hlc) W := by
+        urun N h (tfResumeGpr0 W.tf) (tfResumePc W.tf) avail -∗ wpLoop h) -∗
+      uslot W := by
   iintro #Hdep #Hnp #Hpay Hprog
   iapply (uslot_ukc W).2
   unfold ukc
@@ -774,7 +774,7 @@ theorem uslot_of_urun_all_at (W : Uvis) (avail : Nat) (Q : Int → IProp GF)
   unfold urun
   iexists xi, C, pt, Rfd, Rut, W.sz, W.M, W.perm, W.fd, W.cwd, W.gen, W.ch, W.pid
   unfold urunIds
-  ihave #Hrows := (show urunNopipe (hlc := hlc) W.fd ⊢ urunRows (hlc := hlc) N W.fd from .rfl) $$ Hnp
+  ihave #Hrows := (show urunNopipe W.fd ⊢ urunRows N W.fd from .rfl) $$ Hnp
   iframe Hheap Hstk Hufd Hcwa Hcha Hpa Hpay Hdep Hrows Hb
   ipureintro
   exact ⟨hlo, hpm, hlzf rfl, hRut, tfResumeGpr0_x0 W.tf⟩
@@ -787,7 +787,7 @@ theorem uslot_of_urun_all (W : Uvis) (avail : Nat) (Q : Int → IProp GF)
       (get? (udataLo W.M W.perm W.sz) ((ukeySp W).toNat - 8 * avail + j)).isSome)
     (hfdlen : W.fd.length = NOFILE) (hstop : ∀ p q, W.perm p = some q → p * 4096 < pgRoundUpN W.sz)
     (hlz : W.lazy = false) (hsc : W.secc = seccAll) :
-    ⊢ udep (hlc := hlc) (GF := GF) -∗ urunNopipe (hlc := hlc) W.fd -∗ myPay W.gen Q -∗
+    ⊢ udep (GF := GF) -∗ urunNopipe W.fd -∗ myPay W.gen Q -∗
       (∀ (N : UkNames GF) (h : CPU), ⌜N.pay = Q⌝ -∗ ⌜uszOk W.sz⌝ -∗ usz N.s W.sz -∗
         utextAll N.t W.M W.perm -∗ ustd N.fd (W.fd.take NSTD) -∗ ucwd N.cwd W.cwd -∗ uch N.ch W.ch -∗
         upid N.pid (W.pid.toNat : Int) -∗
@@ -795,8 +795,8 @@ theorem uslot_of_urun_all (W : Uvis) (avail : Nat) (Q : Int → IProp GF)
             (udataLo W.M W.perm W.sz), ubyte N.d k b) -∗
         ([∗map] k ↦ b ∈ PartialMap.filter (fun k _ => !decide (k < (ukeySp W).toNat))
             (udataLo W.M W.perm W.sz), ubyte N.d k b) -∗
-        urun (hlc := hlc) N h (tfResumeGpr0 W.tf) (tfResumePc W.tf) avail -∗ wpLoop h) -∗
-      uslot (hlc := hlc) W := by
+        urun N h (tfResumeGpr0 W.tf) (tfResumePc W.tf) avail -∗ wpLoop h) -∗
+      uslot W := by
   iintro #Hdep #Hnp #Hpay Hprog
   iapply uslot_of_urun_all_at W avail Q hal8 hroom hstk hfdlen hstop hlz hsc $$ Hdep Hnp Hpay
   iintro %N %h %hq %hs Hs Ht Hstd Hc Hch Hp Dlo Dtop Hrun
@@ -811,12 +811,12 @@ theorem uslot_of_urun (W : Uvis) (avail : Nat) (Q : Int → IProp GF)
       (get? (udataLo W.M W.perm W.sz) ((ukeySp W).toNat - 8 * avail + j)).isSome)
     (hfdlen : W.fd.length = NOFILE) (hstop : ∀ p q, W.perm p = some q → p * 4096 < pgRoundUpN W.sz)
     (hlz : W.lazy = false) (hsc : W.secc = seccAll) :
-    ⊢ udep (hlc := hlc) (GF := GF) -∗ urunNopipe (hlc := hlc) W.fd -∗ myPay W.gen Q -∗
+    ⊢ udep (GF := GF) -∗ urunNopipe W.fd -∗ myPay W.gen Q -∗
       (∀ (N : UkNames GF) (h : CPU), ⌜N.pay = Q⌝ -∗ ⌜uszOk W.sz⌝ -∗ usz N.s W.sz -∗
         utextAll N.t W.M W.perm -∗ ustd N.fd (W.fd.take NSTD) -∗ ucwd N.cwd W.cwd -∗ uch N.ch W.ch -∗
         upid N.pid (W.pid.toNat : Int) -∗
-        urun (hlc := hlc) N h (tfResumeGpr0 W.tf) (tfResumePc W.tf) avail -∗ wpLoop h) -∗
-      uslot (hlc := hlc) W := by
+        urun N h (tfResumeGpr0 W.tf) (tfResumePc W.tf) avail -∗ wpLoop h) -∗
+      uslot W := by
   iintro #Hdep #Hnp #Hpay Hprog
   iapply uslot_of_urun_all W avail Q hal8 hroom hstk hfdlen hstop hlz hsc $$ Hdep Hnp Hpay
   iintro %N %h %hq %hs Hs Ht Hstd Hc Hch Hp _ _ Hrun
@@ -832,14 +832,14 @@ theorem uslot_of_urun_ro_at (W : Uvis) (avail : Nat) (Q : Int → IProp GF)
       (get? (udataLo W.M W.perm W.sz) ((ukeySp W).toNat - 8 * avail + j)).isSome)
     (hfdlen : W.fd.length = NOFILE) (hstop : ∀ p q, W.perm p = some q → p * 4096 < pgRoundUpN W.sz)
     (hlz : W.lazy = false) (hsc : W.secc = seccAll) :
-    ⊢ udep (hlc := hlc) (GF := GF) -∗ urunNopipe (hlc := hlc) W.fd -∗ myPay W.gen Q -∗
+    ⊢ udep (GF := GF) -∗ urunNopipe W.fd -∗ myPay W.gen Q -∗
       (∀ (N : UkNames GF) (h : CPU), ⌜N.pay = Q⌝ -∗ ⌜uszOk W.sz⌝ -∗ usz N.s W.sz -∗
         utextAll N.t W.M W.perm -∗ ustdAt N.fd (W.fd.take NSTD) W.fd -∗ ucwd N.cwd W.cwd -∗ uch N.ch W.ch -∗
         upid N.pid (W.pid.toNat : Int) -∗
         ([∗map] k ↦ b ∈ PartialMap.filter (fun k _ => !decide (k < (ukeySp W).toNat))
             (udataLo W.M W.perm W.sz), ubyteq N.d DFrac.discard k b) -∗
-        urun (hlc := hlc) N h (tfResumeGpr0 W.tf) (tfResumePc W.tf) avail -∗ wpLoop h) -∗
-      uslot (hlc := hlc) W := by
+        urun N h (tfResumeGpr0 W.tf) (tfResumePc W.tf) avail -∗ wpLoop h) -∗
+      uslot W := by
   iintro #Hdep #Hnp #Hpay Hprog
   iapply uslot_of_urun_all_at W avail Q hal8 hroom hstk hfdlen hstop hlz hsc $$ Hdep Hnp Hpay
   iintro %N %h %hq %hs Hs Ht Hstd Hc Hch Hp _ Dtop Hrun
@@ -855,14 +855,14 @@ theorem uslot_of_urun_ro (W : Uvis) (avail : Nat) (Q : Int → IProp GF)
       (get? (udataLo W.M W.perm W.sz) ((ukeySp W).toNat - 8 * avail + j)).isSome)
     (hfdlen : W.fd.length = NOFILE) (hstop : ∀ p q, W.perm p = some q → p * 4096 < pgRoundUpN W.sz)
     (hlz : W.lazy = false) (hsc : W.secc = seccAll) :
-    ⊢ udep (hlc := hlc) (GF := GF) -∗ urunNopipe (hlc := hlc) W.fd -∗ myPay W.gen Q -∗
+    ⊢ udep (GF := GF) -∗ urunNopipe W.fd -∗ myPay W.gen Q -∗
       (∀ (N : UkNames GF) (h : CPU), ⌜N.pay = Q⌝ -∗ ⌜uszOk W.sz⌝ -∗ usz N.s W.sz -∗
         utextAll N.t W.M W.perm -∗ ustd N.fd (W.fd.take NSTD) -∗ ucwd N.cwd W.cwd -∗ uch N.ch W.ch -∗
         upid N.pid (W.pid.toNat : Int) -∗
         ([∗map] k ↦ b ∈ PartialMap.filter (fun k _ => !decide (k < (ukeySp W).toNat))
             (udataLo W.M W.perm W.sz), ubyteq N.d DFrac.discard k b) -∗
-        urun (hlc := hlc) N h (tfResumeGpr0 W.tf) (tfResumePc W.tf) avail -∗ wpLoop h) -∗
-      uslot (hlc := hlc) W := by
+        urun N h (tfResumeGpr0 W.tf) (tfResumePc W.tf) avail -∗ wpLoop h) -∗
+      uslot W := by
   iintro #Hdep #Hnp #Hpay Hprog
   iapply uslot_of_urun_ro_at W avail Q hal8 hroom hstk hfdlen hstop hlz hsc $$ Hdep Hnp Hpay
   iintro %N %h %hq %hs Hs Ht Hstd Hc Hch Hp Dtop Hrun

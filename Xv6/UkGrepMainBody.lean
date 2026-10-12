@@ -24,7 +24,7 @@ set_option maxRecDepth 20000
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -43,13 +43,13 @@ theorem grepMain_body (UL : UK_LEAVES) (GG : GREP_GREP) (N : UkNames GF) (sp0 : 
     (hptr : ∀ (j : Nat) (g0 : UArg), args[j]? = some g0 → g0.ptr ≠ 0)
     (hg : args[i]? = some g) (hg1 : args[1]? = some g1) (hwn : grepWords (uargBytes g1) ≤ na) (h28 : 28 ≤ na)
     (hinv : grepMainInv sp0 av args.length i g1.ptr m) :
-    ⊢ treePay (hlc := hlc) N (grepProg N.t) (grepFiles (uargBytes g1) (uargBytes g :: ps) rest) -∗
+    ⊢ treePay N (grepProg N.t) (grepFiles (uargBytes g1) (uargBytes g :: ps) rest) -∗
       grepCode N.t -∗ uargv N.d av args -∗ ubytes N.d User.Grep.Sym.«buf» 1024 f -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x204) na -∗
+      urun N h m (BitVec.ofNat 64 0x204) na -∗
       (∀ (h' : CPU) (m' : RegMap) (f' : Nat → BitVec 8), ⌜grepMainInv sp0 av args.length (i + 1) g1.ptr m'⌝ -∗
-        treePay (hlc := hlc) N (grepProg N.t) (grepFiles (uargBytes g1) ps rest) -∗
+        treePay N (grepProg N.t) (grepFiles (uargBytes g1) ps rest) -∗
         ubytes N.d User.Grep.Sym.«buf» 1024 f' -∗
-        urun (hlc := hlc) N h' m' (BitVec.ofNat 64 0x224) na -∗ wpLoop h') -∗
+        urun N h' m' (BitVec.ofNat 64 0x224) na -∗ wpLoop h') -∗
       wpLoop h := by
   have hilt : i < args.length := by
     rcases Nat.lt_or_ge i args.length with h | h

@@ -39,7 +39,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -49,7 +49,7 @@ set_option maxHeartbeats 16000000 in
 buffer's bytes are the sixteen dinodes), the slot's address, the `sh` of
 the zero type, the deposit's atomic update built; then `iput_ofl_tail`. -/
 theorem iput_ofl_body (LW : LOG_WRITE) (BL : BRELSE)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (γil γisl : GName)
     (kk : Nat) (b : Nat) (inum : BitVec 32) (dn : Dinode) (ge gr gd : GName)
     (bs bsd : List (BitVec 8)) (d0 : Bool)
@@ -72,7 +72,7 @@ theorem iput_ofl_body (LW : LOG_WRITE) (BL : BRELSE)
     iputEnv Γ γl pd pav pu γil γisl kk ∗
     trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
     dinodeAt fscIreg inum dn ∗
-    escAInv (hlc := hlc) fscFs ge gr gd inum.toNat (rgb, (tid, qf)) ∗ redeemTicketA gd ∗
+    escAInv fscFs ge gr gd inum.toNat (rgb, (tid, qf)) ∗ redeemTicketA gd ∗
     crpElem inum.toNat (.crpPre tid qc) ∗ txPin icfgLog tid qa ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
@@ -99,7 +99,7 @@ theorem iput_ofl_body (LW : LOG_WRITE) (BL : BRELSE)
   icases dsHeld_L fscBio fscFs fscDisk icfgDev fscCov b icfgDev _ bs bsd d0 $$ Hpay
     with ⟨HpL, Hpayback⟩
   iapply wpLoop_fupd
-  imod (iregRead (hlc := hlc) ⊤ fscIreg fscFs icfgIst icfgNib inum dn _ bs
+  imod (iregRead ⊤ fscIreg fscFs icfgIst icfgNib inum dn _ bs
     CoPset.subseteq_top logN_top (by omega) hbnoN) $$ Hinv Hdn HpL with ⟨%hex, Hdn, HpL⟩
   imodintro
   ihave Hpay := Hpayback $$ HpL
@@ -113,7 +113,7 @@ theorem iput_ofl_body (LW : LOG_WRITE) (BL : BRELSE)
   unfold dislot
   icases Hsl with ⟨Hd0, Hrest⟩
   -- THE DEPOSIT's atomic update, at the list the walk learned
-  ihave Hau := iput_ofl_au (hlc := hlc) inum dn ds ge gr gd (rgb, (tid, qf)) tid qc e0 hnib hdn
+  ihave Hau := iput_ofl_au inum dn ds ge gr gd (rgb, (tid, qf)) tid qc e0 hnib hdn
     hnl0 hbare $$ [Hdn Hdep Hcel]
   · iframe Hinv Hesc Hpinv Hdn Hdep Hcel
   ihave Hfin : iprop(committedA ge ∗ iregRegime (rgb, (tid, qf)).1 ∗ iregFpin (rgb, (tid, qf)) ∗
@@ -179,7 +179,7 @@ one: bare, nlink 0); the escrow and its deposit ticket, the corpse row's
 element and the freeze's regime/share index are what the +0x8a eviction and
 the +0x94 park left. -/
 theorem iput_offlock (BR : BREAD) (LW : LOG_WRITE) (BL : BRELSE)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat) (γil γisl : GName)
     (kk : Nat) (inum : BitVec 32) (dn : Dinode) (ge gr gd : GName)
     (n : Nat) (Sb : List Nat) (crb cru crz : Bool) (tid : Nat) (qtx qa qc qf : Qp)
@@ -202,7 +202,7 @@ theorem iput_offlock (BR : BREAD) (LW : LOG_WRITE) (BL : BRELSE)
     iputEnv Γ γl pd pav pu γil γisl kk ∗
     trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
     dinodeAt fscIreg inum dn ∗
-    escAInv (hlc := hlc) fscFs ge gr gd inum.toNat (rgb, (tid, qf)) ∗ redeemTicketA gd ∗
+    escAInv fscFs ge gr gd inum.toNat (rgb, (tid, qf)) ∗ redeemTicketA gd ∗
     crpElem inum.toNat (.crpPre tid qc) ∗ txPin icfgLog tid qa ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗

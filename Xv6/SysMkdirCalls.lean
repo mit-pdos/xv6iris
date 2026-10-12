@@ -41,7 +41,7 @@ open LeanRV64D
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -78,18 +78,18 @@ def sysMkdirCreateK (k' : KCtx) (se : Bool) (pj : BitVec 64) (plen : Nat) (pfun 
       iprop(⌜R' 10#5 = ientry kk ∧ kk < NINODE ∧ 0 < inum.toNat ∧ inum.toNat < 16 * icfgNib ∧
           creOkPure ty major minor made dn⌝ ∗
         createLocked pid kk qi s g inum dn bm ∗
-        creOkArms (hlc := hlc) (fsGammaL fscFs) ty.toNat major.toNat minor.toNat Nm Nd P Farm Fdots Fun
+        creOkArms (fsGammaL fscFs) ty.toNat major.toNat minor.toNat Nm Nd P Farm Fdots Fun
           Fok Fex (bview plen pfun) made inum.toNat)
      else
       iprop(⌜R' 10#5 = 0#64⌝ ∗ logTx icfgLog ∗
-        creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs V.rti ty.toNat major.toNat minor.toNat Nm Nd P Pmiss
+        creFailArms (fsGammaL fscFs) fscFs V.rti ty.toNat major.toNat minor.toNat Nm Nd P Pmiss
           Farm Fdots Fun Fok Fex (bview plen pfun))) -∗
     wpLoop c)
 
 set_option maxHeartbeats 16000000 in
 /-- `create(path, ty, major, minor)` at +0x28 (Rocq `Create.wp_create_sconf`),
 the whole block in and out, eb-generic (deviation 1). -/
-theorem sys_mkdir_create (CR : CREATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem sys_mkdir_create (CR : CREATE) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k' : KCtx) (se : Bool) (hs : k'.sie = se) (pj : BitVec 64)
     (hpj : k'.proc = pj) (j : Nat) (plen : Nat) (pfun : Nat → BitVec 8)
     (ty major minor : BitVec 16) (γ : FileNames) (pid : BitVec 32) (V : ProcPriv)
@@ -111,13 +111,13 @@ theorem sys_mkdir_create (CR : CREATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
     (hNdF : ty ≠ T_DIR → Nd (creC0 ty.toNat major.toNat minor.toNat))
     (hNdD : ty = T_DIR → ∀ c : Absnode, Nd c) :
     kctx cpu k' ∗ pcIs cpu KA.«create» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv Γ ∗
     procPrivFd γ pj pid V M ∗
     byteBuf (k'.regs 10#5) (DFrac.own 1) (bview (plen + 1) pfun) ∗
     bslots 3 ∗ irefSlots ns ∗ logOpS icfgLog u Sb ∗ logTx icfgLog ∗
     epStart fscFs V.rti V.cwi P Pmiss (bview plen pfun) ∗
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) Fex ∗
-    creCommits (hlc := hlc) (fsGammaL fscFs) ty.toNat major.toNat minor.toNat
+    creCommits (fsGammaL fscFs) ty.toNat major.toNat minor.toNat
       Nm Nd (P (nparElems (bview plen pfun)).length) Farm Fdots Fun Fok ∗
     sysMkdirCreateK k' se pj plen pfun ty major minor γ pid V M u Sb ns Nm Nd P Pmiss Farm Fdots Fun Fok Fex
     ⊢ wpLoop (GF := GF) cpu := by
@@ -134,7 +134,7 @@ theorem sys_mkdir_create (CR : CREATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
   icases fsReady_region $$ Hrdy with ⟨#Hinv, #Hopen⟩
   icases fsReady_sb_four $$ Hrdy with ⟨#Hsn, #Hsi, #Hss, #Hsb⟩
   ihave #Hbmi := fsReady_bitmap $$ Hrdy
-  have h := CR.wp_create_sconf_eb (hlc := hlc) (GF := GF) Γ cpu k' γbl pd pav pu j fscKalloc
+  have h := CR.wp_create_sconf_eb (GF := GF) Γ cpu k' γbl pd pav pu j fscKalloc
     fsReadyKmem plen pfun ty major minor γ pid V M u Sb ns DFrac.discard DFrac.discard DFrac.discard
     DFrac.discard (DFrac.own 1) Nm Nd P Pmiss Farm Fdots Fun Fok Fex
     hj hproc hK hnoff htier hg.fgoRootdev hg.fgoNibPos hg.fgoLog hg.fgoBitmap hg.fgoCovBelow

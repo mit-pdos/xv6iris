@@ -111,7 +111,7 @@ theorem ushpi_ret (m : RegMap) (y : Nat) (hy : y % 2 = 0) (hl : y < 2 ^ 64) :
   rw [ukWr_get_same _ _ _ (by decide)]; exact ush_retPc y hy hl
 
 section UshPipeArmBase
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -147,9 +147,9 @@ theorem ushpi_lw (UL : UK_LEAVES) (N : UkNames GF) {x : Nat} {rvc : Bool} {imm :
     (y : Nat) (h : CPU) (m : RegMap) (av : Nat) (a : Nat) (w : BitVec 32)
     (ha : ((m.get rs1).toNat : Int) + imm.toInt = a) (hal : a % 4 = 0)
     (hy : x + (if rvc then 2 else 4) = y := by decide) (hns : unotSp rd := by unfold unotSp spIdx; decide) :
-    ⊢ ushCode N.t -∗ ubytes N.d a 4 (nthByte (n := 4) w) -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 x) av -∗
+    ⊢ ushCode N.t -∗ ubytes N.d a 4 (nthByte (n := 4) w) -∗ urun N h m (BitVec.ofNat 64 x) av -∗
       (ubytes N.d a 4 (nthByte (n := 4) w) -∗ ∀ h' : CPU,
-        urun (hlc := hlc) N h' (ukWr m rd (extend_value false (w : BitVec (8 * 4)))) (BitVec.ofNat 64 y) av -∗
+        urun N h' (ukWr m rd (extend_value false (w : BitVec (8 * 4)))) (BitVec.ofNat 64 y) av -∗
           wpLoop h') -∗
       wpLoop h := by
   iintro #HC Hw Hrun Hk
@@ -168,9 +168,9 @@ theorem ushpi_closeH (UL : UK_LEAVES) (SC : SH_SYS_CLOSE) (N : UkNames GF) {x : 
     (harg : (BitVec.setWidth 32 (m.get 10#5)).toInt = (fd : Int))
     (ht : BitVec.ofNat 64 x + BitVec.signExtend 64 imm = BitVec.ofNat 64 User.Sh.Sym.«close»)
     (hy : x + 4 = y) (hye : y % 2 = 0) (hyl : y < 2 ^ 64) :
-    ⊢ ushCode N.t -∗ ushCldep (hlc := hlc) st -∗ ufd N.fd fd st -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 x) av -∗
-      (∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗ urun (hlc := hlc) N h' m' (BitVec.ofNat 64 y) av -∗
+    ⊢ ushCode N.t -∗ ushCldep st -∗ ufd N.fd fd st -∗
+      urun N h m (BitVec.ofNat 64 x) av -∗
+      (∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗ urun N h' m' (BitVec.ofNat 64 y) av -∗
         wpLoop h') -∗
       wpLoop h := by
   iintro #HC #Hd Hh Hrun Hk
@@ -192,10 +192,10 @@ theorem ushpi_closeStd (UL : UK_LEAVES) (SC : SH_SYS_CLOSE) (N : UkNames GF) {x 
     (hne : st ≠ .closed)
     (ht : BitVec.ofNat 64 x + BitVec.signExtend 64 imm = BitVec.ofNat 64 User.Sh.Sym.«close»)
     (hy : x + 4 = y) (hye : y % 2 = 0) (hyl : y < 2 ^ 64) :
-    ⊢ ushCode N.t -∗ ushCldep (hlc := hlc) st -∗ ustd N.fd l -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 x) av -∗
+    ⊢ ushCode N.t -∗ ushCldep st -∗ ustd N.fd l -∗
+      urun N h m (BitVec.ofNat 64 x) av -∗
       (∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗ ustd N.fd (l.set fdn .closed) -∗
-        urun (hlc := hlc) N h' m' (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗
+        urun N h' m' (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #HC #Hd Hstd Hrun Hk
   iapply ushS_jal UL N hi User.Sh.Sym.«close» y h m av ht (by simpa using hy) (by decide) $$ HC Hrun
@@ -216,12 +216,12 @@ theorem ushpi_dup (UL : UK_LEAVES) (SD : SH_SYS_DUP) (hps : ∀ k : Int, freeNum
     (ht : BitVec.ofNat 64 x + BitVec.signExtend 64 imm = BitVec.ofNat 64 User.Sh.Sym.«dup»)
     (hy : x + 4 = y) (hye : y % 2 = 0) (hyl : y < 2 ^ 64) :
     ⊢ ushCode N.t -∗ ustd N.fd l -∗ ufdOwn N.fd l fd0 st -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 x) av -∗
+      urun N h m (BitVec.ofNat 64 x) av -∗
       (∀ (h' : CPU) (m' : RegMap) (r : BitVec 64), ⌜ucalleeSaved m m'⌝ -∗
         ((∃ fd1 : Nat, ⌜r = BitVec.ofNat 64 fd1 ∧ fd1 < NOFILE⌝ ∗
             ualloc N.fd l fd1 st ∗ ufdOwn N.fd (ustdAfter l st) fd0 st) ∨
           (⌜r = -1#64 ∧ fdLowestClosed l = none⌝ ∗ ustd N.fd l ∗ ufdOwn N.fd l fd0 st)) -∗
-        urun (hlc := hlc) N h' m' (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗
+        urun N h' m' (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #HC Hstd Ho Hrun Hk
   iapply ushS_jal UL N hi User.Sh.Sym.«dup» y h m av ht (by simpa using hy) (by decide) $$ HC Hrun
@@ -242,18 +242,18 @@ theorem ushpi_wait0_pre (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap)
     (h1r : pc1 + 4 = ret) :
     ⊢ uinstrIs (GF := GF) N.t (BitVec.ofNat 64 pc0) true (.ITYPE (0#12, .Regidx 0#5, .Regidx 10#5, .ADDI)) -∗
       uinstrIs N.t (BitVec.ofNat 64 pc1) false (.JAL (imm, .Regidx 1#5)) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 pc0) avail -∗
-      (∀ h' : CPU, urun (hlc := hlc) N h' (ukWr (ukWr m 10#5 (BitVec.ofNat 64 0)) 1#5 (BitVec.ofNat 64 ret))
+      urun N h m (BitVec.ofNat 64 pc0) avail -∗
+      (∀ h' : CPU, urun N h' (ukWr (ukWr m 10#5 (BitVec.ofNat 64 0)) 1#5 (BitVec.ofNat 64 ret))
           (BitVec.ofNat 64 User.Sh.Sym.«wait») avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi0 #Hi1 Hrun Hk
   have H0 := ushS_li (C := uinstrIs (GF := GF) N.t (BitVec.ofNat 64 pc0) true
-      (.ITYPE (0#12, .Regidx 0#5, .Regidx 10#5, .ADDI))) (hlc := hlc) UL N .rfl pc1 h m avail 0 (by decide)
+      (.ITYPE (0#12, .Regidx 0#5, .Regidx 10#5, .ADDI))) UL N .rfl pc1 h m avail 0 (by decide)
       (by simp; omega)
   iapply H0 $$ Hi0 Hrun
   iintro %h1 Hrun
   have H1 := ushS_jal (C := uinstrIs (GF := GF) N.t (BitVec.ofNat 64 pc1) false (.JAL (imm, .Regidx 1#5)))
-    (hlc := hlc) UL N .rfl User.Sh.Sym.«wait» ret h1 (ukWr m 10#5 (BitVec.ofNat 64 0)) avail hsym
+    UL N .rfl User.Sh.Sym.«wait» ret h1 (ukWr m 10#5 (BitVec.ofNat 64 0)) avail hsym
     (by simp; omega) (by decide)
   iapply H1 $$ Hi1 Hrun
   iexact Hk
@@ -262,7 +262,7 @@ theorem ushpi_wait0_pre (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap)
 the answer with the pid quantified away. -/
 theorem ushWait0Law_free (UL : UK_LEAVES) (SW : SH_SYS_WAIT)
     (hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k) (N : UkNames GF) :
-    ⊢ ushWait0Law (hlc := hlc) N iprop(emp) (fun rw Sc Sc' => uwaitAns rw Sc Sc') := by
+    ⊢ ushWait0Law N iprop(emp) (fun rw Sc Sc' => uwaitAns rw Sc Sc') := by
   unfold ushWait0Law
   imodintro
   iintro %h %m %pc0 %pc1 %ret %imm %Sc %avail %h01 %hsym %h1r %hre %hrl #Hc #Hi0 #Hi1 Hrun Hch _ Hk
@@ -282,7 +282,7 @@ theorem ushWait0Law_free (UL : UK_LEAVES) (SW : SH_SYS_WAIT)
 reading, spending and handing back sh-main's `ushPid`. -/
 theorem ushWait0Law_pid (UL : UK_LEAVES) (SW : SH_SYS_WAIT)
     (hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k) (N : UkNames GF) :
-    ⊢ ushWait0Law (hlc := hlc) N (ushPid N) (fun rw Sc Sc' => ushWaitPidAns (GF := GF) rw Sc Sc') := by
+    ⊢ ushWait0Law N (ushPid N) (fun rw Sc Sc' => ushWaitPidAns (GF := GF) rw Sc Sc') := by
   unfold ushWait0Law
   imodintro
   iintro %h %m %pc0 %pc1 %ret %imm %Sc %avail %h01 %hsym %h1r %hre %hrl #Hc #Hi0 #Hi1 Hrun Hch Hpid Hk

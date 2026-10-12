@@ -186,15 +186,15 @@ def appIfaceTriv (GF : BundledGFunctors.{0}) : AppIface GF where
 /-- The machine's record literal at an interface: `MachCSL.bootFixedGS` with
 the interface's projections in the three application slots (Rocq's
 `boot_fixedGS … Ai …`; deviation 1). -/
-@[reducible] def AppIface.bootFixedGS {hlc : HasLC} [MachGpreS hlc GF] (Ai : AppIface GF)
-    (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γdisk : GName) (ndisk : Nat)
+@[reducible] def AppIface.bootFixedGS [MachGpreS GF] (Ai : AppIface GF)
+    (Hinv : InvGS GF) (γgen γstart γreg γdisk : GName) (ndisk : Nat)
     (γswap : GName) (Pcp : IProp GF) (Tkp : Nat → IProp GF) (Hkp : Nat → IProp GF → IProp GF)
     (γobs : GName) (T : List Obs) (Ptp : IProp GF)
     (γhist : GName) (Uf : Option (Nat × Obs) → Obs → Prop)
     (Ucr : Nat → IProp GF) (Ucx : Nat → Obs → IProp GF) (Uco : IProp GF)
     (Ue : Option (Nat × Obs) → Obs → IProp GF) (HUe : ∀ ox e, Persistent (Ue ox e))
     (Uet : Nat → IProp GF) (Uea : Nat → List GName → IProp GF) (HUea : ∀ k ns, Persistent (Uea k ns)) :
-    MachFixedGS hlc GF :=
+    MachFixedGS GF :=
   MachCSL.bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap Pcp Tkp Hkp γobs T Ptp γhist
     Ai.tag Ai.tag_persistent Ai.tag_timeless Ai.kill Ai.kill_persistent Ai.kill_timeless
     Ai.cons Ai.cons_timeless Ai.wild Ai.wild_persistent Ai.wild_timeless
@@ -203,15 +203,15 @@ the interface's projections in the three application slots (Rocq's
 end AppIfaceInst
 
 section AppIfaceWild
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-- **Rocq `WpUart.cons_licence_of_taint`**: the TAINT buys the licence, off
 the interface's `lic`, at a record whose two slots are the interface's
 (deviation 5; lane gaps). -/
 theorem consLicence_of_taint (Ai : AppIface GF)
-    (hk : MachFixedGS.killCred (hlc := hlc) (GF := GF) = Ai.kill)
-    (hc : MachFixedGS.consRes (hlc := hlc) (GF := GF) = Ai.cons) :
-    MachFixedGS.killCred (hlc := hlc) (GF := GF) ⊢ consLicence (hlc := hlc) (GF := GF) := by
+    (hk : MachFixedGS.killCred (GF := GF) = Ai.kill)
+    (hc : MachFixedGS.consRes (GF := GF) = Ai.cons) :
+    MachFixedGS.killCred (GF := GF) ⊢ consLicence (GF := GF) := by
   unfold consLicence
   rw [hk, hc]
   exact Ai.lic

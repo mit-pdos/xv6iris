@@ -55,7 +55,7 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 open Std (ExtTreeSet)
 
 section ExecRunSup
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
@@ -68,8 +68,8 @@ not know its own, design/chroot.md section 3; the families do not depend on
 it). -/
 def execWalkOf (cw : Nat) (T : IProp GF) (pl : List (BitVec 8)) (a : Anode) : IProp GF :=
   iprop(∃ (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)),
-    (∀ rt : Nat, exStart (hlc := hlc) fscFs rt cw P Pmiss pl) ∗
-    pfAt (aopenCommitAt (hlc := hlc) (fsGammaL (hlc := hlc) fscFs) appE) Fo ∗
+    (∀ rt : Nat, exStart fscFs rt cw P Pmiss pl) ∗
+    pfAt (aopenCommitAt (fsGammaL fscFs) appE) Fo ∗
     exNodeId T (P (pathElems pl).length) Fo.pfRecv a)
 
 /-- **Rocq `exec_walk_of_pin`**: SUPPLIER ONE, THE PIN -- `PinnedObs`'s
@@ -78,7 +78,7 @@ theorem execWalkOf_pin (Pin : Aview → Prop) (T : IProp GF) [Persistent T] [Tim
     (pl : List (BitVec 8)) (hops : List Nat) (ino : Nat) (a : Anode)
     (hres : ∀ rt : Nat, pinResolvesAt Pin rt cw pl hops ino a) :
     ⊢ iprop(□ ∀ v : Aview, appPred appRun v -∗ appPred appRun v ∗ (⌜Pin v⌝ ∨ T)) -∗
-      appInv (hlc := hlc) fscFs -∗ execWalkOf (hlc := hlc) cw T pl a := by
+      appInv fscFs -∗ execWalkOf cw T pl a := by
   iintro #Hcl #Hinv
   unfold execWalkOf
   iexists (pobsP T hops), (pobsPmiss T), (pobsFo Pin T)
@@ -112,11 +112,11 @@ theorem sbundlePayRefR_of_exec (X : Uvis → IProp GF) (T : IProp GF) (N : UkNam
     (pl : List (BitVec 8)) (f : ElfBytes) (nl : Nat) (Pay R : IProp GF)
     (hload : kexecLoadable f) (ha0 : m.get 10#5 = pv) (ha1 : m.get 11#5 = av)
     (hpath : ∀ Mv, imgAgrees M Mv → argPathOf Mv pv.toNat pl) :
-    ⊢ iprop(□ (Pay -∗ R)) -∗ myPay gn N.pay -∗ execWalkOf (hlc := hlc) c T pl ⟨.AFile f, nl⟩ -∗
+    ⊢ iprop(□ (Pay -∗ R)) -∗ myPay gn N.pay -∗ execWalkOf c T pl ⟨.AFile f, nl⟩ -∗
       iprop(∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees M Mv⌝ -∗
         imageEntry f Mv av fdv c seccAll cs pidv N.pay Pay X) -∗
       imageEntryTaint T fdv seccAll N.pay X -∗ Pay -∗
-      sbundlePayRefR (SG := uexecSGXv6 (hlc := hlc)) X N.pay R
+      sbundlePayRefR (SG := uexecSGXv6) X N.pay R
         (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll) := by
   have e0 : xkA (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll) 0 = pv := by
     rw [xkA_uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll 0 (by decide)]; exact ha0
@@ -125,7 +125,7 @@ theorem sbundlePayRefR_of_exec (X : Uvis → IProp GF) (T : IProp GF) (N : UkNam
   iintro #Hrf Hmp Hw Hcon #Hgen HPay
   unfold execWalkOf
   icases Hw with ⟨%P, %Pmiss, %Fo, Hst, Hobs, #Hid⟩
-  have key := sbundlePay_exec_intro_refR (hlc := hlc) X (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll)
+  have key := sbundlePay_exec_intro_refR X (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll)
     N.pay R P Pmiss Fo Pay
   dsimp only [uvisOfRun] at key e0 e1 ⊢
   iapply key $$ Hrf Hmp

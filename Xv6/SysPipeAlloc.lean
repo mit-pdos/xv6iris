@@ -24,7 +24,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -33,7 +33,7 @@ set_option maxHeartbeats 16000000 in
 /-- `+0x38`, after `fdalloc(rf)`: `sw a0,-60(s0) ; bltz a0` (failure into
 `+0xc8`), then `fdalloc(wf)`. -/
 theorem sys_pipe_stage_c (hct : curTier = KTier.kpt) (FC : FILECLOSE) (FD : FDALLOC) (CO : COPYOUT)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu c : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu c : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
     (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (sts : List FdState) (v : BitVec 64) (γkl : GName) (γk : KmemNames) (spie spp : Bool) (R : RegMap)
     (k0 k1 : Nat) (γp : PipeNames) (hk0 : k0 < NFILE) (hk1 : k1 < NFILE)
@@ -73,7 +73,7 @@ theorem sys_pipe_stage_c (hct : curTier = KTier.kpt) (FC : FILECLOSE) (FD : FDAL
     icases procPrivCoreNoctxAt_pidLend curCtx pa pid V M $$ Hcore with ⟨Hpid, Hlend, Hcw⟩
     iapply (sys_pipe_close2_c8 FC Γ cpu c2 k γl γ pa pid V M sts v γkl γk spie spp R k0 k1 γp
         hk0 hk1 hct hproc htier hnoff hK hpin2 hpins v 0xFFFFFFFF#32 w1
-        iprop((@wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid -∗
+        iprop((@wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid -∗
             (∃ k1 : Nat, ⌜V.ev ≤ k1⌝ ∗ actLend pa k1) -∗
             ∃ k2 : Nat, ⌜V.ev ≤ k2⌝ ∗ procPrivCoreNoctxAt curCtx pa pid (V.updEv k2) M) ∗
           procOfilesOwe γ V.fdg pa V.ofile [] ∗ fdFrags V.fdg sts)
@@ -147,7 +147,7 @@ set_option maxHeartbeats 16000000 in
 /-- `+0x26`, after `pipealloc`: `li a5,-1 ; bltz a0` (failure: exit `-1`),
 then `fd0 = -1` and `fdalloc(rf)`. -/
 theorem sys_pipe_stage_b (hct : curTier = KTier.kpt) (FC : FILECLOSE) (FD : FDALLOC) (CO : COPYOUT)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu c : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu c : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
     (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (sts : List FdState) (v : BitVec 64) (γkl : GName) (γk : KmemNames) (spie spp : Bool) (R : RegMap)
     (hproc : k.proc = pa) (htier : k.tier = KTier.kpt) (hnoff : k.noff = 0) (hK : sysPipeSlots ≤ k.avail)

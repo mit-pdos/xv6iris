@@ -111,7 +111,7 @@ def dirlookupMsgStr : List (BitVec 8) :=
    0x72#8, 0x65#8, 0x61#8, 0x64#8]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 set_option maxRecDepth 100000 in
 /-- Rocq's `dlk_msg_str`. -/
@@ -130,7 +130,7 @@ theorem dirlookup_panic [CurCtx] (PA : PANIC) (c : CPU) (k' : KCtx)
     (hpr : "pr" ∉ k'.locks) (huart : "uart1" ∉ k'.locks) :
     kctx c k' ∗ pcIs c KA.«panic» ∗ panicEnv ∗
     cstr KStr.«dirlookup read» DFrac.discard dirlookupMsgStr ⊢ wpLoop (GF := GF) c := by
-  have h := PA.wp_panic (hlc := hlc) (GF := GF) c k' (PkArgDesc.str DFrac.discard dirlookupMsgStr)
+  have h := PA.wp_panic (GF := GF) c k' (PkArgDesc.str DFrac.discard dirlookupMsgStr)
     hK rfl hnoff hpr huart
   unfold wp_panic_body at h
   simp only [panicAddr] at h
@@ -287,7 +287,7 @@ theorem dirlookup_delivered (data : Nat → List (BitVec 8)) (i : Nat) (olds : L
 /-! ## The frame -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 variable {lent : Bool}
 
 /-- The `de` record's address, `s0 - 96`. -/

@@ -72,7 +72,7 @@ set_option linter.unusedSimpArgs false
 /-! ## 0.  Pure and block-level helpers -/
 
 section Calls
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -111,7 +111,7 @@ descriptor `depTx s dev inum g lo t qt` (Rocq's
 `IUP.wp_iunlockput_dep_gen` sites), no zero-record observation (`crz :=
 false`); the arm's share `txPin t qt` comes home. -/
 theorem createFailMkdir_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k' : KCtx) (j : Nat) (γl : GName)
+    [ClaimIs GF Γ] (cpu : CPU) (k' : KCtx) (j : Nat) (γl : GName)
     (pd pav pu : BitVec 64) (γkl : GName) (γk : KmemNames) (γil γisl : GName) (kk : Nat)
     (qi s : Qp) (g : GName) (lo tl : Nat) (t : Nat) (qt : Qp) (inum : BitVec 32) (dn : Dinode)
     (bm : Blkmap) (n : Nat) (Sb : List Nat) (crb cru : Bool) (pidv : BitVec 32) (dqb dqs : DFrac)
@@ -127,7 +127,7 @@ theorem createFailMkdir_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames)
     (hle : lo ≤ tl) :
     kctx cpu k' ∗ pcIs cpu KA.«iunlockput» ∗
     trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
+    createEnv Γ γl pd pav pu γkl γk ∗
     isSleeplockGen γil γisl (iLock (ientry kk)) (icSlp fscIc kk) (slhTok (icfgIsl kk)) ∗
     sleeplockedQ γisl s (iLock (ientry kk)) pidv ∗
     credFloor lo tl ∗ icHandle fscIc kk (.depTx s icfgDev inum g lo t qt) ∗
@@ -160,7 +160,7 @@ theorem createFailMkdir_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames)
   ihave #Hcla := isItable2_claims $$ Hit2
   ihave Hoff := offRows_to_dep offCfg kk curCtx $$ Hoff
   icases logOpS_named icfgLog n Sb $$ Hop with ⟨%e0, Hop⟩
-  have h := IUP.wp_iunlockput_dep_gen_eb (hlc := hlc) (GF := GF) Γ cpu k' γl pd pav pu j γil γisl
+  have h := IUP.wp_iunlockput_dep_gen_eb (GF := GF) Γ cpu k' γl pd pav pu j γil γisl
     kk qi s g lo tl (.depTx s icfgDev inum g lo t qt) inum dn bm n Sb crb cru false e0 t qt pidv
     pidPriv dqb dqs hj hproc hK hnoff htier rfl hkk hcrb hcru hgeom hbg hcov hlog hnib hbel hn
     hpd ha0 rfl hle
@@ -202,14 +202,14 @@ theorem createFailMkdir_child_park (kslot : Nat) (cinum : BitVec 32) (t : Nat)
     (hdok : dirOk icfgNib dc datc) (hduq : dirUniq dc datc) (hdots : dirDotsOnly dc datc)
     -- THE NODE PREDICATE, owed at every node (INIT-FILE, the UNARM ruling)
     (hNd : ∀ c : Absnode, Nd c) :
-    iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ⊢
+    iregInv fscIreg fscFs icfgIst icfgNib ⊢
       dinodeAt fscIreg cinum (createSetf dc major minor 0#16) -∗
       inodeMeta (ientry kslot) (createSetf dc major minor 0#16) -∗
       inodeMap fscFs (ientry kslot) bmc -∗ inodeBlocks fscFs bmc datc -∗
       topFrag (fsGammaL fscFs) cinum.toNat (eraNode dc bmc datc) -∗
       createDirty t cinum.toNat -∗
       creArmFired Farm cinum.toNat -∗
-      pfAt (aunarmOfArmNd (hlc := hlc) (fsGammaL fscFs) appE Nd Farm) Fun -∗
+      pfAt (aunarmOfArmNd (fsGammaL fscFs) appE Nd Farm) Fun -∗
       |={⊤}=> icLoaded fscFs fscIreg fscCov fscLogst kslot cinum
           (createSetf dc major minor 0#16) bmc ∗
         txPin icfgLog t (1 : Qp).half ∗ creUnarmFired Fun cinum.toNat := by
@@ -238,8 +238,8 @@ theorem createFailMkdir_child_park (kslot : Nat) (cinum : BitVec 32) (t : Nat)
   iintro #Hinv Hdi Hmeta Hmap Hblk Htop Hdirty Harm Hun
   ihave #Hft := iregInv_ftop $$ Hinv
   ihave #Hap := iregInv_app $$ Hinv
-  ihave Hun := aunarmOfArmNd_open (hlc := hlc) (fsGammaL fscFs) appE Nd Farm Fun cinum.toNat $$ Harm Hun
-  imod (create_dirty_clear_unarm_nd (hlc := hlc) ⊤ t cinum.toNat _ Nd Fun _ _ CoPset.subseteq_top
+  ihave Hun := aunarmOfArmNd_open (fsGammaL fscFs) appE Nd Farm Fun cinum.toNat $$ Harm Hun
+  imod (create_dirty_clear_unarm_nd ⊤ t cinum.toNat _ Nd Fun _ _ CoPset.subseteq_top
     hloc hrow hnone (hNd _)) $$ Hft Hap Hdirty Hun Htop with ⟨Htx, Htop, Hr⟩
   ihave Het := entToks_eraDotsOnly (GF := GF) (fsGammaL fscFs) cinum.toNat
     (createSetf dc major minor 0#16) bmc datc ∅ hz hok0.2.2.2.2.2.1 hok0.2.2.2.2.1 hdots0
@@ -264,7 +264,7 @@ theorem createFailMkdir_s3_addr' (sp : BitVec 64) :
   unfold createBuf; rw [BitVec.add_assoc]; rfl
 
 section Half
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -273,7 +273,7 @@ set_option maxHeartbeats 16000000 in
 /-- **create's T_DIR `fail:` TWIN, PROVED** (Rocq's `cr_fail_mkdir_half`):
 `createFailMkdirBody` outright, from `IUPDATE` and `IUNLOCKPUT`. -/
 theorem create_fail_mkdir_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat) (γkl : GName) (γk : KmemNames)
     (plen : Nat) (pfun : Nat → BitVec 8) (ty major minor : BitVec 16)
     (γ : FileNames) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
@@ -285,8 +285,8 @@ theorem create_fail_mkdir_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedName
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (hS : CreateStatic k j pd plen pfun ty major minor u ns)
     (hNdD : ty = T_DIR → ∀ c : Absnode, Nd c) :
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
-      createFailMkdirBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns
+    createEnv Γ γl pd pav pu γkl γk ⊢
+      createFailMkdirBody k plen pfun ty major minor γ pid V M u Sb ns
         dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex := by
   unfold createFailMkdirBody
   iintro #Henv %cpu %spie %spp %R %kd %qd %gd %γil %γisl %dind %nf %tl %t %kslot %q %g %gil %gisl
@@ -483,7 +483,7 @@ theorem create_fail_mkdir_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedName
   ihave Hsl := irefSlots_combine (1 + 1) (ns - 2) $$ [Hsl Hislr]
   · iframe
   -- mkdir's `fail:` payout: the do-then-undo PAIR, the dots as the entry brought them
-  ihave Hcf := create_fail_of_pair (hlc := hlc) (fsGammaL fscFs) fscFs V.rti ty.toNat major.toNat
+  ihave Hcf := create_fail_of_pair (fsGammaL fscFs) fscFs V.rti ty.toNat major.toNat
     minor.toNat Nm Nd P Pmiss Farm Fdots Fun Fok Fex (bview plen pfun) dind.toNat cinum.toNat
     $$ HP Hdlk Hacre Hdots Hunr
   have hns' : (if false = true then 1 + 1 + (ns - 2) + 1 = ns else 1 + 1 + (ns - 2) = ns) := by

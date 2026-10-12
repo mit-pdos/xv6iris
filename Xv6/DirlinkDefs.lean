@@ -83,7 +83,7 @@ def dirlinkRegs (k : KCtx) (ip v9 v19 v20 : BitVec 64) (R : RegMap) : Prop :=
   R 27#5 = k.regs 27#5
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -120,22 +120,22 @@ def dirlinkEnv (Γ : SchedNames) (γl : GName) (pd pav pu : BitVec 64) (γkl : G
   diskCaps fscDisk fscDlock pd pav pu ∗ panicEnv ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗ iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
+  itableInv ∗ iregInv fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
   icSleeplocks fscIc ∗ bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize
 
 instance dirlinkEnv_persistent (Γ : SchedNames) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
-    (γk : KmemNames) : Persistent (dirlinkEnv (hlc := hlc) (GF := GF) Γ γl pd pav pu γkl γk) := by
+    (γk : KmemNames) : Persistent (dirlinkEnv (GF := GF) Γ γl pd pav pu γkl γk) := by
   unfold dirlinkEnv; infer_instance
 
 theorem dirlinkEnv_open (Γ : SchedNames) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
     (γk : KmemNames) :
-    dirlinkEnv (hlc := hlc) (GF := GF) Γ γl pd pav pu γkl γk ⊢
+    dirlinkEnv (GF := GF) Γ γl pd pav pu γkl γk ⊢
       procsInv Γ ∗ bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
       logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
       diskCaps fscDisk fscDlock pd pav pu ∗ panicEnv ∗
       isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
       isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-      itableInv (hlc := hlc) ∗ iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
+      itableInv ∗ iregInv fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
       icSleeplocks fscIc ∗ bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize := by
   unfold dirlinkEnv; exact .rfl
 

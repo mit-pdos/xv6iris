@@ -59,7 +59,7 @@ theorem ush_sext32_small (v : Int) (h0 : 0 ≤ v) (h1 : v < 2 ^ 31) :
   simp [this] <;> omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -73,7 +73,7 @@ theorem ushPtr_word (g : GName) (a p : Nat) :
 
 /-- **Rocq `wp_kshr_redir_arm_g`**. -/
 theorem wp_ushRedirArmG (UL : UK_LEAVES) (SC : SH_SYS_CLOSE)
-    (hent : wpShRuncmdEntryBody (hlc := hlc) (GF := GF)) : wpShRedirArmGBody (hlc := hlc) (GF := GF) := by
+    (hent : wpShRuncmdEntryBody (GF := GF)) : wpShRedirArmGBody (GF := GF) := by
   intro Dg hps N c1 file mode h m t cwdv ld st1 av H K Kf hmode ha0 hst1 hne hnp
   unfold ushOpenCallG ushOpenAnsG
   iintro #Hc #Hjt #Htree Hstd Hcwd Hopen HH Hrun Hk
@@ -81,7 +81,7 @@ theorem wp_ushRedirArmG (UL : UK_LEAVES) (SC : SH_SYS_CLOSE)
   obtain ⟨⟨ht0, ht38⟩, ht8⟩ := haddr
   ihave ⟨#Hsub, #Hfp, #Hfs, #Hmw, #Hfw⟩ := ushCmd_redir N.d t c1 file mode 1 $$ Htree
   icases Hsub with ⟨%q, #Hqp, #Hqc⟩
-  ihave #Hcd := ushCldep_nonpipe (hlc := hlc) st1 hnp
+  ihave #Hcd := ushCldep_nonpipe st1 hnp
   ihave #Hfw' := ushW32_bytes N.d (t + 36) 1 $$ Hfw
   ihave #Hmw' := ushW32_bytes N.d (t + 32) mode $$ Hmw
   ihave #Hfp' := ushPtr_word N.d (t + 16) file.ptr $$ Hfp

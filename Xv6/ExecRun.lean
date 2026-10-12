@@ -42,7 +42,7 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 open Std (ExtTreeSet)
 
 section ExecRun
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg]
 
 /-- **Rocq `sbundle_pay_exec_intro_refR`**: the exec deposit with the
@@ -52,16 +52,16 @@ theorem sbundlePay_exec_intro_refR (X : Uvis → IProp GF) (W : Uvis) (Q : Int �
     (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (Rs : IProp GF) :
     ⊢ □ (Rs -∗ R) -∗ myPay W.gen Q -∗
       (∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗ ∀ rt : Nat,
-        sysExecAuPre (hlc := hlc) ⟨X, Rs⟩ (fsGammaL fscFs) fscFs rt W.cwd W.secc Q P Pmiss Fo Mv
+        sysExecAuPre ⟨X, Rs⟩ (fsGammaL fscFs) fscFs rt W.cwd W.secc Q P Pmiss Fo Mv
           (xkA W 0) (xkA W 1) W.fd W.ch W.pid) -∗
-      sbundlePayRefR (SG := uexecSGXv6 (hlc := hlc)) X Q R W := by
+      sbundlePayRefR (SG := uexecSGXv6) X Q R W := by
   unfold sbundlePayRefR
   iintro #Hrf Hmp H
   iexists (xfamExecAt P Pmiss Fo Rs (fun _ => iprop(True)) iprop(emp) Q)
   isplitr
   · ipureintro; rfl
   isplitr
-  · have e : @UexecSG.sexecRefund GF _ (uexecSGXv6 (hlc := hlc))
+  · have e : @UexecSG.sexecRefund GF _ (uexecSGXv6)
         (xfamExecAt P Pmiss Fo Rs (fun _ => iprop(True)) iprop(emp) Q) = Rs := rfl
     rw [e]
     iexact Hrf

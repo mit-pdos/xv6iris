@@ -62,7 +62,7 @@ theorem ushScan_addr (k : Nat) (hk : k < shNbuf) :
   simp
 
 section Scan
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
@@ -71,10 +71,10 @@ the byte decides where control goes. -/
 theorem ushScan_step (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (mc : RegMap) (k : Nat) (b : BitVec 8) (n : Nat)
     (hregs : ushRegs mc) (hs1 : mc.get 9#5 = BitVec.ofNat 64 (shBuf + k)) (hk : k + 1 < shNbuf) :
     ⊢ ushCode N.t -∗ ubyte N.d (shBuf + (k + 1)) b -∗
-      urun (hlc := hlc) N h mc (BitVec.ofNat 64 0x940) (16 + n) -∗
+      urun N h mc (BitVec.ofNat 64 0x940) (16 + n) -∗
       (ubyte N.d (shBuf + (k + 1)) b -∗ ∀ (h' : CPU) (mc' : RegMap), ⌜ushRegs mc'⌝ -∗
         ⌜mc'.get 9#5 = BitVec.ofNat 64 (shBuf + (k + 1))⌝ -∗ ⌜mc'.get 15#5 = BitVec.ofNat 64 b.toNat⌝ -∗
-        urun (hlc := hlc) N h' mc'
+        urun N h' mc'
           (BitVec.ofNat 64 (if b.toNat = 32 ∨ b.toNat = 9 then 0x940 else 0x952)) (16 + n) -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hb Hrun Hk
@@ -136,10 +136,10 @@ theorem ushScan_step (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (mc : RegMap) (
 theorem ushScan (UL : UK_LEAVES) (N : UkNames GF) (f : Nat → BitVec 8) (i2 : Nat) :
     ∀ (d k : Nat) (h : CPU) (mc : RegMap) (n : Nat), i2 = k + 1 + d → i2 < shNbuf → f i2 = ubyte0 →
       ushRegs mc → mc.get 9#5 = BitVec.ofNat 64 (shBuf + k) →
-      ⊢ ushCode N.t -∗ ubytes N.d shBuf shNbuf f -∗ urun (hlc := hlc) N h mc (BitVec.ofNat 64 0x940) (16 + n) -∗
+      ⊢ ushCode N.t -∗ ubytes N.d shBuf shNbuf f -∗ urun N h mc (BitVec.ofNat 64 0x940) (16 + n) -∗
         (∀ (h' : CPU) (mc' : RegMap) (k' : Nat), ⌜k' ≤ i2⌝ -∗ ⌜ushRegs mc'⌝ -∗
           ⌜mc'.get 9#5 = BitVec.ofNat 64 (shBuf + k')⌝ -∗ ⌜mc'.get 15#5 = BitVec.ofNat 64 (f k').toNat⌝ -∗
-          ubytes N.d shBuf shNbuf f -∗ urun (hlc := hlc) N h' mc' (BitVec.ofNat 64 0x952) (16 + n) -∗ wpLoop h') -∗
+          ubytes N.d shBuf shNbuf f -∗ urun N h' mc' (BitVec.ofNat 64 0x952) (16 + n) -∗ wpLoop h') -∗
         wpLoop h := by
   intro d
   induction d with
@@ -172,7 +172,7 @@ theorem ushScan (UL : UK_LEAVES) (N : UkNames GF) (f : Nat → BitVec 8) (i2 : N
 payload is sh's own lease. -/
 theorem ushMain_die (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) [UknConst N] (h : CPU) (mc : RegMap)
     (n : Nat) :
-    ⊢ ushCode N.t -∗ N.pay (-1) -∗ urun (hlc := hlc) N h mc (BitVec.ofNat 64 0x9a6) n -∗ wpLoop h := by
+    ⊢ ushCode N.t -∗ N.pay (-1) -∗ urun N h mc (BitVec.ofNat 64 0x9a6) n -∗ wpLoop h := by
   iintro #Hc Hpay Hrun
   -- 0x9a6  li a0,0
   iapply ushS_li UL N (ushMI_9a6 N.t) 0x9a8 h mc n 0 $$ Hc Hrun
@@ -191,8 +191,8 @@ theorem ushMain_blank_entry (UL : UK_LEAVES) (N : UkNames GF) (X : UshCtx GF) (D
       (∀ (hh : CPU) (mm : RegMap) (kk : Nat), ⌜ushRegs mm⌝ -∗ ⌜kk ≤ i2⌝ -∗
         ⌜mm.get 9#5 = BitVec.ofNat 64 (shBuf + kk)⌝ -∗ ⌜mm.get 15#5 = BitVec.ofNat 64 (g kk).toNat⌝ -∗
         ushRestLineAt X Dl ws g kk -∗ ubytes N.d shBuf shNbuf g -∗
-        urun (hlc := hlc) N hh mm (BitVec.ofNat 64 0x952) (16 + n) -∗ wpLoop hh) -∗
-      ubytes N.d shBuf shNbuf g -∗ urun (hlc := hlc) N h mc (BitVec.ofNat 64 0x938) (16 + n) -∗ wpLoop h := by
+        urun N hh mm (BitVec.ofNat 64 0x952) (16 + n) -∗ wpLoop hh) -∗
+      ubytes N.d shBuf shNbuf g -∗ urun N h mc (BitVec.ofNat 64 0x938) (16 + n) -∗ wpLoop h := by
   iintro #Hc HT Htail Hbs Hrun
   -- 0x938/0x93c  s1 := buf
   iapply ushS_la UL N (ushMI_938 N.t) (ushMI_93c N.t) shBuf h mc (16 + n) $$ Hc Hrun

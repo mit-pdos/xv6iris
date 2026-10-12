@@ -30,14 +30,14 @@ open HfpPipeP HfpFileClaimsP
 open Std (ExtTreeSet)
 
 section CifRead
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [PipesNG GF] [CifRegG GF]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 namespace CifEnv
-variable (E : CifEnv (hlc := hlc) (GF := GF))
+variable (E : CifEnv (GF := GF))
 
 /-- `cif_in` opened (Rocq: its definition). -/
 theorem inDev_elim (d : Nat) (S : List (BitVec 8)) :
@@ -92,7 +92,7 @@ theorem write_nil (fdm : Fdmap) (fd : Int) (d : Nat) (x : Dspec) (K : Int → IP
     ⊢ E.fds fdm -∗ E.dev d x -∗
       ((E.fds fdm -∗ E.dev d x -∗ K 0) ∧ (E.fds fdm -∗ E.dev d x -∗ K (-1)) ∧
        (∀ y, E.taint (fdDom fdm) -∗ K y)) -∗
-      wrObl (hlc := hlc) E.N E.P fd [] K := by
+      wrObl E.N E.P fd [] K := by
   iintro Hfds Hd HK
   ihave ⟨%kd, Htk, Hback⟩ := E.dev_tok d x $$ Hd
   ihave ⟨%l, %vs, %wv, %hh, Hstd, Hcwd, Hpool, Htoks, Hhs, Hdq, #He, Hxk, Htk⟩ :=
@@ -179,7 +179,7 @@ theorem read (fdm : Fdmap) (fd : Int) (d : Nat) (Sin : List (BitVec 8)) (n : Nat
     ⊢ E.fds fdm -∗ E.inDev d Sin -∗
       ((∀ (cb S' : List (BitVec 8)), ⌜chunkOk n Sin cb S'⌝ -∗ E.fds fdm -∗ E.inDev d S' -∗ K (.RdBytes cb)) ∧
        (∀ x, E.taint (fdDom fdm) -∗ K x)) -∗
-      rdObl (hlc := hlc) E.N E.P fd n K := by
+      rdObl E.N E.P fd n K := by
   iintro Hfds Hin HK
   ihave Hin := E.inDev_elim d Sin $$ Hin
   icases Hin with ⟨%s, %nm, %i, %γo, %p, Htk, %hc, Hu⟩

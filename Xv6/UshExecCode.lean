@@ -72,7 +72,7 @@ theorem ushEI_d6 (γt : GName) :
 end Facts
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -80,7 +80,7 @@ unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in
 /-- **sh's exec stub** (Rocq `uis_shk_cbe`/`cc0`/`cc4`, walked once by
 `UkStub.stubLaw`). -/
 theorem ush_stub_exec (UL : UK_LEAVES) (N : UkNames GF) :
-    ⊢ stubLaw (hlc := hlc) N (ushCode N.t) 7 User.Sh.Sym.«exec» :=
+    ⊢ stubLaw N (ushCode N.t) 7 User.Sh.Sym.«exec» :=
   stub_of_text UL N User.Sh.textOk 7 _ 7#12 (by decide) udec% udec% udec%
     (by decide) (by decide)
 

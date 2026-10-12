@@ -27,7 +27,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std
 open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D LeanRV64D.Functions
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 variable {lent : Bool}
 
 set_option maxHeartbeats 4000000 in
@@ -242,7 +242,7 @@ theorem wp_s_sw_free [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
         (BitVec.extractLsb' 0 32 (k.rget cpu' rs2)) ppn ⟨hpin, hlt, hram, hal⟩ $$ Hcl
       have hcb : ∀ (pa : PAddr) (v : BitVec 8) (H : Hist),
           pa ↦ₕ{DFrac.own 1} (⟨t, hartAgent cpu', v⟩ :: H) ∗
-            keyAt (MachGS.era (hlc := hlc) (GF := GF)) curCtx t ⊢ ctxByte curCtx pa (DFrac.own 1) v :=
+            keyAt (MachGS.era (GF := GF)) curCtx t ⊢ ctxByte curCtx pa (DFrac.own 1) v :=
         fun pa v H => ctxByte_intro curCtx pa (DFrac.own 1) ⟨t, hartAgent cpu', v⟩ H
       ihave Hb := (show histBytes (GF := GF) (paOf ppn (k.rget cpu rs1 + BitVec.signExtend 64 imm)) 4
           (fun _ => DFrac.own 1)

@@ -30,10 +30,10 @@ set_option linter.unusedSimpArgs false
 set_option maxHeartbeats 16000000 in
 /-- `+0x1a .. +0x1c` and on (Rocq 2587-2860). -/
 theorem il_after (LD : IlLoadEb)
-    {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+    {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
     [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF]
     [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl : GName) (pd pav pu : BitVec 64)
     (j : Nat) (γisl : GName) (kk : Nat) (s : Qp) (g : GName) (lo : Nat) (d : IcDep) (o : Ilkc)
     (inum : BitVec 32) (pidv : BitVec 32) (dqp dqs : DFrac) (Tl : Nat)
@@ -53,8 +53,8 @@ theorem il_after (LD : IlLoadEb)
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ panicEnv ∗
     bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
     diskCaps fscDisk fscDlock pd pav pu ∗
-    itableInv (hlc := hlc) ∗ icEscrow fscIc fscFs fscIreg fscCov fscLogst kk ∗
-    iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+    itableInv ∗ icEscrow fscIc fscFs fscIreg fscCov fscLogst kk ∗
+    iregInv fscIreg fscFs icfgIst icfgNib ∗
     frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
@@ -155,9 +155,9 @@ set_option linter.unusedSimpArgs false
 /-- `acquiresleep(&ip->lock)` at its call site (the store-order tier, the
 entry's tracked sleeplock over `ic_slp`, the share's `slhTok` slice as the
 deposit). -/
-theorem il_acq (AS : ACQUIRESLEEP_LLB) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+theorem il_acq (AS : ACQUIRESLEEP_LLB) {GF : BundledGFunctors.{0}} [MachGS GF]
     [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] [IcacheG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γil γisl : GName) (cn : IcNames) (kk : Nat) (s : Qp) (j : Nat)
     (pidv : BitVec 32) (dqp : DFrac) (tl : Nat) (pj : BitVec 64) (hpj : k'.proc = pj)
     (sx : Bool) (hs : k'.sie = sx)
@@ -177,7 +177,7 @@ theorem il_acq (AS : ACQUIRESLEEP_LLB) {hlc : HasLC} {GF : BundledGFunctors.{0}}
       wordPointsTo (pPid pj) 4 dqp pidv -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj hs
-  have h := AS.wp_acquiresleep_gen_llb_eb (hlc := hlc) (GF := GF) Γ c k' γil γisl (icSlp cn kk)
+  have h := AS.wp_acquiresleep_gen_llb_eb (GF := GF) Γ c k' γil γisl (icSlp cn kk)
     (slhTok (icfgIsl kk)) s j pidv dqp tl hj hproc hK hnoff htier
   unfold wp_acquiresleep_gen_llb_eb_body at h
   simp only [acquiresleepAddr] at h
@@ -187,11 +187,11 @@ theorem il_acq (AS : ACQUIRESLEEP_LLB) {hlc : HasLC} {GF : BundledGFunctors.{0}}
 set_option maxHeartbeats 16000000 in
 /-- **THE WALK** `+0x00 .. +0x16` and the acquire (Rocq 2242-2586). -/
 theorem il_main (AS : ACQUIRESLEEP_LLB) (LD : IlLoadEb)
-    {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+    {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [Appcfg GF]
     [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γil γisl : GName) (kk : Nat) (s : Qp) (g : GName) (lo tl : Nat) (d : IcDep) (o : Ilkc)
     (inum : BitVec 32) (pidv : BitVec 32) (dqp dqs : DFrac) (Tl : Nat)
@@ -203,7 +203,7 @@ theorem il_main (AS : ACQUIRESLEEP_LLB) (LD : IlLoadEb)
     (hkk : kk < NINODE) (hgeom : logGeomOk fscCov fscLogst) (hcov : IBLOCK inum icfgIst ∈ fscCov)
     (hnib : inum.toNat < 16 * icfgNib) (hpd : descPageRw pd)
     (ha0 : k.regs 10#5 = ientry kk) (hle : lo ≤ tl) :
-    wp_ilock_dep_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk s g lo tl d o
+    wp_ilock_dep_eb_body (GF := GF) Γ cpu k γl pd pav pu j γil γisl kk s g lo tl d o
       inum pidv dqp dqs Tl hj hproc hK hnoff htier hshr hrdo hkk hgeom hcov hnib hpd
       ha0 hle := by
   have hK4 : 4 ≤ k.avail := by unfold ilockSlots breadSlots panicSlots at hK; omega
@@ -297,7 +297,7 @@ theorem il_main (AS : ACQUIRESLEEP_LLB) (LD : IlLoadEb)
 
 /-- The generic form, from the walk. -/
 theorem ilock_main (AS : ACQUIRESLEEP_LLB) (LD : IlLoadEb) : ILOCK :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl pd pav pu j γil γisl kk s g lo tl
+  ⟨fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl pd pav pu j γil γisl kk s g lo tl
       d o inum pidv dqp dqs Tl hj hproc hK hnoff htier hshr hrdo hkk hgeom hcov hnib
       hpd ha0 hle =>
     il_main AS LD Γ cpu k γl pd pav pu j γil γisl kk s g lo tl d o inum pidv dqp dqs Tl hj hproc hK

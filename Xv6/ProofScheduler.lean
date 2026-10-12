@@ -19,7 +19,7 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-! ## Addresses and the register invariants -/
 
@@ -274,7 +274,7 @@ end
 
 /-! ## The interrupt arm of an idle hart -/
 
-theorem sc_sieArm_on [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) :
+theorem sc_sieArm_on [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx] (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) :
     trapCsrs (GF := GF) cpu ∗ intrRes cpu ⊢ sieArm cpu true 0#64 := by
   unfold sieArm sieArmP intrRes
   simp only [ite_true]
@@ -304,7 +304,7 @@ theorem scheduler_br_168f8 : KA.«scheduler» + 0x168f8#64 = KA.«tickslock» :=
 
 theorem scheduler_br_10af8 : KA.«scheduler» + 0x10af8#64 = KA.«proc» := by decide
 
-theorem scheduler_head_step [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem scheduler_head_step [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx] (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (A : Nat) (hA : kvFrameSlots ≤ A) :
     ▷ scanInv (GF := GF) Γ cpu A 0 ⊢ headInv Γ cpu A := by
   iintro Hscan
@@ -426,7 +426,7 @@ theorem scheduler_release [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [C
         pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
       ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hnoff' hK' reen hreen hon
-    have h := RE.wp_release (hlc := hlc) (GF := GF) cpu k' (Γ.lock n) "proc" (procLockPay Γ n)
+    have h := RE.wp_release (GF := GF) cpu k' (Γ.lock n) "proc" (procLockPay Γ n)
       hsie' hnoff' hK' reen hreen hon
     unfold wp_release_body at h
     simp only [releaseAddr] at h
@@ -670,7 +670,7 @@ theorem scheduler_dispatch (SW : SWTCH) [Xv6G GF] [FdslotG GF] [BioslotG GF] [Ir
          wpLoop h)
       ⊢ wpLoop (GF := GF) cpu := by
     intro k' old_vs hlen h10s h11s hsie' hnoff' hlocks' htier' hproc'
-    have hx := SW.wp_swtch (hlc := hlc) (GF := GF) (pSched Γ) none (some cpu) cpu k'
+    have hx := SW.wp_swtch (GF := GF) (pSched Γ) none (some cpu) cpu k'
       (cpuCtxAddr cpu) (pContext (procAddr n) 0) old_vs true hlen h10s h11s
       (fun _ _ _ _ _ _ _ => instCtxMorphPSched _ _ _ _ _ _ _ _) (adm_none cpu) (adm_pin cpu)
       hsie' hnoff' hlocks' htier'
@@ -849,7 +849,7 @@ theorem scheduler_body (SW : SWTCH) (AC : ACQUIRE) [Xv6G GF] [FdslotG GF] [Biosl
         sieArm cpu k'.sie k'.proc -∗ wpLoop cpu)
       ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hnoff' hK' hs'
-    have hx := AC.wp_acquire (hlc := hlc) (GF := GF) cpu k' (Γ.lock n) "proc" (procLockPay Γ n)
+    have hx := AC.wp_acquire (GF := GF) cpu k' (Γ.lock n) "proc" (procLockPay Γ n)
       hnoff' hK' hs'
     unfold wp_acquire_body at hx
     simp only [acquireAddr] at hx
@@ -973,7 +973,7 @@ theorem scheduler_scan (SW : SWTCH) (AC : ACQUIRE) (RE : RELEASE) [Xv6G GF] [Fds
 
 /-- **The loop**, by Löb induction over the head. -/
 theorem scheduler_loop (SW : SWTCH) (AC : ACQUIRE) (RE : RELEASE) [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (A : Nat)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (A : Nat)
     (hA : kvFrameSlots + 10 ≤ A) :
     procsInv (GF := GF) Γ ⊢ headInv Γ cpu A := by
   iintro #Hpinv
@@ -988,19 +988,19 @@ theorem scheduler_loop (SW : SWTCH) (AC : ACQUIRE) (RE : RELEASE) [Xv6G GF] [Fds
 
 /-- This hart's `struct context` save area, at the running context. -/
 theorem sc_cpuCtx_take [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] (ξ0 : CtxId) (cpu : CPU) (k : KCtx) :
-    @kctx hlc GF _ ⟨ξ0, KTier.kpt⟩ _ _ cpu k ∗ cpuCtxFree cpu ⊢
-      |==> (@kctx hlc GF _ ⟨ξ0, KTier.kpt⟩ _ _ cpu k ∗
-        @ownCtxCells hlc GF _ ⟨ξ0, KTier.kpt⟩ (cpuCtxAddr cpu)) := by
+    @kctx GF _ ⟨ξ0, KTier.kpt⟩ _ _ cpu k ∗ cpuCtxFree cpu ⊢
+      |==> (@kctx GF _ ⟨ξ0, KTier.kpt⟩ _ _ cpu k ∗
+        @ownCtxCells GF _ ⟨ξ0, KTier.kpt⟩ (cpuCtxAddr cpu)) := by
   letI : CurCtx := ⟨ξ0, KTier.kpt⟩
   iintro ⟨Hk, Hfree⟩
   icases (show cpuCtxFree (GF := GF) cpu ⊢ ∃ (vs : List (BitVec 64)) (ξ : CtxId) (T : Nat),
       ⌜vs.length = 14⌝ ∗ ctxStamped ξ T ∗ viewLb cpu T ∗
-      @ctxCells hlc GF _ ⟨ξ, KTier.kpt⟩ (cpuCtxAddr cpu) vs from by
+      @ctxCells GF _ ⟨ξ, KTier.kpt⟩ (cpuCtxAddr cpu) vs from by
     unfold cpuCtxFree; iintro H; iexact H) $$ Hfree with ⟨%vs, %ξ, %T, %hvl, Hst, #Hvb, Hcc⟩
   ihave Hown := ctx_unstamp cpu ξ T T (Nat.le_refl T) $$ [$Hst $Hvb]
-  ihave Hcc := (@ownCtxCells_intro hlc GF _ ⟨ξ, KTier.kpt⟩ (cpuCtxAddr cpu) vs) $$ Hcc
+  ihave Hcc := (@ownCtxCells_intro GF _ ⟨ξ, KTier.kpt⟩ (cpuCtxAddr cpu) vs) $$ Hcc
   imod (kctx_move_in (lent := false)
-      (fun ζ => @ownCtxCells hlc GF _ ⟨ζ, KTier.kpt⟩ (cpuCtxAddr cpu)) cpu k ξ)
+      (fun ζ => @ownCtxCells GF _ ⟨ζ, KTier.kpt⟩ (cpuCtxAddr cpu)) cpu k ξ)
     $$ [$Hk $Hown $Hcc] with ⟨Hk, _, Hcc⟩
   imodintro
   iframe Hk
@@ -1009,7 +1009,7 @@ theorem sc_cpuCtx_take [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [Ctok
 set_option maxHeartbeats 4000000 in
 /-- **`scheduler` meets its specification.** -/
 theorem scheduler_proof (SW : SWTCH) (AC : ACQUIRE) (RE : RELEASE) : SCHEDULER :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ X Γ _ cpu k hproc hK hsie hnoff hlocks htier => by
+  ⟨fun {GF} _ _ _ _ _ _ _ X Γ _ cpu k hproc hK hsie hnoff hlocks htier => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_scheduler_body

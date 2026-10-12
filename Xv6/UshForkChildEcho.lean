@@ -29,7 +29,7 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
 section UshForkChildEcho
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
@@ -40,23 +40,23 @@ DIAGNOSTIC's law at the out-of-memory alternative's bytes (`altOom`, up to
 its prompt), from the lend to the credential after the block, at the era's
 guard `D`. -/
 def ushOomLawWqAtD (D : List (BitVec 8) → Prop) (Wc : List (BitVec 8) → Nat → IProp GF) : IProp GF :=
-  iprop(□ ∀ I : List (BitVec 8), ⌜D I⌝ -∗ ushExecfailLawAt (hlc := hlc) altOom 14 (Wc I 3) (Wc I 0))
+  iprop(□ ∀ I : List (BitVec 8), ⌜D I⌝ -∗ ushExecfailLawAt altOom 14 (Wc I 3) (Wc I 0))
 
 instance ushOomLawWqAtD_persistent (D : List (BitVec 8) → Prop) (Wc : List (BitVec 8) → Nat → IProp GF) :
-    Persistent (ushOomLawWqAtD (hlc := hlc) D Wc) := by
+    Persistent (ushOomLawWqAtD D Wc) := by
   unfold ushOomLawWqAtD; infer_instance
 
 /-- **Rocq `ushf_child_law_holds_at_D`**. -/
 theorem ushf_child_law_holds_at_D (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : USH_FPRINTF) (SP : SH_PANIC)
-    (hent : wpShRuncmdEntryBody (hlc := hlc) (GF := GF)) (SC : SH_CHILD_EXEC)
+    (hent : wpShRuncmdEntryBody (GF := GF)) (SC : SH_CHILD_EXEC)
     (hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k) (X : UshCtx GF) (D : List (BitVec 8) → Prop)
     (dg : List (BitVec 8) → List (BitVec 8)) (nn : List (BitVec 8) → Nat)
     (HD : ∀ (I : List (BitVec 8)) (ws : List (List (BitVec 8))), lineOk ws → ws = lastWs I →
       flineOk (ushLastbody I) → D I)
     (Hdg : ∀ I : List (BitVec 8), D I → dg I = altExecfail ∧ nn I = 17) :
     ⊢ ushExecfailLawWqAtD (ushExecEnvOf UL HS HF hent) D dg nn X.Wc -∗
-      ushExecSupEchoWqAt (ushExecEnvOf UL HS HF hent) D X.Wc -∗ ushOomLawWqAtD (hlc := hlc) D X.Wc -∗
-      ushfChildLaw (hlc := hlc) X ushDg := by
+      ushExecSupEchoWqAt (ushExecEnvOf UL HS HF hent) D X.Wc -∗ ushOomLawWqAtD D X.Wc -∗
+      ushfChildLaw X ushDg := by
   unfold ushExecfailLawWqAtD ushExecSupEchoWqAt ushOomLawWqAtD ushfChildLaw ushfChildLawAt
   dsimp only [ushExecEnvOf, ushExecSupEcho, ushExecSupEchoAt]
   iintro #Hxl #Hsup #Hoomw

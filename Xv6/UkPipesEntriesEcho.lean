@@ -15,13 +15,13 @@ open Iris.Std.PartialMap
 open Std (ExtTreeSet)
 
 section PseEntries
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF]
   [PipeOutG GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
   [DiskG GF] [EchoOutG GF] [PnsRegG GF] [PipesNG GF] [FileAppG GF]
-variable (X : PseCtx hlc GF)
+variable (X : PseCtx GF)
 
 /-- **Rocq `pse_echo_image_entry`**: ECHO AT THE HEAD. -/
 theorem pse_echo_image_entry (ws : List (List (BitVec 8))) (Me : ElfMem) (Mv : Nat → List (BitVec 8)) (s0 t : Nat) (gb : Nat → BitVec 8)
@@ -30,9 +30,9 @@ theorem pse_echo_image_entry (ws : List (List (BitVec 8))) (Me : ElfMem) (Mv : N
     (hQc : ∀ x y : Int, Q x = Q y) (hok : lineOk ws) (hag : imgAgrees Me Mv) (hnode : echoNodeImg ws Me s0 t gb)
     (hab : ushEchoArgvBytes ws gb) (hfdl : sts.length = NOFILE)
     (hl1 : (sts.take NSTD)[1]? = some (.open rb true (.pipe gp))) (hLw : X.R.L = wlLine (ws.drop 1)) :
-    ⊢ urunNopipe (hlc := hlc) sts -∗ udep (hlc := hlc) -∗
+    ⊢ urunNopipe sts -∗ udep -∗
       imageEntry User.Echo.elf Mv (BitVec.ofNat 64 (t + 8)) sts cw seccAll cs pidv Q (pnsEchoLend X.R pn gp Q)
-        (uslot (hlc := hlc)) := by
+        (uslot) := by
   let wv : Nat → Pdev := fun _ => .PDWr pn gp
   let kds : List (Nat × Pdev) := [(0, .PDWr pn gp)]
   have hc : Conforms (pipeEnv (.DOutH [X.R.L]) (fun _ => none)) (echoTree ws) := by

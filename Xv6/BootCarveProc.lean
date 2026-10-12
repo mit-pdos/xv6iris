@@ -74,7 +74,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 /-! ## §1 Runs of zero cells -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- **A run of zero cells** (Rocq `boot_ctx_cells` / `boot_zero_cells` /
 `boot_name_cells`, width-generic): `n` consecutive `w`-byte `.bss` cells at
@@ -109,7 +109,7 @@ end
 /-! ## §2 One proc slot -/
 
 section proc
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
   [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-- **What the image owes about `proc[i]`** (Rocq `proc_slot_raw`):
@@ -172,7 +172,7 @@ theorem bootCarveProc_slot [CurCtx] (i : Nat) (hi : i < NPROC) :
     omega
   have hq := wordPointsTo_split (GF := GF) (pPid pa) 4 ((1 : Qp).half.half) ((1 : Qp).half.half) 0#32
   rw [Qp.half_add_half] at hq
-  have hkill := killPaid_zero (MachFixedGS.killCred (hlc := hlc) (GF := GF)) 0#32 0#32 rfl rfl
+  have hkill := killPaid_zero (MachFixedGS.killCred (GF := GF)) 0#32 0#32 rfl rfl
   iintro #Hk H
   icases (bootRan_split (GF := GF) (imgFlat bootImage) P (P + 24) (P + 376) (by omega) (by omega)).1 $$ H with ⟨Hlk, H⟩
   icases (bootRan_split (GF := GF) (imgFlat bootImage) (P + 24) (P + 28) (P + 376) (by omega) (by omega)).1 $$ H with ⟨Hst, H⟩
@@ -292,7 +292,7 @@ end proc
 /-! ## §4 The rows spent before the tier switch -/
 
 section bare
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 theorem bcp_range10 (E : Nat → IProp GF) :
     ([∗list] i ∈ List.range 10, E i) ⊢ E 0 ∗ E 1 ∗ E 2 ∗ E 3 ∗ E 4 ∗ E 5 ∗ E 6 ∗ E 7 ∗ E 8 ∗ E 9 := by
@@ -438,7 +438,7 @@ end bare
 /-! ## §6 The console ring -/
 
 section cons
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 theorem bcp_consOk0 : consOk 0#32 0#32 0#32 := by unfold consOk INPUT_BUF_SIZE; decide
 
@@ -532,7 +532,7 @@ end cons
 /-! ## §7 `.data`: `first`, `nextpid`, the UART table -/
 
 section data
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-- The image holds `w` at `A` when `Kernel.dataInit` lists its bytes there
 (a bounded check against the 136-byte `.data` literal). -/
@@ -653,7 +653,7 @@ end data
 /-! ## §7b A port's `mainUartRaw` -/
 
 section uartRaw
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
   [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
 
 /-- **A port's `mainUartRaw`** (the per-port row of Rocq's
@@ -664,7 +664,7 @@ mints take (the other `rxHi` half, `uartDeliv`, `uartLogm`, `uartDlcnt`,
 `uartPreinit`). -/
 theorem bootCarveProc_uartRaw (X : CurCtx) (i : UartId) (γ : UartNames) :
     bcpUartCells (Y := X) i ∗ uartInv i γ ∗ uartBootRes γ ⊢
-      mainUartRaw (hlc := hlc) (GF := GF) X i γ [] ∗
+      mainUartRaw (GF := GF) X i γ [] ∗
       (rxHi γ (1 : Qp).half none ∗ uartDeliv γ (1 : Qp).half [] ∗ uartLogm γ (1 : Qp).half [] ∗
         uartDlcnt γ (1 : Qp).half 0 ∗ uartPreinit γ) := by
   unfold bcpUartCells uartBootRes mainUartRaw uartinitonePre
@@ -681,7 +681,7 @@ end uartRaw
 /-! ## §8 The windows, and the rows in `mainGlobalsRaw`'s order -/
 
 section windows
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- Take the window `[a, b)` of `[lo, hi)`, dropping `[lo, a)`. -/
 theorem bcp_take (m : MemF Hist) (lo a b hi : Nat) (h1 : lo ≤ a) (h2 : a ≤ b) (h3 : b ≤ hi) :
@@ -768,7 +768,7 @@ theorem bcpDataWindows (m : MemF Hist) :
 end windows
 
 section rows
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
   [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-- **This file's rows of `mainGlobalsRaw`** (at the ambient context): the

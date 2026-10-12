@@ -72,12 +72,12 @@ theorem imageEntryPayMono (f : ElfBytes) (M : Nat → List (BitVec 8)) (av : Bit
 end ImageEntryPayMono
 
 section UshEchoPipePay
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
-variable (E : UshExecEnv (hlc := hlc) (GF := GF))
+variable (E : UshExecEnv (GF := GF))
 
 /-! ## The landed parameter record's echo fields, discharged -/
 
@@ -104,8 +104,8 @@ theorem imageEntryPayMono_field :
 cat-slot fields (lane R-prog/cat's `UShCatPay.sh_cat_slot(_of_fs_pure)`)
 from the caller. -/
 noncomputable def ushExecPinEchoMk (catSlot catSlotFs : IProp GF → IProp GF)
-    (hc : ∀ T, catSlot T ⊣⊢ shPinSlot (hlc := hlc) era0CatPins T)
-    (hf : ∀ T, catSlotFs T ⊣⊢ shPinSlot (hlc := hlc) fileFsPure T) : UshExecPinEcho (hlc := hlc) E where
+    (hc : ∀ T, catSlot T ⊣⊢ shPinSlot era0CatPins T)
+    (hf : ∀ T, catSlotFs T ⊣⊢ shPinSlot fileFsPure T) : UshExecPinEcho E where
   sh_cat_slot := catSlot
   sh_cat_slot_unfold := hc
   sh_cat_slot_of_fs_pure := catSlotFs
@@ -125,10 +125,10 @@ theorem shExecSupEchoPipeOfEntry (ws : List (List (BitVec 8))) (Qv Cr T : IProp 
           (sts : List FdState) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (rb : Bool),
         ⌜echoNodeImg ws M s0 t g⌝ -∗ ⌜imgAgrees M Mv⌝ -∗ ⌜ushEchoArgvBytes ws g⌝ -∗
         ⌜sts.length = NOFILE⌝ -∗ ⌜(sts.take NSTD)[1]? = some (.open rb true (.pipe γp))⌝ -∗
-        urunNopipe (hlc := hlc) sts -∗
+        urunNopipe sts -∗
         imageEntry User.Echo.elf Mv (BitVec.ofNat 64 (t + 8)) sts ROOTINO seccAll cs pidv (fun _ => Qv) Cr
-          (uslot (hlc := hlc))) -∗
-      □ (uKillCred (hlc := hlc) -∗ Qv) -∗ shEchoSlot (hlc := hlc) T -∗
+          (uslot)) -∗
+      □ (uKillCred -∗ Qv) -∗ shEchoSlot T -∗
       ushExecSupEchoAt E (ushFd1pipe γp) ws (fun _ => Qv) Cr := by
   have hhead : ws[0]! = echoPl := by
     have e : ws[0]! = cmdEcho := by simp [List.getElem!_eq_getElem?_getD, lineOk_head ws hok]
@@ -136,7 +136,7 @@ theorem shExecSupEchoPipeOfEntry (ws : List (List (BitVec 8))) (Qv Cr T : IProp 
   unfold shEchoSlot
   iintro #Hent #Hkt Hs
   iapply shExecSupXOfEntry
-    (ushExecPinEchoMk E (shPinSlot (hlc := hlc) era0CatPins) (shPinSlot (hlc := hlc) fileFsPure)
+    (ushExecPinEchoMk E (shPinSlot era0CatPins) (shPinSlot fileFsPure)
       (fun _ => .rfl) (fun _ => .rfl))
     (ushFd1pipe γp) ws echoPl era0EchoPins [ROOTINO, ECHO_INO] ECHO_INO User.Echo.elf T Qv Cr
     (lineOk_execOk hok) hhead echoElfLoadable shEchoPinResolves $$ [] Hkt Hs

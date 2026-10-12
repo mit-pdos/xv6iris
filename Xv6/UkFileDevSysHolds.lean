@@ -18,14 +18,14 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
 section Holds
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-- **`UkFileDevSysP` at the landed leaves**. -/
 theorem UkFileDevSysP.ofLanded (UL : UK_LEAVES) :
-    UkFileDevSysP (hlc := hlc) (GF := GF) where
+    UkFileDevSysP (GF := GF) where
   writeAt N h m pc avail fdep D S K nb f hn hal hag hsrc :=
     wp_uk_ecall_write_at UL N h m pc avail fdep D S K nb f hn hal hag hsrc
   close N h m pc fd st avail hn harg hal hnp := by

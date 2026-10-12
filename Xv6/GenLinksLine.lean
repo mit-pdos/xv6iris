@@ -67,7 +67,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode MachCSL
 
 /-- THE PARAMETERS: what a tier names (Rocq `gen_params`). -/
-structure GenParams (hlc : HasLC) (GF : BundledGFunctors.{0}) [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+structure GenParams (GF : BundledGFunctors.{0}) [MachGS GF] [Xv6G GF] [DiskG GF]
     [EchoOutG GF] (M : LModel) where
   gL : LmLaws M
   gK : LmHooks M
@@ -113,8 +113,8 @@ structure GenParams (hlc : HasLC) (GF : BundledGFunctors.{0}) [MachGS hlc GF] [X
   gR_exf : ∀ k v I, ⊢ gR k v I (gK.lmhExf (lmLineAt M I))
 
 section genparams
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
-variable {M : LModel} (G : GenParams hlc GF M)
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {M : LModel} (G : GenParams GF M)
 
 instance GenParams.gT_persistent : Persistent G.gT := G.gT_pers
 instance GenParams.gT_timeless : Timeless G.gT := G.gT_tl
@@ -139,8 +139,8 @@ theorem gllBanner_len : uBanner.length = 17 + 1 := by decide
 theorem gllExec_len : (proAlts[1]!).length = 20 + 1 := by decide
 
 section families
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
-variable {M : LModel} (G : GenParams hlc GF M)
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {M : LModel} (G : GenParams GF M)
 
 /-! ## 1. The cursor and the families -/
 
@@ -292,8 +292,8 @@ instance gwcPdiag_timeless (k : Nat) (v : EraPins) (I : List (BitVec 8)) (a i : 
 end families
 
 section structure_
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
-variable {M : LModel} (G : GenParams hlc GF M)
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {M : LModel} (G : GenParams GF M)
 
 /-! ## 2. Structure: the taint, the loose and the tight shapes, the banner's
 readings, the read of a line, the panic's five bytes -/
@@ -593,8 +593,8 @@ theorem gwcPdiag_done_1 (k : Nat) (v : EraPins) (I : List (BitVec 8)) (i : Nat)
 end structure_
 
 section links_
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
-variable {M : LModel} (G : GenParams hlc GF M)
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {M : LModel} (G : GenParams GF M)
 
 /-! ## 3. The links interface -/
 
@@ -681,8 +681,8 @@ instance glinks_persistent : Persistent (glinks G) := by unfold glinks; infer_in
 end links_
 
 section steps
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
-variable {M : LModel} (G : GenParams hlc GF M)
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {M : LModel} (G : GenParams GF M)
 
 /-! ## 4. The steps
 
@@ -1149,8 +1149,8 @@ theorem gpdiagStep (LINKS : IProp GF) [Persistent LINKS] (hgl : ⊢ LINKS -∗ g
 end steps
 
 section readside
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
-variable {M : LModel} (G : GenParams hlc GF M)
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {M : LModel} (G : GenParams GF M)
 
 /-! ## 5. The read side: a read past a boundary whose prompt is unwritten is
 the taint -/
@@ -1242,8 +1242,8 @@ theorem gbanReadTaint (k : Nat) (v : EraPins) (I l : List (BitVec 8)) (_hnl : wl
 end readside
 
 section record
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
-variable {M : LModel} (G : GenParams hlc GF M)
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {M : LModel} (G : GenParams GF M)
 
 /-! ## 6. The record -/
 
@@ -1276,7 +1276,7 @@ noncomputable def genLinkInst
       (∃ v : EraPins, G.gPIN k v ∗ gwcBan G k v [] 0))
     (RRES : EraPins → List (BitVec 8) → IProp GF)
     [RRES_pers : ∀ v I, Persistent (RRES v I)] [RRES_tl : ∀ v I, Timeless (RRES v I)]
-    (hres : ∀ v I, ⊢ RRES v I -∗ gwcRres G v I) : LinkRec hlc GF where
+    (hres : ∀ v I, ⊢ RRES v I -∗ gwcRres G v I) : LinkRec GF where
   lkT := G.gT
   lkPin := G.gPIN
   lkEpin := G.gPIN

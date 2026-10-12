@@ -79,7 +79,7 @@ doors) are `Xv6/IcacheEscrowPoolMove.lean`, split off for size at Rocq's own
 8. **Section binders**: each declaration takes only the camera classes it
    names (`IcacheEscrowTok` deviation 8).  `ipoolBody` / `ipoolInv` / `ipool`
    carry `hlc` (`inv`, and `ipoolExt`'s `escAInv`), so write
-   `(hlc := hlc)` at their uses as for `iregReg`.
+   `` at their uses as for `iregReg`.
 9. `tl_struct` is `infer_instance` after `unfold` (`IcacheEscrowTok`
    deviation 6).
 
@@ -422,7 +422,7 @@ where it does today -- the caller's licence and `ifreeze_excl` -- because
 the movers hand out and take back the FULL pool row. -/
 
 section Pool
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
   [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- THE ORDINARY ROWS, as one big-op -- what boot stocks and what the
@@ -966,8 +966,8 @@ theorem ipoolAllocInv [Icfg] (E : CoPset) (cn : IcNames) (γfs : FsNames) (γi :
       (icfgPcrp ↪●MAP (∅ : RegMapF Icorpse)) -∗
       icIds cn ids -∗
       ipoolRows γfs γi cov logstart (regionInums nib) -∗
-      |={E}=> (ipoolInv (hlc := hlc) cn γfs γi cov logstart nib ∗
-        ipool (hlc := hlc) γfs γi cov logstart (regionInums nib) ∅) := by
+      |={E}=> (ipoolInv cn γfs γi cov logstart nib ∗
+        ipool γfs γi cov logstart (regionInums nib) ∅) := by
   have hrow : regionInums nib = regionInums nib ∪ ∅ ∪ mdom (∅ : RegMapF (Nat × Qp)) ∪
       icLiveInums ids := by
     rw [hlive, mdom_empty, LawfulSet.union_empty_right, LawfulSet.union_empty_right,

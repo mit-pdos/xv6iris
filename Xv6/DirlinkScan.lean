@@ -51,7 +51,7 @@ theorem dirlink_slots_panic (a : Nat) (h : dirlinkSlots ≤ a) : panicSlots ≤ 
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -91,7 +91,7 @@ set_option maxHeartbeats 16000000 in
 LATCH** after a FULL read -- the free record breaks into the record at
 `+0x70` with `k0 = i`; a live one advances, into the next turn through the
 induction hypothesis or, exhausted, into `+0x70` with `k0 = nrec`. -/
-theorem dirlink_record (SN : STRNCPY) (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem dirlink_record (SN : STRNCPY) (WI : WRITEI) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (j : Nat) (γl : GName)
     (pd pav pu : BitVec 64) (γkl : GName) (γk : KmemNames)
     (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
@@ -113,7 +113,7 @@ theorem dirlink_record (SN : STRNCPY) (WI : WRITEI) (Γ : SchedNames) [ClaimIs (
     dirlinkKeep k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr ∗
     bslots 3 ∗ irefSlot ∗ dlinks fscFs dinum.toNat dn bm data ∗
     logOpS icfgLog ncount Sb ∗ txPin icfgLog tid qtx ∗
-    dirlinkEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
+    dirlinkEnv Γ γl pd pav pu γkl γk ∗
     (∀ c' : CPU, dirlinkPost k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
       dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr c') ∗
     dirlinkLoop Γ γl pd pav pu γkl γk k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv

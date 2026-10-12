@@ -30,7 +30,7 @@ open LeanRV64D
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 set_option maxHeartbeats 4000000 in
-theorem plicinit_proof : PLICINIT := ⟨fun {hlc GF} _ _ _ cpu k γ0 γ1 hsie hK => by
+theorem plicinit_proof : PLICINIT := ⟨fun {GF} _ _ _ cpu k γ0 γ1 hsie hK => by
   unfold wp_plicinit_body
   iintro ⟨Hk, Hpc, #Hinv, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩

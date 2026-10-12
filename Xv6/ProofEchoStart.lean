@@ -16,7 +16,7 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 /-- **Rocq `wp_kecho_start_at`**: push, spill ra/s0, `jal main`. -/
@@ -25,9 +25,9 @@ theorem wp_echoStart (UL : UK_LEAVES)
     (N : UkNames GF) (h : CPU) (m : RegMap) (av : Nat)
     (args : List UArg) (n : Nat) (Ci Cend : IProp GF)
     (ha0 : m.get 10#5 = BitVec.ofNat 64 args.length) (ha1 : m.get 11#5 = BitVec.ofNat 64 av) :
-    ⊢ kechoPayAll (hlc := hlc) N args Ci Cend -∗ (Cend -∗ kechoExit (hlc := hlc) N 0) -∗
+    ⊢ kechoPayAll N args Ci Cend -∗ (Cend -∗ kechoExit N 0) -∗
       ukCode N.t User.Echo.code.byte -∗ uargv N.d av args -∗ Ci -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Echo.Sym.«start») (2 + (8 + (2 + n))) -∗ wpLoop h := by
+      urun N h m (BitVec.ofNat 64 User.Echo.Sym.«start») (2 + (8 + (2 + n))) -∗ wpLoop h := by
   rw [show User.Echo.Sym.«start» = 0x7c from rfl]
   iintro Hpay Hend #Hc #Hargv HCi Hrun
   ihave %hstk := urun_stack N h m _ _ $$ Hrun

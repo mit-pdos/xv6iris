@@ -21,7 +21,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D LeanRV64D.Functions
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- `mstatus` after `sret` (from `SPP = S`): `SIE := SPIE`, `SPIE := 1`,
 `SPP := U`, `MPRV := 0`, `SPELP := 0`. -/

@@ -29,7 +29,7 @@ def memsetAddr : BitVec 64 := KA.«memset»
 
 /-- **WP of `memset`.**  `dst` holds `olds` (of length `n`) and afterwards
 holds `n` copies of the low byte of `a1`. -/
-def wp_memset_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+def wp_memset_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (olds : List (BitVec 8)) (n : Nat) (hK : 2 ≤ k.avail)
     (hn : k.regs 12#5 = BitVec.ofNat 64 n) (hn32 : n < 2 ^ 32)
     (hl : olds.length = n) : Prop :=
@@ -42,15 +42,15 @@ def wp_memset_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Cu
 
 /-- The interface of `memset`. -/
 structure MEMSET : Prop where
-  wp_memset : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+  wp_memset : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (olds : List (BitVec 8)) (n : Nat) hK hn hn32 hl,
-    wp_memset_body (hlc := hlc) (GF := GF) cpu k olds n hK hn hn32 hl
+    wp_memset_body (GF := GF) cpu k olds n hK hn hn32 hl
 
 /-- **WP of `memset` over a VISIBILITY-FREE buffer.**  The destination is
 `n` visibility-free bytes (`bytesFree`, e.g. reclaimed memory whose era
 keys are gone) and afterwards holds -- VALUED -- `n` copies of the low byte
 of `a1`, each byte's key minted by the store that wrote it. -/
-def wp_memset_free_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+def wp_memset_free_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (olds : List (BitVec 8)) (n : Nat) (hK : 2 ≤ k.avail)
     (hn : k.regs 12#5 = BitVec.ofNat 64 n) (hn32 : n < 2 ^ 32)
     (hl : olds.length = n) : Prop :=
@@ -63,9 +63,9 @@ def wp_memset_free_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF
 
 /-- The interface of the raw (visibility-free) `memset`. -/
 structure MEMSET_FREE : Prop where
-  wp_memset_free : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+  wp_memset_free : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (olds : List (BitVec 8)) (n : Nat) hK hn hn32 hl,
-    wp_memset_free_body (hlc := hlc) (GF := GF) cpu k olds n hK hn hn32 hl
+    wp_memset_free_body (GF := GF) cpu k olds n hK hn hn32 hl
 
 
 end Xv6

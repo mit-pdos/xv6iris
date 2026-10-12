@@ -36,7 +36,7 @@ set_option linter.unusedSimpArgs false
 /-! ## The frame -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- balloc's 80-byte frame, from `sp-8` down to `sp-80`: `ra`, `s0`, `s1`
 (saved at `+0x02..+0x06`) and `s2`..`s8` (saved at `+0x16..+0x22`, only
@@ -119,7 +119,7 @@ What each of balloc's two exits carries into the shared epilogue; `rv` is
 the value in `s1` at `+0x7e`. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 def baArms (γ : LogNames) (γfs : FsNames) (cov : ExtTreeSet Nat compare)
@@ -192,7 +192,7 @@ theorem bioView_eq_fsView {GF : BundledGFunctors.{0}} [Xv6G GF] [FdslotG GF] [Bi
   rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
   [DiskG GF] [FsBlocksG GF] [SleepLockG GF] [CurCtx]
 
 /-- Rocq's `bio_held_fs_L`, at the parameter view. -/
@@ -227,7 +227,7 @@ end
 /-! ## The buffer's data bytes (Rocq's `ba_buf_byte` / `ba_buf_all`) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- The data area of a buffer, out of `Xv6.bufOwn` and back at a new byte
 list of the same length. -/
@@ -250,7 +250,7 @@ end
 /-! ## The callees, at their call sites -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
@@ -286,7 +286,7 @@ theorem ba_log_write_au (LW : LOG_WRITE)
       bslot -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hb
-  have h := LW.wp_log_write_au (hlc := hlc) (GF := GF) c k' γ γl γb V γfs logstart dev kk pidv
+  have h := LW.wp_log_write_au (GF := GF) c k' γ γl γb V γfs logstart dev kk pidv
     bno bs bsl bsd d u cr Sb e0 vlb Efs Φfsb hK hnoff hlk hbc htier hkk ha0 hdev hcl hdt hhome
     hlogE
   unfold wp_log_write_au_body at h
@@ -296,7 +296,7 @@ theorem ba_log_write_au (LW : LOG_WRITE)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- `"balloc: out of blocks\n"` (22 bytes plus the NUL). -/
 def baFmtStr : List (BitVec 8) :=
@@ -324,7 +324,7 @@ end
 /-! ## Slot units -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [DiskG GF] [CurCtx]
 
 theorem ba_slots_join2 (γ : BcacheNames) : bslot (GF := GF) ∗ bslot ⊢ bslots 2 :=

@@ -139,12 +139,12 @@ theorem gclPure_write_first (M : LModel) (sd : M.lmSt) (k : Nat) (ho : List Obs)
     rw [List.map_nil, linesBytes_nil]; exact Nat.zero_le _
 
 section write
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 
 /-- (W) THE ORDINARY WRITE (Rocq `gcl_step_write`): the writer's witness
 pins the state the stage reads, so the byte it computes from the stream is
 the byte the claim owes. -/
-theorem gclStep_write (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) (A : GenWa M G sd)
+theorem gclStep_write (M : LModel) (G : GenCparams GF M) (sd : M.lmSt) (A : GenWa M G sd)
     (k : Nat) (v : EraPins) (P : Nat) (b : BitVec 8) (ps0 cs0 : List Nat) (s0 : M.lmSt)
     (I0 : List (BitVec 8)) (ho : List Obs) (H : ConsHist)
     (hn : nlines I0 ≤ cs0.length) (hpin0 : lmProPin M ps0 cs0 I0)
@@ -190,7 +190,7 @@ theorem gclStep_write (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) (A : 
 written and nothing echoed, so the stage is empty; the first process byte
 files the boot state (`gwa_file`) and opens the prologue at the alternative
 `a` the writer chose. -/
-theorem gclStep_write_first (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)
+theorem gclStep_write_first (M : LModel) (G : GenCparams GF M) (sd : M.lmSt)
     (A : GenWa M G sd) (k : Nat) (v : EraPins) (a : Nat) (b : BitVec 8) (s0 : M.lmSt)
     (ho : List Obs) (H : ConsHist)
     (hfok : M.lmStOk s0) (halt : a < proAlts.length) (hhead : (proAlts[a]!)[0]? = some b) :

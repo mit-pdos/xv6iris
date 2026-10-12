@@ -49,9 +49,9 @@ is far below it). -/
 def bwriteSlots : Nat := 4 + virtioDiskRwSlots
 
 /-- **WP of `bwrite(b = a0)`**. -/
-def wp_bwrite_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_bwrite_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (kk : Nat)
     (pidv dev bno : BitVec 32) (dqp : DFrac) (bs bsd : List (BitVec 8)) (Q : IProp GF)
@@ -65,7 +65,7 @@ def wp_bwrite_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv
   bioCtx γl γ V ∗ diskCaps V.gd γdl pd pav pu ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   bufHold0 γ V kk pidv dev bno bs bsd ∗
-  diskSeqPermit (genId (hlc := hlc) (GF := GF)) (some (BSIZE * bno.toNat, bs)) Q ∗
+  diskSeqPermit (genId (GF := GF)) (some (BSIZE * bno.toNat, bs)) Q ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -77,9 +77,9 @@ def wp_bwrite_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv
 /-- The eb-generic form of `wp_bwrite_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_bwrite_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_bwrite_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (kk : Nat)
     (pidv dev bno : BitVec 32) (dqp : DFrac) (bs bsd : List (BitVec 8)) (Q : IProp GF)
@@ -93,7 +93,7 @@ def wp_bwrite_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] 
   bioCtx γl γ V ∗ diskCaps V.gd γdl pd pav pu ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   bufHold0 γ V kk pidv dev bno bs bsd ∗
-  diskSeqPermit (genId (hlc := hlc) (GF := GF)) (some (BSIZE * bno.toNat, bs)) Q ∗
+  diskSeqPermit (genId (GF := GF)) (some (BSIZE * bno.toNat, bs)) Q ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -104,14 +104,14 @@ def wp_bwrite_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] 
 
 /-- The interface of `bwrite`. -/
 structure BWRITE : Prop where
-  wp_bwrite_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+  wp_bwrite_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (kk : Nat)
     (pidv dev bno : BitVec 32) (dqp : DFrac) (bs bsd : List (BitVec 8)) (Q : IProp GF)
     hj hproc hK hnoff htier hkk ha0 hbno hbsd hpd,
-    wp_bwrite_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ V γdl pd pav pu j kk
+    wp_bwrite_eb_body (GF := GF) Γ cpu k γl γ V γdl pd pav pu j kk
       pidv dev bno dqp bs bsd Q hj hproc hK hnoff htier hkk ha0 hbno hbsd hpd
 
 end Xv6

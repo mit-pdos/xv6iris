@@ -221,9 +221,9 @@ theorem bmapAi_true (bm bm' : Blkmap) (h1 : bm.bmInd.toNat = 0) (h2 : bm'.bmInd.
 /-! ## The contracts -/
 
 /-- **THE CREDITED / SET-FORM CONTRACT** (Rocq's `wp_bmap_gen_body`). -/
-def wp_bmap_gen_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_bmap_gen_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γ : LogNames) (γfs : FsNames)
     (logstart bmapstart size : Nat) (dev : BitVec 32)
@@ -303,9 +303,9 @@ def wp_bmap_gen_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
 /-- The eb-generic form of `wp_bmap_gen_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_bmap_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_bmap_gen_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γ : LogNames) (γfs : FsNames)
     (logstart bmapstart size : Nat) (dev : BitVec 32)
@@ -386,9 +386,9 @@ def wp_bmap_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF
 `wp_bmap_noalloc_sconf_body`): the slot is already allocated, so all three
 allocation sites are dead; the block resources at a SHARE `dq`; one
 `bslot`; the postcondition exact. -/
-def wp_bmap_noalloc_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_bmap_noalloc_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
     (ip : BitVec 64) (bm : Blkmap) (data : Nat → List (BitVec 8)) (fbn : Nat)
@@ -429,9 +429,9 @@ def wp_bmap_noalloc_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
 /-- The eb-generic form of `wp_bmap_noalloc_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_bmap_noalloc_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_bmap_noalloc_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
     (ip : BitVec 64) (bm : Blkmap) (data : Nat → List (BitVec 8)) (fbn : Nat)
@@ -472,9 +472,9 @@ def wp_bmap_noalloc_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hl
 /-- The interface of the allocating `bmap` (Rocq's `Module Type BMAP`, less
 the dropped counted form). -/
 structure BMAP : Prop where
-  wp_bmap_gen_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+  wp_bmap_gen_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γ : LogNames) (γfs : FsNames)
     (logstart bmapstart size : Nat) (dev : BitVec 32)
@@ -482,22 +482,22 @@ structure BMAP : Prop where
     (n : Nat) (cr : Bool) (Sb : List Nat) (pidv : BitVec 32) (dqp dqd dqb dqs : DFrac)
     hj hproc hK hnoff htier hneed hgeom hbm hcredit hfbn hwf hdev hcl hdt hpd
     ha0 ha1,
-    wp_bmap_gen_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl pd pav pu j γ γfs
+    wp_bmap_gen_eb_body (GF := GF) Γ cpu k γl γb V γdl pd pav pu j γ γfs
       logstart bmapstart size dev ip bm data fbn n cr Sb pidv dqp dqd dqb dqs
       hj hproc hK hnoff htier hneed hgeom hbm hcredit hfbn hwf hdev hcl hdt hpd
       ha0 ha1
 
 /-- The interface of the no-alloc `bmap` (Rocq's `Module Type BMAP_NOALLOC`). -/
 structure BMAP_NOALLOC : Prop where
-  wp_bmap_noalloc_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+  wp_bmap_noalloc_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
     (ip : BitVec 64) (bm : Blkmap) (data : Nat → List (BitVec 8)) (fbn : Nat)
     (pidv : BitVec 32) (dqp dq dqd : DFrac)
     hj hproc hK hnoff htier hgeom hfbn hwf hnz hdev hcl hdt hpd ha0 ha1,
-    wp_bmap_noalloc_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl pd pav pu j γfs logstart
+    wp_bmap_noalloc_eb_body (GF := GF) Γ cpu k γl γb V γdl pd pav pu j γfs logstart
       dev ip bm data fbn pidv dqp dq dqd
       hj hproc hK hnoff htier hgeom hfbn hwf hnz hdev hcl hdt hpd ha0 ha1
 

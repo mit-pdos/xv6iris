@@ -27,7 +27,7 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 open Std (ExtTreeSet)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -39,17 +39,17 @@ def wpShSysSbrkBody : Prop :=
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (m.get 11#5)) = 1#64 →
     uszOk (sz + n) → pgRoundUpN sz = sz →
     ⊢ ukCode N.t User.Sh.code.byte -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«sys_sbrk») avail -∗ usz N.s sz -∗
+      urun N h m (BitVec.ofNat 64 User.Sh.Sym.«sys_sbrk») avail -∗ usz N.s sz -∗
       (∀ (h' : CPU) (r : BitVec 64), ushmSbrkAns N sz n r -∗
-        urun (hlc := hlc) N h' (stubRet m 12 r) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
+        urun N h' (stubRet m 12 r) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
       wpLoop h
 
 end
 
 /-- The interface of sh's `sys_sbrk` stub. -/
 structure SH_SYS_SBRK : Prop where
-  wp_shSysSbrk : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+  wp_shSysSbrk : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
-    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpShSysSbrkBody (hlc := hlc) (GF := GF)
+    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpShSysSbrkBody (GF := GF)
 
 end Xv6

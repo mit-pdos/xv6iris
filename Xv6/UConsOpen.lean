@@ -90,7 +90,7 @@ theorem initCons_moiNat_inj (a b : Nat) (ha : a < NOFILE) (hb : b < NOFILE)
   exact this
 
 section UConsOpen
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsTopG GF] [FsBytesG GF]
 
 /-! ## 3.  THE DEAD WALK THAT GIVES THE CREDENTIAL BACK -/
 

@@ -118,7 +118,7 @@ def paPins1 (k : KCtx) (R : RegMap) : Prop :=
   R 26#5 = k.regs 26#5 ∧ R 27#5 = k.regs 27#5
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -180,7 +180,7 @@ theorem pa_filealloc (FA : FILEALLOC) (c : CPU) (k' : KCtx) (γl : GName) (γ : 
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ fileallocPost γ (R' 10#5) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := FA.wp_filealloc (hlc := hlc) (GF := GF) c k' γl γ hnoff hK hlk
+  have h := FA.wp_filealloc (GF := GF) c k' γl γ hnoff hK hlk
   unfold wp_filealloc_body at h
   simp only [fileallocAddr] at h
   exact h
@@ -211,12 +211,12 @@ theorem pa_initlock (IL : INITLOCK) (c : CPU) (k' : KCtx) (vlock : BitVec 32) (v
       wordPointsTo (k'.regs 10#5 + 8#64) 8 (DFrac.own 1) (k'.regs 11#5) -∗
       lkFresh (k'.regs 10#5) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := IL.wp_initlock (hlc := hlc) (GF := GF) c k' vlock vname vcpu hK
+  have h := IL.wp_initlock (GF := GF) c k' vlock vname vcpu hK
   unfold wp_initlock_body at h
   simp only [initlockAddr] at h
   exact h
 
-theorem pa_fileclose (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU)
+theorem pa_fileclose (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs GF Γ] (c : CPU)
     (k' : KCtx) (γl : GName) (γ : FileNames) (kk : Nat) (γkl : GName) (γk : KmemNames)
     (on : Option Nat) (pidv : BitVec 32) (dqp : DFrac) (ke : Nat)
     (s : Bool) (hs : k'.sie = s) (pj : BitVec 64) (hpj : k'.proc = pj)
@@ -233,7 +233,7 @@ theorem pa_fileclose (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     ⊢ wpLoop (GF := GF) c := by
   subst hs hpj
   iintro ⟨Hk, Hpc, Hte, Hce, #Hft, #Hpe, Href, Hpid, Hir, ⟨%k1, %hk1, Hlend⟩, Hnext⟩
-  have h := FC.wp_fileclose_eb (hlc := hlc) (GF := GF) Γ c k' γl γ kk 1 .closed 0 γkl γk on pidv dqp
+  have h := FC.wp_fileclose_eb (GF := GF) Γ c k' γl γ kk 1 .closed 0 γkl γk on pidv dqp
     iprop(emp) k1 hK hnoff htier ha0
   unfold wp_fileclose_eb_body at h
   simp only [filecloseAddr] at h
@@ -344,7 +344,7 @@ exclusive closed reference we hold): `ld a5,*f1 ; li a0,-1 ; beqz a5 -> exit`
 or `mv a0,a5 ; jal fileclose ; li a0,-1 ; exit`. -/
 theorem pipealloc_br_fffffffffffffccc : KA.«pipealloc» + 0xfffffffffffffccc#64 = KA.«fileclose» := by decide
 
-theorem pa_bad_tail (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU)
+theorem pa_bad_tail (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs GF Γ] (c : CPU)
     (k : KCtx) (γl : GName) (γ : FileNames) (γkl : GName) (γk : KmemNames) (on : Option Nat)
     (pidv : BitVec 32) (dqp : DFrac) (ke : Nat)
     (hwf : k.wf) (hK : pipeallocSlots ≤ k.avail) (hnoff : k.noff = 0)
@@ -792,7 +792,7 @@ theorem pipealloc_br_fffffffffffffc28 : KA.«pipealloc» + 0xfffffffffffffc28#64
 
 set_option maxHeartbeats 16000000 in
 theorem pipealloc_proof (FA : FILEALLOC) (KAL : KALLOC) (IL : INITLOCK) (FC : FILECLOSE) : PIPEALLOC := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γ γkl γk on v0 v1 pidv dqp
+  fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γ γkl γk on v0 v1 pidv dqp
       ke hK hnoff htier => by
   unfold wp_pipealloc_eb_body
   simp only [pipeallocAddr]

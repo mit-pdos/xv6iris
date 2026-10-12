@@ -99,8 +99,8 @@ theorem iput_tail_rest_frac (q qt qrest qr : Qp) (hsub : qpSub qt q = some qrest
   show (1 : Qp).half.val = qrest.val + (q.val + qr.val)
   grind
 
-theorem iput_tail_icHdr_cur {hlc : HasLC} {GF : BundledGFunctors.{0}} [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
-    [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [MachGS hlc GF] [Icfg] [CurCtx]
+theorem iput_tail_icHdr_cur {GF : BundledGFunctors.{0}} [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
+    [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [MachGS GF] [Icfg] [CurCtx]
     (cn : IcNames) (γfs : FsNames) (γi : GName) (cov : ExtTreeSet Nat compare)
     (logstart k : Nat) (i : IcBid) (x : IcX) :
     icHdr (GF := GF) cn γfs γi cov logstart k i x curCtx = icHdrAmb cn γfs γi cov logstart k i x :=
@@ -109,18 +109,18 @@ theorem iput_tail_icHdr_cur {hlc : HasLC} {GF : BundledGFunctors.{0}} [IcacheG G
 theorem iput_tail_ret_30 : jumpPc (KA.«iput» + 0x30#64) = (KA.«iput» + 0x30#64) := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- The persistent pieces a close uses, off the environment. -/
-theorem iput_tail_env (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (γl : GName)
+theorem iput_tail_env (Γ : SchedNames) [ClaimIs GF Γ] (γl : GName)
     (pd pav pu : BitVec 64) (γil γisl : GName) (kk : Nat) :
     iputEnv (GF := GF) Γ γl pd pav pu γil γisl kk ⊢
       isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-      itableInv (hlc := hlc) ∗ icEscrow fscIc fscFs fscIreg fscCov fscLogst kk ∗
-      iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib := by
+      itableInv ∗ icEscrow fscIc fscFs fscIreg fscCov fscLogst kk ∗
+      iregInv fscIreg fscFs icfgIst icfgNib := by
   unfold iputEnv
   iintro ⟨-, -, -, -, -, #Hit, #Hinv, #Hesc, #Hrinv, -, -⟩
   iframe Hit Hinv Hesc Hrinv
@@ -131,7 +131,7 @@ set_option maxHeartbeats 8000000 in
 predecessor count through `iref_close_store_pinw_au`, the box's (d)
 `icDecr`, and the table re-formed at `(qrest, n)` with the departing share
 joined into the table's retained one; the slot hands back one unit. -/
-theorem iput_tail_ne_au (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU) (γl : GName)
+theorem iput_tail_ne_au (Γ : SchedNames) [ClaimIs GF Γ] (c : CPU) (γl : GName)
     (pd pav pu : BitVec 64) (γil γisl : GName) (kk : Nat) (hkk : kk < NINODE) (q : Qp)
     (inum : BitVec 32) (Mt : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × BitVec 32))
     (qt : Qp) (m : PosNat) (hMk : PartialMap.get? Mt kk = some (qt, m.succ))
@@ -203,7 +203,7 @@ theorem iput_tail_ne_au (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU)
   -- the store's accessor
   ihave Hru := (show runitAny (GF := GF) cinum.toNat ⊢ runit false cinum.toNat from .rfl) $$ Hru
   unfold writeAU
-  imod iref_close_store_pinw_au (hlc := hlc) ⊤ fscIreg fscFs icfgIst icfgNib Mt kk cinum false
+  imod iref_close_store_pinw_au ⊤ fscIreg fscFs icfgIst icfgNib Mt kk cinum false
       q qt qrest m g lo tst CoPset.subseteq_top CoPset.subseteq_top hin hMk hqrest
     $$ Hinv Hrinv Hhalf [Hfrag Hlv Hslh] Hisl Hru Hicnt Hst Hllbt with ⟨%hlot, Hpin, Hcl⟩
   · unfold irefTokGenlo; iframe
@@ -335,14 +335,14 @@ store, what the accessor hands back is the rest of the close, run at the
 running context: the retired cell as a free ctx cell, (b′) the raw header
 back at `none`, the pin's exit, (d), the slot re-formed EMPTY and the
 evicted inum's ordinary bundle put back into the pool. -/
-theorem iput_tail_one_au (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU) (γl : GName)
+theorem iput_tail_one_au (Γ : SchedNames) [ClaimIs GF Γ] (c : CPU) (γl : GName)
     (pd pav pu : BitVec 64) (γil γisl : GName) (kk : Nat) (hkk : kk < NINODE) (q : Qp)
     (inum : BitVec 32) (Mt : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × BitVec 32))
     (tid : Nat) (qtx : Qp) (hMk : PartialMap.get? Mt kk = some (q, PosNat.one))
     (hMwf : icMWf Mt) (hciwf : icCiWf Mt ci icfgNib icfgDev) :
     iputEnv Γ γl pd pav pu γil γisl kk ∗
     itableHalf Mt ∗ irefSlotsAuth ∗ islPool Mt ∗
-    ipool (hlc := hlc) fscFs fscIreg fscCov fscLogst (regionInums icfgNib \ ciInums ci) ∅ ∗
+    ipool fscFs fscIreg fscCov fscLogst (regionInums icfgNib \ ciInums ci) ∅ ∗
     irefFrag kk q ∗ liveFracc kk q ∗ slhTok (icfgIsl kk) q ∗
     inodeIdent kk (.own q) icfgDev inum ∗
     iputWindow kk Mt ci icfgDev inum ∗ iputRowOpen kk Mt ci q icfgDev inum ∗
@@ -391,7 +391,7 @@ theorem iput_tail_one_au (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU
     iexact Hrest
   -- THE POOL'S QUARTER AND THE IN-TRANSITION INDEX: the identity goes DEAD
   icases icId_quartersSplit fscIc kk true icfgDev inum $$ Hgid with ⟨Hgid1, HgidT⟩
-  imod ipoolEvictLend (hlc := hlc) ⊤ fscIc fscFs fscIreg fscCov fscLogst icfgNib
+  imod ipoolEvictLend ⊤ fscIc fscFs fscIreg fscCov fscLogst icfgNib
       (regionInums icfgNib \ ciInums ci) kk inum.toNat icfgDev inum tid qr
       CoPset.subseteq_top hkk rfl $$ Hpinv Hpool Hgid1 with ⟨Hpool, Hgidp, Hidback⟩
   ihave Hgid2 := icId_quartersJoin fscIc kk true icfgDev inum $$ HgidT HgidH
@@ -403,7 +403,7 @@ theorem iput_tail_one_au (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU
   imodintro
   -- THE RETIRE STORE's accessor
   unfold writeAU
-  imod iref_close_last_store_pinw_au (hlc := hlc) ⊤ fscIreg fscFs icfgIst icfgNib Mt kk inum q
+  imod iref_close_last_store_pinw_au ⊤ fscIreg fscFs icfgIst icfgNib Mt kk inum q
       false .frzOff g lo tst CoPset.subseteq_top CoPset.subseteq_top hin hMk
     $$ Hinv Hrinv Hhalf [Hfrag Hlv Hslh] Hlvh Hsel Hisl Hru [Hoff] Hicnt [] Hst
     with ⟨%hlot, Hpins, Hcl⟩
@@ -475,16 +475,16 @@ theorem iput_tail_one_au (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU
     rw [islotFreeAtCtx_cur]
     iframe
   -- THE DEPOSIT: the ordinary bundle back into the pool
-  imod ipoolPutOrd (hlc := hlc) ⊤ fscIc fscFs fscIreg fscCov fscLogst icfgNib
+  imod ipoolPutOrd ⊤ fscIc fscFs fscIreg fscCov fscLogst icfgNib
       (regionInums icfgNib \ ciInums ci) inum.toNat tid qr CoPset.subseteq_top
       (iput_notin_diff icfgNib _ ci hincid) $$ Hpinv [Hcnt0 Hmir Hnp Hoff] Hpool
     with ⟨Hpool, Htxr⟩
   · rw [BitVec.ofNat_toNat, BitVec.setWidth_eq]
     unfold ipoolOrd
     iframe
-  ihave Hpool := (show ipool (hlc := hlc) (GF := GF) fscFs fscIreg fscCov fscLogst
+  ihave Hpool := (show ipool (GF := GF) fscFs fscIreg fscCov fscLogst
       ({inum.toNat} ∪ (regionInums icfgNib \ ciInums ci)) ∅ ⊢
-      ipool (hlc := hlc) fscFs fscIreg fscCov fscLogst
+      ipool fscFs fscIreg fscCov fscLogst
         (regionInums icfgNib \ ciInums (PartialMap.delete ci kk)) ∅ by
     rw [iput_pool_delete Mt ci icfgNib icfgDev kk icfgDev inum hciwf hcik]) $$ Hpool
   ihave Htx := iput_txPin_join tid qp qr $$ [Htxp Htxr]
@@ -557,7 +557,7 @@ set_option maxHeartbeats 8000000 in
 /-- **THE NON-LAST CLOSE** (Rocq `ip_tail` at `cnt ≠ 1`, 1487--1666): entry
 at `+0x20` with itable.lock held, the table opened at `(Mt, ci)` and `a5`
 holding the count just read. -/
-theorem iput_tail_ne (RH : RELEASE_HOOK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem iput_tail_ne (RH : RELEASE_HOOK) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (γil γisl : GName)
     (kk : Nat) (q : Qp) (inum : BitVec 32)
     (n : Nat) (Sb : List Nat) (crb cru crz : Bool) (tid : Nat) (qtx : Qp)
@@ -626,7 +626,7 @@ set_option maxHeartbeats 8000000 in
 at `+0x3a` left the header out of the box (`iputWindow`), the table row open
 (`iputRowOpen`) and the pin's name-half in hand (`iputPin`); the reference's
 stamps are in the window. -/
-theorem iput_tail_one (RH : RELEASE_HOOK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem iput_tail_one (RH : RELEASE_HOOK) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (γil γisl : GName)
     (kk : Nat) (q : Qp) (inum : BitVec 32)
     (n : Nat) (Sb : List Nat) (crb cru crz : Bool) (tid : Nat) (qtx : Qp)
@@ -644,7 +644,7 @@ theorem iput_tail_one (RH : RELEASE_HOOK) (Γ : SchedNames) [ClaimIs (hlc := hlc
     pcIs c (KA.«iput» + 0x20#64) ∗ iputEnv Γ γl pd pav pu γil γisl kk ∗
     locked fscItlock c ∗ sieArm c k.sie k.proc ∗
     itableHalf Mt ∗ irefSlotsAuth ∗ islPool Mt ∗
-    ipool (hlc := hlc) fscFs fscIreg fscCov fscLogst (regionInums icfgNib \ ciInums ci) ∅ ∗
+    ipool fscFs fscIreg fscCov fscLogst (regionInums icfgNib \ ciInums ci) ∅ ∗
     irefFrag kk q ∗ liveFracc kk q ∗ slhTok (icfgIsl kk) q ∗
     inodeIdent kk (.own q) icfgDev inum ∗
     iputWindow kk Mt ci icfgDev inum ∗ iputRowOpen kk Mt ci q icfgDev inum ∗

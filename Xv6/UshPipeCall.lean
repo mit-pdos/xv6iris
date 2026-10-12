@@ -68,7 +68,7 @@ theorem shpc_ra (m : RegMap) (v r : BitVec 64) : (ukWr (ukWr m 17#5 v) 10#5 r).g
   rw [ukWr_get_other _ _ _ _ (by decide), ukWr_get_other _ _ _ _ (by decide)]
 
 section UShPipeCall
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
@@ -79,8 +79,8 @@ registrar keeps; the answer's two `ushCldep` rows are built from the
 theorem ush_pipe_call_paid_gen (UL : UK_LEAVES) (hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
     (N : UkNames GF) (l : List FdState) (R : PipeNames → IProp GF) (hnone : fdLowestClosed l = none) :
     ⊢ (∀ γp : PipeNames, pipeQfrag γp.pnQueue pst0 ={⊤}=∗
-        pipeReg (hlc := hlc) (GF := GF) γp ∗ (pipeReg (hlc := hlc) (GF := GF) γp ∗ R γp)) -∗
-      ushPipeCall (hlc := hlc) N l R := by
+        pipeReg (GF := GF) γp ∗ (pipeReg (GF := GF) γp ∗ R γp)) -∗
+      ushPipeCall N l R := by
   iintro Hreg
   unfold ushPipeCall
   iintro %h %m %av %dst %f %hdst #Hc Hstd Hbuf Hrun Hk
@@ -96,7 +96,7 @@ theorem ush_pipe_call_paid_gen (UL : UK_LEAVES) (hps : ∀ k : Int, freeNum k �
     ukWr_get_other _ _ _ _ (by decide)
   ihave #Hi1 := ushRI_c74 N.t $$ Hc
   iapply wp_uk_pipe_read_end UL N h1 (ukWr m 17#5 (BitVec.ofNat 64 4)) (BitVec.ofNat 64 0xc74) l f av
-    (fun γp => iprop(pipeReg (hlc := hlc) (GF := GF) γp ∗ R γp)) hno (by decide) hnone
+    (fun γp => iprop(pipeReg (GF := GF) γp ∗ R γp)) hno (by decide) hnone
     $$ Hi1 Hrun [] Hreg Hstd [Hbuf]
   · iapply udepw_of_psok N _ _ USYS_pipe (hps _ (by decide)) (by decide)
   · rw [ha0]; iexact Hbuf
@@ -144,8 +144,8 @@ close law at all: the registrar's `pipeReg` is persistent, so its slot
 carries a copy out beside whatever the application kept. -/
 theorem ush_pipe_call_paid_reg (UL : UK_LEAVES) (hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
     (N : UkNames GF) (l : List FdState) (R : PipeNames → IProp GF) (hnone : fdLowestClosed l = none) :
-    ⊢ (∀ γp : PipeNames, pipeQfrag γp.pnQueue pst0 ={⊤}=∗ pipeReg (hlc := hlc) (GF := GF) γp ∗ R γp) -∗
-      ushPipeCall (hlc := hlc) N l R := by
+    ⊢ (∀ γp : PipeNames, pipeQfrag γp.pnQueue pst0 ={⊤}=∗ pipeReg (GF := GF) γp ∗ R γp) -∗
+      ushPipeCall N l R := by
   iintro Hreg
   iapply ush_pipe_call_paid_gen UL hps N l R hnone
   iintro %γp Hfrag

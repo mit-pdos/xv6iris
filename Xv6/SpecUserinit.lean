@@ -132,7 +132,7 @@ lock, the console, the device complement, `wireInv`, (NI M2-X2) the era's
 anchor, the trampoline claim;
 the first process's exec bundle at the root and the all-closed table, the
 console's reader token, and (NI M2-W2d) the origin ticket. -/
-def userinitPark {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def userinitPark {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF]
     [SleepLockG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [BcacheG GF] [DiskG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) (γw γtk : GName) : IProp GF := iprop%
@@ -143,19 +143,19 @@ def userinitPark {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G
   wireInv ∗
   -- THE ERA'S ANCHOR (NI M2-X2): registered at the era's boot, on to the
   -- park world every process's syscall environment carries
-  (∃ k : Nat, MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF))) ∗
+  (∃ k : Nat, MachFixedGS.uEraAnchor (GF := GF) k (niNamesHere (GF := GF))) ∗
   syscTrampCl ∗
-  initBootBundle (hlc := hlc) (SG := SG) ROOTINO ROOTINO seccAll (List.replicate NOFILE FdState.closed) ∗
+  initBootBundle (SG := SG) ROOTINO ROOTINO seccAll (List.replicate NOFILE FdState.closed) ∗
   consReader fscCons 0 ∗
   -- THE ORIGIN TICKET (NI M2-W2d): the power-on's initproc claim, through the
   -- era turn, parked with `<init>` (its first resume's origin filing spends it)
-  MachFixedGS.uClaimO (hlc := hlc) (GF := GF)
+  MachFixedGS.uClaimO (GF := GF)
 
 /-- **WP of `userinit`.** -/
-def wp_userinit_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_userinit_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF]
     [SleepLockG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [BcacheG GF] [DiskG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γp : GName) (γft : GName) (γ : FileNames) (γw γtk : GName) (nb np : Nat)
     (hnoff : k.noff + 2 < 2 ^ 31) (hnoff0 : k.noff = 0) (hK : userinitSlots ≤ k.avail)
     (hlk : "kmem" ∉ k.locks) (hlp : "nextpid" ∉ k.locks) (hlq : "proc" ∉ k.locks)
@@ -169,13 +169,13 @@ def wp_userinit_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
   -- THE BOOT TOKEN'S ROWS, unassembled (Rocq's three premises): userinit
   -- seals the allocator count after allocproc's last draw and assembles
   -- `firstBoot` itself
-  wordPointsTo firstAddr 4 (DFrac.own 1) 1#32 ∗ firstBootPersist (hlc := hlc) ∗ firstFsinit (hlc := hlc) ∗
+  wordPointsTo firstAddr 4 (DFrac.own 1) 1#32 ∗ firstBootPersist ∗ firstFsinit ∗
   initPidTok 0#32 ∗
   -- igetroot's / idup's inode-cache rows and iget's live panic
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗ iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ panicEnv ∗
+  itableInv ∗ iregReg fscIreg fscFs icfgIst icfgNib ∗ panicEnv ∗
   isFtable γft γ ∗
-  userinitPark (hlc := hlc) (SG := SG) Γ γw γtk ∗
+  userinitPark (SG := SG) Γ γw γtk ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (ip : BitVec 64)
     (g : Nat),
     ⌜(k.sie = false → spie = k.spie ∧ spp = k.spp) ∧ calleeSaved k.regs R' ∧
@@ -186,13 +186,13 @@ def wp_userinit_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
 
 /-- The interface of `userinit`. -/
 structure USERINIT : Prop where
-  wp_userinit : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  wp_userinit : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF]
     [SleepLockG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [BcacheG GF] [DiskG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [NiFitIs (hlc := hlc) GF]
+    (Γ : SchedNames) [ClaimIs GF Γ] [NiFitIs GF]
     (cpu : CPU) (k : KCtx) (γp : GName) (γft : GName) (γ : FileNames) (γw γtk : GName) (nb np : Nat)
     hnoff hnoff0 hK hlk hlp hlq hlocks htier hproc hsie hnb hroot hnib0,
-    wp_userinit_body (hlc := hlc) (GF := GF) (SG := uexecSGXv6) Γ cpu k γp γft γ γw γtk nb np
+    wp_userinit_body (GF := GF) (SG := uexecSGXv6) Γ cpu k γp γft γ γw γtk nb np
       hnoff hnoff0 hK hlk hlp hlq hlocks htier hproc hsie hnb hroot hnib0
 
 end Xv6

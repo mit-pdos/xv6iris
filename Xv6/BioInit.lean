@@ -50,7 +50,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
 variable [SleepLockG GF] [DiskG GF] [CurCtx]
 
 /-! ## The LRU cycle, out of `binit`'s links -/

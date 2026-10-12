@@ -146,13 +146,13 @@ theorem gclPure_write_blk (M : LModel) (K : LmHooks M) (B : LmByteLaws M) (sd : 
     rw [hlenE]; exact this
 
 section writeblk
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 
 /-- (W') THE WRITE AT A BLOCK'S FIRST BYTE (Rocq `gcl_step_write_blk`): the
 alternative `a` is filed; the block is read at the state the writer's
 witness pins.  The round's PAYLOAD (`A.gpr k v I0 a`, sync SY3-A4) joins the
 choice's store. -/
-theorem gclStep_write_blk (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M) (sd : M.lmSt)
+theorem gclStep_write_blk (M : LModel) (G : GenCparams GF M) (B : LmByteLaws M) (sd : M.lmSt)
     (A : GenWa M G sd) (k : Nat) (v : EraPins) (P a : Nat) (b : BitVec 8) (ps0 cs0 : List Nat)
     (s0 : M.lmSt) (I0 : List (BitVec 8)) (ho : List Obs) (H : ConsHist)
     (hne0 : I0 ≠ []) (hr0 : restOf I0 = []) (hdiv : nlines I0 ≤ cs0.length + 1)

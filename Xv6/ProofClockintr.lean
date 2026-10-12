@@ -131,7 +131,7 @@ theorem ckK_popExit (k : KCtx) (hsie : k.sie = false) :
     _root_.true_and, _root_.and_true]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- What every arm ends with: the caller's continuation. -/
 def ckPost (cpu : CPU) (k : KCtx) : IProp GF := iprop%
@@ -145,7 +145,7 @@ theorem cki_cpuid (CU : CPUID) (c : CPU) (k' : KCtx) (hsie : k'.sie = false) (hK
     (∀ R' : RegMap, kctx c (k'.withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = cpuidRet (hartId c)⌝ -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) c := by
-  have h := CU.wp_cpuid (hlc := hlc) (GF := GF) c k' hsie hK
+  have h := CU.wp_cpuid (GF := GF) c k' hsie hK
   unfold wp_cpuid_body at h
   simp only [cpuidAddr] at h
   exact h
@@ -161,7 +161,7 @@ theorem cki_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γt : GName)
       locked γt cpu' -∗ ticksLedAt curCtx -∗ (∃ K : Nat, viewLb cpu' K) -∗
       sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γt "time" ticksLedAt hnoff hK hs
+  have h := AC.wp_acquire (GF := GF) c k' γt "time" ticksLedAt hnoff hK hs
   unfold wp_acquire_body at h
   simp only [acquireAddr] at h
   rw [ha0] at h
@@ -180,7 +180,7 @@ theorem cki_release (RE : RELEASE) (c : CPU) (k' : KCtx) (γt : GName)
         (k'.locks.filter (fun x => x ≠ "time"))) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γt "time" ticksLedAt hsie hnoff hK reen
+  have h := RE.wp_release (GF := GF) c k' γt "time" ticksLedAt hsie hnoff hK reen
     hreen hon
   unfold wp_release_body at h
   simp only [releaseAddr] at h
@@ -197,7 +197,7 @@ theorem cki_wakeup (WK : WAKEUP) (Γ : SchedNames) (c : CPU) (k' : KCtx)
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := WK.wp_wakeup (hlc := hlc) (GF := GF) Γ c k' hnoff hK hlk htier
+  have h := WK.wp_wakeup (GF := GF) Γ c k' hnoff hK hlk htier
   unfold wp_wakeup_body at h
   simp only [wakeupAddr] at h
   exact h
@@ -432,7 +432,7 @@ end
 
 set_option maxHeartbeats 4000000 in
 theorem clockintr_proof (CU : CPUID) (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP) : CLOCKINTR :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ Γ cpu k γt hsie hnoff hK hlk htier => by
+  ⟨fun {GF} _ _ _ _ _ _ _ _ Γ cpu k γt hsie hnoff hK hlk htier => by
   unfold wp_clockintr_body
   simp only [clockintrAddr]
   iintro ⟨Hk, Hpc, #Hpi, #Hlk, HΦ⟩

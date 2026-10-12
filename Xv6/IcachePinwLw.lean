@@ -27,7 +27,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL LeanRV64D
 
 section IcachePinwLw
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF]
 variable {lent : Bool}
 
 /-- THE LOCK-FREE GUARD READ at any `SIE` (Rocq: `wp_lw_au_rel_s_sconf` +
@@ -39,7 +39,7 @@ theorem wp_s_lw_iref [CurCtx] [KernelGeom] [KernelImage GF] [Icfg] (cpu : CPU) (
     (s : Qp) (g : GName) (lo tl : Nat) (hle : lo ≤ tl) :
     instr (GF := GF) pc is_rvc (instruction.LOAD (imm, regidx.Regidx rs1, regidx.Regidx rd, false, 4)) ∗
     kctxL lent cpu k ∗ pcIs cpu pc ∗ kmapId (iRef (ientry i)) ∗
-    itableInv (hlc := hlc) (GF := GF) ∗ credFloor lo tl ∗ liveGenlo i s g lo ∗
+    itableInv (GF := GF) ∗ credFloor lo tl ∗ liveGenlo i s g lo ∗
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
         iprop(∀ w : BitVec (8 * 4), kctxL lent cpu' (k.setReg rd (BitVec.signExtend 64 w)) -∗
           pcIs cpu' (pc + instrLen is_rvc) -∗ ⌜0 < w.toNat ∧ w.toNat < 2 ^ 31⌝ -∗
@@ -49,7 +49,7 @@ theorem wp_s_lw_iref [CurCtx] [KernelGeom] [KernelImage GF] [Icfg] (cpu : CPU) (
   iintro ⟨HI, Hk, Hpc, #Hcl, #Hinv, #Hfl, Hlv, HΦ⟩
   ihave #Hlk := credFloor_lk lo tl hle $$ Hfl
   iapply (wp_s_lw_au_key (lent := lent) cpu k pc is_rvc imm rd rs1 hrs1 hrd _ haddr hram hal lo
-    iprop(itableInv (hlc := hlc) (GF := GF) ∗ liveGenlo i s g lo)
+    iprop(itableInv (GF := GF) ∗ liveGenlo i s g lo)
     (fun _ w => iprop(⌜0 < w.toNat ∧ w.toNat < 2 ^ 31⌝ ∗ liveGenlo i s g lo))
     (fun cpu' K ts _ hvis => by
       iintro ⟨#Hts, #Hinv, Hlv⟩
@@ -80,7 +80,7 @@ theorem wp_s_lw_iref_locked [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] 
     (M : RegMapF (Qp × PosNat)) (his : ∃ v, PartialMap.get? M i = some v) (tst : Nat) :
     instr (GF := GF) pc is_rvc (instruction.LOAD (imm, regidx.Regidx rs1, regidx.Regidx rd, false, 4)) ∗
     kctxL lent cpu k ∗ pcIs cpu pc ∗ kmapId (iRef (ientry i)) ∗
-    itableInv (hlc := hlc) (GF := GF) ∗ ctxFloor curCtx tst ∗ itableHalf M ∗
+    itableInv (GF := GF) ∗ ctxFloor curCtx tst ∗ itableHalf M ∗
     istmpAuth i (1 : Qp).half tst ∗
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
         iprop(∀ w : BitVec (8 * 4), kctxL lent cpu' (k.setReg rd (BitVec.signExtend 64 w)) -∗
@@ -90,7 +90,7 @@ theorem wp_s_lw_iref_locked [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] 
   obtain ⟨hram, hal⟩ := iRef_ram_aligned i hi
   iintro ⟨HI, Hk, Hpc, #Hcl, #Hinv, #Hfl, Hhalf, Hst, HΦ⟩
   iapply (wp_s_lw_au_floor (lent := lent) cpu k pc is_rvc imm rd rs1 hrs1 hrd _ haddr hram hal tst
-    iprop(itableInv (hlc := hlc) (GF := GF) ∗ itableHalf M ∗ istmpAuth i (1 : Qp).half tst)
+    iprop(itableInv (GF := GF) ∗ itableHalf M ∗ istmpAuth i (1 : Qp).half tst)
     (fun _ w => iprop(⌜w = irefWord M i⌝ ∗ itableHalf M ∗ istmpAuth i (1 : Qp).half tst))
     (fun cpu' K _ htK => by
       iintro ⟨#Hinv, Hhalf, Hst⟩

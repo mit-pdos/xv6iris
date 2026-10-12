@@ -18,7 +18,7 @@ def argintAddr : BitVec 64 := KA.«argint»
 /-- argint's 4-slot frame over argraw's 14. -/
 def argintSlots : Nat := 4 + argrawSlots
 
-def wp_argint_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+def wp_argint_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (i : Nat) (tfp : BitVec 44) (ws : List (BitVec 64)) (v : BitVec 64)
     (old : BitVec 32) (dqt : DFrac)
     (hi : i < NARG) (ha0 : k.regs 10#5 = BitVec.ofNat 64 i) (hws : ws[tfArgIdx i]? = some v)
@@ -35,9 +35,9 @@ def wp_argint_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv
   ⊢ wpLoop (GF := GF) cpu
 
 structure ARGINT : Prop where
-  wp_argint : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+  wp_argint : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (i : Nat) (tfp : BitVec 44) (ws : List (BitVec 64)) (v : BitVec 64)
     (old : BitVec 32) (dqt : DFrac) hi ha0 hws hnoff hK,
-    wp_argint_body (hlc := hlc) (GF := GF) cpu k i tfp ws v old dqt hi ha0 hws hnoff hK
+    wp_argint_body (GF := GF) cpu k i tfp ws v old dqt hi ha0 hws hnoff hK
 
 end Xv6

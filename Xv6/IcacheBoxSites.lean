@@ -133,7 +133,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 /-! ## THE SITES (R3's map), as statements over CtxBox's transitions -/
 
 section IcacheBoxSites
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [LogG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF] [LogG GF]
   [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcboxG GF]
 
 /-- iget's RECYCLE, part 1 -- (a) at `c = 0` on a DEAD slot: the raw header
@@ -212,24 +212,24 @@ theorem icRecycleFlip [Icfg] [Appcfg GF] [CurCtx] (cn : IcNames) (γfs : FsNames
     (hw : r.win = true) (hk : k < NINODE) (hin : inum.toNat ∈ P)
     (hnib : inum.toNat < 16 * nib) :
     icEscrow (GF := GF) cn γfs γi cov logstart k ⊢
-      iregReg (hlc := hlc) γi γfs inodestart nib -∗
-      ipoolInv (hlc := hlc) cn γfs γi cov logstart nib -∗
+      iregReg γi γfs inodestart nib -∗
+      ipoolInv cn γfs γi cov logstart nib -∗
       icRegd k r -∗ icCnt k 0 -∗
-      ipool (hlc := hlc) γfs γi cov logstart P ∅ -∗
+      ipool γfs γi cov logstart P ∅ -∗
       icId cn k Qp.quarter false devT inumT -∗
       icId cn k Qp.quarter false devB inumB -∗
       iname γi γfs inodestart inum l -∗
       |={E}=> (icRegd k r ∗ icCnt k 0 ∗
         iname γi γfs inodestart inum l ∗
         icntHalf inum.toNat 0 ∗ frzmH inum.toNat false ∗ ifreezeOff inum.toNat ∗
-        ipool (hlc := hlc) γfs γi cov logstart (P \ {inum.toNat}) ∅ ∗
+        ipool γfs γi cov logstart (P \ {inum.toNat}) ∅ ∗
         icId cn k (1 : Qp).half true dev inum) := by
   unfold icEscrow icRegd icCnt
   iintro #Hbox #Hrinv #Hpinv Hrd Hc Hpool HgidT HgidB Hlic
   imod boxQ1Update (icBoxPay cn γfs γi cov logstart k) (ndot icBoxN k) (icfgBox k) r 0
       iprop(iname γi γfs inodestart inum l ∗ icntHalf inum.toNat 0 ∗
         frzmH inum.toNat false ∗ ifreezeOff inum.toNat ∗
-        ipool (hlc := hlc) γfs γi cov logstart (P \ {inum.toNat}) ∅ ∗
+        ipool γfs γi cov logstart (P \ {inum.toNat}) ∅ ∗
         icId cn k (1 : Qp).half true dev inum) E hE hw
       $$ [Hrd Hc Hpool HgidT HgidB Hlic] with ⟨Hrd, Hc, HR⟩
   · isplitr
@@ -518,7 +518,7 @@ theorem icCheckoutRd [Icfg] [CurCtx] (cpu : CPU) (cn : IcNames) (γfs : FsNames)
     (hs0 : s0.hold = none) (hKp : s0.tp ≤ Kp) :
     icEscrow (GF := GF) cn γfs γi cov logstart k ⊢
       ownCtx cpu ξ -∗ ctxFloor ξ Kt -∗ ctxFloor ξ Kp -∗
-      itableInv (hlc := hlc) -∗ ityShot g ty -∗
+      itableInv -∗ ityShot g ty -∗
       icBody k (.depRd s dev inum g lo) -∗
       (∃ m : StampMap IcBid, ⌜qsum m = s.val⌝ ∗ ⌜maxStamp m ≤ Kt⌝ ∗
         reference (icfgBox k) (some (dev, inum)) m) -∗
@@ -536,7 +536,7 @@ theorem icCheckoutRd [Icfg] [CurCtx] (cpu : CPU) (cn : IcNames) (γfs : FsNames)
         ⟨hp, nclose_subseteq icBoxN k p hc⟩⟩
   have hsplit : ∀ (x : IcX) (ξ' : CtxId),
       iprop(icDeposit (GF := GF) cn k (.depRd s dev inum g lo) ∗ liveGenlo k s g lo ∗
-          itableInv (hlc := hlc) ∗ ityShot g ty) ∗
+          itableInv ∗ ityShot g ty) ∗
         (icBoxPay (GF := GF) cn γfs γi cov logstart k).hdr (some (dev, inum)) x ξ' ⊢
       |={E \ ↑(ndot icBoxN k)}=>
         (icHdrHeldRdSl cn γfs γi cov logstart k s g lo (some (dev, inum)) x ξ' ∗
@@ -559,7 +559,7 @@ theorem icCheckoutRd [Icfg] [CurCtx] (cpu : CPU) (cn : IcNames) (γfs : FsNames)
   imod MachCSL.boxCheckoutHook (icBoxPay cn γfs γi cov logstart k) (ndot icBoxN k) (icfgBox k) cpu ξ
       (some (dev, inum)) (icHdrHeldRdSl cn γfs γi cov logstart k s g lo)
       iprop(icDeposit cn k (.depRd s dev inum g lo) ∗ liveGenlo k s g lo ∗
-        itableInv (hlc := hlc) ∗ ityShot g ty) m s0 Kt Kp E
+        itableInv ∗ ityShot g ty) m s0 Kt Kp E
       (nclose_subseteq' k hE) hs0 hmt hKp hsplit
       $$ [Hrun Href Hd Hlv Hrp] with ⟨Hrun, ⟨%x, Hhl, Hrest⟩, Hhold⟩
   · isplitr

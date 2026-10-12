@@ -40,15 +40,15 @@ open Iris Iris.BI Iris.ProofMode MachCSL Wid Pline' PipeStage
 set_option synthInstance.maxSize 1024
 
 section PipeOutNFam
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [PipeOutG GF]
 
-instance pwcBlkV_timeless_G (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (v : EraPins)
+instance pwcBlkV_timeless_G (g : PipeGn) (M : LModel) (G : GenCparams GF M) (v : EraPins)
     (I : List (BitVec 8)) (sR : M.lmSt) (k : Nat) (pre : List (BitVec 8)) (tm : Bool) :
     Timeless (pwcBlkV g M G.gcPIN G.gcW G.gcT v I sR k pre tm) :=
   pwcBlkV_timeless g M G.gcPIN G.gcW G.gcT v I sR k pre tm
 
-instance ptkV_persistent_G (M : LModel) (G : GenCparams hlc GF M) (v : EraPins)
+instance ptkV_persistent_G (M : LModel) (G : GenCparams GF M) (v : EraPins)
     (I : List (BitVec 8)) (k : Nat) : Persistent (ptkV G.gcT v I k) :=
   ptkV_persistent G.gcT v I k
 
@@ -57,7 +57,7 @@ instance ptkV_persistent_G (M : LModel) (G : GenCparams hlc GF M) (v : EraPins)
 /-- THE CLAIM PAYS THE FAMILY'S ONE OBLIGATION at the round's state: the
 first byte opens the round, every further byte (any writer's) appends to its
 ledger (Rocq `pblkV_ecl_holds`). -/
-theorem pblkV_ecl_holds (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)
+theorem pblkV_ecl_holds (g : PipeGn) (M : LModel) (G : GenCparams GF M) (sd : M.lmSt)
     (WA : GenWa M G sd) (hext : ∀ k l, WA.gext k l = pext g k l)
     (v : EraPins) (I : List (BitVec 8)) (sR : M.lmSt)
     (hfree : ∀ k a, ⊢ WA.gpr k v I a) :
@@ -162,7 +162,7 @@ theorem pblkV_ecl_holds (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd 
 /-- THE FILING, at the credential, through the view: once the family has
 handed the block back, the prompt's first byte files it as the view's
 `PLRun pre` (Rocq `pwc_blkV_file`). -/
-theorem pwcBlkV_file (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M)
+theorem pwcBlkV_file (g : PipeGn) (M : LModel) (G : GenCparams GF M) (B : LmByteLaws M)
     (sd : M.lmSt) (WA : GenWa M G sd) (hext : ∀ k l, WA.gext k l = pext g k l)
     (V : PView M) (v : EraPins) (I : List (BitVec 8)) (sR : M.lmSt) (lR : Pline') (k : Nat)
     (ho : List Obs) (H : ConsHist) (pre : List (BitVec 8)) (b : BitVec 8)
@@ -264,10 +264,10 @@ theorem runN_silent (fc : List (BitVec 8) → Option (List (BitVec 8))) (l : Pli
 
 /-- the record's claim is SOME claim that pays the N-writer family's one
 obligation at every pipeline line of the view (Rocq `cons_claimV`) -/
-def consClaimV (g : PipeGn) (M : LModel) (V : PView M) (G : GenCparams hlc GF M) (sd : M.lmSt)
+def consClaimV (g : PipeGn) (M : LModel) (V : PView M) (G : GenCparams GF M) (sd : M.lmSt)
     (_WA : GenWa M G sd) : Prop :=
   ∃ CL : Nat → List Obs → ConsHist → IProp GF,
-    MachFixedGS.consRes (hlc := hlc) (GF := GF) = CL
+    MachFixedGS.consRes (GF := GF) = CL
     ∧ ∀ (v : EraPins) (I : List (BitVec 8)) (sR : M.lmSt) (lR : Pline'),
         V.pvLine (lineV M I) = some lR →
         ⊢ eclN CL (pwcBlkV g M G.gcPIN G.gcW G.gcT v I sR) (ptkV G.gcT v I) (pwitV M I sR)
@@ -278,7 +278,7 @@ section Family
 variable [GhostVarG GF (Option (List (BitVec 8)))]
 
 /-- THE ROUND'S LEND at the pipeline (Rocq `pipesV_alloc`). -/
-theorem pipesV_alloc (g : PipeGn) (M : LModel) (V : PView M) (G : GenCparams hlc GF M)
+theorem pipesV_alloc (g : PipeGn) (M : LModel) (V : PView M) (G : GenCparams GF M)
     (v : EraPins) (I : List (BitVec 8)) (sR : M.lmSt) (lR : Pline') (hl : plOk lR)
     (E : CoPset) (N : Namespace) (k : Nat)
     (TERM : Wid → List (BitVec 8) → Bool)
@@ -286,7 +286,7 @@ theorem pipesV_alloc (g : PipeGn) (M : LModel) (V : PView M) (G : GenCparams hlc
     (dep : Wid → List (BitVec 8) → IProp GF) [∀ w s, Timeless (dep w s)] :
     ⊢ pwcBlkV g M G.gcPIN G.gcW G.gcT v I sR k [] false ={E}=∗
       ∃ γc γm : Wid → GName,
-        blkNInv (hlc := hlc) (wids (lcats lR)) (runN (V.pvFc sR) lR)
+        blkNInv (wids (lcats lR)) (runN (V.pvFc sR) lR)
           (pwcBlkV g M G.gcPIN G.gcW G.gcT v I sR) TERM TOK dep N k γc γm
         ∗ [∗list] w ∈ wids (lcats lR), wcurN γc w (1 : Qp).half 0
             ∗ wmodeN γm w (1 : Qp).half none :=
@@ -294,7 +294,7 @@ theorem pipesV_alloc (g : PipeGn) (M : LModel) (V : PView M) (G : GenCparams hlc
     TERM TOK dep (wids_nodup _) E N k (runN_silent _ lR hl)
 
 /-- A FURTHER BYTE by any writer of the pipeline (Rocq `pipesV_cstep`). -/
-theorem pipesV_cstep (g : PipeGn) (M : LModel) (V : PView M) (G : GenCparams hlc GF M)
+theorem pipesV_cstep (g : PipeGn) (M : LModel) (V : PView M) (G : GenCparams GF M)
     (sd : M.lmSt) (WA : GenWa M G sd) (hcons : consClaimV g M V G sd WA)
     (v : EraPins) (I : List (BitVec 8)) (sR : M.lmSt) (lR : Pline')
     (hlR : V.pvLine (lineV M I) = some lR) (hfc : fcOk (V.pvFc sR)) (ha : V.pvAdm lR = true)
@@ -306,7 +306,7 @@ theorem pipesV_cstep (g : PipeGn) (M : LModel) (V : PView M) (G : GenCparams hlc
     (hns : (↑N : CoPset) ## ↑(uartN .uart0)) (hw : w ∈ wids (lcats lR)) (hc : 0 < c)
     (hb : s[c]? = some b)
     (hok : cstepOkN (wids (lcats lR)) (runN (V.pvFc sR) lR) (pwitV M I sR) TERM TOK w s c) :
-    ⊢ blkNInv (hlc := hlc) (wids (lcats lR)) (runN (V.pvFc sR) lR)
+    ⊢ blkNInv (wids (lcats lR)) (runN (V.pvFc sR) lR)
         (pwcBlkV g M G.gcPIN G.gcW G.gcT v I sR) TERM TOK dep N k γc γm -∗
       wcurN γc w (1 : Qp).half c -∗ wmodeN γm w (1 : Qp).half (some s) -∗
       (wcurN γc w (1 : Qp).half (c + 1) -∗ wmodeN γm w (1 : Qp).half (some s)
@@ -322,7 +322,7 @@ theorem pipesV_cstep (g : PipeGn) (M : LModel) (V : PView M) (G : GenCparams hlc
     $$ Hecl Hinv HcW HmW HΦ
 
 /-- A WRITER'S FIRST BYTE, spending the exclusions (Rocq `pipesV_fire`). -/
-theorem pipesV_fire (g : PipeGn) (M : LModel) (V : PView M) (G : GenCparams hlc GF M)
+theorem pipesV_fire (g : PipeGn) (M : LModel) (V : PView M) (G : GenCparams GF M)
     (sd : M.lmSt) (WA : GenWa M G sd) (hcons : consClaimV g M V G sd WA)
     (v : EraPins) (I : List (BitVec 8)) (sR : M.lmSt) (lR : Pline')
     (hlR : V.pvLine (lineV M I) = some lR) (hfc : fcOk (V.pvFc sR)) (ha : V.pvAdm lR = true)
@@ -336,7 +336,7 @@ theorem pipesV_fire (g : PipeGn) (M : LModel) (V : PView M) (G : GenCparams hlc 
     (hw : w ∈ wids (lcats lR)) (hb : s[0]? = some b)
     (hok : fireOkN (wids (lcats lR)) (runN (V.pvFc sR) lR) (pwitV M I sR) TERM TOK w s EXCL) :
     ⊢ □ (∀ w' s', ⌜EXCL w' s'⌝ -∗ dep w' s' -∗ dep w s ={Eex}=∗ False) -∗
-      blkNInv (hlc := hlc) (wids (lcats lR)) (runN (V.pvFc sR) lR)
+      blkNInv (wids (lcats lR)) (runN (V.pvFc sR) lR)
         (pwcBlkV g M G.gcPIN G.gcW G.gcT v I sR) TERM TOK dep N k γc γm -∗
       wcurN γc w (1 : Qp).half 0 -∗ wmodeN γm w (1 : Qp).half none -∗ dep w s -∗
       (wcurN γc w (1 : Qp).half 1 -∗ wmodeN γm w (1 : Qp).half (some s)
@@ -354,7 +354,7 @@ theorem pipesV_fire (g : PipeGn) (M : LModel) (V : PView M) (G : GenCparams hlc 
 /-- AT THE PROMPT, WITH EVERY HALF BACK: the block is one of the line's, and
 the claim's credential comes back at the flag `false` (Rocq
 `pipesV_file`). -/
-theorem pipesV_file (g : PipeGn) (M : LModel) (V : PView M) (G : GenCparams hlc GF M)
+theorem pipesV_file (g : PipeGn) (M : LModel) (V : PView M) (G : GenCparams GF M)
     (v : EraPins) (I : List (BitVec 8)) (sR : M.lmSt) (lR : Pline')
     (E : CoPset) (N : Namespace) (k : Nat) (γc γm : Wid → GName)
     (TERM : Wid → List (BitVec 8) → Bool)
@@ -362,7 +362,7 @@ theorem pipesV_file (g : PipeGn) (M : LModel) (V : PView M) (G : GenCparams hlc 
     (dep : Wid → List (BitVec 8) → IProp GF) [∀ w s, Timeless (dep w s)]
     (sw : Wid → List (BitVec 8))
     (hN : (↑N : CoPset) ⊆ E) (hT : ∀ w, w ∈ wids (lcats lR) → TERM w (sw w) = false) :
-    ⊢ blkNInv (hlc := hlc) (wids (lcats lR)) (runN (V.pvFc sR) lR)
+    ⊢ blkNInv (wids (lcats lR)) (runN (V.pvFc sR) lR)
         (pwcBlkV g M G.gcPIN G.gcW G.gcT v I sR) TERM TOK dep N k γc γm -∗
       ([∗list] w ∈ wids (lcats lR), wcurN γc w (1 : Qp).half (sw w).length
                         ∗ wmodeN γm w (1 : Qp).half (some (sw w))) ={E}=∗

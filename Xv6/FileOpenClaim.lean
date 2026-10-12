@@ -41,20 +41,20 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 /-- `fsGammaL`'s top map is the names' (`rfl`; for `simp` through the
 unfolded commits; `PinnedObs`' private `pobs_fsGammaL_top`). -/
-theorem fileOpen_fsGammaL_top {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF]
+theorem fileOpen_fsGammaL_top {GF : BundledGFunctors.{0}} [MachFixedGS GF]
     [FsBytesG GF] (γfs : FsNames) :
-    (fsGammaL (hlc := hlc) (GF := GF) γfs).top = γfs.top := rfl
+    (fsGammaL (GF := GF) γfs).top = γfs.top := rfl
 
 section FileOpenClaim
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [OffboxG GF] [FsTopG GF] [Appcfg GF] [Icfg]
 
 /-- The era's claim IS the file claim, at the application's equation (a
 helper: the proofs rewrite with it instead of `subst`-ing the instance, which
 the section's other lemmas still need). -/
 theorem fileOpen_appPred (c : FileFixed) (r : FileAppNames)
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r })
-    (v : Aview) : appPred (GF := GF) appRun v = filePred (hlc := hlc) c r v := by
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred c, appRun := r })
+    (v : Aview) : appPred (GF := GF) appRun v = filePred c r v := by
   subst heq; rfl
 
 /-! ## §1. The reading law at a fraction -/
@@ -62,9 +62,9 @@ theorem fileOpen_appPred (c : FileFixed) (r : FileAppNames)
 /-- THE READING LAW AT A FRACTION (Rocq `file_deed_law_q`). -/
 theorem fileDeed_law_q (c : FileFixed) (r : FileAppNames) (q : Qp) :
     ⊢@{IProp GF} □ (∀ (v : Aview) (s : Dst),
-      fdq r q s -∗ filePred (hlc := hlc) c r v -∗
-      filePred (hlc := hlc) c r v ∗ fdq r q s ∗
-      (⌜fOk v s ∧ fileFsPure v⌝ ∨ fileTaint (hlc := hlc) c)) := by
+      fdq r q s -∗ filePred c r v -∗
+      filePred c r v ∗ fdq r q s ∗
+      (⌜fOk v s ∧ fileFsPure v⌝ ∨ fileTaint c)) := by
   iintro !> %v %s Hd Hp
   unfold filePred
   icases Hp with (#Ht | ⟨%hpins, Hc, Hf, Hsy⟩)
@@ -103,8 +103,8 @@ theorem fileDeed_law_q (c : FileFixed) (r : FileAppNames) (q : Qp) :
 /-- THE CONSOLE'S PIN, AT THE FILE CLAIM (Rocq `file_cons_law`). -/
 theorem fileCons_law (c : FileFixed) (r : FileAppNames) (jc : Nat) :
     ⊢@{IProp GF} consMade r.fnCons jc -∗
-      □ (∀ v : Aview, filePred (hlc := hlc) c r v -∗
-        filePred (hlc := hlc) c r v ∗ (⌜consPresentAt jc v⌝ ∨ fileTaint (hlc := hlc) c)) := by
+      □ (∀ v : Aview, filePred c r v -∗
+        filePred c r v ∗ (⌜consPresentAt jc v⌝ ∨ fileTaint c)) := by
   iintro #Hm
   ihave #Hl := fileConsCred_law c r (some jc) $$ [Hm]
   · iapply fileConsCred_of_made c r jc $$ Hm
@@ -117,14 +117,14 @@ theorem fileCons_law (c : FileFixed) (r : FileAppNames) (jc : Nat) :
 /-- The claim's fixed-view read at a deed fraction (Rocq `file_claim_read`). -/
 theorem fileClaim_read (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (jo : Option Nat)
     (s : Dst) (q : Qp) (I : RegMapF FsNode)
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r }) :
-    ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗ fileConsCred (hlc := hlc) c r jo -∗ fdq r q s -∗
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred c, appRun := r }) :
+    ⊢@{IProp GF} appInv γfs -∗ fileConsCred c r jo -∗ fdq r q s -∗
       (γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I) ={appE}=∗
       (γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I) ∗ fdq r q s ∗
-      (⌜fclaimFacts jo s (absView I)⌝ ∨ fileTaint (hlc := hlc) c) := by
-  have hap := fileOpen_appPred (hlc := hlc) c r heq
+      (⌜fclaimFacts jo s (absView I)⌝ ∨ fileTaint c) := by
+  have hap := fileOpen_appPred c r heq
   iintro #Hinv #Hm Hd Hka
-  ihave #Hlaw := fileDeed_law_q (hlc := hlc) c r q
+  ihave #Hlaw := fileDeed_law_q c r q
   ihave #Hcl := fileConsCred_law c r jo $$ Hm
   unfold appInv
   imod (inv_acc (E := appE) (N := appN) (P := appBody (GF := GF) γfs) (fun _ h => h)) $$ Hinv
@@ -134,13 +134,13 @@ theorem fileClaim_read (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (jo :
   icases Hbody with ⟨%I', >Hh, Hp, >%hdom⟩
   ihave %hI := ghost_map_auth_agree (GF := GF) γfs.top _ _ I I' $$ Hka Hh
   subst hI
-  ihave Hpc : iprop(▷ (filePred (hlc := hlc) c r (absView I) ∗ fdq r q s ∗
-      (⌜fOk (absView I) s ∧ fileFsPure (absView I)⌝ ∨ fileTaint (hlc := hlc) c))) $$ [Hp Hd]
+  ihave Hpc : iprop(▷ (filePred c r (absView I) ∗ fdq r q s ∗
+      (⌜fOk (absView I) s ∧ fileFsPure (absView I)⌝ ∨ fileTaint c))) $$ [Hp Hd]
   · inext
     iapply Hlaw $$ Hd Hp
   icases Hpc with ⟨Hp, >Hd, >Hc1⟩
-  ihave Hpd : iprop(▷ (filePred (hlc := hlc) c r (absView I) ∗
-      (⌜consFact jo (absView I)⌝ ∨ fileTaint (hlc := hlc) c))) $$ [Hp]
+  ihave Hpd : iprop(▷ (filePred c r (absView I) ∗
+      (⌜consFact jo (absView I)⌝ ∨ fileTaint c))) $$ [Hp]
   · inext
     iapply Hcl $$ Hp
   icases Hpd with ⟨Hp, >Hc2⟩
@@ -161,15 +161,15 @@ theorem fileClaim_read (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (jo :
 token beside the ledger witness reads the same three facts. -/
 theorem fileClaim_read_esc (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
     (jo : Option Nat) (n : Nat) (s : Dst) (g : GName) (I : RegMapF FsNode)
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r }) :
-    ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗ fileConsCred (hlc := hlc) c r jo -∗
-      escKey (hlc := hlc) c r n s g -∗ escTok (hlc := hlc) g -∗
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred c, appRun := r }) :
+    ⊢@{IProp GF} appInv γfs -∗ fileConsCred c r jo -∗
+      escKey c r n s g -∗ escTok g -∗
       (γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I) ={appE}=∗
-      (γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I) ∗ escTok (hlc := hlc) g ∗
-      ((⌜fclaimFacts jo s (absView I)⌝ ∗ fTyped c s) ∨ fileTaint (hlc := hlc) c) := by
-  have hap := fileOpen_appPred (hlc := hlc) c r heq
+      (γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I) ∗ escTok g ∗
+      ((⌜fclaimFacts jo s (absView I)⌝ ∗ fTyped c s) ∨ fileTaint c) := by
+  have hap := fileOpen_appPred c r heq
   iintro #Hinv #Hm #Hwit Htok Hka
-  ihave #Hlaw := fileEscrow_law (hlc := hlc) (GF := GF) c r
+  ihave #Hlaw := fileEscrow_law (GF := GF) c r
   ihave #Hcl := fileConsCred_law c r jo $$ Hm
   unfold appInv
   imod (inv_acc (E := appE) (N := appN) (P := appBody (GF := GF) γfs) (fun _ h => h)) $$ Hinv
@@ -179,14 +179,14 @@ theorem fileClaim_read_esc (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
   icases Hbody with ⟨%I', >Hh, Hp, >%hdom⟩
   ihave %hI := ghost_map_auth_agree (GF := GF) γfs.top _ _ I I' $$ Hka Hh
   subst hI
-  ihave Hpc : iprop(▷ (filePred (hlc := hlc) c r (absView I) ∗ escTok (hlc := hlc) g ∗
+  ihave Hpc : iprop(▷ (filePred c r (absView I) ∗ escTok g ∗
       ((⌜fOk (absView I) s ∧ fileFsPure (absView I)⌝ ∗ fTyped c s)
-        ∨ fileTaint (hlc := hlc) c))) $$ [Hp Htok]
+        ∨ fileTaint c))) $$ [Hp Htok]
   · inext
     iapply Hlaw $$ Hwit Htok Hp
   icases Hpc with ⟨Hp, >Htok, >Hc1⟩
-  ihave Hpd : iprop(▷ (filePred (hlc := hlc) c r (absView I) ∗
-      (⌜consFact jo (absView I)⌝ ∨ fileTaint (hlc := hlc) c))) $$ [Hp]
+  ihave Hpd : iprop(▷ (filePred c r (absView I) ∗
+      (⌜consFact jo (absView I)⌝ ∨ fileTaint c))) $$ [Hp]
   · inext
     iapply Hcl $$ Hp
   icases Hpd with ⟨Hp, >Hc2⟩
@@ -209,14 +209,14 @@ theorem fileClaim_read_esc (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
 `file_escrow_read_at`). -/
 theorem fileEscrow_read_at (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (n : Nat)
     (s : Dst) (g : GName) (I : RegMapF FsNode)
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r }) :
-    ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗ escKey (hlc := hlc) c r n s g -∗
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred c, appRun := r }) :
+    ⊢@{IProp GF} appInv γfs -∗ escKey c r n s g -∗
       (γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I) ={appE}=∗
       (γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I) ∗
-      (⌜fOk (absView I) s⌝ ∨ escSpent (hlc := hlc) g ∨ fileTaint (hlc := hlc) c) := by
-  have hap := fileOpen_appPred (hlc := hlc) c r heq
+      (⌜fOk (absView I) s⌝ ∨ escSpent g ∨ fileTaint c) := by
+  have hap := fileOpen_appPred c r heq
   iintro #Hinv #Hwit Hka
-  ihave #Hlaw := fileEscrow_read (hlc := hlc) (GF := GF) c r
+  ihave #Hlaw := fileEscrow_read (GF := GF) c r
   unfold appInv
   imod (inv_acc (E := appE) (N := appN) (P := appBody (GF := GF) γfs) (fun _ h => h)) $$ Hinv
     with ⟨Hbody, Hclose⟩
@@ -225,9 +225,9 @@ theorem fileEscrow_read_at (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (
   icases Hbody with ⟨%I', >Hh, Hp, >%hdom⟩
   ihave %hI := ghost_map_auth_agree (GF := GF) γfs.top _ _ I I' $$ Hka Hh
   subst hI
-  ihave Hpc : iprop(▷ (filePred (hlc := hlc) c r (absView I) ∗
+  ihave Hpc : iprop(▷ (filePred c r (absView I) ∗
       ((⌜fOk (absView I) s ∧ fileFsPure (absView I)⌝ ∗ fTyped c s)
-        ∨ escSpent (hlc := hlc) g ∨ fileTaint (hlc := hlc) c))) $$ [Hp]
+        ∨ escSpent g ∨ fileTaint c))) $$ [Hp]
   · inext
     iapply Hlaw $$ Hwit Hp
   icases Hpc with ⟨Hp, >Hc⟩
@@ -246,20 +246,20 @@ theorem fileEscrow_read_at (γfs : FsNames) (c : FileFixed) (r : FileAppNames) (
 /-- THE FREE STEP at the era's record (Rocq `file_app_step_free_at`). -/
 theorem fileAppStep_free_at (c : FileFixed) (r : FileAppNames) (i : Nat)
     (I : RegMapF FsNode) (av' : Aview)
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r })
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred c, appRun := r })
     (hpins : fileFsPure (absView I) → fileFsPure av')
     (hab : consAbsent (absView I) → consAbsent av')
     (hpr : ∀ j, consPresentAt j (absView I) → consPresentAt j av')
     (hok : ∀ s : Dst, fOk (absView I) s → fOk av' s) :
     ⊢@{IProp GF} appStep i I av' := by
-  have hap := fileOpen_appPred (hlc := hlc) c r heq
+  have hap := fileOpen_appPred c r heq
   unfold appStep
   simp only [hap]
   iintro %n' %hav Hp
   rw [hav]
   imodintro
   inext
-  iapply fileStep_free (hlc := hlc) c r _ _ hpins hab hpr hok $$ Hp
+  iapply fileStep_free c r _ _ hpins hab hpr hok $$ Hp
 
 /-! ## §3e'. What the claim says at a view nobody holds a fraction at -/
 
@@ -293,12 +293,12 @@ theorem fclaimFree_of (c : FileFixed) (v : Aview) (s : Dst) (hpins : fileFsPure 
 /-- The claim read with no fraction at all (Rocq `file_claim_read_free`). -/
 theorem fileClaim_read_free (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
     (I : RegMapF FsNode)
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r }) :
-    ⊢@{IProp GF} appInv (hlc := hlc) γfs -∗
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred c, appRun := r }) :
+    ⊢@{IProp GF} appInv γfs -∗
       (γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I) ={appE}=∗
       (γfs.top ↪●MAP{DFrac.own (1 : Qp).half} I) ∗
-      (⌜fclaimFree (absView I)⌝ ∨ fileTaint (hlc := hlc) c) := by
-  have hap := fileOpen_appPred (hlc := hlc) c r heq
+      (⌜fclaimFree (absView I)⌝ ∨ fileTaint c) := by
+  have hap := fileOpen_appPred c r heq
   iintro #Hinv Hka
   unfold appInv
   imod (inv_acc (E := appE) (N := appN) (P := appBody (GF := GF) γfs) (fun _ h => h)) $$ Hinv
@@ -308,14 +308,14 @@ theorem fileClaim_read_free (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
   icases Hbody with ⟨%I', >Hh, >Hp, >%hdom⟩
   ihave %hI := ghost_map_auth_agree (GF := GF) γfs.top _ _ I I' $$ Hka Hh
   subst hI
-  ihave ⟨Hp, Hres⟩ : iprop(filePred (hlc := hlc) c r (absView I) ∗
-      (⌜fclaimFree (absView I)⌝ ∨ fileTaint (hlc := hlc) c)) $$ [Hp]
+  ihave ⟨Hp, Hres⟩ : iprop(filePred c r (absView I) ∗
+      (⌜fclaimFree (absView I)⌝ ∨ fileTaint c)) $$ [Hp]
   · unfold filePred
     icases Hp with (#Ht | ⟨%hpins, Hc, Hf, Hsy⟩)
     · isplitl []
       · ileft; iexact Ht
       · iright; iexact Ht
-    ihave ⟨Hf, %hfree⟩ : iprop(fState (hlc := hlc) c r (absView I) ∗ ⌜fclaimFree (absView I)⌝)
+    ihave ⟨Hf, %hfree⟩ : iprop(fState c r (absView I) ∗ ⌜fclaimFree (absView I)⌝)
       $$ [Hf]
     · unfold fState
       icases Hf with (⟨Hw, Hf⟩ | Hf)
@@ -365,12 +365,12 @@ theorem fileClaim_read_free (γfs : FsNames) (c : FileFixed) (r : FileAppNames)
 
 /-- Rocq `file_pin_law_q`. -/
 theorem filePin_law_q (c : FileFixed) (r : FileAppNames) (q : Qp) (s : Dst)
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r }) :
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred c, appRun := r }) :
     ⊢@{IProp GF} □ (∀ v : Aview, fdq r q s -∗ appPred appRun v -∗
-      appPred appRun v ∗ fdq r q s ∗ (⌜fOk v s⌝ ∨ fileTaint (hlc := hlc) c)) := by
-  have hap := fileOpen_appPred (hlc := hlc) c r heq
+      appPred appRun v ∗ fdq r q s ∗ (⌜fOk v s⌝ ∨ fileTaint c)) := by
+  have hap := fileOpen_appPred c r heq
   simp only [hap]
-  ihave #Hlaw := fileDeed_law_q (hlc := hlc) c r q
+  ihave #Hlaw := fileDeed_law_q c r q
   iintro !> %v Hd Hp
   ihave ⟨Hp, Hd, Hc⟩ := Hlaw $$ %v %s Hd Hp
   iframe Hp Hd
@@ -380,11 +380,11 @@ theorem filePin_law_q (c : FileFixed) (r : FileAppNames) (q : Qp) (s : Dst)
 
 /-- THE TAINT ANSWERS FOR EVERY VIEW (Rocq `FileOpenMiss.file_taint_sup`). -/
 theorem fileTaint_sup (c : FileFixed) (r : FileAppNames)
-    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred (hlc := hlc) c, appRun := r }) :
-    ⊢@{IProp GF} □ (fileTaint (hlc := hlc) c -∗ appSup) := by
-  have hap := fileOpen_appPred (hlc := hlc) c r heq
+    (heq : ‹Appcfg GF› = { appNames := FileAppNames, appPred := filePred c, appRun := r }) :
+    ⊢@{IProp GF} □ (fileTaint c -∗ appSup) := by
+  have hap := fileOpen_appPred c r heq
   iintro !> #Ht
-  ihave H := fileSup_of_taint (hlc := hlc) c r $$ Ht
+  ihave H := fileSup_of_taint c r $$ Ht
   unfold appSup appSupRaw
   simp only [hap]
   iexact H

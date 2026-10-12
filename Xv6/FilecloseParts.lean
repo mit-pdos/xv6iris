@@ -112,7 +112,7 @@ theorem fc_calleeSaved_mk (KR R : RegMap)
 
 /-- The caller's `true` crossing is HART-FREE at a process (Rocq's
 `wp_next true` at `p = proc_addr j`). -/
-theorem fc_next_free {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] (k : KCtx) (j : Nat)
+theorem fc_next_free {GF : BundledGFunctors.{0}} [MachGS GF] (k : KCtx) (j : Nat)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (cpu c : CPU) (K : CPU → IProp GF) :
     wpNext true k.proc cpu K ⊢ wpNext true k.proc c K :=
   wpNext_shift true k.proc cpu c K (fun h => h.elim (fun e => absurd e (by decide))
@@ -150,14 +150,14 @@ theorem fc_locks_nil (k : KCtx) (hwf : k.wf) (hnoff : k.noff = 0) : k.locks = []
   List.eq_nil_of_length_eq_zero (by have := hwf.2.2.2.1; omega)
 
 /-- The caller's `true` crossing, from the entry hart to one pinned to it. -/
-theorem fc_next_shift {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] (k : KCtx)
+theorem fc_next_shift {GF : BundledGFunctors.{0}} [MachGS GF] (k : KCtx)
     (cpu c : CPU) (K : CPU → IProp GF)
     (hpin : k.sie = false ∨ k.proc = 0#64 → c = cpu) :
     wpNext true k.proc cpu K ⊢ wpNext true k.proc c K :=
   wpNext_shift true k.proc cpu c K (fun h => hpin (h.elim (fun e => absurd e (by decide)) Or.inr))
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF]
@@ -270,7 +270,7 @@ theorem fc_pipeclose [CurCtx] (PC : PIPECLOSE) (Γ : SchedNames) (c : CPU) (k' :
     (htier : k'.tier = KTier.kpt) :
     kctx c k' ∗ pcIs c KA.«pipeclose» ∗
     isPipe γl γp (k'.regs 10#5) ∗ pipeRef γp w 1 ∗
-    pipeCpay (hlc := hlc) γp.pnQueue w Φ ∗
+    pipeCpay γp.pnQueue w Φ ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk on ∗ actLend p ke ∗
     procsInv Γ ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
@@ -279,10 +279,10 @@ theorem fc_pipeclose [CurCtx] (PC : PIPECLOSE) (Γ : SchedNames) (c : CPU) (k' :
       (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend p k1) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗
       (kallocAvail γk on ∨ kallocAvail γk (availInc on)) -∗
-      pipeCpost (hlc := hlc) γp.pnQueue w Φ true -∗ wpLoop cpu'))
+      pipeCpost γp.pnQueue w Φ true -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hp
-  have h := PC.wp_pipeclose (hlc := hlc) (GF := GF) Γ c k' γl γp w γkl γk on Φ ke hw hnoff hK hpipe hproc hkmem htier
+  have h := PC.wp_pipeclose (GF := GF) Γ c k' γl γp w γkl γk on Φ ke hw hnoff hK hpipe hproc hkmem htier
   unfold wp_pipeclose_body at h
   simp only [pipecloseAddr] at h
   exact h
@@ -316,8 +316,8 @@ theorem fc_cont_fold [Fscfg] [Icfg] [CurCtx] (cpu : CPU) (k : KCtx) (γk : KmemN
       trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
       wordPointsTo (pPid k.proc) 4 dqp pidv -∗
       fdSlot -∗ irefSlot -∗ filecloseEnvOut (GF := GF) γk on st -∗
-      filecloseCpost (hlc := hlc) q st Φc -∗ wpLoop cpu')) -∗
-    filecloseCpost (hlc := hlc) q st Φc -∗
+      filecloseCpost q st Φc -∗ wpLoop cpu')) -∗
+    filecloseCpost q st Φc -∗
     wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k.regs R'⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗

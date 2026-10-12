@@ -34,7 +34,7 @@ def kernelPagetableAddr : BitVec 64 := KA.«kernel_pagetable»
 
 /-- **WP of `kvminithart`.**  `rootAddr` is the table's physical address
 (page-aligned, in RAM: `rootAddr = root ≪ 12`), `t` the installed table. -/
-def wp_kvminithart_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] (X : CurCtx)
+def wp_kvminithart_body {GF : BundledGFunctors.{0}} [MachGS GF] (X : CurCtx)
     (cpu : CPU) (k : KCtx) (tlb0 : Tlb) (rootAddr : BitVec 64) (dqr : DFrac) (t : PTree)
     (M : RegMapF (BitVec 64)) (hX : X.curTier = KTier.bare) (hsie : k.sie = false) (hK : 2 ≤ k.avail)
     (hhi : BitVec.extractLsb' 56 8 rootAddr = 0#8) (hroot : t.base = BitVec.extractLsb' 12 44 rootAddr) : Prop :=
@@ -47,8 +47,8 @@ def wp_kvminithart_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF
 
 /-- The interface of `kvminithart`. -/
 structure KVMINITHART : Prop where
-  wp_kvminithart : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] (X : CurCtx) (cpu : CPU) (k : KCtx)
+  wp_kvminithart : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] (X : CurCtx) (cpu : CPU) (k : KCtx)
     (tlb0 : Tlb) (rootAddr : BitVec 64) (dqr : DFrac) (t : PTree) (M : RegMapF (BitVec 64)) hX hsie hK hhi hroot,
-    wp_kvminithart_body (hlc := hlc) (GF := GF) X cpu k tlb0 rootAddr dqr t M hX hsie hK hhi hroot
+    wp_kvminithart_body (GF := GF) X cpu k tlb0 rootAddr dqr t M hX hsie hK hhi hroot
 
 end Xv6

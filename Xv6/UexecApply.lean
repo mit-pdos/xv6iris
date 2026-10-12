@@ -135,7 +135,7 @@ theorem ukeyEq_bump {W W' : Uvis} (hl : W.tf.length = 36) (hl' : W'.tf.length = 
     exact retPc_add4_cong hp
 
 section Apply
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF]
 open UexecSG
 
 /-- A slot family that reads its key only at the eleven readings (Rocq's `HS`
@@ -246,7 +246,7 @@ end Apply
 /-! ## §3 THE ROUND'S TAIL, AS NAMED LEMMAS -/
 
 section LoopApply
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF]
 open UexecSG
 
 /-- **Rocq `uexec_ret_F_returning`**: THE RETURNING ARM, FACTORED -- the
@@ -478,7 +478,7 @@ theorem ukc_apply [xi : CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rfd : List F
     (Wr : Uvis) (hlo : loopOk C pt) (hsz : uszOk sz) (hms : userMstatusOk ms)
     (hlz : lz = false → lazyFree pt.um (BitVec.ofNat 64 sz))
     (hR : Ustep.ureachK Wr (uvisOfRun m pc M (permOf pt.um sz) sz fdv cw gn cs pidv lz secc)) :
-    ⊢ ukc (permOf pt.um sz) M sz fdv cw gn cs pidv lz secc m pc -∗ hwConfig cpu -∗ kmapStatic (hlc := hlc) (GF := GF) -∗ wireInv -∗
+    ⊢ ukc (permOf pt.um sz) M sz fdv cw gn cs pidv lz secc m pc -∗ hwConfig cpu -∗ kmapStatic (GF := GF) -∗ wireInv -∗
       uRegs cpu (HartState.HART_ACTIVE ()) ms sc stv sep pc pc m -∗ userPtmInvX cpu pt sz M -∗ Rfd fdv -∗
       userCfg cpu C -∗ Rut pt -∗ ▷ ukb cpu C pt Rfd Rut Wr -∗
       wpLoop cpu := by
@@ -529,7 +529,7 @@ theorem uslot_applyLoop [xi : CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rfd : 
     (hch : W.ch = cs) (hpid : W.pid = pidv) (hlzw : W.lazy = lz) (hscw : W.secc = secc)
     (hlf : lz = false → lazyFree pt.um (BitVec.ofNat 64 sz)) (hg : tfResumeGpr0 W.tf = m)
     (hpc : tfResumePc W.tf = pc) :
-    ⊢ uslot W -∗ hwConfig cpu -∗ kmapStatic (hlc := hlc) (GF := GF) -∗ wireInv -∗ uRegs cpu (HartState.HART_ACTIVE ()) ms sc stv sep pc pc m -∗
+    ⊢ uslot W -∗ hwConfig cpu -∗ kmapStatic (GF := GF) -∗ wireInv -∗ uRegs cpu (HartState.HART_ACTIVE ()) ms sc stv sep pc pc m -∗
       userPtmInvX cpu pt sz M -∗ Rfd fdv -∗ userCfg cpu C -∗ Rut pt -∗
       ▷ ukb cpu C pt Rfd Rut W -∗ wpLoop cpu := by
   have hR : Ustep.ureachK W (uvisOfRun m pc M (permOf pt.um sz) sz fdv cw gn cs pidv lz secc) := by
@@ -548,7 +548,7 @@ end LoopApply
 /-! ## §5 THE FUNCTIONAL ROWS (NI M0 / M2-W3; deviation 6) -/
 
 section Det
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF]
 open UexecSG
 
 /-- **`round_det`** (NI M0, grown by G1d and G1e): at an ecall whose

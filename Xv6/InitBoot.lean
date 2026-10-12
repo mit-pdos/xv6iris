@@ -69,7 +69,7 @@ theorem initBootBytes_nul : initBootBytes 5 = 0#8 := by decide
 /-! ## 2.  THE BUNDLE -/
 
 section InitBoot
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [FsBytesG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [FsBytesG GF]
   [Appcfg GF] [CtokG GF] {SG : UexecSG GF} [Fscfg]
 
 /-- **Rocq `init_boot_bundle`**: WHAT THE APPLICATION OWES THE KERNEL ABOUT
@@ -88,7 +88,7 @@ def initBootBundle (rt cw : Nat) (secc : BitVec 64) (sts : List FdState) : IProp
   iprop(consReader fscCons 0 -∗
     ∃ (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (R : IProp GF),
       ∀ (cs : ExtTreeSet GName compare) (pidv : BitVec 32),
-        execAuPre (hlc := hlc) ⟨uslot (hlc := hlc) (SG := SG), R⟩ (fsGammaL fscFs) fscFs rt cw secc
+        execAuPre ⟨uslot (SG := SG), R⟩ (fsGammaL fscFs) fscFs rt cw secc
           (fun _ => iprop(True)) P Pmiss Fo initBootPath 1 (fun _ => 5) (fun _ => initBootBytes)
           sts cs pidv)
 
@@ -96,15 +96,15 @@ def initBootBundle (rt cw : Nat) (secc : BitVec 64) (sts : List FdState) : IProp
 every key answers both wands and tracks nothing; the reader token is
 dropped. -/
 theorem initBootBundle_triv (rt cw : Nat) (secc : BitVec 64) (sts : List FdState) :
-    ⊢ □ (∀ W : Uvis, myPay W.gen (fun _ => iprop(True)) -∗ uslot (hlc := hlc) (SG := SG) W) -∗
-      initBootBundle (hlc := hlc) (SG := SG) rt cw secc sts := by
+    ⊢ □ (∀ W : Uvis, myPay W.gen (fun _ => iprop(True)) -∗ uslot (SG := SG) W) -∗
+      initBootBundle (SG := SG) rt cw secc sts := by
   iintro #HS
   unfold initBootBundle
   iintro -
   iexists (fun _ _ => iprop(True)), (fun _ _ => iprop(True)), (pfamTriv (fun _ _ _ => iprop(True))),
     iprop(True)
   iintro %cs %pidv
-  iapply (execAuPre_triv_at (hlc := hlc) (uslot (hlc := hlc) (SG := SG)) (fsGammaL fscFs) fscFs rt cw secc
+  iapply (execAuPre_triv_at (uslot (SG := SG)) (fsGammaL fscFs) fscFs rt cw secc
     initBootPath 1 (fun _ => 5) (fun _ => initBootBytes) sts cs pidv)
   iexact HS
 

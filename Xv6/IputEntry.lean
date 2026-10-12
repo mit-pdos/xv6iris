@@ -48,7 +48,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -97,7 +97,7 @@ theorem iput_ent_ident_close (kk : Nat) (q : Qp) (dev inum : BitVec 32) :
 set_option maxHeartbeats 4000000 in
 /-- **EXIT A** (Rocq's `ip_entry_exit1`): at `+0x20` with the window open,
 into the last close (`HT`). -/
-theorem iput_ent_exitA (HT : IputTailOneSpec) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem iput_ent_exitA (HT : IputTailOneSpec) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (γil γisl : GName)
     (kk : Nat) (q : Qp) (inum : BitVec 32)
     (Mt : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × BitVec 32))
@@ -146,7 +146,7 @@ set_option maxHeartbeats 8000000 in
 /-- **EXIT B** (Rocq 4854--5035): at `+0x50` with nlink = 0 -- THE MINT
 rides `sd s3`, then `addi a5,s1,16 ; mv s3,a5 ; mv a0,a5`, the
 regeneration and the frozen park, and into the locked block (`HL`). -/
-theorem iput_ent_free (HL : IputLockedSpec) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem iput_ent_free (HL : IputLockedSpec) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat) (γil γisl : GName)
     (kk : Nat) (q : Qp) (inum : BitVec 32)
     (Mt : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × BitVec 32))
@@ -215,10 +215,10 @@ theorem iput_ent_free (HL : IputLockedSpec) (Γ : SchedNames) [ClaimIs (hlc := h
   unfold iputEntCom
   icases Hcom with ⟨Hhalf, Hsb, ⟨%tst, Hst, #Hllbk, -⟩, Hback, Hrst, Hiu, Hgid, Hicnt, Hmir, Hsel,
     Hhpn, Htxh, Htxf, Hfrag, Hlv, -, -, Hslh, Hiauth, Hipool, Hpool⟩
-  ihave #Hinv := (show iputEnv (GF := GF) Γ γl pd pav pu γil γisl kk ⊢ itableInv (hlc := hlc)
+  ihave #Hinv := (show iputEnv (GF := GF) Γ γl pd pav pu γil γisl kk ⊢ itableInv
     by unfold iputEnv; iintro ⟨-, -, -, -, -, -, H, -⟩; iexact H) $$ Henv
   ihave #Hireg := (show iputEnv (GF := GF) Γ γl pd pav pu γil γisl kk ⊢
-      iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib
+      iregInv fscIreg fscFs icfgIst icfgNib
     by unfold iputEnv; iintro ⟨-, -, -, -, -, -, -, -, H, -⟩; iexact H) $$ Henv
   iapply wpLoop_fupd
   imod iput_ent_mint kk hkk q inum Mt ci hMk hcik hnib dn bm hnl0 g ga lo tid qtx.half rgb
@@ -253,7 +253,7 @@ theorem iput_ent_free (HL : IputLockedSpec) (Γ : SchedNames) [ClaimIs (hlc := h
 set_option maxHeartbeats 4000000 in
 /-- **nlink ≠ 0: THE UNDO** (Rocq 4722--4800): `+0xcc ld s2 ; +0xce ld s4 ;
 +0xd0 c.j +0x20`, the header re-formed, and EXIT A. -/
-theorem iput_ent_undo (HT : IputTailOneSpec) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem iput_ent_undo (HT : IputTailOneSpec) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (γil γisl : GName)
     (kk : Nat) (q : Qp) (inum : BitVec 32)
     (Mt : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × BitVec 32))
@@ -320,7 +320,7 @@ refuted, `+0x3e sd s2 ; +0x40 sd s4`, `+0x42 lw s4,0(s1)` (dev) and
 `+0x46 lw s2,4(s1)` (inum) off the closer's own share, `+0x4a lh a4,74(s1)`
 (nlink) off the header in hand, `+0x4e c.bnez`: the undo or the free. -/
 theorem iput_ent_loaded (HT : IputTailOneSpec) (HL : IputLockedSpec)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat) (γil γisl : GName)
     (kk : Nat) (q : Qp) (inum : BitVec 32)
     (Mt : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × BitVec 32))
@@ -360,7 +360,7 @@ theorem iput_ent_loaded (HT : IputTailOneSpec) (HL : IputLockedSpec)
   iintro ⟨Hk, Hpc, #Henv, Hlocked, Harm, Hte, Hce, Hcom, Hid, Hrd, #Hllbd, #Hflw, Hc, Hhdr,
     Hrg, Hframe, Hrest⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  ihave #Hinv := (show iputEnv (GF := GF) Γ γl pd pav pu γil γisl kk ⊢ itableInv (hlc := hlc)
+  ihave #Hinv := (show iputEnv (GF := GF) Γ γl pd pav pu γil γisl kk ⊢ itableInv
     by unfold iputEnv; iintro ⟨-, -, -, -, -, -, H, -⟩; iexact H) $$ Henv
   -- the payload ghost is on the ORDINARY alternative
   simp only [icHdrAmb, icPay, icXLoaded]
@@ -457,7 +457,7 @@ theorem iput_entry (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_NB
     -- the two successor stages (`IputTail.iput_tail_one_spec`,
     -- `IputLocked.iput_locked_spec`)
     (HT : IputTailOneSpec) (HL : IputLockedSpec)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat) (γil γisl : GName)
     (kk : Nat) (q : Qp) (inum : BitVec 32)
     (Mt : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × BitVec 32))
@@ -503,7 +503,7 @@ theorem iput_entry (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_NB
   iintro ⟨Hk, Hpc, #Henv, Hlocked, Harm, Hte, Hce, Htab, Href, #Hflt, Hru, Hrg, Hnlz, #Hcrd,
     Hop, Htx, Hpid, Hsbb, Hsi, Hsl, Hframe, Hpost⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  ihave #Hinv := (show iputEnv (GF := GF) Γ γl pd pav pu γil γisl kk ⊢ itableInv (hlc := hlc)
+  ihave #Hinv := (show iputEnv (GF := GF) Γ γl pd pav pu γil γisl kk ⊢ itableInv
     by unfold iputEnv; iintro ⟨-, -, -, -, -, -, H, -⟩; iexact H) $$ Henv
   ihave #Hbox := (show iputEnv (GF := GF) Γ γl pd pav pu γil γisl kk ⊢
       icEscrow fscIc fscFs fscIreg fscCov fscLogst kk

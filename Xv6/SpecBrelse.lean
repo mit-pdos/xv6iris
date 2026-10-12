@@ -62,7 +62,7 @@ def brelseAddr : BitVec 64 := KA.«brelse»
 def brelseSlots : Nat := 4 + releasesleepSlots
 
 /-- **WP of `brelse(b = a0)`**. -/
-def wp_brelse_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_brelse_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx] (Γ : SchedNames)
     (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (kk : Nat)
     (pidv dev bno : BitVec 32) (dqp : DFrac) (bs bsd : List (BitVec 8)) (d : Bool)
@@ -82,12 +82,12 @@ def wp_brelse_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv
 
 /-- The interface of `brelse`. -/
 structure BRELSE : Prop where
-  wp_brelse : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+  wp_brelse : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx] (Γ : SchedNames)
     (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (kk : Nat)
     (pidv dev bno : BitVec 32) (dqp : DFrac) (bs bsd : List (BitVec 8)) (d : Bool)
     hnoff hK hlk hsl hp htier hkk ha0,
-    wp_brelse_body (hlc := hlc) (GF := GF) Γ cpu k γl γ V kk pidv dev bno dqp bs bsd d
+    wp_brelse_body (GF := GF) Γ cpu k γl γ V kk pidv dev bno dqp bs bsd d
       hnoff hK hlk hsl hp htier hkk ha0
 
 end Xv6

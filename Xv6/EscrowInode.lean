@@ -143,7 +143,7 @@ namespace (deviation 1). -/
 def escAN (z : Nat) : Namespace := ndot (ndot nroot "icescA") z
 
 section EscrowInode
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF]
   [FsBytesG GF] [FsTopG GF] [Icfg]
 
 /-- Rocq `escA_body`: the per-inum one-shot escrow body.  EMPTY holds the

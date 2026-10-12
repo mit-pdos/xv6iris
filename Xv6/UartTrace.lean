@@ -171,7 +171,7 @@ structure UartNames where
   dlcnt : GName
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-- The trace so far has `tr` as a prefix (persistent). -/
 def uartSent (γ : UartNames) (tr : List (BitVec 8)) : IProp GF := MonoList.lb_own γ.acc tr
@@ -267,7 +267,7 @@ theorem sentRunAt_snoc {L0 L l : List (BitVec 8)} {ps : List Nat} {cs : List (Bi
     rw [List.mem_singleton.1 hp]; exact hl.length_le
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 theorem uartSentRun_intro (γ : UartNames) (L0 L : List (BitVec 8)) (ps : List Nat) (cs : List (BitVec 8))
     (h : sentRunAt L0 L ps cs) : uartSent (GF := GF) γ L ⊢ uartSentRun γ L0 ps cs := by

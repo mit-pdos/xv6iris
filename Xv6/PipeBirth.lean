@@ -27,7 +27,7 @@ set_option linter.unusedSimpArgs false
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [KernelGeom] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [KernelGeom] [CurCtx]
 
 /-! ## Four bytes as a word (the inverse of `MachCSL.wordPointsTo_to_bytes4`) -/
 
@@ -285,7 +285,7 @@ theorem newPipe (cpu : CPU) (pi : BitVec 64) (hpv : pageValid pi) (vname : BitVe
   ihave Hst1 := pipeEndstate_open_intro γp true 1#32 pflag_one_open $$ Hm1
   -- THE QUEUE, COUPLED AT BIRTH: nothing written, nothing read, both ends
   -- open (Rocq `new_pipe`'s `pipe_queue_ok_00`)
-  ihave Hq : pipeQres (hlc := hlc) γp 0#32 0#32 1#32 1#32 bs $$ [Hqa]
+  ihave Hq : pipeQres γp 0#32 0#32 1#32 1#32 bs $$ [Hqa]
   · unfold pipeQres
     ileft
     iexists [], 0

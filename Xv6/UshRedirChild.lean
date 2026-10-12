@@ -37,7 +37,7 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
 section UshRedirChild
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
@@ -58,16 +58,16 @@ theorem wp_kshm_child_file_redir {A : Type} (UL : UK_LEAVES) (HS : UK_SYS_P) (HF
     ⊢ ushCode N'.t -∗ ushJtab N'.t -∗ ustr N'.d (DFrac.own 1) s0 len fb -∗ ustr N'.d dw ushWsA 5 ushpWsF -∗
       ustr N'.d dv ushSymA 7 ushpSymF -∗ ustd N'.fd ld -∗ ucwd N'.cwd ROOTINO -∗ uchAny N'.ch -∗
       ushmFresh N' sz -∗
-      ushOpenCall2 (hlc := hlc) N' ROOTINO (s0 + ((wlBody ws).length + 1 + 2)) rrModeGt file (ld.set 1 .closed) K
+      ushOpenCall2 N' ROOTINO (s0 + ((wlBody ws).length + 1 + 2)) rrModeGt file (ld.set 1 .closed) K
         Dd Kf -∗
       □ (∀ ty : FdType, K ty ={⊤}=∗ K' ty) -∗
       (∀ ty : FdType,
         ushExecSupEchoAt (ushExecEnvOf UL HS HF SR.wp_shRuncmdEntry) (ushsFd1f ty) ws Q iprop(Cr' ∗ K' ty)) -∗
-      (∀ ty : FdType, ushdExecfailLaw (hlc := hlc) iprop(Cr' ∗ K' ty) Cx) -∗ □ (Cx -∗ Q (-1)) -∗
-      ushExecfailLawAt (hlc := hlc) (altOpenfailN file) (13 + file.length) iprop(Kf a ∗ Cr') Cd -∗
-      □ (Cd -∗ Q (-1)) -∗ ushpOom (hlc := hlc) N' iprop(Cr ∗ ustd N'.fd ld) (4 + (ushDg + n) - 2) -∗
+      (∀ ty : FdType, ushdExecfailLaw iprop(Cr' ∗ K' ty) Cx) -∗ □ (Cx -∗ Q (-1)) -∗
+      ushExecfailLawAt (altOpenfailN file) (13 + file.length) iprop(Kf a ∗ Cr') Cd -∗
+      □ (Cd -∗ Q (-1)) -∗ ushpOom N' iprop(Cr ∗ ustd N'.fd ld) (4 + (ushDg + n) - 2) -∗
       (Cr -∗ Dd a ∗ Cr') -∗ Cr -∗
-      urun (hlc := hlc) N' h m (BitVec.ofNat 64 0x99c) (68 + (8 + (ushDg + n))) -∗ wpLoop h := by
+      urun N' h m (BitVec.ofNat 64 0x99c) (68 + (8 + (ushDg + n))) -∗ wpLoop h := by
   obtain ⟨hred, htoks, hpos, htlen⟩ := ush_line_toks_holds_redir ws file fb 0 len hline
   have hok := hline.1
   have hlen1 : 1 < ld.length := by

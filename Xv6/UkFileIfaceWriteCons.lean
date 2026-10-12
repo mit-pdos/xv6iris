@@ -25,27 +25,27 @@ open Std (ExtTreeSet)
 open HfpFileClaimsP
 
 noncomputable section FifWriteCons
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF] [FifRegG GF]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 namespace FifCtx
-variable (X : FifCtx hlc GF)
+variable (X : FifCtx GF)
 
 /-- **Rocq `fif_write`**: `eiWrite` at the console -- the device's slot is a
 console row. -/
 theorem fif_write (UL : UK_LEAVES) [Persistent X.LINKS] [Persistent X.P.code]
     (hLw : ⊢ X.LINKS -∗ glW X.Pm) (hLb : ⊢ X.LINKS -∗ glBlk X.Pm)
-    (hLt : ⊢ X.LINKS -∗ glTaintAt X.Pm (genId (hlc := hlc) (GF := GF) + 1))
-    (hsw : ⊢ stubLaw (hlc := hlc) X.N X.P.code 16 X.P.write)
+    (hLt : ⊢ X.LINKS -∗ glTaintAt X.Pm (genId (GF := GF) + 1))
+    (hsw : ⊢ stubLaw X.N X.P.code 16 X.P.write)
     (fdm : Fdmap) (fd : Int) (d : Nat) (alts : List Bytes) (a bs : Bytes) (K : Int → IProp GF)
     (hfd : fdm fd = some d) (ha : a ∈ alts) (hpre : bs <+: a) :
     ⊢ X.fifFds fdm -∗ X.fifOut d alts -∗
       ((X.fifFds fdm -∗ X.fifOut d [a.drop bs.length] -∗ K (bs.length : Int)) ∧
        (∀ x, X.fifTaint (fdDom fdm) -∗ K x)) -∗
-      wrObl (hlc := hlc) X.N X.P fd bs K := by
+      wrObl X.N X.P fd bs K := by
   iintro Hfds Hout HK
   ihave Hout := (show X.fifOut d alts ⊢ iprop(∃ (v : EraPins) (I : List (BitVec 8)) (C : List Nat),
     fifTok X.γreg d (1 : Qp).half (.FDCons v I C) ∗ consDevAtc X.M X.Pm X.LINKS C v I alts) from .rfl) $$ Hout
@@ -74,10 +74,10 @@ theorem fif_write (UL : UK_LEAVES) [Persistent X.LINKS] [Persistent X.P.code]
 /-- **Rocq `fif_cons_nil`**: a ZERO-LENGTH write at the console, any device
 resource `D` coming back untouched. -/
 theorem fif_cons_nil (UL : UK_LEAVES) [Persistent X.P.code]
-    (hsw : ⊢ stubLaw (hlc := hlc) X.N X.P.code 16 X.P.write)
+    (hsw : ⊢ stubLaw X.N X.P.code 16 X.P.write)
     (l : List FdState) (fd : Nat) (rb : Bool) (D : IProp GF) (K : Int → IProp GF)
     (hfd : fd < NSTD) (hl : l[fd]? = some (.open rb true (.device CONSOLE))) :
-    ⊢ ustd X.N.fd l -∗ D -∗ (ustd X.N.fd l -∗ D -∗ K 0) -∗ wrObl (hlc := hlc) X.N X.P (fd : Int) [] K := by
+    ⊢ ustd X.N.fd l -∗ D -∗ (ustd X.N.fd l -∗ D -∗ K 0) -∗ wrObl X.N X.P (fd : Int) [] K := by
   unfold wrObl
   iintro Hstd Hd HK %h %m %avail %ua %tx %dq %f %hf %ha0 %ha1 %ha2 Hcode Hsrc Hrun Hcont
   ihave Hsrc := (usrcAt_rebase X.N tx dq ua (m.get 11#5).toNat 0 f (Or.inl rfl)).1 $$ Hsrc

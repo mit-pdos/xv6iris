@@ -40,7 +40,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section FileOutSeal
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF]
 
 /-! ## The era's boot-state record, allocated -/
@@ -114,7 +114,7 @@ theorem f0Pinned_io (g : FileGn) (h : List Obs) (e : Obs) (s0s : List Fstate)
 /-- The drain's read: the state the ledger fixed (Rocq `f0_pinned_drained`). -/
 theorem f0Pinned_drained (g : FileGn) (h : List Obs) (s0s : List Fstate) (vf : FileEra)
     (s0 : Fstate) (hw : obsWire .uart0 (openSeg h) ≠ []) :
-    fileEraPin (GF := GF) g (obsBoots h) vf ∗ f0Lb (hlc := hlc) g vf s0 ∗ f0Pinned g h s0s ⊢
+    fileEraPin (GF := GF) g (obsBoots h) vf ∗ f0Lb g vf s0 ∗ f0Pinned g h s0s ⊢
       ⌜∃ u1, s0s = u1 ++ [s0]⌝ := by
   unfold f0Pinned
   rw [if_neg hw]
@@ -126,7 +126,7 @@ theorem f0Pinned_drained (g : FileGn) (h : List Obs) (s0s : List Fstate) (vf : F
     · iexact Hfp'
   subst hv
   ihave %hs : ⌜s0 = s0'⌝ $$ []
-  · iapply f0Lb_agree (hlc := hlc) (GF := GF) g vf s0 s0'
+  · iapply f0Lb_agree (GF := GF) g vf s0 s0'
     isplitl []
     · iexact Hlb
     · iexact Hlb'
@@ -137,7 +137,7 @@ theorem f0Pinned_drained (g : FileGn) (h : List Obs) (s0s : List Fstate) (vf : F
 /-- The drain's fix (Rocq `f0_pinned_drain`). -/
 theorem f0Pinned_drain (g : FileGn) (h : List Obs) (b : BitVec 8) (u1 : List Fstate)
     (vf : FileEra) (s0 : Fstate) :
-    fileEraPin (GF := GF) g (obsBoots h) vf ∗ f0Lb (hlc := hlc) g vf s0 ⊢
+    fileEraPin (GF := GF) g (obsBoots h) vf ∗ f0Lb g vf s0 ⊢
       f0Pinned g (h ++ [Obs.dev (.uartOut .uart0 b)]) (u1 ++ [s0]) := by
   have hio := io_singleton (Obs.dev (.uartOut .uart0 b)) rfl
   have hs := openSeg_io h _ hio
@@ -171,17 +171,17 @@ end FileOutSeal
 /-! ## The birth step -/
 
 section FileOutSealBirth
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF]
 
 /-- THE BIRTH STEP (Rocq `file_birth_all`): `AppFile.file_birth` beside one
 more `ghost_map` allocation, handed the machine's started counter's name,
 which the fixed part keeps. -/
 theorem fileBirthAll (γst : GName) :
-    ⊢@{IProp GF} |==> ∃ g : FileGn, ⌜g.fgnCl.ffSt = γst⌝ ∗ fileClAll (hlc := hlc) g
-      ∗ syncRegAuth g.fgnCl ∅ ∗ syncCmAuth (hlc := hlc) g.fgnCl 0
+    ⊢@{IProp GF} |==> ∃ g : FileGn, ⌜g.fgnCl.ffSt = γst⌝ ∗ fileClAll g
+      ∗ syncRegAuth g.fgnCl ∅ ∗ syncCmAuth g.fgnCl 0
       ∗ slAuth g.fgnCl.ffHist 1 [] ∗ runAuth g.fgnCl 0 := by
-  imod (fileBirth (hlc := hlc) (GF := GF) γst) with ⟨%c, %hst, Hc, Hreg, Hcm, Hh, Hrun⟩
+  imod (fileBirth (GF := GF) γst) with ⟨%c, %hst, Hc, Hreg, Hcm, Hh, Hrun⟩
   imod (ghost_map_alloc_empty (GF := GF) (K := Nat) (V := FileEra) (H := RegMapF))
     with ⟨%ge, Hm⟩
   imodintro

@@ -39,7 +39,7 @@ no discard lemma on `wordPointsTo`; `Xv6/ProofUserinit.lean` builds one for
 three lines are repeated here under their own names. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- A single byte cell is publishable. -/
 theorem lbByte_persist (ξ : CtxId) (a : PAddr) (dq : DFrac) (v : BitVec 8) :
@@ -64,7 +64,7 @@ theorem lbBytes_persist (ξ : CtxId) (pa : PAddr) (n : Nat) (dq : DFrac) (w : Bi
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- **A word is publishable**: give up the fraction, keep the value forever. -/
 theorem lbWord_persist (va : PAddr) (n : Nat) (dq : DFrac) (w : BitVec (8 * n)) :
@@ -82,7 +82,7 @@ end
 /-! ## The persistent bundle -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 /-- The persistent bundle `initlog` returns, out of the sealed lock, the
@@ -93,11 +93,11 @@ theorem logCtx_mk (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (dev : BitVec 32) :
     isLock γ.lk logAddr "log" (logResAt (GF := GF) γ γb γfs cov logstart) ∗
     logFrozen logstart dev ∗ fsBytesAnyAt γfs (fsHomeList cov logstart) ∗
-    swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) ∗
-    sbParked γfs ∗ snapLaw (hlc := hlc) γ γfs cov logstart (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF)) ∗
-    snapLawGhost (hlc := hlc) γ γfs cov logstart (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF))
-      (eraSyncHook (hlc := hlc) (GF := GF)) ∗
-    crashInv (hlc := hlc) (GF := GF) ∗ genCert (hlc := hlc) (GF := GF)
+    swapLb (GF := GF) (genId (GF := GF) + 1) ∗
+    sbParked γfs ∗ snapLaw γ γfs cov logstart (eraSyncTok (GF := GF)) (genId (GF := GF)) ∗
+    snapLawGhost γ γfs cov logstart (eraSyncTok (GF := GF)) (genId (GF := GF))
+      (eraSyncHook (GF := GF)) ∗
+    crashInv (GF := GF) ∗ genCert (GF := GF)
     ⊢ logCtx γ γb γfs cov logstart dev := by
   unfold logCtx; iintro H; iexact H
 
@@ -125,7 +125,7 @@ block's content moves inside `Xv6.fsBytesInv` through
 `Xv6.fsblock_install_exc`, and `SpecInitlog` is general in `n`.) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 /-- **THE TWO FROZEN CELLS**, minted at `initlog`'s two stores.  Rocq's
@@ -153,7 +153,7 @@ theorem logStateAt_boot (γb : BcacheNames) (γfs : FsNames)
     (L : BlockMap) (D : RegMapF Bool) (bsh : List (BitVec 8))
     (M : LogMirror) (hMhdr : lmHdr M logstart = (0, []))
     (hMtie : logMirrorTieBody M L cov logstart []) :
-    logMirrorHalf (hlc := hlc) M ∗
+    logMirrorHalf M ∗
     wordPointsTo (GF := GF) lhNAddr 4 (DFrac.own 1) 0#32 ∗
     ([∗list] i ∈ List.range LOGBLOCKS, ∃ w : BitVec 32,
        wordPointsTo (lhBlock i) 4 (DFrac.own 1) w) ∗
@@ -223,7 +223,7 @@ theorem logFreeTok_split (γ : LogNames) :
     logFreeTok (GF := GF) γ ⊢ lockFreeTok γ.lk ∗
       ((γ.ops ↪●MAP (∅ : RegMapF OpEntry)) ∗ logEpochAuth γ 1 ∗
         logRegAuth γ (∅ : RegMapF (Nat × Nat)) ∗ logTxAuth γ (∅ : RegMapF Unit)) ∗
-      (γ.help ↪●MAP (∅ : RegMapF (GName × BitVec 32))) ∗ eraSyncTok (hlc := hlc) (GF := GF) := by
+      (γ.help ↪●MAP (∅ : RegMapF (GName × BitVec 32))) ∗ eraSyncTok (GF := GF) := by
   unfold logFreeTok; iintro ⟨H1, H2, H3, H4, H5, H6, H7⟩; iframe H1 H2 H3 H4 H5 H6 H7
 
 /-- **`Xv6.logResAt` AT GENESIS** (Rocq's boot `log_res` pack).  `out = 0`,
@@ -240,7 +240,7 @@ theorem logResAt_boot (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
       logRegAuth γ (∅ : RegMapF (Nat × Nat)) ∗ logTxAuth γ (∅ : RegMapF Unit)) ∗
     -- THE HELPING SLOT, EMPTY, and THE ERA'S SYNC TOKEN (sync K3-3/K3-4),
     -- off `Xv6.logFreeTok`
-    (γ.help ↪●MAP (∅ : RegMapF (GName × BitVec 32))) ∗ eraSyncTok (hlc := hlc) (GF := GF) ∗
+    (γ.help ↪●MAP (∅ : RegMapF (GName × BitVec 32))) ∗ eraSyncTok (GF := GF) ∗
     logStateAt γb γfs cov logstart 0 [] (opPending (∅ : RegMapF OpEntry)) curCtx
     ⊢ logResAt (GF := GF) γ γb γfs cov logstart curCtx := by
   unfold logResAt

@@ -31,21 +31,21 @@ open HfpPipeP HfpFileClaimsP
 open Std (ExtTreeSet)
 
 section CifLend
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [PipesNG GF] [CifRegG GF]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-- **Rocq `cif_catf_lend`**: what the producer stage is lent (deviation 1). -/
-def catfLend (R : PnsRound hlc GF) 
+def catfLend (R : PnsRound GF) 
     (cf : FileFixed) (rf : FileAppNames) (qf : Qp) (sf : Dst) (pn : PNames) (gp : PipeNames) (w : Wid)
     (A X ds xs : List (List (BitVec 8))) (Q : Int → IProp GF) : IProp GF :=
   iprop(pipeInv pn gp R.L ∗ wcur pn 0 ∗ pwsLb pn [] ∗ cifUnf R pn w A X ds xs ∗
     fdq rf qf sf ∗
-    □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ fileTaint (hlc := hlc) cf) ∗
-    □ (fileTaint (hlc := hlc) cf -∗ MachFixedGS.killCred (hlc := hlc) (GF := GF)) ∗
-    appInv (hlc := hlc) fscFs ∗ (∃ jo : Option Nat, fileConsCred (hlc := hlc) cf rf jo) ∗
+    □ (MachFixedGS.killCred (GF := GF) -∗ fileTaint cf) ∗
+    □ (fileTaint cf -∗ MachFixedGS.killCred (GF := GF)) ∗
+    appInv fscFs ∗ (∃ jo : Option Nat, fileConsCred cf rf jo) ∗
     cifXkQOf R rf qf sf [(0, .UDProd pn gp w A X)] Q)
 
 /-- The descriptors of `cat f`'s environment: fds 1 and 2 on device 0. -/
@@ -59,7 +59,7 @@ theorem catpEnv_fd (x : Dspec) (files : List (BitVec 8) → Option (List (BitVec
     · cases h
 
 namespace CifEnv
-variable (E : CifEnv (hlc := hlc) (GF := GF))
+variable (E : CifEnv (GF := GF))
 
 /-- **Rocq `cif_catf_env_res`**: `cat f`'s environment -- fds 1 and 2 on
 the producer device (device 0, protected). -/

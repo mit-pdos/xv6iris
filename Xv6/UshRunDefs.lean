@@ -93,7 +93,7 @@ def ushJarm : Ushcmd → Nat
   | .back _ => 0x1c4
 
 section UshRunDefs
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -363,8 +363,8 @@ theorem ushDiagRes_panic (g : GName) (m : RegMap) : ushDiagRes (GF := GF) g User
 printer-and-exit subtree, at its three entries, at stack need `Dg`. -/
 def ushDiagLeaf (Dg : Nat) : Prop :=
   ∀ (N : UkNames GF) [UknConst N] (h : CPU) (m : RegMap) (pc n : Nat), ushDiagAt pc m →
-    ⊢ shDeps (hlc := hlc) -∗ ushCode N.t -∗ ushDiagRes N.d pc m -∗ N.pay (-1) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 pc) (Dg + n) -∗ wpLoop h
+    ⊢ shDeps -∗ ushCode N.t -∗ ushDiagRes N.d pc m -∗ N.pay (-1) -∗
+      urun N h m (BitVec.ofNat 64 pc) (Dg + n) -∗ wpLoop h
 
 /-! ## §9 What an arm carries in registers -/
 

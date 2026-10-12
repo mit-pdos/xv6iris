@@ -138,7 +138,7 @@ theorem sys_mknod_path_of (M : Nat → List (BitVec 8)) (va : Nat) (pl : List (B
 /-! ## The generic carve: slots ↔ bytes -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 variable {lent : Bool}
 
 /-- THE CARVE (Rocq `mn_frame_carve`, the path half): slots 3..18 ARE
@@ -473,7 +473,7 @@ structure SysMknodArgs (GF : BundledGFunctors.{0}) where
   Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -481,12 +481,12 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 /-- The contract's continuation at the record (hart-free: a `true` crossing
 at a process pins nothing). -/
 abbrev sysMknodPostA (k : KCtx) (A : SysMknodArgs GF) (c : CPU) : IProp GF :=
-  sysMknodK (hlc := hlc) k A.γ (procAddr A.j) A.pid A.V A.M A.ns A.v0.toNat (devArg A.v1)
+  sysMknodK k A.γ (procAddr A.j) A.pid A.V A.M A.ns A.v0.toNat (devArg A.v1)
     (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok A.Fex c
 
 /-- The caller's bundle at the record. -/
 abbrev sysMknodAu (A : SysMknodArgs GF) : IProp GF :=
-  mknodAuAt (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
+  mknodAuAt (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
     (devArg A.v1) (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok A.Fex
 
 /-- THE RECORD AT A RAISED COUNT (permit sweep L1b, deviation 5): argstr
@@ -500,8 +500,8 @@ theorem sysMknodK_raise (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitV
     (P Pmiss : Nat → Nat → IProp GF) (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (c : CPU) (kv : Nat)
     (hkv : V.ev ≤ kv) :
-    sysMknodK (hlc := hlc) k γ pa pid V M ns pv ma mi P Pmiss Farm Fun Fok Fex c ⊢
-      sysMknodK (hlc := hlc) k γ pa pid (V.updEv kv) M ns pv ma mi P Pmiss Farm Fun Fok Fex c := by
+    sysMknodK k γ pa pid V M ns pv ma mi P Pmiss Farm Fun Fok Fex c ⊢
+      sysMknodK k γ pa pid (V.updEv kv) M ns pv ma mi P Pmiss Farm Fun Fok Fex c := by
   unfold sysMknodK
   iintro H %spie %spp %R' %P' %k' %hcs %hext %hk'
   iapply H $$ %spie %spp %R' %P' %k' %hcs %hext %(Nat.le_trans hkv hk')
@@ -557,7 +557,7 @@ def sysMknodOut (A : SysMknodArgs GF) (r : BitVec 64) : IProp GF := iprop%
   bslots 3 ∗ irefSlots A.ns ∗
   (∃ P' : UPtd, ⌜A.V.upt.extSz A.V.sz P'⌝ ∗
     procPrivFd A.γ (procAddr A.j) A.pid { A.V with upt := P' } (viewFaulted A.V.upt P' A.M) ∗
-    mknodArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
+    mknodArms (fsGammaL fscFs) fscFs A.V.rti A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
       (devArg A.v1) (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok A.Fex r)
 
 set_option maxHeartbeats 8000000 in

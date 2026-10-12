@@ -48,7 +48,7 @@ def slhOf : Option Qp → Option UFrac := Option.map uf
 @[simp] theorem slhOf_some (q : Qp) : slhOf (some q) = some (uf q) := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
 
 /-- A `q`-share of the right to hold the sleeplock. -/
 def slhTok (γ : GName) (q : Qp) : IProp GF := iOwn (F := SlhRF) γ (◯ (some (uf q) : Option UFrac))

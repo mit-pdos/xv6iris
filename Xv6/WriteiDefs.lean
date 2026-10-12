@@ -91,7 +91,7 @@ structure WiArgs where
 /-! ## The frame -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- writei's 112-byte frame, from `sp-8` down to `sp-112` (deviation 2):
 `ra`, `s0`, `s1` .. `s11`, and the never-written slot at offset 0. -/
@@ -212,7 +212,7 @@ structure WiSizeOk [Fscfg] (A : WiArgs) (src : BitVec 64) (tot : Nat) (bm' : Blk
 /-! ## The resources -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -223,7 +223,7 @@ def wiEnv (Γ : SchedNames) (A : WiArgs) : IProp GF := iprop%
   diskCaps fscDisk fscDlock A.pd A.pav A.pu ∗
   isLock A.γkl kmemLockAddr "kmem" (kmemRes A.γk) ∗ kallocAvail A.γk none ∗
   bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize ∗
-  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib
+  iregInv fscIreg fscFs icfgIst icfgNib
 
 instance wiEnv_persistent (Γ : SchedNames) (A : WiArgs) : Persistent (wiEnv (GF := GF) Γ A) := by
   unfold wiEnv; infer_instance
@@ -285,7 +285,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -299,7 +299,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
@@ -335,7 +335,7 @@ theorem writei_log_writeF [Fscfg] [Icfg] (LW : LOG_WRITE) (c : CPU) (k' : KCtx) 
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
 /-- `either_copyin(bp->data + off%BSIZE, user_src, src, m)` at `+0x60`. -/
@@ -370,7 +370,7 @@ theorem writei_either_copyin (EC : EITHER_COPYIN) (c : CPU) (k' : KCtx) (γl : G
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   cases user
-  · have h := EC.wp_either_copyin (hlc := hlc) (GF := GF) c k' γl γk j pid V P M false dqs
+  · have h := EC.wp_either_copyin (GF := GF) c k' γl γk j pid V P M false dqs
       bs old hj hproc hnoff hK hlk huser hlen hlen' hbs
     unfold wp_either_copyin_body at h
     simp only [eitherCopyinAddr] at h
@@ -378,7 +378,7 @@ theorem writei_either_copyin (EC : EITHER_COPYIN) (c : CPU) (k' : KCtx) (γl : G
   · -- the block at the count the earlier rounds raised it to
     simp only [if_true]
     iintro ⟨Hk, Hpc, #Hl, #Hav, Hold, ⟨%kv, %hkv, Hpriv⟩, HΦ⟩
-    have h := EC.wp_either_copyin (hlc := hlc) (GF := GF) c k' γl γk j pid (V.updEv kv) P M true
+    have h := EC.wp_either_copyin (GF := GF) c k' γl γk j pid (V.updEv kv) P M true
       dqs bs old hj hproc hnoff hK hlk huser hlen hlen' hbs
     unfold wp_either_copyin_body at h
     simp only [eitherCopyinAddr, if_true] at h
@@ -395,7 +395,7 @@ theorem writei_either_copyin (EC : EITHER_COPYIN) (c : CPU) (k' : KCtx) (γl : G
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 end
@@ -446,7 +446,7 @@ structure WiFactsEb [Fscfg] [Icfg] (k : KCtx) (A : WiArgs) : Prop where
   huser : if A.user then k.regs 11#5 ≠ 0#64 else k.regs 11#5 = 0#64
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -470,7 +470,7 @@ def wiContEb (k : KCtx) (A : WiArgs) : IProp GF :=
 set_option maxHeartbeats 2000000 in
 /-- `iupdate(ip)` at `+0xd4` at EITHER entry `SIE` (`Xv6.writei_iupdate` at
 `IUPDATE.wp_iupdate_credgen_eb`; the complement at the named index `s`). -/
-theorem writei_iupdate_eb (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem writei_iupdate_eb (IU : IUPDATE) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (ip : BitVec 64) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
     (u : Nat) (Sb0 : List Nat) (cru : Bool) (e0 : Nat)
@@ -492,7 +492,7 @@ theorem writei_iupdate_eb (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
     diskCaps fscDisk fscDlock pd pav pu ∗
     iuCells ip inum dn bm dqd dqn dqs ∗
-    iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
+    iregInv fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗
     bslots 2 ∗
     logCredit icfgLog cru Sb0 e0 (IBLOCK inum icfgIst) ∗
@@ -514,7 +514,7 @@ theorem writei_iupdate_eb (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc)
   ihave Hlb0 := logEpochLb_0 (GF := GF) icfgLog
   imod Hlb0 with #Hlb0
   imodintro
-  have h := IU.wp_iupdate_credgen_eb (hlc := hlc) (GF := GF) Γ c k' γl pd pav pu j ip inum
+  have h := IU.wp_iupdate_credgen_eb (GF := GF) Γ c k' γl pd pav pu j ip inum
     dn dn0 bm u Sb0 cru e0 0 pidv dqp dqd dqn dqs hj hproc hK hnoff
     htier hgeom hcov hlog hnib hstab hnl hnz hda hdir hpd ha0
   unfold wp_iupdate_credgen_eb_body at h
@@ -529,14 +529,14 @@ theorem writei_iupdate_eb (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
 /-- `bmap(ip, off/BSIZE)` at `+0x88` at EITHER entry `SIE`
 (the call at `BMAP.wp_bmap_gen_eb`; the complement at the named
 index `s`). -/
-theorem writei_bmap_eb (BM : BMAP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem writei_bmap_eb (BM : BMAP) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γ : LogNames) (γfs : FsNames)
     (logstart bmapstart size : Nat) (dev : BitVec 32)
@@ -595,7 +595,7 @@ theorem writei_bmap_eb (BM : BMAP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
       logOpS γ n' Sb' -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj hs
-  have h := BM.wp_bmap_gen_eb (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl pd pav pu j γ γfs
+  have h := BM.wp_bmap_gen_eb (GF := GF) Γ c k' γl γb V γdl pd pav pu j γ γfs
     logstart bmapstart size dev ip bm data fbn n cr Sb pidv dqp dqd dqb dqs hj hproc hK
     hnoff htier hneed hgeom hbm hcredit hfbn hwf hdev hcl hdt hpd ha0 ha1
   unfold wp_bmap_gen_eb_body at h

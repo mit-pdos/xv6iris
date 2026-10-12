@@ -48,7 +48,7 @@ persistently -- the WP this slot RETURNS at every trap is this slot (the Löb
 hypothesis is both the recursion and the return value). -/
 theorem uexecWp_gen (US : USER) : UEXEC_GEN where
   uexec_wp_gen := by
-    intro hlc GF _
+    intro GF _
     iloeb as IH
     imodintro
     iapply uexecWp_fold
@@ -56,7 +56,7 @@ theorem uexecWp_gen (US : USER) : UEXEC_GEN where
     iintro %h %xi %C %pt %Rut %hRut %M %g %ms %sc %stv %sep %va %hlo %hms #Hhw #Hks #Hwire Hregs Hpt Hcfg Hrut Hh
     -- THE OLD-SHAPE HANDLER, out of the PAIRED one: the missing half is `IH`,
     -- under the same later, so one `inext` strips both and the two compose.
-    ihave Hhandler : iprop(▷ @stvecHandlerWp hlc GF _ xi h C pt Rut) $$ [Hh]
+    ihave Hhandler : iprop(▷ @stvecHandlerWp GF _ xi h C pt Rut) $$ [Hh]
     · inext
       unfold stvecHandlerWp
       iintro Hframe
@@ -64,7 +64,7 @@ theorem uexecWp_gen (US : USER) : UEXEC_GEN where
       isplitl [Hframe]
       · iexact Hframe
       · iexact IH
-    iapply (@USER.wp_user_exec_closed US hlc GF _ xi h C pt Rut hRut) $$ Hhw Hks Hwire [Hregs Hpt Hcfg Hrut] Hhandler
+    iapply (@USER.wp_user_exec_closed US GF _ xi h C pt Rut hRut) $$ Hhw Hks Hwire [Hregs Hpt Hcfg Hrut] Hhandler
     -- the concrete state, packed into the loop invariant: ACTIVE (so
     -- `userHartOk` is `True` and PC/nextPC are `va` both), the mstatus pins
     -- from the slot's premise, and the pinned image `M` FORGOTTEN -- exactly
@@ -80,8 +80,8 @@ theorem uexecWp_gen (US : USER) : UEXEC_GEN where
     isplitl [Hregs]
     · iexact Hregs
     isplitl [Hpt]
-    · iapply @userPtAny_intro hlc GF _ xi h pt M
-      iapply @userPtInvX_forget hlc GF _ xi h pt M $$ Hks Hpt
+    · iapply @userPtAny_intro GF _ xi h pt M
+      iapply @userPtInvX_forget GF _ xi h pt M $$ Hks Hpt
     isplitl [Hcfg]
     · iexact Hcfg
     · iexact Hrut

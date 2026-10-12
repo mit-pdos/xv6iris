@@ -26,7 +26,7 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -34,8 +34,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [S
 theorem catMain_die (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (h : CPU) (m : RegMap) (av : Nat)
     (args : List UArg) (i : Nat) (g : UArg) (n : Nat) (hg : args[i]? = some g) (hp : g.ptr ≠ 0)
     (hs2 : m.get 18#5 = BitVec.ofNat 64 (av + 8 * i)) :
-    ⊢ kcatDgOpen (hlc := hlc) N g -∗ ukCode N.t User.Cat.code.byte -∗ uargv N.d av args -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0xde) (10 + (12 + (4 + n))) -∗ wpLoop h := by
+    ⊢ kcatDgOpen N g -∗ ukCode N.t User.Cat.code.byte -∗ uargv N.d av args -∗
+      urun N h m (BitVec.ofNat 64 0xde) (10 + (12 + (4 + n))) -∗ wpLoop h := by
   unfold kcatDgOpen
   iintro ⟨%Cm1, %Cm2, H1, H2, H3⟩ #Hc #Hargv Hrun
   ihave %halc := uargv_align N.d av args $$ Hargv
@@ -97,7 +97,7 @@ theorem catMain_die (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (h : CP
   have h5ra : m5.get 1#5 = BitVec.ofNat 64 0xec + instrLen false := by ureg
   obtain ⟨hq0, hq1, hq2a, hq2b, hq2c⟩ := cm_directive
   iapply HF.wp_catFprintfS N cmMsg cmMsgLen cmMsgQ cmLit g.ptr g.len g.bytes h5 m5 n iprop(emp) Cm1 Cm2
-    (kcatExit (hlc := hlc) N 1) (by decide) (by decide) hq0 hq1 (fun j hj hne => cm_nopct_ok j hj hne)
+    (kcatExit N 1) (by decide) (by decide) hq0 hq1 (fun j hj hne => cm_nopct_ok j hj hne)
     hq2a hq2b hq2c (fun h => absurd h (by decide)) hp h5a1 h5a2 $$ [H1] [H2] [H3] Hc Hfmt Hstr [] Hrun
   · rw [h5a0]; iexact H1
   · rw [h5a0]; iexact H2

@@ -14,7 +14,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
 section SysExecNe
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsTopG GF] [FsBytesG GF]
   [Appcfg GF] [CtokG GF]
 
 /-- **Rocq `sys_exec_slot_pre_ne`**. -/
@@ -39,8 +39,8 @@ theorem sysExecAuPre_ne (n : Nat) (S S' : Uvis → IProp GF) (Rs : IProp GF) (Γ
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (M : Nat → List (BitVec 8))
     (pv av : BitVec 64) (sts : List FdState) (cs : Std.ExtTreeSet GName compare)
     (pidv : BitVec 32) (HS : ∀ W, S W ≡{n}≡ S' W) :
-    sysExecAuPre (hlc := hlc) ⟨S, Rs⟩ Γ γfs rt cw secc Q P Pmiss Fo M pv av sts cs pidv ≡{n}≡
-      sysExecAuPre (hlc := hlc) ⟨S', Rs⟩ Γ γfs rt cw secc Q P Pmiss Fo M pv av sts cs pidv := by
+    sysExecAuPre ⟨S, Rs⟩ Γ γfs rt cw secc Q P Pmiss Fo M pv av sts cs pidv ≡{n}≡
+      sysExecAuPre ⟨S', Rs⟩ Γ γfs rt cw secc Q P Pmiss Fo M pv av sts cs pidv := by
   unfold sysExecAuPre pfAt
   refine BI.sep_ne.ne .rfl (BI.sep_ne.ne .rfl (BI.and_ne.ne ?_ .rfl))
   exact sysExecSlotPre_ne n S S' Q P Fo.pfRecv cw secc M pv av sts cs pidv HS

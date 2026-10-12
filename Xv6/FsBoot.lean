@@ -215,7 +215,7 @@ theorem fsLogRegionSplit {PROP : Type _} [BI PROP] (Φ : Nat → PROP)
 /-! ## §4 The ghost step -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [FsBlocksG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF] [FsBlocksG GF]
 
 /-- A whole ghost-map element, as two halves. -/
 theorem fsBoot_elemHalves {V : Type _} [GhostMapG GF Nat V RegMapF] (g : GName) (b : Nat) (v : V) :

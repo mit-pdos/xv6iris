@@ -61,15 +61,15 @@ theorem cfs_short_open (f : List (BitVec 8)) (hf : uname f) : consShort [catDgOp
   omega
 
 section UshCatFStageSup
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF]
   [IcacheG GF] [PipeProtoG GF] [PipeOutG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [PipesNG GF] [CifRegG GF]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
-variable (D : PdRound hlc GF) (E : UshExecEnv (hlc := hlc) (GF := GF))
-  (S : UShPipesStageP (hlc := hlc) D E)
+variable (D : PdRound GF) (E : UshExecEnv (GF := GF))
+  (S : UShPipesStageP D E)
 
 theorem cfs_shotsF_zero : ⊢ D.shotsF 0 := by
   unfold PdRound.shotsF
@@ -80,22 +80,22 @@ theorem cfs_shotsF_zero : ⊢ D.shotsF 0 := by
 theorem cfs_toPns_dep : D.toPns.dep = pdep D := rfl
 
 /-- `cif_final` at a producer device, read. -/
-theorem cfs_final_prod (R : PnsRound hlc GF) (pn : PNames) (gp : PipeNames) (w : Wid) (A X : List (List (BitVec 8))) :
+theorem cfs_final_prod (R : PnsRound GF) (pn : PNames) (gp : PipeNames) (w : Wid) (A X : List (List (BitVec 8))) :
     cifFinalOf R (.UDProd pn gp w A X) ⊢
       iprop(((pnsLexit R pn ∨ wcur pn 0) ∗ pnsConFinal R w A) ∨
         (∃ x : List (BitVec 8), ⌜x ∈ X⌝ ∗ pnsWfin R w (some x))) := .rfl
 
-theorem cfs_con_final (R : PnsRound hlc GF) (w : Wid) (A : List (List (BitVec 8))) :
+theorem cfs_con_final (R : PnsRound GF) (w : Wid) (A : List (List (BitVec 8))) :
     pnsConFinal R w A ⊢ ∃ o : Option (List (BitVec 8)), ⌜o = none ∨ ∃ s, o = some s ∧ s ∈ A⌝ ∗ pnsWfin R w o :=
   .rfl
 
 theorem cfs_lexit (pn : PNames) :
     pnsLexit D.toPns pn ⊢ iprop((wcur pn D.L.length ∗ pwsLb pn D.L) ∨
       ((∃ c : Nat, ⌜c ≤ D.L.length⌝ ∗ (wcur pn c ∗ pwsLb pn (D.L.take c)) ∗ roShot pn) ∨
-        MachFixedGS.killCred (hlc := hlc) (GF := GF))) := by
+        MachFixedGS.killCred (GF := GF))) := by
   have h : pnsLexit D.toPns pn = iprop((wcur pn D.L.length ∗ pwsLb pn (D.L.take D.L.length)) ∨
       ((∃ c : Nat, ⌜c ≤ D.L.length⌝ ∗ (wcur pn c ∗ pwsLb pn (D.L.take c)) ∗ roShot pn) ∨
-        MachFixedGS.killCred (hlc := hlc) (GF := GF))) := rfl
+        MachFixedGS.killCred (GF := GF))) := rfl
   rw [h, List.take_length]
 
 include S in
@@ -122,7 +122,7 @@ theorem catf_kit
 unfired with the kits (the report's deposit FROM the permit), the deed, the
 file's context, and the exit wand reading the producer device's final state
 into node 0's report. -/
-theorem catf_lend_of (C : CfeCtx (hlc := hlc) (GF := GF)) (hR : C.R = D.toPns)
+theorem catf_lend_of (C : CfeCtx (GF := GF)) (hR : C.R = D.toPns)
     (hfire : ∀ w s, w ∈ D.wsN → fireSrc D.fcR D.pr (lfilts D.lR) D.L w s →
       fireOkN D.toPns.wsN D.toPns.RUNN D.toPns.WITN D.toPns.TERM D.toPns.TOK w s
         (EXf D.fcR D.pr (lfilts D.lR) D.nc D.L w s))
@@ -130,17 +130,17 @@ theorem catf_lend_of (C : CfeCtx (hlc := hlc) (GF := GF)) (hR : C.R = D.toPns)
     (hRd : D.Rd = fdq C.rf qf sf)
     (hpr : D.pr = .PrCatF f) (hf : uname f) (hn : 0 < D.nc)
     (hds : (ds = [[], catDgWrite] ∧ (D.fcR f).isSome) ∨ ds = [[]]) :
-    ⊢ D.FAM -∗ □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ fileTaint (hlc := hlc) C.cf) -∗
-      □ (fileTaint (hlc := hlc) C.cf -∗ MachFixedGS.killCred (hlc := hlc) (GF := GF)) -∗
-      appInv (hlc := hlc) fscFs -∗ (∃ jo : Option Nat, fileConsCred (hlc := hlc) C.cf C.rf jo) -∗
+    ⊢ D.FAM -∗ □ (MachFixedGS.killCred (GF := GF) -∗ fileTaint C.cf) -∗
+      □ (fileTaint C.cf -∗ MachFixedGS.killCred (GF := GF)) -∗
+      appInv fscFs -∗ (∃ jo : Option Nat, fileConsCred C.cf C.rf jo) -∗
       □ (prodCrD D E S γp D.Rd -∗
           C.lend qf sf (D.P 0) γp (Wid.WLeft 0) ds [catDgOpen f] ds [catDgOpen f] (fun _ => S.QcK 0)) := by
   have hw0 : Wid.WLeft 0 ∈ D.wsN := (wids_elem _ _).2 hn
   have hfso : failSrc D.pr (lfilts D.lR) 0 (catDgOpen f) := Or.inr ⟨rfl, by rw [hpr]; rfl⟩
   have hfo : fireSrc D.fcR D.pr (lfilts D.lR) D.L (Wid.WLeft 0) (catDgOpen f) := Or.inl hfso
-  have hkill : MachFixedGS.killCred (hlc := hlc) (GF := GF) = D.G.gcT := by
+  have hkill : MachFixedGS.killCred (GF := GF) = D.G.gcT := by
     have h := C.OK.hkill; rw [hR] at h; exact h
-  have hkT : MachFixedGS.killCred (hlc := hlc) (GF := GF) ⊢ D.T := by rw [hkill]
+  have hkT : MachFixedGS.killCred (GF := GF) ⊢ D.T := by rw [hkill]
   have hcs : consShort ds ∧ consShort [catDgOpen f] := by
     refine ⟨?_, cfs_short_open f hf⟩
     rcases hds with ⟨rfl, _⟩ | rfl
@@ -284,11 +284,11 @@ theorem catf_lend_of (C : CfeCtx (hlc := hlc) (GF := GF)) (hR : C.R = D.toPns)
 
 /-- **Rocq `catf_stage_sup`**: THE PREMISE of `stage_catf_law` at the deed --
 `cat f`'s exec supply from the entry, at every pipe (deviations 1-3). -/
-theorem catf_stage_sup (C : CfeCtx (hlc := hlc) (GF := GF))
-    (hR : C.R = D.toPns) (P : UshExecPinEcho (hlc := hlc) E) (Pr : UshExecPinProg)
+theorem catf_stage_sup (C : CfeCtx (GF := GF))
+    (hR : C.R = D.toPns) (P : UshExecPinEcho E) (Pr : UshExecPinProg)
     (hfd2E : ∀ l, E.ush_fd2p l → ushFd2p l)
     (hnode : ∀ ws M s0 t g, P.echo_node_img ws M s0 t g → echoNodeImg ws M s0 t g)
-    (hudep : ⊢ udep (hlc := hlc) (GF := GF))
+    (hudep : ⊢ udep (GF := GF))
     (hfire : ∀ w s, w ∈ D.wsN → fireSrc D.fcR D.pr (lfilts D.lR) D.L w s →
       fireOkN D.toPns.wsN D.toPns.RUNN D.toPns.WITN D.toPns.TERM D.toPns.TOK w s
         (EXf D.fcR D.pr (lfilts D.lR) D.nc D.L w s))
@@ -298,12 +298,12 @@ theorem catf_stage_sup (C : CfeCtx (hlc := hlc) (GF := GF))
     (hcase : ((sf[f]?).map Prod.snd = some D.L ∧ D.fcR f = some D.L ∧ ds = [[], catDgWrite]) ∨
       (sf[f]? = none ∧ ds = [[]])) :
     ⊢ D.FAM -∗ P.sh_cat_slot D.T -∗
-      □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ fileTaint (hlc := hlc) C.cf) -∗
-      □ (fileTaint (hlc := hlc) C.cf -∗ MachFixedGS.killCred (hlc := hlc) (GF := GF)) -∗
-      appInv (hlc := hlc) fscFs -∗ (∃ jo : Option Nat, fileConsCred (hlc := hlc) C.cf C.rf jo) -∗
+      □ (MachFixedGS.killCred (GF := GF) -∗ fileTaint C.cf) -∗
+      □ (fileTaint C.cf -∗ MachFixedGS.killCred (GF := GF)) -∗
+      appInv fscFs -∗ (∃ jo : Option Nat, fileConsCred C.cf C.rf jo) -∗
       □ (∀ γp : PipeNames, ushExecSupEchoAt E (catfRows E γp) (prodWords (.PrCatF f)) (fun _ => S.QcK 0)
           (prodCrD D E S γp D.Rd)) := by
-  have hkill : MachFixedGS.killCred (hlc := hlc) (GF := GF) = D.G.gcT := by
+  have hkill : MachFixedGS.killCred (GF := GF) = D.G.gcT := by
     have h := C.OK.hkill; rw [hR] at h; exact h
   have hds : (ds = [[], catDgWrite] ∧ (D.fcR f).isSome) ∨ ds = [[]] := by
     rcases hcase with ⟨_, hfc, rfl⟩ | ⟨_, rfl⟩
@@ -325,7 +325,7 @@ theorem catf_stage_sup (C : CfeCtx (hlc := hlc) (GF := GF))
     iintro %M %Mv %s1 %t1 %g1 %sts %cs %pidv %rb1 %rb2 %hi1 %hag %hb1 %hl1 %hr1 %hr2 #Hnp
     iapply P.image_entry_pay_mono User.Cat.elf Mv (BitVec.ofNat 64 (t1 + 8)) sts ROOTINO seccAll cs pidv
       (fun _ => S.QcK 0) (C.lend qf sf (D.P 0) γp (Wid.WLeft 0) ds [catDgOpen f] ds [catDgOpen f] (fun _ => S.QcK 0))
-      (prodCrD D E S γp D.Rd) (uslot (hlc := hlc)) $$ Hlend
+      (prodCrD D E S γp D.Rd) (uslot) $$ Hlend
     iapply pse_catf_image_entry_gen C f M Mv s1 t1 g1 sts ROOTINO cs pidv (fun _ => S.QcK 0) (D.P 0) γp
       (Wid.WLeft 0) ds [catDgOpen f] ds [catDgOpen f] qf sf rb1 rb2 (fun _ _ => rfl) hf (catf_ws_exec_ok f hf) hag
       (hnode _ _ _ _ _ hi1) hb1 hl1 rfl hr1 hr2 hc2 $$ Hnp []
@@ -334,7 +334,7 @@ theorem catf_stage_sup (C : CfeCtx (hlc := hlc) (GF := GF))
     iintro #Ht
     rw [S.QcK_unfold 0]
     ileft
-    iapply (show MachFixedGS.killCred (hlc := hlc) (GF := GF) ⊢ D.T by rw [hkill])
+    iapply (show MachFixedGS.killCred (GF := GF) ⊢ D.T by rw [hkill])
     iexact Ht
   · iapply (P.sh_cat_slot_unfold D.T).2
     iexact Hs
@@ -343,11 +343,11 @@ theorem catf_stage_sup (C : CfeCtx (hlc := hlc) (GF := GF))
 `stage_catf_law` at the deed. -/
 theorem stage_catf_law_holds (OK : PdRoundOk D) (SE : SH_RUNCMD_EXEC)
     (hxb : E.ush_execfail_bytes altExecR fdWCat)
-    (C : CfeCtx (hlc := hlc) (GF := GF))
-    (hR : C.R = D.toPns) (P : UshExecPinEcho (hlc := hlc) E) (Pr : UshExecPinProg)
+    (C : CfeCtx (GF := GF))
+    (hR : C.R = D.toPns) (P : UshExecPinEcho E) (Pr : UshExecPinProg)
     (hfd2E : ∀ l, E.ush_fd2p l → ushFd2p l)
     (hnode : ∀ ws M s0 t g, P.echo_node_img ws M s0 t g → echoNodeImg ws M s0 t g)
-    (hudep : ⊢ udep (hlc := hlc) (GF := GF))
+    (hudep : ⊢ udep (GF := GF))
     (hfire : ∀ w s, w ∈ D.wsN → fireSrc D.fcR D.pr (lfilts D.lR) D.L w s →
       fireOkN D.toPns.wsN D.toPns.RUNN D.toPns.WITN D.toPns.TERM D.toPns.TOK w s
         (EXf D.fcR D.pr (lfilts D.lR) D.nc D.L w s))
@@ -358,9 +358,9 @@ theorem stage_catf_law_holds (OK : PdRoundOk D) (SE : SH_RUNCMD_EXEC)
     (hcase : ((sf[f]?).map Prod.snd = some D.L ∧ D.fcR f = some D.L ∧ ds = [[], catDgWrite]) ∨
       (sf[f]? = none ∧ ds = [[]])) :
     ⊢ D.FAM -∗ P.sh_cat_slot D.T -∗
-      □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ fileTaint (hlc := hlc) C.cf) -∗
-      □ (fileTaint (hlc := hlc) C.cf -∗ MachFixedGS.killCred (hlc := hlc) (GF := GF)) -∗
-      appInv (hlc := hlc) fscFs -∗ (∃ jo : Option Nat, fileConsCred (hlc := hlc) C.cf C.rf jo) -∗
+      □ (MachFixedGS.killCred (GF := GF) -∗ fileTaint C.cf) -∗
+      □ (fileTaint C.cf -∗ MachFixedGS.killCred (GF := GF)) -∗
+      appInv fscFs -∗ (∃ jo : Option Nat, fileConsCred C.cf C.rf jo) -∗
       S.prod_stage_law (ushArgs s0 gs (ushEchoToks (prodWords (.PrCatF f)))) := by
   iintro #Hfam Hslot #Hbr #Hrb #Hai #Hcr
   iapply stage_catf_law D E S OK SE hxb hfire f s0 gs hpr hok hbytes hn $$ Hfam
@@ -375,19 +375,19 @@ Rocq's ambient one): the R-pipes parameter record is
 diagnostic's bytes `catfExecfailBytes`; the stage law is R-pipes'
 `UShPipesStage.prod_stage_law`. -/
 theorem stage_catf_law_holds_at (OK : PdRoundOk D) (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : USH_FPRINTF)
-    (hent : wpShRuncmdEntryBody (hlc := hlc) (GF := GF)) (SE : SH_RUNCMD_EXEC)
-    (C : CfeCtx (hlc := hlc) (GF := GF)) (hR : C.R = D.toPns)
-    (hudep : ⊢ udep (hlc := hlc) (GF := GF)) (hfire : UShPipesStage.HfireP D)
+    (hent : wpShRuncmdEntryBody (GF := GF)) (SE : SH_RUNCMD_EXEC)
+    (C : CfeCtx (GF := GF)) (hR : C.R = D.toPns)
+    (hudep : ⊢ udep (GF := GF)) (hfire : UShPipesStage.HfireP D)
     (f : List (BitVec 8)) (s0 : Nat) (gs : Nat → BitVec 8) (qf : Qp) (sf : Dst) (ds : List (List (BitVec 8)))
     (hRd : D.Rd = fdq C.rf qf sf)
     (hpr : D.pr = .PrCatF f) (hf : uname f) (hok : execOk (prodWords (.PrCatF f)))
     (hbytes : ushEchoArgvBytes (prodWords (.PrCatF f)) gs) (hn : 0 < D.nc)
     (hcase : ((sf[f]?).map Prod.snd = some D.L ∧ D.fcR f = some D.L ∧ ds = [[], catDgWrite]) ∨
       (sf[f]? = none ∧ ds = [[]])) :
-    ⊢ D.FAM -∗ shCatSlot (hlc := hlc) D.T -∗
-      □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ fileTaint (hlc := hlc) C.cf) -∗
-      □ (fileTaint (hlc := hlc) C.cf -∗ MachFixedGS.killCred (hlc := hlc) (GF := GF)) -∗
-      appInv (hlc := hlc) fscFs -∗ (∃ jo : Option Nat, fileConsCred (hlc := hlc) C.cf C.rf jo) -∗
+    ⊢ D.FAM -∗ shCatSlot D.T -∗
+      □ (MachFixedGS.killCred (GF := GF) -∗ fileTaint C.cf) -∗
+      □ (fileTaint C.cf -∗ MachFixedGS.killCred (GF := GF)) -∗
+      appInv fscFs -∗ (∃ jo : Option Nat, fileConsCred C.cf C.rf jo) -∗
       UShPipesStage.prod_stage_law D (ushArgs s0 gs (ushEchoToks (prodWords (.PrCatF f)))) :=
   stage_catf_law_holds D (ushExecEnvOf UL HS HF hent) (UShPipesStage.stageP D OK UL HS HF hent) OK SE
     catfExecfailBytes C hR (ushExecPinEcho_holds _) ushExecPinProg_holds

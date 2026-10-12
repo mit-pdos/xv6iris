@@ -33,7 +33,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode MachCSL
 
 section PipeStore
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [PipeOutG GF]
 variable (R : Nat → EraPins → List (BitVec 8) → Nat → IProp GF)
 

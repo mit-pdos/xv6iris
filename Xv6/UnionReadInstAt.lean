@@ -74,7 +74,7 @@ theorem union_disc_no_ctrl_d (h : List Obs) (b : BitVec 8) (hend : obsEndsIn .ua
   omega
 
 section UnionReadInstAt
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF] [PipeOutG GF] [Fscfg]
 
 /-! ## 1. The read record at the index -/
@@ -82,7 +82,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Di
 /-- Rocq `uria_rd`. -/
 theorem uria_rd (ug : UnionGn) (s0 : Fstate) (k n : Nat) (v : EraPins)
     (ws : List (List Obs × BitVec 8)) (Φ : IProp GF) :
-    ⊢ (unionLinkInstAt (hlc := hlc) ug s0).lkLinks -∗ (unionLinkInstAt ug s0).lkPin k v -∗
+    ⊢ (unionLinkInstAt ug s0).lkLinks -∗ (unionLinkInstAt ug s0).lkPin k v -∗
       dlCnt v (1 : Qp).half n -∗ ((unionLinkInstAt ug s0).lkRr k v n ws -∗ Φ) -∗
       consLink .uart0 k (.evRead ws) Φ :=
   uri_rd ug k n v ws Φ
@@ -90,23 +90,23 @@ theorem uria_rd (ug : UnionGn) (s0 : Fstate) (k n : Nat) (v : EraPins)
 /-- Rocq `uria_rd_taint`. -/
 theorem uria_rd_taint (ug : UnionGn) (s0 : Fstate) (ws : List (List Obs × BitVec 8))
     (Φ : IProp GF) :
-    ⊢ (unionLinkInstAt (hlc := hlc) ug s0).lkLinks -∗ (unionLinkInstAt ug s0).lkT -∗
+    ⊢ (unionLinkInstAt ug s0).lkLinks -∗ (unionLinkInstAt ug s0).lkT -∗
       ((unionLinkInstAt ug s0).lkT -∗ Φ) -∗
-      consLink .uart0 (genId (hlc := hlc) (GF := GF) + 1) (.evRead ws) Φ :=
+      consLink .uart0 (genId (GF := GF) + 1) (.evRead ws) Φ :=
   uri_rd_taint ug ws Φ
 
 /-- Rocq `uria_arms`. -/
 theorem uria_arms (ug : UnionGn)
-    (htag : MachFixedGS.rxTag (hlc := hlc) (GF := GF) = utag (hlc := hlc) ug) (s0 : Fstate)
+    (htag : MachFixedGS.rxTag (GF := GF) = utag ug) (s0 : Fstate)
     (v : EraPins) (I : List (BitVec 8)) (ws sl sl' : List (List Obs × BitVec 8))
     (hs : List (List Obs)) (dd dc : Nat) (g0 : Nat → BitVec 8)
     (hddc : dd ≤ dc) (hlws : ws.length = dc) (hwinf : consWindow sl I.length dd g0 hs)
     (hpre2 : sl <+: sl') (hwsj : ∀ j : Nat, j < dc → ws[j]? = sl'[I.length + j]?) :
-    ⊢ (unionLinkInstAt (hlc := hlc) ug s0).lkEpin (genId (hlc := hlc) (GF := GF) + 1) v -∗
+    ⊢ (unionLinkInstAt ug s0).lkEpin (genId (GF := GF) + 1) v -∗
       inpLb v I -∗ (unionLinkInstAt ug s0).lkRres v I -∗
-      (unionLinkInstAt ug s0).lkRr (genId (hlc := hlc) (GF := GF) + 1) v I.length ws -∗
-      ([∗list] hh ∈ hs, MachFixedGS.rxTag (hlc := hlc) (GF := GF) hh) -∗
-      consSwallow (hlc := hlc) fscCons False sl dd dc -∗
+      (unionLinkInstAt ug s0).lkRr (genId (GF := GF) + 1) v I.length ws -∗
+      ([∗list] hh ∈ hs, MachFixedGS.rxTag (GF := GF) hh) -∗
+      consSwallow fscCons False sl dd dc -∗
       consStoredLb fscCons sl' -∗
       ((dlCnt v (1 : Qp).half (I.length + dc) ∗
         ∃ J : List (BitVec 8),
@@ -119,8 +119,8 @@ theorem uria_arms (ug : UnionGn)
 /-- THE UNION ERA'S READ RECORD AT THE ROUND'S BOOT STATE (Rocq
 `union_read_inst_at`). -/
 noncomputable def unionReadInstAt (ug : UnionGn)
-    (htag : MachFixedGS.rxTag (hlc := hlc) (GF := GF) = utag (hlc := hlc) ug) (s0 : Fstate) :
-    ReadRec (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0) where
+    (htag : MachFixedGS.rxTag (GF := GF) = utag ug) (s0 : Fstate) :
+    ReadRec (unionLinkInstAt (GF := GF) ug s0) where
   rkDisc := lmDiscInput ulmG
   rkRd := uria_rd ug s0
   rkRdTaint := uria_rd_taint ug s0
@@ -132,24 +132,24 @@ end UnionReadInstAt
 /-! ## 2. Sh's read leaf at the indexed record, and the tag's reading -/
 
 section UnionReadLeafAt
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF] [PipeOutG GF] [Fscfg] [Appcfg GF]
 
 /-- The record's pin names the era (Rocq `union_pin_refl_at`). -/
 theorem union_pin_refl_at (ug : UnionGn) (s0 : Fstate) (v : EraPins) :
-    ⊢ eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v -∗
-      (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkPin (genId (hlc := hlc) (GF := GF) + 1) v := by
-  show ⊢ eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v -∗
-    eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v
+    ⊢ eraPin (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v -∗
+      (unionLinkInstAt (GF := GF) ug s0).lkPin (genId (GF := GF) + 1) v := by
+  show ⊢ eraPin (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v -∗
+    eraPin (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v
   iintro H
   iexact H
 
 /-- Rocq `union_ep_refl_at`. -/
 theorem union_ep_refl_at (ug : UnionGn) (s0 : Fstate) (v : EraPins) :
-    ⊢ eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v -∗
-      (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkEpin (genId (hlc := hlc) (GF := GF) + 1) v := by
-  show ⊢ eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v -∗
-    eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v
+    ⊢ eraPin (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v -∗
+      (unionLinkInstAt (GF := GF) ug s0).lkEpin (genId (GF := GF) + 1) v := by
+  show ⊢ eraPin (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v -∗
+    eraPin (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v
   iintro H
   iexact H
 
@@ -166,17 +166,17 @@ byte stored at `p ≥ length I`:
   line itself, strictly below is refuted by the token's frozen choice list
   against the residue's (`csFrozenAt_lb_absurd`). -/
 theorem union_dirty_law (ug : UnionGn)
-    (htag : MachFixedGS.rxTag (hlc := hlc) (GF := GF) = utag (hlc := hlc) ug) (s0 : Fstate)
-    (hstw : ⊢ appSup (GF := GF) -∗ fileTaint (hlc := hlc) ug.ugnFile.fgnCl)
-    (hrdw : MachFixedGS.rdwild (hlc := hlc) (GF := GF) = urdwild (hlc := hlc) ug) :
-    ushDirtyLaw (hlc := hlc) (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0) (fgnEcho ug.ugnFile) := by
+    (htag : MachFixedGS.rxTag (GF := GF) = utag ug) (s0 : Fstate)
+    (hstw : ⊢ appSup (GF := GF) -∗ fileTaint ug.ugnFile.fgnCl)
+    (hrdw : MachFixedGS.rdwild (GF := GF) = urdwild ug) :
+    ushDirtyLaw (unionLinkInstAt (GF := GF) ug s0) (fgnEcho ug.ugnFile) := by
   intro I v sl p h b hch hp hsl hend hbt
-  show ⊢ consStoredLb fscCons sl -∗ MachFixedGS.rxTag (hlc := hlc) (GF := GF) h -∗
-    eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v -∗ inpLb v I -∗
-    urresw (hlc := hlc) ug v I -∗ rposAuth v I.length -∗
-    consDirtyCred (appRdcred (hlc := hlc) (GF := GF)) -∗ fileTaint (hlc := hlc) ug.ugnFile.fgnCl
+  show ⊢ consStoredLb fscCons sl -∗ MachFixedGS.rxTag (GF := GF) h -∗
+    eraPin (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v -∗ inpLb v I -∗
+    urresw ug v I -∗ rposAuth v I.length -∗
+    consDirtyCred (appRdcred (GF := GF)) -∗ fileTaint ug.ugnFile.fgnCl
   iintro #Hsl #Htag #Hpin #HE #Hres Hrp #Hdirty
-  ihave #Htag' : utag (hlc := hlc) ug h $$ []
+  ihave #Htag' : utag ug h $$ []
   · rw [← htag]; iexact Htag
   unfold utag
   icases Htag' with ⟨%hsh, #Hd, -⟩
@@ -269,7 +269,7 @@ theorem union_dirty_law (ug : UnionGn)
 end UnionReadLeafAt
 
 section UnionReadLeafHolds
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [DiskG GF] [EchoOutG GF]
@@ -280,26 +280,26 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fs
 at the engine `UL`) at the union's read record, its marked-arm law
 discharged by `union_dirty_law`. -/
 theorem union_read_leaf_holds_at (UL : UK_LEAVES) (ug : UnionGn)
-    (htag : MachFixedGS.rxTag (hlc := hlc) (GF := GF) = utag (hlc := hlc) ug) (s0 : Fstate)
+    (htag : MachFixedGS.rxTag (GF := GF) = utag ug) (s0 : Fstate)
     (Wb : List (BitVec 8) → IProp GF) (N : UkNames GF) (X : UshCtx GF) (l : List FdState)
-    (hT : X.T = (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkT)
-    (hPm : X.Pm = ushMidAt (hlc := hlc) (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkRres
+    (hT : X.T = (unionLinkInstAt (GF := GF) ug s0).lkT)
+    (hPm : X.Pm = ushMidAt (unionLinkInstAt (GF := GF) ug s0).lkRres
       (fgnEcho ug.ugnFile) X.γp)
-    (hpeq : N.pay = uconsPay (hlc := hlc) fscCons X.γp
-      (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkT
-      (ushRdXAt (hlc := hlc) (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkRres (fgnEcho ug.ugnFile) Wb))
-    (hstw : ⊢ appSup (GF := GF) -∗ (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkT)
-    (htsw : ⊢ (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkT -∗ appRdcred (hlc := hlc) (GF := GF))
-    (hrdw : MachFixedGS.rdwild (hlc := hlc) (GF := GF) = urdwild (hlc := hlc) ug)
-    (hlk : ⊢ (unionLinkInstAt (hlc := hlc) (GF := GF) ug s0).lkLinks) :
-    ⊢ ushReadRecvLeafAt (hlc := hlc) (SG := uexecSGXv6 (hlc := hlc)) N X (lmDiscInput ulmG) fscCons l :=
+    (hpeq : N.pay = uconsPay fscCons X.γp
+      (unionLinkInstAt (GF := GF) ug s0).lkT
+      (ushRdXAt (unionLinkInstAt (GF := GF) ug s0).lkRres (fgnEcho ug.ugnFile) Wb))
+    (hstw : ⊢ appSup (GF := GF) -∗ (unionLinkInstAt (GF := GF) ug s0).lkT)
+    (htsw : ⊢ (unionLinkInstAt (GF := GF) ug s0).lkT -∗ appRdcred (GF := GF))
+    (hrdw : MachFixedGS.rdwild (GF := GF) = urdwild ug)
+    (hlk : ⊢ (unionLinkInstAt (GF := GF) ug s0).lkLinks) :
+    ⊢ ushReadRecvLeafAt (SG := uexecSGXv6) N X (lmDiscInput ulmG) fscCons l :=
   ushReadRecvLeafHoldsAt UL (unionReadInstAt ug htag s0) (fgnEcho ug.ugnFile) Wb N X l hT hPm hpeq htsw
     (union_dirty_law ug htag s0 hstw hrdw) (fun v => union_pin_refl_at ug s0 v) hlk
 
 end UnionReadLeafHolds
 
 section UnionTagLaw
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF] [DiskG GF]
@@ -308,9 +308,9 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [S
 /-- THE TAG'S READING at the union discipline (Rocq `union_tag_law_at`), at
 any shell context whose taint is the union's. -/
 theorem union_tag_law_at (ug : UnionGn)
-    (htag : MachFixedGS.rxTag (hlc := hlc) (GF := GF) = utag (hlc := hlc) ug)
-    (X : UshCtx GF) (hT : X.T = fileTaint (hlc := hlc) ug.ugnFile.fgnCl) :
-    ⊢ ushTagLawAt (hlc := hlc) X (lmDisc ulmG) := by
+    (htag : MachFixedGS.rxTag (GF := GF) = utag ug)
+    (X : UshCtx GF) (hT : X.T = fileTaint ug.ugnFile.fgnCl) :
+    ⊢ ushTagLawAt X (lmDisc ulmG) := by
   unfold ushTagLawAt
   rw [hT, htag]
   imodintro
@@ -321,9 +321,9 @@ theorem union_tag_law_at (ug : UnionGn)
 
 /-- Rocq `union_tag_law_holds`. -/
 theorem union_tag_law_holds (ug : UnionGn)
-    (htag : MachFixedGS.rxTag (hlc := hlc) (GF := GF) = utag (hlc := hlc) ug)
-    (X : UshCtx GF) (hT : X.T = fileTaint (hlc := hlc) ug.ugnFile.fgnCl) :
-    ⊢ ushTagLaw (hlc := hlc) X := by
+    (htag : MachFixedGS.rxTag (GF := GF) = utag ug)
+    (X : UshCtx GF) (hT : X.T = fileTaint ug.ugnFile.fgnCl) :
+    ⊢ ushTagLaw X := by
   iapply ushTagLaw_of_at X (lmDisc ulmG) union_disc_no_ctrl_d
   iapply union_tag_law_at ug htag X hT
 

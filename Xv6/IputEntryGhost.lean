@@ -37,7 +37,7 @@ theorem iput_ent_frac (q : Qp) : q.half.half + (q.half.half + q.half) = q := by
   grind
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -72,7 +72,7 @@ def iputEntCom (kk : Nat) (Mt : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32
     txPin icfgLog tid qtx.half ∗
     irefFrag kk q ∗ liveGenlo kk q g lo ∗ ⌜lo ≤ tl⌝ ∗ credFloor lo tl ∗ slhTok (icfgIsl kk) q ∗
     irefSlotsAuth ∗ islPool Mt ∗
-    ipool (hlc := hlc) fscFs fscIreg fscCov fscLogst (regionInums icfgNib \ ciInums ci) ∅)
+    ipool fscFs fscIreg fscCov fscLogst (regionInums icfgNib \ ciInums ci) ∅)
 
 set_option maxHeartbeats 4000000 in
 /-- **THE WINDOW OPENS** (Rocq 4331--4450). -/
@@ -80,7 +80,7 @@ theorem iput_ent_open (cpu : CPU) (kk : Nat) (hkk : kk < NINODE) (q : Qp) (inum 
     (Mt : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × BitVec 32))
     (hciwf : icCiWf Mt ci icfgNib icfgDev) (hMk : PartialMap.get? Mt kk = some (q, PosNat.one))
     (mst : StampMap IcBid) (Kt : Nat) (hmst : maxStamp mst ≤ Kt) (tid : Nat) (qtx : Qp) :
-    itableInv (hlc := hlc) (GF := GF) ∗ icEscrow fscIc fscFs fscIreg fscCov fscLogst kk ∗
+    itableInv (GF := GF) ∗ icEscrow fscIc fscFs fscIreg fscCov fscLogst kk ∗
     ownCtx cpu curCtx ∗ iputTab Mt ci ∗ inodeRefAt kk q icfgDev inum mst ∗
     ctxFloor curCtx Kt ∗ txPin icfgLog tid qtx ⊢
     |={⊤}=> ownCtx cpu curCtx ∗ ∃ (g : GName) (lo tl : Nat) (x0 : IcX) (td T0 Kw : Nat),
@@ -122,7 +122,7 @@ theorem iput_ent_open (cpu : CPU) (kk : Nat) (hkk : kk < NINODE) (q : Qp) (inum 
   ihave Hiu := (show irefSlots (GF := GF) PosNat.one.val ⊢ irefSlots 1 from .rfl) $$ Hiu
   ihave Hicnt := (show icntHalf (GF := GF) inum.toNat PosNat.one.val ⊢ icntHalf inum.toNat 1 from .rfl) $$ Hicnt
   -- THE REF-1 PARK DECISION
-  imod Xv6.frzPark_shr_off (hlc := hlc) ⊤ kk inum.toNat q g lo CoPset.subseteq_top hkk
+  imod Xv6.frzPark_shr_off ⊤ kk inum.toNat q g lo CoPset.subseteq_top hkk
     $$ Hinv Hlv Hpark with ⟨Hlv, Hmir, Hsel, Hpin⟩
   -- the slot's payload row
   icases itableSlotRes_acc_upd_llb curCtx Mt ci kk hkk $$ Hstamps with ⟨Hsrow, Hstampsback⟩
@@ -175,7 +175,7 @@ theorem iput_ent_toTail (kk : Nat) (Mt : RegMapF (Qp × PosNat))
     icRegd kk ⟨td, true, some (icfgDev, inum), some (x0, T0)⟩ ∗ topLb td ∗ icCnt kk 1 ∗
     icHdr fscIc fscFs fscIreg fscCov fscLogst kk (some (icfgDev, inum)) x0 curCtx ⊢
     itableHalf Mt ∗ irefSlotsAuth ∗ islPool Mt ∗
-    ipool (hlc := hlc) fscFs fscIreg fscCov fscLogst (regionInums icfgNib \ ciInums ci) ∅ ∗
+    ipool fscFs fscIreg fscCov fscLogst (regionInums icfgNib \ ciInums ci) ∅ ∗
     irefFrag kk q ∗ liveFracc kk q ∗ slhTok (icfgIsl kk) q ∗
     iputWindow kk Mt ci icfgDev inum ∗ iputRowOpen kk Mt ci q icfgDev inum ∗
     iputPin kk tid qtx := by
@@ -217,7 +217,7 @@ theorem iput_ent_mint (kk : Nat) (hkk : kk < NINODE) (q : Qp) (inum : BitVec 32)
     (hcik : PartialMap.get? ci kk = some (icfgDev, inum))
     (hnib : inum.toNat < 16 * icfgNib) (dn : Dinode) (bm : Blkmap) (hnl0 : dn.diNlink.toNat = 0)
     (g ga : GName) (lo : Nat) (tid : Nat) (qf : Qp) (rgb : Bool) :
-    itableInv (hlc := hlc) (GF := GF) ∗ iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+    itableInv (GF := GF) ∗ iregInv fscIreg fscFs icfgIst icfgNib ∗
     itableHalf Mt ∗ liveGenlo kk q g lo ∗ liveGen kk (1 : Qp).half ga ∗
     frzsel kk (1 : Qp).half false ∗ frzmH inum.toNat false ∗ icntHalf inum.toNat 1 ∗
     ifreezeOff inum.toNat ∗ iregRegime rgb ∗ txPin icfgLog tid qf ∗
@@ -254,7 +254,7 @@ theorem iput_ent_mint (kk : Nat) (hkk : kk < NINODE) (q : Qp) (inum : BitVec 32)
   ihave Hoff := (show ifreezeOff (GF := GF) inum.toNat ⊢ ifreeze .frzOff inum.toNat from .rfl) $$ Hoff
   ihave Hfpin := (show txPin (GF := GF) icfgLog tid qf ⊢ iregFpin (rgb, (tid, qf)) from .rfl) $$ Htxf
   ihave Hrg := (show iregRegime (GF := GF) rgb ⊢ iregRegime (rgb, (tid, qf)).1 from .rfl) $$ Hrg
-  imod iregFreeze_au (hlc := hlc) ⊤ fscIreg fscFs icfgIst icfgNib inum dn (rgb, (tid, qf))
+  imod iregFreeze_au ⊤ fscIreg fscFs icfgIst icfgNib inum dn (rgb, (tid, qf))
       CoPset.subseteq_top hin hnl0 hty0 $$ Hireg Hrg Hfpin Hdat Hoff Hicnt Hmir
     with ⟨Hdat, Hpre, Hicnt, Hmir⟩
   ihave Hdat := (show dinodeAt (GF := GF) fscIreg inum dn ⊢
@@ -269,9 +269,9 @@ theorem iput_ent_mint (kk : Nat) (hkk : kk < NINODE) (q : Qp) (inum : BitVec 32)
   ihave Hlg := icMkLoadedGhost fscFs fscIreg fscCov fscLogst inum dn bm data h1 h2 h3 h4 h5
     $$ Hleg
   -- THE REGENERATION, THE FREEZE, THE FROZEN PARK
-  imod live_slot_regen_pinw (hlc := hlc) ⊤ Mt kk q PosNat.one g lo CoPset.subseteq_top hMk
+  imod live_slot_regen_pinw ⊤ Mt kk q PosNat.one g lo CoPset.subseteq_top hMk
     $$ Hinv Hhalf Hlv Hlvh with ⟨%g', Hhalf, Hlv, Hlvh, Hpend⟩
-  imod frz_slot_freeze_pinw (hlc := hlc) ⊤ Mt kk q PosNat.one g' lo CoPset.subseteq_top hMk
+  imod frz_slot_freeze_pinw ⊤ Mt kk q PosNat.one g' lo CoPset.subseteq_top hMk
     $$ Hinv Hhalf Hlv Hlvh Hsel with ⟨Hhalf, Hselp, Hsele⟩
   ihave Hpark := frzPark_intro_on kk inum.toNat $$ [Hmir Hselp]
   · iframe
@@ -303,11 +303,11 @@ the selector's quarter, refuted against the closer's own liveness slice
 theorem iput_ent_kill (kk : Nat) (hkk : kk < NINODE) (Mt : RegMapF (Qp × PosNat))
     (ci : RegMapF (BitVec 32 × BitVec 32)) (q : Qp) (inum : BitVec 32) (tid : Nat) (qtx : Qp)
     (g : GName) (lo tl : Nat) :
-    itableInv (hlc := hlc) (GF := GF) ∗ iputEntCom kk Mt ci q icfgDev inum tid qtx g lo tl ∗
+    itableInv (GF := GF) ∗ iputEntCom kk Mt ci q icfgDev inum tid qtx g lo tl ∗
     frzsel kk (1 : Qp).half.half true ⊢ |={⊤}=> False := by
   unfold iputEntCom
   iintro ⟨#Hinv, ⟨-, -, -, -, -, -, -, -, -, -, -, -, -, -, Hlv, -⟩, Hsel⟩
-  iapply frz_slot_kill_pinw (hlc := hlc) ⊤ kk (1 : Qp).half.half q g lo CoPset.subseteq_top hkk
+  iapply frz_slot_kill_pinw ⊤ kk (1 : Qp).half.half q g lo CoPset.subseteq_top hkk
     $$ Hinv Hsel Hlv
 
 /-- `c.bnez` over the sign-extended nlink halfword. -/

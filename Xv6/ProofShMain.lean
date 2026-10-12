@@ -21,13 +21,13 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
 /-- **Rocq `wp_ksh_main`**. -/
 theorem wp_shMain (UL : UK_LEAVES) (HS : UK_SYS_P) (HSS : USH_SYS_P) (SC : SH_GETCMD) :
-    wpShMainBody (hlc := hlc) (GF := GF) := by
+    wpShMainBody (GF := GF) := by
   intro N _ X _ Dsc Dl cn L D HR R K h m f n0 l
   iintro #Hdp #Hlaw #Hplaw #Hrest #Hc #Hjt #Hgen %hfd0 Hin Hstd Hcwd Hch Hpid Hpos HR Hbs Hrun
   rw [show User.Sh.Sym.«main» = 0x8be from rfl]

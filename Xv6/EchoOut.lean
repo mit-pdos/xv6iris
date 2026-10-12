@@ -173,7 +173,7 @@ class EchoOutG (GF : BundledGFunctors.{0}) where
 attribute [reducible, instance] EchoOutG.pinG
 
 section EchoOut
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 
 /-! ## The era's pin -/
 

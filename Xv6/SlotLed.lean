@@ -210,16 +210,16 @@ end Rows
 /-! ## The invariant, the element, the receipt -/
 
 section Inv
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [WchG GF]
 
 /-- **THE SLOT-OCCUPANCY LEDGER'S INVARIANT.** -/
 def slotLedInv : IProp GF := inv slotN (slotLedBody (GF := GF))
 
-instance slotLedInv_persistent : Persistent (slotLedInv (hlc := hlc) (GF := GF)) := by
+instance slotLedInv_persistent : Persistent (slotLedInv (GF := GF)) := by
   unfold slotLedInv; infer_instance
 
 /-- **Slot `pa`'s element, with the invariant it answers to.** -/
-def soElem (pa : BitVec 64) (b : Bool) : IProp GF := iprop(slotLedInv (hlc := hlc) ∗ soOwn pa b)
+def soElem (pa : BitVec 64) (b : Bool) : IProp GF := iprop(slotLedInv ∗ soOwn pa b)
 
 /-- **THE EXHAUSTION RECEIPT**: `SFull act k0` was appended right after
 history `h`, whose window from `k0` covers every slot. -/
@@ -234,15 +234,15 @@ visit; afterwards a lower bound at which every visited slot was occupied at
 some prefix no shorter than the window start `k0`. -/
 def slotScan (n : Nat) : IProp GF :=
   iprop(⌜n = 0⌝ ∨ ∃ (k0 : Nat) (h : List Sev),
-    slotLedInv (hlc := hlc) ∗ slotLedLb h ∗ ⌜sevScan h k0 n⌝)
+    slotLedInv ∗ slotLedLb h ∗ ⌜sevScan h k0 n⌝)
 
-theorem slotScan_zero : ⊢@{IProp GF} slotScan (hlc := hlc) 0 := by
+theorem slotScan_zero : ⊢@{IProp GF} slotScan 0 := by
   unfold slotScan; iintro; ileft; ipureintro; rfl
 
 /-- **ALLOCPROC'S USED STORE** (slot `j`): append `SOcc j`, the element
 becomes occupied.  Unlabelled: no permit step. -/
 theorem soElem_occ (j : Nat) (hj : j < NPROC) (b : Bool) :
-    soElem (hlc := hlc) (GF := GF) (procAddr j) b ⊢ |={⊤}=> soElem (hlc := hlc) (procAddr j) true := by
+    soElem (GF := GF) (procAddr j) b ⊢ |={⊤}=> soElem (procAddr j) true := by
   unfold soElem slotLedInv
   iintro ⟨#Hinv, He⟩
   iinv Hinv with Hbody Hclose
@@ -266,7 +266,7 @@ theorem soElem_occ (j : Nat) (hj : j < NPROC) (b : Bool) :
 /-- **FREEPROC'S UNUSED STORE** (slot `j`): append `SVac j`, the element
 becomes vacant.  Unlabelled: no permit step. -/
 theorem soElem_vac (j : Nat) (hj : j < NPROC) (b : Bool) :
-    soElem (hlc := hlc) (GF := GF) (procAddr j) b ⊢ |={⊤}=> soElem (hlc := hlc) (procAddr j) false := by
+    soElem (GF := GF) (procAddr j) b ⊢ |={⊤}=> soElem (procAddr j) false := by
   unfold soElem slotLedInv
   iintro ⟨#Hinv, He⟩
   iinv Hinv with Hbody Hclose
@@ -291,8 +291,8 @@ theorem soElem_vac (j : Nat) (hj : j < NPROC) (b : Bool) :
 the invariant's authority, and the accumulator grows by the slot (the first
 visit fixes the window start at the current length). -/
 theorem slotScan_visit (n : Nat) (hn : n < NPROC) :
-    slotScan (hlc := hlc) (GF := GF) n ∗ soElem (hlc := hlc) (procAddr n) true ⊢
-      |={⊤}=> (slotScan (hlc := hlc) (n + 1) ∗ soElem (hlc := hlc) (procAddr n) true) := by
+    slotScan (GF := GF) n ∗ soElem (procAddr n) true ⊢
+      |={⊤}=> (slotScan (n + 1) ∗ soElem (procAddr n) true) := by
   unfold soElem slotLedInv
   iintro ⟨Hsc, #Hinv, He⟩
   iinv Hinv with Hbody Hclose
@@ -343,7 +343,7 @@ theorem slotScan_visit (n : Nat) (hn : n < NPROC) :
 k0` is appended with its window and the receipt comes back.  The caller pays
 the actor's ONE permit step (`actLend_step`) beside it. -/
 theorem slotLed_full (act : BitVec 64) :
-    slotScan (hlc := hlc) (GF := GF) NPROC ⊢ |={⊤}=> sFullRcpt act := by
+    slotScan (GF := GF) NPROC ⊢ |={⊤}=> sFullRcpt act := by
   unfold slotScan
   iintro (%h0 | ⟨%k0, %h', #Hinv, #Hlb', %hs⟩)
   · exact absurd h0 (by decide)
@@ -373,7 +373,7 @@ theorem slotLed_full (act : BitVec 64) :
 /-- **THE BOOT**: the raw authority at the empty history becomes the
 invariant. -/
 theorem slotLed_alloc (E : CoPset) :
-    slotLedAuth (GF := GF) [] ∗ soAuth [] ⊢ |={E}=> slotLedInv (hlc := hlc) := by
+    slotLedAuth (GF := GF) [] ∗ soAuth [] ⊢ |={E}=> slotLedInv := by
   iintro ⟨Ha, Hs⟩
   unfold slotLedInv
   iapply inv_alloc slotN E (slotLedBody (GF := GF))
@@ -385,8 +385,8 @@ theorem slotLed_alloc (E : CoPset) :
 
 /-- The boot pairs each raw element with the invariant. -/
 theorem soElem_boot (l : List Nat) :
-    slotLedInv (hlc := hlc) (GF := GF) ∗ ([∗list] i ∈ l, soOwn (GF := GF) (procAddr i) false) ⊢
-      [∗list] i ∈ l, soElem (hlc := hlc) (procAddr i) false := by
+    slotLedInv (GF := GF) ∗ ([∗list] i ∈ l, soOwn (GF := GF) (procAddr i) false) ⊢
+      [∗list] i ∈ l, soElem (procAddr i) false := by
   iintro ⟨#Hinv, H⟩
   iapply BigSepL.bigSepL_impl $$ H
   imodintro

@@ -63,10 +63,10 @@ def xfamWr {GF : BundledGFunctors.{0}} (Q : Nat → IProp GF) (Xp : Int → IPro
 /-! ## S2 THE TWO KEY-LEVEL ROWS, S3 the arm -/
 
 section Rows
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg]
 
-local notation "SGX" => uexecSGXv6 (hlc := hlc)
+local notation "SGX" => uexecSGXv6
 
 /-- **Rocq `sbundle_at_write_intro_at`** (deviation 2: the input at every
 view agreeing with the key's image). -/
@@ -75,10 +75,10 @@ theorem sbundleAt_write_intro_at (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis
     (h0 : tfW W.tf (tfArgIdx 0) = v0) (h1 : tfW W.tf (tfArgIdx 1) = v1) (h2 : tfW W.tf (tfArgIdx 2) = v2)
     (hfd : W.fd = sts) (hM : W.M = E) (hpm : W.perm = pmv) (hsz : W.sz = szv) (hlz : W.lazy = lzv) :
     (∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees E Mv⌝ -∗
-      filewriteIn (hlc := hlc) pmv szv lzv (fdStOfKey v0 sts) (argZ v2) Mv v1 f.wQ f.wQe) ⊢
+      filewriteIn pmv szv lzv (fdStOfKey v0 sts) (argZ v2) Mv v1 f.wQ f.wQe) ⊢
       @UexecSG.sbundleAt GF _ SGX X 16 f W := by
   subst h0 h1 h2 hfd hM hpm hsz hlz
-  exact (sbundleAt_xv6_write (hlc := hlc) X f W).symm ▸ .rfl
+  exact (sbundleAt_xv6_write X f W).symm ▸ .rfl
 
 /-- **Rocq `spost_at_write_elim_at`**, at Lean's row-16 post (deviation 3):
 THE BLANKET FIRST, then the table and the view the arm fired at. -/
@@ -90,7 +90,7 @@ theorem spostAt_write_elim_at (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (
       ⌜filewriteRet (argZ v2) r⌝ ∗
       ∃ (P : UPtd) (Mv : Nat → List (BitVec 8)),
         ⌜permOf P.um W.sz = W.perm⌝ ∗ ⌜imgAgrees W.M Mv⌝ ∗
-        filewriteExtra (hlc := hlc) W.gen P (fdStOfKey v0 sts) (argZ v2) Mv v1 f.wQ f.wQe r := by
+        filewriteExtra W.gen P (fdStOfKey v0 sts) (argZ v2) Mv v1 f.wQ f.wQe r := by
   subst h0 h1 h2 hfd
   rw [spostAt_xv6_write]
   unfold xpostWrite xkA
@@ -117,12 +117,12 @@ theorem uwr_fd_st_dev (v0 : BitVec 64) (fdv l : List FdState) (i : Nat) (rb : Bo
 /-! ## S4 THE SUPPLY -/
 
 section Supply
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
-local notation "SGX" => uexecSGXv6 (hlc := hlc)
+local notation "SGX" => uexecSGXv6
 
 /-- **Rocq `uwrite_chain_sup`**: THE DEPOSIT, AT THE PROGRAM'S OWN CURSOR --
 the chain enters as a wand over the heap the deposit lends (deviation 2:
@@ -135,8 +135,8 @@ theorem uwrite_chain_sup (N : UkNames GF) (Q : Nat → IProp GF) (m : RegMap) (p
       uheap N.t N.d N.s M pm sz -∗
       uheap N.t N.d N.s M pm sz ∗
         ∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees M Mv⌝ -∗
-          consOutChain (genId (hlc := hlc) (GF := GF) + 1) Mv (m.get 11#5) Q 0 (argZ (m.get 12#5)).toNat) ⊢
-      UshSysP.udepwfStd (hlc := hlc) (SG := SGX) N m pc 16 (xfamWr Q N.pay) l := by
+          consOutChain (genId (GF := GF) + 1) Mv (m.get 11#5) Q 0 (argZ (m.get 12#5)).toNat) ⊢
+      UshSysP.udepwfStd (SG := SGX) N m pc 16 (xfamWr Q N.pay) l := by
   unfold UshSysP.udepwfStd Xv6.udepwfStd
   iintro Hch
   isplitr
@@ -144,7 +144,7 @@ theorem uwrite_chain_sup (N : UkNames GF) (Q : Nat → IProp GF) (m : RegMap) (p
   iintro %M %pm %sz %fdv %cw %gn %cs %pidv %htake #Hmp Hh Hf
   icases Hch $$ %M %pm %sz Hh with ⟨Hh, Hch⟩
   iframe Hh Hf
-  iapply sbundleAt_write_intro_at (hlc := hlc) (uslot (hlc := hlc) (SG := SGX)) (xfamWr Q N.pay)
+  iapply sbundleAt_write_intro_at (uslot (SG := SGX)) (xfamWr Q N.pay)
     (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) (m.get 10#5) (m.get 11#5) (m.get 12#5) fdv
     M pm sz false (Xv6.tfOf_a0 m pc) (Xv6.tfOf_a1 m pc) (Xv6.tfOf_a2 m pc) rfl rfl rfl rfl rfl
   rw [uwr_fd_st_dev (m.get 10#5) fdv l i rb mj h0 hi htake hli]
@@ -189,15 +189,15 @@ theorem uwrite_chain_sup_ret (N : UkNames GF) (Q : Nat → IProp GF) (R : IProp 
       uheap N.t N.d N.s M pm sz -∗
       uheap N.t N.d N.s M pm sz ∗ R ∗
         ∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees M Mv⌝ -∗
-          consOutChain (genId (hlc := hlc) (GF := GF) + 1) Mv (m.get 11#5) Q 0 (argZ (m.get 12#5)).toNat) ⊢
-      UshSysP.udepwfStd (hlc := hlc) (SG := SGX) N m pc 16 (xfamWr (fun j => iprop(Q j ∗ R)) N.pay) l := by
+          consOutChain (genId (GF := GF) + 1) Mv (m.get 11#5) Q 0 (argZ (m.get 12#5)).toNat) ⊢
+      UshSysP.udepwfStd (SG := SGX) N m pc 16 (xfamWr (fun j => iprop(Q j ∗ R)) N.pay) l := by
   iintro Hch
-  iapply uwrite_chain_sup (hlc := hlc) N (fun j => iprop(Q j ∗ R)) m pc l i rb mj h0 hi hli
+  iapply uwrite_chain_sup N (fun j => iprop(Q j ∗ R)) m pc l i rb mj h0 hi hli
   iintro %M %pm %sz Hh
   icases Hch $$ %M %pm %sz Hh with ⟨Hh, HR, Hch⟩
   iframe Hh
   iintro %Mv %hag
-  iapply cons_out_chain_frame (genId (hlc := hlc) (GF := GF) + 1) Mv (m.get 11#5) Q R _ 0 $$ HR
+  iapply cons_out_chain_frame (genId (GF := GF) + 1) Mv (m.get 11#5) Q R _ 0 $$ HR
   iapply Hch $$ %Mv %hag
 
 end Supply
@@ -205,10 +205,10 @@ end Supply
 /-! ## THE POST, READ BACK AT THE SAME FAMILY -/
 
 section Post
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg]
 
-local notation "SGX" => uexecSGXv6 (hlc := hlc)
+local notation "SGX" => uexecSGXv6
 
 /-- **Rocq `uwrite_post_cons`**: the device arm of `filewriteExtra` is keyed
 on `CONSOLE`, so this is where the major stops being free (deviation 3: the
@@ -218,7 +218,7 @@ theorem uwrite_post_cons (Q : Nat → IProp GF) (Xp : Int → IProp GF) (W : Uvi
     (l : List FdState) (i : Nat) (rb : Bool)
     (h0 : (BitVec.setWidth 32 (tfW W.tf (tfArgIdx 0))).toInt = (i : Int)) (hi : i < NSTD)
     (htake : W.fd.take NSTD = l) (hli : l[i]? = some (.open rb true (.device CONSOLE))) :
-    @UexecSG.spostAt GF _ SGX (uslot (hlc := hlc) (SG := SGX)) 16 (xfamWr Q Xp) W r M' fdv' cw' cs' ⊢
+    @UexecSG.spostAt GF _ SGX (uslot (SG := SGX)) 16 (xfamWr Q Xp) W r M' fdv' cw' cs' ⊢
       ∃ P : UPtd, ⌜permOf P.um W.sz = W.perm⌝ ∗ ⌜uptWf P⌝ ∗
         ⌜W.lazy = false → lazyFree P.um (BitVec.ofNat 64 W.sz)⌝ ∗
         writeConsArms P (tfW W.tf (tfArgIdx 1)) Q (argZ (tfW W.tf (tfArgIdx 2))) r := by
@@ -252,9 +252,9 @@ theorem uwrite_no_short (Q : Nat → IProp GF) (Xp : Int → IProp GF) (W : Uvis
     (hnf : ∀ (P : UPtd) (j : Nat), uptWf P → permOf P.um W.sz = W.perm →
       lazyFree P.um (BitVec.ofNat 64 W.sz) → j < nb →
       uvaRmapped P (tfW W.tf (tfArgIdx 1) + BitVec.ofNat 64 j).toNat) :
-    @UexecSG.spostAt GF _ SGX (uslot (hlc := hlc) (SG := SGX)) 16 (xfamWr Q Xp) W r M' fdv' cw' cs' ⊢
+    @UexecSG.spostAt GF _ SGX (uslot (SG := SGX)) 16 (xfamWr Q Xp) W r M' fdv' cw' cs' ⊢
       ⌜r = BitVec.ofNat 64 nb⌝ ∗ Q nb := by
-  refine (uwrite_post_cons (hlc := hlc) Q Xp W r M' fdv' cw' cs' l i rb h0 hi htake hli).trans ?_
+  refine (uwrite_post_cons Q Xp W r M' fdv' cw' cs' l i rb h0 hi htake hli).trans ?_
   iintro ⟨%P, %hpm, %hwf, %hlf, H⟩
   rw [hcnt]
   unfold writeConsArms
@@ -281,7 +281,7 @@ theorem xpostWrite_no_short (Q : Nat → IProp GF) (Xp : Int → IProp GF) (W : 
     (hnf : ∀ (P : UPtd) (j : Nat), uptWf P → permOf P.um W.sz = W.perm →
       lazyFree P.um (BitVec.ofNat 64 W.sz) → j < nb →
       uvaRmapped P (tfW W.tf (tfArgIdx 1) + BitVec.ofNat 64 j).toNat) :
-    xpostWrite (hlc := hlc) (xfamWr Q Xp).wQ (xfamWr Q Xp).wQe W r ⊢ ⌜r = BitVec.ofNat 64 nb⌝ ∗ Q nb :=
+    xpostWrite (xfamWr Q Xp).wQ (xfamWr Q Xp).wQe W r ⊢ ⌜r = BitVec.ofNat 64 nb⌝ ∗ Q nb :=
   uwrite_no_short Q Xp W r W.M W.fd 0 ∅ l i rb nb h0 hi htake hli hcnt hlz hnf
 
 end Post

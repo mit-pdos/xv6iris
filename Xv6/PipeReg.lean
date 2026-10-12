@@ -48,7 +48,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
 section PipeReg
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-! ## 1.  THE REGISTRY -/
 
@@ -56,9 +56,9 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 `pipe_reg`).  `emp` is the payload because kexit's row is at `emp` -- a
 dying process never resumes to be told anything. -/
 def pipeReg (γp : PipeNames) : IProp GF :=
-  iprop(□ ∀ w : Bool, pipeCpay (hlc := hlc) γp.pnQueue w emp)
+  iprop(□ ∀ w : Bool, pipeCpay γp.pnQueue w emp)
 
-instance pipeReg_persistent (γp : PipeNames) : Persistent (pipeReg (hlc := hlc) (GF := GF) γp) := by
+instance pipeReg_persistent (γp : PipeNames) : Persistent (pipeReg (GF := GF) γp) := by
   unfold pipeReg; infer_instance
 
 /-- ...AND A TABLE ROW'S: the registry at a pipe row and nothing at all
@@ -66,11 +66,11 @@ anywhere else (Rocq `pipe_row_reg`).  `FileDefs.fdstNopipe` is its pure
 reading (`pipeRowReg_nopipe`). -/
 def pipeRowReg (st : FdState) : IProp GF :=
   match st with
-  | .open _ _ (.pipe γp) => pipeReg (hlc := hlc) γp
+  | .open _ _ (.pipe γp) => pipeReg γp
   | _ => iprop(emp)
 
 instance pipeRowReg_persistent (st : FdState) :
-    Persistent (pipeRowReg (hlc := hlc) (GF := GF) st) := by
+    Persistent (pipeRowReg (GF := GF) st) := by
   unfold pipeRowReg
   rcases st with _ | ⟨_, _, _ | _ | _⟩ <;> infer_instance
 
@@ -93,7 +93,7 @@ theorem pipeReg_not_free (γ : GName) :
 /-- ...AND A ROW THAT IS NOT A PIPE REGISTERS ITSELF (Rocq
 `pipe_row_reg_nopipe`): a program that never calls pipe(2) pays nothing. -/
 theorem pipeRowReg_nopipe (st : FdState) (h : fdstNopipe st) :
-    ⊢ pipeRowReg (hlc := hlc) (GF := GF) st := by
+    ⊢ pipeRowReg (GF := GF) st := by
   unfold pipeRowReg
   rcases st with _ | ⟨_, _, _ | _ | _⟩
   · iempintro
@@ -107,7 +107,7 @@ theorem pipeRowReg_nopipe (st : FdState) (h : fdstNopipe st) :
 `pipe_cpay_of_reg_true`): a registered row pays its own close at `True`,
 for a caller that reads nothing back from it. -/
 theorem pipeCpay_of_reg_true (γp : PipeNames) (w : Bool) :
-    pipeReg (hlc := hlc) (GF := GF) γp ⊢ pipeCpay (hlc := hlc) γp.pnQueue w iprop(True) := by
+    pipeReg (GF := GF) γp ⊢ pipeCpay γp.pnQueue w iprop(True) := by
   unfold pipeReg pipeCpay
   iintro #Hr
   icases Hr $$ %w with (Hl | #Ht)
@@ -120,7 +120,7 @@ theorem pipeCpay_of_reg_true (γp : PipeNames) (w : Bool) :
 /-- WHAT THE REGISTRY PAYS: a registered row's close at `emp`, kexit's
 payload (Rocq `fileclose_cpay_of_reg`). -/
 theorem fileclose_cpay_of_reg (st : FdState) :
-    pipeRowReg (hlc := hlc) (GF := GF) st ⊢ filecloseCpay (hlc := hlc) st iprop(emp) := by
+    pipeRowReg (GF := GF) st ⊢ filecloseCpay st iprop(emp) := by
   unfold pipeRowReg filecloseCpay
   rcases st with _ | ⟨_, w, _ | _ | _⟩
   · iintro -; iempintro
@@ -136,7 +136,7 @@ theorem fileclose_cpay_of_reg (st : FdState) :
 is `True` (`UexecExecInst.xfamPt`) -- so a registered row pays its own close
 too, for a caller that reads nothing back from it. -/
 theorem fileclose_cpay_of_reg_true (st : FdState) :
-    pipeRowReg (hlc := hlc) (GF := GF) st ⊢ filecloseCpay (hlc := hlc) st iprop(True) := by
+    pipeRowReg (GF := GF) st ⊢ filecloseCpay st iprop(True) := by
   unfold pipeRowReg filecloseCpay
   rcases st with _ | ⟨_, w, _ | _ | _⟩
   · iintro -; iempintro
@@ -147,7 +147,7 @@ theorem fileclose_cpay_of_reg_true (st : FdState) :
 /-- The whole table's close payments out of its rows' registrations (Rocq
 `fileclose_cpays_of_regs`): exit's bundle row, from what a run carries. -/
 theorem fileclose_cpays_of_regs (sts : List FdState) :
-    ([∗list] st ∈ sts, pipeRowReg (hlc := hlc) (GF := GF) st) ⊢ filecloseCpays (hlc := hlc) sts := by
+    ([∗list] st ∈ sts, pipeRowReg (GF := GF) st) ⊢ filecloseCpays sts := by
   unfold filecloseCpays
   exact BigSepL.bigSepL_mono_of_forall (fun {_ st} => fileclose_cpay_of_reg st)
 

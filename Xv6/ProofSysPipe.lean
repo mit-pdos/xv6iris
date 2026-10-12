@@ -39,7 +39,7 @@ set_option maxHeartbeats 16000000 in
 set_option maxRecDepth 20000 in
 theorem sys_pipe_proof (MP : MYPROC) (AA : ARGADDR) (PA : PIPEALLOC) (FD : FDALLOC) (CO : COPYOUT)
     (FC : FILECLOSE) : SYSPIPE := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ cpu k γl γ pa pid V M sts v γkl γk
+  fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ cpu k γl γ pa pid V M sts v γkl γk
       hv hproc htier hnoff hK => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
@@ -152,7 +152,7 @@ theorem sys_pipe_proof (MP : MYPROC) (AA : ARGADDR) (PA : PIPEALLOC) (FD : FDALL
   -- ...AND THE BLOCK'S EVENT COUNTER, LENT (permit sweep L1b): pipealloc's
   -- error paths close files, and fileclose takes the lend
   icases procPrivCoreNoctxAt_pidLend curCtx pa pid V M $$ Hcore with ⟨Hpid, Hlend, Hcw⟩
-  ihave Hpid := (show @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ⊢
+  ihave Hpid := (show @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ⊢
       wordPointsTo (pPid pa) 4 pidPriv pid from .rfl) $$ Hpid
   iapply (sys_pipe_pipealloc PA Γ c11 _ γl γ γkl γk none rf wf pid pidPriv V.ev k.sie (by k_norm_g) pa
       (by k_norm_g; exact hproc) ?hKp ?hnp ?ht)
@@ -175,7 +175,7 @@ theorem sys_pipe_proof (MP : MYPROC) (AA : ARGADDR) (PA : PIPEALLOC) (FD : FDALL
     sys_pipe_pins hpins2
   obtain ⟨hpins3, h9'⟩ := sys_pipe_pins_call k _ R3 hpins2' hcs3
   ihave Hpid := (show wordPointsTo (GF := GF) (pPid pa) 4 pidPriv pid ⊢
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid from .rfl) $$ Hpid
+      @wordPointsTo GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid from .rfl) $$ Hpid
   ihave Hce := (show cpuClaimExt (GF := GF) c12 k.sie pa ⊢ cpuClaimExt c12 k.sie k.proc from by
     rw [hproc]) $$ Hce
   icases Hcw $$ Hpid Hlend with ⟨%kv, %hkv, Hcore⟩

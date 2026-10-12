@@ -97,13 +97,13 @@ theorem fw_branch_last {α : Type _} (b : BitVec 44) (i : Nat) (hi : i < 512) (p
 /-- `freewalk`'s contract at level `lvl`: what the induction proves and what
 the recursive call assumes. -/
 structure FwAt (lvl : Nat) : Prop where
-  wp_fw : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
+  wp_fw : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (t : PTree) (ke : Nat)
     hlvl hnoff hK hlk hroot hwf hnd hpg hnl,
-    wp_freewalk_body (hlc := hlc) (GF := GF) cpu k γl γk lvl t ke hlvl hnoff hK hlk hroot hwf hnd hpg hnl
+    wp_freewalk_body (GF := GF) cpu k γl γk lvl t ke hlvl hnoff hK hlk hroot hwf hnd hpg hnl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-! ## The frame -/
 
@@ -184,7 +184,7 @@ theorem fw_rec_call [WchG GF] (l' : Nat) (FW : FwAt l') [CurCtx] (c : CPU) (k' :
       (∃ k1 : Nat, ⌜ke ≤ k1⌝ ∗ actLend k'.proc k1) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := FW.wp_fw (hlc := hlc) (GF := GF) c k' γl γk u ke hlvl' hnoff' hK' hlk' hroot' hwf' hnd' hpg' hnl'
+  have h := FW.wp_fw (GF := GF) c k' γl γk u ke hlvl' hnoff' hK' hlk' hroot' hwf' hnd' hpg' hnl'
   unfold wp_freewalk_body at h
   simp only [freewalkAddr] at h
   exact h
@@ -612,7 +612,7 @@ end
 set_option maxHeartbeats 4000000 in
 /-- `freewalk` at level `lvl`, given its own contract one level down. -/
 theorem freewalk_body (KF : KFREE) (lvl : Nat) (hrec : ∀ l', lvl = l' + 1 → FwAt l') : FwAt lvl :=
-  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk t ke hlvl hnoff hK hlk hroot hwf hnd hpg hnl => by
+  ⟨fun {GF} _ _ _ _ cpu k γl γk t ke hlvl hnoff hK hlk hroot hwf hnd hpg hnl => by
   unfold wp_freewalk_body
   simp only [freewalkAddr]
   iintro ⟨Hk, Hpc, #Hlk, #Hav, Htree, Hlend, HΦ⟩

@@ -36,7 +36,7 @@ set_option linter.unusedSimpArgs false
 abbrev ushPpRs : List (BitVec 5) := [1#5, 8#5, 9#5, 18#5, 19#5, 20#5]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -46,13 +46,13 @@ theorem shPp_head (UL : UK_LEAVES) (SE : SH_PARSEEXEC) (SP : SH_PEEK) (N : UkNam
     (UM UM1 Pex : IProp GF) (nn : Nat)
     (ha0 : m.get 10#5 = BitVec.ofNat 64 ps) (ha1 : m.get 11#5 = BitVec.ofNat 64 (s0 + len)) (hoff : off ≤ len)
     (hsc : refSymScope len f) (hpe : refParseexec len f fuel off = some (t1, s))
-    (hpk : refPeek len f s [rbBar] = (hit, s1)) (hch : ushMallocChain (hlc := hlc) N (ushpNodes t1) UM UM1)
+    (hpk : refPeek len f s [rbBar] = (hit, s1)) (hch : ushMallocChain N (ushpNodes t1) UM UM1)
     (hrd : refHasRedir t1 = true → 12 ≤ nn) (hs64 : s0 + len < 2 ^ 64) (hps0 : 0 < ps) (hps8 : ps % 8 = 0)
     (hpsz : ps + 8 < 2 ^ 64) :
     ⊢ ushCode N.t -∗ uword N.d ps (BitVec.ofNat 64 (s0 + off)) -∗ ustr N.d dq s0 len f -∗
       ustr N.d dw ushWsA 5 ushpWsF -∗ ustr N.d dv ushSymA 7 ushpSymF -∗ UM -∗
-        ushpOom (hlc := hlc) N Pex (16 + (24 + nn) - ushPexDeep t1) -∗ Pex -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«parsepipe») (6 + (16 + (24 + nn))) -∗
+        ushpOom N Pex (16 + (24 + nn) - ushPexDeep t1) -∗ Pex -∗
+      urun N h m (BitVec.ofNat 64 User.Sh.Sym.«parsepipe») (6 + (16 + (24 + nn))) -∗
       (∀ (h' : CPU) (m' : RegMap) (p : Nat),
         ⌜(m.get spIdx).toNat % 8 = 0 ∧ 8 * (6 + (16 + (24 + nn))) ≤ (m.get spIdx).toNat⌝ -∗
         ⌜m'.get spIdx = m.get spIdx + BitVec.ofInt 64 (-((8 * 6 : Nat) : Int))⌝ -∗
@@ -64,7 +64,7 @@ theorem shPp_head (UL : UK_LEAVES) (SE : SH_PARSEEXEC) (SP : SH_PEEK) (N : UkNam
         ustack N.d (BitVec.ofNat 64 ((m.get spIdx).toNat - 8 * 6)) 0 -∗
         ushOTree N s0 p t1 -∗ uword N.d ps (BitVec.ofNat 64 (s0 + s1)) -∗
         ustr N.d dq s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗ ustr N.d dv ushSymA 7 ushpSymF -∗ UM1 -∗ Pex -∗
-        urun (hlc := hlc) N h' m' (BitVec.ofNat 64 0x68a) (16 + (24 + nn)) -∗ wpLoop h') -∗
+        urun N h' m' (BitVec.ofNat 64 0x68a) (16 + (24 + nn)) -∗ wpLoop h') -∗
       wpLoop h := by
   rw [show User.Sh.Sym.«parsepipe» = 0x65e from rfl]
   iintro #Hc Hcur Hstr Hws Hsy HM #Hpx Hpay Hrun Hk
@@ -147,9 +147,9 @@ theorem shPp_tail (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m me : RegMap) (r
     (hkeep : ∀ q, ucalleeSavedIdx q = true → q ≠ spIdx → q ∉ ushPpRs → me.get q = m.get q) :
     ⊢ ushCode N.t -∗ ushSaved N.d (m.get spIdx).toNat (ushPpRs.map m.get) -∗
       ustack N.d (BitVec.ofNat 64 ((m.get spIdx).toNat - 8 * 6)) 0 -∗
-      urun (hlc := hlc) N h me (BitVec.ofNat 64 0x68c) nt -∗
+      urun N h me (BitVec.ofNat 64 0x68c) nt -∗
       (∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗ ⌜m'.get 10#5 = BitVec.ofNat 64 root⌝ -∗
-        urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (6 + nt) -∗ wpLoop h') -∗
+        urun N h' m' (retPc (m.get 1#5)) (6 + nt) -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hsv Hloc Hrun Hk
   iapply ushS_mv UL N (ushI_68c N.t) 0x68e h me _ (BitVec.ofNat 64 root) hs3 $$ Hc Hrun

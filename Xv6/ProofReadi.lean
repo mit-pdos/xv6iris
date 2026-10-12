@@ -49,7 +49,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 theorem rd_ctx_entry (c : CPU) (k : KCtx) (X R : RegMap) :
@@ -70,7 +70,7 @@ set_option maxHeartbeats 16000000 in
 /-- **`+0x2c .. +0x30`: the clamp** `n = min(n, size - off)`, then
 `Xv6.rd_body0`. -/
 theorem rd_clamp_n (BM : BMAP_NOALLOC) (BR : BREAD) (BE : BRELSE) (EC : EITHER_COPYOUT)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu c0 : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
     (γkl : GName) (γk : KmemNames)
@@ -161,7 +161,7 @@ theorem rd_clamp_n (BM : BMAP_NOALLOC) (BR : BREAD) (BE : BRELSE) (EC : EITHER_C
 
 set_option maxHeartbeats 16000000 in
 theorem rd_entry (BM : BMAP_NOALLOC) (BR : BREAD) (BE : BRELSE) (EC : EITHER_COPYOUT)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu c0 : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
     (γkl : GName) (γk : KmemNames)
@@ -257,7 +257,7 @@ theorem rd_entry (BM : BMAP_NOALLOC) (BR : BREAD) (BE : BRELSE) (EC : EITHER_COP
 
 set_option maxHeartbeats 16000000 in
 theorem readi_main (BM : BMAP_NOALLOC) (BR : BREAD) (BE : BRELSE) (EC : EITHER_COPYOUT)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (c0 : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
     (γkl : GName) (γk : KmemNames)
@@ -278,7 +278,7 @@ theorem readi_main (BM : BMAP_NOALLOC) (BR : BREAD) (BE : BRELSE) (EC : EITHER_C
     (ha3 : k.regs 13#5 = BitVec.signExtend 64 (BitVec.ofNat 32 off))
     (ha4 : k.regs 14#5 = BitVec.signExtend 64 (BitVec.ofNat 32 n))
     (holds : user = false → olds.length = n) :
-    wp_readi_eb_body (hlc := hlc) (GF := GF) Γ c0 k γl γb V γdl pd pav pu j γfs logstart dev
+    wp_readi_eb_body (GF := GF) Γ c0 k γl γb V γdl pd pav pu j γfs logstart dev
       γkl γk ip bm data dn user off n olds pidv Vp M dqp dq dqd
       hj hproc hK hnoff htier hgeom hwf hcov hsz hoff hjoint hdev hcl hdt hpd
       ha0 huser ha3 ha4 holds := by
@@ -335,7 +335,7 @@ end
 /-- `readi`'s proof, from its callees' interfaces (Rocq's `ReadiProof`). -/
 theorem readi_proof (BM : BMAP_NOALLOC) (BR : BREAD) (BE : BRELSE) (EC : EITHER_COPYOUT) :
     READI :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γb V γdl pd pav pu j γfs logstart dev γkl γk ip bm
+  ⟨fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γb V γdl pd pav pu j γfs logstart dev γkl γk ip bm
     data dn user off n olds pidv Vp M dqp dq dqd hj hproc hK hnoff htier hgeom hwf
     hcov hsz hoff hjoint hdev hcl hdt hpd ha0 huser ha3 ha4 holds =>
   readi_main BM BR BE EC Γ cpu k γl γb V γdl pd pav pu j γfs logstart dev γkl γk ip bm data dn user

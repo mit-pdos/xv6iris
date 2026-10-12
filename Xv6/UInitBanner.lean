@@ -43,7 +43,7 @@ PORTED THOUGH THE WALK MARKS IT UNREACHED: `kinit_ban_timeless_at`
    `mword_of_int 1 : mword 64` is `1#64` (`kinitBannerPay`'s spelling).
 2. **Parameters**: the engine `UL : UK_LEAVES` (DU2, for init's write stub
    `init_stub_write` and the row-16 leaf); the link record
-   `L : LinkRec hlc GF` is an explicit argument (Rocq's section context).
+   `L : LinkRec GF` is an explicit argument (Rocq's section context).
 3. **The cursor family** (Rocq's local `set Q`) is `UshPanicByte.ushpW1Q`
    (the same family: the byte's half-run beside `F0` at 0 and `F1` after).
 4. **The post is read OUTSIDE the walk** (`UshPanicStub` deviation 4):
@@ -84,7 +84,7 @@ theorem init_banner_bytes (j : Nat) (hj : j < 18) :
 /-! ## S2 THE WRITE STUB WITH THE POST READ BY THE CALLER (deviation 4) -/
 
 section Stub
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -98,14 +98,14 @@ theorem wp_kinit_write_chain_at_ans (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) 
       tfW W.tf (tfArgIdx 2) = m.get 12#5 → W.fd.take NSTD = l → W.lazy = false →
       (∀ (P : UPtd) (j : Nat), uptWf P → permOf P.um W.sz = W.perm → lazyFree P.um (BitVec.ofNat 64 W.sz) →
         j < nb → uvaRmapped P ((m.get 11#5 + BitVec.ofNat 64 j).toNat)) →
-      UexecSG.spostAt (uslot (hlc := hlc)) 16 fdep W r W.M W.fd cw' cs' ⊢ Ans r) :
-    ⊢ initCode N.t -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Init.Sym.«write») avail -∗
-      UshSysP.udepwfStd (hlc := hlc) N (ukWr m 17#5 (BitVec.ofInt 64 16))
+      UexecSG.spostAt (uslot) 16 fdep W r W.M W.fd cw' cs' ⊢ Ans r) :
+    ⊢ initCode N.t -∗ urun N h m (BitVec.ofNat 64 User.Init.Sym.«write») avail -∗
+      UshSysP.udepwfStd N (ukWr m 17#5 (BitVec.ofInt 64 16))
         (BitVec.ofNat 64 (User.Init.Sym.«write» + 2)) 16 fdep l -∗
       ustdAt N.fd l v -∗ ubytesq N.d dq (m.get 11#5).toNat nb fb -∗
       (∀ (h' : CPU) (ret : BitVec 64),
         ustdAt N.fd l v -∗ ubytesq N.d dq (m.get 11#5).toNat nb fb -∗ Ans ret -∗
-        urun (hlc := hlc) N h' (stubRet m 16 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
+        urun N h' (stubRet m 16 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hrun Hsb Hstd Hbuf Hcont
   iapply wp_kinit_write_chain_at UL N h m avail fdep l v dq nb fb $$ Hc Hrun Hsb Hstd Hbuf
@@ -118,7 +118,7 @@ end Stub
 /-! ## S2' ONE BYTE, THROUGH THE ERA'S WRITE LINK -/
 
 section Byte
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [DiskG GF] [EchoOutG GF]
@@ -132,8 +132,8 @@ abbrev kbnFamAt (N : UkNames GF) (Q : Nat → IProp GF) : Xfam GF := xfamWr Q N.
 /-- **Rocq `bnr_at`**: what the walk carries at the round the credential
 names -- the era's cursor `i` banner bytes into the round's own block, or
 the taint. -/
-def bnrAt (L : LinkRec hlc GF) (v : EraPins) (I : List (BitVec 8)) (i : Nat) : IProp GF :=
-  L.lkBan (genId (hlc := hlc) (GF := GF) + 1) v I i
+def bnrAt (L : LinkRec GF) (v : EraPins) (I : List (BitVec 8)) (i : Nat) : IProp GF :=
+  L.lkBan (genId (GF := GF) + 1) v I i
 
 /-- THE POST, READ AT THE INSTANCE (deviation 4): a console write at fd 1 of
 a run the caller owns hands back the caller's own cursor at the full count. -/
@@ -145,9 +145,9 @@ theorem kinitb_post_cons1 (N : UkNames GF) (Q : Nat → IProp GF) (m : RegMap) (
       tfW W.tf (tfArgIdx 2) = m.get 12#5 → W.fd.take NSTD = l → W.lazy = false →
       (∀ (P : UPtd) (j : Nat), uptWf P → permOf P.um W.sz = W.perm → lazyFree P.um (BitVec.ofNat 64 W.sz) →
         j < nb → uvaRmapped P ((m.get 11#5 + BitVec.ofNat 64 j).toNat)) →
-      UexecSG.spostAt (uslot (hlc := hlc)) 16 (kbnFamAt N Q) W r W.M W.fd cw' cs' ⊢ Q nb := by
+      UexecSG.spostAt (uslot) 16 (kbnFamAt N Q) W r W.M W.fd cw' cs' ⊢ Q nb := by
   intro W r cw' cs' hka0 hka1 hka2 htk hlz hnf
-  refine (uwrite_no_short (hlc := hlc) Q N.pay W r W.M W.fd cw' cs' l 1 rb nb
+  refine (uwrite_no_short Q N.pay W r W.M W.fd cw' cs' l 1 rb nb
     (by rw [hka0, ha0]; decide) (by decide) htk hl1 (by rw [hka2, ha2]; exact Xv6.echoCountIs nb hnb) hlz
     (by rw [hka1]; exact hnf)).trans sep_elim_right
 
@@ -155,8 +155,8 @@ theorem kinitb_post_cons1 (N : UkNames GF) (Q : Nat → IProp GF) (m : RegMap) (
 CONSOLE LINK: the byte's chain is paid by the step `F0 ~> F1`. -/
 theorem kinit_w1_of_step (UL : UK_LEAVES) (N : UkNames GF) (F0 F1 : IProp GF) (l vw : List FdState)
     (rb : Bool) (b : BitVec 8) (hl1 : l[1]? = some (.open rb true (.device CONSOLE))) :
-    ⊢ □ (∀ Φ : IProp GF, F0 -∗ (F1 -∗ Φ) -∗ outLink .uart0 (genId (hlc := hlc) (GF := GF) + 1) b Φ) -∗
-      kinitW1 (hlc := hlc) N 1#64 b iprop(ustdAt N.fd l vw ∗ F0) iprop(ustdAt N.fd l vw ∗ F1) := by
+    ⊢ □ (∀ Φ : IProp GF, F0 -∗ (F1 -∗ Φ) -∗ outLink .uart0 (genId (GF := GF) + 1) b Φ) -∗
+      kinitW1 N 1#64 b iprop(ustdAt N.fd l vw ∗ F0) iprop(ustdAt N.fd l vw ∗ F1) := by
   iintro #Hst
   unfold kinitW1
   iintro %h %m %avail %ha0 %ha2 #Hcode Hbuf ⟨Hl, Hc⟩ Hrun Hcont
@@ -169,12 +169,12 @@ theorem kinit_w1_of_step (UL : UK_LEAVES) (N : UkNames GF) (F0 F1 : IProp GF) (l
     rw [e _ (by decide), ha0]; decide
   have hcnt : (argZ ((ukWr m 17#5 (BitVec.ofInt 64 16)).get 12#5)).toNat = 1 := by
     rw [e _ (by decide), ha2]; decide
-  iapply wp_kinit_write_chain_at_ans (hlc := hlc) UL N h m avail
+  iapply wp_kinit_write_chain_at_ans UL N h m avail
     (kbnFamAt N (ushpW1Q N.d (m.get 11#5).toNat b F0 F1)) l vw (DFrac.own (1 : Qp).half) 1 (fun _ => b)
     (fun _ => ushpW1Q N.d (m.get 11#5).toNat b F0 F1 1)
     (kinitb_post_cons1 N _ m l rb 1 hl1 ha0 ha2 (by decide)) $$ Hcode Hrun [Hb1 Hc] Hl Hb2
   · -- THE DEPOSIT: the caller's own chain at its own cursor
-    iapply uwrite_chain_sup (hlc := hlc) N (ushpW1Q N.d (m.get 11#5).toNat b F0 F1)
+    iapply uwrite_chain_sup N (ushpW1Q N.d (m.get 11#5).toNat b F0 F1)
       (ukWr m 17#5 (BitVec.ofInt 64 16)) _ l 1 rb CONSOLE hi0 (by decide) hl1
     iintro %M %pm %sz Hh
     ihave %hM := uheap_ubytes_wat N.t N.d N.s M pm sz _ (m.get 11#5) 1 (fun _ => b) $$ Hh Hb1
@@ -203,30 +203,30 @@ theorem kinit_w1_of_step (UL : UK_LEAVES) (N : UkNames GF) (F0 F1 : IProp GF) (l
 
 /-- **Rocq `kinit_w1_of_link_at`**: a banner byte at fd 1, paid by the
 record's banner step. -/
-theorem kinit_w1_of_link_at (UL : UK_LEAVES) (L : LinkRec hlc GF) (N : UkNames GF) (v : EraPins)
+theorem kinit_w1_of_link_at (UL : UK_LEAVES) (L : LinkRec GF) (N : UkNames GF) (v : EraPins)
     (I : List (BitVec 8)) (l vw : List FdState) (rb : Bool) (i : Nat) (b : BitVec 8)
     (hl1 : l[1]? = some (.open rb true (.device CONSOLE))) (hb : uBanner[i]? = some b) :
-    ⊢ L.lkPin (genId (hlc := hlc) (GF := GF) + 1) v -∗ L.lkLinks -∗
-      kinitW1 (hlc := hlc) N 1#64 b iprop(ustdAt N.fd l vw ∗ bnrAt L v I i)
+    ⊢ L.lkPin (genId (GF := GF) + 1) v -∗ L.lkLinks -∗
+      kinitW1 N 1#64 b iprop(ustdAt N.fd l vw ∗ bnrAt L v I i)
         iprop(ustdAt N.fd l vw ∗ bnrAt L v I (i + 1)) := by
   iintro #Hpin #Hlk
-  iapply kinit_w1_of_step (hlc := hlc) UL N _ _ l vw rb b hl1
+  iapply kinit_w1_of_step UL N _ _ l vw rb b hl1
   imodintro
   iintro %Φ Hc HΦ
   unfold bnrAt
-  iapply L.lkBan_step (genId (hlc := hlc) (GF := GF) + 1) v I i b Φ hb $$ Hpin Hlk Hc HΦ
+  iapply L.lkBan_step (genId (GF := GF) + 1) v I i b Φ hb $$ Hpin Hlk Hc HΦ
 
 /-! ## S3 THE PAYMENT, AT AN ARBITRARY ROUND -/
 
 /-- **Rocq `kinit_ban_at`**: /init's own loop head -- the round's banner
 owed -- at the era's input of length `n`, with the era's pin beside it. -/
-def kinitBanAt (L : LinkRec hlc GF) (n : Nat) : IProp GF :=
+def kinitBanAt (L : LinkRec GF) (n : Nat) : IProp GF :=
   iprop(∃ (v : EraPins) (I : List (BitVec 8)),
-    ⌜I.length = n⌝ ∗ L.lkPin (genId (hlc := hlc) (GF := GF) + 1) v ∗
-      L.lkBan (genId (hlc := hlc) (GF := GF) + 1) v I 0)
+    ⌜I.length = n⌝ ∗ L.lkPin (genId (GF := GF) + 1) v ∗
+      L.lkBan (genId (GF := GF) + 1) v I 0)
 
 /-- **Rocq `kinit_ban_timeless_at`** (see the header). -/
-instance kinitBanAt_timeless (L : LinkRec hlc GF) (n : Nat) : Timeless (kinitBanAt L n) := by
+instance kinitBanAt_timeless (L : LinkRec GF) (n : Nat) : Timeless (kinitBanAt L n) := by
   unfold kinitBanAt; infer_instance
 
 /-- **Rocq `kinit_banner_pay_of_lic`**: ANY PRINT OF /init'S, THROUGH A
@@ -235,8 +235,8 @@ console row, and hands `Rt` back. -/
 theorem kinit_banner_pay_of_lic (UL : UK_LEAVES) (N : UkNames GF) (len : Nat) (f : Nat → BitVec 8)
     (F Rt : IProp GF) :
     ⊢ □ (∀ (b : BitVec 8) (Φ : IProp GF), F -∗ (F -∗ Φ) -∗
-          outLink .uart0 (genId (hlc := hlc) (GF := GF) + 1) b Φ) -∗
-      F -∗ (F -∗ Rt) -∗ kinitBannerPay (hlc := hlc) N stcCons len f Rt := by
+          outLink .uart0 (genId (GF := GF) + 1) b Φ) -∗
+      F -∗ (F -∗ Rt) -∗ kinitBannerPay N stcCons len f Rt := by
   iintro #Hst HF HRt
   unfold kinitBannerPay
   iintro %vw Hl
@@ -245,7 +245,7 @@ theorem kinit_banner_pay_of_lic (UL : UK_LEAVES) (N : UkNames GF) (len : Nat) (f
   isplitr
   · imodintro
     iintro %j %hj
-    iapply kinit_w1_of_step (hlc := hlc) UL N F F (ufdL3 stcCons) vw true (f j) (ufdL3_row1 stcCons)
+    iapply kinit_w1_of_step UL N F F (ufdL3 stcCons) vw true (f j) (ufdL3_row1 stcCons)
     imodintro
     iintro %Φ
     iapply Hst
@@ -258,7 +258,7 @@ theorem kinit_banner_pay_of_lic (UL : UK_LEAVES) (N : UkNames GF) (len : Nat) (f
 /-- **Rocq `kinit_banner0_mono_at`**: `kinitBannerPay`'s `Rt` occurs
 positively, so a payment leaving one credential leaves any consequence. -/
 theorem kinit_banner0_mono_at (N : UkNames GF) (Rt Rt' : IProp GF) :
-    ⊢ (Rt -∗ Rt') -∗ kinitBanner0 (hlc := hlc) N stcCons Rt -∗ kinitBanner0 (hlc := hlc) N stcCons Rt' := by
+    ⊢ (Rt -∗ Rt') -∗ kinitBanner0 N stcCons Rt -∗ kinitBanner0 N stcCons Rt' := by
   iintro Hm H
   unfold kinitBanner0 kinitBannerPay
   iintro %vw Hl

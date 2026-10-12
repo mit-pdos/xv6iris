@@ -168,7 +168,7 @@ theorem grepMainInv_call (sp0 : BitVec 64) (av nargs i pv : Nat) (m m' : RegMap)
 /-! ## §3 The putc chain, and how the tree pays it -/
 
 section Holes
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -178,34 +178,34 @@ def kgrepW (N : UkNames GF) (fdw ua : BitVec 64) (nb : Nat) (Ci Co : IProp GF) :
   iprop(∀ (h : CPU) (m : RegMap) (avail : Nat),
     ⌜m.get 10#5 = fdw⌝ -∗ ⌜m.get 11#5 = ua⌝ -∗ ⌜m.get 12#5 = BitVec.ofNat 64 nb⌝ -∗
     ukCode N.t User.Grep.code.byte -∗ Ci -∗
-    urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Grep.Sym.«write») avail -∗
+    urun N h m (BitVec.ofNat 64 User.Grep.Sym.«write») avail -∗
     (∀ (h' : CPU) (ret : BitVec 64), Co -∗
-      urun (hlc := hlc) N h' (stubRet m 16 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
+      urun N h' (stubRet m 16 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
     wpLoop h)
 
 /-- **Rocq `kgrep_wb`**: putc's one-byte write, the frame address
 quantified. -/
 def kgrepWb (N : UkNames GF) (fdw : BitVec 64) (b : BitVec 8) (Ci Co : IProp GF) : IProp GF :=
   iprop(∀ ua : BitVec 64,
-    kgrepW (hlc := hlc) N fdw ua 1 iprop(Ci ∗ ubyte N.d ua.toNat b) iprop(Co ∗ ubyte N.d ua.toNat b))
+    kgrepW N fdw ua 1 iprop(Ci ∗ ubyte N.d ua.toNat b) iprop(Co ∗ ubyte N.d ua.toNat b))
 
 /-- **Rocq `kgrep_pay_seq`**: a run of putc writes, what fprintf spends. -/
 def kgrepPaySeq (N : UkNames GF) (fdw : BitVec 64) (fb : Nat → BitVec 8) :
     Nat → Nat → IProp GF → IProp GF → IProp GF
   | _, 0, Ci, Cend => iprop(Ci -∗ Cend)
-  | i, k + 1, Ci, Cend => iprop(∃ Cm : IProp GF, kgrepWb (hlc := hlc) N fdw (fb i) Ci Cm ∗
+  | i, k + 1, Ci, Cend => iprop(∃ Cm : IProp GF, kgrepWb N fdw (fb i) Ci Cm ∗
       kgrepPaySeq N fdw fb (i + 1) k Cm Cend)
 
 /-- **`kgrep_pay_seq` is the image's chain** (`CatPrintfLink.kcatPaySeq_ulibUk`'s
 pattern). -/
 theorem kgrepPaySeq_ulibUk (N : UkNames GF) (fdw : BitVec 64) (fb : Nat → BitVec 8) (k i : Nat) (Ci Cend : IProp GF) :
-    kgrepPaySeq (hlc := hlc) N fdw fb i k Ci Cend ⊢
-      ulibUkPaySeq (hlc := hlc) N User.Grep.code.byte User.Grep.Sym.«write» fdw fb i k Ci Cend :=
-  ulibUkPaySeq_of N _ _ fdw fb (kgrepPaySeq (hlc := hlc) N fdw fb) (fun _ _ _ => rfl) (fun _ _ _ _ => rfl) k i Ci Cend
+    kgrepPaySeq N fdw fb i k Ci Cend ⊢
+      ulibUkPaySeq N User.Grep.code.byte User.Grep.Sym.«write» fdw fb i k Ci Cend :=
+  ulibUkPaySeq_of N _ _ fdw fb (kgrepPaySeq N fdw fb) (fun _ _ _ => rfl) (fun _ _ _ _ => rfl) k i Ci Cend
 
 /-- **Rocq `gtree_pay_exit`**. -/
 theorem grepTreePay_exit (N : UkNames GF) (s : Int) :
-    treePay (hlc := hlc) N (grepProg N.t) (exit_ s) ⊢ exObl (hlc := hlc) N (grepProg N.t) s := by
+    treePay N (grepProg N.t) (exit_ s) ⊢ exObl N (grepProg N.t) s := by
   unfold exit_
   rw [treePay_vis]
   exact .rfl
@@ -214,8 +214,8 @@ theorem grepTreePay_exit (N : UkNames GF) (s : Int) :
 any descriptor the word in a0 reads as. -/
 theorem kgrepWb_tree (N : UkNames GF) (fdw : BitVec 64) (fd : Int) (b : BitVec 8) (T : Proc)
     (hfd : (BitVec.setWidth 32 fdw).toInt = fd) :
-    ⊢ kgrepWb (hlc := hlc) N fdw b (treePay (hlc := hlc) N (grepProg N.t) (.vis (.EWrite fd [b]) (fun _ => T)))
-      (treePay (hlc := hlc) N (grepProg N.t) T) := by
+    ⊢ kgrepWb N fdw b (treePay N (grepProg N.t) (.vis (.EWrite fd [b]) (fun _ => T)))
+      (treePay N (grepProg N.t) T) := by
   unfold kgrepWb kgrepW
   iintro %ua %h %m %avail %ha0 %ha1 %ha2 #Hc ⟨Ht, Hb⟩ Hrun Hcont
   rw [treePay_vis]
@@ -239,9 +239,9 @@ theorem kgrepWb_tree (N : UkNames GF) (fdw : BitVec 64) (fd : Int) (b : BitVec 8
 theorem kgrepPaySeq_tree (N : UkNames GF) (fdw : BitVec 64) (fd : Int) (fb : Nat → BitVec 8)
     (hfd : (BitVec.setWidth 32 fdw).toInt = fd) :
     ∀ (k i : Nat) (rest : Proc),
-      ⊢ kgrepPaySeq (hlc := hlc) N fdw fb i k
-          (treePay (hlc := hlc) N (grepProg N.t) (writeBytes fd ((List.range k).map (fun j => fb (i + j))) rest))
-          (treePay (hlc := hlc) N (grepProg N.t) rest)
+      ⊢ kgrepPaySeq N fdw fb i k
+          (treePay N (grepProg N.t) (writeBytes fd ((List.range k).map (fun j => fb (i + j))) rest))
+          (treePay N (grepProg N.t) rest)
   | 0, i, rest => by
     simp only [kgrepPaySeq, List.range_zero, List.map_nil, writeBytes]
     iintro H; iexact H
@@ -252,7 +252,7 @@ theorem kgrepPaySeq_tree (N : UkNames GF) (fdw : BitVec 64) (fd : Int) (fb : Nat
       apply List.map_congr_left; intro j _; congr 1; omega
     rw [e]
     simp only [kgrepPaySeq, writeBytes]
-    iexists (treePay (hlc := hlc) N (grepProg N.t) (writeBytes fd ((List.range k).map (fun j => fb (i + 1 + j))) rest))
+    iexists (treePay N (grepProg N.t) (writeBytes fd ((List.range k).map (fun j => fb (i + 1 + j))) rest))
     isplitl []
     · iapply kgrepWb_tree N fdw fd (fb i) _ hfd
     · iapply kgrepPaySeq_tree N fdw fd fb hfd k (i + 1) rest

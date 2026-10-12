@@ -23,14 +23,14 @@ open Std (ExtTreeSet)
 open HfpFileClaimsP UkFileDev
 
 noncomputable section FifRead
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF] [FifRegG GF]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 namespace FifCtx
-variable (X : FifCtx hlc GF)
+variable (X : FifCtx GF)
 
 /-- **Rocq `fif_in_file_in`**: the deed lent to an input's leaf --
 UkFileDev's `file_in` out of the core's deed and the device's offset half. -/
@@ -77,14 +77,14 @@ theorem fif_in_of_file_in (d : Nat) (S content : List (BitVec 8)) (s : Bool) (nm
     iexact Hd
 
 /-- **Rocq `fif_read`**: `eiRead` at an input. -/
-theorem fif_read (UL : UK_LEAVES) (heq : HfpFileClaimsP.fileAppIs (hlc := hlc) (GF := GF) X.c X.r)
-    (STB : FdevStubs (hlc := hlc) X.N X.P)
+theorem fif_read (UL : UK_LEAVES) (heq : HfpFileClaimsP.fileAppIs (GF := GF) X.c X.r)
+    (STB : FdevStubs X.N X.P)
     (fdm : Fdmap) (fd : Int) (d : Nat) (Sin : List (BitVec 8)) (n : Nat) (K : RdAns → IProp GF)
     (hn : 0 < n) (hfd : fdm fd = some d) :
     ⊢ X.fifFds fdm -∗ X.fifIn d Sin -∗
       ((∀ (cb S' : List (BitVec 8)), ⌜chunkOk n Sin cb S'⌝ -∗ X.fifFds fdm -∗ X.fifIn d S' -∗ K (.RdBytes cb)) ∧
        (∀ x, X.fifTaint (fdDom fdm) -∗ K x)) -∗
-      rdObl (hlc := hlc) X.N X.P fd n K := by
+      rdObl X.N X.P fd n K := by
   iintro Hfds Hin HK
   ihave Hfds := X.fifFds_open fdm $$ Hfds
   icases Hfds with ⟨%l, %vs, %w, ⟨Hstd, Hcwd, %hok, Hpool, Htoks, Hhs, Hdq, #He⟩, Hk⟩

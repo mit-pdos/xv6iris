@@ -71,7 +71,7 @@ theorem pse_dp01 (x y : Pdev) : dpIn ([(0, x), (1, y)].map Prod.fst) ({0} ∪ {1
 /-! ## §2 The instances at the minted record -/
 
 noncomputable section PseInst
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF]
   [PipeOutG GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
@@ -79,13 +79,13 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Ic
   [DiskG GF] [EchoOutG GF] [PnsRegG GF] [PipesNG GF] [FileAppG GF]
 
 /-- **Rocq `UkPipesEntries`'s section context** (deviation 1). -/
-structure PseCtx (hlc : HasLC) (GF : BundledGFunctors.{0}) [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+structure PseCtx (GF : BundledGFunctors.{0}) [MachGS GF] [Xv6G GF] [IcacheG GF]
     [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
     [PS : UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
     [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
     [DiskG GF] [EchoOutG GF] [PipesNG GF] where
-  R : PnsRound hlc GF
+  R : PnsRound GF
   OK : PnsRoundOk R
   /-- the stubs' engine (DU2) -/
   UL : UK_LEAVES
@@ -93,24 +93,24 @@ structure PseCtx (hlc : HasLC) (GF : BundledGFunctors.{0}) [MachGS hlc GF] [Xv6G
   Sup : IProp GF
   sup_pers : Persistent Sup
   hsup : ⊢ □ (R.T -∗ Sup)
-  lawW : ⊢ Sup -∗ MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ udepwLaw (hlc := hlc) (GF := GF) 16
-  lawR : ⊢ Sup -∗ MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ udepwLaw (hlc := hlc) (GF := GF) 5
-  lawC : ⊢ MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ udepwLaw (hlc := hlc) (GF := GF) 21
-  lawO : ⊢ Sup -∗ udepwLaw (hlc := hlc) (GF := GF) 15
+  lawW : ⊢ Sup -∗ MachFixedGS.killCred (GF := GF) -∗ udepwLaw (GF := GF) 16
+  lawR : ⊢ Sup -∗ MachFixedGS.killCred (GF := GF) -∗ udepwLaw (GF := GF) 5
+  lawC : ⊢ MachFixedGS.killCred (GF := GF) -∗ udepwLaw (GF := GF) 21
+  lawO : ⊢ Sup -∗ udepwLaw (GF := GF) 15
 
 namespace PseCtx
-variable (X : PseCtx hlc GF)
+variable (X : PseCtx GF)
 
 /-- `UkPipesIface`'s context at a program instance and a registry. -/
-abbrev pctx (N' : UkNames GF) (P : Uprog GF) (γreg : GName) (kds : List (Nat × Pdev)) : PnsCtx hlc GF :=
+abbrev pctx (N' : UkNames GF) (P : Uprog GF) (γreg : GName) (kds : List (Nat × Pdev)) : PnsCtx GF :=
   ⟨X.R, ⟨N', P, γreg, kds, X.Sup⟩⟩
 
 /-- ...and its hypotheses, at the program's five stub laws. -/
 theorem pok (N' : UkNames GF) (P : Uprog GF) (γreg : GName) (kds : List (Nat × Pdev))
     (hkds : (kds.map Prod.fst).Nodup) (hpc : Persistent P.code)
-    (sr : ⊢ stubLaw (hlc := hlc) N' P.code 5 P.read) (sw : ⊢ stubLaw (hlc := hlc) N' P.code 16 P.write)
-    (so : ⊢ stubLaw (hlc := hlc) N' P.code 15 P.open) (sc : ⊢ stubLaw (hlc := hlc) N' P.code 21 P.close)
-    (se : ⊢ exitStubLaw (hlc := hlc) N' P.code P.exit) :
+    (sr : ⊢ stubLaw N' P.code 5 P.read) (sw : ⊢ stubLaw N' P.code 16 P.write)
+    (so : ⊢ stubLaw N' P.code 15 P.open) (sc : ⊢ stubLaw N' P.code 21 P.close)
+    (se : ⊢ exitStubLaw N' P.code P.exit) :
     PnsCtxOk (X.pctx N' P γreg kds) where
   OK := X.OK
   QK := ⟨hkds, ⟨sr, sw, so, sc, se, X.lawW, X.lawR, X.lawC, X.lawO⟩, X.sup_pers⟩
@@ -148,19 +148,19 @@ theorem echoCtxOk (γreg : GName) (kds : List (Nat × Pdev)) (hkds : (kds.map Pr
 /-- **Rocq `pse_iface_cat`**: THE INSTANCE AT THE MINTED RECORD, at a
 registry and its protected devices. -/
 def pseIfaceCat (γreg : GName) (kds : List (Nat × Pdev)) (hkds : (kds.map Prod.fst).Nodup)
-    (N' : UkNames GF) (hNc : UknConst N') : EpIfaceP (hlc := hlc) N' (catProg N') (kds.map Prod.fst) :=
+    (N' : UkNames GF) (hNc : UknConst N') : EpIfaceP N' (catProg N') (kds.map Prod.fst) :=
   haveI := hNc
   (X.pctx N' (catProg N') γreg kds).pipesIface (X.catCtxOk γreg kds hkds N')
 
 /-- **Rocq `pse_iface_grep`**. -/
 def pseIfaceGrep (γreg : GName) (kds : List (Nat × Pdev)) (hkds : (kds.map Prod.fst).Nodup)
-    (N' : UkNames GF) (hNc : UknConst N') : EpIfaceP (hlc := hlc) N' (grepProg N'.t) (kds.map Prod.fst) :=
+    (N' : UkNames GF) (hNc : UknConst N') : EpIfaceP N' (grepProg N'.t) (kds.map Prod.fst) :=
   haveI := hNc
   (X.pctx N' (grepProg N'.t) γreg kds).pipesIface (X.grepCtxOk γreg kds hkds N')
 
 /-- **Rocq `pse_iface_echo`**. -/
 def pseIfaceEcho (γreg : GName) (kds : List (Nat × Pdev)) (hkds : (kds.map Prod.fst).Nodup)
-    (N' : UkNames GF) (hNc : UknConst N') : EpIfaceP (hlc := hlc) N' (echoProg N') (kds.map Prod.fst) :=
+    (N' : UkNames GF) (hNc : UknConst N') : EpIfaceP N' (echoProg N') (kds.map Prod.fst) :=
   haveI := hNc
   (X.pctx N' (echoProg N') γreg kds).pipesIface (X.echoCtxOk γreg kds hkds N')
 

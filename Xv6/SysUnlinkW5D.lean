@@ -138,7 +138,7 @@ theorem sys_unlink_open_orphan [Fscfg] [Icfg] (inum : Nat) (dn : Dinode) (bm : B
     (fun hd => by rw [sysfile_setnl_size]; exact hrl.2.2 (by rw [← sysfile_setnl_type dn _]; exact hd))
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -163,7 +163,7 @@ theorem sys_unlink_w5d_ghost (dinum : BitVec 32) (dnd dnW : Dinode) (bmd bmW : B
     (hnibi : (BitVec.setWidth 32 (dirInum datd kk)).toNat < 16 * icfgNib)
     (htyi : dni.diType.toNat = T_DIR_z) (hdots : dirDotsOnly dni dati)
     (hne' : (dirInum datd kk).toNat ≠ dinum.toNat) :
-    iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ⊢
+    iregInv fscIreg fscFs icfgIst icfgNib ⊢
       dlinks fscFs dinum.toNat dnd bmd datd -∗
       dlinks fscFs (BitVec.setWidth 32 (dirInum datd kk)).toNat dni bmi dati -∗
       dinodeAt fscIreg (BitVec.setWidth 32 (dirInum datd kk)) dni -∗
@@ -322,14 +322,14 @@ set_option maxHeartbeats 64000000 in
 T_DIR test TAKEN, `dp->nlink--`, `iupdate(dp)` credited and paid by the
 child's `".."`, INSTANT 1 at `dec = 1`, the rejoin, into the spine. -/
 theorem sys_unlink_w5_dir (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF) (ok : SuOk k A)
+    [ClaimIs GF Γ] (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF) (ok : SuOk k A)
     (spie spp : Bool) (R : RegMap) (nf : Nat → BitVec 8) (tln : List (BitVec 8))
     (P2 : UPtd) (pl : List (BitVec 8)) (kd : Nat) (q : Qp) (g : GName) (lo tl : Nat)
     (dinum : BitVec 32) (dnd : Dinode) (bmd : Blkmap) (datd : Nat → List (BitVec 8))
     (γil γisl : GName) (kk : Nat) (ks : Nat) (qi : Qp) (gi : GName) (loi tli : Nat) (dni : Dinode)
     (bmi : Blkmap) (dati : Nat → List (BitVec 8)) (γili γisli : GName) (t : Nat)
     (dnW : Dinode) (bmW : Blkmap) (datW : Nat → List (BitVec 8)) (nw : Nat) (Sbw : List Nat) :
-    sysUnlinkAtAe (hlc := hlc) Γ cpu k A spie spp R nf tln P2 pl kd q g lo tl dinum dnd bmd datd
+    sysUnlinkAtAe Γ cpu k A spie spp R nf tln P2 pl kd q g lo tl dinum dnd bmd datd
       γil γisl kk ks qi gi loi tli dni bmi dati γili γisli t dnW bmW datW nw Sbw true
     ⊢ wpLoop (GF := GF) cpu := by
   unfold sysUnlinkAtAe
@@ -362,7 +362,7 @@ theorem sys_unlink_w5_dir (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : 
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
   icases fsReady_region $$ Hrdy with ⟨#Hinv, #Hopen⟩
   iapply wpLoop_fupd
-  imod (sys_unlink_w5d_ghost (hlc := hlc) dinum dnd dnW bmd bmW datd datW kk nf dni bmi dati hop hZ
+  imod (sys_unlink_w5d_ghost dinum dnd dnW bmd bmW datd datW kk nf dni bmi dati hop hZ
       hlive hty hnd hndd hfn hopi hnli hnibi htyi hdots hne')
     $$ Hinv Hdl Hdli Hdii with ⟨%⟨hdp2, hnl1⟩, Hdl2, Hdli2, Hdii, ⟨%tyup, Htokd⟩, %uty, Hpile⟩
   imodintro
@@ -426,7 +426,7 @@ theorem sys_unlink_w5_dir (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : 
           (sysUnlinkDF2 dnW).diNlink.toNat) tyup) from by
     rw [iregDotDelta_live _ _ hnlF2, FsStateLink.linkReps_1]
     exact .rfl) $$ Htokd
-  ihave #Henv : sysfileEnv (hlc := hlc) Γ $$ []
+  ihave #Henv : sysfileEnv Γ $$ []
   · unfold sysfileEnv; iframe #
   iapply (sys_unlink_iupdate_unlink IU Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j kd dinum
       (sysUnlinkDF2 dnW) dnW bmW u Sbw true tyup A.pid ok.hj ?ip ?iK ?inf ?it (fun _ => hmem) hnib
@@ -473,7 +473,7 @@ theorem sys_unlink_w5_dir (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : 
       (eraNode dni bmi dati) ⊢ topFragQ (fsGammaL fscFs) (DFrac.own 1)
         (BitVec.setWidth 32 (dirInum datd kk)).toNat (eraNode dni bmi dati) from .rfl) $$ Htopi
   iapply wpLoop_fupd
-  imod (ufUent_fire (hlc := hlc) fscFs ⊤ (DFrac.own 1) (A.P (nparElems pl).length) A.Fent
+  imod (ufUent_fire fscFs ⊤ (DFrac.own 1) (A.P (nparElems pl).length) A.Fent
       dinum.toNat
       (BitVec.setWidth 32 (dirInum datd kk)).toNat (dirBname datd kk) 1 (eraNode dnd bmd datd)
       (eraNode (sysUnlinkDF2 dnW) bmW datW) (eraNode dni bmi dati) ufNd_top hloc

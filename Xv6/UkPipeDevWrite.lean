@@ -33,7 +33,7 @@ open Std (ExtTreeSet)
 open UexecSG
 
 section Write
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CtokG GF] [SG : UexecSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CtokG GF] [SG : UexecSG GF]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
@@ -42,11 +42,11 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Ct
 theorem pdev_wpost (Pt : UPtd) (γ : GName) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF)
     (Qe : Nat → PipeSt → IProp GF) (Rk : IProp GF) (n : Nat) (r : BitVec 64)
     (hmap : ∀ j : Nat, j < n → uvaRmapped Pt (ua + BitVec.ofNat 64 j).toNat) :
-    ⊢ pipeWpost (hlc := hlc) Pt γ M ua Q Qe Rk n r -∗
+    ⊢ pipeWpost Pt γ M ua Q Qe Rk n r -∗
       (⌜r = BitVec.ofNat 64 n ∨ (n = 0 ∧ r = -1#64)⌝ ∗ Q n) ∨
       (⌜r = -1#64⌝ ∗ ∃ k : Nat, ⌜k < n⌝ ∗ Rk ∗ Q k) ∨
       (⌜r = -1#64⌝ ∗ ∃ (k : Nat) (s : PipeSt), ⌜k < n ∧ s.ro = false⌝ ∗ Qe k s) ∨
-      MachFixedGS.killCred (hlc := hlc) (GF := GF) := by
+      MachFixedGS.killCred (GF := GF) := by
   iintro H
   ihave H := pipeWpost_cursor Pt γ M ua Q Qe Rk n r $$ H
   icases H with (⟨%k, %hk, (⟨%hr, %hs, HQ⟩ | ⟨%hr, %hkn, HR, HQ⟩ | ⟨%hr, %hkn, Hobs⟩)⟩ | ⟨#Ht, -⟩)
@@ -84,7 +84,7 @@ theorem pdev_wpost (Pt : UPtd) (γ : GName) (M : Nat → List (BitVec 8)) (ua : 
 theorem pipe_wpay_halted [IcacheG GF] [PipeProtoG GF] (pn : PNames) (γp : PipeNames)
     (L : List (BitVec 8)) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (R : IProp GF) (n : Nat) :
     ⊢ pipeInv pn γp L -∗ roShot pn -∗ R -∗
-      pipeWpay (hlc := hlc) γp.pnQueue M ua (pdevQh R) (fun (j : Nat) (_ : PipeSt) => pdevQh R j) n := by
+      pipeWpay γp.pnQueue M ua (pdevQh R) (fun (j : Nat) (_ : PipeSt) => pdevQh R j) n := by
   iintro #Hinv #Hsh HR
   unfold pipeWpay
   ileft
@@ -127,21 +127,21 @@ theorem pdev_usrc_ok (N : UkNames GF) (M : ElfMem) (pmv : Nat → Option UPerm) 
 /-- **Rocq `pdev_wr_obl`**: one write of `bs` at ledger slot `fd`, for any
 cursor family -- the deposit is told the run's bytes are `bs`, and the
 answer is read off the post. -/
-theorem pdev_wr_obl (UL : UK_LEAVES) (DK : PipeDevK hlc GF) (N : UkNames GF) (P : Uprog GF)
-    (Hsw : ⊢ stubLaw (hlc := hlc) N P.code 16 P.write)
+theorem pdev_wr_obl (UL : UK_LEAVES) (DK : PipeDevK GF) (N : UkNames GF) (P : Uprog GF)
+    (Hsw : ⊢ stubLaw N P.code 16 P.write)
     (fd : Nat) (l : List FdState) (rb : Bool) (γp : PipeNames) (bs : Bytes) (K : Int → IProp GF)
     (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF)
     (hlt : fd < NSTD) (hl : l[fd]? = some (.open rb true (.pipe γp))) (hbnd : (bs.length : Int) < 2 ^ 31) :
     ⊢ ustd N.fd l -∗
       (∀ (Mv : Nat → List (BitVec 8)) (ua : BitVec 64),
         ⌜∀ j : Nat, j < bs.length → umemByte Mv (ua + BitVec.ofNat 64 j).toNat = bs[j]!⌝ -∗
-        pipeWpay (hlc := hlc) γp.pnQueue Mv ua Q Qe bs.length) -∗
+        pipeWpay γp.pnQueue Mv ua Q Qe bs.length) -∗
       (∀ (r : BitVec 64) (Pt : UPtd) (Mv : Nat → List (BitVec 8)) (gn : GName) (ua : BitVec 64),
         ⌜∀ j : Nat, j < bs.length → uvaRmapped Pt (ua + BitVec.ofNat 64 j).toNat⌝ -∗
-        pipeWpost (hlc := hlc) Pt γp.pnQueue Mv ua Q Qe
-          iprop(killShot gn ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF)) bs.length r -∗
+        pipeWpost Pt γp.pnQueue Mv ua Q Qe
+          iprop(killShot gn ∗ □ MachFixedGS.killCred (GF := GF)) bs.length r -∗
         ustd N.fd l -∗ K r.toInt) -∗
-      wrObl (hlc := hlc) N P (fd : Int) bs K := by
+      wrObl N P (fd : Int) bs K := by
   unfold wrObl
   iintro Hstd Hch Hpost %h %m %avail %ua %tx %dq %f %hbf %ha0 %ha1 %ha2 Hcode Hsrc Hrun Hcont
   ihave Hs := Hsw
@@ -183,8 +183,8 @@ theorem pdev_wr_obl (UL : UK_LEAVES) (DK : PipeDevK hlc GF) (N : UkNames GF) (P 
 device owes `S`, the chunk `bs` is a prefix of it; the kernel answers the
 whole count and the device owes the rest, or -1 and the device is halted,
 or the taint (finding 1). -/
-theorem pipe_write [IcacheG GF] [PipeProtoG GF] (UL : UK_LEAVES) (DK : PipeDevK hlc GF)
-    (N : UkNames GF) (P : Uprog GF) (Hsw : ⊢ stubLaw (hlc := hlc) N P.code 16 P.write)
+theorem pipe_write [IcacheG GF] [PipeProtoG GF] (UL : UK_LEAVES) (DK : PipeDevK GF)
+    (N : UkNames GF) (P : Uprog GF) (Hsw : ⊢ stubLaw N P.code 16 P.write)
     (pn : PNames) (γp : PipeNames) (L S : List (BitVec 8)) (l : List FdState) (fd : Nat) (rb : Bool)
     (a bs : List (BitVec 8)) (K : Int → IProp GF)
     (hlt : fd < NSTD) (hl : l[fd]? = some (.open rb true (.pipe γp))) (ha : a ∈ [S]) (hpre : bs <+: a)
@@ -192,8 +192,8 @@ theorem pipe_write [IcacheG GF] [PipeProtoG GF] (UL : UK_LEAVES) (DK : PipeDevK 
     ⊢ pipeInv pn γp L -∗ ustd N.fd l -∗ pipeOut pn L S -∗
       ((ustd N.fd l -∗ pipeOut pn L (a.drop bs.length) -∗ K (bs.length : Int)) ∧
        (ustd N.fd l -∗ pipeHalt pn -∗ K (-1)) ∧
-       (ustd N.fd l -∗ MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ ∀ z : Int, K z)) -∗
-      wrObl (hlc := hlc) N P (fd : Int) bs K := by
+       (ustd N.fd l -∗ MachFixedGS.killCred (GF := GF) -∗ ∀ z : Int, K z)) -∗
+      wrObl N P (fd : Int) bs K := by
   have haS : a = S := List.mem_singleton.mp ha
   subst haS
   iintro #Hinv Hstd Hout HK
@@ -249,16 +249,16 @@ theorem pipe_write [IcacheG GF] [PipeProtoG GF] (UL : UK_LEAVES) (DK : PipeDevK 
 
 /-- **Rocq `pipe_write_halt`**: THE HALTED WRITE (`eiWriteHalt`'s shape): -1,
 and the device stays halted -- or the taint. -/
-theorem pipe_write_halt [IcacheG GF] [PipeProtoG GF] (UL : UK_LEAVES) (DK : PipeDevK hlc GF)
-    (N : UkNames GF) (P : Uprog GF) (Hsw : ⊢ stubLaw (hlc := hlc) N P.code 16 P.write)
+theorem pipe_write_halt [IcacheG GF] [PipeProtoG GF] (UL : UK_LEAVES) (DK : PipeDevK GF)
+    (N : UkNames GF) (P : Uprog GF) (Hsw : ⊢ stubLaw N P.code 16 P.write)
     (pn : PNames) (γp : PipeNames) (L : List (BitVec 8)) (l : List FdState) (fd : Nat) (rb : Bool)
     (bs : List (BitVec 8)) (K : Int → IProp GF)
     (hlt : fd < NSTD) (hl : l[fd]? = some (.open rb true (.pipe γp))) (hne : bs ≠ [])
     (hbnd : (bs.length : Int) < 2 ^ 31) :
     ⊢ pipeInv pn γp L -∗ ustd N.fd l -∗ pipeHalt pn -∗
       ((ustd N.fd l -∗ pipeHalt pn -∗ K (-1)) ∧
-       (ustd N.fd l -∗ MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ ∀ z : Int, K z)) -∗
-      wrObl (hlc := hlc) N P (fd : Int) bs K := by
+       (ustd N.fd l -∗ MachFixedGS.killCred (GF := GF) -∗ ∀ z : Int, K z)) -∗
+      wrObl N P (fd : Int) bs K := by
   iintro #Hinv Hstd Hh HK
   unfold pipeHalt
   icases Hh with ⟨%c0, Hw0, #Hsh⟩
@@ -304,14 +304,14 @@ theorem pipe_write_halt [IcacheG GF] [PipeProtoG GF] (UL : UK_LEAVES) (DK : Pipe
 
 /-- **Rocq `pipe_write_nil`**: A ZERO-LENGTH WRITE (finding 3): 0 or -1, at
 ANY device state `R`, which does not move -- or the taint. -/
-theorem pipe_write_nil (UL : UK_LEAVES) (DK : PipeDevK hlc GF) (N : UkNames GF) (P : Uprog GF)
-    (Hsw : ⊢ stubLaw (hlc := hlc) N P.code 16 P.write)
+theorem pipe_write_nil (UL : UK_LEAVES) (DK : PipeDevK GF) (N : UkNames GF) (P : Uprog GF)
+    (Hsw : ⊢ stubLaw N P.code 16 P.write)
     (γp : PipeNames) (l : List FdState) (fd : Nat) (rb : Bool) (R : IProp GF) (K : Int → IProp GF)
     (hlt : fd < NSTD) (hl : l[fd]? = some (.open rb true (.pipe γp))) :
     ⊢ ustd N.fd l -∗ R -∗
       ((ustd N.fd l -∗ R -∗ K 0) ∧ (ustd N.fd l -∗ R -∗ K (-1)) ∧
-       (ustd N.fd l -∗ MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ ∀ z : Int, K z)) -∗
-      wrObl (hlc := hlc) N P (fd : Int) [] K := by
+       (ustd N.fd l -∗ MachFixedGS.killCred (GF := GF) -∗ ∀ z : Int, K z)) -∗
+      wrObl N P (fd : Int) [] K := by
   iintro Hstd HR HK
   iapply pdev_wr_obl UL DK N P Hsw fd l rb γp [] K (fun _ : Nat => R) (fun (_ : Nat) (_ : PipeSt) => R)
     hlt hl (by simp) $$ Hstd [HR] [HK]

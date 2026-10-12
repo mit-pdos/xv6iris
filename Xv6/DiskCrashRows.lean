@@ -77,7 +77,7 @@ theorem crashRow_del_isSome (l : List (Nat × List (BitVec 8))) (k k' : Nat) :
 /-! ## A row depends on its head's phase and its chain's cache keys -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
 
 theorem crashRow_congr (γ : DiskNames) (v v' : VirtioState) (i : Nat) (s : HState) (b : SByte)
     (hph : Virtio.phase v' (BitVec.ofNat 16 i) = Virtio.phase v (BitVec.ofNat 16 i))

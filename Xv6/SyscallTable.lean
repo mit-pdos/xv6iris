@@ -313,7 +313,7 @@ theorem syscPins_calleeSaved (k : KCtx) (R R' : RegMap) (hp : syscPins k R) (hc 
     c24.trans h24, c25.trans h25, c26.trans h26, c27.trans h27⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
@@ -330,7 +330,7 @@ entered at `syscTarget n` right after the `jalr`, with every resource of
 `c0` is the dispatch's entry hart (the slot's key), `cpu` the current one.
 `hE` is the deposit instance's `spost_at_emp` (SpecSyscall deviation 2),
 threaded to the seal. -/
-def syscArmBody (n : Nat) (PT : SchedNames → IProp GF) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+def syscArmBody (n : Nat) (PT : SchedNames → IProp GF) (Γ : SchedNames) [ClaimIs GF Γ]
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -344,10 +344,10 @@ def syscArmBody (n : Nat) (PT : SchedNames → IProp GF) (Γ : SchedNames) [Clai
   procsInv Γ ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
   isLock γw waitLockAddr "wait_lock" waitLockPay ∗
   bslots 3 ∗ syscInitId ip ∗ fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
-  syscallEnv (hlc := hlc) PT Γ γ ∗
+  syscallEnv PT Γ γ ∗
   procPrivFd γ (procAddr j) pid V M ∗ fdFrags V.fdg sts ∗ chFrag V.chg (procAddr j) cs ∗
-  syscSysIn (hlc := hlc) f V M sts gn cs pid ∗ syscForkIn (hlc := hlc) f V M sts ∗ syscPayIn f V ∗
-  (wpNext true k.proc c0 (syscallPost (hlc := hlc) PT Γ k γ j pid V M sts gn cs ip f) ∧
+  syscSysIn f V M sts gn cs pid ∗ syscForkIn f V M sts ∗ syscPayIn f V ∗
+  (wpNext true k.proc c0 (syscallPost PT Γ k γ j pid V M sts gn cs ip f) ∧
     syscallCloser k V)
   ⊢ wpLoop (GF := GF) cpu
 
@@ -357,7 +357,7 @@ entered at `+0x40` when the `bltu` is taken (the number is out of range --
 with the same resources as an arm, it prints, stores `-1` to
 `p->trapframe->a0` and leaves through the shared epilogue
 (`SyscallRet.syscall_epilogue_tail`).  `ra` is not pinned (myproc's link). -/
-def syscFallbackBody (PT : SchedNames → IProp GF) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+def syscFallbackBody (PT : SchedNames → IProp GF) (Γ : SchedNames) [ClaimIs GF Γ]
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -371,10 +371,10 @@ def syscFallbackBody (PT : SchedNames → IProp GF) (Γ : SchedNames) [ClaimIs (
   procsInv Γ ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
   isLock γw waitLockAddr "wait_lock" waitLockPay ∗
   bslots 3 ∗ syscInitId ip ∗ fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
-  syscallEnv (hlc := hlc) PT Γ γ ∗
+  syscallEnv PT Γ γ ∗
   procPrivFd γ (procAddr j) pid V M ∗ fdFrags V.fdg sts ∗ chFrag V.chg (procAddr j) cs ∗
-  syscSysIn (hlc := hlc) f V M sts gn cs pid ∗ syscForkIn (hlc := hlc) f V M sts ∗ syscPayIn f V ∗
-  (wpNext true k.proc c0 (syscallPost (hlc := hlc) PT Γ k γ j pid V M sts gn cs ip f) ∧
+  syscSysIn f V M sts gn cs pid ∗ syscForkIn f V M sts ∗ syscPayIn f V ∗
+  (wpNext true k.proc c0 (syscallPost PT Γ k γ j pid V M sts gn cs ip f) ∧
     syscallCloser k V)
   ⊢ wpLoop (GF := GF) cpu
 
@@ -391,7 +391,7 @@ entered at `+0x40` when the `bltu` is taken (the number is out of range --
 with the same resources as an arm, it prints, stores `-1` to
 `p->trapframe->a0` and leaves through the shared epilogue
 (`SyscallRet.syscall_epilogue_tail`).  `ra` is not pinned (myproc's link). -/
-def syscBlockedBody (PT : SchedNames → IProp GF) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+def syscBlockedBody (PT : SchedNames → IProp GF) (Γ : SchedNames) [ClaimIs GF Γ]
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -405,10 +405,10 @@ def syscBlockedBody (PT : SchedNames → IProp GF) (Γ : SchedNames) [ClaimIs (h
   procsInv Γ ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
   isLock γw waitLockAddr "wait_lock" waitLockPay ∗
   bslots 3 ∗ syscInitId ip ∗ fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
-  syscallEnv (hlc := hlc) PT Γ γ ∗
+  syscallEnv PT Γ γ ∗
   procPrivFd γ (procAddr j) pid V M ∗ fdFrags V.fdg sts ∗ chFrag V.chg (procAddr j) cs ∗
-  syscSysIn (hlc := hlc) f V M sts gn cs pid ∗ syscForkIn (hlc := hlc) f V M sts ∗ syscPayIn f V ∗
-  (wpNext true k.proc c0 (syscallPost (hlc := hlc) PT Γ k γ j pid V M sts gn cs ip f) ∧
+  syscSysIn f V M sts gn cs pid ∗ syscForkIn f V M sts ∗ syscPayIn f V ∗
+  (wpNext true k.proc c0 (syscallPost PT Γ k γ j pid V M sts gn cs ip f) ∧
     syscallCloser k V)
   ⊢ wpLoop (GF := GF) cpu
 

@@ -84,7 +84,7 @@ theorem sys_chdir_ret_76 : jumpPc (KA.«sys_chdir» + 0x76#64) = KA.«sys_chdir�
 theorem sys_chdir_ret_7a : jumpPc (KA.«sys_chdir» + 0x7a#64) = KA.«sys_chdir» + 0x7a#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -110,7 +110,7 @@ theorem sys_chdir_ir_11 : irefSlot (GF := GF) ∗ irefSlots 1 ⊢ irefSlots 2 :=
 theorem sys_chdir_out_fail (A : SysChdirArgs GF) (P2 : UPtd) (hP2 : A.V.upt.extSz A.V.sz P2) :
     sysChdirHole (GF := GF) A.γ (procAddr A.j) A.pid (sysChdirV1 A P2) (sysChdirM1 A P2) ∗
       sysChdirRows (procAddr A.j) A.pid A.V.cwd A.V.cwi ∗ bslots 3 ∗ irefSlots 2 ∗
-      chdirPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.P A.Pmiss A.Fo ⊢
+      chdirPostFail (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.P A.Pmiss A.Fo ⊢
     sysChdirOut A 0xFFFFFFFFFFFFFFFF#64 := by
   iintro ⟨Hh, Hr, Hbs, Hir, Hf⟩
   unfold sysChdirOut
@@ -160,7 +160,7 @@ theorem sys_chdir_out_ok (A : SysChdirArgs GF) (P2 : UPtd) (hP2 : A.V.upt.extSz 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x68 .. +0x6e`** (Rocq `sc_m1_tail`): `end_op`, `a0 = -1`, the jump
 to the join point, with the fail receipt the caller built. -/
-theorem sys_chdir_tail_68 (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU)
+theorem sys_chdir_tail_68 (EO : END_OP) (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU)
     (k : KCtx) (A : SysChdirArgs GF) (P2 : UPtd) (spie spp : Bool) (R : RegMap) (w₃ : BitVec 64)
     (u : Nat)
     (hj : A.j < NPROC) (hproc : k.proc = procAddr A.j) (hK : sysChdirSlots ≤ k.avail)
@@ -170,11 +170,11 @@ theorem sys_chdir_tail_68 (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
     kctx cpu (((k.withSpie spie spp).pushed 20).withRegs R) ∗ pcIs cpu (KA.«sys_chdir» + 0x68#64) ∗
     sysChdirCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) w₃ (k.regs 18#5) ∗
     sysfileAny (sysChdirBuf (k.regs 2#5)) 128 ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv Γ ∗
     sysChdirRows (procAddr A.j) A.pid A.V.cwd A.V.cwi ∗
     sysChdirHole A.γ (procAddr A.j) A.pid (sysChdirV1 A P2) (sysChdirM1 A P2) ∗
     (∀ c : CPU, sysChdirPostA k A c) ∗ bslots 3 ∗ irefSlots 2 ∗ logOp icfgLog u ∗
-    chdirPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.P A.Pmiss A.Fo
+    chdirPostFail (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.P A.Pmiss A.Fo
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hbuf, Hte, Hce, #Henv, Hrows, Hhole, HΦ, Hbs, Hir, Hop, Hfail⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -238,7 +238,7 @@ set_option maxHeartbeats 16000000 in
 /-- **ARM C** (+0x70): `iunlockput(ip)` (counted), `end_op`, `a0 = -1`,
 the slot-3 reload, the jump to the join point.  The receipt at the refused
 node was fired by the caller. -/
-theorem sys_chdir_tail_70 (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem sys_chdir_tail_70 (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : SysChdirArgs GF) (P2 : UPtd) (spie spp : Bool) (R : RegMap)
     (kk : Nat) (q : Qp) (g : GName) (lo tl : Nat) (γil γisl : GName)
     (inum : BitVec 32) (dn : Dinode) (bm : Blkmap) (n : Nat) (Sb : List Nat)
@@ -250,13 +250,13 @@ theorem sys_chdir_tail_70 (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [Cl
     kctx cpu (((k.withSpie spie spp).pushed 20).withRegs R) ∗ pcIs cpu (KA.«sys_chdir» + 0x70#64) ∗
     sysChdirCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     sysfileAny (sysChdirBuf (k.regs 2#5)) 128 ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv Γ ∗
     sysChdirRows (procAddr A.j) A.pid A.V.cwd A.V.cwi ∗
     sysChdirHole A.γ (procAddr A.j) A.pid (sysChdirV1 A P2) (sysChdirM1 A P2) ∗
     (∀ c : CPU, sysChdirPostA k A c) ∗
     sysChdirLocked kk q g lo tl γil γisl inum A.pid dn bm ∗
     bslots 3 ∗ irefSlots 1 ∗ logOpS icfgLog n Sb ∗
-    chdirPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.P A.Pmiss A.Fo
+    chdirPostFail (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.P A.Pmiss A.Fo
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hbuf, Hte, Hce, #Henv, Hrows, Hhole, HΦ, Hlk, Hbs, Hir, Hop, Hfail⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -361,7 +361,7 @@ set_option maxHeartbeats 16000000 in
 /-- `+0x48 .. +0x5a`: `ld a0,336(s2)`, `iput(p->cwd)` (the OLD cwd's
 reference destroyed), `end_op`, `sd s1,336(s2)` (THE SWAP), `a0 = 0`, the
 slot-3 reload, and the join point with the new cwd at its inum. -/
-theorem sys_chdir_tail_swap (IP : IPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem sys_chdir_tail_swap (IP : IPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : SysChdirArgs GF) (P2 : UPtd) (spie spp : Bool) (R : RegMap)
     (kk : Nat) (inum : BitVec 32) (n : Nat) (L : Nat) (pf : Nat → BitVec 8) (pl : Nat)
     (hL : L = (pathElems (bview pl pf)).length)
@@ -375,7 +375,7 @@ theorem sys_chdir_tail_swap (IP : IPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs
     kctx cpu (((k.withSpie spie spp).pushed 20).withRegs R) ∗ pcIs cpu (KA.«sys_chdir» + 0x48#64) ∗
     sysChdirCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     sysfileAny (sysChdirBuf (k.regs 2#5)) 128 ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv Γ ∗
     sysChdirRows (procAddr A.j) A.pid A.V.cwd A.V.cwi ∗
     sysChdirHole A.γ (procAddr A.j) A.pid (sysChdirV1 A P2) (sysChdirM1 A P2) ∗
     (∀ c : CPU, sysChdirPostA k A c) ∗
@@ -469,7 +469,7 @@ set_option maxHeartbeats 16000000 in
 /-- **THE SUCCESS TAIL** (+0x42): `iunlock(ip)` -- the share comes home,
 the reference is GATHERED at its inum -- then `sys_chdir_tail_swap`. -/
 theorem sys_chdir_tail_ok (IU : IUNLOCK) (IP : IPUT) (EO : END_OP) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : SysChdirArgs GF) (P2 : UPtd) (spie spp : Bool) (R : RegMap)
     (kk : Nat) (q : Qp) (g : GName) (lo tl : Nat) (γil γisl : GName)
     (inum : BitVec 32) (dn : Dinode) (bm : Blkmap) (n : Nat) (Sb : List Nat)
@@ -485,7 +485,7 @@ theorem sys_chdir_tail_ok (IU : IUNLOCK) (IP : IPUT) (EO : END_OP) (Γ : SchedNa
     kctx cpu (((k.withSpie spie spp).pushed 20).withRegs R) ∗ pcIs cpu (KA.«sys_chdir» + 0x42#64) ∗
     sysChdirCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     sysfileAny (sysChdirBuf (k.regs 2#5)) 128 ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv Γ ∗
     sysChdirRows (procAddr A.j) A.pid A.V.cwd A.V.cwi ∗
     sysChdirHole A.γ (procAddr A.j) A.pid (sysChdirV1 A P2) (sysChdirM1 A P2) ∗
     (∀ c : CPU, sysChdirPostA k A c) ∗

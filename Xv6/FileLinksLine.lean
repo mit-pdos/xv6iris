@@ -41,50 +41,50 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section FileLinksLine
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF]
 
 /-- THE ERA'S EXTRA STATE, as a resource: the era's file record and the boot
 state, filed, at the CONSOLE era (Rocq `f0w`). -/
 def f0w (g : FileGn) (k : Nat) (s0 : Fstate) : IProp GF :=
-  iprop(⌜k = genId (hlc := hlc) (GF := GF) + 1⌝ ∗
-    ∃ vf : FileEra, fileEraPin g k vf ∗ f0Lb (hlc := hlc) g vf s0)
+  iprop(⌜k = genId (GF := GF) + 1⌝ ∗
+    ∃ vf : FileEra, fileEraPin g k vf ∗ f0Lb g vf s0)
 
 instance f0w_persistent (g : FileGn) (k : Nat) (s : Fstate) :
-    Persistent (f0w (hlc := hlc) (GF := GF) g k s) := by
+    Persistent (f0w (GF := GF) g k s) := by
   unfold f0w; infer_instance
 instance f0w_timeless (g : FileGn) (k : Nat) (s : Fstate) :
-    Timeless (f0w (hlc := hlc) (GF := GF) g k s) := by
+    Timeless (f0w (GF := GF) g k s) := by
   unfold f0w; infer_instance
 
 /-- THE READER'S BOOT WITNESS: the boot ledger's entry alone (Rocq `f0bw`). -/
 def f0bw (g : FileGn) (k : Nat) (s0 : Fstate) : IProp GF :=
-  iprop(⌜k = genId (hlc := hlc) (GF := GF) + 1⌝ ∗
-    ∃ vf : FileEra, fileEraPin g k vf ∗ f0Bl (hlc := hlc) g vf s0)
+  iprop(⌜k = genId (GF := GF) + 1⌝ ∗
+    ∃ vf : FileEra, fileEraPin g k vf ∗ f0Bl g vf s0)
 
 instance f0bw_persistent (g : FileGn) (k : Nat) (s : Fstate) :
-    Persistent (f0bw (hlc := hlc) (GF := GF) g k s) := by
+    Persistent (f0bw (GF := GF) g k s) := by
   unfold f0bw; infer_instance
 instance f0bw_timeless (g : FileGn) (k : Nat) (s : Fstate) :
-    Timeless (f0bw (hlc := hlc) (GF := GF) g k s) := by
+    Timeless (f0bw (GF := GF) g k s) := by
   unfold f0bw; infer_instance
 
 /-- THE HEAD'S PRECONDITION: the typed witness of the boot state beside its
 (already minted) boot-ledger entry (Rocq `f0pre`). -/
 def f0pre (g : FileGn) : IProp GF :=
   iprop(∃ s : Fstate, ⌜fstateOk s⌝ ∗ (f0Typed g s ∨ fileTaint g.fgnCl)
-    ∗ f0bw (hlc := hlc) g (genId (hlc := hlc) (GF := GF) + 1) s)
+    ∗ f0bw g (genId (GF := GF) + 1) s)
 
 /-- THE ERA'S HEAD: nothing written, the boot state not yet filed (Rocq
 `fhead`). -/
 def fhead (g : FileGn) (k : Nat) (v : EraPins) (I : List (BitVec 8)) : IProp GF :=
-  iprop(⌜I = []⌝ ∗ ⌜k = genId (hlc := hlc) (GF := GF) + 1⌝ ∗ turn v 0 ∗ psLb v [] ∗ csLb v []
-    ∗ inpLb v [] ∗ (∃ vf : FileEra, fileEraPin g k vf) ∗ f0pre (hlc := hlc) g)
+  iprop(⌜I = []⌝ ∗ ⌜k = genId (GF := GF) + 1⌝ ∗ turn v 0 ∗ psLb v [] ∗ csLb v []
+    ∗ inpLb v [] ∗ (∃ vf : FileEra, fileEraPin g k vf) ∗ f0pre g)
 
-instance f0pre_timeless (g : FileGn) : Timeless (f0pre (hlc := hlc) (GF := GF) g) := by
+instance f0pre_timeless (g : FileGn) : Timeless (f0pre (GF := GF) g) := by
   unfold f0pre; infer_instance
 instance fhead_timeless (g : FileGn) (k : Nat) (v : EraPins) (I : List (BitVec 8)) :
-    Timeless (fhead (hlc := hlc) (GF := GF) g k v I) := by
+    Timeless (fhead (GF := GF) g k v I) := by
   unfold fhead; infer_instance
 
 /-- THE ROUND'S LINE WITNESS (Rocq `flw`, sync SY3-A3bc, design 4.5 ruling (ii)
@@ -95,23 +95,23 @@ element is the round's line, every redirect line of the input is in it, and
 its length is the round position.  It is read off the consumed bytes' TAGS
 (`UnionOut.utag`); at the era's head it is the base itself. -/
 noncomputable def flw (g : FileGn) (I : List (BitVec 8)) : IProp GF :=
-  iprop(∃ vf : FileEra, fileEraPin g (genId (hlc := hlc) (GF := GF) + 1) vf
+  iprop(∃ vf : FileEra, fileEraPin g (genId (GF := GF) + 1) vf
     ∗ flLb g.fgnCl (vf.feBase ++ ulinesIn I))
 
 instance flw_persistent (g : FileGn) (I : List (BitVec 8)) :
-    Persistent (flw (hlc := hlc) (GF := GF) g I) := by
+    Persistent (flw (GF := GF) g I) := by
   unfold flw; infer_instance
 instance flw_timeless (g : FileGn) (I : List (BitVec 8)) :
-    Timeless (flw (hlc := hlc) (GF := GF) g I) := by
+    Timeless (flw (GF := GF) g I) := by
   unfold flw; infer_instance
 
 /-- THE ERA'S TURN (Rocq `fturn_pre`: `GenLinksLine.gen_link_inst`'s TURN at
 the file). -/
 def fturnPre (g : FileGn) (k : Nat) : IProp GF :=
-  iprop(⌜k = genId (hlc := hlc) (GF := GF) + 1⌝ ∗ fturnCore g k ∗ f0pre (hlc := hlc) g)
+  iprop(⌜k = genId (GF := GF) + 1⌝ ∗ fturnCore g k ∗ f0pre g)
 
 instance fturnPre_timeless (g : FileGn) (k : Nat) :
-    Timeless (fturnPre (hlc := hlc) (GF := GF) g k) := by
+    Timeless (fturnPre (GF := GF) g k) := by
   unfold fturnPre; infer_instance
 
 end FileLinksLine

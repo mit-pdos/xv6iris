@@ -332,7 +332,7 @@ theorem ucInv_delRun {Pold Pnew P : UPtd} {i n : Nat} (h : ucInv Pold Pnew P i)
 /-! ## Resources -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- Two whole pages at the same address cannot both be owned. -/
 theorem byteBuf_excl [CurCtx] (a : BitVec 64) (bs bs' : List (BitVec 8))

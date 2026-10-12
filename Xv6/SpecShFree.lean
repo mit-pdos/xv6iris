@@ -20,7 +20,7 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 open Std (ExtTreeSet)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -31,19 +31,19 @@ def wpShFreeBody : Prop :=
     p + 16 * nu < 2 ^ 38 →
     ⊢ ukCode N.t User.Sh.code.byte -∗ uword N.d ushmFreep (BitVec.ofNat 64 ushmBase) -∗
       ushmHdr N.d ushmBase (BitVec.ofNat 64 ushmBase) 0 -∗ ushmHdr N.d p b0 nu -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«free») (2 + nn) -∗
+      urun N h m (BitVec.ofNat 64 User.Sh.Sym.«free») (2 + nn) -∗
       (∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗
         uword N.d ushmFreep (BitVec.ofNat 64 ushmBase) -∗
         ushmHdr N.d ushmBase (BitVec.ofNat 64 p) 0 -∗ ushmHdr N.d p (BitVec.ofNat 64 ushmBase) nu -∗
-        urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (2 + nn) -∗ wpLoop h') -∗
+        urun N h' m' (retPc (m.get 1#5)) (2 + nn) -∗ wpLoop h') -∗
       wpLoop h
 
 end
 
 /-- The interface of sh's `free` (first-call scope). -/
 structure SH_FREE : Prop where
-  wp_shFree : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+  wp_shFree : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
-    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpShFreeBody (hlc := hlc) (GF := GF)
+    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpShFreeBody (GF := GF)
 
 end Xv6

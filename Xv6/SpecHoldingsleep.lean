@@ -45,7 +45,7 @@ def holdingsleepAddr : BitVec 64 := KA.«holdingsleep»
 def holdingsleepSlots : Nat := 6 + 10
 
 /-- **WP of `holdingsleep(slk = a0)`** as the holder, over the deposit `H`. -/
-def wp_holdingsleep_gen_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
+def wp_holdingsleep_gen_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
     [CurCtx]
     (cpu : CPU) (k : KCtx) (γl γ : GName) (R : CtxId → IProp GF) [CtxMorph R] (H : Qp → IProp GF) (q : Qp)
     (pid : BitVec 32) (dqp : DFrac)
@@ -62,7 +62,7 @@ def wp_holdingsleep_gen_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS h
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The untracked instance. -/
-def wp_holdingsleep_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
+def wp_holdingsleep_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
     [CurCtx]
     (cpu : CPU) (k : KCtx) (γl γ : GName) (R : CtxId → IProp GF) [CtxMorph R] (q : Qp)
     (pid : BitVec 32) (dqp : DFrac)
@@ -80,19 +80,19 @@ def wp_holdingsleep_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
 
 /-- The interface of `holdingsleep`. -/
 structure HOLDINGSLEEP : Prop where
-  wp_holdingsleep_gen : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
+  wp_holdingsleep_gen : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
     [CurCtx]
     (cpu : CPU) (k : KCtx) (γl γ : GName) (R : CtxId → IProp GF) [CtxMorph R] (H : Qp → IProp GF) (q : Qp)
     (pid : BitVec 32) (dqp : DFrac) hnoff hK hs htier,
-    wp_holdingsleep_gen_body (hlc := hlc) (GF := GF) cpu k γl γ R H q pid dqp hnoff hK hs htier
+    wp_holdingsleep_gen_body (GF := GF) cpu k γl γ R H q pid dqp hnoff hK hs htier
 
 /-- The untracked contract, from the general one. -/
-theorem HOLDINGSLEEP.wp_holdingsleep (A : HOLDINGSLEEP) {hlc : HasLC} {GF : BundledGFunctors.{0}}
-    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] [CurCtx]
+theorem HOLDINGSLEEP.wp_holdingsleep (A : HOLDINGSLEEP) {GF : BundledGFunctors.{0}}
+    [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl γ : GName) (R : CtxId → IProp GF) [CtxMorph R] (q : Qp)
     (pid : BitVec 32) (dqp : DFrac) hnoff hK hs htier :
-    wp_holdingsleep_body (hlc := hlc) (GF := GF) cpu k γl γ R q pid dqp hnoff hK hs htier := by
-  have h := A.wp_holdingsleep_gen (hlc := hlc) (GF := GF) cpu k γl γ R slUntracked q pid dqp hnoff hK hs htier
+    wp_holdingsleep_body (GF := GF) cpu k γl γ R q pid dqp hnoff hK hs htier := by
+  have h := A.wp_holdingsleep_gen (GF := GF) cpu k γl γ R slUntracked q pid dqp hnoff hK hs htier
   unfold wp_holdingsleep_gen_body at h
   unfold wp_holdingsleep_body isSleeplock
   exact h

@@ -105,7 +105,7 @@ theorem pidNext_toNat (c : BitVec 32) (h : c.toNat ≤ PIDMAX) :
     omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [WchG GF]
 
 /-- THE PID LEDGER, as the lock's payload holds it (Rocq `pid_ledger`, design
 ni-pid-ledger.md D3, ruling R2(a)): the history's authority, tied to the
@@ -151,10 +151,10 @@ def pidLockPay [CurCtx] : CtxId → IProp GF := fun ξ => pidLockResAt ξ
 `release` apply to it (the register rows are ghost: constants). -/
 instance instCtxMorphPidLockPay [CurCtx] : CtxMorph (GF := GF) pidLockPay := by
   unfold pidLockPay pidLockResAt
-  exact @instCtxMorphExists hlc GF _ _ _ (fun _ => @instCtxMorphExists hlc GF _ _ _ (fun pids =>
-    @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-      (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAtN _ _ _ _)
-        (@instCtxMorphSep hlc GF _ _ _
+  exact @instCtxMorphExists GF _ _ _ (fun _ => @instCtxMorphExists GF _ _ _ (fun pids =>
+    @instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
+      (@instCtxMorphSep GF _ _ _ (instCtxMorphWordAtN _ _ _ _)
+        (@instCtxMorphSep GF _ _ _
           (ctxMorph_bigSepL (List.range NPROC)
             (fun _ y ξ => wordAtN ξ (pPid (procAddr y)) 4 pidLockQ (pids y))
             (fun _ _ => instCtxMorphWordAtN _ _ _ _))

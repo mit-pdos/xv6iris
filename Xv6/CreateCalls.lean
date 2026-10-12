@@ -53,7 +53,7 @@ theorem create_tx_join [Icfg] (t : Nat) (q q1 q2 : Qp) (hq : q = q1 + q2) :
 end Tx
 
 section Bare
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [WchG GF]
 
 /-- **The bare block's pid cell** (Rocq's `Hppid` / `proc_priv_bare_acc`,
 the `namexEra_core_rows` shape at the bare block): at the ambient context
@@ -78,7 +78,7 @@ theorem create_bare_pid [X : CurCtx] (hct : X.curTier = KTier.kpt) (pa : BitVec 
 end Bare
 
 section Env
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -86,8 +86,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 /-- The region's invariant, read off the environment. -/
 theorem create_env_ireg (Γ : SchedNames) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
     (γk : KmemNames) :
-    createEnv (hlc := hlc) (GF := GF) Γ γl pd pav pu γkl γk ⊢
-      iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib := by
+    createEnv (GF := GF) Γ γl pd pav pu γkl γk ⊢
+      iregInv fscIreg fscFs icfgIst icfgNib := by
   unfold createEnv
   iintro ⟨-, -, -, -, -, -, -, -, -, -, #Hinv, -, -⟩
   iexact Hinv
@@ -95,7 +95,7 @@ theorem create_env_ireg (Γ : SchedNames) (γl : GName) (pd pav pu : BitVec 64) 
 /-- One slot's escrow, read off the environment (Rocq's `cr_esc_acc`). -/
 theorem create_env_esc (Γ : SchedNames) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
     (γk : KmemNames) (kk : Nat) (hkk : kk < NINODE) :
-    createEnv (hlc := hlc) (GF := GF) Γ γl pd pav pu γkl γk ⊢
+    createEnv (GF := GF) Γ γl pd pav pu γkl γk ⊢
       icEscrow fscIc fscFs fscIreg fscCov fscLogst kk := by
   unfold createEnv
   iintro ⟨-, -, -, -, -, -, -, #Hit2, -, -, -, -, -⟩
@@ -106,7 +106,7 @@ set_option maxHeartbeats 8000000 in
 /-- `iupdate(ip)` at `+0x14c`, after the `ip->nlink = 0`: THE LINK-SPENDING
 FLUSH (Rocq's `IU.wp_iupdate_unlink` site), the fill's pile retired,
 hart-free.  Both `fail:` entries (CreateFail, CreateFailMkdir) run it. -/
-theorem create_iupdate_unlink (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem create_iupdate_unlink (IU : IUPDATE) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k' : KCtx) (j : Nat) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
     (γk : KmemNames) (kk : Nat) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
     (u : Nat) (Sb : List Nat) (cru : Bool) (uty : Ity) (pidv : BitVec 32) (dqs : DFrac)
@@ -123,7 +123,7 @@ theorem create_iupdate_unlink (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := 
     (hpd : descPageRw pd) (ha0 : k'.regs 10#5 = ientry kk) :
     kctx cpu k' ∗ pcIs cpu KA.«iupdate» ∗
     trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
+    createEnv Γ γl pd pav pu γkl γk ∗
     wordPointsTo (iDev (ientry kk)) 4 (DFrac.own (1 : Qp).half) icfgDev ∗
     wordPointsTo (iInum (ientry kk)) 4 (DFrac.own (1 : Qp).half) inum ∗
     inodeMeta (ientry kk) dn ∗ inodeMap fscFs (ientry kk) bm ∗
@@ -144,7 +144,7 @@ theorem create_iupdate_unlink (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := 
       dinodeAt fscIreg inum dn -∗ bslots 2 -∗
       logOpS icfgLog (if cru then u + 1 else u) (IBLOCK inum icfgIst :: Sb) -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) cpu := by
-  have h := IU.wp_iupdate_unlink_eb (hlc := hlc) (GF := GF) Γ cpu k' γl pd pav pu j (ientry kk)
+  have h := IU.wp_iupdate_unlink_eb (GF := GF) Γ cpu k' γl pd pav pu j (ientry kk)
     inum dn dn0 bm u Sb cru uty pidv pidPriv (DFrac.own (1 : Qp).half)
     (DFrac.own (1 : Qp).half) dqs hj hproc hK hnoff htier hcru hgeom hcov hlog hnib hstab hnz hdec
     hda hdir hpd ha0

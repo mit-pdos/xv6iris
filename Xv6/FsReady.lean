@@ -159,7 +159,7 @@ theorem FsGeomOk.iblockOut [Fscfg] [Icfg] (h : FsGeomOk) (inum : BitVec 32)
   (h.fgoIreg inum hi).2
 
 section FsReady
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF]
 
@@ -213,10 +213,10 @@ def fsReady [Fscfg] [Icfg] [CurCtx] : IProp GF := iprop(
   (∃ pd pav pu : BitVec 64, diskCaps fscDisk fscDlock pd pav pu) ∗
   -- the icache's persistent set (`isItable2` carries the escrows, deviation 5)
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗
+  itableInv ∗
   icSleeplocks fscIc ∗
   -- the inode region...
-  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+  iregInv fscIreg fscFs icfgIst icfgNib ∗
   -- ...AND THE SEALED REGIME (the one conjunct the boot chain cannot have)
   iregOpen ∗
   -- THE ALLOCATOR, SPELLED OUT (deviation 6)
@@ -228,11 +228,11 @@ def fsReady [Fscfg] [Icfg] [CurCtx] : IProp GF := iprop(
   -- the block bitmap
   bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize ∗
   -- THE CRASH SEAM AND THE ERA CERTIFICATE (D38; LAST, deviation 1)
-  fsCrashSeam (hlc := hlc) (GF := GF) fscCov fscLogst ∗
-  genCert (hlc := hlc) (GF := GF))
+  fsCrashSeam (GF := GF) fscCov fscLogst ∗
+  genCert (GF := GF))
 
 instance fsReady_persistent [Fscfg] [Icfg] [CurCtx] :
-    Persistent (fsReady (hlc := hlc) (GF := GF)) := by
+    Persistent (fsReady (GF := GF)) := by
   unfold fsReady; infer_instance
 
 /-! ## 2.  THE SEAL (Rocq `fs_ready_seal`)
@@ -257,7 +257,7 @@ a constituent-shaped contract asks for (the table in the header). -/
 
 /-- Rocq `fs_ready_bio` (the lock's name bound, deviation 2). -/
 theorem fsReady_bio [Fscfg] [Icfg] [CurCtx] :
-    fsReady (hlc := hlc) (GF := GF) ⊢
+    fsReady (GF := GF) ⊢
       ∃ γl : GName, bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) := by
   unfold fsReady
   iintro ⟨H, -⟩
@@ -265,7 +265,7 @@ theorem fsReady_bio [Fscfg] [Icfg] [CurCtx] :
 
 /-- Rocq `fs_ready_log`. -/
 theorem fsReady_log [Fscfg] [Icfg] [CurCtx] :
-    fsReady (hlc := hlc) (GF := GF) ⊢ logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev := by
+    fsReady (GF := GF) ⊢ logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev := by
   unfold fsReady
   iintro ⟨-, H, -⟩
   iexact H
@@ -282,7 +282,7 @@ theorem fsReady_descPage [CurCtx] (γ : DiskNames) (γl : GName) (pd pav pu : Bi
 /-- Rocq `fs_ready_disk`: the disk fabric, the ring pages quantified exactly
 as the predicate carries them, WITH the contracts' `descPageRw pd`. -/
 theorem fsReady_disk [Fscfg] [Icfg] [CurCtx] :
-    fsReady (hlc := hlc) (GF := GF) ⊢
+    fsReady (GF := GF) ⊢
       ∃ pd pav pu : BitVec 64, diskCaps fscDisk fscDlock pd pav pu ∗ ⌜descPageRw pd⌝ := by
   unfold fsReady
   iintro ⟨-, -, ⟨%pd, %pav, %pu, #Hd⟩, -⟩
@@ -294,9 +294,9 @@ theorem fsReady_disk [Fscfg] [Icfg] [CurCtx] :
 
 /-- Rocq `fs_ready_icache` (less `ic_escrows`, deviation 5). -/
 theorem fsReady_icache [Fscfg] [Icfg] [CurCtx] :
-    fsReady (hlc := hlc) (GF := GF) ⊢
+    fsReady (GF := GF) ⊢
       isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-      itableInv (hlc := hlc) ∗ icSleeplocks fscIc := by
+      itableInv ∗ icSleeplocks fscIc := by
   unfold fsReady
   iintro ⟨-, -, -, H1, H2, H3, -⟩
   iframe H1 H2 H3
@@ -304,7 +304,7 @@ theorem fsReady_icache [Fscfg] [Icfg] [CurCtx] :
 /-- One slot's escrow (iput's / ilock's `icEscrow … kk`), through
 `isItable2_escrows` (deviation 5). -/
 theorem fsReady_escrow [Fscfg] [Icfg] [CurCtx] (kk : Nat) (hkk : kk < NINODE) :
-    fsReady (hlc := hlc) (GF := GF) ⊢ icEscrow fscIc fscFs fscIreg fscCov fscLogst kk := by
+    fsReady (GF := GF) ⊢ icEscrow fscIc fscFs fscIreg fscCov fscLogst kk := by
   unfold fsReady
   iintro ⟨-, -, -, H, -⟩
   ihave H := isItable2_escrows fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev $$ H
@@ -312,22 +312,22 @@ theorem fsReady_escrow [Fscfg] [Icfg] [CurCtx] (kk : Nat) (hkk : kk < NINODE) :
 
 /-- Rocq `fs_ready_region`: the region beside the SEALED regime. -/
 theorem fsReady_region [Fscfg] [Icfg] [CurCtx] :
-    fsReady (hlc := hlc) (GF := GF) ⊢
-      iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ iregOpen := by
+    fsReady (GF := GF) ⊢
+      iregInv fscIreg fscFs icfgIst icfgNib ∗ iregOpen := by
   unfold fsReady
   iintro ⟨-, -, -, -, -, -, H1, H2, -⟩
   iframe H1 H2
 
 /-- The byte view's row readi takes (`fsBytesAny`, via `iregInv_bytes`). -/
 theorem fsReady_bytes [Fscfg] [Icfg] [CurCtx] :
-    fsReady (hlc := hlc) (GF := GF) ⊢ fsBytesAny fscFs := by
+    fsReady (GF := GF) ⊢ fsBytesAny fscFs := by
   unfold fsReady
   iintro ⟨-, -, -, -, -, -, H, -⟩
   iapply iregInv_bytes $$ H
 
 /-- Rocq `fs_ready_kmem`: the allocator pair, spelled (deviation 6). -/
 theorem fsReady_kmem [Fscfg] [Icfg] [CurCtx] :
-    fsReady (hlc := hlc) (GF := GF) ⊢
+    fsReady (GF := GF) ⊢
       isLock fscKalloc kmemLockAddr "kmem" (kmemRes fsReadyKmem) ∗
       kallocAvail fsReadyKmem none := by
   unfold fsReady
@@ -336,7 +336,7 @@ theorem fsReady_kmem [Fscfg] [Icfg] [CurCtx] :
 
 /-- Rocq `fs_ready_geom`. -/
 theorem fsReady_geom [Fscfg] [Icfg] [CurCtx] :
-    fsReady (hlc := hlc) (GF := GF) ⊢ ⌜FsGeomOk⌝ := by
+    fsReady (GF := GF) ⊢ ⌜FsGeomOk⌝ := by
   unfold fsReady
   iintro ⟨-, -, -, -, -, -, -, -, -, -, %h, -⟩
   ipureintro; exact h
@@ -344,7 +344,7 @@ theorem fsReady_geom [Fscfg] [Icfg] [CurCtx] :
 /-- Rocq `fs_ready_sb_four`: the four cells spelled one by one, the form
 every fs contract states them in, at `dq := DFrac.discard`. -/
 theorem fsReady_sb_four [Fscfg] [Icfg] [CurCtx] :
-    fsReady (hlc := hlc) (GF := GF) ⊢
+    fsReady (GF := GF) ⊢
       wordPointsTo sbNinodes 4 DFrac.discard (BitVec.ofNat 32 fscNinodes) ∗
       wordPointsTo sbInodestart 4 DFrac.discard (BitVec.ofNat 32 icfgIst) ∗
       wordPointsTo sbSizeAddr 4 DFrac.discard (BitVec.ofNat 32 fscSize) ∗
@@ -355,21 +355,21 @@ theorem fsReady_sb_four [Fscfg] [Icfg] [CurCtx] :
 
 /-- Rocq `fs_ready_bitmap`. -/
 theorem fsReady_bitmap [Fscfg] [Icfg] [CurCtx] :
-    fsReady (hlc := hlc) (GF := GF) ⊢ bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize := by
+    fsReady (GF := GF) ⊢ bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize := by
   unfold fsReady
   iintro ⟨-, -, -, -, -, -, -, -, -, -, -, -, H, -⟩
   iexact H
 
 /-- Rocq `fs_ready_seam`: the crash seam `end_op` takes. -/
 theorem fsReady_seam [Fscfg] [Icfg] [CurCtx] :
-    fsReady (hlc := hlc) (GF := GF) ⊢ fsCrashSeam (hlc := hlc) (GF := GF) fscCov fscLogst := by
+    fsReady (GF := GF) ⊢ fsCrashSeam (GF := GF) fscCov fscLogst := by
   unfold fsReady
   iintro ⟨-, -, -, -, -, -, -, -, -, -, -, -, -, H, -⟩
   iexact H
 
 /-- Rocq `fs_ready_gen`: the era certificate `end_op` takes. -/
 theorem fsReady_gen [Fscfg] [Icfg] [CurCtx] :
-    fsReady (hlc := hlc) (GF := GF) ⊢ genCert (hlc := hlc) (GF := GF) := by
+    fsReady (GF := GF) ⊢ genCert (GF := GF) := by
   unfold fsReady
   iintro ⟨-, -, -, -, -, -, -, -, -, -, -, -, -, -, H⟩
   iexact H
@@ -380,13 +380,13 @@ the spelled pair, deviation 6; `descPageRw` rides with the caps).  Rocq's
 `fs_crash_seam` / `gen_cert` rows are left to `fsReady_seam` /
 `fsReady_gen`, so this lemma's landed destructuring patterns stay put. -/
 theorem fsReady_all [Fscfg] [Icfg] [CurCtx] :
-    fsReady (hlc := hlc) (GF := GF) ⊢
+    fsReady (GF := GF) ⊢
       (∃ γl : GName, bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov)) ∗
       logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
       (∃ pd pav pu : BitVec 64, diskCaps fscDisk fscDlock pd pav pu ∗ ⌜descPageRw pd⌝) ∗
       isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-      itableInv (hlc := hlc) ∗ icSleeplocks fscIc ∗
-      iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
+      itableInv ∗ icSleeplocks fscIc ∗
+      iregInv fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
       isLock fscKalloc kmemLockAddr "kmem" (kmemRes fsReadyKmem) ∗
       kallocAvail fsReadyKmem none ∗
       ⌜FsGeomOk⌝ ∗ fsSbCells ∗

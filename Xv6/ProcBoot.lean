@@ -49,7 +49,7 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-- A name TABLE, minted one key at a time: for any per-name resource that a
 fresh name can be allocated at, a function from keys to names carrying the
@@ -102,16 +102,16 @@ def procBootRows (Γ : SchedNames) (c : CPU) : IProp GF := iprop%
   ([∗list] i ∈ List.range NPROC, pstateFull Γ i UNUSED) ∗
   procsAvailSome Γ NPROC ∗
   ([∗list] i ∈ List.range NPROC, slotFree Γ (procAddr i)) ∗
-  ([∗list] i ∈ List.range NPROC, lockFreeTok (hlc := hlc) (Γ.lock i))
+  ([∗list] i ∈ List.range NPROC, lockFreeTok (Γ.lock i))
 
 theorem procBoot_pavCount : pavCount (fun _ => true) = NPROC := by
   unfold pavCount; rw [List.filter_eq_self.2 (fun _ _ => rfl), List.length_range]
 
 /-- **THE MINT**: a fresh `SchedNames` and its boot rows. -/
 theorem procBootAlloc (c : CPU) :
-    ⊢@{IProp GF} |==> ∃ Γ : SchedNames, procBootRows (hlc := hlc) Γ c := by
+    ⊢@{IProp GF} |==> ∃ Γ : SchedNames, procBootRows Γ c := by
   iintro
-  imod procBoot_namesNat (fun _ γ => lockFreeTok (hlc := hlc) (GF := GF) γ)
+  imod procBoot_namesNat (fun _ γ => lockFreeTok (GF := GF) γ)
     (fun _ => lockGhostAlloc) NPROC with ⟨%fl, Hl⟩
   imod procBoot_namesNat (fun _ γ => iprop(γ ↪VAR c))
     (fun _ => ghost_var_alloc (GF := GF) c) NPROC with ⟨%fp, Hp⟩
@@ -146,12 +146,12 @@ theorem procBootAlloc (c : CPU) :
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF]
 
 /-- Rocq `boot_shared_alloc`'s `iAssert (procs_avail_at (Some NPROC) true)`:
 the counted regime beside the pid counter's boot-era token. -/
 theorem procBoot_availAt (Γ : SchedNames) :
-    procsAvailSome (GF := GF) Γ NPROC ∗ nextpidPend ⊢ procsAvailAt (hlc := hlc) Γ (some NPROC) true := by
+    procsAvailSome (GF := GF) Γ NPROC ∗ nextpidPend ⊢ procsAvailAt Γ (some NPROC) true := by
   unfold procsAvailAt
   exact .rfl
 

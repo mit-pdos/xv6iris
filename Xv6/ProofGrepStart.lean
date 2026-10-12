@@ -19,7 +19,7 @@ open Std (ExtTreeSet)
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -29,9 +29,9 @@ theorem wp_grepStart (UL : UK_LEAVES) (GM : GREP_MAIN) (N : UkNames GF) (h : CPU
     (hptr : ∀ (j : Nat) (g : UArg), args[j]? = some g → g.ptr ≠ 0)
     (ha0 : m.get 10#5 = BitVec.ofNat 64 args.length) (ha1 : m.get 11#5 = BitVec.ofNat 64 av)
     (hneed : grepStack args ≤ n) :
-    ⊢ treePay (hlc := hlc) N (grepProg N.t) (grepTree (args.map uargBytes)) -∗
+    ⊢ treePay N (grepProg N.t) (grepTree (args.map uargBytes)) -∗
       grepCode N.t -∗ uargv N.d av args -∗ ubytes N.d User.Grep.Sym.«buf» 1024 f -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Grep.Sym.«start») n -∗ wpLoop h := by
+      urun N h m (BitVec.ofNat 64 User.Grep.Sym.«start») n -∗ wpLoop h := by
   rw [grepStack_main] at hneed
   obtain ⟨n', rfl⟩ : ∃ n', n = 2 + n' := ⟨n - 2, by omega⟩
   rw [show User.Grep.Sym.«start» = 0x266 from rfl]

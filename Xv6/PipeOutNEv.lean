@@ -93,16 +93,16 @@ theorem popenV_filed (k : Nat) (ho : List Obs) (so : GStage M) (r : Nat)
 end OpenEventsPure
 
 section PipesEventsV
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [PipeOutG GF]
 
-theorem peclV_gen (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)
+theorem peclV_gen (g : PipeGn) (M : LModel) (G : GenCparams GF M) (sd : M.lmSt)
     (WA : GenWa M G sd) (k : Nat) (ho : List Obs) (H : ConsHist) :
     peclV g M G sd WA k ho H ⊣⊢ iprop(gcl M G sd WA k ho H ∨ popenV g M G.gcPIN WA.gwa sd WA.gpr k ho H) :=
   .rfl
 
 /-- the reader's receipt: `GenOut.gcl_step_read`'s (Rocq `rd_retV`). -/
-def rdRetV (M : LModel) (G : GenCparams hlc GF M) (k : Nat) (v : EraPins) (n : Nat)
+def rdRetV (M : LModel) (G : GenCparams GF M) (k : Nat) (v : EraPins) (n : Nat)
     (CH : ConsHist) (ws : List (List Obs × BitVec 8)) : IProp GF :=
   iprop((G.gcT ∗ dlCnt v (1 : Qp).half n)
    ∨ dlCnt v (1 : Qp).half (n + ws.length)
@@ -121,7 +121,7 @@ def rdRetV (M : LModel) (G : GenCparams hlc GF M) (k : Nat) (v : EraPins) (n : N
             ∗ ⌜lmRdStage M ps0 cs0 s0 ((CH.chDl ++ ws).map Prod.snd)⌝))
 
 /-- THE READ at an open round (Rocq `popenV_step_read`). -/
-theorem popenV_step_read (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M)
+theorem popenV_step_read (g : PipeGn) (M : LModel) (G : GenCparams GF M) (B : LmByteLaws M)
     (sd : M.lmSt) (WA : GenWa M G sd) (k : Nat) (v : EraPins) (n : Nat) (ho : List Obs)
     (CH : ConsHist) (ws : List (List Obs × BitVec 8)) (hread : readOk CH.chLog CH.chDl ws) :
     ⊢ G.gcPIN k v -∗ dlCnt v (1 : Qp).half n -∗ popenV g M G.gcPIN WA.gwa sd WA.gpr k ho CH ==∗
@@ -208,7 +208,7 @@ theorem popenV_step_read (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B 
       · ipureintro; exact hrdq
 
 /-- THE CLAIM'S READ (Rocq `peclV_step_read`). -/
-theorem peclV_step_read (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M)
+theorem peclV_step_read (g : PipeGn) (M : LModel) (G : GenCparams GF M) (B : LmByteLaws M)
     (sd : M.lmSt) (WA : GenWa M G sd) (k : Nat) (v : EraPins) (n : Nat) (ho : List Obs)
     (CH : ConsHist) (ws : List (List Obs × BitVec 8)) (hread : readOk CH.chLog CH.chDl ws) :
     ⊢ G.gcPIN k v -∗ dlCnt v (1 : Qp).half n -∗ peclV g M G sd WA k ho CH ==∗
@@ -230,7 +230,7 @@ theorem peclV_step_read (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B :
 is the block's first byte, and the claim -- between rounds -- files the
 round at the view's `PLRun []` by `GenOut.gcl_step_write_blk` (Rocq
 `pwc_blkV_file_empty`). -/
-theorem pwcBlkV_file_empty (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M)
+theorem pwcBlkV_file_empty (g : PipeGn) (M : LModel) (G : GenCparams GF M) (B : LmByteLaws M)
     (sd : M.lmSt) (WA : GenWa M G sd) (V : PView M) (v : EraPins) (I : List (BitVec 8))
     (sR : M.lmSt) (lR : Pline') (k : Nat) (ho : List Obs) (H : ConsHist) (b : BitVec 8)
     (hlR : V.pvLine (lineV M I) = some lR) (hbv : b = uPrompt[0]!)

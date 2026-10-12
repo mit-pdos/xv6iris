@@ -251,7 +251,7 @@ structure DiskNames where
 def diskN : Namespace := ndot nroot "xv6disk"
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
 
 theorem list_eq_map_range {A : Type _} (l : List A) (d : A) :
     (List.range l.length).map (fun j => l.getD j d) = l := by
@@ -4751,7 +4751,7 @@ holder cashes a key at the handler's `__sync_synchronize()`
 (`MachCSL.wp_s_fence_iorw_iorw_pub` for the own-store arm). -/
 def diskPayFl (nr : Nat) (ξ : CtxId) (T : Nat) : IProp GF :=
   match nr with
-  | 0 => keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ T
+  | 0 => keyAt (MachGS.era (GF := GF)) ξ T
   | _ + 1 => ctxFloor ξ T
 
 instance diskPayFl_persistent (nr : Nat) (ξ : CtxId) (T : Nat) :
@@ -4771,11 +4771,11 @@ instance instCtxMorphPayFl (nr T : Nat) : CtxMorph (GF := GF) (fun ξ => diskPay
   · exact instCtxMorphFloor T
 
 theorem diskPayFl_zero (ξ : CtxId) (T : Nat) :
-    diskPayFl (GF := GF) 0 ξ T = keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ T := rfl
+    diskPayFl (GF := GF) 0 ξ T = keyAt (MachGS.era (GF := GF)) ξ T := rfl
 
 /-- A floor is a key. -/
 theorem diskPayFl_key (nr : Nat) (ξ : CtxId) (T : Nat) :
-    diskPayFl (GF := GF) nr ξ T ⊢ keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ T := by
+    diskPayFl (GF := GF) nr ξ T ⊢ keyAt (MachGS.era (GF := GF)) ξ T := by
   cases nr
   · exact .rfl
   · unfold diskPayFl keyAt
@@ -4819,7 +4819,7 @@ instance diskPayWm_persistent (γ : DiskNames) (nr : Nat) (ξ : CtxId) :
 /-- The credential at the base: a watermark of zero needs only a KEY for
 the position of the stores that zeroed the used page. -/
 theorem diskPayWm_zero (γ : DiskNames) (ξ : CtxId) (b : Nat) :
-    diskBaseFrozen (GF := GF) γ b ∗ keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ b ⊢ diskPayWm γ 0 ξ := by
+    diskBaseFrozen (GF := GF) γ b ∗ keyAt (MachGS.era (GF := GF)) ξ b ⊢ diskPayWm γ 0 ξ := by
   unfold diskPayWm
   iintro ⟨#Hb, #Hfl⟩
   iexists b

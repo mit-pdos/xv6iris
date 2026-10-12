@@ -26,7 +26,7 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -38,14 +38,14 @@ theorem shMalloc_init (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (
       (∃ w : BitVec 64, uword N.d (sp - 24) w) -∗ (∃ w : BitVec 64, uword N.d (sp - 48) w) -∗
       (∃ w : BitVec 64, uword N.d (sp - 56) w) -∗ (∃ w : BitVec 64, uword N.d (sp - 64) w) -∗
       uword N.d ushmFreep wf -∗ ubytes N.d ushmBase 16 fb -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x11ce) n -∗
+      urun N h m (BitVec.ofNat 64 0x11ce) n -∗
       (∀ (h' : CPU) (m' : RegMap), ⌜ushmKeep [14#5, 15#5] m m'⌝ -∗
         ⌜m'.get 15#5 = BitVec.ofNat 64 ushmBase⌝ -∗
         uword N.d (sp - 24) (m.get 9#5) -∗ uword N.d (sp - 48) (m.get 20#5) -∗
         uword N.d (sp - 56) (m.get 21#5) -∗ uword N.d (sp - 64) (m.get 22#5) -∗
         uword N.d ushmFreep (BitVec.ofNat 64 ushmBase) -∗
         ushmHdr N.d ushmBase (BitVec.ofNat 64 ushmBase) 0 -∗
-        urun (hlc := hlc) N h' m' (BitVec.ofNat 64 0x11b0) n -∗ wpLoop h') -∗
+        urun N h' m' (BitVec.ofNat 64 0x11b0) n -∗ wpLoop h') -∗
       wpLoop h := by
   have hB : ushmBase = 0x2088 := rfl
   have hF : ushmFreep = 0x2010 := rfl
@@ -165,11 +165,11 @@ theorem shMalloc_init (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (
 (units), s1 = &freep, s5 = -1. -/
 theorem shMalloc_setup (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (nu n : Nat)
     (hs3 : m.get 19#5 = BitVec.ofNat 64 nu) (hnu : nu < 4096) :
-    ⊢ ukCode N.t User.Sh.code.byte -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 0x11b0) n -∗
+    ⊢ ukCode N.t User.Sh.code.byte -∗ urun N h m (BitVec.ofNat 64 0x11b0) n -∗
       (∀ (h' : CPU) (m' : RegMap), ⌜ushmKeep [9#5, 14#5, 20#5, 21#5, 22#5] m m'⌝ -∗
         ⌜m'.get 20#5 = BitVec.ofNat 64 65536⌝ -∗ ⌜m'.get 22#5 = BitVec.ofNat 64 4096⌝ -∗
         ⌜m'.get 9#5 = BitVec.ofNat 64 ushmFreep⌝ -∗ ⌜m'.get 21#5 = BitVec.ofInt 64 (-1)⌝ -∗
-        urun (hlc := hlc) N h' m' (BitVec.ofNat 64 0x120a) n -∗ wpLoop h') -∗
+        urun N h' m' (BitVec.ofNat 64 0x120a) n -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hrun Hcont
   -- 0x11b0  mv s4,s3

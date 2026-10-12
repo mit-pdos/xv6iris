@@ -45,7 +45,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF]
 
@@ -53,7 +53,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 entry's own `spie`/`spp` and hart). -/
 theorem ialloc_scan_start (BD : BREAD) (MS : MEMSET) (LW : LOG_WRITE) (BE : BRELSE) (IG : IGET)
     (PK : PRINTK) [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu c0 : CPU) (k : KCtx) (R : RegMap)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu c0 : CPU) (k : KCtx) (R : RegMap)
     (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (ty : BitVec 16) (u : Nat) (Sb : List Nat) (t : Nat) (qt : Qp)
     (pidv : BitVec 32) (dqp dqs dqn : DFrac)
@@ -69,7 +69,7 @@ theorem ialloc_scan_start (BD : BREAD) (MS : MEMSET) (LW : LOG_WRITE) (BE : BREL
     diskCaps fscDisk fscDlock pd pav pu ∗
     logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-    itableInv (hlc := hlc) ∗ iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
+    itableInv ∗ iregInv fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
@@ -77,7 +77,7 @@ theorem ialloc_scan_start (BD : BREAD) (MS : MEMSET) (LW : LOG_WRITE) (BE : BREL
     bslots 2 ∗ irefSlot ∗ txPin icfgLog t qt ∗ logOpS icfgLog (u + 1) Sb ∗
     iallocCont k c0 ty u Sb t qt pidv dqp dqs dqn ∗ iallocFrameK k
     ⊢ wpLoop (GF := GF) cpu := by
-  have h := ialloc_scan (hlc := hlc) (GF := GF) BD MS LW BE IG PK Γ c0 k γl pd pav pu j ty u Sb t qt
+  have h := ialloc_scan (GF := GF) BD MS LW BE IG PK Γ c0 k γl pd pav pu j ty u Sb t qt
     pidv dqp dqs dqn hj hproc hK hnoff hlocks htier hty htyk hpd hgeom hblk hn31 hnnib
     fscNinodes 1 cpu k.spie k.spp R (by omega) (by omega) hn1 hr
   unfold iallocScanPre at h
@@ -92,7 +92,7 @@ set_option maxHeartbeats 16000000 in
 `wp_ialloc_sconf`, its middle), then the scan at `inum = 1`. -/
 theorem ialloc_setup (BD : BREAD) (MS : MEMSET) (LW : LOG_WRITE) (BE : BRELSE) (IG : IGET)
     (PK : PRINTK) [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu c0 : CPU) (k : KCtx) (R : RegMap) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (ty : BitVec 16) (u : Nat) (Sb : List Nat) (t : Nat) (qt : Qp)
     (pidv : BitVec 32) (dqp dqs dqn : DFrac) (w2 w3 w4 w5 w6 w7 : BitVec 64)
@@ -116,11 +116,11 @@ theorem ialloc_setup (BD : BREAD) (MS : MEMSET) (LW : LOG_WRITE) (BE : BRELSE) (
     diskCaps fscDisk fscDlock pd pav pu ∗
     wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
-    iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
+    iregInv fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     bslots 2 ∗
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-    itableInv (hlc := hlc) ∗ irefSlot ∗ logOpS icfgLog (u + 1) Sb ∗ txPin icfgLog t qt ∗
+    itableInv ∗ irefSlot ∗ logOpS icfgLog (u + 1) Sb ∗ txPin icfgLog t qt ∗
     iallocCont k c0 ty u Sb t qt pidv dqp dqs dqn ∗
     iallocFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) w2 w3 w4 w5 w6 w7
     ⊢ wpLoop (GF := GF) cpu := by
@@ -184,7 +184,7 @@ part): the prologue, `sb.ninodes`, and the DEAD `bgeu` at `+0x12` (refuted
 from `1 < ninodes`). -/
 theorem ialloc_entry (BD : BREAD) (MS : MEMSET) (LW : LOG_WRITE) (BE : BRELSE) (IG : IGET)
     (PK : PRINTK) [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (ty : BitVec 16) (u : Nat) (Sb : List Nat) (t : Nat) (qt : Qp)
     (pidv : BitVec 32) (dqp dqs dqn : DFrac)
@@ -196,7 +196,7 @@ theorem ialloc_entry (BD : BREAD) (MS : MEMSET) (LW : LOG_WRITE) (BE : BRELSE) (
     (hty : ty.toNat ≠ 0) (htyk : iregTyOk (iallocFresh ty)) (hpd : descPageRw pd)
     (ha0 : k.regs 10#5 = BitVec.signExtend 64 icfgDev)
     (ha1 : k.regs 11#5 = BitVec.signExtend 64 ty) :
-    wp_ialloc_gen_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j ty u Sb t qt
+    wp_ialloc_gen_eb_body (GF := GF) Γ cpu k γl pd pav pu j ty u Sb t qt
       pidv dqp dqs dqn
       hj hproc hK hnoff htier hgeom hblk hn1 hnnib hn31 hty htyk hpd ha0 ha1 := by
   obtain ⟨hK8, -, -, -, -, -, -⟩ := ialloc_slots k.avail hK
@@ -258,7 +258,7 @@ end
 /-- `ialloc` meets its contract, given its six callees. -/
 theorem ialloc_proof (BR : BREAD) (LW : LOG_WRITE) (BL : BRELSE) (MS : MEMSET) (IG : IGET)
     (PK : PRINTK) : IALLOC :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl pd pav pu j ty u Sb t qt
+  ⟨fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl pd pav pu j ty u Sb t qt
     pidv dqp dqs dqn hj hproc hK hnoff htier hgeom hblk hn1 hnnib hn31 hty htyk hpd
     ha0 ha1 =>
   ialloc_entry BR MS LW BL IG PK Γ cpu k γl pd pav pu j ty u Sb t qt pidv dqp dqs dqn hj hproc hK

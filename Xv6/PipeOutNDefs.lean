@@ -53,7 +53,7 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 set_option synthInstance.maxSize 1024
 
 section PipesOpenV
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [PipeOutG GF]
 
 /-- THE OPEN ROUND at the model (Rocq `popenV`): its pin `PIN`, the
@@ -113,7 +113,7 @@ theorem pipesV_HWIT (M : LModel) (V : PView M) (I : List (BitVec 8)) (sR : M.lmS
     exact prefix_forall _ _ _ hp (pipesN_blk_nodollar (V.pvFc sR) lR bl hfc hl hb)
 
 section PipesCredV
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [PipeOutG GF]
 
 /-- THE ROUND'S LEDGER, as the family holds it (Rocq `pledV`). -/
@@ -173,21 +173,21 @@ theorem pwcBlkV_entry (g : PipeGn) (M : LModel) (PIN : Nat → EraPins → IProp
 end PipesCredV
 
 section PipesOutV
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [PipeOutG GF]
 
 /-- THE CLAIM (Rocq `peclV`): the generic claim between rounds, the open
 round of any number of writers. -/
-def peclV (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) (WA : GenWa M G sd)
+def peclV (g : PipeGn) (M : LModel) (G : GenCparams GF M) (sd : M.lmSt) (WA : GenWa M G sd)
     (k : Nat) (ho : List Obs) (H : ConsHist) : IProp GF :=
   iprop(gcl M G sd WA k ho H ∨ popenV g M G.gcPIN WA.gwa sd WA.gpr k ho H)
 
-instance peclV_timeless (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)
+instance peclV_timeless (g : PipeGn) (M : LModel) (G : GenCparams GF M) (sd : M.lmSt)
     (WA : GenWa M G sd) (k : Nat) (ho : List Obs) (H : ConsHist) :
     Timeless (peclV g M G sd WA k ho H) := by
   unfold peclV popenV; infer_instance
 
-theorem peclV_taint (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)
+theorem peclV_taint (g : PipeGn) (M : LModel) (G : GenCparams GF M) (sd : M.lmSt)
     (WA : GenWa M G sd) (k : Nat) (ho : List Obs) (H : ConsHist) :
     G.gcT ⊢ peclV g M G sd WA k ho H := by
   iintro #HT

@@ -28,7 +28,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
   [FsLinkG GF] [FsTopG GF]
 
 /-! ## §7f The log's commit contract -/
@@ -43,15 +43,15 @@ theorem fsCommitL_seqPermit (G : GName → IProp GF) (T : IProp GF) (cov : ExtTr
     (hoff : ∀ b, b ≠ logHdrBno ls → M0.view b = V b)
     (hrow : ∀ b, fsHome cov ls b → b ∉ Ws → PartialMap.get? L b = some (V b))
     (hslot : ∀ i b, Ws[i]? = some b → PartialMap.get? L b = some (V (logSlotBno ls i))) :
-    fsCrashSeamAt (hlc := hlc) G cov ls ⊢
-      eraRegistered (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF))
-        (MachGS.era (hlc := hlc) (GF := GF)) -∗
-      swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
-      logMirrorHalf (hlc := hlc) M0 -∗
-      durPair (hlc := hlc) G T (genId (hlc := hlc) (GF := GF)) (fsRestrict (dvOfD L) (fsHomeList cov ls)) -∗
-      diskSeqPermit (hlc := hlc) (genId (hlc := hlc) (GF := GF))
+    fsCrashSeamAt G cov ls ⊢
+      eraRegistered (GF := GF) (genId (GF := GF))
+        (MachGS.era (GF := GF)) -∗
+      swapLb (GF := GF) (genId (GF := GF) + 1) -∗
+      logMirrorHalf M0 -∗
+      durPair G T (genId (GF := GF)) (fsRestrict (dvOfD L) (fsHomeList cov ls)) -∗
+      diskSeqPermit (genId (GF := GF))
         (some (1024 * logHdrBno ls, bs))
-        iprop(logMirrorHalf (hlc := hlc) (lmUpd M0 (logHdrBno ls) bs) ∗ T) := by
+        iprop(logMirrorHalf (lmUpd M0 (logHdrBno ls) bs) ∗ T) := by
   have hext := logHdr_in_ext cov ls
   have hwfh : ∀ (_M : LogMirror) (r : FsRec) (dk : Nat → BitVec 8),
       logMirrorOk _M (fsBlocks dk) cov ls → fsRecWf r (fsBlocks dk) cov ls →
@@ -64,7 +64,7 @@ theorem fsCommitL_seqPermit (G : GName → IProp GF) (T : IProp GF) (cov : ExtTr
   isplit
   · -- SECTOR 0 FIRST: the commit, then a landing recovery cannot see
     iapply fsSeq_branch G cov ls _ _ _
-      iprop(logMirrorHalf (hlc := hlc)
+      iprop(logMirrorHalf
           (lmUpd M0 (logHdrBno ls) (blkSec0 (M0.view (logHdrBno ls)) bs)) ∗ T ∗
         ⌜(M0.view (logHdrBno ls)).length = BSIZE⌝) _ $$ Hseam [Hmir Hepoch] []
     · iapply fsCommitL_sector0_rec G T cov ls M0 V L nn Ws bs hlen hdec hnn hnd hin hinsb hM0
@@ -81,7 +81,7 @@ theorem fsCommitL_seqPermit (G : GName → IProp GF) (T : IProp GF) (cov : ExtTr
         · iexact HT
   · -- SECTOR 1 FIRST: nothing recovery reads moves, and THEN the commit
     iapply fsSeq_branch G cov ls _ _ _
-      iprop(logMirrorHalf (hlc := hlc)
+      iprop(logMirrorHalf
           (lmUpd M0 (logHdrBno ls) (blkSec1 (M0.view (logHdrBno ls)) bs)) ∗
         ⌜(M0.view (logHdrBno ls)).length = BSIZE⌝) _ $$ Hseam [Hmir] [Hepoch]
     · iapply fsV_sector1_rec G cov ls (logHdrBno ls) bs M0 hlen hext (hwfh M0) $$ Hreg Hswlb
@@ -115,14 +115,14 @@ theorem fsClearKeep_seqPermit (cov : ExtTreeSet Nat compare) (ls : Nat) (M0 : Lo
     (hlen : bs.length = BSIZE) (hn0 : hdrN bs = 0) (hnn : nn ≤ LOGBLOCKS)
     (hM0 : lmHdr M0 ls = (nn, Ws)) (hoff : ∀ b, b ≠ logHdrBno ls → M0.view b = V b)
     (hcaught : ∀ j b, Ws[j]? = some b → V b = V (logSlotBno ls j)) :
-    fsCrashSeam (hlc := hlc) (GF := GF) cov ls ⊢
-      eraRegistered (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF))
-        (MachGS.era (hlc := hlc) (GF := GF)) -∗
-      swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
-      logMirrorHalf (hlc := hlc) M0 -∗
-      diskSeqPermit (hlc := hlc) (genId (hlc := hlc) (GF := GF))
+    fsCrashSeam (GF := GF) cov ls ⊢
+      eraRegistered (GF := GF) (genId (GF := GF))
+        (MachGS.era (GF := GF)) -∗
+      swapLb (GF := GF) (genId (GF := GF) + 1) -∗
+      logMirrorHalf M0 -∗
+      diskSeqPermit (genId (GF := GF))
         (some (1024 * logHdrBno ls, bs))
-        iprop(logMirrorHalf (hlc := hlc) (lmUpd M0 (logHdrBno ls) bs)) := by
+        iprop(logMirrorHalf (lmUpd M0 (logHdrBno ls) bs)) := by
   have hext := logHdr_in_ext cov ls
   have hwfh : ∀ (_M : LogMirror) (r : FsRec) (dk : Nat → BitVec 8),
       logMirrorOk _M (fsBlocks dk) cov ls → fsRecWf r (fsBlocks dk) cov ls →
@@ -137,7 +137,7 @@ theorem fsClearKeep_seqPermit (cov : ExtTreeSet Nat compare) (ls : Nat) (M0 : Lo
   isplit
   · -- SECTOR 0 FIRST
     iapply fsSeq_branch G cov ls _ _ _
-      iprop(logMirrorHalf (hlc := hlc)
+      iprop(logMirrorHalf
           (lmUpd M0 (logHdrBno ls) (blkSec0 (M0.view (logHdrBno ls)) bs)) ∗
         ⌜(M0.view (logHdrBno ls)).length = BSIZE⌝) _ $$ Hseam [Hmir] []
     · iapply fsClearV_sector0_rec G cov ls M0 V nn Ws bs hlen hn0 hM0 hoff hcaught $$ Hreg Hswlb
@@ -152,7 +152,7 @@ theorem fsClearKeep_seqPermit (cov : ExtTreeSet Nat compare) (ls : Nat) (M0 : Lo
         iexact Hm2
   · -- SECTOR 1 FIRST
     iapply fsSeq_branch G cov ls _ _ _
-      iprop(logMirrorHalf (hlc := hlc)
+      iprop(logMirrorHalf
           (lmUpd M0 (logHdrBno ls) (blkSec1 (M0.view (logHdrBno ls)) bs)) ∗
         ⌜(M0.view (logHdrBno ls)).length = BSIZE⌝) _ $$ Hseam [Hmir] []
     · iapply fsV_sector1_rec G cov ls (logHdrBno ls) bs M0 hlen hext (hwfh M0) $$ Hreg Hswlb

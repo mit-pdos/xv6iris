@@ -11,7 +11,7 @@ namespace MachCSL
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std
 open LeanRV64D
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-! ## Registering the store's own position as a key -/
 
@@ -22,7 +22,7 @@ is in general NOT a floor: the hart's own view does not reach its own
 store position. -/
 theorem ctx_key_mint (cpu : CPU) (ξ : CtxId) (t : Nat) :
     ownCtx (GF := GF) cpu ξ ∗ authoredBy t (hartAgent cpu) ∗ topLb t ⊢ |==>
-      (ownCtx cpu ξ ∗ keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ t) := by
+      (ownCtx cpu ξ ∗ keyAt (MachGS.era (GF := GF)) ξ t) := by
   iintro ⟨Hctx, #Hau, #Ht⟩
   icases ownCtx_cases cpu ξ $$ Hctx with ⟨%B, %K, %W, %D, Hat, #HK, %hBK, #HW, %hok, #Hels⟩
   cases hD : get? D t with

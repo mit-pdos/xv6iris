@@ -90,7 +90,7 @@ def availDec (on : Option Nat) : Option Nat := on.map (· - 1)
 def availZero (on : Option Nat) : Prop := on = none ∨ on = some 0
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-! ## Context-parametric cells -/
 
@@ -122,9 +122,9 @@ theorem pageRestAt_cur [CurCtx] (p : BitVec 64) :
 
 instance instCtxMorphPageRestAt [CurCtx] (p : BitVec 64) :
     CtxMorph (GF := GF) (fun ξ => pageRestAt ξ p) :=
-  @instCtxMorphExists hlc GF _ _ (fun (bs : List (BitVec 8)) ξ => iprop(⌜bs.length = 4088⌝ ∗
+  @instCtxMorphExists GF _ _ (fun (bs : List (BitVec 8)) ξ => iprop(⌜bs.length = 4088⌝ ∗
     [∗list] j ↦ b ∈ bs, wordAtN ξ (p + 8#64 + BitVec.ofNat 64 j) 1 (DFrac.own 1) b))
-    (fun bs => @instCtxMorphSep hlc GF _ (fun _ => iprop(⌜bs.length = 4088⌝)) _ (instCtxMorphConst _)
+    (fun bs => @instCtxMorphSep GF _ (fun _ => iprop(⌜bs.length = 4088⌝)) _ (instCtxMorphConst _)
       (ctxMorph_bigSepL bs (fun j b ξ => wordAtN ξ (p + 8#64 + BitVec.ofNat 64 j) 1 (DFrac.own 1) b)
         (fun _ _ => inferInstance)))
 
@@ -159,11 +159,11 @@ theorem chainAt_morph [CurCtx] (ps : List (BitVec 64)) (head : BitVec 64) :
   induction ps generalizing head with
   | nil => exact instCtxMorphConst _
   | cons p ps ih =>
-    exact @instCtxMorphSep hlc GF _ (fun _ => iprop(⌜head = p ∧ pageValid p⌝)) _ (instCtxMorphConst _)
-      (@instCtxMorphExists hlc GF _ _ (fun (nxt : BitVec 64) ξ =>
+    exact @instCtxMorphSep GF _ (fun _ => iprop(⌜head = p ∧ pageValid p⌝)) _ (instCtxMorphConst _)
+      (@instCtxMorphExists GF _ _ (fun (nxt : BitVec 64) ξ =>
         iprop(wordAtN ξ p 8 (DFrac.own 1) nxt ∗ pageRestAt ξ p ∗ chainAt ξ nxt ps))
-        (fun nxt => @instCtxMorphSep hlc GF _ _ _ inferInstance
-          (@instCtxMorphSep hlc GF _ _ _ inferInstance (ih nxt))))
+        (fun nxt => @instCtxMorphSep GF _ _ _ inferInstance
+          (@instCtxMorphSep GF _ _ _ inferInstance (ih nxt))))
 
 instance instCtxMorphChainAt [CurCtx] (ps : List (BitVec 64)) (head : BitVec 64) :
     CtxMorph (GF := GF) (fun ξ => chainAt ξ head ps) := chainAt_morph ps head
@@ -335,12 +335,12 @@ def kmemRes [CurCtx] (γk : KmemNames) (ξ : CtxId) : IProp GF := iprop%
     wordAtN ξ kmemFreelistAddr 8 (DFrac.own 1) head ∗ chainAt ξ head pages ∗ kmemAuth γk pages.length
 
 instance instCtxMorphKmemRes [CurCtx] (γk : KmemNames) : CtxMorph (GF := GF) (kmemRes γk) :=
-  @instCtxMorphExists hlc GF _ _ (fun (head : BitVec 64) ξ => iprop(∃ pages : List (BitVec 64),
+  @instCtxMorphExists GF _ _ (fun (head : BitVec 64) ξ => iprop(∃ pages : List (BitVec 64),
       wordAtN ξ kmemFreelistAddr 8 (DFrac.own 1) head ∗ chainAt ξ head pages ∗ kmemAuth γk pages.length))
-    (fun head => @instCtxMorphExists hlc GF _ _ (fun (pages : List (BitVec 64)) ξ =>
+    (fun head => @instCtxMorphExists GF _ _ (fun (pages : List (BitVec 64)) ξ =>
         iprop(wordAtN ξ kmemFreelistAddr 8 (DFrac.own 1) head ∗ chainAt ξ head pages ∗ kmemAuth γk pages.length))
-      (fun _ => @instCtxMorphSep hlc GF _ _ _ inferInstance
-        (@instCtxMorphSep hlc GF _ _ _ inferInstance (instCtxMorphConst _))))
+      (fun _ => @instCtxMorphSep GF _ _ _ inferInstance
+        (@instCtxMorphSep GF _ _ _ inferInstance (instCtxMorphConst _))))
 
 /-- The client's count agrees with the allocator's, and the pair steps together. -/
 theorem kmemCnt_inc (γk : KmemNames) (n : Nat) (on : Option Nat) :

@@ -23,7 +23,7 @@ namespace MachCSL
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std
 open LeanRV64D
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 variable {lent : Bool}
 
 -- The raw-history view of a window (`histBytes_of_bytes`, `histBytes_of_wordBytes`)

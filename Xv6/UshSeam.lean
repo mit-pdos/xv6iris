@@ -54,7 +54,7 @@ def ushcmdOfTree (s0 : Nat) (g : Nat → BitVec 8) : UshpCmd → Ushcmd
   | .back c => .back (ushcmdOfTree s0 g c)
 
 section UshSeam
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -190,9 +190,9 @@ theorem ushCmd_of_ushp_gen (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 
     (hend : ∀ (i : Nat) (tk : Nat × Nat), toks[i]? = some tk → g tk.2 = ubyte0)
     (hbod : ∀ (i : Nat) (tk : Nat × Nat), toks[i]? = some tk → ∀ j, j < tk.2 - tk.1 → g (tk.1 + j) ≠ ubyte0)
     (hlen : len < 2 ^ 31) (hs0 : 0 < s0) (hs0hi : s0 + len < 2 ^ 38) :
-    ⊢ urun (hlc := hlc) N h m pc avail -∗ ushTree N s0 p (.exec toks) -∗
+    ⊢ urun N h m pc avail -∗ ushTree N s0 p (.exec toks) -∗
       ubytesq N.d DFrac.discard s0 (len + 1) g -∗
-      |==> (urun (hlc := hlc) N h m pc avail ∗ ushCmd N.d p (.exec (ushArgs s0 g toks))) := by
+      |==> (urun N h m pc avail ∗ ushCmd N.d p (.exec (ushArgs s0 g toks))) := by
   iintro Hrun Hnode #Hline
   simp only [ushTree, ushExecAt, ushTypeAt]
   icases Hnode with ⟨%hlt10, %hp0, %hp8, ⟨Hty, -⟩, Hargv, -⟩
@@ -306,8 +306,8 @@ theorem ushCmd_back_of (g : GName) (t q : Nat) (c1 : Ushcmd) (v : Int) (hv : v =
 address bound off the run's heap. -/
 theorem ushType_persist (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail p : Nat) (t : UshpCmd)
     (hp0 : 0 < p) :
-    ⊢ urun (hlc := hlc) N h m pc avail -∗ ushTypeAt N p t -∗
-      |==> (urun (hlc := hlc) N h m pc avail ∗ ⌜0 < p ∧ p < 2 ^ 38⌝ ∗ ushW32 N.d p (ushpTy t)) := by
+    ⊢ urun N h m pc avail -∗ ushTypeAt N p t -∗
+      |==> (urun N h m pc avail ∗ ⌜0 < p ∧ p < 2 ^ 38⌝ ∗ ushW32 N.d p (ushpTy t)) := by
   iintro Hrun HT
   unfold ushTypeAt
   icases HT with ⟨Hty, -⟩
@@ -325,8 +325,8 @@ under `ushpCutOk`. -/
 theorem ushCmd_of_ushp_tree (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail s0 len : Nat)
     (g : Nat → BitVec 8) (hlen : len < 2 ^ 31) (hs0 : 0 < s0) (hs0hi : s0 + len < 2 ^ 38) :
     ∀ (t : UshpCmd) (p : Nat), ushpCutOk len g t →
-    ⊢ urun (hlc := hlc) N h m pc avail -∗ ushTree N s0 p t -∗ ubytesq N.d DFrac.discard s0 (len + 1) g -∗
-      |==> (urun (hlc := hlc) N h m pc avail ∗ ushCmd N.d p (ushcmdOfTree s0 g t))
+    ⊢ urun N h m pc avail -∗ ushTree N s0 p t -∗ ubytesq N.d DFrac.discard s0 (len + 1) g -∗
+      |==> (urun N h m pc avail ∗ ushCmd N.d p (ushcmdOfTree s0 g t))
   | .exec toks, p, hcut => by
     obtain ⟨hin, hend, hbod⟩ := hcut
     exact ushCmd_of_ushp_gen N h m pc avail s0 p len g toks hin hend hbod hlen hs0 hs0hi
@@ -416,9 +416,9 @@ theorem ushCmd_of_ushp_tree (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec
 theorem ushCmd_of_ref (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail s0 p len : Nat)
     (f : Nat → BitVec 8) (t : UshpCmd) (href : refParsecmd len f = some t) (hnn : ∀ j, j < len → f j ≠ ubyte0)
     (hlen : len < 2 ^ 31) (hs0 : 0 < s0) (hs0hi : s0 + len < 2 ^ 38) :
-    ⊢ urun (hlc := hlc) N h m pc avail -∗ ushTree N s0 p t -∗
+    ⊢ urun N h m pc avail -∗ ushTree N s0 p t -∗
       ubytes N.d s0 (len + 1) (ushZeroAt (refNulcut t) (ushpExt len f)) -∗
-      |==> (urun (hlc := hlc) N h m pc avail ∗
+      |==> (urun N h m pc avail ∗
         ushCmd N.d p (ushcmdOfTree s0 (ushZeroAt (refNulcut t) (ushpExt len f)) t)) := by
   iintro Hrun Hnode Hline
   imod ushUbytes_persist N.d s0 (len + 1) _ $$ Hline with #Hline
@@ -429,9 +429,9 @@ theorem ushCmd_of_ref (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (
 theorem ushCmd_of_ref_exec (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail s0 p len : Nat)
     (f : Nat → BitVec 8) (toks : List (Nat × Nat)) (href : refParsecmd len f = some (.exec toks))
     (hnn : ∀ j, j < len → f j ≠ ubyte0) (hlen : len < 2 ^ 31) (hs0 : 0 < s0) (hs0hi : s0 + len < 2 ^ 38) :
-    ⊢ urun (hlc := hlc) N h m pc avail -∗ ushTree N s0 p (.exec toks) -∗
+    ⊢ urun N h m pc avail -∗ ushTree N s0 p (.exec toks) -∗
       ubytes N.d s0 (len + 1) (ushZeroAt (refNulcut (.exec toks)) (ushpExt len f)) -∗
-      |==> (urun (hlc := hlc) N h m pc avail ∗
+      |==> (urun N h m pc avail ∗
         ushCmd N.d p (.exec (ushArgs s0 (ushZeroAt (refNulcut (.exec toks)) (ushpExt len f)) toks))) :=
   ushCmd_of_ref N h m pc avail s0 p len f (.exec toks) href hnn hlen hs0 hs0hi
 

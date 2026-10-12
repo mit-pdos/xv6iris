@@ -46,9 +46,9 @@ set_option maxHeartbeats 16000000 in
 cleared bitmap `bitmapBytes (used \ {bi})` and its payload still at
 `bitmapBytes used`. -/
 theorem bf_tail (LW : LOG_WRITE) (BE : BRELSE)
-    {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+    {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (c0 cpu : CPU) (k : KCtx) (spie1 spp1 : Bool) (R : RegMap)
     (γl : GName) (γb : BcacheNames) (V : BioView GF) (γ : LogNames) (γfs : FsNames)
     (kk logstart bmapstart size : Nat) (dev bnoB pidv : BitVec 32)

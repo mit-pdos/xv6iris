@@ -19,7 +19,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -28,7 +28,7 @@ set_option maxHeartbeats 16000000 in
 /-- **`+0x30 .. +0x3e`: ONE TURN OF THE SCAN** -- readi of record `i`, the
 read test, and the short-read panic or the record test. -/
 theorem dirlink_read (RD : READI) (SN : STRNCPY) (WI : WRITEI) (PA : PANIC)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (j : Nat) (γl : GName)
     (pd pav pu : BitVec 64) (γkl : GName) (γk : KmemNames)
     (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
@@ -50,7 +50,7 @@ theorem dirlink_read (RD : READI) (SN : STRNCPY) (WI : WRITEI) (PA : PANIC)
     dirlinkKeep k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr ∗
     bslots 3 ∗ irefSlot ∗ dlinks fscFs dinum.toNat dn bm data ∗
     logOpS icfgLog ncount Sb ∗ txPin icfgLog tid qtx ∗
-    dirlinkEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
+    dirlinkEnv Γ γl pd pav pu γkl γk ∗
     (∀ c' : CPU, dirlinkPost k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
       dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr c') ∗
     dirlinkLoop Γ γl pd pav pu γkl γk k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
@@ -87,8 +87,8 @@ theorem dirlink_read (RD : READI) (SN : STRNCPY) (WI : WRITEI) (PA : PANIC)
   iintro Hk Hpc
   -- readi(dp, 0, &de, 16 i, 16): the kernel arm
   ihave ⟨#Hpi, #Hbc, #Hlc, #Hdc, #Hpe, #Hkl, #Hav, #Hit, #Hiti, #Hinv, #Hopen, #Hslks, #Hbmi⟩ :=
-    dirlinkEnv_open (hlc := hlc) Γ γl pd pav pu γkl γk $$ Henv
-  ihave #Hany := iregInv_bytes (hlc := hlc) fscIreg fscFs icfgIst icfgNib $$ Hinv
+    dirlinkEnv_open Γ γl pd pav pu γkl γk $$ Henv
+  ihave #Hany := iregInv_bytes fscIreg fscFs icfgIst icfgNib $$ Hinv
   unfold dirlinkKeep
   icases Hkeep with ⟨Hdev, Hin, Hmeta, Hmap, Hblk, Hnm, Hsi, Hss, Hsb, Hdi, Hpid, Hdr⟩
   icases bslots_uncons 2 $$ Hbs with ⟨Hb1, Hb2⟩
@@ -163,7 +163,7 @@ theorem dirlink_read (RD : READI) (SN : STRNCPY) (WI : WRITEI) (PA : PANIC)
 set_option maxHeartbeats 4000000 in
 /-- **THE SCAN**, by induction on the fuel (`nrec + 1 - i`). -/
 theorem dirlink_loop (RD : READI) (SN : STRNCPY) (WI : WRITEI) (PA : PANIC)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (k : KCtx) (j : Nat) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName) (γk : KmemNames)
     (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
     (dn dn0 : Dinode) (fn : Nat → BitVec 8) (inum : BitVec 16) (ncount : Nat) (Sb : List Nat)
@@ -171,7 +171,7 @@ theorem dirlink_loop (RD : READI) (SN : STRNCPY) (WI : WRITEI) (PA : PANIC)
     (kd : Nat) (sd : Qp) (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
     (hs : DirlinkStatic k j bm data dn dn0 fn inum dinum ncount Sb) (hpd : descPageRw pd)
     (hnone : dirFirst data (dirNrec dn.diSize.toNat) (bname 14 fn) = none) :
-    ∀ fuel : Nat, dirlinkEnv (hlc := hlc) (GF := GF) Γ γl pd pav pu γkl γk -∗
+    ∀ fuel : Nat, dirlinkEnv (GF := GF) Γ γl pd pav pu γkl γk -∗
       dirlinkLoop Γ γl pd pav pu γkl γk k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
         dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr fuel := by
   intro fuel

@@ -24,10 +24,10 @@ namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}}
+variable {GF : BundledGFunctors.{0}}
 
 section helpers
-variable [MachFixedGS hlc GF]
+variable [MachFixedGS GF]
 
 /-- The disk conjunct of the state interpretation, on its own (Rocq
 `power_interp_disk_auth`). -/
@@ -45,8 +45,8 @@ theorem diskProjTrace (ndisk : Nat) (γdisk : GName) (P : IProp GF)
     (Hproj : ∀ dk : Nat → BitVec 8,
       diskImgAuthSized γdisk ndisk dk ∗ ▷ P ⊢@{IProp GF}
         ◇ (diskImgAuthSized γdisk ndisk dk ∗ ▷ P ∗ ⌜Ppure dk⌝))
-    (hname : MachFixedGS.diskName (hlc := hlc) (GF := GF) = γdisk)
-    (hsize : MachFixedGS.diskSize (hlc := hlc) (GF := GF) = ndisk)
+    (hname : MachFixedGS.diskName (GF := GF) = γdisk)
+    (hsize : MachFixedGS.diskSize (GF := GF) = ndisk)
     (g' : GState) :
     powerInterp g' ∗ ▷ P ⊢@{IProp GF} ◇ ⌜Ppure (diskOf g'.m.devs)⌝ := by
   iintro ⟨Hsi, HP⟩

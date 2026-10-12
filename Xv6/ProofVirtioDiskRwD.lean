@@ -55,11 +55,11 @@ theorem vdrw4_and7 (n : Nat) :
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 set_option maxHeartbeats 6000000 in
 /-- **P4.**  From `Xv6.vdrwP3Exit` to `Xv6.vdrwP4Exit`. -/
-theorem vdrw_P4 (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem vdrw_P4 (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64)
     (bno : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool)
     (c : Chain) (y : BitVec 32) (R : RegMap)

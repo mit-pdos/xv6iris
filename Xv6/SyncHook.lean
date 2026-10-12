@@ -22,20 +22,20 @@ namespace Xv6
 open Iris Iris.BI MachCSL
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- The era's sync token (Rocq `riscv_sync_tok gen_id`). -/
 abbrev eraSyncTok : IProp GF :=
-  MachFixedGS.syncTok (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF))
+  MachFixedGS.syncTok (GF := GF) (genId (GF := GF))
 
 /-- The era's hook family (Rocq `riscv_sync_hook gen_id`). -/
 abbrev eraSyncHook (Q : IProp GF) : IProp GF :=
-  MachFixedGS.syncHook (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF)) Q
+  MachFixedGS.syncHook (GF := GF) (genId (GF := GF)) Q
 
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF]
 
 /-- Rocq `hook_opt`: at `none` the unit (the dispatcher's own arm 22, a
 program that deposits no hook); at `some Q` the era's hook at `Q`, fired
@@ -43,7 +43,7 @@ once at a ghost commit. -/
 def hookOpt (gen : Nat) (oQ : Option (IProp GF)) : IProp GF :=
   match oQ with
   | none => iprop(emp)
-  | some Q => MachFixedGS.syncHook (hlc := hlc) (GF := GF) gen Q
+  | some Q => MachFixedGS.syncHook (GF := GF) gen Q
 
 /-- Rocq `Q_opt`: the hook's receipt. -/
 def qOpt (oQ : Option (IProp GF)) : IProp GF :=

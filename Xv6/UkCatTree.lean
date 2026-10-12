@@ -56,7 +56,7 @@ theorem ukBytesOf_prefix (g : Nat → BitVec 8) (nb : Nat) : ukBytesOf ((List.ra
   exact mapRange_getElem? _ _ _ hj
 
 section UkCatTree
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -75,15 +75,15 @@ theorem catProg_close (N : UkNames GF) : (catProg N).close = User.Cat.Sym.«clos
 
 /-- **Rocq `kcat_exit_ex_obl`**. -/
 theorem kcatExit_exObl (N : UkNames GF) (s : Int) :
-    kcatExit (hlc := hlc) N s = exObl (hlc := hlc) N (catProg N) s := rfl
+    kcatExit N s = exObl N (catProg N) s := rfl
 
 /-- **Rocq `tree_pay_exit`**. -/
 theorem catTreePay_exit (N : UkNames GF) (s : Int) :
-    treePay (hlc := hlc) N (catProg N) (exit_ s) = kcatExit (hlc := hlc) N s := by
+    treePay N (catProg N) (exit_ s) = kcatExit N s := by
   rw [exit_, treePay_vis]; rfl
 
 theorem catTreePay_exit_ent (N : UkNames GF) (s : Int) :
-    ⊢ treePay (hlc := hlc) N (catProg N) (exit_ s) -∗ kcatExit (hlc := hlc) N s := by
+    ⊢ treePay N (catProg N) (exit_ s) -∗ kcatExit N s := by
   rw [catTreePay_exit]; iintro H; iexact H
 
 /-- **Rocq `usrc_at_data`**. -/
@@ -96,13 +96,13 @@ theorem catUpathAt_data (N : UkNames GF) (pv n : Nat) (f : Nat → BitVec 8) :
 /-! The holes a node's payment unfolds to (deviation 4). -/
 
 theorem kcatTp_wr (N : UkNames GF) (fd : Int) (bs : Bytes) (k : Int → Proc) :
-    treePay (hlc := hlc) N (catProg N) (.vis (.EWrite fd bs) k) ⊢
-      wrObl (hlc := hlc) N (catProg N) fd bs (fun r => treePay (hlc := hlc) N (catProg N) (k r)) := by
+    treePay N (catProg N) (.vis (.EWrite fd bs) k) ⊢
+      wrObl N (catProg N) fd bs (fun r => treePay N (catProg N) (k r)) := by
   rw [treePay_vis]; exact .rfl
 
 theorem kcatTp_files (N : UkNames GF) (p : Bytes) (ps : List Bytes) (rest : Proc) :
-    treePay (hlc := hlc) N (catProg N) (catFiles (p :: ps) rest) ⊢
-      opObl (hlc := hlc) N (catProg N) p 0 (fun fd => treePay (hlc := hlc) N (catProg N)
+    treePay N (catProg N) (catFiles (p :: ps) rest) ⊢
+      opObl N (catProg N) p 0 (fun fd => treePay N (catProg N)
         (if (fd : Int) < 0 then writeBytes 2 (catDgOpen p) (exit_ 1)
           else catLoop fd (.vis (.EClose fd) (fun _ => catFiles ps rest)))) := by
   rw [show catFiles (p :: ps) rest = .vis (.EOpen p 0) (fun fd =>
@@ -111,22 +111,22 @@ theorem kcatTp_files (N : UkNames GF) (p : Bytes) (ps : List Bytes) (rest : Proc
   exact .rfl
 
 theorem kcatTp_cl (N : UkNames GF) (fd : Int) (k : Int → Proc) :
-    treePay (hlc := hlc) N (catProg N) (.vis (.EClose fd) k) ⊢
-      clObl (hlc := hlc) N (catProg N) fd (fun r => treePay (hlc := hlc) N (catProg N) (k r)) := by
+    treePay N (catProg N) (.vis (.EClose fd) k) ⊢
+      clObl N (catProg N) fd (fun r => treePay N (catProg N) (k r)) := by
   rw [treePay_vis]; exact .rfl
 
 theorem kcatTp_loop (N : UkNames GF) (fd : Int) (rest : Proc) :
-    treePay (hlc := hlc) N (catProg N) (catLoop fd rest) ⊢
-      rdObl (hlc := hlc) N (catProg N) fd catBufsz (fun a => treePay (hlc := hlc) N (catProg N) (catTurn fd rest a)) := by
+    treePay N (catProg N) (catLoop fd rest) ⊢
+      rdObl N (catProg N) fd catBufsz (fun a => treePay N (catProg N) (catTurn fd rest a)) := by
   rw [catLoop_step, treePay_vis]; exact .rfl
 
 /-! ## §2 the byte-literal chains -/
 
 /-- **Rocq `kcat_wb_tree`**: one putc byte is one node `EWrite 2 [b]`. -/
 theorem kcatWb_tree (N : UkNames GF) (b : BitVec 8) (T : Proc) :
-    ⊢ kcatWb (hlc := hlc) N (BitVec.ofNat 64 2) b
-        (treePay (hlc := hlc) N (catProg N) (.vis (.EWrite 2 [b]) (fun _ => T)))
-        (treePay (hlc := hlc) N (catProg N) T) := by
+    ⊢ kcatWb N (BitVec.ofNat 64 2) b
+        (treePay N (catProg N) (.vis (.EWrite 2 [b]) (fun _ => T)))
+        (treePay N (catProg N) T) := by
   unfold kcatWb kcatW
   iintro %ua %h %m %avail %ha0 %ha1 %ha2 #Hc ⟨Ht, Hb⟩ Hrun Hcont
   ihave Ht := kcatTp_wr N 2 [b] (fun _ => T) $$ Ht
@@ -150,16 +150,16 @@ theorem kcatWb_tree (N : UkNames GF) (b : BitVec 8) (T : Proc) :
 /-- **Rocq `kcat_pay_seq_tree`**. -/
 theorem kcatPaySeq_tree (N : UkNames GF) (fb : Nat → BitVec 8) :
     ∀ (k i : Nat) (rest : Proc),
-      ⊢ kcatPaySeq (hlc := hlc) N (BitVec.ofNat 64 2) fb i k
-          (treePay (hlc := hlc) N (catProg N) (writeBytes 2 ((List.range' i k).map fb) rest))
-          (treePay (hlc := hlc) N (catProg N) rest)
+      ⊢ kcatPaySeq N (BitVec.ofNat 64 2) fb i k
+          (treePay N (catProg N) (writeBytes 2 ((List.range' i k).map fb) rest))
+          (treePay N (catProg N) rest)
   | 0, i, rest => by
     rw [kcatPaySeq_zero, List.range'_zero, List.map_nil, show writeBytes 2 [] rest = rest from rfl]
     iintro H; iexact H
   | k + 1, i, rest => by
     rw [kcatPaySeq_succ, List.range'_succ, List.map_cons, show ∀ (b : BitVec 8) (r : Bytes),
       writeBytes 2 (b :: r) rest = .vis (.EWrite 2 [b]) (fun _ => writeBytes 2 r rest) from fun _ _ => rfl]
-    iexists treePay (hlc := hlc) N (catProg N) (writeBytes 2 ((List.range' (i + 1) k).map fb) rest)
+    iexists treePay N (catProg N) (writeBytes 2 ((List.range' (i + 1) k).map fb) rest)
     isplitl []
     · iapply kcatWb_tree
     · iapply kcatPaySeq_tree N fb k (i + 1) rest
@@ -168,20 +168,20 @@ theorem kcatPaySeq_tree (N : UkNames GF) (fb : Nat → BitVec 8) :
 payment handed in once. -/
 theorem kcatPaySeq_tree_emp (N : UkNames GF) (fb : Nat → BitVec 8) (i k : Nat) (bs : Bytes) (rest : Proc)
     (Cend : IProp GF) (hbs : (List.range' i k).map fb = bs) :
-    ⊢ (treePay (hlc := hlc) N (catProg N) rest -∗ Cend) -∗
-      treePay (hlc := hlc) N (catProg N) (writeBytes 2 bs rest) -∗
-      kcatPaySeq (hlc := hlc) N (BitVec.ofNat 64 2) fb i k iprop(emp) Cend := by
+    ⊢ (treePay N (catProg N) rest -∗ Cend) -∗
+      treePay N (catProg N) (writeBytes 2 bs rest) -∗
+      kcatPaySeq N (BitVec.ofNat 64 2) fb i k iprop(emp) Cend := by
   iintro HC Ht
   iapply kcatPaySeq_frame N _ fb k i iprop(emp) Cend _ $$ Ht
-  iapply kcatPaySeq_in N _ fb k i (treePay (hlc := hlc) N (catProg N) (writeBytes 2 bs rest)) _ Cend $$ []
+  iapply kcatPaySeq_in N _ fb k i (treePay N (catProg N) (writeBytes 2 bs rest)) _ Cend $$ []
   · iintro ⟨-, H⟩; iexact H
-  iapply kcatPaySeq_mono N _ fb k i _ (treePay (hlc := hlc) N (catProg N) rest) Cend $$ HC
+  iapply kcatPaySeq_mono N _ fb k i _ (treePay N (catProg N) rest) Cend $$ HC
   rw [← hbs]
   iapply kcatPaySeq_tree
 
 /-- **Rocq `kcat_dg_cr_tree`**. -/
 theorem kcatDgCr_tree (N : UkNames GF) :
-    ⊢ treePay (hlc := hlc) N (catProg N) (writeBytes 2 catDgRead (exit_ 1)) -∗ kcatDgCr (hlc := hlc) N := by
+    ⊢ treePay N (catProg N) (writeBytes 2 catDgRead (exit_ 1)) -∗ kcatDgCr N := by
   unfold kcatDgCr
   iintro Ht
   iapply kcatPaySeq_tree_emp N _ 0 16 catDgRead (exit_ 1) _ (by rw [← List.range_eq_range']; exact catDgRead_lit)
@@ -190,7 +190,7 @@ theorem kcatDgCr_tree (N : UkNames GF) :
 
 /-- **Rocq `kcat_dg_cw_tree`**. -/
 theorem kcatDgCw_tree (N : UkNames GF) :
-    ⊢ treePay (hlc := hlc) N (catProg N) (writeBytes 2 catDgWrite (exit_ 1)) -∗ kcatDgCw (hlc := hlc) N := by
+    ⊢ treePay N (catProg N) (writeBytes 2 catDgWrite (exit_ 1)) -∗ kcatDgCw N := by
   unfold kcatDgCw
   iintro Ht
   iapply kcatPaySeq_tree_emp N _ 0 17 catDgWrite (exit_ 1) _ (by rw [← List.range_eq_range']; exact catDgWrite_lit)
@@ -199,25 +199,25 @@ theorem kcatDgCw_tree (N : UkNames GF) :
 
 /-- **Rocq `kcat_dg_open_tree`**. -/
 theorem kcatDgOpen_tree (N : UkNames GF) (g : UArg) :
-    ⊢ treePay (hlc := hlc) N (catProg N) (writeBytes 2 (catDgOpen (uargBytes g)) (exit_ 1)) -∗
-      kcatDgOpen (hlc := hlc) N g := by
+    ⊢ treePay N (catProg N) (writeBytes 2 (catDgOpen (uargBytes g)) (exit_ 1)) -∗
+      kcatDgOpen N g := by
   have e : uargBytes g = (List.range' 0 g.len).map g.bytes := by rw [uargBytes, List.range_eq_range']
   have hnl : (List.range' (cmMsgQ + 2) (cmMsgLen - (cmMsgQ + 2))).map cmLit = [wlNl] := by decide +kernel
   have hpre : (List.range' 0 cmMsgQ).map cmLit = (List.range cmMsgQ).map cmLit := by rw [List.range_eq_range']
   unfold kcatDgOpen
   rw [← catDgOpen_lit, writeBytes_app, writeBytes_app, e]
   iintro Ht
-  iexists treePay (hlc := hlc) N (catProg N) (writeBytes 2 ((List.range' 0 g.len).map g.bytes)
+  iexists treePay N (catProg N) (writeBytes 2 ((List.range' 0 g.len).map g.bytes)
       (writeBytes 2 [wlNl] (exit_ 1))),
-    treePay (hlc := hlc) N (catProg N) (writeBytes 2 [wlNl] (exit_ 1))
+    treePay N (catProg N) (writeBytes 2 [wlNl] (exit_ 1))
   isplitl [Ht]
   · iapply kcatPaySeq_tree_emp N cmLit 0 cmMsgQ _ _ _ hpre $$ [] Ht
     iintro H; iexact H
   isplitl []
   · iapply kcatPaySeq_tree N g.bytes g.len 0
-  · iapply kcatPaySeq_mono N _ cmLit _ (cmMsgQ + 2) _ (treePay (hlc := hlc) N (catProg N) (exit_ 1)) $$ []
+  · iapply kcatPaySeq_mono N _ cmLit _ (cmMsgQ + 2) _ (treePay N (catProg N) (exit_ 1)) $$ []
     · iapply catTreePay_exit_ent
-    have H := kcatPaySeq_tree (hlc := hlc) N cmLit (cmMsgLen - (cmMsgQ + 2)) (cmMsgQ + 2) (exit_ 1)
+    have H := kcatPaySeq_tree N cmLit (cmMsgLen - (cmMsgQ + 2)) (cmMsgQ + 2) (exit_ 1)
     rw [hnl] at H
     iapply H
 
@@ -242,8 +242,8 @@ set_option maxRecDepth 20000 in
 /-- **Rocq `kcat_round_tree`**. -/
 theorem kcatRound_tree (N : UkNames GF) (fdv : BitVec 64) (fd : Int) (rest : Proc)
     (hfd : (BitVec.setWidth 32 fdv).toInt = fd) :
-    ⊢ kcatRound (hlc := hlc) N fdv (treePay (hlc := hlc) N (catProg N) (catLoop fd rest))
-        (treePay (hlc := hlc) N (catProg N) rest) := by
+    ⊢ kcatRound N fdv (treePay N (catProg N) (catLoop fd rest))
+        (treePay N (catProg N) rest) := by
   unfold kcatRound kcatR
   iintro !> %h %m %avail %f %ha0 %ha1 %ha2 #Hc HI Hbuf Hrun Hcont
   ihave HI := kcatTp_loop N fd rest $$ HI
@@ -317,7 +317,7 @@ theorem kcatRound_tree (N : UkNames GF) (fdv : BitVec 64) (fd : Int) (rest : Pro
 
 /-- **Rocq `kcat_o_mono_in`**. -/
 theorem kcatO_mono_in (N : UkNames GF) (pv : BitVec 64) (Oi Oi' : IProp GF) (Oo : BitVec 64 → IProp GF) :
-    ⊢ (Oi' -∗ Oi) -∗ kcatO (hlc := hlc) N pv Oi Oo -∗ kcatO (hlc := hlc) N pv Oi' Oo := by
+    ⊢ (Oi' -∗ Oi) -∗ kcatO N pv Oi Oo -∗ kcatO N pv Oi' Oo := by
   unfold kcatO
   iintro Hm Ho %h %m %avail %ha0 %ha1 #Hc HOi Hrun Hcont
   iapply Ho $$ %h %m %avail %ha0 %ha1 Hc [Hm HOi] Hrun Hcont
@@ -325,7 +325,7 @@ theorem kcatO_mono_in (N : UkNames GF) (pv : BitVec 64) (Oi Oi' : IProp GF) (Oo 
 
 /-- **Rocq `kcat_pay_in`**. -/
 theorem kcatPay_in (N : UkNames GF) (args : List UArg) (k i : Nat) (Ci Ci' Cend : IProp GF) :
-    ⊢ (Ci' -∗ Ci) -∗ kcatPay (hlc := hlc) N args i k Ci Cend -∗ kcatPay (hlc := hlc) N args i k Ci' Cend := by
+    ⊢ (Ci' -∗ Ci) -∗ kcatPay N args i k Ci Cend -∗ kcatPay N args i k Ci' Cend := by
   cases k with
   | zero =>
     rw [kcatPay_zero, kcatPay_zero]
@@ -346,8 +346,8 @@ theorem kcatPay_in (N : UkNames GF) (args : List UArg) (k i : Nat) (Ci Ci' Cend 
 theorem kcatFile_tree (N : UkNames GF) (av : Nat) (args : List UArg) (i : Nat) (g : UArg) (ps : List Bytes)
     (rest : Proc) (hg : args[i]? = some g) :
     ⊢ uargv N.d av args -∗
-      kcatFile (hlc := hlc) N g (treePay (hlc := hlc) N (catProg N) (catFiles (uargBytes g :: ps) rest))
-        (treePay (hlc := hlc) N (catProg N) (catFiles ps rest)) := by
+      kcatFile N g (treePay N (catProg N) (catFiles (uargBytes g :: ps) rest))
+        (treePay N (catProg N) (catFiles ps rest)) := by
   iintro #Hargv
   icases uargv_acc N.d av args i g hg $$ Hargv with ⟨-, #Hstr⟩
   unfold kcatFile kcatO
@@ -378,16 +378,16 @@ theorem kcatFile_tree (N : UkNames GF) (av : Nat) (args : List UArg) (i : Nat) (
       have hfd : ret.toInt = ((ret.toInt.toNat : Nat) : Int) := by omega
       have hlt : ret.toInt.toNat < NOFILE := by omega
       iexists ret.toInt.toNat,
-        treePay (hlc := hlc) N (catProg N) (.vis (.EClose ret.toInt) (fun _ => catFiles ps rest))
+        treePay N (catProg N) (.vis (.EClose ret.toInt) (fun _ => catFiles ps rest))
       isplitr
       · ipureintro; exact (kcat_ofNat_of_toInt ret _ hfd).symm
       isplitr
       · ipureintro; exact hlt
       isplitl [HK]
       · unfold kcatRun0
-        iexists treePay (hlc := hlc) N (catProg N) (catLoop ret.toInt (.vis (.EClose ret.toInt)
+        iexists treePay N (catProg N) (catLoop ret.toInt (.vis (.EClose ret.toInt)
             (fun _ => catFiles ps rest))),
-          treePay (hlc := hlc) N (catProg N) (.vis (.EClose ret.toInt) (fun _ => catFiles ps rest))
+          treePay N (catProg N) (.vis (.EClose ret.toInt) (fun _ => catFiles ps rest))
         isplitr
         · iapply kcatRound_tree
           rw [kcat_cint_small _ (by unfold NOFILE at hlt; omega)]
@@ -408,9 +408,9 @@ theorem kcatFile_tree (N : UkNames GF) (av : Nat) (args : List UArg) (i : Nat) (
 /-- **Rocq `kcat_pay_tree`**. -/
 theorem kcatPay_tree (N : UkNames GF) (av : Nat) (args : List UArg) :
     ∀ (k i : Nat) (rest : Proc) (Cend : IProp GF), i + k = args.length →
-      ⊢ uargv N.d av args -∗ (treePay (hlc := hlc) N (catProg N) rest -∗ Cend) -∗
-        kcatPay (hlc := hlc) N args i k
-          (treePay (hlc := hlc) N (catProg N) (catFiles ((args.drop i).map uargBytes) rest)) Cend
+      ⊢ uargv N.d av args -∗ (treePay N (catProg N) rest -∗ Cend) -∗
+        kcatPay N args i k
+          (treePay N (catProg N) (catFiles ((args.drop i).map uargBytes) rest)) Cend
   | 0, i, rest, Cend, hlen => by
     rw [kcatPay_zero, List.drop_eq_nil_of_le (by omega), List.map_nil, show catFiles [] rest = rest from rfl]
     iintro _ HC Ht
@@ -419,7 +419,7 @@ theorem kcatPay_tree (N : UkNames GF) (av : Nat) (args : List UArg) :
     have hi : i < args.length := by omega
     rw [kcatPay_succ, List.drop_eq_getElem_cons hi, List.map_cons]
     iintro #Hargv HC
-    iexists args[i], treePay (hlc := hlc) N (catProg N) (catFiles ((args.drop (i + 1)).map uargBytes) rest)
+    iexists args[i], treePay N (catProg N) (catFiles ((args.drop (i + 1)).map uargBytes) rest)
     isplitr
     · ipureintro; exact List.getElem?_eq_getElem hi
     isplitl []
@@ -428,18 +428,18 @@ theorem kcatPay_tree (N : UkNames GF) (av : Nat) (args : List UArg) :
 
 /-- **Rocq `kcat_pay_all_tree`**. -/
 theorem kcatPayAll_tree (N : UkNames GF) (av : Nat) (args : List UArg) :
-    ⊢ uargv N.d av args -∗ treePay (hlc := hlc) N (catProg N) (catTree (args.map uargBytes)) -∗
-      kcatPayAll (hlc := hlc) N args iprop(emp) (exObl (hlc := hlc) N (catProg N) 0) := by
+    ⊢ uargv N.d av args -∗ treePay N (catProg N) (catTree (args.map uargBytes)) -∗
+      kcatPayAll N args iprop(emp) (exObl N (catProg N) 0) := by
   unfold kcatPayAll
   iintro #Hargv Ht
   isplit
   · iintro %hle
     rw [catTree_stdin _ (by rw [List.length_map]; omega)]
-    iexists treePay (hlc := hlc) N (catProg N) (exit_ 0)
+    iexists treePay N (catProg N) (exit_ 0)
     isplitl [Ht]
     · unfold kcatRun0
-      iexists treePay (hlc := hlc) N (catProg N) (catLoop 0 (exit_ 0)),
-        treePay (hlc := hlc) N (catProg N) (exit_ 0)
+      iexists treePay N (catProg N) (catLoop 0 (exit_ 0)),
+        treePay N (catProg N) (exit_ 0)
       isplitr
       · iapply kcatRound_tree N (BitVec.ofNat 64 0) 0 (exit_ 0) (by decide)
       isplitl [Ht]
@@ -451,7 +451,7 @@ theorem kcatPayAll_tree (N : UkNames GF) (av : Nat) (args : List UArg) :
   · iintro %hge
     rw [catTree_files _ (by rw [List.length_map]; omega), ← List.map_drop]
     iapply kcatPay_in N args (args.length - 1) 1
-      (treePay (hlc := hlc) N (catProg N) (catFiles ((args.drop 1).map uargBytes) (exit_ 0))) iprop(emp) _ $$ [Ht]
+      (treePay N (catProg N) (catFiles ((args.drop 1).map uargBytes) (exit_ 0))) iprop(emp) _ $$ [Ht]
     · iintro _; iexact Ht
     iapply kcatPay_tree N av args (args.length - 1) 1 (exit_ 0) _ (by omega) $$ Hargv
     rw [← kcatExit_exObl]
@@ -464,12 +464,12 @@ theorem wp_kcat_start_tree (HS : CAT_START) (N : UkNames GF) (h : CPU) (m : RegM
     (args : List UArg) (f : Nat → BitVec 8) (n : Nat)
     (hptr : ∀ (j : Nat) (g : UArg), args[j]? = some g → g.ptr ≠ 0)
     (ha0 : m.get 10#5 = BitVec.ofNat 64 args.length) (ha1 : m.get 11#5 = BitVec.ofNat 64 av) :
-    ⊢ treePay (hlc := hlc) N (catProg N) (catTree (args.map uargBytes)) -∗ ukCode N.t User.Cat.code.byte -∗
+    ⊢ treePay N (catProg N) (catTree (args.map uargBytes)) -∗ ukCode N.t User.Cat.code.byte -∗
       uargv N.d av args -∗ ubytes N.d User.Cat.Sym.«buf» 512 f -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Cat.Sym.«start»)
+      urun N h m (BitVec.ofNat 64 User.Cat.Sym.«start»)
         (2 + (6 + (8 + (10 + (12 + (4 + n)))))) -∗ wpLoop h := by
   iintro Ht #Hc #Hargv Hbuf Hrun
-  iapply HS.wp_catStart N h m av args f n iprop(emp) (exObl (hlc := hlc) N (catProg N) 0) hptr ha0 ha1
+  iapply HS.wp_catStart N h m av args f n iprop(emp) (exObl N (catProg N) 0) hptr ha0 ha1
     $$ [Ht] [] Hc Hargv [] Hbuf Hrun
   · iapply kcatPayAll_tree $$ Hargv Ht
   · rw [kcatExit_exObl]; iintro H; iexact H
@@ -479,7 +479,7 @@ theorem wp_kcat_start_tree (HS : CAT_START) (N : UkNames GF) (h : CPU) (m : RegM
 
 /-- **Rocq `wp_kcat_start_env`**: the tree paid by an ENVIRONMENT
 (`UkHandler.treePay_of_conforms_p`). -/
-theorem wp_kcat_start_env (HS : CAT_START) {Dp : List Nat} (N : UkNames GF) (I : EpIfaceP (hlc := hlc) N (catProg N) Dp)
+theorem wp_kcat_start_env (HS : CAT_START) {Dp : List Nat} (N : UkNames GF) (I : EpIfaceP N (catProg N) Dp)
     (E : Penv) (ds : ExtTreeSet Nat compare) (h : CPU) (m : RegMap) (av : Nat) (args : List UArg)
     (f : Nat → BitVec 8) (n : Nat) (hc : Conforms E (catTree (args.map uargBytes)))
     (hs : SafeFds (fdDom E.fd) (catTree (args.map uargBytes))) (hdp : dpIn Dp ds)
@@ -487,7 +487,7 @@ theorem wp_kcat_start_env (HS : CAT_START) {Dp : List Nat} (N : UkNames GF) (I :
     (ha0 : m.get 10#5 = BitVec.ofNat 64 args.length) (ha1 : m.get 11#5 = BitVec.ofNat 64 av) :
     ⊢ envRes I E ds -∗ ukCode N.t User.Cat.code.byte -∗ uargv N.d av args -∗
       ubytes N.d User.Cat.Sym.«buf» 512 f -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Cat.Sym.«start»)
+      urun N h m (BitVec.ofNat 64 User.Cat.Sym.«start»)
         (2 + (6 + (8 + (10 + (12 + (4 + n)))))) -∗ wpLoop h := by
   iintro Henv #Hc #Hargv Hbuf Hrun
   iapply wp_kcat_start_tree HS N h m av args f n hptr ha0 ha1 $$ [Henv] Hc Hargv Hbuf Hrun

@@ -165,7 +165,7 @@ theorem kxcC_permOf_congr {um um' : RegMapF (BitVec 64)} (h : ∀ k, get? um' k 
 /-! ## §3 THE BLOCK'S `p->sz` CELL -/
 
 section Priv
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg]
 
 /-- The `p->sz` cell LENT out of the whole block (+0x1b4's `ld s5,72(a0)`,
@@ -195,7 +195,7 @@ end Priv
 /-! ## §4 THE USTACK REGROUPINGS -/
 
 section Frame
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- The 33 ustack slots, as `stackOwn` sees them, end at `kxcUstackBuf`. -/
 theorem kxcC_ust_base (sp0 : BitVec 64) (n : Nat) (h : n ≤ 33) :
@@ -322,7 +322,7 @@ end Frame
 /-! ## §4b SMALL ACCESSORS -/
 
 section Acc
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- A cell at an equal address. -/
 theorem kxcC_addr_eq [CurCtx] {a b : BitVec 64} (h : a = b) (n : Nat) (dq : DFrac) (v : BitVec (8 * n)) :
@@ -348,7 +348,7 @@ theorem kxcC_range_acc (Φ : Nat → IProp GF) (n i : Nat) (h : i < n) :
 end Acc
 
 /-- `argv[i]`, read-only, out of the caller's vector. -/
-theorem kxcC_argv_acc {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+theorem kxcC_argv_acc {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx] (av : BitVec 64) (A : KexecArgs) (i : Nat)
@@ -363,7 +363,7 @@ theorem kxcC_argv_acc {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] 
 /-! ## §5 THE CALL SITES (deviation 1) -/
 
 section Calls
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -385,7 +385,7 @@ theorem kxcC_call_myproc (MP : MYPROC) (cpu : CPU) (k : KCtx) (spie spp : Bool) 
   iintro ⟨#Hi, Hk, Hpc, Hte, Hce, HK⟩
   k_step_e (wp_s_jal cpu _ X false imm 1#5 (by decide)) $$ [- $Hk $Hpc $Hi] with [hX]
   iintro Hk Hpc
-  have h := MP.wp_myproc (hlc := hlc) (GF := GF) cpu
+  have h := MP.wp_myproc (GF := GF) cpu
     ((((k.withSpie spie spp).pushed 68).withRegs R).setReg 1#5 (X + 4#64))
     (by k_norm_g; omega) (by k_norm_g; exact hK')
   unfold wp_myproc_body at h
@@ -426,7 +426,7 @@ theorem kxcC_call_uvmclear (UC : UVMCLEAR) (cpu : CPU) (k : KCtx) (spie spp : Bo
   iintro ⟨#Hi, Hk, Hpc, Hte, Hce, Hpt, HK⟩
   k_step_e (wp_s_jal cpu _ X false imm 1#5 (by decide)) $$ [- $Hk $Hpc $Hi] with [hX]
   iintro Hk Hpc
-  have h := UC.wp_uvmclear (hlc := hlc) (GF := GF) cpu
+  have h := UC.wp_uvmclear (GF := GF) cpu
     ((((k.withSpie spie spp).pushed 68).withRegs R).setReg 1#5 (X + 4#64)) P M w
     (by k_norm_g; exact hK') (by k_norm_g; simp [RegMap.set_apply, hroot])
     (by k_norm_g; simpa [RegMap.set_apply] using hva) (by k_norm_g; simpa [RegMap.set_apply] using hmap)
@@ -468,7 +468,7 @@ theorem kxcC_call_strlen (SL : STRLEN) (cpu : CPU) (k : KCtx) (spie spp : Bool) 
   iintro ⟨#Hi, Hk, Hpc, Hte, Hce, Hs, HK⟩
   k_step_e (wp_s_jal cpu _ X false imm 1#5 (by decide)) $$ [- $Hk $Hpc $Hi] with [hX]
   iintro Hk Hpc
-  have h := SL.wp_strlen (hlc := hlc) (GF := GF) cpu
+  have h := SL.wp_strlen (GF := GF) cpu
     ((((k.withSpie spie spp).pushed 68).withRegs R).setReg 1#5 (X + 4#64)) s dq
     (by k_norm_g; exact hK') hn31
   unfold wp_strlen_body at h
@@ -502,7 +502,7 @@ theorem kxcC_call_copyout (Γ : SchedNames) (CO : COPYOUT) (cpu : CPU) (k : KCtx
     instr X false (instruction.JAL (imm, regidx.Regidx 1#5)) ∗
     kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu X ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗ procPtAt P M ∗ byteBuf src dqs bs ∗
+    fsFabric Γ A.pd A.pav A.pu ∗ procPtAt P M ∗ byteBuf src dqs bs ∗
     actLend k.proc ke ∗
     (∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (M' : Nat → List (BitVec 8)),
       ⌜calleeSaved (R.set 1#5 (X + 4#64)) R' ∧ P.extSz (R 11#5) P' ∧
@@ -525,7 +525,7 @@ theorem kxcC_call_copyout (Γ : SchedNames) (CO : COPYOUT) (cpu : CPU) (k : KCtx
     exact List.eq_nil_of_length_eq_zero (by omega)
   k_step_e (wp_s_jal cpu _ X false imm 1#5 (by decide)) $$ [- $Hk $Hpc $Hi] with [hX]
   iintro Hk Hpc
-  have h := CO.wp_copyout (hlc := hlc) (GF := GF) cpu
+  have h := CO.wp_copyout (GF := GF) cpu
     ((((k.withSpie spie spp).pushed 68).withRegs R).setReg 1#5 (X + 4#64)) fscKalloc fsReadyKmem P M
     dqs bs ke (by k_norm_g; omega) (by k_norm_g; exact hK') (by k_norm_g; simp [hlocks])
     (by k_norm_g; simp [RegMap.set_apply, hroot]) (by k_norm_g; simpa [RegMap.set_apply] using hsz)

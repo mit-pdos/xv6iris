@@ -91,7 +91,7 @@ theorem sys_open_walk_bview_cut (plen : Nat) (bp : Nat → BitVec 8) (h : plen <
   rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -124,7 +124,7 @@ theorem sys_open_walk_buf_join (a : BitVec 64) (plen : Nat) (bp : Nat → BitVec
   iexact H
 
 theorem sys_open_walk_rdy (Γ : SchedNames) (A : SysOpenArgs GF) :
-    sysOpenEnv (hlc := hlc) Γ A ⊢ fsReady (hlc := hlc) := by
+    sysOpenEnv Γ A ⊢ fsReady := by
   unfold sysOpenEnv; iintro ⟨-, -, H, -⟩; iexact H
 
 /-! ## namei, at the era trace (+0xe0) -/
@@ -156,7 +156,7 @@ def sysOpenNameiK (k' : KCtx) (se : Bool) (pj : BitVec 64) (plen : Nat) (pfun : 
 set_option maxHeartbeats 8000000 in
 /-- `namei(path)` at +0xe0 (Rocq `NameiEra.wp_namei_era`), the core in and
 out. -/
-theorem sys_open_namei_era (NI : NAMEI_ERA) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem sys_open_namei_era (NI : NAMEI_ERA) (Γ : SchedNames) [ClaimIs GF Γ]
     (A : SysOpenArgs GF) (cpu : CPU) (k' : KCtx) (se : Bool) (hs : k'.sie = se) (pj : BitVec 64)
     (hpj : k'.proc = pj) (j : Nat) (plen : Nat) (pfun : Nat → BitVec 8) (n : Nat)
     (Sb : List Nat) (P Pmiss : Nat → Nat → IProp GF) (pid : BitVec 32) (V : ProcPriv)
@@ -166,7 +166,7 @@ theorem sys_open_namei_era (NI : NAMEI_ERA) (Γ : SchedNames) [ClaimIs (hlc := h
     (hnn : ∀ i, i < plen → pfun i ≠ 0#8) (hterm : pfun plen = 0#8) (hplen : plen < 2 ^ 31)
     (hbud : walkNeed (pathElems (bview plen pfun)).length ≤ n) :
     kctx cpu k' ∗ pcIs cpu KA.«namei» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysOpenEnv (hlc := hlc) Γ A ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysOpenEnv Γ A ∗
     procPrivCoreNoctxAt curCtx pj pid V M ∗
     byteBuf (k'.regs 10#5) (DFrac.own 1) (bview (plen + 1) pfun) ∗
     bslots 3 ∗ irefSlots 2 ∗ logOpS icfgLog n Sb ∗ logTx icfgLog ∗
@@ -186,7 +186,7 @@ theorem sys_open_namei_era (NI : NAMEI_ERA) (Γ : SchedNames) [ClaimIs (hlc := h
   icases fsReady_region $$ Hrdy with ⟨#Hinv, #Hopen⟩
   icases fsReady_sb_four $$ Hrdy with ⟨-, #Hsi, -, #Hsb⟩
   ihave #Hbmi := fsReady_bitmap $$ Hrdy
-  have h := NI.wp_namei_era_eb (hlc := hlc) (GF := GF) Γ cpu k' γbl pd pav pu j fscKalloc
+  have h := NI.wp_namei_era_eb (GF := GF) Γ cpu k' γbl pd pav pu j fscKalloc
     fsReadyKmem plen pfun n Sb P Pmiss pid V M DFrac.discard DFrac.discard (DFrac.own 1)
     hj hproc hK hnoff htier hg.fgoRootdev hg.fgoNibPos hg.fgoLog hg.fgoBitmap
     hg.fgoCovBelow hg.fgoIreg hnn hterm hplen hbud hpd
@@ -226,7 +226,7 @@ def sysOpenIlockK (k' : KCtx) (se : Bool) (pj : BitVec 64) (dqp : DFrac) (γisl 
 set_option maxHeartbeats 8000000 in
 /-- `ilock(ip)` at +0xe8: the write arm (Rocq `Ilock.wp_ilock_dep_sconf` at
 `PlainK`, `llb_0`). -/
-theorem sys_open_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem sys_open_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF Γ]
     (A : SysOpenArgs GF) (cpu : CPU)
     (k' : KCtx) (se : Bool) (hs : k'.sie = se) (pj : BitVec 64) (hpj : k'.proc = pj) (j : Nat)
     (dqp : DFrac) (γil γisl : GName) (kk : Nat) (s : Qp) (g : GName) (lo tl : Nat)
@@ -235,7 +235,7 @@ theorem sys_open_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) (hkk : kk < NINODE)
     (hnib : inum.toNat < 16 * icfgNib) (ha0 : k'.regs 10#5 = ientry kk) (hle : lo ≤ tl) :
     kctx cpu k' ∗ pcIs cpu KA.«ilock» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysOpenEnv (hlc := hlc) Γ A ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysOpenEnv Γ A ∗
     isSleeplockGen γil γisl (iLock (ientry kk)) (icSlp fscIc kk) (slhTok (icfgIsl kk)) ∗
     credFloor lo tl ∗ inodeShrGenlo kk s icfgDev inum g lo ∗ runitAny inum.toNat ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗ bslot ∗ logTx icfgLog ∗
@@ -253,8 +253,8 @@ theorem sys_open_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
   icases fsReady_sb_four $$ Hrdy with ⟨-, #Hsi, -, -⟩
   ihave #Hesc := fsReady_escrow kk hkk $$ Hrdy
   ihave #Hcla := isItable2_claims $$ Hit2
-  ihave #Hl0 := topLbAt_0 (GF := GF) (MachGS.era (hlc := hlc) (GF := GF))
-  have h := IL.wp_ilock_tx_eb (hlc := hlc) (GF := GF) Γ cpu k' γbl pd pav pu j γil γisl
+  ihave #Hl0 := topLbAt_0 (GF := GF) (MachGS.era (GF := GF))
+  have h := IL.wp_ilock_tx_eb (GF := GF) Γ cpu k' γbl pd pav pu j γil γisl
     kk s g lo tl .plainK inum pidv dqp DFrac.discard 0 hj hproc hK hnoff htier hkk hg.fgoLog
     (hg.iblockCov inum hnib) hnib hpd ha0 hle
   unfold wp_ilock_tx_eb_body at h

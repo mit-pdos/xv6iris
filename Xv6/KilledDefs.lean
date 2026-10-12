@@ -54,7 +54,7 @@ theorem kl_ret_2146 : jumpPc (KA.«kkill» + 0x52#64) = (KA.«kkill» + 0x52#64)
 
 set_option maxHeartbeats 1000000 in
 /-- `acquire`'s contract at the call site. -/
-theorem kl_acquire (AC : ACQUIRE) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem kl_acquire (AC : ACQUIRE) {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (c : CPU) (k' : KCtx) (γ : GName) (Rp : CtxId → IProp GF) [CtxMorph Rp]
     (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 10 ≤ k'.avail) (hs' : "proc" ∉ k'.locks) :
     kctx c k' ∗ pcIs c KA.«acquire» ∗ isLock γ (k'.regs 10#5) "proc" Rp ∗
@@ -65,14 +65,14 @@ theorem kl_acquire (AC : ACQUIRE) {hlc : HasLC} {GF : BundledGFunctors.{0}} [Mac
       locked γ cpu' -∗ Rp curCtx -∗ (∃ K : Nat, viewLb cpu' K) -∗
       sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γ "proc" Rp hnoff' hK' hs'
+  have h := AC.wp_acquire (GF := GF) c k' γ "proc" Rp hnoff' hK' hs'
   unfold wp_acquire_body at h
   simp only [acquireAddr] at h
   exact h
 
 set_option maxHeartbeats 1000000 in
 /-- `release`'s contract at the call site. -/
-theorem kl_release (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem kl_release (RE : RELEASE) {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (c : CPU) (k' : KCtx) (γ : GName) (Rp : CtxId → IProp GF) [CtxMorph Rp]
     (hsie' : k'.sie = false) (hnoff' : 1 ≤ k'.noff) (hK' : 10 ≤ k'.avail)
     (reen : Bool) (hreen : reen = (decide (k'.noff = 1) && k'.intena))
@@ -83,20 +83,20 @@ theorem kl_release (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors.{0}} [Mac
       kctx cpu' (((k'.popExit reen).withRegs R').withLocks (k'.locks.filter (fun x => x ≠ "proc"))) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γ "proc" Rp hsie' hnoff' hK' reen hreen hon
+  have h := RE.wp_release (GF := GF) c k' γ "proc" Rp hsie' hnoff' hK' reen hreen hon
   unfold wp_release_body at h
   simp only [releaseAddr] at h
   exact h
 
 /-- The frame at a context with the pinned bits rewritten (`withSpie` does
 not touch the registers). -/
-theorem kl_frame4s1_cast {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem kl_frame4s1_cast {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (k : KCtx) (a b : Bool) (ra s0 s1 : BitVec 64) :
     frame4s1 (GF := GF) (k.regs 2#5) ra s0 s1 ⊢ frame4s1 ((k.withSpie a b).regs 2#5) ra s0 s1 := by
   simp only [KCtx.withSpie_regs]
   iintro H; iexact H
 
-theorem kl_frame4s2_cast {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem kl_frame4s2_cast {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (k : KCtx) (a b : Bool) (ra s0 s1 s2 : BitVec 64) :
     frame4s2 (GF := GF) (k.regs 2#5) ra s0 s1 s2 ⊢ frame4s2 ((k.withSpie a b).regs 2#5) ra s0 s1 s2 := by
   simp only [KCtx.withSpie_regs]
@@ -104,14 +104,14 @@ theorem kl_frame4s2_cast {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
 
 /-- Recasting the program counter along a definitional equality (the
 `done`-indexed exit of an iteration). -/
-theorem kl_pcIs_cast {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+theorem kl_pcIs_cast {GF : BundledGFunctors.{0}} [MachGS GF]
     (cpu : CPU) (a b : BitVec 64) (h : a = b) : pcIs (GF := GF) cpu a ⊢ pcIs cpu b := by
   rw [h]
 
 /-! ## Naming the lock payload -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 theorem kl_pay_elim (Γ : SchedNames) (ξ : CtxId) (j : Nat) :
     procLockPay (GF := GF) Γ j ξ ⊢ procLockResAt Γ ξ (procAddr j) := by
@@ -123,19 +123,19 @@ theorem kl_pay_intro (Γ : SchedNames) (ξ : CtxId) (j : Nat) :
 
 /-- The cells of `procPubRest`, named, and the killed row. -/
 theorem kl_rest_elim (ξ : CtxId) (pa : BitVec 64) (kl xs pid : BitVec 32) :
-    @procPubRest hlc GF _ ⟨ξ, KTier.kpt⟩ _ _ pa kl xs pid ⊢
-      iprop(@wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pKilled pa) 4 (DFrac.own 1) kl ∗
-        @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pXstate pa) 4 xsHalf xs ∗
-        @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pPid pa) 4 pidPub pid ∗
-        killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pid kl) := by
+    @procPubRest GF _ ⟨ξ, KTier.kpt⟩ _ _ pa kl xs pid ⊢
+      iprop(@wordPointsTo GF _ ⟨ξ, KTier.kpt⟩ (pKilled pa) 4 (DFrac.own 1) kl ∗
+        @wordPointsTo GF _ ⟨ξ, KTier.kpt⟩ (pXstate pa) 4 xsHalf xs ∗
+        @wordPointsTo GF _ ⟨ξ, KTier.kpt⟩ (pPid pa) 4 pidPub pid ∗
+        killPaidAt (MachFixedGS.killCred (GF := GF)) pid kl) := by
   unfold procPubRest; iintro H; iexact H
 
 theorem kl_rest_intro (ξ : CtxId) (pa : BitVec 64) (kl xs pid : BitVec 32) :
-    iprop(@wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pKilled pa) 4 (DFrac.own 1) kl ∗
-        @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pXstate pa) 4 xsHalf xs ∗
-        @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pPid pa) 4 pidPub pid ∗
-        killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pid kl) ⊢
-      @procPubRest hlc GF _ ⟨ξ, KTier.kpt⟩ _ _ pa kl xs pid := by
+    iprop(@wordPointsTo GF _ ⟨ξ, KTier.kpt⟩ (pKilled pa) 4 (DFrac.own 1) kl ∗
+        @wordPointsTo GF _ ⟨ξ, KTier.kpt⟩ (pXstate pa) 4 xsHalf xs ∗
+        @wordPointsTo GF _ ⟨ξ, KTier.kpt⟩ (pPid pa) 4 pidPub pid ∗
+        killPaidAt (MachFixedGS.killCred (GF := GF)) pid kl) ⊢
+      @procPubRest GF _ ⟨ξ, KTier.kpt⟩ _ _ pa kl xs pid := by
   unfold procPubRest; iintro H; iexact H
 
 end

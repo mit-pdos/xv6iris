@@ -57,7 +57,7 @@ theorem ba_beqz_size (size : Nat) (h0 : 0 < size) (h : size < 2 ^ 31) :
   simp [this]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
@@ -69,7 +69,7 @@ invariant (`Xv6.baScanPre`) carries the complement at the loop's current
 hart, the induction being over that hart too.  ONE core for the credited
 and the counted forms (Rocq Round 13), by `cr`. -/
 theorem ba_entry (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET) (PK : PRINTK)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (c0 : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γ : LogNames) (γfs : FsNames)
     (logstart bmapstart size : Nat) (dev : BitVec 32)
@@ -82,7 +82,7 @@ theorem ba_entry (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET) (PK :
     (hdev : dev = V.dev) (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
     (hpd : descPageRw pd)
     (ha0 : k.regs 10#5 = BitVec.signExtend 64 dev) :
-    wp_balloc_gen_eb_body (hlc := hlc) (GF := GF) Γ c0 k γl γb V γdl pd pav pu j γ γfs
+    wp_balloc_gen_eb_body (GF := GF) Γ c0 k γl γb V γdl pd pav pu j γ γfs
       logstart bmapstart size dev u cr Sb pidv dqp dqb dqs
       hj hproc hK hnoff htier hgeom hbm hcredit hdev hcl hdt hpd ha0 := by
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
@@ -146,7 +146,7 @@ theorem ba_entry (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET) (PK :
 end
 
 theorem balloc_proof (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET) (PK : PRINTK) :
-    BALLOC := ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γb V γdl pd pav pu j γ γfs
+    BALLOC := ⟨fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γb V γdl pd pav pu j γ γfs
     logstart bmapstart size dev u cr Sb pidv dqp dqb dqs
     hj hproc hK hnoff htier hgeom hbm hcredit hdev hcl hdt hpd ha0 =>
   ba_entry BR LW BE MS PK Γ cpu k γl γb V γdl pd pav pu j γ γfs logstart bmapstart size dev

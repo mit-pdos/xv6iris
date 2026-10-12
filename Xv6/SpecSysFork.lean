@@ -59,11 +59,11 @@ def sysForkAddr : BitVec 64 := KA.«sys_fork»
 def sysForkSlots : Nat := 2 + kforkSlots
 
 /-- **WP of `sys_fork()`.** -/
-def wp_sys_fork_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_sys_fork_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (γft : GName) (γ : FileNames)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (stsP : List FdState)
     (Q : Int → IProp GF) (csP : ExtTreeSet GName compare) (Rc : IProp GF)
@@ -77,9 +77,9 @@ def wp_sys_fork_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
   isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗ procsAvailAt Γ none false ∗
   isFtable γft γ ∗
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗ iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
-  □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ Q (-1)) ∗ firstDone (hlc := hlc) ∗
-  kforkPark (hlc := hlc) (SG := SG) Γ V M stsP Q Rc ∗
+  itableInv ∗ iregInv fscIreg fscFs icfgIst icfgNib ∗
+  □ (MachFixedGS.killCred (GF := GF) -∗ Q (-1)) ∗ firstDone ∗
+  kforkPark (SG := SG) Γ V M stsP Q Rc ∗
   procPrivFd γ (procAddr j) pid V M ∗ fdFrags V.fdg stsP ∗ chFrag V.chg (procAddr j) csP ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (rv : BitVec 32),
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ kforkAns rv⌝ -∗
@@ -90,11 +90,11 @@ def wp_sys_fork_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
 
 /-- **WP of `sys_fork()`, at either entry `SIE`** (Rocq `wp_sys_fork_sconf_body`):
 kfork's balanced contract forwarded through the two-slot frame. -/
-def wp_sys_fork_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_sys_fork_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (γft : GName) (γ : FileNames)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (stsP : List FdState)
     (Q : Int → IProp GF) (csP : ExtTreeSet GName compare) (Rc : IProp GF)
@@ -106,9 +106,9 @@ def wp_sys_fork_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF
   isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗ procsAvailAt Γ none false ∗
   isFtable γft γ ∗
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗ iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
-  □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ Q (-1)) ∗ firstDone (hlc := hlc) ∗
-  kforkPark (hlc := hlc) (SG := SG) Γ V M stsP Q Rc ∗
+  itableInv ∗ iregInv fscIreg fscFs icfgIst icfgNib ∗
+  □ (MachFixedGS.killCred (GF := GF) -∗ Q (-1)) ∗ firstDone ∗
+  kforkPark (SG := SG) Γ V M stsP Q Rc ∗
   procPrivFd γ (procAddr j) pid V M ∗ fdFrags V.fdg stsP ∗ chFrag V.chg (procAddr j) csP ∗
   wpNext k.sie k.proc cpu (kforkPost k γ j pid V M stsP Q csP Rc)
   ⊢ wpLoop (GF := GF) cpu
@@ -117,11 +117,11 @@ def wp_sys_fork_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF
 the post `kforkPostLed` (its success arm carries the pid ledger's and the
 family ledger's receipts; NI joint fork lane F2: and the allocator ledger's
 decisive receipt on both arms, at `γk`). -/
-def wp_sys_fork_led_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_sys_fork_led_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (γft : GName) (γ : FileNames)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (stsP : List FdState)
     (Q : Int → IProp GF) (csP : ExtTreeSet GName compare) (Rc : IProp GF)
@@ -133,35 +133,35 @@ def wp_sys_fork_led_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hl
   isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗ procsAvailAt Γ none false ∗
   isFtable γft γ ∗
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗ iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
-  □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ Q (-1)) ∗ firstDone (hlc := hlc) ∗
-  kforkPark (hlc := hlc) (SG := SG) Γ V M stsP Q Rc ∗
+  itableInv ∗ iregInv fscIreg fscFs icfgIst icfgNib ∗
+  □ (MachFixedGS.killCred (GF := GF) -∗ Q (-1)) ∗ firstDone ∗
+  kforkPark (SG := SG) Γ V M stsP Q Rc ∗
   procPrivFd γ (procAddr j) pid V M ∗ fdFrags V.fdg stsP ∗ chFrag V.chg (procAddr j) csP ∗
   wpNext k.sie k.proc cpu (kforkPostLed k γ γk j pid V M stsP Q csP Rc)
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `sys_fork`. -/
 structure SYSFORK : Prop where
-  wp_sys_fork_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  wp_sys_fork_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (γft : GName) (γ : FileNames)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (stsP : List FdState)
     (Q : Int → IProp GF) (csP : ExtTreeSet GName compare) (Rc : IProp GF) hj hproc hK hnoff htier,
-    wp_sys_fork_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk γft γ j pid V M stsP Q csP Rc
+    wp_sys_fork_eb_body (GF := GF) Γ cpu k γw γp γl γk γft γ j pid V M stsP Q csP Rc
       hj hproc hK hnoff htier
   /-- (NI M2-G2b) the led twin, forwarded -/
-  wp_sys_fork_led_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  wp_sys_fork_led_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (γft : GName) (γ : FileNames)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (stsP : List FdState)
     (Q : Int → IProp GF) (csP : ExtTreeSet GName compare) (Rc : IProp GF) hj hproc hK hnoff htier,
-    wp_sys_fork_led_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk γft γ j pid V M stsP Q csP Rc
+    wp_sys_fork_led_eb_body (GF := GF) Γ cpu k γw γp γl γk γft γ j pid V M stsP Q csP Rc
       hj hproc hK hnoff htier
 
 end Xv6

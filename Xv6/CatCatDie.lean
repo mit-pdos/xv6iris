@@ -24,7 +24,7 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -44,10 +44,10 @@ theorem catCat_dieAt (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (h : C
       uinstrIs N.t (BitVec.ofNat 64 (pc + 10)) false (.JAL (jf, .Regidx 1#5)) -∗
       uinstrIs N.t (BitVec.ofNat 64 (pc + 14)) true (.ITYPE (1#12, .Regidx 0#5, .Regidx 10#5, .ADDI)) -∗
       uinstrIs N.t (BitVec.ofNat 64 (pc + 16)) false (.JAL (je, .Regidx 1#5)) -∗
-      kcatPaySeq (hlc := hlc) N (BitVec.ofNat 64 2) (User.Cat.catLit lit) 0 len iprop(emp)
-        (kcatExit (hlc := hlc) N 1) -∗
+      kcatPaySeq N (BitVec.ofNat 64 2) (User.Cat.catLit lit) 0 len iprop(emp)
+        (kcatExit N 1) -∗
       ukCode N.t User.Cat.code.byte -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 pc) (10 + (12 + (4 + n))) -∗ wpLoop h := by
+      urun N h m (BitVec.ofNat 64 pc) (10 + (12 + (4 + n))) -∗ wpLoop h := by
   iintro #Hi0 #Hi1 #Hi2 #Hi3 #Hi4 #Hi5 Hdg #Hc Hrun
   ihave #Hstr := kcatLitStr N.t lit len hok (by omega) $$ Hc
   -- auipc a1,0x1
@@ -81,7 +81,7 @@ theorem catCat_dieAt (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (h : C
   have h4a0 : m4.get 10#5 = BitVec.ofNat 64 2 := by ureg
   have h4a1 : m4.get 11#5 = BitVec.ofNat 64 lit := by ureg
   have h4ra : m4.get 1#5 = BitVec.ofNat 64 (pc + 10) + instrLen false := by ureg
-  iapply HF.wp_catFprintf N lit len (User.Cat.catLit lit) h4 m4 n iprop(emp) (kcatExit (hlc := hlc) N 1)
+  iapply HF.wp_catFprintf N lit len (User.Cat.catLit lit) h4 m4 n iprop(emp) (kcatExit N 1)
     hbnd hlen (fun j hj => User.litOk_nopct _ lit len j hok hj) h4a1 $$ [Hdg] Hc Hstr [] Hrun
   · rw [h4a0]; iexact Hdg
   · iempintro
@@ -108,8 +108,8 @@ theorem catCat_dieAt (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (h : C
 
 /-- **Rocq `wp_kcat_cat_die_cw`**: the `cat: write error` tail at 0x40. -/
 theorem catCat_dieCw (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (h : CPU) (m : RegMap) (n : Nat) :
-    ⊢ kcatDgCw (hlc := hlc) N -∗ ukCode N.t User.Cat.code.byte -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x40) (10 + (12 + (4 + n))) -∗ wpLoop h := by
+    ⊢ kcatDgCw N -∗ ukCode N.t User.Cat.code.byte -∗
+      urun N h m (BitVec.ofNat 64 0x40) (10 + (12 + (4 + n))) -∗ wpLoop h := by
   unfold kcatDgCw
   iintro Hdg #Hc Hrun
   ihave Hi0 := cat_uis N.t 0x40 false (.UTYPE (1#20, .Regidx 11#5, .AUIPC)) udec%
@@ -130,8 +130,8 @@ theorem catCat_dieCw (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (h : C
 
 /-- **Rocq `wp_kcat_cat_die_cr`**: the `cat: read error` tail at 0x6a. -/
 theorem catCat_dieCr (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (h : CPU) (m : RegMap) (n : Nat) :
-    ⊢ kcatDgCr (hlc := hlc) N -∗ ukCode N.t User.Cat.code.byte -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x6a) (10 + (12 + (4 + n))) -∗ wpLoop h := by
+    ⊢ kcatDgCr N -∗ ukCode N.t User.Cat.code.byte -∗
+      urun N h m (BitVec.ofNat 64 0x6a) (10 + (12 + (4 + n))) -∗ wpLoop h := by
   unfold kcatDgCr
   iintro Hdg #Hc Hrun
   ihave Hi0 := cat_uis N.t 0x6a false (.UTYPE (1#20, .Regidx 11#5, .AUIPC)) udec%

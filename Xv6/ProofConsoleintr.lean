@@ -39,7 +39,7 @@ theorem ci_sw_ne' (c n : BitVec 8) (m : BitVec 64) (hm : BitVec.setWidth 64 n = 
     BitVec.setWidth 64 c ≠ m := hm ▸ ci_sw_ne c n h
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 set_option maxHeartbeats 8000000 in
 /-- **The four character tests**, from `+0x18` (just past `acquire`):
@@ -56,7 +56,7 @@ theorem ci_body (CP : CONSPUTC) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
     (hsv : ciSaved k.regs R) (hs1 : R 9#5 = BitVec.setWidth 64 cb) :
     kctx c ((ciK k a b).withRegs R) ∗ pcIs c (KA.«consoleintr» + 0x18#64) ∗
     procsInv Γ ∗ ciLk γc cn ∗ locked γc c ∗ uartPort .uart0 γl γ ∗ ciPay γ hb cb ∗
-    MachFixedGS.rxTag (hlc := hlc) (GF := GF) hb ∗ consResCur cn ∗
+    MachFixedGS.rxTag (GF := GF) hb ∗ consResCur cn ∗
     frame6s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
     rxHi γ (1 : Qp).half hh ∗ ciMark γ hb ∗ ciRet c k a b γ hb
     ⊢ wpLoop (GF := GF) c := by
@@ -238,7 +238,7 @@ set_option maxHeartbeats 8000000 in
 dispatch. -/
 theorem consoleintr_proof (CP : CONSPUTC) (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP) :
     CONSOLEINTR := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ Γ cpu k γc γl γ hb cb hh hg hnoff hK hlk htier ha0 hends hboots hx hxg
+  fun {GF} _ _ _ _ _ _ _ _ Γ cpu k γc γl γ hb cb hh hg hnoff hK hlk htier ha0 hends hboots hx hxg
     hshb hnext => by
   unfold wp_consoleintr_body
   simp only [consoleintrAddr]

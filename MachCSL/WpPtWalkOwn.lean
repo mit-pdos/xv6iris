@@ -36,7 +36,7 @@ open Sail Sail.ConcurrencyInterfaceV1
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-! ## Owned bytes, exclusively -/
 
@@ -136,7 +136,7 @@ theorem ctx_store_excl (σ : MState) (cpu : CPU) (ξ : CtxId) (pa : PAddr) (n : 
     (r : Option Resv) (hram : ramBytes pa n) (hno : ¬ othersReserve σ.resv cpu pa n) :
     memModel σ ∗ ownCtx cpu ξ ∗ resvFragAny cpu r ⊢@{IProp GF} |==>
       (memModel (σ.store cpu pa n w true) ∗ ownCtx cpu ξ ∗ resvFrag cpu none false ∗
-       keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ (σ.top + 1)) := by
+       keyAt (MachGS.era (GF := GF)) ξ (σ.top + 1)) := by
   unfold ownCtx ownCtxAt resvFragAny resvFragAnyAt resvFrag memModel
   iintro ⟨Hmm, ⟨%B, %K, %W, %D, Hctx, #HK, %hBK, #HW, %hDW, #Hels⟩, %acq, Hfrag⟩
   ihave %hW : ⌜W ≤ σ.top⌝ $$ [Hmm HW]

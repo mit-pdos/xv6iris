@@ -151,7 +151,7 @@ structure EraGS where
 
 /-- The functors the machine needs (for adequacy: what a `BundledGFunctors`
 must contain). -/
-class MachGpreS (hlc : outParam HasLC) (GF : BundledGFunctors.{0}) extends InvGpreS GF where
+class MachGpreS (GF : BundledGFunctors.{0}) extends InvGpreS GF where
   reg_pre : GhostMapG GF Nat RegVal RegMapF
   mem_pre : genHeapPreS PAddr Hist GF MemF
   mono_pre : MonoNatG GF
@@ -194,9 +194,9 @@ attribute [reducible, instance] MachGpreS.diskImg_pre
 attribute [reducible, instance] MachGpreS.mirror_pre
 
 /-- The fixed layer: allocated once, survives every power cycle. -/
-class MachFixedGS (hlc : outParam HasLC) (GF : BundledGFunctors.{0}) where
+class MachFixedGS (GF : BundledGFunctors.{0}) where
   -- not an instance on purpose to avoid diamonds with IrisGS_gen
-  [invGS : InvGS_gen hlc GF]
+  [invGS : InvGS GF]
   reg : GhostMapG GF Nat RegVal RegMapF
   memPre : genHeapPreS PAddr Hist GF MemF
   mono : MonoNatG GF
@@ -419,8 +419,8 @@ structure CtxId where
 /-- The ambient instance: the fixed layer, one era (its register names and
 memory heap, spelled out as fields so the heap can be an instance), and the
 era's generation. -/
-class MachGS (hlc : outParam HasLC) (GF : BundledGFunctors.{0}) where
-  [fixed : MachFixedGS hlc GF]
+class MachGS (GF : BundledGFunctors.{0}) where
+  [fixed : MachFixedGS GF]
   /-- the register-map ghost name of each hart -/
   regName : CPU → GName
   /-- the memory heap's value map (see `EraGS.heapName`) -/
@@ -453,11 +453,11 @@ class MachGS (hlc : outParam HasLC) (GF : BundledGFunctors.{0}) where
 
 attribute [reducible, instance] MachGS.fixed
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}}
+variable {GF : BundledGFunctors.{0}}
 
 /-- Era `E`'s memory heap: the fixed layer's heap functors at the era's two
 heap names. -/
-@[reducible] def EraGS.mem [MachFixedGS hlc GF] (E : EraGS) : genHeapGS PAddr Hist GF MemF :=
+@[reducible] def EraGS.mem [MachFixedGS GF] (E : EraGS) : genHeapGS PAddr Hist GF MemF :=
   ⟨E.heapName, E.metaName⟩
 
 set_option synthInstance.checkSynthOrder false in
@@ -465,37 +465,37 @@ set_option synthInstance.checkSynthOrder false in
 era's heap names.  (`hlc` is an out-parameter of `MachGS`, found from the
 ambient instance; the order check does not know that, as for the former
 field projection.) -/
-@[reducible] instance MachGS.mem [MachGS hlc GF] : genHeapGS PAddr Hist GF MemF :=
-  ⟨MachGS.heapName (hlc := hlc) (GF := GF), MachGS.metaName (hlc := hlc) (GF := GF)⟩
+@[reducible] instance MachGS.mem [MachGS GF] : genHeapGS PAddr Hist GF MemF :=
+  ⟨MachGS.heapName (GF := GF), MachGS.metaName (GF := GF)⟩
 
 /-- The ambient era. -/
-@[reducible] def MachGS.era [MachGS hlc GF] : EraGS :=
-  ⟨MachGS.regName (hlc := hlc) (GF := GF), MachGS.heapName (hlc := hlc) (GF := GF),
-   MachGS.metaName (hlc := hlc) (GF := GF),
-   MachGS.viewName (hlc := hlc) (GF := GF), MachGS.iviewName (hlc := hlc) (GF := GF),
-   MachGS.rviewName (hlc := hlc) (GF := GF), MachGS.topName (hlc := hlc) (GF := GF),
-   MachGS.authName (hlc := hlc) (GF := GF), MachGS.resvName (hlc := hlc) (GF := GF),
-   MachGS.lockSetName (hlc := hlc) (GF := GF), MachGS.kmapName (hlc := hlc) (GF := GF),
-   MachGS.kptRootName (hlc := hlc) (GF := GF),
-   MachGS.devName (hlc := hlc) (GF := GF), MachGS.mirrorName (hlc := hlc) (GF := GF)⟩
+@[reducible] def MachGS.era [MachGS GF] : EraGS :=
+  ⟨MachGS.regName (GF := GF), MachGS.heapName (GF := GF),
+   MachGS.metaName (GF := GF),
+   MachGS.viewName (GF := GF), MachGS.iviewName (GF := GF),
+   MachGS.rviewName (GF := GF), MachGS.topName (GF := GF),
+   MachGS.authName (GF := GF), MachGS.resvName (GF := GF),
+   MachGS.lockSetName (GF := GF), MachGS.kmapName (GF := GF),
+   MachGS.kptRootName (GF := GF),
+   MachGS.devName (GF := GF), MachGS.mirrorName (GF := GF)⟩
 
 /-- The register-map ghost name of hart `cpu` in the ambient era. -/
-def regName [MachGS hlc GF] (cpu : CPU) : GName := MachGS.regName (hlc := hlc) (GF := GF) cpu
+def regName [MachGS GF] (cpu : CPU) : GName := MachGS.regName (GF := GF) cpu
 
 /-- The ambient generation. -/
-def genId [MachGS hlc GF] : Nat := MachGS.gen (hlc := hlc) (GF := GF)
+def genId [MachGS GF] : Nat := MachGS.gen (GF := GF)
 
 /-! ## Register points-to -/
 
 /-- Register `r` holds `v`, in the register map named `γ`. -/
-def regPointsToAt [MachFixedGS hlc GF] (γ : GName) (r : Register) (dq : DFrac)
+def regPointsToAt [MachFixedGS GF] (γ : GName) (r : Register) (dq : DFrac)
     (v : RegisterType r) : IProp GF :=
   ghost_map_elem γ dq (regIdx r) (⟨r, v⟩ : RegVal)
 
 /-- Hart `cpu`'s register `r` holds `v` (in the ambient era). -/
-def regPointsTo [MachGS hlc GF] (cpu : CPU) (r : Register) (dq : DFrac) (v : RegisterType r) :
+def regPointsTo [MachGS GF] (cpu : CPU) (r : Register) (dq : DFrac) (v : RegisterType r) :
     IProp GF :=
-  regPointsToAt (regName (hlc := hlc) (GF := GF) cpu) r dq v
+  regPointsToAt (regName (GF := GF) cpu) r dq v
 
 notation:50 r:50 " ↦ᵣ[" cpu "]{" dq "} " v:50 => regPointsTo cpu r dq v
 notation:50 r:50 " ↦ᵣ[" cpu "] " v:50 => regPointsTo cpu r (DFrac.own 1) v
@@ -514,12 +514,12 @@ def regAgree (m : RegMapF RegVal) (f : RegFile) : Prop :=
   ∀ r : Register, get? m (regIdx r) = some ⟨r, f r⟩
 
 /-- One hart's register interpretation, at the register map named `γ`. -/
-def regInterpAt [MachFixedGS hlc GF] (γ : GName) (f : RegFile) : IProp GF := iprop%
+def regInterpAt [MachFixedGS GF] (γ : GName) (f : RegFile) : IProp GF := iprop%
   ∃ m : RegMapF RegVal, (γ ↪●MAP m) ∗ ⌜regAgree m f⌝
 
 /-- One hart's register interpretation, in the ambient era. -/
-def regInterp [MachGS hlc GF] (cpu : CPU) (f : RegFile) : IProp GF :=
-  regInterpAt (regName (hlc := hlc) (GF := GF) cpu) f
+def regInterp [MachGS GF] (cpu : CPU) (f : RegFile) : IProp GF :=
+  regInterpAt (regName (GF := GF) cpu) f
 
 /-! ## The memory-model mirrors -/
 
@@ -927,19 +927,19 @@ theorem mmOk_boot (σ : MState) (h : bootFacts σ) : mmOk σ := by
 
 /-- Hart `cpu`'s view mirrors at the machine `σ`: data view, instruction
 view, read watermark. -/
-def hartViewsAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (cpu : CPU) : IProp GF := iprop%
+def hartViewsAt [MachFixedGS GF] (E : EraGS) (σ : MState) (cpu : CPU) : IProp GF := iprop%
   MonoNat.auth_own (E.viewName cpu) (DFrac.own 1) (.ofNat (σ.tv cpu)) ∗
   MonoNat.auth_own (E.iviewName cpu) (DFrac.own 1) (.ofNat (σ.itv cpu)) ∗
   MonoNat.auth_own (E.rviewName cpu) (DFrac.own 1) (.ofNat (σ.hr cpu).rv)
 
-theorem hartViewsAt_cases [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (cpu : CPU) :
+theorem hartViewsAt_cases [MachFixedGS GF] (E : EraGS) (σ : MState) (cpu : CPU) :
     hartViewsAt E σ cpu ⊢@{IProp GF}
       MonoNat.auth_own (E.viewName cpu) (DFrac.own 1) (.ofNat (σ.tv cpu)) ∗
       MonoNat.auth_own (E.iviewName cpu) (DFrac.own 1) (.ofNat (σ.itv cpu)) ∗
       MonoNat.auth_own (E.rviewName cpu) (DFrac.own 1) (.ofNat (σ.hr cpu).rv) := by
   unfold hartViewsAt; iintro H; iexact H
 
-theorem hartViewsAt_intro [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (cpu : CPU) :
+theorem hartViewsAt_intro [MachFixedGS GF] (E : EraGS) (σ : MState) (cpu : CPU) :
     MonoNat.auth_own (E.viewName cpu) (DFrac.own 1) (.ofNat (σ.tv cpu)) ∗
       MonoNat.auth_own (E.iviewName cpu) (DFrac.own 1) (.ofNat (σ.itv cpu)) ∗
       MonoNat.auth_own (E.rviewName cpu) (DFrac.own 1) (.ofNat (σ.hr cpu).rv) ⊢@{IProp GF}
@@ -947,7 +947,7 @@ theorem hartViewsAt_intro [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (cpu : 
   unfold hartViewsAt; iintro H; iexact H
 
 /-- Era `E`'s memory-model mirrors at the machine `σ`. -/
-def memModelAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) : IProp GF := iprop%
+def memModelAt [MachFixedGS GF] (E : EraGS) (σ : MState) : IProp GF := iprop%
   MonoNat.auth_own E.topName (DFrac.own 1) (.ofNat σ.top) ∗
   (E.authName ↪●MAP authMap σ.log) ∗
   ([∗list] cpu ∈ cpus, hartViewsAt E σ cpu) ∗
@@ -972,26 +972,26 @@ theorem cpus_get?_ne {k : Nat} {y : CPU} (hk : cpus[k]? = some y) (cpu : CPU) (h
 /-! ## The device mirrors -/
 
 /-- The authoritative half of device `d`'s mirror at era `E`. -/
-def devAuthAt [MachFixedGS hlc GF] (E : EraGS) (d : DevId) (s : DevSt d) : IProp GF :=
+def devAuthAt [MachFixedGS GF] (E : EraGS) (d : DevId) (s : DevSt d) : IProp GF :=
   (E.devName d) ↪VAR{.own (1 : Qp).half} (⟨d, s⟩ : DevVal)
 
 /-- The other half: what a device's invariant holds (the Rocq prototype's
 `uart_frag`/`plic_frag`/`virtio_frag`). -/
-def devFragAt [MachFixedGS hlc GF] (E : EraGS) (d : DevId) (s : DevSt d) : IProp GF :=
+def devFragAt [MachFixedGS GF] (E : EraGS) (d : DevId) (s : DevSt d) : IProp GF :=
   (E.devName d) ↪VAR{.own (1 : Qp).half} (⟨d, s⟩ : DevVal)
 
 /-- Every device's authoritative half, at the machine's states. -/
-def devInterpAt [MachFixedGS hlc GF] (E : EraGS) (ds : DevStates) : IProp GF := iprop%
+def devInterpAt [MachFixedGS GF] (E : EraGS) (ds : DevStates) : IProp GF := iprop%
   [∗list] d ∈ DevId.all, devAuthAt E d (ds.st d)
 
-instance [MachFixedGS hlc GF] (E : EraGS) (d : DevId) (s : DevSt d) :
+instance [MachFixedGS GF] (E : EraGS) (d : DevId) (s : DevSt d) :
     Timeless (PROP := IProp GF) (devAuthAt E d s) := by
   unfold devAuthAt; infer_instance
-instance [MachFixedGS hlc GF] (E : EraGS) (d : DevId) (s : DevSt d) :
+instance [MachFixedGS GF] (E : EraGS) (d : DevId) (s : DevSt d) :
     Timeless (PROP := IProp GF) (devFragAt E d s) := by
   unfold devFragAt; infer_instance
 
-theorem devAgreeAt [MachFixedGS hlc GF] (E : EraGS) (d : DevId) (s s' : DevSt d) :
+theorem devAgreeAt [MachFixedGS GF] (E : EraGS) (d : DevId) (s s' : DevSt d) :
     devAuthAt E d s ∗ devFragAt E d s' ⊢@{IProp GF} ⌜s' = s⌝ := by
   unfold devAuthAt devFragAt
   iintro ⟨Ha, Hf⟩
@@ -1001,14 +1001,14 @@ theorem devAgreeAt [MachFixedGS hlc GF] (E : EraGS) (d : DevId) (s s' : DevSt d)
   simp only [Sigma.mk.injEq, heq_eq_eq, true_and] at h'
   exact h'.symm
 
-theorem devUpdateAt [MachFixedGS hlc GF] (E : EraGS) (d : DevId) (s s' s'' : DevSt d) :
+theorem devUpdateAt [MachFixedGS GF] (E : EraGS) (d : DevId) (s s' s'' : DevSt d) :
     devAuthAt E d s ∗ devFragAt E d s' ⊢@{IProp GF} |==> (devAuthAt E d s'' ∗ devFragAt E d s'') := by
   unfold devAuthAt devFragAt
   iintro ⟨Ha, Hf⟩
   iapply ghost_var_update_halves (⟨d, s''⟩ : DevVal) (E.devName d) _ _ $$ Ha Hf
 
 /-- Era `E`'s interpretation of the machine `σ`. -/
-def eraInterp [MachFixedGS hlc GF] (E : EraGS) (σ : MState) : IProp GF := iprop%
+def eraInterp [MachFixedGS GF] (E : EraGS) (σ : MState) : IProp GF := iprop%
   ([∗list] cpu ∈ cpus, regInterpAt (E.regName cpu) (σ.regs cpu)) ∗
   genHeapInterp (G := E.mem) σ.mem ∗
   memModelAt E σ ∗
@@ -1017,20 +1017,20 @@ def eraInterp [MachFixedGS hlc GF] (E : EraGS) (σ : MState) : IProp GF := iprop
 /-! ## The generation ghosts -/
 
 section fixed
-variable [MachFixedGS hlc GF]
+variable [MachFixedGS GF]
 
 /-- The generation counter, pinned to the state's `gen`. -/
 def genAuth (n : Nat) : IProp GF :=
-  MonoNat.auth_own (MachFixedGS.genName (hlc := hlc) (GF := GF)) (DFrac.own 1) (.ofNat n)
+  MonoNat.auth_own (MachFixedGS.genName (GF := GF)) (DFrac.own 1) (.ofNat n)
 
 /-- Generation `gen` has been reached (persistent): the birth certificate. -/
 def genBorn (gen : Nat) : IProp GF :=
-  MonoNat.lb_own (MachFixedGS.genName (hlc := hlc) (GF := GF)) (.ofNat gen)
+  MonoNat.lb_own (MachFixedGS.genName (GF := GF)) (.ofNat gen)
 
 /-- Generation `gen` has passed (persistent): the death certificate.
 `PowerOff` bumps the counter, so a generation once passed is dead forever. -/
 def genDead (gen : Nat) : IProp GF :=
-  MonoNat.lb_own (MachFixedGS.genName (hlc := hlc) (GF := GF)) (.ofNat (gen + 1))
+  MonoNat.lb_own (MachFixedGS.genName (GF := GF)) (.ofNat (gen + 1))
 
 /-- How many generations have been started: the current one counts once it
 is powered on. -/
@@ -1038,15 +1038,15 @@ def startCount (g : GState) : Nat := g.gen + (if g.pow then 1 else 0)
 
 /-- The started-generations counter, pinned to `startCount`. -/
 def startAuth (n : Nat) : IProp GF :=
-  MonoNat.auth_own (MachFixedGS.startName (hlc := hlc) (GF := GF)) (DFrac.own 1) (.ofNat n)
+  MonoNat.auth_own (MachFixedGS.startName (GF := GF)) (DFrac.own 1) (.ofNat n)
 
 /-- Generation `gen`'s `PowerOn` has happened (persistent). -/
 def genStarted (gen : Nat) : IProp GF :=
-  MonoNat.lb_own (MachFixedGS.startName (hlc := hlc) (GF := GF)) (.ofNat (gen + 1))
+  MonoNat.lb_own (MachFixedGS.startName (GF := GF)) (.ofNat (gen + 1))
 
 /-- Generation `gen` runs era `E` (persistent registry element). -/
 def eraRegistered (gen : Nat) (E : EraGS) : IProp GF :=
-  ghost_map_elem (MachFixedGS.registryName (hlc := hlc) (GF := GF)) DFrac.discard gen E
+  ghost_map_elem (MachFixedGS.registryName (GF := GF)) DFrac.discard gen E
 
 /-- The certificate a generation-`gen` thread of era `E` carries: born,
 started, and registered.  Persistent. -/
@@ -1078,8 +1078,8 @@ def eraCur (R : RegMapF EraGS) (g : GState) : IProp GF :=
 the state interpretation holds and what a disk drain lends a permit for the
 instant. -/
 def diskFixedAuth (dk : Nat → BitVec 8) : IProp GF :=
-  diskImgAuthSized (MachFixedGS.diskName (hlc := hlc) (GF := GF))
-    (MachFixedGS.diskSize (hlc := hlc) (GF := GF)) dk
+  diskImgAuthSized (MachFixedGS.diskName (GF := GF))
+    (MachFixedGS.diskSize (GF := GF)) dk
 
 instance (dk : Nat → BitVec 8) : Timeless (PROP := IProp GF) (diskFixedAuth dk) := by
   unfold diskFixedAuth; infer_instance
@@ -1102,29 +1102,29 @@ the boot memory is the language constant `bootImage`, as in Rocq. -/
 def powerInterp (g : GState) : IProp GF := iprop%
   genAuth g.gen ∗ startAuth (startCount g) ∗
   (∃ R : RegMapF EraGS,
-    (MachFixedGS.registryName (hlc := hlc) (GF := GF) ↪●MAP R) ∗ ⌜registryOk R (startCount g)⌝ ∗
+    (MachFixedGS.registryName (GF := GF) ↪●MAP R) ∗ ⌜registryOk R (startCount g)⌝ ∗
     eraCur R g) ∗
   diskFixedInterp g
 
 /-! ### The observation history (Rocq `RiscvPtsto`: `obs_hist_lb` … `obs_interp`) -/
 
 /-- "`h` is a prefix of the history the run has reached" (persistent). -/
-def obsHistLb (h : List Obs) : IProp GF := MonoList.lb_own (MachFixedGS.obsHist (hlc := hlc) (GF := GF)) h
+def obsHistLb (h : List Obs) : IProp GF := MonoList.lb_own (MachFixedGS.obsHist (GF := GF)) h
 /-- The history's growth authority. -/
 def obsHistAuth (h : List Obs) : IProp GF :=
-  MonoList.auth_own (MachFixedGS.obsHist (hlc := hlc) (GF := GF)) (DFrac.own 1) h
+  MonoList.auth_own (MachFixedGS.obsHist (GF := GF)) (DFrac.own 1) h
 /-- The machine's half WITHOUT the growth authority.  A CLIENT HOOK MOVES
 THIS ONE (the power hook, `wp_power`'s `Hobs`), so the monotone authority is
 stepped beside it by the power loop rather than by the hook. -/
 def obsHalf (h : List Obs) : IProp GF :=
-  MachFixedGS.obsName (hlc := hlc) (GF := GF) ↪VAR{.own (1 : Qp).half} h
+  MachFixedGS.obsName (GF := GF) ↪VAR{.own (1 : Qp).half} h
 /-- The machine's half: it CARRIES THE GROWTH AUTHORITY TOO, so every mover
 of the history steps it, and "the history only grows" is a fact no arm can
 sidestep. -/
 def obsAuth (h : List Obs) : IProp GF := iprop% obsHalf h ∗ obsHistAuth h
 /-- The client's half. -/
 def obsFrag (h : List Obs) : IProp GF :=
-  MachFixedGS.obsName (hlc := hlc) (GF := GF) ↪VAR{.own (1 : Qp).half} h
+  MachFixedGS.obsName (GF := GF) ↪VAR{.own (1 : Qp).half} h
 
 instance (h : List Obs) : Persistent (PROP := IProp GF) (obsHistLb h) := by
   unfold obsHistLb; infer_instance
@@ -1216,7 +1216,7 @@ theorem obsHalf_update (h h' : List Obs) :
     obsHalf (GF := GF) h ∗ obsFrag h ⊢ |==> (obsHalf h' ∗ obsFrag h') := by
   unfold obsHalf obsFrag
   iintro ⟨H1, H2⟩
-  iapply ghost_var_update_halves h' (MachFixedGS.obsName (hlc := hlc) (GF := GF)) h h $$ H1 H2
+  iapply ghost_var_update_halves h' (MachFixedGS.obsName (GF := GF)) h h $$ H1 H2
 
 /-- THE APPEND.  The prefix premise is the growth law itself, and it costs
 nothing: every mover of the history appends. -/
@@ -1238,7 +1238,7 @@ half of the history ghost.  A silent step re-packs at the same `h`
 (`obsInterp_silent`); an observed one re-packs at `h ++ κ` after the client
 has moved the ghost (`obsInterp_close`). -/
 def obsInterp (g : GState) (κs : List Obs) : IProp GF := iprop%
-  ∃ h : List Obs, ⌜h ++ κs = MachFixedGS.obsTotal (hlc := hlc) (GF := GF)⌝ ∗ ⌜obsWf h g⌝ ∗ obsAuth h
+  ∃ h : List Obs, ⌜h ++ κs = MachFixedGS.obsTotal (GF := GF)⌝ ∗ ⌜obsWf h g⌝ ∗ obsAuth h
 
 theorem obsInterp_silent (e : Expr) (g : GState) (e' : Expr) (g' : GState) (efs : List Expr)
     (κs : List Obs) (hstep : PrimStep.primStep (e, g) ([] : List Obs) (e', g', efs)) :
@@ -1261,7 +1261,7 @@ theorem obsInterp_silent_nil (e : Expr) (g : GState) (e' : Expr) (g' : GState) (
 
 theorem obsInterp_close (e : Expr) (g : GState) (κ : List Obs) (e' : Expr) (g' : GState)
     (efs : List Expr) (h κs : List Obs) (hstep : PrimStep.primStep (e, g) κ (e', g', efs))
-    (hwf : obsWf h g) (htot : h ++ (κ ++ κs) = MachFixedGS.obsTotal (hlc := hlc) (GF := GF)) :
+    (hwf : obsWf h g) (htot : h ++ (κ ++ κs) = MachFixedGS.obsTotal (GF := GF)) :
     obsAuth (GF := GF) (h ++ κ) ⊢ obsInterp g' κs := by
   unfold obsInterp
   iintro Ha
@@ -1279,12 +1279,12 @@ instance : StateInterp GState Obs GF where
 theorem stateInterp_eq (g : GState) (ns : Nat) (κs : List Obs) (nt : Nat) :
     stateInterp (GF := GF) g ns κs nt = iprop(powerInterp g ∗ obsInterp g κs) := rfl
 
-instance instIrisGS : IrisGS_gen hlc Expr GF where
+instance instIrisGS : IrisGS_gen .hasLC Expr GF where
   invGS := MachFixedGS.invGS
   numLatersPerStep _ := 0
   forkPost _ := iprop(True)
   stateInterp_mono σ ns obs nt := by
-    let := @MachFixedGS.invGS hlc GF _
+    let := @MachFixedGS.invGS GF _
     iintro $
 
 /-- THE TRACE INVARIANT's namespace.  (Rocq `obsN := nroot .@ "obs"`.) -/
@@ -1293,7 +1293,7 @@ def obsN : Namespace := ndot nroot "obs"
 /-- THE TRACE INVARIANT: the client's trace predicate, in its own fixed-layer
 slot.  Opened by the power arms (through `wp_power`'s hook) and by the UART
 threads' observed arms (through their permits). -/
-def obsInv : IProp GF := inv obsN (MachFixedGS.obsPred (hlc := hlc) (GF := GF))
+def obsInv : IProp GF := inv obsN (MachFixedGS.obsPred (GF := GF))
 
 instance : Persistent (PROP := IProp GF) obsInv := by unfold obsInv; infer_instance
 
@@ -1385,17 +1385,17 @@ the exit at some position `i`, and the one-shot claims the client mints
 there (`MachFixedGS.uClaimR i`, `MachFixedGS.uClaimX i x`).  NOT persistent:
 the claims are exclusive. -/
 def uExitTok (x : Obs) : IProp GF := iprop%
-  ∃ i : Nat, uRcpt (i, x) ∗ MachFixedGS.uClaimR (hlc := hlc) (GF := GF) i ∗
-    MachFixedGS.uClaimX (hlc := hlc) (GF := GF) i x
+  ∃ i : Nat, uRcpt (i, x) ∗ MachFixedGS.uClaimR (GF := GF) i ∗
+    MachFixedGS.uClaimX (GF := GF) i x
 
 /-- An exit token at an event equal to another is one at the other. -/
 theorem uExitTok_eq {x x' : Obs} (h : x = x') :
-    uExitTok (hlc := hlc) (GF := GF) x ⊢ uExitTok x' := by
+    uExitTok (GF := GF) x ⊢ uExitTok x' := by
   subst h; exact .rfl
 
 /-- The receipt inside an exit token. -/
 theorem uExitTok_rcpt (x : Obs) :
-    uExitTok (hlc := hlc) (GF := GF) x ⊢ (∃ i, uRcpt (i, x)) ∗ uExitTok x := by
+    uExitTok (GF := GF) x ⊢ (∃ i, uRcpt (i, x)) ∗ uExitTok x := by
   unfold uExitTok
   iintro ⟨%i, #Hr, Hc, Hx⟩
   isplitl []
@@ -1406,13 +1406,13 @@ theorem uExitTok_rcpt (x : Obs) :
 /-- The entry's evidence (NI M2-X1) at an event equal to another is the
 evidence at the other. -/
 theorem uEvid_eq {ox : Option (Nat × Obs)} {e e' : Obs} (h : e = e') :
-    MachFixedGS.uEvid (hlc := hlc) (GF := GF) ox e ⊢ MachFixedGS.uEvid (hlc := hlc) (GF := GF) ox e' := by
+    MachFixedGS.uEvid (GF := GF) ox e ⊢ MachFixedGS.uEvid (GF := GF) ox e' := by
   subst h; exact .rfl
 
 /-- **THE CLAIM AN ENTRY SPENDS** (NI M2-W2d): a round citing the exit at `i`
 spends its round claim, an origin the origin ticket. -/
 def uClaimFor (ox : Option (Nat × Obs)) : IProp GF :=
-  uClaimForRaw (MachFixedGS.uClaimR (hlc := hlc) (GF := GF)) (MachFixedGS.uClaimO (hlc := hlc) (GF := GF)) ox
+  uClaimForRaw (MachFixedGS.uClaimR (GF := GF)) (MachFixedGS.uClaimO (GF := GF)) ox
 
 /-- **THE HART'S TRACE PERMIT** (M2-W2a, design §3), persistent: any exit,
 handing back the exit's token (NI M2-W2d: its receipt and the claims minted
@@ -1421,18 +1421,18 @@ spends (since M2-W2c the only entry arm: the kernel's `sret` carries the
 evidence, `USERRET`), and (NI M2-X1) the entry's evidence
 `MachFixedGS.uEvid ox e`, handed on to the entry hook. -/
 def hartObsPermit : IProp GF := iprop%
-  □ ((∀ e : Obs, ⌜isUExit e = true⌝ -∗ hartObsStep e (uExitTok (hlc := hlc) e)) ∧
+  □ ((∀ e : Obs, ⌜isUExit e = true⌝ -∗ hartObsStep e (uExitTok e)) ∧
      (∀ (e : Obs) (ox : Option (Nat × Obs)),
-        ⌜isUEnter e = true ∧ MachFixedGS.uFit (hlc := hlc) (GF := GF) ox e⌝ -∗
-        uRcptOpt ox -∗ uClaimFor (hlc := hlc) ox -∗ MachFixedGS.uEvid (hlc := hlc) (GF := GF) ox e -∗
+        ⌜isUEnter e = true ∧ MachFixedGS.uFit (GF := GF) ox e⌝ -∗
+        uRcptOpt ox -∗ uClaimFor ox -∗ MachFixedGS.uEvid (GF := GF) ox e -∗
         hartObsStep e emp))
 
-instance hartObsPermit_persistent : Persistent (hartObsPermit (hlc := hlc) (GF := GF)) := by
+instance hartObsPermit_persistent : Persistent (hartObsPermit (GF := GF)) := by
   unfold hartObsPermit; infer_instance
 
 /-- The exit arm. -/
 theorem hartObsPermit_exit (e : Obs) (he : isUExit e = true) :
-    hartObsPermit (hlc := hlc) (GF := GF) ⊢ hartObsStep e (uExitTok (hlc := hlc) e) := by
+    hartObsPermit (GF := GF) ⊢ hartObsStep e (uExitTok e) := by
   unfold hartObsPermit
   iintro #H
   icases H with ⟨H, -⟩
@@ -1440,9 +1440,9 @@ theorem hartObsPermit_exit (e : Obs) (he : isUExit e = true) :
 
 /-- The evidence-carrying entry arm. -/
 theorem hartObsPermit_enter (e : Obs) (ox : Option (Nat × Obs)) (he : isUEnter e = true)
-    (hf : MachFixedGS.uFit (hlc := hlc) (GF := GF) ox e) :
-    hartObsPermit (hlc := hlc) (GF := GF) ⊢ uRcptOpt ox -∗ uClaimFor (hlc := hlc) ox -∗
-      MachFixedGS.uEvid (hlc := hlc) (GF := GF) ox e -∗ hartObsStep e emp := by
+    (hf : MachFixedGS.uFit (GF := GF) ox e) :
+    hartObsPermit (GF := GF) ⊢ uRcptOpt ox -∗ uClaimFor ox -∗
+      MachFixedGS.uEvid (GF := GF) ox e -∗ hartObsStep e emp := by
   unfold hartObsPermit
   iintro #H
   icases H with ⟨-, H⟩
@@ -1451,15 +1451,15 @@ theorem hartObsPermit_enter (e : Obs) (ox : Option (Nat × Obs)) (he : isUEnter 
 /-- One consent from a hook on the client's half. -/
 theorem hartObsStep_of_hook (e : Obs)
     (Hk : ∀ h : List Obs,
-      ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
-        |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [e]))) :
+      ▷ MachFixedGS.obsPred (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
+        |==> ◇ (▷ MachFixedGS.obsPred (GF := GF) ∗ obsHalf (h ++ [e]))) :
     obsInv ⊢@{IProp GF} hartObsStep e emp := by
   unfold hartObsStep
   iintro #Hoinv %h %g %_ Ha
   unfold obsAuth
   icases Ha with ⟨Hhalf, Hhist⟩
   unfold obsInv
-  imod (inv_acc (E := ⊤) (N := obsN) (P := MachFixedGS.obsPred (hlc := hlc) (GF := GF))
+  imod (inv_acc (E := ⊤) (N := obsN) (P := MachFixedGS.obsPred (GF := GF))
     CoPset.subseteq_top) $$ Hoinv with ⟨HP, Hoclose⟩
   imod Hk h $$ [HP Hhalf] with >⟨HP, Hhalf⟩
   · iframe HP Hhalf
@@ -1473,17 +1473,17 @@ the client's half by the exit and mints the claims at the exit's position
 `h.length`; the permit adds the machine receipt there. -/
 theorem hartObsStep_of_exitHook (e : Obs)
     (Hk : ∀ h : List Obs,
-      ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
-        |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [e]) ∗
-          MachFixedGS.uClaimR (hlc := hlc) (GF := GF) h.length ∗
-          MachFixedGS.uClaimX (hlc := hlc) (GF := GF) h.length e)) :
-    obsInv ⊢@{IProp GF} hartObsStep e (uExitTok (hlc := hlc) e) := by
+      ▷ MachFixedGS.obsPred (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
+        |==> ◇ (▷ MachFixedGS.obsPred (GF := GF) ∗ obsHalf (h ++ [e]) ∗
+          MachFixedGS.uClaimR (GF := GF) h.length ∗
+          MachFixedGS.uClaimX (GF := GF) h.length e)) :
+    obsInv ⊢@{IProp GF} hartObsStep e (uExitTok e) := by
   unfold hartObsStep
   iintro #Hoinv %h %g %_ Ha
   unfold obsAuth
   icases Ha with ⟨Hhalf, Hhist⟩
   unfold obsInv
-  imod (inv_acc (E := ⊤) (N := obsN) (P := MachFixedGS.obsPred (hlc := hlc) (GF := GF))
+  imod (inv_acc (E := ⊤) (N := obsN) (P := MachFixedGS.obsPred (GF := GF))
     CoPset.subseteq_top) $$ Hoinv with ⟨HP, Hoclose⟩
   imod Hk h $$ [HP Hhalf] with >⟨HP, Hhalf, HcR, HcX⟩
   · iframe HP Hhalf
@@ -1510,16 +1510,16 @@ the receipt against the authority itself, so no hook is lent it) -- the
 spent claim and (NI M2-X1) the entry's evidence `MachFixedGS.uEvid ox e`. -/
 theorem hartObsPermit_of_hook
     (HuserExit : ∀ (h : List Obs) (e : Obs), isUExit e = true →
-      ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
-        |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [e]) ∗
-          MachFixedGS.uClaimR (hlc := hlc) (GF := GF) h.length ∗
-          MachFixedGS.uClaimX (hlc := hlc) (GF := GF) h.length e))
+      ▷ MachFixedGS.obsPred (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
+        |==> ◇ (▷ MachFixedGS.obsPred (GF := GF) ∗ obsHalf (h ++ [e]) ∗
+          MachFixedGS.uClaimR (GF := GF) h.length ∗
+          MachFixedGS.uClaimX (GF := GF) h.length e))
     (HuserEnter : ∀ (h : List Obs) (e : Obs) (ox : Option (Nat × Obs)), isUEnter e = true →
-      MachFixedGS.uFit (hlc := hlc) (GF := GF) ox e →
+      MachFixedGS.uFit (GF := GF) ox e →
       (∀ i x, ox = some (i, x) → i < h.length ∧ h[i]? = some x) →
-      uClaimFor (hlc := hlc) (GF := GF) ox ∗ MachFixedGS.uEvid (hlc := hlc) (GF := GF) ox e ∗
-      ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
-        |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [e]))) :
+      uClaimFor (GF := GF) ox ∗ MachFixedGS.uEvid (GF := GF) ox e ∗
+      ▷ MachFixedGS.obsPred (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
+        |==> ◇ (▷ MachFixedGS.obsPred (GF := GF) ∗ obsHalf (h ++ [e]))) :
     obsInv ⊢@{IProp GF} hartObsPermit := by
   unfold hartObsPermit
   iintro #Hoinv !>
@@ -1534,7 +1534,7 @@ theorem hartObsPermit_of_hook
     unfold obsAuth
     icases Ha with ⟨Hhalf, Hhist⟩
     unfold obsInv
-    imod (inv_acc (E := ⊤) (N := obsN) (P := MachFixedGS.obsPred (hlc := hlc) (GF := GF))
+    imod (inv_acc (E := ⊤) (N := obsN) (P := MachFixedGS.obsPred (GF := GF))
       CoPset.subseteq_top) $$ Hoinv with ⟨HP, Hoclose⟩
     imod HuserEnter h e ox he hf hv $$ [Hcl HP Hhalf] with >⟨HP, Hhalf⟩
     · iframe Hcl Hev HP Hhalf
@@ -1547,13 +1547,13 @@ theorem hartObsPermit_of_hook
 `devObsPermit_triv`): a client that states no trace property moves the
 ghost and ignores the event. -/
 theorem hartObsPermit_triv
-    (heq : MachFixedGS.obsPred (hlc := hlc) (GF := GF) = obsPredTriv)
-    (hR : ∀ i, ⊢@{IProp GF} MachFixedGS.uClaimR (hlc := hlc) (GF := GF) i)
-    (hX : ∀ i e, ⊢@{IProp GF} MachFixedGS.uClaimX (hlc := hlc) (GF := GF) i e) :
+    (heq : MachFixedGS.obsPred (GF := GF) = obsPredTriv)
+    (hR : ∀ i, ⊢@{IProp GF} MachFixedGS.uClaimR (GF := GF) i)
+    (hX : ∀ i e, ⊢@{IProp GF} MachFixedGS.uClaimX (GF := GF) i e) :
     obsInv ⊢@{IProp GF} hartObsPermit := by
   have Hk : ∀ (h : List Obs) (e : Obs),
-      ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
-        |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [e])) := by
+      ▷ MachFixedGS.obsPred (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
+        |==> ◇ (▷ MachFixedGS.obsPred (GF := GF) ∗ obsHalf (h ++ [e])) := by
     intro h e
     rw [heq]
     unfold obsPredTriv obsHalf obsFrag
@@ -1593,19 +1593,19 @@ nothing beside it -- the tie to the real disk is the auth/fragment agreement
 against `diskFixedInterp`, available to the one opener (the disk's drain) at
 its step.  Allocated once, in adequacy, over the fixed layer's `crashPred`;
 it spans power cycles for free, since neither power arm moves the image. -/
-def crashInv : IProp GF := inv crashN (MachFixedGS.crashPred (hlc := hlc) (GF := GF))
+def crashInv : IProp GF := inv crashN (MachFixedGS.crashPred (GF := GF))
 
 instance : Persistent (PROP := IProp GF) crashInv := by unfold crashInv; infer_instance
 
 /-- THE SWAP COUNTER's authority (Rocq `swap_auth`): rides in the crash
 predicate's checked-out arm at the generation in custody. -/
 def swapAuth (g : Nat) : IProp GF :=
-  MonoNat.auth_own (MachFixedGS.swapName (hlc := hlc) (GF := GF)) (DFrac.own 1) (.ofNat g)
+  MonoNat.auth_own (MachFixedGS.swapName (GF := GF)) (DFrac.own 1) (.ofNat g)
 
 /-- The persistent SWAP RECEIPT (Rocq `swap_lb`) an era keeps once its
 `initlog` took custody. -/
 def swapLb (g : Nat) : IProp GF :=
-  MonoNat.lb_own (MachFixedGS.swapName (hlc := hlc) (GF := GF)) (.ofNat g)
+  MonoNat.lb_own (MachFixedGS.swapName (GF := GF)) (.ofNat g)
 
 instance (g : Nat) : Persistent (PROP := IProp GF) (swapLb g) := by unfold swapLb; infer_instance
 instance (g : Nat) : Timeless (PROP := IProp GF) (swapLb g) := by unfold swapLb; infer_instance
@@ -1642,7 +1642,7 @@ theorem startAuth_started (n gen : Nat) :
 
 /-- The registry pins the era a generation runs. -/
 theorem eraRegistered_lookup (R : RegMapF EraGS) (gen : Nat) (E : EraGS) :
-    ⊢@{IProp GF} (MachFixedGS.registryName (hlc := hlc) (GF := GF) ↪●MAP R) -∗
+    ⊢@{IProp GF} (MachFixedGS.registryName (GF := GF) ↪●MAP R) -∗
       eraRegistered gen E -∗ ⌜get? R gen = some E⌝ := by
   unfold eraRegistered
   iintro HR HE
@@ -1679,8 +1679,8 @@ theorem startAuth_bump (n : Nat) :
 /-- `PowerOn` registers the new era. -/
 theorem registry_insert (R : RegMapF EraGS) (gen : Nat) (E : EraGS)
     (h : get? R gen = none) :
-    (MachFixedGS.registryName (hlc := hlc) (GF := GF) ↪●MAP R) ⊢@{IProp GF}
-      |==> ((MachFixedGS.registryName (hlc := hlc) (GF := GF) ↪●MAP insert R gen E) ∗
+    (MachFixedGS.registryName (GF := GF) ↪●MAP R) ⊢@{IProp GF}
+      |==> ((MachFixedGS.registryName (GF := GF) ↪●MAP insert R gen E) ∗
         eraRegistered gen E) := by
   unfold eraRegistered
   iintro HR
@@ -1697,16 +1697,16 @@ theorem genAuth_get_born (n : Nat) : genAuth n ⊢@{IProp GF} genBorn n := by
 end fixed
 
 /-- The ambient generation's certificate. -/
-def genCert [MachGS hlc GF] : IProp GF :=
-  genCertAt (genId (hlc := hlc) (GF := GF)) (MachGS.era (hlc := hlc) (GF := GF))
+def genCert [MachGS GF] : IProp GF :=
+  genCertAt (genId (GF := GF)) (MachGS.era (GF := GF))
 
-instance [MachGS hlc GF] : Persistent (PROP := IProp GF) genCert := by
+instance [MachGS GF] : Persistent (PROP := IProp GF) genCert := by
   unfold genCert; infer_instance
 
-theorem genCert_parts [MachGS hlc GF] :
+theorem genCert_parts [MachGS GF] :
     genCert ⊢@{IProp GF}
-      genBorn (genId (hlc := hlc) (GF := GF)) ∗ genStarted (genId (hlc := hlc) (GF := GF)) ∗
-      eraRegistered (genId (hlc := hlc) (GF := GF)) (MachGS.era (hlc := hlc) (GF := GF)) := by
+      genBorn (genId (GF := GF)) ∗ genStarted (genId (GF := GF)) ∗
+      eraRegistered (genId (GF := GF)) (MachGS.era (GF := GF)) := by
   unfold genCert genCertAt
   iintro H
   iexact H
@@ -1718,7 +1718,7 @@ theorem regVal_inj {r : Register} {v w : RegisterType r}
   cases h; rfl
 
 section fixed
-variable [MachFixedGS hlc GF]
+variable [MachFixedGS GF]
 
 /-- Reading: a register cell pins the register file's value. -/
 theorem reg_valid_at (γ : GName) (f : RegFile) (r : Register) (dq : DFrac) (v : RegisterType r) :
@@ -1753,7 +1753,7 @@ theorem reg_update_at (γ : GName) (f : RegFile) (r : Register) (v w : RegisterT
 end fixed
 
 section ambient
-variable [MachGS hlc GF]
+variable [MachGS GF]
 
 theorem reg_valid (cpu : CPU) (f : RegFile) (r : Register) (dq : DFrac) (v : RegisterType r) :
     regInterp cpu f ∗ r ↦ᵣ[cpu]{dq} v ⊢@{IProp GF} ⌜f r = v⌝ := by

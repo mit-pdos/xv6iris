@@ -45,16 +45,16 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-- THE ECHO'S JUSTIFICATION, FIXED AT BOOT (Rocq `cons_echo_shift`). -/
 def consEchoShift : IProp GF := iprop%
   □ ∀ (h : List Obs) (c : BitVec 8) (cs : List (BitVec 8)) (Φ : IProp GF),
-    ⌜obsEndsIn .uart0 h c⌝ -∗ ⌜obsBoots h = genId (hlc := hlc) (GF := GF) + 1⌝ -∗
+    ⌜obsEndsIn .uart0 h c⌝ -∗ ⌜obsBoots h = genId (GF := GF) + 1⌝ -∗
     ⌜consEcho c cs⌝ -∗
-    MachFixedGS.rxTag (hlc := hlc) (GF := GF) h -∗ obsHistLb h -∗
-    Φ -∗ consLink .uart0 (genId (hlc := hlc) (GF := GF) + 1) (.evOpen h c cs)
-      (consRun (genId (hlc := hlc) (GF := GF) + 1) cs Φ)
+    MachFixedGS.rxTag (GF := GF) h -∗ obsHistLb h -∗
+    Φ -∗ consLink .uart0 (genId (GF := GF) + 1) (.evOpen h c cs)
+      (consRun (genId (GF := GF) + 1) cs Φ)
 
 instance consEchoShift_persistent : Persistent (consEchoShift (GF := GF)) := by
   unfold consEchoShift; infer_instance
@@ -67,7 +67,7 @@ theorem consEchoShift_of_licence : consLicence (GF := GF) ⊢ consEchoShift := b
   iapply consRun_of_licence $$ Hlic HΦ
 
 /-- THE TRIVIAL APPLICATION'S DISCHARGE (Rocq `cons_echo_shift_triv`). -/
-theorem consEchoShift_triv (hc : MachFixedGS.consRes (hlc := hlc) (GF := GF) = consResTriv) :
+theorem consEchoShift_triv (hc : MachFixedGS.consRes (GF := GF) = consResTriv) :
     ⊢@{IProp GF} consEchoShift :=
   (consLicence_triv hc).trans consEchoShift_of_licence
 
@@ -76,7 +76,7 @@ RING IS THIS ERA'S (Rocq seccomp S2k follow-up): what lets the store arm
 keep `consResCur`'s era clause with the byte's own stamp
 `obsBoots hb = genId + 1`. -/
 def consoleCaps [CurCtx] (γc γl : GName) (γ : UartNames) : IProp GF := iprop%
-  ∃ cn : ConsNames, ⌜cn.uart = γ⌝ ∗ ⌜cn.era = genId (hlc := hlc) (GF := GF) + 1⌝ ∗
+  ∃ cn : ConsNames, ⌜cn.uart = γ⌝ ∗ ⌜cn.era = genId (GF := GF) + 1⌝ ∗
     isLock γc consAddr "cons" (consResAt cn) ∗
     uartPort .uart0 γl γ ∗ consEchoShift
 

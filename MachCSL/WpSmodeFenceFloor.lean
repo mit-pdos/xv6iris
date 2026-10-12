@@ -66,12 +66,12 @@ open Sail Sail.ConcurrencyInterfaceV1
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-! ## The model level -/
 
 section memmodel
-variable [MachFixedGS hlc GF] (E : EraGS)
+variable [MachFixedGS GF] (E : EraGS)
 
 /-- The read watermark's mirror, read off. -/
 theorem memModel_rviewLb (σ : MState) (cpu : CPU) (K : Nat) :
@@ -182,7 +182,7 @@ theorem swp_sail_barrier_view (cpu : CPU) (b : barrier_kind) (hacq : fenceAcq b 
   inext
   iintro %v' %σ' %Hev
   obtain rfl := Hev
-  imod memModel_fence_acq (MachGS.era (hlc := hlc) (GF := GF)) σ cpu b hacq T $$ Hrv Hmm with ⟨Hmm, #Hv⟩
+  imod memModel_fence_acq (MachGS.era (GF := GF)) σ cpu b hacq T $$ Hrv Hmm with ⟨Hmm, #Hv⟩
   imod Hmask
   imodintro
   isplitl [Hregs Hmem Hmm Hclose]

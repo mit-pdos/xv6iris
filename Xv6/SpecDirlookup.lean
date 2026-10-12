@@ -230,10 +230,10 @@ theorem dirlookup_lic_live (dn : Dinode) (data : Nat → List (BitVec 8))
 
 /-- **WP of `dirlookup(dp = a0, name = a1, poff = a2)`** (Rocq's
 `wp_dirlookup_sconf_body`). -/
-def wp_dirlookup_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_dirlookup_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γkl : GName) (γk : KmemNames)
     (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
@@ -288,9 +288,9 @@ def wp_dirlookup_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] 
   bslot ∗
   -- THE ICACHE, exactly as iget takes it
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗
+  itableInv ∗
   -- THE INODE REGION (iget's `iregReg` and readi's byte row, both out of it)
-  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+  iregInv fscIreg fscFs icfgIst icfgNib ∗
   -- ONE ledger unit for the iget on the found arm; RETURNED on the other
   irefSlot ∗
   -- THE BORROWED TICKET LIST AND THE HOME'S OWN RECORD
@@ -332,10 +332,10 @@ def wp_dirlookup_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] 
 /-- The eb-generic form of `wp_dirlookup_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_dirlookup_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_dirlookup_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γkl : GName) (γk : KmemNames)
     (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
@@ -390,9 +390,9 @@ def wp_dirlookup_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
   bslot ∗
   -- THE ICACHE, exactly as iget takes it
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗
+  itableInv ∗
   -- THE INODE REGION (iget's `iregReg` and readi's byte row, both out of it)
-  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+  iregInv fscIreg fscFs icfgIst icfgNib ∗
   -- ONE ledger unit for the iget on the found arm; RETURNED on the other
   irefSlot ∗
   -- THE BORROWED TICKET LIST AND THE HOME'S OWN RECORD
@@ -434,10 +434,10 @@ def wp_dirlookup_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
 /-- The interface of `dirlookup` (Rocq's `Module Type DIRLOOKUP`; its one
 field is Rocq's `wp_dirlookup_sconf`). -/
 structure DIRLOOKUP : Prop where
-  wp_dirlookup_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  wp_dirlookup_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γkl : GName) (γk : KmemNames)
     (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
@@ -446,7 +446,7 @@ structure DIRLOOKUP : Prop where
     (kd : Nat) (sd : Qp) (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
     hj hproc hK hnoff htier htype hgeom hwf hcov hsz hholes hinums hdisj horph
     hdrnz hdrnl hpd ha0 hkd hkdn hpoff,
-    wp_dirlookup_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γkl γk ip dinum bm data
+    wp_dirlookup_eb_body (GF := GF) Γ cpu k γl pd pav pu j γkl γk ip dinum bm data
       dn dr fn hasp pofv pidv dqp dqd dqn kd sd rootv rti dqr
       hj hproc hK hnoff htier htype hgeom hwf hcov hsz hholes hinums hdisj horph
       hdrnz hdrnl hpd ha0 hkd hkdn hpoff

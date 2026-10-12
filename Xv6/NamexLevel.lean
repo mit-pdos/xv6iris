@@ -40,7 +40,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- The type cell, borrowed out of `inodeMeta` (a copy of
 `Xv6.dirlookup_meta_type`, ProofDirlookup; promotion candidate). -/
@@ -68,7 +68,7 @@ theorem namex_meta_nlink (ip : BitVec 64) (dn : Dinode) :
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -87,7 +87,7 @@ set_option maxHeartbeats 16000000 in
 (and the receipt's mint), and nameiparent's early stop -- dispatching to
 `L_notdir`, `L_nlink`, `L_par` or the lookup. -/
 theorem namex_tests (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKUP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : NamexArgs) (hs : NamexStatic k A) (spie spp : Bool) (R : RegMap)
     (o2 ik : Nat) (q : Qp) (g : GName) (lo tl : Nat) (inum : BitVec 32) (dn : Dinode) (bm : Blkmap)
     (γil γisl : GName) (nf : Nat → BitVec 8) (ncur : Nat) (Scur : List Nat)
@@ -95,7 +95,7 @@ theorem namex_tests (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKUP)
     (hf : NamexLvlFacts k A R o2 ik inum ncur Scur es0 el nf wc fuel) (hle : lo ≤ tl) :
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0xca#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    namexEnv (hlc := hlc) Γ A ∗
+    namexEnv Γ A ∗
     namexLk A ik q g lo tl inum dn γil γisl ∗ icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
     irefSlots 1 ∗ namexKeep k A ∗ namexPath k A ∗ byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) ∗
     bslots 3 ∗ logOpS icfgLog ncur Scur ∗
@@ -159,7 +159,7 @@ theorem namex_tests (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKUP)
   iintro Hk Hpc
   have hnl := namex_nlink_nz dn.diNlink hnz
   -- ===== THE RECEIPT'S MINT =====
-  icases namexEnv_open (hlc := hlc) Γ A $$ Henv with
+  icases namexEnv_open Γ A $$ Henv with
     ⟨#Hpi, #Hpe, #Hbc, #Hlc, #Hdc, #Hkl, #Hav, #Hit2, #Hiti, #Hslks, #Hinv, #Hopen, #Hbmi⟩
   icases logOpS_named icfgLog ncur Scur $$ Hop with ⟨%e0, Hop⟩
   ihave #Hlb := logOpSe_lb icfgLog ncur Scur e0 $$ Hop
@@ -234,7 +234,7 @@ set_option maxHeartbeats 16000000 in
 its generation and shed into the walk's short parent and ilock's share;
 ilock's write arm; then the tests (`namex_tests`). -/
 theorem namex_level (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKUP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : NamexArgs) (hs : NamexStatic k A) (spie spp : Bool) (R : RegMap)
     (o2 : Nat) (ipv : BitVec 64) (nf : Nat → BitVec 8) (ncur : Nat) (Scur : List Nat)
     (es0 : List (List (BitVec 8))) (el : List (BitVec 8)) (wc : Bool) (fuel : Nat)
@@ -246,7 +246,7 @@ theorem namex_level (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOK
     (hfu : A.plen - o2 < fuel) :
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0xc4#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    namexEnv (hlc := hlc) Γ A ∗ namexWalk k A ipv ncur Scur nf ∗
+    namexEnv Γ A ∗ namexWalk k A ipv ncur Scur nf ∗
     (∀ c' : CPU, namexPostA k A c') ∗ namexLoop k A fuel
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Henv, Hwalk, Hnext, IH⟩
@@ -263,7 +263,7 @@ theorem namex_level (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOK
   -- THE SHED, at the reference's own generation
   icases (inodeRef_gen_intro ik q icfgDev inum).1 $$ Href with ⟨%g, %lo, %tl, %hle, #Hfl, Href⟩
   icases (inodeRefGenlo_shed ik q icfgDev inum g lo).1 $$ Href with ⟨Hpar, Hshr⟩
-  icases namexEnv_open (hlc := hlc) Γ A $$ Henv with
+  icases namexEnv_open Γ A $$ Henv with
     ⟨#Hpi, #Hpe, #Hbc, #Hlc, #Hdc, #Hkl, #Hav, #Hit2, #Hiti, #Hslks, #Hinv, #Hopen, #Hbmi⟩
   ihave #Hescs := isItable2_escrows $$ Hit2
   ihave #Hesc := icEscrows_lookup fscIc fscFs fscIreg fscCov fscLogst ik hik $$ Hescs

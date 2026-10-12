@@ -59,7 +59,7 @@ THE LOGGED VIEW `L`, keyed by BYTE ADDRESS, is typed by the FIXED layer's
 the same functor), exactly as Rocq's `fsLogG` leaves the byte view to
 `DiskImg.diskImgG` (`Xv6Cameras.v:428`: "A second field here would be a
 second, non-interacting Sigma slot").  Hence every byte-view section carries
-`[MachFixedGS hlc GF]` (Rocq's `riscvGS` in the same `Context`). -/
+`[MachFixedGS GF]` (Rocq's `riscvGS` in the same `Context`). -/
 
 /-- The byte view's own ghost map beyond the shared one (Rocq's `fsLogG`
 member for the `FsBytes` section). -/
@@ -182,7 +182,7 @@ syscall-altitude proof walks the whole context). -/
 theorem logN_top : (↑logN : CoPset) ⊆ ⊤ := CoPset.subseteq_top
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsBytesG GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF] [FsBytesG GF]
 
 /-! ## The points-to run -/
 

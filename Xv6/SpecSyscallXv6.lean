@@ -37,15 +37,15 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 `Module Type SYSCALL`, whose `UexecSG` is `uexecSG_xv6`): `SYSCALL`'s field
 with the class binder resolved to `uexecSGXv6`. -/
 structure SYSCALL_XV6 : Prop where
-  wp_syscall : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+  wp_syscall : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [CtokG GF] [WchG GF] [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γw : GName) (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName) (cs : ExtTreeSet GName compare)
     (ip : BitVec 64) (f : UexecSG.sfam GF) hj hproc hK hnoff htier hgn,
-    wp_syscall_body (hlc := hlc) (GF := GF) (parkToken (hlc := hlc)) Γ cpu k γw γ j pid V M sts gn cs ip f
+    wp_syscall_body (GF := GF) (parkToken) Γ cpu k γw γ j pid V M sts gn cs ip f
       hj hproc hK hnoff htier hgn
 
 end Xv6

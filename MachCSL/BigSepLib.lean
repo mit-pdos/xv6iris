@@ -18,7 +18,7 @@ namespace MachCSL
 open Iris Iris.BI Iris.ProofMode Iris.Std Std
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- Rocq's `fun_of_big` (`BioInv.tok_fun_alloc`'s trick in the other
 direction): a big-op of EXISTENTIALS yields ONE function of the index.

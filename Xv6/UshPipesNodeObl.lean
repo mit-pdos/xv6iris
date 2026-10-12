@@ -54,13 +54,13 @@ open Wid RdOut WrOut
 open UShPipesDefs UShPipesStage UShPipeLeaves UShPipeCall
 
 section Obl
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
   [DiskG GF] [EchoOutG GF] [PipesNG GF]
-variable {D : PdRound hlc GF} {fs : List Filt} {Qfin Rtop : IProp GF}
+variable {D : PdRound GF} {fs : List Filt} {Qfin Rtop : IProp GF}
 
 /-- A TAINTED child's report pays the node's own payment (Rocq inline). -/
 theorem npay_of_T (H : NodeOk D fs Qfin Rtop) (k : Nat) :
@@ -90,7 +90,7 @@ theorem node_parent (H : NodeOk D fs Qfin Rtop) (UL : UK_LEAVES) (HS : UK_SYS_P)
       ushForkAns S1 S2 (RcRf D k st0 γp) (Qcf D k st0) r2 -∗
       ushWaitPidAns (GF := GF) rw1 S2 S3 -∗ ushWaitPidAns (GF := GF) rw2 S3 S4 -∗
       Rkf D k γp -∗ Cxf D Rtop k γp -∗
-      urun (hlc := hlc) N h' m' (BitVec.ofNat 64 0xea) avail -∗ wpLoop h' := by
+      urun N h' m' (BitVec.ofNat 64 0xea) avail -∗ wpLoop h' := by
   haveI := H.hRd
   unfold Cxf halvesN
   rw [show Qcf D k st0 = fun _ : Int => D.QcK k from rfl]
@@ -144,8 +144,8 @@ theorem node_obl_of (H : NodeOk D fs Qfin Rtop) (UL : UK_LEAVES) (HS : UK_SYS_P)
     (hk : k < D.nc) (hpeq : N.pay = fun _ : Int => npay D Qfin k) (hnone : fdLowestClosed ld = none)
     (hfd2 : ushFd2p ld) :
     ⊢ D.FAM -∗ ncred D Rtop k st0 -∗ pbundle (D.P k) -∗ ushPid N -∗ ushCode N.t -∗
-      ushNodeObl (hlc := hlc) ushDg N ld szv cwdv ∅ av (Qcf D k st0) (RcLf D k st0) (RcRf D k st0) := by
-  have hkill : uKillCred (hlc := hlc) (GF := GF) = D.T := H.hkill
+      ushNodeObl ushDg N ld szv cwdv ∅ av (Qcf D k st0) (RcLf D k st0) (RcRf D k st0) := by
+  have hkill : uKillCred (GF := GF) = D.T := H.hkill
   iintro #Hfam Hcr Hpb Hpid #Hcode
   unfold ushNodeObl
   iexists (ncred D Rtop k st0), (ushPid N), (fun rw Sc Sc' => ushWaitPidAns (GF := GF) rw Sc Sc'),

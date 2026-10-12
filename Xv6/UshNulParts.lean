@@ -78,7 +78,7 @@ theorem ushNulRow_bytes {ty : Int} {row : Nat} {rowv : BitVec 32} {arm : Nat} (h
   rcases hr with ⟨rfl, rfl, rfl, rfl⟩ | ⟨rfl, rfl, rfl, rfl⟩ | ⟨rfl, rfl, rfl, rfl⟩ <;> decide +kernel
 
 section UshNulParts
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -162,9 +162,9 @@ theorem ushS_lw (UL : UK_LEAVES) (N : UkNames GF) {C : IProp GF} [Persistent C] 
     (y : Nat) (h : CPU) (m : RegMap) (av : Nat) (dq : DFrac) (a : Nat) (w : BitVec 32) (v : BitVec 64)
     (hv : extend_value u w = v) (ha : ((m.get rs1).toNat : Int) + imm.toInt = a) (hal : a % 4 = 0)
     (hy : x + (if rvc then 2 else 4) = y := by decide) (hns : unotSp rd := by unfold unotSp spIdx; decide) :
-    ⊢ C -∗ ubytesq N.d dq a 4 (nthByte (n := 4) w) -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 x) av -∗
+    ⊢ C -∗ ubytesq N.d dq a 4 (nthByte (n := 4) w) -∗ urun N h m (BitVec.ofNat 64 x) av -∗
       (ubytesq N.d dq a 4 (nthByte (n := 4) w) -∗ ∀ h' : CPU,
-        urun (hlc := hlc) N h' (ukWr m rd v) (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗ wpLoop h := by
+        urun N h' (ukWr m rd v) (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗ wpLoop h := by
   have hi' : C ⊢ uinstrIs N.t (BitVec.ofNat 64 x) rvc (.LOAD (imm, .Regidx rs1, .Regidx rd, u, ((4 : Nat) : Int))) := hi
   iintro #HC Hb Hrun Hk
   ihave #Hi := hi' $$ HC
@@ -182,8 +182,8 @@ theorem ushS_lwT (UL : UK_LEAVES) (N : UkNames GF) {C : IProp GF} [Persistent C]
     (hv : extend_value u w = v) (ha : ((m.get rs1).toNat : Int) + imm.toInt = a) (hal : a % 4 = 0)
     (hy : x + (if rvc then 2 else 4) = y := by decide) (hns : unotSp rd := by unfold unotSp spIdx; decide) :
     ⊢ C -∗ ([∗list] j ∈ List.range 4, utext N.t (a + j) (nthByte (n := 4) w j)) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 x) av -∗
-      (∀ h' : CPU, urun (hlc := hlc) N h' (ukWr m rd v) (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗ wpLoop h := by
+      urun N h m (BitVec.ofNat 64 x) av -∗
+      (∀ h' : CPU, urun N h' (ukWr m rd v) (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗ wpLoop h := by
   have hi' : C ⊢ uinstrIs N.t (BitVec.ofNat 64 x) rvc (.LOAD (imm, .Regidx rs1, .Regidx rd, u, ((4 : Nat) : Int))) := hi
   iintro #HC Hb Hrun Hk
   ihave #Hi := hi' $$ HC
@@ -200,8 +200,8 @@ theorem ushS_sb0 (UL : UK_LEAVES) (N : UkNames GF) {C : IProp GF} [Persistent C]
     (y : Nat) (h : CPU) (m : RegMap) (av : Nat) (a : Nat) (b0 : BitVec 8)
     (ha : ((m.get rs1).toNat : Int) + imm.toInt = a)
     (hy : x + (if rvc then 2 else 4) = y := by decide) :
-    ⊢ C -∗ ubyte N.d a b0 -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 x) av -∗
-      (ubyte N.d a ubyte0 -∗ ∀ h' : CPU, urun (hlc := hlc) N h' m (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗
+    ⊢ C -∗ ubyte N.d a b0 -∗ urun N h m (BitVec.ofNat 64 x) av -∗
+      (ubyte N.d a ubyte0 -∗ ∀ h' : CPU, urun N h' m (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #HC Hb Hrun Hk
   ihave #Hi := hi $$ HC
@@ -215,8 +215,8 @@ theorem ushS_jr (UL : UK_LEAVES) (N : UkNames GF) {C : IProp GF} [Persistent C] 
     {rs1 : BitVec 5}
     (hi : C ⊢ uinstrIs N.t (BitVec.ofNat 64 x) rvc (.JALR (0#12, .Regidx rs1, .Regidx 0#5)))
     (t : Nat) (h : CPU) (m : RegMap) (av : Nat) (ht : retPc (m.get rs1) = BitVec.ofNat 64 t) :
-    ⊢ C -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 x) av -∗
-      (∀ h' : CPU, urun (hlc := hlc) N h' m (BitVec.ofNat 64 t) av -∗ wpLoop h') -∗ wpLoop h := by
+    ⊢ C -∗ urun N h m (BitVec.ofNat 64 x) av -∗
+      (∀ h' : CPU, urun N h' m (BitVec.ofNat 64 t) av -∗ wpLoop h') -∗ wpLoop h := by
   iintro #HC Hrun Hk
   ihave #Hi := hi $$ HC
   iapply wp_uk_ret UL N h m _ rvc rs1 av $$ Hi Hrun
@@ -232,7 +232,7 @@ theorem shNul_head (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (p :
     (rowv : BitVec 32) (arm nn : Nat) (hrow : ushNulRow ty row rowv arm)
     (ha0 : m.get 10#5 = BitVec.ofNat 64 p) (hp : 0 < p) (hp8 : p % 8 = 0) (hp64 : p + 8 < 2 ^ 64) :
     ⊢ ushCode N.t -∗ ubytes N.d p 4 (nthByte (n := 4) (BitVec.ofInt 32 ty)) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x7ca) (4 + nn) -∗
+      urun N h m (BitVec.ofNat 64 0x7ca) (4 + nn) -∗
       (∀ (h' : CPU) (m' : RegMap), ⌜(m.get spIdx).toNat % 8 = 0 ∧ 8 * (4 + nn) ≤ (m.get spIdx).toNat⌝ -∗
         ⌜m'.get spIdx = m.get spIdx + BitVec.ofInt 64 (-((8 * 4 : Nat) : Int))⌝ -∗
         ⌜m'.get 10#5 = BitVec.ofNat 64 p⌝ -∗ ⌜m'.get 9#5 = BitVec.ofNat 64 p⌝ -∗
@@ -240,7 +240,7 @@ theorem shNul_head (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (p :
         ushSaved N.d (m.get spIdx).toNat [m.get 1#5, m.get 8#5, m.get 9#5] -∗
         ustack N.d (BitVec.ofNat 64 ((m.get spIdx).toNat - 8 * 3)) 1 -∗
         ubytes N.d p 4 (nthByte (n := 4) (BitVec.ofInt 32 ty)) -∗
-        urun (hlc := hlc) N h' m' (BitVec.ofNat 64 arm) nn -∗ wpLoop h') -∗
+        urun N h' m' (BitVec.ofNat 64 arm) nn -∗ wpLoop h') -∗
       wpLoop h := by
   obtain ⟨F1, F2, F3, F4, F5, F6, F7, F8, F9⟩ := ushNulRow_facts hrow
   have hpn : (BitVec.ofNat 64 p).toNat = p := Xv6.bcOfNatToNat p (by omega)
@@ -342,9 +342,9 @@ theorem shNul_fin (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m me : RegMap) (p
     (hkeep : ∀ q : BitVec 5, ucalleeSavedIdx q = true → q ≠ spIdx → q ≠ 8#5 → q ≠ 9#5 → me.get q = m.get q) :
     ⊢ ushCode N.t -∗ ushSaved N.d (m.get spIdx).toNat [m.get 1#5, m.get 8#5, m.get 9#5] -∗
       ustack N.d (BitVec.ofNat 64 ((m.get spIdx).toNat - 8 * 3)) 1 -∗
-      urun (hlc := hlc) N h me (BitVec.ofNat 64 0x81a) nn -∗
+      urun N h me (BitVec.ofNat 64 0x81a) nn -∗
       (∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗ ⌜m'.get 10#5 = BitVec.ofNat 64 p⌝ -∗
-        urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (4 + nn) -∗ wpLoop h') -∗
+        urun N h' m' (retPc (m.get 1#5)) (4 + nn) -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hsv Hloc Hrun Hk
   -- 0x81a  mv a0,s1
@@ -386,12 +386,12 @@ theorem shNul_loop (UL : UK_LEAVES) (N : UkNames GF) (s0 p len nn : Nat) (hs0 : 
       mc.get 15#5 = BitVec.ofNat 64 (p + 16 + 8 * done.length) →
     ⊢ ushCode N.t -∗ ([∗list] i ∈ List.range 10, ushSlot N s0 (p + 8) toks Prod.fst i) -∗
       ([∗list] i ∈ List.range 10, ushSlot N s0 (p + 88) toks Prod.snd i) -∗ ubytes N.d s0 (len + 1) g -∗
-      urun (hlc := hlc) N h mc (BitVec.ofNat 64 0x7fe) nn -∗
+      urun N h mc (BitVec.ofNat 64 0x7fe) nn -∗
       (([∗list] i ∈ List.range 10, ushSlot N s0 (p + 8) toks Prod.fst i) -∗
         ([∗list] i ∈ List.range 10, ushSlot N s0 (p + 88) toks Prod.snd i) -∗
         ubytes N.d s0 (len + 1) (ushpNulfold (tk :: rest) g) -∗ ∀ (h' : CPU) (mc' : RegMap),
         ⌜∀ q : BitVec 5, q ≠ 14#5 → q ≠ 15#5 → mc'.get q = mc.get q⌝ -∗
-        urun (hlc := hlc) N h' mc' (BitVec.ofNat 64 0x81a) nn -∗ wpLoop h') -∗
+        urun N h' mc' (BitVec.ofNat 64 0x81a) nn -∗ wpLoop h') -∗
       wpLoop h := by
   intro rest
   induction rest with
@@ -513,12 +513,12 @@ theorem shNul_exec (UL : UK_LEAVES) (N : UkNames GF) (s0 p len nn : Nat) (hs0 : 
     (ha0 : mc.get 10#5 = BitVec.ofNat 64 p) :
     ⊢ ushCode N.t -∗ ([∗list] i ∈ List.range 10, ushSlot N s0 (p + 8) toks Prod.fst i) -∗
       ([∗list] i ∈ List.range 10, ushSlot N s0 (p + 88) toks Prod.snd i) -∗ ubytes N.d s0 (len + 1) g -∗
-      urun (hlc := hlc) N h mc (BitVec.ofNat 64 0x7f6) nn -∗
+      urun N h mc (BitVec.ofNat 64 0x7f6) nn -∗
       (([∗list] i ∈ List.range 10, ushSlot N s0 (p + 8) toks Prod.fst i) -∗
         ([∗list] i ∈ List.range 10, ushSlot N s0 (p + 88) toks Prod.snd i) -∗
         ubytes N.d s0 (len + 1) (ushpNulfold toks g) -∗ ∀ (h' : CPU) (mc' : RegMap),
         ⌜∀ q : BitVec 5, q ≠ 14#5 → q ≠ 15#5 → mc'.get q = mc.get q⌝ -∗
-        urun (hlc := hlc) N h' mc' (BitVec.ofNat 64 0x81a) nn -∗ wpLoop h') -∗
+        urun N h' mc' (BitVec.ofNat 64 0x81a) nn -∗ wpLoop h') -∗
       wpLoop h := by
   have hpn : (BitVec.ofNat 64 p).toNat = p := Xv6.bcOfNatToNat p (by omega)
   have hA : ((mc.get 10#5).toNat : Int) + (8#12 : BitVec 12).toInt = ((p + 8 + 8 * 0 : Nat) : Int) := by

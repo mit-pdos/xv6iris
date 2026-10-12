@@ -44,13 +44,13 @@ open Wid RdOut WrOut
 open UShPipesDefs
 
 section Last
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
   [DiskG GF] [EchoOutG GF] [PnsRegG GF] [PipesNG GF] [FileAppG GF]
-variable (D : PdRound hlc GF)
+variable (D : PdRound GF)
 
 /-- The last stage's exec lend (Rocq's `set Cr` in `stage_last`). -/
 def lastCr (m : Nat) : IProp GF :=
@@ -203,12 +203,12 @@ theorem stage_last (S : StgEnv D) (K : StgOk D S) (m : Nat) (F : Filt) (co s0 : 
     (hbytes : ushEchoArgvBytes (filtWords F) (fun j => gs (co + j)))
     (hpeq : N'.pay = fun _ => D.QcK m) (ha0 : m'.get 10#5 = BitVec.ofNat 64 q)
     (hfd : last_fd0 γp ld) (hav : 6 ≤ av) :
-    ⊢ D.FAM -∗ shPinSlot (hlc := hlc) (filtPins F) D.T -∗
+    ⊢ D.FAM -∗ shPinSlot (filtPins F) D.T -∗
       ushCode N'.t -∗ ushJtab N'.t -∗
       ushCmd N'.d q (.exec (ushArgs s0 gs (ushqRebase co (wlToks (filtWords F))))) -∗
       usz N'.s szv -∗ ustd N'.fd ld -∗ ucwd N'.cwd ROOTINO -∗ uch N'.ch ∅ -∗
       last_raw D m γp -∗
-      urun (hlc := hlc) N' h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (2 + (ushDg + av)) -∗
+      urun N' h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (2 + (ushDg + av)) -∗
       wpLoop h' := by
   have hc : UknConst N' := ukn_const_of_eq N' _ hpeq (fun _ _ => rfl)
   have hwl : WLast ∈ D.wsN := (wids_elem _ _).2 trivial
@@ -234,7 +234,7 @@ theorem stage_last (S : StgEnv D) (K : StgOk D S) (m : Nat) (F : Filt) (co s0 : 
     iintro %M %Mv %s1 %t1 %g1 %sts %cs %pidv %hi1 %hag %hb1 %hl1 %hf1 #Hnp
     obtain ⟨⟨wb, hr0⟩, ⟨rb1, hr1⟩, ⟨rb2, hr2⟩⟩ := hf1
     iapply imageEntryPayMono (filtElf F) Mv _ sts ROOTINO seccAll cs pidv (fun _ => D.QcK m)
-      (pnsCopyLendM D.toPns (D.P m) γp F (.CSCon WLast) (fun _ => D.QcK m)) (lastCr D m) (uslot (hlc := hlc))
+      (pnsCopyLendM D.toPns (D.P m) γp F (.CSCon WLast) (fun _ => D.QcK m)) (lastCr D m) (uslot)
       $$ Hlend
     iapply (pse_filt_last_image_entry S K F M Mv s1 t1 g1 sts ROOTINO cs pidv (fun _ => D.QcK m)
       (D.P m) γp WLast wb rb1 rb2 (fun _ _ => rfl) hok hag hi1 hb1 hl1 hr0 hr1 hr2 hfok) $$ Hnp
@@ -265,19 +265,19 @@ theorem stage_last (S : StgEnv D) (K : StgOk D S) (m : Nat) (F : Filt) (co s0 : 
     simp only [pnsWfin, filtDgExecLen]
     iframe Hcw Hmw
   -- ...AND THE ARM
-  ihave Hrun := (show urun (hlc := hlc) N' h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (2 + (ushDg + av)) ⊢
-      urun (hlc := hlc) N' h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (6 + (2 + (ushDg + (av - 6))))
+  ihave Hrun := (show urun N' h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (2 + (ushDg + av)) ⊢
+      urun N' h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (6 + (2 + (ushDg + (av - 6))))
     by rw [show 2 + (ushDg + av) = 6 + (2 + (ushDg + (av - 6))) by omega]) $$ Hrun
   have harm := S.RX.wp_shExecXAtGen S.E (fun γ ld => ustd γ ld) (fun _ _ => .rfl) (last_fd0 γp)
     (filtWords F) (filtAlt F) (fun _ => D.QcK m) (lastCr D m) (lastCd D m F) N' hc h' m' q szv
     (s0 + co) (fun j => gs (co + j)) ld (av - 6) hok (filtExecfailBytes F) hpeq ha0 hbytes hfd hfd2
   change ⊢ ushCode N'.t -∗ ushExecSupEchoAt S.E (last_fd0 γp) (filtWords F) (fun _ => D.QcK m)
       (lastCr D m) -∗
-    ushExecfailLawAt (hlc := hlc) (filtAlt F) (13 + ((filtWords F)[0]!).length) (lastCr D m) (lastCd D m F) -∗
+    ushExecfailLawAt (filtAlt F) (13 + ((filtWords F)[0]!).length) (lastCr D m) (lastCd D m F) -∗
     □ (lastCd D m F -∗ D.QcK m) -∗ ushJtab N'.t -∗
     ushCmd N'.d q (.exec (ushArgs (s0 + co) (fun j => gs (co + j)) (ushEchoToks (filtWords F)))) -∗
     usz N'.s szv -∗ ustd N'.fd ld -∗ ucwd N'.cwd ROOTINO -∗ uchAny N'.ch -∗ lastCr D m -∗
-    urun (hlc := hlc) N' h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (6 + (2 + (ushDg + (av - 6)))) -∗
+    urun N' h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (6 + (2 + (ushDg + (av - 6)))) -∗
     wpLoop h' at harm
   iapply harm $$ Hcode Hsup Hxl [] Hjt Hcmd Hsz Hstd Hcwd [Hch] [Hr HsR Hcw Hmw] Hrun
   · unfold lastCd

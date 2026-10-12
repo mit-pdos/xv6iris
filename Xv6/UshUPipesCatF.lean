@@ -42,7 +42,7 @@ open Wid Pline'
 open UShPipesDefs UShPipesStage UShPipesNode
 
 section CatF
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
@@ -52,18 +52,18 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Ic
   [FsLinkG GF] [IcboxG GF] [OffboxBoxG GF] [IrefslotG GF] [WchG GF] [FileG GF] [CurCtx]
 
 /-- **`UkCatFEntries`' context at the union's round** (deviation 2). -/
-noncomputable def uCfe (E : UPipesEng (hlc := hlc) (GF := GF)) (ug : UnionGn) (r : FileAppNames)
-    (heq : HfpFileClaimsP.fileAppIs (hlc := hlc) (GF := GF) ug.ugnFile.fgnCl r)
-    (hkill : MachFixedGS.killCred (hlc := hlc) (GF := GF) = fileTaint (hlc := hlc) ug.ugnFile.fgnCl)
-    (D : PdRound hlc GF) (OK : PnsRoundOk D.toPns)
-    (hT : D.G.gcT = fileTaint (hlc := hlc) ug.ugnFile.fgnCl) : CfeCtx (hlc := hlc) (GF := GF) where
+noncomputable def uCfe (E : UPipesEng (GF := GF)) (ug : UnionGn) (r : FileAppNames)
+    (heq : HfpFileClaimsP.fileAppIs (GF := GF) ug.ugnFile.fgnCl r)
+    (hkill : MachFixedGS.killCred (GF := GF) = fileTaint ug.ugnFile.fgnCl)
+    (D : PdRound GF) (OK : PnsRoundOk D.toPns)
+    (hT : D.G.gcT = fileTaint ug.ugnFile.fgnCl) : CfeCtx (GF := GF) where
   R := D.toPns
   OK := OK
   cf := ug.ugnFile.fgnCl
   rf := r
   heq := heq
   UL := E.UL
-  Kc := uKillCred (hlc := hlc) (GF := GF)
+  Kc := uKillCred (GF := GF)
   Sup := appSup (GF := GF)
   hKc := inferInstance
   hSup := inferInstance
@@ -72,7 +72,7 @@ noncomputable def uCfe (E : UPipesEng (hlc := hlc) (GF := GF)) (ug : UnionGn) (r
   lawC := ue_lawC
   lawO := ue_lawO
   hTKc := by
-    show ⊢ □ (D.G.gcT -∗ MachFixedGS.killCred (hlc := hlc) (GF := GF))
+    show ⊢ □ (D.G.gcT -∗ MachFixedGS.killCred (GF := GF))
     rw [hT, hkill]
     iintro !> #H
     iexact H
@@ -90,17 +90,17 @@ theorem uD_Rd_fdq (ug : UnionGn) (v : EraPins) (I : List (BitVec 8)) (sR : Fstat
 
 /-- **Rocq `upipes_child_law_catf`**: THE `cat f` PIPELINE'S CHILD, node 0
 LENDING the deed's half to the producer and keeping the ticket. -/
-theorem upipes_child_law_catf (E : UPipesEng (hlc := hlc) (GF := GF))
+theorem upipes_child_law_catf (E : UPipesEng (GF := GF))
     (ug : UnionGn) (r : FileAppNames) (s0 : Fstate) (γp : GName)
-    (heq : HfpFileClaimsP.fileAppIs (hlc := hlc) (GF := GF) ug.ugnFile.fgnCl r)
-    (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = ucl (hlc := hlc) ug)
-    (hkill : MachFixedGS.killCred (hlc := hlc) (GF := GF) = fileTaint (hlc := hlc) ug.ugnFile.fgnCl) :
-    ⊢ unionLinks (hlc := hlc) (GF := GF) ug -∗
-      shEchoSlot (hlc := hlc) (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) -∗
-      shCatSlot (hlc := hlc) (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) -∗
-      shGrepSlot (hlc := hlc) (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) -∗
-      (∃ jo : Option Nat, fileConsCred (hlc := hlc) ug.ugnFile.fgnCl r jo) -∗
-      ushfChildLawAt (hlc := hlc) (Xu (hlc := hlc) (GF := GF) ug r s0 γp) ushDg pipesLpcg (68 + ushDpipe) := by
+    (heq : HfpFileClaimsP.fileAppIs (GF := GF) ug.ugnFile.fgnCl r)
+    (hcons : MachFixedGS.consRes (GF := GF) = ucl ug)
+    (hkill : MachFixedGS.killCred (GF := GF) = fileTaint ug.ugnFile.fgnCl) :
+    ⊢ unionLinks (GF := GF) ug -∗
+      shEchoSlot (fileTaint ug.ugnFile.fgnCl) -∗
+      shCatSlot (fileTaint ug.ugnFile.fgnCl) -∗
+      shGrepSlot (fileTaint ug.ugnFile.fgnCl) -∗
+      (∃ jo : Option Nat, fileConsCred ug.ugnFile.fgnCl r jo) -∗
+      ushfChildLawAt (Xu (GF := GF) ug r s0 γp) ushDg pipesLpcg (68 + ushDpipe) := by
   unfold ushfChildLawAt
   iintro #Hlk #Hes #Hcs #Hgs #Hmade
   imodintro
@@ -141,7 +141,7 @@ theorem upipes_child_law_catf (E : UPipesEng (hlc := hlc) (GF := GF))
     (ushq_um_chain E.HM E.hps N' sz (by have h8 : ushmBase + 16 ≤ 8344 := (by decide); omega) hszal hszok)
     h m dw dv sa len gb (wlToks (prodWords (.PrCatF nm))) (uRT (prodWords (.PrCatF nm)) (F :: fs')) 0
     (96 + nn - 6 * (fs'.length + 1))
-    iprop((Xu (hlc := hlc) (GF := GF) ug r s0 γp).Wc I 3 ∗ ustd N'.fd ld) hbars (by rw [urt_len]; simp only [List.length_cons]; omega) hs1 hs0 hs64 hs38
+    iprop((Xu (GF := GF) ug r s0 γp).Wc I 3 ∗ ustd N'.fd ld) hbars (by rw [urt_len]; simp only [List.length_cons]; omega) hs1 hs0 hs64 hs38
     $$ Hcode Hstr Hws Hsy HM [Hcp Hstd] [] Hrun
   · isplitl [Hcp]
     · iexact Hcp
@@ -177,9 +177,9 @@ theorem upipes_child_law_catf (E : UPipesEng (hlc := hlc) (GF := GF))
   unfold fown
   icases Hown with ⟨Hdq, Htk⟩
   have hdeed : iprop((ftkt r s ∗ fTyped ug.ugnFile.fgnCl s
-        ∗ eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v ∗ csLb v cs
-        ∗ urpos (hlc := hlc) ug r I)
-      ∗ fdq r (1 : Qp).half s) ⊢ ushDeedAt (hlc := hlc) (GF := GF) ug r upreTie s0 I := by
+        ∗ eraPin (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v ∗ csLb v cs
+        ∗ urpos ug r I)
+      ∗ fdq r (1 : Qp).half s) ⊢ ushDeedAt (GF := GF) ug r upreTie s0 I := by
     unfold ushDeedAt
     iintro ⟨⟨Htk, #Hty', #Hpin', #Hcs', Hup⟩, Hdq⟩
     ileft
@@ -203,9 +203,9 @@ theorem upipes_child_law_catf (E : UPipesEng (hlc := hlc) (GF := GF))
   -- THE ROUND'S ALLOCATION, at the deed's state
   iapply wpLoop_fupd
   imod pls_nodes_alloc (GF := GF) (lcats (LPipes (.PrCatF nm) (F :: fs'))) with ⟨%P, %gF, %gG, Hnodes⟩
-  ihave HPW := uD_pwc ug v I (dstContent s) (genId (hlc := hlc) (GF := GF) + 1) $$ HPW
+  ihave HPW := uD_pwc ug v I (dstContent s) (genId (GF := GF) + 1) $$ HPW
   imod pipesV_alloc (ugnPipe ug) ulmG pviewUnionU (ucparams ug) v I (dstContent s)
-    (LPipes (.PrCatF nm) (F :: fs')) hplok ⊤ pnsN (genId (hlc := hlc) (GF := GF) + 1) termw
+    (LPipes (.PrCatF nm) (F :: fs')) hplok ⊤ pnsN (genId (GF := GF) + 1) termw
     (tokN (pviewUnionU.pvFc (dstContent s)) (LPipes (.PrCatF nm) (F :: fs')))
     (pdep (uD ug v I (dstContent s) (LPipes (.PrCatF nm) (F :: fs'))
       (prodContent (pviewUnionU.pvFc (dstContent s)) (.PrCatF nm)) (.PrCatF nm)
@@ -217,12 +217,12 @@ theorem upipes_child_law_catf (E : UPipesEng (hlc := hlc) (GF := GF))
     (fdq r (1 : Qp).half s) γc γm P gF gG hcons hlR hfc hadmit hplok
   have H : NodeOk (uD ug v I (dstContent s) (LPipes (.PrCatF nm) (F :: fs'))
       (prodContent (pviewUnionU.pvFc (dstContent s)) (.PrCatF nm)) (.PrCatF nm)
-      (fdq r (1 : Qp).half s) γc γm P gF gG) (F :: fs') (ushfWq (Xu (hlc := hlc) (GF := GF) ug r s0 γp) I)
-      iprop(eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v ∗ inpLb v I
-        ∗ f0cw ug.ugnFile (genId (hlc := hlc) (GF := GF) + 1) s0
+      (fdq r (1 : Qp).half s) γc γm P gF gG) (F :: fs') (ushfWq (Xu (GF := GF) ug r s0 γp) I)
+      iprop(eraPin (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v ∗ inpLb v I
+        ∗ f0cw ug.ugnFile (genId (GF := GF) + 1) s0
         ∗ (ftkt r s ∗ fTyped ug.ugnFile.fgnCl s
-            ∗ eraPin (fgnEcho ug.ugnFile) (genId (hlc := hlc) (GF := GF) + 1) v ∗ csLb v cs
-            ∗ urpos (hlc := hlc) ug r I)) :=
+            ∗ eraPin (fgnEcho ug.ugnFile) (genId (GF := GF) + 1) v ∗ csLb v cs
+            ∗ urpos ug r I)) :=
     { ok := OK
       hkill := hkill
       hL31 := hL31
@@ -236,7 +236,7 @@ theorem upipes_child_law_catf (E : UPipesEng (hlc := hlc) (GF := GF))
   have K := uStgOk ug v I (dstContent s) (LPipes (.PrCatF nm) (F :: fs'))
     (prodContent (pviewUnionU.pvFc (dstContent s)) (.PrCatF nm)) (.PrCatF nm)
     (fdq r (1 : Qp).half s) γc γm P gF gG E r heq hkill OK hL31 (Hfire H)
-  have L : LawOk (uD (hlc := hlc) (GF := GF) ug v I (dstContent s) (LPipes (.PrCatF nm) (F :: fs'))
+  have L : LawOk (uD (GF := GF) ug v I (dstContent s) (LPipes (.PrCatF nm) (F :: fs'))
       (prodContent (pviewUnionU.pvFc (dstContent s)) (.PrCatF nm)) (.PrCatF nm)
       (fdq r (1 : Qp).half s) γc γm P gF gG) sa (uGS (prodWords (.PrCatF nm)) (F :: fs') len gb)
       (uSTG (prodWords (.PrCatF nm)) (F :: fs') len gb sa)
@@ -258,11 +258,11 @@ theorem upipes_child_law_catf (E : UPipesEng (hlc := hlc) (GF := GF))
     (prodContent (pviewUnionU.pvFc (dstContent s)) (.PrCatF nm)) (.PrCatF nm) (fdq r (1 : Qp).half s)
     γc γm P gF gG $$ Hnodes
   -- THE STAGES, at the parser's cut
-  ihave #Hss := ush_stage_slots (F :: fs') (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) $$ Hcs Hgs
+  ihave #Hss := ush_stage_slots (F :: fs') (fileTaint ug.ugnFile.fgnCl) $$ Hcs Hgs
   ihave #Hss := uD_slots ug v I (dstContent s) (LPipes (.PrCatF nm) (F :: fs'))
     (prodContent (pviewUnionU.pvFc (dstContent s)) (.PrCatF nm)) (.PrCatF nm) (fdq r (1 : Qp).half s)
     γc γm P gF gG (F :: fs') $$ Hss
-  ihave #Hcd0 := ushCldep_nonpipe (hlc := hlc) (GF := GF) (FdState.open true wr0 (.device CONSOLE))
+  ihave #Hcd0 := ushCldep_nonpipe (GF := GF) (FdState.open true wr0 (.device CONSOLE))
     (fun _ _ _ h => by cases h)
   have E2 : 68 + ((uRT (prodWords (.PrCatF nm)) (F :: fs')).length * 6 + (96 + nn - 6 * (fs'.length + 1))) =
       6 + (2 + (ushDg + (6 * (uREST (prodWords (.PrCatF nm)) F fs' len gb sa).length
@@ -271,7 +271,7 @@ theorem upipes_child_law_catf (E : UPipesEng (hlc := hlc) (GF := GF))
     omega
   rw [E2]
   -- THE PRODUCER'S LAW: `cat f`'s, at the deed
-  ihave #Hinv := (show shCatSlot (hlc := hlc) (fileTaint (hlc := hlc) ug.ugnFile.fgnCl) ⊢ appInv (hlc := hlc) fscFs
+  ihave #Hinv := (show shCatSlot (fileTaint ug.ugnFile.fgnCl) ⊢ appInv fscFs
     by unfold shCatSlot; iintro ⟨#H, -, -⟩; iexact H) $$ Hcs
   ihave #Hpl := stage_catf_law_holds_at (uD ug v I (dstContent s) (LPipes (.PrCatF nm) (F :: fs'))
       (prodContent (pviewUnionU.pvFc (dstContent s)) (.PrCatF nm)) (.PrCatF nm) (fdq r (1 : Qp).half s)
@@ -283,7 +283,7 @@ theorem upipes_child_law_catf (E : UPipesEng (hlc := hlc) (GF := GF))
     $$ Hfam [Hcs] [] [] Hinv [Hmade]
   · iapply uD_T_cast ug v I (dstContent s) (LPipes (.PrCatF nm) (F :: fs'))
       (prodContent (pviewUnionU.pvFc (dstContent s)) (.PrCatF nm)) (.PrCatF nm) (fdq r (1 : Qp).half s)
-      γc γm P gF gG (shCatSlot (hlc := hlc)) $$ Hcs
+      γc γm P gF gG (shCatSlot) $$ Hcs
   · dsimp only [uCfe]
     rw [hkill]
     iintro !> #Hk

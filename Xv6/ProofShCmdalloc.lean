@@ -37,19 +37,19 @@ theorem ush_ofNat_beq0 (p : Nat) (h0 : 0 < p) (h : p < 2 ^ 64) : (BitVec.ofNat 6
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-- **Rocq `wp_kshp_cmdalloc`**. -/
 theorem wp_shCmdalloc (UL : UK_LEAVES) (MS : USH_MEMSET) (N : UkNames GF) (h : CPU) (m : RegMap) (nb nn : Nat)
-    (UM UM' Pex : IProp GF) (hM : ushmMallocTyLe (hlc := hlc) N 168 UM UM')
+    (UM UM' Pex : IProp GF) (hM : ushmMallocTyLe N 168 UM UM')
     (ha0 : m.get 10#5 = BitVec.ofNat 64 nb) (hnb0 : 0 < nb) (hnb : nb ≤ 168) :
-    ⊢ ushCode N.t -∗ UM -∗ ushpOom (hlc := hlc) N Pex (10 + nn) -∗ Pex -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«cmdalloc») (4 + (10 + nn)) -∗
+    ⊢ ushCode N.t -∗ UM -∗ ushpOom N Pex (10 + nn) -∗ Pex -∗
+      urun N h m (BitVec.ofNat 64 User.Sh.Sym.«cmdalloc») (4 + (10 + nn)) -∗
       (∀ (h' : CPU) (m' : RegMap) (p : Nat), ⌜ucalleeSaved m m'⌝ -∗ ⌜m'.get 10#5 = BitVec.ofNat 64 p⌝ -∗
         ⌜0 < p ∧ p % 16 = 0 ∧ p + nb < 2 ^ 38⌝ -∗ ubytes N.d p nb (fun _ => ubyte0) -∗ UM' -∗ Pex -∗
-        urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (4 + (10 + nn)) -∗ wpLoop h') -∗
+        urun N h' m' (retPc (m.get 1#5)) (4 + (10 + nn)) -∗ wpLoop h') -∗
       wpLoop h := by
   rw [show User.Sh.Sym.«cmdalloc» = 0x1d2 from rfl]
   unfold ushpOom

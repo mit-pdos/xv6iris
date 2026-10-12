@@ -259,13 +259,13 @@ conjunct closes the resource verbatim, the right one (at `out = 0`,
 commit. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 /-- The optional hook as the ghost commit's list. -/
 theorem ss_hook_list (oQ : Option (IProp GF)) :
-    hookOpt (hlc := hlc) (genId (hlc := hlc) (GF := GF)) oQ ⊢
-      [∗list] Q ∈ oQ.toList, eraSyncHook (hlc := hlc) Q := by
+    hookOpt (genId (GF := GF)) oQ ⊢
+      [∗list] Q ∈ oQ.toList, eraSyncHook Q := by
   cases oQ with
   | none =>
     iintro _
@@ -305,9 +305,9 @@ def ssTicket (γ : LogNames) (oQ : Option (IProp GF)) (n0 : BitVec 32) : IProp G
 /-- **The deposit**, at the guard (`committing` set or `outstanding ≠ 0`). -/
 theorem ss_deposit (γ : LogNames) (nc : BitVec 32) (out : Nat) (cmt : Bool)
     (oQ : Option (IProp GF)) (hg : cmt = true ∨ out ≠ 0) :
-    logHelp (hlc := hlc) γ nc out cmt ⊢
-      hookOpt (hlc := hlc) (genId (hlc := hlc) (GF := GF)) oQ -∗
-      |={⊤}=> logHelp (hlc := hlc) γ nc out cmt ∗ ssTicket γ oQ nc := by
+    logHelp γ nc out cmt ⊢
+      hookOpt (genId (GF := GF)) oQ -∗
+      |={⊤}=> logHelp γ nc out cmt ∗ ssTicket γ oQ nc := by
   cases oQ with
   | none =>
     iintro H _
@@ -327,8 +327,8 @@ theorem ss_deposit (γ : LogNames) (nc : BitVec 32) (out : Nat) (cmt : Bool)
 /-- **The collect**, at the loop's exit (`ncommit` moved past `n0`). -/
 theorem ss_collect (γ : LogNames) (nc : BitVec 32) (out : Nat) (cmt : Bool)
     (oQ : Option (IProp GF)) (n0 : BitVec 32) (hne : n0 ≠ nc) :
-    ssTicket γ oQ n0 ⊢ logHelp (hlc := hlc) γ nc out cmt -∗
-      |={⊤}=> logHelp (hlc := hlc) γ nc out cmt ∗ ▷ qOpt (GF := GF) oQ := by
+    ssTicket γ oQ n0 ⊢ logHelp γ nc out cmt -∗
+      |={⊤}=> logHelp γ nc out cmt ∗ ▷ qOpt (GF := GF) oQ := by
   cases oQ with
   | none =>
     iintro _ H
@@ -368,7 +368,7 @@ end
 /-! ## The post and the loop's proposition -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 /-- The caller's continuation, at whichever hart the thread ends on. -/
@@ -403,7 +403,7 @@ theorem ss_kctx_ws (cpu : CPU) (k : KCtx) (R : RegMap) :
 with its payload closed, the register pins set, `s1`/`s2` saved in the two
 spare frame cells.  The `bge` at `+0x56` comes back here, at whichever hart
 `sleep` resumed the thread on and with whatever `SPIE`/`SPP` it carried. -/
-def ssLoopHead (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+def ssLoopHead (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32)
     (pidv : BitVec 32) (dqp : DFrac) (oQ : Option (IProp GF)) (nv : BitVec 64) (R : RegMap) : IProp GF := iprop%
@@ -416,7 +416,7 @@ def ssLoopHead (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   wpNext true k.proc cpu (ssPost k γ pidv dqp oQ)
 
-theorem ssLoopHead_elim (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem ssLoopHead_elim (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32)
     (pidv : BitVec 32) (dqp : DFrac) (oQ : Option (IProp GF)) (nv : BitVec 64) (R : RegMap) :
@@ -431,7 +431,7 @@ theorem ssLoopHead_elim (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       wpNext true k.proc cpu (ssPost k γ pidv dqp oQ) := by
   unfold ssLoopHead; iintro H; iexact H
 
-theorem ssLoopHead_intro (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem ssLoopHead_intro (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32)
     (pidv : BitVec 32) (dqp : DFrac) (oQ : Option (IProp GF)) (nv : BitVec 64) (R : RegMap) (hR : ssRegs k nv R) :
@@ -449,7 +449,7 @@ theorem ssLoopHead_intro (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   · ipureintro; exact hR
   iframe Hk Hpc Hpi Htc Hcc Hir Hctx Hlb Hlocked Hpay Hfr Hpid Hnext
 
-theorem ssLoopHead_self (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem ssLoopHead_self (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32)
     (pidv : BitVec 32) (dqp : DFrac) (oQ : Option (IProp GF)) (nv : BitVec 64) (R : RegMap) :
@@ -471,7 +471,7 @@ theorem ss_ac (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γ : LogNames) (γb : Bcache
       locked γ.lk cpu' -∗ logResAt γ γb γfs cov ls curCtx -∗ (∃ K : Nat, viewLb cpu' K) -∗
       sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γ.lk "log"
+  have h := AC.wp_acquire (GF := GF) c k' γ.lk "log"
     (logResAt γ γb γfs cov ls) hnoff hK hs
   unfold wp_acquire_body at h
   simp only [acquireAddr] at h
@@ -505,7 +505,7 @@ theorem ss_re (RE : RELEASE) (c : CPU) (k' : KCtx) (γ : LogNames) (γb : Bcache
         (k'.locks.filter (fun x => x ≠ "log"))) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γ.lk "log"
+  have h := RE.wp_release (GF := GF) c k' γ.lk "log"
     (logResAt γ γb γfs cov ls) hsie hnoff hK s hreen hon
   unfold wp_release_body at h
   simp only [releaseAddr] at h
@@ -517,7 +517,7 @@ theorem ss_re (RE : RELEASE) (c : CPU) (k' : KCtx) (γ : LogNames) (γb : Bcache
   iframe Hk Hpc Hlocked Hpay HΦ Harm
   iexact Hlk
 
-theorem ss_sp (SP : SLEEP_PREPARE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem ss_sp (SP : SLEEP_PREPARE) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (jp : Nat)
     (hj : jp < NPROC) (hproc : k'.proc = procAddr jp) (hchan : k'.regs 10#5 ≠ 0#64)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : sleepPrepareSlots ≤ k'.avail)
@@ -528,14 +528,14 @@ theorem ss_sp (SP : SLEEP_PREPARE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := SP.wp_sleep_prepare (hlc := hlc) (GF := GF) Γ c k' jp hj hproc hchan hnoff hK hlk htier
+  have h := SP.wp_sleep_prepare (GF := GF) Γ c k' jp hj hproc hchan hnoff hK hlk htier
   unfold wp_sleep_prepare_body at h
   simp only [sleepPrepareAddr] at h
   exact h
 
 /-- `sleep` at either `SIE`, with the complement at a named index `s` and
 proc `p` (so the caller's hypotheses frame syntactically). -/
-theorem ss_sl (SL : SLEEP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem ss_sl (SL : SLEEP) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (jp : Nat) (s : Bool) (p : BitVec 64)
     (hj : jp < NPROC) (hproc : k'.proc = procAddr jp) (hK : sleepSlots ≤ k'.avail)
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) (hs : k'.sie = s) (hp : k'.proc = p) :
@@ -547,7 +547,7 @@ theorem ss_sl (SL : SLEEP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hs hp
-  have h := SL.wp_sleep_eb (hlc := hlc) (GF := GF) Γ c k' jp hj hproc hK hnoff htier
+  have h := SL.wp_sleep_eb (GF := GF) Γ c k' jp hj hproc hK hnoff htier
   unfold wp_sleep_eb_body at h
   simp only [sleepAddr] at h
   exact h
@@ -562,7 +562,7 @@ then the two-register epilogue.  Reached from the FAST arm's `blez` at
 callee-saved map is back at the caller's. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 8000000 in
@@ -570,7 +570,7 @@ set_option maxHeartbeats 8000000 in
 arm back to the pop, re-enabling interrupts when the caller had them on),
 and `li a0,0` and the epilogue run at the caller's index with the
 complement. -/
-theorem ss_tail (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem ss_tail (RE : RELEASE) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames)
     (γfs : FsNames) (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32)
     (pidv : BitVec 32) (dqp : DFrac) (oQ : Option (IProp GF)) (R : RegMap) (jp : Nat)
@@ -673,12 +673,12 @@ and the re-acquire the thread holds NO lock and is at `noff = 0`, and
 under an `iloeb`. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
 theorem ss_body (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32)
     (jp : Nat) (pidv : BitVec 32) (dqp : DFrac) (oQ : Option (IProp GF)) (nv : BitVec 64) (R : RegMap)
@@ -925,12 +925,12 @@ end
 /-! ## The wait loop, closed by Löb at the head `+0x3e` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
 theorem ss_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (k : KCtx) (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32)
     (jp : Nat) (pidv : BitVec 32) (dqp : DFrac) (oQ : Option (IProp GF))
@@ -960,7 +960,7 @@ waits) the lazy `s1`/`s2` saves, the first reading of `log.ncommit` and
 the fall into the loop head at `+0x3e`. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 8000000 in
@@ -996,7 +996,7 @@ set_option maxHeartbeats 16000000 in
 /-- **The wait arm's set-up**, `+0x2a .. +0x3c`: the shrink-wrapped
 `s1`/`s2` saves, the FIRST reading of `log.ncommit` into `s2` and the
 reload of `&log` into `s1`, falling through into the loop head. -/
-theorem ss_setup (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem ss_setup (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32)
     (pidv : BitVec 32) (dqp : DFrac) (oQ : Option (IProp GF)) (nc0 : BitVec 32) (R : RegMap)
@@ -1076,7 +1076,7 @@ bundle), the `committing` guard at `+0x1c` and the `outstanding` guard at
 `+0x26`.  The fast arm (`committing == 0 && outstanding <= 0`) goes
 straight to the release at `+0x5e`; the other two go to the wait arm's
 set-up at `+0x2a`. -/
-theorem ss_entry (AC : ACQUIRE) (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem ss_entry (AC : ACQUIRE) (RE : RELEASE) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32)
     (pidv : BitVec 32) (dqp : DFrac) (oQ : Option (IProp GF)) (jp : Nat) (hjp : jp < NPROC) (hproc : k.proc = procAddr jp)
@@ -1084,7 +1084,7 @@ theorem ss_entry (AC : ACQUIRE) (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :
     (hlocks : k.locks = []) (htier : k.tier = KTier.kpt) (hint : k.intena = k.sie) :
     kctx cpu k ∗ pcIs cpu KA.«sys_sync» ∗ procsInv Γ ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    logCtx γ γb γfs cov ls dev ∗ hookOpt (hlc := hlc) (genId (hlc := hlc) (GF := GF)) oQ ∗
+    logCtx γ γb γfs cov ls dev ∗ hookOpt (genId (GF := GF)) oQ ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wpNext true k.proc cpu (ssPost k γ pidv dqp oQ) ∗
     (∀ (c : CPU) (a b : Bool) (nv : BitVec 64) (R' : RegMap),
@@ -1173,7 +1173,7 @@ theorem ss_entry (AC : ACQUIRE) (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :
       · ipureintro; first | exact hout0 | trivial
       · ipureintro; first | exact hout0 | trivial
       icases Hq with ⟨%L, %M, Hquiet, Hstok, Hback⟩
-      ihave Hhs := ss_hook_list (hlc := hlc) oQ $$ Hhook
+      ihave Hhs := ss_hook_list oQ $$ Hhook
       iapply (logGhostCommit_loop cpu oQ.toList γ γb γfs cov ls dev L M) $$ Hctx Hquiet Hstok Hhs
       iintro Hquiet Hstok HQs
       ihave HQ := ss_q_list oQ $$ HQs
@@ -1208,7 +1208,7 @@ theorem ss_entry (AC : ACQUIRE) (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :
       imodintro
       icases Hacc with ⟨Hclose, -⟩
       ihave Hcl : iprop(wordAtN curCtx lNcommit 4 (DFrac.own 1) nc -∗
-          logResAt (hlc := hlc) γ γb γfs cov ls curCtx) $$ [Hclose Hout Hcmt Hhelp]
+          logResAt γ γb γfs cov ls curCtx) $$ [Hclose Hout Hcmt Hhelp]
       · iintro Hnc
         iapply Hclose $$ Hout Hcmt Hnc Hhelp
       iapply (ss_setup Γ cpu (k.withSpie s0 p0) γ γb γfs cov ls dev pidv dqp oQ nc _ hK ?hRs)
@@ -1243,7 +1243,7 @@ theorem ss_entry (AC : ACQUIRE) (RE : RELEASE) (Γ : SchedNames) [ClaimIs (hlc :
     imodintro
     icases Hacc with ⟨Hclose, -⟩
     ihave Hcl : iprop(wordAtN curCtx lNcommit 4 (DFrac.own 1) nc -∗
-        logResAt (hlc := hlc) γ γb γfs cov ls curCtx) $$ [Hclose Hout Hcmt Hhelp]
+        logResAt γ γb γfs cov ls curCtx) $$ [Hclose Hout Hcmt Hhelp]
     · iintro Hnc
       iapply Hclose $$ Hout Hcmt Hnc Hhelp
     iapply (ss_setup Γ cpu (k.withSpie s0 p0) γ γb γfs cov ls dev pidv dqp oQ nc _ hK ?hRs2)
@@ -1264,7 +1264,7 @@ set_option maxHeartbeats 16000000 in
 /-- **`sys_sync` meets its specification**, at either entry `SIE`. -/
 theorem sysSync_proof (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP) :
     SYS_SYNC := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γ γb V γfs j logstart dev oQ pidv dqp
+  fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γ γb V γfs j logstart dev oQ pidv dqp
     hj hproc hK hnoff htier => by
   unfold wp_sys_sync_eb_body
   simp only [sysSyncAddr]

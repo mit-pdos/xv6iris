@@ -52,7 +52,7 @@ def utReadCons (tf : List (BitVec 64)) (sts : List FdState) : Prop :=
     ∃ rb : Bool, sts[(usysArgfd tf).toNat]? = some (.open true rb (.device 1))
 
 section ReadWhy
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF]
 open UexecSG
 
 /-- **Rocq `UexecExecInst.spost_at_read_why`, as a hypothesis**: read's
@@ -78,7 +78,7 @@ def UtPauseWhy : Prop :=
 end ReadWhy
 
 section ExitElim
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CtokG GF] [SG : UexecSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CtokG GF] [SG : UexecSG GF]
 open UexecSG
 
 /-- **Rocq `UexecExecInst.sbundle_at_exit_elim`, as a hypothesis** (the
@@ -87,7 +87,7 @@ key's whole table (discharged at the instance by
 `UexecExecInst.sbundleAt_exit_elim_xv6`). -/
 def UtExitElim : Prop :=
   ∀ (X : Uvis → IProp GF) (f : sfam GF) (W : Uvis),
-    sbundleAt X USYS_exit f W ⊢ filecloseCpays (hlc := hlc) W.fd
+    sbundleAt X USYS_exit f W ⊢ filecloseCpays W.fd
 
 end ExitElim
 
@@ -219,24 +219,24 @@ end Rows
 /-! ## §5 The out rows -/
 
 section Outs
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [WchG GF]
     [CurCtx] [Xv6G GF] [Fscfg]
 
 /-- **The four channel answers at the parked record** (the post's out rows
 minus the kill row), and (NI M2-X2) the round's ledger evidence. -/
 def utOuts (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8)) (sts2 : List FdState)
     (cs2 : ExtTreeSet GName compare) : IProp GF := iprop(
-  utExecOut (hlc := hlc) A.sc A.sep A.V A.M V2 M2 A.sts sts2 A.gn A.cs A.pid ∗
+  utExecOut A.sc A.sep A.V A.M V2 M2 A.sts sts2 A.gn A.cs A.pid ∗
   utForkOut A.f A.sc A.sep A.V (tfW V2.tf (tfArgIdx 0)) A.cs cs2 ∗
   utWaitOut A.sc A.sep A.V A.M (syscImg V2 M2) (tfW V2.tf (tfArgIdx 0)) A.cs cs2 A.pid ∗
-  utSysOut (hlc := hlc) A.f A.sc A.sep A.V A.M A.sts A.gn A.cs A.pid (tfW V2.tf (tfArgIdx 0))
+  utSysOut A.f A.sc A.sep A.V A.M A.sts A.gn A.cs A.pid (tfW V2.tf (tfArgIdx 0))
     (syscImg V2 M2) sts2 V2.cwi cs2 ∗
-  utEvOut (hlc := hlc) A.sc A.sep A.V A.M A.sts V2 M2 A.cs cs2)
+  utEvOut A.sc A.sep A.V A.M A.sts V2 M2 A.cs cs2)
 
 /-- Off the ecall every answer is owed nothing. -/
 theorem utOuts_quiet (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8)) (sts2 : List FdState)
     (cs2 : ExtTreeSet GName compare) (h : A.sc ≠ uecallScause) :
-    ⊢ utOuts (hlc := hlc) (GF := GF) A V2 M2 sts2 cs2 := by
+    ⊢ utOuts (GF := GF) A V2 M2 sts2 cs2 := by
   unfold utOuts
   isplitl []
   · iapply utExecOut_quiet _ _ _ _ _ _ _ _ _ _ _ h
@@ -253,7 +253,7 @@ theorem utOuts_quiet (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 
 theorem utEvOut_retf (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
     (V2 : ProcPriv) (M2 : Nat → List (BitVec 8)) (cs cs2 : ExtTreeSet GName compare) (ws : List (BitVec 64))
     (ha : tfW ws (tfArgIdx 0) = tfW V2.tf (tfArgIdx 0)) :
-    utEvOut (hlc := hlc) (GF := GF) sc sep V M sts V2 M2 cs cs2 ⊢
+    utEvOut (GF := GF) sc sep V M sts V2 M2 cs cs2 ⊢
       utEvOut sc sep V M sts { V2 with tf := ws } M2 cs cs2 := by
   have hrow : ∀ ι, syscEvRow (utSysRec sep V) V2 (syscImg (utSysRec sep V) M) (syscImg V2 M2) cs cs2 sts ι →
       syscEvRow (utSysRec sep V) { V2 with tf := ws } (syscImg (utSysRec sep V) M)
@@ -275,7 +275,7 @@ theorem utEvOut_retf (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List (BitV
 /-- **The answers survive a kernel-word rewrite.** -/
 theorem utOuts_retf (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8)) (sts2 : List FdState)
     (cs2 : ExtTreeSet GName compare) (ws : List (BitVec 64)) (hu : tfUeq V2.tf ws) :
-    utOuts (hlc := hlc) (GF := GF) A V2 M2 sts2 cs2 ⊢ utOuts A { V2 with tf := ws } M2 sts2 cs2 := by
+    utOuts (GF := GF) A V2 M2 sts2 cs2 ⊢ utOuts A { V2 with tf := ws } M2 sts2 cs2 := by
   have ha : tfW ws (tfArgIdx 0) = tfW V2.tf (tfArgIdx 0) := (tfUeq_arg 0 (by decide) hu).symm
   unfold utOuts
   simp only [ha]
@@ -297,13 +297,13 @@ end Outs
 /-! ## §6 The live reason and the kill reading -/
 
 section Kill
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [WchG GF]
     [CurCtx]
 
 /-- **What the last kill check lends** (Rocq's `Hres` / `Hlvres`): the
 resume row with the live row, or the incarnation's kill shot. -/
 def utLiveRes (A : UtArgs GF) (V2 : ProcPriv) (cs2 : ExtTreeSet GName compare) : IProp GF :=
-  iprop((utKillOut (hlc := hlc) A.sc A.Wk ∗ ⌜utLive A V2 cs2⌝) ∨ killShot A.gn)
+  iprop((utKillOut A.sc A.Wk ∗ ⌜utLive A V2 cs2⌝) ∨ killShot A.gn)
 
 /-- **What `killed()` reads out** (the reading `Rout` of
 `KILLED.wp_killed_r`): at a zero flag the lent `Z` comes back (a shot was
@@ -312,7 +312,7 @@ refuted by the row), at a nonzero flag the shot AND THE KILLER'S CREDENTIAL
 spent arm, so the row was paid by a third party with its taint -- which pays
 the tear-down's closes). -/
 def utKillRead (gn : GName) (Z : IProp GF) (kl : BitVec 32) : IProp GF :=
-  iprop((⌜kl = 0#32⌝ ∗ Z) ∨ (⌜kl ≠ 0#32⌝ ∗ killShot gn ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF)))
+  iprop((⌜kl = 0#32⌝ ∗ Z) ∨ (⌜kl ≠ 0#32⌝ ∗ killShot gn ∗ □ MachFixedGS.killCred (GF := GF)))
 
 /-- **The lend** (Rocq `Hkacc`): the block's pid half and registration
 eighth, the incarnation's MARKER, and `Z ∨ killShot gn`, into `killed`'s
@@ -322,10 +322,10 @@ theorem ut_kill_lend (j : Nat) (pid : BitVec 32) (gn : GName) (Z : IProp GF) (hn
       (Z ∨ killShot gn) ⊢
       ∀ (pidr klr : BitVec 32),
         wordPointsTo (pPid (procAddr j)) 4 pidPub pidr -∗
-        killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pidr klr -∗
+        killPaidAt (MachFixedGS.killCred (GF := GF)) pidr klr -∗
         wordPointsTo (pPid (procAddr j)) 4 pidPub pidr ∗
-        killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pidr klr ∗
-        (utKillRead (hlc := hlc) gn Z klr ∗ wordPointsTo (pPid (procAddr j)) 4 pidPriv pid ∗
+        killPaidAt (MachFixedGS.killCred (GF := GF)) pidr klr ∗
+        (utKillRead gn Z klr ∗ wordPointsTo (pPid (procAddr j)) 4 pidPriv pid ∗
           pidReg pid (.own qeighth) gn ∗ takenAt gn) := by
   iintro ⟨Hqp, Hrg, Ht, HZ⟩ %pidr %klr Hq Hr
   icases (show wordPointsTo (GF := GF) (pPid (procAddr j)) 4 pidPub pidr ∗
@@ -362,9 +362,9 @@ theorem ut_kill_lend_shot (j : Nat) (pid : BitVec 32) (gn : GName) (hnz : pid.to
     wordPointsTo (pPid (procAddr j)) 4 pidPriv pid ∗ pidReg pid (.own qeighth) gn ∗ killShot gn ⊢
       ∀ (pidr klr : BitVec 32),
         wordPointsTo (pPid (procAddr j)) 4 pidPub pidr -∗
-        killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pidr klr -∗
+        killPaidAt (MachFixedGS.killCred (GF := GF)) pidr klr -∗
         wordPointsTo (pPid (procAddr j)) 4 pidPub pidr ∗
-        killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pidr klr ∗
+        killPaidAt (MachFixedGS.killCred (GF := GF)) pidr klr ∗
         (⌜klr ≠ 0#32⌝ ∗ wordPointsTo (pPid (procAddr j)) 4 pidPriv pid ∗
           pidReg pid (.own qeighth) gn) := by
   iintro ⟨Hqp, Hrg, #Hsh⟩ %pidr %klr Hq Hr
@@ -383,7 +383,7 @@ theorem ut_kill_lend_shot (j : Nat) (pid : BitVec 32) (gn : GName) (hnz : pid.to
 end Kill
 
 section Tear
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CtokG GF] [WchG GF]
 
 /-- **THE TEAR-DOWN'S PRICE** (Rocq `ut_kexit`'s package, lane PQ-C,
 design/pipe.md "The exit path"): LEFT, a kill by a THIRD PARTY -- the
@@ -392,8 +392,8 @@ payload) and the killer's credential (which pays every close); RIGHT, a
 SELF-KILL -- the closes of the table the trap holds (the exit number's
 bundle row) and the process's own death payload (`ChildTok.killOwed`). -/
 def utTear (gn : GName) (sts : List FdState) : IProp GF :=
-  iprop((killShot gn ∗ takenAt gn ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF)) ∨
-    (filecloseCpays (hlc := hlc) sts ∗ killOwed gn))
+  iprop((killShot gn ∗ takenAt gn ∗ □ MachFixedGS.killCred (GF := GF)) ∨
+    (filecloseCpays sts ∗ killOwed gn))
 
 end Tear
 

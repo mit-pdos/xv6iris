@@ -51,7 +51,7 @@ theorem ut_myproc_norm : KA.«usertrap» + 18446744073709548236#64 = KA.«myproc
 theorem ut_ret_26 : jumpPc (KA.«usertrap» + 0x26#64) = KA.«usertrap» + 0x26#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
@@ -65,7 +65,7 @@ theorem ut_myproc_at (MP : MYPROC) (cpu : CPU) (k' : KCtx) (hsie' : k'.sie = fal
     (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.proc⌝ -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
-  have h := MP.wp_myproc (hlc := hlc) (GF := GF) cpu k' hnoff' hK'
+  have h := MP.wp_myproc (GF := GF) cpu k' hnoff' hK'
   unfold wp_myproc_body at h
   simp only [myprocAddr] at h
   iintro ⟨Hk, Hp, Hcont⟩
@@ -98,14 +98,14 @@ theorem ut_own_tf (hct : curTier = KTier.kpt) (A : UtArgs GF) (hok : UtOk Γ A) 
 set_option maxHeartbeats 8000000 in
 /-- **Rocq `ut_entry`**: from the contract's state (the residue opened) to
 the dispatch at +0x30. -/
-theorem usertrap_entry (MP : MYPROC) (HD : UT_DISPATCH (hlc := hlc) PT Γ)
+theorem usertrap_entry (MP : MYPROC) (HD : UT_DISPATCH PT Γ)
     (A : UtArgs GF) (cpu : CPU) (tv : BitVec 64) (hok : UtOk Γ A) :
     kctx cpu A.k ∗ pcIs cpu usertrapPc ∗ Register.sepc ↦ᵣ[cpu] A.sep ∗ Register.scause ↦ᵣ[cpu] A.sc ∗
       Register.stval ↦ᵣ[cpu] tv ∗ Register.stvec ↦ᵣ[cpu] uservecTvec ∗ cpuClaim cpu A.k.proc ∗
       utCaps A.N ∗ utOwn (utRsys PT Γ A) A.N A.V A.M A.sts A.cs A.pid ∗
-      utSysIn (hlc := hlc) A.f A.sc A.sep A.V A.M A.sts A.gn A.cs A.pid ∗
-      utForkIn (hlc := hlc) A.f A.sc A.sep A.V A.M A.sts ∗ utPayIn A.f A.sc A.sep A.V ∗
-      utKillIn (hlc := hlc) A.f A.sc A.Wk A.gn A.sts ∗ utKont PT Γ A
+      utSysIn A.f A.sc A.sep A.V A.M A.sts A.gn A.cs A.pid ∗
+      utForkIn A.f A.sc A.sep A.V A.M A.sts ∗ utPayIn A.f A.sc A.sep A.V ∗
+      utKillIn A.f A.sc A.Wk A.gn A.sts ∗ utKont PT Γ A
     ⊢ wpLoop (GF := GF) cpu := by
   have hsie : A.k.sie = false := hok.hctx.1
   iintro ⟨Hk, Hpc, Hsepc, Hsc, Htv, Hstv, Hcl, #Hcaps, Hown, Hsi, Hfi, Hpi, Hki, Hkont⟩

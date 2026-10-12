@@ -52,7 +52,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -81,7 +81,7 @@ theorem swr_ok_back (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bit
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [fd0] ∗
     fileRef γ kk q st ∗ fdStAuth V.fdg fd0 st ∗ fdFrags V.fdg sts ∗
     filewriteEnvOut γl γu st ∗ (filewriteEnvOut γl γu st -∗ filewriteFsOut (GF := GF)) ∗
-    filewriteArms (hlc := hlc) V.gen V.upt st (argZ v2) (writerImg V.upt M) v1 Q Qe (R 10#5) ∗
+    filewriteArms V.gen V.upt st (argZ v2) (writerImg V.upt M) v1 Q Qe (R 10#5) ∗
     fwConsOut st γu (writerImg V.upt M) v1 (R 10#5) ∗
     (∀ c : CPU, sysWritePost k γ γu j pid V M sts v v1 v2 Q Qe c)
     ⊢ wpLoop (GF := GF) cpu := by
@@ -114,7 +114,7 @@ set_option maxHeartbeats 16000000 in
 the environment it selects and its offset row, and filewrite's block
 (the core as it is, the array aside); filewrite's return goes to
 `swr_ok_back`. -/
-theorem swr_ok_jal (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem swr_ok_jal (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (v v1 v2 : BitVec 64)
     (γkl : GName) (γk : KmemNames) (γl : GName) (γu : UartNames) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool)
@@ -131,8 +131,8 @@ theorem swr_ok_jal (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ fdFrags V.fdg sts ∗
-    filewriteFsEnv (hlc := hlc) ∗
-    sysWriteIn (hlc := hlc) pmv szv lzv V v sts (argZ v2) (writerImg V.upt M) v1 Q Qe ∗
+    filewriteFsEnv ∗
+    sysWriteIn pmv szv lzv V v sts (argZ v2) (writerImg V.upt M) v1 Q Qe ∗
     (∀ c : CPU, sysWritePost k γ γu j pid V M sts v v1 v2 Q Qe c)
     ⊢ wpLoop (GF := GF) cpu := by
   have hK110 := hK
@@ -204,7 +204,7 @@ set_option maxHeartbeats 16000000 in
 /-- **`+0x28 .. +0x38`, argfd SUCCEEDED** (`a0 = 0`): `mv a5,a0`, the
 hoisted `li a0,-1`, `bltz` falls through, the three loads (`a2 := n`,
 `a1 := p`, `a0 := f`); then `swr_ok_jal`. -/
-theorem swr_ok_loads (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem swr_ok_loads (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (v v1 v2 : BitVec 64)
     (γkl : GName) (γk : KmemNames) (γl : GName) (γu : UartNames) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool)
@@ -220,8 +220,8 @@ theorem swr_ok_loads (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ fdFrags V.fdg sts ∗
-    filewriteFsEnv (hlc := hlc) ∗
-    sysWriteIn (hlc := hlc) pmv szv lzv V v sts (argZ v2) (writerImg V.upt M) v1 Q Qe ∗
+    filewriteFsEnv ∗
+    sysWriteIn pmv szv lzv V v sts (argZ v2) (writerImg V.upt M) v1 Q Qe ∗
     (∀ c : CPU, sysWritePost k γ γu j pid V M sts v v1 v2 Q Qe c)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, #Henv, Hra, Hs0, Hcells, Hte, Hce, Hcore, Howe, Hfr, Hfs, Hin, HΦ⟩
@@ -283,7 +283,7 @@ theorem swr_fail_arm (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bi
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ fdFrags V.fdg sts ∗
-    filewriteFsEnv (hlc := hlc) ∗
+    filewriteFsEnv ∗
     (∀ c : CPU, sysWritePost k γ γu j pid V M sts v v1 v2 Q Qe c)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hra, Hs0, Hcells, Hte, Hce, Hcore, Howe, Hfr, Hfs, HΦ⟩
@@ -325,7 +325,7 @@ theorem swr_fail_arm (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bi
 set_option maxHeartbeats 16000000 in
 /-- **`+0x1c .. +0x24`: `argfd(0, 0, &f)`** (`pfd` null, `pf = &f`), and
 its answer dispatched to the two arms (`swr_fail_arm`, `swr_ok_loads`). -/
-theorem swr_argfd_call (AF : ARGFD) (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem swr_argfd_call (AF : ARGFD) (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (v v1 v2 : BitVec 64)
     (γkl : GName) (γk : KmemNames) (γl : GName) (γu : UartNames) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool)
@@ -342,8 +342,8 @@ theorem swr_argfd_call (AF : ARGFD) (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs 
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ fdFrags V.fdg sts ∗
-    filewriteFsEnv (hlc := hlc) ∗
-    sysWriteIn (hlc := hlc) pmv szv lzv V v sts (argZ v2) (writerImg V.upt M) v1 Q Qe ∗
+    filewriteFsEnv ∗
+    sysWriteIn pmv szv lzv V v sts (argZ v2) (writerImg V.upt M) v1 Q Qe ∗
     (∀ c : CPU, sysWritePost k γ γu j pid V M sts v v1 v2 Q Qe c)
     ⊢ wpLoop (GF := GF) cpu := by
   have hK110 := hK
@@ -409,7 +409,7 @@ set_option maxHeartbeats 16000000 in
 /-- **`+0x12 .. +0x18`: `argint(2, &n)`**, into the upper word of the
 slot at `s0-32`; then `swr_argfd_call`. -/
 theorem swr_argint_call (AI : ARGINT) (AF : ARGFD) (FW : FILEWRITE) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (v v1 v2 : BitVec 64)
     (γkl : GName) (γk : KmemNames) (γl : GName) (γu : UartNames) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool)
@@ -426,8 +426,8 @@ theorem swr_argint_call (AI : ARGINT) (AF : ARGFD) (FW : FILEWRITE) (Γ : SchedN
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ fdFrags V.fdg sts ∗
-    filewriteFsEnv (hlc := hlc) ∗
-    sysWriteIn (hlc := hlc) pmv szv lzv V v sts (argZ v2) (writerImg V.upt M) v1 Q Qe ∗
+    filewriteFsEnv ∗
+    sysWriteIn pmv szv lzv V v sts (argZ v2) (writerImg V.upt M) v1 Q Qe ∗
     (∀ c : CPU, sysWritePost k γ γu j pid V M sts v v1 v2 Q Qe c)
     ⊢ wpLoop (GF := GF) cpu := by
   have hK110 := hK
@@ -482,7 +482,7 @@ set_option maxHeartbeats 16000000 in
 /-- **`sys_write` meets its specification**, at either entry `SIE`: the
 prologue and `argaddr(1, &p)`; then `swr_argint_call`. -/
 theorem sys_write_main (AA : ARGADDR) (AI : ARGINT) (AF : ARGFD) (FW : FILEWRITE)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (v v1 v2 : BitVec 64)
     (γkl : GName) (γk : KmemNames) (γl : GName) (γu : UartNames) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF)
@@ -491,7 +491,7 @@ theorem sys_write_main (AA : ARGADDR) (AI : ARGINT) (AF : ARGFD) (FW : FILEWRITE
     (hv2 : V.tf[tfArgIdx 2]? = some v2)
     (hK : sysWriteSlots ≤ k.avail) (hj : j < NPROC) (hproc : k.proc = procAddr j)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) (htb : wrTb pmv szv lzv V.upt) :
-    wp_sys_write_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ j pid V M sts v v1 v2 γkl γk γl γu Q Qe
+    wp_sys_write_eb_body (GF := GF) Γ cpu k γ j pid V M sts v v1 v2 γkl γk γl γu Q Qe
       pmv szv lzv hv hv1 hv2 hK hj hproc hnoff htier htb := by
   unfold wp_sys_write_eb_body
   have hK110 := hK

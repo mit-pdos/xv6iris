@@ -87,7 +87,7 @@ theorem sys_open_walk_pins_s1 (k : KCtx) (R : RegMap) (s1 s2 s3 v w : BitVec 64)
   hv ▸ sysOpenPins_s1 k R s1 s2 s3 v h
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -102,7 +102,7 @@ theorem sys_open_walk_dead_rcpt (rt : Nat) (P Pmiss : Nat → Nat → IProp GF) 
     (∃ (kd d : Nat), ⌜kd < (pathElems pl).length⌝ ∗
       ((P kd d ∗ exHopsFrom rt fscFs P Pmiss pl kd) ∨
        (Pmiss kd d ∗ exHopsFrom rt fscFs P Pmiss pl (kd + 1)))) ⊢
-    nameiWalkDeadEra (hlc := hlc) fscFs rt P Pmiss pl := by
+    nameiWalkDeadEra fscFs rt P Pmiss pl := by
   unfold nameiWalkDeadEra
   simp only [exHops_is_axHops]
   exact .rfl
@@ -117,8 +117,8 @@ ALLOC block (a directory at O_RDONLY: the witness EARNED) or ARM C-FAIL (a
 directory opened for writing). -/
 theorem sys_open_walk_tested (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
     (hS : SysOpenStatic k A)
-    (hJ : ⊢ sysOpenJoinBody (hlc := hlc) Γ k A) (hAl : ⊢ sysOpenAllocBody (hlc := hlc) Γ k A)
-    (hTC : ⊢ sysOpenTailCBody (hlc := hlc) Γ k A)
+    (hJ : ⊢ sysOpenJoinBody Γ k A) (hAl : ⊢ sysOpenAllocBody Γ k A)
+    (hTC : ⊢ sysOpenTailCBody Γ k A)
     (cpu : CPU) (spie spp : Bool) (R : RegMap) (w4 w5 w6 : BitVec 64) (lo : BitVec 32)
     (w24 : BitVec 64) (γil γisl : GName) (loc tlc kk : Nat) (s : Qp) (g : GName)
     (inum : BitVec 32) (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8))
@@ -128,15 +128,15 @@ theorem sys_open_walk_tested (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
     (hpins : sysOpenPins k R (ientry kk) (k.regs 18#5) (k.regs 19#5))
     (hal : (sysOpenPath (k.regs 2#5)).toNat % 8 = 0) :
     kctx cpu (((k.withSpie spie spp).pushed 24).withRegs R) ∗ pcIs cpu (KA.«sys_open» + 0xec#64) ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysOpenEnv (hlc := hlc) Γ A ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysOpenEnv Γ A ∗
     sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w4 w5 w6 lo (sysOpenOm A) w24 ∗
     sysOpenAny (sysOpenPath (k.regs 2#5)) 128 ∗
     sysOpenLk γil γisl loc tlc A.pid kk s g inum dn ∗
     sysOpenFlat kk inum dn bm data ∗ sysOpenKeep kk s g inum ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) ∗
     logOpb icfgLog u ∗ bslots 3 ∗ irefSlots nsj ∗ fdSlot ∗ fdFrags A.V.fdg A.sts ∗
-    sysOpenResidue (hlc := hlc) A pl inum dn bm data ∗
-    (∀ c' : CPU, sysOpenPostP (hlc := hlc) k A c')
+    sysOpenResidue A pl inum dn bm data ∗
+    (∀ c' : CPU, sysOpenPostP k A c')
     ⊢ wpLoop (GF := GF) cpu := by
   unfold sysOpenJoinBody at hJ
   unfold sysOpenAllocBody at hAl
@@ -234,23 +234,23 @@ set_option maxHeartbeats 16000000 in
 slots come home and the armed post gets the era refund beside both commits
 (`so_arm_dead`). -/
 theorem sys_open_walk_dead (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
-    (hS : SysOpenStatic k A) (hTB : ⊢ sysOpenTailBBody (hlc := hlc) Γ k A)
+    (hS : SysOpenStatic k A) (hTB : ⊢ sysOpenTailBBody Γ k A)
     (cpu : CPU) (spie spp : Bool) (R : RegMap) (s1v w4 w5 w6 : BitVec 64) (lo : BitVec 32)
     (w24 : BitVec 64) (P2 : UPtd) (n' : Nat) (Sb' : List Nat) (pl : List (BitVec 8))
     (hpins : sysOpenPins k R s1v (k.regs 18#5) (k.regs 19#5)) (h10 : R 10#5 = 0#64)
     (hal : (sysOpenPath (k.regs 2#5)).toNat % 8 = 0) (hP2 : A.V.upt.extSz A.V.sz P2)
     (hns : 2 ≤ A.ns) (hpl : argPathOf (sysOpenIm A) A.v.toNat pl) :
     kctx cpu (((k.withSpie spie spp).pushed 24).withRegs R) ∗ pcIs cpu (KA.«sys_open» + 0xe4#64) ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysOpenEnv (hlc := hlc) Γ A ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysOpenEnv Γ A ∗
     sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w4 w5 w6 lo (sysOpenOm A) w24 ∗
     sysOpenAny (sysOpenPath (k.regs 2#5)) 128 ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) ∗
     logOpS icfgLog n' Sb' ∗ logTx icfgLog ∗ bslots 3 ∗ irefSlots 2 ∗ irefSlots (A.ns - 2) ∗
     fdSlot ∗ fdFrags A.V.fdg A.sts ∗
-    nameiWalkDeadEra (hlc := hlc) fscFs A.V.rti A.P A.Pmiss pl ∗
-    pfAt (aopenCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fo ∗
-    openTruncPiece (hlc := hlc) (fsGammaL fscFs) A.vom (truncTermAt pl A.P) A.Ft ∗
-    (∀ c' : CPU, sysOpenPostP (hlc := hlc) k A c')
+    nameiWalkDeadEra fscFs A.V.rti A.P A.Pmiss pl ∗
+    pfAt (aopenCommitAt (fsGammaL fscFs) appE) A.Fo ∗
+    openTruncPiece (fsGammaL fscFs) A.vom (truncTermAt pl A.P) A.Ft ∗
+    (∀ c' : CPU, sysOpenPostP k A c')
     ⊢ wpLoop (GF := GF) cpu := by
   unfold sysOpenTailBBody at hTB
   simp only [sysOpenAddr] at hTB
@@ -282,7 +282,7 @@ theorem sys_open_walk_dead (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
   ispecialize Hpost $$ %c'
   unfold sysOpenPostP sysOpenK
   iapply Hpost $$ %spie' %spp' %R' %P2 %A.V.ev %hcs %hP2 %(Nat.le_refl _) Hk Hpc Hte Hce Hbs Hisl
-  iapply (sys_open_arm_dead (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid
+  iapply (sys_open_arm_dead A.omo (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.γ (procAddr A.j) A.pid
       (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss A.Fo A.Ft A.sts (sysOpenV2 A P2) (sysOpenM2 A P2) (R' 10#5)
       pl hpl hr)
     $$ Hpriv Hfrags Hfds Hdead Hoc Htc
@@ -293,10 +293,10 @@ through, the reference taken apart and its share NAMED
 (`sys_open_walk_name`), `ilock(ip)` at the write arm, and THE TERMINAL
 OBSERVATION FIRED off the peeled payload's own `topFrag`
 (`FsAbsOpenFire.opfOpen_fire_1`); then `sys_open_walk_tested`. -/
-theorem sys_open_walk_found (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem sys_open_walk_found (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF Γ]
     (k : KCtx) (A : SysOpenArgs GF) (hS : SysOpenStatic k A)
-    (hJ : ⊢ sysOpenJoinBody (hlc := hlc) Γ k A) (hAl : ⊢ sysOpenAllocBody (hlc := hlc) Γ k A)
-    (hTC : ⊢ sysOpenTailCBody (hlc := hlc) Γ k A)
+    (hJ : ⊢ sysOpenJoinBody Γ k A) (hAl : ⊢ sysOpenAllocBody Γ k A)
+    (hTC : ⊢ sysOpenTailCBody Γ k A)
     (cpu : CPU) (spie spp : Bool) (R : RegMap) (s1v w4 w5 w6 : BitVec 64) (lo : BitVec 32)
     (w24 : BitVec 64) (P2 : UPtd) (n' : Nat) (Sb' : List Nat) (ipv : BitVec 64) (iL : Nat)
     (pl : List (BitVec 8))
@@ -304,16 +304,16 @@ theorem sys_open_walk_found (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     (hal : (sysOpenPath (k.regs 2#5)).toNat % 8 = 0) (hP2 : A.V.upt.extSz A.V.sz P2)
     (hn : iputUnits ≤ n') (hns : 2 ≤ A.ns) (hpl : argPathOf (sysOpenIm A) A.v.toNat pl) :
     kctx cpu (((k.withSpie spie spp).pushed 24).withRegs R) ∗ pcIs cpu (KA.«sys_open» + 0xe4#64) ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysOpenEnv (hlc := hlc) Γ A ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysOpenEnv Γ A ∗
     sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w4 w5 w6 lo (sysOpenOm A) w24 ∗
     sysOpenAny (sysOpenPath (k.regs 2#5)) 128 ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) ∗
     logOpS icfgLog n' Sb' ∗ logTx icfgLog ∗ bslots 3 ∗ irefSlots 1 ∗ irefSlots (A.ns - 2) ∗
     fdSlot ∗ fdFrags A.V.fdg A.sts ∗
     inodeHeldAt ipv iL ∗ A.P (pathElems pl).length iL ∗
-    pfAt (aopenCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fo ∗
-    openTruncPiece (hlc := hlc) (fsGammaL fscFs) A.vom (truncTermAt pl A.P) A.Ft ∗
-    (∀ c' : CPU, sysOpenPostP (hlc := hlc) k A c')
+    pfAt (aopenCommitAt (fsGammaL fscFs) appE) A.Fo ∗
+    openTruncPiece (fsGammaL fscFs) A.vom (truncTermAt pl A.P) A.Ft ∗
+    (∀ c' : CPU, sysOpenPostP k A c')
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hcells, Hbuf, Hpriv, HopS, Htx, Hbs, Hir1, Hirr, Hfds, Hfrags,
     Hheld, HP, Hoc, Htc, Hpost⟩
@@ -375,7 +375,7 @@ theorem sys_open_walk_found (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
   icases fsReady_region $$ Hrdy with ⟨#Hinv, #Hopen⟩
   ihave #Hft := iregInv_ftop _ _ _ _ $$ Hinv
   iapply wpLoop_fupd
-  imod (opfOpen_fire_1 (hlc := hlc) fscFs ⊤ A.Fo inum.toNat (eraNode dn bm data)
+  imod (opfOpen_fire_1 fscFs ⊤ A.Fo inum.toNat (eraNode dn bm data)
       CoPset.subseteq_top (opfEra_typed_ok _ _ dn bm data hok)) $$ Hft Hoc Ht
     with ⟨Ht, %av, %harow, HFo⟩
   imodintro
@@ -389,9 +389,9 @@ theorem sys_open_walk_found (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
   -- THE PLAIN PERMIT IS PAID HERE (Rocq TRUNC-PERMIT, `plain_trunc_key`): the
   -- walk has an inode, so the terminal cursor splits into the permit's
   -- payment and what the arms keep (`SpecSysOpen.curKept`)
-  ihave Hkey := plainTruncKey (hlc := hlc) (fsGammaL fscFs) A.vom pl A.P inum.toNat A.Ft $$ Htc HP
+  ihave Hkey := plainTruncKey (fsGammaL fscFs) A.vom pl A.P inum.toNat A.Ft $$ Htc HP
   icases Hkey with ⟨HP, Htc⟩
-  ihave Hres : sysOpenResidue (hlc := hlc) A pl inum dn bm data $$ [HP HFo Htc]
+  ihave Hres : sysOpenResidue A pl inum dn bm data $$ [HP HFo Htc]
   · unfold sysOpenResidue sysOpenObs
     iframe HP Htc
     isplitr
@@ -421,10 +421,10 @@ the one-shot handed DOWN unfired (the walk picks the start inum and fires it
 there), and namei's two arms to `sys_open_walk_dead` /
 `sys_open_walk_found`. -/
 theorem sys_open_entry_n (NI : NAMEI_ERA) (IL : ILOCK) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ] (k : KCtx) (A : SysOpenArgs GF) (hS : SysOpenStatic k A)
-    (hJ : ⊢ sysOpenJoinBody (hlc := hlc) Γ k A) (hAl : ⊢ sysOpenAllocBody (hlc := hlc) Γ k A)
-    (hTB : ⊢ sysOpenTailBBody (hlc := hlc) Γ k A) (hTC : ⊢ sysOpenTailCBody (hlc := hlc) Γ k A) :
-    ⊢ sysOpenEntryNBody (hlc := hlc) Γ k A := by
+    [ClaimIs GF Γ] (k : KCtx) (A : SysOpenArgs GF) (hS : SysOpenStatic k A)
+    (hJ : ⊢ sysOpenJoinBody Γ k A) (hAl : ⊢ sysOpenAllocBody Γ k A)
+    (hTB : ⊢ sysOpenTailBBody Γ k A) (hTC : ⊢ sysOpenTailCBody Γ k A) :
+    ⊢ sysOpenEntryNBody Γ k A := by
   unfold sysOpenEntryNBody
   simp only [sysOpenAddr]
   iintro %cpu %spie %spp %R %s1v %w4 %w5 %w6 %lo %w24 %P2 %plen %bp %Sb %hP2 %hstr %hpins %hal Hk

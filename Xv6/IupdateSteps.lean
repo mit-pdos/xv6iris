@@ -111,7 +111,7 @@ theorem iu_andi (inum : BitVec 32) :
 /-! ## The region's ghost step, as a premise -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- ...and the form a SEAL supplies, which cannot name `ds`: the list is
@@ -131,7 +131,7 @@ receipt, so its anchor is the unit (`lwAuRec`). -/
 theorem iu_step_out [Fscfg] [Icfg] (inum : BitVec 32) (dn dn0 : Dinode) (e0 : Nat)
     (hnib : inum.toNat < 16 * icfgNib) (hdn : dinodeWf dn) (hstab : diTypeStable dn dn0)
     (hnl : diNlinkStable dn dn0) (hnz : dn.diType.toNat ≠ 0) :
-    iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ⊢
+    iregInv fscIreg fscFs icfgIst icfgNib ⊢
       iuRegionStep inum dn dn0 e0 (iregOut (GF := GF) fscIreg inum dn) := by
   unfold iuRegionStep dislotWriteAu
   iintro #Hinv %ds %_ Hdn
@@ -139,7 +139,7 @@ theorem iu_step_out [Fscfg] [Icfg] (inum : BitVec 32) (dn dn0 : Dinode) (e0 : Na
     (dinodeBytes dn) (iregOut fscIreg inum dn) e0
   unfold iregOut
   rw [if_neg hnz]
-  iapply (iregWrite_au (hlc := hlc) ⊤ fscIreg fscFs icfgIst icfgNib inum dn0 dn (diblkBytes ds)
+  iapply (iregWrite_au ⊤ fscIreg fscFs icfgIst icfgNib inum dn0 dn (diblkBytes ds)
     CoPset.subseteq_top (by omega) hdn hnz hstab hnl) $$ Hinv Hdn
 
 /-- THE LINK-MINTING STEP (Rocq's `iu_step_link`): the same ghost step
@@ -151,7 +151,7 @@ theorem iu_step_link [Fscfg] [Icfg] (inum : BitVec 32) (dn dn0 : Dinode) (e0 : N
     (hstab : diTypeStable dn dn0)
     (hbump : dn.diNlink = dn0.diNlink + 1#16) (hgrd : dn0.diNlink ≠ 32767#16)
     (hup : ∀ w : Ity, oty = some w → iregMult dn0 = 0 ∧ iregRegOk dn.diType.toNat w) :
-    iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ⊢
+    iregInv fscIreg fscFs icfgIst icfgNib ⊢
       iregLinkPin pin inum.toNat dn0 -∗
       iuRegionStep inum dn dn0 e0
         (iprop(dinodeAt fscIreg inum dn ∗
@@ -163,7 +163,7 @@ theorem iu_step_link [Fscfg] [Icfg] (inum : BitVec 32) (dn dn0 : Dinode) (e0 : N
   iintro #Hinv Hpin %ds %_ Hdn
   iapply lwAuRec icfgLog fscFs (IBLOCK inum icfgIst) (⊤ \ ↑iregN) (islot inum) (diblkBytes ds)
     (dinodeBytes dn) _ e0
-  iapply (iregWriteLink_reg (hlc := hlc) ⊤ fscIreg fscFs icfgIst icfgNib inum dn0 dn
+  iapply (iregWriteLink_reg ⊤ fscIreg fscFs icfgIst icfgNib inum dn0 dn
     (diblkBytes ds) pin oty CoPset.subseteq_top (by omega) hdn hnz hstab hbump hgrd hup)
     $$ Hinv Hdn Hpin
 
@@ -176,13 +176,13 @@ theorem iu_step_unlink [Fscfg] [Icfg] (inum : BitVec 32) (dn dn0 : Dinode) (e0 :
     (uty : Ity)
     (hnib : inum.toNat < 16 * icfgNib) (hdn : dinodeWf dn) (hnz : dn.diType.toNat ≠ 0)
     (hstab : diTypeStable dn dn0) (hdec : dn0.diNlink.toNat = dn.diNlink.toNat + 1) :
-    iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ⊢
+    iregInv fscIreg fscFs icfgIst icfgNib ⊢
       FsStateLink.linkToks (fsGammaL (GF := GF) fscFs) (inum.toNat : Int)
         (FsStateLink.linkReps (iregDotDelta dn.diType.toNat dn.diNlink.toNat) uty) -∗
       iuRegionStep inum dn dn0 e0 (dinodeAt fscIreg inum dn) := by
   unfold iuRegionStep dislotWriteAu
   iintro #Hinv Htok %ds %_ Hdn
-  imod (iregWriteUnlink_reg (hlc := hlc) ⊤ fscIreg fscFs icfgIst icfgNib inum dn0 dn
+  imod (iregWriteUnlink_reg ⊤ fscIreg fscFs icfgIst icfgNib inum dn0 dn
     (diblkBytes ds) uty CoPset.subseteq_top (by omega) hdn hnz hstab hdec) $$ Hinv Hdn Htok
     with ⟨%recOld, %v, %hl, Hrun, #Hvlb, Hcl⟩
   imodintro
@@ -208,7 +208,7 @@ end
 /-! ## The continuation (Rocq's `iu_cont`) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF]
 
 /-- What the walk owes its caller once `brelse` has returned: the entry
@@ -241,7 +241,7 @@ end
 /-! ## The borrowed cells, at the addresses the loads compute -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsBlocksG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsBlocksG GF]
 
 /-- `iuCells` opened at the normal forms `ip + <off>#64` the loads reach. -/
 theorem iu_cells_open [Fscfg] [Icfg] [CurCtx] (ip : BitVec 64) (inum : BitVec 32) (dn : Dinode)
@@ -298,7 +298,7 @@ end
 /-! ## Slot-unit bookkeeping (Rocq's `iu_slots_split` / `iu_slots_join`, at 1 + 1) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
   [DiskG GF] [FsBlocksG GF] [SleepLockG GF]
 
 theorem iu_slots_split [CurCtx] (γ : BcacheNames) :
@@ -317,7 +317,7 @@ end
 /-! ## The handle, opened at iupdate's bread -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
   [DiskG GF] [FsBlocksG GF] [SleepLockG GF]
 
 /-- Rocq's `iu_held_k` and `iu_held_swap` in one opening: the buffer index
@@ -341,7 +341,7 @@ end
 /-! ## The four callees, at their call sites (at the ambient view) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [CurCtx]
 
 theorem iu_memmove (MM : MEMMOVE) (c : CPU) (k' : KCtx) (bs olds : List (BitVec 8)) (n : Nat)
@@ -354,7 +354,7 @@ theorem iu_memmove (MM : MEMMOVE) (c : CPU) (k' : KCtx) (bs olds : List (BitVec 
       byteBuf (k'.regs 11#5) dqs bs -∗ byteBuf (k'.regs 10#5) (DFrac.own 1) bs -∗
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.regs 10#5⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := MM.wp_memmove (hlc := hlc) (GF := GF) c k' bs olds n dqs hK hn hn32 hls hld
+  have h := MM.wp_memmove (GF := GF) c k' bs olds n dqs hK hn hn32 hls hld
   unfold wp_memmove_body at h
   simp only [memmoveAddr] at h
   exact h

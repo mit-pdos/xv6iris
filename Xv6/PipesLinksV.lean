@@ -19,11 +19,11 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode MachCSL
 
 section PeclVFirst
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [PipeOutG GF]
 
 /-- THE ERA'S HEAD WRITE at the claim (Rocq `peclV_step_write_first`). -/
-theorem peclV_step_write_first (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)
+theorem peclV_step_write_first (g : PipeGn) (M : LModel) (G : GenCparams GF M) (sd : M.lmSt)
     (WA : GenWa M G sd) (k : Nat) (v : EraPins) (a : Nat) (b : BitVec 8) (s0 : M.lmSt)
     (ho : List Obs) (H : ConsHist)
     (hfok : M.lmStOk s0) (halt : a < proAlts.length) (hhead : (proAlts[a]!)[0]? = some b) :

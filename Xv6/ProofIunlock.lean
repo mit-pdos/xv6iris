@@ -118,7 +118,7 @@ theorem iul_calleeSaved_epi (KR R : RegMap)
       | assumption
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF] [LogG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF] [LogG GF]
   [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF]
   [SleepLockG GF]
 
@@ -219,7 +219,7 @@ theorem iul_holdingsleep [Icfg] [CurCtx] (HS : HOLDINGSLEEP) (c : CPU)
       wordPointsTo (pPid pj) 4 dqp pidv -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj
-  have h := HS.wp_holdingsleep_gen (hlc := hlc) (GF := GF) c k' γil γisl (icSlp cn kk)
+  have h := HS.wp_holdingsleep_gen (GF := GF) c k' γil γisl (icSlp cn kk)
     (slhTok (icfgIsl kk)) s pidv dqp hnoff hK hs htier
   unfold wp_holdingsleep_gen_body at h
   simp only [holdingsleepAddr] at h
@@ -240,7 +240,7 @@ theorem iul_releasesleep [Icfg] [CurCtx] (RS : RELEASESLEEP_HOOK)
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ slhTok (icfgIsl kk) s -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RS.wp_releasesleep_gen_hook (hlc := hlc) (GF := GF) Γ c k' γil γisl (icSlp cn kk)
+  have h := RS.wp_releasesleep_gen_hook (GF := GF) Γ c k' γil γisl (icSlp cn kk)
     (fun _ => icSlpDep cn kk Tc) (slhTok (icfgIsl kk)) s pidv hnoff hK hs hp htier
   unfold wp_releasesleep_gen_hook_body at h
   simp only [releasesleepAddr] at h
@@ -260,7 +260,7 @@ end
 
 set_option maxHeartbeats 16000000 in
 theorem iunlock_proof (HS : HOLDINGSLEEP) (RS : RELEASESLEEP_HOOK) : IUNLOCK := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ cpu k γil γisl kk s g lo tl d dev inum dn bm
+  fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ cpu k γil γisl kk s g lo tl d dev inum dn bm
     pidv dqp hnoff hK hshr hkk ha0 hsl hp htier hle => by
   unfold wp_iunlock_dep_body
   simp only [iunlockAddr]

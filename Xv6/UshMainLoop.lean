@@ -85,14 +85,14 @@ theorem ushMain_restline (Dl : Uline → Prop) (lu : Uline) (g : Nat → BitVec 
   exact ⟨lu, hD, rfl, hok, hlen, hby⟩
 
 section Loop
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
 /-- What gets left, on the arm getcmd answered `-1` on: the payload. -/
 theorem ushMain_done_pay (N : UkNames GF) (X : UshCtx GF) (Dl : Uline → Prop) (l : List FdState) (i2 : Nat)
     (g : Nat → BitVec 8) (hg0 : g 0 = ubyte0) :
-    ushGetsDoneAt (hlc := hlc) N X Dl l i2 g ⊢ N.pay (-1) := by
+    ushGetsDoneAt N X Dl l i2 g ⊢ N.pay (-1) := by
   unfold ushGetsDoneAt
   iintro (⟨-, Hp⟩ | (⟨%lu, %hl, -⟩ | ⟨-, Hp⟩))
   · iapply ushPos_pay N X $$ Hp
@@ -103,9 +103,9 @@ theorem ushMain_done_pay (N : UkNames GF) (X : UshCtx GF) (Dl : Uline → Prop) 
 body's slot at its words. -/
 theorem ushMain_done_line (N : UkNames GF) (X : UshCtx GF) [Persistent X.T] (Dl : Uline → Prop)
     (l : List FdState) (i2 : Nat) (g : Nat → BitVec 8) (hg0 : g 0 ≠ ubyte0) (hnul : g i2 = ubyte0) :
-    ushGetsDoneAt (hlc := hlc) N X Dl l i2 g ⊢
+    ushGetsDoneAt N X Dl l i2 g ⊢
       ∃ lu : Uline, (⌜Dl lu ∧ i2 = (lineBytes lu).length ∧ ushLineAt lu g 0 i2⌝ ∨ X.T) ∗
-        ushPosw (hlc := hlc) N X l (ulineWs lu) := by
+        ushPosw N X l (ulineWs lu) := by
   unfold ushGetsDoneAt
   iintro (⟨%h0, -⟩ | (⟨%lu, %hl, Hp⟩ | ⟨#HT, Hp⟩))
   · exact (hg0 (by rw [← hnul, h0])).elim
@@ -121,16 +121,16 @@ theorem ushMain_done_line (N : UkNames GF) (X : UshCtx GF) [Persistent X.T] (Dl 
 goes round the loop again on the Löb hypothesis; anything else is main's
 body, `ushRestLAt`. -/
 theorem ushMain_tail (UL : UK_LEAVES) (N : UkNames GF) [UknConst N] (X : UshCtx GF) [Persistent X.T]
-    (L : UshLaws (hlc := hlc) N X)
+    (L : UshLaws N X)
     (Dl : Uline → Prop) (R : IProp GF) (l : List FdState) (h : CPU) (mm : RegMap) (g : Nat → BitVec 8)
     (lu : Uline) (kk i2 n0 : Nat) (ws : List (List (BitVec 8))) (hrm : ushRegs mm) (hkk : kk ≤ i2) (hi2 : i2 < shNbuf)
     (hnul : g i2 = ubyte0) (hsm : mm.get 9#5 = BitVec.ofNat 64 (shBuf + kk))
     (ham : mm.get 15#5 = BitVec.ofNat 64 (g kk).toNat) (hfd0 : ushFd0p l) :
-    ⊢ ushCode N.t -∗ ushJtab N.t -∗ ushGenSlot (hlc := hlc) N X -∗ ushRestLAt (hlc := hlc) N X Dl R -∗
-      ▷ ushLoopHead (hlc := hlc) N X R l -∗ (⌜Dl lu ∧ i2 = (lineBytes lu).length ∧ ushLineAt lu g 0 i2⌝ ∨ X.T) -∗
-      ushRestLineAt X Dl ws g kk -∗ ushBstate (hlc := hlc) N X l ws -∗
+    ⊢ ushCode N.t -∗ ushJtab N.t -∗ ushGenSlot N X -∗ ushRestLAt N X Dl R -∗
+      ▷ ushLoopHead N X R l -∗ (⌜Dl lu ∧ i2 = (lineBytes lu).length ∧ ushLineAt lu g 0 i2⌝ ∨ X.T) -∗
+      ushRestLineAt X Dl ws g kk -∗ ushBstate N X l ws -∗
       R -∗ ubytes N.d shBuf shNbuf g -∗
-      urun (hlc := hlc) N h mm (BitVec.ofNat 64 0x952) (16 + (ushDbody + n0)) -∗ wpLoop h := by
+      urun N h mm (BitVec.ofNat 64 0x952) (16 + (ushDbody + n0)) -∗ wpLoop h := by
   iintro #Hc #Hjt #Hgen #Hrest IH #Hline #Hrl Hstd HR Hbs Hrun
   ihave #Hi := ushMI_952 N.t $$ Hc
   iapply wp_uk_btype UL N h mm _ false 8130#13 20#5 15#5 .BEQ _ (fun _ => by decide) $$ Hi Hrun
@@ -184,21 +184,21 @@ theorem ushMain_tail (UL : UK_LEAVES) (N : UkNames GF) [UknConst N] (X : UshCtx 
 byte's blank tests; the scan on a leading blank (the taint's), the tail
 otherwise. -/
 theorem ushMain_line (UL : UK_LEAVES) (N : UkNames GF) [UknConst N] (X : UshCtx GF) [Persistent X.T]
-    (L : UshLaws (hlc := hlc) N X) (Dl : Uline → Prop) (R : IProp GF) (l : List FdState) (h : CPU) (mR : RegMap)
+    (L : UshLaws N X) (Dl : Uline → Prop) (R : IProp GF) (l : List FdState) (h : CPU) (mR : RegMap)
     (g : Nat → BitVec 8) (lu : Uline) (i2 n0 : Nat) (hrR : ushRegs mR) (hi2 : i2 < shNbuf)
     (hnul : g i2 = ubyte0) (hfd0 : ushFd0p l) :
-    ⊢ ushCode N.t -∗ ushJtab N.t -∗ ushGenSlot (hlc := hlc) N X -∗ ushRestLAt (hlc := hlc) N X Dl R -∗
-      ▷ ushLoopHead (hlc := hlc) N X R l -∗
+    ⊢ ushCode N.t -∗ ushJtab N.t -∗ ushGenSlot N X -∗ ushRestLAt N X Dl R -∗
+      ▷ ushLoopHead N X R l -∗
       (⌜Dl lu ∧ i2 = (lineBytes lu).length ∧ ushLineAt lu g 0 i2⌝ ∨ X.T) -∗
-      ushBstate (hlc := hlc) N X l (ulineWs lu) -∗ R -∗ ubytes N.d shBuf shNbuf g -∗
-      urun (hlc := hlc) N h mR (BitVec.ofNat 64 0x920) (16 + (ushDbody + n0)) -∗ wpLoop h := by
+      ushBstate N X l (ulineWs lu) -∗ R -∗ ubytes N.d shBuf shNbuf g -∗
+      urun N h mR (BitVec.ofNat 64 0x920) (16 + (ushDbody + n0)) -∗ wpLoop h := by
   iintro #Hc #Hjt #Hgen #Hrest IH #Hline Hstd HR Hbs Hrun
   have hs2 := hrR.1
   -- the shared tail, once
   ihave Htail : (∀ (hh : CPU) (mm : RegMap) (kk : Nat), ⌜ushRegs mm⌝ -∗ ⌜kk ≤ i2⌝ -∗
       ⌜mm.get 9#5 = BitVec.ofNat 64 (shBuf + kk)⌝ -∗ ⌜mm.get 15#5 = BitVec.ofNat 64 (g kk).toNat⌝ -∗
       ushRestLineAt X Dl (ulineWs lu) g kk -∗ ubytes N.d shBuf shNbuf g -∗
-      urun (hlc := hlc) N hh mm (BitVec.ofNat 64 0x952) (16 + (ushDbody + n0)) -∗ wpLoop hh) $$ [Hstd HR IH]
+      urun N hh mm (BitVec.ofNat 64 0x952) (16 + (ushDbody + n0)) -∗ wpLoop hh) $$ [Hstd HR IH]
   · iintro %hh %mm %kk %hrm %hkk %hsm %ham Hrl Hbs Hrun
     iapply ushMain_tail UL N X L Dl R l hh mm g lu kk i2 n0 _ hrm hkk hi2 hnul hsm ham hfd0
       $$ Hc Hjt Hgen Hrest IH Hline Hrl Hstd HR Hbs Hrun
@@ -271,11 +271,11 @@ theorem ushMain_line (UL : UK_LEAVES) (N : UkNames GF) [UknConst N] (X : UshCtx 
 Löb induction. DEPENDS ON `ush_read_leaf` (through getcmd). -/
 theorem ushMain_loop (UL : UK_LEAVES) (HS : UK_SYS_P) (SC : SH_GETCMD) (N : UkNames GF) [UknConst N]
     (X : UshCtx GF) [Persistent X.T] (Dsc : List (BitVec 8) → Prop) (Dl : Uline → Prop) (cn : ConsNames)
-    (L : UshLaws (hlc := hlc) N X) (D : UshDisc Dsc Dl)
-    (HR : ∀ l : List FdState, ⊢ ushReadRecvLeafAt (hlc := hlc) N X Dsc cn l) (R : IProp GF) (l : List FdState) :
-    ⊢ □ (X.T -∗ shDeps (hlc := hlc)) -∗ ushTagLaw (hlc := hlc) X -∗ ushPromptLaw (hlc := hlc) N X -∗
-      ushRestLAt (hlc := hlc) N X Dl R -∗ ushCode N.t -∗ ushJtab N.t -∗ ushGenSlot (hlc := hlc) N X -∗
-      ushLoopHead (hlc := hlc) N X R l := by
+    (L : UshLaws N X) (D : UshDisc Dsc Dl)
+    (HR : ∀ l : List FdState, ⊢ ushReadRecvLeafAt N X Dsc cn l) (R : IProp GF) (l : List FdState) :
+    ⊢ □ (X.T -∗ shDeps) -∗ ushTagLaw X -∗ ushPromptLaw N X -∗
+      ushRestLAt N X Dl R -∗ ushCode N.t -∗ ushJtab N.t -∗ ushGenSlot N X -∗
+      ushLoopHead N X R l := by
   iintro #Hdp #Hlaw #Hplaw #Hrest #Hc #Hjt #Hgen
   iloeb as IH
   unfold ushLoopHead

@@ -44,16 +44,16 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section AppFileHook
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF]
 
 /-- THE TOKEN AS THE ERA HOLDS IT: the shares, or the taint (Rocq
 `union_tk`). -/
 def unionTk (c : FileFixed) (k : Nat) : IProp GF :=
-  iprop(fileTaint (hlc := hlc) c ∨ unionTkb (hlc := hlc) c k)
+  iprop(fileTaint c ∨ unionTkb c k)
 
 instance unionTk_timeless (c : FileFixed) (k : Nat) :
-    Timeless (unionTk (hlc := hlc) (GF := GF) c k) := by
+    Timeless (unionTk (GF := GF) c k) := by
   unfold unionTk; infer_instance
 
 /-- THE HOOK FAMILY over an abstract claim (Rocq `union_hk`). -/
@@ -61,8 +61,8 @@ def unionHk (A : FileFixed → FileAppNames → Aview → IProp GF) (c : FileFix
     (Q : IProp GF) : IProp GF :=
   iprop(∀ (I : RegMapF FsNode) (r r' : FileAppNames),
     ⌜r.fnEra = k + 1⌝ -∗ ⌜r'.fnEra = k + 1⌝ -∗ ⌜r'.fnRole = true⌝ -∗
-    ▷ A c r' (absView I) -∗ ▷ A c r (absView I) -∗ unionTk (hlc := hlc) c k ==∗
-      ◇ (▷ A c r' (absView I) ∗ ▷ A c r (absView I) ∗ unionTk (hlc := hlc) c k ∗ Q))
+    ▷ A c r' (absView I) -∗ ▷ A c r (absView I) -∗ unionTk c k ==∗
+      ◇ (▷ A c r' (absView I) ∗ ▷ A c r (absView I) ∗ unionTk c k ∗ Q))
 
 /-- A later absorbed into a basic update whose result is under `◇` (Rocq
 `bupd_except_0_elim`). -/
@@ -72,8 +72,8 @@ theorem bupd_except0_elim (P : IProp GF) : iprop(◇ (|==> ◇ P)) ⊢ iprop(|==
 /-- A holder's half of the deed reads the claim's files (Rocq
 `f_state_deed_ok`). -/
 theorem fState_deedOk (c : FileFixed) (r : FileAppNames) (av : Aview) (s : Dst) :
-    ⊢@{IProp GF} fdeed r s -∗ fState (hlc := hlc) c r av -∗
-      fState (hlc := hlc) c r av ∗ fdeed r s ∗ ⌜fOk av s⌝ := by
+    ⊢@{IProp GF} fdeed r s -∗ fState c r av -∗
+      fState c r av ∗ fdeed r s ∗ ⌜fOk av s⌝ := by
   iintro Hd Hf
   unfold fState
   icases Hf with (⟨Hw, Hf⟩ | Hf)
@@ -111,14 +111,14 @@ theorem unionHook_file (c : FileFixed) (k : Nat) (r0 : FileAppNames) (s : Dst)
       runReg c (k + 1) r0.fnPos r0.fnDeed -∗
       ((fdeed r0 s -∗ fposh r0 ls'.length -∗
           ∀ Ls : List Srec, slLb c.ffHist (Ls ++ [(ls'.length, dstContent s)]) -∗ Q)
-       ∧ (fileTaint (hlc := hlc) c -∗ fdeed r0 s -∗ fposh r0 n -∗ Q)) -∗
-      unionHk (filePred (hlc := hlc)) c k Q := by
+       ∧ (fileTaint c -∗ fdeed r0 s -∗ fposh r0 n -∗ Q)) -∗
+      unionHk (filePred) c k Q := by
   iintro Hd Hpos #Hls' #Hrr0 Hk
   unfold unionHk
   iintro %I %r %r' %hr %hr' %hrc Hg Hp Htk
   iapply bupd_except0_elim
-  imod (@timeless_except0 _ _ _ (filePred_timeless (hlc := hlc) (GF := GF) c r' (absView I))).mp $$ Hg with Hg
-  imod (@timeless_except0 _ _ _ (filePred_timeless (hlc := hlc) (GF := GF) c r (absView I))).mp $$ Hp with Hp
+  imod (@timeless_except0 _ _ _ (filePred_timeless (GF := GF) c r' (absView I))).mp $$ Hg with Hg
+  imod (@timeless_except0 _ _ _ (filePred_timeless (GF := GF) c r (absView I))).mp $$ Hp with Hp
   imodintro
   unfold unionTk
   -- THE TAINT, from any of its three sources: the loan untouched

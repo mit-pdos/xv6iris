@@ -133,7 +133,7 @@ theorem it_slotaddr (ls t : Nat) (hls : ls < 2 ^ 31) (ht : t < 2 ^ 31)
 /-! ## The format string -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- `"recovering tail %d dst %d\n"` at `0x80007500` (26 bytes plus the NUL). -/
 def itFmtStr : List (BitVec 8) :=
@@ -156,7 +156,7 @@ end
 /-! ## The ten-slot frame -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- The ten cells of `install_trans`'s 80-byte frame, from `sp-8` down to
 `sp-80`: `ra`, `s0` and `s1`..`s8`. -/
@@ -291,7 +291,7 @@ end
 /-! ## The five callees, at their call sites -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [CurCtx]
 
 /-- Two value varargs cost nothing. -/
@@ -324,7 +324,7 @@ theorem it_printk (PK : PRINTK) (c : CPU) (k' : KCtx)
   icases (show panicEnv (GF := GF) ⊢ ∃ (γpr γlp : GName) (γd : UartNames),
       isLock γpr prLock "pr" (fun _ => emp) ∗ isTxLock γlp γd ∗ uartSentSub γd [] from by
     unfold panicEnv; iintro H; iexact H) $$ Hpe with ⟨%γpr, %γlp, %γd, #Hlk, #Htx, #Hsent⟩
-  have h := PK.wp_printk (hlc := hlc) (GF := GF) c k' γpr γlp γd [] DFrac.discard itFmtStr
+  have h := PK.wp_printk (GF := GF) c k' γpr γlp γd [] DFrac.discard itFmtStr
     [PkArgDesc.num, PkArgDesc.num] hK (by unfold itFmtStr; decide)
     (by rw [it_pkKinds]; rfl) (by decide) hnoff hpr huart
   unfold wp_printk_body at h
@@ -345,7 +345,7 @@ theorem it_printk (PK : PRINTK) (c : CPU) (k' : KCtx)
 
 set_option maxHeartbeats 1000000 in
 /-- `bwrite(dbuf)` at `+0xa2`. -/
-theorem it_bwrite (BW : BWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem it_bwrite (BW : BWRITE) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j kk : Nat)
     (pidv dev bno : BitVec 32) (dqp : DFrac) (bs bsd : List (BitVec 8)) (Q : IProp GF)
@@ -360,7 +360,7 @@ theorem it_bwrite (BW : BWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗
     bufHold0 γb V kk pidv dev bno bs bsd ∗
-    diskSeqPermit (genId (hlc := hlc) (GF := GF)) (some (BSIZE * bno.toNat, bs)) Q ∗
+    diskSeqPermit (genId (GF := GF)) (some (BSIZE * bno.toNat, bs)) Q ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
@@ -369,7 +369,7 @@ theorem it_bwrite (BW : BWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       bufHold0 γb V kk pidv dev bno bs bs -∗ ▷ Q -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj hs
-  have h := BW.wp_bwrite_eb (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl pd pav pu j kk
+  have h := BW.wp_bwrite_eb (GF := GF) Γ c k' γl γb V γdl pd pav pu j kk
     pidv dev bno dqp bs bsd Q hj hproc hK hnoff htier hkk ha0 hbno hbsd hpd
   unfold wp_bwrite_eb_body at h
   simp only [bwriteAddr] at h
@@ -389,7 +389,7 @@ theorem it_bunpin (BU : BUNPIN)
       ⌜calleeSaved k'.regs R'⌝ -∗ bslot -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj
-  have h := BU.wp_bunpin (hlc := hlc) (GF := GF) c k' γl γb V kk dev bno hnoff hK hlk hkk ha0
+  have h := BU.wp_bunpin (GF := GF) c k' γl γb V kk dev bno hnoff hK hlk hkk ha0
   unfold wp_bunpin_body at h
   simp only [bunpinAddr] at h
   exact h
@@ -409,7 +409,7 @@ theorem it_memmove (MM : MEMMOVE) (c : CPU) (k' : KCtx)
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = dst⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hsrc; subst hdst
-  have h := MM.wp_memmove (hlc := hlc) (GF := GF) c k' bs olds m dqs hK hn hn32 hls hld
+  have h := MM.wp_memmove (GF := GF) c k' bs olds m dqs hK hn hn32 hls hld
   unfold wp_memmove_body at h
   simp only [memmoveAddr] at h
   exact h
@@ -419,7 +419,7 @@ end
 /-! ## The loop's vocabulary -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [CurCtx]
 
 /-- Entry `i` of the write set BEFORE the pass reaches it: the log copy's
@@ -598,7 +598,7 @@ theorem itFix_cs (k : KCtx) (recovering : Bool) (t : Nat) (R R' : RegMap)
     c22.trans a22, c23.trans a23, c24.trans a24, c25.trans a25, c26.trans a26, c27.trans a27⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [CurCtx]
 
 /-- THE HOME WRITES' PERMIT GENERATOR (the contract's `□ (∀ i w, …)`,
@@ -606,17 +606,17 @@ Rocq's): persistent, cursor-indexed over the threaded `Rt`. -/
 def itGen (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8)) (Rt : Nat → IProp GF) :
     IProp GF := iprop(
   □ (∀ (i : Nat) (w : BitVec 32), ⌜W[i]? = some w⌝ -∗ ⌜(Lw i).length = BSIZE⌝ -∗ ▷ Rt i -∗
-       diskSeqPermit (genId (hlc := hlc) (GF := GF)) (some (1024 * w.toNat, Lw i)) (Rt (i + 1))))
+       diskSeqPermit (genId (GF := GF)) (some (1024 * w.toNat, Lw i)) (Rt (i + 1))))
 
 instance itGen_persistent (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8))
-    (Rt : Nat → IProp GF) : Persistent (itGen (hlc := hlc) (GF := GF) W Lw Rt) := by
+    (Rt : Nat → IProp GF) : Persistent (itGen (GF := GF) W Lw Rt) := by
   unfold itGen; infer_instance
 
 /-- Entry `i`'s permit, at `bwrite`'s spelling of the offset. -/
 theorem itGen_use (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8)) (Rt : Nat → IProp GF)
     (i : Nat) (w : BitVec 32) (hw : W[i]? = some w) (hl : (Lw i).length = BSIZE) :
-    itGen (hlc := hlc) (GF := GF) W Lw Rt ⊢ ▷ Rt i -∗
-      diskSeqPermit (genId (hlc := hlc) (GF := GF)) (some (BSIZE * w.toNat, Lw i)) (Rt (i + 1)) := by
+    itGen (GF := GF) W Lw Rt ⊢ ▷ Rt i -∗
+      diskSeqPermit (genId (GF := GF)) (some (BSIZE * w.toNat, Lw i)) (Rt (i + 1)) := by
   unfold itGen
   iintro #H HR
   ihave Hp := H $$ %i %w %hw %hl HR
@@ -689,7 +689,7 @@ theorem it_post_at (cpu c : CPU) (k : KCtx) (γb : BcacheNames) (γfs : FsNames)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [CurCtx]
 
 set_option maxHeartbeats 4000000 in
@@ -749,7 +749,7 @@ theorem it_exit (c0 cpu : CPU) (k : KCtx) (γb : BcacheNames) (γfs : FsNames)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [CurCtx]
 
 /-- **The loop invariant at the head `+0x6c`**: the pins, the cursor `t`,
@@ -833,7 +833,7 @@ theorem it_ctx_pushed0 (k : KCtx) (m : Nat) (R0 R1 : RegMap) :
   rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [CurCtx]
 
 theorem it_frozen (logstart : Nat) (dev : BitVec 32) :
@@ -859,7 +859,7 @@ set_option maxHeartbeats 40000000 in
 `bread`s, the `memmove`, the `bwrite`, the two `brelse`s, the cursor step
 and the test -- either back to the head or out at `+0xb2`. -/
 theorem it_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PRINTK)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (c0 cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (γfs : FsNames) (pd pav pu : BitVec 64) (j logstart n : Nat) (dev : BitVec 32)
     (recovering : Bool)
@@ -885,7 +885,7 @@ theorem it_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
     pcIs cpu (KA.«install_trans» + 0x6c#64) ∗
     procsInv Γ ∗ bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
     logFrozen logstart dev ∗ fsBytesInv γfs.bytes γfs.cache γfs.exc homeL Xv ∗
-    itGen (hlc := hlc) W Lw Rt ∗
+    itGen W Lw Rt ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wordPointsTo lhNAddr 4 (DFrac.own 1) (BitVec.ofNat 32 n) ∗
@@ -1390,7 +1390,7 @@ set_option maxHeartbeats 40000000 in
 cursor step and the test.  The `printk` arm is not taken (`s6 = 0`) and the
 `bunpin` at `+0xac` is. -/
 theorem it_body_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PRINTK)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (c0 cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (γfs : FsNames) (pd pav pu : BitVec 64) (j logstart n : Nat) (dev : BitVec 32)
     (recovering : Bool)
@@ -1414,7 +1414,7 @@ theorem it_body_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (M
     pcIs cpu (KA.«install_trans» + 0x6c#64) ∗
     procsInv Γ ∗ bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
     logFrozen logstart dev ∗ fsBytesInv γfs.bytes γfs.cache γfs.exc homeL Xv ∗
-    itGen (hlc := hlc) W Lw Rt ∗
+    itGen W Lw Rt ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wordPointsTo lhNAddr 4 (DFrac.own 1) (BitVec.ofNat 32 n) ∗
@@ -1900,12 +1900,12 @@ end
 /-! ## The loop, closed by Löb at the head `+0x6c` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
 theorem it_loop (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PRINTK)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (γfs : FsNames) (pd pav pu : BitVec 64) (j logstart n : Nat) (dev : BitVec 32)
     (recovering : Bool)
@@ -1928,7 +1928,7 @@ theorem it_loop (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
     (hrec : recovering = true) :
     procsInv (GF := GF) Γ -∗ bioCtx γl γb V -∗ diskCaps V.gd γdl pd pav pu -∗ panicEnv -∗
     logFrozen logstart dev -∗ fsBytesInv γfs.bytes γfs.cache γfs.exc homeL Xv -∗
-    itGen (hlc := hlc) W Lw Rt -∗
+    itGen W Lw Rt -∗
     itLoopInv cpu k γb γfs recovering logstart n W Lw L D pidv dqp Xexc Rt := by
   iintro #Hpinv #Hbc #Hdc #Hpe #Hfroz #Hbinv #Hgen
   iloeb as IH
@@ -1944,7 +1944,7 @@ theorem it_loop (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PR
 
 set_option maxHeartbeats 16000000 in
 theorem it_loop_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE) (PK : PRINTK)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (γfs : FsNames) (pd pav pu : BitVec 64) (j logstart n : Nat) (dev : BitVec 32)
     (recovering : Bool)
@@ -1965,7 +1965,7 @@ theorem it_loop_commit (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE) (M
     (hrec : recovering = false) :
     procsInv (GF := GF) Γ -∗ bioCtx γl γb V -∗ diskCaps V.gd γdl pd pav pu -∗ panicEnv -∗
     logFrozen logstart dev -∗ fsBytesInv γfs.bytes γfs.cache γfs.exc homeL Xv -∗
-    itGen (hlc := hlc) W Lw Rt -∗
+    itGen W Lw Rt -∗
     itLoopInv cpu k γb γfs recovering logstart n W Lw L D pidv dqp Xexc Rt := by
   iintro #Hpinv #Hbc #Hdc #Hpe #Hfroz #Hbinv #Hgen
   iloeb as IH
@@ -1988,14 +1988,14 @@ set_option maxHeartbeats 16000000 in
 /-- **`install_trans` meets its specification** (the recovering arm). -/
 theorem installTrans_proof (BR : BREAD) (BU : BUNPIN) (BW : BWRITE) (BE : BRELSE)
     (MM : MEMMOVE) (PK : PRINTK) : INSTALL_TRANS := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ c0 k γl γb V γdl γfs pd pav pu j logstart dev recovering n
+  fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ c0 k γl γb V γdl γfs pd pav pu j logstart dev recovering n
       W Lw L D pidv dqp homeL Xv Xexc Rt hj hproc hK hnoff htier hgeom hdev hcl2 hdt2
       ha0 hn hnodup hhome hlen hcommit hpin hxexc hpd => by
   unfold wp_install_trans_eb_body
   simp only [installTransAddr]
   iintro ⟨Hk, Hpc, #Hpinv, Hte, Hce, #Hbc, #Hdc, #Hpe, #Hfroz, Hpid, HlhN, Hlhb,
     #Hbinv, Hexc, Hauth, Hdirty, Hrows, Hslots, #Hgen0, HR0, HΦ⟩
-  ihave #Hgen : itGen (hlc := hlc) (GF := GF) W Lw Rt $$ [Hgen0]
+  ihave #Hgen : itGen (GF := GF) W Lw Rt $$ [Hgen0]
   · unfold itGen; iexact Hgen0
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩

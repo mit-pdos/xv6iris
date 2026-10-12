@@ -117,7 +117,7 @@ theorem biKept_trans {R R' R'' : RegMap} (h : biKept R R') (h' : biKept R' R'') 
     h'.2.2.2.2.2.2.2.2.2.2.2.trans h.2.2.2.2.2.2.2.2.2.2.2⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-! ## The pieces of the list -/
 
@@ -241,7 +241,7 @@ theorem bi_initlock_call (IL : INITLOCK) [CurCtx] (c : CPU) (k' : KCtx)
       wordPointsTo (lk + 8#64) 8 (DFrac.own 1) nm -∗
       lkFresh lk -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := IL.wp_initlock (hlc := hlc) (GF := GF) c k' vlock vname vcpu hK'
+  have h := IL.wp_initlock (GF := GF) c k' vlock vname vcpu hK'
   unfold wp_initlock_body at h
   simp only [initlockAddr, h10, h11] at h
   exact h
@@ -256,7 +256,7 @@ theorem bi_initsleeplock_call (IS : INITSLEEPLOCK) [CurCtx] (c : CPU) (k' : KCtx
       kctx cpu' (k'.withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       sleepLockInited lk nm -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := IS.wp_initsleeplock (hlc := hlc) (GF := GF) c k' hK'
+  have h := IS.wp_initsleeplock (GF := GF) c k' hK'
   unfold wp_initsleeplock_body at h
   simp only [initsleeplockAddr, h10, h11] at h
   exact h
@@ -571,7 +571,7 @@ theorem binit_br_477c : KA.«binit» + 0x477c#64 = KStr.«bcache» := by decide
 
 set_option maxHeartbeats 4000000 in
 theorem binit_proof (IL : INITLOCK) (IS : INITSLEEPLOCK) : BINIT :=
-  ⟨fun {hlc GF} _ _ cpu k vlock vname vcpu vhp vhn hK => by
+  ⟨fun {GF} _ _ cpu k vlock vname vcpu vhp vhn hK => by
   unfold wp_binit_body
   simp only [lockWords, bi_headPrev, bi_headNext]
   iintro ⟨Hk, Hpc, ⟨#Hcl, #Hcl', Hwlock, Hwname, Hwcpu⟩, Hhp, Hhn, Hbufs, HΦ⟩

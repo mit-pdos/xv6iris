@@ -17,7 +17,7 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 open Std (ExtTreeSet)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -27,9 +27,9 @@ def wpCatStartBody : Prop :=
     (Ci Cend : IProp GF),
     (∀ (j : Nat) (g : UArg), args[j]? = some g → g.ptr ≠ 0) →
     m.get 10#5 = BitVec.ofNat 64 args.length → m.get 11#5 = BitVec.ofNat 64 av →
-    ⊢ kcatPayAll (hlc := hlc) N args Ci Cend -∗ (Cend -∗ kcatExit (hlc := hlc) N 0) -∗
+    ⊢ kcatPayAll N args Ci Cend -∗ (Cend -∗ kcatExit N 0) -∗
       ukCode N.t User.Cat.code.byte -∗ uargv N.d av args -∗ Ci -∗ ubytes N.d User.Cat.Sym.«buf» 512 f -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Cat.Sym.«start»)
+      urun N h m (BitVec.ofNat 64 User.Cat.Sym.«start»)
         (2 + (6 + (8 + (10 + (12 + (4 + n)))))) -∗
       wpLoop h
 
@@ -37,8 +37,8 @@ end
 
 /-- The interface of cat's `start` (its entry point). -/
 structure CAT_START : Prop where
-  wp_catStart : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+  wp_catStart : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
-    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpCatStartBody (hlc := hlc) (GF := GF)
+    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpCatStartBody (GF := GF)
 
 end Xv6

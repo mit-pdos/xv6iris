@@ -122,7 +122,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std Iris.Algebra MachCSL
 
 /-- The slot accessor's key, re-read at the inum (Rocq's
 `iEval (rewrite Hkey) in "Hslot"`). -/
-theorem iregSlot_atKey {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF]
+theorem iregSlot_atKey {GF : BundledGFunctors.{0}} [MachGS GF] [IregG GF]
     [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBytesG GF] [FsTopG GF] [FsLinkG GF] [Icfg]
     (γfs : FsNames) (γi : GName) (inum : BitVec 32) (d : Dinode) :
     iregSlot (GF := GF) γfs γi (16 * iregBi inum + islot inum) d ⊣⊢ iregSlot γfs γi inum.toNat d := by
@@ -175,7 +175,7 @@ end Back
 /-! ## 2.  THE CLAIM PACKAGE's ELIM (SIMP-2, ghost-simplification.md §5.1) -/
 
 section Claimed
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF]
   [SleepLockG GF] [IcboxG GF]
 
 /-- `IcacheRef.inodeClaimed` -- what `SpecIalloc` hands back as ONE row --
@@ -200,7 +200,7 @@ end Claimed
 /-! ## 3.  THE WITHDRAWAL (§16.4's `icb_withdraw`) -/
 
 section Withdraw
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- THE THREE ARMS, DISCHARGED IN ONE STEP (§5'.3, RESHAPED BY RULING C';
@@ -398,7 +398,7 @@ theorem iregWithdraw [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames) (inodest
     (hin : (inum.toNat : Int) < 16 * (nib : Int)) (hb : b = IBLOCK inum inodestart)
     (hwf : diblkWf ds) (hbsl : bsl = diblkBytes ds)
     (hnz : ds[islot inum]!.diType.toNat ≠ 0) :
-    ⊢@{IProp GF} iregInv (hlc := hlc) γi γfs inodestart nib -∗
+    ⊢@{IProp GF} iregInv γi γfs inodestart nib -∗
       imark γi (inum.toNat : Int) -∗
       iregWdLic o gy inum.toNat -∗
       (γfs.cache ↪◯MAP[b]{DFrac.own (1 : Qp).half} bsl) -∗
@@ -450,7 +450,7 @@ sources `create_fresh_ty`'s type equation. -/
 theorem iregClaimNoOut [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames) (inodestart nib : Nat)
     (inum : BitVec 32) (dn : Dinode) (ty : BitVec 16) (t : Nat) (qt : Qp)
     (hE : (↑iregN : CoPset) ⊆ E) (hin : (inum.toNat : Int) < 16 * (nib : Int)) :
-    ⊢@{IProp GF} iregInv (hlc := hlc) γi γfs inodestart nib -∗
+    ⊢@{IProp GF} iregInv γi γfs inodestart nib -∗
       dinodeAt γi inum dn -∗
       iclaim inum.toNat ty t qt -∗ |={E}=> False := by
   have hbi := iregBi_lt inum nib hin

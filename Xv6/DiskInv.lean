@@ -162,7 +162,7 @@ def serveTail (h : BitVec 16) (r : VioReq) : Virtio.VM Unit := do
       some (Virtio.complete s h) else none) (Virtio.usedIdxAddr c) 2 (ui + 1#16)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
 
 /-! ## The protocol survives a move that leaves the image alone -/
 
@@ -586,10 +586,10 @@ theorem diskProto_drain_acc (γ : DiskNames) (v : VirtioState) (k : Nat) :
 channel, both persistent -- what `MachCSL.wpDev_dmaD`'s lent `stepD` may
 open (Rocq `wp_disk_loop`'s `crash_inv` and `perm_inv gen_id (dn_perm γd)`). -/
 def diskDrainEnv (γ : DiskNames) : IProp GF := iprop%
-  crashInv ∗ crashPermInv (genId (hlc := hlc) (GF := GF)) γ.cperm
+  crashInv ∗ crashPermInv (genId (GF := GF)) γ.cperm
 
 instance diskDrainEnv_persistent (γ : DiskNames) :
-    Persistent (diskDrainEnv (hlc := hlc) (GF := GF) γ) := by
+    Persistent (diskDrainEnv (GF := GF) γ) := by
   unfold diskDrainEnv; infer_instance
 
 theorem crashPermN_diskN : (↑crashPermN : CoPset) ⊆ ⊤ \ ↑diskN := by
@@ -611,21 +611,21 @@ arms): both invariants are opened at the step's first leg, the between-legs
 `▷` strips the channel's body and the crash predicate, and the second leg
 runs the channel step `hF` with the durable authority lent. -/
 theorem diskLend_spend (γ : DiskNames) (P Q : IProp GF) (dk dk' : Nat → BitVec 8)
-    (hF : crashPermInvBody (genId (hlc := hlc) (GF := GF)) γ.cperm ∗ P ∗
-        startAuth (genId (hlc := hlc) (GF := GF) + 1) ∗ diskFixedAuth dk ∗
-        ▷ MachFixedGS.crashPred (hlc := hlc) (GF := GF) ⊢@{IProp GF} |={∅}=>
-      (crashPermInvBody (genId (hlc := hlc) (GF := GF)) γ.cperm ∗
-        startAuth (genId (hlc := hlc) (GF := GF) + 1) ∗ diskFixedAuth dk' ∗
-        ▷ MachFixedGS.crashPred (hlc := hlc) (GF := GF) ∗ Q)) :
-    diskDrainEnv (hlc := hlc) (GF := GF) γ ∗ P ⊢@{IProp GF}
+    (hF : crashPermInvBody (genId (GF := GF)) γ.cperm ∗ P ∗
+        startAuth (genId (GF := GF) + 1) ∗ diskFixedAuth dk ∗
+        ▷ MachFixedGS.crashPred (GF := GF) ⊢@{IProp GF} |={∅}=>
+      (crashPermInvBody (genId (GF := GF)) γ.cperm ∗
+        startAuth (genId (GF := GF) + 1) ∗ diskFixedAuth dk' ∗
+        ▷ MachFixedGS.crashPred (GF := GF) ∗ Q)) :
+    diskDrainEnv (GF := GF) γ ∗ P ⊢@{IProp GF}
       |={⊤ \ ↑diskN, ∅}=> ▷ (diskLend dk ={∅, ⊤ \ ↑diskN}=∗ (diskLend dk' ∗ Q)) := by
   unfold diskDrainEnv crashInv crashPermInv
   iintro ⟨⟨#Hci, #Hpi⟩, HP⟩
   imod (inv_acc (E := ⊤ \ ↑diskN) (N := crashPermN)
-    (P := crashPermInvBody (genId (hlc := hlc) (GF := GF)) γ.cperm) crashPermN_diskN) $$ Hpi
+    (P := crashPermInvBody (genId (GF := GF)) γ.cperm) crashPermN_diskN) $$ Hpi
     with ⟨Hpb, Hpclose⟩
   imod (inv_acc (E := (⊤ \ ↑diskN) \ ↑crashPermN) (N := crashN)
-    (P := MachFixedGS.crashPred (hlc := hlc) (GF := GF)) crashN_diskN_perm) $$ Hci
+    (P := MachFixedGS.crashPred (GF := GF)) crashN_diskN_perm) $$ Hci
     with ⟨HC, Hcclose⟩
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
@@ -645,7 +645,7 @@ sector's owner spends one branch of its sequential permit at the image the
 machine moves FROM, and -- if it was the request's last sector -- its leaf
 too. -/
 theorem diskDrain_step (γ : DiskNames) (v : VirtioState) (k : Nat) :
-    iprop(diskDrainEnv (hlc := hlc) (GF := GF) γ ∗ diskRoot γ ∗ diskProto γ v) ⊢@{IProp GF}
+    iprop(diskDrainEnv (GF := GF) γ ∗ diskRoot γ ∗ diskProto γ v) ⊢@{IProp GF}
       |={⊤ \ ↑diskN, ∅}=> ▷ (diskLend v.disk ={∅, ⊤ \ ↑diskN}=∗
         (diskLend (Virtio.drain v k).disk ∗ diskProto γ (Virtio.drain v k) ∗ diskRoot γ)) := by
   iintro ⟨#Henv, HC, HR⟩
@@ -670,14 +670,14 @@ theorem diskDrain_step (γ : DiskNames) (v : VirtioState) (k : Nat) :
     rotate_left
     · iframe Henv Hpend Hback HC
     iintro ⟨Hpb, ⟨Hpend, Hback, HC⟩, Hst, Hdk, HP⟩
-    imod crashPerm_step_kq (genId (hlc := hlc) (GF := GF)) γ.cperm kq w todo j v.disk
-        (genId (hlc := hlc) (GF := GF) + 1) hj rfl $$ [Hpb Hpend Hst Hdk HP]
+    imod crashPerm_step_kq (genId (GF := GF)) γ.cperm kq w todo j v.disk
+        (genId (GF := GF) + 1) hj rfl $$ [Hpb Hpend Hst Hdk HP]
       with ⟨Hpb, Hpend, Hst, Hdk, HP⟩
     · iframe Hpb Hpend Hst Hdk HP
     by_cases he : todo.erase j = []
     · isimp only [he] at Hpend
-      imod crashPerm_consume_kq (genId (hlc := hlc) (GF := GF)) γ.cperm kq w
-          (wrApply (wrSector w j) v.disk) (genId (hlc := hlc) (GF := GF) + 1) rfl
+      imod crashPerm_consume_kq (genId (GF := GF)) γ.cperm kq w
+          (wrApply (wrSector w j) v.disk) (genId (GF := GF) + 1) rfl
           $$ [Hpb Hpend Hst Hdk HP] with ⟨Hpb, Hdone, Hst, Hdk, HP⟩
       · iframe Hpb Hpend Hst Hdk HP
       imodintro
@@ -697,7 +697,7 @@ theorem diskDrain_step (γ : DiskNames) (v : VirtioState) (k : Nat) :
 it with the durable authority lent -- it moves no disk byte. -/
 theorem diskProtoLeaf_step (γ : DiskNames) (v : VirtioState) (dk dk' : Nat → BitVec 8)
     (C : IProp GF) (hdk : dk' = dk) :
-    iprop(diskDrainEnv (hlc := hlc) (GF := GF) γ ∗ diskProtoLeaf γ v ∗ C) ⊢@{IProp GF}
+    iprop(diskDrainEnv (GF := GF) γ ∗ diskProtoLeaf γ v ∗ C) ⊢@{IProp GF}
       |={⊤ \ ↑diskN, ∅}=> ▷ (diskLend dk ={∅, ⊤ \ ↑diskN}=∗ (diskLend dk' ∗ diskProto γ v ∗ C)) := by
   rw [hdk]
   unfold diskProtoLeaf
@@ -713,8 +713,8 @@ theorem diskProtoLeaf_step (γ : DiskNames) (v : VirtioState) (dk dk' : Nat → 
     rotate_left
     · iframe Henv Hpend Hback HC
     iintro ⟨Hpb, ⟨Hpend, Hback, HC⟩, Hst, Hdk, HP⟩
-    imod crashPerm_consume_kq (genId (hlc := hlc) (GF := GF)) γ.cperm kq w dk
-        (genId (hlc := hlc) (GF := GF) + 1) rfl $$ [Hpb Hpend Hst Hdk HP]
+    imod crashPerm_consume_kq (genId (GF := GF)) γ.cperm kq w dk
+        (genId (GF := GF) + 1) rfl $$ [Hpb Hpend Hst Hdk HP]
       with ⟨Hpb, Hdone, Hst, Hdk, HP⟩
     · iframe Hpb Hpend Hst Hdk HP
     imodintro
@@ -3394,7 +3394,7 @@ theorem leaseV_ring_pin (γ : DiskNames) (c0 : VirtioCfg) (lo : Nat) (v s' : Vir
 
 set_option maxHeartbeats 1000000 in
 theorem leaseD_body (γ : DiskNames) :
-    DevM.LeaseD (fun s : VirtioState => s.disk) (diskDrainEnv (hlc := hlc) (GF := GF) γ) (⊤ \ ↑diskN)
+    DevM.LeaseD (fun s : VirtioState => s.disk) (diskDrainEnv (GF := GF) γ) (⊤ \ ↑diskN)
       (diskProto (GF := GF) γ) (diskTaskRes γ) (diskRoot γ) (diskRoot γ) Virtio.body := by
   unfold Virtio.body DevM.chooseLt DevM.choose DevM.get DevM.modify DevM.guard DevM.step
     DevM.lift Virtio.dma16 DevM.dmaRead DevM.fork
@@ -3508,7 +3508,7 @@ move of the device's own state carries the protocol along -- the install
 included, which is what the serve permit buys -- and the ROOT LOOP holds
 the pop counter's half from one iteration to the next. -/
 theorem disk_leaseD (γ : DiskNames) :
-    DevSig.LeaseD (diskDrainEnv (hlc := hlc) (GF := GF) γ) (⊤ \ ↑diskN) (diskProto (GF := GF) γ)
+    DevSig.LeaseD (diskDrainEnv (GF := GF) γ) (⊤ \ ↑diskN) (diskProto (GF := GF) γ)
       (diskTaskRes γ) (diskRoot γ) := by
   refine ⟨leaseD_body γ, fun t => ?_⟩
   cases t with
@@ -3524,7 +3524,7 @@ once, at power-on: the other half of the pop counter, whose invariant half
 sits beside `⌜v.seen = wrap16 lo⌝`. -/
 theorem wpDev_disk_inv (γ : DiskNames) :
     diskInv γ ∗ genCert ∗ diskDrainEnv γ ∗ diskRoot γ ⊢@{IProp GF}
-      devWP (genId (hlc := hlc) (GF := GF)) .virtio rootTask (DevM.pure ()) := by
+      devWP (genId (GF := GF)) .virtio rootTask (DevM.pure ()) := by
   unfold diskInv
   iintro ⟨Hinv, Hcert, Henv, Hroot⟩
   iapply wpDev_dmaD_root diskN (diskDrainEnv γ) (diskProto γ) (diskTaskRes γ) (diskRoot γ)

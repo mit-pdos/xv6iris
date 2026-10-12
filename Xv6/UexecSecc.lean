@@ -104,7 +104,7 @@ def seccN : Namespace := ndot nroot "secc"
 theorem seccN_top : (↑seccN : CoPset) ⊆ ⊤ := CoPset.subseteq_top
 
 section UexecSecc
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg]
 
 /-- THE WILD PIPE: the queue fragment parked with NO protocol (Rocq
@@ -112,31 +112,31 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fs
 def wildPipe (γp : PipeNames) : IProp GF :=
   inv seccN iprop(∃ s : PipeSt, pipeQfrag (GF := GF) γp.pnQueue s)
 
-instance wildPipe_persistent (γp : PipeNames) : Persistent (wildPipe (hlc := hlc) (GF := GF) γp) := by
+instance wildPipe_persistent (γp : PipeNames) : Persistent (wildPipe (GF := GF) γp) := by
   unfold wildPipe; infer_instance
 
 /-- Rocq `secc_row`. -/
 def seccRow (st : FdState) : IProp GF :=
   match st with
   | .open _ _ (.inode _ _ _) => iprop(False)
-  | .open _ _ (.pipe γp) => wildPipe (hlc := hlc) γp
+  | .open _ _ (.pipe γp) => wildPipe γp
   | _ => iprop(True)
 
-instance seccRow_persistent (st : FdState) : Persistent (seccRow (hlc := hlc) (GF := GF) st) := by
+instance seccRow_persistent (st : FdState) : Persistent (seccRow (GF := GF) st) := by
   unfold seccRow
   rcases st with _ | ⟨_, _, _ | _ | _⟩ <;> infer_instance
 
 /-- Rocq `secc_rows`. -/
 def seccRows (sts : List FdState) : IProp GF :=
-  iprop([∗list] st ∈ sts, seccRow (hlc := hlc) st)
+  iprop([∗list] st ∈ sts, seccRow st)
 
-instance seccRows_persistent (sts : List FdState) : Persistent (seccRows (hlc := hlc) (GF := GF) sts) := by
+instance seccRows_persistent (sts : List FdState) : Persistent (seccRows (GF := GF) sts) := by
   unfold seccRows; infer_instance
 
 /-- a table all of whose rows are free holds its rows outright -/
 theorem seccRows_of_free : ∀ (sts : List FdState),
     (∀ st ∈ sts, st = .closed ∨ ∃ (r w : Bool) (mj : Nat), st = .open r w (.device mj)) →
-    ⊢ seccRows (hlc := hlc) (GF := GF) sts
+    ⊢ seccRows (GF := GF) sts
   | [], _ => by unfold seccRows; exact BigSepL.bigSepL_nil_intro
   | st :: sts, h => by
     unfold seccRows
@@ -153,7 +153,7 @@ theorem seccRows_of_free : ∀ (sts : List FdState),
 /-- THE WHOLE-TABLE FACT (Rocq `ush_view_secc_rows`, lane S4): a table under
 an ok view holds the key's rows outright. -/
 theorem ushViewSeccRows (v sts : List FdState) (hok : ushViewOk v) (hle : tabLe sts v) :
-    ⊢ seccRows (hlc := hlc) (GF := GF) sts := by
+    ⊢ seccRows (GF := GF) sts := by
   refine seccRows_of_free sts (fun st hst => ?_)
   obtain ⟨k, hk, hkst⟩ := List.getElem_of_mem hst
   have hk' : sts[k]? = some st := List.getElem?_eq_some_iff.2 ⟨hk, hkst⟩
@@ -163,27 +163,27 @@ theorem ushViewSeccRows (v sts : List FdState) (hok : ushViewOk v) (hle : tabLe 
 
 /-- THE KEY (Rocq `secc_key`): NOT timeless (`wildPipe` is an invariant). -/
 def seccKey (W : Uvis) : IProp GF :=
-  iprop(⌜seccMasked W.secc⌝ ∗ seccRows (hlc := hlc) W.fd)
+  iprop(⌜seccMasked W.secc⌝ ∗ seccRows W.fd)
 
-instance seccKey_persistent (W : Uvis) : Persistent (seccKey (hlc := hlc) (GF := GF) W) := by
+instance seccKey_persistent (W : Uvis) : Persistent (seccKey (GF := GF) W) := by
   unfold seccKey; infer_instance
 
 /-- the key reads two components and no others (Rocq `secc_key_cong`) -/
 theorem seccKeyCong (W W' : Uvis) (hf : W'.fd = W.fd) (hs : W'.secc = W.secc) :
-    seccKey (hlc := hlc) (GF := GF) W ⊢ seccKey W' := by
+    seccKey (GF := GF) W ⊢ seccKey W' := by
   unfold seccKey; rw [hf, hs]
 
 /-! ### the rows, one at a time -/
 
 /-- Rocq `secc_rows_lookup` (deviation 3) -/
 theorem seccRowsLookup (sts : List FdState) (i : Nat) :
-    seccRows (hlc := hlc) (GF := GF) sts ⊢ seccRow (hlc := hlc) (sts.getD i .closed) := by
+    seccRows (GF := GF) sts ⊢ seccRow (sts.getD i .closed) := by
   unfold seccRows
   cases hi : sts[i]? with
   | some st =>
     have : sts.getD i .closed = st := by simp [List.getD_eq_getElem?_getD, hi]
     rw [this]
-    exact fdRows_lookup (fun s => seccRow (hlc := hlc) (GF := GF) s) sts i st hi
+    exact fdRows_lookup (fun s => seccRow (GF := GF) s) sts i st hi
   | none =>
     have : sts.getD i .closed = .closed := by simp [List.getD_eq_getElem?_getD, hi]
     rw [this]
@@ -193,32 +193,32 @@ theorem seccRowsLookup (sts : List FdState) (i : Nat) :
 
 /-- THE ROW THE SYSCALL'S ARGUMENT NAMES (Rocq `secc_rows_at_key`) -/
 theorem seccRowsAtKey (v : BitVec 64) (sts : List FdState) :
-    seccRows (hlc := hlc) (GF := GF) sts ⊢ seccRow (hlc := hlc) (fdStOfKey v sts) := by
+    seccRows (GF := GF) sts ⊢ seccRow (fdStOfKey v sts) := by
   unfold fdStOfKey
   split
-  · have h := seccRowsLookup (hlc := hlc) (GF := GF) sts (argZ v).toNat
+  · have h := seccRowsLookup (GF := GF) sts (argZ v).toNat
     simpa [List.getD_eq_getElem?_getD] using h
   · unfold seccRow; iintro -; ipureintro; trivial
 
 /-- Rocq `secc_key_at_arg` -/
 theorem seccKeyAtArg (W : Uvis) (v : BitVec 64) :
-    seccKey (hlc := hlc) (GF := GF) W ⊢ seccRow (hlc := hlc) (fdStOfKey v W.fd) := by
+    seccKey (GF := GF) W ⊢ seccRow (fdStOfKey v W.fd) := by
   unfold seccKey
   iintro ⟨-, #H⟩
   iapply seccRowsAtKey v W.fd $$ H
 
 /-- Rocq `secc_rows_insert` -/
 theorem seccRowsInsert (sts : List FdState) (i : Nat) (st : FdState) :
-    seccRows (hlc := hlc) (GF := GF) sts ⊢ seccRow (hlc := hlc) st -∗ seccRows (sts.set i st) := by
+    seccRows (GF := GF) sts ⊢ seccRow st -∗ seccRows (sts.set i st) := by
   unfold seccRows
-  exact fdRows_insert (fun s => seccRow (hlc := hlc) (GF := GF) s) sts i st
+  exact fdRows_insert (fun s => seccRow (GF := GF) s) sts i st
 
 /-! ### 2a. preservation along the descriptor row -/
 
 /-- every number but open and pipe (Rocq `secc_rows_fd_ok`) -/
 theorem seccRowsFdOk (n : Int) (tf : List (BitVec 64)) (r : BitVec 64) (sts sts' : List FdState)
     (ho : n ≠ USYS_open) (hp : n ≠ USYS_pipe) (h : usysFdOk n tf r sts sts') :
-    seccRows (hlc := hlc) (GF := GF) sts ⊢ seccRows sts' := by
+    seccRows (GF := GF) sts ⊢ seccRows sts' := by
   unfold usysFdOk at h
   iintro #Hr
   by_cases hc : n = USYS_close
@@ -244,15 +244,15 @@ theorem seccRowsFdOk (n : Int) (tf : List (BitVec 64)) (r : BitVec 64) (sts sts'
 /-- pipe: two rows at the NEW name, given that name's wild pipe (Rocq
 `secc_rows_pipe`) -/
 theorem seccRowsPipe (sts : List FdState) (a b : Nat) (γp : PipeNames) :
-    wildPipe (hlc := hlc) (GF := GF) γp ⊢ seccRows (hlc := hlc) sts -∗
+    wildPipe (GF := GF) γp ⊢ seccRows sts -∗
       seccRows ((sts.set a (.open true false (.pipe γp))).set b (.open false true (.pipe γp))) := by
   iintro #Hw #Hr
-  ihave #H1 : seccRow (hlc := hlc) (GF := GF) (.open true false (.pipe γp)) $$ []
+  ihave #H1 : seccRow (GF := GF) (.open true false (.pipe γp)) $$ []
   · unfold seccRow; iexact Hw
-  ihave #H2 : seccRow (hlc := hlc) (GF := GF) (.open false true (.pipe γp)) $$ []
+  ihave #H2 : seccRow (GF := GF) (.open false true (.pipe γp)) $$ []
   · unfold seccRow; iexact Hw
-  ihave #H3 := seccRowsInsert (hlc := hlc) (GF := GF) sts a (.open true false (.pipe γp)) $$ Hr H1
-  iapply seccRowsInsert (hlc := hlc) (GF := GF) _ b (.open false true (.pipe γp)) $$ H3 H2
+  ihave #H3 := seccRowsInsert (GF := GF) sts a (.open true false (.pipe γp)) $$ Hr H1
+  iapply seccRowsInsert (GF := GF) _ b (.open false true (.pipe γp)) $$ H3 H2
 
 /-! ### 2b. the key at the fork child's and the exec'd image's keys -/
 
@@ -260,26 +260,26 @@ theorem seccRowsPipe (sts : List FdState) (a b : Nat) (γp : PipeNames) :
 theorem seccKeyForkChild (W : Uvis) (r : BitVec 64) (M' : ElfMem) (π' : Nat → Option UPerm)
     (szv' : Nat) (cw' : Nat) (g' : GName) (cs' : ExtTreeSet GName compare) (pid' : BitVec 32)
     (lz' : Bool) :
-    seccKey (hlc := hlc) (GF := GF) W ⊢ seccKey (bumpAt W r M' π' szv' W.fd cw' g' cs' pid' lz' W.secc) :=
+    seccKey (GF := GF) W ⊢ seccKey (bumpAt W r M' π' szv' W.fd cw' g' cs' pid' lz' W.secc) :=
   seccKeyCong W _ rfl rfl
 
 /-- exec, arm (a) (Rocq `secc_key_exec_image`) -/
 theorem seccKeyExecImage (W W' : Uvis) (f : ElfBytes) (na : Nat) (alen : Nat → Nat)
     (afun : Nat → Nat → BitVec 8) (hok : kexecImageOk f na alen afun W.fd W')
-    (hs : W'.secc = W.secc) : seccKey (hlc := hlc) (GF := GF) W ⊢ seccKey W' :=
+    (hs : W'.secc = W.secc) : seccKey (GF := GF) W ⊢ seccKey W' :=
   seccKeyCong W W' (kexecImageOk_fd hok) hs
 
 /-- ...arm (b), the non-loadable resume (Rocq `secc_key_exec_key`) -/
 theorem seccKeyExecKey (W W' : Uvis) (na : Nat) (alen : Nat → Nat)
     (hok : execKeyOk na alen W.fd W') (hs : W'.secc = W.secc) :
-    seccKey (hlc := hlc) (GF := GF) W ⊢ seccKey W' :=
+    seccKey (GF := GF) W ⊢ seccKey W' :=
   seccKeyCong W W' (execKeyOk_fd hok) hs
 
 /-! ## 3.  THE LINKS OUT OF A WILD PIPE, at the trivial protocol -/
 
 /-- Rocq `wild_clink` -/
 theorem wildClink (γp : PipeNames) (w : Bool) :
-    wildPipe (hlc := hlc) (GF := GF) γp ⊢ pipeClink (hlc := hlc) γp.pnQueue w iprop(emp) := by
+    wildPipe (GF := GF) γp ⊢ pipeClink γp.pnQueue w iprop(emp) := by
   unfold pipeClink wildPipe
   iintro #Hinv %s Ha
   imod (inv_acc_timeless (E := ⊤) (N := seccN)
@@ -296,7 +296,7 @@ theorem wildClink (γp : PipeNames) (w : Bool) :
 
 /-- ...which IS the registration (Rocq `wild_reg`) -/
 theorem wildReg (γp : PipeNames) :
-    wildPipe (hlc := hlc) (GF := GF) γp ⊢ pipeReg (hlc := hlc) γp := by
+    wildPipe (GF := GF) γp ⊢ pipeReg γp := by
   unfold pipeReg
   iintro #Hw
   imodintro
@@ -307,7 +307,7 @@ theorem wildReg (γp : PipeNames) :
 
 /-- Rocq `secc_row_reg` -/
 theorem seccRowReg (st : FdState) :
-    seccRow (hlc := hlc) (GF := GF) st ⊢ pipeRowReg (hlc := hlc) st := by
+    seccRow (GF := GF) st ⊢ pipeRowReg st := by
   unfold seccRow pipeRowReg
   rcases st with _ | ⟨_, _, γp | _ | _⟩
   · iintro -; iempintro
@@ -317,13 +317,13 @@ theorem seccRowReg (st : FdState) :
 
 /-- Rocq `secc_rows_regs` -/
 theorem seccRowsRegs (sts : List FdState) :
-    seccRows (hlc := hlc) (GF := GF) sts ⊢ [∗list] st ∈ sts, pipeRowReg (hlc := hlc) st := by
+    seccRows (GF := GF) sts ⊢ [∗list] st ∈ sts, pipeRowReg st := by
   unfold seccRows
   exact BigSepL.bigSepL_mono_of_forall (fun {_ st} => seccRowReg st)
 
 /-- Rocq `wild_rlink` -/
 theorem wildRlink (γp : PipeNames) (Φ : BitVec 8 → IProp GF) :
-    wildPipe (hlc := hlc) (GF := GF) γp ⊢ □ (∀ b, Φ b) -∗ pipeRlink (hlc := hlc) γp.pnQueue Φ := by
+    wildPipe (GF := GF) γp ⊢ □ (∀ b, Φ b) -∗ pipeRlink γp.pnQueue Φ := by
   unfold pipeRlink wildPipe
   iintro #Hinv #HΦ %s %b %_ %_ Ha
   imod (inv_acc_timeless (E := ⊤) (N := seccN)
@@ -341,7 +341,7 @@ theorem wildRlink (γp : PipeNames) (Φ : BitVec 8 → IProp GF) :
 
 /-- Rocq `wild_wlink` -/
 theorem wildWlink (γp : PipeNames) (b : BitVec 8) (Φ : IProp GF) :
-    wildPipe (hlc := hlc) (GF := GF) γp ⊢ □ Φ -∗ pipeWlink (hlc := hlc) γp.pnQueue b Φ := by
+    wildPipe (GF := GF) γp ⊢ □ Φ -∗ pipeWlink γp.pnQueue b Φ := by
   unfold pipeWlink wildPipe
   iintro #Hinv #HΦ %s %_ %_ Ha
   imod (inv_acc_timeless (E := ⊤) (N := seccN)
@@ -358,14 +358,14 @@ theorem wildWlink (γp : PipeNames) (b : BitVec 8) (Φ : IProp GF) :
   iexact HΦ
 
 /-- an observation at a trivial payload moves nothing (Rocq `triv_rolink`) -/
-theorem trivRolink (γ : GName) : ⊢ pipeRolink (hlc := hlc) (GF := GF) γ (fun _ => iprop(True)) := by
+theorem trivRolink (γ : GName) : ⊢ pipeRolink (GF := GF) γ (fun _ => iprop(True)) := by
   unfold pipeRolink
   iintro %s %_ Ha
   imodintro
   iframe Ha
 
 /-- Rocq `triv_wolink` -/
-theorem trivWolink (γ : GName) : ⊢ pipeWolink (hlc := hlc) (GF := GF) γ (fun _ => iprop(True)) := by
+theorem trivWolink (γ : GName) : ⊢ pipeWolink (GF := GF) γ (fun _ => iprop(True)) := by
   unfold pipeWolink
   iintro %s %_ Ha
   imodintro
@@ -373,8 +373,8 @@ theorem trivWolink (γ : GName) : ⊢ pipeWolink (hlc := hlc) (GF := GF) γ (fun
 
 /-- THE READ CHAIN at the trivial cursor and observation (Rocq `wild_rchain`) -/
 theorem wildRchain (γp : PipeNames) (cnt : Nat) : ∀ (acc : List (BitVec 8)),
-    wildPipe (hlc := hlc) (GF := GF) γp ⊢
-      pipeRchain (hlc := hlc) γp.pnQueue (fun _ => iprop(True)) (fun _ _ => iprop(True)) acc cnt := by
+    wildPipe (GF := GF) γp ⊢
+      pipeRchain γp.pnQueue (fun _ => iprop(True)) (fun _ _ => iprop(True)) acc cnt := by
   induction cnt with
   | zero => intro acc; unfold pipeRchain; iintro -; ipureintro; trivial
   | succ cnt ih =>
@@ -392,8 +392,8 @@ theorem wildRchain (γp : PipeNames) (cnt : Nat) : ∀ (acc : List (BitVec 8)),
 
 /-- THE WRITE CHAIN, likewise (Rocq `wild_wchain`) -/
 theorem wildWchain (γp : PipeNames) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (cnt : Nat) :
-    ∀ (j : Nat), wildPipe (hlc := hlc) (GF := GF) γp ⊢
-      pipeWchain (hlc := hlc) γp.pnQueue M ua (fun _ => iprop(True)) (fun _ _ => iprop(True)) j cnt := by
+    ∀ (j : Nat), wildPipe (GF := GF) γp ⊢
+      pipeWchain γp.pnQueue M ua (fun _ => iprop(True)) (fun _ _ => iprop(True)) j cnt := by
   induction cnt with
   | zero => intro j; unfold pipeWchain; iintro -; ipureintro; trivial
   | succ cnt ih =>
@@ -413,8 +413,8 @@ theorem wildWchain (γp : PipeNames) (M : Nat → List (BitVec 8)) (ua : BitVec 
 
 /-- read's row at a pipe descriptor (Rocq `wild_fileread_in`) -/
 theorem wildFilereadIn (γp : PipeNames) (rb wb : Bool) (n : Int) (P : IProp GF) :
-    wildPipe (hlc := hlc) (GF := GF) γp ⊢
-      filereadIn (hlc := hlc) (.open rb wb (.pipe γp)) n (pfamTriv (fun _ _ _ _ => iprop(True)))
+    wildPipe (GF := GF) γp ⊢
+      filereadIn (.open rb wb (.pipe γp)) n (pfamTriv (fun _ _ _ _ => iprop(True)))
         (fun _ _ => iprop(True)) (fun _ => iprop(True)) (fun _ => iprop(True)) (fun _ _ => iprop(True)) P := by
   unfold filereadIn
   iintro #Hw HP
@@ -429,8 +429,8 @@ theorem wildFilereadIn (γp : PipeNames) (rb wb : Bool) (n : Int) (P : IProp GF)
 /-- write's row at a pipe descriptor (Rocq `wild_filewrite_in`) -/
 theorem wildFilewriteIn (γp : PipeNames) (rb wb : Bool) (n : Int) (pmv : Nat → Option UPerm)
     (sz : Nat) (lz : Bool) (M : Nat → List (BitVec 8)) (ua : BitVec 64) :
-    wildPipe (hlc := hlc) (GF := GF) γp ⊢
-      filewriteIn (hlc := hlc) pmv sz lz (.open rb wb (.pipe γp)) n M ua (fun _ => iprop(True))
+    wildPipe (GF := GF) γp ⊢
+      filewriteIn pmv sz lz (.open rb wb (.pipe γp)) n M ua (fun _ => iprop(True))
         (fun _ _ => iprop(True)) := by
   unfold filewriteIn
   iintro #Hw
@@ -442,17 +442,17 @@ theorem wildFilewriteIn (γp : PipeNames) (rb wb : Bool) (n : Int) (pmv : Nat �
 
 /-- close's row at ANY row of the universe (Rocq `secc_fileclose_cpay`) -/
 theorem seccFilecloseCpay (st : FdState) :
-    seccRow (hlc := hlc) (GF := GF) st ⊢ filecloseCpay (hlc := hlc) st iprop(True) :=
+    seccRow (GF := GF) st ⊢ filecloseCpay st iprop(True) :=
   (seccRowReg st).trans (fileclose_cpay_of_reg_true st)
 
 /-- ...and exit's, every row of the table (Rocq `secc_fileclose_cpays`) -/
 theorem seccFilecloseCpays (sts : List FdState) :
-    seccRows (hlc := hlc) (GF := GF) sts ⊢ filecloseCpays (hlc := hlc) sts :=
+    seccRows (GF := GF) sts ⊢ filecloseCpays sts :=
   (seccRowsRegs sts).trans (fileclose_cpays_of_regs sts)
 
 /-- ...at the key, at the row the argument names (Rocq `secc_key_close_cpay`) -/
 theorem seccKeyCloseCpay (W : Uvis) (v : BitVec 64) :
-    seccKey (hlc := hlc) (GF := GF) W ⊢ filecloseCpay (hlc := hlc) (fdStOfKey v W.fd) iprop(True) :=
+    seccKey (GF := GF) W ⊢ filecloseCpay (fdStOfKey v W.fd) iprop(True) :=
   (seccKeyAtArg W v).trans (seccFilecloseCpay _)
 
 /-! ## 4.  THE CONSOLE ROWS, AS ONE PAYER -/
@@ -461,20 +461,20 @@ theorem seccKeyCloseCpay (W : Uvis) (v : BitVec 64) :
 at the console (Rocq `secc_cons_pay`). -/
 def seccConsPay : IProp GF :=
   iprop(□ ((∀ (wb : Bool) (mj : Nat) (n : Int) (P : IProp GF),
-        filereadIn (hlc := hlc) (.open true wb (.device mj)) n (pfamTriv (fun _ _ _ _ => iprop(True)))
+        filereadIn (.open true wb (.device mj)) n (pfamTriv (fun _ _ _ _ => iprop(True)))
           (fun _ _ => iprop(True)) (fun _ => iprop(True)) (fun _ => iprop(True)) (fun _ _ => iprop(True)) P) ∧
       (∀ (rb : Bool) (mj : Nat) (n : Int) (pmv : Nat → Option UPerm) (sz : Nat) (lz : Bool)
           (M : Nat → List (BitVec 8)) (ua : BitVec 64),
-        filewriteIn (hlc := hlc) pmv sz lz (.open rb true (.device mj)) n M ua (fun _ => iprop(True))
+        filewriteIn pmv sz lz (.open rb true (.device mj)) n M ua (fun _ => iprop(True))
           (fun _ _ => iprop(True)))))
 
-instance seccConsPay_persistent : Persistent (seccConsPay (hlc := hlc) (GF := GF)) := by
+instance seccConsPay_persistent : Persistent (seccConsPay (GF := GF)) := by
   unfold seccConsPay; infer_instance
 
 /-- READ'S ROW at any row of the universe (Rocq `secc_fileread_in`) -/
 theorem seccFilereadIn (st : FdState) (n : Int) (P : IProp GF) :
-    seccConsPay (hlc := hlc) (GF := GF) ⊢ seccRow (hlc := hlc) st -∗
-      filereadIn (hlc := hlc) st n (pfamTriv (fun _ _ _ _ => iprop(True))) (fun _ _ => iprop(True))
+    seccConsPay (GF := GF) ⊢ seccRow st -∗
+      filereadIn st n (pfamTriv (fun _ _ _ _ => iprop(True))) (fun _ _ => iprop(True))
         (fun _ => iprop(True)) (fun _ => iprop(True)) (fun _ _ => iprop(True)) P := by
   rcases st with _ | ⟨rb, wb, γp | ⟨i, γo, om⟩ | mj⟩
   · iintro - -
@@ -499,8 +499,8 @@ theorem seccFilereadIn (st : FdState) (n : Int) (P : IProp GF) :
 /-- WRITE'S ROW, likewise (Rocq `secc_filewrite_in`) -/
 theorem seccFilewriteIn (st : FdState) (n : Int) (pmv : Nat → Option UPerm) (sz : Nat) (lz : Bool)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) :
-    seccConsPay (hlc := hlc) (GF := GF) ⊢ seccRow (hlc := hlc) st -∗
-      filewriteIn (hlc := hlc) pmv sz lz st n M ua (fun _ => iprop(True)) (fun _ _ => iprop(True)) := by
+    seccConsPay (GF := GF) ⊢ seccRow st -∗
+      filewriteIn pmv sz lz st n M ua (fun _ => iprop(True)) (fun _ _ => iprop(True)) := by
   rcases st with _ | ⟨rb, wb, γp | ⟨i, γo, om⟩ | mj⟩
   · iintro - -
     unfold filewriteIn

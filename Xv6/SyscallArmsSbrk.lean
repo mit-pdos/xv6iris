@@ -445,7 +445,7 @@ theorem syscRows_sbrk (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (sts : 
 /-! ## §3 The block's pure page facts -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF]
   [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -457,7 +457,7 @@ theorem sbrkArm_pageLen (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V :
     procPrivFd (GF := GF) γ pa pid V M ⊢ procPrivFd γ pa pid V M ∗ ⌜umPageLen V.upt M⌝ := by
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt
   iintro ⟨⟨⟨%h, Hpid, Hf, Hpt, Htfp, %hlz, Hev⟩, Hc⟩, Ho⟩
-  icases @UMemL.procPtAt_pageLen hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt M $$ Hpt with ⟨%hpl, Hpt⟩
+  icases @UMemL.procPtAt_pageLen GF _ ⟨curCtx, KTier.kpt⟩ V.upt M $$ Hpt with ⟨%hpl, Hpt⟩
   isplitl [Hpid Hf Hpt Htfp Hc Ho Hev]
   · iframe Hpid Hf Hpt Htfp Hc Ho Hev
     isplitl []
@@ -470,7 +470,7 @@ end
 /-! ## §4 The arm -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
@@ -488,9 +488,9 @@ theorem syscArmSbrk_ev (V V2 : ProcPriv) (M M2 : Nat → List (BitVec 8)) (sts :
     (hw1 : tfW V.tf (tfArgIdx 1) = v1) (hszb : V.sz.toNat ≤ uvmMaxsz)
     (hok : sysSbrkOk V V2 M M2 v0 v1 r) (ha : syscA0 V' = r) (hsz : V'.sz = V2.sz)
     (hlz : V'.pvLazy = V2.pvLazy) :
-    MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) ke (niNamesHere (GF := GF)) ⊢
+    MachFixedGS.uEraAnchor (GF := GF) ke (niNamesHere (GF := GF)) ⊢
       (⌜r = -1#64 ∧ ¬ sysSbrkOverrun V v0⌝ -∗ kNullRcpt fsReadyKmem act) -∗
-      |==> syscEvOut (hlc := hlc) V M sts V' M' cs cs gn := by
+      |==> syscEvOut V M sts V' M' cs cs gn := by
   have hrow : ∀ ι : UIota, (ι.kNull ↔ (r = -1#64 ∧ ¬ sysSbrkOverrun V v0)) →
       syscEvRow V V' (syscImg V M) (syscImg V' M') cs cs sts ι := by
     intro ι hk
@@ -531,7 +531,7 @@ set_option maxHeartbeats 4000000 in
 /-- **Arm 12, `sys_sbrk`** (Rocq `sysc_arm_sbrk`; the whole block, D16). -/
 theorem syscall_arm_sbrk (SS : SYSSBRK)
     (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs GF Γ]
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -569,7 +569,7 @@ theorem syscall_arm_sbrk (SS : SYSSBRK)
   have hw0 : tfW V.tf (tfArgIdx 0) = v0 := by unfold tfW; rw [List.getD_eq_getElem?_getD, hv0]; rfl
   have hw1 : tfW V.tf (tfArgIdx 1) = v1 := by unfold tfW; rw [List.getD_eq_getElem?_getD, hv1]; rfl
   icases syscallEnv_kmem PT Γ γ $$ Henv with ⟨#Hkl, #Hka⟩
-  have hU := SS.wp_sys_sbrk (hlc := hlc) (GF := GF) cpu (((k.withSpie spie spp).pushed 4).withRegs R)
+  have hU := SS.wp_sys_sbrk (GF := GF) cpu (((k.withSpie spie spp).pushed 4).withRegs R)
     fscKalloc fsReadyKmem γ j pid V M v0 v1 hj hprocK hv0 hv1 (by rw [hnoffK]; decide)
     (by k_norm_g; have : sysSbrkSlots + 4 ≤ syscallSlots := by decide
         omega)

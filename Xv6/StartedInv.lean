@@ -102,7 +102,7 @@ def startedSet : BitVec (8 * 4) := 1
 def startedPrimary : CPU := ⟨0, by decide⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-- THE PRIMARY'S TOKEN: half of the position ghost, at "not yet stored". -/
 def startedPrim (γ : GName) : IProp GF := ghost_var γ (.own (1 : Qp).half) (0 : Nat)

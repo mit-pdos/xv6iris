@@ -52,7 +52,7 @@ def spikeDrefU : (r : Register) → Option (RegisterType r)
   | .senvcfg => some 0#64
   | _ => none
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- The cells `spikeDrefU` names, at fraction `dq`. -/
 def spikeUCells (cpu : CPU) (dq : DFrac) : IProp GF := iprop%

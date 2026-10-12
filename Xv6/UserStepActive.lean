@@ -37,7 +37,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open Sail LeanRV64D LeanRV64D.Functions
 
 section active
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- **The fetch, as the loop consumes it** (U2-F's deliverable; Rocq
 `UserFetch`/`UserFetchCert`/`UserFaultCert` through `UserActiveClass`'s `va`

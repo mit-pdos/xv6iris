@@ -23,7 +23,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
   [SleepLockG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
   [IcboxG GF] [OffboxG GF] [OffboxBoxG GF]
 
@@ -70,7 +70,7 @@ every callee.  The caller's continuation is carried HART-FREE
 a pinning fact. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
   [SleepLockG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
   [IcboxG GF] [OffboxG GF] [OffboxBoxG GF]
 
@@ -123,10 +123,10 @@ end
 the complement for the trio, no `SIE` premise, and the caller's
 continuation hart-free. -/
 def IlLoadEb : Prop :=
-  ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+  ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
     [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF]
     [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl : GName) (pd pav pu : BitVec 64)
     (j : Nat) (γisl : GName) (kk : Nat) (s : Qp) (g : GName) (d : IcDep) (o : Ilkc)
     (inum : BitVec 32) (pidv : BitVec 32) (dqp dqs : DFrac) (Tl : Nat),
@@ -140,7 +140,7 @@ def IlLoadEb : Prop :=
       trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ panicEnv ∗
       bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
       diskCaps fscDisk fscDlock pd pav pu ∗
-      iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+      iregInv fscIreg fscFs icfgIst icfgNib ∗
       frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
       wordPointsTo (pPid k.proc) 4 dqp pidv ∗
       wordPointsTo (iDev (ientry kk)) 4 (DFrac.own (1 : Qp).half) icfgDev ∗

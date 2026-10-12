@@ -86,7 +86,7 @@ theorem consPmiss_hold (T K : IProp GF) : ⊢ pobsMissHold K (consPmiss T K) := 
 end Dead
 
 section UConsOpenSup
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -99,8 +99,8 @@ theorem cons_open_bundle_dead (γfs : FsNames) (rt : Nat) (T K : IProp GF) [Pers
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (hom : omArg vom = 2) (hpath : argPathOf M pv initConsPl) :
-    ⊢ initConsAbsLaw T K -∗ appInv (hlc := hlc) γfs -∗ K -∗
-      openIn (hlc := hlc) (fsGammaL γfs) γfs rt ROOTINO M pv vom (consPDead T K ROOTINO) (consPmiss T K) Farm
+    ⊢ initConsAbsLaw T K -∗ appInv γfs -∗ K -∗
+      openIn (fsGammaL γfs) γfs rt ROOTINO M pv vom (consPDead T K ROOTINO) (consPmiss T K) Farm
         Fun Fok Fex (pfamTriv (fun (_ : Aview) (_ : Nat) (_ : Anode) => iprop(True))) Ft := by
   obtain ⟨hcr, htr⟩ := omRdwr_plain vom hom
   iintro #Hcl #Hinv HK
@@ -120,7 +120,7 @@ theorem cons_open_dead_recv (γfs : FsNames) (rt : Nat) (T K : IProp GF) [Persis
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF))
     (sts : List FdState) (r : BitVec 64) (fdv' : List FdState)
     (htr : omTrunc vom = false) (hpath : argPathOf M pv initConsPl) :
-    ⊢ openReceiptPlain (hlc := hlc) .parked (fsGammaL γfs) γfs rt ROOTINO M pv vom (consPDead T K ROOTINO)
+    ⊢ openReceiptPlain .parked (fsGammaL γfs) γfs rt ROOTINO M pv vom (consPDead T K ROOTINO)
         (consPmiss T K) Fo Ft sts r fdv' ={⊤}=∗
       iprop((⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ ⌜fdv' = sts⌝ ∗ (K ∨ T)) ∨ T) := by
   rw [consPDead_eq, consPmiss_eq]
@@ -174,8 +174,8 @@ theorem cons_sup_absent (N : UkNames GF) (T K : IProp GF) [Persistent T] [Timele
     (Img : ElfMem) (pv : Nat) (m : RegMap) (pc : BitVec 64)
     (hpath : ∀ Mv, imgAgrees Img Mv → argPathOf Mv pv initConsPl) (ha0 : (m.get 10#5).toNat = pv)
     (ha1 : m.get 11#5 = 2#64) :
-    ⊢ initConsAbsLaw T K -∗ appInv (hlc := hlc) fscFs -∗ uimgView N Img -∗ K -∗
-      udepwfAt (hlc := hlc) N m pc USYS_open (initConsAbsentFam T K N.pay) ROOTINO := by
+    ⊢ initConsAbsLaw T K -∗ appInv fscFs -∗ uimgView N Img -∗ K -∗
+      udepwfAt N m pc USYS_open (initConsAbsentFam T K N.pay) ROOTINO := by
   unfold udepwfAt
   iintro #Habs #Hinv #Hro HK
   isplitr
@@ -206,8 +206,8 @@ theorem cons_sup_console (N : UkNames GF) (Pure : Aview → Prop) (Made : Nat �
     (T K : IProp GF) [Persistent T] [Timeless T] (i : Nat) (Img : ElfMem) (pv : Nat) (m : RegMap)
     (pc : BitVec 64) (hpath : ∀ Mv, imgAgrees Img Mv → argPathOf Mv pv initConsPl)
     (ha0 : (m.get 10#5).toNat = pv) (ha1 : m.get 11#5 = 2#64) :
-    ⊢ initConsLawsAt Pure Made Pv T K -∗ Made i -∗ appInv (hlc := hlc) fscFs -∗ uimgView N Img -∗
-      udepwfAt (hlc := hlc) N m pc USYS_open (initConsConsoleFam T i N.pay) ROOTINO := by
+    ⊢ initConsLawsAt Pure Made Pv T K -∗ Made i -∗ appInv fscFs -∗ uimgView N Img -∗
+      udepwfAt N m pc USYS_open (initConsConsoleFam T i N.pay) ROOTINO := by
   unfold udepwfAt
   iintro #Hlaws Hmade #Hinv #Hro
   isplitr

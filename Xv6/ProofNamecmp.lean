@@ -105,7 +105,7 @@ theorem namecmp_br_ffffffffffffd4c8 : KA.«namecmp» + 0xffffffffffffd4c8#64 = K
 
 theorem namecmp_ret : jumpPc (KA.«namecmp» + 0xe#64) = KA.«namecmp» + 0xe#64 := by decide
 
-theorem namecmp_proof (S : STRNCMP) : NAMECMP := ⟨fun {hlc GF} _ _ cpu k f g dq1 dq2 hK => by
+theorem namecmp_proof (S : STRNCMP) : NAMECMP := ⟨fun {GF} _ _ cpu k f g dq1 dq2 hK => by
   unfold wp_namecmp_body
   unfold namecmpSlots at hK
   iintro ⟨Hk, Hpc, Hs, Ht, HΦ⟩
@@ -130,7 +130,7 @@ theorem namecmp_proof (S : STRNCMP) : NAMECMP := ⟨fun {hlc GF} _ _ cpu k f g d
     with [namecmp_br_ffffffffffffd4c8] next c3 hp3
   iintro Hk Hpc
   -- the call
-  have hm := S.wp_strncmp (hlc := hlc) (GF := GF) c3 ((k.pushed 2).withRegs
+  have hm := S.wp_strncmp (GF := GF) c3 ((k.pushed 2).withRegs
       (((((k.regs.set 2#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFFF0#64)).set 8#5 (k.regs 2#5)).set 12#5 14#64).set
         1#5 (KA.«namecmp» + 0xe#64))))
     (bview 14 f) (bview 14 g) 14 dq1 dq2 (by k_norm_g; omega) (by k_norm_g) (by decide)

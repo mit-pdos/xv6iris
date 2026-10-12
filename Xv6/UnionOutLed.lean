@@ -41,7 +41,7 @@ def unionBorn (_ _ _ : GName) (γst : GName) (ug : UnionGn) : Prop :=
   ug.ugnFile.fgnCl.ffSt = γst
 
 section UnionOutLed
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF] [PipeOutG GF]
 
 /-- THE CONCLUSION'S RESOURCE (Rocq `union_phi_res`, sync SY3-A4): each
@@ -50,7 +50,7 @@ the run-long history whose last record is the last completed sync so far;
 and the era's record, whose floor's last record is the era's boot record. -/
 noncomputable def unionPhiRes (ug : UnionGn) (h : List Obs) : IProp GF :=
   iprop(∃ W : List (Fstate × Option Srec),
-    ⌜lmDisc ulmG h → unionPhiSyncBody h W⌝ ∗ f0Pinned (hlc := hlc) ug.ugnFile h (W.map Prod.fst)
+    ⌜lmDisc ulmG h → unionPhiSyncBody h W⌝ ∗ f0Pinned ug.ugnFile h (W.map Prod.fst)
     ∗ (∃ F : List Srec, slLb ug.ugnFile.fgnCl.ffHist F ∗ ⌜lmDisc ulmG h → slast F = unionRecNow h W⌝)
     ∗ (⌜obsBoots h = 0⌝
        ∨ ∃ vf : FileEra, fileEraPin ug.ugnFile (obsBoots h) vf
@@ -58,7 +58,7 @@ noncomputable def unionPhiRes (ug : UnionGn) (h : List Obs) : IProp GF :=
            ∗ ⌜lmDisc ulmG h → slast vf.feFloor = unionRecBase h W⌝))
 
 instance unionPhiRes_timeless (ug : UnionGn) (h : List Obs) :
-    Timeless (unionPhiRes (hlc := hlc) (GF := GF) ug h) := by
+    Timeless (unionPhiRes (GF := GF) ug h) := by
   unfold unionPhiRes; infer_instance
 
 /-- THE SYNC REGISTRY'S AUTHORITY (Rocq `union_reg`, sync SY3-A3bc): eras up
@@ -107,18 +107,18 @@ noncomputable def unionLed (ug : UnionGn) (h : List Obs) : IProp GF :=
     ∗ f0Map ug.ugnFile h
     ∗ peraMap (ugnPipe ug) h
     ∗ flAuth ug.ugnFile.fgnCl (ulinesOf h)
-    ∗ (unionPhiRes (hlc := hlc) ug h ∨ fileTaint (hlc := hlc) ug.ugnFile.fgnCl ∗ unionFloor ug)
+    ∗ (unionPhiRes ug h ∨ fileTaint ug.ugnFile.fgnCl ∗ unionFloor ug)
     ∗ unionReg ug h ∗ unionBase ug h)
 
 instance unionLed_timeless (ug : UnionGn) (h : List Obs) :
-    Timeless (unionLed (hlc := hlc) (GF := GF) ug h) := by
+    Timeless (unionLed (GF := GF) ug h) := by
   unfold unionLed; infer_instance
 
 /-- THE BIRTH'S YIELD, the TRACE slot's part (Rocq `union_cl_all`): the
 registry at era 0 and the era-0 floor beside the file's and the byte
 ledger's. -/
 def unionClAll (ug : UnionGn) : IProp GF :=
-  iprop(fileClAll (hlc := hlc) ug.ugnFile ∗ (ug.ugnPera ↪●MAP (∅ : RegMapF PipeEra))
+  iprop(fileClAll ug.ugnFile ∗ (ug.ugnPera ↪●MAP (∅ : RegMapF PipeEra))
     ∗ (∃ γ0 : GName, syncRegAuth ug.ugnFile.fgnCl (Std.PartialMap.insert (∅ : RegMapF GName) 0 γ0))
     ∗ slLb ug.ugnFile.fgnCl.ffHist [])
 
@@ -126,7 +126,7 @@ def unionClAll (ug : UnionGn) : IProp GF :=
 copy is founded from (`AppFileBoot.fileInit`). -/
 def unionCls (ug : UnionGn) : IProp GF :=
   iprop(∃ γ0 : GName, syncReg ug.ugnFile.fgnCl 0 γ0 ∗ slAuth γ0 (1 : Qp).half []
-    ∗ syncCmAuth (hlc := hlc) ug.ugnFile.fgnCl 0 ∗ slAuth ug.ugnFile.fgnCl.ffHist 1 []
+    ∗ syncCmAuth ug.ugnFile.fgnCl 0 ∗ slAuth ug.ugnFile.fgnCl.ffHist 1 []
     ∗ runAuth ug.ugnFile.fgnCl 0 ∗ flLb ug.ugnFile.fgnCl [])
 
 /-! ## The era's turn in its four stages (Rocq sync SY3-A3bc, design 4.5
@@ -151,9 +151,9 @@ of the list. -/
 def uturn' (ug : UnionGn) (k : Nat) : IProp GF :=
   iprop(fturn (GF := GF) ug.ugnFile k ∗ ∃ (vf : FileEra) (ls : List FlLine),
     fileEraPin ug.ugnFile k vf ∗ fcpPin vf ls ∗ flLb ug.ugnFile.fgnCl ls
-    ∗ (fileTaint (hlc := hlc) ug.ugnFile.fgnCl
+    ∗ (fileTaint ug.ugnFile.fgnCl
        ∨ ∃ (γ : GName) (Ls : List Srec), syncReg ug.ugnFile.fgnCl k γ
-           ∗ slAuth γ (1 : Qp).half.half Ls ∗ slLb γ Ls ∗ syncCmLb (hlc := hlc) ug.ugnFile.fgnCl k))
+           ∗ slAuth γ (1 : Qp).half.half Ls ∗ slLb γ Ls ∗ syncCmLb ug.ugnFile.fgnCl k))
 
 /-- After the return path (Rocq `uturn''`): the copy's list certified INSIDE
 the era's base, and a lower bound at the base. -/
@@ -161,9 +161,9 @@ def uturn'' (ug : UnionGn) (k : Nat) : IProp GF :=
   iprop(fturn (GF := GF) ug.ugnFile k ∗ ∃ (vf : FileEra) (ls : List FlLine),
     fileEraPin ug.ugnFile k vf ∗ fcpPin vf ls ∗ ⌜ls <+: vf.feBase⌝
     ∗ flLb ug.ugnFile.fgnCl vf.feBase
-    ∗ (fileTaint (hlc := hlc) ug.ugnFile.fgnCl
+    ∗ (fileTaint ug.ugnFile.fgnCl
        ∨ ∃ (γ : GName) (Ls : List Srec), syncReg ug.ugnFile.fgnCl k γ
-           ∗ slAuth γ (1 : Qp).half.half Ls ∗ syncCmLb (hlc := hlc) ug.ugnFile.fgnCl k))
+           ∗ slAuth γ (1 : Qp).half.half Ls ∗ syncCmLb ug.ugnFile.fgnCl k))
 
 /-- What /init is handed (Rocq `uturn_i`): the above less the token. -/
 def uturnI (ug : UnionGn) (k : Nat) : IProp GF :=
@@ -176,10 +176,10 @@ instance unionTn_timeless (ug : UnionGn) (k : Nat) : Timeless (unionTn (GF := GF
 instance uturn_timeless (ug : UnionGn) (k : Nat) : Timeless (uturn (GF := GF) ug k) := by
   unfold uturn; infer_instance
 instance uturn'_timeless (ug : UnionGn) (k : Nat) :
-    Timeless (uturn' (hlc := hlc) (GF := GF) ug k) := by
+    Timeless (uturn' (GF := GF) ug k) := by
   unfold uturn'; infer_instance
 instance uturn''_timeless (ug : UnionGn) (k : Nat) :
-    Timeless (uturn'' (hlc := hlc) (GF := GF) ug k) := by
+    Timeless (uturn'' (GF := GF) ug k) := by
   unfold uturn''; infer_instance
 instance uturnI_timeless (ug : UnionGn) (k : Nat) : Timeless (uturnI (GF := GF) ug k) := by
   unfold uturnI; infer_instance
@@ -190,8 +190,8 @@ position, founded at the length of the copy's line list the era's record
 pins (or the taint) -- AND THE BOOT FACT at the deed's state, the deed's
 typed witness and the running claim's registration at the era. -/
 noncomputable def unionBoot (ug : UnionGn) (k : Nat) (r : FileAppNames) : IProp GF :=
-  iprop(∃ s : Dst, fileBootAt (hlc := hlc) ug.ugnFile.fgnCl k r s
-    ∗ (fileTaint (hlc := hlc) ug.ugnFile.fgnCl
+  iprop(∃ s : Dst, fileBootAt ug.ugnFile.fgnCl k r s
+    ∗ (fileTaint ug.ugnFile.fgnCl
        ∨ ∃ (vf : FileEra) (ls : List FlLine),
            fileEraPin ug.ugnFile k vf ∗ fcpPin vf ls ∗ fposh r ls.length
            ∗ flLb ug.ugnFile.fgnCl ls
@@ -202,7 +202,7 @@ noncomputable def unionBoot (ug : UnionGn) (k : Nat) (r : FileAppNames) : IProp 
 /-- THE CONCLUSION'S READ at the end of the run (Rocq `union_led_phi`, sync
 SY3-A4). -/
 theorem unionLed_phi (ug : UnionGn) (h : List Obs) :
-    unionLed (hlc := hlc) (GF := GF) ug h ⊢ ⌜unionPhiSync h⌝ := by
+    unionLed (GF := GF) ug h ⊢ ⌜unionPhiSync h⌝ := by
   unfold unionLed
   iintro ⟨Hcnt, -, -, -, -, Hphi, -⟩
   icases Hphi with (Hphi | ⟨HT, -⟩)

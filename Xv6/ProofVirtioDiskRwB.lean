@@ -118,7 +118,7 @@ theorem vdrw2_filter : (["virtio_disk"] : List String).filter (fun x => x ≠ "v
   decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 /-! ## One turn of the eight-way scan -/
 
@@ -474,7 +474,7 @@ theorem vdrw_ac (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γ : DiskNames) (γl : GNa
       locked γl cpu' -∗ diskRes γ pd pav pu curCtx -∗ (∃ K : Nat, viewLb cpu' K) -∗
       sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γl "virtio_disk" (diskRes γ pd pav pu)
+  have h := AC.wp_acquire (GF := GF) c k' γl "virtio_disk" (diskRes γ pd pav pu)
     hnoff hK hs
   unfold wp_acquire_body at h
   simp only [acquireAddr] at h
@@ -502,7 +502,7 @@ again and jump to the head of the loop.  At either entry `SIE`: the
 release re-splits the bundle (its arm back to the pop, the complement on
 to `sleep`), the re-acquire joins them again. -/
 theorem vdrw_park (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) (jp : Nat)
     (bno dsk0 : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool)
     (x0 x1 x2 y : BitVec 32) (R : RegMap)
@@ -680,13 +680,13 @@ theorem tkOut_1 (h m : Nat) : tkOut 1 h m = updB (fun _ => false) h true := rfl
 theorem tkOut_2 (h m : Nat) : tkOut 2 h m = updB (updB (fun _ => false) h true) m true := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
 /-- **The failure ladder** at `+0x7a`: give the `i` descriptors already
 taken back with `free_desc`, then park. -/
 theorem vdrw_ladder (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE)
-    (SL : SLEEP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (SL : SLEEP) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) (jp : Nat)
     (bno dsk0 : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool)
     (i h m : Nat) (v0 v1 v2 y : BitVec 32) (R : RegMap)
@@ -939,7 +939,7 @@ set_option maxHeartbeats 40000000 in
 three turns of `vdrw_iter`; a turn that finds nothing takes the failure
 ladder and comes back here (Löb), three that succeed reach `+0xc4`. -/
 theorem vdrw_loop (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE)
-    (SL : SLEEP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (SL : SLEEP) (Γ : SchedNames) [ClaimIs GF Γ]
     (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) (jp : Nat)
     (bno dsk0 : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool)
     (hjp : jp < NPROC) (hproc : k.proc = procAddr jp) (hK : virtioDiskRwSlots ≤ k.avail)
@@ -1103,7 +1103,7 @@ theorem vdrw_loop (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : REL
   iframe Hi0 Hi1 Hi2 Hi3
 
 /-- `vdrwK`'s `SPIE`/`SPP` are the entry context's. -/
-theorem vdrwLoopHead_self (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem vdrwLoopHead_self (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64)
     (bno dsk0 : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool)
     (x0 x1 x2 y : BitVec 32) (R : RegMap) :
@@ -1118,7 +1118,7 @@ set_option maxHeartbeats 4000000 in
 loop) to `Xv6.vdrwP2Exit` (three distinct free descriptors in `idx[]`, at
 the first instruction of the chain formatting). -/
 theorem vdrw_P2 (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE)
-    (SL : SLEEP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (SL : SLEEP) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) (jp : Nat)
     (bno dsk0 : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (R : RegMap)
     (wr : Bool) (hwr : wr = decide (k.regs 11#5 ≠ 0#64))

@@ -38,7 +38,7 @@ outermost push_off and it found interrupts on (`reen`), they are on again
 (`KCtx.popExit`): the caller brings the arm push_off paid out (`popArm`),
 the context must be one interrupts may be enabled in, and the continuation
 is at whichever hart the thread lands on. -/
-def wp_release_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+def wp_release_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : GName) (s : String) (R : CtxId → IProp GF) [CtxMorph R]
     (hsie : k.sie = false)
     (hnoff : 1 ≤ k.noff) (hK : 10 ≤ k.avail)
@@ -53,16 +53,16 @@ def wp_release_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [C
 
 /-- The interface of `release`. -/
 structure RELEASE : Prop where
-  wp_release : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_release : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γ : GName) (s : String) (R : CtxId → IProp GF) [CtxMorph R] hsie hnoff hK reen hreen hon,
-    wp_release_body (hlc := hlc) (GF := GF) cpu k γ s R hsie hnoff hK reen hreen hon
+    wp_release_body (GF := GF) cpu k γ s R hsie hnoff hK reen hreen hon
 
 /-- **Cancellable-lock form of `wp_release_body`.**  Opens through
 `lockOpenable γ lk s R D`, ruling out the dead ownership-check branch with
 a credential `Tc` that refutes `D`; `Tc` is threaded through the holding
 check, the two clears and pop_off, and handed back in the continuation.
 The `D := False`, `Tc := emp` case recovers `wp_release_body`. -/
-def wp_release_gen_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+def wp_release_gen_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : GName) (s : String) (R : CtxId → IProp GF) [CtxMorph R]
     (D : IProp GF) [Timeless D] (Tc : IProp GF) (hrefute : ⊢ Tc -∗ D -∗ (False : IProp GF))
     (hsie : k.sie = false)
@@ -78,10 +78,10 @@ def wp_release_gen_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF
 
 /-- The cancellable-lock interface of `release`. -/
 structure RELEASE_GEN : Prop where
-  wp_release_gen : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_release_gen : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γ : GName) (s : String) (R : CtxId → IProp GF) [CtxMorph R] (D : IProp GF) [Timeless D] (Tc : IProp GF)
     hrefute hsie hnoff hK reen hreen hon,
-    wp_release_gen_body (hlc := hlc) (GF := GF) cpu k γ s R D Tc hrefute hsie hnoff hK reen hreen hon
+    wp_release_gen_body (GF := GF) cpu k γ s R D Tc hrefute hsie hnoff hK reen hreen hon
 
 /-- **The DESTROY form of `release`.**  The last close of a dead object
 (e.g. `pipeclose`) releases the lock and RECLAIMS its two page words.  The
@@ -93,7 +93,7 @@ the destroy licence: given the parked state half and the surrendered
 payload `R curCtx`, it produces the dead invariant `D` and the caller's
 carry-out `Out`.  The lock's two words come back as raw byte histories, to
 be freed with the page. -/
-def wp_release_cancel_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+def wp_release_cancel_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : GName) (s : String) (R : CtxId → IProp GF) [CtxMorph R]
     (D Out : IProp GF) [Timeless D]
     (hrefuteCore : ⊢ lockedCore γ cpu -∗ D -∗ (False : IProp GF))
@@ -115,10 +115,10 @@ def wp_release_cancel_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc
 
 /-- The destroy interface of `release`. -/
 structure RELEASE_CANCEL : Prop where
-  wp_release_cancel : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_release_cancel : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γ : GName) (s : String) (R : CtxId → IProp GF) [CtxMorph R] (D Out : IProp GF) [Timeless D]
     hrefuteCore hrefuteHalf hsie hnoff hK reen hreen hon,
-    wp_release_cancel_body (hlc := hlc) (GF := GF) cpu k γ s R D Out hrefuteCore hrefuteHalf hsie hnoff hK reen hreen hon
+    wp_release_cancel_body (GF := GF) cpu k γ s R D Out hrefuteCore hrefuteHalf hsie hnoff hK reen hreen hon
 
 /-- **The self-refuting NON-freeing form of `release`.**  Like
 `wp_release_gen_body`, but instead of a separate credential `Tc` refuting the
@@ -131,7 +131,7 @@ special.  For a releaser that spent its reference into the deposited payload
 (e.g. `pipeclose`'s non-freeing arm), so it has no `Tc` but still holds the
 lock.  This is the exact analogue of `wp_release_cancel_body` that closes
 normally instead of destroying. -/
-def wp_release_refute_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+def wp_release_refute_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : GName) (s : String) (R : CtxId → IProp GF) [CtxMorph R]
     (D : IProp GF) [Timeless D]
     (hrefuteCore : ⊢ lockedCore γ cpu -∗ D -∗ (False : IProp GF))
@@ -149,10 +149,10 @@ def wp_release_refute_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc
 
 /-- The self-refuting non-freeing interface of `release`. -/
 structure RELEASE_REFUTE : Prop where
-  wp_release_refute : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_release_refute : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γ : GName) (s : String) (R : CtxId → IProp GF) [CtxMorph R] (D : IProp GF) [Timeless D]
     hrefuteCore hrefuteHalf hsie hnoff hK reen hreen hon,
-    wp_release_refute_body (hlc := hlc) (GF := GF) cpu k γ s R D hrefuteCore hrefuteHalf hsie hnoff hK reen hreen hon
+    wp_release_refute_body (GF := GF) cpu k γ s R D hrefuteCore hrefuteHalf hsie hnoff hK reen hreen hon
 
 /-! ## The HOOKED form
 
@@ -169,7 +169,7 @@ releaser's own view can be minted only on a hartless record
 between the stamp and the word store.  `MachCSL.lockHook_llb` is that
 instance, and it is how the buffer cache's lock payload carries the floor
 its next holder needs (Rocq `BioInv.bcache_res2_fold_in`). -/
-def wp_release_hook_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+def wp_release_hook_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : GName) (s : String) (R Rin : CtxId → IProp GF) [CtxMorph Rin]
     (hsie : k.sie = false)
     (hnoff : 1 ≤ k.noff) (hK : 10 ≤ k.avail)
@@ -184,14 +184,14 @@ def wp_release_hook_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
 
 /-- The hooked interface of `release`. -/
 structure RELEASE_HOOK : Prop where
-  wp_release_hook : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_release_hook : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γ : GName) (s : String) (R Rin : CtxId → IProp GF) [CtxMorph Rin] hsie hnoff hK reen hreen hon,
-    wp_release_hook_body (hlc := hlc) (GF := GF) cpu k γ s R Rin hsie hnoff hK reen hreen hon
+    wp_release_hook_body (GF := GF) cpu k γ s R Rin hsie hnoff hK reen hreen hon
 
 /-- `RELEASE` is the identity-hook instance. -/
 theorem RELEASE_HOOK.toRELEASE (A : RELEASE_HOOK) : RELEASE := ⟨by
-  intro hlc GF _ _ cpu k γ s R _ hsie hnoff hK reen hreen hon
-  have h := A.wp_release_hook (hlc := hlc) (GF := GF) cpu k γ s R R hsie hnoff hK reen hreen hon
+  intro GF _ _ cpu k γ s R _ hsie hnoff hK reen hreen hon
+  have h := A.wp_release_hook (GF := GF) cpu k γ s R R hsie hnoff hK reen hreen hon
   unfold wp_release_hook_body at h
   unfold wp_release_body
   iintro ⟨Hk, Hpc, #Hlk, Hlocked, HR, Harm, HΦ⟩

@@ -42,7 +42,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
 section Lease
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF] [Fscfg]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF] [EchoOutG GF] [Fscfg]
   [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
@@ -52,10 +52,10 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Di
 /-- **Rocq `ush_mid_wc_read_t_at`**: a line read leaves the pieces at
 `I ++ l ++ "\n"` with the era's input there, which takes the loop's tight
 credential from the prompt's index (2) to the block-owed one (3). -/
-theorem ushMidWcReadTAt (L : LinkRec hlc GF) (γ : EchoGn) (γp : GName) (k : Nat) (I l : List (BitVec 8))
-    (hnl : wlNl ∉ l) (hep : ∀ v : EraPins, ⊢ eraPin γ (genId (hlc := hlc) (GF := GF) + 1) v -∗ L.lkEpin k v) :
-    ⊢ ushMidAt (hlc := hlc) L.lkRres γ γp (I ++ l ++ [wlNl]) -∗ lkLcred L k I 2 -∗
-      ushMidAt (hlc := hlc) L.lkRres γ γp (I ++ l ++ [wlNl]) ∗ lkLcred L k (I ++ l ++ [wlNl]) 3 := by
+theorem ushMidWcReadTAt (L : LinkRec GF) (γ : EchoGn) (γp : GName) (k : Nat) (I l : List (BitVec 8))
+    (hnl : wlNl ∉ l) (hep : ∀ v : EraPins, ⊢ eraPin γ (genId (GF := GF) + 1) v -∗ L.lkEpin k v) :
+    ⊢ ushMidAt L.lkRres γ γp (I ++ l ++ [wlNl]) -∗ lkLcred L k I 2 -∗
+      ushMidAt L.lkRres γ γp (I ++ l ++ [wlNl]) ∗ lkLcred L k (I ++ l ++ [wlNl]) 3 := by
   iintro Hmid Hc
   unfold ushMidAt
   icases Hmid with ⟨Hpos, Hpa, Hrd0, %v, #Hpin, Hdl, #HE, #Hres, Hrp⟩
@@ -69,11 +69,11 @@ theorem ushMidWcReadTAt (L : LinkRec hlc GF) (γ : EchoGn) (γp : GName) (k : Na
 /-- **Rocq `ush_wb_read_holds_at`**: THE DISCIPLINE LEMMA AT THE PIECES --
 a whole line read past a banner-owed boundary refutes the credential's
 untainted arm (`lkBan_read_taint`); what is left is the taint. -/
-theorem ushWbReadHoldsAt (L : LinkRec hlc GF) (γ : EchoGn) (γp : GName) (k : Nat) (I l : List (BitVec 8))
-    (hnl : wlNl ∉ l) (hep : ∀ v : EraPins, ⊢ eraPin γ (genId (hlc := hlc) (GF := GF) + 1) v -∗ L.lkEpin k v) :
-    ⊢ ushMidAt (hlc := hlc) L.lkRres γ γp (I ++ l ++ [wlNl]) -∗
+theorem ushWbReadHoldsAt (L : LinkRec GF) (γ : EchoGn) (γp : GName) (k : Nat) (I l : List (BitVec 8))
+    (hnl : wlNl ∉ l) (hep : ∀ v : EraPins, ⊢ eraPin γ (genId (GF := GF) + 1) v -∗ L.lkEpin k v) :
+    ⊢ ushMidAt L.lkRres γ γp (I ++ l ++ [wlNl]) -∗
       (∃ v : EraPins, L.lkPin k v ∗ L.lkBan k v I 0) -∗
-      ushMidAt (hlc := hlc) L.lkRres γ γp (I ++ l ++ [wlNl]) ∗ L.lkT := by
+      ushMidAt L.lkRres γ γp (I ++ l ++ [wlNl]) ∗ L.lkT := by
   iintro Hmid ⟨%v', #Hpin', Hb⟩
   unfold ushMidAt
   icases Hmid with ⟨Hpos, Hpa, Hrd0, %v, #Hpin, Hdl, #HE, #Hres, Hrp⟩
@@ -93,10 +93,10 @@ theorem ushWbReadHoldsAt (L : LinkRec hlc GF) (γ : EchoGn) (γp : GName) (k : N
 (`UshLaws.pm_of_at`); the exit family's credential slot is DROPPED. -/
 theorem ushLeaseOfAt (Rres : EraPins → List (BitVec 8) → IProp GF) (γ : EchoGn) (X : UshCtx GF) [Persistent X.T]
     (Wb : List (BitVec 8) → IProp GF) (N : UkNames GF) (n : Nat)
-    (hPm : X.Pm = ushMidAt (hlc := hlc) Rres γ X.γp)
-    (hpay : N.pay = uconsPay (hlc := hlc) fscCons X.γp X.T (ushRdXAt (hlc := hlc) Rres γ Wb)) :
-    ⊢ ushAt (hlc := hlc) N X n -∗ ∃ I : List (BitVec 8), ⌜I.length = n⌝ ∗ ushLease (hlc := hlc) N X I := by
-  have htaint : ⊢ X.T -∗ upos (hlc := hlc) X.γp n -∗ ushPos (hlc := hlc) N X := by
+    (hPm : X.Pm = ushMidAt Rres γ X.γp)
+    (hpay : N.pay = uconsPay fscCons X.γp X.T (ushRdXAt Rres γ Wb)) :
+    ⊢ ushAt N X n -∗ ∃ I : List (BitVec 8), ⌜I.length = n⌝ ∗ ushLease N X I := by
+  have htaint : ⊢ X.T -∗ upos X.γp n -∗ ushPos N X := by
     iintro #HT Hpos
     unfold ushPos ushAt
     iexists n
@@ -109,7 +109,7 @@ theorem ushLeaseOfAt (Rres : EraPins → List (BitVec 8) → IProp GF) (γ : Ech
   rw [hpay]
   unfold uconsPay
   icases Hlease with (⟨%n', Hrd0, Hpa, Hcred⟩ | #HT)
-  · ihave %he := upos_agree (hlc := hlc) X.γp n n' $$ Hpos Hpa
+  · ihave %he := upos_agree X.γp n n' $$ Hpos Hpa
     subst he
     unfold ushRdXAt initRd initRdCred ushRdPinAt
     icases Hcred with ⟨⟨%v, %I, %hI, #Hpin, Hdl, #HE, Hres, Hrp⟩, -⟩
@@ -132,8 +132,8 @@ theorem ushLeaseOfAt (Rres : EraPins → List (BitVec 8) → IProp GF) (γ : Ech
 /-- **Rocq `ush_at_of_mid_taint_at`** (`UshLaws.at_of_pm_taint`). -/
 theorem ushAtOfMidTaintAt (Rres : EraPins → List (BitVec 8) → IProp GF) (γ : EchoGn) (X : UshCtx GF)
     [Persistent X.T] (Wb : List (BitVec 8) → IProp GF) (N : UkNames GF) (I : List (BitVec 8))
-    (hpay : N.pay = uconsPay (hlc := hlc) fscCons X.γp X.T (ushRdXAt (hlc := hlc) Rres γ Wb)) :
-    ⊢ X.T -∗ ushMidAt (hlc := hlc) Rres γ X.γp I -∗ ushAt (hlc := hlc) N X I.length := by
+    (hpay : N.pay = uconsPay fscCons X.γp X.T (ushRdXAt Rres γ Wb)) :
+    ⊢ X.T -∗ ushMidAt Rres γ X.γp I -∗ ushAt N X I.length := by
   iintro #HT Hmid
   unfold ushMidAt ushAt
   icases Hmid with ⟨Hpos, -, -, -⟩
@@ -145,9 +145,9 @@ theorem ushAtOfMidTaintAt (Rres : EraPins → List (BitVec 8) → IProp GF) (γ 
 the banner-owed credential are the exit payload. -/
 theorem ushAtOfMidWbAt (Rres : EraPins → List (BitVec 8) → IProp GF) (γ : EchoGn) (X : UshCtx GF)
     [Persistent X.T] (Wb : List (BitVec 8) → IProp GF) (N : UkNames GF) (I : List (BitVec 8))
-    (hpay : N.pay = uconsPay (hlc := hlc) fscCons X.γp X.T (ushRdXAt (hlc := hlc) Rres γ Wb))
-    (hwbi : ushWbInp (hlc := hlc) γ X.T Wb) :
-    ⊢ ushMidAt (hlc := hlc) Rres γ X.γp I -∗ Wb I -∗ ushAt (hlc := hlc) N X I.length := by
+    (hpay : N.pay = uconsPay fscCons X.γp X.T (ushRdXAt Rres γ Wb))
+    (hwbi : ushWbInp γ X.T Wb) :
+    ⊢ ushMidAt Rres γ X.γp I -∗ Wb I -∗ ushAt N X I.length := by
   iintro Hmid Hb
   ihave Hr := hwbi I $$ Hb
   icases Hr with ⟨Hb, Hrd⟩
@@ -156,7 +156,7 @@ theorem ushAtOfMidWbAt (Rres : EraPins → List (BitVec 8) → IProp GF) (γ : E
     icases Hmid with ⟨Hpos, Hpa, Hrd0, %v, #Hpin, Hdl, #HE, Hres, Hrp⟩
     iframe Hpos
     rw [hpay]
-    iapply uconsPay_tok (hlc := hlc) fscCons X.γp X.T (ushRdXAt (hlc := hlc) Rres γ Wb) I.length (-1) $$ Hrd0 Hpa
+    iapply uconsPay_tok fscCons X.γp X.T (ushRdXAt Rres γ Wb) I.length (-1) $$ Hrd0 Hpa
     unfold ushRdXAt initRd initRdCred ushRdPinAt
     isplitl [Hdl Hres Hrp]
     · iexists v, I
@@ -177,13 +177,13 @@ credential slot at the lent count is sh's cursor at a line boundary.  The
 lend's input and the credential's are the SAME (`inpLb_agree`). -/
 theorem ushPosbOfLendAt (Rres : EraPins → List (BitVec 8) → IProp GF) (γ : EchoGn) (X : UshCtx GF)
     [Persistent X.T] (N : UkNames GF) (l : List FdState) (n : Nat)
-    (hPm : X.Pm = ushMidAt (hlc := hlc) Rres γ X.γp)
-    (hpay : N.pay = uconsPay (hlc := hlc) fscCons X.γp X.T (ushRdXAt (hlc := hlc) Rres γ X.Wb))
-    (hwci : ushWcInp (hlc := hlc) γ X.T X.Wc) (hwbi : ushWbInp (hlc := hlc) γ X.T X.Wb) :
-    ⊢ upos (hlc := hlc) X.γp n -∗ uconsPay (hlc := hlc) fscCons X.γp X.T (ushRdPinAt (hlc := hlc) Rres γ) (-1) -∗
+    (hPm : X.Pm = ushMidAt Rres γ X.γp)
+    (hpay : N.pay = uconsPay fscCons X.γp X.T (ushRdXAt Rres γ X.Wb))
+    (hwci : ushWcInp γ X.T X.Wc) (hwbi : ushWbInp γ X.T X.Wb) :
+    ⊢ upos X.γp n -∗ uconsPay fscCons X.γp X.T (ushRdPinAt Rres γ) (-1) -∗
       ((∃ I : List (BitVec 8), ⌜I.length = n⌝ ∗ ushWcp X l I 0) ∨ X.T) -∗
-      ushPosb (hlc := hlc) N X l 0 := by
-  have htaint : ⊢ X.T -∗ upos (hlc := hlc) X.γp n -∗ ushPosb (hlc := hlc) N X l 0 := by
+      ushPosb N X l 0 := by
+  have htaint : ⊢ X.T -∗ upos X.γp n -∗ ushPosb N X l 0 := by
     iintro #HT Hpos
     iapply ushPosb_taint N X l 0 $$ HT
     unfold ushPos ushAt
@@ -195,13 +195,13 @@ theorem ushPosbOfLendAt (Rres : EraPins → List (BitVec 8) → IProp GF) (γ : 
   icases Hw with (⟨%I, %hlen, Hwc⟩ | #HT)
   · unfold uconsPay
     icases Hl with (⟨%n', Hrd0, Hpa, Hcred⟩ | #HT)
-    · ihave %he := upos_agree (hlc := hlc) X.γp n n' $$ Hpos Hpa
+    · ihave %he := upos_agree X.γp n n' $$ Hpos Hpa
       subst he
       unfold ushRdPinAt
       icases Hcred with ⟨%v, %I0, %hI0, #Hpin, Hdl, #HE, Hres, Hrp⟩
       -- the credential's read-back: the slot, and the era's input bound or the taint
       ihave Hsplit : iprop(ushWcp X l I 0 ∗
-          ((∃ v' : EraPins, eraPin γ (genId (hlc := hlc) (GF := GF) + 1) v' ∗ inpLb v' I) ∨ X.T)) $$ [Hwc]
+          ((∃ v' : EraPins, eraPin γ (genId (GF := GF) + 1) v' ∗ inpLb v' I) ∨ X.T)) $$ [Hwc]
       · unfold ushWcp
         icases Hwc with (⟨%hrow, Hc⟩ | ⟨%hrow, Hb⟩)
         · ihave Hr := hwci I 0 $$ Hc
@@ -221,7 +221,7 @@ theorem ushPosbOfLendAt (Rres : EraPins → List (BitVec 8) → IProp GF) (γ : 
             · iright; iexact HT
       icases Hsplit with ⟨Hwc, Hrd⟩
       icases Hrd with (⟨%v', #Hpin', #HE'⟩ | #HT)
-      · ihave %hv := eraPin_agree γ (genId (hlc := hlc) (GF := GF) + 1) v v' $$ [Hpin Hpin']
+      · ihave %hv := eraPin_agree γ (genId (GF := GF) + 1) v v' $$ [Hpin Hpin']
         · iframe Hpin Hpin'
         subst hv
         ihave %hII := inpLb_agree v I0 I (by rw [hlen]; exact hI0.1) $$ [HE HE']

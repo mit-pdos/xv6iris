@@ -38,7 +38,7 @@ theorem bu_br_acq : KA.«bunpin» + 0xffffffffffffddde#64 = KA.«acquire» := by
 theorem bu_br_rel : KA.«bunpin» + 0xffffffffffffde66#64 = KA.«release» := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF] [CurCtx]
 
 /-! ## The tail: the epilogue -/
 
@@ -76,7 +76,7 @@ end
 
 set_option maxHeartbeats 16000000 in
 theorem bunpin_proof (AC : ACQUIRE) (RE : RELEASE_HOOK) : BUNPIN := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ cpu k γl γ V kk dev bno hnoff hK hlk hkk ha0 => by
+  fun {GF} _ _ _ _ _ _ _ _ _ _ _ cpu k γl γ V kk dev bno hnoff hK hlk hkk ha0 => by
   unfold wp_bunpin_body
   simp only [bunpinAddr]
   iintro ⟨Hk, Hpc, #Hbc, Href, Hnext⟩

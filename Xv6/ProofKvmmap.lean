@@ -30,7 +30,7 @@ theorem kvm_ret_10ac : jumpPc (KA.«kvmmap» + 0x12#64) = (KA.«kvmmap» + 0x12#
   decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [WchG GF]
 
 /-! ## The callee, at its entry address -/
 
@@ -61,7 +61,7 @@ theorem kvm_mappages_call (MP : MAPPAGES) [CurCtx] (c : CPU) (k' : KCtx)
           = ([], n) ∧
         fresh.Nodup ∧ (∀ b ∈ fresh, pageValid (pageAddr b) ∧ b ∉ t.pages 2)⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := MP.wp_mappages (hlc := hlc) (GF := GF) c k' γl γk nb t n perm 0 hnoff hK hlk hroot
+  have h := MP.wp_mappages (GF := GF) c k' γl γk nb t n perm 0 hnoff hK hlk hroot
     hargs hperm hmask hrwx hwf hnd hpgt hcount
   unfold wp_mappages_body at h
   simp only [mappagesAddr] at h
@@ -82,7 +82,7 @@ theorem kvmmap_br_ffffffffffffff4a : KA.«kvmmap» + 0xffffffffffffff4a#64 = KA.
 
 set_option maxHeartbeats 4000000 in
 theorem kvmmap_proof (MP : MAPPAGES) : KVMMAP :=
-  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk nb t n perm hnoff hK hlk hroot hargs hperm hmask hrwx hwf hnd
+  ⟨fun {GF} _ _ _ _ cpu k γl γk nb t n perm hnoff hK hlk hroot hargs hperm hmask hrwx hwf hnd
       hpgt hcount hp0 => by
   unfold wp_kvmmap_body
   simp only [kvmmapAddr]

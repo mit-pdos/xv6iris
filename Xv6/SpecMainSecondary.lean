@@ -89,7 +89,7 @@ callee, which is the scheduler (printk's 52 is below it). -/
 def mainSecondarySlots : Nat := 2 + schedulerSlots
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
   [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
 
 /-! ## The deposit -/
@@ -104,12 +104,12 @@ def mainDeposit (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) 
   ∃ (γpr : GName) (rootAddr : BitVec 64) (t : PTree) (M : RegMapF (BitVec 64))
     (pd pav pu : BitVec 64),
     ⌜BitVec.extractLsb' 56 8 rootAddr = 0#8 ∧ t.base = BitVec.extractLsb' 12 44 rootAddr⌝ ∗
-    @isLock hlc GF _ _ ⟨ξ, KTier.bare⟩ γpr prLock "pr" (fun _ => emp) ∗
-    @isTxLock hlc GF _ _ ⟨ξ, KTier.bare⟩ γl1 γ1 ∗
+    @isLock GF _ _ ⟨ξ, KTier.bare⟩ γpr prLock "pr" (fun _ => emp) ∗
+    @isTxLock GF _ _ ⟨ξ, KTier.bare⟩ γl1 γ1 ∗
     uartSentSub γ1 [] ∗
-    @kptOn hlc GF _ ⟨ξ, KTier.bare⟩ t M ∗
-    @pwordPointsTo hlc GF _ ⟨ξ, KTier.bare⟩ kernelPagetableAddr 8 DFrac.discard rootAddr ∗
-    @devintrCaps hlc GF _ _ _ _ _ _ _ _ ⟨ξ, KTier.kpt⟩ Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu
+    @kptOn GF _ ⟨ξ, KTier.bare⟩ t M ∗
+    @pwordPointsTo GF _ ⟨ξ, KTier.bare⟩ kernelPagetableAddr 8 DFrac.discard rootAddr ∗
+    @devintrCaps GF _ _ _ _ _ _ _ _ ⟨ξ, KTier.kpt⟩ Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu
 
 /-- A discarded physical word is persistent. -/
 instance mainSec_pword_discard_persistent [CurCtx] (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
@@ -124,14 +124,14 @@ instance mainDeposit_persistent (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl
 /-- UART1's port bundle at the Bare tier transports (the kernel-tier
 instance is `Xv6.instCtxMorphUartPort`). -/
 instance mainSec_instCtxMorphUartPortBare (i : UartId) (γl : GName) (γ : UartNames) :
-    CtxMorph (GF := GF) (fun ξ => @uartPort hlc GF _ _ ⟨ξ, KTier.bare⟩ i γl γ) := by
+    CtxMorph (GF := GF) (fun ξ => @uartPort GF _ _ ⟨ξ, KTier.bare⟩ i γl γ) := by
   unfold uartPort isTxLockAt uartBaseWord
   infer_instance
 
 /-- A physical word transports: its bytes do. -/
 instance mainSec_instCtxMorphPword (tier : KTier) (pa : PAddr) (n : Nat) (dq : DFrac)
     (w : BitVec (8 * n)) :
-    CtxMorph (GF := GF) (fun ξ => @pwordPointsTo hlc GF _ ⟨ξ, tier⟩ pa n dq w) := by
+    CtxMorph (GF := GF) (fun ξ => @pwordPointsTo GF _ ⟨ξ, tier⟩ pa n dq w) := by
   unfold pwordPointsTo
   infer_instance
 
@@ -150,7 +150,7 @@ the kernel context the boot bridge builds (`Xv6.bootBridge`: Bare,
 interrupts off, depth 0, no lock, no proc), holding its own
 `cpus[cpu].context` save area, its raw TLB / trap-CSR cells and the
 `started` channel at the CONCRETE deposit. -/
-def wp_main_secondary_body (X : CurCtx) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+def wp_main_secondary_body (X : CurCtx) (Γ : SchedNames) [ClaimIs GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
     (cpu : CPU) (k : KCtx) (γi : GName) (ξd : CtxId) (tlb0 : Tlb)
     (hX : X.curTier = KTier.bare) (hcpu : cpu ≠ startedPrimary) (hK : mainSecondarySlots ≤ k.avail)
@@ -165,12 +165,12 @@ end
 
 /-- The interface of `main`'s secondary arm (Rocq `MAIN_SECONDARY`). -/
 structure MAIN_SECONDARY : Prop where
-  wp_main_secondary : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+  wp_main_secondary : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] (X : CurCtx)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
     (cpu : CPU) (k : KCtx) (γi : GName) (ξd : CtxId) (tlb0 : Tlb) hX hcpu hK hsie hnoff hlocks hproc,
-    wp_main_secondary_body (hlc := hlc) (GF := GF) X Γ γ0 γ1 γc γl0 γl1 γd γdl γt
+    wp_main_secondary_body (GF := GF) X Γ γ0 γ1 γc γl0 γl1 γd γdl γt
       cpu k γi ξd tlb0 hX hcpu hK hsie hnoff hlocks hproc
 
 end Xv6

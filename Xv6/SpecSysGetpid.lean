@@ -48,7 +48,7 @@ def sysGetpidAddr : BitVec 64 := KA.«sys_getpid»
 def sysGetpidSlots : Nat := 12
 
 /-- **WP of `sys_getpid()`**, at either `SIE`. -/
-def wp_sys_getpid_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_sys_getpid_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -66,12 +66,12 @@ def wp_sys_getpid_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- The interface of `sys_getpid`. -/
 structure SYSGETPID : Prop where
-  wp_sys_getpid : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  wp_sys_getpid : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) hproc htier hnoff hK,
-    wp_sys_getpid_body (hlc := hlc) (GF := GF) cpu k γ pa pid V M hproc htier hnoff hK
+    wp_sys_getpid_body (GF := GF) cpu k γ pa pid V M hproc htier hnoff hK
 
 end Xv6

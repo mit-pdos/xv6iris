@@ -27,11 +27,11 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 set_option synthInstance.maxSize 1024
 
 section PipesEventsVSeal
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [PipeOutG GF]
 
 /-- Rocq `popenV_arm`. -/
-theorem popenV_arm (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)
+theorem popenV_arm (g : PipeGn) (M : LModel) (G : GenCparams GF M) (sd : M.lmSt)
     (WA : GenWa M G sd) (k : Nat) (ho : List Obs) (CH : ConsHist) :
     ⊢ popenV g M G.gcPIN WA.gwa sd WA.gpr k ho CH -∗
       popenV g M G.gcPIN WA.gwa sd WA.gpr k ho CH ∗ ⌜garmEra M k ho CH⌝ := by
@@ -46,7 +46,7 @@ theorem popenV_arm (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.l
   · ipureintro; exact gclPureO_arm M sd k ho so r pre CH hall
 
 /-- Rocq `popenV_close`.  `hK3`: DEVIATION 2. -/
-theorem popenV_close (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)
+theorem popenV_close (g : PipeGn) (M : LModel) (G : GenCparams GF M) (sd : M.lmSt)
     (WA : GenWa M G sd) (k : Nat) (ho : List Obs) (H : ConsHist) (hok : consHistOk H)
     (hev : consEvOk H .evClose)
     (hK3 : ∀ a, H.chArm = some a → caEcho a = [echoOf (caByte a)] → caSent a = 1) :
@@ -63,7 +63,7 @@ theorem popenV_close (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M
   exact gclPureO_close M sd k ho so r pre H hok hev hK3 hall
 
 /-- Rocq `popenV_open`.  `hK1`/`hK2`: DEVIATION 2. -/
-theorem popenV_open (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M)
+theorem popenV_open (g : PipeGn) (M : LModel) (G : GenCparams GF M) (B : LmByteLaws M)
     (sd : M.lmSt) (WA : GenWa M G sd) (k : Nat) (ho : List Obs) (H : ConsHist) (h : List Obs)
     (c : BitVec 8) (cs : List (BitVec 8)) (hok : consHistOk H) (hev : consEvOk H (.evOpen h c cs))
     (hK1 : ∃ f : Nat, flushLost h f
@@ -87,7 +87,7 @@ theorem popenV_open (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B : LmB
 round's own code -- the receipt at the resolution the stage names, the open
 round's code appended, its item from the open round's free payload (sync
 SY3-A4). -/
-theorem popenV_drain (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M)
+theorem popenV_drain (g : PipeGn) (M : LModel) (G : GenCparams GF M) (B : LmByteLaws M)
     (sd : M.lmSt) (WA : GenWa M G sd) (k : Nat) (h ho : List Obs) (CH : ConsHist) (seg : List Obs)
     (hsh : traceShape h true) (hk : obsBoots h = k) (hpre : ho <+: h)
     (hins : consIns seg = consIns (openSeg h)) (hwire : obsWire .uart0 seg <+: CH.chAcc) :
@@ -144,7 +144,7 @@ theorem popenV_drain (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B : Lm
       exact ⟨Nat.le_refl _, hIs, fun I hI => ((hIdl I hI).trans hdlE).trans hbytes⟩
 
 /-- Rocq `peclV_arm`. -/
-theorem peclV_arm (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)
+theorem peclV_arm (g : PipeGn) (M : LModel) (G : GenCparams GF M) (sd : M.lmSt)
     (WA : GenWa M G sd) (k : Nat) (ho : List Obs) (CH : ConsHist) :
     ⊢ peclV g M G sd WA k ho CH -∗ peclV g M G sd WA k ho CH ∗ (G.gcT ∨ ⌜garmEra M k ho CH⌝) := by
   iintro Hc
@@ -160,7 +160,7 @@ theorem peclV_arm (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lm
     · iright; ipureintro; exact ha
 
 /-- Rocq `peclV_close`.  `hK3`: DEVIATION 2. -/
-theorem peclV_close (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)
+theorem peclV_close (g : PipeGn) (M : LModel) (G : GenCparams GF M) (sd : M.lmSt)
     (WA : GenWa M G sd) (k : Nat) (ho : List Obs) (H : ConsHist) (hok : consHistOk H)
     (hev : consEvOk H .evClose)
     (hK3 : ∀ a, H.chArm = some a → caEcho a = [echoOf (caByte a)] → caSent a = 1) :
@@ -172,7 +172,7 @@ theorem peclV_close (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.
   · iright; iapply popenV_close g M G sd WA k ho H hok hev hK3 $$ Hc
 
 /-- Rocq `peclV_open`.  `hK1`/`hK2`: DEVIATION 2. -/
-theorem peclV_open (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M)
+theorem peclV_open (g : PipeGn) (M : LModel) (G : GenCparams GF M) (B : LmByteLaws M)
     (sd : M.lmSt) (WA : GenWa M G sd) (k : Nat) (ho : List Obs) (H : ConsHist) (h : List Obs)
     (c : BitVec 8) (cs : List (BitVec 8)) (hok : consHistOk H) (hev : consEvOk H (.evOpen h c cs))
     (hK1 : ∃ f : Nat, flushLost h f
@@ -188,7 +188,7 @@ theorem peclV_open (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B : LmBy
   · iright; iapply popenV_open g M G B sd WA k ho H h c cs hok hev hK1 hK2 hd hb hdh hsh $$ Hc
 
 /-- Rocq `peclV_drain`. -/
-theorem peclV_drain (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M)
+theorem peclV_drain (g : PipeGn) (M : LModel) (G : GenCparams GF M) (B : LmByteLaws M)
     (sd : M.lmSt) (WA : GenWa M G sd) (k : Nat) (h ho : List Obs) (CH : ConsHist) (seg : List Obs)
     (hsh : traceShape h true) (hk : obsBoots h = k) (hpre : ho <+: h)
     (hins : consIns seg = consIns (openSeg h)) (hwire : obsWire .uart0 seg <+: CH.chAcc)
@@ -207,7 +207,7 @@ theorem peclV_drain (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B : LmB
     · iexact Hd
 
 /-- Rocq `peclV_step_echo`: THE ECHO, refuted while a round is open. -/
-theorem peclV_step_echo (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M)
+theorem peclV_step_echo (g : PipeGn) (M : LModel) (G : GenCparams GF M) (B : LmByteLaws M)
     (sd : M.lmSt) (WA : GenWa M G sd) (L : LmLaws M) (k : Nat) (h : List Obs) (c : BitVec 8)
     (ho : List Obs) (CH : ConsHist)
     (hdisc : lmDisc M h) (hsh : traceShape h true) (hk : obsBoots h = k)
@@ -228,7 +228,7 @@ theorem peclV_step_echo (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B :
       hopen).elim
 
 /-- Rocq `peclV_step_byte`: THE BYTE, which takes NOTHING. -/
-theorem peclV_step_byte (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M)
+theorem peclV_step_byte (g : PipeGn) (M : LModel) (G : GenCparams GF M) (B : LmByteLaws M)
     (sd : M.lmSt) (WA : GenWa M G sd) (L : LmLaws M) (k : Nat) (ho : List Obs) (CH : ConsHist)
     (b : BitVec 8) (hok : consHistOk CH) (hev : consEvOk CH (.evByte b)) :
     ⊢ peclV g M G sd WA k ho CH ==∗ peclV g M G sd WA k ho (consStep CH (.evByte b)) := by

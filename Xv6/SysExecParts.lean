@@ -199,7 +199,7 @@ theorem sys_exec_argv_al (sp0 : BitVec 64) (hal : sp0.toNat % 8 = 0) :
 /-! ## §1.  THE FRAME: 480 bytes, SIXTY slots -/
 
 section Frame
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 variable {lent : Bool}
 
 /-- Slots 1 and 2: `ra` and `s0`, spilled by the prologue. -/
@@ -422,7 +422,7 @@ end Frame
 /-! ### The prologue and the epilogue -/
 
 section Code
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 variable {lent : Bool}
 
 set_option maxHeartbeats 4000000 in
@@ -578,7 +578,7 @@ theorem sysExecPins_exit (k : KCtx) (R : RegMap) (h : sysExecPinsE k R) :
 /-! ### THE JOIN POINT `+0x104` -/
 
 section Exit
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 set_option maxHeartbeats 8000000 in
 /-- **THE JOIN POINT `+0x104`** (Rocq `sx_epilogue`): every exit arrives here
@@ -850,7 +850,7 @@ structure SysExecAU (GF : BundledGFunctors.{0}) where
   Fo : Pfam GF (Aview → Nat → Anode → IProp GF)
 
 section Vocab
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -859,10 +859,10 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 system, panic, the process table and the disk fabric; the kmem lock and
 `kallocAvail` are inside `fsReady`, Rocq's `kalloc_env`). -/
 def sysExecEnv (Γ : SchedNames) (A : SysExecArgs) : IProp GF :=
-  fsFabric (hlc := hlc) Γ A.pd A.pav A.pu
+  fsFabric Γ A.pd A.pav A.pu
 
 instance sysExecEnv_persistent (Γ : SchedNames) (A : SysExecArgs) :
-    Persistent (sysExecEnv (hlc := hlc) (GF := GF) Γ A) := by
+    Persistent (sysExecEnv (GF := GF) Γ A) := by
   unfold sysExecEnv; infer_instance
 
 /-- **Everything the loop only CARRIES** (Rocq `sx_carry`): ra / s0, the
@@ -961,7 +961,7 @@ end Vocab
 instantiated at the vector the walk built** -- the walk piece narrows at the
 ONE path argstr fetched, the slot piece at that path and argument vector
 (its refund untouched, `pfAt_mono`). -/
-theorem sysExecAuPre_at {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF]
+theorem sysExecAuPre_at {GF : BundledGFunctors.{0}} [MachGS GF] [FsTopG GF]
     [FsBytesG GF] [Appcfg GF] [CtokG GF]
     (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames GF) (γfs : FsNames) (rt cw : Nat) (secc : BitVec 64)
     (Q : Int → IProp GF) (P Pmiss : Nat → Nat → IProp GF)
@@ -969,8 +969,8 @@ theorem sysExecAuPre_at {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF
     (sts : List FdState) (cs : Std.ExtTreeSet GName compare) (pidv : BitVec 32)
     (pl : List (BitVec 8)) (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8)
     (hpl : argPathOf M pv.toNat pl) (hargs : execArgsOf M av na alen afun) :
-    sysExecAuPre (hlc := hlc) Fs Γ γfs rt cw secc Q P Pmiss Fo M pv av sts cs pidv ⊢
-      execAuPre (hlc := hlc) Fs Γ γfs rt cw secc Q P Pmiss Fo pl na alen afun sts cs pidv := by
+    sysExecAuPre Fs Γ γfs rt cw secc Q P Pmiss Fo M pv av sts cs pidv ⊢
+      execAuPre Fs Γ γfs rt cw secc Q P Pmiss Fo pl na alen afun sts cs pidv := by
   unfold sysExecAuPre execAuPre
   iintro ⟨Hera, Hcom, Hslot⟩
   isplitl [Hera]
@@ -1005,7 +1005,7 @@ spie spp).pushed 60).withRegs R)`.
 The epilogue at +0x104 is `sys_exec_exit` (§1, proved here). -/
 
 section Bodies
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -1022,7 +1022,7 @@ untouched (bytes), `uargv = A.v1`. -/
 def sysExecHeadBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) : IProp GF :=
   iprop(∀ c : CPU,
     kctx c k -∗ pcIs c sysExecAddr -∗ trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
-    sysExecEnv (hlc := hlc) Γ A -∗ procPrivFd A.γ (procAddr A.j) A.pid A.V A.M -∗
+    sysExecEnv Γ A -∗ procPrivFd A.γ (procAddr A.j) A.pid A.V A.M -∗
     ((∀ (c' : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (kv : Nat),
         ⌜calleeSaved k.regs R' ∧ R' 10#5 = 0xFFFFFFFFFFFFFFFF#64 ∧ A.V.upt.extSz A.V.sz P' ∧
           A.V.ev ≤ kv⌝ -∗
@@ -1074,18 +1074,18 @@ def sysExecStepBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) : IProp GF :=
       (pg : Nat → BitVec 64)
       (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (uvf : Nat → BitVec 64)
       (pl rest : List (BitVec 8)),
-    sysExecLoopSt (hlc := hlc) k A spie spp R P kv i pg alen afun uvf pl rest (sysExecAddr + 0x56#64)
+    sysExecLoopSt k A spie spp R P kv i pg alen afun uvf pl rest (sysExecAddr + 0x56#64)
       c -∗
-    sysExecEnv (hlc := hlc) Γ A -∗
+    sysExecEnv Γ A -∗
     (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (kv' : Nat) (i' : Nat)
         (pg' : Nat → BitVec 64)
         (alen' : Nat → Nat) (afun' : Nat → Nat → BitVec 8) (uvf' : Nat → BitVec 64),
-      ((⌜i' = i + 1⌝ ∗ sysExecLoopSt (hlc := hlc) k A spie' spp' R' P' kv' i' pg' alen' afun' uvf' pl
+      ((⌜i' = i + 1⌝ ∗ sysExecLoopSt k A spie' spp' R' P' kv' i' pg' alen' afun' uvf' pl
           rest (sysExecAddr + 0x56#64) c') ∨
        (⌜bytesToWord (umemRead (sysExecIm A) (A.v1 + BitVec.ofNat 64 (8 * i')).toNat 8) = 0#64⌝ ∗
-          sysExecLoopSt (hlc := hlc) k A spie' spp' R' P' kv' i' pg' alen' afun' uvf' pl rest
+          sysExecLoopSt k A spie' spp' R' P' kv' i' pg' alen' afun' uvf' pl rest
             (sysExecAddr + 0xb6#64) c') ∨
-       sysExecBadSt (hlc := hlc) k A spie' spp' R' P' kv' i' pg' afun' pl rest c') -∗
+       sysExecBadSt k A spie' spp' R' P' kv' i' pg' afun' pl rest c') -∗
       wpLoop c') -∗
     wpLoop c)
 
@@ -1097,16 +1097,16 @@ def sysExecLoopBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) : IProp GF :=
       (pg : Nat → BitVec 64)
       (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (uvf : Nat → BitVec 64)
       (pl rest : List (BitVec 8)),
-    sysExecLoopSt (hlc := hlc) k A spie spp R P kv i pg alen afun uvf pl rest (sysExecAddr + 0x56#64)
+    sysExecLoopSt k A spie spp R P kv i pg alen afun uvf pl rest (sysExecAddr + 0x56#64)
       c -∗
-    sysExecEnv (hlc := hlc) Γ A -∗
+    sysExecEnv Γ A -∗
     (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (kv' : Nat) (i' : Nat)
         (pg' : Nat → BitVec 64)
         (alen' : Nat → Nat) (afun' : Nat → Nat → BitVec 8) (uvf' : Nat → BitVec 64),
       ((⌜bytesToWord (umemRead (sysExecIm A) (A.v1 + BitVec.ofNat 64 (8 * i')).toNat 8) = 0#64⌝ ∗
-          sysExecLoopSt (hlc := hlc) k A spie' spp' R' P' kv' i' pg' alen' afun' uvf' pl rest
+          sysExecLoopSt k A spie' spp' R' P' kv' i' pg' alen' afun' uvf' pl rest
             (sysExecAddr + 0xb6#64) c') ∨
-       sysExecBadSt (hlc := hlc) k A spie' spp' R' P' kv' i' pg' afun' pl rest c') -∗
+       sysExecBadSt k A spie' spp' R' P' kv' i' pg' afun' pl rest c') -∗
       wpLoop c') -∗
     wpLoop c)
 
@@ -1130,7 +1130,7 @@ def sysExecFreeBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) (base ea : Bi
     ⌜m ≤ t ∧ m < 32 ∧ t ≤ 32 ∧ sysExecPgOk pg t ∧ R 9#5 = sysExecArgvAt (k.regs 2#5) m ∧
       R 20#5 = sysExecPath (k.regs 2#5)⌝ -∗
     kctx c (((k.withSpie spie spp).pushed 60).withRegs R) -∗ pcIs c (sysExecAddr + base) -∗
-    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysExecEnv (hlc := hlc) Γ A -∗
+    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysExecEnv Γ A -∗
     sysExecArgvFrom (k.regs 2#5) m t pg -∗ sysExecPages pg afun m t -∗
     -- the running proc's lend (permit sweep L3b): each kfree steps it
     actLend k.proc ke -∗
@@ -1151,7 +1151,7 @@ def sysExecBadTailBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) : IProp GF
   iprop(∀ (c : CPU) (spie spp : Bool) (R : RegMap) (P : UPtd) (kv : Nat) (t : Nat)
       (pg : Nat → BitVec 64)
       (afun : Nat → Nat → BitVec 8) (pl rest : List (BitVec 8)),
-    sysExecBadSt (hlc := hlc) k A spie spp R P kv t pg afun pl rest c -∗ sysExecEnv (hlc := hlc) Γ A -∗
+    sysExecBadSt k A spie spp R P kv t pg afun pl rest c -∗ sysExecEnv Γ A -∗
     (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap) (kv' : Nat),
       ⌜calleeSaved k.regs R' ∧ R' 10#5 = 0xFFFFFFFFFFFFFFFF#64 ∧ A.V.upt.extSz A.V.sz P ∧
         A.V.ev ≤ kv'⌝ -∗
@@ -1171,7 +1171,7 @@ def sysExecSuccTailBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) : IProp G
       (afun : Nat → Nat → BitVec 8) (pl rest : List (BitVec 8)) (rv : BitVec 64) (ke : Nat),
     ⌜t ≤ 32 ∧ sysExecPgOk pg t ∧ sysExecBadPins k R ∧ R 10#5 = rv ∧ (k.regs 2#5).toNat % 8 = 0⌝ -∗
     kctx c (((k.withSpie spie spp).pushed 60).withRegs R) -∗ pcIs c (sysExecAddr + 0xce#64) -∗
-    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysExecEnv (hlc := hlc) Γ A -∗
+    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysExecEnv Γ A -∗
     sysExecCarry k pl rest -∗ wordPointsTo (sysExecUargv (k.regs 2#5)) 8 (DFrac.own 1) A.v1 -∗
     (∃ w : BitVec 64, wordPointsTo (sysExecUarg (k.regs 2#5)) 8 (DFrac.own 1) w) -∗
     sysExecArgvArr (k.regs 2#5) (sysExecArgvL pg t) -∗ sysExecPages pg afun 0 t -∗
@@ -1200,11 +1200,11 @@ def sysExecBreakBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) (U : SysExec
       (pl rest : List (BitVec 8)),
     ⌜bytesToWord (umemRead (sysExecIm A) (A.v1 + BitVec.ofNat 64 (8 * i)).toNat 8) = 0#64⌝ -∗
     ⌜pl.length < 128 ∧ argPathOf (sysExecIm A) A.v0.toNat pl⌝ -∗
-    sysExecLoopSt (hlc := hlc) k A spie spp R P kv i pg alen afun uvf pl rest (sysExecAddr + 0xb6#64)
+    sysExecLoopSt k A spie spp R P kv i pg alen afun uvf pl rest (sysExecAddr + 0xb6#64)
       c -∗
-    sysExecEnv (hlc := hlc) Γ A -∗ bslots 3 -∗ irefSlots 2 -∗
+    sysExecEnv Γ A -∗ bslots 3 -∗ irefSlots 2 -∗
     myPay U.gn U.Q -∗
-    sysExecAuPre (hlc := hlc) U.Fs (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.V.pvSecc U.Q U.P U.Pmiss U.Fo (sysExecIm A)
+    sysExecAuPre U.Fs (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.V.pvSecc U.Q U.P U.Pmiss U.Fo (sysExecIm A)
       A.v0 A.v1 U.sts U.cs A.pid -∗
     (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap) (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
       ⌜calleeSaved k.regs R'⌝ -∗ ⌜execArgsOf (sysExecIm A) A.v1 i alen afun⌝ -∗
@@ -1212,7 +1212,7 @@ def sysExecBreakBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) (U : SysExec
       -- the count the argument fetches left the block at (deviation 9);
       -- kexec was handed the block there
       ⌜A.V.ev ≤ kv⌝ -∗
-      execArms (hlc := hlc) U.Fs (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.V.pvSecc U.Q U.P U.Pmiss U.Fo pl i alen afun
+      execArms U.Fs (fsGammaL fscFs) fscFs A.V.rti A.V.cwi A.V.pvSecc U.Q U.P U.Pmiss U.Fo pl i alen afun
         U.sts U.gn U.cs A.pid (sysExecV2 A P kv) (sysExecM2 A P) V' M' (R' 10#5) -∗
       kctx c' ((k.withSpie spie' spp').withRegs R') -∗ pcIs c' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗ bslots 3 -∗ irefSlots 2 -∗
@@ -1230,19 +1230,19 @@ of the returns into the contract's `sysExecArms`.  The seal
 (`ProofSysExec`) instantiates it at the proved bodies. -/
 
 section Compose
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
 /-- **THE COMPOSITION**: the five bodies give the contract. -/
-theorem sys_exec_compose (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx)
+theorem sys_exec_compose (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx)
     (A : SysExecArgs) (U : SysExecAU GF) (hS : SysExecStatic k A)
-    (hhead : ⊢ sysExecHeadBody (hlc := hlc) (GF := GF) Γ k A) (hsetup : ⊢ sysExecSetupBody (hlc := hlc) (GF := GF) k)
-    (hloop : ⊢ sysExecLoopBody (hlc := hlc) (GF := GF) Γ k A) (hbreak : ⊢ sysExecBreakBody (hlc := hlc) (GF := GF) Γ k A U)
-    (hbad : ⊢ sysExecBadTailBody (hlc := hlc) (GF := GF) Γ k A) :
-    wp_sys_exec_eb_body (hlc := hlc) (GF := GF) Γ cpu k A.γ A.j A.pd A.pav A.pu A.v0 A.v1 A.pid A.V
+    (hhead : ⊢ sysExecHeadBody (GF := GF) Γ k A) (hsetup : ⊢ sysExecSetupBody (GF := GF) k)
+    (hloop : ⊢ sysExecLoopBody (GF := GF) Γ k A) (hbreak : ⊢ sysExecBreakBody (GF := GF) Γ k A U)
+    (hbad : ⊢ sysExecBadTailBody (GF := GF) Γ k A) :
+    wp_sys_exec_eb_body (GF := GF) Γ cpu k A.γ A.j A.pd A.pav A.pu A.v0 A.v1 A.pid A.V
       A.M U.sts U.gn U.cs U.Fs U.Q U.P U.Pmiss U.Fo hS.hK hS.hnoff hS.htier hS.hj hS.hproc hS.hv0
       hS.hv1 := by
   unfold sysExecHeadBody at hhead
@@ -1253,7 +1253,7 @@ theorem sys_exec_compose (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : C
   unfold wp_sys_exec_eb_body sysExecK
   iintro ⟨Hk, Hpc, Hte, Hce, #Hfab, Hbs, Hir, Hblk, Hpay, Hau, HΦ⟩
   ihave HΦ := sys_exec_post_pin k A hS cpu _ $$ HΦ
-  ihave #Henv : sysExecEnv (hlc := hlc) Γ A $$ [Hfab]
+  ihave #Henv : sysExecEnv Γ A $$ [Hfab]
   · unfold sysExecEnv; iexact Hfab
   iapply hhead $$ %cpu Hk Hpc Hte Hce Henv Hblk
   isplit

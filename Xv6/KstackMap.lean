@@ -104,7 +104,7 @@ theorem kvmTableOk_kptFacts_stacks (t : PTree) (pas : Nat → BitVec 44) (h : kv
 
 /-! ## The stack claims -/
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- The 64 stack claims: page `pas i` is mapped read-write at `KSTACK(i)`. -/
 def kstackMapAt [CurCtx] (pas : Nat → BitVec 44) : IProp GF := iprop%
@@ -123,8 +123,8 @@ theorem kstackMapAt_at [CurCtx] (pas : Nat → BitVec 44) (i : Nat) (hi : i < 64
 
 /-- Insert the first `n` stacks into the (owned) mapping authority. -/
 theorem kmap_insert_stacksN [CurCtx] (pas : Nat → BitVec 44) (n : Nat) (hn : n ≤ 64) :
-    (MachGS.kmapName (hlc := hlc) (GF := GF) ↪●MAP KernelMap.static) ⊢
-      |==> ((MachGS.kmapName (hlc := hlc) (GF := GF) ↪●MAP kvmMapN pas n) ∗
+    (MachGS.kmapName (GF := GF) ↪●MAP KernelMap.static) ⊢
+      |==> ((MachGS.kmapName (GF := GF) ↪●MAP kvmMapN pas n) ∗
         [∗list] i ∈ List.range n, kmapAt (GF := GF) (kstackVpn i) (kstackLeaf pas i)) := by
   induction n with
   | zero =>
@@ -154,8 +154,8 @@ theorem kmap_insert_stacksN [CurCtx] (pas : Nat → BitVec 44) (n : Nat) (hn : n
 
 /-- All 64 stacks inserted. -/
 theorem kmap_insert_stacks [CurCtx] (pas : Nat → BitVec 44) :
-    (MachGS.kmapName (hlc := hlc) (GF := GF) ↪●MAP KernelMap.static) ⊢
-      |==> ((MachGS.kmapName (hlc := hlc) (GF := GF) ↪●MAP kvmMap pas) ∗ kstackMapAt (GF := GF) pas) :=
+    (MachGS.kmapName (GF := GF) ↪●MAP KernelMap.static) ⊢
+      |==> ((MachGS.kmapName (GF := GF) ↪●MAP kvmMap pas) ∗ kstackMapAt (GF := GF) pas) :=
   kmap_insert_stacksN pas 64 (Nat.le_refl _)
 
 /-! ## The stack of process `i` at its virtual address -/

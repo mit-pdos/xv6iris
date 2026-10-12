@@ -21,7 +21,7 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-! ## `walkaddr` -/
 
@@ -30,7 +30,7 @@ theorem walkaddr_br_ffffffffffffff66 : KA.«walkaddr» + 0xffffffffffffff66#64 =
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 theorem walkaddr_proof (W : WALK_NOALLOC) : WALKADDR :=
-  ⟨fun {hlc GF} _ _ _ cpu k dq t L hK hroot hrep => by
+  ⟨fun {GF} _ _ _ cpu k dq t L hK hroot hrep => by
   unfold wp_walkaddr_body
   simp only [walkaddrAddr]
   iintro ⟨Hk, Hpc, Htree, HΦ⟩

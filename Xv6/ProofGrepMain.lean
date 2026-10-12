@@ -43,7 +43,7 @@ theorem grepMain_scale (L : Nat) (h3 : 3 ≤ L) (h31 : L < 2 ^ 31) :
     umoi_natCast]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -54,9 +54,9 @@ theorem grepMain_loop (UL : UK_LEAVES) (GG : GREP_GREP) (N : UkNames GF) (sp0 : 
     ∀ (k i : Nat) (h : CPU) (m : RegMap) (f : Nat → BitVec 8) (na : Nat),
       i + (k + 1) = args.length → grepWords (uargBytes g1) ≤ na → 28 ≤ na →
       grepMainInv sp0 av args.length i g1.ptr m →
-      ⊢ treePay (hlc := hlc) N (grepProg N.t) (grepFiles (uargBytes g1) ((args.drop i).map uargBytes) (exit_ 0)) -∗
+      ⊢ treePay N (grepProg N.t) (grepFiles (uargBytes g1) ((args.drop i).map uargBytes) (exit_ 0)) -∗
         grepCode N.t -∗ uargv N.d av args -∗ ubytes N.d User.Grep.Sym.«buf» 1024 f -∗
-        urun (hlc := hlc) N h m (BitVec.ofNat 64 0x204) na -∗ wpLoop h := by
+        urun N h m (BitVec.ofNat 64 0x204) na -∗ wpLoop h := by
   intro k
   induction k with
   | zero =>
@@ -114,9 +114,9 @@ theorem wp_grepMain (UL : UK_LEAVES) (GG : GREP_GREP) (N : UkNames GF) (h : CPU)
     (hptr : ∀ (j : Nat) (g : UArg), args[j]? = some g → g.ptr ≠ 0)
     (ha0 : m.get 10#5 = BitVec.ofNat 64 args.length) (ha1 : m.get 11#5 = BitVec.ofNat 64 av)
     (hneed : grepMainWords args ≤ n) :
-    ⊢ treePay (hlc := hlc) N (grepProg N.t) (grepTree (args.map uargBytes)) -∗
+    ⊢ treePay N (grepProg N.t) (grepTree (args.map uargBytes)) -∗
       grepCode N.t -∗ uargv N.d av args -∗ ubytes N.d User.Grep.Sym.«buf» 1024 f -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Grep.Sym.«main») n -∗ wpLoop h := by
+      urun N h m (BitVec.ofNat 64 User.Grep.Sym.«main») n -∗ wpLoop h := by
   have h6 : 6 ≤ n := by
     match args, hneed with
     | [], hn => simp [grepMainWords] at hn; omega

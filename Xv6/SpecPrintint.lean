@@ -23,7 +23,7 @@ open LeanRV64D
 def printintAddr : BitVec 64 := KA.«printint»
 
 /-- **WP of `printint`.** -/
-def wp_printint_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_printint_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γd : UartNames) (bs : List (BitVec 8))
     (hsie : k.sie = false) (hK : 28 ≤ k.avail)
     (hbase : k.regs 11#5 = 10#64 ∨ k.regs 11#5 = 16#64)
@@ -37,8 +37,8 @@ def wp_printint_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
 
 /-- The interface of `printint`. -/
 structure PRINTINT : Prop where
-  wp_printint : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_printint : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γl : GName) (γd : UartNames) (bs : List (BitVec 8)) hsie hK hbase hnoff huart,
-    wp_printint_body (hlc := hlc) (GF := GF) cpu k γl γd bs hsie hK hbase hnoff huart
+    wp_printint_body (GF := GF) cpu k γl γd bs hsie hK hbase hnoff huart
 
 end Xv6

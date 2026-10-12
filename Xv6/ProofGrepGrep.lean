@@ -26,7 +26,7 @@ set_option maxRecDepth 20000
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -38,16 +38,16 @@ theorem grepLoop_scan (UL : UK_LEAVES) (SC : GREP_STRCHR) (MA : GREP_MATCH) (N :
     grepGlRegs m0 sp0 ar fdv m → m.get 18#5 = BitVec.ofNat 64 (User.Grep.Sym.«buf» + i) →
     m.get 19#5 = kgrepB01 sk → m.get 20#5 = BitVec.ofNat 64 mv → m.get 22#5 = BitVec.ofNat 64 mv → F mv = ubyte0 →
     ⊢ grepCode N.t -∗ ustr N.d dqr ar lr fr -∗ ubytes N.d User.Grep.Sym.«buf» 1024 F -∗
-      treePay (hlc := hlc) N (grepProg N.t) (grepK ((List.range lr).map fr) fd rest
+      treePay N (grepProg N.t) (grepK ((List.range lr).map fr) fd rest
         (scan ((List.range lr).map fr) sk [] ((List.range (mv - i)).map (fun j => F (i + j))))) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x136) (4 + n2) -∗
+      urun N h m (BitVec.ofNat 64 0x136) (4 + n2) -∗
       (∀ (h' : CPU) (m' : RegMap) (F' : Nat → BitVec 8) (i' : Nat) (sk' : Bool), ⌜i' ≤ mv⌝ -∗
         ⌜grepGlRegs m0 sp0 ar fdv m'⌝ -∗ ⌜m'.get 18#5 = BitVec.ofNat 64 (User.Grep.Sym.«buf» + i')⌝ -∗
         ⌜m'.get 19#5 = kgrepB01 sk'⌝ -∗ ⌜m'.get 20#5 = BitVec.ofNat 64 mv⌝ -∗ ⌜m'.get 22#5 = BitVec.ofNat 64 mv⌝ -∗
         ustr N.d dqr ar lr fr -∗ ubytes N.d User.Grep.Sym.«buf» 1024 F' -∗
-        treePay (hlc := hlc) N (grepProg N.t) (grepK ((List.range lr).map fr) fd rest
+        treePay N (grepProg N.t) (grepK ((List.range lr).map fr) fd rest
           (([], (List.range (mv - i')).map (fun j => F' (i' + j))), sk')) -∗
-        urun (hlc := hlc) N h' m' (BitVec.ofNat 64 0x16a) (4 + n2) -∗ wpLoop h') -∗
+        urun N h' m' (BitVec.ofNat 64 0x16a) (4 + n2) -∗ wpLoop h') -∗
       wpLoop h := by
   intro d
   refine Nat.strongRecOn d ?_
@@ -81,12 +81,12 @@ theorem grepLoop_loop (UL : UK_LEAVES) (SC : GREP_STRCHR) (MM : GREP_MEMMOVE) (M
         ⌜m.get 22#5 = BitVec.ofNat 64 left.length⌝ -∗ ⌜left.length < 1023⌝ -∗
         ⌜(List.range left.length).map F = left⌝ -∗
         ustr N.d dqr ar lr fr -∗ ubytes N.d User.Grep.Sym.«buf» 1024 F -∗
-        treePay (hlc := hlc) N (grepProg N.t) (grepGo ((List.range lr).map fr) fd skip [] left rest) -∗
+        treePay N (grepProg N.t) (grepGo ((List.range lr).map fr) fd skip [] left rest) -∗
         (∀ (h' : CPU) (m' : RegMap) (F' : Nat → BitVec 8), ⌜grepGlRegs m0 sp0 ar fdv m'⌝ -∗
           ustr N.d dqr ar lr fr -∗ ubytes N.d User.Grep.Sym.«buf» 1024 F' -∗
-          treePay (hlc := hlc) N (grepProg N.t) rest -∗
-          urun (hlc := hlc) N h' m' (BitVec.ofNat 64 0x1b2) (4 + n2) -∗ wpLoop h') -∗
-        urun (hlc := hlc) N h m (BitVec.ofNat 64 0x16e) (4 + n2) -∗ wpLoop h := by
+          treePay N (grepProg N.t) rest -∗
+          urun N h' m' (BitVec.ofNat 64 0x1b2) (4 + n2) -∗ wpLoop h') -∗
+        urun N h m (BitVec.ofNat 64 0x16e) (4 + n2) -∗ wpLoop h := by
   iintro #Hc
   iloeb as IH
   iintro %h %m %F %skip %left %hgl %hs3 %hs6 %hL %hleft Hre Hbuf Ht Hx Hrun
@@ -119,11 +119,11 @@ theorem wp_grepGrep_gen (UL : UK_LEAVES) (SC : GREP_STRCHR) (MM : GREP_MEMMOVE) 
     (ha0 : m.get 10#5 = BitVec.ofNat 64 ar) (ha1 : m.get 11#5 = fdv) (hfd : (BitVec.setWidth 32 fdv).toInt = fd)
     (hn : grepWords ((List.range lr).map fr) ≤ n) :
     ⊢ grepCode N.t -∗ ustr N.d dqr ar lr fr -∗ ubytes N.d User.Grep.Sym.«buf» 1024 g -∗
-      treePay (hlc := hlc) N (grepProg N.t) (grepGo ((List.range lr).map fr) fd false [] [] rest) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Grep.Sym.«grep») n -∗
+      treePay N (grepProg N.t) (grepGo ((List.range lr).map fr) fd false [] [] rest) -∗
+      urun N h m (BitVec.ofNat 64 User.Grep.Sym.«grep») n -∗
       (∀ (h' : CPU) (m' : RegMap) (g' : Nat → BitVec 8), ⌜ucalleeSaved m m'⌝ -∗ ustr N.d dqr ar lr fr -∗
-        ubytes N.d User.Grep.Sym.«buf» 1024 g' -∗ treePay (hlc := hlc) N (grepProg N.t) rest -∗
-        urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) n -∗ wpLoop h') -∗
+        ubytes N.d User.Grep.Sym.«buf» 1024 g' -∗ treePay N (grepProg N.t) rest -∗
+        urun N h' m' (retPc (m.get 1#5)) n -∗ wpLoop h') -∗
       wpLoop h := by
   unfold grepWords at hn
   obtain ⟨n2, rfl⟩ : ∃ n2, n = 14 + (4 + n2) := ⟨n - 18, by omega⟩
@@ -147,7 +147,7 @@ theorem wp_grepGrep_gen (UL : UK_LEAVES) (SC : GREP_STRCHR) (MM : GREP_MEMMOVE) 
 /-- **Rocq `wp_kgrep_grep`**: THE STATEMENT OF RECORD, the pattern an argv
 string. -/
 theorem wp_grepGrep (UL : UK_LEAVES) (SC : GREP_STRCHR) (MM : GREP_MEMMOVE) (MA : GREP_MATCH) :
-    wpGrepGrepBody (hlc := hlc) (GF := GF) := by
+    wpGrepGrepBody (GF := GF) := by
   intro N h m ar lr fr fdv fd g rest n ha0 ha1 hfd hn
   iintro #Hc Hre Hbuf Ht Hrun Hcont
   iapply wp_grepGrep_gen UL SC MM MA N h m DFrac.discard ar lr fr fdv fd g rest n ha0 ha1 hfd hn

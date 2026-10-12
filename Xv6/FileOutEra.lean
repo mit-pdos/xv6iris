@@ -120,7 +120,7 @@ theorem fileOut_single_prefix (s s' : Fstate) (h : [s] <+: [s']) : s = s' := by
   | cons y z => simp at hz
 
 section FileOutEra
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF]
 
 /-! ## The era's boot-state record, pinned -/
@@ -155,24 +155,24 @@ admissible after the era's floor's last record, against a lower bound of the
 line list -- what the PowerOn transport derived from the durable copy, and what
 the ledger reads at the era's first drain; or the taint. -/
 def f0Bt (g : FileGn) (v : FileEra) (s0 : Fstate) : IProp GF :=
-  iprop(fileTaint (hlc := hlc) g.fgnCl
+  iprop(fileTaint g.fgnCl
     ∨ ∃ ls : List FlLine, flLb g.fgnCl ls ∗ ⌜uadm ls (slast v.feFloor) s0⌝)
 
 instance f0Bt_persistent (g : FileGn) (v : FileEra) (s : Fstate) :
-    Persistent (f0Bt (hlc := hlc) (GF := GF) g v s) := by
+    Persistent (f0Bt (GF := GF) g v s) := by
   unfold f0Bt; infer_instance
 instance f0Bt_timeless (g : FileGn) (v : FileEra) (s : Fstate) :
-    Timeless (f0Bt (hlc := hlc) (GF := GF) g v s) := by
+    Timeless (f0Bt (GF := GF) g v s) := by
   unfold f0Bt; infer_instance
 
 /-- ...its one-element lower bound, AND the era's boot fact beside it (Rocq
 `f0_bl`). -/
 def f0Bl (g : FileGn) (v : FileEra) (s0 : Fstate) : IProp GF :=
-  iprop(MonoList.lb_own v.feF0 [s0] ∗ f0Bt (hlc := hlc) g v s0)
+  iprop(MonoList.lb_own v.feF0 [s0] ∗ f0Bt g v s0)
 
 /-- Rocq `f0_bl_bt`. -/
 theorem f0Bl_bt (g : FileGn) (v : FileEra) (s0 : Fstate) :
-    f0Bl (hlc := hlc) (GF := GF) g v s0 ⊢ f0Bt (hlc := hlc) g v s0 := by
+    f0Bl (GF := GF) g v s0 ⊢ f0Bt g v s0 := by
   unfold f0Bl
   iintro ⟨-, H⟩
   iexact H
@@ -190,13 +190,13 @@ def f0Fd (v : FileEra) (s0 : Fstate) : IProp GF :=
 /-- What a WRITER carries past the era's first byte: the boot state, and that
 it is filed (Rocq `f0_lb`). -/
 def f0Lb (g : FileGn) (v : FileEra) (s0 : Fstate) : IProp GF :=
-  iprop(f0Bl (hlc := hlc) g v s0 ∗ f0Fd v s0)
+  iprop(f0Bl g v s0 ∗ f0Fd v s0)
 
 instance f0Bl_persistent (g : FileGn) (v : FileEra) (s : Fstate) :
-    Persistent (f0Bl (hlc := hlc) (GF := GF) g v s) := by
+    Persistent (f0Bl (GF := GF) g v s) := by
   unfold f0Bl; infer_instance
 instance f0Bl_timeless (g : FileGn) (v : FileEra) (s : Fstate) :
-    Timeless (f0Bl (hlc := hlc) (GF := GF) g v s) := by
+    Timeless (f0Bl (GF := GF) g v s) := by
   unfold f0Bl; infer_instance
 instance f0Fd_persistent (v : FileEra) (s : Fstate) : Persistent (f0Fd (GF := GF) v s) := by
   unfold f0Fd; infer_instance
@@ -205,16 +205,16 @@ instance f0Fd_timeless (v : FileEra) (s : Fstate) : Timeless (f0Fd (GF := GF) v 
 instance f0fAuth_timeless (v : FileEra) (l : List Fstate) : Timeless (f0fAuth (GF := GF) v l) := by
   unfold f0fAuth; infer_instance
 instance f0Lb_persistent (g : FileGn) (v : FileEra) (s : Fstate) :
-    Persistent (f0Lb (hlc := hlc) (GF := GF) g v s) := by
+    Persistent (f0Lb (GF := GF) g v s) := by
   unfold f0Lb; infer_instance
 instance f0Lb_timeless (g : FileGn) (v : FileEra) (s : Fstate) :
-    Timeless (f0Lb (hlc := hlc) (GF := GF) g v s) := by
+    Timeless (f0Lb (GF := GF) g v s) := by
   unfold f0Lb; infer_instance
 instance f0Auth_timeless (v : FileEra) (l : List Fstate) : Timeless (f0Auth (GF := GF) v l) := by
   unfold f0Auth; infer_instance
 
 theorem f0Lb_bl (g : FileGn) (v : FileEra) (s0 : Fstate) :
-    f0Lb (hlc := hlc) (GF := GF) g v s0 ⊢ f0Bl (hlc := hlc) g v s0 := by
+    f0Lb (GF := GF) g v s0 ⊢ f0Bl g v s0 := by
   unfold f0Lb
   iintro ⟨H, -⟩
   iexact H
@@ -234,7 +234,7 @@ theorem f0fAuth_lb_agree (v : FileEra) (f0 : Option Fstate) (s : Fstate) :
 /-- TWO LOWER BOUNDS OF THE ERA'S BOOT STATE AGREE, with no authority in hand
 (Rocq `f0_bl_agree`). -/
 theorem f0Bl_agree (g : FileGn) (v : FileEra) (s s' : Fstate) :
-    f0Bl (hlc := hlc) (GF := GF) g v s ∗ f0Bl (hlc := hlc) g v s' ⊢ ⌜s = s'⌝ := by
+    f0Bl (GF := GF) g v s ∗ f0Bl g v s' ⊢ ⌜s = s'⌝ := by
   unfold f0Bl
   iintro ⟨⟨H1, -⟩, ⟨H2, -⟩⟩
   ihave %h := MonoList.lb_own_valid $$ H1 H2
@@ -244,7 +244,7 @@ theorem f0Bl_agree (g : FileGn) (v : FileEra) (s s' : Fstate) :
   · exact (fileOut_single_prefix s' s h).symm
 
 theorem f0Lb_agree (g : FileGn) (v : FileEra) (s s' : Fstate) :
-    f0Lb (hlc := hlc) (GF := GF) g v s ∗ f0Lb (hlc := hlc) g v s' ⊢ ⌜s = s'⌝ := by
+    f0Lb (GF := GF) g v s ∗ f0Lb g v s' ⊢ ⌜s = s'⌝ := by
   unfold f0Lb
   iintro ⟨⟨H1, -⟩, ⟨H2, -⟩⟩
   iapply f0Bl_agree g
@@ -263,7 +263,7 @@ theorem f0fLb_get (v : FileEra) (s : Fstate) :
 /-- /INIT FILES THE BOOT STATE AT BOOT, once and for all, handed the era's
 boot fact at the state it files; the authority is spent (Rocq `f0_file`). -/
 theorem f0File (g : FileGn) (v : FileEra) (s : Fstate) :
-    f0Auth (GF := GF) v [] ∗ f0Bt (hlc := hlc) g v s ⊢ |==> f0Bl (hlc := hlc) g v s := by
+    f0Auth (GF := GF) v [] ∗ f0Bt g v s ⊢ |==> f0Bl g v s := by
   unfold f0Auth f0Bl
   iintro ⟨H, #Hbt⟩
   imod MonoList.auth_own_update v.feF0 [s] (List.nil_prefix) $$ H with ⟨-, Hl⟩
@@ -282,14 +282,14 @@ theorem f0fFile (v : FileEra) (s : Fstate) :
 `f0_wit`). -/
 def f0Wit (g : FileGn) (v : FileEra) (f0 : Option Fstate) : IProp GF :=
   match f0 with
-  | some s => f0Bl (hlc := hlc) g v s
+  | some s => f0Bl g v s
   | none => iprop(emp)
 
 instance f0Wit_persistent (g : FileGn) (v : FileEra) (f0 : Option Fstate) :
-    Persistent (f0Wit (hlc := hlc) (GF := GF) g v f0) := by
+    Persistent (f0Wit (GF := GF) g v f0) := by
   cases f0 <;> unfold f0Wit <;> infer_instance
 instance f0Wit_timeless (g : FileGn) (v : FileEra) (f0 : Option Fstate) :
-    Timeless (f0Wit (hlc := hlc) (GF := GF) g v f0) := by
+    Timeless (f0Wit (GF := GF) g v f0) := by
   cases f0 <;> unfold f0Wit <;> infer_instance
 
 /-! ## The copy's line list -/

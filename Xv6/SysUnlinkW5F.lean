@@ -111,7 +111,7 @@ theorem sys_unlink_open2_file [Fscfg] [Icfg] (inum : Nat) (dni : Dinode) (bmi : 
     (by rw [Xv6.setnl_nlink]; have := hrl.2.1; omega) (fun hd => absurd hd htyT)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -157,13 +157,13 @@ theorem sys_unlink_w5f_ghost (Pd : Nat → IProp GF) (Fent : Pfam GF (Aview → 
     (hoki : inodeOk fscCov fscLogst dni bmi dati) (hnli : dni.diNlink.toNat ≠ 0)
     (hnibi : (BitVec.setWidth 32 (dirInum datd kk)).toNat < 16 * icfgNib)
     (htyi : dni.diType.toNat ≠ T_DIR_z) :
-    iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ⊢
+    iregInv fscIreg fscFs icfgIst icfgNib ⊢
       dlinks fscFs dinum.toNat dnd bmd datd -∗ dinodeAt fscIreg dinum dnW -∗
       inodeMeta (ientry kd) dnW -∗ inodeMap fscFs (ientry kd) bmW -∗ inodeBlocks fscFs bmW datW -∗
       topFrag (fsGammaL fscFs) dinum.toNat (eraNode dnd bmd datd) -∗
       dinodeAt fscIreg (BitVec.setWidth 32 (dirInum datd kk)) dni -∗
       topFrag (fsGammaL fscFs) (BitVec.setWidth 32 (dirInum datd kk)).toNat (eraNode dni bmi dati) -∗
-      pfAt (uentCommitAt (hlc := hlc) (fsGammaL fscFs) appE Pd) Fent -∗
+      pfAt (uentCommitAt (fsGammaL fscFs) appE Pd) Fent -∗
       -- THE PARENT CURSOR the walk handed back, lent to the leg (TL-3C)
       Pd dinum.toNat -∗
       |={⊤}=> (icLoaded fscFs fscIreg fscCov fscLogst kd dinum dnW bmW ∗ Pd dinum.toNat ∗
@@ -224,7 +224,7 @@ theorem sys_unlink_w5f_ghost (Pd : Nat → IProp GF) (Fent : Pfam GF (Aview → 
   ihave Htopi := (show topFrag (GF := GF) (fsGammaL fscFs) (BitVec.setWidth 32 (dirInum datd kk)).toNat
       (eraNode dni bmi dati) ⊢ topFragQ (fsGammaL fscFs) (DFrac.own 1)
         (BitVec.setWidth 32 (dirInum datd kk)).toNat (eraNode dni bmi dati) from .rfl) $$ Htopi
-  imod (ufUent_fire (hlc := hlc) fscFs ⊤ (DFrac.own 1) Pd Fent dinum.toNat
+  imod (ufUent_fire fscFs ⊤ (DFrac.own 1) Pd Fent dinum.toNat
       (BitVec.setWidth 32 (dirInum datd kk)).toNat (dirBname datd kk) 0 (eraNode dnd bmd datd)
       (eraNode dnW bmW datW) (eraNode dni bmi dati) ufNd_top hloc (mkfEra_is_dir dnd bmd datd htyz)
       (sys_unlink_ent_at dinum.toNat dnd bmd datd kk nf hop hty hfn) hnD hnDD
@@ -251,14 +251,14 @@ set_option maxHeartbeats 64000000 in
 /-- **W5-FILE** (+0xae .. +0xb8): INSTANT 1, the second T_DIR test FALLING,
 the buffers re-folded, into the spine. -/
 theorem sys_unlink_w5_file (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF) (ok : SuOk k A)
+    [ClaimIs GF Γ] (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF) (ok : SuOk k A)
     (spie spp : Bool) (R : RegMap) (nf : Nat → BitVec 8) (tln : List (BitVec 8))
     (P2 : UPtd) (pl : List (BitVec 8)) (kd : Nat) (q : Qp) (g : GName) (lo tl : Nat)
     (dinum : BitVec 32) (dnd : Dinode) (bmd : Blkmap) (datd : Nat → List (BitVec 8))
     (γil γisl : GName) (kk : Nat) (ks : Nat) (qi : Qp) (gi : GName) (loi tli : Nat) (dni : Dinode)
     (bmi : Blkmap) (dati : Nat → List (BitVec 8)) (γili γisli : GName) (t : Nat)
     (dnW : Dinode) (bmW : Blkmap) (datW : Nat → List (BitVec 8)) (nw : Nat) (Sbw : List Nat) :
-    sysUnlinkAtAe (hlc := hlc) Γ cpu k A spie spp R nf tln P2 pl kd q g lo tl dinum dnd bmd datd
+    sysUnlinkAtAe Γ cpu k A spie spp R nf tln P2 pl kd q g lo tl dinum dnd bmd datd
       γil γisl kk ks qi gi loi tli dni bmi dati γili γisli t dnW bmW datW nw Sbw false
     ⊢ wpLoop (GF := GF) cpu := by
   unfold sysUnlinkAtAe
@@ -286,7 +286,7 @@ theorem sys_unlink_w5_file (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ :
   ihave HP := (show A.P (npElems pl).length dinum.toNat ⊢ A.P (nparElems pl).length dinum.toNat
     from .rfl) $$ HP
   iapply wpLoop_fupd
-  imod (sys_unlink_w5f_ghost (hlc := hlc) (A.P (nparElems pl).length) A.Fent kd dinum dnd dnW bmd
+  imod (sys_unlink_w5f_ghost (A.P (nparElems pl).length) A.Fent kd dinum dnd dnW bmd
       bmW datd datW kk nf dni bmi dati hop hZ hlive hty hnd hndd hfn hoki hnli hnibi htyi)
     $$ Hinv Hdl Hdi Hmeta Hmap Hblk Htop Hdii Htopi He HP
     with ⟨Hloadd, HP, Hdii, Htopi, ⟨%uty, Htok⟩, %av0, %hpre, Hrecv⟩

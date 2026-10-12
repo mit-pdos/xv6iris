@@ -46,7 +46,7 @@ open UShPipesDefs
 open Std (ExtTreeSet)
 
 section UshCatFStage
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF]
   [IcacheG GF] [PipeProtoG GF] [PipeOutG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [PipesNG GF] [CifRegG GF]
   [PS : UprogSG GF]
@@ -58,7 +58,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fi
 /-- **Rocq `sh_exec_sup_catf_of_entry`** (deviations 1, 2):
 `sh_exec_sup_echo_pipe_of_entry` at cat's image -- the entry at every image
 the exec can produce, the ledger fragment spent at the exec. -/
-theorem sh_exec_sup_catf_of_entry {E : UshExecEnv (hlc := hlc) (GF := GF)} (P : UshExecPinEcho (hlc := hlc) E)
+theorem sh_exec_sup_catf_of_entry {E : UshExecEnv (GF := GF)} (P : UshExecPinEcho E)
     (Pr : UshExecPinProg) (hfd2E : ∀ l, E.ush_fd2p l → ushFd2p l)
     (f : List (BitVec 8)) (hf : uname f) (γp : PipeNames) (T : IProp GF) [Persistent T] [Timeless T]
     (Qv Cr : IProp GF) :
@@ -68,10 +68,10 @@ theorem sh_exec_sup_catf_of_entry {E : UshExecEnv (hlc := hlc) (GF := GF)} (P : 
         ⌜ushEchoArgvBytes (prodWords (.PrCatF f)) gn⌝ -∗ ⌜sts.length = NOFILE⌝ -∗
         ⌜(sts.take NSTD)[1]? = some (.open rb1 true (.pipe γp))⌝ -∗
         ⌜(sts.take NSTD)[2]? = some (.open rb2 true (.device CONSOLE))⌝ -∗
-        urunNopipe (hlc := hlc) sts -∗
+        urunNopipe sts -∗
         imageEntry User.Cat.elf Mv (BitVec.ofNat 64 (t + 8)) sts ROOTINO seccAll cs pidv (fun _ => Qv) Cr
-          (uslot (hlc := hlc))) -∗
-      □ (uKillCred (hlc := hlc) -∗ Qv) -∗ P.sh_cat_slot T -∗
+          (uslot)) -∗
+      □ (uKillCred -∗ Qv) -∗ P.sh_cat_slot T -∗
       ushExecSupEchoAt E (catfRows E γp) (prodWords (.PrCatF f)) (fun _ => Qv) Cr := by
   iintro #Hent #Hkt Hslot
   ihave Hs := shPinSlotCat P T $$ Hslot
@@ -86,8 +86,8 @@ theorem sh_exec_sup_catf_of_entry {E : UshExecEnv (hlc := hlc) (GF := GF)} (P : 
 
 /-! ## 2.  THE STAGE LAW AT A LEND WITH THE DEED -/
 
-variable (D : PdRound hlc GF) (E : UshExecEnv (hlc := hlc) (GF := GF))
-  (S : UShPipesStageP (hlc := hlc) D E)
+variable (D : PdRound GF) (E : UshExecEnv (GF := GF))
+  (S : UShPipesStageP D E)
 
 /-- `prod_crD`, read. -/
 theorem prodCrD_eq (γp : PipeNames) (Rd : IProp GF) :
@@ -116,7 +116,7 @@ theorem stage_catf (OK : PdRoundOk D) (SE : SH_RUNCMD_EXEC)
       ushExecSupEchoAt E (catfRows E γp) (prodWords (.PrCatF f)) (fun _ => S.QcK 0) (prodCrD D E S γp D.Rd) -∗
       ushCode N'.t -∗ E.ush_jtab N'.t -∗ E.ush_cmd N'.d q (ushEchoCmd E (prodWords (.PrCatF f)) s0 gs) -∗
       usz N'.s szv -∗ ustd N'.fd ld -∗ ucwd N'.cwd ROOTINO -∗ uch N'.ch ∅ -∗ S.echo_raw γp -∗ D.Rd -∗
-      urun (hlc := hlc) N' h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (2 + (E.ush_Dg + av)) -∗ wpLoop h' := by
+      urun N' h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (2 + (E.ush_Dg + av)) -∗ wpLoop h' := by
   have hdg0 : dgExecR = dgSt D.pr (lfilts D.lR) 0 := by rw [hpr]; rfl
   have hsrc : fireSrc D.fcR D.pr (lfilts D.lR) D.L (Wid.WLeft 0) dgExecR := Or.inl (Or.inl hdg0)
   have hc := ukn_const_of_eq N' _ hpeq (fun _ _ => rfl)

@@ -262,7 +262,7 @@ end Mirror
 /-! ## 3.  THE REGION's SIDE OF A COUNT MOVE, AS AN ACCESSOR -/
 
 section Reg
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- Rocq `ireg_icnt_acc`.  ONE `↑iregN` OPEN, the slot's `icnt` half in,
@@ -286,7 +286,7 @@ inside is one line, `iregRcol_spend`. -/
 theorem iregIcnt_acc [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames) (inodestart nib : Nat)
     (inum : BitVec 32) (n : Nat)
     (hE : (↑iregN : CoPset) ⊆ E) (hin : (inum.toNat : Int) < 16 * (nib : Int)) :
-    ⊢@{IProp GF} iregInv (hlc := hlc) γi γfs inodestart nib -∗ icntHalf inum.toNat n -∗
+    ⊢@{IProp GF} iregInv γi γfs inodestart nib -∗ icntHalf inum.toNat n -∗
       |={E, E \ ↑iregN}=> ∃ (f : FrzUR) (d : Dinode),
         ⌜iregFrzOk f n d⌝ ∗
         (∀ (m : Nat) (bfl : Bool), ⌜iregFrzOk f m d⌝ -∗ ⌜m + 1 = n⌝ -∗
@@ -372,7 +372,7 @@ The continuation's premises:
 theorem iregIcnt_frz_acc [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames)
     (inodestart nib : Nat) (inum : BitVec 32) (ph : Frz) (n : Nat)
     (hE : (↑iregN : CoPset) ⊆ E) (hin : (inum.toNat : Int) < 16 * (nib : Int)) :
-    ⊢@{IProp GF} iregInv (hlc := hlc) γi γfs inodestart nib -∗
+    ⊢@{IProp GF} iregInv γi γfs inodestart nib -∗
       ifreeze ph inum.toNat -∗ icntHalf inum.toNat n -∗ frzMir ph inum.toNat -∗
       |={E, E \ ↑iregN}=> ∃ d : Dinode,
         ⌜iregFrzOk (some (.excl ph)) n d⌝ ∗
@@ -462,7 +462,7 @@ theorem iregIcnt_lic_acc [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames)
     (inodestart nib : Nat) (inum : BitVec 32) (l : Ilic) (n : Nat)
     (hE : (↑iregN : CoPset) ⊆ E) (hEl : (↑logN : CoPset) ⊆ E)
     (hin : (inum.toNat : Int) < 16 * (nib : Int)) :
-    ⊢@{IProp GF} iregReg (hlc := hlc) γi γfs inodestart nib -∗
+    ⊢@{IProp GF} iregReg γi γfs inodestart nib -∗
       iname γi γfs inodestart inum l -∗ icntHalf inum.toNat n -∗
       |={E, E \ ↑iregN}=> (iname γi γfs inodestart inum l ∗
         (∀ m : Nat, ⌜m = n + 1⌝ -∗
@@ -532,7 +532,7 @@ proved, not assumed). -/
 theorem icnt_freeze_forces_one [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames)
     (inodestart nib : Nat) (inum : BitVec 32) (n : Nat) (rg : Frzidx)
     (hE : (↑iregN : CoPset) ⊆ E) (hin : (inum.toNat : Int) < 16 * (nib : Int)) :
-    ⊢@{IProp GF} iregInv (hlc := hlc) γi γfs inodestart nib -∗
+    ⊢@{IProp GF} iregInv γi γfs inodestart nib -∗
       ifreezePre rg inum.toNat -∗ icntHalf inum.toNat n -∗
       |={E}=> (⌜n = 1⌝ ∗ ifreezePre rg inum.toNat ∗ icntHalf inum.toNat n) := by
   iintro #Hinv Hpre Hcnt
@@ -549,7 +549,7 @@ end Reg
 /-! ## 4.  THE FROZEN PARK, READ THROUGH THE REGION -/
 
 section Park
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- Rocq `frz_park_pre_reclaim` -- THE +0x82 RECLAIM (S1b, iclaim-ledger.md
@@ -563,7 +563,7 @@ selector -- to be joined with the escrow tail's at the +0x8a retirement
 theorem frzPark_pre_reclaim [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames)
     (inodestart nib : Nat) (inum : BitVec 32) (k : Nat) (rg : Frzidx)
     (hE : (↑iregN : CoPset) ⊆ E) (hin : (inum.toNat : Int) < 16 * (nib : Int)) :
-    ⊢@{IProp GF} iregInv (hlc := hlc) γi γfs inodestart nib -∗
+    ⊢@{IProp GF} iregInv γi γfs inodestart nib -∗
       ifreezePre rg inum.toNat -∗ frzPark k inum.toNat -∗
       |={E}=> (ifreezePre rg inum.toNat ∗ frzmH inum.toNat true ∗
         frzsel k (1 : Qp).half.half true) := by
@@ -593,7 +593,7 @@ re-parked. -/
 theorem frzPark_lic_off [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames)
     (inodestart nib : Nat) (inum : BitVec 32) (l : Ilic) (k : Nat)
     (hE : (↑iregN : CoPset) ⊆ E) (hin : (inum.toNat : Int) < 16 * (nib : Int)) :
-    ⊢@{IProp GF} iregReg (hlc := hlc) γi γfs inodestart nib -∗
+    ⊢@{IProp GF} iregReg γi γfs inodestart nib -∗
       iname γi γfs inodestart inum l -∗ frzPark k inum.toNat -∗
       |={E}=> (iname γi γfs inodestart inum l ∗ frzmH inum.toNat false ∗
         frzsel k (1 : Qp).half false ∗ hpnFull k none) := by
@@ -659,7 +659,7 @@ PARENT's flavour -- "idup copies the flavour" -- which keeps (R3) true. -/
 theorem iregIcnt_mir_acc [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames)
     (inodestart nib : Nat) (inum : BitVec 32) (bfl : Bool) (n : Nat)
     (hE : (↑iregN : CoPset) ⊆ E) (hin : (inum.toNat : Int) < 16 * (nib : Int)) (hn : 1 ≤ n) :
-    ⊢@{IProp GF} iregReg (hlc := hlc) γi γfs inodestart nib -∗
+    ⊢@{IProp GF} iregReg γi γfs inodestart nib -∗
       frzmH inum.toNat false -∗ icntHalf inum.toNat n -∗
       |={E, E \ ↑iregN}=> (frzmH inum.toNat false ∗
         (∀ m : Nat, ⌜m = n + 1⌝ -∗ runit bfl inum.toNat -∗

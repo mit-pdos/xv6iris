@@ -177,7 +177,7 @@ theorem uc_inv_ok {Pold Pnew P : UPtd} {Mold Mnew : Nat → List (BitVec 8)} {n 
       exact ⟨hb, by unfold UPtCopy.ucView; rw [if_pos hi]⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-! ## The callees, at their entry addresses -/
 
@@ -209,7 +209,7 @@ theorem uc_memmove_call (MM : MEMMOVE) [CurCtx] (c : CPU) (k' : KCtx)
       byteBuf (k'.regs 11#5) dqs bs -∗ byteBuf (k'.regs 10#5) (DFrac.own 1) bs -∗
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.regs 10#5⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := MM.wp_memmove (hlc := hlc) (GF := GF) c k' bs olds m dqs hK' hn' hn32 hls hld
+  have h := MM.wp_memmove (GF := GF) c k' bs olds m dqs hK' hn' hn32 hls hld
   unfold wp_memmove_body at h
   simp only [memmoveAddr] at h
   exact h
@@ -246,7 +246,7 @@ theorem uc_mappages_call [WchG GF] (MA : MAPPAGES_ANY) [CurCtx] (c : CPU) (k' : 
               perm m fresh).2.2 < m ∧ availZero (availSub on fresh.length)))⌝ -∗
       wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := MA.wp_mappages_any (hlc := hlc) (GF := GF) c k' γl γk on t' m perm ke hnoff' hK' hlk'
+  have h := MA.wp_mappages_any (GF := GF) c k' γl γk on t' m perm ke hnoff' hK' hlk'
     hroot' hargs' hperm' hmask' hrwx' hwf' hnd' hpg'
   unfold wp_mappages_any_body at h
   simp only [mappagesAddr] at h
@@ -269,7 +269,7 @@ theorem uc_uvmunmap_call [WchG GF] (UM : UVMUNMAP) [CurCtx] (c : CPU) (k' : KCtx
       procPtAt (P.delRun (vpnOf (k'.regs 11#5)).toNat m) M -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := UM.wp_uvmunmap_free (hlc := hlc) (GF := GF) c k' γl γk P M m ke hnoff' hK' hlk' hroot'
+  have h := UM.wp_uvmunmap_free (GF := GF) c k' γl γk P M m ke hnoff' hK' hlk' hroot'
     hal' hn' hrange' hfree'
   unfold wp_uvmunmap_free_body at h
   simp only [uvmunmapAddr] at h
@@ -626,7 +626,7 @@ theorem uc_setLeaf_entAt_self : ∀ (lvl : Nat) (t : PTree) (vpn : BitVec 27),
 theorem uc_pte2pa_shift (x : BitVec 64) : (x >>> 10) <<< 12 = pte2pa x := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-- Open the bytes of one mapped page, with the length up front. -/
 theorem uc_umPages_acc [CurCtx] (P : UPtd) (M : Nat → List (BitVec 8)) (k : Nat) (w : BitVec 64)
@@ -1386,7 +1386,7 @@ theorem uvmcopy_loop [WchG GF] (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (M
 set_option maxHeartbeats 4000000 in
 theorem uvmcopy_proof (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (MM : MEMMOVE)
     (MA : MAPPAGES_ANY) (UM : UVMUNMAP) : UVMCOPY :=
-  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk Pold Pnew Mold Mnew ke hnoff hK hlk hold hnew hsz hfree => by
+  ⟨fun {GF} _ _ _ _ cpu k γl γk Pold Pnew Mold Mnew ke hnoff hK hlk hold hnew hsz hfree => by
   unfold wp_uvmcopy_body
   simp only [uvmcopyAddr]
   iintro ⟨Hk, Hpc, #Hlk, Hav, Hold, Hchild, Hlend, HΦ⟩

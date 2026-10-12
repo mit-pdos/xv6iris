@@ -106,7 +106,7 @@ theorem sys_link_K (a : Nat) (h : sysLinkSlots ≤ a) :
 /-! ## The generic carve: slots ↔ bytes -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 variable {lent : Bool}
 
 /-! ## The frame -/
@@ -352,7 +352,7 @@ structure SysLinkArgs (GF : BundledGFunctors.{0}) where
   Funt : Pfam GF (Aview → Nat → IProp GF)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -360,7 +360,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fd
 /-- The contract's post, at the record (hart-free: a `true` crossing at a
 process pins nothing). -/
 abbrev sysLinkPostA (k : KCtx) (A : SysLinkArgs GF) (c : CPU) : IProp GF :=
-  sysLinkPost (hlc := hlc) k A.γ (procAddr A.j) A.pid A.V A.M A.Ftgt A.Fent A.Funt c
+  sysLinkPost k A.γ (procAddr A.j) A.pid A.V A.M A.Ftgt A.Fent A.Funt c
 
 /-- THE RECORD AT A RAISED COUNT (permit sweep L1b, deviation 3). -/
 abbrev SysLinkArgs.raise (A : SysLinkArgs GF) (kv : Nat) : SysLinkArgs GF :=
@@ -372,8 +372,8 @@ theorem sysLinkPost_raise (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : Bi
     (Ftgt : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Fent : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Funt : Pfam GF (Aview → Nat → IProp GF)) (c : CPU) (kv : Nat) (hkv : V.ev ≤ kv) :
-    sysLinkPost (hlc := hlc) k γ pa pid V M Ftgt Fent Funt c ⊢
-      sysLinkPost (hlc := hlc) k γ pa pid (V.updEv kv) M Ftgt Fent Funt c := by
+    sysLinkPost k γ pa pid V M Ftgt Fent Funt c ⊢
+      sysLinkPost k γ pa pid (V.updEv kv) M Ftgt Fent Funt c := by
   unfold sysLinkPost
   iintro H %spie %spp %R' %P' %k' %hcs %hext %hk'
   iapply H $$ %spie %spp %R' %P' %k' %hcs %hext %(Nat.le_trans hkv hk')
@@ -385,7 +385,7 @@ def sysLinkOut (A : SysLinkArgs GF) (r : BitVec 64) : IProp GF := iprop%
   bslots 3 ∗ irefSlots sysLinkIrefs ∗
   (∃ P' : UPtd, ⌜A.V.upt.extSz A.V.sz P'⌝ ∗
     procPrivFd A.γ (procAddr A.j) A.pid { A.V with upt := P' } (viewFaulted A.V.upt P' A.M)) ∗
-  linkArms (hlc := hlc) (fsGammaL fscFs) A.Ftgt A.Fent A.Funt r
+  linkArms (fsGammaL fscFs) A.Ftgt A.Fent A.Funt r
 
 /-- The five rows the two walks borrow from the block: the pid cell, the
 `p->cwd` cell and the cwd's reference, the `p->root` cell and the root's
@@ -475,7 +475,7 @@ theorem sys_link_exit (cpu : CPU) (k : KCtx) (A : SysLinkArgs GF)
   unfold sysLinkOut
   icases Hout with ⟨Hbs, Hir, ⟨%P', %hP', Hblk⟩, Harms⟩
   subst hr
-  ihave %hret := linkArms_ret (hlc := hlc) _ _ _ _ _ $$ Harms
+  ihave %hret := linkArms_ret _ _ _ _ _ $$ Harms
   ispecialize HΦ $$ %c
   unfold sysLinkPostA sysLinkPost
   iapply HΦ $$ %spie %spp %_ %P' %A.V.ev %hcs %hP' %(Nat.le_refl _) Hk Hpc Hte Hce Hbs Hir Hblk [] [Harms]
@@ -502,7 +502,7 @@ theorem sys_link_ir_1s1 : irefSlots (GF := GF) 1 ∗ irefSlot ⊢ irefSlots 2 :=
 /-- The out bundle, assembled (every exit's last ghost step). -/
 theorem sys_link_out_intro (A : SysLinkArgs GF) (pa : BitVec 64) (P2 : UPtd) (r : BitVec 64) :
     sysLinkHole (GF := GF) A pa P2 ∗ sysLinkRows pa A.pid A.V ∗ bslots 3 ∗ irefSlots sysLinkIrefs ∗
-      linkArms (hlc := hlc) (fsGammaL fscFs) A.Ftgt A.Fent A.Funt r ⊢ sysLinkOut A r := by
+      linkArms (fsGammaL fscFs) A.Ftgt A.Fent A.Funt r ⊢ sysLinkOut A r := by
   iintro ⟨Hh, Hr, Hbs, Hir, Ha⟩
   unfold sysLinkOut
   iframe Hbs Hir Ha

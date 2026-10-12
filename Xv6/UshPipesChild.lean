@@ -40,25 +40,25 @@ abbrev ushqStages (s0 len : Nat) (f : Nat → BitVec 8) (a : List (Nat × Nat)) 
     (rest.map (ushArgs s0 (ushqNulfolds a rest (ushpExt len f))))
 
 section UshPipesChild
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-- **Rocq `wp_kshm_child_pipes_g`**: from 0x99c through the N-stage parse
 and the seam to runcmd's entry, the parse's payer `Cp` whole across it. -/
 theorem wp_ushChildPipesG (UL : UK_LEAVES) (SP : SH_PARSECMD) (N : UkNames GF) (UM : Nat → IProp GF) (K : Nat)
-    (Hchain : ∀ i, i < K → ushmMallocTyLe (hlc := hlc) N 168 (UM i) (UM (i + 1)))
+    (Hchain : ∀ i, i < K → ushmMallocTyLe N 168 (UM i) (UM (i + 1)))
     (h : CPU) (m : RegMap) (dw dv : DFrac) (s0 len : Nat) (f : Nat → BitVec 8) (a : List (Nat × Nat))
     (rest : List (List (Nat × Nat))) (i k : Nat) (Cp : IProp GF)
     (hbars : UshqBars len f 0 a rest) (hK : i + 2 * rest.length + 1 ≤ K) (hs1 : m.get 9#5 = BitVec.ofNat 64 s0)
     (hs0 : 0 < s0) (hs64 : s0 + len + 1 < 2 ^ 64) (hs38 : s0 + len < 2 ^ 38) :
     ⊢ ushCode N.t -∗ ustr N.d (DFrac.own 1) s0 len f -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
-      ustr N.d dv ushSymA 7 ushpSymF -∗ UM i -∗ Cp -∗ ushpOom (hlc := hlc) N Cp (20 + (6 + k)) -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x99c) (68 + (rest.length * 6 + k)) -∗
+      ustr N.d dv ushSymA 7 ushpSymF -∗ UM i -∗ Cp -∗ ushpOom N Cp (20 + (6 + k)) -∗
+      urun N h m (BitVec.ofNat 64 0x99c) (68 + (rest.length * 6 + k)) -∗
       (∀ (h' : CPU) (m' : RegMap) (q : Nat), ⌜m'.get 10#5 = BitVec.ofNat 64 q⌝ -∗
         ushCmd N.d q (ushqStages s0 len f a rest) -∗ ustr N.d dw ushWsA 5 ushpWsF -∗
         ustr N.d dv ushSymA 7 ushpSymF -∗ UM (i + 2 * rest.length + 1) -∗ Cp -∗
-        urun (hlc := hlc) N h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (68 + (rest.length * 6 + k)) -∗
+        urun N h' m' (BitVec.ofNat 64 User.Sh.Sym.«runcmd») (68 + (rest.length * 6 + k)) -∗
         wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hline Hws Hsy HM Hcp #Hpx Hrun Hk

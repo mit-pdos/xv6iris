@@ -31,7 +31,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -108,7 +108,7 @@ theorem namexEra_fail_out (k : KCtx) (A : NamexArgs) (P Pmiss : Nat → Nat → 
 set_option maxHeartbeats 8000000 in
 /-- **`L_notdir` (+0x54)**: `ip->type != T_DIR` -- iunlockput, `s4 := 0`, the
 tail at the death arm (LEFT: the level's hop never fired). -/
-theorem namexEra_notdir (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem namexEra_notdir (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : NamexArgs) (hs : NamexStatic k A) (P Pmiss : Nat → Nat → IProp GF)
     (spie spp : Bool) (R : RegMap)
     (ik : Nat) (q : Qp) (g : GName) (lo tl : Nat) (inum : BitVec 32) (dn : Dinode) (bm : Blkmap)
@@ -116,7 +116,7 @@ theorem namexEra_notdir (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := hl
     (hf : NamexFailFacts k A R ik inum ncur Scur wc) (hle : lo ≤ tl) :
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0x58#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    namexEnv (hlc := hlc) Γ A ∗
+    namexEnv Γ A ∗
     namexLk A ik q g lo tl inum dn γil γisl ∗ icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
     irefSlots 1 ∗ namexKeep k A ∗ namexPath k A ∗ byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) ∗
     bslots 3 ∗ logOpS icfgLog ncur Scur ∗ namexEraDead A P Pmiss ∗
@@ -160,7 +160,7 @@ theorem namexEra_notdir (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := hl
 set_option maxHeartbeats 8000000 in
 /-- **`L_nlink` (+0x7a)**: the nlink guard fired -- `L_notdir`'s arm plus
 the `c.j`, at the death arm (LEFT: the hop never fired). -/
-theorem namexEra_nlink (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem namexEra_nlink (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : NamexArgs) (hs : NamexStatic k A) (P Pmiss : Nat → Nat → IProp GF)
     (spie spp : Bool) (R : RegMap)
     (ik : Nat) (q : Qp) (g : GName) (lo tl : Nat) (inum : BitVec 32) (dn : Dinode) (bm : Blkmap)
@@ -168,7 +168,7 @@ theorem namexEra_nlink (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc
     (hf : NamexFailFacts k A R ik inum ncur Scur wc) (hle : lo ≤ tl) :
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0x7e#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    namexEnv (hlc := hlc) Γ A ∗
+    namexEnv Γ A ∗
     namexLk A ik q g lo tl inum dn γil γisl ∗ icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
     irefSlots 1 ∗ namexKeep k A ∗ namexPath k A ∗ byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) ∗
     bslots 3 ∗ logOpS icfgLog ncur Scur ∗ namexEraDead A P Pmiss ∗
@@ -217,7 +217,7 @@ set_option maxHeartbeats 8000000 in
 /-- **`L_miss` (+0x8c)**: dirlookup found nothing -- iunlockput CREDITED on
 the inode block, `s4 := s2 (= 0)`, the tail at the death arm (RIGHT: the hop
 fired and missed). -/
-theorem namexEra_miss (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem namexEra_miss (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : NamexArgs) (hs : NamexStatic k A) (P Pmiss : Nat → Nat → IProp GF)
     (spie spp : Bool) (R : RegMap)
     (ik : Nat) (q : Qp) (g : GName) (lo tl : Nat) (inum : BitVec 32) (dn : Dinode) (bm : Blkmap)
@@ -225,7 +225,7 @@ theorem namexEra_miss (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     (hf : NamexFailFacts k A R ik inum ncur Scur wc) (hle : lo ≤ tl) (h18 : R 18#5 = 0#64) :
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0x90#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    namexEnv (hlc := hlc) Γ A ∗
+    namexEnv Γ A ∗
     namexLk A ik q g lo tl inum dn γil γisl ∗ icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
     irefSlots 1 ∗ namexKeep k A ∗ namexPath k A ∗ byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) ∗
     bslots 3 ∗ nlzObs inum.toNat e0 ∗ logOpSe icfgLog ncur Scur e0 ∗ namexEraDead A P Pmiss ∗
@@ -291,7 +291,7 @@ set_option maxHeartbeats 8000000 in
 the parent re-formed typed AT ITS INUM, the cursor at the parent index
 (`hL`: the parent prefix is exactly the elements consumed), the unfired
 suffix empty. -/
-theorem namexEra_par (IU : IUNLOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem namexEra_par (IU : IUNLOCK) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : NamexArgs) (hs : NamexStatic k A) (P Pmiss : Nat → Nat → IProp GF)
     (spie spp : Bool) (R : RegMap)
     (ik : Nat) (q : Qp) (g : GName) (lo tl : Nat) (inum : BitVec 32) (dn : Dinode) (bm : Blkmap)
@@ -303,7 +303,7 @@ theorem namexEra_par (IU : IUNLOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
     (hL : (npElems A.pl).length = kk) :
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0x88#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    namexEnv (hlc := hlc) Γ A ∗
+    namexEnv Γ A ∗
     namexLk A ik q g lo tl inum dn γil γisl ∗ icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
     irefSlots 1 ∗ namexKeep k A ∗ namexPath k A ∗ byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) ∗
     bslots 3 ∗ logOpSe icfgLog ncur Scur e0 ∗ P kk inum.toNat ∗
@@ -378,7 +378,7 @@ set_option maxHeartbeats 8000000 in
 own reference PINNED, the cursor at `L` (the elements consumed ARE the
 path's); nameiparent (the path had no elements at all, by the invariant's
 second conjunct) iputs it and returns the cursor at 0 as the whole refund. -/
-theorem namexEra_done (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem namexEra_done (IP : IPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (A : NamexArgs) (hs : NamexStatic k A) (P Pmiss : Nat → Nat → IProp GF)
     (spie spp : Bool) (R : RegMap)
     (off : Nat) (ipv : BitVec 64) (ncur : Nat) (Scur : List Nat) (nf : Nat → BitVec 8) (wc : Bool)
@@ -390,7 +390,7 @@ theorem namexEra_done (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (hnpe : A.npar = true → es0 ≠ [] → pathElems (A.pl.drop off) ≠ []) :
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«namex» + 0x144#64) ∗
     namexFrame k ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    namexEnv (hlc := hlc) Γ A ∗ namexEraWalk k A P Pmiss ipv dcur es0.length ncur Scur nf ∗
+    namexEnv Γ A ∗ namexEraWalk k A P Pmiss ipv dcur es0.length ncur Scur nf ∗
     (∀ c' : CPU, namexEraPostR k A P Pmiss c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 := namex_slots_12 _ hs.hK

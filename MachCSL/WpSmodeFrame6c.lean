@@ -17,7 +17,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open LeanRV64D
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 variable {lent : Bool}
 
 /-- The spare cell at `sp-48` (offset 0). -/

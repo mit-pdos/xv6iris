@@ -23,7 +23,7 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -35,10 +35,10 @@ theorem grepStrchr_loop (UL : UK_LEAVES) (N : UkNames GF) (dq : DFrac) (p : Nat)
     ∀ (i j : Nat) (h : CPU) (mc : RegMap) (n : Nat), j + i = k → g j ≠ ubyte0 →
     mc.get 10#5 = BitVec.ofNat 64 (p + j) → mc.get 11#5 = BitVec.setWidth 64 c →
     mc.get 15#5 = BitVec.setWidth 64 (g j) →
-    ⊢ grepCode N.t -∗ ubytesq N.d dq p (k + 1) g -∗ urun (hlc := hlc) N h mc (BitVec.ofNat 64 0x326) n -∗
+    ⊢ grepCode N.t -∗ ubytesq N.d dq p (k + 1) g -∗ urun N h mc (BitVec.ofNat 64 0x326) n -∗
       (ubytesq N.d dq p (k + 1) g -∗ ∀ (h' : CPU) (mc' : RegMap),
         ⌜mc'.get 10#5 = BitVec.ofNat 64 (if g k = c then p + k else 0)⌝ -∗ ⌜grepRkeep [10, 15] mc mc'⌝ -∗
-        urun (hlc := hlc) N h' mc' (BitVec.ofNat 64 0x334) n -∗ wpLoop h') -∗
+        urun N h' mc' (BitVec.ofNat 64 0x334) n -∗ wpLoop h') -∗
       wpLoop h := by
   intro i
   induction i with
@@ -160,10 +160,10 @@ theorem wp_grepStrchr (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (
     (ha0 : m.get 10#5 = BitVec.ofNat 64 p) (ha1 : m.get 11#5 = BitVec.setWidth 64 c) (hc0 : c ≠ ubyte0)
     (hpre : ∀ j, j < k → g j ≠ c ∧ g j ≠ ubyte0) (hk : g k = c ∨ g k = ubyte0) :
     ⊢ grepCode N.t -∗ ubytesq N.d dq p (k + 1) g -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Grep.Sym.«strchr») (2 + n) -∗
+      urun N h m (BitVec.ofNat 64 User.Grep.Sym.«strchr») (2 + n) -∗
       (ubytesq N.d dq p (k + 1) g -∗ ∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗
         ⌜m'.get 10#5 = BitVec.ofNat 64 (if g k = c then p + k else 0)⌝ -∗
-        urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (2 + n) -∗ wpLoop h') -∗
+        urun N h' m' (retPc (m.get 1#5)) (2 + n) -∗ wpLoop h') -∗
       wpLoop h := by
   rw [show User.Grep.Sym.«strchr» = 0x318 from rfl]
   iintro #Hc Hbs Hrun Hcont
@@ -189,10 +189,10 @@ theorem wp_grepStrchr (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (
       mc.get 2#5 = m.get spIdx + BitVec.ofInt 64 (-((8 * 2 : Nat) : Int)) →
       ⊢ grepCode N.t -∗ uword N.d ((m.get spIdx).toNat - 8) (m.get 1#5) -∗
         uword N.d ((m.get spIdx).toNat - 16) (m.get 8#5) -∗
-        urun (hlc := hlc) N h5 mc (BitVec.ofNat 64 0x334) n -∗
+        urun N h5 mc (BitVec.ofNat 64 0x334) n -∗
         (∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗
           ⌜m'.get 10#5 = BitVec.ofNat 64 (if g k = c then p + k else 0)⌝ -∗
-          urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (2 + n) -∗ wpLoop h') -∗ wpLoop h5 := by
+          urun N h' m' (retPc (m.get 1#5)) (2 + n) -∗ wpLoop h') -∗ wpLoop h5 := by
     intro h5 mc hmc10 hkc hspc
     iintro #Hc Hwra Hws0 Hrun Hk
     gfetch 0x334 true (.LOAD (8#12, .Regidx 2#5, .Regidx 1#5, false, 8))

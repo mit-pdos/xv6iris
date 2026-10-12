@@ -193,7 +193,7 @@ theorem il_cells_step (W C : List (BitVec 32)) (t : Nat) (hW : t < W.length) (hC
 /-! ## The buffer's words -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- Word `t + 1` of the header, at the address `c.lw a3,92(a5)` computes,
 READ and put back unchanged. -/
@@ -242,7 +242,7 @@ end
 set_option maxHeartbeats 4000000 in
 /-- One turn of the copy do-while (`+0x52 .. +0x5a`): header word `t + 1`
 lands in `log.lh.block[t]`. -/
-theorem il_loop_iter {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem il_loop_iter {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (kb : KCtx) (s : Bool) (hsie : kb.sie = s) (pj : BitVec 64)
     (kk : Nat) (hkk : kk < NBUF) (bs : List (BitVec 8)) (C : List (BitVec 32))
     (hl : bs.length = BSIZE) (hnB : hdrN bs ≤ LOGBLOCKS) (hC : C.length = LOGBLOCKS)
@@ -310,7 +310,7 @@ theorem il_loop_iter {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
 set_option maxHeartbeats 4000000 in
 /-- The copy loop from `+0x52` with `t` entries copied runs to `+0x5e` with
 the whole write set laid out; only `a3`, `a4`, `a5` change. -/
-theorem il_loop {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem il_loop {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (kb : KCtx) (s : Bool) (hsie : kb.sie = s) (pj : BitVec 64)
     (kk : Nat) (hkk : kk < NBUF) (bs : List (BitVec 8)) (C : List (BitVec 32))
     (hl : bs.length = BSIZE) (hnB : hdrN bs ≤ LOGBLOCKS) (hC : C.length = LOGBLOCKS)
@@ -383,7 +383,7 @@ set_option maxHeartbeats 8000000 in
 takes the header's `n`, and `lh.block[]`'s first `n` cells take the decoded
 write set (`Xv6.ilW`); the buffer's bytes are only read.  Only `a2 .. a5`
 change. -/
-theorem il_read_head {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+theorem il_read_head {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (kb : KCtx) (s : Bool) (hsie : kb.sie = s) (pj : BitVec 64)
     (kk : Nat) (hkk : kk < NBUF) (bs : List (BitVec 8)) (C : List (BitVec 32))
     (hl : bs.length = BSIZE) (hnB : hdrN bs ≤ LOGBLOCKS) (hC : C.length = LOGBLOCKS)
@@ -483,7 +483,7 @@ theorem il_read_head {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
 /-! ## The glue for the recovering `install_trans` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsBlocksG GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsBlocksG GF] [CurCtx]
 
 /-- A range-indexed family of per-index existentials IS one list of values
 (Rocq's `il_sepL_exist`). -/

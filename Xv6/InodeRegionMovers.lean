@@ -122,7 +122,7 @@ movers; here it is stated once.  `iregSlotRest` is what is left over: the
 registry and the two re-build wands. -/
 
 section Open
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- What stays behind when slot `islot inum` of block `iregBi inum` is out:
@@ -207,7 +207,7 @@ slot is out. -/
 theorem iregInv_slot_acc [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames) (inodestart nib : Nat)
     (inum : BitVec 32) (hE : (↑iregN : CoPset) ⊆ E)
     (hin : (inum.toNat : Int) < 16 * (nib : Int)) :
-    ⊢@{IProp GF} iregInv (hlc := hlc) γi γfs inodestart nib -∗
+    ⊢@{IProp GF} iregInv γi γfs inodestart nib -∗
       |={E, E \ ↑iregN}=> ∃ (m : IregMapF Dinode) (ds : List Dinode),
         ⌜diblkWf ds⌝ ∗ ⌜iregCouple m (iregBi inum) ds⌝ ∗ (γi ↪●MAP m) ∗
         iregRecs γfs inodestart (iregBi inum) ds ∗
@@ -232,7 +232,7 @@ PowerOn too (chroot bump: userinit's `idup` runs before fsinit). -/
 theorem iregReg_slot_acc [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames) (inodestart nib : Nat)
     (inum : BitVec 32) (hE : (↑iregN : CoPset) ⊆ E)
     (hin : (inum.toNat : Int) < 16 * (nib : Int)) :
-    ⊢@{IProp GF} iregReg (hlc := hlc) γi γfs inodestart nib -∗
+    ⊢@{IProp GF} iregReg γi γfs inodestart nib -∗
       |={E, E \ ↑iregN}=> ∃ (m : IregMapF Dinode) (ds : List Dinode),
         ⌜diblkWf ds⌝ ∗ ⌜iregCouple m (iregBi inum) ds⌝ ∗ (γi ↪●MAP m) ∗
         iregRecs γfs inodestart (iregBi inum) ds ∗
@@ -275,7 +275,7 @@ end Open
 /-! ## 2.  THE READS: `iregRead`, THE OBSERVATION, `iregRead_blk` -/
 
 section Movers
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- Rocq's `ireg_read`.  THE FLIP'S ONE ADDITION (durable-disk 1c-flip step
@@ -288,7 +288,7 @@ theorem iregRead [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames) (inodestart 
     (inum : BitVec 32) (dn : Dinode) (b : Nat) (bsl : List (BitVec 8))
     (hE : (↑iregN : CoPset) ⊆ E) (hEl : (↑logN : CoPset) ⊆ E)
     (hin : (inum.toNat : Int) < 16 * (nib : Int)) (hb : b = IBLOCK inum inodestart) :
-    ⊢@{IProp GF} iregInv (hlc := hlc) γi γfs inodestart nib -∗ dinodeAt γi inum dn -∗
+    ⊢@{IProp GF} iregInv γi γfs inodestart nib -∗ dinodeAt γi inum dn -∗
       (γfs.cache ↪◯MAP[b]{DFrac.own (1 : Qp).half} bsl) -∗
       |={E}=> (⌜∃ ds : List Dinode, diblkWf ds ∧ bsl = diblkBytes ds ∧ ds[islot inum]! = dn⌝ ∗
         dinodeAt γi inum dn ∗ (γfs.cache ↪◯MAP[b]{DFrac.own (1 : Qp).half} bsl)) := by
@@ -327,7 +327,7 @@ theorem iregObs_mint [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames) (inodest
     (inum : BitVec 32) (dn : Dinode) (γ : LogNames) (e0 : Nat)
     (hE : (↑iregN : CoPset) ⊆ E) (hin : (inum.toNat : Int) < 16 * (nib : Int))
     (hγ : γ = icfgLog) (hnz : dn.diNlink.toNat ≠ 0) :
-    ⊢@{IProp GF} iregInv (hlc := hlc) γi γfs inodestart nib -∗ dinodeAt γi inum dn -∗
+    ⊢@{IProp GF} iregInv γi γfs inodestart nib -∗ dinodeAt γi inum dn -∗
       logEpochLb γ e0 -∗ |={E}=> (dinodeAt γi inum dn ∗ nlzObs inum.toNat e0) := by
   iintro #Hinv Hdn #Hlb0
   imod iregInv_slot_acc E γi γfs inodestart nib inum hE hin $$ Hinv with
@@ -358,7 +358,7 @@ theorem iregObs_use [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames) (inodesta
     (inum : BitVec 32) (dn : Dinode) (γ : LogNames) (e0 : Nat)
     (hE : (↑iregN : CoPset) ⊆ E) (hin : (inum.toNat : Int) < 16 * (nib : Int))
     (hγ : γ = icfgLog) (hz : dn.diNlink.toNat = 0) (he0 : 1 ≤ e0) :
-    ⊢@{IProp GF} iregInv (hlc := hlc) γi γfs inodestart nib -∗ dinodeAt γi inum dn -∗
+    ⊢@{IProp GF} iregInv γi γfs inodestart nib -∗ dinodeAt γi inum dn -∗
       nlzObs inum.toNat e0 -∗
       |={E}=> (dinodeAt γi inum dn ∗
         ∃ e : Nat, ⌜e0 ≤ e⌝ ∗ loggedAt γ e (IBLOCK inum icfgIst)) := by
@@ -395,7 +395,7 @@ sixteen records share one opening (Rocq's `ireg_read_blk`). -/
 theorem iregRead_blk [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames) (inodestart nib : Nat)
     (bi : Nat) (bsl : List (BitVec 8))
     (hE : (↑iregN : CoPset) ⊆ E) (hEl : (↑logN : CoPset) ⊆ E) (hbi : bi < nib) :
-    ⊢@{IProp GF} iregInv (hlc := hlc) γi γfs inodestart nib -∗
+    ⊢@{IProp GF} iregInv γi γfs inodestart nib -∗
       (γfs.cache ↪◯MAP[inodestart + bi]{DFrac.own (1 : Qp).half} bsl) -∗
       |={E}=> (⌜∃ ds : List Dinode, diblkWf ds ∧ bsl = diblkBytes ds⌝ ∗
         (γfs.cache ↪◯MAP[inodestart + bi]{DFrac.own (1 : Qp).half} bsl)) := by
@@ -458,7 +458,7 @@ theorem iregWrite_au [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames) (inodest
     (hE : (↑iregN : CoPset) ⊆ E) (hin : (inum.toNat : Int) < 16 * (nib : Int))
     (hdn' : dinodeWf dn') (hnz : dn'.diType.toNat ≠ 0)
     (hstab : diTypeStable dn' dn) (hnl : diNlinkStable dn' dn) :
-    ⊢@{IProp GF} iregInv (hlc := hlc) γi γfs inodestart nib -∗ dinodeAt γi inum dn -∗
+    ⊢@{IProp GF} iregInv γi γfs inodestart nib -∗ dinodeAt γi inum dn -∗
       |={E, E \ ↑iregN}=> ∃ recOld : List (BitVec 8),
         ⌜recOld.length = 64⌝ ∗
         FsView.byteRange (fsGammaL γfs) (IBLOCK inum inodestart) (64 * islot inum) recOld ∗
@@ -577,7 +577,7 @@ theorem iregClaim_au [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames) (inodest
     (hE : (↑iregN : CoPset) ⊆ E) (hin : (inum.toNat : Int) < 16 * (nib : Int))
     (hwfc : diblkWf dsc) (ht0c : dsc[islot inum]!.diType.toNat = 0)
     (hfr : freshShape dn') (htyc : iregTyOk dn') :
-    ⊢@{IProp GF} iregInv (hlc := hlc) γi γfs inodestart nib -∗ iregOpen -∗
+    ⊢@{IProp GF} iregInv γi γfs inodestart nib -∗ iregOpen -∗
       txPin icfgLog t qt -∗
       |={E, E \ ↑iregN}=> ∃ recOld : List (BitVec 8),
         ⌜recOld.length = 64⌝ ∗
@@ -741,7 +741,7 @@ theorem iregFreeze_au [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames) (inodes
     (inum : BitVec 32) (dn : Dinode) (rg : Frzidx)
     (hE : (↑iregN : CoPset) ⊆ E) (hin : (inum.toNat : Int) < 16 * (nib : Int))
     (hnl0 : dn.diNlink.toNat = 0) (hty0 : dn.diType.toNat ≠ 0) :
-    ⊢@{IProp GF} iregInv (hlc := hlc) γi γfs inodestart nib -∗ iregRegime rg.1 -∗
+    ⊢@{IProp GF} iregInv γi γfs inodestart nib -∗ iregRegime rg.1 -∗
       iregFpin rg -∗ dinodeAt γi inum dn -∗ ifreeze .frzOff inum.toNat -∗
       icntHalf inum.toNat 1 -∗ frzmH inum.toNat false -∗
       |={E}=> (dinodeAt γi inum dn ∗ ifreezePre rg inum.toNat ∗ icntHalf inum.toNat 1 ∗
@@ -828,7 +828,7 @@ shelter clause: the slot goes back exactly as it came out. -/
 theorem iregFrzm_read [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames) (inodestart nib : Nat)
     (inum : BitVec 32) (ph : Frz) (b : Bool)
     (hE : (↑iregN : CoPset) ⊆ E) (hin : (inum.toNat : Int) < 16 * (nib : Int)) :
-    ⊢@{IProp GF} iregInv (hlc := hlc) γi γfs inodestart nib -∗ ifreeze ph inum.toNat -∗
+    ⊢@{IProp GF} iregInv γi γfs inodestart nib -∗ ifreeze ph inum.toNat -∗
       frzmH inum.toNat b -∗
       |={E}=> (⌜b = frzIspre ph⌝ ∗ ifreeze ph inum.toNat ∗ frzmH inum.toNat b) := by
   iintro #Hinv Hfz Hmir
@@ -865,7 +865,7 @@ it came out. -/
 theorem iregFrzPin_read [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames) (inodestart nib : Nat)
     (inum : BitVec 32) (ph : Frz) (n : Nat)
     (hE : (↑iregN : CoPset) ⊆ E) (hin : (inum.toNat : Int) < 16 * (nib : Int)) :
-    ⊢@{IProp GF} iregInv (hlc := hlc) γi γfs inodestart nib -∗ ifreeze ph inum.toNat -∗
+    ⊢@{IProp GF} iregInv γi γfs inodestart nib -∗ ifreeze ph inum.toNat -∗
       icntHalf inum.toNat n -∗
       |={E}=> ((∃ d : Dinode, ⌜iregFrzOk (some (.excl ph)) n d⌝) ∗
         ifreeze ph inum.toNat ∗ icntHalf inum.toNat n) := by

@@ -31,7 +31,7 @@ def uartNameStr : UartId → BitVec 64
   | .uart1 => KStr.«uart1»
 
 /-- **WP of `uartinit`**: both ports, in order.  Two slots over `uartinitone`'s four. -/
-def wp_uartinit_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_uartinit_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ0 γ1 : UartNames) (l0 l1 : List (BitVec 8)) (k0 k1 : Nat)
     (vlock0 vlock1 : BitVec 32) (vname0 vcpu0 vname1 vcpu1 : BitVec 64)
     (hsie : k.sie = false) (hK : 6 ≤ k.avail) : Prop :=
@@ -46,9 +46,9 @@ def wp_uartinit_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
 
 /-- The interface of `uartinit`. -/
 structure UARTINIT : Prop where
-  wp_uartinit : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+  wp_uartinit : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ0 γ1 : UartNames) (l0 l1 : List (BitVec 8)) (k0 k1 : Nat)
     (vlock0 vlock1 : BitVec 32) (vname0 vcpu0 vname1 vcpu1 : BitVec 64) hsie hK,
-    wp_uartinit_body (hlc := hlc) (GF := GF) cpu k γ0 γ1 l0 l1 k0 k1 vlock0 vlock1 vname0 vcpu0 vname1 vcpu1 hsie hK
+    wp_uartinit_body (GF := GF) cpu k γ0 γ1 l0 l1 k0 k1 vlock0 vlock1 vname0 vcpu0 vname1 vcpu1 hsie hK
 
 end Xv6

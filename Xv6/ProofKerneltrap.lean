@@ -56,7 +56,7 @@ theorem bcond_beq_12 : bcond bop.BEQ 1#64 2#64 = false := by decide
 theorem bcond_beq_22 : bcond bop.BEQ 2#64 2#64 = true := by decide
 
 /-- A context is itself with its own pinned bits. -/
-theorem kctx_withSpie_of {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx] {lent : Bool}
+theorem kctx_withSpie_of {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx] {lent : Bool}
     (cpu : CPU) (k : KCtx) (R : RegMap) (a b : Bool) (ha : a = k.spie) (hb : b = k.spp) :
     kctxL (GF := GF) lent cpu (k.withRegs R) ⊢ kctxL lent cpu ((k.withSpie a b).withRegs R) := by
   rw [KCtx.withSpie_self' k a b ha hb]
@@ -71,7 +71,7 @@ set_option maxHeartbeats 8000000 in
 /-- **`kerneltrap` meets its specification**, given `devintr`, `myproc` and
 `yield`. -/
 theorem kerneltrap_proof (DI : DEVINTR) (MP : MYPROC) (YI : YIELD) : KERNELTRAP :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ Γ _ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu
+  ⟨fun {GF} _ _ _ _ _ _ _ _ _ Γ _ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu
       cpu k epc sc hsie hspie hspp hnoff hlocks htier hK hsc hepc => by
   unfold wp_kerneltrap_body
   iintro ⟨Hk, Hpc, #Hpinv, #Hcaps, Hcsrs, Hclaim, Hres, HΦ⟩
@@ -205,7 +205,7 @@ theorem kerneltrap_proof (DI : DEVINTR) (MP : MYPROC) (YI : YIELD) : KERNELTRAP 
         Register.scause ↦ᵣ[cpu] sc -∗ ⌜calleeSaved k'.regs R' ∧ R' 10#5 = devintrRet sc⌝ -∗ wpLoop cpu)
       ⊢ wpLoop (GF := GF) cpu := by
     intro k' hsie' hnoff' hlocks' htier' hK'
-    have h := DI.wp_devintr (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu
+    have h := DI.wp_devintr (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu
       cpu k' sc hsie' hnoff' hlocks' htier' hK'
     unfold wp_devintr_body at h
     simp only [devintrAddr] at h
@@ -260,7 +260,7 @@ theorem kerneltrap_proof (DI : DEVINTR) (MP : MYPROC) (YI : YIELD) : KERNELTRAP 
           ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.proc⌝ -∗ wpLoop cpu)
         ⊢ wpLoop (GF := GF) cpu := by
       intro k' hsie' hnoff' hK'
-      have h := MP.wp_myproc (hlc := hlc) (GF := GF) cpu k' hnoff' hK'
+      have h := MP.wp_myproc (GF := GF) cpu k' hnoff' hK'
       unfold wp_myproc_body at h
       simp only [myprocAddr] at h
       iintro ⟨Hk, Hp, Hcont⟩
@@ -328,7 +328,7 @@ theorem kerneltrap_proof (DI : DEVINTR) (MP : MYPROC) (YI : YIELD) : KERNELTRAP 
             trapCsrs cpu' -∗ cpuClaim cpu' k'.proc -∗ intrRes cpu' -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
           ⊢ wpLoop (GF := GF) cpu := by
         intro k' hj' hproc' hK' hsie' hnoff' hlocks' htier'
-        have h := YI.wp_yield (hlc := hlc) (GF := GF) Γ cpu k' jp hj' hproc' hK' hsie' hnoff' hlocks'
+        have h := YI.wp_yield (GF := GF) Γ cpu k' jp hj' hproc' hK' hsie' hnoff' hlocks'
           htier'
         unfold wp_yield_body at h
         simp only [yieldAddr] at h

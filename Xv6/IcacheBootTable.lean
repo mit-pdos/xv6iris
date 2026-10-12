@@ -230,7 +230,7 @@ theorem slLk_iLock_ientry16 (k : Nat) :
   congr 1
 
 section Claims
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 theorem ientry_kmapId [CurCtx] (k m : Nat) (hk : k < NINODE) (hm : m < ISLOTSZ) :
     kmapStatic (GF := GF) ⊢ kmapId (ientry k + BitVec.ofNat 64 m) := by
@@ -289,7 +289,7 @@ end Claims
 /-! ### Choice: a big-op of existentials is one function of the index -/
 
 section IcacheBootTable
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [LogG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF] [LogG GF]
   [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcboxG GF] [SleepLockG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF]
 
@@ -489,7 +489,7 @@ theorem itableRes2Bare_boot [Icfg] [CurCtx] (tl : Nat) (cn : IcNames) (γfs : Fs
     itableHalf (GF := GF) ∅ ∗ ([∗list] k ∈ List.range NINODE, itableSlotResBare curCtx tl ∅ ∅ k) ∗
       irefSlotsAuth ∗ ([∗list] k ∈ List.range NINODE, slhAuth (icfgIsl k) none) ∗
       ([∗list] k ∈ List.range NINODE, islotEmpty curCtx cn k) ∗
-      ipool (hlc := hlc) γfs γi cov logstart (regionInums nib) ∅ ⊢
+      ipool γfs γi cov logstart (regionInums nib) ∅ ⊢
       itableRes2Bare curCtx tl cn γfs γi cov logstart nib dv := by
   unfold itableRes2Bare
   iintro ⟨Hh, Hrows, Hia, Hisl, Hs, Hpool⟩
@@ -603,7 +603,7 @@ theorem icacheBootAt [Icfg] [CurCtx] (cpu : CPU) (E : CoPset) (γl : GName) (cn 
     ownCtx cpu curCtx -∗
     |={E}=> (ownCtx cpu curCtx ∗
       isItable2 γl cn γfs γi cov logstart nib dv ∗
-      itableInv (hlc := hlc) ∗
+      itableInv ∗
       icEscrows cn γfs γi cov logstart ∗
       icSleeplocks cn) := by
   iintro #HS Hauth Hlive Hislauth Hfresh Hsl Hraw Hsupply Hstamps Hrows Hkey Hxkey Hfree Htok

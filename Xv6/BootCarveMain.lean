@@ -43,7 +43,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-! ## MAIN: generic cell at a named address -/
 

@@ -134,17 +134,17 @@ end
 
 /-- The interface of `fprintf`: every load address. -/
 structure ULIB_FPRINTF : Prop where
-  wp_ulibFprintf_gen : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] (L : UlibRunP GF)
+  wp_ulibFprintf_gen : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] (L : UlibRunP GF)
     (base : BitVec 64) (a : Nat) (m : RegMap) (n : Nat) (R : IProp GF),
     wp_ulibFprintf_gen_body L base a m n R
-  wp_ulibFprintf : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] (L : UlibRunP GF)
+  wp_ulibFprintf : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] (L : UlibRunP GF)
     (base : BitVec 64) (a len : Nat) (f : Nat → BitVec 8) (m : RegMap) (n : Nat) (Ci Co : IProp GF),
     wp_ulibFprintf_body L base a len f m n Ci Co
-  wp_ulibFprintfS : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] (L : UlibRunP GF)
+  wp_ulibFprintfS : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] (L : UlibRunP GF)
     (base : BitVec 64) (a len q : Nat) (f : Nat → BitVec 8) (sa slen : Nat) (sf : Nat → BitVec 8)
     (m : RegMap) (n : Nat) (Ci Cm1 Cm2 Co : IProp GF),
     wp_ulibFprintfS_body L base a len q f sa slen sf m n Ci Cm1 Cm2 Co
-  wp_ulibFprintfSG : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] (L : UlibRunP GF)
+  wp_ulibFprintfSG : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] (L : UlibRunP GF)
     (base : BitVec 64) (a len q : Nat) (f : Nat → BitVec 8) (sdq : DFrac) (sa slen : Nat) (sf : Nat → BitVec 8)
     (m : RegMap) (n : Nat) (Ci Cm1 Cm2 Co : IProp GF),
     wp_ulibFprintfSG_body L base a len q f sdq sa slen sf m n Ci Cm1 Cm2 Co

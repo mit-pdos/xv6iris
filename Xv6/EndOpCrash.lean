@@ -176,7 +176,7 @@ theorem eo_fill_facts (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8)) (Mc 
 /-! ## The logged view on the home set, read through the cache's parked halves -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 /-- **THE READING THE COMMITTER TAKES, AT THE AUTHORITY IT HOLDS** (Rocq
@@ -190,9 +190,9 @@ theorem eo_snapLaw_ofAuth (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     logCtx (GF := GF) γ γb γfs cov ls dev ⊢ fsCacheAuth γfs L -∗ logTxAuth γ ∅ -∗
       -- the era's token, checked out of `logResAt` with the batch (sync K3-3):
       -- the law puts it into the pair
-      eraSyncTok (hlc := hlc) (GF := GF) -∗
-      |={⊤}=> ((∃ G : GName → IProp GF, fsCrashSeamAt (hlc := hlc) G cov ls ∗
-          snapLawOut G (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF)) L (fsHomeList cov ls)) ∗
+      eraSyncTok (GF := GF) -∗
+      |={⊤}=> ((∃ G : GName → IProp GF, fsCrashSeamAt G cov ls ∗
+          snapLawOut G (eraSyncTok (GF := GF)) (genId (GF := GF)) L (fsHomeList cov ls)) ∗
         fsCacheAuth γfs L ∗ logTxAuth γ ∅) := by
   iintro #Hctx HcL Ht HT
   ihave #Hlaw := logCtx_snapLaw γ γb γfs cov ls dev $$ Hctx
@@ -246,18 +246,18 @@ theorem eo_commit_fam (G : GName → IProp GF) (cov : Std.ExtTreeSet Nat compare
     (hrow : logMirrorTieBody Mc L cov ls (W.map (fun w => w.toNat)))
     (hLw : ∀ (i : Nat) (w : BitVec 32), W[i]? = some w →
       PartialMap.get? L w.toNat = some (Lw i)) :
-    fsCrashSeamAt (hlc := hlc) G cov ls ⊢
-      eraRegistered (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF))
-        (MachGS.era (hlc := hlc) (GF := GF)) -∗
-      swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
-      logMirrorHalf (hlc := hlc) Mc -∗
-      durPair G (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF)) (fsRestrict (dvOfD L) (fsHomeList cov ls)) -∗
+    fsCrashSeamAt G cov ls ⊢
+      eraRegistered (GF := GF) (genId (GF := GF))
+        (MachGS.era (GF := GF)) -∗
+      swapLb (GF := GF) (genId (GF := GF) + 1) -∗
+      logMirrorHalf Mc -∗
+      durPair G (eraSyncTok (GF := GF)) (genId (GF := GF)) (fsRestrict (dvOfD L) (fsHomeList cov ls)) -∗
       ∀ bs' : List (BitVec 8), ⌜bs'.length = BSIZE⌝ -∗ ⌜hdrN bs' = n⌝ -∗
         ⌜hdrDec bs' = (n, W.map (fun w => w.toNat))⌝ -∗
-        diskSeqPermit (hlc := hlc) (genId (hlc := hlc) (GF := GF))
+        diskSeqPermit (genId (GF := GF))
           (some (1024 * logHdrBno ls, bs'))
-          iprop(logMirrorHalf (hlc := hlc) (lmUpd Mc (logHdrBno ls) bs') ∗
-            eraSyncTok (hlc := hlc) (GF := GF)) := by
+          iprop(logMirrorHalf (lmUpd Mc (logHdrBno ls) bs') ∗
+            eraSyncTok (GF := GF)) := by
   iintro #Hs #Hr #Hsw Hm He %bs' %hl %_ %hd
   have hin : ∀ b, b ∈ W.map (fun w => w.toNat) → b ∈ cov ∧ logRegion ls b = false := by
     intro b hb
@@ -287,14 +287,14 @@ theorem eo_install_gen (cov : Std.ExtTreeSet Nat compare) (ls n : Nat)
     (hhome : ∀ w ∈ W, fsHome cov ls w.toNat)
     (hM1 : ∀ t, t ≤ n →
       lmHdr (lmInstall M1 (W.map (fun w => w.toNat)) Lw t) ls = (n, W.map (fun w => w.toNat))) :
-    fsCrashSeam (hlc := hlc) (GF := GF) cov ls ⊢
-      eraRegistered (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF))
-        (MachGS.era (hlc := hlc) (GF := GF)) -∗
-      swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
+    fsCrashSeam (GF := GF) cov ls ⊢
+      eraRegistered (GF := GF) (genId (GF := GF))
+        (MachGS.era (GF := GF)) -∗
+      swapLb (GF := GF) (genId (GF := GF) + 1) -∗
       □ (∀ (i : Nat) (w : BitVec 32), ⌜W[i]? = some w⌝ -∗ ⌜(Lw i).length = BSIZE⌝ -∗
-        ▷ logMirrorHalf (hlc := hlc) (lmInstall M1 (W.map (fun w => w.toNat)) Lw i) -∗
-        diskSeqPermit (hlc := hlc) (genId (hlc := hlc) (GF := GF)) (some (1024 * w.toNat, Lw i))
-          (logMirrorHalf (hlc := hlc) (lmInstall M1 (W.map (fun w => w.toNat)) Lw (i + 1)))) := by
+        ▷ logMirrorHalf (lmInstall M1 (W.map (fun w => w.toNat)) Lw i) -∗
+        diskSeqPermit (genId (GF := GF)) (some (1024 * w.toNat, Lw i))
+          (logMirrorHalf (lmInstall M1 (W.map (fun w => w.toNat)) Lw (i + 1)))) := by
   iintro #Hs #Hr #Hsw
   imodintro
   iintro %i %w %hw %hl HR
@@ -311,16 +311,16 @@ goes back to its clean picture. -/
 theorem eo_clear_fam (cov : Std.ExtTreeSet Nat compare) (ls n : Nat) (Ws : List Nat)
     (M2 : LogMirror) (hnL : n ≤ LOGBLOCKS) (hM2 : lmHdr M2 ls = (n, Ws))
     (hcaught : ∀ j b, Ws[j]? = some b → M2.view b = M2.view (logSlotBno ls j)) :
-    fsCrashSeam (hlc := hlc) (GF := GF) cov ls ⊢
-      eraRegistered (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF))
-        (MachGS.era (hlc := hlc) (GF := GF)) -∗
-      swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
-      logMirrorHalf (hlc := hlc) M2 -∗
+    fsCrashSeam (GF := GF) cov ls ⊢
+      eraRegistered (GF := GF) (genId (GF := GF))
+        (MachGS.era (GF := GF)) -∗
+      swapLb (GF := GF) (genId (GF := GF) + 1) -∗
+      logMirrorHalf M2 -∗
       ∀ bs' : List (BitVec 8), ⌜bs'.length = BSIZE⌝ -∗ ⌜hdrN bs' = 0⌝ -∗
         ⌜hdrDec bs' = (0, ([] : List (BitVec 32)).map (fun w => w.toNat))⌝ -∗
-        diskSeqPermit (hlc := hlc) (genId (hlc := hlc) (GF := GF))
+        diskSeqPermit (genId (GF := GF))
           (some (1024 * logHdrBno ls, bs'))
-          iprop(logMirrorHalf (hlc := hlc) (lmUpd M2 (logHdrBno ls) bs')) := by
+          iprop(logMirrorHalf (lmUpd M2 (logHdrBno ls) bs')) := by
   iintro #Hs #Hr #Hsw Hm %bs' %hl %hn0 %_
   iapply fsClearKeep_seqPermit cov ls M2 M2.view n Ws bs' hl hn0 hnL hM2 (fun _ _ => rfl)
     hcaught $$ Hs Hr Hsw Hm

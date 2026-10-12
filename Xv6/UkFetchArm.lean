@@ -158,7 +158,7 @@ def UkDecodes (fr : FetchResult) (len : Int) (i : instruction) : Prop :=
     Functions.execute i₀ = pure (ExecutionResult.ExecuteAs i))
 
 section arm
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- The step's execute result is never a redirect here. -/
 theorem uk_notExecAs {r : ExecutionResult} {pc : BitVec 64}

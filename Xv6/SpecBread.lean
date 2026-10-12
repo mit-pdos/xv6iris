@@ -67,9 +67,9 @@ callees are `virtio_disk_rw` (32), `acquiresleep` (24) and
 def breadSlots : Nat := 6 + panicSlots
 
 /-- **WP of `bread(dev = a0, blockno = a1)`**. -/
-def wp_bread_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_bread_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (pidv dev bno : BitVec 32) (dqp : DFrac)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : breadSlots ≤ k.avail)
@@ -95,9 +95,9 @@ def wp_bread_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6
 /-- The eb-generic form of `wp_bread_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_bread_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_bread_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (pidv dev bno : BitVec 32) (dqp : DFrac)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : breadSlots ≤ k.avail)
@@ -122,13 +122,13 @@ def wp_bread_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
 
 /-- The interface of `bread`. -/
 structure BREAD : Prop where
-  wp_bread_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+  wp_bread_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (pidv dev bno : BitVec 32) (dqp : DFrac)
     hj hproc hK hnoff htier hbno hcov hdev hpd ha0 ha1,
-    wp_bread_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ V γdl pd pav pu j pidv dev bno dqp
+    wp_bread_eb_body (GF := GF) Γ cpu k γl γ V γdl pd pav pu j pidv dev bno dqp
       hj hproc hK hnoff htier hbno hcov hdev hpd ha0 ha1
 
 end Xv6

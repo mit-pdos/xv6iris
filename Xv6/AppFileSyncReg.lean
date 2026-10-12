@@ -72,7 +72,7 @@ union). -/
 def fileOk (_c : FileFixed) (k : Nat) (r : FileAppNames) : Prop := r.fnEra = k
 
 section AppFileSyncReg
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FileAppG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FileAppG GF]
 
 /-! ## The registry: era ↦ that era's sync list -/
 

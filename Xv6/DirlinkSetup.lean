@@ -31,7 +31,7 @@ theorem dirlink_slot_zero (data : Nat → List (BitVec 8)) (sz : Nat) (h : sz = 
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -41,7 +41,7 @@ set_option maxHeartbeats 16000000 in
 empty-directory shortcut into the record at `+0x70` (`k0 = 0`), or the
 scan at record 0. -/
 theorem dirlink_setup (RD : READI) (SN : STRNCPY) (WI : WRITEI) (PA : PANIC)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (j : Nat) (γl : GName)
     (pd pav pu : BitVec 64) (γkl : GName) (γk : KmemNames)
     (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap) (data : Nat → List (BitVec 8))
@@ -61,7 +61,7 @@ theorem dirlink_setup (RD : READI) (SN : STRNCPY) (WI : WRITEI) (PA : PANIC)
     dirlinkKeep k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr ∗
     bslots 3 ∗ irefSlot ∗ dlinks fscFs dinum.toNat dn bm data ∗
     logOpS icfgLog ncount Sb ∗ txPin icfgLog tid qtx ∗
-    dirlinkEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
+    dirlinkEnv Γ γl pd pav pu γkl γk ∗
     (∀ c' : CPU, dirlinkPost k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
       dqp dqd dqf dqn dqs dqbs dqb kd sd rootv rti dqr c')
     ⊢ wpLoop (GF := GF) cpu := by

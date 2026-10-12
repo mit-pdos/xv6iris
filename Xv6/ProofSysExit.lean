@@ -42,7 +42,7 @@ theorem sysx_sp4 (x : BitVec 64) :
     x - 8#64 * BitVec.ofNat 64 4 = x + 0xFFFFFFFFFFFFFFE0#64 := by bv_decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -63,7 +63,7 @@ theorem sysx_argint (AI : ARGINT) (c : CPU) (k' : KCtx) (tfp : BitVec 44) (ws : 
       wordPointsTo (pTrapframe k'.proc) 8 dqt (pageAddr tfp) -∗ tfPageAt tfp ws -∗
       wordPointsTo (k'.regs 11#5) 4 (DFrac.own 1) (BitVec.extractLsb' 0 32 v) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AI.wp_argint (hlc := hlc) (GF := GF) c k' 0 tfp ws v old dqt (by unfold NARG; decide)
+  have h := AI.wp_argint (GF := GF) c k' 0 tfp ws v old dqt (by unfold NARG; decide)
     ha0 hws hnoff hK
   unfold wp_argint_body at h
   simp only [argintAddr] at h
@@ -71,7 +71,7 @@ theorem sysx_argint (AI : ARGINT) (c : CPU) (k' : KCtx) (tfp : BitVec 44) (ws : 
 
 /-- `kexit` at its eb contract, with its stack closer stated at an explicit
 `sp`/`avail` and the complement at a named index `s`. -/
-theorem sysx_kexit (KX : KEXIT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem sysx_kexit (KX : KEXIT) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γw γl : GName) (γ : FileNames) (γkl : GName) (γk : KmemNames)
     (on : Option Nat) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (ip : BitVec 64) (cs : ExtTreeSet GName compare) (sts : List FdState)
@@ -85,16 +85,16 @@ theorem sysx_kexit (KX : KEXIT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initIdentAt curCtx ip ∗
     isFtable γl γ ∗ panicEnv ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk on ∗
-    fsReady (hlc := hlc) ∗ bslots 3 ∗
+    fsReady ∗ bslots 3 ∗
     fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
-    procPrivUnmarked γ (procAddr j) pid V M ∗ fdFrags V.fdg sts ∗ filecloseCpays (hlc := hlc) sts ∗
+    procPrivUnmarked γ (procAddr j) pid V M ∗ fdFrags V.fdg sts ∗ filecloseCpays sts ∗
     chFrag V.chg (procAddr j) cs ∗
     myPay V.gen Q ∗ (Q st ∨ (⌜st = -1⌝ ∗ killShot V.gen ∗ takenAt V.gen)) ∗
     (stackOwn sp n -∗ stackOwn (V.kstack + 4096#64) 512)
     ⊢ wpLoop (GF := GF) c := by
   subst hs
   subst hst
-  have h := KX.wp_kexit_eb (hlc := hlc) (GF := GF) Γ c k' γw γl γ γkl γk on j pid V M ip cs sts Q
+  have h := KX.wp_kexit_eb (GF := GF) Γ c k' γw γl γ γkl γk on j pid V M ip cs sts Q
     hj hproc hK hnoff htier
   unfold wp_kexit_eb_body at h
   simp only [kexitAddr, KCtx.sp, hsp, hav, hproc] at h
@@ -167,7 +167,7 @@ theorem sys_exit_br_fffffffffffff6ee : KA.«sys_exit» + 0xfffffffffffff6ee#64 =
 set_option maxHeartbeats 64000000 in
 set_option maxRecDepth 20000 in
 theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ cpu k γw γl γ γkl γk on j pid V M ip v cs sts Q
+  fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ cpu k γw γl γ γkl γk on j pid V M ip v cs sts Q
       hj hproc hv hK hnoff htier => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩

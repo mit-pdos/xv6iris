@@ -54,8 +54,8 @@ def uartwriteAddr : BitVec 64 := KA.«uartwrite»
 def uartwriteSlots : Nat := 8 + sleepSlots
 
 /-- **WP of `uartwrite`.**  `a0` the port index, `a1` the buffer, `a2` the count. -/
-def wp_uartwrite_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+def wp_uartwrite_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (i : UartId) (γl : GName) (γ : UartNames) (j : Nat)
     (bs L0 cs : List (BitVec 8)) (dq : DFrac) (n : Nat) (Φ : IProp GF)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : uartwriteSlots ≤ k.avail)
@@ -66,7 +66,7 @@ def wp_uartwrite_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] 
   kctx cpu k ∗ pcIs cpu uartwriteAddr ∗ procsInv Γ ∗
   trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
   uartPort i γl γ ∗ uartSentSub γ bs ∗ uartSent γ L0 ∗ byteBuf (k.regs 11#5) dq cs ∗
-  outChain i (genId (hlc := hlc) (GF := GF) + 1) cs Φ ∗
+  outChain i (genId (GF := GF) + 1) cs Φ ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -83,8 +83,8 @@ the caller brings the trap-CSR complement (`trapCsrsExt` / `cpuClaimExt`,
 back (nothing sleeps under the lock), so the complement is exactly what the
 interior `sleep` needs.  Depth 0, so no spinlock held (`KCtx.wf`).  It parks,
 so the crossing is the literal `true`. -/
-def wp_uartwrite_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+def wp_uartwrite_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (i : UartId) (γl : GName) (γ : UartNames) (j : Nat)
     (bs L0 cs : List (BitVec 8)) (dq : DFrac) (n : Nat) (Φ : IProp GF)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : uartwriteSlots ≤ k.avail)
@@ -95,7 +95,7 @@ def wp_uartwrite_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
   kctx cpu k ∗ pcIs cpu uartwriteAddr ∗ procsInv Γ ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
   uartPort i γl γ ∗ uartSentSub γ bs ∗ uartSent γ L0 ∗ byteBuf (k.regs 11#5) dq cs ∗
-  outChain i (genId (hlc := hlc) (GF := GF) + 1) cs Φ ∗
+  outChain i (genId (GF := GF) + 1) cs Φ ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -106,10 +106,10 @@ def wp_uartwrite_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
 
 /-- The interface of `uartwrite`. -/
 structure UARTWRITE : Prop where
-  wp_uartwrite_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+  wp_uartwrite_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (i : UartId) (γl : GName) (γ : UartNames) (j : Nat)
     (bs L0 cs : List (BitVec 8)) (dq : DFrac) (n : Nat) (Φ : IProp GF) hj hproc hK hnoff htier hid hn hn' hcs,
-    wp_uartwrite_eb_body (hlc := hlc) (GF := GF) Γ cpu k i γl γ j bs L0 cs dq n Φ hj hproc hK hnoff htier hid hn hn' hcs
+    wp_uartwrite_eb_body (GF := GF) Γ cpu k i γl γ j bs L0 cs dq n Φ hj hproc hK hnoff htier hid hn hn' hcs
 
 end Xv6

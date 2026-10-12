@@ -39,9 +39,9 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Wid RdOut WrOut
 
 section Fam
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF] [PipesNG GF]
-variable (D : PdRound hlc GF)
+variable (D : PdRound GF)
 
 /-! ## Reading a deposit at a known source (Rocq inline) -/
 
@@ -307,7 +307,7 @@ theorem fam_silence (E : CoPset) (w : Wid) (hE : (↑pnsN : CoPset) ⊆ E) (hw :
       wcurN D.γc w (1 : Qp).half 0 ∗ wmodeN D.γm w (1 : Qp).half (some []) := by
   iintro #Hinv Hc Hm
   iapply (blkNSilence D.wsN D.RUNN D.PWN termw D.TOKN (pdep D) (wids_nodup _) E pnsN ∅
-    (genId (hlc := hlc) (GF := GF) + 1) D.γc D.γm w (fun _ _ => False) hE LawfulSet.empty_subset hw hok)
+    (genId (GF := GF) + 1) D.γc D.γm w (fun _ _ => False) hE LawfulSet.empty_subset hw hok)
     $$ [] Hinv Hc Hm []
   · imodintro
     iintro %w' %s' %hf
@@ -342,7 +342,7 @@ theorem fam_peek (E : CoPset) (w : Wid) (s : List (BitVec 8)) (c : Nat) (Φ : IP
   iintro #Hinv Hcw Hmw Hacc
   unfold PdRound.FAM blkNInv
   imod (inv_acc_timeless (E := E) (N := pnsN)
-    (P := blkNBody D.wsN D.RUNN D.PWN termw D.TOKN (pdep D) (genId (hlc := hlc) (GF := GF) + 1)
+    (P := blkNBody D.wsN D.RUNN D.PWN termw D.TOKN (pdep D) (genId (GF := GF) + 1)
       D.γc D.γm) hE) $$ Hinv with ⟨Hin, Hclose⟩
   unfold blkNBody
   icases Hin with (⟨%md, %sel, HPW, Hb, %hfam⟩ | Hdone)
@@ -375,7 +375,7 @@ theorem fam_cur_le (E : CoPset) (w : Wid) (s : List (BitVec 8)) (c : Nat)
   iintro #Hinv Hcw Hmw
   unfold PdRound.FAM blkNInv
   imod (inv_acc_timeless (E := E) (N := pnsN)
-    (P := blkNBody D.wsN D.RUNN D.PWN termw D.TOKN (pdep D) (genId (hlc := hlc) (GF := GF) + 1)
+    (P := blkNBody D.wsN D.RUNN D.PWN termw D.TOKN (pdep D) (genId (GF := GF) + 1)
       D.γc D.γm) hE) $$ Hinv with ⟨Hin, Hclose⟩
   unfold blkNBody
   icases Hin with (⟨%md, %sel, HPW, Hb, %hfam⟩ | Hdone)

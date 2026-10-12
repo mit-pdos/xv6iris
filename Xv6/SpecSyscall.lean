@@ -267,7 +267,7 @@ structure SyscRows (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPriv)
 /-! ## §2 The deposit channels (Rocq `Section SyscExec`, deviation 2) -/
 
 section SyscExec
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [WchG GF]
 open UexecSG
 
 /-- **Rocq `uwait_ans_at_m`** (deviation 5): wait's answer at the a0 WORD
@@ -283,7 +283,7 @@ families `f`, keyed at the entry record. -/
 def syscSysIn (f : sfam GF) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
     (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32) : IProp GF :=
   iprop(∀ n : Int, ⌜syscNum V = n ∧ n ≠ USYS_fork⌝ -∗
-    sbundleAt (uslot (hlc := hlc)) n f (uvisOf V M sts gn cs pid))
+    sbundleAt (uslot) n f (uvisOf V M sts gn cs pid))
 
 /-- **Rocq `sysc_sys_out`**: WHAT COMES BACK at the same key and families --
 the armed post at the stored a0, the resume image, the descriptor view, the
@@ -292,7 +292,7 @@ def syscSysOut (f : sfam GF) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts :
     (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32) (r : BitVec 64) (M' : ElfMem)
     (sts' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare) : IProp GF :=
   iprop(∀ n : Int, ⌜syscNum V = n ∧ n ≠ USYS_exit ∧ n ≠ USYS_fork⌝ -∗
-    spostAt (uslot (hlc := hlc)) n f (uvisOf V M sts gn cs pid) r M' sts' cw' cs')
+    spostAt (uslot) n f (uvisOf V M sts gn cs pid) r M' sts' cw' cs')
 
 /-- **Rocq `sysc_fork_in`** (deviations 6, 7): FORK'S DEPOSIT, the one that
 is a SLOT -- the child's WP at the record kfork builds, over every
@@ -301,12 +301,12 @@ beside the killer's price and the lend. -/
 def syscForkIn (f : sfam GF) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) :
     IProp GF :=
   iprop(⌜syscNum V = USYS_fork⌝ -∗
-    □ (uKillCred (hlc := hlc) -∗ sforkPay f (-1)) ∗ sforkLend f ∗
+    □ (uKillCred -∗ sforkPay f (-1)) ∗ sforkLend f ∗
     -- THE CHILD'S ORIGIN TICKET (NI M2-W2d): the fork exit's one-shot
     -- child-origin claim, which kfork parks with the child
-    MachFixedGS.uClaimO (hlc := hlc) (GF := GF) ∗
+    MachFixedGS.uClaimO (GF := GF) ∗
     ∀ (g' : GName) (pidc : BitVec 32), ⌜pidc ≠ 1#32⌝ -∗ myPay g' (sforkPay f) -∗ sforkLend f -∗
-      uslot (hlc := hlc) (uvisOf (syscForkChild V) M sts g' syscNoChildren pidc))
+      uslot (uvisOf (syscForkChild V) M sts g' syscNoChildren pidc))
 
 /-- **Rocq `sysc_pay_in`**: THE PAYMENT -- the process's knowledge of what
 its exit owes and, at exit, that payload paid; at the block's generation. -/
@@ -338,7 +338,7 @@ def syscExecOut (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPriv)
     (M' : Nat → List (BitVec 8)) (sts sts' : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (pid : BitVec 32) : IProp GF :=
   iprop(⌜syscNum V = USYS_exec⌝ -∗
-    (⌜syscExecFailed V M V' M' sts sts'⌝ ∨ uslot (hlc := hlc) (uvisOf V' M' sts' gn cs pid)))
+    (⌜syscExecFailed V M V' M' sts sts'⌝ ∨ uslot (uvisOf V' M' sts' gn cs pid)))
 
 /-- **Rocq `UexecExecInst.spost_at_emp`, as a hypothesis** (deviation 2):
 the instance's posts are `emp`-payable at every number without a contract.
@@ -384,7 +384,7 @@ theorem syscWaitOut_of (M' : ElfMem) (r : BitVec 64) (rv xw : BitVec 32)
 /-- Rocq `sysc_exec_out_ne`. -/
 theorem syscExecOut_ne (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (sts' : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (pid : BitVec 32) (h : syscNum V ≠ USYS_exec) :
-    ⊢ syscExecOut (hlc := hlc) (GF := GF) V M V' M' sts sts' gn cs pid := by
+    ⊢ syscExecOut (GF := GF) V M V' M' sts sts' gn cs pid := by
   unfold syscExecOut
   iintro %hc
   exact absurd hc h
@@ -393,7 +393,7 @@ theorem syscExecOut_ne (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (sts' : Li
 number but fork). -/
 theorem syscSysIn_at (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32) (k : Int)
     (hk : syscNum V = k) (hf : k ≠ USYS_fork) :
-    syscSysIn (hlc := hlc) f V M sts gn cs pid ⊢ sbundleAt (uslot (hlc := hlc)) k f (uvisOf V M sts gn cs pid) := by
+    syscSysIn f V M sts gn cs pid ⊢ sbundleAt (uslot) k f (uvisOf V M sts gn cs pid) := by
   unfold syscSysIn
   iintro H
   iapply H $$ %k %⟨hk, hf⟩
@@ -403,8 +403,8 @@ the channel (every number but exit and fork). -/
 theorem syscSysOut_at (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32) (r : BitVec 64)
     (M' : ElfMem) (sts' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare) (k : Int)
     (hk : syscNum V = k) (he : k ≠ USYS_exit) (hf : k ≠ USYS_fork) :
-    spostAt (uslot (hlc := hlc)) k f (uvisOf V M sts gn cs pid) r M' sts' cw' cs' ⊢
-      syscSysOut (hlc := hlc) f V M sts gn cs pid r M' sts' cw' cs' := by
+    spostAt (uslot) k f (uvisOf V M sts gn cs pid) r M' sts' cw' cs' ⊢
+      syscSysOut f V M sts gn cs pid r M' sts' cw' cs' := by
   unfold syscSysOut
   iintro H %n %hg
   have hn : n = k := by rw [← hg.1, hk]
@@ -414,7 +414,7 @@ theorem syscSysOut_at (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec
 /-- fork owes nothing on the syscall channel (its guard excludes it). -/
 theorem syscSysOut_fork (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32) (r : BitVec 64)
     (M' : ElfMem) (sts' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare)
-    (hk : syscNum V = USYS_fork) : ⊢ syscSysOut (hlc := hlc) f V M sts gn cs pid r M' sts' cw' cs' := by
+    (hk : syscNum V = USYS_fork) : ⊢ syscSysOut f V M sts gn cs pid r M' sts' cw' cs' := by
   unfold syscSysOut
   iintro %n %hg
   exact absurd (hg.1.symm.trans hk) hg.2.2
@@ -434,7 +434,7 @@ theorem syscPayIn_exit (hk : syscNum V = USYS_exit) :
 theorem syscSysOut_quiet (hE : SyscSpostEmp (GF := GF)) (gn : GName) (cs : ExtTreeSet GName compare)
     (pid : BitVec 32) (r : BitVec 64) (M' : ElfMem) (sts' : List FdState) (cw' : Nat)
     (cs' : ExtTreeSet GName compare) (k : Int) (hk : syscNum V = k) (hno : syscNumNofs k) :
-    ⊢ syscSysOut (hlc := hlc) f V M sts gn cs pid r M' sts' cw' cs' := by
+    ⊢ syscSysOut f V M sts gn cs pid r M' sts' cw' cs' := by
   unfold syscSysOut
   iintro %n %hg
   have hn : syscNumNofs n := by rw [← hg.1, hk]; exact hno
@@ -446,7 +446,7 @@ theorem syscSysOut_exec (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitV
     (M' : ElfMem) (sts' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare)
     (hk : syscNum V = USYS_exec) :
     (⌜r = BitVec.ofInt 64 (-1)⌝ -∗ sexecRefund f) ⊢
-      syscSysOut (hlc := hlc) f V M sts gn cs pid r M' sts' cw' cs' := by
+      syscSysOut f V M sts gn cs pid r M' sts' cw' cs' := by
   unfold syscSysOut
   iintro H %n %hg
   have hn : n = USYS_exec := by rw [← hg.1, hk]
@@ -459,7 +459,7 @@ end SyscExec
 /-! ## §3 The contract -/
 
 section Contract
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
@@ -477,14 +477,14 @@ def syscEvOut (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) 
     (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) (gn : GName) : IProp GF :=
   iprop(⌜syscNum V ≠ USYS_uptime ∧ syscNum V ≠ USYS_wait ∧ syscNum V ≠ USYS_fork ∧
       syscNum V ≠ USYS_sbrk ∧ syscNum V ≠ USYS_write⌝ ∨
-    (∃ (k : Nat) (ι : UIota), MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF)) ∗
+    (∃ (k : Nat) (ι : UIota), MachFixedGS.uEraAnchor (GF := GF) k (niNamesHere (GF := GF)) ∗
       niIotaLbs (niNamesHere (GF := GF)) ι ∗ ⌜syscEvRow V V' (syscImg V M) (syscImg V' M') cs cs' sts ι⌝) ∨
     (⌜syscNum V = USYS_wait ∧ syscA0 V' = -1#64 ∧ cs' = cs ∧ syscImg V' M' = syscImg V M⌝ ∗
       killShot gn))
 
 instance syscEvOut_persistent (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (V' : ProcPriv)
     (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) (gn : GName) :
-    Persistent (syscEvOut (hlc := hlc) (GF := GF) V M sts V' M' cs cs' gn) := by
+    Persistent (syscEvOut (GF := GF) V M sts V' M' cs cs' gn) := by
   unfold syscEvOut; infer_instance
 
 /-- **The deposit at a number that cites nothing** (NI M2-X2): every arm but
@@ -494,7 +494,7 @@ theorem syscEvOut_quiet (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List
     (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) (gn : GName) (n : Int)
     (hnum : syscNum V = n) (h14 : n ≠ 14 := by decide) (h3 : n ≠ 3 := by decide)
     (h1 : n ≠ 1 := by decide) (h12 : n ≠ 12 := by decide) (h16 : n ≠ 16 := by decide) :
-    ⊢ syscEvOut (hlc := hlc) (GF := GF) V M sts V' M' cs cs' gn := by
+    ⊢ syscEvOut (GF := GF) V M sts V' M' cs cs' gn := by
   unfold syscEvOut
   ileft
   ipureintro
@@ -505,9 +505,9 @@ theorem syscEvOut_quiet (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List
 theorem syscEvOut_cite (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (V' : ProcPriv)
     (M' : Nat → List (BitVec 8)) (cs cs' : ExtTreeSet GName compare) (gn : GName) (k : Nat) (ι : UIota)
     (h : syscEvRow V V' (syscImg V M) (syscImg V' M') cs cs' sts ι) :
-    MachFixedGS.uEraAnchor (hlc := hlc) (GF := GF) k (niNamesHere (GF := GF)) ⊢
+    MachFixedGS.uEraAnchor (GF := GF) k (niNamesHere (GF := GF)) ⊢
       niIotaLbs (niNamesHere (GF := GF)) ι -∗
-      syscEvOut (hlc := hlc) (GF := GF) V M sts V' M' cs cs' gn := by
+      syscEvOut (GF := GF) V M sts V' M' cs cs' gn := by
   unfold syscEvOut
   iintro #Ha #Hl
   iright; ileft
@@ -530,14 +530,14 @@ def syscallPost (PT : SchedNames → IProp GF) (Γ : SchedNames) (k : KCtx) (γ 
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     bslots 3 -∗ syscInitId ip -∗ fdSlots FDSPARE -∗ irefSlots IREFSPARE -∗
-    syscallEnv (hlc := hlc) PT Γ γ -∗
+    syscallEnv PT Γ γ -∗
     procPrivFd γ (procAddr j) pid V' M' -∗ fdFrags V.fdg sts' -∗ chFrag V.chg (procAddr j) cs' -∗
-    syscExecOut (hlc := hlc) V M V' M' sts sts' gn cs pid -∗
-    syscSysOut (hlc := hlc) f V M sts gn cs pid (syscA0 V') (syscImg V' M') sts' V'.cwi cs' -∗
+    syscExecOut V M V' M' sts sts' gn cs pid -∗
+    syscSysOut f V M sts gn cs pid (syscA0 V') (syscImg V' M') sts' V'.cwi cs' -∗
     syscForkOut f V (syscA0 V') cs cs' -∗
     syscWaitOut V M (syscImg V' M') (syscA0 V') cs cs' pid -∗
     -- THE ROUND'S LEDGER EVIDENCE (NI M2-X2), last
-    syscEvOut (hlc := hlc) V M sts V' M' cs cs' gn -∗
+    syscEvOut V M sts V' M' cs cs' gn -∗
     wpLoop cpu')
 
 /-- **The divergent conjunct** (deviation 8): an entry that declines to
@@ -549,7 +549,7 @@ def syscallCloser (k : KCtx) (V : ProcPriv) : IProp GF :=
 `SIE` (D32).  The exit slot is `wpNext true … (syscallPost …) ∧
 syscallCloser …`: twenty-one entries take the left conjunct, sys_exit the
 right. -/
-def wp_syscall_body (PT : SchedNames → IProp GF) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+def wp_syscall_body (PT : SchedNames → IProp GF) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γw : GName) (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName) (cs : ExtTreeSet GName compare)
     (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -561,14 +561,14 @@ def wp_syscall_body (PT : SchedNames → IProp GF) (Γ : SchedNames) [ClaimIs (h
   -- THE FOUR EXPLICIT FAMILIES (SyscallEnv's header)
   bslots 3 ∗ syscInitId ip ∗ fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
   -- everything else the twenty-two entries consume (D30)
-  syscallEnv (hlc := hlc) PT Γ γ ∗
+  syscallEnv PT Γ γ ∗
   -- the block, the descriptor fragments at a named table, the children row
   procPrivFd γ (procAddr j) pid V M ∗ fdFrags V.fdg sts ∗ chFrag V.chg (procAddr j) cs ∗
   -- the deposit channels
-  syscSysIn (hlc := hlc) f V M sts gn cs pid ∗ syscForkIn (hlc := hlc) f V M sts ∗
+  syscSysIn f V M sts gn cs pid ∗ syscForkIn f V M sts ∗
   syscPayIn f V ∗
   -- THE EXIT SLOT: ∧, the callee picks
-  (wpNext true k.proc cpu (syscallPost (hlc := hlc) PT Γ k γ j pid V M sts gn cs ip f) ∧
+  (wpNext true k.proc cpu (syscallPost PT Γ k γ j pid V M sts gn cs ip f) ∧
     syscallCloser k V)
   ⊢ wpLoop (GF := GF) cpu
 
@@ -580,15 +580,15 @@ end Contract
 token `PT` -- PERSISTENT, as Rocq's `park_token` is (`park_token_persistent`),
 so the environment is (SyscallEnv's header) -- and the deposit class. -/
 structure SYSCALL : Prop where
-  wp_syscall : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+  wp_syscall : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [CtokG GF] [WchG GF] [Appcfg GF] [FileG GF] [UexecSG GF] [Fscfg] [Icfg] [CurCtx]
-    (PT : SchedNames → IProp GF) [∀ Γ, Persistent (PT Γ)] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (PT : SchedNames → IProp GF) [∀ Γ, Persistent (PT Γ)] (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γw : GName) (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName) (cs : ExtTreeSet GName compare)
     (ip : BitVec 64) (f : UexecSG.sfam GF) hj hproc hK hnoff htier hgn,
-    wp_syscall_body (hlc := hlc) (GF := GF) PT Γ cpu k γw γ j pid V M sts gn cs ip f
+    wp_syscall_body (GF := GF) PT Γ cpu k γw γ j pid V M sts gn cs ip f
       hj hproc hK hnoff htier hgn
 
 end Xv6

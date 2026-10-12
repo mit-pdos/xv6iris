@@ -86,7 +86,7 @@ theorem colView_lookup (C : BlockMap) (home : List Nat) (b : Nat) :
   fsRestrict_lookup _ _ _
 
 section ColAuth
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsBytesG GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF] [FsBytesG GF]
 
 /-- What the WAL holds at the commit's ghost step: the byte view's authority
 and the pure rows of its body beside the cache map (Rocq's `col_auth`). -/
@@ -141,7 +141,7 @@ value at ANY share, both halves name the same list, and
 `FsView.blkOwned_split34` closes. -/
 
 section PoolJoin
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsBytesG GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF] [FsBytesG GF]
 
 /-- Rocq's `blk_owned_join_34`: the byte list is NAMED, so no agreement is
 needed. -/
@@ -215,7 +215,7 @@ end PoolJoin
 /-! ## 2.  THE COLLECTED HAND -/
 
 section Hand
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- ONE REGION INUM'S BUNDLE, AT THREE QUARTERS: every supplier sheds to the
 smaller of the unlocked (1) and read-locked (3/4) shares, which is still
@@ -271,7 +271,7 @@ abbrev colState (sb : FsSb) (sbb : List (BitVec 8)) (I : RegMapF FsNode) (used :
 /-! ## 3.  READING ONE BUNDLE -/
 
 section Bundle
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- Rocq's `col_bundle_local`. -/
 theorem colBundle_local (γfs : FsNames) (γi : GName) (i : Nat) (n : FsNode) :
@@ -370,7 +370,7 @@ theorem colBytes_leDbytes (Lb : RegMapF (BitVec 8)) (C : BlockMap) (home : List 
   exact hfd
 
 section AuthDbytes
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsBytesG GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF] [FsBytesG GF]
 
 /-- Rocq's `col_auth_dbytes`. -/
 theorem colAuth_dbytes (γfs : FsNames) (Lb : RegMapF (BitVec 8)) (C : BlockMap)
@@ -386,7 +386,7 @@ end AuthDbytes
 /-! ## 6.  THE GEOMETRY, off the boot configuration and the domain rows -/
 
 section Geom
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- `SnapShape`'s one clause: the ledger's keys are real blocks, off
 `cgSize` (Rocq's `col_snap_shape`). -/
@@ -436,7 +436,7 @@ end Geom
 /-! ## 6b.  ONE INODE'S FOOTPRINT, AT THE UNIFORM SHARE -/
 
 section PhiAcc
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
+variable {GF : BundledGFunctors.{0}} [MachFixedGS GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- THE RECORD COMES DOWN TO THE COLLECTION'S SHARE AND THE QUARTER IS KEPT:
 the era's residue (the proxy, the abstract fragment) rides the closing

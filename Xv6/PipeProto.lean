@@ -136,7 +136,7 @@ theorem pipe_take_succ (L : List (BitVec 8)) (n : Nat) (h : n < L.length) :
   rfl
 
 section PipeProto
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF]
   [CtokG GF] [PipeProtoG GF]
 
 /-! ## 1.  The pieces -/
@@ -512,7 +512,7 @@ theorem pipeClink_of_invU (E : CoPset) (pn : PNames) (γp : PipeNames) (L : List
 /-- ...and that IS the registration (Rocq `pipe_reg_of_invU`). -/
 theorem pipeReg_of_invU (pn : PNames) (γp : PipeNames) (L : List (BitVec 8)) (U : IProp GF)
     [Timeless U] :
-    pipeInvU pn γp L U ⊢ pipeReg (hlc := hlc) γp := by
+    pipeInvU pn γp L U ⊢ pipeReg γp := by
   unfold pipeReg pipeCpay
   iintro #Hinv
   imodintro
@@ -522,7 +522,7 @@ theorem pipeReg_of_invU (pn : PNames) (γp : PipeNames) (L : List (BitVec 8)) (U
 
 /-- Rocq `pipe_reg_of_inv`. -/
 theorem pipeReg_of_inv (pn : PNames) (γp : PipeNames) (L : List (BitVec 8)) :
-    pipeInv (GF := GF) pn γp L ⊢ pipeReg (hlc := hlc) γp :=
+    pipeInv (GF := GF) pn γp L ⊢ pipeReg γp :=
   pipeReg_of_invU pn γp L iprop(True)
 
 /-! ## 4.  The writer's chain -/
@@ -695,7 +695,7 @@ theorem pipeWpay_of_inv (pn : PNames) (γp : PipeNames) (L : List (BitVec 8))
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (c n : Nat) (hle : c + n ≤ L.length)
     (hM : ∀ k : Nat, k < n → umemByte M (ua + BitVec.ofNat 64 k).toNat = L[c + k]!) :
     pipeInv (GF := GF) pn γp L ⊢ wcur pn c -∗ pwsLb pn (L.take c) -∗
-      pipeWpay (hlc := hlc) γp.pnQueue M ua (pipeWQ pn L c) (pipeWQe pn L c) n := by
+      pipeWpay γp.pnQueue M ua (pipeWQ pn L c) (pipeWQe pn L c) n := by
   unfold pipeWpay
   iintro #Hinv Hw #Hlb
   ileft
@@ -733,7 +733,7 @@ theorem pipeWpay_of_invU (pn : PNames) (γp : PipeNames) (L : List (BitVec 8)) (
     [Timeless U] (M : Nat → List (BitVec 8)) (ua : BitVec 64) (c n : Nat) (hle : c + n ≤ L.length)
     (hM : ∀ k : Nat, k < n → umemByte M (ua + BitVec.ofNat 64 k).toNat = L[c + k]!) :
     pipeInvU pn γp L U ⊢ □ U -∗ wcur pn c -∗ pwsLb pn (L.take c) -∗
-      pipeWpay (hlc := hlc) γp.pnQueue M ua (pipeWQ pn L c) (pipeWQe pn L c) n := by
+      pipeWpay γp.pnQueue M ua (pipeWQ pn L c) (pipeWQe pn L c) n := by
   unfold pipeWpay
   iintro #Hinv #HU Hw #Hlb
   ileft

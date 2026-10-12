@@ -13,13 +13,13 @@ open Iris.Std.PartialMap
 open Std (ExtTreeSet)
 
 section PseEntries
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF]
   [PipeOutG GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
   [DiskG GF] [EchoOutG GF] [PnsRegG GF] [PipesNG GF] [FileAppG GF]
-variable (X : PseCtx hlc GF)
+variable (X : PseCtx GF)
 
 /-- **Rocq `pse_grep_image_entry`**: A GREP STAGE (a middle grep, or any grep whose fd 2 is a lent console writer): the sink a parameter. -/
 theorem pse_grep_image_entry (wp : List (BitVec 8))
@@ -33,9 +33,9 @@ theorem pse_grep_image_entry (wp : List (BitVec 8))
     (hl1 : (sts.take NSTD)[1]? = some (.open rb1 true (pnsSinkTy sk)))
     (hl2 : (sts.take NSTD)[2]? = some (.open rb2 true (.device CONSOLE)))
     (hLg : grepOk X.R.L) (hnil : [] ∈ alts2) :
-    ⊢ urunNopipe (hlc := hlc) sts -∗ udep (hlc := hlc) -∗
+    ⊢ urunNopipe sts -∗ udep -∗
       imageEntry User.Grep.elf Mv (BitVec.ofNat 64 (t + 8)) sts cw seccAll cs pidv Q
-        (pnsCopyLend X.R w2 A2 alts2 pin gin (.FGrep wp) sk Q) (uslot (hlc := hlc)) := by
+        (pnsCopyLend X.R w2 A2 alts2 pin gin (.FGrep wp) sk Q) (uslot) := by
   let wv : Nat → Pdev := fun d => match d with | 0 => .PDCon w2 A2 | _ => .PDCopy (pin, gin) (.FGrep wp) sk
   let kds : List (Nat × Pdev) := [(0, .PDCon w2 A2), (1, .PDCopy (pin, gin) (.FGrep wp) sk)]
   have hc : Conforms (copyEnv (.DCopy (filtPf (.FGrep wp)) (pnsSinkH sk) [] X.R.L []) alts2 (fun _ => none) []) (grepTree (filtWords (.FGrep wp))) := grep_filter_conforms fdWGrep wp (pnsSinkH sk) X.R.L alts2 _ [] hLg hnil
@@ -76,9 +76,9 @@ theorem pse_grep_mid_image_entry (wp : List (BitVec 8))
     (hl1 : (sts.take NSTD)[1]? = some (.open rb1 true (.pipe gp)))
     (hl2 : (sts.take NSTD)[2]? = some (.open rb2 true (.device CONSOLE)))
     (hLg : grepOk X.R.L) (hnil : [] ∈ alts2) :
-    ⊢ urunNopipe (hlc := hlc) sts -∗ udep (hlc := hlc) -∗
+    ⊢ urunNopipe sts -∗ udep -∗
       imageEntry User.Grep.elf Mv (BitVec.ofNat 64 (t + 8)) sts cw seccAll cs pidv Q
-        (pnsCopyLend X.R w2 A2 alts2 pin gin (.FGrep wp) (.CSPipe pn gp) Q) (uslot (hlc := hlc)) :=
+        (pnsCopyLend X.R w2 A2 alts2 pin gin (.FGrep wp) (.CSPipe pn gp) Q) (uslot) :=
   pse_grep_image_entry X wp Me Mv sv t gn sts cw cs pidv Q w2 A2 alts2 (.CSPipe pn gp) pin gin wb rb1 rb2 hQc
     hok hag hnode hab hfdl hl0 hl1 hl2 hLg hnil
 
@@ -94,9 +94,9 @@ theorem pse_grep_last_image_entry (wp : List (BitVec 8))
     (hl1 : (sts.take NSTD)[1]? = some (.open rb1 true (.device CONSOLE)))
     (hl2 : (sts.take NSTD)[2]? = some (.open rb2 true (.device CONSOLE)))
     (hLg : grepOk X.R.L) :
-    ⊢ urunNopipe (hlc := hlc) sts -∗ udep (hlc := hlc) -∗
+    ⊢ urunNopipe sts -∗ udep -∗
       imageEntry User.Grep.elf Mv (BitVec.ofNat 64 (t + 8)) sts cw seccAll cs pidv Q
-        (pnsCopyLendM X.R pin gin (.FGrep wp) (.CSCon wL) Q) (uslot (hlc := hlc)) := by
+        (pnsCopyLendM X.R pin gin (.FGrep wp) (.CSCon wL) Q) (uslot) := by
   let wv : Nat → Pdev := fun d => match d with | 0 => .PDMute | _ => .PDCopy (pin, gin) (.FGrep wp) (.CSCon wL)
   let kds : List (Nat × Pdev) := [(0, .PDMute), (1, .PDCopy (pin, gin) (.FGrep wp) (.CSCon wL))]
   have hc : Conforms (copyEnv (.DCopy (filtPf (.FGrep wp)) (pnsSinkH (.CSCon wL)) [] X.R.L []) [[]] (fun _ => none) []) (grepTree (filtWords (.FGrep wp))) := grep_filter_conforms fdWGrep wp false X.R.L [[]] _ [] hLg (List.mem_singleton_self _)

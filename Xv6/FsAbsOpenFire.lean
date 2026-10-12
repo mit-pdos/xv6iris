@@ -173,7 +173,7 @@ with a nonzero count is LIVE by `FsAbsMknodFire.mkfEra_live` (Rocq's
 `opf_era_live`; deviation 3). -/
 
 section OpenFire
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [FsTopG GF] [FsBytesG GF]
 
 /-! ## 1.  Item 1: the walk premise -/
@@ -186,7 +186,7 @@ there -- same quantifier over the start, same start rule, same family over
 `FsAbsMknodFire.npStart_of_mknod`. -/
 theorem opfStart_of_open (γfs : FsNames) (rt cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
     (pl : List (BitVec 8)) :
-    nameiWalkPreEra (hlc := hlc) γfs rt cw P Pmiss ⊢ exStart (hlc := hlc) γfs rt cw P Pmiss pl := by
+    nameiWalkPreEra γfs rt cw P Pmiss ⊢ exStart γfs rt cw P Pmiss pl := by
   unfold nameiWalkPreEra exStart
   rw [exHops_is_axHops]
   iintro Hpre %r %hr
@@ -201,8 +201,8 @@ unlinked between namei and this lock. -/
 theorem opfOpen_fire [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (i : Nat) (n : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hnz : fnType n ≠ 0) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗
-      pfAt (aopenCommitAt (hlc := hlc) (fsGammaL γfs) appE) Fo -∗
+    ⊢@{IProp GF} ftopInv γfs -∗
+      pfAt (aopenCommitAt (fsGammaL γfs) appE) Fo -∗
       topFragQ (fsGammaL γfs) dq i n ={E}=∗
         topFragQ (fsGammaL γfs) dq i n ∗
         ∃ av : Aview, ⌜arowAt av i (absRow n)⌝ ∗ Fo.pfRecv av i (absRow n) := by
@@ -236,8 +236,8 @@ theorem opfOpen_fire [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
 theorem opfOpen_fire_1 [Icfg] (γfs : FsNames) (E : CoPset)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (i : Nat) (n : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hnz : fnType n ≠ 0) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗
-      pfAt (aopenCommitAt (hlc := hlc) (fsGammaL γfs) appE) Fo -∗
+    ⊢@{IProp GF} ftopInv γfs -∗
+      pfAt (aopenCommitAt (fsGammaL γfs) appE) Fo -∗
       topFrag (fsGammaL γfs) i n ={E}=∗
         topFrag (fsGammaL γfs) i n ∗
         ∃ av : Aview, ⌜arowAt av i (absRow n)⌝ ∗ Fo.pfRecv av i (absRow n) := by
@@ -260,11 +260,11 @@ theorem opfAtrunc_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hloc : InodeLocal i n')
     (hnz : fnType n ≠ 0) (habs : absRow n = ⟨.AFile bs0, nl⟩)
     (hnz' : fnType n' ≠ 0) (habs' : absRow n' = ⟨.AFile [], nl⟩) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
+    ⊢@{IProp GF} ftopInv γfs -∗ appInv γfs -∗
       -- THE PIECE ARRIVES KEYED AT THE INUM (Rocq lane F-OPEN-3): the permit
       -- was paid where what pays it was still in hand
       -- (`SysOpenDefs.openTruncAt`)
-      pfAt (atruncCommitI (hlc := hlc) (fsGammaL γfs) appE i) Ft -∗
+      pfAt (atruncCommitI (fsGammaL γfs) appE i) Ft -∗
       topFrag (fsGammaL γfs) i n ={E}=∗
         topFrag (fsGammaL γfs) i n' ∗
         ∃ av : Aview, ⌜arowAt av i ⟨.AFile bs0, nl⟩⌝ ∗ Ft.pfRecv av i bs0 := by

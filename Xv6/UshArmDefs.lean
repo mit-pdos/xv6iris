@@ -38,7 +38,7 @@ open LeanRV64D LeanRV64D.Functions
 open Std (ExtTreeSet)
 
 section UshArmDefs
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -46,15 +46,15 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [S
 
 /-- **Rocq `ush_cldep`**: the close deposit, at every record and every key. -/
 def ushCldep (st : FdState) : IProp GF :=
-  iprop(□ ∀ (N : UkNames GF) (m : RegMap) (pc : BitVec 64), udepwCl (hlc := hlc) N m pc st)
+  iprop(□ ∀ (N : UkNames GF) (m : RegMap) (pc : BitVec 64), udepwCl N m pc st)
 
-instance ushCldep_persistent (st : FdState) : Persistent (ushCldep (hlc := hlc) (GF := GF) st) := by
+instance ushCldep_persistent (st : FdState) : Persistent (ushCldep (GF := GF) st) := by
   unfold ushCldep; infer_instance
 
 /-- **Rocq `ush_cldep_nonpipe`**: at a stream that is not a pipe it is free
 (Rocq `udepw_cl_nonpipe`). -/
 theorem ushCldep_nonpipe (st : FdState) (hnp : ∀ (rb wb : Bool) (gp : PipeNames), st ≠ .open rb wb (.pipe gp)) :
-    ⊢ ushCldep (hlc := hlc) (GF := GF) st := by
+    ⊢ ushCldep (GF := GF) st := by
   unfold ushCldep
   imodintro
   iintro %N %m %pc
@@ -74,15 +74,15 @@ def ushWait0Law (N : UkNames GF) (Wr : IProp GF)
     ushCode N.t -∗
     uinstrIs N.t (BitVec.ofNat 64 pc0) true (.ITYPE (0#12, .Regidx 0#5, .Regidx 10#5, .ADDI)) -∗
     uinstrIs N.t (BitVec.ofNat 64 pc1) false (.JAL (imm, .Regidx 1#5)) -∗
-    urun (hlc := hlc) N h m (BitVec.ofNat 64 pc0) avail -∗ uch N.ch Sc -∗ Wr -∗
+    urun N h m (BitVec.ofNat 64 pc0) avail -∗ uch N.ch Sc -∗ Wr -∗
     (∀ (h' : CPU) (m' : RegMap) (rw : BitVec 64) (Sc' : ExtTreeSet GName compare),
-      ⌜ucalleeSaved m m'⌝ -∗ Pw rw Sc Sc' -∗ urun (hlc := hlc) N h' m' (BitVec.ofNat 64 ret) avail -∗
+      ⌜ucalleeSaved m m'⌝ -∗ Pw rw Sc Sc' -∗ urun N h' m' (BitVec.ofNat 64 ret) avail -∗
       uch N.ch Sc' -∗ Wr -∗ wpLoop h') -∗
     wpLoop h)
 
 instance ushWait0Law_persistent (N : UkNames GF) (Wr : IProp GF)
     (Pw : BitVec 64 → ExtTreeSet GName compare → ExtTreeSet GName compare → IProp GF) :
-    Persistent (ushWait0Law (hlc := hlc) N Wr Pw) := by
+    Persistent (ushWait0Law N Wr Pw) := by
   unfold ushWait0Law; infer_instance
 
 /-- **Rocq `ush_wait_pid_ans`**: the pid reading of a reap. -/
@@ -100,7 +100,7 @@ def ushPipeAns (N : UkNames GF) (dst : Nat) (l : List FdState) (R : PipeNames �
       ubytes N.d dst 4 (nthByte (n := 4) (BitVec.ofNat 32 a)) ∗
       ubytes N.d (dst + 4) 4 (nthByte (n := 4) (BitVec.ofNat 32 b)) ∗
       ustd N.fd l ∗ ufd N.fd a (.open true false (.pipe γp)) ∗ ufd N.fd b (.open false true (.pipe γp)) ∗
-      ushCldep (hlc := hlc) (.open true false (.pipe γp)) ∗ ushCldep (hlc := hlc) (.open false true (.pipe γp)) ∗
+      ushCldep (.open true false (.pipe γp)) ∗ ushCldep (.open false true (.pipe γp)) ∗
       R γp) ∨
     (⌜r = -1#64⌝ ∗ (∃ f : Nat → BitVec 8, ubytes N.d dst 8 f) ∗ ustd N.fd l))
 
@@ -108,9 +108,9 @@ def ushPipeAns (N : UkNames GF) (dst : Nat) (l : List FdState) (R : PipeNames �
 def ushPipeCall (N : UkNames GF) (l : List FdState) (R : PipeNames → IProp GF) : IProp GF :=
   iprop(∀ (h : CPU) (m : RegMap) (av dst : Nat) (f : Nat → BitVec 8),
     ⌜(m.get 10#5).toNat = dst⌝ -∗ ushCode N.t -∗ ustd N.fd l -∗ ubytes N.d dst 8 f -∗
-    urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«pipe») av -∗
+    urun N h m (BitVec.ofNat 64 User.Sh.Sym.«pipe») av -∗
     (∀ (h' : CPU) (m' : RegMap) (r : BitVec 64), ⌜ucalleeSaved m m'⌝ -∗ ⌜m'.get 10#5 = r⌝ -∗
-      ushPipeAns N dst l R r -∗ urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) av -∗ wpLoop h') -∗
+      ushPipeAns N dst l R r -∗ urun N h' m' (retPc (m.get 1#5)) av -∗ wpLoop h') -∗
     wpLoop h)
 
 /-! ## What a `fork1` answers (Rocq `UkShPipe` §4a) -/
@@ -139,9 +139,9 @@ def ushOpenCallG (N : UkNames GF) (cwdv : Nat) (file : UArg) (mode : Int) (l : L
   iprop(∀ (h : CPU) (m : RegMap) (av : Nat),
     ⌜m.get 10#5 = BitVec.ofNat 64 file.ptr⌝ -∗ ⌜m.get 11#5 = BitVec.ofInt 64 mode⌝ -∗
     ushStr N.d file -∗ H -∗ ushCode N.t -∗ ucwd N.cwd cwdv -∗ ustd N.fd l -∗
-    urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«open») av -∗
+    urun N h m (BitVec.ofNat 64 User.Sh.Sym.«open») av -∗
     (∀ (h' : CPU) (m' : RegMap) (r : BitVec 64), ⌜ucalleeSaved m m'⌝ -∗ ⌜m'.get 10#5 = r⌝ -∗
-      ucwd N.cwd cwdv -∗ ushOpenAnsG N l K Kf r -∗ urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) av -∗
+      ucwd N.cwd cwdv -∗ ushOpenAnsG N l K Kf r -∗ urun N h' m' (retPc (m.get 1#5)) av -∗
       wpLoop h') -∗
     wpLoop h)
 

@@ -177,7 +177,7 @@ def walkNeed (L : Nat) : Nat :=
   | _ + 1 => iputUnits + 1
 
 section Post
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF]
@@ -221,11 +221,11 @@ end Post
 
 /-- **WP of `namex(path = a0, nameiparent = a1, name = a2)`, the set-form
 contract at either entry `SIE`** (Rocq's `wp_namex_gen_body`). -/
-def wp_namex_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+def wp_namex_gen_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γkl : GName) (γk : KmemNames)
     (plen : Nat) (pfun nfun : Nat → BitVec 8) (npar : Bool) (n : Nat) (Sb : List Nat)
@@ -260,8 +260,8 @@ def wp_namex_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
   -- ---- THE ICACHE'S PERSISTENT SET (the FAMILIES: namex's slots are
   -- dirlookup's outputs and cannot be named in advance) ----
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗ icSleeplocks fscIc ∗
-  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
+  itableInv ∗ icSleeplocks fscIc ∗
+  iregInv fscIreg fscFs icfgIst icfgNib ∗
   -- ...AND THE SEALED REGIME (RULING B/G): iput's free path freezes
   iregOpen ∗
   -- ---- iput's / itrunc's own resources ----
@@ -292,18 +292,18 @@ def wp_namex_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc G
 /-- The interface of `namex` (Rocq's `Module Type NAMEX`, its `wp_namex_gen`
 field; the counted `wp_namex_sconf` is dropped, see the header). -/
 structure NAMEX : Prop where
-  wp_namex_gen_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  wp_namex_gen_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (γkl : GName) (γk : KmemNames)
     (plen : Nat) (pfun nfun : Nat → BitVec 8) (npar : Bool) (n : Nat) (Sb : List Nat)
     (pidv : BitVec 32) (cwdv : BitVec 64) (cwi : Nat) (dqp dqc dqb dqs dqpv : DFrac)
     (rootv : BitVec 64) (rti : Nat) (dqr : DFrac)
     hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud hnpar hpd,
-    wp_namex_gen_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j γkl γk plen pfun nfun
+    wp_namex_gen_eb_body (GF := GF) Γ cpu k γl pd pav pu j γkl γk plen pfun nfun
       npar n Sb pidv cwdv cwi dqp dqc dqb dqs dqpv rootv rti dqr
       hj hproc hK hnoff htier hroot hnib0 hgeom hbg hbel hireg hnn hterm hplen hbud hnpar hpd
 

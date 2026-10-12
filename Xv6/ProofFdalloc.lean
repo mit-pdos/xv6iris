@@ -193,7 +193,7 @@ theorem fda_a2'' (pa : BitVec 64) (fd : Nat) :
 /-! ## Context shapes -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
 
 /-! ## The callee -/
 
@@ -205,7 +205,7 @@ theorem fda_myproc (MP : MYPROC) (c : CPU) (k' : KCtx)
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.proc⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := MP.wp_myproc (hlc := hlc) (GF := GF) c k' hnoff hK
+  have h := MP.wp_myproc (GF := GF) c k' hnoff hK
   unfold wp_myproc_body at h
   simp only [myprocAddr] at h
   exact h
@@ -489,7 +489,7 @@ theorem fdalloc_br_ffffffffffffcc58 : KA.«fdalloc» + 0xffffffffffffcc58#64 = K
 
 set_option maxHeartbeats 16000000 in
 theorem fdalloc_proof (MP : MYPROC) : FDALLOC := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k γ γd kk fs D ha0 hkk hnoff hK => by
+  fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k γ γd kk fs D ha0 hkk hnoff hK => by
   unfold wp_fdalloc_body
   simp only [fdallocAddr]
   iintro ⟨Hk, Hpc, Howe, Hnext⟩

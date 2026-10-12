@@ -89,7 +89,7 @@ theorem ushExecPinProg_of_grep (hg : kexecLoadable User.Grep.elf) : UshExecPinPr
 /-! ## 2. The ingredients -- `UShEcho.sh_echo_slot` at /cat -/
 
 section UshCatPay
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
@@ -97,33 +97,33 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fs
 /-- **Rocq `sh_cat_slot`**: the file system's invariant, /cat's pin (or the
 taint) at every running view, and the generic taint continuation. -/
 def shCatSlot (T : IProp GF) : IProp GF :=
-  iprop(appInv (hlc := hlc) fscFs ∗
+  iprop(appInv fscFs ∗
     □ (∀ v : Aview, appPred appRun v -∗ appPred appRun v ∗ (⌜era0CatPins v⌝ ∨ T)) ∗
-    □ (∀ (R : IProp GF) (W : Uvis), T -∗ myPay W.gen (fun _ => R) -∗ □ (uKillCred (hlc := hlc) -∗ R) -∗
-        uslot (hlc := hlc) W))
+    □ (∀ (R : IProp GF) (W : Uvis), T -∗ myPay W.gen (fun _ => R) -∗ □ (uKillCred -∗ R) -∗
+        uslot W))
 
 /-- `sh_cat_slot` IS `sh_pin_slot` at /cat's pin (the landed field
 `UshExecPinEcho.sh_cat_slot_unfold`). -/
 theorem shCatSlot_unfold (T : IProp GF) :
-    shCatSlot (hlc := hlc) T ⊣⊢ shPinSlot (hlc := hlc) era0CatPins T := .rfl
+    shCatSlot T ⊣⊢ shPinSlot era0CatPins T := .rfl
 
 /-- **Rocq `sh_cat_slot_of_fs_pure`**: THE ONE SEAM A PIPELINE ERA HAS TO
 MEET -- the slot at the WHOLE of `FileFsPure.file_fs_pure`. -/
 def shCatSlotOfFsPure (T : IProp GF) : IProp GF :=
-  iprop(appInv (hlc := hlc) fscFs ∗
+  iprop(appInv fscFs ∗
     □ (∀ v : Aview, appPred appRun v -∗ appPred appRun v ∗ (⌜fileFsPure v⌝ ∨ T)) ∗
-    □ (∀ (R : IProp GF) (W : Uvis), T -∗ myPay W.gen (fun _ => R) -∗ □ (uKillCred (hlc := hlc) -∗ R) -∗
-        uslot (hlc := hlc) W))
+    □ (∀ (R : IProp GF) (W : Uvis), T -∗ myPay W.gen (fun _ => R) -∗ □ (uKillCred -∗ R) -∗
+        uslot W))
 
 /-- `sh_cat_slot_of_fs_pure` IS `sh_pin_slot` at `fileFsPure` (the landed
 field `UshExecPinEcho.sh_cat_slot_of_fs_pure_unfold`). -/
 theorem shCatSlotOfFsPure_unfold (T : IProp GF) :
-    shCatSlotOfFsPure (hlc := hlc) T ⊣⊢ shPinSlot (hlc := hlc) fileFsPure T := .rfl
+    shCatSlotOfFsPure T ⊣⊢ shPinSlot fileFsPure T := .rfl
 
 /-- **Rocq `sh_cat_slot_of_fs_pure_holds`** (deviation 2): the projection
 under the law's own box. -/
 theorem shCatSlotOfFsPure_holds (T : IProp GF) :
-    ⊢ shCatSlotOfFsPure (hlc := hlc) T -∗ shCatSlot (hlc := hlc) T :=
+    ⊢ shCatSlotOfFsPure T -∗ shCatSlot T :=
   shPinSlot_mono fileFsPure era0CatPins T fileFsPure_cat
 
 end UshCatPay

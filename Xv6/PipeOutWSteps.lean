@@ -28,17 +28,17 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 set_option synthInstance.maxSize 1024
 
 section PipesWildSteps
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [PipeOutG GF]
 
-theorem pwclV_unfold (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)
+theorem pwclV_unfold (g : PipeGn) (M : LModel) (G : GenCparams GF M) (sd : M.lmSt)
     (WA : GenWa M G sd) (WL : M.lmLine → Bool) (k : Nat) (ho : List Obs) (H : ConsHist) :
     pwclV g M G sd WA WL k ho H ⊢
       iprop(G.gcT ∨ (∃ v : EraPins, G.gcPIN k v ∗ seccFlag v 0 ∗ peclV g M G sd WA k ho H)
         ∨ wildV M G sd WA WL k ho H) := by
   unfold pwclV; exact .rfl
 
-theorem pwclV_wild (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)
+theorem pwclV_wild (g : PipeGn) (M : LModel) (G : GenCparams GF M) (sd : M.lmSt)
     (WA : GenWa M G sd) (WL : M.lmLine → Bool) (k : Nat) (ho : List Obs) (H : ConsHist) :
     wildV M G sd WA WL k ho H ⊢ pwclV g M G sd WA WL k ho H := by
   unfold pwclV
@@ -48,7 +48,7 @@ theorem pwclV_wild (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.l
 /-! ## The writes -/
 
 /-- (H) THE ERA'S HEAD WRITE (Rocq `pwclV_step_write_first`). -/
-theorem pwclV_step_write_first (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)
+theorem pwclV_step_write_first (g : PipeGn) (M : LModel) (G : GenCparams GF M) (sd : M.lmSt)
     (WA : GenWa M G sd) (WL : M.lmLine → Bool) (HWL : ∀ l, WL l = true → lmWild M l)
     (k : Nat) (v : EraPins) (a : Nat) (b : BitVec 8) (s0 : M.lmSt) (ho : List Obs) (H : ConsHist)
     (hfok : M.lmStOk s0) (halt : a < proAlts.length) (hhead : (proAlts[a]!)[0]? = some b) :
@@ -77,7 +77,7 @@ theorem pwclV_step_write_first (g : PipeGn) (M : LModel) (G : GenCparams hlc GF 
     omega
 
 /-- (W) A BYTE INSIDE A BLOCK OR A PROLOGUE ROUND (Rocq `pwclV_step_write`). -/
-theorem pwclV_step_write (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)
+theorem pwclV_step_write (g : PipeGn) (M : LModel) (G : GenCparams GF M) (sd : M.lmSt)
     (WA : GenWa M G sd) (WL : M.lmLine → Bool) (HWL : ∀ l, WL l = true → lmWild M l)
     (k : Nat) (v : EraPins) (P : Nat) (b : BitVec 8) (ps0 cs0 : List Nat) (s0 : M.lmSt)
     (I0 : List (BitVec 8)) (ho : List Obs) (H : ConsHist)
@@ -113,7 +113,7 @@ theorem pwclV_step_write (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd
 
 /-- (B) A BLOCK'S FIRST BYTE, at a line that is NOT wild (Rocq
 `pwclV_step_write_blk`). -/
-theorem pwclV_step_write_blk (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M)
+theorem pwclV_step_write_blk (g : PipeGn) (M : LModel) (G : GenCparams GF M) (B : LmByteLaws M)
     (sd : M.lmSt) (WA : GenWa M G sd) (WL : M.lmLine → Bool) (HWL : ∀ l, WL l = true → lmWild M l)
     (k : Nat) (v : EraPins) (P a : Nat) (b : BitVec 8) (ps0 cs0 : List Nat) (s0 : M.lmSt)
     (I0 : List (BitVec 8)) (ho : List Obs) (H : ConsHist)
@@ -167,7 +167,7 @@ theorem pwclV_step_write_blk (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M)
     cases hnw
 
 /-- (P) A PROLOGUE ROUND'S CHOICE BYTE (Rocq `pwclV_step_write_pro`). -/
-theorem pwclV_step_write_pro (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)
+theorem pwclV_step_write_pro (g : PipeGn) (M : LModel) (G : GenCparams GF M) (sd : M.lmSt)
     (WA : GenWa M G sd) (WL : M.lmLine → Bool) (HWL : ∀ l, WL l = true → lmWild M l)
     (k : Nat) (v : EraPins) (P a : Nat) (b : BitVec 8) (ps0 cs0 : List Nat) (s0 : M.lmSt)
     (I0 : List (BitVec 8)) (ho : List Obs) (CH : ConsHist)
@@ -212,7 +212,7 @@ theorem pwclV_step_write_pro (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M)
 
 /-- a further byte of an open round: the arm keeps the pipe ledger's whole
 cursor, which no half survives (Rocq `wild_cur_refute`) -/
-theorem wildCur_refute (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)
+theorem wildCur_refute (g : PipeGn) (M : LModel) (G : GenCparams GF M) (sd : M.lmSt)
     (WA : GenWa M G sd) (WL : M.lmLine → Bool) (hext : ∀ k l, WA.gext k l = pext g k l)
     (k : Nat) (ho : List Obs) (H : ConsHist) (w : PipeEra) (r : Nat) (gb : GName) (tm : Bool) :
     ⊢ wildV M G sd WA WL k ho H -∗ peraPin g k w -∗ curHalf w (1 : Qp).half r gb tm -∗ False := by
@@ -230,7 +230,7 @@ theorem wildCur_refute (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd :
 /-- a block's first byte at a line that is not wild: below the wild line
 the cursor refutes it, and the wild line is the arm's own (Rocq
 `wild_blk_refute`) -/
-theorem wildBlk_refute (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) (WA : GenWa M G sd)
+theorem wildBlk_refute (M : LModel) (G : GenCparams GF M) (sd : M.lmSt) (WA : GenWa M G sd)
     (WL : M.lmLine → Bool) (HWL : ∀ l, WL l = true → lmWild M l)
     (k : Nat) (ho : List Obs) (H : ConsHist) (v : EraPins) (ps cs : List Nat) (s0 : M.lmSt)
     (I : List (BitVec 8)) (P : Nat) (hwb : wrBlkV M ps cs s0 I P) (hnw : WL (lineV M I) = false) :
@@ -257,7 +257,7 @@ theorem wildBlk_refute (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt) (WA 
 
 /-- THE CLAIM PAYS THE FAMILY'S ONE OBLIGATION, at a line that is not wild
 (Rocq `pwclV_ecl_holds`). -/
-theorem pwclV_ecl_holds (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)
+theorem pwclV_ecl_holds (g : PipeGn) (M : LModel) (G : GenCparams GF M) (sd : M.lmSt)
     (WA : GenWa M G sd) (hext : ∀ k l, WA.gext k l = pext g k l)
     (WL : M.lmLine → Bool) (HWL : ∀ l, WL l = true → lmWild M l)
     (v : EraPins) (I : List (BitVec 8)) (sR : M.lmSt) (hnw : WL (lineV M I) = false)
@@ -301,7 +301,7 @@ theorem pwclV_ecl_holds (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd 
 
 /-- THE FILING at the credential: a block the family wrote (Rocq
 `pwclV_blk_file`). -/
-theorem pwclV_blk_file (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M)
+theorem pwclV_blk_file (g : PipeGn) (M : LModel) (G : GenCparams GF M) (B : LmByteLaws M)
     (sd : M.lmSt) (WA : GenWa M G sd) (hext : ∀ k l, WA.gext k l = pext g k l)
     (WL : M.lmLine → Bool)
     (V : PView M) (v : EraPins) (I : List (BitVec 8)) (sR : M.lmSt) (lR : Pline') (k : Nat)
@@ -342,7 +342,7 @@ theorem pwclV_blk_file (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B : 
 
 /-- ...and the EMPTY block: a pipeline line is not wild (Rocq
 `pwclV_blk_file_empty`). -/
-theorem pwclV_blk_file_empty (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M)
+theorem pwclV_blk_file_empty (g : PipeGn) (M : LModel) (G : GenCparams GF M)
     (B : LmByteLaws M) (sd : M.lmSt) (WA : GenWa M G sd) (WL : M.lmLine → Bool)
     (HWL : ∀ l, WL l = true → lmWild M l)
     (V : PView M) (v : EraPins) (I : List (BitVec 8)) (sR : M.lmSt) (lR : Pline') (k : Nat)
@@ -386,7 +386,7 @@ theorem pwclV_blk_file_empty (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M)
 
 /-- THE WILD LICENCE (Rocq `pwclV_wild_lic`): the token moves the claim by
 any process event. -/
-theorem pwclV_wild_lic (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (B : LmByteLaws M)
+theorem pwclV_wild_lic (g : PipeGn) (M : LModel) (G : GenCparams GF M) (B : LmByteLaws M)
     (sd : M.lmSt) (WA : GenWa M G sd) (WL : M.lmLine → Bool) (k : Nat) :
     ⊢ seccTok G.gcPIN k -∗
       □ ∀ (h : List Obs) (H : ConsHist) (ev : ConsEv),

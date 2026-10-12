@@ -62,7 +62,7 @@ theorem ulibWords_close10 (L : UlibRun GF) (s : Nat) :
   iapply (ulibWords_zero L s).2
   iempintro
 
-theorem wp_ulibFprintf_gen {hlc : HasLC} [MachGS hlc GF] (L : UlibRunP GF) (base : BitVec 64) (a : Nat)
+theorem wp_ulibFprintf_gen [MachGS GF] (L : UlibRunP GF) (base : BitVec 64) (a : Nat)
     (m : RegMap) (n : Nat) (R : IProp GF) : wp_ulibFprintf_gen_body L base a m n R := by
   intro hb ha
   unfold ulibFprintfAt
@@ -181,14 +181,14 @@ theorem wp_ulibFprintf_gen {hlc : HasLC} [MachGS hlc GF] (L : UlibRunP GF) (base
     · exact hne _ (Or.inr (Or.inr (Or.inl rfl)))
     · exact hne _ (Or.inr (Or.inr (Or.inr ⟨h1, h2⟩)))
 
-theorem wp_ulibFprintf {hlc : HasLC} [MachGS hlc GF] (V : ULIB_VPRINTF) (L : UlibRunP GF) (base : BitVec 64)
+theorem wp_ulibFprintf [MachGS GF] (V : ULIB_VPRINTF) (L : UlibRunP GF) (base : BitVec 64)
     (a len : Nat) (f : Nat → BitVec 8) (m : RegMap) (n : Nat) (Ci Co : IProp GF) :
     wp_ulibFprintf_body L base a len f m n Ci Co := by
   intro hb hbnd hlen hpct ha
   iintro Hpay #Hpc #Hvc #Hfc #Hs HCi Hrun Hk
-  iapply (wp_ulibFprintf_gen (hlc := hlc) L base a m n Co hb ha) $$ Hfc [Hpay HCi] Hrun Hk
+  iapply (wp_ulibFprintf_gen L base a m n Co hb ha) $$ Hfc [Hpay HCi] Hrun Hk
   iintro %m' %h11 %h12 %h1 %h10 W6 Hrun Hk'
-  iapply (V.wp_ulibVprintf (hlc := hlc) L base a len f m' n Ci Co hb hbnd hlen hpct h11)
+  iapply (V.wp_ulibVprintf L base a len f m' n Ci Co hb hbnd hlen hpct h11)
     $$ [Hpay] Hpc Hvc Hs HCi Hrun [Hk' W6]
   · rw [h10]; iexact Hpay
   iintro %m'' %hcs HCo
@@ -196,7 +196,7 @@ theorem wp_ulibFprintf {hlc : HasLC} [MachGS hlc GF] (V : ULIB_VPRINTF) (L : Uli
   iintro Hrun
   iapply Hk' $$ %m'' %hcs W6 HCo Hrun
 
-theorem wp_ulibFprintfSG {hlc : HasLC} [MachGS hlc GF] (V : ULIB_VPRINTF) (L : UlibRunP GF) (base : BitVec 64)
+theorem wp_ulibFprintfSG [MachGS GF] (V : ULIB_VPRINTF) (L : UlibRunP GF) (base : BitVec 64)
     (a len q : Nat) (f : Nat → BitVec 8) (sdq : DFrac) (sa slen : Nat) (sf : Nat → BitVec 8) (m : RegMap)
     (n : Nat) (Ci Cm1 Cm2 Co : IProp GF) :
     wp_ulibFprintfSG_body L base a len q f sdq sa slen sf m n Ci Cm1 Cm2 Co := by
@@ -204,12 +204,12 @@ theorem wp_ulibFprintfSG {hlc : HasLC} [MachGS hlc GF] (V : ULIB_VPRINTF) (L : U
   iintro Hpay1 Hpay2 Hpay3 #Hpc #Hvc #Hfc #Hs Hsstr HCi Hrun Hk
   ihave %hst : ⌜(m 2#5).toNat % 8 = 0 ∧ 8 * (10 + (12 + (4 + n))) ≤ (m 2#5).toNat⌝ $$ [Hrun]
   · iapply L.urun_stack; iexact Hrun
-  iapply (wp_ulibFprintf_gen (hlc := hlc) L base a m n iprop(ulibStr L sdq sa slen sf ∗ Co) hb ha1)
+  iapply (wp_ulibFprintf_gen L base a m n iprop(ulibStr L sdq sa slen sf ∗ Co) hb ha1)
     $$ Hfc [Hpay1 Hpay2 Hpay3 HCi Hsstr] Hrun [Hk]
   · iintro %m' %h11 %h12 %h1 %h10 W6 Hrun Hk'
     rw [ha2]
     icases (L.uword_own _ _).1 $$ W6 with W6
-    iapply (V.wp_ulibVprintfSG (hlc := hlc) L base a len q f ((m 2#5).toNat - 48) sa (DFrac.own 1) sdq slen sf
+    iapply (V.wp_ulibVprintfSG L base a len q f ((m 2#5).toNat - 48) sa (DFrac.own 1) sdq slen sf
       m' n Ci Cm1 Cm2 Co hb hbnd hq2 hfq hfsq hpct hc1d hc1u hc1x hc2set (by omega) hsanz h11 h12)
       $$ [Hpay1] [Hpay2] [Hpay3] Hpc Hvc Hs W6 Hsstr HCi Hrun [Hk']
     · rw [h10]; iexact Hpay1
@@ -225,12 +225,12 @@ theorem wp_ulibFprintfSG {hlc : HasLC} [MachGS hlc GF] (V : ULIB_VPRINTF) (L : U
     iapply Hk $$ %m' Hsstr %hcs HCo Hrun
 
 /-- The `DFrac.discard` instance, the string dropped. -/
-theorem wp_ulibFprintfS {hlc : HasLC} [MachGS hlc GF] (V : ULIB_VPRINTF) (L : UlibRunP GF) (base : BitVec 64)
+theorem wp_ulibFprintfS [MachGS GF] (V : ULIB_VPRINTF) (L : UlibRunP GF) (base : BitVec 64)
     (a len q : Nat) (f : Nat → BitVec 8) (sa slen : Nat) (sf : Nat → BitVec 8) (m : RegMap) (n : Nat)
     (Ci Cm1 Cm2 Co : IProp GF) : wp_ulibFprintfS_body L base a len q f sa slen sf m n Ci Cm1 Cm2 Co := by
   intro hb hbnd hq2 hfq hfsq hpct hc1d hc1u hc1x hc2set hsanz ha1 ha2
   iintro Hpay1 Hpay2 Hpay3 Hpc Hvc Hfc Hs Hsstr HCi Hrun Hk
-  iapply (wp_ulibFprintfSG (hlc := hlc) V L base a len q f DFrac.discard sa slen sf m n Ci Cm1 Cm2 Co
+  iapply (wp_ulibFprintfSG V L base a len q f DFrac.discard sa slen sf m n Ci Cm1 Cm2 Co
     hb hbnd hq2 hfq hfsq hpct hc1d hc1u hc1x hc2set hsanz ha1 ha2)
     $$ Hpay1 Hpay2 Hpay3 Hpc Hvc Hfc Hs Hsstr HCi Hrun
   iintro %m' - %hcs HCo Hrun
@@ -240,11 +240,11 @@ end
 
 /-- **`fprintf` holds at every load address**, given `vprintf`'s contract. -/
 theorem ulibFprintf_holds (V : ULIB_VPRINTF) : ULIB_FPRINTF :=
-  ⟨fun L base a m n R => wp_ulibFprintf_gen (hlc := _) L base a m n R,
-   fun L base a len f m n Ci Co => wp_ulibFprintf (hlc := _) V L base a len f m n Ci Co,
+  ⟨fun L base a m n R => wp_ulibFprintf_gen L base a m n R,
+   fun L base a len f m n Ci Co => wp_ulibFprintf V L base a len f m n Ci Co,
    fun L base a len q f sa slen sf m n Ci Cm1 Cm2 Co =>
-    wp_ulibFprintfS (hlc := _) V L base a len q f sa slen sf m n Ci Cm1 Cm2 Co,
+    wp_ulibFprintfS V L base a len q f sa slen sf m n Ci Cm1 Cm2 Co,
    fun L base a len q f sdq sa slen sf m n Ci Cm1 Cm2 Co =>
-    wp_ulibFprintfSG (hlc := _) V L base a len q f sdq sa slen sf m n Ci Cm1 Cm2 Co⟩
+    wp_ulibFprintfSG V L base a len q f sdq sa slen sf m n Ci Cm1 Cm2 Co⟩
 
 end Xv6

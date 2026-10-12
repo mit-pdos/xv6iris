@@ -24,7 +24,7 @@ open LeanRV64D
 def mycpuAddr : BitVec 64 := KA.«mycpu»
 
 /-- **WP of `mycpu`.**  Two stack slots; returns `&cpus[hartid]` in `a0`. -/
-def wp_mycpu_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx] {lent : Bool}
+def wp_mycpu_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx] {lent : Bool}
     (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (hK : 2 ≤ k.avail) : Prop :=
   kctxL lent cpu k ∗ pcIs cpu mycpuAddr ∗
   (∀ R' : RegMap, kctxL lent cpu (k.withRegs R') -∗ pcIs cpu (jumpPc (k.regs 1#5)) -∗
@@ -34,7 +34,7 @@ def wp_mycpu_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Cur
 /-- The interface of `mycpu` (generic in `lent`: push_off calls it with the
 `c->intena` cell lent out). -/
 structure MYCPU : Prop where
-  wp_mycpu : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx] {lent : Bool} (cpu : CPU) (k : KCtx)
-    hsie hK, wp_mycpu_body (hlc := hlc) (GF := GF) (lent := lent) cpu k hsie hK
+  wp_mycpu : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx] {lent : Bool} (cpu : CPU) (k : KCtx)
+    hsie hK, wp_mycpu_body (GF := GF) (lent := lent) cpu k hsie hK
 
 end Xv6

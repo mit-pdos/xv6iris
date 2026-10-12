@@ -19,7 +19,7 @@ open HfpFileClaimsP UkFileOpen UkFileDev
 open Std (ExtTreeSet)
 
 section Read
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
@@ -49,17 +49,17 @@ theorem fdev_ufd_key_agree (N : UkNames GF) (fd : Nat) (st : FdState) (v0 : BitV
 /-- **Rocq `file_read_at`**: `ei_read` at a HELD descriptor on the deed's
 inum, at any handle `D` naming its state. -/
 theorem file_read_at (UL : UK_LEAVES) (c : FileFixed) (r : FileAppNames) (sf : Dst)
-    (nm : Fname) (heq : fileAppIs (hlc := hlc) (GF := GF) c r) (N : UkNames GF) (Pr : Uprog GF) (STB : FdevStubs (hlc := hlc) N Pr) (D : IProp GF) (fd : Nat) (wb : Bool)
+    (nm : Fname) (heq : fileAppIs (GF := GF) c r) (N : UkNames GF) (Pr : Uprog GF) (STB : FdevStubs N Pr) (D : IProp GF) (fd : Nat) (wb : Bool)
     (i : Nat) (γo : GName) (q : Qp) (jo : Option Nat) (content S : List (BitVec 8)) (n : Nat)
     (K : RdAns → IProp GF) (hfd : fd < NOFILE) (hn : 0 < n)
     (hag : ∀ (v0 : BitVec 64) (fdv : List FdState), (BitVec.setWidth 32 v0).toInt = (fd : Int) →
       ⊢ ufdAuth N.fd fdv -∗ D -∗ ⌜fdStOfKey v0 fdv = .open true wb (.inode i γo .held)⌝) :
-    ⊢ □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ fileTaint (hlc := hlc) c) -∗
-      □ (fileTaint (hlc := hlc) c -∗ MachFixedGS.killCred (hlc := hlc) (GF := GF)) -∗
-      fileConsCred (hlc := hlc) c r jo -∗ appInv (hlc := hlc) fscFs -∗ D -∗ fileIn sf nm r i γo q content S -∗
+    ⊢ □ (MachFixedGS.killCred (GF := GF) -∗ fileTaint c) -∗
+      □ (fileTaint c -∗ MachFixedGS.killCred (GF := GF)) -∗
+      fileConsCred c r jo -∗ appInv fscFs -∗ D -∗ fileIn sf nm r i γo q content S -∗
       ((∀ (cb S' : Bytes), ⌜chunkOk n S cb S'⌝ -∗ D -∗ fileIn sf nm r i γo q content S' -∗ K (.RdBytes cb)) ∧
-        (∀ (x : RdAns), fileTaint (hlc := hlc) c -∗ D -∗ fileIn sf nm r i γo q content S -∗ K x)) -∗
-      rdObl (hlc := hlc) N Pr (fd : Int) n K := by
+        (∀ (x : RdAns), fileTaint c -∗ D -∗ fileIn sf nm r i γo q content S -∗ K x)) -∗
+      rdObl N Pr (fd : Int) n K := by
   unfold rdObl
   iintro #Hbr #Hrb #Hm #Hinv Hh Hin HK %h %m %avail %a %f %ha0 %ha1 %ha2 Hcode Hbuf Hrun Hcont
   unfold fileIn
@@ -127,34 +127,34 @@ theorem file_read_at (UL : UK_LEAVES) (c : FileFixed) (r : FileAppNames) (sf : D
 
 /-- **Rocq `file_read`**: ...at the tail handle. -/
 theorem file_read (UL : UK_LEAVES) (c : FileFixed) (r : FileAppNames) (sf : Dst) (nm : Fname)
-    (heq : fileAppIs (hlc := hlc) (GF := GF) c r) (N : UkNames GF) (Pr : Uprog GF) (STB : FdevStubs (hlc := hlc) N Pr) (fd : Nat) (wb : Bool) (i : Nat) (γo : GName)
+    (heq : fileAppIs (GF := GF) c r) (N : UkNames GF) (Pr : Uprog GF) (STB : FdevStubs N Pr) (fd : Nat) (wb : Bool) (i : Nat) (γo : GName)
     (q : Qp) (jo : Option Nat) (content S : List (BitVec 8)) (n : Nat) (K : RdAns → IProp GF)
     (hfd : fd < NOFILE) (hn : 0 < n) :
-    ⊢ □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ fileTaint (hlc := hlc) c) -∗
-      □ (fileTaint (hlc := hlc) c -∗ MachFixedGS.killCred (hlc := hlc) (GF := GF)) -∗
-      fileConsCred (hlc := hlc) c r jo -∗ appInv (hlc := hlc) fscFs -∗ ufd N.fd fd (.open true wb (.inode i γo .held)) -∗
+    ⊢ □ (MachFixedGS.killCred (GF := GF) -∗ fileTaint c) -∗
+      □ (fileTaint c -∗ MachFixedGS.killCred (GF := GF)) -∗
+      fileConsCred c r jo -∗ appInv fscFs -∗ ufd N.fd fd (.open true wb (.inode i γo .held)) -∗
       fileIn sf nm r i γo q content S -∗
       ((∀ (cb S' : Bytes), ⌜chunkOk n S cb S'⌝ -∗ ufd N.fd fd (.open true wb (.inode i γo .held)) -∗
           fileIn sf nm r i γo q content S' -∗ K (.RdBytes cb)) ∧
-        (∀ (x : RdAns), fileTaint (hlc := hlc) c -∗ ufd N.fd fd (.open true wb (.inode i γo .held)) -∗
+        (∀ (x : RdAns), fileTaint c -∗ ufd N.fd fd (.open true wb (.inode i γo .held)) -∗
           fileIn sf nm r i γo q content S -∗ K x)) -∗
-      rdObl (hlc := hlc) N Pr (fd : Int) n K :=
+      rdObl N Pr (fd : Int) n K :=
   file_read_at UL c r sf nm heq N Pr STB _ fd wb i γo q jo content S n K hfd hn
     (fun v0 fdv h0 => fdev_ufd_key_agree N fd _ v0 fdv h0 hfd)
 
 /-- **Rocq `file_read_std`**: ...at a STANDARD slot the ledger names. -/
 theorem file_read_std (UL : UK_LEAVES) (c : FileFixed) (r : FileAppNames) (sf : Dst)
-    (nm : Fname) (heq : fileAppIs (hlc := hlc) (GF := GF) c r) (N : UkNames GF) (Pr : Uprog GF) (STB : FdevStubs (hlc := hlc) N Pr) (fd : Nat) (l : List FdState)
+    (nm : Fname) (heq : fileAppIs (GF := GF) c r) (N : UkNames GF) (Pr : Uprog GF) (STB : FdevStubs N Pr) (fd : Nat) (l : List FdState)
     (wb : Bool) (i : Nat) (γo : GName) (q : Qp) (jo : Option Nat) (content S : List (BitVec 8)) (n : Nat)
     (K : RdAns → IProp GF) (hs : fd < NSTD) (hl : l[fd]? = some (.open true wb (.inode i γo .held)))
     (hn : 0 < n) :
-    ⊢ □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ fileTaint (hlc := hlc) c) -∗
-      □ (fileTaint (hlc := hlc) c -∗ MachFixedGS.killCred (hlc := hlc) (GF := GF)) -∗
-      fileConsCred (hlc := hlc) c r jo -∗ appInv (hlc := hlc) fscFs -∗ ustd N.fd l -∗ fileIn sf nm r i γo q content S -∗
+    ⊢ □ (MachFixedGS.killCred (GF := GF) -∗ fileTaint c) -∗
+      □ (fileTaint c -∗ MachFixedGS.killCred (GF := GF)) -∗
+      fileConsCred c r jo -∗ appInv fscFs -∗ ustd N.fd l -∗ fileIn sf nm r i γo q content S -∗
       ((∀ (cb S' : Bytes), ⌜chunkOk n S cb S'⌝ -∗ ustd N.fd l -∗ fileIn sf nm r i γo q content S' -∗
           K (.RdBytes cb)) ∧
-        (∀ (x : RdAns), fileTaint (hlc := hlc) c -∗ ustd N.fd l -∗ fileIn sf nm r i γo q content S -∗ K x)) -∗
-      rdObl (hlc := hlc) N Pr (fd : Int) n K :=
+        (∀ (x : RdAns), fileTaint c -∗ ustd N.fd l -∗ fileIn sf nm r i γo q content S -∗ K x)) -∗
+      rdObl N Pr (fd : Int) n K :=
   file_read_at UL c r sf nm heq N Pr STB _ fd wb i γo q jo content S n K
     (Nat.lt_of_lt_of_le hs NSTD_le_NOFILE) hn
     (fun v0 fdv h0 => fdev_ustd_key_agree N l fd _ v0 fdv h0 hs hl)

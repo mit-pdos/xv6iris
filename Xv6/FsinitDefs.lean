@@ -39,18 +39,18 @@ them too. -/
 /-- The crash rows `initlog` consumes beyond the seam and the certificate:
 the era's born-true mirror, the file system's law minus block 1's park, and
 the byte view's row named at `Xv`. -/
-def fsinitCrash {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+def fsinitCrash {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF] [DiskG GF] [FsBlocksG GF]
     [LogG GF] [FsLinkG GF] [FsTopG GF] [Fscfg] [Icfg] [CurCtx]
     (M : LogMirror) (sbrec : FsSb) (Xv : Nat → List (BitVec 8)) : IProp GF :=
-  iprop(logMirrorBorn (hlc := hlc) M ∗
-    □ (sbPark fscFs sbrec -∗ snapLaw (hlc := hlc) icfgLog fscFs fscCov fscLogst
-        (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF))) ∗
+  iprop(logMirrorBorn M ∗
+    □ (sbPark fscFs sbrec -∗ snapLaw icfgLog fscFs fscCov fscLogst
+        (eraSyncTok (GF := GF)) (genId (GF := GF))) ∗
     -- the ghost commit's hooked law and the crash invariant it opens (Rocq
     -- sync K3-3), both parked into `logCtx` by initlog
-    □ (sbPark fscFs sbrec -∗ snapLawGhost (hlc := hlc) icfgLog fscFs fscCov fscLogst
-        (eraSyncTok (hlc := hlc) (GF := GF)) (genId (hlc := hlc) (GF := GF)) (eraSyncHook (hlc := hlc) (GF := GF))) ∗
-    crashInv (hlc := hlc) (GF := GF) ∗
+    □ (sbPark fscFs sbrec -∗ snapLawGhost icfgLog fscFs fscCov fscLogst
+        (eraSyncTok (GF := GF)) (genId (GF := GF)) (eraSyncHook (GF := GF))) ∗
+    crashInv (GF := GF) ∗
     fsBytesInv fscFs.bytes fscFs.cache fscFs.exc (fsHomeList fscCov fscLogst) Xv)
 
 /-- ...and their pure side, what `initlog` asks beside them: (g') the era's
@@ -114,7 +114,7 @@ theorem fsinit_sb_align (i : Nat) (hi : i < 8) : (KA.«sb» + BitVec.ofNat 64 (4
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- One word off the front of a window. -/
 theorem fsinit_word_cons (a : BitVec 64) (w : BitVec 32) (rest : List (BitVec 8))
@@ -204,7 +204,7 @@ end
 /-! ## The buffer's data window, and the `readsb` crossing -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [CurCtx]
 
 /-- `b->data` is `b + 88`: the address `addi a1,a0,88` at `+0x1a` computes. -/
@@ -262,7 +262,7 @@ end
 /-! ## The boot dirty map, as the pure fact initlog consumes -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsBlocksG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsBlocksG GF]
 
 /-- Rocq's `initlog_dirty_all_false`: every covered block's pin half is
 `false`, so the authority says so too. -/

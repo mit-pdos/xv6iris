@@ -382,7 +382,7 @@ class LogG (GF : BundledGFunctors.{0}) where
 attribute [reducible, instance] LogG.gmOps LogG.gmLg LogG.gmHelp
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [LogG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [LogG GF]
 
 /-! ## The two client-side fragments
 
@@ -535,12 +535,12 @@ def logFreeTok (γ : LogNames) : IProp GF := iprop%
   -- ...and THE ERA'S SYNC TOKEN, the application's opaque slot of the fixed
   -- record (`MachFixedGS.syncTok`).  Its birth is the era's mint, which hands
   -- it here; `initlog` seals it into the first `logResAt` (sync K3-2/K3-3).
-  eraSyncTok (hlc := hlc) (GF := GF)
+  eraSyncTok (GF := GF)
 
 /-- Rocq's `log_ghost_alloc`: mint all six names at their genesis values, the
 era's sync token handed in. -/
 theorem logGhostAlloc :
-    eraSyncTok (hlc := hlc) (GF := GF) ⊢ |==> (∃ γ : LogNames, logFreeTok (GF := GF) γ) := by
+    eraSyncTok (GF := GF) ⊢ |==> (∃ γ : LogNames, logFreeTok (GF := GF) γ) := by
   iintro Hstok
   imod (lockGhostAlloc (GF := GF)) with ⟨%γlk, Hl⟩
   imod (ghost_map_alloc_empty (GF := GF) (K := Nat) (V := OpEntry) (H := RegMapF))

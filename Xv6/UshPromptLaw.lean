@@ -39,24 +39,24 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
 section UshPromptLaw
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
 /-- **Rocq `UShKernel.sh_prompt_law`** (deviation 1): the prompt's law at
 every record whose credential family is `Wc`, given sh's own .rodata. -/
 def shPromptLaw (Wc : List (BitVec 8) → Nat → IProp GF) : IProp GF :=
-  iprop(□ ∀ (N : UkNames GF) (X : UshCtx GF), ⌜X.Wc = Wc⌝ -∗ ushCode N.t -∗ ushPromptLaw (hlc := hlc) N X)
+  iprop(□ ∀ (N : UkNames GF) (X : UshCtx GF), ⌜X.Wc = Wc⌝ -∗ ushCode N.t -∗ ushPromptLaw N X)
 
 /-- **Rocq `sh_prompt_law_persistent`**. -/
 instance shPromptLaw_persistent (Wc : List (BitVec 8) → Nat → IProp GF) :
-    Persistent (shPromptLaw (hlc := hlc) Wc) := by
+    Persistent (shPromptLaw Wc) := by
   unfold shPromptLaw; infer_instance
 
 /-- The law at a record, as a consumer spends it. -/
 theorem shPromptLaw_at (Wc : List (BitVec 8) → Nat → IProp GF) (N : UkNames GF) (X : UshCtx GF)
     (hX : X.Wc = Wc) :
-    ⊢ shPromptLaw (hlc := hlc) Wc -∗ ushCode N.t -∗ ushPromptLaw (hlc := hlc) N X := by
+    ⊢ shPromptLaw Wc -∗ ushCode N.t -∗ ushPromptLaw N X := by
   iintro #H #Hc
   unfold shPromptLaw
   iapply H $$ %N %X %hX Hc
@@ -64,8 +64,8 @@ theorem shPromptLaw_at (Wc : List (BitVec 8) → Nat → IProp GF) (N : UkNames 
 /-- THE BRIDGE to `UshKernelSlot.shUexecSlot` / `shSlotOfKexec`, which take
 the law at one context `X`, unfolded: `□ (∀ N, ushCode N.t -∗ ushPromptLaw N X)`. -/
 theorem shPromptLaw_forall (Wc : List (BitVec 8) → Nat → IProp GF) (X : UshCtx GF) (hX : X.Wc = Wc) :
-    ⊢ shPromptLaw (hlc := hlc) Wc -∗
-      □ (∀ N : UkNames GF, ushCode N.t -∗ ushPromptLaw (hlc := hlc) N X) := by
+    ⊢ shPromptLaw Wc -∗
+      □ (∀ N : UkNames GF, ushCode N.t -∗ ushPromptLaw N X) := by
   iintro #H
   imodintro
   iintro %N #Hc

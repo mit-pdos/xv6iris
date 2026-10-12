@@ -86,8 +86,8 @@ def consReadRet (d : Nat) (r : BitVec 64) : Prop :=
 complement `trapCsrsExt` / `cpuClaimExt` in and out; depth 0; the crossing
 the literal `true` (it parks).  `a0 = user_dst` (nonzero), `a1 = dst`,
 `a2 = n`. -/
-def wp_consoleread_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+def wp_consoleread_eb_body {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γc : GName) (cn : ConsNames) (Wd : IProp GF) (ord : Option Nat)
     (Rin : List (List Obs × BitVec 8) → IProp GF)
     (γkl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
@@ -99,7 +99,7 @@ def wp_consoleread_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc
   kctx cpu k ∗ pcIs cpu consolereadAddr ∗ procsInv Γ ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
   isConslock cn Wd γc ∗ consPay cn Wd ord ∗
-  consReadPay (genId (hlc := hlc) (GF := GF) + 1) Rin ∗ uartInv .uart0 cn.uart ∗
+  consReadPay (genId (GF := GF) + 1) Rin ∗ uartInv .uart0 cn.uart ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
   procPrivBareAt curCtx (procAddr j) pid V M ∗ genHalvesPriv (procAddr j) pid V.gen ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
@@ -113,7 +113,7 @@ def wp_consoleread_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc
       consTagged bs hs d⌝ -∗
     -- ...AND A NEGATIVE ANSWER IS A KILL: the incarnation's one-shot
     (⌜R' 10#5 = -1#64⌝ -∗ killShot V.gen) -∗
-    ([∗list] h ∈ hs, MachFixedGS.rxTag (hlc := hlc) (GF := GF) h) -∗
+    ([∗list] h ∈ hs, MachFixedGS.rxTag (GF := GF) h) -∗
     consStoredLb cn sl -∗
     ((⌜consWindow sl cur d bs hs⌝ ∗ ⌜consChain sl⌝ ∗
        consSwallow cn (¬ uvaWmapped V.upt ((k.regs 11#5) + BitVec.ofNat 64 d).toNat) sl d dc ∗
@@ -138,13 +138,13 @@ def wp_consoleread_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc
 
 /-- The interface of `consoleread`. -/
 structure CONSOLEREAD : Prop where
-  wp_consoleread_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+  wp_consoleread_eb : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (γc : GName) (cn : ConsNames) (Wd : IProp GF) (ord : Option Nat)
     (Rin : List (List Obs × BitVec 8) → IProp GF)
     (γkl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) hj hproc hK hnoff htier huser hn hn',
-    wp_consoleread_eb_body (hlc := hlc) (GF := GF) Γ cpu k γc cn Wd ord Rin γkl γk j pid V M n hj hproc hK
+    wp_consoleread_eb_body (GF := GF) Γ cpu k γc cn Wd ord Rin γkl γk j pid V M n hj hproc hK
       hnoff htier huser hn hn'
 
 end Xv6

@@ -64,7 +64,7 @@ set_option linter.unusedSimpArgs false
 set_option maxHeartbeats 16000000 in
 theorem fileclose_proof (AC : ACQUIRE) (RE : RELEASE) (PC : PIPECLOSE) (BO : BEGIN_OP)
     (IP : IPUT) (EO : END_OP) : FILECLOSE := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γ kk q st j γkl γk on pidv dqp
+  fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γ kk q st j γkl γk on pidv dqp
       Φc ke hK hnoff htier ha0 => by
   unfold wp_fileclose_eb_body
   simp only [filecloseAddr]

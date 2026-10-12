@@ -14,14 +14,14 @@ open HfpFileClaimsP UkFileOpen
 open Std (ExtTreeSet)
 
 section Calls
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 namespace UkFileOpen
-variable (FO : HfpFileOpenP (hlc := hlc) (GF := GF))
-  (SYS : UkFileOpenSysP (hlc := hlc) (GF := GF))
+variable (FO : HfpFileOpenP (GF := GF))
+  (SYS : UkFileOpenSysP (GF := GF))
 
 include FO SYS in
 /-- **Rocq `wp_uk_ecall_open_create_deed_v`**: close-then-open `f` at 0x601
@@ -31,20 +31,20 @@ FROM THE DEED -- the escrow is parked here and closed by the receipt reader;
 theorem wp_uk_ecall_open_create_deed_v (N : UkNames GF) (omo : OffMode) (h : CPU) (m : RegMap) (pc : BitVec 64)
     (l : List FdState) (avail : Nat) (c : FileFixed) (r : FileAppNames) (jo : Option Nat) (Nf : Fname) (s : Dst)
     (np : Nat) (ls : List FlLine) (ws : Wordline) (cw : Nat) (Img : ElfMem) (pv : Nat) (pl : List (BitVec 8))
-    (hNf : uname Nf) (heq : fileAppIs (hlc := hlc) (GF := GF) c r) (hn : UkSysP.usysno m = USYS_open)
+    (hNf : uname Nf) (heq : fileAppIs (GF := GF) c r) (hn : UkSysP.usysno m = USYS_open)
     (hal : (pc + 4#64) &&& 1#64 = 0#64) (hpath : ∀ Mv, imgAgrees Img Mv → argPathOf Mv pv pl)
     (ha0 : (m.get 10#5).toNat = pv) (hcr : omCreate (m.get 11#5) = true) (htr : omTrunc (m.get 11#5) = true)
     (hnp : npElems pl = []) (hst : ∀ rt, umStartOf rt cw pl = ROOTINO) (hlast : (pathElems pl).getLast? = some Nf)
     (hlst : ls.getLast? = some (Uline.LEchoF ws Nf)) (hnpl : np = ls.length) (hok : lineOk ws) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ uimgView N Img -∗ urun (hlc := hlc) N h m pc avail -∗
-      ucwd N.cwd cw -∗ ustd N.fd l -∗ appInv (hlc := hlc) fscFs -∗ fileConsCred (hlc := hlc) c r jo -∗ flLb c ls -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ uimgView N Img -∗ urun N h m pc avail -∗
+      ucwd N.cwd cw -∗ ustd N.fd l -∗ appInv fscFs -∗ fileConsCred c r jo -∗ flLb c ls -∗
       fown r s -∗ fpos r np -∗
       (∀ (h' : CPU) (rv : BitVec 64),
-        ((⌜rv = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ ustd N.fd l ∗ fileOpenPay (hlc := hlc) c r Nf s np) ∨
+        ((⌜rv = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ ustd N.fd l ∗ fileOpenPay c r Nf s np) ∨
           (∃ (fd : Nat) (ty : FdType), ⌜rv = BitVec.ofNat 64 fd ∧ fd < NOFILE⌝ ∗
             ualloc N.fd l fd (.open (omReadable (m.get 11#5)) (omWritable (m.get 11#5)) ty) ∗
             redirK omo c r Nf s np ty)) -∗
-        ucwd N.cwd cw -∗ urun (hlc := hlc) N h' (ukWr m 10#5 rv) (pc + 4#64) avail -∗ wpLoop h') -∗
+        ucwd N.cwd cw -∗ urun N h' (ukWr m 10#5 rv) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi #Hro Hrun Hcwd Hstd #Hinv #Hm #Hlb Hown Hpos Hcont
   iapply wpLoop_fupd
@@ -98,21 +98,21 @@ half, discarded. -/
 theorem wp_uk_ecall_open_create_deed_d (N : UkNames GF) (omo : OffMode) (h : CPU) (m : RegMap) (pc : BitVec 64)
     (l : List FdState) (avail : Nat) (c : FileFixed) (r : FileAppNames) (jo : Option Nat) (Nf : Fname) (s : Dst)
     (np : Nat) (ls : List FlLine) (ws : Wordline) (cw : Nat) (Img : ElfMem) (pv : Nat) (pl : List (BitVec 8))
-    (hNf : uname Nf) (heq : fileAppIs (hlc := hlc) (GF := GF) c r) (hn : UkSysP.usysno m = USYS_open)
+    (hNf : uname Nf) (heq : fileAppIs (GF := GF) c r) (hn : UkSysP.usysno m = USYS_open)
     (hal : (pc + 4#64) &&& 1#64 = 0#64) (hpath : ∀ Mv, imgAgrees Img Mv → argPathOf Mv pv pl)
     (ha0 : (m.get 10#5).toNat = pv) (hcr : omCreate (m.get 11#5) = true) (htr : omTrunc (m.get 11#5) = true)
     (hnp : npElems pl = []) (hst : ∀ rt, umStartOf rt cw pl = ROOTINO) (hlast : (pathElems pl).getLast? = some Nf)
     (hlst : ls.getLast? = some (Uline.LEchoF ws Nf)) (hnpl : np = ls.length) (hok : lineOk ws)
     (R : IProp GF) (hdata : R ⊢ uimgView N Img) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ R -∗ urun (hlc := hlc) N h m pc avail -∗
-      ucwd N.cwd cw -∗ ustd N.fd l -∗ appInv (hlc := hlc) fscFs -∗ fileConsCred (hlc := hlc) c r jo -∗ flLb c ls -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ R -∗ urun N h m pc avail -∗
+      ucwd N.cwd cw -∗ ustd N.fd l -∗ appInv fscFs -∗ fileConsCred c r jo -∗ flLb c ls -∗
       fown r s -∗ fpos r np -∗
       (∀ (h' : CPU) (rv : BitVec 64),
-        ((⌜rv = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ ustd N.fd l ∗ fileOpenPay (hlc := hlc) c r Nf s np) ∨
+        ((⌜rv = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ ustd N.fd l ∗ fileOpenPay c r Nf s np) ∨
           (∃ (fd : Nat) (ty : FdType), ⌜rv = BitVec.ofNat 64 fd ∧ fd < NOFILE⌝ ∗
             ualloc N.fd l fd (.open (omReadable (m.get 11#5)) (omWritable (m.get 11#5)) ty) ∗
             redirK omo c r Nf s np ty)) -∗
-        ucwd N.cwd cw -∗ urun (hlc := hlc) N h' (ukWr m 10#5 rv) (pc + 4#64) avail -∗ wpLoop h') -∗
+        ucwd N.cwd cw -∗ urun N h' (ukWr m 10#5 rv) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hdi Hrun Hcwd Hstd #Hinv #Hm #Hlb Hown Hpos Hcont
   iapply wp_uk_ecall_open_create_deed_v FO SYS N omo h m pc l avail c r jo Nf s np ls ws cw Img pv pl hNf heq

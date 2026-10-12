@@ -56,7 +56,7 @@ reached -- `fdev_signed_small`, `fdev_m1`, `fdev_cint_lt`,
 
 1. The section variables `c r sf nm Heq N P` and the stub laws are explicit
    arguments (the program instance is `Pr`);
-   `Heq` is `fileAppIs (hlc := hlc) (GF := GF) c r`.  The deposit instance is the xv6 one
+   `Heq` is `fileAppIs (GF := GF) c r`.  The deposit instance is the xv6 one
    (`UkFileOpenDefs` deviation 1): row 16's `sbundle_at_write_intro_at` /
    `spost_at_write_elim_at` (UkWriteLeaf, landed) are specialised here to
    the key's own words (`sbundleAt_write_intro`, `spostAt_write_elim`), at every page view
@@ -179,7 +179,7 @@ end UkFileDev
 open UkFileDev
 
 section Defs
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
@@ -187,10 +187,10 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fs
 /-- **Rocq's section hypotheses `Hsr Hsw Hso Hsc`**: the program's four stub
 laws. -/
 structure FdevStubs (N : UkNames GF) (Pr : Uprog GF) : Prop where
-  sr : ⊢ stubLaw (hlc := hlc) N Pr.code 5 Pr.read
-  sw : ⊢ stubLaw (hlc := hlc) N Pr.code 16 Pr.write
-  so : ⊢ stubLaw (hlc := hlc) N Pr.code 15 Pr.open
-  sc : ⊢ stubLaw (hlc := hlc) N Pr.code 21 Pr.close
+  sr : ⊢ stubLaw N Pr.code 5 Pr.read
+  sw : ⊢ stubLaw N Pr.code 16 Pr.write
+  so : ⊢ stubLaw N Pr.code 15 Pr.open
+  sc : ⊢ stubLaw N Pr.code 21 Pr.close
 
 /-- **The kernel leaves UkFileDev calls beyond UkFileOpen's, a parameter**
 (run-sys lane; Rocq's statements, deviation 3). -/
@@ -202,31 +202,31 @@ structure UkFileDevSysP : Prop where
     (∀ fdv : List FdState, ⊢ ufdAuth N.fd fdv -∗ D -∗ ⌜K fdv⌝) →
     (∀ (M : ElfMem) (pmv : Nat → Option UPerm) (sz : Nat), uszOk sz →
       ⊢ uheap N.t N.d N.s M pmv sz -∗ S -∗ ⌜usrcOk M pmv sz (m.get 11#5) nb f⌝) →
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
-      udepwfK (hlc := hlc) N m pc 16 fdep K -∗ D -∗ S -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗
+      udepwfK N m pc 16 fdep K -∗ D -∗ S -∗
       (∀ (h' : CPU) (r : BitVec 64) (W : Uvis) (cw' : Nat) (cs' : ExtTreeSet GName compare),
         ⌜tfW W.tf (tfArgIdx 0) = m.get 10#5⌝ -∗ ⌜tfW W.tf (tfArgIdx 1) = m.get 11#5⌝ -∗
         ⌜tfW W.tf (tfArgIdx 2) = m.get 12#5⌝ -∗ ⌜K W.fd⌝ -∗ ⌜W.lazy = false⌝ -∗
         ⌜usrcOk W.M W.perm W.sz (m.get 11#5) nb f⌝ -∗ D -∗ S -∗
-        UexecSG.spostAt (self := uexecSGXv6 (hlc := hlc)) (uslot (hlc := hlc)) 16 fdep W r W.M W.fd cw' cs' -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        UexecSG.spostAt (self := uexecSGXv6) (uslot) 16 fdep W r W.M W.fd cw' cs' -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h
   /-- Rocq `UkRunSys.wp_uk_ecall_close` at a non-pipe handle (deviation 3) -/
   close : ∀ (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (fd : Nat) (st : FdState) (avail : Nat),
     UkSysP.usysno m = USYS_close → (BitVec.setWidth 32 (m.get 10#5)).toInt = (fd : Int) →
     (pc + 4#64) &&& 1#64 = 0#64 → fdstNopipe st →
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗ ufd N.fd fd st -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗ ufd N.fd fd st -∗
       (∀ (h' : CPU) (r : BitVec 64), ⌜r.toNat = 0⌝ -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h
   /-- Rocq `UkRunSys.wp_uk_ecall_close_std` at a non-pipe slot (deviation 3) -/
   closeStd : ∀ (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (l : List FdState) (fd : Nat)
       (st : FdState) (avail : Nat),
     UkSysP.usysno m = USYS_close → (BitVec.setWidth 32 (m.get 10#5)).toInt = (fd : Int) → fd < NSTD →
     l[fd]? = some st → st ≠ .closed → (pc + 4#64) &&& 1#64 = 0#64 → fdstNopipe st →
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗ ustd N.fd l -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗ ustd N.fd l -∗
       (∀ (h' : CPU) (r : BitVec 64), ⌜r.toNat = 0⌝ -∗ ustd N.fd (l.set fd .closed) -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h
 
 namespace UkFileDev
@@ -243,7 +243,7 @@ def fileIn (sf : Dst) (nm : Fname) (r : FileAppNames) (i : Nat) (γo : GName) (q
 below `b` decided. -/
 def fileOut (c : FileFixed) (r : FileAppNames) (sf : Dst) (nm : Fname) (i : Nat) (γo : GName) (ws : Wordline)
     (b : Nat) : IProp GF :=
-  efany (hlc := hlc) c r nm sf i γo ws b
+  efany c r nm sf i γo ws b
 
 end UkFileDev
 
@@ -254,7 +254,7 @@ namespace UkFileDev
 /-- **Rocq `fdev_ubytes_bnd`**. -/
 theorem fdev_ubytes_bnd (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail : Nat) (dq : DFrac)
     (a n : Nat) (f : Nat → BitVec 8) (hn : 0 < n) :
-    ⊢ urun (hlc := hlc) N h m pc avail -∗ ubytesq N.d dq a n f -∗ ⌜a < 2 ^ 38⌝ := by
+    ⊢ urun N h m pc avail -∗ ubytesq N.d dq a n f -∗ ⌜a < 2 ^ 38⌝ := by
   iintro Hrun Hbs
   ihave %hb := urun_ubytes_bnd N h m pc avail dq a n f hn $$ Hrun Hbs
   ipureintro; omega
@@ -262,7 +262,7 @@ theorem fdev_ubytes_bnd (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64)
 /-- a text byte the program owns is below MAXVA -/
 theorem fdev_utext_bnd (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail : Nat) (a : Nat)
     (b : BitVec 8) :
-    ⊢ urun (hlc := hlc) N h m pc avail -∗ utext N.t a b -∗ ⌜a < 2 ^ 38⌝ := by
+    ⊢ urun N h m pc avail -∗ utext N.t a b -∗ ⌜a < 2 ^ 38⌝ := by
   unfold urun
   iintro ⟨%xi, %C, %pt, %Rfd, %Rut, %sz, %M, %pm, %fdv, %cw, %gn, %cs, %pidv, -, -, -, -, -, Hh, -⟩ Hb
   ihave %hb := uheap_text N.t N.d N.s M pm sz a b $$ Hh Hb
@@ -271,7 +271,7 @@ theorem fdev_utext_bnd (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) 
 /-- **Rocq `fdev_src_bnd`**. -/
 theorem fdev_src_bnd (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail : Nat) (tx : Bool)
     (dq : DFrac) (ua n : Nat) (f : Nat → BitVec 8) (hn : 0 < n) :
-    ⊢ urun (hlc := hlc) N h m pc avail -∗ usrcAt N tx dq ua n f -∗ ⌜ua < 2 ^ 38⌝ := by
+    ⊢ urun N h m pc avail -∗ usrcAt N tx dq ua n f -∗ ⌜ua < 2 ^ 38⌝ := by
   unfold usrcAt
   cases tx with
   | true =>
@@ -289,7 +289,7 @@ theorem fdev_src_bnd (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (a
 /-- **Rocq `fdev_path_bnd`**. -/
 theorem fdev_path_bnd (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail : Nat) (tx : Bool)
     (pv n : Nat) (f : Nat → BitVec 8) (hn : 0 < n) :
-    ⊢ urun (hlc := hlc) N h m pc avail -∗ upathAt N tx pv n f -∗ ⌜pv < 2 ^ 38⌝ := by
+    ⊢ urun N h m pc avail -∗ upathAt N tx pv n f -∗ ⌜pv < 2 ^ 38⌝ := by
   unfold upathAt
   cases tx with
   | true =>

@@ -42,7 +42,7 @@ theorem ireclaim_ientry_beq (k : Nat) (hk : k < NINODE) :
   exact beq_eq_false_iff_ne.mpr (ientry_ne_zero k (Nat.le_of_lt hk))
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF]
@@ -62,7 +62,7 @@ set_option maxHeartbeats 16000000 in
 `ireclaim_orphan_b`. -/
 theorem ireclaim_orphan (PK : PRINTK) (BE : BRELSE) (IG : IGET) (BO : BEGIN_OP) (IL : ILOCK)
     (IU : IUNLOCK) (IP : IPUT) (EO : END_OP) [Fscfg] [Icfg] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx)
+    (Γ : SchedNames) [ClaimIs GF Γ] (cpu : CPU) (k : KCtx)
     (spie spp : Bool) (R : RegMap) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (pidv : BitVec 32) (dqp dqb dqs dqn : DFrac) (n : Nat)
     (kk : Nat) (ds : List Dinode) (bsd : List (BitVec 8)) (d : Bool)
@@ -79,10 +79,10 @@ theorem ireclaim_orphan (PK : PRINTK) (BE : BRELSE) (IG : IGET) (BO : BEGIN_OP) 
     (htnz : ds[islot (BitVec.ofNat 32 n)]!.diType.toNat ≠ 0)
     (IH : n + 1 < fscNinodes → ∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap),
       ireclaimLoopRegs k (n + 1) R' →
-      ireclaimLoopPre (hlc := hlc) Γ c' k spie' spp' R' γl pd pav pu pidv dqp dqb dqs dqn ⊢
+      ireclaimLoopPre Γ c' k spie' spp' R' γl pd pav pu pidv dqp dqb dqs dqn ⊢
         wpLoop (GF := GF) c') :
     kctx cpu (((k.withSpie spie spp).pushed 8).withRegs R) ∗ pcIs cpu (KA.«ireclaim» + 0x38#64) ∗
-    ireclaimEnv (hlc := hlc) Γ γl pd pav pu ∗ ireclaimTurn cpu k pidv dqp dqb dqs dqn ∗
+    ireclaimEnv Γ γl pd pav pu ∗ ireclaimTurn cpu k pidv dqp dqb dqs dqn ∗
     bslots 2 ∗
     bioLocked fscBio (fsView fscFs fscDisk icfgDev fscCov) kk pidv icfgDev
       (BitVec.ofNat 32 (IBLOCK (BitVec.ofNat 32 n) icfgIst)) (diblkBytes ds) bsd d ∗
@@ -111,7 +111,7 @@ theorem ireclaim_orphan (PK : PRINTK) (BE : BRELSE) (IG : IGET) (BO : BEGIN_OP) 
   icases Henv with ⟨#Hpe, #Hpi, #Hbc, #Hdc, #Hlc, #Hinv, #Hit2, #Hiti, #Hslks, #Hbmi, #Hseam, #Hcert⟩
   unfold ireclaimTurn
   icases Hturn with ⟨Hte, Hce, Hsn, Hsi, Hsb, Hpid, Hframe, Hnext⟩
-  ihave #Hreg := iregInv_reg (hlc := hlc) fscIreg fscFs icfgIst icfgNib $$ Hinv
+  ihave #Hreg := iregInv_reg fscIreg fscFs icfgIst icfgNib $$ Hinv
   ihave #Hseal := logCtx_seal icfgLog fscBio fscFs fscCov fscLogst icfgDev $$ Hlc
   -- THE LICENCE (e): the block's client half out of the held buffer, and the
   -- boot token lent beside it
@@ -194,7 +194,7 @@ theorem ireclaim_orphan (PK : PRINTK) (BE : BRELSE) (IG : IGET) (BO : BEGIN_OP) 
   k_next_e
   iintro %spie2 %spp2 %R2 %hsp2 Hk Hpc %hcs2 %kslot %q %hkq Hrefb Hname
   k_norm_g [ireclaim_ret_48, hww, hpsw]
-  icases ireclaim_refb_buf (hlc := hlc) (IBLOCK inum icfgIst) ds kslot q icfgDev inum $$ Hrefb
+  icases ireclaim_refb_buf (IBLOCK inum icfgIst) ds kslot q icfgDev inum $$ Hrefb
     with ⟨Href, Hru⟩
   unfold iname fsChalf
   icases Hname with ⟨HL, -, -, -, Hboot, -⟩

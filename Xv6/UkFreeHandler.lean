@@ -70,7 +70,7 @@ open Std (ExtTreeSet)
 namespace UkSysP
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -82,11 +82,11 @@ def wpUkEcallRead : Prop :=
     m.get 11#5 = BitVec.ofNat 64 a →
     (BitVec.setWidth 32 (m.get 12#5)).toInt = (cnt : Int) →
     (pc + 4#64) &&& 1#64 = 0#64 →
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ ubytes N.d a cnt f -∗ urun (hlc := hlc) N h m pc avail -∗
-      udepw (hlc := hlc) N m pc USYS_read -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ ubytes N.d a cnt f -∗ urun N h m pc avail -∗
+      udepw N m pc USYS_read -∗
       (∀ (h' : CPU) (r : BitVec 64) (g : Nat → BitVec 8),
         ⌜r.toInt = -1 ∨ (0 ≤ r.toInt ∧ r.toInt ≤ (cnt : Int))⌝ -∗ ubytes N.d a cnt g -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h
 
 /-- **Rocq `wp_uk_ecall_close_std`**: a standard slot the ledger names open
@@ -98,10 +98,10 @@ def wpUkEcallCloseStd : Prop :=
     (BitVec.setWidth 32 (m.get 10#5)).toInt = (fd : Int) →
     fd < NSTD → l[fd]? = some st → st ≠ .closed →
     (pc + 4#64) &&& 1#64 = 0#64 →
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
-      udepw (hlc := hlc) N m pc USYS_close -∗ ustd N.fd l -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗
+      udepw N m pc USYS_close -∗ ustd N.fd l -∗
       (∀ (h' : CPU) (r : BitVec 64), ⌜r.toNat = 0⌝ -∗ ustd N.fd (l.set fd .closed) -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h
 
 /-- **Rocq `wp_uk_ecall_close`**: a tail handle (deviation 1: pre-K4
@@ -111,10 +111,10 @@ def wpUkEcallClose : Prop :=
     usysno m = USYS_close →
     (BitVec.setWidth 32 (m.get 10#5)).toInt = (fd : Int) →
     (pc + 4#64) &&& 1#64 = 0#64 →
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
-      udepw (hlc := hlc) N m pc USYS_close -∗ ufd N.fd fd st -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗
+      udepw N m pc USYS_close -∗ ufd N.fd fd st -∗
       (∀ (h' : CPU) (r : BitVec 64), ⌜r.toNat = 0⌝ -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h
 
 end
@@ -124,15 +124,15 @@ end UkSysP
 /-- **The rows the free handler takes beyond `UK_SYS_P`** (deviation 1):
 UkRunSys's, a parameter until UkRunSys is ported. -/
 structure UK_SYS_FH : Prop where
-  read : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+  read : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
-    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], UkSysP.wpUkEcallRead (hlc := hlc) (GF := GF)
-  closeStd : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], UkSysP.wpUkEcallRead (GF := GF)
+  closeStd : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
-    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], UkSysP.wpUkEcallCloseStd (hlc := hlc) (GF := GF)
-  close : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], UkSysP.wpUkEcallCloseStd (GF := GF)
+  close : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
-    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], UkSysP.wpUkEcallClose (hlc := hlc) (GF := GF)
+    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], UkSysP.wpUkEcallClose (GF := GF)
 
 /-- The handle map (deviation 4): Rocq `gmap Z fdstate`. -/
 abbrev FhMapF := fun V => Std.ExtTreeMap Int V compare
@@ -162,26 +162,26 @@ def fhHeldOk (held : FdSet) (l : List FdState) (hm : FhMapF FdState) : Prop :=
      ((NSTD : Int) ≤ fd ∧ (get? hm fd).isSome))
 
 section UkFreeHandler
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-- The free handler's hypotheses (deviations 2, 3): the program's five stub
 laws, and the four deposit laws at the application's credentials. -/
 structure FhHyps (N : UkNames GF) (P : Uprog GF) (Kc Sup : IProp GF) : Prop where
-  sr : ⊢ stubLaw (hlc := hlc) N P.code 5 P.read
-  sw : ⊢ stubLaw (hlc := hlc) N P.code 16 P.write
-  so : ⊢ stubLaw (hlc := hlc) N P.code 15 P.open
-  sc : ⊢ stubLaw (hlc := hlc) N P.code 21 P.close
-  se : ⊢ exitStubLaw (hlc := hlc) N P.code P.exit
+  sr : ⊢ stubLaw N P.code 5 P.read
+  sw : ⊢ stubLaw N P.code 16 P.write
+  so : ⊢ stubLaw N P.code 15 P.open
+  sc : ⊢ stubLaw N P.code 21 P.close
+  se : ⊢ exitStubLaw N P.code P.exit
   /-- Rocq `udepw_law_of_sup_write` -/
-  lawW : ⊢ Sup -∗ Kc -∗ udepwLaw (hlc := hlc) (GF := GF) 16
+  lawW : ⊢ Sup -∗ Kc -∗ udepwLaw (GF := GF) 16
   /-- Rocq `udepw_law_of_sup_read` -/
-  lawR : ⊢ Sup -∗ Kc -∗ udepwLaw (hlc := hlc) (GF := GF) 5
+  lawR : ⊢ Sup -∗ Kc -∗ udepwLaw (GF := GF) 5
   /-- Rocq `udepw_law_of_sup_close` -/
-  lawC : ⊢ Kc -∗ udepwLaw (hlc := hlc) (GF := GF) 21
+  lawC : ⊢ Kc -∗ udepwLaw (GF := GF) 21
   /-- Rocq `udepw_law_of_sup 15` -/
-  lawO : ⊢ Sup -∗ udepwLaw (hlc := hlc) (GF := GF) 15
+  lawO : ⊢ Sup -∗ udepwLaw (GF := GF) 15
 
 /-- **Rocq `fh_taint`**: THE TAINT at the held descriptors -- the flag and
 its two readings, the payload, the ledger and the handles. -/
@@ -212,8 +212,8 @@ variable (T Kc Sup : IProp GF) [T_pers : Persistent T] [Kc_pers : Persistent Kc]
 
 /-- **Rocq `fh_exit_pay`**: the exit -- the exit stub law, and the payload. -/
 theorem fh_exit_pay (SYS : UK_SYS_P) (N : UkNames GF) [HNc : UknConst N] (P : Uprog GF)
-    (H : FhHyps (hlc := hlc) N P Kc Sup) (s : Int) :
-    ⊢ N.pay (-1) -∗ exObl (hlc := hlc) N P s := by
+    (H : FhHyps N P Kc Sup) (s : Int) :
+    ⊢ N.pay (-1) -∗ exObl N P s := by
   unfold exObl
   iintro Hpay %h %m %avail %_ Hcode Hrun
   ihave Hs := H.se
@@ -228,9 +228,9 @@ theorem fh_exit_pay (SYS : UK_SYS_P) (N : UkNames GF) [HNc : UknConst N] (P : Up
 /-! ## The four free leaves -/
 
 /-- **Rocq `fh_t_write`**. -/
-theorem fh_t_write (SYS : UK_SYS_P) (N : UkNames GF) (P : Uprog GF) (H : FhHyps (hlc := hlc) N P Kc Sup)
+theorem fh_t_write (SYS : UK_SYS_P) (N : UkNames GF) (P : Uprog GF) (H : FhHyps N P Kc Sup)
     (held : FdSet) (fd : Int) (bs : Bytes) (K : Int → IProp GF) :
-    ⊢ fhTaint T Kc Sup N held -∗ (∀ x, fhTaint T Kc Sup N held -∗ K x) -∗ wrObl (hlc := hlc) N P fd bs K := by
+    ⊢ fhTaint T Kc Sup N held -∗ (∀ x, fhTaint T Kc Sup N held -∗ K x) -∗ wrObl N P fd bs K := by
   unfold wrObl
   iintro Ht HK %h %m %avail %ua %tx %dq %f %hf %ha0 %ha1 %ha2 Hcode Hsrc Hrun Hcont
   unfold fhTaint
@@ -257,9 +257,9 @@ theorem fh_t_write (SYS : UK_SYS_P) (N : UkNames GF) (P : Uprog GF) (H : FhHyps 
   iframe HT Hkc Hsc Hpay Hrest
 
 /-- **Rocq `fh_t_read`**. -/
-theorem fh_t_read (FH : UK_SYS_FH) (N : UkNames GF) (P : Uprog GF) (H : FhHyps (hlc := hlc) N P Kc Sup)
+theorem fh_t_read (FH : UK_SYS_FH) (N : UkNames GF) (P : Uprog GF) (H : FhHyps N P Kc Sup)
     (held : FdSet) (fd : Int) (n : Nat) (K : RdAns → IProp GF) :
-    ⊢ fhTaint T Kc Sup N held -∗ (∀ x, fhTaint T Kc Sup N held -∗ K x) -∗ rdObl (hlc := hlc) N P fd n K := by
+    ⊢ fhTaint T Kc Sup N held -∗ (∀ x, fhTaint T Kc Sup N held -∗ K x) -∗ rdObl N P fd n K := by
   unfold rdObl
   iintro Ht HK %h %m %avail %a %f %ha0 %ha1 %ha2 Hcode Hbuf Hrun Hcont
   unfold fhTaint
@@ -289,10 +289,10 @@ theorem fh_t_read (FH : UK_SYS_FH) (N : UkNames GF) (P : Uprog GF) (H : FhHyps (
   iframe HT Hkc Hsc Hpay Hrest
 
 /-- **Rocq `fh_t_close`**. -/
-theorem fh_t_close (FH : UK_SYS_FH) (N : UkNames GF) (P : Uprog GF) (H : FhHyps (hlc := hlc) N P Kc Sup)
+theorem fh_t_close (FH : UK_SYS_FH) (N : UkNames GF) (P : Uprog GF) (H : FhHyps N P Kc Sup)
     (held : FdSet) (fd : Int) (K : Int → IProp GF) (hin : held fd) :
     ⊢ fhTaint T Kc Sup N held -∗ (∀ x, fhTaint T Kc Sup N (fun z => held z ∧ z ≠ fd) -∗ K x) -∗
-      clObl (hlc := hlc) N P fd K := by
+      clObl N P fd K := by
   unfold clObl
   iintro Ht HK %h %m %avail %ha0 Hcode Hrun Hcont
   unfold fhTaint
@@ -362,12 +362,12 @@ theorem fh_t_close (FH : UK_SYS_FH) (N : UkNames GF) (P : Uprog GF) (H : FhHyps 
       exact hsm'
 
 /-- **Rocq `fh_t_open`**. -/
-theorem fh_t_open (SYS : UK_SYS_P) (N : UkNames GF) (P : Uprog GF) (H : FhHyps (hlc := hlc) N P Kc Sup)
+theorem fh_t_open (SYS : UK_SYS_P) (N : UkNames GF) (P : Uprog GF) (H : FhHyps N P Kc Sup)
     (held : FdSet) (p : Bytes) (mo : Int) (K : Int → IProp GF) :
     ⊢ fhTaint T Kc Sup N held -∗
       (∀ x, ((⌜x = -1⌝ ∗ fhTaint T Kc Sup N held) ∨
              (⌜0 ≤ x⌝ ∗ fhTaint T Kc Sup N (fun y => y = x ∨ held y))) -∗ K x) -∗
-      opObl (hlc := hlc) N P p mo K := by
+      opObl N P p mo K := by
   unfold opObl
   iintro Ht HK %h %m %avail %pv %tx %f %hf %ha0 %ha1 Hcode Hp Hrun Hcont
   unfold fhTaint
@@ -475,8 +475,8 @@ def fhTinv (N : UkNames GF) (t : Proc) : IProp GF :=
 
 /-- One node of the free handler's coinduction. -/
 theorem fh_step (SYS : UK_SYS_P) (FH : UK_SYS_FH) (N : UkNames GF) [HNc : UknConst N] (P : Uprog GF)
-    (H : FhHyps (hlc := hlc) N P Kc Sup) (held : FdSet) (t : Proc) (hs : SafeFds held t) :
-    ⊢ fhTaint T Kc Sup N held -∗ treeF (hlc := hlc) N P (fhTinv T Kc Sup N) t := by
+    (H : FhHyps N P Kc Sup) (held : FdSet) (t : Proc) (hs : SafeFds held t) :
+    ⊢ fhTaint T Kc Sup N held -∗ treeF N P (fhTinv T Kc Sup N) t := by
   have hs' := safeFds_unfold hs
   unfold sfStep at hs'
   unfold treeF
@@ -552,8 +552,8 @@ theorem fh_step (SYS : UK_SYS_P) (FH : UK_SYS_FH) (N : UkNames GF) [HNc : UknCon
 /-- **Rocq `fh_taint_pays`**: THE FREE HANDLER -- the taint pays any
 disciplined tree. -/
 theorem fh_taint_pays (SYS : UK_SYS_P) (FH : UK_SYS_FH) (N : UkNames GF) [HNc : UknConst N] (P : Uprog GF)
-    (H : FhHyps (hlc := hlc) N P Kc Sup) (held : FdSet) (t : Proc) (hs : SafeFds held t) :
-    ⊢ fhTaint T Kc Sup N held -∗ treePay (hlc := hlc) N P t := by
+    (H : FhHyps N P Kc Sup) (held : FdSet) (t : Proc) (hs : SafeFds held t) :
+    ⊢ fhTaint T Kc Sup N held -∗ treePay N P t := by
   iintro Ht
   iapply treePay_coind N P (fhTinv T Kc Sup N) $$ [] %t [Ht]
   · iintro !> %t' Hi

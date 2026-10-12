@@ -265,7 +265,7 @@ theorem freeSet_nodup (nb : Nat) (u : BitSet) : (freeSet nb u).Nodup := by
       omega
 
 section SnapRes
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsBlocksG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsBlocksG GF]
 
 /-- **Rocq `bitmap_res_of_snap`**: the bitmap block and the free pool, off
 `skBmap` / `skMetaUsed` (the bitmap block's bit reads IN USE, so it is not
@@ -351,7 +351,7 @@ theorem dirUniq_ofLocal (i : Nat) (n : FsNode) (hl : InodeLocal i n) :
 /-! ## 6.  The type register, routed off `fsLinks` -/
 
 section SnapLinks
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsBlocksG GF] [FsLinkG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [FsBlocksG GF] [FsLinkG GF]
 
 /-- **Rocq `snap_links_to_set`** (deviation 4): the state's link family,
 read at the region's inums (the state's domain CONTAINS the region,
@@ -479,7 +479,7 @@ theorem snapCarve {PROP : Type _} [BI PROP] (Φ : Nat → PROP) (S : FsStateRec)
     (Φ := fun z => iprop([∗set] b ∈ snapBlkSet (fpNode S z), Φ b))).2
 
 section SnapPool
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [LogG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF] [LogG GF]
   [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- ONE LIVE INUM of `ipoolAlloc_ofSnap`'s allocated arm: the record's

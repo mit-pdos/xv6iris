@@ -39,7 +39,7 @@ open Std (ExtTreeSet)
 set_option linter.unusedSimpArgs false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -66,13 +66,13 @@ theorem wp_shMallocFirst (UL : UK_LEAVES) (HS : SH_SBRK) (HF : SH_FREE)
     (ha0 : m.get 10#5 = BitVec.ofNat 64 nbytes) (hnb0 : 0 < nbytes) (hnbhi : nbytes ≤ 65504)
     (hszlo : ushmBase + 16 ≤ sz) (hszal : pgRoundUpN sz = sz) (hszok : uszOk (sz + 65536)) :
     ⊢ ukCode N.t User.Sh.code.byte -∗ uword N.d ushmFreep 0#64 -∗ ubytes N.d ushmBase 16 fb -∗
-      usz N.s sz -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«malloc») (10 + avail) -∗
+      usz N.s sz -∗ urun N h m (BitVec.ofNat 64 User.Sh.Sym.«malloc») (10 + avail) -∗
       (∀ (h' : CPU) (m' : RegMap) (r : BitVec 64), ⌜ucalleeSaved m m'⌝ -∗ ⌜m'.get 10#5 = r⌝ -∗
         ((⌜r = 0#64⌝ ∗ ushmSbrkAns N sz 65536 (BitVec.ofInt 64 (-1))) ∨
           ∃ (q : Nat) (g : Nat → BitVec 8), ⌜r = BitVec.ofNat 64 q⌝ ∗
             ⌜0 < q ∧ q % 16 = 0 ∧ q + nbytes < 2 ^ 38⌝ ∗
             ushmOne N (sz + 65536) (4096 - ushmNu nbytes) ∗ ubytes N.d q nbytes g) -∗
-        urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (10 + avail) -∗ wpLoop h') -∗
+        urun N h' m' (retPc (m.get 1#5)) (10 + avail) -∗ wpLoop h') -∗
       wpLoop h := by
   have hszhi : sz + 65536 < 2 ^ 38 := ushm_szhi _ hszok
   have hnu : ushmNu nbytes = (nbytes + 15) / 16 + 1 := rfl
@@ -193,12 +193,12 @@ theorem wp_shMallocOne (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) 
     (ha0 : m.get 10#5 = BitVec.ofNat 64 nbytes) (hnb0 : 0 < nbytes) (hnbhi : nbytes ≤ 65504)
     (hfit : ushmNu nbytes < R) :
     ⊢ ukCode N.t User.Sh.code.byte -∗ ushmOne N szv R -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«malloc») (10 + avail) -∗
+      urun N h m (BitVec.ofNat 64 User.Sh.Sym.«malloc») (10 + avail) -∗
       (∀ (h' : CPU) (m' : RegMap) (r : BitVec 64), ⌜ucalleeSaved m m'⌝ -∗ ⌜m'.get 10#5 = r⌝ -∗
         (∃ (q : Nat) (g : Nat → BitVec 8), ⌜r = BitVec.ofNat 64 q⌝ ∗
           ⌜0 < q ∧ q % 16 = 0 ∧ q + nbytes < 2 ^ 38⌝ ∗
           ushmOne N szv (R - ushmNu nbytes) ∗ ubytes N.d q nbytes g) -∗
-        urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (10 + avail) -∗ wpLoop h') -∗
+        urun N h' m' (retPc (m.get 1#5)) (10 + avail) -∗ wpLoop h') -∗
       wpLoop h := by
   have hB : ushmBase = 0x2088 := rfl
   have hnu : ushmNu nbytes = (nbytes + 15) / 16 + 1 := rfl

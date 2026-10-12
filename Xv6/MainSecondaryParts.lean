@@ -70,7 +70,7 @@ theorem ms_slots (k : KCtx) (hK : mainSecondarySlots ≤ k.avail) :
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-- `cpuid`'s contract at the call site (interrupts off). -/
 theorem ms_call_cpuid (CI : CPUID) [CurCtx] (cpu : CPU) (k' : KCtx)
@@ -79,7 +79,7 @@ theorem ms_call_cpuid (CI : CPUID) [CurCtx] (cpu : CPU) (k' : KCtx)
     (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = cpuidRet (hartId cpu)⌝ -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
-  have h := CI.wp_cpuid (hlc := hlc) (GF := GF) cpu k' hsie hK
+  have h := CI.wp_cpuid (GF := GF) cpu k' hsie hK
   unfold wp_cpuid_body at h
   simp only [cpuidAddr] at h
   exact h
@@ -287,7 +287,7 @@ theorem ms_call_printk (PK : PRINTK) [CurCtx]
       cstr (k'.regs 10#5) dqf f -∗ pkDescs k'.regs descs -∗
       uartSentSub γd (bs ++ cs) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := PK.wp_printk (hlc := hlc) (GF := GF) c k' γpr γl γd bs dqf f descs hK hflen hkinds
+  have h := PK.wp_printk (GF := GF) c k' γpr γl γd bs dqf f descs hK hflen hkinds
     hdlen hnoff hpr huart
   unfold wp_printk_body at h
   simp only [printkAddr] at h
@@ -356,7 +356,7 @@ end
 /-! ## The per-hart init and the join into `scheduler` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF]
   [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
 
 theorem ms_trapinithart_br : KA.«main» + 5750#64 = KA.«trapinithart» := by decide
@@ -370,7 +370,7 @@ set_option maxHeartbeats 4000000 in
 handler, plicinithart, `jal scheduler`. -/
 theorem ms_tail_kpt (TIH : TRAPINITHART) (PIH : PLICINITHART) (SCH : SCHEDULER) (KV : KERNELVEC)
     [Y : CurCtx] (hY : curTier = KTier.kpt)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
     (pd pav pu : BitVec 64)
     (cpu : CPU) (k : KCtx) (R : RegMap) (hsie : k.sie = false) (hK : schedulerSlots ≤ k.avail)
@@ -384,7 +384,7 @@ theorem ms_tail_kpt (TIH : TRAPINITHART) (PIH : PLICINITHART) (SCH : SCHEDULER) 
   k_step (wp_s_jal cpu _ (KA.«main» + 54#64) false 5696#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ms_trapinithart_br]
   iintro Hk Hpc
-  have htih := TIH.wp_trapinithart (hlc := hlc) (GF := GF) cpu (k.withRegs (R.set 1#5 (KA.«main» + 58#64)))
+  have htih := TIH.wp_trapinithart (GF := GF) cpu (k.withRegs (R.set 1#5 (KA.«main» + 58#64)))
     tv0 (by simp [hsie]) (by simp; unfold schedulerSlots at hK; omega)
   unfold wp_trapinithart_body at htih
   simp only [trapinithartAddr] at htih
@@ -402,7 +402,7 @@ theorem ms_tail_kpt (TIH : TRAPINITHART) (PIH : PLICINITHART) (SCH : SCHEDULER) 
   k_step (wp_s_jal cpu _ (KA.«main» + 58#64) false 18738#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ms_plicinithart_br]
   iintro Hk Hpc
-  have hpih := PIH.wp_plicinithart (hlc := hlc) (GF := GF) cpu
+  have hpih := PIH.wp_plicinithart (GF := GF) cpu
     (k.withRegs (R2.set 1#5 (KA.«main» + 62#64))) γ0 γ1 (by simp [hsie])
     (by simp; unfold schedulerSlots plicinithartSlots at *; omega)
   unfold wp_plicinithart_body at hpih
@@ -419,7 +419,7 @@ theorem ms_tail_kpt (TIH : TRAPINITHART) (PIH : PLICINITHART) (SCH : SCHEDULER) 
   k_step (wp_s_jal cpu _ (KA.«main» + 62#64) false 3884#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ms_scheduler_br]
   iintro Hk Hpc
-  have hsch := SCH.wp_scheduler (hlc := hlc) (GF := GF) Γ cpu
+  have hsch := SCH.wp_scheduler (GF := GF) Γ cpu
     (k.withRegs (R3.set 1#5 (KA.«main» + 66#64))) (by simp [hproc]) (by simp; omega)
     (by simp [hsie]) (by simp [hnoff]) (by simp [hlocks]) (by simp [htier])
   unfold wp_scheduler_body at hsch
@@ -439,7 +439,7 @@ the hart to the kernel table (the ambient context moves to `X.toKpt`), then
 `ms_tail_kpt`. -/
 theorem ms_tail (KVH : KVMINITHART) (TIH : TRAPINITHART) (PIH : PLICINITHART) (SCH : SCHEDULER)
     (KV : KERNELVEC) [X : CurCtx] (hX : curTier = KTier.bare)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
     (pd pav pu : BitVec 64)
     (cpu : CPU) (k : KCtx) (R : RegMap) (hsie : k.sie = false) (hK : schedulerSlots ≤ k.avail)
@@ -449,7 +449,7 @@ theorem ms_tail (KVH : KVMINITHART) (TIH : TRAPINITHART) (PIH : PLICINITHART) (S
     kctx cpu (k.withRegs R) ∗ pcIs cpu (KA.«main» + 50#64) ∗ Register.tlb ↦ᵣ[cpu] tlb0 ∗
     kptOn t M ∗ pwordPointsTo kernelPagetableAddr 8 DFrac.discard rootAddr ∗
     trapCsrs cpu ∗ cpuCtxFree cpu ∗
-    @devintrCaps hlc GF _ _ _ _ _ _ _ _ X.toKpt Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu
+    @devintrCaps GF _ _ _ _ _ _ _ _ X.toKpt Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Htlb, #Hkpt, #Hroot, Hcsrs, Hfree, #Hcaps⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -457,7 +457,7 @@ theorem ms_tail (KVH : KVMINITHART) (TIH : TRAPINITHART) (PIH : PLICINITHART) (S
   k_step (wp_s_jal cpu _ (KA.«main» + 50#64) false 130#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ms_kvminithart_br]
   iintro Hk Hpc
-  have hkv := KVH.wp_kvminithart (hlc := hlc) (GF := GF) X cpu (k.withRegs (R.set 1#5 (KA.«main» + 54#64)))
+  have hkv := KVH.wp_kvminithart (GF := GF) X cpu (k.withRegs (R.set 1#5 (KA.«main» + 54#64)))
     tlb0 rootAddr DFrac.discard t M hX (by simp [hsie]) (by simp; unfold schedulerSlots at hK; omega) hhi hroot
   unfold wp_kvminithart_body at hkv
   simp only [kvminithartAddr] at hkv

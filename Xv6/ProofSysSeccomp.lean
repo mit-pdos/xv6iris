@@ -46,7 +46,7 @@ theorem ssc_ret_12 : jumpPc (KA.«sys_seccomp» + 0x12#64) = KA.«sys_seccomp» 
 theorem ssc_ret_16 : jumpPc (KA.«sys_seccomp» + 0x16#64) = KA.«sys_seccomp» + 0x16#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
@@ -60,7 +60,7 @@ theorem ssc_myproc (MP : MYPROC) [CurCtx] (c : CPU) (k' : KCtx)
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.proc⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := MP.wp_myproc (hlc := hlc) (GF := GF) c k' hnoff hK
+  have h := MP.wp_myproc (GF := GF) c k' hnoff hK
   unfold wp_myproc_body at h
   simp only [myprocAddr] at h
   exact h
@@ -92,7 +92,7 @@ end
 
 set_option maxHeartbeats 16000000 in
 theorem sys_seccomp_proof (AA : ARGADDR) (MP : MYPROC) : SYSSECCOMP :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X cpu k γ pa pid V M v0 hproc htier hv hnoff
+  ⟨fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X cpu k γ pa pid V M v0 hproc htier hv hnoff
       hK => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩

@@ -25,7 +25,7 @@ set_option linter.unusedSimpArgs false
 /-! ## The nine call sites -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 theorem eo_ac (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γ : LogNames) (γb : BcacheNames)
@@ -40,7 +40,7 @@ theorem eo_ac (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γ : LogNames) (γb : Bcache
       locked γ.lk cpu' -∗ logResAt γ γb γfs cov ls curCtx -∗ (∃ K : Nat, viewLb cpu' K) -∗
       sieArm cpu' k'.sie k'.proc -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := AC.wp_acquire (hlc := hlc) (GF := GF) c k' γ.lk "log"
+  have h := AC.wp_acquire (GF := GF) c k' γ.lk "log"
     (logResAt γ γb γfs cov ls) hnoff hK hs
   unfold wp_acquire_body at h
   simp only [acquireAddr] at h
@@ -63,7 +63,7 @@ theorem eo_re (RE : RELEASE) (c : CPU) (k' : KCtx) (γ : LogNames) (γb : Bcache
         (k'.locks.filter (fun x => x ≠ "log"))) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γ.lk "log"
+  have h := RE.wp_release (GF := GF) c k' γ.lk "log"
     (logResAt γ γb γfs cov ls) hsie hnoff hK reen hreen hon
   unfold wp_release_body at h
   simp only [releaseAddr] at h
@@ -83,12 +83,12 @@ theorem eo_wk (WK : WAKEUP) (Γ : SchedNames) (c : CPU) (k' : KCtx)
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := WK.wp_wakeup (hlc := hlc) (GF := GF) Γ c k' hnoff hK hlk htier
+  have h := WK.wp_wakeup (GF := GF) Γ c k' hnoff hK hlk htier
   unfold wp_wakeup_body at h
   simp only [wakeupAddr] at h
   exact h
 
-theorem eo_bwrite (BW : BWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem eo_bwrite (BW : BWRITE) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j kk : Nat)
     (pidv dev bno : BitVec 32) (dqp : DFrac) (bs bsd : List (BitVec 8)) (Q : IProp GF)
@@ -103,7 +103,7 @@ theorem eo_bwrite (BW : BWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗
     bufHold0 γb V kk pidv dev bno bs bsd ∗
-    diskSeqPermit (genId (hlc := hlc) (GF := GF)) (some (BSIZE * bno.toNat, bs)) Q ∗
+    diskSeqPermit (genId (GF := GF)) (some (BSIZE * bno.toNat, bs)) Q ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
@@ -112,7 +112,7 @@ theorem eo_bwrite (BW : BWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       bufHold0 γb V kk pidv dev bno bs bs -∗ ▷ Q -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj hs
-  have h := BW.wp_bwrite_eb (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl pd pav pu j kk
+  have h := BW.wp_bwrite_eb (GF := GF) Γ c k' γl γb V γdl pd pav pu j kk
     pidv dev bno dqp bs bsd Q hj hproc hK hnoff htier hkk ha0 hbno hbsd hpd
   unfold wp_bwrite_eb_body at h
   simp only [bwriteAddr] at h
@@ -131,12 +131,12 @@ theorem eo_memmove (MM : MEMMOVE) (c : CPU) (k' : KCtx)
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = dst⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hsrc; subst hdst
-  have h := MM.wp_memmove (hlc := hlc) (GF := GF) c k' bs olds m dqs hK hn hn32 hls hld
+  have h := MM.wp_memmove (GF := GF) c k' bs olds m dqs hK hn hn32 hls hld
   unfold wp_memmove_body at h
   simp only [memmoveAddr] at h
   exact h
 
-theorem eo_wh (WH : WRITE_HEAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem eo_wh (WH : WRITE_HEAD) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (γfs : FsNames) (pd pav pu : BitVec 64) (j logstart : Nat) (dev : BitVec 32)
     (n : Nat) (W : List (BitVec 32)) (L : BlockMap) (pidv : BitVec 32) (dqp : DFrac)
@@ -160,7 +160,7 @@ theorem eo_wh (WH : WRITE_HEAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     bslot ∗
     (∀ bs' : List (BitVec 8), ⌜bs'.length = BSIZE⌝ -∗ ⌜hdrN bs' = n⌝ -∗
        ⌜hdrDec bs' = (n, W.map (fun w => w.toNat))⌝ -∗
-       diskSeqPermit (genId (hlc := hlc) (GF := GF)) (some (1024 * logHdrBno logstart, bs'))
+       diskSeqPermit (genId (GF := GF)) (some (1024 * logHdrBno logstart, bs'))
          (Q bs')) ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap)
         (bs' : List (BitVec 8)),
@@ -176,13 +176,13 @@ theorem eo_wh (WH : WRITE_HEAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       bslot -∗ ▷ Q bs' -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj hs
-  have h := WH.wp_write_head_eb (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl γfs pd pav pu j
+  have h := WH.wp_write_head_eb (GF := GF) Γ c k' γl γb V γdl γfs pd pav pu j
     logstart dev n W L pidv dqp Q hj hproc hK hnoff htier hgeom hdev hcl hdt hn hpd
   unfold wp_write_head_eb_body at h
   simp only [writeHeadAddr] at h
   exact h
 
-theorem eo_it (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem eo_it (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (γfs : FsNames) (pd pav pu : BitVec 64) (j logstart : Nat) (dev : BitVec 32)
     (n : Nat) (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8))
@@ -217,7 +217,7 @@ theorem eo_it (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
        fsDirtyHalf γfs w.toNat true) ∗
     bslots 2 ∗
     □ (∀ (i : Nat) (w : BitVec 32), ⌜W[i]? = some w⌝ -∗ ⌜(Lw i).length = BSIZE⌝ -∗ ▷ Rt i -∗
-         diskSeqPermit (genId (hlc := hlc) (GF := GF)) (some (1024 * w.toNat, Lw i))
+         diskSeqPermit (genId (GF := GF)) (some (1024 * w.toNat, Lw i))
            (Rt (i + 1))) ∗
     ▷ Rt 0 ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
@@ -235,7 +235,7 @@ theorem eo_it (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
       bslots (2 + W.length) -∗ ▷ Rt n -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj hs
-  have h := IT.wp_install_trans_eb (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl γfs pd pav pu j
+  have h := IT.wp_install_trans_eb (GF := GF) Γ c k' γl γb V γdl γfs pd pav pu j
     logstart dev false n W Lw L D pidv dqp homeL Xv Xexc Rt
     hj hproc hK hnoff htier hgeom hdev
     hcl hdt (by simp only [Bool.false_eq_true, if_false]; exact ha0) hn hnodup hhome hlen
@@ -249,7 +249,7 @@ end
 /-! ## The epilogue, shared by both arms -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 /-- Two cache authorities cannot coexist.  This is what refutes the
@@ -324,11 +324,11 @@ epilogue.  The op has already retired (the store at `+0x20` and the ledger
 step with it), so this stretch moves no ghost at all. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
-theorem eo_fast (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem eo_fast (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (a b : Bool) (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32)
     (pidv : BitVec 32) (dqp : DFrac) (R : RegMap) (r9 r18 : BitVec 64)

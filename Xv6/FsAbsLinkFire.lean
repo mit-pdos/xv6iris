@@ -133,7 +133,7 @@ theorem lfParent_row (dn dn' : Dinode) (bm bm' : Blkmap) (data data' : Nat → L
 /-! ## 2.  The two fire points, `ftopN` opened and closed -/
 
 section LinkFire
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [FsTopG GF] [FsBytesG GF]
 
 /-- INSTANT 1 -- THE TARGET'S COUNT UP, FUSED WITH ITS RETAG (Rocq's
@@ -148,8 +148,8 @@ theorem lfTgt_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hloc : InodeLocal t nt')
     (hnzt : fnType nt ≠ 0) (hok : linkTgtOk (absRow nt).anNode)
     (habs' : fnType nt' ≠ 0 ∧ absRow nt' = ⟨(absRow nt).anNode, fnNlink nt + 1⟩) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
-      pfAt (ltgtCommitAt (hlc := hlc) (fsGammaL γfs) appE) Ftgt -∗
+    ⊢@{IProp GF} ftopInv γfs -∗ appInv γfs -∗
+      pfAt (ltgtCommitAt (fsGammaL γfs) appE) Ftgt -∗
       topFrag (fsGammaL γfs) t nt ={E}=∗
         topFrag (fsGammaL γfs) t nt' ∗
         ∃ av : Aview, ⌜arowAt av t (absRow nt)⌝ ∗ ⌜linkTgtOk (absRow nt).anNode⌝ ∗
@@ -201,8 +201,8 @@ theorem lfEnt_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hloc : InodeLocal d np')
     (hdir : fnIsDir np = true) (hnl : fnNlink np ≠ 0) (hnm : (dirEntries np)[nm]? = none)
     (habsp' : absOf np' = some ⟨.ADir ((dirEntries np).insert nm t), fnNlink np⟩) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
-      pfAt (lentCommitAt (hlc := hlc) (fsGammaL γfs) appE) Fent -∗
+    ⊢@{IProp GF} ftopInv γfs -∗ appInv γfs -∗
+      pfAt (lentCommitAt (fsGammaL γfs) appE) Fent -∗
       topFrag (fsGammaL γfs) d np ={E}=∗
         topFrag (fsGammaL γfs) d np' ∗
         ∃ av : Aview, ⌜PartialMap.get? av d = some ⟨.ADir (dirEntries np), fnNlink np⟩⌝ ∗

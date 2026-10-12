@@ -35,7 +35,7 @@ open Std (ExtTreeSet)
 open UexecSG
 
 section Walk
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CtokG GF] [SG : UexecSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CtokG GF] [SG : UexecSG GF]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
@@ -50,14 +50,14 @@ theorem wp_uk_ecall_write_src (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : R
     (hag : ∀ fdv : List FdState, ⊢ ufdAuth N.fd fdv -∗ D -∗ ⌜K fdv⌝)
     (hsrc : ∀ (M : ElfMem) (pmv : Nat → Option UPerm) (sz : Nat), uszOk sz →
       ⊢ uheap N.t N.d N.s M pmv sz -∗ S -∗ ⌜usrcOk M pmv sz (m.get 11#5) nb f⌝) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
-      udepwfKs (hlc := hlc) N m pc 16 fdep K nb f -∗ D -∗ S -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗
+      udepwfKs N m pc 16 fdep K nb f -∗ D -∗ S -∗
       (∀ (h' : CPU) (r : BitVec 64) (W : Uvis) (cw' : Nat) (cs' : ExtTreeSet GName compare),
         ⌜tfW W.tf (tfArgIdx 0) = m.get 10#5⌝ -∗ ⌜tfW W.tf (tfArgIdx 1) = m.get 11#5⌝ -∗
         ⌜tfW W.tf (tfArgIdx 2) = m.get 12#5⌝ -∗ ⌜K W.fd⌝ -∗ ⌜W.lazy = false⌝ -∗
         ⌜usrcOk W.M W.perm W.sz (m.get 11#5) nb f⌝ -∗ D -∗ S -∗
-        UexecSG.spostAt (uslot (hlc := hlc)) 16 fdep W r W.M W.fd cw' cs' -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        UexecSG.spostAt (uslot) 16 fdep W r W.M W.fd cw' cs' -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hrun Hsb HD HS Hcont
   iapply urun_ecallS UL N h m pc avail $$ Hi Hrun
@@ -84,8 +84,8 @@ theorem wp_uk_ecall_write_src (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : R
   iapply uslot_bump_close N m pc M pm sz fdv fdv cw cw gn cs pidv r avail hx0 hal4
     $$ Hheap Hstk Hufd Hcwda Hids Hmy Hdep Hrows
   iintro %h' Hrun
-  have hP : UexecSG.spostAt (uslot (hlc := hlc)) 16 fdep (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll)
-      r M fdv cw cs ⊢ UexecSG.spostAt (uslot (hlc := hlc)) 16 fdep
+  have hP : UexecSG.spostAt (uslot) 16 fdep (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll)
+      r M fdv cw cs ⊢ UexecSG.spostAt (uslot) 16 fdep
       (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) r
       (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll).M
       (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll).fd cw cs := .rfl
@@ -96,7 +96,7 @@ theorem wp_uk_ecall_write_src (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : R
 /-- **Rocq `wp_pdev_write_std`**: the write at a pipe's write end in a
 ledger slot, with any source run `S` and a deposit told the run's bytes at
 the page view it pins them to (deviation 3). -/
-theorem wp_pdev_write_std (UL : UK_LEAVES) (DK : PipeDevK hlc GF) (N : UkNames GF) (h : CPU) (m : RegMap)
+theorem wp_pdev_write_std (UL : UK_LEAVES) (DK : PipeDevK GF) (N : UkNames GF) (h : CPU) (m : RegMap)
     (pc : BitVec 64) (avail : Nat) (l : List FdState) (fd : Nat) (rb : Bool) (γp : PipeNames) (S : IProp GF)
     (nb : Nat) (f : Nat → BitVec 8) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF)
     (hn : UkSysP.usysno m = 16) (h0 : argZ (m.get 10#5) = (fd : Int)) (hlt : fd < NSTD)
@@ -104,16 +104,16 @@ theorem wp_pdev_write_std (UL : UK_LEAVES) (DK : PipeDevK hlc GF) (N : UkNames G
     (hal4 : (pc + 4#64) &&& 1#64 = 0#64)
     (hsrc : ∀ (M : ElfMem) (pmv : Nat → Option UPerm) (sz : Nat), uszOk sz →
       ⊢ uheap N.t N.d N.s M pmv sz -∗ S -∗ ⌜usrcOk M pmv sz (m.get 11#5) nb f⌝) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗ ustd N.fd l -∗ S -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗ ustd N.fd l -∗ S -∗
       (∀ Mv : Nat → List (BitVec 8),
         ⌜∀ j : Nat, j < nb → umemByte Mv (m.get 11#5 + BitVec.ofNat 64 j).toNat = f j⌝ -∗
-        pipeWpay (hlc := hlc) γp.pnQueue Mv (m.get 11#5) Q Qe nb) -∗
+        pipeWpay γp.pnQueue Mv (m.get 11#5) Q Qe nb) -∗
       (∀ (h' : CPU) (r : BitVec 64) (Pt : UPtd) (Mv : Nat → List (BitVec 8)) (gn : GName),
         ⌜∀ j : Nat, j < nb → uvaRmapped Pt (m.get 11#5 + BitVec.ofNat 64 j).toNat⌝ -∗
-        pipeWpost (hlc := hlc) Pt γp.pnQueue Mv (m.get 11#5) Q Qe
-          iprop(killShot gn ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF)) nb r -∗
+        pipeWpost Pt γp.pnQueue Mv (m.get 11#5) Q Qe
+          iprop(killShot gn ∗ □ MachFixedGS.killCred (GF := GF)) nb r -∗
         ustd N.fd l -∗ S -∗
-        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+        urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hi Hrun Hstd HS Hch Hcont
   iapply wp_uk_ecall_write_src UL N h m pc avail (DK.wpFam Q Qe N.pay) (ustd N.fd l) S

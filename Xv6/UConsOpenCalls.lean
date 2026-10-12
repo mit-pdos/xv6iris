@@ -50,7 +50,7 @@ open Std (ExtTreeSet)
 theorem initConsCalls_m1 : (0xFFFFFFFFFFFFFFFF#64 : BitVec 64) = BitVec.ofInt 64 (-1) := by decide
 
 section UConsOpenCalls
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx] [PS : UprogSG GF]
@@ -73,12 +73,12 @@ theorem consOpen_post_ent (f : Xfam GF) (omo : OffMode) (P Pmiss : Nat → Nat �
     (cs' : ExtTreeSet GName compare)
     (hk0 : tfW W.tf (tfArgIdx 0) = m.get 10#5) (hk1 : tfW W.tf (tfArgIdx 1) = m.get 11#5)
     (hcw : W.cwd = ROOTINO) (ha0 : (m.get 10#5).toNat = pv) (ha1 : m.get 11#5 = 2#64) :
-    UexecSG.spostAt (self := uexecSGXv6 (hlc := hlc)) (uslot (hlc := hlc)) USYS_open f W rv M' fdv' cw' cs' ⊢
+    UexecSG.spostAt (self := uexecSGXv6) (uslot) USYS_open f W rv M' fdv' cw' cs' ⊢
       ∃ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ ∗ ∃ rt : Nat,
-        openReceiptPlain (hlc := hlc) omo (fsGammaL (hlc := hlc) fscFs) fscFs rt ROOTINO Mv pv (2#64) P Pmiss Fo Ft
+        openReceiptPlain omo (fsGammaL fscFs) fscFs rt ROOTINO Mv pv (2#64) P Pmiss Fo Ft
           W.fd rv fdv' := by
   obtain ⟨h1, h2, h3, h4, h5⟩ := hf
-  refine (wand_entails (UkFileOpen.spostAt_open_elim (hlc := hlc) _ f W rv M' fdv' cw' cs')).trans
+  refine (wand_entails (UkFileOpen.spostAt_open_elim _ f W rv M' fdv' cw' cs')).trans
     (exists_mono fun Mv => sep_mono_right (exists_mono fun rt => ?_))
   have e0 : xkA W 0 = m.get 10#5 := hk0
   have e1 : xkA W 1 = m.get 11#5 := hk1
@@ -95,9 +95,9 @@ theorem consOpen_post_pre (f : Xfam GF) (omo : OffMode) (P Pmiss : Nat → Nat �
     (hk0 : tfW W.tf (tfArgIdx 0) = m.get 10#5) (hk1 : tfW W.tf (tfArgIdx 1) = m.get 11#5)
     (hcw : W.cwd = ROOTINO) (ha0 : (m.get 10#5).toNat = pv) (ha1 : m.get 11#5 = 2#64) :
     iprop((∃ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ ∗ ∃ rt : Nat,
-        openReceiptPlain (hlc := hlc) omo (fsGammaL (hlc := hlc) fscFs) fscFs rt ROOTINO Mv pv (2#64) P Pmiss Fo Ft
+        openReceiptPlain omo (fsGammaL fscFs) fscFs rt ROOTINO Mv pv (2#64) P Pmiss Fo Ft
           W.fd rv fdv') -∗ R) ⊢
-      iprop(UexecSG.spostAt (self := uexecSGXv6 (hlc := hlc)) (uslot (hlc := hlc)) USYS_open f W rv M' fdv' cw' cs'
+      iprop(UexecSG.spostAt (self := uexecSGXv6) (uslot) USYS_open f W rv M' fdv' cw' cs'
         -∗ R) :=
   wand_mono (consOpen_post_ent f omo P Pmiss Fo Ft hf m pv W rv M' fdv' cw' cs' hk0 hk1 hcw ha0 ha1) .rfl
 
@@ -160,16 +160,16 @@ theorem open_console_call_any (UL : UK_LEAVES) (N : UkNames GF) (T K : IProp GF)
     (hpv : pv < 2 ^ 64) (h : CPU) (m : RegMap) (pc : BitVec 64) (l v : List FdState) (avail : Nat)
     (hn : UkSysP.usysno m = 15) (ha0 : m.get 10#5 = BitVec.ofNat 64 pv) (ha1 : m.get 11#5 = BitVec.ofNat 64 2)
     (hal : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ initConsLawsAt echoFsPure (consMade r) Pv T K -∗ consMade r i -∗ appInv (hlc := hlc) fscFs -∗
+    ⊢ initConsLawsAt echoFsPure (consMade r) Pv T K -∗ consMade r i -∗ appInv fscFs -∗
       ukCode N.t ro -∗
-      uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗ ucwd N.cwd ROOTINO -∗
+      uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗ ucwd N.cwd ROOTINO -∗
       ustdAt N.fd l v -∗
       (∀ (h' : CPU) (ret : BitVec 64),
         ((∃ fd : Nat, ⌜ret = BitVec.ofNat 64 fd ∧ fd < NOFILE⌝ ∗
             ∃ fdv : List FdState, ⌜tabLe fdv v⌝ ∗
               uallocV N.fd l fd (.open true true (.device CONSOLE)) (fdv.set fd (.open true true (.device CONSOLE)))) ∨
           (⌜ret = BitVec.ofInt 64 (-1)⌝ ∗ ustdAt N.fd l v) ∨ (ustdAny N.fd ∗ T)) -∗
-        ucwd N.cwd ROOTINO -∗ urun (hlc := hlc) N h' (ukWr m 10#5 ret) (pc + 4#64) avail -∗ wpLoop h') -∗
+        ucwd N.cwd ROOTINO -∗ urun N h' (ukWr m 10#5 ret) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   have hro : ∀ Mv, imgAgrees ro Mv → argPathOf Mv pv initConsPl := fun Mv hag => hpath ro Mv (fun _ _ h => h) hag
   have ha0' := initConsCalls_a0 m pv hpv ha0
@@ -205,12 +205,12 @@ theorem open_absent_call_any (UL : UK_LEAVES) (N : UkNames GF) (T K : IProp GF) 
     (hn : UkSysP.usysno m = 15) (ha0 : m.get 10#5 = BitVec.ofNat 64 pv) (ha1 : m.get 11#5 = BitVec.ofNat 64 2)
     (hal : (pc + 4#64) &&& 1#64 = 0#64) :
     ⊢ □ (∀ v : Aview, K -∗ appPred appRun v -∗ appPred appRun v ∗ K ∗ (⌜consAbsent v⌝ ∨ T)) -∗
-      appInv (hlc := hlc) fscFs -∗ ukCode N.t ro -∗
-      uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗ ucwd N.cwd ROOTINO -∗
+      appInv fscFs -∗ ukCode N.t ro -∗
+      uinstrIs N.t pc false (.ECALL ()) -∗ urun N h m pc avail -∗ ucwd N.cwd ROOTINO -∗
       ustdAt N.fd l v -∗ K -∗
       (∀ (h' : CPU) (ret : BitVec 64),
         ((⌜ret = BitVec.ofInt 64 (-1)⌝ ∗ ustdAt N.fd l v ∗ K) ∨ (ustdAny N.fd ∗ T)) -∗
-        ucwd N.cwd ROOTINO -∗ urun (hlc := hlc) N h' (ukWr m 10#5 ret) (pc + 4#64) avail -∗ wpLoop h') -∗
+        ucwd N.cwd ROOTINO -∗ urun N h' (ukWr m 10#5 ret) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h := by
   have hro : ∀ Mv, imgAgrees ro Mv → argPathOf Mv pv initConsPl := fun Mv hag => hpath ro Mv (fun _ _ h => h) hag
   have ha0' := initConsCalls_a0 m pv hpv ha0
@@ -250,7 +250,7 @@ theorem open_absent_call_any (UL : UK_LEAVES) (N : UkNames GF) (T K : IProp GF) 
 
 /-- **`UshConsK.ShConsOpenCalls` HOLDS** at the kernel's instance: the two
 core calls, their taint arms' ledgers dropped. -/
-theorem shConsOpenCalls_holds (UL : UK_LEAVES) : ShConsOpenCalls (hlc := hlc) GF fscFs where
+theorem shConsOpenCalls_holds (UL : UK_LEAVES) : ShConsOpenCalls GF fscFs where
   openConsoleCall N T K _ _ Pv r i ro pv hpath hpv h m pc l v avail hn ha0 ha1 hal := by
     iintro #Hlaws #Hmade #Hinv #Hro #Hi Hrun Hcwd Hstd Hcont
     iapply open_console_call_any UL N T K Pv r i ro pv hpath hpv h m pc l v avail hn ha0 ha1 hal

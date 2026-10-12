@@ -31,10 +31,10 @@ open Std (ExtTreeSet)
 open UexecSG
 
 section PkIn
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF] [PipesNG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF] [PipesNG GF]
 
 /-- a filter device's gate and input pipe, at either sink (deviation 2) -/
-theorem pns_pk_copy_in (R : PnsRound hlc GF) (pin : PNames) (gin : PipeNames) (F : Filt) (sk : Csink) :
+theorem pns_pk_copy_in (R : PnsRound GF) (pin : PNames) (gin : PipeNames) (F : Filt) (sk : Csink) :
     ⊢ pnsPkInv R (.PDCopy (pin, gin) F sk) -∗
       ⌜fok F R.L⌝ ∗ ∃ (prev : Option PNames) (gf : List (BitVec 8) → List (BitVec 8)),
         pipeInvU pin gin R.L (flowF R.L gf prev) := by
@@ -53,11 +53,11 @@ theorem pns_pk_copy_in (R : PnsRound hlc GF) (pin : PNames) (gin : PipeNames) (F
 end PkIn
 
 section Read
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
   [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [DiskG GF] [EchoOutG GF] [PnsRegG GF] [PipesNG GF]
-variable {C : PnsCtx hlc GF}
+variable {C : PnsCtx GF}
 
 /-- **Rocq `pns_read_e`**: `ei_read_e` at a read end. -/
 theorem pns_read_e (CK : PnsCtxOk C) (fdm : Fdmap) (fd : Int) (d : Nat) (Sin : List (BitVec 8)) (n : Nat)
@@ -67,7 +67,7 @@ theorem pns_read_e (CK : PnsCtxOk C) (fdm : Fdmap) (fd : Int) (d : Nat) (Sin : L
           pnsFds C.R C.Q fdm -∗ pnsIn C.R C.Q.γreg d S' -∗ K (.RdBytes cb)) ∧
        (pnsFds C.R C.Q fdm -∗ pnsInEnd C.R C.Q.γreg d -∗ K (.RdBytes [])) ∧
        (∀ x, pnsTaint C.R C.Q (fdDom fdm) -∗ K x)) -∗
-      rdObl (hlc := hlc) C.Q.N C.Q.P fd n K := by
+      rdObl C.Q.N C.Q.P fd n K := by
   iintro Hfds Hin HK
   unfold pnsIn
   icases Hin with ⟨%pn, %gp, Htk, Hd⟩
@@ -113,7 +113,7 @@ theorem pns_read_end (CK : PnsCtxOk C) (fdm : Fdmap) (fd : Int) (d : Nat) (n : N
     ⊢ pnsFds C.R C.Q fdm -∗ pnsInEnd C.R C.Q.γreg d -∗
       ((pnsFds C.R C.Q fdm -∗ pnsInEnd C.R C.Q.γreg d -∗ K (.RdBytes [])) ∧
        (∀ x, pnsTaint C.R C.Q (fdDom fdm) -∗ K x)) -∗
-      rdObl (hlc := hlc) C.Q.N C.Q.P fd n K := by
+      rdObl C.Q.N C.Q.P fd n K := by
   iintro Hfds Hd HK
   unfold pnsInEnd
   icases Hd with ⟨%pn, %gp, Htk, %S, Hd⟩
@@ -151,7 +151,7 @@ theorem pns_read_copy (CK : PnsCtxOk C) (fdm : Fdmap) (fd : Int) (d : Nat) (Fp :
           K (.RdBytes cb)) ∧
        (pnsFds C.R C.Q fdm -∗ pnsCopyEnd C.R C.Q.γreg d Fp h p -∗ K (.RdBytes [])) ∧
        (∀ x, pnsTaint C.R C.Q (fdDom fdm) -∗ K x)) -∗
-      rdObl (hlc := hlc) C.Q.N C.Q.P fd n K := by
+      rdObl C.Q.N C.Q.P fd n K := by
   iintro Hfds Hd HK
   unfold pnsCopy
   icases Hd with ⟨%pin, %gin, %F, %sk, %hh, Htk, %c, %wc, %hp4, Hcore⟩
@@ -234,7 +234,7 @@ theorem pns_read_copy_end (CK : PnsCtxOk C) (fdm : Fdmap) (fd : Int) (d : Nat) (
     ⊢ pnsFds C.R C.Q fdm -∗ pnsCopyEnd C.R C.Q.γreg d Fp h p -∗
       ((pnsFds C.R C.Q fdm -∗ pnsCopyEnd C.R C.Q.γreg d Fp h p -∗ K (.RdBytes [])) ∧
        (∀ x, pnsTaint C.R C.Q (fdDom fdm) -∗ K x)) -∗
-      rdObl (hlc := hlc) C.Q.N C.Q.P fd n K := by
+      rdObl C.Q.N C.Q.P fd n K := by
   iintro Hfds Hd HK
   unfold pnsCopyEnd
   icases Hd with ⟨%pin, %gin, %F, %sk, %hh, Htk, %c, %wc, ⟨%hF, %hP⟩, Hcore, #Heof⟩
@@ -279,7 +279,7 @@ theorem pns_read_copy_halt (CK : PnsCtxOk C) (fdm : Fdmap) (fd : Int) (d : Nat) 
           pnsFds C.R C.Q fdm -∗ pnsCopyHalt C.R C.Q.γreg d (some S') -∗ K (.RdBytes cb)) ∧
        (pnsFds C.R C.Q fdm -∗ pnsCopyHalt C.R C.Q.γreg d none -∗ K (.RdBytes [])) ∧
        (∀ x, pnsTaint C.R C.Q (fdDom fdm) -∗ K x)) -∗
-      rdObl (hlc := hlc) C.Q.N C.Q.P fd n K := by
+      rdObl C.Q.N C.Q.P fd n K := by
   iintro Hfds Hd HK
   unfold pnsCopyHalt
   icases Hd with ⟨%pin, %gin, %F, %pn, %gp, Htk, %c, %wc, Hr, Hw, #Hsh, HoS⟩
@@ -336,7 +336,7 @@ theorem pns_read_copy_halt_end (CK : PnsCtxOk C) (fdm : Fdmap) (fd : Int) (d : N
     ⊢ pnsFds C.R C.Q fdm -∗ pnsCopyHalt C.R C.Q.γreg d none -∗
       ((pnsFds C.R C.Q fdm -∗ pnsCopyHalt C.R C.Q.γreg d none -∗ K (.RdBytes [])) ∧
        (∀ x, pnsTaint C.R C.Q (fdDom fdm) -∗ K x)) -∗
-      rdObl (hlc := hlc) C.Q.N C.Q.P fd n K := by
+      rdObl C.Q.N C.Q.P fd n K := by
   iintro Hfds Hd HK
   unfold pnsCopyHalt
   icases Hd with ⟨%pin, %gin, %F, %pn, %gp, Htk, %c, %wc, Hr, Hw, #Hsh, HoS⟩

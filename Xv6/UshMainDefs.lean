@@ -85,7 +85,7 @@ structure UshCtx (GF : BundledGFunctors.{0}) where
   Pm : List (BitVec 8) → IProp GF
 
 section UshMainDefs
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
@@ -103,9 +103,9 @@ theorem ushStd_len (N : UkNames GF) (X : UshCtx GF) (l : List FdState) : ushStd 
   (ushStd_ustd N X l).trans (ustd_len N.fd l)
 
 /-- **Rocq `sh_deps`**: the flagged deposit at write (16). -/
-def shDeps : IProp GF := udepwLaw (hlc := hlc) 16
+def shDeps : IProp GF := udepwLaw 16
 
-instance shDeps_persistent : Persistent (shDeps (hlc := hlc) (GF := GF)) := by
+instance shDeps_persistent : Persistent (shDeps (GF := GF)) := by
   unfold shDeps; infer_instance
 
 /-! ## §2 One write call, as a hole (Rocq `ksh_w`) -/
@@ -116,14 +116,14 @@ def kshW (N : UkNames GF) (fdw ua : BitVec 64) (nb : Nat) (Ci Co : IProp GF) : I
   iprop(∀ (h : CPU) (m : RegMap) (avail : Nat),
     ⌜m.get 10#5 = fdw⌝ -∗ ⌜m.get 11#5 = ua⌝ -∗ ⌜m.get 12#5 = BitVec.ofNat 64 nb⌝ -∗
     ushCode N.t -∗ Ci -∗
-    urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«write») avail -∗
+    urun N h m (BitVec.ofNat 64 User.Sh.Sym.«write») avail -∗
     (∀ (h' : CPU) (ret : BitVec 64), Co -∗
-      urun (hlc := hlc) N h' (stubRet m 16 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
+      urun N h' (stubRet m 16 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
     wpLoop h)
 
 /-- **Rocq `ksh_w_mono`**. -/
 theorem kshW_mono (N : UkNames GF) (fdw ua : BitVec 64) (nb : Nat) (Ci Co Co' : IProp GF) :
-    ⊢ (Co -∗ Co') -∗ kshW (hlc := hlc) N fdw ua nb Ci Co -∗ kshW (hlc := hlc) N fdw ua nb Ci Co' := by
+    ⊢ (Co -∗ Co') -∗ kshW N fdw ua nb Ci Co -∗ kshW N fdw ua nb Ci Co' := by
   iintro Hm Hw
   unfold kshW
   iintro %h %m %avail %h0 %h1 %h2 #Hc HCi Hrun Hcont
@@ -134,7 +134,7 @@ theorem kshW_mono (N : UkNames GF) (fdw ua : BitVec 64) (nb : Nat) (Ci Co Co' : 
 
 /-- **Rocq `ksh_w_frame`**. -/
 theorem kshW_frame (N : UkNames GF) (fdw ua : BitVec 64) (nb : Nat) (Ci Co C : IProp GF) :
-    ⊢ C -∗ kshW (hlc := hlc) N fdw ua nb iprop(Ci ∗ C) Co -∗ kshW (hlc := hlc) N fdw ua nb Ci Co := by
+    ⊢ C -∗ kshW N fdw ua nb iprop(Ci ∗ C) Co -∗ kshW N fdw ua nb Ci Co := by
   iintro HC Hw
   unfold kshW
   iintro %h %m %avail %h0 %h1 %h2 #Hc HCi Hrun Hcont
@@ -145,8 +145,8 @@ theorem kshW_frame (N : UkNames GF) (fdw ua : BitVec 64) (nb : Nat) (Ci Co C : I
 ledger. -/
 theorem kshW_ushStd1 (N : UkNames GF) (X : UshCtx GF) (fdw ua : BitVec 64) (nb : Nat) (l : List FdState)
     (Co : IProp GF) :
-    ⊢ (∀ v : List FdState, kshW (hlc := hlc) N fdw ua nb (ustdAt N.fd l v) iprop(ustdAt N.fd l v ∗ Co)) -∗
-      kshW (hlc := hlc) N fdw ua nb (ushStd N X l) iprop(ushStd N X l ∗ Co) := by
+    ⊢ (∀ v : List FdState, kshW N fdw ua nb (ustdAt N.fd l v) iprop(ustdAt N.fd l v ∗ Co)) -∗
+      kshW N fdw ua nb (ushStd N X l) iprop(ushStd N X l ∗ Co) := by
   iintro Hw
   unfold kshW
   iintro %h %m %avail %h0 %h1 %h2 #Hc Hstd Hrun Hcont
@@ -165,13 +165,13 @@ theorem kshW_ushStd1 (N : UkNames GF) (X : UshCtx GF) (fdw ua : BitVec 64) (nb :
 can be printed on (fd 2 the console, or fd 2 closed), at any view. -/
 def ushPromptLaw (N : UkNames GF) (X : UshCtx GF) : IProp GF :=
   iprop(□ ((∀ (I : List (BitVec 8)) (l v : List FdState), ⌜ushFd2p l⌝ -∗
-      kshW (hlc := hlc) N (BitVec.ofNat 64 2) (BitVec.ofNat 64 shPromptPv) 2
+      kshW N (BitVec.ofNat 64 2) (BitVec.ofNat 64 shPromptPv) 2
         iprop(ustdAt N.fd l v ∗ X.Wc I 0) iprop(ustdAt N.fd l v ∗ X.Wc I 2)) ∗
     (∀ (l v : List FdState), ⌜l[2]? = some FdState.closed⌝ -∗
-      kshW (hlc := hlc) N (BitVec.ofNat 64 2) (BitVec.ofNat 64 shPromptPv) 2 (ustdAt N.fd l v) (ustdAt N.fd l v))))
+      kshW N (BitVec.ofNat 64 2) (BitVec.ofNat 64 shPromptPv) 2 (ustdAt N.fd l v) (ustdAt N.fd l v))))
 
 instance ushPromptLaw_persistent (N : UkNames GF) (X : UshCtx GF) :
-    Persistent (ushPromptLaw (hlc := hlc) N X) := by
+    Persistent (ushPromptLaw N X) := by
   unfold ushPromptLaw; infer_instance
 
 /-- **Rocq `ush_wcp`**: the credential slot the loop carries, at its two
@@ -186,25 +186,25 @@ def ushWcp (X : UshCtx GF) (l : List FdState) (I : List (BitVec 8)) (p : Nat) : 
 /-- **Rocq `ush_tag_law_at`**: the tag read as the discipline `D`, or the
 taint. -/
 def ushTagLawAt (X : UshCtx GF) (D : List Obs → Prop) : IProp GF :=
-  iprop(□ ∀ h : List Obs, MachFixedGS.rxTag (hlc := hlc) (GF := GF) h -∗ ⌜D h⌝ ∨ X.T)
+  iprop(□ ∀ h : List Obs, MachFixedGS.rxTag (GF := GF) h -∗ ⌜D h⌝ ∨ X.T)
 
 instance ushTagLawAt_persistent (X : UshCtx GF) (D : List Obs → Prop) :
-    Persistent (ushTagLawAt (hlc := hlc) X D) := by
+    Persistent (ushTagLawAt X D) := by
   unfold ushTagLawAt; infer_instance
 
 /-- **Rocq `ush_tag_law`**: a tag on a history whose last console byte is
 C('D') is the taint. -/
 def ushTagLaw (X : UshCtx GF) : IProp GF :=
   iprop(□ ∀ (h : List Obs) (b : BitVec 8), ⌜obsEndsIn .uart0 h b⌝ -∗ ⌜(consXlate b).toNat = 4⌝ -∗
-    MachFixedGS.rxTag (hlc := hlc) (GF := GF) h -∗ X.T)
+    MachFixedGS.rxTag (GF := GF) h -∗ X.T)
 
-instance ushTagLaw_persistent (X : UshCtx GF) : Persistent (ushTagLaw (hlc := hlc) X) := by
+instance ushTagLaw_persistent (X : UshCtx GF) : Persistent (ushTagLaw X) := by
   unfold ushTagLaw; infer_instance
 
 /-- **Rocq `ush_tag_law_of_at`**. -/
 theorem ushTagLaw_of_at (X : UshCtx GF) (D : List Obs → Prop)
     (hD : ∀ (h : List Obs) (b : BitVec 8), obsEndsIn .uart0 h b → (consXlate b).toNat = 4 → D h → False) :
-    ⊢ ushTagLawAt (hlc := hlc) X D -∗ ushTagLaw (hlc := hlc) X := by
+    ⊢ ushTagLawAt X D -∗ ushTagLaw X := by
   iintro #Hl
   unfold ushTagLaw
   imodintro
@@ -219,20 +219,20 @@ theorem ushTagLaw_of_at (X : UshCtx GF) (D : List Obs → Prop)
 /-- **Rocq `ush_at`**: the program's half of the position pair, and the
 exit payload beside it. -/
 def ushAt (N : UkNames GF) (X : UshCtx GF) (n : Nat) : IProp GF :=
-  iprop(upos (hlc := hlc) X.γp n ∗ N.pay (-1))
+  iprop(upos X.γp n ∗ N.pay (-1))
 
 /-- **Rocq `ush_pos`**. -/
-def ushPos (N : UkNames GF) (X : UshCtx GF) : IProp GF := iprop(∃ n : Nat, ushAt (hlc := hlc) N X n)
+def ushPos (N : UkNames GF) (X : UshCtx GF) : IProp GF := iprop(∃ n : Nat, ushAt N X n)
 
 /-- **Rocq `ush_pos_pay`**. -/
-theorem ushPos_pay (N : UkNames GF) (X : UshCtx GF) : ushPos (hlc := hlc) N X ⊢ N.pay (-1) := by
+theorem ushPos_pay (N : UkNames GF) (X : UshCtx GF) : ushPos N X ⊢ N.pay (-1) := by
   unfold ushPos ushAt
   iintro ⟨%n, -, H⟩
   iexact H
 
 /-- **Rocq `ush_lease`**: the pieces, or the taint with the position. -/
 def ushLease (N : UkNames GF) (X : UshCtx GF) (I : List (BitVec 8)) : IProp GF :=
-  iprop(X.Pm I ∨ (X.T ∗ ushPos (hlc := hlc) N X))
+  iprop(X.Pm I ∨ (X.T ∗ ushPos N X))
 
 /-- **Rocq `UkSh`'s section hypotheses on the credential families and the
 lease** (deviation 1). -/
@@ -241,11 +241,11 @@ structure UshLaws (N : UkNames GF) (X : UshCtx GF) : Prop where
   wb_wc : ∀ I : List (BitVec 8), ⊢ X.Wb I -∗ X.Wc I 0
   /-- Rocq `ush_pm_of_at` -/
   pm_of_at : ∀ n : Nat,
-    ⊢ ushAt (hlc := hlc) N X n -∗ ∃ I : List (BitVec 8), ⌜I.length = n⌝ ∗ ushLease (hlc := hlc) N X I
+    ⊢ ushAt N X n -∗ ∃ I : List (BitVec 8), ⌜I.length = n⌝ ∗ ushLease N X I
   /-- Rocq `ush_at_of_pm_taint` -/
-  at_of_pm_taint : ∀ I : List (BitVec 8), ⊢ X.T -∗ X.Pm I -∗ ushAt (hlc := hlc) N X I.length
+  at_of_pm_taint : ∀ I : List (BitVec 8), ⊢ X.T -∗ X.Pm I -∗ ushAt N X I.length
   /-- Rocq `ush_at_of_pm_wb` -/
-  at_of_pm_wb : ∀ I : List (BitVec 8), ⊢ X.Pm I -∗ X.Wb I -∗ ushAt (hlc := hlc) N X I.length
+  at_of_pm_wb : ∀ I : List (BitVec 8), ⊢ X.Pm I -∗ X.Wb I -∗ ushAt N X I.length
   /-- Rocq `ush_wb_read` -/
   wb_read : ∀ I l : List (BitVec 8), wlNl ∉ l →
     ⊢ X.Pm (I ++ l ++ [wlNl]) -∗ X.Wb I -∗ X.Pm (I ++ l ++ [wlNl]) ∗ X.T
@@ -256,7 +256,7 @@ structure UshLaws (N : UkNames GF) (X : UshCtx GF) : Prop where
 /-- **Rocq `ush_wcp_cons`**: the preamble's open at the lowest closed slot
 keeps the slot; the third open turns the banner-owed credential into the
 prompt's. -/
-theorem ushWcp_cons (N : UkNames GF) (X : UshCtx GF) (L : UshLaws (hlc := hlc) N X) (l : List FdState) (k : Nat)
+theorem ushWcp_cons (N : UkNames GF) (X : UshCtx GF) (L : UshLaws N X) (l : List FdState) (k : Nat)
     (I : List (BitVec 8)) (hlen : l.length = NSTD) (hk : fdLowestClosed l = some k) :
     ushWcp X l I 0 ⊢ ushWcp X (l.set k (.open true true (.device CONSOLE))) I 0 := by
   unfold ushWcp
@@ -284,8 +284,8 @@ theorem ushWcp_cons (N : UkNames GF) (X : UshCtx GF) (L : UshLaws (hlc := hlc) N
 /-- **Rocq `ksh_w_of_wcp`**: the prompt's call at whichever arm the walk is
 on; what comes back is the slot two bytes on. -/
 theorem kshW_of_wcp (N : UkNames GF) (X : UshCtx GF) (l : List FdState) (I : List (BitVec 8)) :
-    ⊢ ushPromptLaw (hlc := hlc) N X -∗ ushWcp X l I 0 -∗
-      kshW (hlc := hlc) N (BitVec.ofNat 64 2) (BitVec.ofNat 64 shPromptPv) 2 (ushStd N X l)
+    ⊢ ushPromptLaw N X -∗ ushWcp X l I 0 -∗
+      kshW N (BitVec.ofNat 64 2) (BitVec.ofNat 64 shPromptPv) 2 (ushStd N X l)
         iprop(ushStd N X l ∗ ushWcp X l I 2) := by
   iintro #Hlaw Hwc
   iapply kshW_ushStd1 N X
@@ -313,8 +313,8 @@ theorem kshW_of_wcp (N : UkNames GF) (X : UshCtx GF) (l : List FdState) (I : Lis
     exact ⟨⟨j, hj2, hlcl⟩, by omega⟩
 
 /-- **Rocq `ush_pos_of_pm`**. -/
-theorem ushPos_of_pm (N : UkNames GF) (X : UshCtx GF) (L : UshLaws (hlc := hlc) N X) (I : List (BitVec 8)) :
-    ⊢ X.T -∗ X.Pm I -∗ ushPos (hlc := hlc) N X := by
+theorem ushPos_of_pm (N : UkNames GF) (X : UshCtx GF) (L : UshLaws N X) (I : List (BitVec 8)) :
+    ⊢ X.T -∗ X.Pm I -∗ ushPos N X := by
   iintro HT H
   unfold ushPos
   iexists I.length
@@ -325,11 +325,11 @@ theorem ushPos_of_pm (N : UkNames GF) (X : UshCtx GF) (L : UshLaws (hlc := hlc) 
 /-- **Rocq `ush_posb`**: the pieces at a boundary with the credential slot,
 or the taint. -/
 def ushPosb (N : UkNames GF) (X : UshCtx GF) (l : List FdState) (p : Nat) : IProp GF :=
-  iprop((∃ I : List (BitVec 8), ⌜restOf I = []⌝ ∗ X.Pm I ∗ ushWcp X l I p) ∨ (X.T ∗ ushPos (hlc := hlc) N X))
+  iprop((∃ I : List (BitVec 8), ⌜restOf I = []⌝ ∗ X.Pm I ∗ ushWcp X l I p) ∨ (X.T ∗ ushPos N X))
 
 /-- **Rocq `ush_posb_of_wc`**. -/
 theorem ushPosb_of_wc (N : UkNames GF) (X : UshCtx GF) (l : List FdState) (p : Nat) (I : List (BitVec 8))
-    (hn : restOf I = []) : ⊢ X.Pm I -∗ ushWcp X l I p -∗ ushPosb (hlc := hlc) N X l p := by
+    (hn : restOf I = []) : ⊢ X.Pm I -∗ ushWcp X l I p -∗ ushPosb N X l p := by
   iintro H Hc
   unfold ushPosb
   ileft
@@ -341,20 +341,20 @@ theorem ushPosb_of_wc (N : UkNames GF) (X : UshCtx GF) (l : List FdState) (p : N
 to it. -/
 def ushPosw (N : UkNames GF) (X : UshCtx GF) (l : List FdState) (ws : List (List (BitVec 8))) : IProp GF :=
   iprop((∃ I : List (BitVec 8), ⌜restOf I = [] ∧ lastWs I = ws ∧ flineOk (ushLastbody I)⌝ ∗ X.Pm I ∗
-      ushWcp X l I 3) ∨ (X.T ∗ ushPos (hlc := hlc) N X))
+      ushWcp X l I 3) ∨ (X.T ∗ ushPos N X))
 
 /-- **Rocq `ush_posw_taint`**. -/
 theorem ushPosw_taint (N : UkNames GF) (X : UshCtx GF) (l : List FdState) (ws : List (List (BitVec 8))) :
-    ⊢ X.T -∗ ushPos (hlc := hlc) N X -∗ ushPosw (hlc := hlc) N X l ws := by
+    ⊢ X.T -∗ ushPos N X -∗ ushPosw N X l ws := by
   iintro HT H
   unfold ushPosw
   iright
   iframe
 
 /-- **Rocq `ush_posb_cons`**: the slot rides the preamble's back edge. -/
-theorem ushPosb_cons (N : UkNames GF) (X : UshCtx GF) (L : UshLaws (hlc := hlc) N X) (l : List FdState) (k : Nat)
+theorem ushPosb_cons (N : UkNames GF) (X : UshCtx GF) (L : UshLaws N X) (l : List FdState) (k : Nat)
     (hlen : l.length = NSTD) (hk : fdLowestClosed l = some k) :
-    ushPosb (hlc := hlc) N X l 0 ⊢ ushPosb (hlc := hlc) N X (l.set k (.open true true (.device CONSOLE))) 0 := by
+    ushPosb N X l 0 ⊢ ushPosb N X (l.set k (.open true true (.device CONSOLE))) 0 := by
   unfold ushPosb
   iintro (⟨%I, %hn, H, Hc⟩ | H)
   · ileft
@@ -367,7 +367,7 @@ theorem ushPosb_cons (N : UkNames GF) (X : UshCtx GF) (L : UshLaws (hlc := hlc) 
 
 /-- **Rocq `ush_posb_taint`**. -/
 theorem ushPosb_taint (N : UkNames GF) (X : UshCtx GF) (l : List FdState) (p : Nat) :
-    ⊢ X.T -∗ ushPos (hlc := hlc) N X -∗ ushPosb (hlc := hlc) N X l p := by
+    ⊢ X.T -∗ ushPos N X -∗ ushPosb N X l p := by
   iintro HT H
   unfold ushPosb
   iright
@@ -383,16 +383,16 @@ def ushReadAnsAt (N : UkNames GF) (X : UshCtx GF) (Dsc : List (BitVec 8) → Pro
   iprop((∃ (dd dc : Nat) (hs : List (List Obs)) (sl : List (List Obs × BitVec 8)) (J : List (BitVec 8)),
       ⌜dd = r.toNat⌝ ∗ ⌜dd ≤ cap⌝ ∗ ⌜dd = cap → dc = dd⌝ ∗ ⌜dd = 0 → 0 < cap → dc = dd + 1⌝ ∗
       ⌜consChain sl⌝ ∗ consStoredLb cn sl ∗
-      ([∗list] hh ∈ hs, MachFixedGS.rxTag (hlc := hlc) (GF := GF) hh) ∗
-      ⌜consWindow sl I.length dd g hs⌝ ∗ consSwallow (hlc := hlc) cn False sl dd dc ∗
+      ([∗list] hh ∈ hs, MachFixedGS.rxTag (GF := GF) hh) ∗
+      ⌜consWindow sl I.length dd g hs⌝ ∗ consSwallow cn False sl dd dc ∗
       ⌜J.length = dc⌝ ∗ ⌜Dsc (I ++ J)⌝ ∗ ⌜0 < dd → g 0 = J[0]!⌝ ∗ ⌜ushFd0c l⌝ ∗ X.Pm (I ++ J)) ∨
     (⌜r = BitVec.ofInt 64 (-1)⌝ ∗ ⌜l[0]? = some .closed⌝ ∗ X.Pm I) ∨
-    (X.T ∗ ushPos (hlc := hlc) N X))
+    (X.T ∗ ushPos N X))
 
 /-- **Rocq `ush_swallow_taint`**: a zero-length delivery that moved the
 cursor is the ^D swallow, which the tag law reads as the taint. -/
 theorem ushSwallowTaint (X : UshCtx GF) (cn : ConsNames) (sl : List (List Obs × BitVec 8)) (dc : Nat)
-    (hdc : dc ≠ 0) : ⊢ ushTagLaw (hlc := hlc) X -∗ consSwallow (hlc := hlc) cn False sl 0 dc -∗ X.T := by
+    (hdc : dc ≠ 0) : ⊢ ushTagLaw X -∗ consSwallow cn False sl 0 dc -∗ X.T := by
   iintro #Hlaw Hsw
   unfold consSwallow
   icases Hsw with (%he | ⟨%he, %h, %b, %hen, -, -, Htg, Hwhy⟩)
@@ -408,13 +408,13 @@ theorem ushSwallowTaint (X : UshCtx GF) (cn : ConsNames) (sl : List (List Obs ×
 or the taint. -/
 def ushGetsLineAt (N : UkNames GF) (X : UshCtx GF) (Dsc : List (BitVec 8) → Prop) (l : List FdState)
     (I0 J : List (BitVec 8)) (f : Nat → BitVec 8) : IProp GF :=
-  iprop((⌜ushGlinePAt Dsc l I0 J f⌝ ∗ X.Pm (I0 ++ J)) ∨ (X.T ∗ ushPos (hlc := hlc) N X))
+  iprop((⌜ushGlinePAt Dsc l I0 J f⌝ ∗ X.Pm (I0 ++ J)) ∨ (X.T ∗ ushPos N X))
 
 /-- **Rocq `ush_gets_line_split_at`**. -/
 theorem ushGetsLine_split_at (N : UkNames GF) (X : UshCtx GF) [Persistent X.T] (Dsc : List (BitVec 8) → Prop)
     (l : List FdState) (I0 J : List (BitVec 8)) (f : Nat → BitVec 8) :
-    ushGetsLineAt (hlc := hlc) N X Dsc l I0 J f ⊢
-      ushLease (hlc := hlc) N X (I0 ++ J) ∗ (⌜ushGlinePAt Dsc l I0 J f⌝ ∨ X.T) := by
+    ushGetsLineAt N X Dsc l I0 J f ⊢
+      ushLease N X (I0 ++ J) ∗ (⌜ushGlinePAt Dsc l I0 J f⌝ ∨ X.T) := by
   unfold ushGetsLineAt ushLease
   iintro (⟨%hp, H⟩ | ⟨#HT, H⟩)
   · isplitl [H]
@@ -430,7 +430,7 @@ theorem ushGetsLine_split_at (N : UkNames GF) (X : UshCtx GF) [Persistent X.T] (
 /-- **Rocq `ush_gets_line_0_at`**: the loop enters at the empty line. -/
 theorem ushGetsLine_0_at (N : UkNames GF) (X : UshCtx GF) (Dsc : List (BitVec 8) → Prop) (l : List FdState)
     (I0 : List (BitVec 8)) (f : Nat → BitVec 8) (hr0 : restOf I0 = []) :
-    X.Pm I0 ⊢ ushGetsLineAt (hlc := hlc) N X Dsc l I0 [] f := by
+    X.Pm I0 ⊢ ushGetsLineAt N X Dsc l I0 [] f := by
   unfold ushGetsLineAt
   iintro H
   ileft
@@ -442,8 +442,8 @@ theorem ushGetsLine_0_at (N : UkNames GF) (X : UshCtx GF) (Dsc : List (BitVec 8)
 /-- **Rocq `ush_gets_line_of_posb_at`**: the entry from a command-loop turn. -/
 theorem ushGetsLine_of_posb_at (N : UkNames GF) (X : UshCtx GF) [Persistent X.T] (Dsc : List (BitVec 8) → Prop)
     (l : List FdState) (f : Nat → BitVec 8) :
-    ushPosb (hlc := hlc) N X l 2 ⊢
-      ∃ I0 : List (BitVec 8), ushGetsLineAt (hlc := hlc) N X Dsc l I0 [] f ∗ (ushWcp X l I0 2 ∨ X.T) := by
+    ushPosb N X l 2 ⊢
+      ∃ I0 : List (BitVec 8), ushGetsLineAt N X Dsc l I0 [] f ∗ (ushWcp X l I0 2 ∨ X.T) := by
   unfold ushPosb
   iintro (⟨%I, %hn, H, Hc⟩ | ⟨#HT, H⟩)
   · iexists I
@@ -463,15 +463,15 @@ theorem ushGetsLine_of_posb_at (N : UkNames GF) (X : UshCtx GF) [Persistent X.T]
 line the era admits (with the body's slot at its words), or the taint. -/
 def ushGetsDoneAt (N : UkNames GF) (X : UshCtx GF) (Dl : Uline → Prop) (l : List FdState) (i : Nat)
     (f : Nat → BitVec 8) : IProp GF :=
-  iprop((⌜i = 0⌝ ∗ ushPos (hlc := hlc) N X) ∨
+  iprop((⌜i = 0⌝ ∗ ushPos N X) ∨
     (∃ lu : Uline, ⌜Dl lu ∧ i = (lineBytes lu).length ∧ ushLineAt lu f 0 i⌝ ∗
-      ushPosw (hlc := hlc) N X l (ulineWs lu)) ∨
-    (X.T ∗ ushPos (hlc := hlc) N X))
+      ushPosw N X l (ulineWs lu)) ∨
+    (X.T ∗ ushPos N X))
 
 /-- **Rocq `ush_gets_done_0_at`**: nothing read, on a shut fd 0. -/
-theorem ushGetsDone_0_at (N : UkNames GF) (X : UshCtx GF) (L : UshLaws (hlc := hlc) N X) (Dl : Uline → Prop)
+theorem ushGetsDone_0_at (N : UkNames GF) (X : UshCtx GF) (L : UshLaws N X) (Dl : Uline → Prop)
     (l : List FdState) (I0 : List (BitVec 8)) (f : Nat → BitVec 8) (hcl : l[0]? = some .closed) :
-    ⊢ X.Pm I0 -∗ ushWcp X l I0 2 -∗ ushGetsDoneAt (hlc := hlc) N X Dl l 0 f := by
+    ⊢ X.Pm I0 -∗ ushWcp X l I0 2 -∗ ushGetsDoneAt N X Dl l 0 f := by
   iintro H Hwc
   unfold ushGetsDoneAt
   ileft
@@ -485,9 +485,9 @@ theorem ushGetsDone_0_at (N : UkNames GF) (X : UshCtx GF) (L : UshLaws (hlc := h
   · iapply L.at_of_pm_wb I0 $$ H Hb
 
 /-- **Rocq `ush_gets_done_line_t_at`**: the exit on a tainted turn. -/
-theorem ushGetsDone_line_t_at (N : UkNames GF) (X : UshCtx GF) (L : UshLaws (hlc := hlc) N X) (Dl : Uline → Prop)
+theorem ushGetsDone_line_t_at (N : UkNames GF) (X : UshCtx GF) (L : UshLaws N X) (Dl : Uline → Prop)
     (l : List FdState) (I : List (BitVec 8)) (i : Nat) (f : Nat → BitVec 8) [Persistent X.T] :
-    ⊢ X.T -∗ X.Pm I -∗ ushGetsDoneAt (hlc := hlc) N X Dl l i f := by
+    ⊢ X.T -∗ X.Pm I -∗ ushGetsDoneAt N X Dl l i f := by
   iintro #HT H
   unfold ushGetsDoneAt
   iright; iright
@@ -497,7 +497,7 @@ theorem ushGetsDone_line_t_at (N : UkNames GF) (X : UshCtx GF) (L : UshLaws (hlc
 
 /-- **Rocq `ush_gets_done_taint_at`**. -/
 theorem ushGetsDone_taint_at (N : UkNames GF) (X : UshCtx GF) (Dl : Uline → Prop) (l : List FdState) (i : Nat)
-    (f : Nat → BitVec 8) : ⊢ X.T -∗ ushPos (hlc := hlc) N X -∗ ushGetsDoneAt (hlc := hlc) N X Dl l i f := by
+    (f : Nat → BitVec 8) : ⊢ X.T -∗ ushPos N X -∗ ushGetsDoneAt N X Dl l i f := by
   iintro HT H
   unfold ushGetsDoneAt
   iright; iright
@@ -507,7 +507,7 @@ theorem ushGetsDone_taint_at (N : UkNames GF) (X : UshCtx GF) (Dl : Uline → Pr
 disturb it. -/
 theorem ushGetsDone_set_at (N : UkNames GF) (X : UshCtx GF) (Dl : Uline → Prop) (l : List FdState) (i : Nat)
     (f : Nat → BitVec 8) (b : BitVec 8) :
-    ushGetsDoneAt (hlc := hlc) N X Dl l i f ⊢ ushGetsDoneAt (hlc := hlc) N X Dl l i (ushSet f i b) := by
+    ushGetsDoneAt N X Dl l i f ⊢ ushGetsDoneAt N X Dl l i (ushSet f i b) := by
   unfold ushGetsDoneAt
   iintro (H | (⟨%lu, %hl, H⟩ | H))
   · ileft; iexact H
@@ -547,12 +547,12 @@ def ushReadRecvLeafAt (N : UkNames GF) (X : UshCtx GF) (Dsc : List (BitVec 8) �
     ⌜UkSysP.usysno m = USYS_read⌝ -∗ ⌜(BitVec.setWidth 32 (m.get 10#5)).toInt = 0⌝ -∗
     ⌜(m.get 11#5).toNat = a⌝ -∗ ⌜(m.get 12#5).toNat = cap⌝ -∗ ⌜0 < cap⌝ -∗ ⌜cap ≤ k⌝ -∗ ⌜cap < 2 ^ 31⌝ -∗
     ⌜ushFd0p l⌝ -∗ ⌜(pc + 4#64) &&& 1#64 = 0#64⌝ -∗
-    uinstrIs N.t pc false (.ECALL ()) -∗ ubytes N.d a k f -∗ ushStd N X l -∗ ushLease (hlc := hlc) N X I -∗
-    urun (hlc := hlc) N h m pc avail -∗
+    uinstrIs N.t pc false (.ECALL ()) -∗ ubytes N.d a k f -∗ ushStd N X l -∗ ushLease N X I -∗
+    urun N h m pc avail -∗
     (∀ (h' : CPU) (r : BitVec 64) (d : Nat) (g : Nat → BitVec 8),
       ⌜d ≤ cap⌝ -∗ ⌜∀ j, d ≤ j → j < k → g j = f j⌝ -∗ ushStd N X l -∗
-      ushReadAnsAt (hlc := hlc) N X Dsc cn l r cap I g -∗ ubytes N.d a k g -∗
-      urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+      ushReadAnsAt N X Dsc cn l r cap I g -∗ ubytes N.d a k g -∗
+      urun N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
     wpLoop h)
 
 /-! ## §10 The entry's rows, the taint's continuation, the console open -/
@@ -562,15 +562,15 @@ def ushFd0 (X : UshCtx GF) (l : List FdState) : IProp GF := iprop(⌜ushFd0p l�
 
 /-- **Rocq `ush_gen_slot`**: the taint's generic continuation. -/
 def ushGenSlot (N : UkNames GF) (X : UshCtx GF) : IProp GF :=
-  iprop(□ ∀ W : Uvis, X.T -∗ myPay W.gen N.pay -∗ uslot (hlc := hlc) W)
+  iprop(□ ∀ W : Uvis, X.T -∗ myPay W.gen N.pay -∗ uslot W)
 
-instance ushGenSlot_persistent (N : UkNames GF) (X : UshCtx GF) : Persistent (ushGenSlot (hlc := hlc) N X) := by
+instance ushGenSlot_persistent (N : UkNames GF) (X : UshCtx GF) : Persistent (ushGenSlot N X) := by
   unfold ushGenSlot; infer_instance
 
 /-- **Rocq `ush_gen_run`**. -/
 theorem ushGenRun (N : UkNames GF) (X : UshCtx GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail : Nat)
     (hal : pc &&& 1#64 = 0#64) :
-    ⊢ ushGenSlot (hlc := hlc) N X -∗ X.T -∗ urun (hlc := hlc) N h m pc avail -∗ wpLoop h := by
+    ⊢ ushGenSlot N X -∗ X.T -∗ urun N h m pc avail -∗ wpLoop h := by
   iintro #Hg HT Hrun
   unfold ushGenSlot
   iapply urun_gen N X.T h m pc avail hal $$ Hg HT Hrun
@@ -612,7 +612,7 @@ with the ledger back; or the taint (deviation 3: one code resource). -/
 def ushOpenConsoleLeaf (N : UkNames GF) (X : UshCtx GF) : IProp GF :=
   iprop(∀ (h : CPU) (m : RegMap) (l v : List FdState) (avail : Nat),
     ushCode N.t -∗ ⌜m.get 10#5 = BitVec.ofNat 64 shConsPv ∧ m.get 11#5 = BitVec.ofNat 64 2⌝ -∗
-    urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«open») avail -∗ ucwd N.cwd ROOTINO -∗
+    urun N h m (BitVec.ofNat 64 User.Sh.Sym.«open») avail -∗ ucwd N.cwd ROOTINO -∗
     ustdAt N.fd l v -∗
     (∀ (h' : CPU) (ret : BitVec 64),
       ((∃ fd : Nat, ⌜ret = BitVec.ofNat 64 fd ∧ fd < NOFILE⌝ ∗
@@ -620,7 +620,7 @@ def ushOpenConsoleLeaf (N : UkNames GF) (X : UshCtx GF) : IProp GF :=
             uallocV N.fd l fd (.open true true (.device CONSOLE)) (fdv.set fd (.open true true (.device CONSOLE)))) ∨
         (⌜ret = BitVec.ofInt 64 (-1)⌝ ∗ ustdAt N.fd l v) ∨ X.T) -∗
       ucwd N.cwd ROOTINO -∗
-      urun (hlc := hlc) N h' (stubRet m 15 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
+      urun N h' (stubRet m 15 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
     wpLoop h)
 
 /-- **Rocq `ush_open_absent_leaf`**: the pinned open that misses -- two
@@ -628,32 +628,32 @@ arms, the credential `K` in and back. -/
 def ushOpenAbsentLeaf (N : UkNames GF) (X : UshCtx GF) (K : IProp GF) : IProp GF :=
   iprop(∀ (h : CPU) (m : RegMap) (l v : List FdState) (avail : Nat),
     ushCode N.t -∗ ⌜m.get 10#5 = BitVec.ofNat 64 shConsPv ∧ m.get 11#5 = BitVec.ofNat 64 2⌝ -∗
-    urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«open») avail -∗ ucwd N.cwd ROOTINO -∗
+    urun N h m (BitVec.ofNat 64 User.Sh.Sym.«open») avail -∗ ucwd N.cwd ROOTINO -∗
     ustdAt N.fd l v -∗ K -∗
     (∀ (h' : CPU) (ret : BitVec 64),
       ((⌜ret = BitVec.ofInt 64 (-1)⌝ ∗ ustdAt N.fd l v ∗ K) ∨ X.T) -∗
       ucwd N.cwd ROOTINO -∗
-      urun (hlc := hlc) N h' (stubRet m 15 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
+      urun N h' (stubRet m 15 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
     wpLoop h)
 
 /-- **Rocq `ush_cons_in`**: what sh's entry is told about the console node. -/
 def ushConsIn (N : UkNames GF) (X : UshCtx GF) (K : IProp GF) : IProp GF :=
-  iprop(□ ushOpenConsoleLeaf (hlc := hlc) N X ∨ (□ ushOpenAbsentLeaf (hlc := hlc) N X K ∗ K) ∨ X.T)
+  iprop(□ ushOpenConsoleLeaf N X ∨ (□ ushOpenAbsentLeaf N X K ∗ K) ∨ X.T)
 
 /-- **Rocq `ush_cons_open`**: the one call the preamble makes, whichever
 state the node is in. -/
 theorem ushConsOpen (N : UkNames GF) (X : UshCtx GF) [Persistent X.T] (K : IProp GF) (h : CPU) (m : RegMap)
     (l : List FdState) (avail : Nat) (ha0 : m.get 10#5 = BitVec.ofNat 64 shConsPv)
     (ha1 : m.get 11#5 = BitVec.ofNat 64 2) (hal : retPc (m.get 1#5) &&& 1#64 = 0#64) :
-    ⊢ ushCode N.t -∗ ushGenSlot (hlc := hlc) N X -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Sh.Sym.«open») avail -∗ ucwd N.cwd ROOTINO -∗
-      ushStd N X l -∗ ushConsIn (hlc := hlc) N X K -∗
+    ⊢ ushCode N.t -∗ ushGenSlot N X -∗
+      urun N h m (BitVec.ofNat 64 User.Sh.Sym.«open») avail -∗ ucwd N.cwd ROOTINO -∗
+      ushStd N X l -∗ ushConsIn N X K -∗
       (∀ (h' : CPU) (ret : BitVec 64),
         ((∃ fd : Nat, ⌜ret = BitVec.ofNat 64 fd ∧ fd < NOFILE⌝ ∗
             ushUalloc N X l fd (.open true true (.device CONSOLE))) ∨
           (⌜ret = BitVec.ofInt 64 (-1)⌝ ∗ ushStd N X l)) -∗
-        ushConsIn (hlc := hlc) N X K -∗ ucwd N.cwd ROOTINO -∗
-        urun (hlc := hlc) N h' (stubRet m 15 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
+        ushConsIn N X K -∗ ucwd N.cwd ROOTINO -∗
+        urun N h' (stubRet m 15 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hcode #Hgen Hrun Hcwd Hstd Hin Hcont
   unfold ushStd ustdOk
@@ -713,20 +713,20 @@ def ushPid (N : UkNames GF) : IProp GF := iprop(∃ p : Int, ⌜p ≠ 1⌝ ∗ u
 /-- **Rocq `ush_pstate`**: the ledger, the cwd at the root, the empty
 children set, the pid and the cursor at a line boundary. -/
 def ushPstate (N : UkNames GF) (X : UshCtx GF) (l : List FdState) : IProp GF :=
-  iprop(ushStd N X l ∗ ucwd N.cwd ROOTINO ∗ uch N.ch ∅ ∗ ushPid N ∗ ushPosb (hlc := hlc) N X l 0)
+  iprop(ushStd N X l ∗ ucwd N.cwd ROOTINO ∗ uch N.ch ∅ ∗ ushPid N ∗ ushPosb N X l 0)
 
 /-- **Rocq `ush_bstate`**: the body's state, the slot at the line's words. -/
 def ushBstate (N : UkNames GF) (X : UshCtx GF) (l : List FdState) (ws : List (List (BitVec 8))) : IProp GF :=
-  iprop(ushStd N X l ∗ ucwd N.cwd ROOTINO ∗ uch N.ch ∅ ∗ ushPid N ∗ ushPosw (hlc := hlc) N X l ws)
+  iprop(ushStd N X l ∗ ucwd N.cwd ROOTINO ∗ uch N.ch ∅ ∗ ushPid N ∗ ushPosw N X l ws)
 
 /-- **Rocq `ush_pstate_of_bstate_taint`** (7adb0cba2): back to the head's
 state, where nothing was written -- a blank line's back edge -- UNDER THE
 TAINT, the one place that edge is taken (the read's clean arm delivers an
 admissible line, whose first byte is never the newline).  The block owed is
 not converted: the cursor goes back through the taint's arm. -/
-theorem ushPstate_of_bstate_taint (N : UkNames GF) (X : UshCtx GF) [Persistent X.T] (L : UshLaws (hlc := hlc) N X)
+theorem ushPstate_of_bstate_taint (N : UkNames GF) (X : UshCtx GF) [Persistent X.T] (L : UshLaws N X)
     (l : List FdState) (ws : List (List (BitVec 8))) :
-    ⊢ X.T -∗ ushBstate (hlc := hlc) N X l ws -∗ ushPstate (hlc := hlc) N X l := by
+    ⊢ X.T -∗ ushBstate N X l ws -∗ ushPstate N X l := by
   unfold ushBstate ushPstate
   iintro #HT ⟨Hstd, Hcwd, Hch, Hpid, Hpos⟩
   iframe Hstd Hcwd Hch Hpid
@@ -742,8 +742,8 @@ theorem ushPstate_of_bstate_taint (N : UkNames GF) (X : UshCtx GF) [Persistent X
 opaque `R` a turn carries. -/
 def ushLoopHead (N : UkNames GF) (X : UshCtx GF) (R : IProp GF) (l : List FdState) : IProp GF :=
   iprop(∀ (h : CPU) (m : RegMap) (f : Nat → BitVec 8) (n : Nat),
-    ⌜ushRegs m⌝ -∗ ⌜ushFd0p l⌝ -∗ ushPstate (hlc := hlc) N X l -∗ R -∗ ubytes N.d shBuf shNbuf f -∗
-    urun (hlc := hlc) N h m (BitVec.ofNat 64 0x914) (16 + (ushDbody + n)) -∗ wpLoop h)
+    ⌜ushRegs m⌝ -∗ ⌜ushFd0p l⌝ -∗ ushPstate N X l -∗ R -∗ ubytes N.d shBuf shNbuf f -∗
+    urun N h m (BitVec.ofNat 64 0x914) (16 + (ushDbody + n)) -∗ wpLoop h)
 
 /-- **Rocq `ush_rest_line_at`**: the first NUL at or after `k` ends a line
 the era admits with words `ws`, or the taint. -/
@@ -806,17 +806,17 @@ theorem ushJtab_of_rodata (γ : GName) : ushCode (GF := GF) γ ⊢ ushJtab γ :=
 persistent obligation that takes the loop head as its own premise. -/
 def ushRestLAt (N : UkNames GF) (X : UshCtx GF) (D : Uline → Prop) (R : IProp GF) : IProp GF :=
   iprop(□ ∀ l : List FdState, ⌜UknConst N⌝ -∗
-    ⌜∀ n : Nat, ⊢ ushAt (hlc := hlc) N X n -∗ ∃ I : List (BitVec 8), ⌜I.length = n⌝ ∗ ushLease (hlc := hlc) N X I⌝ -∗
-    ⌜∀ I : List (BitVec 8), ⊢ X.Pm I -∗ X.Wb I -∗ ushAt (hlc := hlc) N X I.length⌝ -∗
-    ushCode N.t -∗ ushJtab N.t -∗ ushGenSlot (hlc := hlc) N X -∗ ushLoopHead (hlc := hlc) N X R l -∗
+    ⌜∀ n : Nat, ⊢ ushAt N X n -∗ ∃ I : List (BitVec 8), ⌜I.length = n⌝ ∗ ushLease N X I⌝ -∗
+    ⌜∀ I : List (BitVec 8), ⊢ X.Pm I -∗ X.Wb I -∗ ushAt N X I.length⌝ -∗
+    ushCode N.t -∗ ushJtab N.t -∗ ushGenSlot N X -∗ ushLoopHead N X R l -∗
     ∀ (h : CPU) (m : RegMap) (f : Nat → BitVec 8) (k i2 n : Nat) (ws : List (List (BitVec 8))),
       ⌜ushRegs m⌝ -∗ ⌜m.get 9#5 = BitVec.ofNat 64 (shBuf + k)⌝ -∗ ⌜m.get 15#5 = BitVec.ofNat 64 (f k).toNat⌝ -∗
       ⌜k ≤ i2 ∧ i2 < shNbuf ∧ f i2 = ubyte0⌝ -∗ ⌜ushFd0p l⌝ -∗ ushRestLineAt X D ws f k -∗
-      ushBstate (hlc := hlc) N X l ws -∗ R -∗ ubytes N.d shBuf shNbuf f -∗
-      urun (hlc := hlc) N h m (BitVec.ofNat 64 0x956) (16 + (ushDbody + n)) -∗ wpLoop h)
+      ushBstate N X l ws -∗ R -∗ ubytes N.d shBuf shNbuf f -∗
+      urun N h m (BitVec.ofNat 64 0x956) (16 + (ushDbody + n)) -∗ wpLoop h)
 
 instance ushRestLAt_persistent (N : UkNames GF) (X : UshCtx GF) (D : Uline → Prop) (R : IProp GF) :
-    Persistent (ushRestLAt (hlc := hlc) N X D R) := by
+    Persistent (ushRestLAt N X D R) := by
   unfold ushRestLAt; infer_instance
 
 /-! ## §14 What the loop carries at this shell (Rocq `UkShLoop`) -/
@@ -839,16 +839,16 @@ theorem ushlFresh_of_dat (N : UkNames GF) (sz : Nat) :
 on it. -/
 def ushlHead (N : UkNames GF) (X : UshCtx GF) (l : List FdState) (sz : Nat) : IProp GF :=
   iprop(∀ (h : CPU) (m : RegMap) (f : Nat → BitVec 8) (n : Nat),
-    ⌜ushRegs m⌝ -∗ ⌜ushFd0p l⌝ -∗ ushPstate (hlc := hlc) N X l -∗ ushlDat N.d -∗ usz N.s sz -∗
+    ⌜ushRegs m⌝ -∗ ⌜ushFd0p l⌝ -∗ ushPstate N X l -∗ ushlDat N.d -∗ usz N.s sz -∗
     ubytes N.d shBuf shNbuf f -∗
-    urun (hlc := hlc) N h m (BitVec.ofNat 64 0x914) (16 + (ushDbody + n)) -∗ wpLoop h)
+    urun N h m (BitVec.ofNat 64 0x914) (16 + (ushDbody + n)) -∗ wpLoop h)
 
 /-- **Rocq `ushl_R`**: the opaque `R` at this shell. -/
 def ushlR (N : UkNames GF) (sz : Nat) : IProp GF := iprop(ushlDat N.d ∗ usz N.s sz)
 
 /-- **Rocq `ushl_head_of_R`**. -/
 theorem ushlHead_of_R (N : UkNames GF) (X : UshCtx GF) (l : List FdState) (sz : Nat) :
-    ushLoopHead (hlc := hlc) N X (ushlR N sz) l ⊢ ushlHead (hlc := hlc) N X l sz := by
+    ushLoopHead N X (ushlR N sz) l ⊢ ushlHead N X l sz := by
   unfold ushLoopHead ushlHead ushlR
   iintro H %h %m %f %n %hregs %hfd0 Hstd Hdat Hsz Hbuf Hrun
   iapply H $$ %h %m %f %n %hregs %hfd0 Hstd [Hdat Hsz] Hbuf Hrun

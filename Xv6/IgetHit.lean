@@ -69,7 +69,7 @@ theorem ig_ciwf_update (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × 
   · simp only [h, if_false]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
   [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [SleepLockG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -104,7 +104,7 @@ theorem ig_hit_au (c : CPU) (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 3
     icases Hrest with ⟨⟩
   simp only [hq]
   -- the freeze park, decided from the licence
-  imod frzPark_lic_off (hlc := hlc) ⊤ fscIreg fscFs icfgIst icfgNib inum l j CoPset.subseteq_top
+  imod frzPark_lic_off ⊤ fscIreg fscFs icfgIst icfgNib inum l j CoPset.subseteq_top
       hnib' $$ Hrinv Hlic Hpark with ⟨Hlic, Hmir, Hsel, Hpinj⟩
   -- the iref-slot conservation law
   ihave Hiu := irefSlots_combine nj.val 1 $$ [Hiu Hislot]
@@ -132,7 +132,7 @@ theorem ig_hit_au (c : CPU) (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 3
   iexists qj'.half
   -- the store's accessor
   unfold writeAU
-  imod iref_incr_store_pinw_au (hlc := hlc) ⊤ fscIreg fscFs icfgIst icfgNib M j inum l qj qj'.half nj
+  imod iref_incr_store_pinw_au ⊤ fscIreg fscFs icfgIst icfgNib M j inum l qj qj'.half nj
       tst CoPset.subseteq_top CoPset.subseteq_top CoPset.subseteq_top hnib' hMj
       (ig_frac_lt qj qj' hq) hno'
     $$ Hinv Hrinv Hhalf Hisl Hsel Hlic Hicnt Hst Hllbt with ⟨%g, %lo, %hlot, Hpin, Hcl⟩

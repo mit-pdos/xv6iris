@@ -72,7 +72,7 @@ theorem shCode_rows (M : ElfMem) (π : Nat → Option UPerm) (hsub : uimgSub Use
   exact ⟨hsub a b hab, (hx a (by omega)).1, (hx a (by omega)).2, by unfold uCap; omega⟩
 
 section UshKernelSlot
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
@@ -81,13 +81,13 @@ the deposit).  See the header for the deviations. -/
 theorem shUexecSlot (SS : SH_START) (R : GName → GName → GName → IProp GF) (X : UshCtx GF) [Persistent X.T]
     (cn : ConsNames) (K : IProp GF) (Q Ql : Int → IProp GF)
     (Dsc : List (BitVec 8) → Prop) (Dl : Uline → Prop) (HD : UshDisc Dsc Dl)
-    (HL : ∀ N : UkNames GF, N.pay = Q → UshLaws (hlc := hlc) N X)
-    (Hrl : ∀ (N : UkNames GF) (l : List FdState), N.pay = Q → ⊢ ushReadRecvLeafAt (hlc := hlc) N X Dsc cn l)
+    (HL : ∀ N : UkNames GF, N.pay = Q → UshLaws N X)
+    (Hrl : ∀ (N : UkNames GF) (l : List FdState), N.pay = Q → ⊢ ushReadRecvLeafAt N X Dsc cn l)
     (W : Uvis) (n0 n : Nat)
     (Hbd : ∀ (N : UkNames GF) (l : List FdState) (n : Nat), N.pay = Q →
-      ⊢ upos (hlc := hlc) X.γp n -∗ Ql (-1) -∗
+      ⊢ upos X.γp n -∗ Ql (-1) -∗
         ((∃ I : List (BitVec 8), ⌜I.length = n⌝ ∗ ushWcp X l I 0) ∨ X.T) -∗
-        ushPosb (hlc := hlc) N X l 0)
+        ushPosb N X l 0)
     (HQc : ∀ x y : Int, Q x = Q y)
     (hpc : tfResumePc W.tf = BitVec.ofNat 64 User.Sh.Sym.«start»)
     (hsub : uimgSub User.Sh.code.byte W.M)
@@ -106,17 +106,17 @@ theorem shUexecSlot (SS : SH_START) (R : GName → GName → GName → IProp GF)
               (fun k _ => decide (k < (ukeySp W).toNat - 8 * (2 + (8 + (16 + (ushDbody + n0))))))
               (udataLo W.M W.perm W.sz), ubyte γd k b) -∗
           |==> ∃ f : Nat → BitVec 8, R γt γd γs ∗ ubytes γd shBuf shNbuf f) -∗
-      urunNopipe (hlc := hlc) W.fd -∗ udep (hlc := hlc) -∗ □ (X.T -∗ shDeps (hlc := hlc)) -∗
-      ushTagLaw (hlc := hlc) X -∗
-      □ (∀ N : UkNames GF, ushCode N.t -∗ ushPromptLaw (hlc := hlc) N X) -∗
-      (∀ N : UkNames GF, ushRestLAt (hlc := hlc) N X Dl (R N.t N.d N.s)) -∗
+      urunNopipe W.fd -∗ udep -∗ □ (X.T -∗ shDeps) -∗
+      ushTagLaw X -∗
+      □ (∀ N : UkNames GF, ushCode N.t -∗ ushPromptLaw N X) -∗
+      (∀ N : UkNames GF, ushRestLAt N X Dl (R N.t N.d N.s)) -∗
       ushFd0 X (W.fd.take NSTD) -∗ (⌜ushViewOk W.fd⌝ ∨ X.T) -∗
-      (□ (∀ N : UkNames GF, ushOpenConsoleLeaf (hlc := hlc) N X) ∨
-        (□ (∀ N : UkNames GF, ushOpenAbsentLeaf (hlc := hlc) N X K) ∗ K) ∨ X.T) -∗
-      □ (∀ W' : Uvis, X.T -∗ myPay W'.gen Q -∗ uslot (hlc := hlc) W') -∗
-      myPay W.gen Q -∗ upos (hlc := hlc) X.γp n -∗ Ql (-1) -∗
+      (□ (∀ N : UkNames GF, ushOpenConsoleLeaf N X) ∨
+        (□ (∀ N : UkNames GF, ushOpenAbsentLeaf N X K) ∗ K) ∨ X.T) -∗
+      □ (∀ W' : Uvis, X.T -∗ myPay W'.gen Q -∗ uslot W') -∗
+      myPay W.gen Q -∗ upos X.γp n -∗ Ql (-1) -∗
       ((∃ I : List (BitVec 8), ⌜I.length = n⌝ ∗ ushWcp X (W.fd.take NSTD) I 0) ∨ X.T) -∗
-      uslot (hlc := hlc) W := by
+      uslot W := by
   have hcode := shCode_rows W.M W.perm hsub hx
   iintro #Hpay Hnp Hdep #Hdp #Htag #Hplaw Hrest Hfd0 #Hvok Hin #Hgen Hmp Hpos Hlease Hwcp
   iapply uslot_of_urun_all_at W _ Q hal8 hroom hstk hfdlen hstop hlz hsc $$ Hdep Hnp Hmp
@@ -129,7 +129,7 @@ theorem shUexecSlot (SS : SH_START) (R : GName → GName → GName → IProp GF)
   -- sh's own image, off the text heap: the code, the jump table and the
   -- prompt's bytes all live in it
   ihave #Hc := utextAll_img N.t W.M W.perm User.Sh.code.byte hcode $$ Ht
-  ihave Hin' : ushConsIn (hlc := hlc) N X K $$ [Hin]
+  ihave Hin' : ushConsIn N X K $$ [Hin]
   · unfold ushConsIn
     icases Hin with (#Hl | ⟨#Hl, HK⟩ | #HT)
     · ileft
@@ -144,7 +144,7 @@ theorem shUexecSlot (SS : SH_START) (R : GName → GName → GName → IProp GF)
     · iright
       iright
       iexact HT
-  ihave #Hgen' : ushGenSlot (hlc := hlc) N X $$ []
+  ihave #Hgen' : ushGenSlot N X $$ []
   · unfold ushGenSlot
     rw [hpay]
     iexact Hgen
@@ -177,14 +177,14 @@ the room bound and the caller's rows. -/
 theorem shSlotOfKexec (SS : SH_START) (R : GName → GName → GName → IProp GF) (X : UshCtx GF) [Persistent X.T]
     (cn : ConsNames) (K : IProp GF) (Q Ql : Int → IProp GF)
     (Dsc : List (BitVec 8) → Prop) (Dl : Uline → Prop) (HD : UshDisc Dsc Dl)
-    (HL : ∀ N : UkNames GF, N.pay = Q → UshLaws (hlc := hlc) N X)
-    (Hrl : ∀ (N : UkNames GF) (l : List FdState), N.pay = Q → ⊢ ushReadRecvLeafAt (hlc := hlc) N X Dsc cn l)
+    (HL : ∀ N : UkNames GF, N.pay = Q → UshLaws N X)
+    (Hrl : ∀ (N : UkNames GF) (l : List FdState), N.pay = Q → ⊢ ushReadRecvLeafAt N X Dsc cn l)
     (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (sts : List FdState)
     (W' : Uvis) (n0 n : Nat)
     (Hbd : ∀ (N : UkNames GF) (l : List FdState) (n : Nat), N.pay = Q →
-      ⊢ upos (hlc := hlc) X.γp n -∗ Ql (-1) -∗
+      ⊢ upos X.γp n -∗ Ql (-1) -∗
         ((∃ I : List (BitVec 8), ⌜I.length = n⌝ ∗ ushWcp X l I 0) ∨ X.T) -∗
-        ushPosb (hlc := hlc) N X l 0)
+        ushPosb N X l 0)
     (HQc : ∀ x y : Int, Q x = Q y)
     (hok : kexecImageOk User.Sh.elf na alen afun sts W')
     (hcwd : W'.cwd = ROOTINO)
@@ -197,17 +197,17 @@ theorem shSlotOfKexec (SS : SH_START) (R : GName → GName → GName → IProp G
               (fun k _ => decide (k < (ukeySp W').toNat - 8 * (2 + (8 + (16 + (ushDbody + n0))))))
               (udataLo W'.M W'.perm W'.sz), ubyte γd k b) -∗
           |==> ∃ f : Nat → BitVec 8, R γt γd γs ∗ ubytes γd shBuf shNbuf f) -∗
-      urunNopipe (hlc := hlc) sts -∗ udep (hlc := hlc) -∗ □ (X.T -∗ shDeps (hlc := hlc)) -∗
-      ushTagLaw (hlc := hlc) X -∗
-      □ (∀ N : UkNames GF, ushCode N.t -∗ ushPromptLaw (hlc := hlc) N X) -∗
-      (∀ N : UkNames GF, ushRestLAt (hlc := hlc) N X Dl (R N.t N.d N.s)) -∗
+      urunNopipe sts -∗ udep -∗ □ (X.T -∗ shDeps) -∗
+      ushTagLaw X -∗
+      □ (∀ N : UkNames GF, ushCode N.t -∗ ushPromptLaw N X) -∗
+      (∀ N : UkNames GF, ushRestLAt N X Dl (R N.t N.d N.s)) -∗
       ushFd0 X (sts.take NSTD) -∗ (⌜ushViewOk sts⌝ ∨ X.T) -∗
-      (□ (∀ N : UkNames GF, ushOpenConsoleLeaf (hlc := hlc) N X) ∨
-        (□ (∀ N : UkNames GF, ushOpenAbsentLeaf (hlc := hlc) N X K) ∗ K) ∨ X.T) -∗
-      □ (∀ W : Uvis, X.T -∗ myPay W.gen Q -∗ uslot (hlc := hlc) W) -∗
-      myPay W'.gen Q -∗ upos (hlc := hlc) X.γp n -∗ Ql (-1) -∗
+      (□ (∀ N : UkNames GF, ushOpenConsoleLeaf N X) ∨
+        (□ (∀ N : UkNames GF, ushOpenAbsentLeaf N X K) ∗ K) ∨ X.T) -∗
+      □ (∀ W : Uvis, X.T -∗ myPay W.gen Q -∗ uslot W) -∗
+      myPay W'.gen Q -∗ upos X.γp n -∗ Ql (-1) -∗
       ((∃ I : List (BitVec 8), ⌜I.length = n⌝ ∗ ushWcp X (sts.take NSTD) I 0) ∨ X.T) -∗
-      uslot (hlc := hlc) W' := by
+      uslot W' := by
   -- the map stops at the break, the pc, the table
   have hstop := kexecImageOk_below hok
   have hpc := kexecImageOk_pc hok User.Sh.elf_entry

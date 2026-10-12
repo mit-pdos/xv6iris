@@ -80,7 +80,7 @@ theorem IgRegs.set [Icfg] {k : KCtx} {inum : BitVec 32} {R : RegMap} (h : IgRegs
       by simpa [RegMap.set_apply] using p27⟩⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
   [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [SleepLockG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -171,7 +171,7 @@ abbrev igRin : CtxId → IProp GF :=
 /-- The persistent environment (Rocq's `#Hlock0 #Hinv #Hrinv #Hpenv`). -/
 def igEnv : IProp GF :=
   iprop(isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-    itableInv (hlc := hlc) ∗ iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ panicEnv)
+    itableInv ∗ iregReg fscIreg fscFs icfgIst icfgNib ∗ panicEnv)
 
 instance igEnv_persistent : Persistent (igEnv (GF := GF)) := by
   unfold igEnv; infer_instance
@@ -180,10 +180,10 @@ theorem igEnv_it : igEnv (GF := GF) ⊢
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev := by
   unfold igEnv; iintro ⟨H, -⟩; iexact H
 
-theorem igEnv_inv : igEnv (GF := GF) ⊢ itableInv (hlc := hlc) := by
+theorem igEnv_inv : igEnv (GF := GF) ⊢ itableInv := by
   unfold igEnv; iintro ⟨-, H, -⟩; iexact H
 
-theorem igEnv_ireg : igEnv (GF := GF) ⊢ iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib := by
+theorem igEnv_ireg : igEnv (GF := GF) ⊢ iregReg fscIreg fscFs icfgIst icfgNib := by
   unfold igEnv; iintro ⟨-, -, H, -⟩; iexact H
 
 theorem igEnv_panic : igEnv (GF := GF) ⊢ panicEnv := by
@@ -196,7 +196,7 @@ writes nothing, so `M`, `ci` and this whole bundle are FIXED across it
 def igTab (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × BitVec 32)) : IProp GF :=
   iprop(itableHalf M ∗ ([∗list] j ∈ List.range NINODE, itableSlotRes curCtx M ci j) ∗
     irefSlotsAuth ∗ islPool M ∗ ([∗list] j ∈ List.range NINODE, islot2 curCtx fscIc M ci j) ∗
-    ipool (hlc := hlc) fscFs fscIreg fscCov fscLogst (regionInums icfgNib \ ciInums ci) ∅)
+    ipool fscFs fscIreg fscCov fscLogst (regionInums icfgNib \ ciInums ci) ∅)
 
 /-- What the holder carries across the scan besides the table: the lock
 token, the SIE arm the release takes back, the caller's iref unit, THE
@@ -233,7 +233,7 @@ theorem ig_release (RH : RELEASE_HOOK) (c cpu : CPU) (k : KCtx) (spie spp : Bool
     intro a ha
     simp only [decide_not, Bool.not_eq_eq_eq_not, Bool.not_true, decide_eq_false_iff_not]
     intro e; subst e; exact hlk ha
-  have h := RH.wp_release_hook (hlc := hlc) (GF := GF) c
+  have h := RH.wp_release_hook (GF := GF) c
     ((((k.pushOffAt spie spp).withLocks ("itable" :: k.locks)).pushed 6).withRegs R)
     fscItlock "itable" igR igRin rfl ?hnr ?hKr k.sie ?hrr ?hor
   rotate_left

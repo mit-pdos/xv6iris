@@ -47,7 +47,7 @@ def itDRegs (k : KCtx) (ip : BitVec 64) (kx : Nat) (R : RegMap) : Prop :=
   itPins k R ∧ R 9#5 = iAddr ip kx ∧ R 18#5 = iAddr ip NDIRECT ∧ R 19#5 = ip
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- The resources at a point of the direct loop, cursor `kx` (the state
@@ -133,7 +133,7 @@ body): read cell `k`; skip it if zero, otherwise free its block (bfree,
 through `Xv6.itrunc_bfree_eb`) and clear the cell; then `Xv6.itrunc_dnext`.
 At either entry `SIE`: the complement `Hte`/`Hce` follows each step and is
 handed to bfree and back. -/
-theorem itrunc_dstep (BF : BFREE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem itrunc_dstep (BF : BFREE) (Γ : SchedNames) [ClaimIs GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
     (γl : GName) (pd pav pu : BitVec 64) (j : Nat) (ip : BitVec 64) (bm : Blkmap)
     (data : Nat → List (BitVec 8)) (crb : Bool) (u : Nat) (Sb : List Nat) (e0 : Nat)
@@ -255,7 +255,7 @@ theorem itrunc_dstep (BF : BFREE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
 
 /-- **THE DIRECT LOOP, by fuel induction on `NDIRECT - k`** (Rocq's
 `it_dloop`), at any hart. -/
-theorem itrunc_dloop (BF : BFREE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem itrunc_dloop (BF : BFREE) (Γ : SchedNames) [ClaimIs GF Γ]
     (k : KCtx)
     (γl : GName) (pd pav pu : BitVec 64) (j : Nat) (ip : BitVec 64) (bm : Blkmap)
     (data : Nat → List (BitVec 8)) (crb : Bool) (u : Nat) (Sb : List Nat) (e0 : Nat)

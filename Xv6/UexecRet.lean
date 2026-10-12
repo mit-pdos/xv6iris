@@ -283,7 +283,7 @@ theorem urunEq_resume {Wk : Uvis} {V V2 : ProcPriv} {M M2 : Nat → List (BitVec
 /-! ## §2 The trapped machine -/
 
 section TrappedMachine
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- **Rocq `trapped_machine`**: a thin wrapper on `userTrapFrameAtm` at the
 key's own data (the epc word in `sepc`, the resume file in `gprFile`, the lazy
@@ -348,11 +348,11 @@ theorem uexec_ite_ne {GF : BundledGFunctors.{0}} {k : Nat} {c : Prop} [Decidable
   · rw [if_neg h, if_neg h]; exact h2 h
 
 section UexecRet
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF]
 open UexecSG
 
 /-- Rocq `RiscvPtsto.riscv_kill_cred`: MachCSL's ambient kill credential. -/
-abbrev uKillCred : IProp GF := MachFixedGS.killCred (hlc := hlc) (GF := GF)
+abbrev uKillCred : IProp GF := MachFixedGS.killCred (GF := GF)
 
 /-! ### The payment -/
 

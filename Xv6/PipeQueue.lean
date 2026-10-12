@@ -68,7 +68,7 @@ open Iris Iris.BI Iris.ProofMode Std MachCSL
 open ExclAuth
 
 section PipeQueue
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-! ## 1.  THE ALGEBRA -/
 
@@ -258,32 +258,32 @@ theorem pipeRchain_cursor (γ : GName) (Q : List (BitVec 8) → IProp GF)
 /-- WHAT A WRITER PAYS: its links, or the taint (Rocq `pipe_wpay`). -/
 def pipeWpay (γ : GName) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF)
     (Qe : Nat → PipeSt → IProp GF) (n : Nat) : IProp GF :=
-  iprop(pipeWchain γ M ua Q Qe 0 n ∨ MachFixedGS.killCred (hlc := hlc) (GF := GF))
+  iprop(pipeWchain γ M ua Q Qe 0 n ∨ MachFixedGS.killCred (GF := GF))
 
 /-- WHAT A READER PAYS (Rocq `pipe_rpay`). -/
 def pipeRpay (γ : GName) (Q : List (BitVec 8) → IProp GF)
     (Qe : List (BitVec 8) → PipeSt → IProp GF) (n : Nat) : IProp GF :=
-  iprop(pipeRchain γ Q Qe [] n ∨ MachFixedGS.killCred (hlc := hlc) (GF := GF))
+  iprop(pipeRchain γ Q Qe [] n ∨ MachFixedGS.killCred (GF := GF))
 
 /-- WHAT A CLOSER PAYS (Rocq `pipe_cpay`). -/
 def pipeCpay (γ : GName) (w : Bool) (Φ : IProp GF) : IProp GF :=
-  iprop(pipeClink γ w Φ ∨ MachFixedGS.killCred (hlc := hlc) (GF := GF))
+  iprop(pipeClink γ w Φ ∨ MachFixedGS.killCred (GF := GF))
 
 /-- Rocq `pipe_wpay_taint`. -/
 theorem pipeWpay_taint (γ : GName) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
     (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (n : Nat) :
-    MachFixedGS.killCred (hlc := hlc) (GF := GF) ⊢ pipeWpay (hlc := hlc) γ M ua Q Qe n := by
+    MachFixedGS.killCred (GF := GF) ⊢ pipeWpay γ M ua Q Qe n := by
   unfold pipeWpay; exact or_intro_r
 
 /-- Rocq `pipe_rpay_taint`. -/
 theorem pipeRpay_taint (γ : GName) (Q : List (BitVec 8) → IProp GF)
     (Qe : List (BitVec 8) → PipeSt → IProp GF) (n : Nat) :
-    MachFixedGS.killCred (hlc := hlc) (GF := GF) ⊢ pipeRpay (hlc := hlc) γ Q Qe n := by
+    MachFixedGS.killCred (GF := GF) ⊢ pipeRpay γ Q Qe n := by
   unfold pipeRpay; exact or_intro_r
 
 /-- Rocq `pipe_cpay_taint`. -/
 theorem pipeCpay_taint (γ : GName) (w : Bool) (Φ : IProp GF) :
-    MachFixedGS.killCred (hlc := hlc) (GF := GF) ⊢ pipeCpay (hlc := hlc) γ w Φ := by
+    MachFixedGS.killCred (GF := GF) ⊢ pipeCpay γ w Φ := by
   unfold pipeCpay; exact or_intro_r
 
 /-- A CLOSE'S POST (Rocq `pipe_cpost`).  The link FIRES exactly at the LAST
@@ -291,18 +291,18 @@ fileclose of the end; `last` is what the closer can say about that (a holder
 of the WHOLE reference is the last closer).  Tainted: the payment back
 beside the credential. -/
 def pipeCpost (γ : GName) (w : Bool) (Φ : IProp GF) (last : Bool) : IProp GF :=
-  iprop(Φ ∨ (MachFixedGS.killCred (hlc := hlc) (GF := GF) ∗ pipeCpay (hlc := hlc) γ w Φ) ∨
-    (⌜last = false⌝ ∗ pipeCpay (hlc := hlc) γ w Φ))
+  iprop(Φ ∨ (MachFixedGS.killCred (GF := GF) ∗ pipeCpay γ w Φ) ∨
+    (⌜last = false⌝ ∗ pipeCpay γ w Φ))
 
 /-- Rocq `pipe_cpost_fired`. -/
 theorem pipeCpost_fired (γ : GName) (w : Bool) (Φ : IProp GF) (last : Bool) :
-    Φ ⊢ pipeCpost (hlc := hlc) γ w Φ last := by
+    Φ ⊢ pipeCpost γ w Φ last := by
   unfold pipeCpost; exact or_intro_l
 
 /-- Rocq `pipe_cpost_taint`. -/
 theorem pipeCpost_taint (γ : GName) (w : Bool) (Φ : IProp GF) (last : Bool) :
-    MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ pipeCpay (hlc := hlc) γ w Φ -∗
-      pipeCpost (hlc := hlc) γ w Φ last := by
+    MachFixedGS.killCred (GF := GF) -∗ pipeCpay γ w Φ -∗
+      pipeCpost γ w Φ last := by
   unfold pipeCpost
   iintro #Ht Hp
   iright; ileft
@@ -310,7 +310,7 @@ theorem pipeCpost_taint (γ : GName) (w : Bool) (Φ : IProp GF) (last : Bool) :
 
 /-- Rocq `pipe_cpost_unfired`. -/
 theorem pipeCpost_unfired (γ : GName) (w : Bool) (Φ : IProp GF) :
-    pipeCpay (hlc := hlc) γ w Φ ⊢ pipeCpost (hlc := hlc) γ w Φ false := by
+    pipeCpay γ w Φ ⊢ pipeCpost γ w Φ false := by
   unfold pipeCpost
   iintro Hp
   iright; iright
@@ -334,12 +334,12 @@ def pipeWpost (P : UPtd) (γ : GName) (M : Nat → List (BitVec 8)) (ua : BitVec
           pipeWchain γ M ua Q Qe k (n - k)) ∨
         (⌜r = -1#64⌝ ∗ ⌜k < n⌝ ∗ Rk ∗ pipeWchain γ M ua Q Qe k (n - k)) ∨
         (⌜r = -1#64⌝ ∗ ⌜k < n⌝ ∗ ∃ s : PipeSt, ⌜s.ro = false⌝ ∗ Qe k s))) ∨
-    (MachFixedGS.killCred (hlc := hlc) (GF := GF) ∗ pipeWpay (hlc := hlc) γ M ua Q Qe n))
+    (MachFixedGS.killCred (GF := GF) ∗ pipeWpay γ M ua Q Qe n))
 
 /-- The sign guard's exit, from the payment alone (Rocq `pipe_wpost_neg`). -/
 theorem pipeWpost_neg (P : UPtd) (γ : GName) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
     (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (Rk : IProp GF) :
-    pipeWpay (hlc := hlc) γ M ua Q Qe 0 ⊢ pipeWpost (hlc := hlc) P γ M ua Q Qe Rk 0 (-1#64) := by
+    pipeWpay γ M ua Q Qe 0 ⊢ pipeWpost P γ M ua Q Qe Rk 0 (-1#64) := by
   unfold pipeWpost pipeWpay
   iintro (Hch | #Ht)
   · ileft
@@ -360,13 +360,13 @@ theorem pipeWpost_neg (P : UPtd) (γ : GName) (M : Nat → List (BitVec 8)) (ua 
 /-- What every arm leaves at the cursor (Rocq `pipe_wpost_cursor`). -/
 theorem pipeWpost_cursor (P : UPtd) (γ : GName) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
     (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (Rk : IProp GF) (n : Nat) (r : BitVec 64) :
-    pipeWpost (hlc := hlc) P γ M ua Q Qe Rk n r ⊢
+    pipeWpost P γ M ua Q Qe Rk n r ⊢
       (∃ k : Nat, ⌜k ≤ n⌝ ∗
         ((⌜r = BitVec.ofNat 64 k ∨ (k = 0 ∧ r = -1#64)⌝ ∗
             ⌜k = n ∨ ¬ uvaRmapped P (ua + BitVec.ofNat 64 k).toNat⌝ ∗ Q k) ∨
           (⌜r = -1#64⌝ ∗ ⌜k < n⌝ ∗ Rk ∗ Q k) ∨
           (⌜r = -1#64⌝ ∗ ⌜k < n⌝ ∗ ∃ s : PipeSt, ⌜s.ro = false⌝ ∗ Qe k s))) ∨
-      (MachFixedGS.killCred (hlc := hlc) (GF := GF) ∗ pipeWpay (hlc := hlc) γ M ua Q Qe n) := by
+      (MachFixedGS.killCred (GF := GF) ∗ pipeWpay γ M ua Q Qe n) := by
   unfold pipeWpost
   iintro (⟨%k, %hk, (⟨%hr, %hs, Hch⟩ | ⟨%hr, %hs, Hk, Hch⟩ | Hobs)⟩ | H)
   · ileft; iexists k
@@ -418,7 +418,7 @@ def pipeRpost (P : UPtd) (γ : GName) (addr : BitVec 64) (Q : List (BitVec 8) �
           ∃ s : PipeSt, ⌜pstEmpty s ∧ (d = 0 → s.wo = false)⌝ ∗ Qe acc s) ∨
         (⌜acc.length = d⌝ ∗ pipeRstopNoobs P addr Rk n d r ∗
           pipeRchain γ Q Qe acc (n - acc.length)))) ∨
-    (MachFixedGS.killCred (hlc := hlc) (GF := GF) ∗ pipeRpay (hlc := hlc) γ Q Qe n))
+    (MachFixedGS.killCred (GF := GF) ∗ pipeRpay γ Q Qe n))
 
 /-- THE READ-BACK TIE at the image (deviation 2): under the caller's
 linearity of its buffer, the `d` bytes at `addr` in `M'` ARE `acc`'s. -/
@@ -438,7 +438,7 @@ def pipeRpostImg (P : UPtd) (γ : GName) (Q : List (BitVec 8) → IProp GF)
           ∃ s : PipeSt, ⌜pstEmpty s ∧ (d = 0 → s.wo = false)⌝ ∗ Qe acc s) ∨
         (⌜acc.length = d⌝ ∗ pipeRstopNoobs P addr Rk n d r ∗
           pipeRchain γ Q Qe acc (n - acc.length)))) ∨
-    (MachFixedGS.killCred (hlc := hlc) (GF := GF) ∗ pipeRpay (hlc := hlc) γ Q Qe n))
+    (MachFixedGS.killCred (GF := GF) ∗ pipeRpay γ Q Qe n))
 
 /-- THE ONE STEP BETWEEN THEM (Rocq `pipe_rpost_img_of`): piperead's window
 IS the image's run.  The written pages' length is the premise the Lean view
@@ -447,8 +447,8 @@ theorem pipeRpostImg_of (P : UPtd) (γ : GName) (addr : BitVec 64) (Q : List (Bi
     (Qe : List (BitVec 8) → PipeSt → IProp GF) (Rk : IProp GF) (n d : Nat) (bs : Nat → BitVec 8)
     (r : BitVec 64) (V : Nat → List (BitVec 8))
     (hlen : ∀ j : Nat, j < d → (V ((addr.toNat + j) / 4096)).length = 4096) :
-    pipeRpost (hlc := hlc) P γ addr Q Qe Rk n d bs r ⊢
-      pipeRpostImg (hlc := hlc) P γ Q Qe Rk n r
+    pipeRpost P γ addr Q Qe Rk n d bs r ⊢
+      pipeRpostImg P γ Q Qe Rk n r
         (umemWrite V addr.toNat ((List.range d).map bs)) addr := by
   unfold pipeRpost pipeRpostImg
   iintro (⟨%acc, %hle, %hbs, Hst⟩ | H)
@@ -469,7 +469,7 @@ theorem pipeRpostImg_of (P : UPtd) (γ : GName) (addr : BitVec 64) (Q : List (Bi
 theorem pipeRpostImg_neg (P : UPtd) (γ : GName) (Q : List (BitVec 8) → IProp GF)
     (Qe : List (BitVec 8) → PipeSt → IProp GF) (Rk : IProp GF) (M' : Nat → List (BitVec 8))
     (addr : BitVec 64) :
-    pipeRpay (hlc := hlc) γ Q Qe 0 ⊢ pipeRpostImg (hlc := hlc) P γ Q Qe Rk 0 (-1#64) M' addr := by
+    pipeRpay γ Q Qe 0 ⊢ pipeRpostImg P γ Q Qe Rk 0 (-1#64) M' addr := by
   unfold pipeRpostImg pipeRpay
   iintro (Hch | #Ht)
   · ileft
@@ -495,12 +495,12 @@ theorem pipeRpostImg_neg (P : UPtd) (γ : GName) (Q : List (BitVec 8) → IProp 
 theorem pipeRpostImg_cursor (P : UPtd) (γ : GName) (Q : List (BitVec 8) → IProp GF)
     (Qe : List (BitVec 8) → PipeSt → IProp GF) (Rk : IProp GF) (n : Nat) (r : BitVec 64)
     (M' : Nat → List (BitVec 8)) (addr : BitVec 64) :
-    pipeRpostImg (hlc := hlc) P γ Q Qe Rk n r M' addr ⊢
+    pipeRpostImg P γ Q Qe Rk n r M' addr ⊢
       (∃ (acc : List (BitVec 8)) (d : Nat), ⌜acc.length ≤ n⌝ ∗ ⌜pipeImgTie M' addr acc d⌝ ∗
         ((⌜d < n ∧ acc.length = d ∧ r = BitVec.ofNat 64 d⌝ ∗
             ∃ s : PipeSt, ⌜pstEmpty s ∧ (d = 0 → s.wo = false)⌝ ∗ Qe acc s) ∨
           (⌜acc.length = d⌝ ∗ pipeRstopNoobs P addr Rk n d r ∗ Q acc))) ∨
-      (MachFixedGS.killCred (hlc := hlc) (GF := GF) ∗ pipeRpay (hlc := hlc) γ Q Qe n) := by
+      (MachFixedGS.killCred (GF := GF) ∗ pipeRpay γ Q Qe n) := by
   unfold pipeRpostImg
   iintro (⟨%acc, %d, %h1, %h2, (Hobs | ⟨%h3, Hno, Hch⟩)⟩ | H)
   · ileft; iexists acc, d

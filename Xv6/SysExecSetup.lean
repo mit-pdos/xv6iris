@@ -44,7 +44,7 @@ theorem sys_exec_br_memset : KA.«sys_exec» + 0xffffffffffffb754#64 = KA.«mems
 theorem sys_exec_ret_46 : jumpPc (KA.«sys_exec» + 0x46#64) = KA.«sys_exec» + 0x46#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 set_option maxHeartbeats 8000000 in
 /-- `memset(dst, c, n)` (Rocq `Memset.wp_memset_sconf`): memset does not
@@ -61,7 +61,7 @@ theorem sys_exec_memset (MS : MEMSET) (cpu : CPU) (k' : KCtx) (se : Bool) (hs : 
       wpLoop c)
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj
-  have h := MS.wp_memset (hlc := hlc) (GF := GF) cpu k' olds n hK hn hn32 hl
+  have h := MS.wp_memset (GF := GF) cpu k' olds n hK hn hn32 hl
   unfold wp_memset_body at h
   simp only [memsetAddr] at h
   iintro ⟨Hk, Hpc, Hte, Hce, Hbuf, HK⟩
@@ -77,7 +77,7 @@ theorem sys_exec_memset (MS : MEMSET) (cpu : CPU) (k' : KCtx) (se : Bool) (hs : 
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -99,7 +99,7 @@ theorem sys_exec_argv_zero (sp0 : BitVec 64) (hal : sp0.toNat % 8 = 0) :
 set_option maxHeartbeats 32000000 in
 /-- **+0x028 .. +0x054** (Rocq `sx_setup`). -/
 theorem sys_exec_setup (MS : MEMSET) (k : KCtx) (hK : sysExecSlots ≤ k.avail) :
-    ⊢ sysExecSetupBody (hlc := hlc) (GF := GF) k := by
+    ⊢ sysExecSetupBody (GF := GF) k := by
   unfold sysExecSetupBody
   iintro %cpu %spie %spp %R %⟨hpins, hal⟩ Hk Hpc Hte Hce Hsp Hargv HΦ
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩

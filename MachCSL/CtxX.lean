@@ -27,14 +27,14 @@ namespace MachCSL
 
 open Iris Iris.BI Iris.ProofMode Std
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- **Rocq `ctx_phys_xpointsto`**: the byte at `a` holds `v`, justified at
 context ξ, and its latest write is at or below the instruction-view position
 `K`. -/
 def ctxByteX (ξ : CtxId) (K : Nat) (a : PAddr) (dq : DFrac) (v : BitVec 8) : IProp GF := iprop%
   ∃ (e : HEnt) (H : Hist), a ↦ₕ{dq} (e :: H) ∗ ⌜e.v = v⌝ ∗
-    keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ e.t ∗ ⌜e.t ≤ K⌝
+    keyAt (MachGS.era (GF := GF)) ξ e.t ∗ ⌜e.t ≤ K⌝
 
 /-- The `n` stamped bytes of `w` at `pa` (little-endian). -/
 def ctxBytesX (ξ : CtxId) (K : Nat) (pa : PAddr) (n : Nat) (dq : DFrac) (w : BitVec (8 * n)) :

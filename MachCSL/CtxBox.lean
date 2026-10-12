@@ -81,9 +81,9 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std
 open LeanRV64D
 
 section transport
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
-local notation "era" => MachGS.era (hlc := hlc) (GF := GF)
+local notation "era" => MachGS.era (GF := GF)
 
 /-! ## The two transport laws a box lives on
 
@@ -701,7 +701,7 @@ abbrev StampsRF (Id : Type) [Ord Id] [Std.TransOrd Id] [Std.LawfulEqOrd Id] : CO
 
 section box
 
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 variable {Id X : Type} [Ord Id] [Std.TransOrd Id] [Std.LawfulEqOrd Id] [DecidableEq Id]
 
 /-- The client's obligations (Rocq's section `Context`s): both halves of the

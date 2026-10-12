@@ -40,7 +40,7 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-- The context at the entry interrupt state, in the exit shape. -/
 theorem ua_setReg_spie (k : KCtx) (i : BitVec 5) (v : BitVec 64) :
@@ -49,7 +49,7 @@ theorem ua_setReg_spie (k : KCtx) (i : BitVec 5) (v : BitVec 64) :
 /-! ## `uvmalloc`: the ten-slot frame -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-- `uvmalloc`'s ten-slot frame: `ra`, `s0`, `s1`..`s7` and one unused slot. -/
 def uaFrame [CurCtx] (sp v0 v1 v2 v3 v4 v5 v6 v7 v8 v9 : BitVec 64) : IProp GF := iprop%
@@ -168,7 +168,7 @@ end
 /-! ## `uvmalloc` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-- The permission word `uvmalloc` passes to `mappages`. -/
 theorem ua_perm_eq (x : BitVec 64) : x ||| PTE_R ||| PTE_U = x ||| 18#64 := by
@@ -251,7 +251,7 @@ theorem ua_memset_call (MS : MEMSET) [CurCtx] (cc : CPU) (k' : KCtx)
       byteBuf (k'.regs 10#5) (DFrac.own 1) (List.replicate 4096 0#8) -∗
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = k'.regs 10#5⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cc := by
-  have h := MS.wp_memset (hlc := hlc) (GF := GF) cc k' olds 4096 hK' hn (by decide) hl
+  have h := MS.wp_memset (GF := GF) cc k' olds 4096 hK' hn (by decide) hl
   unfold wp_memset_body at h
   simp only [memsetAddr, hc] at h
   exact h
@@ -286,7 +286,7 @@ theorem ua_mappages_call [WchG GF] (MA : MAPPAGES_ANY) [CurCtx] (γl : GName) (�
             (t.mapRun (vpnOf (k'.regs 11#5)) (BitVec.extractLsb' 12 44 (k'.regs 13#5)) perm 1
               fresh).2.2 < 1 ∧ availZero (none : Option Nat)))⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cc := by
-  have h := MA.wp_mappages_any (hlc := hlc) (GF := GF) cc k' γl γk none t 1 perm ke hnoff' hK' hlk'
+  have h := MA.wp_mappages_any (GF := GF) cc k' γl γk none t 1 perm ke hnoff' hK' hlk'
     hroot' hargs hperm' hmask hrwx hwf hnd hpg
   unfold wp_mappages_any_body at h
   simp only [mappagesAddr, availSub, Option.map] at h
@@ -315,7 +315,7 @@ theorem ua_uvmdealloc_call [WchG GF] (UD : UVMDEALLOC) [CurCtx] (γl : GName) (�
         (uvmdNp (k'.regs 11#5) (k'.regs 12#5))) M' -∗
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = uvmdRsz (k'.regs 11#5) (k'.regs 12#5)⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cc := by
-  have h := UD.wp_uvmdealloc (hlc := hlc) (GF := GF) cc k' γl γk P' M' ke hnoff' hK' hlk' hroot' hold'
+  have h := UD.wp_uvmdealloc (GF := GF) cc k' γl γk P' M' ke hnoff' hK' hlk' hroot' hold'
   unfold wp_uvmdealloc_body at h
   simp only [uvmdeallocAddr] at h
   exact h
@@ -1311,7 +1311,7 @@ theorem uvma_loop [WchG GF] (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPP
 set_option maxHeartbeats 4000000 in
 theorem uvmalloc_proof (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_ANY)
     (UD : UVMDEALLOC) : UVMALLOC :=
-  ⟨fun {hlc GF} _ _ _ _ cpu k γl γk P M ke hnoff hK hlk hroot hold hnew hperm hfree0 => by
+  ⟨fun {GF} _ _ _ _ cpu k γl γk P M ke hnoff hK hlk hroot hold hnew hperm hfree0 => by
   unfold wp_uvmalloc_body
   simp only [uvmallocAddr]
   iintro ⟨Hk, Hpc, #Hlk, Hav, HP, Hlend, HΦ⟩

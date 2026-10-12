@@ -243,7 +243,7 @@ def plicNames (γ0 γ1 : UartNames) (i : Nat) : UartNames := if i = 10 then γ0 
 @[simp] theorem plicNames_12 (γ0 γ1 : UartNames) : plicNames γ0 γ1 12 = γ1 := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]
 
 /-- What a pending, unclaimed source hands its handler: the port's receive
 token.  (Nothing, for a source the invariant does not track.) -/
@@ -540,7 +540,7 @@ invariant.**  This is the `[∗list] d ∈ DevId.all, devWP ...` obligation of
 the boot client (`MachCSL.Power`), for `d = .plic`. -/
 theorem wpDev_plic_inv (γ0 γ1 : UartNames) :
     plicInv (GF := GF) γ0 γ1 ∗ wireInv ∗ genCert ⊢
-      devWP (genId (hlc := hlc) (GF := GF)) .plic rootTask (DevM.pure ()) := by
+      devWP (genId (GF := GF)) .plic rootTask (DevM.pure ()) := by
   unfold plicInv
   iintro H
   iapply wpDev_wireR plicN .plic devSilent_plic plicRel (fun p => plicGhosts γ0 γ1 p) plic_wireR

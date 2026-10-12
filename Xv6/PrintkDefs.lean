@@ -23,7 +23,7 @@ theorem imm_p192 : BitVec.signExtend 64 192#12 = 8#64 * BitVec.ofNat 64 24 := by
 def pkApBase (sp0 : BitVec 64) : BitVec 64 := sp0 + 0xFFFFFFFFFFFFFFC8#64
 
 /-- The spilled varargs `a1..a7`, slot `j` at `pkApBase sp0 + 8j`. -/
-def pkVaCells {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+def pkVaCells {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (sp0 : BitVec 64) (R0 : RegMap) : IProp GF := iprop%
   [∗list] j ∈ List.range 7, wordPointsTo (pkApBase sp0 + 8#64 * BitVec.ofNat 64 j) 8 (DFrac.own 1) (R0 (BitVec.ofNat 5 (11 + j)))
 
@@ -32,7 +32,7 @@ def pkVaCells {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 8..17, 19, 20), the `va_list` pointer at slot 22, `w18` at slot 18 (`s9`'s
 save slot, used by the `%p` arm); slots 7, 21, 23 scratch.  `R0` is the entry register
 map. -/
-def pkFrame {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+def pkFrame {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (sp0 : BitVec 64) (R0 : RegMap) (ap w18 : BitVec 64) : IProp GF := iprop%
   pkVaCells sp0 R0 ∗
   (∃ w : BitVec 64, wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFC0#64) 8 (DFrac.own 1) (w)) ∗
@@ -55,7 +55,7 @@ def pkFrame {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- The frame at the release path: the callee-saved registers restored,
 only `ra`, `s0`, `s2` still to be reloaded. -/
-def pkFrameExit {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+def pkFrameExit {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (sp0 ra s0 s2 : BitVec 64) : IProp GF := iprop%
   (∃ w : BitVec 64, wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) (w)) ∗
   (∃ w : BitVec 64, wordPointsTo (sp0 + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) (w)) ∗
@@ -253,7 +253,7 @@ theorem shr60_lt (v : BitVec 64) : (v >>> 60).toNat < 16 := by
 /-! ## The vararg slots -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- Vararg slot `kk` of the frame. -/
 theorem pkVaCells_acc (sp0 : BitVec 64) (R0 : RegMap) (kk : Nat) (hk : kk < 7) :
@@ -318,7 +318,7 @@ end
 /-! ## Splitting a slot: its low word -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 
 /-- Description `kk` of the varargs. -/
@@ -473,7 +473,7 @@ def dispatch7a0 (c0 c1 c2 : BitVec 8) : BitVec 64 :=
 /-! ## Frame introduction and access -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 theorem cell_ex (a w : BitVec 64) :
     wordPointsTo (GF := GF) a 8 (DFrac.own 1) w ⊢ ∃ w' : BitVec 64, wordPointsTo a 8 (DFrac.own 1) w' := by
@@ -635,7 +635,7 @@ theorem ite_decide_ne {α : Type} (n : Nat) (x y : α) :
 /-! ## The continuations of the walk -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
 
 /-- `printk`'s own postcondition, as the walk carries it: what its
 `release` needs to pop the base depth (the re-enable arm and, if it
@@ -730,7 +730,7 @@ theorem fmt_i3 (a : BitVec 64) (i : Nat) :
   rw [this]; ac_rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- The C string a `.str` description owns (the pointer not null), given
 back on return.  The string's own fact (no NUL inside) travels with the
@@ -781,7 +781,7 @@ end
 
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [CurCtx]
 
 /-- Both continuations of a `%` turn (one of them is taken). -/
 abbrev pkCont (cpu : CPU) (k : KCtx) (γpr : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac)
@@ -799,7 +799,7 @@ theorem pkCont_exit (cpu : CPU) (k : KCtx) (γpr : GName) (γd : UartNames) (bs 
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 
 end
@@ -848,13 +848,13 @@ theorem pkRegsN_of_cs (R0 R R' : RegMap) (h : pkRegsN R0 R)
     c24.trans h24, c26.trans h26, c27.trans h27⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 end
 
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- The first byte of a buffer. -/
 theorem byteBuf_acc0 (a : BitVec 64) (dq : DFrac) (bs : List (BitVec 8)) (b : BitVec 8) (hb : bs[0]? = some b) :
@@ -983,7 +983,7 @@ macro_rules
 
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 theorem pcIs_bne_bit (cpu : CPU) (b : BitVec 64) (p : Prop) [Decidable p] (a c : BitVec 64)
     (h : b = if p then 1#64 else 0#64) :

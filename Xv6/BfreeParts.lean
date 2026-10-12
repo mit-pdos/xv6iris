@@ -132,7 +132,7 @@ theorem bf_slots (a : Nat) (h : bfreeSlots ≤ a) :
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [CurCtx]
 
 /-! ## The handle -/
@@ -206,7 +206,7 @@ end
 /-! ## The three callees, at their call sites -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 /-- `log_write`'s atomic-update, credited form at its call site. -/
@@ -239,7 +239,7 @@ theorem bf_log_write (LW : LOG_WRITE)
       bioLocked γb V kk pidv dev bno bs bsd true -∗
       bslot -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := LW.wp_log_write_au (hlc := hlc) (GF := GF) c k' γ γl γb V γfs logstart dev kk pidv
+  have h := LW.wp_log_write_au (GF := GF) c k' γ γl γb V γfs logstart dev kk pidv
     bno bs bsl bsd d u cr Sb e0 vlb Efs Φfsb hK hnoff hlk hbc htier hkk ha0 hdev hcl hdt hhome
     hlogE
   unfold wp_log_write_au_body at h

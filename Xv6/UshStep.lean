@@ -158,7 +158,7 @@ theorem ush_cs_epi (m me : RegMap) (rs : List (BitVec 5)) (sp0 : BitVec 64) (hsp
 /-! ## §1 The step lemmas at `Nat` pcs -/
 
 section UshStep
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] {C : IProp GF} [Persistent C]
 
@@ -168,8 +168,8 @@ theorem ushS_itype (UL : UK_LEAVES) (N : UkNames GF) {x : Nat} {rvc : Bool} {imm
     (hi : C ⊢ uinstrIs N.t (BitVec.ofNat 64 x) rvc (.ITYPE (imm, .Regidx rs1, .Regidx rd, op)))
     (y : Nat) (h : CPU) (m : RegMap) (av : Nat) (v : BitVec 64) (hv : ukItypeVal op (m.get rs1) imm = v)
     (hy : x + (if rvc then 2 else 4) = y := by decide) (hns : unotSp rd := by unfold unotSp spIdx; decide) :
-    ⊢ C -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 x) av -∗
-      (∀ h' : CPU, urun (hlc := hlc) N h' (ukWr m rd v) (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗ wpLoop h := by
+    ⊢ C -∗ urun N h m (BitVec.ofNat 64 x) av -∗
+      (∀ h' : CPU, urun N h' (ukWr m rd v) (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗ wpLoop h := by
   iintro #HC Hrun Hk
   ihave #Hi := hi $$ HC
   iapply wp_uk_itype UL N h m _ rvc imm rs1 rd op av hns $$ Hi Hrun
@@ -183,8 +183,8 @@ theorem ushS_rtype (UL : UK_LEAVES) (N : UkNames GF) {x : Nat} {rvc : Bool} {rs2
     (y : Nat) (h : CPU) (m : RegMap) (av : Nat) (v : BitVec 64)
     (hv : ukRtypeVal op (m.get rs1) (m.get rs2) = v)
     (hy : x + (if rvc then 2 else 4) = y := by decide) (hns : unotSp rd := by unfold unotSp spIdx; decide) :
-    ⊢ C -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 x) av -∗
-      (∀ h' : CPU, urun (hlc := hlc) N h' (ukWr m rd v) (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗ wpLoop h := by
+    ⊢ C -∗ urun N h m (BitVec.ofNat 64 x) av -∗
+      (∀ h' : CPU, urun N h' (ukWr m rd v) (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗ wpLoop h := by
   iintro #HC Hrun Hk
   ihave #Hi := hi $$ HC
   iapply wp_uk_rtype UL N h m _ rvc rs2 rs1 rd op av hns $$ Hi Hrun
@@ -197,8 +197,8 @@ theorem ushS_mv (UL : UK_LEAVES) (N : UkNames GF) {x : Nat} {rvc : Bool} {rs rd 
     (hi : C ⊢ uinstrIs N.t (BitVec.ofNat 64 x) rvc (.RTYPE (.Regidx rs, .Regidx 0#5, .Regidx rd, .ADD)))
     (y : Nat) (h : CPU) (m : RegMap) (av : Nat) (v : BitVec 64) (hv : m.get rs = v)
     (hy : x + (if rvc then 2 else 4) = y := by decide) (hns : unotSp rd := by unfold unotSp spIdx; decide) :
-    ⊢ C -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 x) av -∗
-      (∀ h' : CPU, urun (hlc := hlc) N h' (ukWr m rd v) (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗ wpLoop h :=
+    ⊢ C -∗ urun N h m (BitVec.ofNat 64 x) av -∗
+      (∀ h' : CPU, urun N h' (ukWr m rd v) (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗ wpLoop h :=
   ushS_rtype UL N hi y h m av v (by rw [ukMv, hv]) hy hns
 
 /-- `li rd, d` (`addi rd, x0, d`; Rocq `wp_uk_li`, `cli`). -/
@@ -207,8 +207,8 @@ theorem ushS_li (UL : UK_LEAVES) (N : UkNames GF) {x : Nat} {rvc : Bool} {imm : 
     (y : Nat) (h : CPU) (m : RegMap) (av : Nat) (d : Nat)
     (hd : BitVec.signExtend 64 imm = BitVec.ofNat 64 d := by decide)
     (hy : x + (if rvc then 2 else 4) = y := by decide) (hns : unotSp rd := by unfold unotSp spIdx; decide) :
-    ⊢ C -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 x) av -∗
-      (∀ h' : CPU, urun (hlc := hlc) N h' (ukWr m rd (BitVec.ofNat 64 d)) (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗
+    ⊢ C -∗ urun N h m (BitVec.ofNat 64 x) av -∗
+      (∀ h' : CPU, urun N h' (ukWr m rd (BitVec.ofNat 64 d)) (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗
       wpLoop h :=
   ushS_itype UL N hi y h m av _ (ukLi m imm d hd) hy hns
 
@@ -217,8 +217,8 @@ theorem ushS_addiw (UL : UK_LEAVES) (N : UkNames GF) {x : Nat} {rvc : Bool} {imm
     (hi : C ⊢ uinstrIs N.t (BitVec.ofNat 64 x) rvc (.ADDIW (imm, .Regidx rs1, .Regidx rd)))
     (y : Nat) (h : CPU) (m : RegMap) (av : Nat) (v : BitVec 64) (hv : ukAddiwVal (m.get rs1) imm = v)
     (hy : x + (if rvc then 2 else 4) = y := by decide) (hns : unotSp rd := by unfold unotSp spIdx; decide) :
-    ⊢ C -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 x) av -∗
-      (∀ h' : CPU, urun (hlc := hlc) N h' (ukWr m rd v) (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗ wpLoop h := by
+    ⊢ C -∗ urun N h m (BitVec.ofNat 64 x) av -∗
+      (∀ h' : CPU, urun N h' (ukWr m rd v) (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗ wpLoop h := by
   iintro #HC Hrun Hk
   ihave #Hi := hi $$ HC
   iapply wp_uk_addiw UL N h m _ rvc imm rs1 rd av hns $$ Hi Hrun
@@ -231,8 +231,8 @@ theorem ushS_shiftiop (UL : UK_LEAVES) (N : UkNames GF) {x : Nat} {rvc : Bool} {
     (hi : C ⊢ uinstrIs N.t (BitVec.ofNat 64 x) rvc (.SHIFTIOP (sh, .Regidx rs1, .Regidx rd, op)))
     (y : Nat) (h : CPU) (m : RegMap) (av : Nat) (v : BitVec 64) (hv : ukShiftiopVal op (m.get rs1) sh = v)
     (hy : x + (if rvc then 2 else 4) = y := by decide) (hns : unotSp rd := by unfold unotSp spIdx; decide) :
-    ⊢ C -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 x) av -∗
-      (∀ h' : CPU, urun (hlc := hlc) N h' (ukWr m rd v) (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗ wpLoop h := by
+    ⊢ C -∗ urun N h m (BitVec.ofNat 64 x) av -∗
+      (∀ h' : CPU, urun N h' (ukWr m rd v) (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗ wpLoop h := by
   iintro #HC Hrun Hk
   ihave #Hi := hi $$ HC
   iapply wp_uk_shiftiop UL N h m _ rvc sh rs1 rd op av hns $$ Hi Hrun
@@ -245,8 +245,8 @@ theorem ushS_utype (UL : UK_LEAVES) (N : UkNames GF) {x : Nat} {rvc : Bool} {imm
     (hi : C ⊢ uinstrIs N.t (BitVec.ofNat 64 x) rvc (.UTYPE (imm, .Regidx rd, op)))
     (y : Nat) (h : CPU) (m : RegMap) (av : Nat) (v : BitVec 64) (hv : ukUtypeVal op (BitVec.ofNat 64 x) imm = v)
     (hy : x + (if rvc then 2 else 4) = y := by decide) (hns : unotSp rd := by unfold unotSp spIdx; decide) :
-    ⊢ C -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 x) av -∗
-      (∀ h' : CPU, urun (hlc := hlc) N h' (ukWr m rd v) (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗ wpLoop h := by
+    ⊢ C -∗ urun N h m (BitVec.ofNat 64 x) av -∗
+      (∀ h' : CPU, urun N h' (ukWr m rd v) (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗ wpLoop h := by
   iintro #HC Hrun Hk
   ihave #Hi := hi $$ HC
   iapply wp_uk_utype UL N h m _ rvc imm rd op av hns $$ Hi Hrun
@@ -262,8 +262,8 @@ theorem ushS_la (UL : UK_LEAVES) (N : UkNames GF) {x : Nat} {imm20 : BitVec 20} 
     (hsym : ukUtypeVal .AUIPC (BitVec.ofNat 64 x) imm20 + BitVec.signExtend 64 imm12 = BitVec.ofNat 64 sym :=
       by decide)
     (hns : unotSp rd := by unfold unotSp spIdx; decide) (hrd : rd ≠ 0#5 := by decide) :
-    ⊢ C -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 x) av -∗
-      (∀ h' : CPU, urun (hlc := hlc) N h' (ukWr (ukWr m rd (ukUtypeVal .AUIPC (BitVec.ofNat 64 x) imm20)) rd
+    ⊢ C -∗ urun N h m (BitVec.ofNat 64 x) av -∗
+      (∀ h' : CPU, urun N h' (ukWr (ukWr m rd (ukUtypeVal .AUIPC (BitVec.ofNat 64 x) imm20)) rd
           (BitVec.ofNat 64 sym)) (BitVec.ofNat 64 (x + 8)) av -∗ wpLoop h') -∗ wpLoop h := by
   iintro #HC Hrun Hk
   iapply ushS_utype UL N hi1 (x + 4) h m av _ rfl (by simp) hns $$ HC Hrun
@@ -282,8 +282,8 @@ theorem ushS_jal (UL : UK_LEAVES) (N : UkNames GF) {x : Nat} {rvc : Bool} {imm :
     (hy : x + (if rvc then 2 else 4) = y := by decide)
     (hal : (BitVec.ofNat 64 t).getLsbD 0 = false := by decide)
     (hns : unotSp rd := by unfold unotSp spIdx; decide) :
-    ⊢ C -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 x) av -∗
-      (∀ h' : CPU, urun (hlc := hlc) N h' (ukWr m rd (BitVec.ofNat 64 y)) (BitVec.ofNat 64 t) av -∗ wpLoop h') -∗
+    ⊢ C -∗ urun N h m (BitVec.ofNat 64 x) av -∗
+      (∀ h' : CPU, urun N h' (ukWr m rd (BitVec.ofNat 64 y)) (BitVec.ofNat 64 t) av -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #HC Hrun Hk
   ihave #Hi := hi $$ HC
@@ -298,8 +298,8 @@ theorem ushS_j (UL : UK_LEAVES) (N : UkNames GF) {x : Nat} {rvc : Bool} {imm : B
     (t : Nat) (h : CPU) (m : RegMap) (av : Nat)
     (ht : BitVec.ofNat 64 x + BitVec.signExtend 64 imm = BitVec.ofNat 64 t := by decide)
     (hal : (BitVec.ofNat 64 t).getLsbD 0 = false := by decide) :
-    ⊢ C -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 x) av -∗
-      (∀ h' : CPU, urun (hlc := hlc) N h' m (BitVec.ofNat 64 t) av -∗ wpLoop h') -∗ wpLoop h := by
+    ⊢ C -∗ urun N h m (BitVec.ofNat 64 x) av -∗
+      (∀ h' : CPU, urun N h' m (BitVec.ofNat 64 t) av -∗ wpLoop h') -∗ wpLoop h := by
   iintro #HC Hrun Hk
   have e : ∀ v, ukWr m 0#5 v = m := fun v => by unfold ukWr; rw [if_pos rfl]
   iapply ushS_jal UL N hi t (x + (if rvc then 2 else 4)) h m av ht rfl hal (by unfold unotSp spIdx; decide)
@@ -311,8 +311,8 @@ theorem ushS_j (UL : UK_LEAVES) (N : UkNames GF) {x : Nat} {rvc : Bool} {imm : B
 theorem ushS_ret (UL : UK_LEAVES) (N : UkNames GF) {x : Nat} {rvc : Bool}
     (hi : C ⊢ uinstrIs N.t (BitVec.ofNat 64 x) rvc (.JALR (0#12, .Regidx 1#5, .Regidx 0#5)))
     (h : CPU) (m : RegMap) (av : Nat) :
-    ⊢ C -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 x) av -∗
-      (∀ h' : CPU, urun (hlc := hlc) N h' m (retPc (m.get 1#5)) av -∗ wpLoop h') -∗ wpLoop h := by
+    ⊢ C -∗ urun N h m (BitVec.ofNat 64 x) av -∗
+      (∀ h' : CPU, urun N h' m (retPc (m.get 1#5)) av -∗ wpLoop h') -∗ wpLoop h := by
   iintro #HC Hrun Hk
   ihave #Hi := hi $$ HC
   iapply wp_uk_ret UL N h m _ rvc 1#5 av $$ Hi Hrun
@@ -328,8 +328,8 @@ theorem ushS_br (UL : UK_LEAVES) (N : UkNames GF) {x : Nat} {rvc : Bool} {imm : 
     (ht : (if ukBtaken op (m.get rs1) (m.get rs2) then BitVec.ofNat 64 x + BitVec.signExtend 64 imm
       else BitVec.ofNat 64 x + instrLen rvc) = BitVec.ofNat 64 tgt)
     (hal : (BitVec.ofNat 64 x + BitVec.signExtend 64 imm).getLsbD 0 = false := by decide) :
-    ⊢ C -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 x) av -∗
-      (∀ h' : CPU, urun (hlc := hlc) N h' m (BitVec.ofNat 64 tgt) av -∗ wpLoop h') -∗ wpLoop h := by
+    ⊢ C -∗ urun N h m (BitVec.ofNat 64 x) av -∗
+      (∀ h' : CPU, urun N h' m (BitVec.ofNat 64 tgt) av -∗ wpLoop h') -∗ wpLoop h := by
   iintro #HC Hrun Hk
   ihave #Hi := hi $$ HC
   iapply wp_uk_btype UL N h m _ rvc imm rs2 rs1 op av (fun _ => hal) $$ Hi Hrun
@@ -343,8 +343,8 @@ theorem ushS_brT (UL : UK_LEAVES) (N : UkNames GF) {x : Nat} {rvc : Bool} {imm :
     (t : Nat) (h : CPU) (m : RegMap) (av : Nat) (hb : ukBtaken op (m.get rs1) (m.get rs2) = true)
     (ht : BitVec.ofNat 64 x + BitVec.signExtend 64 imm = BitVec.ofNat 64 t := by decide)
     (hal : (BitVec.ofNat 64 x + BitVec.signExtend 64 imm).getLsbD 0 = false := by decide) :
-    ⊢ C -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 x) av -∗
-      (∀ h' : CPU, urun (hlc := hlc) N h' m (BitVec.ofNat 64 t) av -∗ wpLoop h') -∗ wpLoop h :=
+    ⊢ C -∗ urun N h m (BitVec.ofNat 64 x) av -∗
+      (∀ h' : CPU, urun N h' m (BitVec.ofNat 64 t) av -∗ wpLoop h') -∗ wpLoop h :=
   ushS_br UL N hi t h m av (by rw [hb, if_pos rfl, ht]) hal
 
 /-- A branch NOT taken: the fall-through. -/
@@ -353,8 +353,8 @@ theorem ushS_brN (UL : UK_LEAVES) (N : UkNames GF) {x : Nat} {rvc : Bool} {imm :
     (y : Nat) (h : CPU) (m : RegMap) (av : Nat) (hb : ukBtaken op (m.get rs1) (m.get rs2) = false)
     (hy : x + (if rvc then 2 else 4) = y := by decide)
     (hal : (BitVec.ofNat 64 x + BitVec.signExtend 64 imm).getLsbD 0 = false := by decide) :
-    ⊢ C -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 x) av -∗
-      (∀ h' : CPU, urun (hlc := hlc) N h' m (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗ wpLoop h :=
+    ⊢ C -∗ urun N h m (BitVec.ofNat 64 x) av -∗
+      (∀ h' : CPU, urun N h' m (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗ wpLoop h :=
   ushS_br UL N hi y h m av (by rw [hb]; simp only [Bool.false_eq_true, if_false]; exact ukPc x y rvc hy) hal
 
 /-- `ld rd, imm(rs1)` of a word held at a fraction (Rocq `wp_uk_ld`,
@@ -364,8 +364,8 @@ theorem ushS_ld (UL : UK_LEAVES) (N : UkNames GF) {x : Nat} {rvc : Bool} {imm : 
     (y : Nat) (h : CPU) (m : RegMap) (av : Nat) (dq : DFrac) (a : Nat) (w : BitVec 64)
     (ha : ((m.get rs1).toNat : Int) + imm.toInt = a) (hal : a % 8 = 0)
     (hy : x + (if rvc then 2 else 4) = y := by decide) (hns : unotSp rd := by unfold unotSp spIdx; decide) :
-    ⊢ C -∗ uwordq N.d dq a w -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 x) av -∗
-      (uwordq N.d dq a w -∗ ∀ h' : CPU, urun (hlc := hlc) N h' (ukWr m rd w) (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗
+    ⊢ C -∗ uwordq N.d dq a w -∗ urun N h m (BitVec.ofNat 64 x) av -∗
+      (uwordq N.d dq a w -∗ ∀ h' : CPU, urun N h' (ukWr m rd w) (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #HC Hw Hrun Hk
   ihave #Hi := hi $$ HC
@@ -380,9 +380,9 @@ theorem ushS_lbu (UL : UK_LEAVES) (N : UkNames GF) {x : Nat} {rvc : Bool} {imm :
     (y : Nat) (h : CPU) (m : RegMap) (av : Nat) (dq : DFrac) (a : Nat) (b : BitVec 8)
     (ha : ((m.get rs1).toNat : Int) + imm.toInt = a)
     (hy : x + (if rvc then 2 else 4) = y := by decide) (hns : unotSp rd := by unfold unotSp spIdx; decide) :
-    ⊢ C -∗ ubyteq N.d dq a b -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 x) av -∗
+    ⊢ C -∗ ubyteq N.d dq a b -∗ urun N h m (BitVec.ofNat 64 x) av -∗
       (ubyteq N.d dq a b -∗ ∀ h' : CPU,
-        urun (hlc := hlc) N h' (ukWr m rd (BitVec.setWidth 64 b)) (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗
+        urun N h' (ukWr m rd (BitVec.setWidth 64 b)) (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #HC Hb Hrun Hk
   ihave #Hi := hi $$ HC
@@ -397,8 +397,8 @@ theorem ushS_lbuT (UL : UK_LEAVES) (N : UkNames GF) {x : Nat} {rvc : Bool} {imm 
     (y : Nat) (h : CPU) (m : RegMap) (av : Nat) (a : Nat) (b : BitVec 8)
     (ha : ((m.get rs1).toNat : Int) + imm.toInt = a)
     (hy : x + (if rvc then 2 else 4) = y := by decide) (hns : unotSp rd := by unfold unotSp spIdx; decide) :
-    ⊢ C -∗ utext N.t a b -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 x) av -∗
-      (∀ h' : CPU, urun (hlc := hlc) N h' (ukWr m rd (BitVec.setWidth 64 b)) (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗
+    ⊢ C -∗ utext N.t a b -∗ urun N h m (BitVec.ofNat 64 x) av -∗
+      (∀ h' : CPU, urun N h' (ukWr m rd (BitVec.setWidth 64 b)) (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #HC #Hb Hrun Hk
   ihave #Hi := hi $$ HC
@@ -413,8 +413,8 @@ theorem ushS_sd (UL : UK_LEAVES) (N : UkNames GF) {x : Nat} {rvc : Bool} {imm : 
     (y : Nat) (h : CPU) (m : RegMap) (av : Nat) (a : Nat) (v0 : BitVec 64)
     (ha : ((m.get rs1).toNat : Int) + imm.toInt = a) (hal : a % 8 = 0)
     (hy : x + (if rvc then 2 else 4) = y := by decide) :
-    ⊢ C -∗ uword N.d a v0 -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 x) av -∗
-      (uword N.d a (m.get rs2) -∗ ∀ h' : CPU, urun (hlc := hlc) N h' m (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗
+    ⊢ C -∗ uword N.d a v0 -∗ urun N h m (BitVec.ofNat 64 x) av -∗
+      (uword N.d a (m.get rs2) -∗ ∀ h' : CPU, urun N h' m (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #HC Hw Hrun Hk
   ihave #Hi := hi $$ HC
@@ -429,9 +429,9 @@ theorem ushS_store (UL : UK_LEAVES) (N : UkNames GF) {x : Nat} {rvc : Bool} {imm
     (y : Nat) (h : CPU) (m : RegMap) (av : Nat) (a : Nat) (w0 : BitVec (8 * k)) (hk : ukWidth k)
     (ha : ((m.get rs1).toNat : Int) + imm.toInt = a) (hal : a % k = 0)
     (hy : x + (if rvc then 2 else 4) = y := by decide) :
-    ⊢ C -∗ ubytes N.d a k (nthByte w0) -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 x) av -∗
+    ⊢ C -∗ ubytes N.d a k (nthByte w0) -∗ urun N h m (BitVec.ofNat 64 x) av -∗
       (ubytes N.d a k (nthByte (n := 8) (m.get rs2)) -∗ ∀ h' : CPU,
-        urun (hlc := hlc) N h' m (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗
+        urun N h' m (BitVec.ofNat 64 y) av -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #HC Hw Hrun Hk
   ihave #Hi := hi $$ HC
@@ -529,9 +529,9 @@ top `rs.length` of the free-stack body at `sb`. -/
 theorem ush_spill (UL : UK_LEAVES) (N : UkNames GF) : ∀ (rs : List (BitVec 5)) (p u : Nat) (sb : BitVec 64) (h : CPU) (m : RegMap) (av : Nat),
     ushSdRun C N.t p u rs → sb.toNat = (m.get spIdx).toNat + u → 8 * rs.length ≤ u → u ≤ 2048 →
     sb.toNat % 8 = 0 →
-    ⊢ C -∗ ustackBody N.d sb rs.length -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 p) av -∗
+    ⊢ C -∗ ustackBody N.d sb rs.length -∗ urun N h m (BitVec.ofNat 64 p) av -∗
       (ushSaved N.d sb.toNat (rs.map m.get) -∗ ∀ h' : CPU,
-        urun (hlc := hlc) N h' m (BitVec.ofNat 64 (p + 2 * rs.length)) av -∗ wpLoop h') -∗ wpLoop h := by
+        urun N h' m (BitVec.ofNat 64 (p + 2 * rs.length)) av -∗ wpLoop h') -∗ wpLoop h := by
   intro rs
   induction rs with
   | nil =>
@@ -567,9 +567,9 @@ theorem ush_restore (UL : UK_LEAVES) (N : UkNames GF) : ∀ (rs : List (BitVec 5
     (av : Nat),
     ushLdRun C N.t p u rs → rs.length = vs.length → sb = (m.get spIdx).toNat + u → 8 * rs.length ≤ u →
     u ≤ 2048 → sb % 8 = 0 → (∀ r ∈ rs, r ≠ spIdx) →
-    ⊢ C -∗ ushSaved N.d sb vs -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 p) av -∗
+    ⊢ C -∗ ushSaved N.d sb vs -∗ urun N h m (BitVec.ofNat 64 p) av -∗
       (ushSaved N.d sb vs -∗ ∀ h' : CPU,
-        urun (hlc := hlc) N h' (ushWrs m rs vs) (BitVec.ofNat 64 (p + 2 * rs.length)) av -∗ wpLoop h') -∗
+        urun N h' (ushWrs m rs vs) (BitVec.ofNat 64 (p + 2 * rs.length)) av -∗ wpLoop h') -∗
       wpLoop h := by
   intro rs
   induction rs with
@@ -628,11 +628,11 @@ theorem ush_frame_pro (UL : UK_LEAVES) (N : UkNames GF) (k : Nat) (rs : List (Bi
     (himmf : BitVec.signExtend 64 immf = BitVec.ofNat 64 (8 * k) := by decide)
     (hrs : ∀ r ∈ rs, r ≠ spIdx := by decide)
     (hpe : p0 + 2 + 2 * rs.length + (if rvcfp then 2 else 4) = pe := by decide) :
-    ⊢ C -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 p0) (k + nn) -∗
+    ⊢ C -∗ urun N h m (BitVec.ofNat 64 p0) (k + nn) -∗
       (⌜(m.get spIdx).toNat % 8 = 0 ∧ 8 * (k + nn) ≤ (m.get spIdx).toNat⌝ -∗
         ushSaved N.d (m.get spIdx).toNat (rs.map m.get) -∗
         ustack N.d (BitVec.ofNat 64 ((m.get spIdx).toNat - 8 * rs.length)) n -∗
-        ∀ h' : CPU, urun (hlc := hlc) N h'
+        ∀ h' : CPU, urun N h'
           (ukWr (ukWr m spIdx (m.get spIdx + BitVec.ofInt 64 (-((8 * k : Nat) : Int)))) 8#5 (m.get spIdx))
           (BitVec.ofNat 64 pe) nn -∗ wpLoop h') -∗
       wpLoop h := by
@@ -696,8 +696,8 @@ theorem ush_frame_epi (UL : UK_LEAVES) (N : UkNames GF) (k : Nat) (rs : List (Bi
     (himmp : BitVec.signExtend 64 immp = BitVec.ofNat 64 (8 * k) := by decide)
     (hrs : ∀ r ∈ rs, r ≠ spIdx := by decide) :
     ⊢ C -∗ ushSaved N.d sp0.toNat vs -∗ ustack N.d (BitVec.ofNat 64 (sp0.toNat - 8 * rs.length)) n -∗
-      urun (hlc := hlc) N h me (BitVec.ofNat 64 q0) nn -∗
-      (∀ h' : CPU, urun (hlc := hlc) N h' (ukWr (ushWrs me rs vs) spIdx sp0)
+      urun N h me (BitVec.ofNat 64 q0) nn -∗
+      (∀ h' : CPU, urun N h' (ukWr (ushWrs me rs vs) spIdx sp0)
           (retPc ((ushWrs me rs vs).get 1#5)) (k + nn) -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #HC Hsv Hloc Hrun Hk

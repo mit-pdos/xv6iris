@@ -83,7 +83,7 @@ theorem cfe_kdp0 (pn : PNames) (gp : PipeNames) (w : Wid) (A X : List (List (Bit
   exact ⟨pn, gp, w, A, X, rfl⟩
 
 section CfeEntries
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [PipesNG GF] [CifRegG GF]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
@@ -91,11 +91,11 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fi
 
 /-- **Rocq `UkCatFEntries`'s section context** (deviation 1). -/
 structure CfeCtx where
-  R : PnsRound hlc GF
+  R : PnsRound GF
   OK : PnsRoundOk R
   cf : FileFixed
   rf : FileAppNames
-  heq : fileAppIs (hlc := hlc) (GF := GF) cf rf
+  heq : fileAppIs (GF := GF) cf rf
   /-- the stubs' engine (DU2) -/
   UL : UK_LEAVES
   /-- the free handler's credentials and minting laws (deviation 1) -/
@@ -103,26 +103,26 @@ structure CfeCtx where
   Sup : IProp GF
   hKc : Persistent Kc
   hSup : Persistent Sup
-  lawW : ⊢ Sup -∗ Kc -∗ udepwLaw (hlc := hlc) (GF := GF) 16
-  lawR : ⊢ Sup -∗ Kc -∗ udepwLaw (hlc := hlc) (GF := GF) 5
-  lawC : ⊢ Kc -∗ udepwLaw (hlc := hlc) (GF := GF) 21
-  lawO : ⊢ Sup -∗ udepwLaw (hlc := hlc) (GF := GF) 15
+  lawW : ⊢ Sup -∗ Kc -∗ udepwLaw (GF := GF) 16
+  lawR : ⊢ Sup -∗ Kc -∗ udepwLaw (GF := GF) 5
+  lawC : ⊢ Kc -∗ udepwLaw (GF := GF) 21
+  lawO : ⊢ Sup -∗ udepwLaw (GF := GF) 15
   hTKc : ⊢ □ (R.G.gcT -∗ Kc)
   hTSup : ⊢ □ (R.G.gcT -∗ Sup)
   /-- the file device's own parameters (deviation 1, lane hfp-F1): its open
   claims (discharged by `hfpFileOpen_holds` at the fs tier's classes) -/
-  FO : HfpFileOpenP (hlc := hlc) (GF := GF)
+  FO : HfpFileOpenP (GF := GF)
 
 /-- Rocq `cfe_cat_code_persistent`. -/
 theorem cfe_code_persistent (N' : UkNames GF) : Persistent (catProg N').code := by
   unfold catProg; infer_instance
 
 namespace CfeCtx
-variable (C : CfeCtx (hlc := hlc) (GF := GF))
+variable (C : CfeCtx (GF := GF))
 
 include C in
 /-- `UkFileDevSysP` at the landed leaves. -/
-theorem sysd : UkFileDevSysP (hlc := hlc) (GF := GF) :=
+theorem sysd : UkFileDevSysP (GF := GF) :=
   UkFileDevSysP.ofLanded C.UL
 
 /-- The device laws at the instance `N'` (`CifDevP.ofOwners`). -/
@@ -133,7 +133,7 @@ def dev (N' : UkNames GF) : CifDevP N' (catProg N') :=
 /-- `UkCatFIface`'s section context at the entry's instance. -/
 def env (γreg : GName) (kds : List (Nat × CfDev)) (hkds : (kds.map Prod.fst).Nodup)
     (hkdp : ∀ dk, dk ∈ kds → ∃ pn gp w A X, dk.2 = CfDev.UDProd pn gp w A X)
-    (qf : Qp) (sf : Dst) (N' : UkNames GF) (hNc : UknConst N') : CifEnv (hlc := hlc) (GF := GF) where
+    (qf : Qp) (sf : Dst) (N' : UkNames GF) (hNc : UknConst N') : CifEnv (GF := GF) where
   R := C.R
   OK := C.OK
   cf := C.cf
@@ -166,7 +166,7 @@ def env (γreg : GName) (kds : List (Nat × CfDev)) (hkds : (kds.map Prod.fst).N
 noncomputable def iface (γreg : GName) (kds : List (Nat × CfDev)) (hkds : (kds.map Prod.fst).Nodup)
     (hkdp : ∀ dk, dk ∈ kds → ∃ pn gp w A X, dk.2 = CfDev.UDProd pn gp w A X)
     (qf : Qp) (sf : Dst) (N' : UkNames GF) (hNc : UknConst N') :
-    EpIfaceP (hlc := hlc) N' (catProg N') (kds.map Prod.fst) :=
+    EpIfaceP N' (catProg N') (kds.map Prod.fst) :=
   (C.env γreg kds hkds hkdp qf sf N' hNc).iface
 
 /-- **Rocq `LEND`**: the stage's lend at the context. -/
@@ -178,7 +178,7 @@ end CfeCtx
 
 /-- **Rocq `pse_catf_image_entry_gen`**: THE ENTRY, at either state of the
 file `f` -- any name of the class (cut W3). -/
-theorem pse_catf_image_entry_gen (C : CfeCtx (hlc := hlc) (GF := GF))
+theorem pse_catf_image_entry_gen (C : CfeCtx (GF := GF))
     (f : List (BitVec 8)) (Me : ElfMem) (Mv : Nat → List (BitVec 8)) (sv t : Nat) (gn : Nat → BitVec 8)
     (sts : List FdState) (cw : Nat) (cs : ExtTreeSet GName compare) (pidv : BitVec 32)
     (Q : Int → IProp GF) (pn : PNames) (gp : PipeNames) (w : Wid) (A X ds xs : List (List (BitVec 8)))
@@ -191,9 +191,9 @@ theorem pse_catf_image_entry_gen (C : CfeCtx (hlc := hlc) (GF := GF))
     (hl2 : (sts.take NSTD)[2]? = some (.open rb2 true (.device CONSOLE)))
     (hcase : ((sf[f]?).map Prod.snd = some C.R.L ∧ catDgOpen f ∈ xs ∧ [] ∈ ds ∧ catDgWrite ∈ ds) ∨
       (sf[f]? = none ∧ catDgOpen f ∈ xs)) :
-    ⊢ urunNopipe (hlc := hlc) (SG := uexecSGXv6 (hlc := hlc)) sts -∗ udep (hlc := hlc) (SG := uexecSGXv6 (hlc := hlc)) -∗
+    ⊢ urunNopipe (SG := uexecSGXv6) sts -∗ udep (SG := uexecSGXv6) -∗
       imageEntry User.Cat.elf Mv (BitVec.ofNat 64 (t + 8)) sts cw seccAll cs pidv Q
-        (C.lend qf sf pn gp w A X ds xs Q) (uslot (hlc := hlc) (SG := uexecSGXv6 (hlc := hlc))) := by
+        (C.lend qf sf pn gp w A X ds xs Q) (uslot (SG := uexecSGXv6)) := by
   let wv : Nat → CfDev := fun _ => .UDProd pn gp w A X
   let kds : List (Nat × CfDev) := [(0, .UDProd pn gp w A X)]
   let files := filesOf (dstContent sf)

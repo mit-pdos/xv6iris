@@ -36,7 +36,7 @@ def bufNextVal (i : Nat) : BitVec 64 := if i = 0 then bcacheHeadAddr else bufAdd
 def bufPrevVal (i : Nat) : BitVec 64 := if i = 29 then bcacheHeadAddr else bufAddr (i + 1)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 
 /-- Buffer `i`'s fields `binit` touches, before. -/
 def bufIn (i : Nat) : IProp GF := iprop%
@@ -71,8 +71,8 @@ end
 
 /-- The interface of `binit`. -/
 structure BINIT : Prop where
-  wp_binit : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
+  wp_binit : ∀ {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (vlock : BitVec 32) (vname vcpu vhp vhn : BitVec 64) hK,
-    wp_binit_body (hlc := hlc) (GF := GF) cpu k vlock vname vcpu vhp vhn hK
+    wp_binit_body (GF := GF) cpu k vlock vname vcpu vhp vhn hK
 
 end Xv6

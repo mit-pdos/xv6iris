@@ -72,9 +72,9 @@ def ndRoup (L : List (BitVec 8)) : WrOut → RdOut
   | _ => RdGone
 
 section Read
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF] [PipesNG GF]
-variable {D : PdRound hlc GF} {fs : List Filt} {Qfin Rtop : IProp GF}
+variable {D : PdRound GF} {fs : List Filt} {Qfin Rtop : IProp GF}
 
 variable (D) in
 /-- What node `k` knows of the pipe above it once it has read (Rocq's inline

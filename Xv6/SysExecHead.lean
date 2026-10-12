@@ -62,7 +62,7 @@ theorem sys_exec_head_ret_12 : jumpPc (KA.«sys_exec» + 0x12#64) = KA.«sys_exe
 theorem sys_exec_head_ret_20 : jumpPc (KA.«sys_exec» + 0x20#64) = KA.«sys_exec» + 0x20#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -90,7 +90,7 @@ def sysExecHeadOuts (k : KCtx) (A : SysExecArgs) : IProp GF :=
 
 /-- The fabric holds the sysfile environment (argstr's). -/
 theorem sys_exec_head_env (Γ : SchedNames) (A : SysExecArgs) :
-    sysExecEnv (hlc := hlc) (GF := GF) Γ A ⊢ sysfileEnv (hlc := hlc) Γ := by
+    sysExecEnv (GF := GF) Γ A ⊢ sysfileEnv Γ := by
   unfold sysExecEnv fsFabric sysfileEnv
   iintro ⟨#Hr, #Hp, #Hs, -⟩
   iframe #
@@ -189,7 +189,7 @@ theorem sys_exec_head_str (AS : ARGSTR) (Γ : SchedNames) (k : KCtx) (A : SysExe
     (hS : SysExecStatic k A) (c : CPU) (spie spp : Bool) (R : RegMap)
     (hpins : sysExecPinsE k R) (hal : (k.regs 2#5).toNat % 8 = 0) :
     kctx c (((k.withSpie spie spp).pushed 60).withRegs R) ∗ pcIs c (KA.«sys_exec» + 0x12#64) ∗
-    trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗ sysExecEnv (hlc := hlc) Γ A ∗
+    trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗ sysExecEnv Γ A ∗
     procPrivFd A.γ (procAddr A.j) A.pid A.V A.M ∗
     sysExecRaS0 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗ sysExecSpillsFree (k.regs 2#5) ∗
     sysExecSlot10 (k.regs 2#5) ∗ sysfileAny (sysExecPath (k.regs 2#5)) 128 ∗
@@ -201,7 +201,7 @@ theorem sys_exec_head_str (AS : ARGSTR) (Γ : SchedNames) (k : KCtx) (A : SysExe
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hblk, Hrs, Hsp, H10, Hpath, Hargv, H59, H60, HO⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   obtain ⟨-, -, -, hKas, -⟩ := sys_exec_K _ hS.hK
-  ihave #Hsf := sys_exec_head_env (hlc := hlc) Γ A $$ Henv
+  ihave #Hsf := sys_exec_head_env Γ A $$ Henv
   icases (show sysfileAny (GF := GF) (sysExecPath (k.regs 2#5)) 128 ⊢
       ∃ bs : List (BitVec 8), ⌜bs.length = 128⌝ ∗ byteBuf (sysExecPath (k.regs 2#5)) (DFrac.own 1) bs
     from .rfl) $$ Hpath with ⟨%old, %hold, Hbuf⟩
@@ -254,7 +254,7 @@ set_option maxHeartbeats 16000000 in
 prologue, `addi a1,s0,-472`, `c.li a0,1`, `argaddr(1, &uargv)` over the
 core's trapframe quarter (slot 59 := `A.v1`); then `sys_exec_head_str`. -/
 theorem sys_exec_head (AA : ARGADDR) (AS : ARGSTR) (Γ : SchedNames) (k : KCtx) (A : SysExecArgs)
-    (hS : SysExecStatic k A) : ⊢ sysExecHeadBody (hlc := hlc) (GF := GF) Γ k A := by
+    (hS : SysExecStatic k A) : ⊢ sysExecHeadBody (GF := GF) Γ k A := by
   unfold sysExecHeadBody
   iintro %c Hk Hpc Hte Hce #Henv Hblk HO
   ihave HO : sysExecHeadOuts (GF := GF) k A $$ [HO]

@@ -32,17 +32,17 @@ open Std (ExtTreeSet)
 open UexecSG
 
 section K
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [FsTopG GF] [OffboxG GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-- **Rocq `pns_cons_nil`** (= `UkPipeIface.pif_cons_nil`): a ZERO-LENGTH
 write at a console row, at any device resource. -/
-theorem pns_cons_nil (UL : UK_LEAVES) (N : UkNames GF) (P : Uprog GF) (Hsw : ⊢ stubLaw (hlc := hlc) N P.code 16 P.write)
+theorem pns_cons_nil (UL : UK_LEAVES) (N : UkNames GF) (P : Uprog GF) (Hsw : ⊢ stubLaw N P.code 16 P.write)
     (l : List FdState) (fd : Nat) (rb : Bool) (R : IProp GF) (K : Int → IProp GF)
     (hfd : fd < NSTD) (hlk : l[fd]? = some (.open rb true (.device CONSOLE))) :
-    ⊢ ustd N.fd l -∗ R -∗ (ustd N.fd l -∗ R -∗ K 0) -∗ wrObl (hlc := hlc) N P (fd : Int) [] K := by
+    ⊢ ustd N.fd l -∗ R -∗ (ustd N.fd l -∗ R -∗ K 0) -∗ wrObl N P (fd : Int) [] K := by
   unfold wrObl
   iintro Hstd HR HK %h %m %avail %ua %tx %dq %f %hbf %ha0 %ha1 %ha2 Hcode Hsrc Hrun Hcont
   simp only [List.length_nil] at ha2 ⊢

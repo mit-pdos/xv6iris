@@ -26,7 +26,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
+variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-! ## A brand-new context -/
 
@@ -37,7 +37,7 @@ authority). -/
 theorem ctx_fresh (cpu : CPU) : ⊢@{IProp GF} |==> ∃ ξ : CtxId, ownCtx cpu ξ := by
   imod (MonoNat.own_alloc (GF := GF) (.ofNat 0)) with ⟨%γb, Hb, _⟩
   imod (ghost_map_alloc_empty (GF := GF) (K := Nat) (V := CPU) (H := RegMapF)) with ⟨%γd, Hd⟩
-  imod (MonoNat.lb_own_0 (GF := GF) ((MachGS.era (hlc := hlc) (GF := GF)).viewName cpu)) with #Hv
+  imod (MonoNat.lb_own_0 (GF := GF) ((MachGS.era (GF := GF)).viewName cpu)) with #Hv
   imodintro
   iexists ⟨γb, γd⟩
   iapply ownCtx_intro cpu ⟨γb, γd⟩ 0 0 0 ∅
