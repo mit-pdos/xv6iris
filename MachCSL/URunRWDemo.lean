@@ -26,6 +26,7 @@ The Iris side is one application of `swp_runRW` per fact
 (`urwDemo_swp_add`, `urwDemo_swp_ld`).
 -/
 import MachCSL.BvEnumSatp
+import MachCSL.BvEnums -- `bv_decide`'s enum encodings, declared once
 import MachCSL.UExecAluGpr
 
 noncomputable section

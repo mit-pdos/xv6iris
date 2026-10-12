@@ -43,7 +43,12 @@ open Lean Elab Tactic Meta in
 with the simp cache kept across calls (see above). -/
 def kNormSimp (extra : Array Term) (e : Lean.Expr) : TacticM Simp.Result := withMainContext do
   let lems ← extra.mapM fun l => `(Lean.Parser.Tactic.simpLemma| $l:term)
-  let stx ← `(tactic| simp only [k_norm_simps, k_addr, $lems,*])
+  -- `implicitDefEqProofs := false`: with implicit `rfl` rewrites (Lean ≥ 4.34) the proof simp
+  -- builds for a conditional lemma's side condition (`8 ≤ (k.withSpie a b).avail`, rewritten by
+  -- the `rfl` projection lemmas and then a hypothesis) has the rewritten type, which no longer
+  -- unifies with the side condition at simp's transparency ("failed to assign proof"), so
+  -- `KCtx.pushOffAt_pushed` and its kin would never fire.
+  let stx ← `(tactic| simp (config := { implicitDefEqProofs := false }) only [k_norm_simps, k_addr, $lems,*])
   let { ctx, simprocs, .. } ← mkSimpContext stx (eraseLocal := false)
   let lctx ← getLCtx
   let mut key : UInt64 := 1723
@@ -79,7 +84,7 @@ def kNormGoalAll (extra : Array Term) : TacticM Unit := do
       let tgt ← instantiateMVars (← goal.getType)
       unless tgt.isAppOfArity `Iris.ProofMode.Entails' 4 do
         let lems ← extra.mapM fun l => `(Lean.Parser.Tactic.simpLemma| $l:term)
-        evalTactic (← `(tactic| simp only [k_norm_simps, k_addr, $lems,*]))
+        evalTactic (← `(tactic| simp (config := { implicitDefEqProofs := false }) only [k_norm_simps, k_addr, $lems,*]))
         return
       let r ← kNormSimp extra tgt
       if r.expr == tgt then throwError "k_norm: no progress"

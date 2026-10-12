@@ -8,6 +8,9 @@ Rocq prototype's `word_pointsto`), so an instruction rule takes the cell and
 nothing else: no client proves RAM membership or alignment at a memory access.
 -/
 import MachCSL.KMap
+import MachCSL.BvEnums -- `bv_decide`'s enum encodings, declared once
+
+noncomputable section
 
 namespace MachCSL
 

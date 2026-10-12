@@ -12,6 +12,7 @@ cell from the context and re-introducing it after the later; or, if the head
 is a call of a model function, unfolds that function.  `swp_run n` repeats
 this up to `n` times.
 -/
+import MachCSL.DecInst
 import MachCSL.HwConfig
 
 noncomputable section
@@ -37,6 +38,25 @@ theorem bindCont_ok {ε : Type} {m : Type → Type} [Monad m] {α β : Type}
 
 theorem bindCont_error {ε : Type} {m : Type → Type} [Monad m] {α β : Type}
     (f : α → ExceptT ε m β) (e : ε) : ExceptT.bindCont f (.error e) = pure (.error e) := rfl
+
+/-- Lean ≥ 4.34 compiles a `match` on literals into `dite`s whose branches are cast with
+`Eq.ndrec_symm`; with a constant motive (every Sail match result type is) the cast is the
+identity, so the executor can enter the chosen branch. -/
+@[sail_facts] theorem ndrec_symm_const {α : Sort _} {β : Sort _} {a b : α} (m : β) (h : b = a) :
+    @Eq.ndrec_symm α a (fun _ => β) m b h = m := by cases h; rfl
+
+/-- Lean ≥ 4.34 compiles a `match` on literals into `dite`s whose branches are `Eq.rec` casts
+at a constant motive.  Stripping the casts, then collapsing the proof-free `dite`s to `ite`s
+(`dite_eq_ite`), gives the executor the conditionals it knows: an `ite`'s hidden branches do not
+mention the condition, so a rewrite of the condition cannot leave them stale. -/
+@[sail_facts] theorem eqRec_const_motive {α : Sort _} {β : Sort _} {a b : α} (m : β) (h : a = b) :
+    (@Eq.rec α a (fun _ _ => β) m b h) = m := by cases h; rfl
+
+attribute [sail_facts] dite_eq_ite
+
+/-- The same for the eta-reduced branch `Eq.ndrec_symm m` of a `dite`. -/
+@[sail_facts] theorem ndrec_symm_const_fun {α : Sort _} {β : Sort _} {a b : α} (m : β) :
+    (@Eq.ndrec_symm α a (fun _ => β) m b) = fun _ => m := funext fun h => by cases h; rfl
 
 @[sail_facts] theorem addInt_zero {w : Nat} (x : BitVec w) : Sail.BitVec.addInt x 0 = x := by
   simp [Sail.BitVec.addInt]
@@ -209,7 +229,7 @@ simproc_decl pureBindValue (_) := pureBindValueCore
 /-- Normalise the head of the computation. -/
 macro "sail_norm" : tactic =>
   `(tactic| simp only [reduceClosedBEq, reduceClosedBNe, reduceClosedNot, reduceClosedAnd,
-      reduceClosedOr, reduceClosedDecide, reduceClosedIte, reduceClosedDIte, reduceClosedEq, reduceClosedNe, reduceClosedLe,
+      reduceClosedOr, reduceClosedDecide, reduceClosedIte, reduceClosedDIte, fixDecInst, fixDecInstD, fixDecInstDecide, fixDiteBinders, reduceClosedEq, reduceClosedNe, reduceClosedLe,
       reduceClosedLt, reduceClosedMem,
       sail_facts, ↓ pureBindValue, pureBindValue, bind_assoc, bind_pure, map_eq_pure_bind,
 BitVec.reduceNeg, BitVec.reduceNot, BitVec.reduceAnd, BitVec.reduceOr, BitVec.reduceXOr,
@@ -309,6 +329,28 @@ def mkSailNormCtx : TacticM (Simp.Context × Simp.SimprocsArray) := do
   let { ctx, simprocs, .. } ← Lean.Elab.Tactic.mkSimpContext simpStx (eraseLocal := false)
   return (ctx, simprocs)
 
+/-- The repair pass of `MachCSL.DecInst` (Lean ≥ 4.34: a definitional rewrite under an `if`
+leaves the `Decidable` instance and a `dite`'s branch binder types stale, and the next `simp`
+refuses the goal).  A separate definitional pass over the normaliser's result, with only the
+repair dsimprocs: the repair does not take effect inside the pass that creates the staleness. -/
+initialize fixDecCtx : IO.Ref (Option (Simp.Context × Simp.SimprocsArray)) ← IO.mkRef none
+
+def getFixDecCtx : MetaM (Simp.Context × Simp.SimprocsArray) := do
+  if let some c ← fixDecCtx.get then return c
+  let ctx ← Simp.mkContext {} (simpTheorems := #[]) (congrTheorems := ← getSimpCongrTheorems)
+  let mut procs : Simp.Simprocs := {}
+  for n in [``fixDecInst, ``fixDecInstD, ``fixDecInstDecide, ``fixDiteBinders] do
+    procs ← procs.add n (post := true)
+  let c := (ctx, #[procs])
+  fixDecCtx.set (some c)
+  return c
+
+def fixDecPass (r : Simp.Result) : MetaM Simp.Result := do
+  let (ctx, procs) ← getFixDecCtx
+  let ctx ← ctx.setLctxInitIndices
+  let (r2, _) ← Lean.Meta.simp r.expr ctx procs
+  r.mkEqTrans r2
+
 def getSailNormCtx : TacticM (Simp.Context × Simp.SimprocsArray) := do
   if let some c ← sailNormCtx.get then return c
   mkSailNormCtx
@@ -330,6 +372,7 @@ def sailNormFocused : TacticM Unit := withMainContext do
   let (ctx, simprocs) ← getSailNormCtx
   let ctx ← ctx.setLctxInitIndices
   let (r, _) ← withOptions (·.setBool `swp_run.deferPure true) <| Lean.Meta.simp m ctx simprocs
+  let r ← fixDecPass r
   if r.expr == m then throwError "simp made no progress"
   let tgt' := mapSwp tgt fun _ => r.expr
   match r.proof? with
@@ -483,7 +526,7 @@ def unfoldModelIn (e : Lean.Expr) : TacticM Unit := do
   if cs.isEmpty then
     -- no model function left: evaluate the arithmetic of the condition
     evalTactic (← `(tactic| simp only [reduceClosedBEq, reduceClosedBNe, reduceClosedNot,
-      reduceClosedAnd, reduceClosedOr, reduceClosedDecide, reduceClosedIte, reduceClosedDIte, reduceClosedEq, reduceClosedNe,
+      reduceClosedAnd, reduceClosedOr, reduceClosedDecide, reduceClosedIte, reduceClosedDIte, fixDecInst, fixDecInstD, fixDecInstDecide, fixDiteBinders, reduceClosedEq, reduceClosedNe,
       reduceClosedLe, reduceClosedLt, reduceClosedMem, sail_facts, BitVec.reduceNeg, BitVec.reduceNot, BitVec.reduceAnd, BitVec.reduceOr, BitVec.reduceXOr,
       BitVec.reduceAdd, BitVec.reduceMul, BitVec.reduceSub, BitVec.reduceShiftLeft,
       BitVec.reduceUShiftRight, BitVec.reduceSShiftRight, BitVec.reduceAppend, BitVec.reduceToNat,
@@ -512,11 +555,33 @@ def unfoldModelIn (e : Lean.Expr) : TacticM Unit := do
     -- go through their equation lemmas
     unfoldConsts cs
 
+/-- Repair the `if`s of the `swp` computation (`MachCSL.DecInst`): definitional, so the goal is
+replaced without a proof.  Before a rewrite with hypotheses or lemmas, which `simp` refuses on a
+goal that is not type-correct at reducible transparency. -/
+def fixDecFocused : TacticM Unit := withMainContext do
+  let goal ← getMainGoal
+  let tgt ← instantiateMVars (← goal.getType)
+  let trace := (← getOptions).getBool `swp_run.trace
+  let some m := getSwp tgt
+    | do
+      if trace then logInfo m!"fixDecFocused: no swp goal"
+      return
+  let (ctx, procs) ← getFixDecCtx
+  let ctx ← ctx.setLctxInitIndices
+  let (r, _) ← Lean.Meta.simp m ctx procs
+  if trace then logInfo m!"fixDecFocused: changed={r.expr != m}"
+  if r.expr == m then return
+  let tgt' := mapSwp tgt fun _ => r.expr
+  replaceMainGoal [← goal.replaceTargetDefEq tgt']
+
+elab "fix_dec_focused" : tactic => fixDecFocused
+
 /-- Rewrite the goal with the local equational hypotheses (`h : c = true`,
 `h : f x = v`, `h : ¬ p`): facts the proof established about a symbolic
 condition are used before the condition's functions get unfolded.  Returns
 whether the goal changed. -/
 def rewriteWithHyps : TacticM Bool := withMainContext do
+  fixDecFocused
   let mut ids : Array Ident := #[]
   for d in ← getLCtx do
     if d.isImplementationDetail then continue
@@ -528,7 +593,10 @@ def rewriteWithHyps : TacticM Bool := withMainContext do
   if ids.isEmpty then return false
   let before ← instantiateMVars (← getMainTarget)
   let args ← ids.mapM fun i => `(Lean.Parser.Tactic.simpLemma| $i:ident)
-  evalTactic (← `(tactic| try simp only [$args,*]))
+  try evalTactic (← `(tactic| simp only [$args,*]))
+  catch e => do
+    if (← getOptions).getBool `swp_run.trace then
+      logInfo m!"rewriteWithHyps: simp only [{ids}] raised: {e.toMessageData}"
   let after ← instantiateMVars (← getMainTarget)
   return !(before == after)
 
@@ -587,8 +655,18 @@ partial def unfoldHead (x : Lean.Expr) : TacticM Unit := do
       evalTactic (← `(tactic| unfold $f:ident))
       reduceClosedItesEverywhere
     else if let some c ← headCondition x then
-      if ← rewriteWithHyps then (try sailNormFocused catch _ => pure ())
-      else unfoldModelIn c
+      let trace := (← getOptions).getBool `swp_run.trace
+      let changed ← rewriteWithHyps
+      if trace then logInfo m!"swp_step: head condition {c}\n  rewriteWithHyps changed={changed}; model consts: {modelConsts (← getEnv) c}"
+      if trace && changed then
+        let tgt ← instantiateMVars (← getMainTarget)
+        let hd := (getSwp tgt).map headAction
+        logInfo m!"swp_step: head after rewriteWithHyps: {hd}"
+      if changed then (try sailNormFocused catch _ => pure ())
+      else
+        let before ← instantiateMVars (← getMainTarget)
+        unfoldModelIn c
+        if trace then logInfo m!"swp_step: unfoldModelIn changed={before != (← instantiateMVars (← getMainTarget))}"
     else
       -- loop combinators, library wrappers: unfold the head symbol
       let f := mkIdent n
@@ -831,9 +909,13 @@ the goal beta-reduced.  (`simp` does not unfold `let` variables, and the event
 rules are generic in the continuation.)  On the mstatus legaliser this turns
 a 70 s run into a 6 s one. -/
 
-/-- The branches of an `if` (both are left alone until the condition decides). -/
+/-- The branches of an `if` (both are left alone until the condition decides).  Only a plain
+`ite`'s: a `dite`'s branches are the `Eq.rec`-cast alternatives of a compiled literal `match`
+(Lean ≥ 4.34), and the normaliser must see them to strip the casts and collapse the `dite` to an
+`ite` (`eqRec_const_motive`, `dite_eq_ite`); hidden, their types would also go stale when the
+condition is rewritten. -/
 def branchesOf (x : Lean.Expr) : Array Lean.Expr :=
-  if x.isAppOfArity ``ite 5 || x.isAppOfArity ``dite 5 then #[x.getAppArgs[3]!, x.getAppArgs[4]!]
+  if x.isAppOfArity ``ite 5 then #[x.getAppArgs[3]!, x.getAppArgs[4]!]
   else #[]
 
 /-- The continuations of the head of `m`: what the next step leaves untouched
@@ -1076,6 +1158,10 @@ elab "swp_run " n:num : tactic => withSailNormCtx do
           catch e => do
             if trace then logInfo m!"swp_run: pass raised: {e.toMessageData}"
             pure false
+        -- the pass ran with the continuations hidden: the branches of an `if` whose condition it
+        -- rewrote are stale lambdas again once unhidden (MachCSL.DecInst); repair before anything
+        -- looks at the head
+        fixDecFocused
         lastHid := hid
         let after ← instantiateMVars (← getMainTarget)
         if trace then logInfo m!"swp_run: pass changed={before != after} hidden={hid}"
@@ -1110,8 +1196,12 @@ elab "swp_run " n:num : tactic => withSailNormCtx do
         let _ ← try withHiddenConts sailNormFocused catch _ => pure false
       break
     let wasReg ← headIsRegEvent
-    let ok ← try let _ ← withHiddenConts (evalTactic (← `(tactic| swp_step))); pure true catch _ => pure false
+    let ok ← try let _ ← withHiddenConts (evalTactic (← `(tactic| swp_step))); pure true
+      catch e => do
+        if (← getOptions).getBool `swp_run.trace then logInfo m!"swp_run: step raised: {e.toMessageData}"
+        pure false
     if !ok then break
+    fixDecFocused
     skipNorm := wasReg && (← headIsRegEvent)
     i := i + 1
 

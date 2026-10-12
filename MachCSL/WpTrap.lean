@@ -11,6 +11,9 @@ import MachCSL.ModelFacts
 import MachCSL.PlatformFacts
 import MachCSL.KCtx
 import MachCSL.Tactics
+import MachCSL.BvEnums -- `bv_decide`'s enum encodings, declared once
+
+noncomputable section
 
 namespace MachCSL
 

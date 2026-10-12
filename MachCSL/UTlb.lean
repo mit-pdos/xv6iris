@@ -20,6 +20,7 @@ its `vpn` hashes to.  A fill after a walk, a refresh after a write-back,
 and a write-back into the tree (`PTree.setLeaf`) preserve it.
 -/
 import MachCSL.UWalk
+import MachCSL.BvEnums -- `bv_decide`'s enum encodings, declared once
 
 namespace MachCSL
 

@@ -191,7 +191,7 @@ def body : DevM PlicState Empty Unit := do
     DevM.setPin ⟨c % NCPU, Nat.mod_lt _ (by decide)⟩ mm (eip p (if mm then mctx c else sctx c))
 
 /-- The device, as the fabric sees it.  The PLIC drives no source. -/
-def sig : DevSig :=
+@[reducible] def sig : DevSig :=
   { S := PlicState, T := Empty, body := body, task := (fun t => nomatch t),
     read := readN, write := writeN, irq := fun _ => false, reset := fun _ => reset }
 

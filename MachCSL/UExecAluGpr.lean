@@ -305,6 +305,11 @@ once `m` is unfolded to its `rX_bits`/`wX_bits`/pure spine: the bind toolkit
 with the two GPR leaves, then the witness is the value the walk computed. -/
 macro "uxa_alu " hD:term : tactic =>
   `(tactic| (simp only [runRW_bind, uxa_rX $hD, uxa_wX $hD, Option.bind, runRW_pure];
-             exact ⟨_, rfl⟩))
+             first
+               | exact ⟨_, rfl⟩
+               -- Lean ≥ 4.34: `simp` instantiates `uxa_wX`'s `v : BitVec 64` only at a value whose
+               -- width is syntactically 64; `extractLsb`/`mult_to_bits_half` values have widths
+               -- that are 64 by evaluation (`xlen`), so rewrite at default transparency.
+               | exact ⟨_, by erw [uxa_wX $hD]; rfl⟩))
 
 end MachCSL

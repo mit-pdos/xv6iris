@@ -23,14 +23,21 @@ namespace MachCSL
 
 /-! ## The instances -/
 
-/-- The board's devices. -/
-def devSig : DevId → DevSig
-  | .uart i => Uart.sig i
-  | .plic => Plic.sig
-  | .virtio => Virtio.sig
+/-- The board's devices.  Reducible and by `casesOn` rather than `match`, so that
+`DevSt (.uart i)` reduces to `UartState` at reducible transparency: Lean ≥ 4.34 checks the
+types of `rw`/`simp` targets and unifies instance arguments at that transparency, and a
+device's state `s : DevSt d` is passed to lemmas about its own state type. -/
+@[reducible] def devSig (d : DevId) : DevSig :=
+  d.casesOn (motive := fun _ => DevSig) (fun i => Uart.sig i) Plic.sig Virtio.sig
 
 /-- Device `d`'s local state type. -/
 abbrev DevSt (d : DevId) : Type := (devSig d).S
+/-- Since `DevSt d` reduces to the state type, instance search for `Inhabited (DevSt .virtio)`
+looks for `Inhabited VirtioState` (Lean ≥ 4.34). -/
+instance : Inhabited UartState := ⟨Uart.reset⟩
+instance : Inhabited PlicState := ⟨Plic.reset⟩
+instance : Inhabited VirtioState := ⟨Virtio.initial (fun _ => 0#8)⟩
+
 instance (d : DevId) : Inhabited (DevSt d) :=
   match d with
   | .uart _ => ⟨Uart.reset⟩

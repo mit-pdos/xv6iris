@@ -25,6 +25,9 @@ import Xv6.FsStateBitmap
 import Xv6.FsWords
 import Xv6.KmemTier
 import Xv6.PtRunLemmas
+import MachCSL.BvEnums -- `bv_decide`'s enum encodings, declared once
+
+noncomputable section
 
 namespace Xv6
 

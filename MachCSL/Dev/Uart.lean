@@ -219,7 +219,7 @@ def body (i : UartId) : DevM UartState Empty Unit := do
   else pure ()
 
 /-- The device, as the fabric sees it. -/
-def sig (i : UartId) : DevSig :=
+@[reducible] def sig (i : UartId) : DevSig :=
   { S := UartState, T := Empty, body := body i, task := (fun t => nomatch t),
     read := readN, write := writeN, irq := irq, reset := fun _ => reset }
 

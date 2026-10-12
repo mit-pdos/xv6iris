@@ -137,7 +137,7 @@ macro_rules
   | `(tactic| k_norm_g [$extra:term,*]) => `(tactic| k_norm_all [$extra,*])
   | `(tactic| k_norm_g [$extra:term,*] at $h:ident) => do
     let lems ← extra.getElems.mapM fun l => `(Lean.Parser.Tactic.simpLemma| $l:term)
-    `(tactic| try simp only [k_norm_simps, k_addr, $lems,*] at $h:ident)
+    `(tactic| try simp (config := { implicitDefEqProofs := false }) only [k_norm_simps, k_addr, $lems,*] at $h:ident)
 
 set_option hygiene false in
 macro_rules
