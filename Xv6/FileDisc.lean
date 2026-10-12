@@ -391,7 +391,10 @@ theorem raltDec_enc (a : Ralt) : raltDec (raltEnc a) = a := by
         if_neg (by omega), if_neg (by omega)]
       congr 1; omega
   | RFRan sel =>
-    simp only [raltEnc, raltDec]
+    -- `raltEnc` first: unfolding it under `raltDec`'s `if`s leaves their decidability instances
+    -- at the folded form, which `rw [if_neg …]` then rejects (Lean ≥ 4.34)
+    simp only [raltEnc]
+    simp only [raltDec]
     rw [if_neg (by omega), if_neg (by omega), if_neg (by omega), if_neg (by omega),
       if_neg (by omega), if_neg (by omega), if_neg (by omega), if_neg (by omega),
       if_neg (by omega), if_pos (by omega)]

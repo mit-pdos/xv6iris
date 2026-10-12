@@ -662,8 +662,10 @@ where the device fabric ends). -/
 theorem devAddr_false_of_inRam {pa : PAddr} {n : Nat} (h : inRam pa n) : devAddr pa = false := by
   have h1 := h.1
   simp only [ramBase] at h1
-  simp only [devAddr, devBound, decide_eq_false_iff_not, Nat.not_lt]
-  omega
+  simp only [devAddr, devBound]
+  -- the goal is `decide (pa.toNat < devBound) = false` (Sail's `<b`); since Lean 4.34
+  -- `decide_eq_false_iff_not` does not fire on it under `simp only`
+  exact decide_eq_false (by omega)
 
 /-- A memory access whose footprint is DRAM is not an MMIO access. -/
 theorem devAddr_false_of_ramBytes {pa : PAddr} {n : Nat} (h : ramBytes pa n) (hn : 0 < n) :
@@ -710,7 +712,7 @@ theorem devWrite_pos {ds ds' : DevStates} {pa : PAddr} {n : Nat} {w : BitVec (8 
     | some p =>
       obtain ⟨d, off⟩ := p
       cases d <;> simp [devSig, Uart.sig, Uart.writeN, Plic.sig, Plic.writeN,
-        Virtio.sig, Virtio.writeN]
+        Virtio.sig, Virtio.writeN, Option.map]
   · exact hn
 
 /-! ### Getting `ramBytes` out of the memory -/
@@ -954,7 +956,7 @@ def memModelAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) : IProp GF := ipro
 
 /-- `cpus` lists every hart at its own index. -/
 theorem cpus_get? (cpu : CPU) : cpus[cpu.val]? = some cpu := by
-  simp [cpus, cpu.isLt]; exact Fin.ext rfl
+  simp [cpus, cpu.isLt]
 
 theorem cpus_get?_ne {k : Nat} {y : CPU} (hk : cpus[k]? = some y) (cpu : CPU) (hne : k ≠ cpu.val) :
     y ≠ cpu := by

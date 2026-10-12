@@ -113,13 +113,14 @@ theorem sys_mknod_tdev_nz : T_DEVICE_w.toNat ≠ 0 := by decide
 /-- ...and without the NUL, the path itself. -/
 theorem sys_mknod_bview_self (pl : List (BitVec 8)) :
     bview pl.length (sysfilePfun pl) = pl := by
-  apply List.ext_getElem
-  · simp [bview_length]
-  · intro i h1 h2
-    rw [bview_length] at h1
-    unfold bview sysfilePfun
-    simp only [List.getElem_map, List.getElem_range]
-    simp [List.getD_eq_getElem?_getD, List.getElem?_eq_getElem h1]
+  -- Lean ≥ 4.34: rewriting the bound inside the goal's `getElem` proof leaves the goal ill-typed
+  -- at reducible transparency, which `simp` refuses; go through `getElem?`
+  apply List.ext_getElem?
+  intro i
+  unfold bview sysfilePfun
+  by_cases hi : i < pl.length
+  · simp [List.getElem?_range, hi, List.getD_eq_getElem?_getD, List.getElem?_eq_getElem hi]
+  · simp [List.getElem?_range, hi, List.getElem?_eq_none_iff] <;> omega
 
 /-- argstr's success arm, read: the path, its shape, its length under the
 buffer, and THE READING OF ARGUMENT 0 at the view argstr read it in. -/

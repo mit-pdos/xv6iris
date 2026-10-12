@@ -573,7 +573,7 @@ theorem plic_write_au (γ0 γ1 : UartNames) (off : Nat) (v : BitVec 32) (f : Pli
   iexists p
   iframe Hfrag
   isplit
-  · ipureintro; rw [hx]; rfl
+  · ipureintro; exact Option.isSome_iff_exists.mpr ⟨_, hx⟩
   inext
   iintro %p'' %hwr Hfrag
   obtain rfl : f p = p'' := Option.some.inj (hx.symm.trans hwr)
@@ -655,7 +655,7 @@ theorem plic_claim_au (γ0 γ1 : UartNames) (hrt : Nat) (hh : hrt < NCPU) :
   iexists p
   iframe Hfrag
   isplit
-  · ipureintro; rw [hx]; rfl
+  · ipureintro; exact Option.isSome_iff_exists.mpr ⟨_, hx⟩
   inext
   iintro %w %p' %hrd Hfrag
   obtain ⟨rfl, rfl⟩ := Prod.mk.inj (Option.some.inj (hx.symm.trans hrd))
@@ -711,7 +711,7 @@ theorem plic_complete_au (γ0 γ1 : UartNames) (hrt : Nat) (hh : hrt < NCPU) (w 
   iexists p
   iframe Hfrag
   isplit
-  · ipureintro; rw [hx]; rfl
+  · ipureintro; exact Option.isSome_iff_exists.mpr ⟨_, hx⟩
   inext
   iintro %p'' %hwr Hfrag
   obtain rfl : Plic.complete p w.toNat = p'' := Option.some.inj (hx.symm.trans hwr)

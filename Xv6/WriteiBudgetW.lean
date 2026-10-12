@@ -95,7 +95,7 @@ theorem bmPot_mono (bms : Nat) (S S' : List Nat) (hsub : ∀ x ∈ S, x ∈ S') 
   by_cases h' : bms ∈ S'
   · rw [if_pos h']; omega
   · have : bms ∉ S := fun h => h' (hsub _ h)
-    rw [if_neg h', if_neg this]; exact Nat.le_refl 1
+    rw [if_neg h', if_neg this]
 
 /-- What the rest of the loop can afford (Rocq's `wi_inv_bud`). -/
 def wiInvBud (bms : Nat) (W nI : Nat) (SI : List Nat) : Prop :=

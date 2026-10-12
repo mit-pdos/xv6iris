@@ -222,8 +222,12 @@ theorem swp_write_CSR_mstatus (cpu : CPU) (o v : BitVec 64)
     ⊢ swp cpu (write_CSR 0x300#12 v) Φ := by
   iintro ⟨#Hhw, Hmstatus, HΦ⟩
   swp_run 120
-  unfold mstatusWrite Mk_Mstatus _get_Mstatus_MPP
-  sail_norm
+  unfold mstatusWrite
+  -- Lean ≥ 4.34: `unfold` fails on a constant that does not occur, and the executor may
+  -- already have unfolded these.
+  try unfold Mk_Mstatus
+  try unfold _get_Mstatus_MPP
+  try sail_norm
   try simp only [hMPP]
   iapply HΦ $$ Hmstatus
 

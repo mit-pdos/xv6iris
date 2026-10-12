@@ -428,7 +428,7 @@ theorem KCtx.intrOff_pushed (k : KCtx) (m : Nat) (a b : Bool) (h : m ≤ k.avail
   obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k
   simp only at h
   simp only [KCtx.pushed, KCtx.intrOff, KCtx.mk.injEq, _root_.true_and, _root_.and_true]
-  omega
+  exact ⟨by omega, rfl⟩
 
 /-- The `SIE` bit of a value with `sstatusAt`, as `srli; andi` extracts it. -/
 theorem sie_shr_and1 (v : BitVec 64) (old : Bool) (hv : sstatusAt old v) :

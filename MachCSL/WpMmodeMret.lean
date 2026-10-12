@@ -58,6 +58,7 @@ theorem execSpecP_mret (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64)
   have hmpp' := mpp_after_mie_update c.mstatus
   unfold execute
   swp_run 200
+  fix_dec
   simp only [update_bit0_eq]
   ihave HS := confCells_intro cpu (DFrac.own 1) Privilege.Supervisor { c with mstatus := mretMstatus c.mstatus }
     $$ [Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren

@@ -71,11 +71,9 @@ theorem uma_split_on_page_boundary_al (va : BitVec 64) (w : Nat) (hw : umaW w) (
     (by rcases hw with rfl | rfl | rfl | rfl <;> decide) hp
   rcases hw with rfl | rfl | rfl | rfl <;> (
     unfold split_on_page_boundary
+    dsimp only
+    rw [umm_pageMask va]
     sail_norm
-    generalize hm : Sail.BitVec.updateSubrange _ _ _ _ = M
-    have hM : M = 0xFFFFFFFFFFFFF000#64 := by
-      subst hm; change Sail.BitVec.updateSubrange (ones : BitVec 64) _ 0 _ = _; decide
-    subst hM
     simp only [Sail.BitVec.subInt, BitVec.reduceOfInt, ← hb, beq_self_eq_true, if_true])
 
 theorem uma_split_al (D : UFoot) (orc : UOrc) (s : UWSt) (va : BitVec 64) (w : Nat) (hw : umaW w)

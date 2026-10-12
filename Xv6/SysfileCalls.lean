@@ -88,18 +88,18 @@ def sysfilePfun (pl : List (BitVec 8)) (i : Nat) : BitVec 8 := pl.getD i 0#8
 
 theorem sysfile_bview (pl : List (BitVec 8)) :
     bview (pl.length + 1) (sysfilePfun pl) = pl ++ [0#8] := by
-  apply List.ext_getElem
-  · simp [bview_length]
-  · intro i h1 h2
-    rw [bview_length] at h1
-    unfold bview sysfilePfun
-    simp only [List.getElem_map, List.getElem_range]
-    by_cases hi : i < pl.length
-    · rw [List.getElem_append_left hi]
-      simp [List.getD_eq_getElem?_getD, List.getElem?_eq_getElem hi]
-    · have he : i = pl.length := by omega
-      subst he
-      simp [List.getD_eq_getElem?_getD]
+  apply List.ext_getElem?
+  intro i
+  unfold bview sysfilePfun
+  by_cases hi : i < pl.length
+  · simp [List.getElem?_range, hi, Nat.lt_succ_of_lt hi, List.getD_eq_getElem?_getD,
+      List.getElem?_append_left hi, List.getElem?_eq_getElem hi]
+  · by_cases he : i = pl.length
+    · subst he
+      simp [List.getElem?_range, List.getD_eq_getElem?_getD]
+    · have hge : pl.length ≤ i := by omega
+      have hn : ¬ i < pl.length + 1 := by omega
+      simp [List.getElem?_range, hn, List.getElem?_append_right hge, List.getElem?_eq_none_iff]
 
 theorem sysfile_pfun_nn (pl : List (BitVec 8)) (hn : nonul pl) :
     ∀ i, i < pl.length → sysfilePfun pl i ≠ 0#8 := by

@@ -66,6 +66,9 @@ import Xv6.PipeDisc
 import Xv6.PipesMerge
 import Xv6.PipesPair
 import Xv6.GrepFilt
+import MachCSL.DecInst
+
+noncomputable section
 
 namespace Xv6
 
@@ -267,17 +270,20 @@ theorem cat_not_echo_ok (f : List (BitVec 8)) (hf : fnWord f) : ¬ bodyOk (wlBod
 
 theorem prodParse_body (p : Producer) (hp : prodOk p) : prodParse (prodBody p) = some p := by
   have hwf := prodWf p hp
-  unfold prodParse prodBody
   cases p with
   | PrEcho ws =>
-    simp only [prodWords] at hwf ⊢
-    rw [if_pos ⟨by rw [wlWords_body_fn ws hwf], by rw [wlWords_body_fn ws hwf]; exact hp⟩,
+    -- the producer's words first, the parser's `if`s after (Lean ≥ 4.34 leaves the instance of
+    -- an `if` stale when a rewrite happens under its condition)
+    simp only [prodBody, prodWords] at hwf ⊢
+    unfold prodParse
+    rw [if_pos (by exact ⟨by rw [wlWords_body_fn ws hwf], by rw [wlWords_body_fn ws hwf]; exact hp⟩),
       wlWords_body_fn ws hwf]
   | PrCatF f =>
-    simp only [prodWords] at hwf ⊢
+    simp only [prodBody, prodWords] at hwf ⊢
+    unfold prodParse
     rw [if_neg (cat_not_echo_ok f hp), wlWords_body_fn _ hwf]
     simp only
-    rw [if_pos ⟨rfl, hp, rfl⟩]
+    rw [if_pos (by exact ⟨rfl, hp, rfl⟩)]
 
 theorem prodParse_some (r : List (BitVec 8)) (p : Producer) (h : prodParse r = some p) :
     prodOk p ∧ r = prodBody p := by
@@ -738,9 +744,11 @@ theorem plaltOf_code (a : PLAlt) : plaltOf (plaltCode a) = a := by
   | PLPanic => rfl
   | PLRun b =>
     simp only [plaltOf, plaltCode]
+    fix_dec
     rw [if_pos (by omega), show 3 * bytesCode b / 3 = bytesCode b by omega, bytesDecode_code]
   | PLTerm b =>
     simp only [plaltOf, plaltCode]
+    fix_dec
     rw [if_neg (by omega), if_pos (by omega), show (3 * bytesCode b + 1) / 3 = bytesCode b by omega,
       bytesDecode_code]
 

@@ -140,9 +140,10 @@ theorem ume_matching_pma_ram (pa : BitVec 64) (n : Nat) (h : inRam pa n) (hn : 0
     omega
   rw [hslice]
   simp only [Int.ofNat_eq_natCast, Int.ofNat_le]
-  rw [if_neg (by intro hc; obtain ⟨c1, c2, c3⟩ := hc; bv_omega),
-    if_neg (by intro hc; obtain ⟨c1, c2, c3⟩ := hc; bv_omega),
-    if_pos (by refine ⟨?_, ?_, ?_⟩ <;> bv_omega)]
+  -- Lean ≥ 4.34: `bv_omega` no longer strips Sail's `(x ≤b y) = true` (`decide`)
+  rw [if_neg (by intro hc; obtain ⟨c1, c2, c3⟩ := hc; simp only [decide_eq_true_eq] at c1 c2 c3; bv_omega),
+    if_neg (by intro hc; obtain ⟨c1, c2, c3⟩ := hc; simp only [decide_eq_true_eq] at c1 c2 c3; bv_omega),
+    if_pos (by refine ⟨?_, ?_, ?_⟩ <;> simp only [decide_eq_true_eq] <;> bv_omega)]
   rfl
 
 theorem ume_pmpCheckRWX_pf (c : cbop_zicbop) : pmpCheckRWX 15#8 (umoPf c) = pure true := by

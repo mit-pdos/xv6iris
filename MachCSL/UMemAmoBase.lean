@@ -104,7 +104,8 @@ theorem umo_get_pmlen {D : UFoot} (hD : UmoFoot D) (orc : UOrc) (s : UWSt) (hU :
   · rfl
 
 theorem umo_pm_transform_VA0 (v : BitVec 64) : pm_transform_VA (.Virtaddr v) 0 = .Virtaddr v := by
-  simp only [pm_transform_VA, sign_extend, Sail.BitVec.signExtend, Sail.BitVec.extractLsb, Functions.xlen]
+  simp only [pm_transform_VA, sign_extend, Sail.BitVec.signExtend, Sail.BitVec.extractLsb, Functions.xlen,
+    Int.reduceNatCast, Int.reduceNatCast', Int.reduceSub, Int.reduceToNat, Nat.reduceSub, Nat.reduceAdd]
   congr 1
   bv_decide
 

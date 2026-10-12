@@ -473,7 +473,7 @@ theorem il_read_head {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [
           wordPointsTo (GF := GF) (lhBlock i) 4 (DFrac.own 1) w) ⊢
         ([∗list] i ↦ w ∈ ilW bs ++ C.drop (hdrN bs),
           wordPointsTo (lhBlock i) 4 (DFrac.own 1) w) from by
-      rw [List.take_of_length_le (by rw [ilW_length]; exact Nat.le_refl _)]) $$ HW
+      rw [List.take_of_length_le (by rw [ilW_length])]) $$ HW
     iapply HΦ $$ %cpu %Rf Hk Hpc Hby HlhN HW Hte Hce
     ipureintro
     intro r ha hb hc hd

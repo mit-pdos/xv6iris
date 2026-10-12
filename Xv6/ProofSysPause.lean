@@ -613,7 +613,7 @@ theorem sp_ret0 (RE : RELEASE) (cpu : CPU) (k kb : KCtx) (hb : SpBase k kb) (γt
       $$ [- $Hk $Hpc $Hframe $Hte $Hce $Htf $Htp $HΦ]
   case ha0 => k_norm_g
   case hsr => k_norm_g
-  case hnr => k_norm_g; rw [hb.noff]; omega
+  case hnr => k_norm_g; rw [hb.noff]
   case hKr => k_norm_g; unfold sysPauseSlots sleepSlots at hK; omega
   case hpr => k_norm_g; exact hb.proc
   case hrr => k_norm_g; simp [hb.intena, hb.sie, hb.noff]
@@ -713,7 +713,7 @@ theorem sp_retm1 (RE : RELEASE) (cpu : CPU) (k kb : KCtx) (hb : SpBase k kb) (γ
       $$ [- $Hk $Hpc $Hframe $Hte $Hce $Htf $Htp $HΦ]
   case ha0 => k_norm_g
   case hsr => k_norm_g
-  case hnr => k_norm_g; rw [hb.noff]; omega
+  case hnr => k_norm_g; rw [hb.noff]
   case hKr => k_norm_g; unfold sysPauseSlots sleepSlots at hK; omega
   case hpr => k_norm_g; exact hb.proc
   case hrr => k_norm_g; simp [hb.intena, hb.sie, hb.noff]
@@ -1028,7 +1028,7 @@ theorem sp_round (AC : ACQUIRE) (RE : RELEASE) (SP : SLEEP_PREPARE) (SL : SLEEP)
       case hslt => k_norm_g; exact hb.tier
     case ha0 => k_norm_g
     case hsr => k_norm_g
-    case hnr => k_norm_g; rw [hb.noff]; omega
+    case hnr => k_norm_g; rw [hb.noff]
     case hKr => k_norm_g; unfold sysPauseSlots sleepSlots at hK; omega
     case hpr => k_norm_g; exact hb.proc
     case hrr => k_norm_g; simp [hb.intena, hb.sie, hb.noff]

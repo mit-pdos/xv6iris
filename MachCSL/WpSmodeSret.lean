@@ -59,7 +59,7 @@ theorem execSpecF_sret (cpu : CPU) (c : MConf) (hok : SConfPhys (GF := GF) c fal
     $$ [Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren
         Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n]
   case' _ =>
-    simp only [sretMs]
+    simp only [sretMs, hspie, BitVec.reduceZeroExtend]
     iframe
     iexact Hhw
   iapply HΦ $$ HmConf HPC HnextPC [HF Hsepc]

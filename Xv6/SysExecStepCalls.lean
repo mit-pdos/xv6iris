@@ -50,13 +50,12 @@ set_option linter.unusedSimpArgs false
 theorem sys_exec_bview_full (bs : List (BitVec 8)) (n : Nat) (h : bs.length = n) :
     bview n (sysfilePfun bs) = bs := by
   subst h
-  apply List.ext_getElem
-  · simp [bview_length]
-  · intro i h1 h2
-    unfold bview sysfilePfun
-    simp only [List.getElem_map, List.getElem_range]
-    rw [List.getD_eq_getElem?_getD, List.getElem?_eq_getElem h2]
-    rfl
+  apply List.ext_getElem?
+  intro i
+  unfold bview sysfilePfun
+  by_cases hi : i < bs.length
+  · simp [List.getElem?_range, hi, List.getD_eq_getElem?_getD, List.getElem?_eq_getElem hi]
+  · simp [List.getElem?_range, hi, List.getElem?_eq_none_iff] <;> omega
 
 /-- **What fetchstr's success hands the loop** (Rocq `sx_step`'s `Hgot` /
 `sx_ok_push` side conditions): the 4096-byte buffer is the page's byte

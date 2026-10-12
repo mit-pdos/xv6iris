@@ -42,6 +42,9 @@ the collection goes through `colFreeSlotLnk_acc`).
 -/
 import Xv6.FsCollect
 import Xv6.IcacheEscrowTok
+import MachCSL.DecInst
+
+noncomputable section
 
 namespace Xv6
 
@@ -316,6 +319,7 @@ theorem colIty_iff (n : FsNode) (d : Dinode) (hrec : n.fnRec = d) (w : Ity) :
   subst hrec
   have hty : iregDirTy = T_DIR_z := rfl
   cases w <;> simp [iregRegOk, fnItyOk, fnIsDir, fnType, hty]
+  all_goals (fix_dec; simp)
 
 /-- ...and its multiplicity. -/
 theorem colMult_eq (n : FsNode) (d : Dinode) (hrec : n.fnRec = d) :

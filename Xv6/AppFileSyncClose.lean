@@ -115,7 +115,7 @@ theorem unionHook_closes (c : FileFixed) (r' r : FileAppNames) (av : Aview) (gen
     intro rec hin
     rcases List.mem_append.mp hin with hin | hin
     · exact hbm rec hin
-    · rw [List.mem_singleton.mp hin]; exact Nat.le_refl _
+    · rw [List.mem_singleton.mp hin]
   imodintro
   isplitl [Hg Hcmg Hhg Hrag]
   · iapply syncClaim_intro c ⟨gc, gd, gt, ge, gγ, gen + 1, true, gp⟩ av L _ hch' hw' $$ Hregg HL

@@ -136,7 +136,7 @@ theorem procBootAlloc (c : CPU) :
   unfold procsAvailSome
   iexists (fun _ => true)
   isplitr
-  · ipureintro; rw [procBoot_pavCount]; exact Nat.le_refl _
+  · ipureintro; rw [procBoot_pavCount]
   iapply BigSepL.bigSepL_mono ?_ $$ Hu1
   intro k j _
   unfold pavArm slotFree

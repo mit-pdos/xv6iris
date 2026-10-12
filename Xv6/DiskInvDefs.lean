@@ -1987,7 +1987,6 @@ theorem usedOk_pos_le (pm : RegMapF PermVal) (dl dl0 : List UsedRec) (nc M : Nat
   · have hkk : k = k' := by omega
     subst hkk
     rw [← hkr, ← hkr']
-    exact Nat.le_refl _
 
 /-- **The dead arm has no permit at all**, so it carries no witness. -/
 theorem not_wroteIdx_of_dead (v : VirtioState) (pm : RegMapF PermVal)

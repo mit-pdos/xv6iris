@@ -279,13 +279,12 @@ theorem sys_mkdir_path_of (M : Nat → List (BitVec 8)) (va : Nat) (pl : List (B
     (hs : umemStr M va 128 = some (pl ++ [0#8])) :
     argPathOf M va (bview pl.length (sysfilePfun pl)) := by
   have hself : bview pl.length (sysfilePfun pl) = pl := by
-    apply List.ext_getElem
-    · simp [bview_length]
-    · intro i h1 h2
-      rw [bview_length] at h1
-      unfold bview sysfilePfun
-      simp only [List.getElem_map, List.getElem_range]
-      simp [List.getD_eq_getElem?_getD, List.getElem?_eq_getElem h1]
+    apply List.ext_getElem?
+    intro i
+    unfold bview sysfilePfun
+    by_cases hi : i < pl.length
+    · simp [List.getElem?_range, hi, List.getD_eq_getElem?_getD, List.getElem?_eq_getElem hi]
+    · simp [List.getElem?_range, hi, List.getElem?_eq_none_iff] <;> omega
   rw [hself]
   obtain ⟨pl', hpl', hof⟩ := argPathOf_umemStr M va 128 _ (by decide) hs
   rw [List.append_cancel_right hpl']

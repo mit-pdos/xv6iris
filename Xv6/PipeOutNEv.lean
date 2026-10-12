@@ -64,7 +64,7 @@ theorem gclPureO_rd_stage (k : Nat) (ho : List Obs) (so : GStage M) (r : Nat)
   obtain ⟨_, _, _, hpsb, hpin, hcsb, _⟩ := hout
   obtain ⟨hq, hr, _⟩ := lmBlkOpen_cs M sd so r pre hop
   refine ⟨hpsb, hcsb, hpin, ?_⟩
-  rw [ll_nlines_removelast _ hr, hq]; exact Nat.le_refl _
+  rw [ll_nlines_removelast _ hr, hq]
 
 /-- THE READ, pure (Rocq `gcl_pure_o_read`). -/
 theorem gclPureO_read (k : Nat) (ho : List Obs) (so : GStage M) (r : Nat)

@@ -352,8 +352,9 @@ def umerge (adm : Pline' → Bool) : Uline → List (BitVec 8) → Prop
 
 /-! ## 3.  THE MODEL AND ITS LAWS -/
 
-/-- **Rocq `ulm`**: THE UNION LINE MODEL. -/
-noncomputable def ulm (adm : Pline' → Bool) (admS : List (List (BitVec 8)) → Bool) : LModel where
+/-- **Rocq `ulm`**: THE UNION LINE MODEL.  Reducible, so that `ulmG.lmSt` unfolds to `Fstate`
+where `rw`/`simp` check types at reducible transparency (Lean ≥ 4.34). -/
+@[reducible] noncomputable def ulm (adm : Pline' → Bool) (admS : List (List (BitVec 8)) → Bool) : LModel where
   lmSt := Fstate
   lmLine := Uline
   lmOf := ulineOfU
@@ -400,7 +401,7 @@ an argument. -/
 def admSOn (ws : List (List (BitVec 8))) : Bool := decide (ws ≠ [])
 
 /-- **Rocq `ulmG`**: the union application's model. -/
-noncomputable def ulmG : LModel := ulm admUG admSOn
+@[reducible] noncomputable def ulmG : LModel := ulm admUG admSOn
 
 theorem admUG_echo (ws : List (List (BitVec 8))) (fs : List Filt) (h : ∀ F ∈ fs, filtOk F) :
     admUG (LPipes (.PrEcho ws) fs) = true :=

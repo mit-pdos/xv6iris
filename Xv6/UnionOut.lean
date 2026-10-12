@@ -107,8 +107,9 @@ noncomputable def ucparams (ug : UnionGn) : GenCparams hlc GF ulmG where
   gcPIN_tl := fun _ _ => inferInstance
   gcPIN_agree := fileOut_eraPin_agree (fgnEcho ug.ugnFile)
   gcW := f0cw ug.ugnFile
-  gcW_pers := fun _ _ => inferInstance
-  gcW_tl := fun _ _ => inferInstance
+  -- Lean ≥ 4.34: `inferInstance` does not find these in a structure-instance field; name them
+  gcW_pers := fun k s => f0cw_persistent ug.ugnFile k s
+  gcW_tl := fun k s => f0cw_timeless ug.ugnFile k s
 
 /-- The parameters' projections, by name (Iris's tactics match up to
 reducible unfolding only). -/

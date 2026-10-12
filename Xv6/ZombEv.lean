@@ -753,9 +753,7 @@ theorem FInv_of (I : BitVec 64) (r : BitVec 32) (h : List Zev) (hw : zevWfAt I h
       refine FInv_reap hI hn hpar hz ?_ ?_ ?_ ?_ ?_ ?_
       · simp only [famStep, if_true]
       · intro k hk; simp only [famStep, hk, if_false]
-      · simp only [zActIn]; split
-        · simp [famStepR, famStep]
-        · rfl
+      · by_cases hsp : (zSlotOf act).any (zFamOf r h) = true <;> simp [zActIn, famStepR, famStep, hsp]
       · intro k hk; split
         · simp [famStepR, famStep, hk]
         · rfl
