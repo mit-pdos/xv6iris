@@ -20,12 +20,14 @@
 -/
 import Xv6.AppFileNames
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section AppFileDeed
-variable {GF : BundledGFunctors} [FileAppG GF]
+variable {GF : BundledGFunctors.{0}} [FileAppG GF]
 
 /-- THE DEED, half (Rocq `fdeed`). -/
 def fdeed (r : FileAppNames) (s : Dst) : IProp GF :=

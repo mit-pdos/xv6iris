@@ -42,6 +42,8 @@ import Xv6.PidLock
 import Xv6.SpecProcPagetable
 import Xv6.FdTable
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -115,7 +117,7 @@ refutes `pid_lock`'s payload marks and so pins the pid to the literal 1;
 the sealed one hands the shot and init's registration, which refutes the
 candidate 1.  Both come back as `pavSpent` once the pid section ran (the
 null arm, which returns before it, hands the ledger back as it came). -/
-def allocprocPost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF]
+def allocprocPost {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF]
     [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
     (Γ : SchedNames) (γ : FileNames) (cpu : CPU) (γk : KmemNames) (on : Option Nat) (pav : Option Nat)
     (tk : Bool) (Q : Int → IProp GF) (r : BitVec 64) :
@@ -152,7 +154,7 @@ carries the allocator ledger's receipt of the trapframe `kalloc`
 (`kAllocRcpt γk act`: the round's first `kalloc`, labelled by the actor).
 Its pure parts are `allocprocPost`'s.
 `allocprocPostLed_post` drops the receipts. -/
-def allocprocPostLed {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF]
+def allocprocPostLed {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF]
     [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
     (Γ : SchedNames) (γ : FileNames) (cpu : CPU) (γk : KmemNames) (on : Option Nat) (pav : Option Nat)
     (tk : Bool) (Q : Int → IProp GF) (act : BitVec 64) (r : BitVec 64) :
@@ -183,7 +185,7 @@ def allocprocPostLed {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
 
 /-- The landed post is the led one with the receipt dropped (Rocq
 `allocproc_post_led_post`). -/
-theorem allocprocPostLed_post {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF]
+theorem allocprocPostLed_post {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF]
     [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
     (Γ : SchedNames) (γ : FileNames) (cpu : CPU) (γk : KmemNames) (on : Option Nat) (pav : Option Nat)
     (tk : Bool) (Q : Int → IProp GF) (act : BitVec 64) (r : BitVec 64) :
@@ -201,7 +203,7 @@ holding `p->lock`, and with it the arm its `acquire` paid out
 `false`) -- Rocq's `cpu_own 1 eb p false` carries that pay, and the caller's
 eventual `release` (re-enabling interrupts when the entry had them on) takes
 it back through `popArm`. -/
-def wp_allocproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF]
+def wp_allocproc_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF]
     [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
     (Γ : SchedNames) (γ : FileNames) (cpu : CPU) (k : KCtx) (γl γp : GName) (γk : KmemNames) (on : Option Nat)
     (pav : Option Nat) (tk : Bool) (Q : Int → IProp GF) (ke : Nat)
@@ -226,7 +228,7 @@ def wp_allocproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
 `wp_allocproc_core_led_body`, design D4): `wp_allocproc_body` verbatim, at
 the post `allocprocPostLed` with the actor `k.proc`.  The led form is the
 proof; the landed `wp_allocproc_body` is its corollary. -/
-def wp_allocproc_led_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF]
+def wp_allocproc_led_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF]
     [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
     (Γ : SchedNames) (γ : FileNames) (cpu : CPU) (k : KCtx) (γl γp : GName) (γk : KmemNames) (on : Option Nat)
     (pav : Option Nat) (tk : Bool) (Q : Int → IProp GF) (ke : Nat)
@@ -250,12 +252,12 @@ def wp_allocproc_led_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
 /-- The interface of `allocproc`: the landed contract and (Rocq's
 `Parameter wp_allocproc_core_led`) its led form. -/
 structure ALLOCPROC : Prop where
-  wp_allocproc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF]
+  wp_allocproc : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF]
     [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx] (Γ : SchedNames) (γ : FileNames) (cpu : CPU) (k : KCtx)
     (γl γp : GName) (γk : KmemNames) (on : Option Nat) (pav : Option Nat) (tk : Bool) (Q : Int → IProp GF)
     (ke : Nat) hnoff hK hlk hlp hlq htier,
     wp_allocproc_body (hlc := hlc) (GF := GF) Γ γ cpu k γl γp γk on pav tk Q ke hnoff hK hlk hlp hlq htier
-  wp_allocproc_led : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF]
+  wp_allocproc_led : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF]
     [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx] (Γ : SchedNames) (γ : FileNames) (cpu : CPU) (k : KCtx)
     (γl γp : GName) (γk : KmemNames) (on : Option Nat) (pav : Option Nat) (tk : Bool) (Q : Int → IProp GF)
     (ke : Nat) hnoff hK hlk hlp hlq htier,

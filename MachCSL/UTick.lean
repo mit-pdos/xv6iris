@@ -16,6 +16,8 @@ go through the reference-map transport.
 -/
 import MachCSL.UCycle
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

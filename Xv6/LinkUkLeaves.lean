@@ -35,7 +35,7 @@ open Iris.Std.PartialMap Iris.Std.FiniteMap
 open Sail LeanRV64D LeanRV64D.Functions
 
 section leaves
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [CurCtx]
 
 /-- A leaf that moves only registers and the pc (the pages unchanged). -/
 theorem uk_leaf_reg (S : UkSec GF) (K : UkKey) (M : ElfMem) (m : RegMap) (pc : BitVec 64) (isRvc : Bool)
@@ -179,7 +179,7 @@ theorem ukLeaves_holds : UK_LEAVES where
       (fun C pt T V => ukTrap_ecall C pt T _ m pc V) (ustep_ecall m S.sz K.fdv K.cw K.gn K.cs K.pid hI)
 
 section trapGoal
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
 
 /-- **The ECALL at ANY continuation** (NI M3 U-2a, the engine-based generic
 mint): the return is built under a ghost update. -/

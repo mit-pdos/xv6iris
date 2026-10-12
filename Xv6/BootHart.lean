@@ -48,6 +48,8 @@ import Xv6.BootConfig
 import Xv6.SpecBoot
 import MachCSL.KCtx
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -113,7 +115,7 @@ pins (`MachCSL.regCellsNoPins`). -/
 def bootEntryTaken : List Register := bootEntryRegs.reverse ++ [.sig_meip, .sig_seip]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- The part of `Xv6.bootEntryPre` past the configuration cells. -/
 theorem bootEntry_rest_cells (cpu : CPU) (f : RegFile) (hres : resetRegsRun cpu f) :

@@ -116,6 +116,8 @@ instance, deviation 10).
 import Xv6.UexecExecInst
 import Xv6.UtResFits
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -240,7 +242,7 @@ end Pure
 /-! ## §3 The resource rows -/
 
 section Rows
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [WchG GF]
 open UexecSG
 
 /-- **Rocq `ut_sys_in`** (deviation 3): the process's deposit for the
@@ -332,7 +334,7 @@ end Rows
 /-! ## §4 The ledger evidence (NI M2-X2) -/
 
 section Ev
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [Fscfg]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [Fscfg]
 
 /-- **THE ROUND'S LEDGER EVIDENCE, AT USERTRAP'S POST** (NI M2-X2, design
 "M2-X design" §2(c)): at the ecall, `SpecSyscall.syscEvOut`'s first two
@@ -360,7 +362,7 @@ end Ev
 /-! ## §5 The contract -/
 
 section Contract
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [WchG GF]
     [CurCtx] [Xv6G GF] [Fscfg]
 
 /-- **Rocq `usertrap_post`**: userret's entry shape at the resuming hart
@@ -428,7 +430,7 @@ proc table (`ClaimIs`), at the kernel's deposit instance (deviation 10).
 devintr's credentials are read from the residue's handler environment row
 (`utCaps`' `handlerEnvAt`, at its own names). -/
 structure USERTRAP : Prop where
-  wp_usertrap : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+  wp_usertrap : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [CtokG GF] [WchG GF] [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]

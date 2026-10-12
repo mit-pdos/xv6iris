@@ -96,6 +96,8 @@ InodeRegionWithdraw / InodeRegionLink / EscrowDeposit and lives in
 -/
 import Xv6.InodeRegionInv
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Iris.Algebra MachCSL
@@ -120,7 +122,7 @@ movers; here it is stated once.  `iregSlotRest` is what is left over: the
 registry and the two re-build wands. -/
 
 section Open
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- What stays behind when slot `islot inum` of block `iregBi inum` is out:
@@ -273,7 +275,7 @@ end Open
 /-! ## 2.  THE READS: `iregRead`, THE OBSERVATION, `iregRead_blk` -/
 
 section Movers
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- Rocq's `ireg_read`.  THE FLIP'S ONE ADDITION (durable-disk 1c-flip step

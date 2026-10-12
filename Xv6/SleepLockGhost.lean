@@ -8,6 +8,8 @@ the sleeplock definitions (`SleepLockDefs`) so the icache reference layer
 import Xv6.IrefSlots
 import Xv6.SlotGen
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -21,7 +23,7 @@ abbrev SlhRF : COFE.OFunctorPre := constOF (Auth (Option UFrac))
 (the holder token / deposit authority pair).  The counting camera `SlhRF`
 is the SHARED `Xv6G.authUfracG` (one instance per camera type; the iref-slot
 supply, `Xv6.IrefslotRF`, is the same camera under its own name). -/
-class SleepLockG (GF : BundledGFunctors) where
+class SleepLockG (GF : BundledGFunctors.{0}) where
   [gvSlhG : GhostVarG GF Qp]
 
 attribute [reducible, instance] SleepLockG.gvSlhG
@@ -46,7 +48,7 @@ def slhOf : Option Qp → Option UFrac := Option.map uf
 @[simp] theorem slhOf_some (q : Qp) : slhOf (some q) = some (uf q) := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
 
 /-- A `q`-share of the right to hold the sleeplock. -/
 def slhTok (γ : GName) (q : Qp) : IProp GF := iOwn (F := SlhRF) γ (◯ (some (uf q) : Option UFrac))

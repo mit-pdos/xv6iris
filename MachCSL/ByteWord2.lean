@@ -16,11 +16,13 @@ could not add to `MachCSL`.)
 -/
 import MachCSL.ByteWord
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.BI Iris.ProofMode Std
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- One 16-bit field, little-endian (the `wordToBytes4` pattern at two bytes
 instead of four; Rocq's `half_bytes`). -/

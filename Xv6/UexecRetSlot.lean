@@ -26,12 +26,14 @@ THE MOVE (NI M3 U-2a, ruling U-R3; design of record
 import Xv6.Ustep
 import Xv6.UexecWp
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL LeanRV64D
 
 section UexecRet
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]
 open UexecSG
 
 /-! ### The kernel obligation, the bundle, the slot -/
@@ -640,7 +642,7 @@ the seccomp universe (`UexecSeccMint`), whose keys are all masked, uses this
 alone. -/
 
 section UexecRetGen
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]
 open UexecSG
 
 /-- **THE FALLBACK**: at a key whose pure step is stuck, the generic loop is

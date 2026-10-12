@@ -32,6 +32,8 @@ import Xv6.FsEchoPin
 import Xv6.FsAbsDelta
 import Xv6.ConsoleInvDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris.Std

@@ -62,7 +62,7 @@ theorem ulibPutc_byte_ofNat (sp : BitVec 64) (hsp : 32 ≤ sp.toNat) :
   bv_omega
 
 section
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- The obligation, applied: every argument is read off the hypotheses it
 is framed with (the byte `b'` stored is the caller's `b` up to `hb`). -/

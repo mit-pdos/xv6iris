@@ -22,6 +22,8 @@ import MachCSL.UExecAluC
 import MachCSL.UExecAluBit
 import MachCSL.UExecAluZicond
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

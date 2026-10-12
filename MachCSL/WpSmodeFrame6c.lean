@@ -9,13 +9,15 @@ and its mirror.  The slot at offset `0` is the pad.  A twin of
 -/
 import MachCSL.WpSmodeFrame6
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open LeanRV64D
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {lent : Bool}
 
 /-- The spare cell at `sp-48` (offset 0). -/

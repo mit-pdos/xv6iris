@@ -37,12 +37,14 @@ credential and the generic user-execution WP: no `appSup`, no taint
 -/
 import Xv6.UexecSecc
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
 section RetContGen
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]
 
 /-- the returning arm at a number whose post the caller does not read,
 stated over the ABSTRACT class (a kernel-cheap intro: the class's post is
@@ -98,7 +100,7 @@ theorem ukillCredAt_of_owed_at (X : Uvis → IProp GF) (gn : GName) (sc : BitVec
 end RetContGen
 
 section UexecSeccMint
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg]
 
 /-! ## 5.  THE BUNDLE AT EVERY NUMBER A MASKED KEY CAN REACH -/

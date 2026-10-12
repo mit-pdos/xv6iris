@@ -13,6 +13,8 @@ page of the caller's tree.
 import Xv6.PtRunLemmas
 import Xv6.KvmDefs
 
+noncomputable section
+
 namespace Xv6.PtStack
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -317,7 +319,7 @@ all these pages are distinct.  (The same argument as `Xv6.pageWord`, kept
 here so that this file depends only on `PtRunLemmas`.) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- A page, witnessed by the word at its first entry. -/
 def pageWord [CurCtx] (b : BitVec 44) : IProp GF := iprop%

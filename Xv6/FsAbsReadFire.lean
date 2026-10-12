@@ -105,6 +105,8 @@ import Xv6.PieceFam
 import Xv6.UserOff
 import Xv6.FdTable
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -181,7 +183,7 @@ def readBufTie (a : Anode) (off d : Nat) (M' : Nat → List (BitVec 8)) (addr : 
 /-! ## 1.  The raw-map commit -/
 
 section ReadCommit
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [OffboxG GF]
 
 /-- SINGLE-PHASE AND READ-ONLY at the RAW MAP, WITH THE OFFSET'S HALF LENT
 AND RETURNED UNMOVED (Rocq's `aread_commit_at`).  THE PIECE-SHAPE RULE: a
@@ -337,7 +339,7 @@ theorem arfFoffN_sub (E : CoPset) (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) :
   nclose_subseteq' (N := appN) "foff" (fun p hp => hE p (CoPset.in_union.2 (Or.inr hp)))
 
 section ReadFire
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [FsTopG GF] [FsBytesG GF] [OffboxG GF]
 
 /-- THE FIRE, AT ANY SUPPLIER (Rocq's `arf_read_fire_gen`): ONE step,

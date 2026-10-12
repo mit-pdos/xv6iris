@@ -18,6 +18,8 @@ predicate quantifies over EVERY index, so the out-of-range reads (the
 import MachCSL.BootPeel
 import MachCSL.WpPmpDefs
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

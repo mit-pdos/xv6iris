@@ -18,6 +18,8 @@ contract (see `SpecUlibPrintf`).
 -/
 import Xv6.SpecUlibPutc
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL LeanRV64D
@@ -30,7 +32,7 @@ def ulibFprintfAt (base : BitVec 64) : BitVec 64 := base + 0x37c#64
 def ulibPrintfAt (base : BitVec 64) : BitVec 64 := base + 0x3a6#64
 
 section
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- **Rocq `kcat_pay_seq`** (see the header). -/
 def ulibPaySeq (L : UlibRun GF) (base fd : BitVec 64) (f : Nat → BitVec 8) :

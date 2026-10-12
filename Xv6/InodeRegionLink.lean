@@ -96,6 +96,8 @@ coupling's lookup / one-slot update (`iregSlotKey`, `iregCouple_lookup`,
 -/
 import Xv6.InodeRegionInv
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Iris.Algebra MachCSL
@@ -103,7 +105,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std Iris.Algebra MachCSL
 /-! ## 1.  THE FREEZE PIN's PRICE AND ITS READER -/
 
 section Pin
-variable {GF : BundledGFunctors} [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [IcacheG GF]
 
 /-- THE FREEZE PIN'S PRICE, IN ITS RULING A-prime FORM (iclaim-ledger.md
 §3.9), as the raising mover `iregWriteLink_reg` takes it: either the
@@ -162,7 +164,7 @@ and its slot, retags the map element (`ghost_map_update`) and re-closes the
 block at the one-slot-updated list and map (`iregCouple_set`). -/
 
 section Acc
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 theorem iregRec_acc [Icfg] (E : CoPset) (γi : GName) (γfs : FsNames) (inodestart nib : Nat)
@@ -236,7 +238,7 @@ both collide with the caller's (`dinodeAt_excl`).  The marked arm's clause
 vacuous at every byte-writing mover (iclaim-ledger.md §2.4). -/
 
 section Marked
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBytesG GF] [FsTopG GF] [FsLinkG GF]
 
 theorem iregSlot_marked_open [Icfg] (γfs : FsNames) (γi : GName) (inum : BitVec 32)
@@ -317,7 +319,7 @@ theorem iregWriteUnlink_pure (dn dn' : Dinode) (hnz : dn'.diType.toNat ≠ 0)
 /-! ## 5.  THE RAISE's REGISTER STEP -/
 
 section Raise
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsBytesG GF] [FsLinkG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsBytesG GF] [FsLinkG GF]
 
 /-- THE RA's OWN STEP (durable-disk 2b-inode-4), Rocq's inline `iAssert`
 in `ireg_write_link_reg`: the raised count is one `link_mint` on the
@@ -360,7 +362,7 @@ end Raise
 /-! ## 6.  THE TWO nlink-MOVING FLUSHES -/
 
 section Movers
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- `ip->nlink++; iupdate(ip)` (Rocq `ireg_write_link_reg`).

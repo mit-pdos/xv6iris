@@ -46,6 +46,8 @@ and `cons_hist_ok_step` feed WpUart / ConsoleInv / ProofConsoleintr).
 import MachCSL.ObsTrace
 import MachCSL.LogEntryDefs
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

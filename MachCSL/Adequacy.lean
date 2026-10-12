@@ -77,12 +77,14 @@ crash invariant.
 import MachCSL.Power
 import Iris.ProgramLogic.Adequacy
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std
 open Language.Notation PrimStep
 
-variable {hlc : HasLC} {GF : BundledGFunctors}
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}}
 
 /-- The record `F` with its invariant world replaced by `Hinv`.  The core
 quantifies over the record EXISTENTIALLY, so it cannot ask that the client's

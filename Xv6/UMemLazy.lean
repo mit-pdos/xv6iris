@@ -24,6 +24,8 @@ Pure: nothing in `IProp`.
 -/
 import Xv6.UMemLemmas
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

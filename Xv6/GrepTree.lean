@@ -29,6 +29,8 @@ lines, pinned `1900b8a43`; design program-specs.md, grep.md).  Pure.
 -/
 import Xv6.ProgTree
 
+noncomputable section
+
 namespace Xv6
 
 /-! ## §1 The matcher -/

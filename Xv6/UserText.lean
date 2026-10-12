@@ -26,11 +26,13 @@ tree lookup by `rfl` where it applies an instruction rule, as the kernel's do
 import Xv6.UserTextDefs
 import Iris.Instances.UPred.Instance
 
+noncomputable section
+
 namespace Xv6.User
 
 open Iris Iris.BI Iris.ProofMode
 
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- **Rocq `UserHeap.utext_img`**: every byte of the image `m`, as the per-byte
 text predicate `T` (persistent). -/

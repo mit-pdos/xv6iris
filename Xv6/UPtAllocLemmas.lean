@@ -366,7 +366,7 @@ theorem viewZero_ne (M : Nat → List (BitVec 8)) (k k' : Nat) (h : k' ≠ k) :
 /-! ## `umPages` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- Two exclusive buffers of at least a word cannot start at the same
 aligned address. -/
@@ -562,7 +562,7 @@ theorem uvmdNp_run' (x y : BitVec 64) (A i : Nat) (hx : x.toNat = A + 4096 * i)
 /-! ## The space at a different view -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 theorem procPtAt_split (P : UPtd) (M : Nat → List (BitVec 8)) :
     procPtAt (GF := GF) P M ⊢

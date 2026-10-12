@@ -27,7 +27,7 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 set_option synthInstance.maxSize 1024
 
 section PipesEventsVSeal
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [PipeOutG GF]
 
 /-- Rocq `popenV_arm`. -/

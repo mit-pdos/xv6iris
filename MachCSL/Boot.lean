@@ -7,13 +7,15 @@ registers.  The configuration bundle is in `MConf.lean`.
 -/
 import MachCSL.Resources
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Std
 open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- The program counter at a cycle boundary: `PC` and `nextPC` agree
 (the model keeps them in lock-step between instructions). -/

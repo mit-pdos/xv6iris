@@ -51,6 +51,8 @@ import Xv6.FsStateTop
 import Xv6.InodeRegion
 import Xv6.AppCfg
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.Std Std MachCSL COFE
@@ -67,7 +69,7 @@ abbrev xgfMl (α : Type) : OFunctorPre := constOF (MonoList (DiscreteO α))
 /-! ## The slot table -/
 
 /-- **THE CONCRETE FUNCTOR LIST** (Rocq `xv6Σ`): one slot per camera. -/
-def xv6GF : BundledGFunctors :=
+def xv6GF : BundledGFunctors.{0} :=
   BundledGFunctors.default
   -- iris: wsat + later credits (`InvGpreS`)
   |>.set 0 ⟨InvMapF, inferInstance⟩

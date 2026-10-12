@@ -68,7 +68,7 @@ theorem pp_ret_1a32 : jumpPc (KA.«proc_pagetable» + 0x80#64) = (KA.«proc_page
   decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-! ## The callees, at their entry addresses -/
 

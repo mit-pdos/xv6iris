@@ -18,6 +18,8 @@ back: outside the window nothing moved.
 import MachCSL.UByteFrame
 import MachCSL.UMemMisBytes
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

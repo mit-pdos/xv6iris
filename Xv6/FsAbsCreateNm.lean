@@ -50,12 +50,14 @@ Nothing.
 -/
 import Xv6.SysMknodDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section CreateNm
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [Appcfg GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [Appcfg GF]
 
 /-- Rocq `acre_commit_at_gen_nm`: `acre_commit_at_gen` (at Rocq HEAD: with
 the parent cursor `Pd` and the dot-name credential) with the NAME
@@ -162,7 +164,7 @@ theorem nparNm_elim (M : Nat → List (BitVec 8)) (pv : Nat) (pl : List (BitVec 
 /-! ## The unarm at a node predicate -/
 
 section UnarmNd
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [Appcfg GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [Appcfg GF]
 
 /-- Rocq `aunarm_commit_at_nd`: `aunarmCommitAt` with a NODE predicate on
 the unarmed row. -/

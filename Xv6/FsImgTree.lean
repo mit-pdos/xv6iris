@@ -37,6 +37,8 @@ reasons are the content):
 import Xv6.FsImgDinode
 import Xv6.FsTree
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

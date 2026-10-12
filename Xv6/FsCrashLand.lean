@@ -145,7 +145,7 @@ theorem fsClear_recWf (cov : ExtTreeSet Nat compare) (ls : Nat) (M0 : LogMirror)
   rw [fsRestrict_lookup, if_pos hbhome, hv]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
   [FsLinkG GF] [FsTopG GF]
 
 /-! ## The shared arm opening -/

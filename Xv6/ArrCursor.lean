@@ -28,6 +28,8 @@ Nothing here is Iris: the whole file is `BitVec` arithmetic, as in Rocq.
 -/
 import MachCSL.ByteWord
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

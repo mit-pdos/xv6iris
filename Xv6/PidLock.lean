@@ -41,6 +41,8 @@ and the pid the kernel was bound to give from it (`PidEv.pidPick`).
 -/
 import Xv6.ProcDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -103,7 +105,7 @@ theorem pidNext_toNat (c : BitVec 32) (h : c.toNat ≤ PIDMAX) :
     omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [WchG GF]
 
 /-- THE PID LEDGER, as the lock's payload holds it (Rocq `pid_ledger`, design
 ni-pid-ledger.md D3, ruling R2(a)): the history's authority, tied to the

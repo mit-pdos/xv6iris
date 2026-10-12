@@ -84,6 +84,8 @@ import Xv6.SpecReadi
 import Xv6.FsAbsDefs
 import Xv6.PipeInvDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris.Std MachCSL

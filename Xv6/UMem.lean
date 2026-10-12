@@ -5,6 +5,8 @@ per-page view `M`, and the zeroing of freshly faulted pages.
 -/
 import Xv6.UPtDefs
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

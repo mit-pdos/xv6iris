@@ -24,6 +24,8 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 import Xv6.SleepLockDefs
 import Xv6.SpecWakeup
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -36,7 +38,7 @@ def releasesleepAddr : BitVec 64 := KA.«releasesleep»
 def releasesleepSlots : Nat := 4 + wakeupSlots
 
 /-- **WP of `releasesleep(slk = a0)`**, over the deposit `H` at `q`. -/
-def wp_releasesleep_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
+def wp_releasesleep_gen_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
     [CurCtx] (Γ : SchedNames)
     (cpu : CPU) (k : KCtx) (γl γ : GName) (R : CtxId → IProp GF) [CtxMorph R] (H : Qp → IProp GF) (q : Qp)
     (pid : BitVec 32)
@@ -52,7 +54,7 @@ def wp_releasesleep_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc G
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The untracked instance. -/
-def wp_releasesleep_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
+def wp_releasesleep_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
     [CurCtx] (Γ : SchedNames)
     (cpu : CPU) (k : KCtx) (γl γ : GName) (R : CtxId → IProp GF) [CtxMorph R] (q : Qp) (pid : BitVec 32)
     (hnoff : k.noff + 2 < 2 ^ 31) (hK : releasesleepSlots ≤ k.avail)
@@ -68,7 +70,7 @@ def wp_releasesleep_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
 
 /-- The interface of `releasesleep`. -/
 structure RELEASESLEEP : Prop where
-  wp_releasesleep_gen : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
+  wp_releasesleep_gen : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
     [CurCtx] (Γ : SchedNames)
     (cpu : CPU) (k : KCtx) (γl γ : GName) (R : CtxId → IProp GF) [CtxMorph R] (H : Qp → IProp GF) (q : Qp)
     (pid : BitVec 32) hnoff hK hs hp htier,
@@ -81,7 +83,7 @@ sleeplock states AT THE INNER SPINLOCK'S OWN STAMPED CONTEXT -- the one
 place a row `MachCSL.ctxFloor ξ tl` above the releaser's view can be minted
 (`MachCSL.lockHook_llb`, lifted over the body by `Xv6.slBody_hook`).  The
 identity hook recovers `RELEASESLEEP`. -/
-def wp_releasesleep_gen_hook_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+def wp_releasesleep_gen_hook_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [SleepLockG GF] [CurCtx] (Γ : SchedNames)
     (cpu : CPU) (k : KCtx) (γl γ : GName) (R Rin : CtxId → IProp GF) [CtxMorph R] [CtxMorph Rin]
     (H : Qp → IProp GF) (q : Qp) (pid : BitVec 32)
@@ -98,7 +100,7 @@ def wp_releasesleep_gen_hook_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS 
 
 /-- The hooked interface of `releasesleep`. -/
 structure RELEASESLEEP_HOOK : Prop where
-  wp_releasesleep_gen_hook : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+  wp_releasesleep_gen_hook : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [SleepLockG GF] [CurCtx] (Γ : SchedNames)
     (cpu : CPU) (k : KCtx) (γl γ : GName) (R Rin : CtxId → IProp GF) [CtxMorph R] [CtxMorph Rin]
     (H : Qp → IProp GF) (q : Qp) (pid : BitVec 32) hnoff hK hs hp htier,

@@ -20,6 +20,8 @@ hart is, and its rules follow the hart's (`MachCSL.Wp`):
 -/
 import MachCSL.Wp
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
@@ -78,7 +80,7 @@ theorem devStep_total (gen : Nat) (d : DevId) (tid : TaskId) (m : DevProg d) (σ
 /-! ## The corpse rule -/
 
 section dead
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF]
 
 /-- The bare WP of a device expression. -/
 def devWP (gen : Nat) (d : DevId) (tid : TaskId) (m : DevProg d) : IProp GF :=
@@ -133,7 +135,7 @@ theorem devWP_loop (gen : Nat) (d : DevId) :
 
 end dead
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- Safety of the ambient generation's device `d`'s task `tid` with `m` left
 to run, given the generation's certificate. -/

@@ -38,6 +38,8 @@ import Xv6.AppFileSteps
 import Xv6.AppFileLaws
 import Xv6.FileDeltasStep
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -72,7 +74,7 @@ theorem fileConsArm_nd : ∀ e : Std.ExtTreeMap Fname Nat compare, cdev ≠ .ADi
   consDev_nondir
 
 section AppFileCons
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF]
 
 /-! ## The claim's pure half -/

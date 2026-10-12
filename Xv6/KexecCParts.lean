@@ -165,7 +165,7 @@ theorem kxcC_permOf_congr {um um' : RegMapF (BitVec 64)} (h : ∀ k, get? um' k 
 /-! ## §3 THE BLOCK'S `p->sz` CELL -/
 
 section Priv
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg]
 
 /-- The `p->sz` cell LENT out of the whole block (+0x1b4's `ld s5,72(a0)`,
@@ -195,7 +195,7 @@ end Priv
 /-! ## §4 THE USTACK REGROUPINGS -/
 
 section Frame
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- The 33 ustack slots, as `stackOwn` sees them, end at `kxcUstackBuf`. -/
 theorem kxcC_ust_base (sp0 : BitVec 64) (n : Nat) (h : n ≤ 33) :
@@ -322,7 +322,7 @@ end Frame
 /-! ## §4b SMALL ACCESSORS -/
 
 section Acc
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- A cell at an equal address. -/
 theorem kxcC_addr_eq [CurCtx] {a b : BitVec 64} (h : a = b) (n : Nat) (dq : DFrac) (v : BitVec (8 * n)) :
@@ -348,7 +348,7 @@ theorem kxcC_range_acc (Φ : Nat → IProp GF) (n i : Nat) (h : i < n) :
 end Acc
 
 /-- `argv[i]`, read-only, out of the caller's vector. -/
-theorem kxcC_argv_acc {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+theorem kxcC_argv_acc {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx] (av : BitVec 64) (A : KexecArgs) (i : Nat)
@@ -363,7 +363,7 @@ theorem kxcC_argv_acc {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
 /-! ## §5 THE CALL SITES (deviation 1) -/
 
 section Calls
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]

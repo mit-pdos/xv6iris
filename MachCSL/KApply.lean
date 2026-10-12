@@ -6,6 +6,8 @@ is needed, so the proofs that do not import the step machinery can use it.
 -/
 import Iris.ProofMode
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.BI Iris.ProofMode

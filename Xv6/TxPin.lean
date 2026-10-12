@@ -81,12 +81,14 @@ conclusion names `LogInv.log_tx`, which lives above this leaf.
 -/
 import Xv6.LogDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section TxPin
-variable {GF : BundledGFunctors} [Xv6G GF] [LogG GF]
+variable {GF : BundledGFunctors.{0}} [Xv6G GF] [LogG GF]
 
 /-- ONE PARKED SHARE: transaction `t` is open, and `q` of the evidence for
 that is parked here.  `(t, q)` are always FIELDS of whatever records the

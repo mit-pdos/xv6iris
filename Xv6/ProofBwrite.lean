@@ -36,7 +36,7 @@ theorem bw_br_hold : KA.«bwrite» + 0x1434#64 = KA.«holdingsleep» := by decid
 theorem bw_br_vdr : KA.«bwrite» + 0x2d64#64 = KA.«virtio_disk_rw» := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
 
 /-! ## The two callees, at this call site -/

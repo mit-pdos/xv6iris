@@ -44,6 +44,8 @@ import Xv6.SpecSysMkdir
 import Xv6.ProcPrivAcc
 import Xv6.KexecParts
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -95,7 +97,7 @@ reading; `UMemL.umemStr_nul` is deviation 3) -/
 /-! ## The generic carve: slots ↔ bytes -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {lent : Bool}
 
 /-- THE CARVE (Rocq `md_frame_carve`): the sixteen low slots ARE
@@ -290,7 +292,7 @@ theorem sys_mkdir_path_of (M : Nat → List (BitVec 8)) (va : Nat) (pl : List (B
   exact hof
 
 /-- The contract's parameters, as one record (the `NamexArgs` pattern). -/
-structure SysMkdirArgs (GF : BundledGFunctors) where
+structure SysMkdirArgs (GF : BundledGFunctors.{0}) where
   γ : FileNames
   j : Nat
   pid : BitVec 32
@@ -308,7 +310,7 @@ structure SysMkdirArgs (GF : BundledGFunctors) where
   Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]

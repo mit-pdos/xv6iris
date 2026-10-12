@@ -34,6 +34,8 @@ import Xv6.UkStub
 import Xv6.User.InitText
 import Xv6.User.SeccompText
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -73,7 +75,7 @@ theorem ulibUk_get (m : RegMap) (r : BitVec 5) (h : r ≠ 0#5) : m r = m.get r :
 
 /-- **A ulib link**: what the bridge needs of a program's image (the
 relocation facts are `UlibPutcReloc`'s / `UlibPrintfReloc`'s). -/
-structure UlibUkImg (GF : BundledGFunctors) where
+structure UlibUkImg (GF : BundledGFunctors.{0}) where
   /-- The text tree and the image (U0-7). -/
   t : User.UTextTree
   img : ElfMem
@@ -95,7 +97,7 @@ structure UlibUkImg (GF : BundledGFunctors) where
   printf : ∀ L : UlibRun GF, L.utext t ⊢ ulibPrintfCode L base
 
 section Img
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -556,7 +558,7 @@ end Img
 /-! ## §7 The four ulib links the union runs -/
 
 /-- `cat`'s image. -/
-noncomputable abbrev ulibUkCat {GF : BundledGFunctors} : UlibUkImg GF where
+noncomputable abbrev ulibUkCat {GF : BundledGFunctors.{0}} : UlibUkImg GF where
   t := User.Cat.tree
   img := User.Cat.code.byte
   hok := User.Cat.textOk
@@ -574,7 +576,7 @@ noncomputable abbrev ulibUkCat {GF : BundledGFunctors} : UlibUkImg GF where
   printf := fun L => ulibPrintfCode_cat L
 
 /-- `grep`'s image. -/
-noncomputable abbrev ulibUkGrep {GF : BundledGFunctors} : UlibUkImg GF where
+noncomputable abbrev ulibUkGrep {GF : BundledGFunctors.{0}} : UlibUkImg GF where
   t := User.Grep.tree
   img := User.Grep.code.byte
   hok := User.Grep.textOk
@@ -592,7 +594,7 @@ noncomputable abbrev ulibUkGrep {GF : BundledGFunctors} : UlibUkImg GF where
   printf := fun L => ulibPrintfCode_grep L
 
 /-- `init`'s image. -/
-noncomputable abbrev ulibUkInit {GF : BundledGFunctors} : UlibUkImg GF where
+noncomputable abbrev ulibUkInit {GF : BundledGFunctors.{0}} : UlibUkImg GF where
   t := User.Init.tree
   img := User.Init.code.byte
   hok := User.Init.textOk
@@ -610,7 +612,7 @@ noncomputable abbrev ulibUkInit {GF : BundledGFunctors} : UlibUkImg GF where
   printf := fun L => ulibPrintfCode_init L
 
 /-- `seccomp`'s image. -/
-noncomputable abbrev ulibUkSecc {GF : BundledGFunctors} : UlibUkImg GF where
+noncomputable abbrev ulibUkSecc {GF : BundledGFunctors.{0}} : UlibUkImg GF where
   t := User.Seccomp.tree
   img := User.Seccomp.code.byte
   hok := User.Seccomp.textOk

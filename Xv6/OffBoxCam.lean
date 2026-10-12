@@ -40,6 +40,8 @@ imports this file's camera abbreviations) and delete this class.
 -/
 import MachCSL.CtxBox
 
+noncomputable section
+
 namespace MachCSL
 
 /-- The four gnames of a box, as one lexicographically ordered key. -/
@@ -76,7 +78,7 @@ abbrev OffSetUR : Type := Auth (LeibnizSet OffSet)
 `offbox_offG`, which is `Xv6.OffboxG.offG`; see the header): the stamps at
 the FILE SLOT identity `Nat`, the two register ghost variables (witness
 `Unit`), and the per-inode-slot published-set authority. -/
-class OffboxBoxG (GF : BundledGFunctors) where
+class OffboxBoxG (GF : BundledGFunctors.{0}) where
   [stampsG : ElemG GF (StampsRF Nat)]
   [slotdG : GhostVarG GF (SlotReg Nat Unit)]
   [slotpG : GhostVarG GF (L2Reg Nat)]

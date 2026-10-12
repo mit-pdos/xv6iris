@@ -42,6 +42,8 @@ import Xv6.SpecFileread
 import MachCSL.WpSmodeFrame6c
 import Xv6.FilePay
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -122,7 +124,7 @@ theorem frd_cr_nz : KA.«consoleread» ≠ 0#64 := by decide
 /-! ## 3.  The frame -/
 
 section Frame
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {lent : Bool}
 
 set_option maxHeartbeats 4000000 in
@@ -285,7 +287,7 @@ theorem frd_cs_epi (k : KCtx) (v18 : BitVec 64) (R : RegMap)
 /-! ## 5.  The reference: its cells, its state, its payload, the carve -/
 
 section Ref
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF]
   [Icfg] [CurCtx]
 
@@ -413,7 +415,7 @@ theorem frd_st_inode (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : Pipe
 /-! ## 6.  The block, at the ambient form -/
 
 section Block
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [WchG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [WchG GF] [CurCtx]
 
 /-- EVERY MAPPED PAGE OF THE BLOCK'S VIEW IS FULL (deviation 2; Rocq's
 `proc_pt_dom`): `UMemL.procPtAt_pageLen`, read through the block. -/
@@ -503,7 +505,7 @@ end Ties
 /-! ## 8.  The console receipt, built from consoleread's post -/
 
 section Receipt
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CtokG GF] [Appcfg GF] [Fscfg]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CtokG GF] [Appcfg GF] [Fscfg]
 
 /-- The per-byte ledger at the resume image (Rocq's `umem_wr_lookup_in`
 step, shared by both receipt builders). -/

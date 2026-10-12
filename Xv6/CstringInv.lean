@@ -58,6 +58,8 @@ iris-light.
 -/
 import MachCSL.CallConv
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

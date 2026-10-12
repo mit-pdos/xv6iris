@@ -38,6 +38,8 @@ Iris-free and Sail-free, like the Rocq original.
 -/
 import MachCSL.ByteWord4
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

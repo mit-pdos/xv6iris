@@ -31,6 +31,8 @@ premises at the pipeline's terminal sources (`pwitV_true`, `tokV_wit`,
 import Xv6.PipesLinksV
 import Xv6.PipeBothN
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL Wid Pline' PipeStage
@@ -38,7 +40,7 @@ open Iris Iris.BI Iris.ProofMode MachCSL Wid Pline' PipeStage
 set_option synthInstance.maxSize 1024
 
 section PipeOutNFam
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [PipeOutG GF]
 
 instance pwcBlkV_timeless_G (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (v : EraPins)

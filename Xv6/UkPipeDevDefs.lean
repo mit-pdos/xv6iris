@@ -87,6 +87,8 @@ import Xv6.UkTree
 import Xv6.PipeProto
 import Xv6.UkRunSysWrite
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -140,7 +142,7 @@ def pdevQh {PROP : Type} [BI PROP] (R : PROP) : Nat → PROP
 /-! ## §1 The devices -/
 
 section Dev
-variable {GF : BundledGFunctors} [Xv6G GF] [IcacheG GF] [CtokG GF] [PipeProtoG GF]
+variable {GF : BundledGFunctors.{0}} [Xv6G GF] [IcacheG GF] [CtokG GF] [PipeProtoG GF]
 
 /-- **Rocq `pipe_out`**: the write end owing `S`, and the line fits a write
 count. -/
@@ -164,7 +166,7 @@ end Dev
 /-! ## §2 The kernel leaves (deviation 2), and the deposit with the source -/
 
 section Leaves
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CtokG GF] [SG : UexecSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CtokG GF] [SG : UexecSG GF]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
@@ -225,7 +227,7 @@ theorem pdev_usrcOk_ubytesq (γt γd γs : GName) (M : ElfMem) (pm : Nat → Opt
 row's deposit families and their bundle/post readers (H-io) and the close
 leaf at a pipe row.  Built at the xv6
 instance by `pipeDevK_xv6` (`UkPipeDevXv6`). -/
-structure PipeDevK (hlc : HasLC) (GF : BundledGFunctors) [MachGS hlc GF] [Xv6G GF] [CtokG GF]
+structure PipeDevK (hlc : HasLC) (GF : BundledGFunctors.{0}) [MachGS hlc GF] [Xv6G GF] [CtokG GF]
     [SG : UexecSG GF] [PS : UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
     [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] where

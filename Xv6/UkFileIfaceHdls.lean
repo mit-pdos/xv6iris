@@ -19,7 +19,7 @@ open Iris.Std.PartialMap
 open Std (ExtTreeSet)
 
 section FifHdls
-variable {GF : BundledGFunctors} [GhostMapG GF (Option Nat) UfdCell UfdMapF]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF (Option Nat) UfdCell UfdMapF]
 
 /-- `fifHdl` is the handle `fifHf` names. -/
 theorem fifHdl_hf (γfd : GName) (fd : Int) (vs : FifVs) (d : Nat) :

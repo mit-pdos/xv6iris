@@ -26,6 +26,8 @@ term, so a missing twin is an error, never an unsound step.
 import MachCSL.URunXWalk
 import MachCSL.UWalkRun
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

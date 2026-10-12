@@ -51,6 +51,8 @@ import Xv6.UkPipesIfaceDefs
 import Xv6.UshPipesChild
 import Xv6.PipesCutEcho
 
+noncomputable section
+
 namespace Xv6
 
 namespace UShUPipes
@@ -120,7 +122,7 @@ theorem ustg_fs_rb (p : Producer) (fs : List Filt) (len : Nat) (gb : Nat → Bit
 /-! ## The claim, the supply, the deed's typing -/
 
 section Claim
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]

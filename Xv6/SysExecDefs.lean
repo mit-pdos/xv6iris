@@ -34,6 +34,8 @@ Imports only definitional files.
 import Xv6.KexecDefs
 import Xv6.FdTable
 
+noncomputable section
+
 namespace Xv6
 
 /-- sys_exec's own sixty-slot frame over kexec's 188, by a wide margin its
@@ -45,7 +47,7 @@ theorem sysExecSlots_val : sysExecSlots = 248 := rfl
 open Iris Iris.BI Std MachCSL
 
 section Post
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF]
   [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 

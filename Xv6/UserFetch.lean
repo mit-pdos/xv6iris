@@ -17,6 +17,8 @@ exception) -- from which the translator is chosen.
 import Xv6.UserStepActive
 import MachCSL.UFetchTotal
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -85,7 +87,7 @@ theorem ustFetchOut_of_uftOut {t0 : PTree} {mm0 : BMap} {s : UWSt} {fr : FetchRe
   | F_Error p => obtain ⟨e, a⟩ := p; exact ⟨hl, userExc_of_uftExc e hsh⟩
   | F_Ext_Error e => exact hsh.elim
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- **U2-F's deliverable** (the contract of lane U3-L), from the tree-level
 translation of the fetch. -/

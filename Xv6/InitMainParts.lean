@@ -72,7 +72,7 @@ theorem kinit_lit_start_ok : User.Init.initLitOk 0x988 18 = true := by decide +k
 
 /-- **Rocq `init_lit_str`**: a literal as the string printf reads, out of
 init's image (`UkInitDefs` deviation 1: the rodata is the code image). -/
-theorem kinit_lit_str {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
+theorem kinit_lit_str {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
     (γt : GName) (base len : Nat) (hok : User.Init.initLitOk base len = true) (hlen : len < 2 ^ 31) :
     initCode (GF := GF) γt ⊢ utextStr γt base len (User.Init.initLit base) :=
   utextStr_of_img γt _ base len _
@@ -80,7 +80,7 @@ theorem kinit_lit_str {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMa
     (fun j hj => (User.litOk_body _ base len j hok hj).1) (User.litOk_nul _ base len hok)
 
 section Steps
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 

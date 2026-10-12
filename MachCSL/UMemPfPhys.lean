@@ -14,6 +14,8 @@ MachCSL: **a prefetch's `translateAddr` front and physical check at User**
 import MachCSL.UMemPfWalk
 import MachCSL.UMemAccess
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

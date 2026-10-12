@@ -48,6 +48,8 @@ import MachCSL.UTlb
 import MachCSL.SailHooks
 import MachCSL.UMemMisPlan
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

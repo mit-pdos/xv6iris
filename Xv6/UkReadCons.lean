@@ -51,20 +51,22 @@ Unreached (not ported): `wp_uk_ecall_read_cons` (the plain-ledger form).
 import Xv6.UkReadRows
 import Xv6.UkSysIOHolds
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Std (ExtTreeSet)
 
 /-- **Rocq `read_cons_fam`**: the console member. -/
-def readConsFam {GF : BundledGFunctors} (Q : Int → IProp GF) (Rd : Nat → Nat → IProp GF)
+def readConsFam {GF : BundledGFunctors.{0}} (Q : Int → IProp GF) (Rd : Nat → Nat → IProp GF)
     (Rin : List (List Obs × BitVec 8) → IProp GF) : Xfam GF :=
   xfamRd Q Rd Rin
 
 /-! ## §2 THE DEPOSIT'S SUPPLIER, §3 THE CONTENT POST -/
 
 section Defs
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CtokG GF] [Appcfg GF] [Fscfg]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CtokG GF] [Appcfg GF] [Fscfg]
 
 /-- **Rocq `cons_acc_triv`**: the kernel threads the caller's payload `P`
 through the console arm, at `True` here -- framing a unit. -/
@@ -119,7 +121,7 @@ def ureadConsAns (cnm : ConsNames) (Rd : Nat → Nat → IProp GF) (Rin : List (
 end Defs
 
 section Inst
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
@@ -275,7 +277,7 @@ end Inst
 /-! ## §4 THE LEAF -/
 
 section Walk
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -319,7 +321,7 @@ theorem readCons_walk (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (
 end Walk
 
 section Leaf
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]

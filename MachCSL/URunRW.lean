@@ -75,6 +75,8 @@ built: a sub-lemma per branch, composed (`URunRWDemo.urwDemo_add_sym`).
 import MachCSL.DecodeBridge
 import MachCSL.WpPtWalkOwn
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
@@ -482,7 +484,7 @@ end toolkit
 /-! ## The frames -/
 
 section iris
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- The walk's hold on the hart's reservation: the fragment in ANY state
 (Rocq `resv_any`: any reservation, either pending-acquire bit), whatever the
@@ -516,7 +518,7 @@ theorem uResvTok_ctxTok (cpu : CPU) (ξ : CtxId) (rv : Bool) :
 /-- A register frame for the footprint `D`: it hands out every readable
 cell (at some fraction) and every writable cell (in full), and takes it back
 (updated). -/
-structure URegFrame (GF : BundledGFunctors) [MachGS hlc GF] (cpu : CPU) (D : UFoot) where
+structure URegFrame (GF : BundledGFunctors.{0}) [MachGS hlc GF] (cpu : CPU) (D : UFoot) where
   F : RegFile → IProp GF
   rd : ∀ (f : RegFile) (r : Register), D.Dr r = true →
     F f ⊢ ∃ dq : DFrac, r ↦ᵣ[cpu]{dq} (f r) ∗ (r ↦ᵣ[cpu]{dq} (f r) -∗ F f)
@@ -525,7 +527,7 @@ structure URegFrame (GF : BundledGFunctors) [MachGS hlc GF] (cpu : CPU) (D : UFo
 
 /-- A byte frame at context ξ: it hands out any owned footprint, at the
 map's value, and takes it back at any new value (the map updated). -/
-structure UByteFrame (GF : BundledGFunctors) [MachGS hlc GF] (ξ : CtxId) where
+structure UByteFrame (GF : BundledGFunctors.{0}) [MachGS hlc GF] (ξ : CtxId) where
   B : BMap → IProp GF
   acc : ∀ (mm : BMap) (pa : PAddr) (n : Nat), n < 2 ^ 64 → bmOwned mm pa n = true →
     B mm ⊢ ∃ w : BitVec (8 * n), ⌜bmRead mm pa n = some w⌝ ∗ ctxBytes ξ pa n (DFrac.own 1) w ∗
@@ -586,7 +588,7 @@ end iris
 /-! ## `swp_runRW`, node by node -/
 
 section cases
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {cpu : CPU} {ξ : CtxId} {D : UFoot} (RF : URegFrame GF cpu D) (BF : UByteFrame GF ξ)
 
 /-- A node the walk refuses cannot be reached. -/
@@ -927,7 +929,7 @@ end cases
 /-! ## The concrete frames -/
 
 section frames
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- The footprint of two register lists (written, read-only) and the wire
 list.  `cur_privilege` is never writable (`UFoot.noPriv`), whichever list

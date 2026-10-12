@@ -39,6 +39,8 @@ the written block).
 import Xv6.LogDefs
 import Xv6.DiskDefs
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

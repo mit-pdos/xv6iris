@@ -16,6 +16,8 @@ through `UexecRetSlot`.  The deviations these definitions carry are
 -/
 import Xv6.UexecRet
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL

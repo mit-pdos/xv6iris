@@ -40,6 +40,8 @@ result `r` and leaves `r = rhs` (closed by `rfl` when it can);
 import MachCSL.URunRW
 import Std.Tactic.BVDecide
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

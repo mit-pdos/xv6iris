@@ -15,6 +15,8 @@ only at `tlb` is an engine machine again.
 import Xv6.UkDefs
 import Xv6.UserMemTr
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Std MachCSL

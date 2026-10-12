@@ -34,6 +34,8 @@ import Xv6.UnionDiscDec
 import Xv6.UshFileRedir
 import Xv6.UnionDemo
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI MachCSL

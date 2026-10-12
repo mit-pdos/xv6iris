@@ -50,7 +50,7 @@ theorem moi_le (z : Int) (hz : 0 ≤ z) : ((BitVec.ofInt 64 z).toNat : Int) ≤ 
   omega
 
 section FileOpenRead
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [OffboxG GF] [FsTopG GF] [FsBytesG GF] [Appcfg GF] [Icfg]
 
 /-- THE READ PIECE, the offset's half in hand (Rocq `file_read_piece_adv`). -/

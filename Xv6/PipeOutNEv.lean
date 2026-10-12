@@ -36,6 +36,8 @@ import Xv6.PipeOutNSteps
 import Xv6.GenOutRead
 import Xv6.GenOutWriteBlk
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
@@ -91,7 +93,7 @@ theorem popenV_filed (k : Nat) (ho : List Obs) (so : GStage M) (r : Nat)
 end OpenEventsPure
 
 section PipesEventsV
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [PipeOutG GF]
 
 theorem peclV_gen (g : PipeGn) (M : LModel) (G : GenCparams hlc GF M) (sd : M.lmSt)

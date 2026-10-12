@@ -18,6 +18,8 @@ persistent text-heap resource as the code (`utextImg T <P>.code.byte`, Rocq
 -/
 import Xv6.UserText
 
+noncomputable section
+
 namespace Xv6.User
 
 open Iris Iris.BI Iris.ProofMode
@@ -73,7 +75,7 @@ theorem litOk_nopct (ro : ElfMem) (base len j : Nat) (h : litOk ro base len = tr
 bytes and the NUL after them, out of the program's text resource.  (Rocq's
 `utext_str γt base len f` is this conjunction plus the pure `len < 2^31` and
 non-NUL facts, which `litOk_body` gives; `UserHeap` (U0-6) folds it.) -/
-theorem litOk_str {GF : BundledGFunctors} (T : Nat → BitVec 8 → IProp GF) (ro : ElfMem)
+theorem litOk_str {GF : BundledGFunctors.{0}} (T : Nat → BitVec 8 → IProp GF) (ro : ElfMem)
     (base len : Nat) (h : litOk ro base len = true) :
     utextImg T ro ⊢ ([∗list] j ∈ List.range len, T (base + j) (litByte ro base j)) ∗ T (base + len) 0#8 := by
   iintro #H

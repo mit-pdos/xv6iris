@@ -21,6 +21,8 @@ are unreached and not ported.
 import Xv6.FsInitPinBoot
 import Xv6.FsImgFilesSync
 
+noncomputable section
+
 namespace Xv6
 
 open Iris.Std

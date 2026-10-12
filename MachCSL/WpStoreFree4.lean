@@ -19,13 +19,15 @@ is the consumer: the fresh file's off cell arrives free (Rocq
 import MachCSL.ByteWord4
 import MachCSL.WpSmodeMint
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std
 open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D LeanRV64D.Functions
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {lent : Bool}
 
 set_option maxHeartbeats 4000000 in

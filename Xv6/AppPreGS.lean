@@ -23,12 +23,14 @@ of a definition equals the record's (`preGS_transport`).
 -/
 import Xv6.AppIface
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI MachCSL
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors}
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}}
 
 /-- The invariant-world instance at the pre-structure's cameras, all names
 `0` (read by nothing the records use). -/

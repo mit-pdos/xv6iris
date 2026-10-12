@@ -67,6 +67,8 @@ Rocq's header, kept because the reasons are the content:
 import Xv6.FsAbsDefs
 import Xv6.FsBytes
 
+noncomputable section
+
 namespace Xv6
 
 open Iris.Std MachCSL

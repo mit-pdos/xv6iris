@@ -28,6 +28,8 @@ valid) discharges it once.
 import Xv6.UserFetch
 import MachCSL.UTlb
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

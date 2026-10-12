@@ -136,6 +136,8 @@ are used inside this file.
 import Xv6.FsStateDefs
 import Xv6.IcacheRefDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -159,7 +161,7 @@ abbrev FsLinkUR : Type := FsLinkMapF FsLinkElemUR
 /-- Rocq `fsLinkG`: the capacity class of the type register.  A checked-out
 payload carries its directory's fragments and the inode region parks the
 per-inum authority, so both altitudes bind it. -/
-class FsLinkG (GF : BundledGFunctors) where
+class FsLinkG (GF : BundledGFunctors.{0}) where
   [fsLinkInG : ElemG GF (constOF FsLinkUR)]
 
 attribute [reducible, instance] FsLinkG.fsLinkInG
@@ -220,7 +222,7 @@ theorem linkReps_sub_elem (Q : ItyMS) (n : Nat) (ty x : Ity) (h : Q ⊆ linkReps
 /-! ## 2.  The two shapes -/
 
 section Link
-variable {GF : BundledGFunctors} [FsLinkG GF]
+variable {GF : BundledGFunctors.{0}} [FsLinkG GF]
 
 def linkAuthElem (i : Int) (n : Nat) (ty : Ity) : FsLinkUR :=
   PartialMap.singleton i (● (LeibnizMultiSet.ofSet (linkReps n ty)) : FsLinkElemUR)
@@ -465,7 +467,7 @@ contributes the unit.  (Rocq's `own_gather_list(_opt)` and `own_gather_map`
 have no consumer and are dropped; see the header.) -/
 
 section Gather
-variable {GF : BundledGFunctors} {F : COFE.OFunctorPre} [URFunctorContractive F] [ElemG GF F]
+variable {GF : BundledGFunctors.{0}} {F : COFE.OFunctorPre} [URFunctorContractive F] [ElemG GF F]
 
 theorem ownGather_mapOpt {K V : Type _} {M : Type _ → Type _} [LawfulFiniteMap M K]
     [DecidableEq K] (γ : GName) (f : K → V → F.ap (IProp GF)) (p : K → V → Bool)
@@ -511,7 +513,7 @@ two do not meet by search.  They are definitionally equal at
 once, so callers never have to. -/
 
 section LinkGather
-variable {GF : BundledGFunctors} [FsLinkG GF]
+variable {GF : BundledGFunctors.{0}} [FsLinkG GF]
 
 theorem linkGather_mapOpt {K V : Type _} {M : Type _ → Type _} [LawfulFiniteMap M K]
     [DecidableEq K] (γ : GName) (f : K → V → FsLinkUR) (p : K → V → Bool)

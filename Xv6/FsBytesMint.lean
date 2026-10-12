@@ -31,13 +31,15 @@ map-filter split, and belongs with the wave that ports `fsinit`.
 -/
 import Xv6.FsBytesInv
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 open Iris.Std Iris.Std.PartialMap
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsBlocksG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsBlocksG GF]
 
 /-! ## THE MINT
 

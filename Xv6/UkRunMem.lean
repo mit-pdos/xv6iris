@@ -42,6 +42,8 @@ THE ADDRESS IS A NUMBER: `(m.get rs1).toNat + imm.toInt = a` (Rocq `a = uint
 -/
 import Xv6.UkRun
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -77,7 +79,7 @@ theorem uMWord_of_bytes {M : ElfMem} {a k : Nat} {w : BitVec (8 * k)}
   uMBytes_inj (uMWord_bytes M a k (fun j hj => by rw [h j hj]; rfl)) h
 
 section UkRunMem
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 

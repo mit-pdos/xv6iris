@@ -12,6 +12,8 @@ and `tlbOk` what the model's TLB may hold about such a tree.
 import MachCSL.Pte
 import LeanRV64D.VmemTlb
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

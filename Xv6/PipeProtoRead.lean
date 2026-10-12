@@ -35,6 +35,8 @@ What is here (Rocq's section headers, abridged):
 import Xv6.PipeProto
 import Xv6.PipesPair
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -67,7 +69,7 @@ theorem pipeRd_take1_ne {L : List (BitVec 8)} (hL : L ≠ []) (h : L.take 1 <+: 
     simp at this
 
 section PipeProtoRead
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
   [CtokG GF] [PipeProtoG GF]
 
 /-! ## The body's end-of-file shot (deviation 3 of `PipeProto`; Rocq inline) -/

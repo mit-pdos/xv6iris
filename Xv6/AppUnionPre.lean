@@ -10,12 +10,14 @@ instance (`AppPreGS` header).
 -/
 import Xv6.AppUnionRec
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI MachCSL
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGpreS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF] [PipeOutG GF]
 variable [M : MachGS hlc GF]
   (hmono : MachFixedGS.mono (hlc := hlc) (GF := GF) = MachGpreS.mono_pre (hlc := hlc))
@@ -83,7 +85,7 @@ open Iris Iris.BI MachCSL
 
 /-- A machine instance whose fixed layer is `F`, every era name `0`: what a
 fixed-layer-only law (`al_merge`) reads a `[MachGS]`-section lemma at. -/
-@[reducible] def atFixedGS {hlc : HasLC} {GF : BundledGFunctors} (F : MachFixedGS hlc GF) :
+@[reducible] def atFixedGS {hlc : HasLC} {GF : BundledGFunctors.{0}} (F : MachFixedGS hlc GF) :
     MachGS hlc GF :=
   { fixed := F, regName := fun _ => 0, heapName := 0, metaName := 0, viewName := fun _ => 0,
     iviewName := fun _ => 0, rviewName := fun _ => 0, topName := 0, authName := 0, resvName := 0,

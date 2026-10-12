@@ -104,6 +104,8 @@ import Xv6.FsStateTop
 import Xv6.FsBlocks
 import Xv6.IcacheRefDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -117,7 +119,7 @@ def appE : CoPset := ↑appN
 /-! ## 1.  The raw credentials: at a predicate and an instance -/
 
 section AppCredsRaw
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-! ### 1a.  THE SUPPLY: the claim holds of EVERY view -/
 
@@ -192,7 +194,7 @@ end AppCredsRaw
 /-! ### 1c.  THE MERGE (Rocq `app_merge_raw`, SY3-K2 / SY3-A1 / SY3-A3b) -/
 
 section AppMergeRaw
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF]
 
 /-- THE COMMIT'S LAW (Rocq's `app_merge_raw`, main): the new durable copy is
 built from the running claim AND the old durable copy, curried at the
@@ -249,7 +251,7 @@ end AppMergeRaw
 /-! ### 1d.  THE SYNC RUNNER (Rocq `app_sync_run_raw`, sync K3-3 / SY3-A1 / SY3-A3b) -/
 
 section AppSyncRaw
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsTopG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsTopG GF]
 
 /-- THE ONE PLACE A SYNC HOOK'S MEANING IS USED (Rocq's `app_sync_run_raw`,
 main): fired by the ghost commit with the fresh guest half, the new durable
@@ -312,7 +314,7 @@ end AppSyncRaw
 /-! ## 2.  The invariant, at the ambient configuration -/
 
 section AppInv
-variable {hlc : HasLC} {GF : BundledGFunctors}
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}}
 
 /-- THE SUPPLY, PINNED (Rocq's `app_sup`): what the deposit class's
 `UexecSG.ssupply` is at the kernel's instance.  A CREDENTIAL, not a parked

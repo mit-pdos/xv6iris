@@ -13,6 +13,8 @@
 -/
 import Xv6.UkShParsePure
 
+noncomputable section
+
 namespace Xv6
 
 /-- **Rocq `ushs_nulcut`**: the line after the parse. -/

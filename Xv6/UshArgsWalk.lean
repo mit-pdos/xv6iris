@@ -35,6 +35,8 @@ import Xv6.UlibVprintfInv
 import Xv6.UshParserPure
 import Xv6.UshCodeExec
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -110,7 +112,7 @@ theorem ushPexRegs_cs {m m' : RegMap} {fp t0 argc ps es p : Nat}
     by rw [hk _ rfl]; exact h25, by rw [hk _ rfl]; exact h26, by rw [hk _ rfl]; exact h27⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 

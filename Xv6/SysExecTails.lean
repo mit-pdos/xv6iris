@@ -50,6 +50,8 @@ Imports only the shared vocabulary.
 -/
 import Xv6.SysExecParts
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -88,7 +90,7 @@ theorem sysExecReloaded_pinsE (k : KCtx) (R : RegMap)
 /-! ## §2.  THE SEVEN RELOADS at a symbolic base (Rocq `sx_reload`) -/
 
 section Reload
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
 /-- `+base .. +base+12`: `c.ldsp s1..s7` off the pushed sp, each from the
@@ -158,7 +160,7 @@ end Reload
 /-! ## §3.  The join point from a tail -/
 
 section Tails
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]

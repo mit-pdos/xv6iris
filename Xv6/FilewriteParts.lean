@@ -32,6 +32,8 @@ import Xv6.FilePay
 import Xv6.FsAbsWriteFire
 import Xv6.WriteiBudgetW
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -94,7 +96,7 @@ theorem fwr_budget_ok (off c : Nat) (hc : c ≤ 3072) : wiCostBmonly off c ≤ M
 /-! ## 3.  The frame -/
 
 section Frame
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {lent : Bool}
 
 set_option maxHeartbeats 4000000 in
@@ -389,7 +391,7 @@ theorem fwr_cs_epi (k : KCtx) (fk : Nat) (n : Int) (R : RegMap)
 `procPtAt_congr`) -- shared with consolewrite's chain. -/
 
 section Block
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [WchG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [WchG GF] [CurCtx]
 
 theorem fwr_priv_congr (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
     (M M' : Nat → List (BitVec 8))
@@ -468,7 +470,7 @@ theorem fwr_bytes (Pv P0 P' : UPtd) (M : Nat → List (BitVec 8)) (ua : BitVec 6
 /-! ## 7.  The reference: its cells, its state, its payload -/
 
 section Ref
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF]
   [Icfg] [CurCtx]
 

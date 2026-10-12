@@ -39,6 +39,8 @@ the device's `fetch` would build.
 import MachCSL.Resources
 import Xv6.KernelImage
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

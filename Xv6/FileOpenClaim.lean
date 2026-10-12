@@ -41,12 +41,12 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 /-- `fsGammaL`'s top map is the names' (`rfl`; for `simp` through the
 unfolded commits; `PinnedObs`' private `pobs_fsGammaL_top`). -/
-theorem fileOpen_fsGammaL_top {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
+theorem fileOpen_fsGammaL_top {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF]
     [FsBytesG GF] (γfs : FsNames) :
     (fsGammaL (hlc := hlc) (GF := GF) γfs).top = γfs.top := rfl
 
 section FileOpenClaim
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [OffboxG GF] [FsTopG GF] [Appcfg GF] [Icfg]
 
 /-- The era's claim IS the file claim, at the application's equation (a

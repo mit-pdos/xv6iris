@@ -30,6 +30,8 @@ sets from the line's length (`refFuel`).
 -/
 import Xv6.UkShParsePure
 
+noncomputable section
+
 namespace Xv6
 
 /-! ## §1 The cursor, the byte at it, and the two scans -/

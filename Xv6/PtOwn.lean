@@ -13,6 +13,8 @@ unchanged, well-formedness, distinct pages) are what `mappages` builds on.
 import MachCSL.PtTree
 import MachCSL.WordPointsTo
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -65,7 +67,7 @@ def availSub (on : Option Nat) (g : Nat) : Option Nat := on.map (· - g)
 /-! ## Ownership -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- The 512 entry words of a node page. -/
 def nodeOwn [CurCtx] (dq : DFrac) (t : PTree) : IProp GF := iprop%

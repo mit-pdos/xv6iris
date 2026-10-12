@@ -41,7 +41,7 @@ theorem uc_ret_11a6 : jumpPc (KA.«uvmcreate» + 0x1a#64) = (KA.«uvmcreate» + 
   decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-! ## The callees, at their entry addresses -/
 

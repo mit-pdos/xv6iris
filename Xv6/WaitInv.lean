@@ -76,6 +76,8 @@ Imports only definitional files.
 import Xv6.UserChildren
 import Xv6.IrefSlots
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -216,7 +218,7 @@ theorem inRow_upd_ne (m : ChMap) (γ0 : GName) (pa : BitVec 64) (cs S' : ExtTree
 /-- One slot of a range-indexed big-op, borrowed and given back at any
 member of a family of functions that agree with the original off the slot:
 the shape every accessor below takes. -/
-theorem waitInv_range_acc {GF : BundledGFunctors} {A : Type} (n k : Nat) (hk : k < n)
+theorem waitInv_range_acc {GF : BundledGFunctors.{0}} {A : Type} (n k : Nat) (hk : k < n)
     (Φ : Nat → IProp GF) (Φ' : A → Nat → IProp GF) (h : ∀ a i, i ≠ k → Φ' a i = Φ i) :
     ([∗list] i ∈ List.range n, Φ i) ⊢ Φ k ∗ (∀ a, Φ' a k -∗ [∗list] i ∈ List.range n, Φ' a i) := by
   refine (BigSepL.bigSepL_lookup_acc_impl (Φ := fun _ i => Φ i) (List.getElem?_range hk)).trans
@@ -234,7 +236,7 @@ theorem waitInv_range_acc {GF : BundledGFunctors} {A : Type} (n k : Nat) (hk : k
   iapply H $$ %(fun _ i => Φ' a i) Hbox HΦ'
 
 section WaitInv
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [WchG GF] [CtokG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [WchG GF] [CtokG GF]
 
 /-- every proc's `parent` cell, at context `ξ` (Rocq `parents_own_at`;
 deviation 1: it IS `WaitLock.waitResAt`). -/
@@ -695,7 +697,7 @@ name) are bound, so `TicksDefs.isTickslock` gains `[WchG GF]` and nothing
 else. -/
 
 section TickLedger
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [WchG GF]
 
 /-- the mirror's whole authority at count `n` (Rocq `tick_cnt`). -/
 def tickCnt (n : Nat) : IProp GF := MonoNat.auth_own (WchG.wtkName GF) (DFrac.own 1) (.ofNat n)

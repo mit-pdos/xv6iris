@@ -49,6 +49,8 @@ and wire primitives is given by the language step relation in
 import MachCSL.Dev.DevIds
 import MachCSL.TsoMem
 
+noncomputable section
+
 namespace MachCSL
 
 /-- The primitives of a device program over local state `S` with task

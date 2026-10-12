@@ -56,7 +56,7 @@ theorem bcond_beq_12 : bcond bop.BEQ 1#64 2#64 = false := by decide
 theorem bcond_beq_22 : bcond bop.BEQ 2#64 2#64 = true := by decide
 
 /-- A context is itself with its own pinned bits. -/
-theorem kctx_withSpie_of {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] {lent : Bool}
+theorem kctx_withSpie_of {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx] {lent : Bool}
     (cpu : CPU) (k : KCtx) (R : RegMap) (a b : Bool) (ha : a = k.spie) (hb : b = k.spp) :
     kctxL (GF := GF) lent cpu (k.withRegs R) ⊢ kctxL lent cpu ((k.withSpie a b).withRegs R) := by
   rw [KCtx.withSpie_self' k a b ha hb]

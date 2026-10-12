@@ -48,6 +48,8 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 import Xv6.TicksDefs
 import Xv6.SpecSleep
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -61,7 +63,7 @@ def sysPauseAddr : BitVec 64 := KA.«sys_pause»
 def sysPauseSlots : Nat := 8 + sleepSlots
 
 /-- **WP of `sys_pause()`.** -/
-def wp_sys_pause_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+def wp_sys_pause_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γt : GName) (j : Nat) (pid : BitVec 32) (gn : GName)
     (tfp : BitVec 44) (ws : List (BitVec 64)) (v : BitVec 64) (dqt : DFrac)
@@ -92,7 +94,7 @@ that instance).  At `sie = true` sys_pause's own `acquire(&tickslock)`
 mints the bundle `killed`/`sleep` need and the caller brings nothing; at
 `sie = false` the caller brings it.  Depth 0, so no spinlock is held
 (`KCtx.wf`). -/
-def wp_sys_pause_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+def wp_sys_pause_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γt : GName) (j : Nat) (pid : BitVec 32) (gn : GName)
     (tfp : BitVec 44) (ws : List (BitVec 64)) (v : BitVec 64) (dqt : DFrac)
@@ -118,7 +120,7 @@ def wp_sys_pause_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
 
 /-- The interface of `sys_pause`. -/
 structure SYSPAUSE : Prop where
-  wp_sys_pause_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+  wp_sys_pause_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γt : GName) (j : Nat) (pid : BitVec 32) (gn : GName)
     (tfp : BitVec 44) (ws : List (BitVec 64)) (v : BitVec 64) (dqt : DFrac)

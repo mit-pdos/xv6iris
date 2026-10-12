@@ -28,6 +28,8 @@ system theorem's file may import them, and no PROOF file imports any of them.
 import Xv6.FsImgRaw
 import Xv6.FsCrashPure
 
+noncomputable section
+
 namespace Xv6
 
 open Std

@@ -39,6 +39,8 @@ import Xv6.FileLinkGen
 import Xv6.FsCfgDefs
 import Xv6.GenLinksLine
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -65,7 +67,7 @@ theorem lmWrBlkSpRun (M : LModel) (ps cs : List Nat) (s0 : M.lmSt) (I : List (Bi
     decide
 
 section UnionLinkInst
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF] [PipeOutG GF] [Fscfg]
 
 /-! ## 1. The parameters: the file's witness and head -/

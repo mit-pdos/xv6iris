@@ -49,6 +49,8 @@ register rules, so the D52 `hwConfig` refactor does not touch it.
 -/
 import MachCSL.URunRW
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

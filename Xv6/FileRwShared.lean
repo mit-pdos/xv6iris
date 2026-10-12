@@ -23,6 +23,8 @@ import Xv6.EitherDefs
 import Xv6.FdTable
 import Xv6.FilePay
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -120,7 +122,7 @@ theorem filerw_offadd (v : BitVec 32) (tot : Nat) (h : v.toNat + tot < 2 ^ 31) :
 /-! ## The block -/
 
 section Block
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [WchG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [WchG GF] [CurCtx]
 
 /-- The pid cell out of the block and back (Rocq's
 `proc_priv_core_bare_acc`, lent around each of begin_op, ilock, iunlock,
@@ -163,7 +165,7 @@ taken apart).  fileread / filewrite / filestat never touch `p->cwd` or the
 generation row: the two are parked in the continuation at entry and handed
 back with the block at exit (Rocq carries them inside `proc_priv_core`
 through every step; same resource, fewer frames). -/
-theorem filerw_core_conv {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+theorem filerw_core_conv {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
     [FdslotG GF] [BioslotG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [OffboxG GF] [OffboxBoxG GF] [FileG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [X : CurCtx]
@@ -180,7 +182,7 @@ theorem filerw_core_conv {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
 /-! ## The reference: its cells, its state, its payload -/
 
 section Ref
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF]
   [Icfg] [CurCtx]
 

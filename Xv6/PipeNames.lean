@@ -28,6 +28,8 @@ like writing a byte (`pstClose`), paid by the closer.
 -/
 import Iris.Algebra.IProp
 
+noncomputable section
+
 namespace Xv6
 
 open Iris

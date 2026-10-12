@@ -42,6 +42,8 @@ import Xv6.FsImgUsed
 import Xv6.FsImgDir
 import Xv6.FsDurSnapBytes
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL Iris Iris.BI Iris.ProofMode Iris.Std Std

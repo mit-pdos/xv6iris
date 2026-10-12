@@ -21,6 +21,8 @@ import Xv6.UPtDefs
 import MachCSL.WpSmodeIntr
 import Xv6.SlotGen
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -40,7 +42,7 @@ def uvmcopyOk (Pold Pnew Pnew' : UPtd) (Mold Mnew Mnew' : Nat → List (BitVec 8
     | some w => (∃ ppn' : BitVec 44, Iris.Std.PartialMap.get? Pnew'.um i = some (leafOf ppn' (pteFlags w))) ∧
         Mnew' i = Mold i)
 
-def wp_uvmcopy_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
+def wp_uvmcopy_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (Pold Pnew : UPtd) (Mold Mnew : Nat → List (BitVec 8))
     (ke : Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 42 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
@@ -62,7 +64,7 @@ def wp_uvmcopy_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G 
   ⊢ wpLoop (GF := GF) cpu
 
 structure UVMCOPY : Prop where
-  wp_uvmcopy : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_uvmcopy : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γl : GName) (γk : KmemNames) (Pold Pnew : UPtd) (Mold Mnew : Nat → List (BitVec 8)) (ke : Nat)
     hnoff hK hlk hold hnew hsz hfree,
     wp_uvmcopy_body (hlc := hlc) (GF := GF) cpu k γl γk Pold Pnew Mold Mnew ke hnoff hK hlk hold hnew hsz hfree

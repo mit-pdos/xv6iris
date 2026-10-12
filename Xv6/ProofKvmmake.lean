@@ -22,6 +22,8 @@ import Xv6.CodeTactics
 import Xv6.UvmCallSites
 import MachCSL.BvLemmas
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -106,7 +108,7 @@ theorem km_cnt5 {nb : Nat} (h : 166 < nb) : 63 < nb - 1 - 2 - 0 - 0 - 32 - 2 := 
 theorem km_cnt6 {nb : Nat} (h : 166 < nb) : 2 < nb - 1 - 2 - 0 - 0 - 32 - 2 - 63 := by omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF]
 
 /-! ## The callees, at their entry addresses -/
 
@@ -727,7 +729,7 @@ end
 /-! ## kvmmake itself: the root, the seven regions, the stacks, the epilogue -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF]
 
 /-! ## The caller's continuation, named -/
 

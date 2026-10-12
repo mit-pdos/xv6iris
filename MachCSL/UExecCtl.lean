@@ -27,6 +27,8 @@ oracle answer is consumed.
 -/
 import MachCSL.UExecCtlSys
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

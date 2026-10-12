@@ -18,6 +18,8 @@ END).  Nothing here bounds the number of words or the line's length.
 import Xv6.LineWords
 import Xv6.UkShParsePure
 
+noncomputable section
+
 namespace Xv6
 
 /-! ## §1 The two blanks, as the lexer sees them -/

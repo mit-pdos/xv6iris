@@ -22,6 +22,8 @@ import Xv6.SpecWakeup
 import Xv6.CodeTactics
 import MachCSL.WpSmodeDev
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -113,7 +115,7 @@ theorem uiPres_call (k : KCtx) (R R' : RegMap) (h : uiPres k R) (hcs : calleeSav
     c22.trans h22, c23.trans h23, c24.trans h24, c25.trans h25, c26.trans h26, c27.trans h27⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable {lent : Bool}
 
 /-! ## One byte load from a UART register -/
@@ -205,7 +207,7 @@ theorem ui_call_wakeup (WK : WAKEUP) [CurCtx]
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-! ## Unpacking the port's bundle and port 0's credentials -/
 

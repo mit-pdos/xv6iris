@@ -23,6 +23,8 @@ import MachCSL.UExecCtl
 import MachCSL.UWait
 import MachCSL.UExecCtlJump
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

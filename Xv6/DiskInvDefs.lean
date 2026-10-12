@@ -163,6 +163,8 @@ import MachCSL.DmaCtxSplit
 import MachCSL.CrashPermInv
 import MachCSL.WpDev
 
+noncomputable section
+
 namespace Xv6
 
 set_option linter.unusedSimpArgs false
@@ -174,7 +176,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 /-- The ghost libraries the disk needs beyond `Xv6G` (Rocq's `diskG`).  The
 block image uses the SHARED `Xv6G.gmBlkG` and the completion counters the
 SHARED `MachFixedGS.mono` (one instance per camera type). -/
-class DiskG (GF : BundledGFunctors) where
+class DiskG (GF : BundledGFunctors.{0}) where
   /-- the frozen configuration (`VirtioProto.v`'s `cfg`) -/
   [gvCfgG : GhostVarG GF VirtioCfg]
   /-- the per-descriptor receipt -/
@@ -249,7 +251,7 @@ structure DiskNames where
 def diskN : Namespace := ndot nroot "xv6disk"
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
 
 theorem list_eq_map_range {A : Type _} (l : List A) (d : A) :
     (List.range l.length).map (fun j => l.getD j d) = l := by

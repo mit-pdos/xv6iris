@@ -38,7 +38,7 @@ theorem mn_started_addr' : KA.«main» + 162#64 + 36864#64 + 1168#64 = KA.«star
 theorem mn_j_3e : KA.«main» + 178#64 + BitVec.signExtend 64 2097036#21 = KA.«main» + 62#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 set_option maxHeartbeats 4000000 in
 /-- **+0xa2 → +0x3e: `__sync_synchronize(); started = 1;`**, the handover
@@ -96,7 +96,7 @@ theorem mn_started [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsie : k.sie =
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
   [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
 
 set_option maxHeartbeats 4000000 in

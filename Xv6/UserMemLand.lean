@@ -22,6 +22,8 @@ import Xv6.UserClassifyLand
 import MachCSL.UMemFrStore
 import MachCSL.UMemExec
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

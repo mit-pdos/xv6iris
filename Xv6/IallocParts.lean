@@ -26,6 +26,8 @@ import Xv6.SpecIalloc
 import Xv6.SpecIget
 import Xv6.BfreeParts
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -194,7 +196,7 @@ def iallocFmtStr : List (BitVec 8) :=
    0x69#8, 0x6e#8, 0x6f#8, 0x64#8, 0x65#8, 0x73#8, 0x0a#8]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 set_option maxRecDepth 100000 in
 /-- Rocq's `ia_msg_bytes` + `kernel_data_string`: the format string, minted

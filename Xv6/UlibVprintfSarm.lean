@@ -31,7 +31,7 @@ theorem ulibOfNat_beq0 (x : Nat) (hx : x < 2 ^ 64) (h : x ≠ 0) : (BitVec.ofNat
   omega
 
 section
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- **The string loop**, `+0x2ae → +0x2bc` (Rocq `wp_kcat_vprintf_sloop`):
 `k + 1` bytes left from index `j`, the current one in `a1`. -/

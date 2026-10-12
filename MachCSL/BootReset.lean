@@ -38,6 +38,8 @@ everywhere downstream, Rocq's route:
 -/
 import MachCSL.BootInitModel
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

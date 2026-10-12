@@ -61,6 +61,8 @@ entry Spec).
 import Xv6.SyscallRet
 import Xv6.SpecFdalloc
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -161,7 +163,7 @@ theorem syscPath_imgLazy (P : UPtd) (sz : BitVec 64) (M : Nat → List (BitVec 8
 /-! ## §2 The deposit laws (§4 template; deviation 1) -/
 
 section Laws
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [FsBlocksG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [FsBlocksG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CtokG GF] [SG : UexecSG GF]
 open UexecSG
 
@@ -287,7 +289,7 @@ end Laws
 /-! ## §3 The arms -/
 
 section Arms
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]

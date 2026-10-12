@@ -48,6 +48,8 @@ import Xv6.UImgWordDefs
 import Xv6.UserHeap
 import Xv6.BootCarve
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
@@ -201,7 +203,7 @@ theorem uargv_det (E : ElfMem) (Mv : Nat → List (BitVec 8)) (av : Nat) (args :
 /-! ## §3 Reading a run off the heap -/
 
 section ExecArgsHeap
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
 
 /-- **Rocq `uheap_ubytesq_img`** (deviation 4): a run at any fraction is a
 run the image holds. -/

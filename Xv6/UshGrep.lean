@@ -77,6 +77,8 @@ import Xv6.SpecGrepStart
 import Xv6.UEchoOut
 import Xv6.ElfUserGrep
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.Std MachCSL

@@ -71,6 +71,8 @@ import Xv6.KallocDefs
 import Xv6.SpecEntry
 import Xv6.KernelData
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -166,7 +168,7 @@ theorem bc_ro_bytes (p : Nat × Nat) (hp : p ∈ Kernel.rodata) (j : Nat) (hj : 
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 def bootRaw (m : MemF Hist) : IProp GF := iprop% [∗map] a ↦ H ∈ m, a ↦ₕ H
 

@@ -32,6 +32,8 @@ import MachCSL.SmodeDevDefs
 import Xv6.UartModel
 import Xv6.UartLinks
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -58,7 +60,7 @@ theorem uartByteOk (i : UartId) (off : Nat) (hoff : off < 8) :
   cases i <;> (rcases off with _ | _ | _ | _ | _ | _ | _ | _ | off <;> first | decide | omega)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-- `uarts[i].base`, read-only after boot: the port's MMIO base. -/
 def uartBaseWord [CurCtx] (i : UartId) : IProp GF :=
@@ -1086,7 +1088,7 @@ port the log's mark IS the popper's anchor (or nothing is logged yet and
 everything popped went to uartinit's flush). -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-- The popper's resource at count `k` and anchor `hl` (Rocq `uart_rx_writer`). -/
 def uartRxWriter (i : UartId) (γ : UartNames) (k : Nat) (hl : Option (List Obs)) : IProp GF := iprop%
@@ -1120,7 +1122,7 @@ end
 /-! ## The receive accessors at the writer (what `uartintr` holds) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-- `lsr_read_rx_au` with the whole PLIC payload in hand. -/
 theorem lsr_read_rx_au_w (i : UartId) (γ : UartNames) (k : Nat) (hl : Option (List Obs)) :
@@ -1146,7 +1148,7 @@ credential, the frozen divisor latch and the port's base word.  All
 persistent, so one copy serves every caller. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 def uartPort [CurCtx] (i : UartId) (γl : GName) (γ : UartNames) : IProp GF := iprop%
   uartInv i γ ∗ isTxLockAt i γl γ ∗ dlabOff γ ∗ uartBaseWord i
@@ -1182,7 +1184,7 @@ flips the regime once, irreversibly, with `uartPreinit_deposit`.  Nothing
 in the `uartinit` cone mentions either: the flip happens beside it. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-- Port `γ`'s one-shot, unfired: an EXCLUSIVE whole (the boot client's). -/
 def uartPreinit (γ : UartNames) : IProp GF := γ.init ↪VAR{.own 1} false

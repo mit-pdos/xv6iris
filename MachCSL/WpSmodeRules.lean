@@ -20,6 +20,8 @@ import MachCSL.WpSmodeMemSb
 import MachCSL.WpSmodeMemSd
 import MachCSL.WpSmodeMemSw
 
+noncomputable section
+
 
 namespace MachCSL
 
@@ -27,7 +29,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D LeanRV64D.Functions
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {lent : Bool}
 
 /-- Framing an execute stage. -/

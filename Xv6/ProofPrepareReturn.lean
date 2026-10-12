@@ -49,7 +49,7 @@ theorem prepare_return_ctx_eq (k : KCtx) (a b s1 s2 : Bool) (h : 2 ≤ k.avail) 
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-- A cell at an equal value. -/
 theorem prepare_return_cell_eq [CurCtx] (a : BitVec 64) (x y : BitVec 64) (h : x = y) :

@@ -86,6 +86,8 @@ the mechanisms both sides rest on.
 import Xv6.DiskCrashRows
 import MachCSL.WpDevDisk
 
+noncomputable section
+
 namespace Xv6
 
 set_option linter.unusedSimpArgs false
@@ -160,7 +162,7 @@ def serveTail (h : BitVec 16) (r : VioReq) : Virtio.VM Unit := do
       some (Virtio.complete s h) else none) (Virtio.usedIdxAddr c) 2 (ui + 1#16)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
 
 /-! ## The protocol survives a move that leaves the image alone -/
 

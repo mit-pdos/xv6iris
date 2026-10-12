@@ -70,6 +70,8 @@ import Xv6.FsDurSnapBytes
 import Xv6.FsDurRead
 import Xv6.FsDurXfer
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -78,7 +80,7 @@ open FsStateLink
 /-! ## Pure-reading helpers (deviation 4) -/
 
 section Helpers
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- A pure `∀` read pointwise off the same resources (helper). -/
 theorem fsSnapPureAll {α : Type _} {P : IProp GF} {φ : α → Prop} (h : ∀ x, P ⊢ ⌜φ x⌝) :
@@ -105,7 +107,7 @@ end Helpers
 /-! ## 7.  The snapshot, and the epoch registry -/
 
 section Snap
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [FsLinkG GF] [FsTopG GF]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF] [FsLinkG GF] [FsTopG GF]
 
 /-- ONE epoch's durable instance: its byte identity, the KERNEL half of the
 abstract map's authority and every fragment, the nested predicate, the root's
@@ -282,7 +284,7 @@ end Snap
 /-! ## 7b.  The reading -/
 
 section ReadBytes
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF]
 
 /-- Rocq's `snap_read_blks`. -/
 theorem snapReadBlks (g gl gt : GName) (D : BlockMap) (n : FsNode) (hf : dblkFull D) :
@@ -323,7 +325,7 @@ end ReadBytes
 /-! ### One inode's own slots are distinct: exclusivity, not a clause -/
 
 section Owns
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- `recOwned` read as the run it is (helper; `recOwned_sb` and one
 unfolding). -/
@@ -402,7 +404,7 @@ theorem inodeDat_slotInj (Γ : FsViewNames GF) (hex : phiExcl Γ) (i : Nat) (n :
 end Owns
 
 section Read
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF]
 
 /-- The whole per-inode reading (Rocq's `snap_read_inode`). -/
 theorem snapReadInode (g gl gt : GName) (D : BlockMap) (sb : FsSb) (i : Nat) (n : FsNode)
@@ -460,7 +462,7 @@ end Read
 /-! ### The used-set coupling: three refutations off the `∗` -/
 
 section Coupling
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- Rocq's `fs_inodes_phi_disj`. -/
 theorem fsInodes_phiDisj (Γ : FsViewNames GF) (hex : phiExcl Γ) (sb : FsSb) (I : RegMapF FsNode) :
@@ -589,7 +591,7 @@ end Coupling
 /-! ### The reading -/
 
 section ReadOk
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [FsLinkG GF] [FsTopG GF]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF] [FsLinkG GF] [FsTopG GF]
 
 /-- THE WITNESS BUNDLE the reading destructures (deviation 4; helper): the
 snapshot's identity, the footprint's four pieces, the link family and the
@@ -737,7 +739,7 @@ Its own section because the merge's left arm is LENT the machine's
 started-generations auth `startAuth`, a `MachFixedGS` resource. -/
 
 section SnapMerge
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [FsLinkG GF] [FsTopG GF]
 
 /-- THE GUEST'S MERGE (Rocq's `dur_merge`, SY3-K2 / K3-3 / SY3-A1): the new

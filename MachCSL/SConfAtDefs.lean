@@ -8,13 +8,15 @@ cycle lemmas over them do not wait for the translation proofs.
 import MachCSL.SConfPhysDefs
 import MachCSL.KptInv
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D LeanRV64D.Functions
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- What the supervisor-mode stage lemmas that TRANSLATE need of a
 configuration at the Bare tier: everything the physical leaves need, plus

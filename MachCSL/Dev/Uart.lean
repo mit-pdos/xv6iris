@@ -24,6 +24,8 @@ latching of this port's level is the PLIC's own program's business
 -/
 import MachCSL.Dev.DevLang
 
+noncomputable section
+
 namespace MachCSL
 
 /-- The state of one 16550. -/

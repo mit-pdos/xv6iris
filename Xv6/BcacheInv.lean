@@ -94,6 +94,8 @@ import Xv6.BufDefs
 import Xv6.SleepLockDefs
 import MachCSL.CtxBox
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -195,7 +197,7 @@ with the escrow's `boxG` folded in -- Rocq `BioInv.v`'s `bioboxG`).  The
 slot tokens (at `BioslotG.bioslotName`, `Xv6/SlotSupply.lean`), the per-buffer ownership variables and
 the escrow counters use the SHARED cameras `Xv6G.gmUnitG`,
 `Xv6G.gvUnitG` and `Xv6G.gvNatG` (one instance per camera type). -/
-class BcacheG (GF : BundledGFunctors) where
+class BcacheG (GF : BundledGFunctors.{0}) where
   [gmRefG : GhostMapG GF Nat Nat RegMapF]
   [stmG : ElemG GF (StampsRF BufId)]
   [gvSlotd : GhostVarG GF (SlotReg BufId BufX)]
@@ -205,7 +207,7 @@ attribute [reducible, instance] BcacheG.gmRefG
   BcacheG.stmG BcacheG.gvSlotd BcacheG.gvSlotp
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
 variable [DiskG GF] [CurCtx]
 
 /-! ## The circular LRU list -/
@@ -1055,7 +1057,7 @@ theorem bufData_kmapRw (k m : Nat) (hk : k < NBUF) (hm : m < BSIZE) :
   rw [if_neg (by omega), if_pos (Or.inl ⟨hlo, hhi⟩)]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
   [SleepLockG GF] [DiskG GF] [CurCtx]
 
 /-! ## The per-buffer sleeplock, and the held handle -/
@@ -1396,7 +1398,7 @@ theorem bcacheOrd_map (o1 o2 : List Nat) (kk : Nat) :
   simp
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
 variable [DiskG GF] [CurCtx]
 
 /-! ## Opening the cache and one slot -/

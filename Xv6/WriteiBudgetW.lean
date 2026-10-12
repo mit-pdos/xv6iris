@@ -39,6 +39,8 @@ consumed by writei or any caller.
 -/
 import Xv6.SpecWritei
 
+noncomputable section
+
 namespace Xv6
 
 /-! ## 1. The chunk the code hands writei -/

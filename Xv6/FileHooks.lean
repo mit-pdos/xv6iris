@@ -33,6 +33,8 @@ Deviations from Rocq:
 import Xv6.FileOutPure
 import Xv6.LineModelLinks
 
+noncomputable section
+
 namespace Xv6
 
 /-! ## S0  THE LINE, ITS ALTERNATIVES' OUTPUT, AND STATE-FREEDOM -/

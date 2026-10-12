@@ -9,6 +9,8 @@ import MachCSL.WpSmodeFrame
 import Xv6.UPtDefs
 import Xv6.Image
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -22,7 +24,7 @@ def walkaddrRet (L : RegMapF (BitVec 64)) (va r : BitVec 64) : Prop :=
       ∃ w, Iris.Std.PartialMap.get? L (vpnOf va).toNat = some w ∧ ¬ pteVU w)) ∨
   (∃ w, Iris.Std.PartialMap.get? L (vpnOf va).toNat = some w ∧ pteVU w ∧ va.toNat < 2 ^ 38 ∧ r = pte2pa w)
 
-def wp_walkaddr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_walkaddr_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (dq : DFrac) (t : PTree) (L : RegMapF (BitVec 64))
     (hK : 10 ≤ k.avail) (hroot : k.regs 10#5 = pageAddr t.base) (hrep : ptRep t L) : Prop :=
   kctx cpu k ∗ pcIs cpu walkaddrAddr ∗ ptreeOwn 2 dq t ∗
@@ -32,7 +34,7 @@ def wp_walkaddr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   ⊢ wpLoop (GF := GF) cpu
 
 structure WALKADDR : Prop where
-  wp_walkaddr : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_walkaddr : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (dq : DFrac) (t : PTree) (L : RegMapF (BitVec 64)) hK hroot hrep,
     wp_walkaddr_body (hlc := hlc) (GF := GF) cpu k dq t L hK hroot hrep
 

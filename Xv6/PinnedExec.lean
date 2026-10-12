@@ -19,6 +19,8 @@ links.
 import Xv6.PinnedObs
 import Xv6.ElfFile
 
+noncomputable section
+
 namespace Xv6
 
 /-- Rocq `pin_resolves`: `pinResolvesAt` at a file node holding `f`. -/

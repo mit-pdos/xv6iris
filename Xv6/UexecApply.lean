@@ -63,6 +63,8 @@ round resumed.  Everything here is what that re-keying needs:
 -/
 import Xv6.UsysDet
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL LeanRV64D
@@ -133,7 +135,7 @@ theorem ukeyEq_bump {W W' : Uvis} (hl : W.tf.length = 36) (hl' : W'.tf.length = 
     exact retPc_add4_cong hp
 
 section Apply
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]
 open UexecSG
 
 /-- A slot family that reads its key only at the eleven readings (Rocq's `HS`
@@ -244,7 +246,7 @@ end Apply
 /-! ## §3 THE ROUND'S TAIL, AS NAMED LEMMAS -/
 
 section LoopApply
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]
 open UexecSG
 
 /-- **Rocq `uexec_ret_F_returning`**: THE RETURNING ARM, FACTORED -- the
@@ -546,7 +548,7 @@ end LoopApply
 /-! ## §5 THE FUNCTIONAL ROWS (NI M0 / M2-W3; deviation 6) -/
 
 section Det
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]
 open UexecSG
 
 /-- **`round_det`** (NI M0, grown by G1d and G1e): at an ecall whose

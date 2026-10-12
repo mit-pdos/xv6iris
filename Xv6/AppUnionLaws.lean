@@ -44,7 +44,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
 section UnionLawsPre
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGpreS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF] [PipeOutG GF]
 
 attribute [local instance] appPreGS
@@ -210,7 +210,7 @@ theorem union_al_pow (c : (appUnion (hlc := hlc) (GF := GF)).fixed) (h : List Ob
 end UnionLawsPre
 
 section UnionLawsEra
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGpreS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF] [PipeOutG GF]
 
 /-- **Rocq `union_al_rx`** (deviations 1, 2). -/
@@ -283,7 +283,7 @@ theorem union_al_tx [MachGS hlc GF] [Fscfg] (c : (appUnion (hlc := hlc) (GF := G
 end UnionLawsEra
 
 section UnionMerge
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGpreS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF] [PipeOutG GF]
 
 /-- **Rocq `union_al_merge`** (sync SY3-A3bc): THE MERGE -- the file
@@ -314,7 +314,7 @@ theorem union_al_merge [F : MachFixedGS hlc GF] (c : (appUnion (hlc := hlc) (GF 
 end UnionMerge
 
 section UnionLaws
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G GF] [CtokG GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGpreS hlc GF] [Xv6G GF] [CtokG GF] [DiskG GF]
   [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [SleepLockG GF]
   [BcacheG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF] [PipeOutG GF]

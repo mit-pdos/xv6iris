@@ -26,6 +26,8 @@ import Xv6.FileDeltasOk
 import Xv6.FileDeltasCons
 import Xv6.FileDeltasLen
 
+noncomputable section
+
 namespace Xv6
 
 open Iris.Std

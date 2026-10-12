@@ -46,6 +46,8 @@ refuted by the certificate.  Above this lemma no rule ever sees a generation.
 import MachCSL.Ctx
 import Iris.ProgramLogic.Lifting
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
@@ -56,7 +58,7 @@ open LeanRV64D
 /-! ## The corpse rule -/
 
 section dead
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF]
 
 theorem eraCur_true {R : RegMapF EraGS} {g : GState} (h : g.pow = true) :
     eraCur (GF := GF) R g = iprop(∃ E, ⌜get? R g.gen = some E⌝ ∗ eraInterp E g.m) := by
@@ -112,7 +114,7 @@ theorem wp_dead (gen : Nat) (cpu : CPU) (m : SailM Unit) :
 
 end dead
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-! ## The state interpretation of the ambient era -/
 
@@ -1139,7 +1141,7 @@ open Sail Sail.ConcurrencyInterfaceV1
 open Sail.ArchSem (FreeM)
 open LeanRV64D
 
-variable {hlc : HasLC} {GF : BundledGFunctors}
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}}
 
 /-! ## The memory model's ghost bridges
 

@@ -28,6 +28,8 @@ the reference answers (§6).
 import Xv6.RefParse
 import Xv6.UkShParseSym
 
+noncomputable section
+
 namespace Xv6
 
 /-- **Rocq `ref_nonnul`**: the body bytes of the line are not NUL

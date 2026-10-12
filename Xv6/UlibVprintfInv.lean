@@ -18,6 +18,8 @@ twelve hypotheses); the epilogue gives them back.
 -/
 import Xv6.UlibStep
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL LeanRV64D
@@ -194,7 +196,7 @@ theorem ulibAddr_add (a i : Nat) (h : a + i < 2 ^ 64) :
 /-! ## The frame -/
 
 section
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- **The twelve words `vprintf`'s prologue spills**, below the entry `sp`
 (`s`), holding the entry registers `ra, s0, s1..s8` of `m0` (Rocq's twelve

@@ -97,6 +97,8 @@ import Xv6.ConsNames
 import Xv6.BcacheInv
 import Xv6.IcacheRefDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Std MachCSL

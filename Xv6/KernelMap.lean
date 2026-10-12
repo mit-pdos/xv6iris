@@ -7,6 +7,8 @@ identity mappings and are inserted at the switch.
 -/
 import MachCSL.KMap
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

@@ -31,6 +31,8 @@ key movers, none in wave 7b.  `lazy_free` itself is landed as
 -/
 import Xv6.UPtDefs
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

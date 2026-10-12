@@ -75,13 +75,15 @@ Nothing.
 -/
 import Xv6.FsAbsDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris
 
 /-- Rocq's `appcfg Σ`: THE APPLICATION'S PREDICATE ON THE ABSTRACT
 FILE-SYSTEM STATE, with the fixed part already applied. -/
-class Appcfg (GF : BundledGFunctors) where
+class Appcfg (GF : BundledGFunctors.{0}) where
   /-- THE APPLICATION'S OWN PER-INSTANCE GHOST NAMES (app-instances.md
   section 1): a running instance per era, a durable one per snapshot (round
   C); the generic application's is `Unit`. -/

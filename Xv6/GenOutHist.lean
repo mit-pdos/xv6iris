@@ -40,6 +40,8 @@ Deviations from Rocq:
 import Xv6.GenOutPure
 import Xv6.EchoOutLine
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

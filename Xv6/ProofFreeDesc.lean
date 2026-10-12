@@ -95,7 +95,7 @@ theorem fd_s16 : BitVec.extractLsb' 0 16 (0#64) = 0#16 := by decide
 theorem fd_s8 : BitVec.extractLsb' 0 8 (1#64) = 1#8 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 /-- `&disk.desc`, out of the geometry. -/
 theorem fd_geom (γ : DiskNames) (pd pav pu : BitVec 64) :

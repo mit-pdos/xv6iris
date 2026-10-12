@@ -9,6 +9,8 @@ stage layer (`WpSmode`) does not wait for it.
 import MachCSL.MConf
 import MachCSL.PmpXv6Defs
 
+noncomputable section
+
 namespace MachCSL
 
 /-- `satp` at each tier: Bare, or Sv39 at the kernel root. -/

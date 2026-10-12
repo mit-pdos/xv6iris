@@ -46,6 +46,8 @@ Everything is stated over a `UFoot` and `UWSt.file`.
 -/
 import MachCSL.UWalk
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

@@ -30,7 +30,7 @@ theorem kvm_ret_10ac : jumpPc (KA.«kvmmap» + 0x12#64) = (KA.«kvmmap» + 0x12#
   decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF]
 
 /-! ## The callee, at its entry address -/
 

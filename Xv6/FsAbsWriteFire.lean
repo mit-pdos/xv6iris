@@ -121,6 +121,8 @@ import Xv6.FsAbsOpenFire
 import Xv6.SpecWritei
 import Xv6.FsAbsUnlinkFire
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -291,7 +293,7 @@ theorem wriCount_step (n t : Int) (p : Nat) (_ht : 0 ≤ t) (htn : t < n) (heq :
 /-! ## 2.  The authority-shaped chunk commits and the chain -/
 
 section WriteCommit
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [OffboxG GF]
 
 /-- THE FULL-CHUNK COMMIT (Rocq's `awrite_full_at`): the two-phase fire at
 the RAW MAP, with the very same authority handed back, phase 2 quantified
@@ -668,7 +670,7 @@ end WriteCommit
 /-! ## 3.  Item 1: the chunk fire, fused with the row retag -/
 
 section WriteFire
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [FsTopG GF] [FsBytesG GF] [OffboxG GF]
 
 /-- the delta collapses to the ONE-ROW counted insert: at a nonzero count

@@ -61,6 +61,8 @@ import Xv6.UkAbi
 import Xv6.UserTextDecode
 import Xv6.UserFd
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -270,7 +272,7 @@ structure UArg where
 /-! ## §2 The two points-to families, and runs of them -/
 
 section UserHeap
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
 
 /-- **Rocq `utext`**: a TEXT byte, PERSISTENT. -/
 def utext (γt : GName) (a : Nat) (b : BitVec 8) : IProp GF := γt ↪◯MAP[a]{DFrac.discard} b

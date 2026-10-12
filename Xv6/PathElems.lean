@@ -82,6 +82,8 @@ header, kept because the reasons are the content:
 -/
 import Xv6.DirentEnc
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

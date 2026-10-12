@@ -90,7 +90,7 @@ theorem ka_al8 (p : BitVec 64) (h : p &&& 0xfff#64 = 0#64) : p.toNat % 8 = 0 := 
 /-! ## Curried forms of the allocator's ghost steps -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
 
 /-- `kmemAuth_agree`, curried. -/
 theorem kmemAuth_agree' (γk : KmemNames) (n : Nat) (on : Option Nat) :
@@ -141,7 +141,7 @@ set_option maxHeartbeats 4000000 in
 /-- From `0x80000bbe` at hart `c` with `s1 = v`: `mv a0,s1`, the epilogue,
 and the caller's continuation.  `kb` is the function's base context (the
 one a balanced `push_off`/`pop_off` pair left), `R` the current map. -/
-theorem ka_tail {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+theorem ka_tail {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (c : CPU) (kb : KCtx) (hK : 4 ≤ kb.avail) (v : BitVec 64)
     (KR : RegMap) (hregs : kb.regs = KR)
     (R : RegMap) (hR2 : R 2#5 = KR 2#5 + 0xFFFFFFFFFFFFFFE0#64) (h9 : R 9#5 = v)
@@ -185,7 +185,7 @@ theorem kalloc_br_19a : KA.«kalloc» + 0x19a#64 = KA.«memset» := by decide
 set_option maxHeartbeats 4000000 in
 /-- From `0x80000bb4` at hart `c`, after `release`, with the page `p` owned:
 `memset(p, 5, 4096)` and the tail. -/
-theorem ka_memset_tail (MS : MEMSET) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+theorem ka_memset_tail (MS : MEMSET) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (c : CPU) (kb : KCtx) (hK : 6 ≤ kb.avail) (p : BitVec 64)
     (KR : RegMap) (hregs : kb.regs = KR)
     (R : RegMap) (hR2 : R 2#5 = KR 2#5 + 0xFFFFFFFFFFFFFFE0#64) (h9 : R 9#5 = p)
@@ -286,7 +286,7 @@ set_option maxHeartbeats 4000000 in
 `wp_kalloc` follows as a corollary in `kalloc_proof`.  The actor of the
 ledger's event is `k.proc`, the `cpu_own` proc word (design D3). -/
 theorem kalloc_led_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET)
-    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+    {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γl : GName) (γk : KmemNames) (on : Option Nat) (ke : Nat) hnoff hK hlk :
     wp_kalloc_led_body (hlc := hlc) (GF := GF) cpu k γl γk on ke hnoff hK hlk := by
   unfold wp_kalloc_led_body

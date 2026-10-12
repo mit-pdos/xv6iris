@@ -56,6 +56,8 @@ import Xv6.UkEchoDefs
 import Xv6.User.ShText
 import Xv6.UkRunMem
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -67,7 +69,7 @@ set_option linter.unusedSimpArgs false
 /-! ## §1 sh's instruction facts (deviation 1) -/
 
 section Code
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
 
 /-- **sh's catalog, once** (Rocq `UCodeShM.uis_shm_<pc>`): an instruction
 sh's text tree finds and decodes at `pc`. -/
@@ -158,7 +160,7 @@ theorem ushmKeep_of_cs {m m' : RegMap} (h : ucalleeSaved m m') : ushmKeep ushmCa
 /-! ## §4 One K&R header, and the byte facts its 32-bit field needs -/
 
 section Heap
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
 
 /-- **Rocq `ushm_hdr`**: an 8-byte `next` and a 32-bit unit count in a
 16-byte cell; the top four bytes are padding no instruction touches, so they
@@ -242,7 +244,7 @@ end Heap
 /-! ## §5 THE SBRK ROW, AS A PARAMETER (deviation 2) -/
 
 section Sbrk
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -270,14 +272,14 @@ end Sbrk
 /-- **The sbrk row the allocator's walks are proved against** (deviation 2):
 `UkRunSys.wp_uk_ecall_sbrk`, a parameter until UkRunSys is ported. -/
 structure USHM_SBRK_LEAF : Prop where
-  wp_uk_ecall_sbrk : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
+  wp_uk_ecall_sbrk : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
     [UprogSG GF] [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
     [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], ushmEcallSbrkBody (hlc := hlc) (GF := GF)
 
 /-! ## §6 The allocator's states and its capability types -/
 
 section States
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -402,7 +404,7 @@ theorem ushm_wr0 (m : RegMap) (v : BitVec 64) : ukWr m 0#5 v = m := by
 /-! ## §7 The two-word frame (deviation 4) -/
 
 section Frame
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 

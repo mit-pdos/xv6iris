@@ -57,6 +57,8 @@ import Xv6.UshPipesDefsFam
 import Xv6.UshPipesDefsFire
 import Xv6.UshPipesStageDefs
 
+noncomputable section
+
 namespace Xv6
 
 namespace UShPipesNode
@@ -74,7 +76,7 @@ theorem take_pos_ne_at (L : List (BitVec 8)) (c : Nat) (hc : 0 < c ∧ c ≤ L.l
 /-! ## The node's record (deviation 1) -/
 
 /-- **Rocq `UShPipesNode`'s section hypotheses** beyond `UShPipesDefs`'s. -/
-structure NodeOk {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+structure NodeOk {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
     [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF] [PipesNG GF]
     (D : PdRound hlc GF) (fs : List Filt) (Qfin Rtop : IProp GF) : Prop where
   /-- Rocq `Hext Hcons HlR Hfc Hadmit Hplok` -/
@@ -95,7 +97,7 @@ structure NodeOk {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
   hRd : Timeless D.Rd
 
 section Round
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF] [PipesNG GF]
 variable {D : PdRound hlc GF} {fs : List Filt} {Qfin Rtop : IProp GF}
 

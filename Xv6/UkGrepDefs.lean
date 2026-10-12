@@ -44,6 +44,8 @@ import Xv6.UkEchoDefs
 import Xv6.GrepTree
 import Xv6.UkRunMem
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -55,7 +57,7 @@ set_option linter.unusedSimpArgs false
 /-! ## §0 grep's instruction facts (deviation 1) -/
 
 section Code
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
 
 /-- **Rocq `grep_code γt`**: grep's whole text, persistent. -/
 abbrev grepCode (γt : GName) : IProp GF := ukCode γt User.Grep.code.byte
@@ -324,7 +326,7 @@ theorem grepRin_caller (S : List Nat) :
 /-! ## §4 The heap: a run byte by byte, a string at its first byte -/
 
 section Heap
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
 
 /-- **Rocq `ubytesq_ext`**: two runs whose byte functions agree below the
 length are one run. -/
@@ -432,7 +434,7 @@ end Heap
 /-! ## §4b Address bounds off the resource (Rocq `urun_ubytesq_bnd'`) -/
 
 section Bnd
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -453,7 +455,7 @@ end Bnd
 /-! ## §5 The two-word frame (Rocq `wp_kgrep_pro2`, `wp_kgrep_epi2`) -/
 
 section Frame
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 

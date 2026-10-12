@@ -46,6 +46,8 @@ import Xv6.UnionLinkInstAt
 import Xv6.UshMainLine
 import Xv6.UshLineRead
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -72,7 +74,7 @@ theorem union_disc_no_ctrl_d (h : List Obs) (b : BitVec 8) (hend : obsEndsIn .ua
   omega
 
 section UnionReadInstAt
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF] [PipeOutG GF] [Fscfg]
 
 /-! ## 1. The read record at the index -/
@@ -130,7 +132,7 @@ end UnionReadInstAt
 /-! ## 2. Sh's read leaf at the indexed record, and the tag's reading -/
 
 section UnionReadLeafAt
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF] [PipeOutG GF] [Fscfg] [Appcfg GF]
 
 /-- The record's pin names the era (Rocq `union_pin_refl_at`). -/
@@ -267,7 +269,7 @@ theorem union_dirty_law (ug : UnionGn)
 end UnionReadLeafAt
 
 section UnionReadLeafHolds
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [DiskG GF] [EchoOutG GF]
@@ -297,7 +299,7 @@ theorem union_read_leaf_holds_at (UL : UK_LEAVES) (ug : UnionGn)
 end UnionReadLeafHolds
 
 section UnionTagLaw
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF] [DiskG GF]

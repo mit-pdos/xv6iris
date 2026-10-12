@@ -27,6 +27,8 @@
 import Xv6.GrepTree
 import Xv6.ProgTreePipes
 
+noncomputable section
+
 namespace Xv6
 
 /-! ## §1 The unfinished line -/

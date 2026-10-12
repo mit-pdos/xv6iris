@@ -32,6 +32,8 @@ A SEALED head (`reset_pmp`, Rocq's `Opaque reset_pmp`) is never unfolded: at
 -/
 import MachCSL.BootRun
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

@@ -25,6 +25,8 @@ devices' state types never see each other.
 -/
 import MachCSL.Dev.DevLang
 
+noncomputable section
+
 namespace MachCSL
 
 /-- The PLIC's state. -/

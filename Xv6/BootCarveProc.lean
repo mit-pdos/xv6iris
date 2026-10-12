@@ -65,6 +65,8 @@ Imports only definitional and Spec files.
 import Xv6.SpecMain
 import Xv6.UartBoot
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -72,7 +74,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 /-! ## §1 Runs of zero cells -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- **A run of zero cells** (Rocq `boot_ctx_cells` / `boot_zero_cells` /
 `boot_name_cells`, width-generic): `n` consecutive `w`-byte `.bss` cells at
@@ -107,7 +109,7 @@ end
 /-! ## §2 One proc slot -/
 
 section proc
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
   [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-- **What the image owes about `proc[i]`** (Rocq `proc_slot_raw`):
@@ -290,7 +292,7 @@ end proc
 /-! ## §4 The rows spent before the tier switch -/
 
 section bare
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 theorem bcp_range10 (E : Nat → IProp GF) :
     ([∗list] i ∈ List.range 10, E i) ⊢ E 0 ∗ E 1 ∗ E 2 ∗ E 3 ∗ E 4 ∗ E 5 ∗ E 6 ∗ E 7 ∗ E 8 ∗ E 9 := by
@@ -436,7 +438,7 @@ end bare
 /-! ## §6 The console ring -/
 
 section cons
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 theorem bcp_consOk0 : consOk 0#32 0#32 0#32 := by unfold consOk INPUT_BUF_SIZE; decide
 
@@ -530,7 +532,7 @@ end cons
 /-! ## §7 `.data`: `first`, `nextpid`, the UART table -/
 
 section data
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-- The image holds `w` at `A` when `Kernel.dataInit` lists its bytes there
 (a bounded check against the 136-byte `.data` literal). -/
@@ -651,7 +653,7 @@ end data
 /-! ## §7b A port's `mainUartRaw` -/
 
 section uartRaw
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
   [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
 
 /-- **A port's `mainUartRaw`** (the per-port row of Rocq's
@@ -679,7 +681,7 @@ end uartRaw
 /-! ## §8 The windows, and the rows in `mainGlobalsRaw`'s order -/
 
 section windows
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- Take the window `[a, b)` of `[lo, hi)`, dropping `[lo, a)`. -/
 theorem bcp_take (m : MemF Hist) (lo a b hi : Nat) (h1 : lo ≤ a) (h2 : a ≤ b) (h3 : b ≤ hi) :
@@ -766,7 +768,7 @@ theorem bcpDataWindows (m : MemF Hist) :
 end windows
 
 section rows
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
   [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-- **This file's rows of `mainGlobalsRaw`** (at the ambient context): the

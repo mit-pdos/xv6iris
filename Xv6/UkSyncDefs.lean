@@ -42,6 +42,8 @@ import Xv6.UkStub
 import Xv6.UkSysP
 import Xv6.User.SyncText
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -52,7 +54,7 @@ durability receipt. -/
 abbrev syncPay {PROP : Type _} [BI PROP] (P Qr R : PROP) : PROP := iprop(P -∗ Qr -∗ R)
 
 section Code
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
 
 /-- **sync's catalog, once** (Rocq `UCodeSync.uis_sync_<pc>`). -/
 theorem sync_uis (γt : GName) (pc : Nat) (rvc : Bool) (i : instruction)
@@ -76,7 +78,7 @@ theorem sync_ustack_two (γd : GName) (sp : BitVec 64) :
 end Code
 
 section Leaf
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (Std.ExtTreeSet GName compare)] [GhostVarG GF Int]
 

@@ -22,12 +22,14 @@ copy of `MachCSL.wp_prologue12s7_gen` / `wp_epilogue12s7_gen`.
 -/
 import MachCSL.WpSmodeFrame
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {lent : Bool}
 
 /-- readi's fourteen cells, from `sp-8` (`ra`) down to `sp-112` (never

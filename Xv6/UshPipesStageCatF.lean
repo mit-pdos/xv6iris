@@ -20,6 +20,8 @@ import Xv6.UshCatFStageDefs
 import Xv6.UshPipesStageLaw
 import Xv6.UshExecEnvRun
 
+noncomputable section
+
 namespace Xv6
 
 namespace UShPipesStage
@@ -29,7 +31,7 @@ open Std (ExtTreeSet)
 open UShPipesDefs
 
 section CatF
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF]
   [IcacheG GF] [PipeProtoG GF] [PipeOutG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [PipesNG GF] [CifRegG GF]
   [PS : UprogSG GF]

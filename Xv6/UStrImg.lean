@@ -29,6 +29,8 @@ Everything here is instance-free: no ghost class is generalized here.
 import Xv6.UmodeAbi
 import Xv6.UexecExecInst
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI

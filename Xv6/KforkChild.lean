@@ -17,6 +17,8 @@ import Xv6.ProcDefs
 import Xv6.UserExec
 import Xv6.UserPerm
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Std

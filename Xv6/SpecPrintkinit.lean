@@ -9,6 +9,8 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 import Xv6.SpecProcinit
 import Xv6.SpecPrintk
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -20,7 +22,7 @@ def printkinitAddr : BitVec 64 := KA.«printkinit»
 def prNameAddr : BitVec 64 := KStr.«pr»
 
 /-- The specification of `printkinit`. -/
-def wp_printkinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+def wp_printkinit_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (vlock : BitVec 32) (vname vcpu : BitVec 64) (hK : 4 ≤ k.avail) : Prop :=
   kctx cpu k ∗ pcIs cpu printkinitAddr ∗ lockWords prLock vlock vname vcpu ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
@@ -30,7 +32,7 @@ def wp_printkinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cu
 
 /-- The interface of `printkinit`. -/
 structure PRINTKINIT : Prop where
-  wp_printkinit : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+  wp_printkinit : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (vlock : BitVec 32) (vname vcpu : BitVec 64) hK,
     wp_printkinit_body (hlc := hlc) (GF := GF) cpu k vlock vname vcpu hK
 

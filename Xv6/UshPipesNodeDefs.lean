@@ -59,7 +59,7 @@ theorem gin_of_some (st : FdState) (gin : PipeNames) (h : gin_of st = some gin) 
 noncomputable section
 
 section Defs
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF] [PipesNG GF]
 variable (D : PdRound hlc GF) (Qfin Rtop : IProp GF)
 

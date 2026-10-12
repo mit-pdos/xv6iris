@@ -39,7 +39,7 @@ no discard lemma on `wordPointsTo`; `Xv6/ProofUserinit.lean` builds one for
 three lines are repeated here under their own names. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- A single byte cell is publishable. -/
 theorem lbByte_persist (ξ : CtxId) (a : PAddr) (dq : DFrac) (v : BitVec 8) :
@@ -64,7 +64,7 @@ theorem lbBytes_persist (ξ : CtxId) (pa : PAddr) (n : Nat) (dq : DFrac) (w : Bi
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- **A word is publishable**: give up the fraction, keep the value forever. -/
 theorem lbWord_persist (va : PAddr) (n : Nat) (dq : DFrac) (w : BitVec (8 * n)) :
@@ -82,7 +82,7 @@ end
 /-! ## The persistent bundle -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 /-- The persistent bundle `initlog` returns, out of the sealed lock, the
@@ -125,7 +125,7 @@ block's content moves inside `Xv6.fsBytesInv` through
 `Xv6.fsblock_install_exc`, and `SpecInitlog` is general in `n`.) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 /-- **THE TWO FROZEN CELLS**, minted at `initlog`'s two stores.  Rocq's

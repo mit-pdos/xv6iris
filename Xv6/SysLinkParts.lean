@@ -77,6 +77,8 @@ statements above discharge directly).
 -/
 import Xv6.SysfileCalls
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL LeanRV64D

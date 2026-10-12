@@ -27,6 +27,8 @@ import Xv6.UMem
 import Xv6.Image
 import Xv6.SlotGen
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -36,7 +38,7 @@ def copyinstrAddr : BitVec 64 := KA.«copyinstr»
 
 /-- `copyinstr(pt a0, psz a1, dst a2, srcva a3, max a4)`: the NUL-terminated
 string from `srcva` (at most `max` bytes, NUL included) into `dst`. -/
-def wp_copyinstr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
+def wp_copyinstr_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8))
     (old : List (BitVec 8)) (ke : Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 50 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
@@ -59,7 +61,7 @@ def wp_copyinstr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
   ⊢ wpLoop (GF := GF) cpu
 
 structure COPYINSTR : Prop where
-  wp_copyinstr : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_copyinstr : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8)) (old : List (BitVec 8)) (ke : Nat)
     hnoff hK hlk hroot hsz hmax hmax',
     wp_copyinstr_body (hlc := hlc) (GF := GF) cpu k γl γk P M old ke hnoff hK hlk hroot hsz hmax hmax'

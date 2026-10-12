@@ -20,13 +20,15 @@ not in `SConfAt`, so the two `sstatus` rules are proved directly from
 -/
 import MachCSL.WpSmodeIntr
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D LeanRV64D.Functions
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {lent : Bool}
 
 @[sail_facts] theorem csr_name_map_forwards_sepc : csr_name_map_forwards 0x141#12 = pure "sepc" := rfl

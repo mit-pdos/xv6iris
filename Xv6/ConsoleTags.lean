@@ -59,6 +59,8 @@ transitions and the gtop kit; `ProofConsoleread` the window/prefix kit and
 import Xv6.ConsoleRing
 import Xv6.ConsLog
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

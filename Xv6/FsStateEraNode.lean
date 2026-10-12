@@ -10,6 +10,8 @@ for them.
 -/
 import Xv6.InodeInv
 
+noncomputable section
+
 namespace Xv6
 
 open Iris.Std MachCSL Std

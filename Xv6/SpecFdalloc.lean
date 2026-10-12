@@ -17,6 +17,8 @@ table: fdalloc takes the array in whatever loan state the caller left it.
 -/
 import Xv6.FdTable
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -123,7 +125,7 @@ theorem fdFrees_below (fs : List (BitVec 64)) (j : Nat) (l : List Nat) (h : fdFr
   simpa using this
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
 
 /-- fdalloc's result, keyed by the returned `a0`. -/
 def fdallocPost (γ : FileNames) (γd : GName) (pa : BitVec 64) (fs : List (BitVec 64)) (D : List Nat)
@@ -146,7 +148,7 @@ def wp_fdalloc_body (cpu : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (kk : 
 end
 
 structure FDALLOC : Prop where
-  wp_fdalloc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
+  wp_fdalloc : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (kk : Nat) (fs : List (BitVec 64))
     (D : List Nat) ha0 hkk hnoff hK,
     wp_fdalloc_body (hlc := hlc) (GF := GF) cpu k γ γd kk fs D ha0 hkk hnoff hK

@@ -30,6 +30,8 @@ Rocq's, camelCased (`wl_bar` → `wlBar`, `dg_execL` → `dgExecL`,
 -/
 import Xv6.FileDisc
 
+noncomputable section
+
 namespace Xv6
 
 /-- **Rocq `wl_bar`**: `'|'`. -/

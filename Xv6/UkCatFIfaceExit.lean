@@ -38,6 +38,8 @@ import Xv6.UkCatFIfaceClose
 import Xv6.UkPipesIfaceDev
 import Xv6.UkCatFIfaceOpenLaw
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -74,13 +76,13 @@ theorem bigSepL_map_fst {B : Type _} (Φ : Nat → PROP) (kl : List (Nat × B)) 
 end BigSepAux
 
 /-- A false device's law (the record's `False` kinds). -/
-theorem cif_false_law {GF : BundledGFunctors} {A B C : IProp GF} : ⊢ A -∗ iprop(False) -∗ B -∗ C := by
+theorem cif_false_law {GF : BundledGFunctors.{0}} {A B C : IProp GF} : ⊢ A -∗ iprop(False) -∗ B -∗ C := by
   iintro _ H
   iexfalso
   iexact H
 
 section CifExit
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [PipesNG GF] [CifRegG GF]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostMapG GF (Option Nat) UfdCell UfdMapF]

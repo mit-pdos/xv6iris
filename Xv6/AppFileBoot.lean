@@ -32,12 +32,14 @@ and §7 of Rocq `AppFile.v` (`iris/AppFile.v`, pinned
 import Xv6.AppFileSteps
 import Xv6.FileNamePins
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section AppFileBoot
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF]
 
 /-- WHAT /init IS HANDED AT THE ERA MINT, at a deed state (Rocq

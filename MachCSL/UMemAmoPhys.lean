@@ -22,6 +22,8 @@ Lane U2-M1's width-generic RAM leaves (`UMemRam`) cover the widths
 import MachCSL.UMemAmo
 import MachCSL.UMemRam
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

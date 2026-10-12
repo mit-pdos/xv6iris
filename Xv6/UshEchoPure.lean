@@ -34,6 +34,8 @@ import Xv6.UkShLineDefs
 import Xv6.UshParserPure
 import Xv6.UserHeap
 
+noncomputable section
+
 namespace Xv6
 
 /-! ## §1 The token list and its two boundary accessors -/

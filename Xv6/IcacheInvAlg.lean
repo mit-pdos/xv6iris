@@ -152,6 +152,8 @@ their own: `NINODE`/`ISLOTSZ`/`ientry` are `Xv6/FsGeom.lean` /
 import Xv6.IcacheRefGhost
 import Xv6.InodeInv
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -316,7 +318,7 @@ theorem irefSet_read (w : BitVec 32) (h : irefSet w) : 0 < w.toNat ∧ w.toNat <
 /-! ### The sleeplock share's authority, and the two authority halves -/
 
 section IcacheGhost
-variable {GF : BundledGFunctors} [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
+variable {GF : BundledGFunctors.{0}} [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
 
 /-! THE SLEEPLOCK SHARE'S AUTHORITY, PER SLOT.  `irefTok k q` carries
 `slhTok (icfgIsl k) q` -- a q-share of "somebody may hold slot `k`'s

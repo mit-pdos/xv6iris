@@ -25,12 +25,14 @@ design §4.5 "The merge", "The hook", "The round position", "PowerOn",
 -/
 import Xv6.AppFileSync
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section AppFileSyncClose
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF]
 
 /-- Rocq `sync_claim_rec_eq`: the sync part reads only an instance's sync

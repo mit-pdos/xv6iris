@@ -47,7 +47,7 @@ theorem mn_br_8a : KA.«main» + 18796#64 = KA.«plicinithart» := by decide
 theorem mn_ret_8e : jumpPc (KA.«main» + 142#64) = KA.«main» + 142#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 set_option maxHeartbeats 4000000 in
 /-- **+0x7e → +0x82**: `trapinit()` (`initlock(&tickslock, "time")`), then

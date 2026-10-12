@@ -5,6 +5,8 @@ runs of `PTree.mapRun` over the pages `kalloc` hands out.
 -/
 import Xv6.PtOwn
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

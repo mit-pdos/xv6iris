@@ -8,13 +8,15 @@ proofs (and, through them, for `WpStagesM`).
 import MachCSL.MConf
 import MachCSL.Boot
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D LeanRV64D.Functions
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- Under the boot configuration, with `PC = pc` and the code resource `R`,
 the fetch stage returns `fr` (and keeps `R`). -/

@@ -57,6 +57,8 @@ Deviations from Rocq:
 import Xv6.FileDiscLine
 import Xv6.LineModel
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

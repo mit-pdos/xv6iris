@@ -18,6 +18,8 @@ The local unfolding lemmas are `uxr_run_node` / `MachCSL.uxw_text_some`.
 import MachCSL.UIcache
 import MachCSL.URunXWalk
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
@@ -69,7 +71,7 @@ end walker
 /-! ## The Iris rule -/
 
 section iris
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {cpu : CPU} {ξ : CtxId} {D : UFoot} (RF : URegFrame GF cpu D) (BF : UByteFrame GF ξ)
 
 /-- The obligation after a text-map walk from `s`: whatever the oracle, the

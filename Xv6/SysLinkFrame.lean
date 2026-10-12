@@ -43,6 +43,8 @@ import Xv6.SpecNameiparent
 import Xv6.SpecDirlink
 import Xv6.KexecParts
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -104,7 +106,7 @@ theorem sys_link_K (a : Nat) (h : sysLinkSlots ≤ a) :
 /-! ## The generic carve: slots ↔ bytes -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {lent : Bool}
 
 /-! ## The frame -/
@@ -339,7 +341,7 @@ theorem sysLinkPins_exit (k : KCtx) (R : RegMap) (h : sysLinkPins k R (k.regs 9#
 /-! ## The arguments, the out bundle, the block's cwd seam -/
 
 /-- The contract's parameters, as one record (the `NamexArgs` pattern). -/
-structure SysLinkArgs (GF : BundledGFunctors) where
+structure SysLinkArgs (GF : BundledGFunctors.{0}) where
   γ : FileNames
   j : Nat
   pid : BitVec 32
@@ -350,7 +352,7 @@ structure SysLinkArgs (GF : BundledGFunctors) where
   Funt : Pfam GF (Aview → Nat → IProp GF)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]

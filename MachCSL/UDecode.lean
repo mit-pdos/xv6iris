@@ -36,6 +36,8 @@ about 670 (16-bit, 0.2 s + 0.2 s); no case split over the opcode is needed.
 -/
 import MachCSL.UDecodeWalk
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

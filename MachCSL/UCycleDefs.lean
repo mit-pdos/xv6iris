@@ -43,6 +43,8 @@ nothing is assumed about the model.
 -/
 import MachCSL.UExecAluGpr
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

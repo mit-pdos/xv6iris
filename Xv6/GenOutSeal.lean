@@ -28,6 +28,8 @@ DEVIATIONS from Rocq:
 import Xv6.GenOutSealPure
 import Xv6.GenOutHistSeal
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
@@ -225,7 +227,7 @@ theorem gclPure_step_echo (M : LModel) (L : LmLaws M) (K : LmHooks M) (B : LmByt
     (lmDlOk_echo M K sd so _ CH.chDl hcsb' hweq hdlok) hall0⟩
 
 section genoutSeal
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 
 /-- THE DRAIN'S RECEIPT (Rocq `gdrain_ret`): the cycle's boot state and its
 good output, AT THE RESOLUTION THE STAGE NAMES (the filed choices `csf`,

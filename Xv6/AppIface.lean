@@ -71,6 +71,8 @@ import Xv6.UartLinks
 import Xv6.FsAbsDefs
 import MachCSL.Adequacy
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
@@ -80,7 +82,7 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 /-- THE APPLICATION'S CONSOLE INTERFACE, as ONE record (Rocq `app_iface`,
 redesign R4): the input tag family, the kill credential, the console claim,
 and the licence that ties the last two. -/
-structure AppIface (GF : BundledGFunctors) where
+structure AppIface (GF : BundledGFunctors.{0}) where
   /-- THE TAG FAMILY: what the kernel files beside a received byte. -/
   tag : List Obs → IProp GF
   tag_persistent : ∀ h, Persistent (tag h)
@@ -120,7 +122,7 @@ structure AppIface (GF : BundledGFunctors) where
   rdwild_timeless : ∀ k, Timeless (rdwild k)
 
 section AppIfaceInst
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 instance AppIface.tag_persistent_inst (Ai : AppIface GF) (h : List Obs) :
     Persistent (Ai.tag h) := Ai.tag_persistent h
@@ -163,7 +165,7 @@ theorem consResTriv_lic :
 
 /-- THE TRIVIAL INTERFACE (Rocq `app_iface_triv`): a tag that says nothing, no
 price on a kill, nothing claimed of the console. -/
-def appIfaceTriv (GF : BundledGFunctors) : AppIface GF where
+def appIfaceTriv (GF : BundledGFunctors.{0}) : AppIface GF where
   tag := rxTagTriv
   tag_persistent := fun _ => inferInstance
   tag_timeless := fun _ => inferInstance
@@ -201,7 +203,7 @@ the interface's projections in the three application slots (Rocq's
 end AppIfaceInst
 
 section AppIfaceWild
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-- **Rocq `WpUart.cons_licence_of_taint`**: the TAINT buys the licence, off
 the interface's `lic`, at a record whose two slots are the interface's
@@ -222,7 +224,7 @@ end AppIfaceWild
 per-instance names and its claim on the abstract view, the boot resource the
 era's first process is handed, its trace ledger, its console interface, the
 era's turn, and its conclusion. -/
-structure Xv6App (GF : BundledGFunctors) where
+structure Xv6App (GF : BundledGFunctors.{0}) where
   /-- THE FIXED PART: born once, before the crash slot. -/
   fixed : Type
   /-- what the birth step yields about the fixed part -/
@@ -273,7 +275,7 @@ structure Xv6App (GF : BundledGFunctors) where
   phi : GState → List Obs → Prop
 
 section Xv6AppProj
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- Rocq `app_tag`. -/
 def Xv6App.tag (A : Xv6App GF) (c : A.fixed) : List Obs → IProp GF := (A.ifc c).tag
@@ -299,7 +301,7 @@ end Xv6AppProj
 /-! ## The trivial sync values (Rocq `SystemAdequacy.app_triv_*`, SY3-A1) -/
 
 section AppTrivVals
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- Rocq `app_triv_tk`: a token that says nothing. -/
 @[reducible] def appTrivTk {CT : Type} (_ : CT) (_ : Nat) : IProp GF := iprop(True)
@@ -322,7 +324,7 @@ end AppTrivVals
 
 /-- THE GENERIC APPLICATION (Rocq `app_triv`): no fixed part, nothing
 claimed, nothing read; the turn `emp` at all four stages, no sync ledger. -/
-def appTriv (GF : BundledGFunctors) : Xv6App GF where
+def appTriv (GF : BundledGFunctors.{0}) : Xv6App GF where
   fixed := Unit
   cl := fun _ => iprop(True)
   names := Unit

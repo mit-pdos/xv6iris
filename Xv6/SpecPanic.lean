@@ -45,6 +45,8 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.SpecPrintk
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -57,7 +59,7 @@ def panicAddr : BitVec 64 := KA.«panic»
 def panicSlots : Nat := 4 + 52
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
 
 /-- **The credentials the `printk` cone needs** (Rocq's `panic_env`), with
 the ghost names existential: every one of them occurs exactly once in the
@@ -73,7 +75,7 @@ instance panicEnv_persistent : Persistent (panicEnv (GF := GF)) := by
 end
 
 /-- **WP of `panic(s = a0)`**, with no continuation. -/
-def wp_panic_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_panic_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (dm : PkArgDesc)
     (hK : panicSlots ≤ k.avail) (hkind : dm.kind = PkKind.str)
     (hnoff : k.noff + 2 < 2 ^ 31) (hpr : "pr" ∉ k.locks) (huart : "uart1" ∉ k.locks) : Prop :=
@@ -82,7 +84,7 @@ def wp_panic_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
 
 /-- The interface of `panic`. -/
 structure PANIC : Prop where
-  wp_panic : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+  wp_panic : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (dm : PkArgDesc) hK hkind hnoff hpr huart,
     wp_panic_body (hlc := hlc) (GF := GF) cpu k dm hK hkind hnoff hpr huart
 

@@ -31,6 +31,8 @@ file is that rule applied to the one type the top map's camera is over.
 -/
 import Xv6.DinodeEnc
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

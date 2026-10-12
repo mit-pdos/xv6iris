@@ -22,6 +22,8 @@ Rocq `upt_map_wf`'s `pte_valid`) -- a conjunct of `uptWf`
 -/
 import Xv6.UserFetchXlate
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

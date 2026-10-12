@@ -124,6 +124,8 @@ Everything of `Xv6/IcacheBox.lean`; `ipoolTakeLend`
 import Xv6.IcacheBox
 import Xv6.IcacheEscrowPoolMove
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -131,7 +133,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 /-! ## THE SITES (R3's map), as statements over CtxBox's transitions -/
 
 section IcacheBoxSites
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [LogG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [LogG GF]
   [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcboxG GF]
 
 /-- iget's RECYCLE, part 1 -- (a) at `c = 0` on a DEAD slot: the raw header

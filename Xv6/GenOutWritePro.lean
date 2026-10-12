@@ -208,7 +208,7 @@ theorem gclPure_write_pro (M : LModel) (L : LmLaws M) (K : LmHooks M) (sd : M.lm
   · exact lmDlOk_out M so _ H.chDl rfl (by simp) hcase hdlok
 
 section writepro
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 
 /-- THE WITNESS'S AUTHORITY, FILED at the state the stage reads: already
 filed, or the instance files its default (`gwa_file_free`). -/

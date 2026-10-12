@@ -116,7 +116,7 @@ theorem sys_exec_uargv_i (v : BitVec 64) (i : Nat) (hi : i < 32) :
 /-! ## The pages -/
 
 section Pages
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- **Rocq `sx_pages_close`**: this round's page joins the run, at the
 updated page / byte functions. -/
@@ -148,7 +148,7 @@ theorem sysExecPages_push (pg : Nat → BitVec 64) (afun : Nat → Nat → BitVe
 end Pages
 
 /-- The allocator and the rest of `fsReady` out of the fabric. -/
-theorem sysExecEnv_ready {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+theorem sysExecEnv_ready {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [CtokG GF] [WchG GF] [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames)
@@ -161,7 +161,7 @@ theorem sysExecEnv_ready {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
 /-! ## The three callees -/
 
 section Calls
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]

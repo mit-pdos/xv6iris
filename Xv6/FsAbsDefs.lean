@@ -74,6 +74,8 @@ so the whole file is kept.)
 -/
 import Xv6.FsStateInode
 
+noncomputable section
+
 namespace Xv6
 
 open Iris.Std MachCSL

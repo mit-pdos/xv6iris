@@ -25,6 +25,8 @@ import Xv6.DiskInvDefs
 import Xv6.KernelData
 import MachCSL.WpDmaCtx2
 
+noncomputable section
+
 namespace Xv6
 
 set_option linter.unusedSimpArgs false
@@ -32,7 +34,7 @@ set_option linter.unusedSimpArgs false
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
 
 /-! ## `headsAre`, split -/
 

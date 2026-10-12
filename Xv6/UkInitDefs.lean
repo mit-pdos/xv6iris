@@ -48,6 +48,8 @@ import Xv6.UkInitLit
 import Xv6.User.InitText
 import Xv6.UkForkHeap
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -58,7 +60,7 @@ open Std (ExtTreeSet)
 /-! ## §0 init's code, its argv, and what crosses the fork (deviations 1, 3) -/
 
 section Code
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
 
 /-- **Rocq `init_code γt`** (and `init_rodata γt`, deviation 1). -/
 abbrev initCode (γt : GName) : IProp GF := ukCode γt User.Init.code.byte
@@ -117,7 +119,7 @@ end Code
 /-! ## §2 THE CONSOLE PROLOGUE'S LEAVES (Rocq `UkInit`, lane OPEN-PIN) -/
 
 section Dance
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -292,7 +294,7 @@ end Dance
 `UkInitMain`, lanes IO-LEAF, TL-6, M6b, EXEC-SEAM) -/
 
 section Round
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
@@ -438,7 +440,7 @@ end Round
 the one printf proof by `InitPrintfLink.initPrintf_link`) -/
 
 section Printf
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -459,7 +461,7 @@ end Printf
 
 /-- The interface of init's `printf` (Rocq `UkInitPrintf`). -/
 structure INIT_PRINTF : Prop where
-  wp_initPrintfChain : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
+  wp_initPrintfChain : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
     [UprogSG GF] [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
     [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpInitPrintfChainBody (hlc := hlc) (GF := GF)
 

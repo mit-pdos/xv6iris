@@ -42,6 +42,8 @@ import Xv6.SpecVirtioDiskIntr
 import Xv6.SpecClockintr
 import MachCSL.LockFacts
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -145,7 +147,7 @@ theorem dv_calleeSaved_mk (k : KCtx) (R : RegMap) (h9 : R 9#5 = k.regs 9#5) (h :
       | assumption
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-! ## devintr's post -/
 
@@ -290,7 +292,7 @@ theorem dv_retOk_1 (γ0 γ1 : UartNames) :
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-! ## The tail at `+0x22` -/
 
@@ -388,7 +390,7 @@ theorem dv_join (PM : PLIC_COMPLETE) (cpu : CPU) (k : KCtx) (sc : BitVec 64) (γ
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 /-- `virtio_disk_intr`'s contract at `+0x68`. -/
 theorem dv_call_virtio (VI : VIRTIO_DISK_INTR) (Γ : SchedNames) (cpu : CPU) (k' : KCtx)
@@ -580,7 +582,7 @@ theorem dv_arm_virtio (PM : PLIC_COMPLETE) (VI : VIRTIO_DISK_INTR) (Γ : SchedNa
 end
 
 /-- The claim's answer, opened. -/
-theorem dv_retOk_cases {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+theorem dv_retOk_cases {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (γ0 γ1 : UartNames) (v : BitVec 64) :
     plicClaimRetOk (GF := GF) γ0 γ1 v ⊢
       ⌜v = 0#64 ∨ v = 1#64 ∨ v = 10#64 ∨ v = 12#64⌝ ∗
@@ -588,7 +590,7 @@ theorem dv_retOk_cases {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
   unfold plicClaimRetOk; iintro H; iexact H
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 /-! ## The dispatch at `+0x30`, one lemma per answer
 
@@ -794,7 +796,7 @@ theorem dv_disp_0 (cpu : CPU) (k : KCtx) (sc : BitVec 64)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 /-- The cone's credentials, opened. -/
 theorem dv_caps_open (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames)

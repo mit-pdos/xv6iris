@@ -33,6 +33,8 @@ import Xv6.LineModel
 import Xv6.LineBytesSeal
 import Xv6.LineWordsSeal
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

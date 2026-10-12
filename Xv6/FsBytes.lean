@@ -45,6 +45,8 @@ Do not `unfold fsblock` inside a proof-mode block that then runs `iframe`.
 -/
 import Xv6.DiskDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
@@ -61,7 +63,7 @@ second, non-interacting Sigma slot").  Hence every byte-view section carries
 
 /-- The byte view's own ghost map beyond the shared one (Rocq's `fsLogG`
 member for the `FsBytes` section). -/
-class FsBytesG (GF : BundledGFunctors) where
+class FsBytesG (GF : BundledGFunctors.{0}) where
   /-- the byte view's EXCEPTION SET, at the single key `0` (Rocq uses
   `gmap unit (gset Z)`; this port has no `unit`-keyed map functor and its
   sets are lists) -/
@@ -180,7 +182,7 @@ syscall-altitude proof walks the whole context). -/
 theorem logN_top : (↑logN : CoPset) ⊆ ⊤ := CoPset.subseteq_top
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsBytesG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsBytesG GF]
 
 /-! ## The points-to run -/
 

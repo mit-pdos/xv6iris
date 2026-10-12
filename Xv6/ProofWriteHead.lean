@@ -9,6 +9,8 @@ import Xv6.SpecBwrite
 import Xv6.EndOpDefs
 import Xv6.InitlogHead
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -178,7 +180,7 @@ theorem wh_slot_addr (kk t : Nat) :
 /-! ## The buffer's bytes, out of the handle and back -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- The header's `n` word, at the address `c.sw a2,88(a0)` computes. -/
 theorem wh_hdr_acc (kk : Nat) (hkk : kk < NBUF) (bs : List (BitVec 8)) (hl : 4 ≤ bs.length) :
@@ -210,7 +212,7 @@ theorem wh_slot_acc (kk t : Nat) (hkk : kk < NBUF) (bs : List (BitVec 8))
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
 
 /-- Open the held buffer at its data bytes: the pure facts, the byte run,
@@ -245,7 +247,7 @@ end
 set_option maxHeartbeats 4000000 in
 /-- One turn of the header-copy do-while (`+0x3a .. +0x42`): entry `t` of
 `log.lh.block` lands in header word `t + 1`. -/
-theorem wh_loop_iter {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+theorem wh_loop_iter {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (kb : KCtx) (s : Bool) (hsie : kb.sie = s) (pj : BitVec 64)
     (kk : Nat) (hkk : kk < NBUF) (n : Nat) (W : List (BitVec 32)) (bs0 : List (BitVec 8))
     (hn : n = W.length) (hnB : n ≤ LOGBLOCKS) (hl0 : bs0.length = BSIZE)
@@ -322,7 +324,7 @@ theorem wh_bne_ne (kk x y : Nat) (hx : x ≤ 30) (hy : y ≤ 30) (h : x ≠ y) :
 set_option maxHeartbeats 4000000 in
 /-- The copy loop from `+0x3a` with `t` entries copied runs to `+0x46` with
 the whole write set laid out; only `a3`, `a4`, `a5` change. -/
-theorem wh_loop {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+theorem wh_loop {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (kb : KCtx) (s : Bool) (hsie : kb.sie = s) (pj : BitVec 64)
     (kk : Nat) (hkk : kk < NBUF) (n : Nat) (W : List (BitVec 32)) (bs0 : List (BitVec 8))
     (hn : n = W.length) (hnB : n ≤ LOGBLOCKS) (hl0 : bs0.length = BSIZE)
@@ -407,7 +409,7 @@ theorem wh_lhb0 : KA.«write_head» + 0x1ec90#64 = lhBlock 0 := by
 /-! ## The three callees, at their call sites -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
 
 theorem wh_bwrite (BW : BWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -446,7 +448,7 @@ end
 
 set_option maxHeartbeats 16000000 in
 theorem wh_tail (BW : BWRITE) (BE : BRELSE)
-    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+    {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (spie1 spp1 : Bool) (R : RegMap)

@@ -8,11 +8,13 @@ buffer (the sleeplock, the LRU links, `valid`, `refcnt`, `dev`) belongs to
 import MachCSL.CallConv
 import Xv6.DiskDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- What `virtio_disk_rw` needs of `*b`: `blockno` (read, at a HALF), `disk`
 (written `1` then, by the handler, `0`), and the data.

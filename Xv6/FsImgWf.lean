@@ -28,6 +28,8 @@ proof file evaluates it.
 import Xv6.FsImgDir
 import Xv6.FsImgUsed
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL Iris Iris.Std Std

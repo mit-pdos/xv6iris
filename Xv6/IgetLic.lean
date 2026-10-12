@@ -106,6 +106,8 @@ rewrite -ireg_key_split`).
 -/
 import Xv6.InodeRegionMovers
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Iris.Algebra MachCSL
@@ -181,7 +183,7 @@ WHY NO COLUMN BOUND IS READ HERE EITHER: the bound the licence needs is
 the target's own slot (`iregLnk`). -/
 
 section Lic
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [IregG GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsBlocksG GF] [FsLinkG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [IregG GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsBlocksG GF] [FsLinkG GF]
 
 /-- THE LICENCE.
 
@@ -275,7 +277,7 @@ end Lic
 (iclaim-ledger.md §2.6, executed as §3.1's RULING A) -/
 
 section Table
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [IregG GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsLinkG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [IregG GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsLinkG GF]
 
 /-- THE LICENCE TABLE.  §2.6 wrote a five-row table -- "at a box the free
 path has frozen, EVERY runtime licence is refutable" -- and increment IIIb
@@ -452,7 +454,7 @@ end Table
 /-! ## 5.  THE `bufL` ROW's BLOCK TRANSPORT (durable-disk 1c-flip step 3) -/
 
 section BufList
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsBlocksG GF] [FsLinkG GF]
 
 /-- THE `bufL` ROW's BLOCK TRANSPORT, ON ITS OWN.  `iname_mintOk` used to
@@ -512,7 +514,7 @@ end BufList
 /-! ## 6.  THE TABLE AS AN ACCESSOR -/
 
 section FreezeOff
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- Rocq's inline `Hcp (islot inum) Hsl; rewrite -ireg_key_split`: the

@@ -17,6 +17,8 @@ import MachCSL.WpSmodeFrame8
 import Xv6.KilledDefs
 import Xv6.UvmallocDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -92,7 +94,7 @@ theorem wkKept_trans {R R' R'' : RegMap} (h : wkKept R R') (h' : wkKept R' R'') 
     h'.2.2.2.2.2.2.2.2.2.2.2.trans h.2.2.2.2.2.2.2.2.2.2.2⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-! ## The wake transition of the lock payload -/
 
@@ -137,7 +139,7 @@ theorem wk_bne_eq {α : Type} (a b : BitVec 64) (h : a = b) (p q : α) :
   rw [if_neg (by simp only [bcond, bne_iff_ne, ne_eq]; exact fun hc => hc h)]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 end
 
@@ -149,7 +151,7 @@ falls into: `release(&p->lock)`, the cursor step and the termination test.
 The lock is still held, so the hart is pinned up to the release. -/
 theorem wakeup_br_ffffffffffffeca0 : KA.«wakeup» + 0xffffffffffffeca0#64 = KA.«release» := by decide
 
-theorem wk_rel (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+theorem wk_rel (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [CurCtx] (Γ : SchedNames) (k : KCtx) (hwf : k.wf) (hnoff : k.noff + 1 < 2 ^ 31)
     (hK : wakeupSlots ≤ k.avail) (hlk : "proc" ∉ k.locks)
     (i : Nat) (hi : i < NPROC) (spie spp spie1 spp1 : Bool) (R Rr : RegMap)
@@ -247,7 +249,7 @@ both halves of the state mirror, so the scan may pass over the caller's own
 slot. -/
 theorem wakeup_br_ffffffffffffec18 : KA.«wakeup» + 0xffffffffffffec18#64 = KA.«acquire» := by decide
 
-theorem wk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
+theorem wk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors.{0}}
     [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
     (Γ : SchedNames) (k : KCtx) (chan : BitVec 64)
     (hwf : k.wf) (hnoff : k.noff + 1 < 2 ^ 31) (hK : wakeupSlots ≤ k.avail)
@@ -426,7 +428,7 @@ set_option maxHeartbeats 4000000 in
 the epilogue at `(KernelSyms.«wakeup» + 0x54)`.  A bounded loop: ordinary induction on a `fuel`
 bounding the iterations left, with the hart quantified inside (the thread may
 migrate at every interrupt window between two critical sections). -/
-theorem wk_loop (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
+theorem wk_loop (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors.{0}}
     [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (k : KCtx) (chan : BitVec 64)
     (hwf : k.wf) (hnoff : k.noff + 1 < 2 ^ 31) (hK : wakeupSlots ≤ k.avail)
@@ -492,7 +494,7 @@ theorem wk_loop (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
 
 /-- `wakeup`'s eight-slot frame at `sp`: `ra`, `s0`, `s1`..`s5` and the unused
 bottom word. -/
-def wkFrame {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+def wkFrame {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (sp v0 v1 v2 v3 v4 v5 v6 v7 : BitVec 64) : IProp GF := iprop%
   wordPointsTo (sp + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) v0 ∗
   wordPointsTo (sp + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) v1 ∗
@@ -503,7 +505,7 @@ def wkFrame {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
   wordPointsTo (sp + 0xFFFFFFFFFFFFFFC8#64) 8 (DFrac.own 1) v6 ∗
   wordPointsTo (sp + 0xFFFFFFFFFFFFFFC0#64) 8 (DFrac.own 1) v7
 
-theorem wkFrame_split {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+theorem wkFrame_split {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (sp v0 v1 v2 v3 v4 v5 v6 v7 : BitVec 64) :
     wkFrame (GF := GF) sp v0 v1 v2 v3 v4 v5 v6 v7 ⊢
       iprop(wordPointsTo (sp + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) v0 ∗
@@ -516,7 +518,7 @@ theorem wkFrame_split {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cur
       wordPointsTo (sp + 0xFFFFFFFFFFFFFFC0#64) 8 (DFrac.own 1) v7) := by
   unfold wkFrame; iintro H; iexact H
 
-theorem wkFrame_join {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+theorem wkFrame_join {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (sp v0 v1 v2 v3 v4 v5 v6 v7 : BitVec 64) :
     iprop(wordPointsTo (sp + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) v0 ∗
       wordPointsTo (sp + 0xFFFFFFFFFFFFFFF0#64) 8 (DFrac.own 1) v1 ∗
@@ -532,7 +534,7 @@ theorem wkFrame_join {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurC
 set_option maxHeartbeats 4000000 in
 /-- The epilogue at `0x80002094`: restore `ra`, `s0`, `s1`..`s5`, pop the
 frame, return. -/
-theorem wk_epi {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+theorem wk_epi {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu cur : CPU) (k : KCtx)
     (hpin : k.sie = false ∨ k.proc = 0#64 → cur = cpu) (hK : 8 ≤ k.avail)
     (spie spp : Bool) (hsp : k.sie = false → spie = k.spie ∧ spp = k.spp)

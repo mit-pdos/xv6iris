@@ -58,7 +58,7 @@ theorem pcm_wide12 {v : BitVec 64} (hv : v = 0#64 ∨ v = 1#64 ∨ v = 10#64 ∨
   rcases hv with rfl | rfl | rfl | rfl <;> first | rfl | exact absurd h (by decide)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-- `cpuid`'s contract at the call site (interrupts off). -/
 theorem pcm_call_cpuid (CI : CPUID) [CurCtx] (cpu : CPU) (k' : KCtx)

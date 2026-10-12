@@ -28,6 +28,8 @@ import Xv6.ConsoleInvDefs
 import Xv6.User.ShImage
 import Xv6.UkRunLeaf
 
+noncomputable section
+
 namespace Xv6
 
 open LeanRV64D MachCSL

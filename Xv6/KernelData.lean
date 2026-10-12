@@ -9,6 +9,8 @@ import MachCSL.CallConv
 import Xv6.KernelText
 import MachCSL.Instr
 
+noncomputable section
+
 namespace Xv6.Kernel
 
 def rodataChunk0 : List (Nat × Nat) := [
@@ -2306,7 +2308,7 @@ namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- One read-only byte: the boot image's, never written. -/
 def dataByte (p : Nat × Nat) : IProp GF := imgBytes (BitVec.ofNat 64 p.1) 1 (BitVec.ofNat 8 p.2)

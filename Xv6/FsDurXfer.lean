@@ -48,7 +48,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 open Iris.Std.PartialMap
 
 section XferBytes
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF]
 
 /-- The durable family's byte authority IS the `phiAgree` the transport
 wants, by one ghost-map lookup (Rocq's `snap_gamma_agree`). -/
@@ -104,7 +104,7 @@ theorem fsFootprint_xfer (Γ : FsViewNames GF) (hex : phiExcl Γ) (A : IProp GF)
 end XferBytes
 
 section Xfer
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [FsLinkG GF] [FsTopG GF]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF] [FsLinkG GF] [FsTopG GF]
 open FsStateLink
 
 /-- THE TRANSPORT, WITH THE ROOT'S SPARE LINK FRAGMENT RIDING ALONG (the

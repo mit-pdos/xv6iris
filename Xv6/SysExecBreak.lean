@@ -68,6 +68,8 @@ Imports only the shared vocabulary and kexec's Spec.
 -/
 import Xv6.SysExecParts
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -119,7 +121,7 @@ theorem sysExecBreak_nn (pl : List (BitVec 8)) (h : argPathShape pl) :
 /-! ## §2.  The three buffers, in kexec's spelling (standalone) -/
 
 section Bufs
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- The array above kexec's `argv[0 .. i]` (Rocq `sx_argv_kx`'s second
 half): framed across the call. -/
@@ -197,7 +199,7 @@ end Bufs
 /-! ## §3.  kexec, at the record (Rocq's `KX.wp_kexec_sconf` call) -/
 
 section Kexec
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]

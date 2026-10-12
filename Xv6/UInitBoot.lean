@@ -97,7 +97,7 @@ theorem initBootRoom (n0 : Nat) (hn0 : 8 * (2 + (4 + (12 + (12 + (4 + n0))))) â‰
 /-! ## 4.  The boot bundle -/
 
 section UInitBoot
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [FsBytesG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [FsBytesG GF]
   [Appcfg GF] [CtokG GF] {SG : UexecSG GF} [Fscfg] [Icfg]
 
 /-- **Rocq `init_boot_bundle_of_pinned`**: `initBootBundle` off the pin's

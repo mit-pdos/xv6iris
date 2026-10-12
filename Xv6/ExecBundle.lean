@@ -35,6 +35,8 @@ CONE (re-walked on the pinned globs: 5/6 reached): `ex_node_id`,
 -/
 import Xv6.ExecEntry
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
@@ -43,7 +45,7 @@ open Std (ExtTreeSet)
 /-! ## 1.  (W)'s THIRD PIECE: THE NODE THE OBSERVATION REPORTS -/
 
 section ExNodeId
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- **Rocq `ex_node_id`**: THE IDENTIFICATION, at whatever pair of families
 the supplier chose -- the cursor at the walk's TERMINAL hop, with the
@@ -62,7 +64,7 @@ instance exNodeId_persistent (T : IProp GF) (Pfin : Nat → IProp GF)
 end ExNodeId
 
 section ExecBundle
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
   [Appcfg GF] [CtokG GF]
 
 /-! ## 2.  THE SLOT PIECE, AT ONE ARGUMENT SHAPE -/

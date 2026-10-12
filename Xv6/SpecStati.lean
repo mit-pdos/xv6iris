@@ -76,6 +76,8 @@ import Xv6.IcacheRefDefs
 import Xv6.InodeInv
 import MachCSL.AluFacts
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -102,7 +104,7 @@ def stNlink (st : BitVec 64) : BitVec 64 := st + 10#64
 def stSize (st : BitVec 64) : BitVec 64 := st + 16#64
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- Rocq's `stat_at`: THE FIVE FIELDS stati writes, and only those (bytes
 12..15, the alignment hole, are not part of this bundle). -/
@@ -119,7 +121,7 @@ end
 /-- **WP of `stati`** (Rocq `wp_stati_sconf_body`).  The identity cells and
 the metadata bundle come back untouched; the stat buffer comes back holding
 the five fields, `size` ZERO-extended (`lwu` feeding an 8-byte `sd`). -/
-def wp_stati_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsBlocksG GF] [CurCtx]
+def wp_stati_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsBlocksG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (ip st : BitVec 64) (dev inum : BitVec 32) (dn : Dinode)
     (dev0 ino0 : BitVec 32) (ty0 nl0 : BitVec 16) (sz0 : BitVec 64) (dqd dqn : DFrac)
     (ha0 : k.regs 10#5 = ip) (ha1 : k.regs 11#5 = st) (hK : statiSlots ≤ k.avail) : Prop :=
@@ -136,7 +138,7 @@ def wp_stati_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsBlock
 
 /-- The interface of `stati` (Rocq `STATI`). -/
 structure STATI : Prop where
-  wp_stati : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsBlocksG GF] [CurCtx]
+  wp_stati : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsBlocksG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (ip st : BitVec 64) (dev inum : BitVec 32) (dn : Dinode)
     (dev0 ino0 : BitVec 32) (ty0 nl0 : BitVec 16) (sz0 : BitVec 64) (dqd dqn : DFrac) ha0 ha1 hK,
     wp_stati_body (hlc := hlc) (GF := GF) cpu k ip st dev inum dn dev0 ino0 ty0 nl0 sz0 dqd dqn

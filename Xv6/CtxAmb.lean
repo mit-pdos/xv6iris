@@ -28,6 +28,8 @@ handle over an ambient-elaborated payload is closed as
 -/
 import Xv6.IcacheTable
 
+noncomputable section
+
 namespace Xv6
 
 open Lean Meta Elab Tactic
@@ -66,7 +68,7 @@ elab "amb_tier_rfl" : tactic => do
 
 section
 open Iris MachCSL
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- Pointwise rewriting of a transport (Rocq closes these by `rewrite /X`). -/
 theorem ctxMorph_congr {R R' : CtxId → IProp GF} (h : ∀ ξ, R ξ = R' ξ) (hR : CtxMorph R') :

@@ -8,6 +8,8 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 import MachCSL.WpSmodeFrame
 import Xv6.SchedCtx
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -34,7 +36,7 @@ marker in, payload kept.  What comes back beside the shot is the side the
 write did not spend: the credential (persistent), or the process's own
 death payload, which the fault arm hands its kexit directly (`SpecKexit`'s
 left side at `-1`). -/
-def wp_setkilled_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+def wp_setkilled_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (j : Nat) (pidv : BitVec 32) (gn : GName) (self : Bool)
     (hj : j < NPROC) (hp : k.regs 10#5 = procAddr j) (hpnz : pidv.toNat ≠ 0)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 14 ≤ k.avail) (hlk : "proc" ∉ k.locks) (htier : k.tier = KTier.kpt) : Prop :=
@@ -52,7 +54,7 @@ def wp_setkilled_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
   ⊢ wpLoop (GF := GF) cpu
 
 structure SETKILLED : Prop where
-  wp_setkilled : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx] (Γ : SchedNames) (cpu : CPU) (k : KCtx)
+  wp_setkilled : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx] (Γ : SchedNames) (cpu : CPU) (k : KCtx)
     (j : Nat) (pidv : BitVec 32) (gn : GName) (self : Bool) hj hp hpnz hnoff hK hlk htier,
     wp_setkilled_body (hlc := hlc) (GF := GF) Γ cpu k j pidv gn self hj hp hpnz hnoff hK hlk htier
 

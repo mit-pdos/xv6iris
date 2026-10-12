@@ -58,6 +58,8 @@ import Xv6.FsBytesMap
 import Xv6.FsStateDefs
 import Xv6.LogDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -237,7 +239,7 @@ particular not about WHICH points-to `phi` is.  So it is stated over an
 arbitrary view record. -/
 
 section DbytesGen
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- ONE BLOCK'S ELEMENTS ARE ITS `blkOwned`, at any view (Rocq's
 `blk_owned_seqZ`). -/
@@ -289,7 +291,7 @@ There is no `phiFrac` witness and none is wanted: the durable instances
 stay at `DFrac.own 1` and never split. -/
 
 section SnapGamma
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF]
 
 /-- Rocq's `snap_gamma` (deviation 4 on the capacity instance). -/
 def snapGamma (g gl gt : GName) : FsViewNames GF :=

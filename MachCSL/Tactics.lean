@@ -14,6 +14,8 @@ this up to `n` times.
 -/
 import MachCSL.HwConfig
 
+noncomputable section
+
 namespace MachCSL
 
 open Lean Elab Tactic Meta

@@ -57,6 +57,8 @@ Imports only the shared vocabulary and callee Specs.
 import Xv6.SysExecParts
 import Xv6.SpecKfree
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -113,7 +115,7 @@ theorem sysExecKeepS1_round (R R2 : RegMap) (a b v : BitVec 64)
 /-! ## §2.  The list surgery (standalone, Rocq's header) -/
 
 section Surgery
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- The page at the cursor out of the run (Rocq `sx_pages_peel`). -/
 theorem sysExecFree_peel (pg : Nat → BitVec 64) (afun : Nat → Nat → BitVec 8) (m t : Nat)
@@ -164,7 +166,7 @@ end Surgery
 /-! ## §3.  kfree, carried across its own crossing -/
 
 section Kfree
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
 
 set_option maxHeartbeats 8000000 in
 /-- `kfree(pa)` (Rocq `Kfree.wp_kfree_sconf`): kfree does not thread the
@@ -201,7 +203,7 @@ end Kfree
 /-! ## §4.  THE LOOP at a symbolic base -/
 
 section Loop
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]

@@ -11,6 +11,8 @@ Both take two numeric varargs (`PkArgDesc.num`), which cost nothing.
 import Xv6.SpecSetkilled
 import Xv6.ProcPrivAcc
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -35,7 +37,7 @@ theorem utFmt1_kinds : pkKinds utFmt1 = [PkKind.num, PkKind.num] := by unfold ut
 theorem utFmt2_kinds : pkKinds utFmt2 = [PkKind.num, PkKind.num] := by unfold utFmt2; decide
 
 section Str
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 set_option maxRecDepth 100000 in
 /-- Rocq `ut_fmt1_str`. -/
@@ -73,7 +75,7 @@ theorem utA_descs2 (R : RegMap) : ⊢ pkDescs (GF := GF) R [PkArgDesc.num, PkArg
 end Str
 
 section Calls
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
@@ -138,7 +140,7 @@ theorem utA_setkilled (SK : SETKILLED) (Γ : SchedNames) (c : CPU) (k' : KCtx) (
 end Calls
 
 section Split
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg]

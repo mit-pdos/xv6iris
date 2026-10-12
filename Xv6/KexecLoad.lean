@@ -69,6 +69,8 @@ Imports only definitional files.
 import Xv6.KexecDefs
 import Xv6.ElfFile
 
+noncomputable section
+
 namespace Xv6
 
 /-! ## 1.  THE PURE LAYER: loadability, the size, the stack -/

@@ -44,6 +44,8 @@ transition).
 import Xv6.PipeOutNFam
 import Xv6.GenOutWild
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
@@ -72,7 +74,7 @@ theorem lmRdOpen_nows (M : LModel) (sd : M.lmSt) (k : Nat) (ho : List Obs) (so :
   exact List.eq_nil_of_length_eq_zero (by omega)
 
 section PipesWildV
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [PipeOutG GF]
 
 /-! ## 1. The flag and the token -/

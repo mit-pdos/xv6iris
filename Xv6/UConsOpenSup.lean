@@ -48,6 +48,8 @@ landed: `xfam_open` is `UkFileOpen.xfamOpen`, `sbundle_at_open_intro_at` /
 import Xv6.UInitCons
 import Xv6.UkFileOpenDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -61,7 +63,7 @@ theorem init_cons_path_elems_ne : pathElems initConsPl ≠ [] := by
 /-! ## 2.  The dead walk (deviation 1) -/
 
 section Dead
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 theorem consPDead_eq (T K : IProp GF) (d0 : Nat) : consPDead T K d0 = pobsPDeadLin T K d0 := rfl
 
@@ -84,7 +86,7 @@ theorem consPmiss_hold (T K : IProp GF) : ⊢ pobsMissHold K (consPmiss T K) := 
 end Dead
 
 section UConsOpenSup
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]

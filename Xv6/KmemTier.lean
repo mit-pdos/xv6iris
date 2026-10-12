@@ -58,7 +58,7 @@ theorem kt_kmapClass_page (p : BitVec 64) (hp : pageValid p) (off : Nat) (hoff :
     · omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-- A context word travels to the kernel table (the kernel tier pins
 nothing). -/

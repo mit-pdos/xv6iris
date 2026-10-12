@@ -22,6 +22,8 @@ lanes consume as `hpc`), a fault a fetch fault, never `F_Ext_Error`.
 -/
 import MachCSL.UFetch
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
@@ -151,7 +153,7 @@ theorem uft_fetch_total (T : UftTr D I) (s : UWSt) (hI : I s) (orc : UOrc) :
 end total
 
 section swp
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {cpu : CPU} {ξ : CtxId} {D : UFoot} (RF : URegFrame GF cpu D) (BF : UByteFrame GF ξ)
 
 /-- **The fetch, in Iris** (the cycle's fetch obligation,

@@ -73,6 +73,8 @@ by the W1..W5 walks' `Z` side conditions).
 -/
 import Xv6.SysfileCalls
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL LeanRV64D

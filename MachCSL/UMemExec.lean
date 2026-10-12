@@ -16,6 +16,8 @@ the loaded/stored data stay symbolic.
 import MachCSL.UMemAmo
 import MachCSL.UMemStore
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

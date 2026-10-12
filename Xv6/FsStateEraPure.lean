@@ -155,6 +155,8 @@ Everything else in lines 1--1020 is ported with Rocq's statement.
 import Xv6.InodeLock
 import Xv6.FsStateEraNode
 
+noncomputable section
+
 namespace Xv6
 
 open Iris.Std MachCSL Std

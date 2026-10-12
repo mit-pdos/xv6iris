@@ -38,6 +38,8 @@ DROPPED (unreached): `sh_dollar_pro`, `pro_alts_len3`, `sh_pro_stage`,
 -/
 import Xv6.UkWriteLeaf
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
@@ -50,6 +52,6 @@ theorem sh_fd2_signed : (BitVec.setWidth 32 (BitVec.ofNat 64 2)).toInt = ((2 : N
 /-! ## S4 THE CALL'S FAMILY AND ITS LITERALS -/
 
 /-- **Rocq `ksh_fam`** (deviation 3): row 16 at sh's own cursor family. -/
-abbrev kshFam {GF : BundledGFunctors} (N : UkNames GF) (Q : Nat → IProp GF) : Xfam GF := xfamWr Q N.pay
+abbrev kshFam {GF : BundledGFunctors.{0}} (N : UkNames GF) (Q : Nat → IProp GF) : Xfam GF := xfamWr Q N.pay
 
 end Xv6

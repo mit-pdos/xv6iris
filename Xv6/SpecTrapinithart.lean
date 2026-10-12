@@ -12,6 +12,8 @@ Imports only definitional files.
 -/
 import Xv6.SpecKernelvec
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -21,7 +23,7 @@ open LeanRV64D
 def trapinithartAddr : BitVec 64 := KA.«trapinithart»
 
 /-- **WP of `trapinithart`.**  `tv0` is whatever the cell held on entry. -/
-def wp_trapinithart_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+def wp_trapinithart_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (tv0 : BitVec 64) (hsie : k.sie = false) (hK : 2 ≤ k.avail) : Prop :=
   kctx cpu k ∗ pcIs cpu trapinithartAddr ∗ Register.stvec ↦ᵣ[cpu] tv0 ∗
   (∀ R' : RegMap, kctx cpu (k.withRegs R') -∗ pcIs cpu (jumpPc (k.regs 1#5)) -∗
@@ -30,7 +32,7 @@ def wp_trapinithart_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
 
 /-- The interface of `trapinithart`. -/
 structure TRAPINITHART : Prop where
-  wp_trapinithart : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_trapinithart : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (tv0 : BitVec 64) hsie hK, wp_trapinithart_body (hlc := hlc) (GF := GF) cpu k tv0 hsie hK
 
 end Xv6

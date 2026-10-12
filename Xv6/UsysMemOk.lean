@@ -69,6 +69,8 @@ dropped.
 -/
 import Xv6.UexecSlot
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

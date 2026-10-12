@@ -18,6 +18,8 @@ register write is `ukWr m 10#5 (-1#64)`.
 -/
 import Xv6.UkSysP
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -27,7 +29,7 @@ open Std (ExtTreeSet)
 namespace UshRunSysP
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -49,7 +51,7 @@ end UshRunSysP
 /-- **The ecall leaf sh's runner takes beyond the landed UkRunSys rows**
 (see the header): exec's failure row (discharged, `ushRunSysP_holds`). -/
 structure USH_RUN_SYS_P : Prop where
-  exec : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+  exec : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
     [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], UshRunSysP.wpUkEcallExec (hlc := hlc) (GF := GF)
 

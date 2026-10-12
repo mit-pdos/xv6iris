@@ -26,6 +26,8 @@ mint, `UslotDetMint`).
 -/
 import Xv6.UkEngine
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -64,7 +66,7 @@ theorem uk_ecall_scause : utrapScause (.Exception (.E_U_EnvCall ())) 0#64 = ueca
   rw [utrapScause_eq]; rfl
 
 section wrap
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [CurCtx]
 
 /-- **Rocq `wp_uk_retire_later`**: a retiring leaf, from the fetch-decode
 premise and the family's execute fact at every table realizing `π`. -/
@@ -184,7 +186,7 @@ theorem uk_leaf_storeDenied (S : UkSec GF) (K : UkKey) (M : ElfMem) (m : RegMap)
 end wrap
 
 section trapGen
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
 
 /-- **A trapping instruction at ANY continuation** (NI M3 U-2a: the
 engine-based generic mint's ecall and denied store): the engine with the

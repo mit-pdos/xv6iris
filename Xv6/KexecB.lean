@@ -100,6 +100,8 @@ Rocq's header, in short:
 import Xv6.KexecSeam
 import Xv6.UPtPptLemmas
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -172,7 +174,7 @@ theorem kxcB_ret_94 : jumpPc (KA.«kexec» + 0x94#64 + 4#64) = KA.«kexec» + 0x
 /-! ## The frame's field windows and the block's trapframe quarter -/
 
 section Win
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- `elf.phnum`'s window, at the `lhu a5,-376(s0)` address. -/
 theorem kxcB_win_phnum [CurCtx] (sp0 : BitVec 64) (ef : List (BitVec 8))
@@ -226,7 +228,7 @@ def kxcBFrame8 [CurCtx] (sp0 ra0 s00 s10 s20 pv av w6 w8 : BitVec 64) (ef : List
 end Win
 
 section Tf
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg]
 
 /-- **Rocq `kxc_priv_tf_ev`, at the pinned tier** (deviation 8): the
@@ -257,7 +259,7 @@ end Tf
 /-! ## THE CALL SITE -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]

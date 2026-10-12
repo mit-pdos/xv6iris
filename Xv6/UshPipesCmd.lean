@@ -48,7 +48,7 @@ theorem ushqBars_scope {len : Nat} {f : Nat → BitVec 8} {a : List (Nat × Nat)
   | cons _ gp _ _ _ _ hbw _ _ _ _ => exact fun j hj hs => hbw.2.2.2.2 j hj hs
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 

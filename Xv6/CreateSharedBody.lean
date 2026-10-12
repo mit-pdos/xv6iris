@@ -85,6 +85,8 @@ import Xv6.CreateSharedRegs
 import Xv6.SpecCreate
 import Xv6.ReadiDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -130,7 +132,7 @@ structure CreateStatic [Fscfg] [Icfg] (k : KCtx) (j : Nat) (pd : BitVec 64) (ple
   hpd : descPageRw pd
 
 section Env
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -184,7 +186,7 @@ end Env
 /-! ## 1.  The child's suspended row (Rocq's `cr_dirty` and its six moves) -/
 
 section Dirty
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF] [LogG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [FsBytesG GF]
   [Appcfg GF] [Fscfg] [Icfg]
 
@@ -413,7 +415,7 @@ Every exit of every half ends in one of these six, so the shape of
 these rather than eleven call sites. -/
 
 section Builders
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
   [Appcfg GF]
 
 /-- ARMS G / A-FAIL: the walk reached the parent and nothing else moved
@@ -556,7 +558,7 @@ end Builders
 /-! ## 3.  The epilogue funnel (Rocq's `cr_tail_body` / `cr_tail_half`) -/
 
 section Tail
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 set_option maxHeartbeats 8000000 in
 /-- **`+0x70 .. +0x82`: THE FUNNEL** (Rocq's `cr_tail_half`): `c.mv a0,s2`,
@@ -617,7 +619,7 @@ end Tail
 /-! ## 4.  The four parked bodies -/
 
 section Bodies
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]

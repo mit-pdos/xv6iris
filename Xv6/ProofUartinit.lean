@@ -40,7 +40,7 @@ theorem uartinit_ret_1c : jumpPc (KA.«uartinit» + 0x1c#64) = KA.«uartinit» +
 theorem uartinit_ret_30 : jumpPc (KA.«uartinit» + 0x30#64) = KA.«uartinit» + 0x30#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 set_option maxHeartbeats 1000000 in
 /-- `uartinitone`'s contract as a rule, with the name pointer named. -/

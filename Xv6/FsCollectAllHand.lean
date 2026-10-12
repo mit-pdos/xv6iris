@@ -35,6 +35,8 @@ at the restriction, whose domain IS the region.
 -/
 import Xv6.FsCollectAllRows
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -71,7 +73,7 @@ theorem colRegMap_dom (nib : Nat) (I : RegMapF FsNode)
     rfl
 
 section Hand
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
   [FsBlocksG GF] [FsTopG GF] [FsLinkG GF]
 

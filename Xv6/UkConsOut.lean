@@ -63,6 +63,8 @@ import Xv6.GenLinksLine
 import Xv6.UEchoOut
 import Xv6.UkFreeHandler
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -112,7 +114,7 @@ theorem consBlkByte (M : LModel) (ps cs : List Nat) (s0 : M.lmSt) (I : List (Bit
 /-! ## S2 THE SOURCE RUN -/
 
 section src
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
@@ -259,7 +261,7 @@ end src
 /-! ## S3 THE CLAIM-FREE CORE -/
 
 section core
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
@@ -414,7 +416,7 @@ end core
 /-! ## S3b THE GENERIC CLAIM'S DEVICE, at `GenLinksLine`'s link families -/
 
 section gen
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 
 /-- **Rocq `cons_cur`**: the era's cursor at a block of the stage, `i` bytes
 out, the first of which filed `c` (`gwc_blk`'s left arm). -/
@@ -522,7 +524,7 @@ theorem consDevAtc_sub (M : LModel) (Pm : GenParams hlc GF M) (LINKS : IProp GF)
 end gen
 
 section genstep
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 
 /-- **Rocq `cons_dev_atc_step`**: ONE BYTE -- the head of what the device owes,
 through the three leaves (`glBlk` at an unfiled device -- it files the code
@@ -749,7 +751,7 @@ theorem consCur_gwcPost {M : LModel} (Pm : GenParams hlc GF M) (v : EraPins) (ps
 end genstep
 
 section genprog
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [DiskG GF] [EchoOutG GF]

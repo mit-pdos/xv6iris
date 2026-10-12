@@ -33,12 +33,14 @@ the file system's law built.  Not timeless (the guest is arbitrary).
 -/
 import Xv6.FsCrash
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [Xv6G GF]
   [FsLinkG GF] [FsTopG GF]
 
 /-- The record at an image, at the fixed layer's names (Rocq `P_fs_rec_at`). -/

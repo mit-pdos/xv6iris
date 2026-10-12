@@ -54,7 +54,7 @@ theorem fileTrunc_free (av0 av : Aview) (i : Nat) (s : Dst)
   exact h2
 
 section FileOpenTrunc
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [OffboxG GF] [FsTopG GF] [FsBytesG GF] [Appcfg GF] [Icfg]
 
 /-- THE FRESH RUN: the create at `N` put the deed at `s.insert N (i, [])` and

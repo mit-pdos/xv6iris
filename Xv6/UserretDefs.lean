@@ -23,6 +23,8 @@ import Xv6.SpecUserret
 import Xv6.CodeTactics
 import Xv6.UptWalkTramp
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -74,7 +76,7 @@ def urLd (n : BitVec 5) : instruction := .LOAD (urImm n, .Regidx 10#5, .Regidx n
 def urSret : instruction := .SRET ()
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- **The trampoline's instruction fact from the kernel text's**: the
 bytes at the physical address, fetched at the virtual one (same page
@@ -282,7 +284,7 @@ theorem urLoadSeq_a0 (ns : List (BitVec 5)) (ws : List (BitVec 64)) (R : RegMap)
 /-! ## §5 Consequence rules for the abstract obligations -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- An execute stage under a stronger precondition and a weaker
 postcondition. -/
@@ -320,7 +322,7 @@ end
 /-! ## §6 The running block and the trapframe page -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [X : CurCtx]
@@ -328,7 +330,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- One word of the trapframe page, read (the page comes back as it was). -/
 theorem userret_tf_acc (tfp : BitVec 44) (ws : List (BitVec 64)) (j : Nat) (hj : j < 36) :
@@ -381,7 +383,7 @@ end
 /-! ## §7 The machine under the installed user table -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- **userret's machine between the switch and the `sret`** (Rocq's
 per-node `utlb_inv_pt` residue): supervisor cells at `c`, the clock, the
@@ -408,7 +410,7 @@ end
 /-! ## §8 The kernel table's shared half -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 instance kptOnAt_persistent (root : BitVec 44) : Persistent (kptOnAt (GF := GF) root) := by
   unfold kptOnAt; infer_instance

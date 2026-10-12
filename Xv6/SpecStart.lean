@@ -15,6 +15,8 @@ import MachCSL.WpGpr
 import Xv6.SpecEntry
 import MachCSL.SConfDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -53,7 +55,7 @@ in supervisor mode at `main` with `tp = a5 = sext32(hartid)`,
 frame holding the saved `ra`/`s0`, `timerinit`'s frame below it holding
 `start`'s `s0`/`ra`, and the configuration `startConf t`.  The 32 bytes
 below `sp₀` are the two frames. -/
-def wp_start_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+def wp_start_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (dq : DFrac) (hartid ret sp₀ v4 v8 v14 v15 f0 f8 g0 g8 : BitVec 64) :
     Prop :=
   mBoot cpu (DFrac.own 1) ∗
@@ -84,7 +86,7 @@ def wp_start_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 
 /-- The interface of `start`. -/
 structure START : Prop where
-  wp_start : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+  wp_start : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (dq : DFrac) (hartid ret sp₀ v4 v8 v14 v15 f0 f8 g0 g8 : BitVec 64),
     wp_start_body (hlc := hlc) (GF := GF) cpu dq hartid ret sp₀ v4 v8 v14 v15 f0 f8 g0 g8
 

@@ -21,6 +21,8 @@ accessor strengthened.
 import MachCSL.WpSmodeRules
 import MachCSL.WpSmodeAtomic
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std
@@ -28,7 +30,7 @@ open Sail Sail.ConcurrencyInterfaceV1
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- **The accessor of a plain store of `w'` by `cpu`, ordered**: beside the
 histories it names a position `T` of the store order (`topLb T`), and the

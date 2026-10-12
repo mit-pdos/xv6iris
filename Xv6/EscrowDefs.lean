@@ -52,6 +52,8 @@ The vocabulary:
 -/
 import Xv6.IcacheRefDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Iris.Algebra MachCSL
@@ -64,7 +66,7 @@ abbrev ST_FILLED : Nat := 1
 abbrev ST_REDEEMED : Nat := 2
 
 section EscrowDefs
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF]
 
 /-- The one-shot "deposit happened" flag (`mono_nat`, deviation 2). -/
 def committedA (ge : GName) : IProp GF := MonoNat.lb_own ge (.ofNat ST_FILLED)

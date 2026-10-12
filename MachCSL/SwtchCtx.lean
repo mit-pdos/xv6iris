@@ -15,12 +15,14 @@ import MachCSL.WpSmodeCtl
 import MachCSL.KCtxMove
 import MachCSL.Instr
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std OFE
 open LeanRV64D
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-! ## The save area -/
 
@@ -162,7 +164,7 @@ structure VcIx where
 RESUMER's index, the context being resumed, the resumer's context, the
 resumer's `tp`, the record's proc, the caller-comes-back flag, and the
 record's own context. -/
-abbrev VcPay (GF : BundledGFunctors) :=
+abbrev VcPay (GF : BundledGFunctors.{0}) :=
   CPU → CtxAdm → BitVec 64 → BitVec 64 → BitVec 64 → BitVec 64 → Bool → CtxId → IProp GF
 
 /-- The functional of the record contract. -/

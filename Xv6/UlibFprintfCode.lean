@@ -6,6 +6,8 @@ pc-relative).  Rocq `UkCatFprintf`/`UkGrepFprintf`/`UkSeccFprintf`.
 -/
 import Xv6.UlibCode
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL LeanRV64D
@@ -45,7 +47,7 @@ theorem ulibFprintfTab_size : ulibFprintfTab.all (fun x => decide (x.off < ulibF
   decide
 
 section
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- **`fprintf`'s code at printf.o's `base`.** -/
 abbrev ulibFprintfCode (L : UlibRun GF) (base : BitVec 64) : IProp GF :=

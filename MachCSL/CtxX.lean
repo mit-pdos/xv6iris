@@ -21,11 +21,13 @@ gate, the data-read gate) and the walker that uses them are
 -/
 import MachCSL.Ctx
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.BI Iris.ProofMode Std
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- **Rocq `ctx_phys_xpointsto`**: the byte at `a` holds `v`, justified at
 context ξ, and its latest write is at or below the instruction-view position

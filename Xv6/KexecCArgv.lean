@@ -59,6 +59,8 @@ STAGE file (no `Proof` prefix).
 -/
 import Xv6.KexecCParts
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -113,7 +115,7 @@ theorem kxcC_nonul (m : Nat) (f : Nat → BitVec 8) (h : ∀ j, j < m → f j �
   exact h j hj
 
 section Str
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- An argument string's owned run, as the C string strlen reads and the
 `len + 1` bytes copyout reads. -/
@@ -241,7 +243,7 @@ theorem kxcC_round16_nonneg (x : Int) (h : 0 ≤ x) : 0 ≤ kxcRound16 x := by
 /-! ## §3 THE TWO `-1` STUBS (Rocq `kxc_c_exit_m1`, deviation 2) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -315,7 +317,7 @@ theorem kxcC_j_358 : KA.«kexec» + 0x356#64 + 2#64 + BitVec.signExtend 64 20967
     KA.«kexec» + 0x1d6#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]

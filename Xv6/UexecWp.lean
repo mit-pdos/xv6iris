@@ -45,6 +45,8 @@ statement needs it.
 -/
 import Xv6.UserExec
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL LeanRV64D
@@ -59,7 +61,7 @@ def loopOk (C : UCfg) (pt : UPtd) : Prop :=
 /-! ## §2 The slot, ∀-state form, as a guarded fixpoint -/
 
 section UexecWp
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- **Rocq `uexec_F`**: the body with the RETURN CHANNEL at `X`; the only
 occurrence of `X` is under the handler premise's `▷`. -/
@@ -130,6 +132,6 @@ the one reader is the generic application's discharge of the system
 theorem's init-boot hypothesis.  The application's supply is NOT a field
 (it is built inside the boot update; Rocq's header). -/
 structure UEXEC_GEN : Prop where
-  uexec_wp_gen : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF], ⊢ □ uexecWp (GF := GF)
+  uexec_wp_gen : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF], ⊢ □ uexecWp (GF := GF)
 
 end Xv6

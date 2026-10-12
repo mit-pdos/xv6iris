@@ -23,6 +23,8 @@ import MachCSL.SwtchCtx
 import Xv6.Image
 import Xv6.UartTrace
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -32,7 +34,7 @@ open LeanRV64D
 def swtchAddr : BitVec 64 := KA.«swtch»
 
 /-- **WP of `swtch`.** -/
-def wp_swtch_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [X : CurCtx]
+def wp_swtch_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [X : CurCtx]
     (P : VcPay GF) (An Ao : CtxAdm) (cpu : CPU) (k : KCtx) (oldc newc : BitVec 64)
     (old_vs : List (BitVec 64)) (back : Bool)
     (hlen : old_vs.length = 14) (h10 : k.regs 10#5 = oldc) (h11 : k.regs 11#5 = newc)
@@ -59,7 +61,7 @@ def wp_swtch_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
 
 /-- The interface of `swtch`. -/
 structure SWTCH : Prop where
-  wp_swtch : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+  wp_swtch : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (P : VcPay GF) (An Ao : CtxAdm) (cpu : CPU) (k : KCtx) (oldc newc : BitVec 64)
     (old_vs : List (BitVec 64)) (back : Bool) hlen h10 h11 hmorph hAn hAo hsie hnoff hlocks htier,
     wp_swtch_body (hlc := hlc) (GF := GF) P An Ao cpu k oldc newc old_vs back

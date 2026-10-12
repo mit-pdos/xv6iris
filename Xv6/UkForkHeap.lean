@@ -46,6 +46,8 @@ Rocq's header, point for point:
 -/
 import Xv6.UserHeap
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -103,7 +105,7 @@ theorem useqMap_get (a : Nat) : ∀ (n : Nat) (f : Nat → BitVec 8) (x : Nat),
       · rw [if_neg h1, if_neg (by omega)]
 
 section BigSep
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- **Rocq `big_seq_map`**: a big-op over the run's map IS the big-op over the
 run. -/
@@ -157,7 +159,7 @@ end BigSep
 /-! ## §1 Pure extraction from fragment maps -/
 
 section Frags
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF]
 
 /-- **Rocq `ghost_frags_full_disjoint`**: a FULL fragment map is disjoint
 from any other fragment map at the same name. -/
@@ -234,7 +236,7 @@ end Frags
 /-! ## §3 THE MINT: a second heap over the same image -/
 
 section UkForkHeap
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
 
 /-- The child heap's invariant, from the parent's and the mirrored
 footprint (its slack is EMPTY). -/

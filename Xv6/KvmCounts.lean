@@ -14,6 +14,8 @@ the 48k-page runs themselves.
 import Xv6.KvmLemmas
 import Xv6.SpecKvmmake
 
+noncomputable section
+
 namespace Xv6.Kvm
 
 open Std MachCSL

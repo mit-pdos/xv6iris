@@ -130,7 +130,7 @@ theorem syscArmWait_bytes (rv xw : BitVec 32) (v : BitVec 64) (d : Nat) (hans : 
   · rw [if_neg h0, hans.2 h0 hrv, BitVec.ofInt_toInt]; rfl
 
 section
-variable {GF : BundledGFunctors} [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [CtokG GF] [WchG GF]
 
 /-- **kwait's led answer, read** (NI G1d): its pure image -- `-1` with the
 column kept, or the reap at the family ledger's reading (`zLowest` at the
@@ -179,7 +179,7 @@ theorem waitAnsLed_row (rv : BitVec 32) (xs : Int) (cs cs' : ExtTreeSet GName co
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]

@@ -46,6 +46,8 @@ Instance `sh_echo_slot_persistent` is unreached (walk blind spot) but ported:
 import Xv6.UshEchoPin
 import Xv6.UshExecPin
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -61,7 +63,7 @@ def echoNodeRow (ws : List (List (BitVec 8))) (M : ElfMem) (s0 t : Nat) (g : Nat
   ∧ M (s0 + ushEchoOff ws i + ushEchoAlen ws i) = some ubyte0
 
 section UshEchoSlot
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]

@@ -14,6 +14,8 @@ import Xv6.CodeTactics
 import Xv6.StepLemmas
 import MachCSL.LockFacts
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL

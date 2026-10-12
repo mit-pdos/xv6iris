@@ -44,6 +44,8 @@ Rocq's header, abridged (the reasons are the content):
 -/
 import Xv6.AppFileNames
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -70,7 +72,7 @@ union). -/
 def fileOk (_c : FileFixed) (k : Nat) (r : FileAppNames) : Prop := r.fnEra = k
 
 section AppFileSyncReg
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FileAppG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FileAppG GF]
 
 /-! ## The registry: era ↦ that era's sync list -/
 

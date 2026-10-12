@@ -37,7 +37,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 /-! ## Buffers of visibility-free bytes: concatenation -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- A visibility-free buffer splits at any point (the twin of
 `byteBuf_append`). -/
@@ -93,7 +93,7 @@ end
 /-! ## Lifting raw bytes to mappable ones, given the page's identity claim -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- A pure visibility-free byte at a kernel address whose identity claim we
 hold becomes a MAPPABLE one: give it the page's claim and the RAM fact, at
@@ -156,7 +156,7 @@ bytes never leave the page (the low two bits are clear), so the claim, pin
 and window transport to each byte. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 @[simp] theorem word4Bytes_length (w : BitVec 32) : (wordToBytes4 w).length = 4 := rfl
 
@@ -188,7 +188,7 @@ end
 /-! ## The page reassembly -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [KernelGeom] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [KernelGeom] [CurCtx]
 
 /-- One byte of an in-RAM window is in RAM. -/
 theorem inRam_byte (p : BitVec 64) (n j : Nat) (hj : j < n) (h : inRam p n) :

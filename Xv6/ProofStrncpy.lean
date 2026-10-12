@@ -25,6 +25,8 @@ import Xv6.FsWords
 import Xv6.StepLemmas
 import MachCSL.BvLemmas
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -159,7 +161,7 @@ theorem syKept_of_pad {R R' : RegMap} (h : syPadKept R R') : syKept R R' :=
   fun r _ _ h13 h14 _ _ => h r h13 h14
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-! ## The zero-fill loop -/
 

@@ -26,6 +26,8 @@ import Xv6.UsertrapSysTail
 import Xv6.UsertrapTailA6
 import Xv6.SpecSyscallXv6
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -44,7 +46,7 @@ theorem ut90_ret_a6 : jumpPc (KA.«usertrap» + 0xa6#64) = KA.«usertrap» + 0xa
 /-! ## The trapframe's epc word -/
 
 section Tf
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- `p->trapframe->epc` out of the trapframe page, at its value, and back at
 any. -/
@@ -84,7 +86,7 @@ theorem ut90_rec (sep : BitVec 64) (V : ProcPriv) (hl : V.tf.length = 36) :
   rw [e, List.set_set]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]

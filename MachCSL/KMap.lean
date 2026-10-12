@@ -18,11 +18,13 @@ tier the pin says the address is its own physical address.
 import MachCSL.Ctx
 import MachCSL.Pte
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.BI Iris.ProofMode Std
 
-variable {hlc : HasLC} {GF : BundledGFunctors}
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}}
 
 /-! ## Addresses -/
 

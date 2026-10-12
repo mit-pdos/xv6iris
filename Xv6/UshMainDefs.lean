@@ -66,6 +66,8 @@ import Xv6.UkSysP
 import Xv6.UserConsole
 import Xv6.UkShMallocDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -75,7 +77,7 @@ open Std (ExtTreeSet)
 /-- **Rocq `UkSh`'s section variables** (deviation 1): the console
 position's ghost name, the application's taint, the era's prompt
 credential family, the banner-owed credential and the lease's pieces. -/
-structure UshCtx (GF : BundledGFunctors) where
+structure UshCtx (GF : BundledGFunctors.{0}) where
   γp : GName
   T : IProp GF
   Wc : List (BitVec 8) → Nat → IProp GF
@@ -83,7 +85,7 @@ structure UshCtx (GF : BundledGFunctors) where
   Pm : List (BitVec 8) → IProp GF
 
 section UshMainDefs
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 

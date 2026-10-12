@@ -37,6 +37,8 @@ invariant, which sits below the inode region and the collection).
 import Xv6.FsBytesInv
 import Xv6.FsCrashSeam
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
@@ -44,7 +46,7 @@ open Iris Iris.BI Iris.ProofMode Std MachCSL
 /-! ## The law -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [Xv6G GF] [FsBytesG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [Xv6G GF] [FsBytesG GF]
   [FsLinkG GF] [FsTopG GF]
 
 /-- THE CONCLUSION, AS ONE NAME: the next epoch at the map the commit jumps to,

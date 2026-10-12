@@ -52,6 +52,8 @@ DEVIATIONS from Rocq:
 import Xv6.UnionDemo
 import Xv6.UnionOutPureSync
 
+noncomputable section
+
 namespace Xv6
 
 namespace UnionAdmDemo

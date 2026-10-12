@@ -65,7 +65,7 @@ theorem fileWrite_dst_insert_insert (s : Dst) (N : Fname) (v w : Nat × List (Bi
   by_cases h : compare N k = .eq <;> simp [h]
 
 section FileWriteNode
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [OffboxG GF] [FsTopG GF] [Icfg]
 
 /-- the offset link's two arms, for `icases` (deviation 5). -/

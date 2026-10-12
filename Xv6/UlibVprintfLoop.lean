@@ -27,7 +27,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Std MachCSL LeanRV64D
 
 section
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- `putc`'s contract at a call site: the descriptor and the byte read off
 the call's registers, the return address named. -/

@@ -60,12 +60,14 @@ Nothing here reads the wild interface itself.
 import Xv6.LinkRec
 import Xv6.LineModelLinks
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 
 /-- THE PARAMETERS: what a tier names (Rocq `gen_params`). -/
-structure GenParams (hlc : HasLC) (GF : BundledGFunctors) [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+structure GenParams (hlc : HasLC) (GF : BundledGFunctors.{0}) [MachGS hlc GF] [Xv6G GF] [DiskG GF]
     [EchoOutG GF] (M : LModel) where
   gL : LmLaws M
   gK : LmHooks M
@@ -111,7 +113,7 @@ structure GenParams (hlc : HasLC) (GF : BundledGFunctors) [MachGS hlc GF] [Xv6G 
   gR_exf : ∀ k v I, ⊢ gR k v I (gK.lmhExf (lmLineAt M I))
 
 section genparams
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 variable {M : LModel} (G : GenParams hlc GF M)
 
 instance GenParams.gT_persistent : Persistent G.gT := G.gT_pers
@@ -137,7 +139,7 @@ theorem gllBanner_len : uBanner.length = 17 + 1 := by decide
 theorem gllExec_len : (proAlts[1]!).length = 20 + 1 := by decide
 
 section families
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 variable {M : LModel} (G : GenParams hlc GF M)
 
 /-! ## 1. The cursor and the families -/
@@ -290,7 +292,7 @@ instance gwcPdiag_timeless (k : Nat) (v : EraPins) (I : List (BitVec 8)) (a i : 
 end families
 
 section structure_
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 variable {M : LModel} (G : GenParams hlc GF M)
 
 /-! ## 2. Structure: the taint, the loose and the tight shapes, the banner's
@@ -591,7 +593,7 @@ theorem gwcPdiag_done_1 (k : Nat) (v : EraPins) (I : List (BitVec 8)) (i : Nat)
 end structure_
 
 section links_
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 variable {M : LModel} (G : GenParams hlc GF M)
 
 /-! ## 3. The links interface -/
@@ -679,7 +681,7 @@ instance glinks_persistent : Persistent (glinks G) := by unfold glinks; infer_in
 end links_
 
 section steps
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 variable {M : LModel} (G : GenParams hlc GF M)
 
 /-! ## 4. The steps
@@ -1147,7 +1149,7 @@ theorem gpdiagStep (LINKS : IProp GF) [Persistent LINKS] (hgl : ⊢ LINKS -∗ g
 end steps
 
 section readside
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 variable {M : LModel} (G : GenParams hlc GF M)
 
 /-! ## 5. The read side: a read past a boundary whose prompt is unwritten is
@@ -1240,7 +1242,7 @@ theorem gbanReadTaint (k : Nat) (v : EraPins) (I l : List (BitVec 8)) (_hnl : wl
 end readside
 
 section record
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 variable {M : LModel} (G : GenParams hlc GF M)
 
 /-! ## 6. The record -/

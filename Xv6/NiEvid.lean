@@ -42,6 +42,8 @@ Iris-level, no stepping.
 import Xv6.UsysDet
 import Xv6.FsCfgDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
@@ -97,13 +99,13 @@ theorem niBelow_join {H ι : UIota} (hp : H.pev <+: ι.pev ∨ ι.pev <+: H.pev)
 /-- **The era's ledger names**, in a fixed order: ticks, pid, family,
 allocator, (NI joint fork lane F3) the slot-occupancy ledger and (NI M3
 NI-OUT) the console port's accepted stream. -/
-def niNamesHere {GF : BundledGFunctors} [WchG GF] [Fscfg] : List GName :=
+def niNamesHere {GF : BundledGFunctors.{0}} [WchG GF] [Fscfg] : List GName :=
   [WchG.wtkName GF, WchG.wplName GF, WchG.wzlName GF, fsReadyKmem.pend, WchG.wslName GF, fscUart.acc]
 
 /-! ## §3 The evidence -/
 
 section
-variable {GF : BundledGFunctors} [MonoNatG GF] [Xv6G GF] [WchGpre GF]
+variable {GF : BundledGFunctors.{0}} [MonoNatG GF] [Xv6G GF] [WchGpre GF]
 
 /-- **THE PER-ROUND EVIDENCE**: a lower bound of every ledger at ι, at the
 names `ns` (uncited ledgers at `[]` / `0`: free). -/

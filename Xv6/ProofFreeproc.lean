@@ -36,6 +36,8 @@ import Xv6.PtOwnLemmas
 import Xv6.CodeTactics
 import Xv6.WordFrac
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -51,7 +53,7 @@ The `pid` word is shared three ways (`pidPriv` 1/2, `pidPub` 1/4,
 `pidLockQ` 1/4); the store needs the three back together. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- Two fractions of a byte cell join (and their values agree). -/
 theorem fp_ctxByte_join (ξ : CtxId) (a : PAddr) (q1 q2 : Qp) (v1 v2 : BitVec 8) :
@@ -275,7 +277,7 @@ theorem pidsOk_clear (pids : Nat → BitVec 32) (j : Nat) (h : pidsOk pids) :
     exact h j1 j2 h1 h2 hne heq
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-- `pidReg_lookup`, keeping both sides. -/
 theorem fp_pidReg_lookup_keep (R : IntMapF GName) (pid : BitVec 32) (dq : DFrac) (g : GName) :
@@ -392,7 +394,7 @@ end
 /-! ## The block freeproc only carries -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-- The private cells `freeproc` never writes (the name buffer is written
 once, in its last stretch, so it rides here as a parameter). -/
@@ -435,7 +437,7 @@ theorem fp_pnameWf_zero (nm : List (BitVec 8)) (h : nm.length = PNAMELEN) :
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-- **The UNUSED block freeproc leaves**: the emptied cells, the kernel
 stack, and the two pure rows its caller brought. -/
@@ -716,7 +718,7 @@ theorem fp_filter_nextpid (l : List String) (h : "nextpid" ∉ l) :
   exact List.filter_eq_self.2 (fun x hx => by simp; intro e; subst e; exact h hx)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-! ## The address of a field, folded back after a store -/
 
@@ -1095,7 +1097,7 @@ set_option maxHeartbeats 4000000 in
 theorem freeproc_br_ffffffffffffef88 : KA.«freeproc» + 0xffffffffffffef88#64 = KA.«kfree» := by decide
 
 theorem freeproc_led_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE) (RE : RELEASE)
-    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+    {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx] (Γ : SchedNames) (cpu : CPU) (k : KCtx)
     (γl γp : GName) (γk : KmemNames) (j : Nat) (st : BitVec 32) (ch : BitVec 64) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (g : GName) (ke : Nat) hj hp hst hnoff hK hsie hlk hlp htier :
@@ -1234,7 +1236,7 @@ theorem freeproc_led_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE
       iexact HPhi
 
 /-- A landed continuation serves as a led one: the receipt is dropped. -/
-theorem fp_cont_led {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+theorem fp_cont_led {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (j : Nat) (pid : BitVec 32) (ke : Nat) :
     wpNext (GF := GF) k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,

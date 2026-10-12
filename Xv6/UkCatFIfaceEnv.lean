@@ -47,6 +47,8 @@ import Xv6.UkCatFIfaceDeps
 import Xv6.UkPipesIfaceReg
 import Xv6.UkCatFIfaceReg
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -68,7 +70,7 @@ def cifHmOk (fdm : Fdmap) (vs : RegMapF CfDev) (hm : FhMapF FdState) : Prop :=
   ∀ fd, get? hm fd = (fdm fd).bind (cifHf vs)
 
 section CifEnvDef
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [PipesNG GF] [CifRegG GF]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostMapG GF (Option Nat) UfdCell UfdMapF]

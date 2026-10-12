@@ -22,6 +22,8 @@ The check is one closed evaluation of `utrapWithin` by the kernel
 import Xv6.Ustep
 import Xv6.User.EchoImage
 
+noncomputable section
+
 namespace Xv6.UstepEcho
 
 open Xv6 Xv6.Ustep MachCSL

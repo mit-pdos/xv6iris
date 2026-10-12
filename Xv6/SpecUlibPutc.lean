@@ -32,12 +32,14 @@ obligation's supplier's business, and it is persistent there).
 -/
 import Xv6.UlibPutcCode
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL LeanRV64D
 
 section
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- **Rocq `kcat_wb` (at `kcat_w … 1`)**: the per-call obligation for
 `write(fd, ua, 1)` from `putc` at `base`, at the byte `b` it stores. -/
@@ -67,7 +69,7 @@ end
 
 /-- The interface of `putc`: ONE contract, every load address. -/
 structure ULIB_PUTC : Prop where
-  wp_ulibPutc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] (L : UlibRun GF) (base : BitVec 64) (m : RegMap)
+  wp_ulibPutc : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] (L : UlibRun GF) (base : BitVec 64) (m : RegMap)
     (n : Nat) (Ci Co : IProp GF), wp_ulibPutc_body L base m n Ci Co
 
 end Xv6

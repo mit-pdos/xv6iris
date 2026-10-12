@@ -140,6 +140,8 @@ import Xv6.IcacheEscrowPool
 import Xv6.InodeRegionInv
 import Xv6.FsStateEraPure
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Iris.Algebra MachCSL
@@ -374,7 +376,7 @@ theorem dummyReg_bigSepM {PROP : Type _} [BI PROP] (nib : Nat) (Φ : Nat → GNa
     (X := regionInums nib)).symm
 
 section BootRegionPure
-variable {GF : BundledGFunctors} [IregG GF]
+variable {GF : BundledGFunctors.{0}} [IregG GF]
 
 /-- `FsBoot.fs_C0_big`, for this map (Rocq's `ireg_M0_big`). -/
 theorem iregM0_big (Φ : Int → Dinode → IProp GF) (dss : List (List Dinode)) (nib : Nat) :
@@ -424,7 +426,7 @@ theorem bigSepS_sep2 {PROP : Type _} [BI PROP] {Φ Ψ : Nat → PROP} {X : Std.E
   wand_intro BigSepS.bigSepS_sep_symm.1
 
 section IcacheBootRegion
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- Rocq's `ireg_slots_of_set`. -/
@@ -693,7 +695,7 @@ end IcacheBootRegion
 /-! ## 3.  STOCKING THE POOL (§13.3) -/
 
 section IcacheBootPool
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [LogG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [LogG GF]
   [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- THE POOL'S KEYS ARE THE `BitVec` ROUND TRIP, and the ledger's are plain

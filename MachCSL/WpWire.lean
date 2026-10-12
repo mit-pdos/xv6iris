@@ -30,12 +30,14 @@ needs it, and because it documents the intended allocation discipline.
 import MachCSL.WpDev
 import MachCSL.WireInv
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open LeanRV64D
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-! ## What a pin-driving primitive does -/
 

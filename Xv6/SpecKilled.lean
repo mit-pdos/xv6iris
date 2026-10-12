@@ -8,6 +8,8 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 import MachCSL.WpSmodeFrame
 import Xv6.SchedCtx
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -25,7 +27,7 @@ lends the registration eighth its own block carries reads
 number lends `emp`.  (NI M3 no-kill K1: sys_pause, the last number-only
 caller, reads the shot now; the number-only form `KILLED.wp_killed` and its
 body `wp_killed_body` were deleted as unreached.) -/
-def wp_killed_r_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+def wp_killed_r_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (j : Nat) (Rout : BitVec 32 → IProp GF)
     (hj : j < NPROC) (hp : k.regs 10#5 = procAddr j)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 14 ≤ k.avail) (hlk : "proc" ∉ k.locks) (htier : k.tier = KTier.kpt) : Prop :=
@@ -42,7 +44,7 @@ def wp_killed_r_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   ⊢ wpLoop (GF := GF) cpu
 
 structure KILLED : Prop where
-  wp_killed_r : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx] (Γ : SchedNames) (cpu : CPU) (k : KCtx)
+  wp_killed_r : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx] (Γ : SchedNames) (cpu : CPU) (k : KCtx)
     (j : Nat) (Rout : BitVec 32 → IProp GF) hj hp hnoff hK hlk htier,
     wp_killed_r_body (hlc := hlc) (GF := GF) Γ cpu k j Rout hj hp hnoff hK hlk htier
 

@@ -38,7 +38,7 @@ theorem ukRegs_ne (f : RegFile) (m : RegMap) (h : ukRegs f m) (i : BitVec 5) (hi
   rw [h i, RegMap.get_ne m i hi]
 
 section frames
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 set_option maxRecDepth 10000 in
 /-- **The machine cells at known values, as the register frame** (Rocq

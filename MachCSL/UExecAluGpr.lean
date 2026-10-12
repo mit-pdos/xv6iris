@@ -27,6 +27,8 @@ AUIPC read); every family fact takes it, whether or not it reads `PC`.
 -/
 import MachCSL.URunRW
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

@@ -64,6 +64,8 @@ import Xv6.ElfUserSh
 import Xv6.KexecImageOk
 import Xv6.UshMainPure
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.Std MachCSL

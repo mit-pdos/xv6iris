@@ -44,6 +44,8 @@ The ghost half (the deed, the ticket, the escrow, the claim) is
 import Xv6.FileDisc
 import Xv6.FsAbsDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.Std Std MachCSL

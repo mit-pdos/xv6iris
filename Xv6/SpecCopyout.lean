@@ -44,6 +44,8 @@ import Xv6.Image
 import Xv6.UMemLemmas
 import Xv6.SlotGen
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -52,7 +54,7 @@ open LeanRV64D
 def copyoutAddr : BitVec 64 := KA.«copyout»
 
 /-- `copyout(pt a0, psz a1, dstva a2, src a3, len a4)`. -/
-def wp_copyout_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
+def wp_copyout_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8))
     (dqs : DFrac) (bs : List (BitVec 8)) (ke : Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 52 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
@@ -79,7 +81,7 @@ def wp_copyout_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G 
 
 /-- The contract WITHOUT the failure reason: what the callers that never
 read it restate (`COPYOUT.wp_copyout_nr`). -/
-def wp_copyout_nr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
+def wp_copyout_nr_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8))
     (dqs : DFrac) (bs : List (BitVec 8)) (ke : Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 52 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
@@ -104,14 +106,14 @@ def wp_copyout_nr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
   ⊢ wpLoop (GF := GF) cpu
 
 structure COPYOUT : Prop where
-  wp_copyout : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_copyout : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8)) (dqs : DFrac) (bs : List (BitVec 8)) (ke : Nat)
     hnoff hK hlk hroot hsz hlen hlen',
     wp_copyout_body (hlc := hlc) (GF := GF) cpu k γl γk P M dqs bs ke hnoff hK hlk hroot hsz hlen hlen'
 
 /-- The contract with the failure reason and the written prefix's writability dropped
 (`UMemL.coPost_drop`). -/
-theorem COPYOUT.wp_copyout_nr (A : COPYOUT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
+theorem COPYOUT.wp_copyout_nr (A : COPYOUT) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF]
     [CurCtx] (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8))
     (dqs : DFrac) (bs : List (BitVec 8)) (ke : Nat) hnoff hK hlk hroot hsz hlen hlen' :
     wp_copyout_nr_body (hlc := hlc) (GF := GF) cpu k γl γk P M dqs bs ke hnoff hK hlk hroot hsz hlen hlen' := by

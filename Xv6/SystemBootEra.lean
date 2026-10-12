@@ -97,6 +97,8 @@ import Xv6.BootShared
 import Xv6.SystemSlot
 import Xv6.BootChain
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -104,7 +106,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 /-! ## §3 The four device loops -/
 
 section devs
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
 
 theorem xv6Era_devs (γ0 γ1 : UartNames) (γd : DiskNames) :
     uartInv .uart0 γ0 ∗ uartInv .uart1 γ1 ∗ uartObsPermit .uart0 γ0 ∗ uartObsPermit .uart1 γ1 ∗
@@ -140,7 +142,7 @@ end devs
 /-! ## §2 The eight harts, at the final instance -/
 
 section harts
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
   [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
   [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
   [IcboxG GF] [SleepLockG GF] [Appcfg GF] [BcacheG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF]
@@ -285,7 +287,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 /-! ## §1 The lend, unpacked, and the era's instances -/
 
 section lend
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [FsLinkG GF] [FsTopG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGpreS hlc GF] [FsLinkG GF] [FsTopG GF]
 
 /-- **THE LEND → THE ERA'S FILE-SYSTEM STATE** (Rocq `xv6_boot_era`
 :680-750, `power_boot_res_lend` through the `HDeq` rewrite): the lent epoch,
@@ -317,7 +319,7 @@ theorem xv6Era_lend {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp
 end lend
 
 section seam
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [Xv6G GF] [FsLinkG GF] [FsTopG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [Xv6G GF] [FsLinkG GF] [FsTopG GF]
 
 /-- THE SEAM, off the slot equation (Rocq `xv6_boot_era`'s `Hseamg`): both
 directions are the identity once the crash predicate is the composite. -/
@@ -337,7 +339,7 @@ end seam
 /-! ## §4 The era's instances and the application's per-era obligations -/
 
 section inst
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF]
 
 /-- The PROVISIONAL instance the shared allocation runs at: nothing it
 produces reads the claim payload (`bootSharedOut_ofEra`). -/
@@ -389,7 +391,7 @@ end inst
 /-! ## §5 ONE ERA -/
 
 section era
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G GF] [WchGpre GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGpreS hlc GF] [Xv6G GF] [WchGpre GF]
   [CtokG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
   [IcboxG GF] [SleepLockG GF] [BcacheG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF]
 

@@ -6,6 +6,8 @@ declares it cannot use.
 -/
 import Lean
 
+noncomputable section
+
 namespace MachCSL
 
 /-! ### `k_norm`'s simp cache, kept across calls

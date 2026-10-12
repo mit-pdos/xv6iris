@@ -45,6 +45,8 @@ nothing to pair.
 -/
 import MachCSL.WpTrap
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
@@ -165,7 +167,7 @@ theorem trapMstatusOk_utrapMs (e : BitVec 1) (ms : BitVec 64)
   · rw [utrapMs_SPIE]; exact hSIE
 
 section swp
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-! ## §2 The tower at `cur_privilege = User`, generic in the cause -/
 

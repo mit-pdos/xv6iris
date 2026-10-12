@@ -52,6 +52,8 @@ xv6GF slot 86) -- hence the `[DiskG GF]` binder.  **unionGF needs no
 -/
 import Xv6.DiskInvDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -63,7 +65,7 @@ structure EchoNames where
   n2 : GName
 
 section AppEchoCons
-variable {GF : BundledGFunctors} [DiskG GF]
+variable {GF : BundledGFunctors.{0}} [DiskG GF]
 
 /-! ## The flag -/
 

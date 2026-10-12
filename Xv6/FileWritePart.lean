@@ -45,7 +45,7 @@ theorem fwpSingleBlock (off n : Nat) (hn : 0 < n) (hfit : off % BSIZE + n < BSIZ
   omega
 
 section FileWritePart
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [OffboxG GF] [FsTopG GF] [Icfg] [FsBytesG GF]
 
 /-- THE PARTIAL ARM FROM THE CURSOR (Rocq `file_awrite_part_adv`): at a

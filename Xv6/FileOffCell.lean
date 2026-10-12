@@ -51,6 +51,8 @@ import Xv6.FsGeom
 import Xv6.OffGv
 import Xv6.KallocDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
@@ -74,7 +76,7 @@ theorem offWf_zero : offWf 0#32 := by
   decide
 
 section FileOffCell
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [OffboxG GF]
 
 /-- The resident cell, wf, WITH THE KERNEL'S HALF OF ITS SHADOW -- what the
 off box holds while a file's `f->off` is not checked out (Rocq

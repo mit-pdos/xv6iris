@@ -62,6 +62,8 @@ anti-vacuity check evaluates (`Xv6.UstepEcho`).
 import Xv6.UkVals
 import MachCSL.UTrap
 
+noncomputable section
+
 namespace Xv6.Ustep
 
 open MachCSL

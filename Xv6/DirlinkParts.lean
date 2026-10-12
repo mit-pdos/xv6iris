@@ -44,6 +44,8 @@ import Xv6.SpecStrncpy
 import Xv6.IcacheBootDecode
 import MachCSL.BvLemmas
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -74,7 +76,7 @@ def dirlinkMsgStr : List (BitVec 8) :=
    0x61#8, 0x64#8]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 set_option maxRecDepth 100000 in
 /-- Rocq's `dl_msg_str`. -/
@@ -231,7 +233,7 @@ theorem dirlink_snc (fn : Nat → BitVec 8) (bsd' : List (BitVec 8)) (hl : bsd'.
 /-! ## The frame -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {lent : Bool}
 
 /-- The `de` record's address, `s0 - 80`. -/

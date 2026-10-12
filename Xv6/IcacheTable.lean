@@ -252,6 +252,8 @@ import Xv6.IcacheBox
 import Xv6.IcacheEscrowPool
 import Xv6.SleepLockDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -259,7 +261,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 /-! ## A ξ-constant row transports (deviation 6) -/
 
 section MorphEq
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- A family that is the same proposition at every context transports
 trivially (the rows whose ambient is tier-only: `irefClaims`, `icEscrows`,
@@ -276,7 +278,7 @@ end MorphEq
 /-! ## §6.  THE itable LOCK'S RESOURCE, v2: the slot rows -/
 
 section IcacheTableSlot
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF]
 
 /-- Rocq's `islot_rest_at (XI := ξ)` (deviation 1). -/
 def islotRestAtCtx [CurCtx] (ξ : CtxId) (k : Nat) (q : Qp) (dev inum : BitVec 32) : IProp GF :=
@@ -381,7 +383,7 @@ end IcacheTableSlot
 /-! ## §6.  The per-slot PAYLOAD rows (A6.145, R3 M-6/F17) -/
 
 section IcacheTableRow
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcboxG GF]
 
 /-- The slot's count in `M` (0 when not live; Rocq's `icM_count`). -/
 def icMCount (M : RegMapF (Qp × PosNat)) (k : Nat) : Nat :=
@@ -739,7 +741,7 @@ end IcacheTableRow
 /-! ## §6.  THE TABLE: `itable_res2` and its two release forms -/
 
 section IcacheTableRes
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF]
   [FsBlocksG GF] [FsTopG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcboxG GF] [SleepLockG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-- Rocq's `itable_res2`: the lock holder's half of the count authority,
@@ -995,7 +997,7 @@ theorem isItable2_pool [Icfg] [CurCtx] (γl : GName) (cn : IcNames) (γfs : FsNa
 end IcacheTableRes
 
 /-- Rocq's `ic_escrows_lookup`. -/
-theorem icEscrows_lookup {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF]
+theorem icEscrows_lookup {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF]
     [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcboxG GF]
     [Icfg] [CurCtx] (cn : IcNames) (γfs : FsNames) (γi : GName) (cov : ExtTreeSet Nat compare)
     (logstart k : Nat) (hk : k < NINODE) :
@@ -1007,7 +1009,7 @@ theorem icEscrows_lookup {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
 /-! ## §6b.  EVERY ENTRY'S INODE SLEEPLOCK -/
 
 section IcacheSleeplocks
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
   [IcacheG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF]
 
 /-- Rocq's `ic_sleeplocks` (deviation 4: no name conjunct). -/
@@ -1033,7 +1035,7 @@ end IcacheSleeplocks
 /-! ## §6c.  THE TWO ICACHE ENVIRONMENT ROWS' TRANSPORT OBLIGATIONS -/
 
 section IcacheEnvMorph
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
   [IcacheG GF] [IcboxG GF]
 
 /-- One slot's sleeplock handle transports: the payload `slBody … (icSlp cn
@@ -1087,7 +1089,7 @@ end IcacheEnvMorph
 /-! ## §7.  ALLOCATION OF THE TOKEN FAMILIES -/
 
 section IcacheEscrowAlloc
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF]
 
 /-- THE CHECKOUT DESCRIPTOR's family (§14.8), at `depNone`: at boot no
 entry is checked out, and a whole variable at the neutral descriptor IS

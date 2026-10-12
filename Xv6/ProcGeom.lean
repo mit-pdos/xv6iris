@@ -21,6 +21,8 @@ Imports only definitional files.
 -/
 import Xv6.SlotSupply
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Std MachCSL

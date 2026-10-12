@@ -28,6 +28,8 @@ stay as their corollaries through `lineOk_execOk`.
 -/
 import Xv6.EchoDisc
 
+noncomputable section
+
 namespace Xv6
 
 /-- **Rocq `exec_ok`**: `lineOk` without the command. -/

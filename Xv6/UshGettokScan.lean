@@ -27,6 +27,8 @@ import Xv6.SpecShStrchr
 import Xv6.UkGrepDefs
 import Xv6.UshCodeGettoken
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -91,7 +93,7 @@ theorem ushG_cs3 (mc : RegMap) (a b c : BitVec 64) (q : BitVec 5) (hq : ucalleeS
 macro "ushG_pc" : tactic => `(tactic| first | decide | omega | (simp; done) | (simp; omega))
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 

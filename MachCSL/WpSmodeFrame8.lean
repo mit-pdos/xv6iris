@@ -7,12 +7,14 @@ scribble on and must hold at the epilogue.
 -/
 import MachCSL.WpSmodeFrame
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open LeanRV64D
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {lent : Bool}
 
 /-- The five spare cells at `sp-32 .. sp-64`. -/

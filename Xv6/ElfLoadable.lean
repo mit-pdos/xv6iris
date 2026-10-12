@@ -34,6 +34,8 @@ import Xv6.KexecLoad
 import Xv6.ElfUserInit
 import Xv6.ElfUserSh
 
+noncomputable section
+
 namespace Xv6
 
 open Xv6.User (ElfRd elfParseEhdrR)

@@ -37,6 +37,8 @@ import Xv6.UexecSeccMasked
 import Xv6.UexecExecInst
 import Xv6.UserFd
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
@@ -102,7 +104,7 @@ def seccN : Namespace := ndot nroot "secc"
 theorem seccN_top : (↑seccN : CoPset) ⊆ ⊤ := CoPset.subseteq_top
 
 section UexecSecc
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg]
 
 /-- THE WILD PIPE: the queue fragment parked with NO protocol (Rocq

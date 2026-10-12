@@ -33,6 +33,8 @@ program.
 import Xv6.KexecBuilt
 import Xv6.UmodeArith
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

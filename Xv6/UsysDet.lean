@@ -192,6 +192,8 @@ read as the policy (`uexecRetContF_det`) are in `UexecApply`.
 -/
 import Xv6.UexecRound
 
+noncomputable section
+
 namespace Xv6
 
 open Std Iris

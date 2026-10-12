@@ -124,6 +124,8 @@ import Xv6.FsStateInodeOwned
 import Xv6.FsStateTop
 import Xv6.InodeRegion
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -131,7 +133,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 /-! ## 3.  THE RESOURCE BRIDGE, AND THE BUNDLE -/
 
 section EraBigOp
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- A RANGE-INDEXED BIG-OP OVER A TOTAL READING IS THE SPARSE MAP'S.  One
 induction, over an ABSTRACT map whose domain the range covers, so no
@@ -177,7 +179,7 @@ theorem bigSepL_seqMap (Φ : Nat → List (BitVec 8) → IProp GF)
 end EraBigOp
 
 section EraBridge
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsBlocksG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsBlocksG GF]
 
 /-! ### the two content bridges
 
@@ -246,7 +248,7 @@ theorem indResEra (γfs : FsNames) (n : FsNode) :
 end EraBridge
 
 section EraRes
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsBlocksG GF] [IregG GF] [FsTopG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsBlocksG GF] [IregG GF] [FsTopG GF]
 
 /-! ### THE BUNDLE
 
@@ -604,7 +606,7 @@ payload producer of a non-directory or of a record-less directory
 discharges the conjunct with. -/
 
 section EraLinks
-variable {GF : BundledGFunctors} [FsLinkG GF]
+variable {GF : BundledGFunctors.{0}} [FsLinkG GF]
 
 /-- Rocq's `era_not_dir`. -/
 theorem era_notDir (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8))

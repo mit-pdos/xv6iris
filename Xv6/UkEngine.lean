@@ -55,6 +55,8 @@ mint builds it out of the supply, `UslotDetMint`).
 -/
 import Xv6.UkFetchArm
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -74,7 +76,7 @@ def ukRt (ret : Bool) (C : UCfg) (P : UPtd) (T : BMap) (sz : Nat) (m' : RegMap) 
 def ukEx (ret : Bool) (e : ExceptionType) (exc : sync_exception) : Prop := ret = false ∧ exc.trap = e
 
 section engine
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
 
 /-! ## §2 The bundle, taken apart and put together -/
 

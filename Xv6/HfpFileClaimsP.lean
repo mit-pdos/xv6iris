@@ -36,12 +36,14 @@ The rename map from the old record is `lane-hfp/scratch/file_swap_map.txt`.
 -/
 import Xv6.AppFileEra
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section Claims
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
   [FileAppG GF] [Appcfg GF]
 
 namespace HfpFileClaimsP

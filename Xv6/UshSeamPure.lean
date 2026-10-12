@@ -18,6 +18,8 @@ of the reference's answer, `ushpCutOk` what the seam consumes, and
 -/
 import Xv6.UshParserPure
 
+noncomputable section
+
 namespace Xv6
 
 /-- **Rocq `ref_tok_ok`**: a token as gettoken's word arm produces it. -/

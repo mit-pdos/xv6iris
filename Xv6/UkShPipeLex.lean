@@ -23,6 +23,8 @@ premise covering both symbols (it IS `refSymScope`).
 -/
 import Xv6.UkShParseSym
 
+noncomputable section
+
 namespace Xv6
 
 /-! ## §1 The byte -/

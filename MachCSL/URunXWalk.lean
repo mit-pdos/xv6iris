@@ -16,6 +16,8 @@ import MachCSL.URunX
 import MachCSL.URunRWMono
 import MachCSL.UFetchRun
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

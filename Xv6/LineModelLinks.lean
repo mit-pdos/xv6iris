@@ -45,6 +45,8 @@ import Xv6.EchoLinks
 import Xv6.EchoOutPure
 import Xv6.PipeOutPure
 
+noncomputable section
+
 namespace Xv6
 
 /-! ## §0 Small list facts, and the prologue's -/

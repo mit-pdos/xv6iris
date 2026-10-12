@@ -14,6 +14,8 @@ table must not be used for the image's data addresses.)
 import MachCSL.KCtx
 import Xv6.KernelImage
 
+noncomputable section
+
 namespace Xv6
 
 /-- `&cpus[0]`. -/

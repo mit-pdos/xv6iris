@@ -45,18 +45,20 @@ Nothing.
 import Xv6.FsStateDefs
 import Xv6.FsNode
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 /-- Rocq `Xv6Cameras.fsTopG`: the top-level abstract map, inum ↦ node. -/
-class FsTopG (GF : BundledGFunctors) where
+class FsTopG (GF : BundledGFunctors.{0}) where
   [gmTop : GhostMapG GF Nat FsNode RegMapF]
 
 attribute [reducible, instance] FsTopG.gmTop
 
 section FsStateTop
-variable {GF : BundledGFunctors} [FsTopG GF]
+variable {GF : BundledGFunctors.{0}} [FsTopG GF]
 
 /-- The whole top-map element: inum `i`'s abstract node is `n`. -/
 def topFrag (Γ : FsViewNames GF) (i : Nat) (n : FsNode) : IProp GF :=

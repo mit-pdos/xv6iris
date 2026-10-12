@@ -77,6 +77,8 @@ in the wave brief's file plan beside this section, is Rocq line 162, in
 -/
 import Xv6.IcacheRefDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -128,7 +130,7 @@ theorem liveVal_one_update (k : Nat) (g g' : GName) (lo lo' : Nat) :
   exact Heap.singleton_update (Update.exclusive ⟨Rat.le_refl, Agree.toAgree_valid⟩)
 
 section IcacheRefGhost
-variable {GF : BundledGFunctors} [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [IcacheG GF]
 
 /-- HALF the authority.  The other half is the other one: the itable lock's
 resource and the `ref`-word invariant hold one each, so neither can move `M`
@@ -384,7 +386,7 @@ end IcacheRefGhost
 /-! ## The reference token (needs the sleeplock share; deviation 5) -/
 
 section IcacheRefTok
-variable {GF : BundledGFunctors} [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
+variable {GF : BundledGFunctors.{0}} [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
 
 /-- ONE reference to slot `k`, holding fraction `q` of its identity -- the
 count fragment AND the matching liveness slice, canonically paired (see the

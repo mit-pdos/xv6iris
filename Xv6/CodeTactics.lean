@@ -6,12 +6,14 @@ search-tree lookup of `pc` plus the read-only decode walk, both evaluated by
 import MachCSL.DecodeBridge
 import Xv6.KernelData
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-! ## Instruction facts straight from the kernel text
 

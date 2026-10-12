@@ -18,6 +18,8 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 import Xv6.SpecKvmmake
 import Xv6.SpecKvminithart
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -27,7 +29,7 @@ open LeanRV64D
 def kvminitAddr : BitVec 64 := KA.«kvminit»
 
 /-- The specification of `kvminit` (counted mode). -/
-def wp_kvminit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
+def wp_kvminit_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (nb : Nat) (v0 : BitVec 64)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 50 ≤ k.avail) (hlk : "kmem" ∉ k.locks)
     (hcount : kvmmakeCount < nb)
@@ -47,7 +49,7 @@ def wp_kvminit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G 
 
 /-- The interface of `kvminit`. -/
 structure KVMINIT : Prop where
-  wp_kvminit : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_kvminit : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γl : GName) (γk : KmemNames) (nb : Nat) (v0 : BitVec 64) hnoff hK hlk hcount hp0,
     wp_kvminit_body (hlc := hlc) (GF := GF) cpu k γl γk nb v0 hnoff hK hlk hcount hp0
 

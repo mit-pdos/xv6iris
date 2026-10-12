@@ -25,11 +25,13 @@ with no conjunct of its own; `procPrivBareAt_evAcc` (Rocq
 -/
 import Xv6.ProcDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- `procFieldsNoctx` minus the descriptor array. -/
 def procFieldsNoOfile (pa : BitVec 64) (dq : DFrac) (V : ProcPriv) : IProp GF := iprop%

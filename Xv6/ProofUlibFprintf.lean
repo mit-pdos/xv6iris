@@ -21,7 +21,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Std MachCSL LeanRV64D
 
 section
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- Ten free words, one by one. -/
 theorem ulibWords_open10 (L : UlibRun GF) (s : Nat) :

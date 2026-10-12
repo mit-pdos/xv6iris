@@ -16,6 +16,8 @@ import Xv6.FsCallSitesF
 import Xv6.SpecIput
 import Xv6.EscrowDeposit
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -94,7 +96,7 @@ theorem iput_ofl_mask_ftop (z : Nat) :
 /-! ## The deposit's ghost step, as log_write's atomic update -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- THE DEPOSIT (Rocq's `ireg_free_deposit_au` through `lw_au_rec`): the
@@ -125,7 +127,7 @@ end
 /-! ## The handle, opened (iupdate's `iu_hold_open`, copied) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
   [DiskG GF] [FsBlocksG GF] [SleepLockG GF]
 
 theorem iput_ofl_slots3 [CurCtx] (γ : BcacheNames) :

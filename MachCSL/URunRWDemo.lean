@@ -28,6 +28,8 @@ The Iris side is one application of `swp_runRW` per fact
 import MachCSL.BvEnumSatp
 import MachCSL.UExecAluGpr
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
@@ -239,7 +241,7 @@ theorem urwDemo_ld (orc : UOrc) (rs : RegFile) (pg : BitVec 12 → BitVec 8) (rv
 /-! ## The Iris side: one `swp_runRW` per fact -/
 
 section iris
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- The RTYPE walk on the two-list footprint of the instruction. -/
 theorem urwDemo_addL (orc : UOrc) (rs : RegFile) (mm : BMap) (rv : Bool) :

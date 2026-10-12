@@ -54,6 +54,8 @@ import Xv6.PtOwnLemmas
 import Xv6.DiskTier
 import MachCSL.SmodeDevDefs
 
+noncomputable section
+
 namespace Xv6
 
 set_option linter.unusedSimpArgs false
@@ -61,7 +63,7 @@ set_option linter.unusedSimpArgs false
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
 
 /-! ## The MMIO window, as the fabric sees it
 

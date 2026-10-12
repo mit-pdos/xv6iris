@@ -43,6 +43,8 @@ import MachCSL.UCycleDefs
 import MachCSL.UDispatch
 import MachCSL.UTranslate
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

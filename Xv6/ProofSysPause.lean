@@ -52,6 +52,8 @@ import MachCSL.WpSmodeFrame8
 import Xv6.SpecArgint
 import Xv6.WordFrac
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -152,7 +154,7 @@ structure SpBase (k kb : KCtx) : Prop where
   struct : ∃ (a b : Bool) (Rb : RegMap), kb = ((k.pushed 8).withSpie a b).withRegs Rb
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-! ## The frame -/
 
@@ -488,7 +490,7 @@ end
 /-! ## The epilogue `(KernelSyms.«sys_pause» + 0x8e)` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 set_option maxHeartbeats 8000000 in
 /-- `ld ra,56(sp); ld s0,48(sp); addi sp,sp,64; ret` with `r` in `a0`. -/
@@ -542,7 +544,7 @@ theorem sp_exit (cpu : CPU) (k kb : KCtx) (hb : SpBase k kb) (j : Nat)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
 theorem sys_pause_br_ffffffffffffe1ea : KA.«sys_pause» + 0xffffffffffffe1ea#64 = KA.«release» := by decide
 
@@ -725,7 +727,7 @@ end
 /-! ## The sleep loop at `(KernelSyms.«sys_pause» + 0x4a)` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
 /-- The loop invariant at `0x80002b40`: the lock held, the counter reading
 `t0` in `s3`, `&ticks` in `s2`, `&tickslock` in `s1`. -/
@@ -1210,7 +1212,7 @@ end
 /-! ## From `(KernelSyms.«sys_pause» + 0x1a)`: acquire, the `n == 0` test, the loop setup -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
 theorem sys_pause_br_7922 : KA.«sys_pause» + 0x7922#64 = ticksAddr := by decide
 

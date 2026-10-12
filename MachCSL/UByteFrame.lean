@@ -22,6 +22,8 @@ list `D` (Rocq's `dom mm`), each owned at context ξ, their values the map's.
 -/
 import MachCSL.URunRW
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
@@ -176,7 +178,7 @@ theorem ubLookup_mem (A : List (PAddr × BitVec 8)) (hnd : (A.map Prod.fst).Nodu
 /-! ## Ownership of a byte list -/
 
 section iris
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- **Rocq `bytes_own mm`** over the addresses `D`: each holds, exclusively at
 context ξ, the byte the map says. -/

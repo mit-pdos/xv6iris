@@ -22,12 +22,14 @@ Three groups of lemmas:
 -/
 import MachCSL.KCtx
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open LeanRV64D
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 local notation "era" => MachGS.era (hlc := hlc) (GF := GF)
 

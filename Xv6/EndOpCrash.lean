@@ -176,7 +176,7 @@ theorem eo_fill_facts (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8)) (Mc 
 /-! ## The logged view on the home set, read through the cache's parked halves -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 /-- **THE READING THE COMMITTER TAKES, AT THE AUTHORITY IT HOLDS** (Rocq

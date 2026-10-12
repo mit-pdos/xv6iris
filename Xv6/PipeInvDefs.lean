@@ -32,6 +32,8 @@ step it (`PipeQstep`), paid by the caller's links or the taint.
 import MachCSL.KCtxMove
 import Xv6.PipeQueue
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL LeanRV64D
@@ -225,7 +227,7 @@ def pnEnd (γp : PipeNames) (w : Bool) : GName := if w then γp.pnWrite else γp
 def pnMark (γp : PipeNames) (w : Bool) : GName := if w then γp.pnMwrite else γp.pnMread
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-! ### THE reference: a share of one END of the pipe
 
@@ -402,7 +404,7 @@ end
 /-! ## The page bytes, the lock payload, the dead state -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [KernelGeom] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [KernelGeom] [CurCtx]
 
 /-- `pi->data[0..PIPESIZE)`, contents tracked, over an EXPLICIT context. -/
 def pipeDataAt (ξ : CtxId) (pi : BitVec 64) (bs : List (BitVec 8)) : IProp GF := iprop%

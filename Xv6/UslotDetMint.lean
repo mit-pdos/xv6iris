@@ -27,13 +27,15 @@ now needs the engine); `USER` and `uexecWp` are unchanged.
 -/
 import Xv6.LinkUkLeaves
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D LeanRV64D.Functions
 
 section DetMint
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF]
 open UexecSG
 
 /-- **One retiring leaf at a slot supplier**: the proved leaf, its

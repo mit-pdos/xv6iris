@@ -101,6 +101,8 @@ import Xv6.PipeReg
 import Xv6.SpecArgfd
 import Xv6.SpecSysMkdir
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
@@ -186,7 +188,7 @@ theorem imgAgrees_writerImg (P : UPtd) (sz : Nat) (M : Nat → List (BitVec 8)) 
 /-- **Rocq `xfam`**: one field per syscall whose contract takes
 caller-chosen families (deviation 4), and
 the three payload fields fork/exit read. -/
-structure Xfam (GF : BundledGFunctors) where
+structure Xfam (GF : BundledGFunctors.{0}) where
   /-- exec (7) -/
   xP : Nat → Nat → IProp GF
   xPmiss : Nat → Nat → IProp GF
@@ -263,7 +265,7 @@ structure Xfam (GF : BundledGFunctors) where
   syOQ : Option (IProp GF)
 
 section Fam
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- **Rocq `xfam_pt`** (`xfam_exec` at the trivial families): every family
 trivial, the payloads `True`, the lend `emp`. -/
@@ -341,7 +343,7 @@ end Fam
 /-! ## §2 The rows, at explicit families -/
 
 section Rows
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg]
 
 /-- **Rocq `exec_sbundle`**: the pay fact at the key's generation and own
@@ -832,7 +834,7 @@ end Rows
 /-! ## §4 THE CLASS INSTANCE -/
 
 section Inst
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg]
 
 /-- **Rocq `uexecSG_xv6`**: THE instance of the deposit class. -/

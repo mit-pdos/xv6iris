@@ -32,6 +32,8 @@ import MachCSL.UExecCtlBase
 import MachCSL.UTranslate
 import MachCSL.BvEnumSatp
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

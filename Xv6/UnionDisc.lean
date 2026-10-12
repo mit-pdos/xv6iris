@@ -59,6 +59,8 @@ Deviations from Rocq:
 import Xv6.FileHooks
 import Xv6.PipesUline
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL Pline' PLAlt PipeStage

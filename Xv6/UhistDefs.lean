@@ -48,6 +48,8 @@ tail the resumed key), parked across user execution in
 -/
 import Xv6.UexecRound
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std
@@ -250,7 +252,7 @@ instance : Inhabited Uvis := ⟨⟨[], fun _ => none, fun _ => none, 0, [], 0, 0
 the start key heads the encoded list) -/
 
 section Uhist
-variable {GF : BundledGFunctors} [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [Xv6G GF]
 open UledEnc
 
 /-- The encoded history: the start key, then the rounds. -/

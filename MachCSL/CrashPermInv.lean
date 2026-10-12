@@ -49,6 +49,8 @@ Deviations from Rocq.
 import MachCSL.DiskPermit
 import Iris.Instances.Lib.SavedProp
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.BI Iris.ProofMode Std
@@ -59,14 +61,14 @@ abbrev CrashPermVal : Type := (Bool × GName) × (DiskWr × List Nat)
 
 /-- THE CAPACITY CLASS (Rocq `permG`): saved propositions and the channel's
 ghost map. -/
-class CrashPermG (GF : BundledGFunctors) where
+class CrashPermG (GF : BundledGFunctors.{0}) where
   [savedG : SavedPropG GF]
   [mapG : GhostMapG GF Nat CrashPermVal RegMapF]
 
 attribute [reducible, instance] CrashPermG.savedG CrashPermG.mapG
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [CrashPermG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [CrashPermG GF]
 
 /-- ONE in-flight request's cell (Rocq `perm_slot`): pending (`b = true`)
 holds the SEQUENTIAL permit at the sectors still to land, done holds the

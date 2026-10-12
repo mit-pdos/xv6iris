@@ -41,6 +41,8 @@ Imports only `ProcGeom` (for `NPROC`); no Iris, no ghost state.
 
 import Xv6.ProcGeom
 
+noncomputable section
+
 namespace Xv6
 
 /-- One event of the slot-occupancy ledger. -/

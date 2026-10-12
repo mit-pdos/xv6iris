@@ -21,6 +21,8 @@ import Xv6.CodeTactics
 import Xv6.StepLemmas
 import MachCSL.BvLemmas
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -72,7 +74,7 @@ theorem sn_succ' (b : BitVec 64) (k : Nat) :
 /-! ## The loop -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- What the loop leaves: either the stopping index, at `e14`, or agreement
 on all `n` non-NUL bytes, at `e0c`. -/

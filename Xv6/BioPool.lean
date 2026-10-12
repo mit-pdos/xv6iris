@@ -44,6 +44,8 @@ argument instead of a set-extensionality one.
 -/
 import Xv6.DiskInvDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -81,7 +83,7 @@ converts clean ↔ dirty; holders do that with their own (log-layer) ghosts.
 The payloads ride an escrow opened inside atomic updates, so no step is
 available to absorb a later: both carry their own `Timeless` proof, exactly
 as Rocq's `bv_clean_tl`/`bv_dirty_tl` do. -/
-structure BioView (GF : BundledGFunctors) where
+structure BioView (GF : BundledGFunctors.{0}) where
   /-- the disk ghost (Rocq's `bv_gd`) -/
   gd : DiskNames
   /-- the one device the view speaks for (Rocq's `bv_dev`) -/
@@ -129,7 +131,7 @@ theorem not_bcached (bnos : Nat → BitVec 32) (b : Nat)
     exact absurd he (h j hj)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
 
 /-! ## The payloads -/
 

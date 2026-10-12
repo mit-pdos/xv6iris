@@ -18,12 +18,14 @@ the payload folded through the hook).
 -/
 import MachCSL.Lock
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.BI Iris.ProofMode Std
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- The birth's move, HOOKED: park the payload in a fresh context, stamp it,
 and run the hook there (`MachCSL.lock_pay_intro_hook`'s twin). -/

@@ -10,12 +10,14 @@ node NAMES).
 import Xv6.UkCode
 import Xv6.User.ShImage
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 
 section
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
 
 /-- **Rocq `shp_code γt`** (= `shk_code γt`): sh's whole text (and
 `.rodata`, which shares the R-X segment), as the text heap holds it. -/

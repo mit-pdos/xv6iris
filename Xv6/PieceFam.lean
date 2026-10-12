@@ -51,7 +51,7 @@ the Rocq tree's `claude-notes/design/fs-syscall-specs.md` sections 0-4, and
 1. Names: `pfam`/`MkPfam`/`pf_recv`/`pf_refund` are `Pfam`/`Pfam.mk`/
    `Pfam.pfRecv`/`Pfam.pfRefund`; `pf_at` is `pfAt`, `pfam_triv` is
    `pfamTriv`; the lemmas keep their Rocq names camel-headed
-   (`refund_mono`, `pfAt_au`, ...).  `Σ` is `GF : BundledGFunctors`.
+   (`refund_mono`, `pfAt_au`, ...).  `Σ` is `GF : BundledGFunctors.{0}`.
 2. Rocq's curried `A -∗ B -∗ C` lemma statements are `⊢ A -∗ B -∗ C`.
 3. Rocq's "REDUCING A LITERAL PAIR" note (`cbn [pf_recv pf_refund]`) has no
    Lean analogue to keep: the projections of `Pfam.mk` reduce by `rfl`.
@@ -62,6 +62,8 @@ Nothing.
 -/
 import Iris.Instances.UPred.Instance
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode
@@ -69,7 +71,7 @@ open Iris Iris.BI Iris.ProofMode
 /-! ## 1.  The pair -/
 
 /-- Rocq's `pfam Σ A`: a one-shot piece's receipt family beside its refund. -/
-structure Pfam (GF : BundledGFunctors) (A : Type) where
+structure Pfam (GF : BundledGFunctors.{0}) (A : Type) where
   pfRecv : A
   pfRefund : IProp GF
 
@@ -78,19 +80,19 @@ structure Pfam (GF : BundledGFunctors) (A : Type) where
 /-- `pfAt AU F` is the one-shot piece `AU` at the family `F`, CONJOINED with
 `F`'s refund (Rocq's `pf_at`) -- the `AU ∧ R` of the ruling.  `AU` is the
 piece with its receipt slot ABSTRACTED. -/
-def pfAt {GF : BundledGFunctors} {A : Type} (AU : A → IProp GF) (F : Pfam GF A) : IProp GF :=
+def pfAt {GF : BundledGFunctors.{0}} {A : Type} (AU : A → IProp GF) (F : Pfam GF A) : IProp GF :=
   iprop(AU F.pfRecv ∧ F.pfRefund)
 
 /-! ## 2.  The trivial pair -/
 
 /-- Rocq's `pfam_triv`: the caller's receipt beside `True`. -/
-def pfamTriv {GF : BundledGFunctors} {A : Type} (Φ : A) : Pfam GF A :=
+def pfamTriv {GF : BundledGFunctors.{0}} {A : Type} (Φ : A) : Pfam GF A :=
   ⟨Φ, iprop(True)⟩
 
 /-! ## 3.  The transport under the conjunction -/
 
 section Refund
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- A mover on the AU side lifts to the pair (Rocq's `refund_mono`). -/
 theorem refund_mono (A A' R : IProp GF) :

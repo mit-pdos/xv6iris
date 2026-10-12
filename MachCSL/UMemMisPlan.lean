@@ -29,6 +29,8 @@ a symbolic address (performance rule 2):
 import MachCSL.BvEnumSatp
 import Xv6.UmodeArith
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

@@ -41,6 +41,8 @@ caller; and one theorem per discharged field (`*_field`).
 -/
 import Xv6.UshEchoSlot
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -52,7 +54,7 @@ def ushFd1pipe (γp : PipeNames) (l : List FdState) : Prop :=
   ∃ rb : Bool, l[1]? = some (.open rb true (.pipe γp))
 
 section ImageEntryPayMono
-variable {GF : BundledGFunctors} [CtokG GF]
+variable {GF : BundledGFunctors.{0}} [CtokG GF]
 
 /-- **Rocq `image_entry_pay_mono`**: the exec channel's entry is
 CONTRAVARIANT in its linear payload. -/
@@ -70,7 +72,7 @@ theorem imageEntryPayMono (f : ElfBytes) (M : Nat → List (BitVec 8)) (av : Bit
 end ImageEntryPayMono
 
 section UshEchoPipePay
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]

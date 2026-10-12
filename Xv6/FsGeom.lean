@@ -41,6 +41,8 @@ are available (`NINDIRECT = 256` and the `BSIZE`-relative reading
 -/
 import Xv6.DiskDefs
 
+noncomputable section
+
 namespace Xv6
 
 /-! ## `struct dinode` and the block it lives in

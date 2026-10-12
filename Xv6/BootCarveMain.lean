@@ -36,12 +36,14 @@ import Xv6.BootCarve
 import Xv6.BioInit
 import Xv6.SpecKinit
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-! ## MAIN: generic cell at a named address -/
 

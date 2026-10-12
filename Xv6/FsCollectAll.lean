@@ -63,6 +63,8 @@ import Xv6.FsCollectAllBodies
 import Xv6.AppDur
 import Xv6.IputOfflockParts
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -131,7 +133,7 @@ theorem colDiff_empty (E : CoPset) : E \ colEscNs [] = E := by
   exact ⟨fun h => h.1, fun h => ⟨h, CoPset.mem_empty⟩⟩
 
 section Open
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
   [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF]
 
@@ -194,7 +196,7 @@ theorem colRegMap_id [Icfg] (I : RegMapF FsNode) (hd : appDom I) : colRegMap icf
 /-! ## 4.  THE MINT, AND THE APPLICATION'S CROSSING (deviation 2) -/
 
 section Mint
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsLinkG GF] [FsTopG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsLinkG GF] [FsTopG GF]
   [Appcfg GF]
 
 /-- THE TRANSPORT IS THE MINT'S CALLER, and the application's MERGE runs on
@@ -288,7 +290,7 @@ end Mint
 /-! ## 4b.  THE ASSEMBLY -/
 
 section Assembly
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
   [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [Appcfg GF]
 
@@ -584,7 +586,7 @@ end Assembly
 /-! ## 5.  THE LAW, DISCHARGED -/
 
 section Law
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
   [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [Appcfg GF] [MonoListG GF BlockMap]
 

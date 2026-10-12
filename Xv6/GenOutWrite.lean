@@ -139,7 +139,7 @@ theorem gclPure_write_first (M : LModel) (sd : M.lmSt) (k : Nat) (ho : List Obs)
     rw [List.map_nil, linesBytes_nil]; exact Nat.zero_le _
 
 section write
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 
 /-- (W) THE ORDINARY WRITE (Rocq `gcl_step_write`): the writer's witness
 pins the state the stage reads, so the byte it computes from the stream is

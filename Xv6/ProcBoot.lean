@@ -42,12 +42,14 @@ import MachCSL.CtxBox
 import MachCSL.LockBornHook
 import Xv6.ProcAvail
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-- A name TABLE, minted one key at a time: for any per-name resource that a
 fresh name can be allocated at, a function from keys to names carrying the
@@ -144,7 +146,7 @@ theorem procBootAlloc (c : CPU) :
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF]
 
 /-- Rocq `boot_shared_alloc`'s `iAssert (procs_avail_at (Some NPROC) true)`:
 the counted regime beside the pid counter's boot-era token. -/

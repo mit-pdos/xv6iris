@@ -17,6 +17,8 @@ import Xv6.ByteCursor
 import Xv6.UvmallocDefs
 import MachCSL.BvLemmas
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -137,7 +139,7 @@ theorem availInc_availAdd (on : Option Nat) (i : Nat) :
   | some m => simp only [availInc, availAdd, Option.map_some]; congr 1
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-! ## The frame and the page range -/
 

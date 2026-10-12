@@ -115,6 +115,8 @@ statements are `A ∗ B ⊢ C`, the port's convention (CtxBox.lean).
 import Xv6.FileOffCell
 import Xv6.IcacheRefDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -143,7 +145,7 @@ def offBoxN : Namespace := ndot nroot "xv6offbox"
 
 /-- The set big-op re-indexes elementwise (it IS the list big-op over the
 set's elements: `bigOpS_bigOpL`).  Deviation 5. -/
-theorem ctxMorph_bigSepS {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+theorem ctxMorph_bigSepS {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
     {S A : Type} [LawfulFiniteSet S A] (L : S) (Φ : A → CtxId → IProp GF)
     (h : ∀ x, CtxMorph (GF := GF) (Φ x)) :
     CtxMorph (GF := GF) (fun ξ => iprop([∗set] x ∈ L, Φ x ξ)) := by
@@ -154,7 +156,7 @@ theorem ctxMorph_bigSepS {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
   exact ctxMorph_bigSepL (FiniteSet.toList (A := A) L) (fun _ x ξ => Φ x ξ) (fun (_ : Nat) (x : A) => h x)
 
 section OffBox
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF]
   [OffboxBoxG GF] [CurCtx]
 
 /-! ## The instance's parameters

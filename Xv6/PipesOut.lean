@@ -23,7 +23,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode MachCSL
 
 section PipesWritesV
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [PipeOutG GF]
 
 /-- the open round's writer count: its block has at least one byte out -/

@@ -23,6 +23,8 @@ import Xv6.DinodeSlot
 import Xv6.FsCallSitesF
 import MachCSL.WpSmodeFrame6c
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -38,7 +40,7 @@ theorem itrunc_map_empty (bm : Blkmap) (hlen : bm.bmDir.length = NDIRECT) :
   bmDirZeroed_ind0 bm hlen
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- The five SAVED slots of `MachCSL.frame6s3` (its pad slot is the arm's). -/
 def itFrame5 [CurCtx] (sp ra s0 s1 s2 s3 : BitVec 64) : IProp GF := iprop%
@@ -67,7 +69,7 @@ theorem itrunc_frame_join [CurCtx] (sp ra s0 s1 s2 s3 w : BitVec 64) :
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [CurCtx]
 
 /-- No indirect block, no resource (the `if` of `Xv6.indBlkQ`). -/
@@ -106,7 +108,7 @@ end
 /-! ## The callees at their call sites -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- The resources at the JOIN `+0x38` both predecessors reach (the machine

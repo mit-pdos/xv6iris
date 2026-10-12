@@ -54,7 +54,7 @@ theorem wa_ret_148a : jumpPc (KA.«ismapped» + 0xe#64) = (KA.«ismapped» + 0xe
   decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-! ## The callee, at its entry address -/
 

@@ -27,6 +27,8 @@ sp, read-only -- into `UserHeap.uargv` of that list.
 -/
 import Xv6.UserHeap
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -88,7 +90,7 @@ theorem echoArea_lookup (M : ElfMem) (π : Nat → Option UPerm) (sz lo a : Nat)
     simp [hna, udataLo_sub M π sz a b hb]
 
 section UEchoKernel
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
 
 /-- **Rocq `echo_argv_word_of_area`**: ONE ARRAY SLOT, eight image bytes read
 as the pointer word. -/

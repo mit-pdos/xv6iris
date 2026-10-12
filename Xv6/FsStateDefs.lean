@@ -84,12 +84,14 @@ instances declared explicitly.
 -/
 import Xv6.DiskDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 
 section
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-! ## 1.  The view record -/
 
@@ -97,7 +99,7 @@ variable {GF : BundledGFunctors}
 (deviation 1).  Rocq spells the field `fsΦ` because a top-level projection
 named `Φ` would shadow the proofmode's ubiquitous `Φ` binder at every use
 site; `phi` is the same dodge. -/
-structure FsViewNames (GF : BundledGFunctors) where
+structure FsViewNames (GF : BundledGFunctors.{0}) where
   /-- byte ownership, BY BYTE ADDRESS, at a share -/
   phi : DFrac → Nat → BitVec 8 → IProp GF
   /-- the link-counting family (Rocq `γlink`, `FsStateLink`) -/

@@ -36,6 +36,8 @@ seal file's.
 -/
 import Xv6.EchoOut
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -48,7 +50,7 @@ theorem io_singleton (e : Obs) (he : isIo e = true) : ∀ x ∈ [e], isIo x = tr
   exact he
 
 section EchoOutSealEra
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 
 /-! ## The era map's two moves -/
 

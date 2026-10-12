@@ -42,6 +42,8 @@ where nothing is carved.
 import Xv6.FsDurAllocList
 import Xv6.FsDurSnap
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -51,7 +53,7 @@ open FsStateLink
 /-! ## 3.  The block ledger, and the cut -/
 
 section Ledger
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- Rocq's `blk_ledger`. -/
 def blkLedger (Γ : FsViewNames GF) (D : BlockMap) : IProp GF :=
@@ -254,7 +256,7 @@ end Ledger
 /-! ## 4.  The registry's value-first entry points -/
 
 section AllocSnap
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [FsLinkG GF] [FsTopG GF]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF] [FsLinkG GF] [FsTopG GF]
 
 /-- Rocq's `snap_ledger_of_elems`. -/
 theorem snapLedger_ofElems (g gl gt : GName) (D : BlockMap)

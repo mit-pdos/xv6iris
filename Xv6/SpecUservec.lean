@@ -107,6 +107,8 @@ Imports only definitional files.
 -/
 import Xv6.SpecUserret
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -152,7 +154,7 @@ def uservecKWords (cpu : CPU) (k : KCtx) (ws : List (BitVec 64)) : Prop :=
   tfW ws 0 = satpOf KTier.kpt k.root ∧ tfW ws 1 = k.sp ∧ tfW ws 2 = usertrapPc ∧ tfW ws 4 = hartId cpu
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- **What uservec hands usertrap** (the continuation, at usertrap's
 entry): the kernel context, the pc, the raw trap cells, `stvec` at
@@ -174,7 +176,7 @@ end
 /-- **WP of `uservec`** (Rocq `wp_uservec_pt_body`, deviation 1): entered
 at the trapped user machine, with the kernel context's remainder and the
 trapframe page, it reaches usertrap's entry. -/
-def wp_uservec_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+def wp_uservec_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IProp GF) (k : KCtx) (sz : Nat) (M : ElfMem)
     (ws : List (BitVec 64)) (ms sc tv sep : BitVec 64) (g : RegMap)
     (hloop : loopOk C P) (hsie : k.sie = false) (htier : k.tier = KTier.kpt)
@@ -186,7 +188,7 @@ def wp_uservec_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
 
 /-- **Rocq `Module Type USERVEC`**. -/
 structure USERVEC : Prop where
-  wp_uservec : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+  wp_uservec : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IProp GF) (k : KCtx) (sz : Nat) (M : ElfMem)
     (ws : List (BitVec 64)) (ms sc tv sep : BitVec 64) (g : RegMap) hloop hsie htier hkw,
     wp_uservec_body (hlc := hlc) (GF := GF) cpu C P Rut k sz M ws ms sc tv sep g hloop hsie htier hkw

@@ -152,6 +152,8 @@ import Xv6.PidEv
 import Xv6.ZombEv
 import Xv6.SlotEv
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -183,7 +185,7 @@ abbrev OrphMap : Type := AddrMapF (ExtTreeSet GName compare)
 abbrev IpidUR : Type := Option (DFracAgree.DFracAgreeR (DiscreteO (BitVec 32)))
 
 /-- Rocq `wchGpreS`: the cameras alone. -/
-class WchGpre (GF : BundledGFunctors) where
+class WchGpre (GF : BundledGFunctors.{0}) where
   [chG : GhostMapG GF GName (BitVec 64 × ExtTreeSet GName compare) RegMapF]
   [orphG : GhostVarG GF OrphMap]
   [sgenG : ElemG GF (constOF SgenUR)]
@@ -232,7 +234,7 @@ attribute [reducible, instance] WchGpre.slG WchGpre.soG
 /-- Rocq `wchG`: the cameras and their CANONICAL names (the capacity may be
 assumed by adequacy, the NAMES are minted in the boot fupd and the instance
 handed out existentially -- `IrefslotG`'s precedent). -/
-class WchG (GF : BundledGFunctors) extends WchGpre GF where
+class WchG (GF : BundledGFunctors.{0}) extends WchGpre GF where
   /-- the children map (`WaitInv.childrenOwnAt`) -/
   wchName : GName
   /-- the orphan column (`WaitInv.orphansOwn`) -/
@@ -346,7 +348,7 @@ theorem sgBootMap_valid (g0 : GName) (l : List (BitVec 64)) (hl : l.Nodup) :
 /-! ## The slot's current generation -/
 
 section SlotGen
-variable {GF : BundledGFunctors} [WchG GF]
+variable {GF : BundledGFunctors.{0}} [WchG GF]
 
 /-- Rocq `slot_gen`. -/
 def slotGen (pa : BitVec 64) (dq : DFrac) (g : GName) : IProp GF :=
@@ -968,7 +970,7 @@ register's own users (`pid_lock`, which has no `CtokG`) are not generalised
 over a class they never mention. -/
 
 section SlotGenTok
-variable {GF : BundledGFunctors} [WchG GF] [CtokG GF]
+variable {GF : BundledGFunctors.{0}} [WchG GF] [CtokG GF]
 
 /-- Rocq `gen_halves_priv`. -/
 def genHalvesPriv (pa : BitVec 64) (pid : BitVec 32) (g : GName) : IProp GF :=
@@ -1084,7 +1086,7 @@ theorem pidRegDom_delete (R : IntMapF GName) (pids : Nat → BitVec 32) (k : Nat
 map (over the CAMERA class only -- the names are what this creates) -/
 
 section SlotGenBoot
-variable {GF : BundledGFunctors} [WchGpre GF]
+variable {GF : BundledGFunctors.{0}} [WchGpre GF]
 
 /-- the map is a composition of singletons, so owning it IS owning the
 wholes (Rocq `sg_boot_split`) -/

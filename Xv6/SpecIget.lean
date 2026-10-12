@@ -116,6 +116,8 @@ import Xv6.IcacheTable
 import Xv6.IgetLic
 import Xv6.FsCfgDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -130,7 +132,7 @@ def igetSlots : Nat := 6 + panicSlots
 
 /-- **WP of `iget(dev = a0, inum = a1)`** at either `SIE` (Rocq
 `wp_iget_sconf_body`). -/
-def wp_iget_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
+def wp_iget_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
     [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [SleepLockG GF]
     [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (cpu : CPU) (k : KCtx) (inum : BitVec 32) (l : Ilic)
@@ -154,7 +156,7 @@ def wp_iget_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 
 /-- The interface of `iget` (Rocq `Module Type IGET`). -/
 structure IGET : Prop where
-  wp_iget : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
+  wp_iget : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
     [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [SleepLockG GF]
     [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (cpu : CPU) (k : KCtx) (inum : BitVec 32) (l : Ilic) hK hnoff hnib hpos ha0 ha1 hit hpr huart,

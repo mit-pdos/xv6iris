@@ -90,6 +90,8 @@ import Xv6.BallocParts
 import Xv6.KexecB
 import MachCSL.BvLemmas
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -259,14 +261,14 @@ theorem kxcB3_off_step (ef : List (BitVec 8)) (i : Nat) :
   simpa using this
 
 section Win
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 end Win
 
 /-! ## THE FRAME WITH THE HEADER NAMED (deviation 3) -/
 
 section FramePh
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- `kxcFrameBp` with the 56-byte `ph` buffer NAMED (`g`, what readi wrote)
 and the unused word beside it. -/
@@ -377,7 +379,7 @@ theorem kxcB3_B_Ph [CurCtx] (sp0 ra0 s00 s10 s20 pv av : BitVec 64)
 end FramePh
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]

@@ -85,7 +85,7 @@ theorem rrByteOfRows (D : List (BitVec 8) → Prop)
   exact hncr (I ++ J) I.length hdisc (by simp; omega)
 
 section readrec
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 variable [Fscfg]
 
 /-- THE READ RECORD over an era's link record `L` (Rocq `ReadRec`). -/

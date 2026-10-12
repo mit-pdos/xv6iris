@@ -54,6 +54,8 @@ Deviations from Rocq (each forced by the Lean language, none by taste):
 -/
 import MachCSL.Lang
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris.ProgramLogic

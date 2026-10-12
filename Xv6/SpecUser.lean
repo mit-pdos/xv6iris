@@ -58,19 +58,21 @@ hypotheses, as in Rocq.
 -/
 import Xv6.UserExec
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 
 /-- **Rocq `wp_user_exec_closed_body`**. -/
-def wpUserExecClosedBody {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+def wpUserExecClosedBody {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp GF) : Prop :=
   (∀ pt' : UPtd, Rut pt' ⊢ ctxToken cpu ∗ (ctxToken cpu -∗ Rut pt')) →
   ⊢ hwConfig cpu -∗ kmapStatic (hlc := hlc) (GF := GF) -∗ wireInv -∗ userInv cpu C pt Rut -∗ ▷ stvecHandlerWp cpu C pt Rut -∗ wpLoop cpu
 
 /-- **Rocq `Module Type USER`**: the one assumed interface D24 allows. -/
 structure USER : Prop where
-  wp_user_exec_closed : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+  wp_user_exec_closed : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp GF),
     wpUserExecClosedBody cpu C pt Rut
 

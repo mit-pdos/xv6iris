@@ -113,7 +113,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std Iris.Algebra MachCSL
 
 section EscrowDeposit
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- The registry, lent out of what stays behind at a slot opening (the

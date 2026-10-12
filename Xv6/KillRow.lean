@@ -59,12 +59,14 @@ Imports only definitional files.
 -/
 import Xv6.SlotGen
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
 section KillRow
-variable {GF : BundledGFunctors} [CtokG GF]
+variable {GF : BundledGFunctors.{0}} [CtokG GF]
 
 /-- Rocq `kill_row`, at the credential `Wk` (deviation 2).  THE PAID ARM
 CARRIES THE KILLER'S CREDENTIAL (Rocq lane PQ-C, "The exit path"; the
@@ -186,7 +188,7 @@ theorem killRow_take (Wk : IProp GF) (gn : GName) (kl : BitVec 32) :
 end KillRow
 
 section KillPaid
-variable {GF : BundledGFunctors} [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [CtokG GF] [WchG GF]
 
 /-- Rocq `kill_paid`, at the credential `Wk` (deviation 2): an unused slot's
 cell is 0 with a zero flag; a live

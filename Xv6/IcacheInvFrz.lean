@@ -124,6 +124,8 @@ Z.of_nat nib` is `(inum.toNat : Int) < 16 * (nib : Int)` (what
 import Xv6.IcacheInvRef
 import Xv6.IgetLic
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Iris.Algebra MachCSL
@@ -194,7 +196,7 @@ theorem iregFrzmOk_of_bit (ph : Frz) : iregFrzmOk (frzBit ph) (some (.excl ph)) 
   cases ph <;> rfl
 
 section Mirror
-variable {GF : BundledGFunctors} [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [IcacheG GF]
 
 /-- The caller's trade INTO the phase step: the lock's `true` half at
 `FrzPre`, nothing otherwise (Rocq `frz_mir`). -/
@@ -260,7 +262,7 @@ end Mirror
 /-! ## 3.  THE REGION's SIDE OF A COUNT MOVE, AS AN ACCESSOR -/
 
 section Reg
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- Rocq `ireg_icnt_acc`.  ONE `↑iregN` OPEN, the slot's `icnt` half in,
@@ -547,7 +549,7 @@ end Reg
 /-! ## 4.  THE FROZEN PARK, READ THROUGH THE REGION -/
 
 section Park
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- Rocq `frz_park_pre_reclaim` -- THE +0x82 RECLAIM (S1b, iclaim-ledger.md

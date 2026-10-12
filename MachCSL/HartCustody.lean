@@ -35,7 +35,7 @@ open LeanRV64D
 /-! ## The generic unfolding -/
 
 section unfold
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF]
 
 /-- A fupd that re-closes the state interpretation runs before any hart
 expression's step, and its yield goes to the continuation. -/
@@ -57,7 +57,7 @@ theorem wp_stateInterp_fupd (e : Expr) (Q : IProp GF) :
 end unfold
 
 section custody
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- **Rocq `wp_start_auth_fupd`**: at any hart expression of the ambient
 generation, a client fupd at `⊤` runs against the state interpretation's

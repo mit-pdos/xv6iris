@@ -62,6 +62,8 @@ import Xv6.AppEcho
 import Xv6.AppFilePure
 import Xv6.UnionAdm
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -129,7 +131,7 @@ instance : Inhabited FileAppNames :=
 /-- THE FILE APPLICATION'S CAMERAS (Rocq `fileAppG`).  The two Rocq
 NON-INSTANCE fields `fa_st : mono_natG` and `fa_pos : ghost_varG nat` have
 no counterpart here (deviation 5). -/
-class FileAppG (GF : BundledGFunctors) where
+class FileAppG (GF : BundledGFunctors.{0}) where
   [deedG : GhostVarG GF Dst]
   [flG : MonoListG GF FlLine]
   [escG : MonoListG GF EscRec]
@@ -146,7 +148,7 @@ attribute [reducible, instance] FileAppG.deedG FileAppG.flG FileAppG.escG FileAp
   FileAppG.runG
 
 section AppFileNames
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF]
 
 /-! ## 1a. The taint, at the projection -/

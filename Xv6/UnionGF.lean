@@ -56,6 +56,8 @@ import Xv6.UkPipesIfaceDefs
 import Xv6.UkCatFIfaceReg
 import Xv6.UkFileIfaceReg
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.Std Std MachCSL COFE
@@ -64,7 +66,7 @@ open Iris Iris.BI Iris.Std Std MachCSL COFE
 
 /-- **THE UNION'S CONCRETE FUNCTOR LIST** (Rocq `unionΣ`): `xv6GF` and one
 slot per new camera. -/
-def unionGF : BundledGFunctors :=
+def unionGF : BundledGFunctors.{0} :=
   xv6GF
   |>.set 95 ⟨xgfGm Nat EraPins RegMapF, inferInstance⟩
   |>.set 96 ⟨GhostVarF Dst, inferInstance⟩

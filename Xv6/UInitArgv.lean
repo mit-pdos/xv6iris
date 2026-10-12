@@ -39,6 +39,8 @@ reading of its bytes (`initArgvMap_byte`) that ties the two.
 -/
 import Xv6.UkInitDefs
 
+noncomputable section
+
 namespace Xv6
 
 /-- **Rocq `init_argv_map`** (deviation 1): the sixteen `.data` bytes. -/

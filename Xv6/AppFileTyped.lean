@@ -20,6 +20,8 @@ list is not mintable from nothing, and era 0 holds no file.
 -/
 import Xv6.AppFileNames
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -42,7 +44,7 @@ theorem dst_forall_insert (s : Dst) (N : Fname) (v : Nat × List (BitVec 8))
   · exact hs M p h
 
 section AppFileTyped
-variable {GF : BundledGFunctors} [Xv6G GF] [DiskG GF] [EchoOutG GF] [FileAppG GF]
+variable {GF : BundledGFunctors.{0}} [Xv6G GF] [DiskG GF] [EchoOutG GF] [FileAppG GF]
 
 /-- THE TYPED FACT (Rocq `f_typed`). -/
 def fTyped (c : FileFixed) (s : Dst) : IProp GF :=

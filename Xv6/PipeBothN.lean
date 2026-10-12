@@ -70,6 +70,8 @@ instantiate).
 import Xv6.PipesMerge
 import Xv6.UartLinks
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -77,7 +79,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 /-! ## Two ghost-var helpers -/
 
 section gvHelpers
-variable {GF : BundledGFunctors} {A : Type} [GhostVarG GF A]
+variable {GF : BundledGFunctors.{0}} {A : Type} [GhostVarG GF A]
 
 /-- a whole ghost var is its two halves -/
 theorem blkNGvHalves (γ : GName) (a : A) :
@@ -108,7 +110,7 @@ theorem blkNMask (N : Namespace) (hns : (↑N : CoPset) ## ↑(uartN .uart0)) :
   exact ⟨CoPset.subseteq_top p hp, fun hc => hns p ⟨hp, hc⟩⟩
 
 section blkN
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
   [GhostVarG GF (Option (List (BitVec 8)))]
 variable {W : Type} [DecidableEq W]
 -- THE WRITERS, each once

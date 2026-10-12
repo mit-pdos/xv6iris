@@ -46,12 +46,14 @@ Rocq's notes, abridged (the reasons are the content):
 import Xv6.AppFileSeal
 import Xv6.AppFileHook
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section AppFileXfer
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF]
 
 /-- The file state reads only its own names (Rocq `f_state_rec_eq`). -/

@@ -34,7 +34,7 @@ theorem uartElt_lock (i : UartId) : txLockAddr i = uartElt i + 16#64 := by
   cases i <;> decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 variable {lent : Bool}
 
 /-! ## One byte store to a UART register -/
@@ -244,7 +244,7 @@ theorem uartinitone_ret_48 :
     jumpPc (KA.«uartinitone» + 0x48#64) = KA.«uartinitone» + 0x48#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 set_option maxHeartbeats 1000000 in
 /-- `initlock`'s contract as a rule, with the lock and name pointers named. -/
@@ -271,7 +271,7 @@ end
 /-! ## The function -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 set_option maxHeartbeats 4000000 in
 theorem uartinitone_proof (IL : INITLOCK) : UARTINITONE :=

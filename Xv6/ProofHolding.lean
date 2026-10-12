@@ -16,6 +16,8 @@ import Xv6.SpecMycpu
 import Xv6.CodeTactics
 import MachCSL.LockFacts
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -51,7 +53,7 @@ context `k` whose `a0` is `lk`, given what the owner-word load answers
 (`P` before, `Q w` after, with the answer `w`) and the comparison's value. -/
 theorem holding_br_d6a : KA.«holding» + 0xd6a#64 = KA.«mycpu» := by decide
 
-theorem holding_tail (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+theorem holding_tail (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (hK : 6 ≤ k.avail)
     (P : IProp GF) (Q : BitVec 64 → IProp GF) (ans : BitVec 64)
     (hld : instr (GF := GF) (KA.«holding» + 0x12#64) true (instruction.LOAD (16#12, regidx.Regidx 10#5, regidx.Regidx 15#5, false, 8)) ∗
@@ -140,7 +142,7 @@ theorem holding_tail (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors} [MachGS 
 /-! ## The two contracts -/
 
 set_option maxHeartbeats 4000000 in
-theorem holding_notheld_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+theorem holding_notheld_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : GName) (s : String) (R : CtxId → IProp GF)
     (hsie : k.sie = false) (hK : 6 ≤ k.avail) (hs : s ∉ k.locks) :
     wp_holding_notheld_body (hlc := hlc) (GF := GF) cpu k γ s R hsie hK hs := by
@@ -216,7 +218,7 @@ set_option maxHeartbeats 4000000 in
 dead branch `D`) through the racy word load and the owner-word load, and
 handing it back in the continuation.  `holding_tail` is generic in its
 `P`/`Q` and needs no change. -/
-theorem holding_notheld_gen_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+theorem holding_notheld_gen_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : GName) (s : String) (R : CtxId → IProp GF)
     (D : IProp GF) [Timeless D] (Tc : IProp GF) (hrefute : ⊢ Tc -∗ D -∗ (False : IProp GF))
     (hsie : k.sie = false) (hK : 6 ≤ k.avail) (hs : s ∉ k.locks) :
@@ -292,7 +294,7 @@ theorem holding_notheld_gen_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunct
         · iexact Hcred
 
 set_option maxHeartbeats 4000000 in
-theorem holding_locked_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+theorem holding_locked_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : GName) (s : String) (R : CtxId → IProp GF)
     (hsie : k.sie = false) (hK : 6 ≤ k.avail) :
     wp_holding_locked_body (hlc := hlc) (GF := GF) cpu k γ s R hsie hK := by
@@ -356,7 +358,7 @@ set_option maxHeartbeats 4000000 in
 dead branch `D`) through the holder read of the word and the owner-word
 load, and handing it back alongside the holder token in the continuation.
 `holding_tail` is generic in its `P`/`Q` and needs no change. -/
-theorem holding_locked_gen_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+theorem holding_locked_gen_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : GName) (s : String) (R : CtxId → IProp GF)
     (D : IProp GF) [Timeless D] (Tc : IProp GF) (hrefute : ⊢ Tc -∗ D -∗ (False : IProp GF))
     (hsie : k.sie = false) (hK : 6 ≤ k.avail) :
@@ -418,7 +420,7 @@ theorem holding_locked_gen_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFuncto
     · ipureintro; rfl
 
 set_option maxHeartbeats 4000000 in
-theorem holding_locked_refute_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+theorem holding_locked_refute_proof (MC : MYCPU) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : GName) (s : String) (R : CtxId → IProp GF)
     (D : IProp GF) [Timeless D] (hrefute : ⊢ lockedCore γ cpu -∗ D -∗ (False : IProp GF))
     (hsie : k.sie = false) (hK : 6 ≤ k.avail) :

@@ -40,6 +40,8 @@ import Xv6.SchedCtx
 import Xv6.SpecInitsleeplock
 import Xv6.SleepLockGhost
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -57,7 +59,7 @@ def slNameField (slk : BitVec 64) : BitVec 64 := slk + 32#64
 def slPid (slk : BitVec 64) : BitVec 64 := slk + 40#64
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
 
 /-! ## The ghost -/
 
@@ -409,7 +411,7 @@ end
 -- `Xv6.SleepLockGhost`.
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
 
 /-- The TRACKED sleeplock: the deposit is a share of the "may hold" right
 keyed by the OBJECT's gname `γt` (the icache keys it by the inode slot so

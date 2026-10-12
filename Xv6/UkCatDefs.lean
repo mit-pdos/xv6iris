@@ -63,6 +63,8 @@ HOLES the caller funds (Rocq's program-specs cut 3):
 import Xv6.UkEchoDefs
 import Xv6.UkCatLit
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -72,7 +74,7 @@ open Std (ExtTreeSet)
 /-! ## §1 cat's instruction facts (deviation 1) -/
 
 section Code
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
 
 /-- **cat's catalog, once** (Rocq `UCodeCat.uis_cat_<pc>`): an instruction
 cat's text tree finds and decodes at `pc`. -/
@@ -125,7 +127,7 @@ theorem kcat_cint_small (fd : Nat) (h : fd < 16) : (BitVec.setWidth 32 (BitVec.o
 /-! ## §3 The frame `cat(fd)` spills (deviation 4) -/
 
 section Frame
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
 
 /-- The eight words of `cat(fd)`'s frame below `sp0`: ra, s0..s5 as the
 caller had them (`m0`), and the pad word. -/
@@ -173,7 +175,7 @@ end Frame
 /-! ## §4 THE HOLES (Rocq `UkCat.v`) -/
 
 section UkCat
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -345,7 +347,7 @@ end UkCat
 /-! ## §5 `fprintf`, as cat calls it (deviation 2) -/
 
 section Fprintf
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -386,10 +388,10 @@ end Fprintf
 /-- **cat's `fprintf`, as an interface** (deviation 2): Rocq's two contracts
 at cat's printf.o, over `urun`. -/
 structure CAT_FPRINTF : Prop where
-  wp_catFprintf : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+  wp_catFprintf : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
     [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpCatFprintfBody (hlc := hlc) (GF := GF)
-  wp_catFprintfS : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+  wp_catFprintfS : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
     [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpCatFprintfSBody (hlc := hlc) (GF := GF)
 
@@ -444,7 +446,7 @@ theorem cvInv_upd (m0 m : RegMap) (sp0 fdv : BitVec 64) (r : BitVec 5) (v : BitV
     exact hfr q hq hf
 
 section Round
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -520,7 +522,7 @@ theorem cm_directive : (cmLit cmMsgQ).toNat = 37 ∧ (cmLit (cmMsgQ + 1)).toNat 
     (cmLit (cmMsgQ + 2)).toNat ≠ 120 := by decide +kernel
 
 section CmStr
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
 
 /-- **Rocq `cm_str`**: the literal as the text string `fprintf` reads. -/
 theorem cm_str (γt : GName) :
@@ -581,7 +583,7 @@ theorem cmInv_call (sp0 : BitVec 64) (av nargs i : Nat) (m m' : RegMap) (hcs : u
   · rw [hcs 19#5 (by decide)]; exact h19
 
 section Main
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 

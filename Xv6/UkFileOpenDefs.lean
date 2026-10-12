@@ -75,6 +75,8 @@ import Xv6.UkSysP
 import Xv6.FileOpenFams
 import Xv6.UkRunSysOpenImg
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -86,7 +88,7 @@ namespace UkFileOpen
 /-! ## §0 The ledger a tainted open hands back; the fd tie -/
 
 section Fd
-variable {GF : BundledGFunctors} [GhostMapG GF (Option Nat) UfdCell UfdMapF]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF (Option Nat) UfdCell UfdMapF]
 
 /-- **Rocq `uk_open_taint_fd`**: either the call allocated (a non-pipe row,
 on the ledger's `ualloc`) or it said `-1` and the ledger is back. -/
@@ -135,7 +137,7 @@ theorem fileOpen_fd_tie (sts fdv' : List FdState) (rv : BitVec 64) (rb wb : Bool
 /-! ## §1 The deposit families (deviation 1) -/
 
 section Fam
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- **Rocq `UConsOpen.xfam_open`**: row 15's cursor, miss, observation and
 truncate families, the offset mode and the own payload; the create legs
@@ -159,7 +161,7 @@ end UkFileOpen
 open UkFileOpen
 
 section Params
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [DiskG GF] [EchoOutG GF] [FileAppG GF]
 
 /-- **FileOpen's heavy lemmas UkFileOpen reads, a parameter DISCHARGED by
@@ -248,7 +250,7 @@ structure HfpFileOpenP : Prop where
 end Params
 
 section Leaves
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]

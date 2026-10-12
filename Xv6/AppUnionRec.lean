@@ -41,6 +41,8 @@ import Xv6.AppPreGS
 import Xv6.UnionOutLed
 import Xv6.AppFileHook
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -53,7 +55,7 @@ verbatim (sync SY3-A4); it reads the trace alone. -/
 def unionPhiApp : GState → List Obs → Prop := fun _ h => unionPhiSync h
 
 section UnionApp
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGpreS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [FileAppG GF] [FileOutG GF] [PipeOutG GF]
 
 attribute [local instance] appPreGS

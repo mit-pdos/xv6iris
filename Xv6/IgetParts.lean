@@ -39,13 +39,15 @@ import Xv6.IcacheInvRef
 import Xv6.IcacheEscrowPool
 import Xv6.SpecPanic
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open LeanRV64D
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {lent : Bool}
 
 /-- iget's six saved cells: `ra`, `s0`, `s1`, `s2`, `s3`, `s4` at `sp-8`
@@ -270,7 +272,7 @@ def igMsgStr : List (BitVec 8) :=
    0x69#8, 0x6e#8, 0x6f#8, 0x64#8, 0x65#8, 0x73#8]
 
 section Msg
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 set_option maxRecDepth 100000 in
 theorem ig_cstr_msg [CurCtx] :

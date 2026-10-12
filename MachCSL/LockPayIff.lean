@@ -15,7 +15,7 @@ namespace MachCSL
 
 open Iris Iris.BI Iris.ProofMode Std
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [KernelGeom]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [KernelGeom]
 
 /-- The escrowed payload at an equivalent family. -/
 theorem lockPay_payIff (R R' : CtxId → IProp GF) :

@@ -36,6 +36,8 @@ Imports only definitional files.
 -/
 import Xv6.SchedCtx
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -48,7 +50,7 @@ def schedAddr : BitVec 64 := KA.«sched»
 def schedSlots : Nat := 16
 
 /-- **WP of `sched`.** -/
-def wp_sched_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
+def wp_sched_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (j : Nat) (st : BitVec 32) (ch : BitVec 64)
     (hj : j < NPROC) (hpark : parkOk st) (hK : schedSlots ≤ k.avail)
@@ -74,7 +76,7 @@ def wp_sched_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
 
 /-- The interface of `sched`. -/
 structure SCHED : Prop where
-  wp_sched : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+  wp_sched : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (j : Nat) (st : BitVec 32) (ch : BitVec 64)
     hj hpark hK hsie hnoff hlocks htier hproc,

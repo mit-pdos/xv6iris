@@ -56,12 +56,14 @@ import Xv6.EchoOut
 import Xv6.EchoFsPure
 import Xv6.FsConsPin
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section AppEcho
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF]
 
 /-! ## The taint and the birth resource -/
@@ -373,7 +375,7 @@ theorem echoFsEra0 (dk : Nat → BitVec 8) (D : BlockMap) (S : FsStateRec)
     era0RecoveryEchoPins dk D S hdk hrec hS⟩
 
 section AppEchoInit
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF]
 
 /-- THE ERA-0 CLAIM *AND THE KEY* (Rocq `echo_init_key`): the instance is

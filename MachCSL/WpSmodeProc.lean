@@ -11,13 +11,15 @@ and the change would have to be paid for; xv6 never does it there.)
 import MachCSL.WpSmodeCycle
 import MachCSL.WpSmodeMemSd
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D LeanRV64D.Functions
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {lent : Bool}
 
 /-- The context with `c->proc` replaced. -/

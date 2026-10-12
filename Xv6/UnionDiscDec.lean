@@ -23,6 +23,8 @@ anti-vacuity demos this port keeps are `Xv6/UnionDemo.lean`).
 -/
 import Xv6.UnionDisc
 
+noncomputable section
+
 namespace Xv6
 
 /-- **Rocq `ulm_hooks`**: THE HOOKS at every admission.  Rocq's decider

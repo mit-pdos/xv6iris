@@ -36,6 +36,8 @@ that changes the hook breaks that lemma, not a silent copy.
 -/
 import LeanRV64D.Model
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

@@ -52,6 +52,8 @@ Imports only definitional files.
 -/
 import Xv6.FsCfgBoot
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -213,7 +215,7 @@ theorem fsLogRegionSplit {PROP : Type _} [BI PROP] (Φ : Nat → PROP)
 /-! ## §4 The ghost step -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [FsBlocksG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [FsBlocksG GF]
 
 /-- A whole ghost-map element, as two halves. -/
 theorem fsBoot_elemHalves {V : Type _} [GhostMapG GF Nat V RegMapF] (g : GName) (b : Nat) (v : V) :

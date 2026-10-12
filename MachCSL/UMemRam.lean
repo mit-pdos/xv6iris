@@ -28,6 +28,8 @@ by the `UmaRam` hypothesis.
 -/
 import MachCSL.UMemPhys
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

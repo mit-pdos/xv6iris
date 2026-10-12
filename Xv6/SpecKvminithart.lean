@@ -18,6 +18,8 @@ import Xv6.Image
 import Xv6.Geom
 import MachCSL.WpSmodeKpt
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -32,7 +34,7 @@ def kernelPagetableAddr : BitVec 64 := KA.«kernel_pagetable»
 
 /-- **WP of `kvminithart`.**  `rootAddr` is the table's physical address
 (page-aligned, in RAM: `rootAddr = root ≪ 12`), `t` the installed table. -/
-def wp_kvminithart_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] (X : CurCtx)
+def wp_kvminithart_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] (X : CurCtx)
     (cpu : CPU) (k : KCtx) (tlb0 : Tlb) (rootAddr : BitVec 64) (dqr : DFrac) (t : PTree)
     (M : RegMapF (BitVec 64)) (hX : X.curTier = KTier.bare) (hsie : k.sie = false) (hK : 2 ≤ k.avail)
     (hhi : BitVec.extractLsb' 56 8 rootAddr = 0#8) (hroot : t.base = BitVec.extractLsb' 12 44 rootAddr) : Prop :=
@@ -45,7 +47,7 @@ def wp_kvminithart_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] (X
 
 /-- The interface of `kvminithart`. -/
 structure KVMINITHART : Prop where
-  wp_kvminithart : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] (X : CurCtx) (cpu : CPU) (k : KCtx)
+  wp_kvminithart : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] (X : CurCtx) (cpu : CPU) (k : KCtx)
     (tlb0 : Tlb) (rootAddr : BitVec 64) (dqr : DFrac) (t : PTree) (M : RegMapF (BitVec 64)) hX hsie hK hhi hroot,
     wp_kvminithart_body (hlc := hlc) (GF := GF) X cpu k tlb0 rootAddr dqr t M hX hsie hK hhi hroot
 

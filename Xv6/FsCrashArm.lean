@@ -43,6 +43,8 @@ why a fresh era can always swap (`fsArm_swap`).
 -/
 import Xv6.FsCrashPure
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
@@ -61,7 +63,7 @@ structure FsCrashNames where
   start : GName
 
 section
-variable {GF : BundledGFunctors} [Xv6G GF]
+variable {GF : BundledGFunctors.{0}} [Xv6G GF]
 
 /-! ## §2a The committed-history mono-list -/
 
@@ -107,7 +109,7 @@ end
 /-! ## §3 The generation arm -/
 
 section
-variable {GF : BundledGFunctors} [GhostMapG GF Nat EraGS RegMapF] [MonoNatG GF]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat EraGS RegMapF] [MonoNatG GF]
   [GhostVarG GF LogMirror]
 
 /-- The registry element at the PARAMETER gname (Rocq `fs_era_reg`). -/

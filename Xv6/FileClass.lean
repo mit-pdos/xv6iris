@@ -32,6 +32,8 @@ Deviations from Rocq:
 -/
 import Xv6.LineWords
 
+noncomputable section
+
 namespace Xv6
 
 /-! ## 1.  BOOLEAN DECIDERS OVER THE BYTE VALUES -/

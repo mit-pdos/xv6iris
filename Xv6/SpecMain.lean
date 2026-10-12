@@ -134,6 +134,8 @@ import Xv6.IcacheBootTable
 import Xv6.FsBootSupply
 import Xv6.FileBoot
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -149,7 +151,7 @@ def mainSlots : Nat := 2 + max schedulerSlots (max 52 userinitSlots)
 def mainBslotsFs : Nat := (LOGBLOCKS + 2) + 2 + 1
 
 section raw
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- **This hart's own raw translation and trap cells** (Rocq
 `main_hart_raw`): the TLB cell `kvminithart` flushes and the trap CSRs the
@@ -225,7 +227,7 @@ def mainGlobalsBare : IProp GF := iprop%
 end raw
 
 section globals
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
   [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Y : CurCtx]
 
 /-- **The rest of the raw global image the init sequence writes** (Rocq
@@ -261,7 +263,7 @@ def mainGlobalsRaw (cn : ConsNames) : IProp GF := iprop%
 end globals
 
 section boot
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
   [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
 
 /-- **THE DEPOSIT RECIPE** (the `□`-wand of Rocq's contract): out of the
@@ -371,7 +373,7 @@ end boot
 
 /-- The interface of `main`'s boot arm (Rocq `MAIN`). -/
 structure MAIN : Prop where
-  wp_main_boot : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+  wp_main_boot : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
     [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
     [IcboxG GF] [SleepLockG GF] [Appcfg GF] [BcacheG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF]

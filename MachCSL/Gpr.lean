@@ -5,13 +5,15 @@ register points-to, not the symbolic-execution tactics `gpr_case` is built on.
 -/
 import MachCSL.HwConfig
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D LeanRV64D.Functions
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- General-purpose register `i` of hart `cpu` holds `v` (`i ≠ 0`; index `0`
 names no register and is mapped to `x31` arbitrarily). -/

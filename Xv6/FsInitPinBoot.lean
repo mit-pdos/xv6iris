@@ -20,6 +20,8 @@ cheapest: recovery is a FUNCTION of the physical disk, and at a clean log
 -/
 import Xv6.FsInitPin
 
+noncomputable section
+
 namespace Xv6
 
 open Iris.Std

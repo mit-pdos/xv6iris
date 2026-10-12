@@ -52,6 +52,8 @@ import Xv6.UkReadCons
 import Xv6.ReadRec
 import Xv6.UkInitDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -60,7 +62,7 @@ open Std (ExtTreeSet)
 /-! ## §1 The family -/
 
 section Fam
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fscfg]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [Fscfg]
 
 /-- **Rocq `ush_rd_ret`**: WHAT SH ASKS TO BE TOLD -- the window began at
 its own position `n` and both halves of the pair (with the reader token and
@@ -87,7 +89,7 @@ theorem ushFdStClosed (v0 : BitVec 64) (fdv l : List FdState) (h0 : (BitVec.setW
   std_fd_st_of_key v0 fdv l 0 _ (by rw [h0]; rfl) (by unfold NSTD; omega) htake hl0
 
 section Closed
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg] [Icfg]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
 
@@ -117,7 +119,7 @@ end Closed
 /-! ## §3 The era's read side on sh's lease -/
 
 section Era
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF] [Fscfg]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF] [Fscfg]
 
 /-- **Rocq `ush_rd_pin_at`**: the lease's per-position credential -- the
 era's pin, the reader's half of the delivered count, the era's input of
@@ -192,7 +194,7 @@ end Era
 
 /-- **Rocq `ush_rdcred_w`**: a taint that pays the supply pays the dirty
 credential. -/
-theorem ushRdcredW {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Appcfg GF] (T : IProp GF)
+theorem ushRdcredW {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Appcfg GF] (T : IProp GF)
     (h : ⊢ T -∗ appSup (GF := GF)) : ⊢ T -∗ appRdcred (hlc := hlc) (GF := GF) := by
   iintro HT
   iapply appRdcred_of_sup (hlc := hlc)

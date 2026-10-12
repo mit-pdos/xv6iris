@@ -97,6 +97,8 @@ import Xv6.PieceFam
 import Xv6.InodeRegionInv
 import Xv6.FsStateEraNode
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -199,7 +201,7 @@ theorem cafEra_dir_row (dn : Dinode) (bm : Blkmap) (dat : Nat → List (BitVec 8
 /-! ## 1.  The authority-shaped commits -/
 
 section CreateCommit
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF]
 
 /-- THE ARM'S RECEIPT (Rocq's `cre_arm_fired`), hoisted above the commits
 because the CREATE leg takes it too: the row at `i` APPEARED -- at the
@@ -450,7 +452,7 @@ end CreateCommit
 phases on either side of the map update -/
 
 section CreateFire
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [FsTopG GF] [FsBytesG GF] [Appcfg GF]
 
 /-- UNDER THE ARMED REGISTRY (Rocq's `caf_armed_retag`): the receipt names

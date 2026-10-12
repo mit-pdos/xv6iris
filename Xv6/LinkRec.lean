@@ -67,13 +67,15 @@ import Xv6.EchoOut
 import Xv6.EchoLinks
 import Xv6.UartLinks
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
 
 /-- an instance with no payload (Rocq `lk_emp_valid`, sync SY3-A4): the
 `gR_0/_pan/_exf` of an `emp` family -/
-theorem lkEmp_valid {GF : BundledGFunctors} : ⊢ (emp : IProp GF) := by
+theorem lkEmp_valid {GF : BundledGFunctors.{0}} : ⊢ (emp : IProp GF) := by
   iempintro
 
 /-- THE NON-UNION ERAS' WILD LINES: none (the value of `LinkRec.lkWild` /
@@ -84,10 +86,10 @@ def lkWildNone : List (BitVec 8) → Prop := fun _ => False
 theorem lkWildNone_not (I : List (BitVec 8)) : ¬ lkWildNone I := fun h => h
 
 section linkrec
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 
 /-- THE LINK RECORD (Rocq `LinkRec`). -/
-structure LinkRec (hlc : HasLC) (GF : BundledGFunctors) [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+structure LinkRec (hlc : HasLC) (GF : BundledGFunctors.{0}) [MachGS hlc GF] [Xv6G GF] [DiskG GF]
     [EchoOutG GF] where
   -- ---- the era ----
   lkT : IProp GF
@@ -277,7 +279,7 @@ structure LinkRec (hlc : HasLC) (GF : BundledGFunctors) [MachGS hlc GF] [Xv6G GF
 end linkrec
 
 section linkinst
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 variable (L : LinkRec hlc GF)
 
 instance LinkRec.lkT_persistent : Persistent L.lkT := L.lkT_pers
@@ -327,7 +329,7 @@ end linkinst
 /-! ## The derived families and laws, proved ONCE over an arbitrary record -/
 
 section linkgen
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 variable (L : LinkRec hlc GF)
 
 /-- the block written up to its prompt (Rocq `lk_post`) -/

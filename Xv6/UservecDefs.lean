@@ -24,6 +24,8 @@ import Xv6.SpecUservec
 import Xv6.UserretDefs
 import Xv6.UserKernelBridge
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -50,7 +52,7 @@ def uvLd (j rd : BitVec 5) : instruction := .LOAD (uvKImm j, .Regidx 10#5, .Regi
 def uvJalr : instruction := .JALR (0#12, .Regidx 5#5, .Regidx 1#5)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 theorem uvi_csrw_sscratch : kernelText (GF := GF) ⊢ urI 0x0#64 false uvCsrwSscratch :=
   userret_text_instrX _ 0x80006000#64 _ _ _ (by decide) (by decide) rfl rfl
@@ -224,7 +226,7 @@ theorem uservecTf_reg (ws : List (BitVec 64)) (g : RegMap) (hlen : ws.length = 3
 /-! ## §3 The trapped machine, opened -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- **The trapped machine, opened** (uservec's entry, at the named data):
 the kernel's supervisor configuration cells over the user root (interrupts

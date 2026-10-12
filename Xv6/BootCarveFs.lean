@@ -55,6 +55,8 @@ Imports only definitional files and Spec files.
 -/
 import Xv6.SpecMain
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -77,7 +79,7 @@ theorem bootCarveFs_range_get {n k x : Nat} (h : (List.range n)[k]? = some x) : 
   exact ⟨rfl, hlt⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- `bootRan_stride` at a window whose end is only EQUAL to the stride's. -/
 theorem bootCarveFs_stride (m : MemF Hist) (base stride N hi : Nat) (h : hi = base + stride * N) :

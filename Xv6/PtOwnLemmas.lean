@@ -368,7 +368,7 @@ open Sail LeanRV64D LeanRV64D.Functions
 set_option maxRecDepth 8000
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-! ## Updating one element of a big separating conjunction -/
 

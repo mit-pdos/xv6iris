@@ -17,7 +17,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode MachCSL
 
 section UConsOpenAny
-variable {GF : BundledGFunctors} [GhostMapG GF (Option Nat) UfdCell UfdMapF]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF (Option Nat) UfdCell UfdMapF]
 
 /-- **Rocq `init_cons_any_std_at`**: whichever arm the receipt took, the
 program holds SOME ledger afterwards. -/

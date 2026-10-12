@@ -45,6 +45,8 @@ switch (`MainKvm`), out of the `lkFresh consAddr` consoleinit returns.
 import Xv6.MainSecondaryParts
 import Xv6.SpecPrintkinit
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -58,7 +60,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 theorem mn_beqz_take : bcond bop.BEQ (cpuidRet (hartId startedPrimary)) 0#64 = true := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 set_option maxHeartbeats 4000000 in
 /-- **+0x00 → +0x42**: the frame, `cpuid()`, `a4 := &started`, and the
@@ -112,7 +114,7 @@ theorem mn_br_42 : KA.«main» + 18446744073709548902#64 = KA.«consoleinit» :=
 theorem mn_ret_46 : jumpPc (KA.«main» + 70#64) = KA.«main» + 70#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-- A port's popper resource (Rocq `uart_rx_writer`), out of the token
 `uartinit` handed back and the three halves main holds at `none`.  The log
@@ -211,7 +213,7 @@ theorem mn_br_46 : KA.«main» + 18446744073709549988#64 = KA.«printkinit» := 
 theorem mn_ret_4a : jumpPc (KA.«main» + 74#64) = KA.«main» + 74#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-- A port's transmitter token is its transmit lock's payload. -/
 theorem mn_txRes_of_own (γ : UartNames) (l : List (BitVec 8)) : txOwn (GF := GF) γ l ⊢ txRes γ := by
@@ -337,7 +339,7 @@ theorem mn_boot_kinds : pkKinds mnBootStr = ([] : List PkArgDesc).map PkArgDesc.
 theorem mn_boot_len : mnBootStr.length + 4 < 2 ^ 31 := by unfold mnBootStr; decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 set_option maxRecDepth 100000 in
 /-- `"\n"`, out of the kernel image. -/

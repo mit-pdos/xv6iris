@@ -44,7 +44,7 @@ theorem ulibVprintf_cat_at : ulibTabAt User.Cat.tree ulibVprintfTab User.Cat.Sym
   decide +kernel
 
 /-- `vprintf`'s code at `cat`'s printf.o, from `cat`'s text. -/
-theorem ulibVprintfCode_cat {GF : BundledGFunctors} (L : UlibRun GF) :
+theorem ulibVprintfCode_cat {GF : BundledGFunctors.{0}} (L : UlibRun GF) :
     L.utext User.Cat.tree ⊢ ulibVprintfCode L (BitVec.ofNat 64 User.Cat.Sym.«putc») :=
   ulibTabCode_of_text L _ ulibVprintfTab_decodes _ ulibVprintfTab_size _ _ (by decide) ulibVprintf_cat_at
 
@@ -55,7 +55,7 @@ theorem ulibFprintf_cat_sym : ulibFprintfAt (BitVec.ofNat 64 User.Cat.Sym.«putc
   decide
 
 /-- `fprintf`'s code at `cat`'s printf.o, from `cat`'s text. -/
-theorem ulibFprintfCode_cat {GF : BundledGFunctors} (L : UlibRun GF) :
+theorem ulibFprintfCode_cat {GF : BundledGFunctors.{0}} (L : UlibRun GF) :
     L.utext User.Cat.tree ⊢ ulibFprintfCode L (BitVec.ofNat 64 User.Cat.Sym.«putc») :=
   ulibTabCode_of_text L _ ulibFprintfTab_decodes _ ulibFprintfTab_size _ _ (by decide) ulibFprintf_cat_at
 
@@ -66,7 +66,7 @@ theorem ulibPrintf_cat_sym : ulibPrintfAt (BitVec.ofNat 64 User.Cat.Sym.«putc»
   decide
 
 /-- `printf`'s code at `cat`'s printf.o, from `cat`'s text. -/
-theorem ulibPrintfCode_cat {GF : BundledGFunctors} (L : UlibRun GF) :
+theorem ulibPrintfCode_cat {GF : BundledGFunctors.{0}} (L : UlibRun GF) :
     L.utext User.Cat.tree ⊢ ulibPrintfCode L (BitVec.ofNat 64 User.Cat.Sym.«putc») :=
   ulibTabCode_of_text L _ ulibPrintfTab_decodes _ ulibPrintfTab_size _ _ (by decide) ulibPrintf_cat_at
 
@@ -76,7 +76,7 @@ theorem ulibVprintf_grep_at : ulibTabAt User.Grep.tree ulibVprintfTab User.Grep.
   decide +kernel
 
 /-- `vprintf`'s code at `grep`'s printf.o, from `grep`'s text. -/
-theorem ulibVprintfCode_grep {GF : BundledGFunctors} (L : UlibRun GF) :
+theorem ulibVprintfCode_grep {GF : BundledGFunctors.{0}} (L : UlibRun GF) :
     L.utext User.Grep.tree ⊢ ulibVprintfCode L (BitVec.ofNat 64 User.Grep.Sym.«putc») :=
   ulibTabCode_of_text L _ ulibVprintfTab_decodes _ ulibVprintfTab_size _ _ (by decide) ulibVprintf_grep_at
 
@@ -87,7 +87,7 @@ theorem ulibFprintf_grep_sym : ulibFprintfAt (BitVec.ofNat 64 User.Grep.Sym.«pu
   decide
 
 /-- `fprintf`'s code at `grep`'s printf.o, from `grep`'s text. -/
-theorem ulibFprintfCode_grep {GF : BundledGFunctors} (L : UlibRun GF) :
+theorem ulibFprintfCode_grep {GF : BundledGFunctors.{0}} (L : UlibRun GF) :
     L.utext User.Grep.tree ⊢ ulibFprintfCode L (BitVec.ofNat 64 User.Grep.Sym.«putc») :=
   ulibTabCode_of_text L _ ulibFprintfTab_decodes _ ulibFprintfTab_size _ _ (by decide) ulibFprintf_grep_at
 
@@ -98,7 +98,7 @@ theorem ulibPrintf_grep_sym : ulibPrintfAt (BitVec.ofNat 64 User.Grep.Sym.«putc
   decide
 
 /-- `printf`'s code at `grep`'s printf.o, from `grep`'s text. -/
-theorem ulibPrintfCode_grep {GF : BundledGFunctors} (L : UlibRun GF) :
+theorem ulibPrintfCode_grep {GF : BundledGFunctors.{0}} (L : UlibRun GF) :
     L.utext User.Grep.tree ⊢ ulibPrintfCode L (BitVec.ofNat 64 User.Grep.Sym.«putc») :=
   ulibTabCode_of_text L _ ulibPrintfTab_decodes _ ulibPrintfTab_size _ _ (by decide) ulibPrintf_grep_at
 
@@ -108,7 +108,7 @@ theorem ulibVprintf_init_at : ulibTabAt User.Init.tree ulibVprintfTab User.Init.
   decide +kernel
 
 /-- `vprintf`'s code at `init`'s printf.o, from `init`'s text. -/
-theorem ulibVprintfCode_init {GF : BundledGFunctors} (L : UlibRun GF) :
+theorem ulibVprintfCode_init {GF : BundledGFunctors.{0}} (L : UlibRun GF) :
     L.utext User.Init.tree ⊢ ulibVprintfCode L (BitVec.ofNat 64 User.Init.Sym.«putc») :=
   ulibTabCode_of_text L _ ulibVprintfTab_decodes _ ulibVprintfTab_size _ _ (by decide) ulibVprintf_init_at
 
@@ -119,7 +119,7 @@ theorem ulibFprintf_init_sym : ulibFprintfAt (BitVec.ofNat 64 User.Init.Sym.«pu
   decide
 
 /-- `fprintf`'s code at `init`'s printf.o, from `init`'s text. -/
-theorem ulibFprintfCode_init {GF : BundledGFunctors} (L : UlibRun GF) :
+theorem ulibFprintfCode_init {GF : BundledGFunctors.{0}} (L : UlibRun GF) :
     L.utext User.Init.tree ⊢ ulibFprintfCode L (BitVec.ofNat 64 User.Init.Sym.«putc») :=
   ulibTabCode_of_text L _ ulibFprintfTab_decodes _ ulibFprintfTab_size _ _ (by decide) ulibFprintf_init_at
 
@@ -130,7 +130,7 @@ theorem ulibPrintf_init_sym : ulibPrintfAt (BitVec.ofNat 64 User.Init.Sym.«putc
   decide
 
 /-- `printf`'s code at `init`'s printf.o, from `init`'s text. -/
-theorem ulibPrintfCode_init {GF : BundledGFunctors} (L : UlibRun GF) :
+theorem ulibPrintfCode_init {GF : BundledGFunctors.{0}} (L : UlibRun GF) :
     L.utext User.Init.tree ⊢ ulibPrintfCode L (BitVec.ofNat 64 User.Init.Sym.«putc») :=
   ulibTabCode_of_text L _ ulibPrintfTab_decodes _ ulibPrintfTab_size _ _ (by decide) ulibPrintf_init_at
 
@@ -140,7 +140,7 @@ theorem ulibVprintf_seccomp_at : ulibTabAt User.Seccomp.tree ulibVprintfTab User
   decide +kernel
 
 /-- `vprintf`'s code at `seccomp`'s printf.o, from `seccomp`'s text. -/
-theorem ulibVprintfCode_seccomp {GF : BundledGFunctors} (L : UlibRun GF) :
+theorem ulibVprintfCode_seccomp {GF : BundledGFunctors.{0}} (L : UlibRun GF) :
     L.utext User.Seccomp.tree ⊢ ulibVprintfCode L (BitVec.ofNat 64 User.Seccomp.Sym.«putc») :=
   ulibTabCode_of_text L _ ulibVprintfTab_decodes _ ulibVprintfTab_size _ _ (by decide) ulibVprintf_seccomp_at
 
@@ -151,7 +151,7 @@ theorem ulibFprintf_seccomp_sym : ulibFprintfAt (BitVec.ofNat 64 User.Seccomp.Sy
   decide
 
 /-- `fprintf`'s code at `seccomp`'s printf.o, from `seccomp`'s text. -/
-theorem ulibFprintfCode_seccomp {GF : BundledGFunctors} (L : UlibRun GF) :
+theorem ulibFprintfCode_seccomp {GF : BundledGFunctors.{0}} (L : UlibRun GF) :
     L.utext User.Seccomp.tree ⊢ ulibFprintfCode L (BitVec.ofNat 64 User.Seccomp.Sym.«putc») :=
   ulibTabCode_of_text L _ ulibFprintfTab_decodes _ ulibFprintfTab_size _ _ (by decide) ulibFprintf_seccomp_at
 
@@ -162,7 +162,7 @@ theorem ulibPrintf_seccomp_sym : ulibPrintfAt (BitVec.ofNat 64 User.Seccomp.Sym.
   decide
 
 /-- `printf`'s code at `seccomp`'s printf.o, from `seccomp`'s text. -/
-theorem ulibPrintfCode_seccomp {GF : BundledGFunctors} (L : UlibRun GF) :
+theorem ulibPrintfCode_seccomp {GF : BundledGFunctors.{0}} (L : UlibRun GF) :
     L.utext User.Seccomp.tree ⊢ ulibPrintfCode L (BitVec.ofNat 64 User.Seccomp.Sym.«putc») :=
   ulibTabCode_of_text L _ ulibPrintfTab_decodes _ ulibPrintfTab_size _ _ (by decide) ulibPrintf_seccomp_at
 

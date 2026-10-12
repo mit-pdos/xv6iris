@@ -32,6 +32,8 @@ import Xv6.Image
 import MachCSL.WpSmodeIntr
 import Xv6.UartInv
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -117,7 +119,7 @@ def PkArgDesc.kind : PkArgDesc → PkKind
 
 /-- What a description costs: nothing for a value; the pointer's nullness
 for a null string; the C string (`cstr`, hence not at 0) otherwise. -/
-def pkDescRes {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] (v : BitVec 64) :
+def pkDescRes {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx] (v : BitVec 64) :
     PkArgDesc → IProp GF
   | .num => iprop(⌜True⌝)
   | .null => iprop(⌜v = 0#64⌝)
@@ -127,14 +129,14 @@ def pkDescRes {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] (v 
 def pkVararg (R : RegMap) (j : Nat) : BitVec 64 := R (BitVec.ofNat 5 (11 + j))
 
 /-- The descriptions' resources. -/
-def pkDescs {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] (R : RegMap)
+def pkDescs {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx] (R : RegMap)
     (descs : List PkArgDesc) : IProp GF := iprop%
   [∗list] j ↦ d ∈ descs, pkDescRes (pkVararg R j) d
 
 /-! ## The contract -/
 
 /-- **WP of `printk`.** -/
-def wp_printk_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_printk_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8))
     (dqf : DFrac) (f : List (BitVec 8)) (descs : List PkArgDesc)
     (hK : 52 ≤ k.avail)
@@ -154,7 +156,7 @@ def wp_printk_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
 
 /-- The interface of `printk`. -/
 structure PRINTK : Prop where
-  wp_printk : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_printk : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γpr γl : GName) (γd : UartNames) (bs : List (BitVec 8)) (dqf : DFrac) (f : List (BitVec 8))
     (descs : List PkArgDesc) hK hflen hkinds hdlen hnoff hpr huart,
     wp_printk_body (hlc := hlc) (GF := GF) cpu k γpr γl γd bs dqf f descs hK hflen hkinds hdlen

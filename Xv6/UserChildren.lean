@@ -80,6 +80,8 @@ Imports only definitional files.
 import Xv6.SlotGen
 import Xv6.UPtDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -87,7 +89,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 /-! ## The children set, as a resource (Rocq `Section UserChildren`) -/
 
 section UserChildren
-variable {GF : BundledGFunctors} [GhostVarG GF (ExtTreeSet GName compare)]
+variable {GF : BundledGFunctors.{0}} [GhostVarG GF (ExtTreeSet GName compare)]
 
 /-- the ENGINE's half: the run carries it at the key's children reading -/
 def uchAuth (γs : GName) (S : ExtTreeSet GName compare) : IProp GF :=
@@ -147,7 +149,7 @@ OVER `Int` (Rocq `Z`) and the fragment is at the pid's value.  NO UPDATE
 LAW: a process's pid never changes. -/
 
 section UserPid
-variable {GF : BundledGFunctors} [GhostVarG GF Int]
+variable {GF : BundledGFunctors.{0}} [GhostVarG GF Int]
 
 def upidAuth (γp : GName) (p : Int) : IProp GF := ghost_var γp (.own (1 : Qp).half) p
 
@@ -198,7 +200,7 @@ theorem sext32_rng_not_neg1 (w : BitVec 32) (h : 1 ≤ w.toNat ∧ w.toNat ≤ g
 /-! ## The caller is init, as a ghost (Rocq `Section GenIsInit`) -/
 
 section GenIsInit
-variable {GF : BundledGFunctors} [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [CtokG GF] [WchG GF]
 
 /-- THE CALLER IS INIT, AT THE CALLER'S OWN GENERATION (Rocq
 `gen_is_init`).  It is the kernel's own form and stops at kwait. -/
@@ -226,7 +228,7 @@ end GenIsInit
 /-! ## What a wait answers (Rocq `Section WaitAns`) -/
 
 section WaitAns
-variable {GF : BundledGFunctors} [CtokG GF]
+variable {GF : BundledGFunctors.{0}} [CtokG GF]
 
 /-- THE REASON a wait failed, at a NULL status pointer (Rocq `wait_why`):
 the pointer was not null (the guard, not a claim), or the caller's own
@@ -286,7 +288,7 @@ two proofs.  HERE and not in `WaitInv` because the reap's receipt is part of
 `waitAnsLed` below, and `WaitInv` imports this file (as Rocq). -/
 
 section ZombLedger
-variable {GF : BundledGFunctors} [WchG GF]
+variable {GF : BundledGFunctors.{0}} [WchG GF]
 
 /-- The ledger's authoritative history (Rocq `zomb_led_auth`). -/
 def zombLedAuth (h : List Zev) : IProp GF := WchG.wzlName GF ↪●ML h
@@ -406,7 +408,7 @@ end ZombLedger
 (Rocq `Section WaitAnsGen`, NI G1c) -/
 
 section WaitAnsGen
-variable {GF : BundledGFunctors} [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [CtokG GF] [WchG GF]
 
 /-- **The status copyout's failure, with its window** (NI M2-G1e): fewer
 than four status bytes were copied (`d`), each of them WRITABLE in the table

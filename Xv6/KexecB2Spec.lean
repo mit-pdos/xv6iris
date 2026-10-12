@@ -48,6 +48,8 @@ header, in short:
 -/
 import Xv6.KexecSeam
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -186,7 +188,7 @@ theorem kxcB2_zext' (x : Nat) (h : x < 2 ^ 32) :
 /-! ## THE FRAME WITH SLOTS 63 AND 65 PINNED -/
 
 section Frames
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- **Rocq `kxc_frameBpin`**: `kxcFrameB` with slot 63 (`off`, written at
 +0x12c) and slot 65 (the C's `sz1`, written at +0x180 and READ by the
@@ -359,7 +361,7 @@ theorem kxcB2_ph_align (x : BitVec 64) (h : x.toNat % 8 = 0) (o : Nat) (ho : o %
 /-! ## THE BUNDLE BOTH LOOPS CARRY UNCHANGED, AND THE LOOP STATES -/
 
 section Res
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]

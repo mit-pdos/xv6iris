@@ -16,6 +16,8 @@ import Xv6.Image
 import Xv6.Geom
 import MachCSL.WpSmodeCtl
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -30,7 +32,7 @@ def cpuidRet (tp : BitVec 64) : BitVec 64 := BitVec.signExtend 64 (BitVec.extrac
 
 /-- **WP of `cpuid`.**  Two stack slots (its frame); returns the entry
 hart's id in `a0`. -/
-def wp_cpuid_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+def wp_cpuid_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (hsie : k.sie = false) (hK : 2 ≤ k.avail) : Prop :=
   kctx cpu k ∗ pcIs cpu cpuidAddr ∗
   (∀ R' : RegMap, kctx cpu (k.withRegs R') -∗ pcIs cpu (jumpPc (k.regs 1#5)) -∗
@@ -39,7 +41,7 @@ def wp_cpuid_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 
 /-- The interface of `cpuid`. -/
 structure CPUID : Prop where
-  wp_cpuid : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx) hsie hK,
+  wp_cpuid : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx] (cpu : CPU) (k : KCtx) hsie hK,
     wp_cpuid_body (hlc := hlc) (GF := GF) cpu k hsie hK
 
 end Xv6

@@ -30,7 +30,7 @@ set_option linter.unusedSimpArgs false
 set_option maxHeartbeats 16000000 in
 /-- `+0x1a .. +0x1c` and on (Rocq 2587-2860). -/
 theorem il_after (LD : IlLoadEb)
-    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+    {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
     [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF]
     [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -155,7 +155,7 @@ set_option linter.unusedSimpArgs false
 /-- `acquiresleep(&ip->lock)` at its call site (the store-order tier, the
 entry's tracked sleeplock over `ic_slp`, the share's `slhTok` slice as the
 deposit). -/
-theorem il_acq (AS : ACQUIRESLEEP_LLB) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+theorem il_acq (AS : ACQUIRESLEEP_LLB) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
     [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] [IcacheG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c : CPU) (k' : KCtx) (γil γisl : GName) (cn : IcNames) (kk : Nat) (s : Qp) (j : Nat)
@@ -187,7 +187,7 @@ theorem il_acq (AS : ACQUIRESLEEP_LLB) {hlc : HasLC} {GF : BundledGFunctors} [Ma
 set_option maxHeartbeats 16000000 in
 /-- **THE WALK** `+0x00 .. +0x16` and the acquire (Rocq 2242-2586). -/
 theorem il_main (AS : ACQUIRESLEEP_LLB) (LD : IlLoadEb)
-    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+    {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [Appcfg GF]
     [Fscfg] [Icfg] [CurCtx]

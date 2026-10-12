@@ -36,6 +36,8 @@ The Rocq prototype: `WireInv.v` (`wire_inv_body`, `wire_inv_alloc`) and
 -/
 import MachCSL.Resources
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
@@ -44,7 +46,7 @@ open Sail.ArchSem (FreeM)
 open LeanRV64D
 
 section Fixed
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF]
 
 /-! ## The wire invariant, at an explicit era -/
 
@@ -83,7 +85,7 @@ theorem wireInvAt_alloc (E : EraGS) (M : CoPset) (seip meip : CPU → BitVec 1) 
 
 end Fixed
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-! ## The wire invariant in the ambient era -/
 

@@ -19,6 +19,8 @@ the loop's output by hand; the frame hypothesis does it read by read.
 import MachCSL.BootBoard
 import MachCSL.BootPmp
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

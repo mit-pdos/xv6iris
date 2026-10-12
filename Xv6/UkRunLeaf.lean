@@ -57,6 +57,8 @@ All leaves are proved from ONE step lemma, `urun_step` (the destructuring of
 -/
 import Xv6.UkRun
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -134,7 +136,7 @@ macro "ureg" : tactic => `(tactic| simp (config := {decide := true, zetaDelta :=
   _root_.true_and, _root_.not_true_eq_false])
 
 section UkRunLeaf
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 

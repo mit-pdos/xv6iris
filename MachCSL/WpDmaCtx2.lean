@@ -25,11 +25,13 @@ sub-window of `w` is byte `o + j` of `w`.
 -/
 import MachCSL.BytesFree
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-! ## The big-op over a split range -/
 

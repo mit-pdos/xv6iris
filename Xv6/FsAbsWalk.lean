@@ -61,12 +61,14 @@ above).
 -/
 import Xv6.FsTree
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section FsAbsWalk
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- WHAT A HOP HANDS BACK beside the fragment, keyed by the lookup of the
 element in the lent entry map: the stepped cursor on a hit, `Pmiss` on a

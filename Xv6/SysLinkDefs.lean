@@ -56,6 +56,8 @@ Nothing from the section.  The rest of SpecSysLink.v is NOT dropped: it is
 import Xv6.SysUnlinkDefs
 import Xv6.PieceFam
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -85,7 +87,7 @@ theorem linkTgtOk_not_dir (n : FsNode) (hd : fnIsDir n = false) :
   · trivial
 
 section SysLinkAbs
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF]
 
 /-! ### The two NEW commits (the third is unlink's, reused) -/
 

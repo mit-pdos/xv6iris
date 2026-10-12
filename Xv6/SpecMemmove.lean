@@ -18,6 +18,8 @@ import MachCSL.WpSmodeFrame
 import Xv6.Image
 import Xv6.Geom
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -28,7 +30,7 @@ def memmoveAddr : BitVec 64 := KA.«memmove»
 
 /-- **WP of `memmove`.**  `src` holds `bs`, `dst` holds `olds` (both of
 length `n`). -/
-def wp_memmove_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+def wp_memmove_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (bs olds : List (BitVec 8)) (n : Nat) (dqs : DFrac) (hK : 2 ≤ k.avail)
     (hn : k.regs 12#5 = BitVec.ofNat 64 n) (hn32 : n < 2 ^ 32)
     (hls : bs.length = n) (hld : olds.length = n) : Prop :=
@@ -42,7 +44,7 @@ def wp_memmove_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
 
 /-- The interface of `memmove`. -/
 structure MEMMOVE : Prop where
-  wp_memmove : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+  wp_memmove : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (bs olds : List (BitVec 8)) (n : Nat) (dqs : DFrac)
     hK hn hn32 hls hld,
     wp_memmove_body (hlc := hlc) (GF := GF) cpu k bs olds n dqs hK hn hn32 hls hld

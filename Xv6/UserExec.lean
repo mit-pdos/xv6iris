@@ -84,6 +84,8 @@ import Xv6.KernelMap
 import MachCSL.CtxX
 import MachCSL.WireInv
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
@@ -169,7 +171,7 @@ def stvecBase (v : BitVec 64) : BitVec 64 := v &&& ~~~3#64
 /-! ## §2 The resources -/
 
 section UserExec
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- **Rocq `UserFrame.u_regs`**: the per-step mutable cells, as ONE bundle --
 hart state, privilege User, mstatus, the three trap CSRs, PC and nextPC
@@ -327,7 +329,7 @@ def umemLazy (P : UPtd) (sz : Nat) (M : Nat → List (BitVec 8)) : ElfMem :=
     else if n < pgRoundUpN sz then some 0#8 else none
 
 section UVocab
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- **Rocq `UserPtTree.user_ptm_inv`**: `userPtInv` at the LAZY view -- the
 page view `Mp` the ownership is at, read as `umemLazy P sz Mp` (UexecSlot's
@@ -382,7 +384,7 @@ theorem gprList_ext (m m' : RegMap) (h : ∀ i, i ≠ 0#5 → m i = m' i) : gprL
   decide
 
 /-- The exit token at a GPR map is one at any map agreeing off slot `0`. -/
-theorem uRcpt_gprList_ext {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] (cpu : CPU)
+theorem uRcpt_gprList_ext {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] (cpu : CPU)
     (s sc sep : BitVec 64) (m m' : RegMap) (h : ∀ i, i ≠ 0#5 → m i = m' i) :
     uExitTok (hlc := hlc) (GF := GF) (.uExit cpu s sc sep (gprList m)) ⊢
       uExitTok (hlc := hlc) (.uExit cpu s sc sep (gprList m')) := by

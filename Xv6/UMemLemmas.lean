@@ -276,7 +276,7 @@ theorem umemStr_of_nul (M : Nat → List (BitVec 8)) (va max d : Nat) (hd : d < 
 /-! ## Opening a user page -/
 
 section res
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- Open the bytes of one mapped page, with a wand that takes them back at
 a view that agrees with the old one everywhere else. -/

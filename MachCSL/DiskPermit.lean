@@ -39,6 +39,8 @@ Deviations from Rocq.
 -/
 import MachCSL.Resources
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.BI Iris.ProofMode Std
@@ -80,7 +82,7 @@ def wrSectorBytes (w : DiskWr) (i : Nat) : List (BitVec 8) :=
   | none => []
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF]
 
 /-! ## The write permit -/
 

@@ -83,6 +83,8 @@ have to be in the guard rather than in the argument.
 -/
 import MachCSL.Dev.DevLang
 
+noncomputable section
+
 namespace MachCSL
 
 /-! ## Geometry and identity -/

@@ -17,6 +17,8 @@ import MachCSL.Dev.Uart
 import MachCSL.Dev.Plic
 import MachCSL.Dev.Virtio
 
+noncomputable section
+
 namespace MachCSL
 
 /-! ## The instances -/

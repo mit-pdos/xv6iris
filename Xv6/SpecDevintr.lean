@@ -46,6 +46,8 @@ import Xv6.ConsoleDefs
 import Xv6.SpecVirtioDiskRw
 import Xv6.TicksDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -80,7 +82,7 @@ keeps them.  Port `i`'s bundle and `rx` word, plus the console's
 credentials at port 0 (`uartRxCaps .uart1 = emp`), the PLIC's invariant
 with both ports past `uartinit`, the disk's credentials, the ticks lock and
 the proc table. -/
-def devintrCaps {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+def devintrCaps {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
     (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
     (pd pav pu : BitVec 64) : IProp GF := iprop(
   plicInv γ0 γ1 ∗ uartInited γ0 ∗ uartInited γ1 ∗
@@ -89,14 +91,14 @@ def devintrCaps {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] 
   uartRxCaps .uart0 γc γl0 γ0 ∗ uartRxCaps .uart1 γc γl1 γ1 ∗
   diskCaps γd γdl pd pav pu ∗ isTickslock γt ∗ procsInv Γ)
 
-instance devintrCaps_persistent {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+instance devintrCaps_persistent {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [DiskG GF] [CurCtx] (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames)
     (γdl γt : GName) (pd pav pu : BitVec 64) :
     Persistent (devintrCaps (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu) := by
   unfold devintrCaps; infer_instance
 
 /-- **WP of `devintr`** (Rocq `wp_devintr_sconf_body`), at any cause. -/
-def wp_devintr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+def wp_devintr_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
     (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
     (pd pav pu : BitVec 64)
     (cpu : CPU) (k : KCtx) (sc : BitVec 64)
@@ -110,7 +112,7 @@ def wp_devintr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G 
 
 /-- The interface of `devintr` (Rocq `Module Type DEVINTR`). -/
 structure DEVINTR : Prop where
-  wp_devintr : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
+  wp_devintr : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
     (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
     (pd pav pu : BitVec 64)
     (cpu : CPU) (k : KCtx) (sc : BitVec 64) hsie hnoff hlocks htier hK,

@@ -27,12 +27,14 @@ updatable, and an update needs both halves.
 -/
 import Iris.Instances.Lib.GhostVar
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode
 
 section UserCwd
-variable {GF : BundledGFunctors} [GhostVarG GF Nat]
+variable {GF : BundledGFunctors.{0}} [GhostVarG GF Nat]
 
 /-- **Rocq `ucwd_auth`**: the ENGINE's half. -/
 def ucwdAuth (γc : GName) (c : Nat) : IProp GF := ghost_var γc (.own (1 : Qp).half) c

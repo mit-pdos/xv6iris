@@ -28,6 +28,8 @@ import Xv6.UkGrepTreeDefs
 import Xv6.UserLit
 import Xv6.UlibUkProg
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -95,7 +97,7 @@ theorem grepDgOpen_lit (p : Bytes) :
   rfl
 
 section Str
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
 
 /-- **Rocq `grep_lit_str` at the usage line**. -/
 theorem grepUsage_str (γt : GName) : grepCode (GF := GF) γt ⊢ utextStr γt 0xb30 31 (grepLit 0xb30) := by
@@ -166,7 +168,7 @@ theorem grepMainInv_call (sp0 : BitVec 64) (av nargs i pv : Nat) (m m' : RegMap)
 /-! ## §3 The putc chain, and how the tree pays it -/
 
 section Holes
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 

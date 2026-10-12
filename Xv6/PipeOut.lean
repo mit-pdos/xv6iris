@@ -60,6 +60,8 @@ resolution's `mono_list nat` is `DiskG.mlPosG` (slot 86), as at `EchoOut`.
 -/
 import Xv6.EchoOut
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -83,7 +85,7 @@ structure PipeGn where
   pgnEra : GName
 
 /-- THE PIPELINE APPLICATION'S TWO NEW CAMERAS (Rocq `pipeOutG`). -/
-class PipeOutG (GF : BundledGFunctors) where
+class PipeOutG (GF : BundledGFunctors.{0}) where
   [eraG : GhostMapG GF Nat PipeEra RegMapF]
   [curG : GhostVarG GF (Nat × GName × Bool)]
 
@@ -112,7 +114,7 @@ theorem blkFmapPrefixInv (l1 l2 : List (BitVec 8)) (hp : l1.map blkEnc <+: l2.ma
       exact List.cons_prefix_cons.mpr ⟨rfl, ih l2 hp.2⟩
 
 section PipeLedger
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [PipeOutG GF]
 
 /-! ## The era's byte ledger -/
@@ -281,7 +283,7 @@ instance peraMap_timeless (g : PipeGn) (h : List Obs) : Timeless (peraMap (GF :=
 end PipeLedger
 
 section PipeOutClaim
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [PipeOutG GF]
 
 /-! ## The resolution, frozen (design app-pipe.md §4.3l) -/

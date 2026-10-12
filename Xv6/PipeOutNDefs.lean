@@ -43,6 +43,8 @@ import Xv6.PipeOutStore
 import Xv6.PipesView
 import Xv6.PipeBothNPure
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
@@ -51,7 +53,7 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 set_option synthInstance.maxSize 1024
 
 section PipesOpenV
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [PipeOutG GF]
 
 /-- THE OPEN ROUND at the model (Rocq `popenV`): its pin `PIN`, the
@@ -111,7 +113,7 @@ theorem pipesV_HWIT (M : LModel) (V : PView M) (I : List (BitVec 8)) (sR : M.lmS
     exact prefix_forall _ _ _ hp (pipesN_blk_nodollar (V.pvFc sR) lR bl hfc hl hb)
 
 section PipesCredV
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [PipeOutG GF]
 
 /-- THE ROUND'S LEDGER, as the family holds it (Rocq `pledV`). -/
@@ -171,7 +173,7 @@ theorem pwcBlkV_entry (g : PipeGn) (M : LModel) (PIN : Nat → EraPins → IProp
 end PipesCredV
 
 section PipesOutV
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
   [EchoOutG GF] [PipeOutG GF]
 
 /-- THE CLAIM (Rocq `peclV`): the generic claim between rounds, the open

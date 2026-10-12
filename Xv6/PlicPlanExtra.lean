@@ -30,7 +30,7 @@ open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D LeanRV64D.Functions
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- `slliw rd, rs1, shamt` in the kernel context. -/
 theorem wp_s_slliw [CurCtx] [KernelGeom] [KernelImage GF] {lent : Bool} (cpu : CPU) (k : KCtx)
@@ -50,7 +50,7 @@ theorem wp_s_slliw [CurCtx] [KernelGeom] [KernelImage GF] {lent : Bool} (cpu : C
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 variable {lent : Bool}
 
 /-- `lw rd, imm(rs1)` from a PLIC register: the device read accessor at

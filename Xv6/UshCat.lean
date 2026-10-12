@@ -66,6 +66,8 @@ import Xv6.UshGeom
 import Xv6.ElfLoadable
 import Xv6.ElfUserCat
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.Std MachCSL

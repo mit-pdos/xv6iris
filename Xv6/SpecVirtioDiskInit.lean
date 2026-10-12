@@ -42,6 +42,8 @@ import Xv6.Image
 import Xv6.DiskInvDefs
 import Xv6.SlotGen
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -71,7 +73,7 @@ the payload must own them for every slot that is free or a chain member
 (`Xv6.infoWin`, in `Xv6.freeSlotRes` and in `Xv6.slotBody _ _ _
 (.member _)`).  `virtio_disk_init` does not touch them either; they come
 in at their bss `0`. -/
-def diskInitCells {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+def diskInitCells {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (vlock : BitVec 32) (vname vcpu pd0 pav0 pu0 : BitVec 64) (free0 : List (BitVec 8)) : IProp GF := iprop%
   ⌜free0.length = NUM⌝ ∗
   ([∗list] i ∈ List.range NUM,
@@ -95,7 +97,7 @@ allocates them (both halves of the receipts and of the published count; the
 whole watermark and stage variables; the completed-count authority): what
 the `DRIVER_OK` write deposits into the invariant and the lock payload
 (`diskFlipIn`). -/
-def diskInitGhosts {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+def diskInitGhosts {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
     (γ : DiskNames) : IProp GF := iprop%
   ([∗list] i ∈ List.range NUM, headAuth γ i .inactive ∗ headTok γ i .inactive) ∗
   diskPubAuth γ 0 ∗ diskPub γ 0 ∗ diskReadAt γ 0 ∗ diskReadLbAuth γ 0 ∗
@@ -103,7 +105,7 @@ def diskInitGhosts {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
 
 /-- **WP of `virtio_disk_init`.**  The invariant is DEAD on entry (the
 device was never programmed); `c0` is the configuration the tracker holds. -/
-def wp_virtio_disk_init_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
+def wp_virtio_disk_init_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γkl : GName) (γk : KmemNames) (nb : Nat) (c0 : VirtioCfg)
     (vlock : BitVec 32) (vname vcpu pd0 pav0 pu0 : BitVec 64) (free0 : List (BitVec 8))
     (hsie : k.sie = false) (hK : virtioDiskInitSlots ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
@@ -124,7 +126,7 @@ def wp_virtio_disk_init_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc G
 
 /-- The interface of `virtio_disk_init`. -/
 structure VIRTIO_DISK_INIT : Prop where
-  wp_virtio_disk_init : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [WchG GF] [CurCtx]
+  wp_virtio_disk_init : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γkl : GName) (γk : KmemNames) (nb : Nat) (c0 : VirtioCfg)
     (vlock : BitVec 32) (vname vcpu pd0 pav0 pu0 : BitVec 64) (free0 : List (BitVec 8))
     hsie hK hnoff hlk hnb hdead hp0,

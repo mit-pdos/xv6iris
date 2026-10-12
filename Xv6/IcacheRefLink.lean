@@ -101,6 +101,8 @@ fragments are `iclaim` (c), `runit_plain` (r), `runit_claim` (rc) and
 -/
 import Xv6.IcacheRefDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -139,7 +141,7 @@ theorem singleton_frac_split {V : Type} [OFE V] (z : Nat) (a : V) :
   rw [Heap.singleton_op_singleton, ← DFracAgree.Frac.mk_op, Qp.half_add_half]
 
 section IcacheLink
-variable {GF : BundledGFunctors} [IcacheG GF]
+variable {GF : BundledGFunctors.{0}} [IcacheG GF]
 
 /-- Rocq `big_opL_own_1` at a constant functor (iris-lean's
 `bigOpL_iOwn_entail` is stated under `URFunctorContractive`, whose `ElemG`

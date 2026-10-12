@@ -27,7 +27,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL LeanRV64D
 
 section IcachePinwLw
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF]
 variable {lent : Bool}
 
 /-- THE LOCK-FREE GUARD READ at any `SIE` (Rocq: `wp_lw_au_rel_s_sconf` +

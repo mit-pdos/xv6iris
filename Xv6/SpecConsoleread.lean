@@ -63,6 +63,8 @@ import Xv6.SchedCtx
 import Xv6.SpecEitherCopyout
 import Xv6.UartInv
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -84,7 +86,7 @@ def consReadRet (d : Nat) (r : BitVec 64) : Prop :=
 complement `trapCsrsExt` / `cpuClaimExt` in and out; depth 0; the crossing
 the literal `true` (it parks).  `a0 = user_dst` (nonzero), `a1 = dst`,
 `a2 = n`. -/
-def wp_consoleread_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+def wp_consoleread_eb_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γc : GName) (cn : ConsNames) (Wd : IProp GF) (ord : Option Nat)
     (Rin : List (List Obs × BitVec 8) → IProp GF)
@@ -136,7 +138,7 @@ def wp_consoleread_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 /-- The interface of `consoleread`. -/
 structure CONSOLEREAD : Prop where
-  wp_consoleread_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+  wp_consoleread_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γc : GName) (cn : ConsNames) (Wd : IProp GF) (ord : Option Nat)
     (Rin : List (List Obs × BitVec 8) → IProp GF)

@@ -29,7 +29,7 @@ namespace MachCSL
 open Iris Iris.BI OFE
 
 section
-variable {GF : BundledGFunctors} {F1 F2 : COFE.OFunctorPre}
+variable {GF : BundledGFunctors.{0}} {F1 F2 : COFE.OFunctorPre}
   [RFunctorContractive F1] [RFunctorContractive F2] [E1 : ElemG GF F1] [E2 : ElemG GF F2]
 
 theorem iOwn_alloc_same_name (hτ : E1.τ ≠ E2.τ)

@@ -109,6 +109,8 @@ import Xv6.BlkmapDefs
 import Xv6.FsBytesGamma
 import Xv6.FsStateInode
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -563,7 +565,7 @@ ahead of the cell-carrying ones, because Lean's section binders are
 per-section and the block resources need neither `MachGS` nor `CurCtx`. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsBlocksG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsBlocksG GF]
 
 /-! ## `indBlk`: the indirect block's own logical content
 
@@ -712,7 +714,7 @@ theorem inodeBlocksQ_1_to (γfs : FsNames) (dq : DFrac) (bm : Blkmap)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsBlocksG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsBlocksG GF]
 
 /-! ### BUILDING `inodeBlocks` FROM BLOCK-GRANULAR RESOURCES
 
@@ -875,7 +877,7 @@ theorem inodeBlocks_of_blocks (γfs : FsNames) (bm : Blkmap) (U : ExtTreeSet Nat
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsBlocksG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [FsBlocksG GF]
 
 /-! ### `inodeBlocks`: one-block access, and the deposit of a fresh block -/
 
@@ -1059,7 +1061,7 @@ theorem inodeFreshQ (γfs : FsNames) (dq : DFrac) (bm : Blkmap)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsBlocksG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsBlocksG GF]
 
 /-- Rocq's `RiscvPtsto.ctx_word4_pointsto_aligned_p`: the alignment fact a
 cell carries, read out (deviation 4). -/
@@ -1253,7 +1255,7 @@ instance instCtxMorphInodeMetaAt [CurCtx] (ip : BitVec 64) (d : Dinode) :
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsBlocksG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsBlocksG GF]
 
 /-! ## THE ADDRS CELLS AS A 52-BYTE BUFFER
 

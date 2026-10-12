@@ -23,6 +23,8 @@ are `Xv6/FsDurAllocSlots.lean`, the cut `Xv6/FsDurAlloc.lean`).
 -/
 import Xv6.FsDurAllocSlots
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.Std MachCSL

@@ -98,6 +98,8 @@ import Xv6.BootPrimarySupply
 import Xv6.SpecMainSecondary
 import Xv6.BootCarveHart
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -105,7 +107,7 @@ open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 /-! ## §1 `powerBootRes`, unpacked -/
 
 section rows
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- **The power thread's boot rows at the AMBIENT forms** (Rocq
 `power_boot_res_unpack`'s right-hand side): `MachCSL.powerBootRes` less the
@@ -142,7 +144,7 @@ theorem bs_pull {PROP : Type _} [BI PROP] [BIAffine PROP]
   iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, Ht, Ho, Hk, H12, H13, Hr, Hc⟩
   iframe Hr Ht Ho Hk H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 Hc
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF]
 
 /-- **Rocq `power_boot_res_unpack`**: at `Hboot`'s era instance
 (`MachGS.ofEra E gen …`, any claim payload), `powerBootRes`
@@ -163,7 +165,7 @@ end unpack
 /-! ## §2 The carve, in stages -/
 
 section carve
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-- **The image, persisted and cut** (Rocq `boot_shared_alloc`'s image
 steps: `boot_bytes_split`, `boot_text_persist`, `kernel_text_intro`,
@@ -283,7 +285,7 @@ theorem bootShared_bareRows [CurCtx] :
 end carve
 
 section carveRows
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
   [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
 
 /-- **The rows at the kernel tier** (Rocq `main_locks_raw`'s post-switch
@@ -333,7 +335,7 @@ end carveRows
 /-! ## §4 The whole carve, at the boot hart's context -/
 
 section carveAll
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-- The boot hart's entry context: its running token's, at the Bare tier. -/
 @[reducible] def bootSharedX (ξ0 : CtxId) : CurCtx := ⟨ξ0, KTier.bare⟩
@@ -407,7 +409,7 @@ end carveAll
 /-! ## §3 The boot hart's supply, less the application's two rows -/
 
 section supply
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
   [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
   [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
   [IcboxG GF] [SleepLockG GF] [Appcfg GF] [BcacheG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF]
@@ -475,7 +477,7 @@ end supply
 /-! ## §5 THE SHARED ALLOCATION -/
 
 section alloc
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchGpre GF] [CtokG GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchGpre GF] [CtokG GF] [DiskG GF]
   [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
   [IcboxG GF] [SleepLockG GF] [Appcfg GF] [BcacheG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF]
 
@@ -604,7 +606,7 @@ end alloc
 /-! ## §6 Transport to the final claim payload -/
 
 section ofEra
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [Xv6G GF] [CtokG GF] [DiskG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachFixedGS hlc GF] [Xv6G GF] [CtokG GF] [DiskG GF]
   [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
   [IcboxG GF] [SleepLockG GF] [Appcfg GF] [BcacheG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF]
   [WchG GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [Icfg] [Fscfg]
@@ -631,7 +633,7 @@ theorem bootSharedOut_ofEra (E : EraGS) (gen : Nat)
 end ofEra
 
 section started
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
   [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
 
 /-- **The handover channel, at the final instance** (Rocq

@@ -59,7 +59,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 set_option linter.unusedSimpArgs false
 
-theorem writei_kctx_push {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+theorem writei_kctx_push {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     [KernelGeom] [KernelImage GF] (c : CPU) (k : KCtx) (R0 R1 : RegMap) (m : Nat) :
     kctx (GF := GF) c (((k.withRegs R0).pushed m).withRegs R1) ⊢
       kctx c (((k.withSpie k.spie k.spp).pushed m).withRegs R1) := by
@@ -88,7 +88,7 @@ theorem writei_bltu_size (w : BitVec 32) (off : Nat) (hw : w.toNat < 2 ^ 31) (ho
   rw [Xv6.dsSext_small w hw, Xv6.dsBltu _ _ (by omega) (by omega)]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [X : CurCtx]
 

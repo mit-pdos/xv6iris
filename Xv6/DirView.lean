@@ -75,6 +75,8 @@ import Xv6.DirentEnc
 import Xv6.InodeDefs
 import Xv6.LogDefs
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

@@ -10,6 +10,8 @@ these forms, so the tree spec never mentions raw bit positions.
 -/
 import LeanRV64D.VmemPte
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

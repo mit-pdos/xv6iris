@@ -65,6 +65,8 @@ import Xv6.ElfLoadable
 import Xv6.EchoFsPure
 import Xv6.PinnedExec
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.Std MachCSL

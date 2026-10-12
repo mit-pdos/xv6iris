@@ -31,6 +31,8 @@ import Xv6.Image
 import MachCSL.WpSmodeIntr
 import Xv6.SlotGen
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -52,7 +54,7 @@ def uvmallocOk (P P' : UPtd) (M M' : Nat → List (BitVec 8)) (oldsz newsz xperm
       Iris.Std.PartialMap.get? P'.um (uvmaVpn0 oldsz + i) = some (leafOf (BitVec.extractLsb' 12 44 r) (xperm ||| PTE_R ||| PTE_U))) ∧
     M' (uvmaVpn0 oldsz + i) = List.replicate 4096 0#8)
 
-def wp_uvmalloc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
+def wp_uvmalloc_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8)) (ke : Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : uvmallocSlots ≤ k.avail) (hlk : "kmem" ∉ k.locks)
     (hroot : k.regs 10#5 = pageAddr P.root)
@@ -78,7 +80,7 @@ def wp_uvmalloc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   ⊢ wpLoop (GF := GF) cpu
 
 structure UVMALLOC : Prop where
-  wp_uvmalloc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_uvmalloc : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γl : GName) (γk : KmemNames) (P : UPtd) (M : Nat → List (BitVec 8)) (ke : Nat) hnoff hK hlk hroot hold hnew hperm hfree,
     wp_uvmalloc_body (hlc := hlc) (GF := GF) cpu k γl γk P M ke hnoff hK hlk hroot hold hnew hperm hfree
 

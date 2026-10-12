@@ -70,6 +70,8 @@ G1 design §1.
 
 import Xv6.ProcGeom
 
+noncomputable section
+
 namespace Xv6
 
 open Iris (GName)

@@ -56,7 +56,7 @@ theorem pc_narrow12 {w : BitVec 32} (hw : w = 0#32 ∨ w = 1#32 ∨ w = 10#32 �
   rcases hw with rfl | rfl | rfl | rfl <;> first | rfl | exact absurd h (by decide)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-- `cpuid`'s contract at the call site (interrupts off). -/
 theorem pc_call_cpuid (CI : CPUID) [CurCtx] (cpu : CPU) (k' : KCtx)

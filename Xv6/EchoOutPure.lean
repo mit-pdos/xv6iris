@@ -79,6 +79,8 @@ Deviations from Rocq:
 import Xv6.LineBytes
 import Xv6.ConsLog
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

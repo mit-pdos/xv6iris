@@ -44,6 +44,8 @@ None in this file (the two dead declarations of FsDurAlloc.v,
 import Xv6.FsDurSnapBytes
 import Xv6.FsDurBytes
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.Std MachCSL

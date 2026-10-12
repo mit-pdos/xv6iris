@@ -35,6 +35,8 @@ import MachCSL.WpSmodeFrame
 import Xv6.Image
 import Xv6.Geom
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Std MachCSL
@@ -62,7 +64,7 @@ theorem flags2permRet_permOk (fl : BitVec 64) : flags2permRet fl &&& ~~~0x3CE#64
 
 /-- **WP of `flags2perm`.**  Two stack slots (its frame); returns
 `flags2permRet a0` in `a0`, callee-saved registers preserved. -/
-def wp_flags2perm_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+def wp_flags2perm_body {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (hK : 2 ≤ k.avail) : Prop :=
   kctx cpu k ∗ pcIs cpu flags2permAddr ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
@@ -72,7 +74,7 @@ def wp_flags2perm_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Cu
 
 /-- The interface of `flags2perm`. -/
 structure FLAGS2PERM : Prop where
-  wp_flags2perm : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+  wp_flags2perm : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) hK,
     wp_flags2perm_body (hlc := hlc) (GF := GF) cpu k hK
 

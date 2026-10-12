@@ -28,6 +28,8 @@ import Xv6.SpecRelease
 import Xv6.ParkCap
 import MachCSL.LockFacts
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -43,7 +45,7 @@ theorem fkr_ret0e : jumpPc (KA.«forkret» + 0xe#64) = KA.«forkret» + 0xe#64 :
 theorem fkr_ret14 : jumpPc (KA.«forkret» + 0x14#64) = KA.«forkret» + 0x14#64 := by decide
 
 /-- forkret's 6-slot frame, never popped (the loop merges it back). -/
-def fkrFrame [CurCtx] {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] (ksp : BitVec 64) : IProp GF :=
+def fkrFrame [CurCtx] {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] (ksp : BitVec 64) : IProp GF :=
   iprop((∃ w : BitVec 64, wordPointsTo (ksp + 0xFFFFFFFFFFFFFFD0#64) 8 (DFrac.own 1) w) ∗
     (∃ w : BitVec 64, wordPointsTo (ksp + 0xFFFFFFFFFFFFFFD8#64) 8 (DFrac.own 1) w) ∗
     (∃ w : BitVec 64, wordPointsTo (ksp + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) w) ∗
@@ -66,7 +68,7 @@ structure FkrAfter (kr : KCtx) (eb : Bool) (root : BitVec 44) (pa ksp : BitVec 6
   avail : kr.avail + trapRes eb = 506
 
 section Head
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
@@ -228,7 +230,7 @@ theorem FkrAfter.setReg {kr : KCtx} {eb : Bool} {root : BitVec 44} {pa ksp : Bit
     simp [KCtx.setReg, RegMap.set_apply, Ne.symm h2, Ne.symm h8, Ne.symm h9, g, i, l]
 
 section First
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg]

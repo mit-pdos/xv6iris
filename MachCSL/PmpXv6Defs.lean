@@ -8,6 +8,8 @@ Kept apart from the CSR stage lemmas (`WpCsr`) and the PMP stage
 -/
 import MachCSL.Platform
 
+noncomputable section
+
 namespace MachCSL
 
 /-- The PMP tables after `start()`: entry 0 is TOR up to `0x3fffffffffffff` (all

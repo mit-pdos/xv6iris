@@ -37,6 +37,8 @@ LogDefs.v).
 import Xv6.FsCrashPure
 import MachCSL.DiskPermit
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL Std

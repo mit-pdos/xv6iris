@@ -20,6 +20,8 @@ import Xv6.UkBundle
 import Xv6.UkLandGlue
 import MachCSL.URunXSwp
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -156,7 +158,7 @@ def UkDecodes (fr : FetchResult) (len : Int) (i : instruction) : Prop :=
     Functions.execute i₀ = pure (ExecutionResult.ExecuteAs i))
 
 section arm
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- The step's execute result is never a redirect here. -/
 theorem uk_notExecAs {r : ExecutionResult} {pc : BitVec 64}

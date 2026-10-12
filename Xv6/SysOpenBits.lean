@@ -49,6 +49,8 @@ image (`KA.«sys_open»` = 0x800052c6):
 -/
 import Xv6.SysOpenDefs
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL LeanRV64D

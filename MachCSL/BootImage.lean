@@ -18,6 +18,8 @@ cheaply.
 import MachCSL.TsoMem
 import MachCSL.KernelElf
 
+noncomputable section
+
 namespace MachCSL
 
 /-- The byte the loader leaves at physical address `n` (Rocq `boot_byte`):

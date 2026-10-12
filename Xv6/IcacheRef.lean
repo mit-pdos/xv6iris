@@ -129,6 +129,8 @@ import Xv6.IcacheRefLink
 import Xv6.IcacheRefGhost
 import Xv6.WordFrac
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -137,7 +139,7 @@ open Iris.Algebra
 /-! ## 4a.  THE CREDENTIAL FLOOR (A6.146) -/
 
 section CredFloor
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- A6.146: THE CREDENTIAL FLOOR, received-or-wrote (the §0.38' pair,
 `WpLock.lk_floor`'s shape at the bundle tier).  The right arm is the FRESH
@@ -189,7 +191,7 @@ end CredFloor
 /-! ## 4b.  THE IDENTITY CELLS -/
 
 section Ident
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- An entry's IDENTITY -- the two cells iget writes into a recycled slot and
 nobody writes again while the slot is live.  Fractional, so a reference
@@ -241,7 +243,7 @@ theorem inodeIdent_halve [CurCtx] (k : Nat) (q : Qp) (dev inum : BitVec 32) :
 end Ident
 
 section SlhHalve
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
 
 theorem slhTok_halve_i [Icfg] (k : Nat) (q : Qp) :
     slhTok (GF := GF) (icfgIsl k) q ⊢ slhTok (icfgIsl k) q.half ∗ slhTok (icfgIsl k) q.half := by
@@ -254,7 +256,7 @@ end SlhHalve
 /-! ## 4c.  THE FLOORED SLICE -/
 
 section Fracc
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF]
 
 /-- The agreement, keeping both slices. -/
 theorem liveGenlo_agree_keep' [Icfg] (k : Nat) (s1 : Qp) (g1 : GName) (lo1 : Nat)
@@ -328,7 +330,7 @@ canonical parent `qt = qi` is mass 1).  The keys are recorded by the box
 register; only the mass is pinned here (R-1). -/
 
 section Stamps
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcboxG GF]
 
 def icStamps [Icfg] (k : Nat) (i : IcBid) (μ : Rat) : IProp GF :=
   iprop(∃ m : StampMap IcBid, ⌜qsum m = μ⌝ ∗ reference (icfgBox k) i m)
@@ -416,7 +418,7 @@ end Stamps
 /-! ## 4e.  WHAT A REFERENCE IS -/
 
 section IcacheRef
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF]
   [SleepLockG GF] [IcboxG GF]
 
 /-- HOLDING ONE REFERENCE to itable slot `k`.  It needs no inode POINTER

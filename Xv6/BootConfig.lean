@@ -47,6 +47,8 @@ import MachCSL.Power
 import MachCSL.MConf
 import Xv6.KernelImage
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -62,7 +64,7 @@ theorem entry_sym_addr : KA.«_entry» = 0x80000000#64 := by decide
 /-! ## §1 A register file's cells, with the taken registers named -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors}
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}}
 
 /-- The file's register map with the registers in `ex` deleted. -/
 def regMapEx (f : RegFile) (ex : List Register) : RegMapF RegVal :=
@@ -140,7 +142,7 @@ theorem regCellsEx_takeList (γ : GName) (f : RegFile) (rs ex : List Register)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- `Xv6.regCellsEx_takeList` at the ambient era's hart `cpu`, with the
 taken cells spelled `r ↦ᵣ[cpu] _`. -/
@@ -162,7 +164,7 @@ def bootConfRegs : List Register :=
    .menvcfg, .mcounteren, .mtimecmp, .stimecmp, .pmpcfg_n, .pmpaddr_n] ++ hwRegs
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- **The reset configuration cells ARE `mBoot`** (Rocq `hw_config_intro` +
 `mmode_config_intro`): every register `MachCSL.confCells` names is pinned by

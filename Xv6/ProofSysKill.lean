@@ -40,7 +40,7 @@ theorem sys_kill_br_argint : KA.«sys_kill» + 0xfffffffffffffd8e#64 = KA.«argi
 theorem sys_kill_br_kkill : KA.«sys_kill» + 0xfffffffffffff60e#64 = KA.«kkill» := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-! ## The callees -/
 

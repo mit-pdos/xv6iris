@@ -32,6 +32,8 @@ Rocq's header, abridged:
 -/
 import Xv6.GenOut
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

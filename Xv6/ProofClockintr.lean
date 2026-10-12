@@ -33,6 +33,8 @@ import Xv6.SpecAcquire
 import Xv6.SpecRelease
 import Xv6.CodeTactics
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -129,7 +131,7 @@ theorem ckK_popExit (k : KCtx) (hsie : k.sie = false) :
     _root_.true_and, _root_.and_true]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- What every arm ends with: the caller's continuation. -/
 def ckPost (cpu : CPU) (k : KCtx) : IProp GF := iprop%

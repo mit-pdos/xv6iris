@@ -51,6 +51,8 @@ import Xv6.UkHandler
 import Xv6.PipeProtoRead
 import Xv6.UexecExecInst
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -60,7 +62,7 @@ open Std (ExtTreeSet)
 /-! ## §2d The process (deviation 1) -/
 
 /-- **Rocq `UkPipesIface`'s process context (data)**. -/
-structure PnsProc (GF : BundledGFunctors) where
+structure PnsProc (GF : BundledGFunctors.{0}) where
   /-- the program instance -/
   N : UkNames GF
   P : Uprog GF
@@ -72,10 +74,10 @@ structure PnsProc (GF : BundledGFunctors) where
   Sup : IProp GF
 
 /-- Rocq `Dp`: the protected devices. -/
-abbrev PnsProc.Dp {GF : BundledGFunctors} (Q : PnsProc GF) : List Nat := Q.kds.map Prod.fst
+abbrev PnsProc.Dp {GF : BundledGFunctors.{0}} (Q : PnsProc GF) : List Nat := Q.kds.map Prod.fst
 
 section Rows
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-! ### The rows a device's kind demands, and the registry's clauses -/
 
@@ -270,7 +272,7 @@ end Rows
 /-! ## §2d' The persistent context, the finals, the descriptors -/
 
 section Ctx
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF]
   [PipesNG GF]
 variable (R : PnsRound hlc GF)
 
@@ -370,7 +372,7 @@ def pnsFinal : Pdev → IProp GF
 end Ctx
 
 section Fds
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
   [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [DiskG GF] [EchoOutG GF] [PnsRegG GF] [PipesNG GF]
@@ -402,7 +404,7 @@ def pnsTaint (held : FdSet) : IProp GF :=
 end Fds
 
 /-- **Rocq `UkPipesIface`'s process hypotheses** (deviation 1). -/
-structure PnsProcOk {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
+structure PnsProcOk {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
     [PS : UprogSG GF] [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
     [GhostMapG GF (Option Nat) UfdCell UfdMapF] [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
     (Q : PnsProc GF) : Prop where
@@ -414,7 +416,7 @@ structure PnsProcOk {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G 
   sup_pers : Persistent Q.Sup
 
 section Taint
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
   [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [DiskG GF] [EchoOutG GF] [PnsRegG GF] [PipesNG GF]

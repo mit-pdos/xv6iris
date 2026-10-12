@@ -21,6 +21,8 @@ kernel-side obligations built from them.
 -/
 import Xv6.UartGhosts
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -31,7 +33,7 @@ def uartN : UartId → Namespace
   | .uart1 => ndot nroot "xv6uart1"
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-! ## The one link, and the licence -/
 

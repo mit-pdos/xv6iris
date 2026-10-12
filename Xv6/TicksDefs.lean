@@ -41,6 +41,8 @@ seals from trapinit's `lkFresh`.
 import Xv6.SpecTrapinit
 import Xv6.WaitInv
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -86,7 +88,7 @@ theorem ticksTie_self (t : BitVec 32) : ticksTie t t.toNat := by
   exact (Nat.mod_eq_of_lt t.isLt).symm
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-- The bare counter cell at context `ξ`, contents existential: what main's
 boot rows carry (`SpecMain.mainGlobalsRaw`; deviation 1). -/
@@ -110,7 +112,7 @@ theorem ticksRes_intro [CurCtx] (t : BitVec 32) :
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF]
 
 /-- **The payload of `tickslock`** at context `ξ` (Rocq's strengthened
 `ticks_res_at`): the counter cell and its mirror, tied (deviation 1). -/

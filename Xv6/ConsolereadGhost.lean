@@ -33,6 +33,8 @@ import Xv6.ConsoleInvDefs
 import Xv6.UartConsAcc
 import Xv6.UMemWindow
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -47,7 +49,7 @@ theorem crPfxLe (l1 l2 : List (List Obs × BitVec 8)) (h : l1 <+: l2 ∨ l2 <+: 
     rw [this]; exact List.prefix_refl _
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-! ## The ring's ghost half, from the consumer's side -/
 
@@ -807,7 +809,7 @@ theorem crGlue_hi (d : Nat) (bs : Nat → BitVec 8) (b : BitVec 8) : crGlue d bs
   simp [crGlue]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-- The call's persistent console context: the credential, the port's
 invariant, and the tokenless caller's price. -/

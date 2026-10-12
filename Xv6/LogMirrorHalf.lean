@@ -21,12 +21,14 @@ permits superseded it).
 -/
 import MachCSL.Resources
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI MachCSL
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- The era's half at a NAMED picture (Rocq `log_mirror_half`). -/
 def logMirrorHalf (M : LogMirror) : IProp GF :=

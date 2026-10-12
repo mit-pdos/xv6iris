@@ -8,13 +8,15 @@ import MachCSL.WpSmodeAuDefs
 import MachCSL.SConfPhysDefs
 import MachCSL.WpPmpXv6
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D LeanRV64D.Functions
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 -- The facts and the `checked_mem_S_au_prefix` script live in `MachCSL.WpSmodeAuDefs`.
 

@@ -47,6 +47,8 @@ Rocq's header design points, all kept:
 -/
 import Xv6.UsysMemOk
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
@@ -69,7 +71,7 @@ def skeyEq (W W' : Uvis) : Prop :=
 
 /-- **Rocq `uexecSG`**, indexed by `CtokG` (the generic-family law hands a
 slot `myPay`).  Field order and content are Rocq's. -/
-class UexecSG (GF : BundledGFunctors) [CtokG GF] where
+class UexecSG (GF : BundledGFunctors.{0}) [CtokG GF] where
   /-- the process's choice of families, for every syscall at once -/
   sfam : Type
   /-- a point of it, for the arms that carry no deposit -/
@@ -155,7 +157,7 @@ attribute [instance] UexecSG.srowReg_persistent
 /-! ## The family-free reader, derived -/
 
 section SBundle
-variable {GF : BundledGFunctors} [CtokG GF] [SG : UexecSG GF]
+variable {GF : BundledGFunctors.{0}} [CtokG GF] [SG : UexecSG GF]
 open UexecSG
 
 /-- **Rocq `sbundle_pay`**: the same at a NAMED payload. -/
@@ -169,7 +171,7 @@ end SBundle
 /-- **Rocq `uprogSG`**: the program's deposit SUPPLIER (used as `□ Dsup`) and
 the syscall numbers it undertakes to pay a bundle for.  A data class, as in
 Rocq (the ~570 `urun` sites of the wave-9 program tier stay binder-free). -/
-class UprogSG (GF : BundledGFunctors) where
+class UprogSG (GF : BundledGFunctors.{0}) where
   Dsup : IProp GF
   psok : Int → Prop
 

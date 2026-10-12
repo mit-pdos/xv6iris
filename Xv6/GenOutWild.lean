@@ -35,6 +35,8 @@ Deviations from Rocq:
 import Xv6.GenOutHist
 import Xv6.ConsoleTags
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

@@ -7,6 +7,8 @@ import Xv6.BcacheInv
 import Xv6.SpecAcquire
 import Xv6.SpecRelease
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -60,7 +62,7 @@ theorem bcPins_cs (k : KCtx) (R R' : RegMap) (h : bcPins k R) (hcs : calleeSaved
     c24.trans a24, c25.trans a25, c26.trans a26, c27.trans a27⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF]
 variable [DiskG GF] [CurCtx]
 
 theorem bc_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γl : GName) (γ : BcacheNames)

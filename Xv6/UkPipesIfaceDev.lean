@@ -29,6 +29,8 @@ import Xv6.UkPipesIfaceReg
 import Xv6.PnsKeep
 import Xv6.UkPipeDevDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -36,7 +38,7 @@ open Iris.Std.PartialMap
 open Std (ExtTreeSet)
 
 section Lexit
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF]
   [PipesNG GF]
 variable {R : PnsRound hlc GF}
 
@@ -101,7 +103,7 @@ end Lexit
 /-! ## §2d'' The devices -/
 
 section Devs
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF]
   [PnsRegG GF] [PipesNG GF]
 variable (R : PnsRound hlc GF) (γreg : GName)
 

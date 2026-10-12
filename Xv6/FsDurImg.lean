@@ -282,7 +282,7 @@ theorem imgSnapOk (dk : Nat → BitVec 8) (ndisk : Nat) (sb : FsSb) (nib : Nat)
 /-! ## 12.  Era 0's snapshot -- the one value-first allocation left -/
 
 section DurImgAlloc
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [FsLinkG GF] [FsTopG GF]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF] [FsLinkG GF] [FsTopG GF]
 
 /-- ERA 0'S EPOCH, and the GUEST HALF of era 0's map at the image's own
 state (Rocq's `img_P_dur_alloc`). -/

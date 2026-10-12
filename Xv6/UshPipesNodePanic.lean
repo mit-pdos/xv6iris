@@ -59,7 +59,7 @@ theorem termw_pipe (k : Nat) : termw (WSh k) dgPipeB = false := by
   simp [termw, dgPipe_ne_fork]
 
 section Silence
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF] [PipesNG GF]
 variable {D : PdRound hlc GF} {fs : List Filt} {Qfin Rtop : IProp GF}
 
@@ -251,7 +251,7 @@ theorem fork_panic_pay (H : NodeOk D fs Qfin Rtop) (k : Nat) (hk : k < D.nc) :
 end Silence
 
 section Panic
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [FsTopG GF] [OffboxG GF] [Appcfg GF] [FsBytesG GF] [Fscfg] [Icfg]
   [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]

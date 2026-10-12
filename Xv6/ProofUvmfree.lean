@@ -60,7 +60,7 @@ theorem uf_vpn0 : (vpnOf (0#64)).toNat = 0 := by decide
 theorem uf_one_ne_zero : (1#64 : BitVec 64) ≠ 0#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF]
 
 /-! ## The two calls -/
 

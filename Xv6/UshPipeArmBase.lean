@@ -26,6 +26,8 @@ import Xv6.SpecShSysWait
 import Xv6.SpecShSysClose
 import Xv6.SpecShSysDup
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -109,7 +111,7 @@ theorem ushpi_ret (m : RegMap) (y : Nat) (hy : y % 2 = 0) (hl : y < 2 ^ 64) :
   rw [ukWr_get_same _ _ _ (by decide)]; exact ush_retPc y hy hl
 
 section UshPipeArmBase
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 

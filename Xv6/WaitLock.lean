@@ -15,6 +15,8 @@ published as a discarded fraction, `initprocIs`.
 import Xv6.PidLock
 import Xv6.WaitInvTies
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -23,7 +25,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 -- the lock's name string is `"wait_lock"`.
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- The payload of `wait_lock` at context `ξ`: the `parent` word of every
 process. -/

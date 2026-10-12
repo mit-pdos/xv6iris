@@ -132,6 +132,8 @@ import Xv6.FsStateTop
 import Xv6.FsBytesGamma
 import Xv6.FsStateInode
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Iris.Algebra MachCSL
@@ -141,7 +143,7 @@ namespace (deviation 1). -/
 def escAN (z : Nat) : Namespace := ndot (ndot nroot "icescA") z
 
 section EscrowInode
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF]
   [FsBytesG GF] [FsTopG GF] [Icfg]
 
 /-- Rocq `escA_body`: the per-inum one-shot escrow body.  EMPTY holds the

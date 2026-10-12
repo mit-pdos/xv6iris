@@ -47,7 +47,7 @@ theorem ki_hargs : freerangeArgs KA.«end» 0x88000000#64 kinitBase kinitPages :
   ⟨by decide, by decide, by decide, by decide, by decide⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-! ## The callees, at their entry addresses -/
 

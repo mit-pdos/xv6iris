@@ -9,13 +9,15 @@ import MachCSL.DecodeBridge
 import MachCSL.PlatformFacts
 import MachCSL.Tactics
 
+noncomputable section
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
 open Sail Sail.ConcurrencyInterfaceV1
 open LeanRV64D LeanRV64D.Functions
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 @[sail_facts] theorem csr_name_map_forwards_sstatus : csr_name_map_forwards 0x100#12 = pure "sstatus" := rfl
 @[sail_facts] theorem csr_name_map_backwards_sstatus : csr_name_map_backwards "sstatus" = pure 0x100#12 := rfl

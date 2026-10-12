@@ -33,6 +33,8 @@ the map's `toList` rather than `map_ind`.
 -/
 import Xv6.LogDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
@@ -41,7 +43,7 @@ open Iris Iris.BI Iris.ProofMode Std MachCSL
 def helpN : Namespace := ndot nroot "loghelp"
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [LogG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [LogG GF]
 
 /-- THE ESCROW (Rocq `esc`): `Q` with the "flipped" witness, or the waiter's
 half at zero (before the flip), or the terminal full authority at one

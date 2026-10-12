@@ -63,6 +63,8 @@ import Xv6.SpecFreeproc
 import Xv6.UPtLemmas
 import Xv6.CodeTactics
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -230,7 +232,7 @@ The `pid` word is owned in three pieces (`pidPriv` a half, `pidPub` and
 general fractional lemma for `wordPointsTo` existed, so here it is. -/
 
 section Frac
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 theorem ap_ctxByte_split (ξ : CtxId) (a : PAddr) (q1 q2 : Qp) (v : BitVec 8) :
     ctxByte (GF := GF) ξ a (DFrac.own (q1 + q2)) v ⊣⊢
@@ -415,7 +417,7 @@ end Frac
 /-! ## A page of bytes as words (the fresh trapframe page) -/
 
 section Words
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 theorem ap_toNat_add8 (a : BitVec 64) (h : a.toNat + 8 < 2 ^ 64) : (a + 8#64).toNat = a.toNat + 8 := by
   simp only [BitVec.toNat_add, BitVec.toNat_ofNat, Nat.reducePow]
@@ -476,7 +478,7 @@ end Words
 /-! ## The fresh trapframe page, and the `pid` words of the `pid_lock` payload -/
 
 section Page
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- A page of the allocator is 8-aligned (a copy of `ProofKalloc.ka_al8`:
 a `Proof` file may not import another). -/
@@ -535,7 +537,7 @@ theorem ap_tfPage_of_page (p : BitVec 64) (hv : pageValid p) :
 end Page
 
 section BigOp
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- One element of a big-op over `List.range NPROC`, and the rest. -/
 theorem ap_bigop_split (Φ : Nat → IProp GF) (n : Nat) (hn : n < NPROC) :
@@ -589,7 +591,7 @@ set_option maxHeartbeats 4000000 in
 and the caller's continuation.  `kb` is the context the epilogue returns
 to (the scan's base context at a `0` return, the lock-holding one at a
 success), `R` the current map. -/
-theorem ap_tail {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+theorem ap_tail {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
     (c : CPU) (kb : KCtx) (hK : 4 ≤ kb.avail) (v : BitVec 64)
     (KR : RegMap) (hregs : kb.regs = KR)
     (R : RegMap) (hR2 : R 2#5 = KR 2#5 + 0xFFFFFFFFFFFFFFE0#64) (h9 : R 9#5 = v)
@@ -638,7 +640,7 @@ theorem ap_tail {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 /-! ## The caller's continuation -/
 
 section Body
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-- **The cells-level post** the body is proved against (the landed pre-8-P
 `apPostCells`): the raw block `procPriv` (null descriptor cells) and the
@@ -693,7 +695,7 @@ UNUSED?`.  The payload is handed to the caller opened, with the `pcIs` at
 the found arm exactly when the slot is UNUSED. -/
 theorem allocproc_br_fffffffffffff0e6 : KA.«allocproc» + 0xfffffffffffff0e6#64 = KA.«acquire» := by decide
 
-theorem ap_scan_acq (AC : ACQUIRE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+theorem ap_scan_acq (AC : ACQUIRE) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [X : CurCtx] (Γ : SchedNames) (cpu cur : CPU) (k : KCtx) (n : Nat) (hn : n < NPROC)
     (hnoff : k.noff + 2 < 2 ^ 31) (hK : allocprocSlots ≤ k.avail) (hlq : "proc" ∉ k.locks)
     (htier : k.tier = KTier.kpt) (spie spp : Bool) (R : RegMap) (h9 : R 9#5 = procAddr n) :
@@ -788,7 +790,7 @@ theorem allocproc_br_fffffffffffff16e : KA.«allocproc» + 0xfffffffffffff16e#64
 set_option maxHeartbeats 4000000 in
 /-- `0x80001b98 .. 0x80001b9a`: `release(&p->lock)`, the payload put back.
 The thread resumes at whichever hart `release` left it on. -/
-theorem ap_scan_rel (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+theorem ap_scan_rel (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [X : CurCtx] (Γ : SchedNames) (c : CPU) (k : KCtx) (n : Nat) (hn : n < NPROC) (hwf : k.wf)
     (hnoff : k.noff + 2 < 2 ^ 31) (hK : allocprocSlots ≤ k.avail) (hlq : "proc" ∉ k.locks)
     (htier : k.tier = KTier.kpt) (spie2 spp2 : Bool) (R2 : RegMap) (h9 : R2 9#5 = procAddr n)
@@ -918,7 +920,7 @@ set_option maxHeartbeats 4000000 in
 /-- `0x80001be6 .. 0x80001bf0`: the scan for a process already holding the
 candidate pid.  It exits at `(KernelSyms.«allocproc» + 0x5c)` on a match, and falls through to
 `(KernelSyms.«allocproc» + 0x82)` when none of the 64 slots holds it. -/
-theorem ap_pidscan {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+theorem ap_pidscan {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (c : CPU) (kh : KCtx) (hsie : kh.sie = false) (pids : Nat → BitVec 32) (cand : BitVec 32)
     (fuel : Nat) (F : IProp GF) :
     ∀ (m : Nat) (_ : NPROC - m = fuel + 1) (_ : m < NPROC) (_ : ∀ j, j < m → pids j ≠ cand)
@@ -1048,7 +1050,7 @@ theorem ap_pidscan {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
 /-! ## The `pid_lock` payload transports, and the new-pid arithmetic -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 end
 
@@ -1091,7 +1093,7 @@ theorem apKeepPid_set (R R' : RegMap) (i : BitVec 5) (v : BitVec 64)
 /-! ## The outer `allocpid` loop -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-- The loop's exit continuation: at `0x80001bf4`, with a pid no slot holds
 in `[1, PIDMAX]` (`a3`), the next counter value in `a1`, and the payload's
@@ -1270,7 +1272,7 @@ end
 /-! ## The found arm (stated here, proved below) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 /-- The UNUSED dormant block, opened: the private fields (with `pid`,
 `pagetable`, `trapframe`, `sz` zero and no files), the slot's allowances
@@ -1337,7 +1339,7 @@ end
 /-! ## Helpers for the found-arm body (spliced from the finishing agent) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CurCtx]
 
 /-- `n` words at an aligned base become `8n` bytes (forward of `ap_bytes_to_words`). -/
 theorem ap_words_to_bytes : ∀ (ws : List (BitVec 64)) (b : BitVec 64),
@@ -1427,7 +1429,7 @@ theorem ap_zbytes_to_words : ∀ (n : Nat) (b : BitVec 64),
 end
 
 section Calls
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- `kalloc`'s led contract at its call site (address folded), at a lend
 (permit sweep L3b): the lend back stepped; the call's receipt kept (NI
@@ -1526,7 +1528,7 @@ theorem ap_rel_proc (RE : RELEASE) (Γ : SchedNames) (c : CPU) (k' : KCtx) (j : 
 end Calls
 
 section Pids
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- The UNUSED slot's dormant block and hart tag -- and its T2 element of
 the family ledger's zombie column (NI M2-G1b). -/
@@ -1571,7 +1573,7 @@ theorem apPidsOk_set (pids : Nat → BitVec 32) (n : Nat) (v : BitVec 32) (hn : 
     exact hok j1 j2 hj1 hj2 hnz heq
 
 section State
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- The UNUSED lock share is the whole mirror; move it to USED, the slot's
 occupancy element with it (`SOcc j`, NI joint fork lane F1; unlabelled). -/
@@ -1590,7 +1592,7 @@ theorem ap_pstate_used (Γ : SchedNames) (pa : BitVec 64) :
 end State
 
 section Fail
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-- Forget the free-page count (copy of `ProofProcPagetable.pp_avail_none`). -/
 theorem ap_avail_none (γk : KmemNames) (on : Option Nat) :
@@ -1664,7 +1666,7 @@ killed row founded at the new pid on its zero arm (Rocq `kill_paid_of_reg`
 on `kill_row_zero`). -/
 
 section Ghost
-variable {GF : BundledGFunctors} [CtokG GF] [WchG GF]
+variable {GF : BundledGFunctors.{0}} [CtokG GF] [WchG GF]
 
 /-- A pure reading that keeps its source. -/
 theorem ap_keep {P : IProp GF} {φ : Prop} (h : P ⊢ ⌜φ⌝) : P ⊢ ⌜φ⌝ ∗ P :=
@@ -1792,7 +1794,7 @@ set_option maxHeartbeats 8000000 in
 /-- `0x80001baa ..`: the whole found arm, under `p->lock`. -/
 theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
     (PP : PROC_PAGETABLE) (FP : FREEPROC)
-    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
+    {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
     (Γ : SchedNames) (c : CPU) (k : KCtx) (γl γp : GName) (γk : KmemNames) (on : Option Nat)
     (pav : Option Nat) (tk : Bool) (Q : Int → IProp GF)
     (n : Nat) (hn : n < NPROC) (hwf : k.wf)
@@ -3139,7 +3141,7 @@ set_option maxHeartbeats 4000000 in
 /-- The scan from slot `n` on, by induction on the slots left. -/
 theorem ap_scan (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
     (PP : PROC_PAGETABLE) (FP : FREEPROC)
-    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
+    {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
     (Γ : SchedNames) (k : KCtx) (γl γp : GName) (γk : KmemNames) (on : Option Nat)
     (pav : Option Nat) (tk : Bool) (Q : Int → IProp GF)
     (hwf : k.wf) (hnoff : k.noff + 2 < 2 ^ 31) (hK : allocprocSlots ≤ k.avail)
@@ -3451,7 +3453,7 @@ set_option maxHeartbeats 4000000 in
 /-- **`allocproc` meets its specification.** -/
 theorem allocproc_cells (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
     (PP : PROC_PAGETABLE) (FP : FREEPROC)
-    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+    {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γl γp : GName) (γk : KmemNames) (on : Option Nat)
     (pav : Option Nat) (tk : Bool) (Q : Int → IProp GF) (ke : Nat)
@@ -3540,7 +3542,7 @@ fragment bundle at all-`closed` and the three allowances
 (`FdTable.procPriv_null_mint`); the pid ledger's receipt passes through. -/
 theorem allocproc_led_proof (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
     (PP : PROC_PAGETABLE) (FP : FREEPROC)
-    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF]
+    {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF]
     [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF]
     [OffboxBoxG GF] [Icfg] [X : CurCtx] (Γ : SchedNames) (γ : FileNames) (cpu : CPU) (k : KCtx)
     (γl γp : GName) (γk : KmemNames) (on : Option Nat) (pav : Option Nat) (tk : Bool)
@@ -3586,7 +3588,7 @@ theorem allocproc_led_proof (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : M
 
 /-- A landed continuation serves as a led one: the found arm's receipt is
 dropped (`allocprocPostLed_post`). -/
-theorem allocproc_cont_led {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+theorem allocproc_cont_led {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF]
     [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
     (Γ : SchedNames) (γ : FileNames) (cpu : CPU) (k : KCtx) (γk : KmemNames) (on : Option Nat)

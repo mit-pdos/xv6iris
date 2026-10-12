@@ -33,6 +33,8 @@ STAND-INS (owned elsewhere, replaced when they land):
 import Xv6.UserTextDecode
 import Xv6.User.EchoText
 
+noncomputable section
+
 namespace Xv6.User.EchoSpike
 
 open Iris Iris.BI Iris.ProofMode Iris.ProgramLogic
@@ -50,7 +52,7 @@ def spikeDrefU : (r : Register) → Option (RegisterType r)
   | .senvcfg => some 0#64
   | _ => none
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- The cells `spikeDrefU` names, at fraction `dq`. -/
 def spikeUCells (cpu : CPU) (dq : DFrac) : IProp GF := iprop%

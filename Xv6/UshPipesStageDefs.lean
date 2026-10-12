@@ -56,6 +56,8 @@ resolution instead; `prod_stage_law_persistent` is ported in `UshPipesStageLaw`.
 -/
 import Xv6.UshPipesDefsPay
 
+noncomputable section
+
 namespace Xv6
 
 namespace UShPipesStage
@@ -112,7 +114,7 @@ def last_fd0 (γp : PipeNames) (l : List FdState) : Prop :=
   ∧ (∃ rb, l[2]? = some (.open rb true (.device CONSOLE)))
 
 section Stage
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
   [PipeProtoG GF] [PipeOutG GF] [CtokG GF] [DiskG GF] [EchoOutG GF] [PipesNG GF]
 variable (D : PdRound hlc GF)
 

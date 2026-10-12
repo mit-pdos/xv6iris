@@ -55,6 +55,8 @@ the number but not the list.  The ghost steps (`kmemAuth_dec`,
 import Xv6.UartTrace
 import MachCSL.BytesFree
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -88,7 +90,7 @@ def availDec (on : Option Nat) : Option Nat := on.map (· - 1)
 def availZero (on : Option Nat) : Prop := on = none ∨ on = some 0
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-! ## Context-parametric cells -/
 

@@ -17,6 +17,8 @@ the redirect line's argument list, which is ECHO'S OWN: `wlToks ws`
 -/
 import Xv6.UkShRedirLine
 
+noncomputable section
+
 namespace Xv6
 
 /-! ## §1 The tokenization, at a terminator -/

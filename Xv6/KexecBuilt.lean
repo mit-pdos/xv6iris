@@ -90,6 +90,8 @@ import Xv6.UserPerm
 import Xv6.SpecFlags2perm
 import Xv6.ElfBridge
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

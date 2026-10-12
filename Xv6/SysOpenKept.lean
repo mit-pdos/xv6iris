@@ -44,12 +44,14 @@ Nothing.
 -/
 import Xv6.SysOpenDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section CurKept
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0}}
 
 /-- Rocq `cur_kept`: the cursor a truncating open keeps -- nothing at
 O_TRUNC, the cursor otherwise. -/
@@ -70,7 +72,7 @@ theorem curKept_of (vom : BitVec 64) (P : Nat → Nat → IProp GF) (k d : Nat) 
 end CurKept
 
 section OpenKept
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [Appcfg GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [FsTopG GF] [Appcfg GF]
 
 /-- Rocq `plain_trunc_kept`: THE PLAIN SURFACE'S KEYED PIECE -- the commit
 at the node the walk reached, with the terminal cursor on the refund side. -/

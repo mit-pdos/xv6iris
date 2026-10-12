@@ -26,6 +26,8 @@ Deviations: spelling only (`Forall P l` is `∀ x ∈ l, P x`,
 -/
 import Xv6.EchoDisc
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL

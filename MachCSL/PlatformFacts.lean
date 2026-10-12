@@ -12,6 +12,8 @@ import LeanRV64D.ZicsrInsts
 import LeanRV64D.Arithmetic
 import LeanRV64D.BaseInsts
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

@@ -265,7 +265,7 @@ theorem ic_close_last_lu (M : RegMapF (Qp × PosNat)) (k : Nat) (qt : Qp)
 the two arm moves) -/
 
 section Ghost
-variable {GF : BundledGFunctors} [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
+variable {GF : BundledGFunctors.{0}} [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
 
 /-- Rocq `iref_close_step_noarm`: the departing reference's share goes back
 into the outstanding total, exactly as its fraction does. -/
@@ -432,7 +432,7 @@ end Ghost
 /-! ## 2.  The stamp half's moves -/
 
 section Stamp
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 theorem istmpAuth_whole [Icfg] (k : Nat) (t : Nat) :
     istmpAuth (GF := GF) k (1 : Qp).half t ∗ istmpAuth k (1 : Qp).half t ⊣⊢ istmpAuth k 1 t := by
@@ -495,7 +495,7 @@ theorem qp_valid_of_lt_half {q : Qp} (h : q < (1 : Qp).half) : ✓ q := by
   exact Qp.valid_iff.mpr (by grind)
 
 section Open
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF]
 
 /-- Every mover's first five Rocq lines, and its last: open `icacheN`, meet
 the lock's map half against the invariant's (`itable_half_agree`), take
@@ -569,7 +569,7 @@ retire: the caller turns the pushed histories into ctx cells with
 row).  The masks nest `↑iregN` INSIDE `↑icacheN` (brief §6). -/
 
 section Store
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IregG GF] [IcacheG GF]
   [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [SleepLockG GF]
 
 /-- Rocq `iref_incr_store_pinw_au`: THE CACHE-HIT UP-COUNT, pinw-faced.  The

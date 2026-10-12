@@ -123,6 +123,8 @@ import Xv6.IcacheEscrowTok
 import Xv6.TxPin
 import Xv6.FsStateEraPure
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
@@ -156,7 +158,7 @@ arm, where the pure arm `diNlink dn0 ≠ 0` is FALSE at the one and
 unavailable at the other. -/
 
 section Payload
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF]
   [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- Rocq's `ic_payload`. -/
@@ -194,7 +196,7 @@ for that map is EMPTY -- neither window can be standing.  NO NAMED LEMMA:
 the consumers open the pin's existential and call `txPin_noOps`. -/
 
 section Pin
-variable {GF : BundledGFunctors} [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsLinkG GF] [FsTopG GF]
+variable {GF : BundledGFunctors.{0}} [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsLinkG GF] [FsTopG GF]
 
 /-- The slot is in NEITHER of iput's two windows (Rocq's `ic_pin_rest`). -/
 def icPinRest [Icfg] (k : Nat) : IProp GF := hpnFull k none
@@ -271,7 +273,7 @@ def icDepSideTx (d : IcDep) : Option (Nat × Qp) :=
   | _ => none
 
 section Side
-variable {GF : BundledGFunctors} [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsLinkG GF] [FsTopG GF]
+variable {GF : BundledGFunctors.{0}} [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsLinkG GF] [FsTopG GF]
 
 /-- Rocq's `ic_dep_side`. -/
 def icDepSide [Icfg] (d : IcDep) : IProp GF := txPinO icfgLog (icDepSideTx d)
@@ -300,7 +302,7 @@ theorem icDepRd_shr (d : IcDep) (s : Qp) (dev inum : BitVec 32) (g : GName) (lo 
 /-! ## THE LOADED BUNDLE: WHAT A HOLDER CARRIES OUT, AND ITS FLAT SHAPE -/
 
 section Loaded
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [IcacheG GF]
   [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- WHAT THE HOLDER CARRIES OUT, keyed by the descriptor's read bit

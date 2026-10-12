@@ -67,6 +67,8 @@ children and the pid.  Rocq's header, point for point:
 import Xv6.UserHeap
 import Xv6.UserCwd
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -77,7 +79,7 @@ open Std (ExtTreeSet)
 
 /-- **Rocq `uk_names`**: the engine's per-process ghosts, and THE EXIT
 PAYLOAD (what this process's exit owes its parent). -/
-structure UkNames (GF : BundledGFunctors) where
+structure UkNames (GF : BundledGFunctors.{0}) where
   t : GName
   d : GName
   s : GName
@@ -97,16 +99,16 @@ read as a signed 32-bit word. -/
 abbrev uexitst (m : RegMap) : Int := (BitVec.setWidth 32 (m.get 10#5)).toInt
 
 /-- **Rocq `ukn_const`**: the payload does not read the status. -/
-class UknConst {GF : BundledGFunctors} (N : UkNames GF) : Prop where
+class UknConst {GF : BundledGFunctors.{0}} (N : UkNames GF) : Prop where
   eq : ∀ x y : Int, N.pay x = N.pay y
 
 /-- Rocq `ukn_const_of_eq`. -/
-theorem ukn_const_of_eq {GF : BundledGFunctors} (N : UkNames GF) (Q : Int → IProp GF) (heq : N.pay = Q)
+theorem ukn_const_of_eq {GF : BundledGFunctors.{0}} (N : UkNames GF) (Q : Int → IProp GF) (heq : N.pay = Q)
     (hQ : ∀ x y, Q x = Q y) : UknConst N :=
   ⟨fun x y => by rw [heq]; exact hQ x y⟩
 
 section UkRun
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -573,7 +575,7 @@ theorem ukWr_x0 (m : RegMap) (rd : BitVec 5) (v : BitVec 64) (h0 : m 0#5 = 0#64)
 /-! ## §3 THE CLOSE, THE GENERIC CONTINUATION, AND WHAT A LEAF READS -/
 
 section UkRunLeaf
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
@@ -666,7 +668,7 @@ theorem umemLazy_bound (P : UPtd) (sz : Nat) (Mp : Nat → List (BitVec 8)) (hwf
     · cases ha
 
 section UkEntry
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 

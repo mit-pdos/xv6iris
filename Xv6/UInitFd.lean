@@ -37,6 +37,8 @@ there (camelCase: `ufdHeadL`, `ufdRow`, …): `ufd_alloc0_v`, `ufd_headL`,
 -/
 import Xv6.UserFd
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode MachCSL
@@ -96,7 +98,7 @@ theorem ufd_scan2 (st : FdState) (hne : st ≠ .closed) : fdLowestClosed (ufdL2 
 /-! ## 3.  THE SOURCE CLAIM THE TWO DUPS HAND IN -/
 
 section UInitFd
-variable {GF : BundledGFunctors} [GhostMapG GF (Option Nat) UfdCell UfdMapF]
+variable {GF : BundledGFunctors.{0}} [GhostMapG GF (Option Nat) UfdCell UfdMapF]
 
 end UInitFd
 

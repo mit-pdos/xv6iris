@@ -56,7 +56,7 @@ theorem uservec_tf_eq (g : RegMap) (ws : List (BitVec 64)) :
   simp only [uvSaveSeq, List.foldl_cons, List.foldl_nil]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 set_option maxHeartbeats 4000000 in
 /-- **The walk**, from the trapped machine at `+0x0` (the user table

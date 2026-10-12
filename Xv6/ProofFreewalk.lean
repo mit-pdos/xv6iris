@@ -30,6 +30,8 @@ import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
 import Xv6.UvmallocDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -95,13 +97,13 @@ theorem fw_branch_last {α : Type _} (b : BitVec 44) (i : Nat) (hi : i < 512) (p
 /-- `freewalk`'s contract at level `lvl`: what the induction proves and what
 the recursive call assumes. -/
 structure FwAt (lvl : Nat) : Prop where
-  wp_fw : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
+  wp_fw : ∀ {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (t : PTree) (ke : Nat)
     hlvl hnoff hK hlk hroot hwf hnd hpg hnl,
     wp_freewalk_body (hlc := hlc) (GF := GF) cpu k γl γk lvl t ke hlvl hnoff hK hlk hroot hwf hnd hpg hnl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF]
 
 /-! ## The frame -/
 

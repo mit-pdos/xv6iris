@@ -83,6 +83,8 @@ import Xv6.OffBox
 import Xv6.DirView
 import Xv6.FsImg
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -328,7 +330,7 @@ abbrev UfdMapF := fun V => Std.ExtTreeMap (Option Nat) V compare
 /-- The ghost libraries the file table uses (Rocq's `fileG`/`fdslotG`).  The
 fd-slot tokens (`FdslotG.fdslotName`) use the SHARED `Xv6G.gmUnitG`; the inode
 arm's cancellable invariant the shared `Xv6G.cinvG`. -/
-class FileG (GF : BundledGFunctors) where
+class FileG (GF : BundledGFunctors.{0}) where
   [gmRefG : GhostMapG GF Nat (Nat × Qp) RegMapF]
   [gvPayG : GhostVarG GF FPNames]
   /-- a process's per-descriptor states (FdSlots.v's `fd_st`), one map per
@@ -349,7 +351,7 @@ invariants. -/
 def fileipN : Namespace := ndot nroot "fileip"
 
 section InodeCore
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF]
   [SleepLockG GF] [IcboxG GF]
 
 /-- What `inodePay`'s cancellable invariant parks (Rocq `inode_core`): the
@@ -368,7 +370,7 @@ instance inodeCore_timeless [Icfg] (v : BitVec 64) (Q : Qp) (inum : BitVec 32) :
 end InodeCore
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF]
   [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF]
   [Icfg] [CurCtx]
 

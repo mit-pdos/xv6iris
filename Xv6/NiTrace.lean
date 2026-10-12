@@ -406,6 +406,8 @@ PURE: imports `NiLedger` (its pure definitions only) and `UsysDet`.
 -/
 import Xv6.NiLedger
 
+noncomputable section
+
 namespace Xv6
 
 open MachCSL Std

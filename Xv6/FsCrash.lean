@@ -50,12 +50,14 @@ import Xv6.FsCrashArm
 import Xv6.FsDurSnap
 import Xv6.FsCrashRec
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Std MachCSL
 
 section
-variable {GF : BundledGFunctors} [Xv6G GF] [GhostMapG GF Nat EraGS RegMapF]
+variable {GF : BundledGFunctors.{0}} [Xv6G GF] [GhostMapG GF Nat EraGS RegMapF]
   [MonoNatG GF] [GhostVarG GF LogMirror] [GhostMapG GF Nat (BitVec 8) RegMapF]
   [FsLinkG GF] [FsTopG GF]
 

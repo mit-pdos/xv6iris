@@ -89,12 +89,14 @@ Imports only definitional files.
 import Xv6.WaitInv
 import Xv6.SlotLed
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 
 section WaitInvTies
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [WchG GF] [CtokG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [WchG GF] [CtokG GF]
 
 /-! ## What the three writers spend -/
 
@@ -869,7 +871,7 @@ row belongs to the SLOT and not to an incarnation, and nothing can install
 one later, which is why they are all born here. -/
 
 section WaitInvBoot
-variable {GF : BundledGFunctors} [WchGpre GF]
+variable {GF : BundledGFunctors.{0}} [WchGpre GF]
 
 /-- `n` rows, one per slot index from 0, keyed by the index itself (any
 distinct names serve; Rocq takes `fresh (dom m)`), installed into a raw

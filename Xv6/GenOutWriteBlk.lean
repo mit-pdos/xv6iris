@@ -146,7 +146,7 @@ theorem gclPure_write_blk (M : LModel) (K : LmHooks M) (B : LmByteLaws M) (sd : 
     rw [hlenE]; exact this
 
 section writeblk
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [EchoOutG GF]
 
 /-- (W') THE WRITE AT A BLOCK'S FIRST BYTE (Rocq `gcl_step_write_blk`): the
 alternative `a` is filed; the block is read at the state the writer's

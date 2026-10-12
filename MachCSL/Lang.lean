@@ -64,6 +64,8 @@ import MachCSL.Dev.Fabric
 import Iris.ProgramLogic.Language
 import LeanRV64D.Step
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

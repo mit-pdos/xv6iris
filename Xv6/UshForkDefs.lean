@@ -46,6 +46,8 @@ returning arm.  THE CHILD'S WALK is a law the body takes
 -/
 import Xv6.UshRunDefs
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -131,7 +133,7 @@ theorem ushf_lp0_echo (ws : List (List (BitVec 8))) (g : Nat → BitVec 8) (k le
   exact lineOk_head_byte0 ws hok
 
 section UshForkDefs
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 

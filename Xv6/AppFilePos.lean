@@ -43,12 +43,14 @@ Rocq's note, abridged (the reasons are the content):
 -/
 import Xv6.AppFileNames
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
 
 section AppFilePos
-variable {GF : BundledGFunctors} [Xv6G GF] [FileAppG GF]
+variable {GF : BundledGFunctors.{0}} [Xv6G GF] [FileAppG GF]
 
 /-- The position's camera, spelled once: Rocq `@ghost_var Σ nat fa_pos`
 (deviation 1). -/

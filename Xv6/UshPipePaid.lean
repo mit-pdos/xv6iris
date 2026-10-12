@@ -48,7 +48,7 @@ theorem ushq_pipe_msg_byte (p : Nat) (hp : p < 4) : ushLit 0x12b8 p = (wlLine dg
 theorem ushq_pipe_msg_nl : ushLit 0x1280 2 = (wlLine dgPipe)[4]! := by decide
 
 section UshPipePaid
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 

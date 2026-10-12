@@ -19,6 +19,8 @@ N-stage seam assumes.
 -/
 import Xv6.RefParseBars
 
+noncomputable section
+
 namespace Xv6
 
 /-- **Rocq `UkShPipeSeam.ushq_cut_ok`**: one token list, readable in the cut

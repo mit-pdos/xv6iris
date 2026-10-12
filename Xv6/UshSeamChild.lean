@@ -46,7 +46,7 @@ theorem ush_ucs_upd (m : RegMap) (r : BitVec 5) (v : BitVec 64) (hr : ucalleeSav
   ukWr_get_other m r q v (fun he => by subst he; rw [hq] at hr; cases hr)
 
 section UshSeamChild
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 

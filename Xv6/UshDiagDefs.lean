@@ -55,6 +55,8 @@ import Xv6.UshMainStubs
 import Xv6.UshLits
 import Xv6.LineBytes
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std MachCSL
@@ -79,7 +81,7 @@ theorem shdNopct_ok (base len q j : Nat) (h : shdNopct base len q = true) (hj : 
 
 /-- **Rocq `shd_fmt_str`**: a checked literal as the text string fprintf
 reads. -/
-theorem shdFmtStr {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
+theorem shdFmtStr {GF : BundledGFunctors.{0}} [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat]
     (γt : GName) (base len : Nat) (hok : ushLitOk base len = true) (hlen : len < 2 ^ 31) :
     ushCode (GF := GF) γt ⊢ utextStr γt base len (ushLit base) :=
   utextStr_of_img γt _ base len _ (fun j hj => (ushLitOk_body base len j hok hj).2) hlen
@@ -135,7 +137,7 @@ def ushExecfailBytes (dg cmd : List (BitVec 8)) : Prop :=
   (∀ p, 7 ≤ p → p < 15 → ushLit 0x1298 p = dg[p + (cmd.length - 2)]!)
 
 section UshDiagDefs
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 

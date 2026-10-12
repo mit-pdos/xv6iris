@@ -55,6 +55,8 @@ import Xv6.UptWalkTramp
 import Xv6.UPtCopyLemmas
 import MachCSL.UByteFrame
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
@@ -64,7 +66,7 @@ open Sail LeanRV64D LeanRV64D.Functions
 /-! ## §0 Helpers -/
 
 section helpers
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- A big separating conjunction, converted element-wise under a persistent
 premise. -/
@@ -136,7 +138,7 @@ theorem ubWordBytes_read (mm : BMap) (a : PAddr) (w : BitVec 64)
   exact h _ (List.mem_map.2 ⟨j, List.mem_range.2 hj, rfl⟩)
 
 section tree
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 /-- One entry word, physically: its 8 bytes. -/
 theorem ubWord_own [CurCtx] (b : BitVec 44) (hb : pageValid (pageAddr b)) (i : BitVec 9) (w : BitVec 64) :
@@ -258,7 +260,7 @@ theorem ub_data_valid (P : UPtd) (hwf : uptWf P) (k : Nat) (w : BitVec 64) (h : 
   exact ⟨he, he ▸ hv⟩
 
 section data
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF]
 
 theorem ub_ctxBytes_one (ξ : CtxId) (a : PAddr) (dq : DFrac) (x : BitVec 8) :
     ctxBytes (GF := GF) ξ a 1 dq x ⊣⊢ ctxByte ξ a dq x := by

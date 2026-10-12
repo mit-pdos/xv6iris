@@ -11,7 +11,7 @@ namespace Xv6
 open Iris Iris.BI Iris.ProofMode
 
 /-- A pure conclusion of two resources keeps them. -/
-theorem pns_keep2 {GF : BundledGFunctors} {P Q : IProp GF} {φ : Prop} (h : ⊢ P -∗ Q -∗ ⌜φ⌝) :
+theorem pns_keep2 {GF : BundledGFunctors.{0}} {P Q : IProp GF} {φ : Prop} (h : ⊢ P -∗ Q -∗ ⌜φ⌝) :
     P ∗ Q ⊢ ⌜φ⌝ ∗ (P ∗ Q) := by
   refine BI.pure_elim φ ?_ (fun hφ => ?_)
   · iintro ⟨HP, HQ⟩

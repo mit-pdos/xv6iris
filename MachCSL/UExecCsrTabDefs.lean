@@ -8,6 +8,8 @@ one after another).
 import MachCSL.UExecCsrCnt
 import MachCSL.UExecCsrDflt
 
+noncomputable section
+
 namespace MachCSL
 
 open Sail Sail.ConcurrencyInterfaceV1

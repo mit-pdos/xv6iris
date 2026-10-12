@@ -33,6 +33,8 @@ FsImgCheck's: no kernel proof file imports this one; the pin files do.
 -/
 import Xv6.FsImgCheck
 
+noncomputable section
+
 namespace Xv6
 
 /-! ## 3.  PATHS OUT OF THE ROOT -/

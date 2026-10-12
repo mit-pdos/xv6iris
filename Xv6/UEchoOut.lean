@@ -30,6 +30,8 @@ import Xv6.EchoDisc
 import Xv6.UserHeap
 import Xv6.SpecArgfd
 
+noncomputable section
+
 namespace Xv6
 
 /-- **Rocq `ws_at`**: a word of the line, read back through `[i]?` (so that

@@ -14,18 +14,20 @@ CONE (re-walked on the pinned globs: 2/10 reached): `write_pipe_fam`,
 -/
 import Xv6.UkWriteLeaf
 
+noncomputable section
+
 namespace Xv6
 
 open Iris Iris.BI MachCSL
 
 /-- **Rocq `write_pipe_fam`**: `xfam_wr` with the caller's read-shut
 observation `Qe` in `wQe`. -/
-def writePipeFam {GF : BundledGFunctors} (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF)
+def writePipeFam {GF : BundledGFunctors.{0}} (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF)
     (Xp : Int → IProp GF) : Xfam GF :=
   { xfamWr Q Xp with wQe := Qe }
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0}} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [CtokG GF] [Fscfg]
 
 /-- **Rocq `uwrite_pipe_extra`**: the post's pipe arm, the match at one

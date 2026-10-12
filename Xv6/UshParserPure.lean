@@ -22,6 +22,8 @@ Deviations from Rocq: none of substance (`Nat` throughout).
 -/
 import Xv6.RefParseSym
 
+noncomputable section
+
 namespace Xv6
 
 /-- Rocq `ushp_pex_extra`. -/
