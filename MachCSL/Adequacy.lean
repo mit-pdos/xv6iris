@@ -124,7 +124,7 @@ theorem powerAdequacyCore [MachGpreS GF] (g : GState) (phi : GState → List Obs
     rcases h.1 e2 he with hv | hr
     · exact absurd hv (by simp [ToVal.toVal])
     · exact hr
-  refine wp_strong_adequacy_gen (GF := GF) Stuckness.NotStuck [Expr.power] g n κs t2 g2
+  refine wp_strong_adequacy_gen (hlc := .hasLC) (GF := GF) Stuckness.NotStuck [Expr.power] g n κs t2 g2
     _ (fun _ => 0) ?_ hsteps
   intro Hinv
   have H := @Hwp Hinv κs

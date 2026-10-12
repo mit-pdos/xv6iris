@@ -264,7 +264,8 @@ BitVec.reduceNeg, BitVec.reduceNot, BitVec.reduceAnd, BitVec.reduceOr, BitVec.re
 
 /-- Find the `swp cpu m Φ` in the goal and return `m`. -/
 def findSwp (e : Lean.Expr) : Option Lean.Expr :=
-  (e.find? fun t => t.isAppOfArity ``MachCSL.swp 7).map fun t => t.getAppArgs[5]!
+  -- `@swp GF inst cpu X m Φ`: six arguments, the program at index 4
+  (e.find? fun t => t.isAppOfArity ``MachCSL.swp 6).map fun t => t.getAppArgs[4]!
 
 /-- The head action of `m`: for `x >>= k` it is `x`, otherwise `m` itself. -/
 def headAction (m : Lean.Expr) : Lean.Expr :=
@@ -296,23 +297,23 @@ def regHypName (r : Lean.Expr) : Name :=
 argument at each level (the proof-mode entailment's conclusion is its last
 argument), so that neither finding nor rewriting it traverses the context. -/
 partial def getSwp (tgt : Lean.Expr) : Option Lean.Expr :=
-  if tgt.isAppOfArity ``MachCSL.swp 7 then some tgt.getAppArgs[5]!
+  if tgt.isAppOfArity ``MachCSL.swp 6 then some tgt.getAppArgs[4]!
   else if tgt.isApp then getSwp tgt.appArg!
   else none
 
 /-- Rewrite the `swp` computation of a goal (see `getSwp`); a full traversal
 if it is not on the last-argument path. -/
 partial def mapSwp (tgt : Lean.Expr) (f : Lean.Expr → Lean.Expr) : Lean.Expr :=
-  if tgt.isAppOfArity ``MachCSL.swp 7 then
+  if tgt.isAppOfArity ``MachCSL.swp 6 then
     let args := tgt.getAppArgs
-    mkAppN tgt.getAppFn (args.set! 5 (f args[5]!))
+    mkAppN tgt.getAppFn (args.set! 4 (f args[4]!))
   else if tgt.isApp && (getSwp tgt.appArg!).isSome then
     tgt.updateApp! tgt.appFn! (mapSwp tgt.appArg! f)
   else
     tgt.replace fun s =>
-      if s.isAppOfArity ``MachCSL.swp 7 then
+      if s.isAppOfArity ``MachCSL.swp 6 then
         let args := s.getAppArgs
-        some (mkAppN s.getAppFn (args.set! 5 (f args[5]!)))
+        some (mkAppN s.getAppFn (args.set! 4 (f args[4]!)))
       else none
 
 /-- The normaliser's simp context, built once per `swp_run` (`sailNormCtx`
