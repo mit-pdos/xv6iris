@@ -190,7 +190,10 @@ def sysUnlinkAtAe (Γ : SchedNames) (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF
   sysUnlinkOpen ks (BitVec.setWidth 32 (dirInum datd kk)) dni bmi dati ∗
   txPin icfgLog t (1 : Qp).half ∗
   A.P (npElems pl).length dinum.toNat ∗
-  bslots 3 ∗ logOpS icfgLog nw Sbw ∗ sysUnlinkCommits A pl
+  bslots 3 ∗ logOpS icfgLog nw Sbw ∗ sysUnlinkCommits A pl ∗
+  -- the +0xaa branch's credit: the file arm's ghost fire spends it at entry
+  -- (`sys_unlink_w5f_ghost`, ordinal step index)
+  £ 1
 
 theorem sys_unlink_sext_off (kk : Nat) (h : 16 * kk < 2 ^ 31) :
     BitVec.signExtend 64 (BitVec.ofNat 32 (16 * kk)) = BitVec.ofNat 64 (16 * kk) :=
@@ -355,6 +358,7 @@ theorem sys_unlink_w5_zero (WI : WRITEI) (MS : MEMSET) (PA : PANIC) (Γ : SchedN
       bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [ha0, sys_unlink_li16, (show bcond bop.BNE (BitVec.ofNat 64 16) 16#64 = false by decide)]
+    £ Hcr
   iintro Hk Hpc
   rw [hdn0W]
   iapply (hZ cpu spie1 spp1 _ dnW bmW datW nw Sbw)

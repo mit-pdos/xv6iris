@@ -96,9 +96,9 @@ theorem il_load (BD : BREAD) (MM : MEMMOVE) (BL : BRELSE) (PA : PANIC) : IlLoadE
   case dcov => rw [hbnoN]; exact hcov
   case da0 => k_norm_g
   case da1 => k_norm_g; exact il_bno_sext inum icfgIst hib
-  -- back from bread (it PARKS: any hart)
-  iapply wpNext_intro_pin
-  iintro %cpu %_ %spie2 %spp2 %R2 %kb %bs %bsd %db %hcs Hk Hpc Hte Hce Hpid Hlk
+  -- back from bread (it PARKS: any hart); its credit pays the claim-box fill's retag
+  iapply wpNext_intro_pin_lc
+  iintro %cpu %_ Hcr %spie2 %spp2 %R2 %kb %bs %bsd %db %hcs Hk Hpc Hte Hce Hpid Hlk
   k_norm_g [il_ret_4e, hww, hpsw]
   obtain ⟨hcsa, ha0kb⟩ := hcs
   unfold calleeSaved at hcsa
@@ -106,9 +106,9 @@ theorem il_load (BD : BREAD) (MM : MEMMOVE) (BL : BRELSE) (PA : PANIC) : IlLoadE
   obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcsa
   -- THE BLOCK, OPENED THROUGH THE REGION: decode, fill, spend the one-shot, borrow the slot
   iapply wpLoop_fupd
-  imod il_blk_open kb pidv inum bs bsd db o g hfills hnib hib $$ [Hlk Hpool Hlic Hpend]
+  imod il_blk_open kb pidv inum bs bsd db o g hfills hnib hib $$ [Hlk Hpool Hlic Hpend Hcr]
     with ⟨%ds, %hwk, Hrest, #Hshot, Hslot, Hsback⟩
-  · iframe Hireg Hlk Hpool Hlic Hpend
+  · iframe Hireg Hlk Hpool Hlic Hpend Hcr
   obtain ⟨hwf, hkb⟩ := hwk
   imodintro
   iapply (il_mid MM BL PA Γ cpu k spie2 spp2 R2 γl kb γisl kk s g d o inum pidv dqp dqs Tl

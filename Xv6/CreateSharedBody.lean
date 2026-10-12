@@ -217,13 +217,13 @@ theorem create_dirty_arm (E : CoPset) (t i : Nat) (c : Absnode)
     ⊢@{IProp GF} ftopInv fscFs -∗ appInv fscFs -∗
       txPin icfgLog t (1 : Qp).half -∗
       pfAt (aarmCommitAt (fsGammaL fscFs) appE c) Farm -∗
-      topFrag (fsGammaL fscFs) i n ={E}=∗
+      topFrag (fsGammaL fscFs) i n -∗ £ 1 ={E}=∗
         createDirty t i ∗ topFrag (fsGammaL fscFs) i n' ∗ creArmFired Farm i := by
-  iintro #Hi #Hai Htx Hcm Hf
+  iintro #Hi #Hai Htx Hcm Hf Hcr
   imod (iregArm E fscFs i t (1 : Qp).half (ftopN_sub_app E hE)) $$ Hi Htx
     with ⟨%k, Harm⟩
   imod (cafArm_fire fscFs E k t (1 : Qp).half {i} i c Farm n n' hE
-    (create_single_mem i) hnone hrow) $$ Hi Hai Harm Hcm Hf with ⟨Harm, Hf, Hr⟩
+    (create_single_mem i) hnone hrow) $$ Hi Hai Harm Hcm Hf Hcr with ⟨Harm, Hf, Hr⟩
   imodintro
   iframe Hf Hr
   unfold createDirty
@@ -238,13 +238,13 @@ theorem create_dirty_dots (E : CoPset) (t i d : Nat) (full : Bool)
     (hrow' : absOf n' = some ⟨.ADir (dotsEnts full i d), 1⟩) :
     ⊢@{IProp GF} ftopInv fscFs -∗ appInv fscFs -∗ createDirty t i -∗
       pfAt (adotsCommitAt (fsGammaL fscFs) appE) Fdots -∗
-      topFrag (fsGammaL fscFs) i n ={E}=∗
+      topFrag (fsGammaL fscFs) i n -∗ £ 1 ={E}=∗
         createDirty t i ∗ topFrag (fsGammaL fscFs) i n' ∗ creDotsFired Fdots i d full := by
-  iintro #Hi #Hai Hd Hcm Hf
+  iintro #Hi #Hai Hd Hcm Hf Hcr
   unfold createDirty
   icases Hd with ⟨%k, Harm⟩
   imod (cafDots_fire fscFs E k t (1 : Qp).half {i} i d full Fdots n n' hE
-    (create_single_mem i) hrow hrow') $$ Hi Hai Harm Hcm Hf with ⟨Harm, Hf, Hr⟩
+    (create_single_mem i) hrow hrow') $$ Hi Hai Harm Hcm Hf Hcr with ⟨Harm, Hf, Hr⟩
   imodintro
   iframe Hf Hr
   iexists k
@@ -259,14 +259,14 @@ theorem create_dirty_clear_dots (E : CoPset) (t i d : Nat) (full : Bool)
     (hrow' : absOf n' = some ⟨.ADir (dotsEnts full i d), 1⟩) :
     ⊢@{IProp GF} ftopInv fscFs -∗ appInv fscFs -∗ createDirty t i -∗
       pfAt (adotsCommitAt (fsGammaL fscFs) appE) Fdots -∗
-      topFrag (fsGammaL fscFs) i n ={E}=∗
+      topFrag (fsGammaL fscFs) i n -∗ £ 1 ={E}=∗
         txPin icfgLog t (1 : Qp).half ∗ topFrag (fsGammaL fscFs) i n' ∗
           creDotsFired Fdots i d full := by
-  iintro #Hi #Hai Hd Hcm Hf
+  iintro #Hi #Hai Hd Hcm Hf Hcr
   unfold createDirty
   icases Hd with ⟨%k, Harm⟩
   imod (cafDots_fire fscFs E k t (1 : Qp).half {i} i d full Fdots n n' hE
-    (create_single_mem i) hrow hrow') $$ Hi Hai Harm Hcm Hf with ⟨Harm, Hf, Hr⟩
+    (create_single_mem i) hrow hrow') $$ Hi Hai Harm Hcm Hf Hcr with ⟨Harm, Hf, Hr⟩
   imod (iregDisarm E fscFs k t (1 : Qp).half {i} i n' (ftopN_sub_app E hE) hloc)
     $$ Hi Harm Hf with ⟨Harm, Hf⟩
   rw [create_single_diff i]
@@ -292,10 +292,10 @@ theorem create_unarm_fire_nd (γfs : FsNames) (E : CoPset) (i : Nat) (c : Absnod
     (hrow : absOf n = some ⟨c, 1⟩) (hnone : absOf n' = none) (hNd : Nd c) :
     ⊢@{IProp GF} ftopInv γfs -∗ appInv γfs -∗
       aunarmCommitAtNd (fsGammaL γfs) appE i Nd Fun.pfRecv -∗
-      topFrag (fsGammaL γfs) i n ={E}=∗
+      topFrag (fsGammaL γfs) i n -∗ £ 1 ={E}=∗
         topFrag (fsGammaL γfs) i n' ∗ creUnarmFired Fun i := by
-  iintro #Hi #Hai Hcm Hf
-  iapply (cafRetag γfs E i n n' (creUnarmFired Fun i) hE hloc) $$ Hi Hai [Hcm] Hf
+  iintro #Hi #Hai Hcm Hf Hcr
+  iapply (cafRetag γfs E i n n' (creUnarmFired Fun i) hE hloc) $$ Hi Hai [Hcm] Hf Hcr
   iintro %I %hlk Ha
   have hav : PartialMap.get? (absView I) i = some ⟨c, 1⟩ := by
     rw [absView_lookup_of I i n hlk, hrow]
@@ -324,10 +324,10 @@ theorem create_unarm_fire_armed_nd (γfs : FsNames) (E : CoPset) (k t : Nat) (q 
     (hrow : absOf n = some ⟨c, 1⟩) (hnone : absOf n' = none) (hNd : Nd c) :
     ⊢@{IProp GF} ftopInv γfs -∗ appInv γfs -∗ iregArmed k t q S -∗
       aunarmCommitAtNd (fsGammaL γfs) appE i Nd Fun.pfRecv -∗
-      topFrag (fsGammaL γfs) i n ={E}=∗
+      topFrag (fsGammaL γfs) i n -∗ £ 1 ={E}=∗
         iregArmed k t q S ∗ topFrag (fsGammaL γfs) i n' ∗ creUnarmFired Fun i := by
-  iintro #Hi #Hai Hrec Hcm Hf
-  iapply (cafArmedRetag γfs E k t q S i n n' (creUnarmFired Fun i) hE hin) $$ Hi Hai Hrec [Hcm] Hf
+  iintro #Hi #Hai Hrec Hcm Hf Hcr
+  iapply (cafArmedRetag γfs E k t q S i n n' (creUnarmFired Fun i) hE hin) $$ Hi Hai Hrec [Hcm] Hf Hcr
   iintro %I %hlk Ha
   have hav : PartialMap.get? (absView I) i = some ⟨c, 1⟩ := by
     rw [absView_lookup_of I i n hlk, hrow]
@@ -355,13 +355,13 @@ theorem create_dirty_clear_unarm_nd (E : CoPset) (t i : Nat) (c : Absnode) (Nd :
     (hrow : absOf n = some ⟨c, 1⟩) (hnone : absOf n' = none) (hNd : Nd c) :
     ⊢@{IProp GF} ftopInv fscFs -∗ appInv fscFs -∗ createDirty t i -∗
       aunarmCommitAtNd (fsGammaL fscFs) appE i Nd Fun.pfRecv -∗
-      topFrag (fsGammaL fscFs) i n ={E}=∗
+      topFrag (fsGammaL fscFs) i n -∗ £ 1 ={E}=∗
         txPin icfgLog t (1 : Qp).half ∗ topFrag (fsGammaL fscFs) i n' ∗ creUnarmFired Fun i := by
-  iintro #Hi #Hai Hd Hcm Hf
+  iintro #Hi #Hai Hd Hcm Hf Hcr
   unfold createDirty
   icases Hd with ⟨%k, Harm⟩
   imod (create_unarm_fire_armed_nd fscFs E k t (1 : Qp).half {i} i c Nd Fun n n' hE
-    (create_single_mem i) hrow hnone hNd) $$ Hi Hai Harm Hcm Hf with ⟨Harm, Hf, Hr⟩
+    (create_single_mem i) hrow hnone hNd) $$ Hi Hai Harm Hcm Hf Hcr with ⟨Harm, Hf, Hr⟩
   imod (iregDisarm E fscFs k t (1 : Qp).half {i} i n' (ftopN_sub_app E hE) hloc)
     $$ Hi Harm Hf with ⟨Harm, Hf⟩
   rw [create_single_diff i]
@@ -375,13 +375,13 @@ whose reading is unchanged owes the application nothing. -/
 theorem create_dirty_retag_same (E : CoPset) (t i : Nat) (n n' : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (habs : absOf n = absOf n') :
     ⊢@{IProp GF} ftopInv fscFs -∗ appInv fscFs -∗ createDirty t i -∗
-      topFrag (fsGammaL fscFs) i n ={E}=∗
+      topFrag (fsGammaL fscFs) i n -∗ £ 1 ={E}=∗
         createDirty t i ∗ topFrag (fsGammaL fscFs) i n' := by
-  iintro #Hi #Hai Hd Hf
+  iintro #Hi #Hai Hd Hf Hcr
   unfold createDirty
   icases Hd with ⟨%k, Harm⟩
   imod (iregTopRetag_armed_same E fscFs k t (1 : Qp).half {i} i n n' hE
-    (create_single_mem i) habs) $$ Hi Hai Harm Hf with ⟨Harm, Hf⟩
+    (create_single_mem i) habs) $$ Hi Hai Harm Hf Hcr with ⟨Harm, Hf⟩
   imodintro
   iframe Hf
   iexists k
@@ -391,13 +391,13 @@ theorem create_dirty_retag_same (E : CoPset) (t i : Nat) (n n' : FsNode)
 theorem create_dirty_clear_same (E : CoPset) (t i : Nat) (n n' : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (habs : absOf n = absOf n') (hloc : InodeLocal i n') :
     ⊢@{IProp GF} ftopInv fscFs -∗ appInv fscFs -∗ createDirty t i -∗
-      topFrag (fsGammaL fscFs) i n ={E}=∗
+      topFrag (fsGammaL fscFs) i n -∗ £ 1 ={E}=∗
         txPin icfgLog t (1 : Qp).half ∗ topFrag (fsGammaL fscFs) i n' := by
-  iintro #Hi #Hai Hd Hf
+  iintro #Hi #Hai Hd Hf Hcr
   unfold createDirty
   icases Hd with ⟨%k, Harm⟩
   imod (iregTopRetag_armed_same E fscFs k t (1 : Qp).half {i} i n n' hE
-    (create_single_mem i) habs) $$ Hi Hai Harm Hf with ⟨Harm, Hf⟩
+    (create_single_mem i) habs) $$ Hi Hai Harm Hf Hcr with ⟨Harm, Hf⟩
   imod (iregDisarm E fscFs k t (1 : Qp).half {i} i n' (ftopN_sub_app E hE) hloc)
     $$ Hi Harm Hf with ⟨Harm, Hf⟩
   rw [create_single_diff i]

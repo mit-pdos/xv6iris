@@ -56,7 +56,13 @@ def snapLawOut (G : GName → IProp GF) (T : IProp GF) (gd : Nat) (C : BlockMap)
     (home : List Nat) : IProp GF :=
   durPair G T gd (fsRestrict (dvOfD C) home)
 
-/-- THE LAW, at a NAMED mask and a NAMED guest (Rocq `snap_law_at`). -/
+/-- THE LAW, at a NAMED mask and a NAMED guest (Rocq `snap_law_at`).  ...AND ONE
+LATER CREDIT (Rocq's ordinal port, the owner's option (a)): the law opens the
+application's invariant (`AppInv.appInv`) and needs its claim at the kernel's
+map while the kernel's half stays outside (`FsCollectAll.fsCollectDur`); at an
+ordinal step index that later is not stripped for free, and the only party
+with a credit is the law's RUNNER (the committer, out of an instruction's
+continuation).  `snapLawGhostAt` takes one too, for the same reason. -/
 def snapLawAt (γ : LogNames) (γfs : FsNames) (cov : ExtTreeSet Nat compare) (logstart : Nat)
     (N : CoPset) (G : GName → IProp GF) (T : IProp GF) (gd : Nat) : IProp GF :=
   iprop(□ (∀ (E : CoPset) (Lb : RegMapF (BitVec 8)) (C : BlockMap),
@@ -65,7 +71,7 @@ def snapLawAt (γ : LogNames) (γfs : FsNames) (cov : ExtTreeSet Nat compare) (l
     ⌜∀ b bs, PartialMap.get? C b = some bs → bs.length = BSIZE⌝ -∗
     ⌜bytesTie Lb C⌝ -∗
     ⌜bytesDom Lb (fsHomeList cov logstart)⌝ -∗
-    (γfs.bytes ↪●MAP Lb) -∗ logTxAuth γ ∅ -∗ T ={E}=∗
+    (γfs.bytes ↪●MAP Lb) -∗ logTxAuth γ ∅ -∗ £ 1 -∗ T ={E}=∗
       snapLawOut G T gd C (fsHomeList cov logstart) ∗ (γfs.bytes ↪●MAP Lb) ∗
       logTxAuth γ ∅))
 
@@ -111,11 +117,11 @@ theorem snapLaw_run (γ : LogNames) (γfs : FsNames) (cov : ExtTreeSet Nat compa
     (hlens : ∀ b bs, PartialMap.get? C b = some bs → bs.length = BSIZE)
     (htie : bytesTie Lb C) (hdm : bytesDom Lb (fsHomeList cov logstart)) :
     snapLaw (GF := GF) γ γfs cov logstart T gd ⊢
-      (γfs.bytes ↪●MAP Lb) -∗ logTxAuth γ ∅ -∗ T ={⊤ \ ↑fsbN}=∗
+      (γfs.bytes ↪●MAP Lb) -∗ logTxAuth γ ∅ -∗ £ 1 -∗ T ={⊤ \ ↑fsbN}=∗
         (∃ G : GName → IProp GF, fsCrashSeamAt G cov logstart ∗
           snapLawOut G T gd C (fsHomeList cov logstart)) ∗
         (γfs.bytes ↪●MAP Lb) ∗ logTxAuth γ ∅ := by
-  iintro #Hlaw Hb Ht HT
+  iintro #Hlaw Hb Ht Hcr HT
   unfold snapLaw
   icases Hlaw with ⟨%N, %G, %hdj, #Hseam, #Hbody⟩
   have hsub : N ⊆ ⊤ \ (↑fsbN : CoPset) := by
@@ -123,7 +129,7 @@ theorem snapLaw_run (γ : LogNames) (γfs : FsNames) (cov : ExtTreeSet Nat compa
     rw [CoPset.in_diff]
     exact ⟨CoPset.subseteq_top p hp, fun hc => hdj p ⟨hc, hp⟩⟩
   unfold snapLawAt
-  imod Hbody $$ %(⊤ \ ↑fsbN) %Lb %C %hsub %hdom %hlens %htie %hdm Hb Ht HT with ⟨Hout, Hb, Ht⟩
+  imod Hbody $$ %(⊤ \ ↑fsbN) %Lb %C %hsub %hdom %hlens %htie %hdm Hb Ht Hcr HT with ⟨Hout, Hb, Ht⟩
   imodintro
   iframe Hb Ht
   iexists G
@@ -156,7 +162,7 @@ def snapLawGhostAt (γ : LogNames) (γfs : FsNames) (cov : ExtTreeSet Nat compar
     ⌜bytesTie Lb C⌝ -∗
     ⌜bytesDom Lb (fsHomeList cov logstart)⌝ -∗
     (γfs.bytes ↪●MAP Lb) -∗ logTxAuth γ ∅ -∗ ▷ G gt_o -∗ T -∗
-    ⌜n = gd + 1⌝ -∗ startAuth (GF := GF) n -∗
+    ⌜n = gd + 1⌝ -∗ startAuth (GF := GF) n -∗ £ 1 -∗
     ([∗list] Q ∈ Qs, Hk Q) ={E}=∗
       (∃ gt : GName, pDurAt gt (fsRestrict (dvOfD C) (fsHomeList cov logstart)) ∗ ▷ G gt) ∗
       T ∗ startAuth (GF := GF) n ∗ ([∗list] Q ∈ Qs, Q) ∗ (γfs.bytes ↪●MAP Lb) ∗
@@ -214,7 +220,7 @@ theorem snapLawGhost_run (γ : LogNames) (γfs : FsNames) (cov : ExtTreeSet Nat 
           ⌜bytesTie Lb C⌝ -∗
           ⌜bytesDom Lb (fsHomeList cov logstart)⌝ -∗
           (γfs.bytes ↪●MAP Lb) -∗ logTxAuth γ ∅ -∗ ▷ G gt_o -∗ T -∗
-          ⌜n = gd + 1⌝ -∗ startAuth (GF := GF) n -∗
+          ⌜n = gd + 1⌝ -∗ startAuth (GF := GF) n -∗ £ 1 -∗
           ([∗list] Q ∈ Qs, Hk Q) ={(⊤ \ ↑crashN) \ ↑fsbN}=∗
             (∃ gt : GName, pDurAt gt (fsRestrict (dvOfD C) (fsHomeList cov logstart)) ∗ ▷ G gt) ∗
             T ∗ startAuth (GF := GF) n ∗ ([∗list] Q ∈ Qs, Q) ∗ (γfs.bytes ↪●MAP Lb) ∗
@@ -226,14 +232,14 @@ theorem snapLawGhost_run (γ : LogNames) (γfs : FsNames) (cov : ExtTreeSet Nat 
   isplitr
   · iexact Hseam
   imodintro
-  iintro %Lb %C %Qs %gt_o %n %hdom %hlens %htie %hdm Hb Ht HG HT %hn Hsa HQs
+  iintro %Lb %C %Qs %gt_o %n %hdom %hlens %htie %hdm Hb Ht HG HT %hn Hsa Hcr HQs
   have hsub : N ⊆ (⊤ \ (↑crashN : CoPset)) \ (↑fsbN : CoPset) := by
     intro p hp
     rw [CoPset.in_diff, CoPset.in_diff]
     exact ⟨⟨CoPset.subseteq_top p hp, fun hc => hdc p ⟨hc, hp⟩⟩, fun hc => hdj p ⟨hc, hp⟩⟩
   unfold snapLawGhostAt
   iapply Hbody $$ %((⊤ \ ↑crashN) \ ↑fsbN) %Lb %C %Qs %gt_o %n %hsub %hdom %hlens %htie %hdm Hb Ht
-    HG HT %hn Hsa HQs
+    HG HT %hn Hsa Hcr HQs
 
 end
 

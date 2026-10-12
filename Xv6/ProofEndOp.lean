@@ -320,7 +320,7 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     k_step (wp_s_sw cpu _ (KA.«end_op» + 0x34#64) true 32#12 9#5 15#5 (by decide)
         (0#32 : BitVec 32))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [eoK_sie, eo_o_cmt, eo_one32]
+      with [eoK_sie, eo_o_cmt, eo_one32] £ Hcr
     iintro Hk Hpc Hcmt
     -- the batch is CHECKED OUT and the flag re-closed set
     icases eoOpen_of_batch γb γfs V.cov ls n LB (opPending om) $$ Hst
@@ -338,7 +338,7 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     icases eoOpen_elim γb γfs V.cov ls n W L D eoNullLw 0 $$ Hopen
       with ⟨HlhN, Hblk, Hjunk, HauthL, HauthD, Hcov, Hhdr, Hdone, Hrest, Hpool⟩
     iapply wpLoop_fupd
-    imod eo_snapLaw_ofAuth γ γb γfs V.cov ls dev L $$ Hctx HauthL Htx Hstok
+    imod eo_snapLaw_ofAuth γ γb γfs V.cov ls dev L $$ Hctx HauthL Htx Hcr Hstok
       with ⟨⟨%G, #HseamG, Hepoch⟩, HauthL, Htx⟩
     imodintro
     ihave Hepoch := (show snapLawOut G (eraSyncTok (GF := GF)) (genId (GF := GF)) L

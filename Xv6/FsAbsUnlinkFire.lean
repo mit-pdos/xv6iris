@@ -300,11 +300,11 @@ theorem ufUent_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (dqt : DFra
       -- THE PARENT CURSOR (TL-3K): READ by the commit and handed straight back
       Pd d -∗
       topFrag (fsGammaL γfs) d np -∗
-      topFragQ (fsGammaL γfs) dqt t nt ={E}=∗
+      topFragQ (fsGammaL γfs) dqt t nt -∗ £ 1 ={E}=∗
         topFrag (fsGammaL γfs) d np' ∗ topFragQ (fsGammaL γfs) dqt t nt ∗ Pd d ∗
         ∃ av : Aview, ⌜unlPre av d nm (dirEntries np) (fnNlink np) t (absRow nt)⌝ ∗
           Fent.pfRecv av d nm t := by
-  iintro #Hi #Hai Hcm HPd Hfp Hft
+  iintro #Hi #Hai Hcm HPd Hfp Hft Hcr
   ihave Hcm := pfAt_au _ _ $$ Hcm
   unfold ftopInv
   imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs)
@@ -332,7 +332,7 @@ theorem ufUent_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (dqt : DFra
   imod (fupd_mask_mono hsub) $$ Hcm with ⟨Ha, HPd, Hstep, Hph2⟩
   -- THE MOVE, at the whole authority: the application's half comes out of
   -- `appN` beside its claim, which the caller's step re-establishes.
-  imod (appTopUpdate (E \ ↑ftopN) γfs I d np np' hsub) $$ Hai [Hstep] Ha Hfp with ⟨Ha, Hfp⟩
+  imod (appTopUpdate (E \ ↑ftopN) γfs I d np np' hsub) $$ Hai [Hstep] Ha Hfp Hcr with ⟨Ha, Hfp⟩
   · iintro %_ Hp
     iapply (appStep_at d I _ np' hdelta) $$ Hstep Hp
   ihave Hph2 := Hph2 $$ %(PartialMap.insert I d np') %hdelta Ha
@@ -360,10 +360,10 @@ theorem ufUtgt_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset)
     (hnzt : fnType nt ≠ 0) :
     ⊢@{IProp GF} ftopInv γfs -∗ appInv γfs -∗
       pfAt (utgtCommitAt (fsGammaL γfs) appE) Ftgt -∗
-      topFrag (fsGammaL γfs) t nt ={E}=∗
+      topFrag (fsGammaL γfs) t nt -∗ £ 1 ={E}=∗
         topFrag (fsGammaL γfs) t nt' ∗
         ∃ av : Aview, ⌜PartialMap.get? av t = some (absRow nt)⌝ ∗ Ftgt.pfRecv av t := by
-  iintro #Hi #Hai Hcm Hf
+  iintro #Hi #Hai Hcm Hf Hcr
   ihave Hcm := pfAt_au _ _ $$ Hcm
   unfold ftopInv
   imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs)
@@ -383,7 +383,7 @@ theorem ufUtgt_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset)
   unfold utgtCommitAt
   ihave Hcm := Hcm $$ %I %t %(absRow nt) %hrow %hnl Ha
   imod (fupd_mask_mono hsub) $$ Hcm with ⟨Ha, Hstep, Hph2⟩
-  imod (appTopUpdate (E \ ↑ftopN) γfs I t nt nt' hsub) $$ Hai [Hstep] Ha Hf with ⟨Ha, Hf⟩
+  imod (appTopUpdate (E \ ↑ftopN) γfs I t nt nt' hsub) $$ Hai [Hstep] Ha Hf Hcr with ⟨Ha, Hf⟩
   · iintro %_ Hp
     iapply (appStep_at t I _ nt' hdelta) $$ Hstep Hp
   ihave Hph2 := Hph2 $$ %(PartialMap.insert I t nt') %hdelta Ha

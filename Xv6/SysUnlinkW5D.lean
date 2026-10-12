@@ -336,7 +336,7 @@ theorem sys_unlink_w5_dir (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : 
   iintro ⟨%⟨hpins, htln, hname, hkd, hnib, hpos, hle, hty, hnd, hndd, hfn, hks, hlei, hnli, hisd,
     hop, hZ, hlive, hmem, h5⟩, Hk, Hpc, Hcells, Hjunk, Hde, Hnm, Htl, Hpath, Hoff, Hdel, Hte, Hce,
     #Henv, Hpid, Hhole, HΦ, Hlkd, Hdl, Hdi, Hmeta, Hmap, Hblk, Htop, Hlki, Hopi, Hres, HP, Hbs, Hop,
-    Hcm⟩
+    Hcm, Hcr⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   obtain ⟨-, -, -, -, -, -, -, -, -, -, hKiu, -, -⟩ := sys_unlink_K _ ok.hK
   have hisd' : dni.diType.toNat = T_DIR_z ∧ dirDotsOnly dni dati ∧
@@ -484,7 +484,7 @@ theorem sys_unlink_w5_dir (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : 
       (sys_unlink_nl1 dnd bmd datd hlive) (sys_unlink_nl1 dni bmi dati hnli)
       (sys_unlink_dir_dots dni bmi dati hoki.2.2.2.2.2.1 hoki.2.2.2.2.1 htyi hdots)
       (sys_unlink_dir_dec _ hdiri) habsp hoki.2.2.2.1)
-    $$ Hftop Happ He HP Htop Htopi with ⟨Htop, Htopi, HP, %av0, %hpre, Hrecv⟩
+    $$ Hftop Happ He HP Htop Htopi Hlc with ⟨Htop, Htopi, HP, %av0, %hpre, Hrecv⟩
   imodintro
   ihave Htopi := (show topFragQ (GF := GF) (fsGammaL fscFs) (DFrac.own 1)
         (BitVec.setWidth 32 (dirInum datd kk)).toNat (eraNode dni bmi dati) ⊢

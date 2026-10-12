@@ -135,7 +135,7 @@ theorem fwr_fire (om : OffMode) (inum : BitVec 32) (γo : GName) (P : UPtd) (n :
     ⊢@{IProp GF} ftopInv fscFs -∗ appInv fscFs -∗
       topFrag (fsGammaL fscFs) inum.toNat (eraNode dn bm data) -∗
       offLink γo (off : Int) -∗
-      fwrSt om (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q t p 0 ={⊤}=∗
+      fwrSt om (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q t p 0 -∗ £ 1 ={⊤}=∗
         topFrag (fsGammaL fscFs) inum.toNat (eraNode dn' bm' data') ∗
         offLink γo ((off + tot : Nat) : Int) ∗
         ((⌜tot = c⌝ ∗ fwrSt om (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q (t + c) (p + 1) 0) ∨
@@ -150,12 +150,12 @@ theorem fwr_fire (om : OffMode) (inum : BitVec 32) (γo : GName) (P : UPtd) (n :
     rw [wrfEra_bytes]; exact Xv6.fileBytes_length' _ _
   have hptie : ua + BitVec.ofNat 64 t = ua + BitVec.ofInt 64 (FW_MAX * (p : Int)) := by
     rw [← htie, BitVec.ofInt_natCast]
-  iintro #Hft #Hai Htop Hgv Hst
+  iintro #Hft #Hai Htop Hgv Hst Hcr
   rcases harms with ⟨h0, htot0, hbm, hdata, hdn⟩ | ⟨h0, hle, hsz'⟩
   · -- WRITEI'S -1: the up-front guards failed, nothing ran
     subst bm' data' dn' htot0
     imod (iregTopRetag_same ⊤ fscFs inum.toNat (eraNode dn bm data) (eraNode dn bm data) hE rfl
-      hloc) $$ Hft Hai Htop with Htop
+      hloc) $$ Hft Hai Htop Hcr with Htop
     imodintro
     iframe Htop
     rw [Nat.add_zero]
@@ -187,7 +187,7 @@ theorem fwr_fire (om : OffMode) (inum : BitVec 32) (γo : GName) (P : UPtd) (n :
         (eraNode dn' bm' data') hE hloc (by rw [wrfRun_length]; omega)
         (by rw [hbs0]; exact hle) (by rw [wrfRun_length]; exact hcap) hnz hrow hnz' hrow'
         hchunk (by rw [wrfRun_length, hfull]; exact hcw) htn htie)
-        $$ Hft Hai Hst Htop Hgv with ⟨Htop, Hgv, Hst⟩
+        $$ Hft Hai Hst Htop Hgv Hcr with ⟨Htop, Hgv, Hst⟩
       imodintro
       iframe Htop
       rw [wrfRun_length] at *
@@ -219,7 +219,7 @@ theorem fwr_fire (om : OffMode) (inum : BitVec 32) (γo : GName) (P : UPtd) (n :
             rw [hct] at hb
             rcases hw16 hb with h | h <;> omega)
           htn htie)
-          $$ Hft Hai Hst Htop Hgv with ⟨Htop, Hgv, Hst⟩
+          $$ Hft Hai Hst Htop Hgv Hcr with ⟨Htop, Hgv, Hst⟩
         imodintro
         iframe Htop Hgv
         iright
@@ -241,7 +241,7 @@ theorem fwr_fire (om : OffMode) (inum : BitVec 32) (γo : GName) (P : UPtd) (n :
         have hsame : absOf (eraNode dn bm data) = absOf (eraNode dn' bm' data') := by
           rw [absOf_counted _ hnz, absOf_counted _ hnz', hnlq, hrow, hrow', hnil, blkSplice_nil]
         imod (iregTopRetag_same ⊤ fscFs inum.toNat (eraNode dn bm data) (eraNode dn' bm' data') hE
-          hsame hloc) $$ Hft Hai Htop with Htop
+          hsame hloc) $$ Hft Hai Htop Hcr with Htop
         imodintro
         iframe Htop
         rw [htot0, Nat.add_zero]
@@ -361,7 +361,7 @@ theorem fwr_post_ghost (om : OffMode) (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : 
       wordPointsTo (fnode fk + 32#64) 4 (DFrac.own 1) (filerwOffW v tot) ∗
       fwrOut (GF := GF) ik fk q γb γo m T0 Tr ∗
       dinodeAt fscIreg inum dn0' ∗ inodeMeta (ientry ik) dn' ∗ inodeMap fscFs (ientry ik) bm' ∗
-      inodeBlocks fscFs bm' data' ⊢
+      inodeBlocks fscFs bm' data' ∗ £ 1 ⊢
       |={⊤}=> ownCtx cpu curCtx ∗ offFd fk q γb γo C ∗ (∃ T : Nat, offRowsDep offCfg ik T) ∗
         icLoaded fscFs fscIreg fscCov fscLogst ik inum dn' bm' ∗
         ((⌜tot = c⌝ ∗ fwrSt om (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q (t + c) (p + 1) 0) ∨
@@ -373,14 +373,14 @@ theorem fwr_post_ghost (om : OffMode) (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : 
   have hw : (filerwOffW v tot).toNat = v.toNat + tot :=
     filerwOffW_toNat v tot (by have : MAXFILE * BSIZE = 274432 := rfl; omega)
   have hwf : offWf (filerwOffW v tot) := by unfold offWf; rw [hw]; exact hcap
-  iintro ⟨Hrun, #Hfs, Htop, Hgv, Hst, Hcell, Hout, Hdi, Hmeta, Hmap, Hblk⟩
+  iintro ⟨Hrun, #Hfs, Htop, Hgv, Hst, Hcell, Hout, Hdi, Hmeta, Hmap, Hblk, Hcr⟩
   icases fsReady_region $$ Hfs with ⟨#Hireg, -⟩
   ihave #Hft := iregInv_ftop fscIreg fscFs icfgIst icfgNib $$ Hireg
   ihave #Hai := iregInv_app fscIreg fscFs icfgIst icfgNib $$ Hireg
   imod (fwr_fire om inum γo P n Mimg ua Q t p c dn dn' bm bm' data data' v.toNat tot dist wrote dstb a0
     htn htie hcpos hcw hw16 hty hty' hnl' hh hh' hcap0 hcap htotc hdistle hdistf hwhy hloc hrange harms
     hchunk)
-    $$ Hft Hai Htop Hgv Hst with ⟨Htop, Hgv, Hst⟩
+    $$ Hft Hai Htop Hgv Hst Hcr with ⟨Htop, Hgv, Hst⟩
   -- CHECK IN the cell: the half came back at exactly its word
   ihave Hres := offResident_of curCtx γo fk (filerwOffW v tot) hwf $$ [Hcell] [Hgv]
   · rw [wordAtN_cur]; unfold aFoff; iexact Hcell

@@ -225,19 +225,19 @@ theorem pobs_aopen (γfs : FsNames) (Pin : Aview → Prop) (T : IProp GF) [Persi
   unfold appInv
   imod (inv_acc (E := appE) (N := appN) (P := appBody (GF := GF) γfs) (fun _ h => h)) $$ Hinv
     with ⟨Hbody, Hclose⟩
-  unfold appBody
-  icases Hbody with ⟨%I', >Hh, Hp, >%hdom⟩
-  ihave %heq := ghost_map_auth_agree (GF := GF) γfs.top _ _ I I' $$ Hka Hh
-  subst heq
-  ihave Hpc : iprop(▷ (appPred appRun (absView I) ∗ (⌜Pin (absView I)⌝ ∨ T))) $$ [Hp]
+  -- CREDIT-FREE at every step index (Rocq's ordinal port): only the pure-or-`T`
+  -- claim leaves the body's later, agreed against the caller's half inside it; a
+  -- persistent assertion consumes nothing, and the body goes back as it was opened
+  ihave Hc : iprop(▷ (⌜Pin (absView I)⌝ ∨ T)) $$ [#]
   · inext
-    iapply Hcl $$ Hp
-  icases Hpc with ⟨Hp, >Hc⟩
-  imod Hclose $$ [Hh Hp]
-  · inext
-    iexists I
-    iframe Hh Hp
-    ipureintro; exact hdom
+    unfold appBody
+    icases Hbody with ⟨%I', Hh, Hp, -⟩
+    ihave %heq := ghost_map_auth_agree (GF := GF) γfs.top _ _ I I' $$ Hka Hh
+    subst heq
+    icases Hcl $$ %(absView I) Hp with ⟨-, Hc⟩
+    iexact Hc
+  imod Hc
+  imod Hclose $$ Hbody
   imodintro
   iframe Hka Hc
   ipureintro; exact hrow
@@ -267,22 +267,24 @@ theorem pobs_hop (γfs : FsNames) (Pin : Aview → Prop) (T : IProp GF) [Persist
     unfold appInv
     imod (inv_acc (E := ⊤) (N := appN) (P := appBody (GF := GF) γfs) CoPset.subseteq_top) $$ Hinv
       with ⟨Hbody, Hclose⟩
-    unfold appBody
-    icases Hbody with ⟨%I, >Hh, Hp, >%hdom⟩
-    ihave Hpc : iprop(▷ (appPred appRun (absView I) ∗ (⌜Pin (absView I)⌝ ∨ T))) $$ [Hp]
+    -- CREDIT-FREE at every step index (Rocq's ordinal port): what leaves the body's
+    -- later is a PURE reading (the witness folded in) or the persistent, timeless `T`;
+    -- a persistent assertion consumes nothing, and the body goes back as it was opened
+    ihave Hc : iprop(▷ (⌜∃ v, Pin v ∧ astep v hops[k]! s = ents[s]?⌝ ∨ T)) $$ [#]
     · inext
-      iapply Hcl $$ Hp
-    icases Hpc with ⟨Hp, >Hc⟩
-    ihave %hae := pobs_elend_astep γfs (1 : Qp).half I hops[k]! dqv ents s $$ Hh HF
-    imod Hclose $$ [Hh Hp]
-    · inext
-      iexists I
-      iframe Hh Hp
-      ipureintro; exact hdom
+      unfold appBody
+      icases Hbody with ⟨%I, Hh, Hp, -⟩
+      icases Hcl $$ %(absView I) Hp with ⟨-, (%hP | #HT)⟩
+      · ihave %hae := pobs_elend_astep γfs (1 : Qp).half I hops[k]! dqv ents s $$ Hh HF
+        ileft; ipureintro; exact ⟨absView I, hP, hae⟩
+      · iright; iexact HT
+    imod Hc
+    imod Hclose $$ Hbody
     imodintro
     iframe HF
-    icases Hc with (%hP | #HT)
-    · have hst := arun_step_tot k s (hpin _ hP).1 hk
+    icases Hc with (%hv | #HT)
+    · obtain ⟨v, hP, hae⟩ := hv
+      have hst := arun_step_tot k s (hpin _ hP).1 hk
       rw [hae] at hst
       rw [hst]
       simp only [axHopNext]
@@ -456,22 +458,23 @@ theorem pobs_hop_dead_lin (γfs : FsNames) (Pin : Aview → Prop) (T : IProp GF)
     unfold appInv
     imod (inv_acc (E := ⊤) (N := appN) (P := appBody (GF := GF) γfs) CoPset.subseteq_top) $$ Hinv
       with ⟨Hbody, Hclose⟩
-    unfold appBody
-    icases Hbody with ⟨%I, >Hh, Hp, >%hdom⟩
-    ihave Hpc : iprop(▷ (appPred appRun (absView I) ∗ K ∗ (⌜Pin (absView I)⌝ ∨ T))) $$ [Hp HK]
+    -- CREDIT-FREE at every step index (Rocq's ordinal port), as `pobs_hop`: the
+    -- persistent assertion may use `K` and the body, and consumes neither
+    ihave Hc : iprop(▷ (⌜∃ v, Pin v ∧ astep v d s = ents[s]?⌝ ∨ T)) $$ [#]
     · inext
-      iapply Hcl $$ HK Hp
-    icases Hpc with ⟨Hp, >HK, >Hc⟩
-    ihave %hae := pobs_elend_astep γfs (1 : Qp).half I d dqv ents s $$ Hh HF
-    imod Hclose $$ [Hh Hp]
-    · inext
-      iexists I
-      iframe Hh Hp
-      ipureintro; exact hdom
+      unfold appBody
+      icases Hbody with ⟨%I, Hh, Hp, -⟩
+      icases Hcl $$ %(absView I) HK Hp with ⟨-, -, (%hP | #HT)⟩
+      · ihave %hae := pobs_elend_astep γfs (1 : Qp).half I d dqv ents s $$ Hh HF
+        ileft; ipureintro; exact ⟨absView I, hP, hae⟩
+      · iright; iexact HT
+    imod Hc
+    imod Hclose $$ Hbody
     imodintro
     iframe HF
-    icases Hc with (%hP | #HT)
-    · have hn : ents[s]? = none := by rw [← hae]; exact hmiss _ s hP hs
+    icases Hc with (%hv | #HT)
+    · obtain ⟨v, hP, hae⟩ := hv
+      have hn : ents[s]? = none := by rw [← hae]; exact hmiss _ s hP hs
       rw [hn]
       simp only [axHopNext]
       iapply Hmh $$ HK
@@ -611,22 +614,22 @@ theorem pobs_hop_w_lin (γfs : FsNames) (Pin : Aview → Prop) (T : IProp GF) [P
     unfold appInv
     imod (inv_acc (E := ⊤) (N := appN) (P := appBody (GF := GF) γfs) CoPset.subseteq_top) $$ Hinv
       with ⟨Hbody, Hclose⟩
-    unfold appBody
-    icases Hbody with ⟨%I, >Hh, Hp, >%hdom⟩
-    ihave Hpc : iprop(▷ (appPred appRun (absView I) ∗ K ∗ (⌜Pin (absView I)⌝ ∨ T))) $$ [Hp HK]
+    -- CREDIT-FREE at every step index (Rocq's ordinal port), as `pobs_hop_dead_lin`
+    ihave Hc : iprop(▷ (⌜∃ v, Pin v ∧ astep v hops[k]! s = ents[s]?⌝ ∨ T)) $$ [#]
     · inext
-      iapply Hcl $$ HK Hp
-    icases Hpc with ⟨Hp, >HK, >Hc⟩
-    ihave %hae := pobs_elend_astep γfs (1 : Qp).half I hops[k]! dqv ents s $$ Hh HF
-    imod Hclose $$ [Hh Hp]
-    · inext
-      iexists I
-      iframe Hh Hp
-      ipureintro; exact hdom
+      unfold appBody
+      icases Hbody with ⟨%I, Hh, Hp, -⟩
+      icases Hcl $$ %(absView I) HK Hp with ⟨-, -, (%hP | #HT)⟩
+      · ihave %hae := pobs_elend_astep γfs (1 : Qp).half I hops[k]! dqv ents s $$ Hh HF
+        ileft; ipureintro; exact ⟨absView I, hP, hae⟩
+      · iright; iexact HT
+    imod Hc
+    imod Hclose $$ Hbody
     imodintro
     iframe HF
-    icases Hc with (%hP | #HT)
-    · have hst := arun_step_tot k s (hpin _ hP) hk
+    icases Hc with (%hv | #HT)
+    · obtain ⟨v, hP, hae⟩ := hv
+      have hst := arun_step_tot k s (hpin _ hP) hk
       rw [hae] at hst
       rw [hst]
       simp only [axHopNext]

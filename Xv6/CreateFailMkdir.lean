@@ -210,7 +210,7 @@ theorem createFailMkdir_child_park (kslot : Nat) (cinum : BitVec 32) (t : Nat)
       topFrag (fsGammaL fscFs) cinum.toNat (eraNode dc bmc datc) -∗
       createDirty t cinum.toNat -∗
       creArmFired Farm cinum.toNat -∗
-      pfAt (aunarmOfArmNd (fsGammaL fscFs) appE Nd Farm) Fun -∗
+      pfAt (aunarmOfArmNd (fsGammaL fscFs) appE Nd Farm) Fun -∗ £ 1 -∗
       |={⊤}=> icLoaded fscFs fscIreg fscCov fscLogst kslot cinum
           (createSetf dc major minor 0#16) bmc ∗
         txPin icfgLog t (1 : Qp).half ∗ creUnarmFired Fun cinum.toNat := by
@@ -236,12 +236,12 @@ theorem createFailMkdir_child_park (kslot : Nat) (cinum : BitVec 32) (t : Nat)
     intro _
     rw [fnOrphan_eraZ _ bmc datc hz, cafEra_nlink, hz]
     simp
-  iintro #Hinv Hdi Hmeta Hmap Hblk Htop Hdirty Harm Hun
+  iintro #Hinv Hdi Hmeta Hmap Hblk Htop Hdirty Harm Hun Hcr
   ihave #Hft := iregInv_ftop $$ Hinv
   ihave #Hap := iregInv_app $$ Hinv
   ihave Hun := aunarmOfArmNd_open (fsGammaL fscFs) appE Nd Farm Fun cinum.toNat $$ Harm Hun
   imod (create_dirty_clear_unarm_nd ⊤ t cinum.toNat _ Nd Fun _ _ CoPset.subseteq_top
-    hloc hrow hnone (hNd _)) $$ Hft Hap Hdirty Hun Htop with ⟨Htx, Htop, Hr⟩
+    hloc hrow hnone (hNd _)) $$ Hft Hap Hdirty Hun Htop Hcr with ⟨Htx, Htop, Hr⟩
   ihave Het := entToks_eraDotsOnly (GF := GF) (fsGammaL fscFs) cinum.toNat
     (createSetf dc major minor 0#16) bmc datc ∅ hz hok0.2.2.2.2.2.1 hok0.2.2.2.2.1 hdots0
   ihave Hdl := dlinks_intro fscFs cinum.toNat _ bmc datc ∅ hdset hexact $$ Het
@@ -356,7 +356,7 @@ theorem create_fail_mkdir_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedName
   ihave #Hinv := create_env_ireg Γ γl pd pav pu γkl γk $$ Henv
   iapply wpLoop_fupd
   imod (createFailMkdir_child_park kslot cinum t major minor dc bmc datc Nm Nd Farm Fun hctynz hcnl hciok
-    hcrl hcdok hcduq hcdots (hNdD htd)) $$ Hinv Hcdiat Hcmeta Hcmap Hcblocks Hctop Hdirty Harmr Hun
+    hcrl hcdok hcduq hcdots (hNdD htd)) $$ Hinv Hcdiat Hcmeta Hcmap Hcblocks Hctop Hdirty Harmr Hun Hlc
     with ⟨Hcload, Htx0, Hunr⟩
   imodintro
   -- ===== +0x150  c.mv a0,s3 =====

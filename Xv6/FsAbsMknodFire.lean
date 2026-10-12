@@ -373,11 +373,11 @@ theorem cafAcre_fire_nm [Icfg] (γfs : FsNames) (E : CoPset) (cf : Nat → Nat �
       -- back, so the prover keeps the cursor its own post owes
       Pd d -∗
       topFrag (fsGammaL γfs) d np -∗
-      topFragQ (fsGammaL γfs) dqc i nc ={E}=∗
+      topFragQ (fsGammaL γfs) dqc i nc -∗ £ 1 ={E}=∗
         topFrag (fsGammaL γfs) d np' ∗ topFragQ (fsGammaL γfs) dqc i nc ∗ Pd d ∗
         ∃ av : Aview, ⌜crePre av d nm (dirEntries np) (fnNlink np) i (cf d i)⌝ ∗
           Fok.pfRecv av d nm i := by
-  iintro #Hi #Hai Hcm Harm HPd Hfp Hfc
+  iintro #Hi #Hai Hcm Harm HPd Hfp Hfc Hcr
   ihave Hcm := pfAt_au _ _ $$ Hcm
   unfold topFrag topFragQ
   -- PARENT AND CHILD ARE DISTINCT KEYS: the parent's fragment is whole
@@ -402,7 +402,7 @@ theorem cafAcre_fire_nm [Icfg] (γfs : FsNames) (E : CoPset) (cf : Nat → Nat �
   ihave Hcm := Hcm $$ %I %d %i %nm %(dirEntries np) %(fnNlink np) %hpre %hpnm %hNm Harm HPd Ha
   imod (fupd_mask_mono hsub) $$ Hcm with ⟨Ha, HPd, Hstep, Hph2⟩
   -- THE MOVE, at the whole authority (`AppInv.appTopUpdate`)
-  imod (appTopUpdate (E \ ↑ftopN) γfs I d np np' hsub) $$ Hai [Hstep] Ha Hfp with ⟨Ha, Hfp⟩
+  imod (appTopUpdate (E \ ↑ftopN) γfs I d np np' hsub) $$ Hai [Hstep] Ha Hfp Hcr with ⟨Ha, Hfp⟩
   · iintro %_ Hp
     iapply (appStep_at d I _ np' hdelta) $$ Hstep Hp
   ihave Hph2 := Hph2 $$ %(PartialMap.insert I d np') %hdelta Ha

@@ -122,17 +122,20 @@ theorem fileResync [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed) (r : File
   imod (inv_acc (E := E) (N := appN) (P := appBody (GF := GF) γfs) hE) $$ Hinv
     with ⟨Hbody, Hclose⟩
   unfold appBody
-  icases Hbody with ⟨%I0, >Hh, Hp, >%hdom⟩
+  have htl : ∀ av : Aview, Timeless (appPred appRun av : IProp GF) := by
+    intro av; subst heq; exact filePred_timeless (GF := GF) c r av
   subst heq
+  imod Hbody
+  icases Hbody with ⟨%I0, Hh, Hp, %hdom⟩
   ihave %hI := ghost_map_auth_agree _ _ _ _ _ $$ Hka Hh
   subst hI
-  imod (@timeless_except0 _ _ _ (filePred_timeless (GF := GF) c r (absView I'))).mp $$ Hp with Hp
+  dsimp only
   unfold filePred
   icases Hp with (#Ht | ⟨%hpins, Hc, Hf, Hsy⟩)
   · -- TAINTED: the ticket comes back beside the taint
     imod Hclose $$ [Hh]
     · inext
-      dsimp only
+      try dsimp only
       iexists I'
       iframe Hh
       isplitl []
@@ -171,7 +174,7 @@ theorem fileResync [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed) (r : File
   ihave Hnew := filePred_exact c r _ s' hpins hok $$ Hc Hw Hd2 Ht' Hty Hsy
   imod Hclose $$ [Hh Hnew]
   · inext
-    dsimp only
+    try dsimp only
     iexists I'
     iframe Hh
     isplitl
@@ -200,14 +203,17 @@ theorem fileEscrowPark [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed) (r : 
   imod (inv_acc (E := E) (N := appN) (P := appBody (GF := GF) γfs) hE) $$ Hinv
     with ⟨Hbody, Hclose⟩
   unfold appBody
-  icases Hbody with ⟨%I0, >Hka, Hp, >%hdom⟩
+  have htl : ∀ av : Aview, Timeless (appPred appRun av : IProp GF) := by
+    intro av; subst heq; exact filePred_timeless (GF := GF) c r av
   subst heq
-  imod (@timeless_except0 _ _ _ (filePred_timeless (GF := GF) c r (absView I0))).mp $$ Hp with Hp
+  imod Hbody
+  icases Hbody with ⟨%I0, Hka, Hp, %hdom⟩
+  dsimp only
   unfold filePred
   icases Hp with (#Ht | ⟨%hpins, Hc, Hf, Hsy⟩)
   · imod Hclose $$ [Hka]
     · inext
-      dsimp only
+      try dsimp only
       iexists I0
       iframe Hka
       isplitl []
@@ -241,7 +247,7 @@ theorem fileEscrowPark [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed) (r : 
   imod escAuth_grow r h s g $$ Ha with ⟨Ha, #Hwit⟩
   imod Hclose $$ [Hka Hc Ha Hwh Htk' Hsy]
   · inext
-    dsimp only
+    try dsimp only
     iexists I0
     iframe Hka
     isplitl
@@ -279,14 +285,17 @@ theorem fileEscrowReturn [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed) (r 
   imod (inv_acc (E := E) (N := appN) (P := appBody (GF := GF) γfs) hE) $$ Hinv
     with ⟨Hbody, Hclose⟩
   unfold appBody
-  icases Hbody with ⟨%I0, >Hka, Hp, >%hdom⟩
+  have htl : ∀ av : Aview, Timeless (appPred appRun av : IProp GF) := by
+    intro av; subst heq; exact filePred_timeless (GF := GF) c r av
   subst heq
-  imod (@timeless_except0 _ _ _ (filePred_timeless (GF := GF) c r (absView I0))).mp $$ Hp with Hp
+  imod Hbody
+  icases Hbody with ⟨%I0, Hka, Hp, %hdom⟩
+  dsimp only
   unfold filePred
   icases Hp with (#Ht | ⟨%hpins, Hc, Hf, Hsy⟩)
   · imod Hclose $$ [Hka]
     · inext
-      dsimp only
+      try dsimp only
       iexists I0
       iframe Hka
       isplitl []
@@ -320,7 +329,7 @@ theorem fileEscrowReturn [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed) (r 
   ihave Hnew := filePred_exact c r _ s0 hpins hok $$ Hc Hw Hd2 Htk' Hty Hsy
   imod Hclose $$ [Hka Hnew]
   · inext
-    dsimp only
+    try dsimp only
     iexists I0
     iframe Hka
     isplitl
@@ -346,14 +355,17 @@ theorem filePosAdvance [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed) (r : 
   imod (inv_acc (E := E) (N := appN) (P := appBody (GF := GF) γfs) hE) $$ Hinv
     with ⟨Hbody, Hclose⟩
   unfold appBody
-  icases Hbody with ⟨%I0, >Hka, Hp, >%hdom⟩
+  have htl : ∀ av : Aview, Timeless (appPred appRun av : IProp GF) := by
+    intro av; subst heq; exact filePred_timeless (GF := GF) c r av
   subst heq
-  imod (@timeless_except0 _ _ _ (filePred_timeless (GF := GF) c r (absView I0))).mp $$ Hp with Hp
+  imod Hbody
+  icases Hbody with ⟨%I0, Hka, Hp, %hdom⟩
+  dsimp only
   unfold filePred
   icases Hp with (#Ht | ⟨%hpins, Hc, Hf, Hsy⟩)
   · imod Hclose $$ [Hka]
     · inext
-      dsimp only
+      try dsimp only
       iexists I0
       iframe Hka
       isplitl []
@@ -364,7 +376,7 @@ theorem filePosAdvance [inst : Appcfg GF] (γfs : FsNames) (c : FileFixed) (r : 
   imod syncClaim_advance c r (absView I0) n n' hle $$ Hsy Hpos with ⟨Hsy, Hpos⟩
   imod Hclose $$ [Hka Hc Hf Hsy]
   · inext
-    dsimp only
+    try dsimp only
     iexists I0
     iframe Hka
     isplitl

@@ -318,7 +318,7 @@ theorem fsCollectDur [Icfg] [CurCtx] (E : CoPset) (cn : IcNames) (γfs : FsNames
       iregReg γi γfs sb.sbInodestart icfgNib -∗
       bitmapReg γfs sb.sbBmapstart cov ls sb.sbSize -∗ icEscrows cn γfs γi cov ls -∗
       ipoolInv cn γfs γi cov ls icfgNib -∗ sbPark γfs sb -∗
-      colAuth γfs Lb C (fsHomeList cov ls) -∗ logTxAuth icfgLog (∅ : RegMapF Unit) -∗ T ={E}=∗
+      colAuth γfs Lb C (fsHomeList cov ls) -∗ logTxAuth icfgLog (∅ : RegMapF Unit) -∗ £ 1 -∗ T ={E}=∗
       snapLawOut (appGuest Okc) T gd C (fsHomeList cov ls) ∗
       colAuth γfs Lb C (fsHomeList cov ls) ∗ logTxAuth icfgLog (∅ : RegMapF Unit) := by
   -- the masks (Rocq's `solve_ndisj`)
@@ -355,7 +355,7 @@ theorem fsCollectDur [Icfg] [CurCtx] (E : CoPset) (cn : IcNames) (γfs : FsNames
   have h6 : colEscNs (List.range NINODE) ⊆
       (((((E \ ↑appN) \ ↑ftopN) \ ↑iregN) \ ↑bitmapN) \ ↑sbN) \ ↑ipoolN :=
     fun p hp => h6e p (colEscNs_sub _ p hp)
-  iintro #Hxfer #Hireg #Hbmi #Hesc #Hpool #Hpark Hauth Htx HT
+  iintro #Hxfer #Hireg #Hbmi #Hesc #Hpool #Hpark Hauth Htx Hcr HT
   unfold iregReg
   icases Hireg with ⟨#Hiregi, -, #Hftop, #Happ⟩
   unfold bitmapReg
@@ -364,8 +364,15 @@ theorem fsCollectDur [Icfg] [CurCtx] (E : CoPset) (cn : IcNames) (γfs : FsNames
   unfold appInv
   imod (inv_acc (E := E) (N := appN) (P := appBody (GF := GF) γfs) hap) $$ Happ
     with ⟨Hab, Hclapp⟩
+  -- the law's credit strips the body's later WHOLE (Rocq's ordinal port, option (a)):
+  -- the claim must come out at the kernel's map while the kernel's half (`Hta`,
+  -- below) stays outside for the collection, which the existential under the later
+  -- cannot give at an ordinal step index; the claim goes on re-latered
+  imod lc_fupd_elim_later $$ Hcr Hab with Hab
   unfold appBody
-  icases Hab with ⟨%Ia, >Hha, Hpa, >%hdom⟩
+  icases Hab with ⟨%Ia, Hha, Hpa, %hdom⟩
+  ihave Hpa : ▷ appPred appRun (absView Ia) $$ [Hpa]
+  · inext; iexact Hpa
   -- 1. the abstract map's authority
   unfold ftopInv
   imod (inv_acc_timeless (E := E \ ↑appN) (N := ftopN) (P := ftopBody (GF := GF) γfs) h1)
@@ -459,7 +466,7 @@ theorem fsCollectGhost [Icfg] [CurCtx] (E : CoPset) (cn : IcNames) (γfs : FsNam
       bitmapReg γfs sb.sbBmapstart cov ls sb.sbSize -∗ icEscrows cn γfs γi cov ls -∗
       ipoolInv cn γfs γi cov ls icfgNib -∗ sbPark γfs sb -∗
       colAuth γfs Lb C (fsHomeList cov ls) -∗ logTxAuth icfgLog (∅ : RegMapF Unit) -∗
-      ▷ appGuest Okc gt_o -∗ T -∗ startAuth (GF := GF) n -∗
+      ▷ appGuest Okc gt_o -∗ T -∗ startAuth (GF := GF) n -∗ £ 1 -∗
       ([∗list] Q ∈ Qs, Hk Q) ={E}=∗
       (∃ gt : GName, pDurAt gt (colView C (fsHomeList cov ls)) ∗ ▷ appGuest Okc gt) ∗
       T ∗ startAuth (GF := GF) n ∗ ([∗list] Q ∈ Qs, Q) ∗
@@ -498,7 +505,7 @@ theorem fsCollectGhost [Icfg] [CurCtx] (E : CoPset) (cn : IcNames) (γfs : FsNam
   have h6 : colEscNs (List.range NINODE) ⊆
       (((((E \ ↑appN) \ ↑ftopN) \ ↑iregN) \ ↑bitmapN) \ ↑sbN) \ ↑ipoolN :=
     fun p hp => h6e p (colEscNs_sub _ p hp)
-  iintro #Hxfer #Hrun #Hireg #Hbmi #Hesc #Hpool #Hpark Hauth Htx Hold HT Hsa HQs
+  iintro #Hxfer #Hrun #Hireg #Hbmi #Hesc #Hpool #Hpark Hauth Htx Hold HT Hsa Hcr HQs
   unfold iregReg
   icases Hireg with ⟨#Hiregi, -, #Hftop, #Happ⟩
   unfold bitmapReg
@@ -507,8 +514,15 @@ theorem fsCollectGhost [Icfg] [CurCtx] (E : CoPset) (cn : IcNames) (γfs : FsNam
   unfold appInv
   imod (inv_acc (E := E) (N := appN) (P := appBody (GF := GF) γfs) hap) $$ Happ
     with ⟨Hab, Hclapp⟩
+  -- the law's credit strips the body's later WHOLE (Rocq's ordinal port, option (a)):
+  -- the claim must come out at the kernel's map while the kernel's half (`Hta`,
+  -- below) stays outside for the collection, which the existential under the later
+  -- cannot give at an ordinal step index; the claim goes on re-latered
+  imod lc_fupd_elim_later $$ Hcr Hab with Hab
   unfold appBody
-  icases Hab with ⟨%Ia, >Hha, Hpa, >%hdom⟩
+  icases Hab with ⟨%Ia, Hha, Hpa, %hdom⟩
+  ihave Hpa : ▷ appPred appRun (absView Ia) $$ [Hpa]
+  · inext; iexact Hpa
   -- 1. the abstract map's authority
   unfold ftopInv
   imod (inv_acc_timeless (E := E \ ↑appN) (N := ftopN) (P := ftopBody (GF := GF) γfs) h1)
@@ -668,7 +682,7 @@ theorem fsSnapLawBuild [Icfg] [CurCtx] (γ : LogNames) (cn : IcNames) (γfs : Fs
   iapply snapLaw_intro icfgLog γfs cov ls colLawN (appGuest Okc) T gd colLawN_fsbN $$ Hseam
   unfold snapLawAt
   imodintro
-  iintro %E %Lb %C %hNE %hdom %hlens %htie %hdm Hb Ht HT
+  iintro %E %Lb %C %hNE %hdom %hlens %htie %hdm Hb Ht Hcr HT
   have hsub : ∀ X : CoPset, X ⊆ colLawN → X ⊆ E := fun X hX p hp => hNE p (hX p hp)
   have hU : ∀ (X : CoPset) (p : Pos), p ∈ X → p ∈ colLawN → True := fun _ _ _ _ => trivial
   have hin : ∀ (X : CoPset), (∀ p, p ∈ X → p ∈ colLawN) → X ⊆ E := fun X hX => hsub X hX
@@ -697,7 +711,7 @@ theorem fsSnapLawBuild [Icfg] [CurCtx] (γ : LogNames) (cn : IcNames) (γfs : Fs
     ipureintro
     exact ⟨hdom', hlens, htie, hdm⟩
   imod fsCollectDur E cn γfs γi cov ls sb Lb C T Ok Okc gd hgeom hap hft hir hbm hsbn hip hie hOk
-    $$ Hx Hir Hbm Hesc Hpool Hpark Hauth Ht HT with ⟨Hout, Hauth, Ht⟩
+    $$ Hx Hir Hbm Hesc Hpool Hpark Hauth Ht Hcr HT with ⟨Hout, Hauth, Ht⟩
   unfold colAuth
   icases Hauth with ⟨Hb, -⟩
   imodintro
@@ -725,7 +739,7 @@ theorem fsSnapLawGhostBuild [Icfg] [CurCtx] (γ : LogNames) (cn : IcNames) (γfs
     colLawN_crashN $$ Hseam
   unfold snapLawGhostAt
   imodintro
-  iintro %E %Lb %C %Qs %gt_o %n %hNE %hdom %hlens %htie %hdm Hb Ht Hold HT %hn Hsa HQs
+  iintro %E %Lb %C %Qs %gt_o %n %hNE %hdom %hlens %htie %hdm Hb Ht Hold HT %hn Hsa Hcr HQs
   obtain ⟨hap, hft, hir, hbm, hsbn, hip, hie⟩ := colLawN_parts E hNE
   have hdom' : ∀ b, (∃ bs, PartialMap.get? C b = some bs) ↔ b ∈ fsHomeList cov ls :=
     fun b => (hdom b).trans (mem_fsHomeList cov ls b).symm
@@ -736,7 +750,7 @@ theorem fsSnapLawGhostBuild [Icfg] [CurCtx] (γ : LogNames) (cn : IcNames) (γfs
     exact ⟨hdom', hlens, htie, hdm⟩
   imod fsCollectGhost E cn γfs γi cov ls sb Lb C T Hk Qs gt_o Ok Okc gd n hgeom hap hft hir hbm
     hsbn hip hie hn hOk
-    $$ Hx Hrun Hir Hbm Hesc Hpool Hpark Hauth Ht Hold HT Hsa HQs with ⟨Hout, HT, Hsa, HQs, Hauth, Ht⟩
+    $$ Hx Hrun Hir Hbm Hesc Hpool Hpark Hauth Ht Hold HT Hsa Hcr HQs with ⟨Hout, HT, Hsa, HQs, Hauth, Ht⟩
   unfold colAuth
   icases Hauth with ⟨Hb, -⟩
   imodintro

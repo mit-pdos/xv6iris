@@ -61,7 +61,7 @@ theorem il_blk_open [Icfg] [Fscfg] [CurCtx] (kb : Nat) (pidv : BitVec 32) (inum 
     iregInv (GF := GF) fscIreg fscFs icfgIst icfgNib ∗
     bioLocked fscBio (fsView fscFs fscDisk icfgDev fscCov) kb pidv icfgDev
       (BitVec.ofNat 32 (IBLOCK inum icfgIst)) bs bsd db ∗
-    ipoolShapeNp fscFs fscIreg fscCov fscLogst inum ∗ iregWdLic o g inum.toNat ∗ ityPending g
+    ipoolShapeNp fscFs fscIreg fscCov fscLogst inum ∗ iregWdLic o g inum.toNat ∗ ityPending g ∗ £ 1
     ⊢ |={⊤}=> ∃ ds : List Dinode, ⌜diblkWf ds ∧ kb < NBUF⌝ ∗
       ilFillOut fscFs fscIreg fscCov fscLogst o g inum ds[islot inum]! ∗
       ityShot g ds[islot inum]!.diType ∗
@@ -72,7 +72,7 @@ theorem il_blk_open [Icfg] [Fscfg] [CurCtx] (kb : Nat) (pidv : BitVec 32) (inum 
   have hbno : (BitVec.ofNat 32 (IBLOCK inum icfgIst)).toNat = icfgIst + iregBi inum := by
     rw [BitVec.toNat_ofNat, ← iregBi_iblock]; omega
   have hin : (inum.toNat : Int) < 16 * (icfgNib : Int) := by omega
-  iintro ⟨#Hireg, Hlk, Hpool, Hcl, Hpend⟩
+  iintro ⟨#Hireg, Hlk, Hpool, Hcl, Hpend, Hcr⟩
   icases (bioLocked_split _ _ kb pidv icfgDev _ bs bsd db).1 $$ Hlk with ⟨Hhold, Hpay⟩
   icases dsHold_k_keep _ _ kb pidv icfgDev _ bs bsd $$ Hhold with ⟨%hkb, Hhold⟩
   icases dsHeld_L fscBio fscFs fscDisk icfgDev fscCov kb icfgDev
@@ -83,7 +83,7 @@ theorem il_blk_open [Icfg] [Fscfg] [CurCtx] (kb : Nat) (pidv : BitVec 32) (inum 
   obtain ⟨ds, hwf, rfl⟩ := hex
   rw [← iregBi_iblock]
   imod il_fill fscIreg fscFs icfgIst icfgNib fscCov fscLogst inum ds o g hfills hin hwf
-    $$ Hireg Hpool Hcl HL with ⟨HL, Hrest⟩
+    $$ Hireg Hpool Hcl HL Hcr with ⟨HL, Hrest⟩
   imod ityShoot g ds[islot inum]!.diType $$ Hpend with #Hshot
   rw [iregBi_iblock, ← hbno]
   ihave Hpay := Hpback $$ HL

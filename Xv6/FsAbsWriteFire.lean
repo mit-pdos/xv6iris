@@ -716,9 +716,9 @@ theorem wrfFire_core [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (i : Nat) 
             ((fsGammaL (GF := GF) γfs).top ↪●MAP{DFrac.own (1 : Qp).half} I') ={appE}=∗
             ((fsGammaL (GF := GF) γfs).top ↪●MAP{DFrac.own (1 : Qp).half} I') ∗ X)) -∗
       topFrag (fsGammaL γfs) i n -∗
-      offLink (GF := GF) γo (off : Int) ={E}=∗
+      offLink (GF := GF) γo (off : Int) -∗ £ 1 ={E}=∗
         topFrag (fsGammaL γfs) i n' ∗ X := by
-  iintro #Hi #Hai Hcm Hf Hg
+  iintro #Hi #Hai Hcm Hf Hg Hcr
   unfold ftopInv
   imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs)
     (ftopN_sub_app E hE)) $$ Hi with ⟨Hb, Hclose⟩
@@ -736,7 +736,7 @@ theorem wrfFire_core [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (i : Nat) 
   imod (fupd_mask_mono hsub) $$ Hcm with ⟨Ha, Hstep, Hph2⟩
   -- THE MOVE, at the whole authority: the application's half comes out of
   -- `appN` beside its claim, which the caller's step re-establishes.
-  imod (appTopUpdate (E \ ↑ftopN) γfs I i n n' hsub) $$ Hai [Hstep] Ha Hf with ⟨Ha, Hf⟩
+  imod (appTopUpdate (E \ ↑ftopN) γfs I i n n' hsub) $$ Hai [Hstep] Ha Hf Hcr with ⟨Ha, Hf⟩
   · iintro %_ Hp
     iapply (appStep_at i I _ n' hdelta) $$ Hstep Hp
   ihave Hph2 := Hph2 $$ %(PartialMap.insert I i n') %hdelta Ha
@@ -767,13 +767,13 @@ theorem wrfAwrite_fire_gen [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (i :
       offSupply γo E off bs.length ROff -∗
       awriteFullAt (fsGammaL γfs) appE i γo M ua cnt k REST -∗
       topFrag (fsGammaL γfs) i n -∗
-      offLink γo (off : Int) ={E}=∗
+      offLink γo (off : Int) -∗ £ 1 ={E}=∗
         topFrag (fsGammaL γfs) i n' ∗
         offLink γo ((off + bs.length : Nat) : Int) ∗ ROff ∗ REST := by
-  iintro #Hi #Hai Hsup Hcm Hf Hg
+  iintro #Hi #Hai Hsup Hcm Hf Hg Hcr
   imod wrfFire_core γfs E i off bs bs0 nl n n'
     iprop(offRet γo off bs.length ∗ REST)
-    hE hloc hpos hoff hcap hnz habs hnz' habs' γo $$ Hi Hai [Hcm] Hf Hg with ⟨Hf, Hg, Hrest⟩
+    hE hloc hpos hoff hcap hnz habs hnz' habs' γo $$ Hi Hai [Hcm] Hf Hg Hcr with ⟨Hf, Hg, Hrest⟩
   · unfold awriteFullAt
     iintro %I %hpre Ha Hg
     iapply Hcm $$ %I %off %bs %bs0 %nl %hpre %hby %hlen Ha Hg
@@ -798,13 +798,13 @@ theorem wrfAwrite_fire_adv [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (i :
     ⊢@{IProp GF} ftopInv γfs -∗ appInv γfs -∗
       awriteFullAdv (fsGammaL γfs) appE i γo M ua cnt k REST -∗
       topFrag (fsGammaL γfs) i n -∗
-      offLink γo (off : Int) ={E}=∗
+      offLink γo (off : Int) -∗ £ 1 ={E}=∗
         topFrag (fsGammaL γfs) i n' ∗
         offLink γo ((off + bs.length : Nat) : Int) ∗ REST := by
-  iintro #Hi #Hai Hcm Hf Hg
+  iintro #Hi #Hai Hcm Hf Hg Hcr
   iapply wrfFire_core γfs E i off bs bs0 nl n n'
     iprop(offLink γo ((off + bs.length : Nat) : Int) ∗ REST)
-    hE hloc hpos hoff hcap hnz habs hnz' habs' γo $$ Hi Hai [Hcm] Hf Hg
+    hE hloc hpos hoff hcap hnz habs hnz' habs' γo $$ Hi Hai [Hcm] Hf Hg Hcr
   unfold awriteFullAdv
   iintro %I %hpre Ha Hg
   iapply Hcm $$ %I %off %bs %bs0 %nl %hpre %hby %hlen Ha Hg
@@ -829,13 +829,13 @@ theorem wrfApart_fire_gen [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (i : 
       offSupply γo E off r ROff -∗
       awritePartAt (fsGammaL γfs) appE i γo M ua P cnt k REST -∗
       topFrag (fsGammaL γfs) i n -∗
-      offLink γo (off : Int) ={E}=∗
+      offLink γo (off : Int) -∗ £ 1 ={E}=∗
         topFrag (fsGammaL γfs) i n' ∗
         offLink γo ((off + r : Nat) : Int) ∗ ROff ∗ REST := by
-  iintro #Hi #Hai Hsup Hcm Hf Hg
+  iintro #Hi #Hai Hsup Hcm Hf Hg Hcr
   imod wrfFire_core γfs E i off bs bs0 nl n n'
     iprop(offRet γo off r ∗ REST)
-    hE hloc hpos hoff hcap hnz habs hnz' habs' γo $$ Hi Hai [Hcm] Hf Hg with ⟨Hf, Hg, Hrest⟩
+    hE hloc hpos hoff hcap hnz habs hnz' habs' γo $$ Hi Hai [Hcm] Hf Hg Hcr with ⟨Hf, Hg, Hrest⟩
   · unfold awritePartAt
     iintro %I %hpre Ha Hg
     iapply Hcm $$ %I %off %r %bs %bs0 %nl %hpre %hr %hgap %hshort %hwhy %hsb1 %hby Ha Hg
@@ -862,13 +862,13 @@ theorem wrfApart_fire_adv [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (i : 
     ⊢@{IProp GF} ftopInv γfs -∗ appInv γfs -∗
       awritePartAdv (fsGammaL γfs) appE i γo M ua P cnt k REST -∗
       topFrag (fsGammaL γfs) i n -∗
-      offLink γo (off : Int) ={E}=∗
+      offLink γo (off : Int) -∗ £ 1 ={E}=∗
         topFrag (fsGammaL γfs) i n' ∗
         offLink γo ((off + r : Nat) : Int) ∗ REST := by
-  iintro #Hi #Hai Hcm Hf Hg
+  iintro #Hi #Hai Hcm Hf Hg Hcr
   iapply wrfFire_core γfs E i off bs bs0 nl n n'
     iprop(offLink γo ((off + r : Nat) : Int) ∗ REST)
-    hE hloc hpos hoff hcap hnz habs hnz' habs' γo $$ Hi Hai [Hcm] Hf Hg
+    hE hloc hpos hoff hcap hnz habs hnz' habs' γo $$ Hi Hai [Hcm] Hf Hg Hcr
   unfold awritePartAdv
   iintro %I %hpre Ha Hg
   iapply Hcm $$ %I %off %r %bs %bs0 %nl %hpre %hr %hgap %hshort %hwhy %hsb1 %hby Ha Hg

@@ -479,7 +479,7 @@ theorem create_alloc_repark (dind cinum : BitVec 32) (dn dn' : Dinode) (bm bm' :
         (creChild ty.toNat major.toNat minor.toNat) Nm Pd Farm) Fok -∗
       creArmFired Farm cinum.toNat -∗
       -- THE PARENT CURSOR (TL-3K): read by the leg and handed back
-      Pd dind.toNat -∗
+      Pd dind.toNat -∗ £ 1 -∗
       |={⊤}=> dlinks fscFs dind.toNat dn' bm' data' ∗
         topFrag (fsGammaL fscFs) dind.toNat (eraNode dn' bm' data') ∗
         topFrag (fsGammaL fscFs) cinum.toNat (eraNode (createSetf dnc major minor 1#16) bmc datc) ∗
@@ -532,7 +532,7 @@ theorem create_alloc_repark (dind cinum : BitVec 32) (dn dn' : Dinode) (bm bm' :
     exact entTok_ofLink (fsGammaL fscFs) dind.toNat _ _ false (bname 14 nf) cinum.toNat .tFile
       (entTyOk_name _ _ _ false _ (by rw [DOT_dot]; exact hnd.1) (by rw [DOTDOT_dotdot]; exact hnd.2)
         (by simp))
-  iintro #Hinv Hdl Htok Htop Hctop Hacre Harm HPd
+  iintro #Hinv Hdl Htok Htop Hctop Hacre Harm HPd Hcr
   icases dlinks_open fscFs dind.toNat dn bm data $$ Hdl with ⟨%D, %hD, Hetk⟩
   obtain ⟨hdok0, hxact0⟩ := hD
   have hsD : bname 14 nf ∉ D := fun hin => by
@@ -556,7 +556,7 @@ theorem create_alloc_repark (dind cinum : BitVec 32) (dn dn' : Dinode) (bm bm' :
     Fok dind.toNat cinum.toNat (bname 14 nf) (DFrac.own 1) _ _ _ CoPset.subseteq_top hNm hloc
     (mkfEra_is_dir dn bm data hdz) (Xv6.eraNlink_nz dn bm data hnl0z) hnoneE
     ⟨by rw [DOT_dot]; exact hnd.1, by rw [DOTDOT_dotdot]; exact hnd.2⟩ habsp' habsc)
-    $$ Hft Hap Hacre Harm HPd Htop Hctop with ⟨Htop, Hctop, HPd, ⟨%av, %hpre, HFok⟩⟩
+    $$ Hft Hap Hacre Harm HPd Htop Hctop Hcr with ⟨Htop, Hctop, HPd, ⟨%av, %hpre, HFok⟩⟩
   ihave Hctop : topFrag (fsGammaL fscFs) cinum.toNat
       (eraNode (createSetf dnc major minor 1#16) bmc datc) $$ [Hctop]
   · rw [topFrag_1]; iexact Hctop
@@ -935,6 +935,9 @@ theorem create_alloc_file (IUP : IUNLOCKPUT) (DLK : DIRLINK) (Γ : SchedNames)
         (P (nparElems (bview plen pfun)).length) Farm) Fok -∗
       (∀ c' : CPU, £ 1 -∗ createPost k plen pfun ty major minor γ pid V M u Sb ns
         dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex c') -∗
+      -- the child's retag at entry (`create_dirty_clear_same`) spends the caller's
+      -- step credit (ordinal step index)
+      £ 1 -∗
       wpLoop cpu := by
   have hS' := hS
   obtain ⟨hj, hproc, hK, hnoff, htier, hroot, hnib0, hgeom, hbg, hbel, hireg, hnn, hterm, hplen,
@@ -955,7 +958,7 @@ theorem create_alloc_file (IUP : IUNLOCKPUT) (DLK : DIRLINK) (Γ : SchedNames)
   iintro #Henv Hk Hpc Hte Hce Hframe Hnm Htl #Hslk Hsl #Hfl Hdep Hoff Hdev Hinum Hval Hdl Hdi Hmeta
     Hmap Hblk Htop Hshot Hfrz Hkeep Hru #Hcslk Hcsl Hcdep Hcoff Hcdev Hcinum Hcval Hcdl Hcdi Hcmeta
     Hcmap Hcblk Hctop Hcshot Hcfrz #Hcfl Hckeep Hcru Htok Hsn Hsi Hss Hsb Hbare Hbw Hpath Hbs Hisl
-    Hop Hdirty HP Hdlk Harm Hdots Hun Hacre Hpost
+    Hop Hdirty HP Hdlk Harm Hdots Hun Hacre Hpost Hcr
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_tier _ _ $$ Hk with ⟨%hct, Hk⟩
   have ht0 : curTier = KTier.kpt := by rw [← hct]; exact htier
@@ -970,7 +973,7 @@ theorem create_alloc_file (IUP : IUNLOCKPUT) (DLK : DIRLINK) (Γ : SchedNames)
   ihave #Hap := iregInv_app fscIreg fscFs icfgIst icfgNib $$ Hinv
   iapply wpLoop_fupd
   imod (create_dirty_clear_same ⊤ t cinum.toNat _ _ CoPset.subseteq_top rfl hlocfile)
-    $$ Hft Hap Hdirty Hctop with ⟨Htx, Hctop⟩
+    $$ Hft Hap Hdirty Hctop Hcr with ⟨Htx, Hctop⟩
   imodintro
   -- +0xce  lw a2,4(s3)
   k_step_e (wp_s_lw cpu _ (KA.«create» + 0xce#64) false 4#12 12#5 19#5 (by decide) (by decide)
@@ -1067,7 +1070,7 @@ theorem create_alloc_file (IUP : IUNLOCKPUT) (DLK : DIRLINK) (Γ : SchedNames)
     have hcru : IBLOCK dind icfgIst ∈ Sb' := (hmem (by decide)).2.1
     -- +0xdc  bltz a0 : FALLS THROUGH
     k_step_e (wp_s_branch cpu _ (KA.«create» + 0xdc#64) false 106#13 10#5 0#5 (by decide) bop.BLT)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0z, create_bltz_zero]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0z, create_bltz_zero] £ Hcrp
     iintro Hk Hpc
     -- THE PARENT'S RE-PARK AND THE PARENT LEG (Rocq :1161–1378)
     obtain ⟨hty', hnl', hszmax, hcap', hiok', hrl', hdok', hddix', hduq'⟩ :=
@@ -1078,7 +1081,7 @@ theorem create_alloc_file (IUP : IUNLOCKPUT) (DLK : DIRLINK) (Γ : SchedNames)
       bmc datc Nm Nd (P (nparElems (bview plen pfun)).length) Farm Fok htyd hnl0 hiok hdok hddix hduq hrl
       hnone hc16 hcpos.1 hcinb htdir htyc hfresh hty hwf' hholes' haddr' hcov' hdn' hcapp hsizedp
       hrng (hNmL _ (Xv6.sys_unlink_last_of_npar _ nf hnp)))
-      $$ Hinv Hdl Htok Htop Hctop Hacre Harm HP with ⟨Hdl, Htop, Hctop, HP, HFok⟩
+      $$ Hinv Hdl Htok Htop Hctop Hacre Harm HP Hcrp with ⟨Hdl, Htop, Hctop, HP, HFok⟩
     imodintro
     icases create_alloc_map_open (ientry kd) bm' $$ Hmap with ⟨Ha, Hi⟩
     ihave Hload := icMkLoaded fscFs fscIreg fscCov fscLogst kd dind dn' bm' data' hiok' hrl' hdok'
@@ -1270,6 +1273,9 @@ theorem create_alloc_made (IUP : IUNLOCKPUT) (IU : IUPDATE) (DLK : DIRLINK) (Γ 
       Nm Nd (P (nparElems (bview plen pfun)).length) Farm Fdots Fun Fok -∗
       (∀ c' : CPU, £ 1 -∗ createPost k plen pfun ty major minor γ pid V M u Sb ns
         dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex c') -∗
+      -- the arm fire at entry (`create_dirty_arm`) spends the caller's step credit
+      -- (ordinal step index)
+      £ 1 -∗
       wpLoop cpu := by
   have hS' := hS
   obtain ⟨hj, hproc, hK, hnoff, htier, hroot, hnib0, hgeom, hbg, hbel, hireg, hnn, hterm, hplen,
@@ -1283,7 +1289,7 @@ theorem create_alloc_made (IUP : IUNLOCKPUT) (IU : IUPDATE) (DLK : DIRLINK) (Γ 
   unfold createMkdirBody at hM
   iintro #Henv Hk Hpc Hte Hce Hframe Hnm Htl #Hslk Hsl #Hfl Hdep Hoff Hdev Hinum Hval Hdl Hdi Hmeta
     Hmap Hblk Htop Hshot Hfrz Hkeep Hru #Hcslk Hcsl #Hcfl Hcdep Hcoff Hcdev Hcinum Hcval Hcload
-    Hcshot Hcfrz Hckeep Hcru Hsn Hsi Hss Hsb Hbare Hbw Hpath Hbs Hisl Hop Htx HP Hdlk Hcre Hpost
+    Hcshot Hcfrz Hckeep Hcru Hsn Hsi Hss Hsb Hbare Hbw Hpath Hbs Hisl Hop Htx HP Hdlk Hcre Hpost Hcra
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_tier _ _ $$ Hk with ⟨%hct, Hk⟩
   have ht0 : curTier = KTier.kpt := by rw [← hct]; exact htier
@@ -1305,7 +1311,7 @@ theorem create_alloc_made (IUP : IUNLOCKPUT) (IU : IUPDATE) (DLK : DIRLINK) (Γ 
   ihave #Hap := iregInv_app fscIreg fscFs icfgIst icfgNib $$ Hinv
   iapply wpLoop_fupd
   imod (create_dirty_arm ⊤ t cinum.toNat (creC0 ty.toNat major.toNat minor.toNat) Nm Nd Farm
-    _ _ CoPset.subseteq_top hrow0 hrowc) $$ Hft Hap Htx Harm Hctop with ⟨Hdirty, Hctop, Harmr⟩
+    _ _ CoPset.subseteq_top hrow0 hrowc) $$ Hft Hap Htx Harm Hctop Hcra with ⟨Hdirty, Hctop, Harmr⟩
   imodintro
   icases create_alloc_meta_open (ientry kslot) dnc $$ Hcmeta with ⟨Hcty, Hcmaj, Hcmin, Hcnl, Hcsz⟩
   -- +0xb4  sh s5,70(s3) : ip->major = major
@@ -1429,7 +1435,7 @@ theorem create_alloc_made (IUP : IUNLOCKPUT) (IU : IUPDATE) (DLK : DIRLINK) (Γ 
     have hb : bcond bop.BEQ (BitVec.signExtend 64 ty) 1#64 = false := by
       rw [create_beq_tdir]; exact decide_eq_false htd
     k_step_e (wp_s_branch cpu _ (KA.«create» + 0xca#64) false 46#13 20#5 14#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e20, r20, hb]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e20, r20, hb] £ Hcr
     iintro Hk Hpc
     ihave Hbare := Hpw $$ Hpid
     iapply (create_alloc_file IUP DLK Γ k γl pd pav pu j γkl γk plen pfun ty major minor γ pid V M
@@ -1441,7 +1447,7 @@ theorem create_alloc_made (IUP : IUNLOCKPUT) (IU : IUPDATE) (DLK : DIRLINK) (Γ 
       $$ Henv Hk Hpc Hte Hce Hframe Hnm Htl Hslk Hsl Hfl Hdep Hoff Hdev Hinum Hval Hdl Hdi Hmeta Hmap
         Hblk Htop Hshot Hfrz Hkeep Hru Hcslk Hcsl [Hcdep] Hcoff Hcdev Hcinum Hcval Hcdl Hcdi Hcmeta
         Hcmap Hcblk Hctop Hcshot Hcfrz Hcfl Hckeep Hcru Htok Hsn Hsi Hss Hsb Hbare Hbw Hpath Hbs Hisl
-        Hop Hdirty HP Hdlk Harmr Hdots Hun Hacre Hpost
+        Hop Hdirty HP Hdlk Harmr Hdots Hun Hacre Hpost Hcr
     iexists lo, tl0
     iframe Hcfl Hcdep
     ipureintro; exact hle0
@@ -1669,7 +1675,7 @@ theorem create_alloc_half (IL : ILOCK) (IUP : IUNLOCKPUT) (IA : IALLOC) (IU : IU
       ⟨hn1r.1, hn1r.2⟩ hal hkslot ⟨hcpos, hclt⟩ hcinb htyc hfresh hnrt hledc hle0)
       $$ Henv Hk Hpc Hte Hce Hframe Hnm Htl Hslk Hsl Hfl Hdep Hoff Hdev Hinum Hval Hdl Hdi Hmeta Hmap
         Hblk Htop Hshot Hfrz Hkeep Hru Hcslk Hcsl Hcfl Hcdep Hcoff Hcdev Hcinum Hcval Hcload Hcshot
-        Hcfrz Hckeep Hcru Hsn Hsi Hss Hsb Hbare Hbw Hpath Hbs Hislr Hop Htx HP Hdlk Hcre Hpost
+        Hcfrz Hckeep Hcru Hsn Hsi Hss Hsb Hbare Hbw Hpath Hbs Hislr Hop Htx HP Hdlk Hcre Hpost Hlc
 
 end Half
 

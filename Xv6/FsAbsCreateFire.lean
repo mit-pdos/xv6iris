@@ -472,9 +472,9 @@ theorem cafArmedRetag [Icfg] (γfs : FsNames) (E : CoPset) (k t : Nat) (q : Qp)
               (PartialMap.insert I i n')) ={appE}=∗
             ((fsGammaL (GF := GF) γfs).top ↪●MAP{DFrac.own (1 : Qp).half}
               (PartialMap.insert I i n')) ∗ R)) -∗
-      topFrag (fsGammaL γfs) i n ={E}=∗
+      topFrag (fsGammaL γfs) i n -∗ £ 1 ={E}=∗
         iregArmed k t q S ∗ topFrag (fsGammaL γfs) i n' ∗ R := by
-  iintro #Hi #Hai Hrec Hcm Hf
+  iintro #Hi #Hai Hrec Hcm Hf Hcr
   unfold ftopInv iregArmed
   imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs)
     (ftopN_sub_app E hE)) $$ Hi with ⟨Hb, Hclose⟩
@@ -487,7 +487,7 @@ theorem cafArmedRetag [Icfg] (γfs : FsNames) (E : CoPset) (k t : Nat) (q : Qp)
   ihave Hcm := Hcm $$ %I %hlk Ha
   imod (fupd_mask_mono hsub) $$ Hcm with ⟨Ha, Hstep, Hph2⟩
   -- THE MOVE, at the whole authority (`AppInv.appTopUpdate`)
-  imod (appTopUpdate (E \ ↑ftopN) γfs I i n n' hsub) $$ Hai [Hstep] Ha Hf with ⟨Ha, Hf⟩
+  imod (appTopUpdate (E \ ↑ftopN) γfs I i n n' hsub) $$ Hai [Hstep] Ha Hf Hcr with ⟨Ha, Hf⟩
   · iintro %_ Hp
     iapply (appStep_at i I _ n' rfl) $$ Hstep Hp
   ihave Hph2 := Hph2 $$ Ha
@@ -519,8 +519,8 @@ theorem cafRetag [Icfg] (γfs : FsNames) (E : CoPset) (i : Nat) (n n' : FsNode) 
               (PartialMap.insert I i n')) ={appE}=∗
             ((fsGammaL (GF := GF) γfs).top ↪●MAP{DFrac.own (1 : Qp).half}
               (PartialMap.insert I i n')) ∗ R)) -∗
-      topFrag (fsGammaL γfs) i n ={E}=∗ topFrag (fsGammaL γfs) i n' ∗ R := by
-  iintro #Hi #Hai Hcm Hf
+      topFrag (fsGammaL γfs) i n -∗ £ 1 ={E}=∗ topFrag (fsGammaL γfs) i n' ∗ R := by
+  iintro #Hi #Hai Hcm Hf Hcr
   unfold ftopInv
   imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs)
     (ftopN_sub_app E hE)) $$ Hi with ⟨Hb, Hclose⟩
@@ -531,7 +531,7 @@ theorem cafRetag [Icfg] (γfs : FsNames) (E : CoPset) (i : Nat) (n n' : FsNode) 
   have hsub : appE ⊆ E \ ↑ftopN := appN_sub_ftop E hE
   ihave Hcm := Hcm $$ %I %hlk Ha
   imod (fupd_mask_mono hsub) $$ Hcm with ⟨Ha, Hstep, Hph2⟩
-  imod (appTopUpdate (E \ ↑ftopN) γfs I i n n' hsub) $$ Hai [Hstep] Ha Hf with ⟨Ha, Hf⟩
+  imod (appTopUpdate (E \ ↑ftopN) γfs I i n n' hsub) $$ Hai [Hstep] Ha Hf Hcr with ⟨Ha, Hf⟩
   · iintro %_ Hp
     iapply (appStep_at i I _ n' rfl) $$ Hstep Hp
   ihave Hph2 := Hph2 $$ Ha
@@ -562,11 +562,11 @@ theorem cafArm_fire [Icfg] (γfs : FsNames) (E : CoPset) (k t : Nat) (q : Qp)
     (hnone : absOf n = none) (hrow : absOf n' = some ⟨c, 1⟩) :
     ⊢@{IProp GF} ftopInv γfs -∗ appInv γfs -∗ iregArmed k t q S -∗
       pfAt (aarmCommitAt (fsGammaL γfs) appE c) Farm -∗
-      topFrag (fsGammaL γfs) i n ={E}=∗
+      topFrag (fsGammaL γfs) i n -∗ £ 1 ={E}=∗
         iregArmed k t q S ∗ topFrag (fsGammaL γfs) i n' ∗ creArmFired Farm i := by
-  iintro #Hi #Hai Hrec Hcm Hf
+  iintro #Hi #Hai Hrec Hcm Hf Hcr
   ihave Hcm := pfAt_au _ _ $$ Hcm
-  iapply (cafArmedRetag γfs E k t q S i n n' (creArmFired Farm i) hE hin) $$ Hi Hai Hrec [Hcm] Hf
+  iapply (cafArmedRetag γfs E k t q S i n n' (creArmFired Farm i) hE hin) $$ Hi Hai Hrec [Hcm] Hf Hcr
   iintro %I %hlk Ha
   have hav : PartialMap.get? (absView I) i = none := by
     rw [absView_lookup_of I i n hlk, hnone]
@@ -597,12 +597,12 @@ theorem cafDots_fire [Icfg] (γfs : FsNames) (E : CoPset) (k t : Nat) (q : Qp)
     (hrow : absOf n = some ⟨.ADir ∅, 1⟩) (hrow' : absOf n' = some ⟨.ADir (dotsEnts full i d), 1⟩) :
     ⊢@{IProp GF} ftopInv γfs -∗ appInv γfs -∗ iregArmed k t q S -∗
       pfAt (adotsCommitAt (fsGammaL γfs) appE) Fdots -∗
-      topFrag (fsGammaL γfs) i n ={E}=∗
+      topFrag (fsGammaL γfs) i n -∗ £ 1 ={E}=∗
         iregArmed k t q S ∗ topFrag (fsGammaL γfs) i n' ∗ creDotsFired Fdots i d full := by
-  iintro #Hi #Hai Hrec Hcm Hf
+  iintro #Hi #Hai Hrec Hcm Hf Hcr
   ihave Hcm := pfAt_au _ _ $$ Hcm
   iapply (cafArmedRetag γfs E k t q S i n n' (creDotsFired Fdots i d full) hE hin)
-    $$ Hi Hai Hrec [Hcm] Hf
+    $$ Hi Hai Hrec [Hcm] Hf Hcr
   iintro %I %hlk Ha
   have hav : PartialMap.get? (absView I) i = some ⟨.ADir ∅, 1⟩ := by
     rw [absView_lookup_of I i n hlk, hrow]

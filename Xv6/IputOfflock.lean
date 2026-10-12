@@ -72,7 +72,7 @@ theorem iput_ofl_body (LW : LOG_WRITE) (BL : BRELSE)
     iputEnv Γ γl pd pav pu γil γisl kk ∗
     trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
     dinodeAt fscIreg inum dn ∗
-    escAInv fscFs ge gr gd inum.toNat (rgb, (tid, qf)) ∗ redeemTicketA gd ∗
+    escAInv fscFs ge gr gd inum.toNat (rgb, (tid, qf)) ∗ redeemTicketA gd ∗ £ 1 ∗
     crpElem inum.toNat (.crpPre tid qc) ∗ txPin icfgLog tid qa ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
@@ -86,7 +86,7 @@ theorem iput_ofl_body (LW : LOG_WRITE) (BL : BRELSE)
     iputPost k n Sb crb cru crz tid qtx pidv dqp dqb dqs rgb
     ⊢ wpLoop (GF := GF) c := by
   obtain ⟨hbnoN, -⟩ := Xv6.iu_bno inum hgeom hcov
-  iintro ⟨Hk, Hpc, #Henv, Hte, Hce, Hdn, #Hesc, Hdep, Hcel, Htxa, Hpid, Hsb, Hsi, Hsl1,
+  iintro ⟨Hk, Hpc, #Henv, Hte, Hce, Hdn, #Hesc, Hdep, Hcr, Hcel, Htxa, Hpid, Hsb, Hsi, Hsl1,
     Hsl2, Hlocked, Hop, Hslot, Hframe, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave #Henv' := Henv
@@ -114,8 +114,8 @@ theorem iput_ofl_body (LW : LOG_WRITE) (BL : BRELSE)
   icases Hsl with ⟨Hd0, Hrest⟩
   -- THE DEPOSIT's atomic update, at the list the walk learned
   ihave Hau := iput_ofl_au inum dn ds ge gr gd (rgb, (tid, qf)) tid qc e0 hnib hdn
-    hnl0 hbare $$ [Hdn Hdep Hcel]
-  · iframe Hinv Hesc Hpinv Hdn Hdep Hcel
+    hnl0 hbare $$ [Hdn Hdep Hcel Hcr]
+  · iframe Hinv Hesc Hpinv Hdn Hdep Hcel Hcr
   ihave Hfin : iprop(committedA ge ∗ iregRegime (rgb, (tid, qf)).1 ∗ iregFpin (rgb, (tid, qf)) ∗
       txPin icfgLog tid qc -∗ txPin icfgLog tid qtx ∗ iregRegime rgb) $$ [Htxa]
   · iintro ⟨-, Hrg, Hfp, Htc⟩
@@ -261,9 +261,9 @@ theorem iput_offlock (BR : BREAD) (LW : LOG_WRITE) (BL : BRELSE)
   case dcov => rw [hbnoN]; exact hcov
   case da0 => k_norm_g
   case da1 => k_norm_g; exact Xv6.iu_sext_bno _ hib31
-  -- back from bread
-  iapply wpNext_intro_pin
-  iintro %c %_ %spie2 %spp2 %R2 %b %bs2 %bsd2 %d2 %hcs2 Hk Hpc Hte Hce Hpid Hlocked
+  -- back from bread: its credit pays the deposit's retag (`iput_ofl_au`)
+  iapply wpNext_intro_pin_lc
+  iintro %c %_ Hcr %spie2 %spp2 %R2 %b %bs2 %bsd2 %d2 %hcs2 Hk Hpc Hte Hce Hpid Hlocked
   k_norm_g [iput_ofl_ret_ac, hww, hpsw]
   obtain ⟨hcsa, ha0b⟩ := hcs2
   unfold calleeSaved at hcsa

@@ -111,7 +111,7 @@ theorem eo_tail (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_zero]
   iintro Hk Hpc
   k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0x4c#64) false 2084196#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_br_acq]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_br_acq] £ Hlcl
   iintro Hk Hpc
   iapply (eo_ac AC cpu _ γ γb γfs cov ls dev ?ha0 ?hna ?hKa ?hla) $$ [- $Hk $Hpc]
   rotate_right 1
@@ -188,7 +188,7 @@ theorem eo_tail (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP)
     with ⟨Hq, Hqclose⟩
   · iframe Hopen Hmir Htx
   icases logHelp_extract γ nc 0 true $$ Hhelp with ⟨%Qs, Hhooks, Hflip⟩
-  iapply logGhostCommit_loop cpu Qs γ γb γfs cov ls dev L M $$ Hctx Hlcg Hq Hstok Hhooks
+  iapply logGhostCommit_loop cpu Qs γ γb γfs cov ls dev L M $$ Hctx Hlcg Hlcl Hq Hstok Hhooks
   iintro Hq Hstok HQs
   icases Hqclose $$ Hq with ⟨Hopen, Hmir, Htx⟩
   -- +0x50 sw zero,32(s1)

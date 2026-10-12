@@ -216,8 +216,10 @@ theorem init_cons_seal_out_file (UL : UK_LEAVES) (g : FileGn) (r : FileAppNames)
   ihave #Hstep := init_cons_seal_law_file g r heq
   imodintro
   iintro HK
-  imod (appClaimUpdate ⊤ fscFs (consKey r.fnCons)
-      iprop(consNever r.fnCons ∨ fileTaint g.fgnCl) CoPset.subseteq_top) $$ Hinv Hstep HK with Hn
+  have htl : ∀ av : Aview, Timeless (appPred appRun av : IProp GF) := by
+    intro av; subst heq; exact filePred_timeless (GF := GF) g.fgnCl r av
+  imod (appClaimUpdate_tl ⊤ fscFs (consKey r.fnCons)
+      iprop(consNever r.fnCons ∨ fileTaint g.fgnCl) CoPset.subseteq_top htl) $$ Hinv Hstep HK with Hn
   imodintro
   unfold ukiMknodOut
   icases Hn with (#Hn | #HT)
