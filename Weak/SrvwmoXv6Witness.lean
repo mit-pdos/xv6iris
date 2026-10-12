@@ -316,7 +316,7 @@ theorem execProgOk'SSnoc (c : Cand) (i : Nat) (p pa : Pexv6) (da : Efab) (ls : L
     rw [pstSnocLe c pst i p' (cdEnd c) (Nat.le_refl _),
       pstSnocGt c pst i p' (cdEnd c + 1) (by omega),
       dvSnocLe c dv d' (cdEnd c) (Nat.le_refl _), dvSnocGt c dv d' (cdEnd c + 1) (by omega)]
-    exact ⟨hp, rfl, hrun, hfetch,
+    exact ⟨hp, rfl, hrun, hfetch, trivial,
       Or.inl ⟨l, hfu, (hlblRealizesAx _ _ _ _ _).2 hre,
         hst, WeakRvwmoCert.hlblRealizesPin _ _ _ _ _ hre⟩⟩
 

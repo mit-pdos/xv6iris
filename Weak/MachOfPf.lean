@@ -89,6 +89,14 @@ parameter is DISCHARGED (`simDisk`).
    descriptor / header / ring reads); the OUT capture read is made safe by the pf program itself,
    which STALLS on a wrapping capture buffer (`VirtioProg.outWraps`, owner ruling (a′) [OWN.40];
    `caseStall`), so no hypothesis remains.
+8. (W5d [R29.1], the cut clause's carrier) The parameter set is `HypsC fok fcutT`, the run record
+   `contRC fok fcutT`: `contRC.cons` carries the step's `pfCutFactsT fcutT` (`TsoShadow.lean`) and
+   `HypsC.cut` RECEIVES it — M2's cut is that clause verbatim (`Weak/PfRunUnpinned.lean`).  The
+   plan's names are the M1 (trivial-cut `fcutTTriv`) instances, as reducible abbreviations:
+   `Hyps fok := HypsC fok fcutTTriv`, `contR fok := contRC fok fcutTTriv`, so M1's statement text
+   is unchanged; M1's `cutOfPristine` enters `HypsC.cut` through `cutIgnore`.  `HypsC.cut`/`.fi`
+   quantify the trivial-cut `pfRunST` runs (`pfRunSTForgetCut`), so `simRun` threads that run and
+   `machRunOfPfRun` takes any `pfRunSTC` run.
 
 Every name is in `Weak.MachOfPf` (file-qualified).  Axioms: `propext`, `Classical.choice`,
 `Quot.sound`.
@@ -513,43 +521,57 @@ structure PfRec where
 def recLabels (r : List PfRec) : List (Nat × Wlabel) := r.map (fun x => (x.ag, x.lb))
 
 /-- **The run record, forward**: from `c` with step-list prefix `st`, the steps of `r` (each a
-`pfRunST` step with its facts at ITS prefix, and its kind) lead to `cN`. -/
-inductive contR (fok : Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop) :
+`pfRunSTC` step with its facts — the cut clause `fcutT` included, W5d [R29.1] — at ITS prefix, and
+its kind) lead to `cN`. -/
+inductive contRC (fok : Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop)
+    (fcutT : Nat → Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop) :
     Wpcfg Pexv6 Efab → List (Nat × Wlabel) → List PfRec → Wpcfg Pexv6 Efab → Prop where
-  | nil (c : Wpcfg Pexv6 Efab) (st : List (Nat × Wlabel)) : contR fok c st [] c
+  | nil (c : Wpcfg Pexv6 Efab) (st : List (Nat × Wlabel)) : contRC fok fcutT c st [] c
   | cons (c c' : Wpcfg Pexv6 Efab) (st : List (Nat × Wlabel)) (i : Nat) (l : Wlabel) (k : SKind)
       (r : List PfRec) (cN : Wpcfg Pexv6 Efab) :
       wpPfStep pstepEv pclsEv i l c c' → pfStepFacts fok c i l →
-      pfLoadFactsT TsoShadow.cohSrc st c i l → kindOk c i l c' k →
-      contR fok c' (st ++ [(i, l)]) r cN → contR fok c st (⟨c, i, l, k⟩ :: r) cN
+      pfLoadFactsT TsoShadow.cohSrc st c i l → pfCutFactsT fcutT TsoShadow.cohSrc st c i l →
+      kindOk c i l c' k →
+      contRC fok fcutT c' (st ++ [(i, l)]) r cN → contRC fok fcutT c st (⟨c, i, l, k⟩ :: r) cN
+
+/-- The run record of M1 (`contRC` at the trivial cut clause). -/
+abbrev contR (fok : Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop) :
+    Wpcfg Pexv6 Efab → List (Nat × Wlabel) → List PfRec → Wpcfg Pexv6 Efab → Prop :=
+  contRC fok fcutTTriv
 
 theorem contRSnoc (fok : Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop)
+    {fcutT : Nat → Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop}
     {c c1 c2 : Wpcfg Pexv6 Efab} {st : List (Nat × Wlabel)} {r : List PfRec} {i : Nat}
-    {l : Wlabel} {k : SKind} (h : contR fok c st r c1) (hs : wpPfStep pstepEv pclsEv i l c1 c2)
+    {l : Wlabel} {k : SKind} (h : contRC fok fcutT c st r c1)
+    (hs : wpPfStep pstepEv pclsEv i l c1 c2)
     (hf : pfStepFacts fok c1 i l) (hfT : pfLoadFactsT TsoShadow.cohSrc (st ++ recLabels r) c1 i l)
-    (hk : kindOk c1 i l c2 k) : contR fok c st (r ++ [⟨c1, i, l, k⟩]) c2 := by
-  revert hfT
+    (hcf : pfCutFactsT fcutT TsoShadow.cohSrc (st ++ recLabels r) c1 i l)
+    (hk : kindOk c1 i l c2 k) : contRC fok fcutT c st (r ++ [⟨c1, i, l, k⟩]) c2 := by
+  revert hfT hcf
   induction h with
   | nil c st =>
-    intro hfT
-    exact .cons _ _ _ i l k [] c2 hs hf (by simpa [recLabels] using hfT) hk (.nil _ _)
-  | cons c c' st i' l' k' r cN hs' hf' hfT' hk' _ ih =>
-    intro hfT
-    exact .cons _ _ _ i' l' k' _ _ hs' hf' hfT' hk'
-      (ih hs hf hk (by simpa [recLabels, List.append_assoc] using hfT))
+    intro hfT hcf
+    exact .cons _ _ _ i l k [] c2 hs hf (by simpa [recLabels] using hfT)
+      (by simpa [recLabels] using hcf) hk (.nil _ _)
+  | cons c c' st i' l' k' r cN hs' hf' hfT' hcf' hk' _ ih =>
+    intro hfT hcf
+    exact .cons _ _ _ i' l' k' _ _ hs' hf' hfT' hcf' hk'
+      (ih hs hf hk (by simpa [recLabels, List.append_assoc] using hfT)
+        (by simpa [recLabels, List.append_assoc] using hcf))
 
 /-- A shaped run IS a run record. -/
 theorem contROfRun (fok : Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop)
+    {fcutT : Nat → Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop}
     {c0 cN : Wpcfg Pexv6 Efab} {st : List (Nat × Wlabel)}
-    (h : pfRunST pstepEv pclsEv fok TsoShadow.cohSrc c0 st cN) :
-    ∃ r, contR fok c0 [] r cN ∧ recLabels r = st := by
+    (h : pfRunSTC pstepEv pclsEv fok TsoShadow.cohSrc fcutT c0 st cN) :
+    ∃ r, contRC fok fcutT c0 [] r cN ∧ recLabels r = st := by
   induction h with
   | nil => exact ⟨[], .nil _ _, rfl⟩
-  | snoc c1 c2 st i l _ hs hf hfT ih =>
+  | snoc c1 c2 st i l _ hs hf hfT hcf ih =>
     obtain ⟨r, hr, hl⟩ := ih
     obtain ⟨k, hk⟩ := kindOfStep i l c1 c2 hs
-    exact ⟨r ++ [⟨c1, i, l, k⟩], contRSnoc fok hr hs hf (by simpa [hl] using hfT) hk,
-      by simp [recLabels, ← hl]⟩
+    exact ⟨r ++ [⟨c1, i, l, k⟩], contRSnoc fok hr hs hf (by simpa [hl] using hfT)
+      (by simpa [hl] using hcf) hk, by simp [recLabels, ← hl]⟩
 
 /-! ## (F7) Observations: `κs` as a FUNCTION of the run record (E-S3) -/
 
@@ -652,14 +674,17 @@ theorem memFrame {c c' : Wpcfg Pexv6 Efab} {st rest : List (Nat × Wlabel)} {i :
   reducible (W5: `xv6FsAdequacy_closed`'s first conjunct).  It supplies the BUS DECODE the pf
   machine lacks (`devBytes`/`ramBytes` over the whole footprint);
 * `cut` — the fetch cut of `pfStepTso`'s hypothesis (3) at every fetch of the run, at a related
-  MachCSL state reachable from boot (M1: from `candKfetch` and the pristine kernel text; M2:
-  W5d's cut form);
+  MachCSL state reachable from boot, given the step's cut clause `pfCutFactsT fcutT` (W5d
+  [R29.1]; M1: `fcutTTriv`, the cut from `candKfetch` and the pristine kernel text, `cutIgnore`;
+  M2: the clause IS the cut form, `Weak/PfRunUnpinned.lean`);
 * `fi` — plan item (3): `fiArm` at `fence.i` / the `sfence.vma` marker, along every run from
   `c0` (a fact of the Sail model's event order; [OWN.35]: the named premise `sailCycleOrder`),
   at a related MachCSL state reachable from boot — the `cut` shape [R28.2], so that a
   kernel-text discharge (W-SCO) can pin the fetched words to the image through `SimRel`.
-The disk rows are `simDisk`, no longer a parameter. -/
-structure Hyps (fok : Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop)
+The disk rows are `simDisk`, no longer a parameter.  The runs `cut` and `fi` quantify are the
+trivial-cut `pfRunST` ones (every `pfRunSTC` run forgets to one, `pfRunSTForgetCut`). -/
+structure HypsC (fok : Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop)
+    (fcutT : Nat → Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop)
     (g0 : GState) (c0 : Wpcfg Pexv6 Efab) : Prop where
   tso : pfStepTsoStmt fok
   safe : ∀ (n : Nat) (κs : List Obs) (t : List Expr) (g : GState),
@@ -671,6 +696,7 @@ structure Hyps (fok : Image → List Wmsg → Nat → Int → List (Nat × BitVe
     ∀ (cpu : CPU) (base : Int) (tvs : List (Nat × BitVec 8)) (c' : Wpcfg Pexv6 Efab),
       wpPfStep pstepEv pclsEv (hartAgent cpu) (.LIFetch base tvs) c c' →
       pfStepFacts fok c (hartAgent cpu) (.LIFetch base tvs) →
+      pfCutFactsT fcutT TsoShadow.cohSrc st c (hartAgent cpu) (.LIFetch base tvs) →
       ∃ q, (tsoShadow TsoShadow.cohSrc st (hartAgent cpu)).itv ≤ q ∧ q ≤ c.pcLog.length ∧
         ifetchOk c.pcImg c.pcLog q base tvs ∧
         ∀ (j t : Nat) (v : BitVec 8), tvs[j]? = some (t, v) → t ≤ q
@@ -685,6 +711,39 @@ structure Hyps (fok : Image → List Wmsg → Nat → Int → List (Nat × BitVe
          (tsoShadow TsoShadow.cohSrc st (hartAgent cpu)).fiArm = true) ∧
       (∀ n w, o = .instrAnnounce n w → sfAnnB n w = true →
          (tsoShadow TsoShadow.cohSrc st (hartAgent cpu)).fiArm = false)
+
+/-- **W4's parameters at M1** (`HypsC` at the trivial cut clause). -/
+abbrev Hyps (fok : Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop)
+    (g0 : GState) (c0 : Wpcfg Pexv6 Efab) : Prop :=
+  HypsC fok fcutTTriv g0 c0
+
+/-- A cut that does not read the step's cut clause serves at every `fcutT` (M1's `cutOfPristine`
+into `HypsC.cut`). -/
+theorem cutIgnore {fok : Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop}
+    {fcutT : Nat → Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop}
+    {g0 : GState} {c0 : Wpcfg Pexv6 Efab}
+    (h : ∀ (st : List (Nat × Wlabel)) (c : Wpcfg Pexv6 Efab) (t : List Expr) (g : GState) (n : Nat)
+      (κ : List Obs),
+      pfRunST pstepEv pclsEv fok TsoShadow.cohSrc c0 st c → MRun n ([Expr.power], g0) κ (t, g) →
+      SimRel c st t g →
+      ∀ (cpu : CPU) (base : Int) (tvs : List (Nat × BitVec 8)) (c' : Wpcfg Pexv6 Efab),
+        wpPfStep pstepEv pclsEv (hartAgent cpu) (.LIFetch base tvs) c c' →
+        pfStepFacts fok c (hartAgent cpu) (.LIFetch base tvs) →
+        ∃ q, (tsoShadow TsoShadow.cohSrc st (hartAgent cpu)).itv ≤ q ∧ q ≤ c.pcLog.length ∧
+          ifetchOk c.pcImg c.pcLog q base tvs ∧
+          ∀ (j t : Nat) (v : BitVec 8), tvs[j]? = some (t, v) → t ≤ q) :
+    ∀ (st : List (Nat × Wlabel)) (c : Wpcfg Pexv6 Efab) (t : List Expr) (g : GState) (n : Nat)
+      (κ : List Obs),
+      pfRunST pstepEv pclsEv fok TsoShadow.cohSrc c0 st c → MRun n ([Expr.power], g0) κ (t, g) →
+      SimRel c st t g →
+      ∀ (cpu : CPU) (base : Int) (tvs : List (Nat × BitVec 8)) (c' : Wpcfg Pexv6 Efab),
+        wpPfStep pstepEv pclsEv (hartAgent cpu) (.LIFetch base tvs) c c' →
+        pfStepFacts fok c (hartAgent cpu) (.LIFetch base tvs) →
+        pfCutFactsT fcutT TsoShadow.cohSrc st c (hartAgent cpu) (.LIFetch base tvs) →
+        ∃ q, (tsoShadow TsoShadow.cohSrc st (hartAgent cpu)).itv ≤ q ∧ q ≤ c.pcLog.length ∧
+          ifetchOk c.pcImg c.pcLog q base tvs ∧
+          ∀ (j t : Nat) (v : BitVec 8), tvs[j]? = some (t, v) → t ≤ q :=
+  fun st c t g n κ hr hm hR cpu base tvs c' hs hf _ => h st c t g n κ hr hm hR cpu base tvs c' hs hf
 
 /-! ## (F5) The bus decode from HSafe, and what `evStep` moves -/
 
@@ -883,13 +942,15 @@ parked-fence fire, the lost-SC retry) or exactly 1 `primStep` of thread `cpu + 1
 (`devRead`/`devWrite`, the footprint from HSafe), and the RAM/fence/announce nodes through
 `pfStepTso`. -/
 theorem simNode {fok : Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop}
+    {fcutT : Nat → Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop}
     {g0 : GState} {c0 : Wpcfg Pexv6 Efab}
-    (hH : Hyps fok g0 c0) {c c' : Wpcfg Pexv6 Efab} {st rest : List (Nat × Wlabel)}
+    (hH : HypsC fok fcutT g0 c0) {c c' : Wpcfg Pexv6 Efab} {st rest : List (Nat × Wlabel)}
     {t : List Expr} {g : GState} {n : Nat} {κ : List Obs} {i : Nat} {l : Wlabel}
     (hR : SimRel c st t g) (hreach : MRun n ([Expr.power], g0) κ (t, g))
     (hrun : pfRunST pstepEv pclsEv fok TsoShadow.cohSrc c0 st c)
     (hs : wpPfStep pstepEv pclsEv i l c c') (hf : pfStepFacts fok c i l)
-    (hfT : pfLoadFactsT TsoShadow.cohSrc st c i l) (hk : kindOk c i l c' .node)
+    (hfT : pfLoadFactsT TsoShadow.cohSrc st c i l)
+    (hcf : pfCutFactsT fcutT TsoShadow.cohSrc st c i l) (hk : kindOk c i l c' .node)
     (hadj : pairAdjacent (st ++ (i, l) :: rest))
     (hex : ∀ aq base tvs asrc, l = .LExLoad aq base tvs asrc →
       exclOkTs c.pcLog i base (tvs.map Prod.fst) (c.pcLog.length + 1)) :
@@ -1046,7 +1107,8 @@ theorem simNode {fok : Image → List Wmsg → Nat → Int → List (Nat × BitV
       hH.tso c c' st g.m cpu o k (g.m.regs cpu) none ib l _ c'.pcDev rest hps hs hadj ⟨hf, hfT⟩
         (fun n va req ho => hrbR n va req ho (hdaR n va req ho))
         (fun n va req ho => hrbW n va req ho (hdaW n va req ho)) hmem hview hauth
-        (fun base tvs hl => by subst hl; exact hH.cut st c t g n κ hrun hreach hR0 cpu base tvs c' hs hf)
+        (fun base tvs hl => by
+          subst hl; exact hH.cut st c t g n κ hrun hreach hR0 cpu base tvs c' hs hf hcf)
         (fun aq base tvs asrc hl => ⟨hcoh, hex aq base tvs asrc hl⟩) rfl hl1 hl2 hfi1 hfi2
     simp only [Pexv6.PHart.injEq] at hp'
     obtain ⟨-, hmk, -, -, -⟩ := hp'
@@ -2710,9 +2772,10 @@ theorem adminStep {P D : Type} (pstep : P → D → Wlabel → P → D → Prop)
 /-- Walking a record forward over agent `i`'s administrative steps to its exclusive store: the
 store's `exclOkTs` holds at the walk's start (log and `i`'s reservation unchanged). -/
 theorem walkToStore (fok : Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop)
+    {fcutT : Nat → Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop}
     (i : Nat) (rl : Bool) (b : Int) (data : List (BitVec 8)) (a2 v2 : List Dsrc) :
     ∀ {c : Wpcfg Pexv6 Efab} {st : List (Nat × Wlabel)} {r : List PfRec} {cN : Wpcfg Pexv6 Efab},
-      contR fok c st r cN → ∀ (m : Nat),
+      contRC fok fcutT c st r cN → ∀ (m : Nat),
       (∀ w, w < m → ∃ l', (recLabels r)[w]? = some (i, l') ∧ lbAdmin false l') →
       (recLabels r)[m]? = some (i, .LExStore rl b data a2 v2) →
       ∀ (ag : Wpagent Pexv6) (R : Wresv), c.pcAgs[i]? = some ag → ag.paWs.wRes = some R →
@@ -2722,7 +2785,7 @@ theorem walkToStore (fok : Image → List Wmsg → Nat → Int → List (Nat × 
   | nil c st =>
     intro m _ hm
     simp [recLabels] at hm
-  | cons c c' st j l k r cN hs _ _ _ _ ih =>
+  | cons c c' st j l k r cN hs _ _ _ _ _ ih =>
     intro m hadm hm ag R hlk hres
     cases m with
     | zero =>
@@ -2751,10 +2814,11 @@ theorem walkToStore (fok : Image → List Wmsg → Nat → Int → List (Nat × 
 pair's own exclusive store — reached through the agent's administrative steps only — checked
 `exclOkTs` on the reservation's timestamps, which ARE the read's. -/
 theorem exclAhead (fok : Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop)
+    {fcutT : Nat → Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop}
     {c c1 cN : Wpcfg Pexv6 Efab} {st : List (Nat × Wlabel)} {i : Nat} {aq : Bool} {base : Int}
     {tvs : List (Nat × BitVec 8)} {asrc : List Dsrc} {r : List PfRec}
     (hs : wpPfStep pstepEv pclsEv i (.LExLoad aq base tvs asrc) c c1)
-    (hr : contR fok c1 (st ++ [(i, .LExLoad aq base tvs asrc)]) r cN)
+    (hr : contRC fok fcutT c1 (st ++ [(i, .LExLoad aq base tvs asrc)]) r cN)
     (hadj : pairAdjacent (st ++ (i, .LExLoad aq base tvs asrc) :: recLabels r)) :
     exclOkTs c.pcLog i base (tvs.map Prod.fst) (c.pcLog.length + 1) := by
   obtain ⟨u, hvu, hbt, rl, data, a2, v2, hu, -, -⟩ :=
@@ -2778,13 +2842,15 @@ theorem exclAhead (fok : Image → List Wmsg → Nat → Int → List (Nat × Bi
 /-- **ONE pf step** is 0, 1 (or, for the disk program, `simDisk`'s block of) MachCSL steps,
 observed by the record, re-establishing the relation. -/
 theorem simStep {fok : Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop}
+    {fcutT : Nat → Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop}
     {g0 : GState} {c0 : Wpcfg Pexv6 Efab}
-    (hH : Hyps fok g0 c0) {c c' : Wpcfg Pexv6 Efab} {st rest : List (Nat × Wlabel)}
+    (hH : HypsC fok fcutT g0 c0) {c c' : Wpcfg Pexv6 Efab} {st rest : List (Nat × Wlabel)}
     {t : List Expr} {g : GState} {n : Nat} {κ : List Obs} {i : Nat} {l : Wlabel} {k : SKind}
     (hR : SimRel c st t g) (hreach : MRun n ([Expr.power], g0) κ (t, g))
     (hrun : pfRunST pstepEv pclsEv fok TsoShadow.cohSrc c0 st c)
     (hs : wpPfStep pstepEv pclsEv i l c c') (hf : pfStepFacts fok c i l)
-    (hfT : pfLoadFactsT TsoShadow.cohSrc st c i l) (hk : kindOk c i l c' k)
+    (hfT : pfLoadFactsT TsoShadow.cohSrc st c i l)
+    (hcf : pfCutFactsT fcutT TsoShadow.cohSrc st c i l) (hk : kindOk c i l c' k)
     (hadj : pairAdjacent (st ++ (i, l) :: rest))
     (hex : ∀ aq base tvs asrc, l = .LExLoad aq base tvs asrc →
       exclOkTs c.pcLog i base (tvs.map Prod.fst) (c.pcLog.length + 1)) :
@@ -2792,7 +2858,7 @@ theorem simStep {fok : Image → List Wmsg → Nat → Int → List (Nat × BitV
       (k ≠ .disk → m ≤ 1) ∧ MRun m (t, g) (pfStepObs c i k) (t', g') ∧ SimRel c' (st ++ [(i, l)]) t' g' := by
   cases k with
   | node =>
-    obtain ⟨m, t', g', hle, hm, hR'⟩ := simNode hH hR hreach hrun hs hf hfT hk hadj hex
+    obtain ⟨m, t', g', hle, hm, hR'⟩ := simNode hH hR hreach hrun hs hf hfT hcf hk hadj hex
     exact ⟨m, t', g', fun _ => hle, hm, hR'⟩
   | wire =>
     obtain ⟨m, t', g', hle, hm, hR'⟩ := simWire hR hs hk hadj
@@ -2819,10 +2885,11 @@ theorem simStep {fok : Image → List Wmsg → Nat → Int → List (Nat × BitV
 MachCSL configuration, the rest of the run is a MachCSL run observed by `pfObsOf`, ending
 related to the pf run's last configuration. -/
 theorem simRun {fok : Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop}
+    {fcutT : Nat → Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop}
     {g0 : GState} {c0 : Wpcfg Pexv6 Efab}
-    (hH : Hyps fok g0 c0) :
+    (hH : HypsC fok fcutT g0 c0) :
     ∀ {c : Wpcfg Pexv6 Efab} {st : List (Nat × Wlabel)} {r : List PfRec} {cN : Wpcfg Pexv6 Efab},
-      contR fok c st r cN →
+      contRC fok fcutT c st r cN →
       ∀ {t : List Expr} {g : GState} {n : Nat} {κ : List Obs},
         SimRel c st t g → MRun n ([Expr.power], g0) κ (t, g) →
         pfRunST pstepEv pclsEv fok TsoShadow.cohSrc c0 st c → pairAdjacent (st ++ recLabels r) →
@@ -2834,13 +2901,14 @@ theorem simRun {fok : Image → List Wmsg → Nat → Int → List (Nat × BitVe
   | nil c st =>
     intro t g n κ hR hreach _ _
     exact ⟨n, t, g, by simpa [pfObsOf] using hreach, by simpa [recLabels] using hR⟩
-  | cons c c' st i l k r cN hs hf hfT hk hr ih =>
+  | cons c c' st i l k r cN hs hf hfT hcf hk hr ih =>
     intro t g n κ hR hreach hrun hadj
     have hadj' : pairAdjacent (st ++ (i, l) :: recLabels r) := by
       simpa [recLabels] using hadj
-    obtain ⟨m1, t1, g1, -, hm1, hR1⟩ := simStep hH hR hreach hrun hs hf hfT hk hadj'
+    obtain ⟨m1, t1, g1, -, hm1, hR1⟩ := simStep hH hR hreach hrun hs hf hfT hcf hk hadj'
       (fun aq base tvs asrc hl => by subst hl; exact exclAhead fok hs hr hadj')
-    obtain ⟨m2, t2, g2, hm2, hR2⟩ := ih hR1 (mrunTrans hreach hm1) (.snoc c c' st i l hrun hs hf hfT)
+    obtain ⟨m2, t2, g2, hm2, hR2⟩ :=
+      ih hR1 (mrunTrans hreach hm1) (pfRunST.snoc c c' st i l hrun hs hf hfT)
       (by simpa using hadj')
     refine ⟨m2, t2, g2, ?_, by simpa [recLabels] using hR2⟩
     rw [pfObsOfCons, ← List.append_assoc]
@@ -2858,23 +2926,24 @@ related to the run's last one by `SimRel` (the pool by step kind, registers, `R-
 fetch cut and item (3)'s `fiArm` facts) — NOT in the disk rows, which F9 proves
 (`simDisk`). -/
 theorem machRunOfPfRun (fok : Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop)
+    {fcutT : Nat → Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop}
     (σ0 : WGState) (ds : DevStates) (g0 : GState)
     (hb : wbootFacts σ0) (hds : σ0.wgdev = ds.reset) (hg0 : g0.gen = 0) (hp0 : g0.pow = false)
     (hgd : g0.m.devs = ds)
-    (hH : Hyps fok g0 (wpInit (imgZ σ0.wgimg) (efInit σ0.wgdev) (epsInit σ0)))
+    (hH : HypsC fok fcutT g0 (wpInit (imgZ σ0.wgimg) (efInit σ0.wgdev) (epsInit σ0)))
     (st : List (Nat × Wlabel)) (cN : Wpcfg Pexv6 Efab)
-    (hrun : pfRunST pstepEv pclsEv fok TsoShadow.cohSrc
+    (hrun : pfRunSTC pstepEv pclsEv fok TsoShadow.cohSrc fcutT
       (wpInit (imgZ σ0.wgimg) (efInit σ0.wgdev) (epsInit σ0)) st cN)
     (hadj : pairAdjacent st) :
     ∃ r : List PfRec,
-      contR fok (wpInit (imgZ σ0.wgimg) (efInit σ0.wgdev) (epsInit σ0)) [] r cN ∧
+      contRC fok fcutT (wpInit (imgZ σ0.wgimg) (efInit σ0.wgdev) (epsInit σ0)) [] r cN ∧
       recLabels r = st ∧
       ∃ (n : Nat) (t : List Expr) (g : GState),
         MRun n ([Expr.power], g0) (Obs.powerOn :: pfObsOf r) (t, g) ∧ SimRel cN st t g := by
   obtain ⟨r, hr, hl⟩ := contROfRun fok hrun
   have hboot := powerOnRun g0 σ0 ds hb hg0 hp0 hgd
   have hR0 := simRelBoot σ0 ds hb hds
-  obtain ⟨m, t, g, hm, hR⟩ := simRun hH hr hR0 hboot .nil (by simpa [hl] using hadj)
+  obtain ⟨m, t, g, hm, hR⟩ := simRun hH hr hR0 hboot pfRunST.nil (by simpa [hl] using hadj)
   refine ⟨r, hr, hl, m, t, g, by simpa using hm, by simpa [hl] using hR⟩
 
 /-! ## (M1) The fetch cut from the pristine kernel text -/

@@ -36,6 +36,10 @@ unpinned LTS.  Forgetful maps: `execProgOk'SForget` (to `execProgOk'`),
 `execProgOk'SSca` (to `execSca`), `pfRunSRtc` (to `rtc wpPfRun`).
 
 NOT a change to `WeakAxRealize` (the plan: a new theorem in `Weak/`).
+
+W5d [R30.1]: the predicate is `execProgOk'SC … fcutE` with a PER-INDEX clause `fcutE k s.esAg ls
+(stt E k)` beside `fetchesOk` (sharing that index's `ls`); `execProgOk'S` is its M1 instance at
+`fcutETriv` (a reducible abbreviation), `execProgOk'SCForget` the forgetful map.
 -/
 import Weak.WeakAxRealize
 import Weak.WeakAxiomatic2
@@ -235,11 +239,18 @@ def fetchesOk (σ : Mstate) (i : Nat) (ls : List Wlabel) : Prop :=
 
 /-! ## (4) THE SHAPED CONFORMANCE PREDICATE -/
 
+/-- The trivial per-index clause (M1's instance of `execProgOk'SC`'s `fcutE`). -/
+abbrev fcutETriv : Nat → Nat → List Wlabel → Mstate → Prop := fun _ _ _ _ => True
+
 /-- `execProgOk'` with (i) the left arm's realizing label `lbFused`, (ii) the
 stars label-carrying `admRunG`s, the leading one's fetches satisfying `fok`
 (the intra-pair star is `lbAdmin false`, hence fetch-free), (iii) every plain
-axiomatic load single-copy atomic. -/
-def execProgOk'S (pst : Nat → List P) (dv : Nat → D) (E : Exec) : Prop :=
+axiomatic load single-copy atomic; and (W5d [R29.1][R30.1]) a PER-INDEX clause
+`fcutE k s.esAg ls (stt E k)` on the leading star's labels, beside `fetchesOk`
+(M1: `fcutETriv`; M2: the cut form at `itvOf` with its recurrence and frame
+condition, `Weak/PfRunUnpinned.lean`). -/
+def execProgOk'SC (fcutE : Nat → Nat → List Wlabel → Mstate → Prop) (pst : Nat → List P)
+    (dv : Nat → D) (E : Exec) : Prop :=
   ∀ (k : Nat) (s : Estep), E.exTr[k]? = some s →
     (∀ (aq : Bool) (base : Int) (ts : List Nat) (vs : List (BitVec 8)),
        s.esLb = .LLoad aq base ts vs →
@@ -249,6 +260,7 @@ def execProgOk'S (pst : Nat → List P) (dv : Nat → D) (E : Exec) : Prop :=
       pst (k + 1) = (pst k).set s.esAg p' ∧
       admRunG pstep true p (dv k) ls pa da ∧
       fetchesOk fok (stt E k) s.esAg ls ∧
+      fcutE k s.esAg ls (stt E k) ∧
       ((∃ l, lbFused l ∧ lblRealizes pcls pa (stt E k) s.esAg s.esLb l ∧
           pstep pa da l p' (dv (k + 1)))
        ∨ (∃ (pm : P) (dm : D) (ls2 : List Wlabel) (pm2 : P) (dm2 : D) (l1 l2 : Wlabel),
@@ -256,6 +268,18 @@ def execProgOk'S (pst : Nat → List P) (dv : Nat → D) (E : Exec) : Prop :=
             pstep pa da l1 pm dm ∧
             admRunG pstep false pm dm ls2 pm2 dm2 ∧
             pstep pm2 dm2 l2 p' (dv (k + 1))))
+
+/-- THE SHAPED CONFORMANCE PREDICATE (M1): `execProgOk'SC` at the trivial per-index clause. -/
+abbrev execProgOk'S (pst : Nat → List P) (dv : Nat → D) (E : Exec) : Prop :=
+  execProgOk'SC pstep pcls fok fcutETriv pst dv E
+
+/-- Any per-index clause forgets to the trivial one. -/
+theorem execProgOk'SCForget (fcutE : Nat → Nat → List Wlabel → Mstate → Prop)
+    (pst : Nat → List P) (dv : Nat → D) (E : Exec) :
+    execProgOk'SC pstep pcls fok fcutE pst dv E → execProgOk'S pstep pcls fok pst dv E := by
+  intro h k s hs
+  obtain ⟨hsca, p, pa, da, p', ls, hp, hn, hrun, hf, _, hsup⟩ := h k s hs
+  exact ⟨hsca, p, pa, da, p', ls, hp, hn, hrun, hf, trivial, hsup⟩
 
 /-! ## (5) The labelled pf run -/
 
@@ -300,7 +324,7 @@ theorem admRunGAdmin (instr : Bool) (p : P) (d : D) (ls : List Wlabel) (p' : P) 
 theorem execProgOk'SForget (pst : Nat → List P) (dv : Nat → D) (E : Exec) :
     execProgOk'S pstep pcls fok pst dv E → execProgOk' pstep pcls pst dv E := by
   intro h k s hs
-  obtain ⟨_, p, pa, da, p', ls, hp, hn, hrun, _, hsup⟩ := h k s hs
+  obtain ⟨_, p, pa, da, p', ls, hp, hn, hrun, _, _, hsup⟩ := h k s hs
   refine ⟨p, pa, da, p', hp, hn, admRunGStar pstep true _ _ _ _ _ hrun, ?_⟩
   rcases hsup with ⟨l, _, hre, hps⟩ | ⟨pm, dm, ls2, pm2, dm2, l1, l2, hre, hps1, hrun2, hps2⟩
   · exact .inl ⟨l, hre, hps⟩
@@ -538,7 +562,7 @@ theorem execPrefixPfRunProgShaped (pst : Nat → List P) (dv : Nat → D) (E : E
     obtain ⟨c, st, hrun, hadj, hst, hdev, hm⟩ := ih (by omega)
     obtain ⟨s, hs⟩ := someOfIsSome (execTrLookup E n (by omega))
     have hms := execStepAt E n s hE hs
-    obtain ⟨hsca, p, pa, da, p', ls, hp, hnext, hstar, hfetch, hsup⟩ := hpr n s hs
+    obtain ⟨hsca, p, pa, da, p', ls, hp, hnext, hstar, hfetch, -, hsup⟩ := hpr n s hs
     have hex : ∃ ag, c.pcAgs[s.esAg]? = some ag ∧ ag.paSt = p := by
       rw [← hst, List.getElem?_map] at hp
       cases hag : c.pcAgs[s.esAg]? with

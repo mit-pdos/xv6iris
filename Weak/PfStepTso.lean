@@ -527,12 +527,13 @@ theorem viewRelSameRead (stamp : CohStamp) (σ σ' : MState) (st : List (Nat × 
 theorem pfRunSTAuthors {P D : Type} (pstep : P → D → Wlabel → P → D → Prop)
     (pcls : P → Wlabel → Wstate → WmClass)
     (fok : Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop) (stamp : CohStamp)
+    {fcutT : Nat → Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop}
     (c0 c : Wpcfg P D) (st : List (Nat × Wlabel)) (h0 : c0.pcLog = [])
-    (h : pfRunST pstep pcls fok stamp c0 st c) :
+    (h : pfRunSTC pstep pcls fok stamp fcutT c0 st c) :
     c.pcLog.map Wmsg.wmTid = (stAuthors st).map some := by
   induction h with
   | nil => simp [h0, stAuthors]
-  | snoc c1 c2 st i l _ hs _ _ ih =>
+  | snoc c1 c2 st i l _ hs _ _ _ ih =>
     rw [wpPfStepAuthors pstep pcls i l c1 c2 hs, ih, stAuthorsSnoc]
     cases lbWrites l <;> simp
 

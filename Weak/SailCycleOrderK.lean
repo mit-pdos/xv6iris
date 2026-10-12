@@ -440,7 +440,7 @@ theorem SailCycleOrderK.invRun (A : Int → BitVec 8 → Prop) (hcyc : SailCycle
   intro st c hrun
   induction hrun with
   | nil => intro _; exact SailCycleOrderK.invInit A img d0 σ0
-  | snoc c1 c2 st i l _ hs hf _ ih =>
+  | snoc c1 c2 st i l _ hs hf _ _ ih =>
     intro hE2
     have hE1 := hE i l c1 c2 hs hE2
     exact SailCycleOrderK.invStep A hcyc st i l c1 c2 hs
@@ -488,7 +488,7 @@ theorem SailCycleOrderK.runImg (fok : Image → List Wmsg → Nat → Int → Li
   intro st c h
   induction h with
   | nil => rfl
-  | snoc c1 c2 st i l _ hs _ _ ih =>
+  | snoc c1 c2 st i l _ hs _ _ _ ih =>
     exact (SailCycleOrderK.stepLogPrefix i l c1 c2 hs).1.trans ih
 
 /-- The backward-stable fact of an M1 run: the boot image, and no log message writing a window
@@ -583,7 +583,7 @@ theorem SailCycleOrderK.m1HypsK (hK : sailCycleOrderK) (σ0 : WGState) (g0 : GSt
   tso := pfStepTsoProposed _
   safe := fun n κs t g hm =>
     (Xv6.xv6FsAdequacy_closed (hlc := Iris.HasLC.hasLC) g0 hg0 hp0 hfs n κs t g hm).1
-  cut := MachOfPf.cutOfPristine Xv6.bcRoLo Xv6.bcRoHi (Nat.le_refl _) SrvwmoXv6Adequacy.bcRoHiLe
+  cut := MachOfPf.cutIgnore <| MachOfPf.cutOfPristine Xv6.bcRoLo Xv6.bcRoHi (Nat.le_refl _) SrvwmoXv6Adequacy.bcRoHiLe
     g0 _ (SrvwmoXv6Adequacy.winOfText g0 hg0 hp0 hfs)
   fi := SailCycleOrderK.fiOfScoK hK σ0 g0 hb hg0 hp0 hfs
 

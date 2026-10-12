@@ -54,7 +54,13 @@ Deviations from the plan's text: (1) the shadow is indexed by the AGENT `Nat` (a
 edited — the strengthened clauses are new names (`execProgOk'ST`, `pfRunST`, …) beside the
 landed ones, with forgetful maps back, so W5c and every importer stay untouched (W5 re-points
 `srvwmoXv6M1Premises`); (3) `scaOkT` is required of EVERY plain load (the disk row's included —
-there it follows from `latest`), as clause (iii) is.
+there it follows from `latest`), as clause (iii) is; (4) (W5d [R29.1][R30.1], the M2 cut clause's
+carriers) the shadow-threaded run is `pfRunSTC … fcutT`, whose `snoc` carries a THIRD fact
+`pfCutFactsT fcutT` (the clause at the prefix shadow's `itv`), and the shaped predicate is
+`execProgOk'STC … fcutE` (the per-index clause of `execProgOk'SC`, `Weak/PfRunShape.lean`); the plan's
+names `pfRunST`/`execProgOk'ST` are their M1 instances at `fcutTTriv`/`fcutETriv` (reducible
+abbreviations; `pfRunST.nil`/`pfRunST.snoc` keep the constructor shape), so M1's statements read
+as before.  `pfRunSTForgetCut` forgets the clause; `pfRunSTFactsC` unpacks all three facts.
 -/
 import Weak.TsoOfPf
 
@@ -547,6 +553,23 @@ theorem execScaTSca (stamp : CohStamp) (E : Exec) : execScaT stamp E → execSca
 theorem candScaTSca (stamp : CohStamp) (c : Cand) : candScaT stamp c → candSca c :=
   execScaTSca stamp (candExec c)
 
+/-- THE M2 CUT CLAUSE'S CARRIER (W5d [R29.1]): at a fetch `l = .LIFetch base tvs`, the clause
+`fcutT` at the step-list shadow's `itv` (the prefix `st` before the step), the pre-configuration's
+image and log, the agent, and the fetch (M1: `fcutTTriv`; M2: the cut form). -/
+def pfCutFactsT {P D : Type}
+    (fcutT : Nat → Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop)
+    (stamp : CohStamp) (st : List (Nat × Wlabel)) (c : Wpcfg P D) (i : Nat) (l : Wlabel) : Prop :=
+  ∀ (base : Int) (tvs : List (Nat × BitVec 8)), l = .LIFetch base tvs →
+    fcutT (tsoShadow stamp st i).itv c.pcImg c.pcLog i base tvs
+
+/-- The trivial cut clause (M1's instance of `pfRunSTC`'s `fcutT`). -/
+abbrev fcutTTriv : Nat → Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop :=
+  fun _ _ _ _ _ _ => True
+
+theorem pfCutFactsTTriv {P D : Type} (stamp : CohStamp) (st : List (Nat × Wlabel))
+    (c : Wpcfg P D) (i : Nat) (l : Wlabel) : pfCutFactsT fcutTTriv stamp st c i l :=
+  fun _ _ _ => trivial
+
 section shapeT
 
 variable {P D : Type}
@@ -555,9 +578,21 @@ variable (pcls : P → Wlabel → Wstate → WmClass)
 variable (fok : Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop)
 variable (stamp : CohStamp)
 
-/-- THE SHAPED CONFORMANCE PREDICATE with the shadow clauses: `execProgOk'S` ∧ (iii)′ ∧ (iv). -/
-def execProgOk'ST (pst : Nat → List P) (dv : Nat → D) (E : Exec) : Prop :=
-  execProgOk'S pstep pcls fok pst dv E ∧ execScaT stamp E ∧ execDiskLat E
+/-- THE SHAPED CONFORMANCE PREDICATE with the shadow clauses, at a per-index clause `fcutE`
+(W5d [R30.1]): `execProgOk'SC` ∧ (iii)′ ∧ (iv). -/
+def execProgOk'STC (fcutE : Nat → Nat → List Wlabel → Mstate → Prop) (pst : Nat → List P)
+    (dv : Nat → D) (E : Exec) : Prop :=
+  execProgOk'SC pstep pcls fok fcutE pst dv E ∧ execScaT stamp E ∧ execDiskLat E
+
+/-- THE SHAPED CONFORMANCE PREDICATE with the shadow clauses (M1): `execProgOk'STC` at the trivial
+per-index clause, i.e. `execProgOk'S` ∧ (iii)′ ∧ (iv). -/
+abbrev execProgOk'ST (pst : Nat → List P) (dv : Nat → D) (E : Exec) : Prop :=
+  execProgOk'STC pstep pcls fok stamp fcutETriv pst dv E
+
+theorem execProgOk'STCForget (fcutE : Nat → Nat → List Wlabel → Mstate → Prop)
+    (pst : Nat → List P) (dv : Nat → D) (E : Exec) :
+    execProgOk'STC pstep pcls fok stamp fcutE pst dv E → execProgOk'ST pstep pcls fok stamp pst dv E :=
+  fun h => ⟨execProgOk'SCForget pstep pcls fok fcutE pst dv E h.1, h.2⟩
 
 theorem execProgOk'STForget (pst : Nat → List P) (dv : Nat → D) (E : Exec) :
     execProgOk'ST pstep pcls fok stamp pst dv E → execProgOk'S pstep pcls fok pst dv E :=
@@ -580,43 +615,90 @@ theorem pfLoadFactsTNonload (st : List (Nat × Wlabel)) (c : Wpcfg P D) (i : Nat
     (h : lbIsLoad l = false) : pfLoadFactsT stamp st c i l := by
   cases l <;> simp_all [lbIsLoad, pfLoadFactsT]
 
-/-- A labelled promise-free run whose every step carries `pfStepFactsT` at its prefix. -/
-inductive pfRunST (c : Wpcfg P D) : List (Nat × Wlabel) → Wpcfg P D → Prop where
-  | nil : pfRunST c [] c
+/-- A labelled promise-free run whose every step carries `pfStepFactsT` at its prefix and the
+cut clause `pfCutFactsT fcutT` (W5d [R29.1]: the THIRD fact; M1: `fcutTTriv`, so `pfRunST`). -/
+inductive pfRunSTC (fcutT : Nat → Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop)
+    (c : Wpcfg P D) : List (Nat × Wlabel) → Wpcfg P D → Prop where
+  | nil : pfRunSTC fcutT c [] c
   | snoc (c1 c2 : Wpcfg P D) (st : List (Nat × Wlabel)) (i : Nat) (l : Wlabel) :
-      pfRunST c st c1 → wpPfStep pstep pcls i l c1 c2 → pfStepFacts fok c1 i l →
-      pfLoadFactsT stamp st c1 i l →
-      pfRunST c (st ++ [(i, l)]) c2
+      pfRunSTC fcutT c st c1 → wpPfStep pstep pcls i l c1 c2 → pfStepFacts fok c1 i l →
+      pfLoadFactsT stamp st c1 i l → pfCutFactsT fcutT stamp st c1 i l →
+      pfRunSTC fcutT c (st ++ [(i, l)]) c2
 
-theorem pfRunSTForget (c c' : Wpcfg P D) (st : List (Nat × Wlabel)) :
-    pfRunST pstep pcls fok stamp c st c' → pfRunS pstep pcls fok c st c' := by
+/-- THE SHADOW-THREADED RUN (M1): `pfRunSTC` at the trivial cut clause. -/
+abbrev pfRunST (c : Wpcfg P D) (st : List (Nat × Wlabel)) (c' : Wpcfg P D) : Prop :=
+  pfRunSTC pstep pcls fok stamp fcutTTriv c st c'
+
+variable {pstep pcls fok stamp} in
+/-- `pfRunSTC.nil` at `pfRunST` (constructor-shaped: the parameters implicit). -/
+theorem pfRunST.nil {c : Wpcfg P D} : pfRunST pstep pcls fok stamp c [] c := pfRunSTC.nil
+
+variable {pstep pcls fok stamp} in
+/-- `pfRunSTC.snoc` at `pfRunST`: the cut clause is `trivial`. -/
+theorem pfRunST.snoc {c : Wpcfg P D} (c1 c2 : Wpcfg P D) (st : List (Nat × Wlabel)) (i : Nat)
+    (l : Wlabel) (h : pfRunST pstep pcls fok stamp c st c1) (hs : wpPfStep pstep pcls i l c1 c2)
+    (hf : pfStepFacts fok c1 i l) (hl : pfLoadFactsT stamp st c1 i l) :
+    pfRunST pstep pcls fok stamp c (st ++ [(i, l)]) c2 :=
+  pfRunSTC.snoc c1 c2 st i l h hs hf hl (pfCutFactsTTriv stamp st c1 i l)
+
+theorem pfRunSTForget {fcutT : Nat → Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop}
+    (c c' : Wpcfg P D) (st : List (Nat × Wlabel)) :
+    pfRunSTC pstep pcls fok stamp fcutT c st c' → pfRunS pstep pcls fok c st c' := by
   intro h
   induction h with
   | nil => exact .nil
-  | snoc c1 c2 st i l _ hs hf _ ih => exact .snoc c1 c2 st i l ih hs hf
+  | snoc c1 c2 st i l _ hs hf _ _ ih => exact .snoc c1 c2 st i l ih hs hf
 
-/-- Every step carries `pfStepFactsT` at its prefix (the inductive's content, unpacked). -/
-theorem pfRunSTFacts (c c' : Wpcfg P D) (st : List (Nat × Wlabel)) :
-    pfRunST pstep pcls fok stamp c st c' →
+/-- Any cut clause forgets to the trivial one (`sailCycleOrder` and `Hyps.cut`/`Hyps.fi` are
+stated at `pfRunST` [R30.s3]). -/
+theorem pfRunSTForgetCut
+    {fcutT : Nat → Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop}
+    (c c' : Wpcfg P D) (st : List (Nat × Wlabel)) :
+    pfRunSTC pstep pcls fok stamp fcutT c st c' → pfRunST pstep pcls fok stamp c st c' := by
+  intro h
+  induction h with
+  | nil => exact pfRunSTC.nil
+  | snoc c1 c2 st i l _ hs hf hl _ ih =>
+    exact pfRunSTC.snoc c1 c2 st i l ih hs hf hl (pfCutFactsTTriv stamp st c1 i l)
+
+/-- Every step carries `pfStepFactsT` AND its cut clause at its prefix (the inductive's content,
+unpacked [R30.s2]). -/
+theorem pfRunSTFactsC
+    {fcutT : Nat → Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop}
+    (c c' : Wpcfg P D) (st : List (Nat × Wlabel)) :
+    pfRunSTC pstep pcls fok stamp fcutT c st c' →
     ∀ (st0 : List (Nat × Wlabel)) (i : Nat) (l : Wlabel) (rest : List (Nat × Wlabel)),
       st = st0 ++ (i, l) :: rest →
-      ∃ c1 c2, pfRunST pstep pcls fok stamp c st0 c1 ∧ wpPfStep pstep pcls i l c1 c2 ∧
-        pfStepFactsT fok stamp st0 c1 i l := by
+      ∃ c1 c2, pfRunSTC pstep pcls fok stamp fcutT c st0 c1 ∧ wpPfStep pstep pcls i l c1 c2 ∧
+        pfStepFactsT fok stamp st0 c1 i l ∧ pfCutFactsT fcutT stamp st0 c1 i l := by
   intro h
   induction h with
   | nil => intro st0 i l rest he; simp at he
-  | snoc c1 c2 st j l' hr hs hf hl ih =>
+  | snoc c1 c2 st j l' hr hs hf hl hc ih =>
     intro st0 i l rest he
     by_cases hr0 : rest = []
     · subst hr0
       have h1 := List.append_inj' he rfl
       simp only [List.cons.injEq, Prod.mk.injEq, and_true] at h1
       obtain ⟨rfl, rfl, rfl⟩ := h1
-      exact ⟨c1, c2, hr, hs, hf, hl⟩
+      exact ⟨c1, c2, hr, hs, ⟨hf, hl⟩, hc⟩
     · obtain ⟨rest', y, rfl⟩ := List.eq_nil_or_concat rest |>.resolve_left hr0
       have h1 : st ++ [(j, l')] = (st0 ++ (i, l) :: rest') ++ [y] := by simpa using he
       have h2 := List.append_inj' h1 rfl
       exact ih st0 i l rest' h2.1
+
+/-- Every step carries `pfStepFactsT` at its prefix (`pfRunSTFactsC` without the cut clause). -/
+theorem pfRunSTFacts
+    {fcutT : Nat → Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop}
+    (c c' : Wpcfg P D) (st : List (Nat × Wlabel)) :
+    pfRunSTC pstep pcls fok stamp fcutT c st c' →
+    ∀ (st0 : List (Nat × Wlabel)) (i : Nat) (l : Wlabel) (rest : List (Nat × Wlabel)),
+      st = st0 ++ (i, l) :: rest →
+      ∃ c1 c2, pfRunSTC pstep pcls fok stamp fcutT c st0 c1 ∧ wpPfStep pstep pcls i l c1 c2 ∧
+        pfStepFactsT fok stamp st0 c1 i l := by
+  intro h st0 i l rest he
+  obtain ⟨c1, c2, hr, hs, hf, -⟩ := pfRunSTFactsC pstep pcls fok stamp c c' st h st0 i l rest he
+  exact ⟨c1, c2, hr, hs, hf⟩
 
 /-- A run of LOAD-FREE steps appends to a shadow-threaded run (its load facts are vacuous). -/
 theorem pfRunSTApp (c c1 c2 : Wpcfg P D) (st0 ms : List (Nat × Wlabel)) :
@@ -628,16 +710,19 @@ theorem pfRunSTApp (c c1 c2 : Wpcfg P D) (st0 ms : List (Nat × Wlabel)) :
   | snoc c3 c4 st i l _ hs hf ih =>
     intro hnl
     rw [← List.append_assoc]
-    exact .snoc _ _ _ _ _ (ih (fun y hy => hnl y (List.mem_append_left _ hy))) hs hf
+    exact pfRunST.snoc _ _ _ _ _
+      (ih (fun y hy => hnl y (List.mem_append_left _ hy))) hs hf
       (pfLoadFactsTNonload stamp _ _ _ _ (hnl (i, l) (by simp)))
 
-theorem pfRunSTPinSub (img : Image) (c c' : Wpcfg P D) (st : List (Nat × Wlabel)) :
-    pfRunST (pstepPin img pstep) pcls fok stamp c st c' → pfRunST pstep pcls fok stamp c st c' := by
+theorem pfRunSTPinSub {fcutT : Nat → Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop}
+    (img : Image) (c c' : Wpcfg P D) (st : List (Nat × Wlabel)) :
+    pfRunSTC (pstepPin img pstep) pcls fok stamp fcutT c st c' →
+      pfRunSTC pstep pcls fok stamp fcutT c st c' := by
   intro h
   induction h with
   | nil => exact .nil
-  | snoc c1 c2 st i l _ hs hf hl ih =>
-    exact .snoc c1 c2 st i l ih (wpPfStepPinSub img pstep pcls i l c1 c2 hs) hf hl
+  | snoc c1 c2 st i l _ hs hf hl hc ih =>
+    exact .snoc c1 c2 st i l ih (wpPfStepPinSub img pstep pcls i l c1 c2 hs) hf hl hc
 
 /-- The run's authors ARE its log's. -/
 theorem pfRunSAuthors (c c' : Wpcfg P D) (st : List (Nat × Wlabel)) :
@@ -693,7 +778,7 @@ theorem execPrefixPfRunProgShapedT (pst : Nat → List P) (dv : Nat → D) (E : 
     have hms := execStepAt E n s hE hs
     have htake : E.exTr.take (n + 1) = E.exTr.take n ++ [s] := by
       rw [List.take_add_one, hs]; rfl
-    obtain ⟨hsca, p, pa, da, p', ls, hp, hnext, hstar, hfetch, hsup⟩ := hpr n s hs
+    obtain ⟨hsca, p, pa, da, p', ls, hp, hnext, hstar, hfetch, -, hsup⟩ := hpr n s hs
     have hex : ∃ ag, c.pcAgs[s.esAg]? = some ag ∧ ag.paSt = p := by
       rw [← hst, List.getElem?_map] at hp
       cases hag : c.pcAgs[s.esAg]? with
