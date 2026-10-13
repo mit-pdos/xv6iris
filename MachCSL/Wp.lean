@@ -1154,6 +1154,31 @@ theorem memModel_rsvOk (σ : MState) :
   ipureintro
   exact all_of_reservedOk hin hok
 
+/-- An issued certificate is valid of the machine. -/
+theorem memModel_chainCert (σ : MState) (c : ChainCert) :
+    memModelAt E σ ∗ chainCertAt E c ⊢@{IProp GF} ⌜c.valid (chainEnv (hlc := hlc) (GF := GF) σ)⌝ := by
+  unfold memModelAt rsvModelAt chainModelAt chainCertAt
+  iintro ⟨⟨_, _, _, _, _, _, _, %Z, HZ, %hZ, _⟩, %v, Hc⟩
+  ihave %Hl := ghost_map_lookup $$ HZ Hc
+  ipureintro
+  exact hZ.1 c (by rw [Hl]; rfl)
+
+/-- A chain lower bound: boot-image entries, or a valid certificate. -/
+theorem memModel_chainLb (σ : MState) (h : CPU) (t : Nat) (j : CPU) (τ : Nat) :
+    memModelAt E σ ∗ chainLbAt E h t j τ ⊢@{IProp GF}
+      ⌜t = 0 ∨ ChainCert.valid (chainEnv (hlc := hlc) (GF := GF) σ) ⟨h, t, j, τ⟩⌝ := by
+  iintro ⟨Hmm, Hlb⟩
+  unfold chainLbAt
+  icases Hlb with ⟨%h0 | ⟨%t0, %τ0, %hle, Hc⟩⟩
+  · ipureintro
+    rcases h0 with h0 | h0
+    · exact Or.inl h0
+    · exact Or.inr (Or.inl h0)
+  · ihave %hv := memModel_chainCert E σ ⟨h, t0, j, τ0⟩ $$ [Hmm Hc]
+    · iframe Hmm Hc
+    ipureintro
+    exact Or.inr (ChainCert.valid_le hv hle.1 hle.2)
+
 /-- The reserved conjunct moves with the memory, given the regions'
 discipline does. -/
 theorem rsvModel_mono (σ σ' : MState)
@@ -1525,6 +1550,147 @@ theorem ctxBytes_readable (σ : MState) (cpu : CPU) (ξ : CtxId) (pa : PAddr) (n
     memModel σ ∗ ownCtx cpu ξ ∗ genHeapInterp σ.mem ∗ ctxBytes ξ pa n dq w ⊢@{IProp GF}
       ⌜∀ tvn, σ.tv cpu ≤ tvn → σ.mem.readBytes (hartAgent cpu) tvn pa n w⌝ :=
   ctxBytes_readable' σ cpu ξ pa dq (nthByte w) n
+
+/-- **A load of context ξ's byte pays its chain obligation** (W8 (f2-ctx)
+S3, `MachCSL.byteSrcOk`): the byte's latest entry is the one ξ's hart reads
+at every view above the floor, and its key names its author -- the boot
+image, a device, the hart itself, or a hart whose entries at that position
+reach this one (`ownCtx_key_chain`) -- so every entry at the source's
+position (all the author's, `histOk`) is certified.  The exemption is not
+used. -/
+theorem ctxByte_srcOk (σ : MState) (cpu : CPU) (ξ : CtxId) (a : PAddr) (dq : DFrac) (v : BitVec 8)
+    (ex : PAddr → Nat → Prop) :
+    memModel σ ∗ ownCtx cpu ξ ∗ genHeapInterp σ.mem ∗ ctxByte ξ a dq v ⊢@{IProp GF}
+      ⌜∀ tvn, σ.tv cpu ≤ tvn → byteSrcOk (chainEnv (hlc := hlc) (GF := GF) σ) ex σ.mem cpu tvn a⌝ := by
+  iintro ⟨Hmm, Hctx, Hmem, Hb⟩
+  icases ctxByte_cases ξ a dq v $$ Hb with ⟨%e, %H, Hpt, %hev, #Hkey⟩
+  ihave %hget : ⌜σ.mem[a]? = some (e :: H)⌝ $$ [Hmem Hpt]
+  · icases genHeap_valid $$ [$Hmem $Hpt] with >%_
+    itrivial
+  ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
+  · iapply memModel_mmOk $$ Hmm
+  ihave %hvis : ⌜∀ tvn, σ.tv cpu ≤ tvn → e.visible (hartAgent cpu) tvn = true⌝ $$ [Hmm Hctx]
+  · unfold ownCtx ownCtxAt
+    icases Hctx with ⟨%B, %K, %W, %D, Hat, HK, %hBK, _, %hdok, _⟩
+    ihave %hK : ⌜K ≤ σ.tv cpu⌝ $$ [Hmm HK]
+    · iapply memModel_viewLb _ σ cpu K $$ [Hmm HK]
+      iframe
+    icases keyAt_cases _ ξ e.t $$ Hkey with ⟨⟨Hfl, _⟩ | ⟨%h, Hdirty, Hau⟩⟩
+    · ihave %htB : ⌜e.t ≤ B⌝ $$ [Hat Hfl]
+      · iapply ctxAt_floor ξ 1 B D e.t $$ [Hat Hfl]
+        iframe Hat
+        iexact Hfl
+      ipureintro
+      intro tvn htvn
+      exact HEnt.visible_of_le _ _ _ (by omega)
+    · ihave %hD : ⌜get? D e.t = some h⌝ $$ [Hat Hdirty]
+      · iapply ctxAt_dirty ξ 1 B D e.t h $$ [Hat Hdirty]
+        iframe Hat
+        iexact Hdirty
+      obtain ⟨_, hjust⟩ := hdok e.t h hD
+      rcases hjust with htB | rfl
+      · ipureintro
+        intro tvn htvn
+        exact HEnt.visible_of_le _ _ _ (by omega)
+      · ihave %hau : ⌜1 ≤ e.t ∧ σ.log[e.t - 1]? = some (hartAgent h)⌝ $$ [Hmm Hau]
+        · iapply memModel_authored _ σ e.t _ $$ [Hmm Hau]
+          iframe Hmm
+          iexact Hau
+        ipureintro
+        intro tvn _
+        exact histOk_author_visible σ.log _ e (hmm.1 a _ hget) List.mem_cons_self _ tvn hau.1 hau.2
+  have hsrc : ∀ tvn, σ.tv cpu ≤ tvn → ∀ (tid : Agent) (t : Nat),
+      (σ.mem[a]?).bind (Hist.readSrc (hartAgent cpu) tvn) = some (tid, t) → tid = e.tid ∧ t = e.t := by
+    intro tvn htv tid t hs
+    rw [hget, Option.bind_some] at hs
+    simp only [Hist.readSrc, Hist.readEnt, List.find?_cons, hvis tvn htv, Option.map_some,
+      Option.some.injEq, Prod.mk.injEq] at hs
+    exact ⟨hs.1.symm, hs.2.symm⟩
+  icases ownCtx_key_chain cpu ξ e.t $$ [Hctx Hkey] with ⟨_, Hch⟩
+  · iframe Hctx
+    iexact Hkey
+  icases Hch with ⟨%h0 | ⟨%a', #Hau, Harm⟩⟩
+  · ipureintro
+    intro tvn htv tid t hs _ H' e' _ _ het' ht0
+    have := (hsrc tvn htv tid t hs).2
+    omega
+  · ihave %hau : ⌜1 ≤ e.t ∧ σ.log[e.t - 1]? = some a'⌝ $$ [Hmm Hau]
+    · iapply memModel_authored _ σ e.t _ $$ [Hmm Hau]
+      iframe Hmm
+      iexact Hau
+    have hauth : ∀ (H' : Hist) (e' : HEnt), σ.mem[a]? = some H' → e' ∈ H' → e'.t = e.t → e'.tid = a' := by
+      intro H' e' hH' he' het'
+      rw [hget] at hH'
+      cases hH'
+      rcases ((hmm.1 a _ hget).2 e' he').2 with h0 | h0
+      · omega
+      · rw [het', hau.2] at h0
+        exact (Option.some.inj h0).symm
+    icases Harm with ⟨%hda | ⟨%h, %ha, %τ, #Hlb⟩⟩
+    · ipureintro
+      intro tvn htv tid t hs _ H' e' hH' he' het' _ hA hne _
+      have ht := (hsrc tvn htv tid t hs).2
+      have := hauth H' e' hH' he' (by omega)
+      rcases hda with hda | hda
+      · rw [this] at hA
+        exact absurd hA (Nat.not_lt.2 hda)
+      · exact absurd (this.trans hda) hne
+    · ihave %hv := memModel_chainLb _ σ h e.t cpu τ $$ [Hmm Hlb]
+      · iframe Hmm
+        iexact Hlb
+      ipureintro
+      intro tvn htv tid t hs _ H' e' hH' he' het' ht0 hA _ _
+      have ht := (hsrc tvn htv tid t hs).2
+      have hta := hauth H' e' hH' he' (by omega)
+      have hh : (⟨e'.tid, hA⟩ : CPU) = h := Fin.ext (by show e'.tid = h.val; rw [hta, ha]; rfl)
+      rw [hh, het', ht]
+      rcases hv with hv | hv
+      · exact absurd (het'.trans (ht.trans hv)) ht0
+      · exact ⟨τ, hv⟩
+
+theorem ctxBytes_srcOk' (σ : MState) (cpu : CPU) (ξ : CtxId) (pa : PAddr) (dq : DFrac)
+    (bs : Nat → BitVec 8) (ex : PAddr → Nat → Prop) : ∀ n : Nat,
+    memModel σ ∗ ownCtx cpu ξ ∗ genHeapInterp σ.mem ∗
+      ([∗list] j ∈ List.range n, ctxByte ξ (pa + BitVec.ofNat 64 j) dq (bs j)) ⊢@{IProp GF}
+      ⌜∀ tvn, σ.tv cpu ≤ tvn → ∀ j, j < n →
+        byteSrcOk (chainEnv (hlc := hlc) (GF := GF) σ) ex σ.mem cpu tvn (pa + BitVec.ofNat 64 j)⌝
+  | 0 => by
+    iintro ⟨_, _, _, _⟩
+    ipureintro
+    intro tvn _ j hj
+    omega
+  | n + 1 => by
+    rw [List.range_succ]
+    iintro ⟨Hmm, Hctx, Hmem, Hb⟩
+    icases BigSepL.bigSepL_snoc.1 $$ Hb with ⟨Hb1, Hb2⟩
+    ihave %H1 : ⌜∀ tvn, σ.tv cpu ≤ tvn → ∀ j, j < n →
+        byteSrcOk (chainEnv (hlc := hlc) (GF := GF) σ) ex σ.mem cpu tvn (pa + BitVec.ofNat 64 j)⌝
+        $$ [Hmm Hctx Hmem Hb1]
+    · iapply ctxBytes_srcOk' σ cpu ξ pa dq bs ex n $$ [Hmm Hctx Hmem Hb1]
+      iframe
+    ihave %H2 : ⌜∀ tvn, σ.tv cpu ≤ tvn →
+        byteSrcOk (chainEnv (hlc := hlc) (GF := GF) σ) ex σ.mem cpu tvn (pa + BitVec.ofNat 64 n)⌝
+        $$ [Hmm Hctx Hmem Hb2]
+    · iapply ctxByte_srcOk σ cpu ξ _ dq (bs n) ex $$ [Hmm Hctx Hmem Hb2]
+      iframe
+    ipureintro
+    intro tvn htvn j hj
+    rcases Nat.lt_succ_iff_lt_or_eq.1 hj with h | rfl
+    · exact H1 tvn htvn j h
+    · exact H2 tvn htvn
+
+/-- **A load of context ξ's bytes pays its chain obligation** at every view
+above the floor (`MachCSL.loadSrcOk`; W8 (f2-ctx) S3 -- what the plain load
+rule hands `memModel_load` once the load-side invariant is wired). -/
+theorem ctxBytes_srcOk (σ : MState) (cpu : CPU) (ξ : CtxId) (pa : PAddr) (n : Nat) (dq : DFrac)
+    (w : BitVec (8 * n)) (ex : PAddr → Nat → Prop) :
+    memModel σ ∗ ownCtx cpu ξ ∗ genHeapInterp σ.mem ∗ ctxBytes ξ pa n dq w ⊢@{IProp GF}
+      ⌜∀ tvn, σ.tv cpu ≤ tvn → loadSrcOk (chainEnv (hlc := hlc) (GF := GF) σ) ex σ.mem cpu pa n tvn⌝ := by
+  unfold ctxBytes
+  iintro H
+  ihave %h := ctxBytes_srcOk' σ cpu ξ pa dq (nthByte w) ex n $$ H
+  ipureintro
+  exact fun tvn htv k hk => h tvn htv k hk
 
 /-- A never-written byte is read by every agent at every view. -/
 theorem imgByte_readable (m : FlatMem) (a : PAddr) (v : BitVec 8) :

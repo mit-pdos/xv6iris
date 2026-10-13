@@ -836,6 +836,117 @@ theorem ownCtx_intro (cpu : CPU) (ξ : CtxId) (B K W : Nat) (D : RegMapF CPU) :
   iexists B, K, W, D
   iexact H
 
+/-- One component of a hart's certificate set (W8 (f2-ctx) S3). -/
+theorem vecCertsAt_get (V : CPU → Nat) (g : Nat) (cpu h : CPU) :
+    vecCertsAt (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) V g cpu ⊢ ∃ τ : Nat, chainLb h (V h) cpu τ := by
+  unfold vecCertsAt
+  iintro ⟨#Hc, _⟩
+  iapply (BigSepL.bigSepL_lookup (Φ := fun _ (c : CPU) => iprop(∃ τ : Nat, chainLb (GF := GF) c (V c) cpu τ))
+    (cpus_get? h)) $$ Hc
+
+/-- **A key's chain half, cashed against the running token** (W8 (f2-ctx)
+S3: what a load that consumes a key owes the load-side invariant,
+`MachCSL.loadsChained`): the keyed position `t` is the boot image's, or its
+author -- the machine's authorship receipt -- is a device or the hart
+itself, or a hart whose entries at `t` reach this hart (a chain lower bound
+from the token's certificate set: a clean key's vector floor is under the
+token's vector, a foreign dirty key is too, `chainDirtyOk`). -/
+theorem ownCtx_key_chain (cpu : CPU) (ξ : CtxId) (t : Nat) :
+    ownCtx (GF := GF) cpu ξ ∗ keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ t ⊢
+      ownCtx cpu ξ ∗ (⌜t = 0⌝ ∨ ∃ a : Agent, authoredBy t a ∗
+        (⌜NCPU ≤ a ∨ a = hartAgent cpu⌝ ∨ ∃ h : CPU, ⌜a = hartAgent h⌝ ∗ ∃ τ : Nat, chainLb h t cpu τ)) := by
+  iintro ⟨Hctx, #Hkey⟩
+  icases ownCtx_cases cpu ξ $$ Hctx with ⟨%B, %K, %W, %D, Hat, #HK, %hBK, #HW, %hok, #Hels, Hch⟩
+  unfold chainTokAt
+  icases Hch with ⟨%V, %g, Hv, %⟨hd, hw⟩, #Hc⟩
+  ihave #Hcert : (□ ∀ h : CPU, ⌜t ≤ V h⌝ -∗ ∃ τ : Nat, chainLb h t cpu τ) $$ []
+  · imodintro
+    iintro %h %hle
+    icases vecCertsAt_get V g cpu h $$ Hc with ⟨%τ, #Hlb⟩
+    iexists τ
+    iapply chainLbAt_le (MachGS.era (hlc := hlc) (GF := GF)) h (V h) t cpu τ τ hle (Nat.le_refl _) $$ Hlb
+  icases keyAt_cases (MachGS.era (hlc := hlc) (GF := GF)) ξ t $$ Hkey with ⟨⟨_, #Hck⟩ | ⟨%h, #Hd, #Hau⟩⟩
+  · unfold chainKey
+    icases Hck with ⟨%h0 | ⟨%a, #Hau, #Harm⟩⟩
+    · isplitl [Hat Hv]
+      · iapply ownCtx_intro cpu ξ B K W D
+        iframe Hat
+        isplit; · iexact HK
+        isplit; · ipureintro; exact hBK
+        isplit; · iexact HW
+        isplit; · ipureintro; exact hok
+        isplit; · iexact Hels
+        unfold chainTokAt
+        iexists V, g
+        iframe Hv Hc
+        ipureintro; exact ⟨hd, hw⟩
+      · ileft; ipureintro; exact h0
+    · icases Harm with ⟨%hdev | ⟨%h, %ha, #Hfl⟩⟩
+      · isplitl [Hat Hv]
+        · iapply ownCtx_intro cpu ξ B K W D
+          iframe Hat
+          isplit; · iexact HK
+          isplit; · ipureintro; exact hBK
+          isplit; · iexact HW
+          isplit; · ipureintro; exact hok
+          isplit; · iexact Hels
+          unfold chainTokAt
+          iexists V, g
+          iframe Hv Hc
+          ipureintro; exact ⟨hd, hw⟩
+        · iright
+          iexists a
+          iframe Hau
+          ileft; ipureintro; exact Or.inl hdev
+      · ihave %hle : ⌜t ≤ V h⌝ $$ [Hv]
+        · iapply vecAt_floor ξ 1 V g h t $$ [Hv Hfl]
+          iframe Hv
+          iexact Hfl
+        isplitl [Hat Hv]
+        · iapply ownCtx_intro cpu ξ B K W D
+          iframe Hat
+          isplit; · iexact HK
+          isplit; · ipureintro; exact hBK
+          isplit; · iexact HW
+          isplit; · ipureintro; exact hok
+          isplit; · iexact Hels
+          unfold chainTokAt
+          iexists V, g
+          iframe Hv Hc
+          ipureintro; exact ⟨hd, hw⟩
+        · iright
+          iexists a
+          iframe Hau
+          iright
+          iexists h
+          isplit; · ipureintro; exact ha
+          iapply Hcert $$ %h %hle
+  · ihave %hD : ⌜get? D t = some h⌝ $$ [Hat Hd]
+    · iapply ctxAt_dirty ξ 1 B D t h $$ [Hat Hd]
+      iframe Hat
+      iexact Hd
+    isplitl [Hat Hv]
+    · iapply ownCtx_intro cpu ξ B K W D
+      iframe Hat
+      isplit; · iexact HK
+      isplit; · ipureintro; exact hBK
+      isplit; · iexact HW
+      isplit; · ipureintro; exact hok
+      isplit; · iexact Hels
+      unfold chainTokAt
+      iexists V, g
+      iframe Hv Hc
+      ipureintro; exact ⟨hd, hw⟩
+    · iright
+      iexists (hartAgent h)
+      iframe Hau
+      rcases hd t h hD with hh | hle
+      · ileft; ipureintro; exact Or.inr (by rw [hh])
+      · iright
+        iexists h
+        isplit; · ipureintro; rfl
+        iapply Hcert $$ %h %hle
+
 /-- A fragment at a known acquire bit is one at any (Rocq `resv_frag_of_fragb`). -/
 theorem resvFragAny_of (cpu : CPU) (r : Option Resv) (b : Bool) :
     resvFrag cpu r b ⊢@{IProp GF} resvFragAny cpu r := by

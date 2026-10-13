@@ -1230,7 +1230,7 @@ theorem loadsChained_store (rs : List RsvRegion) (wit : List (PAddr × HEnt) →
     {ex ex' : PAddr → Nat → Prop} (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (excl : Bool) (hle : ∀ (j : CPU) (a : PAddr), (σ.hr j).coh a ≤ σ.top)
     (hx : (chainEnvAt rs wit σ).ext (chainEnvAt rs wit (σ.store cpu pa n w excl)))
-    (hex : ∀ a t, ex a t → ex' a t) (h : loadsChained (chainEnvAt rs wit σ) ex) :
+    (hex : ∀ a t, t ≤ σ.top → ex a t → ex' a t) (h : loadsChained (chainEnvAt rs wit σ) ex) :
     loadsChained (chainEnvAt rs wit (σ.store cpu pa n w excl)) ex' := by
   refine loadsChained_keep hx (memAbove_writeBytes _ _ _ σ.top (σ.top + 1) _ (Nat.lt_succ_self _)) hle hex
     (fun j a => ?_) h
@@ -1248,7 +1248,7 @@ theorem loadsChained_store (rs : List RsvRegion) (wit : List (PAddr × HEnt) →
 theorem loadsChained_dma (rs : List RsvRegion) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop)
     {ex ex' : PAddr → Nat → Prop} (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (hle : ∀ (j : CPU) (a : PAddr), (σ.hr j).coh a ≤ σ.top)
-    (hex : ∀ a t, ex a t → ex' a t) (h : loadsChained (chainEnvAt rs wit σ) ex) :
+    (hex : ∀ a t, t ≤ σ.top → ex a t → ex' a t) (h : loadsChained (chainEnvAt rs wit σ) ex) :
     loadsChained (chainEnvAt rs wit (σ.storeDma pa n w)) ex' := by
   by_cases hn : n = 0
   · rw [MState.storeDma_zero σ pa n w hn]
@@ -1258,21 +1258,38 @@ theorem loadsChained_dma (rs : List RsvRegion) (wit : List (PAddr × HEnt) → P
   rw [MState.storeDma_mem_of_ne σ pa n w hn]
   exact memAbove_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _)
 
-/-- **A load keeps the load-side invariant, given its certificates** (the
-obligation S3's load rules discharge INSIDE the load's step [R35.s5]): for
-every footprint byte whose source is FOREIGN, every hart entry at the
+/-- **One byte's chain obligation of a load** by `cpu` at view `tvn` (W8
+(f2-ctx) S3): when the byte's source is FOREIGN, every hart entry at the
 source's timestamp that is not the loader's and not exempt has a valid
-certificate to the loader.  Only the loader's floors move, each to its old
-value or a foreign source's timestamp. -/
+certificate to the loader. -/
+def byteSrcOk (X : ChainEnv) (ex : PAddr → Nat → Prop) (m : FlatMem) (cpu : CPU) (tvn : Nat) (a : PAddr) :
+    Prop :=
+  ∀ (tid : Agent) (t : Nat), (m[a]?).bind (Hist.readSrc (hartAgent cpu) tvn) = some (tid, t) →
+    tid ≠ hartAgent cpu → ∀ (H : Hist) (e : HEnt), m[a]? = some H → e ∈ H → e.t = t → e.t ≠ 0 →
+      ∀ hA : e.tid < NCPU, e.tid ≠ hartAgent cpu → ¬ ex a e.t →
+        ∃ τ, ChainCert.valid X ⟨⟨e.tid, hA⟩, e.t, cpu, τ⟩
+
+/-- **A load's chain obligation**: every footprint byte's (`byteSrcOk`). -/
+def loadSrcOk (X : ChainEnv) (ex : PAddr → Nat → Prop) (m : FlatMem) (cpu : CPU) (pa : PAddr) (n tvn : Nat) :
+    Prop :=
+  ∀ k, k < n → byteSrcOk X ex m cpu tvn (pa + BitVec.ofNat 64 k)
+
+/-- A load's per-byte sources are the bytes' read sources. -/
+theorem FlatMem.loadSrcs_get? (m : FlatMem) (h : Agent) (tvn : Nat) (pa : PAddr) (n k : Nat) (hk : k < n) :
+    (m.loadSrcs h tvn pa n)[k]? = some ((m[pa + BitVec.ofNat 64 k]?).bind (Hist.readSrc h tvn)) := by
+  unfold FlatMem.loadSrcs
+  rw [List.getElem?_map, List.getElem?_range hk]
+  rfl
+
+/-- **A load keeps the load-side invariant, given its certificates** (the
+obligation S3's load rules discharge INSIDE the load's step [R35.s5],
+`loadSrcOk`).  Only the loader's floors move, each to its old value or a
+foreign source's timestamp. -/
 theorem loadsChained_load (rs : List RsvRegion) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop)
     {ex ex' : PAddr → Nat → Prop} (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat)
     (hle : ∀ (j : CPU) (a : PAddr), (σ.hr j).coh a ≤ σ.top)
-    (hex : ∀ a t, ex a t → ex' a t)
-    (hsrc : ∀ (k : Nat), k < n → ∀ (tid : Agent) (t : Nat),
-      (σ.mem.loadSrcs (hartAgent cpu) tvn pa n)[k]? = some (some (tid, t)) → tid ≠ hartAgent cpu →
-      ∀ (H : Hist) (e : HEnt), σ.mem[pa + BitVec.ofNat 64 k]? = some H → e ∈ H → e.t = t → e.t ≠ 0 →
-        ∀ hA : e.tid < NCPU, e.tid ≠ hartAgent cpu → ¬ ex' (pa + BitVec.ofNat 64 k) e.t →
-          ∃ τ, ChainCert.valid (chainEnvAt rs wit σ) ⟨⟨e.tid, hA⟩, e.t, cpu, τ⟩)
+    (hex : ∀ a t, t ≤ σ.top → ex a t → ex' a t)
+    (hsrc : loadSrcOk (chainEnvAt rs wit σ) ex' σ.mem cpu pa n tvn)
     (h : loadsChained (chainEnvAt rs wit σ) ex) :
     loadsChained (chainEnvAt rs wit (σ.afterLoad cpu pa n tvn)) ex' := by
   have hx := chainEnvAt_ext_load rs wit σ cpu pa n tvn
@@ -1304,7 +1321,8 @@ theorem loadsChained_load (rs : List RsvRegion) (wit : List (PAddr × HEnt) → 
         · rw [if_pos htid] at hc; exact absurd hc het
         · rw [if_neg htid] at hc
           subst ha
-          obtain ⟨τ, hv⟩ := hsrc k hk' tid t hs htid H e hH he hc het hA hne' hnex
+          rw [FlatMem.loadSrcs_get? _ _ _ _ _ _ hk'] at hs
+          obtain ⟨τ, hv⟩ := hsrc k hk' tid t (Option.some.inj hs) htid H e hH he hc het hA hne' hnex
           exact ⟨τ, ChainCert.valid_mono hx hv⟩
       · exact absurd hc het
     · rw [if_neg ha] at hc; exact absurd hc het
@@ -1318,6 +1336,12 @@ def rsvLockByte [MachFixedGS hlc GF] (b : PAddr) : Prop :=
 /-- The ambient record's certificate environment at `σ`. -/
 abbrev chainEnv [MachFixedGS hlc GF] (σ : MState) : ChainEnv :=
   chainEnvAt (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (slotWit (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))) σ
+
+/-- The ambient record's load-side exemption at `σ` (W8 (f2-ctx) S3,
+`MachCSL.chainExAt`): lock-layer and page-table bytes, as of a position. -/
+abbrev chainEx [MachFixedGS hlc GF] (σ : MState) : PAddr → Nat → Prop :=
+  chainExAt (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (slotWit (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)))
+    σ.mem σ.top
 
 /-- A static lock byte is a hop byte at every position. -/
 theorem chainEnv_isLk_rsv [MachFixedGS hlc GF] (σ : MState) {b : PAddr} (r : Nat)

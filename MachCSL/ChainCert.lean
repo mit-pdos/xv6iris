@@ -38,15 +38,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors}
 section era
 variable [MachFixedGS hlc GF] (E : EraGS)
 
-/-- An issued certificate is valid of the machine. -/
-theorem memModel_chainCert (σ : MState) (c : ChainCert) :
-    memModelAt E σ ∗ chainCertAt E c ⊢@{IProp GF} ⌜c.valid (chainEnv (hlc := hlc) (GF := GF) σ)⌝ := by
-  unfold memModelAt rsvModelAt chainModelAt chainCertAt
-  iintro ⟨⟨_, _, _, _, _, _, _, %Z, HZ, %hZ, _⟩, %v, Hc⟩
-  ihave %Hl := ghost_map_lookup $$ HZ Hc
-  ipureintro
-  exact hZ.1 c (by rw [Hl]; rfl)
-
 /-- An issued gate is a hart past the gate. -/
 theorem memModel_gate (σ : MState) (j : CPU) :
     memModelAt E σ ∗ gatePassedAt E j ⊢@{IProp GF} ⌜gateOk (chainEnv (hlc := hlc) (GF := GF) σ) j⌝ := by
@@ -59,22 +50,6 @@ theorem memModel_gate (σ : MState) (j : CPU) :
   · ihave %Hl := ghost_map_lookup $$ HZ Hc
     ipureintro
     exact hZ.2.1 j (by rw [Hl]; rfl)
-
-/-- A chain lower bound: boot-image entries, or a valid certificate. -/
-theorem memModel_chainLb (σ : MState) (h : CPU) (t : Nat) (j : CPU) (τ : Nat) :
-    memModelAt E σ ∗ chainLbAt E h t j τ ⊢@{IProp GF}
-      ⌜t = 0 ∨ ChainCert.valid (chainEnv (hlc := hlc) (GF := GF) σ) ⟨h, t, j, τ⟩⌝ := by
-  iintro ⟨Hmm, Hlb⟩
-  unfold chainLbAt
-  icases Hlb with ⟨%h0 | ⟨%t0, %τ0, %hle, Hc⟩⟩
-  · ipureintro
-    rcases h0 with h0 | h0
-    · exact Or.inl h0
-    · exact Or.inr (Or.inl h0)
-  · ihave %hv := memModel_chainCert E σ ⟨h, t0, j, τ0⟩ $$ [Hmm Hc]
-    · iframe Hmm Hc
-    ipureintro
-    exact Or.inr (ChainCert.valid_le hv hle.1 hle.2)
 
 /-- The certificate map's two halves, opened (shared by the two issues). -/
 theorem memModel_chainIssueKey (σ : MState) (k : Nat)

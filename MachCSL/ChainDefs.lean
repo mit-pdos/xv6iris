@@ -584,12 +584,14 @@ theorem loadsChained_zero (X : ChainEnv) (ex : PAddr → Nat → Prop) (h0 : ∀
 
 /-- **The invariant's step law**: a step at top `top` (every coherence floor
 at or below it) that extends the environment, adds only entries above `top`,
-and only GROWS the exemption keeps the invariant at every floor it leaves
+and only GROWS the exemption (at the positions it already holds: an
+exemption read off the memory AS OF a position, `MachCSL.chainExAt`, is fixed
+only up to the top) keeps the invariant at every floor it leaves
 alone or resets to 0; a floor it moves (a load's foreign source) needs the
 step's own certificates (`hnew`). -/
 theorem loadsChained_step {X Y : ChainEnv} {ex ex' : PAddr → Nat → Prop} {top : Nat}
     (hx : X.ext Y) (hm : memAbove X.m top Y.m) (hle : ∀ j a, X.coh j a ≤ top)
-    (hex : ∀ a t, ex a t → ex' a t)
+    (hex : ∀ a t, t ≤ top → ex a t → ex' a t)
     (hnew : ∀ (j : CPU) (a : PAddr), Y.coh j a ≠ X.coh j a → ∀ (H : Hist) (e : HEnt), Y.m[a]? = some H →
       e ∈ H → e.t ≠ 0 → e.t = Y.coh j a → ∀ hA : e.tid < NCPU, e.tid ≠ hartAgent j → ¬ ex' a e.t →
         ∃ τ, ChainCert.valid Y ⟨⟨e.tid, hA⟩, e.t, j, τ⟩)
@@ -598,7 +600,7 @@ theorem loadsChained_step {X Y : ChainEnv} {ex ex' : PAddr → Nat → Prop} {to
   by_cases hcj : Y.coh j a = X.coh j a
   · have hle' : e.t ≤ top := by rw [hc, hcj]; exact hle j a
     obtain ⟨H0, hH0, he0⟩ := hm a H hH e he hle'
-    obtain ⟨τ, hv⟩ := h j a H0 e hH0 he0 het (by rw [hc, hcj]) hA hne (fun hx' => hnex (hex a e.t hx'))
+    obtain ⟨τ, hv⟩ := h j a H0 e hH0 he0 het (by rw [hc, hcj]) hA hne (fun hx' => hnex (hex a e.t hle' hx'))
     exact ⟨τ, ChainCert.valid_mono hx hv⟩
   · exact hnew j a hcj H e hH he het hc hA hne hnex
 
@@ -606,12 +608,140 @@ theorem loadsChained_step {X Y : ChainEnv} {ex ex' : PAddr → Nat → Prop} {to
 exclusive access) keeps the invariant. -/
 theorem loadsChained_keep {X Y : ChainEnv} {ex ex' : PAddr → Nat → Prop} {top : Nat}
     (hx : X.ext Y) (hm : memAbove X.m top Y.m) (hle : ∀ j a, X.coh j a ≤ top)
-    (hex : ∀ a t, ex a t → ex' a t) (hcoh : ∀ j a, Y.coh j a = X.coh j a ∨ Y.coh j a = 0)
+    (hex : ∀ a t, t ≤ top → ex a t → ex' a t) (hcoh : ∀ j a, Y.coh j a = X.coh j a ∨ Y.coh j a = 0)
     (h : loadsChained X ex) : loadsChained Y ex' := by
   refine loadsChained_step hx hm hle hex (fun j a hne' H e _ _ het hc => ?_) h
   rcases hcoh j a with h1 | h1
   · exact absurd h1 hne'
   · rw [h1] at hc
     exact absurd hc het
+
+/-! ## The exemption (W8 (f2-ctx) S3; design (A′), `PROGRESS-W8f2.md`)
+
+`loadsChained`'s exemption, read off the MEMORY and the registry -- not off a
+ghost -- so that the pure export (`Xv6.AccessDiscipline.chainOkAt`'s
+`custAt … = .lockw b` / `.pte` arms) can name the SAME predicate:
+
+* the lock layer's bytes: the static spinlocks' two words and the
+  publication words of the registry (`lockPubByteIn`), and a live dynamic
+  lock's two words (`dynLkAt` at the entry's position);
+* the PAGE-TABLE bytes of BOTH tables ([R25.1 (a)], [OWN.39]): the bytes of
+  every page a Sv39 walk reaches, AS OF the entry's position, from a root
+  word the registry names (`RsvKind.roots`: xv6's `kernel_pagetable` and
+  every `proc[i].pagetable`) -- `ptByteAt`.  One mechanism for the kernel
+  table and the per-process tables built at run time (`uvmcreate`/`mappages`):
+  a table is covered from the position its root is stored in a root word,
+  and stops being covered when the word moves (`freeproc`'s `p->pagetable = 0`).
+
+An exemption read AS OF a position is fixed once the position is below the
+top (`ptByteAt_grow`), which is all the step laws need. -/
+
+/-- Byte `a`'s entry AS OF position `t`: the latest entry at or below `t`
+(the value every agent's read at view `t` would return, ignoring its own
+buffered stores above `t`). -/
+def FlatMem.entAsOf (m : FlatMem) (a : PAddr) (t : Nat) : Option HEnt :=
+  (m[a]?).bind (fun H => H.find? (fun e => decide (e.t ≤ t)))
+
+/-- The doubleword at `a` holds `v` AS OF position `t`. -/
+def wordAsOf (m : FlatMem) (a : PAddr) (t : Nat) (v : BitVec 64) : Prop :=
+  ∀ j, j < 8 → (m.entAsOf (a + BitVec.ofNat 64 j) t).map HEnt.v = some (nthByte (n := 8) v j)
+
+/-- A Sv39 POINTER entry (`V` set, `R`/`W`/`X` clear) naming the page at `c`
+(its PPN, bits 53..10, shifted to a physical address). -/
+def ptPtrTo (v : BitVec 64) (c : PAddr) : Prop :=
+  v.getLsbD 0 = true ∧ v &&& 0xE#64 = 0#64 ∧ c = ((v >>> 10) <<< 12) &&& 0x00FFFFFFFFFFF000#64
+
+/-- An entry of the page at `p` points, as of `t`, at the page `c`. -/
+def ptChildAt (m : FlatMem) (t : Nat) (p c : PAddr) : Prop :=
+  ∃ (i : Nat) (v : BitVec 64), i < 512 ∧ wordAsOf m (p + BitVec.ofNat 64 (8 * i)) t v ∧ ptPtrTo v c
+
+/-- The page at `p` is one a Sv39 walk from the root page `r` visits, as of
+`t`: the root, a level-1 page, or a level-0 page. -/
+def ptPageAt (m : FlatMem) (t : Nat) (r p : PAddr) : Prop :=
+  p = r ∨ ptChildAt m t r p ∨ ∃ q, ptChildAt m t r q ∧ ptChildAt m t q p
+
+/-- As of `t`, a root word of `rs` holds the root page `r ≠ 0`. -/
+def ptRootAt (rs : List RsvRegion) (m : FlatMem) (t : Nat) (r : PAddr) : Prop :=
+  r ≠ 0 ∧ ∃ (base : PAddr) (cnt stride k : Nat), (⟨base, .roots cnt stride⟩ : RsvRegion) ∈ rs ∧ k < cnt ∧
+    wordAsOf m (base + BitVec.ofNat 64 (stride * k)) t r
+
+/-- **A page-table byte as of `t`**: `a` lies in a page a walk reaches, as
+of `t`, from a root word of `rs`. -/
+def ptByteAt (rs : List RsvRegion) (m : FlatMem) (t : Nat) (a : PAddr) : Prop :=
+  ∃ r p : PAddr, ptRootAt rs m t r ∧ ptPageAt m t r p ∧ p.toNat ≤ a.toNat ∧ a.toNat < p.toNat + 4096
+
+/-- A byte of a static spinlock's two words or of a publication word of `rs`. -/
+def lockPubByteIn (rs : List RsvRegion) (a : PAddr) : Prop :=
+  ∃ R ∈ rs, ((∃ cb, R.kind = .lock cb) ∨ (∃ w, R.kind = .pub w)) ∧ a ∈ R.bytes
+
+/-- A byte of the two words (`lk->locked`, `lk->cpu`) of the spinlock at `b`. -/
+def lockWordsByte (b a : PAddr) : Prop :=
+  (∃ j, j < 4 ∧ a = b + BitVec.ofNat 64 j) ∨ (∃ j, j < 8 ∧ a = b + 16#64 + BitVec.ofNat 64 j)
+
+/-- **The exemption of the load-side invariant**, at memory `m` with top
+`top`: byte `a` as of position `t` is a lock-layer byte (static, publication,
+or a dynamic lock live at `t`) or a page-table byte (`ptByteAt`). -/
+def chainExAt (rs : List RsvRegion) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop) (m : FlatMem)
+    (top : Nat) (a : PAddr) (t : Nat) : Prop :=
+  lockPubByteIn rs a ∨ (∃ b, dynLkAt wit m top b t ∧ lockWordsByte b a) ∨ ptByteAt rs m t a
+
+/-- Reading AS OF a position at or below the top is unchanged by a step that
+adds entries above the top only. -/
+theorem FlatMem.entAsOf_grow {m m' : FlatMem} {top t : Nat} (hg : memGrow m top m')
+    (hm : memAbove m top m') (ht : t ≤ top) (a : PAddr) : m'.entAsOf a t = m.entAsOf a t := by
+  unfold FlatMem.entAsOf
+  cases hH : m[a]? with
+  | some H =>
+    obtain ⟨N, hN, hNt⟩ := hg a H hH
+    rw [hN]
+    simp only [Option.bind_some, List.find?_append]
+    have : N.find? (fun e => decide (e.t ≤ t)) = none := by
+      rw [List.find?_eq_none]
+      intro e he
+      have := hNt e he
+      simp only [decide_eq_true_eq]
+      omega
+    rw [this, Option.none_or]
+  | none =>
+    cases hH' : m'[a]? with
+    | none => rfl
+    | some H' =>
+      simp only [Option.bind_some, Option.bind_none]
+      rw [List.find?_eq_none]
+      intro e he hle
+      simp only [decide_eq_true_eq] at hle
+      obtain ⟨H, hH2, _⟩ := hm a H' hH' e he (Nat.le_trans hle ht)
+      rw [hH] at hH2
+      cases hH2
+
+theorem wordAsOf_grow {m m' : FlatMem} {top t : Nat} (hg : memGrow m top m') (hm : memAbove m top m')
+    (ht : t ≤ top) (a : PAddr) (v : BitVec 64) : wordAsOf m' a t v ↔ wordAsOf m a t v := by
+  unfold wordAsOf
+  simp only [FlatMem.entAsOf_grow hg hm ht]
+
+/-- **A page-table byte stays one**: as of a position at or below the top,
+under a step that adds entries above the top only. -/
+theorem ptByteAt_grow {rs : List RsvRegion} {m m' : FlatMem} {top t : Nat} (hg : memGrow m top m')
+    (hm : memAbove m top m') (ht : t ≤ top) (a : PAddr) : ptByteAt rs m' t a ↔ ptByteAt rs m t a := by
+  simp only [ptByteAt, ptRootAt, ptPageAt, ptChildAt, wordAsOf_grow hg hm ht]
+
+/-- **The exemption only grows** along a step that adds entries above the top
+only (at the positions at or below the old top). -/
+theorem chainExAt_grow {rs : List RsvRegion} {wit : List (PAddr × HEnt) → PAddr → Nat → Prop}
+    {m m' : FlatMem} {top top' : Nat} (hg : memGrow m top m') (hm : memAbove m top m') (htop : top ≤ top')
+    (a : PAddr) (t : Nat) (ht : t ≤ top) (h : chainExAt rs wit m top a t) : chainExAt rs wit m' top' a t := by
+  rcases h with h | ⟨b, hb, hw⟩ | h
+  · exact .inl h
+  · exact .inr (.inl ⟨b, dynLkAt_mono hg htop hb, hw⟩)
+  · exact .inr (.inr ((ptByteAt_grow hg hm ht a).2 h))
+
+/-- A step that leaves the memory alone keeps the exemption (any new top). -/
+theorem chainExAt_top {rs : List RsvRegion} {wit : List (PAddr × HEnt) → PAddr → Nat → Prop}
+    {m : FlatMem} {top top' : Nat} (htop : top ≤ top') (a : PAddr) (t : Nat)
+    (h : chainExAt rs wit m top a t) : chainExAt rs wit m top' a t := by
+  rcases h with h | ⟨b, hb, hw⟩ | h
+  · exact .inl h
+  · exact .inr (.inl ⟨b, dynLkAt_mono (memGrow_refl m top) htop hb, hw⟩)
+  · exact .inr (.inr h)
 
 end MachCSL

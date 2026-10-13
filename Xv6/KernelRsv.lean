@@ -60,6 +60,17 @@ def xv6PipeSlotBase : BitVec 64 := KA.«ftable» + 40#64
 
 def xv6PipeSlotsR : RsvRegion := ⟨xv6PipeSlotBase, .slots 100 40⟩
 
+/-- **The page-table root words** (W8 (f2-ctx) S3, the `.pte` exemption of
+BOTH tables, design (A′) [R25.1 (a)][OWN.39]): `kernel_pagetable` (one word)
+and every `proc[i].pagetable` (`NPROC = 64` words at `&proc[0] + 80`, stride
+`sizeof (struct proc) = 376`, `Xv6.ProcGeom`'s `pagetable@80`) -- footprint-free
+registry entries of the static list (`MachCSL.RsvKind.roots`): the page-table
+bytes as of a position are the pages a walk reaches from these words as of
+that position (`MachCSL.ptByteAt`). -/
+def xv6KptRootR : RsvRegion := ⟨KA.«kernel_pagetable», .roots 1 8⟩
+
+def xv6ProcRootsR : RsvRegion := ⟨KA.«proc» + 80#64, .roots 64 376⟩
+
 /-- `started` (`main.c`), the boot handover's ONE-SHOT PUBLICATION word (W8
 (f2-ctx), Q-F2-BOOTGATE (a) as amended by [R35.2]): written once, by hart 0. -/
 def xv6StartedR : RsvRegion := ⟨KA.«started», .pub ⟨0, by decide⟩⟩
@@ -87,10 +98,12 @@ def xv6InodeLockRegions : List RsvRegion := (List.range 50).map (fun k => xv6Loc
 /-- The locks after `proc`, in address order: `tickslock`, `bcache.lock`, the
 buffers' inner locks, `itable.lock`, the inodes' inner locks, `log.lock`,
 `ftable.lock`, `disk.vdisk_lock`; and (W8 (f2-ctx)) the pipe locks'
-registration slots, a footprint-free registry entry (`xv6PipeSlotsR`). -/
+registration slots and the page-table root words, footprint-free registry
+entries (`xv6PipeSlotsR`, `xv6KptRootR`, `xv6ProcRootsR`). -/
 def xv6PostLockRegions : List RsvRegion :=
   [xv6LockR KA.«tickslock», xv6LockR KA.«bcache»] ++ (xv6BufLockRegions ++ ([xv6LockR KA.«itable»] ++
-    (xv6InodeLockRegions ++ [xv6LockR KA.«log», xv6LockR KA.«ftable», xv6LockR rsvDiskLk, xv6PipeSlotsR])))
+    (xv6InodeLockRegions ++ [xv6LockR KA.«log», xv6LockR KA.«ftable», xv6LockR rsvDiskLk, xv6PipeSlotsR,
+      xv6KptRootR, xv6ProcRootsR])))
 
 /-- xv6's static reserved regions, in address order. -/
 def xv6RsvStatic : List RsvRegion :=
@@ -122,6 +135,11 @@ instance : KernelRsv where
 
 /-- The pipe slots are registered. -/
 theorem xv6RsvStatic_pipeSlots : xv6PipeSlotsR ∈ xv6RsvStatic := by decide +kernel
+
+/-- The page-table root words are registered. -/
+theorem xv6RsvStatic_kptRoot : xv6KptRootR ∈ xv6RsvStatic := by decide +kernel
+
+theorem xv6RsvStatic_procRoots : xv6ProcRootsR ∈ xv6RsvStatic := by decide +kernel
 
 /-- Hart `h`'s cells are registered, at index `h + 8`. -/
 theorem xv6RsvStatic_cpu (h : CPU) : xv6RsvStatic[rsvCpuIdx h]? = some ⟨cpuAddr h, .cpu h⟩ := by
@@ -203,7 +221,8 @@ def rsvLocksLow (rs : List RsvRegion) : Bool :=
     | .lock _ => R.base.ult KA.«end»
     | .cpu _ => true
     | .pub _ => true
-    | .slots _ _ => true)
+    | .slots _ _ => true
+    | .roots _ _ => true)
 
 theorem xv6RsvStatic_locksLow : rsvLocksLow xv6RsvStatic = true := by decide +kernel
 

@@ -127,11 +127,20 @@ inductive RsvKind where
   registry entry -- no footprint, no discipline, so the boot's pinning of
   the list pins the slots too -/
   | slots (cnt stride : Nat)
+  /-- the client's PAGE-TABLE ROOT WORDS (W8 (f2-ctx) S3, the `.pte`
+  exemption, design (A′) in `PROGRESS-W8f2.md`): `cnt` doubleword slots at
+  `base + stride·k`, each holding (as of a position) the physical address of a
+  Sv39 root page or 0 -- xv6: `kernel_pagetable` and every `proc[i].pagetable`.
+  The page-table bytes of a position are the bytes of the pages a walk reaches
+  from these words AS OF that position (`MachCSL.ptByteAt`); a registry entry
+  -- no footprint, no discipline -/
+  | roots (cnt stride : Nat)
   deriving DecidableEq
 
 /-- The kinds with a footprint (all but a `.slots` registry entry). -/
 def RsvKind.hasFoot : RsvKind → Bool
   | .slots _ _ => false
+  | .roots _ _ => false
   | _ => true
 
 /-- A reserved region: its base address and kind. -/
@@ -150,6 +159,7 @@ def RsvRegion.words (R : RsvRegion) : List (PAddr × Nat) :=
   | .lock _ => [(R.base, 4), (R.base + 16#64, 8)]
   | .pub _ => [(R.base, 4)]
   | .slots _ _ => []
+  | .roots _ _ => []
 
 /-- The bytes of a word. -/
 def wordBytes (w : PAddr × Nat) : List PAddr :=
@@ -177,6 +187,7 @@ def regionOk (m : FlatMem) (R : RsvRegion) : Prop :=
   | .lock cb => lockRegionOk (cpuPtrAt cb) m R.base
   | .pub w => cpuRegionOk w m R ∧ oneShotOk m R
   | .slots _ _ => True
+  | .roots _ _ => True
 
 /-- Every region of the list keeps its discipline. -/
 def rsvAllOk (rs : List RsvRegion) (m : FlatMem) : Prop :=
@@ -280,6 +291,7 @@ theorem RsvRegion.base_mem (R : RsvRegion) (hk : R.kind.hasFoot = true) : R.base
     unfold RsvRegion.words
     cases h : R.kind with
     | slots _ _ => rw [h] at hk; simp [RsvKind.hasFoot] at hk
+    | roots _ _ => rw [h] at hk; simp [RsvKind.hasFoot] at hk
     | _ => exact ⟨_, by decide, List.mem_cons_self⟩
   obtain ⟨n, hn, hw⟩ := hw
   have := mem_regionBytes hw hn
@@ -327,6 +339,7 @@ theorem regionOk_congr {m m' : FlatMem} {R : RsvRegion}
   unfold regionOk at hR ⊢
   cases hk : R.kind with
   | slots _ _ => trivial
+  | roots _ _ => trivial
   | cpu c =>
     rw [hk] at hR
     intro a ha H hH
@@ -431,6 +444,7 @@ theorem rsvAllOk_boot {rs : List RsvRegion} (hwf : rsvWf rs) : rsvAllOk rs (imgF
   unfold regionOk
   cases hk : R.kind with
   | slots _ _ => trivial
+  | roots _ _ => trivial
   | cpu c =>
     intro a ha H hH e he het
     obtain ⟨v, hv⟩ := himg a ha

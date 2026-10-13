@@ -396,6 +396,110 @@ every entry at one of their timestamps is that agent's. -/
 abbrev authorsAre (ts : List (Nat × Agent)) (n : Nat) (Hs : Nat → Hist) : Prop :=
   ∀ p ∈ ts, ∀ j, j < n → ∀ e ∈ Hs j, e.t = p.1 → e.tid = p.2
 
+/-! ### The racy read's chain obligation (W8 (f2-ctx) S3 -- STATED: the field
+`readAU` gains when the load-side invariant `MachCSL.loadsChained` is wired;
+`memModel_readCerts` is the rule's side) -/
+
+/-- **What a racy read owes for one entry it may return**: the entry is the
+boot image's, a device's (the device-key arm), the reader's own, on a static
+lock or publication byte (the lock layer's exemption), or a hart's whose
+entries at its position reach the reader (a chain lower bound). -/
+def srcCertAt (cpu : CPU) (a : PAddr) (e : HEnt) : IProp GF := iprop%
+  ⌜e.t = 0 ∨ NCPU ≤ e.tid ∨ e.tid = hartAgent cpu ∨ lockPubByteIn (rsvList (hlc := hlc) (GF := GF)) a⌝ ∨
+    ∃ h : CPU, ⌜e.tid = hartAgent h⌝ ∗ ∃ τ : Nat, chainLb h e.t cpu τ
+
+instance (cpu : CPU) (a : PAddr) (e : HEnt) : Persistent (PROP := IProp GF) (srcCertAt cpu a e) := by
+  unfold srcCertAt; infer_instance
+
+/-- **A racy read's chain obligation**: every entry a read by `cpu` at a
+view at or above `K` may return. -/
+def readCertsAt (cpu : CPU) (pa : PAddr) (n K : Nat) (Hs : Nat → Hist) : IProp GF := iprop%
+  □ ∀ (j : Nat) (e : HEnt) (tvn : Nat),
+    ⌜j < n ∧ K ≤ tvn ∧ Hist.readEnt (hartAgent cpu) tvn (Hs j) = some e⌝ -∗
+      srcCertAt cpu (pa + BitVec.ofNat 64 j) e
+
+instance (cpu : CPU) (pa : PAddr) (n K : Nat) (Hs : Nat → Hist) :
+    Persistent (PROP := IProp GF) (readCertsAt cpu pa n K Hs) := by
+  unfold readCertsAt; infer_instance
+
+/-- **The rule's side of the obligation**: certificates for the entries a
+read may return pay the load's chain obligation (`MachCSL.loadSrcOk`) at
+every view at or above `K` -- all entries at the source's position are the
+source's author's (`histOk`). -/
+theorem memModel_readCerts (σ : MState) (cpu : CPU) (pa : PAddr) (n K : Nat) (Hs : Nat → Hist)
+    (hget : histsAt σ.mem pa n Hs) :
+    memModel σ ∗ readCertsAt cpu pa n K Hs ⊢@{IProp GF}
+      ⌜∀ tvn, K ≤ tvn → loadSrcOk (chainEnv (hlc := hlc) (GF := GF) σ) (chainEx (hlc := hlc) (GF := GF) σ)
+        σ.mem cpu pa n tvn⌝ := by
+  unfold readCertsAt
+  iintro ⟨Hmm, #Hc⟩
+  ihave %hmm := memModel_mmOk _ σ $$ Hmm
+  iapply BI.pure_forall.2
+  iintro %tvn
+  iapply BI.pure_wand.1
+  iintro %hK
+  unfold loadSrcOk
+  iapply BI.pure_forall.2
+  iintro %k
+  iapply BI.pure_wand.1
+  iintro %hk
+  unfold byteSrcOk
+  iapply BI.pure_forall.2
+  iintro %tid
+  iapply BI.pure_forall.2
+  iintro %t
+  iapply BI.pure_wand.1
+  iintro %hs
+  have hk' := hget k hk
+  rw [hk', Option.bind_some] at hs
+  obtain ⟨e0, he0, hse⟩ : ∃ e0, Hist.readEnt (hartAgent cpu) tvn (Hs k) = some e0 ∧ e0.tid = tid ∧ e0.t = t := by
+    unfold Hist.readSrc at hs
+    cases hr : Hist.readEnt (hartAgent cpu) tvn (Hs k) with
+    | none => rw [hr] at hs; cases hs
+    | some e0 =>
+      rw [hr] at hs
+      simp only [Option.map_some, Option.some.injEq, Prod.mk.injEq] at hs
+      exact ⟨e0, rfl, hs.1, hs.2⟩
+  have hmem0 : e0 ∈ Hs k := List.mem_of_find?_eq_some he0
+  have hok := hmm.1 _ _ hk'
+  -- every entry at the source's (nonzero) position is the source's author's
+  have hsame : ∀ e ∈ Hs k, e.t = t → t ≠ 0 → e.tid = e0.tid := by
+    intro e he het ht0
+    rcases (hok.2 e he).2 with h0 | h0
+    · omega
+    rcases (hok.2 e0 hmem0).2 with h1 | h1
+    · omega
+    rw [het, ← hse.2] at h0
+    rw [h0] at h1
+    exact Option.some.inj h1
+  ihave Hs0 := Hc $$ %k %e0 %tvn %⟨hk, hK, he0⟩
+  unfold srcCertAt
+  icases Hs0 with ⟨%hp | ⟨%h, %hh, %τ, #Hlb⟩⟩
+  · ipureintro
+    intro htid H e hH he het ht0 hA hne hnex
+    rw [hk'] at hH
+    cases hH
+    have hte := hsame e he het (by omega)
+    rcases hp with hp | hp | hp | hp
+    · omega
+    · rw [← hte] at hp
+      exact absurd hA (Nat.not_lt.2 hp)
+    · exact absurd (hse.1.symm.trans hp) htid
+    · exact absurd (Or.inl hp) hnex
+  · ihave %hv := memModel_chainLb _ σ h e0.t cpu τ $$ [Hmm Hlb]
+    · iframe Hmm
+      iexact Hlb
+    ipureintro
+    intro htid H e hH he het ht0 hA hne hnex
+    rw [hk'] at hH
+    cases hH
+    have hte := hsame e he het (by omega)
+    have hh' : (⟨e.tid, hA⟩ : CPU) = h := Fin.ext (by show e.tid = h.val; rw [hte, hh]; rfl)
+    rw [hh', het, ← hse.2]
+    rcases hv with hv | hv
+    · exact absurd (het.trans (hse.2.symm.trans hv)) ht0
+    · exact ⟨τ, hv⟩
+
 /-- The accessor of a plain load by `cpu`, whose view is at least `K`: the
 client also offers authorship fragments `ts` (persistent), and the
 continuation learns that the entries of the histories at their timestamps
