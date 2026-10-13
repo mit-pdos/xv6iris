@@ -10,6 +10,16 @@ root (`p->root`, `sys_chroot`, `igetroot`, `dirlookup`'s self arm at the root, t
 vocabulary); design in `claude-notes/design/chroot.md`; the gate (build, audit, tcb, coverage, vtest)
 is green.
 
+**2026-10-13 (branch `lean-transfinite`).**  The base logic is Transfinite Iris-Lean at the ordinal
+step index (`Iris.SI := Ordinals.Ordinal.{3}`; the fork `dongjaelee1/iris-lean`, branch
+`transfinite`, pinned in `lake-manifest.json`).  `wpNext` carries the step's later credit, and the
+invariant openers that a later blocks at an ordinal index spend it; the resolution of each opener
+family is in `notes/design-rulings.md` ("The ordinal step index"), and how to read the notes' Iris
+reasoning in `claude-notes/LEAN.md`.  The theorems below are unchanged; `xv6FsAdequacy_closed`'s
+statement now also depends on `Classical.choice` (the ordinal order; `tools/tcb/expected.json`).  CI
+runs on `lean` only: this branch was checked with `tools/ci/run_all.sh`, all steps green from a
+fresh clone.
+
 - `Xv6.xv6FsAdequacy_closed` — the system theorem (hypotheses: generation 0, power off, disk = `fs.img`).
 - `Xv6.userProof : USER` — the user-mode machine layer, no hypotheses.
 - `Xv6.unionAdequacyClosed` — union adequacy for init/sh/cat/grep/echo/seccomp/sync, concluding
