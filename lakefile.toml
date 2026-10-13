@@ -6,7 +6,7 @@ defaultTargets = ["MachCSL", "Xv6"]
 [[require]]
 name = "iris"
 git = "https://github.com/dongjaelee1/iris-lean"
-rev = "f2b695389f017b2f690c04a9c7287efd5e9b4804"
+rev = "fdc7402f0997659bbdd366f302ceb455358942f8"
 subDir = "Iris"
 
 # lean-sail with the free-monad concurrency interface (see vendor/lean-sail/README.md).
