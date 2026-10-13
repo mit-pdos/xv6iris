@@ -1,6 +1,22 @@
 # allocproc on RVWMO: target theorem, gap analysis, roadmap (design advisor, 2026-10-09)
 
-**Status: rev 44 (2026-10-13) = rev 43 + review R40 (1 required change, tags [R40.n]; NOT SATISFIED — one S plan-text fix on W13 (R3′), APPLIED AT
+**Status: rev 45 (2026-10-13) = rev 44 + review R41 (5 required changes, tags [R41.n]; NOT SATISFIED — all S plan text on the THIRD launch set and the two open
+owner questions, no redesign, no shrinking; ONE alt: [R41.1-alt] the RUNNING RELAUNCH 5 paragraph is NOT edited — its corrected `.pte` docstring sentence is a launch
+ADDENDUM after it; adopted [R41.s1]–[R41.s8]).**  What changed: **[R41.1]** Q-F2-PTE-WINDOW's bound CORRECTED — `freewalk` (`vm.c:265-280`) `kfree`s EVERY interior
+page-table page BEFORE clearing the parent slot naming it (`freewalk(child); pagetable[i] = 0`, `kfree(pagetable)` LAST), so the window is every page-table page of the
+dying table (≈ 5 for a small process), each from its `kfree`'s `release(&kmem.lock)` to the clear of its pointer — not "the ONE 4 KiB root page"; "exactly `R`'s 4 KiB"
+is not a theorem (a new owner may write a V-only pointer-shaped word naming a RAM page); junk target `0x4040404040000` (`ptPtrTo`, `ChainDefs.lean:651-653`); (b″) closes
+the interior windows too; `exec` swaps the word first (no window), `fork`'s failure path has the same window; (a) stays SOUND and recommended (§D, Rev 44 RESULTS, the
+RELAUNCH 5 addendum).  **[R41.2]** W5d-G is a RE-AUDIT item: `Graph`/`Acyc`/`Topo`/`Conf`/`Supply`/`Hull`/`Lin`/`WeakEvInst`/`WeakEvLang` are in EVERY registered root's
+import closure (`roots-weak.txt`: 13 roots, 493 modules) — each increment = full-cone rebuild + `audit.sh --weak --build`, baseline unchanged; G3's `Gdexec.gdFetch` is a
+STRUCTURE change (`WeakRvwmoGraph.lean:669-671`; default-`[]` field + literal sweep, or a wrapper — worker's choice, re-count at launch [R41.s5]).  **[R41.3]** FabInd-S ∩
+W5d-G G3 = `WeakRvwmoKillIO.lean` (`:423` vs `:86-90/:308`) — FabInd-S LANDS BEFORE G3 STARTS (a gate).  **[R41.4]** W13 (W)'s `gfDevWIo` discharge: the HART half
+PROVED ([R40.s2]), the DISK half a NAMED hypothesis `usedElemGateOk` (the run-level virtio gate at the used-ELEMENT `DWriteDev`, `WeakEvInst.lean:519-525`/
+`VirtioProg.lean:88-90`) discharged by W14; W13-wit exercises the hart half only [R41.s6].  **[R41.5]** Q-BATCH-3 rewritten in the owner format, with a third option
+(W9a + the (W) chain first, W5d-G after) [R41.s7].  Also: cite drift [R41.s2]; (K-cat)'s per-arm closure argument + the image fence census [R41.s3]; the window's timing
+[R41.s4]; RESULTS wording [R41.s8]; `IN FLIGHT` updated (RELAUNCH 5 RUNNING, w2).  No new owner question (R41: none missing; `usedElemGateOk` informed under the
+non-blocking rule, no menu).  History: rev 45 — R41 (5 req., 1 alt; s1–s8 adopted).
+**Rev 44 (2026-10-13) = rev 43 + review R40 (1 required change, tags [R40.n]; NOT SATISFIED — one S plan-text fix on W13 (R3′), APPLIED AT
 LAUNCH as option (α): `gfDevWIo` KEPT as the NAMED premise, `gfDevAnc` NOT introduced; adopted [R40.s1]–[R40.s7]) + RESULTS (SIX MERGES 2026-10-13: **W13 (R3′)**
 11:39, **W11 (iv)c** 11:41, **D35-fix** 11:47, **W8 (f2-ctx) (a′-r) + S3-a** 11:17 and **S3-b + S3-c0** 12:13, **W13 (K)** 12:30, **W13 (F-dep)** 12:50 — EVERY
 Stage 2 first/second-batch item is IN THE TIP) + RULING **[OWN.55]** (the second batch APPROVED 11:16: W11 (iv)c launched w5, (K) launched w4 after (R3′)) + the
@@ -635,6 +651,7 @@ rev 37 (2026-10-12) R33 (1 req.: `Rboot` ALSO pins `htif_tohost_base = none` —
 rev 38 (2026-10-12) R34 (3 req., all S text in the W8 (f2-ctx) launch paragraph — (5) FOUR of six conjuncts, `cpuProcDiscAt`/`utextDiscAt` → W8 (f3-rest) [R34.1]; `W8-Rctx.md` carve-out for [OWN.39]/[OWN.38]/[OWN.41] [R34.2]; ghost plumbing route (A) in Files, 13 MachCSL [R34.3]; applied at launch; s1–s6 adopted) + RESULTS (W8 (f2-ctx) S1 MERGED: `ChainDefs`/`ChainCert`, worker stopped green with 3 findings) + Q-F2-PIPEHOP/Q-F2-BOOTGATE provisional (a) + RELAUNCH W8 (f2-ctx) + W8 (f3-rest) named; OPEN owner questions: Q-F2-PIPEHOP, Q-F2-BOOTGATE.
 rev 40 (2026-10-13) R36 (4 req., all plan text on the (f2-ctx) lane: RESULTS (S1′ + S2-pre MERGED, deviations D1–D4, findings F-A–F-D) + RELAUNCH 2 deciding F-B (guard `j ≠ w`) and F-C ((i) as rows first, (ii) fallback) [R36.1]; `pipeLockNameStr` = `"digits"`, not `"pipe"` → `KS.«pipe»`, S0 [R36.2]; the merged (a″) name-word window is a DEVIATION from RULED (a′), word-shaped hop entries + windowed `lockRegionOk`, provisional pending Q-F2-PIPEHOP-2 [R36.3]; F-C (i) rows before wiring, 27 client files, (ii) sized [R36.4]; s1–s6 adopted) + RESULTS (**M2 CLOSE DONE** — `Weak.srvwmoXv6M2` registered; M1 + M2 DONE, Stage 1b CLOSED); OPEN owner question: Q-F2-PIPEHOP-2 (provisionally (a″+shape)).
 rev 39 (2026-10-13) R35 (2 req., both S text: Q-F2-PIPEHOP (a) → (a′) time-indexed `isLk b r` + `pipeLockAt` [R35.1]; Q-F2-BOOTGATE (a) + history-aware reserved store over `rsvStoreOk`, `started`'s cell/carve moved [R35.2]; applied at launch in the (f2-ctx) continuation brief; s1–s6 adopted) + [OWN.46] (Q-F2-PIPEHOP = (a) as amended = (a′)) + [OWN.47] (Q-F2-BOOTGATE = (a) as amended) + RESULTS (W-SCO (A) DONE: `sailCycleOrder_holds` a THEOREM, M1/M2 non-vacuous, `Weak.srvwmoXv6M1` REGISTERED, `srvwmoXv6M2` stated) + M2 CLOSE launch paragraph (LAUNCHABLE) + the first Stage 2 launch set (W12 (+W12b) ∥ W13 (F-dep) ∥ W13 (L)); OPEN owner questions: NONE.
+rev 45 (2026-10-13) R41 (5 req., 1 alt: Q-F2-PTE-WINDOW's window = EVERY page-table page of the dying table, each `kfree` → clear of its pointer, bound not a page count, junk target `0x4040404040000`, (b″) closes interior windows too [R41.1] — RELAUNCH 5's running paragraph untouched, docstring correction as an addendum [R41.1-alt]; W5d-G = full-cone rebuild + `audit.sh --weak --build` per increment, `Gdexec.gdFetch` a structure change [R41.2]; FabInd-S before G3 (`KillIO` shared) [R41.3]; (W)'s `gfDevWIo` disk half = named `usedElemGateOk` for W14 [R41.4]; Q-BATCH-3 in the owner format + third option [R41.5]; s1–s8 adopted); OPEN owner questions: Q-F2-PTE-WINDOW (provisionally (a), corrected bound), Q-BATCH-3.
 rev 44 (2026-10-13) R40 (1 req., 0 alt: W13 (R3′) keeps `gfDevWIo` as the named premise, option (α), applied at launch [R40.1]; s1–s7 adopted) + RESULTS (W13 (R3′), W11 (iv)c, D35-fix, W13 (K), W13 (F-dep), W8 (f2-ctx) S3-a/S3-b/S3-c0 ALL MERGED) + [OWN.55] (second batch approved) + (K)'s open items placed (W11 (i); NEW W13 (K-cat); NEW FabInd-S) + the THIRD Stage 2 launch set (W5d-G G1–G5 ∥ W9a ∥ W13 (W)) + W8 (f2-ctx) RELAUNCH 5 text; OPEN owner questions: Q-F2-PTE-WINDOW (provisionally (a)), Q-BATCH-3.
 rev 43 (2026-10-13) R39 (3 req., 0 alt: D35-fix list — `grcscGrelAcq :250` FALSE/deleted, `CatLinWit`/`CatLinHull` added, `lblRenRcsc` → `Norm`, `lblTswapRcsc`, `racyD`'s meaning widens via `gppo` [R39.1]; D35-fix ∩ (F-dep) = {`WeakRvwmoAdm`}, `CatLinChain` → (F-dep), applied at launch [R39.2]; (R3′) fabric arm over `gmem` members, `gfDevAnc` a NAMED premise, the `DFence`/silent-`DWriteDev` counter-model [R39.3]; s1–s5 adopted) + W13 (F-dep) RELAUNCHED (A1) w3 + (f2-ctx) RELAUNCH 3 RUNNING w2; no new owner question.
 rev 42 (2026-10-13) RESULTS (W12 + W12b, W13 (L) DONE/MERGED; (f2-ctx) S0 + S2 MERGED, RELAUNCH 3) + [OWN.52] Q-FDEP (A1) → (F-dep) relaunches under (A1) + [OWN.53] Q-L-R3 (a) → W13 (R3′) (S; `gfDevGmo` a theorem, `gfDevWIo` → `gfDevAnc`) + [OWN.54] D35-rule7 (a) → D35-fix (`lbRcsc := aq || rl`, RVWMO⁻ rule 7 in step, `grelAcqGmoC` dropped, re-audit) + the SECOND Stage 2 launch set ((K)+(R3′) ∥ D35-fix ∥ W11 (iv)c; W5d-G next, G1/G2/G5 after (F-dep) (1), G3/G4 after (K)).
@@ -2171,10 +2188,10 @@ MachCSL rule edit — the brief says which), and `utextDiscAt`, needing custody 
 `userret` `fence.i` image fact (`KernelImage.lean:17614`; unsized); exported by the SAME root ("four of six" → "six of six" in the header
 and `roots.txt:20`); gates W5d-G G7 (`utextDiscAt`) and W11 (ii)'s `kOwnerAt` uniqueness (`cpuProcDiscAt`); nothing consumes either before
 W13 (XL).  All options FAITHFUL (the conjuncts are facts about xv6's code; the spec is silent on how a proof partitions them).
-**WAITS / LAUNCHABLE (rev 44) [R40.1][OWN.55]**: **DONE and MERGED since rev 43 (2026-10-13)** — **W13 (R3′)** (w4, 11:39; [R40.1] (α) applied at
+**WAITS / LAUNCHABLE (rev 44–45) [R40.1][OWN.55][R41.n]**: **DONE and MERGED since rev 43 (2026-10-13)** — **W13 (R3′)** (w4, 11:39; [R40.1] (α) applied at
 launch), **W11 (iv)c** (w5, 11:41), **D35-fix** (w1, 11:47; [R40.s1]: launched at once, 13 roots re-audited, baseline unchanged), **W8 (f2-ctx) (a′-r) + S3-a**
 (w2, 11:17) and **S3-b + S3-c0** (w2, 12:13; worker STOPPED GREEN), **W13 (K)** (w4, 12:30), **W13 (F-dep)** (w3, 12:50) — the whole Stage 2 FIRST and SECOND
-batches are IN THE TIP (`Weak.lean:646 import Weak.WeakRvwmoKillIO`).  **IN FLIGHT: none** (the (f2-ctx) RELAUNCH 5 is deferred to the 15:10 five-hour reset).
+batches are IN THE TIP (`Weak.lean:646 import Weak.WeakRvwmoKillIO`).  **IN FLIGHT: W8 (f2-ctx) RELAUNCH 5** (w2, RUNNING — rev 45; its paragraph below is binding and UNCHANGED, plus the [R41.1-alt] addendum after it).
 **LAUNCHABLE: the THIRD Stage 2 batch** below (owner's batch nod — Q-BATCH-3) and **W8 (f2-ctx) RELAUNCH 5** (serial MachCSL lane; the paragraph below; proceeds under
 Q-F2-PTE-WINDOW's provisional (a), non-blocking).  **Gated**: W13 (R) on W5d-G (shared `Supply`/`Lin`/`Glue`/`Walk*`); W14 on W13 (W) + W5d-G; W10 on its sizing
 pass; W11 on W8's export (S4) + W13 (K-cat); W8 (f3-rest) on (f2-ctx).  Weekly cap [OWN.51] stands.  The rev-42 record follows after the RESULTS, the THIRD SET and
@@ -2183,8 +2200,8 @@ RELAUNCH 5.
 (α)): `GraphFabResidue.lean:112-124` — `ioResidue`'s (R3) = `(gisIo x ∧ gisIo y ∧ gpo x y) ∨ (gmem x ∧ gmem y ∧ gfBefore GF x y)`; `ioResidueIo :149` restated
 ("an I/O endpoint, or both endpoints `gmem` fabric members"); `ioResidueNodev :161`; the header `:23-44` names the trusted-surface change AND the `DFence`
 counter-model; **§5 `:322-361` = the [R39.s4] COMPUTED check**: `ioResidueGmo` SATISFIABLE on `GraphFabResidue.diskFab`, a bundle with the disk row's used-idx
-`DWriteDev` RAM store as a member (`:331`), beside `w13fIoResidueOk :286`.  `WeakRvwmoLin2.lean` §8.3: `gfDevGmo :1222` is a THEOREM — `gfDevGmoOfRes :1237 :
-ioResidueGmo GF → gfDevWIo GF → gfDevGmo GF` (via `WeakRvwmoLin2.wioGmem`; replaces `gfDevGmoOfIo`); **`fconfTraceRealizeIO :1284` premises = `rvwmoMinusConsistent`,
+`DWriteDev` RAM store as a member (`:331`), beside `w13fIoResidueOk :286`.  `WeakRvwmoLin2.lean` §8.3: `gfDevGmo :1222` stays the Prop (`gfDevWIo :1225` the premise); `gfDevGmoOfRes :1237 :
+ioResidueGmo GF → gfDevWIo GF → gfDevGmo GF` PROVES it [R41.s8] (via `WeakRvwmoLin2.wioGmem`; replaces `gfDevGmoOfIo`); **`fconfTraceRealizeIO :1284` premises = `rvwmoMinusConsistent`,
 `grule14`, `ioResidueGmo`, `gdiskRead14`, `gfexecConfIO`, `gfDevWIo`, `gxProg.length ≤ N`** — EXACTLY [R40.1] (α)'s acceptance; `w13fIoDevOrdered` re-proved (`:1427`
 uses `gfDevGmoOfRes w13fIo w13fIoResidueOk`).  **DEVIATION (recorded, harmless)**: the three ARBITRARY-trace lemmas `devOrderOfPtraceExtIO :1245`,
 `trDevOrderedOfPtraceIO :1253`, `fconfSupply' :1263` KEEP `gfDevGmo` as an explicit premise beside `gfDevWIo` — their callers discharge it by `gfDevGmoOfRes`
@@ -2232,16 +2249,20 @@ entry's position `t`, from REGISTERED ROOT WORDS: `MachCSL/Reserved.lean` `RsvKi
 adds entries above `T` only, so the exemption at `t ≤ T` never changes — the step laws' `hex` at positions `≤ top`); `Xv6/KernelRsv.lean:70-72` `xv6KptRootR =
 ⟨KA.kernel_pagetable, .roots 1 8⟩`, `xv6ProcRootsR = ⟨KA.proc + 80, .roots 64 376⟩` (in `xv6PostLockRegions :106`; `BootRsv`/`rsvLocksLow` cases) — xv6 registers ONE
 mechanism's two instances, covering [OWN.39]'s user tables from the store of their root into `p->pagetable` until `freeproc`'s clear; **S3-c0**: `Resources.lean`
-`byteSrcOk`, **`loadSrcOk :1273`** (the load's obligation, NAMED), `chainEx σ`, `loadsChained_load :1292` restated over it; `Ctx` `ownCtx_key_chain`; `Wp`
+`byteSrcOk`, **`loadSrcOk :1273`** (the load's obligation, NAMED), `chainEx σ`, `loadsChained_load :1288` restated over it [R41.s2]; `Ctx` `ownCtx_key_chain`; `Wp`
 `ctxByte_srcOk`/`ctxBytes_srcOk` (a plain load of owned context bytes PAYS its obligation); `WpAtomic` `srcCertAt`/`readCertsAt`/`memModel_readCerts` — all STATED,
 NOT WIRED.  Why not (A) literal (kernel root only — user roots are run-time values) or (B) a ghost PT-page set (the export is a PURE predicate of `σ`, W8-design (1):
-a ghost set needs a second bridge and must SHRINK at `freewalk`).  **CAVEAT (WEAKER, named by the worker; `PROGRESS-W8f2.md` "Precision note")**: in `freeproc`
+a ghost set needs a second bridge and must SHRINK at `freewalk`).  **CAVEAT (WEAKER, named by the worker; `PROGRESS-W8f2.md` "Precision note"; bound CORRECTED [R41.1])**: in `freeproc`
 (`kernel/proc.c:156-163`; image `0x80001b2c jal proc_freepagetable`, `0x80001b30 sd zero,80(s1)`) the root page is `kfree`d (`freewalk`'s last `kfree(pagetable)`,
-`vm.c`) BEFORE `p->pagetable = 0`, so for the dozen same-hart instructions between them the registered word still names a FREE page; a page another hart's `kalloc`
-takes in that window is exempt until the clear — the export claims LESS there (sound).  Assessment → **Q-F2-PTE-WINDOW** (§D FIRST; recommended (a): accept as a
-NAMED weakening, the window stated in the export's `.pte` arm; the walk from the junk-filled page reaches no RAM page — `kfree`'s `memset(pa, 1, PGSIZE)`
-(`kalloc.c:55`) is a V-only pointer PTE to PPN `0x40404040404000`-class addresses outside RAM, `kalloc`'s `memset(5)` (`:80`) is leaf-shaped (V|W) and the walk stops —
-so the over-exemption is the ONE 4 KiB root page for that window).  Remaining: S3 wiring (the conjunct, the load rules, the `readAU` client sweep coupled to
+`vm.c:279`) BEFORE `p->pagetable = 0`; and `freewalk` (`vm.c:265-280`) `kfree`s EVERY interior page-table page (`freewalk(child)`, level-0 then level-1) BEFORE
+clearing the parent slot naming it (`pagetable[i] = 0`, `:274`) — under (A′) each such page stays `ptPageAt`-reachable (`ChainDefs.lean:660-662`, depth ≤ 2) from the
+still-stored root word between its `kfree`'s `release(&kmem.lock)` (`kalloc.c:62`, the page becomes allocatable) and the clear; a page another hart's `kalloc` takes in
+such a window is exempt until the clear — the export claims LESS there (sound).  Leaf DATA pages are unaffected (`uvmunmap` frees them before `*pte = 0`, but leaves
+have RWX ≠ 0 and `ptChildAt` follows `ptPtrTo` pointers only).  Assessment → **Q-F2-PTE-WINDOW** (§D FIRST; recommended (a): accept as a NAMED weakening, the WINDOWS
+stated in the export's `.pte` arm — every page-table page of the dying table (≈ 5 for a small process), each from its `kfree`'s release to the clear of its pointer;
+the junk fills themselves reach no RAM page — `kfree`'s `memset(pa, 1, PGSIZE)` (`kalloc.c:55`) is a V-only pointer PTE to `0x4040404040000` (`ptPtrTo :651-653`),
+outside RAM, `kalloc`'s `memset(5)` (`:80`) has RWX ≠ 0 and the walk stops — but a NEW owner that writes a V-only pointer-shaped word before the clear extends the
+exemption to whatever RAM page that word names, so the honest bound is the WINDOW, not a page count).  Remaining: S3 wiring (the conjunct, the load rules, the `readAU` client sweep coupled to
 X1/X5 with TWO receipt arms), X1/X4/X5, S4 → RELAUNCH 5 below.
 **STAGE 2 — THE THIRD LAUNCH SET (rev 44).**  Ground: EVERYTHING of the first two batches is in the tip — W12 (+W12b) ✓, W13 (L) ✓, (F-dep) ✓, (R3′) ✓, (K) ✓,
 D35-fix ✓, W11 (iv)c ✓; the serial MachCSL lane is FREE until W8 (f2-ctx) RELAUNCH 5 (w2: `MachCSL/`, `Xv6/`, `Weak/WeakAdequacy.lean` — no graph item touches
@@ -2250,51 +2271,73 @@ these; each of its cone merges REBUILDS `Weak/`).  Per item — deps / files / p
 is free; (K) left the PARAMETRIC `racyDX` in `Acyc` and `topoExistsX`/`normalizeOfAcyclicX` in `Topo` — G3's fetch fragment enters as a further parameter arm
 beside `ioExtra`, NOT as a second redefinition: the combined instance `racyDX GD (ioExtra ∪ fetchE)` lives in `WeakRvwmoKillIO.lean` beside `racyDIO :90`, or
 `racyDIO`'s `ioExtra` gains the arm — the worker says which; `normalizeOfAcyclicIO :308` then re-proves over it), W12 ✓, W12b ✓ (`Floor` single-writer: the twins left
-`Floor` alone), (L) ✓ (`Lin`).  Files (re-cite at launch — the (F-dep) sweep moved `Supply`/`Fab`/`WeakEvInst` lines): G1 `WeakRvwmoSupply.lean` (`emFetchImg` region,
-was `:277-352`), `WeakRvwmoFab.lean` (the `Gfexec` bundle's fetch-clause SLOT `:816` — `emZifencei` replaces `emFetchImg` there), `WeakEvInst`/`WeakEvLang` (lemma),
-`GraphFetchSpike` (the slot content); G2 `WeakRvwmoConf.lean:57-66,147`; G3 `WeakRvwmoGraph.lean` (`Gdexec.gdFetch`), `Acyc` (`racyDX` instance), `Glue.lean:205-223`,
-`Hull.lean:714`, `Topo` (parametric), `KillIO` (the combined instance); G4 `Topo`; G5 `Lin`, `Floor`, `Supply` (`:743-883` region).  Parallel-safe vs (f2-ctx) ✓, vs
+`Floor` alone), (L) ✓ (`Lin`).  Files (re-cite at launch — the (F-dep) sweep moved `Supply`/`Fab`/`WeakEvInst` lines): G1 `WeakRvwmoSupply.lean` (`emFetchImg :367` today,
+was `:277-352` [R41.s2]), `WeakRvwmoFab.lean` (the `Gfexec` bundle's fetch-clause SLOT `:816` — `emZifencei` replaces `emFetchImg` there), `WeakEvInst`/`WeakEvLang` (lemma),
+`GraphFetchSpike` (the slot content); G2 `WeakRvwmoConf.lean:57-66,147`; G3 `WeakRvwmoGraph.lean` (`Gdexec.gdFetch` — a STRUCTURE change to `structure Gdexec where gdG; gdDeps`
+`:669-671`: either a field with default `[]` + a sweep of the anonymous-constructor literals (RE-COUNT at launch: ≥ 23 structure-syntax `gdDeps :=` sites + the literals
+added by (K)/(F-dep)/(R3′), e.g. `KillIO.lean:701 ⟨⟨w13fIoG, []⟩, …⟩`, `GraphFabResidue.diskFab :339`, `AxDeps.ioGt :1441`), or a wrapper `GdexecF := ⟨GD, gdFetch⟩`
+consumed by `xv6ConfS`/`racyDX` only — the worker says which in its FIRST report; `forget : GdexecT → Gdexec` fills it [R41.2][R41.s5]), `Acyc` (`racyDX` instance),
+`Glue.lean:205-223`, `Hull.lean:716`, `Topo` (parametric), `KillIO` (the combined instance); G4 `Topo`; G5 `Lin`, `Floor`, `Supply` (`:743-883` region).  Parallel-safe vs (f2-ctx) ✓, vs
 W9a ✓ (`PinBridge3` NEW), vs W13 (W) — (W) CONSUMES the `Gfexec` bundle whose fetch clause G1 rewrites: ONE S rebase of (W)'s `xv6ConfS` statement when G1 lands
-(G1 is W5d-G's FIRST increment, M ≈ 350–450 — land it early); vs FabInd-S ✓ (`FabInd` is nobody else's); vs (K-cat) ✓ (NEW leaf file).  Order inside the item: G1 →
-G2 → G3 → G4 → G5 (G1 first for (W); G3/G4 on (K)'s parametric forms).  Size L ≈ 1.8–2.2k (+ XL risk R1, §C W5d-G: hull closure — R1 (a) E1′ recommended).
+(G1 is W5d-G's FIRST increment, M ≈ 350–450 — land it early); vs FabInd-S: SHARED `WeakRvwmoKillIO.lean` (FabInd-S fixes the `:423` call; G3 adds the combined
+instance beside `racyDIO :86-90` and re-proves `normalizeOfAcyclicIO :308`) — **FabInd-S LANDS BEFORE G3 STARTS** (a gate, not a preference; G1/G2 precede G3, so it
+costs nothing), else G3 rebases the one-line `:423` call [R41.3]; vs (K-cat) ✓ (NEW leaf file).  Order inside the item: G1 →
+G2 → G3 → G4 → G5 (G1 first for (W); G3/G4 on (K)'s parametric forms).  Size L ≈ 1.8–2.2k (+ XL risk R1, §C W5d-G: hull closure — R1 (a) E1′ recommended) + a FULL-CONE rebuild per increment (minutes, not lines [R41.2]).
 Acceptance (§C W5d-G): `emFenceI` + `emFenceISound`; the `emZifencei` content in the `Gfexec` slot at the real slot tag [OWN.26]; the six G0 carry-overs;
 `Gdexec.gdFetch` [OWN.18]; `retimeZifencei`; `supplyOfQconf` producing the M2 cut clause; `normalizeOfAcyclicIO` re-proved over the combined relation (I/O positions,
-disk-read anchors AND the fetch fragment kept); hull closure per §B(4)(iii) R1 (a); build/`audit.sh --weak` unchanged (no registered root imports these files).
+disk-read anchors AND the fetch fragment kept); hull closure per §B(4)(iii) R1 (a); **every increment: `lake build` of the registered cone + `audit.sh --weak --build` — 13 roots, `baseline-weak.json` UNCHANGED,
+the roots' STATEMENTS unchanged (report; M1/M2's premises are candidate-level and the AxSpin roots are over `GdexecT`/`forget`, so a default-valued field or a
+`forget`-side fill keeps them — only the audit shows it) [R41.2]**: `Graph`/`Acyc`/`Topo`/`Conf`/`Supply`/`Hull`/`Lin`/`WeakEvInst`/`WeakEvLang` (and `AxDeps`, `Adm`,
+`AxSpinSpike`, `SrvwmoXv6Witness`, `VirtioProg`, `WeakAdequacy`) are in EVERY registered root's import closure (`roots-weak.txt`: 13 roots, 493 modules); OUT are only
+`Fab`/`GraphFetchSpike`/`Glue`/`Floor` and all of `KillIO`/`CatLin*`/`Lin2`/`FabInd`/`GraphFabResidue`/`PinBridge*` — W5d-G is a RE-AUDIT item like D35-fix.
 **W9a `Weak/WeakRvwmoPinBridge3.lean`** (§C W9a): deps MET — W12's `segPinC` ✓ (`CatLin.lean`), **(F-dep) (2)/(3) ✓** (the pin bridge `pinSegPin`/`pinSegPin'`/
 `checkerTaintSubProv` RE-PROVED under the tagged `dstepT` MMIO arms — the rev-43 gate).  Files: NEW `PinBridge3.lean` (reads `PinBridge.lean` 360, `PinBridge2.lean`
 601 — `reaches`/`psites`, §8 — and `CatLin`'s `segPinC`/`segPinCForward`; an S lemma edit to `PinBridge2` is allowed — no other item touches it).  Parallel-safe vs
 everything ✓.  Size L (M–L + M [R6.1], ≈ 0.8–1.2k).  Acceptance: `pinSegPin'` applied at every certifying site of the REAL `pstepEv` run targeting `segPinC`
-(`pinStepOfSegPinArm`; PDep entries across an rfi via `segPinCForward`); no generator work (§B(9)); build/`audit.sh --weak` unchanged.  **FabInd-S** (NEW rev 44;
+(`pinStepOfSegPinArm`; PDep entries across an rfi via `segPinCForward`); no generator work (§B(9)); build/`audit.sh --weak` unchanged (automatic — `PinBridge*`/`CatLin`
+are OUT of the roots' closure [R41.2]).  **FabInd-S** (NEW rev 44;
 S ≈ 10–40 lines; `Weak/WeakRvwmoFabInd.lean` only): `gfexecConfHull :377-383` takes `gfexecConsistent GF` and `hullOk GF.gfGd.gdG cs` and its proof DISCARDS both
-(`rintro _ hdc _ ⟨…⟩` `:384`) — drop the unused `gfexecConsistent` (and `hullOk`, if the worker confirms no caller needs the arity) and fix the 7 in-file uses
-(`:535`, `:570`, …) and the ONE external caller `WeakRvwmoKillIO.lean:423` (which then no longer needs `WeakRvwmoKillIO.gfexecConsistentOfRes`); `gfexecConfRen`
+(`rintro _ hdc _ ⟨…⟩` `:384`) — drop the unused `gfexecConsistent` (and `hullOk`, if the worker confirms no caller needs the arity) and fix the 2 in-file uses
+(`:535`, `:570`) + 4 docstring mentions (`:17,:37,:51,:61`) + the def [R41.s1], and the ONE external caller `WeakRvwmoKillIO.lean:423` (which then no longer needs `WeakRvwmoKillIO.gfexecConsistentOfRes`); `gfexecConfRen`
 unchanged.  Spec: no trusted text (a hull transport lemma).  Why: (K)'s deviation (4) — the cat-side induction (`cycleKillIOC`/`t2linIO` over `rvwmoCatAD` graphs)
 cannot supply `gfexecConsistent`; `hullRunIO`/`fconfRealizeIO` take only `rvwmoCoreD` + the hull's conformance, so this is the last cat-side gap in (K)'s chain.
-Acceptance: build green; `gfexecConfHull`'s statement shorter, every caller re-proved; `audit.sh --weak` unchanged.  Parallel-safe vs all ✓.  **W13 (K-cat)** (NEW rev
+Acceptance: build green; `gfexecConfHull`'s statement shorter, every caller re-proved; `audit.sh --weak` unchanged (automatic — `FabInd`/`KillIO` are OUT of the
+closure).  Parallel-safe vs all ✓ EXCEPT `WeakRvwmoKillIO.lean`, shared with W5d-G G3 — FabInd-S lands BEFORE G3 starts [R41.3].  **W13 (K-cat)** (NEW rev
 44; S–M ≈ 150–300 lines; NEW leaf `Weak/WeakRvwmoKillIOC.lean` importing `WeakRvwmoKillIO` + `CatLin`): the cat twin of `ioSegPinned :609` on `CatLin.rsameC :114`,
 whose rfi arm (`grfi :80`) forwards a read from a po-earlier same-hart write WITHOUT a gmo edge, so check (i) `noReadEdgeOutsideGmo :584` FAILS; the refined
 invariant of §C W13 R5 (plan `:4074-4076`): after the I/O event `x`, every event of the segment is "gmo-after `x`, OR a read FORWARDED (`grfi`) from a write gmo-after
 `x`", closed under every `gpow`/`gppo`/deps/rfi step EXCEPT a `PR∧SR∧¬PW` fence (a fence ordering prior reads before later reads but not prior writes — the forwarded
-read's source write may still be gmo-before `x`'s successor chain); deliverables `WeakRvwmoKillIOC.afterIo` (the invariant), `ioSegPinnedC` (with the NAMED side
+read's source write may still be gmo-before `x`'s successor chain) — per arm [R41.s3], so the worker neither widens the side condition to `PR∧¬PW` nor misses an arm:
+`deps` target writes are ordered after `x` by (R2) (`gdepsWf`, `WeakRvwmoGraph.lean:675-677`: targets are `lbIsW`); `gpoloc :279-280`'s R→R same-address arm keeps the
+later read "forwarded from a po-later write, or coherence-after"; `gacqPo`/`grcsc` need an `aq`/`rl` label a forwarded plain load lacks; `grfi :80` is the invariant's
+own second disjunct; the ONLY break is `gfenceCovers :228-232` with `pr ∧ sr ∧ ¬ pw`; deliverables `WeakRvwmoKillIOC.afterIo` (the invariant), `ioSegPinnedC` (with the NAMED side
 condition `noPrSrFenceInSeg` — no `PR∧SR∧¬PW` fence label in the segment's hart row between `x` and the exit), `rsameCAfterIo` (closure).  Discharge of the side
-condition is an IMAGE fact for W11/W14: the image's only such fence is `fence r,rw` `0x80000ee6` (harts ≥ 1's `started` spin, reached BEFORE their first I/O event;
-hart 0 skips it) — user-mode code after `sret` UNVERIFIED for that sub-case (already noted at §C W13 R5).  Spec: no trusted text (proof device; riscv.cat's rfi
+condition is an IMAGE fact for W11/W14 (its INPUT is the image fence census — opcode `0x0f`/funct3 0: 4 × `fence iorw,iorw`, 2 × `fence rw,w`, 1 × `fence r,rw`
+[R41.s3]): the image's only such fence is `fence r,rw` `0x80000ee6` (`KernelImage.lean:2748` `0x0230000f`; `WkStartedLoad.lean:22`; harts ≥ 1's `started` spin,
+reached BEFORE their first I/O event — `timerinit` is sstc CSR-only, `start.c:56-65`; hart 0 skips it) — user-mode code after `sret` UNVERIFIED for that sub-case (already noted at §C W13 R5).  Spec: no trusted text (proof device; riscv.cat's rfi
 forwarding is exactly what makes the RVWMO⁻ check (i) fail — the cat chain is FAITHFUL, the RVWMO⁻ one STRONGER).  Acceptance: `ioSegPinnedC` proved; the
 `w13f` instance (no fence in row 0 after the UART store) checked; build/`audit.sh --weak` unchanged.  Parallel-safe vs all ✓ (new file; reads `KillIO`/`CatLin`).
 **W13 (W)** (§C W13 (W); `xv6ConfS` on `gfexecConfIO` + W13-wit; M–L ≈ 0.6–1k): deps MET — (K) ✓, (F-dep) ✓, (L) ✓, (I) ✓, (R3′) ✓ (D26's order).  Content: the
 SHAPED, UNPINNED, FABRIC-ORDERED, TAGGED bundle `xv6ConfS` (§A(†)) = `gdexecQconfT` (`CatLinChain.lean:324`) at the device-ACTIVE bundle — i.e. WITHOUT `emDevfree`
 (`:330`; this is where (F-dep)'s I/O-endpoint edges first MATTER: state the tagged conformance over `gfexecConfIO`'s rows and keep `gdexecQconfTForget :337`'s
 projection), `gfexecConfIO` (`Fab`), the fetch-clause slot (`Fab.lean:816`; `emZifencei` once G1 lands — until then the slot's current content, ONE S rebase), and
-**the discharge of `gfDevWIo`** (the (R3′) named premise — PROVED here, not assumed: disk side from `pdiskProg`'s shape (`VirtioProg.lean:68-95`) + xv6's guard
-invariant "no own-guard SKIP at the used-ELEMENT `DWriteDev` on an xv6 run" [R40.s6]; hart side by [R40.s2]'s three cites); + **W13-wit**: hart 0's run `_entry → … →
+**the discharge of `gfDevWIo`** (the (R3′) named premise) **[R41.4]: `gfDevWIoOfXv6` takes a NAMED disk-side hypothesis `usedElemGateOk` (or the worker's name) —
+on an xv6 run the used-ELEMENT `DWriteDev`'s gate `phase ∧ completeOk ∧ pushOk` (`VirtioProg.lean:88-90`) holds and its target `pa s` is RAM, equivalently no own-guard
+SKIP at that node (`WeakEvInst.lean:519-525`: the SKIP arm fires on `g s = none ∨ ¬ ramBytes (pa s) …`) [R40.s6]; the HART half is PROVED here by [R40.s2]'s three cites
+(`lbAdmin` never `LDev`; hart arms keep `d' = d`; `LDev` projects to `LIo`); the DISK half is a RUN-LEVEL virtio fact — a property of the state `virtio_disk_rw`'s
+descriptor/avail discipline produces, NOT of `pdiskProg`'s shape (`VirtioProg.lean:68-95`), and not available in (W)'s consumer files — DISCHARGED by W14's
+device-active witness / the disk invariant, or it stays a named premise.  Spec: RVWMO/riscv.cat/Sail/Zifencei/PMAs are SILENT on device programs; `usedElemGateOk` is
+device-model text EQUAL to MachCSL's disk step on xv6 runs (owner informed, no menu)**; + **W13-wit**: hart 0's run `_entry → … →
 uartinitone` to its first UART store `sb zero,1(a5)` `0x800008a0` (`LIo .wr 0x10000001 [0]` in row 0 — the first candidate with a NON-EMPTY `gfDev`, D31), by kernel
-evaluation on W5c's `esilAdmRun`; **[R38.s1] the COMPUTED satisfiability check of every conformance text** — `xv6ConfS`'s Bool twin `true` on W13-wit's bundle (the
+evaluation on W5c's `esilAdmRun` — it exercises `gfDevWIo`'s HART half only (no disk activity before the UART store: the disk half is VACUOUS on it and the Bool twin
+cannot catch a wrong guess; the disk half's computed check belongs to W14's device-active witness [R41.s6]); **[R38.s1] the COMPUTED satisfiability check of every conformance text** — `xv6ConfS`'s Bool twin `true` on W13-wit's bundle (the
 check that caught (F-dep)'s vacuity); gate 2 (a device-ACTIVE disk witness) → W14 as before.  Files: NEW `Weak/GraphFabConf.lean` (or the worker's name; `xv6ConfS`
 exists today only in docstrings — `Fab.lean:816`, `GraphFetchSpike.lean:89,314`) + `W13Wit.lean`; consumer-only of `Fab`/`CatLinChain`/`Lin2`/`KillIO`.
 Parallel-safe vs (f2-ctx) ✓, vs W9a ✓, vs W5d-G: ONE S rebase on G1 (above); vs FabInd-S/(K-cat) ✓ — RECOMMENDED as the SAME worker's increments: **FabInd-S →
 (K-cat) → (W)** (S, S–M, M–L; each green).  Acceptance: `xv6ConfS` STATED over the device-active tagged text with `gdexecQconfT`'s projection kept; `gfDevWIo`
-discharged (`gfDevWIoOfXv6` or so) — `fconfTraceRealizeIO`'s premise list then closes on xv6 runs except `gdiskRead14` (supplied by (K)) and the trusted
-`ioResidueGmo`; W13-wit builds with a non-empty `gfDev`; the Bool twin evaluates `true`; build/`audit.sh --weak` unchanged.  **W13 (R)** (the re-thread of the
+discharged (`gfDevWIoOfXv6`: hart half PROVED, disk half the NAMED `usedElemGateOk`) — `fconfTraceRealizeIO`'s premise list then closes on xv6 runs except
+`gdiskRead14` (supplied by (K)), the trusted `ioResidueGmo`, and the named `usedElemGateOk` (W14) [R41.4]; W13-wit builds with a non-empty `gfDev`; the Bool twin
+evaluates `true` (hart half); build/`audit.sh --weak` unchanged (automatic — new consumer files, OUT of the closure).  **W13 (R)** (the re-thread of the
 constant-fabric chain onto `gfexecConfIO`: 8.6k lines / 14 files — `Supply`, `LinInd`, `Cert4`, `Glue`, `Glue2`, `Walk*`, `Progress`, `PreNorm*`, `Capstone`; L–XL): deps
 MET but it SHARES `Supply`/`Lin`/`Glue` with W5d-G G1/G3/G5 — **after W5d-G** (the fourth set).  **W10**: D35-fix ✓ (the `CatFloor` twins over `rvwmoCatAD` +
 `noPlainAqC`), but its design is one line (§C W10, "unverified") — a **SIZING PASS first** (S, read-only, any lane: `wsegSupply`/`walkPolicy` on the D35-fixed twins,
@@ -2302,8 +2345,9 @@ whether W10 absorbs `Floor`/`Cert3`'s originals; by the reviser or a spike worke
 export (S4) + (K-cat) — NOT NOW ((iv)c ✓).  **W8 (f3-rest)**: after (f2-ctx).  **RECOMMENDED BATCH (≤ 3, parallel, pairwise file-disjoint up to the ONE named S
 rebase): W5d-G G1–G5 (G1 FIRST) ∥ W9a ∥ W13 (W) [FabInd-S → (K-cat) → (W)]** — graph lane, three workers, beside W8 (f2-ctx) RELAUNCH 5 (w2, serial lane; four
 workers in all); the owner's batch nod is needed ([OWN.55] covered the second batch) — **Q-BATCH-3** (§D).  Disjointness: W5d-G's files ∩ W9a = ∅ (`PinBridge*` are in
-none of G1–G5); ∩ (W)/(K-cat)/FabInd-S = ∅ except the `Gfexec` CONSUMER rebase (S); W9a ∩ (W) = ∅; (f2-ctx) ∩ the graph items = ∅ (`MachCSL/`, `Xv6/`, `WeakAdequacy`).
-Landing order: FabInd-S first (S; frees (K)'s cat-side induction, nobody else edits `FabInd`), G1 early (so (W) rebases once), the rest any order.  Usage: [OWN.51].
+none of G1–G5); ∩ (W)/(K-cat) = ∅ except the `Gfexec` CONSUMER rebase (S); ∩ FabInd-S = `WeakRvwmoKillIO.lean` (`:423` vs `:86-90/:308`) — FabInd-S before G3
+[R41.3]; W9a ∩ (W) = ∅; (f2-ctx) ∩ the graph items = ∅ (`MachCSL/`, `Xv6/`, `WeakAdequacy`).
+Landing order: FabInd-S first (S; frees (K)'s cat-side induction, and the GATE for G3's `KillIO` edit [R41.3]), G1 early (so (W) rebases once), the rest any order.  Usage: [OWN.51].
 **RELAUNCH 5 — W8 (f2-ctx): S3 WIRING → S4 (rev 44; serial MachCSL lane; w2 on the tip; after the 15:10 five-hour reset).**  Binding text: RELAUNCH 2's paragraph
 below (with [OWN.49] (a′-r), [OWN.50] F-C (i)) as executed by RELAUNCH 3/4 (briefs `../weak-orch/allocproc_W8f2_cont3/cont4_prompt.txt`), the worker's
 `PROGRESS-W8f2.md` RELAUNCH 4 section "Next (S3 wiring → S4)" (BINDING step list; it found NO plan clause wrong), §C W8, and THIS paragraph.  **STATE**: S0, S1/S1′,
@@ -2334,6 +2378,13 @@ sites, the walker — current; none RESISTS so far).  Parallel: the third graph 
 root files.  Size: remaining ≈ 3–5k (S3 wiring ≈ 2–3.5k over the clients above, S4 ≈ 0.5–1k); 2 cone rebuilds.  Acceptance: `lake build MachCSL Xv6 Weak Vtest`
 green, `lint.sh`, `audit.sh`, `audit.sh --weak`, `tcb.sh` (`expected.json` unchanged unless the export's modules change — report); registered roots unchanged in
 statement except the (r2) root's export as stated; the export's `.pte` docstring names the window.  **W8 (f3-rest)** after it.
+**RELAUNCH 5 ADDENDUM (rev 45; the RUNNING paragraph above is binding and UNCHANGED — the coordinator relays this to w2 as a launch addendum) [R41.1-alt]**: R41's
+required docstring correction ([R41.1] (2)) is applied HERE rather than in the binding text because the running brief must not be edited; it changes no step. S4's `.pte`
+docstring and `pteDiscAt` state the CORRECTED window: "bytes of pages reachable from a registered root word as of the access, including a page-table page already
+freed by `freewalk`/`proc_freepagetable` until the pointer naming it is cleared (its parent's slot, `pagetable[i] = 0`, `vm.c:274`; for the root, `freeproc`'s
+`p->pagetable = 0`, `0x80001b30`)" — §D Q-F2-PTE-WINDOW (a), §A's export sentence likewise.  Cite drift, re-cite at launch [R41.s2]: `Adequacy:508`/`WpAtomic:938`/
+`Wp:1679` are pre-S3-c0 lines; `loadsChained_load` is `Resources.lean:1288`.  The X1/X5 "both greps EMPTY" is the TARGET: today `ACQUIRE_LLB|ACQUIRESLEEP_LLB` = 31 hits
+in `Xv6/`; after X1/X5 both greps EMPTY.
 **WAITS / LAUNCHABLE (rev 42) [OWN.52]–[OWN.54]**: **DONE and MERGED since rev 41 — W12 (+W12b)** (w1, 06:17), **W13 (L)** (w4, 05:56), **W8 (f2-ctx)
 S0 + S2** (07:11, 109 files; the (a′-r) receipt work PARKED one error from green at `~/dev/weak-orch/parked/w8f2-aprime-r-wip/`, 22 files —
 `Xv6/ProofPipealloc.lean` ~681, the rule's `kmapId` premise unmatched before address normalisation).  **IN FLIGHT: W8 (f2-ctx) RELAUNCH 3** (w2,
@@ -2367,7 +2418,7 @@ anchor = the writes gmo-before it — what W11 (iv)c `linCandDiskLat` uses), `li
 `linCandScaTMinusA :790` (the old statements are the write instances, unchanged); `WeakRvwmoFabInd.lean:464-465` docstring.  Deviations D1–D3 (the
 report).  **Residue of (L)**: `fconfTraceRealizeIO` carries `gfDevGmo` + `gfDevWIo` because the landed (R3) orders I/O PAIRS only — **Q-L-R3 RULED
 (a) [OWN.53] → W13 (R3′) below**.
-**W13 (R3′) — the [OWN.53] text change (S ≈ 0.1–0.2k; NEW rev 42; `Weak/` only; the W13 (K) worker's FIRST green increment) — DONE and MERGED 2026-10-13 11:39 (w4) [rev 44], with [R40.1] (α) APPLIED AT LAUNCH (`../weak-orch/allocproc_R3p_prompt.txt`): `gfDevWIo :1222` KEPT as the NAMED premise, `gfDevAnc` NOT introduced, `fconfTraceRealizeIO` drops `gfDevGmo` ONLY — the landed form is in Rev 44 RESULTS; rev 43's `gfDevAnc` sentences below are corrected in place.**  *Spec (FIRST)*:
+**W13 (R3′) — the [OWN.53] text change (S ≈ 0.1–0.2k; NEW rev 42; `Weak/` only; the W13 (K) worker's FIRST green increment) — DONE and MERGED 2026-10-13 11:39 (w4) [rev 44], with [R40.1] (α) APPLIED AT LAUNCH (`../weak-orch/allocproc_R3p_prompt.txt`): `gfDevWIo :1225` KEPT as the NAMED premise ([R41.s2]: `:1222` is `gfDevGmo`), `gfDevAnc` NOT introduced, `fconfTraceRealizeIO` drops `gfDevGmo` ONLY — the landed form is in Rev 44 RESULTS; rev 43's `gfDevAnc` sentences below are corrected in place.**  *Spec (FIRST)*:
 RVWMO/riscv.cat/Sail have no device events; Zifencei and the PMAs are silent; `gfDev` and (R1)–(R3) are device-model/trusted-surface text (D45/D49).
 *What changes*: `ioResidue`'s (R3) (`GraphFabResidue.lean:84`) becomes `(gisIo x ∧ gisIo y ∧ gpo x y) ∨ (gmem x ∧ gmem y ∧ gfBefore GF x y)` —
 the fabric arm ranges over the members that HAVE a memory-order position **[R39.3]** (EQUAL in strength to "all members" on every anchor — anchors
@@ -4006,18 +4057,22 @@ nothing non-trivial enters M1's premise, `itvOf` is no shared parameter; M1 repl
   fill instant per label follows from Sail + Ziccif.  Then, AFTER W13 (M) (D26; Q-W5dG-seq RULED (a) [OWN.24][R14.3]
   — G1/G3/G5 edit `Fab`/`Supply`/`Acyc`/`Glue`/`Hull`/`Topo`, the files W13 (I)/(K)/(M) rewrite), the spike's change
   list: **G1** `gzContrib`, `emFenceI` + `emFenceISound`, `emZifencei` in `xv6ConfS`/`gdexecQconf` replacing
-  `emFetchImg` (`WeakRvwmoSupply.lean:277-352`, `emFetchImgRen/Prefix` → retime/hull versions; `Fab.lean:516-522`;
+  `emFetchImg` (`WeakRvwmoSupply.lean:367` today, was `:277-352` [R41.s2]; `emFetchImgRen/Prefix` → retime/hull versions; `Fab.lean:516-522`;
   `WeakEvInst`/`WeakEvLang` lemma only) + the six carry-overs above (M ≈ 350–450); **G2** tags = gmo indices — `wlblRen` renames `LIFetch` tags
   (reverts Q-C4, `WeakRvwmoConf.lean:57-66,147`), `pstepEvWren`/`projLblWren` `LIFetch` arms, M1 pin kept via `π 0 =
   0` (S ≈ 100); **G3** fetch fragment as data — `Gdexec.gdFetch`, `racyD` disjunct, `racyDSplit` arm (cross-hart →
-  `gcross`), `gdHull` filter, `retime` keeps it, ~31 literal sites (`WeakRvwmoGraph.lean:613`, `Acyc.lean:200`,
-  `Glue.lean:205-223`, `Hull.lean:714`, `Topo.lean:120-129,594-607`) (M ≈ 300); **G4** `retimeZifencei` + contributor
+  `gcross`), `gdHull` filter, `retime` keeps it — a STRUCTURE change to `Gdexec` (`WeakRvwmoGraph.lean:669-671`; default-`[]`
+  field + literal sweep, or a `GdexecF` wrapper for `xv6ConfS`/`racyDX` — worker's choice in its first report [R41.2][R41.s5]); the pre-(K)/(F-dep)/(R3′) count
+  "~31 literal sites" (`WeakRvwmoGraph.lean:613`, `Acyc.lean:200`, `Glue.lean:205-223`, `Hull.lean:716`, `Topo.lean:120-129,594-607`) is RE-COUNTED at launch (≥ 23
+  `gdDeps :=` sites + `KillIO:701`, `GraphFabResidue.diskFab :339`, `AxDeps.ioGt :1441`, …) (M ≈ 300 + a full-cone rebuild + re-audit per increment); **G4** `retimeZifencei` + contributor
   invariance + `gwlog`/`gwix` bridge (Topo; L ≈ 600); **G5** `linPrefixLog`, the floor bound, `supplyOfQconf` producing
   the M2 cut clause (`Lin`, `Floor`, `Supply.lean:743-883`; M–L ≈ 500); **G6** re-thread `pstepPin` → `execProgOk'S`
   (the 19-file list in §B(10); ONE pass with W11 (iii)); **G7** kill arms for cycles through E1/E2/E3 ("fetch-entry
   segments", pinned only by `fence.i`; W8 vocabulary: user-text page ownership, exec/fork → `p->lock` → `userret`
   `fence.i`) — L, in W11/W8.  Witness files with literal fetch items (`WeakRvwmoConfWit2`, `WeakRvwmoAdm`) need only
-  "the pin implies `gzFetch`".  Hull closure per §B(4)(iii) R1 (a).  Non-vacuity: user-text fetch witness → W14 (D44).
+  "the pin implies `gzFetch`".  Hull closure per §B(4)(iii) R1 (a).  **Every increment rebuilds and RE-AUDITS the registered cone
+  (`audit.sh --weak --build`, 13 roots, `baseline-weak.json` unchanged, roots' statements unchanged): G1–G5's files are in every registered root's import closure
+  [R41.2].**  Non-vacuity: user-text fetch witness → W14 (D44).
 - **W13 `Weak/GraphFab*.lean`** (**XL ≈ 7–10k lines / ~70 files**, REDESIGNED rev 10, eight pieces; D38 RULED
   [OWN.14]) [R5.1][R6.3iii][R7.3].  **(E) the alphabet — PARTIAL, MERGED (2026-10-11; 85 files under `Weak/`;
   `PROGRESS-W13E.md`); RE-SEQUENCED (a) [OWN.27]**.  DONE: `IoKind = rd | wr | dev` (`Weak/WeakMem.lean:110`; D45 (a)),
@@ -4145,7 +4200,8 @@ nothing non-trivial enters M1's premise, `itvOf` is no shared parameter; M1 repl
   constant-fabric chain onto `gfexecConfIO`: measured 8.6k lines / 14 files / ≈ 140 bundle mentions / 52 `fun _ => d0`
   sites (Supply, LinInd, Cert4, Glue, Glue2, Walk*, Progress, PreNorm*, Capstone); segments without I/O events have
   `dvi = dvo` and reuse the constant-fabric lemmas verbatim; witness files embed via `gfexecConfOfQconf`; KillArms,
-  Hull, Lin unchanged except the new arms (L–XL, the bulk).  **(W)** `xv6ConfS` on `gfexecConfIO` + **W13-wit** (M–L):
+  Hull, Lin unchanged except the new arms (L–XL, the bulk).  **(W)** `xv6ConfS` on `gfexecConfIO` + **W13-wit** (M–L; `gfDevWIo`'s discharge: HART half PROVED, DISK half the
+  NAMED `usedElemGateOk` for W14 — §C top [R41.4]):
   hart 0's run `_entry → … → uartinitone` (entry `0x80000896`, `Xv6/KernelImage.lean:1515`; the `jal` at `:1590`) to
   **its first UART store, `sb zero,1(a5)` at `0x800008a0` (`:1525`, IER := 0)** [R6.5b] — the EVENT `LIo .wr
   0x10000001 [0]` in row 0, the first candidate with a non-empty `gfDev` (D31); ≈ 100 dynamic instructions, NO MMIO
@@ -4875,47 +4931,78 @@ from the RULED (a′); adopted PROVISIONALLY as (a″+shape) under the non-block
 anchor, inside W8 (f2-ctx)); F-C = (i) [OWN.50].  RULED 10:22 2026-10-13 (rev 42): **Q-FDEP = (A1) [OWN.52]** (W13 (F-dep) relaunches under (A1) directly); **Q-L-R3 = (a) [OWN.53]** (widen
 (R3) to all `gfDev` members → W13 (R3′), §C top); **D35-rule7 = (a) [OWN.54]** (`lbRcsc` to riscv.cat's RCsc → D35-fix, §C top) — the two new
 ones recorded FIRST below in the owner format (they arrived RULED; the briefing is for the record), then Q-FDEP, then Q-F2-PIPEHOP-2 (RULED).
-OPEN: NONE (rev 42; rev 43 — R39 found none missing, [R39.3]'s refinement of RULED Q-L-R3 (a) recorded there).  **Rev 44: R40 found none missing ([R40.1] is a refinement WITHIN RULED Q-L-R3 (a) — RVWMO/riscv.cat/Sail have no device events, Zifencei/PMAs silent, (α)/(β) EQUAL in strength on every xv6 run; owner informed, no menu); NEW from the W8 (f2-ctx) worker: Q-F2-PTE-WINDOW (FIRST below; provisionally (a)), and the third batch's approval Q-BATCH-3.**  R34 found no missing owner question ([R34.1]'s include-or-defer is a
+OPEN: NONE (rev 42; rev 43 — R39 found none missing, [R39.3]'s refinement of RULED Q-L-R3 (a) recorded there).  **Rev 44: R40 found none missing ([R40.1] is a refinement WITHIN RULED Q-L-R3 (a) — RVWMO/riscv.cat/Sail have no device events, Zifencei/PMAs silent, (α)/(β) EQUAL in strength on every xv6 run; owner informed, no menu); NEW from the W8 (f2-ctx) worker: Q-F2-PTE-WINDOW (FIRST below; provisionally (a)), and the third batch's approval Q-BATCH-3.**  **Rev 45: R41 found none missing — [R41.1] CORRECTS OPEN Q-F2-PTE-WINDOW's bound (every option keeps its mark; (a) stays sound and recommended; the owner should see the corrected bound before ruling), [R41.5] puts Q-BATCH-3 in the format; [R41.4]'s `usedElemGateOk` is a named device-model hypothesis EQUAL to MachCSL's disk step on xv6 runs (RVWMO/riscv.cat/Sail/Zifencei/PMAs silent on device programs) — informed under the non-blocking rule, no menu.**  R34 found no missing owner question ([R34.1]'s include-or-defer is a
 scope choice, both options FAITHFUL; taken by the coordinator: DEFERRED to W8 (f3-rest)).**
 - **Q-F2-PTE-WINDOW — OPEN, provisionally (a) (rev 44; raised by the W8 (f2-ctx) worker, `../weak-orch/parked/PROGRESS-W8f2.md` "Precision note", merged with
-  S3-b 12:13 2026-10-13; non-blocking — RELAUNCH 5 proceeds under (a), only the export's `.pte` docstring text depends on the ruling).  The (A′) page-table
-  exemption keeps a freed root page exempt for a few instructions.**  *Plain language.*  The published access discipline (W8's export, the (r2) root) says every
+  S3-b 12:13 2026-10-13; non-blocking — RELAUNCH 5 proceeds under (a), only the export's `.pte` docstring text depends on the ruling; **bound CORRECTED rev 45
+  [R41.1] — the window covers EVERY page-table page of the dying table, not the root alone, and is a window, not a page count**).  The (A′) page-table exemption
+  keeps each freed page-table page exempt for a few instructions.**  *Plain language.*  The published access discipline (W8's export, the (r2) root) says every
   racy read of a RAM byte is CHAINED to its writer by a release/acquire path — EXCEPT page-table bytes, because the hardware may update a PTE's A/D bits speculatively,
   ordered by nothing (that is why [OWN.39] put PTE bytes under their own arm).  S3 had to say WHICH bytes are page-table bytes without a ghost ledger: (A′) reads it off
   memory — a byte is a PTE byte at time `t` if a Sv39 walk, started from a REGISTERED ROOT WORD as it stood at `t` (`kernel_pagetable`, or any `proc[i].pagetable`),
-  reaches its page.  xv6's `freeproc` (`kernel/proc.c:156-163`) frees the page table FIRST (`proc_freepagetable` → `uvmfree` → `freewalk` → `kfree(root)`) and clears
-  the root word AFTER (`p->pagetable = 0`; image: `jal proc_freepagetable` `0x80001b2c`, `sd zero,80(s1)` `0x80001b30` — about a dozen same-hart instructions apart,
-  three returns).  In that window the word still names a page on the free list.  *Tiny example*: hart 1 runs `freeproc(p)` under `p->lock`: `kfree(R)` puts p's root
-  page `R` on the free list (filled with `0x01` bytes, `kalloc.c:55`).  Hart 2's `kalloc()` returns `R` (filled with `0x05`, `:80`) and, say, `pipealloc` writes pipe
-  fields into it.  Hart 3 reads one of those bytes.  Hart 1 then executes `sd zero,80(s1)`.  Under (A′) hart 3's read, if it happens before hart 1's clear, is a
-  read of a "PTE byte" — the export demands NO chain for it; one instruction later the same read would need one.  The walk from the junk-filled `R` reaches nothing
-  else: `0x0101…` is a V-only pointer PTE whose PPN is outside RAM (≈ `0x40404040404000`), `0x0505…` is leaf-shaped (V|W) and the walk stops — so the over-exemption is
-  exactly `R`'s 4 KiB for that window (unless the new owner stores pointer-shaped words — e.g. `R` becomes a page table again, which is then exempt rightly).
-  *Definitions*: *export / `xv6AccessDisc`* — the discipline theorem's conclusion (`Xv6/AccessDiscipline.lean:115`, four of six conjuncts after S4); *`chainOkAt`* —
-  its chain conjunct, quantified over bytes whose custody is NOT `.pte`; *`custAt`/`Cust.pte`* — the per-byte custody map and its page-table class (`:53`, `:89`);
-  *(A′)* — the custody read off memory via *`ptByteAt`* (`MachCSL/ChainDefs.lean:670`) from the *registry* entries `RsvKind.roots` (`Xv6/KernelRsv.lean:70-72`); *root
-  word* — `kernel_pagetable` or `proc[i].pagetable`; *window* — the instructions between `kfree(root)` and `p->pagetable = 0`; *WEAKER* — the theorem claims less
-  (sound), never something false.  *Spec (FIRST).*  RVWMO/riscv.cat/Sail: SILENT — custody is not an ISA notion; the one relevant ISA fact (Sv39: a hardware walker
-  reads PTEs reachable from `satp` and may set A/D speculatively) does not touch the window — the dying process runs on NO hart at `freeproc` (ZOMBIE; the freeing hart
-  is on `kernel_pagetable`), so no hardware walk reads `R`; Zifencei/PMAs silent.  Every option is custody-spec text, FAITHFUL to the ISA; the marks below compare the
-  EXPORT to the intended statement "bytes in use as PTEs".  *Why it matters.*  A reader checking "is every racy read chained?" finds a named window the theorem skips;
-  it is honest (stated, bounded, sound) but it is a hole in the published sentence, and the user-table half of the exemption is never NEEDED by the proof (user PTE
-  reads are owned context loads, paid by keys) — it exists only to make the export's `.pte` arm cover both tables [OWN.39].  *Options.*  **(a) RECOMMENDED — accept
-  as a NAMED weakening**: S4's `.pte` arm is `ptByteAt` as built; its docstring, `pteDiscAt` and §A's export sentence state the window ("… including a root page
-  already freed by `proc_freepagetable` until `freeproc` clears `p->pagetable`, `0x80001b30`") with the junk-fill argument above.  Export WEAKER than intended by
-  exactly that window; cost 0 (text); unblocks S3 wiring/S4 NOW; risk: a reviewer reads it as a loophole — mitigated by the bound (one 4 KiB page, a dozen same-hart
-  instructions, no hardware walk).  **(b″) kernel reorder, clear-before-free**: `freeproc` saves the root in a local, stores `p->pagetable = 0`, then frees (one
-  statement moved; the `verified` branch's named diff D12 grows by one line).  Export EQUAL to the intended one (no root word ever names a free page); FAITHFUL.  Cost:
-  re-dump `Xv6/KernelImage.lean` and re-prove `freeproc`'s TsoMem Iris step (`Xv6/ProofFreeproc`/`LinkFreeproc`, 44 slots; M) — S overall IF gcc keeps the code size
-  (same instructions reordered; every pc after `0x80001b2c` unchanged), XL if any pc shifts (literal pcs throughout `Xv6/`/`Weak/`); a read-only SIZING PASS (compile,
-  diff the disassembly) decides, S.  Not before S4; a separate serial item.  **(b) σ-readable tightening in S4 ("freed-root receipt")**: exempt via a root word only
-  while the page's as-of-`t` first word is not `kfree`'s fill — WEAKER than (b″) (a sub-window remains after `kalloc`'s refill) and brittle (keyed on fill constants);
-  NOT recommended.  **(c) a ghost freed-page set**: EQUAL, but needs a second bridge ghost ⊆ σ-custody (W8-design (1): no ghost ledger) and must shrink at
-  `freewalk`; L.  Recommended: (a) now; (b″)'s sizing pass as an optional S item if the owner wants the window gone before publication.
-- **Q-BATCH-3 — OPEN (rev 44): approval of the THIRD Stage 2 batch — W5d-G G1–G5 (G1 first) ∥ W9a ∥ W13 (W) [FabInd-S → (K-cat) → (W)]** (§C top; three graph
-  workers beside W8 (f2-ctx) RELAUNCH 5; [OWN.55] covered the second batch only).  Not a memory-model question (every item is a planned proof item; the two NEW S items
-  FabInd-S and W13 (K-cat) are proof devices with no trusted text).  Options: approve as recommended; approve a subset (W9a and FabInd-S are the safest — new/own files);
-  defer (cost: the fourth set — W13 (R), W14 — waits on W5d-G).
+  reaches its page (root → level-1 → level-0, following pointer entries only).  xv6 frees a dying process's page table BOTTOM-UP and frees each page BEFORE clearing the
+  one pointer that names it: `freewalk` (`kernel/vm.c:265-280`) does `freewalk(child); pagetable[i] = 0` for every pointer entry and `kfree(pagetable)` LAST, so a
+  level-0 page is `kfree`d before its level-1 slot is cleared, a level-1 page before its root slot is cleared; and `freeproc` (`proc.c:156-163`) `kfree`s the root
+  (via `proc_freepagetable` → `uvmfree` → `freewalk`) BEFORE `p->pagetable = 0` (image: `jal proc_freepagetable` `0x80001b2c`, `sd zero,80(s1)` `0x80001b30`).  In
+  each such window a still-stored pointer names a page on the free list — from that page's `kfree` `release(&kmem.lock)` (`kalloc.c:62`: the page is allocatable) to
+  the clear of its pointer: a few instructions and two returns for an interior page, four returns for the root (`kfree` → `freewalk` → `uvmfree` → `proc_freepagetable`
+  → `freeproc`; fewer with tail calls) [R41.s4].  Leaf DATA pages have no window (`uvmunmap` frees them, but leaves have RWX ≠ 0 and the walk does not follow them).
+  *Tiny example*: hart 1 runs `freeproc(p)` under `p->lock`: `freewalk` `kfree`s p's level-0 page `L` (filled with `0x01` bytes, `kalloc.c:55`) and is about to clear
+  the level-1 slot naming it.  Hart 2's `kalloc()` returns `L` (filled with `0x05`, `:80`) and, say, `pipealloc` writes pipe fields into it.  Hart 3 reads one of those
+  bytes.  Hart 1 then executes `pagetable[i] = 0`.  Under (A′) hart 3's read, if it happens before hart 1's clear, is a read of a "PTE byte" — the export demands NO
+  chain for it; one instruction later the same read would need one.  The same shape recurs for p's level-1 pages and the root `R` (cleared by `sd zero,80(s1)`).  The
+  junk fills themselves lead nowhere: `0x0101…` is a V-only pointer entry whose target is `0x4040404040000` (`ptPtrTo`, `ChainDefs.lean:651-653`), outside RAM
+  (`0x80000000`–`0x88000000`); `0x0505…` has RWX = `0b010`, so it is not a pointer and the walk stops.  But if the NEW owner writes a V-only pointer-shaped word
+  (`v &&& 0xF = 1`) whose PPN lies in RAM before the clear — user-controlled bytes in a pipe buffer or a `kalloc`ed user page can be anything — the walk reaches an
+  UNRELATED RAM page during the window, so "exactly the freed page's 4 KiB" is NOT a theorem; the honest bound is the WINDOW: every page-table page of the dying table
+  (≈ 5 for a small process: root, ≈ 2 level-1, ≈ 2 level-0 — the user region and the TRAMPOLINE/TRAPFRAME region), each from its `kfree` to the clear of its pointer, plus
+  whatever a pointer-shaped word written there names.  *Definitions*: *export / `xv6AccessDisc`* — the discipline theorem's conclusion (`Xv6/AccessDiscipline.lean:115`,
+  four of six conjuncts after S4); *`chainOkAt`* — its chain conjunct, quantified over bytes whose custody is NOT `.pte`; *`custAt`/`Cust.pte`* — the per-byte custody map
+  and its page-table class (`:53`, `:89`); *(A′)* — the custody read off memory via *`ptByteAt`* (`MachCSL/ChainDefs.lean:670`; `ptPageAt :660` = root, level-1, level-0)
+  from the *registry* entries `RsvKind.roots` (`Xv6/KernelRsv.lean:70-72`); *root word* — `kernel_pagetable` or `proc[i].pagetable`; *page-table page* — the root or an
+  interior (level-1/level-0) page of a table; *window* — the instructions between a page-table page's `kfree` and the clear of the pointer naming it; *WEAKER* — the
+  theorem claims less (sound), never something false.  *Spec (FIRST).*  RVWMO/riscv.cat/Sail: SILENT — custody is not an ISA notion; the one relevant ISA fact (Sv39: a
+  hardware walker reads PTEs reachable from `satp` and may set A/D speculatively) does not touch the windows — the dying process runs on NO hart at `freeproc` (ZOMBIE in
+  `wait`, or a never-scheduled child on `fork`'s failure path, `proc.c:272`; the freeing hart is on `kernel_pagetable`), so no hardware walk reads the freed pages;
+  `exec` installs the new table in `p->pagetable` BEFORE `proc_freepagetable(oldpagetable)` (`exec.c:134-138`), and `uvmdealloc` frees leaves only — NO window there;
+  Zifencei/PMAs silent.  Every option is custody-spec text, FAITHFUL to the ISA; the marks below compare the EXPORT to the intended statement "bytes in use as PTEs".
+  *Why it matters.*  A reader checking "is every racy read chained?" finds named windows the theorem skips; it is honest (stated, bounded in time, sound) but a hole in
+  the published sentence, and the user-table half of the exemption is never NEEDED by the proof (user PTE reads are owned context loads, paid by keys) — it exists only
+  to make the export's `.pte` arm cover both tables [OWN.39].  *Options.*  **(a) RECOMMENDED — accept as a NAMED weakening**: S4's `.pte` arm is `ptByteAt` as built;
+  its docstring, `pteDiscAt` and §A's export sentence state the windows ("… including a page-table page already freed by `freewalk`/`proc_freepagetable` until the
+  pointer naming it is cleared — its parent's slot, or `freeproc`'s `p->pagetable = 0`, `0x80001b30`") with the junk-fill and pointer-shaped-word caveats above.
+  Export WEAKER than intended by exactly those windows; cost 0 (text; RELAUNCH 5's addendum carries the sentence); unblocks S3 wiring/S4 NOW; risk: a reviewer reads it
+  as a loophole — mitigated by the bound (the dying table's ≈ 5 pages, each for a few same-hart instructions, no hardware walk, no false claim).  **(b″) kernel reorder,
+  clear-before-free**: `freeproc` saves the root in a local, stores `p->pagetable = 0`, then frees (one statement moved; the `verified` branch's named diff D12 grows by
+  one line).  Because `ptRootAt :664` needs the root word to HOLD the root, the whole table is unreachable for the entire `freewalk` — this closes the INTERIOR windows
+  too, not only the root's (which strengthens the case for its sizing pass [R41.1]).  Export EQUAL to the intended one (no registered word ever names a free page);
+  FAITHFUL.  Cost: re-dump `Xv6/KernelImage.lean` and re-prove `freeproc`'s TsoMem Iris step (`Xv6/ProofFreeproc`/`LinkFreeproc`, 44 slots; M) — S overall IF gcc keeps
+  the code size (same instructions reordered; every pc after `0x80001b2c` unchanged), XL if any pc shifts (literal pcs throughout `Xv6/`/`Weak/`); a read-only SIZING
+  PASS (compile, diff the disassembly) decides, S.  Not before S4; a separate serial item.  **(b) σ-readable tightening in S4 ("freed-page receipt")**: exempt via a
+  pointer only while the named page's as-of-`t` first word is not `kfree`'s fill — WEAKER than (b″) (a sub-window remains after `kalloc`'s refill, and it would have to
+  be applied at every level) and brittle (keyed on fill constants); NOT recommended.  **(c) a ghost freed-page set**: EQUAL, but needs a second bridge ghost ⊆ σ-custody
+  (W8-design (1): no ghost ledger) and must shrink at `freewalk`; L.  Recommended: (a) now; (b″)'s sizing pass as an optional S item if the owner wants the windows
+  gone before publication.
+- **Q-BATCH-3 — OPEN (rev 44; rewritten in the owner format rev 45 [R41.5]): approval of the THIRD Stage 2 batch — W5d-G G1–G5 (G1 first) ∥ W9a ∥ W13 (W)
+  [FabInd-S → (K-cat) → (W)]** (§C top; three graph workers beside the running W8 (f2-ctx) RELAUNCH 5; [OWN.55] covered the second batch only).  *Plain language.*
+  Three more proof items on the GRAPH side (the RVWMO graph model of the kernel's runs — `Weak/`), run in parallel beside the serial MachCSL lane: **W5d-G** makes
+  instruction FETCH a first-class part of the graph model (Zifencei: a hart's fetch of a text byte is ordered against stores to it only by `fence.i`), so user-text
+  changes are covered — five increments G1–G5, and the ONE item of the three that rebuilds and RE-AUDITS the registered cone on every increment (its files are in
+  every registered root's import closure [R41.2]); **W9a** connects the checker's pin certificates (the per-site evidence the checker emits) to the cat-model segments
+  (`segPinC`) — a new file, nobody else's; **W13 (W)** states the real device-ACTIVE xv6 conformance bundle `xv6ConfS` (the trusted text saying what a conforming xv6
+  run's graph looks like, including the disk) and builds the first witness with a non-empty fabric (hart 0 to its first UART store), after two S preparatory lemmas
+  (FabInd-S drops an unused premise of the hull-transport lemma; (K-cat) proves the cat-model twin of (K)'s "I/O segment pinned" lemma); (W) makes ONE S rebase when G1
+  lands.  *Definitions*: *W8 (f2-ctx) RELAUNCH 5* — the running serial-lane item wiring the access discipline (MachCSL/Xv6 files; disjoint from all three); *FabInd-S*,
+  *(K-cat)* — the S items above, the same worker's first two increments; *registered cone* — the 13 `audit.sh --weak` roots and their 493-module import closure;
+  *re-audit* — `audit.sh --weak --build`, baseline unchanged; *W13 (R)*, *W14* — the fourth set: the re-thread of the constant-fabric chain onto `gfexecConfIO`, and the
+  device-active DISK witness.  *Why it matters.*  The fourth set — W13 (R) and W14, the disk witness that makes the published theorem NON-VACUOUS on I/O — waits on W5d-G
+  and (W); every item is a planned proof item (no memory-model choice — the spec-first rule does not apply; FabInd-S and (K-cat) are proof devices with no trusted text;
+  (W)'s one new named hypothesis `usedElemGateOk` is device-model text EQUAL to MachCSL's disk step [R41.4]).  *Options.*  **(1) RECOMMENDED — approve all three**:
+  cost three graph workers + the serial lane = four under [OWN.51]; unblocks W13 (R)/W14 soonest; risks: W5d-G's XL hull-closure risk R1 (mitigated by R1 (a) E1′) and
+  its full-cone rebuilds (minutes per increment).  **(2) approve W9a + the (W) chain (FabInd-S → (K-cat) → (W)) now, W5d-G after** [R41.s7]: the safest files (new or
+  own, OUT of the roots' closure — no re-audit), three workers in all; defers the fetch model, so W14/W13 (R) wait one round and (W) needs no rebase.  **(3) approve
+  W9a + FabInd-S only**: two S/M-L items, minimal usage; defers (W)'s bundle and the fetch model — the fourth set slips two rounds.  **(4) defer all**: cost — the fourth
+  set slips a round; the serial lane alone runs.
 - **Q-L-R3 — RULED (a) [OWN.53] (10:22 2026-10-13, rev 42; raised by the W13 (L) worker, `../weak-orch/parked/PROGRESS-W13L.md`; LANDS as W13
   (R3′), §C top).  The residue's fabric arm orders I/O pairs only; the disk's fabric-moving RAM stores are fabric members too.**  *Plain language.*
   The published model orders device traffic by a short list of "residue" rules (R1)–(R3) beyond what the ISA gives; (R3) says two MMIO events the
