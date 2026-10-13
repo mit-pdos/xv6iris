@@ -1,5 +1,15 @@
 # allocproc on RVWMO: target theorem, gap analysis, roadmap (design advisor, 2026-10-09)
 
+**Status: rev 48 = rev 47 + RESULTS + owner rulings [OWN.60]–[OWN.67] (2026-10-13; NO new review since R42 — rev 47 applied it — so 0 [R]-required changes, 0 alt;
+tags [OWN.n]/[rev 48]); ALL owner questions RULED; NO new owner question.**  What changed: RESULTS verified at the tip — **W8 (pte-ghost) MERGED** (`ptByteLiveAt`
+`MachCSL/ChainDefs.lean:726`, `RsvKind.uroots`/`.freeHead` `Reserved.lean:147,153`, residual docstring `Xv6/AccessDiscipline.lean:52-63`), **W13 (W) rest MERGED**
+(`Weak/W13Wit.lean` `w13Wit :231` at the real boot, `gfDev = [(0,27)]`, tagged cat by computation `:221`; Bool twin `xv6ConfSB` `Weak/W13WitRun.lean:586`), **W5d-G
+G2–G4 GREEN, merge in progress** (w1: `Gdexec.gdFetch`, `Weak/GraphFetchRetime.lean` `retimeZifencei :340`/`normalizeOfAcyclicZ :448`; G5 left).  Rulings → text:
+**[OWN.60]** NEW item **W9a (B)** (launch paragraph; its frame fact is a NEW W8 part **(f3-stack)** — not one of the six conjuncts); **[OWN.61]** W11 obligation (1);
+**[OWN.62]** **W8 (f3-gate)**; **[OWN.63]** **W8 (f3-racy)**; **[OWN.64]** **W8 (f3-hold)** + ip->ref/holding() as ONE benign-race class (§A(4′), §B(11) (xi), the
+export docstring); **[OWN.65]** **W8 (f3-pipelk)**; **[OWN.66]** **W8 (f3-ptek)/(f3-pteu)**; **[OWN.67]** residual accepted.  W8 (f3-rest) is SPLIT into these named
+parts + (f3-cpuproc), (f3-utext); launch order + BATCH-4 (≤ 3, small first).  Places: header; history; §A(4′); §B(11) (xi); §C top (rev 48 block); §C (f3-rest),
+(pte-ghost), roadmap, W9a, W11; launch status (rev 48); §D (all RULED; Q-HOLD added FIRST).  History: rev 48 — RESULTS + [OWN.60]–[OWN.67] + 8 named items + BATCH-4.
 **Status: rev 47 = rev 46 + review R42 (4 required changes, tags [R42.n]) (2026-10-13; NOT SATISFIED; 0 alt; adopted [R42.s1]–[R42.s7]) + RESULTS (W8 (f2-ctx)
 S4 MERGED; W9a increment 2 MERGED) + ONE new owner question (Q-PTE-RESIDUAL).**  What changed: **[R42.1]** W8 (pte-ghost) REDESIGNED (option (i)): liveness is checked
 only on walks from the FREEABLE (per-process) roots — the kernel table is never freed and no proof consumes the user `.pte` arm — so the rev-46 bridge `kmemHeadOk`/
@@ -675,6 +685,7 @@ rev 37 (2026-10-12) R33 (1 req.: `Rboot` ALSO pins `htif_tohost_base = none` —
 rev 38 (2026-10-12) R34 (3 req., all S text in the W8 (f2-ctx) launch paragraph — (5) FOUR of six conjuncts, `cpuProcDiscAt`/`utextDiscAt` → W8 (f3-rest) [R34.1]; `W8-Rctx.md` carve-out for [OWN.39]/[OWN.38]/[OWN.41] [R34.2]; ghost plumbing route (A) in Files, 13 MachCSL [R34.3]; applied at launch; s1–s6 adopted) + RESULTS (W8 (f2-ctx) S1 MERGED: `ChainDefs`/`ChainCert`, worker stopped green with 3 findings) + Q-F2-PIPEHOP/Q-F2-BOOTGATE provisional (a) + RELAUNCH W8 (f2-ctx) + W8 (f3-rest) named; OPEN owner questions: Q-F2-PIPEHOP, Q-F2-BOOTGATE.
 rev 40 (2026-10-13) R36 (4 req., all plan text on the (f2-ctx) lane: RESULTS (S1′ + S2-pre MERGED, deviations D1–D4, findings F-A–F-D) + RELAUNCH 2 deciding F-B (guard `j ≠ w`) and F-C ((i) as rows first, (ii) fallback) [R36.1]; `pipeLockNameStr` = `"digits"`, not `"pipe"` → `KS.«pipe»`, S0 [R36.2]; the merged (a″) name-word window is a DEVIATION from RULED (a′), word-shaped hop entries + windowed `lockRegionOk`, provisional pending Q-F2-PIPEHOP-2 [R36.3]; F-C (i) rows before wiring, 27 client files, (ii) sized [R36.4]; s1–s6 adopted) + RESULTS (**M2 CLOSE DONE** — `Weak.srvwmoXv6M2` registered; M1 + M2 DONE, Stage 1b CLOSED); OPEN owner question: Q-F2-PIPEHOP-2 (provisionally (a″+shape)).
 rev 39 (2026-10-13) R35 (2 req., both S text: Q-F2-PIPEHOP (a) → (a′) time-indexed `isLk b r` + `pipeLockAt` [R35.1]; Q-F2-BOOTGATE (a) + history-aware reserved store over `rsvStoreOk`, `started`'s cell/carve moved [R35.2]; applied at launch in the (f2-ctx) continuation brief; s1–s6 adopted) + [OWN.46] (Q-F2-PIPEHOP = (a) as amended = (a′)) + [OWN.47] (Q-F2-BOOTGATE = (a) as amended) + RESULTS (W-SCO (A) DONE: `sailCycleOrder_holds` a THEOREM, M1/M2 non-vacuous, `Weak.srvwmoXv6M1` REGISTERED, `srvwmoXv6M2` stated) + M2 CLOSE launch paragraph (LAUNCHABLE) + the first Stage 2 launch set (W12 (+W12b) ∥ W13 (F-dep) ∥ W13 (L)); OPEN owner questions: NONE.
+rev 48 (2026-10-13) no review; RESULTS (W8 (pte-ghost), W13 (W) rest MERGED; W5d-G G2–G4 green) + [OWN.60]–[OWN.67] all RULED → W9a (B), W8 (f3-hold/-gate/-cpuproc/-racy/-pipelk/-ptek/-pteu/-stack/-utext), launch order, BATCH-4; Q-HOLD recorded.
 rev 47 (2026-10-13) R42 (4 req., 0 alt: W8 (pte-ghost) redesigned — live check only from FREEABLE roots, B2 dropped, ≈ 0.3–0.7k [R42.1]; as-of-ENTRY residual sentence [R42.2]; Q-PTEDISC Sail cite [R42.3]; Q-W9A (A) = STRONGER than Sail [R42.4]; s1–s7 adopted) + RESULTS (S4 MERGED, W9a inc. 2 MERGED) + NEW Q-PTE-RESIDUAL.
 rev 46 (2026-10-13) RESULTS (FabInd-S, W13 (W) part 1, W9a inc. 1, W5d-G G1 (pinned `gfexecConfIO` + `gfexecConfZ` until G6), W8 (f2-ctx) S3 MERGED; W13 (K-cat) STOPPED — riscv.cat counterexample `kcatCex`; S4 DONE in w2 at THREE of six) + [OWN.56] (batch 3) + [OWN.57] (pte window → (c)) + [OWN.58] (weekly cap lifted) + W8 (pte-ghost) launch paragraph + F-X (greps not acceptance) + roadmap (W11 (1)–(5), W14 `usedElemGateOk`, G6, (K-cat′)) + 6 owner Qs (Q-KCAT, Q-W9A, Q-F-RACY, Q-F-DISKTAIL, Q-PTEDISC, Q-DYNLKDISC) + (H3′) in §B(11).
 rev 45 (2026-10-13) R41 (5 req., 1 alt: Q-F2-PTE-WINDOW's window = EVERY page-table page of the dying table, each `kfree` → clear of its pointer, bound not a page count, junk target `0x4040404040000`, (b″) closes interior windows too [R41.1] — RELAUNCH 5's running paragraph untouched, docstring correction as an addendum [R41.1-alt]; W5d-G = full-cone rebuild + `audit.sh --weak --build` per increment, `Gdexec.gdFetch` a structure change [R41.2]; FabInd-S before G3 (`KillIO` shared) [R41.3]; (W)'s `gfDevWIo` disk half = named `usedElemGateOk` for W14 [R41.4]; Q-BATCH-3 in the owner format + third option [R41.5]; s1–s8 adopted); OPEN owner questions: Q-F2-PTE-WINDOW (provisionally (a), corrected bound), Q-BATCH-3.
@@ -820,7 +831,11 @@ riscv.cat-tier validation of the handle-based lock protocol; do NOT extend it.
    for them BY CONSTRUCTION — the appendix "I/O Ordering": "For I/O, the load value axiom and atomicity axiom in
    general do not apply" [R8.s1]).  W→W reordering and load buffering ALLOWED; every strengthening NAMED;
 4. page tables live: shared kernel table with concurrent hardware A/D write-back (`MachCSL/KptInv.lean:39,85`;
-   TLB `MachCSL/UTlb.lean`; in W8's export it lands as `pteDiscAt`, §C W8 [R25.1]; **[rev 46] S4 did NOT land it — not derivable from the state interpretation, Q-PTEDISC**; **[rev 47] the `.pte` class stops at a freed page's push (W8 (pte-ghost)); a page-table page is all-zero at `kfree` (`vm.c:270-277`) and no byte-subset of its `0x01` fill is a V-only pointer into RAM [R42.s3]; residual → Q-PTE-RESIDUAL**), fresh user table private until published;
+   TLB `MachCSL/UTlb.lean`; in W8's export it lands as `pteDiscAt`, §C W8 [R25.1]; **[rev 46] S4 did NOT land it — not derivable from the state interpretation, Q-PTEDISC**; **[rev 47] the `.pte` class stops at a freed page's push (W8 (pte-ghost)); a page-table page is all-zero at `kfree` (`vm.c:270-277`) and no byte-subset of its `0x01` fill is a V-only pointer into RAM [R42.s3]; residual → Q-PTE-RESIDUAL**), fresh user table private until published; **[rev 48] (P-a) RULED [OWN.66] → W8 (f3-ptek)/(f3-pteu); the entry residual ACCEPTED, documented [OWN.67]**;
+4′. [rev 48][OWN.63][OWN.64] **ONE benign-race class, two instances — unlocked reads of lock-protected words, harmless by a VALUE argument** (both C11 data races,
+   benign on hardware): `holding()`'s read of `lk->cpu` by a non-holder inside `acquire`, and `ilock`/`iunlock`'s guard `ip->ref < 1` (`kernel/fs.c:300,325`).  The
+   export states each as a VALUE clause, not an exemption: "a non-holder's read of `lk->cpu` never returns its own pointer" (W8 (f3-hold); `lkCpu_read_not_mine`
+   `MachCSL/Lock.lean:283` + `lockWordDiscAt`) and "every value the guard can read is ≥ 1" (W8 (f3-racy); `irefPin_read_vis` `Xv6/IcachePinwObl.lean:106`);
 5. the conclusion is functional AND safety [R1.2][R1.9]: returned slot `&proc[j]`, `j < NPROC`, `p->lock` held,
    `state = USED`, `pid ∈ [1, PIDMAX]` distinct from every live pid, fresh trapframe page (`kalloc`'s fill of
    `5`, `Xv6/SpecKalloc.lean:69`, via `procPrivNocwd`, `SpecAllocproc.lean:131`), fresh user table with
@@ -1655,7 +1670,9 @@ bytes; the stall is FAITHFUL to the PMAs (no physical memory exists past the top
 `PosRel.stall`/`caseStall :1994`, 1 → 0); UNREACHABLE for xv6 (1 KiB buffers in DRAM); F9's former interim `Hyps.noWrap` is
 discharged INSIDE F9 (the capture read's no-wrap bound from `outWraps r = false`, every other disk read ≤ 16 bytes,
 `smallNoWrap :1653`); MachCSL and `Xv6/` UNTOUCHED; like (ix) it emits no label (a stall is the `LSilent` self-loop), so no §A(6)
-entry**; Svadu A/D write-back as a plain
+entry**; **(xi) [rev 48][OWN.63][OWN.64] the benign-race class of §A(4′)**: NOT a trusted
+item — both are value THEOREMS of W8's export ((f3-hold), (f3-racy)); listed because the published sentence names them; RVWMO lets each read return any write not
+coherence-before what the hart observed (real races under RVWMO as under TSO); riscv.cat/Sail/Zifencei/PMAs silent; Svadu A/D write-back as a plain
 view-neutral LR/SC; DMA as a store-order agent; TsoMem's instruction-fetch model (`MachCSL/TsoMem.lean:34-39`,
 `Lang.lean:360-362,155-163`) — beyond RVWMO's text (Zifencei); **[OWN.35] the ISA-model fact `sailCycleOrder` — a THEOREM since rev 39 (`sailCycleOrder_holds`), formerly the named
 premise** — a closed proposition about the pf HART ROWS (Sail's cycle as the event instance labels it)
@@ -2214,7 +2231,94 @@ MachCSL rule edit — the brief says which), and `utextDiscAt`, needing custody 
 `userret` `fence.i` image fact (`KernelImage.lean:17614`; unsized); exported by the SAME root ("four of six" → "six of six" in the header
 and `roots.txt:20`); gates W5d-G G7 (`utextDiscAt`) and W11 (ii)'s `kOwnerAt` uniqueness (`cpuProcDiscAt`); nothing consumes either before
 W13 (XL).  All options FAITHFUL (the conjuncts are facts about xv6's code; the spec is silent on how a proof partitions them).
-**[rev 46] (f3-rest) now carries** `cpuProcDiscAt`, `utextDiscAt` AND whichever the owner rules in of Q-PTEDISC's (P-a)/(P-b) (`pteDiscAt`: kernel-table leaves registered at the seal in `reservedOk`, ≈ 1–2k; user tables per publication epoch, ≈ 1–2k), Q-DYNLKDISC's (L-a) (pipe locks registered at `lock_pay_born`, windowed `lockRegionOk` birth → `kfree` reclaim, ≈ 0.8–1.5k: `Reserved`, `Resources`, `WpLock`, `PipeBirth`) and Q-F-DISKTAIL's (G) (boot-gate certificate arm, S–M) — S4 landed THREE of six, so the header goes "three of six" → up to "six of six"; AFTER W8 (pte-ghost); sized per ruling at launch.
+**[rev 48] SUPERSEDED by the named parts W8 (f3-hold) … (f3-utext), §C top rev 48 — the list below is the record.**  **[rev 46] (f3-rest) now carries** `cpuProcDiscAt`, `utextDiscAt` AND whichever the owner rules in of Q-PTEDISC's (P-a)/(P-b) (`pteDiscAt`: kernel-table leaves registered at the seal in `reservedOk`, ≈ 1–2k; user tables per publication epoch, ≈ 1–2k), Q-DYNLKDISC's (L-a) (pipe locks registered at `lock_pay_born`, windowed `lockRegionOk` birth → `kfree` reclaim, ≈ 0.8–1.5k: `Reserved`, `Resources`, `WpLock`, `PipeBirth`) and Q-F-DISKTAIL's (G) (boot-gate certificate arm, S–M) — S4 landed THREE of six, so the header goes "three of six" → up to "six of six"; AFTER W8 (pte-ghost); sized per ruling at launch.
+**WAITS / LAUNCHABLE (rev 48) [OWN.60]–[OWN.67]**: **MERGED since rev 47**: W8 (pte-ghost) (16:24), W13 (W) rest (17:08); **GREEN, merging now**: W5d-G G2–G4
+(w1; G5 NOT started).  **IN FLIGHT: none.**  **LAUNCHABLE NOW**: BATCH-4 (below).  **Gated**: W5d-G G5 → G6 (G6 ALSO moves `xv6ConfS` to the Zifencei slot and adds
+`GraphFetch.emFetchIn` (w1 `GraphFetchRetime.lean:217`) as its fetch-fragment clause — W13-wit re-discharges it there); W13 (R) on W5d-G; W14 on W5d-G (W13 (W) ✓);
+W11 on (K-cat′) + W8 (f3-pipelk); W9a (B) on its spike, G6 (B4) and W8 (f3-stack) (B3).
+**Rev 48 RESULTS (verified at the tip; w1 cites marked).**  **W8 (pte-ghost) DONE, MERGED** (`MachCSL/ChainDefs.lean`: `wordPosAsOf :692`, `ptFreedSince :698`,
+**`ptByteLiveAt :726`**, `fill01Word :733`/`ptPtrTo_fill01_notRam :742`, `ptByteLiveAt_grow :837`, the WINDOW-CLOSED lemma `ptByteLiveAt_freed :864`; `RsvKind.uroots
+:147`/`.freeHead :153`, `Reserved.lean`; `xv6ProcRootsR`/`xv6FreeHeadR`, `Xv6/KernelRsv.lean:78,86`; `custAt`'s `.pte` arm, `AccessDiscipline.lean:186`); the as-of-entry
+residual is stated (`:52-63`) and now ACCEPTED [OWN.67] — its "open question" sentence (`:63`) is rewritten in (f3-hold)'s docstring pass.  **W13 (W) rest DONE,
+MERGED**: `Weak/W13WitRun.lean` (664; computed runner, `runRowSound :485`, **`xv6ConfSB :586`** + `xv6ConfSBSound :601`), `Weak/W13Wit.lean` (293): **`w13Wit :231`** —
+hart 0 from `_entry` to its first UART store, 28 events, `gfDev = [(0,27)]` (`rowIo :196`, `LIo .wr 0x10000001 [0]`), `xv6ConfS` at `xboot sigma0` with the boot
+fabric/image and `NCPU + 1` rows; `confB :218` (twin `true`, incl. `gtdepsWf` over the real `rowDepsT`), `catT :221` (TAGGED riscv.cat by computation), `gfDevWIo :287`
+(hart half; the disk half is W14's); fetch clause still the PINNED `emFetchImg`.  **W5d-G G2–G4 GREEN** (w1, `../weak-orch/parked/PROGRESS-W5dG.md`): G2 fetch tags =
+gmo write indices; G3 **`Gdexec.gdFetch`** a defaulted field (w1 `WeakRvwmoGraph.lean:680`; 72 literals / 40 files), the fetch arm `gfetchE` inside `racyDIO`'s
+`ioExtra` (deviations: gmo-guarded arm, no `gdFetchGmo` premise; no `racyDSplit` arm — FAITHFUL proof organisation, the trusted item unchanged); G4 NEW
+**`Weak/GraphFetchRetime.lean`** (469): `emFetchIn :217`, **`retimeZifencei :340`**, **`normalizeOfAcyclicZ :448`**; `audit.sh --weak --build` PASS (13 roots).
+**W8 (f3-*) — the RULED export work as NAMED serial-lane parts (rev 48; each = one increment and one cone rebuild; acceptance each: `lake build MachCSL Xv6 Weak
+Vtest`, `lint.sh`, `audit.sh`, `audit.sh --weak`, `tcb.sh` (report `expected.json`); root `xv6DiscAdequacy_closed` TEXT unchanged, export STRONGER, the header's
+conjunct count updated; `PROGRESS-W8f3.md` on every stop; rules as RELAUNCH 5 (stop green on a wrong clause, spec-first options); parallel: graph lane only; spec for
+EVERY part: RVWMO/riscv.cat/Sail/Zifencei/PMAs SILENT on custody and disciplines — proof notions — so every part is FAITHFUL).**
+- **(f3-hold) [OWN.64] — S ≈ 0.1–0.3k; FIRST.**  NEW conjunct `lkCpuReadAt σ`: for every exported lock word `b` (`xv6LockWord`, `AccessDiscipline.lean:234`) and every
+  hart `c` that is not the holder in `lockRegionOk`'s state `st` (`Reserved.lean:108-110`), no value `c`'s read of `lk->cpu` may return (`ReadCases`, any view) is
+  `cpuAddr c`.  Proof: a corollary of `lockWordDiscAt` — a `lkCpuAtP` (`Reserved.lean:67`) twin of `lkCpu_read_not_mine` (`Lock.lean:283`) at `ptr = cpuPtrAt
+  cpusBase`, in `Xv6/AccessDiscipline.lean` (beside `:283` only if MachCSL needs it).  Docstring: the ONE benign-race class with (f3-racy) (§A(4′)); `:63` → "accepted
+  [OWN.67]".  Files: `Xv6/AccessDiscipline.lean` (+ `expected.json`).  Consumer: W11's lock-layer `badSeg` arm (C1/C2).  Static locks now; every lock after (f3-pipelk).
+- **(f3-gate) [OWN.62] — S–M ≈ 0.2–0.5k; second (same worker).**  The used ring's hart-authored entries (hart 0's `kalloc` fill and `memset(disk.used, 0, PGSIZE)`,
+  `virtio_disk.c:123,128`, both before `started = 1`, `main.c:32,35`) pay a CHAIN certificate: `DiskAcc.usedPage_certs` (`Xv6/DiskAcc.lean:2043`, today `exCertAt` via
+  `devPageIn`) re-proved through `srcCertAt`'s EXISTING chain arm `chainLb 0 e.t cpu τ` (`MachCSL/WpAtomic.lean:410-414`) from the boot hop's carried certificates
+  (`startedCerts :161`, `started_seenCerts :390`, `Xv6/StartedInv.lean`; the reader's `gatePassed`) and a disk-invariant fact frozen at `virtio_disk_init` ("every hart
+  entry of the used page is hart 0's, below the `started` store"); device entries keep `NCPU ≤ e.tid`, hart 0's reads the own arm.  Then DELETE the exemption:
+  `devPageIn` (`ChainDefs.lean:763`), `chainExAt`'s fifth disjunct (`:775-778`), `RsvKind.devPtr`, `xv6UsedPtrR` (`KernelRsv.lean:99`), `Cust.dev` and `chainOkAt`'s
+  `.dev` hypothesis (`AccessDiscipline.lean:187,217,296`).  Fallback (report which): if the boot certificates do not reach `virtio_disk_intr`, the rev-46 MachCSL
+  boot-gate arm in `srcCertAt`.  Files: `MachCSL/ChainDefs.lean`, `MachCSL/Reserved.lean` (`WpAtomic.lean` on the fallback), `Xv6/DiskAcc.lean`, `Xv6/DiskInvDefs.lean`,
+  `Xv6/StartedInv.lean`, `Xv6/KernelRsv.lean`, `Xv6/BootRsv.lean`, `Xv6/AccessDiscipline.lean`.  Acceptance + `grep -E 'devPageIn|devPtr' MachCSL Xv6` EMPTY; W11 (4) VOID.
+- **(f3-cpuproc) — S–M ≈ 0.2–0.4k (the rev-38 `cpuProcDiscAt`, unchanged: §C W8 (f3-rest)); third** — W11 (ii)'s `kOwnerAt` uniqueness AND (f3-stack) need it.
+- **(f3-racy) [OWN.63] — M ≈ 0.5–1k.**  The value fact EXISTS inside the proof: `iref_readAU` (`Xv6/IcachePinwObl.lean:155`) shows the lock-free guard read returns, at
+  every view, a member of `irefSet` (`0 < ref < 2^31`, `irefPin_read_vis :106`); the export drops it (`iref_certs :134` pays `exCertAt` via `racyByteIn`, used at `:180`
+  (guard) AND `:236` (`iref_readAU_locked :209`, under `itable.lock`)).  Design: `chainOkAt`'s `.racy` hypothesis goes; for audited-racy bytes its conclusion becomes
+  `syncPath ∨ racyValOk` (the racy word as of the entry is in the region's value set) — "every unchained value a hart observed on `ip->ref` is ≥ 1", i.e. every value
+  `ilock`/`iunlock`'s check can read is ≥ 1.  Feed: `readCertsAt` (`WpAtomic.lean:516-520`) gains a third disjunct `valCertAt` (the entry's word value satisfies the
+  registered region's predicate; `RsvKind.racy` carries it); the guard pays it from `irefPin_read_vis`'s `hW`; the locked read (`:236`) switches to `srcCertAt` from
+  its `itable.lock` key; `loadsChained`'s racy arm (`ChainDefs.lean:573-576`, `racyByteIn :757`) becomes value-qualified — still as-of-entry, never revoked (an entry's
+  value is fixed).  Files: `MachCSL/WpAtomic.lean`, `ChainDefs.lean`, `Reserved.lean`, `Xv6/IcachePinwObl.lean`, `KernelRsv.lean`, `AccessDiscipline.lean`.
+  Acceptance + the docstring's "no claim" for `ip->ref` gone; W11 (3) consumes the clause.
+- **(f3-pipelk) [OWN.65] — M ≈ 0.8–1.5k.**  Pipe locks registered at birth (`lock_pay_born`, `MachCSL/Lock.lean:788`; `Xv6/PipeBirth.lean`), retired at the `kfree`
+  reclaim (`pipeclose`), the windowed `lockRegionOk` [R36.3] in `reservedOk` over the σ-readable live window (`dynLkAt`, the entry-receipt anchor [OWN.49]);
+  `xv6LockWord` = static ∪ live dynamic, so `lockWordDiscAt` AND (f3-hold)'s clause cover EVERY lock.  Files: `MachCSL/Reserved.lean`, `Resources.lean`, `Lock.lean`,
+  `WpLock.lean`, `LockBornHook.lean`, `Xv6/PipeBirth.lean`, the `pipeclose` proof, `AccessDiscipline.lean`.  Acceptance + the "named gap" text (`:24`, `:233`) gone;
+  unblocks W11 (2).
+- **(f3-ptek) / (f3-pteu) [OWN.66] — (P-a), ≈ 1–2k each, kernel table FIRST.**  `pteDiscAt` = "after the seal every entry is the sealed value up to A/D"
+  (`KptInv.pteVariant`).  (ptek): the kernel table's leaves registered at `kptOn_seal` (`MachCSL/KptInv.lean:869`; caller `Xv6/KptBoot.lean:126`, `Xv6/KvmSeal.lean`)
+  as a history-aware reserved region (the `started` mechanism [OWN.47]): `reservedOk` holds half of each leaf, `kpt_exclWriteAU` the only writer, entries after the
+  seal hart-authored A/D variants; files `MachCSL/Reserved.lean`, `KptInv.lean`, `Resources.lean`, `Xv6/KptBoot.lean`, `Xv6/BootCarveProc.lean`, `KernelRsv.lean`,
+  `AccessDiscipline.lean`.  (pteu): each user table per PUBLICATION EPOCH (published value → the next software PTE write or `freeproc`, (pte-ghost)'s freed-set
+  ending the last epoch), entries in an epoch A/D variants of the published value; `pptPost` (`Xv6/SpecProcPagetable.lean`, `UPtLemmas.lean`, `KexecB.lean`),
+  `MachCSL/WpPtWalkOwn.lean`; **the epoch boundary is unverified — a read-only sizing pass (S) precedes (pteu)**.  No Stage-2 consumer [R26.s2].
+- **(f3-stack) — NEW for W9a (B) (B3) [OWN.60]; L ≈ 1.5–3k, unverified; after (f3-cpuproc) and the W9a (B) spike.**  `stackOwnAt σ`: every post-boot entry on a
+  byte of `kstack_j` is authored by `kOwnerAt σ j e.t` (boot era: hart 0's `proc_mapstacks` fills, reached by `started`), on `stack0_h` by `h` — W8-design §1's
+  `.proc j`/`.hart h` custody arms (`Cust.proc`, `AccessDiscipline.lean:132`, unused today).  NOT one of the six conjuncts.  Risk: W8-design §3.2 found NO feed (a
+  store into `kstack_j` cannot show `kOwnerAt σ j = h`: `stackOwn` `MachCSL/KCtx.lean:256` is address-only, `KCtx` has no stack↔proc link; 273 `Xv6/` + 58 MachCSL
+  uses) — (f3-stack) must ADD that link (the running proc in the stack bundle, minted at `allocproc`/`swtch`); the spike sizes it or picks W9a (B)'s route (s2).
+- **(f3-utext)** — `utextDiscAt` (unchanged, unsized; gates W5d-G G7).
+**W9a (B) — [OWN.60] the PUBLISHED discharge of `psitesA` (rev 48; graph lane; XL ≈ 3–5.5k graph + (f3-stack) ≈ 1.5–3k serial, both unverified; a read-only SPIKE
+first; (A) `psitesA` stays the interim premise until (B5)).**  *Goal*: the certified-sequence order survives the real Sail run — `psitesA` (`Weak/WeakRvwmoPinBridge3.lean
+:587`) PROVED at every certifying site of a `hartConf` emission, so no run premise reaches T-alloc-RVWMO.  **(B1) per-instruction dataflow**: DEC-7 per `execute`
+clause (each decoded source register read before the `LRegW`, ≤ 1 write per destination, `taintStep`'s order) by a walker on W-SCO's pattern
+(`Weak/SailCycleOrderAllExec{1..4}.lean`, 122 clauses), restricted to the opcode classes the ≈ 470 certifying walks contain (computed list); ≈ 1.5–2.5k.  **(B2)
+interrupts**: Sail dispatches a pending enabled interrupt BEFORE the fetch (`model/Lean_RV64D/LeanRV64D/Step.lean:331-335`, → `stvec` `:424`); the walk continues
+through `kernelvec` — tainted registers spilled by its `sd` (data edges), restored by its `ld` (own-stack rfi; `pdepSegPinCForward`, rule 12), resuming at `sepc`;
+kernel exceptions panic in `kerneltrap`, so only interrupts; the MIGRATION case (`kerneltrap → yield → sched → swtch`, the stretch resumes on ANOTHER hart) splits the
+segment at the spill — the restore's cross-hart rf is chained over `p->lock` and certified by W11's `chainHyps` arm (that the kill accepts the split is unverified —
+the spike checks); ≈ 0.8–1.5k.  **(B3) `ret` via the frame**: the epilogue `ld ra` must read the prologue `sd ra` (the same own-stack rf (B2) uses) — "no other agent
+wrote the slot", **the stack-ownership fact.  Where it comes from**: NOT any current W8 conjunct (`chainOkAt` says a foreign entry is CHAINED, not ABSENT); (s1,
+default) the NEW W8 part **(f3-stack)** above; (s2, spike option) the realization route — the slot's rf is the realizing TsoMem run's, where the callee's exclusive
+`stackOwn` cells force the reload to return the saved `ra` (no export; needs the certified stretch inside W11's realized hull — unverified); graph side ≈ 0.3–0.6k.
+**(B4) announced word = `kword pc`**: from the fetch clause — pinned `emFetchImg` now, `emZifencei` + pristine kernel text (`xv6TextAdequacy_closed`) after W5d-G G6;
+≈ 0.2–0.4k.  **(B5) assembly**: `psitesA` discharged; `l2ClaimAtC`'s `segPinC ∨ csHyps` arms premise-free; non-vacuity: one `rcStep` on real kernel bytes
+(`PROGRESS-W9a.md` §2: PinBridge2 §8 has only `rcStop`); ≈ 0.3–0.5k.  *Deps*: increments 1–2 ✓; W-SCO walker ✓; G6 (B4); (f3-cpuproc) → (f3-stack) (B3 under (s1));
+W11 `chainHyps` (B2's migration).  *Files*: NEW `Weak/PinDataflow*.lean` (B1, 4–6 files), `Weak/PinTrap.lean` (B2), `Weak/WeakRvwmoPinBridge4.lean` (B3–B5); no
+`MachCSL/`/`Xv6/` edit (the stack fact is W8's).  *Spike (S, read-only, `notes/W9aB-spike.md`)*: (B1)'s opcode list and size; (B2)'s migration split against
+`cycleKillIO`/W11; (B3)'s (s1) vs (s2) with the (f3-stack) feed sized.  *Acceptance*: `psitesA` absent from every statement W11 (v) consumes; `lake build Weak`,
+`lint.sh`, `audit.sh --weak --build` (13 roots, baseline unchanged); `PROGRESS-W9aB.md` on every stop.  *Spec*: FAITHFUL — no run premise (Sail's interrupt dispatch
+and `ret` as modelled; RVWMO: a trap is no barrier, (D) stays rejected); Zifencei/PMAs silent but for (B4)'s fetch clause.  *Lane*: graph, parallel to the serial lane.
+**LAUNCH ORDER (rev 48).**  *Serial MachCSL (FREE)*: (f3-hold) → (f3-gate) → (f3-cpuproc) → (f3-racy) → (f3-pipelk) → (f3-ptek) → [(pteu) sizing] → (f3-pteu) →
+(f3-stack) (after the W9a (B) spike) → (f3-utext).  *Graph*: (K-cat′) → W5d-G G5 → G6 (with W11 (iii)) → W13 (R) / W14; W9a (B) spike → (B1)/(B2) → (B3)–(B5)
+after (f3-stack) and G6; W11 after (K-cat′) + (f3-pipelk).  **BATCH-4 — can start NOW (≤ 3, smallest first)**: (1) serial: **W8 (f3-hold) then (f3-gate)** (one
+worker, S + S–M, merge after each); (2) graph: **(K-cat′)** (S–M, RULED [OWN.61], `WeakRvwmoKillIOC.lean` only); (3) **the W9a (B) spike** (S, read-only, no build).
+Next when one finishes: W5d-G G5 (M, w1's continuation).
 **WAITS / LAUNCHABLE (rev 47) [R42.n]**: **MERGED since rev 46**: W8 (f2-ctx) S4 (`Xv6/AccessDiscipline.lean:219`, THREE of six) and **W9a increment 2** (below).
 **IN FLIGHT** (briefs unchanged): W5d-G G2–G5 (w1), W13 (W) rest (w3).  **LAUNCHABLE NOW**: **W8 (pte-ghost)** as redesigned [R42.1] (serial lane; paragraph below)
 [R42.s1]; **(K-cat′)** (graph, under Q-KCAT (a)).  **Gated**: as rev 46 (W11 on (K-cat′); W8 (f3-rest) on (pte-ghost)).  **Rev 47 RESULTS**: **W9a increment 2 DONE,
@@ -2285,7 +2389,7 @@ TsoMem, consumed by NO certificate, and absent from the export (the only thing W
 X5's [R34.s5] purpose (hooks re-floored from the releaser's vector) was a route to chains that S3's certificates now supply.  Replacement check (automatic): the (r2)
 root's statement names no LLB surface (tcb) and `grep -E 'ACQUIRE_LLB|ACQUIRESLEEP_LLB' MachCSL/` stays EMPTY.  Removing the 31 `Xv6/` hits = optional hygiene, any lane,
 never a gate.  The RELAUNCH 5 paragraph's "both greps EMPTY" and its addendum's "the TARGET" (below) are SUPERSEDED by this.
-**W8 (pte-ghost) — [OWN.57] option (c) SCOPED TO THE FREEABLE TABLES: close the `.pte` window (rev 46; REDESIGNED rev 47 per [R42.1] option (i); serial MachCSL
+**W8 (pte-ghost) — [rev 48] DONE, MERGED (Rev 48 RESULTS; residual RULED (a) [OWN.67]) — [OWN.57] option (c) SCOPED TO THE FREEABLE TABLES: close the `.pte` window (rev 46; REDESIGNED rev 47 per [R42.1] option (i); serial MachCSL
 lane; LAUNCHABLE NOW — S4 is MERGED, `Xv6/AccessDiscipline.lean:219` [R42.s1]; BEFORE W8 (f3-rest); S–M ≈ 0.3–0.7k; one cone rebuild + the (r2) root's tcb check).**
 *Goal*: the export's `.pte` class contains NO page from its push onto the free list on — no freed page-table page of a dying table is exempt through a still-stored
 pointer (the [R41.1] window: `freewalk` `kfree`s each interior page before `pagetable[i] = 0`, `vm.c:273-274`; `freeproc` frees the root before `p->pagetable = 0`,
@@ -2332,7 +2436,7 @@ for leaf-only pages, persistent `ptrCell` otherwise), lent by `kpt_readAU` as a 
 *Graph*: **(K-cat′)** (NEW, S–M, `WeakRvwmoKillIOC.lean`, under Q-KCAT (a)): `ioSegPinnedC` under the NAMED per-step condition `ioStepCloses` — the closing arms: write
 targets by (R2), I/O targets by (R3), `grfi`, the cat-ordered arms (`gppoCat6`/deps/rule 12) out of a gmo-after-`x` event, `pw` fences out of forwarded reads, `gpoloc`
 ON the forwarded byte — its `w13f` instance, and `kcatCex` kept as the permanent counter-model; **W5d-G G6** (with W11 (iii)) ALSO collapses `gfexecConfIO` into
-`gfexecConfZ` and moves `xv6ConfS` to the Zifencei slot; **W13 (R)** after W5d-G; **W10** sizing pass first.  **W11 — NEW obligations (rev 46)**: (1) [Q-KCAT (a)]
+`gfexecConfZ` and moves `xv6ConfS` to the Zifencei slot; **W13 (R)** after W5d-G; **W10** sizing pass first.  **W11 — NEW obligations (rev 46; [rev 48] (1)–(4) RULED, §C W11)**: (1) [Q-KCAT (a)]
 I/O-entered segments whose exit is reached by a NON-closing `rsameC` step (same-source R→R `gpoloc`, off-byte forwarding — `kcatCex`'s shape) are certified by the
 CS-chained route: the outgoing cross edge (`fr v w2`) is a race on `v`'s byte, which `chainOkAt` excludes — a new shape in the certificate census (S–M); W11's gate is
 (K-cat′), not (K-cat); (2) **the lock-word check** — (K)'s check (ii): `lockWordDiscAt` is the precondition of the C1/C2 certificates of racy lock-layer reads
@@ -4888,11 +4992,14 @@ nothing non-trivial enters M1's premise, `itvOf` is no shared parameter; M1 repl
   csHyps` arms for xv6.  No generator work (§B(9)).  **[rev 46] increment 1 MERGED (276 l.; §C top Rev 46 RESULTS); R-3 is FALSE of Sail as
   stated → Q-W9A, provisional (A): R-3 becomes the NAMED premise `runAligned` (per-instruction grouping at the announced word, no trap in the stretch, `ret`
   targets); increment 2 (RUNNING, w5) closes the taken-branch case (any-path `reaches` + soundness of the checker's all-paths search, S–M); before publication the
-  premise is discharged by (B) (per-clause dataflow walker + trap crossing + W8 stack ownership, XL, spike first) or stays a named scope restriction.  [rev 47] increment 2 MERGED (753 l.; §C top Rev 47 RESULTS): the premise is now `psitesA`; it is STRONGER than Sail and interim only [R42.4].**
+  premise is discharged by (B) (per-clause dataflow walker + trap crossing + W8 stack ownership, XL, spike first) or stays a named scope restriction.  [rev 47] increment 2 MERGED (753 l.; §C top Rev 47 RESULTS): the premise is now `psitesA`; it is STRONGER than Sail and interim only [R42.4].**  **[rev 48] [OWN.60] (B) RULED for publication → the NEW item W9a (B) (§C top rev 48; spike first; the frame fact from W8 (f3-stack)); (A) interim only.**
 - **W10** (M–L, **unverified**; L if it absorbs W12b): `wsegSupply`/`walkPolicy` for xv6 graphs on the W12b floor kit — [rev 44] D35-fix ✓ (the `CatFloor` twins over `rvwmoCatAD` + `noPlainAqC` only); a SIZING PASS (S, read-only) precedes any launch (§C top third set).
 - **W11 `Weak/RvwmoXv6Adequacy.lean`** (L) [R4.3][R4.4].  **[rev 46] NEW obligations (1)–(5), §C top STAGE 2 ROADMAP (rev 46): (K-cat′)'s non-closing
   segments by the CS-chained route (Q-KCAT (a)); the lock-word check for PIPE locks (Q-DYNLKDISC); the `ip->ref` audited-racy arm (Q-F-RACY (a)); the used-ring
-  boot-fill arm (Q-F-DISKTAIL (a)); still no PTE arm.  Gate: S4 merged + (K-cat′).**  (i) **The `Bad` arm is LOG-LEVEL**: `l2ClaimAt GD P Bad`
+  boot-fill arm (Q-F-DISKTAIL (a)); still no PTE arm.  Gate: S4 merged + (K-cat′).**  **[rev 48] (1) RULED (a) [OWN.61]: keep each (K-cat′) step where it
+  holds; the failing steps are ordered through the export's lock chains (`chainOkAt`) inside W11; (2) RULED (L-a) [OWN.65] → W8 (f3-pipelk), no named premise;
+  (3) RULED (b) [OWN.63]: the `ip->ref` arm CONSUMES (f3-racy)'s value clause; (4) VOID — (G) [OWN.62], (f3-gate); the lock-layer arm reads (f3-hold)'s clause
+  [OWN.64].  Gate: (K-cat′) + (f3-pipelk).**  (i) **The `Bad` arm is LOG-LEVEL**: `l2ClaimAt GD P Bad`
   (`Glue.lean:440-447`) hands the prover `(GD, log, logOf, protReg)` while the capstone sets `Bad := badRun gen σ0 = ∃
   ρ, rtc epfRun … ∧ violationHart …` (`:384-385`), a RUN-LEVEL existential refuted by `noBadRun` (`:387-391`) over ALL
   `epfRun`-reachable configurations — unreachable on route (M); `rawChainChain` consumes `¬ Bad` globally (`:453-460`).
@@ -4933,6 +5040,10 @@ nothing non-trivial enters M1's premise, `itvOf` is no shared parameter; M1 repl
 
 **Stage 3 — AxSL tier: retired** [OWN.1].  One-paragraph note on Theorem 2 (D6).
 
+**Status of the launch (rev 48, 2026-10-13) [OWN.60]–[OWN.67]:** MERGED since rev 47 — W8 (pte-ghost), W13 (W) rest; W5d-G G2–G4 GREEN (merging; G5 left).
+**IN FLIGHT: none.**  **BATCH-4 (launch now)**: W8 (f3-hold) → (f3-gate) (serial) ∥ (K-cat′) (graph) ∥ the W9a (B) spike (read-only); next W5d-G G5.  **Serial
+MachCSL**: … → W8 (pte-ghost) ✓ → (f3-hold) → (f3-gate) → (f3-cpuproc) → (f3-racy) → (f3-pipelk) → (f3-ptek) → (f3-pteu) → (f3-stack) → (f3-utext).  **OPEN owner
+questions: NONE** (all RULED [OWN.60]–[OWN.67]).  The rev-47 record follows.
 **Status of the launch (rev 47, 2026-10-13) [R42.n]:** MERGED since rev 46 — W8 (f2-ctx) S4, W9a increment 2.  **IN FLIGHT: W5d-G G2–G5 (w1), W13 (W) rest (w3).**
 **LAUNCHABLE NOW: W8 (pte-ghost)** (redesigned [R42.1], S–M) and **(K-cat′)**.  **Serial MachCSL**: … → W8 (f2-ctx) ✓ → **W8 (pte-ghost)** → W8 (f3-rest).  **OPEN owner
 questions (all non-blocking; provisional option in brackets): Q-PTE-RESIDUAL [(a)], Q-KCAT [(a)], Q-W9A [(A) interim; (B) for publication], Q-F-RACY [(a) landed],
@@ -5105,9 +5216,23 @@ from the RULED (a′); adopted PROVISIONALLY as (a″+shape) under the non-block
 anchor, inside W8 (f2-ctx)); F-C = (i) [OWN.50].  RULED 10:22 2026-10-13 (rev 42): **Q-FDEP = (A1) [OWN.52]** (W13 (F-dep) relaunches under (A1) directly); **Q-L-R3 = (a) [OWN.53]** (widen
 (R3) to all `gfDev` members → W13 (R3′), §C top); **D35-rule7 = (a) [OWN.54]** (`lbRcsc` to riscv.cat's RCsc → D35-fix, §C top) — the two new
 ones recorded FIRST below in the owner format (they arrived RULED; the briefing is for the record), then Q-FDEP, then Q-F2-PIPEHOP-2 (RULED).
-OPEN: NONE (rev 42; rev 43 — R39 found none missing, [R39.3]'s refinement of RULED Q-L-R3 (a) recorded there).  **Rev 44: R40 found none missing ([R40.1] is a refinement WITHIN RULED Q-L-R3 (a) — RVWMO/riscv.cat/Sail have no device events, Zifencei/PMAs silent, (α)/(β) EQUAL in strength on every xv6 run; owner informed, no menu); NEW from the W8 (f2-ctx) worker: Q-F2-PTE-WINDOW (FIRST below; provisionally (a)), and the third batch's approval Q-BATCH-3.**  **Rev 45: R41 found none missing — [R41.1] CORRECTS OPEN Q-F2-PTE-WINDOW's bound (every option keeps its mark; (a) stays sound and recommended; the owner should see the corrected bound before ruling), [R41.5] puts Q-BATCH-3 in the format; [R41.4]'s `usedElemGateOk` is a named device-model hypothesis EQUAL to MachCSL's disk step on xv6 runs (RVWMO/riscv.cat/Sail/Zifencei/PMAs silent on device programs) — informed under the non-blocking rule, no menu.**  **Rev 46 (no new review): RULED [OWN.56] Q-BATCH-3 = (1), [OWN.57] Q-F2-PTE-WINDOW = (c); NEW, FIRST below in the owner format, each non-blocking under its provisional option: Q-KCAT, Q-W9A, Q-F-RACY, Q-F-DISKTAIL, Q-PTEDISC, Q-DYNLKDISC; INFORMED (no menu): G1's E1′ reading (after the six).**  **Rev 47: R42 found none missing; [R42.1] (i) = [OWN.57]'s (c) scoped to the freeable tables — INFORMED, no menu (Q-F2-PTE-WINDOW's header); NEW FIRST below: Q-PTE-RESIDUAL (the entry residual [R42.2] leaves; non-blocking); Q-W9A re-marked [R42.4].**  R34 found no missing owner question ([R34.1]'s include-or-defer is a
+OPEN: NONE (rev 42; rev 43 — R39 found none missing, [R39.3]'s refinement of RULED Q-L-R3 (a) recorded there).  **Rev 44: R40 found none missing ([R40.1] is a refinement WITHIN RULED Q-L-R3 (a) — RVWMO/riscv.cat/Sail have no device events, Zifencei/PMAs silent, (α)/(β) EQUAL in strength on every xv6 run; owner informed, no menu); NEW from the W8 (f2-ctx) worker: Q-F2-PTE-WINDOW (FIRST below; provisionally (a)), and the third batch's approval Q-BATCH-3.**  **Rev 45: R41 found none missing — [R41.1] CORRECTS OPEN Q-F2-PTE-WINDOW's bound (every option keeps its mark; (a) stays sound and recommended; the owner should see the corrected bound before ruling), [R41.5] puts Q-BATCH-3 in the format; [R41.4]'s `usedElemGateOk` is a named device-model hypothesis EQUAL to MachCSL's disk step on xv6 runs (RVWMO/riscv.cat/Sail/Zifencei/PMAs silent on device programs) — informed under the non-blocking rule, no menu.**  **Rev 46 (no new review): RULED [OWN.56] Q-BATCH-3 = (1), [OWN.57] Q-F2-PTE-WINDOW = (c); NEW, FIRST below in the owner format, each non-blocking under its provisional option: Q-KCAT, Q-W9A, Q-F-RACY, Q-F-DISKTAIL, Q-PTEDISC, Q-DYNLKDISC; INFORMED (no menu): G1's E1′ reading (after the six).**  **Rev 47: R42 found none missing; [R42.1] (i) = [OWN.57]'s (c) scoped to the freeable tables — INFORMED, no menu (Q-F2-PTE-WINDOW's header); NEW FIRST below: Q-PTE-RESIDUAL (the entry residual [R42.2] leaves; non-blocking); Q-W9A re-marked [R42.4].**  **Rev 48 (no new review): ALL RULED — [OWN.60] Q-W9A (B) for publication, (A) interim; [OWN.61] Q-KCAT (a); [OWN.62] Q-F-DISKTAIL (G); [OWN.63] Q-F-RACY (b); [OWN.64] Q-HOLD (NEW, arrived ruled; FIRST below); [OWN.65] Q-DYNLKDISC (L-a); [OWN.66] Q-PTEDISC (P-a); [OWN.67] Q-PTE-RESIDUAL (a).  OPEN: NONE; the briefings below are the record.**  R34 found no missing owner question ([R34.1]'s include-or-defer is a
 scope choice, both options FAITHFUL; taken by the coordinator: DEFERRED to W8 (f3-rest)).**
-- **Q-PTE-RESIDUAL — OPEN, provisionally (a) (rev 47; raised applying [R42.1]/[R42.2]; non-blocking — W8 (pte-ghost) proceeds under (a), only its docstring depends on
+- **Q-HOLD — RULED YES [OWN.64] (17:10 2026-10-13, rev 48; NEW, arrived ruled — the briefing is the record; → W8 (f3-hold)).  Should the export state, as its own
+  clause, why `holding()`'s unlocked read is harmless?**  *Plain language.*  `acquire(lk)` first calls `holding(lk)`, which reads `lk->cpu` WITHOUT holding `lk`;
+  `lk->cpu` is written only by the holder (its own `&cpus[c]` after acquiring, 0 before releasing).  The read races with those writes — a C11 data race, the same
+  pattern as `ip->ref`'s guard (Q-F-RACY) — but is harmless: whatever a non-holder reads, it is never its OWN pointer, so `holding` correctly answers "no".  The
+  export already exempts lock words from the chain claim and states their write discipline (`lockWordDiscAt`); the question was whether to add this read-value
+  consequence explicitly.  *Tiny example*: hart 1 holds `L` (`L.cpu = &cpus[1]`); hart 2 calls `acquire(&L)`; its `holding` read may return 0, `&cpus[1]` or an
+  older holder's pointer — never `&cpus[2]`: hart 2's own last write to `L.cpu` was the 0 of its last `release`, and every later value is another hart's.
+  *Definitions*: *holder* — the hart whose acquire last succeeded and has not released (`lockRegionOk`'s state `st`, `MachCSL/Reserved.lean:108`);
+  *`lkCpu_read_not_mine`* — the proved lemma (`MachCSL/Lock.lean:283`); *export* — `xv6AccessDisc`.  *Why it matters*: the owner groups this with `ip->ref` as ONE
+  defect class (unlocked reads of lock-protected words, benign by a value argument, §A(4′)); stating both as value clauses makes the published theorem say why each
+  race is benign.  *Spec (FIRST)*: RVWMO lets the read return any write not coherence-before what the hart observed (the race is real); riscv.cat/Sail silent on
+  disciplines; Zifencei/PMAs silent.  *Options*.  **(YES) RULED — the explicit clause** "a non-holder's read of `lk->cpu` never returns its own pointer": FAITHFUL;
+  export MORE INFORMATIVE; S (a corollary of `lockWordDiscAt`); every lock once (f3-pipelk) lands.  **(NO) leave it implicit** (the lemma stays MachCSL-internal,
+  W11 re-derives it): FAITHFUL; cost 0.
+- **Q-PTE-RESIDUAL — RULED (a) [OWN.67] (17:13 2026-10-13, rev 48: a named, documented residual); was OPEN, provisionally (a) (rev 47; raised applying [R42.1]/[R42.2]; non-blocking — W8 (pte-ghost) proceeds under (a), only its docstring depends on
   the ruling).  The redesigned window fix leaves a small exemption keyed on WRITES, not time: is that "no window" in your [OWN.57] sense?**  *Plain language.*  [OWN.57]
   asked that the export's page-table exemption stop covering a page-table page once it is freed.  W8 (pte-ghost) (rev 47) does that: from the moment a page is pushed
   onto the free list (`kalloc.c:61`), no stored pointer makes its bytes "page-table bytes", so nothing a later owner writes is ever exempt.  But exemption is decided per
@@ -5127,7 +5252,7 @@ scope choice, both options FAITHFUL; taken by the coordinator: DEFERRED to W8 (f
   **(b) kernel reorder, clear-before-free (= Q-F2-PTE-WINDOW's (b″))**: `freeproc` saves the root, stores `p->pagetable = 0`, then frees — the whole table is unreachable
   before any of its pages' `kfree` starts (`exec` already swaps first; `proc_pagetable`'s failure path frees a never-stored table), so NO residual.  FAITHFUL; export
   EQUAL; xv6 changes (diff D12 + one line), image re-dump and `freeproc` re-proof — S if no pc shifts, XL if any does; a read-only sizing pass (S) decides first.
-- **Q-KCAT — OPEN, provisionally (a) (rev 46; raised by the W13 (K-cat) worker, `../weak-orch/parked/PROGRESS-W13W.md`; counter-model `Weak/WeakRvwmoKillIOC.lean`).
+- **Q-KCAT — RULED (a) [OWN.61] (16:28 2026-10-13, rev 48: keep the step where it holds, order the failing steps through the access-discipline lock chains inside W11 — §C W11 (1)); was OPEN, provisionally (a) (rev 46; raised by the W13 (K-cat) worker, `../weak-orch/parked/PROGRESS-W13W.md`; counter-model `Weak/WeakRvwmoKillIOC.lean`).
   The planned cat-model lemma "an I/O event pins the rest of its segment" is false; how to certify the segments it cannot pin.**  *Plain language.*  The published theorem
   quantifies over riscv.cat executions.  To rule out a forbidden cycle through an I/O event (an MMIO store), the proof cuts the cycle into SEGMENTS (stretches of one hart's
   program between cross-hart edges) and certifies each; for a segment starting at an I/O event it wanted one lemma: every later event of the segment is in memory order
@@ -5154,7 +5279,7 @@ scope choice, both options FAITHFUL; taken by the coordinator: DEFERRED to W8 (f
   FAITHFUL; M–L, edits W12's shared kit `CatLin.lean`, and STILL needs (a)'s lock route for the off-byte case (`v`'s byte 0).  **(c) keep RVWMO⁻'s order of same-address
   loads** (lemma already proved there): STRONGER than RVWMO — the theorem would stop covering hardware that performs same-source same-address loads out of order;
   EXCLUDED by [OWN.2]; cost 0.
-- **Q-W9A — OPEN, provisionally (A) as an INTERIM premise (rev 46; re-marked rev 47 [R42.4]; raised by the W9a worker, `../weak-orch/parked/PROGRESS-W9a.md`; increments 1–2 under (A) MERGED).  The checker's
+- **Q-W9A — RULED (B) for publication, (A) interim only [OWN.60] (16:28 2026-10-13, rev 48 → NEW item W9a (B), §C top); was OPEN, provisionally (A) as an INTERIM premise (rev 46; re-marked rev 47 [R42.4]; raised by the W9a worker, `../weak-orch/parked/PROGRESS-W9a.md`; increments 1–2 under (A) MERGED).  The checker's
   per-site certificates assume a certified stretch runs exactly as the checker walked it; a real Sail run need not.**  *Plain language.*  An offline checker walks the
   kernel code from each racy load (a "pin site") and certifies that the loaded value reaches later instructions only through dependencies the memory model respects.  W9a
   connects those certificates to the graph proof, which needs: the instructions the real run executes after the load are the ones the checker walked.  That fails in four
@@ -5181,7 +5306,7 @@ scope choice, both options FAITHFUL; taken by the coordinator: DEFERRED to W8 (f
   (`SysControl.lean:671-695`; xv6 `start.c:31-33` delegates all), a fact the proof derives from the code, not assumes; still needs (B)'s dataflow and `ret` parts;
   checker/generator changes (§B(9) excludes them); routes more sites to W8.  **(D) treat trap entry as a fence**: STRONGER than RVWMO and Sail (a trap orders nothing in
   either) — rejected.  Recommended: (A) now as an interim premise; (B)'s spike after stack ownership, so the published theorem has no `runAligned`.
-- **Q-F-RACY — OPEN, provisionally (a) as landed (rev 46; raised by the W8 (f2-ctx) worker at S3, `PROGRESS-W8f2.md` F-RACY).  `ilock`/`iunlock` read an inode's
+- **Q-F-RACY — RULED (b) [OWN.63] (17:08 2026-10-13, rev 48 → W8 (f3-racy); the owner asked first whether it is a bug: YES, a C11 data race like holding(), benign on hardware); was OPEN, provisionally (a) as landed (rev 46; raised by the W8 (f2-ctx) worker at S3, `PROGRESS-W8f2.md` F-RACY).  `ilock`/`iunlock` read an inode's
   reference count without the lock that guards it; the export exempts those bytes.**  *Plain language.*  `ip->ref` is written only under `itable.lock` (`iget`, `idup`,
   `iput`), but `ilock` and `iunlock` test `ip->ref < 1` (then `panic`) WITHOUT taking it (`kernel/fs.c:300,325`).  That read races with other harts' `idup`/`iput`:
   nothing orders it after their latest write, so "every racy read is chained to its writer" is false there.  The race is benign — the reader holds a reference, so it reads
@@ -5200,7 +5325,7 @@ scope choice, both options FAITHFUL; taken by the coordinator: DEFERRED to W8 (f
   the `iget`/`idup`/`iput` proofs, a new export clause).  **(c) prove the read chained**: impossible — the race is real.  **(d) kernel change**: take `itable.lock` in the
   guard (or drop it): the race disappears, export EQUAL to the intended one, but xv6 changes (the `verified` branch's diff D12 grows), the image is re-dumped and
   `ilock`/`iunlock` re-proved — S if no pc shifts, XL if any does (a sizing pass decides).  Recommended: (a) now; (b) if the owner wants the benign-ness published.
-- **Q-F-DISKTAIL — OPEN, provisionally (a) as landed; recommended (G) (rev 46; raised by the W8 (f2-ctx) worker at S3, F-DISKTAIL).  The disk driver can read the used
+- **Q-F-DISKTAIL — RULED (G) [OWN.62] (16:42 2026-10-13, rev 48 → W8 (f3-gate)); was OPEN, provisionally (a) as landed (rev 46; raised by the W8 (f2-ctx) worker at S3, F-DISKTAIL).  The disk driver can read the used
   ring's boot-time zero fill with no chain; the export exempts the whole used-ring page.**  *Plain language.*  The virtio disk reports finished requests through the
   "used ring", a 4 KiB page the DEVICE writes by DMA; hart 0 zero-fills it once at boot (`memset(disk.used, 0, PGSIZE)`, `virtio_disk.c:128`).  `virtio_disk_intr`
   reads `disk.used->idx` (`:318`) under `vdisk_lock`; before the device's first completion that read returns hart 0's zero, on ANY hart, and the proof holds only a
@@ -5218,7 +5343,7 @@ scope choice, both options FAITHFUL; taken by the coordinator: DEFERRED to W8 (f
   **(a) accept as a NAMED weakening (as landed)**: device-ring pages get no chain claim, named in the docstring; W11 proves the boot-fill arm itself (S).  FAITHFUL; export
   WEAKER; cost 0.  **(K) full keys**: the used ring's tail positions keyed in the `vdisk_lock` payload, positions fixed in the disk invariant.  FAITHFUL; EQUAL export;
   ≈ 300–500 lines (`DiskInvDefs`/`DiskAcc`/`ProofVirtioDiskIntr`), disk-specific.  Recommended: (G); (a) stands until it lands.
-- **Q-PTEDISC — OPEN, provisionally (P-c) as landed by S4; recommended (P-a), kernel half first (rev 46; raised by the S4 worker, w2 `PROGRESS-W8f2.md` F-PTEDISC).
+- **Q-PTEDISC — RULED (P-a) [OWN.66] (17:13 2026-10-13, rev 48: kernel table first, then user tables per publication epoch → W8 (f3-ptek)/(f3-pteu)); was OPEN, provisionally (P-c) as landed by S4 (rev 46; raised by the S4 worker, w2 `PROGRESS-W8f2.md` F-PTEDISC).
   Page-table bytes are exempt from the chain claim, but S4 could not state what discipline those bytes DO follow.**  *Plain language.*  Page-table entries (PTEs) are
   exempt from "every racy read is chained" because the hardware page-table walker may set a PTE's Accessed/Dirty bits at any time, ordered by nothing.  The plan's companion
   clause `pteDiscAt` said what replaces the chain: after the kernel table is sealed, every write to a kernel PTE byte is the sealed value with at most A/D changed, by a
@@ -5236,7 +5361,7 @@ scope choice, both options FAITHFUL; taken by the coordinator: DEFERRED to W8 (f
   clause); ≈ 1–2k kernel + ≈ 1–2k user, serial lane, one cone; a W8 (f3-rest) part after (pte-ghost).  **(P-b) kernel table only**: (P-a)'s first half, user tables named
   uncovered.  WEAKER than the plan's clause; ≈ 1–2k.  **(P-c) drop the clause (as landed)**: `.pte` bytes exempt, named in the docstring, nothing more.  WEAKER
   (documentation only); cost 0.  Recommended: (P-a) staged ((P-b)'s increment first); (P-c) stands until it lands.
-- **Q-DYNLKDISC — OPEN, provisionally (L-b) as landed by S4; recommended (L-a) (rev 46; raised by the S4 worker, F-DYNLKDISC).  The export's lock-word discipline covers
+- **Q-DYNLKDISC — RULED (L-a) [OWN.65] (17:10 2026-10-13, rev 48 → W8 (f3-pipelk)); was OPEN, provisionally (L-b) as landed by S4 (rev 46; raised by the S4 worker, F-DYNLKDISC).  The export's lock-word discipline covers
   statically allocated locks only; pipe locks are exempt and uncovered.**  *Plain language.*  Lock words (`lk->locked`, `lk->cpu`) are read racily by design (spinning,
   `holding`), so the export exempts them from chains and states their own discipline `lockWordDiscAt` (written only by the acquiring/releasing holder, in alternation).
   For locks at fixed addresses that is read off the machine-state registry.  A pipe's lock lives in a page `pipealloc` gets from `kalloc` and dies at `pipeclose`'s
