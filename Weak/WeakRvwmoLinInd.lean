@@ -54,6 +54,9 @@ The kill itself is NOT here (`cycleKill` is a definition; nothing assumes it).  
 `mpgd_acyclic` `mpgdAcyclic`.
 
 **Not ported:** nothing — every Rocq definition and lemma has a Lean twin.
+
+**W12 (1) (plan §C W12; D25 (a) [OWN.5]) — statement edit (Lean-only).**  `hullRealizableOfAcyclic` takes the core `rvwmoCoreD` (the hull's core by `hullCoreD`); `cycleKill` and the chain are unchanged (their cat twins are `CatLin*`).  RVWMO⁻ callers
+are unchanged in text (`WeakRvwmoAcyc.coeCoreOfMinus`).
 -/
 import Weak.WeakRvwmoSupply
 import Weak.WeakRvwmoDec
@@ -162,7 +165,7 @@ def cycleKill (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat) : Prop 
 /-- THE FORM THE KILL CONSUMES (deviation 2: the supply at the pinned LTS). -/
 theorem hullRealizableOfAcyclic (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat)
     (GD : Gdexec) (cs : List Nat) (N : Nat) :
-    rvwmoMinusDepsConsistent GD →
+    rvwmoCoreD GD →
     gdexecQconf boot d0 im nh GD →
     properCut GD.gdG cs →
     (∀ x, ¬ tc (racyD (gdHull GD cs)) x x) →
@@ -176,7 +179,7 @@ theorem hullRealizableOfAcyclic (boot : Nat → Pexv6) (d0 : Efab) (im : Image) 
         (((gxHull GD.gdG cs).gxProg[i]?).getD []).map (lblRen pi)) := by
   intro hcons hq hpc hacy hN
   have hok : hullOk GD.gdG cs := properCutOk _ _ hpc
-  have hch : rvwmoMinusDepsConsistent (gdHull GD cs) := hullDepsConsistent GD cs hcons hok
+  have hch : rvwmoCoreD (gdHull GD cs) := hullCoreD GD cs hcons hok
   have hqh : gdexecQconf boot d0 im nh (gdHull GD cs) := gdexecQconfHull boot d0 im nh GD cs hq
   obtain ⟨GD', pi, hcons', h14, hrr, hdeps, _⟩ :=
     normalizeOfAcyclic (gdHull GD cs) hch (fun x y => racyDDec _ x y) hacy

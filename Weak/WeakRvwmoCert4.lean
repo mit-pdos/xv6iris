@@ -74,6 +74,9 @@ Rocq comments/audit, not ported (the lint's axiom/sorry ban is the audit).
 no Lean-only helpers).
 
 **Dropped:** none (Rocq 42 declarations + the `img0` notation; Lean 42).
+
+**W12 (1) (plan §C W12; D25 (a) [OWN.5]) — statement edit (Lean-only).**  `hullRealizableRowsG` takes the core `rvwmoCoreD`.  RVWMO⁻ callers
+are unchanged in text (`WeakRvwmoAcyc.coeCoreOfMinus`).
 -/
 import Weak.WeakRvwmoCert3b
 import Weak.WeakRvwmoLinInd
@@ -150,7 +153,7 @@ theorem gwixPosElem (G : Gexec) (e : Geid) : 0 < gwix G e → e ∈ gwrites G :=
 
 theorem hullRealizableRowsG (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat)
     (GD : Gdexec) (cs : List Nat) (N : Nat) :
-    rvwmoMinusDepsConsistent GD →
+    rvwmoCoreD GD →
     gdexecQconf boot d0 im nh GD →
     properCut GD.gdG cs →
     (∀ x, ¬ tc (racyD (gdHull GD cs)) x x) →

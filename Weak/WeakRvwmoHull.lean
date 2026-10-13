@@ -95,6 +95,11 @@ violation-free (`ergHullLinearizes`, `ergHullBeatsRestr`).
 **Statements checked** (by hand, against Rocq): all of them.
 
 **W13 (I) (plan `notes/weak-allocproc-plan.md` §C W13 (I); [OWN.27]).** `WeakRvwmoHull.lblRenShape`'s `LIo` arms are `True` (`gwf`'s flip).
+
+**W12 (1) (plan §C W12) — Lean-only additions, no statement changed.**  `hullConsistent`'s
+`gwf` / load-value / atomicity clauses are factored out as `WeakRvwmoHull.hullCoreG`
+(same proof; `hullConsistent` = it + the ppo⁻ clause), and `hullCoreD` lifts them to
+`rvwmoCoreD (gdHull GD cs)` for the core-stated `hullRealizableOfAcyclic`.
 -/
 import Weak.WeakRvwmoRestr
 import Weak.WeakRvwmoAcyc
@@ -579,17 +584,16 @@ theorem hullOkGrf (G : Gexec) (cs : List Nat) (w r : Geid) :
   rintro hok hc ⟨a, t, v, hrd, hat⟩
   exact hullOkRf G cs r a t v w hok hc hrd hat
 
-theorem hullConsistent (G : Gexec) (cs : List Nat) :
-    rvwmoMinusConsistent G → hullOk G cs → rvwmoMinusConsistent (gxHull G cs) := by
-  intro hcons hok
-  have hwf := hcons.1
-  have hppo := hcons.2.1
-  have hlv := hcons.2.2.1
-  have hat := hcons.2.2.2
+/-- W12 (1): the hull keeps the CORE (`gwf`, load value, atomicity) — `hullConsistent`
+minus its ppo⁻ clause, which is the only clause that reads `gppoGmo`. -/
+theorem WeakRvwmoHull.hullCoreG (G : Gexec) (cs : List Nat) :
+    gwf G → gloadValue G → gatomicity G → hullOk G cs →
+    gwf (gxHull G cs) ∧ gloadValue (gxHull G cs) ∧ gatomicity (gxHull G cs) := by
+  intro hwf hlv hat hok
   have hnd := hwf.1
   have hmem := hwf.2.1
   have hsh := hwf.2.2
-  refine ⟨⟨?_, ?_, ?_⟩, ?_, ?_, ?_⟩
+  refine ⟨⟨?_, ?_, ?_⟩, ?_, ?_⟩
   · -- gwf: nodup
     exact gxcNodup G cs hnd
   · -- gwf: membership
@@ -616,11 +620,6 @@ theorem hullConsistent (G : Gexec) (cs : List Nat) :
         rw [List.getElem?_map] at hk''
         obtain ⟨l, hl, rfl⟩ := Option.map_eq_some_iff.1 hk''
         exact WeakRvwmoHull.lblRenShape _ l (hsh i p k l hp hl)
-  · -- ppo⁻ ⊆ gmo
-    intro e1 e2 hppo'
-    obtain ⟨hc1, hc2⟩ := gxhGppoCut G cs e1 e2 hppo'
-    have hmo := hppo e1 e2 (gxhGppo G cs e1 e2 hppo')
-    exact (gxhGmoLt G cs e1 e2 hnd).2 ⟨hc1, hc2, hmo⟩
   · -- load value
     intro e a t' v hrd'
     obtain ⟨hce, t, hrd, rfl⟩ := gxhRdbInv G cs e a t' v hrd'
@@ -689,6 +688,19 @@ theorem hullConsistent (G : Gexec) (cs : List Nat) :
       have := (gxhGwixLt G cs w w' hnd hwh hw'h).1 hlt1
       omega
 
+theorem hullConsistent (G : Gexec) (cs : List Nat) :
+    rvwmoMinusConsistent G → hullOk G cs → rvwmoMinusConsistent (gxHull G cs) := by
+  intro hcons hok
+  have hppo := hcons.2.1
+  have hnd := hcons.1.1
+  obtain ⟨hwf', hlv', hat'⟩ := WeakRvwmoHull.hullCoreG G cs hcons.1 hcons.2.2.1 hcons.2.2.2 hok
+  refine ⟨hwf', ?_, hlv', hat'⟩
+  -- ppo⁻ ⊆ gmo
+  intro e1 e2 hppo'
+  obtain ⟨hc1, hc2⟩ := gxhGppoCut G cs e1 e2 hppo'
+  have hmo := hppo e1 e2 (gxhGppo G cs e1 e2 hppo')
+  exact (gxhGmoLt G cs e1 e2 hnd).2 ⟨hc1, hc2, hmo⟩
+
 /-! # 5. RULE 14 FROM VIOLATION-FREEDOM OF THE HULL -/
 
 theorem gviolHull (G : Gexec) (cs : List Nat) (e w : Geid) :
@@ -738,6 +750,19 @@ theorem hullDepsConsistent (GD : Gdexec) (cs : List Nat) :
   · intro p hp
     obtain ⟨hp, hc1, hc2⟩ := (gdHullDeps GD cs p).1 hp
     exact (gxhGmoLt GD.gdG cs p.1 p.2 hnd).2 ⟨hc1, hc2, hdmo p hp⟩
+
+/-- W12 (1): the `Gdexec` hull keeps `rvwmoCoreD` (what `hullRealizableOfAcyclic` feeds to
+the core-stated `normalizeOfAcyclic`). -/
+theorem hullCoreD (GD : Gdexec) (cs : List Nat) :
+    rvwmoCoreD GD → hullOk GD.gdG cs → rvwmoCoreD (gdHull GD cs) := by
+  rintro ⟨hwf, hlv, hat, hdwf⟩ hok
+  obtain ⟨hwf', hlv', hat'⟩ := WeakRvwmoHull.hullCoreG GD.gdG cs hwf hlv hat hok
+  refine ⟨hwf', hlv', hat', ?_⟩
+  intro p hp
+  obtain ⟨hp, hc1, hc2⟩ := (gdHullDeps GD cs p).1 hp
+  obtain ⟨h1, h2, h3, h4⟩ := hdwf p hp
+  exact ⟨h1, h2, (gxhGlblIs GD.gdG cs p.1 lbIsR (fun π l => lblRenIsR π l)).2 ⟨hc1, h3⟩,
+    (gxhGlblIs GD.gdG cs p.2 lbIsW (fun π l => lblRenIsW π l)).2 ⟨hc2, h4⟩⟩
 
 /-! # 7. THE COMPOSITION: a violation-free hull LINEARIZES -/
 

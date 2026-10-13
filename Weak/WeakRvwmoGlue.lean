@@ -83,6 +83,9 @@ Lean-only (file-qualified): `WeakRvwmoGlue.rawChainSnoc`.
 **File-qualified Rocq names:** none (no name of this file is in `notes/weak-port-dupnames.json`).
 
 **Dropped:** none (Rocq 45 declarations; Lean 46 = 45 + the 1 Lean-only).
+
+**W12 (1) (plan §C W12; D25 (a) [OWN.5]) — statement edit (Lean-only).**  `hullRun` takes the core `rvwmoCoreD`; the chain's RVWMO⁻ premises are unchanged (their cat twins are `CatLin*`).  RVWMO⁻ callers
+are unchanged in text (`WeakRvwmoAcyc.coeCoreOfMinus`).
 -/
 import Weak.WeakRvwmoCert4
 import Weak.WeakRvwmoKillArms
@@ -281,7 +284,7 @@ structure RunData (boot : Nat → Pexv6) (d0 : Efab) (N : Nat) (G : Gexec) (c : 
 /-- THE ROUTE, assembled. -/
 theorem hullRun (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat)
     (GD : Gdexec) (cs : List Nat) (N : Nat) :
-    rvwmoMinusDepsConsistent GD →
+    rvwmoCoreD GD →
     gdexecQconf boot d0 im nh GD →
     cutOk GD.gdG cs →
     (∀ x, ¬ tc (racyD (gdHull GD cs)) x x) →

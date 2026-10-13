@@ -70,6 +70,10 @@ Delivered: `racyDDec`, and `topoExists'` / `normalizeOfAcyclic'` —
 
 **Not ported:** nothing (the three `Print Assumptions` are commands, not
 declarations).
+
+**W12 (1) (plan §C W12) — statement edits (Lean-only).**  `topoExists'` / `normalizeOfAcyclic'`
+take the core `rvwmoCoreD` (as `WeakRvwmoTopo`'s W12 note); `normalizeOfAcyclic'` keeps its
+five conclusions (the [R21.2] `gppoCat6Gmo` conjunct is `normalizeOfAcyclic`'s).
 -/
 import Weak.WeakMem
 import Weak.WeakAxiomatic
@@ -369,14 +373,14 @@ instance racyDDec (GD : Gdexec) (x y : Geid) : Decidable (racyD GD x y) := by
 /-! # 6. `WeakRvwmoTopo`'s theorems, hypothesis-free -/
 
 theorem topoExists' (GD : Gdexec) :
-    rvwmoMinusDepsConsistent GD →
+    rvwmoCoreD GD →
     (∀ x, ¬ tc (racyD GD) x x) →
     ∃ L, linExtD GD L := by
   intro hcons hacy
   exact topoExists GD hcons (fun x y => inferInstance) hacy
 
 theorem normalizeOfAcyclic' (GD : Gdexec) :
-    rvwmoMinusDepsConsistent GD →
+    rvwmoCoreD GD →
     (∀ x, ¬ tc (racyD GD) x x) →
     ∃ (GD' : Gdexec) (pi : Nat → Nat),
       rvwmoMinusDepsConsistent GD' ∧
@@ -385,6 +389,7 @@ theorem normalizeOfAcyclic' (GD : Gdexec) :
       GD'.gdDeps = GD.gdDeps ∧
       wperm pi GD.gdG GD'.gdG := by
   intro hcons hacy
-  exact normalizeOfAcyclic GD hcons (fun x y => inferInstance) hacy
+  obtain ⟨GD', pi, h1, h2, h3, h4, h5, -⟩ := normalizeOfAcyclic GD hcons (fun x y => inferInstance) hacy
+  exact ⟨GD', pi, h1, h2, h3, h4, h5⟩
 
 end Weak

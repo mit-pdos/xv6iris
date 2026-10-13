@@ -141,6 +141,9 @@ dummy default.
 `gfHullDevCut`, `gf_hull_consistent` `gfHullConsistent`.
 
 **Not ported:** nothing — every Rocq definition and lemma has a Lean twin.
+
+**W12 (1) (plan §C W12; D25 (a) [OWN.5]) — statement edit (Lean-only).**  `topoLinearizesF` takes the core `rvwmoCoreD GF.gfGd` (the only part of `gfexecConsistent` it used).  RVWMO⁻ callers
+are unchanged in text (`WeakRvwmoAcyc.coeCoreOfMinus`).
 -/
 import Weak.WeakRvwmoSupply
 import Weak.WeakRvwmoDec
@@ -907,12 +910,12 @@ theorem linExtFLinExtD (GF : Gfexec) (L : List Geid) : linExtF GF L → linExtD 
 
 /-- `topoLinearizes` applies VERBATIM — the fabric arm only strengthens the hypothesis. -/
 theorem topoLinearizesF (GF : Gfexec) (L : List Geid) :
-    gfexecConsistent GF → linExtF GF L →
+    rvwmoCoreD GF.gfGd → linExtF GF L →
     rvwmoMinusDepsConsistent ⟨retime GF.gfGd.gdG L, GF.gfGd.gdDeps⟩ ∧
     grule14 (retime GF.gfGd.gdG L) ∧
     rowsRel (tren GF.gfGd.gdG L) GF.gfGd.gdG (retime GF.gfGd.gdG L) ∧
     wperm (tren GF.gfGd.gdG L) GF.gfGd.gdG (retime GF.gfGd.gdG L) :=
-  fun hc hlin => topoLinearizes GF.gfGd L hc.1 (linExtFLinExtD GF L hlin)
+  fun hc hlin => topoLinearizes GF.gfGd L hc (linExtFLinExtD GF L hlin)
 
 theorem beforeTrans {A : Type _} (L : List A) (x y z : A) :
     L.Nodup → before L x y → before L y z → before L x z := by

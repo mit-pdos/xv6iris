@@ -72,6 +72,15 @@ conclusion from acyclicity alone.  A LEAF: nothing imports this file.
 declarations).
 
 **W13 (I) (plan `notes/weak-allocproc-plan.md` §C W13 (I); [OWN.27]).** `WeakRvwmoTopo.lblRenShape`'s `LIo` arms are `True` (`gwf`'s flip).
+
+**W12 (1) (plan §C W12; D25 (a) [OWN.5]) — STATEMENT EDITS (Lean-only, no Rocq twin).**  The
+section hypothesis, `racyDMem`, `topoExists` and `normalizeOfAcyclic` take the CORE
+`rvwmoCoreD` (`WeakRvwmoAcyc`: `gwf` ∧ load value ∧ atomicity ∧ `gdepsWf`) in place of
+`rvwmoMinusDepsConsistent` — the only projections ever used — so a riscv.cat-consistent
+graph (`CatLin.rvwmoCatAD`) is a legal input; the output is unchanged (RVWMO⁻ + rule 14,
+the ppo⁻ arm from `racyD`'s `gppo`).  [R21.2]: `normalizeOfAcyclic` ALSO concludes
+`gppoCat6Gmo GD'.gdG` (last conjunct; `AxGraphCat.gppoCat6Gppo`).  RVWMO⁻ callers are
+unchanged in text (`WeakRvwmoAcyc.coeCoreOfMinus`).
 -/
 import Weak.WeakMem
 import Weak.WeakAxiomatic
@@ -80,6 +89,7 @@ import Weak.WeakRvwmoGraph
 import Weak.WeakRvwmoXchg
 import Weak.WeakRvwmoNorm
 import Weak.WeakRvwmoAcyc
+import Weak.AxGraphCat
 
 namespace Weak
 
@@ -189,12 +199,12 @@ theorem WeakRvwmoTopo.lblRenShape (pi : Nat → Nat) (l : Lbl) :
 section TopoLin
 
 variable (GD : Gdexec) (L : List Geid)
-variable (hcons : rvwmoMinusDepsConsistent GD) (hlin : linExtD GD L)
+variable (hcons : rvwmoCoreD GD) (hlin : linExtD GD L)
 include hcons hlin
 
-theorem linWf : gwf GD.gdG := hcons.1.1
-theorem linLv : gloadValue GD.gdG := hcons.1.2.2.1
-theorem linAt : gatomicity GD.gdG := hcons.1.2.2.2
+theorem linWf : gwf GD.gdG := hcons.1
+theorem linLv : gloadValue GD.gdG := hcons.2.1
+theorem linAt : gatomicity GD.gdG := hcons.2.2.1
 theorem linPerm : L.Perm GD.gdG.gxGmo := hlin.1
 
 theorem linRows : rowsRel (tren GD.gdG L) GD.gdG (retime GD.gdG L) := retimeRowsRel GD.gdG L
@@ -424,7 +434,7 @@ theorem linGatomicity : gatomicity (retime GD.gdG L) := by
 theorem linGdepsWf : gdepsWf (retime GD.gdG L) GD.gdDeps := by
   intro rw hrw
   have hrows := linRows GD L hcons hlin
-  obtain ⟨h1, h2, h3, h4⟩ := hcons.2.1 rw hrw
+  obtain ⟨h1, h2, h3, h4⟩ := hcons.2.2.2 rw hrw
   exact ⟨h1, h2, (rowsRelGlblIs _ GD.gdG _ rw.1 lbIsR hrows (lblRenIsR _)).2 h3,
     (rowsRelGlblIs _ GD.gdG _ rw.2 lbIsW hrows (lblRenIsW _)).2 h4⟩
 
@@ -560,10 +570,9 @@ theorem topoSortExists {A : Type _} (R : A → A → Prop) (Rdec : ∀ x y, Deci
 /-- Every `racyD` edge runs between members of the order.  (Not derivable from
 `rdGmo` here: that route needs `grule14`, which is what we are trying to reach.) -/
 theorem racyDMem (GD : Gdexec) (x y : Geid) :
-    rvwmoMinusDepsConsistent GD → racyD GD x y →
+    rvwmoCoreD GD → racyD GD x y →
     x ∈ GD.gdG.gxGmo ∧ y ∈ GD.gdG.gxGmo := by
-  rintro ⟨hc, hdwf, _⟩ hR
-  have hwf := hc.1
+  rintro ⟨hwf, _, _, hdwf⟩ hR
   rcases hR with (h | h | h | h | h) | hd
   · obtain ⟨_, hm, hw⟩ := h
     exact ⟨gwfMemGmo _ x hwf hm, gwfMemGmo _ y hwf (WeakRvwmoAcyc.gisWGmem _ y hw)⟩
@@ -581,12 +590,12 @@ theorem racyDMem (GD : Gdexec) (x y : Geid) :
 
 /-- THE EXISTENCE THEOREM. -/
 theorem topoExists (GD : Gdexec) :
-    rvwmoMinusDepsConsistent GD →
+    rvwmoCoreD GD →
     (∀ x y, Decidable (racyD GD x y)) →
     (∀ x, ¬ tc (racyD GD) x x) →
     ∃ L, linExtD GD L := by
   intro hcons hdec hacy
-  have hnd : GD.gdG.gxGmo.Nodup := hcons.1.1.1
+  have hnd : GD.gdG.gxGmo.Nodup := hcons.1.1
   obtain ⟨L, hL, hord⟩ := topoSortExists (racyD GD) hdec hacy _ hnd
   refine ⟨L, hL, ?_⟩
   intro x y hR
@@ -596,7 +605,7 @@ theorem topoExists (GD : Gdexec) :
 /-! # 5. THE COROLLARY: `normalize`'s conclusion, from acyclicity alone -/
 
 theorem normalizeOfAcyclic (GD : Gdexec) :
-    rvwmoMinusDepsConsistent GD →
+    rvwmoCoreD GD →
     (∀ x y, Decidable (racyD GD x y)) →
     (∀ x, ¬ tc (racyD GD) x x) →
     ∃ (GD' : Gdexec) (pi : Nat → Nat),
@@ -604,10 +613,13 @@ theorem normalizeOfAcyclic (GD : Gdexec) :
       grule14 GD'.gdG ∧
       rowsRel pi GD.gdG GD'.gdG ∧
       GD'.gdDeps = GD.gdDeps ∧
-      wperm pi GD.gdG GD'.gdG := by
+      wperm pi GD.gdG GD'.gdG ∧
+      gppoCat6Gmo GD'.gdG := by
   intro hcons hdec hacy
   obtain ⟨L, hlin⟩ := topoExists GD hcons hdec hacy
   obtain ⟨hc', h14, hr, hw⟩ := topoLinearizes GD L hcons hlin
-  exact ⟨⟨retime GD.gdG L, GD.gdDeps⟩, tren GD.gdG L, hc', h14, hr, rfl, hw⟩
+  refine ⟨⟨retime GD.gdG L, GD.gdDeps⟩, tren GD.gdG L, hc', h14, hr, rfl, hw, ?_⟩
+  -- [R21.2]: the cat chain's six arms, from the output's RVWMO⁻ (`racyD` keeps `gppo`)
+  exact fun e1 e2 h => hc'.1.2.1 e1 e2 (gppoCat6Gppo _ e1 e2 hc'.1.2.2.1 h)
 
 end Weak

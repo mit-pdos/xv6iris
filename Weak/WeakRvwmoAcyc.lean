@@ -200,6 +200,23 @@ def racy (G : Gexec) (x y : Geid) : Prop :=
 def racyD (GD : Gdexec) (x y : Geid) : Prop :=
   racy GD.gdG x y ∨ (x, y) ∈ GD.gdDeps
 
+/-- W12 (1) (plan §C W12; D25 (a) [OWN.5]): THE CORE the topo / normalize / hull kit
+consumes — well-formedness, load value, atomicity and the dep fragment's shape.  No ppo
+arm and no `gdepsGmo`: the re-timed order takes both from `racyD`'s own arms, so every
+cat-consistent graph (`CatLin.rvwmoCatAD`) and every RVWMO⁻ graph has it. -/
+def rvwmoCoreD (GD : Gdexec) : Prop :=
+  gwf GD.gdG ∧ gloadValue GD.gdG ∧ gatomicity GD.gdG ∧ gdepsWf GD.gdG GD.gdDeps
+
+theorem WeakRvwmoAcyc.coreOfMinus (GD : Gdexec) :
+    rvwmoMinusDepsConsistent GD → rvwmoCoreD GD :=
+  fun ⟨⟨hwf, _, hlv, hat⟩, hdw, _⟩ => ⟨hwf, hlv, hat, hdw⟩
+
+/-- Lean-only: RVWMO⁻ callers of the core-stated kit keep their text (the coercion
+inserts `WeakRvwmoAcyc.coreOfMinus`). -/
+instance WeakRvwmoAcyc.coeCoreOfMinus (GD : Gdexec) :
+    Coe (rvwmoMinusDepsConsistent GD) (rvwmoCoreD GD) :=
+  ⟨WeakRvwmoAcyc.coreOfMinus GD⟩
+
 /-- THE TRANSPORTING FRAGMENT (§5). -/
 def rt (G : Gexec) (x y : Geid) : Prop :=
   gpow G x y ∨ WeakRvwmoAcyc.grf G x y ∨ gppo G x y

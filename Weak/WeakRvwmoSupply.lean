@@ -102,6 +102,9 @@ WHAT IS HERE.
 `smoke_cand_relp` `smokeCandRelp`, `smoke_cand_relp0` `smokeCandRelp0`.
 
 **Not ported:** nothing — every Rocq definition and lemma has a Lean twin.
+
+**W12 (1) (plan §C W12; D25 (a) [OWN.5]) — statement edit (Lean-only).**  `topoSupply` takes the core `rvwmoCoreD`.  RVWMO⁻ callers
+are unchanged in text (`WeakRvwmoAcyc.coeCoreOfMinus`).
 -/
 import Weak.WeakRvwmoConf
 import Weak.WeakRvwmoHull
@@ -952,7 +955,7 @@ theorem hullSupply (boot : Nat → Pexv6) (d0 : Efab) (GD : Gdexec) (cs : List N
 /-! ### 7.2 The acyclicity route -/
 
 theorem topoSupply (boot : Nat → Pexv6) (d0 : Efab) (GD : Gdexec) (N : Nat) :
-    rvwmoMinusDepsConsistent GD →
+    rvwmoCoreD GD →
     (∀ x y, Decidable (racyD GD x y)) →
     (∀ x, ¬ tc (racyD GD) x x) →
     ∀ im nh, gdexecQconf boot d0 im nh GD →
