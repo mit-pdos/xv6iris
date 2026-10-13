@@ -1,7 +1,8 @@
 # xv6iris (Lean) — verifying xv6-riscv in Lean 4 / Iris over the Sail RISC-V semantics
 
-This project proves, in [Lean 4](https://lean-lang.org/) with the
-[iris-lean](https://github.com/leanprover-community/iris-lean) separation logic, that the
+This project proves, in [Lean 4](https://lean-lang.org/) with the separation logic of
+[Transfinite Iris-Lean](https://github.com/dongjaelee1/iris-lean/tree/transfinite) (a fork of
+[iris-lean](https://github.com/leanprover-community/iris-lean) step-indexed by ordinals), that the
 [xv6-riscv](https://github.com/mit-pdos/xv6-riscv) kernel and its user programs are correct —
 reasoning about the *actual binaries*, instruction by instruction, against the official
 [Sail RISC-V](https://github.com/riscv/sail-riscv) ISA semantics compiled to Lean by Sail's own Lean
@@ -82,9 +83,11 @@ critical path is about 4 minutes), plus about 2 minutes the first time for the g
 Lean process elaborating this tree can use several GB of memory, and a parallel build needs tens of GB,
 so build on a machine sized for it.
 
-**Toolchain.** Lean `v4.32.2` (`lean-toolchain`), iris-lean and its dependencies pinned in
-`lake-manifest.json`, lean-sail vendored.  `tools/ci/toolchain_check.sh` checks that the three
-toolchain files, the manifest and the fetched packages agree; CI runs it first.
+**Toolchain.** Lean `v4.34.1` (`lean-toolchain`).  Iris is the `Iris/` package of the fork
+`dongjaelee1/iris-lean`, branch `transfinite`, whose committed step-index choice is the ordinal one
+(`Iris.SI := Ordinals.Ordinal.{3}`); it and its dependencies (batteries, Qq, the fork's `ordinals`)
+are pinned in `lake-manifest.json`, lean-sail vendored.  `tools/ci/toolchain_check.sh` checks
+that the three toolchain files, the manifest and the fetched packages agree; CI runs it first.
 
 **Images.** The kernel image, the user programs and `fs.img` are xv6-riscv `b72cbac1` (branch
 `verified`).  The dumps (`tools/dump_kernel.py`, `tools/dump_elf_image.py`,

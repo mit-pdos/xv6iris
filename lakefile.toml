@@ -1,13 +1,13 @@
 name = "machcsl"
 defaultTargets = ["MachCSL", "Xv6"]
 
-# Transfinite Iris-Lean (fork dongjaelee1/iris-lean, branch `transfinite`), as a PATH dependency on a
-# built worktree while the port is in progress: /work/wt/iris-lean-tf-nat (nat step-index choice,
-# branch agent/tf-nat) or /work/wt/iris-lean-tf-ordinal (ordinal choice, branch agent/tf-ordinal).
-# LANDING CHECKLIST: re-pin by git (url + rev of the fork, subDir = "Iris") before merging into `lean`.
+# Transfinite Iris-Lean: the `Iris/` subdirectory of the fork dongjaelee1/iris-lean, branch
+# `transfinite`, whose committed step-index choice is the ordinal one (`Iris.SI := Ordinal.{3}`).
 [[require]]
 name = "iris"
-path = "/work/wt/iris-lean-tf-ordinal/Iris"
+git = "https://github.com/dongjaelee1/iris-lean"
+rev = "f2b695389f017b2f690c04a9c7287efd5e9b4804"
+subDir = "Iris"
 
 # lean-sail with the free-monad concurrency interface (see vendor/lean-sail/README.md).
 [[require]]
