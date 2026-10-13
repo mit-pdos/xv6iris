@@ -729,7 +729,7 @@ def atMmio (p : Pexv6) : Prop :=
 
 /-- The program's MMIO step AT A PINNED fabric (deviation 3). -/
 def mmioStepAt (F : Efab) (p : Pexv6) : Prop :=
-  ∃ p' F' kd ba bs, pstepProg p F (LDev kd ba bs) p' F'
+  ∃ p' F' kd ba bs sa sv, pstepProg p F (LDev kd ba bs sa sv) p' F'
 
 /-- The device states at which agent `i`'s NEXT device event may be performed. -/
 def devFrontier (GV : GdexecDev) (i : Nat) (d : DevStates) : Prop :=
@@ -791,7 +791,8 @@ theorem uartMmioWriteStep (F : Efab) (cpu : CPU) (va : Nat)
     (AxDevGraph.inUartOff _ _ _ hdec)
   have hdev := uartAddrDev _ _ _ hdec
   refine ⟨.PHart cpu (k (.Ok (some true))) rs none ib,
-    { F with efDev := F.efDev.set (.uart pt) u' }, .wr, paZ req.pa, WeakInterpProj.wbytes 1 v, rfl,
+    { F with efDev := F.efDev.set (.uart pt) u' }, .wr, paZ req.pa, WeakInterpProj.wbytes 1 v,
+    depsAsrc (depsOfIb ib.ibBits), depsVsrc (depsOfIb ib.ibBits), rfl,
     none, none, none, rfl, rfl, ?_, rfl⟩
   simp only [pstepNode, pnodeStep, hdev, hval, ↓reduceIte, and_true]
   simp only [devWrite, hdec, devSig, Uart.sig, Uart.writeN]
@@ -811,7 +812,8 @@ theorem uartMmioReadStep (F : Efab) (cpu : CPU) (va : Nat)
   have hdev := uartAddrDev _ _ _ hdec
   refine ⟨.PHart cpu (k (.Ok (BitVec.setWidth (8 * 1) b, none))) rs none ib,
     { F with efDev := F.efDev.set (.uart pt) u' }, .rd, paZ req.pa,
-    WeakInterpProj.wbytes 1 (BitVec.setWidth (8 * 1) b), rfl, none, none, none, rfl, rfl, ?_, rfl⟩
+    WeakInterpProj.wbytes 1 (BitVec.setWidth (8 * 1) b),
+    depsAsrc (depsOfIb ib.ibBits), [], rfl, none, none, none, rfl, rfl, ?_, rfl⟩
   simp only [pstepNode, pnodeStep, hdev, ↓reduceIte, and_true]
   refine ⟨BitVec.setWidth (8 * 1) b, ?_⟩
   simp only [devRead, hdec, devSig, Uart.sig, Uart.readN]
@@ -829,8 +831,8 @@ theorem uartDevReducibleWrite (GV : GdexecDev)
       ⟨.PHart cpu (.impure (.ok (.memWrite 1 va req)) k) rs none ib, kk⟩ := by
   intro hdec hval
   refine ⟨?_, fun _ F _ => uartMmioWriteStep F cpu va req v k rs ib pt off hdec hval⟩
-  obtain ⟨p', d', _, _, _, hs⟩ := uartMmioWriteStep OpaxWit.wtD0 cpu va req v k rs ib pt off hdec hval
-  exact ⟨[], ⟨p', kk⟩, .inl ⟨LDev _ _ _, .AStepAdmin _ kk _ _ _ _ trivial hs⟩⟩
+  obtain ⟨p', d', _, _, _, _, _, hs⟩ := uartMmioWriteStep OpaxWit.wtD0 cpu va req v k rs ib pt off hdec hval
+  exact ⟨[], ⟨p', kk⟩, .inl ⟨LDev _ _ _ _ _, .AStepAdmin _ kk _ _ _ _ trivial hs⟩⟩
 
 /-- THE UART INSTANCE OF `devReducible` (read). -/
 theorem uartDevReducibleRead (GV : GdexecDev)
@@ -843,8 +845,8 @@ theorem uartDevReducibleRead (GV : GdexecDev)
       ⟨.PHart cpu (.impure (.ok (.memRead 1 va req)) k) rs none ib, kk⟩ := by
   intro hdec
   refine ⟨?_, fun _ F _ => uartMmioReadStep F cpu va req k rs ib pt off hdec⟩
-  obtain ⟨p', d', _, _, _, hs⟩ := uartMmioReadStep OpaxWit.wtD0 cpu va req k rs ib pt off hdec
-  exact ⟨[], ⟨p', kk⟩, .inl ⟨LDev _ _ _, .AStepAdmin _ kk _ _ _ _ trivial hs⟩⟩
+  obtain ⟨p', d', _, _, _, _, _, hs⟩ := uartMmioReadStep OpaxWit.wtD0 cpu va req k rs ib pt off hdec
+  exact ⟨[], ⟨p', kk⟩, .inl ⟨LDev _ _ _ _ _, .AStepAdmin _ kk _ _ _ _ trivial hs⟩⟩
 
 /-! ### 6.1 The pinned clause is NOT trivial -/
 
@@ -857,7 +859,7 @@ def dvWreq (pa : PAddr) (v : BitVec 8) : Mem_write_request 1 64 Arch.pa Arch.tra
 theorem plicByteWriteStuck (F : Efab) (cpu : CPU) (v : BitVec 8)
     (k : Result (Option Bool) Arch.abort → SailM Unit) (rs : RegFile) (ib : Ibch) :
     ¬ mmioStepAt F (.PHart cpu (.impure (.ok (.memWrite 1 64 (dvWreq plicPa v))) k) rs none ib) := by
-  rintro ⟨p', F', _, _, _, h⟩
+  rintro ⟨p', F', _, _, _, _, _, h⟩
   cases p' with
   | PDisk _ => exact h
   | PHart cpu' m' rs' fn' ib' =>

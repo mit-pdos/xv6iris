@@ -17,29 +17,35 @@ NOT (UNSOUND for safety).  And rule 9's LOAD half is missing: `gdepsWf` admits o
 targets, because the emission's `rowDeps` records read→write edges only (D-8).
 
 WHAT IS HERE.
-  §1  `Dtag` and the tagged graph `GdexecT`; `gtdepsWf` (a read source, po-earlier, same hart;
-      the target a WRITE for `DTdata`/`DTctrl`/`DTtrans`/`DTr13`, ANY memory event for
-      `DTaddr`/`DTctx`); `gtdepsGmo`; `forget` (drop tags, keep write-targeted edges); `gtAd`
-      (the addr/data edges into writes); `gppo12T` := rule 12 over `gtAd`; the model
-      `rvwmoCatConsistentT`.
-  §2  `catTOfCat`: the cat model on `forget GT` plus the read-targeted edges' well-formedness
-      and gmo-ordering (`gtdepsRdOk`) gives the tagged model.  The CONVERSE FAILS (`AxDeps.tw`,
+  §1  `Dtag` and the tagged graph `GdexecT`; `gtdepsWf` (a read source — RAM read or I/O load,
+      `lbIsRT` — po-earlier, same hart; the target a WRITE — RAM write or I/O store, `lbIsWT` —
+      for `DTdata`/`DTctrl`/`DTtrans`/`DTr13`, ANY memory event for `DTaddr`/`DTctx`);
+      `gtdepsGmo`; `forget` (drop tags, keep the RAM-read → RAM-write edges); `gtAd` (the
+      addr/data edges from RAM reads into RAM writes, the chain's projection); `gtAdFull` (the
+      addr/data edges into RAM writes from ANY read); `gppo12T` := rule 12 over `gtAdFull`; the
+      model `rvwmoCatConsistentT`.
+  §2  `catTOfCat`: the cat model on `forget GT` plus the dropped edges' well-formedness,
+      gmo-ordering and rule-12 instances (`gtdepsRdOk`) gives the tagged model.  The CONVERSE FAILS (`AxDeps.tw`,
       §5): a ctrl-dep store forwarded to a later read — the untagged rule 12 is the strictly
       stronger (unsound) statement; every clause but rule 12 does hold backwards
       (`catTForgetAxioms`).
-  §3  `gobCatT` := (ppo_cat_t ∪ ALL tagged deps ∪ rfe ∪ co ∪ fr)⁺, `obCatTSubGmo`,
-      irreflexivity, `ownedReadCatT` — by REUSE: `gppoCatT GT` IS `AxGraphCat.gppoCat` on the
-      untagged addr/data projection `gtAdGd GT`.
+  §3  `gobCatT` := (ppo_cat_t of the projection ∪ ALL tagged deps ∪ rfe ∪ co ∪ fr)⁺,
+      `obCatTSubGmo`, irreflexivity, `ownedReadCatT` — by REUSE: `gppoCatT GT` IS
+      `AxGraphCat.gppoCat` on the untagged addr/data projection `gtAdFullGd GT`, and the chain's
+      `gtAdGd GT` is inside it (`gppoCatAdFull`).
   §4  THE EMISSION SIDE: `DstateT` (the tree's `Dstate` plus the rule-13 accumulator `dtAdr`),
       `dstepT`, `rowDepsT` — a NEW fold, `WeakRvwmoConf` untouched — and its exact relation to
       `rowDeps`: `rowDepsSubT` (every existing edge is emitted, tagged, never `DTr13`),
       `rowDepsTSub` (`DTdata`/`DTctrl`/`DTtrans` edges are exactly existing edges),
-      `rowDepsTAddr` (a `DTaddr` edge is an existing edge or targets a pure read).  Smoke tests
-      by computation.
+      `rowDepsTAddr` (a `DTaddr` edge is an existing edge, targets a pure read or an MMIO item,
+      or leaves an MMIO load).  Smoke tests by computation.
   §5  `AxDeps.tw`: two harts, one addr-dep LOAD, one ctrl-dep store forwarded to a later read;
       `rvwmoCatConsistentT AxDeps.tw` by COMPUTATION (`catTConsistentBSound`);
       `¬ rvwmoCatConsistent (forget AxDeps.tw)` by `notCatOfRule12`; `tw2` (same graph,
-      rule-12-abiding gmo) discharges `catTOfCat`'s hypotheses non-vacuously.
+      rule-12-abiding gmo) discharges `catTOfCat`'s hypotheses non-vacuously.  §5.2 (W13 (F-dep))
+      `esIo`/`ioGt`: the I/O dependency edges emitted by `rowDepsT` (the tree records none) and
+      the tagged model SATISFIED on the I/O-active graph carrying them (`ioGtCatT`, by
+      computation — the permanent smoke test [R38.1]).
 
 The Rocq header's CORRECTIONS (1)–(5) stand unchanged: (1) `catTOfCat`'s second premise must
 supply both the shape and the gmo-ordering of every read-targeted edge (`gtdepsRdOk`); (2) there
@@ -57,7 +63,7 @@ FETCHES (O2 Stage C, owner rulings Q-C1/Q-C4: the fetch is an ADMINISTRATIVE lab
 event).  Rocq's fetch row item was `LLoad false false pc tvs []`; the Lean instance label is
 `LIFetch pc tvs`, which has no row item, no identity and no edges.  `dstepT`'s `LIFetch` arm is
 `(s, [])` (no `dtLd` push, no `dtAdr` change, no edges), exactly `WeakRvwmoConf.dstep`'s
-`LIFetch` arm (its deviation 3; `elbIsR (LIFetch ..) = false`), so `dstepTState` holds by `rfl`
+`LIFetch` arm (its deviation 3; `elbIsR (LIFetch ..) = false`), so `dstepTStateRam` holds by `rfl`
 in every arm.  The §5 witness `AxDeps.tw` (like Rocq's `tw_prog`) has no fetch row items, so its
 rows, positions and kernel-checked verdicts are unchanged by Stage C.  Nothing in this file turns
 `hartConf` blocks into `lblRealizes`.
@@ -83,7 +89,38 @@ rows, positions and kernel-checked verdicts are unchanged by Stage C.  Nothing i
    no fetch label; its fetch was an `LLoad` row item).
 6. CLOSURE INDUCTION: `obCatTSubGmo` inducts on the library `tc`, which splits at the LAST step
    (`MachCSL.Rel` deviation 1).
-7. Lean-only helpers: `Tdep`, `Redge`, `tagEdgesLt`, `dedgesRSnd`, `dedgesRLt`, `dedgesWLt`.
+7. Lean-only helpers: `Tdep`, `Redge`, `tagEdgesLt`, `dedgesRSnd`, `dedgesRLt`, `dedgesWLt`;
+   W13 (F-dep): `lbIsIoRd`, `lbIsIoWr`, `lbIsRT`, `lbIsWT`, `gisRd`, `AxDeps.gisRdGlbl`,
+   `lbIsRTOfR`, `lbIsWTOfW`, `lbIsRTMem`, `lbIsWTMem`, `glblIsRTOfR`, `glblIsWTOfW`,
+   `glblIsRTGmem`, `glblIsWTGmem`, `gtAdFull`, `gtAdFullGd`, `elemOfGtAdFull`, `gtAdSubFull`,
+   `gppo12AdFull`, `gppoCatAdFull`, `gppoCatTEvents`, `elbIsIoRd`, `elbIsIoWr`, `ioRdPos`,
+   `dsLe`, `dsUp`, `dsrcsPosLe`, `dsrcsPosUp`, `dedgesLe`, `dedgesUp`, `dstepLe`, `dstepUp`,
+   `dstepTStateRam`, `dstepTStateUp`, `dedgesWSnd`, `dsLeInit`, `dsUpInit`, `esIo`,
+   `rowDepsTIo`, `rowDepsIoGap`, `ioProg`, `ioGt`, `ioGtDepsWfB`, `ioGtCatT`, `ioGtForgetDeps`.
+8. W13 (F-dep) (0) — THE MODEL TEXT (D50 (b) [OWN.17], option A [R38.1], (A1) [OWN.52]).  Rocq's
+   `gtdeps_wf` is RAM-only; here it admits I/O endpoints: the source `lbIsRT` (RAM read or I/O
+   load), a write-tag target `lbIsWT` (RAM write or I/O store); `.dev` events are neither.  Spec:
+   herd's `addr`/`data`/`ctrl` range over every read/write; RVWMO appendix (c1) keeps ppo 9–11
+   for I/O accesses; Sail/Zifencei/PMAs are silent on dependencies — FAITHFUL.  `forget`/`gtAd`
+   keep RAM-read → RAM-write edges only (the chain sees fewer deps — sound), so `catTAd`,
+   `catTForgetAxioms` and W12's `catADOfCatT` keep their statements; rule 12 ranges over
+   `gtAdFull` (any read source, I/O loads included — riscv.cat's `r12`), and `catTAd` /
+   `catADOfCatT` close by `gppo12AdFull`.  `gtdepsRdOk` covers every edge `forget` drops
+   (read-targeted or I/O-endpoint), with the rule-12 instances through a dropped addr/data edge
+   into a RAM write; the checker `catTConsistentB` checks `gppoCatT` over `gtAdFullGd`.  The premise `rvwmoCatConsistentT` of the registered LB roots is thereby WEAKER
+   (it admits I/O-endpoint deps): their text is unchanged.
+9. W13 (F-dep) (2)/(3) — THE EMISSION ([R38.2]).  `dstepT` gains the MMIO arms: `LDev .rd` = the
+   load arm's shape (`DTaddr`/`DTctx` in, provenance OUT through `dtLd`, `dtAcc`, NO ctrl in —
+   appendix (c1): no ctrl → I/O-load ppo), `LDev .wr` = the store arm's; `LDev .dev` is inert.
+   The untagged `WeakRvwmoConf.dstep` STAYS INERT on `LDev` (deviation from the plan's original
+   "dstep arms"): the untagged tree never sees I/O edges, so `gfexecConfIO`'s `rowDeps ⊆ gdDeps`
+   and the RAM-only `gdepsWf` stay true on I/O rows (sound; the chain's I/O orderings are the
+   residue arms).  Hence Rocq's `dstep_t_state` (`dsOfT (dstepT s it).1 = (dstep (dsOfT s) it).1`)
+   holds only off MMIO loads (`dstepTStateRam`) and is RESTATED as the inclusion `dsLe`
+   (`dstepTState`) plus the upper bound by MMIO-load positions (`dstepTStateUp`); `dstepTSup`/
+   `dstepTSub`/`dstepTAddr` and the fold lemmas take the state relation; `rowDepsSubT` keeps its
+   statement; `rowDepsTSub`/`rowDepsTAddr` gain the MMIO disjuncts (an edge leaving an MMIO
+   load, entering an MMIO store, or — address — targeting an MMIO item).
 
 **Rocq → Lean name map.**  `dtag` `Dtag` (`DTaddr`…`DTctx` same), `dtag_w` `dtagW`, `dtag_ad`
 `dtagAd`, `gdexec_t` `GdexecT` (`GDExecT` `GdexecT.mk`, `gt_g`/`gt_deps` `gtG`/`gtDeps`),
@@ -160,49 +197,90 @@ def dtagAd (tg : Dtag) : Bool :=
 /-- (Lean-only abbrev for Rocq's `Notation tdep`; deviation 2.) -/
 abbrev Tdep : Type := (Geid × Geid) × Dtag
 
+/-- W13 (F-dep) (0a) (D50 (b) [OWN.17], option A [R38.1]): the I/O-class LOAD / STORE tests.
+`lbIsR`/`lbIsW` are `false` on `LIo` (D47 (a)); `.dev` (a device-side fabric move, D49) is
+neither — it carries no hart register dataflow. -/
+def lbIsIoRd (l : Lbl) : Bool :=
+  match l with
+  | Lbl.LIo .rd _ _ => true
+  | _ => false
+
+def lbIsIoWr (l : Lbl) : Bool :=
+  match l with
+  | Lbl.LIo .wr _ _ => true
+  | _ => false
+
+/-- riscv.cat's `R` / `W` as the dependency relations see them (herd's `addr`/`data`/`ctrl` range
+over EVERY read / write; RVWMO appendix (c1) keeps ppo 9–11 for I/O accesses): a RAM read or an
+I/O load / a RAM write or an I/O store. -/
+def lbIsRT (l : Lbl) : Bool := lbIsR l || lbIsIoRd l
+
+def lbIsWT (l : Lbl) : Bool := lbIsW l || lbIsIoWr l
+
+/-- The Bool RAM-read test of an event (`gisW`'s twin): `forget`/`gtAd`/`gsrcT` keep RAM-read
+sources only. -/
+def gisRd (G : Gexec) (e : Geid) : Bool :=
+  match gxLbl G e with
+  | some l => lbIsR l
+  | none => false
+
 structure GdexecT where
   mk ::
   gtG : Gexec
   gtDeps : List Tdep
 
+/-- THE TAGGED WELL-FORMEDNESS (W13 (F-dep) (0a) [R38.1]): a same-hart po-forward edge from a READ
+in riscv.cat's sense (`lbIsRT`: RAM read or I/O load) to a WRITE in that sense (`lbIsWT`) for
+`DTdata`/`DTctrl`/`DTtrans`/`DTr13`, to any memory event for `DTaddr`/`DTctx`.  (Rocq's is
+RAM-only: deviation 8.) -/
 def gtdepsWf (G : Gexec) (deps : List Tdep) : Prop :=
   ∀ e : Tdep, e ∈ deps →
-    e.1.1.1 = e.1.2.1 ∧ e.1.1.2 < e.1.2.2 ∧ glblIs G e.1.1 lbIsR ∧
-    (if dtagW e.2 then glblIs G e.1.2 lbIsW else gmem G e.1.2)
+    e.1.1.1 = e.1.2.1 ∧ e.1.1.2 < e.1.2.2 ∧ glblIs G e.1.1 lbIsRT ∧
+    (if dtagW e.2 then glblIs G e.1.2 lbIsWT else gmem G e.1.2)
 
 /-- Rules 9 (both halves), 10, 11, 13 and the context edges: gmo-forward. -/
 def gtdepsGmo (G : Gexec) (deps : List Tdep) : Prop :=
   ∀ e : Tdep, e ∈ deps → gmoLt G e.1.1 e.1.2
 
-/-- `forget`: drop the tags, keep the write-targeted edges. -/
+/-- `forget`: drop the tags, keep the RAM-read → RAM-write edges (W13 (F-dep) (0b): the I/O-endpoint
+edges are dropped too, so the untagged chain sees FEWER deps — sound). -/
 def forgetDeps (G : Gexec) (deps : List Tdep) : List (Geid × Geid) :=
-  deps.filterMap (fun e : Tdep => if gisW G e.1.2 then some e.1 else none)
+  deps.filterMap (fun e : Tdep => if gisRd G e.1.1 && gisW G e.1.2 then some e.1 else none)
 
 def forget (GT : GdexecT) : Gdexec :=
   ⟨GT.gtG, forgetDeps GT.gtG GT.gtDeps⟩
 
-/-- The addr/data edges INTO WRITES, untagged — rule 12's domain.  (The write filter is
-semantically idle, `gppo12TAlt`: an rf-source is a write; it keeps `gtAd ⊆ forgetDeps`
-syntactic.) -/
+/-- The addr/data edges from RAM READS INTO RAM WRITES, untagged — the chain's projection of rule
+12's domain (W13 (F-dep) (0b): RAM sources only, so `gtAd ⊆ forgetDeps` stays syntactic).  (The
+write filter is semantically idle, `gppo12TAlt`: an rf-source is a write.) -/
 def gtAd (G : Gexec) (deps : List Tdep) : List (Geid × Geid) :=
-  deps.filterMap (fun e : Tdep => if dtagAd e.2 && gisW G e.1.2 then some e.1 else none)
+  deps.filterMap (fun e : Tdep =>
+    if dtagAd e.2 && gisRd G e.1.1 && gisW G e.1.2 then some e.1 else none)
 
 def gtAdGd (GT : GdexecT) : Gdexec :=
   ⟨GT.gtG, gtAd GT.gtG GT.gtDeps⟩
 
-/-- RULE 12 over addr/data edges only. -/
-def gppo12T (GT : GdexecT) (a b : Geid) : Prop :=
-  gppo12 GT.gtG (gtAd GT.gtG GT.gtDeps) a b
+/-- RULE 12'S FULL DOMAIN (W13 (F-dep) (0e), RULED (A1) [OWN.52]): the addr/data edges into RAM
+writes from ANY read, I/O loads included — riscv.cat's `r12 = [M];(addr|data);[W];rfi;[R]`. -/
+def gtAdFull (G : Gexec) (deps : List Tdep) : List (Geid × Geid) :=
+  deps.filterMap (fun e : Tdep => if dtagAd e.2 && gisW G e.1.2 then some e.1 else none)
 
-/-- THE TAGGED ppo IS `gppoCat` OF THE PROJECTION — the reuse hinge. -/
+def gtAdFullGd (GT : GdexecT) : Gdexec :=
+  ⟨GT.gtG, gtAdFull GT.gtG GT.gtDeps⟩
+
+/-- RULE 12 over addr/data edges only (from any read, (A1)). -/
+def gppo12T (GT : GdexecT) (a b : Geid) : Prop :=
+  gppo12 GT.gtG (gtAdFull GT.gtG GT.gtDeps) a b
+
+/-- THE TAGGED ppo IS `gppoCat` OF THE FULL addr/data PROJECTION — the reuse hinge. -/
 def gppoCatT (GT : GdexecT) : Geid → Geid → Prop :=
-  gppoCat (gtAdGd GT)
+  gppoCat (gtAdFullGd GT)
 
 theorem gppoCatTAlt (GT : GdexecT) (e1 e2 : Geid) :
     gppoCatT GT e1 e2 ↔ gppoCat6 GT.gtG e1 e2 ∨ gppo12T GT e1 e2 :=
   Iff.rfl
 
-def gppoCatTGmo (GT : GdexecT) : Prop := gppoCatGmo (gtAdGd GT)
+def gppoCatTGmo (GT : GdexecT) : Prop := gppoCatGmo (gtAdFullGd GT)
 
 /-- THE MODEL. -/
 def rvwmoCatConsistentT (GT : GdexecT) : Prop :=
@@ -213,25 +291,45 @@ def rvwmoCatConsistentT (GT : GdexecT) : Prop :=
 /-! ## 1.1 The projections, pointwise -/
 
 theorem elemOfForgetDeps (G : Gexec) (deps : List Tdep) (a m : Geid) :
-    (a, m) ∈ forgetDeps G deps ↔ ∃ tg, ((a, m), tg) ∈ deps ∧ gisW G m = true := by
+    (a, m) ∈ forgetDeps G deps ↔
+    ∃ tg, ((a, m), tg) ∈ deps ∧ gisRd G a = true ∧ gisW G m = true := by
   unfold forgetDeps
   rw [List.mem_filterMap]
   constructor
   · rintro ⟨⟨⟨a', m'⟩, tg⟩, hin, hf⟩
     dsimp only at hf
     split at hf
-    · next hw =>
+    · next hb =>
       simp only [Option.some.injEq, Prod.mk.injEq] at hf
       obtain ⟨rfl, rfl⟩ := hf
-      exact ⟨tg, hin, hw⟩
+      rw [Bool.and_eq_true] at hb
+      exact ⟨tg, hin, hb.1, hb.2⟩
     · cases hf
-  · rintro ⟨tg, hin, hw⟩
-    exact ⟨((a, m), tg), hin, by simp [hw]⟩
+  · rintro ⟨tg, hin, hr, hw⟩
+    exact ⟨((a, m), tg), hin, by simp [hr, hw]⟩
 
 theorem elemOfGtAd (G : Gexec) (deps : List Tdep) (a m : Geid) :
     (a, m) ∈ gtAd G deps ↔
-    ∃ tg, ((a, m), tg) ∈ deps ∧ dtagAd tg = true ∧ gisW G m = true := by
+    ∃ tg, ((a, m), tg) ∈ deps ∧ dtagAd tg = true ∧ gisRd G a = true ∧ gisW G m = true := by
   unfold gtAd
+  rw [List.mem_filterMap]
+  constructor
+  · rintro ⟨⟨⟨a', m'⟩, tg⟩, hin, hf⟩
+    dsimp only at hf
+    split at hf
+    · next hb =>
+      simp only [Option.some.injEq, Prod.mk.injEq] at hf
+      obtain ⟨rfl, rfl⟩ := hf
+      simp only [Bool.and_eq_true] at hb
+      exact ⟨tg, hin, hb.1.1, hb.1.2, hb.2⟩
+    · cases hf
+  · rintro ⟨tg, hin, had, hr, hw⟩
+    exact ⟨((a, m), tg), hin, by simp [had, hr, hw]⟩
+
+theorem elemOfGtAdFull (G : Gexec) (deps : List Tdep) (a m : Geid) :
+    (a, m) ∈ gtAdFull G deps ↔
+    ∃ tg, ((a, m), tg) ∈ deps ∧ dtagAd tg = true ∧ gisW G m = true := by
+  unfold gtAdFull
   rw [List.mem_filterMap]
   constructor
   · rintro ⟨⟨⟨a', m'⟩, tg⟩, hin, hf⟩
@@ -250,8 +348,30 @@ theorem gtAdSubForget (G : Gexec) (deps : List Tdep) (rw : Geid × Geid) :
     rw ∈ gtAd G deps → rw ∈ forgetDeps G deps := by
   obtain ⟨a, m⟩ := rw
   rw [elemOfGtAd, elemOfForgetDeps]
-  rintro ⟨tg, hin, _, hw⟩
-  exact ⟨tg, hin, hw⟩
+  rintro ⟨tg, hin, _, hr, hw⟩
+  exact ⟨tg, hin, hr, hw⟩
+
+/-- (Lean-only, W13 (F-dep) (0e)) the chain's rule-12 domain is inside the model's. -/
+theorem gtAdSubFull (G : Gexec) (deps : List Tdep) (rw : Geid × Geid) :
+    rw ∈ gtAd G deps → rw ∈ gtAdFull G deps := by
+  obtain ⟨a, m⟩ := rw
+  rw [elemOfGtAd, elemOfGtAdFull]
+  rintro ⟨tg, hin, had, _, hw⟩
+  exact ⟨tg, hin, had, hw⟩
+
+/-- (Lean-only, W13 (F-dep) (0e)) `gppo12` monotonicity, `gtAd ⊆ gtAdFull` — the one line
+`catTAd` and `CatLin.catADOfCatT` close by. -/
+theorem gppo12AdFull (G : Gexec) (deps : List Tdep) (a b : Geid) :
+    gppo12 G (gtAd G deps) a b → gppo12 G (gtAdFull G deps) a b := by
+  rintro ⟨hag, m, hin, hrf⟩
+  exact ⟨hag, m, gtAdSubFull G deps (a, m) hin, hrf⟩
+
+/-- (Lean-only, W13 (F-dep) (0e)) the projection's ppo is inside the model's. -/
+theorem gppoCatAdFull (GT : GdexecT) (e1 e2 : Geid) :
+    gppoCat (gtAdGd GT) e1 e2 → gppoCatT GT e1 e2 := by
+  rintro (h | h)
+  · exact Or.inl h
+  · exact Or.inr (gppo12AdFull _ _ _ _ h)
 
 /-- Rule 12's natural reading: some addr/data-tagged edge into the rf-source.  The write filter
 costs nothing (`gwriteAt` names writes). -/
@@ -262,10 +382,10 @@ theorem gppo12TAlt (GT : GdexecT) (a b : Geid) :
   unfold gppo12T gppo12
   constructor
   · rintro ⟨hag, m, hin, hrf⟩
-    obtain ⟨tg, hin, had, _⟩ := (elemOfGtAd _ _ _ _).1 hin
+    obtain ⟨tg, hin, had, _⟩ := (elemOfGtAdFull _ _ _ _).1 hin
     exact ⟨hag, m, tg, hin, had, hrf⟩
   · rintro ⟨hag, m, tg, hin, had, hrf⟩
-    refine ⟨hag, m, (elemOfGtAd _ _ _ _).2 ⟨tg, hin, had, ?_⟩, hrf⟩
+    refine ⟨hag, m, (elemOfGtAdFull _ _ _ _).2 ⟨tg, hin, had, ?_⟩, hrf⟩
     obtain ⟨_, t, _, _, hat⟩ := hrf
     exact ((gwritesElemOf _ _).1 (gwriteAtGwrites _ _ _ hat)).2
 
@@ -276,12 +396,49 @@ theorem AxDeps.gisWGlbl (G : Gexec) (e : Geid) : gisW G e = true → glblIs G e 
   | none => rw [hl] at h; cases h
   | some l => rw [hl] at h; exact ⟨l, hl, h⟩
 
+theorem AxDeps.gisRdGlbl (G : Gexec) (e : Geid) : gisRd G e = true → glblIs G e lbIsR := by
+  intro h
+  unfold gisRd at h
+  cases hl : gxLbl G e with
+  | none => rw [hl] at h; cases h
+  | some l => rw [hl] at h; exact ⟨l, hl, h⟩
+
+/-- (Lean-only) a RAM read / write is a read / write in riscv.cat's sense. -/
+theorem lbIsRTOfR (l : Lbl) : lbIsR l = true → lbIsRT l = true := by
+  intro h; simp [lbIsRT, h]
+
+theorem lbIsWTOfW (l : Lbl) : lbIsW l = true → lbIsWT l = true := by
+  intro h; simp [lbIsWT, h]
+
+/-- (Lean-only) a read / write in riscv.cat's sense is a memory event (`gmem`). -/
+theorem lbIsRTMem (l : Lbl) : lbIsRT l = true → lbIsMem l = true := by
+  cases l <;> simp [lbIsRT, lbIsIoRd, lbIsMem, lbIsR, lbIsW, lbIsIo]
+
+theorem lbIsWTMem (l : Lbl) : lbIsWT l = true → lbIsMem l = true := by
+  cases l <;> simp [lbIsWT, lbIsIoWr, lbIsMem, lbIsR, lbIsW, lbIsIo]
+
+theorem glblIsRTOfR (G : Gexec) (e : Geid) : glblIs G e lbIsR → glblIs G e lbIsRT := by
+  rintro ⟨l, hl, h⟩
+  exact ⟨l, hl, lbIsRTOfR l h⟩
+
+theorem glblIsWTOfW (G : Gexec) (e : Geid) : glblIs G e lbIsW → glblIs G e lbIsWT := by
+  rintro ⟨l, hl, h⟩
+  exact ⟨l, hl, lbIsWTOfW l h⟩
+
+theorem glblIsRTGmem (G : Gexec) (e : Geid) : glblIs G e lbIsRT → gmem G e := by
+  rintro ⟨l, hl, h⟩
+  exact ⟨l, hl, lbIsRTMem l h⟩
+
+theorem glblIsWTGmem (G : Gexec) (e : Geid) : glblIs G e lbIsWT → gmem G e := by
+  rintro ⟨l, hl, h⟩
+  exact ⟨l, hl, lbIsWTMem l h⟩
+
 theorem gtdepsWfForget (G : Gexec) (deps : List Tdep) :
     gtdepsWf G deps → gdepsWf G (forgetDeps G deps) := by
   rintro H ⟨a, m⟩ hin
-  obtain ⟨tg, hin, hw⟩ := (elemOfForgetDeps _ _ _ _).1 hin
-  obtain ⟨h1, h2, h3, _⟩ := H _ hin
-  exact ⟨h1, h2, h3, AxDeps.gisWGlbl _ _ hw⟩
+  obtain ⟨tg, hin, hr, hw⟩ := (elemOfForgetDeps _ _ _ _).1 hin
+  obtain ⟨h1, h2, _, _⟩ := H _ hin
+  exact ⟨h1, h2, AxDeps.gisRdGlbl _ _ hr, AxDeps.gisWGlbl _ _ hw⟩
 
 theorem gtdepsGmoForget (G : Gexec) (deps : List Tdep) :
     gtdepsGmo G deps → gdepsGmo G (forgetDeps G deps) := by
@@ -300,16 +457,21 @@ theorem gtdepsGmoAd (G : Gexec) (deps : List Tdep) :
 /-- The tagged model IS the cat model on the addr/data projection. -/
 theorem catTAd (GT : GdexecT) : rvwmoCatConsistentT GT → rvwmoCatConsistent (gtAdGd GT) := by
   rintro ⟨hwf, hppo, hlv, hat, hdw, hdg⟩
-  exact ⟨hwf, hppo, hlv, hat, gtdepsWfAd _ _ hdw, gtdepsGmoAd _ _ hdg⟩
+  exact ⟨hwf, fun e1 e2 h => hppo e1 e2 (gppoCatAdFull GT e1 e2 h), hlv, hat,
+    gtdepsWfAd _ _ hdw, gtdepsGmoAd _ _ hdg⟩
 
 /-! # 2. `catTOfCat` and what fails backwards -/
 
-/-- The read-targeted edges (dropped by `forget`): well-formed for a read-admitting tag and
-gmo-forward. -/
+/-- The edges `forget` DROPS — read-targeted, or (W13 (F-dep) (0b)) with an I/O endpoint: the
+tagged well-formedness, gmo-forward, and (rule 12 (A1)) for an addr/data edge into a RAM write —
+whose source is then an I/O load — every rule-12 instance through it gmo-forward. -/
 def gtdepsRdOk (GT : GdexecT) : Prop :=
-  ∀ e : Tdep, e ∈ GT.gtDeps → gisW GT.gtG e.1.2 = false →
-    e.1.1.1 = e.1.2.1 ∧ e.1.1.2 < e.1.2.2 ∧ glblIs GT.gtG e.1.1 lbIsR ∧
-    dtagW e.2 = false ∧ gmem GT.gtG e.1.2 ∧ gmoLt GT.gtG e.1.1 e.1.2
+  ∀ e : Tdep, e ∈ GT.gtDeps → (gisRd GT.gtG e.1.1 && gisW GT.gtG e.1.2) = false →
+    e.1.1.1 = e.1.2.1 ∧ e.1.1.2 < e.1.2.2 ∧ glblIs GT.gtG e.1.1 lbIsRT ∧
+    (if dtagW e.2 then glblIs GT.gtG e.1.2 lbIsWT else gmem GT.gtG e.1.2) ∧
+    gmoLt GT.gtG e.1.1 e.1.2 ∧
+    ((dtagAd e.2 && gisW GT.gtG e.1.2) = true →
+      ∀ b, e.1.1.1 = b.1 → WeakRvwmoAcyc.grf GT.gtG e.1.2 b → gmoLt GT.gtG e.1.1 b)
 
 theorem catTOfCat (GT : GdexecT) :
     rvwmoCatConsistent (forget GT) → gtdepsRdOk GT → rvwmoCatConsistentT GT := by
@@ -317,24 +479,30 @@ theorem catTOfCat (GT : GdexecT) :
   refine ⟨hwf, ?_, hlv, hat, ?_, ?_⟩
   · rintro e1 e2 (h | ⟨hag, m, hin, hrf⟩)
     · exact hppo _ _ (Or.inl h)
-    · exact hppo _ _ (Or.inr ⟨hag, m, gtAdSubForget _ _ _ hin, hrf⟩)
+    · obtain ⟨tg, hin, had, hw⟩ := (elemOfGtAdFull _ _ _ _).1 hin
+      cases hr : gisRd GT.gtG e1
+      · have hb : (gisRd GT.gtG e1 && gisW GT.gtG m) = false := by simp [hr]
+        exact (hrd _ hin hb).2.2.2.2.2 (by simp [had, hw]) e2 hag hrf
+      · exact hppo _ _ (Or.inr ⟨hag, m, (elemOfForgetDeps _ _ _ _).2 ⟨tg, hin, hr, hw⟩, hrf⟩)
   · rintro ⟨⟨a, m⟩, tg⟩ hin
     dsimp only
-    cases hw : gisW GT.gtG m
-    · obtain ⟨h1, h2, h3, h4, h5, _⟩ := hrd _ hin hw
-      refine ⟨h1, h2, h3, ?_⟩
-      dsimp only at h4
-      rw [if_neg (by rw [h4]; decide)]
-      exact h5
-    · obtain ⟨h1, h2, h3, h4⟩ := hdw (a, m) ((elemOfForgetDeps _ _ _ _).2 ⟨tg, hin, hw⟩)
-      refine ⟨h1, h2, h3, ?_⟩
+    cases hb : (gisRd GT.gtG a && gisW GT.gtG m)
+    · obtain ⟨h1, h2, h3, h4, _⟩ := hrd _ hin hb
+      exact ⟨h1, h2, h3, h4⟩
+    · rw [Bool.and_eq_true] at hb
+      obtain ⟨h1, h2, h3, h4⟩ :=
+        hdw (a, m) ((elemOfForgetDeps _ _ _ _).2 ⟨tg, hin, hb.1, hb.2⟩)
+      obtain ⟨l, hl, hlr⟩ := h3
+      obtain ⟨l', hl', hlw⟩ := h4
+      refine ⟨h1, h2, ⟨l, hl, lbIsRTOfR l hlr⟩, ?_⟩
       split
-      · exact h4
-      · exact WeakRvwmoGraph.glblIsWGmem _ _ h4
+      · exact ⟨l', hl', lbIsWTOfW l' hlw⟩
+      · exact WeakRvwmoGraph.glblIsWGmem _ _ ⟨l', hl', hlw⟩
   · rintro ⟨⟨a, m⟩, tg⟩ hin
-    cases hw : gisW GT.gtG m
-    · exact (hrd _ hin hw).2.2.2.2.2
-    · exact hdg (a, m) ((elemOfForgetDeps _ _ _ _).2 ⟨tg, hin, hw⟩)
+    cases hb : (gisRd GT.gtG a && gisW GT.gtG m)
+    · exact (hrd _ hin hb).2.2.2.2.1
+    · rw [Bool.and_eq_true] at hb
+      exact hdg (a, m) ((elemOfForgetDeps _ _ _ _).2 ⟨tg, hin, hb.1, hb.2⟩)
 
 /-- BACKWARDS, everything but rule 12 transfers (`AxDeps.tw` shows rule 12 does not). -/
 theorem catTForgetAxioms (GT : GdexecT) :
@@ -410,7 +578,9 @@ EDGES.  A READ at `k`: `DTaddr` from its address sources (rule 9's load half), `
 context CSRs' provenance.  A WRITE at `k`: `DTaddr` (rule 9), `DTdata` (10), `DTctrl` (11, from
 `dtCtl`), `DTtrans` (the tree's W-TV edge, from `dtLd`), `DTr13` (from `dtAdr`, BEFORE this
 access's own sources are appended), `DTctx`.  The fused RMW is a write here and also joins
-`dtLd`, exactly as in `dstep`.  The fetch (Stage C) is admin: `(s, [])`. -/
+`dtLd`, exactly as in `dstep`.  The fetch (Stage C) is admin: `(s, [])`.  W13 (F-dep) (2): an
+MMIO LOAD (`LDev .rd`) is a READ here (and joins `dtLd`), an MMIO STORE (`LDev .wr`) a WRITE;
+the untagged `dstep` stays inert on both (deviation 9). -/
 
 structure DstateT where
   mk ::
@@ -460,7 +630,15 @@ def dtAcc (s : DstateT) (xs : List Dsrc) : List Nat :=
 
 def dstepT (s : DstateT) (it : Eitem) : DstateT × List Redge :=
   match it.1 with
-  | LSilent | LDev .. | LFence _ _ _ _ | LIFetch _ _ => (s, [])
+  | LSilent | LFence _ _ _ _ | LIFetch _ _ => (s, [])
+  -- W13 (F-dep) (2) (D50 (b) [OWN.17], appendix (c1)): an MMIO LOAD is the load arm's shape
+  -- (address edges in, provenance OUT through `dtLd`, rule-13 accumulation, NO ctrl in), an
+  -- MMIO STORE the store arm's; a device-side move (`dev`) is inert
+  | LDev kd _ _ asrc vsrc =>
+      match kd, it.2 with
+      | .rd, some k => (⟨s.dtProv, k :: s.dtLd, s.dtCtl, dtAcc s asrc⟩, dedgesR s k asrc)
+      | .wr, some k => (⟨s.dtProv, s.dtLd, s.dtCtl, dtAcc s asrc⟩, dedgesW s k asrc vsrc)
+      | _, _ => (s, [])
   | LInstr => (⟨s.dtProv, [], s.dtCtl, s.dtAdr⟩, [])
   | LRegW rd srcs =>
       (⟨dprovSet s.dtProv rd (dtsrcs s srcs), s.dtLd, s.dtCtl, s.dtAdr⟩, [])
@@ -587,123 +765,420 @@ theorem dedgesWLt (s : DstateT) (k : Nat) (asrc vsrc : List Dsrc) (j k' : Nat) (
   simp only [dedgesW, List.mem_append]
   rintro (h | h | h | h | h | h) <;> exact tagEdgesLt _ _ _ _ _ _ h
 
-/-! ## 4.2 One step: state projection and edge correspondence -/
+/-! ## 4.2 One step: state inclusion and edge correspondence
 
-theorem dstepTState (s : DstateT) (it : Eitem) : dsOfT (dstepT s it).1 = (dstep (dsOfT s) it).1 := by
+W13 (F-dep) (3) [R38.2]: the untagged `dstep` is INERT on `LDev`, the tagged `dstepT` is not (an
+I/O load joins `dtLd`), so the old state equation becomes a two-sided INCLUSION: the untagged
+state is below the tagged one (`dsLe`), and the tagged one is above it only by I/O-load positions
+(`dsUp P`, `P` holding of every I/O load's position). -/
+
+/-- (Lean-only, W13 (F-dep) (3)) a hart's MMIO load / store item. -/
+def elbIsIoRd (l : Wlabel) : Bool :=
+  match l with
+  | LDev .rd _ _ _ _ => true
+  | _ => false
+
+def elbIsIoWr (l : Wlabel) : Bool :=
+  match l with
+  | LDev .wr _ _ _ _ => true
+  | _ => false
+
+/-- (Lean-only) the positions of an emission's MMIO loads. -/
+def ioRdPos (es : List Eitem) (j : Nat) : Prop :=
+  ∃ it, it ∈ es ∧ it.2 = some j ∧ elbIsIoRd it.1 = true
+
+/-- (Lean-only) pointwise inclusion of dataflow states. -/
+def dsLe (a b : Dstate) : Prop :=
+  (∀ r j, j ∈ a.dsProv r → j ∈ b.dsProv r) ∧ (∀ j, j ∈ a.dsLd → j ∈ b.dsLd) ∧
+  (∀ j, j ∈ a.dsCtl → j ∈ b.dsCtl)
+
+/-- (Lean-only) `b` exceeds `a` only by positions satisfying `P`. -/
+def dsUp (P : Nat → Prop) (a b : Dstate) : Prop :=
+  (∀ r j, j ∈ b.dsProv r → j ∈ a.dsProv r ∨ P j) ∧ (∀ j, j ∈ b.dsLd → j ∈ a.dsLd ∨ P j) ∧
+  (∀ j, j ∈ b.dsCtl → j ∈ a.dsCtl ∨ P j)
+
+theorem dsrcsPosLe (a b : Dstate) (xs : List Dsrc) (j : Nat) :
+    dsLe a b → j ∈ dsrcsPos a xs → j ∈ dsrcsPos b xs := by
+  rintro ⟨hp, hl, -⟩ h
+  simp only [dsrcsPos, List.mem_flatten, List.mem_map] at h ⊢
+  obtain ⟨L, ⟨x, hx, rfl⟩, hj⟩ := h
+  refine ⟨dsrcPos b x, ⟨x, hx, rfl⟩, ?_⟩
+  cases x with
+  | DReg r => exact hp r j hj
+  | DLdRes => exact hl j hj
+
+theorem dsrcsPosUp (P : Nat → Prop) (a b : Dstate) (xs : List Dsrc) (j : Nat) :
+    dsUp P a b → j ∈ dsrcsPos b xs → j ∈ dsrcsPos a xs ∨ P j := by
+  rintro ⟨hp, hl, -⟩ h
+  simp only [dsrcsPos, List.mem_flatten, List.mem_map] at h ⊢
+  obtain ⟨L, ⟨x, hx, rfl⟩, hj⟩ := h
+  have h' : j ∈ dsrcPos a x ∨ P j := by
+    cases x with
+    | DReg r => exact hp r j hj
+    | DLdRes => exact hl j hj
+  rcases h' with h' | h'
+  · exact Or.inl ⟨dsrcPos a x, ⟨x, hx, rfl⟩, h'⟩
+  · exact Or.inr h'
+
+theorem dedgesLe (a b : Dstate) (k : Nat) (asrc vsrc : List Dsrc) (j k' : Nat) :
+    dsLe a b → (j, k') ∈ dedges a k asrc vsrc → (j, k') ∈ dedges b k asrc vsrc := by
+  intro hle h
+  rw [elemOfDedges] at h ⊢
+  obtain ⟨hk, hlt, hin⟩ := h
+  refine ⟨hk, hlt, ?_⟩
+  have hle' := hle
+  obtain ⟨hp, hl, hc⟩ := hle
+  simp only [List.mem_append] at hin ⊢
+  rcases hin with h | h | h | h | h
+  · exact Or.inl (dsrcsPosLe a b asrc j hle' h)
+  · exact Or.inr (Or.inl (dsrcsPosLe a b vsrc j hle' h))
+  · exact Or.inr (Or.inr (Or.inl (hc j h)))
+  · exact Or.inr (Or.inr (Or.inr (Or.inl (hl j h))))
+  · exact Or.inr (Or.inr (Or.inr (Or.inr (hp wsatp j h))))
+
+theorem dedgesUp (P : Nat → Prop) (a b : Dstate) (k : Nat) (asrc vsrc : List Dsrc) (j k' : Nat) :
+    dsUp P a b → (j, k') ∈ dedges b k asrc vsrc → (j, k') ∈ dedges a k asrc vsrc ∨ P j := by
+  intro hup h
+  rw [elemOfDedges] at h
+  rw [elemOfDedges]
+  obtain ⟨hk, hlt, hin⟩ := h
+  have hup' := hup
+  obtain ⟨hp, hl, hc⟩ := hup
+  simp only [List.mem_append] at hin
+  have key : (j ∈ dsrcsPos a asrc ∨ j ∈ dsrcsPos a vsrc ∨ j ∈ a.dsCtl ∨ j ∈ a.dsLd ∨
+      j ∈ dprov a wsatp) ∨ P j := by
+    rcases hin with h | h | h | h | h
+    · rcases dsrcsPosUp P a b asrc j hup' h with h | h
+      · exact Or.inl (Or.inl h)
+      · exact Or.inr h
+    · rcases dsrcsPosUp P a b vsrc j hup' h with h | h
+      · exact Or.inl (Or.inr (Or.inl h))
+      · exact Or.inr h
+    · rcases hc j h with h | h
+      · exact Or.inl (Or.inr (Or.inr (Or.inl h)))
+      · exact Or.inr h
+    · rcases hl j h with h | h
+      · exact Or.inl (Or.inr (Or.inr (Or.inr (Or.inl h))))
+      · exact Or.inr h
+    · rcases hp wsatp j h with h | h
+      · exact Or.inl (Or.inr (Or.inr (Or.inr (Or.inr h))))
+      · exact Or.inr h
+  rcases key with h | h
+  · left
+    refine ⟨hk, hlt, ?_⟩
+    simp only [List.mem_append]
+    exact h
+  · exact Or.inr h
+
+/-- (Lean-only) the untagged step is MONOTONE in the state (both relations). -/
+theorem dstepLe (a b : Dstate) (it : Eitem) : dsLe a b → dsLe (dstep a it).1 (dstep b it).1 := by
+  intro h
+  have h' := h
+  obtain ⟨hp, hl, hc⟩ := h
+  have hpush : ∀ k, dsLe ⟨a.dsProv, k :: a.dsLd, a.dsCtl⟩ ⟨b.dsProv, k :: b.dsLd, b.dsCtl⟩ := by
+    intro k
+    refine ⟨hp, fun j hj => ?_, hc⟩
+    rcases List.mem_cons.1 hj with rfl | hj
+    · exact List.mem_cons_self
+    · exact List.mem_cons_of_mem _ (hl j hj)
   obtain ⟨l, ok⟩ := it
-  cases l <;> cases ok <;> rfl
+  cases l with
+  | LInstr => exact ⟨hp, fun j hj => absurd hj List.not_mem_nil, hc⟩
+  | LRegW rd srcs =>
+    refine ⟨fun r j hj => ?_, hl, hc⟩
+    simp only [dstep, dprovSet] at hj ⊢
+    by_cases hr : r = rd
+    · rw [if_pos hr] at hj ⊢; exact dsrcsPosLe a b srcs j h' hj
+    · rw [if_neg hr] at hj ⊢; exact hp r j hj
+  | LCtrl srcs =>
+    refine ⟨hp, hl, fun j hj => ?_⟩
+    simp only [dstep, List.mem_append] at hj ⊢
+    rcases hj with hj | hj
+    · exact Or.inl (hc j hj)
+    · exact Or.inr (dsrcsPosLe a b srcs j h' hj)
+  | LLoad => cases ok with
+    | none => exact h'
+    | some k => exact hpush k
+  | LExLoad => cases ok with
+    | none => exact h'
+    | some k => exact hpush k
+  | LRmw => cases ok with
+    | none => exact h'
+    | some k => exact hpush k
+  | LStore => cases ok <;> exact h'
+  | LExStore => cases ok <;> exact h'
+  | LSilent => exact h'
+  | LDev => exact h'
+  | LFence => exact h'
+  | LIFetch => exact h'
 
-theorem dstepTSup (s : DstateT) (it : Eitem) (j k : Nat) :
-    (j, k) ∈ (dstep (dsOfT s) it).2 →
-    ∃ tg, ((j, k), tg) ∈ (dstepT s it).2 ∧ tg ≠ DTr13 := by
+theorem dstepUp (P : Nat → Prop) (a b : Dstate) (it : Eitem) :
+    dsUp P a b → dsUp P (dstep a it).1 (dstep b it).1 := by
+  intro h
+  have h' := h
+  obtain ⟨hp, hl, hc⟩ := h
+  have hpush : ∀ k, dsUp P ⟨a.dsProv, k :: a.dsLd, a.dsCtl⟩ ⟨b.dsProv, k :: b.dsLd, b.dsCtl⟩ := by
+    intro k
+    refine ⟨hp, fun j hj => ?_, hc⟩
+    rcases List.mem_cons.1 hj with rfl | hj
+    · exact Or.inl List.mem_cons_self
+    · rcases hl j hj with h | h
+      · exact Or.inl (List.mem_cons_of_mem _ h)
+      · exact Or.inr h
+  obtain ⟨l, ok⟩ := it
+  cases l with
+  | LInstr => exact ⟨hp, fun j hj => absurd hj List.not_mem_nil, hc⟩
+  | LRegW rd srcs =>
+    refine ⟨fun r j hj => ?_, hl, hc⟩
+    simp only [dstep, dprovSet] at hj ⊢
+    by_cases hr : r = rd
+    · rw [if_pos hr] at hj ⊢; exact dsrcsPosUp P a b srcs j h' hj
+    · rw [if_neg hr] at hj ⊢; exact hp r j hj
+  | LCtrl srcs =>
+    refine ⟨hp, hl, fun j hj => ?_⟩
+    simp only [dstep, List.mem_append] at hj ⊢
+    rcases hj with hj | hj
+    · rcases hc j hj with h | h
+      · exact Or.inl (Or.inl h)
+      · exact Or.inr h
+    · rcases dsrcsPosUp P a b srcs j h' hj with h | h
+      · exact Or.inl (Or.inr h)
+      · exact Or.inr h
+  | LLoad => cases ok with
+    | none => exact h'
+    | some k => exact hpush k
+  | LExLoad => cases ok with
+    | none => exact h'
+    | some k => exact hpush k
+  | LRmw => cases ok with
+    | none => exact h'
+    | some k => exact hpush k
+  | LStore => cases ok <;> exact h'
+  | LExStore => cases ok <;> exact h'
+  | LSilent => exact h'
+  | LDev => exact h'
+  | LFence => exact h'
+  | LIFetch => exact h'
+
+/-- Off the MMIO loads the old state equation holds verbatim (Rocq's `dstep_t_state`). -/
+theorem dstepTStateRam (s : DstateT) (it : Eitem) :
+    elbIsIoRd it.1 = false → dsOfT (dstepT s it).1 = (dstep (dsOfT s) it).1 := by
   intro h
   obtain ⟨l, ok⟩ := it
-  cases l <;> cases ok <;> simp only [dstep, List.not_mem_nil] at h <;>
-    exact dedgesWSup _ _ _ _ _ _ h
+  cases l
+  case LDev kd b vs asrc vsrc =>
+    cases kd <;> cases ok <;> first | rfl | (simp [elbIsIoRd] at h)
+  all_goals cases ok <;> rfl
 
-theorem dstepTSub (s : DstateT) (it : Eitem) (j k : Nat) (tg : Dtag) :
-    ((j, k), tg) ∈ (dstepT s it).2 → tg = DTdata ∨ tg = DTctrl ∨ tg = DTtrans →
-    (j, k) ∈ (dstep (dsOfT s) it).2 := by
-  intro h htg
+/-- **`dstepTState`, restated (W13 (F-dep) (3) [R38.2])**: one step keeps the untagged state below
+the tagged one ... -/
+theorem dstepTState (a : Dstate) (s : DstateT) (it : Eitem) :
+    dsLe a (dsOfT s) → dsLe (dstep a it).1 (dsOfT (dstepT s it).1) := by
+  intro h
+  cases hio : elbIsIoRd it.1
+  · rw [dstepTStateRam s it hio]
+    exact dstepLe a (dsOfT s) it h
+  · obtain ⟨l, ok⟩ := it
+    cases l
+    case LDev kd b vs asrc vsrc =>
+      obtain ⟨hp, hl, hc⟩ := h
+      cases kd <;> cases ok
+      case rd.some k =>
+        exact ⟨hp, fun j hj => List.mem_cons_of_mem _ (hl j hj), hc⟩
+      all_goals exact ⟨hp, hl, hc⟩
+    all_goals simp [elbIsIoRd] at hio
+
+/-- ... and the tagged state above the untagged one only by MMIO-load positions. -/
+theorem dstepTStateUp (P : Nat → Prop) (a : Dstate) (s : DstateT) (it : Eitem) :
+    dsUp P a (dsOfT s) → (∀ k, it.2 = some k → elbIsIoRd it.1 = true → P k) →
+    dsUp P (dstep a it).1 (dsOfT (dstepT s it).1) := by
+  intro h hP
+  cases hio : elbIsIoRd it.1
+  · rw [dstepTStateRam s it hio]
+    exact dstepUp P a (dsOfT s) it h
+  · obtain ⟨l, ok⟩ := it
+    cases l
+    case LDev kd b vs asrc vsrc =>
+      obtain ⟨hp, hl, hc⟩ := h
+      cases kd <;> cases ok
+      case rd.some k =>
+        refine ⟨hp, fun j hj => ?_, hc⟩
+        rcases List.mem_cons.1 hj with rfl | hj
+        · exact Or.inr (hP _ rfl hio)
+        · exact hl j hj
+      all_goals exact ⟨hp, hl, hc⟩
+    all_goals simp [elbIsIoRd] at hio
+
+/-- (Lean-only) a write's edges target the write. -/
+theorem dedgesWSnd (s : DstateT) (k : Nat) (asrc vsrc : List Dsrc) (j k' : Nat) (tg : Dtag) :
+    ((j, k'), tg) ∈ dedgesW s k asrc vsrc → k' = k := by
+  simp only [dedgesW, List.mem_append, elemOfTagEdges]
+  rintro (⟨_, rfl, _⟩ | ⟨_, rfl, _⟩ | ⟨_, rfl, _⟩ | ⟨_, rfl, _⟩ | ⟨_, rfl, _⟩ | ⟨_, rfl, _⟩) <;> rfl
+
+theorem dstepTSup (a : Dstate) (s : DstateT) (it : Eitem) (j k : Nat) :
+    dsLe a (dsOfT s) → (j, k) ∈ (dstep a it).2 →
+    ∃ tg, ((j, k), tg) ∈ (dstepT s it).2 ∧ tg ≠ DTr13 := by
+  intro hle h
+  obtain ⟨l, ok⟩ := it
+  cases l <;> cases ok <;> simp only [dstep, List.not_mem_nil] at h <;>
+    exact dedgesWSup _ _ _ _ _ _ (dedgesLe _ _ _ _ _ _ _ hle h)
+
+theorem dstepTSub (P : Nat → Prop) (a : Dstate) (s : DstateT) (it : Eitem) (j k : Nat)
+    (tg : Dtag) :
+    dsUp P a (dsOfT s) → ((j, k), tg) ∈ (dstepT s it).2 →
+    tg = DTdata ∨ tg = DTctrl ∨ tg = DTtrans →
+    (j, k) ∈ (dstep a it).2 ∨ P j ∨ (it.2 = some k ∧ elbIsIoWr it.1 = true) := by
+  intro hup h htg
   have htg' : tg = DTaddr ∨ tg = DTdata ∨ tg = DTctrl ∨ tg = DTtrans := Or.inr htg
   have hnr : ¬ (tg = DTaddr ∨ tg = DTctx) := by
     rcases htg with rfl | rfl | rfl <;> decide
+  have hst : ∀ (k' : Nat) (asrc vsrc : List Dsrc), ((j, k), tg) ∈ dedgesW s k' asrc vsrc →
+      (j, k) ∈ dedges a k' asrc vsrc ∨ P j := fun k' asrc vsrc h =>
+    dedgesUp P a (dsOfT s) k' asrc vsrc j k hup (dedgesWSub _ _ _ _ _ _ _ h htg')
   obtain ⟨l, ok⟩ := it
-  cases l <;> cases ok <;> simp only [dstepT, List.not_mem_nil] at h <;>
-    first
+  cases l
+  case LDev kd b vs asrc vsrc =>
+    cases kd <;> cases ok <;> simp only [dstepT, List.not_mem_nil] at h
+    case rd.some k' => exact absurd (dedgesRTags _ _ _ _ _ _ h) hnr
+    case wr.some k' =>
+      exact Or.inr (Or.inr ⟨by rw [dedgesWSnd _ _ _ _ _ _ _ h], rfl⟩)
+  all_goals cases ok <;> simp only [dstepT, List.not_mem_nil] at h
+  all_goals first
     | exact absurd (dedgesRTags _ _ _ _ _ _ h) hnr
-    | exact dedgesWSub _ _ _ _ _ _ _ h htg'
+    | (rcases hst _ _ _ h with h' | h'
+       · exact Or.inl h'
+       · exact Or.inr (Or.inl h'))
 
-theorem dstepTAddr (s : DstateT) (it : Eitem) (j k : Nat) :
-    ((j, k), DTaddr) ∈ (dstepT s it).2 →
-    (j, k) ∈ (dstep (dsOfT s) it).2 ∨
-    (it.2 = some k ∧ elbIsR it.1 = true ∧ elbIsW it.1 = false) := by
-  intro h
+theorem dstepTAddr (P : Nat → Prop) (a : Dstate) (s : DstateT) (it : Eitem) (j k : Nat) :
+    dsUp P a (dsOfT s) → ((j, k), DTaddr) ∈ (dstepT s it).2 →
+    (j, k) ∈ (dstep a it).2 ∨ P j ∨
+    (it.2 = some k ∧ ((elbIsR it.1 = true ∧ elbIsW it.1 = false) ∨ elbIsIoRd it.1 = true ∨
+      elbIsIoWr it.1 = true)) := by
+  intro hup h
+  have hst : ∀ (k' : Nat) (asrc vsrc : List Dsrc), ((j, k), DTaddr) ∈ dedgesW s k' asrc vsrc →
+      (j, k) ∈ dedges a k' asrc vsrc ∨ P j := fun k' asrc vsrc h =>
+    dedgesUp P a (dsOfT s) k' asrc vsrc j k hup (dedgesWSub _ _ _ _ _ _ _ h (Or.inl rfl))
   obtain ⟨l, ok⟩ := it
-  cases l <;> cases ok <;> simp only [dstepT, List.not_mem_nil] at h <;>
-    first
-    | exact Or.inl (dedgesWSub _ _ _ _ _ _ _ h (Or.inl rfl))
-    | exact Or.inr ⟨by rw [dedgesRSnd _ _ _ _ _ _ h], rfl, rfl⟩
+  cases l
+  case LDev kd b vs asrc vsrc =>
+    cases kd <;> cases ok <;> simp only [dstepT, List.not_mem_nil] at h
+    case rd.some k' =>
+      exact Or.inr (Or.inr ⟨by rw [dedgesRSnd _ _ _ _ _ _ h], Or.inr (Or.inl rfl)⟩)
+    case wr.some k' =>
+      exact Or.inr (Or.inr ⟨by rw [dedgesWSnd _ _ _ _ _ _ _ h], Or.inr (Or.inr rfl)⟩)
+  all_goals cases ok <;> simp only [dstepT, List.not_mem_nil] at h
+  all_goals first
+    | exact Or.inr (Or.inr ⟨by rw [dedgesRSnd _ _ _ _ _ _ h], Or.inl ⟨rfl, rfl⟩⟩)
+    | (rcases hst _ _ _ h with h' | h'
+       · exact Or.inl h'
+       · exact Or.inr (Or.inl h'))
 
 theorem dstepTLt (s : DstateT) (it : Eitem) (j k : Nat) (tg : Dtag) :
     ((j, k), tg) ∈ (dstepT s it).2 → j < k := by
   intro h
   obtain ⟨l, ok⟩ := it
-  cases l <;> cases ok <;> simp only [dstepT, List.not_mem_nil] at h <;>
+  cases l
+  case LDev kd b vs asrc vsrc =>
+    cases kd <;> cases ok <;> simp only [dstepT, List.not_mem_nil] at h
+    case rd.some k' => exact dedgesRLt _ _ _ _ _ _ h
+    case wr.some k' => exact dedgesWLt _ _ _ _ _ _ _ h
+  all_goals cases ok <;> simp only [dstepT, List.not_mem_nil] at h <;>
     first
     | exact dedgesRLt _ _ _ _ _ _ h
     | exact dedgesWLt _ _ _ _ _ _ _ h
 
 /-! ## 4.3 The fold: the exact relation to `rowDeps` -/
 
-theorem rowDepsTAuxSup (s : DstateT) (es : List Eitem) (j k : Nat) :
-    (j, k) ∈ rowDepsAux (dsOfT s) es →
+theorem rowDepsTAuxSup (a : Dstate) (s : DstateT) (es : List Eitem) (j k : Nat) :
+    dsLe a (dsOfT s) → (j, k) ∈ rowDepsAux a es →
     ∃ tg, ((j, k), tg) ∈ rowDepsTAux s es ∧ tg ≠ DTr13 := by
-  induction es generalizing s with
-  | nil => intro h; exact absurd h List.not_mem_nil
+  induction es generalizing a s with
+  | nil => intro _ h; exact absurd h List.not_mem_nil
   | cons it es ih =>
-    intro h
+    intro hle h
     simp only [rowDepsAux, List.mem_append] at h
     simp only [rowDepsTAux, List.mem_append]
     rcases h with h | h
-    · obtain ⟨tg, hin, hne⟩ := dstepTSup s it j k h
+    · obtain ⟨tg, hin, hne⟩ := dstepTSup a s it j k hle h
       exact ⟨tg, Or.inl hin, hne⟩
-    · rw [← dstepTState] at h
-      obtain ⟨tg, hin, hne⟩ := ih _ h
+    · obtain ⟨tg, hin, hne⟩ := ih _ _ (dstepTState a s it hle) h
       exact ⟨tg, Or.inr hin, hne⟩
 
-theorem rowDepsTAuxSub (s : DstateT) (es : List Eitem) (j k : Nat) (tg : Dtag) :
+theorem rowDepsTAuxSub (P : Nat → Prop) (a : Dstate) (s : DstateT) (es : List Eitem) (j k : Nat)
+    (tg : Dtag) :
+    dsUp P a (dsOfT s) → (∀ it, it ∈ es → ∀ k, it.2 = some k → elbIsIoRd it.1 = true → P k) →
     ((j, k), tg) ∈ rowDepsTAux s es → tg = DTdata ∨ tg = DTctrl ∨ tg = DTtrans →
-    (j, k) ∈ rowDepsAux (dsOfT s) es := by
-  induction es generalizing s with
-  | nil => intro h; exact absurd h List.not_mem_nil
+    (j, k) ∈ rowDepsAux a es ∨ P j ∨ ∃ it, it ∈ es ∧ it.2 = some k ∧ elbIsIoWr it.1 = true := by
+  induction es generalizing a s with
+  | nil => intro _ _ h; exact absurd h List.not_mem_nil
   | cons it es ih =>
-    intro h htg
+    intro hup hP h htg
     simp only [rowDepsTAux, List.mem_append] at h
     simp only [rowDepsAux, List.mem_append]
     rcases h with h | h
-    · exact Or.inl (dstepTSub s it j k tg h htg)
-    · right
-      rw [← dstepTState]
-      exact ih _ h htg
-
-theorem rowDepsTAuxAddr (s : DstateT) (es : List Eitem) (j k : Nat) :
-    ((j, k), DTaddr) ∈ rowDepsTAux s es →
-    (j, k) ∈ rowDepsAux (dsOfT s) es ∨
-    ∃ it, it ∈ es ∧ it.2 = some k ∧ elbIsR it.1 = true ∧ elbIsW it.1 = false := by
-  induction es generalizing s with
-  | nil => intro h; exact absurd h List.not_mem_nil
-  | cons it es ih =>
-    intro h
-    simp only [rowDepsTAux, List.mem_append] at h
-    simp only [rowDepsAux, List.mem_append]
-    rcases h with h | h
-    · rcases dstepTAddr s it j k h with h' | h'
+    · rcases dstepTSub P a s it j k tg hup h htg with h' | h' | h'
       · exact Or.inl (Or.inl h')
-      · exact Or.inr ⟨it, List.mem_cons_self .., h'⟩
-    · rcases ih _ h with h' | ⟨it0, hin, h'⟩
-      · rw [dstepTState] at h'
-        exact Or.inl (Or.inr h')
-      · exact Or.inr ⟨it0, List.mem_cons_of_mem _ hin, h'⟩
+      · exact Or.inr (Or.inl h')
+      · exact Or.inr (Or.inr ⟨it, List.mem_cons_self, h'⟩)
+    · rcases ih _ _ (dstepTStateUp P a s it hup (hP it List.mem_cons_self))
+        (fun it' h' => hP it' (List.mem_cons_of_mem _ h')) h htg with h' | h' | ⟨it', hin, h'⟩
+      · exact Or.inl (Or.inr h')
+      · exact Or.inr (Or.inl h')
+      · exact Or.inr (Or.inr ⟨it', List.mem_cons_of_mem _ hin, h'⟩)
+
+theorem rowDepsTAuxAddr (P : Nat → Prop) (a : Dstate) (s : DstateT) (es : List Eitem)
+    (j k : Nat) :
+    dsUp P a (dsOfT s) → (∀ it, it ∈ es → ∀ k, it.2 = some k → elbIsIoRd it.1 = true → P k) →
+    ((j, k), DTaddr) ∈ rowDepsTAux s es →
+    (j, k) ∈ rowDepsAux a es ∨ P j ∨
+    ∃ it, it ∈ es ∧ it.2 = some k ∧ ((elbIsR it.1 = true ∧ elbIsW it.1 = false) ∨
+      elbIsIoRd it.1 = true ∨ elbIsIoWr it.1 = true) := by
+  induction es generalizing a s with
+  | nil => intro _ _ h; exact absurd h List.not_mem_nil
+  | cons it es ih =>
+    intro hup hP h
+    simp only [rowDepsTAux, List.mem_append] at h
+    simp only [rowDepsAux, List.mem_append]
+    rcases h with h | h
+    · rcases dstepTAddr P a s it j k hup h with h' | h' | h'
+      · exact Or.inl (Or.inl h')
+      · exact Or.inr (Or.inl h')
+      · exact Or.inr (Or.inr ⟨it, List.mem_cons_self, h'⟩)
+    · rcases ih _ _ (dstepTStateUp P a s it hup (hP it List.mem_cons_self))
+        (fun it' h' => hP it' (List.mem_cons_of_mem _ h')) h with h' | h' | ⟨it', hin, h'⟩
+      · exact Or.inl (Or.inr h')
+      · exact Or.inr (Or.inl h')
+      · exact Or.inr (Or.inr ⟨it', List.mem_cons_of_mem _ hin, h'⟩)
+
+theorem dsLeInit : dsLe dsInit (dsOfT dtInit) :=
+  ⟨fun _ _ h => h, fun _ h => h, fun _ h => h⟩
+
+theorem dsUpInit (P : Nat → Prop) : dsUp P dsInit (dsOfT dtInit) :=
+  ⟨fun _ _ h => Or.inl h, fun _ h => Or.inl h, fun _ h => Or.inl h⟩
 
 /-- (A) Every tree edge is a tagged edge, and its tag is not `DTr13`. -/
 theorem rowDepsSubT (es : List Eitem) (j k : Nat) :
     (j, k) ∈ rowDeps es → ∃ tg, ((j, k), tg) ∈ rowDepsT es ∧ tg ≠ DTr13 :=
-  rowDepsTAuxSup dtInit es j k
+  rowDepsTAuxSup dsInit dtInit es j k dsLeInit
 
-/-- (B) A `DTdata`/`DTctrl`/`DTtrans` edge is exactly a tree edge. -/
+/-- (B) A `DTdata`/`DTctrl`/`DTtrans` edge is a tree edge, or (W13 (F-dep) (3)) it leaves an
+MMIO load or enters an MMIO store — the RAM-read → RAM-write edges are exactly the tree's. -/
 theorem rowDepsTSub (es : List Eitem) (j k : Nat) (tg : Dtag) :
     ((j, k), tg) ∈ rowDepsT es → tg = DTdata ∨ tg = DTctrl ∨ tg = DTtrans →
-    (j, k) ∈ rowDeps es :=
-  rowDepsTAuxSub dtInit es j k tg
+    (j, k) ∈ rowDeps es ∨ ioRdPos es j ∨
+    ∃ it, it ∈ es ∧ it.2 = some k ∧ elbIsIoWr it.1 = true :=
+  rowDepsTAuxSub (ioRdPos es) dsInit dtInit es j k tg (dsUpInit _)
+    (fun it hit k hk hio => ⟨it, hit, hk, hio⟩)
 
-/-- (C) A `DTaddr` edge is a tree edge or targets a pure READ item (rule 9's load half — what
-the tree drops). -/
+/-- (C) A `DTaddr` edge is a tree edge, targets a pure READ item (rule 9's load half — what the
+tree drops) or (W13 (F-dep) (3)) an MMIO item, or leaves an MMIO load. -/
 theorem rowDepsTAddr (es : List Eitem) (j k : Nat) :
     ((j, k), DTaddr) ∈ rowDepsT es →
-    (j, k) ∈ rowDeps es ∨
-    ∃ it, it ∈ es ∧ it.2 = some k ∧ elbIsR it.1 = true ∧ elbIsW it.1 = false :=
-  rowDepsTAuxAddr dtInit es j k
+    (j, k) ∈ rowDeps es ∨ ioRdPos es j ∨
+    ∃ it, it ∈ es ∧ it.2 = some k ∧ ((elbIsR it.1 = true ∧ elbIsW it.1 = false) ∨
+      elbIsIoRd it.1 = true ∨ elbIsIoWr it.1 = true) :=
+  rowDepsTAuxAddr (ioRdPos es) dsInit dtInit es j k (dsUpInit _)
+    (fun it hit k hk hio => ⟨it, hit, hk, hio⟩)
 
 /-- Shape: every edge climbs the row. -/
 theorem rowDepsTLt (es : List Eitem) (j k : Nat) (tg : Dtag) :
@@ -776,8 +1251,8 @@ theorem rowDepsCtxGap : rowDeps esCtx = [] := by decide
 def gtdepsWfB (G : Gexec) (deps : List Tdep) : Bool :=
   deps.all (fun e : Tdep =>
     decide (e.1.1.1 = e.1.2.1) && decide (e.1.1.2 < e.1.2.2) &&
-    glblB G e.1.1 lbIsR &&
-    (if dtagW e.2 then glblB G e.1.2 lbIsW else glblB G e.1.2 lbIsMem))
+    glblB G e.1.1 lbIsRT &&
+    (if dtagW e.2 then glblB G e.1.2 lbIsWT else glblB G e.1.2 lbIsMem))
 
 theorem glblMemGmem (G : Gexec) (e : Geid) : glblIs G e lbIsMem → gmem G e := fun h => h
 
@@ -802,29 +1277,49 @@ theorem gtdepsGmoBSound (G : Gexec) (deps : List Tdep) :
   intro H e he
   exact (gmoLtBSpec _ _ _).1 (H e he)
 
+/-- The checker for `gtdepsRdOk`; it accepts only graphs whose dropped edges include no
+addr/data edge into a RAM write (so the rule-12 clause holds vacuously). -/
 def gtdepsRdOkB (G : Gexec) (deps : List Tdep) : Bool :=
   deps.all (fun e : Tdep =>
-    !(!(gisW G e.1.2)) ||
+    (gisRd G e.1.1 && gisW G e.1.2) ||
       (decide (e.1.1.1 = e.1.2.1) && decide (e.1.1.2 < e.1.2.2) &&
-       glblB G e.1.1 lbIsR && !(dtagW e.2) &&
-       glblB G e.1.2 lbIsMem && gmoLtB G e.1.1 e.1.2))
+       glblB G e.1.1 lbIsRT &&
+       (if dtagW e.2 then glblB G e.1.2 lbIsWT else glblB G e.1.2 lbIsMem) &&
+       gmoLtB G e.1.1 e.1.2 && !(dtagAd e.2 && gisW G e.1.2)))
 
 theorem gtdepsRdOkBSound (GT : GdexecT) :
     gtdepsRdOkB GT.gtG GT.gtDeps = true → gtdepsRdOk GT := by
   rw [gtdepsRdOkB, forallbForallTrue]
-  intro H e he hw
+  intro H e he hb
   have h := H e he
-  rw [hw] at h
-  simp only [Bool.not_false, Bool.not_true, Bool.false_or, Bool.and_eq_true,
-    decide_eq_true_eq, Bool.not_eq_true'] at h
+  rw [hb] at h
+  simp only [Bool.false_or, Bool.and_eq_true, decide_eq_true_eq, Bool.not_eq_true'] at h
   obtain ⟨⟨⟨⟨⟨h1, h2⟩, h3⟩, h4⟩, h5⟩, h6⟩ := h
-  exact ⟨h1, h2, (glblBSpec _ _ _).1 h3, h4, glblMemGmem _ _ ((glblBSpec _ _ _).1 h5),
-    (gmoLtBSpec _ _ _).1 h6⟩
+  refine ⟨h1, h2, (glblBSpec _ _ _).1 h3, ?_, (gmoLtBSpec _ _ _).1 h5, fun h7 => ?_⟩
+  · split
+    · next hw => rw [if_pos hw] at h4; exact (glblBSpec _ _ _).1 h4
+    · next hw => rw [if_neg hw] at h4; exact glblMemGmem _ _ ((glblBSpec _ _ _).1 h4)
+  · rw [h6] at h7; cases h7
+
+/-- (Lean-only, W13 (F-dep) (0e)) the endpoints of a `gppoCatT` edge are events
+(`AxGraphCat.gppoCatEvents` over the full addr/data projection, from `gtdepsWf`). -/
+theorem gppoCatTEvents (GT : GdexecT) (e1 e2 : Geid) :
+    gtdepsWf GT.gtG GT.gtDeps → gppoCatT GT e1 e2 →
+    e1 ∈ gevents GT.gtG ∧ e2 ∈ gevents GT.gtG := by
+  rintro hdw (h | h)
+  · obtain ⟨_, _, h1, h2⟩ := gppoCat6Gpo _ _ _ h
+    exact ⟨(geventsSpec _ _).2 h1, (geventsSpec _ _).2 h2⟩
+  · obtain ⟨_, m, hd, a, t, v, hrd, _⟩ := h
+    obtain ⟨tg, hin, _, _⟩ := (elemOfGtAdFull _ _ _ _).1 hd
+    obtain ⟨_, _, ⟨l, hl, _⟩, _⟩ := hdw _ hin
+    obtain ⟨l', _, _, _, _, hl', _⟩ := hrd
+    exact ⟨(geventsSpec _ _).2 (by simp [hl]),
+      (geventsSpec _ _).2 (by rw [show gxLbl GT.gtG e2 = some l' from hl']; rfl)⟩
 
 def catTConsistentB (GT : GdexecT) : Bool :=
   gwfB GT.gtG && gloadValueB GT.gtG && gatomB GT.gtG &&
   gtdepsWfB GT.gtG GT.gtDeps && gtdepsGmoB GT.gtG GT.gtDeps &&
-  ppoGmoB (gppoCatB (gtAdGd GT)) GT.gtG
+  ppoGmoB (gppoCatB (gtAdFullGd GT)) GT.gtG
 
 theorem catTConsistentBSound (GT : GdexecT) :
     catTConsistentB GT = true → rvwmoCatConsistentT GT := by
@@ -832,7 +1327,9 @@ theorem catTConsistentBSound (GT : GdexecT) :
   simp only [Bool.and_eq_true]
   rintro ⟨⟨⟨⟨⟨hwf, hlv⟩, hat⟩, hdw⟩, hdg⟩, hppo⟩
   have hdw' := gtdepsWfBSound _ _ hdw
-  exact ⟨gwfBSound _ hwf, gppoCatGmoBSound (gtAdGd GT) (gtdepsWfAd _ _ hdw') hppo,
+  exact ⟨gwfBSound _ hwf,
+    ppoGmoBSound _ (gppoCatT GT) GT.gtG (gppoCatBSpec (gtAdFullGd GT))
+      (fun x y h => gppoCatTEvents GT x y hdw' h) hppo,
     gloadValueBSound _ hlv, gatomBSound _ hat, hdw', gtdepsGmoBSound _ _ hdg⟩
 
 /-! ## 5.1 The witness
@@ -889,7 +1386,7 @@ theorem twR12Edge :
     grfAt AxDeps.tw.gtG 0 (1, 1) (1, 2) := by
   refine ⟨(gppo12BSpec _ _ _ _).1 (by decide +kernel), fun H => ?_,
     (grfAtBSpec _ _ _ _).1 (by decide +kernel)⟩
-  have hf : gppo12B AxDeps.tw.gtG (gtAd AxDeps.tw.gtG AxDeps.tw.gtDeps) (1, 0) (1, 2) = false := by
+  have hf : gppo12B AxDeps.tw.gtG (gtAdFull AxDeps.tw.gtG AxDeps.tw.gtDeps) (1, 0) (1, 2) = false := by
     decide +kernel
   have ht := (gppo12BSpec _ _ _ _).2 H
   rw [hf] at ht
@@ -911,5 +1408,48 @@ theorem tw2CatT : rvwmoCatConsistentT tw2 :=
 
 /-- ... and the checker agrees. -/
 theorem tw2CatTB : catTConsistentB tw2 = true := by decide +kernel
+
+/-! ## 5.2 W13 (F-dep): the I/O dependency edges, emitted and SATISFIABLE (by computation)
+
+The PERMANENT smoke test [R38.1]: the check that would have caught the gap (with the RAM-only
+`gtdepsWf`, no graph carrying these edges is `rvwmoCatConsistentT`).  `esIo` is the shape of
+`uartputc_sync`'s poll-then-transmit (`0x800009ec`…`0x800009fa`) plus a RAM store of the polled
+value: an MMIO LOAD (LSR) branched on, a RAM load (the tx byte), the MMIO STORE (THR) — DATA from
+the RAM load, CTRL from the MMIO load — and a RAM store with DATA and CTRL from the MMIO load.
+The tree's fold records NOTHING (`dstep` is inert on `LDev`); the tagged one records all four. -/
+
+def esIo : List Eitem :=
+  [ (LInstr, none), (LDev .rd 5 [0#8] [] [], some 0),
+    (LRegW 10 [.DLdRes], none), (LCtrl [.DReg 10], none),
+    (LInstr, none), (LLoad false false 8 [(0, 0#8)] [], some 1),
+    (LRegW 11 [.DLdRes], none),
+    (LInstr, none), (LDev .wr 0 [0#8] [] [.DReg 11], some 2),
+    (LInstr, none), (LStore false 16 [0#8] [] [.DReg 10], some 3) ]
+
+theorem rowDepsTIo :
+    rowDepsT esIo =
+      [((1, 2), DTdata), ((0, 2), DTctrl), ((0, 3), DTdata), ((0, 3), DTctrl)] := by decide
+
+theorem rowDepsIoGap : rowDeps esIo = [] := by decide
+
+/-- The one-hart graph of `esIo` (hart 0; I/O events are `Lbl.LIo`), its deps EXACTLY the tagged
+fold's (hart-indexed), gmo = program order. -/
+def ioProg : List (List Lbl) :=
+  [[Lbl.LIo .rd 5 [b0], Lbl.LLoad false 8 [0] [b0], Lbl.LIo .wr 0 [b0],
+    Lbl.LStore false 16 [b0] .WCplain]]
+
+def ioGt : GdexecT :=
+  mkgt ioProg [(0, 0), (0, 1), (0, 2), (0, 3)]
+    ((rowDepsT esIo).map (fun e => (((0, e.1.1), (0, e.1.2)), e.2)))
+
+/-- THE SMOKE TEST: the tagged well-formedness accepts the I/O-endpoint edges ... -/
+theorem ioGtDepsWfB : gtdepsWfB ioGt.gtG ioGt.gtDeps = true := by decide +kernel
+
+/-- ... and the whole tagged model is satisfiable on the I/O-active graph. -/
+theorem ioGtCatT : rvwmoCatConsistentT ioGt :=
+  catTConsistentBSound _ (by decide +kernel)
+
+/-- `forget` drops every I/O-endpoint edge (the chain sees none of them — sound). -/
+theorem ioGtForgetDeps : (forget ioGt).gdDeps = [] := by decide +kernel
 
 end Weak

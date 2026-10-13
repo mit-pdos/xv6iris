@@ -228,7 +228,8 @@ def shapesOkB (rows : List (List Lbl)) : Bool := rows.all (fun r => r.all shapeI
 def itemOkB (rows : List (List Lbl)) (i : Nat) (it : Eitem) : Bool :=
   match it.2 with
   | none => true
-  | some k => (!elbIsR it.1 || isAt rows lbIsR i k) && (!elbIsW it.1 || isAt rows lbIsW i k)
+  | some k => !elbIsIoRd it.1 && !elbIsIoWr it.1 &&
+      (!elbIsR it.1 || isAt rows lbIsR i k) && (!elbIsW it.1 || isAt rows lbIsW i k)
 
 def emsOkB (rows : List (List Lbl)) (ems : List (List Eitem)) : Bool :=
   (ems.mapIdx (·, ·)).all (fun ies : Nat × List Eitem => ies.2.all (itemOkB rows ies.1))
@@ -1233,7 +1234,15 @@ theorem dinvStep (s : DstateT) (it : Eitem) :
     fun asrc => ⟨hp, hl, hc, fun j => dinvAcc rows i s asrc j hd⟩
   cases l with
   | LSilent => exact hd
-  | LDev => exact hd
+  | LDev kd =>
+    -- W13 (F-dep) (2): an SC-run emission has no positioned MMIO item (`itemOkB`)
+    cases ko with
+    | none => cases kd <;> exact hd
+    | some k =>
+      cases kd
+      · simp [itemOkB, elbIsIoRd] at hok
+      · simp [itemOkB, elbIsIoRd, elbIsIoWr] at hok
+      · exact hd
   | LFence => exact hd
   | LIFetch => exact hd
   | LInstr =>
@@ -1257,21 +1266,21 @@ theorem dinvStep (s : DstateT) (it : Eitem) :
     cases ko with
     | none => exact hd
     | some k =>
-      simp only [itemOkB, elbIsR, elbIsW, Bool.not_true, Bool.false_or, Bool.not_false,
+      simp only [itemOkB, elbIsIoRd, elbIsIoWr, Bool.not_false, Bool.true_and, elbIsR, elbIsW, Bool.not_true, Bool.false_or, Bool.not_false,
         Bool.true_or, Bool.and_true] at hok
       exact hload k _ hok
   | LExLoad =>
     cases ko with
     | none => exact hd
     | some k =>
-      simp only [itemOkB, elbIsR, elbIsW, Bool.not_true, Bool.false_or, Bool.not_false,
+      simp only [itemOkB, elbIsIoRd, elbIsIoWr, Bool.not_false, Bool.true_and, elbIsR, elbIsW, Bool.not_true, Bool.false_or, Bool.not_false,
         Bool.true_or, Bool.and_true] at hok
       exact hload k _ hok
   | LRmw =>
     cases ko with
     | none => exact hd
     | some k =>
-      simp only [itemOkB, elbIsR, elbIsW, Bool.not_true, Bool.false_or, Bool.and_eq_true] at hok
+      simp only [itemOkB, elbIsIoRd, elbIsIoWr, Bool.not_false, Bool.true_and, elbIsR, elbIsW, Bool.not_true, Bool.false_or, Bool.and_eq_true] at hok
       exact hload k _ hok.1
   | LStore =>
     cases ko with
@@ -1313,24 +1322,29 @@ theorem dstepEdge (s : DstateT) (it : Eitem) (j k : Nat) (tg : Dtag) :
       · exact isAtWMem rows i k hw
     cases l with
     | LLoad =>
-      simp only [itemOkB, elbIsR, elbIsW, Bool.not_true, Bool.false_or, Bool.not_false,
+      simp only [itemOkB, elbIsIoRd, elbIsIoWr, Bool.not_false, Bool.true_and, elbIsR, elbIsW, Bool.not_true, Bool.false_or, Bool.not_false,
         Bool.true_or, Bool.and_true] at hok
       exact hR _ hin hok
     | LExLoad =>
-      simp only [itemOkB, elbIsR, elbIsW, Bool.not_true, Bool.false_or, Bool.not_false,
+      simp only [itemOkB, elbIsIoRd, elbIsIoWr, Bool.not_false, Bool.true_and, elbIsR, elbIsW, Bool.not_true, Bool.false_or, Bool.not_false,
         Bool.true_or, Bool.and_true] at hok
       exact hR _ hin hok
     | LStore =>
-      simp only [itemOkB, elbIsR, elbIsW, Bool.not_true, Bool.false_or, Bool.not_false,
+      simp only [itemOkB, elbIsIoRd, elbIsIoWr, Bool.not_false, Bool.true_and, elbIsR, elbIsW, Bool.not_true, Bool.false_or, Bool.not_false,
         Bool.true_or, Bool.true_and] at hok
       exact hW _ _ hin hok
     | LExStore =>
-      simp only [itemOkB, elbIsR, elbIsW, Bool.not_true, Bool.false_or, Bool.not_false,
+      simp only [itemOkB, elbIsIoRd, elbIsIoWr, Bool.not_false, Bool.true_and, elbIsR, elbIsW, Bool.not_true, Bool.false_or, Bool.not_false,
         Bool.true_or, Bool.true_and] at hok
       exact hW _ _ hin hok
     | LRmw =>
-      simp only [itemOkB, elbIsR, elbIsW, Bool.not_true, Bool.false_or, Bool.and_eq_true] at hok
+      simp only [itemOkB, elbIsIoRd, elbIsIoWr, Bool.not_false, Bool.true_and, elbIsR, elbIsW, Bool.not_true, Bool.false_or, Bool.and_eq_true] at hok
       exact hW _ _ hin hok.2
+    | LDev kd =>
+      cases kd
+      · simp [itemOkB, elbIsIoRd] at hok
+      · simp [itemOkB, elbIsIoRd, elbIsIoWr] at hok
+      · simp [dstepT] at hin
     | _ => simp [dstepT] at hin
 
 theorem rowEdges (s : DstateT) (es : List Eitem) (j k : Nat) (tg : Dtag) :
@@ -1359,13 +1373,13 @@ theorem gDepsWf (img : Int → BitVec 8) (rows : List (List Lbl)) (il : List Gei
   have hlt := rowDepsTLt es j k tg hdd
   obtain ⟨hr, ht⟩ := rowEdges rows i dtInit es j k tg (dinvInit rows i)
     (emsOkItems _ _ _ _ hems hes) hdd
-  refine ⟨rfl, hlt, (glblIsAt img rows il ems lbIsR (i, j) kindR).2 hr, ?_⟩
+  refine ⟨rfl, hlt, glblIsRTOfR _ _ ((glblIsAt img rows il ems lbIsR (i, j) kindR).2 hr), ?_⟩
   simp only
   cases htg : dtagW tg
   · simp only [htg, Bool.false_eq_true, if_false] at ht ⊢
     exact (gmemAt img rows il ems (i, k)).2 ht
   · simp only [htg, if_true] at ht ⊢
-    exact (glblIsAt img rows il ems lbIsW (i, k) kindW).2 ht
+    exact glblIsWTOfW _ _ ((glblIsAt img rows il ems lbIsW (i, k) kindW).2 ht)
 
 /-! # 8. THE CAPSTONES (i): SC, hence the tagged model -/
 
@@ -1398,6 +1412,11 @@ theorem dstepTTgt (s : DstateT) (it : Eitem) (j k : Nat) (tg : Dtag) :
     | LStore => rw [(AxScRun.dedgesWMem _ _ _ _ _ _ _ h).1]
     | LExStore => rw [(AxScRun.dedgesWMem _ _ _ _ _ _ _ h).1]
     | LRmw => rw [(AxScRun.dedgesWMem _ _ _ _ _ _ _ h).1]
+    | LDev kd =>
+      cases kd
+      · rw [(AxScRun.dedgesRMem _ _ _ _ _ _ h).1]
+      · rw [(AxScRun.dedgesWMem _ _ _ _ _ _ _ h).1]
+      · simp [dstepT] at h
     | _ => simp [dstepT] at h
 
 theorem rowTgt (s : DstateT) (es : List Eitem) (j k : Nat) (tg : Dtag) :

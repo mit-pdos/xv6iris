@@ -156,9 +156,9 @@ theorem scTdepsGmo (G : Gexec) (D : List Tdep) : scPoGmo G → gtdepsWf G D → 
   obtain ⟨hag, hlt, hr, htg⟩ := hdw d hd
   have hm2 : gmem G d.1.2 := by
     split at htg
-    · exact WeakRvwmoGraph.glblIsWGmem _ _ htg
+    · exact glblIsWTGmem _ _ htg
     · exact htg
-  refine hpo _ _ ⟨hag, hlt, ?_, ?_⟩ (WeakRvwmoGraph.glblIsRGmem _ _ hr) hm2
+  refine hpo _ _ ⟨hag, hlt, ?_, ?_⟩ (glblIsRTGmem _ _ hr) hm2
   · obtain ⟨l, hl, _⟩ := hr
     rw [hl]; rfl
   · obtain ⟨l, hl, _⟩ := hm2
@@ -172,7 +172,7 @@ theorem scPpo (GT : GdexecT) :
     obtain ⟨hm1, hm2⟩ := gppoGmem _ _ _ (gppoCat6Gppo _ _ _ hlv h6)
     exact hpo _ _ (gppoCat6Gpo _ _ _ h6) hm1 hm2
   · obtain ⟨_, m, had, a, t, v, hrd, hat⟩ := h12
-    obtain ⟨tg, hin, _, _⟩ := (elemOfGtAd _ _ _ _).1 had
+    obtain ⟨tg, hin, _, _⟩ := (elemOfGtAdFull _ _ _ _).1 had
     have hdm := scTdepsGmo _ _ hpo hdw _ hin
     obtain ⟨hsrc, _⟩ := hrf e2 a t v hrd
     cases t with
@@ -323,7 +323,7 @@ theorem dstepTCtlMono (s : DstateT) (it : Eitem) (j : Nat) :
     j ∈ s.dtCtl → j ∈ (dstepT s it).1.dtCtl := by
   intro h
   obtain ⟨l, ok⟩ := it
-  cases l <;> cases ok <;> simp [dstepT, h]
+  cases l <;> cases ok <;> simp [dstepT, h] <;> split <;> simp [h]
 
 theorem dtFinCtlMono (s : DstateT) (es : List Eitem) (j : Nat) :
     j ∈ s.dtCtl → j ∈ (dtFin s es).dtCtl := by
@@ -335,7 +335,11 @@ theorem dtFinCtlMono (s : DstateT) (es : List Eitem) (j : Nat) :
 theorem dstepTCtrlSrc (s : DstateT) (it : Eitem) (j k : Nat) :
     ((j, k), DTctrl) ∈ (dstepT s it).2 → j ∈ s.dtCtl := by
   obtain ⟨l, ok⟩ := it
-  cases l <;> cases ok <;>
+  cases l
+  case LDev kd b vs asrc vsrc =>
+    cases kd <;> cases ok <;>
+      simp [dstepT, dedgesR, dedgesW, elemOfTagEdges] <;> intros <;> assumption
+  all_goals cases ok <;>
     simp [dstepT, dedgesR, dedgesW, elemOfTagEdges] <;> intros <;> assumption
 
 theorem rowDepsTAuxCtrlSrc (s : DstateT) (es : List Eitem) (j k : Nat) :

@@ -87,7 +87,7 @@ dummy default.
    `DWriteDev` store / skip / abort), so Rocq's `hemitfStates` family -- stated for an ARBITRARY
    start -- is FALSE for a device-active disk row.  (b) `hemitfStatesQ`, `hemitfStates`,
    `hartConffStatesQ`, `hartConffStates`, `hartConfNoGap` take the QUIET-ROW hypothesis
-   `devQuiet p ∧ (∀ dp, p = .PDisk dp → ∀ kd ba bs, LDev kd ba bs ∉ labels)` (a hart row is
+   `devQuiet p ∧ (∀ dp, p = .PDisk dp → ∀ kd ba bs sa sv, LDev kd ba bs sa sv ∉ labels)` (a hart row is
    unconstrained; a disk row must be `LDev`-free), carried by the induction through the
    Lean-only `WeakRvwmoFab.quietStep` / `WeakRvwmoFab.quietAdm`; (a) `gfexecConf` gains the
    INTERIM per-row clause `boot i = .PDisk dp → emDevfree em` (DELETED BY W13 (I); until then
@@ -165,23 +165,23 @@ def lbIsdev (l : Wlabel) : Bool :=
   | LDev .. => true
   | _ => false
 
-theorem lbIsdevNe (l : Wlabel) : lbIsdev l = false → ∀ kd ba bs, l ≠ LDev kd ba bs := by
-  intro h kd ba bs he; subst he; simp [lbIsdev] at h
+theorem lbIsdevNe (l : Wlabel) : lbIsdev l = false → ∀ kd ba bs sa sv, l ≠ LDev kd ba bs sa sv := by
+  intro h kd ba bs sa sv he; subst he; simp [lbIsdev] at h
 
 def hasDev (ls : List Wlabel) : Bool :=
   match ls with
   | [] => false
   | l :: ls' => lbIsdev l || hasDev ls'
 
-theorem hasDevFalse (ls : List Wlabel) : hasDev ls = false → ∀ kd ba bs, LDev kd ba bs ∉ ls := by
+theorem hasDevFalse (ls : List Wlabel) : hasDev ls = false → ∀ kd ba bs sa sv, LDev kd ba bs sa sv ∉ ls := by
   induction ls with
-  | nil => intro _ _ _ _ h; simp at h
+  | nil => intro _ _ _ _ _ _ h; simp at h
   | cons l ls ih =>
-    intro h kd ba bs hin
+    intro h kd ba bs sa sv hin
     obtain ⟨hl, hls⟩ := orbFalseSplit _ _ h
     rcases List.mem_cons.1 hin with he | hin'
     · rw [← he] at hl; simp [lbIsdev] at hl
-    · exact ih hls kd ba bs hin'
+    · exact ih hls kd ba bs sa sv hin'
 
 /-- An administrative item belongs to the block of the NEAREST TAGGED ITEM AT OR AFTER IT;
 `pend` = "an `LDev` has been seen since the last tagged item". -/
@@ -226,16 +226,16 @@ theorem emDevTagNe (pend : Bool) (ls : List Wlabel) (l : Wlabel) (k n : Nat) (es
 
 /-- An `LDev`-free item list has no dev block. -/
 theorem emDevDevfree (k : Nat) (es : List Eitem) :
-    (∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst) → emDev false k es = false := by
+    (∀ kd ba bs sa sv, LDev kd ba bs sa sv ∉ es.map Prod.fst) → emDev false k es = false := by
   induction es with
   | nil => intro _; rfl
   | cons it es ih =>
     intro hnd
     obtain ⟨l, o⟩ := it
     have hl : lbIsdev l = false := by
-      cases l <;> first | rfl | exact absurd (List.mem_cons_self ..) (hnd _ _ _)
-    have hrest : ∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst :=
-      fun kd ba bs hin => hnd kd ba bs (List.mem_cons_of_mem _ hin)
+      cases l <;> first | rfl | exact absurd (List.mem_cons_self ..) (hnd _ _ _ _ _)
+    have hrest : ∀ kd ba bs sa sv, LDev kd ba bs sa sv ∉ es.map Prod.fst :=
+      fun kd ba bs sa sv hin => hnd kd ba bs sa sv (List.mem_cons_of_mem _ hin)
     cases o with
     | some j =>
       show (if j = k then _ else _) = false
@@ -335,16 +335,16 @@ contact-free. -/
 theorem WeakRvwmoFab.admRunTFalse (instr : Bool) (p : Pexv6) (d : Efab) (ls : List Wlabel)
     (p' : Pexv6) (d' : Efab) (b : Bool) :
     WeakRvwmoFab.admRunT instr p d ls p' d' b → devQuiet p →
-    (∀ kd ba bs, LDev kd ba bs ∉ ls) → b = false := by
+    (∀ kd ba bs sa sv, LDev kd ba bs sa sv ∉ ls) → b = false := by
   intro h
   induction h with
   | ATnil => intro _ _; rfl
   | ATcons p d l p1 d1 ls p' d' b _ hs _ ih =>
     intro hq hnd
-    have hne : ∀ kd ba bs, l ≠ LDev kd ba bs := fun kd ba bs he => hnd kd ba bs (by simp [he])
+    have hne : ∀ kd ba bs sa sv, l ≠ LDev kd ba bs sa sv := fun kd ba bs sa sv he => hnd kd ba bs sa sv (by simp [he])
     have h1 := pdevEvFalse p l p1 hq hne
     have h2 := ih (devQuietStep _ _ _ _ _ hs hne hq)
-      (fun kd ba bs hin => hnd kd ba bs (List.mem_cons_of_mem _ hin))
+      (fun kd ba bs sa sv hin => hnd kd ba bs sa sv (List.mem_cons_of_mem _ hin))
     simp only [h1, h2, Bool.or_self]
 
 /-- (Lean-only, W13 (I)) An I/O-class row event is realized by an `LDev` step (`projLbl`), which
@@ -501,7 +501,7 @@ theorem hblockHblk (dv : Nat → Efab) (k : Nat) (ws : Wstate) (lb : Lbl) (p p' 
 /-- (Lean-only, W-DISK) One step keeps the QUIET-ROW invariant: a quiet start stays quiet when
 a disk start's label is `LDev`-free, and a disk state comes only from a disk state. -/
 theorem WeakRvwmoFab.quietStep (p : Pexv6) (d : Efab) (l : Wlabel) (p' : Pexv6) (d' : Efab) :
-    pstepEv p d l p' d' → devQuiet p → (∀ dp, p = .PDisk dp → ∀ kd ba bs, l ≠ LDev kd ba bs) →
+    pstepEv p d l p' d' → devQuiet p → (∀ dp, p = .PDisk dp → ∀ kd ba bs sa sv, l ≠ LDev kd ba bs sa sv) →
     devQuiet p' ∧ (∀ dp', p' = .PDisk dp' → ∃ dp, p = .PDisk dp) := by
   intro hs hq hnd
   cases p with
@@ -517,7 +517,7 @@ theorem WeakRvwmoFab.quietStep (p : Pexv6) (d : Efab) (l : Wlabel) (p' : Pexv6) 
 /-- (Lean-only, W-DISK) ... and so does an administrative run. -/
 theorem WeakRvwmoFab.quietAdm (instr : Bool) (p : Pexv6) (d : Efab) (ls : List Wlabel) (p' : Pexv6)
     (d' : Efab) : admRun instr p d ls p' d' → devQuiet p →
-    (∀ dp, p = .PDisk dp → ∀ kd ba bs, LDev kd ba bs ∉ ls) →
+    (∀ dp, p = .PDisk dp → ∀ kd ba bs sa sv, LDev kd ba bs sa sv ∉ ls) →
     devQuiet p' ∧ (∀ dp', p' = .PDisk dp' → ∃ dp, p = .PDisk dp) := by
   intro h
   induction h with
@@ -525,10 +525,10 @@ theorem WeakRvwmoFab.quietAdm (instr : Bool) (p : Pexv6) (d : Efab) (ls : List W
   | ARcons p d l p1 d1 ls p' d' _ hs _ ih =>
     intro hq hnd
     obtain ⟨hq1, hk1⟩ := WeakRvwmoFab.quietStep _ _ _ _ _ hs hq
-      (fun dp hp kd ba bs he => hnd dp hp kd ba bs (by simp [he]))
-    obtain ⟨hq', hk'⟩ := ih hq1 (fun dp1 hp1 kd ba bs hin => by
+      (fun dp hp kd ba bs sa sv he => hnd dp hp kd ba bs sa sv (by simp [he]))
+    obtain ⟨hq', hk'⟩ := ih hq1 (fun dp1 hp1 kd ba bs sa sv hin => by
       obtain ⟨dp, hp⟩ := hk1 dp1 hp1
-      exact hnd dp hp kd ba bs (List.mem_cons_of_mem _ hin))
+      exact hnd dp hp kd ba bs sa sv (List.mem_cons_of_mem _ hin))
     refine ⟨hq', fun dp' hp' => ?_⟩
     obtain ⟨dp1, hp1⟩ := hk' dp' hp'
     exact hk1 dp1 hp1
@@ -691,7 +691,7 @@ a block that is not a dev block (`emDev`) is contact-free. -/
 theorem WeakRvwmoFab.hemitfQuietTq (dvi dvo : Nat → Efab) (tq : Nat → Bool) (k : Nat)
     (ws : Wstate) (row : List Lbl) (p : Pexv6) (es : List Eitem) (pfin : Pexv6) :
     hemitf dvi dvo tq k ws row p es pfin →
-    devQuiet p ∧ (∀ dp, p = .PDisk dp → ∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst) →
+    devQuiet p ∧ (∀ dp, p = .PDisk dp → ∀ kd ba bs sa sv, LDev kd ba bs sa sv ∉ es.map Prod.fst) →
     ∀ n, n < row.length → emDev false (n + k) es = false → tq (n + k) = false := by
   intro h
   induction h with
@@ -701,10 +701,10 @@ theorem WeakRvwmoFab.hemitfQuietTq (dvi dvo : Nat → Efab) (tq : Nat → Bool) 
     rw [eblockFst] at hdk
     have har' := WeakRvwmoFab.admRunTRun _ _ _ _ _ _ _ har
     obtain ⟨hqa, hka⟩ := WeakRvwmoFab.quietAdm _ _ _ _ _ _ har' hdq
-      (fun dp hp kd ba bs hin => hdk dp hp kd ba bs (List.mem_append_left _ hin))
-    obtain ⟨hq', hk'⟩ := WeakRvwmoFab.quietStep _ _ _ _ _ hst hqa (fun dpa hpa kd ba bs he => by
+      (fun dp hp kd ba bs sa sv hin => hdk dp hp kd ba bs sa sv (List.mem_append_left _ hin))
+    obtain ⟨hq', hk'⟩ := WeakRvwmoFab.quietStep _ _ _ _ _ hst hqa (fun dpa hpa kd ba bs sa sv he => by
       obtain ⟨dp, hp⟩ := hka dpa hpa
-      exact hdk dp hp kd ba bs (List.mem_append_right _ (by rw [he]; exact List.mem_cons_self)))
+      exact hdk dp hp kd ba bs sa sv (List.mem_append_right _ (by rw [he]; exact List.mem_cons_self)))
     cases n with
     | zero =>
       rw [Nat.zero_add] at hnd ⊢
@@ -719,10 +719,10 @@ theorem WeakRvwmoFab.hemitfQuietTq (dvi dvo : Nat → Efab) (tq : Nat → Bool) 
       have e : n + 1 + k = n + (k + 1) := by omega
       rw [e] at hnd ⊢
       rw [emDevTagNe false ls l k (n + (k + 1)) es (by omega)] at hnd
-      exact ih ⟨hq', fun dp' hp' kd ba bs hin => by
+      exact ih ⟨hq', fun dp' hp' kd ba bs sa sv hin => by
           obtain ⟨dpa, hpa⟩ := hk' dp' hp'
           obtain ⟨dp, hp⟩ := hka dpa hpa
-          exact hdk dp hp kd ba bs (List.mem_append_right _ (List.mem_cons_of_mem _ hin))⟩ n
+          exact hdk dp hp kd ba bs sa sv (List.mem_append_right _ (List.mem_cons_of_mem _ hin))⟩ n
         (by simp only [List.length_cons] at hn; omega) hnd
   | HFpair k ws lb row p ls1 pa da l1 pm dm ls2 pm2 dm2 l2 p' es pfin b1 b2 har1 hre hst1 har2
       hst2 htq _ ih =>
@@ -730,26 +730,26 @@ theorem WeakRvwmoFab.hemitfQuietTq (dvi dvo : Nat → Efab) (tq : Nat → Bool) 
     rw [eblockFst, eblockFst] at hdk
     have har1' := WeakRvwmoFab.admRunTRun _ _ _ _ _ _ _ har1
     have har2' := WeakRvwmoFab.admRunTRun _ _ _ _ _ _ _ har2
-    have hdk2 : ∀ dp, p = .PDisk dp → ∀ kd ba bs, LDev kd ba bs ∉ ls2 ++ l2 :: es.map Prod.fst :=
-      fun dp hp kd ba bs hin => hdk dp hp kd ba bs (List.mem_append_right _ (List.mem_cons_of_mem _ hin))
+    have hdk2 : ∀ dp, p = .PDisk dp → ∀ kd ba bs sa sv, LDev kd ba bs sa sv ∉ ls2 ++ l2 :: es.map Prod.fst :=
+      fun dp hp kd ba bs sa sv hin => hdk dp hp kd ba bs sa sv (List.mem_append_right _ (List.mem_cons_of_mem _ hin))
     obtain ⟨hqa, hka⟩ := WeakRvwmoFab.quietAdm _ _ _ _ _ _ har1' hdq
-      (fun dp hp kd ba bs hin => hdk dp hp kd ba bs (List.mem_append_left _ hin))
-    obtain ⟨hqm, hkm⟩ := WeakRvwmoFab.quietStep _ _ _ _ _ hst1 hqa (fun dpa hpa kd ba bs he => by
+      (fun dp hp kd ba bs sa sv hin => hdk dp hp kd ba bs sa sv (List.mem_append_left _ hin))
+    obtain ⟨hqm, hkm⟩ := WeakRvwmoFab.quietStep _ _ _ _ _ hst1 hqa (fun dpa hpa kd ba bs sa sv he => by
       obtain ⟨dp, hp⟩ := hka dpa hpa
-      exact hdk dp hp kd ba bs (List.mem_append_right _ (by rw [he]; exact List.mem_cons_self)))
+      exact hdk dp hp kd ba bs sa sv (List.mem_append_right _ (by rw [he]; exact List.mem_cons_self)))
     have hkm' : ∀ dpm, pm = .PDisk dpm → ∃ dp, p = .PDisk dp := fun dpm hpm => by
       obtain ⟨dpa, hpa⟩ := hkm dpm hpm
       exact hka dpa hpa
     obtain ⟨hqm2, hkm2⟩ := WeakRvwmoFab.quietAdm _ _ _ _ _ _ har2' hqm
-      (fun dpm hpm kd ba bs hin => by
+      (fun dpm hpm kd ba bs sa sv hin => by
         obtain ⟨dp, hp⟩ := hkm' dpm hpm
-        exact hdk2 dp hp kd ba bs (List.mem_append_left _ hin))
+        exact hdk2 dp hp kd ba bs sa sv (List.mem_append_left _ hin))
     have hkm2' : ∀ dpm, pm2 = .PDisk dpm → ∃ dp, p = .PDisk dp := fun dpm hpm => by
       obtain ⟨dpm1, hpm1⟩ := hkm2 dpm hpm
       exact hkm' dpm1 hpm1
-    obtain ⟨hq', hk'⟩ := WeakRvwmoFab.quietStep _ _ _ _ _ hst2 hqm2 (fun dpm hpm kd ba bs he => by
+    obtain ⟨hq', hk'⟩ := WeakRvwmoFab.quietStep _ _ _ _ _ hst2 hqm2 (fun dpm hpm kd ba bs sa sv he => by
       obtain ⟨dp, hp⟩ := hkm2' dpm hpm
-      exact hdk2 dp hp kd ba bs (List.mem_append_right _ (by rw [he]; exact List.mem_cons_self)))
+      exact hdk2 dp hp kd ba bs sa sv (List.mem_append_right _ (by rw [he]; exact List.mem_cons_self)))
     cases n with
     | zero =>
       rw [Nat.zero_add] at hnd ⊢
@@ -770,10 +770,10 @@ theorem WeakRvwmoFab.hemitfQuietTq (dvi dvo : Nat → Efab) (tq : Nat → Bool) 
       rw [e] at hnd ⊢
       rw [emDevTagNe false ls1 l1 k (n + (k + 1)) _ (by omega),
         emDevTagNe false ls2 l2 k (n + (k + 1)) es (by omega)] at hnd
-      exact ih ⟨hq', fun dp' hp' kd ba bs hin => by
+      exact ih ⟨hq', fun dp' hp' kd ba bs sa sv hin => by
           obtain ⟨dpm, hpm⟩ := hk' dp' hp'
           obtain ⟨dp, hp⟩ := hkm2' dpm hpm
-          exact hdk2 dp hp kd ba bs (List.mem_append_right _ (List.mem_cons_of_mem _ hin))⟩ n
+          exact hdk2 dp hp kd ba bs sa sv (List.mem_append_right _ (List.mem_cons_of_mem _ hin))⟩ n
         (by simp only [List.length_cons] at hn; omega) hnd
 
 /-! ### 3.3 The obstruction, machine-checked -/
@@ -781,7 +781,7 @@ theorem WeakRvwmoFab.hemitfQuietTq (dvi dvo : Nat → Efab) (tq : Nat → Bool) 
 theorem hartConfNoGap (i : Nat) (row : List Lbl) (p0 : Pexv6) (dv : Nat → Efab)
     (em : Hemission) (n : Nat) (lb : Lbl) :
     hartConf i row p0 dv em →
-    devQuiet p0 ∧ (∀ dp, p0 = .PDisk dp → ∀ kd ba bs, LDev kd ba bs ∉ emLabels em) →
+    devQuiet p0 ∧ (∀ dp, p0 = .PDisk dp → ∀ kd ba bs sa sv, LDev kd ba bs sa sv ∉ emLabels em) →
     row[n]? = some lb → ¬ isDevBlock em n → dv (n + 1) = dv n := by
   intro hem hdq hn hnd
   obtain ⟨tq, hemf⟩ := hartConfHemitf i row p0 dv em hem

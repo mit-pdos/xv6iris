@@ -155,19 +155,19 @@ theorem hemitRunAtGraphValuesAux
     hemit dv k ws rrow p es pfin →
     (∀ j, rrow[j]? = (AxOpsem.grow GD i)[k + j]?) →
     itemsGv GD i es →
-    (∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst) →
+    (∀ kd ba bs sa sv, LDev kd ba bs sa sv ∉ es.map Prod.fst) →
     nsteps (astepAnyNfGv GD i) es.length ⟨p, k⟩ ⟨pfin, k + rrow.length⟩ := by
   intro h
   induction h with
   | HEnil k ws p => intro _ _ _; exact nsteps_O _
   | HEone k ws lb rrow' p ls pa da l p' es pfin har hre hst _ ih =>
     intro hrow hgv hnd
-    have hndl : ∀ kd ba bs, l ≠ LDev kd ba bs := fun kd ba bs he =>
-      hnd kd ba bs (List.mem_map.2 ⟨(l, some k), List.mem_append_right _ List.mem_cons_self,
+    have hndl : ∀ kd ba bs sa sv, l ≠ LDev kd ba bs sa sv := fun kd ba bs sa sv he =>
+      hnd kd ba bs sa sv (List.mem_map.2 ⟨(l, some k), List.mem_append_right _ List.mem_cons_self,
         by rw [he]⟩)
-    have hnd' : ∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst := fun kd ba bs hin => by
+    have hnd' : ∀ kd ba bs sa sv, LDev kd ba bs sa sv ∉ es.map Prod.fst := fun kd ba bs sa sv hin => by
       obtain ⟨x, hx, hxe⟩ := List.mem_map.1 hin
-      exact hnd kd ba bs (List.mem_map.2 ⟨x, List.mem_append_right _ (List.mem_cons_of_mem _ hx),
+      exact hnd kd ba bs sa sv (List.mem_map.2 ⟨x, List.mem_append_right _ (List.mem_cons_of_mem _ hx),
         hxe⟩)
     have hlb : (AxOpsem.grow GD i)[k]? = some lb := by
       have h0 := hrow 0
@@ -207,12 +207,12 @@ theorem hemitRunAtGraphValuesAux
           exact absurd hst (pstepEvNoRmw _ _ _ _ _ _ _ _ _ _ _)
         | LExStore => exact False.elim hnb
         | LSilent => simp [projLbl] at hpr
-        | LDev kd ba bs => exact absurd rfl (hndl kd ba bs)
+        | LDev kd ba bs sa sv => exact absurd rfl (hndl kd ba bs sa sv)
         | LRegW => simp [projLbl] at hpr
         | LCtrl => simp [projLbl] at hpr
         | LInstr => simp [projLbl] at hpr
       · obtain ⟨rfl, _⟩ := pstepWireInv _ _ _ _ _ hw
-        exact absurd rfl (hndl _ _ _)
+        exact absurd rfl (hndl _ _ _ _ _)
     have e1 : (eadm ls ++ (l, some k) :: es).length = ls.length + (es.length + 1) := by
       simp [eadm]
     have e2 : k + (lb :: rrow').length = k + 1 + rrow'.length := by
@@ -222,9 +222,9 @@ theorem hemitRunAtGraphValuesAux
   | HEpair k ws lb rrow' p ls1 pa da l1 pm dm ls2 pm2 dm2 l2 p' es pfin har1 hre hst1 har2
       hst2 _ ih =>
     intro hrow hgv hnd
-    have hnd' : ∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst := fun kd ba bs hin => by
+    have hnd' : ∀ kd ba bs sa sv, LDev kd ba bs sa sv ∉ es.map Prod.fst := fun kd ba bs sa sv hin => by
       obtain ⟨x, hx, hxe⟩ := List.mem_map.1 hin
-      exact hnd kd ba bs (List.mem_map.2 ⟨x, List.mem_append_right _ (List.mem_cons_of_mem _
+      exact hnd kd ba bs sa sv (List.mem_map.2 ⟨x, List.mem_append_right _ (List.mem_cons_of_mem _
         (List.mem_append_right _ (List.mem_cons_of_mem _ hx))), hxe⟩)
     have hlb : (AxOpsem.grow GD i)[k]? = some lb := by
       have h0 := hrow 0
@@ -279,7 +279,7 @@ theorem hemitRunAtGraphValues
     (p0 : Pexv6) (dv : Nat → Efab) (em : Hemission) :
     hartConf i (AxOpsem.grow GD i) p0 dv em →
     emReadsAtGraphValues GD i em →
-    (∀ kd ba bs, LDev kd ba bs ∉ emLabels em) →
+    (∀ kd ba bs sa sv, LDev kd ba bs sa sv ∉ emLabels em) →
     nsteps (astepAnyNfGv GD i) em.emItems.length ⟨p0, 0⟩
       ⟨em.emFin, (AxOpsem.grow GD i).length⟩ := by
   intro h hgv hnd
@@ -293,7 +293,7 @@ theorem hemitRunAtGraphValuesRtc
     (p0 : Pexv6) (dv : Nat → Efab) (em : Hemission) :
     hartConf i (AxOpsem.grow GD i) p0 dv em →
     emReadsAtGraphValues GD i em →
-    (∀ kd ba bs, LDev kd ba bs ∉ emLabels em) →
+    (∀ kd ba bs sa sv, LDev kd ba bs sa sv ∉ emLabels em) →
     rtc (astepAnyNfGv GD i) ⟨p0, 0⟩ ⟨em.emFin, (AxOpsem.grow GD i).length⟩ :=
   fun h hgv hnd => rtc_nsteps_2 (hemitRunAtGraphValues GD i hpin p0 dv em h hgv hnd)
 

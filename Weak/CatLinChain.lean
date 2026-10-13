@@ -17,21 +17,25 @@ hypothesis, `rawChainC`/`segRunC`/`gcrossE`/`segPinC` in place of `rawChain`/`se
       `walkSupplyOfPolicyC`, `cycleKillOfL2C`, `t2linOfL2'''C`.
   §3  The TAGGED conformance text `gdexecQconfT` (`gdexecQconf` with the TAGGED edges
       `rowDepsT ⊆ GT.gtDeps` in place of `rowDeps ⊆ gdDeps`) and `gdexecQconfTForget` (it
-      implies `gdexecQconf (forget GT)`, by `AxDeps.rowDepsSubT` and the target-is-a-store fact
-      `hartConfRowDepsWf`); the capstone `xv6RvwmoSafeModuloT` — STATED, premises W11's, NOT
+      implies `gdexecQconf (forget GT)`, by `AxDeps.rowDepsSubT` and the source-is-a-RAM-read /
+      target-is-a-store facts of `hartConfRowDepsWf`); the capstone `xv6RvwmoSafeModuloT` — STATED, premises W11's, NOT
       registered (plan: "its premises are W11's").
 
 **Trusted-surface note (`gdexecQconfT`, §A(6)).**  It is new statement text: each hart's row is
 the hart's emission from its boot program (`hartConf`), quiescent (`emDevfree`), fetching from
 the image (`emFetchImg`), and EVERY tagged dependency edge the tagger `rowDepsT` emits for that
 emission is an edge of `GT.gtDeps` with its tag.  It is reviewed against `rowDepsT`'s correction
-(5) (`AxDeps.lean` header: `dtAdr` fed only from an access's own `asrc`).  It covers I/O items
-only as far as today's `rowDepsT` does (W13 (F-dep) extends the tagger; the plan names that
-item as the one that makes the text cover I/O sources).
+(5) (`AxDeps.lean` header: `dtAdr` fed only from an access's own `asrc`).  W13 (F-dep) (2)
+extended the tagger: `rowDepsT` emits the D50 (b) edges of MMIO items (address/data/ctrl into an
+MMIO store, address into an MMIO load, provenance out of an MMIO load; `AxDeps` deviation 9), so
+the clause covers I/O items' sources; under this bundle's `emDevfree` clause a conforming row has
+no MMIO item, so the edges first matter for a conformance text that admits I/O rows (W13 (W)).
 
-**Spec reliance on `AxDeps.gtdepsWf`'s RAM-endpoint shape** (pending ruling on W13 (F-dep)): only
-through `CatLin.catADOfCatT` (`catTForgetAxioms`, `gtAdSubForget`); `gdexecQconfTForget` relies
-on `forgetDeps` keeping exactly the WRITE-targeted edges (`elemOfForgetDeps`).
+**Spec reliance on `AxDeps.gtdepsWf`** (RULED [OWN.52] (A1); W13 (F-dep) (0)): `gtdepsWf` admits
+I/O endpoints, `forget`/`gtAd` keep RAM-read → RAM-write edges; the chain relies on that only
+through `CatLin.catADOfCatT` (`catTForgetAxioms`, `gtAdSubForget`, `gppo12AdFull`), and
+`gdexecQconfTForget` on `forgetDeps` keeping exactly the RAM-read → WRITE edges
+(`elemOfForgetDeps`).
 -/
 import Weak.CatLinHull
 import Weak.WeakRvwmoWalk3
@@ -328,7 +332,8 @@ def gdexecQconfT (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat) (GT 
           (∀ e, e ∈ rowDepsT em.emItems → (((i, e.1.1), (i, e.1.2)), e.2) ∈ GT.gtDeps))
 
 /-- The tagged bundle gives the untagged one on the projection (`rowDepsSubT`: every tree edge is
-a tagged edge; `hartConfRowDepsWf`: its target is a store, so `forget` keeps it). -/
+a tagged edge; `hartConfRowDepsWf`: its source is a RAM read and its target a store, so `forget`
+keeps it — W13 (F-dep) (0b) [R39.2]). -/
 theorem gdexecQconfTForget (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat)
     (GT : GdexecT) :
     gdexecQconfT boot d0 im nh GT → gdexecQconf boot d0 im nh (forget GT) := by
@@ -337,10 +342,12 @@ theorem gdexecQconfTForget (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh :
   obtain ⟨em, hcf, hdf, hfi, hdeps⟩ := hrows i row hrow
   refine ⟨em, hcf, hdf, hfi, fun jk hjk => ?_⟩
   obtain ⟨tg, htg, -⟩ := rowDepsSubT em.emItems jk.1 jk.2 hjk
-  obtain ⟨-, -, lb, hlb, hw⟩ := hartConfRowDepsWf i row (boot i) (fun _ => d0) em jk hcf hjk
-  refine (elemOfForgetDeps GT.gtG GT.gtDeps (i, jk.1) (i, jk.2)).2 ⟨tg, hdeps _ htg, ?_⟩
+  obtain ⟨-, ⟨lr, hlr, hr⟩, lb, hlb, hw⟩ :=
+    hartConfRowDepsWf i row (boot i) (fun _ => d0) em jk hcf hjk
   have hrow' : GT.gtG.gxProg[i]? = some row := hrow
-  simp [gisW, gxLbl, hrow', hlb, hw]
+  refine (elemOfForgetDeps GT.gtG GT.gtDeps (i, jk.1) (i, jk.2)).2 ⟨tg, hdeps _ htg, ?_, ?_⟩
+  · simp [gisRd, gxLbl, hrow', hlr, hr]
+  · simp [gisW, gxLbl, hrow', hlb, hw]
 
 section capstone
 

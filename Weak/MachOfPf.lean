@@ -80,7 +80,7 @@ parameter is DISCHARGED (`simDisk`).
    M1 by `cutOfPristine` from a SECOND MachCSL-side hypothesis (the pristine window at every
    reachable powered state; W5: `powerInterp_textPristine`) — `candKfetch` alone does not give it.
 5. `κs` is a function of the run RECORD (configurations + step kinds): the disk agent's
-   `LDev .dev 0 []` does not say which device moved, and `pfRunST` is a `Prop`.
+   `LDev .dev 0 [] [] []` does not say which device moved, and `pfRunST` is a `Prop`.
 6. (F9) `SimRel`'s device clause is `R-dev` (`diskSide`/`devAgree`), no longer `efDev = σ.devs`:
    every device but the disk EQUAL, the disk EQUAL (all fields, `disk` and `cache` included) off
    the OUT capture segment and `(pre₁ pf).1` on it [R18.3][R20.1]; the plan's `cache = []`
@@ -146,7 +146,7 @@ def pfStepTsoStmt (fok : Image → List Wmsg → Nat → Int → List (Nat × Bi
     (∀ aq base tvs asrc, l = .LExLoad aq base tvs asrc →                           -- (4)
        ownCoh c ∧ exclOkTs c.pcLog (hartAgent cpu) base (tvs.map Prod.fst) (c.pcLog.length + 1)) →
     fn = none →
-    l ≠ .LSilent → (∀ kd ba bs, l ≠ .LDev kd ba bs) →
+    l ≠ .LSilent → (∀ kd ba bs sa sv, l ≠ .LDev kd ba bs sa sv) →
     (o = .barrier .Barrier_RISCV_i →
        (tsoShadow TsoShadow.cohSrc st (hartAgent cpu)).fiArm = true) →
     (∀ n w, o = .instrAnnounce n w → sfAnnB n w = true →
@@ -448,11 +448,11 @@ def kindStep (k : SKind) (p : Pexv6) (d : Efab) (l : Wlabel) (p' : Pexv6) (d' : 
         rs' = ors.getD rs ∧ ib' = oib.getD ib ∧
         pstepPlic cpu m rs fn ib d l m' ors fn' d' oib obar
   | .uart u, .PDisk dp, .PDisk dp' =>
-      dp' = dp ∧ l = .LDev .dev 0 [] ∧
+      dp' = dp ∧ l = .LDev .dev 0 [] [] [] ∧
       ∃ (m' : DevProg (.uart u)) (ds' : DevStates),
         fdevStep (.uart u) (efU d u) d.efDev m' ds' ∧ d' = efUset { d with efDev := ds' } u m'
   | .gate, .PDisk dp, .PDisk dp' =>
-      dp' = dp ∧ l = .LDev .dev 0 [] ∧
+      dp' = dp ∧ l = .LDev .dev 0 [] [] [] ∧
       ∃ (m' : DevProg .plic) (ds' : DevStates),
         fdevStep .plic d.efPlic d.efDev m' ds' ∧ d' = { d with efDev := ds', efPlic := m' }
   | .disk, .PDisk dp, .PDisk dp' =>
@@ -1108,7 +1108,7 @@ theorem simNode {fok : Image → List Wmsg → Nat → Int → List (Nat × BitV
       (fun _ _ => rfl) hdsM hm1 hv1
       (hartRun ht hgen hpow cpu (by rw [hm]; exact hlkc)
         (by rw [hm]; exact Or.inl ⟨v, rfl, hev'⟩))
-  have tso : l ≠ .LSilent → (∀ kd ba bs, l ≠ .LDev kd ba bs) →
+  have tso : l ≠ .LSilent → (∀ kd ba bs sa sv, l ≠ .LDev kd ba bs sa sv) →
       c'.pcDev.efDev = c.pcDev.efDev → fnOk fn' →
       (∀ n va req, o = .memRead n va req → devAddr req.pa = false) →
       (∀ n va req, o = .memWrite n va req → devAddr req.pa = false) →
@@ -1225,7 +1225,7 @@ theorem simNode {fok : Image → List Wmsg → Nat → Int → List (Nat × BitV
       (fun _ _ _ ho => by cases ho) (by rw [hors]; rfl)
   | instrAnnounce nb w =>
     obtain ⟨hl, -, hors, hfn', hd'', -, -⟩ := hn
-    have hl1 : l ≠ .LSilent ∧ ∀ kd ba bs, l ≠ .LDev kd ba bs := by
+    have hl1 : l ≠ .LSilent ∧ ∀ kd ba bs sa sv, l ≠ .LDev kd ba bs sa sv := by
       rcases annLabelCases nb w with h | h <;> rw [hl, h]
       · exact ⟨nofun, fun _ _ _ => nofun⟩
       · obtain ⟨pr', pw', sr', sw', hb⟩ := ebarLabelFence .Barrier_RISCV_i
@@ -1376,7 +1376,7 @@ theorem simDev {fok : Image → List Wmsg → Nat → Int → List (Nat × BitVe
       viewRel TsoShadow.cohSrc { g.m with devs := ds' } (st ++ [(NCPU, l)]) ∧
       c'.pcLog.map Wmsg.wmTid = (stAuthors (st ++ [(NCPU, l)])).map some ∧ ownCoh c' := by
     intro ds'
-    have hl : l = .LDev .dev 0 [] := by
+    have hl : l = .LDev .dev 0 [] [] [] := by
       cases k
       · exact absurd rfl hk1
       · exact absurd rfl hk2

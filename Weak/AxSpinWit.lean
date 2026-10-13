@@ -249,7 +249,8 @@ theorem AxSpinWit.sprCtrlClosed : ctrlClosed AxSpinWit.spr :=
 
 /-- The gate is non-trivial: the f read gates the reload. -/
 theorem spwGsrcReload : ((hB, 0) : Geid) ∈ gsrcT spw (hB, 2) :=
-  (gsrcTSpec _ _ _).2 ⟨(hB, 1), by decide +kernel, .inr ((gpoBSpec _ _ _).1 (by decide +kernel))⟩
+  (gsrcTSpec _ _ _).2 ⟨(hB, 1), by decide +kernel, .inr ((gpoBSpec _ _ _).1 (by decide +kernel)),
+    by decide +kernel⟩
 
 /-- Lean-only: the target order is a permutation of `spw`'s gmo. -/
 theorem AxSpinWit.spwListPerm :

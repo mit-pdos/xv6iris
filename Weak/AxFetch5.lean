@@ -179,6 +179,7 @@ theorem afDtProvPreservedStep (s : DstateT) (it : Eitem) (r : Nat)
   cases l <;> cases ok <;>
     first
     | rfl
+    | (cases ‹IoKind› <;> rfl)
     | exact if_neg (fun h => H _ _ rfl h.symm)
 
 theorem afDtProvPreservedRow (s : DstateT) (es : List Eitem) (r : Nat)

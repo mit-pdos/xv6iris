@@ -119,7 +119,8 @@ theorem afAdminRunToEnd (m : SailM Unit) :
             obtain ⟨ib2, hrtc⟩ := ih _ (s.setDev d0) ib s' hex hsf cpu kpos row
             refine ⟨ib2, ?_⟩
             refine AxFetch1.admPrepend row cpu _ _ s.regs ib s.dev d0
-              (.LDev .rd (paZ req.pa) (WeakInterpProj.wbytes n0 w0)) none none none kpos _
+              (.LDev .rd (paZ req.pa) (WeakInterpProj.wbytes n0 w0) (depsAsrc (depsOfIb ib.ibBits)) [])
+                none none none kpos _
               hrtc ?_ trivial
             simp only [pnodeStep, hdevT, ↓reduceIte]
             exact ⟨w0, by simp [hdr]⟩
@@ -148,7 +149,8 @@ theorem afAdminRunToEnd (m : SailM Unit) :
               obtain ⟨ib2, hrtc⟩ := ih _ (s.setDev d0) ib s' hex hsf cpu kpos row
               refine ⟨ib2, ?_⟩
               refine AxFetch1.admPrepend row cpu _ _ s.regs ib s.dev d0
-                (.LDev .wr (paZ req.pa) (WeakInterpProj.wbytes n0 w)) none none none kpos
+                (.LDev .wr (paZ req.pa) (WeakInterpProj.wbytes n0 w) (depsAsrc (depsOfIb ib.ibBits))
+                  (depsVsrc (depsOfIb ib.ibBits))) none none none kpos
                 _ hrtc ?_ trivial
               simp only [pnodeStep, hdevT, hv, ↓reduceIte]
               simp [hdw]

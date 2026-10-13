@@ -241,7 +241,7 @@ theorem wpstepSplit (c c' : Wpcfg P D) :
     exact .inr ⟨i, _, wpAstep.WPAStep c ag st' d' (fun w => fencePost w pr pw sr sw) none hlk hps
       ⟨rfl, rfl⟩⟩
   | WPDev i ag st' d' hlk hps =>
-    exact .inr ⟨i, LDev _ _ _, wpAstep.WPAStep c ag st' d' id none hlk hps ⟨rfl, rfl⟩⟩
+    exact .inr ⟨i, LDev _ _ _ _ _, wpAstep.WPAStep c ag st' d' id none hlk hps ⟨rfl, rfl⟩⟩
   | WPRegW i ag rd srcs st' d' hlk hps =>
     exact .inr ⟨i, _, wpAstep.WPAStep c ag st' d' (fun w => regwPost w rd (srcsView w srcs)) none
       hlk hps ⟨rfl, rfl⟩⟩

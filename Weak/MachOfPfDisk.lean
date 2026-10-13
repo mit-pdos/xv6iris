@@ -1010,7 +1010,7 @@ inductive PosRel : Option (DM Dres) → VM Unit → Option (VM Unit) → VRel �
 
 theorem pdpNone {d : DevStates} {l : Wlabel} {dp' : Option (DM Dres)} {d' : DevStates}
     (h : pdiskProg none d l dp' d') :
-    l = .LDev .dev 0 [] ∧ dp' = some (virtioProg (dvirtio d)) ∧ d' = d := by
+    l = .LDev .dev 0 [] [] [] ∧ dp' = some (virtioProg (dvirtio d)) ∧ d' = d := by
   rcases h with ⟨-, h1, h2, h3⟩ | ⟨_, _, _, _, _, h, _⟩ | ⟨_, h, _⟩ |
     ⟨_, _, _, _, _, _, _, h, _⟩ | ⟨_, _, _, _, _, _, h, _⟩ | ⟨_, _, _, _, _, _, h, _⟩ |
     ⟨_, _, h, _⟩ | ⟨_, _, h, _⟩ | ⟨h, _⟩ | ⟨h, _⟩
@@ -1057,7 +1057,7 @@ theorem pdpWrite {pre : VirtioState → VirtioState × Bool} {g : VirtioState �
 
 theorem pdpPop {hh : BitVec 16} {k : VirtioState → DM Dres} {d : DevStates} {l : Wlabel}
     {dp' : Option (DM Dres)} {d' : DevStates} (h : pdiskProg (some (DPop hh k)) d l dp' d') :
-    l = .LDev .dev 0 [] ∧
+    l = .LDev .dev 0 [] [] [] ∧
     (((Virtio.phase (dvirtio d) hh).isSome = true ∧ dp' = none ∧ d' = d) ∨
      ((Virtio.phase (dvirtio d) hh).isSome = false ∧ dp' = some (k (popState (dvirtio d) hh)) ∧
        d' = setDvirtio d (popState (dvirtio d) hh))) := by

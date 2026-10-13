@@ -392,10 +392,10 @@ inductive wpPfStep (i : Nat) : Wlabel → Wpcfg P D → Wpcfg P D → Prop
         ⟨cfg.pcImg, cfg.pcLog, d',
          cfg.pcAgs.set i ⟨st', fencePost ag.paWs pr pw sr sw, ag.paProm⟩⟩
   | PFDev (cfg : Wpcfg P D) (ag : Wpagent P) {kd : IoKind} {ba : Int} {bs : List (BitVec 8)}
-      (st' : P) (d' : D) :
+      {sa sv : List Dsrc} (st' : P) (d' : D) :
       cfg.pcAgs[i]? = some ag →
-      pstep ag.paSt cfg.pcDev (.LDev kd ba bs) st' d' →
-      wpPfStep i (.LDev kd ba bs) cfg
+      pstep ag.paSt cfg.pcDev (.LDev kd ba bs sa sv) st' d' →
+      wpPfStep i (.LDev kd ba bs sa sv) cfg
         ⟨cfg.pcImg, cfg.pcLog, d', cfg.pcAgs.set i ⟨st', ag.paWs, ag.paProm⟩⟩
   | PFRegW (cfg : Wpcfg P D) (ag : Wpagent P) (rd : Nat) (srcs : List Dsrc) (st' : P) (d' : D) :
       cfg.pcAgs[i]? = some ag →
@@ -539,7 +539,7 @@ def projLbl (k : WmClass) (l : Wlabel) : Option Lbl :=
   | .LRmw aq rl base tvs data _ _ =>
       some (.LRmw aq rl base (tvs.map Prod.fst) (tvs.map Prod.snd) data k)
   | .LFence pr pw sr sw => some (.LFence pr pw sr sw)
-  | .LDev kd base vs => some (.LIo kd base vs)
+  | .LDev kd base vs _ _ => some (.LIo kd base vs)
   | .LRegW _ _ => none
   | .LCtrl _ => none
   | .LInstr => none
@@ -853,7 +853,7 @@ theorem wpPfStepMstep (i : Nat) (l : Wlabel) (c c' : Wpcfg P D) (σ : Mstate) :
     exact cfgMatchdUpdGen _ _ _ _ i ag st' _ _ f _ hf hlk
       (by rw [updWsEq]; exact wsEqrFencePost _ _ _ _ _ _ (hf i ag hlk))
       (fun j hne => updWsNe _ _ _ _ hne)
-  | @PFDev c ag kd ba bs st' d' hlk _ =>
+  | @PFDev c ag kd ba bs sa sv st' d' hlk _ =>
     -- W13 (I): the I/O-class event, replayed by the inert `mstep.MStepIo`
     refine ⟨.WCplain, ?_⟩
     dsimp only [projLbl]
@@ -966,7 +966,7 @@ def unprojLbl (lb : Lbl) : Wlabel :=
   | .LStore rl base vs _ => .LStore rl base vs [] []
   | .LFence pr pw sr sw => .LFence pr pw sr sw
   | .LRmw aq rl base ts rvs wvs _ => .LRmw aq rl base (ts.zip rvs) wvs [] []
-  | .LIo kd base vs => .LDev kd base vs
+  | .LIo kd base vs => .LDev kd base vs [] []
 
 /-- THE REVERSE BRIDGE'S ONE NEW PREMISE (G6a): the labelled classes are the
 ones `pcls` would have written. -/

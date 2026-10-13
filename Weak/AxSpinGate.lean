@@ -22,8 +22,10 @@ WHAT IS PROVED.
   lemmas `canonGate`/`canonPol` REUSED).  `dev2DS'`: `AxDefer3.dev2DS` from `gateReal'` (`gateW'`
   is the only changed leaf; `flowStep`/`flowGmo` REUSED).  `gateReal'WritesNotDeferred`: under
   `Lcanon` every write has `gkey w = gpos w` and `goff w = 0` (the HELD_NZ lemma).
-- §2 The tagged gate map `gsrcT GT e = {r | ∃ w, ((r,w),DTctrl) ∈ gtDeps GT ∧ (w = e ∨ gpo w e)}`
-  (`gsrcTSpec`), `ctrlClosed GT` (the plan's Hctrl_closed), `gsrcTMono` (no premise),
+- §2 The tagged gate map `gsrcT GT e = {r | ∃ w, ((r,w),DTctrl) ∈ gtDeps GT ∧ (w = e ∨ gpo w e) ∧
+  r a RAM read}` (`gsrcTSpec`; the RAM-read filter is W13 (F-dep) (0c): `gtdepsWf` admits I/O-load
+  sources, the gate keeps RAM reads only, and the registered roots keep their text),
+  `ctrlClosed GT` (the plan's Hctrl_closed), `gsrcTMono` (no premise),
   `gsrcTSrcPo` (from `gtdepsWf` alone), `gsrcTReal'` (from `rvwmoCatConsistentT` +
   `ctrlClosed`), `writesNotDeferredT`.
 - §3 `tierAAdequacyAnnGateT`: `AxDefer5.tierAAdequacyAnnGate` at `GD := gtAdGd GT`, `Hcons :=
@@ -202,13 +204,17 @@ theorem gateReal'WritesNotDeferred (GD : Gdexec) (gsrc : Geid → GSet Geid)
 
 /-! # 2. The tagged gate map -/
 
+/-- The tagged gate map: the RAM-READ sources of the ctrl edges into `e` or a po-earlier write
+(W13 (F-dep) (0c) [R38.1]: an I/O-load source is filtered out, so the gate's sources stay RAM
+reads under the I/O-admitting `gtdepsWf`). -/
 def gsrcT (GT : GdexecT) (e : Geid) : GSet Geid :=
   LawfulSet.ofList (GT.gtDeps.filterMap (fun d : Tdep =>
-    if decide (d.2 = DTctrl) && (decide (d.1.2 = e) || gpoB GT.gtG d.1.2 e)
+    if decide (d.2 = DTctrl) && gisRd GT.gtG d.1.1 && (decide (d.1.2 = e) || gpoB GT.gtG d.1.2 e)
     then some d.1.1 else none))
 
 theorem gsrcTSpec (GT : GdexecT) (e r : Geid) :
-    r ∈ gsrcT GT e ↔ ∃ w, ((r, w), DTctrl) ∈ GT.gtDeps ∧ (w = e ∨ WeakRvwmoGraph.gpo GT.gtG w e) := by
+    r ∈ gsrcT GT e ↔ ∃ w, ((r, w), DTctrl) ∈ GT.gtDeps ∧ (w = e ∨ WeakRvwmoGraph.gpo GT.gtG w e) ∧
+      gisRd GT.gtG r = true := by
   rw [gsrcT, elemOfListToSet, List.mem_filterMap]
   constructor
   · rintro ⟨⟨⟨r', w⟩, tg⟩, Hin, Hf⟩
@@ -217,16 +223,18 @@ theorem gsrcTSpec (GT : GdexecT) (e r : Geid) :
     · next Hb =>
       cases Hf
       simp only [Bool.and_eq_true, Bool.or_eq_true, decide_eq_true_eq, gpoBSpec] at Hb
-      obtain ⟨rfl, Hwe⟩ := Hb
-      exact ⟨w, Hin, Hwe⟩
+      obtain ⟨⟨rfl, Hr⟩, Hwe⟩ := Hb
+      exact ⟨w, Hin, Hwe, Hr⟩
     · cases Hf
-  · rintro ⟨w, Hin, Hwe⟩
+  · rintro ⟨w, Hin, Hwe, Hr⟩
     refine ⟨((r, w), DTctrl), Hin, ?_⟩
-    have Hb : (decide (DTctrl = DTctrl) && (decide (w = e) || gpoB GT.gtG w e)) = true := by
-      simp only [decide_true, Bool.true_and, Bool.or_eq_true, decide_eq_true_eq, gpoBSpec]
-      exact Hwe
-    show (if (decide (DTctrl = DTctrl) && (decide (w = e) || gpoB GT.gtG w e)) = true
-      then some r else none) = some r
+    have Hb : (decide (DTctrl = DTctrl) && gisRd GT.gtG r && (decide (w = e) || gpoB GT.gtG w e))
+        = true := by
+      simp only [decide_true, Bool.true_and, Bool.and_eq_true, Bool.or_eq_true, decide_eq_true_eq,
+        gpoBSpec]
+      exact ⟨Hr, Hwe⟩
+    show (if (decide (DTctrl = DTctrl) && gisRd GT.gtG r && (decide (w = e) || gpoB GT.gtG w e))
+      = true then some r else none) = some r
     rw [if_pos Hb]
 
 /-- The plan's Hctrl_closed, verbatim. -/
@@ -238,8 +246,8 @@ def ctrlClosed (GT : GdexecT) : Prop :=
 theorem gsrcTMono (GT : GdexecT) : gateMono (gtAdGd GT) (gsrcT GT) := by
   intro e1 e2 H12 r Hr
   rw [gsrcTSpec] at Hr ⊢
-  obtain ⟨w, Hin, Hwe⟩ := Hr
-  refine ⟨w, Hin, .inr ?_⟩
+  obtain ⟨w, Hin, Hwe, Hrd⟩ := Hr
+  refine ⟨w, Hin, .inr ?_, Hrd⟩
   rcases Hwe with rfl | Hpo
   · exact H12
   · exact gpoTransSg _ _ _ _ Hpo H12
@@ -247,16 +255,15 @@ theorem gsrcTMono (GT : GdexecT) : gateMono (gtAdGd GT) (gsrcT GT) := by
 theorem gsrcTSrc (GT : GdexecT) (Hdw : gtdepsWf GT.gtG GT.gtDeps) (e r : Geid) :
     r ∈ gsrcT GT e → ∃ w, ((r, w), DTctrl) ∈ GT.gtDeps ∧
       (w = e ∨ WeakRvwmoGraph.gpo GT.gtG w e) ∧
-      WeakRvwmoGraph.gpo GT.gtG r w ∧ glblIs GT.gtG r lbIsR ∧ glblIs GT.gtG w lbIsW := by
+      WeakRvwmoGraph.gpo GT.gtG r w ∧ glblIs GT.gtG r lbIsR ∧ glblIs GT.gtG w lbIsWT := by
   intro Hr
-  obtain ⟨w, Hin, Hwe⟩ := (gsrcTSpec GT e r).1 Hr
+  obtain ⟨w, Hin, Hwe, Hrd⟩ := (gsrcTSpec GT e r).1 Hr
   obtain ⟨H1, H2, H3, H4⟩ := Hdw _ Hin
   simp only [dtagW, if_true] at H1 H2 H3 H4
-  obtain ⟨l, Hl, _⟩ := H3
+  obtain ⟨l, Hl, Hlr⟩ := AxDeps.gisRdGlbl _ _ Hrd
   obtain ⟨l', Hl', _⟩ := H4
-  refine ⟨w, Hin, Hwe, ⟨H1, H2, by simp [Hl], by simp [Hl']⟩, ⟨l, Hl, ?_⟩, ⟨l', Hl', ?_⟩⟩
-  · assumption
-  · assumption
+  refine ⟨w, Hin, Hwe, ⟨H1, H2, by simp [Hl], by simp [Hl']⟩, ⟨l, Hl, Hlr⟩, ⟨l', Hl', ?_⟩⟩
+  assumption
 
 /-- Conjuncts 1-2 from `gtdepsWf` alone. -/
 theorem gsrcTSrcPo (GT : GdexecT) (Hdw : gtdepsWf GT.gtG GT.gtDeps) :
@@ -389,7 +396,7 @@ theorem twCtrlClosed : ctrlClosed AxDeps.tw :=
   ctrlClosedBSound _ twCatT.1 (by decide +kernel)
 
 theorem twGsrcNonempty : ((1, 0) : Geid) ∈ gsrcT AxDeps.tw (1, 1) :=
-  (gsrcTSpec _ _ _).2 ⟨(1, 1), by decide +kernel, .inl rfl⟩
+  (gsrcTSpec _ _ _).2 ⟨(1, 1), by decide +kernel, .inl rfl, by decide +kernel⟩
 
 /-- Lean-only: the target order is a permutation of `AxDeps.tw`'s gmo. -/
 theorem AxSpinGate.twListPerm :
@@ -462,7 +469,8 @@ theorem twcCtrlClosed : ctrlClosed twc :=
   ctrlClosedBSound _ twcCatT.1 (by decide +kernel)
 
 theorem twcGsrcNonempty : ((1, 0) : Geid) ∈ gsrcT twc (1, 3) :=
-  (gsrcTSpec _ _ _).2 ⟨(1, 1), by decide +kernel, .inr ((gpoBSpec _ _ _).1 (by decide +kernel))⟩
+  (gsrcTSpec _ _ _).2 ⟨(1, 1), by decide +kernel, .inr ((gpoBSpec _ _ _).1 (by decide +kernel)),
+    by decide +kernel⟩
 
 /-- The gate fact on the SECOND store, through the closure edge. -/
 theorem twcGateW : gmoLt twc.gtG (1, 0) (1, 3) :=

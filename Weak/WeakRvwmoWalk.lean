@@ -859,7 +859,7 @@ theorem wlkSegOfCert (G : Gexec) (n : Nat) (x : Nat) (cpu : CPU) (d0 : Efab) (T 
     wrdsFree d0 T →
     wndOk cpu d0 (wQ G d0 T Nd n x k0 kz) Nd →
     hemit (fun _ => d0) k0 ws0 rowseg (.PHart cpu m0 rs10 fn0 ib0) es pfin →
-    (∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst) →
+    (∀ kd ba bs sa sv, LDev kd ba bs sa sv ∉ es.map Prod.fst) →
     WeakRvwmoCert2.esPin St.cstC.cdImg es →
     (∀ i lb, rowseg[i]? = some lb → wQ G d0 T Nd n x k0 kz (k0 + i) lb) →
     cstOk d0 St →

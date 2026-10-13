@@ -471,7 +471,7 @@ def wsegSupply (boot : Nat → Pexv6) (d0 : Efab) (N : Nat) (GD : Gdexec) : Prop
          (((qrow GD.gdG x).drop k0).take (kz - k0) ++
           [(gxLbl GD.gdG (x, kz)).getD (.LFence false false false false)])
          (.PHart cpu m0 rs10 fn0 ib0) es pfin →
-       (∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst) ∧ Nd k0 cpu m0) ∧
+       (∀ kd ba bs sa sv, LDev kd ba bs sa sv ∉ es.map Prod.fst) ∧ Nd k0 cpu m0) ∧
     -- THE WITNESS SET's side conditions
     cpolCtx GD.gdG (wwit GD.gdG n) x St.cstC ∧
     WPolocClosed GD.gdG (wwit GD.gdG n) ∧

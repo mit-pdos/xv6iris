@@ -414,7 +414,7 @@ theorem pstepEvSplit (p : Pexv6) (d : Efab) (l : Wlabel) (p' : Pexv6) (d' : Efab
 it advances; the monad and the parked fence untouched; the pin set. -/
 theorem pstepWireInv (p : Pexv6) (d : Efab) (l : Wlabel) (p' : Pexv6) (d' : Efab) :
     pstepWire p d l p' d' →
-    l = LDev .dev 0 [] ∧
+    l = LDev .dev 0 [] [] [] ∧
     ∃ (cpu : CPU) (m : SailM Unit) (rs : RegFile) (fn : Option (Bool × Bool × Bool × Bool))
       (ib : Ibch) (mm b : Bool) (k : Unit → DevProg .plic),
       p = .PHart cpu m rs fn ib ∧ d.efPlic = .op (.setPin cpu mm b) k ∧
@@ -438,7 +438,7 @@ theorem pstepWireAlways (cpu : CPU) (m : SailM Unit) (rs : RegFile)
     (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch) (d : Efab) (mm b : Bool)
     (k : Unit → DevProg .plic) :
     d.efPlic = .op (.setPin cpu mm b) k →
-    pstepWire (.PHart cpu m rs fn ib) d (LDev .dev 0 []) (.PHart cpu m (pinSet rs mm b) fn ib)
+    pstepWire (.PHart cpu m rs fn ib) d (LDev .dev 0 [] [] []) (.PHart cpu m (pinSet rs mm b) fn ib)
       { d with efPlic := k () } :=
   fun hd => ⟨rfl, some (pinSet rs mm b), none, none, rfl, rfl,
     pstepPlicPin cpu mm b k rs d hd m fn ib⟩
@@ -733,7 +733,7 @@ theorem astepProgPstep (row : List Lbl)
 
 /-- The PLIC wire, as an opax step: position kept, program moved by `pstepWire`. -/
 def awire (s s' : Athread) : Prop :=
-  s'.atK = s.atK ∧ ∃ d d', pstepWire s.atP d (LDev .dev 0 []) s'.atP d'
+  s'.atK = s.atK ∧ ∃ d d', pstepWire s.atP d (LDev .dev 0 [] [] []) s'.atP d'
 
 def astep (row : List Lbl) 
     (s s' : Athread) : Prop :=
@@ -1041,19 +1041,19 @@ theorem hemitAstepAux (row : List Lbl)
     (pfin : Pexv6) :
     hemit dv k ws rrow p es pfin →
     (∀ j, rrow[j]? = row[k + j]?) →
-    (∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst) →
+    (∀ kd ba bs sa sv, LDev kd ba bs sa sv ∉ es.map Prod.fst) →
     nsteps (astepAny row) es.length ⟨p, k⟩ ⟨pfin, k + rrow.length⟩ := by
   intro h
   induction h with
   | HEnil k ws p => intro _ _; exact nsteps_O _
   | HEone k ws lb rrow' p ls pa da l p' es pfin har hre hst _ ih =>
     intro hrow hnd
-    have hndl : ∀ kd ba bs, l ≠ LDev kd ba bs := fun kd ba bs he =>
-      hnd kd ba bs (List.mem_map.2 ⟨(l, some k), List.mem_append_right _ List.mem_cons_self,
+    have hndl : ∀ kd ba bs sa sv, l ≠ LDev kd ba bs sa sv := fun kd ba bs sa sv he =>
+      hnd kd ba bs sa sv (List.mem_map.2 ⟨(l, some k), List.mem_append_right _ List.mem_cons_self,
         by rw [he]⟩)
-    have hnd' : ∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst := fun kd ba bs hin => by
+    have hnd' : ∀ kd ba bs sa sv, LDev kd ba bs sa sv ∉ es.map Prod.fst := fun kd ba bs sa sv hin => by
       obtain ⟨x, hx, hxe⟩ := List.mem_map.1 hin
-      exact hnd kd ba bs (List.mem_map.2 ⟨x, List.mem_append_right _ (List.mem_cons_of_mem _ hx),
+      exact hnd kd ba bs sa sv (List.mem_map.2 ⟨x, List.mem_append_right _ (List.mem_cons_of_mem _ hx),
         hxe⟩)
     have hlb : row[k]? = some lb := by
       have h0 := hrow 0
@@ -1089,12 +1089,12 @@ theorem hemitAstepAux (row : List Lbl)
           exact absurd hst (pstepEvNoRmw _ _ _ _ _ _ _ _ _ _ _)
         | LExStore => exact False.elim hnb
         | LSilent => simp [projLbl] at hpr
-        | LDev kd ba bs => exact absurd rfl (hndl kd ba bs)
+        | LDev kd ba bs sa sv => exact absurd rfl (hndl kd ba bs sa sv)
         | LRegW => simp [projLbl] at hpr
         | LCtrl => simp [projLbl] at hpr
         | LInstr => simp [projLbl] at hpr
       · obtain ⟨rfl, _⟩ := pstepWireInv _ _ _ _ _ hw
-        exact absurd rfl (hndl _ _ _)
+        exact absurd rfl (hndl _ _ _ _ _)
     have e1 : (eadm ls ++ (l, some k) :: es).length = ls.length + (es.length + 1) := by
       simp [eadm]
     have e2 : k + (lb :: rrow').length = k + 1 + rrow'.length := by
@@ -1104,9 +1104,9 @@ theorem hemitAstepAux (row : List Lbl)
   | HEpair k ws lb rrow' p ls1 pa da l1 pm dm ls2 pm2 dm2 l2 p' es pfin har1 hre hst1 har2
       hst2 _ ih =>
     intro hrow hnd
-    have hnd' : ∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst := fun kd ba bs hin => by
+    have hnd' : ∀ kd ba bs sa sv, LDev kd ba bs sa sv ∉ es.map Prod.fst := fun kd ba bs sa sv hin => by
       obtain ⟨x, hx, hxe⟩ := List.mem_map.1 hin
-      exact hnd kd ba bs (List.mem_map.2 ⟨x, List.mem_append_right _ (List.mem_cons_of_mem _
+      exact hnd kd ba bs sa sv (List.mem_map.2 ⟨x, List.mem_append_right _ (List.mem_cons_of_mem _
         (List.mem_append_right _ (List.mem_cons_of_mem _ hx))), hxe⟩)
     have hlb : row[k]? = some lb := by
       have h0 := hrow 0
@@ -1148,7 +1148,7 @@ theorem hemitAstepAux (row : List Lbl)
 item, from position 0 to the row's end. -/
 theorem hemitAstep (row : List Lbl)  (i : Nat)
     (p0 : Pexv6) (dv : Nat → Efab) (em : Hemission) :
-    hartConf i row p0 dv em → (∀ kd ba bs, LDev kd ba bs ∉ emLabels em) →
+    hartConf i row p0 dv em → (∀ kd ba bs sa sv, LDev kd ba bs sa sv ∉ emLabels em) →
     nsteps (astepAny row) em.emItems.length ⟨p0, 0⟩ ⟨em.emFin, row.length⟩ := by
   intro h hnd
   have := hemitAstepAux row dv 0 wsInit row p0 _ _ h (fun j => by rw [Nat.zero_add]) hnd
@@ -1156,7 +1156,7 @@ theorem hemitAstep (row : List Lbl)  (i : Nat)
 
 theorem hartConfCoverage (row : List Lbl) 
     (i : Nat) (p0 : Pexv6) (dv : Nat → Efab) (em : Hemission) :
-    hartConf i row p0 dv em → (∀ kd ba bs, LDev kd ba bs ∉ emLabels em) →
+    hartConf i row p0 dv em → (∀ kd ba bs sa sv, LDev kd ba bs sa sv ∉ emLabels em) →
     ∀ j, consumed row ⟨p0, 0⟩ ⟨em.emFin, row.length⟩ j ↔ j < row.length := by
   intro h hnd
   exact coverageOfRow row _ _ (rtc_nsteps_2 (hemitAstep row i p0 dv em h hnd))
@@ -1372,7 +1372,7 @@ theorem wtHartConf (i : Nat) (cpu : CPU) (rs : RegFile) (w0 : BitVec (8 * 4)) :
 theorem wtHemitAstep (i : Nat) (cpu : CPU) (rs : RegFile) (w0 : BitVec (8 * 4)) :
     nsteps (astepAny (wtRow w0 w0)) 2 ⟨wtP0 cpu rs, 0⟩ ⟨wtP2 cpu rs, 2⟩ :=
   hemitAstep _ i _ wtDv _ (wtHartConf i cpu rs w0)
-    (by intro kd ba bs h; simp [emLabels, wtItems] at h)
+    (by intro kd ba bs sa sv h; simp [emLabels, wtItems] at h)
 
 end OpaxWit
 

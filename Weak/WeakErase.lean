@@ -98,7 +98,8 @@ open MachCSL MachCSL.Stdpp Iris.Std Wlabel
 
 /-- Blank every operand list; send the three dependency-only labels to `LSilent`.  Everything
 else is kept VERBATIM, which is what makes the log, the message classes and the axiomatic
-projection agree on the nose.  (Deviation 6: a fetch is kept as is.) -/
+projection agree on the nose.  (Deviation 6: a fetch is kept as is.  W13 (F-dep) (1): `LDev`'s operand lists
+are blanked like every other label's.) -/
 def eraseLbl (l : Wlabel) : Wlabel :=
   match l with
   | LSilent => LSilent
@@ -106,7 +107,7 @@ def eraseLbl (l : Wlabel) : Wlabel :=
   | LStore rl base data _ _ => LStore rl base data [] []
   | LRmw aq rl base tvs data _ _ => LRmw aq rl base tvs data [] []
   | LFence pr pw sr sw => LFence pr pw sr sw
-  | LDev kd ba bs => LDev kd ba bs
+  | LDev kd ba bs _ _ => LDev kd ba bs [] []
   | LRegW _ _ => LSilent
   | LCtrl _ => LSilent
   | LInstr => LSilent
@@ -564,7 +565,7 @@ theorem eraseStep (i : Nat) (l : Wlabel) (c c' ce : Wpcfg P D) :
       (fencePostEr _ _ _ _ _ _ hws)
   | PFDev cfg ag st' d' hlk hps =>
     obtain ⟨age, hlke, hst, hpr, hws⟩ := hags i ag hlk
-    refine ⟨_, wpPfStep.PFDev ce age st' d' hlke ⟨.LDev _ _ _, rfl, by rw [hst, hdev]; exact hps⟩, ?_⟩
+    refine ⟨_, wpPfStep.PFDev ce age st' d' hlke ⟨.LDev _ _ _ _ _, rfl, by rw [hst, hdev]; exact hps⟩, ?_⟩
     rw [hpr]
     exact erCfgUpd _ _ _ _ _ _ _ _ _ _ _ _ _ _ himg hlog hlen hags hlk hlke hws
   | PFRegW cfg ag rd srcs st' d' hlk hps =>

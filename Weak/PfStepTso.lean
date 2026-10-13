@@ -64,7 +64,7 @@ def pinnedStmt (fok : Image → List Wmsg → Nat → Int → List (Nat × BitVe
     (∀ n va req, o = .memWrite n va req → ramBytes req.pa n) →
     rmem c st σ → viewRel TsoShadow.cohSrc σ st →
     fn = none →
-    l ≠ .LSilent → (∀ kd ba bs, l ≠ .LDev kd ba bs) →
+    l ≠ .LSilent → (∀ kd ba bs sa sv, l ≠ .LDev kd ba bs sa sv) →
     (o = .barrier .Barrier_RISCV_i →
        (tsoShadow TsoShadow.cohSrc st (hartAgent cpu)).fiArm = true) →
     (∀ n w, o = .instrAnnounce n w → sfAnnB n w = true →
@@ -119,7 +119,7 @@ def proposedStmt (fok : Image → List Wmsg → Nat → Int → List (Nat × Bit
     (∀ aq base tvs asrc, l = .LExLoad aq base tvs asrc →                           -- (4)
        ownCoh c ∧ exclOkTs c.pcLog (hartAgent cpu) base (tvs.map Prod.fst) (c.pcLog.length + 1)) →
     fn = none →
-    l ≠ .LSilent → (∀ kd ba bs, l ≠ .LDev kd ba bs) →
+    l ≠ .LSilent → (∀ kd ba bs sa sv, l ≠ .LDev kd ba bs sa sv) →
     (o = .barrier .Barrier_RISCV_i →
        (tsoShadow TsoShadow.cohSrc st (hartAgent cpu)).fiArm = true) →
     (∀ n w, o = .instrAnnounce n w → sfAnnB n w = true →
@@ -267,7 +267,7 @@ theorem loadRow {P D : Type} (pstep : P → D → Wlabel → P → D → Prop)
 /-- The hart's own node step, off a parked fence and the PLIC wire. -/
 theorem nodeOf (cpu : CPU) (m : SailM Unit) (rs : RegFile) (fn : Option (Bool × Bool × Bool × Bool))
     (ib : Ibch) (d : Efab) (l : Wlabel) (p' : Pexv6) (d' : Efab)
-    (h : pstepEv (.PHart cpu m rs fn ib) d l p' d') (hl : ∀ kd ba bs, l ≠ .LDev kd ba bs)
+    (h : pstepEv (.PHart cpu m rs fn ib) d l p' d') (hl : ∀ kd ba bs sa sv, l ≠ .LDev kd ba bs sa sv)
     (hfn : fn = none) :
     ∃ m' ors fn' dd oib obar, pnodeStep m rs ib d.efDev l m' ors fn' dd oib obar ∧
       ∃ rs' ib', p' = .PHart cpu m' rs' fn' ib' := by
@@ -278,7 +278,7 @@ theorem nodeOf (cpu : CPU) (m : SailM Unit) (rs : RegFile) (fn : Option (Bool ×
     rcases hh with ⟨hn, -⟩ | ⟨mm, b, kk, -, hl', -⟩
     · subst hfn
       exact ⟨m', ors, fn', _, oib, obar, hn, rs', ib', rfl⟩
-    · exact absurd hl' (hl _ _ _)
+    · exact absurd hl' (hl _ _ _ _ _)
 
 theorem erwInert (e : ErwKind) : lbInert (erwLabel e) = true := by cases e <;> rfl
 
@@ -318,7 +318,7 @@ theorem pfStepTso (fok : Image → List Wmsg → Nat → Int → List (Nat × Bi
     (∀ aq base tvs asrc, l = .LExLoad aq base tvs asrc →
        ownCoh c ∧ exclOkTs c.pcLog (hartAgent cpu) base (tvs.map Prod.fst) (c.pcLog.length + 1)) →
     fn = none →
-    l ≠ .LSilent → (∀ kd ba bs, l ≠ .LDev kd ba bs) →
+    l ≠ .LSilent → (∀ kd ba bs sa sv, l ≠ .LDev kd ba bs sa sv) →
     (o = .barrier .Barrier_RISCV_i →
        (tsoShadow TsoShadow.cohSrc st (hartAgent cpu)).fiArm = true) →
     (∀ n w, o = .instrAnnounce n w → sfAnnB n w = true →
@@ -345,7 +345,7 @@ theorem pfStepTso (fok : Image → List Wmsg → Nat → Int → List (Nat × Bi
     dsimp only [pnodeStep] at hn
     split at hn
     · obtain ⟨w, -, hl, -⟩ := hn
-      exact absurd hl (hld _ _ _)
+      exact absurd hl (hld _ _ _ _ _)
     · rcases hn with ⟨hif, w, tvs, hlen, hw, rfl, rfl, -⟩ |
         ⟨hif, ⟨hlat, w, tvs, hlen, hw, rfl, rfl, -⟩ | ⟨hlat, w, tvs, hlen, hw, rfl, rfl, -⟩⟩
       · -- the FETCH
@@ -381,7 +381,7 @@ theorem pfStepTso (fok : Image → List Wmsg → Nat → Int → List (Nat × Bi
     dsimp only [pnodeStep] at hn
     split at hn
     · split at hn
-      · exact absurd hn.2.1 (hld _ _ _)
+      · exact absurd hn.2.1 (hld _ _ _ _ _)
       · exact hn.elim
     · split at hn
       · rename_i v hval
@@ -502,11 +502,11 @@ theorem pfStepTsoSame {P D : Type} (pstep : P → D → Wlabel → P → D → P
     wpPfStep pstep pcls i l c c' →
     pairAdjacent (st ++ (i, l) :: rest) →
     rmem c st σ → viewRel TsoShadow.cohSrc σ st →
-    (l = .LSilent ∨ ∃ kd ba bs, l = .LDev kd ba bs) →
+    (l = .LSilent ∨ ∃ kd ba bs sa sv, l = .LDev kd ba bs sa sv) →
     rmem c' (st ++ [(i, l)]) σ ∧ viewRel TsoShadow.cohSrc σ (st ++ [(i, l)]) := by
   intro hstep hadj hR hV hl
-  have hfr : frameLbl l := by rcases hl with rfl | ⟨_, _, _, rfl⟩ <;> trivial
-  have hin : lbInert l = true := by rcases hl with rfl | ⟨_, _, _, rfl⟩ <;> rfl
+  have hfr : frameLbl l := by rcases hl with rfl | ⟨_, _, _, _, _, _, _, rfl⟩ <;> trivial
+  have hin : lbInert l = true := by rcases hl with rfl | ⟨_, _, _, _, _, _, _, rfl⟩ <;> rfl
   exact ⟨(pfFrameRowMem pstep pcls c c' st rest σ i l hR hstep hfr hadj).2.2 σ rfl rfl rfl,
     viewRelInert cohSrc σ σ st i l hin hV (sameReadRefl σ)⟩
 

@@ -245,7 +245,8 @@ theorem AxSpinProt4.spaShape :
   refine ⟨by decide +kernel, (grfAtBSpec _ _ _ _).1 (by decide +kernel), by decide +kernel,
     (grfAtBSpec _ _ _ _).1 (by decide +kernel), by decide +kernel,
     (grfAtBSpec _ _ _ _).1 (by decide +kernel), ?_⟩
-  exact (gsrcTSpec _ _ _).2 ⟨(hB, 1), by decide +kernel, .inr ((gpoBSpec _ _ _).1 (by decide +kernel))⟩
+  exact (gsrcTSpec _ _ _).2 ⟨(hB, 1), by decide +kernel, .inr ((gpoBSpec _ _ _).1 (by decide +kernel)),
+    by decide +kernel⟩
 
 theorem aWpdSpa :
     ∀ [InvGS_gen .hasNoLC spinGF] [AxannotGS spinGF] (nm : spinN),

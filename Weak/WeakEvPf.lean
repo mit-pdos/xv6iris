@@ -411,13 +411,13 @@ inductive epfStep : Nat → Wlabel → (Epool × WGState) → (Epool × WGState)
       ethreadLive σ P.epGen →
       wdevStep P.epGen (.uart i) rootTask (epU P i) σ m' σ' [] →
       σ'.wglog = σ.wglog →
-      epfStep nDisk (.LDev .dev 0 []) (P, σ) (epUset P i m', σ')
+      epfStep nDisk (.LDev .dev 0 [] [] []) (P, σ) (epUset P i m', σ')
   /-- A PLIC step: the wire write at its target hart, the gateway at the disk (deviation 2). -/
   | EPFPlic (P : Epool) (σ σ' : WGState) (m' : DevProg .plic) :
       ethreadLive σ P.epGen →
       wdevStep P.epGen .plic rootTask P.epPlic σ m' σ' [] →
       σ'.wglog = σ.wglog →
-      epfStep (plicAgent P.epPlic) (.LDev .dev 0 []) (P, σ) (epPset P m', σ')
+      epfStep (plicAgent P.epPlic) (.LDev .dev 0 [] [] []) (P, σ) (epPset P m', σ')
 
 def epfRun (ρ ρ' : Epool × WGState) : Prop := ∃ i l, epfStep i l ρ ρ'
 
@@ -640,7 +640,7 @@ theorem ecycleStepLabel (gen : Nat) (σ : WGState) (c : CPU) (m : SailM Unit)
         simp only [emonadStep, ecycleStep] at h
         split at h
         · obtain ⟨w, d', -, -, rfl⟩ := h
-          exact ⟨.LDev .rd (paZ req.pa) [], rfl, rfl⟩
+          exact ⟨.LDev .rd (paZ req.pa) [] [] [], rfl, rfl⟩
         · rcases h with ⟨-, w, tvs, -, -, hif, -, rfl⟩ |
             ⟨-, ⟨-, w, tvs, -, -, hrd, -, rfl⟩ | ⟨-, w, tvs, -, -, hrd, -, rfl⟩⟩
           · -- O2: THE I-CACHE READ
@@ -653,7 +653,7 @@ theorem ecycleStepLabel (gen : Nat) (σ : WGState) (c : CPU) (m : SailM Unit)
         split at h
         · split at h
           · obtain ⟨d', -, -, rfl⟩ := h
-            exact ⟨.LDev .wr (paZ req.pa) [], rfl, rfl⟩
+            exact ⟨.LDev .wr (paZ req.pa) [] [] [], rfl, rfl⟩
           · exact h.elim
         · split at h
           · rename_i v _
@@ -720,14 +720,14 @@ theorem ediskStepLabel (P : Epool) (σ : WGState) (e' : EExpr) (σ' : WGState) :
     ⟨pre, g, pa, bs, k, s, s', -, -, -, -, hne, rfl, rfl⟩ | ⟨pre, g, pa, bs, k, s, -, -, -, rfl, rfl⟩ |
     ⟨pre, g, pa, bs, k, s, -, -, rfl, rfl⟩ | ⟨h, k, -, -, rfl, rfl⟩ | ⟨h, k, -, -, rfl, rfl⟩ |
     ⟨-, rfl, rfl⟩ | ⟨-, rfl, rfl⟩)
-  · exact ⟨.LDev .dev 0 [], _, _, rfl, rfl, rfl⟩
+  · exact ⟨.LDev .dev 0 [] [] [], _, _, rfl, rfl, rfl⟩
   · exact ⟨.LLoad aq false (paZ pa) tvs [], _, _, rfl, rfl, rfl, hrd, rfl, rfl⟩
   · exact ⟨.LFence true true true true, _, _, rfl, rfl, rfl⟩
   · exact ⟨.LStore false (paZ (pa s)) (bs s) [] [], _, _, rfl, rfl, rfl, ⟨_, rfl⟩, hne, rfl⟩
   · exact ⟨.LSilent, _, _, rfl, rfl, rfl⟩
   · exact ⟨.LSilent, _, _, rfl, rfl, rfl⟩
-  · exact ⟨.LDev .dev 0 [], _, _, rfl, rfl, rfl⟩
-  · exact ⟨.LDev .dev 0 [], _, _, rfl, rfl, rfl⟩
+  · exact ⟨.LDev .dev 0 [] [] [], _, _, rfl, rfl, rfl⟩
+  · exact ⟨.LDev .dev 0 [] [] [], _, _, rfl, rfl, rfl⟩
   · exact ⟨.LSilent, _, _, rfl, rfl, rfl⟩
   · exact ⟨.LSilent, _, _, rfl, rfl, rfl⟩
 

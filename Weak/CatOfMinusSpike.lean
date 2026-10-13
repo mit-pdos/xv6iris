@@ -39,7 +39,7 @@ theorem catADOfCatT (GT : GdexecT) :
   intro h
   obtain ⟨hwf, h6, hlv, hat, hdw, hdg⟩ := catTForgetAxioms GT h
   exact ⟨hwf, h6, hlv, hat, hdw, hdg, fun p hp => gtAdSubForget _ _ p hp,
-    fun a b h12 => h.2.1 a b (Or.inr h12)⟩
+    fun a b h12 => h.2.1 a b (Or.inr (gppo12AdFull _ _ _ _ h12))⟩
 
 theorem catADOfCat (GD : Gdexec) :
     rvwmoCatConsistent GD → rvwmoCatAD GD GD.gdDeps := by

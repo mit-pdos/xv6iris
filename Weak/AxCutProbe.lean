@@ -366,22 +366,22 @@ theorem restrictCatConsistentT (GT : GdexecT) (cs : List Nat) (n : Nat) :
   · rintro e1 e2 (h6 | h12)
     · obtain ⟨h, hc1, hc2⟩ := gxrGppoCat6 GT.gtG cs n hcut e1 e2 h6
       exact gxrGmoLtIn _ cs n e1 e2 hwf hro hc1 hc2 (hppo e1 e2 (Or.inl h))
-    · obtain ⟨h, hc1, hc2⟩ := gxrGppo12 GT.gtG cs n hcut (gtAd GT.gtG GT.gtDeps)
-        (gtAd (gtRestrict GT cs n).gtG (gtRestrict GT cs n).gtDeps) e1 e2
+    · obtain ⟨h, hc1, hc2⟩ := gxrGppo12 GT.gtG cs n hcut (gtAdFull GT.gtG GT.gtDeps)
+        (gtAdFull (gtRestrict GT cs n).gtG (gtRestrict GT cs n).gtDeps) e1 e2
         (by
           rintro ⟨a, m⟩ hx
-          obtain ⟨tg, hin, had, hw⟩ := (elemOfGtAd _ _ _ _).1 hx
+          obtain ⟨tg, hin, had, hw⟩ := (elemOfGtAdFull _ _ _ _).1 hx
           obtain ⟨hin, hca, _⟩ := (gtRestrictDeps GT cs n _).1 hin
           obtain ⟨_, hw⟩ := (gxrGisWTrue GT.gtG cs n m).1 hw
-          exact ⟨(elemOfGtAd _ _ _ _).2 ⟨tg, hin, had, hw⟩, hca⟩) h12
+          exact ⟨(elemOfGtAdFull _ _ _ _).2 ⟨tg, hin, had, hw⟩, hca⟩) h12
       exact gxrGmoLtIn _ cs n e1 e2 hwf hro hc1 hc2 (hppo e1 e2 (Or.inr h))
   · intro e he
     obtain ⟨he, hc1, hc2⟩ := (gtRestrictDeps GT cs n e).1 he
     obtain ⟨h1, h2, h3, h4⟩ := hdw e he
-    refine ⟨h1, h2, (gxrGlblIs GT.gtG cs n e.1.1 lbIsR).2 ⟨hc1, h3⟩, ?_⟩
+    refine ⟨h1, h2, (gxrGlblIs GT.gtG cs n e.1.1 lbIsRT).2 ⟨hc1, h3⟩, ?_⟩
     by_cases hd : dtagW e.2 = true
     · rw [if_pos hd] at h4 ⊢
-      exact (gxrGlblIs GT.gtG cs n e.1.2 lbIsW).2 ⟨hc2, h4⟩
+      exact (gxrGlblIs GT.gtG cs n e.1.2 lbIsWT).2 ⟨hc2, h4⟩
     · rw [if_neg hd] at h4 ⊢
       exact (gxrGmem GT.gtG cs n e.1.2).2 ⟨hc2, h4⟩
   · intro e he

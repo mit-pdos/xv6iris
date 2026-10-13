@@ -10,6 +10,11 @@
 # without the Sail-cycle premise, SailCycleOrderCycle; Weak.srvwmoXv6M2, the
 # corollary of PfRunUnpinned's srvwmoXv6M2Core without the Sail-cycle premise,
 # SailCycleOrderCycle; NOT published [OWN.2]).
+# W13 (F-dep) (0) [R38.1][OWN.52]: the AxSpin roots' premise `rvwmoCatConsistentT`
+# (Weak/AxDeps.lean) admits I/O-endpoint dependency edges (`gtdepsWf`) and orders rule 12
+# from any read (`gtAdFull`); on graphs with RAM-endpoint deps only it is the old premise,
+# so the roots' TEXT is unchanged and their premise is WEAKER -- strictly stronger theorems,
+# no re-registration.
 Weak.allocpidOpen             # THEOREM 2: two-hart allocpid pid distinctness + nextpid source, open third hart (AxSpinT2b); model rule 7 = riscv.cat's RCsc [OWN.54]
 Weak.allocpid2Distinct        # THEOREM 1: its corollary with no third hart (AxSpinT2b); model rule 7 = riscv.cat's RCsc [OWN.54]
 Weak.allocpidOpen2            # THEOREM 2, stage 2: no panic (no cut) on prefix rows + nextpid source + pid distinctness + a3 = pid at the final state (P4), open third hart (AxSpinT2b2); model rule 7 = riscv.cat's RCsc [OWN.54]

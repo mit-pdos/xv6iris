@@ -281,8 +281,10 @@ theorem lblRealizesUnproj (p : P) (σ : Mstate) (i : Nat) (lb : Lbl) (l : Wlabel
     simp only [projLbl, Option.some.injEq] at hpr
     subst hpr
     exact ⟨rfl, trivial⟩
-  | LDev kd base vs =>
+  | LDev kd base vs asrc vsrc =>
     -- W13 (I): the fabric marker realizes its own I/O-class event
+    simp only [lbDepfree] at hdf
+    obtain ⟨rfl, rfl⟩ := hdf
     simp only [projLbl, Option.some.injEq] at hpr
     subst hpr
     exact ⟨rfl, trivial⟩

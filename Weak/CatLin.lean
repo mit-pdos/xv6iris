@@ -29,8 +29,10 @@ are new.  Everything else is the spike's text, re-namespaced.
 
 **Spec notes (RVWMO / riscv.cat).**  `rvwmoCatAD` is implied by the tagged model; it is
 WEAKER than RVWMO⁻ (`catADOfMinus`) and its forwarding witness is in `CatLinWit`.  It relies on
-`AxDeps.gtdepsWf`'s RAM-endpoint shape only through `AxDeps.catTForgetAxioms` (the untagged
-`gdepsWf` of `forget GT`) and `gtAdSubForget` (rule 12's domain inside `forgetDeps`).
+`AxDeps.gtdepsWf` only through `AxDeps.catTForgetAxioms` (the untagged `gdepsWf` of `forget GT`,
+whose RAM-read → RAM-write filter drops the I/O-endpoint edges W13 (F-dep) admits) and
+`gtAdSubForget` (rule 12's domain inside `forgetDeps`); the model's rule 12 ranges over
+`gtAdFull` ⊇ `gtAd` ([OWN.52] (A1)), closed by `gppo12AdFull`.
 -/
 import Weak.WeakRvwmoKillArms
 import Weak.AxDeps
@@ -56,7 +58,7 @@ theorem catADOfCatT (GT : GdexecT) :
   intro h
   obtain ⟨hwf, h6, hlv, hat, hdw, hdg⟩ := catTForgetAxioms GT h
   exact ⟨hwf, h6, hlv, hat, hdw, hdg, fun p hp => gtAdSubForget _ _ p hp,
-    fun a b h12 => h.2.1 a b (Or.inr h12)⟩
+    fun a b h12 => h.2.1 a b (Or.inr (gppo12AdFull _ _ _ _ h12))⟩
 
 theorem catADOfCat (GD : Gdexec) :
     rvwmoCatConsistent GD → rvwmoCatAD GD GD.gdDeps := by

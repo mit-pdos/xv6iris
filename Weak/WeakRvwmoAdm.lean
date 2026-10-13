@@ -689,11 +689,11 @@ theorem laEmItemsFst (t : Nat) (w : BitVec 32) (cpu : CPU) :
 theorem laEmDevfree (t : Nat) (w : BitVec 32) (cpu : CPU) : emDevfree (laEm t w cpu) := by
   unfold emDevfree
   rw [laEmItemsFst]
-  intro kd ba bs h
+  intro kd ba bs sa sv h
   rcases List.mem_cons.1 h with h | h
   · simp [laWl0] at h
   · rcases List.mem_append.1 h with h | h
-    · rcases WeakRvwmoAdm.laAdmMem w (LDev kd ba bs) h with hx | hx | hx
+    · rcases WeakRvwmoAdm.laAdmMem w (LDev kd ba bs sa sv) h with hx | hx | hx
       · simp [wlAdmok] at hx
       · simp [laWl1] at hx
       · simp [WeakRvwmoAdm.laWlH] at hx

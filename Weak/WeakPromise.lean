@@ -85,8 +85,10 @@ inductive Wlabel where
   | LFence (pr pw sr sw : Bool)
   /-- The fabric marker, carrying the I/O event's payload (W13 (E), D47 (a)): the kind
   (`rd`/`wr` = a hart's MMIO load/store, `dev` = a device-side fabric move, D49 (a)), the
-  base address and the bytes moved (`dev`: `0`/`[]`). -/
-  | LDev (kind : IoKind) (base : Int) (vs : List (BitVec 8))
+  base address and the bytes moved (`dev`: `0`/`[]`); W13 (F-dep) (1) (D50 (b) [OWN.17]): the
+  dependency operands — `asrc` the address sources (`rd` as `LExLoad`'s, `wr` as `LStore`'s), `vsrc`
+  the data sources (`wr` only; `[]` for `rd`; both `[]` for `dev`). -/
+  | LDev (kind : IoKind) (base : Int) (vs : List (BitVec 8)) (asrc vsrc : List Dsrc)
   | LRegW (rd : Nat) (srcs : List Dsrc)
   | LCtrl (srcs : List Dsrc)
   | LInstr
@@ -102,7 +104,8 @@ open Wlabel
 /-- THE DEPENDENCY-FREE FRAGMENT OF THE LABEL ALPHABET. -/
 def lbDepfree (l : Wlabel) : Prop :=
   match l with
-  | LSilent | LFence .. | LDev .. | LIFetch .. => True
+  | LSilent | LFence .. | LIFetch .. => True
+  | LDev _ _ _ asrc vsrc => asrc = [] ∧ vsrc = []
   | LLoad _ _ _ _ asrc => asrc = []
   | LStore _ _ _ asrc vsrc => asrc = [] ∧ vsrc = []
   | LRmw _ _ _ _ _ asrc vsrc => asrc = [] ∧ vsrc = []
@@ -675,9 +678,9 @@ inductive wpstep : Wpcfg P D → Wpcfg P D → Prop
       wpstep cfg
         ⟨cfg.pcImg, cfg.pcLog, d', cfg.pcAgs.set i ⟨st', fencePost ag.paWs pr pw sr sw, ag.paProm⟩⟩
   | WPDev (cfg : Wpcfg P D) (i : Nat) (ag : Wpagent P) {kd : IoKind} {ba : Int}
-      {bs : List (BitVec 8)} (st' : P) (d' : D) :
+      {bs : List (BitVec 8)} {sa sv : List Dsrc} (st' : P) (d' : D) :
       cfg.pcAgs[i]? = some ag →
-      pstep ag.paSt cfg.pcDev (LDev kd ba bs) st' d' →
+      pstep ag.paSt cfg.pcDev (LDev kd ba bs sa sv) st' d' →
       wpstep cfg ⟨cfg.pcImg, cfg.pcLog, d', cfg.pcAgs.set i ⟨st', ag.paWs, ag.paProm⟩⟩
   | WPRegW (cfg : Wpcfg P D) (i : Nat) (ag : Wpagent P) (rd : Nat) (srcs : List Dsrc) (st' : P)
       (d' : D) :

@@ -61,7 +61,7 @@ open Wlabel Dtag
 theorem dstepTDtctlMono (s : DstateT) (it : Eitem) : s.dtCtl ⊆ (dstepT s it).1.dtCtl := by
   obtain ⟨l, ok⟩ := it
   intro x hx
-  cases l <;> cases ok <;> simp [dstepT, hx]
+  cases l <;> cases ok <;> simp [dstepT, hx] <;> split <;> simp [hx]
 
 /-- The state reached after folding `dstepT` over a whole row. -/
 def dstateTAfter (s : DstateT) (es : List Eitem) : DstateT :=

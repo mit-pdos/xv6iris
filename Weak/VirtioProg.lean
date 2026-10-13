@@ -27,7 +27,7 @@ MODEL text; the model of record is MachCSL's (`MachCSL/Dev/*.lean`).
     DRead pa n aq k             one RAM read (label `LLoad aq false`)
     DFence k                    the device-side `fence rw,rw` (label `LFence true true true true`)
     DWriteDev pre g pa bs k     ONE FABRIC-MOVING RAM WRITE (the pf twin of `DevM.dmaWriteStep`)
-    DPop h k                    THE RING POP (one `LDev .dev 0 []` event)
+    DPop h k                    THE RING POP (one `LDev .dev 0 [] [] []` event)
 
 `DWriteDev pre g pa bs k`, at the fabric `v` the write finds (the disk agent's step reads the
 CURRENT fabric, `WeakEvLang.ediskStep` / `WeakEvInst.pdiskProg`): `pre` is the FOLDED part --

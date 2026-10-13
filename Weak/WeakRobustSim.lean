@@ -1452,11 +1452,11 @@ theorem QinvStep (hwf : ptracesWf pstep TS) (hwsi : ptracesWsInit TS) (hco : ∀
     · rw [← hWdef]; simp only [aevPost, hlbe]
     · rw [hstpost, hlogNone hgts]
       exact .PFFence cf _ pr pw sr sw st' dnew hcflk hpure
-  | LDev kd ba bs =>
+  | LDev kd ba bs sa sv =>
     -- the `LSilent` case verbatim, at `PFDev`
     obtain ⟨_, hts0⟩ := hok
     have hgts : gevTs TS e = none := by simp [gevTs, hgev, hts0]
-    refine ⟨_, qcfgStep pstep pcls TS DS img d0 ps hwf hwfl dn e T ev ag2 cf W (.LDev kd ba bs) dnew
+    refine ⟨_, qcfgStep pstep pcls TS DS img d0 ps hwf hwfl dn e T ev ag2 cf W (.LDev kd ba bs sa sv) dnew
       hq hnp hT hev hag2 hc0 ?_ hfab' ?_⟩
     · rw [← hWdef]; simp only [aevPost, hlbe]
     · rw [hstpost, hlogNone hgts]

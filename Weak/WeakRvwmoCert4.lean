@@ -515,7 +515,7 @@ theorem segStepOfSegment (x : Nat) (cpu : CPU) (d0 : Efab)
     (ib0 : Ibch) (St : CycState) (m20 : SailM Unit) (rs20 : RegFile)
     (fn20 : Ofence) (ib20 : Ibch) :
     hemit (fun _ => d0) k0 ws0 rowseg (.PHart cpu m0 rs10 fn0 ib0) es pfin →
-    (∀ kd ba bs, LDev kd ba bs ∉ es.map Prod.fst) →
+    (∀ kd ba bs sa sv, LDev kd ba bs sa sv ∉ es.map Prod.fst) →
     WeakRvwmoCert2.esPin St.cstC.cdImg es →
     (∀ i lb, rowseg[i]? = some lb → Q (k0 + i) lb) →
     cstOk d0 St →
