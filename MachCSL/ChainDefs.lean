@@ -627,14 +627,18 @@ ghost -- so that the pure export (`Xv6.AccessDiscipline.chainOkAt`'s
   lock's two words (`dynLkAt` at the entry's position);
 * the PAGE-TABLE bytes of BOTH tables ([R25.1 (a)], [OWN.39]): the bytes of
   every page a Sv39 walk reaches, AS OF the entry's position, from a root
-  word the registry names (`RsvKind.roots`: xv6's `kernel_pagetable` and
-  every `proc[i].pagetable`) -- `ptByteAt`.  One mechanism for the kernel
-  table and the per-process tables built at run time (`uvmcreate`/`mappages`):
-  a table is covered from the position its root is stored in a root word,
-  and stops being covered when the word moves (`freeproc`'s `p->pagetable = 0`).
+  word the registry names -- `ptByteLiveAt`.  From a PERMANENT root
+  (`RsvKind.roots`: xv6's `kernel_pagetable`, never freed) the walk is
+  unrestricted (`ptByteAt`); from a FREEABLE root (`RsvKind.uroots`: every
+  `proc[i].pagetable`, built at run time by `uvmcreate`/`mappages`) every hop
+  is restricted to pages NOT pushed onto the registered free list
+  (`RsvKind.freeHead`: `kmem.freelist`) since the naming word's last write
+  (W8 (pte-ghost), [OWN.57] scoped to the freeable tables [R42.1]): a freed
+  page-table page stops being covered at its push, not when the stale
+  pointer naming it is cleared.
 
 An exemption read AS OF a position is fixed once the position is below the
-top (`ptByteAt_grow`), which is all the step laws need. -/
+top (`ptByteLiveAt_grow`), which is all the step laws need. -/
 
 /-- Byte `a`'s entry AS OF position `t`: the latest entry at or below `t`
 (the value every agent's read at view `t` would return, ignoring its own
@@ -665,10 +669,81 @@ def ptRootAt (rs : List RsvRegion) (m : FlatMem) (t : Nat) (r : PAddr) : Prop :=
   r ≠ 0 ∧ ∃ (base : PAddr) (cnt stride k : Nat), (⟨base, .roots cnt stride⟩ : RsvRegion) ∈ rs ∧ k < cnt ∧
     wordAsOf m (base + BitVec.ofNat 64 (stride * k)) t r
 
-/-- **A page-table byte as of `t`**: `a` lies in a page a walk reaches, as
-of `t`, from a root word of `rs`. -/
+/-- **A page-table byte of a PERMANENT table as of `t`**: `a` lies in a page
+a walk reaches, as of `t`, from a PERMANENT root word of `rs` (`RsvKind.roots`;
+xv6: `kernel_pagetable`, never freed), unrestricted. -/
 def ptByteAt (rs : List RsvRegion) (m : FlatMem) (t : Nat) (a : PAddr) : Prop :=
   ∃ r p : PAddr, ptRootAt rs m t r ∧ ptPageAt m t r p ∧ p.toNat ≤ a.toNat ∧ a.toNat < p.toNat + 4096
+
+/-! ### The freeable tables (W8 (pte-ghost), [OWN.57] option (c) scoped to the
+freeable tables [R42.1])
+
+A table that is FREED at run time (xv6: a process's, `freewalk` /
+`proc_freepagetable`) is walked HOP-RESTRICTED: a hop (a root word to its
+root page, a pointer slot to its child page) is taken only if the named page
+was NOT pushed onto a registered free list (`RsvKind.freeHead`; xv6:
+`kmem.freelist`) after the naming word's last write.  Freed-ness is read off
+the head word's history (positions are global, so the head's and the naming
+word's positions compare); no ghost state. -/
+
+/-- The POSITION of the doubleword at `a` as of `t`: the max over its 8 bytes
+of the latest entry's position at or below `t` (0 for a byte without one) --
+ENTRY-based [R42.s2]: a later write rewriting the same value moves it. -/
+def wordPosAsOf (m : FlatMem) (a : PAddr) (t : Nat) : Nat :=
+  (List.range 8).foldr
+    (fun j acc => max (((m.entAsOf (a + BitVec.ofNat 64 j) t).map HEnt.t).getD 0) acc) 0
+
+/-- **The page `p` was freed since `t0`** (as of `t`): a registered free-list
+head word held `p`, as of some position in `(t0, t]`. -/
+def ptFreedSince (rs : List RsvRegion) (m : FlatMem) (t0 t : Nat) (p : PAddr) : Prop :=
+  ∃ (base : PAddr) (cnt stride k t' : Nat), (⟨base, .freeHead cnt stride⟩ : RsvRegion) ∈ rs ∧ k < cnt ∧
+    t0 < t' ∧ t' ≤ t ∧ wordAsOf m (base + BitVec.ofNat 64 (stride * k)) t' p
+
+/-- A LIVE hop: an entry of the page at `p` points, as of `t`, at the page
+`c`, and `c` was not freed since that entry's word was last written. -/
+def ptLiveChildAt (rs : List RsvRegion) (m : FlatMem) (t : Nat) (p c : PAddr) : Prop :=
+  ∃ (i : Nat) (v : BitVec 64), i < 512 ∧ wordAsOf m (p + BitVec.ofNat 64 (8 * i)) t v ∧ ptPtrTo v c ∧
+    ¬ ptFreedSince rs m (wordPosAsOf m (p + BitVec.ofNat 64 (8 * i)) t) t c
+
+/-- The page at `p` is one a LIVE walk from the root page `r` visits, as of
+`t`: the root, a live level-1 page, or a live level-0 page under one. -/
+def ptLivePageAt (rs : List RsvRegion) (m : FlatMem) (t : Nat) (r p : PAddr) : Prop :=
+  p = r ∨ ptLiveChildAt rs m t r p ∨ ∃ q, ptLiveChildAt rs m t r q ∧ ptLiveChildAt rs m t q p
+
+/-- As of `t`, a FREEABLE root word of `rs` (`RsvKind.uroots`) holds the root
+page `r ≠ 0`, not freed since the word's last write. -/
+def ptURootAt (rs : List RsvRegion) (m : FlatMem) (t : Nat) (r : PAddr) : Prop :=
+  r ≠ 0 ∧ ∃ (base : PAddr) (cnt stride k : Nat), (⟨base, .uroots cnt stride⟩ : RsvRegion) ∈ rs ∧ k < cnt ∧
+    wordAsOf m (base + BitVec.ofNat 64 (stride * k)) t r ∧
+    ¬ ptFreedSince rs m (wordPosAsOf m (base + BitVec.ofNat 64 (stride * k)) t) t r
+
+/-- **A LIVE page-table byte as of `t`** (W8 (pte-ghost)): a byte of a page
+the unrestricted walk from a PERMANENT root reaches (`ptByteAt`), or of a
+page the hop-restricted walk from a FREEABLE root reaches -- so no page is
+covered through a word that named it before it was pushed onto the free
+list (the [R41.1] window is closed), and pointer-shaped words a later owner
+writes into a freed page lead nowhere. -/
+def ptByteLiveAt (rs : List RsvRegion) (m : FlatMem) (t : Nat) (a : PAddr) : Prop :=
+  ptByteAt rs m t a ∨
+    ∃ r p : PAddr, ptURootAt rs m t r ∧ ptLivePageAt rs m t r p ∧ p.toNat ≤ a.toNat ∧ a.toNat < p.toNat + 4096
+
+/-- The doubleword whose byte `j` is `0x01` exactly when bit `j` of `mask` is
+set and `0x00` otherwise: a byte-subset of `kfree`'s `0x01` junk fill
+(`kalloc.c:55`) over an all-zero word. -/
+def fill01Word (mask : Nat) : BitVec 64 :=
+  BitVec.ofNat 64 ((List.range 8).foldr (fun j acc => (if mask.testBit j then 2 ^ (8 * j) else 0) + acc) 0)
+
+/-- **No partial `0x01` fill is a pointer into RAM** [R42.s3]: for every
+byte-subset of the fill over zero (256 masks), a Sv39 pointer entry it spells
+names no page in `[0x80000000, 0x88000000)` (the PPN bits it can set are
+`≡ 2 (mod 8)`, never bit 31).  So the fill `kfree` writes into an (all-zero,
+`freewalk`) page-table page before its push makes no RAM page a page-table
+page. -/
+theorem ptPtrTo_fill01_notRam (mask : Nat) (hm : mask < 256) (c : PAddr) (hp : ptPtrTo (fill01Word mask) c) :
+    ¬ (0x80000000 ≤ c.toNat ∧ c.toNat < 0x88000000) := by
+  obtain ⟨_, _, rfl⟩ := hp
+  revert mask
+  decide +kernel
 
 /-- A byte of a static spinlock's two words or of a publication word of `rs`. -/
 def lockPubByteIn (rs : List RsvRegion) (a : PAddr) : Prop :=
@@ -692,13 +767,14 @@ def devPageIn (rs : List RsvRegion) (m : FlatMem) (top : Nat) (a : PAddr) : Prop
 
 /-- **The exemption of the load-side invariant**, at memory `m` with top
 `top`: byte `a` as of position `t` is a lock-layer byte (static, publication,
-or a dynamic lock live at `t`), a page-table byte (`ptByteAt`: one named
-predicate, so a later refinement -- W8 (pte-ghost), [OWN.57] -- can strengthen
-it by "page not freed"), a byte of an audited racy word (`racyByteIn`), or a
-byte of a device-shared ring page (`devPageIn`). -/
+or a dynamic lock live at `t`), a LIVE page-table byte (`ptByteLiveAt`: the
+permanent table's walk, or a freeable table's walk through pages not freed
+since their naming words' writes -- W8 (pte-ghost), [OWN.57]), a byte of an
+audited racy word (`racyByteIn`), or a byte of a device-shared ring page
+(`devPageIn`). -/
 def chainExAt (rs : List RsvRegion) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop) (m : FlatMem)
     (top : Nat) (a : PAddr) (t : Nat) : Prop :=
-  lockPubByteIn rs a ∨ (∃ b, dynLkAt wit m top b t ∧ lockWordsByte b a) ∨ ptByteAt rs m t a ∨
+  lockPubByteIn rs a ∨ (∃ b, dynLkAt wit m top b t ∧ lockWordsByte b a) ∨ ptByteLiveAt rs m t a ∨
     racyByteIn rs a ∨ devPageIn rs m top a
 
 /-- Reading AS OF a position at or below the top is unchanged by a step that
@@ -741,6 +817,68 @@ theorem ptByteAt_grow {rs : List RsvRegion} {m m' : FlatMem} {top t : Nat} (hg :
     (hm : memAbove m top m') (ht : t ≤ top) (a : PAddr) : ptByteAt rs m' t a ↔ ptByteAt rs m t a := by
   simp only [ptByteAt, ptRootAt, ptPageAt, ptChildAt, wordAsOf_grow hg hm ht]
 
+theorem wordPosAsOf_grow {m m' : FlatMem} {top t : Nat} (hg : memGrow m top m') (hm : memAbove m top m')
+    (ht : t ≤ top) (a : PAddr) : wordPosAsOf m' a t = wordPosAsOf m a t := by
+  simp only [wordPosAsOf, FlatMem.entAsOf_grow hg hm ht]
+
+theorem ptFreedSince_grow {rs : List RsvRegion} {m m' : FlatMem} {top t0 t : Nat} (hg : memGrow m top m')
+    (hm : memAbove m top m') (ht : t ≤ top) (p : PAddr) :
+    ptFreedSince rs m' t0 t p ↔ ptFreedSince rs m t0 t p := by
+  unfold ptFreedSince
+  constructor
+  · rintro ⟨base, cnt, stride, k, t', hR, hk, h1, h2, hw⟩
+    exact ⟨base, cnt, stride, k, t', hR, hk, h1, h2, (wordAsOf_grow hg hm (Nat.le_trans h2 ht) _ _).1 hw⟩
+  · rintro ⟨base, cnt, stride, k, t', hR, hk, h1, h2, hw⟩
+    exact ⟨base, cnt, stride, k, t', hR, hk, h1, h2, (wordAsOf_grow hg hm (Nat.le_trans h2 ht) _ _).2 hw⟩
+
+/-- **A live page-table byte stays one** (and a non-live one stays non-live):
+as of a position at or below the top, under a step that adds entries above
+the top only. -/
+theorem ptByteLiveAt_grow {rs : List RsvRegion} {m m' : FlatMem} {top t : Nat} (hg : memGrow m top m')
+    (hm : memAbove m top m') (ht : t ≤ top) (a : PAddr) : ptByteLiveAt rs m' t a ↔ ptByteLiveAt rs m t a := by
+  simp only [ptByteLiveAt, ptByteAt_grow hg hm ht, ptURootAt, ptLivePageAt, ptLiveChildAt,
+    wordAsOf_grow hg hm ht, wordPosAsOf_grow hg hm ht, ptFreedSince_grow hg hm ht]
+
+/-- A permanent-table byte is a live page-table byte (the kernel side: the
+kernel table is never freed, so its walk needs no freed-check). -/
+theorem ptByteLiveAt_of_ptByteAt {rs : List RsvRegion} {m : FlatMem} {t : Nat} {a : PAddr}
+    (h : ptByteAt rs m t a) : ptByteLiveAt rs m t a := .inl h
+
+/-- **A hop into a freed page is not live**: if the page `c` was pushed onto
+the free list after EVERY entry of the page `p` naming it was last written,
+the live walk does not go from `p` to `c`. -/
+theorem ptLiveChildAt_freed {rs : List RsvRegion} {m : FlatMem} {t : Nat} {p c : PAddr}
+    (h : ∀ (i : Nat) (v : BitVec 64), i < 512 → wordAsOf m (p + BitVec.ofNat 64 (8 * i)) t v → ptPtrTo v c →
+      ptFreedSince rs m (wordPosAsOf m (p + BitVec.ofNat 64 (8 * i)) t) t c) :
+    ¬ ptLiveChildAt rs m t p c := by
+  rintro ⟨i, v, hi, hw, hp, hn⟩
+  exact hn (h i v hi hw hp)
+
+/-- **THE WINDOW IS CLOSED** (W8 (pte-ghost), [OWN.57]): a byte off the
+permanent tables, every one of whose pages a freeable walk could reach was
+pushed onto the free list after the word naming it was last written, is NOT
+a live page-table byte.  Instances: `freewalk` `kfree`s each interior page
+while its parent's slot still names it (`vm.c:273-274`), and `freeproc` frees
+the root while `p->pagetable` still holds it (`proc.c:162-163`) -- from each
+push on, the page's bytes are not exempt through the stale word. -/
+theorem ptByteLiveAt_freed {rs : List RsvRegion} {m : FlatMem} {t : Nat} {a : PAddr}
+    (hk : ¬ ptByteAt rs m t a)
+    (hroot : ∀ (base : PAddr) (cnt stride k : Nat) (r : PAddr), (⟨base, .uroots cnt stride⟩ : RsvRegion) ∈ rs →
+      k < cnt → wordAsOf m (base + BitVec.ofNat 64 (stride * k)) t r → r.toNat ≤ a.toNat →
+      a.toNat < r.toNat + 4096 → ptFreedSince rs m (wordPosAsOf m (base + BitVec.ofNat 64 (stride * k)) t) t r)
+    (hslot : ∀ (r q c : PAddr) (i : Nat) (v : BitVec 64), ptURootAt rs m t r → (q = r ∨ ptLiveChildAt rs m t r q) →
+      i < 512 → wordAsOf m (q + BitVec.ofNat 64 (8 * i)) t v → ptPtrTo v c → c.toNat ≤ a.toNat →
+      a.toNat < c.toNat + 4096 → ptFreedSince rs m (wordPosAsOf m (q + BitVec.ofNat 64 (8 * i)) t) t c) :
+    ¬ ptByteLiveAt rs m t a := by
+  rintro (h | ⟨r, p, hr, hp, h1, h2⟩)
+  · exact hk h
+  · have hr' := hr
+    obtain ⟨_, base, cnt, stride, k, hR, hkc, hw, hn⟩ := hr'
+    rcases hp with rfl | ⟨i, v, hi, hwv, hpt, hn'⟩ | ⟨q, hq, i, v, hi, hwv, hpt, hn'⟩
+    · exact hn (hroot base cnt stride k _ hR hkc hw h1 h2)
+    · exact hn' (hslot r r p i v hr (.inl rfl) hi hwv hpt h1 h2)
+    · exact hn' (hslot r q p i v hr (.inr hq) hi hwv hpt h1 h2)
+
 /-- **The exemption only grows** along a step that adds entries above the top
 only (at the positions at or below the old top). -/
 theorem chainExAt_grow {rs : List RsvRegion} {wit : List (PAddr × HEnt) → PAddr → Nat → Prop}
@@ -749,7 +887,7 @@ theorem chainExAt_grow {rs : List RsvRegion} {wit : List (PAddr × HEnt) → PAd
   rcases h with h | ⟨b, hb, hw⟩ | h | h | ⟨base, cnt, stride, k, t', p, hR, hk, ht', hwd, h1, h2⟩
   · exact .inl h
   · exact .inr (.inl ⟨b, dynLkAt_mono hg htop hb, hw⟩)
-  · exact .inr (.inr (.inl ((ptByteAt_grow hg hm ht a).2 h)))
+  · exact .inr (.inr (.inl ((ptByteLiveAt_grow hg hm ht a).2 h)))
   · exact .inr (.inr (.inr (.inl h)))
   · exact .inr (.inr (.inr (.inr ⟨base, cnt, stride, k, t', p, hR, hk, Nat.le_trans ht' htop,
       (wordAsOf_grow hg hm ht' _ _).2 hwd, h1, h2⟩)))

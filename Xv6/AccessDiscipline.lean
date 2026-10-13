@@ -25,18 +25,46 @@ STRENGTHEN the conjunction.
   - `pub w`: a byte of a one-shot publication word written only by hart `w`
     (xv6: `started`, the boot gate; its discipline is the registry's
     `RsvKind.pub`);
-  - **`pte`**: a page-table byte as of `t` (`MachCSL.ptByteAt`, design (A′)):
-    the bytes of the pages a Sv39 walk reaches, as of the access, from a
-    registered root word (`kernel_pagetable`, every `proc[i].pagetable`) --
-    BOTH tables [R25.1 (a)], [OWN.39].  **The window**: this includes a
-    page-table page already freed by `freewalk`/`proc_freepagetable` until
-    the pointer naming it is cleared (its parent's slot, `pagetable[i] = 0`,
-    `vm.c:274`; for the root, `freeproc`'s `p->pagetable = 0`,
-    `0x80001b30`) -- so a page `kalloc` hands out inside that window has
-    its first entries exempt until the pointer is cleared.  The window is
-    NOT accepted: the owner ruled Q-F2-PTE-WINDOW = (c) [OWN.57] (a ghost
-    freed-page set), and the follow-up item **W8 (pte-ghost)** CLOSES it by
-    strengthening the one named predicate `ptByteAt` with "page not freed";
+  - **`pte`**: a LIVE page-table byte as of `t` (`MachCSL.ptByteLiveAt`,
+    design (A′) + W8 (pte-ghost) [OWN.57], scoped to the freeable tables
+    [R42.1]): the bytes of the pages a Sv39 walk reaches, as of the access,
+    from a registered root word -- BOTH tables [R25.1 (a)], [OWN.39]:
+    - from the PERMANENT root `kernel_pagetable` (`RsvKind.roots`) the walk
+      is unrestricted (`MachCSL.ptByteAt`): the kernel table is NEVER freed
+      (its pointer entries and root word are frozen after the seal,
+      `MachCSL.KptInv`'s `kptPtrs`/`kptRootW`; xv6 has no `kfree` of a
+      kernel page-table page), so its walk needs no freed-check;
+    - from a FREEABLE root `proc[i].pagetable` (`RsvKind.uroots`) every hop
+      (root word → root page, pointer slot → child page) is taken only if
+      the named page was NOT pushed onto `kmem.freelist` (`kfree`'s
+      `kmem.freelist = r`, `kalloc.c:61`; the registered head word
+      `RsvKind.freeHead`, read off its byte history -- `MachCSL.ptFreedSince`)
+      after the naming word's last write (`MachCSL.wordPosAsOf`, entry-based).
+    **No window** [OWN.57]: from its push on, no page is covered through a
+    still-stored pointer (`freewalk` `kfree`s each interior page before
+    `pagetable[i] = 0`, `vm.c:273-274`; `freeproc` frees the root before
+    `p->pagetable = 0`, `proc.c:162-163`) -- `MachCSL.ptByteLiveAt_freed`;
+    a freed page is not walked through, so pointer-shaped words a later
+    owner writes lead nowhere; a reallocated page is covered again only
+    through a fresh slot write after its pop (`walk`'s
+    `*pte = PA2PTE(pagetable) | PTE_V`, `vm.c:112`).  On every xv6 run the
+    class is the intended "bytes of pages in use as page-table pages" up to
+    **the residual** [R42.2]: exemption is decided AS OF the ENTRY's
+    position (`loadsChained`'s `¬ ex a e.t`) and never revoked, so the
+    entries the freeing hart writes inside `kfree` BEFORE its push -- the
+    `0x01` junk fill and the link `r->next` (`kalloc.c:55,60`), written while
+    the page is still a live page-table page -- STAY exempt.  Their one later
+    foreign read in xv6 is `kalloc`'s `r->next` (`kalloc.c:76`), under
+    `kmem.lock` (lock-chained, but not claimed so here).  The fill's partial
+    words lead nowhere in RAM: a page-table page is all-zero at `kfree`
+    (`freewalk` zeroes each pointer slot and panics on a leaf,
+    `vm.c:270-277`), and no byte-subset of `0x01` over zero is a pointer into
+    `[0x80000000, 0x88000000)` (`MachCSL.ptPtrTo_fill01_notRam`, 256 cases).
+    Whether this entry residual meets [OWN.57]'s "no window" is the open
+    owner question Q-PTE-RESIDUAL (provisionally (a): accepted, as stated
+    here).  Spec: RVWMO/riscv.cat/Sail/Zifencei/PMAs are SILENT (custody is
+    not an ISA notion; no hart's `satp` names a dying user table at
+    `freeproc`), FAITHFUL;
   - `racy`: a byte of an AUDITED RACY word (`MachCSL.racyByteIn`; xv6:
     `itable.inode[k].ref`, read lock-free by `ilock`'s/`iunlock`'s guard
     `ip->ref < 1`) -- finding **F-RACY**: a NAMED WEAKENING pending the
@@ -146,14 +174,15 @@ def dynLockByteAt (σ : MState) (b a : PAddr) (t : Nat) : Prop :=
 open Classical in
 /-- **The custody map** (σ-readable): the exempt classes first, in the order
 of `MachCSL.chainExAt`'s arms (static lock words, publication words, live
-dynamic lock words, page-table bytes as of `t` -- WITH the freed-page window
-W8 (pte-ghost) closes [OWN.57] --, audited racy words (F-RACY), device-ring
-pages (F-DISKTAIL)), then `cpus[h]`'s cells, then `free`. -/
+dynamic lock words, LIVE page-table bytes as of `t` -- no freed page of a
+freeable table, W8 (pte-ghost) [OWN.57], up to the as-of-entry residual of
+the header --, audited racy words (F-RACY), device-ring pages (F-DISKTAIL)),
+then `cpus[h]`'s cells, then `free`. -/
 noncomputable def custAt (σ : MState) (a : PAddr) (t : Nat) : Cust :=
   if h1 : ∃ b, staticLockByteOf b a then .lockw (Classical.choose h1) else
   if h2 : ∃ w, pubByteOf w a then .pub (Classical.choose h2) else
   if h3 : ∃ b, dynLockByteAt σ b a t then .lockw (Classical.choose h3) else
-  if ptByteAt xv6Rsv σ.mem t a then .pte else
+  if ptByteLiveAt xv6Rsv σ.mem t a then .pte else
   if racyByteIn xv6Rsv a then .racy else
   if devPageIn xv6Rsv σ.mem σ.top a then .dev else
   if h7 : ∃ c, a ∈ cpuCellBytes c then .hart (Classical.choose h7) else .free
@@ -177,8 +206,9 @@ def syncPath (σ : MState) (A : CPU) (t : Nat) (B : CPU) (τ : Nat) : Prop :=
 /-- **(iii+) Every observed foreign hart entry off the exempt classes is
 sync-chained**: hart `j`'s coherence floor at `a` names a post-power-on entry
 of a hart other than `j`; unless the byte is, as of the entry, a lock-layer
-word, a publication word, a page-table byte (incl. the freed-page window
-W8 (pte-ghost) closes), an audited racy word (F-RACY) or a device-ring page
+word, a publication word, a LIVE page-table byte (no page of a freeable table
+from its push onto the free list on; the as-of-entry residual of the header),
+an audited racy word (F-RACY) or a device-ring page
 (F-DISKTAIL), that entry reaches `j` along a sync path. -/
 def chainOkAt (σ : MState) : Prop :=
   ∀ (j : CPU) (a : PAddr) (H : Hist) (e : HEnt), σ.mem[a]? = some H → e ∈ H → e.t ≠ 0 →
@@ -274,7 +304,7 @@ theorem custAt_notEx {σ : MState} {a : PAddr} {t : Nat} (h1 : ∀ b, custAt σ 
   by_cases c3 : ∃ b, dynLockByteAt σ b a t
   · rw [dif_pos c3] at h1; exact absurd rfl (h1 _)
   rw [dif_neg c3] at h1 h2 h3 h4 h5
-  by_cases c4 : ptByteAt xv6Rsv σ.mem t a
+  by_cases c4 : ptByteLiveAt xv6Rsv σ.mem t a
   · rw [if_pos c4] at h3; exact absurd rfl h3
   rw [if_neg c4] at h1 h2 h3 h4 h5
   by_cases c5 : racyByteIn xv6Rsv a

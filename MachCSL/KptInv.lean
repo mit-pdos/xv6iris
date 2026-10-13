@@ -353,6 +353,20 @@ theorem KptInv.leaf_ptByteAt (rs : List RsvRegion) (m : FlatMem) (b b1 b0 : BitV
     simp only [BitVec.toNat_ofNat, Nat.zero_mod, Nat.mul_zero, Nat.add_zero]
     omega
 
+/-- **A leaf's byte is a LIVE page-table byte** (W8 (pte-ghost),
+`MachCSL.ptByteLiveAt`): the left injection of `KptInv.leaf_ptByteAt` -- the
+kernel table is a PERMANENT root (never freed), so its walk needs no
+freed-check. -/
+theorem KptInv.leaf_ptByteLiveAt (rs : List RsvRegion) (m : FlatMem) (b b1 b0 : BitVec 44)
+    (hroot0 : pteAddr b 0#9 ≠ 0) (i1 i0 k : BitVec 9) (S tt : Nat) (hS : S ≤ tt)
+    (ra : PAddr) (hra : (⟨ra, .roots 1 8⟩ : RsvRegion) ∈ rs) (Hr : Nat → Hist)
+    (hrg : ∀ j, j < 8 → m[ra + BitVec.ofNat 64 j]? = some (Hr j))
+    (hrh : ∀ j, j < 8 → ∃ e H, Hr j = e :: H ∧ e.v = nthByte (n := 8) (pteAddr b 0#9) j ∧ e.t ≤ S)
+    (hp1 : wordAsOf m (pteAddr b i1) tt (kPtr b1)) (hp0 : wordAsOf m (pteAddr b1 i0) tt (kPtr b0))
+    (j : Nat) (hj : j < 8) :
+    ptByteLiveAt rs m tt (pteAddr b0 k + BitVec.ofNat 64 j) :=
+  ptByteLiveAt_of_ptByteAt (KptInv.leaf_ptByteAt rs m b b1 b0 hroot0 i1 i0 k S tt hS ra hra Hr hrg hrh hp1 hp0 j hj)
+
 /-! ## The accessors
 
 What a page-walk leaf uses: the racy read of an entry (a value of its
@@ -539,7 +553,7 @@ theorem kpt_readAU [CurCtx] (cpu : CPU) (t : PTree) (M : RegMapF (BitVec 64)) (a
               ∀ j', j' < 8 → fl n' j' ≤ e.t := fun n' x hx j' hj' => Nat.le_trans (hfl n' x hx j' hj') hSe
           refine Or.inr (Or.inr (Or.inl ?_))
           rw [haddr]
-          refine KptInv.leaf_ptByteAt _ σ.mem t.base c1.base g.base (KptInv.root_ne_zero t M hf) i1 i0 k
+          refine KptInv.leaf_ptByteLiveAt _ σ.mem t.base c1.base g.base (KptInv.root_ne_zero t M hf) i1 i0 k
             S e.t hSe ra hra Hr hr hrh ?_ ?_ j hj
           · exact KptInv.wordAsOf_heads σ.mem _ e.t _ Hs1 h1 (fun j' hj' => by
               obtain ⟨x, H, h1', h2', h3'⟩ := ht1 j' hj'

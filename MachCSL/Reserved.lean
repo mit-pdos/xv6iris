@@ -133,8 +133,24 @@ inductive RsvKind where
   Sv39 root page or 0 -- xv6: `kernel_pagetable` and every `proc[i].pagetable`.
   The page-table bytes of a position are the bytes of the pages a walk reaches
   from these words AS OF that position (`MachCSL.ptByteAt`); a registry entry
-  -- no footprint, no discipline -/
+  -- no footprint, no discipline.  W8 (pte-ghost) [OWN.57] [R42.1]: the
+  PERMANENT roots only (xv6: `kernel_pagetable`, never freed); the roots of
+  tables that are freed at run time are `uroots` -/
   | roots (cnt stride : Nat)
+  /-- the client's FREEABLE page-table root words (W8 (pte-ghost) [OWN.57],
+  [R42.1]): `cnt` doubleword slots at `base + stride·k` holding the root of a
+  table that is FREED at run time (xv6: every `proc[i].pagetable`, freed by
+  `proc_freepagetable`/`freewalk`).  The walk from these words is
+  hop-restricted: a page pushed onto a registered free list (`freeHead`) after
+  its naming word's last write is not walked (`MachCSL.ptByteLiveAt`); a
+  registry entry -- no footprint, no discipline -/
+  | uroots (cnt stride : Nat)
+  /-- the client's FREE-LIST HEAD words (W8 (pte-ghost) [OWN.57], [R42.1]):
+  `cnt` doubleword slots at `base + stride·k` whose stores push and pop pages
+  of a free list (xv6: `kmem.freelist`, `kfree`'s push `kmem.freelist = r`):
+  a page the word held after a position was FREED since that position
+  (`MachCSL.ptFreedSince`); a registry entry -- no footprint, no discipline -/
+  | freeHead (cnt stride : Nat)
   /-- the client's AUDITED RACY words (W8 (f2-ctx) S3): `cnt` words of `n`
   bytes at `base + stride·k` that the client reads WITHOUT synchronization
   (xv6: `itable.inode[k].ref`, read lock-free by `ilock`'s guard
@@ -155,6 +171,8 @@ inductive RsvKind where
 def RsvKind.hasFoot : RsvKind → Bool
   | .slots _ _ => false
   | .roots _ _ => false
+  | .uroots _ _ => false
+  | .freeHead _ _ => false
   | .racy _ _ _ => false
   | .devPtr _ _ => false
   | _ => true
@@ -176,6 +194,8 @@ def RsvRegion.words (R : RsvRegion) : List (PAddr × Nat) :=
   | .pub _ => [(R.base, 4)]
   | .slots _ _ => []
   | .roots _ _ => []
+  | .uroots _ _ => []
+  | .freeHead _ _ => []
   | .racy _ _ _ => []
   | .devPtr _ _ => []
 
@@ -206,6 +226,8 @@ def regionOk (m : FlatMem) (R : RsvRegion) : Prop :=
   | .pub w => cpuRegionOk w m R ∧ oneShotOk m R
   | .slots _ _ => True
   | .roots _ _ => True
+  | .uroots _ _ => True
+  | .freeHead _ _ => True
   | .racy _ _ _ => True
   | .devPtr _ _ => True
 
@@ -312,6 +334,8 @@ theorem RsvRegion.base_mem (R : RsvRegion) (hk : R.kind.hasFoot = true) : R.base
     cases h : R.kind with
     | slots _ _ => rw [h] at hk; simp [RsvKind.hasFoot] at hk
     | roots _ _ => rw [h] at hk; simp [RsvKind.hasFoot] at hk
+    | uroots _ _ => rw [h] at hk; simp [RsvKind.hasFoot] at hk
+    | freeHead _ _ => rw [h] at hk; simp [RsvKind.hasFoot] at hk
     | racy _ _ _ => rw [h] at hk; simp [RsvKind.hasFoot] at hk
     | devPtr _ _ => rw [h] at hk; simp [RsvKind.hasFoot] at hk
     | _ => exact ⟨_, by decide, List.mem_cons_self⟩
@@ -362,6 +386,8 @@ theorem regionOk_congr {m m' : FlatMem} {R : RsvRegion}
   cases hk : R.kind with
   | slots _ _ => trivial
   | roots _ _ => trivial
+  | uroots _ _ => trivial
+  | freeHead _ _ => trivial
   | racy _ _ _ => trivial
   | devPtr _ _ => trivial
   | cpu c =>
@@ -469,6 +495,8 @@ theorem rsvAllOk_boot {rs : List RsvRegion} (hwf : rsvWf rs) : rsvAllOk rs (imgF
   cases hk : R.kind with
   | slots _ _ => trivial
   | roots _ _ => trivial
+  | uroots _ _ => trivial
+  | freeHead _ _ => trivial
   | racy _ _ _ => trivial
   | devPtr _ _ => trivial
   | cpu c =>

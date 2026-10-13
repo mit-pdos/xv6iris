@@ -64,12 +64,26 @@ def xv6PipeSlotsR : RsvRegion := ⟨xv6PipeSlotBase, .slots 100 40⟩
 BOTH tables, design (A′) [R25.1 (a)][OWN.39]): `kernel_pagetable` (one word)
 and every `proc[i].pagetable` (`NPROC = 64` words at `&proc[0] + 80`, stride
 `sizeof (struct proc) = 376`, `Xv6.ProcGeom`'s `pagetable@80`) -- footprint-free
-registry entries of the static list (`MachCSL.RsvKind.roots`): the page-table
-bytes as of a position are the pages a walk reaches from these words as of
-that position (`MachCSL.ptByteAt`). -/
+registry entries of the static list: the page-table bytes as of a position
+are the pages a walk reaches from these words as of that position.  W8
+(pte-ghost) [OWN.57] [R42.1] splits them: `kernel_pagetable` is a PERMANENT
+root (`MachCSL.RsvKind.roots`; never freed -- frozen after the seal,
+`MachCSL.KptInv`), walked unrestricted (`MachCSL.ptByteAt`); the
+`proc[i].pagetable` words are FREEABLE roots (`MachCSL.RsvKind.uroots`; freed
+by `proc_freepagetable`/`freewalk`), walked hop-restricted: no page pushed
+onto `kmem.freelist` (`xv6FreeHeadR`) after its naming word's last write is
+walked (`MachCSL.ptByteLiveAt`). -/
 def xv6KptRootR : RsvRegion := ⟨KA.«kernel_pagetable», .roots 1 8⟩
 
-def xv6ProcRootsR : RsvRegion := ⟨KA.«proc» + 80#64, .roots 64 376⟩
+def xv6ProcRootsR : RsvRegion := ⟨KA.«proc» + 80#64, .uroots 64 376⟩
+
+/-- **The free-list head word** (W8 (pte-ghost) [OWN.57] [R42.1]):
+`kmem.freelist` (`&kmem + 24`, `Xv6.kmemFreelistAddr`), whose stores push
+(`kfree`'s `kmem.freelist = r`, `kalloc.c:61`) and pop (`kalloc`'s
+`kmem.freelist = r->next`) pages -- a footprint-free registry entry
+(`MachCSL.RsvKind.freeHead`): a page the word held after a position was
+freed since that position (`MachCSL.ptFreedSince`). -/
+def xv6FreeHeadR : RsvRegion := ⟨KA.«kmem» + 0x18#64, .freeHead 1 8⟩
 
 /-- **The audited racy words** (W8 (f2-ctx) S3): `itable.inode[k].ref`
 (`inode[k]` at `itable + 24 + 136 k`, `ref` at +8; `NINODE = 50`), read
@@ -111,13 +125,14 @@ def xv6InodeLockRegions : List RsvRegion := (List.range 50).map (fun k => xv6Loc
 /-- The locks after `proc`, in address order: `tickslock`, `bcache.lock`, the
 buffers' inner locks, `itable.lock`, the inodes' inner locks, `log.lock`,
 `ftable.lock`, `disk.vdisk_lock`; and (W8 (f2-ctx)) the pipe locks'
-registration slots, the page-table root words and the audited racy words,
+registration slots, the page-table root words, the audited racy words, the
+device-ring pointer word and (W8 (pte-ghost)) the free-list head word,
 footprint-free registry entries (`xv6PipeSlotsR`, `xv6KptRootR`, `xv6ProcRootsR`,
-`xv6IrefRacyR`). -/
+`xv6IrefRacyR`, `xv6UsedPtrR`, `xv6FreeHeadR`). -/
 def xv6PostLockRegions : List RsvRegion :=
   [xv6LockR KA.«tickslock», xv6LockR KA.«bcache»] ++ (xv6BufLockRegions ++ ([xv6LockR KA.«itable»] ++
     (xv6InodeLockRegions ++ [xv6LockR KA.«log», xv6LockR KA.«ftable», xv6LockR rsvDiskLk, xv6PipeSlotsR,
-      xv6KptRootR, xv6ProcRootsR, xv6IrefRacyR, xv6UsedPtrR])))
+      xv6KptRootR, xv6ProcRootsR, xv6IrefRacyR, xv6UsedPtrR, xv6FreeHeadR])))
 
 /-- xv6's static reserved regions, in address order. -/
 def xv6RsvStatic : List RsvRegion :=
@@ -158,6 +173,9 @@ theorem xv6RsvStatic_procRoots : xv6ProcRootsR ∈ xv6RsvStatic := by decide +ke
 theorem xv6RsvStatic_irefRacy : xv6IrefRacyR ∈ xv6RsvStatic := by decide +kernel
 
 theorem xv6RsvStatic_usedPtr : xv6UsedPtrR ∈ xv6RsvStatic := by decide +kernel
+
+/-- The free-list head word is registered. -/
+theorem xv6RsvStatic_freeHead : xv6FreeHeadR ∈ xv6RsvStatic := by decide +kernel
 
 /-- Hart `h`'s cells are registered, at index `h + 8`. -/
 theorem xv6RsvStatic_cpu (h : CPU) : xv6RsvStatic[rsvCpuIdx h]? = some ⟨cpuAddr h, .cpu h⟩ := by
@@ -241,6 +259,8 @@ def rsvLocksLow (rs : List RsvRegion) : Bool :=
     | .pub _ => true
     | .slots _ _ => true
     | .roots _ _ => true
+    | .uroots _ _ => true
+    | .freeHead _ _ => true
     | .racy _ _ _ => true
     | .devPtr _ _ => true)
 
