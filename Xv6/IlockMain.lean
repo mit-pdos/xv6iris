@@ -245,8 +245,9 @@ theorem il_main (AS : ACQUIRESLEEP_LLB) (LD : IlLoadEb)
   ihave #Hclaim := irefClaims_at kk hkk $$ Hclm
   unfold inodeShrGenlo
   icases Hshr with ⟨Hid, Hlv, Hslh, Hst⟩
+  icases kctx_rsvEq cpu _ $$ Hk with ⟨%heqR, Hk⟩
   k_step_e (wp_s_lw_iref cpu _ (KA.«ilock» + 0xe#64) true 8#12 15#5 10#5 (by decide) (by decide) kk
-      hkk ?haddr s g lo tl hle)
+      hkk ?haddr s g lo tl hle heqR)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   case haddr => k_norm_g [ha0]; rfl
   iintro %w Hk Hpc %hw Hlv

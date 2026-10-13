@@ -64,14 +64,18 @@ def rdOut (cpu : CPU) {n : Nat} (w : BitVec (8 * n)) : Option RdIssue → IProp 
 /-- The accessor of a plain load by `cpu` whose view is at least `K`, WITH
 the read watermark's receipt: the continuation also gets
 `MachCSL.rviewLb cpu tvn` for the very view `tvn` its answer was read
-at; and (W8 (f2-ctx)) a publication read's issue request (`rdIn`/`rdOut`). -/
+at; and (W8 (f2-ctx)) a publication read's issue request (`rdIn`/`rdOut`),
+and (S3) the certificates of every entry the read may return
+(`MachCSL.readCertsAt`, with companion windows `cs`, as `MachCSL.readAU`). -/
 def readAUr (cpu : CPU) (pa : PAddr) (n K : Nat) (ts : List (Nat × Agent))
     (Ψ : BitVec (8 * n) → IProp GF) : IProp GF := iprop%
   ([∗list] p ∈ ts, authoredBy p.1 p.2) ∗
-  (|={⊤,∅}=> ∃ (dqs : Nat → DFrac) (Hs : Nat → Hist) (o : Option RdIssue),
+  (|={⊤,∅}=> ∃ (dqs : Nat → DFrac) (Hs : Nat → Hist) (o : Option RdIssue) (cs : RdComps),
     histBytes pa n dqs Hs ∗ ⌜∀ j, j < n → Hs j ≠ []⌝ ∗ rdIn cpu pa n Hs o ∗
+    rdCompBytes cs ∗ readCertsAt cpu pa n K ts Hs cs ∗
     ▷ (∀ (w : BitVec (8 * n)) (tvn : Nat), ⌜K ≤ tvn⌝ -∗ ⌜readsAre (hartAgent cpu) tvn Hs n w⌝ -∗
-        ⌜authorsAre ts n Hs⌝ -∗ rviewLb cpu tvn -∗ rdOut cpu w o -∗ histBytes pa n dqs Hs ={∅,⊤}=∗ Ψ w))
+        ⌜authorsAre ts n Hs⌝ -∗ rviewLb cpu tvn -∗ rdOut cpu w o -∗ histBytes pa n dqs Hs -∗
+        rdCompBytes cs ={∅,⊤}=∗ Ψ w))
 
 /-- The postcondition may be weakened, as for `MachCSL.readAU`. -/
 theorem readAUr_wand (cpu : CPU) (pa : PAddr) (n K : Nat) (ts : List (Nat × Agent))
@@ -80,15 +84,15 @@ theorem readAUr_wand (cpu : CPU) (pa : PAddr) (n K : Nat) (ts : List (Nat × Age
   unfold readAUr
   iintro ⟨#Hts, H⟩ Hw
   iframe Hts
-  imod H with ⟨%dqs, %Hs, %o, Hb, %hne, Ho, Hcont⟩
+  imod H with ⟨%dqs, %Hs, %o, %cs, Hb, %hne, Ho, Hcs, #Hcert, Hcont⟩
   imodintro
-  iexists dqs, Hs, o
-  iframe Hb Ho
+  iexists dqs, Hs, o, cs
+  iframe Hb Ho Hcs Hcert
   isplitl []
   · ipureintro; exact hne
   inext
-  iintro %w %tvn %hK %hrd %hau #Hrv Hout Hb
-  imod Hcont $$ %w %tvn %hK %hrd %hau Hrv Hout Hb with HΨ
+  iintro %w %tvn %hK %hrd %hau #Hrv Hout Hb Hcs
+  imod Hcont $$ %w %tvn %hK %hrd %hau Hrv Hout Hb Hcs with HΨ
   imodintro
   iapply Hw $$ %w HΨ
 

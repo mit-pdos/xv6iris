@@ -326,8 +326,9 @@ theorem iunlock_proof (HS : HOLDINGSLEEP) (RS : RELEASESLEEP_HOOK) : IUNLOCK := 
   -- +0x1c c.lw a5,8(s1) : THE RACY GUARD READ
   ihave #Hclaim := irefClaims_at kk hkk $$ Hcl
   icases iul_borrow fscIc kk d s dev inum g lo hshr $$ Hh with ⟨Hlg, Hhback⟩
+  icases kctx_rsvEq c8 _ $$ Hk with ⟨%heqR, Hk⟩
   k_step_gen (wp_s_lw_iref c8 _ (KA.«iunlock» + 0x1c#64) true 8#12 15#5 9#5 (by decide)
-      (by decide) kk hkk ?hra (1 : Qp).half g lo tl hle)
+      (by decide) kk hkk ?hra (1 : Qp).half g lo tl hle heqR)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc $Hclaim $Hitbl $Hfl $Hlg] next c9 hp9
   case hra => k_norm_g [b9, ha0]; exact iRef_sext _
   iintro %w Hk Hpc %hw Hlg

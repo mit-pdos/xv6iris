@@ -1988,6 +1988,111 @@ theorem diskProto_usedRead_acc (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioStat
     ipureintro
     exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e9, hok, e11, e12, e13, e14, e15, e16, e17, e18⟩
 
+/-! ### The certificates of the driver's racy reads (W8 (f2-ctx) S3) -/
+
+/-- **A read of DMA-written bytes is certified** (the device-key arm): their
+heads are the device's, at a position the reader's view has passed, so the
+read returns them. -/
+theorem DiskAcc.dma_certs (cpu : CPU) (pa : PAddr) (n K : Nat) (ts : List (Nat × Agent)) (Hs : Nat → Hist)
+    (td : Nat) (htK : td ≤ K) (hh : headsAtT Hs n td) :
+    authoredBy td diskAgent ⊢@{IProp GF} readCertsAt cpu pa n K ts Hs [] := by
+  iintro #Hau
+  iapply readCertsAt_of cpu pa n K ts Hs [] (fun _ e => e.t = td)
+  · intro j e tvn hj hKt _ hr
+    have h0 := hh j hj
+    cases hx : Hs j with
+    | nil => rw [hx] at h0; cases h0
+    | cons e0 H0 =>
+      rw [hx] at h0 hr
+      simp only [List.head?_cons, Option.map_some, Option.some.injEq] at h0
+      rw [Hist.readEnt_head _ _ e0 H0 (HEnt.visible_of_le _ _ e0 (by omega)) e hr]
+      exact h0
+  · imodintro
+    iintro %j %e %⟨_, het⟩
+    ileft
+    unfold srcCertAt
+    iright; iright
+    iexists diskAgent
+    rw [het]
+    iframe Hau
+    ileft; ipureintro; exact Or.inl (by unfold diskAgent; exact Nat.le_refl _)
+
+/-- The largest of `f 0 .. f (n-1)`. -/
+def DiskAcc.fmax (f : Nat → Nat) : Nat → Nat
+  | 0 => 0
+  | n + 1 => max (f n) (DiskAcc.fmax f n)
+
+theorem DiskAcc.le_fmax (f : Nat → Nat) : ∀ n j, j < n → f j ≤ DiskAcc.fmax f n
+  | 0, j, h => absurd h (Nat.not_lt_zero _)
+  | n + 1, j, h => by
+    simp only [DiskAcc.fmax]
+    rcases Nat.lt_succ_iff_lt_or_eq.1 h with h | rfl
+    · exact Nat.le_trans (DiskAcc.le_fmax f n j h) (Nat.le_max_right _ _)
+    · exact Nat.le_max_left _ _
+
+theorem DiskAcc.fmax_le (f : Nat → Nat) (B : Nat) : ∀ n, (∀ j, j < n → f j ≤ B) → DiskAcc.fmax f n ≤ B
+  | 0, _ => Nat.zero_le _
+  | n + 1, h => by
+    simp only [DiskAcc.fmax]
+    exact Nat.max_le.2 ⟨h n (Nat.lt_succ_self n), DiskAcc.fmax_le f B n (fun j hj => h j (Nat.lt_succ_of_lt hj))⟩
+
+/-- **A read of the used ring is exempt** (`MachCSL.devPageIn`): its bytes
+lie in the page `disk.used` names -- the frozen pointer word, lent as a
+companion (its only hart-written entries are `virtio_disk_init`'s zero
+fill; the rest are the device's). -/
+theorem DiskAcc.usedPage_certs (cpu : CPU) (pu : PAddr) (off n K : Nat) (ts : List (Nat × Agent))
+    (Hs Hp : Nat → Hist) (f : Nat → Nat) (hpu : inRam pu 4096) (hoff : off + n ≤ 4096)
+    (htail : tailOkT 8 f pu Hp)
+    (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) :
+    ⊢@{IProp GF} readCertsAt cpu (pu + BitVec.ofNat 64 off) n K ts Hs [(aUsedPtr, 8, DFrac.discard, Hp)] := by
+  iapply readCertsAt_of cpu _ n K ts Hs _ (fun _ _ => True) (fun _ _ _ _ _ _ _ => trivial)
+  imodintro
+  iintro %j %e %⟨hj, _⟩
+  iright
+  unfold exCertAt
+  iexists []
+  isplitl []
+  · exact BigSepL.bigSepL_nil_intro
+  ipureintro
+  intro σ hmm _ hcs _
+  have hp : histsAt σ.mem aUsedPtr 8 Hp := hcs _ List.mem_cons_self
+  have hT : ∀ j', j' < 8 → f j' ≤ σ.top := by
+    intro j' hj'
+    obtain ⟨x, H, h1, _, h3⟩ := htail j' hj'
+    have hok := hmm.1 _ _ (hp j' hj')
+    rw [h1] at hok
+    rw [← h3]; exact (hok.2 x List.mem_cons_self).1
+  refine Or.inr (Or.inr (Or.inr (Or.inr ⟨KA.«disk» + 16#64, 1, 8, 0, DiskAcc.fmax f 8, pu, ?_, by omega,
+    DiskAcc.fmax_le f _ 8 hT, ?_, ?_, ?_⟩)))
+  · rw [hrsv]; exact xv6RsvStatic_usedPtr
+  · have e0 : KA.«disk» + 16#64 + BitVec.ofNat 64 (8 * 0) = aUsedPtr := by decide
+    rw [e0]
+    exact KptInv.wordAsOf_heads σ.mem aUsedPtr _ pu Hp hp (fun j' hj' => by
+      obtain ⟨x, H, h1, h2, h3⟩ := htail j' hj'
+      exact ⟨x, H, h1, h2, by rw [h3]; exact DiskAcc.le_fmax f 8 j' hj'⟩)
+  · rw [BitVec.toNat_add, BitVec.toNat_add, BitVec.toNat_ofNat, BitVec.toNat_ofNat]
+    unfold inRam ramBase ramEnd at hpu
+    omega
+  · rw [BitVec.toNat_add, BitVec.toNat_add, BitVec.toNat_ofNat, BitVec.toNat_ofNat]
+    unfold inRam ramBase ramEnd at hpu
+    omega
+
+/-- The frozen `disk.used` word's histories, at its (identity-mapped) address. -/
+theorem DiskAcc.usedPtr_hist [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) :
+    diskGeom (GF := GF) γ pd pav pu ∗ kmapStatic ⊢
+      ∃ (Hp : Nat → Hist) (f : Nat → Nat), histBytes aUsedPtr 8 (fun _ => DFrac.discard) Hp ∗
+        ⌜tailOkT 8 f pu Hp ∧ inRam pu 4096⌝ := by
+  unfold diskGeom
+  iintro ⟨⟨%c0, _, %hg, _, _, #Hup⟩, #HS⟩
+  ihave #Hid := kmapStatic_rw aUsedPtr (by decide) $$ HS
+  ihave Hp := wordPointsTo_phys aUsedPtr 8 DFrac.discard pu $$ Hid Hup
+  icases pwordPointsTo_cases aUsedPtr 8 DFrac.discard pu $$ Hp with ⟨_, Hb⟩
+  icases histBytes_keys_of_wordBytes aUsedPtr 8 DFrac.discard pu $$ Hb with ⟨%Hp, %f, Hh, %ht, _⟩
+  iexists Hp, f
+  iframe Hh
+  ipureintro
+  exact ⟨ht, hg.2.2.2.2.2.2.2.2.1⟩
+
 /-- **`disk.used->idx`, read** (the `lhu` of `virtio_disk_intr`'s loop
 test).  The answer is `wrap16 m` for a counter `m` the device has
 published, and `m` is at least the handler's watermark -- which is what
@@ -2007,13 +2112,15 @@ out beside the answer, and the `__sync_synchronize()` of the loop body
 turns the `rviewLb cpu F` into the floor `MachCSL.viewLb cpu F` that the
 element and status reads need. -/
 theorem disk_used_idx_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : CPU)
-    (K nr : Nat) :
-    diskInv (GF := GF) γ ∗ diskGeom γ pd pav pu ∗ diskReadAt γ nr ∗ diskWm γ nr K ⊢
+    (K nr : Nat) (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) :
+    diskInv (GF := GF) γ ∗ diskGeom γ pd pav pu ∗ kmapStatic ∗ diskReadAt γ nr ∗ diskWm γ nr K ⊢
       readAUr cpu (usedIdxAt pu) 2 K [] (fun w =>
         iprop(diskReadAt γ nr ∗ ∃ m F : Nat, ⌜w = wrap16 m ∧ nr ≤ m⌝ ∗ diskDoneLb γ m ∗
           rviewLb cpu F ∗ diskWm γ m F)) := by
   unfold diskInv devInvR readAUr
-  iintro ⟨#Hinv, #Hgeom, Hnr, #Hwm⟩
+  iintro ⟨#Hinv, #Hgeom, #HS, Hnr, #Hwm⟩
+  icases DiskAcc.usedPtr_hist γ pd pav pu $$ [Hgeom HS] with ⟨%Hp, %fp, HpB, %⟨hpt, hpu⟩⟩
+  · iframe Hgeom HS
   icases diskGeom_cfg γ pd pav pu $$ Hgeom with ⟨%c0, #Hfr, %hg⟩
   obtain ⟨hgd, hga, hgu, hgl, hgq⟩ := hg
   subst hgu
@@ -2030,15 +2137,26 @@ theorem disk_used_idx_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : 
   icases usedIdxCell_cases (usedIdxAt c0.used) b dl $$ Hui with ⟨%Hold, Hb, %htail⟩
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
-  iexists (fun _ => DFrac.own 1), ((usedW dl).hist Hold), none
+  iexists (fun _ => DFrac.own 1), ((usedW dl).hist Hold), none, [(aUsedPtr, 8, DFrac.discard, Hp)]
   iframe Hb
   isplit
   · ipureintro
     exact fun j hj => usedIdxCell_ne_nil b dl Hold htail j hj
-  isplitr
+  isplitl []
   · simp only [rdIn]; iempintro
+  isplitl [HpB]
+  · unfold rdCompBytes
+    iapply BigSepL.bigSepL_cons.2
+    isplitl [HpB]
+    · iexact HpB
+    · exact BigSepL.bigSepL_nil_intro
+  isplitl []
+  · have hc : ⊢@{IProp GF} readCertsAt cpu (usedIdxAt c0.used) 2 K [] ((usedW dl).hist Hold)
+        [(aUsedPtr, 8, DFrac.discard, Hp)] :=
+      DiskAcc.usedPage_certs cpu c0.used 2 2 K [] _ Hp fp hpu (by omega) hpt hrsv
+    iapply hc
   inext
-  iintro %w %tvn %hKt %hrd %hauth #Hrv _ Hb
+  iintro %w %tvn %hKt %hrd %hauth #Hrv _ Hb _
   imod Hmask
   obtain ⟨m, hwm, hmm, hdom⟩ :=
     usedIdx_read dl Hold b cpu tvn w htail (by omega) hok.2.2.2.1 hrd
@@ -2871,7 +2989,7 @@ theorem disk_status_read [CurCtx] (γ : DiskNames) (q : Qp) (pd pav pu : PAddr) 
     simpa using h0
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
-  iexists (fun _ => DFrac.own 1), Hs
+  iexists (fun _ => DFrac.own 1), Hs, []
   iframe Hb
   isplit
   · ipureintro
@@ -2879,8 +2997,13 @@ theorem disk_status_read [CurCtx] (γ : DiskNames) (q : Qp) (pd pav pu : PAddr) 
     have : j = 0 := by omega
     rw [this, heq]
     simp
+  isplitl []
+  · iapply rdCompBytes_nil
+  isplitl []
+  · iapply DiskAcc.dma_certs cpu c.status 1 K [] Hs ts (by omega) hp.2
+    iexact Hau
   inext
-  iintro %w %tvn %hKt %hrd %hauth Hb
+  iintro %w %tvn %hKt %hrd %hauth Hb _
   imod Hmask
   have hw : w = 0#8 := by
     have hvis : e.visible (hartAgent cpu) tvn = true :=
@@ -3099,7 +3222,7 @@ theorem disk_used_elem_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu :
     with ⟨Hlo, Hjoin⟩
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
-  iexists (fun _ => DFrac.own 1), Hs
+  iexists (fun _ => DFrac.own 1), Hs, []
   iframe Hlo
   isplit
   · ipureintro
@@ -3107,8 +3230,14 @@ theorem disk_used_elem_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu :
     have h0 := hpp.2 j (by omega)
     rw [hnil] at h0
     simp at h0
+  isplitl []
+  · iapply rdCompBytes_nil
+  isplitl []
+  · iapply DiskAcc.dma_certs cpu (usedElemAt c0.used (nr % NUM)) 4 K [] Hs ts (by omega)
+      (fun j hj => hpp.2 j (by omega))
+    iexact Hau
   inext
-  iintro %w %tvn %hKt %hrd %hauth Hlo
+  iintro %w %tvn %hKt %hrd %hauth Hlo _
   imod Hmask
   have hweq : w = BitVec.extractLsb' 0 32 w8 := by
     apply bv_eq_of_bytes

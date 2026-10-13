@@ -201,6 +201,35 @@ theorem WordHist.read_cases_visT (W : WordHist n) (Hold : Nat → Hist) (h : Age
   WordHist.read_cases_vals W Hold h tvn v0 w hn (tailOkT_vals htail)
     (tailOkT_visible W h tsl htail hKt hvis hauth) hrd
 
+/-- **The entries a read may return** from a word window whose tail head
+at byte `j` is visible: an entry of `W` (its byte-`j` projection), or that
+tail head (W8 (f2-ctx) S3: what a racy read's certificates range over). -/
+theorem WordHist.readEnt_cases (W : WordHist n) (Hold : Nat → Hist) (h : Agent) (tv j : Nat)
+    (e0 : HEnt) (H0 : Hist) (hH : Hold j = e0 :: H0) (hvis : e0.visible h tv = true) (e : HEnt)
+    (hr : Hist.readEnt h tv (W.hist Hold j) = some e) :
+    (∃ x ∈ W, e = WEnt.proj j x) ∨ e = e0 := by
+  unfold Hist.readEnt WordHist.hist at hr
+  rw [List.find?_append] at hr
+  cases hf : (W.map (WEnt.proj j)).find? (HEnt.visible h tv) with
+  | some e' =>
+    rw [hf] at hr
+    simp only [Option.some_or, Option.some.injEq] at hr
+    subst hr
+    left
+    obtain ⟨x, hx, rfl⟩ := List.mem_map.1 (List.mem_of_find?_eq_some hf)
+    exact ⟨x, hx, rfl⟩
+  | none =>
+    rw [hf, Option.none_or, hH, List.find?_cons, hvis] at hr
+    right
+    exact (Option.some.inj hr).symm
+
+/-- A read of a history whose head is visible returns the head. -/
+theorem Hist.readEnt_head (h : Agent) (tv : Nat) (e0 : HEnt) (H0 : Hist) (hvis : e0.visible h tv = true)
+    (e : HEnt) (hr : Hist.readEnt h tv (e0 :: H0) = some e) : e = e0 := by
+  unfold Hist.readEnt at hr
+  rw [List.find?_cons, hvis] at hr
+  exact (Option.some.inj hr).symm
+
 /-! ## The resource -/
 
 section res

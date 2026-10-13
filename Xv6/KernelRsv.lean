@@ -71,6 +71,19 @@ def xv6KptRootR : RsvRegion := ⟨KA.«kernel_pagetable», .roots 1 8⟩
 
 def xv6ProcRootsR : RsvRegion := ⟨KA.«proc» + 80#64, .roots 64 376⟩
 
+/-- **The audited racy words** (W8 (f2-ctx) S3): `itable.inode[k].ref`
+(`inode[k]` at `itable + 24 + 136 k`, `ref` at +8; `NINODE = 50`), read
+lock-free by `ilock`'s guard `ip->ref < 1` -- a race the program has, so no
+load of them is claimed chained (`MachCSL.RsvKind.racy`, a footprint-free
+registry entry; the tie to `Xv6.iRef`/`Xv6.ientry` is `IcachePinwObl.iref_racy`). -/
+def xv6IrefRacyR : RsvRegion := ⟨KA.«itable» + 32#64, .racy 50 136 4⟩
+
+/-- **The device-ring pointer word** (W8 (f2-ctx) S3): `disk.used`
+(`&disk + 16`), naming the virtio used ring -- written by the device, read by
+the driver, whose only hart-written entries are `virtio_disk_init`'s zero fill
+(`MachCSL.RsvKind.devPtr`, a footprint-free registry entry). -/
+def xv6UsedPtrR : RsvRegion := ⟨KA.«disk» + 16#64, .devPtr 1 8⟩
+
 /-- `started` (`main.c`), the boot handover's ONE-SHOT PUBLICATION word (W8
 (f2-ctx), Q-F2-BOOTGATE (a) as amended by [R35.2]): written once, by hart 0. -/
 def xv6StartedR : RsvRegion := ⟨KA.«started», .pub ⟨0, by decide⟩⟩
@@ -98,12 +111,13 @@ def xv6InodeLockRegions : List RsvRegion := (List.range 50).map (fun k => xv6Loc
 /-- The locks after `proc`, in address order: `tickslock`, `bcache.lock`, the
 buffers' inner locks, `itable.lock`, the inodes' inner locks, `log.lock`,
 `ftable.lock`, `disk.vdisk_lock`; and (W8 (f2-ctx)) the pipe locks'
-registration slots and the page-table root words, footprint-free registry
-entries (`xv6PipeSlotsR`, `xv6KptRootR`, `xv6ProcRootsR`). -/
+registration slots, the page-table root words and the audited racy words,
+footprint-free registry entries (`xv6PipeSlotsR`, `xv6KptRootR`, `xv6ProcRootsR`,
+`xv6IrefRacyR`). -/
 def xv6PostLockRegions : List RsvRegion :=
   [xv6LockR KA.«tickslock», xv6LockR KA.«bcache»] ++ (xv6BufLockRegions ++ ([xv6LockR KA.«itable»] ++
     (xv6InodeLockRegions ++ [xv6LockR KA.«log», xv6LockR KA.«ftable», xv6LockR rsvDiskLk, xv6PipeSlotsR,
-      xv6KptRootR, xv6ProcRootsR])))
+      xv6KptRootR, xv6ProcRootsR, xv6IrefRacyR, xv6UsedPtrR])))
 
 /-- xv6's static reserved regions, in address order. -/
 def xv6RsvStatic : List RsvRegion :=
@@ -140,6 +154,10 @@ theorem xv6RsvStatic_pipeSlots : xv6PipeSlotsR ∈ xv6RsvStatic := by decide +ke
 theorem xv6RsvStatic_kptRoot : xv6KptRootR ∈ xv6RsvStatic := by decide +kernel
 
 theorem xv6RsvStatic_procRoots : xv6ProcRootsR ∈ xv6RsvStatic := by decide +kernel
+
+theorem xv6RsvStatic_irefRacy : xv6IrefRacyR ∈ xv6RsvStatic := by decide +kernel
+
+theorem xv6RsvStatic_usedPtr : xv6UsedPtrR ∈ xv6RsvStatic := by decide +kernel
 
 /-- Hart `h`'s cells are registered, at index `h + 8`. -/
 theorem xv6RsvStatic_cpu (h : CPU) : xv6RsvStatic[rsvCpuIdx h]? = some ⟨cpuAddr h, .cpu h⟩ := by
@@ -222,7 +240,9 @@ def rsvLocksLow (rs : List RsvRegion) : Bool :=
     | .cpu _ => true
     | .pub _ => true
     | .slots _ _ => true
-    | .roots _ _ => true)
+    | .roots _ _ => true
+    | .racy _ _ _ => true
+    | .devPtr _ _ => true)
 
 theorem xv6RsvStatic_locksLow : rsvLocksLow xv6RsvStatic = true := by decide +kernel
 

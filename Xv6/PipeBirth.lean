@@ -308,6 +308,7 @@ theorem newPipe (cpu : CPU) (pi : BitVec 64) (hpv : pageValid pi)
   imod lock_pay_born cpu (pipeResAt γp pi) [] (fun _ h => by simp at h) $$ [$Hrun $HR]
     with ⟨Hrun, ⟨%Vb, Hpay, #Hvf⟩⟩
   imod lockHalf_alloc with ⟨%γl, H1, H2⟩
+  ihave #HregW := lkDynRegW_nil pi lo $$ Hreg
   imod inv_alloc lockN E
     (iprop(lockBody γl pi "pipe" (pipeResAt γp pi) lo lc Vb ∨ pipeDead γl γp))
     $$ [Hw Hc H1 H2 Hpay] with #Hinv
@@ -315,7 +316,7 @@ theorem newPipe (cpu : CPU) (pi : BitVec 64) (hpv : pageValid pi)
     ileft
     unfold lockBody
     iexists [], [], none, 0
-    iframe Hw Hc H1 Hreg
+    iframe Hw Hc H1 HregW
     isplit
     · ipureintro
       refine ⟨rfl, fun e he => absurd he (by simp), fun c _ e hl => ?_, fun _ h => by cases h⟩

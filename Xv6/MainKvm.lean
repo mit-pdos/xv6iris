@@ -157,8 +157,7 @@ theorem mn_publish [CurCtx] (hct : curTier = KTier.bare) (cpu : CPU) (k : KCtx) 
     ⊢ |={⊤}=> (kctx (GF := GF) cpu k ∗ kptOn t (kvmMapT pas) ∗ kstackMapAt pas ∗ syscTrampCl ∗
       pwordPointsTo kernelPagetableAddr 8 DFrac.discard (pageAddr t.base)) := by
   iintro ⟨Hk, Ht, Hauth, ⟨%r0, Hroot⟩, Hw⟩
-  imod kctx_kptOn_publish cpu k t pas r0 hct hok $$ [$Hk $Ht $Hauth $Hroot] with ⟨Hk, #Hkpt, #Hs, #Htr⟩
-  imod kptRoot_persist hct kernelPagetableAddr (pageAddr t.base) $$ Hw with #Hrw
+  imod kctx_kptOn_publish cpu k t pas r0 hct hok $$ [$Hk $Ht $Hauth $Hroot $Hw] with ⟨Hk, #Hkpt, #Hs, #Htr, #Hrw⟩
   imodintro
   iframe Hk Hkpt Hs Htr Hrw
 

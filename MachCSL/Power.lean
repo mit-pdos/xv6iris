@@ -729,7 +729,12 @@ theorem wp_power [KernelMap] [KernelRsv]
             refine ⟨rsvRegMap_staticIn hrwf.2.2, rsvRegMap_exact _, reservedOk_of_all (rsvRegMap_exact _) ?_⟩
             rw [hmem0]
             exact rsvAllOk_boot hrwf
-          · iexists ∅
+          · isplit
+            · ipureintro
+              exact loadsChained_zero _ _ (fun j a => by
+                show (g₂.m.hr j).coh a = 0
+                rw [(hhart0 j).2.2.1]; rfl)
+            iexists ∅
             iframe HcG
             isplit
             · ipureintro

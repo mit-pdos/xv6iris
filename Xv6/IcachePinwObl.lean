@@ -116,13 +116,45 @@ theorem irefPin_read_vis (W : WordHist 4) (Hold : Nat → Hist) (h : Agent) (tvn
 
 variable [IcacheG GF]
 
+/-- `ip->ref`'s bytes are an audited racy word's (W8 (f2-ctx) S3,
+`Xv6.xv6IrefRacyR`): `ilock`'s guard reads it lock-free. -/
+theorem iref_racy (k : Nat) (hk : k < NINODE)
+    (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) (j : Nat) (hj : j < 4) :
+    racyByteIn (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (iRef (ientry k) + BitVec.ofNat 64 j) := by
+  refine ⟨KA.«itable» + 32#64, 50, 136, 4, k, j, ?_, by unfold NINODE at hk; exact hk, hj, ?_⟩
+  · rw [hrsv]; exact xv6RsvStatic_irefRacy
+  · unfold NINODE at hk
+    apply BitVec.eq_of_toNat_eq
+    simp only [iRef, ientry, ISLOTSZ, KA.«itable», KernelSyms.«itable», BitVec.toNat_add,
+      BitVec.toNat_ofNat]
+    omega
+
+/-- **A read of `ip->ref` is exempt** (its bytes are an audited racy
+word's): the certificates every `ip->ref` load hands its rule. -/
+theorem iref_certs (cpu : CPU) (k : Nat) (hk : k < NINODE)
+    (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) (K : Nat)
+    (ts : List (Nat × Agent)) (Hs : Nat → Hist) :
+    ⊢@{IProp GF} readCertsAt cpu (iRef (ientry k)) 4 K ts Hs [] := by
+  iapply readCertsAt_of cpu _ 4 K ts Hs [] (fun _ _ => True) (fun _ _ _ _ _ _ _ => trivial)
+  imodintro
+  iintro %j %e %⟨hj, _⟩
+  iright
+  unfold exCertAt
+  iexists []
+  isplitl []
+  · exact BigSepL.bigSepL_nil_intro
+  ipureintro
+  intro σ _ _ _ _
+  exact Or.inr (Or.inr (Or.inr (Or.inl (iref_racy k hk hrsv j hj))))
+
 /-- A6.145/A6.146, Rocq `iref_read_obl ∘ iref_load_pinw_au` (deviation 1):
 THE LOCK-FREE GUARD READ.  A slice holder whose floor `lo` is visible to the
 reading hart (the `(K, ts)` licence of `hvis`) reads,
 at every view the load may choose, a whole member of `irefSet`: `0 < ref <
 2^31`, never 0, never torn.  The slice comes back untouched. -/
 theorem iref_readAU [Icfg] (cpu : CPU) (k : Nat) (s : Qp) (g : GName) (lo K : Nat)
-    (ts : List (Nat × Agent)) (hk : k < NINODE) (hvis : lo ≤ K ∨ (lo, hartAgent cpu) ∈ ts) :
+    (ts : List (Nat × Agent)) (hk : k < NINODE) (hvis : lo ≤ K ∨ (lo, hartAgent cpu) ∈ ts)
+    (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) :
     itableInv (hlc := hlc) (GF := GF) ∗ ([∗list] p ∈ ts, authoredBy p.1 p.2) ∗
       liveGenlo k s g lo ⊢
       readAU cpu (iRef (ientry k)) 4 K ts
@@ -138,12 +170,16 @@ theorem iref_readAU [Icfg] (cpu : CPU) (k : Nat) (s : Qp) (g : GName) (lo K : Na
   icases wordCell_cases _ 4 lo v0 W $$ Hc with ⟨%Hold, Hb, %htail⟩
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
-  iexists (fun _ => DFrac.own 1), W.hist Hold
+  iexists (fun _ => DFrac.own 1), W.hist Hold, []
   iframe Hb
   isplit
   · ipureintro; exact fun j hj => WordHist.hist_ne_nil W Hold htail j hj
+  isplitl []
+  · iapply rdCompBytes_nil
+  isplitl []
+  · iapply iref_certs cpu k hk hrsv K ts _
   inext
-  iintro %w %tvn %hKt %hrd %hauth Hb
+  iintro %w %tvn %hKt %hrd %hauth Hb _
   imod Hmask
   ihave Hc := wordCell_intro _ 4 lo v0 W Hold htail $$ Hb
   imod Hcl $$ [Hc]
@@ -172,7 +208,8 @@ the read is the LATEST value -- exactly `irefWord M k` -- at every view the
 load may choose.  The map half and the stamp half come back untouched. -/
 theorem iref_readAU_locked [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] [Icfg] (cpu : CPU) (M : RegMapF (Qp × PosNat))
     (k tst K : Nat) (ts : List (Nat × Agent)) (hk : k < NINODE)
-    (his : ∃ v, PartialMap.get? M k = some v) (htK : tst ≤ K) :
+    (his : ∃ v, PartialMap.get? M k = some v) (htK : tst ≤ K)
+    (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) :
     itableInv (hlc := hlc) (GF := GF) ∗ ([∗list] p ∈ ts, authoredBy p.1 p.2) ∗
       itableHalf M ∗ istmpAuth k (1 : Qp).half tst ⊢
       readAU cpu (iRef (ientry k)) 4 K ts
@@ -189,12 +226,16 @@ theorem iref_readAU_locked [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [
   icases wordCell_cases _ 4 lo v0 W $$ Hc with ⟨%Hold, Hb, %htail⟩
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
-  iexists (fun _ => DFrac.own 1), W.hist Hold
+  iexists (fun _ => DFrac.own 1), W.hist Hold, []
   iframe Hb
   isplit
   · ipureintro; exact fun j hj => WordHist.hist_ne_nil W Hold htail j hj
+  isplitl []
+  · iapply rdCompBytes_nil
+  isplitl []
+  · iapply iref_certs cpu k hk hrsv K ts _
   inext
-  iintro %w %tvn %hKt %hrd %hauth Hb
+  iintro %w %tvn %hKt %hrd %hauth Hb _
   imod Hmask
   ihave Hc := wordCell_intro _ 4 lo v0 W Hold htail $$ Hb
   imod Hcl $$ [Hc]

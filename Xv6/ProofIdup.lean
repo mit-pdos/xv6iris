@@ -318,8 +318,9 @@ theorem idup_core [Fscfg] [Icfg] [CurCtx] (AC : ACQUIRE) (RE : RELEASE_HOOK)
   icases ownCtx_floor_view c curCtx tst $$ [Hctx Hfl] with ⟨Hctx, ⟨%K, #HK, %htK⟩⟩
   · iframe Hctx Hfl
   ihave Hk := Hkback $$ Hctx
+  icases kctx_rsvEq c _ $$ Hk with ⟨%heqR, Hk⟩
   -- +0x18 c.lw a5,8(s1): THE EXACT READ, an accessor step
-  ihave HAU := iref_readAU_locked (hlc := hlc) c M kk tst K [] hkk ⟨_, hMk⟩ htK
+  ihave HAU := iref_readAU_locked (hlc := hlc) c M kk tst K [] hkk ⟨_, hMk⟩ htK heqR
     $$ [Hhalf Hst]
   · iframe Hinv Hhalf Hst
     iapply BigSepL.bigSepL_nil.2

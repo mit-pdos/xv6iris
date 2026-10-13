@@ -42,7 +42,7 @@ variable [MachFixedGS hlc GF] (E : EraGS)
 theorem memModel_gate (σ : MState) (j : CPU) :
     memModelAt E σ ∗ gatePassedAt E j ⊢@{IProp GF} ⌜gateOk (chainEnv (hlc := hlc) (GF := GF) σ) j⌝ := by
   unfold memModelAt rsvModelAt chainModelAt gatePassedAt
-  iintro ⟨⟨_, _, _, _, _, _, _, %Z, HZ, %hZ, _⟩, Hg⟩
+  iintro ⟨⟨_, _, _, _, _, _, _, _, %Z, HZ, %hZ, _⟩, Hg⟩
   icases Hg with ⟨%hw | ⟨%v, Hc⟩⟩
   · ipureintro
     intro f w hp hj
@@ -57,7 +57,7 @@ theorem memModel_chainIssueKey (σ : MState) (k : Nat)
       certsOk (chainEnv (hlc := hlc) (GF := GF) σ) (Iris.Std.PartialMap.insert Z k (0 : Agent))) :
     memModelAt E σ ⊢@{IProp GF} |==> (memModelAt E σ ∗ ∃ v : Agent, E.chainName ↪◯MAP[k]{.discard} v) := by
   unfold memModelAt rsvModelAt chainModelAt
-  iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hreg, Hh, %Z, HZ, %hZ, #Hels⟩
+  iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hreg, Hh, %hlc0, %Z, HZ, %hZ, #Hels⟩
   cases hk : get? Z k with
   | some v =>
     imodintro
@@ -65,7 +65,9 @@ theorem memModel_chainIssueKey (σ : MState) (k : Nat)
     isplitl [HZ]
     · isplit
       · ipureintro; exact hmm
-      · iexists Z
+      · isplit
+        · ipureintro; exact hlc0
+        iexists Z
         iframe HZ Hels
         ipureintro; exact hZ
     · iexists v
@@ -78,7 +80,9 @@ theorem memModel_chainIssueKey (σ : MState) (k : Nat)
     isplitl [HZ]
     · isplit
       · ipureintro; exact hmm
-      · iexists (Iris.Std.PartialMap.insert Z k (0 : Agent))
+      · isplit
+        · ipureintro; exact hlc0
+        iexists (Iris.Std.PartialMap.insert Z k (0 : Agent))
         iframe HZ
         isplit
         · ipureintro; exact hv Z hZ
@@ -123,7 +127,7 @@ theorem memModel_entIssue (σ : MState) (pa : PAddr) (e : HEnt) (he : ∃ H, σ.
 theorem memModel_entryAt (σ : MState) (pa : PAddr) (e : HEnt) :
     memModelAt E σ ∗ entryAtE E pa e ⊢@{IProp GF} ⌜∃ H, σ.mem[pa]? = some H ∧ e ∈ H⌝ := by
   unfold memModelAt rsvModelAt chainModelAt entryAtE
-  iintro ⟨⟨_, _, _, _, _, _, _, %Z, HZ, %hZ, _⟩, %v, Hc⟩
+  iintro ⟨⟨_, _, _, _, _, _, _, _, %Z, HZ, %hZ, _⟩, %v, Hc⟩
   ihave %Hl := ghost_map_lookup $$ HZ Hc
   ipureintro
   exact hZ.2.2 pa e (by rw [Hl]; rfl)

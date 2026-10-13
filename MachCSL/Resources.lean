@@ -1348,6 +1348,56 @@ theorem chainEnv_isLk_rsv [MachFixedGS hlc GF] (σ : MState) {b : PAddr} (r : Na
     (h : rsvLockByte (hlc := hlc) (GF := GF) b) : (chainEnv (hlc := hlc) (GF := GF) σ).isLk b r :=
   Or.inl h
 
+/-! ### The load-side invariant at the ambient record, step by step (W8
+(f2-ctx) S3-c1: what `chainModelAt`'s first conjunct needs of each machine
+step) -/
+
+/-- The coherence floors are at or below the top (`mmOk`). -/
+theorem mmOk_coh_le {σ : MState} (h : mmOk σ) (j : CPU) (a : PAddr) : (σ.hr j).coh a ≤ σ.top :=
+  (h.2.1 j).2.2.2 a
+
+/-- **A hart's store keeps the load-side invariant** (the footprint's floors
+reset; the exemption, read as of positions at or below the old top, only
+grows). -/
+theorem chainLoads_store [MachFixedGS hlc GF] (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
+    (w : BitVec (8 * n)) (excl : Bool) (hmm : mmOk σ)
+    (hnew : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))
+      (σ.mem.writeBytes pa n w (σ.top + 1) (hartAgent cpu)))
+    (h : loadsChained (chainEnv (hlc := hlc) (GF := GF) σ) (chainEx (hlc := hlc) (GF := GF) σ)) :
+    loadsChained (chainEnv (hlc := hlc) (GF := GF) (σ.store cpu pa n w excl))
+      (chainEx (hlc := hlc) (GF := GF) (σ.store cpu pa n w excl)) :=
+  loadsChained_store _ _ σ cpu pa n w excl (mmOk_coh_le hmm) (chainEnvAt_ext_store _ _ σ cpu pa n w excl hnew)
+    (fun a t ht hx => chainExAt_grow (memGrow_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _))
+      (memAbove_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _))
+      (by simp only [MState.top, List.length_append, List.length_singleton]; omega) a t ht hx) h
+
+/-- **A DMA write keeps the load-side invariant.** -/
+theorem chainLoads_dma [MachFixedGS hlc GF] (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (hmm : mmOk σ)
+    (h : loadsChained (chainEnv (hlc := hlc) (GF := GF) σ) (chainEx (hlc := hlc) (GF := GF) σ)) :
+    loadsChained (chainEnv (hlc := hlc) (GF := GF) (σ.storeDma pa n w))
+      (chainEx (hlc := hlc) (GF := GF) (σ.storeDma pa n w)) := by
+  by_cases hn : n = 0
+  · rw [MState.storeDma_zero σ pa n w hn]; exact h
+  refine loadsChained_dma _ _ σ pa n w (mmOk_coh_le hmm) (fun a t ht hx => ?_) h
+  show chainExAt _ _ (σ.storeDma pa n w).mem (σ.storeDma pa n w).top a t
+  rw [MState.storeDma_mem_of_ne σ pa n w hn]
+  refine chainExAt_grow (memGrow_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _))
+    (memAbove_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _)) ?_ a t ht hx
+  show σ.log.length ≤ (if n = 0 then σ.log else σ.log ++ [diskAgent]).length
+  rw [if_neg hn, List.length_append]
+  exact Nat.le_add_right _ _
+
+/-- **A plain load keeps the load-side invariant, given its chain obligation**
+(`loadSrcOk`, discharged by the load rule's caller). -/
+theorem chainLoads_load [MachFixedGS hlc GF] (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat)
+    (hmm : mmOk σ)
+    (hsrc : loadSrcOk (chainEnv (hlc := hlc) (GF := GF) σ) (chainEx (hlc := hlc) (GF := GF) σ) σ.mem cpu pa n tvn)
+    (h : loadsChained (chainEnv (hlc := hlc) (GF := GF) σ) (chainEx (hlc := hlc) (GF := GF) σ)) :
+    loadsChained (chainEnv (hlc := hlc) (GF := GF) (σ.afterLoad cpu pa n tvn))
+      (chainEx (hlc := hlc) (GF := GF) (σ.afterLoad cpu pa n tvn)) :=
+  loadsChained_load _ _ σ cpu pa n tvn (mmOk_coh_le hmm) (fun _ _ _ hx => hx) hsrc h
+
 /-- The issued elements of a certificate map, kept beside the authority (so
 re-issuing a certificate hands out its element; `MachCSL.dirtyElems`'s
 pattern). -/
@@ -1358,9 +1408,12 @@ instance [MachFixedGS hlc GF] (E : EraGS) (Z : RegMapF Agent) :
     Persistent (PROP := IProp GF) (chainElemsAt E Z) := by
   unfold chainElemsAt; infer_instance
 
-/-- **The chain conjunct** of era `E`'s interpretation: the certificate map,
-every key valid, every element issued. -/
+/-- **The chain conjunct** of era `E`'s interpretation: the load-side
+invariant (W8 (f2-ctx) S3: every observed foreign hart entry outside the
+exemption is chained, `MachCSL.loadsChained`), the certificate map, every
+key valid, every element issued. -/
 def chainModelAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) : IProp GF := iprop%
+  ⌜loadsChained (chainEnv (hlc := hlc) (GF := GF) σ) (chainEx (hlc := hlc) (GF := GF) σ)⌝ ∗
   ∃ Z : RegMapF Agent, (E.chainName ↪●MAP Z) ∗ ⌜certsOk (chainEnv (hlc := hlc) (GF := GF) σ) Z⌝ ∗
     chainElemsAt E Z
 
@@ -1388,8 +1441,9 @@ def memModelAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) : IProp GF := ipro
 theorem rsvModelAt_congr [MachFixedGS hlc GF] (E : EraGS) {σ σ' : MState} (h : σ'.mem = σ.mem)
     (hl : σ'.log = σ.log) (hc : ∀ (j : CPU) (a : PAddr), (σ'.hr j).coh a = (σ.hr j).coh a) :
     rsvModelAt (GF := GF) E σ' = rsvModelAt E σ := by
-  unfold rsvModelAt reservedOk chainModelAt chainEnv
-  rw [chainEnvAt_congr _ _ h hl hc, h]
+  have ht : σ'.top = σ.top := by simp only [MState.top, hl]
+  unfold rsvModelAt reservedOk chainModelAt chainEnv chainEx
+  rw [chainEnvAt_congr _ _ h hl hc, h, ht]
 
 /-- `cpus` lists every hart at its own index. -/
 theorem cpus_get? (cpu : CPU) : cpus[cpu.val]? = some cpu := by

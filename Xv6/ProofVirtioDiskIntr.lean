@@ -855,7 +855,8 @@ theorem vdis_loop (WK : WAKEUP)
   iintro Hk Hpc Hup
   obtain ⟨hram2, hal2, hkm2⟩ := vdis_usedIdx_facts pu hpu
   ihave #Hid3 := kmapStatic_rw (usedIdxAt pu) hkm2 $$ HS
-  ihave HAU3 := disk_used_idx_read γ pd pav pu cpu F (nr + 1) $$ [Hinv Hgeom Hnr Hwm1]
+  icases kctx_rsvEq cpu _ $$ Hk with ⟨%heqR, Hk⟩
+  ihave HAU3 := disk_used_idx_read γ pd pav pu cpu F (nr + 1) heqR $$ [Hinv Hgeom Hnr Hwm1]
   · iframe #; iframe
   k_step (wp_s_lhu_aur cpu _ ?hs (KA.«virtio_disk_intr» + 0x82#64) false 2#12 14#5 14#5
       (by decide) (usedIdxAt pu) ?hb3 hram2 hal2 F [] _)
@@ -1060,7 +1061,8 @@ theorem virtio_disk_intr_proof
   -- +0x36  lhu a5,2(a5)   used->idx
   obtain ⟨hram0, hal0, hkm0⟩ := vdis_usedIdx_facts pu hpu
   ihave #Hid0 := kmapStatic_rw (usedIdxAt pu) hkm0 $$ HS
-  ihave HAU3 := disk_used_idx_read γ pd pav pu cpu Kw nr $$ [Hinv Hgeom Hnr Hwm]
+  icases kctx_rsvEq cpu _ $$ Hk with ⟨%heqR, Hk⟩
+  ihave HAU3 := disk_used_idx_read γ pd pav pu cpu Kw nr heqR $$ [Hinv Hgeom Hnr Hwm]
   · iframe #; iframe
   k_step (wp_s_lhu_aur cpu _ ?hs (KA.«virtio_disk_intr» + 0x36#64) false 2#12 15#5 15#5
       (by decide) (usedIdxAt pu) ?hb2 hram0 hal0 Kw [] _)

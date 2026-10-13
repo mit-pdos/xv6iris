@@ -678,12 +678,28 @@ def lockPubByteIn (rs : List RsvRegion) (a : PAddr) : Prop :=
 def lockWordsByte (b a : PAddr) : Prop :=
   (∃ j, j < 4 ∧ a = b + BitVec.ofNat 64 j) ∨ (∃ j, j < 8 ∧ a = b + 16#64 + BitVec.ofNat 64 j)
 
+/-- A byte of an audited racy word of `rs` (`RsvKind.racy`). -/
+def racyByteIn (rs : List RsvRegion) (a : PAddr) : Prop :=
+  ∃ (base : PAddr) (cnt stride n k j : Nat), (⟨base, .racy cnt stride n⟩ : RsvRegion) ∈ rs ∧ k < cnt ∧
+    j < n ∧ a = base + BitVec.ofNat 64 (stride * k) + BitVec.ofNat 64 j
+
+/-- A byte of a page a registered device-ring pointer word (`RsvKind.devPtr`)
+has named, as of some position at or below the top. -/
+def devPageIn (rs : List RsvRegion) (m : FlatMem) (top : Nat) (a : PAddr) : Prop :=
+  ∃ (base : PAddr) (cnt stride k t : Nat) (p : PAddr), (⟨base, .devPtr cnt stride⟩ : RsvRegion) ∈ rs ∧
+    k < cnt ∧ t ≤ top ∧ wordAsOf m (base + BitVec.ofNat 64 (stride * k)) t p ∧ p.toNat ≤ a.toNat ∧
+    a.toNat < p.toNat + 4096
+
 /-- **The exemption of the load-side invariant**, at memory `m` with top
 `top`: byte `a` as of position `t` is a lock-layer byte (static, publication,
-or a dynamic lock live at `t`) or a page-table byte (`ptByteAt`). -/
+or a dynamic lock live at `t`), a page-table byte (`ptByteAt`: one named
+predicate, so a later refinement -- W8 (pte-ghost), [OWN.57] -- can strengthen
+it by "page not freed"), a byte of an audited racy word (`racyByteIn`), or a
+byte of a device-shared ring page (`devPageIn`). -/
 def chainExAt (rs : List RsvRegion) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop) (m : FlatMem)
     (top : Nat) (a : PAddr) (t : Nat) : Prop :=
-  lockPubByteIn rs a ∨ (∃ b, dynLkAt wit m top b t ∧ lockWordsByte b a) ∨ ptByteAt rs m t a
+  lockPubByteIn rs a ∨ (∃ b, dynLkAt wit m top b t ∧ lockWordsByte b a) ∨ ptByteAt rs m t a ∨
+    racyByteIn rs a ∨ devPageIn rs m top a
 
 /-- Reading AS OF a position at or below the top is unchanged by a step that
 adds entries above the top only. -/
@@ -730,18 +746,23 @@ only (at the positions at or below the old top). -/
 theorem chainExAt_grow {rs : List RsvRegion} {wit : List (PAddr × HEnt) → PAddr → Nat → Prop}
     {m m' : FlatMem} {top top' : Nat} (hg : memGrow m top m') (hm : memAbove m top m') (htop : top ≤ top')
     (a : PAddr) (t : Nat) (ht : t ≤ top) (h : chainExAt rs wit m top a t) : chainExAt rs wit m' top' a t := by
-  rcases h with h | ⟨b, hb, hw⟩ | h
+  rcases h with h | ⟨b, hb, hw⟩ | h | h | ⟨base, cnt, stride, k, t', p, hR, hk, ht', hwd, h1, h2⟩
   · exact .inl h
   · exact .inr (.inl ⟨b, dynLkAt_mono hg htop hb, hw⟩)
-  · exact .inr (.inr ((ptByteAt_grow hg hm ht a).2 h))
+  · exact .inr (.inr (.inl ((ptByteAt_grow hg hm ht a).2 h)))
+  · exact .inr (.inr (.inr (.inl h)))
+  · exact .inr (.inr (.inr (.inr ⟨base, cnt, stride, k, t', p, hR, hk, Nat.le_trans ht' htop,
+      (wordAsOf_grow hg hm ht' _ _).2 hwd, h1, h2⟩)))
 
 /-- A step that leaves the memory alone keeps the exemption (any new top). -/
 theorem chainExAt_top {rs : List RsvRegion} {wit : List (PAddr × HEnt) → PAddr → Nat → Prop}
     {m : FlatMem} {top top' : Nat} (htop : top ≤ top') (a : PAddr) (t : Nat)
     (h : chainExAt rs wit m top a t) : chainExAt rs wit m top' a t := by
-  rcases h with h | ⟨b, hb, hw⟩ | h
+  rcases h with h | ⟨b, hb, hw⟩ | h | h | ⟨base, cnt, stride, k, t', p, hR, hk, ht', hwd, h1, h2⟩
   · exact .inl h
   · exact .inr (.inl ⟨b, dynLkAt_mono (memGrow_refl m top) htop hb, hw⟩)
-  · exact .inr (.inr h)
+  · exact .inr (.inr (.inl h))
+  · exact .inr (.inr (.inr (.inl h)))
+  · exact .inr (.inr (.inr (.inr ⟨base, cnt, stride, k, t', p, hR, hk, Nat.le_trans ht' htop, hwd, h1, h2⟩)))
 
 end MachCSL

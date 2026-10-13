@@ -51,6 +51,8 @@ def rsvSpan : RsvKind → Nat
   | .pub _ => 4
   | .slots _ _ => 0
   | .roots _ _ => 0
+  | .racy _ _ _ => 0
+  | .devPtr _ _ => 0
 
 theorem regionBytes_span (R : RsvRegion) (hR : R.base.toNat + rsvSpan R.kind ≤ 2 ^ 64) (a : PAddr)
     (ha : a ∈ R.bytes) : R.base.toNat ≤ a.toNat ∧ a.toNat < R.base.toNat + rsvSpan R.kind := by
@@ -58,6 +60,8 @@ theorem regionBytes_span (R : RsvRegion) (hR : R.base.toNat + rsvSpan R.kind ≤
   cases k with
   | slots _ _ => simp [RsvRegion.bytes, RsvRegion.words] at ha
   | roots _ _ => simp [RsvRegion.bytes, RsvRegion.words] at ha
+  | racy _ _ _ => simp [RsvRegion.bytes, RsvRegion.words] at ha
+  | devPtr _ _ => simp [RsvRegion.bytes, RsvRegion.words] at ha
   | pub w =>
     simp only [rsvSpan] at hR ⊢
     simp only [RsvRegion.bytes, RsvRegion.words, wordBytes, List.flatMap_cons, List.flatMap_nil,
@@ -87,6 +91,8 @@ theorem regionBytes_span0 (R : RsvRegion) (h0 : rsvSpan R.kind = 0) (a : PAddr) 
   cases k with
   | slots _ _ => simp [RsvRegion.bytes, RsvRegion.words] at ha
   | roots _ _ => simp [RsvRegion.bytes, RsvRegion.words] at ha
+  | racy _ _ _ => simp [RsvRegion.bytes, RsvRegion.words] at ha
+  | devPtr _ _ => simp [RsvRegion.bytes, RsvRegion.words] at ha
   | _ => simp [rsvSpan] at h0
 
 /-- No region of `rs` meets `[lo, hi)`. -/

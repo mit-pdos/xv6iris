@@ -326,7 +326,8 @@ theorem ig_live (RH : RELEASE_HOOK) (PA : PANIC) (c cpu : CPU) (k : KCtx) (spie 
   icases ownCtx_floor_view c curCtx tst $$ [Hrun Hfl] with ⟨Hrun, ⟨%K, #HK, %htK⟩⟩
   · iframe Hrun Hfl
   ihave Hk := Hkback $$ Hrun
-  ihave HAU := iref_readAU_locked (hlc := hlc) c M j tst K [] hj ⟨_, hMj⟩ htK $$ [Hhalf Hst]
+  icases kctx_rsvEq c _ $$ Hk with ⟨%heqR, Hk⟩
+  ihave HAU := iref_readAU_locked (hlc := hlc) c M j tst K [] hj ⟨_, hMj⟩ htK heqR $$ [Hhalf Hst]
   · iframe Hinv Hhalf Hst
     iapply BigSepL.bigSepL_nil.2; iempintro
   -- +0x44 c.lw a5,8(s1) : THE EXACT READ

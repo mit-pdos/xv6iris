@@ -1158,7 +1158,7 @@ theorem memModel_rsvOk (σ : MState) :
 theorem memModel_chainCert (σ : MState) (c : ChainCert) :
     memModelAt E σ ∗ chainCertAt E c ⊢@{IProp GF} ⌜c.valid (chainEnv (hlc := hlc) (GF := GF) σ)⌝ := by
   unfold memModelAt rsvModelAt chainModelAt chainCertAt
-  iintro ⟨⟨_, _, _, _, _, _, _, %Z, HZ, %hZ, _⟩, %v, Hc⟩
+  iintro ⟨⟨_, _, _, _, _, _, _, _, %Z, HZ, %hZ, _⟩, %v, Hc⟩
   ihave %Hl := ghost_map_lookup $$ HZ Hc
   ipureintro
   exact hZ.1 c (by rw [Hl]; rfl)
@@ -1185,10 +1185,13 @@ theorem rsvModel_mono (σ σ' : MState)
     (h : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem →
       rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ'.mem)
     (hext : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ'.mem →
-      (chainEnv (hlc := hlc) (GF := GF) σ).ext (chainEnv (hlc := hlc) (GF := GF) σ')) :
+      (chainEnv (hlc := hlc) (GF := GF) σ).ext (chainEnv (hlc := hlc) (GF := GF) σ'))
+    (hch : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ'.mem →
+      loadsChained (chainEnv (hlc := hlc) (GF := GF) σ) (chainEx (hlc := hlc) (GF := GF) σ) →
+      loadsChained (chainEnv (hlc := hlc) (GF := GF) σ') (chainEx (hlc := hlc) (GF := GF) σ')) :
     rsvModelAt E σ ⊢@{IProp GF} rsvModelAt E σ' := by
   unfold rsvModelAt chainModelAt
-  iintro ⟨⟨%reg, Hreg, %⟨hin, hex, hok⟩⟩, Hh, ⟨%Z, HZ, %hZ, #Hels⟩⟩
+  iintro ⟨⟨%reg, Hreg, %⟨hin, hex, hok⟩⟩, Hh, %hlc0, ⟨%Z, HZ, %hZ, #Hels⟩⟩
   have hnew := h (all_of_reservedOk hin hok)
   iframe Hh
   isplitl [Hreg]
@@ -1196,7 +1199,10 @@ theorem rsvModel_mono (σ σ' : MState)
     iframe Hreg
     ipureintro
     exact ⟨hin, hex, reservedOk_of_all hex hnew⟩
-  · iexists Z
+  · isplit
+    · ipureintro
+      exact hch hnew hlc0
+    iexists Z
     iframe HZ Hels
     ipureintro
     exact certsOk_mono (hext hnew) hZ
@@ -1322,12 +1328,15 @@ theorem hartViews_acc (σ : MState) (cpu : CPU) :
   · iexact Hc'
 
 /-- A plain load moves only the read side of its hart. -/
-theorem memModel_load (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv : tvn ≤ σ.top) :
+theorem memModel_load (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv : tvn ≤ σ.top)
+    (hsrc : loadSrcOk (chainEnv (hlc := hlc) (GF := GF) σ) (chainEx (hlc := hlc) (GF := GF) σ)
+      σ.mem cpu pa n tvn) :
     memModelAt E σ ⊢@{IProp GF} |==> memModelAt E (σ.afterLoad cpu pa n tvn) := by
   unfold memModelAt
   iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
   ihave Hrsv := rsvModel_mono E σ (σ.afterLoad cpu pa n tvn) id
-    (fun _ => chainEnvAt_ext_load _ _ σ cpu pa n tvn) $$ Hrsv
+    (fun _ => chainEnvAt_ext_load _ _ σ cpu pa n tvn)
+    (fun _ h => chainLoads_load σ cpu pa n tvn hmm hsrc h) $$ Hrsv
   icases hartViews_acc E σ cpu $$ Hviews with ⟨Hc, Hclose⟩
   icases hartViewsAt_cases E σ cpu $$ Hc with ⟨Hv, Hi, Hr⟩
   imod MonoNat.own_update _ (.ofNat (σ.hr cpu).rv) (.ofNat (max (σ.hr cpu).rv tvn))
@@ -1427,7 +1436,8 @@ theorem memModel_store_plain (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w
   unfold memModelAt
   icases Hmm with ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
   ihave Hrsv := rsvModel_mono E σ (σ.store cpu pa n w false) hrsv
-    (chainEnvAt_ext_store _ _ σ cpu pa n w false) $$ Hrsv
+    (chainEnvAt_ext_store _ _ σ cpu pa n w false)
+    (fun hnew h => chainLoads_store σ cpu pa n w false hmm hnew h) $$ Hrsv
   imod MonoNat.own_update _ (.ofNat σ.top) (.ofNat (σ.top + 1))
     (by simp only [MaxNat.le_toNat]; omega) $$ Htop with ⟨Htop, #Htoplb⟩
   imod ghost_map_insert_persist (σ.top + 1) (hartAgent cpu)
@@ -2033,6 +2043,10 @@ theorem swp_sail_mem_read_plain_ctx (cpu : CPU) {n vasize : Nat}
       $$ [Hmm Hctx Hmem Hb]
   · iapply ctxBytes_readable σ cpu ξ req.pa n dq w $$ [Hmm Hctx Hmem Hb]
     iframe
+  ihave %hsrc : ⌜∀ tvn, σ.tv cpu ≤ tvn → loadSrcOk (chainEnv (hlc := hlc) (GF := GF) σ)
+      (chainEx (hlc := hlc) (GF := GF) σ) σ.mem cpu req.pa n tvn⌝ $$ [Hmm Hctx Hmem Hb]
+  · iapply ctxBytes_srcOk σ cpu ξ req.pa n dq w (chainEx (hlc := hlc) (GF := GF) σ) $$ [Hmm Hctx Hmem Hb]
+    iframe
   ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
   · iapply memModel_mmOk $$ Hmm
   have hram : ramBytes req.pa n := ramBytes_of_readBytes hmm.2.2.2.1 (hrd _ (Nat.le_refl _))
@@ -2052,7 +2066,7 @@ theorem swp_sail_mem_read_plain_ctx (cpu : CPU) {n vasize : Nat}
   · rw [hk'.1] at hif
     exact absurd hif (by decide)
   · obtain rfl := readBytes_unique _ _ _ _ _ _ _ (hrd tvn htv) hrd'
-    imod memModel_load _ σ cpu req.pa n tvn htop $$ Hmm with Hmm
+    imod memModel_load _ σ cpu req.pa n tvn htop (hsrc tvn htv) $$ Hmm with Hmm
     imod Hmask
     imodintro
     isplitl [Hregs Hmem Hmm Hclose]

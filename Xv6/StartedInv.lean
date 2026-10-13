@@ -402,6 +402,25 @@ theorem started_seenCerts (cpu : CPU) (a : ChainVG) (t : Nat) :
     iexact H
   · iright; iexact Hg
 
+/-- **A read of the flag is certified** (W8 (f2-ctx) S3): its bytes are a
+publication word's -- the lock layer's exemption, `lockPubByteIn`. -/
+theorem started_certs (cpu : CPU) (K : Nat) (Hs : Nat → Hist)
+    (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) :
+    ⊢@{IProp GF} readCertsAt cpu startedAddr 4 K [] Hs [] := by
+  iapply readCertsAt_of cpu startedAddr 4 K [] Hs [] (fun _ _ => True) (fun _ _ _ _ _ _ _ => trivial)
+  imodintro
+  iintro %j %e %⟨hj, _⟩
+  ileft
+  unfold srcCertAt
+  ileft
+  ipureintro
+  have hm : xv6StartedR ∈ MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) := by
+    rw [hrsv]; exact (by decide +kernel : xv6StartedR ∈ xv6RsvStatic)
+  refine Or.inr (Or.inr (Or.inr ⟨xv6StartedR, hm, Or.inr ⟨_, rfl⟩, ?_⟩))
+  simp only [RsvRegion.bytes, RsvRegion.words, xv6StartedR, wordBytes, List.flatMap_cons,
+    List.flatMap_nil, List.append_nil, List.mem_map, List.mem_range]
+  exact ⟨j, hj, rfl⟩
+
 /-- **THE READ, a secondary's** (Rocq `started_read_open` +
 `started_read_obl`): the invariant is the accessor of the racy `lw` of the
 flag (at its half, W8 (f2-ctx)), and the load's continuation learns
@@ -423,15 +442,19 @@ theorem started_readAUr (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) [∀
   icases Hbody with (⟨>Hw, >Hg, >Hst⟩ | ⟨%t, %T, %a, >Hw, >Hidx, >%⟨hT, ht0⟩, >Hst, HP, >#HC⟩)
   · iapply fupd_mask_intro LawfulSet.empty_subset
     iintro Hmask
-    iexists (fun _ => DFrac.own (1 : Qp).half), WordHist.hist ([] : WordHist 4) startedImg, none
+    iexists (fun _ => DFrac.own (1 : Qp).half), WordHist.hist ([] : WordHist 4) startedImg, none, []
     unfold startedWin
     iframe Hw
     isplit
     · ipureintro; exact fun j hj => WordHist.hist_ne_nil _ startedImg startedImg_tail j hj
-    isplitr
+    isplitl []
     · simp only [rdIn]; iempintro
+    isplitl []
+    · iapply rdCompBytes_nil
+    isplitl []
+    · iapply started_certs cpu K _ hrsv
     inext
-    iintro %w %tvn %hKt %hrd %hauth #Hrv _ Hb
+    iintro %w %tvn %hKt %hrd %hauth #Hrv _ Hb _
     imod Hmask
     imod Hclose $$ [Hb Hg Hst]
     · inext
@@ -447,17 +470,21 @@ theorem started_readAUr (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) [∀
     iintro Hmask
     iexists (fun _ => DFrac.own (1 : Qp).half),
       WordHist.hist ([⟨t, hartAgent startedPrimary, startedSet⟩] : WordHist 4) startedImg,
-      some (startedPrimary, [], cpus.map (fun h => (h, a.1 h, t)), fun v => decide (v ≠ 0))
+      some (startedPrimary, [], cpus.map (fun h => (h, a.1 h, t)), fun v => decide (v ≠ 0)), []
     unfold startedWin
     iframe Hw
     isplit
     · ipureintro; exact fun j hj => WordHist.hist_ne_nil _ startedImg startedImg_tail j hj
-    isplitr
+    isplitl [HC]
     · iapply started_rdIn cpu hcpu _ a t hrsv
         (fun e he => by simp at he; subst he; exact ⟨rfl, ht0, Nat.le_refl _⟩) $$ HC
+    isplitl []
+    · iapply rdCompBytes_nil
+    isplitl []
+    · iapply started_certs cpu K _ hrsv
     inext
     icases HP with #HP
-    iintro %w %tvn %hKt %hrd %hauth #Hrv Hout Hb
+    iintro %w %tvn %hKt %hrd %hauth #Hrv Hout Hb _
     imod Hmask
     imod Hclose $$ [Hb Hst]
     · inext

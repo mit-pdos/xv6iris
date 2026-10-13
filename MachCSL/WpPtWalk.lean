@@ -489,7 +489,7 @@ theorem swp_update_and_write_pte_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MCon
     conf_cases HmConf
     swp_run 60
     conf_intro HmConf
-    ihave HAU := kpt_exclReadAU t M addr _ hmem $$ Hkpt
+    ihave HAU := kpt_exclReadAU t M addr _ hmem (pteLeafB_kLeaf _ _ _ _) $$ Hkpt
     iapply swp_bind
     iapply (swp_read_pte_exclusive cpu dq c sie hok addr (hents _ hmem).1 (hents _ hmem).2 r0
       (fun w => iprop(⌜pteVariant (kLeaf ppn perm a0 d0) w⌝ ∗ resvFrag cpu (some (snapOf addr 8 w)) false)))
@@ -524,7 +524,7 @@ theorem swp_update_and_write_pte_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MCon
         · exact absurd hupd2 (by simp)
       obtain ⟨a2, d2, rfl⟩ := hp2
       swp_run 40
-      ihave HW := kpt_exclWriteAU cpu t M addr _ hmem (kLeaf ppn perm a1 d1) (kLeaf ppn perm a2 d2)
+      ihave HW := kpt_exclWriteAU cpu t M addr _ hmem (pteLeafB_kLeaf _ _ _ _) (kLeaf ppn perm a1 d1) (kLeaf ppn perm a2 d2)
         (pteVariant_kLeaf ppn perm a0 d0 a2 d2) $$ Hkpt
       iapply swp_bind
       iapply (swp_write_pte_conditional cpu dq c sie hok addr (kLeaf ppn perm a1 d1) (kLeaf ppn perm a2 d2)

@@ -200,8 +200,9 @@ theorem iput_main (AC : ACQUIRE_LLB) (HN : IputTailNeSpec) (HE : IputEntrySpec)
   unfold itableSlotLive
   icases Hsrow with ⟨Hbrow, ⟨%tst, Hst, #Hllbk, #Hflk⟩⟩
   -- +0x18 c.lw a5,8(s1): THE EXACT READ
+  icases kctx_rsvEq c1 _ $$ Hk with ⟨%heqR, Hk⟩
   k_step (wp_s_lw_iref_locked c1 _ (KA.«iput» + 0x18#64) true 8#12 15#5 9#5 (by decide)
-      (by decide) kk hkk ?ha18 Mt ⟨_, hMk⟩ tst)
+      (by decide) kk hkk ?ha18 Mt ⟨_, hMk⟩ tst heqR)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc $Hclaim $Hinv $Hflk $Hhalf $Hst]
   iintro %w Hk Hpc %hw Hhalf Hst
   case ha18 => k_norm [b9, ha0]; exact iRef_sext _

@@ -36,7 +36,8 @@ theorem wp_s_lw_iref [CurCtx] [KernelGeom] [KernelImage GF] [Icfg] (cpu : CPU) (
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rd rs1 : BitVec 5) (hrs1 : rs1 ≠ 4#5)
     (hrd : rdOk rd) (i : Nat) (hi : i < NINODE)
     (haddr : k.rget cpu rs1 + BitVec.signExtend 64 imm = iRef (ientry i))
-    (s : Qp) (g : GName) (lo tl : Nat) (hle : lo ≤ tl) :
+    (s : Qp) (g : GName) (lo tl : Nat) (hle : lo ≤ tl)
+    (heqR : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) :
     instr (GF := GF) pc is_rvc (instruction.LOAD (imm, regidx.Regidx rs1, regidx.Regidx rd, false, 4)) ∗
     kctxL lent cpu k ∗ pcIs cpu pc ∗ kmapId (iRef (ientry i)) ∗
     itableInv (hlc := hlc) (GF := GF) ∗ credFloor lo tl ∗ liveGenlo i s g lo ∗
@@ -53,7 +54,7 @@ theorem wp_s_lw_iref [CurCtx] [KernelGeom] [KernelImage GF] [Icfg] (cpu : CPU) (
     (fun _ w => iprop(⌜0 < w.toNat ∧ w.toNat < 2 ^ 31⌝ ∗ liveGenlo i s g lo))
     (fun cpu' K ts _ hvis => by
       iintro ⟨#Hts, #Hinv, Hlv⟩
-      iapply iref_readAU cpu' i s g lo K ts hi hvis
+      iapply iref_readAU cpu' i s g lo K ts hi hvis heqR
       iframe Hlv
       isplit
       · iexact Hinv
@@ -77,7 +78,8 @@ theorem wp_s_lw_iref_locked [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] 
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rd rs1 : BitVec 5) (hrs1 : rs1 ≠ 4#5)
     (hrd : rdOk rd) (i : Nat) (hi : i < NINODE)
     (haddr : k.rget cpu rs1 + BitVec.signExtend 64 imm = iRef (ientry i))
-    (M : RegMapF (Qp × PosNat)) (his : ∃ v, PartialMap.get? M i = some v) (tst : Nat) :
+    (M : RegMapF (Qp × PosNat)) (his : ∃ v, PartialMap.get? M i = some v) (tst : Nat)
+    (heqR : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) :
     instr (GF := GF) pc is_rvc (instruction.LOAD (imm, regidx.Regidx rs1, regidx.Regidx rd, false, 4)) ∗
     kctxL lent cpu k ∗ pcIs cpu pc ∗ kmapId (iRef (ientry i)) ∗
     itableInv (hlc := hlc) (GF := GF) ∗ ctxFloor curCtx tst ∗ itableHalf M ∗
@@ -94,7 +96,7 @@ theorem wp_s_lw_iref_locked [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] 
     (fun _ w => iprop(⌜w = irefWord M i⌝ ∗ itableHalf M ∗ istmpAuth i (1 : Qp).half tst))
     (fun cpu' K _ htK => by
       iintro ⟨#Hinv, Hhalf, Hst⟩
-      iapply iref_readAU_locked cpu' M i tst K [] hi his htK
+      iapply iref_readAU_locked cpu' M i tst K [] hi his htK heqR
       iframe Hhalf Hst
       isplit
       · iexact Hinv

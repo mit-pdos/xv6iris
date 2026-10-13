@@ -223,6 +223,11 @@ theorem swp_sail_mem_read_plain_x (cpu : CPU) {n vasize : Nat}
   · iapply ctxBytes_readable σ cpu ξ req.pa n dq w $$ [Hmm Hctx Hmem Hb]
     iframe Hmm Hctx Hmem
     iapply ctxBytesX_forget $$ Hb
+  ihave %hsrc : ⌜∀ tvn, σ.tv cpu ≤ tvn → loadSrcOk (chainEnv (hlc := hlc) (GF := GF) σ)
+      (chainEx (hlc := hlc) (GF := GF) σ) σ.mem cpu req.pa n tvn⌝ $$ [Hmm Hctx Hmem Hb]
+  · iapply ctxBytes_srcOk σ cpu ξ req.pa n dq w (chainEx (hlc := hlc) (GF := GF) σ) $$ [Hmm Hctx Hmem Hb]
+    iframe Hmm Hctx Hmem
+    iapply ctxBytesX_forget $$ Hb
   ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
   · iapply memModel_mmOk $$ Hmm
   have hram : ramBytes req.pa n := ramBytes_of_readBytes hmm.2.2.2.1 (hrd _ (Nat.le_refl _))
@@ -242,7 +247,7 @@ theorem swp_sail_mem_read_plain_x (cpu : CPU) {n vasize : Nat}
   · rw [hk'.1] at hif
     exact absurd hif (by decide)
   · obtain rfl := readBytes_unique _ _ _ _ _ _ _ (hrd tvn htv) hrd'
-    imod memModel_load _ σ cpu req.pa n tvn htop $$ Hmm with Hmm
+    imod memModel_load _ σ cpu req.pa n tvn htop (hsrc tvn htv) $$ Hmm with Hmm
     imod Hmask
     imodintro
     isplitl [Hregs Hmem Hmm Hclose]

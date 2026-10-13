@@ -500,8 +500,9 @@ theorem iput_lk_c (RH : RELEASE_HOOK) (HO : IputOfflockSpec)
   ihave Hk := Hkback $$ Hrun
   imodintro
   -- +0x86 c.lw a5,8(s1): the exact read
+  icases kctx_rsvEq c _ $$ Hk with ⟨%heqR, Hk⟩
   k_step (wp_s_lw_iref_locked c _ (KA.«iput» + 0x86#64) true 8#12 15#5 9#5 (by decide)
-      (by decide) kk hkk ?ha Mt ⟨_, hMk⟩ tst)
+      (by decide) kk hkk ?ha Mt ⟨_, hMk⟩ tst heqR)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc $Hclaim $Hinv $Hflk $Hhalf $Hst]
   iintro %wv Hk Hpc %hwv Hhalf Hst
   case ha => k_norm [h9]; exact iRef_sext _

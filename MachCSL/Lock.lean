@@ -995,6 +995,109 @@ instance lkDynReg_timeless (lk : BitVec 64) (lo : Nat) : Timeless (lkDynReg (GF 
 instance lkDynReg_persistent (lk : BitVec 64) (lo : Nat) : Persistent (lkDynReg (GF := GF) lk lo) := by
   unfold lkDynReg; infer_instance
 
+/-- **A dynamic lock's registration with its window** (W8 (f2-ctx) S3): the
+registration `lkDynReg`, and every post-birth entry of the lock's two words
+(`W`, `W'`) at or after the registration's position -- so a racy read of
+either word that returns a post-birth entry reads a live dynamic lock's
+word (`MachCSL.dynLkAt`, the load-side exemption). -/
+def lkDynRegW (lk : BitVec 64) (lo : Nat) (W : WordHist 4) (W' : WordHist 8) : IProp GF := iprop%
+  ∃ (L : List (PAddr × HEnt)) (te : Nat), ⌜lo ≤ te ∧ (∀ e ∈ W, te ≤ e.t) ∧ (∀ e ∈ W', te ≤ e.t)⌝ ∗
+    hopRegAt lk (some (L, te))
+
+instance lkDynRegW_timeless (lk : BitVec 64) (lo : Nat) (W : WordHist 4) (W' : WordHist 8) :
+    Timeless (lkDynRegW (GF := GF) lk lo W W') := by
+  unfold lkDynRegW; infer_instance
+
+instance lkDynRegW_persistent (lk : BitVec 64) (lo : Nat) (W : WordHist 4) (W' : WordHist 8) :
+    Persistent (lkDynRegW (GF := GF) lk lo W W') := by
+  unfold lkDynRegW; infer_instance
+
+/-- At birth the words have no post-birth entry. -/
+theorem lkDynRegW_nil (lk : BitVec 64) (lo : Nat) :
+    lkDynReg (GF := GF) lk lo ⊢ lkDynRegW lk lo [] [] := by
+  unfold lkDynReg lkDynRegW
+  iintro ⟨%L, %te, %h, #H⟩
+  iexists L, te
+  iframe H
+  ipureintro
+  exact ⟨h, fun e he => absurd he (by simp), fun e he => absurd he (by simp)⟩
+
+/-- The registration opened: its receipts, position, window facts and top
+receipt. -/
+theorem Lock.lkDynRegW_open (lk : BitVec 64) (lo : Nat) (W : WordHist 4) (W' : WordHist 8) :
+    lkDynRegW (GF := GF) lk lo W W' ⊢ ∃ (L : List (PAddr × HEnt)) (te : Nat),
+      ⌜lo ≤ te ∧ (∀ e ∈ W, te ≤ e.t) ∧ (∀ e ∈ W', te ≤ e.t)⌝ ∗ hopRegAt lk (some (L, te)) ∗ topLb te := by
+  unfold lkDynRegW
+  iintro ⟨%L, %te, %h, #H⟩
+  iexists L, te
+  isplit
+  · ipureintro; exact h
+  isplit
+  · iexact H
+  · unfold hopRegAt
+    icases H with ⟨#Ht, _⟩
+    iexact Ht
+
+/-- The registration after a lock-word entry at or after it. -/
+theorem Lock.lkDynRegW_push4' (lk : BitVec 64) (lo : Nat) (W : WordHist 4) (W' : WordHist 8)
+    (L : List (PAddr × HEnt)) (te : Nat) (e : WEnt 4) (hlo : lo ≤ te) (hW : ∀ x ∈ W, te ≤ x.t)
+    (hW' : ∀ x ∈ W', te ≤ x.t) (he : te ≤ e.t) :
+    hopRegAt (GF := GF) lk (some (L, te)) ⊢ lkDynRegW lk lo (e :: W) W' := by
+  unfold lkDynRegW
+  iintro #H
+  iexists L, te
+  iframe H
+  ipureintro
+  refine ⟨hlo, fun x hx => ?_, hW'⟩
+  rcases List.mem_cons.1 hx with rfl | hx
+  · exact he
+  · exact hW x hx
+
+/-- The registration after an owner-word entry at or after it. -/
+theorem Lock.lkDynRegW_push8' (lk : BitVec 64) (lo : Nat) (W : WordHist 4) (W' : WordHist 8)
+    (L : List (PAddr × HEnt)) (te : Nat) (e : WEnt 8) (hlo : lo ≤ te) (hW : ∀ x ∈ W, te ≤ x.t)
+    (hW' : ∀ x ∈ W', te ≤ x.t) (he : te ≤ e.t) :
+    hopRegAt (GF := GF) lk (some (L, te)) ⊢ lkDynRegW lk lo W (e :: W') := by
+  unfold lkDynRegW
+  iintro #H
+  iexists L, te
+  iframe H
+  ipureintro
+  refine ⟨hlo, hW, fun x hx => ?_⟩
+  rcases List.mem_cons.1 hx with rfl | hx
+  · exact he
+  · exact hW' x hx
+
+/-- The registration survives a new entry of the lock word at or after it. -/
+theorem lkDynRegW_push4 (lk : BitVec 64) (lo : Nat) (W : WordHist 4) (W' : WordHist 8) (e : WEnt 4) :
+    lkDynRegW (GF := GF) lk lo W W' ⊢ (∀ L te, hopRegAt lk (some (L, te)) -∗ ⌜te ≤ e.t⌝) -∗
+      lkDynRegW lk lo (e :: W) W' := by
+  unfold lkDynRegW
+  iintro ⟨%L, %te, %⟨h1, h2, h3⟩, #H⟩ Hle
+  ihave %hle := Hle $$ %L %te H
+  iexists L, te
+  iframe H
+  ipureintro
+  refine ⟨h1, fun x hx => ?_, h3⟩
+  rcases List.mem_cons.1 hx with rfl | hx
+  · exact hle
+  · exact h2 x hx
+
+/-- The registration survives a new entry of the owner word at or after it. -/
+theorem lkDynRegW_push8 (lk : BitVec 64) (lo : Nat) (W : WordHist 4) (W' : WordHist 8) (e : WEnt 8) :
+    lkDynRegW (GF := GF) lk lo W W' ⊢ (∀ L te, hopRegAt lk (some (L, te)) -∗ ⌜te ≤ e.t⌝) -∗
+      lkDynRegW lk lo W (e :: W') := by
+  unfold lkDynRegW
+  iintro ⟨%L, %te, %⟨h1, h2, h3⟩, #H⟩ Hle
+  ihave %hle := Hle $$ %L %te H
+  iexists L, te
+  iframe H
+  ipureintro
+  refine ⟨h1, h2, fun x hx => ?_⟩
+  rcases List.mem_cons.1 hx with rfl | hx
+  · exact hle
+  · exact h3 x hx
+
 /-- A dynamic registration's window test holds of a lock word's histories:
 the word's own entries are word-sized, and the tail's head sits at the
 floor `lo ≤ te`. -/
@@ -1019,7 +1122,7 @@ def lockBody (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF)
     (Vb : CPU → Nat) : IProp GF := iprop%
   ∃ (W : WordHist 4) (W' : WordHist 8) (st : LockState) (B : Nat),
     wordCell lk 4 lo 0 W ∗ wordCell (lk + 16#64) 8 lc 0 W' ∗
-    ⌜lockWordAt st B W ∧ lkCpuAt st W'⌝ ∗ lockHalf γ st B ∗ lkCpuFrag st s ∗ lkDynReg lk lo ∗
+    ⌜lockWordAt st B W ∧ lkCpuAt st W'⌝ ∗ lockHalf γ st B ∗ lkCpuFrag st s ∗ lkDynRegW lk lo W W' ∗
     ((⌜st = none⌝ ∗ lockHalf γ none B ∗ lockPay R W Vb) ∨ ⌜st ≠ none⌝)
 
 /-- The lock's two fields are aligned RAM words. -/
@@ -1088,6 +1191,178 @@ def lockBodyR (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF
     ⌜lockWordAt st B W ∧ lkCpuAt st W'⌝ ∗ ⌜lkRsvIn (hlc := hlc) (GF := GF) lk ∧ lockRsvW st W W'⌝ ∗
     lockHalf γ st B ∗ lkCpuFrag st s ∗
     ((⌜st = none⌝ ∗ lockHalf γ none B ∗ lockPay R W Vb) ∨ ⌜st ≠ none⌝)
+
+/-! ### A racy read's certificates at a lock's words (W8 (f2-ctx) S3) -/
+
+/-- **A live dynamic lock's word, read off memory** (`MachCSL.dynLkAt`): the
+registration's receipts are in memory, and the lock word's entries past it
+are word-sized (`hopRegWord`, given the histories' sortedness). -/
+theorem Lock.dynLkAt_of (rs : List RsvRegion) (m : FlatMem) (top : Nat) (lk : PAddr) (Hs : Nat → Hist)
+    (L : List (PAddr × HEnt)) (te a : Nat) (lg : List Agent)
+    (hget : histsAt m lk 4 Hs) (hok : ∀ i, i < 4 → histOk lg (Hs i))
+    (hrw : hopRegWord Hs (some (L, te))) (hwit : slotWit rs L lk te)
+    (hL : ∀ p ∈ L, ∃ H, m[p.1]? = some H ∧ p.2 ∈ H) (hte : te ≤ a) (hat : a ≤ top) :
+    dynLkAt (slotWit rs) m top lk a := by
+  refine ⟨hat, L, te, hwit, hL, hte, fun i hi => ⟨_, hget i hi, ?_⟩⟩
+  intro e he hte' _
+  obtain ⟨P, Q, hPQ, hP, hQ⟩ := hrw i hi
+  have hs := (hok i hi).1
+  rw [hPQ] at he hs
+  rcases List.mem_append.1 he with he | he
+  · intro j hj
+    obtain ⟨e', he', h1, h2⟩ := hP e he j hj
+    exact ⟨_, e', hget j hj, he', h1, h2⟩
+  · exfalso
+    cases Q with
+    | nil => cases he
+    | cons q Q' =>
+      have hq := hQ q rfl
+      rcases List.mem_cons.1 he with rfl | he
+      · omega
+      · have hpw := (List.pairwise_append.1 hs).2.1
+        have := (List.pairwise_cons.1 hpw).1 e he
+        omega
+
+/-- A key of the reader's context certifies the entries at its position, for
+every byte of a window. -/
+theorem Lock.key_certs [CurCtx] (cpu : CPU) (f : Nat) :
+    ownCtx (GF := GF) cpu curCtx ∗ lkFloor curCtx f ⊢
+      ownCtx cpu curCtx ∗ □ ∀ (a : PAddr) (e : HEnt), ⌜e.t = f⌝ -∗ srcCertAt cpu a e := by
+  unfold lkFloor
+  iintro H
+  iapply srcCertAt_of_key cpu curCtx f $$ H
+
+/-- **The certificates of a racy read of a static lock's word**: its bytes
+are the lock layer's (`lockPubByteIn`). -/
+theorem Lock.rsv_certs (cpu : CPU) (lk : BitVec 64) (hm : lkRsvIn (hlc := hlc) (GF := GF) lk)
+    (off n : Nat) (hw : (off = 0 ∧ n = 4) ∨ (off = 16 ∧ n = 8)) (K : Nat) (ts : List (Nat × Agent))
+    (Hs : Nat → Hist) :
+    ⊢@{IProp GF} readCertsAt cpu (lk + BitVec.ofNat 64 off) n K ts Hs [] := by
+  iapply readCertsAt_of cpu _ n K ts Hs [] (fun _ _ => True) (fun _ _ _ _ _ _ _ => trivial)
+  imodintro
+  iintro %j %e %⟨hj, _⟩
+  ileft
+  unfold srcCertAt
+  ileft
+  ipureintro
+  refine Or.inr (Or.inr (Or.inr ⟨⟨lk, .lock KernelGeom.cpusBase⟩, hm, Or.inl ⟨_, rfl⟩, ?_⟩))
+  simp only [RsvRegion.bytes, RsvRegion.words, wordBytes, List.flatMap_cons, List.flatMap_nil,
+    List.append_nil, List.mem_append, List.mem_map, List.mem_range]
+  rcases hw with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩
+  · exact Or.inl ⟨j, hj, by simp⟩
+  · exact Or.inr ⟨j, hj, by simp⟩
+
+/-- **The certificates of a racy read of a dynamic lock's LOCK word**: its
+tail head (the creator's store) is keyed; every post-birth entry is at or
+after the registration, so the byte is a live dynamic lock's (exempt). -/
+theorem Lock.dyn_certs4 (cpu : CPU) (lk : BitVec 64) (K : Nat) (ts : List (Nat × Agent))
+    (W : WordHist 4) (W' : WordHist 8) (Hold : Nat → Hist) (lo : Nat) (htail : tailOk 4 lo 0 Hold)
+    (hvis : lo ≤ K ∨ (lo, hartAgent cpu) ∈ ts) :
+    (□ ∀ (a : PAddr) (e : HEnt), ⌜e.t = lo⌝ -∗ srcCertAt cpu a e) ∗ lkDynRegW lk lo W W' ⊢@{IProp GF}
+      readCertsAt cpu lk 4 K ts (W.hist Hold) [] := by
+  unfold lkDynRegW hopRegAt
+  iintro ⟨#Hkc, ⟨%L, %te, %⟨hlo, hW, _⟩, #Hte, #HL, %hwit⟩⟩
+  iapply readCertsAt_of cpu lk 4 K ts (W.hist Hold) [] (fun j e => e.t = lo ∨ ∃ x ∈ W, e = WEnt.proj j x)
+  · intro j e tvn hj hKt hau hr
+    obtain ⟨e0, H0, hH, _, he0⟩ := htail j hj
+    have hv := tailOk_visible W (hartAgent cpu) ts htail hKt hvis hau j hj e0 H0 hH
+    rcases WordHist.readEnt_cases W Hold (hartAgent cpu) tvn j e0 H0 hH hv e hr with h | rfl
+    · exact Or.inr h
+    · exact Or.inl he0
+  · imodintro
+    iintro %j %e %⟨hj, hP⟩
+    rcases hP with het | ⟨x, hx, rfl⟩
+    · ileft
+      iapply Hkc $$ %_ %_ %het
+    · iright
+      unfold exCertAt
+      iexists L
+      iframe HL
+      ipureintro
+      intro σ hmm hget _ hLm
+      refine Or.inr (Or.inl ⟨lk, ?_, Or.inl ⟨j, hj, rfl⟩⟩)
+      have hxt : x.t ≤ σ.top := by
+        have hok := hmm.1 _ _ (hget j hj)
+        exact (hok.2 _ (by unfold WordHist.hist; exact List.mem_append_left _ (List.mem_map_of_mem hx))).1
+      exact Lock.dynLkAt_of _ σ.mem σ.top lk (W.hist Hold) L te x.t σ.log hget
+        (fun i hi => hmm.1 _ _ (hget i hi)) (hopRegWord_cell W Hold L htail hlo) hwit hLm (hW x hx) hxt
+
+/-- **The certificates of a racy read of a dynamic lock's OWNER word**: its
+tail head is keyed; every post-birth entry is at or after the registration,
+and the LOCK word -- lent as a companion -- says the lock is live there. -/
+theorem Lock.dyn_certs8 (cpu : CPU) (lk : BitVec 64) (K : Nat) (ts : List (Nat × Agent))
+    (W : WordHist 4) (W' : WordHist 8) (Hold Hold' : Nat → Hist) (lo lc : Nat) (dq : DFrac)
+    (htail : tailOk 4 lo 0 Hold) (htail' : tailOk 8 lc 0 Hold')
+    (hvis : lc ≤ K ∨ (lc, hartAgent cpu) ∈ ts) :
+    (□ ∀ (a : PAddr) (e : HEnt), ⌜e.t = lc⌝ -∗ srcCertAt cpu a e) ∗ lkDynRegW lk lo W W' ⊢@{IProp GF}
+      readCertsAt cpu (lk + 16#64) 8 K ts (W'.hist Hold') [(lk, 4, dq, W.hist Hold)] := by
+  unfold lkDynRegW hopRegAt
+  iintro ⟨#Hkc, ⟨%L, %te, %⟨hlo, _, hW'⟩, #Hte, #HL, %hwit⟩⟩
+  iapply readCertsAt_of cpu (lk + 16#64) 8 K ts (W'.hist Hold') _
+    (fun j e => e.t = lc ∨ ∃ x ∈ W', e = WEnt.proj j x)
+  · intro j e tvn hj hKt hau hr
+    obtain ⟨e0, H0, hH, _, he0⟩ := htail' j hj
+    have hv := tailOk_visible W' (hartAgent cpu) ts htail' hKt hvis hau j hj e0 H0 hH
+    rcases WordHist.readEnt_cases W' Hold' (hartAgent cpu) tvn j e0 H0 hH hv e hr with h | rfl
+    · exact Or.inr h
+    · exact Or.inl he0
+  · imodintro
+    iintro %j %e %⟨hj, hP⟩
+    rcases hP with het | ⟨x, hx, rfl⟩
+    · ileft
+      iapply Hkc $$ %_ %_ %het
+    · iright
+      unfold exCertAt
+      iexists L
+      iframe HL
+      ipureintro
+      intro σ hmm hget hcs hLm
+      refine Or.inr (Or.inl ⟨lk, ?_, Or.inr ⟨j, hj, rfl⟩⟩)
+      have hxt : x.t ≤ σ.top := by
+        have hok := hmm.1 _ _ (hget j hj)
+        exact (hok.2 _ (by unfold WordHist.hist; exact List.mem_append_left _ (List.mem_map_of_mem hx))).1
+      have hgl : histsAt σ.mem lk 4 (W.hist Hold) := hcs _ List.mem_cons_self
+      exact Lock.dynLkAt_of _ σ.mem σ.top lk (W.hist Hold) L te x.t σ.log hgl
+        (fun i hi => hmm.1 _ _ (hgl i hi)) (hopRegWord_cell W Hold L htail hlo) hwit hLm (hW' x hx) hxt
+
+theorem Lock.rsv_certs4 (cpu : CPU) (lk : BitVec 64) (hm : lkRsvIn (hlc := hlc) (GF := GF) lk) (K : Nat)
+    (ts : List (Nat × Agent)) (Hs : Nat → Hist) : ⊢@{IProp GF} readCertsAt cpu lk 4 K ts Hs [] := by
+  have h := Lock.rsv_certs (hlc := hlc) (GF := GF) cpu lk hm 0 4 (Or.inl ⟨rfl, rfl⟩) K ts Hs
+  simp only [BitVec.ofNat_eq_ofNat, BitVec.add_zero] at h
+  exact h
+
+theorem Lock.rsv_certs8 (cpu : CPU) (lk : BitVec 64) (hm : lkRsvIn (hlc := hlc) (GF := GF) lk) (K : Nat)
+    (ts : List (Nat × Agent)) (Hs : Nat → Hist) : ⊢@{IProp GF} readCertsAt cpu (lk + 16#64) 8 K ts Hs [] :=
+  Lock.rsv_certs (hlc := hlc) (GF := GF) cpu lk hm 16 8 (Or.inr ⟨rfl, rfl⟩) K ts Hs
+
+/-- `Lock.dyn_certs4`, the registration kept. -/
+theorem Lock.dyn_certs4' (cpu : CPU) (lk : BitVec 64) (K : Nat) (ts : List (Nat × Agent))
+    (W : WordHist 4) (W' : WordHist 8) (Hold : Nat → Hist) (lo : Nat) (htail : tailOk 4 lo 0 Hold)
+    (hvis : lo ≤ K ∨ (lo, hartAgent cpu) ∈ ts) :
+    (□ ∀ (a : PAddr) (e : HEnt), ⌜e.t = lo⌝ -∗ srcCertAt cpu a e) ∗ lkDynRegW lk lo W W' ⊢@{IProp GF}
+      lkDynRegW lk lo W W' ∗ readCertsAt cpu lk 4 K ts (W.hist Hold) [] := by
+  iintro ⟨#Hkc, #Hnm⟩
+  isplit
+  · iexact Hnm
+  · iapply Lock.dyn_certs4 cpu lk K ts W W' Hold lo htail hvis
+    isplit
+    · iexact Hkc
+    · iexact Hnm
+
+/-- `Lock.dyn_certs8`, the registration kept. -/
+theorem Lock.dyn_certs8' (cpu : CPU) (lk : BitVec 64) (K : Nat) (ts : List (Nat × Agent))
+    (W : WordHist 4) (W' : WordHist 8) (Hold Hold' : Nat → Hist) (lo lc : Nat) (dq : DFrac)
+    (htail : tailOk 4 lo 0 Hold) (htail' : tailOk 8 lc 0 Hold')
+    (hvis : lc ≤ K ∨ (lc, hartAgent cpu) ∈ ts) :
+    (□ ∀ (a : PAddr) (e : HEnt), ⌜e.t = lc⌝ -∗ srcCertAt cpu a e) ∗ lkDynRegW lk lo W W' ⊢@{IProp GF}
+      lkDynRegW lk lo W W' ∗ readCertsAt cpu (lk + 16#64) 8 K ts (W'.hist Hold') [(lk, 4, dq, W.hist Hold)] := by
+  iintro ⟨#Hkc, #Hnm⟩
+  isplit
+  · iexact Hnm
+  · iapply Lock.dyn_certs8 cpu lk K ts W W' Hold Hold' lo lc dq htail htail' hvis
+    isplit
+    · iexact Hkc
+    · iexact Hnm
 
 /-- **The lock's invariant body**: reserved or not, by the address. -/
 def lockBodyM (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF) (lo lc : Nat)
@@ -1309,6 +1584,7 @@ theorem newlock_written [CurCtx] (cpu : CPU) (lk : BitVec 64) (s : String) (R : 
   iintro ⟨#Hcl, #Hcl', Hrun, HR, Hw', #Hflo, Hc', #Hflc, Hnm, #Hg⟩
   imod lock_pay_born cpu R [] (fun _ h => by simp at h) $$ [$Hrun $HR] with ⟨Hrun, ⟨%Vb, Hpay, #Hvf⟩⟩
   imod lockHalf_alloc with ⟨%γ, H1, H2⟩
+  ihave Hnm := lkDynRegW_nil lk lo $$ Hnm
   imod inv_alloc lockN E (lockBody γ lk s R lo lc Vb) $$ [Hw' Hc' H1 H2 Hpay Hnm] with #Hinv
   · inext
     unfold lockBody

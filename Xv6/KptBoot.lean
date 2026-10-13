@@ -20,6 +20,7 @@ Imports only definitional files.
 import Xv6.KstackMap
 import Xv6.SyscallEnv
 import Xv6.LogBoot
+import Xv6.SpecKvminithart
 
 namespace Xv6
 
@@ -107,17 +108,24 @@ theorem kctx_kptOn_publish [CurCtx] [Xv6G GF] [FdslotG GF] [BioslotG GF] [Irefsl
     (hct : curTier = KTier.bare) (hok : kvmTableOk t pas) :
     kctxL (GF := GF) lent cpu k ∗ ptreeOwn 2 (DFrac.own 1) t ∗
       (MachGS.kmapName (hlc := hlc) (GF := GF) ↪●MAP KernelMap.static) ∗
-      (MachGS.kptRootName (hlc := hlc) (GF := GF) ↪VAR r0)
-    ⊢ |={⊤}=> (kctxL lent cpu k ∗ kptOn t (kvmMapT pas) ∗ kstackMapAt pas ∗ syscTrampCl) := by
-  iintro ⟨Hk, Ht, Hauth, Hroot⟩
+      (MachGS.kptRootName (hlc := hlc) (GF := GF) ↪VAR r0) ∗
+      wordPointsTo kernelPagetableAddr 8 (DFrac.own 1) (pageAddr t.base)
+    ⊢ |={⊤}=> (kctxL lent cpu k ∗ kptOn t (kvmMapT pas) ∗ kstackMapAt pas ∗ syscTrampCl ∗
+      pwordPointsTo kernelPagetableAddr 8 DFrac.discard (pageAddr t.base)) := by
+  iintro ⟨Hk, Ht, Hauth, Hroot, Hrw⟩
+  icases kctx_rsvEq cpu k $$ Hk with ⟨%heqR, Hk⟩
+  have hra : (⟨kernelPagetableAddr, .roots 1 8⟩ : RsvRegion) ∈ MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) := by
+    rw [heqR]; exact xv6RsvStatic_kptRoot
   imod kmap_insert_boot pas $$ Hauth with ⟨Hauth, #Hs, #Htr⟩
   icases kctx_cases cpu k $$ Hk with
     ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
   icases ctxTok_cases cpu curCtx $$ Htok with ⟨Hctx, %r, Hfrag⟩
   ihave Hents := (ptreeOwn_entries (DFrac.own 1) 2 t).1 $$ Ht
-  imod kptOn_seal cpu t (kvmMapT pas) r0 hct (kvmTableOk_kptFacts_tramp t pas hok)
-    $$ [Hctx Hents Hauth Hroot] with ⟨Hctx, #Hkpt⟩
-  · iframe Hctx Hents Hauth Hroot
+  ihave Hrw := (show wordPointsTo (GF := GF) kernelPagetableAddr 8 (DFrac.own 1) (pageAddr t.base) ⊢
+      wordPointsTo kernelPagetableAddr 8 (DFrac.own 1) (pteAddr t.base 0#9) from .rfl) $$ Hrw
+  imod kptOn_seal cpu t (kvmMapT pas) r0 hct (kvmTableOk_kptFacts_tramp t pas hok) kernelPagetableAddr hra
+    $$ [Hctx Hents Hrw Hauth Hroot] with ⟨Hctx, #Hkpt, Hrp⟩
+  · iframe Hctx Hents Hrw Hauth Hroot
   imodintro
   isplitl [HConf HF Hstack Htrans Harm Hcpu Hctx Hfrag Hclock]
   · iapply kctx_intro' cpu k hwf
@@ -126,8 +134,9 @@ theorem kctx_kptOn_publish [CurCtx] [Xv6G GF] [FdslotG GF] [BioslotG GF] [Irefsl
     · iapply ctxTok_intro cpu curCtx r
       iframe Hctx Hfrag
     · iexact Hro
-  · iframe Hkpt Hs
-    iexact Htr
+  · iframe Hkpt Hs Htr
+    iapply (show pwordPointsTo (GF := GF) kernelPagetableAddr 8 DFrac.discard (pteAddr t.base 0#9) ⊢
+      pwordPointsTo kernelPagetableAddr 8 DFrac.discard (pageAddr t.base) from .rfl) $$ Hrp
 
 /-- **THE ROOT CELL, PERSISTED** (Rocq `kernel_pagetable ↦₈□ root`): the
 word kvminit wrote, at the Bare tier (so its page is its own address),
