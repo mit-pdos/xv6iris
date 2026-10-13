@@ -18,7 +18,8 @@ the two OLD watermarks feed `wVrNew` only THROUGH A FENCE.  So the invariant `fi
 conditional in exactly two places — `wVrOld`/`wVwOld` are bounded only when a fence still to
 come will publish them (`fhook`), `wVRel` only when an acquire still to come will consume it
 (`ahook`).  Each hook is one riscv.cat ppo⁻ arm: coh ← rules 1-3 (`gpolocGmo`), wVrNew ←
-rule 5 (`gacqGmo`), wVrOld/wVwOld ← rule 4 (`gfenceGmo`), wVRel ← rule 7 (`grelacqGmo`).
+rule 5 (`gacqGmo`), wVrOld/wVwOld ← rule 4 (`gfenceGmo`), wVRel ← rule 7 (`grelacqGmo`;
+D35-fix [OWN.54]: through `grelAcqGrcsc`, `gppo`'s rule-7 arm being riscv.cat's RCsc `grcsc`).
 The closing arithmetic: everything an ordered-before-`r` event can put into a view is a gmo
 write index BELOW `r`, and `gloadValue`'s co-maximality half says every gmo-visible same-byte
 write has index ≤ `t` — that is `gvisUb` (§1).
@@ -431,7 +432,7 @@ theorem gacqGmo (G : Gexec) (hppo : gppoGmo G) (e1 e2 : Geid) :
 theorem grelacqGmo (G : Gexec) (hppo : gppoGmo G) (e1 e2 : Geid) :
     WeakRvwmoGraph.gpo G e1 e2 → glblIs G e1 lbIsW → glblIs G e1 lbRl →
     glblIs G e2 lbIsR → glblIs G e2 lbAq → gmoLt G e1 e2 :=
-  fun h1 h2 h3 h4 h5 => hppo _ _ (.inr (.inr (.inr ⟨h1, h2, h3, h4, h5⟩)))
+  fun h1 h2 h3 h4 h5 => hppo _ _ (.inr (.inr (.inr (grelAcqGrcsc G e1 e2 ⟨h1, h2, h3, h4, h5⟩))))
 
 theorem gfenceGmo (G : Gexec) (hppo : gppoGmo G) (e1 e2 : Geid) (kf : Nat) (pr pw sr sw : Bool) :
     e1.1 = e2.1 → e1.2 < kf → kf < e2.2 →

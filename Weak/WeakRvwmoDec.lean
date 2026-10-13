@@ -50,6 +50,8 @@ Delivered: `racyDDec`, and `topoExists'` / `normalizeOfAcyclic'` —
    them more usable (`decide` can evaluate them).
 4. `list_exists_dec` takes `l` explicitly as in Rocq; it is a `def` (its result
    is data).
+5. D35-fix ([OWN.54]; `WeakRvwmoGraph` deviation 7): `gppo`'s rule-7 arm is `grcsc`, so the
+   Lean-only `grcscDec` sits beside `grelAcqDec` (kept) for `gppoDec`.
 
 **Name map** (Rocq → Lean): `dec_iff` ↦ `decIff`; `list_exists_dec` ↦
 `listExistsDec`; `lookup_zip` ↦ `lookupZip`; `gwr_bytes` ↦ `gwrBytes`;
@@ -243,6 +245,9 @@ instance gacqPoDec (G : Gexec) (e1 e2 : Geid) : Decidable (gacqPo G e1 e2) := by
 
 instance grelAcqDec (G : Gexec) (e1 e2 : Geid) : Decidable (grelAcq G e1 e2) := by
   unfold grelAcq; infer_instance
+
+instance grcscDec (G : Gexec) (e1 e2 : Geid) : Decidable (grcsc G e1 e2) := by
+  unfold grcsc; infer_instance
 
 /-! # 4. THE ARMS THAT NEEDED A REFORMULATION -/
 

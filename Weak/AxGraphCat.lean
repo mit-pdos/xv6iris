@@ -34,13 +34,17 @@ consumes over it.
       graph).
 
 The Rocq header's audit notes stand unchanged: rule 4 is `gfenceCovers`, rule 5
-`gacqPo` (riscv.cat's `[AQ];po;[M]` on this alphabet), the tree's rule 7
-`grelAcq` includes RCpc pairs while `grcsc` (both bits on both ends — only an
-`LRmw` carries both) is ⊆ `grelAcq` (`grcscGrelAcq`).  RULE 12 GAP: `gdDeps` is
-untagged (address, data, control and translation deps alike), so `gppo12` over
-`gdDeps` also orders `[M];ctrl;[W];rfi;[R]` — stronger than RVWMO there; it is
+`gacqPo` (riscv.cat's `[AQ];po;[M]` on this alphabet), rule 7 = riscv.cat's RCsc
+(D35-fix [OWN.54]): `grcsc` = `[RCsc];po;[RCsc]` with `lbRcsc := lbAq || lbRl`
+(herd `riscv-defs.cat`: `let RCsc = (Acq|Rel|AcqRel) & (EX|X)` — the alphabet carries
+the bits only on atomics), both defined in `WeakRvwmoGraph` (its deviation 7), where it
+is also RVWMO⁻'s rule-7 arm; Rocq's `grelAcq` (`[W.rl];po;[R.aq]`) is ⊆ `grcsc`
+(`grelAcqGrcsc`).  (Before D35-fix the tree read RCsc as BOTH bits, so it lacked
+riscv.cat's `[W.rl];po;[R.aq]`, `[W.rl];po;[W.rl]` and rl-only-RMW pairs.)  RULE 12 GAP:
+`gdDeps` is untagged (address, data, control and translation deps alike), so `gppo12`
+over `gdDeps` also orders `[M];ctrl;[W];rfi;[R]` — stronger than RVWMO there; it is
 stated over an explicit edge list `dd` for that reason.  OMITTED (each enlarges
-the model — sound direction): rule 6, rule 7's RCpc part, rule 8.  The §7 header
+the model — sound direction): rules 6, 8.  The §7 header
 note on `gdepsWf` (no READ targets, so the identity stop quantifies over an
 ABSTRACT relation `D` with `D ⊆ gmo`) also stands.
 
@@ -81,8 +85,9 @@ witnesses (`epc`, `isw`, …) is a data load, so no row or `decide` check change
 `rvwmo_cat6_consistent` ↦ `rvwmoCat6Consistent`; `cat_implies_cat6` ↦
 `catImpliesCat6`; `gppo_cat6_gpo` ↦ `gppoCat6Gpo`; `gppo_cat_events` ↦
 `gppoCatEvents`; `gppo1_gpoloc` ↦ `gppo1Gpoloc`; `gppo2_gpoloc` ↦
-`gppo2Gpoloc`; `gppo3_gpoloc` ↦ `gppo3Gpoloc`; `lb_rcsc_bits` ↦ `lbRcscBits`;
-`grcsc_grel_acq` ↦ `grcscGrelAcq`; `gppo_cat6_gppo` ↦ `gppoCat6Gppo`;
+`gppo2Gpoloc`; `gppo3_gpoloc` ↦ `gppo3Gpoloc`; `lb_rcsc_bits` ↦ `lbRcscMem` (D35-fix: "an RCsc label is a memory
+label", in `WeakRvwmoGraph`); `grcsc_grel_acq` ↦ DELETED (FALSE under riscv.cat's RCsc), Lean-only
+`grelAcqGrcsc` (its converse, in `WeakRvwmoGraph`); `gppo_cat6_gppo` ↦ `gppoCat6Gppo`;
 `gppo12_gmo_minus` ↦ `gppo12GmoMinus`; `minus_implies_cat` ↦ `minusImpliesCat`;
 `gobr_cat` ↦ `gobrCat`; `gob_cat` ↦ `gobCat`; `gob_cat_step` ↦ `gobCatStep`;
 `gob_cat_trans` ↦ `gobCatTrans`; `gfr_gmo_lv` ↦ `gfrGmoLv`; `gobr_cat_gmo` ↦
@@ -139,8 +144,9 @@ open Lbl
 /-- A fused RMW: the only label that both reads and writes. -/
 def lbIsRmw (l : Lbl) : Bool := lbIsR l && lbIsW l
 
-/-- RCsc: both annotation bits. -/
-def lbRcsc (l : Lbl) : Bool := lbAq l && lbRl l
+/-! `lbRcsc` (riscv.cat's RCsc: `lbAq || lbRl`) and RULE 7 `grcsc` (`[RCsc];po;[RCsc]`) are
+defined in `WeakRvwmoGraph` (deviation 7 there; D35-fix [OWN.54]) — RVWMO⁻'s rule-7 arm is
+the same relation. -/
 
 /-- RULE 1  `[M];po-loc;[W]` — a same-byte access before a WRITE. -/
 def gppo1 (G : Gexec) (e1 e2 : Geid) : Prop :=
@@ -159,12 +165,8 @@ hart. -/
 def gppo3 (G : Gexec) (e1 e2 : Geid) : Prop :=
   WeakRvwmoGraph.gpo G e1 e2 ∧ glblIs G e1 lbIsRmw ∧ ∃ a, grfAt G a e1 e2
 
-/-- RULE 7, RCsc only  `[RCsc];po;[RCsc]`. -/
-def grcsc (G : Gexec) (e1 e2 : Geid) : Prop :=
-  WeakRvwmoGraph.gpo G e1 e2 ∧ glblIs G e1 lbRcsc ∧ glblIs G e2 lbRcsc
-
 /-- The six program-order arms: rules 1, 2, 3, 4 (`gfenceCovers`), 5 (`gacqPo`),
-7-RCsc. -/
+7 (`grcsc`, riscv.cat's RCsc). -/
 def gppoCat6 (G : Gexec) (e1 e2 : Geid) : Prop :=
   gppo1 G e1 e2 ∨ gppo2 G e1 e2 ∨ gppo3 G e1 e2 ∨
   gfenceCovers G e1 e2 ∨ gacqPo G e1 e2 ∨ grcsc G e1 e2
@@ -241,18 +243,6 @@ theorem gppo3Gpoloc (G : Gexec) (e1 e2 : Geid) : gloadValue G → gppo3 G e1 e2 
   rintro hlv ⟨hpo, _, a, t, v, hrd, hat⟩
   exact ⟨hpo, a, Or.inl ⟨v, greadSourceByte G e2 a t v e1 hlv hrd hat⟩, Or.inr ⟨t, v, hrd⟩⟩
 
-/-- An RCsc label is a fused RMW carrying both bits. -/
-theorem lbRcscBits (l : Lbl) :
-    lbRcsc l = true →
-    lbIsW l = true ∧ lbRl l = true ∧ lbIsR l = true ∧ lbAq l = true := by
-  cases l <;> simp +contextual [lbRcsc, lbAq, lbRl, lbIsW, lbIsR]
-
-theorem grcscGrelAcq (G : Gexec) (e1 e2 : Geid) : grcsc G e1 e2 → grelAcq G e1 e2 := by
-  rintro ⟨hpo, ⟨l1, hl1, h1⟩, ⟨l2, hl2, h2⟩⟩
-  obtain ⟨w1, r1, _, _⟩ := lbRcscBits l1 h1
-  obtain ⟨_, _, r2, a2⟩ := lbRcscBits l2 h2
-  exact ⟨hpo, ⟨l1, hl1, w1⟩, ⟨l1, hl1, r1⟩, ⟨l2, hl2, r2⟩, ⟨l2, hl2, a2⟩⟩
-
 /-- The six arms ⊆ ppo⁻ (under load-value). -/
 theorem gppoCat6Gppo (G : Gexec) (e1 e2 : Geid) : gloadValue G → gppoCat6 G e1 e2 → gppo G e1 e2 := by
   rintro hlv (h | h | h | h | h | h)
@@ -261,7 +251,7 @@ theorem gppoCat6Gppo (G : Gexec) (e1 e2 : Geid) : gloadValue G → gppoCat6 G e1
   · exact Or.inl (gppo3Gpoloc _ _ _ hlv h)
   · exact Or.inr (Or.inl h)
   · exact Or.inr (Or.inr (Or.inl h))
-  · exact Or.inr (Or.inr (Or.inr (grcscGrelAcq _ _ _ h)))
+  · exact Or.inr (Or.inr (Or.inr h))
 
 /-- Rule 12 is gmo-forward under RVWMO⁻: `gdepsGmo` then `grfGmo` (whose
 forwarding case is exactly `gpoloc`'s W→R edge). -/

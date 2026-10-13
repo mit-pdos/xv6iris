@@ -62,6 +62,9 @@ A LEAF: nothing imports this file.
    `descent` takes them as its first four arguments (as Rocq's section
    closing does).
 7. `lbgd_kill_K1_false`'s closed `vm_compute` side conditions are `decide`.
+8. D35-fix ([OWN.54]; `WeakRvwmoGraph` deviation 7): the Lean-only `lblRenRcsc` (moved here
+   from `CatLinHull`) sits beside `lblRenAq`/`lblRenRl`, BELOW `WeakRvwmoAcyc.rowsRelGppo`,
+   which now rewrites `gppo`'s `grcsc` arm with it.
 
 **Name map** (Rocq → Lean): `filter_length_le` ↦ `filterLengthLe`;
 `filter_length_lt` ↦ `filterLengthLt`; `filter_pos` ↦ `filterPos`;
@@ -361,6 +364,8 @@ theorem lblRenIsMem (π : Nat → Nat) (l : Lbl) : lbIsMem (lblRen π l) = lbIsM
   cases l <;> rfl
 theorem lblRenAq (π : Nat → Nat) (l : Lbl) : lbAq (lblRen π l) = lbAq l := by cases l <;> rfl
 theorem lblRenRl (π : Nat → Nat) (l : Lbl) : lbRl (lblRen π l) = lbRl l := by cases l <;> rfl
+theorem lblRenRcsc (π : Nat → Nat) (l : Lbl) : lbRcsc (lblRen π l) = lbRcsc l := by
+  simp only [lbRcsc, lblRenAq, lblRenRl]
 theorem lblRenCls (π : Nat → Nat) (l : Lbl) : lbCls (lblRen π l) = lbCls l := by cases l <;> rfl
 theorem lblRenWr (π : Nat → Nat) (l : Lbl) : lbWr (lblRen π l) = lbWr l := by cases l <;> rfl
 theorem lblRenRd (π : Nat → Nat) (l : Lbl) (base : Int) (ts : List Nat) (vs : List (BitVec 8)) :

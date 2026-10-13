@@ -509,13 +509,13 @@ theorem rowsRelGfb (π : Nat → Nat) (G G' : Gexec) (e1 e2 : Geid) (pr pw sr sw
 theorem rowsRelGppo (π : Nat → Nat) (G G' : Gexec) (e1 e2 : Geid) :
     rowsRel π G G' → (gppo G' e1 e2 ↔ gppo G e1 e2) := by
   intro hr
-  unfold gppo gpoloc gfenceCovers gacqPo grelAcq
+  unfold gppo gpoloc gfenceCovers gacqPo grcsc
   simp only [rowsRelGpo π G G' e1 e2 hr, rowsRelGaccesses π G G' _ _ hr,
     rowsRelGfb π G G' e1 e2 _ _ _ _ hr,
     rowsRelGlblIs π G G' _ lbIsR hr (lblRenIsR π),
     rowsRelGlblIs π G G' _ lbIsW hr (lblRenIsW π),
     rowsRelGlblIs π G G' _ lbAq hr (lblRenAq π),
-    rowsRelGlblIs π G G' _ lbRl hr (lblRenRl π),
+    rowsRelGlblIs π G G' _ lbRcsc hr (lblRenRcsc π),
     rowsRelGmem π G G' _ hr]
 
 /-! ## 5.3 `gco` / `gfr` — ONLY under a MONOTONE renaming -/

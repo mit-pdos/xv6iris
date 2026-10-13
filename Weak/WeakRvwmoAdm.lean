@@ -861,7 +861,9 @@ theorem mp2PpoGmo : gppoGmo mp2 := by
       rcases h2r with ⟨⟨l, hl, _⟩, _⟩ | ⟨⟨l, hl, _⟩, _⟩ <;> rw [hl] <;> rfl
     rcases mp2Pos e2 hs2 with rfl | rfl | rfl <;> dsimp only at hk2 <;> omega
   · exact mp2Noaq e1 hacq.2.2.1
-  · exact mp2Noaq e2 hrel.2.2.2.2
+  · -- rule 7 (D35-fix [OWN.54]: riscv.cat's RCsc `grcsc`): `mp2` carries no annotated access
+    obtain ⟨_, ⟨l, hl, hrc⟩, _⟩ := hrel
+    rcases mp2Lbl e1 l hl with ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩ <;> simp [lbRcsc, lbAq, lbRl] at hrc
 
 theorem mp2Consistent : rvwmoMinusConsistent mp2 := by
   refine ⟨⟨by decide +kernel, ?_, ?_⟩, mp2PpoGmo, ?_, ?_⟩

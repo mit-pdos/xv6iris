@@ -1681,11 +1681,11 @@ theorem linRelAcqGmo (G : Gexec) (hwf : gwf G) (hppo : gppoGmo G) (h14 : grule14
   have e1' := linTrEq G k1 g1 s1 h1 hs1
   have e2' := linTrEq G k2 g2 s2 h2 hs2
   subst e1' e2'
-  exact hppo g1 g2 (Or.inr (Or.inr (Or.inr
+  exact hppo g1 g2 (Or.inr (Or.inr (Or.inr (grelAcqGrcsc G g1 g2
     ⟨⟨hag, (glinPoIff G hwf h14 k1 k2 g1 g2 h1 h2 hag).1 hlt, glinLookupLbl G hwf k1 g1 h1,
         glinLookupLbl G hwf k2 g2 h2⟩,
       ⟨glbl G g1, linLbl G hwf k1 g1 h1, hw1⟩, ⟨glbl G g1, linLbl G hwf k1 g1 h1, hrl1⟩,
-      ⟨glbl G g2, linLbl G hwf k2 g2 h2, hr2⟩, ⟨glbl G g2, linLbl G hwf k2 g2 h2, haq2⟩⟩)))
+      ⟨glbl G g2, linLbl G hwf k2 g2 h2, hr2⟩, ⟨glbl G g2, linLbl G hwf k2 g2 h2, haq2⟩⟩))))
 
 theorem linFrBound (G : Gexec) (hwf : gwf G) (hlv : gloadValue G) (k2 : Nat) (e2 : Geid)
     (a : Int) (w : Ev) :

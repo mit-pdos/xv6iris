@@ -91,9 +91,6 @@ theorem hullGppo2 (G : Gexec) (cs : List Nat) (e1 e2 : Geid) :
 theorem lblRenIsRmw (π : Nat → Nat) (l : Lbl) : lbIsRmw (lblRen π l) = lbIsRmw l := by
   simp only [lbIsRmw, lblRenIsR, lblRenIsW]
 
-theorem lblRenRcsc (π : Nat → Nat) (l : Lbl) : lbRcsc (lblRen π l) = lbRcsc l := by
-  simp only [lbRcsc, lblRenAq, lblRenRl]
-
 theorem hullGppo3 (G : Gexec) (cs : List Nat) (e1 e2 : Geid) :
     gloadValue G → hullOk G cs → gppo3 (gxHull G cs) e1 e2 → gppo3 G e1 e2 := by
   rintro hlv hok ⟨hpo, hrmw, a, hrf⟩

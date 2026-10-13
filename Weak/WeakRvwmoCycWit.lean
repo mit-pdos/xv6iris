@@ -634,8 +634,9 @@ theorem cygNoppo (e1 e2 : Geid) : ¬ gppo cyg e1 e2 := by
     rw [hl, Option.some.injEq] at hl'
     subst hl'
     rcases cygLbl _ _ hl with ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩ <;> simp [lbAq] at haq
-  · obtain ⟨_, _, ⟨l, hl, hrl⟩, _⟩ := hr
-    rcases cygLbl _ _ hl with ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩ <;> simp [lbRl] at hrl
+  · obtain ⟨_, ⟨l, hl, hrc⟩, _⟩ := hr
+    rcases cygLbl _ _ hl with ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩ <;>
+      simp [lbRcsc, lbAq, lbRl] at hrc
 
 theorem cygConsistent : rvwmoMinusConsistent cyg := by
   refine ⟨cygGwf, fun e1 e2 h => absurd h (cygNoppo e1 e2), ?_, ?_⟩

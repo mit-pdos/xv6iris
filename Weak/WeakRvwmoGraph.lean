@@ -60,6 +60,18 @@ four-event LB execution is RVWMO⁻-consistent, so tier 2 is about a real gap.
    stay RAM-only.  W13 (I) ([OWN.27]) flips `gwf`'s `LIo` shape arm to `True` (it was `False`
    under W13 (E)/(M)), so a `gwf` graph may carry I/O events; the (M)-era helpers
    `gwfNoIo`/`gwfMemRW` are retired with the `False` arm.
+7. D35-fix ([OWN.54], plan `notes/weak-allocproc-plan.md` §C top): RVWMO⁻'s RULE-7 ARM is
+   `grcsc` (`[RCsc];po;[RCsc]` with riscv.cat's `lbRcsc := lbAq || lbRl`), defined HERE
+   (`AxGraphCat` uses it as the cat model's rule-7 arm); Rocq's `gppo` has `grelAcq`
+   (`[W.rl];po;[R.aq]`), kept as a lemma-level name with `grelAcq ⊆ grcsc`
+   (`grelAcqGrcsc`).  Widened IN STEP with the cat model so that
+   `gppoCat6Gppo`/`minusImpliesCat` keep their statements.  SEMANTIC CONSEQUENCE: RVWMO⁻ is
+   STRONGER (it orders riscv.cat's `[W.rl];po;[W.rl]`, `[W.rl];po;[R.aq]`, rl-only-RMW pairs —
+   EQUAL to riscv.cat's rule 7), and `WeakRvwmoAcyc.racy` carries `gppo` BY NAME, so `racyD`
+   (the acyclicity premise of `normalizeOfAcyclic`, `hullRun`, the kill, and every `racyD ∪ …`
+   built on it) WIDENS with NO text change: those premises must now exclude rule-7-wide
+   cycles — EMPTY on xv6 graphs, which carry no `W.rl` (the kernel's only annotated atomic is
+   `acquire`'s `amoswap.w.aq`).
 
 **Name map** (Rocq → Lean): `geid` ↦ `Geid`; `gexec` ↦ `Gexec` (`gx_img`/
 `gx_prog`/`gx_gmo` ↦ `gxImg`/`gxProg`/`gxGmo`); `gdexec` ↦ `Gdexec`
@@ -70,7 +82,8 @@ four-event LB execution is RVWMO⁻-consistent, so tier 2 is about a real gap.
 `gfence_between` ↦ `gfenceBetween`, `glbl_is` ↦ `glblIs`, `glbl_is_r_gmem` ↦
 `WeakRvwmoGraph.glblIsRGmem`, `glbl_is_w_gmem` ↦ `WeakRvwmoGraph.glblIsWGmem`,
 `gfence_covers` ↦ `gfenceCovers`, `gacq_po` ↦ `gacqPo`, `grel_acq` ↦
-`grelAcq`, `gaccesses`, `gpoloc`, `gppo`, `gppo_gmo` ↦ `gppoGmo`, `gvisible`,
+`grelAcq`, (deviation 7: `AxGraphCat`'s `lb_rcsc` ↦ `lbRcsc`, `grcsc` and
+`lb_rcsc_bits` ↦ `lbRcscMem` live here; Lean-only `glblIsRcscGmem`, `grelAcqGrcsc`), `gaccesses`, `gpoloc`, `gppo`, `gppo_gmo` ↦ `gppoGmo`, `gvisible`,
 `gload_value` ↦ `gloadValue`, `gatomicity`, `rvwmo_minus_consistent` ↦
 `rvwmoMinusConsistent`, `grule14`, `graph_of_cand` ↦ `graphOfCand`, `lbg`,
 `lbg_acc` ↦ `lbgAcc`, `lbg_wr` ↦ `lbgWr`, `lb_graph_consistent` ↦
@@ -210,7 +223,8 @@ theorem WeakRvwmoGraph.glblIsWGmem (G : Gexec) (e : Geid) : glblIs G e lbIsW →
 
 /-- ppo⁻, the kept arms: rules 1–3 as same-byte program order; rule 4 (SOME
 fence whose predecessor bit covers `e1`'s kind and whose successor bit covers
-`e2`'s kind); rule 5 (`e1` an acquire read); rule 7 (an RCsc pair). -/
+`e2`'s kind); rule 5 (`e1` an acquire read); rule 7 (an RCsc pair, `grcsc` — riscv.cat's
+RCsc, deviation 7). -/
 def gfenceCovers (G : Gexec) (e1 e2 : Geid) : Prop :=
   ∃ pr pw sr sw,
     gfenceBetween G e1 e2 pr pw sr sw ∧
@@ -224,9 +238,40 @@ arm whose successor may be a FENCE would be unsatisfiable rather than strong
 def gacqPo (G : Gexec) (e1 e2 : Geid) : Prop :=
   WeakRvwmoGraph.gpo G e1 e2 ∧ glblIs G e1 lbIsR ∧ glblIs G e1 lbAq ∧ gmem G e2
 
+/-- `[W.rl];po;[R.aq]` — Rocq's RVWMO⁻ rule-7 arm, kept as a LEMMA-LEVEL name (D35-fix
+[OWN.54]): `gppo`'s rule-7 arm is now the wider `grcsc`, and `grelAcq ⊆ grcsc`
+(`grelAcqGrcsc`). -/
 def grelAcq (G : Gexec) (e1 e2 : Geid) : Prop :=
   WeakRvwmoGraph.gpo G e1 e2 ∧ glblIs G e1 lbIsW ∧ glblIs G e1 lbRl ∧
   glblIs G e2 lbIsR ∧ glblIs G e2 lbAq
+
+/-- RCsc, riscv.cat's reading (herd `riscv-defs.cat`: `let RCsc = (Acq|Rel|AcqRel) & (EX|X)`;
+D35-fix [OWN.54]): an aq- OR rl-annotated access.  The alphabet carries the bits only on
+atomics (a hart's `LLoad aq`/`LStore rl` come from LR/SC/AMO access kinds, `LRmw` from AMOs),
+so the `& (EX|X)` conjunct is implicit. -/
+def lbRcsc (l : Lbl) : Bool := lbAq l || lbRl l
+
+/-- RULE 7  `[RCsc];po;[RCsc]` (riscv.cat's `r7`) — RVWMO⁻'s rule-7 arm (D35-fix [OWN.54]:
+Rocq's arm is `grelAcq`; this one is `grcsc`-wide, so RVWMO⁻ ⇒ the cat model survives). -/
+def grcsc (G : Gexec) (e1 e2 : Geid) : Prop :=
+  WeakRvwmoGraph.gpo G e1 e2 ∧ glblIs G e1 lbRcsc ∧ glblIs G e2 lbRcsc
+
+/-- An RCsc label is a memory label (a load, store or fused RMW) — Rocq's `lb_rcsc_bits`
+(`AxGraphCat`, "an RCsc label is a fused RMW carrying both bits", FALSE under riscv.cat's
+RCsc), deviation 7. -/
+theorem lbRcscMem (l : Lbl) : lbRcsc l = true → lbIsMem l = true := by
+  cases l <;> simp +contextual [lbRcsc, lbAq, lbRl, lbIsMem, lbIsW, lbIsR]
+
+theorem glblIsRcscGmem (G : Gexec) (e : Geid) : glblIs G e lbRcsc → gmem G e := by
+  rintro ⟨l, hl, h⟩
+  exact ⟨l, hl, lbRcscMem l h⟩
+
+/-- Rocq's RVWMO⁻ rule-7 arm `[W.rl];po;[R.aq]` is an RCsc pair (riscv.cat's reading).  The
+converse (Rocq's `grcsc_grel_acq`) is FALSE under riscv.cat's RCsc: two `LStore true` in po
+are `grcsc` but not `grelAcq`. -/
+theorem grelAcqGrcsc (G : Gexec) (e1 e2 : Geid) : grelAcq G e1 e2 → grcsc G e1 e2 := by
+  rintro ⟨hpo, _, ⟨l1, hl1, r1⟩, _, ⟨l2, hl2, a2⟩⟩
+  exact ⟨hpo, ⟨l1, hl1, by simp [lbRcsc, r1]⟩, ⟨l2, hl2, by simp [lbRcsc, a2]⟩⟩
 
 def gaccesses (G : Gexec) (e : Geid) (a : Int) : Prop :=
   (∃ v, gwritesByte G e a v) ∨ (∃ t v, greadsByte G e a t v)
@@ -235,7 +280,7 @@ def gpoloc (G : Gexec) (e1 e2 : Geid) : Prop :=
   WeakRvwmoGraph.gpo G e1 e2 ∧ ∃ a, gaccesses G e1 a ∧ gaccesses G e2 a
 
 def gppo (G : Gexec) (e1 e2 : Geid) : Prop :=
-  gpoloc G e1 e2 ∨ gfenceCovers G e1 e2 ∨ gacqPo G e1 e2 ∨ grelAcq G e1 e2
+  gpoloc G e1 e2 ∨ gfenceCovers G e1 e2 ∨ gacqPo G e1 e2 ∨ grcsc G e1 e2
 
 def gppoGmo (G : Gexec) : Prop := ∀ e1 e2, gppo G e1 e2 → gmoLt G e1 e2
 
@@ -352,8 +397,9 @@ theorem lbGraphConsistent : rvwmoMinusConsistent lbg := by
       rw [hl, Option.some.injEq] at hl'
       subst hl'
       rcases lbgLbl _ _ hl with ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩ <;> simp [lbAq] at haq
-    · obtain ⟨_, _, ⟨l, hl, hrl⟩, _⟩ := hr
-      rcases lbgLbl _ _ hl with ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩ <;> simp [lbRl] at hrl
+    · obtain ⟨_, ⟨l, hl, hrc⟩, _⟩ := hr
+      rcases lbgLbl _ _ hl with ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩ <;>
+        simp [lbRcsc, lbAq, lbRl] at hrc
   · -- load value
     intro e a t v hr
     obtain ⟨l, base, ts, vs, j, hl, hrd, hj, hv, ha⟩ := hr
@@ -673,7 +719,7 @@ theorem gaccessesGmem (G : Gexec) (e : Geid) (a : Int) : gaccesses G e a → gme
   · exact WeakRvwmoGraph.glblIsRGmem G e ⟨l, hl, lbRdIsR l _ hrd⟩
 
 theorem gppoGmem (G : Gexec) (e1 e2 : Geid) : gppo G e1 e2 → gmem G e1 ∧ gmem G e2 := by
-  rintro (⟨_, a, h1, h2⟩ | ⟨_, _, _, _, _, h1, h2⟩ | ⟨_, h1, _, h2⟩ | ⟨_, h1, _, h2, _⟩)
+  rintro (⟨_, a, h1, h2⟩ | ⟨_, _, _, _, _, h1, h2⟩ | ⟨_, h1, _, h2⟩ | ⟨_, h1, h2⟩)
   · exact ⟨gaccessesGmem G e1 a h1, gaccessesGmem G e2 a h2⟩
   · refine ⟨?_, ?_⟩
     · rcases h1 with ⟨h, _⟩ | ⟨h, _⟩
@@ -683,7 +729,7 @@ theorem gppoGmem (G : Gexec) (e1 e2 : Geid) : gppo G e1 e2 → gmem G e1 ∧ gme
       · exact WeakRvwmoGraph.glblIsRGmem G e2 h
       · exact WeakRvwmoGraph.glblIsWGmem G e2 h
   · exact ⟨WeakRvwmoGraph.glblIsRGmem G e1 h1, h2⟩
-  · exact ⟨WeakRvwmoGraph.glblIsWGmem G e1 h1, WeakRvwmoGraph.glblIsRGmem G e2 h2⟩
+  · exact ⟨glblIsRcscGmem G e1 h1, glblIsRcscGmem G e2 h2⟩
 
 /-- ... AND PO-EARLIER: `gpo` and `gfenceBetween` both carry `e1.2 < e2.2`. -/
 theorem gppoPoLt (G : Gexec) (e1 e2 : Geid) : gppo G e1 e2 → e1.1 = e2.1 ∧ e1.2 < e2.2 := by

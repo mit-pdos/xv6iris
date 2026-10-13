@@ -34,10 +34,13 @@ A LEAF: nothing imports this file.
    `BitVec 8`).
 3. `gviolK2CrossHart`'s three-way split on `z.2` vs `e.2` is
    `Nat.lt_trichotomy` (Rocq: two `decide`s).
+4. D35-fix ([OWN.54]; `WeakRvwmoGraph` deviation 7): rule 7's exclusion is `¬ grcsc`
+   (riscv.cat's RCsc; Rocq: `¬ grel_acq`), so `gviol_no_relacq` is `gviolNoRcsc` and the
+   racy forms `killK1Racy`/`killK2Racy`/`killK3Racy` carry `¬ grcsc GD'.gdG e w`.
 
 **Name map** (Rocq → Lean): `gviol_no_gppo` ↦ `gviolNoGppo`; `gviol_no_aq` ↦
 `gviolNoAq`; `gviol_no_fence` ↦ `gviolNoFence`; `gviol_no_relacq` ↦
-`gviolNoRelacq`; `gviol_no_poloc` ↦ `gviolNoPoloc`; `gviol_no_dep` ↦
+`gviolNoRcsc` (D35-fix, `¬ grcsc`); `gviol_no_poloc` ↦ `gviolNoPoloc`; `gviol_no_dep` ↦
 `gviolNoDep`; `gviol_K2_cross_hart` ↦ `gviolK2CrossHart`; `kill_K1_racy`/
 `_K2_racy`/`_K3_racy` ↦ `killK1Racy`/`killK2Racy`/`killK3Racy`;
 `kill_K1_of_racy`/`_K2_`/`_K3_` ↦ `killK1OfRacy`/`killK2OfRacy`/`killK3OfRacy`;
@@ -82,9 +85,9 @@ theorem gviolNoFence (G : Gexec) (e w : Geid) :
   rintro ⟨_, hppo, _, _⟩ hv hf
   exact gviolNoGppo G e w hppo hv (Or.inr (Or.inl hf))
 
-/-- RULE 7 — the RCsc pair. -/
-theorem gviolNoRelacq (G : Gexec) (e w : Geid) :
-    rvwmoMinusConsistent G → gviol G e w → ¬ grelAcq G e w := by
+/-- RULE 7 — the RCsc pair (D35-fix [OWN.54]: riscv.cat's RCsc, `grcsc`; Rocq: `grelAcq`). -/
+theorem gviolNoRcsc (G : Gexec) (e w : Geid) :
+    rvwmoMinusConsistent G → gviol G e w → ¬ grcsc G e w := by
   rintro ⟨_, hppo, _, _⟩ hv hra
   exact gviolNoGppo G e w hppo hv (Or.inr (Or.inr (Or.inr hra)))
 
@@ -159,7 +162,7 @@ def killK1Racy (GD : Gdexec) : Prop :=
     -- ---- the arithmetic exclusions (§2): no ppo⁻ arm, no dep edge ----
     ¬ (glblIs GD'.gdG e lbIsR ∧ glblIs GD'.gdG e lbAq) →
     ¬ gfenceCovers GD'.gdG e w →
-    ¬ grelAcq GD'.gdG e w →
+    ¬ grcsc GD'.gdG e w →
     (∀ b, gaccesses GD'.gdG e b → gaccesses GD'.gdG w b → False) →
     (e, w) ∉ GD'.gdDeps →
     False
@@ -169,7 +172,7 @@ theorem killK1OfRacy (GD : Gdexec) : killK1Racy GD → killK1 GD := by
   obtain ⟨_, _, _, _, hcons⟩ := id heq
   have hc := hcons.1
   exact hR GD' heq w e a t v w0 hv hmin hpmin hew hrd hsrc hag hmo1 hmo2
-    (gviolNoAq _ e w hc hv) (gviolNoFence _ e w hc hv) (gviolNoRelacq _ e w hc hv)
+    (gviolNoAq _ e w hc hv) (gviolNoFence _ e w hc hv) (gviolNoRcsc _ e w hc hv)
     (fun b => gviolNoPoloc _ e w b hc hv) (gviolNoDep GD' e w hcons hv)
 
 /-! ## 4.2 K2 — the witness is a WRITE with an interval STALE reader -/
@@ -189,7 +192,7 @@ def killK2Racy (GD : Gdexec) : Prop :=
     z.1 ≠ e.1 →
     ¬ (glblIs GD'.gdG e lbIsR ∧ glblIs GD'.gdG e lbAq) →
     ¬ gfenceCovers GD'.gdG e w →
-    ¬ grelAcq GD'.gdG e w →
+    ¬ grcsc GD'.gdG e w →
     (∀ b, gaccesses GD'.gdG e b → gaccesses GD'.gdG w b → False) →
     (e, w) ∉ GD'.gdDeps →
     False
@@ -200,7 +203,7 @@ theorem killK2OfRacy (GD : Gdexec) : killK2Racy GD → killK2 GD := by
   have hc := hcons.1
   exact hR GD' heq w e z a t v v' hv hmin hpmin hew hmo1 hmo2 hrd hwb hlt
     (gviolK2CrossHart _ w e z a t v v' hc hv hpmin hmo1 hmo2 hrd hwb)
-    (gviolNoAq _ e w hc hv) (gviolNoFence _ e w hc hv) (gviolNoRelacq _ e w hc hv)
+    (gviolNoAq _ e w hc hv) (gviolNoFence _ e w hc hv) (gviolNoRcsc _ e w hc hv)
     (fun b => gviolNoPoloc _ e w b hc hv) (gviolNoDep GD' e w hcons hv)
 
 /-! ## 4.3 K3 — the witness is a WRITE racing a cross-hart same-byte write -/
@@ -218,7 +221,7 @@ def killK3Racy (GD : Gdexec) : Prop :=
     -- ---- the arithmetic exclusions (§2) ----
     ¬ (glblIs GD'.gdG e lbIsR ∧ glblIs GD'.gdG e lbAq) →
     ¬ gfenceCovers GD'.gdG e w →
-    ¬ grelAcq GD'.gdG e w →
+    ¬ grcsc GD'.gdG e w →
     (∀ b, gaccesses GD'.gdG e b → gaccesses GD'.gdG w b → False) →
     (e, w) ∉ GD'.gdDeps →
     False
@@ -228,7 +231,7 @@ theorem killK3OfRacy (GD : Gdexec) : killK3Racy GD → killK3 GD := by
   obtain ⟨_, _, _, _, hcons⟩ := id heq
   have hc := hcons.1
   exact hR GD' heq w e z a v v' hv hmin hpmin hew hzw hag hmo1 hmo2 hzb heb
-    (gviolNoAq _ e w hc hv) (gviolNoFence _ e w hc hv) (gviolNoRelacq _ e w hc hv)
+    (gviolNoAq _ e w hc hv) (gviolNoFence _ e w hc hv) (gviolNoRcsc _ e w hc hv)
     (fun b => gviolNoPoloc _ e w b hc hv) (gviolNoDep GD' e w hcons hv)
 
 /-! ## 4.4 STATEMENT FIDELITY, MACHINE-CHECKED

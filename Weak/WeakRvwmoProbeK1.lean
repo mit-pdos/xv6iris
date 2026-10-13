@@ -178,8 +178,8 @@ theorem mpgConsistent : rvwmoMinusConsistent mpg := by
       rw [hl, Option.some.injEq] at hl'
       subst hl'
       rcases mpgLbl _ _ hl with ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩ <;> simp [lbAq] at haq
-    · obtain ⟨_, _, ⟨l, hl, hrl⟩, _⟩ := hr
-      rcases mpgLbl _ _ hl with ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩ <;> simp [lbRl] at hrl
+    · obtain ⟨_, ⟨l, hl, hrc⟩, _⟩ := hr
+      rcases mpgLbl _ _ hl with ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩ <;> simp [lbRcsc, lbAq, lbRl] at hrc
   · -- load value: the ONE read, byte 0 at write index 2 = hart 1's store
     intro e a t v hr
     obtain ⟨l, base, ts, vs, j, hl, hrd, hj, hv, ha⟩ := hr
@@ -265,8 +265,8 @@ theorem mpg'Consistent : rvwmoMinusConsistent mpg' := by
       rw [hl, Option.some.injEq] at hl'
       subst hl'
       rcases mpg'Lbl _ _ hl with ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩ <;> simp [lbAq] at haq
-    · obtain ⟨_, _, ⟨l, hl, hrl⟩, _⟩ := hr
-      rcases mpg'Lbl _ _ hl with ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩ <;> simp [lbRl] at hrl
+    · obtain ⟨_, ⟨l, hl, hrc⟩, _⟩ := hr
+      rcases mpg'Lbl _ _ hl with ⟨_, rfl⟩ | ⟨_, rfl⟩ | ⟨_, rfl⟩ <;> simp [lbRcsc, lbAq, lbRl] at hrc
   · -- load value: byte 0 at write index 1 = hart 1's store, now FIRST
     intro e a t v hr
     obtain ⟨l, base, ts, vs, j, hl, hrd, hj, hv, ha⟩ := hr

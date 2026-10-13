@@ -22,7 +22,9 @@ TWO PROOF TECHNIQUES:
     `cowrForbidden`, IS proved ∀ gmo, ∀ read-index, directly at the `Prop` level.
 
 RVWMO⁻ COMPARISON: §1 adds a whole-model boolean `minusConsistentB` for
-`rvwmoMinusConsistent` (rule 7-RCpc's boolean arm `grelAcqB` was missing).
+`rvwmoMinusConsistent` (Rocq: rule 7-RCpc's boolean arm `grelAcqB` was missing;
+D35-fix [OWN.54]: RVWMO⁻'s rule-7 arm is riscv.cat's RCsc `grcsc`, so `gppoMinusB` uses
+`AxGraphDec.grcscB` and every litmus verdict is re-checked under riscv.cat's RCsc).
 Every ALLOWED test is also checked against it; every FORBIDDEN verdict transfers
 through `minusImpliesCat`'s contrapositive (`notCatNotMinus`).
 
@@ -48,6 +50,8 @@ verdict for `cowr`/`corr`.  A LEAF: nothing imports this file.
    rather than by enumerating `gevents`.
 5. The §4 `Print Assumptions` block has no Lean twin (the lint's axiom check
    covers it).
+6. D35-fix ([OWN.54]; `WeakRvwmoGraph` deviation 7): `gppoMinusB`'s rule-7 arm is `grcscB`
+   (Rocq: `grel_acq_b`); `grelAcqB`/`grelAcqBSpec` are kept.
 
 **Name map** (Rocq → Lean): `imgw` ↦ `AxLitmus.imgw`; `mkgd` ↦
 `AxLitmus.mkgd`; `not_cat_of_ppo` ↦ `notCatOfPpo`; `not_cat_not_minus` ↦
@@ -107,7 +111,8 @@ theorem notCatNotMinus (GD : Gdexec) :
     ¬ rvwmoCatConsistent GD → ¬ rvwmoMinusDepsConsistent GD :=
   fun hnc hm => hnc (minusImpliesCat GD hm)
 
-/-- Rule 7's RCpc arm (`AxGraphDec` keeps RCsc only). -/
+/-- Rocq's RVWMO⁻ rule-7 arm `[W.rl];po;[R.aq]`, Boolean (D35-fix [OWN.54]: RVWMO⁻'s arm is now
+the RCsc-wide `grcscB`, `AxGraphDec`; `grelAcqB` is kept as a lemma-level twin of `grelAcq`). -/
 def grelAcqB (G : Gexec) (e1 e2 : Geid) : Bool :=
   gpoB G e1 e2 && glblB G e1 lbIsW && glblB G e1 lbRl &&
   glblB G e2 lbIsR && glblB G e2 lbAq
@@ -116,11 +121,11 @@ theorem grelAcqBSpec (G : Gexec) (e1 e2 : Geid) : grelAcqB G e1 e2 = true ↔ gr
   simp only [grelAcqB, grelAcq, Bool.and_eq_true, gpoBSpec, glblBSpec, and_assoc]
 
 def gppoMinusB (G : Gexec) (e1 e2 : Geid) : Bool :=
-  gpolocB G e1 e2 || gfenceB G e1 e2 || gacqB G e1 e2 || grelAcqB G e1 e2
+  gpolocB G e1 e2 || gfenceB G e1 e2 || gacqB G e1 e2 || grcscB G e1 e2
 
 theorem gppoMinusBSpec (G : Gexec) (e1 e2 : Geid) : gppoMinusB G e1 e2 = true ↔ gppo G e1 e2 := by
   simp only [gppoMinusB, gppo, Bool.or_eq_true, gpolocBSpec, gfenceBSpec, gacqBSpec,
-    grelAcqBSpec, or_assoc]
+    grcscBSpec, or_assoc]
 
 /-- ppo⁻'s four arms are all events (fed to `ppoGmoBSound`). -/
 theorem gppoMinusGevents (G : Gexec) (e1 e2 : Geid) :

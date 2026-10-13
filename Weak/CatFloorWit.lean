@@ -25,18 +25,6 @@ open Lbl
 
 namespace CatLin
 
-/-- No label of `sbrfi` carries `rl`: the D35 premise holds vacuously. -/
-theorem sbrfiNoRl (e : Geid) (l : Lbl) : gxLbl sbrfi.gdG e = some l → lbRl l = false := by
-  obtain ⟨i, k⟩ := e
-  intro hl
-  rcases i with _ | _ | i <;> rcases k with _ | _ | _ | k <;>
-    simp [gxLbl, sbrfi, AxGraphWit.mkgd, sbrfiProg] at hl <;> subst hl <;> rfl
-
-theorem sbrfiRel7 : grelAcqGmoC sbrfi.gdG := by
-  rintro e1 e2 ⟨_, _, ⟨l, hl, hrl⟩, _, _⟩
-  rw [sbrfiNoRl e1 l hl] at hrl
-  cases hrl
-
 theorem sbrfiFloorFacts : gwf sbrfi.gdG ∧ gppoCat6Gmo sbrfi.gdG ∧ gloadValue sbrfi.gdG :=
   catADFloor _ _ sbrfiCatAD
 
@@ -76,7 +64,7 @@ theorem sbrfiOldFinvFails : ¬ finv sbrfi.gdG (0, 1) 0 1 sbrfiWs1 := by
 /-- … while the NEW one holds there. -/
 theorem sbrfiNewFinv : finvC sbrfi.gdG (0, 1) 0 1 1 sbrfiWs1 := by
   obtain ⟨hwf, h6, hlv⟩ := sbrfiFloorFacts
-  exact finvCStep sbrfi.gdG hwf h6 hlv sbrfiRel7 (0, 1) 0 1 b1 sbrfiReads 0 sbrfiStore wsInit 1
+  exact finvCStep sbrfi.gdG hwf h6 hlv (0, 1) 0 1 b1 sbrfiReads 0 sbrfiStore wsInit 1
     (by decide) sbrfiLblW (fun _ => sbrfiGwixW) (fun base ts vs h => by cases h)
     (finvCInit _ _ _ _)
 
@@ -101,7 +89,7 @@ theorem sbrfiCertified :
     GtracePrefix sbrfi.gdG (candSnoc sbrfiC1 ⟨0, sbrfiRead⟩) (evSnoc sbrfiC1 sbrfiEv1 (0, 1)) := by
   obtain ⟨hwf, h6, hlv⟩ := sbrfiFloorFacts
   have h := gtraceSnocReadConsistentC sbrfi.gdG sbrfiC1 sbrfiEv1 0 false 0 [1] [b1] hwf h6 hlv
-    sbrfiRel7 ?_ sbrfiC1Gt.1 sbrfiC1Gt.2 sbrfiLblR ?_
+    ?_ sbrfiC1Gt.1 sbrfiC1Gt.2 sbrfiLblR ?_
   · exact h
   · intro k hk base ts vs heq
     have hk0 : k = 0 := by simp [sbrfiC1, sbrfiC0, candSnoc, gcnt] at hk; omega

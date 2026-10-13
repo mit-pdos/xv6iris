@@ -53,6 +53,9 @@ violation-monotonicity lemmas.
 7. Lean-only helper (no Rocq twin): `sidxSpec`, the three-way case analysis
    of `sidx` that every arithmetic proof here (Rocq: `repeat case_bool_decide;
    lia`) is run through.
+9. D35-fix ([OWN.54]; `WeakRvwmoGraph` deviation 7): `gppo`'s rule-7 arm is `grcsc`, so
+   `gswapwPpo` rewrites with the Lean-only `gswapwRcsc` (over the Lean-only `lblTswapRcsc`);
+   `gswapwRelAcq` is kept.
 
 **Name map** (Rocq → Lean): `sidx`; `sidx_n` ↦ `sidxN`; `sidx_Sn` ↦ `sidxSn`;
 `sidx_id` ↦ `sidxId`; `sidx_invol` ↦ `sidxInvol`; `sidx_inj` ↦ `sidxInj`;
@@ -741,6 +744,8 @@ theorem lblTswapIsMem (k1 : Nat) (l : Lbl) : lbIsMem (lblTswap k1 l) = lbIsMem l
   cases l <;> rfl
 theorem lblTswapAq (k1 : Nat) (l : Lbl) : lbAq (lblTswap k1 l) = lbAq l := by cases l <;> rfl
 theorem lblTswapRl (k1 : Nat) (l : Lbl) : lbRl (lblTswap k1 l) = lbRl l := by cases l <;> rfl
+theorem lblTswapRcsc (k1 : Nat) (l : Lbl) : lbRcsc (lblTswap k1 l) = lbRcsc l := by
+  simp only [lbRcsc, lblTswapAq, lblTswapRl]
 theorem lblTswapCls (k1 : Nat) (l : Lbl) : lbCls (lblTswap k1 l) = lbCls l := by cases l <;> rfl
 theorem lblTswapWr (k1 : Nat) (l : Lbl) : lbWr (lblTswap k1 l) = lbWr l := by cases l <;> rfl
 
@@ -901,10 +906,17 @@ theorem gswapwRelAcq (G : Gexec) (n k1 : Nat) (e1 e2 : Geid) :
   unfold grelAcq
   rw [gswapwPo, hW, hL, hR, hA]
 
+theorem gswapwRcsc (G : Gexec) (n k1 : Nat) (e1 e2 : Geid) :
+    grcsc (gswapw G n k1) e1 e2 ↔ grcsc G e1 e2 := by
+  have h1 := gswapwGlblIs G n k1 e1 lbRcsc (lblTswapRcsc k1)
+  have h2 := gswapwGlblIs G n k1 e2 lbRcsc (lblTswapRcsc k1)
+  unfold grcsc
+  rw [gswapwPo, h1, h2]
+
 theorem gswapwPpo (G : Gexec) (n k1 : Nat) (e1 e2 : Geid) :
     gppo (gswapw G n k1) e1 e2 ↔ gppo G e1 e2 := by
   unfold gppo
-  rw [gswapwPoloc, gswapwFenceCovers, gswapwAcqPo, gswapwRelAcq]
+  rw [gswapwPoloc, gswapwFenceCovers, gswapwAcqPo, gswapwRcsc]
 
 /-! ## 8.5 THE WRITE SUB-ORDER SWAPS TOO — the §1 kit, self-applied -/
 

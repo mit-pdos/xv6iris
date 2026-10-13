@@ -51,11 +51,14 @@ fetch constructor), the history and claimed ghosts, and `flowEqDyn`.
    statements; Rocq's `ax_text` field does not exist in Lean (Stage C).
 6. STATEMENT SHAPES (as `AxProt` deviation 4): `P -∗ flowEqDyn …` ↦ `P ⊢ flowEqDyn …`;
    `lockGenesisMono`'s `P -∗ Q` ↦ `P ⊢ Q`; pure premises stay `→`.
+7. D35-fix ([OWN.54]; `WeakRvwmoGraph` deviation 7): rule 7 is riscv.cat's RCsc (`lbRcsc :=
+   lbAq || lbRl`), so Rocq's `lb_rcsc_is_r` (an RCsc endpoint is a read) is FALSE for `LStore rl`
+   and is deleted; `gppoCat6Gmem1`'s rule-7 case uses `lbRcscMem`.
 
 **Rocq → Lean name map.**  `lock_pol_s_b` `lockPolSB`, `lock_pol_s` `lockPolS`,
 `grf_src_gx_gmo` `grfSrcGxGmo`, `lock_pol_s_b_spec` `lockPolSBSpec`, `lock_pol_lobp`
 `lockPolLobp`, `lock_axpol` `lockAxpol`, `lock_axpol_Hs_pol_sub` `lockAxpolHsPolSub`,
-`lock_axpol_Hlobp_sub` `lockAxpolHlobpSub`, `gmem_b_iff` `gmemBIff`, `lb_rcsc_is_r` `lbRcscIsR`,
+`lock_axpol_Hlobp_sub` `lockAxpolHlobpSub`, `gmem_b_iff` `gmemBIff`, `lb_rcsc_is_r` ↦ `lbRcscMem` (D35-fix, `WeakRvwmoGraph`: an RCsc label is a memory label),
 `gppo_cat6_gmem1` `gppoCat6Gmem1`, `lock_axpol_wf` `lockAxpolWf`, `gwrites_byte_gx_gmo`
 `gwritesByteGxGmo`, `lock_pol_s_intro` `lockPolSIntro`, `lock_pol_s_intro2` `lockPolSIntro2`,
 `lock_ext_rmw_reader0` `lockExtRmwReader0`, `lock_ext_rmw_reader0_unique`
@@ -159,10 +162,6 @@ theorem gmemBIff (G : Gexec) (e : Geid) : gmemB G e = true ↔ gmem G e := by
     · rintro ⟨l', hl', _⟩
       cases hl'
 
-/-- Only an `LRmw` carries both annotation bits, so an RCsc endpoint is a read. -/
-theorem lbRcscIsR (l : Lbl) : lbRcsc l = true → lbIsR l = true := by
-  cases l <;> simp_all [lbRcsc, lbAq, lbRl, lbIsR]
-
 /-- Every `gppoCat6` arm's predecessor endpoint is a memory event. -/
 theorem gppoCat6Gmem1 (G : Gexec) (e1 e2 : Geid) : gppoCat6 G e1 e2 → gmem G e1 := by
   rintro (h1 | h2 | h3 | h4 | h5 | h6)
@@ -179,7 +178,9 @@ theorem gppoCat6Gmem1 (G : Gexec) (e1 e2 : Geid) : gppoCat6 G e1 e2 → gmem G e
   · obtain ⟨_, hr, _, _⟩ := h5
     exact WeakRvwmoGraph.glblIsRGmem G e1 hr
   · obtain ⟨_, ⟨l, hl, hb⟩, _⟩ := h6
-    exact WeakRvwmoGraph.glblIsRGmem G e1 ⟨l, hl, lbRcscIsR l hb⟩
+    -- D35-fix [OWN.54]: an RCsc endpoint is a memory event (Rocq: a read — FALSE for
+    -- `LStore rl` under riscv.cat's RCsc)
+    exact ⟨l, hl, lbRcscMem l hb⟩
 
 theorem lockAxpolWf : @axpolWf lockAxpol := by
   intro GD i k w hw

@@ -25,13 +25,11 @@ rule orders W→R; `CatLinWit.sbrfi`), so the clause is false (`CatFloorWit.sbrf
     rule 5 (`gacqPo`) and rule 4 (`gfenceCovers`) are cat arms; a read's source is gmo-before it
     unless forwarded (then `fwdView = 0`), and an RMW's source always is (RULE 1).
 
-**Two premises the tree's cat transcription does not imply (spec notes, vacuous for kernel rows).**
-  * D35 — the `wVRel` hook consumes RULE 7 for `[W.rl];po;[R.aq]`: `grelAcqGmoC G`.  riscv.cat's
-    rule 7 is `[RCsc];po;[RCsc]` with RCsc = every aq/rl-annotated AMO/LR/SC, and the graph
-    carries aq/rl only on atomics (LR/SC are `LLoad aq`/`LStore rl`, `projLbl`), so riscv.cat
-    implies it — FAITHFUL; but `AxGraphCat.lbRcsc` demands BOTH bits, so `rvwmoCatAD` does not
-    (D35 (a), RULED, is the `lbRcsc` correction — outside this item's files).  Vacuous for kernel
-    rows (no rl-annotated write: release is `fence rw,w; sw`).
+**One premise the cat model does not imply (spec note, vacuous for kernel rows).**
+  * D35 — CLOSED by D35-fix [OWN.54]: the `wVRel` hook consumes RULE 7 for `[W.rl];po;[R.aq]`,
+    which is now a `gppoCat6` arm (`grelAcqGrcsc`: riscv.cat's RCsc `lbRcsc := lbAq || lbRl`,
+    `WeakRvwmoGraph` deviation 7), so the former premise `grelAcqGmoC` is DELETED and the twins
+    take rule 7 from `gppoCat6Gmo`.
   * D36 (a) RULED — no plain `LLoad aq` in the reader's row before it (`noPlainAqC`): WeakMem's
     forwarded ACQUIRE load raises `wVrNew` to the forwarded store's index (`fwdViewAq`), stricter
     than cat.  True for the kernel (acquire is `amoswap.w.aq`, an RMW).
@@ -54,10 +52,7 @@ open Lbl
 
 namespace CatLin
 
-/-! # 0. The two extra premises -/
-
-/-- D35: rule 7 at `[W.rl];po;[R.aq]` (riscv.cat's RCsc rule on annotated atomics). -/
-def grelAcqGmoC (G : Gexec) : Prop := ∀ e1 e2, grelAcq G e1 e2 → gmoLt G e1 e2
+/-! # 0. The extra premise -/
 
 /-- D36 (a): no plain acquire load in hart `x` below position `n`. -/
 def noPlainAqC (G : Gexec) (x n : Nat) : Prop :=
@@ -327,7 +322,7 @@ theorem notWriteNoByte (G : Gexec) (e : Geid) (l : Lbl) :
 /-! ## 3.1 THE STEP -/
 
 theorem finvCStep (G : Gexec) (hwf : gwf G) (h6 : gppoCat6Gmo G) (hlv : gloadValue G)
-    (h7 : grelAcqGmoC G) (r : Geid) (a : Int) (t : Nat) (v : BitVec 8)
+    (r : Geid) (a : Int) (t : Nat) (v : BitVec 8)
     (hrb : greadsByte G r a t v) (k : Nat) (l : Lbl) (ws : Wstate) (tw : Nat) :
     k < r.2 →
     gxLbl G (r.1, k) = some l →
@@ -363,7 +358,8 @@ theorem finvCStep (G : Gexec) (hwf : gwf G) (h6 : gppoCat6Gmo G) (hlv : gloadVal
     have hpo2 : WeakRvwmoGraph.gpo G (r.1, k) (r.1, kf) := by
       obtain ⟨l', hl', _⟩ := hr1
       exact ⟨rfl, show k < kf by omega, hesome, by rw [hl']; rfl⟩
-    have hlt := h7 _ _ ⟨hpo2, hw, hrl, hr1, hr2⟩
+    have hlt := h6 _ _ (.inr (.inr (.inr (.inr (.inr
+      (grelAcqGrcsc G _ _ ⟨hpo2, hw, hrl, hr1, hr2⟩))))))
     rcases hle with heq | hlt2
     · rw [heq] at hlt; exact hlt
     · exact gmoLtTrans G _ _ _ hlt hlt2
@@ -517,7 +513,7 @@ theorem finvCStep (G : Gexec) (hwf : gwf G) (h6 : gppoCat6Gmo G) (hlv : gloadVal
 /-! ## 3.2 THE INDUCTION over the candidate's trace -/
 
 theorem finvCReplay (G : Gexec) (hwf : gwf G) (h6 : gppoCat6Gmo G) (hlv : gloadValue G)
-    (h7 : grelAcqGmoC G) (r : Geid) (a : Int) (t : Nat) (v : BitVec 8)
+    (r : Geid) (a : Int) (t : Nat) (v : BitVec 8)
     (hrb : greadsByte G r a t v) (hnoaq : noPlainAqC G r.1 r.2)
     (c : Cand) (ev : Nat → Geid) (p : Nat) :
     GtracePrefix G c ev →
@@ -545,7 +541,7 @@ theorem finvCReplay (G : Gexec) (hwf : gwf G) (h6 : gppoCat6Gmo G) (hlv : gloadV
         omega
       have hlbl : gxLbl G (r.1, gcnt r.1 (c.cdTr.take p)) = some s.esLb := by
         rw [← hev]; exact hgt.gtpLbl p s hs
-      apply finvCStep G hwf h6 hlv h7 r a t v hrb (gcnt r.1 (c.cdTr.take p)) s.esLb _ _ hklt hlbl
+      apply finvCStep G hwf h6 hlv r a t v hrb (gcnt r.1 (c.cdTr.take p)) s.esLb _ _ hklt hlbl
       · intro hw; rw [← hev, hlog]; exact hgt.gtpWix p s hs hw
       · intro base ts vs heq
         exact hnoaq _ hklt base ts vs (by rw [hlbl, heq])
@@ -558,7 +554,7 @@ theorem finvCReplay (G : Gexec) (hwf : gwf G) (h6 : gppoCat6Gmo G) (hlv : gloadV
 
 theorem floorOfGraphC (G : Gexec) (c : Cand) (ev : Nat → Geid) (i : Nat) (r : Geid) (a : Int)
     (t : Nat) (v : BitVec 8) (aq : Bool) :
-    gwf G → gppoCat6Gmo G → gloadValue G → grelAcqGmoC G →
+    gwf G → gppoCat6Gmo G → gloadValue G →
     noPlainAqC G i (gcnt i c.cdTr) →
     GtracePrefix G c ev →
     r = (i, gcnt i c.cdTr) →
@@ -567,14 +563,14 @@ theorem floorOfGraphC (G : Gexec) (c : Cand) (ev : Nat → Geid) (i : Nat) (r : 
     ¬ writesIn (cdLog c c.cdTr.length) a t
       (max (loadVpre ((stt (candExec c) c.cdTr.length).msWs i) aq)
            (coh ((stt (candExec c) c.cdTr.length).msWs i) a)) := by
-  intro hwf h6 hlv h7 hnoaq hgt hr hrb haq
+  intro hwf h6 hlv hnoaq hgt hr hrb haq
   have hrr : glblIs G r lbIsR := by
     obtain ⟨l, base, ts, vs, j, hl, hrd, _⟩ := hrb
     exact ⟨l, hl, lbRdIsR l _ hrd⟩
   subst hr
   have hcl : maxcl (gvisUb G (i, gcnt i c.cdTr)) := gvisUbMaxcl G _
   have hclA : maxcl (cohUbA G a t) := cohUbAMaxcl G a t
-  have hinv := finvCReplay G hwf h6 hlv h7 _ a t v hrb hnoaq c ev c.cdTr.length hgt
+  have hinv := finvCReplay G hwf h6 hlv _ a t v hrb hnoaq c ev c.cdTr.length hgt
     (Nat.le_refl _) (Nat.le_refl _)
   rw [take_ge (l := c.cdTr) (Nat.le_refl _)] at hinv
   obtain ⟨_, hcoh, hrn, hrel, _, _⟩ := hinv
@@ -590,7 +586,7 @@ theorem floorOfGraphC (G : Gexec) (c : Cand) (ev : Nat → Geid) (i : Nat) (r : 
 /-- `gtraceSnocReadConsistent` over cat. -/
 theorem gtraceSnocReadConsistentC (G : Gexec) (c : Cand) (ev : Nat → Geid) (i : Nat)
     (aq : Bool) (base : Int) (ts : List Nat) (vs : List (BitVec 8)) :
-    gwf G → gppoCat6Gmo G → gloadValue G → grelAcqGmoC G →
+    gwf G → gppoCat6Gmo G → gloadValue G →
     noPlainAqC G i (gcnt i c.cdTr) →
     srvwmoConsistent c →
     GtracePrefix G c ev →
@@ -598,7 +594,7 @@ theorem gtraceSnocReadConsistentC (G : Gexec) (c : Cand) (ev : Nat → Geid) (i 
     (∀ (j : Nat) t, ts[j]? = some t → t ≤ (cdLogEnd c).length) →
     srvwmoConsistent (candSnoc c ⟨i, .LLoad aq base ts vs⟩) ∧
     GtracePrefix G (candSnoc c ⟨i, .LLoad aq base ts vs⟩) (evSnoc c ev (i, gcnt i c.cdTr)) := by
-  intro hwf h6 hlv h7 hnoaq hc hgt hl hsrc
+  intro hwf h6 hlv hnoaq hc hgt hl hsrc
   have hlen : vs.length = ts.length := WeakRvwmoFloor.gshape G hwf _ _ hl
   have hrb : ∀ (j : Nat) t v, ts[j]? = some t → vs[j]? = some v →
       greadsByte G (i, gcnt i c.cdTr) (accAddr base j) t v :=
@@ -617,7 +613,7 @@ theorem gtraceSnocReadConsistentC (G : Gexec) (c : Cand) (ev : Nat → Geid) (i 
   · intro j t hj
     have hjlt : j < vs.length := by rw [hlen]; exact lookup_lt_Some hj
     obtain ⟨v, hv⟩ := someOfIsSome (lookup_lt_is_Some_2 hjlt)
-    exact floorOfGraphC G c ev i (i, gcnt i c.cdTr) (accAddr base j) t v aq hwf h6 hlv h7 hnoaq
+    exact floorOfGraphC G c ev i (i, gcnt i c.cdTr) (accAddr base j) t v aq hwf h6 hlv hnoaq
       hgt rfl (hrb j t v hj hv) (fun h => by subst h; exact ⟨_, hl, rfl⟩)
 
 /-! # 4. The certified prefix (`WeakRvwmoCert3` §2–§3 over cat) -/
@@ -650,7 +646,7 @@ theorem cinvCStepWit (G : Gexec) (hwf : gwf G) (hlv : gloadValue G)
   · rw [loadRunVwOld]; intro hfh; exact hwo (fhookS G r k false hfh)
 
 theorem cinvCReplay (G : Gexec) (hwf : gwf G) (h6 : gppoCat6Gmo G) (hlv : gloadValue G)
-    (h7 : grelAcqGmoC G) (r : Geid) (a : Int) (t : Nat) (v : BitVec 8)
+    (r : Geid) (a : Int) (t : Nat) (v : BitVec 8)
     (hrb : greadsByte G r a t v) (hnoaq : noPlainAqC G r.1 r.2)
     (c : Cand) (ev : Nat → Geid) (W : Geid → Prop) (p : Nat) :
     CtracePrefix G c ev W →
@@ -693,7 +689,7 @@ theorem cinvCReplay (G : Gexec) (hwf : gwf G) (h6 : gppoCat6Gmo G) (hlv : gloadV
     · -- A TRUE STEP
       have hlbl : gxLbl G (r.1, gcnt r.1 (c.cdTr.take p)) = some s.esLb := by
         rw [← hev]; exact hlblp
-      apply finvCStep G hwf h6 hlv h7 r a t v hrb _ s.esLb _ _ hklt hlbl
+      apply finvCStep G hwf h6 hlv r a t v hrb _ s.esLb _ _ hklt hlbl
       · intro hw; rw [← hev, hlog]; exact hgt.ctpWix p s hs hw
       · intro base ts vs heq
         exact hnoaq _ hklt base ts vs (by rw [hlbl, heq])
@@ -737,7 +733,7 @@ theorem cinvCReplay (G : Gexec) (hwf : gwf G) (h6 : gppoCat6Gmo G) (hlv : gloadV
 
 theorem floorOfCgraphC (G : Gexec) (c : Cand) (ev : Nat → Geid) (W : Geid → Prop) (i : Nat)
     (r : Geid) (a : Int) (t : Nat) (v : BitVec 8) (aq : Bool) :
-    gwf G → gppoCat6Gmo G → gloadValue G → grelAcqGmoC G →
+    gwf G → gppoCat6Gmo G → gloadValue G →
     noPlainAqC G i (gcnt i c.cdTr) →
     CtracePrefix G c ev W →
     WPolocClosed G W →
@@ -750,14 +746,14 @@ theorem floorOfCgraphC (G : Gexec) (c : Cand) (ev : Nat → Geid) (W : Geid → 
     ¬ writesIn (cdLog c c.cdTr.length) a t
       (max (loadVpre ((stt (candExec c) c.cdTr.length).msWs i) aq)
            (coh ((stt (candExec c) c.cdTr.length).msWs i) a)) := by
-  intro hwf h6 hlv h7 hnoaq hgt hpc hwub hpd hnW hr hrb haq
+  intro hwf h6 hlv hnoaq hgt hpc hwub hpd hnW hr hrb haq
   have hrr : glblIs G r lbIsR := by
     obtain ⟨l, base, ts, vs, j, hl, hrd, _⟩ := hrb
     exact ⟨l, hl, lbRdIsR l _ hrd⟩
   subst hr
   have hcl : maxcl (gvisUb G (i, gcnt i c.cdTr)) := gvisUbMaxcl G _
   have hclA : maxcl (cohUbA G a t) := cohUbAMaxcl G a t
-  have hinv := cinvCReplay G hwf h6 hlv h7 _ a t v hrb hnoaq c ev W c.cdTr.length hgt hpc hwub
+  have hinv := cinvCReplay G hwf h6 hlv _ a t v hrb hnoaq c ev W c.cdTr.length hgt hpc hwub
     hpd hnW (Nat.le_refl _) (Nat.le_refl _)
   rw [take_ge (l := c.cdTr) (Nat.le_refl _)] at hinv
   obtain ⟨_, hcoh, hrn, hrel, _, _⟩ := hinv
@@ -772,7 +768,7 @@ theorem floorOfCgraphC (G : Gexec) (c : Cand) (ev : Nat → Geid) (W : Geid → 
 
 theorem certFloorOkC (G : Gexec) (c : Cand) (ev : Nat → Geid) (W : Geid → Prop) (i : Nat)
     (aq : Bool) (base : Int) (ts : List Nat) (vs : List (BitVec 8)) :
-    gwf G → gppoCat6Gmo G → gloadValue G → grelAcqGmoC G →
+    gwf G → gppoCat6Gmo G → gloadValue G →
     noPlainAqC G i (gcnt i c.cdTr) →
     CtracePrefix G c ev W →
     WPolocClosed G W →
@@ -781,17 +777,17 @@ theorem certFloorOkC (G : Gexec) (c : Cand) (ev : Nat → Geid) (W : Geid → Pr
     ¬ W (i, gcnt i c.cdTr) →
     gxLbl G (i, gcnt i c.cdTr) = some (.LLoad aq base ts vs) →
     floorOk c i aq base ts := by
-  intro hwf h6 hlv h7 hnoaq hgt hpc hwub hpd hnW hl j t hj
+  intro hwf h6 hlv hnoaq hgt hpc hwub hpd hnW hl j t hj
   have hlen : vs.length = ts.length := WeakRvwmoFloor.gshape G hwf _ _ hl
   obtain ⟨v, hv⟩ := someOfIsSome (lookup_lt_is_Some_2
     (show j < vs.length by rw [hlen]; exact lookup_lt_Some hj))
-  exact floorOfCgraphC G c ev W i _ (accAddr base j) t v aq hwf h6 hlv h7 hnoaq hgt hpc hwub hpd
+  exact floorOfCgraphC G c ev W i _ (accAddr base j) t v aq hwf h6 hlv hnoaq hgt hpc hwub hpd
     hnW rfl ⟨.LLoad aq base ts vs, base, ts, vs, j, hl, rfl, hj, hv, rfl⟩
     (fun h => by subst h; exact ⟨.LLoad true base ts vs, hl, rfl⟩)
 
 theorem certReadInLog'C (G : Gexec) (c : Cand) (ev : Nat → Geid) (W : Geid → Prop) (i : Nat)
     (aq : Bool) (base : Int) (ts : List Nat) (vs : List (BitVec 8)) :
-    gwf G → gppoCat6Gmo G → gloadValue G → grelAcqGmoC G →
+    gwf G → gppoCat6Gmo G → gloadValue G →
     noPlainAqC G i (gcnt i c.cdTr) →
     CtracePrefix G c ev W →
     WPolocClosed G W →
@@ -801,35 +797,35 @@ theorem certReadInLog'C (G : Gexec) (c : Cand) (ev : Nat → Geid) (W : Geid →
     gxLbl G (i, gcnt i c.cdTr) = some (.LLoad aq base ts vs) →
     srcInLog c base ts vs →
     mstepOk (candLastSt c) i (.LLoad aq base ts vs) :=
-  fun hwf h6 hlv h7 hnoaq hgt hpc hwub hpd hnW hl hsrc =>
+  fun hwf h6 hlv hnoaq hgt hpc hwub hpd hnW hl hsrc =>
     certReadInLog c i aq base ts vs hsrc
-      (certFloorOkC G c ev W i aq base ts vs hwf h6 hlv h7 hnoaq hgt hpc hwub hpd hnW hl)
+      (certFloorOkC G c ev W i aq base ts vs hwf h6 hlv hnoaq hgt hpc hwub hpd hnW hl)
 
 /-- `cpolRead` over cat, at the certification context `cpolCtx`. -/
 theorem cpolReadC (G : Gexec) (W : Geid → Prop) (x : Nat) (c : Cand) (aq : Bool) (base : Int)
     (ts : List Nat) (vs : List (BitVec 8)) :
-    gwf G → gppoCat6Gmo G → gloadValue G → grelAcqGmoC G →
+    gwf G → gppoCat6Gmo G → gloadValue G →
     noPlainAqC G x (gcnt x c.cdTr) →
     WPolocClosed G W → cpolCtx G W x c →
     ¬ W (x, gcnt x c.cdTr) →
     gxLbl G (x, gcnt x c.cdTr) = some (.LLoad aq base ts vs) →
     srcInLog c base ts vs →
     mstepOk (candLastSt c) x (.LLoad aq base ts vs) := by
-  rintro hwf h6 hlv h7 hnoaq hpc ⟨ev, hgt, hwub, hpd⟩ hnW hl hsrc
-  exact certReadInLog'C G c ev W x aq base ts vs hwf h6 hlv h7 hnoaq hgt hpc hwub
+  rintro hwf h6 hlv hnoaq hpc ⟨ev, hgt, hwub, hpd⟩ hnW hl hsrc
+  exact certReadInLog'C G c ev W x aq base ts vs hwf h6 hlv hnoaq hgt hpc hwub
     (poisOkAtOfHart G c ev x hpd) hnW hl hsrc
 
 /-- … and from the chain's hypothesis. -/
 theorem cpolReadCatAD (GD : Gdexec) (ad : List (Geid × Geid)) (W : Geid → Prop) (x : Nat)
     (c : Cand) (aq : Bool) (base : Int) (ts : List Nat) (vs : List (BitVec 8)) :
-    rvwmoCatAD GD ad → grelAcqGmoC GD.gdG → noPlainAqC GD.gdG x (gcnt x c.cdTr) →
+    rvwmoCatAD GD ad → noPlainAqC GD.gdG x (gcnt x c.cdTr) →
     WPolocClosed GD.gdG W → cpolCtx GD.gdG W x c →
     ¬ W (x, gcnt x c.cdTr) →
     gxLbl GD.gdG (x, gcnt x c.cdTr) = some (.LLoad aq base ts vs) →
     srcInLog c base ts vs →
     mstepOk (candLastSt c) x (.LLoad aq base ts vs) :=
-  fun hc h7 hnoaq =>
-    cpolReadC GD.gdG W x c aq base ts vs hc.1 hc.2.1 hc.2.2.1 h7 hnoaq
+  fun hc hnoaq =>
+    cpolReadC GD.gdG W x c aq base ts vs hc.1 hc.2.1 hc.2.2.1 hnoaq
 
 end CatLin
 

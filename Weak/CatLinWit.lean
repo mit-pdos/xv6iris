@@ -20,7 +20,9 @@ forbids (both forwarded reads gmo-BEFORE the stores they read):
     six arms ([R21.2]).
 
 The rank check (`racyChk`, `acyclicOfRank`) is a general Lean-only helper: a Boolean
-over-approximation of `racyD`, checked on the gmo carrier.
+over-approximation of `racyD`, checked on the gmo carrier.  D35-fix [OWN.54]: its rule-7 arm is
+`grcscB` (RVWMO⁻'s rule-7 arm is riscv.cat's RCsc `grcsc`, `WeakRvwmoGraph` deviation 7); the
+`sbrfi*` verdicts are recomputed under it (unchanged: `sbrfi` carries no annotated access).
 -/
 import Weak.CatLin
 import Weak.AxGraphWit
@@ -39,7 +41,7 @@ namespace CatLin
 def racyChk (GD : Gdexec) (x y : Geid) : Bool :=
   (gpoB GD.gdG x y && glblB GD.gdG x lbIsMem && gisW GD.gdG y) || grfB GD.gdG x y ||
   gcoB GD.gdG x y || gfrB GD.gdG x y || gpolocB GD.gdG x y || gfenceB GD.gdG x y ||
-  gacqB GD.gdG x y || grelAcqB GD.gdG x y || decide ((x, y) ∈ GD.gdDeps)
+  gacqB GD.gdG x y || grcscB GD.gdG x y || decide ((x, y) ∈ GD.gdDeps)
 
 theorem racyChkOf (GD : Gdexec) (x y : Geid) : racyD GD x y → racyChk GD x y = true := by
   unfold racyChk
@@ -53,7 +55,7 @@ theorem racyChkOf (GD : Gdexec) (x y : Geid) : racyD GD x y → racyChk GD x y =
   · exact .inl (.inl (.inl (.inl (.inr ((gpolocBSpec _ _ _).2 h)))))
   · exact .inl (.inl (.inl (.inr ((gfenceBSpec _ _ _).2 h))))
   · exact .inl (.inl (.inr ((gacqBSpec _ _ _).2 h)))
-  · exact .inl (.inr ((grelAcqBSpec _ _ _).2 h))
+  · exact .inl (.inr ((grcscBSpec _ _ _).2 h))
   · exact .inr h
 
 /-- A rank strictly increasing along every checked edge of the carrier kills every `racyD`

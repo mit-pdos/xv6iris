@@ -127,7 +127,7 @@ theorem ergConsistent : rvwmoMinusConsistent erg := by
     intro e1 e2 hppo
     exfalso
     rcases hppo with ⟨⟨hag, hlt, _, _⟩, a, h1, h2⟩ | ⟨pr, pw, sr, sw, ⟨hag, hlt, kf, hk1, hk2, hlf⟩, _, _⟩ |
-        ⟨_, ⟨l, hl, hr⟩, ⟨l', hl', haq⟩, _⟩ | ⟨_, _, ⟨l, hl, hrl⟩, _⟩
+        ⟨_, ⟨l, hl, hr⟩, ⟨l', hl', haq⟩, _⟩ | ⟨_, ⟨l, hl, hrc⟩, _⟩
     · rcases ergAcc e1 a h1 with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ <;>
         rcases ergAcc e2 _ h2 with ⟨rfl, ha⟩ | ⟨rfl, ha⟩ | ⟨rfl, ha⟩ | ⟨rfl, ha⟩ <;>
         simp at hag hlt ha
@@ -137,7 +137,7 @@ theorem ergConsistent : rvwmoMinusConsistent erg := by
       rcases ergLbl e1 _ hl with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ <;>
         simp [lbAq] at haq
     · rcases ergLbl e1 l hl with ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩ <;>
-        simp [lbRl] at hrl
+        simp [lbRcsc, lbAq, lbRl] at hrc
   · -- load value: all three reads name the ERA-INITIAL image, and the one write
     -- in the graph touches none of their bytes
     rintro e a t v ⟨l, base, ts, vs, j, hl, hrd, hj, hv, ha⟩

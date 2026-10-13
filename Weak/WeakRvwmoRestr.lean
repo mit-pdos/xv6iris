@@ -288,7 +288,7 @@ theorem gppoLbl (G : Gexec) (e1 e2 : Geid) :
 theorem gxrGppo (G : Gexec) (cs : List Nat) (n : Nat) (e1 e2 : Geid) :
     gppo (gxRestrict G cs n) e1 e2 → gppo G e1 e2 := by
   rintro (⟨hpo, a, h1, h2⟩ | ⟨pr, pw, sr, sw, ⟨hag, hlt, kf, hk3, hk4, hlf⟩, hk1, hk2⟩ |
-    ⟨hpo, h1, h2, h3⟩ | ⟨hpo, h1, h2, h3, h4⟩)
+    ⟨hpo, h1, h2, h3⟩ | ⟨hpo, h1, h2⟩)
   · exact Or.inl ⟨((gxrGpo G cs n e1 e2).1 hpo).1, a, gxrGaccesses G cs n e1 a h1,
       gxrGaccesses G cs n e2 a h2⟩
   · refine Or.inr (Or.inl ⟨pr, pw, sr, sw,
@@ -303,8 +303,7 @@ theorem gxrGppo (G : Gexec) (cs : List Nat) (n : Nat) (e1 e2 : Geid) :
       ((gxrGlblIs G cs n e1 _).1 h1).2, ((gxrGlblIs G cs n e1 _).1 h2).2,
       ((gxrGmem G cs n e2).1 h3).2⟩))
   · exact Or.inr (Or.inr (Or.inr ⟨((gxrGpo G cs n e1 e2).1 hpo).1,
-      ((gxrGlblIs G cs n e1 _).1 h1).2, ((gxrGlblIs G cs n e1 _).1 h2).2,
-      ((gxrGlblIs G cs n e2 _).1 h3).2, ((gxrGlblIs G cs n e2 _).1 h4).2⟩))
+      ((gxrGlblIs G cs n e1 _).1 h1).2, ((gxrGlblIs G cs n e2 _).1 h2).2⟩))
 
 theorem gxrGppoCut (G : Gexec) (cs : List Nat) (n : Nat) (e1 e2 : Geid) :
     gppo (gxRestrict G cs n) e1 e2 → gcut cs e1 = true ∧ gcut cs e2 = true := by
