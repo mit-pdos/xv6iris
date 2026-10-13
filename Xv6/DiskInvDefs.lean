@@ -943,14 +943,42 @@ theorem usedW_snoc (dl : List UsedRec) (r : UsedRec) :
   rw [List.map_append, List.reverse_append]
   rfl
 
-/-- The tails under the log: nonempty, spelling `0`, at positions at most
-`b` -- the stores that zeroed the used page before the flip. -/
+/-- The position of byte `j`'s tail head, out of the two (W8 (f3-gate)). -/
+def usedHeadPos (t0 t1 j : Nat) : Nat := if j = 0 then t0 else t1
+
+/-- The tails under the log: nonempty, spelling `0`, their heads at EXACTLY
+the positions `t0` (byte 0) and `t1` (byte 1) the base code `b =
+chainPair t0 t1` names -- the stores that zeroed the used page before the
+flip (W8 (f3-gate) [OWN.62]: the code pins each head's position, so the
+lock's payload can carry a KEY for each and a reader certify the head it
+returns, `Xv6.diskHeadKeys`). -/
 def usedTailOk (b : Nat) (Hold : Nat → Hist) : Prop :=
-  ∀ j, j < 2 → ∃ e H, Hold j = e :: H ∧ e.v = nthByte (0 : BitVec (8 * 2)) j ∧ e.t ≤ b
+  ∃ t0 t1, b = chainPair t0 t1 ∧
+    ∀ j, j < 2 → ∃ e H, Hold j = e :: H ∧ e.v = nthByte (0 : BitVec (8 * 2)) j ∧ e.t = usedHeadPos t0 t1 j
+
+/-- The base code's two positions are at most `F`. -/
+def usedBaseLe (b F : Nat) : Prop := ∃ t0 t1, b = chainPair t0 t1 ∧ t0 ≤ F ∧ t1 ≤ F
+
+theorem usedBaseLe_mono {b F F' : Nat} (h : usedBaseLe b F) (hF : F ≤ F') : usedBaseLe b F' :=
+  let ⟨t0, t1, hb, h0, h1⟩ := h; ⟨t0, t1, hb, by omega, by omega⟩
+
+theorem usedBaseLe_pair (t0 t1 : Nat) : usedBaseLe (chainPair t0 t1) (max t0 t1) :=
+  ⟨t0, t1, rfl, Nat.le_max_left _ _, Nat.le_max_right _ _⟩
 
 theorem usedTailOk_vals (b : Nat) (Hold : Nat → Hist) (h : usedTailOk b Hold) :
     tailVals 2 (0 : BitVec (8 * 2)) Hold :=
-  fun j hj => let ⟨e, H, h1, h2, _⟩ := h j hj; ⟨e, H, h1, h2⟩
+  fun j hj => let ⟨_, _, _, h'⟩ := h; let ⟨e, H, h1, h2, _⟩ := h' j hj; ⟨e, H, h1, h2⟩
+
+/-- Under a base bound, every head is at most `F`. -/
+theorem usedTailOk_le {b F : Nat} {Hold : Nat → Hist} (h : usedTailOk b Hold) (hb : usedBaseLe b F)
+    (j : Nat) (hj : j < 2) :
+    ∃ e H, Hold j = e :: H ∧ e.v = nthByte (0 : BitVec (8 * 2)) j ∧ e.t ≤ F := by
+  obtain ⟨t0, t1, rfl, h'⟩ := h
+  obtain ⟨u0, u1, hu, h0, h1⟩ := hb
+  obtain ⟨rfl, rfl⟩ := chainPair_inj hu
+  obtain ⟨e, H, h1', h2, h3⟩ := h' j hj
+  refine ⟨e, H, h1', h2, ?_⟩
+  rw [h3]; unfold usedHeadPos; split <;> omega
 
 /-- **The log's bookkeeping.**  `dl` is the real write log, `dl0` the ghost
 list that lags it, `M` the monotone counter a reader may cash, `nc` the
@@ -1097,18 +1125,18 @@ theorem usedIdx_read_some (dl : List UsedRec) (Hold : Nat → Hist) (cpu : CPU) 
   exact h.symm
 
 theorem usedIdx_read_none (dl : List UsedRec) (Hold : Nat → Hist) (b : Nat) (cpu : CPU)
-    (tvn : Nat) (w : BitVec (8 * 2)) (htail : usedTailOk b Hold) (hb : b ≤ tvn)
+    (tvn : Nat) (w : BitVec (8 * 2)) (htail : usedTailOk b Hold) (hb : usedBaseLe b tvn)
     (hf : (usedW dl).find? (WEnt.visible (hartAgent cpu) tvn) = none)
     (hrd : readsAre (hartAgent cpu) tvn ((usedW dl).hist Hold) 2 w) :
     w = (0 : BitVec (8 * 2)) := by
   apply bv_eq_of_bytes
   intro j hj
   have h := hrd j hj
-  obtain ⟨e, H, hH, hev, het⟩ := htail j hj
+  obtain ⟨e, H, hH, hev, het⟩ := usedTailOk_le htail hb j hj
   unfold Hist.read at h
   rw [WordHist.find?_hist, hf, Option.map_none, Option.none_or, hH] at h
   have hvis : HEnt.visible (hartAgent cpu) tvn e = true :=
-    HEnt.visible_of_le _ _ _ (by omega)
+    HEnt.visible_of_le _ _ _ het
   simp only [List.find?_cons, hvis, Option.map_some, Option.some.injEq] at h
   rw [← h, hev]
 
@@ -1120,7 +1148,7 @@ write the reader's view has passed -- so a reader whose floor covers the
 write that published its own watermark reads a counter at least as
 large. -/
 theorem usedIdx_read (dl : List UsedRec) (Hold : Nat → Hist) (b : Nat) (cpu : CPU)
-    (tvn : Nat) (w : BitVec (8 * 2)) (htail : usedTailOk b Hold) (hb : b ≤ tvn)
+    (tvn : Nat) (w : BitVec (8 * 2)) (htail : usedTailOk b Hold) (hb : usedBaseLe b tvn)
     (hpw : dl.Pairwise (fun a c => a.1 ≤ c.1 ∧ a.2.1 ≤ c.2.1))
     (hrd : readsAre (hartAgent cpu) tvn ((usedW dl).hist Hold) 2 w) :
     ∃ m : Nat, w = wrap16 m ∧ (m = 0 ∨ ∃ (t hd ep : Nat), (m, t, hd, ep) ∈ dl ∧ t ≤ tvn) ∧
@@ -1338,14 +1366,14 @@ whose continuation names the view the load read at) and CASHED by the
 reads that follow the loop body's `__sync_synchronize()`, which is what
 turns that read watermark into a floor. -/
 def diskWm (γ : DiskNames) (n F : Nat) : IProp GF := iprop%
-  (∃ b : Nat, diskBaseFrozen γ b ∗ ⌜b ≤ F⌝) ∗
+  (∃ b : Nat, diskBaseFrozen γ b ∗ ⌜usedBaseLe b F⌝) ∗
   (⌜n = 0⌝ ∨ ∃ (k m t hd ep : Nat), doneRec γ k (m, t, hd, ep) ∗ ⌜n ≤ m ∧ t ≤ F⌝)
 
 instance diskWm_persistent (γ : DiskNames) (n F : Nat) :
     Persistent (diskWm (GF := GF) γ n F) := by unfold diskWm; infer_instance
 
 theorem diskWm_base (γ : DiskNames) (n F : Nat) :
-    diskWm (GF := GF) γ n F ⊢ ∃ b : Nat, diskBaseFrozen γ b ∗ ⌜b ≤ F⌝ := by
+    diskWm (GF := GF) γ n F ⊢ ∃ b : Nat, diskBaseFrozen γ b ∗ ⌜usedBaseLe b F⌝ := by
   unfold diskWm
   iintro ⟨H, _⟩
   iexact H
@@ -1451,7 +1479,7 @@ instance headRead_persistent (γ : DiskNames) (h nr : Nat) :
 
 /-- **The credential at the base**: a watermark of zero needs only the
 bound on the zeroing stores. -/
-theorem diskWm_zero (γ : DiskNames) (F b : Nat) (hb : b ≤ F) :
+theorem diskWm_zero (γ : DiskNames) (F b : Nat) (hb : usedBaseLe b F) :
     diskBaseFrozen (GF := GF) γ b ⊢ diskWm γ 0 F := by
   unfold diskWm
   iintro #Hb
@@ -1469,7 +1497,7 @@ theorem diskWm_mono (γ : DiskNames) (n n' F F' : Nat) (hn : n' ≤ n) (hF : F �
   isplitl []
   · iexists b
     iframe Hb
-    ipureintro; omega
+    ipureintro; exact usedBaseLe_mono hb hF
   icases Hor with ⟨%hz | ⟨%k, %m, %t, %hd, %ep, #Hr, %hmt⟩⟩
   · ileft; ipureintro; omega
   · iright
@@ -4861,6 +4889,54 @@ theorem diskPayFl_of_floor (nr : Nat) (ξ : CtxId) (T : Nat) :
     iexact H
   · exact .rfl
 
+/-- **The base code's head keys** (W8 (f3-gate)): a full key at each of the
+two positions the base code `b` names. -/
+def diskBaseKeys (ξ : CtxId) (b : Nat) : IProp GF := iprop%
+  ∃ t0 t1 : Nat, ⌜b = chainPair t0 t1⌝ ∗ keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ t0 ∗
+    keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ t1
+
+instance diskBaseKeys_persistent (ξ : CtxId) (b : Nat) : Persistent (diskBaseKeys (GF := GF) ξ b) := by
+  unfold diskBaseKeys; infer_instance
+
+instance instCtxMorphBaseKeys (b : Nat) : CtxMorph (GF := GF) (fun ξ => diskBaseKeys ξ b) := by
+  constructor
+  intro ξ ξ'
+  iintro ⟨Hdom, #Hk⟩
+  unfold diskBaseKeys
+  icases Hk with ⟨%t0, %t1, %hb, #Hk0, #Hk1⟩
+  icases ctx_dom_key ξ ξ' _ t0 $$ [Hdom Hk0] with ⟨Hdom, #Hk0'⟩
+  · iframe; iexact Hk0
+  icases ctx_dom_key ξ ξ' _ t1 $$ [Hdom Hk1] with ⟨Hdom, #Hk1'⟩
+  · iframe; iexact Hk1
+  imodintro
+  iframe Hdom
+  iexists t0, t1
+  iframe Hk0' Hk1'
+  ipureintro; exact hb
+
+/-- **The head keys of the base credential** (W8 (f3-gate) [OWN.62]): at a
+watermark of zero the handler may still read the tails' heads -- hart 0's
+`memset` zeroes of `used->idx` in `virtio_disk_init`, below `started = 1`
+(`main.c`) -- so the payload carries a FULL key (`MachCSL.keyAt`, chain half
+included) for each head's position, frozen in the base code; a holder cashes
+them against its running token for the chain certificates of those heads
+(`DiskAcc.diskHeadCerts_cash`).  Past the base the heads are unreadable (a
+device write the watermark names is visible) and nothing is carried. -/
+def diskHeadKeys (γ : DiskNames) (nr : Nat) (ξ : CtxId) : IProp GF :=
+  match nr with
+  | 0 => iprop(∃ b : Nat, diskBaseFrozen γ b ∗ diskBaseKeys ξ b)
+  | _ + 1 => iprop(True)
+
+instance diskHeadKeys_persistent (γ : DiskNames) (nr : Nat) (ξ : CtxId) :
+    Persistent (diskHeadKeys (GF := GF) γ nr ξ) := by
+  cases nr <;> (unfold diskHeadKeys; infer_instance)
+
+instance instCtxMorphHeadKeys (γ : DiskNames) (nr : Nat) : CtxMorph (GF := GF) (fun ξ => diskHeadKeys γ nr ξ) := by
+  cases nr
+  · show CtxMorph (fun ξ => iprop(∃ b : Nat, diskBaseFrozen (GF := GF) γ b ∗ diskBaseKeys ξ b))
+    exact instCtxMorphExists (fun (b : Nat) ξ => iprop(diskBaseFrozen (GF := GF) γ b ∗ diskBaseKeys ξ b))
+  · exact instCtxMorphConst _
+
 /-- **The handler's ENTRY credential, carried by the LOCK PAYLOAD**
 (Rocq's `disk_flr` in `disk_res`).  `Xv6.disk_used_idx_read` at the
 watermark `nr` consumes `Xv6.diskWm γ nr K` for a `K` the reading hart's
@@ -4877,24 +4953,59 @@ edge for a key that is the holder's own store) into `∃ K, viewLb cpu K ∗
 is RESTORED at each release by `MachCSL.ctx_absorb`, which turns the hart's
 `viewLb cpu F` -- which `disk_used_idx_read` and the loop's fence leave
 behind -- back into `ctxFloor curCtx F`.  At the base the position is a
-KEY, not a floor (`Xv6.diskPayFl`). -/
+KEY, not a floor (`Xv6.diskPayFl`); and (W8 (f3-gate) [OWN.62]) the base
+credential also carries FULL keys for the two tail heads' positions
+(`Xv6.diskHeadKeys`), the chain certificates of the one read that can still
+return a hart's entry of the used ring. -/
 def diskPayWm (γ : DiskNames) (nr : Nat) (ξ : CtxId) : IProp GF := iprop%
-  ∃ T : Nat, diskWm γ nr T ∗ diskPayFl nr ξ T
+  (∃ T : Nat, diskWm γ nr T ∗ diskPayFl nr ξ T) ∗ diskHeadKeys γ nr ξ
 
 instance diskPayWm_persistent (γ : DiskNames) (nr : Nat) (ξ : CtxId) :
     Persistent (diskPayWm (GF := GF) γ nr ξ) := by unfold diskPayWm; infer_instance
 
-/-- The credential at the base: a watermark of zero needs only a KEY for
-the position of the stores that zeroed the used page. -/
-theorem diskPayWm_zero (γ : DiskNames) (ξ : CtxId) (b : Nat) :
-    diskBaseFrozen (GF := GF) γ b ∗ keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ b ⊢ diskPayWm γ 0 ξ := by
+/-- The base credential's watermark half (the context's justification of
+the position). -/
+theorem diskPayWm_wm (γ : DiskNames) (nr : Nat) (ξ : CtxId) :
+    diskPayWm (GF := GF) γ nr ξ ⊢ ∃ T : Nat, diskWm γ nr T ∗ diskPayFl nr ξ T := by
   unfold diskPayWm
-  iintro ⟨#Hb, #Hfl⟩
-  iexists b
+  iintro ⟨H, _⟩
+  iexact H
+
+/-- The base credential's head keys. -/
+theorem diskPayWm_keys (γ : DiskNames) (nr : Nat) (ξ : CtxId) :
+    diskPayWm (GF := GF) γ nr ξ ⊢ diskHeadKeys γ nr ξ := by
+  unfold diskPayWm
+  iintro ⟨_, H⟩
+  iexact H
+
+/-- Past the base the credential is its watermark half alone. -/
+theorem diskPayWm_succ (γ : DiskNames) (nr : Nat) (ξ : CtxId) :
+    (∃ T : Nat, diskWm (GF := GF) γ (nr + 1) T ∗ diskPayFl (nr + 1) ξ T) ⊢ diskPayWm γ (nr + 1) ξ := by
+  unfold diskPayWm diskHeadKeys
+  iintro H
+  iframe H
+
+/-- The credential at the base: a watermark of zero needs only a KEY for
+the position of each of the two stores that zeroed `used->idx` (the base
+code `b` names both, `Xv6.usedTailOk`). -/
+theorem diskPayWm_zero (γ : DiskNames) (ξ : CtxId) (b : Nat) :
+    diskBaseFrozen (GF := GF) γ b ∗ diskBaseKeys ξ b ⊢ diskPayWm γ 0 ξ := by
+  unfold diskPayWm diskHeadKeys
+  iintro ⟨#Hb, #Hk⟩
   isplitl []
-  · iapply diskWm_zero γ b b (Nat.le_refl b)
-    iexact Hb
-  · rw [diskPayFl_zero]; iapply diskVisKey_of_key ξ b $$ Hfl
+  · unfold diskBaseKeys
+    icases Hk with ⟨%t0, %t1, %hb, #Hk0, #Hk1⟩
+    subst hb
+    iexists (max t0 t1)
+    isplitl []
+    · iapply diskWm_zero γ (max t0 t1) (chainPair t0 t1) (usedBaseLe_pair t0 t1)
+      iexact Hb
+    · rw [diskPayFl_zero]
+      rcases Nat.le_total t0 t1 with h | h
+      · rw [Nat.max_eq_right h]; iapply diskVisKey_of_key ξ t1 $$ Hk1
+      · rw [Nat.max_eq_left h]; iapply diskVisKey_of_key ξ t0 $$ Hk0
+  · iexists b
+    iframe Hb Hk
 
 /-- **The payload of `disk.vdisk_lock`** (Rocq's `disk_res`): the
 publisher's and the handler's halves of the counters (the watermark
@@ -4948,7 +5059,9 @@ instance instCtxMorphSlots (γ : DiskNames) (pd : PAddr) :
 instance instCtxMorphPayWm (γ : DiskNames) (nr : Nat) :
     CtxMorph (GF := GF) (fun ξ => diskPayWm γ nr ξ) := by
   unfold diskPayWm
-  exact instCtxMorphExists (fun (T : Nat) ξ => iprop(diskWm γ nr T ∗ diskPayFl nr ξ T))
+  have : CtxMorph (GF := GF) (fun ξ => iprop(∃ T : Nat, diskWm γ nr T ∗ diskPayFl nr ξ T)) :=
+    instCtxMorphExists (fun (T : Nat) ξ => iprop(diskWm γ nr T ∗ diskPayFl nr ξ T))
+  exact instCtxMorphSep _ _
 
 instance instCtxMorphDiskRes (γ : DiskNames) (pd pav pu : PAddr) :
     CtxMorph (GF := GF) (diskRes γ pd pav pu) := by

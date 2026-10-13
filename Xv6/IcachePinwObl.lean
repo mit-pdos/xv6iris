@@ -145,7 +145,7 @@ theorem iref_certs (cpu : CPU) (k : Nat) (hk : k < NINODE)
   · exact BigSepL.bigSepL_nil_intro
   ipureintro
   intro σ _ _ _ _
-  exact Or.inr (Or.inr (Or.inr (Or.inl (iref_racy k hk hrsv j hj))))
+  exact Or.inr (Or.inr (Or.inr (iref_racy k hk hrsv j hj)))
 
 /-- A6.145/A6.146, Rocq `iref_read_obl ∘ iref_load_pinw_au` (deviation 1):
 THE LOCK-FREE GUARD READ.  A slice holder whose floor `lo` is visible to the

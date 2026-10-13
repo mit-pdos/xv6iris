@@ -92,12 +92,6 @@ load of them is claimed chained (`MachCSL.RsvKind.racy`, a footprint-free
 registry entry; the tie to `Xv6.iRef`/`Xv6.ientry` is `IcachePinwObl.iref_racy`). -/
 def xv6IrefRacyR : RsvRegion := ⟨KA.«itable» + 32#64, .racy 50 136 4⟩
 
-/-- **The device-ring pointer word** (W8 (f2-ctx) S3): `disk.used`
-(`&disk + 16`), naming the virtio used ring -- written by the device, read by
-the driver, whose only hart-written entries are `virtio_disk_init`'s zero fill
-(`MachCSL.RsvKind.devPtr`, a footprint-free registry entry). -/
-def xv6UsedPtrR : RsvRegion := ⟨KA.«disk» + 16#64, .devPtr 1 8⟩
-
 /-- `started` (`main.c`), the boot handover's ONE-SHOT PUBLICATION word (W8
 (f2-ctx), Q-F2-BOOTGATE (a) as amended by [R35.2]): written once, by hart 0. -/
 def xv6StartedR : RsvRegion := ⟨KA.«started», .pub ⟨0, by decide⟩⟩
@@ -125,14 +119,15 @@ def xv6InodeLockRegions : List RsvRegion := (List.range 50).map (fun k => xv6Loc
 /-- The locks after `proc`, in address order: `tickslock`, `bcache.lock`, the
 buffers' inner locks, `itable.lock`, the inodes' inner locks, `log.lock`,
 `ftable.lock`, `disk.vdisk_lock`; and (W8 (f2-ctx)) the pipe locks'
-registration slots, the page-table root words, the audited racy words, the
-device-ring pointer word and (W8 (pte-ghost)) the free-list head word,
-footprint-free registry entries (`xv6PipeSlotsR`, `xv6KptRootR`, `xv6ProcRootsR`,
-`xv6IrefRacyR`, `xv6UsedPtrR`, `xv6FreeHeadR`). -/
+registration slots, the page-table root words, the audited racy words and
+(W8 (pte-ghost)) the free-list head word, footprint-free registry entries
+(`xv6PipeSlotsR`, `xv6KptRootR`, `xv6ProcRootsR`, `xv6IrefRacyR`,
+`xv6FreeHeadR`; W8 (f3-gate) [OWN.62] retired the device-ring pointer
+word). -/
 def xv6PostLockRegions : List RsvRegion :=
   [xv6LockR KA.«tickslock», xv6LockR KA.«bcache»] ++ (xv6BufLockRegions ++ ([xv6LockR KA.«itable»] ++
     (xv6InodeLockRegions ++ [xv6LockR KA.«log», xv6LockR KA.«ftable», xv6LockR rsvDiskLk, xv6PipeSlotsR,
-      xv6KptRootR, xv6ProcRootsR, xv6IrefRacyR, xv6UsedPtrR, xv6FreeHeadR])))
+      xv6KptRootR, xv6ProcRootsR, xv6IrefRacyR, xv6FreeHeadR])))
 
 /-- xv6's static reserved regions, in address order. -/
 def xv6RsvStatic : List RsvRegion :=
@@ -171,8 +166,6 @@ theorem xv6RsvStatic_kptRoot : xv6KptRootR ∈ xv6RsvStatic := by decide +kernel
 theorem xv6RsvStatic_procRoots : xv6ProcRootsR ∈ xv6RsvStatic := by decide +kernel
 
 theorem xv6RsvStatic_irefRacy : xv6IrefRacyR ∈ xv6RsvStatic := by decide +kernel
-
-theorem xv6RsvStatic_usedPtr : xv6UsedPtrR ∈ xv6RsvStatic := by decide +kernel
 
 /-- The free-list head word is registered. -/
 theorem xv6RsvStatic_freeHead : xv6FreeHeadR ∈ xv6RsvStatic := by decide +kernel
@@ -261,8 +254,7 @@ def rsvLocksLow (rs : List RsvRegion) : Bool :=
     | .roots _ _ => true
     | .uroots _ _ => true
     | .freeHead _ _ => true
-    | .racy _ _ _ => true
-    | .devPtr _ _ => true)
+    | .racy _ _ _ => true)
 
 theorem xv6RsvStatic_locksLow : rsvLocksLow xv6RsvStatic = true := by decide +kernel
 

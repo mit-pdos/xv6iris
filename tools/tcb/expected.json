@@ -2423,6 +2423,7 @@
     "MachCSL.KCtx",
     "MachCSL.KernelElf",
     "MachCSL.Lang",
+    "MachCSL.Lock",
     "MachCSL.Platform",
     "MachCSL.Reserved",
     "MachCSL.Resources",

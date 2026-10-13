@@ -289,13 +289,15 @@ theorem vdis_fence_cash [KernelGeom] [KernelImage GF] (γ : DiskNames) (cpu : CP
     kctx cpu k ∗ pcIs cpu pc ∗ diskPayWm γ n curCtx ∗
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
         iprop(kctx cpu' k -∗ pcIs cpu' (pc + instrLen is_rvc) -∗
-          (∃ K : Nat, viewLb cpu K ∗ diskWm γ n K) -∗ wpLoop cpu'))
+          (∃ K : Nat, viewLb cpu K ∗ diskWm γ n K ∗ DiskAcc.diskHeadCerts γ cpu n) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨#Hi, Hk, Hpc, #Hp, HΦ⟩
   unfold diskPayWm
-  icases Hp with ⟨%T, #Hw, #Hfl⟩
+  icases Hp with ⟨⟨%T, #Hw, #Hfl⟩, #Hhk⟩
   ihave #Hkey := diskPayFl_key n curCtx T $$ Hfl
   icases kctx_token_acc cpu k $$ Hk with ⟨Hctx, Hback⟩
+  icases DiskAcc.diskHeadCerts_cash γ cpu curCtx n $$ [Hctx Hhk] with ⟨Hctx, #Hhc⟩
+  · iframe Hctx Hhk
   icases diskVisKey_vis cpu curCtx T $$ [Hctx Hkey] with ⟨Hctx, %K, %ts, #HK, #Hts, %hv⟩
   · iframe Hctx Hkey
   ihave Hk := Hback $$ Hctx
@@ -307,7 +309,7 @@ theorem vdis_fence_cash [KernelGeom] [KernelImage GF] (γ : DiskNames) (cpu : CP
     iintro %cpu' HΦ Hk Hpc
     iapply HΦ $$ Hk Hpc
     iexists K
-    iframe HK
+    iframe HK Hhc
     iapply diskWm_mono γ n n T K (Nat.le_refl n) hle
     iexact Hw
   · ihave #Hau := BigSepL.bigSepL_mem (Φ := fun p : Nat × Agent => iprop(authoredBy (GF := GF) p.1 p.2))
@@ -319,7 +321,7 @@ theorem vdis_fence_cash [KernelGeom] [KernelImage GF] (γ : DiskNames) (cpu : CP
     iintro %cpu' HΦ Hk Hpc #HT
     iapply HΦ $$ Hk Hpc
     iexists T
-    iframe HT Hw
+    iframe HT Hw Hhc
 
 /-- ... and RESTORED.  The hart's floor -- which the loop's
 `__sync_synchronize()` has taken past the view the last `used->idx` read
@@ -327,8 +329,8 @@ ran at -- becomes a CONTEXT floor (`MachCSL.ctx_absorb`), and the
 credential that read left behind rides back into the payload on it. -/
 theorem vdis_payWm_mk [KernelGeom] [KernelImage GF] (γ : DiskNames) (cpu : CPU) (k : KCtx)
     (n F : Nat) :
-    kctx (GF := GF) cpu k ∗ viewLb cpu F ∗ diskWm γ n F ⊢
-      |==> (kctx cpu k ∗ diskPayWm γ n curCtx) := by
+    kctx (GF := GF) cpu k ∗ viewLb cpu F ∗ diskWm γ (n + 1) F ⊢
+      |==> (kctx cpu k ∗ diskPayWm γ (n + 1) curCtx) := by
   iintro ⟨Hk, #Hv, #Hw⟩
   icases kctx_token_acc cpu k $$ Hk with ⟨Hctx, Hback⟩
   imod ctx_absorb cpu curCtx F $$ [Hctx Hv] with ⟨Hctx, #Hfl⟩
@@ -336,10 +338,10 @@ theorem vdis_payWm_mk [KernelGeom] [KernelImage GF] (γ : DiskNames) (cpu : CPU)
   imodintro
   ihave Hk := Hback $$ Hctx
   iframe Hk
-  unfold diskPayWm
+  iapply diskPayWm_succ
   iexists F
   iframe Hw
-  iapply diskPayFl_of_floor n curCtx F $$ Hfl
+  iapply diskPayFl_of_floor (n + 1) curCtx F $$ Hfl
 
 theorem vdisPay_slot (γ : DiskNames) (pd pav : PAddr) (i : Nat) (hi : i < NUM) :
     vdisPay (GF := GF) γ pd pav ⊢
@@ -856,6 +858,8 @@ theorem vdis_loop (WK : WAKEUP)
   obtain ⟨hram2, hal2, hkm2⟩ := vdis_usedIdx_facts pu hpu
   ihave #Hid3 := kmapStatic_rw (usedIdxAt pu) hkm2 $$ HS
   icases kctx_rsvEq cpu _ $$ Hk with ⟨%heqR, Hk⟩
+  ihave #Hhc1 : DiskAcc.diskHeadCerts (GF := GF) γ cpu (nr + 1) $$ []
+  · unfold DiskAcc.diskHeadCerts; itrivial
   ihave HAU3 := disk_used_idx_read γ pd pav pu cpu F (nr + 1) heqR $$ [Hinv Hgeom Hnr Hwm1]
   · iframe #; iframe
   k_step (wp_s_lhu_aur cpu _ ?hs (KA.«virtio_disk_intr» + 0x82#64) false 2#12 14#5 14#5
@@ -884,7 +888,7 @@ theorem vdis_loop (WK : WAKEUP)
     -- loop's fence took this hart's floor past `F`, and `MachCSL.ctx_absorb`
     -- makes that a CONTEXT floor
     iapply wpLoop_fupd
-    imod (vdis_payWm_mk γ cpu _ (nr + 1) F) $$ [Hk Hview Hwm1] with ⟨Hk, #Hwmp⟩
+    imod (vdis_payWm_mk γ cpu _ nr F) $$ [Hk Hview Hwm1] with ⟨Hk, #Hwmp⟩
     · iframe Hk Hview Hwm1
     imodintro
     ihave Hres := vdisPay_close γ pd pav pu (nr + 1) $$ [Hnr Hrl Hlbnr Hwmp Hui Hpay]
@@ -1042,7 +1046,7 @@ theorem virtio_disk_intr_proof
   k_step (vdis_fence_cash γ cpu _ ?hs (KA.«virtio_disk_intr» + 0x2c#64) false nr)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc $Hwmp] with [vdisK_sie k]
   case hs => k_norm [vdisK_sie k]
-  iintro Hk Hpc ⟨%Kw, #Hview, #Hwm⟩
+  iintro Hk Hpc ⟨%Kw, #Hview, #Hwm, #Hhc⟩
   -- +0x30  ld a5,16(s1)
   ihave Hup : iprop(wordPointsTo (GF := GF) aUsedPtr 8 DFrac.discard pu) $$ [Hgeom]
   · iapply vdis_geom_used γ pd pav pu

@@ -158,13 +158,6 @@ inductive RsvKind where
   exemption covers their bytes at every position (`MachCSL.racyByteIn`); a
   registry entry -- no footprint, no discipline -/
   | racy (cnt stride n : Nat)
-  /-- the client's DEVICE-RING POINTER words (W8 (f2-ctx) S3): `cnt`
-  doubleword slots at `base + stride·k` naming a page shared with a device
-  (xv6: `disk.used`, the virtio used ring the device writes and the driver
-  reads; its only hart-written entries are the driver's zero fill): the
-  load-side exemption covers the bytes of every page such a word has named
-  (`MachCSL.devPageIn`); a registry entry -- no footprint, no discipline -/
-  | devPtr (cnt stride : Nat)
   deriving DecidableEq
 
 /-- The kinds with a footprint (all but a `.slots` registry entry). -/
@@ -174,7 +167,6 @@ def RsvKind.hasFoot : RsvKind → Bool
   | .uroots _ _ => false
   | .freeHead _ _ => false
   | .racy _ _ _ => false
-  | .devPtr _ _ => false
   | _ => true
 
 /-- A reserved region: its base address and kind. -/
@@ -197,7 +189,6 @@ def RsvRegion.words (R : RsvRegion) : List (PAddr × Nat) :=
   | .uroots _ _ => []
   | .freeHead _ _ => []
   | .racy _ _ _ => []
-  | .devPtr _ _ => []
 
 /-- The bytes of a word. -/
 def wordBytes (w : PAddr × Nat) : List PAddr :=
@@ -229,7 +220,6 @@ def regionOk (m : FlatMem) (R : RsvRegion) : Prop :=
   | .uroots _ _ => True
   | .freeHead _ _ => True
   | .racy _ _ _ => True
-  | .devPtr _ _ => True
 
 /-- Every region of the list keeps its discipline. -/
 def rsvAllOk (rs : List RsvRegion) (m : FlatMem) : Prop :=
@@ -337,7 +327,6 @@ theorem RsvRegion.base_mem (R : RsvRegion) (hk : R.kind.hasFoot = true) : R.base
     | uroots _ _ => rw [h] at hk; simp [RsvKind.hasFoot] at hk
     | freeHead _ _ => rw [h] at hk; simp [RsvKind.hasFoot] at hk
     | racy _ _ _ => rw [h] at hk; simp [RsvKind.hasFoot] at hk
-    | devPtr _ _ => rw [h] at hk; simp [RsvKind.hasFoot] at hk
     | _ => exact ⟨_, by decide, List.mem_cons_self⟩
   obtain ⟨n, hn, hw⟩ := hw
   have := mem_regionBytes hw hn
@@ -389,7 +378,6 @@ theorem regionOk_congr {m m' : FlatMem} {R : RsvRegion}
   | uroots _ _ => trivial
   | freeHead _ _ => trivial
   | racy _ _ _ => trivial
-  | devPtr _ _ => trivial
   | cpu c =>
     rw [hk] at hR
     intro a ha H hH
@@ -498,7 +486,6 @@ theorem rsvAllOk_boot {rs : List RsvRegion} (hwf : rsvWf rs) : rsvAllOk rs (imgF
   | uroots _ _ => trivial
   | freeHead _ _ => trivial
   | racy _ _ _ => trivial
-  | devPtr _ _ => trivial
   | cpu c =>
     intro a ha H hH e he het
     obtain ⟨v, hv⟩ := himg a ha
