@@ -32,6 +32,13 @@ disjunct); (2) the trace's author list; (3) the invariant `RvwmoXv6ScaT.shInv`; 
 with the corollaries `linCandScaTCatT` (from `rvwmoCatConsistentT GT`, the published model, on
 `GT.gtG`) and `linCandScaTMinus` (from RVWMO⁻, the current chain's `normalizeOfAcyclic` output).
 
+**W13 (L)** (plan §C W13 (L): "`linCandScaT` re-proved on the anchors"): every piece is stated on
+the ANCHORED linearization `linCandA G anc` of an admissible anchor class (`ancOk` replaces rule 14:
+anchor-14 is what the rank arguments use; a forwarded source is now emitted before its read by the
+trace's po order, `glinAPoLt`): `linCandScaTA`, `linCandScaTMinusA`; `linCandScaT` (statement
+unchanged) is the write instance.  The `RvwmoXv6ScaT.*` helpers and the shadow invariant take the
+class `anc` as a parameter.
+
 No new hypothesis beyond the cat fragment (`gatomicity` and rule 12 are not used).  `Lbl.LIo`
 events are handled without `gwf`'s interim `False` arm (they write nothing, and the shadow
 ignores them), so W13 (I)/(M)'s flip of that arm does not touch this file.  Lean-only helpers are
@@ -49,82 +56,61 @@ open TsoShadow
 
 /-! ## (1) Cat-level single-copy atomicity bytes (no `gpoloc ⊆ gmo`) -/
 
-/-- Lean-only: a read's named source is emitted before the read — under cat a forwarded
-(po-before) source is gmo-before the read's next write by rule 14. -/
-theorem RvwmoXv6ScaT.linSourceBefore (G : Gexec) (hwf : gwf G) (hlv : gloadValue G)
-    (h14 : grule14 G) (k : Nat) (r : Geid) (a : Int) (i : Nat) (v : BitVec 8) :
-    (glinEids G)[k]? = some r → greadsByte G r a (i + 1) v →
-    ∃ kw w, gwriteAt G (i + 1) = some w ∧ (glinEids G)[kw]? = some w ∧ kw < k := by
+/-- Lean-only: a read's named source is emitted before the read — a gmo-before source is an
+anchor (a write) gmo-before the read (`glinAGmoAnc`); under cat a forwarded (po-before) source is
+emitted before the read by the trace's po order (`glinAPoLt`). -/
+theorem RvwmoXv6ScaT.linSourceBefore (G : Gexec) (anc : Geid → Bool) (hwf : gwf G)
+    (hlv : gloadValue G) (hok : ancOk G anc) (k : Nat) (r : Geid) (a : Int) (i : Nat)
+    (v : BitVec 8) :
+    (glinEidsA G anc)[k]? = some r → greadsByte G r a (i + 1) v →
+    ∃ kw w, gwriteAt G (i + 1) = some w ∧ (glinEidsA G anc)[kw]? = some w ∧ kw < k := by
   intro hk hrd
   obtain ⟨w, hwa, _, hvis⟩ := (hlv r a (i + 1) v hrd).1
   obtain ⟨hw, _⟩ := gwriteAtInv G (i + 1) w (linNd G hwf) hwa
-  obtain ⟨kw, hkw⟩ := glinIndex G hwf w (gwritesLbl G hwf w hw)
+  obtain ⟨kw, hkw⟩ := glinAIndex G anc hwf hok w (gwritesLbl G hwf w hw)
   refine ⟨kw, w, hwa, hkw, ?_⟩
-  apply glinRankLt G kw k w r hkw hk
-  rw [grankWrite G hwf w hw]
-  have hrl := greadsByteLbl G r a (i + 1) v hrd
-  obtain ⟨hri, hrk⟩ := (gxLblBounds G r).1 hrl
-  have hwmem : gmem G w := gwfGmoMem G w hwf (gwritesGmo G w hw)
-  obtain ⟨ir, kr⟩ := r
-  simp only at hri hrk
-  unfold WeakRvwmoLin.grank
-  cases hf : gnxw G (ir, kr) with
-  | none => have := gwixLe G w hw; dsimp only; omega
-  | some w' =>
-    obtain ⟨m, rfl, hkm, hm, hwm, _⟩ := gnxwSome G ir kr w' hf
-    have hlm := glblSome G ir m hri hm
-    have hmW := WeakRvwmoAcyc.gisWGlblIs G _ hwm
-    have hmo' : gmoLt G w (ir, m) := by
-      rcases hvis with hmo | hpo
-      · by_cases hkm' : kr = m
-        · subst hkm'; exact hmo
-        · apply gmoLtTrans G w (ir, kr) (ir, m) hmo
-          exact h14 _ _ ⟨rfl, show kr < m by omega, hrl, hlm⟩
-            (gwfGmoMem G (ir, kr) hwf (greadsByteMem G hwf _ a _ v hrd)) hmW
-      · obtain ⟨h1, h2, h3, _⟩ := hpo
-        have h2' : w.2 < kr := h2
-        exact h14 _ _ ⟨h1, show w.2 < m by omega, h3, hlm⟩ hwmem hmW
-    dsimp only
-    exact (gwixGposLt G w (ir, m) (linNd G hwf) hw
-      (gisWGwrites G (ir, m) hwf hlm hwm)).2 hmo'.2.2
+  rcases hvis with hmo | hpo
+  · exact glinAGmoAnc G anc hwf hok k kw r w hk hkw (hok.2.1 w (gwritesIsw G w hw)) hmo
+  · exact glinAPoLt G anc hwf hok kw k w r hkw hk hpo.1 hpo.2.1
 
 /-- Lean-only: a read's source fits in its prefix log (cat-level `linReadTsLe`). -/
-theorem RvwmoXv6ScaT.linReadTsLe (G : Gexec) (hwf : gwf G) (hlv : gloadValue G)
-    (h14 : grule14 G) (k : Nat) (r : Geid) (a : Int) (t : Nat) (v : BitVec 8) :
-    (glinEids G)[k]? = some r → greadsByte G r a t v → t ≤ (cdLog (linCand G) k).length := by
+theorem RvwmoXv6ScaT.linReadTsLe (G : Gexec) (anc : Geid → Bool) (hwf : gwf G)
+    (hlv : gloadValue G) (hok : ancOk G anc) (k : Nat) (r : Geid) (a : Int) (t : Nat) (v : BitVec 8) :
+    (glinEidsA G anc)[k]? = some r → greadsByte G r a t v → t ≤ (cdLog (linCandA G anc) k).length := by
   intro hk hrd
-  rw [linLogLen]
+  rw [linALogLen]
   cases t with
   | zero => omega
   | succ i =>
-    obtain ⟨kw, w, hwa, hkw, hlt⟩ := RvwmoXv6ScaT.linSourceBefore G hwf hlv h14 k r a i v hk hrd
+    obtain ⟨kw, w, hwa, hkw, hlt⟩ := RvwmoXv6ScaT.linSourceBefore G anc hwf hlv hok k r a i v hk hrd
     obtain ⟨hw, hwix⟩ := gwriteAtInv G (i + 1) w (linNd G hwf) hwa
-    have hsp := linGwritesSplit G hwf kw w hkw (gwritesIsw G w hw)
-    rw [gwixOfLookup G (linNw G kw) w (linNd G hwf) hsp] at hwix
-    have hS := linNwS G kw w hkw (gwritesIsw G w hw)
-    have := linNwMono G (kw + 1) k (by omega)
+    have hsp := linAGwritesSplit G anc hwf hok kw w hkw (gwritesIsw G w hw)
+    rw [gwixOfLookup G (linNwA G anc kw) w (linNd G hwf) hsp] at hwix
+    have hS := linANwS G anc kw w hkw (gwritesIsw G w hw)
+    have := linANwMono G anc (kw + 1) k (by omega)
     omega
 
 /-- (1) Every byte of a linearized plain load is TsoMem's reading at the witness `tvnSca G r`
 (cat level: the forwarded case is `scaVis`'s own-message disjunct). -/
-theorem RvwmoXv6ScaT.linScaBytes (G : Gexec) (hwf : gwf G) (hlv : gloadValue G) (h14 : grule14 G)
+theorem RvwmoXv6ScaT.linScaBytes (G : Gexec) (anc : Geid → Bool) (hwf : gwf G) (hlv : gloadValue G)
+    (hok : ancOk G anc)
     (k : Nat) (r : Geid) (aq : Bool) (base : Int) (ts : List Nat) (vs : List (BitVec 8)) :
-    (glinEids G)[k]? = some r → gxLbl G r = some (LLoad aq base ts vs) →
+    (glinEidsA G anc)[k]? = some r → gxLbl G r = some (LLoad aq base ts vs) →
     ∀ (j t : Nat), ts[j]? = some t →
-      scaByte G.gxImg (cdLog (linCand G) k) r.1 (tvnSca G r) (accAddr base j) t := by
+      scaByte G.gxImg (cdLog (linCandA G anc) k) r.1 (tvnSca G r) (accAddr base j) t := by
   intro hk hl j t hj
   have hnd := linNd G hwf
   have hsh : vs.length = ts.length := gwfLblShape G r _ hwf hl
-  obtain ⟨rest, hfull⟩ := RvwmoXv6Sca.linLogPrefix G hwf k
-  have hLB : ∀ t a, t ≤ (cdLog (linCand G) k).length →
-      logByte G.gxImg (cdLog (linCand G) k) t a =
+  obtain ⟨rest, hfull⟩ := RvwmoXv6Sca.linLogPrefixA G anc hwf hok k
+  have hLB : ∀ t a, t ≤ (cdLog (linCandA G anc) k).length →
+      logByte G.gxImg (cdLog (linCandA G anc) k) t a =
         logByte G.gxImg ((gwrites G).filterMap (WeakRvwmoLin.gmsg G)) t a := by
     intro t a ht
     rw [hfull, logByteApp _ _ _ _ _ ht]
   obtain ⟨v, hv⟩ := someOfIsSome
     (lookup_lt_is_Some_2 (show j < vs.length by rw [hsh]; exact lookup_lt_Some hj))
   have hrd : greadsByte G r (accAddr base j) t v := ⟨_, base, ts, vs, j, hl, rfl, hj, hv, rfl⟩
-  have htle := RvwmoXv6ScaT.linReadTsLe G hwf hlv h14 k r _ t v hk hrd
+  have htle := RvwmoXv6ScaT.linReadTsLe G anc hwf hlv hok k r _ t v hk hrd
   refine ⟨?_, ?_, ?_⟩
   · -- the source byte is in the prefix log
     rw [hLB t _ htle]
@@ -150,7 +136,7 @@ theorem RvwmoXv6ScaT.linScaBytes (G : Gexec) (hwf : gwf G) (hlv : gloadValue G) 
         have hmf : ((gwrites G).filterMap (WeakRvwmoLin.gmsg G))[i]? = some m := by
           rw [linLogFullLookup G i w hwi, hm]
         rw [hfull] at hmf
-        have hlt : i < (cdLog (linCand G) k).length := by omega
+        have hlt : i < (cdLog (linCandA G anc) k).length := by omega
         rw [lookup_app_l hlt] at hmf
         refine ⟨m, hmf, ?_⟩
         rw [RvwmoXv6Sca.gmsgTid G w m hm, hpo.1]
@@ -160,7 +146,7 @@ theorem RvwmoXv6ScaT.linScaBytes (G : Gexec) (hwf : gwf G) (hlv : gloadValue G) 
     cases t' with
     | zero => omega
     | succ i' =>
-      have hi'lt : i' < (cdLog (linCand G) k).length := by omega
+      have hi'lt : i' < (cdLog (linCandA G anc) k).length := by omega
       obtain ⟨m, hm⟩ := someOfIsSome (lookup_lt_is_Some_2 hi'lt)
       have hmf : ((gwrites G).filterMap (WeakRvwmoLin.gmsg G))[i']? = some m := by
         rw [hfull]; exact lookup_app_l_Some hm
@@ -181,9 +167,9 @@ theorem RvwmoXv6ScaT.linScaBytes (G : Gexec) (hwf : gwf G) (hlv : gloadValue G) 
           rw [hm, Option.some.injEq] at hm0
           subst hm0
           rw [RvwmoXv6Sca.gmsgTid G w' m hgm, Option.some.injEq] at htid
-          obtain ⟨k', hk', hk'w⟩ := linLogEmitted G hwf k (i' + 1) r w' hk hw' ht'le
-          refine Or.inr ⟨htid, ?_, glinLookupLbl G hwf k' w' hk'w, glinLookupLbl G hwf k r hk⟩
-          exact (glinPoIff G hwf h14 k' k w' r hk'w hk htid).1 hk'
+          obtain ⟨k', hk', hk'w⟩ := linLogEmittedA G anc hwf hok k (i' + 1) r w' hk hw' ht'le
+          refine Or.inr ⟨htid, ?_, glinALookupLbl G anc hwf hok k' w' hk'w, glinALookupLbl G anc hwf hok k r hk⟩
+          exact (glinAPoIff G anc hwf hok k' k w' r hk'w hk htid).1 hk'
       have := gcomax G hlv r _ t v w' v' hrd hwb hvis'
       omega
 
@@ -214,19 +200,21 @@ theorem RvwmoXv6ScaT.tsLeTvnSca (G : Gexec) (hwf : gwf G) (r w : Geid) (t : Nat)
   exact (gwixLeTvnSca G r w hwf hw).2 hmo
 
 /-- Lean-only: a write's timestamp in the linearization is one past the writes before it. -/
-theorem RvwmoXv6ScaT.gwixLin (G : Gexec) (hwf : gwf G) (k : Nat) (e : Geid) :
-    (glinEids G)[k]? = some e → gisW G e = true → gwix G e = linNw G k + 1 :=
-  fun hk hw => gwixOfLookup G _ e (linNd G hwf) (linGwritesSplit G hwf k e hk hw)
+theorem RvwmoXv6ScaT.gwixLin (G : Gexec) (anc : Geid → Bool) (hwf : gwf G) (hok : ancOk G anc)
+    (k : Nat) (e : Geid) :
+    (glinEidsA G anc)[k]? = some e → gisW G e = true → gwix G e = linNwA G anc k + 1 :=
+  fun hk hw => gwixOfLookup G _ e (linNd G hwf) (linAGwritesSplit G anc hwf hok k e hk hw)
 
 /-- Lean-only: the writes emitted before a write `e` are all gmo-before it, so their count is at
 most `tvnSca G e`. -/
-theorem RvwmoXv6ScaT.linNwLeTvnSca (G : Gexec) (hwf : gwf G) (k : Nat) (e : Geid) :
-    (glinEids G)[k]? = some e → gisW G e = true → linNw G k ≤ tvnSca G e := by
+theorem RvwmoXv6ScaT.linNwLeTvnSca (G : Gexec) (anc : Geid → Bool) (hwf : gwf G)
+    (hok : ancOk G anc) (k : Nat) (e : Geid) :
+    (glinEidsA G anc)[k]? = some e → gisW G e = true → linNwA G anc k ≤ tvnSca G e := by
   intro hk hw
   have hnd := linNd G hwf
-  have hsp := linGwritesSplit G hwf k e hk hw
+  have hsp := linAGwritesSplit G anc hwf hok k e hk hw
   have he := gwritesLookupElem G _ e hsp
-  cases hn : linNw G k with
+  cases hn : linNwA G anc k with
   | zero => exact Nat.zero_le _
   | succ n =>
     have hlt : n < (gwrites G).length := by have := lookup_lt_Some hsp; omega
@@ -256,31 +244,32 @@ theorem RvwmoXv6ScaT.stAuthorsLin (G : Gexec) (l : List Geid) :
     cases gisW G e <;> rfl
 
 /-- Lean-only: the author list of the trace prefix has one entry per emitted write. -/
-theorem RvwmoXv6ScaT.authorsLen (G : Gexec) (k : Nat) :
-    (stAuthorsL (((glinEids G).take k).map (glinStep G))).length = linNw G k := by
+theorem RvwmoXv6ScaT.authorsLen (G : Gexec) (anc : Geid → Bool) (k : Nat) :
+    (stAuthorsL (((glinEidsA G anc).take k).map (glinStep G))).length = linNwA G anc k := by
   rw [RvwmoXv6ScaT.stAuthorsLin, List.length_map]
   rfl
 
 /-- Lean-only: author `n` of the trace prefix is the row of write `n` in gmo order, emitted
 before position `k`. -/
-theorem RvwmoXv6ScaT.authorsLookup (G : Gexec) (hwf : gwf G) (k n x : Nat) :
-    (stAuthorsL (((glinEids G).take k).map (glinStep G)))[n]? = some x →
-    ∃ kw w, kw < k ∧ (glinEids G)[kw]? = some w ∧ (gwrites G)[n]? = some w ∧ w.1 = x := by
+theorem RvwmoXv6ScaT.authorsLookup (G : Gexec) (anc : Geid → Bool) (hwf : gwf G)
+    (hok : ancOk G anc) (k n x : Nat) :
+    (stAuthorsL (((glinEidsA G anc).take k).map (glinStep G)))[n]? = some x →
+    ∃ kw w, kw < k ∧ (glinEidsA G anc)[kw]? = some w ∧ (gwrites G)[n]? = some w ∧ w.1 = x := by
   rw [RvwmoXv6ScaT.stAuthorsLin, List.getElem?_map]
   intro h
-  cases hn : (((glinEids G).take k).filter (gisW G))[n]? with
+  cases hn : (((glinEidsA G anc).take k).filter (gisW G))[n]? with
   | none => rw [hn] at h; cases h
   | some w =>
     rw [hn] at h
     simp only [Option.map_some, Option.some.injEq] at h
-    have hmem : w ∈ (glinEids G).take k := (List.mem_filter.1 (elem_of_list_lookup_2 hn)).1
+    have hmem : w ∈ (glinEidsA G anc).take k := (List.mem_filter.1 (elem_of_list_lookup_2 hn)).1
     obtain ⟨kw, hkw⟩ := elem_of_list_lookup_1 hmem
     have hkwlt : kw < k := by
       have := lookup_lt_Some hkw
       simp only [List.length_take] at this
       omega
     refine ⟨kw, w, hkwlt, by rw [← lookup_take hkwlt]; exact hkw, ?_, h⟩
-    rw [← glinWrites G hwf, ← List.take_append_drop k (glinEids G), List.filter_append]
+    rw [← glinAWrites G anc hwf hok, ← List.take_append_drop k (glinEidsA G anc), List.filter_append]
     exact lookup_app_l_Some hn
 
 /-- Lean-only: `ownPub` names a message of its agent. -/
@@ -419,42 +408,42 @@ theorem RvwmoXv6ScaT.shForeignLe (i B : Nat) :
 /-! ## (4) The shadow invariant -/
 
 /-- Lean-only: the shadow fold of hart `i` over the first `k` linearized steps. -/
-def RvwmoXv6ScaT.shK (G : Gexec) (i k : Nat) : List Nat × ShSt :=
-  shadowRun cohSrc i (((glinEids G).take k).map (glinStep G))
+def RvwmoXv6ScaT.shK (G : Gexec) (anc : Geid → Bool) (i k : Nat) : List Nat × ShSt :=
+  shadowRun cohSrc i (((glinEidsA G anc).take k).map (glinStep G))
 
 /-- (T) `tv` is below the witness of every read of the hart at or after position `k`. -/
-def RvwmoXv6ScaT.tvOk (G : Gexec) (i k tv : Nat) : Prop :=
-  ∀ r kr, k ≤ kr → (glinEids G)[kr]? = some r → r.1 = i → glblIs G r lbIsR → tv ≤ tvnSca G r
+def RvwmoXv6ScaT.tvOk (G : Gexec) (anc : Geid → Bool) (i k tv : Nat) : Prop :=
+  ∀ r kr, k ≤ kr → (glinEidsA G anc)[kr]? = some r → r.1 = i → glblIs G r lbIsR → tv ≤ tvnSca G r
 
 /-- (R) `rv` is 0 or below the witness of a read of the hart before position `k`. -/
-def RvwmoXv6ScaT.rvOk (G : Gexec) (i k rv : Nat) : Prop :=
-  rv = 0 ∨ ∃ e ke, ke < k ∧ (glinEids G)[ke]? = some e ∧ e.1 = i ∧ glblIs G e lbIsR ∧
+def RvwmoXv6ScaT.rvOk (G : Gexec) (anc : Geid → Bool) (i k rv : Nat) : Prop :=
+  rv = 0 ∨ ∃ e ke, ke < k ∧ (glinEidsA G anc)[ke]? = some e ∧ e.1 = i ∧ glblIs G e lbIsR ∧
     rv ≤ tvnSca G e
 
 /-- (C) at byte `a`: the floor `c` is below a FOREIGN source timestamp of a read of `a` by the
 hart before position `k`, with no own write to `a` since. -/
-def RvwmoXv6ScaT.cohWit (G : Gexec) (i k : Nat) (a : Int) (c : Nat) : Prop :=
-  ∃ e ke t v w', ke < k ∧ (glinEids G)[ke]? = some e ∧ e.1 = i ∧ greadsByte G e a t v ∧
+def RvwmoXv6ScaT.cohWit (G : Gexec) (anc : Geid → Bool) (i k : Nat) (a : Int) (c : Nat) : Prop :=
+  ∃ e ke t v w', ke < k ∧ (glinEidsA G anc)[ke]? = some e ∧ e.1 = i ∧ greadsByte G e a t v ∧
     gwriteAt G t = some w' ∧ w'.1 ≠ i ∧ c ≤ t ∧
-    ∀ m km v', ke < km → km < k → (glinEids G)[km]? = some m → m.1 = i → ¬ gwritesByte G m a v'
+    ∀ m km v', ke < km → km < k → (glinEidsA G anc)[km]? = some m → m.1 = i → ¬ gwritesByte G m a v'
 
-def RvwmoXv6ScaT.cohOk (G : Gexec) (i k : Nat) (coh : Int → Nat) : Prop :=
-  ∀ a, coh a = 0 ∨ RvwmoXv6ScaT.cohWit G i k a (coh a)
+def RvwmoXv6ScaT.cohOk (G : Gexec) (anc : Geid → Bool) (i k : Nat) (coh : Int → Nat) : Prop :=
+  ∀ a, coh a = 0 ∨ RvwmoXv6ScaT.cohWit G anc i k a (coh a)
 
-theorem RvwmoXv6ScaT.tvOkStep (G : Gexec) (i k tv : Nat) :
-    RvwmoXv6ScaT.tvOk G i k tv → RvwmoXv6ScaT.tvOk G i (k + 1) tv :=
+theorem RvwmoXv6ScaT.tvOkStep (G : Gexec) (anc : Geid → Bool) (i k tv : Nat) :
+    RvwmoXv6ScaT.tvOk G anc i k tv → RvwmoXv6ScaT.tvOk G anc i (k + 1) tv :=
   fun h r kr hkr => h r kr (by omega)
 
-theorem RvwmoXv6ScaT.rvOkStep (G : Gexec) (i k rv : Nat) :
-    RvwmoXv6ScaT.rvOk G i k rv → RvwmoXv6ScaT.rvOk G i (k + 1) rv := by
+theorem RvwmoXv6ScaT.rvOkStep (G : Gexec) (anc : Geid → Bool) (i k rv : Nat) :
+    RvwmoXv6ScaT.rvOk G anc i k rv → RvwmoXv6ScaT.rvOk G anc i (k + 1) rv := by
   rintro (h | ⟨e, ke, hke, h⟩)
   · exact Or.inl h
   · exact Or.inr ⟨e, ke, by omega, h⟩
 
 /-- A witness survives a step that does not write `a` on the hart. -/
-theorem RvwmoXv6ScaT.cohWitStep (G : Gexec) (i k : Nat) (e : Geid) (a : Int) (c : Nat)
-    (hk : (glinEids G)[k]? = some e) (hno : e.1 = i → ∀ v', ¬ gwritesByte G e a v') :
-    RvwmoXv6ScaT.cohWit G i k a c → RvwmoXv6ScaT.cohWit G i (k + 1) a c := by
+theorem RvwmoXv6ScaT.cohWitStep (G : Gexec) (anc : Geid → Bool) (i k : Nat) (e : Geid) (a : Int) (c : Nat)
+    (hk : (glinEidsA G anc)[k]? = some e) (hno : e.1 = i → ∀ v', ¬ gwritesByte G e a v') :
+    RvwmoXv6ScaT.cohWit G anc i k a c → RvwmoXv6ScaT.cohWit G anc i (k + 1) a c := by
   rintro ⟨e0, ke, t, v, w', hke, h0, hi, hrd, hwa, hne, hc, hnw⟩
   refine ⟨e0, ke, t, v, w', by omega, h0, hi, hrd, hwa, hne, hc, ?_⟩
   intro m km v' h1 h2 hm hmi
@@ -465,25 +454,26 @@ theorem RvwmoXv6ScaT.cohWitStep (G : Gexec) (i k : Nat) (e : Geid) (a : Int) (c 
     exact hno hmi v'
   · exact hnw m km v' h1 (by omega) hm hmi
 
-theorem RvwmoXv6ScaT.cohOkStep (G : Gexec) (i k : Nat) (e : Geid) (coh : Int → Nat)
-    (hk : (glinEids G)[k]? = some e) (hno : e.1 = i → ∀ a v', ¬ gwritesByte G e a v') :
-    RvwmoXv6ScaT.cohOk G i k coh → RvwmoXv6ScaT.cohOk G i (k + 1) coh := by
+theorem RvwmoXv6ScaT.cohOkStep (G : Gexec) (anc : Geid → Bool) (i k : Nat) (e : Geid) (coh : Int → Nat)
+    (hk : (glinEidsA G anc)[k]? = some e) (hno : e.1 = i → ∀ a v', ¬ gwritesByte G e a v') :
+    RvwmoXv6ScaT.cohOk G anc i k coh → RvwmoXv6ScaT.cohOk G anc i (k + 1) coh := by
   intro h a
   rcases h a with h0 | hw
   · exact Or.inl h0
-  · exact Or.inr (RvwmoXv6ScaT.cohWitStep G i k e a _ hk (fun hi => hno hi a) hw)
+  · exact Or.inr (RvwmoXv6ScaT.cohWitStep G anc i k e a _ hk (fun hi => hno hi a) hw)
 
 section inv
 
-variable (G : Gexec) (hwf : gwf G) (h6 : gppoCat6Gmo G) (hlv : gloadValue G) (h14 : grule14 G)
-include hwf h6 hlv h14
+variable (G : Gexec) (anc : Geid → Bool) (hwf : gwf G) (h6 : gppoCat6Gmo G) (hlv : gloadValue G)
+  (hok : ancOk G anc)
+include hwf h6 hlv hok
 
 /-- THE FLOOR at a load: `F = max(tv, coh over the footprint) ≤ tvnSca G e` — the `coh` part
 is §B(10)'s three-case derivation (same source / different source by rule 2; own stores reset). -/
 theorem RvwmoXv6ScaT.loadFloor (i k : Nat) (sh : ShSt) (e : Geid) (aq : Bool) (base : Int)
-    (ts : List Nat) (vs : List (BitVec 8)) (hk : (glinEids G)[k]? = some e) (hi : e.1 = i)
+    (ts : List Nat) (vs : List (BitVec 8)) (hk : (glinEidsA G anc)[k]? = some e) (hi : e.1 = i)
     (hl : gxLbl G e = some (LLoad aq base ts vs))
-    (hT : RvwmoXv6ScaT.tvOk G i k sh.tv) (hC : RvwmoXv6ScaT.cohOk G i k sh.coh) :
+    (hT : RvwmoXv6ScaT.tvOk G anc i k sh.tv) (hC : RvwmoXv6ScaT.cohOk G anc i k sh.coh) :
     shFloor sh base ts.length ≤ tvnSca G e := by
   have hR : glblIs G e lbIsR := ⟨_, hl, rfl⟩
   have htv := hT e k (Nat.le_refl _) hk hi hR
@@ -499,7 +489,7 @@ theorem RvwmoXv6ScaT.loadFloor (i k : Nat) (sh : ShSt) (e : Geid) (aq : Bool) (b
       have hmo0 : gmoLt G w' e0 :=
         RvwmoXv6ScaT.foreignGmo G hlv e0 _ t0 v0 w' hrd0 hwa (by rw [hi0]; exact hne)
       have hpo0 : e0.2 < e.2 :=
-        (glinPoIff G hwf h14 ke k e0 e h0 hk (by rw [hi0, hi])).1 hke
+        (glinAPoIff G anc hwf hok ke k e0 e h0 hk (by rw [hi0, hi])).1 hke
       apply Nat.le_trans hc
       by_cases htt : t = t0
       · -- the SAME source: foreign, hence gmo-before `e`
@@ -508,14 +498,14 @@ theorem RvwmoXv6ScaT.loadFloor (i k : Nat) (sh : ShSt) (e : Geid) (aq : Bool) (b
           (RvwmoXv6ScaT.foreignGmo G hlv e _ t v w' hrd hwa (by rw [hi]; exact hne))
       · -- a DIFFERENT source, no own write po-between: rule 2
         have h2 : gppo2 G e0 e := by
-          refine ⟨⟨by rw [hi0, hi], hpo0, glinLookupLbl G hwf ke e0 h0,
-            glinLookupLbl G hwf k e hk⟩, accAddr base j, t0, v0, t, v, hrd0, hrd,
+          refine ⟨⟨by rw [hi0, hi], hpo0, glinALookupLbl G anc hwf hok ke e0 h0,
+            glinALookupLbl G anc hwf hok k e hk⟩, accAddr base j, t0, v0, t, v, hrd0, hrd,
             fun h => htt h.symm, ?_⟩
           intro m vm hwm hpo1 hpo2
-          obtain ⟨km, hkm⟩ := glinIndex G hwf m hpo1.2.2.2
+          obtain ⟨km, hkm⟩ := glinAIndex G anc hwf hok m hpo1.2.2.2
           have hmi : m.1 = i := by rw [← hpo1.1, hi0]
-          have h1 := (glinPoIff G hwf h14 ke km e0 m h0 hkm hpo1.1).2 hpo1.2.1
-          have h2 := (glinPoIff G hwf h14 km k m e hkm hk hpo2.1).2 hpo2.2.1
+          have h1 := (glinAPoIff G anc hwf hok ke km e0 m h0 hkm hpo1.1).2 hpo1.2.1
+          have h2 := (glinAPoIff G anc hwf hok km k m e hkm hk hpo2.1).2 hpo2.2.1
           exact hnw m km vm h1 h2 hkm hmi hwm
         have hmo : gmoLt G e0 e := h6 _ _ (Or.inr (Or.inl h2))
         exact RvwmoXv6ScaT.tsLeTvnSca G hwf e w' t0 hwa (gmoLtTrans G w' e0 e hmo0 hmo)
@@ -525,22 +515,22 @@ theorem RvwmoXv6ScaT.loadFloor (i k : Nat) (sh : ShSt) (e : Geid) (aq : Bool) (b
 
 /-- The load's MINIMAL view `shTvn` is below its witness. -/
 theorem RvwmoXv6ScaT.loadTvn (i k : Nat) (sh : ShSt) (e : Geid) (aq : Bool) (base : Int)
-    (ts : List Nat) (vs : List (BitVec 8)) (hk : (glinEids G)[k]? = some e) (hi : e.1 = i)
+    (ts : List Nat) (vs : List (BitVec 8)) (hk : (glinEidsA G anc)[k]? = some e) (hi : e.1 = i)
     (hl : gxLbl G e = some (LLoad aq base ts vs))
-    (hT : RvwmoXv6ScaT.tvOk G i k sh.tv) (hC : RvwmoXv6ScaT.cohOk G i k sh.coh) :
-    shTvn i sh base (ts.map (shSrc (stAuthorsL (((glinEids G).take k).map (glinStep G))))) ≤
+    (hT : RvwmoXv6ScaT.tvOk G anc i k sh.tv) (hC : RvwmoXv6ScaT.cohOk G anc i k sh.coh) :
+    shTvn i sh base (ts.map (shSrc (stAuthorsL (((glinEidsA G anc).take k).map (glinStep G))))) ≤
       tvnSca G e := by
-  have hF := RvwmoXv6ScaT.loadFloor G hwf h6 hlv h14 i k sh e aq base ts vs hk hi hl hT hC
+  have hF := RvwmoXv6ScaT.loadFloor G anc hwf h6 hlv hok i k sh e aq base ts vs hk hi hl hT hC
   have hsh : vs.length = ts.length := gwfLblShape G e _ hwf hl
   unfold shTvn
   rw [List.length_map]
   have hfor := RvwmoXv6ScaT.shForeignLe i (tvnSca G e)
-    (ts.map (shSrc (stAuthorsL (((glinEids G).take k).map (glinStep G))))) (by
+    (ts.map (shSrc (stAuthorsL (((glinEidsA G anc).take k).map (glinStep G))))) (by
       intro x t hm hx
       obtain ⟨t0, ht0, hs⟩ := List.mem_map.1 hm
       rcases RvwmoXv6ScaT.shSrcSome _ t0 x t hs with h0 | ⟨rfl, hpos, hau⟩
       · rw [h0]; exact Nat.zero_le _
-      · obtain ⟨_, w', _, _, hw', hw'1⟩ := RvwmoXv6ScaT.authorsLookup G hwf k (t - 1) x hau
+      · obtain ⟨_, w', _, _, hw', hw'1⟩ := RvwmoXv6ScaT.authorsLookup G anc hwf hok k (t - 1) x hau
         obtain ⟨j, hj⟩ := elem_of_list_lookup_1 ht0
         obtain ⟨v, hv⟩ := someOfIsSome
           (lookup_lt_is_Some_2 (show j < vs.length by rw [hsh]; exact lookup_lt_Some hj))
@@ -552,33 +542,33 @@ theorem RvwmoXv6ScaT.loadTvn (i k : Nat) (sh : ShSt) (e : Geid) (aq : Bool) (bas
   exact Nat.max_le.2 ⟨hF, hfor⟩
 
 /-- Lean-only: one step of the fold. -/
-theorem RvwmoXv6ScaT.shKSucc (i k : Nat) (e : Geid) (hk : (glinEids G)[k]? = some e) :
-    RvwmoXv6ScaT.shK G i (k + 1) = shActL cohSrc i (RvwmoXv6ScaT.shK G i k) (glinStep G e) := by
+theorem RvwmoXv6ScaT.shKSucc (i k : Nat) (e : Geid) (hk : (glinEidsA G anc)[k]? = some e) :
+    RvwmoXv6ScaT.shK G anc i (k + 1) = shActL cohSrc i (RvwmoXv6ScaT.shK G anc i k) (glinStep G e) := by
   unfold RvwmoXv6ScaT.shK
   rw [take_S_r hk, List.map_append, List.map_cons, List.map_nil]
   exact shadowRunSnoc cohSrc i _ _
 
 /-- (3) THE INVARIANT of hart `i`'s shadow along the linearized trace. -/
-theorem RvwmoXv6ScaT.shInv (i : Nat) : ∀ k, k ≤ (glinEids G).length →
-    RvwmoXv6ScaT.tvOk G i k (RvwmoXv6ScaT.shK G i k).2.tv ∧
-    RvwmoXv6ScaT.rvOk G i k (RvwmoXv6ScaT.shK G i k).2.rv ∧
-    RvwmoXv6ScaT.cohOk G i k (RvwmoXv6ScaT.shK G i k).2.coh
+theorem RvwmoXv6ScaT.shInv (i : Nat) : ∀ k, k ≤ (glinEidsA G anc).length →
+    RvwmoXv6ScaT.tvOk G anc i k (RvwmoXv6ScaT.shK G anc i k).2.tv ∧
+    RvwmoXv6ScaT.rvOk G anc i k (RvwmoXv6ScaT.shK G anc i k).2.rv ∧
+    RvwmoXv6ScaT.cohOk G anc i k (RvwmoXv6ScaT.shK G anc i k).2.coh
   | 0, _ => by
     refine ⟨fun _ _ _ _ _ _ => Nat.zero_le _, Or.inl rfl, fun _ => Or.inl rfl⟩
   | k + 1, hkl => by
     obtain ⟨hT, hR, hC⟩ := RvwmoXv6ScaT.shInv i k (by omega)
-    obtain ⟨e, hk⟩ := someOfIsSome (lookup_lt_is_Some_2 (show k < (glinEids G).length by omega))
-    have hl := linLbl G hwf k e hk
-    have hau1 : (RvwmoXv6ScaT.shK G i k).1 =
-        stAuthorsL (((glinEids G).take k).map (glinStep G)) := shadowRunAuthors cohSrc i _
-    have hlen : (RvwmoXv6ScaT.shK G i k).1.length = linNw G k := by
+    obtain ⟨e, hk⟩ := someOfIsSome (lookup_lt_is_Some_2 (show k < (glinEidsA G anc).length by omega))
+    have hl := linALbl G anc hwf hok k e hk
+    have hau1 : (RvwmoXv6ScaT.shK G anc i k).1 =
+        stAuthorsL (((glinEidsA G anc).take k).map (glinStep G)) := shadowRunAuthors cohSrc i _
+    have hlen : (RvwmoXv6ScaT.shK G anc i k).1.length = linNwA G anc k := by
       rw [hau1, RvwmoXv6ScaT.authorsLen]
-    have h2 : (RvwmoXv6ScaT.shK G i (k + 1)).2 =
-        if e.1 = i then shStepL cohSrc i (RvwmoXv6ScaT.shK G i k).1 (RvwmoXv6ScaT.shK G i k).2
-          (glbl G e) else (RvwmoXv6ScaT.shK G i k).2 := by
-      rw [RvwmoXv6ScaT.shKSucc G hwf h6 hlv h14 i k e hk]; rfl
+    have h2 : (RvwmoXv6ScaT.shK G anc i (k + 1)).2 =
+        if e.1 = i then shStepL cohSrc i (RvwmoXv6ScaT.shK G anc i k).1 (RvwmoXv6ScaT.shK G anc i k).2
+          (glbl G e) else (RvwmoXv6ScaT.shK G anc i k).2 := by
+      rw [RvwmoXv6ScaT.shKSucc G anc hwf h6 hlv hok i k e hk]; rfl
     rw [h2]
-    generalize hx : RvwmoXv6ScaT.shK G i k = x at hT hR hC hau1 hlen
+    generalize hx : RvwmoXv6ScaT.shK G anc i k = x at hT hR hC hau1 hlen
     obtain ⟨au, sh⟩ := x
     simp only at hT hR hC hau1 hlen ⊢
     by_cases hei : e.1 = i
@@ -588,24 +578,24 @@ theorem RvwmoXv6ScaT.shInv (i : Nat) : ∀ k, k ≤ (glinEids G).length →
       | LLoad aq base ts vs =>
         have hno : ∀ a v', ¬ gwritesByte G e a v' :=
           fun a v' => RvwmoXv6ScaT.noWrite G e _ a v' hl rfl
-        have hTv := RvwmoXv6ScaT.loadTvn G hwf h6 hlv h14 i k sh e aq base ts vs hk hei hl hT hC
+        have hTv := RvwmoXv6ScaT.loadTvn G anc hwf h6 hlv hok i k sh e aq base ts vs hk hei hl hT hC
         rw [← hau1] at hTv
-        refine ⟨RvwmoXv6ScaT.tvOkStep G i k _ hT, ?_, ?_⟩
+        refine ⟨RvwmoXv6ScaT.tvOkStep G anc i k _ hT, ?_, ?_⟩
         · -- rv := max rv tvn
-          show RvwmoXv6ScaT.rvOk G i (k + 1) (max sh.rv (shTvn i sh base (ts.map (shSrc au))))
+          show RvwmoXv6ScaT.rvOk G anc i (k + 1) (max sh.rv (shTvn i sh base (ts.map (shSrc au))))
           by_cases hle : sh.rv ≤ shTvn i sh base (ts.map (shSrc au))
           · rw [Nat.max_eq_right hle]
             exact Or.inr ⟨e, k, Nat.lt_succ_self _, hk, hei, ⟨_, hl, rfl⟩, hTv⟩
           · rw [Nat.max_eq_left (by omega)]
-            exact RvwmoXv6ScaT.rvOkStep G i k _ hR
+            exact RvwmoXv6ScaT.rvOkStep G anc i k _ hR
         · -- the stamp
-          show RvwmoXv6ScaT.cohOk G i (k + 1)
+          show RvwmoXv6ScaT.cohOk G anc i (k + 1)
             (cohSrc.load i sh.coh base (ts.map (shSrc au)) (shTvn i sh base (ts.map (shSrc au))))
           intro a
-          have hold : sh.coh a = 0 ∨ RvwmoXv6ScaT.cohWit G i (k + 1) a (sh.coh a) := by
+          have hold : sh.coh a = 0 ∨ RvwmoXv6ScaT.cohWit G anc i (k + 1) a (sh.coh a) := by
             rcases hC a with h0 | hw
             · exact Or.inl h0
-            · exact Or.inr (RvwmoXv6ScaT.cohWitStep G i k e a _ hk (fun _ => hno a) hw)
+            · exact Or.inr (RvwmoXv6ScaT.cohWitStep G anc i k e a _ hk (fun _ => hno a) hw)
           rcases RvwmoXv6ScaT.cohSrcLoadCases i sh.coh base (ts.map (shSrc au))
               (shTvn i sh base (ts.map (shSrc au))) a with heq | ⟨j, x, t, ha, hj, hx, heq⟩
           · rw [heq]; exact hold
@@ -622,7 +612,7 @@ theorem RvwmoXv6ScaT.shInv (i : Nat) : ∀ k, k ≤ (glinEids G).length →
                 · rw [Nat.max_eq_right hle]
                   right
                   rw [hau1] at hau
-                  obtain ⟨_, w', _, _, hw', hw'1⟩ := RvwmoXv6ScaT.authorsLookup G hwf k (t - 1) x hau
+                  obtain ⟨_, w', _, _, hw', hw'1⟩ := RvwmoXv6ScaT.authorsLookup G anc hwf hok k (t - 1) x hau
                   have hwa : gwriteAt G t = some w' := by
                     rw [show t = (t - 1) + 1 by omega]; exact hw'
                   have hsh : vs.length = ts.length := gwfLblShape G e _ hwf hl
@@ -638,29 +628,29 @@ theorem RvwmoXv6ScaT.shInv (i : Nat) : ∀ k, k ≤ (glinEids G).length →
                   · omega
                   · exact Or.inr hw
       | LStore rl base vs cl =>
-        refine ⟨?_, RvwmoXv6ScaT.rvOkStep G i k _ hR, ?_⟩
-        · show RvwmoXv6ScaT.tvOk G i (k + 1) (if false && sh.acq then au.length + 1 else sh.tv)
+        refine ⟨?_, RvwmoXv6ScaT.rvOkStep G anc i k _ hR, ?_⟩
+        · show RvwmoXv6ScaT.tvOk G anc i (k + 1) (if false && sh.acq then au.length + 1 else sh.tv)
           simp only [Bool.false_and]
-          exact RvwmoXv6ScaT.tvOkStep G i k _ hT
-        · show RvwmoXv6ScaT.cohOk G i (k + 1) (cohSrc.store sh.coh base vs.length)
+          exact RvwmoXv6ScaT.tvOkStep G anc i k _ hT
+        · show RvwmoXv6ScaT.cohOk G anc i (k + 1) (cohSrc.store sh.coh base vs.length)
           intro a
           rcases RvwmoXv6ScaT.cohSrcStoreCases sh.coh base vs.length a with h0 | ⟨hf, heq⟩
           · exact Or.inl h0
           · rw [heq]
             rcases hC a with h0 | hw
             · exact Or.inl h0
-            · exact Or.inr (RvwmoXv6ScaT.cohWitStep G i k e a _ hk
+            · exact Or.inr (RvwmoXv6ScaT.cohWitStep G anc i k e a _ hk
                 (fun _ v' hwb => RvwmoXv6ScaT.writesFoot G e _ base vs a v' hl rfl hwb hf) hw)
       | LFence pr pw sr sw =>
         have hno : ∀ a v', ¬ gwritesByte G e a v' :=
           fun a v' => RvwmoXv6ScaT.noWrite G e _ a v' hl rfl
-        refine ⟨?_, RvwmoXv6ScaT.rvOkStep G i k _ hR,
-          RvwmoXv6ScaT.cohOkStep G i k e _ hk (fun _ => hno) hC⟩
-        show RvwmoXv6ScaT.tvOk G i (k + 1)
+        refine ⟨?_, RvwmoXv6ScaT.rvOkStep G anc i k _ hR,
+          RvwmoXv6ScaT.cohOkStep G anc i k e _ hk (fun _ => hno) hC⟩
+        show RvwmoXv6ScaT.tvOk G anc i (k + 1)
           (MachCSL.fencePost (pw && sr) (pr && sr) sh.tv sh.rv (MachCSL.ownPub i au))
         intro r kr hkr hr hri hrR
-        have hpoe : e.2 < r.2 := (glinPoIff G hwf h14 k kr e r hk hr (by rw [hei, hri])).1 (by omega)
-        have hrl := glinLookupLbl G hwf kr r hr
+        have hpoe : e.2 < r.2 := (glinAPoIff G anc hwf hok k kr e r hk hr (by rw [hei, hri])).1 (by omega)
+        have hrl := glinALookupLbl G anc hwf hok kr r hr
         have hel : gxLbl G (r.1, e.2) = some (LFence pr pw sr sw) := by
           rw [show ((r.1, e.2) : Geid) = e from Prod.ext (by rw [hri, hei]) rfl]; exact hl
         unfold MachCSL.fencePost
@@ -670,12 +660,12 @@ theorem RvwmoXv6ScaT.shInv (i : Nat) : ∀ k, k ≤ (glinEids G).length →
           intro hd
           simp only [Bool.and_eq_true] at hd
           rw [hau1]
-          by_cases hp0 : MachCSL.ownPub i (stAuthorsL (((glinEids G).take k).map (glinStep G))) = 0
+          by_cases hp0 : MachCSL.ownPub i (stAuthorsL (((glinEidsA G anc).take k).map (glinStep G))) = 0
           · rw [hp0]; exact Nat.zero_le _
           · have hlk := RvwmoXv6ScaT.ownPubLookup i _ hp0
-            obtain ⟨kw, w, hkw, hw, hgw, hw1⟩ := RvwmoXv6ScaT.authorsLookup G hwf k _ i hlk
+            obtain ⟨kw, w, hkw, hw, hgw, hw1⟩ := RvwmoXv6ScaT.authorsLookup G anc hwf hok k _ i hlk
             have hwm := gwritesLookupElem G _ w hgw
-            have hpow : w.2 < e.2 := (glinPoIff G hwf h14 kw k w e hw hk (by rw [hw1, hei])).1 hkw
+            have hpow : w.2 < e.2 := (glinAPoIff G anc hwf hok kw k w e hw hk (by rw [hw1, hei])).1 hkw
             have hcov : gfenceCovers G w r :=
               ⟨pr, pw, sr, sw, ⟨by rw [hw1, hri], by omega, e.2, hpow, hpoe,
                 by rw [show w.1 = r.1 by rw [hw1, hri]]; exact hel⟩,
@@ -691,7 +681,7 @@ theorem RvwmoXv6ScaT.shInv (i : Nat) : ∀ k, k ≤ (glinEids G).length →
           simp only [Bool.and_eq_true] at ha
           rcases hR with h0 | ⟨e0, ke, hke, h0, hi0, hR0, hle⟩
           · rw [h0]; exact Nat.zero_le _
-          · have hpo0 : e0.2 < e.2 := (glinPoIff G hwf h14 ke k e0 e h0 hk (by rw [hi0, hei])).1 hke
+          · have hpo0 : e0.2 < e.2 := (glinAPoIff G anc hwf hok ke k e0 e h0 hk (by rw [hi0, hei])).1 hke
             have hcov : gfenceCovers G e0 r :=
               ⟨pr, pw, sr, sw, ⟨by rw [hi0, hri], by omega, e.2, hpo0, hpoe,
                 by rw [show e0.1 = r.1 by rw [hi0, hri]]; exact hel⟩,
@@ -707,74 +697,81 @@ theorem RvwmoXv6ScaT.shInv (i : Nat) : ∀ k, k ≤ (glinEids G).length →
           | (have := hpub hd; have := hrv ha; omega)
       | LRmw aq rl base ts rvs wvs cl =>
         have hwE : gisW G e = true := by simp only [gisW, hl]; rfl
-        have hgw := RvwmoXv6ScaT.gwixLin G hwf k e hk hwE
+        have hgw := RvwmoXv6ScaT.gwixLin G anc hwf hok k e hk hwE
         refine ⟨?_, ?_, ?_⟩
-        · show RvwmoXv6ScaT.tvOk G i (k + 1)
+        · show RvwmoXv6ScaT.tvOk G anc i (k + 1)
             (if true && aq then au.length + 1 else (if aq then au.length else sh.tv))
           cases haq : aq
           · simp only [Bool.and_false, ite_false, Bool.false_eq_true]
-            exact RvwmoXv6ScaT.tvOkStep G i k _ hT
+            exact RvwmoXv6ScaT.tvOkStep G anc i k _ hT
           · simp only [Bool.and_self, ite_true]
             intro r kr hkr hr hri hrR
             have hpo : e.2 < r.2 :=
-              (glinPoIff G hwf h14 k kr e r hk hr (by rw [hei, hri])).1 (by omega)
+              (glinAPoIff G anc hwf hok k kr e r hk hr (by rw [hei, hri])).1 (by omega)
             have hacq : gacqPo G e r :=
-              ⟨⟨by rw [hei, hri], hpo, glinLookupLbl G hwf k e hk, glinLookupLbl G hwf kr r hr⟩,
+              ⟨⟨by rw [hei, hri], hpo, glinALookupLbl G anc hwf hok k e hk, glinALookupLbl G anc hwf hok kr r hr⟩,
                 ⟨_, hl, rfl⟩, ⟨_, hl, by rw [haq]; rfl⟩, WeakRvwmoGraph.glblIsRGmem G r hrR⟩
             have hmo : gmoLt G e r := h6 _ _ (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl hacq)))))
-            have hem := gisWGwrites G e hwf (glinLookupLbl G hwf k e hk) hwE
+            have hem := gisWGwrites G e hwf (glinALookupLbl G anc hwf hok k e hk) hwE
             have := (gwixLeTvnSca G r e hwf hem).2 hmo
             omega
-        · show RvwmoXv6ScaT.rvOk G i (k + 1) au.length
+        · show RvwmoXv6ScaT.rvOk G anc i (k + 1) au.length
           rw [hlen]
           exact Or.inr ⟨e, k, Nat.lt_succ_self _, hk, hei, ⟨_, hl, rfl⟩,
-            RvwmoXv6ScaT.linNwLeTvnSca G hwf k e hk hwE⟩
-        · show RvwmoXv6ScaT.cohOk G i (k + 1) (cohSrc.store sh.coh base wvs.length)
+            RvwmoXv6ScaT.linNwLeTvnSca G anc hwf hok k e hk hwE⟩
+        · show RvwmoXv6ScaT.cohOk G anc i (k + 1) (cohSrc.store sh.coh base wvs.length)
           intro a
           rcases RvwmoXv6ScaT.cohSrcStoreCases sh.coh base wvs.length a with h0 | ⟨hf, heq⟩
           · exact Or.inl h0
           · rw [heq]
             rcases hC a with h0 | hw
             · exact Or.inl h0
-            · exact Or.inr (RvwmoXv6ScaT.cohWitStep G i k e a _ hk
+            · exact Or.inr (RvwmoXv6ScaT.cohWitStep G anc i k e a _ hk
                 (fun _ v' hwb => RvwmoXv6ScaT.writesFoot G e _ base wvs a v' hl rfl hwb hf) hw)
       | LIo kind base vs =>
         have hno : ∀ a v', ¬ gwritesByte G e a v' :=
           fun a v' => RvwmoXv6ScaT.noWrite G e _ a v' hl rfl
-        exact ⟨RvwmoXv6ScaT.tvOkStep G i k _ hT, RvwmoXv6ScaT.rvOkStep G i k _ hR,
-          RvwmoXv6ScaT.cohOkStep G i k e _ hk (fun _ => hno) hC⟩
+        exact ⟨RvwmoXv6ScaT.tvOkStep G anc i k _ hT, RvwmoXv6ScaT.rvOkStep G anc i k _ hR,
+          RvwmoXv6ScaT.cohOkStep G anc i k e _ hk (fun _ => hno) hC⟩
     · rw [if_neg hei]
-      exact ⟨RvwmoXv6ScaT.tvOkStep G i k _ hT, RvwmoXv6ScaT.rvOkStep G i k _ hR,
-        RvwmoXv6ScaT.cohOkStep G i k e _ hk (fun h => absurd h hei) hC⟩
+      exact ⟨RvwmoXv6ScaT.tvOkStep G anc i k _ hT, RvwmoXv6ScaT.rvOkStep G anc i k _ hR,
+        RvwmoXv6ScaT.cohOkStep G anc i k e _ hk (fun h => absurd h hei) hC⟩
 
 end inv
 
 /-! ## (5) THE THEOREM -/
 
-/-- **W11 (iv)b**: on the linearization of a graph satisfying riscv.cat's program-order arms,
-load value and rule 14, every plain load is single-copy atomic at a view at or above the TsoMem
-shadow's floor under the merged stamp `cohSrc` (G2-Q (a′), both components). -/
-theorem linCandScaT (G : Gexec) :
-    gwf G → gppoCat6Gmo G → gloadValue G → grule14 G → candScaT cohSrc (linCand G) := by
-  intro hwf h6 hlv h14 k s hs aq base ts vs hlb
+/-- **W11 (iv)b, on any admissible anchor class (W13 (L))**: on the anchored linearization of a
+graph satisfying riscv.cat's program-order arms and load value, with anchor-14 (`ancOk`), every
+plain load is single-copy atomic at a view at or above the TsoMem shadow's floor under the merged
+stamp `cohSrc` (G2-Q (a′), both components). -/
+theorem linCandScaTA (G : Gexec) (anc : Geid → Bool) :
+    gwf G → gppoCat6Gmo G → gloadValue G → ancOk G anc → candScaT cohSrc (linCandA G anc) := by
+  intro hwf h6 hlv hok k s hs aq base ts vs hlb
   rw [candExTr] at hs
-  have hkle : k ≤ (linCand G).cdTr.length := by have := lookup_lt_Some hs; omega
-  obtain ⟨e, he, rfl⟩ := linTrLookupInv G k s hs
+  have hkle : k ≤ (linCandA G anc).cdTr.length := by have := lookup_lt_Some hs; omega
+  obtain ⟨e, he, rfl⟩ := linTrALookupInv G anc k s hs
   have hl : gxLbl G e = some (LLoad aq base ts vs) := by
-    rw [linLbl G hwf k e he]
+    rw [linALbl G anc hwf hok k e he]
     exact congrArg some hlb
-  have hkl : k ≤ (glinEids G).length := by rw [← linTrLen]; exact hkle
-  show scaOkT (shadowOf cohSrc ((linCand G).cdTr.take k) e.1)
-    (eimg (candExec (linCand G)) k) (elog (candExec (linCand G)) k) e.1 base ts
+  have hkl : k ≤ (glinEidsA G anc).length := by rw [← linTrALen]; exact hkle
+  show scaOkT (shadowOf cohSrc ((linCandA G anc).cdTr.take k) e.1)
+    (eimg (candExec (linCandA G anc)) k) (elog (candExec (linCandA G anc)) k) e.1 base ts
   rw [candEimg _ k hkle, candElog _ k hkle]
-  have htr : (linCand G).cdTr.take k = ((glinEids G).take k).map (glinStep G) := by
-    show ((glinEids G).map (glinStep G)).take k = _
+  have htr : (linCandA G anc).cdTr.take k = ((glinEidsA G anc).take k).map (glinStep G) := by
+    show ((glinEidsA G anc).map (glinStep G)).take k = _
     rw [fmap_take]
   rw [htr]
-  obtain ⟨hT, _, hC⟩ := RvwmoXv6ScaT.shInv G hwf h6 hlv h14 e.1 k hkl
-  refine ⟨tvnSca G e, linTvnScaLe G hwf h14 k e he, ?_, ?_⟩
-  · exact RvwmoXv6ScaT.loadFloor G hwf h6 hlv h14 e.1 k _ e aq base ts vs he rfl hl hT hC
-  · exact RvwmoXv6ScaT.linScaBytes G hwf hlv h14 k e aq base ts vs he hl
+  obtain ⟨hT, _, hC⟩ := RvwmoXv6ScaT.shInv G anc hwf h6 hlv hok e.1 k hkl
+  refine ⟨tvnSca G e, linTvnScaLeA G anc hwf hok k e he, ?_, ?_⟩
+  · exact RvwmoXv6ScaT.loadFloor G anc hwf h6 hlv hok e.1 k _ e aq base ts vs he rfl hl hT hC
+  · exact RvwmoXv6ScaT.linScaBytes G anc hwf hlv hok k e aq base ts vs he hl
+
+/-- **W11 (iv)b**: on the linearization of a graph satisfying riscv.cat's program-order arms,
+load value and rule 14 — the write-anchored instance of `linCandScaTA` (statement unchanged). -/
+theorem linCandScaT (G : Gexec) :
+    gwf G → gppoCat6Gmo G → gloadValue G → grule14 G → candScaT cohSrc (linCand G) :=
+  fun hwf h6 hlv h14 => linCandScaTA G (gisW G) hwf h6 hlv (ancOkW G h14)
 
 /-- From the PUBLISHED model (`rvwmoCatConsistentT`, the tagged riscv.cat), on its graph. -/
 theorem linCandScaTCatT (GT : GdexecT) :
@@ -788,5 +785,11 @@ theorem linCandScaTMinus (G : Gexec) :
     rvwmoMinusConsistent G → grule14 G → candScaT cohSrc (linCand G) := by
   rintro ⟨hwf, hppo, hlv, _⟩ h14
   exact linCandScaT G hwf (fun e1 e2 h => hppo _ _ (gppoCat6Gppo G e1 e2 hlv h)) hlv h14
+
+/-- From RVWMO⁻, on an admissible anchor class (W13 (L): the anchored trace W11 (v) consumes). -/
+theorem linCandScaTMinusA (G : Gexec) (anc : Geid → Bool) :
+    rvwmoMinusConsistent G → ancOk G anc → candScaT cohSrc (linCandA G anc) := by
+  rintro ⟨hwf, hppo, hlv, _⟩ hok
+  exact linCandScaTA G anc hwf (fun e1 e2 h => hppo _ _ (gppoCat6Gppo G e1 e2 hlv h)) hlv hok
 
 end Weak

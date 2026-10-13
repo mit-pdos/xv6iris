@@ -25,6 +25,15 @@ works for all bytes at once.  The pieces:
   (5) `linScaOk` — the per-load `scaOk` with witness `tvnSca G r`;
   (6) `linCandSca` — `rvwmoMinusConsistent G → grule14 G → candSca (linCand G)`.
 
+**W13 (L)** (plan §C W13 (L)): pieces (3)–(6) are stated on the ANCHORED linearization
+`linCandA G anc` of any admissible anchor class (`ancOk`, `WeakRvwmoLin` §6) — `linGmoEmitBeforeA`
+(now `glinAGmoAnc` at a write), `linLogEmittedA`, `linTvnScaLeA`, `RvwmoXv6Sca.linLogPrefixA`,
+`linScaOkA`, `linCandScaA` — and the pre-(L) statements on `linCand G` are their write instances
+(§(7), statements unchanged; `linLogEmitted`/`RvwmoXv6Sca.linLogPrefix` keep their direct proofs,
+which need no rule 14).  NEW: `linNwAAnc` — at an ANCHOR `r` the prefix log holds exactly the
+writes gmo-before `r` (`linNwA = tvnSca`), the fact W11 (iv)c `linCandDiskLat` reads off the
+disk-row read anchors.
+
 No exhaustive case split on `Lbl`/`Wlabel` (W13 (E) adds `Lbl.LIo` arms in
 parallel): labels are reached through `lbRd`/`lbWr`/`gisW`/`greadsByte`/
 `gwritesByte` and equations with a known constructor.  Lean-only helpers are
@@ -138,63 +147,44 @@ theorem tvnScaMono (G : Gexec) (x y : Geid) : gmoLt G x y → tvnSca G x ≤ tvn
 
 /-! ## (3) The two linearization facts -/
 
-/-- A write gmo-before `r` is EMITTED before `r` in the linearization: its rank
-is its `gwix`, and `r`'s rank is the `gwix` of its next write (gmo-after the
-write by rule 14) or a past-the-end tail slot. -/
-theorem linGmoEmitBefore (G : Gexec) (hwf : gwf G) (h14 : grule14 G) (k kw : Nat) (r w : Geid) :
-    (glinEids G)[k]? = some r → (glinEids G)[kw]? = some w → w ∈ gwrites G →
-    gmoLt G w r → kw < k := by
-  intro hk hkw hw hmo
-  apply glinRankLt G kw k w r hkw hk
-  rw [grankWrite G hwf w hw]
-  have hrl := glinLookupLbl G hwf k r hk
-  obtain ⟨hri, hrk⟩ := (gxLblBounds G r).1 hrl
-  obtain ⟨ir, kr⟩ := r
-  simp only at hri hrk
-  unfold WeakRvwmoLin.grank
-  cases hf : gnxw G (ir, kr) with
-  | none => have := gwixLe G w hw; dsimp only; omega
-  | some w' =>
-    obtain ⟨m, rfl, hkm, hm, hwm, _⟩ := gnxwSome G ir kr w' hf
-    have hlm := glblSome G ir m hri hm
-    have hmo' : gmoLt G w (ir, m) := by
-      by_cases hkm' : kr = m
-      · subst hkm'; exact hmo
-      · apply gmoLtTrans G w (ir, kr) (ir, m) hmo
-        exact h14 _ _ ⟨rfl, show kr < m by omega, hrl, hlm⟩
-          (gwfGmoMem G (ir, kr) hwf hmo.2.1)
-          (WeakRvwmoLin.gisWGlblIs G _ hlm hwm)
-    dsimp only
-    exact (gwixGposLt G w (ir, m) (linNd G hwf) hw
-      (gisWGwrites G (ir, m) hwf hlm hwm)).2 hmo'.2.2
+/-- A write gmo-before `r` is EMITTED before `r` in the (anchored) linearization: writes are
+anchors (W13 (L): `glinAGmoAnc`; on the write-anchored instance this is the rank argument of
+`WeakRvwmoLin.linSourceBefore` generalized). -/
+theorem linGmoEmitBeforeA (G : Gexec) (anc : Geid → Bool) (hwf : gwf G) (hok : ancOk G anc)
+    (k kw : Nat) (r w : Geid) :
+    (glinEidsA G anc)[k]? = some r → (glinEidsA G anc)[kw]? = some w → w ∈ gwrites G →
+    gmoLt G w r → kw < k :=
+  fun hk hkw hw hmo => glinAGmoAnc G anc hwf hok k kw r w hk hkw (hok.2.1 w (gwritesIsw G w hw)) hmo
 
 /-- A write named inside `r`'s prefix log is EMITTED before `r`. -/
-theorem linLogEmitted (G : Gexec) (hwf : gwf G) (k t' : Nat) (r w' : Geid) :
-    (glinEids G)[k]? = some r → gwriteAt G t' = some w' →
-    t' ≤ (cdLog (linCand G) k).length →
-    ∃ k', k' < k ∧ (glinEids G)[k']? = some w' := by
+theorem linLogEmittedA (G : Gexec) (anc : Geid → Bool) (hwf : gwf G) (hok : ancOk G anc)
+    (k t' : Nat) (r w' : Geid) :
+    (glinEidsA G anc)[k]? = some r → gwriteAt G t' = some w' →
+    t' ≤ (cdLog (linCandA G anc) k).length →
+    ∃ k', k' < k ∧ (glinEidsA G anc)[k']? = some w' := by
   intro _ hwa hle
   cases t' with
   | zero => simp [gwriteAt] at hwa
   | succ i =>
     have hi : (gwrites G)[i]? = some w' := hwa
     have hw := gwritesLookupElem G i w' hi
-    obtain ⟨kw, hkw⟩ := glinIndex G hwf w' (gwritesLbl G hwf w' hw)
-    have hsp := linGwritesSplit G hwf kw w' hkw (gwritesIsw G w' hw)
-    have heq : linNw G kw = i := NoDup_lookup (gwritesNodup G (linNd G hwf)) hsp hi
-    rw [linLogLen] at hle
+    obtain ⟨kw, hkw⟩ := glinAIndex G anc hwf hok w' (gwritesLbl G hwf w' hw)
+    have hsp := linAGwritesSplit G anc hwf hok kw w' hkw (gwritesIsw G w' hw)
+    have heq : linNwA G anc kw = i := NoDup_lookup (gwritesNodup G (linNd G hwf)) hsp hi
+    rw [linALogLen] at hle
     refine ⟨kw, ?_, hkw⟩
     by_cases hlt : kw < k
     · exact hlt
-    · have := linNwMono G k kw (by omega)
+    · have := linANwMono G anc k kw (by omega)
       omega
 
 /-! ## (4) The witness fits in the prefix log -/
 
-theorem linTvnScaLe (G : Gexec) (hwf : gwf G) (h14 : grule14 G) (k : Nat) (r : Geid) :
-    (glinEids G)[k]? = some r → tvnSca G r ≤ (cdLog (linCand G) k).length := by
+theorem linTvnScaLeA (G : Gexec) (anc : Geid → Bool) (hwf : gwf G) (hok : ancOk G anc) (k : Nat)
+    (r : Geid) :
+    (glinEidsA G anc)[k]? = some r → tvnSca G r ≤ (cdLog (linCandA G anc) k).length := by
   intro hk
-  rw [linLogLen]
+  rw [linALogLen]
   have hlen : tvnSca G r ≤ (gwrites G).length := List.length_filter_le _ _
   cases hn : tvnSca G r with
   | zero => omega
@@ -204,23 +194,58 @@ theorem linTvnScaLe (G : Gexec) (hwf : gwf G) (h14 : grule14 G) (k : Nat) (r : G
     have hwm := gwritesLookupElem G n w hw
     have hix := gwixOfLookup G n w (linNd G hwf) hw
     have hmo : gmoLt G w r := (gwixLeTvnSca G r w hwf hwm).1 (by rw [hix, hn]; exact Nat.le_refl _)
-    obtain ⟨kw, hkw⟩ := glinIndex G hwf w (gwritesLbl G hwf w hwm)
-    have hlt := linGmoEmitBefore G hwf h14 k kw r w hk hkw hwm hmo
-    have hsp := linGwritesSplit G hwf kw w hkw (gwritesIsw G w hwm)
-    have heq : linNw G kw = n := NoDup_lookup (gwritesNodup G (linNd G hwf)) hsp hw
-    have hS := linNwS G kw w hkw (gwritesIsw G w hwm)
-    have := linNwMono G (kw + 1) k (by omega)
+    obtain ⟨kw, hkw⟩ := glinAIndex G anc hwf hok w (gwritesLbl G hwf w hwm)
+    have hlt := linGmoEmitBeforeA G anc hwf hok k kw r w hk hkw hwm hmo
+    have hsp := linAGwritesSplit G anc hwf hok kw w hkw (gwritesIsw G w hwm)
+    have heq : linNwA G anc kw = n := NoDup_lookup (gwritesNodup G (linNd G hwf)) hsp hw
+    have hS := linANwS G anc kw w hkw (gwritesIsw G w hwm)
+    have := linANwMono G anc (kw + 1) k (by omega)
+    omega
+
+/-- **W13 (L), the anchor fact W11 (iv)c consumes**: at an ANCHOR `r` (a write, an I/O event, a
+disk-row read under G3-Q (a″)) the prefix log of the anchored trace holds EXACTLY the writes
+gmo-before `r` — its length is the witness `tvnSca G r`. -/
+theorem linNwAAnc (G : Gexec) (anc : Geid → Bool) (hwf : gwf G) (hok : ancOk G anc) (k : Nat)
+    (r : Geid) :
+    (glinEidsA G anc)[k]? = some r → anc r = true → linNwA G anc k = tvnSca G r := by
+  intro hk hr
+  have hge := linTvnScaLeA G anc hwf hok k r hk
+  rw [linALogLen] at hge
+  apply Nat.le_antisymm _ hge
+  cases hn : linNwA G anc k with
+  | zero => exact Nat.zero_le _
+  | succ n =>
+    have hsplit : gwrites G = ((glinEidsA G anc).take k).filter (gisW G) ++
+        ((glinEidsA G anc).drop k).filter (gisW G) := by
+      rw [← glinAWrites G anc hwf hok, ← List.filter_append, List.take_append_drop]
+    have hlt : n < (((glinEidsA G anc).take k).filter (gisW G)).length := by
+      unfold linNwA at hn; omega
+    obtain ⟨w, hw⟩ := someOfIsSome (lookup_lt_is_Some_2 hlt)
+    have hgw : (gwrites G)[n]? = some w := by rw [hsplit]; exact lookup_app_l_Some hw
+    have hmem : w ∈ (glinEidsA G anc).take k := (List.mem_filter.1 (elem_of_list_lookup_2 hw)).1
+    obtain ⟨kw, hkw⟩ := elem_of_list_lookup_1 hmem
+    have hkwlt : kw < k := by
+      have := lookup_lt_Some hkw
+      simp only [List.length_take] at this
+      omega
+    have hkw' : (glinEidsA G anc)[kw]? = some w := by rw [← lookup_take hkwlt]; exact hkw
+    have hwm := gwritesLookupElem G n w hgw
+    have hmo : gmoLt G w r :=
+      (glinAAncIff G anc hwf hok kw k w r hkw' hk (hok.2.1 w (gwritesIsw G w hwm)) hr).1 hkwlt
+    have hix := gwixOfLookup G n w (linNd G hwf) hgw
+    have := (gwixLeTvnSca G r w hwf hwm).2 hmo
     omega
 
 /-! ## (5) Per-load single-copy atomicity -/
 
 /-- Lean-only: `r`'s prefix log is a prefix of the final log. -/
-theorem RvwmoXv6Sca.linLogPrefix (G : Gexec) (hwf : gwf G) (k : Nat) :
-    ∃ rest, (gwrites G).filterMap (WeakRvwmoLin.gmsg G) = cdLog (linCand G) k ++ rest := by
-  refine ⟨((glinEids G).drop k).filterMap (WeakRvwmoLin.gmsg G), ?_⟩
-  rw [← linFullLog G hwf]
-  simp only [linLogTake]
-  rw [linTrLen, take_ge (Nat.le_refl _), ← List.filterMap_append, List.take_append_drop]
+theorem RvwmoXv6Sca.linLogPrefixA (G : Gexec) (anc : Geid → Bool) (hwf : gwf G) (hok : ancOk G anc)
+    (k : Nat) :
+    ∃ rest, (gwrites G).filterMap (WeakRvwmoLin.gmsg G) = cdLog (linCandA G anc) k ++ rest := by
+  refine ⟨((glinEidsA G anc).drop k).filterMap (WeakRvwmoLin.gmsg G), ?_⟩
+  rw [← linAFullLog G anc hwf hok]
+  simp only [linALogTake]
+  rw [linTrALen, take_ge (Nat.le_refl _), ← List.filterMap_append, List.take_append_drop]
 
 /-- Lean-only: a graph message is authored by its event's agent. -/
 theorem RvwmoXv6Sca.gmsgTid (G : Gexec) (w : Geid) (m : Wmsg) :
@@ -238,26 +263,26 @@ theorem RvwmoXv6Sca.gmsgTid (G : Gexec) (w : Geid) (m : Wmsg) :
       subst h
       rfl
 
-theorem linScaOk (G : Gexec) (k : Nat) (r : Geid) (aq : Bool) (base : Int) (ts : List Nat)
-    (vs : List (BitVec 8)) :
-    rvwmoMinusConsistent G → grule14 G → (glinEids G)[k]? = some r →
+theorem linScaOkA (G : Gexec) (anc : Geid → Bool) (k : Nat) (r : Geid) (aq : Bool) (base : Int)
+    (ts : List Nat) (vs : List (BitVec 8)) :
+    rvwmoMinusConsistent G → ancOk G anc → (glinEidsA G anc)[k]? = some r →
     gxLbl G r = some (LLoad aq base ts vs) →
-    scaOk G.gxImg (cdLog (linCand G) k) r.1 base ts := by
-  rintro ⟨hwf, hppo, hlv, _⟩ h14 hk hl
+    scaOk G.gxImg (cdLog (linCandA G anc) k) r.1 base ts := by
+  rintro ⟨hwf, hppo, hlv, _⟩ hok hk hl
   have hnd := linNd G hwf
   have hsh : vs.length = ts.length := gwfLblShape G r _ hwf hl
-  obtain ⟨rest, hfull⟩ := RvwmoXv6Sca.linLogPrefix G hwf k
-  have hLB : ∀ t a, t ≤ (cdLog (linCand G) k).length →
-      logByte G.gxImg (cdLog (linCand G) k) t a =
+  obtain ⟨rest, hfull⟩ := RvwmoXv6Sca.linLogPrefixA G anc hwf hok k
+  have hLB : ∀ t a, t ≤ (cdLog (linCandA G anc) k).length →
+      logByte G.gxImg (cdLog (linCandA G anc) k) t a =
         logByte G.gxImg ((gwrites G).filterMap (WeakRvwmoLin.gmsg G)) t a := by
     intro t a ht
     rw [hfull, logByteApp _ _ _ _ _ ht]
-  refine ⟨tvnSca G r, linTvnScaLe G hwf h14 k r hk, ?_⟩
+  refine ⟨tvnSca G r, linTvnScaLeA G anc hwf hok k r hk, ?_⟩
   intro j t hj
   obtain ⟨v, hv⟩ := someOfIsSome
     (lookup_lt_is_Some_2 (show j < vs.length by rw [hsh]; exact lookup_lt_Some hj))
   have hrd : greadsByte G r (accAddr base j) t v := ⟨_, base, ts, vs, j, hl, rfl, hj, hv, rfl⟩
-  have htle := linReadTsLe G hwf hppo hlv h14 k r _ t v hk hrd
+  have htle := linAReadTsLe G anc hwf hok hppo hlv k r _ t v hk hrd
   refine ⟨?_, ?_, ?_⟩
   · -- the source byte is in the prefix log
     rw [hLB t _ htle]
@@ -282,7 +307,7 @@ theorem linScaOk (G : Gexec) (k : Nat) (r : Geid) (aq : Bool) (base : Int) (ts :
     cases t' with
     | zero => omega
     | succ i' =>
-      have hi'lt : i' < (cdLog (linCand G) k).length := by omega
+      have hi'lt : i' < (cdLog (linCandA G anc) k).length := by omega
       obtain ⟨m, hm⟩ := someOfIsSome (lookup_lt_is_Some_2 hi'lt)
       have hmf : ((gwrites G).filterMap (WeakRvwmoLin.gmsg G))[i']? = some m := by
         rw [hfull]; exact lookup_app_l_Some hm
@@ -303,25 +328,74 @@ theorem linScaOk (G : Gexec) (k : Nat) (r : Geid) (aq : Bool) (base : Int) (ts :
           rw [hm, Option.some.injEq] at hm0
           subst hm0
           rw [RvwmoXv6Sca.gmsgTid G w' m hgm, Option.some.injEq] at htid
-          obtain ⟨k', hk', hk'w⟩ := linLogEmitted G hwf k (i' + 1) r w' hk hw' ht'le
-          refine Or.inr ⟨htid, ?_, glinLookupLbl G hwf k' w' hk'w, glinLookupLbl G hwf k r hk⟩
-          exact (glinPoIff G hwf h14 k' k w' r hk'w hk htid).1 hk'
+          obtain ⟨k', hk', hk'w⟩ := linLogEmittedA G anc hwf hok k (i' + 1) r w' hk hw' ht'le
+          refine Or.inr ⟨htid, ?_, glinALookupLbl G anc hwf hok k' w' hk'w, glinALookupLbl G anc hwf hok k r hk⟩
+          exact (glinAPoIff G anc hwf hok k' k w' r hk'w hk htid).1 hk'
       have := gcomax G hlv r _ t v w' v' hrd hwb hvis'
       omega
 
 /-! ## (6) The candidate theorem -/
 
-theorem linCandSca (G : Gexec) : rvwmoMinusConsistent G → grule14 G → candSca (linCand G) := by
-  intro hc h14 k s hs aq base ts vs hlb
+theorem linCandScaA (G : Gexec) (anc : Geid → Bool) :
+    rvwmoMinusConsistent G → ancOk G anc → candSca (linCandA G anc) := by
+  intro hc hok k s hs aq base ts vs hlb
   have hwf := hc.1
   rw [candExTr] at hs
-  have hkle : k ≤ (linCand G).cdTr.length := by have := lookup_lt_Some hs; omega
-  obtain ⟨e, he, rfl⟩ := linTrLookupInv G k s hs
+  have hkle : k ≤ (linCandA G anc).cdTr.length := by have := lookup_lt_Some hs; omega
+  obtain ⟨e, he, rfl⟩ := linTrALookupInv G anc k s hs
   have hl : gxLbl G e = some (LLoad aq base ts vs) := by
-    rw [linLbl G hwf k e he]
+    rw [linALbl G anc hwf hok k e he]
     exact congrArg some hlb
-  show scaOk (eimg (candExec (linCand G)) k) (elog (candExec (linCand G)) k) e.1 base ts
+  show scaOk (eimg (candExec (linCandA G anc)) k) (elog (candExec (linCandA G anc)) k) e.1 base ts
   rw [candEimg _ k hkle, candElog _ k hkle]
-  exact linScaOk G k e aq base ts vs hc h14 he hl
+  exact linScaOkA G anc k e aq base ts vs hc hok he hl
+
+/-! ## (7) The write-anchored instances (the pre-W13 (L) statements, unchanged) -/
+
+theorem linGmoEmitBefore (G : Gexec) (hwf : gwf G) (h14 : grule14 G) (k kw : Nat) (r w : Geid) :
+    (glinEids G)[k]? = some r → (glinEids G)[kw]? = some w → w ∈ gwrites G →
+    gmoLt G w r → kw < k :=
+  linGmoEmitBeforeA G (gisW G) hwf (ancOkW G h14) k kw r w
+
+theorem linLogEmitted (G : Gexec) (hwf : gwf G) (k t' : Nat) (r w' : Geid) :
+    (glinEids G)[k]? = some r → gwriteAt G t' = some w' →
+    t' ≤ (cdLog (linCand G) k).length →
+    ∃ k', k' < k ∧ (glinEids G)[k']? = some w' := by
+  intro _ hwa hle
+  cases t' with
+  | zero => simp [gwriteAt] at hwa
+  | succ i =>
+    have hi : (gwrites G)[i]? = some w' := hwa
+    have hw := gwritesLookupElem G i w' hi
+    obtain ⟨kw, hkw⟩ := glinIndex G hwf w' (gwritesLbl G hwf w' hw)
+    have hsp := linGwritesSplit G hwf kw w' hkw (gwritesIsw G w' hw)
+    have heq : linNw G kw = i := NoDup_lookup (gwritesNodup G (linNd G hwf)) hsp hi
+    rw [linLogLen] at hle
+    refine ⟨kw, ?_, hkw⟩
+    by_cases hlt : kw < k
+    · exact hlt
+    · have := linNwMono G k kw (by omega)
+      omega
+
+theorem linTvnScaLe (G : Gexec) (hwf : gwf G) (h14 : grule14 G) (k : Nat) (r : Geid) :
+    (glinEids G)[k]? = some r → tvnSca G r ≤ (cdLog (linCand G) k).length :=
+  linTvnScaLeA G (gisW G) hwf (ancOkW G h14) k r
+
+theorem RvwmoXv6Sca.linLogPrefix (G : Gexec) (hwf : gwf G) (k : Nat) :
+    ∃ rest, (gwrites G).filterMap (WeakRvwmoLin.gmsg G) = cdLog (linCand G) k ++ rest := by
+  refine ⟨((glinEids G).drop k).filterMap (WeakRvwmoLin.gmsg G), ?_⟩
+  rw [← linFullLog G hwf]
+  simp only [linLogTake]
+  rw [linTrLen, take_ge (Nat.le_refl _), ← List.filterMap_append, List.take_append_drop]
+
+theorem linScaOk (G : Gexec) (k : Nat) (r : Geid) (aq : Bool) (base : Int) (ts : List Nat)
+    (vs : List (BitVec 8)) :
+    rvwmoMinusConsistent G → grule14 G → (glinEids G)[k]? = some r →
+    gxLbl G r = some (LLoad aq base ts vs) →
+    scaOk G.gxImg (cdLog (linCand G) k) r.1 base ts :=
+  fun hc h14 => linScaOkA G (gisW G) k r aq base ts vs hc (ancOkW G h14)
+
+theorem linCandSca (G : Gexec) : rvwmoMinusConsistent G → grule14 G → candSca (linCand G) :=
+  fun hc h14 => linCandScaA G (gisW G) hc (ancOkW G h14)
 
 end Weak

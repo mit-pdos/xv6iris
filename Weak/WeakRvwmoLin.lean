@@ -124,6 +124,22 @@ program has no events — the `Hnil` assertion both `filter_gevs_hart` and
 `glin_hart` prove inline), `linTrEq` (a trace step at a known event index IS
 that event's step — the `lin_tr_lookup` + `simplify_eq` idiom).
 
+**W13 (L) — §6, Lean-only (no Rocq twin; plan `notes/weak-allocproc-plan.md` §C W13 (L),
+[W2s], G3-Q (a″) [OWN.17]).**  The ANCHORED rank trace: `gnxa` (the po-next anchor of an arbitrary
+anchor class `anc`), `gancs` (gmo filtered by `anc`), `gaix` (the anchor index), `grankA`,
+`grankBoundA`, `glinEidsA`, `linCandA`, `linNwA`; admissibility `granc14` (anchor-14: a memory
+event po-before an anchor is gmo-before it) and `ancOk`.  For `anc = gisW G` the construction IS
+§2's, definitionally (`glinEidsAW`, `linCandAW`, `linNwAW`; `ancOkW` from rule 14), so §2–§3 are
+its write instance and are left as they were (their statements need `gwf` only where §6's need
+`ancOk`).  Lemmas (the §2–§3 twins, file order): `gnxaSome`, `gnxaNone`, `gnxaSelf`,
+`gancsElemOf`, `gancsNodup`, `gaixLookup`, `gaixLe`, `gaixInj`, `gancsSorted`, `gaixGposLt`,
+`gancsOfAnc`, `ancLbl`, `gsameHartGaix`, `grankAAnc`, `grankALtBound`, `grankAMono`, `glinANodup`,
+`elemOfGlinA`, `glinALookupLbl`, `glinAIndex`, `glinAPerm`, `glinAHart`, `glinAPoLt`, `glinAPoIff`,
+`glinARankLt`, `glinAWrites`, `linTrALookup`, `linTrALookupInv`, `linTrALen`, `linALbl`,
+`linALogTake`, `linALogLen`, `linANwMono`, `linANwS`, `linAGwritesSplit`, `linASourceBefore`,
+`linAReadTsLe`, `linAFullLog`; and the two new facts `glinAGmoAnc` (an anchor gmo-before an event
+is emitted before it) and `glinAAncIff` (between anchors, trace order IS gmo order).
+
 **Not ported:** nothing.
 
 **Statements checked** (by hand, against Rocq): all of them.
@@ -1854,5 +1870,594 @@ theorem rule14Linearization (G : Gexec) :
   rintro ⟨hwf, hppo, hlv, hat⟩ h14
   exact ⟨linCand G, linSrvwmo G hwf hppo hlv hat h14, rfl, fun i => linProg G hwf h14 i,
     linFullLog G hwf⟩
+
+/-! # 6. W13 (L): THE ANCHORED RANK TRACE (Lean-only; plan §C W13 (L), [W2s], G3-Q (a″))
+
+The rank trace above anchors every event at its po-next WRITE, so it respects gmo between two
+writes and nothing else.  W13 (L) makes I/O events (and, under G3-Q (a″), disk-row reads)
+ANCHORS too: `gnxa G anc e` is the po-next event at-or-after `e` of an arbitrary ANCHOR CLASS
+`anc`, ranked by its index `gaix` in the anchor sub-order `gancs G anc` (gmo filtered by `anc`).
+For `anc = gisW G` this IS the construction above, definitionally (`glinEidsAW`, `linCandAW`), so
+the old trace is one instance.  The class is admissible (`ancOk`) when anchors are memory events,
+every write is an anchor, and ANCHOR-14 holds: a memory event po-before an anchor is gmo-before
+it (`granc14`; rule 14 is the instance `anc = gisW`).  Under `ancOk` the anchored trace keeps the
+per-hart po order, emits the writes in gmo order (so the log is unchanged), and respects gmo
+between an anchor and EVERY later event (`glinAGmoAnc`) — in particular, the anchors come out in
+gmo order (`glinAAncIff`). -/
+
+/-- The po-FIRST anchor at-or-after `e`, in `e`'s own row. -/
+def gnxa (G : Gexec) (anc : Geid → Bool) (e : Geid) : Option Geid :=
+  (listFind (fun k => anc (e.1, k))
+    (List.range' e.2 ((WeakRvwmoLin.grow G e.1).length - e.2))).map
+    (fun ik : Nat × Nat => (e.1, ik.2))
+
+/-- The ANCHOR SUB-ORDER: gmo filtered by the class (for `gisW G` it is `gwrites G`). -/
+def gancs (G : Gexec) (anc : Geid → Bool) : List Geid := G.gxGmo.filter anc
+
+/-- The (1-based) anchor index (for `gisW G` it is `gwix G`). -/
+def gaix (G : Gexec) (anc : Geid → Bool) (e : Geid) : Nat :=
+  match listFind (fun e' => decide (e' = e)) (gancs G anc) with
+  | some (i, _) => i + 1
+  | none => 0
+
+/-- THE ANCHORED RANK: `gaix` of the next anchor, or a past-the-end slot per row. -/
+def grankA (G : Gexec) (anc : Geid → Bool) (e : Geid) : Nat :=
+  match gnxa G anc e with
+  | some a => gaix G anc a
+  | none => (gancs G anc).length + 1 + e.1
+
+def grankBoundA (G : Gexec) (anc : Geid → Bool) : Nat :=
+  (gancs G anc).length + 1 + G.gxProg.length
+
+def glinEidsA (G : Gexec) (anc : Geid → Bool) : List Geid :=
+  rblocks (grankA G anc) (gevs G) (grankBoundA G anc)
+
+def linCandA (G : Gexec) (anc : Geid → Bool) : Cand :=
+  ⟨G.gxImg, (glinEidsA G anc).map (glinStep G)⟩
+
+def linNwA (G : Gexec) (anc : Geid → Bool) (k : Nat) : Nat :=
+  (((glinEidsA G anc).take k).filter (gisW G)).length
+
+/-- ANCHOR-14: a memory event po-before an anchor is gmo-before it. -/
+def granc14 (G : Gexec) (anc : Geid → Bool) : Prop :=
+  ∀ e a, WeakRvwmoGraph.gpo G e a → gmem G e → anc a = true → gmoLt G e a
+
+/-- An ADMISSIBLE anchor class. -/
+def ancOk (G : Gexec) (anc : Geid → Bool) : Prop :=
+  (∀ e, anc e = true → gmem G e) ∧ (∀ e, gisW G e = true → anc e = true) ∧ granc14 G anc
+
+/-! ## 6.1 The write instance IS the rank trace above -/
+
+theorem glinEidsAW (G : Gexec) : glinEidsA G (gisW G) = glinEids G := rfl
+
+theorem linCandAW (G : Gexec) : linCandA G (gisW G) = linCand G := rfl
+
+theorem linNwAW (G : Gexec) (k : Nat) : linNwA G (gisW G) k = linNw G k := rfl
+
+theorem ancOkW (G : Gexec) (h14 : grule14 G) : ancOk G (gisW G) := by
+  refine ⟨fun e he => ?_, fun _ h => h, fun e a hpo hm ha => ?_⟩
+  · have hs : (gxLbl G e).isSome := by
+      unfold gisW at he; cases h : gxLbl G e <;> simp_all
+    exact WeakRvwmoLin.gisWGmem G e hs he
+  · exact h14 e a hpo hm (WeakRvwmoLin.gisWGlblIs G a hpo.2.2.2 ha)
+
+/-! ## 6.2 `gnxa`: the next anchor -/
+
+theorem gnxaSome (G : Gexec) (anc : Geid → Bool) (i k : Nat) (a : Geid) :
+    gnxa G anc (i, k) = some a →
+    ∃ m, a = (i, m) ∧ k ≤ m ∧ m < (WeakRvwmoLin.grow G i).length ∧
+      anc (i, m) = true ∧
+      (∀ k', k ≤ k' → k' < m → anc (i, k') = false) := by
+  unfold gnxa
+  simp only
+  cases hf : listFind (fun k' => anc (i, k'))
+      (List.range' k ((WeakRvwmoLin.grow G i).length - k)) with
+  | none => simp
+  | some q =>
+    obtain ⟨n, j⟩ := q
+    intro h
+    simp only [Option.map_some, Option.some.injEq] at h
+    subst h
+    obtain ⟨hn, hw, hmin⟩ := list_find_Some.1 hf
+    obtain ⟨rfl, hlt⟩ := lookup_seq.1 hn
+    refine ⟨k + n, rfl, by omega, by omega, hw, ?_⟩
+    intro k' hk1 hk2
+    exact hmin (k' - k) k' (lookup_seq.2 ⟨by omega, by omega⟩) (by omega)
+
+theorem gnxaNone (G : Gexec) (anc : Geid → Bool) (i k k' : Nat) :
+    gnxa G anc (i, k) = none → k ≤ k' → k' < (WeakRvwmoLin.grow G i).length →
+    anc (i, k') = false := by
+  unfold gnxa
+  simp only [Option.map_eq_none_iff]
+  intro hf hk1 hk2
+  exact list_find_None.1 hf k' (elem_of_seq.2 ⟨hk1, by omega⟩)
+
+theorem gnxaSelf (G : Gexec) (anc : Geid → Bool) (i k : Nat) :
+    (gxLbl G (i, k)).isSome → anc (i, k) = true → gnxa G anc (i, k) = some (i, k) := by
+  intro hl hw
+  obtain ⟨hi, hk⟩ := (gxLblBounds G (i, k)).1 hl
+  simp only at hi hk
+  cases hf : gnxa G anc (i, k) with
+  | none => rw [gnxaNone G anc i k k hf (Nat.le_refl _) hk] at hw; cases hw
+  | some w =>
+    obtain ⟨m, rfl, hkm, hm, hwm, hmin⟩ := gnxaSome G anc i k w hf
+    by_cases hkm' : k = m
+    · subst hkm'; rfl
+    · rw [hmin k (Nat.le_refl _) (by omega)] at hw; cases hw
+
+/-! ## 6.3 The anchor sub-order and `gaix` (the `gwrites`/`gwix` facts, for any class) -/
+
+theorem gancsElemOf (G : Gexec) (anc : Geid → Bool) (e : Geid) :
+    e ∈ gancs G anc ↔ e ∈ G.gxGmo ∧ anc e = true := by
+  unfold gancs
+  rw [elem_of_list_filter]
+  exact And.comm
+
+theorem gancsNodup (G : Gexec) (anc : Geid → Bool) : G.gxGmo.Nodup → (gancs G anc).Nodup :=
+  fun hnd => NoDup_filter hnd
+
+theorem gaixLookup (G : Gexec) (anc : Geid → Bool) (a : Geid) :
+    a ∈ gancs G anc → ∃ i, (gancs G anc)[i]? = some a ∧ gaix G anc a = i + 1 := by
+  intro he
+  unfold gaix
+  cases hf : listFind (fun e' => decide (e' = a)) (gancs G anc) with
+  | some q =>
+    obtain ⟨i, x⟩ := q
+    obtain ⟨hi, hx, _⟩ := list_find_Some.1 hf
+    have : x = a := of_decide_eq_true hx
+    subst this
+    exact ⟨i, hi, rfl⟩
+  | none =>
+    have := list_find_None.1 hf a he
+    simp at this
+
+theorem gaixLe (G : Gexec) (anc : Geid → Bool) (a : Geid) :
+    a ∈ gancs G anc → gaix G anc a ≤ (gancs G anc).length := by
+  intro he
+  obtain ⟨i, hi, h⟩ := gaixLookup G anc a he
+  have := lookup_lt_Some hi
+  omega
+
+theorem gaixInj (G : Gexec) (anc : Geid → Bool) (a1 a2 : Geid) :
+    a1 ∈ gancs G anc → a2 ∈ gancs G anc → gaix G anc a1 = gaix G anc a2 → a1 = a2 := by
+  intro h1 h2 heq
+  obtain ⟨i1, hi1, e1⟩ := gaixLookup G anc a1 h1
+  obtain ⟨i2, hi2, e2⟩ := gaixLookup G anc a2 h2
+  have : i1 = i2 := by omega
+  subst this
+  rw [hi1, Option.some.injEq] at hi2
+  exact hi2
+
+theorem gancsSorted (G : Gexec) (anc : Geid → Bool) :
+    G.gxGmo.Nodup → List.Pairwise (fun x y => gpos G x < gpos G y) (gancs G anc) := by
+  intro hnd
+  apply stronglySortedFilter
+  apply stronglySortedLookupIntro
+  intro i j x y hi hj hlt
+  rw [gposOfLookup G i x hnd hi, gposOfLookup G j y hnd hj]
+  exact hlt
+
+/-- Anchor index order IS gmo position order. -/
+theorem gaixGposLt (G : Gexec) (anc : Geid → Bool) (a1 a2 : Geid) :
+    G.gxGmo.Nodup → a1 ∈ gancs G anc → a2 ∈ gancs G anc →
+    (gaix G anc a1 < gaix G anc a2 ↔ gpos G a1 < gpos G a2) := by
+  intro hnd h1 h2
+  obtain ⟨i1, hi1, e1⟩ := gaixLookup G anc a1 h1
+  obtain ⟨i2, hi2, e2⟩ := gaixLookup G anc a2 h2
+  have hss := gancsSorted G anc hnd
+  constructor
+  · intro hlt
+    exact stronglySortedLookupElim _ _ i1 i2 a1 a2 hss hi1 hi2 (by omega)
+  · intro hlt
+    rw [e1, e2]
+    by_cases hi : i1 < i2
+    · omega
+    by_cases heq : i1 = i2
+    · subst heq
+      rw [hi1, Option.some.injEq] at hi2
+      subst hi2
+      omega
+    exfalso
+    have hgt := stronglySortedLookupElim _ _ i2 i1 a2 a1 hss hi2 hi1 (by omega)
+    omega
+
+/-- Under `ancOk`, an anchor is a labelled member of the anchor sub-order. -/
+theorem gancsOfAnc (G : Gexec) (anc : Geid → Bool) (hwf : gwf G) (hok : ancOk G anc) (a : Geid) :
+    anc a = true → a ∈ gancs G anc :=
+  fun ha => (gancsElemOf G anc a).2 ⟨gwfMemGmo G a hwf (hok.1 a ha), ha⟩
+
+theorem ancLbl (G : Gexec) (anc : Geid → Bool) (hok : ancOk G anc) (a : Geid) :
+    anc a = true → (gxLbl G a).isSome := by
+  intro ha
+  obtain ⟨l, hl, -⟩ := hok.1 a ha
+  rw [hl]; rfl
+
+/-! ## 6.4 Same-row anchors: position order IS `gaix` order (anchor-14) -/
+
+theorem gsameHartGaix (G : Gexec) (anc : Geid → Bool) (hwf : gwf G) (hok : ancOk G anc)
+    (i k1 k2 : Nat) :
+    anc (i, k1) = true → anc (i, k2) = true → k1 < k2 →
+    gaix G anc (i, k1) < gaix G anc (i, k2) := by
+  intro hw1 hw2 hlt
+  have hl1 := ancLbl G anc hok _ hw1
+  have hl2 := ancLbl G anc hok _ hw2
+  have hmo : gmoLt G (i, k1) (i, k2) :=
+    hok.2.2 _ _ ⟨rfl, hlt, hl1, hl2⟩ (hok.1 _ hw1) hw2
+  exact (gaixGposLt G anc _ _ (linNd G hwf) (gancsOfAnc G anc hwf hok _ hw1)
+    (gancsOfAnc G anc hwf hok _ hw2)).2 hmo.2.2
+
+/-! ## 6.5 The anchored rank: `gaix` on anchors, bounded, monotone in po -/
+
+theorem grankAAnc (G : Gexec) (anc : Geid → Bool) (hok : ancOk G anc) (a : Geid) :
+    anc a = true → grankA G anc a = gaix G anc a := by
+  intro ha
+  obtain ⟨i, k⟩ := a
+  unfold grankA
+  rw [gnxaSelf G anc i k (ancLbl G anc hok _ ha) ha]
+
+theorem grankALtBound (G : Gexec) (anc : Geid → Bool) (hwf : gwf G) (hok : ancOk G anc)
+    (e : Geid) : (gxLbl G e).isSome → grankA G anc e < grankBoundA G anc := by
+  intro hl
+  obtain ⟨hi, hk⟩ := (gxLblBounds G e).1 hl
+  obtain ⟨i, k⟩ := e
+  simp only at hi hk
+  unfold grankA grankBoundA
+  cases hf : gnxa G anc (i, k) with
+  | none => dsimp only; omega
+  | some w =>
+    obtain ⟨m, rfl, _, _, hw, _⟩ := gnxaSome G anc i k w hf
+    have := gaixLe G anc (i, m) (gancsOfAnc G anc hwf hok _ hw)
+    dsimp only; omega
+
+theorem grankAMono (G : Gexec) (anc : Geid → Bool) (hwf : gwf G) (hok : ancOk G anc)
+    (i k1 k2 : Nat) :
+    k1 ≤ k2 → k2 < (WeakRvwmoLin.grow G i).length →
+    grankA G anc (i, k1) ≤ grankA G anc (i, k2) := by
+  intro hle hk2
+  unfold grankA
+  cases h2 : gnxa G anc (i, k2) with
+  | some w2 =>
+    obtain ⟨m2, rfl, hk2m, hm2, hw2, _⟩ := gnxaSome G anc i k2 w2 h2
+    cases h1 : gnxa G anc (i, k1) with
+    | none => rw [gnxaNone G anc i k1 m2 h1 (by omega) hm2] at hw2; cases hw2
+    | some w1 =>
+      obtain ⟨m1, rfl, hk1m, hm1, hw1, hmin1⟩ := gnxaSome G anc i k1 w1 h1
+      have hle' : m1 ≤ m2 := by
+        by_cases hlt : m2 < m1
+        · rw [hmin1 m2 (by omega) hlt] at hw2; cases hw2
+        · omega
+      dsimp only
+      by_cases heq : m1 = m2
+      · subst heq; exact Nat.le_refl _
+      · exact Nat.le_of_lt (gsameHartGaix G anc hwf hok i m1 m2 hw1 hw2 (by omega))
+  | none =>
+    cases h1 : gnxa G anc (i, k1) with
+    | none => dsimp only; omega
+    | some w1 =>
+      obtain ⟨m1, rfl, _, _, hw1, _⟩ := gnxaSome G anc i k1 w1 h1
+      have := gaixLe G anc (i, m1) (gancsOfAnc G anc hwf hok _ hw1)
+      dsimp only; omega
+
+/-! ## 6.6 The anchored trace: NoDup, membership, the order facts -/
+
+theorem glinANodup (G : Gexec) (anc : Geid → Bool) : (glinEidsA G anc).Nodup :=
+  rblocksNodup _ _ _ (gevsNodup G)
+
+theorem elemOfGlinA (G : Gexec) (anc : Geid → Bool) (hwf : gwf G) (hok : ancOk G anc) (e : Geid) :
+    e ∈ glinEidsA G anc ↔ (gxLbl G e).isSome := by
+  unfold glinEidsA
+  rw [elemOfRblocks, elemOfGevs]
+  exact ⟨fun h => h.1, fun h => ⟨h, grankALtBound G anc hwf hok e h⟩⟩
+
+theorem glinALookupLbl (G : Gexec) (anc : Geid → Bool) (hwf : gwf G) (hok : ancOk G anc)
+    (k : Nat) (e : Geid) : (glinEidsA G anc)[k]? = some e → (gxLbl G e).isSome :=
+  fun h => (elemOfGlinA G anc hwf hok e).1 (elem_of_list_lookup_2 h)
+
+theorem glinAIndex (G : Gexec) (anc : Geid → Bool) (hwf : gwf G) (hok : ancOk G anc) (e : Geid) :
+    (gxLbl G e).isSome → ∃ k : Nat, (glinEidsA G anc)[k]? = some e :=
+  fun h => elem_of_list_lookup_1 ((elemOfGlinA G anc hwf hok e).2 h)
+
+theorem glinAPerm (G : Gexec) (anc : Geid → Bool) (hwf : gwf G) (hok : ancOk G anc) :
+    List.Perm (glinEidsA G anc) (gevs G) :=
+  rblocksPerm _ _ _ (gevsNodup G)
+    (fun x hx => grankALtBound G anc hwf hok x ((elemOfGevs G x).1 hx))
+
+/-- The per-row subsequence of the anchored trace IS the row. -/
+theorem glinAHart (G : Gexec) (anc : Geid → Bool) (hwf : gwf G) (hok : ancOk G anc) (i : Nat) :
+    (glinEidsA G anc).filter (fun e : Geid => decide (e.1 = i)) = gevsHart G i := by
+  unfold glinEidsA
+  rw [rblocksFilter, filterGevsHart]
+  by_cases hi : i < G.gxProg.length
+  · apply rblocksId (grankA G anc) (fun x y : Geid => x.2 ≤ y.2)
+    · exact gevsHartNodup G i
+    · apply stronglySortedLookupIntro
+      intro a b x y hx hy hab
+      obtain ⟨rfl, _⟩ := gevsHartLookupInv G i a x hx
+      obtain ⟨rfl, _⟩ := gevsHartLookupInv G i b y hy
+      show a ≤ b
+      omega
+    · intro x hx
+      obtain ⟨hx1, hx2⟩ := (elemOfGevsHart G i x).1 hx
+      apply grankALtBound G anc hwf hok
+      exact (gxLblBounds G x).2 ⟨by rw [hx1]; exact hi, by rw [hx1]; exact hx2⟩
+    · intro x y hx hy hrk
+      obtain ⟨hx1, hx2⟩ := (elemOfGevsHart G i x).1 hx
+      obtain ⟨hy1, hy2⟩ := (elemOfGevsHart G i y).1 hy
+      by_cases h : x.2 ≤ y.2
+      · exact h
+      · exfalso
+        obtain ⟨ix, kx⟩ := x
+        obtain ⟨iy, ky⟩ := y
+        simp only at hx1 hy1 hx2 hy2 h
+        rw [hx1] at hrk
+        rw [hy1] at hrk
+        have := grankAMono G anc hwf hok i ky kx (by omega) hx2
+        omega
+    · intro x y hx hy h1 h2
+      obtain ⟨hx1, _⟩ := (elemOfGevsHart G i x).1 hx
+      obtain ⟨hy1, _⟩ := (elemOfGevsHart G i y).1 hy
+      exact Prod.ext (hx1.trans hy1.symm) (by omega)
+  · rw [gevsHartNil G i hi]
+    unfold rblocks
+    exact mjoinSeqNone _ _ (fun j _ => rfl)
+
+theorem glinAPoLt (G : Gexec) (anc : Geid → Bool) (hwf : gwf G) (hok : ancOk G anc)
+    (k1 k2 : Nat) (e1 e2 : Geid) :
+    (glinEidsA G anc)[k1]? = some e1 → (glinEidsA G anc)[k2]? = some e2 →
+    e1.1 = e2.1 → e1.2 < e2.2 → k1 < k2 := by
+  intro h1 h2 hag hlt
+  have hss := filterSortedPidx (fun e : Geid => decide (e.1 = e1.1)) (glinEidsA G anc)
+    (glinANodup G anc)
+  rw [glinAHart G anc hwf hok e1.1] at hss
+  have hb1 : e1.2 < (WeakRvwmoLin.grow G e1.1).length :=
+    ((gxLblBounds G e1).1 (glinALookupLbl G anc hwf hok k1 e1 h1)).2
+  have hb2 : e2.2 < (WeakRvwmoLin.grow G e1.1).length := by
+    rw [hag]; exact ((gxLblBounds G e2).1 (glinALookupLbl G anc hwf hok k2 e2 h2)).2
+  have hg1 : (gevsHart G e1.1)[e1.2]? = some e1 := by rw [gevsHartLookup G e1.1 e1.2 hb1]
+  have hg2 : (gevsHart G e1.1)[e2.2]? = some e2 := by rw [gevsHartLookup G e1.1 e2.2 hb2, hag]
+  have hp : pidx (glinEidsA G anc) e1 < pidx (glinEidsA G anc) e2 :=
+    stronglySortedLookupElim _ _ e1.2 e2.2 e1 e2 hss hg1 hg2 hlt
+  rw [pidxOfLookup _ k1 e1 (glinANodup G anc) h1, pidxOfLookup _ k2 e2 (glinANodup G anc) h2] at hp
+  exact hp
+
+theorem glinAPoIff (G : Gexec) (anc : Geid → Bool) (hwf : gwf G) (hok : ancOk G anc)
+    (k1 k2 : Nat) (e1 e2 : Geid) :
+    (glinEidsA G anc)[k1]? = some e1 → (glinEidsA G anc)[k2]? = some e2 → e1.1 = e2.1 →
+    (k1 < k2 ↔ e1.2 < e2.2) := by
+  intro h1 h2 hag
+  refine ⟨fun hk => ?_, glinAPoLt G anc hwf hok k1 k2 e1 e2 h1 h2 hag⟩
+  by_cases hlt : e1.2 < e2.2
+  · exact hlt
+  · exfalso
+    by_cases heq : e1.2 = e2.2
+    · have he : e1 = e2 := Prod.ext hag heq
+      rw [he] at h1
+      have := NoDup_lookup (glinANodup G anc) h1 h2
+      omega
+    · have := glinAPoLt G anc hwf hok k2 k1 e2 e1 h2 h1 hag.symm (by omega)
+      omega
+
+/-- Rank order implies trace order. -/
+theorem glinARankLt (G : Gexec) (anc : Geid → Bool) (k1 k2 : Nat) (e1 e2 : Geid) :
+    (glinEidsA G anc)[k1]? = some e1 → (glinEidsA G anc)[k2]? = some e2 →
+    grankA G anc e1 < grankA G anc e2 → k1 < k2 := by
+  intro h1 h2 hlt
+  have hss := rblocksRankSorted (grankA G anc) (gevs G) (grankBoundA G anc)
+  by_cases hk : k1 < k2
+  · exact hk
+  · exfalso
+    by_cases heq : k1 = k2
+    · rw [heq, h2, Option.some.injEq] at h1
+      rw [h1] at hlt
+      omega
+    · have hx : grankA G anc e2 ≤ grankA G anc e1 :=
+        stronglySortedLookupElim _ _ k2 k1 e2 e1 hss h2 h1 (by omega)
+      omega
+
+/-- THE ANCHOR FACT: an anchor gmo-before an event is EMITTED before it (the next anchor of the
+event is gmo-after it by anchor-14, or the event sits in a past-the-end tail). -/
+theorem glinAGmoAnc (G : Gexec) (anc : Geid → Bool) (hwf : gwf G) (hok : ancOk G anc)
+    (k ka : Nat) (r a : Geid) :
+    (glinEidsA G anc)[k]? = some r → (glinEidsA G anc)[ka]? = some a → anc a = true →
+    gmoLt G a r → ka < k := by
+  intro hk hka ha hmo
+  apply glinARankLt G anc ka k a r hka hk
+  rw [grankAAnc G anc hok a ha]
+  have hrl := glinALookupLbl G anc hwf hok k r hk
+  have haG := gancsOfAnc G anc hwf hok a ha
+  obtain ⟨hri, hrk⟩ := (gxLblBounds G r).1 hrl
+  obtain ⟨ir, kr⟩ := r
+  simp only at hri hrk
+  unfold grankA
+  cases hf : gnxa G anc (ir, kr) with
+  | none => have := gaixLe G anc a haG; dsimp only; omega
+  | some w' =>
+    obtain ⟨m, rfl, hkm, hm, hwm, _⟩ := gnxaSome G anc ir kr w' hf
+    have hlm := glblSome G ir m hri hm
+    have hmo' : gmoLt G a (ir, m) := by
+      by_cases hkm' : kr = m
+      · subst hkm'; exact hmo
+      · apply gmoLtTrans G a (ir, kr) (ir, m) hmo
+        exact hok.2.2 _ _ ⟨rfl, show kr < m by omega, hrl, hlm⟩
+          (gwfGmoMem G (ir, kr) hwf hmo.2.1) hwm
+    dsimp only
+    exact (gaixGposLt G anc a (ir, m) (linNd G hwf) haG
+      (gancsOfAnc G anc hwf hok _ hwm)).2 hmo'.2.2
+
+/-- …so between two anchors, trace order IS gmo order. -/
+theorem glinAAncIff (G : Gexec) (anc : Geid → Bool) (hwf : gwf G) (hok : ancOk G anc)
+    (k1 k2 : Nat) (a1 a2 : Geid) :
+    (glinEidsA G anc)[k1]? = some a1 → (glinEidsA G anc)[k2]? = some a2 →
+    anc a1 = true → anc a2 = true → (k1 < k2 ↔ gmoLt G a1 a2) := by
+  intro h1 h2 ha1 ha2
+  refine ⟨fun hlt => ?_, glinAGmoAnc G anc hwf hok k2 k1 a2 a1 h2 h1 ha1⟩
+  have hm1 := gwfMemGmo G a1 hwf (hok.1 a1 ha1)
+  have hm2 := gwfMemGmo G a2 hwf (hok.1 a2 ha2)
+  have hne : a1 ≠ a2 := by
+    intro heq
+    rw [heq] at h1
+    have := NoDup_lookup (glinANodup G anc) h1 h2
+    omega
+  rcases gmoLtTotal G a1 a2 (linNd G hwf) hm1 hm2 hne with h | h
+  · exact h
+  · have := glinAGmoAnc G anc hwf hok k1 k2 a1 a2 h1 h2 ha2 h
+    omega
+
+/-! ## 6.7 The anchored trace's writes ARE `gwrites G` -/
+
+theorem glinAWrites (G : Gexec) (anc : Geid → Bool) (hwf : gwf G) (hok : ancOk G anc) :
+    (glinEidsA G anc).filter (gisW G) = gwrites G := by
+  have hnd := linNd G hwf
+  have hel : ∀ e, e ∈ (gevs G).filter (gisW G) ↔ e ∈ gwrites G := by
+    intro e
+    constructor
+    · intro he
+      obtain ⟨hb, he⟩ := elem_of_list_filter.1 he
+      exact gisWGwrites G e hwf ((elemOfGevs G e).1 he) hb
+    · intro he
+      exact elem_of_list_filter.2 ⟨gwritesIsw G e he, (elemOfGevs G e).2 (gwritesLbl G hwf e he)⟩
+  have hwA : ∀ w, w ∈ gwrites G → anc w = true := fun w hw => hok.2.1 w (gwritesIsw G w hw)
+  have hrkW : ∀ w, w ∈ gwrites G → grankA G anc w = gaix G anc w :=
+    fun w hw => grankAAnc G anc hok w (hwA w hw)
+  have hwG : ∀ w, w ∈ gwrites G → w ∈ gancs G anc :=
+    fun w hw => (gancsElemOf G anc w).2 ⟨gwritesGmo G w hw, hwA w hw⟩
+  unfold glinEidsA
+  rw [rblocksFilter]
+  have hR : rblocks (grankA G anc) (gwrites G) (grankBoundA G anc) = gwrites G := by
+    apply rblocksId (grankA G anc) (fun x y : Geid => gaix G anc x ≤ gaix G anc y)
+    · exact gwritesNodup G hnd
+    · refine stronglySortedWeaken _ _ _ ?_ (gwritesSorted G hnd)
+      intro x y hx hy hxy
+      exact Nat.le_of_lt ((gaixGposLt G anc x y hnd (hwG x hx) (hwG y hy)).2 hxy)
+    · intro x hx
+      exact grankALtBound G anc hwf hok x (gwritesLbl G hwf x hx)
+    · intro x y hx hy hrk
+      rw [hrkW x hx, hrkW y hy] at hrk
+      exact Nat.le_of_lt hrk
+    · intro x y hx hy h1 h2
+      exact gaixInj G anc x y (hwG x hx) (hwG y hy) (by omega)
+  refine Eq.trans ?_ hR
+  apply rblocksExt
+  intro d
+  by_cases hex : ∃ w, w ∈ gwrites G ∧ grankA G anc w = d
+  · obtain ⟨w, hw, hwd⟩ := hex
+    have huniq : ∀ y, y ∈ gwrites G → decide (grankA G anc y = d) = true → y = w := by
+      intro y hy hp
+      have := of_decide_eq_true hp
+      rw [hrkW y hy] at this
+      rw [hrkW w hw] at hwd
+      exact gaixInj G anc y w (hwG y hy) (hwG w hw) (by omega)
+    have hpw : decide (grankA G anc w = d) = true := decide_eq_true hwd
+    rw [filterUnique _ _ w (NoDup_filter (gevsNodup G)) ((hel w).2 hw) hpw
+        (fun y hy hp => huniq y ((hel y).1 hy) hp),
+      filterUnique _ _ w (gwritesNodup G hnd) hw hpw huniq]
+  · have hno : ∀ e, e ∈ gwrites G → ¬ decide (grankA G anc e = d) = true :=
+      fun e he heq => hex ⟨e, he, of_decide_eq_true heq⟩
+    rw [filterNo _ _ (fun e he => hno e ((hel e).1 he)), filterNo _ _ hno]
+
+/-! ## 6.8 The anchored candidate's trace and log -/
+
+theorem linTrALookup (G : Gexec) (anc : Geid → Bool) (k : Nat) (e : Geid) :
+    (glinEidsA G anc)[k]? = some e → (linCandA G anc).cdTr[k]? = some (glinStep G e) := by
+  intro h
+  show ((glinEidsA G anc).map (glinStep G))[k]? = _
+  rw [list_lookup_fmap, h]
+  rfl
+
+theorem linTrALookupInv (G : Gexec) (anc : Geid → Bool) (k : Nat) (s : Estep) :
+    (linCandA G anc).cdTr[k]? = some s → ∃ e, (glinEidsA G anc)[k]? = some e ∧ s = glinStep G e := by
+  show ((glinEidsA G anc).map (glinStep G))[k]? = some s → _
+  rw [list_lookup_fmap]
+  cases he : (glinEidsA G anc)[k]? with
+  | none => simp
+  | some e =>
+    intro h
+    simp only [Option.map_some, Option.some.injEq] at h
+    exact ⟨e, rfl, h.symm⟩
+
+theorem linTrALen (G : Gexec) (anc : Geid → Bool) :
+    (linCandA G anc).cdTr.length = (glinEidsA G anc).length := by
+  simp [linCandA]
+
+theorem linALbl (G : Gexec) (anc : Geid → Bool) (hwf : gwf G) (hok : ancOk G anc) (k : Nat)
+    (e : Geid) : (glinEidsA G anc)[k]? = some e → gxLbl G e = some (glbl G e) := by
+  intro h
+  obtain ⟨l, hl⟩ := someOfIsSome (glinALookupLbl G anc hwf hok k e h)
+  simp [glbl, hl]
+
+theorem linALogTake (G : Gexec) (anc : Geid → Bool) (k : Nat) :
+    cdLog (linCandA G anc) k = ((glinEidsA G anc).take k).filterMap (WeakRvwmoLin.gmsg G) := by
+  unfold cdLog
+  show trMsgs (((glinEidsA G anc).map (glinStep G)).take k) = _
+  rw [← fmap_take, trMsgsOmap, omapGlin]
+
+theorem linALogLen (G : Gexec) (anc : Geid → Bool) (k : Nat) :
+    (cdLog (linCandA G anc) k).length = linNwA G anc k := by
+  rw [linALogTake, omapGmsgLen]
+  rfl
+
+theorem linANwMono (G : Gexec) (anc : Geid → Bool) (k k' : Nat) :
+    k ≤ k' → linNwA G anc k ≤ linNwA G anc k' :=
+  filterTakeMono _ _ k k'
+
+theorem linANwS (G : Gexec) (anc : Geid → Bool) (k : Nat) (e : Geid) :
+    (glinEidsA G anc)[k]? = some e → gisW G e = true → linNwA G anc (k + 1) = linNwA G anc k + 1 := by
+  intro he hw
+  unfold linNwA
+  rw [take_S_r he, List.filter_append]
+  simp [hw]
+
+/-- The write at trace index `k` is `gwrites G` entry number `linNwA G anc k`. -/
+theorem linAGwritesSplit (G : Gexec) (anc : Geid → Bool) (hwf : gwf G) (hok : ancOk G anc)
+    (k : Nat) (e : Geid) :
+    (glinEidsA G anc)[k]? = some e → gisW G e = true → (gwrites G)[linNwA G anc k]? = some e := by
+  intro he hw
+  have hsplit : (glinEidsA G anc).filter (gisW G) =
+      ((glinEidsA G anc).take k).filter (gisW G) ++
+        e :: ((glinEidsA G anc).drop (k + 1)).filter (gisW G) := by
+    conv => lhs; rw [← List.take_append_drop (k + 1) (glinEidsA G anc)]
+    rw [take_S_r he]
+    simp [List.filter_append, hw]
+  rw [← glinAWrites G anc hwf hok, hsplit]
+  unfold linNwA
+  rw [lookup_app_r (Nat.le_refl _), Nat.sub_self]
+  rfl
+
+/-- A read's source has already been emitted (RVWMO⁻: rf ⊆ gmo, writes are anchors). -/
+theorem linASourceBefore (G : Gexec) (anc : Geid → Bool) (hwf : gwf G) (hok : ancOk G anc)
+    (hppo : gppoGmo G) (hlv : gloadValue G) (k : Nat) (r : Geid) (a : Int) (i : Nat)
+    (v : BitVec 8) :
+    (glinEidsA G anc)[k]? = some r → greadsByte G r a (i + 1) v →
+    ∃ kw w, gwriteAt G (i + 1) = some w ∧ (glinEidsA G anc)[kw]? = some w ∧ kw < k := by
+  intro hk hrd
+  obtain ⟨w, hwa, _, _⟩ := (hlv r a (i + 1) v hrd).1
+  have hmo := WeakRvwmoLin.grfGmo G hppo hlv r a i v w hrd hwa
+  obtain ⟨hw, _⟩ := gwriteAtInv G (i + 1) w (linNd G hwf) hwa
+  obtain ⟨kw, hkw⟩ := glinAIndex G anc hwf hok w (gwritesLbl G hwf w hw)
+  exact ⟨kw, w, hwa, hkw,
+    glinAGmoAnc G anc hwf hok k kw r w hk hkw (hok.2.1 w (gwritesIsw G w hw)) hmo⟩
+
+theorem linAReadTsLe (G : Gexec) (anc : Geid → Bool) (hwf : gwf G) (hok : ancOk G anc)
+    (hppo : gppoGmo G) (hlv : gloadValue G) (k : Nat) (r : Geid) (a : Int) (t : Nat)
+    (v : BitVec 8) :
+    (glinEidsA G anc)[k]? = some r → greadsByte G r a t v →
+    t ≤ (cdLog (linCandA G anc) k).length := by
+  intro hk hrd
+  rw [linALogLen]
+  cases t with
+  | zero => omega
+  | succ i =>
+    obtain ⟨kw, w, hwa, hkw, hlt⟩ := linASourceBefore G anc hwf hok hppo hlv k r a i v hk hrd
+    obtain ⟨hw, hwix⟩ := gwriteAtInv G (i + 1) w (linNd G hwf) hwa
+    have hsp := linAGwritesSplit G anc hwf hok kw w hkw (gwritesIsw G w hw)
+    rw [gwixOfLookup G (linNwA G anc kw) w (linNd G hwf) hsp] at hwix
+    have hS := linANwS G anc kw w hkw (gwritesIsw G w hw)
+    have := linANwMono G anc (kw + 1) k (by omega)
+    omega
+
+theorem linAFullLog (G : Gexec) (anc : Geid → Bool) (hwf : gwf G) (hok : ancOk G anc) :
+    cdLog (linCandA G anc) (linCandA G anc).cdTr.length =
+      (gwrites G).filterMap (WeakRvwmoLin.gmsg G) := by
+  rw [linALogTake, linTrALen, take_ge (Nat.le_refl _), omapGmsgFilter, glinAWrites G anc hwf hok]
 
 end Weak
