@@ -47,6 +47,7 @@ Imports only definitional files.
 import Xv6.SpecProcinit
 import Xv6.SchedCtx
 import MachCSL.LockBornHook
+import Xv6.LockRsv
 
 namespace Xv6
 
@@ -75,8 +76,9 @@ def procsInvSlot [CurCtx] (Γ : SchedNames) (i : Nat) : IProp GF := iprop%
 /-- **One slot sealed** (Rocq pass 3's body): its payload at UNUSED, and
 `p->lock` born over it at `Γ.lock i`. -/
 theorem procsInv_alloc_slot [X : CurCtx] (hT : curTier = KTier.kpt) (cpu : CPU) (E : CoPset)
-    (Γ : SchedNames) (i : Nat) (hi : i < NPROC) :
-    ownCtx cpu curCtx ∗ procsInvSlot Γ i ⊢
+    (Γ : SchedNames) (i : Nat) (hi : i < NPROC)
+    (heq : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) :
+    ownCtx cpu curCtx ∗ gateFloor curCtx ∗ procsInvSlot Γ i ⊢
       |={E}=> (ownCtx cpu curCtx ∗ isLock (GF := GF) (Γ.lock i) (procAddr i) "proc" (procLockPay Γ i)) := by
   have hseal := procDormantPrestk_seal (GF := GF) (procAddr i) (kstackVa i)
   obtain ⟨ξ, t⟩ := X
@@ -84,7 +86,7 @@ theorem procsInv_alloc_slot [X : CurCtx] (hT : curTier = KTier.kpt) (cpu : CPU) 
   subst hT
   letI : CurCtx := ⟨ξ, KTier.kpt⟩
   unfold procsInvSlot procReady procFieldsOut lockInited
-  iintro ⟨Hrun, ⟨⟨⟨-, Hfresh⟩, Hst, Hks⟩, #Hc0, #Hc16, Hpre⟩, ⟨%ch, Hch⟩, ⟨%kl, %xs, %pid, Hpub⟩,
+  iintro ⟨Hrun, #Hg, ⟨⟨⟨-, Hfresh⟩, Hst, Hks⟩, #Hc0, #Hc16, Hpre⟩, ⟨%ch, Hch⟩, ⟨%kl, %xs, %pid, Hpub⟩,
     ⟨%h, Hhart⟩, Hps, Hpav, Hfree, Hstk, ⟨%γ0, %g, Hrow, Hsg, Hev, Hzs⟩, Hso⟩
   ihave Hks := (show wordPointsTo (GF := GF) (procAddr i + 64#64) 8 (DFrac.own 1) (kstackVa i) ⊢
       wordPointsTo (pKstack (procAddr i)) 8 (DFrac.own 1) (kstackVa i) from .rfl) $$ Hks
@@ -99,11 +101,16 @@ theorem procsInv_alloc_slot [X : CurCtx] (hT : curTier = KTier.kpt) (cpu : CPU) 
   ihave #Htl := topLbAt_0 (GF := GF) (E := MachGS.era (hlc := hlc) (GF := GF))
   iapply newlockAt_llb cpu E (Γ.lock i) (procAddr i) "proc" (procLockPay Γ i) (procLockPay Γ i) 0
     (fun ξ => by iintro ⟨H, -⟩; iexact H)
-  iframe Hfree Hrun Hfresh
+  iframe Hfree Hrun Hfresh Hg
   isplit
   · iexact Hc0
   isplit
   · iexact Hc16
+  isplitl []
+  · iapply lkNameFor_rsv
+    have hpr : procAddr i = rsvProcLk i := by
+      unfold procAddr rsvProcLk procsAddr procSize; rfl
+    rw [hpr]; exact lkRsvIn_proc heq i (by unfold NPROC at hi; omega)
   isplit
   · iexact Htl
   unfold procLockPay procLockResAt
@@ -124,24 +131,25 @@ theorem procsInv_alloc_slot [X : CurCtx] (hT : curTier = KTier.kpt) (cpu : CPU) 
 
 /-- The seals threaded over the first `n` slots. -/
 theorem procsInv_alloc_upto [CurCtx] (hT : curTier = KTier.kpt) (cpu : CPU) (E : CoPset)
-    (Γ : SchedNames) : ∀ n : Nat, n ≤ NPROC →
-    ownCtx cpu curCtx ∗ ([∗list] i ∈ List.range n, procsInvSlot (GF := GF) Γ i) ⊢
+    (Γ : SchedNames) (heq : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) :
+    ∀ n : Nat, n ≤ NPROC →
+    ownCtx cpu curCtx ∗ gateFloor curCtx ∗ ([∗list] i ∈ List.range n, procsInvSlot (GF := GF) Γ i) ⊢
       |={E}=> (ownCtx cpu curCtx ∗
         [∗list] j ∈ List.range n, isLock (GF := GF) (Γ.lock j) (procAddr j) "proc" (procLockPay Γ j))
   | 0, _ => by
     rw [List.range_zero]
-    iintro ⟨Hrun, -⟩
+    iintro ⟨Hrun, -, -⟩
     imodintro
     iframe Hrun
     iapply BigSepL.bigSepL_nil.2
     itrivial
   | n + 1, hn => by
     rw [List.range_succ]
-    iintro ⟨Hrun, H⟩
+    iintro ⟨Hrun, #Hg, H⟩
     icases BigSepL.bigSepL_append.1 $$ H with ⟨Hs, Hlast⟩
     icases BigSepL.bigSepL_singleton.1 $$ Hlast with Hlast
-    imod procsInv_alloc_upto hT cpu E Γ n (by omega) $$ [$Hrun $Hs] with ⟨Hrun, Hls⟩
-    imod procsInv_alloc_slot hT cpu E Γ n (by omega) $$ [$Hrun $Hlast] with ⟨Hrun, Hl⟩
+    imod procsInv_alloc_upto hT cpu E Γ heq n (by omega) $$ [$Hrun $Hg $Hs] with ⟨Hrun, Hls⟩
+    imod procsInv_alloc_slot hT cpu E Γ n (by omega) heq $$ [$Hrun $Hg $Hlast] with ⟨Hrun, Hl⟩
     imodintro
     iframe Hrun
     iapply BigSepL.bigSepL_append.2
@@ -153,11 +161,11 @@ theorem procsInv_alloc_upto [CurCtx] (hT : curTier = KTier.kpt) (cpu : CPU) (E :
 what the caller adds, becomes the proc table's invariant (at the names the
 machine instance was built at, deviation 1). -/
 theorem procsInv_alloc [CurCtx] (hT : curTier = KTier.kpt) (cpu : CPU) (E : CoPset)
-    (Γ : SchedNames) :
-    ownCtx cpu curCtx ∗ ([∗list] i ∈ List.range NPROC, procsInvSlot (GF := GF) Γ i) ⊢
+    (Γ : SchedNames) (heq : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) :
+    ownCtx cpu curCtx ∗ gateFloor curCtx ∗ ([∗list] i ∈ List.range NPROC, procsInvSlot (GF := GF) Γ i) ⊢
       |={E}=> (ownCtx cpu curCtx ∗ procsInv Γ) := by
   unfold procsInv
-  exact procsInv_alloc_upto hT cpu E Γ NPROC (Nat.le_refl _)
+  exact procsInv_alloc_upto hT cpu E Γ heq NPROC (Nat.le_refl _)
 
 end
 

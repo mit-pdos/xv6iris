@@ -992,10 +992,11 @@ theorem sc_cpuCtx_take [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [Ctok
   letI : CurCtx := ⟨ξ0, KTier.kpt⟩
   iintro ⟨Hk, Hfree⟩
   icases (show cpuCtxFree (GF := GF) cpu ⊢ ∃ (vs : List (BitVec 64)) (ξ : CtxId) (T : Nat),
-      ⌜vs.length = 14⌝ ∗ ctxStamped ξ T ∗ viewLb cpu T ∗
+      ⌜vs.length = 14⌝ ∗ ctxStamped ξ T (fun _ => 0) 0 ∗ viewLb cpu T ∗
       @ctxCells hlc GF _ ⟨ξ, KTier.kpt⟩ (cpuCtxAddr cpu) vs from by
     unfold cpuCtxFree; iintro H; iexact H) $$ Hfree with ⟨%vs, %ξ, %T, %hvl, Hst, #Hvb, Hcc⟩
-  ihave Hown := ctx_unstamp cpu ξ T T (Nat.le_refl T) $$ [$Hst $Hvb]
+  ihave #Hc0 := vecCertsAt_zero (MachGS.era (hlc := hlc) (GF := GF)) cpu
+  ihave Hown := ctx_unstamp cpu ξ T T (fun _ => 0) 0 (Nat.le_refl T) $$ [$Hst $Hvb $Hc0]
   ihave Hcc := (@ownCtxCells_intro hlc GF _ ⟨ξ, KTier.kpt⟩ (cpuCtxAddr cpu) vs) $$ Hcc
   imod (kctx_move_in (lent := false)
       (fun ζ => @ownCtxCells hlc GF _ ⟨ζ, KTier.kpt⟩ (cpuCtxAddr cpu)) cpu k ξ)

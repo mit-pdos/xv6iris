@@ -680,7 +680,7 @@ def bootSharedOut [WchG GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [Icfg] [Fs
   bootHartRes (σ.regs startedPrimary) startedPrimary ∗
   ([∗list] c ∈ cpus.tail, (∃ ξ : CtxId, ctxTok (hlc := hlc) (GF := GF) c ξ) ∗
     bootHartRes (σ.regs c) c) ∗
-  startedCell ∗ ctxStamped ξd 0 ∗
+  startedCell ∗ ctxStamped ξd 0 (fun _ => 0) 0 ∗
   bootSupplyCore (bootSharedX ξ0) Γ γ0 γ1 γc γl0 γl1 γd γt cn [] [] Virtio.cfg0 dk sb nib cov Pb Rspent ∗
   appInv (hlc := hlc) (GF := GF) fscFs ∗
   uartInv .uart0 γ0 ∗ uartInv .uart1 γ1 ∗ plicInv γ0 γ1 ∗ wireInv (hlc := hlc) (GF := GF) ∗
@@ -809,7 +809,7 @@ become the channel at the concrete deposit `mainDeposit Γ …` and the
 primary's half. -/
 theorem bootShared_started (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName)
     (γd : DiskNames) (γdl γt : GName) (ξd : CtxId) :
-    startedCell (GF := GF) ∗ ctxStamped ξd 0 ⊢
+    startedCell (GF := GF) ∗ ctxStamped ξd 0 (fun _ => 0) 0 ⊢
       |={⊤}=> ∃ γi : GName, startedInv γi ξd (mainDeposit Γ γ0 γ1 γc γl0 γl1 γd γdl γt) ∗
         startedPrim γi :=
   started_alloc ⊤ ξd _ 0

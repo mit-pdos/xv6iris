@@ -172,13 +172,13 @@ theorem idup_open [Fscfg] [Icfg] [CurCtx] (k : Nat) (hk : k < NINODE) (s : Qp)
   icases itableSlotRes_acc_upd_llb curCtx M ci k hk $$ Hstamps with ⟨Hsrow, Hstampsback⟩
   ihave Hsrow := id_ent_of_eq (itableSlotRes_some curCtx M ci k qt n hMk) $$ Hsrow
   unfold itableSlotLive icSlotRowFl icSlotRow
-  icases Hsrow with ⟨⟨%tb, ⟨%r, Hrd, %hrw, %hrx, %hrid, #Hllbr, %hrle, Hc⟩, #Hllbb, -⟩,
+  icases Hsrow with ⟨⟨%tb, ⟨%r, Hrd, %hrw, %hrx, %hrid, #Hllbr, %hrle, Hc, #Hvd⟩, #Hllbb, -⟩,
     ⟨%tst, Hstk, #Hllbk, #Hflk⟩⟩
   -- the box's `ref++` (R3): mints the new reference's stamps
   obtain ⟨c0, hc0⟩ : ∃ c0, n.val = c0 + 1 := ⟨n.val - 1, by have := n.pos; omega⟩
   ihave Hc := id_ent_of_eq (show icCnt (GF := GF) k n.val = icCnt k (c0 + 1) by rw [hc0]) $$ Hc
   imod icHitIncr fscIc fscFs fscIreg fscCov fscLogst k r c0 icfgDev inum ⊤ CoPset.subseteq_top
-      hrw (hrid.trans hcik) $$ Hbox Hrd Hc with ⟨Hrd, Hc, Hstnew⟩
+      hrw (hrid.trans hcik) $$ Hbox Hrd Hc Hvd with ⟨Hrd, Hc, Hstnew⟩
   icases islPool_acc_upd M k hk $$ Hipool with ⟨Hisl, Hislback⟩
   ihave Hru := id_runit_of_any inum.toNat $$ Hru
   imodintro
@@ -215,6 +215,7 @@ theorem idup_open [Fscfg] [Icfg] [CurCtx] (k : Nat) (hk : k < NINODE) (s : Qp)
         · iexact Hllbr
         isplitr
         · ipureintro; exact hrle
+        iframe Hvd
         iapply id_ent_of_eq (show icCnt (GF := GF) k (c0 + 2) = icCnt k n.succ.val by
           rw [PosNat.succ_val, hc0])
         iexact Hc

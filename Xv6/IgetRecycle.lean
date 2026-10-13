@@ -200,7 +200,7 @@ theorem ig_rcy_open (c : CPU) (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec
       ownCtx c curCtx -∗ itableSlotRes curCtx M ci e -∗ islot2 curCtx fscIc M ci e -∗
       |={⊤}=> ownCtx c curCtx ∗ ∃ (r : SlotReg IcBid IcX) (T0 tstp : Nat)
         (devT inumT devB inumB : BitVec 32),
-        ⌜r.win = true ∧ r.x = some (.icRaw, T0)⌝ ∗ icRegd e r ∗ icCnt e 0 ∗
+        ⌜r.win = true ∧ r.x = some (.icRaw, T0)⌝ ∗ icRegd e r ∗ vgFloors curCtx r.vd ∗ icCnt e 0 ∗
         wordPointsTo (iDev (ientry e)) 4 (DFrac.own 1) devT ∗
         wordPointsTo (iInum (ientry e)) 4 (DFrac.own 1) inumT ∗
         (∃ v : BitVec 32, wordPointsTo (iValid (ientry e)) 4 (DFrac.own 1) v) ∗
@@ -212,13 +212,13 @@ theorem ig_rcy_open (c : CPU) (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec
   iintro #Hesc Hrun Hrow Hslot
   rw [itableSlotRes_none curCtx M ci e hM, hci, islot2_none curCtx fscIc M ci e hM hci]
   unfold icSlotRowFl icSlotRow itableSlotFree islotEmpty
-  icases Hrow with ⟨⟨%tb, ⟨%r, Hrd, %hw, %hx, %hid, #Hllbr, %hle, Hc⟩, #Hllbb, #Hflb⟩,
+  icases Hrow with ⟨⟨%tb, ⟨%r, Hrd, %hw, %hx, %hid, #Hllbr, %hle, Hc, #Hvd⟩, #Hllbb, #Hflb⟩,
     ⟨%tstp, Hcell, Hst, #Hllbp⟩⟩
   icases Hslot with ⟨%devT, %inumT, HidT, HgidT, Hpin⟩
   icases icId_quartersSplit fscIc e false devT inumT $$ HgidT with ⟨HgidT, HgidQ⟩
-  imod icRecycleWithdraw c fscIc fscFs fscIreg fscCov fscLogst e curCtx r tb devT inumT ⊤
-      CoPset.subseteq_top hw hid hle $$ Hesc Hrun Hflb Hrd Hc HgidQ
-    with ⟨Hrun, Hc, %T0, %hT0, Hrd, Hhdr⟩
+  imod icRecycleWithdraw c fscIc fscFs fscIreg fscCov fscLogst e r tb devT inumT ⊤
+      CoPset.subseteq_top hw hid hle $$ Hesc Hrun Hflb Hvd Hrd Hc HgidQ
+    with ⟨Hrun, Hc, %T0, %aW, %hT0, #HvaW, Hrd, Hhdr⟩
   rw [icHdr_cur]
   simp only [icHdrAmb]
   icases Hhdr with ⟨-, Hvld, ⟨%devB, %inumB, HidB⟩, Hnl, ⟨%devB2, %inumB2, HgidB⟩⟩
@@ -233,8 +233,8 @@ theorem ig_rcy_open (c : CPU) (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec
   icases Hid with ⟨Hd, Hn⟩
   imodintro
   iframe Hrun
-  iexists ⟨r.td, true, none, some (.icRaw, T0)⟩, T0, tstp, devB, inumB, devB2, inumB2
-  iframe Hrd Hc Hvld Hnl Hst Hllbp HgidT HgidB Hpin
+  iexists ⟨r.td, true, none, some (.icRaw, T0), aW⟩, T0, tstp, devB, inumB, devB2, inumB2
+  iframe Hrd Hc Hvld Hnl Hst Hllbp HgidT HgidB Hpin HvaW
   isplitr
   · ipureintro; exact ⟨rfl, rfl⟩
   isplitl [Hd]
@@ -310,7 +310,7 @@ theorem ig_rcy_ghost (c : CPU) (M : RegMapF (Qp × PosNat)) (e : Nat) (he : e < 
     (r : SlotReg IcBid IcX) (T0 tstp t : Nat) (hw : r.win = true) (hx : r.x = some (.icRaw, T0))
     (devT inumT devB inumB : BitVec 32) :
     icEscrow (GF := GF) fscIc fscFs fscIreg fscCov fscLogst e ∗ igEnv ∗
-    ownCtx c curCtx ∗ icRegd e r ∗ icCnt e 0 ∗
+    ownCtx c curCtx ∗ icRegd e r ∗ vgFloors curCtx r.vd ∗ icCnt e 0 ∗
     wordPointsTo (iDev (ientry e)) 4 (DFrac.own 1) icfgDev ∗
     wordPointsTo (iInum (ientry e)) 4 (DFrac.own 1) inum ∗
     wordPointsTo (iValid (ientry e)) 4 (DFrac.own 1) (0#32 : BitVec 32) ∗
@@ -327,11 +327,12 @@ theorem ig_rcy_ghost (c : CPU) (M : RegMapF (Qp × PosNat)) (e : Nat) (he : e < 
       iname fscIreg fscFs icfgIst inum l ∗ icntHalf inum.toNat 1 ∗
       (∃ tstn : Nat, istmpAuth e (1 : Qp).half tstn ∗ topLb tstn) ∗
       icId fscIc e (1 : Qp).half true icfgDev inum ∗
-      (∃ T' : Nat, icRegd e ⟨T', false, some (icfgDev, inum), none⟩ ∗ icCnt e 1 ∗ topLb T') ∗
+      (∃ (T' : Nat) (a : ChainVG), icRegd e ⟨T', false, some (icfgDev, inum), none, a⟩ ∗ icCnt e 1 ∗
+        topLb T' ∗ vgFloors curCtx a) ∗
       inodeRefb (isClaim l) e Qp.quarter icfgDev inum ∗
       inodeIdent e (DFrac.own Qp.quarter) icfgDev inum := by
   have hnib' : (inum.toNat : Int) < 16 * (icfgNib : Int) := by omega
-  iintro ⟨#Hesc, #Henv, Hrun, Hrd, Hc, Hdev, Hinm, Hvld, Hnl, Hcell, #Hkey, Hst, #Hllbp, HgidT,
+  iintro ⟨#Hesc, #Henv, Hrun, Hrd, #Hvd, Hc, Hdev, Hinm, Hvld, Hnl, Hcell, #Hkey, Hst, #Hllbp, HgidT,
     HgidB, Hhalf, Hisl, Hpool, Hlic⟩
   unfold igEnv
   icases Henv with ⟨#Hit, #Hinv, #Hrinv, -⟩
@@ -365,9 +366,9 @@ theorem ig_rcy_ghost (c : CPU) (M : RegMapF (Qp × PosNat)) (e : Nat) (he : e < 
     · iapply wordAtN_cur_of; iexact Hinm
   icases ig_ident_split4 e icfgDev inum $$ Hid with ⟨Hidh, Hidq1, Hidq2⟩
   -- (b″): the deposit
-  imod icRecycleDeposit c fscIc fscFs fscIreg fscCov fscLogst e curCtx r icfgDev inum g T0 ⊤
-      CoPset.subseteq_top hw hx $$ Hesc Hrun Hrd Hc [Hvld Hidh Hnl] Hpend Hfoff [Hlv] Hgid
-    with ⟨Hrun, Hgid, %T', Hrd, Hc, Href, #HllbT⟩
+  imod icRecycleDeposit c fscIc fscFs fscIreg fscCov fscLogst e r icfgDev inum g T0 ⊤
+      CoPset.subseteq_top hw hx $$ Hesc Hrun Hvd Hrd Hc [Hvld Hidh Hnl] Hpend Hfoff [Hlv] Hgid
+    with ⟨Hrun, Hgid, %T', %aR, Hrd, Hc, Href, #HllbT, #HvaR⟩
   · rw [icHdrBare_cur]
     simp only [icHdrBareAmb, icXLoaded, validWord, Bool.false_eq_true, ite_false]
     iframe Hidh Hnl
@@ -380,7 +381,7 @@ theorem ig_rcy_ghost (c : CPU) (M : RegMapF (Qp × PosNat)) (e : Nat) (he : e < 
   isplitl [Hstn]
   · iexists tstn; iframe Hstn; iexact Hllbn
   isplitl [Hrd Hc]
-  · iexists T'; iframe Hrd Hc; iexact HllbT
+  · iexists T', aR; iframe Hrd Hc HvaR; iexact HllbT
   unfold inodeRefb inodeRef irefTokGenlo
   icases Htok with ⟨Hfr, Hlvq, Hsl⟩
   iframe Hfr Hsl Hidq1 Href Hru
@@ -417,7 +418,8 @@ theorem ig_rcy_close (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × Bi
     frzmH inum.toNat false ∗ frzsel e (1 : Qp).half false ∗ icPinRest e ∗ icntHalf inum.toNat 1 ∗
     (∃ tstn : Nat, istmpAuth e (1 : Qp).half tstn ∗ topLb tstn) ∗
     icId fscIc e (1 : Qp).half true icfgDev inum ∗
-    (∃ T' : Nat, icRegd e ⟨T', false, some (icfgDev, inum), none⟩ ∗ icCnt e 1 ∗ topLb T') ∗
+    (∃ (T' : Nat) (a : ChainVG), icRegd e ⟨T', false, some (icfgDev, inum), none, a⟩ ∗ icCnt e 1 ∗
+      topLb T' ∗ vgFloors curCtx a) ∗
     inodeIdent e (DFrac.own Qp.quarter) icfgDev inum ∗ irefSlot ⊢
     igRin curCtx := by
   iintro ⟨Hhalf, Hisl, Hislback, Hiauth, Hpool, Hrback, Hsback, Hmir, Hsel, Hpin, Hicnt, Hstn, Hgid,
@@ -445,12 +447,12 @@ theorem ig_rcy_close (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × Bi
   · rw [itableSlotResLlb_some curCtx _ _ e Qp.quarter PosNat.one (get?_insert_eq rfl),
       get?_insert_eq rfl, PosNat.one_val]
     unfold icSlotRowLlb icSlotRow itableSlotLiveLlb
-    icases Hrow with ⟨%T', Hrd, Hc, #HllbT⟩
+    icases Hrow with ⟨%T', %a, Hrd, Hc, #HllbT, #Hva⟩
     iframe Hstn
     iexists T'
     iframe HllbT
-    iexists ⟨T', false, some (icfgDev, inum), none⟩
-    iframe Hrd Hc HllbT
+    iexists ⟨T', false, some (icfgDev, inum), none, a⟩
+    iframe Hrd Hc HllbT Hva
     ipureintro
     exact ⟨rfl, rfl, rfl, Nat.le_refl _⟩
   rw [← ig_pool_insert ci icfgNib e icfgDev inum hci]
@@ -542,7 +544,7 @@ theorem ig_recycle (RH : RELEASE_HOOK) (c cpu : CPU) (k : KCtx) (spie spp : Bool
   icases kctx_token_acc c _ $$ Hk with ⟨Hrun, Hkback⟩
   iapply wpLoop_fupd
   imod ig_rcy_open c M ci e hMe hci $$ Hesc Hrun Hrow Hslot with
-    ⟨Hrun, %r, %T0, %tstp, %devT, %inumT, %devB, %inumB, %⟨hw, hx⟩, Hrd, Hc, Hdev, Hinm,
+    ⟨Hrun, %r, %T0, %tstp, %devT, %inumT, %devB, %inumB, %⟨hw, hx⟩, Hrd, #Hvd, Hc, Hdev, Hinm,
       ⟨%v, Hvld⟩, Hnl, Hcell, Hst, #Hllbp, HgidT, HgidB, Hpin⟩
   ihave Hk := Hkback $$ Hrun
   imodintro
@@ -592,7 +594,7 @@ theorem ig_recycle (RH : RELEASE_HOOK) (c cpu : CPU) (k : KCtx) (spie spp : Bool
   imod ig_rcy_ghost c M e he hMe inum l hnib _ hinP r T0 tstp t hw hx devT inumT devB inumB $$
       [Hesc Henv Hrun Hrd Hc Hdev Hinm Hvld Hnl Hwc Hkey Hst Hllbp HgidT HgidB Hhalf Hisl Hpool Hlic]
     with ⟨Hrun, Hpool, Hhalf, Hisl, Hmir, Hsel, Hlic, Hicnt, Hstn, Hgid, Hrowr, Href, Hidq⟩
-  · iframe Hesc Henv Hrun Hrd Hc Hnl Hkey Hst Hllbp HgidT HgidB Hhalf Hisl Hpool Hlic
+  · iframe Hesc Henv Hrun Hrd Hvd Hc Hnl Hkey Hst Hllbp HgidT HgidB Hhalf Hisl Hpool Hlic
     isplitl [Hdev]
     · iapply wpt_eq _ _ (iDev_eq _).symm; iexact Hdev
     isplitl [Hinm]

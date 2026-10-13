@@ -23,7 +23,7 @@ of client code reach into it:
 **THE STAMPED SHARES** (Rocq's `stampsR id := authR (gmapUR (id * nat)
 ufracR)`): every counted reference owns ONE UNIT of mass at key (identity,
 stamp of the last deposit it witnessed); a share (the icache's M-5) owns part
-of a unit (`mscale`, `reference_split` / `reference_join`).  The rows are
+of a unit (`mscale`, `referenceAt_split` / `referenceAt_join`).  The rows are
 (Σ) `qsum m = c` -- mass = refcount --, (I) every live key names the box's
 identity, (C)/(D) the box's stamp `T` is covered by a live key's stamp, by
 L1's floor register `td`, or by L2's floor register `tp`.  Each party holds a
@@ -84,6 +84,214 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 local notation "era" => MachGS.era (hlc := hlc) (GF := GF)
 
+/-! ## The chain bounds a box moves (W8 (f2-ctx), F-C)
+
+A box's stamped context carries a chain vector and a gate (`ctxStamped ξb T V
+g`); whoever takes the bundle out must have passed both (its context's floors,
+`ctxDomAt`).  A `ChainVG` is such a pair; `vgFloors ξ a` says ξ has passed it.
+The box never manufactures a floor: it moves the ones its parties already
+hold (minted by lock hops, `MachCSL.lockRec`), as TAGS on references and as
+the two registers' bounds. -/
+
+instance vecCertsAt_timeless (E : EraGS) (V : CPU → Nat) (g : Nat) (cpu : CPU) :
+    Timeless (PROP := IProp GF) (vecCertsAt E V g cpu) := by
+  unfold vecCertsAt chainLbAt chainCertAt gatePassedAt; infer_instance
+
+/-- A chain bound: a per-author vector and a gate flag. -/
+abbrev ChainVG := (CPU → Nat) × Nat
+
+/-- `a` is under `b`: componentwise, and a set gate only under a set gate. -/
+def vgLe (a b : ChainVG) : Prop := (∀ h, a.1 h ≤ b.1 h) ∧ (a.2 = 0 ∨ 1 ≤ b.2)
+
+theorem vgLe_refl (a : ChainVG) : vgLe a a := by
+  refine ⟨fun _ => Nat.le_refl _, ?_⟩
+  by_cases h : a.2 = 0
+  · exact Or.inl h
+  · exact Or.inr (by omega)
+
+theorem vgLe_trans {a b c : ChainVG} (h1 : vgLe a b) (h2 : vgLe b c) : vgLe a c := by
+  refine ⟨fun h => Nat.le_trans (h1.1 h) (h2.1 h), ?_⟩
+  rcases h1.2 with h | h
+  · exact Or.inl h
+  · rcases h2.2 with h' | h'
+    · omega
+    · exact Or.inr h'
+
+/-- ξ has passed the bound `a`. -/
+def vgFloors (ξ : CtxId) (a : ChainVG) : IProp GF := iprop(vecFloors ξ a.1 ∗ (⌜a.2 = 0⌝ ∨ gateFloor ξ))
+
+instance vgFloors_persistent (ξ : CtxId) (a : ChainVG) : Persistent (vgFloors (GF := GF) ξ a) := by
+  unfold vgFloors; infer_instance
+instance vgFloors_timeless (ξ : CtxId) (a : ChainVG) : Timeless (vgFloors (GF := GF) ξ a) := by
+  unfold vgFloors; infer_instance
+
+theorem vgFloors_le (ξ : CtxId) (a b : ChainVG) (h : vgLe a b) : vgFloors (GF := GF) ξ b ⊢ vgFloors ξ a := by
+  unfold vgFloors
+  iintro ⟨#Hv, #Hg⟩
+  isplit
+  · iapply vecFloors_le ξ b.1 a.1 h.1 $$ Hv
+  · rcases h.2 with h0 | h1
+    · ileft; ipureintro; exact h0
+    · icases Hg with ⟨%h0 | #Hg⟩
+      · exfalso; omega
+      · iright; iexact Hg
+
+theorem vgFloors_zero (ξ : CtxId) : ⊢@{IProp GF} vgFloors ξ ((fun _ => 0), 0) := by
+  unfold vgFloors vecFloors
+  iintro
+  isplit
+  · iapply BigSepL.bigSepL_forall_elim
+    iintro %k %c %_
+    iapply vecFloor_0
+  · ileft; ipureintro; rfl
+
+/-- Floors given component by component, from one persistent source. -/
+theorem vecFloors_of_each (ξ : CtxId) (V : CPU → Nat) (P : IProp GF) [Persistent P]
+    (h : ∀ c : CPU, P ⊢ vecFloor ξ c (V c)) : P ⊢ vecFloors ξ V := by
+  unfold vecFloors
+  iintro #HP
+  iapply BigSepL.bigSepL_forall_elim
+  iintro %k %c %_
+  iapply h c $$ HP
+
+/-- Two vectors' floors give their componentwise maximum's. -/
+theorem vecFloors_max (ξ : CtxId) (V1 V2 : CPU → Nat) :
+    vecFloors (GF := GF) ξ V1 ∗ vecFloors ξ V2 ⊢ vecFloors ξ (fun h => max (V1 h) (V2 h)) := by
+  refine vecFloors_of_each ξ _ _ (fun c => ?_)
+  iintro ⟨#H1, #H2⟩
+  by_cases hle : V1 c ≤ V2 c
+  · iapply vecFloor_le ξ c (V2 c) _ (by show max (V1 c) (V2 c) ≤ V2 c; omega)
+    iapply vecFloors_get ξ V2 c $$ H2
+  · iapply vecFloor_le ξ c (V1 c) _ (by show max (V1 c) (V2 c) ≤ V1 c; omega)
+    iapply vecFloors_get ξ V1 c $$ H1
+
+/-- The join of two bounds. -/
+def vgMax (a b : ChainVG) : ChainVG := (fun h => max (a.1 h) (b.1 h), max a.2 b.2)
+
+theorem vgLe_max_l (a b : ChainVG) : vgLe a (vgMax a b) :=
+  ⟨fun _ => Nat.le_max_left _ _, by
+    by_cases h : a.2 = 0
+    · exact Or.inl h
+    · exact Or.inr (by show 1 ≤ max a.2 b.2; omega)⟩
+
+theorem vgLe_max_r (a b : ChainVG) : vgLe b (vgMax a b) :=
+  ⟨fun _ => Nat.le_max_right _ _, by
+    by_cases h : b.2 = 0
+    · exact Or.inl h
+    · exact Or.inr (by show 1 ≤ max a.2 b.2; omega)⟩
+
+theorem vgFloors_max (ξ : CtxId) (a b : ChainVG) :
+    vgFloors (GF := GF) ξ a ∗ vgFloors ξ b ⊢ vgFloors ξ (vgMax a b) := by
+  unfold vgFloors vgMax
+  iintro ⟨⟨#Ha, #Hga⟩, ⟨#Hb, #Hgb⟩⟩
+  isplit
+  · iapply vecFloors_max ξ a.1 b.1
+    iframe Ha Hb
+  · icases Hga with ⟨%h0 | #Hg⟩
+    · icases Hgb with ⟨%h0' | #Hg'⟩
+      · ileft; ipureintro; simp only; omega
+      · iright; iexact Hg'
+    · iright; iexact Hg
+
+/-- A bound's floors transport along a domination. -/
+instance instCtxMorphVgFloors (a : ChainVG) : CtxMorph (GF := GF) (fun ξ => vgFloors ξ a) where
+  morph ξ ξ' := by
+    iintro ⟨Hd, #Hf⟩
+    unfold vgFloors
+    icases Hf with ⟨#Hv, #Hg⟩
+    imod (instCtxMorphVecFloors (GF := GF) a.1).morph ξ ξ' $$ [Hd] with ⟨Hd, #Hv'⟩
+    · iframe Hd Hv
+    icases Hg with ⟨%h0 | #Hgf⟩
+    · imodintro
+      iframe Hd
+      isplit
+      · iexact Hv'
+      · ileft; ipureintro; exact h0
+    · imod (instCtxMorphGate (GF := GF)).morph ξ ξ' $$ [Hd] with ⟨Hd, #Hg'⟩
+      · iframe Hd Hgf
+      imodintro
+      iframe Hd
+      isplit
+      · iexact Hv'
+      · iright; iexact Hg'
+
+/-- Two halves of a context's authority rejoin (keeping the first's names). -/
+theorem ctxAt_join (ξ : CtxId) (B B' : Nat) (D D' : RegMapF CPU) :
+    ctxAt (GF := GF) ξ (1 : Qp).half B D ∗ ctxAt ξ (1 : Qp).half B' D' ⊢ ctxAt ξ 1 B D := by
+  iintro ⟨H1, H2⟩
+  ihave %heq := ctxAt_agree ξ _ _ B B' D D' $$ [H1 H2]
+  · iframe
+  obtain ⟨rfl, rfl⟩ := heq
+  iapply (ctxAt_halves ξ B D).2
+  iframe
+
+/-- Two halves of a chain authority rejoin (keeping the first's names). -/
+theorem vecAt_join (ξ : CtxId) (V V' : CPU → Nat) (g g' : Nat) :
+    vecAt (GF := GF) ξ (1 : Qp).half V g ∗ vecAt ξ (1 : Qp).half V' g' ⊢ vecAt ξ 1 V g := by
+  iintro ⟨H1, H2⟩
+  ihave %heq := vecAt_agree ξ _ _ V V' g g' $$ [H1 H2]
+  · iframe
+  obtain ⟨rfl, rfl⟩ := heq
+  iapply (vecAt_halves ξ V g).2
+  iframe
+
+/-- **The running context's own bound** passes every bound it has floors
+for: the context's chain vector and gate, with their floors. -/
+theorem ownCtx_vgMax (cpu : CPU) (ξ : CtxId) :
+    ∀ (L : List ChainVG), ownCtx (GF := GF) cpu ξ ∗ ([∗list] b ∈ L, vgFloors ξ b) ⊢
+      ∃ a : ChainVG, ownCtx cpu ξ ∗ vgFloors ξ a ∗ ⌜∀ b ∈ L, vgLe b a⌝ := by
+  intro L
+  iintro ⟨Hctx, #HL⟩
+  icases ownCtx_cases cpu ξ $$ Hctx with ⟨%B, %K, %W, %D, Hat, #HK, %hBK, #HW, %hok, #Hels, Hch⟩
+  unfold chainTokAt
+  icases Hch with ⟨%V, %g, Hv, %⟨hcd, hvw⟩, #Hc⟩
+  ihave %hle : ⌜∀ b ∈ L, vgLe b (V, g)⌝ $$ [Hv]
+  · iapply BI.pure_forall.2
+    iintro %b
+    iapply BI.pure_forall.2
+    iintro %hb
+    ihave #Hb := BigSepL.bigSepL_mem (Φ := fun b => vgFloors (GF := GF) ξ b) hb $$ HL
+    unfold vgFloors
+    icases Hb with ⟨#Hbv, #Hbg⟩
+    ihave %h1 := vecAt_floors_le ξ 1 V g b.1 $$ [Hv Hbv]
+    · iframe Hv Hbv
+    ihave %h2 : ⌜b.2 = 0 ∨ 1 ≤ g⌝ $$ [Hv]
+    · icases Hbg with ⟨%h0 | #Hgf⟩
+      · ipureintro; exact Or.inl h0
+      · ihave %h := vecAt_gateFloor ξ 1 V g $$ [Hv Hgf]
+        · iframe Hv Hgf
+        ipureintro; exact Or.inr h
+    ipureintro
+    exact ⟨h1, h2⟩
+  icases vecAt_get ξ 1 V g $$ Hv with ⟨Hv, #Hvf⟩
+  ihave #Hgg : ⌜g = 0⌝ ∨ gateFloor ξ $$ [Hv]
+  · by_cases hg0 : g = 0
+    · ileft; ipureintro; exact hg0
+    · icases vecAt_gate ξ 1 V g (by omega) $$ Hv with ⟨_, #Hgf⟩
+      iright; iexact Hgf
+  iexists (V, g)
+  isplitl [Hat Hv]
+  · iapply ownCtx_intro cpu ξ B K W D
+    iframe Hat
+    isplit
+    · iexact HK
+    isplit
+    · ipureintro; exact hBK
+    isplit
+    · iexact HW
+    isplit
+    · ipureintro; exact hok
+    isplit
+    · iexact Hels
+    · unfold chainTokAt
+      iexists V, g
+      iframe Hv Hc
+      ipureintro; exact ⟨hcd, hvw⟩
+  isplit
+  · unfold vgFloors
+    iframe Hvf Hgg
+  · ipureintro; exact hle
+
 /-! ## The two transport laws a box lives on
 
 Rocq `TsoCtxAbsorbLb.ctx_absorb_lb` and `TsoCtx.ctx_deposit`.  Neither was
@@ -93,47 +301,67 @@ a PART of the bundle out and leaves the rest parked, so the parked context
 must survive both moves. -/
 
 /-- **THE ABSORB**: a payload moves OUT of a stamped context into a running
-one, at a view receipt past the stamp; the stamped token is returned
+one, at a view receipt past the stamp and (W8 (f2-ctx)) floors past the
+stamped context's chain vector and gate; the stamped token is returned
 unchanged. -/
 theorem ctxAbsorbLb (R : CtxId → IProp GF) [CtxMorph R] (cpu : CPU) (ξ ξ' : CtxId)
-    (T K : Nat) (hTK : T ≤ K) :
-    ownCtx (GF := GF) cpu ξ' ∗ viewLb cpu K ∗ ctxStamped ξ T ∗ R ξ ⊢
-      |==> (ownCtx cpu ξ' ∗ ctxStamped ξ T ∗ R ξ') := by
-  iintro ⟨Hrun, #HK, Hst, HR⟩
-  icases ctxStamped_cases ξ T $$ Hst with ⟨%D, Hat, #HT, %hD, #Hels⟩
+    (T K : Nat) (V : CPU → Nat) (g : Nat) (hTK : T ≤ K) :
+    ownCtx (GF := GF) cpu ξ' ∗ viewLb cpu K ∗ vgFloors ξ' (V, g) ∗ ctxStamped ξ T V g ∗ R ξ ⊢
+      |==> (ownCtx cpu ξ' ∗ ctxStamped ξ T V g ∗ R ξ') := by
+  iintro ⟨Hrun, #HK, #Hvg, Hst, HR⟩
+  unfold vgFloors
+  icases Hvg with ⟨#Hvf, #Hgf⟩
+  icases ctxStamped_cases ξ T V g $$ Hst with ⟨%D, Hat, #HT, %hD, #Hels, Hv, %⟨hDV, hVT⟩⟩
   imod ctx_absorb cpu ξ' K $$ [$Hrun $HK] with ⟨Hrun, #Hfl'⟩
   icases (ctxAt_halves ξ T D).1 $$ Hat with ⟨Hat1, Hat2⟩
-  ihave Hdom : ctxDom ξ ξ' $$ [Hat1]
-  · iapply ctxDomAt_intro ξ ξ' _ T D
-    iframe Hat1
+  icases (vecAt_halves ξ V g).1 $$ Hv with ⟨Hv1, Hv2⟩
+  ihave Hdom : ctxDom ξ ξ' $$ [Hat1 Hv1]
+  · iapply ctxDomAt_intro ξ ξ' _ T D V g
+    iframe Hat1 Hv1
     isplit
     · iapply ctxFloor_le ξ' K T hTK; iexact Hfl'
     isplit
     · iexact Hels
+    isplit
     · imodintro
       iintro %k %h %hk
       unfold keyAt
       ileft
-      iapply ctxFloor_le ξ' K k (by have := hD k h hk; omega)
-      iexact Hfl'
+      isplit
+      · iapply ctxFloor_le ξ' K k (by have := hD k h hk; omega)
+        iexact Hfl'
+      · ihave He := dirtyElems_get _ ξ D k h hk $$ Hels
+        icases He with ⟨_, #Hau⟩
+        unfold chainKey
+        iright
+        iexists (hartAgent h)
+        iframe Hau
+        iright
+        iexists h
+        isplit
+        · ipureintro; rfl
+        · iapply vecFloor_le ξ' h (V h) k (hDV k h hk)
+          iapply vecFloors_get ξ' V h $$ Hvf
+    isplit
+    · iexact Hvf
+    · iexact Hgf
   imod CtxMorph.morph (R := R) ξ ξ' $$ [$Hdom $HR] with ⟨Hdom, HR⟩
-  icases ctxDomAt_cases ξ ξ' _ $$ Hdom with ⟨%B2, %D2, Hat1, -, -, -⟩
-  ihave %heq : ⌜B2 = T ∧ D2 = D⌝ $$ [Hat1 Hat2]
-  · iapply ctxAt_agree ξ _ _ B2 T D2 D $$ [Hat1 Hat2]
-    iframe
-  obtain ⟨rfl, rfl⟩ := heq
-  ihave Hat := (ctxAt_halves ξ B2 D2).2 $$ [Hat1 Hat2]
+  icases ctxDomAt_cases ξ ξ' _ $$ Hdom with ⟨%B2, %D2, Hat1, -, -, -, %V2, %g2, Hv1, -, -⟩
+  ihave Hat := ctxAt_join ξ T B2 D D2 $$ [Hat2 Hat1]
+  · iframe
+  ihave Hv := vecAt_join ξ V V2 g g2 $$ [Hv2 Hv1]
   · iframe
   imodintro
   iframe Hrun HR
-  unfold ctxStamped
-  iexists D2
-  iframe Hat
+  iapply ctxStamped_intro ξ T V g D
+  iframe Hat Hv
   isplit
   · iexact HT
   isplit
   · ipureintro; exact hD
+  isplit
   · iexact Hels
+  · ipureintro; exact ⟨hDV, hVT⟩
 
 /-- Raise a context's bound, at full authority (the step `ctx_absorb` makes
 against a view receipt, here made outright). -/
@@ -152,39 +380,93 @@ theorem ctxAt_raise (ξ : CtxId) (B B' : Nat) (D : RegMapF CPU) (h : B ≤ B') :
 /-- **THE DEPOSIT**: a payload moves INTO a stamped context from a running
 one, and the stamp is RAISED to cover it -- so there is nothing to prove at
 the deposit site; whoever takes it next pays the raised stamp.  (Rocq's
-`ctx_deposit`.) -/
-theorem ctxDeposit (R : CtxId → IProp GF) [CtxMorph R] (cpu : CPU) (ξ ξc : CtxId) (T : Nat) :
-    ownCtx (GF := GF) cpu ξ ∗ ctxStamped ξc T ∗ R ξ ⊢
-      |==> (ownCtx cpu ξ ∗ ∃ T' : Nat, ⌜T ≤ T'⌝ ∗ ctxStamped ξc T' ∗ R ξc) := by
-  iintro ⟨Hrun, Hst, HR⟩
-  icases ownCtx_cases cpu ξ $$ Hrun with ⟨%B, %K, %W, %D, Hat, #HK, %hBK, #HW, %hok, #Hels⟩
-  icases ctxStamped_cases ξc T $$ Hst with ⟨%Dc, Hatc, #HTc, %hDc, #Helsc⟩
+`ctx_deposit`.)  (W8 (f2-ctx): the depositor has passed the stamped
+context's bound `(V, g)`; its own component first rises over its own dirty
+keys, and the stamped context's bound rises to the depositor's -- which the
+depositor's floors cover, handed back.) -/
+theorem ctxDeposit (R : CtxId → IProp GF) [CtxMorph R] (cpu : CPU) (ξ ξc : CtxId) (T : Nat)
+    (V : CPU → Nat) (g : Nat) :
+    ownCtx (GF := GF) cpu ξ ∗ vgFloors ξ (V, g) ∗ ctxStamped ξc T V g ∗ R ξ ⊢
+      |==> (ownCtx cpu ξ ∗ ∃ (T' : Nat) (a : ChainVG), ⌜T ≤ T'⌝ ∗ ⌜vgLe (V, g) a⌝ ∗
+        ctxStamped ξc T' a.1 a.2 ∗ vgFloors ξ a ∗ R ξc) := by
+  iintro ⟨Hrun, #Hvg, Hst, HR⟩
+  icases ownCtx_cases cpu ξ $$ Hrun with ⟨%B, %K, %W, %D, Hat, #HK, %hBK, #HW, %hok, #Hels, Hch⟩
+  unfold chainTokAt
+  icases Hch with ⟨%Vx, %gx, Hvx, %⟨hcd, hvw⟩, #Hcx⟩
+  -- the depositor's own component rises over its own dirty keys
+  obtain ⟨Vy, hVy⟩ : ∃ Vy : CPU → Nat, Vy = fun h => if h = cpu then max (Vx h) W else Vx h := ⟨_, rfl⟩
+  imod vecAt_update ξ Vx gx Vy gx
+    (fun h => by rw [hVy]; dsimp only; split <;> omega) (Nat.le_refl _) $$ Hvx with Hvx
+  ihave #Hcx' : vecCertsAt _ Vy gx cpu $$ []
+  · rw [hVy]; iapply vecCertsAt_own _ Vx gx cpu W $$ Hcx
+  -- the new bound: the join of the stamped context's and the depositor's
+  icases ctxStamped_cases ξc T V g $$ Hst with ⟨%Dc, Hatc, #HTc, %hDc, #Helsc, Hvc, %⟨hDVc, hVTc⟩⟩
+  have hVx : ∀ h, Vy h ≤ W := by
+    intro h; have := hvw h; rw [hVy]; dsimp only; split <;> omega
+  -- the bound the box will carry
+  obtain ⟨Vn, hVn⟩ : ∃ Vn : CPU → Nat, Vn = fun h => max (V h) (Vy h) := ⟨_, rfl⟩
   imod ctxAt_raise ξc T (max T (max K W)) Dc (by omega) $$ Hatc with ⟨Hatc, #HflcT⟩
+  imod vecAt_update ξc V g Vn (max g gx) (fun h => by rw [hVn]; exact Nat.le_max_left _ _) (Nat.le_max_left _ _) $$ Hvc with Hvc
+  icases vecAt_get ξc 1 Vn (max g gx) $$ Hvc with ⟨Hvc, #Hvcf⟩
+  ihave #Hgc : ⌜gx = 0⌝ ∨ gateFloor ξc $$ [Hvc]
+  · by_cases hg0 : gx = 0
+    · ileft; ipureintro; exact hg0
+    · icases vecAt_gate ξc 1 Vn (max g gx) (by omega) $$ Hvc with ⟨_, #Hgf⟩
+      iright; iexact Hgf
   icases (ctxAt_halves ξ B D).1 $$ Hat with ⟨Hat1, Hat2⟩
-  ihave Hdom : ctxDom ξ ξc $$ [Hat1]
-  · iapply ctxDomAt_intro ξ ξc _ B D
-    iframe Hat1
+  icases (vecAt_halves ξ Vy gx).1 $$ Hvx with ⟨Hvx1, Hvx2⟩
+  ihave Hdom : ctxDom ξ ξc $$ [Hat1 Hvx1]
+  · iapply ctxDomAt_intro ξ ξc _ B D Vy gx
+    iframe Hat1 Hvx1
     isplit
     · iapply ctxFloor_le ξc (max T (max K W)) B (by omega); iexact HflcT
     isplit
     · iexact Hels
+    isplit
     · imodintro
       iintro %k %h %hk
       unfold keyAt
       ileft
-      iapply ctxFloor_le ξc (max T (max K W)) k (by have := (hok k h hk).1; omega)
-      iexact HflcT
+      isplit
+      · iapply ctxFloor_le ξc (max T (max K W)) k (by have := (hok k h hk).1; omega)
+        iexact HflcT
+      · ihave He := dirtyElems_get _ ξ D k h hk $$ Hels
+        icases He with ⟨_, #Hau⟩
+        unfold chainKey
+        iright
+        iexists (hartAgent h)
+        iframe Hau
+        iright
+        iexists h
+        isplit
+        · ipureintro; rfl
+        · have hkV : k ≤ Vn h := by
+            have hkW := (hok k h hk).1
+            rw [hVn, hVy]
+            show k ≤ max (V h) (if h = cpu then max (Vx h) W else Vx h)
+            rcases hcd k h hk with h1 | h1
+            · subst h1; simp only [if_true]; omega
+            · split <;> omega
+          iapply vecFloor_le ξc h (Vn h) k hkV
+          iapply vecFloors_get ξc Vn h $$ Hvcf
+    isplit
+    · iapply vecFloors_le ξc Vn Vy (fun h => by rw [hVn]; exact Nat.le_max_right _ _) $$ Hvcf
+    · iexact Hgc
   imod CtxMorph.morph (R := R) ξ ξc $$ [$Hdom $HR] with ⟨Hdom, HR⟩
-  icases ctxDomAt_cases ξ ξc _ $$ Hdom with ⟨%B2, %D2, Hat1, -, -, -⟩
-  ihave %heq : ⌜B2 = B ∧ D2 = D⌝ $$ [Hat1 Hat2]
-  · iapply ctxAt_agree ξ _ _ B2 B D2 D $$ [Hat1 Hat2]
-    iframe
-  obtain ⟨rfl, rfl⟩ := heq
-  ihave Hat := (ctxAt_halves ξ B2 D2).2 $$ [Hat1 Hat2]
+  icases ctxDomAt_cases ξ ξc _ $$ Hdom with ⟨%B2, %D2, Hat1, -, -, -, %V2, %g2, Hvx1, -, -⟩
+  ihave Hat := ctxAt_join ξ B B2 D D2 $$ [Hat2 Hat1]
   · iframe
+  ihave Hvx := vecAt_join ξ Vy V2 gx g2 $$ [Hvx2 Hvx1]
+  · iframe
+  icases vecAt_get ξ 1 Vy gx $$ Hvx with ⟨Hvx, #Hvxf⟩
+  ihave #Hgx : ⌜gx = 0⌝ ∨ gateFloor ξ $$ [Hvx]
+  · by_cases hg0 : gx = 0
+    · ileft; ipureintro; exact hg0
+    · icases vecAt_gate ξ 1 Vy gx (by omega) $$ Hvx with ⟨_, #Hgf⟩
+      iright; iexact Hgf
   imodintro
-  isplitl [Hat]
-  · iapply ownCtx_intro cpu ξ B2 K W D2
+  isplitl [Hat Hvx]
+  · iapply ownCtx_intro cpu ξ B K W D
     iframe Hat
     isplit
     · iexact HK
@@ -194,14 +476,28 @@ theorem ctxDeposit (R : CtxId → IProp GF) [CtxMorph R] (cpu : CPU) (ξ ξc : C
     · iexact HW
     isplit
     · ipureintro; exact hok
+    isplit
     · iexact Hels
-  iexists (max T (max K W))
+    · unfold chainTokAt
+      iexists Vy, gx
+      iframe Hvx Hcx'
+      ipureintro
+      refine ⟨fun k h hk => ?_, hVx⟩
+      rcases hcd k h hk with h1 | h1
+      · exact Or.inl h1
+      · right; rw [hVy]; dsimp only; split <;> omega
+  iexists (max T (max K W)), (Vn, max g gx)
   isplit
   · ipureintro; omega
-  isplitl [Hatc]
-  · unfold ctxStamped
-    iexists Dc
-    iframe Hatc
+  isplit
+  · ipureintro
+    refine ⟨fun h => by rw [hVn]; exact Nat.le_max_left _ _, ?_⟩
+    by_cases hg : g = 0
+    · exact Or.inl hg
+    · exact Or.inr (by show 1 ≤ max g gx; omega)
+  isplitl [Hatc Hvc]
+  · iapply ctxStamped_intro ξc (max T (max K W)) Vn (max g gx) Dc
+    iframe Hatc Hvc
     isplit
     · iapply topLb_max T (max K W)
       isplit
@@ -212,7 +508,27 @@ theorem ctxDeposit (R : CtxId → IProp GF) [CtxMorph R] (cpu : CPU) (ξ ξc : C
       · iexact HW
     isplit
     · ipureintro; intro k h hk; have := hDc k h hk; omega
+    isplit
     · iexact Helsc
+    · ipureintro
+      refine ⟨fun k h hk => by rw [hVn]; exact Nat.le_trans (hDVc k h hk) (Nat.le_max_left _ _), fun h => ?_⟩
+      have h1 := hVTc h
+      have h2 := hVx h
+      rw [hVn]
+      show max (V h) (Vy h) ≤ max T (max K W)
+      omega
+  isplitr [HR]
+  · unfold vgFloors
+    icases Hvg with ⟨#Hvf, #Hgf⟩
+    isplit
+    · rw [hVn]
+      iapply vecFloors_max ξ V Vy
+      iframe Hvf Hvxf
+    · icases Hgf with ⟨%h0 | #Hg⟩
+      · icases Hgx with ⟨%h0' | #Hg'⟩
+        · ileft; ipureintro; simp only; omega
+        · iright; iexact Hg'
+      · iright; iexact Hg
   · iexact HR
 
 /-- `dirtyElems` is timeless (so a stamped context can be pulled out from
@@ -220,10 +536,11 @@ under an invariant's later). -/
 instance dirtyElems_timeless (E : EraGS) (ξ : CtxId) (D : RegMapF CPU) :
     Timeless (PROP := IProp GF) (dirtyElems E ξ D) := by unfold dirtyElems; infer_instance
 
-instance ctxStamped_timeless (ξ : CtxId) (T : Nat) :
-    Timeless (ctxStamped (GF := GF) ξ T) := by unfold ctxStamped; infer_instance
+instance ctxStamped_timeless (ξ : CtxId) (T : Nat) (V : CPU → Nat) (g : Nat) :
+    Timeless (ctxStamped (GF := GF) ξ T V g) := by unfold ctxStamped; infer_instance
 
 end transport
+
 
 /-! ## The stamped-share map (Rocq's `gmap (id * nat) ufrac`)
 
@@ -245,30 +562,46 @@ abbrev StampMap (Id : Type) [Ord Id] : Type := StampMapF Id UFrac
 
 /-- **The L1 slot register** (Rocq's `slot_reg`): the floor L1 has reached,
 the window flag, the identity the box holds, and -- while the window is open
--- the witness the parked `rest` sits at, with the stamp it sits at. -/
+-- the witness the parked `rest` sits at, with the stamp it sits at; and (W8
+(f2-ctx), F-C) L1's chain bound `vd`, which the L1 row's floors cover. -/
 structure SlotReg (Id X : Type) where
   td : Nat
   win : Bool
   ident : Id
   x : Option (X × Nat)
+  vd : ChainVG
   deriving Inhabited
 
 /-- **The L2 slot register** (Rocq's `l2_reg`): the floor L2 has reached and
 -- while a checkout is out -- the identity and the stamped fragment that is
-parked, keys AND mass, so the park can take it back and re-form it. -/
+parked, keys AND mass, so the park can take it back and re-form it; and (W8
+(f2-ctx), F-C) L2's chain bound `vp` (the last park's, which the L2 row's
+floors cover), the parked TICKETS `ht`, and the box's bound at the checkout
+`vh` (which the holder's handle covers). -/
 structure L2Reg (Id : Type) [Ord Id] where
   tp : Nat
   hold : Option (Id × StampMap Id)
+  vp : ChainVG
+  ht : StampMap Id
+  vh : ChainVG
 
-instance {Id : Type} [Ord Id] : Inhabited (L2Reg Id) := ⟨⟨0, none⟩⟩
+/-- The L2 register a box is born with. -/
+def L2Reg.init {Id : Type} [Ord Id] : L2Reg Id := ⟨0, none, ((fun _ => 0), 0), ∅, ((fun _ => 0), 0)⟩
+
+instance {Id : Type} [Ord Id] : Inhabited (L2Reg Id) := ⟨L2Reg.init⟩
 
 /-- **The box's ghost names** (Rocq's `box_names`): the stamps, the count,
-and the two registers. -/
+the two registers, and (W8 (f2-ctx), F-C) the tickets. -/
 structure BoxNames where
   stm : GName
   cnt : GName
   slotd : GName
   slotp : GName
+  tkt : GName
+
+/-- The tickets' names, as a stamps camera's (the same camera at the tickets'
+name: every stamps lemma applies). -/
+def BoxNames.tk (γ : BoxNames) : BoxNames := ⟨γ.tkt, γ.cnt, γ.slotd, γ.slotp, γ.tkt⟩
 
 /-- **The client's payload family** (Rocq's four section parameters `P_hdr`,
 `P_rest`, `Q1`, `Q2`): the header the L1 side reads and writes, the rest of
@@ -684,6 +1017,39 @@ theorem stampMap_valid (m : StampMap Id) : ✓ m := by
   intro p
   cases get? m p <;> trivial
 
+/-! ## The tickets' tags (W8 (f2-ctx), F-C)
+
+Every reference carries, beside its stamps, TICKETS of the same mass whose
+key names a chain bound (its TAG, `vgCode`): the bound its holder's floors
+cover.  `vgCode` is injective, so a key names at most one bound. -/
+
+/-- A list of numbers, coded injectively. -/
+def boxCodeList : List Nat → Nat
+  | [] => 0
+  | x :: l => chainPair x (boxCodeList l) + 1
+
+theorem boxCodeList_inj : ∀ {l l' : List Nat}, boxCodeList l = boxCodeList l' → l = l'
+  | [], [], _ => rfl
+  | [], _ :: _, h => by simp [boxCodeList] at h
+  | _ :: _, [], h => by simp [boxCodeList] at h
+  | x :: l, x' :: l', h => by
+    simp only [boxCodeList, Nat.add_right_cancel_iff] at h
+    obtain ⟨h1, h2⟩ := chainPair_inj h
+    rw [h1, boxCodeList_inj h2]
+
+/-- A chain bound's code: the tag a ticket's key carries. -/
+def vgCode (a : ChainVG) : Nat := chainPair a.2 (boxCodeList (cpus.map a.1))
+
+theorem vgCode_inj {a b : ChainVG} (h : vgCode a = vgCode b) : a = b := by
+  obtain ⟨h1, h2⟩ := chainPair_inj h
+  have hm := boxCodeList_inj h2
+  have hf : a.1 = b.1 := by
+    funext c
+    have := congrArg (fun l => l[c.val]?) hm
+    simp only [List.getElem?_map, cpus_get?, Option.map_some, Option.some.injEq] at this
+    exact this
+  exact Prod.ext hf h1
+
 end helpers
 
 /-! ## The box's cameras (Rocq `Xv6Cameras` §15's `stampsR` / `boxG`) -/
@@ -757,7 +1123,7 @@ theorem stampsFrag_empty (γ : BoxNames) : ⊢ |==> stampsFrag (GF := GF) (Id :=
   exact iOwn_unit (F := StampsRF Id) (ε := (UCMRA.unit : Auth (StampMap Id)))
 
 /-- The stamps authority at `∅`, fresh. -/
-theorem stampsAuth_alloc : ⊢ |==> ∃ g : GName, stampsAuth (GF := GF) ⟨g, 0, 0, 0⟩ (∅ : StampMap Id) := by
+theorem stampsAuth_alloc : ⊢ |==> ∃ g : GName, stampsAuth (GF := GF) ⟨g, 0, 0, 0, 0⟩ (∅ : StampMap Id) := by
   unfold stampsAuth
   imod iOwn_alloc (F := StampsRF Id) (● (∅ : StampMap Id)) with ⟨%g, H⟩
   · exact Auth.auth_valid.mpr (stampMap_valid _)
@@ -880,16 +1246,163 @@ theorem ghostVar_halves {A : Type} [GhostVarG GF A] (g : GName) (a : A) :
 
 /-! ## The reference: ONE spelling, ghost-only (Rocq §3.3) -/
 
+/-- **A ticket's tag, covered** (W8 (f2-ctx), F-C): the key's number names a
+chain bound ξ has passed. -/
+def tagFl (ξ : CtxId) (n : Nat) : IProp GF := iprop(∃ W : ChainVG, ⌜n = vgCode W⌝ ∗ vgFloors ξ W)
+
+instance tagFl_persistent (ξ : CtxId) (n : Nat) : Persistent (tagFl (GF := GF) ξ n) := by
+  unfold tagFl; infer_instance
+instance tagFl_timeless (ξ : CtxId) (n : Nat) : Timeless (tagFl (GF := GF) ξ n) := by
+  unfold tagFl; infer_instance
+instance tagFl_morph (n : Nat) : CtxMorph (GF := GF) (fun ξ => tagFl ξ n) := by
+  unfold tagFl; infer_instance
+
+/-- **A ticket fragment's tags, covered at ξ.** -/
+def tagsFl (ξ : CtxId) (mt : StampMap Id) : IProp GF := iprop([∗list] p ∈ skeys mt, tagFl ξ p.2)
+
+instance tagsFl_persistent (ξ : CtxId) (mt : StampMap Id) : Persistent (tagsFl (GF := GF) ξ mt) := by
+  unfold tagsFl; infer_instance
+instance tagsFl_timeless (ξ : CtxId) (mt : StampMap Id) : Timeless (tagsFl (GF := GF) ξ mt) := by
+  unfold tagsFl; infer_instance
+instance tagsFl_morph (mt : StampMap Id) : CtxMorph (GF := GF) (fun ξ => tagsFl ξ mt) := by
+  unfold tagsFl
+  exact ctxMorph_bigSepL (skeys mt) (fun _ p ξ => tagFl ξ p.2) (fun _ p => tagFl_morph p.2)
+
+theorem tagsFl_get (ξ : CtxId) (mt : StampMap Id) (p : Id × Nat) (hp : (get? mt p).isSome) :
+    tagsFl (GF := GF) ξ mt ⊢ tagFl ξ p.2 := by
+  unfold tagsFl
+  iintro #H
+  iapply BigSepL.bigSepL_mem (Φ := fun p => tagFl (GF := GF) ξ p.2) ((mem_skeys mt p).2 hp) $$ H
+
+theorem tagsFl_intro (ξ : CtxId) (mt : StampMap Id) :
+    (□ ∀ p : Id × Nat, ⌜(get? mt p).isSome⌝ -∗ tagFl ξ p.2) ⊢@{IProp GF} tagsFl ξ mt := by
+  unfold tagsFl
+  iintro #H
+  iapply BigSepL.bigSepL_forall_elim
+  iintro %k %p %hk
+  iapply H $$ %p %((mem_skeys mt p).1 (List.mem_of_getElem? hk))
+
+theorem tagsFl_mono (ξ : CtxId) (mt mt' : StampMap Id)
+    (h : ∀ p, (get? mt' p).isSome → (get? mt p).isSome) : tagsFl (GF := GF) ξ mt ⊢ tagsFl ξ mt' := by
+  iintro #H
+  iapply tagsFl_intro
+  imodintro
+  iintro %p %hp
+  iapply tagsFl_get ξ mt p (h p hp) $$ H
+
+theorem tagsFl_op (ξ : CtxId) (mt1 mt2 : StampMap Id) :
+    tagsFl (GF := GF) ξ mt1 ∗ tagsFl ξ mt2 ⊢ tagsFl ξ (mt1 • mt2) := by
+  iintro ⟨#H1, #H2⟩
+  iapply tagsFl_intro
+  imodintro
+  iintro %p %hp
+  rcases (isSome_sop mt1 mt2 p).1 hp with h | h
+  · iapply tagsFl_get ξ mt1 p h $$ H1
+  · iapply tagsFl_get ξ mt2 p h $$ H2
+
+theorem tagsFl_empty (ξ : CtxId) : ⊢@{IProp GF} tagsFl ξ (∅ : StampMap Id) := by
+  iintro
+  iapply tagsFl_intro
+  imodintro
+  iintro %p %hp
+  rw [LawfulPartialMap.get?_empty] at hp
+  cases hp
+
+theorem tagsFl_singleton (ξ : CtxId) (i : Id) (W : ChainVG) (q : UFrac) :
+    vgFloors (GF := GF) ξ W ⊢ tagsFl ξ (PartialMap.singleton (i, vgCode W) q : StampMap Id) := by
+  iintro #H
+  iapply tagsFl_intro
+  imodintro
+  iintro %p %hp
+  by_cases hpe : (i, vgCode W) = p
+  · subst hpe
+    unfold tagFl
+    iexists W
+    iframe H
+    ipureintro; rfl
+  · rw [LawfulPartialMap.get?_singleton_ne hpe] at hp; cases hp
+
+/-- Every live tag the fragment's floors cover is under a bound the holder's
+context passes (the max form `MachCSL.ownCtx_vgMax` consumes). -/
+theorem tagsFl_list (ξ : CtxId) (mt : StampMap Id) :
+    tagsFl (GF := GF) ξ mt ⊢ ∃ L : List ChainVG, ([∗list] b ∈ L, vgFloors ξ b) ∗
+      ⌜∀ p, (get? mt p).isSome → ∃ b ∈ L, p.2 = vgCode b⌝ := by
+  unfold tagsFl
+  have key : ∀ (l : List (Id × Nat)), ([∗list] p ∈ l, tagFl (GF := GF) ξ p.2) ⊢
+      ∃ L : List ChainVG, ([∗list] b ∈ L, vgFloors ξ b) ∗ ⌜∀ p ∈ l, ∃ b ∈ L, p.2 = vgCode b⌝ := by
+    intro l
+    induction l with
+    | nil =>
+      iintro _
+      iexists []
+      isplit
+      · iapply BigSepL.bigSepL_nil.2; itrivial
+      · ipureintro; intro p hp; cases hp
+    | cons p l ih =>
+      iintro H
+      icases BigSepL.bigSepL_cons.1 $$ H with ⟨#Hp, Hl⟩
+      icases ih $$ Hl with ⟨%L, #HL, %hL⟩
+      unfold tagFl
+      icases Hp with ⟨%W, %hW, #HW⟩
+      iexists (W :: L)
+      isplit
+      · iapply BigSepL.bigSepL_cons.2
+        iframe HW HL
+      · ipureintro
+        intro p' hp'
+        rcases List.mem_cons.1 hp' with h | h
+        · subst h; exact ⟨W, List.mem_cons_self, hW⟩
+        · obtain ⟨b, hb, hbe⟩ := hL p' h
+          exact ⟨b, List.mem_cons_of_mem _ hb, hbe⟩
+  iintro #H
+  icases key (skeys mt) $$ H with ⟨%L, #HL, %hL⟩
+  iexists L
+  iframe HL
+  ipureintro
+  exact fun p hp => hL p ((mem_skeys mt p).2 hp)
+
 /-- **A REFERENCE** at identity `i` over the fragment `m` (Rocq's
 `reference`): a counted reference has `qsum m = 1`; a share has any positive
 mass.  The fragment's keys all name `i`, and the store-order receipt of its
 largest stamp is what, cashed against the holder's own floor, lets the
-holder take the bundle out. -/
-def reference (γ : BoxNames) (i : Id) (m : StampMap Id) : IProp GF := iprop%
-  ⌜m ≠ ∅⌝ ∗ ⌜keyed m i⌝ ∗ stampsFrag γ m ∗ topLb (maxStamp m)
+holder take the bundle out.  (W8 (f2-ctx), F-C: context-indexed -- the
+TICKETS of the same mass, whose tags the holder's context ξ has passed.) -/
+def referenceAt (γ : BoxNames) (i : Id) (m : StampMap Id) (ξ : CtxId) : IProp GF := iprop%
+  ⌜m ≠ ∅⌝ ∗ ⌜keyed m i⌝ ∗ stampsFrag γ m ∗ topLb (maxStamp m) ∗
+    ∃ mt : StampMap Id, ⌜qsum mt = qsum m⌝ ∗ stampsFrag γ.tk mt ∗ tagsFl ξ mt
 
-instance reference_timeless (γ : BoxNames) (i : Id) (m : StampMap Id) :
-    Timeless (reference (GF := GF) γ i m) := by unfold reference; infer_instance
+instance referenceAt_timeless (γ : BoxNames) (i : Id) (m : StampMap Id) (ξ : CtxId) :
+    Timeless (referenceAt (GF := GF) γ i m ξ) := by unfold referenceAt; infer_instance
+
+instance referenceAt_morph (γ : BoxNames) (i : Id) (m : StampMap Id) :
+    CtxMorph (GF := GF) (referenceAt γ i m) := by
+  unfold referenceAt
+  refine @instCtxMorphSep _ _ _ _ _ (instCtxMorphConst _) ?_
+  refine @instCtxMorphSep _ _ _ _ _ (instCtxMorphConst _) ?_
+  refine @instCtxMorphSep _ _ _ _ _ (instCtxMorphConst _) ?_
+  refine @instCtxMorphSep _ _ _ _ _ (instCtxMorphConst _) ?_
+  refine @instCtxMorphExists _ _ _ _ _ (fun mt => ?_)
+  refine @instCtxMorphSep _ _ _ _ _ (instCtxMorphConst _) ?_
+  exact @instCtxMorphSep _ _ _ _ _ (instCtxMorphConst _) (tagsFl_morph mt)
+
+theorem referenceAt_cases (γ : BoxNames) (i : Id) (m : StampMap Id) (ξ : CtxId) :
+    referenceAt (GF := GF) γ i m ξ ⊢ ⌜m ≠ ∅⌝ ∗ ⌜keyed m i⌝ ∗ stampsFrag γ m ∗ topLb (maxStamp m) ∗
+      ∃ mt : StampMap Id, ⌜qsum mt = qsum m⌝ ∗ stampsFrag γ.tk mt ∗ tagsFl ξ mt := by
+  unfold referenceAt; iintro H; iexact H
+
+theorem referenceAt_intro (γ : BoxNames) (i : Id) (m mt : StampMap Id) (ξ : CtxId) (hne : m ≠ ∅)
+    (hk : keyed m i) (hq : qsum mt = qsum m) :
+    stampsFrag (GF := GF) γ m ∗ topLb (maxStamp m) ∗ stampsFrag γ.tk mt ∗ tagsFl ξ mt ⊢ referenceAt γ i m ξ := by
+  unfold referenceAt
+  iintro ⟨Hf, #Ht, Hft, #Htg⟩
+  iframe Hf Ht
+  isplit
+  · ipureintro; exact hne
+  isplit
+  · ipureintro; exact hk
+  iexists mt
+  iframe Hft Htg
+  ipureintro; exact hq
 
 /-- The unit singleton a counted reference owns (Rocq's `{[(i, t) :=
 1%Qp]}`). -/
@@ -901,68 +1414,80 @@ theorem qsum_unitStamp (i : Id) (t : Nat) : qsum (unitStamp i t) = 1 := by
 theorem maxStamp_unitStamp (i : Id) (t : Nat) : maxStamp (unitStamp i t) = t := by
   unfold unitStamp; rw [maxStamp_singleton]
 
-/-- A reference minted at a singleton: the fragment and the receipt. -/
-theorem reference_singleton (γ : BoxNames) (i : Id) (t : Nat) (q : UFrac) :
-    stampsFrag (GF := GF) γ (PartialMap.singleton (i, t) q : StampMap Id) ∗ topLb t ⊢
-      reference γ i (PartialMap.singleton (i, t) q : StampMap Id) := by
-  unfold reference
-  iintro ⟨Hf, #Ht⟩
-  iframe Hf
+/-- A reference minted at a singleton: the fragment and the receipt, and a
+ticket of the same mass at a tag the holder's context has passed. -/
+theorem referenceAt_mint (γ : BoxNames) (i : Id) (t : Nat) (q : UFrac) (W : ChainVG) (ξ : CtxId) :
+    stampsFrag (GF := GF) γ (PartialMap.singleton (i, t) q : StampMap Id) ∗ topLb t ∗
+      stampsFrag γ.tk (PartialMap.singleton (i, vgCode W) q : StampMap Id) ∗ vgFloors ξ W ⊢
+      referenceAt γ i (PartialMap.singleton (i, t) q : StampMap Id) ξ := by
+  iintro ⟨Hf, #Ht, Hft, #HW⟩
+  iapply referenceAt_intro γ i _ (PartialMap.singleton (i, vgCode W) q : StampMap Id) ξ
+    (singleton_ne_empty_map _ _) (keyed_singleton i t q) (by rw [qsum_singleton, qsum_singleton])
+  iframe Hf Hft
   isplit
-  · ipureintro; exact singleton_ne_empty_map _ _
-  isplit
-  · ipureintro; exact keyed_singleton i t q
   · rw [maxStamp_singleton]; iexact Ht
+  · iapply tagsFl_singleton ξ i W q $$ HW
 
-/-- A reference's store-order receipt (Rocq's `reference_llb`). -/
-theorem reference_llb (γ : BoxNames) (i : Id) (m : StampMap Id) :
-    reference (GF := GF) γ i m ⊢ topLb (maxStamp m) := by
-  unfold reference
-  iintro ⟨-, -, -, #H⟩
+/-- A reference's store-order receipt (Rocq's `referenceAt_llb`). -/
+theorem referenceAt_llb (γ : BoxNames) (i : Id) (m : StampMap Id) (ξ : CtxId) :
+    referenceAt (GF := GF) γ i m ξ ⊢ topLb (maxStamp m) := by
+  unfold referenceAt
+  iintro ⟨-, -, -, #H, -⟩
   iexact H
 
 /-- ...and kept beside the reference. -/
-theorem reference_topLb (γ : BoxNames) (i : Id) (m : StampMap Id) :
-    reference (GF := GF) γ i m ⊢ reference γ i m ∗ topLb (maxStamp m) := by
-  unfold reference
-  iintro ⟨%h1, %h2, Hf, #H⟩
-  iframe Hf
-  isplit
-  · isplit
-    · ipureintro; exact h1
-    isplit
-    · ipureintro; exact h2
-    · iexact H
-  · iexact H
+theorem referenceAt_topLb (γ : BoxNames) (i : Id) (m : StampMap Id) (ξ : CtxId) :
+    referenceAt (GF := GF) γ i m ξ ⊢ referenceAt γ i m ξ ∗ topLb (maxStamp m) := by
+  iintro H
+  icases referenceAt_cases γ i m ξ $$ H with ⟨%h1, %h2, Hf, #Ht, %mt, %hq, Hft, #Htg⟩
+  isplitl [Hf Hft]
+  · iapply referenceAt_intro γ i m mt ξ h1 h2 hq
+    iframe Hf Hft Ht Htg
+  · iexact Ht
 
-/-- **Shares: a reference splits by mass** (Rocq's `reference_split`, M-5). -/
-theorem reference_split (γ : BoxNames) (i : Id) (m : StampMap Id) (s s' : Qp) (hss : s + s' = 1) :
-    reference (GF := GF) γ i m ⊢ reference γ i (mscale s m) ∗ reference γ i (mscale s' m) := by
-  unfold reference
-  iintro ⟨%hne, %hk, Hf, #Hllb⟩
+/-- **Shares: a referenceAt splits by mass** (Rocq's `referenceAt_split`, M-5);
+its tickets split with it. -/
+theorem referenceAt_split (γ : BoxNames) (i : Id) (m : StampMap Id) (ξ : CtxId) (s s' : Qp)
+    (hss : s + s' = 1) :
+    referenceAt (GF := GF) γ i m ξ ⊢ referenceAt γ i (mscale s m) ξ ∗ referenceAt γ i (mscale s' m) ξ := by
+  unfold referenceAt
+  iintro ⟨%hne, %hk, Hf, #Hllb, %mt, %hq, Hft, #Htg⟩
   have hsp := mscale_split s s' m hss
+  have hspt := mscale_split s s' mt hss
   ihave ⟨Hf1, Hf2⟩ := (stampsFrag_op γ (mscale s m) (mscale s' m)).1 $$ [Hf]
   · rw [← hsp]; iexact Hf
+  ihave ⟨Hft1, Hft2⟩ := (stampsFrag_op γ.tk (mscale s mt) (mscale s' mt)).1 $$ [Hft]
+  · rw [← hspt]; iexact Hft
+  ihave #Htg1 := tagsFl_mono ξ mt (mscale s mt) (fun p hp => (dom_mscale s mt p).1 hp) $$ Htg
+  ihave #Htg2 := tagsFl_mono ξ mt (mscale s' mt) (fun p hp => (dom_mscale s' mt p).1 hp) $$ Htg
   rw [maxStamp_mscale, maxStamp_mscale]
-  isplitl [Hf1]
+  isplitl [Hf1 Hft1]
   · iframe Hf1
     isplit
     · ipureintro; exact fun h => hne ((mscale_empty_iff s m).1 h)
     isplit
     · ipureintro; exact fun p hp => hk p ((dom_mscale s m p).1 hp)
+    isplit
     · iexact Hllb
+    iexists mscale s mt
+    iframe Hft1 Htg1
+    ipureintro; rw [qsum_mscale, qsum_mscale, hq]
   · iframe Hf2
     isplit
     · ipureintro; exact fun h => hne ((mscale_empty_iff s' m).1 h)
     isplit
     · ipureintro; exact fun p hp => hk p ((dom_mscale s' m p).1 hp)
+    isplit
     · iexact Hllb
+    iexists mscale s' mt
+    iframe Hft2 Htg2
+    ipureintro; rw [qsum_mscale, qsum_mscale, hq]
 
-/-- **...and joins** (Rocq's `reference_join`). -/
-theorem reference_join (γ : BoxNames) (i : Id) (m1 m2 : StampMap Id) :
-    reference (GF := GF) γ i m1 ∗ reference γ i m2 ⊢ reference γ i (m1 • m2) := by
-  unfold reference
-  iintro ⟨⟨%hne1, %hk1, Hf1, #Hl1⟩, ⟨%hne2, %hk2, Hf2, #Hl2⟩⟩
+/-- **...and joins** (Rocq's `referenceAt_join`). -/
+theorem referenceAt_join (γ : BoxNames) (i : Id) (m1 m2 : StampMap Id) (ξ : CtxId) :
+    referenceAt (GF := GF) γ i m1 ξ ∗ referenceAt γ i m2 ξ ⊢ referenceAt γ i (m1 • m2) ξ := by
+  unfold referenceAt
+  iintro ⟨⟨%hne1, %hk1, Hf1, #Hl1, %mt1, %hq1, Hft1, #Htg1⟩, ⟨%hne2, %hk2, Hf2, #Hl2, %mt2, %hq2, Hft2, #Htg2⟩⟩
   isplit
   · ipureintro; exact op_ne_empty_l m1 m2 hne1
   isplit
@@ -970,39 +1495,50 @@ theorem reference_join (γ : BoxNames) (i : Id) (m1 m2 : StampMap Id) :
   isplitl [Hf1 Hf2]
   · iapply (stampsFrag_op γ m1 m2).2
     iframe
+  isplit
   · rw [maxStamp_op]
     iapply topLb_max
     isplit
     · iexact Hl1
     · iexact Hl2
+  iexists mt1 • mt2
+  isplit
+  · ipureintro; rw [qsum_op, qsum_op, hq1, hq2]
+  isplitl [Hft1 Hft2]
+  · iapply (stampsFrag_op γ.tk mt1 mt2).2
+    iframe
+  · iapply tagsFl_op ξ mt1 mt2
+    iframe Htg1 Htg2
 
 /-- **THE L2 HOLDER'S HANDLE** (Rocq's `l2_hold`): the L2 register half,
 naming exactly the fragment the checkout parked -- keys AND mass -- so the
-park can take it back, and the receipt of that fragment's stamps. -/
-def l2Hold (γ : BoxNames) (i : Id) (m : StampMap Id) : IProp GF := iprop%
-  ∃ tp : Nat, slotpHalf γ ⟨tp, some (i, m)⟩ ∗ topLb (maxStamp m)
+park can take it back, and the receipt of that fragment's stamps; (W8
+(f2-ctx)) the holder's floors for the box's bound at the checkout. -/
+def l2HoldAt (γ : BoxNames) (i : Id) (m : StampMap Id) (ξ : CtxId) : IProp GF := iprop%
+  ∃ (tp : Nat) (vp : ChainVG) (mt : StampMap Id) (vh : ChainVG),
+    slotpHalf γ ⟨tp, some (i, m), vp, mt, vh⟩ ∗ topLb (maxStamp m) ∗ vgFloors ξ vh
 
-instance l2Hold_timeless (γ : BoxNames) (i : Id) (m : StampMap Id) :
-    Timeless (l2Hold (GF := GF) γ i m) := by unfold l2Hold; infer_instance
+instance l2HoldAt_timeless (γ : BoxNames) (i : Id) (m : StampMap Id) (ξ : CtxId) :
+    Timeless (l2HoldAt (GF := GF) γ i m ξ) := by unfold l2HoldAt; infer_instance
+
+instance l2HoldAt_morph (γ : BoxNames) (i : Id) (m : StampMap Id) :
+    CtxMorph (GF := GF) (l2HoldAt γ i m) := by unfold l2HoldAt; infer_instance
 
 /-- **L2's payload row**, at rest (Rocq's `l2_row`): the register half with
-nothing held, and its floor. -/
+nothing held, its floor, and (W8 (f2-ctx)) its chain bound's floors. -/
 def l2Row (γ : BoxNames) (s : L2Reg Id) (ξ : CtxId) : IProp GF := iprop%
-  slotpHalf γ s ∗ ⌜s.hold = none⌝ ∗ ctxFloor ξ s.tp
+  slotpHalf γ s ∗ ⌜s.hold = none⌝ ∗ ctxFloor ξ s.tp ∗ vgFloors ξ s.vp
 
 instance l2Row_morph (γ : BoxNames) (s : L2Reg Id) :
     CtxMorph (GF := GF) (l2Row γ s) := by unfold l2Row; infer_instance
 
 /-- L2's row, folded (Rocq's `l2_row_fold`). -/
-theorem l2Row_fold (γ : BoxNames) (T' : Nat) (ξ : CtxId) :
-    slotpHalf (GF := GF) γ (⟨T', none⟩ : L2Reg Id) ∗ ctxFloor ξ T' ⊢
-      l2Row γ (⟨T', none⟩ : L2Reg Id) ξ := by
+theorem l2Row_fold (γ : BoxNames) (s : L2Reg Id) (ξ : CtxId) (hs : s.hold = none) :
+    slotpHalf (GF := GF) γ s ∗ ctxFloor ξ s.tp ∗ vgFloors ξ s.vp ⊢ l2Row γ s ξ := by
   unfold l2Row
-  iintro ⟨Hs, #Hfl⟩
-  iframe Hs
-  isplit
-  · ipureintro; rfl
-  · iexact Hfl
+  iintro ⟨Hs, #Hfl, #Hvg⟩
+  iframe Hs Hfl Hvg
+  ipureintro; exact hs
 
 /-- **THE BOOT FOLD** (Rocq's `big_sepL_llb_max`): a list of stamp receipts
 under ONE bound, the largest of them (the L1 floor slot at boot). -/
@@ -1068,10 +1604,11 @@ theorem slotdHalf_update (γ : BoxNames) (r r' r'' : SlotReg Id X) :
   iexact H
 
 /-- **L1's payload row**, at rest (Rocq's `l1_row`): the register half with
-the window shut, the floor row at `td`, and its receipt.  The client adds
-`⌜r.ident = its identity cells' values⌝` beside it. -/
+the window shut, the floor row at `td`, and its receipt; (W8 (f2-ctx)) L1's
+chain bound's floors.  The client adds `⌜r.ident = its identity cells'
+values⌝` beside it. -/
 def l1Row (γ : BoxNames) (r : SlotReg Id X) (ξ : CtxId) : IProp GF := iprop%
-  slotdHalf γ r ∗ ⌜r.win = false ∧ r.x = none⌝ ∗ ctxFloor ξ r.td ∗ topLb r.td
+  slotdHalf γ r ∗ ⌜r.win = false ∧ r.x = none⌝ ∗ ctxFloor ξ r.td ∗ topLb r.td ∗ vgFloors ξ r.vd
 
 instance l1Row_morph (γ : BoxNames) (r : SlotReg Id X) :
     CtxMorph (GF := GF) (l1Row γ r) := by unfold l1Row; infer_instance
@@ -1079,9 +1616,10 @@ instance l1Row_morph (γ : BoxNames) (r : SlotReg Id X) :
 /-! ## The arms -/
 
 /-- The L1 out-window's ghost (Rocq's `hdr_out`): the withdrawer's whole
-units, or `∅`. -/
+units, or `∅`; (W8 (f2-ctx)) and their tickets. -/
 def hdrOut (γ : BoxNames) (m : StampMap Id) : IProp GF := iprop%
-  ∃ m' : StampMap Id, ⌜qsum m' = qsum m⌝ ∗ stampsFrag γ m' ∗ topLb (maxStamp m')
+  ∃ m' mt' : StampMap Id, ⌜qsum m' = qsum m⌝ ∗ stampsFrag γ m' ∗ topLb (maxStamp m') ∗
+    ⌜qsum mt' = qsum m⌝ ∗ stampsFrag γ.tk mt'
 
 /-- The bundle, at rest in the box's own context (Rocq's `in_arm`). -/
 def inArm (P : BoxPay GF Id X) (i : Id) (ξb : CtxId) : IProp GF := iprop%
@@ -1098,33 +1636,53 @@ definition: the view exposes it): `IN` = (window shut, nothing held),
 `OUT_L1` = (window open, nothing held: the header is out, the rest is parked
 at the stamp the register names, and the withdrawer's units sit in
 `hdrOut`), `OUT_L2` = (window shut, a fragment held: the checkout's parked
-fragment and the residue `Q2`). -/
+fragment -- with its tickets, W8 (f2-ctx) -- and the residue `Q2`). -/
 def boxArm (P : BoxPay GF Id X) (γ : BoxNames) (T : Nat) (ξb : CtxId) (m : StampMap Id)
     (c : Nat) (r : SlotReg Id X) (s : L2Reg Id) : IProp GF :=
   match s.hold with
   | some ih =>
-      iprop(⌜r.win = false⌝ ∗ ⌜ih.2 ≠ ∅⌝ ∗ ⌜keyed ih.2 ih.1⌝ ∗ stampsFrag γ ih.2 ∗ P.q2)
+      iprop(⌜r.win = false⌝ ∗ ⌜ih.2 ≠ ∅⌝ ∗ ⌜keyed ih.2 ih.1⌝ ∗ stampsFrag γ ih.2 ∗
+        ⌜qsum s.ht = qsum ih.2⌝ ∗ stampsFrag γ.tk s.ht ∗ P.q2)
   | none =>
       match r.win with
       | true => iprop(hdrOut γ m ∗ (∃ x : X, ⌜r.x = some (x, T)⌝ ∗ P.rest x ξb) ∗ P.q1 c)
       | false => inArm P r.ident ξb
 
-/-- **THE FOUR PURE ROWS** (Rocq's `box_rows`):
+/-- **THE PURE ROWS** (Rocq's `box_rows`, + W8 (f2-ctx) F-C's vector rows):
 (Σ) the mass is the refcount; (I) every live key names the L1 register's
 identity; (C) the L2-side cover: every live stamp is at or past `T`, or L2's
 floor register is; (D) the L1-side cover: L1's floor register is at or past
-`T`, or some live key witnesses `T` itself. -/
-def boxRows (T : Nat) (m : StampMap Id) (c : Nat) (r : SlotReg Id X) (s : L2Reg Id) : Prop :=
+`T`, or some live key witnesses `T` itself.  For the box's chain bound `a`
+(its stamped context's vector and gate): (Σt) the tickets' mass is the
+refcount; (Tg) every live ticket names a tag; **(C′)** the TAKER'S cover --
+`a` is under L2's bound (a park since the last L1 deposit), or under L1's
+bound and under every live tag (every live reference was minted, by an L1
+holder, after the deposit); **(D′)** the WITHDRAWER'S cover -- each component
+of `a` (and its gate) is under L1's bound or under some live tag (the
+withdrawer holds every live reference, hence every live tag; `refDecr` folds
+a dropped reference's tags into L1's bound); (O1) an open window's L1 bound
+is past `a` (the withdrawer's); (O2) a checked-out box's `vh` is past `a`
+(the holder's). -/
+def boxRows (T : Nat) (a : ChainVG) (m mt : StampMap Id) (c : Nat) (r : SlotReg Id X) (s : L2Reg Id) :
+    Prop :=
   qsum m = (c : Rat) ∧
   keyed m r.ident ∧
   ((∀ p, (get? m p).isSome → T ≤ p.2) ∨ T ≤ s.tp) ∧
-  (T ≤ r.td ∨ ∃ p, (get? m p).isSome ∧ p.2 = T)
+  (T ≤ r.td ∨ ∃ p, (get? m p).isSome ∧ p.2 = T) ∧
+  qsum mt = (c : Rat) ∧
+  (∀ p, (get? mt p).isSome → ∃ W, p.2 = vgCode W) ∧
+  (vgLe a s.vp ∨ (vgLe a r.vd ∧ ∀ p W, (get? mt p).isSome → p.2 = vgCode W → vgLe a W)) ∧
+  (∀ h, a.1 h ≤ r.vd.1 h ∨ ∃ p W, (get? mt p).isSome ∧ p.2 = vgCode W ∧ a.1 h ≤ W.1 h) ∧
+  (a.2 = 0 ∨ 1 ≤ r.vd.2 ∨ ∃ p W, (get? mt p).isSome ∧ p.2 = vgCode W ∧ 1 ≤ W.2) ∧
+  (r.win = true → vgLe a r.vd) ∧
+  (s.hold.isSome → vgLe a s.vh)
 
-/-- **THE BODY** (Rocq's `box_body`). -/
+/-- **THE BODY** (Rocq's `box_body`; W8 (f2-ctx): the stamped context's
+chain bound and the tickets). -/
 def boxBody (P : BoxPay GF Id X) (γ : BoxNames) : IProp GF := iprop%
-  ∃ (T : Nat) (ξb : CtxId) (m : StampMap Id) (c : Nat) (r : SlotReg Id X) (s : L2Reg Id),
-    ctxStamped ξb T ∗ stampsAuth γ m ∗ cntHalf γ c ∗ slotdHalf γ r ∗ slotpHalf γ s ∗
-    ⌜boxRows T m c r s⌝ ∗ boxArm P γ T ξb m c r s
+  ∃ (T : Nat) (ξb : CtxId) (a : ChainVG) (m mt : StampMap Id) (c : Nat) (r : SlotReg Id X) (s : L2Reg Id),
+    ctxStamped ξb T a.1 a.2 ∗ stampsAuth γ m ∗ stampsAuth γ.tk mt ∗ cntHalf γ c ∗ slotdHalf γ r ∗
+    slotpHalf γ s ∗ ⌜boxRows T a m mt c r s⌝ ∗ boxArm P γ T ξb m c r s
 
 /-- **THE BOX** (Rocq's `is_box`), persistent. -/
 def isBox (P : BoxPay GF Id X) (N : Namespace) (γ : BoxNames) : IProp GF :=
@@ -1163,23 +1721,26 @@ theorem boxArm_out2_cases (P : BoxPay GF Id X) (γ : BoxNames) (T : Nat) (ξb : 
     (m : StampMap Id) (c : Nat) (r : SlotReg Id X) (s : L2Reg Id) (i : Id) (mh : StampMap Id)
     (hs : s.hold = some (i, mh)) :
     boxArm P γ T ξb m c r s ⊢
-      ⌜r.win = false⌝ ∗ ⌜mh ≠ ∅⌝ ∗ ⌜keyed mh i⌝ ∗ stampsFrag γ mh ∗ P.q2 := by
+      ⌜r.win = false⌝ ∗ ⌜mh ≠ ∅⌝ ∗ ⌜keyed mh i⌝ ∗ stampsFrag γ mh ∗ ⌜qsum s.ht = qsum mh⌝ ∗
+        stampsFrag γ.tk s.ht ∗ P.q2 := by
   simp only [boxArm, hs]
   iintro H; iexact H
 
 theorem boxArm_out2_intro (P : BoxPay GF Id X) (γ : BoxNames) (T : Nat) (ξb : CtxId)
     (m : StampMap Id) (c : Nat) (r : SlotReg Id X) (s : L2Reg Id) (i : Id) (mh : StampMap Id)
-    (hs : s.hold = some (i, mh)) (hw : r.win = false) (hne : mh ≠ ∅) (hk : keyed mh i) :
-    stampsFrag (GF := GF) γ mh ∗ P.q2 ⊢ boxArm P γ T ξb m c r s := by
+    (hs : s.hold = some (i, mh)) (hw : r.win = false) (hne : mh ≠ ∅) (hk : keyed mh i)
+    (hq : qsum s.ht = qsum mh) :
+    stampsFrag (GF := GF) γ mh ∗ stampsFrag γ.tk s.ht ∗ P.q2 ⊢ boxArm P γ T ξb m c r s := by
   simp only [boxArm, hs]
-  iintro H
+  iintro ⟨Hf, Hft, HQ⟩
   isplit
   · ipureintro; exact hw
   isplit
   · ipureintro; exact hne
   isplit
   · ipureintro; exact hk
-  · iexact H
+  iframe Hf Hft HQ
+  ipureintro; exact hq
 
 theorem boxArm_in_cases (P : BoxPay GF Id X) (γ : BoxNames) (T : Nat) (ξb : CtxId)
     (m : StampMap Id) (c : Nat) (r : SlotReg Id X) (s : L2Reg Id)
@@ -1231,20 +1792,20 @@ theorem boxArm_shut (P : BoxPay GF Id X) (γ : BoxNames) (T : Nat) (ξb : CtxId)
 
 /-- The body, opened under the invariant's later. -/
 theorem boxBody_open_later (P : BoxPay GF Id X) (γ : BoxNames) :
-    ▷ boxBody P γ ⊢ ▷ ∃ (T : Nat) (ξb : CtxId) (m : StampMap Id) (c : Nat) (r : SlotReg Id X)
-      (s : L2Reg Id), ctxStamped ξb T ∗ stampsAuth γ m ∗ cntHalf γ c ∗ slotdHalf γ r ∗
-        slotpHalf γ s ∗ ⌜boxRows T m c r s⌝ ∗ boxArm P γ T ξb m c r s := by
+    ▷ boxBody P γ ⊢ ▷ ∃ (T : Nat) (ξb : CtxId) (a : ChainVG) (m mt : StampMap Id) (c : Nat)
+      (r : SlotReg Id X) (s : L2Reg Id), ctxStamped ξb T a.1 a.2 ∗ stampsAuth γ m ∗ stampsAuth γ.tk mt ∗
+        cntHalf γ c ∗ slotdHalf γ r ∗ slotpHalf γ s ∗ ⌜boxRows T a m mt c r s⌝ ∗ boxArm P γ T ξb m c r s := by
   unfold boxBody; iintro H; iexact H
 
 /-- The body, closed. -/
-theorem boxBody_close (P : BoxPay GF Id X) (γ : BoxNames) (T : Nat) (ξb : CtxId)
-    (m : StampMap Id) (c : Nat) (r : SlotReg Id X) (s : L2Reg Id) (h : boxRows T m c r s) :
-    ctxStamped ξb T ∗ stampsAuth (GF := GF) γ m ∗ cntHalf γ c ∗ slotdHalf γ r ∗ slotpHalf γ s ∗
-      boxArm P γ T ξb m c r s ⊢ boxBody P γ := by
+theorem boxBody_close (P : BoxPay GF Id X) (γ : BoxNames) (T : Nat) (ξb : CtxId) (a : ChainVG)
+    (m mt : StampMap Id) (c : Nat) (r : SlotReg Id X) (s : L2Reg Id) (h : boxRows T a m mt c r s) :
+    ctxStamped ξb T a.1 a.2 ∗ stampsAuth (GF := GF) γ m ∗ stampsAuth γ.tk mt ∗ cntHalf γ c ∗
+      slotdHalf γ r ∗ slotpHalf γ s ∗ boxArm P γ T ξb m c r s ⊢ boxBody P γ := by
   unfold boxBody
-  iintro ⟨Hpk, Hst, Hc, Hrd, Hrp, Harm⟩
-  iexists T, ξb, m, c, r, s
-  iframe Hpk Hst Hc Hrd Hrp Harm
+  iintro ⟨Hpk, Hst, Hstt, Hc, Hrd, Hrp, Harm⟩
+  iexists T, ξb, a, m, mt, c, r, s
+  iframe Hpk Hst Hstt Hc Hrd Hrp Harm
   ipureintro; exact h
 
 /-- **THE COVER**: two floors at the caller's context, and a stamp under one
@@ -1268,6 +1829,74 @@ theorem box_floor_view2 (cpu : CPU) (ξ : CtxId) (K1 K2 T : Nat) (h : T ≤ K1 �
     iframe HK
     ipureintro; omega
 
+/-! ## The chain covers (W8 (f2-ctx), F-C) -/
+
+/-- **THE WITHDRAWER'S COVER** (row (D′)): L1's bound's floors and the floors
+of every live tag (a fragment whose domain contains the live tickets') give
+the box's bound. -/
+theorem box_cover (ξ : CtxId) (a vd : ChainVG) (mt mtD : StampMap Id)
+    (hD : ∀ h, a.1 h ≤ vd.1 h ∨ ∃ p W, (get? mt p).isSome ∧ p.2 = vgCode W ∧ a.1 h ≤ W.1 h)
+    (hG : a.2 = 0 ∨ 1 ≤ vd.2 ∨ ∃ p W, (get? mt p).isSome ∧ p.2 = vgCode W ∧ 1 ≤ W.2)
+    (hdom : ∀ p, (get? mt p).isSome → (get? mtD p).isSome) :
+    vgFloors (GF := GF) ξ vd ∗ tagsFl ξ mtD ⊢ vgFloors ξ a := by
+  have hc : ∀ c : CPU, vgFloors (GF := GF) ξ vd ∗ tagsFl ξ mtD ⊢ vecFloor ξ c (a.1 c) := by
+    intro c
+    iintro ⟨#Hvd, #Htg⟩
+    unfold vgFloors
+    icases Hvd with ⟨#Hvdv, _⟩
+    rcases hD c with h | ⟨p, W, hp, hpW, hle⟩
+    · iapply vecFloor_le ξ c (vd.1 c) (a.1 c) h
+      iapply vecFloors_get ξ vd.1 c $$ Hvdv
+    · ihave #Hp := tagsFl_get ξ mtD p (hdom p hp) $$ Htg
+      unfold tagFl
+      icases Hp with ⟨%W', %hW', #HW'⟩
+      have hWW : W' = W := vgCode_inj (hW'.symm.trans hpW)
+      subst hWW
+      unfold vgFloors
+      icases HW' with ⟨#HW'v, _⟩
+      iapply vecFloor_le ξ c (W'.1 c) (a.1 c) hle
+      iapply vecFloors_get ξ W'.1 c $$ HW'v
+  iintro ⟨#Hvd, #Htg⟩
+  ihave #Hv : vecFloors ξ a.1 $$ []
+  · iapply vecFloors_of_each ξ a.1 iprop(vgFloors ξ vd ∗ tagsFl ξ mtD) hc
+    iframe Hvd Htg
+  unfold vgFloors
+  icases Hvd with ⟨_, #Hvdg⟩
+  isplit
+  · iexact Hv
+  · rcases hG with h0 | h1 | ⟨p, W, hp, hpW, h1⟩
+    · ileft; ipureintro; exact h0
+    · icases Hvdg with ⟨%h0 | #Hg⟩
+      · exfalso; omega
+      · iright; iexact Hg
+    · ihave #Hp := tagsFl_get ξ mtD p (hdom p hp) $$ Htg
+      unfold tagFl
+      icases Hp with ⟨%W', %hW', #HW'⟩
+      have hWW : W' = W := vgCode_inj (hW'.symm.trans hpW)
+      subst hWW
+      unfold vgFloors
+      icases HW' with ⟨_, #HW'g⟩
+      icases HW'g with ⟨%h0 | #Hg⟩
+      · exfalso; omega
+      · iright; iexact Hg
+
+/-- **THE TAKER'S COVER, L1 side** (row (C′)'s right arm): a nonempty
+fragment of live tickets whose tags are all past the box's bound. -/
+theorem box_tag_cover (ξ : CtxId) (a : ChainVG) (mt mth : StampMap Id)
+    (hall : ∀ p W, (get? mt p).isSome → p.2 = vgCode W → vgLe a W) (hne : mth ≠ ∅)
+    (hsub : ∀ p, (get? mth p).isSome → (get? mt p).isSome) :
+    tagsFl (GF := GF) ξ mth ⊢ vgFloors ξ a := by
+  iintro #Htg
+  obtain ⟨p, q, hp⟩ := stampMap_ne_empty mth hne
+  have hp' : (get? mth p).isSome := by rw [hp]; rfl
+  ihave #Hp := tagsFl_get ξ mth p hp' $$ Htg
+  unfold tagFl
+  icases Hp with ⟨%W, %hW, #HW⟩
+  iapply vgFloors_le ξ a W (hall p W (hsub p hp') hW) $$ HW
+
+theorem box_qsum_ne_empty (m : StampMap Id) (h : 0 < qsum m) : m ≠ ∅ := by
+  intro he; rw [he, qsum_empty] at h; exact absurd h (by decide)
+
 section inh
 variable [Inhabited Id] [Inhabited X]
 
@@ -1275,39 +1904,47 @@ variable [Inhabited Id] [Inhabited X]
 
 /-- Rocq's `box_withdraw_L1_hook`.  The caller holds L1's register half
 (window shut), the count half at `c`, ALL `c` units as one fragment `mD`
-(`∅` at `c = 0`), and floors covering L1's row (`Kd ≥ td`) and the
-fragment's stamps (`Kt ≥ maxStamp mD`).  The hook runs at the box's context
-on the header the arm holds: from the caller's `Qc` and the header it
-returns the header that travels (`hdr'`) and the OUT_L1 residue `Q1 c` that
-stays.  Refutation: OUT_L2's parked fragment beside all `c` units overflows
-(Σ).  Cover: row (D) with `m = mD` (equal masses under inclusion). -/
+(`∅` at `c = 0`) with ALL their tickets `mtD` (W8 (f2-ctx)), and floors
+covering L1's row (`Kd ≥ td`, L1's bound `vd`) and the fragment's stamps
+(`Kt ≥ maxStamp mD`) and tags.  The hook runs at the box's context on the
+header the arm holds: from the caller's `Qc` and the header it returns the
+header that travels (`hdr'`) and the OUT_L1 residue `Q1 c` that stays.
+Refutation: OUT_L2's parked fragment beside all `c` units overflows (Σ).
+Cover: row (D) with `m = mD` (equal masses under inclusion); the chain
+cover: row (D′) with `mt = mtD`.  The register's bound becomes the box's
+(row (O1)), which the caller's floors now cover. -/
 theorem boxWithdrawL1Hook (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : BoxNames)
-    (cpu : CPU) (ξ : CtxId) (r : SlotReg Id X) (c : Nat) (mD : StampMap Id) (Kd Kt : Nat)
+    (cpu : CPU) (ξ : CtxId) (r : SlotReg Id X) (c : Nat) (mD mtD : StampMap Id) (Kd Kt : Nat)
     (hdr' : Id → X → CtxId → IProp GF) [∀ i x, CtxMorph (hdr' i x)] (Qc : IProp GF)
     (E : CoPset) (hE : ↑N ⊆ E) (hw : r.win = false) (hmD : qsum mD = (c : Rat))
-    (hKd : r.td ≤ Kd) (hKt : maxStamp mD ≤ Kt)
+    (hmtD : qsum mtD = (c : Rat)) (hKd : r.td ≤ Kd) (hKt : maxStamp mD ≤ Kt)
     (hhook : ∀ (x : X) (ξ' : CtxId),
       Qc ∗ P.hdr r.ident x ξ' ⊢ |={E \ ↑N}=> (hdr' r.ident x ξ' ∗ P.q1 c)) :
     isBox P N γ ∗ ownCtx cpu ξ ∗ ctxFloor ξ Kd ∗ ctxFloor ξ Kt ∗ topLb (maxStamp mD) ∗
-      slotdHalf γ r ∗ cntHalf γ c ∗ stampsFrag γ mD ∗ Qc ⊢
+      vgFloors ξ r.vd ∗ slotdHalf γ r ∗ cntHalf γ c ∗ stampsFrag γ mD ∗ stampsFrag γ.tk mtD ∗
+      tagsFl ξ mtD ∗ Qc ⊢
       |={E}=> (ownCtx cpu ξ ∗ cntHalf γ c ∗
-        ∃ (x0 : X) (T0 : Nat), ⌜T0 ≤ max Kd Kt⌝ ∗
-          slotdHalf γ ⟨r.td, true, r.ident, some (x0, T0)⟩ ∗ hdr' r.ident x0 ξ) := by
-  iintro ⟨#Hbox, Hrun, #Hfld, #Hflt, #HllbD, Hrd0, Hc0, HfD, HQc⟩
+        ∃ (x0 : X) (T0 : Nat) (a : ChainVG), ⌜T0 ≤ max Kd Kt⌝ ∗ vgFloors ξ a ∗
+          slotdHalf γ ⟨r.td, true, r.ident, some (x0, T0), a⟩ ∗ hdr' r.ident x0 ξ) := by
+  iintro ⟨#Hbox, Hrun, #Hfld, #Hflt, #HllbD, #Hvd, Hrd0, Hc0, HfD, HftD, #HtgD, HQc⟩
   unfold isBox
   iinv Hbox with Hbody Hclose
   icases boxBody_open_later P γ $$ Hbody with
-    ⟨%T, %ξb, %m, %c1, %r1, %s1, >Hpk, >Hst, >Hc, >Hrd, >Hrp, >%hrows, >Harm⟩
+    ⟨%T, %ξb, %a, %m, %mt, %c1, %r1, %s1, >Hpk, >Hst, >Hstt, >Hc, >Hrd, >Hrp, >%hrows, >Harm⟩
   ihave %hr := slotdHalf_agree γ r1 r $$ [Hrd Hrd0]
   · iframe
   ihave %hc := cntHalf_agree γ c1 c $$ [Hc Hc0]
   · iframe
   subst hr; subst hc
-  obtain ⟨hsum, hI, hC, hD⟩ := hrows
+  obtain ⟨hsum, hI, hC, hD, hsumt, hTg, hC', hD'v, hD'g, hO1, hO2⟩ := hrows
   ihave %hinclD := stampsFrag_incl γ m mD $$ [Hst HfD]
   · iframe
+  ihave %hinclDt := stampsFrag_incl γ.tk mt mtD $$ [Hstt HftD]
+  · iframe
+  have hdomt : ∀ p, (get? mt p).isSome → (get? mtD p).isSome :=
+    qsum_eq_dom mtD mt hinclDt (by rw [hmtD, hsumt])
   rcases hh : s1.hold with _ | ⟨i0, m0⟩
-  · -- IN: the cover is row (D)
+  · -- IN: the cover is row (D); the chain cover is row (D′)
     have hcov : T ≤ Kd ∨ T ≤ Kt := by
       rcases hD with h | ⟨p, hp, hpT⟩
       · left; omega
@@ -1315,6 +1952,8 @@ theorem boxWithdrawL1Hook (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ 
         have hp' := qsum_eq_dom mD m hinclD (by rw [hmD, hsum]) p hp
         have := maxStamp_ge mD p hp'
         omega
+    ihave #Ha := box_cover ξ a r1.vd mt mtD hD'v hD'g hdomt $$ [Hvd HtgD]
+    · iframe Hvd HtgD
     ihave Hin := boxArm_in_cases P γ T ξb m c1 r1 s1 hh hw $$ Harm
     icases box_floor_view2 cpu ξ Kd Kt T hcov $$ [Hrun Hfld Hflt] with ⟨Hrun, %K, #HK, %hTK⟩
     · iframe Hrun
@@ -1326,32 +1965,41 @@ theorem boxWithdrawL1Hook (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ 
     -- THE HOOK, at the box's context, before the absorb
     imod hhook x0 ξb $$ [HQc Hhdr] with ⟨Hhdr', HQ⟩
     · iframe
-    imod ctxAbsorbLb (hdr' r1.ident x0) cpu ξb ξ T K hTK $$ [$Hrun $HK $Hpk $Hhdr']
+    imod ctxAbsorbLb (hdr' r1.ident x0) cpu ξb ξ T K a.1 a.2 hTK $$ [$Hrun $HK $Ha $Hpk $Hhdr']
       with ⟨Hrun, Hpk, Hhdr'⟩
-    imod slotdHalf_update γ r1 r1 ⟨r1.td, true, r1.ident, some (x0, T)⟩ $$ [$Hrd $Hrd0]
+    imod slotdHalf_update γ r1 r1 ⟨r1.td, true, r1.ident, some (x0, T), a⟩ $$ [$Hrd $Hrd0]
       with ⟨Hrd, Hrd0⟩
-    ihave Harm := boxArm_out1_intro P γ T ξb m c1 (⟨r1.td, true, r1.ident, some (x0, T)⟩ : SlotReg Id X)
-      s1 hh rfl $$ [HfD Hrest HQ]
-    · isplitl [HfD]
+    ihave Harm := boxArm_out1_intro P γ T ξb m c1 (⟨r1.td, true, r1.ident, some (x0, T), a⟩ : SlotReg Id X)
+      s1 hh rfl $$ [HfD HftD Hrest HQ]
+    · isplitl [HfD HftD]
       · unfold hdrOut
-        iexists mD
+        iexists mD, mtD
         isplit
         · ipureintro; rw [hmD, hsum]
-        iframe HfD
-        iexact HllbD
+        iframe HfD HftD
+        isplit
+        · iexact HllbD
+        · ipureintro; rw [hmtD, hsum]
       iframe HQ
       iexists x0
       iframe Hrest
       ipureintro; rfl
-    imod Hclose $$ [Hpk Hst Hc Hrd Hrp Harm]
+    have hrows' : boxRows T a m mt c1 (⟨r1.td, true, r1.ident, some (x0, T), a⟩ : SlotReg Id X) s1 := by
+      refine ⟨hsum, hI, hC, hD, hsumt, hTg, ?_, fun h => Or.inl (Nat.le_refl _), ?_, fun _ => vgLe_refl a, hO2⟩
+      · rcases hC' with h | ⟨_, h⟩
+        · exact Or.inl h
+        · exact Or.inr ⟨vgLe_refl a, h⟩
+      · by_cases h0 : a.2 = 0
+        · exact Or.inl h0
+        · exact Or.inr (Or.inl (by show 1 ≤ a.2; omega))
+    imod Hclose $$ [Hpk Hst Hstt Hc Hrd Hrp Harm]
     · inext
-      iapply boxBody_close P γ T ξb m c1 (⟨r1.td, true, r1.ident, some (x0, T)⟩ : SlotReg Id X) s1
-        ⟨hsum, hI, hC, hD⟩
+      iapply boxBody_close P γ T ξb a m mt c1 (⟨r1.td, true, r1.ident, some (x0, T), a⟩ : SlotReg Id X) s1 hrows'
       iframe
     imodintro
     iframe Hrun Hc0
-    iexists x0, T
-    iframe Hrd0 Hhdr'
+    iexists x0, T, a
+    iframe Hrd0 Hhdr' Ha
     ipureintro
     rcases hcov with h | h <;> omega
   · -- OUT_L2: the parked fragment's mass beside all c units overflows Σ
@@ -1367,55 +2015,66 @@ theorem boxWithdrawL1Hook (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ 
 /-- Rocq's `box_withdraw_L1_free` -- THE FREE-TIER FORM: (a) with the absorb
 elided.  The hook runs at the box's context and hands `Q'` out
 context-free, so neither `own_context` nor a floor is needed.  The off box's
-last close is its one client. -/
+last close is its one client (the box is abandoned OUT_L1; its register's
+bound becomes the box's, row (O1)). -/
 theorem boxWithdrawL1Free (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : BoxNames)
-    (r : SlotReg Id X) (c : Nat) (mD : StampMap Id) (Qc Q' : IProp GF) (E : CoPset)
-    (hE : ↑N ⊆ E) (hw : r.win = false) (hmD : qsum mD = (c : Rat))
+    (r : SlotReg Id X) (c : Nat) (mD mtD : StampMap Id) (Qc Q' : IProp GF) (E : CoPset)
+    (hE : ↑N ⊆ E) (hw : r.win = false) (hmD : qsum mD = (c : Rat)) (hmtD : qsum mtD = (c : Rat))
     (hhook : ∀ (x : X) (ξb : CtxId),
       Qc ∗ P.hdr r.ident x ξb ⊢ |={E \ ↑N}=> (Q' ∗ P.q1 c)) :
-    isBox P N γ ∗ slotdHalf γ r ∗ cntHalf γ c ∗ stampsFrag γ mD ∗ topLb (maxStamp mD) ∗ Qc ⊢
+    isBox P N γ ∗ slotdHalf γ r ∗ cntHalf γ c ∗ stampsFrag γ mD ∗ topLb (maxStamp mD) ∗
+      stampsFrag γ.tk mtD ∗ Qc ⊢
       |={E}=> (cntHalf γ c ∗ Q' ∗
-        ∃ (x0 : X) (T0 : Nat), slotdHalf γ ⟨r.td, true, r.ident, some (x0, T0)⟩) := by
-  iintro ⟨#Hbox, Hrd0, Hc0, HfD, #HllbD, HQc⟩
+        ∃ (x0 : X) (T0 : Nat) (a : ChainVG), slotdHalf γ ⟨r.td, true, r.ident, some (x0, T0), a⟩) := by
+  iintro ⟨#Hbox, Hrd0, Hc0, HfD, #HllbD, HftD, HQc⟩
   unfold isBox
   iinv Hbox with Hbody Hclose
   icases boxBody_open_later P γ $$ Hbody with
-    ⟨%T, %ξb, %m, %c1, %r1, %s1, >Hpk, >Hst, >Hc, >Hrd, >Hrp, >%hrows, >Harm⟩
+    ⟨%T, %ξb, %a, %m, %mt, %c1, %r1, %s1, >Hpk, >Hst, >Hstt, >Hc, >Hrd, >Hrp, >%hrows, >Harm⟩
   ihave %hr := slotdHalf_agree γ r1 r $$ [Hrd Hrd0]
   · iframe
   ihave %hc := cntHalf_agree γ c1 c $$ [Hc Hc0]
   · iframe
   subst hr; subst hc
-  obtain ⟨hsum, hI, hC, hD⟩ := hrows
+  obtain ⟨hsum, hI, hC, hD, hsumt, hTg, hC', hD'v, hD'g, hO1, hO2⟩ := hrows
   rcases hh : s1.hold with _ | ⟨i0, m0⟩
   · ihave Hin := boxArm_in_cases P γ T ξb m c1 r1 s1 hh hw $$ Harm
     unfold inArm
     icases Hin with ⟨%x0, Hhdr, Hrest⟩
     imod hhook x0 ξb $$ [HQc Hhdr] with ⟨HQ', HQ⟩
     · iframe
-    imod slotdHalf_update γ r1 r1 ⟨r1.td, true, r1.ident, some (x0, T)⟩ $$ [$Hrd $Hrd0]
+    imod slotdHalf_update γ r1 r1 ⟨r1.td, true, r1.ident, some (x0, T), a⟩ $$ [$Hrd $Hrd0]
       with ⟨Hrd, Hrd0⟩
-    ihave Harm := boxArm_out1_intro P γ T ξb m c1 (⟨r1.td, true, r1.ident, some (x0, T)⟩ : SlotReg Id X)
-      s1 hh rfl $$ [HfD Hrest HQ]
-    · isplitl [HfD]
+    ihave Harm := boxArm_out1_intro P γ T ξb m c1 (⟨r1.td, true, r1.ident, some (x0, T), a⟩ : SlotReg Id X)
+      s1 hh rfl $$ [HfD HftD Hrest HQ]
+    · isplitl [HfD HftD]
       · unfold hdrOut
-        iexists mD
+        iexists mD, mtD
         isplit
         · ipureintro; rw [hmD, hsum]
-        iframe HfD
-        iexact HllbD
+        iframe HfD HftD
+        isplit
+        · iexact HllbD
+        · ipureintro; rw [hmtD, hsum]
       iframe HQ
       iexists x0
       iframe Hrest
       ipureintro; rfl
-    imod Hclose $$ [Hpk Hst Hc Hrd Hrp Harm]
+    have hrows' : boxRows T a m mt c1 (⟨r1.td, true, r1.ident, some (x0, T), a⟩ : SlotReg Id X) s1 := by
+      refine ⟨hsum, hI, hC, hD, hsumt, hTg, ?_, fun h => Or.inl (Nat.le_refl _), ?_, fun _ => vgLe_refl a, hO2⟩
+      · rcases hC' with h | ⟨_, h⟩
+        · exact Or.inl h
+        · exact Or.inr ⟨vgLe_refl a, h⟩
+      · by_cases h0 : a.2 = 0
+        · exact Or.inl h0
+        · exact Or.inr (Or.inl (by show 1 ≤ a.2; omega))
+    imod Hclose $$ [Hpk Hst Hstt Hc Hrd Hrp Harm]
     · inext
-      iapply boxBody_close P γ T ξb m c1 (⟨r1.td, true, r1.ident, some (x0, T)⟩ : SlotReg Id X) s1
-        ⟨hsum, hI, hC, hD⟩
+      iapply boxBody_close P γ T ξb a m mt c1 (⟨r1.td, true, r1.ident, some (x0, T), a⟩ : SlotReg Id X) s1 hrows'
       iframe
     imodintro
     iframe Hc0 HQ'
-    iexists x0, T
+    iexists x0, T, a
     iexact Hrd0
   · icases boxArm_out2_cases P γ T ξb m c1 r1 s1 i0 m0 hh $$ Harm with ⟨%_, %hne0, %_, Hf0, -⟩
     ihave %hincl2 := stampsFrag_incl_2 γ m mD m0 $$ [Hst HfD Hf0]
@@ -1428,15 +2087,16 @@ theorem boxWithdrawL1Free (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ 
 
 /-- Rocq's `box_withdraw_L1` -- plain (a): `Qc := Q1 c`, `hdr' := P_hdr`. -/
 theorem boxWithdrawL1 (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : BoxNames)
-    (cpu : CPU) (ξ : CtxId) (r : SlotReg Id X) (c : Nat) (mD : StampMap Id) (Kd Kt : Nat)
+    (cpu : CPU) (ξ : CtxId) (r : SlotReg Id X) (c : Nat) (mD mtD : StampMap Id) (Kd Kt : Nat)
     (E : CoPset) (hE : ↑N ⊆ E) (hw : r.win = false) (hmD : qsum mD = (c : Rat))
-    (hKd : r.td ≤ Kd) (hKt : maxStamp mD ≤ Kt) :
+    (hmtD : qsum mtD = (c : Rat)) (hKd : r.td ≤ Kd) (hKt : maxStamp mD ≤ Kt) :
     isBox P N γ ∗ ownCtx cpu ξ ∗ ctxFloor ξ Kd ∗ ctxFloor ξ Kt ∗ topLb (maxStamp mD) ∗
-      slotdHalf γ r ∗ cntHalf γ c ∗ stampsFrag γ mD ∗ P.q1 c ⊢
+      vgFloors ξ r.vd ∗ slotdHalf γ r ∗ cntHalf γ c ∗ stampsFrag γ mD ∗ stampsFrag γ.tk mtD ∗
+      tagsFl ξ mtD ∗ P.q1 c ⊢
       |={E}=> (ownCtx cpu ξ ∗ cntHalf γ c ∗
-        ∃ (x0 : X) (T0 : Nat), ⌜T0 ≤ max Kd Kt⌝ ∗
-          slotdHalf γ ⟨r.td, true, r.ident, some (x0, T0)⟩ ∗ P.hdr r.ident x0 ξ) :=
-  boxWithdrawL1Hook P N γ cpu ξ r c mD Kd Kt P.hdr (P.q1 c) E hE hw hmD hKd hKt
+        ∃ (x0 : X) (T0 : Nat) (a : ChainVG), ⌜T0 ≤ max Kd Kt⌝ ∗ vgFloors ξ a ∗
+          slotdHalf γ ⟨r.td, true, r.ident, some (x0, T0), a⟩ ∗ P.hdr r.ident x0 ξ) :=
+  boxWithdrawL1Hook P N γ cpu ξ r c mD mtD Kd Kt P.hdr (P.q1 c) E hE hw hmD hmtD hKd hKt
     (fun _ _ => by iintro ⟨HQ, Hh⟩; imodintro; iframe)
 
 /-! ## (b) `deposit_L1` : OUT_L1 → IN, under L1 -- WITH THE HOOK -/
@@ -1448,7 +2108,10 @@ residue `Q1 c`, the caller's header-so-far `hdr'` at `ξ`, and the arm's
 whole header at the target shape `x1` (at `ξ`), `P_rest` at `x1`, and what
 the caller keeps, `Q'`.  The withdrawer's units in `hdrOut` carry all the
 mass, so they return the authority to `∅`; the new unit (mass `max 1 c`) is
-minted at the raised stamp. -/
+minted at the raised stamp.  (W8 (f2-ctx): the caller has passed L1's bound,
+hence the box's (row (O1)); the deposit raises the box's bound to the
+caller's, the new unit's ticket is tagged with it, and L1's bound becomes
+it.) -/
 theorem boxDepositL1Hook (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : BoxNames)
     (cpu : CPU) (ξ : CtxId) (r : SlotReg Id X) (c : Nat) (i' : Id) (x0 x1 : X) (T0 : Nat)
     (hdr' : Id → X → CtxId → IProp GF) (Qc Q' : IProp GF) (E : CoPset)
@@ -1456,21 +2119,23 @@ theorem boxDepositL1Hook (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ :
     (hhook : ∀ ξb : CtxId,
       Qc ∗ P.q1 c ∗ hdr' i' x1 ξ ∗ P.rest x0 ξb ⊢
         |={E \ ↑N}=> (P.hdr i' x1 ξ ∗ P.rest x1 ξb ∗ Q')) :
-    isBox P N γ ∗ ownCtx cpu ξ ∗ slotdHalf γ r ∗ cntHalf γ c ∗ Qc ∗ hdr' i' x1 ξ ⊢
+    isBox P N γ ∗ ownCtx cpu ξ ∗ vgFloors ξ r.vd ∗ slotdHalf γ r ∗ cntHalf γ c ∗ Qc ∗ hdr' i' x1 ξ ⊢
       |={E}=> (ownCtx cpu ξ ∗ Q' ∗
-        ∃ T' : Nat, slotdHalf γ (⟨T', false, i', none⟩ : SlotReg Id X) ∗ cntHalf γ (max 1 c) ∗
-          reference γ i' (PartialMap.singleton (i', T') (unitMass c) : StampMap Id) ∗ topLb T') := by
-  iintro ⟨#Hbox, Hrun, Hrd0, Hc0, HQc, Hhdr'⟩
+        ∃ (T' : Nat) (a : ChainVG), slotdHalf γ (⟨T', false, i', none, a⟩ : SlotReg Id X) ∗
+          cntHalf γ (max 1 c) ∗
+          referenceAt γ i' (PartialMap.singleton (i', T') (unitMass c) : StampMap Id) ξ ∗ topLb T' ∗
+          vgFloors ξ a) := by
+  iintro ⟨#Hbox, Hrun, #Hvd, Hrd0, Hc0, HQc, Hhdr'⟩
   unfold isBox
   iinv Hbox with Hbody Hclose
   icases boxBody_open_later P γ $$ Hbody with
-    ⟨%T, %ξb, %m, %c1, %r1, %s1, >Hpk, >Hst, >Hc, >Hrd, >Hrp, >%hrows, >Harm⟩
+    ⟨%T, %ξb, %a, %m, %mt, %c1, %r1, %s1, >Hpk, >Hst, >Hstt, >Hc, >Hrd, >Hrp, >%hrows, >Harm⟩
   ihave %hr := slotdHalf_agree γ r1 r $$ [Hrd Hrd0]
   · iframe
   ihave %hc := cntHalf_agree γ c1 c $$ [Hc Hc0]
   · iframe
   subst hr; subst hc
-  obtain ⟨hsum, hI, hC, hD⟩ := hrows
+  obtain ⟨hsum, hI, hC, hD, hsumt, hTg, hC', hD'v, hD'g, hO1, hO2⟩ := hrows
   rcases hh : s1.hold with _ | ⟨i0, m0⟩
   · icases boxArm_out1_cases P γ T ξb m c1 r1 s1 hh hw $$ Harm with
       ⟨Hho, ⟨%x, %hxx, Hrest⟩, HQ⟩
@@ -1481,42 +2146,62 @@ theorem boxDepositL1Hook (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ :
     imod hhook ξb $$ [HQc HQ Hhdr' Hrest] with ⟨Hhdr, Hrest, HQ'⟩
     · iframe
     unfold hdrOut
-    icases Hho with ⟨%m', %hsum', Hf', -⟩
+    icases Hho with ⟨%m', %mt', %hsum', Hf', -, %hsumt', Hft'⟩
     imod stampsDealloc γ m m' $$ [Hst Hf'] with ⟨%m1, Hst, %hq1, -, -⟩
     · iframe
+    imod stampsDealloc γ.tk mt mt' $$ [Hstt Hft'] with ⟨%mt1, Hstt, %hqt1, -, -⟩
+    · iframe
     have hm1 : m1 = ∅ := qsum_zero_empty m1 (by rw [hsum'] at hq1; grind)
-    subst hm1
-    imod ctxDeposit (P.hdr i' x1) cpu ξ ξb T $$ [$Hrun $Hpk $Hhdr]
-      with ⟨Hrun, ⟨%T', %hTT', Hpk, Hhdr⟩⟩
-    ihave ⟨#HtopT', Hpk⟩ := ctxStamped_topLb ξb T' $$ Hpk
+    have hmt1 : mt1 = ∅ := qsum_zero_empty mt1 (by rw [hsumt', hsum, ← hsumt] at hqt1; grind)
+    subst hm1; subst hmt1
+    ihave #Ha := vgFloors_le ξ a r1.vd (hO1 hw) $$ Hvd
+    imod ctxDeposit (P.hdr i' x1) cpu ξ ξb T a.1 a.2 $$ [$Hrun $Ha $Hpk $Hhdr]
+      with ⟨Hrun, ⟨%T', %a', %hTT', %haa', Hpk, #Ha', Hhdr⟩⟩
+    ihave ⟨#HtopT', Hpk⟩ := ctxStamped_topLb ξb T' a'.1 a'.2 $$ Hpk
     imod stampsAlloc γ ∅ (i', T') (unitMass c1) $$ Hst with ⟨Hst, Hfr⟩
-    rw [Heap.op_empty_right]
+    imod stampsAlloc γ.tk ∅ (i', vgCode a') (unitMass c1) $$ Hstt with ⟨Hstt, Hfrt⟩
+    rw [Heap.op_empty_right, Heap.op_empty_right]
     imod cntHalf_update γ c1 c1 (max 1 c1) $$ [$Hc $Hc0] with ⟨Hc, Hc0⟩
-    imod slotdHalf_update γ r1 r1 ⟨T', false, i', none⟩ $$ [$Hrd $Hrd0] with ⟨Hrd, Hrd0⟩
+    imod slotdHalf_update γ r1 r1 ⟨T', false, i', none, a'⟩ $$ [$Hrd $Hrd0] with ⟨Hrd, Hrd0⟩
     ihave Harm := boxArm_in_intro P γ T' ξb (PartialMap.singleton (i', T') (unitMass c1) : StampMap Id)
-      (max 1 c1) (⟨T', false, i', none⟩ : SlotReg Id X) s1 hh rfl $$ [Hhdr Hrest]
+      (max 1 c1) (⟨T', false, i', none, a'⟩ : SlotReg Id X) s1 hh rfl $$ [Hhdr Hrest]
     · unfold inArm
       iexists x1
       iframe
-    imod Hclose $$ [Hpk Hst Hc Hrd Hrp Harm]
+    imod Hclose $$ [Hpk Hst Hstt Hc Hrd Hrp Harm]
     · inext
-      iapply boxBody_close P γ T' ξb (PartialMap.singleton (i', T') (unitMass c1) : StampMap Id)
-        (max 1 c1) (⟨T', false, i', none⟩ : SlotReg Id X) s1 ?_
+      iapply boxBody_close P γ T' ξb a' (PartialMap.singleton (i', T') (unitMass c1) : StampMap Id)
+        (PartialMap.singleton (i', vgCode a') (unitMass c1) : StampMap Id)
+        (max 1 c1) (⟨T', false, i', none, a'⟩ : SlotReg Id X) s1 ?_
       rotate_left
       · iframe
+      have hsing : ∀ p, (get? (PartialMap.singleton (i', vgCode a') (unitMass c1) : StampMap Id) p).isSome →
+          p = (i', vgCode a') := by
+        intro p hp
+        by_cases hpe : (i', vgCode a') = p
+        · exact hpe.symm
+        · rw [LawfulPartialMap.get?_singleton_ne hpe] at hp; cases hp
       refine ⟨by rw [qsum_singleton, unitMass_val], keyed_singleton i' T' _, Or.inl ?_,
-        Or.inl (Nat.le_refl _)⟩
-      intro p hp
-      by_cases hpe : (i', T') = p
-      · subst hpe; exact Nat.le_refl _
-      · rw [LawfulPartialMap.get?_singleton_ne hpe] at hp; cases hp
+        Or.inl (Nat.le_refl _), by rw [qsum_singleton, unitMass_val],
+        fun p hp => ⟨a', by rw [hsing p hp]⟩,
+        Or.inr ⟨vgLe_refl a', fun p W hp hW => ?_⟩, fun h => Or.inl (Nat.le_refl _), ?_,
+        fun h => absurd h (by simp), fun h => by simp [hh] at h⟩
+      · intro p hp
+        by_cases hpe : (i', T') = p
+        · subst hpe; exact Nat.le_refl _
+        · rw [LawfulPartialMap.get?_singleton_ne hpe] at hp; cases hp
+      · rw [hsing p hp] at hW
+        exact (vgCode_inj hW) ▸ vgLe_refl a'
+      · by_cases h0 : a'.2 = 0
+        · exact Or.inl h0
+        · exact Or.inr (Or.inl (by show 1 ≤ a'.2; omega))
     imodintro
     iframe Hrun HQ'
-    iexists T'
-    iframe Hrd0 Hc0
-    isplitl [Hfr]
-    · iapply reference_singleton γ i' T' (unitMass c1)
-      iframe Hfr
+    iexists T', a'
+    iframe Hrd0 Hc0 Ha'
+    isplitl [Hfr Hfrt]
+    · iapply referenceAt_mint γ i' T' (unitMass c1) a' ξ
+      iframe Hfr Hfrt Ha'
       iexact HtopT'
     · iexact HtopT'
   · -- OUT_L2 records a SHUT window; the caller's half says it is open
@@ -1531,61 +2216,79 @@ theorem boxDepositL1Shape (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ 
     (cpu : CPU) (ξ : CtxId) (r : SlotReg Id X) (c : Nat) (i' : Id) (x0 x1 : X) (T0 : Nat)
     (E : CoPset) (hE : ↑N ⊆ E) (hw : r.win = true) (hx : r.x = some (x0, T0))
     (hent : ∀ ξb : CtxId, P.rest x0 ξb ⊢ P.rest x1 ξb) :
-    isBox P N γ ∗ ownCtx cpu ξ ∗ slotdHalf γ r ∗ cntHalf γ c ∗ P.hdr i' x1 ξ ⊢
+    isBox P N γ ∗ ownCtx cpu ξ ∗ vgFloors ξ r.vd ∗ slotdHalf γ r ∗ cntHalf γ c ∗ P.hdr i' x1 ξ ⊢
       |={E}=> (ownCtx cpu ξ ∗ P.q1 c ∗
-        ∃ T' : Nat, slotdHalf γ (⟨T', false, i', none⟩ : SlotReg Id X) ∗ cntHalf γ (max 1 c) ∗
-          reference γ i' (PartialMap.singleton (i', T') (unitMass c) : StampMap Id) ∗ topLb T') := by
-  iintro ⟨#Hbox, Hrun, Hrd, Hc, Hhdr⟩
+        ∃ (T' : Nat) (a : ChainVG), slotdHalf γ (⟨T', false, i', none, a⟩ : SlotReg Id X) ∗
+          cntHalf γ (max 1 c) ∗
+          referenceAt γ i' (PartialMap.singleton (i', T') (unitMass c) : StampMap Id) ξ ∗ topLb T' ∗
+          vgFloors ξ a) := by
+  iintro ⟨#Hbox, Hrun, #Hvd, Hrd, Hc, Hhdr⟩
   iapply boxDepositL1Hook P N γ cpu ξ r c i' x0 x1 T0 P.hdr iprop(emp) (P.q1 c) E hE hw hx
     (fun ξb => by
       iintro ⟨-, HQ, Hh, Hr⟩
       imodintro
       iframe Hh HQ
       iapply hent ξb $$ Hr)
-  iframe Hbox Hrun Hrd Hc Hhdr
+  iframe Hbox Hrun Hvd Hrd Hc Hhdr
 
 /-- Rocq's `box_deposit_L1` -- (b), the instance `x1 := x0`. -/
 theorem boxDepositL1 (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : BoxNames)
     (cpu : CPU) (ξ : CtxId) (r : SlotReg Id X) (c : Nat) (i' : Id) (x0 : X) (T0 : Nat)
     (E : CoPset) (hE : ↑N ⊆ E) (hw : r.win = true) (hx : r.x = some (x0, T0)) :
-    isBox P N γ ∗ ownCtx cpu ξ ∗ slotdHalf γ r ∗ cntHalf γ c ∗ P.hdr i' x0 ξ ⊢
+    isBox P N γ ∗ ownCtx cpu ξ ∗ vgFloors ξ r.vd ∗ slotdHalf γ r ∗ cntHalf γ c ∗ P.hdr i' x0 ξ ⊢
       |={E}=> (ownCtx cpu ξ ∗ P.q1 c ∗
-        ∃ T' : Nat, slotdHalf γ (⟨T', false, i', none⟩ : SlotReg Id X) ∗ cntHalf γ (max 1 c) ∗
-          reference γ i' (PartialMap.singleton (i', T') (unitMass c) : StampMap Id) ∗ topLb T') :=
+        ∃ (T' : Nat) (a : ChainVG), slotdHalf γ (⟨T', false, i', none, a⟩ : SlotReg Id X) ∗
+          cntHalf γ (max 1 c) ∗
+          referenceAt γ i' (PartialMap.singleton (i', T') (unitMass c) : StampMap Id) ξ ∗ topLb T' ∗
+          vgFloors ξ a) :=
   boxDepositL1Shape P N γ cpu ξ r c i' x0 x0 T0 E hE hw hx (fun _ => .rfl)
 
 /-! ## (c) `ref_incr`, under L1 (legal at `c = 0`: bget's hit on a cached
 refcnt-0 buffer takes this path, not the recycler's) -/
 
 /-- Rocq's `box_ref_incr`: a unit is minted at the box's current stamp, at
-the identity the L1 register records. -/
+the identity the L1 register records; (W8 (f2-ctx)) its ticket is tagged with
+L1's bound, which the caller (holding L1) has passed. -/
 theorem boxRefIncr (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : BoxNames)
-    (r : SlotReg Id X) (c : Nat) (E : CoPset) (hE : ↑N ⊆ E) (hw : r.win = false) :
-    isBox P N γ ∗ slotdHalf γ r ∗ cntHalf γ c ⊢
+    (r : SlotReg Id X) (c : Nat) (ξ : CtxId) (E : CoPset) (hE : ↑N ⊆ E) (hw : r.win = false) :
+    isBox P N γ ∗ slotdHalf γ r ∗ cntHalf γ c ∗ vgFloors ξ r.vd ⊢
       |={E}=> (slotdHalf γ r ∗ cntHalf γ (c + 1) ∗
-        ∃ T : Nat, reference γ r.ident (unitStamp r.ident T)) := by
-  iintro ⟨#Hbox, Hrd0, Hc0⟩
+        ∃ T : Nat, referenceAt γ r.ident (unitStamp r.ident T) ξ) := by
+  iintro ⟨#Hbox, Hrd0, Hc0, #Hvd⟩
   unfold isBox
   iinv Hbox with Hbody Hclose
   icases boxBody_open_later P γ $$ Hbody with
-    ⟨%T, %ξb, %m, %c1, %r1, %s1, >Hpk, >Hst, >Hc, >Hrd, >Hrp, >%hrows, >Harm⟩
+    ⟨%T, %ξb, %a, %m, %mt, %c1, %r1, %s1, >Hpk, >Hst, >Hstt, >Hc, >Hrd, >Hrp, >%hrows, >Harm⟩
   ihave %hr := slotdHalf_agree γ r1 r $$ [Hrd Hrd0]
   · iframe
   ihave %hc := cntHalf_agree γ c1 c $$ [Hc Hc0]
   · iframe
   subst hr; subst hc
-  obtain ⟨hsum, hI, hC, hD⟩ := hrows
+  obtain ⟨hsum, hI, hC, hD, hsumt, hTg, hC', hD'v, hD'g, hO1, hO2⟩ := hrows
   imod stampsAlloc γ m (r1.ident, T) (⟨1⟩ : UFrac) $$ Hst with ⟨Hst, Hfr⟩
+  imod stampsAlloc γ.tk mt (r1.ident, vgCode r1.vd) (⟨1⟩ : UFrac) $$ Hstt with ⟨Hstt, Hfrt⟩
   imod cntHalf_update γ c1 c1 (c1 + 1) $$ [$Hc $Hc0] with ⟨Hc, Hc0⟩
-  ihave ⟨#HtopT, Hpk⟩ := ctxStamped_topLb ξb T $$ Hpk
+  ihave ⟨#HtopT, Hpk⟩ := ctxStamped_topLb ξb T a.1 a.2 $$ Hpk
   ihave Harm := boxArm_shut P γ T ξb m ((PartialMap.singleton (r1.ident, T) (⟨1⟩ : UFrac) : StampMap Id) • m) c1 (c1 + 1)
     r1 r1 s1 hw hw rfl $$ Harm
-  imod Hclose $$ [Hpk Hst Hc Hrd Hrp Harm]
+  have hnew : ∀ p, (get? ((PartialMap.singleton (r1.ident, vgCode r1.vd) (⟨1⟩ : UFrac) : StampMap Id) • mt) p).isSome →
+      p = (r1.ident, vgCode r1.vd) ∨ (get? mt p).isSome := by
+    intro p hp
+    rcases (isSome_sop _ mt p).1 hp with h | h
+    · by_cases hpe : (r1.ident, vgCode r1.vd) = p
+      · exact Or.inl hpe.symm
+      · rw [LawfulPartialMap.get?_singleton_ne hpe] at h; cases h
+    · exact Or.inr h
+  have hold : ∀ p, (get? mt p).isSome →
+      (get? ((PartialMap.singleton (r1.ident, vgCode r1.vd) (⟨1⟩ : UFrac) : StampMap Id) • mt) p).isSome :=
+    fun p hp => (isSome_sop _ mt p).2 (Or.inr hp)
+  imod Hclose $$ [Hpk Hst Hstt Hc Hrd Hrp Harm]
   · inext
-    iapply boxBody_close P γ T ξb ((PartialMap.singleton (r1.ident, T) (⟨1⟩ : UFrac) : StampMap Id) • m) (c1 + 1) r1 s1 ?_
+    iapply boxBody_close P γ T ξb a ((PartialMap.singleton (r1.ident, T) (⟨1⟩ : UFrac) : StampMap Id) • m)
+      ((PartialMap.singleton (r1.ident, vgCode r1.vd) (⟨1⟩ : UFrac) : StampMap Id) • mt) (c1 + 1) r1 s1 ?_
     rotate_left
     · iframe
-    refine ⟨?_, keyed_singleton_op m r1.ident T _ hI, ?_, ?_⟩
+    refine ⟨?_, keyed_singleton_op m r1.ident T _ hI, ?_, ?_, ?_, ?_, ?_, ?_, ?_, hO1, hO2⟩
     · rw [qsum_singleton_op, hsum]
       show (1 : Rat) + (c1 : Rat) = ((c1 + 1 : Nat) : Rat)
       rw [Rat.natCast_add, Rat.add_comm]; rfl
@@ -1601,52 +2304,97 @@ theorem boxRefIncr (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : BoxNa
     · right
       refine ⟨(r1.ident, T), (isSome_sop _ m _).2 (Or.inl ?_), rfl⟩
       rw [LawfulPartialMap.get?_singleton_eq rfl]; rfl
+    · rw [qsum_singleton_op, hsumt]
+      show (1 : Rat) + (c1 : Rat) = ((c1 + 1 : Nat) : Rat)
+      rw [Rat.natCast_add, Rat.add_comm]; rfl
+    · intro p hp
+      rcases hnew p hp with h | h
+      · subst h; exact ⟨r1.vd, rfl⟩
+      · exact hTg p h
+    · rcases hC' with h | ⟨h1, h2⟩
+      · exact Or.inl h
+      · refine Or.inr ⟨h1, fun p W hp hW => ?_⟩
+        rcases hnew p hp with h | h
+        · subst h
+          exact (vgCode_inj hW) ▸ h1
+        · exact h2 p W h hW
+    · intro h
+      rcases hD'v h with h1 | ⟨p, W, hp, hW, hle⟩
+      · exact Or.inl h1
+      · exact Or.inr ⟨p, W, hold p hp, hW, hle⟩
+    · rcases hD'g with h1 | h1 | ⟨p, W, hp, hW, hle⟩
+      · exact Or.inl h1
+      · exact Or.inr (Or.inl h1)
+      · exact Or.inr (Or.inr ⟨p, W, hold p hp, hW, hle⟩)
   imodintro
   iframe Hrd0 Hc0
   iexists T
   unfold unitStamp
-  iapply reference_singleton γ r1.ident T ⟨1⟩
-  iframe Hfr
+  iapply referenceAt_mint γ r1.ident T ⟨1⟩ r1.vd ξ
+  iframe Hfr Hfrt Hvd
   iexact HtopT
 
 /-! ## (d) `ref_decr`, under L1 (refs 1 → 0 is THIS, not a withdraw) -/
 
 /-- Rocq's `box_ref_decr`: ONE UNIT (`qsum = 1`) leaves; the L1 floor
 register joins the unit's stamps (`td := max td (maxStamp mD)`), so the
-next withdrawal's cover (row D) still holds. -/
+next withdrawal's cover (row D) still holds.  (W8 (f2-ctx): the unit's
+tickets leave with it, and L1's bound becomes the caller's own -- past L1's
+old bound and the dropped tags, which its context has passed -- so the
+next withdrawal's chain cover (row (D′)) still holds.) -/
 theorem boxRefDecr (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : BoxNames)
-    (r : SlotReg Id X) (c : Nat) (i : Id) (mD : StampMap Id) (E : CoPset)
+    (cpu : CPU) (ξ : CtxId) (r : SlotReg Id X) (c : Nat) (i : Id) (mD : StampMap Id) (E : CoPset)
     (hE : ↑N ⊆ E) (hw : r.win = false) (hmD : qsum mD = 1) :
-    isBox P N γ ∗ slotdHalf γ r ∗ topLb r.td ∗ cntHalf γ (c + 1) ∗ reference γ i mD ⊢
-      |={E}=> (slotdHalf γ ⟨max r.td (maxStamp mD), false, r.ident, r.x⟩ ∗ cntHalf γ c ∗
-        topLb (max r.td (maxStamp mD))) := by
-  iintro ⟨#Hbox, Hrd0, #Htd, Hc0, Href⟩
-  unfold reference
-  icases Href with ⟨%_, %_, HfD, #HllbD⟩
+    isBox P N γ ∗ ownCtx cpu ξ ∗ slotdHalf γ r ∗ topLb r.td ∗ vgFloors ξ r.vd ∗ cntHalf γ (c + 1) ∗
+      referenceAt γ i mD ξ ⊢
+      |={E}=> (ownCtx cpu ξ ∗ ∃ a : ChainVG,
+        slotdHalf γ ⟨max r.td (maxStamp mD), false, r.ident, r.x, a⟩ ∗ cntHalf γ c ∗
+        topLb (max r.td (maxStamp mD)) ∗ vgFloors ξ a) := by
+  iintro ⟨#Hbox, Hrun, Hrd0, #Htd, #Hvd, Hc0, Href⟩
+  icases referenceAt_cases γ i mD ξ $$ Href with ⟨%_, %_, HfD, #HllbD, %mtD, %hqtD, HftD, #HtgD⟩
+  icases tagsFl_list ξ mtD $$ HtgD with ⟨%L, #HL, %hL⟩
+  icases ownCtx_vgMax cpu ξ (r.vd :: L) $$ [Hrun] with ⟨%a, Hrun, #Ha, %ha⟩
+  · iframe Hrun
+    iapply BigSepL.bigSepL_cons.2
+    iframe Hvd HL
+  have havd : vgLe r.vd a := ha r.vd List.mem_cons_self
+  have hatag : ∀ p W, (get? mtD p).isSome → p.2 = vgCode W → vgLe W a := by
+    intro p W hp hW
+    obtain ⟨b, hb, hbe⟩ := hL p hp
+    have : W = b := vgCode_inj (hW.symm.trans hbe)
+    subst this
+    exact ha W (List.mem_cons_of_mem _ hb)
   unfold isBox
   iinv Hbox with Hbody Hclose
   icases boxBody_open_later P γ $$ Hbody with
-    ⟨%T, %ξb, %m, %c1, %r1, %s1, >Hpk, >Hst, >Hc, >Hrd, >Hrp, >%hrows, >Harm⟩
+    ⟨%T, %ξb, %a0, %m, %mt, %c1, %r1, %s1, >Hpk, >Hst, >Hstt, >Hc, >Hrd, >Hrp, >%hrows, >Harm⟩
   ihave %hr := slotdHalf_agree γ r1 r $$ [Hrd Hrd0]
   · iframe
   ihave %hc := cntHalf_agree γ c1 (c + 1) $$ [Hc Hc0]
   · iframe
   subst hr; subst hc
-  obtain ⟨hsum, hI, hC, hD⟩ := hrows
+  obtain ⟨hsum, hI, hC, hD, hsumt, hTg, hC', hD'v, hD'g, hO1, hO2⟩ := hrows
   imod stampsDealloc γ m mD $$ [Hst HfD] with ⟨%m1, Hst, %hq1, %hdom1, %hkeep⟩
   · iframe
+  imod stampsDealloc γ.tk mt mtD $$ [Hstt HftD] with ⟨%mt1, Hstt, %hqt1, %hdomt1, %hkeept⟩
+  · iframe
   imod cntHalf_update γ (c + 1) (c + 1) c $$ [$Hc $Hc0] with ⟨Hc, Hc0⟩
-  imod slotdHalf_update γ r1 r1 ⟨max r1.td (maxStamp mD), false, r1.ident, r1.x⟩ $$ [$Hrd $Hrd0]
+  imod slotdHalf_update γ r1 r1 ⟨max r1.td (maxStamp mD), false, r1.ident, r1.x, a⟩ $$ [$Hrd $Hrd0]
     with ⟨Hrd, Hrd0⟩
   ihave Harm := boxArm_shut P γ T ξb m m1 (c + 1) c r1
-    (⟨max r1.td (maxStamp mD), false, r1.ident, r1.x⟩ : SlotReg Id X) s1 hw rfl rfl $$ Harm
-  imod Hclose $$ [Hpk Hst Hc Hrd Hrp Harm]
+    (⟨max r1.td (maxStamp mD), false, r1.ident, r1.x, a⟩ : SlotReg Id X) s1 hw rfl rfl $$ Harm
+  -- a dropped live ticket's tag is under the caller's bound
+  have hgone : ∀ p, (get? mt p).isSome → ¬ (get? mt1 p).isSome → (get? mtD p).isSome := by
+    intro p hp hn
+    exact Classical.byContradiction (fun hnD => hn (hkeept p hp hnD))
+  imod Hclose $$ [Hpk Hst Hstt Hc Hrd Hrp Harm]
   · inext
-    iapply boxBody_close P γ T ξb m1 c
-      (⟨max r1.td (maxStamp mD), false, r1.ident, r1.x⟩ : SlotReg Id X) s1 ?_
+    iapply boxBody_close P γ T ξb a0 m1 mt1 c
+      (⟨max r1.td (maxStamp mD), false, r1.ident, r1.x, a⟩ : SlotReg Id X) s1 ?_
     rotate_left
     · iframe
-    refine ⟨?_, keyed_sub m m1 r1.ident hdom1 hI, ?_, ?_⟩
+    refine ⟨?_, keyed_sub m m1 r1.ident hdom1 hI, ?_, ?_, ?_, fun p hp => hTg p (hdomt1 p hp), ?_, ?_, ?_,
+      fun h => absurd h (by simp), hO2⟩
     · rw [hsum, hmD] at hq1
       have h : ((c + 1 : Nat) : Rat) = (c : Rat) + 1 := Rat.natCast_add c 1
       rw [h] at hq1
@@ -1662,8 +2410,33 @@ theorem boxRefDecr (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : BoxNa
           have := maxStamp_ge mD p hpD
           omega
         · right; exact ⟨p, hkeep p hp hpD, hpT⟩
+    · rw [hsumt, hqtD, hmD] at hqt1
+      have h : ((c + 1 : Nat) : Rat) = (c : Rat) + 1 := Rat.natCast_add c 1
+      rw [h] at hqt1
+      grind
+    · rcases hC' with h | ⟨h1, h2⟩
+      · exact Or.inl h
+      · exact Or.inr ⟨vgLe_trans h1 havd, fun p W hp hW => h2 p W (hdomt1 p hp) hW⟩
+    · intro h
+      rcases hD'v h with h1 | ⟨p, W, hp, hW, hle⟩
+      · exact Or.inl (Nat.le_trans h1 (havd.1 h))
+      · by_cases hp1 : (get? mt1 p).isSome
+        · exact Or.inr ⟨p, W, hp1, hW, hle⟩
+        · exact Or.inl (Nat.le_trans hle ((hatag p W (hgone p hp hp1) hW).1 h))
+    · rcases hD'g with h1 | h1 | ⟨p, W, hp, hW, hle⟩
+      · exact Or.inl h1
+      · rcases havd.2 with h0 | h0
+        · omega
+        · exact Or.inr (Or.inl h0)
+      · by_cases hp1 : (get? mt1 p).isSome
+        · exact Or.inr (Or.inr ⟨p, W, hp1, hW, hle⟩)
+        · rcases (hatag p W (hgone p hp hp1) hW).2 with h0 | h0
+          · omega
+          · exact Or.inr (Or.inl h0)
   imodintro
-  iframe Hrd0 Hc0
+  iframe Hrun
+  iexists a
+  iframe Hrd0 Hc0 Ha
   iapply topLb_max
   isplit
   · iexact Htd
@@ -1673,40 +2446,44 @@ theorem boxRefDecr (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : BoxNa
 
 /-- Rocq's `box_checkout_hook` (= `box_checkout_split`): the caller's
 reference (mass `> 0`, keyed at `i`, stamps `≤ Kt`), L2's register half with
-nothing held (floor `Kp ≥ tp`), and floors.  The flag is not known (no L1
-half in hand): OUT_L1's window fragment carries all of Σ, and ours
-overflows it.  IN: the reference's keys are live, so they name the box's
-identity (row I); the cover is row (C).  The hook splits the header at the
-box's context into the part that travels and the OUT_L2 residue `Q2`; the
-caller's WHOLE fragment is parked, and the register names it. -/
+nothing held (floor `Kp ≥ tp`, and -- W8 (f2-ctx) -- L2's bound's floors),
+and floors.  The flag is not known (no L1 half in hand): OUT_L1's window
+fragment carries all of Σ, and ours overflows it.  IN: the reference's keys
+are live, so they name the box's identity (row I); the cover is row (C), the
+chain cover row (C′) -- L2's bound, or the reference's own tags.  The hook
+splits the header at the box's context into the part that travels and the
+OUT_L2 residue `Q2`; the caller's WHOLE fragment (and its tickets) is parked,
+and the register names it, with the box's bound, which the handle's floors
+cover. -/
 theorem boxCheckoutHook (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : BoxNames)
     (cpu : CPU) (ξ : CtxId) (i : Id) (hdr' : Id → X → CtxId → IProp GF)
     [∀ i x, CtxMorph (hdr' i x)] (Qc : IProp GF) (mh : StampMap Id) (s0 : L2Reg Id)
     (Kt Kp : Nat) (E : CoPset) (hE : ↑N ⊆ E) (hs : s0.hold = none) (hKt : maxStamp mh ≤ Kt)
     (hKp : s0.tp ≤ Kp)
     (hhook : ∀ (x : X) (ξ' : CtxId), Qc ∗ P.hdr i x ξ' ⊢ |={E \ ↑N}=> (hdr' i x ξ' ∗ P.q2)) :
-    isBox P N γ ∗ ownCtx cpu ξ ∗ ctxFloor ξ Kt ∗ ctxFloor ξ Kp ∗ reference γ i mh ∗ Qc ∗
-      slotpHalf γ s0 ⊢
-      |={E}=> (ownCtx cpu ξ ∗ (∃ x : X, hdr' i x ξ ∗ P.rest x ξ) ∗ l2Hold γ i mh) := by
-  iintro ⟨#Hbox, Hrun, #Hflt, #Hflp, Href, HQc, Hrp0⟩
-  unfold reference
-  icases Href with ⟨%hne, %hkeyed, Hfh, #Hllbh⟩
+    isBox P N γ ∗ ownCtx cpu ξ ∗ ctxFloor ξ Kt ∗ ctxFloor ξ Kp ∗ vgFloors ξ s0.vp ∗ referenceAt γ i mh ξ ∗
+      Qc ∗ slotpHalf γ s0 ⊢
+      |={E}=> (ownCtx cpu ξ ∗ (∃ x : X, hdr' i x ξ ∗ P.rest x ξ) ∗ l2HoldAt γ i mh ξ) := by
+  iintro ⟨#Hbox, Hrun, #Hflt, #Hflp, #Hvp, Href, HQc, Hrp0⟩
+  icases referenceAt_cases γ i mh ξ $$ Href with ⟨%hne, %hkeyed, Hfh, #Hllbh, %mth, %hqth, Hfth, #Htgh⟩
   unfold isBox
   iinv Hbox with Hbody Hclose
   icases boxBody_open_later P γ $$ Hbody with
-    ⟨%T, %ξb, %m, %c1, %r1, %s1, >Hpk, >Hst, >Hc, >Hrd, >Hrp, >%hrows, >Harm⟩
+    ⟨%T, %ξb, %a, %m, %mt, %c1, %r1, %s1, >Hpk, >Hst, >Hstt, >Hc, >Hrd, >Hrp, >%hrows, >Harm⟩
   ihave %hsq := slotpHalf_agree γ s1 s0 $$ [Hrp Hrp0]
   · iframe
   subst hsq
-  obtain ⟨hsum, hI, hC, hD⟩ := hrows
+  obtain ⟨hsum, hI, hC, hD, hsumt, hTg, hC', hD'v, hD'g, hO1, hO2⟩ := hrows
   ihave %hinclh := stampsFrag_incl γ m mh $$ [Hst Hfh]
+  · iframe
+  ihave %hinclht := stampsFrag_incl γ.tk mt mth $$ [Hstt Hfth]
   · iframe
   cases hwv : r1.win with
   | true =>
     -- OUT_L1: the window's fragment carries all of Σ; mine overflows it
     icases boxArm_out1_cases P γ T ξb m c1 r1 s1 hs hwv $$ Harm with ⟨Hho, -, -⟩
     unfold hdrOut
-    icases Hho with ⟨%m', %hsum', Hf', -⟩
+    icases Hho with ⟨%m', %mt', %hsum', Hf', -⟩
     ihave %hincl2 := stampsFrag_incl_2 γ m m' mh $$ [Hst Hf' Hfh]
     · iframe
     exfalso
@@ -1728,6 +2505,12 @@ theorem boxCheckoutHook (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : 
         have := maxStamp_ge mh p hp'
         omega
       · right; omega
+    -- the chain cover: (C′)
+    ihave #Ha : vgFloors ξ a $$ []
+    · rcases hC' with h | ⟨_, h⟩
+      · iapply vgFloors_le ξ a s1.vp h $$ Hvp
+      · have hneth : mth ≠ ∅ := box_qsum_ne_empty mth (by rw [hqth]; exact qsum_pos mh hne)
+        iapply box_tag_cover ξ a mt mth h hneth (incl_dom hinclht) $$ Htgh
     ihave Hin := boxArm_in_cases P γ T ξb m c1 r1 s1 hs hwv $$ Harm
     icases box_floor_view2 cpu ξ Kt Kp T hcov $$ [Hrun Hflt Hflp] with ⟨Hrun, %K, #HK, %hTK⟩
     · iframe Hrun
@@ -1739,30 +2522,32 @@ theorem boxCheckoutHook (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : 
     -- THE HOOK, at the box's context: the residue stays, the rest is absorbed
     imod hhook x ξb $$ [HQc Hhdr] with ⟨Hhdr', HQ⟩
     · iframe
-    imod ctxAbsorbLb (inArmOf P hdr' r1.ident) cpu ξb ξ T K hTK $$ [Hrun HK Hpk Hhdr' Hrest]
+    imod ctxAbsorbLb (inArmOf P hdr' r1.ident) cpu ξb ξ T K a.1 a.2 hTK $$ [Hrun HK Ha Hpk Hhdr' Hrest]
       with ⟨Hrun, Hpk, Hin'⟩
     · iframe Hrun Hpk
       isplit
       · iexact HK
+      isplit
+      · iexact Ha
       unfold inArmOf
       iexists x
       iframe
-    imod slotpHalf_update γ s1 s1 ⟨s1.tp, some (r1.ident, mh)⟩ $$ [$Hrp $Hrp0] with ⟨Hrp, Hrp0⟩
-    ihave Harm := boxArm_out2_intro P γ T ξb m c1 r1 (⟨s1.tp, some (r1.ident, mh)⟩ : L2Reg Id)
-      r1.ident mh rfl hwv hne hkeyed $$ [Hfh HQ]
+    imod slotpHalf_update γ s1 s1 ⟨s1.tp, some (r1.ident, mh), s1.vp, mth, a⟩ $$ [$Hrp $Hrp0] with ⟨Hrp, Hrp0⟩
+    ihave Harm := boxArm_out2_intro P γ T ξb m c1 r1 (⟨s1.tp, some (r1.ident, mh), s1.vp, mth, a⟩ : L2Reg Id)
+      r1.ident mh rfl hwv hne hkeyed hqth $$ [Hfh Hfth HQ]
     · iframe
-    imod Hclose $$ [Hpk Hst Hc Hrd Hrp Harm]
+    imod Hclose $$ [Hpk Hst Hstt Hc Hrd Hrp Harm]
     · inext
-      iapply boxBody_close P γ T ξb m c1 r1 (⟨s1.tp, some (r1.ident, mh)⟩ : L2Reg Id)
-        ⟨hsum, hI, hC, hD⟩
+      iapply boxBody_close P γ T ξb a m mt c1 r1 (⟨s1.tp, some (r1.ident, mh), s1.vp, mth, a⟩ : L2Reg Id)
+        ⟨hsum, hI, hC, hD, hsumt, hTg, hC', hD'v, hD'g, hO1, fun _ => vgLe_refl a⟩
       iframe
     imodintro
     iframe Hrun
     isplitl [Hin']
     · unfold inArmOf; iexact Hin'
-    unfold l2Hold
-    iexists s1.tp
-    iframe Hrp0
+    unfold l2HoldAt
+    iexists s1.tp, s1.vp, mth, a
+    iframe Hrp0 Ha
     iexact Hllbh
 
 /-- Rocq's `box_checkout` -- plain (e): the caller's `Q2` passes straight
@@ -1771,9 +2556,9 @@ theorem boxCheckout (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : BoxN
     (cpu : CPU) (ξ : CtxId) (i : Id) (mh : StampMap Id) (s0 : L2Reg Id) (Kt Kp : Nat)
     (E : CoPset) (hE : ↑N ⊆ E) (hs : s0.hold = none) (hKt : maxStamp mh ≤ Kt)
     (hKp : s0.tp ≤ Kp) :
-    isBox P N γ ∗ ownCtx cpu ξ ∗ ctxFloor ξ Kt ∗ ctxFloor ξ Kp ∗ reference γ i mh ∗ P.q2 ∗
-      slotpHalf γ s0 ⊢
-      |={E}=> (ownCtx cpu ξ ∗ inArm P i ξ ∗ l2Hold γ i mh) := by
+    isBox P N γ ∗ ownCtx cpu ξ ∗ ctxFloor ξ Kt ∗ ctxFloor ξ Kp ∗ vgFloors ξ s0.vp ∗ referenceAt γ i mh ξ ∗
+      P.q2 ∗ slotpHalf γ s0 ⊢
+      |={E}=> (ownCtx cpu ξ ∗ inArm P i ξ ∗ l2HoldAt γ i mh ξ) := by
   iintro H
   imod boxCheckoutHook P N γ cpu ξ i P.hdr P.q2 mh s0 Kt Kp E hE hs hKt hKp
     (fun _ _ => by iintro ⟨HQ, Hh⟩; imodintro; iframe) $$ H with ⟨Hrun, Hin, Hh⟩
@@ -1789,72 +2574,97 @@ refute); the parked keys are live, so they name the box's identity (F13).
 The hook runs at the holder's context on the caller's `Qc'`, the split
 header and the arm's `Q2`, returning the whole header and what the caller
 keeps.  `ctxDeposit` raises the box's stamp; the parked fragment leaves and
-ONE key at the new stamp comes back, AT THE SAME MASS. -/
+ONE key at the new stamp comes back, AT THE SAME MASS.  (W8 (f2-ctx): the
+holder has passed the box's bound at the checkout (row (O2)); the deposit
+raises the box's bound to the holder's, the new key's ticket is tagged with
+it, and L2's bound becomes it.) -/
 theorem boxParkHook (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : BoxNames)
     (cpu : CPU) (ξ : CtxId) (i : Id) (hdr' : Id → X → CtxId → IProp GF) (Qc' Q' : IProp GF)
     (mh : StampMap Id) (E : CoPset) (hE : ↑N ⊆ E)
     (hhook : ∀ (x : X) (ξ' : CtxId),
       Qc' ∗ hdr' i x ξ' ∗ P.q2 ⊢ |={E \ ↑N}=> (P.hdr i x ξ' ∗ Q')) :
-    isBox P N γ ∗ ownCtx cpu ξ ∗ (∃ x : X, hdr' i x ξ ∗ P.rest x ξ) ∗ Qc' ∗ l2Hold γ i mh ⊢
+    isBox P N γ ∗ ownCtx cpu ξ ∗ (∃ x : X, hdr' i x ξ ∗ P.rest x ξ) ∗ Qc' ∗ l2HoldAt γ i mh ξ ⊢
       |={E}=> (ownCtx cpu ξ ∗ Q' ∗
-        ∃ (T' : Nat) (q : UFrac), ⌜q.frac.val = qsum mh⌝ ∗
-          slotpHalf γ (⟨T', none⟩ : L2Reg Id) ∗
-          reference γ i (PartialMap.singleton (i, T') q : StampMap Id) ∗ topLb T') := by
+        ∃ (T' : Nat) (q : UFrac) (a : ChainVG), ⌜q.frac.val = qsum mh⌝ ∗
+          slotpHalf γ (⟨T', none, a, ∅, a⟩ : L2Reg Id) ∗
+          referenceAt γ i (PartialMap.singleton (i, T') q : StampMap Id) ξ ∗ topLb T' ∗ vgFloors ξ a) := by
   iintro ⟨#Hbox, Hrun, Hbun, HQc, Hhold⟩
-  unfold l2Hold
-  icases Hhold with ⟨%tp, Hrp0, -⟩
+  unfold l2HoldAt
+  icases Hhold with ⟨%tp, %vp, %mth, %vh, Hrp0, -, #Hvh⟩
   unfold isBox
   iinv Hbox with Hbody Hclose
   icases boxBody_open_later P γ $$ Hbody with
-    ⟨%T, %ξb, %m, %c1, %r1, %s1, >Hpk, >Hst, >Hc, >Hrd, >Hrp, >%hrows, >Harm⟩
-  ihave %hsq := slotpHalf_agree γ s1 ⟨tp, some (i, mh)⟩ $$ [Hrp Hrp0]
+    ⟨%T, %ξb, %a, %m, %mt, %c1, %r1, %s1, >Hpk, >Hst, >Hstt, >Hc, >Hrd, >Hrp, >%hrows, >Harm⟩
+  ihave %hsq := slotpHalf_agree γ s1 ⟨tp, some (i, mh), vp, mth, vh⟩ $$ [Hrp Hrp0]
   · iframe
   subst hsq
-  obtain ⟨hsum, hI, hC, hD⟩ := hrows
-  icases boxArm_out2_cases P γ T ξb m c1 r1 ⟨tp, some (i, mh)⟩ i mh rfl $$ Harm
-    with ⟨%hwv, %hne0, %hkeyed0, Hf0, HQ⟩
+  obtain ⟨hsum, hI, hC, hD, hsumt, hTg, hC', hD'v, hD'g, hO1, hO2⟩ := hrows
+  icases boxArm_out2_cases P γ T ξb m c1 r1 ⟨tp, some (i, mh), vp, mth, vh⟩ i mh rfl $$ Harm
+    with ⟨%hwv, %hne0, %hkeyed0, Hf0, %hqt0, Hft0, HQ⟩
+  have hqt0' : qsum mth = qsum mh := hqt0
   ihave %hincl0 := stampsFrag_incl γ m mh $$ [Hst Hf0]
   · iframe
   have hid : i = r1.ident := keyed_agree m mh i r1.ident hne0 (incl_dom hincl0) hkeyed0 hI
   subst hid
+  ihave #Ha := vgFloors_le ξ a vh (hO2 rfl) $$ Hvh
   -- THE HOOK, at the holder's context, with the arm's residue
   icases Hbun with ⟨%x, Hhdr', Hrest⟩
   imod hhook x ξ $$ [HQc Hhdr' HQ] with ⟨Hhdr, HQ'⟩
   · iframe
-  imod ctxDeposit (inArm P r1.ident) cpu ξ ξb T $$ [Hrun Hpk Hhdr Hrest]
-    with ⟨Hrun, ⟨%T', %hTT', Hpk, Hbun⟩⟩
-  · iframe Hrun Hpk
+  imod ctxDeposit (inArm P r1.ident) cpu ξ ξb T a.1 a.2 $$ [Hrun Ha Hpk Hhdr Hrest]
+    with ⟨Hrun, ⟨%T', %a', %hTT', %haa', Hpk, #Ha', Hbun⟩⟩
+  · iframe Hrun Hpk Ha
     unfold inArm
     iexists x
     iframe
-  ihave ⟨#HtopT', Hpk⟩ := ctxStamped_topLb ξb T' $$ Hpk
+  ihave ⟨#HtopT', Hpk⟩ := ctxStamped_topLb ξb T' a'.1 a'.2 $$ Hpk
   imod stampsDealloc γ m mh $$ [Hst Hf0] with ⟨%m1, Hst, %hq1, %hdom1, -⟩
+  · iframe
+  imod stampsDealloc γ.tk mt mth $$ [Hstt Hft0] with ⟨%mt1, Hstt, %hqt1, %hdomt1, -⟩
   · iframe
   let q : UFrac := ⟨⟨qsum mh, qsum_pos mh hne0⟩⟩
   imod stampsAlloc γ m1 (r1.ident, T') q $$ Hst with ⟨Hst, Hfr⟩
-  imod slotpHalf_update γ ⟨tp, some (r1.ident, mh)⟩ ⟨tp, some (r1.ident, mh)⟩
-    (⟨T', none⟩ : L2Reg Id) $$ [$Hrp $Hrp0] with ⟨Hrp, Hrp0⟩
+  imod stampsAlloc γ.tk mt1 (r1.ident, vgCode a') q $$ Hstt with ⟨Hstt, Hfrt⟩
+  imod slotpHalf_update γ ⟨tp, some (r1.ident, mh), vp, mth, vh⟩ ⟨tp, some (r1.ident, mh), vp, mth, vh⟩
+    (⟨T', none, a', ∅, a'⟩ : L2Reg Id) $$ [$Hrp $Hrp0] with ⟨Hrp, Hrp0⟩
   ihave Harm := boxArm_in_intro P γ T' ξb (PartialMap.singleton (r1.ident, T') q • m1) c1 r1
-    (⟨T', none⟩ : L2Reg Id) rfl hwv $$ Hbun
-  imod Hclose $$ [Hpk Hst Hc Hrd Hrp Harm]
+    (⟨T', none, a', ∅, a'⟩ : L2Reg Id) rfl hwv $$ Hbun
+  have hnewlive : (get? ((PartialMap.singleton (r1.ident, vgCode a') q : StampMap Id) • mt1)
+      (r1.ident, vgCode a')).isSome := by
+    refine (isSome_sop _ mt1 _).2 (Or.inl ?_)
+    rw [LawfulPartialMap.get?_singleton_eq rfl]; rfl
+  imod Hclose $$ [Hpk Hst Hstt Hc Hrd Hrp Harm]
   · inext
-    iapply boxBody_close P γ T' ξb (PartialMap.singleton (r1.ident, T') q • m1) c1 r1
-      (⟨T', none⟩ : L2Reg Id) ?_
+    iapply boxBody_close P γ T' ξb a' (PartialMap.singleton (r1.ident, T') q • m1)
+      ((PartialMap.singleton (r1.ident, vgCode a') q : StampMap Id) • mt1) c1 r1
+      (⟨T', none, a', ∅, a'⟩ : L2Reg Id) ?_
     rotate_left
     · iframe
     refine ⟨?_, keyed_singleton_op m1 r1.ident T' q (keyed_sub m m1 r1.ident hdom1 hI),
-      Or.inr (Nat.le_refl _), Or.inr ⟨(r1.ident, T'), (isSome_sop _ m1 _).2 (Or.inl ?_), rfl⟩⟩
+      Or.inr (Nat.le_refl _), Or.inr ⟨(r1.ident, T'), (isSome_sop _ m1 _).2 (Or.inl ?_), rfl⟩, ?_, ?_,
+      Or.inl (vgLe_refl a'), fun h => Or.inr ⟨_, a', hnewlive, rfl, Nat.le_refl _⟩, ?_,
+      (fun h => by rw [hwv] at h; cases h), fun h => by simp at h⟩
     · rw [qsum_singleton_op, ← hsum, ← hq1]
     · rw [LawfulPartialMap.get?_singleton_eq rfl]; rfl
+    · rw [qsum_singleton_op, ← hsumt, ← hqt1, hqt0']
+    · intro p hp
+      rcases (isSome_sop _ mt1 p).1 hp with h | h
+      · by_cases hpe : (r1.ident, vgCode a') = p
+        · subst hpe; exact ⟨a', rfl⟩
+        · rw [LawfulPartialMap.get?_singleton_ne hpe] at h; cases h
+      · exact hTg p (hdomt1 p h)
+    · by_cases h0 : a'.2 = 0
+      · exact Or.inl h0
+      · exact Or.inr (Or.inr ⟨_, a', hnewlive, rfl, by omega⟩)
   imodintro
   iframe Hrun HQ'
-  iexists T', q
-  iframe Hrp0
+  iexists T', q, a'
+  iframe Hrp0 Ha'
   isplit
   · ipureintro; rfl
-  isplitl [Hfr]
-  · iapply reference_singleton γ r1.ident T' q
-    iframe Hfr
+  isplitl [Hfr Hfrt]
+  · iapply referenceAt_mint γ r1.ident T' q a' ξ
+    iframe Hfr Hfrt Ha'
     iexact HtopT'
   · iexact HtopT'
 
@@ -1863,11 +2673,11 @@ theorem boxParkJoin (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : BoxN
     (cpu : CPU) (ξ : CtxId) (i : Id) (hdr' : Id → X → CtxId → IProp GF) (Qc' Q' : IProp GF)
     (mh : StampMap Id) (E : CoPset) (hE : ↑N ⊆ E)
     (hjoin : ∀ (x : X) (ξ' : CtxId), Qc' ∗ hdr' i x ξ' ∗ P.q2 ⊢ P.hdr i x ξ' ∗ Q') :
-    isBox P N γ ∗ ownCtx cpu ξ ∗ (∃ x : X, hdr' i x ξ ∗ P.rest x ξ) ∗ Qc' ∗ l2Hold γ i mh ⊢
+    isBox P N γ ∗ ownCtx cpu ξ ∗ (∃ x : X, hdr' i x ξ ∗ P.rest x ξ) ∗ Qc' ∗ l2HoldAt γ i mh ξ ⊢
       |={E}=> (ownCtx cpu ξ ∗ Q' ∗
-        ∃ (T' : Nat) (q : UFrac), ⌜q.frac.val = qsum mh⌝ ∗
-          slotpHalf γ (⟨T', none⟩ : L2Reg Id) ∗
-          reference γ i (PartialMap.singleton (i, T') q : StampMap Id) ∗ topLb T') :=
+        ∃ (T' : Nat) (q : UFrac) (a : ChainVG), ⌜q.frac.val = qsum mh⌝ ∗
+          slotpHalf γ (⟨T', none, a, ∅, a⟩ : L2Reg Id) ∗
+          referenceAt γ i (PartialMap.singleton (i, T') q : StampMap Id) ξ ∗ topLb T' ∗ vgFloors ξ a) :=
   boxParkHook P N γ cpu ξ i hdr' Qc' Q' mh E hE
     (fun x ξ' => by iintro H; imodintro; iapply hjoin x ξ' $$ H)
 
@@ -1875,11 +2685,11 @@ theorem boxParkJoin (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : BoxN
 arm's `Q2` is handed back. -/
 theorem boxPark (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : BoxNames)
     (cpu : CPU) (ξ : CtxId) (i : Id) (mh : StampMap Id) (E : CoPset) (hE : ↑N ⊆ E) :
-    isBox P N γ ∗ ownCtx cpu ξ ∗ inArm P i ξ ∗ l2Hold γ i mh ⊢
+    isBox P N γ ∗ ownCtx cpu ξ ∗ inArm P i ξ ∗ l2HoldAt γ i mh ξ ⊢
       |={E}=> (ownCtx cpu ξ ∗ P.q2 ∗
-        ∃ (T' : Nat) (q : UFrac), ⌜q.frac.val = qsum mh⌝ ∗
-          slotpHalf γ (⟨T', none⟩ : L2Reg Id) ∗
-          reference γ i (PartialMap.singleton (i, T') q : StampMap Id) ∗ topLb T') := by
+        ∃ (T' : Nat) (q : UFrac) (a : ChainVG), ⌜q.frac.val = qsum mh⌝ ∗
+          slotpHalf γ (⟨T', none, a, ∅, a⟩ : L2Reg Id) ∗
+          referenceAt γ i (PartialMap.singleton (i, T') q : StampMap Id) ξ ∗ topLb T' ∗ vgFloors ξ a) := by
   iintro ⟨#Hbox, Hrun, Hin, Hhold⟩
   iapply boxParkHook P N γ cpu ξ i P.hdr iprop(emp) P.q2 mh E hE
     (fun _ _ => by iintro ⟨-, Hh, HQ⟩; imodintro; iframe)
@@ -1892,23 +2702,24 @@ theorem boxPark (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : BoxNames
 /-- Rocq's `box_l1_to_l2_hook` (iput's free path, the unique both-locks
 site): inside its own (a) window at count 1, holding the L2 register half,
 the caller takes `P_rest` out WITHOUT re-depositing the header.  The window's
-fragment moves from `hdrOut` to OUT_L2 as the holder's `l2Hold`; the L1
-register closes at its own old stamp; rows untouched. -/
+fragment (and its tickets) moves from `hdrOut` to OUT_L2 as the holder's
+`l2Hold`; the L1 register closes at its own old stamp; rows untouched.  (W8
+(f2-ctx): the caller has passed L1's bound, hence the box's (row (O1)).) -/
 theorem boxL1ToL2Hook (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : BoxNames)
     (cpu : CPU) (ξ : CtxId) (r : SlotReg Id X) (x0 : X) (T0 K : Nat) (s0 : L2Reg Id)
     (Qc Q' : IProp GF) (E : CoPset) (hE : ↑N ⊆ E) (hw : r.win = true)
     (hx : r.x = some (x0, T0)) (hTK : T0 ≤ K) (hs : s0.hold = none)
     (hhook : Qc ∗ P.q1 1 ⊢ |={E \ ↑N}=> (P.q2 ∗ Q')) :
-    isBox P N γ ∗ ownCtx cpu ξ ∗ ctxFloor ξ K ∗ slotdHalf γ r ∗ cntHalf γ 1 ∗ Qc ∗
+    isBox P N γ ∗ ownCtx cpu ξ ∗ ctxFloor ξ K ∗ vgFloors ξ r.vd ∗ slotdHalf γ r ∗ cntHalf γ 1 ∗ Qc ∗
       slotpHalf γ s0 ⊢
       |={E}=> (ownCtx cpu ξ ∗ Q' ∗ P.rest x0 ξ ∗
-        slotdHalf γ (⟨r.td, false, r.ident, none⟩ : SlotReg Id X) ∗ cntHalf γ 1 ∗
-        ∃ m' : StampMap Id, ⌜qsum m' = 1⌝ ∗ l2Hold γ r.ident m') := by
-  iintro ⟨#Hbox, Hrun, #Hfl, Hrd0, Hc0, HQc, Hrp0⟩
+        slotdHalf γ (⟨r.td, false, r.ident, none, r.vd⟩ : SlotReg Id X) ∗ cntHalf γ 1 ∗
+        ∃ m' : StampMap Id, ⌜qsum m' = 1⌝ ∗ l2HoldAt γ r.ident m' ξ) := by
+  iintro ⟨#Hbox, Hrun, #Hfl, #Hvd, Hrd0, Hc0, HQc, Hrp0⟩
   unfold isBox
   iinv Hbox with Hbody Hclose
   icases boxBody_open_later P γ $$ Hbody with
-    ⟨%T, %ξb, %m, %c1, %r1, %s1, >Hpk, >Hst, >Hc, >Hrd, >Hrp, >%hrows, >Harm⟩
+    ⟨%T, %ξb, %a, %m, %mt, %c1, %r1, %s1, >Hpk, >Hst, >Hstt, >Hc, >Hrd, >Hrp, >%hrows, >Harm⟩
   ihave %hr := slotdHalf_agree γ r1 r $$ [Hrd Hrd0]
   · iframe
   ihave %hc := cntHalf_agree γ c1 1 $$ [Hc Hc0]
@@ -1916,45 +2727,48 @@ theorem boxL1ToL2Hook (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : Bo
   ihave %hsq := slotpHalf_agree γ s1 s0 $$ [Hrp Hrp0]
   · iframe
   subst hr; subst hc; subst hsq
-  obtain ⟨hsum, hI, hC, hD⟩ := hrows
+  obtain ⟨hsum, hI, hC, hD, hsumt, hTg, hC', hD'v, hD'g, hO1, hO2⟩ := hrows
   icases boxArm_out1_cases P γ T ξb m 1 r1 s1 hs hw $$ Harm with ⟨Hho, ⟨%x, %hxx, Hrest⟩, HQo⟩
   have hpe : (x0, T0) = (x, T) := Option.some.inj (hx.symm.trans hxx)
   have hx1 : x0 = x := congrArg Prod.fst hpe
   have hT1 : T0 = T := congrArg Prod.snd hpe
   subst hx1; subst hT1
   unfold hdrOut
-  icases Hho with ⟨%m', %hsum', Hf', #Hllb'⟩
+  icases Hho with ⟨%m', %mt', %hsum', Hf', #Hllb', %hsumt', Hft'⟩
   ihave %hincl' := stampsFrag_incl γ m m' $$ [Hst Hf']
   · iframe
   have hq1 : qsum m' = 1 := by rw [hsum', hsum]; rfl
   have hne' : m' ≠ ∅ := fun h => by rw [h, qsum_empty] at hq1; exact absurd hq1 (by decide)
   have hkeyed' : keyed m' r1.ident := keyed_sub m m' r1.ident (incl_dom hincl') hI
+  ihave #Ha := vgFloors_le ξ a r1.vd (hO1 hw) $$ Hvd
   -- THE HOOK: the residues, at the caller's context
   imod hhook $$ [HQc HQo] with ⟨HQn, HQ'⟩
   · iframe
   -- the cover: the register's stamp IS the box's, under the caller's floor
   icases ownCtx_floor_view cpu ξ K $$ [Hrun Hfl] with ⟨Hrun, ⟨%K', #HK, %hKK⟩⟩
   · iframe Hrun; iexact Hfl
-  imod ctxAbsorbLb (P.rest x0) cpu ξb ξ T0 K' (by omega) $$ [$Hrun $HK $Hpk $Hrest]
+  imod ctxAbsorbLb (P.rest x0) cpu ξb ξ T0 K' a.1 a.2 (by omega) $$ [$Hrun $HK $Ha $Hpk $Hrest]
     with ⟨Hrun, Hpk, Hrest⟩
-  imod slotdHalf_update γ r1 r1 ⟨r1.td, false, r1.ident, none⟩ $$ [$Hrd $Hrd0] with ⟨Hrd, Hrd0⟩
-  imod slotpHalf_update γ s1 s1 ⟨s1.tp, some (r1.ident, m')⟩ $$ [$Hrp $Hrp0] with ⟨Hrp, Hrp0⟩
-  ihave Harm := boxArm_out2_intro P γ T0 ξb m 1 (⟨r1.td, false, r1.ident, none⟩ : SlotReg Id X)
-    (⟨s1.tp, some (r1.ident, m')⟩ : L2Reg Id) r1.ident m' rfl rfl hne' hkeyed' $$ [Hf' HQn]
+  imod slotdHalf_update γ r1 r1 ⟨r1.td, false, r1.ident, none, r1.vd⟩ $$ [$Hrd $Hrd0] with ⟨Hrd, Hrd0⟩
+  imod slotpHalf_update γ s1 s1 ⟨s1.tp, some (r1.ident, m'), s1.vp, mt', a⟩ $$ [$Hrp $Hrp0] with ⟨Hrp, Hrp0⟩
+  ihave Harm := boxArm_out2_intro P γ T0 ξb m 1 (⟨r1.td, false, r1.ident, none, r1.vd⟩ : SlotReg Id X)
+    (⟨s1.tp, some (r1.ident, m'), s1.vp, mt', a⟩ : L2Reg Id) r1.ident m' rfl rfl hne' hkeyed'
+    (by show qsum mt' = qsum m'; rw [hsumt', hsum']) $$ [Hf' Hft' HQn]
   · iframe
-  imod Hclose $$ [Hpk Hst Hc Hrd Hrp Harm]
+  imod Hclose $$ [Hpk Hst Hstt Hc Hrd Hrp Harm]
   · inext
-    iapply boxBody_close P γ T0 ξb m 1 (⟨r1.td, false, r1.ident, none⟩ : SlotReg Id X)
-      (⟨s1.tp, some (r1.ident, m')⟩ : L2Reg Id) ⟨hsum, hI, hC, hD⟩
+    iapply boxBody_close P γ T0 ξb a m mt 1 (⟨r1.td, false, r1.ident, none, r1.vd⟩ : SlotReg Id X)
+      (⟨s1.tp, some (r1.ident, m'), s1.vp, mt', a⟩ : L2Reg Id)
+      ⟨hsum, hI, hC, hD, hsumt, hTg, hC', hD'v, hD'g, fun h => absurd h (by simp), fun _ => vgLe_refl a⟩
     iframe
   imodintro
   iframe Hrun HQ' Hrest Hrd0 Hc0
   iexists m'
   isplit
   · ipureintro; exact hq1
-  unfold l2Hold
-  iexists s1.tp
-  iframe Hrp0
+  unfold l2HoldAt
+  iexists s1.tp, s1.vp, mt', a
+  iframe Hrp0 Ha
   iexact Hllb'
 
 /-- Rocq's `box_l1_to_l2` -- plain (g): the residues are exchanged
@@ -1963,11 +2777,11 @@ theorem boxL1ToL2 (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : BoxNam
     (cpu : CPU) (ξ : CtxId) (r : SlotReg Id X) (x0 : X) (T0 K : Nat) (s0 : L2Reg Id)
     (E : CoPset) (hE : ↑N ⊆ E) (hw : r.win = true) (hx : r.x = some (x0, T0)) (hTK : T0 ≤ K)
     (hs : s0.hold = none) :
-    isBox P N γ ∗ ownCtx cpu ξ ∗ ctxFloor ξ K ∗ slotdHalf γ r ∗ cntHalf γ 1 ∗ P.q2 ∗
+    isBox P N γ ∗ ownCtx cpu ξ ∗ ctxFloor ξ K ∗ vgFloors ξ r.vd ∗ slotdHalf γ r ∗ cntHalf γ 1 ∗ P.q2 ∗
       slotpHalf γ s0 ⊢
       |={E}=> (ownCtx cpu ξ ∗ P.q1 1 ∗ P.rest x0 ξ ∗
-        slotdHalf γ (⟨r.td, false, r.ident, none⟩ : SlotReg Id X) ∗ cntHalf γ 1 ∗
-        ∃ m' : StampMap Id, ⌜qsum m' = 1⌝ ∗ l2Hold γ r.ident m') :=
+        slotdHalf γ (⟨r.td, false, r.ident, none, r.vd⟩ : SlotReg Id X) ∗ cntHalf γ 1 ∗
+        ∃ m' : StampMap Id, ⌜qsum m' = 1⌝ ∗ l2HoldAt γ r.ident m' ξ) :=
   boxL1ToL2Hook P N γ cpu ξ r x0 T0 K s0 P.q2 (P.q1 1) E hE hw hx hTK hs
     (by iintro ⟨H2, H1⟩; imodintro; iframe)
 
@@ -1976,34 +2790,33 @@ theorem boxL1ToL2 (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : BoxNam
 /-- Rocq's `box_q_update`: the L2 holder rewrites its residue in place (the
 register's L2 half selects OUT_L2), handing an output residue `R` out. -/
 theorem boxQUpdate (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : BoxNames) (i : Id)
-    (R : IProp GF) (mh : StampMap Id) (E : CoPset) (hE : ↑N ⊆ E) :
-    isBox P N γ ∗ l2Hold γ i mh ∗ (P.q2 -∗ |={E \ ↑N}=> (P.q2 ∗ R)) ⊢
-      |={E}=> (l2Hold γ i mh ∗ R) := by
+    (R : IProp GF) (mh : StampMap Id) (ξ : CtxId) (E : CoPset) (hE : ↑N ⊆ E) :
+    isBox P N γ ∗ l2HoldAt γ i mh ξ ∗ (P.q2 -∗ |={E \ ↑N}=> (P.q2 ∗ R)) ⊢
+      |={E}=> (l2HoldAt γ i mh ξ ∗ R) := by
   iintro ⟨#Hbox, Hhold, Hupd⟩
-  unfold l2Hold
-  icases Hhold with ⟨%tp, Hrp0, #Hllbh⟩
+  unfold l2HoldAt
+  icases Hhold with ⟨%tp, %vp, %mth, %vh, Hrp0, #Hllbh, #Hvh⟩
   unfold isBox
   iinv Hbox with Hbody Hclose
   icases boxBody_open_later P γ $$ Hbody with
-    ⟨%T, %ξb, %m, %c1, %r1, %s1, >Hpk, >Hst, >Hc, >Hrd, >Hrp, >%hrows, >Harm⟩
-  ihave %hsq := slotpHalf_agree γ s1 ⟨tp, some (i, mh)⟩ $$ [Hrp Hrp0]
+    ⟨%T, %ξb, %a, %m, %mt, %c1, %r1, %s1, >Hpk, >Hst, >Hstt, >Hc, >Hrd, >Hrp, >%hrows, >Harm⟩
+  ihave %hsq := slotpHalf_agree γ s1 ⟨tp, some (i, mh), vp, mth, vh⟩ $$ [Hrp Hrp0]
   · iframe
   subst hsq
-  icases boxArm_out2_cases P γ T ξb m c1 r1 ⟨tp, some (i, mh)⟩ i mh rfl $$ Harm
-    with ⟨%hwv, %hne0, %hkeyed0, Hf0, HQ⟩
+  icases boxArm_out2_cases P γ T ξb m c1 r1 ⟨tp, some (i, mh), vp, mth, vh⟩ i mh rfl $$ Harm
+    with ⟨%hwv, %hne0, %hkeyed0, Hf0, %hqt0, Hft0, HQ⟩
   imod Hupd $$ HQ with ⟨HQ, HR⟩
-  ihave Harm := boxArm_out2_intro P γ T ξb m c1 r1 (⟨tp, some (i, mh)⟩ : L2Reg Id) i mh rfl
-    hwv hne0 hkeyed0 $$ [Hf0 HQ]
+  ihave Harm := boxArm_out2_intro P γ T ξb m c1 r1 (⟨tp, some (i, mh), vp, mth, vh⟩ : L2Reg Id) i mh rfl
+    hwv hne0 hkeyed0 hqt0 $$ [Hf0 Hft0 HQ]
   · iframe
-  imod Hclose $$ [Hpk Hst Hc Hrd Hrp Harm]
+  imod Hclose $$ [Hpk Hst Hstt Hc Hrd Hrp Harm]
   · inext
-    iapply boxBody_close P γ T ξb m c1 r1 (⟨tp, some (i, mh)⟩ : L2Reg Id) hrows
+    iapply boxBody_close P γ T ξb a m mt c1 r1 (⟨tp, some (i, mh), vp, mth, vh⟩ : L2Reg Id) hrows
     iframe
   imodintro
   iframe HR
-  iexists tp
-  iframe Hrp0
-  iexact Hllbh
+  iexists tp, vp, mth, vh
+  iframe Hrp0 Hllbh Hvh
 
 /-- Rocq's `box_q1_update`: `box_q_update`'s L1 twin.  The window's holder
 presents the L1 register half at `win = true` and the count half, and
@@ -2017,7 +2830,7 @@ theorem boxQ1Update (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : BoxN
   unfold isBox
   iinv Hbox with Hbody Hclose
   icases boxBody_open_later P γ $$ Hbody with
-    ⟨%T, %ξb, %m, %c1, %r1, %s1, >Hpk, >Hst, >Hc, >Hrd, >Hrp, >%hrows, >Harm⟩
+    ⟨%T, %ξb, %a, %m, %mt, %c1, %r1, %s1, >Hpk, >Hst, >Hstt, >Hc, >Hrd, >Hrp, >%hrows, >Harm⟩
   ihave %hr := slotdHalf_agree γ r1 r $$ [Hrd Hrd0]
   · iframe
   ihave %hc := cntHalf_agree γ c1 c $$ [Hc Hc0]
@@ -2028,9 +2841,9 @@ theorem boxQ1Update (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : BoxN
     imod Hupd $$ HQ with ⟨HQ, HR⟩
     ihave Harm := boxArm_out1_intro P γ T ξb m c1 r1 s1 hh hw $$ [Hho Hrest HQ]
     · iframe
-    imod Hclose $$ [Hpk Hst Hc Hrd Hrp Harm]
+    imod Hclose $$ [Hpk Hst Hstt Hc Hrd Hrp Harm]
     · inext
-      iapply boxBody_close P γ T ξb m c1 r1 s1 hrows
+      iapply boxBody_close P γ T ξb a m mt c1 r1 s1 hrows
       iframe
     imodintro
     iframe Hrd0 Hc0 HR
@@ -2040,45 +2853,88 @@ theorem boxQ1Update (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace) (γ : BoxN
 
 /-! ## Boot: the box is born IN, at the boot deposit's stamp -/
 
+/-- The boot rows: an empty box, IN, at the creator's bound. -/
+theorem boxRows_boot (Tb : Nat) (a : ChainVG) (i0 : Id) (x0 : Option (X × Nat)) :
+    boxRows Tb a (∅ : StampMap Id) (∅ : StampMap Id) 0 (⟨Tb, false, i0, x0, a⟩ : SlotReg Id X) L2Reg.init := by
+  refine ⟨by rw [qsum_empty]; rfl, fun p hp => ?_, Or.inl (fun p hp => ?_), Or.inl (Nat.le_refl _),
+    by rw [qsum_empty]; rfl, fun p hp => ?_, Or.inr ⟨vgLe_refl a, fun p W hp _ => ?_⟩,
+    fun h => Or.inl (Nat.le_refl _), ?_, fun h => absurd h (by simp), fun h => by simp [L2Reg.init] at h⟩
+  · rw [LawfulPartialMap.get?_empty] at hp; cases hp
+  · rw [LawfulPartialMap.get?_empty] at hp; cases hp
+  · rw [LawfulPartialMap.get?_empty] at hp; cases hp
+  · rw [LawfulPartialMap.get?_empty] at hp; cases hp
+  · by_cases h0 : a.2 = 0
+    · exact Or.inl h0
+    · exact Or.inr (Or.inl (by show 1 ≤ a.2; omega))
+
+/-- The creator's mint of a box's stamped context: the bundle moves to a fresh
+twin context, which is stamped; its bound, which the creator's context
+absorbs (its hart holds the certificates). -/
+theorem box_born (P : BoxPay GF Id X) [BoxPayOk P] (cpu : CPU) (ξ : CtxId) (i0 : Id) :
+    ownCtx (GF := GF) cpu ξ ∗ inArm P i0 ξ ⊢
+      |==> (ownCtx cpu ξ ∗ ∃ (ξb : CtxId) (Tb : Nat) (a : ChainVG),
+        ctxStamped ξb Tb a.1 a.2 ∗ inArm P i0 ξb ∗ topLb Tb ∗ vgFloors ξ a) := by
+  iintro ⟨Hrun, Hin⟩
+  imod ownCtx_new cpu ξ $$ Hrun with ⟨Hrun, ⟨%ξb, Hξb⟩⟩
+  imod ctx_move (inArm P i0) cpu ξ ξb $$ [$Hrun $Hξb $Hin] with ⟨Hrun, Hξb, Hin⟩
+  imod ctx_stamp cpu ξb $$ Hξb with ⟨%Tb, %V, %g, Hpk, -, #Hc⟩
+  icases ctxStamped_cases ξb Tb V g $$ Hpk with ⟨%D, Hat, #HT, %hD, #Hels, Hv, %⟨hDV, hVT⟩⟩
+  imod ctx_vecAbsorb cpu ξ V g Tb hVT $$ [Hrun] with ⟨Hrun, #Hvf, #Hg⟩
+  · iframe Hrun
+    isplit
+    · iexact Hc
+    · iexact HT
+  imodintro
+  iframe Hrun
+  iexists ξb, Tb, (V, g)
+  iframe Hin HT
+  isplitl [Hat Hv]
+  · iapply ctxStamped_intro ξb Tb V g D
+    iframe Hat Hv
+    isplit
+    · iexact HT
+    isplit
+    · ipureintro; exact hD
+    isplit
+    · iexact Hels
+    · ipureintro; exact ⟨hDV, hVT⟩
+  · unfold vgFloors
+    iframe Hvf Hg
+
 /-- Rocq's `box_alloc_at`: the box is built at names already allocated, out
 of a bundle the creator holds in its own running context.  The bundle moves
 to a fresh twin context, which is stamped: that stamp is the box's first
-`T`, and the L1 register's floor. -/
+`T`, and the L1 register's floor; (W8 (f2-ctx)) its bound is L1's, which the
+creator's floors cover. -/
 theorem boxAllocAt (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace)
     (γ : BoxNames) (cpu : CPU) (ξ : CtxId) (i0 : Id) (E : CoPset) :
-    stampsAuth γ (∅ : StampMap Id) ∗ (γ.cnt ↪VAR (0 : Nat)) ∗
-      (∃ r0 : SlotReg Id X, γ.slotd ↪VAR r0) ∗ (γ.slotp ↪VAR (⟨0, none⟩ : L2Reg Id)) ∗
+    stampsAuth γ (∅ : StampMap Id) ∗ stampsAuth γ.tk (∅ : StampMap Id) ∗ (γ.cnt ↪VAR (0 : Nat)) ∗
+      (∃ r0 : SlotReg Id X, γ.slotd ↪VAR r0) ∗ (γ.slotp ↪VAR (L2Reg.init : L2Reg Id)) ∗
       ownCtx cpu ξ ∗ inArm P i0 ξ ⊢
-      |={E}=> (ownCtx cpu ξ ∗ ∃ Tb : Nat, isBox P N γ ∗
-        slotdHalf γ (⟨Tb, false, i0, none⟩ : SlotReg Id X) ∗ topLb Tb ∗ cntHalf γ 0 ∗
-        slotpHalf γ (⟨0, none⟩ : L2Reg Id)) := by
-  iintro ⟨Hst, Hcnt, Hrd, Hrp, Hrun, Hin⟩
+      |={E}=> (ownCtx cpu ξ ∗ ∃ (Tb : Nat) (a : ChainVG), isBox P N γ ∗
+        slotdHalf γ (⟨Tb, false, i0, none, a⟩ : SlotReg Id X) ∗ topLb Tb ∗ vgFloors ξ a ∗ cntHalf γ 0 ∗
+        slotpHalf γ (L2Reg.init : L2Reg Id)) := by
+  iintro ⟨Hst, Hstt, Hcnt, Hrd, Hrp, Hrun, Hin⟩
   icases Hrd with ⟨%r0, Hrd⟩
-  imod ownCtx_new cpu ξ $$ Hrun with ⟨Hrun, ⟨%ξb, Hξb⟩⟩
-  imod ctx_move (inArm P i0) cpu ξ ξb $$ [$Hrun $Hξb $Hin] with ⟨Hrun, Hξb, Hin⟩
-  imod ctx_stamp cpu ξb $$ Hξb with ⟨%Tb, Hpk, -⟩
-  ihave ⟨#HtopTb, Hpk⟩ := ctxStamped_topLb ξb Tb $$ Hpk
-  imod ghost_var_update (⟨Tb, false, i0, none⟩ : SlotReg Id X) γ.slotd r0 $$ Hrd with Hrd
+  imod box_born P cpu ξ i0 $$ [Hrun Hin] with ⟨Hrun, ⟨%ξb, %Tb, %a, Hpk, Hin, #HtopTb, #Ha⟩⟩
+  · iframe
+  imod ghost_var_update (⟨Tb, false, i0, none, a⟩ : SlotReg Id X) γ.slotd r0 $$ Hrd with Hrd
   icases ghostVar_halves γ.cnt (0 : Nat) $$ Hcnt with ⟨Hc, Hc0⟩
-  icases ghostVar_halves γ.slotd (⟨Tb, false, i0, none⟩ : SlotReg Id X) $$ Hrd with ⟨Hrd, Hrd0⟩
-  icases ghostVar_halves γ.slotp (⟨0, none⟩ : L2Reg Id) $$ Hrp with ⟨Hrp, Hrp0⟩
+  icases ghostVar_halves γ.slotd (⟨Tb, false, i0, none, a⟩ : SlotReg Id X) $$ Hrd with ⟨Hrd, Hrd0⟩
+  icases ghostVar_halves γ.slotp (L2Reg.init : L2Reg Id) $$ Hrp with ⟨Hrp, Hrp0⟩
   ihave Harm := boxArm_in_intro P γ Tb ξb (∅ : StampMap Id) 0
-    (⟨Tb, false, i0, none⟩ : SlotReg Id X) (⟨0, none⟩ : L2Reg Id) rfl rfl $$ Hin
-  imod inv_alloc N E (boxBody P γ) $$ [Hpk Hst Hc Hrd Hrp Harm] with #Hinv
+    (⟨Tb, false, i0, none, a⟩ : SlotReg Id X) (L2Reg.init : L2Reg Id) rfl rfl $$ Hin
+  imod inv_alloc N E (boxBody P γ) $$ [Hpk Hst Hstt Hc Hrd Hrp Harm] with #Hinv
   · inext
-    iapply boxBody_close P γ Tb ξb (∅ : StampMap Id) 0 (⟨Tb, false, i0, none⟩ : SlotReg Id X)
-      (⟨0, none⟩ : L2Reg Id) ?_
-    rotate_left
-    · unfold cntHalf slotdHalf slotpHalf
-      iframe
-    refine ⟨by rw [qsum_empty]; rfl, fun p hp => ?_, Or.inl (fun p hp => ?_), Or.inl (Nat.le_refl _)⟩
-    · rw [LawfulPartialMap.get?_empty] at hp; cases hp
-    · rw [LawfulPartialMap.get?_empty] at hp; cases hp
+    iapply boxBody_close P γ Tb ξb a (∅ : StampMap Id) (∅ : StampMap Id) 0
+      (⟨Tb, false, i0, none, a⟩ : SlotReg Id X) (L2Reg.init : L2Reg Id) (boxRows_boot Tb a i0 none)
+    unfold cntHalf slotdHalf slotpHalf
+    iframe
   imodintro
   iframe Hrun
-  iexists Tb
+  iexists Tb, a
   unfold isBox cntHalf slotdHalf slotpHalf
-  iframe Hrd0 Hc0 Hrp0
+  iframe Hrd0 Hc0 Hrp0 Ha
   isplit
   · iexact Hinv
   · iexact HtopTb
@@ -2088,42 +2944,62 @@ half ALREADY SPENT (at the bcache, on the buffer's sleeplock, sealed before
 the names record exists). -/
 theorem boxAllocAtHalves (P : BoxPay GF Id X) [BoxPayOk P] (N : Namespace)
     (γ : BoxNames) (cpu : CPU) (ξ : CtxId) (i0 : Id) (E : CoPset) :
-    stampsAuth γ (∅ : StampMap Id) ∗ (γ.cnt ↪VAR (0 : Nat)) ∗
-      (∃ r0 : SlotReg Id X, γ.slotd ↪VAR r0) ∗ slotpHalf γ (⟨0, none⟩ : L2Reg Id) ∗
+    stampsAuth γ (∅ : StampMap Id) ∗ stampsAuth γ.tk (∅ : StampMap Id) ∗ (γ.cnt ↪VAR (0 : Nat)) ∗
+      (∃ r0 : SlotReg Id X, γ.slotd ↪VAR r0) ∗ slotpHalf γ (L2Reg.init : L2Reg Id) ∗
       ownCtx cpu ξ ∗ inArm P i0 ξ ⊢
-      |={E}=> (ownCtx cpu ξ ∗ ∃ Tb : Nat, isBox P N γ ∗
-        slotdHalf γ (⟨Tb, false, i0, none⟩ : SlotReg Id X) ∗ topLb Tb ∗ cntHalf γ 0) := by
-  iintro ⟨Hst, Hcnt, Hrd, Hrp, Hrun, Hin⟩
+      |={E}=> (ownCtx cpu ξ ∗ ∃ (Tb : Nat) (a : ChainVG), isBox P N γ ∗
+        slotdHalf γ (⟨Tb, false, i0, none, a⟩ : SlotReg Id X) ∗ topLb Tb ∗ vgFloors ξ a ∗ cntHalf γ 0) := by
+  iintro ⟨Hst, Hstt, Hcnt, Hrd, Hrp, Hrun, Hin⟩
   icases Hrd with ⟨%r0, Hrd⟩
-  imod ownCtx_new cpu ξ $$ Hrun with ⟨Hrun, ⟨%ξb, Hξb⟩⟩
-  imod ctx_move (inArm P i0) cpu ξ ξb $$ [$Hrun $Hξb $Hin] with ⟨Hrun, Hξb, Hin⟩
-  imod ctx_stamp cpu ξb $$ Hξb with ⟨%Tb, Hpk, -⟩
-  ihave ⟨#HtopTb, Hpk⟩ := ctxStamped_topLb ξb Tb $$ Hpk
-  imod ghost_var_update (⟨Tb, false, i0, none⟩ : SlotReg Id X) γ.slotd r0 $$ Hrd with Hrd
+  imod box_born P cpu ξ i0 $$ [Hrun Hin] with ⟨Hrun, ⟨%ξb, %Tb, %a, Hpk, Hin, #HtopTb, #Ha⟩⟩
+  · iframe
+  imod ghost_var_update (⟨Tb, false, i0, none, a⟩ : SlotReg Id X) γ.slotd r0 $$ Hrd with Hrd
   icases ghostVar_halves γ.cnt (0 : Nat) $$ Hcnt with ⟨Hc, Hc0⟩
-  icases ghostVar_halves γ.slotd (⟨Tb, false, i0, none⟩ : SlotReg Id X) $$ Hrd with ⟨Hrd, Hrd0⟩
+  icases ghostVar_halves γ.slotd (⟨Tb, false, i0, none, a⟩ : SlotReg Id X) $$ Hrd with ⟨Hrd, Hrd0⟩
   ihave Harm := boxArm_in_intro P γ Tb ξb (∅ : StampMap Id) 0
-    (⟨Tb, false, i0, none⟩ : SlotReg Id X) (⟨0, none⟩ : L2Reg Id) rfl rfl $$ Hin
-  imod inv_alloc N E (boxBody P γ) $$ [Hpk Hst Hc Hrd Hrp Harm] with #Hinv
+    (⟨Tb, false, i0, none, a⟩ : SlotReg Id X) (L2Reg.init : L2Reg Id) rfl rfl $$ Hin
+  imod inv_alloc N E (boxBody P γ) $$ [Hpk Hst Hstt Hc Hrd Hrp Harm] with #Hinv
   · inext
-    iapply boxBody_close P γ Tb ξb (∅ : StampMap Id) 0 (⟨Tb, false, i0, none⟩ : SlotReg Id X)
-      (⟨0, none⟩ : L2Reg Id) ?_
-    rotate_left
-    · unfold cntHalf slotdHalf
-      iframe
-    refine ⟨by rw [qsum_empty]; rfl, fun p hp => ?_, Or.inl (fun p hp => ?_), Or.inl (Nat.le_refl _)⟩
-    · rw [LawfulPartialMap.get?_empty] at hp; cases hp
-    · rw [LawfulPartialMap.get?_empty] at hp; cases hp
+    iapply boxBody_close P γ Tb ξb a (∅ : StampMap Id) (∅ : StampMap Id) 0
+      (⟨Tb, false, i0, none, a⟩ : SlotReg Id X) (L2Reg.init : L2Reg Id) (boxRows_boot Tb a i0 none)
+    unfold cntHalf slotdHalf
+    iframe
   imodintro
   iframe Hrun
-  iexists Tb
+  iexists Tb, a
   unfold isBox cntHalf slotdHalf
-  iframe Hrd0 Hc0
+  iframe Hrd0 Hc0 Ha
   isplit
   · iexact Hinv
   · iexact HtopTb
 
 end inh
+
+/-! ## The ambient forms (clients state references at their running context) -/
+
+/-- A reference at the AMBIENT context. -/
+abbrev reference [CurCtx] (γ : BoxNames) (i : Id) (m : StampMap Id) : IProp GF :=
+  referenceAt γ i m curCtx
+
+/-- The L2 holder's handle at the AMBIENT context. -/
+abbrev l2Hold [CurCtx] (γ : BoxNames) (i : Id) (m : StampMap Id) : IProp GF :=
+  l2HoldAt γ i m curCtx
+
+theorem reference_llb [CurCtx] (γ : BoxNames) (i : Id) (m : StampMap Id) :
+    reference (GF := GF) γ i m ⊢ topLb (maxStamp m) :=
+  referenceAt_llb γ i m curCtx
+
+theorem reference_topLb [CurCtx] (γ : BoxNames) (i : Id) (m : StampMap Id) :
+    reference (GF := GF) γ i m ⊢ reference γ i m ∗ topLb (maxStamp m) :=
+  referenceAt_topLb γ i m curCtx
+
+theorem reference_split [CurCtx] (γ : BoxNames) (i : Id) (m : StampMap Id) (s s' : Qp) (hss : s + s' = 1) :
+    reference (GF := GF) γ i m ⊢ reference γ i (mscale s m) ∗ reference γ i (mscale s' m) :=
+  referenceAt_split γ i m curCtx s s' hss
+
+theorem reference_join [CurCtx] (γ : BoxNames) (i : Id) (m1 m2 : StampMap Id) :
+    reference (GF := GF) γ i m1 ∗ reference γ i m2 ⊢ reference γ i (m1 • m2) :=
+  referenceAt_join γ i m1 m2 curCtx
 
 end withX
 end box

@@ -278,11 +278,11 @@ an entry of a hart `h` under ξ's chain vector. -/
 def chainKey [MachFixedGS hlc GF] (E : EraGS) (ξ : CtxId) (t : Nat) : IProp GF := iprop%
   ⌜t = 0⌝ ∨ ∃ a : Agent, authoredByAt E t a ∗ (⌜NCPU ≤ a⌝ ∨ ∃ h : CPU, ⌜a = hartAgent h⌝ ∗ vecFloor ξ h t)
 
-/-- The justification of timestamp `t` at ξ: clean, or dirty with the
-machine's authorship receipt.  (W8 (f2-ctx) S2, `PROGRESS-W8f2.md`: the clean
-arm becomes `ctxFloor ξ t ∗ chainKey E ξ t`.) -/
+/-- The justification of timestamp `t` at ξ: clean -- under the bound (TSO
+visibility) AND chain-covered (W8 (f2-ctx)) --, or dirty with the machine's
+authorship receipt. -/
 def keyAt [MachFixedGS hlc GF] (E : EraGS) (ξ : CtxId) (t : Nat) : IProp GF := iprop%
-  ctxFloor ξ t ∨ ∃ h : CPU, dirtyIn ξ t h ∗ authoredByAt E t (hartAgent h)
+  (ctxFloor ξ t ∗ chainKey E ξ t) ∨ ∃ h : CPU, dirtyIn ξ t h ∗ authoredByAt E t (hartAgent h)
 
 /-- ξ's authorities at fraction `q`: bound `B`, dirty set `D`. -/
 def ctxAt (ξ : CtxId) (q : Qp) (B : Nat) (D : RegMapF CPU) : IProp GF := iprop%
@@ -322,7 +322,8 @@ instance (ξ : CtxId) (q : Qp) (B : Nat) (D : RegMapF CPU) : Timeless (PROP := I
   unfold ctxAt; infer_instance
 
 theorem keyAt_cases (E : EraGS) (ξ : CtxId) (t : Nat) :
-    keyAt E ξ t ⊢@{IProp GF} ctxFloor ξ t ∨ ∃ h : CPU, dirtyIn ξ t h ∗ authoredByAt E t (hartAgent h) := by
+    keyAt E ξ t ⊢@{IProp GF}
+      (ctxFloor ξ t ∗ chainKey E ξ t) ∨ ∃ h : CPU, dirtyIn ξ t h ∗ authoredByAt E t (hartAgent h) := by
   unfold keyAt; iintro H; iexact H
 
 theorem chainKey_0 (E : EraGS) (ξ : CtxId) : ⊢@{IProp GF} chainKey E ξ 0 := by
@@ -343,7 +344,9 @@ theorem keyAt_0 (E : EraGS) (ξ : CtxId) : ⊢@{IProp GF} keyAt E ξ 0 := by
   unfold keyAt
   iintro
   ileft
-  iapply ctxFloor_0
+  isplit
+  · iapply ctxFloor_0
+  · iapply chainKey_0
 
 theorem ctxFloor_le (ξ : CtxId) (t t' : Nat) (h : t' ≤ t) : ctxFloor ξ t ⊢@{IProp GF} ctxFloor ξ t' := by
   unfold ctxFloor
@@ -697,12 +700,12 @@ theorem vecCertsAt_own (E : EraGS) (V : CPU → Nat) (g : Nat) (cpu : CPU) (x : 
 `own_context` at the ambient hart): ξ's authorities; a view receipt of `cpu`
 dominating the bound; a watermark bounding the dirty keys (a legal position,
 so the token can be stamped); every dirty key under the bound or `cpu`'s own
-store; the membership facts.  (W8 (f2-ctx) S2, `PROGRESS-W8f2.md`: the token
-gains the chain half `chainTokAt E cpu ξ W D`.) -/
+store; the membership facts; and (W8 (f2-ctx)) the chain half
+(`chainTokAt`). -/
 def ownCtxAt (E : EraGS) (cpu : CPU) (ξ : CtxId) : IProp GF := iprop%
   ∃ (B K W : Nat) (D : RegMapF CPU),
     ctxAt ξ 1 B D ∗ viewLbAt E cpu K ∗ ⌜B ≤ K⌝ ∗
-    topLbAt E W ∗ ⌜dirtyOk cpu B W D⌝ ∗ dirtyElems E ξ D
+    topLbAt E W ∗ ⌜dirtyOk cpu B W D⌝ ∗ dirtyElems E ξ D ∗ chainTokAt E cpu ξ W D
 
 /-- The chain half survives a larger watermark and new OWN dirty keys. -/
 theorem chainTokAt_mono (E : EraGS) (cpu : CPU) (ξ : CtxId) (W W' : Nat) (D D' : RegMapF CPU)
@@ -809,13 +812,15 @@ theorem ownCtx_cases (cpu : CPU) (ξ : CtxId) :
       ∃ (B K W : Nat) (D : RegMapF CPU),
         ctxAt ξ 1 B D ∗ viewLbAt (MachGS.era (hlc := hlc) (GF := GF)) cpu K ∗ ⌜B ≤ K⌝ ∗
         topLbAt (MachGS.era (hlc := hlc) (GF := GF)) W ∗ ⌜dirtyOk cpu B W D⌝ ∗
-        dirtyElems (MachGS.era (hlc := hlc) (GF := GF)) ξ D := by
+        dirtyElems (MachGS.era (hlc := hlc) (GF := GF)) ξ D ∗
+        chainTokAt (MachGS.era (hlc := hlc) (GF := GF)) cpu ξ W D := by
   unfold ownCtx ownCtxAt; iintro H; iexact H
 
 theorem ownCtx_intro (cpu : CPU) (ξ : CtxId) (B K W : Nat) (D : RegMapF CPU) :
     ctxAt ξ 1 B D ∗ viewLbAt (MachGS.era (hlc := hlc) (GF := GF)) cpu K ∗ ⌜B ≤ K⌝ ∗
       topLbAt (MachGS.era (hlc := hlc) (GF := GF)) W ∗ ⌜dirtyOk cpu B W D⌝ ∗
-      dirtyElems (MachGS.era (hlc := hlc) (GF := GF)) ξ D ⊢@{IProp GF} ownCtx cpu ξ := by
+      dirtyElems (MachGS.era (hlc := hlc) (GF := GF)) ξ D ∗
+      chainTokAt (MachGS.era (hlc := hlc) (GF := GF)) cpu ξ W D ⊢@{IProp GF} ownCtx cpu ξ := by
   unfold ownCtx ownCtxAt
   iintro H
   iexists B, K, W, D

@@ -124,6 +124,16 @@ theorem lockWordAt_curVal_held {W : WordHist 4} {B : Nat} {i : CPU} {b : Bool}
     (h : lockWordAt (some (i, b)) B W) : curVal W 0 = lkOne :=
   wordPin_curVal h 0
 
+/-- A held lock's word history is headed by a 1 (W8 (f2-ctx): the entry the
+release store lands on). -/
+theorem lockWordAt_held_head {W : WordHist 4} {B : Nat} {i : CPU} {b : Bool}
+    (h : lockWordAt (some (i, b)) B W) : ∃ (e0 : WEnt 4) (W2 : WordHist 4), W = e0 :: W2 ∧ e0.v = lkOne := by
+  obtain ⟨W1, W2, hW, h1⟩ := (h : wordPin W B i)
+  subst hW
+  cases W1 with
+  | nil => exact ⟨_, W2, rfl, rfl⟩
+  | cons e W1 => exact ⟨e, W1 ++ ⟨B, hartAgent i, lkOne⟩ :: W2, rfl, h1 e List.mem_cons_self⟩
+
 /-- The state is free iff the word is 0. -/
 theorem lockWordAt_none_iff {W : WordHist 4} {B : Nat} {st : LockState} (h : lockWordAt st B W) :
     st = none ↔ curVal W 0 = 0 := by
@@ -525,27 +535,54 @@ instance lkCpuFrag_timeless (st : LockState) (s : String) : Timeless (lkCpuFrag 
 
 /-! ## The payload -/
 
-/-- The payload, parked in the lock's own stamped context. -/
-def lockPay (R : CtxId → IProp GF) : IProp GF := iprop%
-  ∃ (ξ : CtxId) (T : Nat), ctxStamped ξ T ∗ R ξ
+/-- **The release record** (W8 (f2-ctx) [OWN.38]): the head of the lock word's
+history `W` is the release `⟨r, A, 0⟩` of hart `A` over the AMO's nonzero
+entry, with `A`'s certificates before `r` for the payload's chain vector `V`
+-- what the next winning AMO, reading that release, converts into its own
+(`MachCSL.memModel_chainHop`) -- or no acquire yet (the BIRTH arm, X3: every
+entry a zero) and `V` under the handle's birth vector `Vb`, which every
+context holding the handle has passed, so the first acquirer's own
+certificates cover it. -/
+def lockRec (W : WordHist 4) (V Vb : CPU → Nat) : IProp GF := iprop%
+  (∃ (A : CPU) (r : Nat) (e0 : WEnt 4) (W2 : WordHist 4),
+      ⌜W = ⟨r, hartAgent A, 0#32⟩ :: e0 :: W2 ∧ e0.v = lkOne⌝ ∗
+      [∗list] p ∈ cpus.map (fun h => (h, V h)), chainLb p.1 p.2 A r) ∨
+  ⌜(∀ e ∈ W, e.v = 0#32) ∧ ∀ h, V h ≤ Vb h⌝
 
-/-- The payload as the winner takes it: with the winner's floor at the stamp. -/
-def lockPayWon [CurCtx] (R : CtxId → IProp GF) : IProp GF := iprop%
-  ∃ (ξ : CtxId) (T : Nat), ctxStamped ξ T ∗ ctxFloor curCtx T ∗ R ξ
+instance lockRec_persistent (W : WordHist 4) (V Vb : CPU → Nat) : Persistent (lockRec (GF := GF) W V Vb) := by
+  unfold lockRec; infer_instance
+
+instance lockRec_timeless (W : WordHist 4) (V Vb : CPU → Nat) : Timeless (lockRec (GF := GF) W V Vb) := by
+  unfold lockRec chainLb chainLbAt chainCertAt; infer_instance
+
+/-- The payload, parked in the lock's own stamped context, with its release
+record. -/
+def lockPay (R : CtxId → IProp GF) (W : WordHist 4) (Vb : CPU → Nat) : IProp GF := iprop%
+  ∃ (ξ : CtxId) (T : Nat) (V : CPU → Nat) (g : Nat), ctxStamped ξ T V g ∗ R ξ ∗ lockRec W V Vb
+
+/-- The payload as the winner on `cpu` takes it: the winner's floor at the
+stamp, and `cpu`'s certificates for the payload's vector. -/
+def lockPayWon [CurCtx] (R : CtxId → IProp GF) (cpu : CPU) : IProp GF := iprop%
+  ∃ (ξ : CtxId) (T : Nat) (V : CPU → Nat) (g : Nat), ctxStamped ξ T V g ∗ ctxFloor curCtx T ∗ R ξ ∗
+    vecCertsAt (MachGS.era (hlc := hlc) (GF := GF)) V g cpu
 
 /-- The lock's context, parked under the holder's. -/
 def lockCtxHeld [CurCtx] : IProp GF := iprop% ∃ ξL : CtxId, ctxParked ξL curCtx
 
 /-- The winner's move: cash the floor into the view receipt, resume the
-lock's context, move the payload to the winner, park the lock's context. -/
+lock's context (its certificates in hand), move the payload to the winner,
+park the lock's context. -/
 theorem lock_pay_take [CurCtx] (cpu : CPU) (R : CtxId → IProp GF) [CtxMorph R] :
-    ownCtx cpu curCtx ∗ lockPayWon R ⊢ |==> (ownCtx cpu curCtx ∗ R curCtx ∗ lockCtxHeld) := by
+    ownCtx cpu curCtx ∗ lockPayWon R cpu ⊢ |==> (ownCtx cpu curCtx ∗ R curCtx ∗ lockCtxHeld) := by
   unfold lockPayWon lockCtxHeld
-  iintro ⟨Hrun, ⟨%ξL, %T, Hst, #Hfl, HR⟩⟩
+  iintro ⟨Hrun, ⟨%ξL, %T, %V, %g, Hst, #Hfl, HR, #Hc⟩⟩
   icases ownCtx_floor_view cpu curCtx T $$ [Hrun Hfl] with ⟨Hrun, ⟨%K, #HK, %hTK⟩⟩
   · iframe Hrun; iexact Hfl
-  ihave HξL := ctx_unstamp cpu ξL T K hTK $$ [Hst HK]
-  · iframe Hst; iexact HK
+  ihave HξL := ctx_unstamp cpu ξL T K V g hTK $$ [Hst]
+  · iframe Hst
+    isplit
+    · iexact HK
+    · iexact Hc
   imod ctx_move R cpu ξL curCtx $$ [$HξL $Hrun $HR] with ⟨HξL, Hrun, HR⟩
   imod ctx_park cpu ξL curCtx $$ [$Hrun $HξL] with ⟨Hrun, Hpk⟩
   imodintro
@@ -553,19 +590,76 @@ theorem lock_pay_take [CurCtx] (cpu : CPU) (R : CtxId → IProp GF) [CtxMorph R]
   iexists ξL
   iexact Hpk
 
-/-- The releaser's move: resume the lock's context, move the payload into
-it, stamp it. -/
-theorem lock_pay_intro [CurCtx] (cpu : CPU) (R : CtxId → IProp GF) [CtxMorph R] :
-    ownCtx cpu curCtx ∗ lockCtxHeld ∗ R curCtx ⊢ |==> (ownCtx cpu curCtx ∗ lockPay R) := by
-  unfold lockCtxHeld lockPay
-  iintro ⟨Hrun, ⟨%ξL, Hpk⟩, HR⟩
-  imod ctx_resume cpu ξL curCtx $$ [$Hrun $Hpk] with ⟨Hrun, HξL⟩
-  imod ctx_move R cpu curCtx ξL $$ [$Hrun $HξL $HR] with ⟨Hrun, HξL, HR⟩
-  imod ctx_stamp cpu ξL $$ HξL with ⟨%T, Hst, _⟩
-  imodintro
+/-- **The winner's certificates** (W8 (f2-ctx)): from the release record
+converted by the winning AMO's hop (`hopOut`), or -- the birth arm -- from
+the winner's own certificates for the handle's birth vector. -/
+theorem lockRec_won_rel [CurCtx] (cpu : CPU) (V : CPU → Nat) (g τ : Nat) :
+    ([∗list] p ∈ cpus.map (fun h => (h, V h)), chainLb p.1 p.2 cpu τ) ∗ gatePassed cpu ⊢@{IProp GF}
+      vecCertsAt (MachGS.era (hlc := hlc) (GF := GF)) V g cpu := by
+  iintro ⟨Hl, #Hg⟩
+  iapply vecCertsAt_ofMap V g cpu τ
+  iframe Hl
+  iright; iexact Hg
+
+theorem lockRec_won_birth [CurCtx] (cpu : CPU) (V Vb : CPU → Nat) (g : Nat) (hV : ∀ h, V h ≤ Vb h) :
+    ownCtx cpu curCtx ∗ vecFloors curCtx Vb ∗ gatePassed cpu ⊢@{IProp GF}
+      ownCtx cpu curCtx ∗ vecCertsAt (MachGS.era (hlc := hlc) (GF := GF)) V g cpu := by
+  iintro ⟨Hrun, #Hf, #Hg⟩
+  icases ownCtx_vecCerts cpu curCtx Vb $$ [Hrun Hf] with ⟨Hrun, #Hc⟩
+  · iframe Hrun Hf
   iframe Hrun
-  iexists ξL, T
-  iframe Hst HR
+  iapply vecCertsAt_gate V g 0 cpu
+  isplit
+  · iapply vecCertsAt_le _ Vb V 0 0 cpu hV (Or.inl rfl) $$ Hc
+  · iexact Hg
+
+theorem lock_nthByte_zero : nthByte (n := 4) (0#32) 0 = 0#8 := by decide
+theorem lock_nthByte_one : nthByte (n := 4) lkOne 0 ≠ 0#8 := by decide
+
+/-- **The winning AMO's hop request** (W8 (f2-ctx)), from the release record:
+the RELEASE arm lends the leaf the record's certificates (the history of the
+lock byte is headed by the release over the AMO's nonzero entry) and gets
+them back converted for the winner (`hopOut`); the BIRTH arm requests no
+hop, and the winner's own certificates for the handle's birth vector cover
+the payload's.  The registration (`reg`) and the winner's gate are lent. -/
+theorem lockRec_hopReq [CurCtx] (cpu : CPU) (lk : BitVec 64) (W : WordHist 4) (Hold : Nat → Hist)
+    (V Vb : CPU → Nat) (g : Nat) (reg : Option ((Nat → DFrac) × (Nat → Hist))) :
+    lockRec W V Vb ∗ hopRegAt lk reg ∗ gatePassed cpu ⊢@{IProp GF}
+      ∃ o : Option HopData, hopIn cpu lk 4 (W.hist Hold) lkOne o ∗
+        (∀ t : Nat, hopOut cpu lk t o -∗ ownCtx cpu curCtx -∗ vecFloors curCtx Vb -∗
+           hopRegAt lk reg ∗ ownCtx cpu curCtx ∗ vecCertsAt (MachGS.era (hlc := hlc) (GF := GF)) V g cpu) := by
+  unfold lockRec
+  iintro ⟨#Hrec, Hreg, #Hg⟩
+  icases Hrec with (⟨%A, %r, %e0, %W2, %⟨hW, he0⟩, #Hl⟩ | %⟨hz, hVb⟩)
+  · iexists (some (A, r, cpus.map (fun h => (h, V h)), reg))
+    simp only [hopIn, hopOut]
+    isplitl [Hreg]
+    · iframe Hreg Hg Hl
+      ipureintro
+      refine ⟨⟨e0.proj 0, (W2.map (WEnt.proj 0)) ++ Hold 0, ?_, ?_, fun i _ => ⟨?_, ?_⟩⟩,
+        lock_nthByte_one, by omega, by omega⟩
+      · subst hW
+        simp only [WordHist.hist, List.map_cons, List.cons_append, WEnt.proj]
+        rw [lock_nthByte_zero]
+        rfl
+      · show nthByte e0.v 0 ≠ 0#8
+        rw [he0]; exact lock_nthByte_one
+      · subst hW
+        exact ⟨WEnt.proj i (⟨r, hartAgent A, 0#32⟩ : WEnt 4), by simp [WordHist.hist], rfl, rfl⟩
+      · subst hW
+        exact ⟨WEnt.proj i e0, by simp [WordHist.hist], rfl, rfl⟩
+    · iintro %t ⟨Hreg, Hl'⟩ Hrun _
+      iframe Hreg Hrun
+      iapply lockRec_won_rel cpu V g (t + 1)
+      iframe Hl' Hg
+  · iexists none
+    simp only [hopIn, hopOut]
+    isplitr
+    · iempintro
+    · iintro %t _ Hrun #Hvf
+      iframe Hreg
+      iapply lockRec_won_birth cpu V Vb g hVb
+      iframe Hrun Hvf Hg
 
 /-! ## The release hook
 
@@ -578,15 +672,17 @@ hook exists at all -- a payload row `ctxFloor ξ tl` ABOVE the releaser's own
 view can be minted only on a hartless record, so the one moment it can be
 minted is here, between the stamp and the store.  The next winner cashes the
 row against its own running token, after `MachCSL.lock_pay_take` has moved
-the payload to it. -/
+the payload to it.  (W8 (f2-ctx): the hook keeps the record's chain vector
+and gate -- the releaser's certificates for it go out with the release.) -/
 def lockCtxHook (R Rin : CtxId → IProp GF) : IProp GF := iprop%
-  ∀ (ξ : CtxId) (T : Nat), ctxStamped ξ T -∗ Rin ξ ==∗ (∃ T' : Nat, ctxStamped ξ T' ∗ R ξ)
+  ∀ (ξ : CtxId) (T : Nat) (V : CPU → Nat) (g : Nat),
+    ctxStamped ξ T V g -∗ Rin ξ ==∗ (∃ T' : Nat, ctxStamped ξ T' V g ∗ R ξ)
 
 /-- The identity hook: the ordinary release. -/
 theorem lockHook_id (R : CtxId → IProp GF) : ⊢ lockCtxHook (GF := GF) R R := by
   unfold lockCtxHook
   iintro
-  iintro %ξ %T Hs HR
+  iintro %ξ %T %V %g Hs HR
   imodintro
   iexists T
   iframe Hs HR
@@ -598,8 +694,8 @@ theorem lockHook_llb (Rin R : CtxId → IProp GF) (tl : Nat)
     (hfold : ∀ ξ : CtxId, Rin ξ ∗ ctxFloor ξ tl ⊢ R ξ) :
     topLb (GF := GF) tl ⊢ lockCtxHook R Rin := by
   unfold lockCtxHook
-  iintro #Htl %ξ %T Hs HR
-  imod ctxStamped_raise ξ T tl $$ [$Htl $Hs] with ⟨Hs, #Hfl⟩
+  iintro #Htl %ξ %T %V %g Hs HR
+  imod ctxStamped_raise ξ T tl V g $$ [$Htl $Hs] with ⟨Hs, #Hfl⟩
   imodintro
   iexists (max T tl)
   iframe Hs
@@ -607,23 +703,52 @@ theorem lockHook_llb (Rin R : CtxId → IProp GF) (tl : Nat)
   iframe HR
   iexact Hfl
 
-/-- The releaser's move, HOOKED: resume the lock's context, move `Rin` into
-it, stamp it, and run the hook there.  `MachCSL.lock_pay_intro` is the
-identity instance. -/
-theorem lock_pay_intro_hook [CurCtx] (cpu : CPU) (R Rin : CtxId → IProp GF) [CtxMorph Rin] :
+/-- **The releaser's move, before its store**, HOOKED: resume the lock's
+context, move `Rin` into it, stamp it, and run the hook there; out come the
+stamped payload and the releaser's certificates for its vector, which the
+release store records (`MachCSL.rtIn`, `MachCSL.lockPay_release`). -/
+theorem lock_pay_stamp [CurCtx] (cpu : CPU) (R Rin : CtxId → IProp GF) [CtxMorph Rin] :
     ownCtx cpu curCtx ∗ lockCtxHeld ∗ Rin curCtx ∗ lockCtxHook R Rin ⊢
-      |==> (ownCtx cpu curCtx ∗ lockPay R) := by
-  unfold lockCtxHeld lockPay lockCtxHook
+      |==> (ownCtx cpu curCtx ∗ ∃ (ξ : CtxId) (T : Nat) (V : CPU → Nat) (g : Nat),
+        ctxStamped ξ T V g ∗ R ξ ∗ vecCertsAt (MachGS.era (hlc := hlc) (GF := GF)) V g cpu) := by
+  unfold lockCtxHeld lockCtxHook
   iintro ⟨Hrun, ⟨%ξL, Hpk⟩, HR, Hhook⟩
   imod ctx_resume cpu ξL curCtx $$ [$Hrun $Hpk] with ⟨Hrun, HξL⟩
   imod ctx_move Rin cpu curCtx ξL $$ [$Hrun $HξL $HR] with ⟨Hrun, HξL, HR⟩
-  imod ctx_stamp cpu ξL $$ HξL with ⟨%T, Hst, _⟩
-  ihave Hres := Hhook $$ %ξL %T Hst HR
+  imod ctx_stamp cpu ξL $$ HξL with ⟨%T, %V, %g, Hst, _, #Hc⟩
+  ihave Hres := Hhook $$ %ξL %T %V %g Hst HR
   imod Hres with ⟨%T', Hst, HR⟩
   imodintro
   iframe Hrun
-  iexists ξL, T'
+  iexists ξL, T', V, g
+  iframe Hst HR Hc
+
+/-- The releaser's move before its store, unhooked. -/
+theorem lock_pay_stamp0 [CurCtx] (cpu : CPU) (R : CtxId → IProp GF) [CtxMorph R] :
+    ownCtx cpu curCtx ∗ lockCtxHeld ∗ R curCtx ⊢
+      |==> (ownCtx cpu curCtx ∗ ∃ (ξ : CtxId) (T : Nat) (V : CPU → Nat) (g : Nat),
+        ctxStamped ξ T V g ∗ R ξ ∗ vecCertsAt (MachGS.era (hlc := hlc) (GF := GF)) V g cpu) := by
+  iintro ⟨Hrun, Hh, HR⟩
+  iapply lock_pay_stamp cpu R R
+  iframe Hrun Hh HR
+  iapply lockHook_id
+
+/-- **The release record**, from the release store's retimed certificates:
+the store's zero lands over the holder's nonzero head. -/
+theorem lockPay_release (R : CtxId → IProp GF) (W : WordHist 4) (Vb : CPU → Nat) (ξ : CtxId) (T : Nat)
+    (V : CPU → Nat) (g : Nat) (A : CPU) (r : Nat) (e0 : WEnt 4) (W2 : WordHist 4) (hW : W = e0 :: W2)
+    (he0 : e0.v = lkOne) :
+    ctxStamped ξ T V g ∗ R ξ ∗ ([∗list] p ∈ cpus.map (fun h => (h, V h)), chainLb p.1 p.2 A r) ⊢@{IProp GF}
+      lockPay R (⟨r, hartAgent A, 0#32⟩ :: W) Vb := by
+  unfold lockPay lockRec
+  iintro ⟨Hst, HR, Hl⟩
+  iexists ξ, T, V, g
   iframe Hst HR
+  ileft
+  iexists A, r, e0, W2
+  iframe Hl
+  ipureintro
+  exact ⟨by rw [hW], he0⟩
 
 theorem viewLbAt_lb (E : EraGS) (cpu : CPU) (K : Nat) :
     viewLbAt E cpu K ⊢@{IProp GF} MonoNat.lb_own (E.viewName cpu) (.ofNat K) := by
@@ -635,14 +760,14 @@ theorem viewLbAt_lb (E : EraGS) (cpu : CPU) (K : Nat) :
 theorem ownCtx_new (cpu : CPU) (ξ : CtxId) :
     ownCtx (GF := GF) cpu ξ ⊢ |==> (ownCtx cpu ξ ∗ ∃ ξ' : CtxId, ownCtx cpu ξ') := by
   iintro Hξ
-  icases ownCtx_cases cpu ξ $$ Hξ with ⟨%B, %K, %W, %D, Hat, #HK, %hBK, #HW, %hok, #Hels⟩
+  icases ownCtx_cases cpu ξ $$ Hξ with ⟨%B, %K, %W, %D, Hat, #HK, %hBK, #HW, %hok, #Hels, Hch⟩
   ihave #H0 := viewLbAt_le (MachGS.era (hlc := hlc) (GF := GF)) cpu K 0 (Nat.zero_le _) $$ HK
   ihave #Hlb := viewLbAt_lb (MachGS.era (hlc := hlc) (GF := GF)) cpu 0 $$ H0
   imod ownCtx_boot (MachGS.era (hlc := hlc) (GF := GF)) cpu $$ Hlb with ⟨%ξ', Hξ'⟩
   imodintro
-  isplitl [Hat]
+  isplitl [Hat Hch]
   · iapply ownCtx_intro cpu ξ B K W D
-    iframe Hat
+    iframe Hat Hch
     isplit
     · iexact HK
     isplit
@@ -655,38 +780,66 @@ theorem ownCtx_new (cpu : CPU) (ξ : CtxId) :
   · iexists ξ'
     iexact Hξ'
 
-/-- The creator's mint: the payload moves to a fresh twin context, which is
-stamped. -/
-theorem lock_pay_born [CurCtx] (cpu : CPU) (R : CtxId → IProp GF) [CtxMorph R] :
-    ownCtx cpu curCtx ∗ R curCtx ⊢ |==> (ownCtx cpu curCtx ∗ lockPay R) := by
-  unfold lockPay
+/-- **The creator's mint**: the payload moves to a fresh twin context, which
+is stamped; the record is the BIRTH arm (X3) at the stamped vector, which
+the creator's own context absorbs (its hart holds the certificates) -- the
+handle's birth vector. -/
+theorem lock_pay_born [CurCtx] (cpu : CPU) (R : CtxId → IProp GF) [CtxMorph R] (W : WordHist 4)
+    (hW : ∀ e ∈ W, e.v = 0#32) :
+    ownCtx cpu curCtx ∗ R curCtx ⊢ |==> (ownCtx cpu curCtx ∗ ∃ Vb : CPU → Nat, lockPay R W Vb ∗ vecFloors curCtx Vb) := by
   iintro ⟨Hrun, HR⟩
   imod ownCtx_new cpu curCtx $$ Hrun with ⟨Hrun, ⟨%ξL, HξL⟩⟩
   imod ctx_move R cpu curCtx ξL $$ [$Hrun $HξL $HR] with ⟨Hrun, HξL, HR⟩
-  imod ctx_stamp cpu ξL $$ HξL with ⟨%T, Hst, _⟩
+  imod ctx_stamp cpu ξL $$ HξL with ⟨%T, %V, %g, Hst, _, #Hc⟩
+  icases ctxStamped_cases ξL T V g $$ Hst with ⟨%D, Hat, #HT, %hD, #Hels, Hv, %⟨hDV, hVT⟩⟩
+  imod ctx_vecAbsorb cpu curCtx V g T hVT $$ [Hrun] with ⟨Hrun, #Hvf, _⟩
+  · iframe Hrun
+    isplit
+    · iexact Hc
+    · iexact HT
   imodintro
   iframe Hrun
-  iexists ξL, T
-  iframe Hst HR
+  iexists V
+  iframe Hvf
+  unfold lockPay lockRec
+  iexists ξL, T, V, g
+  iframe HR
+  isplitl [Hat Hv]
+  · iapply ctxStamped_intro ξL T V g D
+    iframe Hat Hv
+    isplit
+    · iexact HT
+    isplit
+    · ipureintro; exact hD
+    isplit
+    · iexact Hels
+    · ipureintro; exact ⟨hDV, hVT⟩
+  · iright
+    ipureintro
+    exact ⟨hW, fun _ => Nat.le_refl _⟩
 
 /-- A floor row transports between contexts. -/
 instance instCtxMorphFloor (lo : Nat) : CtxMorph (GF := GF) (fun ξ => ctxFloor ξ lo) where
   morph ξ ξ' := by
     iintro ⟨Hd, #Hfl⟩
-    icases ctxDomAt_cases ξ ξ' _ $$ Hd with ⟨%B, %D, Hat, #Hfl', #Hels, #Hkeys⟩
+    icases ctxDomAt_cases ξ ξ' _ $$ Hd with ⟨%B, %D, Hat, #Hfl', #Hels, #Hkeys, %V, %g, Hv, #Hvf, #Hg⟩
     ihave %hle : ⌜lo ≤ B⌝ $$ [Hat Hfl]
     · iapply ctxAt_floor ξ _ B D lo $$ [Hat Hfl]
       iframe Hat
       iexact Hfl
     imodintro
-    isplitl [Hat]
-    · iapply ctxDomAt_intro ξ ξ' _ B D
-      iframe Hat
+    isplitl [Hat Hv]
+    · iapply ctxDomAt_intro ξ ξ' _ B D V g
+      iframe Hat Hv
       isplit
       · iexact Hfl'
       isplit
       · iexact Hels
+      isplit
       · iexact Hkeys
+      isplit
+      · iexact Hvf
+      · iexact Hg
     · iapply ctxFloor_le ξ' B lo hle
       iexact Hfl'
 
@@ -727,6 +880,77 @@ instance instCtxMorphLkFloor (t : Nat) : CtxMorph (GF := GF) (fun ξ => lkFloor 
     imodintro
     iframe
 
+/-- **A VISIBILITY floor** (W8 (f2-ctx)): a lock floor without its chain half
+-- a floor proper, or one of the context's own buffered stores.  What a
+racy load's LICENCE needs (the hart's view reaches the position, or the
+store is its own): visibility, not synchronisation. -/
+def visFloor (ξ : CtxId) (t : Nat) : IProp GF :=
+  iprop(ctxFloor ξ t ∨ ∃ h : CPU, dirtyIn ξ t h ∗ authoredByAt (MachGS.era (hlc := hlc) (GF := GF)) t (hartAgent h))
+
+instance visFloor_persistent (ξ : CtxId) (t : Nat) : Persistent (visFloor (GF := GF) ξ t) := by
+  unfold visFloor; infer_instance
+instance visFloor_timeless (ξ : CtxId) (t : Nat) : Timeless (visFloor (GF := GF) ξ t) := by
+  unfold visFloor; infer_instance
+
+theorem visFloor_of_floor (ξ : CtxId) (t : Nat) : ctxFloor (GF := GF) ξ t ⊢ visFloor ξ t := by
+  unfold visFloor; iintro H; ileft; iexact H
+
+theorem visFloor_of_lk (ξ : CtxId) (t : Nat) : lkFloor (GF := GF) ξ t ⊢ visFloor ξ t := by
+  unfold lkFloor visFloor
+  iintro #H
+  icases keyAt_cases _ ξ t $$ H with ⟨⟨#Hfl, _⟩ | ⟨%h, #Hd, #Hau⟩⟩
+  · ileft; iexact Hfl
+  · iright; iexists h; iframe Hd Hau
+
+theorem visFloor_le (ξ : CtxId) (t t' : Nat) (h : t' ≤ t) : ctxFloor (GF := GF) ξ t ⊢ visFloor ξ t' := by
+  iintro H
+  iapply visFloor_of_floor
+  iapply ctxFloor_le ξ t t' h $$ H
+
+/-- A visibility floor of the running context, cashed (`ownCtx_lkFloor_vis`'s
+form). -/
+theorem ownCtx_visFloor_vis [CurCtx] (cpu : CPU) (f : Nat) :
+    ownCtx (GF := GF) cpu curCtx ∗ visFloor curCtx f ⊢
+      ownCtx cpu curCtx ∗ ∃ (K : Nat) (ts : List (Nat × Agent)),
+        viewLb cpu K ∗ ([∗list] p ∈ ts, authoredBy p.1 p.2) ∗
+        ⌜f ≤ K ∨ (f, hartAgent cpu) ∈ ts⌝ := by
+  iintro ⟨Hctx, #Hk⟩
+  unfold visFloor
+  icases Hk with ⟨#Hfl | ⟨%h, #Hd, #Hau⟩⟩
+  · icases ownCtx_floor_view cpu curCtx f $$ [Hctx Hfl] with ⟨Hctx, ⟨%K, #HK, %hle⟩⟩
+    · iframe Hctx; iexact Hfl
+    iframe Hctx
+    iexists K, []
+    iframe HK
+    isplit
+    · iapply BigSepL.bigSepL_nil.2; itrivial
+    · ipureintro; exact Or.inl hle
+  · ihave #Hkey : keyAt (MachGS.era (hlc := hlc) (GF := GF)) curCtx f $$ []
+    · unfold keyAt; iright; iexists h; iframe Hd Hau
+    iapply ownCtx_key_vis cpu curCtx f
+    iframe Hctx Hkey
+
+/-- A visibility floor transports between contexts. -/
+instance instCtxMorphVisFloor (t : Nat) : CtxMorph (GF := GF) (fun ξ => visFloor ξ t) where
+  morph ξ ξ' := by
+    iintro ⟨Hdom, #Hk⟩
+    unfold visFloor
+    icases Hk with ⟨#Hfl | ⟨%h, #Hd, #Hau⟩⟩
+    · imod (instCtxMorphFloor (GF := GF) t).morph ξ ξ' $$ [Hdom Hfl] with ⟨Hdom, #Hfl'⟩
+      · iframe Hdom Hfl
+      imodintro
+      iframe Hdom
+      ileft; iexact Hfl'
+    · ihave Hkey : keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ t $$ []
+      · unfold keyAt; iright; iexists h; iframe Hd Hau
+      icases ctx_dom_key ξ ξ' _ t $$ [Hdom Hkey] with ⟨Hdom, #Hkey'⟩
+      · iframe
+      imodintro
+      iframe Hdom
+      icases keyAt_cases _ ξ' t $$ Hkey' with ⟨⟨#Hfl', _⟩ | ⟨%h', #Hd', #Hau'⟩⟩
+      · ileft; iexact Hfl'
+      · iright; iexists h'; iframe Hd' Hau'
+
 /-! ## The holder tokens -/
 
 /-- The holder token's core: the state half at the acquire position, and
@@ -756,15 +980,29 @@ theorem locked_intro [CurCtx] (γ : GName) (i : CPU) :
 section geom
 variable [KernelGeom]
 
+/-- A DYNAMIC lock's NAME word (W8 (f2-ctx) [R35.1]): the histories of
+`lk->name`, headed by a registered name of the ambient record -- what makes
+the lock byte a hop while the lock lives (`MachCSL.nameLockAt`, through the
+winning AMO's hop request, `MachCSL.hopRegAt`). -/
+def lkName (lk : BitVec 64) : IProp GF := iprop%
+  ∃ Hn : Nat → Hist, histBytes (lk + 8#64) 8 (fun _ => DFrac.own (1 : Qp).half) Hn ∗
+    ⌜∃ nm ∈ rsvNameList (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)), headsAre Hn 8 nm⌝
+
+instance lkName_timeless (lk : BitVec 64) : Timeless (lkName (GF := GF) lk) := by
+  unfold lkName histBytes; infer_instance
+
+
+
 /-- The body of the lock invariant: the lock word at floor `lo`, the owner
 word at floor `lc` (a lock made from words the creator stored has two
-positions, one per store). -/
-def lockBody (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF) (lo lc : Nat) :
-    IProp GF := iprop%
+positions, one per store), the name word (W8 (f2-ctx)), and the payload
+with its release record against the handle's birth vector `Vb`. -/
+def lockBody (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF) (lo lc : Nat)
+    (Vb : CPU → Nat) : IProp GF := iprop%
   ∃ (W : WordHist 4) (W' : WordHist 8) (st : LockState) (B : Nat),
     wordCell lk 4 lo 0 W ∗ wordCell (lk + 16#64) 8 lc 0 W' ∗
-    ⌜lockWordAt st B W ∧ lkCpuAt st W'⌝ ∗ lockHalf γ st B ∗ lkCpuFrag st s ∗
-    ((⌜st = none⌝ ∗ lockHalf γ none B ∗ lockPay R) ∨ ⌜st ≠ none⌝)
+    ⌜lockWordAt st B W ∧ lkCpuAt st W'⌝ ∗ lockHalf γ st B ∗ lkCpuFrag st s ∗ lkName lk ∗
+    ((⌜st = none⌝ ∗ lockHalf γ none B ∗ lockPay R W Vb) ∨ ⌜st ≠ none⌝)
 
 /-- The lock's two fields are aligned RAM words. -/
 def lockAddrOk (lk : BitVec 64) : Prop :=
@@ -781,6 +1019,17 @@ of the address (`lockBodyM`). -/
 /-- The lock's words are a static reserved region of the ambient record. -/
 def lkRsvIn (lk : BitVec 64) : Prop :=
   (⟨lk, .lock KernelGeom.cpusBase⟩ : RsvRegion) ∈ MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)
+
+/-- What a lock's birth needs of its name word (W8 (f2-ctx)): nothing at a
+RESERVED lock (its byte is a static hop byte); a DYNAMIC lock's name word,
+headed by a registered name, goes into its invariant. -/
+def lkNameFor (lk : BitVec 64) : IProp GF := iprop(⌜lkRsvIn (hlc := hlc) (GF := GF) lk⌝ ∨ lkName lk)
+
+instance lkNameFor_timeless (lk : BitVec 64) : Timeless (lkNameFor (GF := GF) lk) := by
+  unfold lkNameFor; infer_instance
+
+theorem lkNameFor_rsv (lk : BitVec 64) (hm : lkRsvIn (hlc := hlc) (GF := GF) lk) : ⊢@{IProp GF} lkNameFor lk := by
+  unfold lkNameFor; iintro; ileft; ipureintro; exact hm
 
 instance (lk : BitVec 64) : Decidable (lkRsvIn (hlc := hlc) (GF := GF) lk) := by
   unfold lkRsvIn; infer_instance
@@ -812,24 +1061,27 @@ theorem wordCellH_push (pa : PAddr) (n : Nat) (W : WordHist n) (Hold : Nat → H
 
 /-- **The body of a RESERVED lock's invariant**: `lockBody`'s shape, at half
 cells over the image tails, with the reserved discipline's facts. -/
-def lockBodyR (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF) : IProp GF := iprop%
+def lockBodyR (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF) (Vb : CPU → Nat) :
+    IProp GF := iprop%
   ∃ (W : WordHist 4) (W' : WordHist 8) (st : LockState) (B : Nat),
     wordCellH lk 4 W ∗ wordCellH (lk + 16#64) 8 W' ∗
     ⌜lockWordAt st B W ∧ lkCpuAt st W'⌝ ∗ ⌜lkRsvIn (hlc := hlc) (GF := GF) lk ∧ lockRsvW st W W'⌝ ∗
     lockHalf γ st B ∗ lkCpuFrag st s ∗
-    ((⌜st = none⌝ ∗ lockHalf γ none B ∗ lockPay R) ∨ ⌜st ≠ none⌝)
+    ((⌜st = none⌝ ∗ lockHalf γ none B ∗ lockPay R W Vb) ∨ ⌜st ≠ none⌝)
 
 /-- **The lock's invariant body**: reserved or not, by the address. -/
-def lockBodyM (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF) (lo lc : Nat) :
-    IProp GF :=
-  if lkRsvIn (hlc := hlc) (GF := GF) lk then lockBodyR γ lk s R else lockBody γ lk s R lo lc
+def lockBodyM (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF) (lo lc : Nat)
+    (Vb : CPU → Nat) : IProp GF :=
+  if lkRsvIn (hlc := hlc) (GF := GF) lk then lockBodyR γ lk s R Vb else lockBody γ lk s R lo lc Vb
 
 theorem lockBodyM_dyn {γ : GName} {lk : BitVec 64} {s : String} {R : CtxId → IProp GF} {lo lc : Nat}
-    (hm : ¬ lkRsvIn (hlc := hlc) (GF := GF) lk) : lockBodyM γ lk s R lo lc = lockBody γ lk s R lo lc := by
+    {Vb : CPU → Nat} (hm : ¬ lkRsvIn (hlc := hlc) (GF := GF) lk) :
+    lockBodyM γ lk s R lo lc Vb = lockBody γ lk s R lo lc Vb := by
   unfold lockBodyM; rw [if_neg hm]
 
 theorem lockBodyM_rsv {γ : GName} {lk : BitVec 64} {s : String} {R : CtxId → IProp GF} {lo lc : Nat}
-    (hm : lkRsvIn (hlc := hlc) (GF := GF) lk) : lockBodyM γ lk s R lo lc = lockBodyR γ lk s R := by
+    {Vb : CPU → Nat} (hm : lkRsvIn (hlc := hlc) (GF := GF) lk) :
+    lockBodyM γ lk s R lo lc Vb = lockBodyR γ lk s R Vb := by
   unfold lockBodyM; rw [if_pos hm]
 
 /-- A reserved lock-word store's obligation (`MachCSL.rsvStoreOk`), from the
@@ -856,14 +1108,20 @@ theorem lkRsv_storeOkC {lk : BitVec 64} (hm : lkRsvIn (hlc := hlc) (GF := GF) lk
     lockRegion_storeC (hartAgent cpu) w W W' Hold Hold' htail htail' hnew m t ht h1 (h2 _ List.mem_cons_self)⟩
 
 /-- The lock predicate (persistent): the two words are identity-mapped
-kernel RAM (the claims the loads and stores translate through), and the invariant at some floor the
-ambient context has passed. -/
+kernel RAM (the claims the loads and stores translate through), and the
+invariant at some floor the ambient context has passed; (W8 (f2-ctx)) the
+ambient context has passed the lock's birth vector `Vb` (X3), and its boot
+gate is set (every acquire is a hop conversion, which needs the acquirer's
+gate, `MachCSL.memModel_chainHop`; a handle carries the gate from its
+creator through every transport). -/
 def isLock [CurCtx] (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF) : IProp GF := iprop%
   ⌜lockAddrOk lk⌝ ∗ kmapId lk ∗ kmapId (lk + 16#64) ∗
-  ∃ lo lc : Nat, inv lockN (lockBodyM γ lk s R lo lc) ∗ lkFloor curCtx lo ∗ lkFloor curCtx lc
+  ∃ (lo lc : Nat) (Vb : CPU → Nat), inv lockN (lockBodyM γ lk s R lo lc Vb) ∗ lkFloor curCtx lo ∗
+    lkFloor curCtx lc ∗ vecFloors curCtx Vb ∗ gateFloor curCtx
 
 /-- A lock HANDLE transports: it is persistent, and its only context
-dependence is the pair of floors its creator certified (`lkFloor`). -/
+dependence is the pair of floors its creator certified (`lkFloor`), the
+birth vector and the gate. -/
 instance instCtxMorphIsLock (tier : KTier) (γ : GName) (lk : BitVec 64) (s : String)
     (R : CtxId → IProp GF) :
     CtxMorph (GF := GF) (fun ξ => @isLock hlc GF _ _ ⟨ξ, tier⟩ γ lk s R) :=
@@ -871,11 +1129,14 @@ instance instCtxMorphIsLock (tier : KTier) (γ : GName) (lk : BitVec 64) (s : St
     (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
       (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
         (@instCtxMorphExists hlc GF _ _
-          (fun (lo : Nat) ξ => iprop(∃ lc : Nat, inv lockN (lockBodyM γ lk s R lo lc) ∗
-            lkFloor ξ lo ∗ lkFloor ξ lc))
+          (fun (lo : Nat) ξ => iprop(∃ (lc : Nat) (Vb : CPU → Nat), inv lockN (lockBodyM γ lk s R lo lc Vb) ∗
+            lkFloor ξ lo ∗ lkFloor ξ lc ∗ vecFloors ξ Vb ∗ gateFloor ξ))
           (fun _ => @instCtxMorphExists hlc GF _ _ _ (fun _ =>
-            @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-              (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphLkFloor _) (instCtxMorphLkFloor _)))))))
+            @instCtxMorphExists hlc GF _ _ _ (fun _ =>
+              @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
+                (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphLkFloor _)
+                  (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphLkFloor _)
+                    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphVecFloors _) instCtxMorphGate)))))))))
 
 instance isLock_persistent [CurCtx] (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF) :
     Persistent (isLock (GF := GF) γ lk s R) := by
@@ -885,7 +1146,8 @@ instance isLock_persistent [CurCtx] (γ : GName) (lk : BitVec 64) (s : String) (
 theorem isLock_cases [CurCtx] (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF) :
     isLock (GF := GF) γ lk s R ⊢
       ⌜lockAddrOk lk⌝ ∗ kmapId lk ∗ kmapId (lk + 16#64) ∗
-      ∃ lo lc : Nat, inv lockN (lockBodyM γ lk s R lo lc) ∗ lkFloor curCtx lo ∗ lkFloor curCtx lc := by
+      ∃ (lo lc : Nat) (Vb : CPU → Nat), inv lockN (lockBodyM γ lk s R lo lc Vb) ∗ lkFloor curCtx lo ∗
+        lkFloor curCtx lc ∗ vecFloors curCtx Vb ∗ gateFloor curCtx := by
   unfold isLock; iintro H; iexact H
 
 /-- `isLock_cases` at a lock that is not reserved. -/
@@ -893,7 +1155,8 @@ theorem isLock_cases_dyn [CurCtx] (γ : GName) (lk : BitVec 64) (s : String) (R 
     (hm : ¬ lkRsvIn (hlc := hlc) (GF := GF) lk) :
     isLock (GF := GF) γ lk s R ⊢
       ⌜lockAddrOk lk⌝ ∗ kmapId lk ∗ kmapId (lk + 16#64) ∗
-      ∃ lo lc : Nat, inv lockN (lockBody γ lk s R lo lc) ∗ lkFloor curCtx lo ∗ lkFloor curCtx lc := by
+      ∃ (lo lc : Nat) (Vb : CPU → Nat), inv lockN (lockBody γ lk s R lo lc Vb) ∗ lkFloor curCtx lo ∗
+        lkFloor curCtx lc ∗ vecFloors curCtx Vb ∗ gateFloor curCtx := by
   unfold isLock
   simp only [lockBodyM_dyn hm]
   iintro H; iexact H
@@ -903,10 +1166,19 @@ theorem isLock_cases_rsv [CurCtx] (γ : GName) (lk : BitVec 64) (s : String) (R 
     (hm : lkRsvIn (hlc := hlc) (GF := GF) lk) :
     isLock (GF := GF) γ lk s R ⊢
       ⌜lockAddrOk lk⌝ ∗ kmapId lk ∗ kmapId (lk + 16#64) ∗
-      ∃ lo lc : Nat, inv lockN (lockBodyR γ lk s R) ∗ lkFloor curCtx lo ∗ lkFloor curCtx lc := by
+      ∃ (lo lc : Nat) (Vb : CPU → Nat), inv lockN (lockBodyR γ lk s R Vb) ∗ lkFloor curCtx lo ∗
+        lkFloor curCtx lc ∗ vecFloors curCtx Vb ∗ gateFloor curCtx := by
   unfold isLock
   simp only [lockBodyM_rsv hm]
   iintro H; iexact H
+
+/-- The handle's gate (W8 (f2-ctx)): a context holding a lock handle has its
+boot gate set. -/
+theorem isLock_gate [CurCtx] (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF) :
+    isLock (GF := GF) γ lk s R ⊢ gateFloor curCtx := by
+  unfold isLock
+  iintro ⟨_, _, _, %lo, %lc, %Vb, _, _, _, _, #Hg⟩
+  iexact Hg
 
 /-- **The CANCELLABLE lock handle** (Rocq `WpLock.lock_openable`).  Like
 `isLock`, the two words are identity-mapped kernel RAM at a floor the ambient
@@ -919,21 +1191,21 @@ where the dead branch is unreachable. -/
 def lockOpenable [CurCtx] (γ : GName) (lk : BitVec 64) (s : String)
     (R : CtxId → IProp GF) (D : IProp GF) : IProp GF := iprop%
   ⌜lockAddrOk lk⌝ ∗ kmapId lk ∗ kmapId (lk + 16#64) ∗
-  ∃ lo lc : Nat, inv lockN (iprop(lockBodyM γ lk s R lo lc ∨ D)) ∗
-    lkFloor curCtx lo ∗ lkFloor curCtx lc
+  ∃ (lo lc : Nat) (Vb : CPU → Nat), inv lockN (iprop(lockBodyM γ lk s R lo lc Vb ∨ D)) ∗
+    lkFloor curCtx lo ∗ lkFloor curCtx lc ∗ vecFloors curCtx Vb ∗ gateFloor curCtx
 
 instance lockOpenable_persistent [CurCtx] (γ : GName) (lk : BitVec 64) (s : String)
     (R : CtxId → IProp GF) (D : IProp GF) : Persistent (lockOpenable (GF := GF) γ lk s R D) := by
   unfold lockOpenable; infer_instance
 
 /-- The projection every leaf uses: geometry, the dead-branch invariant, the
-two floors. -/
+two floors, the birth vector, the gate. -/
 theorem lockOpenable_cases [CurCtx] (γ : GName) (lk : BitVec 64) (s : String)
     (R : CtxId → IProp GF) (D : IProp GF) :
     lockOpenable (GF := GF) γ lk s R D ⊢
       ⌜lockAddrOk lk⌝ ∗ kmapId lk ∗ kmapId (lk + 16#64) ∗
-      ∃ lo lc : Nat, inv lockN (iprop(lockBodyM γ lk s R lo lc ∨ D)) ∗
-        lkFloor curCtx lo ∗ lkFloor curCtx lc := by
+      ∃ (lo lc : Nat) (Vb : CPU → Nat), inv lockN (iprop(lockBodyM γ lk s R lo lc Vb ∨ D)) ∗
+        lkFloor curCtx lo ∗ lkFloor curCtx lc ∗ vecFloors curCtx Vb ∗ gateFloor curCtx := by
   unfold lockOpenable; iintro H; iexact H
 
 /-- `lockOpenable_cases` at a lock that is not reserved. -/
@@ -941,8 +1213,8 @@ theorem lockOpenable_cases_dyn [CurCtx] (γ : GName) (lk : BitVec 64) (s : Strin
     (R : CtxId → IProp GF) (D : IProp GF) (hm : ¬ lkRsvIn (hlc := hlc) (GF := GF) lk) :
     lockOpenable (GF := GF) γ lk s R D ⊢
       ⌜lockAddrOk lk⌝ ∗ kmapId lk ∗ kmapId (lk + 16#64) ∗
-      ∃ lo lc : Nat, inv lockN (iprop(lockBody γ lk s R lo lc ∨ D)) ∗
-        lkFloor curCtx lo ∗ lkFloor curCtx lc := by
+      ∃ (lo lc : Nat) (Vb : CPU → Nat), inv lockN (iprop(lockBody γ lk s R lo lc Vb ∨ D)) ∗
+        lkFloor curCtx lo ∗ lkFloor curCtx lc ∗ vecFloors curCtx Vb ∗ gateFloor curCtx := by
   unfold lockOpenable
   simp only [lockBodyM_dyn hm]
   iintro H; iexact H
@@ -952,23 +1224,31 @@ theorem lockOpenable_cases_rsv [CurCtx] (γ : GName) (lk : BitVec 64) (s : Strin
     (R : CtxId → IProp GF) (D : IProp GF) (hm : lkRsvIn (hlc := hlc) (GF := GF) lk) :
     lockOpenable (GF := GF) γ lk s R D ⊢
       ⌜lockAddrOk lk⌝ ∗ kmapId lk ∗ kmapId (lk + 16#64) ∗
-      ∃ lo lc : Nat, inv lockN (iprop(lockBodyR γ lk s R ∨ D)) ∗
-        lkFloor curCtx lo ∗ lkFloor curCtx lc := by
+      ∃ (lo lc : Nat) (Vb : CPU → Nat), inv lockN (iprop(lockBodyR γ lk s R Vb ∨ D)) ∗
+        lkFloor curCtx lo ∗ lkFloor curCtx lc ∗ vecFloors curCtx Vb ∗ gateFloor curCtx := by
   unfold lockOpenable
   simp only [lockBodyM_rsv hm]
   iintro H; iexact H
+
+/-- The handle's gate. -/
+theorem lockOpenable_gate [CurCtx] (γ : GName) (lk : BitVec 64) (s : String)
+    (R : CtxId → IProp GF) (D : IProp GF) :
+    lockOpenable (GF := GF) γ lk s R D ⊢ gateFloor curCtx := by
+  unfold lockOpenable
+  iintro ⟨_, _, _, %lo, %lc, %Vb, _, _, _, _, #Hg⟩
+  iexact Hg
 
 /-- A lock handle is a cancellable handle with no dead branch. -/
 theorem isLock_openable [CurCtx] (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF) :
     isLock (GF := GF) γ lk s R ⊢ lockOpenable γ lk s R iprop(False) := by
   unfold isLock lockOpenable
-  iintro ⟨%hok, #H1, #H2, %lo, %lc, #Hinv, #Hflo, #Hflc⟩
+  iintro ⟨%hok, #H1, #H2, %lo, %lc, %Vb, #Hinv, #Hflo, #Hflc, #Hvf, #Hg⟩
   isplitr
   · ipureintro; exact hok
   iframe H1 H2
-  iexists lo, lc
-  iframe Hflo Hflc
-  iapply (inv_alter lockN (lockBodyM γ lk s R lo lc) iprop(lockBodyM γ lk s R lo lc ∨ False)) $$ Hinv
+  iexists lo, lc, Vb
+  iframe Hflo Hflc Hvf Hg
+  iapply (inv_alter lockN (lockBodyM γ lk s R lo lc Vb) iprop(lockBodyM γ lk s R lo lc Vb ∨ False)) $$ Hinv
   inext
   imodintro
   iintro HB
@@ -979,40 +1259,41 @@ theorem isLock_openable [CurCtx] (γ : GName) (lk : BitVec 64) (s : String) (R :
     · iexfalso; iexact HF
 
 /-- The cancellable producer: an invariant with a dead branch, plus the two
-floors and geometry, gives the openable handle. -/
+floors, the birth vector, the gate and geometry, gives the openable handle. -/
 theorem lockOpenable_of_dead [CurCtx] (γ : GName) (lk : BitVec 64) (s : String)
-    (R : CtxId → IProp GF) (D : IProp GF) (lo lc : Nat)
+    (R : CtxId → IProp GF) (D : IProp GF) (lo lc : Nat) (Vb : CPU → Nat)
     (hok : lockAddrOk lk) (hm : ¬ lkRsvIn (hlc := hlc) (GF := GF) lk) :
     kmapId lk -∗ kmapId (lk + 16#64) -∗
-    inv lockN (iprop(lockBody γ lk s R lo lc ∨ D)) -∗
-    lkFloor curCtx lo -∗ lkFloor curCtx lc -∗
+    inv lockN (iprop(lockBody γ lk s R lo lc Vb ∨ D)) -∗
+    lkFloor curCtx lo -∗ lkFloor curCtx lc -∗ vecFloors curCtx Vb -∗ gateFloor curCtx -∗
     lockOpenable (GF := GF) γ lk s R D := by
-  iintro #Hm1 #Hm2 #Hinv #Hflo #Hflc
+  iintro #Hm1 #Hm2 #Hinv #Hflo #Hflc #Hvf #Hg
   unfold lockOpenable
   simp only [lockBodyM_dyn hm]
   isplit
   · ipureintro; exact hok
   iframe Hm1 Hm2
-  iexists lo, lc
-  iframe Hinv Hflo Hflc
+  iexists lo, lc, Vb
+  iframe Hinv Hflo Hflc Hvf Hg
 
 /-- **The lock is born from two words the creator has STORED** (or never
 written): each word cell is certified at its own position, as a key of the
-creator's context; the payload is deposited at the creator's context. -/
+creator's context; the payload is deposited at the creator's context; the
+name word goes into the invariant (W8 (f2-ctx)); the creator's gate is set. -/
 theorem newlock_written [CurCtx] (cpu : CPU) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF)
     [CtxMorph R] (hok : lockAddrOk lk) (hm : ¬ lkRsvIn (hlc := hlc) (GF := GF) lk) (lo lc : Nat) (E : CoPset) :
     kmapId lk ∗ kmapId (lk + 16#64) ∗ ownCtx cpu curCtx ∗ R curCtx ∗
     wordCell lk 4 lo 0 [] ∗ lkFloor curCtx lo ∗
-    wordCell (lk + 16#64) 8 lc 0 [] ∗ lkFloor curCtx lc
+    wordCell (lk + 16#64) 8 lc 0 [] ∗ lkFloor curCtx lc ∗ lkName lk ∗ gateFloor curCtx
     ⊢ |={E}=> (ownCtx cpu curCtx ∗ ∃ γ, isLock (GF := GF) γ lk s R) := by
-  iintro ⟨#Hcl, #Hcl', Hrun, HR, Hw', #Hflo, Hc', #Hflc⟩
-  imod lock_pay_born cpu R $$ [$Hrun $HR] with ⟨Hrun, Hpay⟩
+  iintro ⟨#Hcl, #Hcl', Hrun, HR, Hw', #Hflo, Hc', #Hflc, Hnm, #Hg⟩
+  imod lock_pay_born cpu R [] (fun _ h => by simp at h) $$ [$Hrun $HR] with ⟨Hrun, ⟨%Vb, Hpay, #Hvf⟩⟩
   imod lockHalf_alloc with ⟨%γ, H1, H2⟩
-  imod inv_alloc lockN E (lockBody γ lk s R lo lc) $$ [Hw' Hc' H1 H2 Hpay] with #Hinv
+  imod inv_alloc lockN E (lockBody γ lk s R lo lc Vb) $$ [Hw' Hc' H1 H2 Hpay Hnm] with #Hinv
   · inext
     unfold lockBody
     iexists [], [], none, 0
-    iframe Hw' Hc' H1
+    iframe Hw' Hc' H1 Hnm
     isplit
     · ipureintro
       refine ⟨rfl, fun e he => absurd he (by simp), fun c _ e hl => ?_, fun _ h => by cases h⟩
@@ -1035,12 +1316,8 @@ theorem newlock_written [CurCtx] (cpu : CPU) (lk : BitVec 64) (s : String) (R : 
   · iexact Hcl
   isplit
   · iexact Hcl'
-  iexists lo, lc
-  isplit
-  · iexact Hinv
-  isplit
-  · iexact Hflo
-  · iexact Hflc
+  iexists lo, lc, Vb
+  iframe Hinv Hflo Hflc Hvf Hg
 
 /-- A reserved lock's fresh words: every entry since power-on a hart's zero. -/
 def lkZeroW {n : Nat} (W : WordHist n) : Prop := ∀ e ∈ W, e.t ≠ 0 ∧ e.tid < NCPU ∧ e.v = 0
@@ -1053,17 +1330,17 @@ theorem lkFold_zeros : ∀ {W : WordHist 4}, (∀ e ∈ W, e.v = 0) → lkFold W
 
 /-- **A RESERVED lock is born** (W8-β′) from its two words as `initlock`
 leaves them: half cells over the image tails, every entry a hart's zero.
-The floors are at 0 (the tails are the image's). -/
+The floors are at 0 (the tails are the image's); the creator's gate is set. -/
 theorem newlockR_written [CurCtx] (cpu : CPU) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF)
     [CtxMorph R] (hok : lockAddrOk lk) (hm : lkRsvIn (hlc := hlc) (GF := GF) lk)
     (W : WordHist 4) (W' : WordHist 8) (hW : lkZeroW W) (hW' : lkZeroW W') (E : CoPset) :
     kmapId lk ∗ kmapId (lk + 16#64) ∗ ownCtx cpu curCtx ∗ R curCtx ∗
-    wordCellH lk 4 W ∗ wordCellH (lk + 16#64) 8 W'
+    wordCellH lk 4 W ∗ wordCellH (lk + 16#64) 8 W' ∗ gateFloor curCtx
     ⊢ |={E}=> (ownCtx cpu curCtx ∗ ∃ γ, isLock (GF := GF) γ lk s R) := by
-  iintro ⟨#Hcl, #Hcl', Hrun, HR, Hw', Hc'⟩
-  imod lock_pay_born cpu R $$ [$Hrun $HR] with ⟨Hrun, Hpay⟩
+  iintro ⟨#Hcl, #Hcl', Hrun, HR, Hw', Hc', #Hg⟩
+  imod lock_pay_born cpu R W (fun e he => (hW e he).2.2) $$ [$Hrun $HR] with ⟨Hrun, ⟨%Vb, Hpay, #Hvf⟩⟩
   imod lockHalf_alloc with ⟨%γ, H1, H2⟩
-  imod inv_alloc lockN E (lockBodyR γ lk s R) $$ [Hw' Hc' H1 H2 Hpay] with #Hinv
+  imod inv_alloc lockN E (lockBodyR γ lk s R Vb) $$ [Hw' Hc' H1 H2 Hpay] with #Hinv
   · inext
     unfold lockBodyR
     iexists W, W', none, 0
@@ -1098,9 +1375,8 @@ theorem newlockR_written [CurCtx] (cpu : CPU) (lk : BitVec 64) (s : String) (R :
   · iexact Hcl
   isplit
   · iexact Hcl'
-  iexists 0, 0
-  isplit
-  · iexact Hinv
+  iexists 0, 0, Vb
+  iframe Hinv Hvf Hg
   isplit
   · unfold lkFloor; iapply keyAt_0
   · unfold lkFloor; iapply keyAt_0
@@ -1143,35 +1419,40 @@ theorem lkFresh_introR [CurCtx] (lk : BitVec 64) (hok : lockAddrOk lk) (hm : lkR
     · ipureintro; exact hm
     iexact H
 
-/-- The lock is born from a freshly initialised `struct spinlock`. -/
+/-- The lock is born from a freshly initialised `struct spinlock` (the
+creator's gate set, and a dynamic lock's name word, W8 (f2-ctx)). -/
 theorem newlock_of_fresh [CurCtx] (cpu : CPU) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF)
     [CtxMorph R] (E : CoPset) :
-    kmapId lk ∗ kmapId (lk + 16#64) ∗ ownCtx cpu curCtx ∗ R curCtx ∗ lkFresh lk
+    kmapId lk ∗ kmapId (lk + 16#64) ∗ ownCtx cpu curCtx ∗ R curCtx ∗ lkFresh lk ∗ lkNameFor lk ∗
+      gateFloor curCtx
     ⊢ |={E}=> (ownCtx cpu curCtx ∗ ∃ γ, isLock (GF := GF) γ lk s R) := by
-  unfold lkFresh
-  iintro ⟨#Hcl, #Hcl', Hrun, HR, %hok, (⟨%hm, ⟨%lo, %lc, Hw, #Hflo, Hc, #Hflc⟩⟩ | ⟨%hm, Hf⟩)⟩
-  · iapply newlock_written cpu lk s R hok hm lo lc E
-    iframe Hcl Hcl' Hrun HR Hw Hc
+  unfold lkFresh lkNameFor
+  iintro ⟨#Hcl, #Hcl', Hrun, HR, ⟨%hok, (⟨%hm, ⟨%lo, %lc, Hw, #Hflo, Hc, #Hflc⟩⟩ | ⟨%hm, Hf⟩)⟩, Hnmf, #Hg⟩
+  · icases Hnmf with (%hm' | Hnm)
+    · exact absurd hm' hm
+    iapply newlock_written cpu lk s R hok hm lo lc E
+    iframe Hcl Hcl' Hrun HR Hw Hc Hnm Hg
     isplit
     · iexact Hflo
     · iexact Hflc
   · unfold lkFreshR
     icases Hf with ⟨%W, %W', Hw, Hc, %⟨hW, hW'⟩⟩
     iapply newlockR_written cpu lk s R hok hm W W' hW hW' E
-    iframe Hcl Hcl' Hrun HR Hw Hc
+    iframe Hcl Hcl' Hrun HR Hw Hc Hg
 
 /-- The same at the kernel execution context (which carries the running
 context inside its `ctxTok`), under a fancy update. -/
 theorem kctx_newlock [CurCtx] [KernelImage GF] {lent : Bool} (cpu : CPU) (k : KCtx)
     (lk : BitVec 64) (s : String) (R : CtxId → IProp GF) [CtxMorph R] :
-    kctxL lent cpu k ∗ R curCtx ∗ lkFresh lk ∗ kmapId lk ∗ kmapId (lk + 16#64)
+    kctxL lent cpu k ∗ R curCtx ∗ lkFresh lk ∗ lkNameFor lk ∗ kmapId lk ∗ kmapId (lk + 16#64) ∗
+      gateFloor curCtx
     ⊢ |={⊤}=> (kctxL (GF := GF) lent cpu k ∗ ∃ γ, isLock γ lk s R) := by
-  iintro ⟨Hk, HR, Hfresh, #Hcl, #Hcl'⟩
+  iintro ⟨Hk, HR, Hfresh, Hnmf, #Hcl, #Hcl', #Hg⟩
   icases kctx_cases cpu k $$ Hk with
     ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
   icases ctxTok_cases cpu curCtx $$ Htok with ⟨Hctx, %r, Hfrag⟩
-  imod newlock_of_fresh cpu lk s R ⊤ $$ [Hctx HR Hfresh] with ⟨Hctx, ⟨%γ, #Hlk⟩⟩
-  · iframe Hcl Hcl' Hctx HR Hfresh
+  imod newlock_of_fresh cpu lk s R ⊤ $$ [Hctx HR Hfresh Hnmf] with ⟨Hctx, ⟨%γ, #Hlk⟩⟩
+  · iframe Hcl Hcl' Hctx HR Hfresh Hnmf Hg
   imodintro
   isplitl [HConf HF Hstack Htrans Harm Hcpu Hctx Hfrag Hclock]
   · iapply kctx_intro' cpu k hwf
@@ -1195,25 +1476,29 @@ instance lockSetAt_timeless (E : EraGS) (cpu : CPU) (l : List String) : Timeless
 theorem lkCpuFrag_some (c : CPU) (b : Bool) (s : String) : lkCpuFrag (GF := GF) (some (c, b)) s = lkIn c s := rfl
 theorem lkCpuFrag_none (s : String) : lkCpuFrag (GF := GF) none s = emp := rfl
 
-theorem ctxStamped_topLb (ξ : CtxId) (T : Nat) : ctxStamped (GF := GF) ξ T ⊢ topLb T ∗ ctxStamped ξ T := by
+theorem ctxStamped_topLb (ξ : CtxId) (T : Nat) (V : CPU → Nat) (g : Nat) :
+    ctxStamped (GF := GF) ξ T V g ⊢ topLb T ∗ ctxStamped ξ T V g := by
   iintro H
-  icases ctxStamped_cases ξ T $$ H with ⟨%D, Hat, #HT, %hD, #Hels⟩
+  icases ctxStamped_cases ξ T V g $$ H with ⟨%D, Hat, #HT, %hD, #Hels, Hv, %hDV⟩
   isplit
   · iexact HT
-  · unfold ctxStamped
-    iexists D
-    iframe Hat
+  · iapply ctxStamped_intro ξ T V g D
+    iframe Hat Hv
     isplit
     · iexact HT
     isplit
     · ipureintro; exact hD
+    isplit
     · iexact Hels
+    · ipureintro; exact hDV
 
-theorem lockPayWon_intro [CurCtx] (R : CtxId → IProp GF) (ξ : CtxId) (T : Nat) :
-    ctxStamped ξ T ∗ ctxFloor curCtx T ∗ R ξ ⊢ lockPayWon (GF := GF) R := by
+theorem lockPayWon_intro [CurCtx] (R : CtxId → IProp GF) (cpu : CPU) (ξ : CtxId) (T : Nat) (V : CPU → Nat)
+    (g : Nat) :
+    ctxStamped ξ T V g ∗ ctxFloor curCtx T ∗ R ξ ∗ vecCertsAt (MachGS.era (hlc := hlc) (GF := GF)) V g cpu ⊢
+      lockPayWon (GF := GF) R cpu := by
   unfold lockPayWon
   iintro H
-  iexists ξ, T
+  iexists ξ, T, V, g
   iexact H
 
 theorem lockedCore_cases [CurCtx] (γ : GName) (i : CPU) :

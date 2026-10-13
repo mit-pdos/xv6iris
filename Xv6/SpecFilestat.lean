@@ -307,7 +307,7 @@ theorem filestat_pay_carve (γ : FileNames) (fk : Nat) (q : Qp) (C : FContent) (
   iintro ⟨%pn, %hok, Htok, Hnoff, Hoff⟩
   ihave Hnoff := (fileCoreNoff_inode q pn C h).1 $$ Hnoff
   unfold inodePay inodeShrHeldGen
-  icases Hnoff with ⟨#Hci, Hown, Hside, ⟨%ik, %lo, %tl, %hv, %hk, %hnib, %hle, #Hfl, Hshr⟩,
+  icases Hnoff with ⟨%mt, #Hci, #Htg, Hown, Hside, ⟨%ik, %lo, %tl, %hv, %hk, %hnib, %hle, #Hfl, Hshr⟩,
     ⟨%ty, #Hshot, %hnd, %hdv⟩⟩
   iexists ik, pn.inum, qpMul q pn.iq, pn.ig, ty, lo, tl
   isplitr
@@ -320,7 +320,8 @@ theorem filestat_pay_carve (γ : FileNames) (fk : Nat) (q : Qp) (C : FContent) (
   iframe Htok Hoff
   iapply (fileCoreNoff_inode q pn C h).2
   unfold inodePay inodeShrHeldGen
-  iframe Hci Hown Hside
+  iexists mt
+  iframe Hci Htg Hown Hside
   isplitl [Hshr]
   · iexists ik, lo, tl
     iframe Hfl Hshr

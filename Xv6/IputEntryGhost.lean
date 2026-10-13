@@ -81,11 +81,11 @@ theorem iput_ent_open (cpu : CPU) (kk : Nat) (hkk : kk < NINODE) (q : Qp) (inum 
     itableInv (hlc := hlc) (GF := GF) ∗ icEscrow fscIc fscFs fscIreg fscCov fscLogst kk ∗
     ownCtx cpu curCtx ∗ iputTab Mt ci ∗ inodeRefAt kk q icfgDev inum mst ∗
     ctxFloor curCtx Kt ∗ txPin icfgLog tid qtx ⊢
-    |={⊤}=> ownCtx cpu curCtx ∗ ∃ (g : GName) (lo tl : Nat) (x0 : IcX) (td T0 Kw : Nat),
+    |={⊤}=> ownCtx cpu curCtx ∗ ∃ (g : GName) (lo tl : Nat) (x0 : IcX) (td T0 Kw : Nat) (a : ChainVG),
       ⌜x0 ≠ .icRaw ∧ T0 ≤ Kw ∧ PartialMap.get? ci kk = some (icfgDev, inum)⌝ ∗
       iputEntCom kk Mt ci q icfgDev inum tid qtx g lo tl ∗
       inodeIdent kk (.own q) icfgDev inum ∗
-      icRegd kk ⟨td, true, some (icfgDev, inum), some (x0, T0)⟩ ∗ topLb td ∗
+      icRegd kk ⟨td, true, some (icfgDev, inum), some (x0, T0), a⟩ ∗ topLb td ∗ vgFloors curCtx a ∗
       ctxFloor curCtx Kw ∗ icCnt kk 1 ∗
       icHdr fscIc fscFs fscIreg fscCov fscLogst kk (some (icfgDev, inum)) x0 curCtx := by
   iintro ⟨#Hinv, #Hbox, Hrun, Htab, Href, #Hflt, Htx⟩
@@ -127,7 +127,7 @@ theorem iput_ent_open (cpu : CPU) (kk : Nat) (hkk : kk < NINODE) (q : Qp) (inum 
   ihave Hsrow := Xv6.id_ent_of_eq (itableSlotRes_some curCtx Mt ci kk q PosNat.one hMk) $$ Hsrow
   unfold icSlotRowFl icSlotRow
   rw [hcik]
-  icases Hsrow with ⟨⟨%tb, ⟨%r, Hrd, %hrw, %hrx, %hrid, #Hllbr, %hrle, Hc⟩, #Hllbb, #Hflb⟩, Hlive⟩
+  icases Hsrow with ⟨⟨%tb, ⟨%r, Hrd, %hrw, %hrx, %hrid, #Hllbr, %hrle, Hc, #Hvd⟩, #Hllbb, #Hflb⟩, Hlive⟩
   -- the window half again: the pin and the kept part
   icases iput_txPin_split tid qtx.half.half qtx.half.half $$ [Htxw] with ⟨Htxp, Htxh⟩
   · rw [Qp.half_add_half]; iexact Htxw
@@ -135,9 +135,9 @@ theorem iput_ent_open (cpu : CPU) (kk : Nat) (hkk : kk < NINODE) (q : Qp) (inum 
   imod icPinEnter kk tid qtx.half.half $$ Hpin Htxp with ⟨Hpintx, Hhpn⟩
   -- THE GUARD's (a) at c = 1
   ihave Hc := (show icCnt (GF := GF) kk PosNat.one.val ⊢ icCnt kk 1 from .rfl) $$ Hc
-  imod icGuardWithdraw cpu fscIc fscFs fscIreg fscCov fscLogst kk curCtx r icfgDev inum tb Kt ⊤
-      CoPset.subseteq_top hrw hrid hrle $$ Hbox Hrun Hflb Hflt Hrd Hc [Hrefm] Hpintx
-    with ⟨Hrun, Hc, %x0, %T0, %hx0, %hT0, Hrd, Hhdr⟩
+  imod icGuardWithdraw cpu fscIc fscFs fscIreg fscCov fscLogst kk r icfgDev inum tb Kt ⊤
+      CoPset.subseteq_top hrw hrid hrle $$ Hbox Hrun Hflb Hflt Hvd Hrd Hc [Hrefm] Hpintx
+    with ⟨Hrun, Hc, %x0, %T0, %a, %hx0, %hT0, #Hva, Hrd, Hhdr⟩
   · iexists mst
     iframe Hrefm
     ipureintro; exact ⟨hm, hmst⟩
@@ -145,7 +145,7 @@ theorem iput_ent_open (cpu : CPU) (kk : Nat) (hkk : kk < NINODE) (q : Qp) (inum 
   iframe Hrun
   -- the floor over the register's stamp: the larger of the two
   have hmax : max tb Kt = tb ∨ max tb Kt = Kt := by omega
-  iexists g, lo, tl, x0, r.td, T0, (max tb Kt)
+  iexists g, lo, tl, x0, r.td, T0, (max tb Kt), a
   isplitr
   · ipureintro; exact ⟨hx0, hT0, rfl⟩
   isplitl [Hhalf Hstampsback Hlive Hback Hrest Hiu Hgid Hicnt Hmir Hsel Hhpn Htxh Htxf Hfrag Hlv
@@ -157,7 +157,7 @@ theorem iput_ent_open (cpu : CPU) (kk : Nat) (hkk : kk < NINODE) (q : Qp) (inum 
     · unfold itableSlotLive
       iexact Hlive
     ipureintro; exact hlotl
-  iframe Hid Hrd Hllbr Hc Hhdr
+  iframe Hid Hrd Hllbr Hc Hhdr Hva
   rcases hmax with h | h <;> rw [h]
   · iexact Hflb
   · iexact Hflt
@@ -167,10 +167,11 @@ OPEN into the last close; the two kept shares rejoin behind the pin's
 name-half. -/
 theorem iput_ent_toTail (kk : Nat) (Mt : RegMapF (Qp × PosNat))
     (ci : RegMapF (BitVec 32 × BitVec 32)) (q : Qp) (inum : BitVec 32) (tid : Nat) (qtx : Qp)
-    (g : GName) (lo tl : Nat) (x0 : IcX) (td T0 : Nat) (hx0 : x0 ≠ .icRaw)
+    (g : GName) (lo tl : Nat) (x0 : IcX) (td T0 : Nat) (a : ChainVG) (hx0 : x0 ≠ .icRaw)
     (hcik : PartialMap.get? ci kk = some (icfgDev, inum)) :
     iputEntCom (GF := GF) kk Mt ci q icfgDev inum tid qtx g lo tl ∗
-    icRegd kk ⟨td, true, some (icfgDev, inum), some (x0, T0)⟩ ∗ topLb td ∗ icCnt kk 1 ∗
+    icRegd kk ⟨td, true, some (icfgDev, inum), some (x0, T0), a⟩ ∗ topLb td ∗ vgFloors curCtx a ∗
+    icCnt kk 1 ∗
     icHdr fscIc fscFs fscIreg fscCov fscLogst kk (some (icfgDev, inum)) x0 curCtx ⊢
     itableHalf Mt ∗ irefSlotsAuth ∗ islPool Mt ∗
     ipool (hlc := hlc) fscFs fscIreg fscCov fscLogst (regionInums icfgNib \ ciInums ci) ∅ ∗
@@ -179,7 +180,7 @@ theorem iput_ent_toTail (kk : Nat) (Mt : RegMapF (Qp × PosNat))
     iputPin kk tid qtx := by
   unfold iputEntCom
   iintro ⟨⟨Hhalf, Hsb, Hlive, Hback, Hrest, Hiu, Hgid, Hicnt, Hmir, Hsel, Hhpn, Htxh, Htxf, Hfrag,
-    Hlv, %hlotl, #Hfl, Hslh, Hiauth, Hipool, Hpool⟩, Hrd, #Hllbd, Hc, Hhdr⟩
+    Hlv, %hlotl, #Hfl, Hslh, Hiauth, Hipool, Hpool⟩, Hrd, #Hllbd, #Hva, Hc, Hhdr⟩
   iframe Hhalf Hiauth Hipool Hpool Hfrag Hslh
   isplitl [Hlv]
   · unfold liveFracc
@@ -189,8 +190,8 @@ theorem iput_ent_toTail (kk : Nat) (Mt : RegMapF (Qp × PosNat))
   isplitl [Hsb Hlive Hrd Hc Hhdr]
   · unfold iputWindow
     iframe Hsb Hlive
-    iexists x0, td, T0
-    iframe Hrd Hllbd Hc Hhdr
+    iexists x0, td, T0, a
+    iframe Hrd Hllbd Hc Hhdr Hva
     ipureintro; exact hx0
   isplitl [Hback Hrest Hiu Hgid Hicnt Hmir Hsel]
   · unfold iputRowOpen

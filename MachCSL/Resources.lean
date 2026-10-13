@@ -400,10 +400,6 @@ class MachFixedGS (hlc : outParam HasLC) (GF : BundledGFunctors) where
   rsvStatic : List RsvRegion
   /-- ...byte-distinct image bytes (`rsvWf`). -/
   rsvStatic_wf : rsvWf rsvStatic
-  /-- THE DYNAMIC LOCKS' NAMES (W8 (f2-ctx) [R35.1]): the client's
-  `KernelRsv.names`; a live dynamic spinlock whose name word holds one is a
-  hop byte (`MachCSL.nameLockAt`, the time-indexed registry). -/
-  rsvNames : List (BitVec 64)
 
 attribute [reducible, instance] MachFixedGS.reg
 attribute [reducible, instance] MachFixedGS.memPre
@@ -1153,7 +1149,7 @@ theorem chainEnvAt_ext_store (rs : List RsvRegion) (names : List (BitVec 64))
       simp only at hR
       obtain ⟨H, hH, he⟩ := ChainDefs.writeBytes_mem σ.mem pa w (σ.top + 1) (hartAgent cpu) hj'
       rw [← heq] at hH
-      have := hR.1 f (RsvRegion.base_mem _) H hH _ he (by simp)
+      have := hR.1 f (RsvRegion.base_mem _ (by simp)) H hH _ he (by simp)
       exact hj (Fin.ext this)
     · exact Nat.le_refl _
   · exact Nat.le_refl _
@@ -1183,7 +1179,7 @@ theorem pubOneShot_of_rsv {rs : List RsvRegion} {names : List (BitVec 64)} {σ :
   obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 hp
   have hR := h i _ hi
   unfold regionOk at hR
-  exact hR.2 f (RsvRegion.base_mem _) H hf e he e' he' ht ht'
+  exact hR.2 f (RsvRegion.base_mem _ (by simp)) H hf e he e' he' ht ht'
 
 /-- The lock bytes of the ambient record's static reserved spinlocks: hops the
 chain certificates may use at every position. -/
@@ -1192,7 +1188,7 @@ def rsvLockByte [MachFixedGS hlc GF] (b : PAddr) : Prop :=
 
 /-- The ambient record's certificate environment at `σ`. -/
 abbrev chainEnv [MachFixedGS hlc GF] (σ : MState) : ChainEnv :=
-  chainEnvAt (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.rsvNames (hlc := hlc) (GF := GF)) σ
+  chainEnvAt (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (rsvNameList (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))) σ
 
 /-- A static lock byte is a hop byte at every position. -/
 theorem chainEnv_isLk_rsv [MachFixedGS hlc GF] (σ : MState) {b : PAddr} (r : Nat)

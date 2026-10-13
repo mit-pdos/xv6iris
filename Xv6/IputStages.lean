@@ -129,7 +129,7 @@ def IputLockedSpec : Prop :=
     (kk : Nat) (q : Qp) (inum : BitVec 32) (dn : Dinode) (bm : Blkmap) (g1 g2 : GName)
     (Mt : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × BitVec 32))
     (n : Nat) (Sb : List Nat) (crb cru crz : Bool) (e0 : Nat) (tid : Nat) (qtx : Qp)
-    (pidv : BitVec 32) (dqp dqb dqs : DFrac) (rgb bfl : Bool) (td T0 Kw : Nat) (R : RegMap)
+    (pidv : BitVec 32) (dqp dqb dqs : DFrac) (rgb bfl : Bool) (td T0 Kw : Nat) (a : ChainVG) (R : RegMap)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : iputSlots ≤ k.avail)
     (hwf : k.wf) (hnoff : k.noff = 0) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt) (hkk : kk < NINODE) (hn : iputUnits ≤ n)
@@ -162,8 +162,8 @@ def IputLockedSpec : Prop :=
     (∃ tst : Nat, istmpAuth kk (1 : Qp).half tst ∗ topLb tst) ∗
     -- R3.4 / F30 (g): the guard's WINDOW, still open: the L1 register half,
     -- its stamp's floor, the count half at 1, the header's cells and pieces
-    icRegd kk ⟨td, true, some (icfgDev, inum), some (.icLoaded g1 dn bm, T0)⟩ ∗ topLb td ∗
-    ctxFloor curCtx Kw ∗ icCnt kk 1 ∗
+    icRegd kk ⟨td, true, some (icfgDev, inum), some (.icLoaded g1 dn bm, T0), a⟩ ∗ topLb td ∗
+    vgFloors curCtx a ∗ ctxFloor curCtx Kw ∗ icCnt kk 1 ∗
     wordPointsTo (iValid (ientry kk)) 4 (DFrac.own 1) (validWord true) ∗
     inodeIdent kk (DFrac.own (1 : Qp).half) icfgDev inum ∗
     wordPointsTo (iNlink (ientry kk)) 2 (DFrac.own 1) dn.diNlink ∗

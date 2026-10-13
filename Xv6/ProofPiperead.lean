@@ -927,7 +927,7 @@ empty, or the write end was shut. -/
 def prResI (γp : PipeNames) (pi : BitVec 64) (m : Nat) : IProp GF := iprop(
   ∃ (nr nw ro wo : BitVec 32) (vname : BitVec 64) (bs : List (BitVec 8)),
     ⌜0 < m ∨ nr ≠ nw ∨ ¬ pflagOpen wo⌝ ∗
-    wordAtN curCtx (pipeLockName pi) 8 (DFrac.own 1) vname ∗
+    wordAtN curCtx (pipeLockName pi) 8 (DFrac.own (1 : Qp).half) vname ∗
     wordAtN curCtx (aPnread pi) 4 (DFrac.own 1) nr ∗
     wordAtN curCtx (aPnwrite pi) 4 (DFrac.own 1) nw ∗
     wordAtN curCtx (aPopen pi false) 4 (DFrac.own 1) ro ∗
@@ -940,7 +940,7 @@ theorem prResI_elim (γp : PipeNames) (pi : BitVec 64) (m : Nat) :
     prResI (GF := GF) γp pi m ⊢
       ∃ (nr nw ro wo : BitVec 32) (vname : BitVec 64) (bs : List (BitVec 8)),
         ⌜0 < m ∨ nr ≠ nw ∨ ¬ pflagOpen wo⌝ ∗
-        wordAtN curCtx (pipeLockName pi) 8 (DFrac.own 1) vname ∗
+        wordAtN curCtx (pipeLockName pi) 8 (DFrac.own (1 : Qp).half) vname ∗
         wordAtN curCtx (aPnread pi) 4 (DFrac.own 1) nr ∗
         wordAtN curCtx (aPnwrite pi) 4 (DFrac.own 1) nw ∗
         wordAtN curCtx (aPopen pi false) 4 (DFrac.own 1) ro ∗
@@ -953,7 +953,7 @@ theorem prResI_elim (γp : PipeNames) (pi : BitVec 64) (m : Nat) :
 theorem prResI_intro (γp : PipeNames) (pi : BitVec 64) (m : Nat) (nr nw ro wo : BitVec 32)
     (vname : BitVec 64) (bs : List (BitVec 8)) (hc : 0 < m ∨ nr ≠ nw ∨ ¬ pflagOpen wo)
     (hcnt : pipeCountOk nr nw) (hlen : bs.length = PIPESIZE) :
-    wordAtN (GF := GF) curCtx (pipeLockName pi) 8 (DFrac.own 1) vname ∗
+    wordAtN (GF := GF) curCtx (pipeLockName pi) 8 (DFrac.own (1 : Qp).half) vname ∗
     wordAtN curCtx (aPnread pi) 4 (DFrac.own 1) nr ∗
     wordAtN curCtx (aPnwrite pi) 4 (DFrac.own 1) nw ∗
     wordAtN curCtx (aPopen pi false) 4 (DFrac.own 1) ro ∗

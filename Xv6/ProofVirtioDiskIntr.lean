@@ -296,7 +296,7 @@ theorem vdis_fence_cash [KernelGeom] [KernelImage GF] (γ : DiskNames) (cpu : CP
   icases Hp with ⟨%T, #Hw, #Hfl⟩
   ihave #Hkey := diskPayFl_key n curCtx T $$ Hfl
   icases kctx_token_acc cpu k $$ Hk with ⟨Hctx, Hback⟩
-  icases ownCtx_key_vis cpu curCtx T $$ [Hctx Hkey] with ⟨Hctx, %K, %ts, #HK, #Hts, %hv⟩
+  icases diskVisKey_vis cpu curCtx T $$ [Hctx Hkey] with ⟨Hctx, %K, %ts, #HK, #Hts, %hv⟩
   · iframe Hctx Hkey
   ihave Hk := Hback $$ Hctx
   rcases hv with hle | hmem

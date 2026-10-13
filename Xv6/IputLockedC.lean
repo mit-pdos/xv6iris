@@ -84,7 +84,7 @@ def iputLkMid (kk : Nat) (Mt : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 
     irefSlotsAuth ∗
     ipool (hlc := hlc) fscFs fscIreg fscCov fscLogst (regionInums icfgNib \ ciInums ci)
       (PartialMap.singleton inum.toNat (tid, qp)) ∗
-    icRegd kk r ∗ icCnt kk 1 ∗
+    icRegd kk r ∗ vgFloors curCtx r.vd ∗ icCnt kk 1 ∗
     (∃ v : BitVec 32, wordPointsTo (iValid (ientry kk)) 4 (DFrac.own 1) v) ∗
     inodeIdent kk (DFrac.own (1 : Qp).half) icfgDev inum ∗
     (∃ n : BitVec 16, wordPointsTo (iNlink (ientry kk)) 2 (DFrac.own 1) n) ∗
@@ -166,13 +166,13 @@ theorem iput_lk_c_open (c : CPU) (kk : Nat) (hkk : kk < NINODE) (q : Qp) (inum :
   ihave Hsrow := iput_lk_ent_eq (itableSlotRes_some curCtx Mt ci kk q PosNat.one hMk) $$ Hsrow
   unfold itableSlotLive icSlotRowFl icSlotRow
   rw [hcik]
-  icases Hsrow with ⟨⟨%tb, ⟨%r, Hrd, %hrw, %hrx, %hrid, #Hllbr, %hrle, Hc⟩, #Hllbb, #Hflb⟩,
+  icases Hsrow with ⟨⟨%tb, ⟨%r, Hrd, %hrw, %hrx, %hrid, #Hllbr, %hrle, Hc, #Hvd⟩, #Hllbb, #Hflb⟩,
     ⟨%tst, Hstk, #Hllbk, #Hflk⟩⟩
   ihave Hc := iput_lk_ent_eq (show icCnt (GF := GF) kk PosNat.one.val = icCnt kk 1 from rfl) $$ Hc
   -- THE HOOKED (a): the header comes out FROZEN
-  imod icEvictWithdrawFrz c fscIc fscFs fscIreg fscCov fscLogst kk curCtx r icfgDev inum tb K rg ⊤
-      CoPset.subseteq_top hrw hrid hrle $$ Hesc Hrun Hflb HflK Hrd Hc [Href] Hpre
-    with ⟨Hrun, Hc, %x0, %T0, %hT0, Hrd, Hhdr⟩
+  imod icEvictWithdrawFrz c fscIc fscFs fscIreg fscCov fscLogst kk r icfgDev inum tb K rg ⊤
+      CoPset.subseteq_top hrw hrid hrle $$ Hesc Hrun Hflb HflK Hvd Hrd Hc [Href] Hpre
+    with ⟨Hrun, Hc, %x0, %T0, %aW, %hT0, #HvaW, Hrd, Hhdr⟩
   · iexists _
     iframe Href
     ipureintro
@@ -195,7 +195,7 @@ theorem iput_lk_c_open (c : CPU) (kk : Nat) (hkk : kk < NINODE) (q : Qp) (inum :
   · iframe
   imodintro
   iframe Hrun
-  iexists Mt, ci, tst, ⟨r.td, true, some (icfgDev, inum), some (x0, T0)⟩, x0
+  iexists Mt, ci, tst, ⟨r.td, true, some (icfgDev, inum), some (x0, T0), aW⟩, x0
   isplitr
   · ipureintro
     exact ⟨hMk, hcik, hwf, hciwf, rfl, T0, rfl⟩
@@ -207,7 +207,7 @@ theorem iput_lk_c_open (c : CPU) (kk : Nat) (hkk : kk < NINODE) (q : Qp) (inum :
   ihave Hfree := iput_lk_ent_eq (show islotFreeAt (GF := GF) kk icfgDev inum =
     inodeIdent kk (DFrac.own (1 : Qp).half) icfgDev inum from rfl) $$ Hfree
   unfold iputLkMid
-  iframe Hstampsback Hback Hislback Hiauth Hpool Hrd Hc Hid HgidD HgidT Hgidf Hfree Hiu Hhpn
+  iframe Hstampsback Hback Hislback Hiauth Hpool Hrd HvaW Hc Hid HgidD HgidT Hgidf Hfree Hiu Hhpn
   isplitl [Hvld]
   · iexists _; iexact Hvld
   iexact Hnlk
@@ -287,7 +287,7 @@ theorem iput_lk_c_close_rows (c : CPU) (kk : Nat) (hkk : kk < NINODE)
   iintro ⟨#Hesc, #Hclaim, Hrun, Hout, #Hllbk, Hmid⟩
   unfold iputLkRetOut iputLkMid
   icases Hout with ⟨Hhalf, Hisl, Hpost, Hcnt0, Hmir, Hst, ⟨%Hs, %t, Hb, #Hau, #Ht⟩⟩
-  icases Hmid with ⟨Hstampsback, Hback, Hislback, Hiauth, Hpool, Hrd, Hc, Hvld, Hid, Hnlk, HgidD,
+  icases Hmid with ⟨Hstampsback, Hback, Hislback, Hiauth, Hpool, Hrd, #Hvd, Hc, Hvld, Hid, Hnlk, HgidD,
     HgidT, Hgidf, Hfree, Hiu, Hhpn⟩
   -- the retired word, a plain cell again
   imod ctxBytes_of_pushed c curCtx (iRef (ientry kk)) 4 (DFrac.own 1) t Hs (0#32 : BitVec 32)
@@ -296,9 +296,9 @@ theorem iput_lk_c_close_rows (c : CPU) (kk : Nat) (hkk : kk < NINODE)
   ihave Hcell := wordPointsTo_intro_id (iRef (ientry kk)) 4 (DFrac.own 1) (0#32 : BitVec 32)
     hram hal $$ Hclaim Hcell
   -- (b′): the raw header back at `none`
-  imod icEvictDeposit c fscIc fscFs fscIreg fscCov fscLogst kk curCtx r x0 T0 ⊤
-      CoPset.subseteq_top hw hx $$ Hesc Hrun Hrd Hc [Hvld Hid Hnlk HgidD]
-    with ⟨Hrun, Hpintx, %Tb, Hrd, Hc, Hst0, #HllbTb⟩
+  imod icEvictDeposit c fscIc fscFs fscIreg fscCov fscLogst kk r x0 T0 ⊤
+      CoPset.subseteq_top hw hx $$ Hesc Hrun Hvd Hrd Hc [Hvld Hid Hnlk HgidD]
+    with ⟨Hrun, Hpintx, %Tb, %aE, Hrd, Hc, Hst0, #HllbTb, #HvaE⟩
   · unfold icHdr icHdrAmb
     isplitr
     · ipureintro; rfl
@@ -308,9 +308,9 @@ theorem iput_lk_c_close_rows (c : CPU) (kk : Nat) (hkk : kk < NINODE)
     iexists icfgDev, inum; iexact HgidD
   -- the pin comes home; (d) drops the unit
   imod icPinExit kk tid qp $$ Hhpn Hpintx with ⟨Hpinr, Htxa⟩
-  imod icDecr fscIc fscFs fscIreg fscCov fscLogst kk ⟨Tb, false, none, none⟩ 0 none ⊤
-      CoPset.subseteq_top rfl $$ Hesc Hrd HllbTb Hc [Hst0]
-    with ⟨%td', %htd', Hrd, Hc, #Hllbd'⟩
+  imod icDecr c fscIc fscFs fscIreg fscCov fscLogst kk ⟨Tb, false, none, none, aE⟩ 0 none ⊤
+      CoPset.subseteq_top rfl $$ Hesc Hrun Hrd HllbTb HvaE Hc [Hst0]
+    with ⟨Hrun, %td', %aD, %htd', Hrd, Hc, #Hllbd', #HvaD⟩
   · unfold icRefStampsAt icStamps; iexact Hst0
   have hoffM : ∀ j, j ≠ kk → PartialMap.get? (PartialMap.delete Mt kk) j = PartialMap.get? Mt j :=
     fun j hj => get?_delete_ne (Ne.symm hj)
@@ -325,8 +325,8 @@ theorem iput_lk_c_close_rows (c : CPU) (kk : Nat) (hkk : kk < NINODE)
     isplitl [Hrd Hc]
     · iexists td'
       iframe Hllbd'
-      iexists ⟨td', false, none, none⟩
-      iframe Hrd Hc Hllbd'
+      iexists ⟨td', false, none, none, aD⟩
+      iframe Hrd Hc Hllbd' HvaD
       ipureintro
       exact ⟨rfl, rfl, rfl, Nat.le_refl _⟩
     iexists tst

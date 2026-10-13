@@ -596,24 +596,30 @@ def exclWriteAURsv (cpu : CPU) (pa : PAddr) (n : Nat) (acq : Bool) (w0 w' : BitV
 The winning AMO of a spinlock reads the release it lands on: its entry goes
 IMMEDIATELY above the release entry `⟨r, A, 0⟩` of the releasing hart `A`,
 itself above a nonzero entry (the lock was held) -- a sync hop
-(`MachCSL.syncHop`).  An exclusive write may carry a HOP REQUEST: the head of
-its window's first byte, the lock's registration (a static spinlock, or a
+(`MachCSL.syncHop`); all three entries are word-sized (`MachCSL.wordEntAt`:
+the window is at least the 4-byte lock word, and the release and the held
+entry each have an entry in all four of its bytes) [R36.3].  An exclusive
+write may carry a HOP REQUEST: the heads of its window's bytes, the lock's
+registration (a static spinlock, or a
 live dynamic one through its name word, `MachCSL.nameLockAt`), the
 acquirer's boot gate, and certificates to the releaser before `r`; the leaf
 converts them, inside the atomic step, into certificates to the acquirer
 past its own position (`MachCSL.memModel_chainHop`). -/
 
-/-- A hop request's head: the history is headed by the release entry
-`⟨r, A, 0⟩` of hart `A`, over a nonzero entry. -/
-def hopHead (H : Hist) (A : CPU) (r : Nat) : Prop :=
-  ∃ (e0 : HEnt) (H2 : Hist), H = ⟨r, hartAgent A, 0⟩ :: e0 :: H2 ∧ e0.v ≠ 0
+/-- A hop request's head: the first byte's history is headed by the release
+entry `⟨r, A, 0⟩` of hart `A`, over a nonzero entry, and both are WORD-sized
+-- each of the word's four bytes has an entry at the release's position by
+`A` and one at the held entry's position by its agent [R36.3]. -/
+def hopHead (Hs : Nat → Hist) (A : CPU) (r : Nat) : Prop :=
+  ∃ (e0 : HEnt) (H2 : Hist), Hs 0 = ⟨r, hartAgent A, 0⟩ :: e0 :: H2 ∧ e0.v ≠ 0 ∧
+    ∀ i, i < 4 → (∃ e ∈ Hs i, e.t = r ∧ e.tid = hartAgent A) ∧ (∃ e ∈ Hs i, e.t = e0.t ∧ e.tid = e0.tid)
 
 /-- A hop's registration: a static spinlock (`none`), or a dynamic one whose
 name word's histories `Hn` (lent at `dqn`) are headed by a registered name. -/
 def hopRegAt (pa : PAddr) : Option ((Nat → DFrac) × (Nat → Hist)) → IProp GF
   | none => iprop(⌜rsvLockByte (hlc := hlc) (GF := GF) pa⌝)
   | some (dqn, Hn) => iprop(histBytes (pa + 8#64) 8 dqn Hn ∗
-      ⌜∃ nm ∈ MachFixedGS.rsvNames (hlc := hlc) (GF := GF), headsAre Hn 8 nm⌝)
+      ⌜∃ nm ∈ rsvNameList (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)), headsAre Hn 8 nm⌝)
 
 /-- A hop request's data: the releaser, its release position, the
 certificates `(author, entries)` to convert, the registration. -/
@@ -623,7 +629,7 @@ abbrev HopData := CPU × Nat × List (CPU × Nat) × Option ((Nat → DFrac) × 
 def hopIn (cpu : CPU) (pa : PAddr) (n : Nat) (Hs : Nat → Hist) (w' : BitVec (8 * n)) :
     Option HopData → IProp GF
   | none => iprop(emp)
-  | some (A, r, L, reg) => iprop(⌜hopHead (Hs 0) A r ∧ nthByte w' 0 ≠ 0 ∧ 0 < n ∧ n ≤ 8⌝ ∗ hopRegAt pa reg ∗
+  | some (A, r, L, reg) => iprop(⌜hopHead Hs A r ∧ nthByte w' 0 ≠ 0 ∧ 4 ≤ n ∧ n ≤ 8⌝ ∗ hopRegAt pa reg ∗
       gatePassed cpu ∗ [∗list] p ∈ L, chainLb p.1 p.2 A r)
 
 /-- What a hop request hands back after the store at `t`. -/
@@ -1134,14 +1140,15 @@ theorem swp_sail_mem_read_excl_au (cpu : CPU) {n vasize : Nat}
   iapply HG $$ %r Hfrag H
 
 /-- **The hop issue** (W8 (f2-ctx)): after the exclusive store at position
-`t` (the new top) whose window's first byte now holds the store's entry over
-`Hs 0`, a hop request's certificates convert (`memModel_chainHopL`): the
-store's entry sits immediately above the release over a nonzero entry, and
-the byte is a hop byte at `t` -- a static spinlock's, or a live dynamic one's
+`t` (the new top) whose window's bytes now hold the store's entries over
+`Hs`, a hop request's certificates convert (`memModel_chainHopL`): the
+store's entry sits immediately above the release over a nonzero entry, all
+three word-sized (the store's own entries, and the request's head [R36.3]),
+and the byte is a hop byte at `t` -- a static spinlock's, or a live dynamic one's
 (its name word, headed by a registered name, is untouched by the store). -/
 theorem memModel_hopIssue (σ' : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n))
     (Hs : Nat → Hist) (t : Nat) (htop : σ'.top = t)
-    (hb0 : 0 < n → σ'.mem[pa]? = some (⟨t, hartAgent cpu, nthByte w' 0⟩ :: Hs 0)) (o : Option HopData) :
+    (hbs : histsAt σ'.mem pa n (pushed Hs t (hartAgent cpu) w')) (o : Option HopData) :
     genHeapInterp σ'.mem ∗ memModelAt (MachGS.era (hlc := hlc) (GF := GF)) σ' ∗ hopIn cpu pa n Hs w' o ⊢@{IProp GF}
       |==> (genHeapInterp σ'.mem ∗ memModelAt (MachGS.era (hlc := hlc) (GF := GF)) σ' ∗ hopOut cpu pa t o) := by
   cases o with
@@ -1154,9 +1161,19 @@ theorem memModel_hopIssue (σ' : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w' 
     obtain ⟨A, r, L, reg⟩ := d
     unfold hopIn hopOut
     iintro ⟨Hmem, Hmm, %⟨hhead, hw0, hn0, _⟩, Hreg, #Hg, HL⟩
-    obtain ⟨e0, H2, hH, he0⟩ := hhead
+    obtain ⟨e0, H2, hH, he0, hw⟩ := hhead
     have hb : σ'.mem[pa]? = some (⟨t, hartAgent cpu, nthByte w' 0⟩ :: ⟨r, hartAgent A, 0⟩ :: e0 :: H2) := by
-      rw [hb0 hn0, hH]
+      have h0 := hbs 0 (by omega)
+      simp only [BitVec.add_zero] at h0
+      rw [h0, pushed, hH]
+    have hwa : wordEntAt σ'.mem pa t (hartAgent cpu) := fun i hi =>
+      ⟨_, _, hbs i (by omega), List.mem_cons_self, rfl, rfl⟩
+    have hwr : wordEntAt σ'.mem pa r (hartAgent A) := fun i hi => by
+      obtain ⟨e, he, het, heg⟩ := (hw i hi).1
+      exact ⟨_, e, hbs i (by omega), List.mem_cons_of_mem _ he, het, heg⟩
+    have hwe : wordEntAt σ'.mem pa e0.t e0.tid := fun i hi => by
+      obtain ⟨e, he, het, heg⟩ := (hw i hi).2
+      exact ⟨_, e, hbs i (by omega), List.mem_cons_of_mem _ he, het, heg⟩
     ihave %hmm := memModel_mmOk _ σ' $$ Hmm
     -- the registration: a hop byte at `t`
     ihave %hlk : ⌜(chainEnv (hlc := hlc) (GF := GF) σ').isLk pa t⌝ $$ [Hmem Hreg]
@@ -1185,7 +1202,7 @@ theorem memModel_hopIssue (σ' : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w' 
           refine ⟨e :: H', e.t, hg, [], H', e.tid, ?_, fun x hx => by simp at hx, ?_⟩
           · rw [← hh]; rfl
           · simp only [MState.top] at htop; omega
-    imod memModel_chainHopL _ σ' pa A cpu r t (nthByte w' 0) e0 H2 hb hw0 he0 hlk htop L $$ [Hmm HL]
+    imod memModel_chainHopL _ σ' pa A cpu r t (nthByte w' 0) e0 H2 hb hw0 he0 hwa hwr hwe hlk htop L $$ [Hmm HL]
       with ⟨Hmm, HL⟩
     · iframe Hmm Hg HL
     imodintro
@@ -1273,9 +1290,7 @@ theorem swp_sail_mem_write_excl_au (cpu : CPU) {n vasize : Nat}
         ihave %hget' := histBytes_valid _ req.pa n _ _ $$ [Hmem Hb]
         · iframe Hmem Hb
         imod memModel_hopIssue (σ.store cpu req.pa n w' true) cpu req.pa n w' Hs (σ.top + 1)
-          (by simp [MState.top]) (fun hn => by
-            have h0 := hget' 0 hn
-            simpa using h0) o $$ [Hmem Hmm Ho] with ⟨Hmem, Hmm, Hout⟩
+          (by simp [MState.top]) hget' o $$ [Hmem Hmm Ho] with ⟨Hmem, Hmm, Hout⟩
         · iframe Hmem Hmm Ho
         imod Hcont $$ %(σ.top + 1) %(by omega) %hheads Hvlb Hb Hau Htop' Hout with HΦ
         rw [hk]
@@ -1336,9 +1351,7 @@ theorem swp_sail_mem_write_excl_au (cpu : CPU) {n vasize : Nat}
         ihave %hget' := histBytes_valid _ req.pa n _ _ $$ [Hmem Hb]
         · iframe Hmem Hb
         imod memModel_hopIssue (σ.store cpu req.pa n w' true) cpu req.pa n w' Hs (σ.top + 1)
-          (by simp [MState.top]) (fun hn => by
-            have h0 := hget' 0 hn
-            simpa using h0) o $$ [Hmem Hmm Ho] with ⟨Hmem, Hmm, Hout⟩
+          (by simp [MState.top]) hget' o $$ [Hmem Hmm Ho] with ⟨Hmem, Hmm, Hout⟩
         · iframe Hmem Hmm Ho
         imod Hcont $$ %(σ.top + 1) %(by omega) %(by omega) %hheads Hvlb Hb Hc Hau Htop' Hout with HΦ
         rw [hk]

@@ -56,21 +56,27 @@ instance offFree_morph (t : KTier) (k : Nat) (q : Qp) :
 
 instance offFd_morph (t : KTier) (k : Nat) (q : Qp) (γb : BoxNames) (γo : GName) (C : FContent) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; offFd (GF := GF) k q γb γo C) := by
-  exact ctxMorph_ofEq _ (fun _ _ => by amb_tier_rfl)
+  unfold offFd offRefStamps
+  amb_morph_solve
 
 /-- Rocq `inode_pay_morph`. -/
 instance inodePay_morph (t : KTier) (γx : GName) (Q : Qp) (g : GName) (inum : BitVec 32) (v : BitVec 64)
     (fdty : BitVec 32) (wr : Bool) (q : Qp) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; inodePay (GF := GF) γx Q g inum v fdty wr q) := by
   unfold inodePay
+  refine @instCtxMorphExists hlc GF _ _ _ (fun mt => ?_)
   refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
+  refine @instCtxMorphSep hlc GF _ _ _ (tagsFl_morph mt) ?_
   refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
   refine @instCtxMorphSep hlc GF _ _ _ (inodeRefSide_morph t v _ g inum) ?_
   exact @instCtxMorphSep hlc GF _ _ _ (inodeShrHeldGen_morph t v _ g inum) (instCtxMorphConst _)
 
 instance fileCoreOff_morph (t : KTier) (k : Nat) (q : Qp) (pn : FPNames) (C : FContent) :
-    CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; fileCoreOff (GF := GF) k q pn C) :=
-  ctxMorph_ofEq _ (fun _ _ => by amb_tier_rfl)
+    CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; fileCoreOff (GF := GF) k q pn C) := by
+  unfold fileCoreOff
+  by_cases h : C.type = FD_INODE
+  · simp only [if_pos h]; exact offFd_morph t k q pn.obox pn.ooff C
+  · simp only [if_neg h]; exact offFree_morph t k q
 
 /-- Rocq `is_pipe_morph` (deviation 1, closed by the D8 wiring: the lock
 payload's slack bytes are `PipeInvDefs.pipeSlackAt ξ`, so the payload is a

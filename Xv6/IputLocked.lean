@@ -62,7 +62,7 @@ theorem iput_locked (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_N
     (kk : Nat) (q : Qp) (inum : BitVec 32) (dn : Dinode) (bm : Blkmap) (g1 g2 : GName)
     (Mt : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × BitVec 32))
     (n : Nat) (Sb : List Nat) (crb cru crz : Bool) (e0 : Nat) (tid : Nat) (qtx : Qp)
-    (pidv : BitVec 32) (dqp dqb dqs : DFrac) (rgb bfl : Bool) (td T0 Kw : Nat) (R : RegMap)
+    (pidv : BitVec 32) (dqp dqb dqs : DFrac) (rgb bfl : Bool) (td T0 Kw : Nat) (a : ChainVG) (R : RegMap)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : iputSlots ≤ k.avail)
     (hwf : k.wf) (hnoff : k.noff = 0) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt) (hkk : kk < NINODE) (hn : iputUnits ≤ n)
@@ -95,7 +95,7 @@ theorem iput_locked (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_N
     (∃ tst : Nat, istmpAuth kk (1 : Qp).half tst ∗ topLb tst) ∗
     -- R3.4 / F30 (g): the guard's WINDOW, still open: the L1 register half,
     -- its stamp's floor, the count half at 1, the header's cells and pieces
-    icRegd kk ⟨td, true, some (icfgDev, inum), some (.icLoaded g1 dn bm, T0)⟩ ∗ topLb td ∗
+    icRegd kk ⟨td, true, some (icfgDev, inum), some (.icLoaded g1 dn bm, T0), a⟩ ∗ topLb td ∗ vgFloors curCtx a ∗
     ctxFloor curCtx Kw ∗ icCnt kk 1 ∗
     wordPointsTo (iValid (ientry kk)) 4 (DFrac.own 1) (validWord true) ∗
     inodeIdent kk (DFrac.own (1 : Qp).half) icfgDev inum ∗
@@ -129,7 +129,7 @@ theorem iput_locked (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_N
     iputPost k n Sb crb cru crz tid qtx pidv dqp dqb dqs rgb
     ⊢ wpLoop (GF := GF) c :=
   iput_lk_a RH AC ASN RSH IT HO Γ c k γl pd pav pu j γil γisl kk q inum dn bm g1 g2 Mt ci n Sb
-    crb cru crz e0 tid qtx pidv dqp dqb dqs rgb bfl td T0 Kw R hj hproc hK hwf hnoff hlocks
+    crb cru crz e0 tid qtx pidv dqp dqb dqs rgb bfl td T0 Kw a R hj hproc hK hwf hnoff hlocks
     htier hkk hn hcrb hgeom hbg hcov hlog hnib hbel hpd hnl0 hMwf hciwf hMk hcik hTKw h10 h9 h18
     h19 h20 hR2 hpins
 

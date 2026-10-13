@@ -349,20 +349,23 @@ theorem sys_open_deposit [Icfg] [CurCtx] (cpu : CPU) (E : CoPset) (kk kf : Nat) 
       |={E}=> ownCtx cpu curCtx ∗ offRows offCfg kk curCtx ∗ ∃ γb : BoxNames, offFd kf 1 γb γo C := by
   iintro ⟨Hctx, Hres, Hrows⟩
   imod stampsAuth_alloc (GF := GF) (Id := Nat) with ⟨%gs, Hst⟩
+  imod stampsAuth_alloc (GF := GF) (Id := Nat) with ⟨%gt, Htk⟩
   imod ghost_var_alloc (0 : Nat) with ⟨%gc, Hc⟩
   imod ghost_var_alloc (default : SlotReg Nat Unit) with ⟨%gd, Hd⟩
-  imod ghost_var_alloc (default : L2Reg Nat) with ⟨%gp, Hp⟩
-  let γb : BoxNames := ⟨gs, gc, gd, gp⟩
-  ihave Hst := (show stampsAuth (GF := GF) ⟨gs, 0, 0, 0⟩ (∅ : StampMap Nat) ⊢
+  imod ghost_var_alloc (L2Reg.init : L2Reg Nat) with ⟨%gp, Hp⟩
+  let γb : BoxNames := ⟨gs, gc, gd, gp, gt⟩
+  ihave Hst := (show stampsAuth (GF := GF) ⟨gs, 0, 0, 0, 0⟩ (∅ : StampMap Nat) ⊢
       stampsAuth γb (∅ : StampMap Nat) from .rfl) $$ Hst
-  imod offPublishPark cpu offCfg kk kf γb γo curCtx E hE $$ [Hst Hc Hd Hp Hctx Hres Hrows]
-    with ⟨Hctx, #Hbox, %T0, %T, Hregd, -, Hcnt, Href, #Hmem, Hrows⟩
+  ihave Htk := (show stampsAuth (GF := GF) ⟨gt, 0, 0, 0, 0⟩ (∅ : StampMap Nat) ⊢
+      stampsAuth γb.tk (∅ : StampMap Nat) from .rfl) $$ Htk
+  imod offPublishPark cpu offCfg kk kf γb γo curCtx E hE $$ [Hst Htk Hc Hd Hp Hctx Hres Hrows]
+    with ⟨Hctx, #Hbox, %T0, %T, %a, Hregd, -, Hcnt, Href, #Hmem, Hrows⟩
   · iframe
   imodintro
   iframe Hctx Hrows
   iexists γb
   unfold offFd offRefStamps
-  iexists kk, T0
+  iexists kk, T0, a
   unfold offRegd offCnt slotdHalf cntHalf
   iframe Hbox Hmem Hregd Hcnt
   isplitr

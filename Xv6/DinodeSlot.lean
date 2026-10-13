@@ -577,7 +577,7 @@ theorem dsPay_content [CurCtx] (E : CoPset) (γ : BcacheNames) (γfs : FsNames)
         bioPay γ (fsView γfs γd dev cov) k dv bno bs bsd d -∗
         |={E}=> (⌜bs = bs0⌝ ∗ fsblock γfs.bytes bno.toNat bs0 ∗
           bioPay γ (fsView γfs γd dev cov) k dv bno bs bsd d)) := by
-  unfold bioPay
+  unfold bioPay bioPayAt
   cases d
   · simp only [Bool.false_eq_true, if_false, fsView_clean]
     unfold fsMclean
@@ -610,7 +610,7 @@ theorem dsHeld_L [CurCtx] (γ : BcacheNames) (γfs : FsNames) (γd : DiskNames)
       iprop((γfs.cache ↪◯MAP[bno.toNat]{DFrac.own (1 : Qp).half} bs) ∗
         ((γfs.cache ↪◯MAP[bno.toNat]{DFrac.own (1 : Qp).half} bs) -∗
           bioPay γ (fsView γfs γd dev cov) k dv bno bs bsd d)) := by
-  unfold bioPay
+  unfold bioPay bioPayAt
   cases d
   · simp only [Bool.false_eq_true, if_false, fsView_clean]
     unfold fsMclean

@@ -18,10 +18,14 @@ it), so that the state interpretation can carry it MachCSL-generically
   acquire entry `⟨a, B, va⟩` (`va ≠ 0`, the winning AMO's store) sits
   IMMEDIATELY above the release entry `⟨r, A, 0⟩` -- so the AMO read it: an
   exclusive read reads at the top of the order, and the region discipline
-  lets only the lock rules write the byte -- and the release entry sits
-  above a NONZERO entry, so the lock was held when `A` wrote 0 (the region
-  discipline: a 0 from HELD only by the holder, `MachCSL.lkStepR`).  An
-  `initlock` zero (from FREE) is never a hop.
+  lets only the lock rules write the byte -- or, for a dynamic lock, the word
+  shape + the name window -- and the release entry sits above a NONZERO
+  entry, so the lock was held when `A` wrote 0 (the region discipline: a 0
+  from HELD only by the holder, `MachCSL.lkStepR`).  All three entries are
+  WORD-sized (`wordEntAt`: each of the word's four bytes has an entry at that
+  position by that agent -- every lock-protocol write is ONE 4-byte store,
+  while `memset`'s junk is one byte per position) [R36.3].  An `initlock`
+  zero (from FREE) is never a hop.
 * **A chain** (`hopChain m isLk A t B a`): `t < r₀` (the entry precedes the
   author's release), the releaser of hop k+1 is the acquirer of hop k, which
   acquired before releasing (`a_k < r_{k+1}`), the last acquirer is `B`, at
@@ -165,12 +169,26 @@ def lockByteIn (rs : List RsvRegion) (b : PAddr) : Prop :=
 
 /-! ## Hops and chains -/
 
+/-- **A word-sized entry** of the word at `b`: each of its four bytes has an
+entry at position `t` by agent `g` (one 4-byte store) [R36.3]. -/
+def wordEntAt (m : FlatMem) (b : PAddr) (t : Nat) (g : Agent) : Prop :=
+  ∀ i, i < 4 → ∃ (H : Hist) (e : HEnt), m[b + BitVec.ofNat 64 i]? = some H ∧ e ∈ H ∧ e.t = t ∧ e.tid = g
+
+theorem wordEntAt_mono {m m' : FlatMem} (hx : memExt m m') {b : PAddr} {t : Nat} {g : Agent}
+    (h : wordEntAt m b t g) : wordEntAt m' b t g := by
+  intro i hi
+  obtain ⟨H, e, hH, he, het, heg⟩ := h i hi
+  obtain ⟨N, hN⟩ := hx _ H hH
+  exact ⟨N ++ H, e, hN, List.mem_append_right _ he, het, heg⟩
+
 /-- **A release → acquire hop** at the lock byte `b`: the acquire entry
 `⟨a, B, va⟩` (nonzero) immediately above the release entry `⟨r, A, 0⟩`,
-itself above a nonzero entry (the lock was held). -/
+itself above a nonzero entry (the lock was held); all three WORD-sized
+(`wordEntAt`, [R36.3]). -/
 def syncHop (m : FlatMem) (b : PAddr) (A : CPU) (r : Nat) (B : CPU) (a : Nat) : Prop :=
   ∃ (H1 H2 : Hist) (e0 : HEnt) (va : BitVec 8),
-    m[b]? = some (H1 ++ ⟨a, hartAgent B, va⟩ :: ⟨r, hartAgent A, 0⟩ :: e0 :: H2) ∧ va ≠ 0 ∧ e0.v ≠ 0
+    m[b]? = some (H1 ++ ⟨a, hartAgent B, va⟩ :: ⟨r, hartAgent A, 0⟩ :: e0 :: H2) ∧ va ≠ 0 ∧ e0.v ≠ 0 ∧
+    wordEntAt m b a (hartAgent B) ∧ wordEntAt m b r (hartAgent A) ∧ wordEntAt m b e0.t e0.tid
 
 /-- **A sync chain** from the entries of author `A` at or below `t` to hart
 `B`, whose last acquire is at `a`. -/
@@ -184,9 +202,10 @@ inductive hopChain (m : FlatMem) (isLk : PAddr → Nat → Prop) : CPU → Nat �
 
 theorem syncHop_mono {m m' : FlatMem} (hx : memExt m m') {b : PAddr} {A : CPU} {r : Nat} {B : CPU} {a : Nat}
     (h : syncHop m b A r B a) : syncHop m' b A r B a := by
-  obtain ⟨H1, H2, e0, va, hb, hva, he0⟩ := h
+  obtain ⟨H1, H2, e0, va, hb, hva, he0, hwa, hwr, hwe⟩ := h
   obtain ⟨N, hN⟩ := hx b _ hb
-  exact ⟨N ++ H1, H2, e0, va, by rw [hN, List.append_assoc], hva, he0⟩
+  exact ⟨N ++ H1, H2, e0, va, by rw [hN, List.append_assoc], hva, he0, wordEntAt_mono hx hwa,
+    wordEntAt_mono hx hwr, wordEntAt_mono hx hwe⟩
 
 theorem hopChain_mono {m m' : FlatMem} {isLk isLk' : PAddr → Nat → Prop} (hx : memExt m m')
     (hl : ∀ b r, isLk b r → isLk' b r) {A : CPU} {t : Nat} {B : CPU} {a : Nat}
@@ -205,7 +224,7 @@ theorem hopChain_prefix {m : FlatMem} {isLk : PAddr → Nat → Prop} {A : CPU} 
 /-- A hop's acquire is an entry of the memory, authored by the acquirer. -/
 theorem syncHop_acq_ent {m : FlatMem} {b : PAddr} {A : CPU} {r : Nat} {B : CPU} {a : Nat}
     (h : syncHop m b A r B a) : ∃ (H : Hist) (e : HEnt), m[b]? = some H ∧ e ∈ H ∧ e.t = a := by
-  obtain ⟨H1, H2, e0, va, hb, _, _⟩ := h
+  obtain ⟨H1, H2, e0, va, hb, _, _, _⟩ := h
   exact ⟨_, ⟨a, hartAgent B, va⟩, hb, List.mem_append_right _ List.mem_cons_self, rfl⟩
 
 /-- A chain's last acquire is an entry of the memory. -/
@@ -216,11 +235,13 @@ theorem hopChain_acq_ent {m : FlatMem} {isLk : PAddr → Nat → Prop} {A : CPU}
   | step b _ _ hh _ => exact ⟨b, syncHop_acq_ent hh⟩
 
 /-- The hop a winning AMO makes: on top of a history headed by the release
-entry `⟨r, A, 0⟩` over a nonzero entry, the acquire entry `⟨a, B, va⟩`. -/
+entry `⟨r, A, 0⟩` over a nonzero entry, the acquire entry `⟨a, B, va⟩`; all
+three word-sized. -/
 theorem syncHop_of_head {m : FlatMem} {b : PAddr} {A : CPU} {r : Nat} {B : CPU} {a : Nat} {va : BitVec 8}
     {e0 : HEnt} {H2 : Hist} (hb : m[b]? = some (⟨a, hartAgent B, va⟩ :: ⟨r, hartAgent A, 0⟩ :: e0 :: H2))
-    (hva : va ≠ 0) (he0 : e0.v ≠ 0) : syncHop m b A r B a :=
-  ⟨[], H2, e0, va, by simpa using hb, hva, he0⟩
+    (hva : va ≠ 0) (he0 : e0.v ≠ 0) (hwa : wordEntAt m b a (hartAgent B)) (hwr : wordEntAt m b r (hartAgent A))
+    (hwe : wordEntAt m b e0.t e0.tid) : syncHop m b A r B a :=
+  ⟨[], H2, e0, va, by simpa using hb, hva, he0, hwa, hwr, hwe⟩
 
 /-! ## The pairing (keys of the certificate map) -/
 
@@ -282,19 +303,29 @@ theorem ChainEnv.ext_trans {X Y Z : ChainEnv} (h1 : X.ext Y) (h2 : Y.ext Z) : X.
   ⟨memExt_trans h1.1 h2.1, fun b r h => h2.2.1 b r (h1.2.1 b r h), fun f w => (h1.2.2.1 f w).trans (h2.2.2.1 f w),
     fun j f w hp hj => Nat.le_trans (h1.2.2.2 j f w hp hj) (h2.2.2.2 j f w ((h1.2.2.1 f w).1 hp) hj)⟩
 
-/-- **The boot hop's cover**: the entries of the publication writer `h` at or
-below `t` precede one of its stores to a publication byte `f`, which hart
-`j ≠ h` has read (its coherence floor at `f` reached it). -/
+/-- **The boot hop's cover** (W8 (f2-ctx), F-B adopted [R36.1]): hart `j`
+has read (its coherence floor reached) a store at `r` of the publication
+writer `w ≠ j` to its publication byte `f`, and the entries of `h` at or below
+`t` precede that store -- `w`'s own entries (`h = w`, `t < r`), or entries
+chained to `w` before it (`∃ a < r, hopChain … h t w a`: the boot hop composes
+AFTER lock hops -- `h`'s release, the hops, `w`'s acquire at `a`, `w`'s
+`fence rw,w; sw` at `r > a`, `rf`, `j`'s load and `fence r,rw`; PPO 4--7 and
+`rf` in RVWMO's global memory order).  The guard is `j ≠ w`, the writer the
+coherence clause of `ChainEnv.ext` is about. -/
 def pubCover (X : ChainEnv) (h : CPU) (t : Nat) (j : CPU) : Prop :=
-  h ≠ j ∧ ∃ (f : PAddr) (r : Nat) (v : BitVec 8) (H : Hist),
-    X.isPub f h ∧ X.m[f]? = some H ∧ ⟨r, hartAgent h, v⟩ ∈ H ∧ t < r ∧ r ≤ X.coh j f
+  ∃ (f : PAddr) (w : CPU) (r : Nat) (v : BitVec 8) (H : Hist),
+    j ≠ w ∧ X.isPub f w ∧ X.m[f]? = some H ∧ ⟨r, hartAgent w, v⟩ ∈ H ∧ r ≤ X.coh j f ∧
+    ((h = w ∧ t < r) ∨ ∃ a, a < r ∧ hopChain X.m X.isLk h t w a)
 
 theorem pubCover_mono {X Y : ChainEnv} (hx : X.ext Y) {h : CPU} {t : Nat} {j : CPU}
     (hc : pubCover X h t j) : pubCover Y h t j := by
-  obtain ⟨hne, f, r, v, H, hp, hf, he, ht, hr⟩ := hc
+  obtain ⟨f, w, r, v, H, hne, hp, hf, he, hr, harm⟩ := hc
   obtain ⟨N, hN⟩ := hx.1 f H hf
-  exact ⟨hne, f, r, v, N ++ H, (hx.2.2.1 f h).1 hp, hN, List.mem_append_right _ he, ht,
-    Nat.le_trans hr (hx.2.2.2 j f h hp (Ne.symm hne))⟩
+  refine ⟨f, w, r, v, N ++ H, hne, (hx.2.2.1 f w).1 hp, hN, List.mem_append_right _ he,
+    Nat.le_trans hr (hx.2.2.2 j f w hp hne), ?_⟩
+  rcases harm with h1 | ⟨a, ha, hc⟩
+  · exact .inl h1
+  · exact .inr ⟨a, ha, hopChain_mono hx.1 hx.2.1 hc⟩
 
 /-- **The gate**: hart `j` has read a post-power-on store of every
 publication byte it does not write. -/
@@ -360,10 +391,13 @@ theorem ChainCert.valid_mono {X Y : ChainEnv} (hx : X.ext Y) {c : ChainCert} (h 
 theorem ChainCert.valid_le {X : ChainEnv} {h j : CPU} {t t' τ τ' : Nat}
     (hv : ChainCert.valid X ⟨h, t, j, τ⟩) (ht : t' ≤ t) (hτ : τ ≤ τ') :
     ChainCert.valid X ⟨h, t', j, τ'⟩ := by
-  rcases hv with ⟨h1, h2⟩ | ⟨a, ha, hc⟩ | ⟨hne, f, r, v, H, hp, hf, he, htr, hr⟩
+  rcases hv with ⟨h1, h2⟩ | ⟨a, ha, hc⟩ | ⟨f, w, r, v, H, hne, hp, hf, he, hr, harm⟩
   · exact .inl ⟨h1, by simp only at h2 ⊢; omega⟩
   · exact .inr (.inl ⟨a, by simp only at ha ⊢; omega, hopChain_prefix hc ht⟩)
-  · exact .inr (.inr ⟨hne, f, r, v, H, hp, hf, he, by simp only at htr ⊢; omega, hr⟩)
+  · refine .inr (.inr ⟨f, w, r, v, H, hne, hp, hf, he, hr, ?_⟩)
+    rcases harm with ⟨h1, h2⟩ | ⟨a, ha, hc⟩
+    · exact .inl ⟨h1, by simp only at h2 ⊢; omega⟩
+    · exact .inr ⟨a, ha, hopChain_prefix hc ht⟩
 
 /-- **The release's record**: a certificate to the releaser `j` is one before
 the release store at `r`, when every entry of the memory is below `r` (the
@@ -392,22 +426,26 @@ theorem ChainCert.valid_hop {X : ChainEnv} {h A B : CPU} {t r a : Nat} {b : PAdd
     (hv : ChainCert.valid X ⟨h, t, A, r⟩) (hb : X.isLk b a) (hh : syncHop X.m b A r B a)
     (hall : ∀ (b' : PAddr) (H : Hist) (e : HEnt), X.m[b']? = some H → e ∈ H → e.t ≤ a)
     (hone : pubOneShot X) (hgate : gateOk X B) : ChainCert.valid X ⟨h, t, B, a + 1⟩ := by
-  rcases hv with ⟨h1, h2⟩ | ⟨a1, ha1, hc⟩ | ⟨hne, f, r', v, H, hp, hf, he, htr, hr⟩
+  rcases hv with ⟨h1, h2⟩ | ⟨a1, ha1, hc⟩ | ⟨f, w, r', v, H, hne, hp, hf, he, hr, harm⟩
   · simp only at h1 h2
     subst h1
     exact .inr (.inl ⟨a, Nat.lt_succ_self a, .base b hb hh h2⟩)
   · exact .inr (.inl ⟨a, Nat.lt_succ_self a, .step b hc hb hh ha1⟩)
-  · simp only at hne htr hr hp
-    by_cases hBh : h = B
-    · -- the writer itself: its own entries, all at or below the acquire
-      subst hBh
-      have hle : r' ≤ a := hall f H _ hf he
-      exact .inl ⟨rfl, show t < a + 1 by omega⟩
-    · obtain ⟨r2, v2, H2, hf2, he2, hr20, hr2⟩ := hgate f h hp (Ne.symm hBh)
+  · simp only at hne hr harm
+    have hle : r' ≤ a := hall f H _ hf he
+    by_cases hBw : B = w
+    · -- the writer itself acquires: its own entries, or the chain, before its store
+      subst hBw
+      rcases harm with ⟨h1, h2⟩ | ⟨a', ha', hc⟩
+      · exact .inl ⟨h1, show t < a + 1 by omega⟩
+      · exact .inr (.inl ⟨a', by simp only; omega, hc⟩)
+    · obtain ⟨r2, v2, H2, hf2, he2, hr20, hr2⟩ := hgate f w hp hBw
       rw [hf] at hf2
       cases hf2
-      have heq : r' = r2 := hone f h H _ _ hp hf he he2 (show r' ≠ 0 by omega) (show r2 ≠ 0 by omega)
+      have hr0 : r' ≠ 0 := by
+        rcases harm with ⟨_, h2⟩ | ⟨a', ha', _⟩ <;> omega
+      have heq : r' = r2 := hone f w H _ _ hp hf he he2 hr0 (show r2 ≠ 0 by omega)
       subst heq
-      exact .inr (.inr ⟨hBh, f, r', v2, H, hp, hf, he2, htr, hr2⟩)
+      exact .inr (.inr ⟨f, w, r', v2, H, hBw, hp, hf, he2, hr2, harm⟩)
 
 end MachCSL

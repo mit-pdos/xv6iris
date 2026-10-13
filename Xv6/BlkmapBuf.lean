@@ -217,7 +217,7 @@ theorem dsPay_contentQ [CurCtx] (E : CoPset) (γ : BcacheNames) (γfs : FsNames)
         bioPay γ (fsView γfs γd dev cov) k dv bno bs bsd d -∗
         |={E}=> (⌜bs = bs0⌝ ∗ fsblockQ γfs.bytes dq bno.toNat bs0 ∗
           bioPay γ (fsView γfs γd dev cov) k dv bno bs bsd d)) := by
-  unfold bioPay
+  unfold bioPay bioPayAt
   cases d
   · simp only [Bool.false_eq_true, if_false, fsView_clean]
     unfold fsMclean

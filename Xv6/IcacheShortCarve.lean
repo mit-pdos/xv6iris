@@ -50,7 +50,7 @@ theorem irefFrag_le1 [Icfg] (k : Nat) (q : Qp) : irefFrag (GF := GF) k q ⊢ ⌜
 
 /-- A short parent's lent stamps at `qi + s` are its lent stamps at `qi` and
 a share's stamps at `s` -- given `qt ≤ 1` (Rocq `ic_lent_stamps_carve`). -/
-theorem icLentStamps_carve [Icfg] (k : Nat) (qt qi s : Qp) (dev inum : BitVec 32)
+theorem icLentStamps_carve [Icfg] [CurCtx] (k : Nat) (qt qi s : Qp) (dev inum : BitVec 32)
     (hle : qt ≤ 1) :
     icLentStamps (GF := GF) k qt (qi + s) dev inum ⊣⊢
       icLentStamps k qt qi dev inum ∗ icRefStamps k dev inum s := by

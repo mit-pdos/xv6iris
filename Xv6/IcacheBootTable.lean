@@ -160,6 +160,7 @@ import Xv6.IcacheTable
 import Xv6.IcacheBoxSites
 import Xv6.ArrCursor
 import MachCSL.BigSepLib
+import Xv6.LockRsv
 
 namespace Xv6
 
@@ -221,6 +222,17 @@ theorem slLk_iLock_ientry (k : Nat) : slLk (iLock (ientry k)) = ientry k + BitVe
   unfold slLk iLock
   rw [BitVec.add_assoc]
   congr 1
+
+/-- Inode `k`'s sleeplock's inner spinlock is its registered static lock. -/
+theorem slLk_inodeLock (k : Nat) : slLk (iLock (ientry k)) = rsvInodeLk k := by
+  rw [slLk_iLock_ientry]
+  unfold ientry rsvInodeLk ISLOTSZ
+  apply BitVec.eq_of_toNat_eq
+  simp only [BitVec.toNat_add, BitVec.toNat_ofNat]
+  have h : KA.«itable».toNat = KernelSyms.«itable» := rfl
+  rw [h]
+  have h1 : KernelSyms.«itable» < 2 ^ 32 := by decide
+  omega
 
 theorem slLk_iLock_ientry16 (k : Nat) :
     slLk (iLock (ientry k)) + 16#64 = ientry k + BitVec.ofNat 64 40 := by
@@ -435,35 +447,39 @@ theorem icBoot_slot [Icfg] [CurCtx] (cn : IcNames) (γfs : FsNames) (γi : GName
 
 /-- The fifty registers out of the box allocation: the L1 row (under its
 receipt) and the L2 half, apart (Rocq's inline `big_sepL_mono`). -/
-theorem icBoot_regsSplit [Icfg] (k : Nat) :
-    (∃ T : Nat, icRegd (GF := GF) k ⟨T, false, none, none⟩ ∗ topLb T ∗ icCnt k 0 ∗
-      icRegp k ⟨0, none⟩) ⊢
-      (∃ Td : Nat, topLb Td ∗ (icRegd k ⟨Td, false, none, none⟩ ∗ icCnt k 0)) ∗
-        icRegp k ⟨0, none⟩ := by
-  iintro ⟨%T, Hrd, #Hl, Hc, Hrp⟩
+theorem icBoot_regsSplit [Icfg] [CurCtx] (k : Nat) :
+    (∃ (T : Nat) (a : ChainVG), icRegd (GF := GF) k ⟨T, false, none, none, a⟩ ∗ topLb T ∗
+      vgFloors curCtx a ∗ icCnt k 0 ∗ icRegp k L2Reg.init) ⊢
+      (∃ Td : Nat, topLb Td ∗
+        (∃ a : ChainVG, icRegd k ⟨Td, false, none, none, a⟩ ∗ vgFloors curCtx a ∗ icCnt k 0)) ∗
+        icRegp k L2Reg.init := by
+  iintro ⟨%T, %a, Hrd, #Hl, #Hva, Hc, Hrp⟩
   iframe Hrp
   iexists T
-  iframe Hrd Hc
-  iexact Hl
+  isplitr
+  · iexact Hl
+  iexists a
+  iframe Hrd Hc Hva
 
 /-- One DEAD payload row: the box's L1 row at `none`/0 under `tl`, the ref
 cell at 0, the full stamp auth and its receipt 0 (the body of Rocq's
 `itable_res2_bare` construction, 1549--1564). -/
 theorem itableSlotResBare_boot [Icfg] [CurCtx] (tl k : Nat) :
     (∃ Td : Nat, ⌜Td ≤ tl⌝ ∗ topLb Td ∗
-        (icRegd (GF := GF) k ⟨Td, false, none, none⟩ ∗ icCnt k 0)) ∗
+        (∃ a : ChainVG, icRegd (GF := GF) k ⟨Td, false, none, none, a⟩ ∗ vgFloors curCtx a ∗
+          icCnt k 0)) ∗
       (wordPointsTo (iRef (ientry k)) 4 (DFrac.own 1) (0#32 : BitVec 32) ∗ istmpAuth k 1 0) ⊢
       itableSlotResBare curCtx tl ∅ ∅ k := by
   rw [itableSlotResBare_none curCtx tl ∅ ∅ k (get?_empty k), get?_empty k, itableSlotFree_cur]
   unfold icSlotRowBare icSlotRow
-  iintro ⟨⟨%Td, %hb, #Hl, Hrd, Hc⟩, Hcell, Hst⟩
+  iintro ⟨⟨%Td, %hb, #Hl, %a, Hrd, #Hva, Hc⟩, Hcell, Hst⟩
   isplitl [Hrd Hc]
   · iexists Td
     isplitr
     · ipureintro; exact hb
     isplitl
-    · iexists (⟨Td, false, none, none⟩ : SlotReg IcBid IcX)
-      iframe Hrd Hc
+    · iexists (⟨Td, false, none, none, a⟩ : SlotReg IcBid IcX)
+      iframe Hrd Hc Hva
       isplitr
       · ipureintro; rfl
       isplitr
@@ -508,23 +524,29 @@ theorem itableRes2Bare_boot [Icfg] [CurCtx] (tl : Nat) (cn : IcNames) (γfs : Fs
 the neutral descriptor variable and the slot's EMPTY off-row set (no file
 points at any inode yet) -- the body of Rocq's `Hstep`. -/
 theorem icSleeplock_boot [Icfg] [CurCtx] (cpu : CPU) (E : CoPset) (cn : IcNames)
-    (sname : BitVec 64) (k : Nat) :
-    ownCtx (GF := GF) cpu curCtx ∗
-      (((((sleepLockInited (iLock (ientry k)) sname ∗ icTok cn k) ∗ icRegp k ⟨0, none⟩) ∗
+    (sname : BitVec 64) (k : Nat) (hk : k < NINODE)
+    (heq : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) :
+    gateFloor curCtx ∗ ownCtx (GF := GF) cpu curCtx ∗
+      (((((sleepLockInited (iLock (ientry k)) sname ∗ icTok cn k) ∗ icRegp k L2Reg.init) ∗
           icDepNeutral cn k) ∗ offSetAuth offCfg k ∅) ∗
         (kmapId (slLk (iLock (ientry k))) ∗ kmapId (slLk (iLock (ientry k)) + 16#64))) ⊢
       |={E}=> (ownCtx cpu curCtx ∗ ∃ γil γisl : GName,
         isSleeplockGen γil γisl (iLock (ientry k)) (icSlp cn k) (slhTok (icfgIsl k))) := by
-  iintro ⟨Hrun, ⟨⟨⟨⟨Hf, Ht⟩, Hrp⟩, Hn⟩, Hoff⟩, #Hm1, #Hm2⟩
+  iintro ⟨#Hg, Hrun, ⟨⟨⟨⟨Hf, Ht⟩, Hrp⟩, Hn⟩, Hoff⟩, #Hm1, #Hm2⟩
+  ihave Hnf := lkNameFor_rsv (hlc := hlc) (GF := GF) (slLk (iLock (ientry k)))
+    (lkRsvIn_of heq (by rw [slLk_inodeLock]; exact xv6RsvStatic_inode k (by unfold NINODE at hk; omega)))
   ihave HR : icSlp (GF := GF) cn k curCtx $$ [Ht Hrp Hn Hoff]
   · unfold icSlp
-    iexists (⟨0, none⟩ : L2Reg IcBid)
+    iexists (L2Reg.init : L2Reg IcBid)
     isplitl [Hrp]
     · unfold l2Row icRegp
       iframe Hrp
+      dsimp only [L2Reg.init]
       isplitr
       · ipureintro; rfl
+      isplitr
       · iapply ctxFloor_0
+      · iapply vgFloors_zero
     iframe Ht Hn
     unfold offRows
     iexists ∅
@@ -532,7 +554,7 @@ theorem icSleeplock_boot [Icfg] [CurCtx] (cpu : CPU) (E : CoPset) (cn : IcNames)
     iapply BigSepS.bigSepS_empty.2
     itrivial
   iapply slFresh_newGenl cpu E (iLock (ientry k)) sname (icSlp cn k) (slhTok (icfgIsl k))
-  iframe Hf Hrun HR
+  iframe Hf Hrun HR Hnf Hg
   isplit
   · iexact Hm1
   · iexact Hm2
@@ -576,8 +598,9 @@ creator deposit wants it, and this step builds NINODE+1 locks; borrowed once
 and handed back). -/
 theorem icacheBootAt [Icfg] [CurCtx] (cpu : CPU) (E : CoPset) (γl : GName) (cn : IcNames)
     (γfs : FsNames) (γi : GName) (cov : ExtTreeSet Nat compare) (logstart nib : Nat)
-    (dv : BitVec 32) (sname : BitVec 64) :
-    kmapStatic (GF := GF) ⊢
+    (dv : BitVec 32) (sname : BitVec 64)
+    (heq : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) :
+    kmapStatic (GF := GF) ⊢ gateFloor curCtx -∗
     iOwn (F := constOF IcacheUR) icfgIref (● (∅ : RegMapF (Qp × PosNat))) -∗
     ([∗list] k ∈ List.range (NINODE + NINODE), liveFrac0 k 1) -∗
     ([∗list] k ∈ List.range NINODE, slhAuth (icfgIsl k) none) -∗
@@ -604,7 +627,7 @@ theorem icacheBootAt [Icfg] [CurCtx] (cpu : CPU) (E : CoPset) (γl : GName) (cn 
       itableInv (hlc := hlc) ∗
       icEscrows cn γfs γi cov logstart ∗
       icSleeplocks cn) := by
-  iintro #HS Hauth Hlive Hislauth Hfresh Hsl Hraw Hsupply Hstamps Hrows Hkey Hxkey Hfree Htok
+  iintro #HS #Hg Hauth Hlive Hislauth Hfresh Hsl Hraw Hsupply Hstamps Hrows Hkey Hxkey Hfree Htok
     Hdep Hgid Hhpn Htkey Hckey Hbox Hoffa Hrun
   -- the identity-map claims (deviation 3)
   ihave #Hclaims := irefClaims_boot (GF := GF) $$ HS
@@ -658,8 +681,9 @@ theorem icacheBootAt [Icfg] [CurCtx] (cpu : CPU) (E : CoPset) (γl : GName) (cn 
   -- fold under ONE boot bound `tl` (`bigSepL_topLb_max`)
   ihave Hregs := BigSepL.bigSepL_mono (fun _ => icBoot_regsSplit _) $$ Hregs
   icases BigSepL.bigSepL_sep_eqv.1 $$ Hregs with ⟨Hl1, Hl2⟩
-  icases bigSepL_topLb_max (fun k Td => iprop(icRegd (GF := GF) k ⟨Td, false, none, none⟩ ∗
-      icCnt k 0)) (List.range NINODE) $$ Hl1 with ⟨%tl, #Htl, Hl1⟩
+  icases bigSepL_topLb_max (fun k Td => iprop(∃ a : ChainVG,
+      icRegd (GF := GF) k ⟨Td, false, none, none, a⟩ ∗ vgFloors curCtx a ∗ icCnt k 0))
+      (List.range NINODE) $$ Hl1 with ⟨%tl, #Htl, Hl1⟩
   -- the pool's own invariant, out of the stocked rows, the two keys and the
   -- fifty quarters (durable-disk C-3b)
   ihave Hids := icIdsOf_intro cn dvs $$ Hquarters
@@ -679,11 +703,14 @@ theorem icacheBootAt [Icfg] [CurCtx] (cpu : CPU) (E : CoPset) (γl : GName) (cn 
       (fun ξ => itableRes2Bare (GF := GF) ξ tl cn γfs γi cov logstart nib dv) tl
       (fun ξ => itableRes2_ofBare ξ tl cn γfs γi cov logstart nib dv)
       $$ [Hfree Hrun Hfresh Hres] with ⟨Hrun, #Hlock⟩
-  · iframe Hfree Hrun Hfresh Hres
+  · iframe Hfree Hrun Hfresh Hres Hg
     isplit
     · iexact Hm1
     isplit
     · iexact Hm2
+    isplit
+    · iapply lkNameFor_rsv
+      exact lkRsvIn_of heq xv6RsvStatic_itable
     · iexact Htl
   -- ---- the fifty inode sleeplocks (A6.68: SEQUENTIAL, not fifty
   -- independent fupds -- each borrows the running token and returns it) ----
@@ -697,17 +724,18 @@ theorem icacheBootAt [Icfg] [CurCtx] (cpu : CPU) (E : CoPset) (γl : GName) (cn 
   · iframe Hsl Hoffa
   ihave Hsl := BigSepL.bigSepL_sep_eqv.2 $$ [Hsl Hkm]
   · iframe Hsl Hkm
-  have hstep : ⊢ [∗list] k ∈ List.range NINODE, (ownCtx (GF := GF) cpu curCtx -∗
-      ((((((sleepLockInited (iLock (ientry k)) sname ∗ icTok cn k) ∗ icRegp k ⟨0, none⟩) ∗
+  have hstep : iprop(□ gateFloor (GF := GF) curCtx) ⊢ [∗list] k ∈ List.range NINODE, (ownCtx (GF := GF) cpu curCtx -∗
+      ((((((sleepLockInited (iLock (ientry k)) sname ∗ icTok cn k) ∗ icRegp k L2Reg.init) ∗
           icDepNeutral cn k) ∗ offSetAuth offCfg k ∅) ∗
         (kmapId (slLk (iLock (ientry k))) ∗ kmapId (slLk (iLock (ientry k)) + 16#64))) -∗
       |={E}=> (ownCtx cpu curCtx ∗ ∃ γil γisl : GName,
         isSleeplockGen γil γisl (iLock (ientry k)) (icSlp cn k) (slhTok (icfgIsl k))))) :=
-    BigSepL.bigSepL_intro (P := iprop(emp)) (fun _ k _ => by
-      iintro - Hr Hp
-      iapply icSleeplock_boot cpu E cn sname k
-      iframe Hr Hp)
-  ihave Hstep := hstep
+    BigSepL.bigSepL_intro (P := iprop(□ gateFloor (GF := GF) curCtx)) (fun _ k hk => by
+      have hk' : k < NINODE := List.mem_range.mp (List.mem_of_getElem? hk)
+      iintro #Hg' Hr Hp
+      iapply icSleeplock_boot cpu E cn sname k hk' heq
+      iframe Hr Hp Hg')
+  ihave Hstep := hstep $$ Hg
   imod bigSepL_fupd_thread E (ownCtx (GF := GF) cpu curCtx) _ _ (List.range NINODE)
     $$ [Hrun Hstep Hsl] with ⟨Hrun, Hsls⟩
   · iframe Hrun Hstep Hsl

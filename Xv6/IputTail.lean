@@ -137,10 +137,10 @@ theorem iput_tail_ne_au (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU)
     (qt : Qp) (m : PosNat) (hMk : PartialMap.get? Mt kk = some (qt, m.succ))
     (hMwf : icMWf Mt) (hciwf : icCiWf Mt ci icfgNib icfgDev) :
     iputEnv Γ γl pd pav pu γil γisl kk ∗ iputTab Mt ci ∗ inodeRef kk q icfgDev inum ∗
-      runitAny inum.toNat ⊢
-    |={⊤}=> writeAU c (iRef (ientry kk)) 4 (BitVec.ofNat 32 m.val)
+      runitAny inum.toNat ∗ ownCtx c curCtx ⊢
+    |={⊤}=> ownCtx c curCtx ∗ writeAU c (iRef (ientry kk)) 4 (BitVec.ofNat 32 m.val)
       iprop(iputRin (GF := GF) curCtx ∗ irefSlot) := by
-  iintro ⟨#Henv, Htab, Href, Hru⟩
+  iintro ⟨#Henv, Htab, Href, Hru, Hrun⟩
   icases iput_tail_env Γ γl pd pav pu γil γisl kk $$ Henv with ⟨#Hit, #Hinv, #Hesc, #Hrinv⟩
   unfold iputTab
   icases Htab with ⟨Hhalf, Hrows, Hiauth, Hipool, Hslots, Hpool⟩
@@ -189,17 +189,19 @@ theorem iput_tail_ne_au (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU)
   icases itableSlotRes_acc_upd_llb curCtx Mt ci kk hkk $$ Hrows with ⟨Hrow, Hrback⟩
   rw [itableSlotRes_some curCtx Mt ci kk qt m.succ hMk, hcik]
   unfold icSlotRowFl icSlotRow itableSlotLive
-  icases Hrow with ⟨⟨%tb, ⟨%r, Hrd, %hw, %hx, %hid, #Hllbr, %hle, Hc⟩, #Hllbb, #Hflb⟩,
+  icases Hrow with ⟨⟨%tb, ⟨%r, Hrd, %hw, %hx, %hid, #Hllbr, %hle, Hc, #Hvd⟩, #Hllbb, #Hflb⟩,
     ⟨%tst, Hst, #Hllbt, #Hflt⟩⟩
   -- (d): the departing reference's stamps leave the box's count
   unfold liveFracc
   icases Hlf with ⟨%g, %lo, %tl, Hlv, %hlotl, #Hfl⟩
   ihave Hc := (show icCnt (GF := GF) kk m.succ.val ⊢ icCnt kk (m.val + 1) by
     rw [PosNat.succ_val]) $$ Hc
-  imod icDecr fscIc fscFs fscIreg fscCov fscLogst kk r m.val (some (icfgDev, cinum)) ⊤
-      CoPset.subseteq_top hw $$ Hesc Hrd Hllbr Hc [Hst1] with ⟨%td', %htd', Hrd, Hc, #Hllbd⟩
+  imod icDecr c fscIc fscFs fscIreg fscCov fscLogst kk r m.val (some (icfgDev, cinum)) ⊤
+      CoPset.subseteq_top hw $$ Hesc Hrun Hrd Hllbr Hvd Hc [Hst1]
+    with ⟨Hrun, %td', %aD, %htd', Hrd, Hc, #Hllbd, #HvaD⟩
   · unfold icRefStamps; iexact Hst1
   imodintro
+  iframe Hrun
   -- the store's accessor
   ihave Hru := (show runitAny (GF := GF) cinum.toNat ⊢ runit false cinum.toNat from .rfl) $$ Hru
   iapply writeAU_of_own
@@ -247,8 +249,8 @@ theorem iput_tail_ne_au (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU)
     isplitl [Hrd Hc]
     · iexists td'
       iframe Hllbd
-      iexists ⟨td', false, r.ident, r.x⟩
-      iframe Hrd Hllbd Hc
+      iexists ⟨td', false, r.ident, r.x, aD⟩
+      iframe Hrd Hllbd Hc HvaD
       ipureintro; exact ⟨rfl, hx, hid, Nat.le_refl _⟩
     · iexists tstn
       iframe Hstn Hllbn
@@ -359,7 +361,7 @@ theorem iput_tail_one_au (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU
   ihave #Hclaim := irefClaims_at kk hkk $$ Hclaims
   unfold iputWindow
   icases Hwin with ⟨Hrback, ⟨%tst, Hst, #Hllbt, #Hflt⟩,
-    ⟨%x0, %td, %T0, %hx0, Hrd, #Hllbd, Hc, Hhdr⟩⟩
+    ⟨%x0, %td, %T0, %a, %hx0, Hrd, #Hllbd, #Hva, Hc, Hhdr⟩⟩
   unfold iputRowOpen
   icases Hrow with ⟨Hsback, %hcik, Hrest, Hiu, Hgid, Hicnt, Hmir, Hsel⟩
   unfold iputPin
@@ -434,9 +436,10 @@ theorem iput_tail_one_au (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU
   ihave Hcell := wordPointsTo_intro_id (iRef (ientry kk)) 4 (DFrac.own 1) (0#32 : BitVec 32)
     hram hal $$ Hclaim Hcell
   -- (b′): the RAW header back at `none`
-  imod icEvictDeposit c fscIc fscFs fscIreg fscCov fscLogst kk curCtx
-      ⟨td, true, some (icfgDev, inum), some (x0, T0)⟩ x0 T0 ⊤ CoPset.subseteq_top rfl rfl
-    $$ Hesc Hctx Hrd Hc [Hvld Hhid Hnlk HgidD] with ⟨Hctx, Hpintx, %Tb, Hrd, Hc, Hst0, #HllbTb⟩
+  imod icEvictDeposit c fscIc fscFs fscIreg fscCov fscLogst kk
+      ⟨td, true, some (icfgDev, inum), some (x0, T0), a⟩ x0 T0 ⊤ CoPset.subseteq_top rfl rfl
+    $$ Hesc Hctx Hva Hrd Hc [Hvld Hhid Hnlk HgidD]
+    with ⟨Hctx, Hpintx, %Tb, %aE, Hrd, Hc, Hst0, #HllbTb, #HvaE⟩
   · rw [iput_tail_icHdr_cur]
     simp only [icHdrAmb]
     iframe Hvld Hnlk
@@ -446,8 +449,9 @@ theorem iput_tail_one_au (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU
   -- the guard's window closes: the pin's halves agree, the share comes back
   imod icPinExit kk tid qp $$ Hhpn Hpintx with ⟨Hpinr, Htxp⟩
   -- (d): the dead unit drops, count 0
-  imod icDecr fscIc fscFs fscIreg fscCov fscLogst kk ⟨Tb, false, none, none⟩ 0 none ⊤
-      CoPset.subseteq_top rfl $$ Hesc Hrd HllbTb Hc [Hst0] with ⟨%td', -, Hrd, Hc, #Hllbd'⟩
+  imod icDecr c fscIc fscFs fscIreg fscCov fscLogst kk ⟨Tb, false, none, none, aE⟩ 0 none ⊤
+      CoPset.subseteq_top rfl $$ Hesc Hctx Hrd HllbTb HvaE Hc [Hst0]
+    with ⟨Hctx, %td', %aD, -, Hrd, Hc, #Hllbd', #HvaD⟩
   · unfold icRefStampsAt icStamps; iexact Hst0
   -- the deleted slot's rows re-form FREE
   have hoffM : ∀ j, j ≠ kk → PartialMap.get? (PartialMap.delete Mt kk) j = PartialMap.get? Mt j :=
@@ -463,8 +467,8 @@ theorem iput_tail_one_au (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU
     isplitl [Hrd Hc]
     · iexists td'
       iframe Hllbd'
-      iexists ⟨td', false, none, none⟩
-      iframe Hrd Hllbd' Hc
+      iexists ⟨td', false, none, none, aD⟩
+      iframe Hrd Hllbd' Hc HvaD
       ipureintro; exact ⟨rfl, rfl, rfl, Nat.le_refl _⟩
     · iexists tst
       iframe Hcell Hstf Hllbt
@@ -598,9 +602,11 @@ theorem iput_tail_ne (RH : RELEASE_HOOK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
   ihave #Hclaims := isItable2_claims $$ Hit
   ihave #Hclaim := irefClaims_at kk hkk $$ Hclaims
   iapply wpLoop_fupd
+  icases kctx_token_acc c _ $$ Hk with ⟨Hrun, Hkb⟩
   imod iput_tail_ne_au Γ c γl pd pav pu γil γisl kk hkk q inum Mt ci qt m hMk hMwf hciwf
-    $$ [Henv Htab Href Hru] with HAU
-  · iframe Henv Htab Href Hru
+    $$ [Henv Htab Href Hru Hrun] with ⟨Hrun, HAU⟩
+  · iframe Henv Htab Href Hru Hrun
+  ihave Hk := Hkb $$ Hrun
   imodintro
   -- +0x20 c.addiw a5,a5,-1
   k_step (wp_s_addiw c _ (KA.«iput» + 0x20#64) true 4095#12 15#5 15#5 (by decide))

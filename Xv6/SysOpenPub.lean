@@ -144,7 +144,7 @@ theorem sys_open_pub_off (cpu : CPU) (kk kf : Nat) (γo : GName) (C : FContent) 
     iintro ⟨Hctx, Hrows, Hoff⟩
     imodintro
     iframe Hctx Hrows
-    iexists (⟨0, 0, 0, 0⟩ : BoxNames)
+    iexists (⟨0, 0, 0, 0, 0⟩ : BoxNames)
     ihave Hpub := foffPubT_dev (GF := GF) omo C.major.toNat
     iframe Hoff Hpub
 

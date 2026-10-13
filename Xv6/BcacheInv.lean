@@ -559,31 +559,51 @@ def brefRest (γ : BcacheNames) (k : Nat) (id : Nat) : IProp GF :=
 body of Rocq's `bref_ghost`: `CtxBox.reference (bn_box bn k) (dev, bno)
 {[((dev, bno), t) := 1%Qp]}`): the bcache instantiates the box with UNIT
 singletons everywhere. -/
-def boxRef (γbk : BoxNames) (i : BufId) (T : Nat) : IProp GF :=
-  reference γbk i (unitStamp i T)
+def boxRefAt (γbk : BoxNames) (i : BufId) (T : Nat) (ξ : CtxId) : IProp GF :=
+  referenceAt γbk i (unitStamp i T) ξ
 
-instance boxRef_timeless (γbk : BoxNames) (i : BufId) (T : Nat) :
-    Timeless (boxRef (GF := GF) γbk i T) := by unfold boxRef; infer_instance
+/-- The reference at the ambient context (W8 (f2-ctx): a reference carries
+its tickets' tag floors, at a context). -/
+abbrev boxRef (γbk : BoxNames) (i : BufId) (T : Nat) : IProp GF := boxRefAt γbk i T curCtx
+
+instance boxRefAt_timeless (γbk : BoxNames) (i : BufId) (T : Nat) (ξ : CtxId) :
+    Timeless (boxRefAt (GF := GF) γbk i T ξ) := by unfold boxRefAt; infer_instance
+
+instance boxRefAt_morph (γbk : BoxNames) (i : BufId) (T : Nat) :
+    CtxMorph (GF := GF) (boxRefAt γbk i T) := by unfold boxRefAt; infer_instance
 
 /-- A reference's store-order receipt, peeled off (persistent). -/
-theorem boxRef_topLb (γbk : BoxNames) (i : BufId) (T : Nat) :
-    boxRef (GF := GF) γbk i T ⊢ boxRef γbk i T ∗ topLb T := by
-  unfold boxRef
-  have h := reference_topLb (GF := GF) γbk i (unitStamp i T)
+theorem boxRefAt_topLb (γbk : BoxNames) (i : BufId) (T : Nat) (ξ : CtxId) :
+    boxRefAt (GF := GF) γbk i T ξ ⊢ boxRefAt γbk i T ξ ∗ topLb T := by
+  unfold boxRefAt
+  have h := referenceAt_topLb (GF := GF) γbk i (unitStamp i T) ξ
   rw [maxStamp_unitStamp] at h
   exact h
+
+theorem boxRef_topLb (γbk : BoxNames) (i : BufId) (T : Nat) :
+    boxRef (GF := GF) γbk i T ⊢ boxRef γbk i T ∗ topLb T :=
+  boxRefAt_topLb γbk i T curCtx
 
 /-- **A buffer-cache reference on slot `k` at the identity `(dev, bno)`**
 (Rocq's `bref`, minus the `dev`/`blockno` fraction -- see the file header):
 the count half AND a reference of the buffer's ESCROW, minted at whatever
 stamp the box stood at.  The two travel together: one keeps `b->refcnt`
 honest, the other is what `refcnt--` burns in the box. -/
-def bref (γ : BcacheNames) (k : Nat) (dev bno : BitVec 32) : IProp GF := iprop%
-  brefTok γ k ∗ ∃ T : Nat, boxRef (γ.box k) ((dev, bno) : BufId) T
+def brefAt (γ : BcacheNames) (k : Nat) (dev bno : BitVec 32) (ξ : CtxId) : IProp GF := iprop%
+  brefTok γ k ∗ ∃ T : Nat, boxRefAt (γ.box k) ((dev, bno) : BufId) T ξ
 
-instance bref_timeless (γ : BcacheNames) (k : Nat) (dev bno : BitVec 32) :
-    Timeless (bref (GF := GF) γ k dev bno) := by
-  unfold bref brefTok; infer_instance
+/-- The reference at the ambient context. -/
+abbrev bref (γ : BcacheNames) (k : Nat) (dev bno : BitVec 32) : IProp GF := brefAt γ k dev bno curCtx
+
+instance brefAt_timeless (γ : BcacheNames) (k : Nat) (dev bno : BitVec 32) (ξ : CtxId) :
+    Timeless (brefAt (GF := GF) γ k dev bno ξ) := by
+  unfold brefAt brefTok; infer_instance
+
+instance brefAt_morph (γ : BcacheNames) (k : Nat) (dev bno : BitVec 32) :
+    CtxMorph (GF := GF) (brefAt γ k dev bno) := by
+  unfold brefAt
+  refine @instCtxMorphSep _ _ _ _ _ (instCtxMorphConst _) ?_
+  exact @instCtxMorphExists _ _ _ _ _ (fun T => boxRefAt_morph _ _ T)
 
 /-! ## The travelling payloads (Rocq `BioInv.v`'s `bio_pay` / `buf_pay`)
 
@@ -601,21 +621,34 @@ reference instead.
 its `bref` carries a real fraction `q` of the `dev`/`blockno` cells.  This
 port's `Xv6.bref` is ghost-only (the file header's standing deviation), so
 the arm is the bare reference with no fraction to quantify. -/
-def bioPay (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno : BitVec 32)
-    (bsl bsd : List (BitVec 8)) (d : Bool) : IProp GF :=
-  if d then iprop(V.dirty bno.toNat bsl ∗ bref γ k dev bno)
+def bioPayAt (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno : BitVec 32)
+    (bsl bsd : List (BitVec 8)) (d : Bool) (ξ : CtxId) : IProp GF :=
+  if d then iprop(V.dirty bno.toNat bsl ∗ brefAt γ k dev bno ξ)
   else iprop(V.clean bno.toNat bsl ∗ ⌜bsd = bsl⌝)
 
-instance bioPay_timeless (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno : BitVec 32)
+/-- The payload at the ambient context (W8 (f2-ctx): the dirty arm's
+reference carries tag floors, at a context). -/
+abbrev bioPay (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno : BitVec 32)
+    (bsl bsd : List (BitVec 8)) (d : Bool) : IProp GF := bioPayAt γ V k dev bno bsl bsd d curCtx
+
+instance bioPayAt_timeless (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno : BitVec 32)
+    (bsl bsd : List (BitVec 8)) (d : Bool) (ξ : CtxId) :
+    Timeless (bioPayAt (GF := GF) γ V k dev bno bsl bsd d ξ) := by
+  unfold bioPayAt; split <;> infer_instance
+
+instance bioPayAt_morph (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno : BitVec 32)
     (bsl bsd : List (BitVec 8)) (d : Bool) :
-    Timeless (bioPay (GF := GF) γ V k dev bno bsl bsd d) := by
-  unfold bioPay; split <;> infer_instance
+    CtxMorph (GF := GF) (bioPayAt γ V k dev bno bsl bsd d) := by
+  unfold bioPayAt
+  cases d
+  · exact instCtxMorphConst _
+  · exact @instCtxMorphSep _ _ _ _ _ (instCtxMorphConst _) (brefAt_morph γ k dev bno)
 
 /-- The CLEAN arm, folded. -/
 theorem bioPay_clean (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno : BitVec 32)
-    (bsl : List (BitVec 8)) :
-    V.clean bno.toNat bsl ⊢ bioPay (GF := GF) γ V k dev bno bsl bsl false := by
-  unfold bioPay
+    (bsl : List (BitVec 8)) (ξ : CtxId := curCtx) :
+    V.clean bno.toNat bsl ⊢ bioPayAt (GF := GF) γ V k dev bno bsl bsl false ξ := by
+  unfold bioPayAt
   simp only [Bool.false_eq_true, if_false]
   iintro H
   isplitl [H]
@@ -625,9 +658,9 @@ theorem bioPay_clean (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno : Bi
 /-- ...and unfolded: on the clean arm the disk cell AGREES with the logical
 content. -/
 theorem bioPay_clean_elim (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno : BitVec 32)
-    (bsl bsd : List (BitVec 8)) :
-    bioPay (GF := GF) γ V k dev bno bsl bsd false ⊢ ⌜bsd = bsl⌝ ∗ V.clean bno.toNat bsl := by
-  unfold bioPay
+    (bsl bsd : List (BitVec 8)) (ξ : CtxId := curCtx) :
+    bioPayAt (GF := GF) γ V k dev bno bsl bsd false ξ ⊢ ⌜bsd = bsl⌝ ∗ V.clean bno.toNat bsl := by
+  unfold bioPayAt
   simp only [Bool.false_eq_true, if_false]
   iintro ⟨H, %he⟩
   isplitr [H]
@@ -636,10 +669,10 @@ theorem bioPay_clean_elim (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno
 
 /-- ...and unfolded. -/
 theorem bioPay_dirty_elim (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno : BitVec 32)
-    (bsl bsd : List (BitVec 8)) :
-    bioPay (GF := GF) γ V k dev bno bsl bsd true ⊢
-      V.dirty bno.toNat bsl ∗ bref γ k dev bno := by
-  unfold bioPay
+    (bsl bsd : List (BitVec 8)) (ξ : CtxId := curCtx) :
+    bioPayAt (GF := GF) γ V k dev bno bsl bsd true ξ ⊢
+      V.dirty bno.toNat bsl ∗ brefAt γ k dev bno ξ := by
+  unfold bioPayAt
   simp only [if_true]
   iintro H; iexact H
 
@@ -649,44 +682,61 @@ block's disk cell alongside); an INVALID covered buffer carries the block's
 pool bundle, so that WHOEVER wins the sleeplock race after a recycle finds
 the fragment the fill needs.  Uncovered blocknos (only block `0` in
 practice -- `binit`'s zeroed cells) carry nothing. -/
-def bufPay (γ : BcacheNames) (V : BioView GF) (k : Nat) (i : BufId) (v : BitVec 32)
-    (x : BufX) : IProp GF :=
+def bufPayAt (γ : BcacheNames) (V : BioView GF) (k : Nat) (i : BufId) (v : BitVec 32)
+    (x : BufX) (ξ : CtxId) : IProp GF :=
   if i.2.toNat ∈ V.cov then
     iprop(⌜i.1 = V.dev⌝ ∗
       (if v = 0#32 then poolBlk V i.2.toNat
        else iprop(∃ (bsd : List (BitVec 8)) (d : Bool), ⌜bsd.length = BSIZE⌝ ∗
-         diskBlock V.gd i.2.toNat bsd ∗ bioPay γ V k i.1 i.2 x bsd d)))
+         diskBlock V.gd i.2.toNat bsd ∗ bioPayAt γ V k i.1 i.2 x bsd d ξ)))
   else iprop(emp)
 
-instance bufPay_timeless (γ : BcacheNames) (V : BioView GF) (k : Nat) (i : BufId)
-    (v : BitVec 32) (x : BufX) : Timeless (bufPay (GF := GF) γ V k i v x) := by
-  unfold bufPay diskBlock
+/-- The payload at the ambient context. -/
+abbrev bufPay (γ : BcacheNames) (V : BioView GF) (k : Nat) (i : BufId) (v : BitVec 32)
+    (x : BufX) : IProp GF := bufPayAt γ V k i v x curCtx
+
+instance bufPayAt_timeless (γ : BcacheNames) (V : BioView GF) (k : Nat) (i : BufId)
+    (v : BitVec 32) (x : BufX) (ξ : CtxId) : Timeless (bufPayAt (GF := GF) γ V k i v x ξ) := by
+  unfold bufPayAt diskBlock
   split
   · split <;> infer_instance
   · infer_instance
 
+instance bufPayAt_morph (γ : BcacheNames) (V : BioView GF) (k : Nat) (i : BufId)
+    (v : BitVec 32) (x : BufX) : CtxMorph (GF := GF) (bufPayAt γ V k i v x) := by
+  unfold bufPayAt
+  split
+  · refine @instCtxMorphSep _ _ _ _ _ (instCtxMorphConst _) ?_
+    split
+    · exact instCtxMorphConst _
+    · refine @instCtxMorphExists _ _ _ _ _ (fun bsd => ?_)
+      refine @instCtxMorphExists _ _ _ _ _ (fun d => ?_)
+      exact @instCtxMorphSep _ _ _ _ _ (instCtxMorphConst _)
+        (@instCtxMorphSep _ _ _ _ _ (instCtxMorphConst _) (bioPayAt_morph _ _ _ _ _ _ _ _))
+  · exact instCtxMorphConst _
+
 /-- An uncovered blockno owes nothing (what `binit`'s thirty buffers, all
 naming block `0`, present). -/
 theorem bufPay_uncov (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno v : BitVec 32)
-    (x : BufX) (hcov : bno.toNat ∉ V.cov) :
-    ⊢ bufPay (GF := GF) γ V k ((dev, bno) : BufId) v x := by
-  unfold bufPay
+    (x : BufX) (hcov : bno.toNat ∉ V.cov) (ξ : CtxId := curCtx) :
+    ⊢ bufPayAt (GF := GF) γ V k ((dev, bno) : BufId) v x ξ := by
+  unfold bufPayAt
   rw [if_neg hcov]
   iempintro
 
 /-- The INVALID covered arm, unpacked: the block's pool bundle. -/
 theorem bufPay_invalid (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno v : BitVec 32)
-    (x : BufX) (hcov : bno.toNat ∈ V.cov) (hv : v = 0#32) :
-    bufPay (GF := GF) γ V k ((dev, bno) : BufId) v x ⊢
+    (x : BufX) (hcov : bno.toNat ∈ V.cov) (hv : v = 0#32) (ξ : CtxId := curCtx) :
+    bufPayAt (GF := GF) γ V k ((dev, bno) : BufId) v x ξ ⊢
       ⌜dev = V.dev⌝ ∗ poolBlk V bno.toNat := by
-  unfold bufPay
+  unfold bufPayAt
   rw [if_pos hcov, if_pos hv]
 
 /-- ...and back in, out of the pool. -/
 theorem bufPay_of_pool (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno v : BitVec 32)
-    (x : BufX) (hcov : bno.toNat ∈ V.cov) (hdev : dev = V.dev) (hv : v = 0#32) :
-    poolBlk (GF := GF) V bno.toNat ⊢ bufPay γ V k ((dev, bno) : BufId) v x := by
-  unfold bufPay
+    (x : BufX) (hcov : bno.toNat ∈ V.cov) (hdev : dev = V.dev) (hv : v = 0#32) (ξ : CtxId := curCtx) :
+    poolBlk (GF := GF) V bno.toNat ⊢ bufPayAt γ V k ((dev, bno) : BufId) v x ξ := by
+  unfold bufPayAt
   rw [if_pos hcov, if_pos hv]
   iintro H
   isplitr [H]
@@ -696,21 +746,21 @@ theorem bufPay_of_pool (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno v 
 /-- A VALID covered buffer's payload, unpacked: the disk cell beside the
 held payload at the buffer's own bytes. -/
 theorem bufPay_valid (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno v : BitVec 32)
-    (x : BufX) (hcov : bno.toNat ∈ V.cov) (hv : v ≠ 0#32) :
-    bufPay (GF := GF) γ V k ((dev, bno) : BufId) v x ⊢
+    (x : BufX) (hcov : bno.toNat ∈ V.cov) (hv : v ≠ 0#32) (ξ : CtxId := curCtx) :
+    bufPayAt (GF := GF) γ V k ((dev, bno) : BufId) v x ξ ⊢
       ⌜dev = V.dev⌝ ∗ ∃ (bsd : List (BitVec 8)) (d : Bool), ⌜bsd.length = BSIZE⌝ ∗
-        diskBlock V.gd bno.toNat bsd ∗ bioPay γ V k dev bno x bsd d := by
-  unfold bufPay
+        diskBlock V.gd bno.toNat bsd ∗ bioPayAt γ V k dev bno x bsd d ξ := by
+  unfold bufPayAt
   rw [if_pos hcov, if_neg hv]
 
 /-- ...and back in. -/
 theorem bufPay_of_valid (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno v : BitVec 32)
     (x : BufX) (bsd : List (BitVec 8)) (d : Bool)
     (hcov : bno.toNat ∈ V.cov) (hdev : dev = V.dev) (hv : v ≠ 0#32)
-    (hlen : bsd.length = BSIZE) :
-    diskBlock (GF := GF) V.gd bno.toNat bsd ∗ bioPay γ V k dev bno x bsd d ⊢
-      bufPay γ V k ((dev, bno) : BufId) v x := by
-  unfold bufPay
+    (hlen : bsd.length = BSIZE) (ξ : CtxId := curCtx) :
+    diskBlock (GF := GF) V.gd bno.toNat bsd ∗ bioPayAt γ V k dev bno x bsd d ξ ⊢
+      bufPayAt γ V k ((dev, bno) : BufId) v x ξ := by
+  unfold bufPayAt
   rw [if_pos hcov, if_neg hv]
   iintro ⟨H1, H2⟩
   isplitr [H1 H2]
@@ -735,10 +785,16 @@ floor is re-minted at every release by the LOCK HOOK
 (`MachCSL.lockHook_llb` over `Xv6.bcacheRes_fold_in`), which is the only
 way a row whose stamp rose past the releaser's view (`refcnt--`'s
 `Xv6.bufEscrow_refDecr`) can be put back. -/
-def bufSlotRegs (γbk : BoxNames) (tl : Nat) (dev bno : BitVec 32) : IProp GF := iprop%
+def bufSlotRegs (γbk : BoxNames) (tl : Nat) (dev bno : BitVec 32) (ξ : CtxId) : IProp GF := iprop%
   ∃ r : SlotReg BufId BufX,
     slotdHalf γbk r ∗ ⌜r.win = false ∧ r.x = none ∧ r.ident = ((dev, bno) : BufId)⌝ ∗
-      topLb r.td ∗ ⌜r.td ≤ tl⌝
+      topLb r.td ∗ ⌜r.td ≤ tl⌝ ∗ vgFloors ξ r.vd
+
+instance bufSlotRegs_morph (γbk : BoxNames) (tl : Nat) (dev bno : BitVec 32) :
+    CtxMorph (GF := GF) (bufSlotRegs γbk tl dev bno) := by
+  unfold bufSlotRegs
+  refine @instCtxMorphExists _ _ _ _ _ (fun r => ?_)
+  infer_instance
 
 /-- The escrow invariants sit inside the top mask. -/
 theorem bioxN_top : (↑bioxN : CoPset) ⊆ ⊤ := CoPset.subseteq_top
@@ -791,7 +847,7 @@ the fraction bookkeeping would have to ride the slot's reference list.) -/
 def bkeyAt (γ : BcacheNames) (ξ : CtxId) (tl : Nat) (k : Nat) (dev bno : BitVec 32) : IProp GF := iprop%
   wordAtN ξ (aBufDev (bnode k)) 4 (DFrac.own (1 : Qp).half) dev ∗
   wordAtN ξ (aBufBlockno (bnode k)) 4 (DFrac.own (1 : Qp).half) bno ∗
-  bufSlotRegs (γ.box k) tl dev bno
+  bufSlotRegs (γ.box k) tl dev bno ξ
 
 /-- Every buffer's key row, at the scan's device/blockno assignment. -/
 def bkeyAll (γ : BcacheNames) (ξ : CtxId) (tl : Nat) (devs bnos : Nat → BitVec 32) : IProp GF :=
@@ -828,7 +884,7 @@ theorem bref_free_absurd (γ : BcacheNames) (M : RegMapF Nat) (Ls : Nat → List
   icases (show bref (GF := GF) γ k dev bno ⊢
       (∃ id : Nat, γ.ref ↪◯MAP[id]{.own (1 : Qp).half} k) ∗
       (∃ T : Nat, boxRef (γ.box k) ((dev, bno) : BufId) T) from by
-    unfold bref brefTok; iintro H; iexact H) $$ Hr with ⟨⟨%id, He⟩, -⟩
+    unfold bref brefAt brefTok; iintro H; iexact H) $$ Hr with ⟨⟨%id, He⟩, -⟩
   ihave %hget := ghost_map_lookup $$ Ha He
   have h := (hok id k hget).2
   rw [hnil] at h
@@ -1094,7 +1150,7 @@ def bufHdr (γ : BcacheNames) (V : BioView GF) (k : Nat) (qd qb : Qp) (i : BufId
     wordAtN ξ (aBufValid (bnode k)) 4 (DFrac.own 1) v ∗
     wordAtN ξ (aBufDev (bnode k)) 4 (DFrac.own qd) i.1 ∗
     wordAtN ξ (aBufBlockno (bnode k)) 4 (DFrac.own qb) i.2 ∗
-    bufPay γ V k i v x
+    bufPayAt γ V k i v x ξ
 
 /-- **THE REST** (Rocq's `buf_rest`): the pinned `disk` flag and the data. -/
 def bufRest (k : Nat) (x : BufX) (ξ : CtxId) : IProp GF := iprop%
@@ -1154,7 +1210,8 @@ UNFLOORED row `Xv6.bufSlpDep` and the LOCK HOOK
 (`MachCSL.lockHook_llb` over `Xv6.bufSlp_fold_in`, lifted through
 `Xv6.slBody_hook`) completes it at the inner spinlock's stamped context. -/
 def bufSlpBox (γ : BcacheNames) (k : Nat) : CtxId → IProp GF := fun ξ => iprop(
-  bufTok γ k ∗ ∃ s : L2Reg BufId, slotpHalf (γ.box k) s ∗ ⌜s.hold = none⌝ ∗ ctxFloor ξ s.tp)
+  bufTok γ k ∗ ∃ s : L2Reg BufId, slotpHalf (γ.box k) s ∗ ⌜s.hold = none⌝ ∗ ctxFloor ξ s.tp ∗
+    vgFloors ξ s.vp)
 
 /-- **THE SAME ROW, BEFORE THE NAMES RECORD EXISTS** (Rocq's `bslp_raw`).
 `Xv6.bioInitAt` must seal the thirty sleeplocks over this payload, but the
@@ -1164,7 +1221,7 @@ the raw form, and only then is `Xv6.BcacheNames` assembled.  The two forms
 are the same proposition (by `rfl`). -/
 def bufSlpRaw (γo : GName) (γbk : BoxNames) : CtxId → IProp GF := fun ξ => iprop(
   (γo ↪VAR{.own (1 : Qp)} ()) ∗
-  ∃ s : L2Reg BufId, slotpHalf γbk s ∗ ⌜s.hold = none⌝ ∗ ctxFloor ξ s.tp)
+  ∃ s : L2Reg BufId, slotpHalf γbk s ∗ ⌜s.hold = none⌝ ∗ ctxFloor ξ s.tp ∗ vgFloors ξ s.vp)
 
 instance instCtxMorphBufSlpRaw (γo : GName) (γbk : BoxNames) :
     CtxMorph (GF := GF) (bufSlpRaw γo γbk) := by
@@ -1172,28 +1229,37 @@ instance instCtxMorphBufSlpRaw (γo : GName) (γbk : BoxNames) :
   refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
   refine @instCtxMorphExists _ _ _ _ _ (fun s => ?_)
   exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (instCtxMorphFloor s.tp))
+    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
+      (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphFloor s.tp) (instCtxMorphVgFloors s.vp)))
 
 /-- The raw row at the boot stamp: the checkout token and the park register
 at rest, with the free floor. -/
 theorem bufSlpRaw_boot (γo : GName) (γbk : BoxNames) (ξ : CtxId) :
-    (γo ↪VAR{.own (1 : Qp)} ()) ∗ slotpHalf (GF := GF) γbk (⟨0, none⟩ : L2Reg BufId) ⊢
+    (γo ↪VAR{.own (1 : Qp)} ()) ∗ slotpHalf (GF := GF) γbk (L2Reg.init : L2Reg BufId) ⊢
       bufSlpRaw γo γbk ξ := by
   unfold bufSlpRaw
   iintro ⟨Ht, Hrp⟩
   iframe Ht
-  iexists (⟨0, none⟩ : L2Reg BufId)
+  iexists (L2Reg.init : L2Reg BufId)
   iframe Hrp
+  dsimp only [L2Reg.init]
   isplit
   · ipureintro; rfl
+  isplit
   · iapply ctxFloor_0
+  · iapply vgFloors_zero
 
-/-- The releaser's unfloored row (Rocq's `bslp_dep`), at a KNOWN park stamp. -/
-def bufSlpDep (γ : BcacheNames) (k T' : Nat) : CtxId → IProp GF := fun _ => iprop(
-  bufTok γ k ∗ slotpHalf (γ.box k) (⟨T', none⟩ : L2Reg BufId))
+/-- The releaser's unfloored row (Rocq's `bslp_dep`), at a KNOWN park stamp
+and (W8 (f2-ctx)) the park's chain bound `a`, whose floors the releaser holds
+and the row carries -- context-indexed, it moves with the payload. -/
+def bufSlpDep (γ : BcacheNames) (k T' : Nat) (a : ChainVG) : CtxId → IProp GF := fun ξ => iprop(
+  bufTok γ k ∗ slotpHalf (γ.box k) (⟨T', none, a, ∅, a⟩ : L2Reg BufId) ∗ vgFloors ξ a)
 
-instance instCtxMorphBufSlpDep (γ : BcacheNames) (k T' : Nat) :
-    CtxMorph (GF := GF) (bufSlpDep γ k T') := instCtxMorphConst _
+instance instCtxMorphBufSlpDep (γ : BcacheNames) (k T' : Nat) (a : ChainVG) :
+    CtxMorph (GF := GF) (bufSlpDep γ k T' a) := by
+  unfold bufSlpDep
+  exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
+    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (instCtxMorphVgFloors a))
 
 instance instCtxMorphBufSlp (γ : BcacheNames) (k : Nat) :
     CtxMorph (GF := GF) (bufSlpBox γ k) := by
@@ -1201,17 +1267,18 @@ instance instCtxMorphBufSlp (γ : BcacheNames) (k : Nat) :
   refine @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) ?_
   refine @instCtxMorphExists _ _ _ _ _ (fun s => ?_)
   exact @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (instCtxMorphFloor s.tp))
+    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
+      (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphFloor s.tp) (instCtxMorphVgFloors s.vp)))
 
 /-- **THE SLEEPLOCK HOOK'S FOLD** (Rocq's `bslp_fold`). -/
-theorem bufSlp_fold_in (γ : BcacheNames) (k T' : Nat) :
-    ∀ ξ : CtxId, bufSlpDep (GF := GF) γ k T' ξ ∗ ctxFloor ξ T' ⊢ bufSlpBox γ k ξ := by
+theorem bufSlp_fold_in (γ : BcacheNames) (k T' : Nat) (a : ChainVG) :
+    ∀ ξ : CtxId, bufSlpDep (GF := GF) γ k T' a ξ ∗ ctxFloor ξ T' ⊢ bufSlpBox γ k ξ := by
   intro ξ
   unfold bufSlpDep bufSlpBox
-  iintro ⟨⟨Htok, Hrp⟩, #Hfl⟩
+  iintro ⟨⟨Htok, Hrp, #Hvg⟩, #Hfl⟩
   iframe Htok
-  iexists (⟨T', none⟩ : L2Reg BufId)
-  iframe Hrp
+  iexists (⟨T', none, a, ∅, a⟩ : L2Reg BufId)
+  iframe Hrp Hvg
   isplit
   · ipureintro; rfl
   · iexact Hfl
@@ -1441,12 +1508,13 @@ theorem bcacheScan_intro (γ : BcacheNames) (V : BioView GF) (ξ : CtxId) (tl : 
   iframe Ha Hl Hpool Hkey Hs
   ipureintro; exact ⟨hfresh, hok, hord, hinj, hdev⟩
 
-theorem bufSlotRegs_mono (γbk : BoxNames) (tl tl' : Nat) (h : tl ≤ tl') (dev bno : BitVec 32) :
-    bufSlotRegs (GF := GF) γbk tl dev bno ⊢ bufSlotRegs γbk tl' dev bno := by
+theorem bufSlotRegs_mono (γbk : BoxNames) (tl tl' : Nat) (h : tl ≤ tl') (dev bno : BitVec 32)
+    (ξ : CtxId) :
+    bufSlotRegs (GF := GF) γbk tl dev bno ξ ⊢ bufSlotRegs γbk tl' dev bno ξ := by
   unfold bufSlotRegs
-  iintro ⟨%r, Hrd, %hr, #Htd, %hle⟩
+  iintro ⟨%r, Hrd, %hr, #Htd, %hle, #Hvg⟩
   iexists r
-  iframe Hrd
+  iframe Hrd Hvg
   isplit
   · ipureintro; exact hr
   isplit
@@ -1459,7 +1527,7 @@ theorem bkeyAt_mono (γ : BcacheNames) (ξ : CtxId) (tl tl' : Nat) (h : tl ≤ t
   unfold bkeyAt
   iintro ⟨Hd, Hb, Hr⟩
   iframe Hd Hb
-  iapply bufSlotRegs_mono (γ.box k) tl tl' h dev bno $$ Hr
+  iapply bufSlotRegs_mono (γ.box k) tl tl' h dev bno ξ $$ Hr
 
 /-- The floor slot is a BOUND, so a bigger one keeps every row (Rocq's
 `bcache_scan2_floor_mono`): what a `refcnt--` needs, since the decrement
@@ -1478,13 +1546,13 @@ theorem bkeyAt_elim (γ : BcacheNames) (ξ : CtxId) (tl : Nat) (k : Nat) (dev bn
     bkeyAt (GF := GF) γ ξ tl k dev bno ⊢
       wordAtN ξ (aBufDev (bnode k)) 4 (DFrac.own (1 : Qp).half) dev ∗
       wordAtN ξ (aBufBlockno (bnode k)) 4 (DFrac.own (1 : Qp).half) bno ∗
-      bufSlotRegs (γ.box k) tl dev bno := by
+      bufSlotRegs (γ.box k) tl dev bno ξ := by
   unfold bkeyAt; iintro H; iexact H
 
 theorem bkeyAt_intro (γ : BcacheNames) (ξ : CtxId) (tl : Nat) (k : Nat) (dev bno : BitVec 32) :
     wordAtN (GF := GF) ξ (aBufDev (bnode k)) 4 (DFrac.own (1 : Qp).half) dev ∗
     wordAtN ξ (aBufBlockno (bnode k)) 4 (DFrac.own (1 : Qp).half) bno ∗
-    bufSlotRegs (γ.box k) tl dev bno ⊢ bkeyAt γ ξ tl k dev bno := by
+    bufSlotRegs (γ.box k) tl dev bno ξ ⊢ bkeyAt γ ξ tl k dev bno := by
   unfold bkeyAt; iintro H; iexact H
 
 /-- Borrow buffer `k`'s key row (its two key halves and the escrow's L1

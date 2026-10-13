@@ -894,7 +894,7 @@ theorem fsPay_bs (γb : BcacheNames) (γfs : FsNames) (V : BioView GF)
     (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
     (k : Nat) (dv bno : BitVec 32) (bsl bsd bs0 : List (BitVec 8)) (d : Bool) :
     fsChalf (GF := GF) γfs bno.toNat bs0 ⊢ bioPay γb V k dv bno bsl bsd d -∗ ⌜bsl = bs0⌝ := by
-  unfold bioPay
+  unfold bioPay bioPayAt
   cases d with
   | true =>
     rw [hdt]
@@ -917,7 +917,7 @@ theorem fsPay_bs_auth (γb : BcacheNames) (γfs : FsNames) (V : BioView GF)
     (k : Nat) (dv bno : BitVec 32) (bsl bsd : List (BitVec 8)) (d : Bool) (L : BlockMap) :
     fsCacheAuth (GF := GF) γfs L ⊢ bioPay γb V k dv bno bsl bsd d -∗
       ⌜PartialMap.get? L bno.toNat = some bsl⌝ := by
-  unfold bioPay fsCacheAuth
+  unfold bioPay bioPayAt fsCacheAuth
   cases d with
   | true =>
     rw [hdt]
@@ -940,7 +940,7 @@ theorem fsPay_d (γb : BcacheNames) (γfs : FsNames) (V : BioView GF)
     (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
     (k : Nat) (dv bno : BitVec 32) (bsl bsd : List (BitVec 8)) (d db : Bool) :
     fsDirtyHalf (GF := GF) γfs bno.toNat db ⊢ bioPay γb V k dv bno bsl bsd d -∗ ⌜d = db⌝ := by
-  unfold bioPay fsDirtyHalf
+  unfold bioPay bioPayAt fsDirtyHalf
   cases d with
   | true =>
     rw [hdt]
@@ -966,7 +966,7 @@ theorem fsPay_d_auth (γb : BcacheNames) (γfs : FsNames) (V : BioView GF)
     (k : Nat) (dv bno : BitVec 32) (bsl bsd : List (BitVec 8)) (d : Bool) (D : RegMapF Bool) :
     fsDirtyAuth (GF := GF) γfs D ⊢ bioPay γb V k dv bno bsl bsd d -∗
       ⌜PartialMap.get? D bno.toNat = some d⌝ := by
-  unfold bioPay fsDirtyAuth
+  unfold bioPay bioPayAt fsDirtyAuth
   cases d with
   | true =>
     rw [hdt]
@@ -991,7 +991,7 @@ theorem fsPay_open (γb : BcacheNames) (γfs : FsNames) (V : BioView GF)
     bioPay (GF := GF) γb V k dv bno bsl bsd true ⊢
       (γfs.cache ↪◯MAP[bno.toNat]{.own (1 : Qp).half} bsl) ∗
       (γfs.dirty ↪◯MAP[bno.toNat]{.own (1 : Qp).half} true) ∗ bref γb k dv bno := by
-  unfold bioPay
+  unfold bioPay bioPayAt
   rw [hdt]
   simp only [if_true]
   unfold fsMdirty
@@ -1005,7 +1005,7 @@ theorem fsPay_open_clean (γb : BcacheNames) (γfs : FsNames) (V : BioView GF)
     bioPay (GF := GF) γb V k dv bno bsl bsd false ⊢
       ⌜bsd = bsl⌝ ∗ (γfs.cache ↪◯MAP[bno.toNat]{.own (1 : Qp).half} bsl) ∗
       (γfs.dirty ↪◯MAP[bno.toNat]{.own (1 : Qp).half} false) := by
-  unfold bioPay
+  unfold bioPay bioPayAt
   rw [hcl]
   simp only [Bool.false_eq_true, if_false]
   unfold fsMclean
@@ -1024,7 +1024,7 @@ theorem fsPay_split (γb : BcacheNames) (γfs : FsNames) (V : BioView GF)
       (γfs.cache ↪◯MAP[bno.toNat]{.own (1 : Qp).half} bsl) ∗
       (γfs.dirty ↪◯MAP[bno.toNat]{.own (1 : Qp).half} d) ∗
       (if d then bref γb k dv bno else iprop(emp)) := by
-  unfold bioPay
+  unfold bioPay bioPayAt
   cases d with
   | true =>
     rw [hdt]
@@ -1048,7 +1048,7 @@ theorem fsPay_mk (γb : BcacheNames) (γfs : FsNames) (V : BioView GF)
     (γfs.dirty ↪◯MAP[bno.toNat]{.own (1 : Qp).half} d) ∗
     (if d then bref γb k dv bno else iprop(emp)) ⊢
       bioPay (GF := GF) γb V k dv bno bs bs d := by
-  unfold bioPay
+  unfold bioPay bioPayAt
   cases d with
   | true =>
     rw [hdt]
@@ -1073,7 +1073,7 @@ theorem fsPay_clean (γb : BcacheNames) (γfs : FsNames) (V : BioView GF)
     (γfs.cache ↪◯MAP[bno.toNat]{.own (1 : Qp).half} bsl) ∗
     (γfs.dirty ↪◯MAP[bno.toNat]{.own (1 : Qp).half} false) ⊢
       bioPay (GF := GF) γb V k dv bno bsl bsl false := by
-  unfold bioPay
+  unfold bioPay bioPayAt
   rw [hcl]
   simp only [Bool.false_eq_true, if_false]
   unfold fsMclean

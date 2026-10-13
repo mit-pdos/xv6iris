@@ -49,10 +49,10 @@ is not existential. -/
 theorem kctx_newSleeplockAt [CurCtx] {lent : Bool} (cpu : CPU) (k : KCtx) (p : GName × GName)
     (slk name : BitVec 64) (R : CtxId → IProp GF) [CtxMorph R] (H : Qp → IProp GF) :
     kctxL lent cpu k ∗ slFreePair p ∗ sleepLockInited slk name ∗
-    kmapId (slLk slk) ∗ kmapId (slLk slk + 16#64) ∗ R curCtx
+    kmapId (slLk slk) ∗ kmapId (slLk slk + 16#64) ∗ R curCtx ∗ lkNameFor (slLk slk) ∗ gateFloor curCtx
     ⊢ |={⊤}=> (kctxL (GF := GF) lent cpu k ∗ isSleeplockGen p.1 p.2 slk R H) := by
   unfold sleepLockInited lockInited slFreePair
-  iintro ⟨Hk, ⟨Hlf, Ha, Ht⟩, ⟨Hw, ⟨Hnm, Hfresh⟩, Hn, Hpid⟩, #Hcl, #Hcl', HR⟩
+  iintro ⟨Hk, ⟨Hlf, Ha, Ht⟩, ⟨Hw, ⟨Hnm, Hfresh⟩, Hn, Hpid⟩, #Hcl, #Hcl', HR, Hnf, #Hg⟩
   ihave Hpid := (show wordPointsTo (GF := GF) (slk + 40#64) 4 (DFrac.own 1) 0#32 ⊢
       wordPointsTo (slPid slk) 4 (DFrac.own 1) 0#32 from by unfold slPid; iintro H; iexact H) $$ Hpid
   ihave Htq := sleeplockedQ_intro p.2 1 slk 0#32 $$ [Ht Hpid]
@@ -68,8 +68,8 @@ theorem kctx_newSleeplockAt [CurCtx] {lent : Bool} (cpu : CPU) (k : KCtx) (p : G
   ihave Hfresh := (show lkFresh (GF := GF) (slk + 8#64) ⊢ lkFresh (slLk slk) from by
     unfold slLk; iintro H; iexact H) $$ Hfresh
   imod kctx_newlockAt cpu k p.1 (slLk slk) "sleep lock" (slBody p.2 slk R H)
-    $$ [Hk Hlf Hbody Hfresh] with ⟨Hk, #Hlk⟩
-  · iframe Hk Hlf Hbody Hfresh
+    $$ [Hk Hlf Hbody Hfresh Hnf] with ⟨Hk, #Hlk⟩
+  · iframe Hk Hlf Hbody Hfresh Hnf Hg
     isplit
     · iexact Hcl
     · iexact Hcl'

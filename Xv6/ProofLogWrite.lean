@@ -1347,7 +1347,7 @@ theorem lw_closeA (γ : LogNames) (γb : BcacheNames) (γfs : FsNames) (V : BioV
   ihave Hpay := (show (γfs.cache ↪◯MAP[bno.toNat]{.own (1 : Qp).half} bs) ∗
         (γfs.dirty ↪◯MAP[bno.toNat]{.own (1 : Qp).half} true) ∗ bref γb kk dev bno ⊢
       bioPay (GF := GF) γb V kk dev bno bs bsd true from by
-    unfold bioPay
+    unfold bioPay bioPayAt
     simp only [if_true]
     rw [hdt]
     unfold fsMdirty
@@ -1589,7 +1589,7 @@ theorem lw_closeB (γ : LogNames) (γb : BcacheNames) (γfs : FsNames) (V : BioV
   ihave Hpay := (show (γfs.cache ↪◯MAP[bno.toNat]{.own (1 : Qp).half} bs) ∗
         (γfs.dirty ↪◯MAP[bno.toNat]{.own (1 : Qp).half} true) ∗ bref γb kk dev bno ⊢
       bioPay (GF := GF) γb V kk dev bno bs bsd true from by
-    unfold bioPay
+    unfold bioPay bioPayAt
     simp only [if_true]
     rw [hdt]
     unfold fsMdirty

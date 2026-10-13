@@ -83,7 +83,7 @@ theorem bunpin_proof (AC : ACQUIRE) (RE : RELEASE_HOOK) : BUNPIN := ⟨
   ihave #Hbox := bioCtx_box γl γ V kk hkk $$ Hbc
   icases (show bref (GF := GF) γ kk dev bno ⊢
       brefTok γ kk ∗ ∃ T : Nat, boxRef (γ.box kk) ((dev, bno) : BufId) T from by
-    unfold bref; iintro H; iexact H) $$ Href with ⟨Href, ⟨%T0, Hbref⟩⟩
+    unfold bref brefAt; iintro H; iexact H) $$ Href with ⟨Href, ⟨%T0, Hbref⟩⟩
   icases boxRef_topLb (γ.box kk) ((dev, bno) : BufId) T0 $$ Hbref with ⟨Hbref, #HT0⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
@@ -161,7 +161,7 @@ theorem bunpin_proof (AC : ACQUIRE) (RE : RELEASE_HOOK) : BUNPIN := ⟨
   icases bslotAt_elim γ curCtx kk (s ++ id :: t) $$ Hsl0 with ⟨%⟨hnd, hlt⟩, Hrefc, Hhalves, Hslots, Hcnt⟩
   icases bkey_acc γ curCtx tl devs bnos kk hkk $$ Hkey with ⟨Hkey0, Hkcl⟩
   icases bkeyAt_elim γ curCtx tl kk (devs kk) (bnos kk) $$ Hkey0 with ⟨Hkd, Hkb, Hregs⟩
-  icases bufSlotRegs_elim (γ.box kk) tl (devs kk) (bnos kk) $$ Hregs with ⟨%r, %⟨hrid, hrtl⟩, Hrd, #Htd⟩
+  icases bufSlotRegs_elim (γ.box kk) tl (devs kk) (bnos kk) curCtx $$ Hregs with ⟨%r, %⟨hrid, hrtl⟩, Hrd, #Htd, #Hvd⟩
   obtain ⟨n, hn⟩ : ∃ n, (s ++ id :: t).length = n := ⟨_, rfl⟩
   have hn1 : 1 ≤ n := by rw [← hn]; simp only [List.length_append, List.length_cons]; omega
   have hlen2 : (s ++ t).length = n - 1 := by
@@ -196,18 +196,20 @@ theorem bunpin_proof (AC : ACQUIRE) (RE : RELEASE_HOOK) : BUNPIN := ⟨
   ihave Hup := bref_free_step γ M s t id kk $$ [Ha He Hhalves]
   case' _ => iframe
   imod Hup with ⟨Ha, Hhalves'⟩
-  imod bufEscrow_refDecr γ V (γ.box kk) kk (1 : Qp).half (1 : Qp).half r (s ++ t).length
-      ((dev, bno) : BufId) T0 ⊤ bioxN_top hrid.1 $$ [Hbox Hrd Htd Hcnt Hbref]
-    with ⟨Hrd, Hcnt, #Htd'⟩
-  · iframe Hbox Hrd Hcnt Hbref
+  icases kctx_token_acc c _ $$ Hk with ⟨Hctx, Hkback⟩
+  imod bufEscrow_refDecr γ V (γ.box kk) kk (1 : Qp).half (1 : Qp).half c r (s ++ t).length
+      ((dev, bno) : BufId) T0 ⊤ bioxN_top hrid.1 $$ [Hbox Hctx Hrd Htd Hvd Hcnt Hbref]
+    with ⟨Hctx, ⟨%aD, Hrd, Hcnt, #Htd', #HvaD⟩⟩
+  · iframe Hbox Hctx Hrd Hcnt Hbref Hvd
     iexact Htd
+  ihave Hk := Hkback $$ Hctx
   imodintro
   ihave Hregs := bufSlotRegs_intro (γ.box kk)
-      (⟨max r.td T0, false, r.ident, r.x⟩ : SlotReg BufId BufX) tl (devs kk) (bnos kk)
+      (⟨max r.td T0, false, r.ident, r.x, aD⟩ : SlotReg BufId BufX) tl (devs kk) (bnos kk) curCtx
       rfl hrid.2.1 hrid.2.2
       (by show max r.td T0 ≤ tl; omega)
     $$ [Hrd Htd']
-  case' _ => iframe Hrd Htd'
+  case' _ => iframe Hrd Htd' HvaD
   ihave Hkey0 := bkeyAt_intro γ curCtx tl kk (devs kk) (bnos kk) $$ [Hkd Hkb Hregs]
   case' _ => iframe Hkd Hkb Hregs
   ihave Hkey := Hkcl $$ Hkey0

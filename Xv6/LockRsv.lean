@@ -64,6 +64,16 @@ theorem kctx_lkOut [CurCtx] {lent : Bool} (cpu : CPU) (k : KCtx) (lk : BitVec 64
   ipureintro
   exact fun hm => hout (lkRsvIn_range heq hm)
 
+/-- A registered static lock needs no name word at its birth (W8 (f2-ctx):
+its byte is a static hop byte), out of the context's copy of the list. -/
+theorem kctx_lkNameFor [CurCtx] {lent : Bool} (cpu : CPU) (k : KCtx) {lk : BitVec 64}
+    (h : xv6LockR lk ∈ xv6RsvStatic) :
+    kctxL (GF := GF) lent cpu k ⊢ lkNameFor (hlc := hlc) (GF := GF) lk ∗ kctxL lent cpu k := by
+  iintro H
+  icases kctx_rsvEq cpu k $$ H with ⟨%heq, H⟩
+  iframe H
+  iapply lkNameFor_rsv lk (lkRsvIn_of heq h)
+
 /-- `initlock` at OWNED raw words, at a lock outside `rsvLockAt`
 (`kctx_lkOut`: a dynamic lock). -/
 theorem wp_initlock_own (IL : INITLOCK) [CurCtx] (cpu : CPU) (k : KCtx) (vlock : BitVec 32)

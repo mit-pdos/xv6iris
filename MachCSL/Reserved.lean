@@ -121,6 +121,11 @@ inductive RsvKind where
   hop: xv6's `started`): every post-power-on entry is `w`'s, all at one
   timestamp -/
   | pub (w : CPU)
+  /-- a REGISTERED NAME of the client's dynamic spinlocks (W8 (f2-ctx) [R35.1],
+  the time-indexed hop registry, `nameLockAt`): the region's base IS the
+  name pointer (xv6: the address of `"pipe"`); no footprint, no discipline --
+  a registry entry, so the boot's pinning of the list pins the names too -/
+  | name
   deriving DecidableEq
 
 /-- A reserved region: its base address and kind. -/
@@ -138,6 +143,7 @@ def RsvRegion.words (R : RsvRegion) : List (PAddr × Nat) :=
   | .cpu _ => [(R.base, 8), (R.base + 120#64, 4), (R.base + 124#64, 4)]
   | .lock _ => [(R.base, 4), (R.base + 16#64, 8)]
   | .pub _ => [(R.base, 4)]
+  | .name => []
 
 /-- The bytes of a word. -/
 def wordBytes (w : PAddr × Nat) : List PAddr :=
@@ -164,20 +170,23 @@ def regionOk (m : FlatMem) (R : RsvRegion) : Prop :=
   | .cpu h => cpuRegionOk h m R
   | .lock cb => lockRegionOk (cpuPtrAt cb) m R.base
   | .pub w => cpuRegionOk w m R ∧ oneShotOk m R
+  | .name => True
 
 /-- Every region of the list keeps its discipline. -/
 def rsvAllOk (rs : List RsvRegion) (m : FlatMem) : Prop :=
   ∀ (i : Nat) (R : RsvRegion), rs[i]? = some R → regionOk m R
 
 /-- The list is well formed: its bytes are pairwise distinct and every one is
-a RAM byte, hence an image byte (so the mint can split its points-to). -/
+a RAM byte, hence an image byte (so the mint can split its points-to); and
+(W8 (f2-ctx)) its regions' bases are distinct (a footprint-free `.name`
+entry's base is not one of its bytes). -/
 def rsvWf (rs : List RsvRegion) : Prop :=
-  (rsvBytes rs).Nodup ∧ ∀ a ∈ rsvBytes rs, inRam a 1
+  (rsvBytes rs).Nodup ∧ (∀ a ∈ rsvBytes rs, inRam a 1) ∧ (rs.map (fun R => R.base.toNat)).Nodup
 
 /-- A reserved byte has an image history. -/
 theorem rsvWf_img {rs : List RsvRegion} (hwf : rsvWf rs) {a : PAddr} (ha : a ∈ rsvBytes rs) :
     ((imgFlat bootImage)[a]?).isSome := by
-  have hr := hwf.2 a ha
+  have hr := hwf.2.1 a ha
   rw [imgFlat_get?, if_pos hr, bootImage_get?, if_pos hr]
   rfl
 
@@ -208,12 +217,14 @@ theorem strictSorted_nodup : ∀ l : List PAddr, strictSorted l = true → l.Nod
     · simp only [strictSorted, Bool.and_eq_true] at h
       exact h.2
 
-/-- The list is well formed, by evaluation: sorted bytes, all in RAM. -/
+/-- The list is well formed, by evaluation: sorted bytes, all in RAM, distinct
+bases. -/
 theorem rsvWf_of_check (rs : List RsvRegion) (h1 : strictSorted (rsvBytes rs) = true)
-    (h2 : (rsvBytes rs).all (fun a => decide (inRam a 1)) = true) : rsvWf rs :=
+    (h2 : (rsvBytes rs).all (fun a => decide (inRam a 1)) = true)
+    (h3 : (rs.map (fun R => R.base.toNat)).Nodup) : rsvWf rs :=
   ⟨strictSorted_nodup _ h1, fun a ha => by
     have := List.all_eq_true.1 h2 a ha
-    simpa using this⟩
+    simpa using this, h3⟩
 
 /-- `m'` grows `m` above `t`: every history only gained entries newer than
 `t`, on top (what a machine step at top `t` does to the memory). -/
@@ -248,14 +259,19 @@ theorem nameLockAt_mono {names : List (BitVec 64)} {m m' : FlatMem} {t t' : Nat}
   · have := hNt e he; omega
   · exact h1 e he
 
+/-- **The registered names** of a region list (its `.name` entries): the names
+of the dynamic spinlocks whose lock bytes are hops while they live
+(`nameLockAt`). -/
+def rsvNameList (rs : List RsvRegion) : List (BitVec 64) :=
+  rs.filterMap (fun R => match R.kind with | .name => some R.base | _ => none)
+
 /-- **The client's static reserved regions** (the `KernelMap.static`
 pattern): reserved at the `PowerOn` mint, from timestamp 0, never released;
-and (W8 (f2-ctx) [R35.1]) the NAMES of its dynamic spinlocks whose lock
-bytes are hops while they live (`nameLockAt`). -/
+(W8 (f2-ctx) [R35.1]) its `.name` entries register the NAMES of its dynamic
+spinlocks (`rsvNameList`). -/
 class KernelRsv where
   static : List RsvRegion
   wf : rsvWf static
-  names : List (BitVec 64)
 
 /-! ## Membership facts -/
 
@@ -277,11 +293,14 @@ theorem mem_rsvBytes {rs : List RsvRegion} {i : Nat} {R : RsvRegion} (hi : rs[i]
     (ha : a ∈ R.bytes) : a ∈ rsvBytes rs :=
   List.mem_flatMap.2 ⟨R, List.mem_of_getElem? hi, ha⟩
 
-/-- A region's base is one of its bytes. -/
-theorem RsvRegion.base_mem (R : RsvRegion) : R.base ∈ R.bytes := by
+/-- A region's base is one of its bytes (every kind but a footprint-free
+`.name` entry). -/
+theorem RsvRegion.base_mem (R : RsvRegion) (hk : R.kind ≠ .name) : R.base ∈ R.bytes := by
   have hw : ∃ n, 0 < n ∧ (R.base, n) ∈ R.words := by
     unfold RsvRegion.words
-    cases R.kind <;> exact ⟨_, by decide, List.mem_cons_self⟩
+    cases h : R.kind with
+    | name => exact absurd h hk
+    | _ => exact ⟨_, by decide, List.mem_cons_self⟩
   obtain ⟨n, hn, hw⟩ := hw
   have := mem_regionBytes hw hn
   simpa using this
@@ -327,6 +346,7 @@ theorem regionOk_congr {m m' : FlatMem} {R : RsvRegion}
     (h : ∀ a ∈ R.bytes, m'[a]? = m[a]?) (hR : regionOk m R) : regionOk m' R := by
   unfold regionOk at hR ⊢
   cases hk : R.kind with
+  | name => trivial
   | cpu c =>
     rw [hk] at hR
     intro a ha H hH
@@ -430,6 +450,7 @@ theorem rsvAllOk_boot {rs : List RsvRegion} (hwf : rsvWf rs) : rsvAllOk rs (imgF
     · simp at hs
   unfold regionOk
   cases hk : R.kind with
+  | name => trivial
   | cpu c =>
     intro a ha H hH e he het
     obtain ⟨v, hv⟩ := himg a ha

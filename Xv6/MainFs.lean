@@ -36,6 +36,7 @@ handler environment's device complement), `mn_firstFsinit` (Rocq's
 `first_boot_persist`, seventeen rows).
 -/
 import Xv6.MainPrintk
+import Xv6.LockRsv
 
 namespace Xv6
 
@@ -83,11 +84,11 @@ theorem mn_binit (BI : BINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsi
     (∃ (vhp vhn : BitVec 64), wordPointsTo (bcacheHeadAddr + 72#64) 8 (DFrac.own 1) vhp ∗
       wordPointsTo (bcacheHeadAddr + 80#64) 8 (DFrac.own 1) vhn) ∗
     ([∗list] i ∈ List.range NBUF, bufIn i) ∗ ([∗list] i ∈ List.range NBUF, bdBss curCtx i) ∗
-    bioFreeTok γl γ ∗ ([∗set] b ∈ V.cov, poolBlk V b) ∗
+    bioFreeTok γl γ ∗ ([∗set] b ∈ V.cov, poolBlk V b) ∗ gateFloor curCtx ∗
     (∀ R : RegMap, kctx cpu (k.withRegs R) -∗ pcIs cpu (KA.«main» + 146#64) -∗ bioCtx γl γ V -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
   unfold mainLkRawR
-  iintro ⟨Hk, Hpc, ⟨%vl, %vn, %vc, Hlw⟩, ⟨%vhp, %vhn, Hhp, Hhn⟩, Hin, Hbss, Hfree, Hpool, HΦ⟩
+  iintro ⟨Hk, Hpc, ⟨%vl, %vn, %vc, Hlw⟩, ⟨%vhp, %vhn, Hhp, Hhn⟩, Hin, Hbss, Hfree, Hpool, #Hg, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave Hin := (show ([∗list] i ∈ List.range NBUF, bufIn (GF := GF) i) ⊢
     [∗list] i ∈ List.range 30, bufIn i from .rfl) $$ Hin
@@ -105,7 +106,7 @@ theorem mn_binit (BI : BINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsi
   iintro %R' Hk Hpc Hli Hhp Hhn Hout %_
   simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, if_pos, mn_ret_92]
   iapply wpLoop_fupd
-  imod bioInitAt_of_binit cpu (k.withRegs R') γl γ V hcov0 $$ [$Hk $Hfree $Hli $Hhp $Hhn $Hout $Hbss $Hpool]
+  imod bioInitAt_of_binit cpu (k.withRegs R') γl γ V hcov0 $$ [$Hk $Hfree $Hli $Hhp $Hhn $Hout $Hbss $Hpool $Hg]
     with ⟨Hk, #Hbio⟩
   imodintro
   iapply HΦ $$ %R' Hk Hpc Hbio
@@ -171,11 +172,11 @@ theorem mn_iinit (II : IINIT) [Fscfg] [Icfg] [CurCtx] (cpu : CPU) (k : KCtx) (R0
     kctx cpu (k.withRegs R0) ∗ pcIs cpu (KA.«main» + 146#64) ∗
     mainLkRawR itableLockAddr ∗ ([∗list] i ∈ List.range NINODE, sleepLockIn (inodeAddr i)) ∗
     ([∗list] k ∈ List.range NINODE, ientryRaw k) ∗ irefSlotsAuth ∗
-    ([∗list] k ∈ List.range NINODE, offSetAuth offCfg k ∅) ∗ mnIcacheKit ∗
+    ([∗list] k ∈ List.range NINODE, offSetAuth offCfg k ∅) ∗ mnIcacheKit ∗ gateFloor curCtx ∗
     (∀ R : RegMap, kctx cpu (k.withRegs R) -∗ pcIs cpu (KA.«main» + 150#64) -∗ mnIcacheRows -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
   unfold mainLkRawR
-  iintro ⟨Hk, Hpc, ⟨%vl, %vn, %vc, Hlw⟩, Hin, Hraw, Hsup, Hoffa, Hkit, HΦ⟩
+  iintro ⟨Hk, Hpc, ⟨%vl, %vn, %vc, Hlw⟩, Hin, Hraw, Hsup, Hoffa, Hkit, #Hg, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave Hin := (show ([∗list] i ∈ List.range NINODE, sleepLockIn (GF := GF) (inodeAddr i)) ⊢
     [∗list] i ∈ List.range 50, sleepLockIn (inodeAddr i) from .rfl) $$ Hin
@@ -205,10 +206,11 @@ theorem mn_iinit (II : IINIT) [Fscfg] [Icfg] [CurCtx] (cpu : CPU) (k : KCtx) (R0
   unfold mnIcacheKit
   icases Hkit with ⟨Hiref, Hlive, Hstmp, Hisl, Hipool, Hpkey, Hxkey, Hitlk, Htok, Hdep, Hgid, Hhpn,
     Htkey, Hckey, Hbox⟩
+  icases kctx_rsvEq cpu (k.withRegs R') $$ Hk with ⟨%heq, Hk⟩
   icases kctx_token_acc cpu (k.withRegs R') $$ Hk with ⟨Hrun, Hback⟩
   iapply wpLoop_fupd
-  imod icacheBootAt cpu ⊤ fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev inodeNameAddr
-    $$ HS Hiref Hlive Hisl Hfresh Hsl Hraw Hsup Hstmp Hipool Hpkey Hxkey Hitlk Htok Hdep Hgid Hhpn
+  imod icacheBootAt cpu ⊤ fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev inodeNameAddr heq
+    $$ HS Hg Hiref Hlive Hisl Hfresh Hsl Hraw Hsup Hstmp Hipool Hpkey Hxkey Hitlk Htok Hdep Hgid Hhpn
       Htkey Hckey Hbox Hoffa Hrun with ⟨Hrun, #Hit, #Hiti, #Hesc, Hsls⟩
   icases Hsls with #Hsls
   imodintro
@@ -242,11 +244,12 @@ theorem mn_fileinit (FI : FILEINIT) [Icfg] [CurCtx] (cpu : CPU) (k : KCtx) (R0 :
     (hsie : k.sie = false) (hK : 4 ≤ k.avail) :
     kctx cpu (k.withRegs R0) ∗ pcIs cpu (KA.«main» + 150#64) ∗
     mainLkRawR ftableLockAddr ∗ ([∗list] k ∈ List.range NFILE, fentryRaw curCtx k) ∗ irefSlots NFILE ∗
+    gateFloor curCtx ∗
     (∀ R : RegMap, kctx cpu (k.withRegs R) -∗ pcIs cpu (KA.«main» + 154#64) -∗
       (∃ (γft : GName) (γ : FileNames), isFtable γft γ) -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
   unfold mainLkRawR
-  iintro ⟨Hk, Hpc, ⟨%vl, %vn, %vc, Hlw⟩, Hraw, Hir, HΦ⟩
+  iintro ⟨Hk, Hpc, ⟨%vl, %vn, %vc, Hlw⟩, Hraw, Hir, #Hg, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   k_step (wp_s_jal cpu _ (KA.«main» + 150#64) false 12970#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_96]
@@ -264,7 +267,7 @@ theorem mn_fileinit (FI : FILEINIT) [Icfg] [CurCtx] (cpu : CPU) (k : KCtx) (R0 :
   icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
   icases mn_ftable_kmap $$ HS with ⟨#Hf0, #Hf16⟩
   iapply wpLoop_fupd
-  imod fileBoot_isFtable cpu (k.withRegs R') $$ [$Hk $Hli $Hf0 $Hf16 $Hraw $Hir] with ⟨Hk, -, Hft⟩
+  imod fileBoot_isFtable cpu (k.withRegs R') $$ [$Hk $Hli $Hf0 $Hf16 $Hraw $Hir $Hg] with ⟨Hk, -, Hft⟩
   imodintro
   iapply HΦ $$ %R' Hk Hpc Hft
 
@@ -289,12 +292,12 @@ theorem mn_virtio (VD : VIRTIO_DISK_INIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : 
     diskInv γd ∗ diskCrashCaps γd ∗ diskCfgOwn γd c0 ∗ diskInitGhosts γd ∗
     (∃ (vl : BitVec 32) (vn vc pd0 pav0 pu0 : BitVec 64) (free0 : List (BitVec 8)),
       diskInitCells vl vn vc pd0 pav0 pu0 free0) ∗
-    lockFreeTok γdl ∗
+    lockFreeTok γdl ∗ gateFloor curCtx ∗
     (∀ (R : RegMap) (pd pav pu : BitVec 64), kctx cpu (k.withRegs R) -∗ pcIs cpu (KA.«main» + 158#64) -∗
       kallocAvail γk (some (nb - 3)) -∗ diskCaps γd γdl pd pav pu -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, #Hkml, Hav, #Hdinv, #Hcc, Hcfg, Hgh, ⟨%vl, %vn, %vc, %pd0, %pav0, %pu0, %free0, Hcells⟩,
-    Hlf, HΦ⟩
+    Hlf, #Hg, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   k_step (wp_s_jal cpu _ (KA.«main» + 154#64) false 18884#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_9a]
@@ -313,9 +316,11 @@ theorem mn_virtio (VD : VIRTIO_DISK_INIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : 
   icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
   icases mn_vdisk_kmap $$ HS with ⟨#Hv0, #Hv16⟩
   iapply wpLoop_fupd
-  imod (kctx_newlockAt cpu _ γdl aVdiskLock "virtio_disk" (diskRes γd pd pav pu)) $$ [Hk Hlf HR Hfresh]
+  icases kctx_lkNameFor cpu _ (lk := aVdiskLock) (by unfold aVdiskLock diskAddr dOffLock; exact xv6RsvStatic_disk)
+    $$ Hk with ⟨Hdn, Hk⟩
+  imod (kctx_newlockAt cpu _ γdl aVdiskLock "virtio_disk" (diskRes γd pd pav pu)) $$ [Hk Hlf HR Hfresh Hdn]
     with ⟨Hk, #Hdl⟩
-  · iframe Hk Hlf HR Hfresh Hv0 Hv16
+  · iframe Hk Hlf HR Hfresh Hdn Hv0 Hv16 Hg
   imodintro
   iapply HΦ $$ %R' %pd %pav %pu Hk Hpc Hav
   unfold diskCaps
@@ -407,14 +412,15 @@ born at `γc` over the ring, the clean token buys the credential escrow, and
 the two bundles are assembled while the lock's name is concrete. -/
 theorem mn_consLock [Fscfg] [CurCtx] (cpu : CPU) (k : KCtx) (γc γl0 : GName) (γ0 : UartNames) (cn : ConsNames)
     (hcn : cn.uart = γ0) (hcne : cn.era = genId (hlc := hlc) (GF := GF) + 1) (hcons : fscCons = cn) :
-    kctx cpu k ∗ lockFreeTok γc ∗ lkFresh consAddr ∗ consResAt cn curCtx ∗ consCleanTok cn ∗
+    kctx cpu k ∗ gateFloor curCtx ∗ lockFreeTok γc ∗ lkFresh consAddr ∗ consResAt cn curCtx ∗ consCleanTok cn ∗
     devswTable ∗ uartPort .uart0 γl0 γ0 ∗ consEchoShift
     ⊢ |={⊤}=> (kctx (GF := GF) cpu k ∗ mnConsole γc γl0 γ0) := by
-  iintro ⟨Hk, Hlf, Hfr, HR, Hcl, #Htbl, #Hport, #Hecho⟩
+  iintro ⟨Hk, #Hg, Hlf, Hfr, HR, Hcl, #Htbl, #Hport, #Hecho⟩
+  icases kctx_lkNameFor cpu k (lk := consAddr) xv6RsvStatic_cons $$ Hk with ⟨Hcn, Hk⟩
   icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
   icases mn_cons_kmap $$ HS with ⟨#Hc0, #Hc16⟩
-  imod (kctx_newlockAt cpu k γc consAddr "cons" (consResAt cn)) $$ [Hk Hlf HR Hfr] with ⟨Hk, #Hlk⟩
-  · iframe Hk Hlf HR Hfr Hc0 Hc16
+  imod (kctx_newlockAt cpu k γc consAddr "cons" (consResAt cn)) $$ [Hk Hlf HR Hfr Hcn] with ⟨Hk, #Hlk⟩
+  · iframe Hk Hlf HR Hfr Hcn Hc0 Hc16 Hg
   imod consCredInv_alloc cn (appRdcred (hlc := hlc) (GF := GF)) ⊤ $$ Hcl with #Hcred
   imodintro
   iframe Hk

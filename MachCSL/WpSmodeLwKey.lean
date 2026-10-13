@@ -235,17 +235,17 @@ theorem wp_s_lw_au_key [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : K
       (k.sie = false ∨ k.proc = 0#64 → cpu' = cpu) → (f ≤ K ∨ (f, hartAgent cpu') ∈ ts) →
       ([∗list] p ∈ ts, authoredBy p.1 p.2) ∗ R ⊢ readAU cpu' va 4 K ts (Ψ cpu')) :
     instr (GF := GF) pc is_rvc (instruction.LOAD (imm, regidx.Regidx rs1, regidx.Regidx rd, false, 4)) ∗
-    kctxL lent cpu k ∗ pcIs cpu pc ∗ kmapId va ∗ lkFloor curCtx f ∗ R ∗
+    kctxL lent cpu k ∗ pcIs cpu pc ∗ kmapId va ∗ visFloor curCtx f ∗ R ∗
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
         iprop(∀ w : BitVec (8 * 4), kctxL lent cpu' (k.setReg rd (BitVec.signExtend 64 w)) -∗
           pcIs cpu' (pc + instrLen is_rvc) -∗ Ψ cpu' w -∗ wpLoop cpu'))
     ⊢ wpLoop cpu := by
   have hobl' : ∀ cpu' : CPU, (k.sie = false ∨ k.proc = 0#64 → cpu' = cpu) →
-      ownCtx cpu' curCtx ∗ iprop(lkFloor curCtx f ∗ R) ⊢ ownCtx cpu' curCtx ∗
+      ownCtx cpu' curCtx ∗ iprop(visFloor curCtx f ∗ R) ⊢ ownCtx cpu' curCtx ∗
         ∃ (K : Nat) (ts : List (Nat × Agent)), viewLb cpu' K ∗ readAU cpu' va 4 K ts (Ψ cpu') := by
     intro cpu' hpin
     iintro ⟨Hctx, #Hfl, HR⟩
-    icases ownCtx_lkFloor_vis cpu' f $$ [Hctx] with ⟨Hctx, %K, %ts, #HK, #Hts, %hvis⟩
+    icases ownCtx_visFloor_vis cpu' f $$ [Hctx] with ⟨Hctx, %K, %ts, #HK, #Hts, %hvis⟩
     · iframe Hctx; iexact Hfl
     iframe Hctx
     iexists K, ts
@@ -255,7 +255,7 @@ theorem wp_s_lw_au_key [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : K
     iexact Hts
   iintro ⟨HI, Hk, Hpc, #Hcl, #Hfl, HR, HΦ⟩
   iapply (wp_s_lw_au_ctx (lent := lent) cpu k pc is_rvc imm rd rs1 hrs1 hrd va haddr hram hal
-    iprop(lkFloor curCtx f ∗ R) Ψ hobl')
+    iprop(visFloor curCtx f ∗ R) Ψ hobl')
   iframe HI Hk Hpc HR HΦ
   isplit
   · iexact Hcl

@@ -228,22 +228,22 @@ theorem ownCtx_key_topLb (cpu : CPU) (ξ : CtxId) (t : Nat) :
     ownCtx (GF := GF) cpu ξ ∗ keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ t ⊢
       ownCtx cpu ξ ∗ topLb t := by
   iintro ⟨Hctx, #Hkey⟩
-  icases keyAt_cases _ ξ t $$ Hkey with ⟨#Hfl | ⟨%h, #Hd, #Hau⟩⟩
+  icases keyAt_cases _ ξ t $$ Hkey with ⟨⟨#Hfl, _⟩ | ⟨%h, #Hd, #Hau⟩⟩
   · icases ownCtx_floor_view cpu ξ t $$ [Hctx Hfl] with ⟨Hctx, ⟨%K, #HK, %hle⟩⟩
     · iframe Hctx; iexact Hfl
     iframe Hctx
     iapply topLb_le K t hle
     iapply viewLb_topLb cpu K
     iexact HK
-  · icases ownCtx_cases cpu ξ $$ Hctx with ⟨%B, %K, %W, %D, Hat, #HK, %hBK, #HW, %hok, #Hels⟩
+  · icases ownCtx_cases cpu ξ $$ Hctx with ⟨%B, %K, %W, %D, Hat, #HK, %hBK, #HW, %hok, #Hels, Hch⟩
     ihave %hD : ⌜get? D t = some h⌝ $$ [Hat Hd]
     · iapply ctxAt_dirty ξ 1 B D t h $$ [Hat Hd]
       iframe Hat
       iexact Hd
     have hW := (hok t h hD).1
-    isplitl [Hat]
+    isplitl [Hat Hch]
     · iapply ownCtx_intro cpu ξ B K W D
-      iframe Hat
+      iframe Hat Hch
       isplit
       · iexact HK
       isplit

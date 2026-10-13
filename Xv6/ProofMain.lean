@@ -222,6 +222,7 @@ theorem mn_phaseC (BI : BINIT) (II : IINIT) (FI : FILEINIT) (VD : VIRTIO_DISK_IN
   unfold mnWorldC
   icases Hw with ⟨#Hpinv, #Htl, #Hwl, #Hpl, #Hcons, #Hp0, #Hp1, #Hr0, #Hr1, #Hi0, #Hi1, #Hplic, #Hpe,
     #Hkml, #Htr, #Hwire, #Hanc, #Hcert, #Hseam, #Hcinv⟩
+  ihave #Hg := isLock_gate _ _ _ _ $$ Hkml
   have hsl : 12 ≤ k.avail ∧ 4 ≤ k.avail ∧ virtioDiskInitSlots ≤ k.avail ∧ userinitSlots ≤ k.avail ∧
       schedulerSlots ≤ k.avail := by
     unfold mainSlots schedulerSlots kvFrameSlots userinitSlots virtioDiskInitSlots at *
@@ -231,20 +232,20 @@ theorem mn_phaseC (BI : BINIT) (II : IINIT) (FI : FILEINIT) (VD : VIRTIO_DISK_IN
     [∗set] b ∈ (fsView (GF := GF) fscFs fscDisk icfgDev fscCov).cov,
       poolBlk (fsView fscFs fscDisk icfgDev fscCov) b from .rfl) $$ Hpool
   iapply (mn_binit BI startedPrimary k R0 hsie hsl.1 γbl fscBio (fsView fscFs fscDisk icfgDev fscCov) hcov0)
-  iframe Hk Hpc Hblk Hhead Hbin Hbss Hbio Hpool
+  iframe Hk Hpc Hblk Hhead Hbin Hbss Hbio Hpool Hg
   iintro %R1 Hk Hpc #Hbc
   -- +0x92  iinit, and the inode cache
   iapply (mn_iinit II startedPrimary k R1 hsie hsl.1)
-  iframe Hk Hpc Hilk Hsin Hraw Hira Hoffa Hikit
+  iframe Hk Hpc Hilk Hsin Hraw Hira Hoffa Hikit Hg
   iintro %R2 Hk Hpc #Hrows
   -- +0x96  fileinit, and the open-file table
   iapply (mn_fileinit FI startedPrimary k R2 hsie hsl.2.1)
-  iframe Hk Hpc Hflk Hfent Hirf
+  iframe Hk Hpc Hflk Hfent Hirf Hg
   iintro %R3 Hk Hpc ⟨%γft, %γf, #Hft⟩
   -- +0x9a  virtio_disk_init, and the vdisk lock
   iapply (mn_virtio VD startedPrimary k R3 hsie hsl.2.2.1 hnoff hlocks hproc γd fscKalloc γdl fsReadyKmem
     (kinitPages - kvmmakeCount) (by decide) c0 hdead)
-  iframe Hk Hpc Hkml Hav Hdinv Hcc Hcfg Hgh Hcells
+  iframe Hk Hpc Hkml Hav Hdinv Hcc Hcfg Hgh Hcells Hg
   isplitl [Hdlf]
   · rw [← hdl]; iexact Hdlf
   iintro %R4 %pd %pav %pu Hk Hpc Hav #Hdc
@@ -384,6 +385,7 @@ theorem mn_phaseB (PR : PROCINIT) (TI : TRAPINIT) (TIH : TRAPINITHART) (PLI : PL
   unfold mnWorldB
   icases Hw with ⟨#Htbl, #Hp0, #Hp1, #Hr0, #Hr1, #Hecho, #Hi0, #Hi1, #Hplic, #Hpe, #Hkml, #Htr, #Hwire,
     #Hanc, #Hcert, #Hseam, #Hcinv⟩
+  ihave #Hg := isLock_gate _ _ _ _ $$ Hkml
   have hsl : 10 ≤ k.avail ∧ 4 ≤ k.avail ∧ 2 ≤ k.avail := by
     unfold mainSlots schedulerSlots kvFrameSlots at hK; omega
   -- +0x7a  procinit
@@ -396,16 +398,16 @@ theorem mn_phaseB (PR : PROCINIT) (TI : TRAPINIT) (TIH : TRAPINITHART) (PLI : PL
   imod slotLed_alloc (hlc := hlc) ⊤ $$ [$Hsla $Hsoa] with #Hsli
   ihave Hsoe := soElem_boot (List.range NPROC) $$ [$Hsli $Hsoe]
   ihave Hins := mn_slots_zip Γ pas $$ [$Hready $Hpub $Hhart $Hps $Hsf $Hlk $Hstk $Hslots $Hsoe]
-  imod mn_procsInv hct startedPrimary (k.withRegs R1) Γ t pas hok $$ [$Hk $Hsmap $Hins] with ⟨Hk, #Hpinv⟩
-  imod mn_pidWait_born startedPrimary (k.withRegs R1) $$ [$Hk $Hpli $Hwli $Hnp $Hpq $Hpra $Hpled $Hpar $Hchb $Horph $Hzled $Hzsa]
+  imod mn_procsInv hct startedPrimary (k.withRegs R1) Γ t pas hok $$ [$Hk $Hg $Hsmap $Hins] with ⟨Hk, #Hpinv⟩
+  imod mn_pidWait_born startedPrimary (k.withRegs R1) $$ [$Hk $Hg $Hpli $Hwli $Hnp $Hpq $Hpra $Hpled $Hpar $Hchb $Horph $Hzled $Hzsa]
     with ⟨Hk, ⟨%γp, #Hpidl⟩, ⟨%γw, #Hwaitl⟩⟩
   -- the cons lock and the console bundles
   imod mn_consLock startedPrimary (k.withRegs R1) γc γl0 γ0 cn hcn hcne hcons
-    $$ [$Hk $Hclf $Hcfr $Hcres $Hclean $Htbl $Hp0 $Hecho] with ⟨Hk, #Hcons⟩
+    $$ [$Hk $Hg $Hclf $Hcfr $Hcres $Hclean $Htbl $Hp0 $Hecho] with ⟨Hk, #Hcons⟩
   imodintro
   -- +0x7e  trapinit, and the ticks lock
   iapply (mn_trapinit TI startedPrimary k R1 hsie hsl.2.1 γt tvl tvn tvc)
-  iframe Hk Hpc Ht0 Ht16 Htw Htn Htlf Htres Htk
+  iframe Hk Hpc Ht0 Ht16 Htw Htn Htlf Htres Htk Hg
   iintro %R2 Hk Hpc #Htl
   -- +0x82  trapinithart
   iapply (mn_trapinithart TIH startedPrimary k R2 hsie hsl.2.2)
@@ -518,9 +520,12 @@ theorem main_proof (CI : CPUID) (CN : CONSOLEINIT) (PI : PRINTKINIT) (PK : PRINT
   -- +0x46  printkinit, and the three Bare-phase births
   unfold mainLkRawR
   icases Hpr with ⟨%vpl, %vpn, %vpc, Hprw⟩
+  iapply wpLoop_fupd
+  imod kctx_gatePrim _ $$ Hk with ⟨Hk, #Hg⟩
+  imodintro
   iapply (mn_prinit PI startedPrimary (k.pushed 2) R2 (by simp [hsie]) (by simp; omega) vpl vpn vpc
     fscPrintk γl0 γl1 γ0 γ1 [] [])
-  iframe Hk Hpc Hprw Hkpr Hγl0 Htx0 Htf0 Hγl1 Htx1 Htf1
+  iframe Hk Hpc Hprw Hkpr Hγl0 Htx0 Htf0 Hγl1 Htx1 Htf1 Hg
   iintro %R3 Hk Hpc #Hlocks
   unfold mnPrLocks
   icases Hlocks with ⟨#Hprl, #Htxl0, #Htxl1⟩
@@ -544,7 +549,7 @@ theorem main_proof (CI : CPUID) (CN : CONSOLEINIT) (PI : PRINTKINIT) (PK : PRINT
   -- +0x6e  kinit
   iapply (mn_kinit KI startedPrimary (k.pushed 2) R6 hs2 (by simp; omega) hn2 hl2 (by simp [hproc]) fscKalloc fsReadyKmem
     vkl vkn vkc)
-  iframe Hk Hpc Hkm0 Hkm16 Hkw Hkn Hfl Hpages Hklf Hkav0 Hkauth
+  iframe Hk Hpc Hkm0 Hkm16 Hkw Hkn Hfl Hpages Hklf Hkav0 Hkauth Hg
   iintro %R7 Hk Hpc #Hkml Hkav
   -- +0x72  kvminit
   iapply (mn_kvminit KV startedPrimary (k.pushed 2) R7 hs2 (by simp; omega) hn2 hl2 (by simp [hproc]) fscKalloc fsReadyKmem

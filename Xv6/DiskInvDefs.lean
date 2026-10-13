@@ -285,7 +285,7 @@ position is the handle: a reader whose view has passed it reads the
 head. -/
 def dmaOwnT (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (ts : Nat) : IProp GF := iprop%
   ∃ Hs : Nat → Hist, histBytes pa n (fun _ => DFrac.own 1) Hs ∗ topLb ts ∗
-    ⌜headsAre Hs n w ∧ headsAtT Hs n ts⌝
+    ⌜headsAre Hs n w ∧ headsAtT Hs n ts⌝ ∗ authoredBy ts diskAgent
 
 /-- A HALF of the footprint: all a DMA READ needs (a cell at any fraction
 pins the byte's top), and what leaves the other half to the driver. -/
@@ -304,27 +304,39 @@ instance dmaOwnAt_timeless (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
 instance dmaOwnT_timeless (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (ts : Nat) :
     Timeless (dmaOwnT (GF := GF) pa n w ts) := by unfold dmaOwnT topLb topLbAt; infer_instance
 
+/-- The position of a DMA row is the DEVICE's store (W8 (f2-ctx), X4: the
+device-key arm of `MachCSL.chainKey`). -/
+theorem dmaOwnT_auth (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (ts : Nat) :
+    dmaOwnT (GF := GF) pa n w ts ⊢ authoredBy ts diskAgent ∗ dmaOwnT pa n w ts := by
+  unfold dmaOwnT
+  iintro ⟨%Hs, H, #Ht, %hp, #Ha⟩
+  isplitl []
+  · iexact Ha
+  iexists Hs
+  iframe H Ht Ha
+  ipureintro; exact hp
+
 theorem dmaOwnT_dmaOwn (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (ts : Nat) :
     dmaOwnT (GF := GF) pa n w ts ⊢ dmaOwn pa n := by
   unfold dmaOwnT dmaOwn
-  iintro ⟨%Hs, H, _, %_⟩
+  iintro ⟨%Hs, H, _, %_, _⟩
   iexists Hs
   iexact H
 
 theorem dmaOwnT_cases (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (ts : Nat) :
     dmaOwnT (GF := GF) pa n w ts ⊢
       ∃ Hs : Nat → Hist, histBytes pa n (fun _ => DFrac.own 1) Hs ∗ topLb ts ∗
-        ⌜headsAre Hs n w ∧ headsAtT Hs n ts⌝ := by
+        ⌜headsAre Hs n w ∧ headsAtT Hs n ts⌝ ∗ authoredBy ts diskAgent := by
   unfold dmaOwnT; iintro H; iexact H
 
 theorem dmaOwnT_topLb (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (ts : Nat) :
     dmaOwnT (GF := GF) pa n w ts ⊢ topLb ts ∗ dmaOwnT pa n w ts := by
   unfold dmaOwnT
-  iintro ⟨%Hs, H, #Ht, %hp⟩
+  iintro ⟨%Hs, H, #Ht, %hp, #Ha⟩
   isplitl []
   · iexact Ht
   iexists Hs
-  iframe H Ht
+  iframe H Ht Ha
   ipureintro; exact hp
 
 /-- **The write, at its position**: what `MachCSL.dmaWriteLease`'s
@@ -339,12 +351,12 @@ theorem dmaOwn_leaseT (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (P : IProp GF)
   iframe Hb
   isplitl []
   · iapply topLbAt_0
-  iintro %t Hb2 _ #Htop %_
+  iintro %t Hb2 #Hau #Htop %_
   iapply Hback
   iexists t
   unfold dmaOwnT
   iexists (pushed Hs t diskAgent w)
-  iframe Hb2 Htop
+  iframe Hb2 Htop Hau
   ipureintro
   exact ⟨headsAre_pushed Hs t diskAgent n w, fun j _ => rfl⟩
 /-- **The write, at its position, with the ORDERING RECEIPT.**  The client
@@ -360,14 +372,14 @@ theorem dmaOwn_leaseTb (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (Kb : Nat) (P
   iintro ⟨⟨%Hs, Hb⟩, #Htb, Hback⟩
   iexists Hs, Kb
   iframe Hb Htb
-  iintro %t Hb2 _ #Htop %hlt
+  iintro %t Hb2 #Hau #Htop %hlt
   iapply Hback
   iexists t
   isplitl []
   · ipureintro; exact hlt
   unfold dmaOwnT
   iexists (pushed Hs t diskAgent w)
-  iframe Hb2 Htop
+  iframe Hb2 Htop Hau
   ipureintro
   exact ⟨headsAre_pushed Hs t diskAgent n w, fun j _ => rfl⟩
 
@@ -4738,6 +4750,70 @@ theorem slotBody_member (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (i h : Nat) :
     slotBody (GF := GF) γ ξ pd i (.member h) =
       iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8 ∗ opsWin ξ i ∗ infoWin ξ i) := rfl
 
+/-- **A VISIBILITY key** (W8 (f2-ctx)): a floor, or one of the context's own
+buffered stores -- `MachCSL.keyAt` without the chain half.  The watermark's
+credential is cashed only for VISIBILITY at the handler's fence (the used
+ring's own bytes carry full keys: device-authored, the device-key arm), so a
+scalar floor is all it needs (row 28: the scalar absorb raises no chain
+bound). -/
+def diskVisKey (ξ : CtxId) (T : Nat) : IProp GF :=
+  iprop(ctxFloor ξ T ∨ ∃ h : CPU, dirtyIn ξ T h ∗ authoredByAt (MachGS.era (hlc := hlc) (GF := GF)) T (hartAgent h))
+
+instance diskVisKey_persistent (ξ : CtxId) (T : Nat) : Persistent (diskVisKey (GF := GF) ξ T) := by
+  unfold diskVisKey; infer_instance
+
+theorem diskVisKey_of_key (ξ : CtxId) (T : Nat) :
+    keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ T ⊢ diskVisKey (GF := GF) ξ T := by
+  unfold diskVisKey
+  iintro #H
+  icases keyAt_cases _ ξ T $$ H with ⟨⟨#Hfl, _⟩ | ⟨%h, #Hd, #Hau⟩⟩
+  · ileft; iexact Hfl
+  · iright; iexists h; iframe Hd Hau
+
+instance instCtxMorphVisKey (T : Nat) : CtxMorph (GF := GF) (fun ξ => diskVisKey ξ T) := by
+  constructor
+  intro ξ ξ'
+  iintro ⟨Hdom, #Hk⟩
+  unfold diskVisKey
+  icases Hk with ⟨#Hfl | ⟨%h, #Hd, #Hau⟩⟩
+  · imod (instCtxMorphFloor (GF := GF) T).morph ξ ξ' $$ [Hdom Hfl] with ⟨Hdom, #Hfl'⟩
+    · iframe Hdom Hfl
+    imodintro
+    iframe Hdom
+    ileft; iexact Hfl'
+  · ihave Hkey : keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ T $$ []
+    · unfold keyAt; iright; iexists h; iframe Hd Hau
+    icases ctx_dom_key ξ ξ' _ T $$ [Hdom Hkey] with ⟨Hdom, #Hkey'⟩
+    · iframe
+    imodintro
+    iframe Hdom
+    icases keyAt_cases _ ξ' T $$ Hkey' with ⟨⟨#Hfl', _⟩ | ⟨%h', #Hd', #Hau'⟩⟩
+    · ileft; iexact Hfl'
+    · iright; iexists h'; iframe Hd' Hau'
+
+/-- What a visibility key tells the running hart (`MachCSL.ownCtx_key_vis`'s
+form). -/
+theorem diskVisKey_vis (cpu : CPU) (ξ : CtxId) (t : Nat) :
+    ownCtx (GF := GF) cpu ξ ∗ diskVisKey ξ t ⊢
+      ownCtx cpu ξ ∗ ∃ (K : Nat) (ts : List (Nat × Agent)),
+        viewLb cpu K ∗ ([∗list] p ∈ ts, authoredBy p.1 p.2) ∗
+        ⌜t ≤ K ∨ (t, hartAgent cpu) ∈ ts⌝ := by
+  iintro ⟨Hctx, #Hk⟩
+  unfold diskVisKey
+  icases Hk with ⟨#Hfl | ⟨%h, #Hd, #Hau⟩⟩
+  · icases ownCtx_floor_view cpu ξ t $$ [Hctx Hfl] with ⟨Hctx, ⟨%K, #HK, %hle⟩⟩
+    · iframe Hctx; iexact Hfl
+    iframe Hctx
+    iexists K, []
+    iframe HK
+    isplit
+    · iapply BigSepL.bigSepL_nil.2; itrivial
+    · ipureintro; exact Or.inl hle
+  · ihave #Hkey : keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ t $$ []
+    · unfold keyAt; iright; iexists h; iframe Hd Hau
+    iapply ownCtx_key_vis cpu ξ t
+    iframe Hctx Hkey
+
 /-- **The justification of the handler watermark's position** (Rocq's
 `lk_floor` in `disk_res`'s `disk_fl`).  At a watermark past the first
 completion it is a CONTEXT FLOOR (`MachCSL.ctxFloor`): the handler that
@@ -4750,7 +4826,7 @@ holder cashes a key at the handler's `__sync_synchronize()`
 (`MachCSL.wp_s_fence_iorw_iorw_pub` for the own-store arm). -/
 def diskPayFl (nr : Nat) (ξ : CtxId) (T : Nat) : IProp GF :=
   match nr with
-  | 0 => keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ T
+  | 0 => diskVisKey ξ T
   | _ + 1 => ctxFloor ξ T
 
 instance diskPayFl_persistent (nr : Nat) (ξ : CtxId) (T : Nat) :
@@ -4759,25 +4835,18 @@ instance diskPayFl_persistent (nr : Nat) (ξ : CtxId) (T : Nat) :
 
 instance instCtxMorphPayFl (nr T : Nat) : CtxMorph (GF := GF) (fun ξ => diskPayFl nr ξ T) := by
   cases nr
-  · constructor
-    intro ξ ξ'
-    unfold diskPayFl
-    iintro ⟨Hdom, Hkey⟩
-    icases ctx_dom_key ξ ξ' _ T $$ [Hdom Hkey] with ⟨Hdom, Hkey⟩
-    · iframe
-    imodintro
-    iframe
+  · exact instCtxMorphVisKey T
   · exact instCtxMorphFloor T
 
 theorem diskPayFl_zero (ξ : CtxId) (T : Nat) :
-    diskPayFl (GF := GF) 0 ξ T = keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ T := rfl
+    diskPayFl (GF := GF) 0 ξ T = diskVisKey ξ T := rfl
 
-/-- A floor is a key. -/
+/-- A floor is a visibility key. -/
 theorem diskPayFl_key (nr : Nat) (ξ : CtxId) (T : Nat) :
-    diskPayFl (GF := GF) nr ξ T ⊢ keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ T := by
+    diskPayFl (GF := GF) nr ξ T ⊢ diskVisKey ξ T := by
   cases nr
   · exact .rfl
-  · unfold diskPayFl keyAt
+  · unfold diskPayFl diskVisKey
     iintro H
     ileft
     iexact H
@@ -4786,7 +4855,7 @@ theorem diskPayFl_key (nr : Nat) (ξ : CtxId) (T : Nat) :
 theorem diskPayFl_of_floor (nr : Nat) (ξ : CtxId) (T : Nat) :
     ctxFloor (GF := GF) ξ T ⊢ diskPayFl nr ξ T := by
   cases nr
-  · unfold diskPayFl keyAt
+  · unfold diskPayFl diskVisKey
     iintro H
     ileft
     iexact H
@@ -4825,7 +4894,7 @@ theorem diskPayWm_zero (γ : DiskNames) (ξ : CtxId) (b : Nat) :
   isplitl []
   · iapply diskWm_zero γ b b (Nat.le_refl b)
     iexact Hb
-  · rw [diskPayFl_zero]; iexact Hfl
+  · rw [diskPayFl_zero]; iapply diskVisKey_of_key ξ b $$ Hfl
 
 /-- **The payload of `disk.vdisk_lock`** (Rocq's `disk_res`): the
 publisher's and the handler's halves of the counters (the watermark

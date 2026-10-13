@@ -266,7 +266,7 @@ the cell and `protoReadPark` takes back). -/
 def fwrOut (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo : GName) (m : StampMap Nat) (T0 Tr : Nat) :
     IProp GF := iprop%
   offBox fk γb γo ∗ offMember offCfg ik γb ∗ l2Hold γb fk m ∗
-  (γb.slotd ↪VAR{.own q.half} (⟨T0, false, fk, none⟩ : SlotReg Nat Unit)) ∗
+  (∃ a : ChainVG, γb.slotd ↪VAR{.own q.half} (⟨T0, false, fk, none, a⟩ : SlotReg Nat Unit)) ∗
   (γb.cnt ↪VAR{.own q.half} (1 : Nat)) ∗ offRowsDepBut offCfg ik γb Tr
 
 set_option maxHeartbeats 8000000 in
@@ -294,8 +294,8 @@ theorem fwr_pre_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo :
   ihave Hload := icLoaded_open fscFs fscIreg fscCov fscLogst ik inum dn bm $$ Hload
   unfold icLoadedFlatBody
   icases Hload with ⟨%data, %hok, %hrl, -, -, -, -, -, Hdi, Hmeta, Haddrs, Hind, Hblk, Htop⟩
-  imod protoReadCheckout cpu ⊤ ik fk q γb γo C m K curCtx CoPset.subseteq_top hip hik hK
-    $$ [Hrun Hflr Hat Hrows] with ⟨Hrun, Hres, #Hbox, #Hmem, ⟨%T0, Hhold, Hd, Hc, ⟨%Tr, Hrest⟩⟩⟩
+  imod protoReadCheckout cpu ⊤ ik fk q γb γo C m K CoPset.subseteq_top hip hik hK
+    $$ [Hrun Hflr Hat Hrows] with ⟨Hrun, Hres, #Hbox, #Hmem, ⟨%T0, %a, Hhold, Hd, Hc, ⟨%Tr, Hrest⟩⟩⟩
   · iframe Hrun Hat Hrows; iexact Hflr
   unfold offResident
   icases Hres with ⟨%v, Hcell, %hwf, Hgv⟩
@@ -321,7 +321,8 @@ theorem fwr_pre_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo :
   isplitl [Hgv]
   · iexact Hgv
   unfold fwrOut
-  iframe Hbox Hmem Hhold Hd Hc Hrest
+  iframe Hbox Hmem Hhold Hc Hrest
+  iexists a; iexact Hd
 
 set_option maxHeartbeats 16000000 in
 /-- **AFTER WRITEI** (Rocq's AU EDIT block, the checkin and the re-park):
@@ -384,8 +385,8 @@ theorem fwr_post_ghost (om : OffMode) (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : 
   · rw [wordAtN_cur]; unfold aFoff; iexact Hcell
   · rw [hw]; iexact Hgv
   unfold fwrOut
-  icases Hout with ⟨#Hbox, #Hmem, Hhold, Hd, Hc, Hrest⟩
-  imod protoReadPark cpu ⊤ ik fk q γb γo C m T0 Tr curCtx CoPset.subseteq_top hip hik hq
+  icases Hout with ⟨#Hbox, #Hmem, Hhold, ⟨%a, Hd⟩, Hc, Hrest⟩
+  imod protoReadPark cpu ⊤ ik fk q γb γo C m T0 a Tr CoPset.subseteq_top hip hik hq
     $$ [Hrun Hres Hhold Hd Hc Hrest] with ⟨Hrun, Hoffd, Hrows⟩
   · iframe Hrun Hres Hhold Hd Hc Hrest Hbox Hmem
   -- THE RE-PARK at writei's record

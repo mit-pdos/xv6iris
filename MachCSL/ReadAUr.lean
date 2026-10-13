@@ -25,32 +25,41 @@ A racy read of a PUBLICATION word (`MachCSL.RsvKind.pub`: xv6's `started`,
 written once by hart 0) that returns a post-power-on value of its writer has
 passed the boot gate (`MachCSL.gateOk`: the reader's coherence floor at the
 word reached the writer's store) and may take boot-hop certificates for the
-writer's entries before that store (`MachCSL.pubCover`).  Both are issued
-INSIDE the load's atomic step, where the coherence floor is in hand (there is
-no persistent receipt of `HRead.coh`, [R35.s5]).  The request names the
-writer, the entries to certify, and a test `okv` on the read byte that
-identifies the writer's post-power-on entries. -/
+writer's entries before that store, and -- F-B, the boot hop composing AFTER
+lock hops -- for every entry the writer held a certificate for before that
+store (`MachCSL.pubCover`'s chain arm).  Both are issued INSIDE the load's
+atomic step, where the coherence floor is in hand (there is no persistent
+receipt of `HRead.coh`, [R35.s5]).  The request names the writer, the
+writer's own entry positions to certify, the writer's certificates
+`(author, entries, deadline)` to carry over, and a test `okv` on the read byte
+that identifies the writer's post-power-on entries. -/
 
-/-- A publication read's request: the writer, the entry positions to
-certify, the byte test. -/
-abbrev RdIssue := CPU × List Nat × (BitVec 8 → Bool)
+/-- A publication read's request: the writer, its own entry positions to
+certify, its certificates to carry over, the byte test. -/
+abbrev RdIssue := CPU × List Nat × List (CPU × Nat × Nat) × (BitVec 8 → Bool)
 
 /-- What a publication read's request asserts: the window's first byte is the
-base of the ONLY publication word of another writer, `wr`'s, and every entry
-of its history the test accepts is `wr`'s post-power-on store, after every
-position to certify. -/
+base of a publication word of another writer `wr`, every publication word is
+`wr`'s, the ONLY one foreign to the reader is this one, and every entry of
+its history the test accepts is `wr`'s post-power-on store, after every own
+position to certify and at or after every carried certificate's deadline;
+and the carried certificates. -/
 def rdIn (cpu : CPU) (pa : PAddr) (n : Nat) (Hs : Nat → Hist) : Option RdIssue → IProp GF
   | none => iprop(emp)
-  | some (wr, L, okv) => iprop(⌜0 < n ∧ wr ≠ cpu ∧ pubByteIn (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) pa wr ∧
+  | some (wr, L, C, okv) => iprop(⌜0 < n ∧ wr ≠ cpu ∧ pubByteIn (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) pa wr ∧
+      (∀ f w', pubByteIn (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) f w' → w' = wr) ∧
       (∀ f w', pubByteIn (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) f w' → w' ≠ cpu → f = pa ∧ w' = wr) ∧
-      ∀ e ∈ Hs 0, okv e.v = true → e.tid = hartAgent wr ∧ 0 < e.t ∧ ∀ t0 ∈ L, t0 < e.t⌝)
+      ∀ e ∈ Hs 0, okv e.v = true → e.tid = hartAgent wr ∧ 0 < e.t ∧ (∀ t0 ∈ L, t0 < e.t) ∧
+        ∀ p ∈ C, p.2.2 ≤ e.t⌝ ∗
+      [∗list] p ∈ C, chainLb p.1 p.2.1 wr p.2.2)
 
 /-- What it hands back, given the value read: if the test accepts the read
 byte, the reader's gate and the certificates. -/
 def rdOut (cpu : CPU) {n : Nat} (w : BitVec (8 * n)) : Option RdIssue → IProp GF
   | none => iprop(emp)
-  | some (wr, L, okv) => if okv (nthByte w 0) = true then
-      iprop(gatePassed cpu ∗ [∗list] t0 ∈ L, chainLb wr t0 cpu 0) else iprop(emp)
+  | some (wr, L, C, okv) => if okv (nthByte w 0) = true then
+      iprop(gatePassed cpu ∗ ([∗list] t0 ∈ L, chainLb wr t0 cpu 0) ∗
+        [∗list] p ∈ C, chainLb p.1 p.2.1 cpu 0) else iprop(emp)
 
 /-- The accessor of a plain load by `cpu` whose view is at least `K`, WITH
 the read watermark's receipt: the continuation also gets
@@ -115,9 +124,55 @@ theorem ReadAUr.certIssueL (σ : MState) (wr cpu : CPU) :
     iframe HL
     iapply chainLbAt_of_cert _ ⟨wr, t0, cpu, 0⟩ $$ Hc
 
+/-- A list of carried certificates is issued (F-B): each is valid of the
+writer before its deadline, so -- the writer being the only publisher, and
+the deadline at or below the read store -- the boot hop's chain arm (or its
+own arm) covers it for the reader. -/
+theorem ReadAUr.chainIssueL (σ : MState) (wr cpu : CPU) (f : PAddr) (r : Nat) (v : BitVec 8) (H : Hist)
+    (hne : cpu ≠ wr) (hp : pubByteIn (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) f wr)
+    (hall : ∀ f w', pubByteIn (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) f w' → w' = wr)
+    (hf : σ.mem[f]? = some H) (he : (⟨r, hartAgent wr, v⟩ : HEnt) ∈ H) (hcoh : r ≤ (σ.hr cpu).coh f) :
+    ∀ C : List (CPU × Nat × Nat), (∀ p ∈ C, p.2.2 ≤ r) →
+      memModelAt (MachGS.era (hlc := hlc) (GF := GF)) σ ∗ ([∗list] p ∈ C, chainLb p.1 p.2.1 wr p.2.2) ⊢@{IProp GF}
+        |==> (memModelAt (MachGS.era (hlc := hlc) (GF := GF)) σ ∗ [∗list] p ∈ C, chainLb p.1 p.2.1 cpu 0)
+  | [], _ => by
+    iintro ⟨Hmm, _⟩
+    imodintro
+    iframe Hmm
+    iapply BigSepL.bigSepL_nil.2; itrivial
+  | p :: C, hC => by
+    iintro ⟨Hmm, HC⟩
+    icases BigSepL.bigSepL_cons.1 $$ HC with ⟨#Hp, HC⟩
+    ihave %hv := memModel_chainLb _ σ p.1 p.2.1 wr p.2.2 $$ [Hmm Hp]
+    · iframe Hmm Hp
+    imod ReadAUr.chainIssueL σ wr cpu f r v H hne hp hall hf he hcoh C (fun q hq => hC q (List.mem_cons_of_mem _ hq))
+      $$ [Hmm HC] with ⟨Hmm, HC'⟩
+    · iframe Hmm HC
+    have hτ : p.2.2 ≤ r := hC p List.mem_cons_self
+    rcases hv with h0 | hv
+    · imodintro
+      iframe Hmm
+      iapply BigSepL.bigSepL_cons.2
+      iframe HC'
+      rw [h0]; iapply chainLbAt_0
+    · have hv' : ChainCert.valid (chainEnv (hlc := hlc) (GF := GF) σ) ⟨p.1, p.2.1, cpu, 0⟩ := by
+        refine .inr (.inr ⟨f, wr, r, v, H, hne, hp, hf, he, hcoh, ?_⟩)
+        rcases hv with ⟨h1, h2⟩ | ⟨a, ha, hc⟩ | ⟨f', w', r', v', H', hne', hp', _, _, _, _⟩
+        · exact .inl ⟨h1, by simp only at h2 ⊢; omega⟩
+        · exact .inr ⟨a, by simp only at ha ⊢; omega, hc⟩
+        · simp only at hne'
+          exact absurd (hall f' w' hp').symm hne'
+      imod memModel_certIssue _ σ ⟨p.1, p.2.1, cpu, 0⟩ hv' $$ Hmm with ⟨Hmm, #Hc⟩
+      imodintro
+      iframe Hmm
+      iapply BigSepL.bigSepL_cons.2
+      iframe HC'
+      iapply chainLbAt_of_cert _ ⟨p.1, p.2.1, cpu, 0⟩ $$ Hc
+
 /-- **The publication read's issue** (W8 (f2-ctx)): after the load, a request
-whose test accepts the read byte issues the reader's gate and the boot-hop
-certificates (`MachCSL.memModel_gateIssue`, `MachCSL.memModel_certIssue`). -/
+whose test accepts the read byte issues the reader's gate, the boot-hop
+certificates for the writer's own entries, and the carried certificates
+(`MachCSL.memModel_gateIssue`, `MachCSL.memModel_certIssue`). -/
 theorem memModel_rdIssue (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (Hs : Nat → Hist)
     (w : BitVec (8 * n)) (hget : histsAt σ.mem pa n Hs) (hrd : readsAre (hartAgent cpu) tvn Hs n w)
     (o : Option RdIssue) :
@@ -130,13 +185,13 @@ theorem memModel_rdIssue (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (H
     iframe Hmm
     simp only [rdOut]; iempintro
   | some d =>
-    obtain ⟨wr, L, okv⟩ := d
+    obtain ⟨wr, L, C, okv⟩ := d
     simp only [rdIn, rdOut]
-    iintro ⟨Hmm, %⟨hn0, hwr, hpub, huniq, hents⟩⟩
+    iintro ⟨Hmm, %⟨hn0, hwr, hpub, hallw, huniq, hents⟩, #HC⟩
     by_cases hok : okv (nthByte w 0) = true
     · rw [if_pos hok]
       obtain ⟨e, hre, hmem, hev⟩ := ReadAUr.read_ent _ _ _ _ (hrd 0 hn0)
-      obtain ⟨hetid, het0, hL⟩ := hents e hmem (by rw [hev]; exact hok)
+      obtain ⟨hetid, het0, hL, hCτ⟩ := hents e hmem (by rw [hev]; exact hok)
       have hpa : pa + BitVec.ofNat 64 0 = pa := by simp
       have hget0 : σ.mem[pa]? = some (Hs 0) := by rw [← hget 0 hn0, hpa]
       -- the reader's coherence floor at the word reached the writer's store
@@ -163,10 +218,13 @@ theorem memModel_rdIssue (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (H
       imod memModel_gateIssue _ _ cpu hgate $$ Hmm with ⟨Hmm, #Hg⟩
       have hcert : ∀ t0 ∈ L, ChainCert.valid (chainEnv (hlc := hlc) (GF := GF) (σ.afterLoad cpu pa n tvn))
           ⟨wr, t0, cpu, 0⟩ := fun t0 ht0 =>
-        .inr (.inr ⟨hwr, pa, e.t, e.v, Hs 0, hpub, hmemσ, he', hL t0 ht0, hcoh⟩)
+        .inr (.inr ⟨pa, wr, e.t, e.v, Hs 0, Ne.symm hwr, hpub, hmemσ, he', hcoh, .inl ⟨rfl, hL t0 ht0⟩⟩)
       imod ReadAUr.certIssueL _ wr cpu L hcert $$ Hmm with ⟨Hmm, HL⟩
+      imod ReadAUr.chainIssueL _ wr cpu pa e.t e.v (Hs 0) (Ne.symm hwr) hpub hallw hmemσ he' hcoh C hCτ
+        $$ [Hmm HC] with ⟨Hmm, HC'⟩
+      · iframe Hmm HC
       imodintro
-      iframe Hmm HL Hg
+      iframe Hmm HL Hg HC'
     · rw [if_neg hok]
       imodintro
       iframe Hmm

@@ -24,14 +24,14 @@ theorem ctx_key_mint (cpu : CPU) (ξ : CtxId) (t : Nat) :
     ownCtx (GF := GF) cpu ξ ∗ authoredBy t (hartAgent cpu) ∗ topLb t ⊢ |==>
       (ownCtx cpu ξ ∗ keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ t) := by
   iintro ⟨Hctx, #Hau, #Ht⟩
-  icases ownCtx_cases cpu ξ $$ Hctx with ⟨%B, %K, %W, %D, Hat, #HK, %hBK, #HW, %hok, #Hels⟩
+  icases ownCtx_cases cpu ξ $$ Hctx with ⟨%B, %K, %W, %D, Hat, #HK, %hBK, #HW, %hok, #Hels, Hch⟩
   cases hD : get? D t with
   | some h =>
     ihave #Hd := dirtyElems_get _ ξ D t h hD $$ Hels
     imodintro
-    isplitl [Hat]
+    isplitl [Hat Hch]
     · iapply ownCtx_intro cpu ξ B K W D
-      iframe Hat
+      iframe Hat Hch
       isplit
       · iexact HK
       isplit
@@ -49,11 +49,19 @@ theorem ctx_key_mint (cpu : CPU) (ξ : CtxId) (t : Nat) :
     unfold ctxAt
     icases Hat with ⟨Hb, Hd⟩
     imod ghost_map_insert_persist t cpu hD $$ Hd with ⟨Hd, #Hdin⟩
+    ihave Hch := chainTokAt_mono _ cpu ξ W (max W t) D (Iris.Std.PartialMap.insert D t cpu)
+      (Nat.le_max_left _ _) (fun j h hj => by
+        by_cases hjt : j = t
+        · subst hjt
+          rw [LawfulPartialMap.get?_insert_eq rfl] at hj
+          exact Or.inr (Option.some.inj hj).symm
+        · rw [LawfulPartialMap.get?_insert_ne (Ne.symm hjt)] at hj
+          exact Or.inl hj) $$ Hch
     imodintro
     isplitr []
     · iapply ownCtx_intro cpu ξ B K (max W t) (Iris.Std.PartialMap.insert D t cpu)
       unfold ctxAt
-      iframe Hb Hd
+      iframe Hb Hd Hch
       isplit
       · iexact HK
       isplit

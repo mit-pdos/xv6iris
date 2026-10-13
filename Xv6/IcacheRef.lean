@@ -168,7 +168,18 @@ theorem credFloor_of_ctx [CurCtx] (lo tl : Nat) :
 is a credential at `(t, t)`. -/
 theorem credFloor_of_lk [CurCtx] (lo : Nat) :
     lkFloor (GF := GF) curCtx lo ⊢ credFloor lo lo := by
-  unfold lkFloor keyAt credFloor
+  iintro H
+  ihave #Hv := visFloor_of_lk curCtx lo $$ H
+  unfold visFloor credFloor
+  icases Hv with (H | ⟨%h, H⟩)
+  · ileft; iexact H
+  · iright; iexists h; iexact H
+
+/-- A visibility floor at `lo` is a credential at `(lo, lo)` (W8 (f2-ctx):
+the form the floors law transports, `MachCSL.instCtxMorphVisFloor`). -/
+theorem credFloor_of_vis [CurCtx] (lo : Nat) :
+    visFloor (GF := GF) curCtx lo ⊢ credFloor lo lo := by
+  unfold visFloor credFloor
   iintro H
   icases H with (H | ⟨%h, H⟩)
   · ileft; iexact H
@@ -177,8 +188,8 @@ theorem credFloor_of_lk [CurCtx] (lo : Nat) :
 /-- The cash-in side: a credential at `lo ≤ tl` is a lock floor at `lo`
 (which `MachCSL.ownCtx_lkFloor_vis` turns into a view receipt). -/
 theorem credFloor_lk [CurCtx] (lo tl : Nat) (hle : lo ≤ tl) :
-    credFloor (GF := GF) lo tl ⊢ lkFloor curCtx lo := by
-  unfold lkFloor keyAt credFloor
+    credFloor (GF := GF) lo tl ⊢ visFloor curCtx lo := by
+  unfold visFloor credFloor
   iintro H
   icases H with (H | ⟨%h, H⟩)
   · ileft; iapply ctxFloor_le curCtx tl lo hle; iexact H
@@ -325,10 +336,13 @@ Every reference form carries its share of the slot's box stamps.
 (a whole reference weighs 1, a share of identity fraction `s` weighs `s`, a
 parent that has lent `qt − qi` weighs `1 − (qt − qi)` -- in `Rat` so the
 canonical parent `qt = qi` is mass 1).  The keys are recorded by the box
-register; only the mass is pinned here (R-1). -/
+register; only the mass is pinned here (R-1).  W8 (f2-ctx): a reference
+carries its tickets' tag floors at the ambient context (`MachCSL.reference`),
+so the stamps forms are ambient-context forms. -/
 
 section Stamps
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcboxG GF]
+  [CurCtx]
 
 def icStamps [Icfg] (k : Nat) (i : IcBid) (μ : Rat) : IProp GF :=
   iprop(∃ m : StampMap IcBid, ⌜qsum m = μ⌝ ∗ reference (icfgBox k) i m)
@@ -372,6 +386,38 @@ theorem icStamps_split [Icfg] (k : Nat) (i : IcBid) (μ : Rat) (s s' : Qp) (hss 
   isplitl [Hr1]
   · iexists mscale s m; iframe Hr1; ipureintro; rw [qsum_mscale, hm]
   · iexists mscale s' m; iframe Hr2; ipureintro; rw [qsum_mscale, hm]
+
+/-- THE CONTEXT-FREE PART of a stamps share (W8 (f2-ctx)): the stamps and the
+tickets, without the tickets' tag floors -- what a context-free invariant
+(`FileDefs.inodeCore`) may park; the floors ride beside it at a context. -/
+def icStampsCF [Icfg] (k : Nat) (i : IcBid) (μ : Rat) (mt : StampMap IcBid) : IProp GF :=
+  iprop(∃ m : StampMap IcBid, ⌜qsum m = μ⌝ ∗ ⌜m ≠ ∅⌝ ∗ ⌜keyed m i⌝ ∗ stampsFrag (icfgBox k) m ∗
+    topLb (maxStamp m) ∗ ⌜qsum mt = qsum m⌝ ∗ stampsFrag (icfgBox k).tk mt)
+
+instance icStampsCF_timeless [Icfg] (k : Nat) (i : IcBid) (μ : Rat) (mt : StampMap IcBid) :
+    Timeless (icStampsCF (GF := GF) k i μ mt) := by
+  unfold icStampsCF; infer_instance
+
+/-- A stamps share IS its context-free part beside its tickets' tag floors. -/
+theorem icStamps_cf [Icfg] (k : Nat) (i : IcBid) (μ : Rat) :
+    icStamps (GF := GF) k i μ ⊣⊢ ∃ mt : StampMap IcBid, icStampsCF k i μ mt ∗ tagsFl curCtx mt := by
+  unfold icStamps icStampsCF reference referenceAt
+  constructor
+  · iintro ⟨%m, %hm, %hne, %hk, Hf, #Hl, %mt, %hmt, Ht, #Htg⟩
+    iexists mt
+    iframe Htg
+    iexists m
+    iframe Hf Ht Hl
+    ipureintro; exact ⟨hm, hne, hk, hmt⟩
+  · iintro ⟨%mt, ⟨%m, %hm, %hne, %hk, Hf, #Hl, %hmt, Ht⟩, #Htg⟩
+    iexists m
+    iframe Hf Hl
+    isplitr; · ipureintro; exact hm
+    isplitr; · ipureintro; exact hne
+    isplitr; · ipureintro; exact hk
+    iexists mt
+    iframe Ht Htg
+    ipureintro; exact hmt
 
 theorem icStamps_mass_eq [Icfg] (k : Nat) (i : IcBid) (μ μ' : Rat) (h : μ = μ') :
     icStamps (GF := GF) k i μ ⊣⊢ icStamps k i μ' := by

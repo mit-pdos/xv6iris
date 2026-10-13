@@ -176,56 +176,59 @@ private def icCoverAlts [Icfg] (cn : IcNames) (γfs : FsNames) (γi : GName)
 
 /-- The registers, a `Q` and the way back from `Q` to the arm make a lend. -/
 private theorem icLend_ofArm [Icfg] [CurCtx] (cn : IcNames) (γfs : FsNames) (γi : GName)
-    (cov : ExtTreeSet Nat compare) (logstart k : Nat) (T : Nat) (ξb : CtxId)
-    (m : StampMap IcBid) (c : Nat) (r : SlotReg IcBid IcX) (s : L2Reg IcBid)
-    (hrows : boxRows T m c r s) (Q : IProp GF) :
-    ctxStamped ξb T ∗ stampsAuth (icfgBox k) m ∗ cntHalf (icfgBox k) c ∗
+    (cov : ExtTreeSet Nat compare) (logstart k : Nat) (T : Nat) (ξb : CtxId) (a : ChainVG)
+    (m mt : StampMap IcBid) (c : Nat) (r : SlotReg IcBid IcX) (s : L2Reg IcBid)
+    (hrows : boxRows T a m mt c r s) (Q : IProp GF) :
+    ctxStamped ξb T a.1 a.2 ∗ stampsAuth (icfgBox k) m ∗ stampsAuth (icfgBox k).tk mt ∗
+      cntHalf (icfgBox k) c ∗
       slotdHalf (icfgBox k) r ∗ slotpHalf (icfgBox k) s ∗ Q ∗
       (Q -∗ boxArm (icBoxPay cn γfs γi cov logstart k) (icfgBox k) T ξb m c r s) ⊢
     icLend cn γfs γi cov logstart k Q := by
   unfold icLend
-  iintro ⟨Hpk, Hst, Hc, Hrd, Hrp, HQ, Hw⟩
+  iintro ⟨Hpk, Hst, Htk, Hc, Hrd, Hrp, HQ, Hw⟩
   isplitl [HQ]
   · iexact HQ
-  iexists iprop(ctxStamped ξb T ∗ stampsAuth (icfgBox k) m ∗ cntHalf (icfgBox k) c ∗
+  iexists iprop(ctxStamped ξb T a.1 a.2 ∗ stampsAuth (icfgBox k) m ∗ stampsAuth (icfgBox k).tk mt ∗
+      cntHalf (icfgBox k) c ∗
       slotdHalf (icfgBox k) r ∗ slotpHalf (icfgBox k) s ∗
       (Q -∗ boxArm (icBoxPay cn γfs γi cov logstart k) (icfgBox k) T ξb m c r s))
-  isplitl [Hpk Hst Hc Hrd Hrp Hw]
-  · iframe Hpk Hst Hc Hrd Hrp Hw
-  iintro HQ ⟨Hpk, Hst, Hc, Hrd, Hrp, Hw⟩
+  isplitl [Hpk Hst Htk Hc Hrd Hrp Hw]
+  · iframe Hpk Hst Htk Hc Hrd Hrp Hw
+  iintro HQ ⟨Hpk, Hst, Htk, Hc, Hrd, Hrp, Hw⟩
   ihave Harm := Hw $$ HQ
   unfold icEscrowBody boxBody
-  iexists T, ξb, m, c, r, s
-  iframe Hpk Hst Hc Hrd Hrp Harm
+  iexists T, ξb, a, m, mt, c, r, s
+  iframe Hpk Hst Htk Hc Hrd Hrp Harm
   ipureintro; exact hrows
 
 /-- The registers beside the alternatives make the slot's cover. -/
 private theorem icSlotCover_ofAlts [Icfg] [CurCtx] (cn : IcNames) (γfs : FsNames)
-    (γi : GName) (cov : ExtTreeSet Nat compare) (logstart k : Nat) (T : Nat) (ξb : CtxId)
-    (m : StampMap IcBid) (c : Nat) (r : SlotReg IcBid IcX) (s : L2Reg IcBid)
-    (hrows : boxRows T m c r s) :
-    ctxStamped ξb T ∗ stampsAuth (icfgBox k) m ∗ cntHalf (icfgBox k) c ∗
+    (γi : GName) (cov : ExtTreeSet Nat compare) (logstart k : Nat) (T : Nat) (ξb : CtxId) (a : ChainVG)
+    (m mt : StampMap IcBid) (c : Nat) (r : SlotReg IcBid IcX) (s : L2Reg IcBid)
+    (hrows : boxRows T a m mt c r s) :
+    ctxStamped ξb T a.1 a.2 ∗ stampsAuth (icfgBox k) m ∗ stampsAuth (icfgBox k).tk mt ∗
+      cntHalf (icfgBox k) c ∗
       slotdHalf (icfgBox k) r ∗ slotpHalf (icfgBox k) s ∗
       icCoverAlts cn γfs γi cov logstart k
         (boxArm (icBoxPay cn γfs γi cov logstart k) (icfgBox k) T ξb m c r s) ⊢
     icSlotCover (GF := GF) cn γfs γi cov logstart k := by
-  have hl := icLend_ofArm (GF := GF) cn γfs γi cov logstart k T ξb m c r s hrows
+  have hl := icLend_ofArm (GF := GF) cn γfs γi cov logstart k T ξb a m mt c r s hrows
   unfold icCoverAlts icSlotCover
-  iintro ⟨Hpk, Hst, Hc, Hrd, Hrp, %dev, %inum, Halt⟩
+  iintro ⟨Hpk, Hst, Htk, Hc, Hrd, Hrp, %dev, %inum, Halt⟩
   iexists dev, inum
   icases Halt with (⟨HQ, Hw⟩ | ⟨HQ, Hw⟩ | ⟨%n, %hn, HQ, Hw⟩)
   · ileft
     iapply hl
-    iframe Hpk Hst Hc Hrd Hrp HQ Hw
+    iframe Hpk Hst Htk Hc Hrd Hrp HQ Hw
   · iright; ileft
     iapply hl
-    iframe Hpk Hst Hc Hrd Hrp HQ Hw
+    iframe Hpk Hst Htk Hc Hrd Hrp HQ Hw
   · iright; iright
     iexists n
     isplitr
     · ipureintro; exact hn
     iapply hl
-    iframe Hpk Hst Hc Hrd Hrp HQ Hw
+    iframe Hpk Hst Htk Hc Hrd Hrp HQ Hw
 
 /-- OUT_L2: by the descriptor.  The residue ties its identity to the slot's
 (F40); `depTx` / `depFrz` park a share -- refuted at quiescence; `depRd`
@@ -446,12 +449,12 @@ private theorem icArm_alts [Icfg] [CurCtx] (cn : IcNames) (γfs : FsNames) (γi 
   | some ih =>
     simp only [boxArm, hs]
     dsimp only [icBoxPay]
-    iintro ⟨Ha, %h1, %h2, %h3, Hf, Hq⟩
+    iintro ⟨Ha, %h1, %h2, %h3, Hf, %h4, Ht, Hq⟩
     iapply icArmL2_alts cn γfs γi cov logstart k
     iframe Ha Hq
     iintro Hq
-    iframe Hf Hq
-    ipureintro; exact ⟨h1, h2, h3⟩
+    iframe Hf Ht Hq
+    ipureintro; exact ⟨h1, h2, h3, h4⟩
   | none =>
     cases hw : r.win with
     | true =>
@@ -475,12 +478,12 @@ theorem icEscrowBody_cover [Icfg] [CurCtx] (cn : IcNames) (γfs : FsNames) (γi 
       icEscrowBody cn γfs γi cov logstart k -∗
       logTxAuth icfgLog (∅ : RegMapF Unit) ∗ icSlotCover cn γfs γi cov logstart k := by
   unfold icEscrowBody boxBody
-  iintro Ha ⟨%T, %ξb, %m, %c, %r, %s, Hpk, Hst, Hc, Hrd, Hrp, %hrows, Harm⟩
+  iintro Ha ⟨%T, %ξb, %a, %m, %mt, %c, %r, %s, Hpk, Hst, Htk, Hc, Hrd, Hrp, %hrows, Harm⟩
   ihave ⟨Ha, Halts⟩ := icArm_alts cn γfs γi cov logstart k T ξb m c r s $$ [Ha Harm]
   · iframe Ha Harm
   iframe Ha
-  iapply icSlotCover_ofAlts cn γfs γi cov logstart k T ξb m c r s hrows
-  iframe Hpk Hst Hc Hrd Hrp Halts
+  iapply icSlotCover_ofAlts cn γfs γi cov logstart k T ξb a m mt c r s hrows
+  iframe Hpk Hst Htk Hc Hrd Hrp Halts
 
 end IcacheCover
 

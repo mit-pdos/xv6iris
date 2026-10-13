@@ -137,7 +137,7 @@ the cell and `protoReadPark` takes back). -/
 def frdOut (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo : GName) (m : StampMap Nat) (T0 Tr : Nat) :
     IProp GF := iprop%
   offBox fk γb γo ∗ offMember offCfg ik γb ∗ l2Hold γb fk m ∗
-  (γb.slotd ↪VAR{.own q.half} (⟨T0, false, fk, none⟩ : SlotReg Nat Unit)) ∗
+  (∃ a : ChainVG, γb.slotd ↪VAR{.own q.half} (⟨T0, false, fk, none, a⟩ : SlotReg Nat Unit)) ∗
   (γb.cnt ↪VAR{.own q.half} (1 : Nat)) ∗ offRowsDepBut offCfg ik γb Tr
 
 set_option maxHeartbeats 8000000 in
@@ -167,8 +167,8 @@ theorem frd_pre_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo :
   have hs := nodeShapeOk_ofInodeOk fscCov fscLogst dn bm data hok
   icases inodeRdEra_eraNodeTo fscFs (DFrac.own Qp.quarter) inum dn bm data hs hloc $$ Hq
     with ⟨Hind, Hblk, Htop⟩
-  imod protoReadCheckout cpu ⊤ ik fk q γb γo C m K curCtx CoPset.subseteq_top hip hik hK
-    $$ [Hrun Hflr Hat Hrows] with ⟨Hrun, Hres, #Hbox, #Hmem, ⟨%T0, Hhold, Hd, Hc, ⟨%Tr, Hrest⟩⟩⟩
+  imod protoReadCheckout cpu ⊤ ik fk q γb γo C m K CoPset.subseteq_top hip hik hK
+    $$ [Hrun Hflr Hat Hrows] with ⟨Hrun, Hres, #Hbox, #Hmem, ⟨%T0, %a, Hhold, Hd, Hc, ⟨%Tr, Hrest⟩⟩⟩
   · iframe Hrun Hat Hrows; iexact Hflr
   unfold offResident
   icases Hres with ⟨%v, Hcell, %hwf, Hgv⟩
@@ -183,7 +183,8 @@ theorem frd_pre_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo :
   isplitl [Hcell]
   · rw [wordAtN_cur]; unfold aFoff; iexact Hcell
   unfold frdOut
-  iframe Hbox Hmem Hhold Hd Hc Hrest
+  iframe Hbox Hmem Hhold Hc Hrest
+  iexists a; iexact Hd
 
 set_option maxHeartbeats 16000000 in
 /-- **AFTER READI** (Rocq's "THE OBSERVATION FIRES AT THE CHECKIN"): the
@@ -229,8 +230,8 @@ theorem frd_post_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo 
   · rw [wordAtN_cur]; unfold aFoff; iexact Hcell
   · rw [hw]; iexact Hgv
   unfold frdOut
-  icases Hout with ⟨#Hbox, #Hmem, Hhold, Hd, Hc, Hrest⟩
-  imod protoReadPark cpu ⊤ ik fk q γb γo C m T0 Tr curCtx CoPset.subseteq_top hip hik hq
+  icases Hout with ⟨#Hbox, #Hmem, Hhold, ⟨%a, Hd⟩, Hc, Hrest⟩
+  imod protoReadPark cpu ⊤ ik fk q γb γo C m T0 a Tr CoPset.subseteq_top hip hik hq
     $$ [Hrun Hres Hhold Hd Hc Hrest] with ⟨Hrun, Hoffd, Hrows⟩
   · iframe Hrun Hres Hhold Hd Hc Hrest Hbox Hmem
   -- THE READER'S QUARTER, RE-CLOSED

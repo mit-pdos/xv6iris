@@ -69,24 +69,10 @@ theorem rsvRegMapAux_static : ∀ (rs : List RsvRegion) (i : Nat), (rs.map (fun 
 
 -- `RsvRegion.base_mem` moved to `MachCSL.Reserved` (W8 (f2-ctx)).
 
-theorem rsvBases_nodup : ∀ {rs : List RsvRegion}, (rsvBytes rs).Nodup →
-    (rs.map (fun R => R.base.toNat)).Nodup
-  | [], _ => List.nodup_nil
-  | R0 :: rs, hnd => by
-    unfold rsvBytes at hnd
-    rw [List.flatMap_cons, List.nodup_append] at hnd
-    obtain ⟨_, hnd2, hdis⟩ := hnd
-    rw [List.map_cons, List.nodup_cons]
-    refine ⟨?_, rsvBases_nodup hnd2⟩
-    intro hm
-    obtain ⟨R, hR, hb⟩ := List.mem_map.1 hm
-    have heq : R.base = R0.base := BitVec.eq_of_toNat_eq hb
-    exact hdis R0.base R0.base_mem R0.base (List.mem_flatMap.2 ⟨R, hR, heq ▸ R.base_mem⟩) rfl
-
-theorem rsvRegMap_staticIn {rs : List RsvRegion} (hnd : (rsvBytes rs).Nodup) :
+theorem rsvRegMap_staticIn {rs : List RsvRegion} (hnd : (rs.map (fun R => R.base.toNat)).Nodup) :
     staticIn rs (rsvRegMap rs) := by
   intro i R hi
-  have := rsvRegMapAux_static rs 0 (rsvBases_nodup hnd) i R hi
+  have := rsvRegMapAux_static rs 0 hnd i R hi
   simpa [rsvRegMap] using this
 
 theorem rsvRegMap_exact (rs : List RsvRegion) : rsvExact rs (rsvRegMap rs) := by

@@ -92,15 +92,16 @@ theorem inodePay_split [Icfg] [CurCtx] (γx : GName) (Q : Qp) (g : GName) (inum 
     (inodeShrHeldGen_split v _ _ g inum).to_eq]
   have ho := (CancelableInvariant.instFractionalOwn (GF := GF) γx).fractional q1 q2
   constructor
-  · iintro ⟨#Hi, Ho, ⟨R1, R2⟩, ⟨S1, S2⟩, #Hw⟩
+  · iintro ⟨%mt, #Hi, #Htg, Ho, ⟨R1, R2⟩, ⟨S1, S2⟩, #Hw⟩
     icases ho.1 $$ Ho with ⟨O1, O2⟩
     isplitl [O1 R1 S1]
-    · iframe Hi O1 R1 S1; iexact Hw
-    · iframe Hi O2 R2 S2; iexact Hw
-  · iintro ⟨⟨#Hi, O1, R1, S1, #Hw⟩, ⟨-, O2, R2, S2, -⟩⟩
+    · iexists mt; iframe Hi Htg O1 R1 S1; iexact Hw
+    · iexists mt; iframe Hi Htg O2 R2 S2; iexact Hw
+  · iintro ⟨⟨%mt, #Hi, #Htg, O1, R1, S1, #Hw⟩, ⟨%mt', -, -, O2, R2, S2, -⟩⟩
     ihave Ho := ho.2 $$ [O1 O2]
     · iframe
-    iframe Hi Ho R1 R2 S1 S2
+    iexists mt
+    iframe Hi Htg Ho R1 R2 S1 S2
     iexact Hw
 
 /-- THE LAST CLOSER'S MOVE (Rocq `inode_pay_cancel`): fraction one is the
@@ -115,11 +116,16 @@ theorem inodePay_cancel [Icfg] [CurCtx] (E : CoPset) (γx : GName) (Q : Qp) (g :
     inodePay (GF := GF) γx Q g inum v fdty wr 1 ⊢ |={E}=> inodeHeld v := by
   unfold inodePay
   rw [qpMul_one_l]
-  iintro ⟨#Hi, Ho, Hside, Hs, -⟩
+  iintro ⟨%mt, #Hi, #Htg, Ho, Hside, Hs, -⟩
   imod CancelableInvariant.cancel E hE $$ Hi Ho with Hc
   imod Hc
   unfold inodeCore
   icases Hc with ⟨%k, %hv, %hk, %hb, %hp, Hf, Hlent, Hru⟩
+  ihave Hlent : icLentStamps k (Q + Q) Q icfgDev inum $$ [Hlent]
+  · unfold icLentStamps
+    iapply (icStamps_cf k _ _).2
+    iexists mt
+    iframe Hlent Htg
   unfold inodeRefSide
   icases Hside with ⟨%k1, %lo, %hv1, %hk1, Hid, Hl, Hslh⟩
   unfold inodeShrHeldGen
@@ -164,7 +170,9 @@ theorem inodePay_alloc [Icfg] [CurCtx] (E : CoPset) (k : Nat) (Q : Qp) (g : GNam
       |={E}=> ∃ γx : GName, inodePay γx Q g inum (ientry k) fdty wr 1 := by
   unfold inodeRefShortGenlo
   iintro ⟨⟨Hf, Hl, Hid, Hslh, Hlent⟩, Hru, Hs, #Hty⟩
-  imod CancelableInvariant.alloc E fileipN (inodeCore (GF := GF) (ientry k) Q inum)
+  unfold icLentStamps
+  icases (icStamps_cf k _ _).1 $$ Hlent with ⟨%mt, Hlent, #Htg⟩
+  imod CancelableInvariant.alloc E fileipN (inodeCore (GF := GF) (ientry k) Q inum mt)
     $$ [Hf Hlent Hru] with ⟨%γx, #Hi, Hown⟩
   · inext
     unfold inodeCore
@@ -178,7 +186,8 @@ theorem inodePay_alloc [Icfg] [CurCtx] (E : CoPset) (k : Nat) (Q : Qp) (g : GNam
   iexists γx
   unfold inodePay
   rw [qpMul_one_l]
-  iframe Hi Hown Hs
+  iexists mt
+  iframe Hi Htg Hown Hs
   isplitl [Hl Hid Hslh]
   · unfold inodeRefSide
     iexists k, lo
@@ -263,32 +272,33 @@ theorem offFd_split (k : Nat) (q1 q2 : Qp) (γb : BoxNames) (γo : GName) (C : F
   unfold offFd
   rw [qp_half_add]
   constructor
-  · iintro ⟨%i, %T0, %hip, %hi, #Hbox, #Hmem, Hd, Hc, Hst⟩
-    icases ghost_var_split γb.slotd (⟨T0, false, k, none⟩ : SlotReg Nat Unit) q1.half q2.half $$ Hd
+  · iintro ⟨%i, %T0, %a, %hip, %hi, #Hbox, #Hmem, Hd, Hc, Hst⟩
+    icases ghost_var_split γb.slotd (⟨T0, false, k, none, a⟩ : SlotReg Nat Unit) q1.half q2.half $$ Hd
       with ⟨Hd1, Hd2⟩
     icases ghost_var_split γb.cnt (1 : Nat) q1.half q2.half $$ Hc with ⟨Hc1, Hc2⟩
     icases offRefStamps_split γb k q1 q2 $$ Hst with ⟨Hst1, Hst2⟩
     isplitl [Hd1 Hc1 Hst1]
-    · iexists i, T0
+    · iexists i, T0, a
       iframe Hbox Hmem Hd1 Hc1 Hst1
       isplitr; · ipureintro; exact hip
       ipureintro; exact hi
-    · iexists i, T0
+    · iexists i, T0, a
       iframe Hbox Hmem Hd2 Hc2 Hst2
       isplitr; · ipureintro; exact hip
       ipureintro; exact hi
-  · iintro ⟨⟨%i1, %T1, %hip1, %hi1, #Hbox, #Hmem, Hd1, Hc1, Hst1⟩,
-      ⟨%i2, %T2, %hip2, %hi2, -, -, Hd2, Hc2, Hst2⟩⟩
-    ihave %he := ghost_var_agree γb.slotd (⟨T1, false, k, none⟩ : SlotReg Nat Unit) _
-      (⟨T2, false, k, none⟩ : SlotReg Nat Unit) _ $$ Hd1 Hd2
+  · iintro ⟨⟨%i1, %T1, %a1, %hip1, %hi1, #Hbox, #Hmem, Hd1, Hc1, Hst1⟩,
+      ⟨%i2, %T2, %a2, %hip2, %hi2, -, -, Hd2, Hc2, Hst2⟩⟩
+    ihave %he := ghost_var_agree γb.slotd (⟨T1, false, k, none, a1⟩ : SlotReg Nat Unit) _
+      (⟨T2, false, k, none, a2⟩ : SlotReg Nat Unit) _ $$ Hd1 Hd2
     have hT : T1 = T2 := congrArg SlotReg.td he
-    subst hT
-    iexists i1, T1
+    have ha : a1 = a2 := congrArg SlotReg.vd he
+    subst hT ha
+    iexists i1, T1, a1
     iframe Hbox Hmem
     isplitr; · ipureintro; exact hip1
     isplitr; · ipureintro; exact hi1
     ihave Hd := ((ghost_var_fractional (GF := GF) γb.slotd
-      (⟨T1, false, k, none⟩ : SlotReg Nat Unit)).fractional q1.half q2.half).2 $$ [Hd1 Hd2]
+      (⟨T1, false, k, none, a1⟩ : SlotReg Nat Unit)).fractional q1.half q2.half).2 $$ [Hd1 Hd2]
     · iframe
     ihave Hc := ((ghost_var_fractional (GF := GF) γb.cnt (1 : Nat)).fractional q1.half q2.half).2
       $$ [Hc1 Hc2]
@@ -303,9 +313,9 @@ theorem offFdAt_qsum (k : Nat) (q : Qp) (γb : BoxNames) (γo : GName) (C : FCon
     (m : StampMap Nat) :
     offFdAt (GF := GF) k q γb γo C m ⊢ ⌜MachCSL.qsum m = q.val⌝ ∗ offFdAt k q γb γo C m := by
   unfold offFdAt
-  iintro ⟨%i, %T0, %hip, %hi, #Hbox, #Hmem, Hd, Hc, %hq, Href⟩
+  iintro ⟨%i, %T0, %a, %hip, %hi, #Hbox, #Hmem, Hd, Hc, %hq, Href⟩
   isplitr; · ipureintro; exact hq
-  iexists i, T0
+  iexists i, T0, a
   iframe Hbox Hmem Hd Hc Href
   isplitr; · ipureintro; exact hip
   isplitr; · ipureintro; exact hi
@@ -428,7 +438,7 @@ theorem fileOffReclaim (E : CoPset) (k : Nat) (pn : FPNames) (C : FContent)
   unfold fileCoreOff
   split
   · unfold offFd offRefStamps
-    iintro ⟨%i, %T0, -, -, #Hbox, -, Hd, Hc, %m, %hq, Href⟩
+    iintro ⟨%i, %T0, %a, -, -, #Hbox, -, Hd, Hc, %m, %hq, Href⟩
     imod offLastClose k pn.obox pn.ooff T0 m E hE hq $$ [Hbox Hd Hc Href] with ⟨-, Hfree⟩
     · unfold offRegd offCnt slotdHalf cntHalf
       iframe Hbox Hd Hc Href

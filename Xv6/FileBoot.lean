@@ -53,6 +53,7 @@ import Xv6.FilePay
 import Xv6.BootCarveMain
 import Xv6.SpecFileinit
 import Xv6.FtableMorph
+import Xv6.LockRsv
 
 namespace Xv6
 
@@ -82,7 +83,7 @@ end raw
 
 /-- The payload names a free slot starts at (Rocq `inhabitant`). -/
 def fileBootPn0 : FPNames :=
-  ⟨0, ⟨0, 0, 0, 0, 0⟩, 0, 1, 0, 0#32, ⟨0, 0, 0, 0⟩, 0, .parked⟩
+  ⟨0, ⟨0, 0, 0, 0, 0⟩, 0, 1, 0, 0#32, ⟨0, 0, 0, 0, 0⟩, 0, .parked⟩
 
 section mint
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -180,20 +181,21 @@ theorem fileBoot_ftableRes :
 followed by `newlock`).  It takes `fileinit`'s output words
 (`lockInited`, with the name word handed back), the two identity claims,
 the raw entries at the running context, and the table's iref share. -/
-theorem fileBoot_isFtable [KernelImage GF] {lent : Bool} (cpu : CPU) (kc : KCtx) :
+theorem fileBoot_isFtable {lent : Bool} (cpu : CPU) (kc : KCtx) :
     kctxL lent cpu kc ∗ lockInited ftableLockAddr ftableNameAddr ∗
       kmapId ftableAddr ∗ kmapId (ftableAddr + 16#64) ∗
-      ([∗list] k ∈ List.range NFILE, fentryRaw curCtx k) ∗ irefSlots NFILE
+      ([∗list] k ∈ List.range NFILE, fentryRaw curCtx k) ∗ irefSlots NFILE ∗ gateFloor curCtx
     ⊢ |={⊤}=> (kctxL (GF := GF) lent cpu kc ∗
       wordPointsTo (ftableLockAddr + 8#64) 8 (DFrac.own 1) ftableNameAddr ∗
       ∃ (γl : GName) (γ : FileNames), isFtable γl γ) := by
   unfold lockInited
   rw [show ftableLockAddr = ftableAddr from rfl]
-  iintro ⟨Hk, ⟨Hnm, Hf⟩, #H1, #H2, Hraw, Hir⟩
+  iintro ⟨Hk, ⟨Hnm, Hf⟩, #H1, #H2, Hraw, Hir, #Hg⟩
   imod fileBoot_ftableRes $$ [Hraw Hir] with ⟨%γ, Hres⟩
   · iframe Hraw Hir
-  imod kctx_newlock cpu kc ftableAddr "ftable" (ftableResAt γ) $$ [Hk Hres Hf] with ⟨Hk, %γl, #Hl⟩
-  · iframe Hk Hres Hf H1 H2
+  icases kctx_lkNameFor cpu kc (lk := ftableAddr) xv6RsvStatic_ftable $$ Hk with ⟨Hnf, Hk⟩
+  imod kctx_newlock cpu kc ftableAddr "ftable" (ftableResAt γ) $$ [Hk Hres Hf Hnf] with ⟨Hk, %γl, #Hl⟩
+  · iframe Hk Hres Hf H1 H2 Hnf Hg
   imodintro
   iframe Hk Hnm
   iexists γl, γ

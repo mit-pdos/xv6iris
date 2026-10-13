@@ -528,7 +528,7 @@ gathered from shares that parked at different stamps has several keys and
 may legitimately be checked out.  The MASS is pinned by the pure row (all
 (d) needs: R-1's reason); the KEYS are recovered at (f) by agreement on the
 register, which records the exact map (Rocq's `ic_hold`). -/
-def icHold [Icfg] (k : Nat) (dev inum : BitVec 32) (μ : Qp) : IProp GF :=
+def icHold [Icfg] [CurCtx] (k : Nat) (dev inum : BitVec 32) (μ : Qp) : IProp GF :=
   iprop(∃ m : StampMap IcBid, ⌜qsum m = μ.val⌝ ∗ l2Hold (icfgBox k) (some (dev, inum)) m)
 
 /-- What the holder has IN HAND of its share / reference once acquiresleep
@@ -588,7 +588,7 @@ conjunct must be a shape that comes back (`CtxMorph`) (Rocq's
 def icHandle [Icfg] [CurCtx] (cn : IcNames) (k : Nat) (d : IcDep) : IProp GF :=
   iprop(icDeposit2 k d ∗ icPayLive k d ∗ icDeposit cn k d ∗ icTok cn k)
 
-instance icHold_timeless [Icfg] (k : Nat) (dev inum : BitVec 32) (μ : Qp) :
+instance icHold_timeless [Icfg] [CurCtx] (k : Nat) (dev inum : BitVec 32) (μ : Qp) :
     Timeless (icHold (GF := GF) k dev inum μ) := by
   unfold icHold; infer_instance
 
@@ -751,7 +751,7 @@ theorem icGrowTx [Icfg] [CurCtx] (E : CoPset) (cn : IcNames) (γfs : FsNames) (�
   simp only [icDepId, icDepMass, icBody, icPayLive]
   iintro #Hesc Hvld ⟨⟨⟨%mh, %hmass, Hl2⟩, Hbody⟩, Hpl, Hdep, Htok⟩ Htx
   imod boxQUpdate (icBoxPay cn γfs γi cov logstart k) (ndot icBoxN k) (icfgBox k)
-      (some (dev, inum)) (icDeposit cn k (.depTx s dev inum g lo t q)) mh E hE
+      (some (dev, inum)) (icDeposit cn k (.depTx s dev inum g lo t q)) mh curCtx E hE
       $$ [Hl2 Hdep Htx] with ⟨Hl2, Hdep⟩
   · isplitr
     · iexact Hesc
@@ -796,7 +796,7 @@ theorem icShrinkTx [Icfg] [CurCtx] (E : CoPset) (cn : IcNames) (γfs : FsNames) 
   iintro #Hesc Hvld ⟨⟨⟨%mh, %hmass, Hl2⟩, Hbody⟩, Hpl, Hdep, Htok⟩
   imod boxQUpdate (icBoxPay cn γfs γi cov logstart k) (ndot icBoxN k) (icfgBox k)
       (some (dev, inum))
-      iprop(icDeposit cn k (.depTx s dev inum g lo t q1) ∗ txPin icfgLog t q2) mh E hE
+      iprop(icDeposit cn k (.depTx s dev inum g lo t q1) ∗ txPin icfgLog t q2) mh curCtx E hE
       $$ [Hl2 Hdep] with ⟨Hl2, Hdep, Htx⟩
   · isplitr
     · iexact Hesc
@@ -844,39 +844,40 @@ def icSlp [Icfg] (cn : IcNames) (k : Nat) : CtxId → IProp GF := fun ξ =>
 instance icSlp_morph [Icfg] (cn : IcNames) (k : Nat) : CtxMorph (GF := GF) (icSlp cn k) := by
   unfold icSlp; infer_instance
 
-/-- The releaser's context-free form (R2's `Rdep`, the bcache's `bslp_dep`),
-at ONE bound `T` for the combined maximum (reviewer 2's correction 2): the
-register's own park stamp `Tp ≤ T` (it cannot be raised at release), the
-off rows bounded by `T` (`offRowsDep`), and `topLb T` so the genin release
-presents one lower bound.  `icSlp_fold`'s statement is unchanged; per row
-the fold weakens the floor by `ctxFloor_le` (Rocq's `ic_slp_dep`). -/
-def icSlpDep [Icfg] (cn : IcNames) (k T : Nat) : IProp GF :=
-  iprop(∃ Tp : Nat, ⌜Tp ≤ T⌝ ∗ topLb T ∗
-    icTok cn k ∗ icRegp k ⟨Tp, none⟩ ∗ icDepNeutral cn k ∗ offRowsDep offCfg k T)
+/-- The releaser's form (R2's `Rdep`, the bcache's `bslp_dep`), at ONE bound
+`T` for the combined maximum (reviewer 2's correction 2): the register at
+rest with its park stamp `s.tp ≤ T` (it cannot be raised at release), the
+off rows bounded by `T` (`offRowsDepAt`), and `topLb T` so the genin
+release presents one lower bound.  W8 (f2-ctx): context-indexed -- the
+register's chain bound's floors and the rows' ride it (Rocq's `ic_slp_dep`). -/
+def icSlpDep [Icfg] (cn : IcNames) (k T : Nat) : CtxId → IProp GF := fun ξ =>
+  iprop(∃ s : L2Reg IcBid, ⌜s.hold = none⌝ ∗ ⌜s.tp ≤ T⌝ ∗ topLb T ∗
+    icTok cn k ∗ icRegp k s ∗ vgFloors ξ s.vp ∗ icDepNeutral cn k ∗ offRowsDepAt offCfg k T ξ)
 
-/-- Rocq's `ic_slp_dep_morph` (a context-constant family). -/
+/-- Rocq's `ic_slp_dep_morph`. -/
 instance icSlpDep_morph [Icfg] (cn : IcNames) (k T : Nat) :
-    CtxMorph (GF := GF) (fun _ => icSlpDep cn k T) := instCtxMorphConst _
+    CtxMorph (GF := GF) (icSlpDep cn k T) := by
+  unfold icSlpDep; infer_instance
 
 /-- Rocq's `ic_slp_fold`. -/
 theorem icSlp_fold [Icfg] [CurCtx] (cn : IcNames) (k T : Nat) (ξ : CtxId) :
-    icSlpDep (GF := GF) cn k T ∗ ctxFloor ξ T ⊢ icSlp cn k ξ := by
+    icSlpDep (GF := GF) cn k T ξ ∗ ctxFloor ξ T ⊢ icSlp cn k ξ := by
   unfold icSlpDep icSlp icRegp l2Row
-  iintro ⟨⟨%Tp, %hTp, #Hllb, Ht, Hrp, Hn, Hoff⟩, #Hfl⟩
-  iexists (⟨Tp, none⟩ : L2Reg IcBid)
-  iframe Hrp Ht Hn
+  iintro ⟨⟨%s, %hs, %hTp, #Hllb, Ht, Hrp, #Hvg, Hn, Hoff⟩, #Hfl⟩
+  iexists s
+  iframe Hrp Ht Hn Hvg
   isplitr
   · isplitr
-    · ipureintro; rfl
-    · iapply ctxFloor_le ξ T Tp hTp; iexact Hfl
+    · ipureintro; exact hs
+    · iapply ctxFloor_le ξ T s.tp hTp; iexact Hfl
   · iapply offRows_fold offCfg k T ξ
     iframe Hoff
     iexact Hfl
 
-/-- `offRowsDep`'s own receipt, kept beside it. -/
-private theorem offRowsDep_llb (on : OffNames) (i T : Nat) :
-    offRowsDep (GF := GF) on i T ⊢ offRowsDep on i T ∗ topLb T := by
-  unfold offRowsDep
+/-- `offRowsDepAt`'s own receipt, kept beside it. -/
+private theorem offRowsDep_llb [CurCtx] (on : OffNames) (i T : Nat) (ξ : CtxId) :
+    offRowsDepAt (GF := GF) on i T ξ ⊢ offRowsDepAt on i T ξ ∗ topLb T := by
+  unfold offRowsDepAt
   iintro ⟨%L, Hauth, #Hllb, Hset⟩
   isplitl [Hauth Hset]
   · iexists L
@@ -884,14 +885,12 @@ private theorem offRowsDep_llb (on : OffNames) (i T : Nat) :
     iexact Hllb
   · iexact Hllb
 
-/-- `offRowsDep` is monotone in its bound, given the bigger bound's own
+/-- `offRowsDepAt` is monotone in its bound, given the bigger bound's own
 receipt -- what the genin releases need to lift the off rows from their own
-maximum to the COMBINED one.  (OffBox states no such lemma; it is five lines
-over the definition, so it is proved here rather than re-opening the box
-lane's file.)  Rocq's `off_rows_dep_le`. -/
-theorem offRowsDep_le [Icfg] (i T T' : Nat) (hle : T ≤ T') :
-    topLb (GF := GF) T' ⊢ offRowsDep offCfg i T -∗ offRowsDep offCfg i T' := by
-  unfold offRowsDep
+maximum to the COMBINED one.  Rocq's `off_rows_dep_le`. -/
+theorem offRowsDep_le [Icfg] [CurCtx] (i T T' : Nat) (ξ : CtxId) (hle : T ≤ T') :
+    topLb (GF := GF) T' ⊢ offRowsDepAt offCfg i T ξ -∗ offRowsDepAt offCfg i T' ξ := by
+  unfold offRowsDepAt
   iintro #Hllb ⟨%L, Hauth, -, Hset⟩
   iexists L
   iframe Hauth
@@ -899,9 +898,9 @@ theorem offRowsDep_le [Icfg] (i T T' : Nat) (hle : T ≤ T') :
   · iexact Hllb
   iapply BigSepS.bigSepS_impl $$ Hset
   imodintro
-  iintro %γ %_ ⟨%s, Hp, %hh, #Hl, %hb⟩
+  iintro %γ %_ ⟨%s, Hp, %hh, #Hl, %hb, #Hv⟩
   iexists s
-  iframe Hp
+  iframe Hp Hv
   isplitr
   · ipureintro; exact hh
   isplitr
@@ -913,42 +912,46 @@ iunlock's pre hands it (items 35/36: the holder may have parked an off box
 and then has no floor to re-fold).  The release must present ONE lower
 bound: this joins the register's park stamp and the rows' bound
 (`topLb_max`) (Rocq's `ic_slp_dep_of_dep`). -/
-theorem icSlpDep_ofDep [Icfg] (cn : IcNames) (k Tp T : Nat) :
-    topLb (GF := GF) Tp ⊢ icTok cn k -∗ icRegp k ⟨Tp, none⟩ -∗ icDepNeutral cn k -∗
-      offRowsDep offCfg k T -∗
-      ∃ Tc : Nat, ⌜Tp ≤ Tc⌝ ∗ topLb Tc ∗ icSlpDep cn k Tc := by
-  iintro #HllbP Ht Hrp Hn Hdep
-  icases offRowsDep_llb offCfg k T $$ Hdep with ⟨Hdep, #HllbO⟩
-  ihave #HllbC := topLb_max Tp T $$ [HllbP HllbO]
+theorem icSlpDep_ofDep [Icfg] [CurCtx] (cn : IcNames) (k : Nat) (s : L2Reg IcBid) (T : Nat) (ξ : CtxId)
+    (hs : s.hold = none) :
+    topLb (GF := GF) s.tp ⊢ icTok cn k -∗ icRegp k s -∗ vgFloors ξ s.vp -∗ icDepNeutral cn k -∗
+      offRowsDepAt offCfg k T ξ -∗
+      ∃ Tc : Nat, ⌜s.tp ≤ Tc⌝ ∗ topLb Tc ∗ icSlpDep cn k Tc ξ := by
+  iintro #HllbP Ht Hrp #Hvg Hn Hdep
+  icases offRowsDep_llb offCfg k T ξ $$ Hdep with ⟨Hdep, #HllbO⟩
+  ihave #HllbC := topLb_max s.tp T $$ [HllbP HllbO]
   · isplitr
     · iexact HllbP
     · iexact HllbO
-  ihave Hdep := offRowsDep_le k T (max Tp T) (Nat.le_max_right Tp T) $$ HllbC Hdep
-  iexists (max Tp T)
+  ihave Hdep := offRowsDep_le k T (max s.tp T) ξ (Nat.le_max_right s.tp T) $$ HllbC Hdep
+  iexists (max s.tp T)
   isplitr
   · ipureintro; omega
   isplitr
   · iexact HllbC
   unfold icSlpDep
-  iexists Tp
+  iexists s
+  isplitr
+  · ipureintro; exact hs
   isplitr
   · ipureintro; omega
   isplitr
   · iexact HllbC
-  iframe Ht Hrp Hn Hdep
+  iframe Ht Hrp Hn Hdep Hvg
 
 /-- THE GENIN RELEASE'S ASSEMBLER (r25, correction 2).  A holder of
 ip->lock arrives at `releasesleep` with the park's register half at its own
-stamp `Tp` and the off rows it destructed out of the acquire's `icSlp`;
+stamp and the off rows it destructed out of the acquire's `icSlp`;
 this takes the rows' own maximum (`offRows_to_dep`) and joins the two, so
 every inode proof's site is one destruct (Rocq's `ic_slp_dep_of_rows`). -/
-theorem icSlpDep_ofRows [Icfg] [CurCtx] (cn : IcNames) (k Tp : Nat) (ξ : CtxId) :
-    topLb (GF := GF) Tp ⊢ icTok cn k -∗ icRegp k ⟨Tp, none⟩ -∗ icDepNeutral cn k -∗
+theorem icSlpDep_ofRows [Icfg] [CurCtx] (cn : IcNames) (k : Nat) (s : L2Reg IcBid) (ξ : CtxId)
+    (hs : s.hold = none) :
+    topLb (GF := GF) s.tp ⊢ icTok cn k -∗ icRegp k s -∗ vgFloors ξ s.vp -∗ icDepNeutral cn k -∗
       offRows offCfg k ξ -∗
-      ∃ T : Nat, ⌜Tp ≤ T⌝ ∗ topLb T ∗ icSlpDep cn k T := by
-  iintro #HllbP Ht Hrp Hn Hoff
+      ∃ T : Nat, ⌜s.tp ≤ T⌝ ∗ topLb T ∗ icSlpDep cn k T ξ := by
+  iintro #HllbP Ht Hrp #Hvg Hn Hoff
   icases offRows_to_dep offCfg k ξ $$ Hoff with ⟨%T', Hdep⟩
-  iapply icSlpDep_ofDep cn k Tp T' $$ HllbP Ht Hrp Hn Hdep
+  iapply icSlpDep_ofDep cn k s T' ξ hs $$ HllbP Ht Hrp Hvg Hn Hdep
 
 end IcacheSlp
 
@@ -959,18 +962,25 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 /-- The slot's row in `itable_res2` -- the register half, shut and empty,
 IDENTITY = the table's `ci !! k` (`none` when unidentified: M-1'), bounded
-by the payload's floor slot `tl`.  F17: `c` is `M !! k`'s count (0 at
+by the payload's floor slot `tl`, with (W8 (f2-ctx)) L1's chain bound's
+floors at the table's context `ξ`.  F17: `c` is `M !! k`'s count (0 at
 `none`).  The table's DEAD row keeps `islotFreeAt k dev inum` -- the
 identity halves complementary to the dead header's, which the recycler
 joins for its stores (Rocq's `ic_slot_row`). -/
-def icSlotRow [Icfg] (k : Nat) (oi : IcBid) (c tl : Nat) : IProp GF :=
+def icSlotRow [Icfg] (k : Nat) (oi : IcBid) (c tl : Nat) (ξ : CtxId) : IProp GF :=
   iprop(∃ r : SlotReg IcBid IcX,
     icRegd k r ∗ ⌜r.win = false⌝ ∗ ⌜r.x = none⌝ ∗ ⌜r.ident = oi⌝ ∗
-    topLb r.td ∗ ⌜r.td ≤ tl⌝ ∗ icCnt k c)
+    topLb r.td ∗ ⌜r.td ≤ tl⌝ ∗ icCnt k c ∗ vgFloors ξ r.vd)
 
-instance icSlotRow_timeless [Icfg] (k : Nat) (oi : IcBid) (c tl : Nat) :
-    Timeless (icSlotRow (GF := GF) k oi c tl) := by
+instance icSlotRow_timeless [Icfg] (k : Nat) (oi : IcBid) (c tl : Nat) (ξ : CtxId) :
+    Timeless (icSlotRow (GF := GF) k oi c tl ξ) := by
   unfold icSlotRow icRegd icCnt; infer_instance
+
+instance icSlotRow_morph [Icfg] (k : Nat) (oi : IcBid) (c tl : Nat) :
+    CtxMorph (GF := GF) (icSlotRow k oi c tl) := by
+  unfold icSlotRow
+  refine @instCtxMorphExists _ _ _ _ _ (fun r => ?_)
+  infer_instance
 
 end IcacheSlotRow
 

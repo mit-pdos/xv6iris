@@ -953,7 +953,7 @@ theorem dmaOwnT_ctxBytes (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)
     (hle : ts ≤ T) :
     iprop(ctxFloor (GF := GF) ξ T ∗ dmaOwnT pa n w ts) ⊢ ctxBytes ξ pa n (DFrac.own 1) w := by
   unfold dmaOwnT histBytes
-  iintro ⟨#Hfl, ⟨%Hs, Hraw, _, %hp⟩⟩
+  iintro ⟨#Hfl, ⟨%Hs, Hraw, _, %hp, #Hau⟩⟩
   ihave #Hfl2 := ctxFloor_le ξ T ts hle $$ Hfl
   unfold ctxBytes
   iapply (BigSepL.bigSepL_impl (l := List.range n)
@@ -985,7 +985,13 @@ theorem dmaOwnT_ctxBytes (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)
   · unfold keyAt
     ileft
     rw [het]
-    iexact Hfl2
+    isplit
+    · iexact Hfl2
+    · unfold chainKey
+      iright
+      iexists diskAgent
+      iframe Hau
+      ileft; ipureintro; exact Nat.le_refl _
 
 /-- **The chain's windows, taken back whole, at a KNOWN `b->disk`.** -/
 theorem chainLease_claimD_join {γ : DiskNames} [CurCtx] (ξ : CtxId) (pd : PAddr) (c : Chain) (d : BitVec 32) :
@@ -2849,7 +2855,7 @@ theorem disk_status_read [CurCtx] (γ : DiskNames) (q : Qp) (pd pav pu : PAddr) 
   icases diskProto_status_acc γ q c0 v c (nr + 1) t nr hwf (by omega) hg.2.2.2.1
       $$ [$Hfr Hproto Htok $Hdone Hnr] with ⟨%ts, %hts, Hrow, Hback⟩
   · iframe Hproto Htok Hnr
-  icases dmaOwnT_cases c.status 1 0#8 ts $$ Hrow with ⟨%Hs, Hb, #Htlb, %hp⟩
+  icases dmaOwnT_cases c.status 1 0#8 ts $$ Hrow with ⟨%Hs, Hb, #Htlb, %hp, #Hau⟩
   obtain ⟨e, HT, heq⟩ : ∃ (e : HEnt) (HT : Hist), Hs 0 = e :: HT := by
     have h0 := hp.2 0 (by omega)
     cases hx : Hs 0 with
@@ -2886,13 +2892,13 @@ theorem disk_status_read [CurCtx] (γ : DiskNames) (q : Qp) (pd pav pu : PAddr) 
     rw [← nthByte_one w, ← this, nthByte_one]
   ihave Hrow : iprop(dmaOwnT (GF := GF) c.status 1 0#8 ts) $$ [Hb]
   · iapply (show iprop(histBytes (GF := GF) c.status 1 (fun _ => DFrac.own 1) Hs ∗
-        topLb ts) ⊢ dmaOwnT c.status 1 0#8 ts from by
+        topLb ts ∗ authoredBy ts diskAgent) ⊢ dmaOwnT c.status 1 0#8 ts from by
       unfold dmaOwnT
-      iintro ⟨H, #Ht⟩
+      iintro ⟨H, #Ht, #Ha⟩
       iexists Hs
-      iframe H Ht
+      iframe H Ht Ha
       ipureintro; exact hp)
-    iframe Hb Htlb
+    iframe Hb Htlb Hau
   icases Hback $$ Hrow with ⟨Hproto, Htok, Hnr⟩
   ihave Hcl := Hclose $$ [Hfrag Hproto]
   case' _ =>
@@ -3088,7 +3094,7 @@ theorem disk_used_elem_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu :
     with ⟨%w8, %ts, %t, %i, %hp, #Hdone, Hrow, Hback⟩
   · iframe Hproto Hnr
   icases dmaOwnT_cases (usedElemAt c0.used (nr % NUM)) 8 w8 ts $$ Hrow
-    with ⟨%Hs, Hb, #Htlb, %hpp⟩
+    with ⟨%Hs, Hb, #Htlb, %hpp, #Hau⟩
   icases histBytes_acc_lo4 (usedElemAt c0.used (nr % NUM)) (DFrac.own 1) Hs $$ Hb
     with ⟨Hlo, Hjoin⟩
   iapply fupd_mask_intro LawfulSet.empty_subset
@@ -3132,14 +3138,14 @@ theorem disk_used_elem_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu :
   ihave Hb := Hjoin $$ Hlo
   ihave Hrow : iprop(dmaOwnT (GF := GF) (usedElemAt c0.used (nr % NUM)) 8 w8 ts) $$ [Hb]
   · iapply (show iprop(histBytes (GF := GF) (usedElemAt c0.used (nr % NUM)) 8
-        (fun _ => DFrac.own 1) Hs ∗ topLb ts) ⊢
+        (fun _ => DFrac.own 1) Hs ∗ topLb ts ∗ authoredBy ts diskAgent) ⊢
         dmaOwnT (usedElemAt c0.used (nr % NUM)) 8 w8 ts from by
       unfold dmaOwnT
-      iintro ⟨H, #Ht⟩
+      iintro ⟨H, #Ht, #Ha⟩
       iexists Hs
-      iframe H Ht
+      iframe H Ht Ha
       ipureintro; exact hpp)
-    iframe Hb Htlb
+    iframe Hb Htlb Hau
   icases Hback $$ Hrow with ⟨Hproto, Hnr⟩
   ihave Hcl := Hclose $$ [Hfrag Hproto]
   case' _ =>

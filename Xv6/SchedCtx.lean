@@ -1581,7 +1581,7 @@ theorem procLockRes_elim (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) :
 the scheduler itself runs). -/
 def cpuCtxFree (h : CPU) : IProp GF := iprop%
   ∃ (vs : List (BitVec 64)) (ξ : CtxId) (T : Nat), ⌜vs.length = 14⌝ ∗
-    ctxStamped ξ T ∗ viewLb h T ∗ @ctxCells hlc GF _ ⟨ξ, KTier.kpt⟩ (cpuCtxAddr h) vs
+    ctxStamped ξ T (fun _ => 0) 0 ∗ viewLb h T ∗ @ctxCells hlc GF _ ⟨ξ, KTier.kpt⟩ (cpuCtxAddr h) vs
 
 section
 variable [CurCtx]

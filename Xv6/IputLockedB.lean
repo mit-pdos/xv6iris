@@ -45,16 +45,16 @@ theorem iput_lk_b_park (c : CPU) (kk : Nat) (q : Qp) (inum : BitVec 32) (dn : Di
       ∃ Tp Tc : Nat, ⌜Tp ≤ Tc⌝ ∗
         reference (icfgBox kk) (some (icfgDev, inum))
           (PartialMap.singleton (some (icfgDev, inum), Tp) (⟨1⟩ : UFrac) : StampMap IcBid) ∗
-        topLb Tp ∗ topLb Tc ∗ icSlpDep fscIc kk Tc := by
+        topLb Tp ∗ topLb Tc ∗ icSlpDep fscIc kk Tc curCtx := by
   iintro ⟨#Hesc, Hrun, Hvld, Hidv, Hinh, Hmeta, Hmap, Hdep, Hpinr, Htxp, Hhold, Htok, Hoff⟩
   imod icPinEnter kk tid qp $$ Hpinr Htxp with ⟨Hpintx, Hhpn⟩
   unfold inodeMeta inodeMap
   icases Hmeta with ⟨Hty, Hmaj, Hmin, Hnl, Hsz⟩
   icases Hmap with ⟨Haddrs, -⟩
-  imod icParkFrz c fscIc fscFs fscIreg fscCov fscLogst kk curCtx q icfgDev inum tid qp g ⊤
+  imod icParkFrz c fscIc fscFs fscIreg fscCov fscLogst kk q icfgDev inum tid qp g ⊤
       CoPset.subseteq_top $$ Hesc Hrun [Hvld Hidv Hinh Hnl] [Hty Hmaj Hmin Hsz Haddrs] Hdep Hpintx
       Hhold
-    with ⟨Hrun, Hneu, Hfrg, Htxq, %Tp, Hrp, Href, #HllbT⟩
+    with ⟨Hrun, Hneu, Hfrg, Htxq, %Tp, %aP, Hrp, Href, #HllbT, #HvaP⟩
   · unfold icHdrBare icHdrBareAmb
     simp only [icXLoaded]
     isplitr
@@ -74,7 +74,8 @@ theorem iput_lk_b_park (c : CPU) (kk : Nat) (q : Qp) (inum : BitVec 32) (dn : Di
     iframe Haddrs
     ipureintro
     simp [bmCells, bmEmpty, NDIRECT]
-  icases icSlpDep_ofRows fscIc kk Tp curCtx $$ HllbT Htok Hrp Hneu Hoff with ⟨%Tc, %hTc, #HllbC, Hdepc⟩
+  icases icSlpDep_ofRows fscIc kk ⟨Tp, none, aP, ∅, aP⟩ curCtx rfl $$ HllbT Htok Hrp HvaP Hneu Hoff
+    with ⟨%Tc, %hTc, #HllbC, Hdepc⟩
   imodintro
   iframe Hrun Hfrg Htxq Hhpn
   iexists Tp, Tc
@@ -90,14 +91,14 @@ theorem iput_lk_releasesleep (RS : RELEASESLEEP_HOOK)
     (hs : "sleep lock" ∉ k'.locks) (hp : "proc" ∉ k'.locks) (htier : k'.tier = KTier.kpt) :
     kctx c k' ∗ pcIs c KA.«releasesleep» ∗ procsInv Γ ∗
     isSleeplockGen γil γisl (iLock (ientry kk)) (icSlp cn kk) (slhTok (icfgIsl kk)) ∗
-    sleeplockedQ γisl s (iLock (ientry kk)) pidv ∗ icSlpDep cn kk Tc ∗ topLb Tc ∗
+    sleeplockedQ γisl s (iLock (ientry kk)) pidv ∗ icSlpDep cn kk Tc curCtx ∗ topLb Tc ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ slhTok (icfgIsl kk) s -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   have h := RS.wp_releasesleep_gen_hook (hlc := hlc) (GF := GF) Γ c k' γil γisl (icSlp cn kk)
-    (fun _ => icSlpDep cn kk Tc) (slhTok (icfgIsl kk)) s pidv hnoff hK hs hp htier
+    (icSlpDep cn kk Tc) (slhTok (icfgIsl kk)) s pidv hnoff hK hs hp htier
   unfold wp_releasesleep_gen_hook_body at h
   simp only [releasesleepAddr] at h
   rw [haddr] at h
@@ -106,7 +107,7 @@ theorem iput_lk_releasesleep (RS : RELEASESLEEP_HOOK)
   iframe Hk Hpc Hpi Hslk Hsl Hnext
   isplitl [Hdep]
   · iexact Hdep
-  iapply lockHook_llb (fun _ => icSlpDep cn kk Tc) (icSlp cn kk) Tc
+  iapply lockHook_llb (icSlpDep cn kk Tc) (icSlp cn kk) Tc
     (fun ξ => icSlp_fold cn kk Tc ξ)
   iexact Htop
 

@@ -38,7 +38,7 @@ theorem ctx_fresh (cpu : CPU) : ⊢@{IProp GF} |==> ∃ ξ : CtxId, ownCtx cpu �
   imod (MonoNat.own_alloc (GF := GF) (.ofNat 0)) with ⟨%γb, Hb, _⟩
   imod (ghost_map_alloc_empty (GF := GF) (K := Nat) (V := CPU) (H := RegMapF)) with ⟨%γd, Hd⟩
   imod (MonoNat.lb_own_0 (GF := GF) ((MachGS.era (hlc := hlc) (GF := GF)).viewName cpu)) with #Hv
-  imod (vecAt_alloc (GF := GF)) with ⟨%γc, %γg, _, _⟩
+  imod (vecAt_alloc (GF := GF)) with ⟨%γc, %γg, Hc, Hg⟩
   imodintro
   iexists ⟨γb, γd, γc, γg⟩
   iapply ownCtx_intro cpu ⟨γb, γd, γc, γg⟩ 0 0 0 ∅
@@ -60,11 +60,21 @@ theorem ctx_fresh (cpu : CPU) : ⊢@{IProp GF} |==> ∃ ξ : CtxId, ownCtx cpu �
     intro k h hk
     rw [get?_empty] at hk
     cases hk
+  isplit
   · iapply dirtyElems_intro
     imodintro
     iintro %k %h %hk
     rw [get?_empty] at hk
     cases hk
+  · unfold chainTokAt vecAt
+    iexists (fun _ => 0), 0
+    iframe Hc Hg
+    isplit
+    · ipureintro
+      refine ⟨fun k h hk => ?_, fun _ => Nat.le_refl _⟩
+      rw [get?_empty] at hk
+      cases hk
+    · iapply vecCertsAt_zero
 
 end
 

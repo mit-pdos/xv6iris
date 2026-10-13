@@ -49,11 +49,13 @@ def rsvSpan : RsvKind → Nat
   | .cpu _ => 128
   | .lock _ => 24
   | .pub _ => 4
+  | .name => 0
 
 theorem regionBytes_span (R : RsvRegion) (hR : R.base.toNat + rsvSpan R.kind ≤ 2 ^ 64) (a : PAddr)
     (ha : a ∈ R.bytes) : R.base.toNat ≤ a.toNat ∧ a.toNat < R.base.toNat + rsvSpan R.kind := by
   obtain ⟨b, k⟩ := R
   cases k with
+  | name => simp [RsvRegion.bytes, RsvRegion.words] at ha
   | pub w =>
     simp only [rsvSpan] at hR ⊢
     simp only [RsvRegion.bytes, RsvRegion.words, wordBytes, List.flatMap_cons, List.flatMap_nil,
@@ -76,10 +78,18 @@ theorem lockBytes_cases (L cb : BitVec 64) (hw : L.toNat + 24 ≤ 2 ^ 64) (a : P
   · left; bv_omega
   · right; bv_omega
 
+/-- A footprint-free region (a `.name` registry entry, W8 (f2-ctx)) has no
+bytes. -/
+theorem regionBytes_span0 (R : RsvRegion) (h0 : rsvSpan R.kind = 0) (a : PAddr) (ha : a ∈ R.bytes) : False := by
+  obtain ⟨b, k⟩ := R
+  cases k with
+  | name => simp [RsvRegion.bytes, RsvRegion.words] at ha
+  | _ => simp [rsvSpan] at h0
+
 /-- No region of `rs` meets `[lo, hi)`. -/
 def rsvOff (rs : List RsvRegion) (lo hi : Nat) : Bool :=
-  rs.all (fun R => decide (R.base.toNat + rsvSpan R.kind ≤ 2 ^ 64) &&
-    (decide (R.base.toNat + rsvSpan R.kind ≤ lo) || decide (hi ≤ R.base.toNat)))
+  rs.all (fun R => decide (rsvSpan R.kind = 0) || (decide (R.base.toNat + rsvSpan R.kind ≤ 2 ^ 64) &&
+    (decide (R.base.toNat + rsvSpan R.kind ≤ lo) || decide (hi ≤ R.base.toNat))))
 
 theorem rsvOff_sound {rs : List RsvRegion} {lo hi : Nat} (h : rsvOff rs lo hi = true) :
     ∀ a ∈ rsvBytes rs, ¬ (lo ≤ a.toNat ∧ a.toNat < hi) := by
@@ -87,12 +97,15 @@ theorem rsvOff_sound {rs : List RsvRegion} {lo hi : Nat} (h : rsvOff rs lo hi = 
   obtain ⟨R, hR, haR⟩ := List.mem_flatMap.1 ha
   have := List.all_eq_true.1 h R hR
   simp only [Bool.and_eq_true, Bool.or_eq_true, decide_eq_true_eq] at this
+  rcases this with h0 | this
+  · exact (regionBytes_span0 R h0 a haR).elim
   have hs := regionBytes_span R this.1 a haR
   omega
 
 /-- Only `R0` of `rs` meets `[lo, hi)`. -/
 def rsvOnly (rs : List RsvRegion) (R0 : RsvRegion) (lo hi : Nat) : Bool :=
-  rs.all (fun R => decide (R = R0) || (decide (R.base.toNat + rsvSpan R.kind ≤ 2 ^ 64) &&
+  rs.all (fun R => decide (R = R0) || decide (rsvSpan R.kind = 0) ||
+    (decide (R.base.toNat + rsvSpan R.kind ≤ 2 ^ 64) &&
     (decide (R.base.toNat + rsvSpan R.kind ≤ lo) || decide (hi ≤ R.base.toNat))))
 
 theorem rsvOnly_sound {rs : List RsvRegion} {R0 : RsvRegion} {lo hi : Nat} (h : rsvOnly rs R0 lo hi = true) :
@@ -101,8 +114,9 @@ theorem rsvOnly_sound {rs : List RsvRegion} {R0 : RsvRegion} {lo hi : Nat} (h : 
   obtain ⟨R, hR, haR⟩ := List.mem_flatMap.1 ha
   have := List.all_eq_true.1 h R hR
   simp only [Bool.or_eq_true, Bool.and_eq_true, decide_eq_true_eq] at this
-  rcases this with rfl | ⟨h1, h2⟩
+  rcases this with (rfl | h0) | ⟨h1, h2⟩
   · exact haR
+  · exact (regionBytes_span0 R h0 a haR).elim
   · have hs := regionBytes_span R h1 a haR
     omega
 

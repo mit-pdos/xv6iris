@@ -87,7 +87,9 @@ theorem ctxMorph_ofAmb (t : KTier) (R : CurCtx → CtxId → IProp GF) (hR : ∀
 end
 
 /-- The structural walk (Rocq `CtxMorphTac.ctx_morph_solve`): `∗` / `∃` / `∨`
-split without unfolding a definition; a leaf closes by a named instance, as a
+split without unfolding a definition; a leaf closes by a named instance (W8
+(f2-ctx): the gate, vector and chain-bound floors and a reference's tag
+floors, tried by `exact` so the ambient's `⟨ξ, t⟩` projection unfolds), as a
 constant, or -- read at the ambient only for its tier -- by `amb_tier_rfl`. -/
 macro "amb_morph_solve" : tactic => `(tactic| repeat' (first
     | exact MachCSL.instCtxMorphConst _
@@ -95,6 +97,11 @@ macro "amb_morph_solve" : tactic => `(tactic| repeat' (first
     | with_reducible refine @MachCSL.instCtxMorphExists _ _ _ _ _ (fun _ => ?_)
     | with_reducible refine @Xv6.instCtxMorphOr _ _ _ _ _ ?_ ?_
     | with_reducible refine MachCSL.ctxMorph_bigSepL _ _ (fun _ _ => ?_)
+    | exact MachCSL.instCtxMorphGate
+    | exact MachCSL.instCtxMorphVecFloors _
+    | exact MachCSL.instCtxMorphVgFloors _
+    | exact MachCSL.referenceAt_morph _ _ _
+    | exact MachCSL.tagsFl_morph _
     | infer_instance
     | exact ctxMorph_ofEq _ (fun _ _ => by amb_tier_rfl)))
 

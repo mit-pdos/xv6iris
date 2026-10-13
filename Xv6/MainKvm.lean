@@ -33,6 +33,7 @@ import Xv6.ProcsInvAlloc
 import Xv6.SpecKvminit
 import Xv6.MainSecondaryParts
 import Xv6.KexecSeam
+import Xv6.LockRsv
 
 namespace Xv6
 
@@ -61,11 +62,11 @@ theorem mn_kinit (KI : KINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsi
     wordPointsTo (kmemLockAddr + 8#64) 8 (DFrac.own 1) vn ∗
     wordPointsTo kmemFreelistAddr 8 (DFrac.own 1) 0#64 ∗
     pageRange kinitBase kinitPages ∗
-    lockFreeTok γl ∗ kallocAvail γk (some 0) ∗ kmemAuth γk 0 ∗
+    lockFreeTok γl ∗ kallocAvail γk (some 0) ∗ kmemAuth γk 0 ∗ gateFloor curCtx ∗
     (∀ R : RegMap, kctx cpu (k.withRegs R) -∗ pcIs cpu (KA.«main» + 114#64) -∗
       isLock γl kmemLockAddr "kmem" (kmemRes γk) -∗ kallocAvail γk (some kinitPages) -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hk, Hpc, #Hm0, #Hm16, Hw, Hn, Hfl, Hpr, Hlf, Hav, Hau, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hm0, #Hm16, Hw, Hn, Hfl, Hpr, Hlf, Hav, Hau, #Hg, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   k_step (wp_s_jal cpu _ (KA.«main» + 110#64) false 2096142#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_6e]
@@ -75,7 +76,7 @@ theorem mn_kinit (KI : KINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsi
   unfold wp_kinit_body at hki
   simp only [kinitAddr] at hki
   iapply hki
-  iframe Hk Hpc Hm0 Hm16 Hw Hn Hfl Hpr Hlf Hav Hau
+  iframe Hk Hpc Hm0 Hm16 Hw Hn Hfl Hpr Hlf Hav Hau Hg
   simp only [KCtx.withRegs_sie, KCtx.withRegs_proc, hsie]
   iapply wpNext_off_intro
   iintro %spie %spp %R' %hsp Hk Hpc #Hlk Hav _ %_
@@ -337,13 +338,14 @@ set_option maxHeartbeats 4000000 in
 names the machine instance was built at. -/
 theorem mn_procsInv [CurCtx] (hct : curTier = KTier.kpt) (cpu : CPU) (k : KCtx) (Γ : SchedNames)
     (t : PTree) (pas : Nat → BitVec 44) (hok : kvmTableOk t pas) :
-    kctx cpu k ∗ kstackMapAt pas ∗ ([∗list] i ∈ List.range NPROC, mnSlotIn (GF := GF) Γ pas i)
+    kctx cpu k ∗ gateFloor curCtx ∗ kstackMapAt pas ∗ ([∗list] i ∈ List.range NPROC, mnSlotIn (GF := GF) Γ pas i)
     ⊢ |={⊤}=> (kctx cpu k ∗ procsInv Γ) := by
-  iintro ⟨Hk, #Hst, H⟩
+  iintro ⟨Hk, #Hg, #Hst, H⟩
   icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
+  icases kctx_rsvEq _ _ $$ Hk with ⟨%heq, Hk⟩
   ihave H := mn_slots_seal hct Γ t pas hok $$ HS Hst H
   icases kctx_token_acc cpu k $$ Hk with ⟨Hrun, Hback⟩
-  imod procsInv_alloc hct cpu ⊤ Γ $$ [$Hrun $H] with ⟨Hrun, #Hpi⟩
+  imod procsInv_alloc hct cpu ⊤ Γ heq $$ [$Hrun $Hg $H] with ⟨Hrun, #Hpi⟩
   imodintro
   ihave Hk := Hback $$ Hrun
   iframe Hk Hpi
@@ -401,7 +403,7 @@ over `wait_res` (the parent cells, the children map, no orphans, the zombie
 ledger at the empty history, and -- NI M2-G1b -- the family ledger's T2
 authority at the all-`none` column). -/
 theorem mn_pidWait_born [CurCtx] (cpu : CPU) (k : KCtx) :
-    kctx cpu k ∗ lockInited pidLockAddr nextpidNameAddr ∗ lockInited waitLockAddr waitLockNameAddr ∗
+    kctx cpu k ∗ gateFloor curCtx ∗ lockInited pidLockAddr nextpidNameAddr ∗ lockInited waitLockAddr waitLockNameAddr ∗
     wordPointsTo nextpidAddr 4 (DFrac.own 1) 1#32 ∗
     ([∗list] i ∈ List.range NPROC, wordPointsTo (pPid (procAddr i)) 4 pidLockQ 0#32) ∗
     pidRegAuth ∅ ∗ pidLedAuth [] ∗ parentsResAt curCtx ∗ childrenResBoot ∗ orphansOwn ∅ ∗
@@ -409,7 +411,7 @@ theorem mn_pidWait_born [CurCtx] (cpu : CPU) (k : KCtx) :
     ⊢ |={⊤}=> (kctx (GF := GF) cpu k ∗
       (∃ γp : GName, isLock γp pidLockAddr "nextpid" pidLockPay) ∗
       (∃ γw : GName, isLock γw waitLockAddr "wait_lock" waitLockPay)) := by
-  iintro ⟨Hk, Hpl, Hwl, Hn, Hp, Ha, Hled, Hpar, Hch, Ho, Hzl, Hzs⟩
+  iintro ⟨Hk, #Hg, Hpl, Hwl, Hn, Hp, Ha, Hled, Hpar, Hch, Ho, Hzl, Hzs⟩
   icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
   icases mn_pidLock_kmap $$ HS with ⟨#Hp0, #Hp16⟩
   icases mn_waitLock_kmap $$ HS with ⟨#Hw0, #Hw16⟩
@@ -417,11 +419,13 @@ theorem mn_pidWait_born [CurCtx] (cpu : CPU) (k : KCtx) :
   icases Hpl with ⟨-, Hpf⟩
   icases Hwl with ⟨-, Hwf⟩
   ihave HR := mn_pidRes_boot $$ [$Hn $Hp $Ha $Hled]
-  imod kctx_newlock cpu k pidLockAddr "nextpid" pidLockPay $$ [$Hk $HR $Hpf $Hp0 $Hp16] with ⟨Hk, Hpid⟩
+  icases kctx_lkNameFor cpu k (lk := pidLockAddr) xv6RsvStatic_pid $$ Hk with ⟨Hpn, Hk⟩
+  imod kctx_newlock cpu k pidLockAddr "nextpid" pidLockPay $$ [$Hk $HR $Hpf $Hpn $Hp0 $Hp16 $Hg] with ⟨Hk, Hpid⟩
   ihave HW := waitRes_alloc curCtx $$ [$Hpar $Hch $Ho $Hzl $Hzs]
   ihave HW : iprop(waitLockPay (GF := GF) curCtx) $$ [HW]
   · unfold waitLockPay; iexact HW
-  imod kctx_newlock cpu k waitLockAddr "wait_lock" waitLockPay $$ [$Hk $HW $Hwf $Hw0 $Hw16] with ⟨Hk, Hwait⟩
+  icases kctx_lkNameFor cpu k (lk := waitLockAddr) xv6RsvStatic_wait $$ Hk with ⟨Hwn, Hk⟩
+  imod kctx_newlock cpu k waitLockAddr "wait_lock" waitLockPay $$ [$Hk $HW $Hwf $Hwn $Hw0 $Hw16 $Hg] with ⟨Hk, Hwait⟩
   imodintro
   iframe Hk Hpid Hwait
 

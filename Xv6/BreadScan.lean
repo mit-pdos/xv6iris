@@ -604,8 +604,8 @@ theorem bd_hit (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_RW)
     with ⟨%⟨hnd, hlt⟩, Hrefc, Hhalves, Hslots, Hcnt⟩
   icases bkey_acc γ curCtx tl devs bnos kk hkk $$ Hkey with ⟨Hkey0, Hkcl⟩
   icases bkeyAt_elim γ curCtx tl kk (devs kk) (bnos kk) $$ Hkey0 with ⟨Hkd, Hkb, Hkr⟩
-  icases bufSlotRegs_elim (γ.box kk) tl (devs kk) (bnos kk) $$ Hkr
-    with ⟨%r, %⟨hrid, hrtl⟩, Hrd, #Htd⟩
+  icases bufSlotRegs_elim (γ.box kk) tl (devs kk) (bnos kk) curCtx $$ Hkr
+    with ⟨%r, %⟨hrid, hrtl⟩, Hrd, #Htd, #Hvd⟩
   obtain ⟨n, hn⟩ : ∃ n, (Ls kk).length = n := ⟨_, rfl⟩
   have hlen : (nx :: Ls kk).length = n + 1 := by simp only [List.length_cons, hn]
   ihave Hrefc := (show wordAtN (GF := GF) curCtx (aBufRefcnt (bnode kk)) 4 (DFrac.own 1)
@@ -637,15 +637,15 @@ theorem bd_hit (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_RW)
   imod Hup with ⟨Ha, Href, Hhalves', %hnx⟩
   imod bufEscrow_refIncr γ V (γ.box kk) kk (1 : Qp).half (1 : Qp).half r (Ls kk).length ⊤
       bioxN_top hrid.1 $$ [Hbox Hrd Hcnt] with ⟨Hrd, Hcnt, ⟨%Tb, Hbref⟩⟩
-  · iframe Hbox Hrd Hcnt
+  · iframe Hbox Hrd Hcnt Hvd
   ihave Hbref := (show (boxRef (GF := GF) (γ.box kk) r.ident Tb) ⊢
       boxRef (γ.box kk) ((dev, bno) : BufId) Tb from by
     rw [hrid.2.2, hdv, hbn]) $$ Hbref
   imodintro
   icases boxRef_topLb (γ.box kk) ((dev, bno) : BufId) Tb $$ Hbref with ⟨Hbref, #Htb⟩
-  ihave Hkr := bufSlotRegs_intro (γ.box kk) r tl (devs kk) (bnos kk)
+  ihave Hkr := bufSlotRegs_intro (γ.box kk) r tl (devs kk) (bnos kk) curCtx
     hrid.1 hrid.2.1 hrid.2.2 hrtl $$ [Hrd Htd]
-  case' _ => iframe Hrd Htd
+  case' _ => iframe Hrd Htd Hvd
   ihave Hkey0 := bkeyAt_intro γ curCtx tl kk (devs kk) (bnos kk) $$ [Hkd Hkb Hkr]
   case' _ => iframe Hkd Hkb Hkr
   ihave Hkey := Hkcl $$ Hkey0
@@ -826,7 +826,7 @@ theorem bd_recyc (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_R
   iapply wpLoop_fupd
   icases kctx_token_acc c (kc.withRegs Rc) $$ Hk with ⟨Hctx, Hkback⟩
   imod bufEscrow_withdrawKey γ V kk c tl (devs kk) (bnos kk) ⊤ bioxN_top
-      $$ [Hbox Hctx Hfl Hkr Hcnt] with ⟨Hctx, Hcnt, ⟨%td, %x0, %T0, %hT0, Hrd, Hhdr⟩⟩
+      $$ [Hbox Hctx Hfl Hkr Hcnt] with ⟨Hctx, Hcnt, ⟨%td, %x0, %T0, %aW, %hT0, #HvaW, Hrd, Hhdr⟩⟩
   · iframe Hbox Hctx Hkr Hcnt
     iexact Hfl
   imodintro
@@ -928,10 +928,10 @@ theorem bd_recyc (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_R
   iapply wpLoop_fupd
   icases kctx_token_acc c _ $$ Hk with ⟨Hctx, Hkback⟩
   imod bufEscrow_recycle γ V (γ.box kk) kk (1 : Qp).half (1 : Qp).half c
-      (⟨td, true, ((devs kk, bnos kk) : BufId), some (x0, T0)⟩ : SlotReg BufId BufX)
+      (⟨td, true, ((devs kk, bnos kk) : BufId), some (x0, T0), aW⟩ : SlotReg BufId BufX)
       dev bno x0 T0 ⊤ bioxN_top rfl rfl $$ [Hbox Hctx Hrd Hcnt Hhdr']
-    with ⟨Hctx, ⟨%T', Hrd', Hcnt', Hbref, #HT'⟩⟩
-  · iframe Hbox Hctx Hrd Hcnt Hhdr'
+    with ⟨Hctx, ⟨%T', %aR, Hrd', Hcnt', Hbref, #HT', #HvaR⟩⟩
+  · iframe Hbox Hctx Hrd Hcnt Hhdr' HvaW
   imodintro
   ihave Hk := Hkback $$ Hctx
   -- **THE FLOOR SLOT RISES** over the deposit's stamp
@@ -945,9 +945,9 @@ theorem bd_recyc (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_R
     · iexact Htl
     · iexact HT'
   ihave Hkr' := bufSlotRegs_intro (γ.box kk)
-    (⟨T', false, ((dev, bno) : BufId), none⟩ : SlotReg BufId BufX) tl2 dev bno
+    (⟨T', false, ((dev, bno) : BufId), none, aR⟩ : SlotReg BufId BufX) tl2 dev bno curCtx
     rfl rfl rfl htl2T $$ [Hrd' HT']
-  case' _ => iframe Hrd' HT'
+  case' _ => iframe Hrd' HT' HvaR
   ihave Hd2 := (show wordPointsTo (GF := GF) (aBufDev (bnode kk)) 4
         (DFrac.own (1 : Qp).half) dev ⊢
       wordAtN curCtx (aBufDev (bnode kk)) 4 (DFrac.own (1 : Qp).half) dev from by

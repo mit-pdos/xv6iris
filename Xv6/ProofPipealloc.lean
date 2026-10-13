@@ -506,11 +506,11 @@ theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γ
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) (k.regs 18#5) ∗
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFD8#64) 8 (DFrac.own 1) w2 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    wordPointsTo (pPid k.proc) 4 dqp pidv ∗ irefSlot ∗ paLend k.proc ke ∗
+    wordPointsTo (pPid k.proc) 4 dqp pidv ∗ irefSlot ∗ paLend k.proc ke ∗ gateFloor curCtx ∗
     wpNext true k.proc cpu (paCont k γ γk on pidv dqp ke)
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, Hav, Hpage, Hc0, Hc1, Href0, Href1, Hra, Hs0, Hs1, Hs4, Hsp1, Hsp2, Hte, Hce,
-    Hpid, Hir, Hlend, Hnext⟩
+    Hpid, Hir, Hlend, #Hg, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
   have hK6 : 6 ≤ k.avail := by unfold pipeallocSlots at hK; have := filecloseSlots_callees.2.2.2; omega
@@ -587,9 +587,9 @@ theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γ
   ihave Hwo := (show wordPointsTo (GF := GF) (pi + 548#64) 4 (DFrac.own 1) 1#32 ⊢
       wordPointsTo (aPopen pi true) 4 (DFrac.own 1) 1#32 from by rw [pa_addr_wo]) $$ Hwo
   iapply wpLoop_fupd
-  imod (kctx_newPipe cA _ pi hpv _ bs hbs) $$ [Hk Hid0 Hid16 Hfresh Hnm Hnr Hnw Hro Hwo Hdat Hslack]
+  imod (kctx_newPipe cA _ pi hpv KStr.«pipe» rfl bs hbs) $$ [Hk Hid0 Hid16 Hfresh Hnm Hnr Hnw Hro Hwo Hdat Hslack]
     with ⟨Hk, %γlp, %γp, #Hpipe, Hr0, Hr1, Hqf⟩
-  · iframe Hid0 Hid16 Hfresh Hnm Hnr Hnw Hro Hwo Hdat Hslack
+  · iframe Hid0 Hid16 Hfresh Hnm Hnr Hnw Hro Hwo Hdat Hslack Hg
     iexact Hk
   imodintro
   -- the eight stores into *f0 and *f1
@@ -806,6 +806,7 @@ theorem pipealloc_proof (FA : FILEALLOC) (KAL : KALLOC) (IL : INITLOCK) (FC : FI
   unfold wp_pipealloc_eb_body
   simp only [pipeallocAddr]
   iintro ⟨Hk, Hpc, Hte, Hce, #Hft, #Hpe, #Hkl, Hav, Hfd1, Hfd2, Hc0, Hc1, Hpid, Hir, Hlend, Hnext⟩
+  ihave #Hg := isLock_gate _ _ _ _ $$ Hkl
   -- the lend, as the pass-through every exit hands back (permit sweep L1b)
   ihave Hlend : paLend (GF := GF) k.proc ke $$ [Hlend]
   · iexists ke; iframe Hlend; ipureintro; exact Nat.le_refl _
@@ -1092,6 +1093,6 @@ theorem pipealloc_proof (FA : FILEALLOC) (KAL : KALLOC) (IL : INITLOCK) (FC : FI
                   | exact g27.trans (d27.trans b27))
             w2)
           $$ [$Hk $Hpc $Hav $Hpage $Hc0 $Hc1 $Href0 $Href1 $Hra $Hs0 $Hs1 $Hs4 $Hsp1 $Hsp2 $Hte $Hce
-            $Hpid $Hir $Hlend $Hnext]⟩
+            $Hpid $Hir $Hlend $Hg $Hnext]⟩
 
 end Xv6

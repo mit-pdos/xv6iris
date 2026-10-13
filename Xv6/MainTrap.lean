@@ -29,6 +29,7 @@ import MachCSL.LockBornHook
 import Xv6.SpecTrapinithart
 import Xv6.SpecPlicinit
 import Xv6.SpecPlicinithart
+import Xv6.LockRsv
 
 namespace Xv6
 
@@ -58,10 +59,10 @@ theorem mn_trapinit [WchG GF] (TI : TRAPINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R
     kmapId tickslockAddr ∗ kmapId (tickslockAddr + 16#64) ∗
     lkRaw tickslockAddr vl vc ∗
     wordPointsTo (tickslockAddr + 8#64) 8 (DFrac.own 1) vn ∗
-    lockFreeTok γt ∗ ticksResAt curCtx ∗ tickCnt 0 ∗
+    lockFreeTok γt ∗ ticksResAt curCtx ∗ tickCnt 0 ∗ gateFloor curCtx ∗
     (∀ R : RegMap, kctx cpu (k.withRegs R) -∗ pcIs cpu (KA.«main» + 130#64) -∗ isTickslock γt -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hk, Hpc, #H0, #H16, Hw, Hn, Hlf, Hres, Htk, HΦ⟩
+  iintro ⟨Hk, Hpc, #H0, #H16, Hw, Hn, Hlf, Hres, Htk, #Hg, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   k_step (wp_s_jal cpu _ (KA.«main» + 126#64) false 5588#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_7e]
@@ -80,8 +81,9 @@ theorem mn_trapinit [WchG GF] (TI : TRAPINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R
   -- THE MIRROR IS RAISED TO THE CELL'S BOOT VALUE (design ni-ticks-ledger.md
   -- D2, Rocq `mn_grp_trap`): the payload's tie founded before the seal
   imod ticksLed_boot $$ Hres Htk with Hres
-  imod (kctx_newlockAt cpu _ γt tickslockAddr "time" ticksLedAt) $$ [Hk Hlf Hres Hfr] with ⟨Hk, #Htl⟩
-  · iframe Hk Hlf Hres Hfr H0 H16
+  icases kctx_lkNameFor cpu _ (lk := tickslockAddr) xv6RsvStatic_ticks $$ Hk with ⟨Htn, Hk⟩
+  imod (kctx_newlockAt cpu _ γt tickslockAddr "time" ticksLedAt) $$ [Hk Hlf Hres Hfr Htn] with ⟨Hk, #Htl⟩
+  · iframe Hk Hlf Hres Hfr Htn H0 H16 Hg
   imodintro
   iapply HΦ $$ %R' Hk Hpc
   unfold isTickslock

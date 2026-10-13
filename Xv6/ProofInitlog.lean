@@ -139,7 +139,7 @@ theorem il_pay_agree (γ : BcacheNames) (γfs : FsNames)
     (bs bsd bsc : List (BitVec 8)) (d : Bool) :
     bioPay (GF := GF) γ V kk dev bno bs bsd d ⊢ fsChalf γfs b bsc -∗ ⌜bs = bsc⌝ := by
   subst hb
-  unfold bioPay
+  unfold bioPay bioPayAt
   cases d with
   | false =>
     simp only [Bool.false_eq_true, if_false, hcl]
@@ -391,7 +391,7 @@ theorem il_seal (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       (eraSyncHook (hlc := hlc) (GF := GF)) ∗
     crashInv (hlc := hlc) (GF := GF) ∗ genCert (hlc := hlc) (GF := GF) ∗
     logMirrorHalf (hlc := hlc) M ∗
-    kmapId logAddr ∗ kmapId (logAddr + 16#64) ∗ lkFresh logAddr ∗
+    kmapId logAddr ∗ kmapId (logAddr + 16#64) ∗ lkFresh logAddr ∗ gateFloor curCtx ∗
     logFreeTok γ ∗
     wordPointsTo lOut 4 (DFrac.own 1) 0#32 ∗
     wordPointsTo lCmt 4 (DFrac.own 1) 0#32 ∗
@@ -415,7 +415,7 @@ theorem il_seal (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       logCtx γ γb γfs V.cov logstart dev -∗ wpLoop cpu')
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hte, Hce, Hframe, Hpid, Hsb, #Hfroz, #Hrow, #Hswlb, #Hpark, #Hlaw, #Hlawg,
-    #Hcinv, #Hcert, Hmir, #Hm1, #Hm2, Hfresh, Htok,
+    #Hcinv, #Hcert, Hmir, #Hm1, #Hm2, Hfresh, #Hg, Htok,
     Hout, Hcmt, Hnc, HlhN, Hjunk, HL, HD, Hd, Hhdr, Hslots, Hpool, Hwork, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- the boot pack, with the era's mirror half at the clean picture and row (b)
@@ -431,9 +431,10 @@ theorem il_seal (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     iframe Hout Hcmt Hnc Hops Hep Hreg Htx Hhelp Hstok Hbatch
   -- the seal, AT THE GIVEN NAME `γ.lk` (Rocq `newlock_at`)
   iapply wpLoop_fupd
+  icases kctx_lkNameFor cpu _ (lk := logAddr) xv6RsvStatic_log $$ Hk with ⟨Hnf, Hk⟩
   imod (kctx_newlockAt cpu _ γ.lk logAddr "log" (logResAt γ γb γfs V.cov logstart))
-    $$ [Hk Hlkf Hres Hfresh Hm1 Hm2] with ⟨Hk, #Hlk⟩
-  · iframe Hm1 Hm2
+    $$ [Hk Hlkf Hres Hfresh Hm1 Hm2 Hnf] with ⟨Hk, #Hlk⟩
+  · iframe Hm1 Hm2 Hnf Hg
     iframe
   imodintro
   ihave #Hctx := logCtx_mk γ γb γfs V.cov logstart dev
@@ -501,6 +502,10 @@ theorem initlog_proof
     Htok, Hsb, #Hm1, #Hm2, Hlock, Hname, HlStart, HlDev, Hout, Hcmt, Hnc, HlhN, Hjunk,
     HL, HD, Hd, Hhdr, Hslots, Hpool0, Hb1, #Hlawf, #Hlawgf, #Hcinv, Hnext⟩
   icases genCert_parts $$ Hcert with ⟨-, -, #Hreg⟩
+  ihave #Hg : gateFloor (GF := GF) curCtx $$ [Hbc]
+  · unfold bioCtx isBcache
+    icases Hbc with ⟨#Hl, -, -⟩
+    iapply isLock_gate; iexact Hl
   icases (show logMirrorBorn (hlc := hlc) (GF := GF) M ⊢
       logMirrorHalf (hlc := hlc) M ∗
         swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) from by
@@ -933,7 +938,7 @@ theorem initlog_proof
       ((g26.trans f26).trans ((d26.trans b26).trans a26'))
       ((g27.trans f27).trans ((d27.trans b27).trans a27')))
     $$ [- $Hk $Hpc $Hte $Hce $Hframe $Hpid $Hsb $Hfroz $Hrow $Hswlb $Hparked $Hlaw $Hlawg $Hcinv $Hcert $Hmir3
-         $Hm1 $Hm2 $Hfresh $Htok
+         $Hm1 $Hm2 $Hfresh $Hg $Htok
          $Hout $Hcmt $Hnc $HlhN $Hjunk $HL $HD $Hd $Hch $Hslots $Hpool $Hs2 $Hnext]
   k_norm_g
   try (iframe #)⟩

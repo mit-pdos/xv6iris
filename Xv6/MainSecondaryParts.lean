@@ -190,7 +190,7 @@ theorem ms_spin [CurCtx] (cpu : CPU) (hcpu : cpu ≠ startedPrimary)
   iintro %w Hk Hpc Hseen
   case ha => rw [KCtx.rget_ne cpu k 14#5 (by decide) (by decide), ha4]; rfl
   unfold startedSeen
-  icases Hseen with (%hw | ⟨%t, %hw, #Hidx, #Hrv, #HP, #Hgp⟩)
+  icases Hseen with (%hw | ⟨%t, %a, %hw, #Hidx, #Hrv, #HP, #Hgp, #Hvc⟩)
   · -- read 0: the fence, and round again
     subst hw
     k_step (wp_s_fence_r_rw cpu _ (KA.«main» + 24#64) false 0#5 0#5)
@@ -224,8 +224,8 @@ theorem ms_spin [CurCtx] (cpu : CPU) (hcpu : cpu ≠ startedPrimary)
     -- the absorb
     icases ms_kctx_ownCtx cpu _ $$ Hk with ⟨Hown, Hk⟩
     iapply wpLoop_fupd
-    imod started_absorb ⊤ γi ξd P cpu t t (Nat.le_refl t) CoPset.subseteq_top
-      $$ [$Hinv $Hidx $Hv $Hown $HP] with ⟨Hown, HP'⟩
+    imod started_absorb ⊤ γi ξd P cpu t t a (Nat.le_refl t) CoPset.subseteq_top
+      $$ [$Hinv $Hidx $Hv $Hown $HP $Hvc] with ⟨Hown, HP'⟩
     imodintro
     ihave Hk := Hk $$ Hown
     iapply HΦ $$ %1#64 Hk Hpc HP'
@@ -471,5 +471,22 @@ theorem ms_tail (KVH : KVMINITHART) (TIH : TRAPINITHART) (PIH : PLICINITHART) (S
   iframe Hk Hpc
 
 end
+
+section gate
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+
+/-- **Hart 0's context, gated** (W8 (f2-ctx)): the boot hart writes every
+publication word, so it is past the boot gate (`Xv6.started_gatePrim`, the
+era's list out of the context) and sets its running context's gate flag --
+what every lock birth on the boot path needs. -/
+theorem kctx_gatePrim [CurCtx] {lent : Bool} (k : KCtx) :
+    kctxL (GF := GF) lent startedPrimary k ⊢ |==> (kctxL lent startedPrimary k ∗ gateFloor curCtx) := by
+  iintro Hk
+  icases kctx_rsvEq _ _ $$ Hk with ⟨%heq, Hk⟩
+  ihave #Hgp := started_gatePrim (hlc := hlc) (GF := GF) heq
+  iapply kctx_setGate startedPrimary k
+  iframe Hk Hgp
+
+end gate
 
 end Xv6

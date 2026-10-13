@@ -940,33 +940,34 @@ theorem islFunAlloc [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG G
 
 /-- One slot's box ghosts, whole, at their boot values (deviation 5). -/
 def icBoxRaw [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcboxG GF] (γb : BoxNames) : IProp GF := iprop%
-  stampsAuth γb (∅ : StampMap IcBid) ∗ (γb.cnt ↪VAR (0 : Nat)) ∗
+  stampsAuth γb (∅ : StampMap IcBid) ∗ stampsAuth γb.tk (∅ : StampMap IcBid) ∗ (γb.cnt ↪VAR (0 : Nat)) ∗
   (γb.slotd ↪VAR (default : SlotReg IcBid IcX)) ∗ (γb.slotp ↪VAR (default : L2Reg IcBid))
 
 /-- The per-slot box names, minted as one family (bio_init's pattern). -/
 theorem icfgBoxFunAlloc [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcboxG GF] (n : Nat) :
     ⊢@{IProp GF} |==> ∃ f : Nat → BoxNames, [∗list] k ∈ List.range n, icBoxRaw (f k) :=
-  icFunAlloc ⟨0, 0, 0, 0⟩ (fun _ γb => icBoxRaw γb)
+  icFunAlloc ⟨0, 0, 0, 0, 0⟩ (fun _ γb => icBoxRaw γb)
     (fun _ => by
       imod stampsAuth_alloc (GF := GF) (Id := IcBid) with ⟨%g1, Hst⟩
+      imod stampsAuth_alloc (GF := GF) (Id := IcBid) with ⟨%g5, Hstt⟩
       imod ghost_var_alloc (GF := GF) (0 : Nat) with ⟨%g2, Hcnt⟩
       imod ghost_var_alloc (GF := GF) (default : SlotReg IcBid IcX) with ⟨%g3, Hd⟩
       imod ghost_var_alloc (GF := GF) (default : L2Reg IcBid) with ⟨%g4, Hp⟩
       imodintro
-      iexists (⟨g1, g2, g3, g4⟩ : BoxNames)
-      unfold icBoxRaw stampsAuth
-      iframe Hst Hcnt Hd Hp) n
+      iexists (⟨g1, g2, g3, g4, g5⟩ : BoxNames)
+      unfold icBoxRaw stampsAuth BoxNames.tk
+      iframe Hst Hstt Hcnt Hd Hp) n
 
 /-- A slot's raw box ghosts are exactly `MachCSL.boxAllocAt`'s ghost
 premises (Rocq's `box_alloc_at` takes the same four rows). -/
 theorem icBoxRaw_allocAt [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [IcboxG GF] (γb : BoxNames) :
     icBoxRaw (GF := GF) γb ⊢
-      stampsAuth γb (∅ : StampMap IcBid) ∗ (γb.cnt ↪VAR (0 : Nat)) ∗
+      stampsAuth γb (∅ : StampMap IcBid) ∗ stampsAuth γb.tk (∅ : StampMap IcBid) ∗ (γb.cnt ↪VAR (0 : Nat)) ∗
         (∃ r0 : SlotReg IcBid IcX, γb.slotd ↪VAR r0) ∗
-        (γb.slotp ↪VAR (⟨0, none⟩ : L2Reg IcBid)) := by
+        (γb.slotp ↪VAR (L2Reg.init : L2Reg IcBid)) := by
   unfold icBoxRaw
-  iintro ⟨Hst, Hc, Hd, Hp⟩
-  iframe Hst Hc Hp
+  iintro ⟨Hst, Hstt, Hc, Hd, Hp⟩
+  iframe Hst Hstt Hc Hp
   iexists (default : SlotReg IcBid IcX)
   iexact Hd
 

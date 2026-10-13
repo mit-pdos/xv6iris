@@ -309,8 +309,8 @@ def iputWindow (k : Nat) (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 �
       itableSlotResLlb curCtx M' ci' k -∗
       [∗list] j ∈ List.range NINODE, itableSlotResLlb curCtx M' ci' j) ∗
     (∃ tst : Nat, istmpAuth k (1 : Qp).half tst ∗ topLb tst ∗ ctxFloor curCtx tst) ∗
-    (∃ (x0 : IcX) (td T0 : Nat), ⌜x0 ≠ .icRaw⌝ ∗
-      icRegd k ⟨td, true, some (dev, inum), some (x0, T0)⟩ ∗ topLb td ∗ icCnt k 1 ∗
+    (∃ (x0 : IcX) (td T0 : Nat) (a : ChainVG), ⌜x0 ≠ .icRaw⌝ ∗
+      icRegd k ⟨td, true, some (dev, inum), some (x0, T0), a⟩ ∗ topLb td ∗ vgFloors curCtx a ∗ icCnt k 1 ∗
       icHdr fscIc fscFs fscIreg fscCov fscLogst k (some (dev, inum)) x0 curCtx))
 
 /-- Rocq's `ip_row_open`: the table row's pieces, OPEN (F42/F42′). -/

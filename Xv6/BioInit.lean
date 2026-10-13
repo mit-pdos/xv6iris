@@ -41,6 +41,7 @@ no longer carries `bslots BSLOTS` (it was a fresh name's whole supply).
 import Xv6.BufEscrow
 import Xv6.SleepLockAt
 import MachCSL.BigSepLib
+import Xv6.LockRsv
 
 namespace Xv6
 
@@ -213,6 +214,46 @@ theorem bd_funAllocK {A : Type} [Inhabited A] (Q : Nat → IProp GF) (P : Nat �
       simp only [reduceIte]
       iexact Ha
 
+/-- `bd_funAllocK` with the index's bound and a persistent side premise `G`
+in each step (W8 (f2-ctx): the creator's gate and each lock's registry fact). -/
+theorem bd_funAllocKB {A : Type} [Inhabited A] (G : IProp GF) [Persistent G] (N : Nat)
+    (Q : Nat → IProp GF) (P : Nat → A → IProp GF) (cpu : CPU) (k : KCtx)
+    (hstep : ∀ j : Nat, j < N → G ∗ kctx (GF := GF) cpu k ∗ Q j ⊢ |={⊤}=> (kctx cpu k ∗ ∃ a : A, P j a)) :
+    ∀ n : Nat, n ≤ N → (G ∗ kctx (GF := GF) cpu k ∗ ([∗list] j ∈ List.range n, Q j) ⊢
+      |={⊤}=> (kctx cpu k ∗ ∃ f : Nat → A, [∗list] j ∈ List.range n, P j (f j))) := by
+  intro n
+  induction n with
+  | zero =>
+    intro _
+    iintro ⟨-, Hk, -⟩
+    imodintro
+    iframe Hk
+    iexists (fun _ => (default : A))
+    simp only [List.range_zero]
+    iapply BigSepL.bigSepL_nil.2
+    itrivial
+  | succ n ih =>
+    intro hn
+    rw [List.range_succ]
+    iintro ⟨#HG, Hk, H⟩
+    icases BigSepL.bigSepL_append.1 $$ H with ⟨H1, H2⟩
+    imod ih (by omega) $$ [Hk H1] with ⟨Hk, ⟨%f, Hf⟩⟩
+    · iframe HG Hk H1
+    ihave H2 := BigSepL.bigSepL_singleton.1 $$ H2
+    imod hstep n (by omega) $$ [Hk H2] with ⟨Hk, ⟨%a, Ha⟩⟩
+    · iframe HG Hk H2
+    imodintro
+    iframe Hk
+    iexists (fun j => if j = n then a else f j)
+    iapply BigSepL.bigSepL_append.2
+    isplitl [Hf]
+    · iapply bigSepL_range_congr (fun j => P j (f j))
+        (fun j => P j (if j = n then a else f j)) n (fun j hj => by rw [if_neg (by omega)])
+      iexact Hf
+    · iapply BigSepL.bigSepL_singleton.2
+      simp only [reduceIte]
+      iexact Ha
+
 /-! ## The `.bss` cells `binit` never touches -/
 
 /-- Buffer `i`'s untouched `.bss` fields (Rocq `bio_init`'s per-buffer
@@ -273,7 +314,7 @@ theorem bd_rows_split (γ : BcacheNames) (V : BioView GF) (bx : Nat → BoxNames
           (1 : Qp).half (1 : Qp).half 0#32 0#32) ⊢
         ∃ tl : Nat, topLb tl ∗
           ([∗list] j ∈ List.range n, bufBox γ V (bx j) j (1 : Qp).half (1 : Qp).half) ∗
-          ([∗list] j ∈ List.range n, bufSlotRegs (bx j) tl 0#32 0#32) ∗
+          ([∗list] j ∈ List.range n, bufSlotRegs (bx j) tl 0#32 0#32 curCtx) ∗
           ([∗list] j ∈ List.range n, cntHalf (bx j) 0)) := by
   intro n
   induction n with
@@ -297,9 +338,10 @@ theorem bd_rows_split (γ : BcacheNames) (V : BioView GF) (bx : Nat → BoxNames
     icases (show bufBoxRow (GF := GF) γ V (bx n) n (1 : Qp).half (1 : Qp).half 0#32 0#32 ⊢
         bufBox γ V (bx n) n (1 : Qp).half (1 : Qp).half ∗
         (∃ r : SlotReg BufId BufX, slotdHalf (bx n) r ∗
-          ⌜r.win = false ∧ r.x = none ∧ r.ident = ((0#32, 0#32) : BufId)⌝ ∗ topLb r.td) ∗
+          ⌜r.win = false ∧ r.x = none ∧ r.ident = ((0#32, 0#32) : BufId)⌝ ∗ topLb r.td ∗
+            vgFloors curCtx r.vd) ∗
         cntHalf (bx n) 0 from by
-      unfold bufBoxRow; iintro H; iexact H) $$ H2 with ⟨#Hbn, ⟨%r, Hrd, %hr, #Htd⟩, Hcn⟩
+      unfold bufBoxRow; iintro H; iexact H) $$ H2 with ⟨#Hbn, ⟨%r, Hrd, %hr, #Htd, #Hvd⟩, Hcn⟩
     iexists (max tl r.td)
     isplitl []
     · iapply topLb_max tl r.td
@@ -316,13 +358,13 @@ theorem bd_rows_split (γ : BcacheNames) (V : BioView GF) (bx : Nat → BoxNames
     · iapply BigSepL.bigSepL_append.2
       isplitl [Hrg]
       · iapply BigSepL.bigSepL_mono_of_forall
-          (Φ := fun _ j => bufSlotRegs (GF := GF) (bx j) tl 0#32 0#32)
-          (Ψ := fun _ j => bufSlotRegs (GF := GF) (bx j) (max tl r.td) 0#32 0#32)
-          (fun {_ j} => bufSlotRegs_mono (bx j) tl (max tl r.td) (by omega) 0#32 0#32) $$ Hrg
+          (Φ := fun _ j => bufSlotRegs (GF := GF) (bx j) tl 0#32 0#32 curCtx)
+          (Ψ := fun _ j => bufSlotRegs (GF := GF) (bx j) (max tl r.td) 0#32 0#32 curCtx)
+          (fun {_ j} => bufSlotRegs_mono (bx j) tl (max tl r.td) (by omega) 0#32 0#32 curCtx) $$ Hrg
       · iapply BigSepL.bigSepL_singleton.2
-        ihave Hrg' := bufSlotRegs_intro (bx n) r (max tl r.td) 0#32 0#32 hr.1 hr.2.1 hr.2.2
+        ihave Hrg' := bufSlotRegs_intro (bx n) r (max tl r.td) 0#32 0#32 curCtx hr.1 hr.2.1 hr.2.2
           (by omega) $$ [Hrd Htd]
-        case' _ => iframe Hrd Htd
+        case' _ => iframe Hrd Htd Hvd
         iexact Hrg'
     · iapply BigSepL.bigSepL_append.2
       isplitl [Hc]
@@ -378,6 +420,13 @@ theorem bd_kmap_all (n : Nat) (hn : n ≤ NBUF) :
       iapply kmapStatic_rw _ (bnode_off_kmapRw n 40 (by omega) (by decide))
       iexact HS
 
+/-- Buffer `j`'s sleeplock's inner spinlock is its registered static lock. -/
+theorem slLk_bufLock (j : Nat) : slLk (aBufLock (bnode j)) = rsvBufLk j := by
+  unfold slLk aBufLock bnode bufAddr rsvBufLk bOffLock
+  apply BitVec.eq_of_toNat_eq
+  simp only [BitVec.toNat_add, BitVec.toNat_ofNat]
+  omega
+
 /-! ## The free state of a names record (Rocq `BioInitAt.v`) -/
 
 /-- **Rocq `BioInitAt.bio_free_tok`**: the free state of the buffer cache's
@@ -399,7 +448,7 @@ def bioFreeTok (γl : GName) (γ : BcacheNames) : IProp GF := iprop(
   (γ.ref ↪●MAP (∅ : RegMapF Nat)) ∗
   ([∗list] k ∈ List.range NBUF, slFreePair (γ.slk k) ∗ (γ.own k ↪VAR{DFrac.own (1 : Qp)} ())) ∗
   ([∗list] k ∈ List.range NBUF,
-    bufBoxRaw (γ.box k) ∗ slotpHalf (γ.box k) (⟨0, none⟩ : L2Reg BufId)))
+    bufBoxRaw (γ.box k) ∗ slotpHalf (γ.box k) (L2Reg.init : L2Reg BufId)))
 
 /-- **Rocq `BioInitAt.bio_names_ghost_alloc`**: pick the record (and the
 lock's name).  A plain `bupd`: no mask, no physical premise, so the era
@@ -418,7 +467,7 @@ theorem bioNamesGhostAlloc :
         iexists (p, γo)
         iframe Hp Ho) NBUF with ⟨%f, Hbufs⟩
   imod bd_funAlloc (fun (_ : Nat) (γbk : BoxNames) => iprop(bufBoxRaw (GF := GF) γbk ∗
-      slotpHalf (GF := GF) γbk (⟨0, none⟩ : L2Reg BufId)))
+      slotpHalf (GF := GF) γbk (L2Reg.init : L2Reg BufId)))
       (fun _ => bufBoxRaw_alloc) NBUF with ⟨%bx, Hbx⟩
   imodintro
   iexists γl, (⟨γref, fun k => (f k).1, fun k => (f k).2, bx⟩ : BcacheNames)
@@ -440,11 +489,12 @@ theorem bioInitAt (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : B
     ([∗list] i ∈ List.range NBUF, sleepLockInited (aBufLock (bnode i)) bufferNameAddr) ∗
     ([∗list] i ∈ List.range NBUF, bdLinks curCtx i) ∗
     ([∗list] i ∈ List.range NBUF, bdBss curCtx i) ∗
-    ([∗set] b ∈ V.cov, poolBlk V b)
+    ([∗set] b ∈ V.cov, poolBlk V b) ∗ gateFloor curCtx
     ⊢ |={⊤}=> (kctx (GF := GF) cpu k ∗ bioCtx γl γ V) := by
   unfold bioFreeTok
-  iintro ⟨Hk, ⟨Hlkf, Ha, Hsl, Hbx⟩, Hfresh, Hhn, Hhp, Hslki, Hlinks, Hbss, Hpool⟩
+  iintro ⟨Hk, ⟨Hlkf, Ha, Hsl, Hbx⟩, Hfresh, Hhn, Hhp, Hslki, Hlinks, Hbss, Hpool, #Hg⟩
   icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
+  icases kctx_rsvEq _ _ $$ Hk with ⟨%heq0, Hk⟩
   ihave Hpool := bioPool_boot V hcov0 $$ Hpool
   ihave Hlru := bd_lru_boot curCtx $$ [Hhn Hhp Hlinks]
   case' _ => iframe Hhn Hhp Hlinks
@@ -459,28 +509,33 @@ theorem bioInitAt (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : B
   case' _ => iframe Hq Hslotp
   ihave Hq := BigSepL.bigSepL_sep_eqv.2 $$ [Hq Hkm]
   case' _ => iframe Hq Hkm
-  imod bd_funAllocK
+  imod bd_funAllocKB iprop(gateFloor curCtx ∗ ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static⌝) NBUF
       (fun j => iprop(((sleepLockInited (aBufLock (bnode j)) bufferNameAddr ∗
           (slFreePair (γ.slk j) ∗ (γ.own j ↪VAR{DFrac.own (1 : Qp)} ()))) ∗
-          slotpHalf (γ.box j) (⟨0, none⟩ : L2Reg BufId)) ∗
+          slotpHalf (γ.box j) (L2Reg.init : L2Reg BufId)) ∗
         (kmapId (slLk (aBufLock (bnode j))) ∗ kmapId (slLk (aBufLock (bnode j)) + 16#64))))
       (fun j (_ : Unit) => isSleeplockGen (γ.slk j).1 (γ.slk j).2 (aBufLock (bnode j))
         (bufSlpRaw (γ.own j) (γ.box j)) slUntracked)
       cpu k
-      (fun j => by
-        iintro ⟨Hk, ⟨⟨Hsli, Hp, Htok⟩, Hpp⟩, #Hm1, #Hm2⟩
+      (fun j hj => by
+        iintro ⟨⟨#Hg, %heq⟩, Hk, ⟨⟨Hsli, Hp, Htok⟩, Hpp⟩, #Hm1, #Hm2⟩
+        ihave Hnf := lkNameFor_rsv (hlc := hlc) (GF := GF) (slLk (aBufLock (bnode j)))
+          (lkRsvIn_of heq (by rw [slLk_bufLock]; exact xv6RsvStatic_buf j (by unfold NBUF at hj; omega)))
         imod kctx_newSleeplockAt cpu k (γ.slk j) (aBufLock (bnode j)) bufferNameAddr
-            (bufSlpRaw (γ.own j) (γ.box j)) slUntracked $$ [Hk Hp Hsli Hm1 Hm2 Htok Hpp]
+            (bufSlpRaw (γ.own j) (γ.box j)) slUntracked $$ [Hk Hp Hsli Hm1 Hm2 Htok Hpp Hnf]
           with ⟨Hk, #Hslk⟩
-        · iframe Hk Hp Hsli Hm1 Hm2
+        · iframe Hk Hp Hsli Hm1 Hm2 Hnf Hg
           iapply bufSlpRaw_boot (γ.own j) (γ.box j) curCtx
           iframe Htok Hpp
         imodintro
         iframe Hk
         iexists ()
         iexact Hslk)
-      NBUF $$ [Hk Hq] with ⟨Hk, ⟨%_, Hslks⟩⟩
+      NBUF (Nat.le_refl _) $$ [Hk Hq] with ⟨Hk, ⟨%_, Hslks⟩⟩
   · iframe Hk Hq
+    isplit
+    · iexact Hg
+    · ipureintro; exact heq0
   -- the `.bss` cells, split the way the cache seats them
   ihave Hbss := BigSepL.bigSepL_mono_of_forall
     (Φ := fun _ i => bdBss (GF := GF) curCtx i)
@@ -496,6 +551,7 @@ theorem bioInitAt (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : B
   icases funOfBig (fun i bs => bufTravelV (GF := GF) γ V i (1 : Qp).half (1 : Qp).half
     0#32 0#32 0#32 bs) NBUF $$ Htrav with ⟨%bsf, Htrav⟩
   -- **THE THIRTY ESCROWS**
+  icases kctx_lkNameFor cpu k (lk := bcacheLockAddr) xv6RsvStatic_bcache $$ Hk with ⟨Hnfb, Hk⟩
   icases kctx_token_acc cpu k $$ Hk with ⟨Hctx, Hkback⟩
   imod bufEscrow_allocAllAt γ V γ.box (1 : Qp).half (1 : Qp).half cpu (fun _ => 0#32)
       (fun _ => 0#32) (fun _ => 0#32) bsf ⊤ NBUF $$ [Hctx Hbraw Htrav] with ⟨Hctx, Hrows⟩
@@ -510,7 +566,7 @@ theorem bioInitAt (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : B
     (Φ := fun _ j => iprop((wordAtN (GF := GF) curCtx (aBufDev (bnode j)) 4
           (DFrac.own (1 : Qp).half) 0#32 ∗
         wordAtN curCtx (aBufBlockno (bnode j)) 4 (DFrac.own (1 : Qp).half) 0#32) ∗
-      bufSlotRegs (γ.box j) tl 0#32 0#32))
+      bufSlotRegs (γ.box j) tl 0#32 0#32 curCtx))
     (Ψ := fun _ j => bkeyAt (GF := GF) γ curCtx tl j 0#32 0#32)
     (fun {_ j} => by
       iintro ⟨⟨H1, H2⟩, H3⟩
@@ -552,8 +608,8 @@ theorem bioInitAt (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : B
   ihave Hin := bcacheResIn_intro γ V curCtx tl $$ [Htl Hscan]
   case' _ => iframe Htl Hscan
   imod newlockAt_llb cpu ⊤ γl bcacheLockAddr "bcache" (bcacheResAt γ V) (bcacheResIn γ V tl)
-      tl (bcacheRes_fold_in γ V tl) $$ [Hlkf Hm1 Hm2 Hctx Hfresh Htl Hin] with ⟨Hctx, #Hlk⟩
-  · iframe Hlkf Hm1 Hm2 Hctx Hfresh Htl Hin
+      tl (bcacheRes_fold_in γ V tl) $$ [Hlkf Hm1 Hm2 Hctx Hfresh Htl Hin Hnfb] with ⟨Hctx, #Hlk⟩
+  · iframe Hlkf Hm1 Hm2 Hctx Hfresh Htl Hin Hnfb Hg
   ihave Hk := Hkback $$ Hctx
   imodintro
   iframe Hk
@@ -609,9 +665,9 @@ theorem bioInitAt_of_binit (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheName
     wordPointsTo (bcacheHeadAddr + 80#64) 8 (DFrac.own 1) (bufAddr 29) ∗
     ([∗list] i ∈ List.range 30, bufOut i) ∗
     ([∗list] i ∈ List.range NBUF, bdBss curCtx i) ∗
-    ([∗set] b ∈ V.cov, poolBlk V b)
+    ([∗set] b ∈ V.cov, poolBlk V b) ∗ gateFloor curCtx
     ⊢ |={⊤}=> (kctx (GF := GF) cpu k ∗ bioCtx γl γ V) := by
-  iintro ⟨Hk, Hfree, Hli, Hhp, Hhn, Hout, Hbss, Hpool⟩
+  iintro ⟨Hk, Hfree, Hli, Hhp, Hhn, Hout, Hbss, Hpool, #Hg⟩
   icases (show lockInited (GF := GF) bcacheLockAddr bcacheNameAddr ⊢
       wordPointsTo (bcacheLockAddr + 8#64) 8 (DFrac.own 1) bcacheNameAddr ∗
       lkFresh bcacheLockAddr from by
@@ -639,7 +695,7 @@ theorem bioInitAt_of_binit (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheName
       wordAtN curCtx (bPrev bhead) 8 (DFrac.own 1) (bufAddr 0) from by
     rw [wordAtN_cur, show bPrev bhead = bcacheHeadAddr + 72#64 from rfl]) $$ Hhp
   iapply bioInitAt cpu k γl γ V hcov0
-  iframe Hk Hfree Hfresh Hhn Hhp Hslki Hlinks Hbss Hpool
+  iframe Hk Hfree Hfresh Hhn Hhp Hslki Hlinks Hbss Hpool Hg
 
 end
 

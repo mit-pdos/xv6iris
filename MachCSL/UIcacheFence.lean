@@ -87,7 +87,7 @@ theorem uic_keyAt_le (σ : MState) (cpu : CPU) (ξ : CtxId) (t : Nat) :
   ihave %hK : ⌜Kv ≤ σ.tv cpu⌝ $$ [Hmm HK]
   · iapply memModel_viewLb _ σ cpu Kv $$ [Hmm HK]
     iframe
-  icases keyAt_cases _ ξ t $$ Hkey with ⟨Hfl | ⟨%h, Hdirty, Hau⟩⟩
+  icases keyAt_cases _ ξ t $$ Hkey with ⟨⟨Hfl, _⟩ | ⟨%h, Hdirty, Hau⟩⟩
   · ihave %htB : ⌜t ≤ B⌝ $$ [Hctx Hfl]
     · iapply ctxAt_floor ξ 1 B D t $$ [Hctx Hfl]
       iframe

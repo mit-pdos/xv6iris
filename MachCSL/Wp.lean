@@ -1464,7 +1464,7 @@ theorem ctxByte_readable (σ : MState) (cpu : CPU) (ξ : CtxId) (a : PAddr) (dq 
     intro tvn hvis
     unfold FlatMem.read
     rw [hget, Option.bind_some, Hist.read_cons_visible _ _ _ _ hvis, hev]
-  icases keyAt_cases _ ξ e.t $$ Hkey with ⟨Hfl | ⟨%h, Hdirty, Hau⟩⟩
+  icases keyAt_cases _ ξ e.t $$ Hkey with ⟨⟨Hfl, _⟩ | ⟨%h, Hdirty, Hau⟩⟩
   · ihave %htB : ⌜e.t ≤ B⌝ $$ [Hctx Hfl]
     · iapply ctxAt_floor ξ 1 B D e.t $$ [Hctx Hfl]
       iframe
@@ -1729,7 +1729,7 @@ theorem ctx_store (σ : MState) (cpu : CPU) (ξ : CtxId) (pa : PAddr) (n : Nat) 
       (memModel (σ.store cpu pa n w false) ∗ ownCtx cpu ξ ∗ resvFrag cpu none false ∗
        keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ (σ.top + 1)) := by
   unfold ownCtx ownCtxAt resvFragAny resvFragAnyAt resvFrag memModel
-  iintro ⟨Hmm, ⟨%B, %K, %W, %D, Hctx, #HK, %hBK, #HW, %hDW, #Hels⟩, %b, Hfrag⟩
+  iintro ⟨Hmm, ⟨%B, %K, %W, %D, Hctx, #HK, %hBK, #HW, %hDW, #Hels, Hch⟩, %b, Hfrag⟩
   ihave %hW : ⌜W ≤ σ.top⌝ $$ [Hmm HW]
   · iapply memModel_topLb _ σ W $$ [Hmm HW]
     iframe Hmm
@@ -1762,6 +1762,7 @@ theorem ctx_store (σ : MState) (cpu : CPU) (ξ : CtxId) (pa : PAddr) (n : Nat) 
       · rw [LawfulPartialMap.get?_insert_ne (Ne.symm hkt)] at hk
         obtain ⟨h1, h2⟩ := hDW k h hk
         exact ⟨by omega, h2⟩
+    isplitr [Hch]
     · unfold dirtyElems
       imodintro
       iintro %k %h %hk
@@ -1775,6 +1776,14 @@ theorem ctx_store (σ : MState) (cpu : CPU) (ξ : CtxId) (pa : PAddr) (n : Nat) 
         · iexact Hau
       · rw [LawfulPartialMap.get?_insert_ne (Ne.symm hkt)] at hk
         iapply Hels $$ %k %h %hk
+    · iapply chainTokAt_mono _ cpu ξ W (σ.top + 1) D _ (by omega) ?_ $$ Hch
+      intro k h hk
+      by_cases hkt : k = σ.top + 1
+      · subst hkt
+        rw [LawfulPartialMap.get?_insert_eq rfl] at hk
+        exact Or.inr (Option.some.inj hk).symm
+      · rw [LawfulPartialMap.get?_insert_ne (Ne.symm hkt)] at hk
+        exact Or.inl hk
   · unfold keyAt
     iright
     iexists cpu

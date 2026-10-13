@@ -73,7 +73,7 @@ theorem il_checkout [Icfg] [Fscfg] [CurCtx] (cpu : CPU) (kk : Nat) (s : Qp) (dev
       icDeposit2 kk d ∗ icDeposit fscIc kk d ∗ icTok fscIc kk ∗ offRows offCfg kk curCtx ∗
       iregWdLic o g inum.toNat) := by
   unfold icSlp l2Row
-  iintro ⟨#Hesc, #Hinv, Hrun, #Hflt, ⟨%s0, ⟨Hrp, %hs0, #Hflp⟩, Htok, Hneu, Hoff⟩, Hid, Hlv, Href,
+  iintro ⟨#Hesc, #Hinv, Hrun, #Hflt, ⟨%s0, ⟨Hrp, %hs0, #Hflp, #Hvp⟩, Htok, Hneu, Hoff⟩, Hid, Hlv, Href,
     Hside, Hcl⟩
   imod icDepCheckout fscIc kk d $$ Hneu with ⟨Hd, Hd2⟩
   cases hrd : icDepRd d with
@@ -83,9 +83,9 @@ theorem il_checkout [Icfg] [Fscfg] [CurCtx] (cpu : CPU) (kk : Nat) (s : Qp) (dev
     subst hdd
     simp only [iregWdLic]
     icases Hcl with #Hshot
-    imod icCheckoutRd cpu fscIc fscFs fscIreg fscCov fscLogst kk curCtx s dev inum g lo ty s0 Kt s0.tp ⊤
+    imod icCheckoutRd cpu fscIc fscFs fscIreg fscCov fscLogst kk s dev inum g lo ty s0 Kt s0.tp ⊤
       CoPset.subseteq_top CoPset.subseteq_top hkk hs0 (Nat.le_refl _)
-      $$ Hesc Hrun Hflt Hflp Hinv Hshot [Hid Hlv] [Href] Hd2 [Hrp] with ⟨Hrun, Hbun, Hdep2⟩
+      $$ Hesc Hrun Hflt Hflp Hinv Hshot [Hid Hlv] [Href] Hd2 [Hrp] Hvp with ⟨Hrun, Hbun, Hdep2⟩
     · simp only [icBody]; iframe Hid Hlv
     · iexists mst; iframe Href
       isplitr
@@ -95,9 +95,9 @@ theorem il_checkout [Icfg] [Fscfg] [CurCtx] (cpu : CPU) (kk : Nat) (s : Qp) (dev
     imodintro
     iframe Hrun Hbun Hdep2 Hd Htok Hoff Hshot
   | false =>
-    imod icCheckout cpu fscIc fscFs fscIreg fscCov fscLogst kk curCtx d dev inum s0 Kt s0.tp ⊤
+    imod icCheckout cpu fscIc fscFs fscIreg fscCov fscLogst kk d dev inum s0 Kt s0.tp ⊤
       CoPset.subseteq_top (icDepId_ofShr d s dev inum g lo hshr) hrd hs0 (Nat.le_refl _)
-      $$ Hesc Hrun Hflt Hflp [Hid Hlv] [Href] Hd2 [Hside] [Hrp] with ⟨Hrun, Hbun, Hdep2⟩
+      $$ Hesc Hrun Hflt Hflp [Hid Hlv] [Href] Hd2 [Hside] [Hrp] Hvp with ⟨Hrun, Hbun, Hdep2⟩
     · rw [icBody_ofShr kk d s dev inum g lo hshr]; iframe Hid Hlv
     · iexists mst
       rw [icDepMass_ofShr d s dev inum g lo hshr]

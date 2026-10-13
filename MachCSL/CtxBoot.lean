@@ -19,16 +19,16 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 /-- A fresh context, stamped at 0 (Rocq `ctx_stamped_alloc`): bound 0, empty
-dirty set.  (Its W8 (f2-ctx) chain names are allocated, unused until S2.) -/
-theorem ctxStamped_boot : ⊢@{IProp GF} |==> ∃ ξ : CtxId, ctxStamped ξ 0 := by
+dirty set, (W8 (f2-ctx)) the zero chain vector and an unset gate. -/
+theorem ctxStamped_boot : ⊢@{IProp GF} |==> ∃ ξ : CtxId, ctxStamped ξ 0 (fun _ => 0) 0 := by
   imod (MonoNat.own_alloc (GF := GF) (.ofNat 0)) with ⟨%γb, Hb, _⟩
   imod (ghost_map_alloc_empty (GF := GF) (K := Nat) (V := CPU) (H := RegMapF)) with ⟨%γd, Hd⟩
-  imod (vecAt_alloc (GF := GF)) with ⟨%γc, %γg, _, _⟩
+  imod (vecAt_alloc (GF := GF)) with ⟨%γc, %γg, Hc, Hg⟩
   imodintro
   iexists ⟨γb, γd, γc, γg⟩
-  unfold ctxStamped ctxAt
+  unfold ctxStamped ctxAt vecAt
   iexists ∅
-  iframe Hb Hd
+  iframe Hb Hd Hc Hg
   isplit
   · unfold topLb
     iapply topLbAt_0
@@ -37,9 +37,14 @@ theorem ctxStamped_boot : ⊢@{IProp GF} |==> ∃ ξ : CtxId, ctxStamped ξ 0 :=
     intro k h hk
     rw [LawfulPartialMap.get?_empty] at hk
     simp at hk
+  isplit
   · unfold dirtyElems
     imodintro
     iintro %k %h %hk
+    rw [LawfulPartialMap.get?_empty] at hk
+    simp at hk
+  · ipureintro
+    refine ⟨fun k h hk => ?_, fun _ => Nat.le_refl _⟩
     rw [LawfulPartialMap.get?_empty] at hk
     simp at hk
 
@@ -59,7 +64,7 @@ theorem ownCtx_boot (E : EraGS) (cpu : CPU) :
   iintro HK
   imod (MonoNat.own_alloc (.ofNat 0)) with ⟨%γb, Hb, _⟩
   imod (ghost_map_alloc_empty (K := Nat) (V := CPU) (H := RegMapF)) with ⟨%γd, Hd⟩
-  imod (vecAt_alloc (GF := GF)) with ⟨%γc, %γg, _, _⟩
+  imod (vecAt_alloc (GF := GF)) with ⟨%γc, %γg, Hc, Hg⟩
   imodintro
   iexists ⟨γb, γd, γc, γg⟩
   unfold ownCtxAt ctxAt viewLbAt
@@ -76,10 +81,20 @@ theorem ownCtx_boot (E : EraGS) (cpu : CPU) :
     intro k h hk
     rw [LawfulPartialMap.get?_empty] at hk
     simp at hk
+  isplit
   · unfold dirtyElems
     imodintro
     iintro %k %h %hk
     rw [LawfulPartialMap.get?_empty] at hk
     simp at hk
+  · unfold chainTokAt vecAt
+    iexists (fun _ => 0), 0
+    iframe Hc Hg
+    isplit
+    · ipureintro
+      refine ⟨fun k h hk => ?_, fun _ => Nat.le_refl _⟩
+      rw [LawfulPartialMap.get?_empty] at hk
+      simp at hk
+    · iapply vecCertsAt_zero
 
 end MachCSL

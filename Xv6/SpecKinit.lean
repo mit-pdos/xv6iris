@@ -66,6 +66,8 @@ def wp_kinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
   -- the "kmem" lock's ghost, unbuilt (what `kctx_newlockAt` fills), and the
   -- free-list count at GENESIS -- zero pages -- in both halves
   lockFreeTok γl ∗ kallocAvail γk (some 0) ∗ kmemAuth γk 0 ∗
+  -- (W8 (f2-ctx)) the creator's boot gate, which the lock's handle carries
+  gateFloor curCtx ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗

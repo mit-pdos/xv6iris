@@ -286,16 +286,34 @@ instance inodeIdent_morph (t : KTier) (k : Nat) (dq : DFrac) (dev inum : BitVec 
   @instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAt t (iDev (ientry k)) 4 dq dev)
     (instCtxMorphWordAt t (iInum (ientry k)) 4 dq inum)
 
+/-- The stamps share transports (W8 (f2-ctx)): its reference's tickets carry
+tag floors at the ambient context, which move by `MachCSL.referenceAt_morph`. -/
+instance icStamps_morph [Icfg] (t : KTier) (k : Nat) (i : IcBid) (μ : Rat) :
+    CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; icStamps (GF := GF) k i μ) := by
+  unfold icStamps
+  exact @instCtxMorphExists hlc GF _ _ _ fun m =>
+    @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (referenceAt_morph (icfgBox k) i m)
+
+instance icRefStamps_morph [Icfg] (t : KTier) (k : Nat) (dev inum : BitVec 32) (μ : Qp) :
+    CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; icRefStamps (GF := GF) k dev inum μ) := by
+  unfold icRefStamps icRefStampsAt
+  exact icStamps_morph t k _ _
+
+instance icLentStamps_morph [Icfg] (t : KTier) (k : Nat) (qt qi : Qp) (dev inum : BitVec 32) :
+    CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; icLentStamps (GF := GF) k qt qi dev inum) := by
+  unfold icLentStamps
+  exact icStamps_morph t k _ _
+
 /-- The floors law for the floored slice (Rocq `live_fracc_morph`). -/
 instance liveFracc_morph [Icfg] (t : KTier) (k : Nat) (s : Qp) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; liveFracc (GF := GF) k s) where
   morph ξ ξ' := by
     unfold liveFracc
     iintro ⟨Hd, %g, %lo, %tl, Hlv, %hle, #Hfl⟩
-    have hlk : (letI : CurCtx := ⟨ξ, t⟩; credFloor (GF := GF) lo tl) ⊢ lkFloor ξ lo :=
+    have hlk : (letI : CurCtx := ⟨ξ, t⟩; credFloor (GF := GF) lo tl) ⊢ visFloor ξ lo :=
       letI : CurCtx := ⟨ξ, t⟩; credFloor_lk lo tl hle
     ihave Hk := hlk $$ Hfl
-    imod (instCtxMorphLkFloor (GF := GF) lo).morph ξ ξ' $$ [Hd Hk] with ⟨Hd, #Hk⟩
+    imod (instCtxMorphVisFloor (GF := GF) lo).morph ξ ξ' $$ [Hd Hk] with ⟨Hd, #Hk⟩
     · iframe; iexact Hk
     imodintro
     iframe Hd
@@ -303,19 +321,23 @@ instance liveFracc_morph [Icfg] (t : KTier) (k : Nat) (s : Qp) :
     iframe Hlv
     isplitr
     · ipureintro; exact Nat.le_refl lo
-    · iapply (show lkFloor (GF := GF) ξ' lo ⊢ (letI : CurCtx := ⟨ξ', t⟩; credFloor lo lo) from
-      letI : CurCtx := ⟨ξ', t⟩; credFloor_of_lk lo)
+    · iapply (show visFloor (GF := GF) ξ' lo ⊢ (letI : CurCtx := ⟨ξ', t⟩; credFloor lo lo) from
+      letI : CurCtx := ⟨ξ', t⟩; credFloor_of_vis lo)
       iexact Hk
 
 instance inodeShrGen_morph [Icfg] (t : KTier) (k : Nat) (s : Qp) (dev inum : BitVec 32)
     (g : GName) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; inodeShrGen (GF := GF) k s dev inum g) :=
-  @instCtxMorphSep hlc GF _ _ _ (inodeIdent_morph t k (.own s) dev inum) (instCtxMorphConst _)
+  @instCtxMorphSep hlc GF _ _ _ (inodeIdent_morph t k (.own s) dev inum)
+    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
+      (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (icRefStamps_morph t k dev inum s)))
 
 instance inodeShrGenlo_morph [Icfg] (t : KTier) (k : Nat) (s : Qp) (dev inum : BitVec 32)
     (g : GName) (lo : Nat) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; inodeShrGenlo (GF := GF) k s dev inum g lo) :=
-  @instCtxMorphSep hlc GF _ _ _ (inodeIdent_morph t k (.own s) dev inum) (instCtxMorphConst _)
+  @instCtxMorphSep hlc GF _ _ _ (inodeIdent_morph t k (.own s) dev inum)
+    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
+      (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (icRefStamps_morph t k dev inum s)))
 
 /-- The floors law for the pointer-keyed share (Rocq
 `inode_shr_held_gen_morph`, `FileInvDefs.inode_pay_morph`'s one named
@@ -326,10 +348,10 @@ instance inodeShrHeldGen_morph [Icfg] (t : KTier) (v : BitVec 64) (s : Qp) (g : 
   morph ξ ξ' := by
     unfold inodeShrHeldGen
     iintro ⟨Hd, %k, %lo, %tl, %hv, %hk, %hb, %hle, #Hfl, Hs⟩
-    have hlk : (letI : CurCtx := ⟨ξ, t⟩; credFloor (GF := GF) lo tl) ⊢ lkFloor ξ lo :=
+    have hlk : (letI : CurCtx := ⟨ξ, t⟩; credFloor (GF := GF) lo tl) ⊢ visFloor ξ lo :=
       letI : CurCtx := ⟨ξ, t⟩; credFloor_lk lo tl hle
     ihave Hk := hlk $$ Hfl
-    imod (instCtxMorphLkFloor (GF := GF) lo).morph ξ ξ' $$ [Hd Hk] with ⟨Hd, #Hk⟩
+    imod (instCtxMorphVisFloor (GF := GF) lo).morph ξ ξ' $$ [Hd Hk] with ⟨Hd, #Hk⟩
     · iframe; iexact Hk
     imod (inodeShrGenlo_morph (GF := GF) t k s icfgDev inum g lo).morph ξ ξ' $$ [Hd Hs]
       with ⟨Hd, Hs⟩
@@ -342,14 +364,15 @@ instance inodeShrHeldGen_morph [Icfg] (t : KTier) (v : BitVec 64) (s : Qp) (g : 
     isplitr; · ipureintro; exact hk
     isplitr; · ipureintro; exact hb
     isplitr; · ipureintro; exact Nat.le_refl lo
-    iapply (show lkFloor (GF := GF) ξ' lo ⊢ (letI : CurCtx := ⟨ξ', t⟩; credFloor lo lo) from
-      letI : CurCtx := ⟨ξ', t⟩; credFloor_of_lk lo)
+    iapply (show visFloor (GF := GF) ξ' lo ⊢ (letI : CurCtx := ⟨ξ', t⟩; credFloor lo lo) from
+      letI : CurCtx := ⟨ξ', t⟩; credFloor_of_vis lo)
     iexact Hk
 
 instance inodeShr_morph [Icfg] (t : KTier) (k : Nat) (s : Qp) (dev inum : BitVec 32) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; inodeShr (GF := GF) k s dev inum) :=
   @instCtxMorphSep hlc GF _ _ _ (inodeIdent_morph t k (.own s) dev inum)
-    (@instCtxMorphSep hlc GF _ _ _ (liveFracc_morph t k s) (instCtxMorphConst _))
+    (@instCtxMorphSep hlc GF _ _ _ (liveFracc_morph t k s)
+      (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (icRefStamps_morph t k dev inum s)))
 
 instance inodeRef_morph [Icfg] (t : KTier) (k : Nat) (q : Qp) (dev inum : BitVec 32) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; inodeRef (GF := GF) k q dev inum) :=
@@ -357,14 +380,14 @@ instance inodeRef_morph [Icfg] (t : KTier) (k : Nat) (q : Qp) (dev inum : BitVec
     (@instCtxMorphSep hlc GF _ _ _ (liveFracc_morph t k q)
       (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
         (@instCtxMorphSep hlc GF _ _ _ (inodeIdent_morph t k (.own q) dev inum)
-          (instCtxMorphConst _))))
+          (icRefStamps_morph t k dev inum 1))))
 
 instance inodeRefShort_morph [Icfg] (t : KTier) (k : Nat) (qt qi : Qp) (dev inum : BitVec 32) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; inodeRefShort (GF := GF) k qt qi dev inum) :=
   @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
     (@instCtxMorphSep hlc GF _ _ _ (liveFracc_morph t k qi)
       (@instCtxMorphSep hlc GF _ _ _ (inodeIdent_morph t k (.own qi) dev inum)
-        (instCtxMorphConst _)))
+        (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (icLentStamps_morph t k qt qi dev inum))))
 
 instance inodeRefp_morph [Icfg] (t : KTier) (k : Nat) (q : Qp) (dev inum : BitVec 32) :
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; inodeRefp (GF := GF) k q dev inum) :=

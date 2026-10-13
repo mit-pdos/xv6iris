@@ -35,23 +35,27 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 /-- **The accessor of a plain store of `w'` by `cpu`, ordered**: beside the
 histories it names a position `T` of the store order (`topLb T`), and the
-continuation learns that the store's own position `t` passes it. -/
+continuation learns that the store's own position `t` passes it.  (W8
+(f2-ctx): the RESERVED arm -- the `started` publication store -- may carry a
+retime request, `MachCSL.rtIn`: the storer's certificates re-dated to the
+store's own position, which the boot hop carries to the readers, F-B.) -/
 def writeAUT (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) (Ψ : IProp GF) : IProp GF := iprop%
   |={⊤,∅}=>
     ((∃ (Hs : Nat → Hist) (T : Nat), histBytes pa n (fun _ => DFrac.own 1) Hs ∗ topLb T ∗
       ▷ (∀ t : Nat, ⌜T ≤ t⌝ -∗ histBytes pa n (fun _ => DFrac.own 1) (pushed Hs t (hartAgent cpu) w') -∗
           authoredBy t (hartAgent cpu) -∗ topLb t ={∅,⊤}=∗ Ψ)) ∨
-     (∃ (Hs : Nat → Hist) (T : Nat) (cs : RsvComps), histBytes pa n (fun _ => DFrac.own (1 : Qp).half) Hs ∗
-      topLb T ∗ compBytes cs ∗ ⌜rsvStoreOk (hlc := hlc) (GF := GF) cpu pa n w' Hs cs⌝ ∗
+     (∃ (Hs : Nat → Hist) (T : Nat) (cs : RsvComps) (o : Option (List (CPU × Nat))),
+      histBytes pa n (fun _ => DFrac.own (1 : Qp).half) Hs ∗
+      topLb T ∗ compBytes cs ∗ ⌜rsvStoreOk (hlc := hlc) (GF := GF) cpu pa n w' Hs cs⌝ ∗ rtIn cpu o ∗
       ▷ (∀ t : Nat, ⌜T ≤ t⌝ -∗ ⌜0 < t⌝ -∗
           histBytes pa n (fun _ => DFrac.own (1 : Qp).half) (pushed Hs t (hartAgent cpu) w') -∗
-          compBytes cs -∗ authoredBy t (hartAgent cpu) -∗ topLb t ={∅,⊤}=∗ Ψ)))
+          compBytes cs -∗ authoredBy t (hartAgent cpu) -∗ topLb t -∗ rtOut cpu t o ={∅,⊤}=∗ Ψ)))
 
 theorem writeAUT_wand (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) (Ψ Ψ' : IProp GF) :
     writeAUT cpu pa n w' Ψ ⊢ ▷ (Ψ -∗ Ψ') -∗ writeAUT cpu pa n w' Ψ' := by
   unfold writeAUT
   iintro H HW
-  imod H with (⟨%Hs, %T, Hb, #HT, Hcont⟩ | ⟨%Hs, %T, %cs, Hb, #HT, Hc, %hok, Hcont⟩)
+  imod H with (⟨%Hs, %T, Hb, #HT, Hcont⟩ | ⟨%Hs, %T, %cs, %o, Hb, #HT, Hc, %hok, Ho, Hcont⟩)
   · imodintro
     ileft
     iexists Hs, T
@@ -63,13 +67,13 @@ theorem writeAUT_wand (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) (
     iapply HW $$ HΨ
   · imodintro
     iright
-    iexists Hs, T, cs
-    iframe Hb HT Hc
+    iexists Hs, T, cs, o
+    iframe Hb HT Hc Ho
     isplitr
     · ipureintro; exact hok
     inext
-    iintro %t %hT %ht Hb Hc Hau Htop
-    imod Hcont $$ %t %hT %ht Hb Hc Hau Htop with HΨ
+    iintro %t %hT %ht Hb Hc Hau Htop Hout
+    imod Hcont $$ %t %hT %ht Hb Hc Hau Htop Hout with HΨ
     imodintro
     iapply HW $$ HΨ
 
@@ -113,7 +117,7 @@ theorem swp_sail_mem_write_plain_auT (cpu : CPU) {n vasize : Nat}
       isplitl [Hregs Hmem Hmm Hclose]
       · iapply Hclose $$ %σ %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
       · iapply IH $$ Hfrag H
-  · imod H with (⟨%Hs, %T, Hb, #HT, Hcont⟩ | ⟨%Hs, %T, %cs, Hb, #HT, Hc, %hok, Hcont⟩)
+  · imod H with (⟨%Hs, %T, Hb, #HT, Hcont⟩ | ⟨%Hs, %T, %cs, %o, Hb, #HT, Hc, %hok, Ho, Hcont⟩)
     rotate_left
     · -- a RESERVED word (W8 (f2-ctx): `started`)
       obtain ⟨i, k, R, hi, hk', hpres⟩ := hok
@@ -141,6 +145,8 @@ theorem swp_sail_mem_write_plain_auT (cpu : CPU) {n vasize : Nat}
         rw [hv] at hv'
         obtain rfl := Option.some.inj hv'
         icases resvFragAny_cases cpu r $$ Hfrag with ⟨%b, Hfrag⟩
+        imod memModel_rtIssue σ cpu o $$ [Hmm Ho] with ⟨Hmm, Hout⟩
+        · iframe Hmm Ho
         icases memModel_rsvHalf_acc σ hi hk' $$ Hmm with ⟨Hh, Hmmc⟩
         ihave Hb := rsvJoinHalf req.pa n Hs $$ [Hb Hh]
         · iframe
@@ -153,7 +159,7 @@ theorem swp_sail_mem_write_plain_auT (cpu : CPU) {n vasize : Nat}
           (rsvAllOk_store_in w' (σ.top + 1) (hartAgent cpu)
             (MachFixedGS.rsvStatic_wf (hlc := hlc) (GF := GF)).1 hi (List.mem_of_getElem? hk')
             (hpres σ.mem (σ.top + 1) (by omega) hget hcget)) $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag, #Hau, #Htop'⟩
-        imod Hcont $$ %(σ.top + 1) %(by omega) %(by omega) Hb Hc Hau Htop' with HΦ
+        imod Hcont $$ %(σ.top + 1) %(by omega) %(by omega) Hb Hc Hau Htop' Hout with HΦ
         rw [hk]
         imodintro
         isplitl [Hregs Hmem Hmm Hclose]

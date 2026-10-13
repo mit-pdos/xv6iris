@@ -47,6 +47,20 @@ def rsvUartLk (i : Nat) : BitVec 64 := KA.«uarts» + BitVec.ofNat 64 (40 * i + 
 /-- `&disk.vdisk_lock` (+296). -/
 def rsvDiskLk : BitVec 64 := KA.«disk» + 296#64
 
+/-- The address of the string `"pipe"` (`.rodata`, `KStr.«pipe»`), the name
+`pipealloc` passes to `initlock` (`auipc a1,0x3 ; addi a1,a1,-146` at
+`pipealloc+0x48`; the tie to the image is the `pipealloc` proof's own
+computation, `Xv6.pipealloc_br_2fb6 : KA.«pipealloc» + 0x2fb6 = KStr.«pipe»`,
+`0x2fb6 = 0x48 + 0x3000 - 146`): the name of xv6's only dynamic spinlocks,
+the pipe locks (W8 (f2-ctx) [R35.1]/[R36.2]: their lock bytes are hops while
+the name word holds it, `MachCSL.nameLockAt`). -/
+def pipeLockNameStr : BitVec 64 := KStr.«pipe»
+
+/-- The pipe locks' registered name (W8 (f2-ctx) [R35.1]/[R36.2]): a
+footprint-free `.name` registry entry of the static list, so the boot's
+pinning of the list (`MachFixedGS.rsvStatic = KernelRsv.static`) pins it. -/
+def xv6PipeNameR : RsvRegion := ⟨pipeLockNameStr, .name⟩
+
 /-- `started` (`main.c`), the boot handover's ONE-SHOT PUBLICATION word (W8
 (f2-ctx), Q-F2-BOOTGATE (a) as amended by [R35.2]): written once, by hart 0. -/
 def xv6StartedR : RsvRegion := ⟨KA.«started», .pub ⟨0, by decide⟩⟩
@@ -73,10 +87,11 @@ def xv6InodeLockRegions : List RsvRegion := (List.range 50).map (fun k => xv6Loc
 
 /-- The locks after `proc`, in address order: `tickslock`, `bcache.lock`, the
 buffers' inner locks, `itable.lock`, the inodes' inner locks, `log.lock`,
-`ftable.lock`, `disk.vdisk_lock`. -/
+`ftable.lock`, `disk.vdisk_lock`; and (W8 (f2-ctx)) the pipe locks' registered
+name, a footprint-free registry entry (`xv6PipeNameR`). -/
 def xv6PostLockRegions : List RsvRegion :=
   [xv6LockR KA.«tickslock», xv6LockR KA.«bcache»] ++ (xv6BufLockRegions ++ ([xv6LockR KA.«itable»] ++
-    (xv6InodeLockRegions ++ [xv6LockR KA.«log», xv6LockR KA.«ftable», xv6LockR rsvDiskLk])))
+    (xv6InodeLockRegions ++ [xv6LockR KA.«log», xv6LockR KA.«ftable», xv6LockR rsvDiskLk, xv6PipeNameR])))
 
 /-- xv6's static reserved regions, in address order. -/
 def xv6RsvStatic : List RsvRegion :=
@@ -93,22 +108,21 @@ theorem xv6RsvStatic_sorted : strictSorted (rsvBytes xv6RsvStatic) = true := by 
 theorem xv6RsvStatic_ramB : (rsvBytes xv6RsvStatic).all (fun a => decide (inRam a 1)) = true := by
   decide +kernel
 
+theorem xv6RsvStatic_bases : (xv6RsvStatic.map (fun R => R.base.toNat)).Nodup := by decide +kernel
+
 theorem xv6RsvStatic_wf : rsvWf xv6RsvStatic :=
-  rsvWf_of_check _ xv6RsvStatic_sorted xv6RsvStatic_ramB
+  rsvWf_of_check _ xv6RsvStatic_sorted xv6RsvStatic_ramB xv6RsvStatic_bases
 
-/-- The address of the string `"pipe"` (`.rodata`), the name `pipealloc`
-passes to `initlock` (`auipc a1,0x3 ; addi a1,a1,222` at `pipealloc+0x48`):
-the name of xv6's only dynamic spinlocks, the pipe locks (W8 (f2-ctx)
-[R35.1]: their lock bytes are hops while the name word holds it,
-`MachCSL.nameLockAt`). -/
-def pipeLockNameStr : BitVec 64 := KA.«pipealloc» + 0x48#64 + 0x3000#64 + 222#64
 
-/-- xv6's static reserved regions, as the machine's class (and its dynamic
-spinlocks' name). -/
+
+/-- xv6's static reserved regions, as the machine's class (with its dynamic
+spinlocks' registered name). -/
 instance : KernelRsv where
   static := xv6RsvStatic
   wf := xv6RsvStatic_wf
-  names := [pipeLockNameStr]
+
+/-- xv6's ONLY registered dynamic-lock name is `"pipe"`'s (W8 (f2-ctx)). -/
+theorem xv6RsvNames : rsvNameList xv6RsvStatic = [pipeLockNameStr] := by decide +kernel
 
 /-- Hart `h`'s cells are registered, at index `h + 8`. -/
 theorem xv6RsvStatic_cpu (h : CPU) : xv6RsvStatic[rsvCpuIdx h]? = some ⟨cpuAddr h, .cpu h⟩ := by
@@ -186,7 +200,11 @@ instance (lk : BitVec 64) : Decidable (rsvLockAt lk) := by unfold rsvLockAt; inf
 /-- Every registered LOCK region lies below the linker's `end` (in the image's
 `.data`/`.bss`), so no kalloc page carries a reserved lock. -/
 def rsvLocksLow (rs : List RsvRegion) : Bool :=
-  rs.all (fun R => match R.kind with | .lock _ => R.base.ult KA.«end» | .cpu _ => true | .pub _ => true)
+  rs.all (fun R => match R.kind with
+    | .lock _ => R.base.ult KA.«end»
+    | .cpu _ => true
+    | .pub _ => true
+    | .name => true)
 
 theorem xv6RsvStatic_locksLow : rsvLocksLow xv6RsvStatic = true := by decide +kernel
 

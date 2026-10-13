@@ -37,13 +37,13 @@ set_option maxHeartbeats 4000000 in
 /-- (g) AND THE ROWS BACK (Rocq 2930--2986); see the header. -/
 theorem iput_lk_a_take (c : CPU) (kk : Nat) (q : Qp) (inum : BitVec 32) (dn : Dinode)
     (bm : Blkmap) (g1 : GName) (Mt : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × BitVec 32))
-    (tid : Nat) (qp : Qp) (td T0 Kw : Nat) (hTKw : T0 ≤ Kw)
+    (tid : Nat) (qp : Qp) (td T0 Kw : Nat) (a : ChainVG) (hTKw : T0 ≤ Kw)
     (hMwf : icMWf Mt) (hciwf : icCiWf Mt ci icfgNib icfgDev)
     (hMk : PartialMap.get? Mt kk = some (q, PosNat.one))
     (hcik : PartialMap.get? ci kk = some (icfgDev, inum)) :
     icEscrow (GF := GF) fscIc fscFs fscIreg fscCov fscLogst kk ∗ ownCtx c curCtx ∗
     ctxFloor curCtx Kw ∗
-    icRegd kk ⟨td, true, some (icfgDev, inum), some (.icLoaded g1 dn bm, T0)⟩ ∗ topLb td ∗
+    icRegd kk ⟨td, true, some (icfgDev, inum), some (.icLoaded g1 dn bm, T0), a⟩ ∗ topLb td ∗ vgFloors curCtx a ∗
     icCnt kk 1 ∗ icSlp fscIc kk curCtx ∗
     irefFrag kk q ∗ frzsel kk (1 : Qp).half.half true ∗ txPin icfgLog tid qp ∗
     icId fscIc kk Qp.quarter true icfgDev inum ∗ hpnH kk (some (tid, qp)) ∗
@@ -60,18 +60,18 @@ theorem iput_lk_a_take (c : CPU) (kk : Nat) (q : Qp) (inum : BitVec 32) (dn : Di
     |={⊤}=> ownCtx c curCtx ∗ iputRin curCtx ∗ icRest kk (.icLoaded g1 dn bm) curCtx ∗
       icDeposit fscIc kk (.depFrz q icfgDev inum tid qp) ∗ icPinRest kk ∗ txPin icfgLog tid qp ∗
       icHold kk icfgDev inum 1 ∗ icTok fscIc kk ∗ offRows offCfg kk curCtx := by
-  iintro ⟨#Hesc, Hrun, #Hflw, Hreg, #Hllbd, Hc, Hslp, Hfrg, Hsele, Htxh, HgidH, Hhpn, Hhalf,
+  iintro ⟨#Hesc, Hrun, #Hflw, Hreg, #Hllbd, #Hva, Hc, Hslp, Hfrg, Hsele, Htxh, HgidH, Hhpn, Hhalf,
     Hstampsback, Hstk, Hiauth, Hipool, Hpool, Hslots⟩
   unfold icSlp l2Row
-  icases Hslp with ⟨%s0, ⟨Hrp, %hs0, #Hflp⟩, Hictok, Hneu, Hoffr⟩
+  icases Hslp with ⟨%s0, ⟨Hrp, %hs0, #Hflp, #Hvp⟩, Hictok, Hneu, Hoffr⟩
   imod icDepCheckout fscIc kk (.depFrz q icfgDev inum tid qp) $$ Hneu with ⟨Hdep, Hdepa⟩
   ihave Hq2 := icQ2_intro fscIc fscFs fscIreg fscCov fscLogst kk (.depFrz q icfgDev inum tid qp)
     icfgDev inum rfl $$ Hdepa [Hfrg Hsele Htxh] HgidH
   · simp only [icQSide]; iframe Hfrg Hsele Htxh
-  imod icFreeTake c fscIc fscFs fscIreg fscCov fscLogst kk curCtx
-      ⟨td, true, some (icfgDev, inum), some (.icLoaded g1 dn bm, T0)⟩ icfgDev inum
+  imod icFreeTake c fscIc fscFs fscIreg fscCov fscLogst kk
+      ⟨td, true, some (icfgDev, inum), some (.icLoaded g1 dn bm, T0), a⟩ icfgDev inum
       (.icLoaded g1 dn bm) T0 Kw s0 ⊤ CoPset.subseteq_top rfl rfl rfl hTKw hs0
-    $$ Hesc Hrun Hflw Hreg Hc Hq2 [Hrp]
+    $$ Hesc Hrun Hflw Hva Hreg Hc Hq2 [Hrp]
     with ⟨Hrun, Hpintx, Hrest, Hreg, Hc, Hhold⟩
   · unfold icRegp; iexact Hrp
   imod icPinExit kk tid qp $$ Hhpn Hpintx with ⟨Hpinr, Htxp⟩
@@ -82,8 +82,8 @@ theorem iput_lk_a_take (c : CPU) (kk : Nat) (q : Qp) (inum : BitVec 32) (dn : Di
     isplitl [Hreg Hc]
     · iexists td
       iframe Hllbd
-      iexists ⟨td, false, some (icfgDev, inum), none⟩
-      iframe Hreg Hllbd Hc
+      iexists ⟨td, false, some (icfgDev, inum), none, a⟩
+      iframe Hreg Hllbd Hc Hva
       ipureintro; exact ⟨rfl, rfl, rfl, Nat.le_refl _⟩
     unfold itableSlotLiveLlb
     iexact Hstk
@@ -286,7 +286,7 @@ theorem iput_lk_a (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_NB)
     (kk : Nat) (q : Qp) (inum : BitVec 32) (dn : Dinode) (bm : Blkmap) (g1 g2 : GName)
     (Mt : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × BitVec 32))
     (n : Nat) (Sb : List Nat) (crb cru crz : Bool) (e0 : Nat) (tid : Nat) (qtx : Qp)
-    (pidv : BitVec 32) (dqp dqb dqs : DFrac) (rgb bfl : Bool) (td T0 Kw : Nat) (R : RegMap)
+    (pidv : BitVec 32) (dqp dqb dqs : DFrac) (rgb bfl : Bool) (td T0 Kw : Nat) (a : ChainVG) (R : RegMap)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : iputSlots ≤ k.avail)
     (hwf : k.wf) (hnoff : k.noff = 0) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt) (hkk : kk < NINODE) (hn : iputUnits ≤ n)
@@ -315,7 +315,7 @@ theorem iput_lk_a (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_NB)
       itableSlotResLlb curCtx M' ci' kk -∗
       [∗list] j ∈ List.range NINODE, itableSlotResLlb curCtx M' ci' j) ∗
     (∃ tst : Nat, istmpAuth kk (1 : Qp).half tst ∗ topLb tst) ∗
-    icRegd kk ⟨td, true, some (icfgDev, inum), some (.icLoaded g1 dn bm, T0)⟩ ∗ topLb td ∗
+    icRegd kk ⟨td, true, some (icfgDev, inum), some (.icLoaded g1 dn bm, T0), a⟩ ∗ topLb td ∗ vgFloors curCtx a ∗
     ctxFloor curCtx Kw ∗ icCnt kk 1 ∗
     wordPointsTo (iValid (ientry kk)) 4 (DFrac.own 1) (validWord true) ∗
     inodeIdent kk (DFrac.own (1 : Qp).half) icfgDev inum ∗
@@ -344,7 +344,7 @@ theorem iput_lk_a (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_NB)
   have hlk : "itable" ∉ k.locks := by simp [hlocks]
   have hsie : (k.pushOffAt k.spie k.spp).sie = false := rfl
   iintro ⟨Hk, Hpc, #Henv, Hlocked, Harm, Hte, Hce, Hhalf, Hstampsback, Hstk, Hreg, #Hllbd,
-    #Hflw, Hc, Hvld, Hid, Hnl, Hsele, Hiauth, Hipool, Hpool, Hslots, Hfrg, Hrslh, Hrident, HgidH,
+    #Hva, #Hflw, Hc, Hvld, Hid, Hnl, Hsele, Hiauth, Hipool, Hpool, Hslots, Hfrg, Hrslh, Hrident, HgidH,
     Hlg, -, -, Hpre, Hru, Hnlz, #Hcrd, Hop, Hhpn, Htxh, Hpid, Hsb, Hsi, Hbsl, Hframe, Hpost⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases iput_lk_env_parts Γ γl pd pav pu γil γisl kk $$ Henv with ⟨#Hit, #Hinv, #Hesc, #Hireg⟩
@@ -388,12 +388,12 @@ theorem iput_lk_a (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_NB)
   -- (g): OUT_L1 -> OUT_L2, the rows back, the table in its release form
   icases kctx_token_acc c2 _ $$ Hk with ⟨Hrun, Hkback⟩
   iapply wpLoop_fupd
-  imod iput_lk_a_take c2 kk q inum dn bm g1 Mt ci tid qtx.half.half td T0 Kw hTKw hMwf hciwf hMk hcik
+  imod iput_lk_a_take c2 kk q inum dn bm g1 Mt ci tid qtx.half.half td T0 Kw a hTKw hMwf hciwf hMk hcik
       $$ [Hrun Hreg Hc Hslp Hfrg Hsele Htxh HgidH Hhpn Hhalf Hstampsback Hstk Hiauth Hipool Hpool
         Hslots]
     with ⟨Hrun, HRin, Hrest, Hdep, Hpinr, Htxp, Hhold, Hictok, Hoffr⟩
   · iframe Hstk
-    iframe Hesc Hrun Hflw Hreg Hllbd Hc Hslp Hfrg Hsele Htxh HgidH Hhpn Hhalf Hstampsback
+    iframe Hesc Hrun Hflw Hreg Hllbd Hva Hc Hslp Hfrg Hsele Htxh HgidH Hhpn Hhalf Hstampsback
       Hiauth Hipool Hpool Hslots
   ihave Hk := Hkback $$ Hrun
   imodintro

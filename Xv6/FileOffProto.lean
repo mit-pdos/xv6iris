@@ -53,11 +53,11 @@ store-order receipt (what the reader presents at its ilock acquire). -/
 theorem protoReadLlb (k : Nat) (q : Qp) (γb : BoxNames) (γo : GName) (C : FContent) :
     offFd (GF := GF) k q γb γo C ⊢ ∃ m : StampMap Nat, offFdAt k q γb γo C m ∗ topLb (maxStamp m) := by
   unfold offFd offFdAt offRefStamps
-  iintro ⟨%i, %T0, %hip, %hi, #Hbox, #Hmem, Hd, Hc, ⟨%m, %hq, Href⟩⟩
+  iintro ⟨%i, %T0, %a, %hip, %hi, #Hbox, #Hmem, Hd, Hc, ⟨%m, %hq, Href⟩⟩
   icases reference_topLb γb k m $$ Href with ⟨Href, #Hllb⟩
   iexists m
   isplitl [Hd Hc Href]
-  · iexists i, T0
+  · iexists i, T0, a
     iframe Hbox Hmem Hd Hc Href
     isplitr
     · ipureintro; exact hip
@@ -70,24 +70,24 @@ theorem protoReadLlb (k : Nat) (q : Qp) (γb : BoxNames) (γo : GName) (C : FCon
 of the inode's rows (its floor is `Kp`), the cell checked out at the
 reader's floor `Kt ≥ max_stamp m` (the ilock acquire's). -/
 theorem protoReadCheckout (cpu : CPU) (E : CoPset) (i k : Nat) (q : Qp) (γb : BoxNames)
-    (γo : GName) (C : FContent) (m : StampMap Nat) (Kt : Nat) (ξ : CtxId)
+    (γo : GName) (C : FContent) (m : StampMap Nat) (Kt : Nat)
     (hE : ↑(ndot offBoxN k) ⊆ E) (hip : C.ip = ientry i) (hi : i < NINODE)
     (hKt : maxStamp m ≤ Kt) :
-    ownCtx cpu ξ ∗ ctxFloor ξ Kt ∗ offFdAt (GF := GF) k q γb γo C m ∗ offRows offCfg i ξ ⊢
-      |={E}=> (ownCtx cpu ξ ∗ offResident ξ γo k ∗ offBox k γb γo ∗ offMember offCfg i γb ∗
-        ∃ T0 : Nat, l2Hold γb k m ∗
-          (γb.slotd ↪VAR{.own q.half} (⟨T0, false, k, none⟩ : SlotReg Nat Unit)) ∗
+    ownCtx cpu curCtx ∗ ctxFloor curCtx Kt ∗ offFdAt (GF := GF) k q γb γo C m ∗ offRows offCfg i curCtx ⊢
+      |={E}=> (ownCtx cpu curCtx ∗ offResident curCtx γo k ∗ offBox k γb γo ∗ offMember offCfg i γb ∗
+        ∃ (T0 : Nat) (a : ChainVG), l2Hold γb k m ∗
+          (γb.slotd ↪VAR{.own q.half} (⟨T0, false, k, none, a⟩ : SlotReg Nat Unit)) ∗
           (γb.cnt ↪VAR{.own q.half} (1 : Nat)) ∗
           ∃ T : Nat, offRowsDepBut offCfg i γb T) := by
   unfold offFdAt
-  iintro ⟨Hctx, #Hflt, ⟨%i', %T0, %hip', %hi', #Hbox, #Hmem, Hd, Hc, %hq, Href⟩, Hrows⟩
+  iintro ⟨Hctx, #Hflt, ⟨%i', %T0, %a, %hip', %hi', #Hbox, #Hmem, Hd, Hc, %hq, Href⟩, Hrows⟩
   have e : i' = i := ientry_inj i' i (Nat.le_of_lt hi') (Nat.le_of_lt hi) (hip'.symm.trans hip)
   subst e
-  icases offRows_take_dep offCfg i' γb ξ $$ [Hmem Hrows] with ⟨⟨%s, Hrow⟩, Hback⟩
+  icases offRows_take_dep offCfg i' γb curCtx $$ [Hmem Hrows] with ⟨⟨%s, Hrow⟩, Hback⟩
   · iframe Hrows; iexact Hmem
   unfold offL2Row l2Row
-  icases Hrow with ⟨⟨Hrp, %hh, #Hflp⟩, -⟩
-  imod offReadCheckout cpu offCfg i' k γb γo ξ m Kt s.tp E hE hKt
+  icases Hrow with ⟨⟨Hrp, %hh, #Hflp, #Hvg⟩, -⟩
+  imod offReadCheckout cpu offCfg i' k γb γo curCtx m Kt s.tp E hE hKt
     $$ [Hctx Href Hrp] with ⟨Hctx, Hres, Hhold⟩
   · iframe Hbox Hctx Href Hmem
     isplit
@@ -96,35 +96,35 @@ theorem protoReadCheckout (cpu : CPU) (E : CoPset) (i k : Nat) (q : Qp) (γb : B
     · iexact Hflp
     iexists s
     unfold offRegp
-    iframe Hrp
+    iframe Hrp Hvg
     isplit
     · ipureintro; exact hh
     · ipureintro; exact Nat.le_refl _
   imodintro
   iframe Hctx Hres Hbox Hmem
-  iexists T0
+  iexists T0, a
   iframe Hhold Hd Hc Hback
 
 /-- Rocq `proto_read_park`: after the read, the cell parks back and the
 share is re-formed at the fresh stamp; the row goes back into the set. -/
 theorem protoReadPark (cpu : CPU) (E : CoPset) (i k : Nat) (q : Qp) (γb : BoxNames) (γo : GName)
-    (C : FContent) (m : StampMap Nat) (T0 Tr : Nat) (ξ : CtxId)
+    (C : FContent) (m : StampMap Nat) (T0 : Nat) (a : ChainVG) (Tr : Nat)
     (hE : ↑(ndot offBoxN k) ⊆ E) (hip : C.ip = ientry i) (hi : i < NINODE)
     (hq : MachCSL.qsum m = q.val) :
-    ownCtx cpu ξ ∗ offResident ξ γo k ∗ l2Hold γb k m ∗
-      (γb.slotd ↪VAR{.own q.half} (⟨T0, false, k, none⟩ : SlotReg Nat Unit)) ∗
+    ownCtx cpu curCtx ∗ offResident curCtx γo k ∗ l2Hold γb k m ∗
+      (γb.slotd ↪VAR{.own q.half} (⟨T0, false, k, none, a⟩ : SlotReg Nat Unit)) ∗
       (γb.cnt ↪VAR{.own q.half} (1 : Nat)) ∗
       offBox (GF := GF) k γb γo ∗ offMember offCfg i γb ∗ offRowsDepBut offCfg i γb Tr ⊢
-      |={E}=> (ownCtx cpu ξ ∗ offFd k q γb γo C ∗ ∃ T' : Nat, offRowsDep offCfg i T') := by
+      |={E}=> (ownCtx cpu curCtx ∗ offFd k q γb γo C ∗ ∃ T' : Nat, offRowsDep offCfg i T') := by
   iintro ⟨Hctx, Hres, Hhold, Hd, Hc, #Hbox, #Hmem, Hrest⟩
-  imod offReadPark cpu k γb γo ξ m E hE $$ [Hbox Hctx Hres Hhold]
-    with ⟨Hctx, ⟨%T', %q', %hq', Hrp, Href, #Hllb⟩⟩
+  imod offReadPark cpu k γb γo curCtx m E hE $$ [Hbox Hctx Hres Hhold]
+    with ⟨Hctx, ⟨%T', %q', %a', %hq', Hrp, Href, #Hllb, #Hvg⟩⟩
   · iframe Hbox Hctx Hres Hhold
   imodintro
   iframe Hctx
   isplitl [Hd Hc Href]
   · unfold offFd offRefStamps
-    iexists i, T0
+    iexists i, T0, a
     iframe Hbox Hmem Hd Hc
     isplitr
     · ipureintro; exact hip
@@ -135,9 +135,8 @@ theorem protoReadPark (cpu : CPU) (E : CoPset) (i k : Nat) (q : Qp) (γb : BoxNa
     ipureintro
     rw [qsum_singleton, hq', hq]
   · iexists (max Tr T')
-    iapply offRowsDep_insert offCfg i γb Tr (⟨T', none⟩ : L2Reg Nat) rfl
-    iframe Hrest Hrp
-    iexact Hllb
+    iapply offRowsDep_insert offCfg i γb Tr (⟨T', none, a', ∅, a'⟩ : L2Reg Nat) curCtx rfl
+    iframe Hrest Hrp Hllb Hvg
 
 end Proto
 

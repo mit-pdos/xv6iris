@@ -117,13 +117,13 @@ theorem ig_hit_au (c : CPU) (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 3
   icases itableSlotRes_acc_upd_llb curCtx M ci j hj $$ Hrows with ⟨Hrow, Hrback⟩
   rw [itableSlotRes_some curCtx M ci j qj nj hMj, hcij]
   unfold icSlotRowFl icSlotRow itableSlotLive
-  icases Hrow with ⟨⟨%tb, ⟨%r, Hrd, %hw, %hx, %hid, #Hllbr, %hle, Hc⟩, #Hllbb, #Hflb⟩,
+  icases Hrow with ⟨⟨%tb, ⟨%r, Hrd, %hw, %hx, %hid, #Hllbr, %hle, Hc, #Hvd⟩, #Hllbb, #Hflb⟩,
     ⟨%tst, Hst, #Hllbt, #Hflt⟩⟩
   -- (c): the box mints the new reference's stamps
   obtain ⟨c0, hc0⟩ : ∃ c0, nj.val = c0 + 1 := ⟨nj.val - 1, by have := nj.pos; omega⟩
   ihave Hc := (show icCnt (GF := GF) j nj.val ⊢ icCnt j (c0 + 1) by rw [hc0]) $$ Hc
   imod icHitIncr fscIc fscFs fscIreg fscCov fscLogst j r c0 icfgDev inum ⊤ CoPset.subseteq_top hw hid
-    $$ Hesc Hrd Hc with ⟨Hrd, Hc, Hstamps⟩
+    $$ Hesc Hrd Hc Hvd with ⟨Hrd, Hc, Hstamps⟩
   -- the identity share: the reference takes half the retained rest
   have hsplit := (inodeIdent_split (GF := GF) j qj'.half qj'.half icfgDev inum).1
   rw [Qp.half_add_half] at hsplit
@@ -180,7 +180,7 @@ theorem ig_hit_au (c : CPU) (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 3
     · iexists tb
       iframe Hllbb
       iexists r
-      iframe Hrd Hllbr Hc
+      iframe Hrd Hllbr Hc Hvd
       ipureintro; exact ⟨hw, hx, hid, hle⟩
     · iexists tstn
       iframe Hstn Hllbn

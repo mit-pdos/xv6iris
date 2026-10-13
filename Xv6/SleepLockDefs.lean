@@ -240,10 +240,10 @@ theorem slBody_hook [CurCtx] (γ : GName) (slk : BitVec 64) (R Rin : CtxId → I
     (H : Qp → IProp GF) :
     lockCtxHook (GF := GF) R Rin ⊢ lockCtxHook (slBody γ slk R H) (slBody γ slk Rin H) := by
   unfold lockCtxHook
-  iintro Hhook %ξ %T Hst Hbody
+  iintro Hhook %ξ %T %V %g Hst Hbody
   unfold slBody
   icases Hbody with ⟨%v, %vln, %vn, H1, H2, H3, ⟨%hv, Hfree, HR⟩ | Hheld⟩
-  · ihave Hres := Hhook $$ %ξ %T Hst HR
+  · ihave Hres := Hhook $$ %ξ %T %V %g Hst HR
     imod Hres with ⟨%T', Hst, HR⟩
     imodintro
     iexists T'
@@ -372,10 +372,10 @@ authority. -/
 theorem slFresh_newGenl [CurCtx] (cpu : CPU) (E : CoPset) (slk name : BitVec 64)
     (R : CtxId → IProp GF) [CtxMorph R] (H : Qp → IProp GF) :
     sleepLockInited slk name ∗ kmapId (slLk slk) ∗ kmapId (slLk slk + 16#64) ∗
-      ownCtx cpu curCtx ∗ R curCtx ⊢
+      ownCtx cpu curCtx ∗ R curCtx ∗ lkNameFor (slLk slk) ∗ gateFloor curCtx ⊢
       |={E}=> (ownCtx cpu curCtx ∗ ∃ γl γ : GName, isSleeplockGen (GF := GF) γl γ slk R H) := by
   unfold sleepLockInited lockInited
-  iintro ⟨⟨Hw, ⟨Hnm, Hfresh⟩, Hn, Hpid⟩, #Hcl, #Hcl', Hrun, HR⟩
+  iintro ⟨⟨Hw, ⟨Hnm, Hfresh⟩, Hn, Hpid⟩, #Hcl, #Hcl', Hrun, HR, Hnf, #Hg⟩
   imod slh_ghost_alloc (GF := GF) with ⟨%γ, Ha, Ht⟩
   ihave Hpid := (show wordPointsTo (GF := GF) (slk + 40#64) 4 (DFrac.own 1) 0#32 ⊢
       wordPointsTo (slPid slk) 4 (DFrac.own 1) 0#32 from by unfold slPid; iintro H; iexact H) $$ Hpid
@@ -392,8 +392,8 @@ theorem slFresh_newGenl [CurCtx] (cpu : CPU) (E : CoPset) (slk name : BitVec 64)
   ihave Hfresh := (show lkFresh (GF := GF) (slk + 8#64) ⊢ lkFresh (slLk slk) from by
     unfold slLk; iintro H; iexact H) $$ Hfresh
   imod newlock_of_fresh cpu (slLk slk) "sleep lock" (slBody γ slk R H) E
-    $$ [Hrun Hbody Hfresh] with ⟨Hrun, ⟨%γl, #Hlk⟩⟩
-  · iframe Hrun Hbody Hfresh
+    $$ [Hrun Hbody Hfresh Hnf] with ⟨Hrun, ⟨%γl, #Hlk⟩⟩
+  · iframe Hrun Hbody Hfresh Hnf Hg
     isplit
     · iexact Hcl
     · iexact Hcl'

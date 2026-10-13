@@ -57,8 +57,10 @@ Rocq `CtxBox.is_box`/`cnt_half`/`slotd_half`/`slotp_half`/`reference`/
 `l2_row`/`l2_hold`/`qsum`/`max_stamp`/`mscale` → `MachCSL.isBox`/`cntHalf`/
 `slotdHalf`/`slotpHalf`/`reference`/`l2Row`/`l2Hold`/`qsum`/`maxStamp`/
 `mscale`; the section parameters `(off_hdr γo) off_rest (λ _, emp) emp` →
-the bundle `Xv6.offPay γo`; `SlotReg T b i x` → `⟨T, b, i, x⟩ : SlotReg Nat
-Unit`, `L2Reg T h` → `⟨T, h⟩ : L2Reg Nat`; `{[(k, T) := 1%Qp]}` →
+the bundle `Xv6.offPay γo`; `SlotReg T b i x` → `⟨T, b, i, x, a⟩ : SlotReg Nat
+Unit`, `L2Reg T h` → `⟨T, h, vp, ht, vh⟩ : L2Reg Nat` (W8 (f2-ctx): the chain
+bounds and tickets; the dep forms `offRowsDepAt` keep each row's bound's
+floors, so they are context-indexed, with ambient `offRowsDep`); `{[(k, T) := 1%Qp]}` →
 `MachCSL.unitStamp k T`; `llb loglen_name T` → `MachCSL.topLb T` (as in
 CtxBox.lean); `own_context ξ` under a `CpuId` section → `ownCtx cpu ξ` with
 an explicit `cpu`; `ctx_floor` → `ctxFloor`; `Qp_to_Qc μ` → `μ.val` (a
@@ -351,11 +353,12 @@ and the ROW is assembled afterwards from the floor the caller re-mints at its
 releasesleep (`ctxFloor` is persistent, so the wand is pure assembly --
 which is what lets `offPublishPark` hand the set back behind a `ctxFloor ξ
 T'` wand rather than an update).  Rocq `off_rows_insert_row`. -/
-theorem offRows_insert_row (on : OffNames) (i : Nat) (γ : BoxNames) (T' : Nat) (ξ : CtxId) :
-    offRows (GF := GF) on i ξ ∗ slotpHalf γ (⟨T', none⟩ : L2Reg Nat) ∗ topLb T' ⊢
-      |==> ((ctxFloor ξ T' -∗ offRows on i ξ) ∗ offMember on i γ) := by
+theorem offRows_insert_row (on : OffNames) (i : Nat) (γ : BoxNames) (s' : L2Reg Nat) (ξ : CtxId)
+    (hs : s'.hold = none) :
+    offRows (GF := GF) on i ξ ∗ slotpHalf γ s' ∗ topLb s'.tp ∗ vgFloors ξ s'.vp ⊢
+      |==> ((ctxFloor ξ s'.tp -∗ offRows on i ξ) ∗ offMember on i γ) := by
   unfold offRows
-  iintro ⟨⟨%L, Hauth, Hset⟩, Hp, #Hllb⟩
+  iintro ⟨⟨%L, Hauth, Hset⟩, Hp, #Hllb, #Hvg⟩
   imod offSetAuth_insert on i L γ $$ Hauth with ⟨Hauth, #Hmem⟩
   imodintro
   iframe Hmem
@@ -368,12 +371,11 @@ theorem offRows_insert_row (on : OffNames) (i : Nat) (γ : BoxNames) (T' : Nat) 
   · iapply (BigSepS.bigSepS_union (LawfulSet.disjoint_singleton_left.2 hin)).2
     iframe Hset
     iapply BigSepS.bigSepS_singleton.2
-    iexists (⟨T', none⟩ : L2Reg Nat)
+    iexists s'
     unfold offL2Row
     isplitl [Hp]
-    · iapply l2Row_fold γ T' ξ
-      iframe Hp
-      iexact Hfl
+    · iapply l2Row_fold γ s' ξ hs
+      iframe Hp Hfl Hvg
     · iexact Hllb
 
 /-! ## What the fd row's FD_INODE arm carries for the off cell
@@ -395,24 +397,35 @@ bound for the combined maximum (reviewer 2's correction 2: the register's
 `tp` cannot be raised, so the fold takes one floor at `T ≥ max` and weakens
 per row by `ctxFloor_le`). -/
 
-/-- Rocq `off_rows_dep`. -/
-def offRowsDep (on : OffNames) (i : Nat) (T : Nat) : IProp GF := iprop%
+/-- Rocq `off_rows_dep` (W8 (f2-ctx): context-indexed -- each row keeps
+its chain bound's floors, which no receipt re-mints). -/
+def offRowsDepAt (on : OffNames) (i : Nat) (T : Nat) (ξ : CtxId) : IProp GF := iprop%
   ∃ L : OffSet, offSetAuth on i L ∗ topLb T ∗
     [∗set] γ ∈ L, ∃ s : L2Reg Nat,
-      offRegp γ s ∗ ⌜s.hold = none⌝ ∗ topLb s.tp ∗ ⌜s.tp ≤ T⌝
+      offRegp γ s ∗ ⌜s.hold = none⌝ ∗ topLb s.tp ∗ ⌜s.tp ≤ T⌝ ∗ vgFloors ξ s.vp
+
+/-- The dep form at the ambient context. -/
+abbrev offRowsDep (on : OffNames) (i : Nat) (T : Nat) : IProp GF := offRowsDepAt on i T curCtx
+
+instance offRowsDepAt_morph (on : OffNames) (i T : Nat) : CtxMorph (GF := GF) (offRowsDepAt on i T) := by
+  unfold offRowsDepAt
+  refine @instCtxMorphExists _ _ _ _ _ (fun L => ?_)
+  have h := ctxMorph_bigSepS (GF := GF) L (fun γ ξ => iprop(∃ s : L2Reg Nat,
+    offRegp γ s ∗ ⌜s.hold = none⌝ ∗ topLb s.tp ∗ ⌜s.tp ≤ T⌝ ∗ vgFloors ξ s.vp)) (fun _ => inferInstance)
+  infer_instance
 
 theorem offRows_fold (on : OffNames) (i : Nat) (T : Nat) (ξ : CtxId) :
-    offRowsDep (GF := GF) on i T ∗ ctxFloor ξ T ⊢ offRows on i ξ := by
-  unfold offRowsDep offRows
+    offRowsDepAt (GF := GF) on i T ξ ∗ ctxFloor ξ T ⊢ offRows on i ξ := by
+  unfold offRowsDepAt offRows
   iintro ⟨⟨%L, Hauth, #HllbT, Hset⟩, #Hfl⟩
   iexists L
   iframe Hauth
   iapply BigSepS.bigSepS_impl $$ Hset
   imodintro
-  iintro %γ %_ ⟨%s, Hp, %hh, #Hls, %hle⟩
+  iintro %γ %_ ⟨%s, Hp, %hh, #Hls, %hle, #Hvg⟩
   iexists s
   unfold offL2Row l2Row offRegp
-  iframe Hp
+  iframe Hp Hvg
   isplitr
   · isplit
     · ipureintro; exact hh
@@ -427,7 +440,7 @@ theorem offRows_bound (L : OffSet) (ξ : CtxId) :
     ([∗set] γ ∈ L, ∃ s : L2Reg Nat, offL2Row (GF := GF) γ s ξ) ⊢
       ∃ T : Nat, topLb T ∗
         [∗set] γ ∈ L, ∃ s : L2Reg Nat,
-          offRegp γ s ∗ ⌜s.hold = none⌝ ∗ topLb s.tp ∗ ⌜s.tp ≤ T⌝ := by
+          offRegp γ s ∗ ⌜s.hold = none⌝ ∗ topLb s.tp ∗ ⌜s.tp ≤ T⌝ ∗ vgFloors ξ s.vp := by
   induction L using FiniteSet.set_ind with
   | hemp =>
     iintro -
@@ -441,7 +454,7 @@ theorem offRows_bound (L : OffSet) (ξ : CtxId) :
     icases (BigSepS.bigSepS_insert hγ).1 $$ H with ⟨⟨%s, Hrow⟩, Hset⟩
     icases ih $$ Hset with ⟨%T, #HT, Hset⟩
     unfold offL2Row l2Row
-    icases Hrow with ⟨⟨Hp, %hh, -⟩, #Hls⟩
+    icases Hrow with ⟨⟨Hp, %hh, -, #Hvg⟩, #Hls⟩
     iexists max s.tp T
     isplit
     · iapply topLb_max
@@ -452,7 +465,7 @@ theorem offRows_bound (L : OffSet) (ξ : CtxId) :
     isplitl [Hp]
     · iexists s
       unfold offRegp
-      iframe Hp
+      iframe Hp Hvg
       isplit
       · ipureintro; exact hh
       isplit
@@ -460,9 +473,9 @@ theorem offRows_bound (L : OffSet) (ξ : CtxId) :
       · ipureintro; omega
     · iapply BigSepS.bigSepS_mono ?_ $$ Hset
       intro γ' _
-      iintro ⟨%s', Hp', %hh', #Hl', %hle'⟩
+      iintro ⟨%s', Hp', %hh', #Hl', %hle', #Hvg'⟩
       iexists s'
-      iframe Hp'
+      iframe Hp' Hvg'
       isplit
       · ipureintro; exact hh'
       isplit
@@ -475,15 +488,19 @@ authority still names the taken box; its row is re-inserted by
 `offRowsDep_insert` at whatever stamp the park gave it -- no floor needed,
 which is the point: after a park the parker has none.  Rocq
 `off_rows_dep_but`. -/
-def offRowsDepBut (on : OffNames) (i : Nat) (γ : BoxNames) (T : Nat) : IProp GF := iprop%
+def offRowsDepButAt (on : OffNames) (i : Nat) (γ : BoxNames) (T : Nat) (ξ : CtxId) : IProp GF := iprop%
   ∃ L : OffSet, ⌜γ ∈ L⌝ ∗ offSetAuth on i L ∗ topLb T ∗
     [∗set] γ' ∈ L \ ({γ} : OffSet), ∃ s : L2Reg Nat,
-      offRegp γ' s ∗ ⌜s.hold = none⌝ ∗ topLb s.tp ∗ ⌜s.tp ≤ T⌝
+      offRegp γ' s ∗ ⌜s.hold = none⌝ ∗ topLb s.tp ∗ ⌜s.tp ≤ T⌝ ∗ vgFloors ξ s.vp
+
+/-- The remainder at the ambient context. -/
+abbrev offRowsDepBut (on : OffNames) (i : Nat) (γ : BoxNames) (T : Nat) : IProp GF :=
+  offRowsDepButAt on i γ T curCtx
 
 theorem offRows_take_dep (on : OffNames) (i : Nat) (γ : BoxNames) (ξ : CtxId) :
     offMember (GF := GF) on i γ ∗ offRows on i ξ ⊢
-      (∃ s : L2Reg Nat, offL2Row γ s ξ) ∗ ∃ T : Nat, offRowsDepBut on i γ T := by
-  unfold offRows offRowsDepBut
+      (∃ s : L2Reg Nat, offL2Row γ s ξ) ∗ ∃ T : Nat, offRowsDepButAt on i γ T ξ := by
+  unfold offRows offRowsDepButAt
   iintro ⟨#Hmem, ⟨%L, Hauth, Hset⟩⟩
   ihave %hγ := offMember_elem on i L γ $$ [Hauth Hmem]
   · iframe Hauth
@@ -498,11 +515,11 @@ theorem offRows_take_dep (on : OffNames) (i : Nat) (γ : BoxNames) (ξ : CtxId) 
   · iexact HT
 
 theorem offRowsDep_insert (on : OffNames) (i : Nat) (γ : BoxNames) (T : Nat) (s' : L2Reg Nat)
-    (hh : s'.hold = none) :
-    offRowsDepBut (GF := GF) on i γ T ∗ offRegp γ s' ∗ topLb s'.tp ⊢
-      offRowsDep on i (max T s'.tp) := by
-  unfold offRowsDepBut offRowsDep
-  iintro ⟨⟨%L, %hγ, Hauth, #HT, Hset⟩, Hrp, #Hls⟩
+    (ξ : CtxId) (hh : s'.hold = none) :
+    offRowsDepButAt (GF := GF) on i γ T ξ ∗ offRegp γ s' ∗ topLb s'.tp ∗ vgFloors ξ s'.vp ⊢
+      offRowsDepAt on i (max T s'.tp) ξ := by
+  unfold offRowsDepButAt offRowsDepAt
+  iintro ⟨⟨%L, %hγ, Hauth, #HT, Hset⟩, Hrp, #Hls, #Hvs⟩
   iexists L
   iframe Hauth
   isplit
@@ -513,7 +530,7 @@ theorem offRowsDep_insert (on : OffNames) (i : Nat) (γ : BoxNames) (T : Nat) (s
   iapply (BigSepS.bigSepS_delete hγ).2
   isplitl [Hrp]
   · iexists s'
-    iframe Hrp
+    iframe Hrp Hvs
     isplit
     · ipureintro; exact hh
     isplit
@@ -521,9 +538,9 @@ theorem offRowsDep_insert (on : OffNames) (i : Nat) (γ : BoxNames) (T : Nat) (s
     · ipureintro; omega
   · iapply BigSepS.bigSepS_mono ?_ $$ Hset
     intro γ' _
-    iintro ⟨%s, Hp, %hh', #Hl, %hle⟩
+    iintro ⟨%s, Hp, %hh', #Hl, %hle, #Hv⟩
     iexists s
-    iframe Hp
+    iframe Hp Hv
     isplit
     · ipureintro; exact hh'
     isplit
@@ -531,8 +548,8 @@ theorem offRowsDep_insert (on : OffNames) (i : Nat) (γ : BoxNames) (T : Nat) (s
     · ipureintro; omega
 
 theorem offRows_to_dep (on : OffNames) (i : Nat) (ξ : CtxId) :
-    offRows (GF := GF) on i ξ ⊢ ∃ T : Nat, offRowsDep on i T := by
-  unfold offRows offRowsDep
+    offRows (GF := GF) on i ξ ⊢ ∃ T : Nat, offRowsDepAt on i T ξ := by
+  unfold offRows offRowsDepAt
   iintro ⟨%L, Hauth, Hset⟩
   icases offRows_bound L ξ $$ Hset with ⟨%T, #HT, Hset⟩
   iexists T, L
@@ -621,20 +638,21 @@ itself with `ctxFloor_0`, so what comes out is the next link's premise (item
 31 (a)).  Rocq `off_publish_park`. -/
 theorem offPublishPark (cpu : CPU) (on : OffNames) (i k : Nat) (γ : BoxNames) (γo : GName)
     (ξ : CtxId) (E : CoPset) (hE : ↑(ndot offBoxN k) ⊆ E) :
-    stampsAuth (GF := GF) γ (∅ : StampMap Nat) ∗ (γ.cnt ↪VAR (0 : Nat)) ∗
-      (γ.slotd ↪VAR (default : SlotReg Nat Unit)) ∗ (γ.slotp ↪VAR (default : L2Reg Nat)) ∗
+    stampsAuth (GF := GF) γ (∅ : StampMap Nat) ∗ stampsAuth γ.tk (∅ : StampMap Nat) ∗
+      (γ.cnt ↪VAR (0 : Nat)) ∗
+      (γ.slotd ↪VAR (default : SlotReg Nat Unit)) ∗ (γ.slotp ↪VAR (L2Reg.init : L2Reg Nat)) ∗
       ownCtx cpu ξ ∗ offResident ξ γo k ∗ offRows on i ξ ⊢
       |={E}=> (ownCtx cpu ξ ∗ offBox k γ γo ∗
-        ∃ T0 T : Nat,
-          offRegd γ (⟨T0, false, k, none⟩ : SlotReg Nat Unit) ∗ topLb T0 ∗
+        ∃ (T0 T : Nat) (a : ChainVG),
+          offRegd γ (⟨T0, false, k, none, a⟩ : SlotReg Nat Unit) ∗ topLb T0 ∗
           offCnt γ 1 ∗
-          reference γ k (unitStamp k T) ∗
+          referenceAt γ k (unitStamp k T) ξ ∗
           offMember on i γ ∗
           offRows on i ξ) := by
-  iintro ⟨Hst, Hc, Hd, Hp, Hrun, Hcell, Hrows⟩
-  imod boxAllocAt (offPay γo) (ndot offBoxN k) γ cpu ξ k E $$ [Hst Hc Hd Hp Hrun Hcell]
-    with ⟨Hrun, ⟨%Tb, #Hbx, Hrd, #Hllb, Hcnt, Hrp⟩⟩
-  · iframe Hst Hc Hrun
+  iintro ⟨Hst, Htk, Hc, Hd, Hp, Hrun, Hcell, Hrows⟩
+  imod boxAllocAt (offPay γo) (ndot offBoxN k) γ cpu ξ k E $$ [Hst Htk Hc Hd Hp Hrun Hcell]
+    with ⟨Hrun, ⟨%Tb, %a, #Hbx, Hrd, #Hllb, #Hvg, Hcnt, Hrp⟩⟩
+  · iframe Hst Htk Hc Hrun
     isplitl [Hd]
     · iexists (default : SlotReg Nat Unit)
       iexact Hd
@@ -643,23 +661,27 @@ theorem offPublishPark (cpu : CPU) (on : OffNames) (i k : Nat) (γ : BoxNames) (
     · unfold inArm offPay offHdr offRest
       iexists ()
       iframe Hcell
-  imod boxRefIncr (offPay γo) (ndot offBoxN k) γ (⟨Tb, false, k, none⟩ : SlotReg Nat Unit) 0 E hE rfl
-    $$ [Hbx Hrd Hcnt] with ⟨Hrd, Hcnt, ⟨%T, Href⟩⟩
-  · iframe Hbx Hrd Hcnt
-  imod offRows_insert_row on i γ 0 ξ $$ [Hrows Hrp] with ⟨Hfold, #Hmem⟩
+  imod boxRefIncr (offPay γo) (ndot offBoxN k) γ (⟨Tb, false, k, none, a⟩ : SlotReg Nat Unit) 0 ξ E hE rfl
+    $$ [Hbx Hrd Hcnt Hvg] with ⟨Hrd, Hcnt, ⟨%T, Href⟩⟩
+  · iframe Hbx Hrd Hcnt Hvg
+  imod offRows_insert_row on i γ (L2Reg.init : L2Reg Nat) ξ rfl $$ [Hrows Hrp] with ⟨Hfold, #Hmem⟩
   · iframe Hrows Hrp
-    iapply topLbAt_0
+    dsimp only [L2Reg.init]
+    isplit
+    · iapply topLbAt_0
+    · iapply vgFloors_zero
   imodintro
   iframe Hrun
   unfold offBox
   isplitr
   · iexact Hbx
-  iexists Tb, T
+  iexists Tb, T, a
   unfold offRegd offCnt
   iframe Hrd Hcnt Href Hmem
   isplitr
   · iexact Hllb
   iapply Hfold
+  dsimp only [L2Reg.init]
   iapply ctxFloor_0
 
 /-- fileread / filewrite, under ip->lock: select the row by membership, (e),
@@ -670,15 +692,15 @@ theorem offReadCheckout (cpu : CPU) (on : OffNames) (i k : Nat) (γ : BoxNames) 
     (ξ : CtxId) (m : StampMap Nat) (Kt Kp : Nat) (E : CoPset)
     (hE : ↑(ndot offBoxN k) ⊆ E) (hKt : maxStamp m ≤ Kt) :
     offBox (GF := GF) k γ γo ∗ ownCtx cpu ξ ∗ ctxFloor ξ Kt ∗ ctxFloor ξ Kp ∗
-      offMember on i γ ∗ reference γ k m ∗
+      offMember on i γ ∗ referenceAt γ k m ξ ∗
       -- the row, taken from the inode payload's set: its floor is Kp
-      (∃ s : L2Reg Nat, ⌜s.hold = none⌝ ∗ ⌜s.tp ≤ Kp⌝ ∗ offRegp γ s) ⊢
-      |={E}=> (ownCtx cpu ξ ∗ offResident ξ γo k ∗ l2Hold γ k m) := by
+      (∃ s : L2Reg Nat, ⌜s.hold = none⌝ ∗ ⌜s.tp ≤ Kp⌝ ∗ offRegp γ s ∗ vgFloors ξ s.vp) ⊢
+      |={E}=> (ownCtx cpu ξ ∗ offResident ξ γo k ∗ l2HoldAt γ k m ξ) := by
   unfold offBox offRegp
-  iintro ⟨#Hbox, Hrun, #Hflt, #Hflp, -, Href, ⟨%s, %hh, %htp, Hrp⟩⟩
+  iintro ⟨#Hbox, Hrun, #Hflt, #Hflp, -, Href, ⟨%s, %hh, %htp, Hrp, #Hvg⟩⟩
   imod boxCheckout (offPay γo) (ndot offBoxN k) γ cpu ξ k m s Kt Kp E hE hh hKt htp
     $$ [Hbox Hrun Hflt Hflp Href Hrp] with ⟨Hrun, Hin, Hhold⟩
-  · iframe Hbox Hrun Href Hrp
+  · iframe Hbox Hrun Href Hrp Hvg
     isplit
     · iexact Hflt
     isplit
@@ -693,28 +715,26 @@ theorem offReadCheckout (cpu : CPU) (on : OffNames) (i k : Nat) (γ : BoxNames) 
 `off_read_park`. -/
 theorem offReadPark (cpu : CPU) (k : Nat) (γ : BoxNames) (γo : GName) (ξ : CtxId)
     (m : StampMap Nat) (E : CoPset) (hE : ↑(ndot offBoxN k) ⊆ E) :
-    offBox (GF := GF) k γ γo ∗ ownCtx cpu ξ ∗ offResident ξ γo k ∗ l2Hold γ k m ⊢
+    offBox (GF := GF) k γ γo ∗ ownCtx cpu ξ ∗ offResident ξ γo k ∗ l2HoldAt γ k m ξ ⊢
       |={E}=> (ownCtx cpu ξ ∗
-        ∃ (T' : Nat) (q : UFrac),
+        ∃ (T' : Nat) (q : UFrac) (a : ChainVG),
           ⌜q.frac.val = qsum m⌝ ∗
-          offRegp γ (⟨T', none⟩ : L2Reg Nat) ∗
-          reference γ k (PartialMap.singleton (k, T') q : StampMap Nat) ∗
-          topLb T') := by
+          offRegp γ (⟨T', none, a, ∅, a⟩ : L2Reg Nat) ∗
+          referenceAt γ k (PartialMap.singleton (k, T') q : StampMap Nat) ξ ∗
+          topLb T' ∗ vgFloors ξ a) := by
   unfold offBox offRegp
   iintro ⟨#Hbox, Hrun, Hcell, Hhold⟩
   imod boxPark (offPay γo) (ndot offBoxN k) γ cpu ξ k m E hE $$ [Hbox Hrun Hcell Hhold]
-    with ⟨Hrun, -, ⟨%T', %q, %hq, Hrp, Href, #Hllb⟩⟩
+    with ⟨Hrun, -, ⟨%T', %q, %a, %hq, Hrp, Href, #Hllb, #Hvg⟩⟩
   · iframe Hbox Hrun Hhold
     unfold inArm offPay offHdr offRest
     iexists ()
     iframe Hcell
   imodintro
   iframe Hrun
-  iexists T', q
-  iframe Hrp Href
-  isplit
-  · ipureintro; exact hq
-  · iexact Hllb
+  iexists T', q, a
+  iframe Hrp Href Hllb Hvg
+  ipureintro; exact hq
 
 /-! filedup, under ftable.lock: (c).  Rocq's STATEMENT CHANGE (L6
 skeleton→proof): `sr_ident r = k` added -- (c) mints the unit at the
@@ -742,15 +762,15 @@ beside it: refuted by Σ).  What comes out is the free word (deviation 2),
 which the retype to FD_NONE puts in the free row.  Proof:
 `boxWithdrawL1Free` at `Qc := emp`, `Q1 1 = emp`; the hook is
 `offResident_byteMapped`.  Rocq `off_last_close`. -/
-theorem offLastClose (k : Nat) (γ : BoxNames) (γo : GName) (T0 : Nat) (m : StampMap Nat)
+theorem offLastClose (k : Nat) (γ : BoxNames) (γo : GName) (T0 : Nat) {a : ChainVG} (m : StampMap Nat)
     (E : CoPset) (hE : ↑(ndot offBoxN k) ⊆ E) (hq : qsum m = 1) :
-    offBox (GF := GF) k γ γo ∗ offRegd γ (⟨T0, false, k, none⟩ : SlotReg Nat Unit) ∗
+    offBox (GF := GF) k γ γo ∗ offRegd γ (⟨T0, false, k, none, a⟩ : SlotReg Nat Unit) ∗
       offCnt γ 1 ∗ reference γ k m ⊢
       |={E}=> (offCnt γ 1 ∗
         [∗list] j ∈ List.range 4, byteMapped (aFoff k + BitVec.ofNat 64 j)) := by
   have hq1 : qsum m = ((1 : Nat) : Rat) := by rw [hq]; rfl
   have hhook : ∀ (x : Unit) (ξb : CtxId),
-      iprop(emp) ∗ (offPay (GF := GF) γo).hdr (⟨T0, false, k, none⟩ : SlotReg Nat Unit).ident x ξb ⊢
+      iprop(emp) ∗ (offPay (GF := GF) γo).hdr (⟨T0, false, k, none, a⟩ : SlotReg Nat Unit).ident x ξb ⊢
         |={E \ ↑(ndot offBoxN k)}=>
           (iprop([∗list] j ∈ List.range 4, byteMapped (GF := GF) (aFoff k + BitVec.ofNat 64 j)) ∗
             (offPay (GF := GF) γo).q1 1) := by
@@ -761,15 +781,13 @@ theorem offLastClose (k : Nat) (γ : BoxNames) (γo : GName) (T0 : Nat) (m : Sta
     isplitl [Hcell]
     · iapply offResident_byteMapped ξb γo k $$ Hcell
     · dsimp only; iempintro
-  unfold offBox offRegd offCnt reference
-  iintro ⟨#Hbox, Hrd, Hcnt, ⟨%_, %_, HfD, #HllbD⟩⟩
-  imod boxWithdrawL1Free (offPay γo) (ndot offBoxN k) γ (⟨T0, false, k, none⟩ : SlotReg Nat Unit)
-    1 m iprop(emp) iprop([∗list] j ∈ List.range 4, byteMapped (GF := GF) (aFoff k + BitVec.ofNat 64 j))
-    E hE rfl hq1 hhook $$ [Hbox Hrd Hcnt HfD HllbD] with ⟨Hcnt, Hfree, -⟩
-  · iframe Hbox Hrd Hcnt HfD
-    isplit
-    · iexact HllbD
-    · iempintro
+  unfold offBox offRegd offCnt reference referenceAt
+  iintro ⟨#Hbox, Hrd, Hcnt, ⟨%_, %_, HfD, #HllbD, %mt, %hmt, Htk, -⟩⟩
+  imod boxWithdrawL1Free (offPay γo) (ndot offBoxN k) γ (⟨T0, false, k, none, a⟩ : SlotReg Nat Unit)
+    1 m mt iprop(emp) iprop([∗list] j ∈ List.range 4, byteMapped (GF := GF) (aFoff k + BitVec.ofNat 64 j))
+    E hE rfl hq1 (hmt.trans hq1) hhook $$ [Hbox Hrd Hcnt HfD HllbD Htk] with ⟨Hcnt, Hfree, -⟩
+  · iframe Hbox Hrd Hcnt HfD Htk
+    iexact HllbD
   imodintro
   iframe Hcnt Hfree
 

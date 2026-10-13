@@ -42,13 +42,14 @@ import MachCSL.CtxBox
 
 namespace MachCSL
 
-/-- The four gnames of a box, as one lexicographically ordered key. -/
-def BoxNames.key (γ : BoxNames) : Nat × Nat × Nat × Nat := (γ.stm, γ.cnt, γ.slotd, γ.slotp)
+/-- The five gnames of a box (W8 (f2-ctx): with the tickets'), as one
+lexicographically ordered key. -/
+def BoxNames.key (γ : BoxNames) : Nat × Nat × Nat × Nat × Nat := (γ.stm, γ.cnt, γ.slotd, γ.slotp, γ.tkt)
 
 theorem BoxNames.key_inj {a b : BoxNames} (h : a.key = b.key) : a = b := by
   cases a; cases b
   simp only [BoxNames.key, Prod.mk.injEq] at h
-  obtain ⟨rfl, rfl, rfl, rfl⟩ := h
+  obtain ⟨rfl, rfl, rfl, rfl, rfl⟩ := h
   rfl
 
 /-- The order a set of boxes is kept in (Rocq's `box_names_countable`). -/
@@ -58,7 +59,7 @@ instance instTransOrdBoxNames : Std.TransOrd BoxNames :=
   inferInstanceAs (Std.TransCmp (compareOn BoxNames.key))
 
 instance instLawfulEqOrdBoxNames : Std.LawfulEqOrd BoxNames where
-  eq_of_compare h := BoxNames.key_inj (Std.LawfulEqOrd.eq_of_compare (α := Nat × Nat × Nat × Nat) h)
+  eq_of_compare h := BoxNames.key_inj (Std.LawfulEqOrd.eq_of_compare (α := Nat × Nat × Nat × Nat × Nat) h)
 
 end MachCSL
 

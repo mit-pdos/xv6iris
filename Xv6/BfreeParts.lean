@@ -183,7 +183,7 @@ theorem bf_pay_L (γ : BcacheNames) (γfs : FsNames) (V : BioView GF)
     (k : Nat) (dv bno : BitVec 32) (bs bsd : List (BitVec 8)) (d : Bool) :
     bioPay (GF := GF) γ V k dv bno bs bsd d ⊢
       fsChalf γfs bno.toNat bs ∗ (fsChalf γfs bno.toNat bs -∗ bioPay γ V k dv bno bs bsd d) := by
-  unfold bioPay fsChalf
+  unfold bioPay bioPayAt fsChalf
   cases d
   · simp only [Bool.false_eq_true, if_false]
     rw [hcl]

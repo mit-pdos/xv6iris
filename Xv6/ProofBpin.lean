@@ -153,7 +153,7 @@ theorem bpin_proof (AC : ACQUIRE) (RE : RELEASE) : BPIN := ⟨
         wordAtN curCtx (aBufBlockno (bnode kk)) 4 (DFrac.own (1 : Qp).half) bno from by
       rw [wordAtN_cur])
     iexact Hbnoc
-  icases bufSlotRegs_elim (γ.box kk) tl (devs kk) (bnos kk) $$ Hregs with ⟨%r, %⟨hrid, hrtl⟩, Hrd, #Htd⟩
+  icases bufSlotRegs_elim (γ.box kk) tl (devs kk) (bnos kk) curCtx $$ Hregs with ⟨%r, %⟨hrid, hrtl⟩, Hrd, #Htd, #Hvd⟩
   obtain ⟨n, hn⟩ : ∃ n, (Ls kk).length = n := ⟨_, rfl⟩
   have hlen : (nx :: Ls kk).length = n + 1 := by simp only [List.length_cons, hn]
   ihave Hrefc := (show wordAtN (GF := GF) curCtx (aBufRefcnt (bnode kk)) 4 (DFrac.own 1)
@@ -182,13 +182,14 @@ theorem bpin_proof (AC : ACQUIRE) (RE : RELEASE) : BPIN := ⟨
   imod Hup with ⟨Ha, Href, Hhalves', %hnx⟩
   imod bufEscrow_refIncr γ V (γ.box kk) kk (1 : Qp).half (1 : Qp).half r (Ls kk).length ⊤
       bioxN_top hrid.1 $$ [Hbox Hrd Hcnt] with ⟨Hrd, Hcnt, ⟨%Tb, Hbref⟩⟩
-  · iframe Hbox Hrd Hcnt
+  · iframe Hbox Hrd Hcnt Hvd
   ihave Hbref := (show (boxRef (GF := GF) (γ.box kk) r.ident Tb) ⊢
       ∃ T : Nat, boxRef (γ.box kk) ((dev, bno) : BufId) T from by
     rw [hrid.2.2, hdveq, hbneq]; iintro H; iexists Tb; iexact H) $$ Hbref
   imodintro
-  ihave Hregs := bufSlotRegs_intro (γ.box kk) r tl (devs kk) (bnos kk) hrid.1 hrid.2.1 hrid.2.2 hrtl $$ [Hrd Htd]
-  case' _ => iframe Hrd Htd
+  ihave Hregs := bufSlotRegs_intro (γ.box kk) r tl (devs kk) (bnos kk) curCtx hrid.1 hrid.2.1 hrid.2.2 hrtl
+    $$ [Hrd Htd]
+  case' _ => iframe Hrd Htd Hvd
   ihave Hkey0 := bkeyAt_intro γ curCtx tl kk (devs kk) (bnos kk) $$ [Hkd Hkb Hregs]
   case' _ => iframe
   ihave Hkey := Hkcl $$ Hkey0
@@ -261,7 +262,7 @@ theorem bpin_proof (AC : ACQUIRE) (RE : RELEASE) : BPIN := ⟨
   iintro %cc H %R'' Hk Hpc %hcs
   iapply H $$ %spie %spp %R'' %hsp Hk Hpc [] Hdevc Hbnoc [Href Hbref]
   · ipureintro; exact hcs
-  · unfold bref
+  · unfold bref brefAt
     iframe Href
     iexact Hbref⟩
 

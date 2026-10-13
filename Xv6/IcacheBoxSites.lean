@@ -139,50 +139,54 @@ comes out, its shape known from the identity (M-1').  F38: the OUT_L1
 residue at `c = 0` is a DEAD identity quarter, the recycler's, split off
 the table row's half (Rocq's `ic_recycle_withdraw`). -/
 theorem icRecycleWithdraw [Icfg] [CurCtx] (cpu : CPU) (cn : IcNames) (γfs : FsNames)
-    (γi : GName) (cov : ExtTreeSet Nat compare) (logstart k : Nat) (ξ : CtxId)
+    (γi : GName) (cov : ExtTreeSet Nat compare) (logstart k : Nat)
     (r : SlotReg IcBid IcX) (Kd : Nat) (devT inumT : BitVec 32) (E : CoPset)
     (hE : ↑icBoxN ⊆ E) (hw : r.win = false) (hid : r.ident = none) (hKd : r.td ≤ Kd) :
     icEscrow (GF := GF) cn γfs γi cov logstart k ⊢
-      ownCtx cpu ξ -∗ ctxFloor ξ Kd -∗ icRegd k r -∗ icCnt k 0 -∗
+      ownCtx cpu curCtx -∗ ctxFloor curCtx Kd -∗ vgFloors curCtx r.vd -∗ icRegd k r -∗ icCnt k 0 -∗
       icId cn k Qp.quarter false devT inumT -∗
-      |={E}=> (ownCtx cpu ξ ∗ icCnt k 0 ∗
-        ∃ T0 : Nat, ⌜T0 ≤ Kd⌝ ∗
-          icRegd k ⟨r.td, true, none, some (.icRaw, T0)⟩ ∗
-          icHdr cn γfs γi cov logstart k none .icRaw ξ) := by
-  rcases r with ⟨td, win, ident, rx⟩
+      |={E}=> (ownCtx cpu curCtx ∗ icCnt k 0 ∗
+        ∃ (T0 : Nat) (a : ChainVG), ⌜T0 ≤ Kd⌝ ∗ vgFloors curCtx a ∗
+          icRegd k ⟨r.td, true, none, some (.icRaw, T0), a⟩ ∗
+          icHdr cn γfs γi cov logstart k none .icRaw curCtx) := by
+  rcases r with ⟨td, win, ident, rx, vd⟩
   simp only at hw hid hKd ⊢
   subst hw hid
   unfold icEscrow icRegd icCnt
-  iintro #Hbox Hrun #Hfl Hrd Hc Hqr
+  iintro #Hbox Hrun #Hfl #Hvd Hrd Hc Hqr
   imod stampsFrag_empty (GF := GF) (Id := IcBid) (icfgBox k) with Hf0
-  imod boxWithdrawL1 (icBoxPay cn γfs γi cov logstart k) (ndot icBoxN k) (icfgBox k) cpu ξ
-      ⟨td, false, none, rx⟩ 0 ∅ Kd 0 E (nclose_subseteq' k hE) rfl
-      (by rw [qsum_empty]; rfl) hKd (by rw [maxStamp_empty]; exact Nat.le_refl 0)
-      $$ [Hrun Hrd Hc Hf0 Hqr] with ⟨Hrun, Hc, %x0, %T0, %hT0, Hrd, Hhdr⟩
+  imod stampsFrag_empty (GF := GF) (Id := IcBid) (icfgBox k).tk with Ht0
+  imod boxWithdrawL1 (icBoxPay cn γfs γi cov logstart k) (ndot icBoxN k) (icfgBox k) cpu curCtx
+      ⟨td, false, none, rx, vd⟩ 0 ∅ ∅ Kd 0 E (nclose_subseteq' k hE) rfl
+      (by rw [qsum_empty]; rfl) (by rw [qsum_empty]; rfl) hKd
+      (by rw [maxStamp_empty]; exact Nat.le_refl 0)
+      $$ [Hrun Hrd Hc Hf0 Ht0 Hqr] with ⟨Hrun, Hc, %x0, %T0, %a, %hT0, #Hva, Hrd, Hhdr⟩
   · isplitr
     · iexact Hbox
-    iframe Hrun Hrd Hc Hf0
+    iframe Hrun Hrd Hc Hf0 Ht0 Hvd
     isplitr
     · iexact Hfl
     isplitr
     · iapply ctxFloor_0
     isplitr
     · rw [maxStamp_empty]; iapply topLbAt_0
+    isplitr
+    · iapply tagsFl_empty
     simp only [icBoxPay, icQ1, icQRecycle]
     ileft
     iexists devT, inumT
     iexact Hqr
   dsimp only [icBoxPay]
   ihave %hx : ⌜x0 = .icRaw⌝ $$ [Hhdr]
-  · iapply icHdr_deadRawAt cn γfs γi cov logstart k x0 ξ
+  · iapply icHdr_deadRawAt cn γfs γi cov logstart k x0 curCtx
     iexact Hhdr
   subst hx
   imodintro
   iframe Hrun Hc
-  iexists T0
+  iexists T0, a
   isplitr
   · ipureintro; omega
-  iframe Hrd
+  iframe Hrd Hva
   iexact Hhdr
 
 /-- iget's RECYCLE, part 2 -- THE MID-WINDOW FLIP (endgame §6²⁴ Q8/Q9,
@@ -274,29 +278,29 @@ token, the liveness half ride `Qc`) and the residue's live arm (the quarter
 and the `np` shape); the table's half at `true` selects the arm and comes
 back as `Q'` (Rocq's `ic_recycle_deposit`). -/
 theorem icRecycleDeposit [Icfg] [CurCtx] (cpu : CPU) (cn : IcNames) (γfs : FsNames)
-    (γi : GName) (cov : ExtTreeSet Nat compare) (logstart k : Nat) (ξ : CtxId)
+    (γi : GName) (cov : ExtTreeSet Nat compare) (logstart k : Nat)
     (r : SlotReg IcBid IcX) (dev inum : BitVec 32) (g : GName) (T0 : Nat) (E : CoPset)
     (hE : ↑icBoxN ⊆ E) (hw : r.win = true) (hx : r.x = some (.icRaw, T0)) :
     icEscrow (GF := GF) cn γfs γi cov logstart k ⊢
-      ownCtx cpu ξ -∗ icRegd k r -∗ icCnt k 0 -∗
-      icHdrBare k (some (dev, inum)) (.icUnloaded g) ξ -∗
+      ownCtx cpu curCtx -∗ vgFloors curCtx r.vd -∗ icRegd k r -∗ icCnt k 0 -∗
+      icHdrBare k (some (dev, inum)) (.icUnloaded g) curCtx -∗
       ityPending g -∗ ifreezeOff inum.toNat -∗ liveGen k (1 : Qp).half g -∗
       icId cn k (1 : Qp).half true dev inum -∗
-      |={E}=> (ownCtx cpu ξ ∗ icId cn k (1 : Qp).half true dev inum ∗
-        ∃ T' : Nat,
-          icRegd k ⟨T', false, some (dev, inum), none⟩ ∗
+      |={E}=> (ownCtx cpu curCtx ∗ icId cn k (1 : Qp).half true dev inum ∗
+        ∃ (T' : Nat) (a : ChainVG),
+          icRegd k ⟨T', false, some (dev, inum), none, a⟩ ∗
           icCnt k 1 ∗
           icRefStamps k dev inum 1 ∗
-          topLb T') := by
+          topLb T' ∗ vgFloors curCtx a) := by
   have hhook : ∀ ξb : CtxId,
       iprop(ityPending g ∗ ifreezeOff inum.toNat ∗ liveGen k (1 : Qp).half g ∗
           icId cn k (1 : Qp).half true dev inum) ∗
         (icBoxPay (GF := GF) cn γfs γi cov logstart k).q1 0 ∗
-        icHdrBare k (some (dev, inum)) (.icUnloaded g) ξ ∗
+        icHdrBare k (some (dev, inum)) (.icUnloaded g) curCtx ∗
         (icBoxPay (GF := GF) cn γfs γi cov logstart k).rest .icRaw ξb ⊢
       |={E \ ↑(ndot icBoxN k)}=>
         ((icBoxPay (GF := GF) cn γfs γi cov logstart k).hdr (some (dev, inum))
-            (.icUnloaded g) ξ ∗
+            (.icUnloaded g) curCtx ∗
           (icBoxPay (GF := GF) cn γfs γi cov logstart k).rest (.icUnloaded g) ξb ∗
           icId cn k (1 : Qp).half true dev inum) := by
     intro ξb
@@ -324,21 +328,21 @@ theorem icRecycleDeposit [Icfg] [CurCtx] (cpu : CPU) (cn : IcNames) (γfs : FsNa
       simp only [icRestAmb]
       iexact Hrest
   unfold icEscrow icRegd icCnt
-  iintro #Hbox Hrun Hrd Hc Hbare Hpend Hfoff Hlvh Hgid
-  imod boxDepositL1Hook (icBoxPay cn γfs γi cov logstart k) (ndot icBoxN k) (icfgBox k) cpu ξ
-      r 0 (some (dev, inum)) .icRaw (.icUnloaded g) T0 (fun i x ξ => icHdrBare k i x ξ)
+  iintro #Hbox Hrun #Hvd Hrd Hc Hbare Hpend Hfoff Hlvh Hgid
+  imod boxDepositL1Hook (icBoxPay cn γfs γi cov logstart k) (ndot icBoxN k) (icfgBox k) cpu curCtx
+      r 0 (some (dev, inum)) .icRaw (.icUnloaded g) T0 (fun i x curCtx => icHdrBare k i x curCtx)
       iprop(ityPending g ∗ ifreezeOff inum.toNat ∗ liveGen k (1 : Qp).half g ∗
         icId cn k (1 : Qp).half true dev inum)
       (icId cn k (1 : Qp).half true dev inum) E (nclose_subseteq' k hE) hw hx hhook
-      $$ [Hrun Hrd Hc Hpend Hfoff Hlvh Hgid Hbare] with ⟨Hrun, Hgid, %T', Hrd, Hc, Href, #Hllb⟩
+      $$ [Hrun Hrd Hc Hpend Hfoff Hlvh Hgid Hbare] with ⟨Hrun, Hgid, %T', %a, Hrd, Hc, Href, #Hllb, #Hva⟩
   · isplitr
     · iexact Hbox
-    iframe Hrun Hrd Hc Hpend Hfoff Hlvh Hgid Hbare
+    iframe Hrun Hrd Hc Hpend Hfoff Hlvh Hgid Hbare Hvd
   imodintro
   iframe Hrun Hgid
-  iexists T'
+  iexists T', a
   rw [show (max 1 0 : Nat) = 1 from rfl]
-  iframe Hrd Hc Hllb
+  iframe Hrd Hc Hllb Hva
   unfold icRefStamps icRefStampsAt icStamps
   iexists _
   iframe Href
@@ -352,15 +356,15 @@ theorem icHitIncr [Icfg] [CurCtx] (cn : IcNames) (γfs : FsNames) (γi : GName)
     (dev inum : BitVec 32) (E : CoPset)
     (hE : ↑icBoxN ⊆ E) (hw : r.win = false) (hid : r.ident = some (dev, inum)) :
     icEscrow (GF := GF) cn γfs γi cov logstart k ⊢
-      icRegd k r -∗ icCnt k (c + 1) -∗
+      icRegd k r -∗ icCnt k (c + 1) -∗ vgFloors curCtx r.vd -∗
       |={E}=> (icRegd k r ∗ icCnt k (c + 2) ∗ icRefStamps k dev inum 1) := by
   unfold icEscrow icRegd icCnt
-  iintro #Hbox Hrd Hc
-  imod boxRefIncr (icBoxPay cn γfs γi cov logstart k) (ndot icBoxN k) (icfgBox k) r (c + 1) E
+  iintro #Hbox Hrd Hc #Hvd
+  imod boxRefIncr (icBoxPay cn γfs γi cov logstart k) (ndot icBoxN k) (icfgBox k) r (c + 1) curCtx E
       (nclose_subseteq' k hE) hw $$ [Hrd Hc] with ⟨Hrd, Hc, %T, Href⟩
   · isplitr
     · iexact Hbox
-    iframe Hrd Hc
+    iframe Hrd Hc Hvd
   imodintro
   iframe Hrd Hc
   unfold icRefStamps icRefStampsAt icStamps
@@ -372,26 +376,29 @@ theorem icHitIncr [Icfg] [CurCtx] (cn : IcNames) (γfs : FsNames) (γi : GName)
 
 /-- iput's `ref--` -- (d): the unit's debt paid into the L1 register (Rocq's
 `ic_decr`). -/
-theorem icDecr [Icfg] [CurCtx] (cn : IcNames) (γfs : FsNames) (γi : GName)
+theorem icDecr [Icfg] [CurCtx] (cpu : CPU) (cn : IcNames) (γfs : FsNames) (γi : GName)
     (cov : ExtTreeSet Nat compare) (logstart k : Nat) (r : SlotReg IcBid IcX) (c : Nat)
     (i : IcBid) (E : CoPset) (hE : ↑icBoxN ⊆ E) (hw : r.win = false) :
     icEscrow (GF := GF) cn γfs γi cov logstart k ⊢
-      icRegd k r -∗ topLb r.td -∗ icCnt k (c + 1) -∗ icRefStampsAt k i 1 -∗
-      |={E}=> ∃ td' : Nat, ⌜r.td ≤ td'⌝ ∗
-        icRegd k ⟨td', false, r.ident, r.x⟩ ∗ icCnt k c ∗ topLb td' := by
+      ownCtx cpu curCtx -∗ icRegd k r -∗ topLb r.td -∗ vgFloors curCtx r.vd -∗ icCnt k (c + 1) -∗
+      icRefStampsAt k i 1 -∗
+      |={E}=> ownCtx cpu curCtx ∗ ∃ (td' : Nat) (a : ChainVG), ⌜r.td ≤ td'⌝ ∗
+        icRegd k ⟨td', false, r.ident, r.x, a⟩ ∗ icCnt k c ∗ topLb td' ∗ vgFloors curCtx a := by
   unfold icEscrow icRegd icCnt icRefStampsAt icStamps
-  iintro #Hbox Hrd #Hllb Hc ⟨%m, %hm, Href⟩
-  imod boxRefDecr (icBoxPay cn γfs γi cov logstart k) (ndot icBoxN k) (icfgBox k) r c i m E
-      (nclose_subseteq' k hE) hw (by rw [hm]; rfl) $$ [Hrd Hc Href] with ⟨Hrd, Hc, #Hllb'⟩
+  iintro #Hbox Hrun Hrd #Hllb #Hvd Hc ⟨%m, %hm, Href⟩
+  imod boxRefDecr (icBoxPay cn γfs γi cov logstart k) (ndot icBoxN k) (icfgBox k) cpu curCtx r c i m E
+      (nclose_subseteq' k hE) hw (by rw [hm]; rfl) $$ [Hrun Hrd Hc Href]
+    with ⟨Hrun, ⟨%a, Hrd, Hc, #Hllb', #Hva⟩⟩
   · isplitr
     · iexact Hbox
-    iframe Hrd Hc Href
+    iframe Hrun Hrd Hc Href Hvd
     iexact Hllb
   imodintro
-  iexists (max r.td (maxStamp m))
+  iframe Hrun
+  iexists (max r.td (maxStamp m)), a
   isplitr
   · ipureintro; omega
-  iframe Hrd Hc
+  iframe Hrd Hc Hva
   iexact Hllb'
 
 /-- The park's return by arm kind: the read arm's three quarters went home
@@ -435,20 +442,20 @@ fragment of the descriptor's mass, its stamps covered by `Kt` (R1 at `Tl
 bundle at the identity (one binder over the shape), and the handle row
 `icDeposit2 k d` (Rocq's `ic_checkout`). -/
 theorem icCheckout [Icfg] [CurCtx] (cpu : CPU) (cn : IcNames) (γfs : FsNames) (γi : GName)
-    (cov : ExtTreeSet Nat compare) (logstart k : Nat) (ξ : CtxId) (d : IcDep)
+    (cov : ExtTreeSet Nat compare) (logstart k : Nat) (d : IcDep)
     (dev inum : BitVec 32) (s0 : L2Reg IcBid) (Kt Kp : Nat) (E : CoPset)
     (hE : ↑icBoxN ⊆ E) (hid : icDepId d = some (dev, inum)) (_hrd : icDepRd d = false)
     (hs0 : s0.hold = none) (hKp : s0.tp ≤ Kp) :
     icEscrow (GF := GF) cn γfs γi cov logstart k ⊢
-      ownCtx cpu ξ -∗ ctxFloor ξ Kt -∗ ctxFloor ξ Kp -∗
+      ownCtx cpu curCtx -∗ ctxFloor curCtx Kt -∗ ctxFloor curCtx Kp -∗
       icBody k d -∗
       (∃ m : StampMap IcBid, ⌜qsum m = (icDepMass d).val⌝ ∗ ⌜maxStamp m ≤ Kt⌝ ∗
         reference (icfgBox k) (some (dev, inum)) m) -∗
       icDeposit cn k d -∗ icQSide γfs γi cov logstart k d -∗
-      icRegp k s0 -∗
-      |={E}=> (ownCtx cpu ξ ∗
-        (∃ x : IcX, icHdrHeld cn γfs γi cov logstart k false (some (dev, inum)) x ξ ∗
-          icRest k x ξ) ∗
+      icRegp k s0 -∗ vgFloors curCtx s0.vp -∗
+      |={E}=> (ownCtx cpu curCtx ∗
+        (∃ x : IcX, icHdrHeld cn γfs γi cov logstart k false (some (dev, inum)) x curCtx ∗
+          icRest k x curCtx) ∗
         icDeposit2 k d) := by
   have hsplit : ∀ (x : IcX) (ξ' : CtxId),
       iprop(icDeposit (GF := GF) cn k d ∗ icQSide γfs γi cov logstart k d) ∗
@@ -464,15 +471,15 @@ theorem icCheckout [Icfg] [CurCtx] (cpu : CPU) (cn : IcNames) (γfs : FsNames) (
     iframe Hh
     iapply icQ2_intro cn γfs γi cov logstart k d dev inum hid $$ Hd Hs Hq
   unfold icEscrow icRegp
-  iintro #Hbox Hrun #Hflt #Hflp Hbody ⟨%m, %hm, %hmt, Href⟩ Hd Hs Hrp
-  imod MachCSL.boxCheckoutHook (icBoxPay cn γfs γi cov logstart k) (ndot icBoxN k) (icfgBox k) cpu ξ
+  iintro #Hbox Hrun #Hflt #Hflp Hbody ⟨%m, %hm, %hmt, Href⟩ Hd Hs Hrp #Hvp
+  imod MachCSL.boxCheckoutHook (icBoxPay cn γfs γi cov logstart k) (ndot icBoxN k) (icfgBox k) cpu curCtx
       (some (dev, inum)) (icHdrHeld cn γfs γi cov logstart k false)
       iprop(icDeposit cn k d ∗ icQSide γfs γi cov logstart k d) m s0 Kt Kp E
       (nclose_subseteq' k hE) hs0 hmt hKp hsplit
       $$ [Hrun Href Hd Hs Hrp] with ⟨Hrun, Hbun, Hhold⟩
   · isplitr
     · iexact Hbox
-    iframe Hrun Href Hrp Hd Hs
+    iframe Hrun Href Hrp Hd Hs Hvp
     isplitr
     · iexact Hflt
     · iexact Hflp
@@ -509,22 +516,22 @@ quarters of the leg into `icQ2` -- exactly main's `ic_swap_checkout_rd`,
 inside the checkout's own ghost step.  The slice rides the caller residue
 in and the held bundle out (Rocq's `ic_checkout_rd`). -/
 theorem icCheckoutRd [Icfg] [CurCtx] (cpu : CPU) (cn : IcNames) (γfs : FsNames) (γi : GName)
-    (cov : ExtTreeSet Nat compare) (logstart k : Nat) (ξ : CtxId) (s : Qp)
+    (cov : ExtTreeSet Nat compare) (logstart k : Nat) (s : Qp)
     (dev inum : BitVec 32) (g : GName) (lo : Nat) (ty : BitVec 16) (s0 : L2Reg IcBid)
     (Kt Kp : Nat) (E : CoPset)
     (hE : ↑icBoxN ⊆ E) (hEi : (↑icacheN : CoPset) ⊆ E) (hk : k < NINODE)
     (hs0 : s0.hold = none) (hKp : s0.tp ≤ Kp) :
     icEscrow (GF := GF) cn γfs γi cov logstart k ⊢
-      ownCtx cpu ξ -∗ ctxFloor ξ Kt -∗ ctxFloor ξ Kp -∗
+      ownCtx cpu curCtx -∗ ctxFloor curCtx Kt -∗ ctxFloor curCtx Kp -∗
       itableInv (hlc := hlc) -∗ ityShot g ty -∗
       icBody k (.depRd s dev inum g lo) -∗
       (∃ m : StampMap IcBid, ⌜qsum m = s.val⌝ ∗ ⌜maxStamp m ≤ Kt⌝ ∗
         reference (icfgBox k) (some (dev, inum)) m) -∗
       icDeposit cn k (.depRd s dev inum g lo) -∗
-      icRegp k s0 -∗
-      |={E}=> (ownCtx cpu ξ ∗
-        (∃ x : IcX, icHdrHeld cn γfs γi cov logstart k true (some (dev, inum)) x ξ ∗
-          icRest k x ξ) ∗
+      icRegp k s0 -∗ vgFloors curCtx s0.vp -∗
+      |={E}=> (ownCtx cpu curCtx ∗
+        (∃ x : IcX, icHdrHeld cn γfs γi cov logstart k true (some (dev, inum)) x curCtx ∗
+          icRest k x curCtx) ∗
         icDeposit2 k (.depRd s dev inum g lo)) := by
   have hEi' : (↑icacheN : CoPset) ⊆ E \ ↑(ndot icBoxN k) := by
     intro p hp
@@ -553,8 +560,8 @@ theorem icCheckoutRd [Icfg] [CurCtx] (cpu : CPU) (cn : IcNames) (γfs : FsNames)
     iexact Harm
   unfold icEscrow icRegp
   simp only [icBody]
-  iintro #Hbox Hrun #Hflt #Hflp #Hinv #Hshot ⟨Hident, Hlv⟩ ⟨%m, %hm, %hmt, Href⟩ Hd Hrp
-  imod MachCSL.boxCheckoutHook (icBoxPay cn γfs γi cov logstart k) (ndot icBoxN k) (icfgBox k) cpu ξ
+  iintro #Hbox Hrun #Hflt #Hflp #Hinv #Hshot ⟨Hident, Hlv⟩ ⟨%m, %hm, %hmt, Href⟩ Hd Hrp #Hvp
+  imod MachCSL.boxCheckoutHook (icBoxPay cn γfs γi cov logstart k) (ndot icBoxN k) (icfgBox k) cpu curCtx
       (some (dev, inum)) (icHdrHeldRdSl cn γfs γi cov logstart k s g lo)
       iprop(icDeposit cn k (.depRd s dev inum g lo) ∗ liveGenlo k s g lo ∗
         itableInv (hlc := hlc) ∗ ityShot g ty) m s0 Kt Kp E
@@ -562,7 +569,7 @@ theorem icCheckoutRd [Icfg] [CurCtx] (cpu : CPU) (cn : IcNames) (γfs : FsNames)
       $$ [Hrun Href Hd Hlv Hrp] with ⟨Hrun, ⟨%x, Hhl, Hrest⟩, Hhold⟩
   · isplitr
     · iexact Hbox
-    iframe Hrun Href Hrp Hd Hlv
+    iframe Hrun Href Hrp Hd Hlv Hvp
     isplitr
     · iexact Hflt
     isplitr
@@ -600,21 +607,21 @@ names its shape `x0` (it holds the bundle).  Two forms: over a bare hold at
 mass `μ` (this one), and over the handle row `icDeposit2` (`icPark`)
 (Rocq's `ic_park_hold`). -/
 theorem icParkHold [Icfg] [CurCtx] (cpu : CPU) (cn : IcNames) (γfs : FsNames) (γi : GName)
-    (cov : ExtTreeSet Nat compare) (logstart k : Nat) (ξ : CtxId) (d : IcDep)
+    (cov : ExtTreeSet Nat compare) (logstart k : Nat) (d : IcDep)
     (dev inum : BitVec 32) (x0 : IcX) (μ : Qp) (E : CoPset)
     (hE : ↑icBoxN ⊆ E) (hid : icDepId d = some (dev, inum)) :
     icEscrow (GF := GF) cn γfs γi cov logstart k ⊢
-      ownCtx cpu ξ -∗
-      icHdrHeld cn γfs γi cov logstart k (icDepRd d) (some (dev, inum)) x0 ξ -∗
-      icRest k x0 ξ -∗
+      ownCtx cpu curCtx -∗
+      icHdrHeld cn γfs γi cov logstart k (icDepRd d) (some (dev, inum)) x0 curCtx -∗
+      icRest k x0 curCtx -∗
       icDeposit cn k d -∗
       icHold k dev inum μ -∗
-      |={E}=> (ownCtx cpu ξ ∗ icDepNeutral cn k ∗ icParkSide γfs γi cov logstart k d ∗
-        ∃ T' : Nat,
-          icRegp k ⟨T', none⟩ ∗
+      |={E}=> (ownCtx cpu curCtx ∗ icDepNeutral cn k ∗ icParkSide γfs γi cov logstart k d ∗
+        ∃ (T' : Nat) (a : ChainVG),
+          icRegp k ⟨T', none, a, ∅, a⟩ ∗
           reference (icfgBox k) (some (dev, inum))
             (PartialMap.singleton (some (dev, inum), T') (⟨μ⟩ : UFrac) : StampMap IcBid) ∗
-          topLb T') := by
+          topLb T' ∗ vgFloors curCtx a) := by
   have hjoin : ∀ (x : IcX) (ξ' : CtxId),
       icDeposit (GF := GF) cn k d ∗
         icHdrHeld cn γfs γi cov logstart k (icDepRd d) (some (dev, inum)) x ξ' ∗
@@ -647,11 +654,11 @@ theorem icParkHold [Icfg] [CurCtx] (cpu : CPU) (cn : IcNames) (γfs : FsNames) (
       iframe Hh Hd Hd'
   unfold icEscrow icRegp icHold
   iintro #Hbox Hrun Hhdr Hrest Hd ⟨%m, %hm, Hhold⟩
-  imod boxParkJoin (icBoxPay cn γfs γi cov logstart k) (ndot icBoxN k) (icfgBox k) cpu ξ
+  imod boxParkJoin (icBoxPay cn γfs γi cov logstart k) (ndot icBoxN k) (icfgBox k) cpu curCtx
       (some (dev, inum)) (icHdrHeld cn γfs γi cov logstart k (icDepRd d)) (icDeposit cn k d)
       iprop(icDeposit cn k d ∗ icDeposit cn k d ∗ icParkSide γfs γi cov logstart k d) m E
       (nclose_subseteq' k hE) hjoin
-      $$ [Hrun Hhdr Hrest Hd Hhold] with ⟨Hrun, ⟨Hd1, Hd2, Hs⟩, %T', %q, %hq, Hrp, Href, #Hllb⟩
+      $$ [Hrun Hhdr Hrest Hd Hhold] with ⟨Hrun, ⟨Hd1, Hd2, Hs⟩, %T', %q, %a, %hq, Hrp, Href, #Hllb, #Hva⟩
   · isplitr
     · iexact Hbox
     iframe Hrun Hd Hhold
@@ -662,36 +669,36 @@ theorem icParkHold [Icfg] [CurCtx] (cpu : CPU) (cn : IcNames) (γfs : FsNames) (
   obtain rfl := ufrac_of_val q μ (by rw [hq, hm])
   imodintro
   iframe Hrun Hn Hs
-  iexists T'
-  iframe Hrp Href
+  iexists T', a
+  iframe Hrp Href Hva
   iexact Hllb
 
 /-- Rocq's `ic_park`: `icParkHold` over the handle row `icDeposit2` (the
 descriptor's mass); the body comes back beside it. -/
 theorem icPark [Icfg] [CurCtx] (cpu : CPU) (cn : IcNames) (γfs : FsNames) (γi : GName)
-    (cov : ExtTreeSet Nat compare) (logstart k : Nat) (ξ : CtxId) (d : IcDep)
+    (cov : ExtTreeSet Nat compare) (logstart k : Nat) (d : IcDep)
     (dev inum : BitVec 32) (x0 : IcX) (E : CoPset)
     (hE : ↑icBoxN ⊆ E) (hid : icDepId d = some (dev, inum)) :
     icEscrow (GF := GF) cn γfs γi cov logstart k ⊢
-      ownCtx cpu ξ -∗
-      icHdrHeld cn γfs γi cov logstart k (icDepRd d) (some (dev, inum)) x0 ξ -∗
-      icRest k x0 ξ -∗
+      ownCtx cpu curCtx -∗
+      icHdrHeld cn γfs γi cov logstart k (icDepRd d) (some (dev, inum)) x0 curCtx -∗
+      icRest k x0 curCtx -∗
       icDeposit cn k d -∗
       icDeposit2 k d -∗
-      |={E}=> (ownCtx cpu ξ ∗ icDepNeutral cn k ∗ icParkSide γfs γi cov logstart k d ∗
+      |={E}=> (ownCtx cpu curCtx ∗ icDepNeutral cn k ∗ icParkSide γfs γi cov logstart k d ∗
         icBody k d ∗
-        ∃ T' : Nat,
-          icRegp k ⟨T', none⟩ ∗
+        ∃ (T' : Nat) (a : ChainVG),
+          icRegp k ⟨T', none, a, ∅, a⟩ ∗
           reference (icfgBox k) (some (dev, inum))
             (PartialMap.singleton (some (dev, inum), T') (⟨icDepMass d⟩ : UFrac) :
               StampMap IcBid) ∗
-          topLb T') := by
+          topLb T' ∗ vgFloors curCtx a) := by
   iintro #Hbox Hrun Hhdr Hrest Hd Hdep
   unfold icDeposit2
   rw [hid]
   dsimp only
   icases Hdep with ⟨Hhold, Hbody⟩
-  imod icParkHold cpu cn γfs γi cov logstart k ξ d dev inum x0 (icDepMass d) E hE hid
+  imod icParkHold cpu cn γfs γi cov logstart k d dev inum x0 (icDepMass d) E hE hid
       $$ Hbox Hrun Hhdr Hrest Hd Hhold with ⟨Hrun, Hn, Hs, Hout⟩
   imodintro
   iframe Hrun Hn Hs Hbody Hout
@@ -702,33 +709,33 @@ the guard's valid and nlink reads are exact.  The unit's stamps are covered
 by `Kt` (R1 at the itable acquire); the guard window's residue is main's
 `icPinTx` pin (F32 as Q-reuse) (Rocq's `ic_guard_withdraw`). -/
 theorem icGuardWithdraw [Icfg] [CurCtx] (cpu : CPU) (cn : IcNames) (γfs : FsNames)
-    (γi : GName) (cov : ExtTreeSet Nat compare) (logstart k : Nat) (ξ : CtxId)
+    (γi : GName) (cov : ExtTreeSet Nat compare) (logstart k : Nat)
     (r : SlotReg IcBid IcX) (dev inum : BitVec 32) (Kd Kt : Nat) (E : CoPset)
     (hE : ↑icBoxN ⊆ E) (hw : r.win = false) (hid : r.ident = some (dev, inum))
     (hKd : r.td ≤ Kd) :
     icEscrow (GF := GF) cn γfs γi cov logstart k ⊢
-      ownCtx cpu ξ -∗ ctxFloor ξ Kd -∗ ctxFloor ξ Kt -∗
+      ownCtx cpu curCtx -∗ ctxFloor curCtx Kd -∗ ctxFloor curCtx Kt -∗ vgFloors curCtx r.vd -∗
       icRegd k r -∗ icCnt k 1 -∗
       (∃ m : StampMap IcBid, ⌜qsum m = (1 : Qp).val⌝ ∗ ⌜maxStamp m ≤ Kt⌝ ∗
         reference (icfgBox k) (some (dev, inum)) m) -∗
       icPinTx k -∗
-      |={E}=> (ownCtx cpu ξ ∗ icCnt k 1 ∗
-        ∃ (x0 : IcX) (T0 : Nat), ⌜x0 ≠ .icRaw⌝ ∗ ⌜T0 ≤ max Kd Kt⌝ ∗
-          icRegd k ⟨r.td, true, some (dev, inum), some (x0, T0)⟩ ∗
-          icHdr cn γfs γi cov logstart k (some (dev, inum)) x0 ξ) := by
-  rcases r with ⟨td, win, ident, rx⟩
+      |={E}=> (ownCtx cpu curCtx ∗ icCnt k 1 ∗
+        ∃ (x0 : IcX) (T0 : Nat) (a : ChainVG), ⌜x0 ≠ .icRaw⌝ ∗ ⌜T0 ≤ max Kd Kt⌝ ∗ vgFloors curCtx a ∗
+          icRegd k ⟨r.td, true, some (dev, inum), some (x0, T0), a⟩ ∗
+          icHdr cn γfs γi cov logstart k (some (dev, inum)) x0 curCtx) := by
+  rcases r with ⟨td, win, ident, rx, vd⟩
   simp only at hw hid hKd ⊢
   subst hw hid
-  unfold icEscrow icRegd icCnt reference
-  iintro #Hbox Hrun #Hfld #Hflt Hrd Hc ⟨%m, %hm, %hmt, %_, %_, Hf, #Hl⟩ Hpin
-  imod boxWithdrawL1 (icBoxPay cn γfs γi cov logstart k) (ndot icBoxN k) (icfgBox k) cpu ξ
-      ⟨td, false, some (dev, inum), rx⟩ 1 m Kd Kt E (nclose_subseteq' k hE) rfl
-      (by rw [hm]; rfl) hKd hmt
-      $$ [Hrun Hrd Hc Hf Hpin] with ⟨Hrun, Hc, %x0, %T0, %hT0, Hrd, Hhdr⟩
+  unfold icEscrow icRegd icCnt reference referenceAt
+  iintro #Hbox Hrun #Hfld #Hflt #Hvd Hrd Hc ⟨%m, %hm, %hmt, %_, %_, Hf, #Hl, %mt, %hmtq, Ht, #Htg⟩ Hpin
+  imod boxWithdrawL1 (icBoxPay cn γfs γi cov logstart k) (ndot icBoxN k) (icfgBox k) cpu curCtx
+      ⟨td, false, some (dev, inum), rx, vd⟩ 1 m mt Kd Kt E (nclose_subseteq' k hE) rfl
+      (by rw [hm]; rfl) (by rw [hmtq, hm]; rfl) hKd hmt
+      $$ [Hrun Hrd Hc Hf Ht Hpin] with ⟨Hrun, Hc, %x0, %T0, %a, %hT0, #Hva, Hrd, Hhdr⟩
   · isplitr
     · iexact Hbox
     dsimp only [icBoxPay, icQ1]
-    iframe Hrun Hrd Hc Hf Hpin
+    iframe Hrun Hrd Hc Hf Ht Hpin Hvd Htg
     isplitr
     · iexact Hfld
     isplitr
@@ -744,15 +751,15 @@ theorem icGuardWithdraw [Icfg] [CurCtx] (cpu : CPU) (cn : IcNames) (γfs : FsNam
   | icUnloaded g =>
     imodintro
     iframe Hrun Hc
-    iexists .icUnloaded g, T0
-    iframe Hrd Hhdr
+    iexists .icUnloaded g, T0, a
+    iframe Hrd Hhdr Hva
     ipureintro
     exact ⟨nofun, hT0⟩
   | icLoaded g dn bm =>
     imodintro
     iframe Hrun Hc
-    iexists .icLoaded g dn bm, T0
-    iframe Hrd Hhdr
+    iexists .icLoaded g dn bm, T0, a
+    iframe Hrd Hhdr Hva
     ipureintro
     exact ⟨nofun, hT0⟩
 
@@ -764,21 +771,21 @@ own pin into the OUT_L1 residue `Q1 1` -- so the walk's name-half of the pin
 stays in its hand, and (b′)'s return of the residue is re-identified by
 `icPinExit` exactly as on main (Rocq's `ic_evict_withdraw_frz`). -/
 theorem icEvictWithdrawFrz [Icfg] [CurCtx] (cpu : CPU) (cn : IcNames) (γfs : FsNames)
-    (γi : GName) (cov : ExtTreeSet Nat compare) (logstart k : Nat) (ξ : CtxId)
+    (γi : GName) (cov : ExtTreeSet Nat compare) (logstart k : Nat)
     (r : SlotReg IcBid IcX) (dev inum : BitVec 32) (Kd Kt : Nat) (rg : Frzidx) (E : CoPset)
     (hE : ↑icBoxN ⊆ E) (hw : r.win = false) (hid : r.ident = some (dev, inum))
     (hKd : r.td ≤ Kd) :
     icEscrow (GF := GF) cn γfs γi cov logstart k ⊢
-      ownCtx cpu ξ -∗ ctxFloor ξ Kd -∗ ctxFloor ξ Kt -∗
+      ownCtx cpu curCtx -∗ ctxFloor curCtx Kd -∗ ctxFloor curCtx Kt -∗ vgFloors curCtx r.vd -∗
       icRegd k r -∗ icCnt k 1 -∗
       (∃ m : StampMap IcBid, ⌜qsum m = (1 : Qp).val⌝ ∗ ⌜maxStamp m ≤ Kt⌝ ∗
         reference (icfgBox k) (some (dev, inum)) m) -∗
       ifreezePre rg inum.toNat -∗
-      |={E}=> (ownCtx cpu ξ ∗ icCnt k 1 ∗
-        ∃ (x0 : IcX) (T0 : Nat), ⌜T0 ≤ max Kd Kt⌝ ∗
-          icRegd k ⟨r.td, true, some (dev, inum), some (x0, T0)⟩ ∗
-          icHdrFrz cn rg k (some (dev, inum)) x0 ξ) := by
-  rcases r with ⟨td, win, ident, rx⟩
+      |={E}=> (ownCtx cpu curCtx ∗ icCnt k 1 ∗
+        ∃ (x0 : IcX) (T0 : Nat) (a : ChainVG), ⌜T0 ≤ max Kd Kt⌝ ∗ vgFloors curCtx a ∗
+          icRegd k ⟨r.td, true, some (dev, inum), some (x0, T0), a⟩ ∗
+          icHdrFrz cn rg k (some (dev, inum)) x0 curCtx) := by
+  rcases r with ⟨td, win, ident, rx, vd⟩
   simp only at hw hid hKd ⊢
   subst hw hid
   have hhook : ∀ (x : IcX) (ξ' : CtxId),
@@ -820,15 +827,16 @@ theorem icEvictWithdrawFrz [Icfg] [CurCtx] (cpu : CPU) (cn : IcNames) (γfs : Fs
       · ipureintro; exact nofun
       iexists dn.diNlink
       iexact Hnl
-  unfold icEscrow icRegd icCnt reference
-  iintro #Hbox Hrun #Hfld #Hflt Hrd Hc ⟨%m, %hm, %hmt, %_, %_, Hf, #Hl⟩ Hpre
-  imod boxWithdrawL1Hook (icBoxPay cn γfs γi cov logstart k) (ndot icBoxN k) (icfgBox k) cpu ξ
-      ⟨td, false, some (dev, inum), rx⟩ 1 m Kd Kt (icHdrFrz cn rg k)
-      (ifreezePre rg inum.toNat) E (nclose_subseteq' k hE) rfl (by rw [hm]; rfl) hKd hmt hhook
-      $$ [Hrun Hrd Hc Hf Hpre] with ⟨Hrun, Hc, %x0, %T0, %hT0, Hrd, Hhdr⟩
+  unfold icEscrow icRegd icCnt reference referenceAt
+  iintro #Hbox Hrun #Hfld #Hflt #Hvd Hrd Hc ⟨%m, %hm, %hmt, %_, %_, Hf, #Hl, %mt, %hmtq, Ht, #Htg⟩ Hpre
+  imod boxWithdrawL1Hook (icBoxPay cn γfs γi cov logstart k) (ndot icBoxN k) (icfgBox k) cpu curCtx
+      ⟨td, false, some (dev, inum), rx, vd⟩ 1 m mt Kd Kt (icHdrFrz cn rg k)
+      (ifreezePre rg inum.toNat) E (nclose_subseteq' k hE) rfl (by rw [hm]; rfl)
+      (by rw [hmtq, hm]; rfl) hKd hmt hhook
+      $$ [Hrun Hrd Hc Hf Ht Hpre] with ⟨Hrun, Hc, %x0, %T0, %a, %hT0, #Hva, Hrd, Hhdr⟩
   · isplitr
     · iexact Hbox
-    iframe Hrun Hrd Hc Hf Hpre
+    iframe Hrun Hrd Hc Hf Ht Hpre Hvd Htg
     isplitr
     · iexact Hfld
     isplitr
@@ -836,8 +844,8 @@ theorem icEvictWithdrawFrz [Icfg] [CurCtx] (cpu : CPU) (cn : IcNames) (γfs : Fs
     · iexact Hl
   imodintro
   iframe Hrun Hc
-  iexists x0, T0
-  iframe Hrd Hhdr
+  iexists x0, T0, a
+  iframe Hrd Hhdr Hva
   ipureintro; exact hT0
 
 /-- iput's MID-FREE PARK -- (f′) at the FROZEN alternative.  The header is
@@ -847,21 +855,21 @@ the window pin the walk re-enters here -- and the residue's identification
 quarter; the residue's fragment and share come back (Rocq's
 `ic_park_frz`). -/
 theorem icParkFrz [Icfg] [CurCtx] (cpu : CPU) (cn : IcNames) (γfs : FsNames) (γi : GName)
-    (cov : ExtTreeSet Nat compare) (logstart k : Nat) (ξ : CtxId) (qf : Qp)
+    (cov : ExtTreeSet Nat compare) (logstart k : Nat) (qf : Qp)
     (dev inum : BitVec 32) (t : Nat) (qt : Qp) (g : GName) (E : CoPset)
     (hE : ↑icBoxN ⊆ E) :
     icEscrow (GF := GF) cn γfs γi cov logstart k ⊢
-      ownCtx cpu ξ -∗
-      icHdrBare k (some (dev, inum)) (.icUnloaded g) ξ -∗ icRest k (.icUnloaded g) ξ -∗
+      ownCtx cpu curCtx -∗
+      icHdrBare k (some (dev, inum)) (.icUnloaded g) curCtx -∗ icRest k (.icUnloaded g) curCtx -∗
       icDeposit cn k (.depFrz qf dev inum t qt) -∗
       icPinTx k -∗
       icHold k dev inum 1 -∗
-      |={E}=> (ownCtx cpu ξ ∗ icDepNeutral cn k ∗ irefFrag k qf ∗ txPin icfgLog t qt ∗
-        ∃ T' : Nat,
-          icRegp k ⟨T', none⟩ ∗
+      |={E}=> (ownCtx cpu curCtx ∗ icDepNeutral cn k ∗ irefFrag k qf ∗ txPin icfgLog t qt ∗
+        ∃ (T' : Nat) (a : ChainVG),
+          icRegp k ⟨T', none, a, ∅, a⟩ ∗
           reference (icfgBox k) (some (dev, inum))
             (PartialMap.singleton (some (dev, inum), T') (⟨1⟩ : UFrac) : StampMap IcBid) ∗
-          topLb T') := by
+          topLb T' ∗ vgFloors curCtx a) := by
   have hjoin : ∀ (x : IcX) (ξ' : CtxId),
       iprop(icDeposit (GF := GF) cn k (.depFrz qf dev inum t qt) ∗ icPinTx k) ∗
         icHdrBare k (some (dev, inum)) x ξ' ∗
@@ -900,14 +908,14 @@ theorem icParkFrz [Icfg] [CurCtx] (cpu : CPU) (cn : IcNames) (γfs : FsNames) (�
       iframe Hsel Hpin
   unfold icEscrow icRegp icHold
   iintro #Hbox Hrun Hbare Hrest Hd Hpin ⟨%m, %hm, Hhold⟩
-  imod boxParkJoin (icBoxPay cn γfs γi cov logstart k) (ndot icBoxN k) (icfgBox k) cpu ξ
-      (some (dev, inum)) (fun i x ξ => icHdrBare k i x ξ)
+  imod boxParkJoin (icBoxPay cn γfs γi cov logstart k) (ndot icBoxN k) (icfgBox k) cpu curCtx
+      (some (dev, inum)) (fun i x curCtx => icHdrBare k i x curCtx)
       iprop(icDeposit cn k (.depFrz qf dev inum t qt) ∗ icPinTx k)
       iprop(icDeposit cn k (.depFrz qf dev inum t qt) ∗
         icDeposit cn k (.depFrz qf dev inum t qt) ∗ irefFrag k qf ∗ txPin icfgLog t qt) m E
       (nclose_subseteq' k hE) hjoin
       $$ [Hrun Hbare Hrest Hd Hpin Hhold]
-      with ⟨Hrun, ⟨Hd1, Hd2, Hfrg, Htx⟩, %T', %q, %hq, Hrp, Href, #Hllb⟩
+      with ⟨Hrun, ⟨Hd1, Hd2, Hfrg, Htx⟩, %T', %q, %a, %hq, Hrp, Href, #Hllb, #Hva⟩
   · isplitr
     · iexact Hbox
     iframe Hrun Hd Hpin Hhold
@@ -918,8 +926,8 @@ theorem icParkFrz [Icfg] [CurCtx] (cpu : CPU) (cn : IcNames) (γfs : FsNames) (�
   obtain rfl := ufrac_of_val q 1 (by rw [hq, hm])
   imodintro
   iframe Hrun Hn Hfrg Htx
-  iexists T'
-  iframe Hrp Href
+  iexists T', a
+  iframe Hrp Href Hva
   iexact Hllb
 
 /-- iput's LAST CLOSE with eviction -- (a) at `c = 1` as above, the client
@@ -929,34 +937,34 @@ withdrawn shape, `x1 = icRaw`, entailment `icRest_toRaw`): the slot is dead
 from here (M-1'), and (d) at `none` drops the unit (F18) (Rocq's
 `ic_evict_deposit`). -/
 theorem icEvictDeposit [Icfg] [CurCtx] (cpu : CPU) (cn : IcNames) (γfs : FsNames)
-    (γi : GName) (cov : ExtTreeSet Nat compare) (logstart k : Nat) (ξ : CtxId)
+    (γi : GName) (cov : ExtTreeSet Nat compare) (logstart k : Nat)
     (r : SlotReg IcBid IcX) (x0 : IcX) (T0 : Nat) (E : CoPset)
     (hE : ↑icBoxN ⊆ E) (hw : r.win = true) (hx : r.x = some (x0, T0)) :
     icEscrow (GF := GF) cn γfs γi cov logstart k ⊢
-      ownCtx cpu ξ -∗ icRegd k r -∗ icCnt k 1 -∗
-      icHdr cn γfs γi cov logstart k none .icRaw ξ -∗
-      |={E}=> (ownCtx cpu ξ ∗ icPinTx k ∗
-        ∃ T' : Nat,
-          icRegd k ⟨T', false, none, none⟩ ∗
+      ownCtx cpu curCtx -∗ vgFloors curCtx r.vd -∗ icRegd k r -∗ icCnt k 1 -∗
+      icHdr cn γfs γi cov logstart k none .icRaw curCtx -∗
+      |={E}=> (ownCtx cpu curCtx ∗ icPinTx k ∗
+        ∃ (T' : Nat) (a : ChainVG),
+          icRegd k ⟨T', false, none, none, a⟩ ∗
           icCnt k 1 ∗
           (∃ m : StampMap IcBid, ⌜qsum m = (1 : Qp).val⌝ ∗ reference (icfgBox k) none m) ∗
-          topLb T') := by
+          topLb T' ∗ vgFloors curCtx a) := by
   unfold icEscrow icRegd icCnt
-  iintro #Hbox Hrun Hrd Hc Hhdr
-  imod boxDepositL1Shape (icBoxPay cn γfs γi cov logstart k) (ndot icBoxN k) (icfgBox k) cpu ξ
+  iintro #Hbox Hrun #Hvd Hrd Hc Hhdr
+  imod boxDepositL1Shape (icBoxPay cn γfs γi cov logstart k) (ndot icBoxN k) (icfgBox k) cpu curCtx
       r 1 none x0 .icRaw T0 E (nclose_subseteq' k hE) hw hx
       (fun ξb => icRest_toRawAt k x0 ξb)
-      $$ [Hrun Hrd Hc Hhdr] with ⟨Hrun, HQ, %T', Hrd, Hc, Href, #Hllb⟩
+      $$ [Hrun Hrd Hc Hhdr] with ⟨Hrun, HQ, %T', %a, Hrd, Hc, Href, #Hllb, #Hva⟩
   · isplitr
     · iexact Hbox
     dsimp only [icBoxPay]
-    iframe Hrun Hrd Hc Hhdr
+    iframe Hrun Hrd Hc Hhdr Hvd
   dsimp only [icBoxPay, icQ1]
   rw [show (max 1 1 : Nat) = 1 from rfl]
   imodintro
   iframe Hrun HQ
-  iexists T'
-  iframe Hrd Hc Hllb
+  iexists T', a
+  iframe Hrd Hc Hllb Hva
   iexists _
   iframe Href
   ipureintro
@@ -970,30 +978,30 @@ pairs with its `icBody` into `icDeposit2`.  Cover: the register's stamp
 `T0` (bounded by (a)'s post) under a floor the caller holds -- the itable
 acquire's `Kt`, or `Kd`, whichever (a) named (Rocq's `ic_free_take`). -/
 theorem icFreeTake [Icfg] [CurCtx] (cpu : CPU) (cn : IcNames) (γfs : FsNames) (γi : GName)
-    (cov : ExtTreeSet Nat compare) (logstart k : Nat) (ξ : CtxId) (r : SlotReg IcBid IcX)
+    (cov : ExtTreeSet Nat compare) (logstart k : Nat) (r : SlotReg IcBid IcX)
     (dev inum : BitVec 32) (x0 : IcX) (T0 K : Nat) (s0 : L2Reg IcBid) (E : CoPset)
     (hE : ↑icBoxN ⊆ E) (hw : r.win = true) (hx : r.x = some (x0, T0))
     (hid : r.ident = some (dev, inum)) (hTK : T0 ≤ K) (hs0 : s0.hold = none) :
     icEscrow (GF := GF) cn γfs γi cov logstart k ⊢
-      ownCtx cpu ξ -∗ ctxFloor ξ K -∗
+      ownCtx cpu curCtx -∗ ctxFloor curCtx K -∗ vgFloors curCtx r.vd -∗
       icRegd k r -∗ icCnt k 1 -∗ icQ2 cn γfs γi cov logstart k -∗ icRegp k s0 -∗
-      |={E}=> (ownCtx cpu ξ ∗ icPinTx k ∗
-        icRest k x0 ξ ∗
-        icRegd k ⟨r.td, false, some (dev, inum), none⟩ ∗
+      |={E}=> (ownCtx cpu curCtx ∗ icPinTx k ∗
+        icRest k x0 curCtx ∗
+        icRegd k ⟨r.td, false, some (dev, inum), none, r.vd⟩ ∗
         icCnt k 1 ∗
         icHold k dev inum 1) := by
-  rcases r with ⟨td, win, ident, rx⟩
+  rcases r with ⟨td, win, ident, rx, vd⟩
   simp only at hw hx hid ⊢
   subst hw hx hid
   unfold icEscrow icRegd icCnt icRegp icHold
-  iintro #Hbox Hrun #Hfl Hrd Hc Hq Hrp
-  imod boxL1ToL2 (icBoxPay cn γfs γi cov logstart k) (ndot icBoxN k) (icfgBox k) cpu ξ
-      ⟨td, true, some (dev, inum), some (x0, T0)⟩ x0 T0 K s0 E (nclose_subseteq' k hE) rfl rfl
+  iintro #Hbox Hrun #Hfl #Hvd Hrd Hc Hq Hrp
+  imod boxL1ToL2 (icBoxPay cn γfs γi cov logstart k) (ndot icBoxN k) (icfgBox k) cpu curCtx
+      ⟨td, true, some (dev, inum), some (x0, T0), vd⟩ x0 T0 K s0 E (nclose_subseteq' k hE) rfl rfl
       hTK hs0 $$ [Hrun Hrd Hc Hq Hrp] with ⟨Hrun, HQo, Hrest, Hrd, Hc, %m, %hm, Hhold⟩
   · isplitr
     · iexact Hbox
     dsimp only [icBoxPay]
-    iframe Hrun Hrd Hc Hq Hrp
+    iframe Hrun Hrd Hc Hq Hrp Hvd
     iexact Hfl
   dsimp only [icBoxPay, icQ1]
   imodintro
@@ -1010,13 +1018,13 @@ private theorem icBoxAllocAt_one [Icfg] [CurCtx] (cpu : CPU) (cn : IcNames) (γf
     ownCtx (GF := GF) cpu ξ ∗
       (icBoxRaw (icfgBox k) ∗ icHdr cn γfs γi cov logstart k none .icRaw ξ ∗ icRest k .icRaw ξ) ⊢
       |={E}=> (ownCtx cpu ξ ∗ icEscrow cn γfs γi cov logstart k ∗
-        ∃ Tb : Nat, icRegd k ⟨Tb, false, none, none⟩ ∗ topLb Tb ∗ icCnt k 0 ∗
-          icRegp k ⟨0, none⟩) := by
+        ∃ (Tb : Nat) (a : ChainVG), icRegd k ⟨Tb, false, none, none, a⟩ ∗ topLb Tb ∗ vgFloors ξ a ∗
+          icCnt k 0 ∗ icRegp k L2Reg.init) := by
   iintro ⟨Hrun, Hraw, Hhdr, Hrest⟩
-  icases icBoxRaw_allocAt (icfgBox k) $$ Hraw with ⟨Hst, Hc, Hd, Hp⟩
+  icases icBoxRaw_allocAt (icfgBox k) $$ Hraw with ⟨Hst, Htk, Hc, Hd, Hp⟩
   imod boxAllocAt (icBoxPay cn γfs γi cov logstart k) (ndot icBoxN k) (icfgBox k) cpu ξ none E
-      $$ [Hst Hc Hd Hp Hrun Hhdr Hrest] with ⟨Hrun, %Tb, #Hbx, Hrd, #Hllb, Hc2, Hp2⟩
-  · iframe Hst Hc Hd Hp Hrun
+      $$ [Hst Htk Hc Hd Hp Hrun Hhdr Hrest] with ⟨Hrun, %Tb, %a, #Hbx, Hrd, #Hllb, #Hva, Hc2, Hp2⟩
+  · iframe Hst Htk Hc Hd Hp Hrun
     unfold inArm
     dsimp only [icBoxPay]
     iexists .icRaw
@@ -1026,8 +1034,8 @@ private theorem icBoxAllocAt_one [Icfg] [CurCtx] (cpu : CPU) (cn : IcNames) (γf
   unfold icEscrow icRegd icCnt icRegp
   isplitr
   · iexact Hbx
-  iexists Tb
-  iframe Hrd Hc2 Hp2
+  iexists Tb, a
+  iframe Hrd Hc2 Hp2 Hva
   iexact Hllb
 
 private theorem icBoxAllocAt_range [Icfg] [CurCtx] (cpu : CPU) (cn : IcNames) (γfs : FsNames)
@@ -1039,8 +1047,9 @@ private theorem icBoxAllocAt_range [Icfg] [CurCtx] (cpu : CPU) (cn : IcNames) (�
             icRest k .icRaw ξ) ⊢
       |={E}=> (ownCtx cpu ξ ∗
         ([∗list] k ∈ List.range n, icEscrow cn γfs γi cov logstart k) ∗
-        [∗list] k ∈ List.range n, ∃ Tb : Nat,
-          icRegd k ⟨Tb, false, none, none⟩ ∗ topLb Tb ∗ icCnt k 0 ∗ icRegp k ⟨0, none⟩) := by
+        [∗list] k ∈ List.range n, ∃ (Tb : Nat) (a : ChainVG),
+          icRegd k ⟨Tb, false, none, none, a⟩ ∗ topLb Tb ∗ vgFloors ξ a ∗ icCnt k 0 ∗
+            icRegp k L2Reg.init) := by
   intro n
   induction n with
   | zero =>
@@ -1085,9 +1094,9 @@ theorem icBoxAllocAt [Icfg] [CurCtx] (cpu : CPU) (cn : IcNames) (γfs : FsNames)
           icRest k .icRaw ξ) -∗
       |={E}=> (ownCtx cpu ξ ∗
         icEscrows cn γfs γi cov logstart ∗
-        [∗list] k ∈ List.range NINODE, ∃ T_boot : Nat,
-          icRegd k ⟨T_boot, false, none, none⟩ ∗ topLb T_boot ∗ icCnt k 0 ∗
-            icRegp k ⟨0, none⟩) := by
+        [∗list] k ∈ List.range NINODE, ∃ (T_boot : Nat) (a : ChainVG),
+          icRegd k ⟨T_boot, false, none, none, a⟩ ∗ topLb T_boot ∗ vgFloors ξ a ∗ icCnt k 0 ∗
+            icRegp k L2Reg.init) := by
   iintro Hrun Hall
   unfold icEscrows
   iapply icBoxAllocAt_range cpu cn γfs γi cov logstart ξ E NINODE

@@ -59,7 +59,7 @@ theorem mn_started [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsie : k.sie =
   -- the deposit, at a first opening
   icases kctx_token_acc startedPrimary _ $$ Hk with ⟨Hrun, Hback⟩
   iapply wpLoop_fupd
-  imod started_deposit_open γi ξd P startedPrimary $$ [$Hinv $Hprim $Hrun $HP] with ⟨Hrun, Hprim, #HPd⟩
+  imod started_deposit_open γi ξd P $$ [$Hinv $Hprim $Hrun $HP] with ⟨Hrun, Hprim, #HPd⟩
   imodintro
   ihave Hk := Hback $$ Hrun
   ihave HAU := started_writeAUT γi ξd P $$ [$Hinv $Hprim $HPd]

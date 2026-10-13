@@ -44,6 +44,7 @@ switch (`MainKvm`), out of the `lkFresh consAddr` consoleinit returns.
 -/
 import Xv6.MainSecondaryParts
 import Xv6.SpecPrintkinit
+import Xv6.LockRsv
 
 namespace Xv6
 
@@ -254,24 +255,27 @@ set_option maxHeartbeats 4000000 in
 `uarts[i].tx_lock`), at the running context. -/
 theorem mn_prLocks_born [CurCtx] (cpu : CPU) (k : KCtx) (γpr γl0 γl1 : GName)
     (γ0 γ1 : UartNames) (l0 l1 : List (BitVec 8)) :
-    kctx cpu k ∗ lockFreeTok γpr ∗ lkFresh prLock ∗
+    kctx cpu k ∗ gateFloor curCtx ∗ lockFreeTok γpr ∗ lkFresh prLock ∗
     lockFreeTok γl0 ∗ txOwn γ0 l0 ∗ lkFresh (txLockAddr .uart0) ∗
     lockFreeTok γl1 ∗ txOwn γ1 l1 ∗ lkFresh (txLockAddr .uart1)
     ⊢ |={⊤}=> (kctx (GF := GF) cpu k ∗ mnPrLocks γpr γl0 γl1 γ0 γ1) := by
-  iintro ⟨Hk, Hpf, Hprf, H0f, Htx0, H0fr, H1f, Htx1, H1fr⟩
+  iintro ⟨Hk, #Hg, Hpf, Hprf, H0f, Htx0, H0fr, H1f, Htx1, H1fr⟩
+  icases kctx_lkNameFor cpu k (lk := prLock) xv6RsvStatic_pr $$ Hk with ⟨Hprn, Hk⟩
+  icases kctx_lkNameFor cpu k (lk := txLockAddr .uart0) (xv6RsvStatic_uart 0 (by decide)) $$ Hk with ⟨H0n, Hk⟩
+  icases kctx_lkNameFor cpu k (lk := txLockAddr .uart1) (xv6RsvStatic_uart 1 (by decide)) $$ Hk with ⟨H1n, Hk⟩
   icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
   icases mn_pr_kmap $$ HS with ⟨#Hp0, #Hp16⟩
   icases mn_txLock0_kmap $$ HS with ⟨#H00, #H016⟩
   icases mn_txLock1_kmap $$ HS with ⟨#H10, #H116⟩
-  imod (kctx_newlockAt cpu k γpr prLock "pr" (fun _ => iprop(emp) : CtxId → IProp GF)) $$ [Hk Hpf Hprf] with ⟨Hk, #Hpr⟩
-  · iframe Hk Hpf Hprf Hp0 Hp16
+  imod (kctx_newlockAt cpu k γpr prLock "pr" (fun _ => iprop(emp) : CtxId → IProp GF)) $$ [Hk Hpf Hprf Hprn] with ⟨Hk, #Hpr⟩
+  · iframe Hk Hpf Hprf Hprn Hp0 Hp16 Hg
   imod (kctx_newlockAt cpu k γl0 (txLockAddr .uart0) (txLockName .uart0) (fun _ => txRes (GF := GF) γ0))
-    $$ [Hk H0f Htx0 H0fr] with ⟨Hk, #Hl0⟩
-  · iframe Hk H0f H0fr H00 H016
+    $$ [Hk H0f Htx0 H0fr H0n] with ⟨Hk, #Hl0⟩
+  · iframe Hk H0f H0fr H0n H00 H016 Hg
     iapply mn_txRes_of_own γ0 l0 $$ Htx0
   imod (kctx_newlockAt cpu k γl1 (txLockAddr .uart1) (txLockName .uart1) (fun _ => txRes (GF := GF) γ1))
-    $$ [Hk H1f Htx1 H1fr] with ⟨Hk, #Hl1⟩
-  · iframe Hk H1f H1fr H10 H116
+    $$ [Hk H1f Htx1 H1fr H1n] with ⟨Hk, #Hl1⟩
+  · iframe Hk H1f H1fr H1n H10 H116 Hg
     iapply mn_txRes_of_own γ1 l1 $$ Htx1
   imodintro
   iframe Hk
@@ -287,11 +291,11 @@ theorem mn_prinit (PI : PRINTKINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap
     kctx cpu (k.withRegs R0) ∗ pcIs cpu (KA.«main» + 0x46#64) ∗
     lockWordsR prLock vpl vpn vpc ∗ lockFreeTok γpr ∗
     lockFreeTok γl0 ∗ txOwn γ0 l0 ∗ lkFresh (txLockAddr .uart0) ∗
-    lockFreeTok γl1 ∗ txOwn γ1 l1 ∗ lkFresh (txLockAddr .uart1) ∗
+    lockFreeTok γl1 ∗ txOwn γ1 l1 ∗ lkFresh (txLockAddr .uart1) ∗ gateFloor curCtx ∗
     (∀ R : RegMap, kctx cpu (k.withRegs R) -∗ pcIs cpu (KA.«main» + 0x4a#64) -∗
       mnPrLocks γpr γl0 γl1 γ0 γ1 -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hk, Hpc, Hlw, Hpf, H0f, Htx0, H0fr, H1f, Htx1, H1fr, HΦ⟩
+  iintro ⟨Hk, Hpc, Hlw, Hpf, H0f, Htx0, H0fr, H1f, Htx1, H1fr, #Hg, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x46  jal printkinit
   k_step (wp_s_jal cpu _ (KA.«main» + 0x46#64) false 2095454#21 1#5 (by decide))
@@ -312,7 +316,7 @@ theorem mn_prinit (PI : PRINTKINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap
     unfold lockInited; iintro H; iexact H) $$ Hli with ⟨-, Hprf⟩
   iapply wpLoop_fupd
   imod mn_prLocks_born cpu (k.withRegs R') γpr γl0 γl1 γ0 γ1 l0 l1
-    $$ [$Hk $Hpf $Hprf $H0f $Htx0 $H0fr $H1f $Htx1 $H1fr] with ⟨Hk, #Hls⟩
+    $$ [$Hk $Hpf $Hprf $H0f $Htx0 $H0fr $H1f $Htx1 $H1fr $Hg] with ⟨Hk, #Hls⟩
   imodintro
   iapply HΦ $$ %R' Hk Hpc Hls
 

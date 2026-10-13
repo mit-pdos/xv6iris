@@ -231,6 +231,7 @@ theorem pc_release_cancel (RE : RELEASE_CANCEL) (c : CPU) (k' : KCtx)
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗
       (∃ Hs : Nat → Hist, histBytes pi 4 (fun _ => DFrac.own 1) Hs) -∗
       (∃ Hs : Nat → Hist, histBytes (pi + 16#64) 8 (fun _ => DFrac.own 1) Hs) -∗
+      (∃ Hs : Nat → Hist, histBytes (pi + 8#64) 8 (fun _ => DFrac.own (1 : Qp).half) Hs) -∗
       pipeBytes pi -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   have h := RE.wp_release_cancel (hlc := hlc) (GF := GF) c k' γl "pipe" (pipeResAt γp pi)
@@ -507,12 +508,12 @@ theorem pc_free (RelC : RELEASE_CANCEL) (Kf : KFREE_FREE) (cpu c : CPU) (k : KCt
   · iapply (popArm_sie _ k _ (by k_norm_g)) $$ Harm
   -- past release: the lock is dead, its two words and the rest of the page are ours
   iapply wpNext_intro_pin
-  iintro %c5 %hp5 %R3 Hk Hpc %hcs3 Hw4 Hw8 Hbytes
+  iintro %c5 %hp5 %R3 Hk Hpc %hcs3 Hw4 Hw8 Hnmr Hbytes
   k_norm_g [pc_withLocks_self']
   unfold calleeSaved at hcs3
   k_norm_g at hcs3
   obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs3
-  ihave Hpage := pipeBytes_pageFree pi hok $$ Hm1 Hm2 Hw4 Hw8 Hbytes
+  ihave Hpage := pipeBytes_pageFree pi hok hpv $$ Hm1 Hm2 Hw4 Hw8 Hnmr Hbytes
   have hpin5 : k.sie = false ∨ k.proc = 0#64 → c5 = cpu := fun h => (hp5 h).trans (hpin h)
   -- c.mv a0,s1 (interrupts may be back on: at whichever hart)
   k_step_gen (wp_s_add c5 _ (KA.«pipeclose» + 0x56#64) true 10#5 0#5 9#5 (by decide))

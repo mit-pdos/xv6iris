@@ -726,7 +726,7 @@ theorem wp_power [KernelMap] [KernelRsv]
           · iexists (rsvRegMap (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)))
             iframe HrG
             ipureintro
-            refine ⟨rsvRegMap_staticIn hrwf.1, rsvRegMap_exact _, reservedOk_of_all (rsvRegMap_exact _) ?_⟩
+            refine ⟨rsvRegMap_staticIn hrwf.2.2, rsvRegMap_exact _, reservedOk_of_all (rsvRegMap_exact _) ?_⟩
             rw [hmem0]
             exact rsvAllOk_boot hrwf
           · iexists ∅

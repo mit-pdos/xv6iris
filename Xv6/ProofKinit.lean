@@ -169,7 +169,7 @@ set_option maxHeartbeats 4000000 in
 theorem kinit_proof (IL : INITLOCK) (FR : FREERANGE) : KINIT :=
   ⟨fun {hlc GF} _ _ _ _ cpu k γl γk vlock vname vcpu hnoff hK hlk hp0 => by
   unfold wp_kinit_body
-  iintro ⟨Hk, Hpc, #Hcl, #Hcl', Hwlock, Hwname, Hfl, Hpages, Hlkf, Hav, Hauth, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hcl, #Hcl', Hwlock, Hwname, Hfl, Hpages, Hlkf, Hav, Hauth, #Hg, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   simp only [kinitAddr]
   k_norm_g
@@ -221,9 +221,10 @@ theorem kinit_proof (IL : INITLOCK) (FR : FREERANGE) : KINIT :=
   ihave HR := ki_kmemRes_intro γk $$ [Hfl Hauth]
   case' _ => iframe
   iapply wpLoop_fupd
-  imod (kctx_newlockAt c7 _ γl kmemLockAddr "kmem" (kmemRes γk)) $$ [Hk Hlkf HR Hfresh Hcl Hcl']
+  icases kctx_lkNameFor c7 _ (lk := kmemLockAddr) xv6RsvStatic_kmem $$ Hk with ⟨Hnf, Hk⟩
+  imod (kctx_newlockAt c7 _ γl kmemLockAddr "kmem" (kmemRes γk)) $$ [Hk Hlkf HR Hfresh Hnf Hcl Hcl']
     with ⟨Hk, #Hlk⟩
-  · iframe Hk Hlkf HR Hfresh
+  · iframe Hk Hlkf HR Hfresh Hnf Hg
     isplit
     · iexact Hcl
     · iexact Hcl'

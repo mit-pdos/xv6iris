@@ -445,10 +445,11 @@ instance instCtxMorphPipeSlackAt (pi : BitVec 64) :
 
 /-- The resource `pi->lock` protects: every byte of the page except the lock's
 own two WORDS.  THE PAYLOAD OVER AN EXPLICIT CONTEXT -- what the lock surface
-takes as its `CtxId → IProp`.  The lock's NAME field is here, held raw. -/
+takes as its `CtxId → IProp`.  HALF the lock's NAME field is here (W8 (f2-ctx): the
+other half, raw, is the lock's `lkName`). -/
 def pipeResAt (γp : PipeNames) (pi : BitVec 64) (ξ : CtxId) : IProp GF := iprop%
   ∃ (nr nw ro wo : BitVec 32) (vname : BitVec 64) (bs : List (BitVec 8)),
-    wordAtN ξ (pipeLockName pi) 8 (DFrac.own 1) vname ∗
+    wordAtN ξ (pipeLockName pi) 8 (DFrac.own (1 : Qp).half) vname ∗
     wordAtN ξ (aPnread pi) 4 (DFrac.own 1) nr ∗
     wordAtN ξ (aPnwrite pi) 4 (DFrac.own 1) nw ∗
     wordAtN ξ (aPopen pi false) 4 (DFrac.own 1) ro ∗
@@ -480,7 +481,7 @@ instance instCtxMorphPipeResAt (γp : PipeNames) (pi : BitVec 64) :
 its ghosts are spent, and what pipeclose reassembles into `pageOwn` for kfree. -/
 def pipeBytes (pi : BitVec 64) : IProp GF := iprop%
   ∃ (vname : BitVec 64) (nr nw ro wo : BitVec 32) (bs : List (BitVec 8)),
-    wordAtN curCtx (pipeLockName pi) 8 (DFrac.own 1) vname ∗
+    wordAtN curCtx (pipeLockName pi) 8 (DFrac.own (1 : Qp).half) vname ∗
     wordAtN curCtx (aPnread pi) 4 (DFrac.own 1) nr ∗
     wordAtN curCtx (aPnwrite pi) 4 (DFrac.own 1) nw ∗
     wordAtN curCtx (aPopen pi false) 4 (DFrac.own 1) ro ∗
@@ -557,9 +558,9 @@ Persistent, so every holder of either end shares it.  Built via
 to open it is a resource (a reference, or the lock token). -/
 def isPipe (γl : GName) (γp : PipeNames) (pi : BitVec 64) : IProp GF := iprop%
   ⌜lockAddrOk pi⌝ ∗ ⌜pageValid pi ∧ ¬ lkRsvIn (hlc := hlc) (GF := GF) pi⌝ ∗ kmapId pi ∗ kmapId (pi + 16#64) ∗
-  ∃ lo lc : Nat,
-    inv lockN (iprop(lockBody γl pi "pipe" (pipeResAt γp pi) lo lc ∨ pipeDead γl γp)) ∗
-    lkFloor curCtx lo ∗ lkFloor curCtx lc
+  ∃ (lo lc : Nat) (Vb : CPU → Nat),
+    inv lockN (iprop(lockBody γl pi "pipe" (pipeResAt γp pi) lo lc Vb ∨ pipeDead γl γp)) ∗
+    lkFloor curCtx lo ∗ lkFloor curCtx lc ∗ vecFloors curCtx Vb ∗ gateFloor curCtx
 
 instance isPipe_persistent (γl : GName) (γp : PipeNames) (pi : BitVec 64) :
     Persistent (isPipe (GF := GF) γl γp pi) := by unfold isPipe; infer_instance
@@ -598,9 +599,9 @@ theorem isPipe_openable (γl : GName) (γp : PipeNames) (pi : BitVec 64) :
     isPipe (GF := GF) γl γp pi -∗
     lockOpenable γl pi "pipe" (pipeResAt γp pi) (pipeDead γl γp) := by
   unfold isPipe
-  iintro ⟨%hok, %hpv, #Hm1, #Hm2, %lo, %lc, #Hinv, #Hflo, #Hflc⟩
-  iapply (lockOpenable_of_dead γl pi "pipe" (pipeResAt γp pi) (pipeDead γl γp) lo lc hok hpv.2)
-    $$ Hm1 Hm2 Hinv Hflo Hflc
+  iintro ⟨%hok, %hpv, #Hm1, #Hm2, %lo, %lc, %Vb, #Hinv, #Hflo, #Hflc, #Hvf, #Hg⟩
+  iapply (lockOpenable_of_dead γl pi "pipe" (pipeResAt γp pi) (pipeDead γl γp) lo lc Vb hok hpv.2)
+    $$ Hm1 Hm2 Hinv Hflo Hflc Hvf Hg
 
 end
 

@@ -356,13 +356,16 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 count fragment at the reference's whole fraction `Q + Q`, its lent stamps,
 the reader unit.  Keyed ghost only -- the cells, the liveness slice and the
 sleep-lock share ride the fractional payload OUTSIDE the invariant
-(`inodeRefSide`), so the invariant's body names no context. -/
-def inodeCore [Icfg] (v : BitVec 64) (Q : Qp) (inum : BitVec 32) : IProp GF := iprop%
+(`inodeRefSide`), so the invariant's body names no context.  (W8 (f2-ctx):
+the lent stamps' CONTEXT-FREE part, `icStampsCF`, at the tickets `mt`; their
+tag floors ride `inodePay` beside the invariant.) -/
+def inodeCore [Icfg] (v : BitVec 64) (Q : Qp) (inum : BitVec 32) (mt : StampMap IcBid) : IProp GF := iprop%
   ∃ k : Nat, ⌜v = ientry k⌝ ∗ ⌜k < NINODE⌝ ∗ ⌜inum.toNat < 16 * icfgNib⌝ ∗ ⌜0 < inum.toNat⌝ ∗
-    irefFrag k (Q + Q) ∗ icLentStamps k (Q + Q) Q icfgDev inum ∗ runitAny inum.toNat
+    irefFrag k (Q + Q) ∗ icStampsCF k (some (icfgDev, inum)) (1 + Q.val - (Q + Q).val) mt ∗
+    runitAny inum.toNat
 
-instance inodeCore_timeless [Icfg] (v : BitVec 64) (Q : Qp) (inum : BitVec 32) :
-    Timeless (inodeCore (GF := GF) v Q inum) := by
+instance inodeCore_timeless [Icfg] (v : BitVec 64) (Q : Qp) (inum : BitVec 32) (mt : StampMap IcBid) :
+    Timeless (inodeCore (GF := GF) v Q inum mt) := by
   unfold inodeCore; infer_instance
 
 end InodeCore
@@ -428,7 +431,8 @@ WHOLE `inodeHeld` for iput (`inodePay_cancel`); sys_open publishes one
 (`inodePay_alloc`). -/
 def inodePay (γx : GName) (Q : Qp) (g : GName) (inum : BitVec 32) (v : BitVec 64)
     (fdty : BitVec 32) (wr : Bool) (q : Qp) : IProp GF := iprop%
-  CancelableInvariant.cinv fileipN γx (inodeCore v Q inum) ∗ CancelableInvariant.own γx q ∗
+  ∃ mt : StampMap IcBid, CancelableInvariant.cinv fileipN γx (inodeCore v Q inum mt) ∗ tagsFl curCtx mt ∗
+  CancelableInvariant.own γx q ∗
   inodeRefSide v (qpMul q Q) g inum ∗ inodeShrHeldGen v (qpMul q Q) g inum ∗
   ∃ ty : BitVec 16, ityShot g ty ∗ ⌜wr = true → ty.toNat ≠ T_DIR_z⌝ ∗
     ⌜fdty = FD_INODE → ty.toNat ≠ T_DEVICE⌝
@@ -451,12 +455,12 @@ def offFree (k : Nat) (q : Qp) : IProp GF :=
 
 /-- THE FD'S SHARE OF THE OFF BOX (Rocq `off_fd`): every piece at the fd's
 fraction `q` -- the two register halves of the box's client side at `q/2`
-(the birth stamp `T0` ∃-bound, the count at the constant 1), the stamps
+(the birth stamp `T0` and, W8 (f2-ctx), L1's chain bound `a` ∃-bound, the count at the constant 1), the stamps
 share at mass `q`, membership in the inode's published set, the handle. -/
 def offFd (k : Nat) (q : Qp) (γb : BoxNames) (γo : GName) (C : FContent) : IProp GF := iprop%
-  ∃ (i T0 : Nat), ⌜C.ip = ientry i⌝ ∗ ⌜i < NINODE⌝ ∗
+  ∃ (i T0 : Nat) (a : MachCSL.ChainVG), ⌜C.ip = ientry i⌝ ∗ ⌜i < NINODE⌝ ∗
     offBox k γb γo ∗ offMember offCfg i γb ∗
-    (γb.slotd ↪VAR{.own q.half} (⟨T0, false, k, none⟩ : SlotReg Nat Unit)) ∗
+    (γb.slotd ↪VAR{.own q.half} (⟨T0, false, k, none, a⟩ : SlotReg Nat Unit)) ∗
     (γb.cnt ↪VAR{.own q.half} (1 : Nat)) ∗
     offRefStamps γb k q
 
@@ -464,9 +468,9 @@ def offFd (k : Nat) (q : Qp) (γb : BoxNames) (γo : GName) (C : FContent) : IPr
 reader presents at its ilock acquire is the fragment's `topLb`. -/
 def offFdAt (k : Nat) (q : Qp) (γb : BoxNames) (γo : GName) (C : FContent) (m : StampMap Nat) :
     IProp GF := iprop%
-  ∃ (i T0 : Nat), ⌜C.ip = ientry i⌝ ∗ ⌜i < NINODE⌝ ∗
+  ∃ (i T0 : Nat) (a : MachCSL.ChainVG), ⌜C.ip = ientry i⌝ ∗ ⌜i < NINODE⌝ ∗
     offBox k γb γo ∗ offMember offCfg i γb ∗
-    (γb.slotd ↪VAR{.own q.half} (⟨T0, false, k, none⟩ : SlotReg Nat Unit)) ∗
+    (γb.slotd ↪VAR{.own q.half} (⟨T0, false, k, none, a⟩ : SlotReg Nat Unit)) ∗
     (γb.cnt ↪VAR{.own q.half} (1 : Nat)) ∗
     ⌜MachCSL.qsum m = q.val⌝ ∗ reference γb k m
 
