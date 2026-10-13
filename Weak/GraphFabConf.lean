@@ -9,7 +9,7 @@ Lean-only, no Rocq twin.
   §2  **`xv6ConfS`** — the SHAPED, UNPINNED, FABRIC-ORDERED, TAGGED conformance text of §A(†):
       `gfexecConfIO`'s rows (per-row `hartConff` emission with two fabric endpoints and contact
       bits, membership by fabric CONTACT [OWN.43], fabric endpoints read off the global trace
-      `fab`, the fetch-clause SLOT `emZifencei`) with the dependency clause TAGGED (every edge
+      `fab`, the PINNED fetch clause `emFetchImg`) with the dependency clause TAGGED (every edge
       `rowDepsT` emits is in `gtDeps` with its tag — `gdexecQconfT`'s clause, `CatLinChain.lean`
       §3) and NO `emDevfree` (this is where W13 (F-dep)'s I/O-endpoint edges first have a
       consumer).  `xv6ConfSForget`: the projection to the untagged `gfexecConfIO` on
@@ -38,10 +38,14 @@ only; proving it is W14's.)
 
 **Deviations from the plan text.**  (1) `xv6ConfS` quantifies the fabric trace `fab`
 EXISTENTIALLY (§A's statement passes no `fab`; `fab 0 = d0` is inside).  (2) The fetch clause is
-the SLOT `emZifencei` with its current content (`emFetchImg`); W5d-G G1 changes its content in
-`Fab` — ONE S rebase of nothing here (the slot's NAME is what `xv6ConfS` uses).  (3) The plan's
-W13-wit (hart 0 to its first UART store, by kernel evaluation) and the Bool twin of `xv6ConfS` are
-NOT in this increment (`PROGRESS-W13W.md`).
+the PINNED `emFetchImg` — `gfexecConfIO`'s clause after W5d-G G1 (D43 (a), kept for the pinned
+supply).  At G6 it moves to the unpinned Zifencei slot `emZifencei` of `gfexecConfZ`
+(`WeakRvwmoFab`): the ONE conjunct `emFetchImg GT.gfGd.gtG.gxImg em` of `gfexecConfIOT` below
+becomes `emZifencei GT.gfGd.gtG i em`, and `xv6ConfSForget` then projects to `gfexecConfZ`
+(W13-wit re-discharges it from the same image-answered fetches).  (3) The plan's
+W13-wit (hart 0 to its first UART store, by kernel evaluation) and the Bool twin of `xv6ConfS`
+(`xv6ConfSB`) are increment 2: `Weak/W13WitRun.lean` (runner, soundness, twin) and
+`Weak/W13Wit.lean` (`w13Wit`).
 
 **Name map.**  Lean-only: `GfexecT`, `forgetF`, `gfexecConfIOT`, `xv6ConfS`, `xv6ConfSForget`,
 `GraphFabConf.hemitfTagLbl`, `GraphFabConf.isHart`, `GraphFabConf.isLDev`,
@@ -72,7 +76,8 @@ def forgetF (GT : GfexecT) : Gfexec := ⟨forget GT.gfGd, GT.gfDev⟩
 /-! # 2. `xv6ConfS` -/
 
 /-- The device-ACTIVE fabric conformance over the tagged graph: `gfexecConfIO`'s clauses with the
-dependency clause TAGGED (no `emDevfree`). -/
+dependency clause TAGGED (no `emDevfree`).  The fetch conjunct is the pinned `emFetchImg`; it is
+the one that moves to `emZifencei` (`gfexecConfZ`) at W5d-G G6 (header, deviation 2). -/
 def gfexecConfIOT (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GT : GfexecT) : Prop :=
   fab 0 = d0 ∧
   GT.gfDev.Nodup ∧
