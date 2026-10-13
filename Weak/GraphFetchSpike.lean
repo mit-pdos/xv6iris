@@ -5,7 +5,8 @@ no Rocq twin; imported by no root.
 
 The Stage-0 spike's Lean file (226 lines, 2026-10-09) was lost before jj snapshotted it
 [R10.4][OWN.18].  This file re-creates it from the report `notes/W5dG-spike.md`: VERBATIM where
-the report's §2 gives Lean (`gwlog`, `gfcut`, `gzContrib`, `gzFetch`, `emZifencei`), and from the
+the report's §2 gives Lean (`gwlog`, `gfcut`, `gzContrib`, `gzFetch`; `emZifencei` up to R8's slot
+function), and from the
 report's prose (§0, §2 "Kernel-text instance", §3) plus plan §B(4)(iii) where it does not.
 
 What it does.  The fetch stays an ADMINISTRATIVE emission item (report §0).  The graph-tier
@@ -90,6 +91,13 @@ R32 [R32.3]): the report's `emZifencei` is `GraphFetchSpike.emZifencei` here -- 
 of `GraphFetchSpike.emZifencei` as the content of the `emZifencei` slot (W13 (I)),
 `Gdexec.gdFetch`, the gwlog/gwix bridge, retime, hull closure (the report's risk R1),
 `linPrefixLog`, the floor bound.
+
+**W5d-G G1 edits (2026-10-13; plan rev 45 §C W5d-G, the six G0 carry-overs).**  (Z2) of `gzFetch`
+is STRENGTHENED to R1 (a)'s E1′ (carry-over 4; see `gzFetch`); `gzContrib`'s fence.i sites are a
+`Prop` predicate (the emission's `GraphFetch.emFenceI`); docstrings per carry-overs 3, 5, 6.
+`emFenceI`/`emFenceISound`, `emSlotShift` (carry-over 2) and the kernel-text instance of
+`gzFetch` are in `Weak/GraphFetch.lean`; the `emZifencei` slot content and the Zifencei bundle
+`gfexecConfZ` in `Weak/WeakRvwmoFab.lean`.
 -/
 import Weak.WeakRvwmoConf
 import Weak.WeakRvwmoLin
@@ -263,8 +271,8 @@ theorem GraphFetchSpike.fetchCutRel (img : Image) (log : List Wmsg) (cut itv : N
     obtain ⟨hi, hl⟩ := he t' h1' h2'
     exact ⟨fun c hc => by rw [List.mem_singleton] at hc; omega, hl⟩
 
-/-- THE GRAPH CUT FORM: one view `q` with `itv ≤ q ≤ next-own-write` over the graph's write log.
-(R6) -/
+/-- THE GRAPH CUT FORM: one view `q` with `itv ≤ q <` next-own-write (`q ≤ gfcut = gwix nxw -
+1`) over the graph's write log.  (R6; G0 review item 5) -/
 def gzFetchCut (G : Gexec) (i k itv : Nat) (base : Int) (tvs : List (Nat × BitVec 8)) : Prop :=
   fetchCutOk G.gxImg (gwlog G) (gfcut G i k) itv base tvs
 
@@ -272,20 +280,36 @@ def gzFetchCut (G : Gexec) (i k itv : Nat) (base : Int) (tvs : List (Nat × BitV
 
 /-- fence.i contributors at slot k (Q-G2 (a), the superset; D41 RULED (a) [OWN.16]; R7): own
 writes po-before a fence.i site before the slot, and rf-sources of the hart's reads po-before
-it. -/
-def gzContrib (G : Gexec) (fi : Nat → Bool) (i k : Nat) (c : Geid) : Prop :=
-  ∃ f, f < k ∧ fi f = true ∧
+it.  (W5d-G G1: the fence.i sites `fi` are a predicate on row slots -- the emission's
+`GraphFetch.emFenceI em`, D40 [OWN.15].) -/
+def gzContrib (G : Gexec) (fi : Nat → Prop) (i k : Nat) (c : Geid) : Prop :=
+  ∃ f, f < k ∧ fi f ∧
     ((c.1 = i ∧ c.2 < f ∧ gisW G c = true) ∨
      (∃ r a t v, r.1 = i ∧ r.2 < f ∧ greadsByte G r a t v ∧ gwriteAt G t = some c))
 
-/-- THE TRUSTED-BASE ITEM, one fetch item (hart i, row slot k). -/
+/-- THE TRUSTED-BASE ITEM, one fetch item (hart i, row slot k).
+
+W5d-G G1 (G0 review item 4; plan §B(4)(iii) R1 (a), E1′): (Z2) is stated in the E1′ form --
+the source is gmo-before EVERY memory event of hart `i` at or after slot `k` -- not the report's
+"gmo-before the next own write `gnxw`".  The report's form is WEAKER than its own reading (H3):
+a later own store to another address may be gmo-before `gnxw`, so it admitted a fetch reading
+the hart's own LATER store.  E1′ reads (H3′): an instruction's memory accesses are performed
+after the fetches of it and of every po-earlier instruction (in-order fetch), and a fetch after
+its source -- STRONGER than the spec (RVWMO has no fetch model; Zifencei is silent on the
+order of a fetch against later accesses), gmo-TRUE on in-order-fetch hardware; listed in plan
+§B(11).  It implies (H3) (every own write at/after `k` is gmo-after the source) and the report's
+(Z2) (`gnxw` is such a write), and it makes "kept fetch ⇒ source kept" follow from
+racyD-closure of the hull (risk R1 (a)).  (Z3)'s "one fill instant per label": Sail's `fetch`
+(`LeanRV64D/Fetch.lean:253-288`) does ONE 4-byte read at a 4-aligned pc under `Ext_Ziccif`
+(`PlatformConfig.lean:2157`) -- it FOLLOWS from Sail + Ziccif; only (H1)'s no-forwarding half
+is a stronger hardware reading (G0 review item 6). -/
 def gzFetch (G : Gexec) (C : Geid → Prop) (i k : Nat) (base : Int)
     (tvs : List (Nat × BitVec 8)) : Prop :=
   ∀ (j t : Nat) (v : BitVec 8), tvs[j]? = some (t, v) →
     -- (Z1) value
     logByte G.gxImg (gwlog G) t (base + (j : Int)) = some v ∧
-    -- (Z2) not from the future
-    (∀ w n, gwriteAt G t = some w → gnxw G (i, k) = some n → gmoLt G w n) ∧
+    -- (Z2) not from the future -- E1′: before every own memory event at/after the slot
+    (∀ w k', gwriteAt G t = some w → k ≤ k' → gmem G (i, k') → gmoLt G w (i, k')) ∧
     -- (Z3) fresh past fence.i, one cut per label
     (∀ w' v', gwritesByte G w' (base + (j : Int)) v' → t < gwix G w' →
        (∀ c, C c → gmoLt G c w') ∧
@@ -293,7 +317,10 @@ def gzFetch (G : Gexec) (C : Geid → Prop) (i k : Nat) (base : Int)
          gwriteAt G tl = some wl → gmoLt G wl w'))
 
 /-- The row slot of emission item `n`: the slot tag of the first row item at or after `n`;
-past-the-end after the last row item.  (R8) -/
+past-the-end after the last row item.  (R8)  The past-the-end default is the number of ROW
+ITEMS, which double-counts exclusive pairs (two row items per slot); it is UNREACHABLE for a
+`hemit` emission -- `hemit` ends with a row item (`HEnil` emits nothing), so every admin item,
+fetches included, has a row item after it (G0 review item 3). -/
 def GraphFetchSpike.emSlot (its : List Eitem) (n : Nat) : Nat :=
   (((its.drop n).filterMap Prod.snd).head?).getD (its.filterMap Prod.snd).length
 

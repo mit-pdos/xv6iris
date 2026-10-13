@@ -61,11 +61,11 @@ dummy default.
    programs, `WeakEvPf` deviation 9 / owner decision Q1).
 2. O2 / STAGE C — THE FETCH IS ADMINISTRATIVE, PINNED TO THE BOOT IMAGE, exactly as in
    `WeakRvwmoSupply` (its deviation 2; owner ruling Q-C1, `notes/weak-port-o2-stageC.md` §B).
-   - `gfexecConfIO` gains, per row, the clause `emZifencei GF.gfGd.gdG.gxImg em` (W13 (I)
-     [R28.s5]: the stage-C `emFetchImg` under the plan's slot name -- every fetch item of the
-     emission reads the graph's image at timestamp 0; W5d-G G1 gives the slot its Zifencei
-     content), between the fabric clause and the deps clause; `gfexecConfOfQconf` takes it from
-     `gdexecQconf`'s.
+   - `gfexecConfIO` gains, per row, the clause `emFetchImg GF.gfGd.gdG.gxImg em` (every fetch
+     item of the emission reads the graph's image at timestamp 0; W13 (I) [R28.s5] called it the
+     `emZifencei` slot until W5d-G G1 gave that slot its Zifencei content in `gfexecConfZ`,
+     deviation 6), between the fabric clause and the deps clause; `gfexecConfOfQconf` takes it
+     from `gdexecQconf`'s.
    - Lean-only `WeakRvwmoFab.pstepQ Q` (`pstepEv` restricted to labels satisfying `Q`;
      `pstepQ (WeakAxRealize.fetchPin im)` is `pstepPin im pstepEv`, `WeakRvwmoFab.pstepQPin`),
      `WeakRvwmoFab.admRunQ`, `hblkQ Q` (`hblk` at `pstepQ Q`), `hblkQHblk`, `hemitfStatesQ`,
@@ -118,6 +118,27 @@ dummy default.
    EQUAL to [R22.2] on every xv6 run, STRONGER as generic trusted text only by unreachable
    non-moving fabric-touching blocks ((R3) orders them).  `supplyOfFconf` is unchanged.
 
+6. **W5d-G G1 — THE ZIFENCEI FETCH CLAUSE** (plan rev 45 §C W5d-G G1; D27 (a) [OWN.6], D40
+   [OWN.15], D43 (a) [OWN.18], [OWN.26]).  The slot `emZifencei` gets its Zifencei content:
+   `emZifencei G i em := GraphFetch.emZif G i em` (`Weak/GraphFetch.lean`: every administrative
+   fetch item of hart `i`'s emission satisfies the trusted-base item `gzFetch` at its real slot
+   tag, with the emission's fence.i contributors `gzContrib G (emFenceI em) i`).  The bundle that
+   carries it is **`gfexecConfZ`** -- `gfexecConfIO`'s text with the slot `emZifencei
+   GF.gfGd.gdG i em` (`gfexecConfZ` is `xv6ConfS`'s fabric half, W13 (W)).  DEVIATION from the
+   plan's "the slot is replaced in `gfexecConfIO`": the PINNED supply (`fconfRowsPin`,
+   `supplyOfFconf`, `fconfSupply`, and W13's chain over them in `FabInd`/`Lin2`/`KillIO`) needs
+   every block's labels pinned (`hblkQ (fetchPin im)`), and D43 (a) keeps `pstepPin`/`fetchPin`
+   as the M1 kernel-text instance until G6 re-threads the supply onto `execProgOk'S`; and the
+   Zifencei clause is not transported by `gfexecConfRen`/`gfexecConfHull` before G2 (tags =
+   gmo indices), G3/G4 (the fetch fragment in `racyD`, `retimeZifencei`) and the hull closure
+   (R1 (a)).  So `gfexecConfIO` stays the PINNED bundle -- its slot is now written
+   `emFetchImg GF.gfGd.gdG.gxImg em` directly (TEXT of the clause unchanged; the old slot def is
+   gone) -- and `gfexecConfZOfIO` moves a pinned bundle to the Zifencei one given the per-row
+   slot, e.g. by the kernel-text instance `GraphFetch.emZifOfPinC` (pinned fetches of unwritten
+   bytes).  G6 collapses the two.  Spec: an encoding choice (the ISA is silent on proof
+   organisation); `gfexecConfZ` is FAITHFUL to the Zifencei reading of `gzFetch`, `gfexecConfIO`
+   is the pinned (kernel-only, STRONGER) M1 instance.
+
 **Rocq → Lean name map.**  `orb_false_split` `orbFalseSplit`, `lb_isdev` `lbIsdev`,
 `lb_isdev_ne` `lbIsdevNe`, `has_dev` `hasDev`, `has_dev_false` `hasDevFalse`, `em_dev` `emDev`,
 `is_dev_block` `isDevBlock`, `is_dev_block_dec` `isDevBlockDec`, `em_dev_eadm` `emDevEadm`,
@@ -147,6 +168,7 @@ are unchanged in text (`WeakRvwmoAcyc.coeCoreOfMinus`).
 -/
 import Weak.WeakRvwmoSupply
 import Weak.WeakRvwmoDec
+import Weak.GraphFetch
 
 namespace Weak
 
@@ -813,11 +835,13 @@ theorem WeakRvwmoFab.gisIoRow (G : Gexec) (i k : Nat) (row : List Lbl) (lb : Lbl
   rw [hrow]
   simp only [Option.bind_some, hlb]
 
-/-- THE FETCH CLAUSE'S SLOT (W13 (I) [R28.s5]: a RENAME only).  `xv6ConfS`'s `emZifencei`
-(§A(†)), here with the content of the stage-C clause `emFetchImg` (every fetch item of the
-emission reads the graph's image at timestamp 0); W5d-G G1 fills in its Zifencei content (the
-spike's `GraphFetchSpike.emZifencei`) AFTER W13 (I), keeping this file single-writer (D26). -/
-def emZifencei (im : Image) (em : Hemission) : Prop := emFetchImg im em
+/-- **THE FETCH CLAUSE** (`xv6ConfS`'s `emZifencei`, §A(†); W5d-G G1, deviation 6): every
+administrative fetch item of hart `i`'s emission satisfies the trusted-base item `gzFetch`
+(readings (H1)–(H3), (Z2) in E1′ form; `Weak/GraphFetchSpike.lean`) at its REAL slot tag
+`GraphFetchSpike.emSlot` [OWN.26], with the fence.i contributors of the emission's sites
+`emFenceI em` (D40 [OWN.15], D41 (a) [OWN.16]).  It is the slot of the Zifencei bundle
+`gfexecConfZ`; the pinned bundle `gfexecConfIO` carries the stage-C `emFetchImg` (D43 (a)). -/
+def emZifencei (G : Gexec) (i : Nat) (em : Hemission) : Prop := GraphFetch.emZif G i em
 
 /-- **THE FABRIC BUNDLE `gfexecConfIO`** (W13 (I), deviation 5; Rocq's `gfexec_conf` with its
 `isDevBlock` clause replaced and W-DISK's interim disk-row clause deleted).
@@ -834,7 +858,9 @@ Per row: an emission `em` with the blocks' fabric endpoints `dvi k → dvo k` an
   (`WeakEvInst.pdevEvOk`) -- which is what `supplyOfFconf`'s replay at the global fabric
   `fab ∘ dcnt` needs (`fconfRowsPin`);
 * the members' endpoints pinned to the global fabric trace `fab` in `gfDev`'s order;
-* the fetch clause `emZifencei` (W5d-G's slot, content `emFetchImg` until G1);
+* the PINNED fetch clause `emFetchImg` (the stage-C clause: every fetch item reads the image at
+  timestamp 0) -- D43 (a): the M1 kernel-text instance, kept for the pinned supply until G6; the
+  Zifencei bundle is `gfexecConfZ` (deviation 6);
 * the row's dependency edges in `gdDeps`.
 
 TRUSTED-SURFACE MARKS (§A(†), rev 35).  RVWMO / riscv.cat / Sail have NO device-internal events;
@@ -856,8 +882,62 @@ def gfexecConfIO (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF : G
        (∀ k : Nat, k < row.length →
           ((i, k) ∈ GF.gfDev ↔ (gisIo GF.gfGd.gdG (i, k) = true ∨ dvi k ≠ dvo k ∨ tq k = true))) ∧
        (∀ (k n : Nat), GF.gfDev[n]? = some (i, k) → dvi k = fab n ∧ dvo k = fab (n + 1)) ∧
-       emZifencei GF.gfGd.gdG.gxImg em ∧
+       emFetchImg GF.gfGd.gdG.gxImg em ∧
        (∀ jk, jk ∈ rowDeps em.emItems → ((i, jk.1), (i, jk.2)) ∈ GF.gfGd.gdDeps))
+
+/-- **THE ZIFENCEI FABRIC BUNDLE `gfexecConfZ`** (W5d-G G1, deviation 6): `gfexecConfIO`'s text
+with the fetch clause `emZifencei GF.gfGd.gdG i em` (the trusted-base item `gzFetch` at every
+administrative fetch item, real slot tag, emission fence.i contributors) in place of the pinned
+`emFetchImg` -- UNPINNED: a fetch may read any write the Zifencei reading allows.  `xv6ConfS`'s
+fabric half (W13 (W)); the fetch fragment `F_em ⊆ gdFetch` joins at G3. -/
+def gfexecConfZ (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF : Gfexec) :
+    Prop :=
+  fab 0 = d0 ∧
+  GF.gfDev.Nodup ∧
+  (∀ (n i k : Nat), GF.gfDev[n]? = some (i, k) →
+     ∃ row, GF.gfGd.gdG.gxProg[i]? = some row ∧ k < row.length) ∧
+  (∀ (i : Nat) (row : List Lbl), GF.gfGd.gdG.gxProg[i]? = some row →
+     ∃ (em : Hemission) (dvi dvo : Nat → Efab) (tq : Nat → Bool),
+       hartConff i row (boot i) dvi dvo tq em ∧
+       (∀ k : Nat, k < row.length →
+          ((i, k) ∈ GF.gfDev ↔ (gisIo GF.gfGd.gdG (i, k) = true ∨ dvi k ≠ dvo k ∨ tq k = true))) ∧
+       (∀ (k n : Nat), GF.gfDev[n]? = some (i, k) → dvi k = fab n ∧ dvo k = fab (n + 1)) ∧
+       emZifencei GF.gfGd.gdG i em ∧
+       (∀ jk, jk ∈ rowDeps em.emItems → ((i, jk.1), (i, jk.2)) ∈ GF.gfGd.gdDeps))
+
+/-- A pinned bundle is a Zifencei bundle once every row's pinned emission satisfies the slot
+(deviation 6; the two share every other clause). -/
+theorem gfexecConfZOfIO (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF : Gfexec) :
+    gfexecConfIO boot d0 fab GF →
+    (∀ (i : Nat) (row : List Lbl) (em : Hemission) (dvi dvo : Nat → Efab) (tq : Nat → Bool),
+      GF.gfGd.gdG.gxProg[i]? = some row → hartConff i row (boot i) dvi dvo tq em →
+      emFetchImg GF.gfGd.gdG.gxImg em → emZifencei GF.gfGd.gdG i em) →
+    gfexecConfZ boot d0 fab GF := by
+  rintro ⟨h0, hnd, hbnd, hc⟩ hz
+  refine ⟨h0, hnd, hbnd, fun i row hrow => ?_⟩
+  obtain ⟨em, dvi, dvo, tq, hem, hiff, hpin, hfi, hdep⟩ := hc i row hrow
+  exact ⟨em, dvi, dvo, tq, hem, hiff, hpin, hz i row em dvi dvo tq hrow hem hfi, hdep⟩
+
+/-- THE KERNEL-TEXT INSTANCE at the bundle (D43 (a)): a pinned bundle whose rows' fetched bytes
+the graph never writes is a Zifencei bundle (`GraphFetch.emZifOfPinC`). -/
+theorem gfexecConfZOfText (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF : Gfexec) :
+    gfexecConfIO boot d0 fab GF →
+    (∀ (i : Nat) (row : List Lbl) (em : Hemission) (dvi dvo : Nat → Efab) (tq : Nat → Bool),
+      GF.gfGd.gdG.gxProg[i]? = some row → hartConff i row (boot i) dvi dvo tq em →
+      GraphFetch.emFetchUnwritten GF.gfGd.gdG em) →
+    gfexecConfZ boot d0 fab GF :=
+  fun hc hnw => gfexecConfZOfIO boot d0 fab GF hc
+    (fun i row em dvi dvo tq hrow hem hfi =>
+      GraphFetch.emZifOfPinC _ i em hfi (hnw i row em dvi dvo tq hrow hem))
+
+/-- A graph that writes no byte at all (e.g. a kernel-boot prefix up to the first store)
+satisfies every row's unwritten-fetch condition. -/
+theorem gfexecConfZOfNoWrite (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF : Gfexec) :
+    gfexecConfIO boot d0 fab GF →
+    (∀ w a v, ¬ gwritesByte GF.gfGd.gdG w a v) →
+    gfexecConfZ boot d0 fab GF :=
+  fun hc hnw => gfexecConfZOfText boot d0 fab GF hc
+    (fun _ _ _ _ _ _ _ _ _ _ _ _ _ _ w v => hnw w _ v)
 
 /-! ## 5. The model arm -/
 
@@ -1122,7 +1202,7 @@ theorem supplyOfFconf (c : Cand) (boot : Nat → Pexv6) (fab : Nat → Efab) (GF
 
 /-! ### 7.1 The bundle supplies `supplyOfFconf`'s third hypothesis -/
 
-/-- (Lean-only, deviation 2) `fconfRows` at the pinned LTS: the bundle's `emZifencei` clause
+/-- (Lean-only, deviation 2) `fconfRows` at the pinned LTS: the bundle's `emFetchImg` clause
 pins the blocks to the graph's image.  (W13 (I), deviation 5: the non-member conjunct -- the
 `∀ d` folding -- is DERIVED from contact: a non-member's contact bit is `false`.) -/
 theorem fconfRowsPin (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF : Gfexec)

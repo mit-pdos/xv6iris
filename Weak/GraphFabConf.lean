@@ -84,7 +84,7 @@ def gfexecConfIOT (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GT : 
        (∀ k : Nat, k < row.length →
           ((i, k) ∈ GT.gfDev ↔ (gisIo GT.gfGd.gtG (i, k) = true ∨ dvi k ≠ dvo k ∨ tq k = true))) ∧
        (∀ (k n : Nat), GT.gfDev[n]? = some (i, k) → dvi k = fab n ∧ dvo k = fab (n + 1)) ∧
-       emZifencei GT.gfGd.gtG.gxImg em ∧
+       emFetchImg GT.gfGd.gtG.gxImg em ∧
        (∀ e, e ∈ rowDepsT em.emItems → (((i, e.1.1), (i, e.1.2)), e.2) ∈ GT.gfGd.gtDeps))
 
 /-- **`xv6ConfS`** (§A(†)): the booted image, at most `nh` rows, and a fabric trace along which
