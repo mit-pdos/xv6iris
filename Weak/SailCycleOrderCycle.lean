@@ -173,9 +173,9 @@ theorem srvwmoXv6M1 (σ0 : WGState) (c : Cand) (pst : Nat → List Pexv6) (dv : 
       SrvwmoXv6Adequacy.allocprocAns (Obs.powerOn :: MachOfPf.pfObsOf r) :=
   srvwmoXv6M1Core σ0 c pst dv hP g0 hg0 hp0 hgd hfs sailCycleOrder_holds
 
-/-- **M2 without `hsco`** (W-SCO (A) deliverable (3) [R32.s4]) — stated here, NOT registered (M2
-CLOSE registers it, §C W5d): `srvwmoXv6M2Core`'s statement with `sailCycleOrder` discharged by
-`sailCycleOrder_holds`. -/
+/-- **M2 without `hsco`** (W-SCO (A) deliverable (3) [R32.s4]) — INTERNAL milestone, NOT published
+[OWN.2]; registered (M2 CLOSE: `roots-weak.txt`, `baseline-weak.json`): `srvwmoXv6M2Core`'s statement
+with `sailCycleOrder` discharged by `sailCycleOrder_holds` (direct application). -/
 theorem srvwmoXv6M2 (σ0 : WGState) (c : Cand) (pst : Nat → List Pexv6) (dv : Nat → Efab)
     (itvOf : Nat → Nat → Nat) (fiOf : Nat → Nat → Bool)
     (hP : srvwmoXv6M2Premises σ0 c pst dv itvOf fiOf)

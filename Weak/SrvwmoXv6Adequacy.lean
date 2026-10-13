@@ -17,8 +17,8 @@ M1 — composition milestone, INTERNAL (not published [OWN.2]): kernel-only by p
 disk-row loads latest by premise `candDiskLat`, under the named ISA-model premise
 `sailCycleOrder` [OWN.35] (TRUE of the model from this platform's reset — the boot PMA table
 forbids instruction fetch from I/O regions and the HTIF window is disabled; FALSE over arbitrary
-register files; stated under `wbootFacts σ0` [R32.1][R33.1][OWN.45]; W-SCO (A) proves it for every
-instruction); the disk rows PROVED (W4 F9), no
+register files; stated under `wbootFacts σ0` [R32.1][R33.1][OWN.45]; proved: `sailCycleOrder_holds`,
+`SailCycleOrderCycle.lean:137`); the disk rows PROVED (W4 F9), no
 side condition; the realizing MachCSL run satisfies `xv6FsAdequacy_closed`'s conclusions,
 `xv6NiPhi`, `unionPhiSync`, `textPristine` and the allocproc shadow; axioms = the SC roots'
 (`propext`, `Classical.choice`, `Quot.sound`; opaques the two `resv` predicates +
@@ -70,8 +70,8 @@ window is disabled); FALSE over arbitrary register files (a fetch from MMIO unde
 marking the PLIC executable is labelled `LDev`, leaves no `LIFetch`, and an SFENCE.VMA word fetched
 there refutes the second clause [R32.1]; likewise an HTIF window over RAM answers the fetch from a
 register [R33.1]) — hence stated under `wbootFacts σ0`, which pins both registers (`bootPost`).
-RVWMO / riscv.cat / Zifencei are silent on in-cycle order.  W-SCO (A) proves it for every
-instruction (`SailCycleOrderK.sailCycleOrderOfCycle`, `Weak/SailCycleOrderK.lean`).
+RVWMO / riscv.cat / Zifencei are silent on in-cycle order.  Proved: `sailCycleOrder_holds`,
+`SailCycleOrderCycle.lean:137` (W-SCO (A), via `SailCycleOrderK.sailCycleOrderOfCycle`).
 
 ## Remaining hypotheses of `srvwmoXv6M1Core`
 
@@ -79,7 +79,7 @@ instruction (`SailCycleOrderK.sailCycleOrderOfCycle`, `Weak/SailCycleOrderK.lean
 * the MachCSL boot state `g0`: `g0.gen = 0`, `g0.pow = false`, `σ0.wgdev = g0.m.devs.reset`,
   `diskOf g0.m.devs = fsImgDisk` (always constructible: `SrvwmoXv6Adequacy.bootStateOf`);
 * `sailCycleOrder` [OWN.35] (restated under `wbootFacts σ0` [R32.1][OWN.45]: the premise got
-  WEAKER, the theorem STRONGER and non-vacuous; discharged by W-SCO (A), `srvwmoXv6M1`).
+  WEAKER, the theorem STRONGER and non-vacuous; discharged by `sailCycleOrder_holds` in `srvwmoXv6M1`/`M2`).
 
 ## Deviations from the plan text
 

@@ -74,8 +74,8 @@ parameter is DISCHARGED (`simDisk`).
    the step list); Q-FIARM RULED [OWN.35]: it is the named premise `sailCycleOrder`
    (`Weak/SrvwmoXv6Adequacy.lean`, `fiOfSco`) — TRUE of the model from this platform's reset (the
    boot PMA table forbids instruction fetch from I/O regions and the HTIF window is disabled);
-   FALSE over arbitrary register files; stated under `wbootFacts σ0` [R32.1][R33.1][OWN.45]; W-SCO
-   (A) proves it for every instruction (`Weak/SailCycleOrderK.lean`).
+   FALSE over arbitrary register files; stated under `wbootFacts σ0` [R32.1][R33.1][OWN.45];
+   proved: `sailCycleOrder_holds`, `SailCycleOrderCycle.lean:137`.
 4. The fetch cut is a PARAMETER over related, boot-reachable states (`Hyps.cut`), discharged at
    M1 by `cutOfPristine` from a SECOND MachCSL-side hypothesis (the pristine window at every
    reachable powered state; W5: `powerInterp_textPristine`) — `candKfetch` alone does not give it.

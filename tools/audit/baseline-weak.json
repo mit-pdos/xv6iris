@@ -1,14 +1,16 @@
 {
   "comment": [
     "THE WEAK-TIER ASSUMPTION BASELINE, read by tools/audit/Audit.lean in its Weak run (tools/ci/audit.sh --weak:",
-    "XV6_AUDIT_MODULES=Weak.AxSpinT2b,...,Weak.AxSpinT2q4,Weak.SrvwmoXv6Adequacy, XV6_AUDIT_BASELINE=this file).",
+    "XV6_AUDIT_MODULES=Weak.AxSpinT2b,...,Weak.AxSpinT2q4,Weak.SrvwmoXv6Adequacy,Weak.SailCycleOrderCycle, XV6_AUDIT_BASELINE=this file).",
     "Same format and rules as baseline.json.  Separate because Weak/ is not part of the Xv6/MachCSL build CI audits;",
     "tools/ci/lint.sh checks that this file and tools/ci/roots-weak.txt name the same theorems.",
     "Weak.srvwmoXv6M1Core (the allocproc plan's INTERNAL milestone M1, NOT published) carries EXACTLY",
     "Xv6.xv6FsAdequacy_closed's baseline.json entry: the three standard axioms (its bv_decide certificates are",
     "counted, never listed) and the two reservation opaques + MachCSL.bootImageSealed (already in baseline.json).",
     "Weak.srvwmoXv6M1 (M1 without the Sail-cycle premise: srvwmoXv6M1Core applied to sailCycleOrder_holds, W-SCO (A))",
-    "carries EXACTLY Weak.srvwmoXv6M1Core's entry (the cycle proof's decide/bv_decide certificates counted, no new opaque)."
+    "carries EXACTLY Weak.srvwmoXv6M1Core's entry (the cycle proof's decide/bv_decide certificates counted, no new opaque).",
+    "Weak.srvwmoXv6M2 (the INTERNAL milestone M2, NOT published: PfRunUnpinned's srvwmoXv6M2Core applied to sailCycleOrder_holds,",
+    "M2 CLOSE) carries EXACTLY Weak.srvwmoXv6M1's entry (certificates counted, never listed; no new opaque)."
   ],
   "theorems": [
     {
@@ -146,6 +148,19 @@
     },
     {
       "name": "Weak.srvwmoXv6M1",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "opaques": [
+        "LeanRV64D.Functions.xv6_resv_is_valid",
+        "LeanRV64D.Functions.xv6_resv_matches",
+        "MachCSL.bootImageSealed"
+      ]
+    },
+    {
+      "name": "Weak.srvwmoXv6M2",
       "axioms": [
         "propext",
         "Classical.choice",

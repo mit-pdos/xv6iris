@@ -51,8 +51,8 @@ pf view-0 check; (2) `fcutEM2` reads the realizing label from `E.exTr[k]?` (clos
 [R31.s1]); (3) `srvwmoXv6M2Core` also returns the replay invariant (`itv`/`fiArm` of the run's
 shadow are `itvOf`/`fiOf` at the trace's end).
 
-Lean-only helpers are file-qualified (`PfRunUnpinned.*`).  Axioms: `propext`, `Classical.choice`,
-`Quot.sound` for the replay; `srvwmoXv6M2Core` adds `xv6FsAdequacy_closed`'s cone, as M1.
+Lean-only helpers: `PfRunUnpinned.*`.  Axioms: `propext`, `Classical.choice`, `Quot.sound` (replay); `srvwmoXv6M2Core`
+adds `xv6FsAdequacy_closed`'s cone, as M1.  M2 CLOSED: registered as `Weak.srvwmoXv6M2` (SailCycleOrderCycle).
 -/
 import Weak.SrvwmoXv6Adequacy
 

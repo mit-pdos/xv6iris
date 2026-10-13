@@ -5,9 +5,11 @@
 # are kept apart: they are audited by `tools/ci/audit.sh --weak` against
 # tools/audit/baseline-weak.json, and tools/ci/lint.sh fails if the two lists
 # differ.  Two families: the AxSpin allocpid theorems and certificates
-# (AxSpinT2*), and the allocproc plan's INTERNAL milestone M1
+# (AxSpinT2*), and the allocproc plan's INTERNAL milestones M1 and M2
 # (Weak.srvwmoXv6M1Core, SrvwmoXv6Adequacy, and its corollary Weak.srvwmoXv6M1
-# without the Sail-cycle premise, SailCycleOrderCycle; NOT published [OWN.2]).
+# without the Sail-cycle premise, SailCycleOrderCycle; Weak.srvwmoXv6M2, the
+# corollary of PfRunUnpinned's srvwmoXv6M2Core without the Sail-cycle premise,
+# SailCycleOrderCycle; NOT published [OWN.2]).
 Weak.allocpidOpen             # THEOREM 2: two-hart allocpid pid distinctness + nextpid source, open third hart (AxSpinT2b)
 Weak.allocpid2Distinct        # THEOREM 1: its corollary with no third hart (AxSpinT2b)
 Weak.allocpidOpen2            # THEOREM 2, stage 2: no panic (no cut) on prefix rows + nextpid source + pid distinctness + a3 = pid at the final state (P4), open third hart (AxSpinT2b2)
@@ -20,3 +22,4 @@ Weak.allocpidStkRaceCert      # CERTIFICATE (p-stk): a stack-overwriting racer h
 Weak.allocpidPrefixCert       # CERTIFICATE (a-): stage-2 Theorem 1 applied on PREFIX rows (A mid-critical-section, B after one failed claim), no cut, both incomplete, no hypotheses (AxSpinT2q2)
 Weak.srvwmoXv6M1Core          # M1 (INTERNAL milestone, NOT published [OWN.2]): the sRVWMO/kernel-only composition -- every M1-premised shaped pf run is realized by a MachCSL run from the machine off on which `xv6FsAdequacy_closed`/NI/union/text/`allocprocTraceAns` conclude; premises `srvwmoXv6M1Premises` + `g0` boot facts + `sailCycleOrder` [OWN.35] (THEOREM after W-SCO (A)) (SrvwmoXv6Adequacy)
 Weak.srvwmoXv6M1              # M1 without the Sail-cycle premise (INTERNAL, NOT published [OWN.2]): `srvwmoXv6M1Core` applied to `sailCycleOrder_holds` -- premises `srvwmoXv6M1Premises` + `g0` boot facts only (SailCycleOrderCycle)
+Weak.srvwmoXv6M2              # M2 (INTERNAL milestone, NOT published [OWN.2]): the UNPINNED fork-path composition -- every M2-premised cut-form pf run (`pstepEv` itself, `fcutEM2` at `itvOf`/`fiOf`, boot values) is realized by a MachCSL run from the machine off on which the closed xv6 theorems and `allocprocAns` conclude, plus the replay invariant; premises `srvwmoXv6M2Premises` + `g0` boot facts only (SailCycleOrderCycle)
