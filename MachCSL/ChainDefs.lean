@@ -25,7 +25,9 @@ it), so that the state interpretation can carry it MachCSL-generically
 * **A chain** (`hopChain m isLk A t B a`): `t < r₀` (the entry precedes the
   author's release), the releaser of hop k+1 is the acquirer of hop k, which
   acquired before releasing (`a_k < r_{k+1}`), the last acquirer is `B`, at
-  `a`.  Each author's chained entries form a PREFIX (`hopChain_prefix`):
+  `a`; every hop's byte is a lock byte AT ITS ACQUIRE POSITION (`isLk b a_k`:
+  the registry is TIME-INDEXED, [R35.1] -- a dynamic (pipe) lock is a hop
+  byte exactly while it lives, `MachCSL.nameLockAt`).  Each author's chained entries form a PREFIX (`hopChain_prefix`):
   hence the per-author vector of [OWN.38].
 * **A certificate** (`ChainCert`, `ChainCert.valid`): "the entries of `h` at
   or below `t` reach hart `j` before `τ`" -- `h = j` and `t < τ` (own
@@ -115,6 +117,46 @@ theorem ChainDefs.writeBytes_mem {n : Nat} (m : FlatMem) (pa : PAddr) (w : BitVe
     ∃ H, (m.writeBytes pa n w t h)[pa + BitVec.ofNat 64 j]? = some H ∧ (⟨t, h, nthByte w j⟩ : HEnt) ∈ H :=
   ChainDefs.foldl_mem pa w t h j _ m (List.mem_range.2 hj)
 
+/-! ## Growth above a position (the dynamic registry's stability) -/
+
+theorem memGrow_refl (m : FlatMem) (t : Nat) : memGrow m t m :=
+  fun _ H h => ⟨[], by simpa using h, fun _ he => by simp at he⟩
+
+theorem memGrow_memExt {m m' : FlatMem} {t : Nat} (h : memGrow m t m') : memExt m m' :=
+  fun a H hH => (h a H hH).imp fun _ hN => hN.1
+
+theorem memGrow_push (m : FlatMem) (a : PAddr) (e : HEnt) (t : Nat) (ht : t < e.t) : memGrow m t (m.push a e) := by
+  intro a' H h
+  by_cases ha : a' = a
+  · subst ha
+    refine ⟨[e], ?_, fun x hx => by simp at hx; subst hx; exact ht⟩
+    rw [FlatMem.push_get?_eq, Std.ExtTreeMap.getD_eq_getD_getElem?, h]
+    rfl
+  · exact ⟨[], by rw [FlatMem.push_get?_ne _ _ _ _ ha, h]; rfl, fun _ hx => by simp at hx⟩
+
+theorem memGrow_trans {m m' m'' : FlatMem} {t : Nat} (h1 : memGrow m t m') (h2 : memGrow m' t m'') :
+    memGrow m t m'' := by
+  intro a H h
+  obtain ⟨N, hN, hN'⟩ := h1 a H h
+  obtain ⟨N', hN2, hN2'⟩ := h2 a _ hN
+  refine ⟨N' ++ N, by rw [hN2, List.append_assoc], fun e he => ?_⟩
+  rcases List.mem_append.1 he with he | he
+  · exact hN2' e he
+  · exact hN' e he
+
+theorem memGrow_foldlPush {n : Nat} (pa : PAddr) (w : BitVec (8 * n)) (t0 t : Nat) (h : Agent) (ht : t0 < t) :
+    ∀ (l : List Nat) (m : FlatMem),
+      memGrow m t0 (l.foldl (fun (m : FlatMem) j => m.push (pa + BitVec.ofNat 64 j) ⟨t, h, nthByte w j⟩) m)
+  | [], m => memGrow_refl m t0
+  | j :: l, m => by
+    simp only [List.foldl_cons]
+    exact memGrow_trans (memGrow_push _ _ _ _ ht) (memGrow_foldlPush pa w t0 t h ht l _)
+
+/-- A store at a position above `t0` grows the memory above `t0`. -/
+theorem memGrow_writeBytes {n : Nat} (m : FlatMem) (pa : PAddr) (w : BitVec (8 * n)) (t0 t : Nat) (h : Agent)
+    (ht : t0 < t) : memGrow m t0 (m.writeBytes pa n w t h) :=
+  memGrow_foldlPush pa w t0 t h ht _ m
+
 /-! ## Lock bytes of a region list -/
 
 /-- `b` is the lock word (its low byte) of a reserved spinlock of `rs`. -/
@@ -132,13 +174,13 @@ def syncHop (m : FlatMem) (b : PAddr) (A : CPU) (r : Nat) (B : CPU) (a : Nat) : 
 
 /-- **A sync chain** from the entries of author `A` at or below `t` to hart
 `B`, whose last acquire is at `a`. -/
-inductive hopChain (m : FlatMem) (isLk : PAddr → Prop) : CPU → Nat → CPU → Nat → Prop
+inductive hopChain (m : FlatMem) (isLk : PAddr → Nat → Prop) : CPU → Nat → CPU → Nat → Prop
   /-- one hop: `A` released after its entry -/
   | base {A B : CPU} {t r a : Nat} (b : PAddr) :
-      isLk b → syncHop m b A r B a → t < r → hopChain m isLk A t B a
+      isLk b a → syncHop m b A r B a → t < r → hopChain m isLk A t B a
   /-- one more hop: the last acquirer `C` released after its acquire -/
   | step {A C B : CPU} {t a1 r a : Nat} (b : PAddr) :
-      hopChain m isLk A t C a1 → isLk b → syncHop m b C r B a → a1 < r → hopChain m isLk A t B a
+      hopChain m isLk A t C a1 → isLk b a → syncHop m b C r B a → a1 < r → hopChain m isLk A t B a
 
 theorem syncHop_mono {m m' : FlatMem} (hx : memExt m m') {b : PAddr} {A : CPU} {r : Nat} {B : CPU} {a : Nat}
     (h : syncHop m b A r B a) : syncHop m' b A r B a := by
@@ -146,15 +188,15 @@ theorem syncHop_mono {m m' : FlatMem} (hx : memExt m m') {b : PAddr} {A : CPU} {
   obtain ⟨N, hN⟩ := hx b _ hb
   exact ⟨N ++ H1, H2, e0, va, by rw [hN, List.append_assoc], hva, he0⟩
 
-theorem hopChain_mono {m m' : FlatMem} {isLk isLk' : PAddr → Prop} (hx : memExt m m')
-    (hl : ∀ b, isLk b → isLk' b) {A : CPU} {t : Nat} {B : CPU} {a : Nat}
+theorem hopChain_mono {m m' : FlatMem} {isLk isLk' : PAddr → Nat → Prop} (hx : memExt m m')
+    (hl : ∀ b r, isLk b r → isLk' b r) {A : CPU} {t : Nat} {B : CPU} {a : Nat}
     (h : hopChain m isLk A t B a) : hopChain m' isLk' A t B a := by
   induction h with
-  | base b hb hh ht => exact .base b (hl b hb) (syncHop_mono hx hh) ht
-  | step b _ hb hh ha ih => exact .step b ih (hl b hb) (syncHop_mono hx hh) ha
+  | base b hb hh ht => exact .base b (hl b _ hb) (syncHop_mono hx hh) ht
+  | step b _ hb hh ha ih => exact .step b ih (hl b _ hb) (syncHop_mono hx hh) ha
 
 /-- Each author's chained entries form a prefix. -/
-theorem hopChain_prefix {m : FlatMem} {isLk : PAddr → Prop} {A : CPU} {t : Nat} {B : CPU} {a : Nat}
+theorem hopChain_prefix {m : FlatMem} {isLk : PAddr → Nat → Prop} {A : CPU} {t : Nat} {B : CPU} {a : Nat}
     (h : hopChain m isLk A t B a) {t' : Nat} (ht : t' ≤ t) : hopChain m isLk A t' B a := by
   induction h with
   | base b hb hh hr => exact .base b hb hh (by omega)
@@ -167,7 +209,7 @@ theorem syncHop_acq_ent {m : FlatMem} {b : PAddr} {A : CPU} {r : Nat} {B : CPU} 
   exact ⟨_, ⟨a, hartAgent B, va⟩, hb, List.mem_append_right _ List.mem_cons_self, rfl⟩
 
 /-- A chain's last acquire is an entry of the memory. -/
-theorem hopChain_acq_ent {m : FlatMem} {isLk : PAddr → Prop} {A : CPU} {t : Nat} {B : CPU} {a : Nat}
+theorem hopChain_acq_ent {m : FlatMem} {isLk : PAddr → Nat → Prop} {A : CPU} {t : Nat} {B : CPU} {a : Nat}
     (h : hopChain m isLk A t B a) : ∃ (b : PAddr) (H : Hist) (e : HEnt), m[b]? = some H ∧ e ∈ H ∧ e.t = a := by
   cases h with
   | base b _ hh _ => exact ⟨b, syncHop_acq_ent hh⟩
@@ -214,28 +256,30 @@ theorem chainPair_inj {a b c d : Nat} (h : chainPair a b = chainPair c d) : a = 
 /-! ## The environment certificates are checked against -/
 
 /-- What a certificate is checked against: the byte histories, every hart's
-coherence floors (`HRead.coh`), the lock bytes (the hop registry), and the
-PUBLICATION bytes with their sole writer (the boot hop: `started`, written
-once by hart 0 and read racily by the others). -/
+coherence floors (`HRead.coh`), the lock bytes AT EACH POSITION (the hop
+registry, time-indexed [R35.1]: `isLk b a` -- `b` is a hop byte for an
+acquire at `a`), and the PUBLICATION bytes with their sole writer (the boot hop:
+`started`, written once by hart 0 and read racily by the others). -/
 structure ChainEnv where
   m : FlatMem
   coh : CPU → PAddr → Nat
-  isLk : PAddr → Prop
+  isLk : PAddr → Nat → Prop
   isPub : PAddr → CPU → Prop
 
-/-- `Y` extends `X`: histories grew on top, the lock registry grew, the
-publication registry is the same, and no hart's coherence floor at a
-publication byte of another writer went down (a load only raises it; the
-region discipline keeps every other hart's store off the byte). -/
+/-- `Y` extends `X`: histories grew on top, the lock registry grew (a PAST
+registration never changes: `isLk b r` stays true), the publication registry
+is the same, and no hart's coherence floor at a publication byte of another
+writer went down (a load only raises it; the region discipline keeps every
+other hart's store off the byte). -/
 def ChainEnv.ext (X Y : ChainEnv) : Prop :=
-  memExt X.m Y.m ∧ (∀ b, X.isLk b → Y.isLk b) ∧ (∀ f w, X.isPub f w ↔ Y.isPub f w) ∧
+  memExt X.m Y.m ∧ (∀ b r, X.isLk b r → Y.isLk b r) ∧ (∀ f w, X.isPub f w ↔ Y.isPub f w) ∧
     (∀ (j : CPU) (f : PAddr) (w : CPU), X.isPub f w → j ≠ w → X.coh j f ≤ Y.coh j f)
 
 theorem ChainEnv.ext_refl (X : ChainEnv) : X.ext X :=
-  ⟨memExt_refl _, fun _ h => h, fun _ _ => Iff.rfl, fun _ _ _ _ _ => Nat.le_refl _⟩
+  ⟨memExt_refl _, fun _ _ h => h, fun _ _ => Iff.rfl, fun _ _ _ _ _ => Nat.le_refl _⟩
 
 theorem ChainEnv.ext_trans {X Y Z : ChainEnv} (h1 : X.ext Y) (h2 : Y.ext Z) : X.ext Z :=
-  ⟨memExt_trans h1.1 h2.1, fun b h => h2.2.1 b (h1.2.1 b h), fun f w => (h1.2.2.1 f w).trans (h2.2.2.1 f w),
+  ⟨memExt_trans h1.1 h2.1, fun b r h => h2.2.1 b r (h1.2.1 b r h), fun f w => (h1.2.2.1 f w).trans (h2.2.2.1 f w),
     fun j f w hp hj => Nat.le_trans (h1.2.2.2 j f w hp hj) (h2.2.2.2 j f w ((h1.2.2.1 f w).1 hp) hj)⟩
 
 /-- **The boot hop's cover**: the entries of the publication writer `h` at or
@@ -345,7 +389,7 @@ release `r`, and the hop from that release to `B`'s acquire at `a`, give a
 certificate to `B` past `a` -- by the chain, or (a boot-hop cover of the
 releaser) by `B`'s own gate, the publication byte being one-shot. -/
 theorem ChainCert.valid_hop {X : ChainEnv} {h A B : CPU} {t r a : Nat} {b : PAddr}
-    (hv : ChainCert.valid X ⟨h, t, A, r⟩) (hb : X.isLk b) (hh : syncHop X.m b A r B a)
+    (hv : ChainCert.valid X ⟨h, t, A, r⟩) (hb : X.isLk b a) (hh : syncHop X.m b A r B a)
     (hall : ∀ (b' : PAddr) (H : Hist) (e : HEnt), X.m[b']? = some H → e ∈ H → e.t ≤ a)
     (hone : pubOneShot X) (hgate : gateOk X B) : ChainCert.valid X ⟨h, t, B, a + 1⟩ := by
   rcases hv with ⟨h1, h2⟩ | ⟨a1, ha1, hc⟩ | ⟨hne, f, r', v, H, hp, hf, he, htr, hr⟩

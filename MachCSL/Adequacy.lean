@@ -226,6 +226,7 @@ trace predicate `Ptp`, and the application's slots. -/
   mirrorG := MachGpreS.mirror_pre
   rsvStatic := KernelRsv.static
   rsvStatic_wf := KernelRsv.wf
+  rsvNames := KernelRsv.names
 
 theorem crashN_obsN : (↑obsN : CoPset) ⊆ ⊤ \ ↑crashN := by
   have hd : (↑obsN : CoPset) ## ↑crashN := ndot_ne_disjoint nroot (by decide)

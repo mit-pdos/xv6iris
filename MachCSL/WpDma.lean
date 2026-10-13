@@ -76,7 +76,7 @@ theorem memModel_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * 
   unfold memModelAt
   iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
   ihave Hrsv := rsvModel_mono E σ (σ.storeDma pa n w) hrsv
-    (fun _ => chainEnvAt_ext_dma _ σ pa n w) $$ Hrsv
+    (fun _ => chainEnvAt_ext_dma _ _ σ pa n w) $$ Hrsv
   imod MonoNat.own_update _ (.ofNat σ.top) (.ofNat (σ.top + 1))
     (by simp only [MaxNat.le_toNat]; omega) $$ Htop with ⟨Htop, #Htoplb⟩
   imod ghost_map_insert_persist (σ.top + 1) diskAgent

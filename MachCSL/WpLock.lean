@@ -1227,7 +1227,7 @@ theorem wp_s_amoswap_lock_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
           iapply fupd_mask_intro LawfulSet.empty_subset
           iintro Hmask
           iright
-          iexists W2.hist Hold2, (max T tl), [(lk + 16#64, 8, W2'.hist HoldW)]
+          iexists W2.hist Hold2, (max T tl), [(lk + 16#64, 8, W2'.hist HoldW)], none
           iframe Hb2
           isplitl []
           · iapply topLb_max T tl
@@ -1241,8 +1241,10 @@ theorem wp_s_amoswap_lock_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
             exact lkRsv_storeOkW hm cpu _ W2 W2' Hold2 HoldW htail2 htailW (fun t ht =>
               ⟨some (cpu, false), t, lockWordAt_take W2 t cpu, lkCpuAt_take hst2.2 cpu,
                 lockRsvW_take hx2.2 (by omega) cpu⟩)
+          isplitr
+          · simp only [hopIn]; iempintro
           inext
-          iintro %t %hTt %ht %hheads2 Hvlb0 Hb2 HbW #Hau #Htop
+          iintro %t %hTt %ht %hheads2 Hvlb0 Hb2 HbW #Hau #Htop _
           unfold compBytes
           ihave HbW := BigSepL.bigSepL_singleton.1 $$ HbW
           ihave Hc2 := wordCellH_intro (lk + 16#64) 8 W2' HoldW htailW $$ HbW
@@ -1289,7 +1291,7 @@ theorem wp_s_amoswap_lock_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
           iapply fupd_mask_intro LawfulSet.empty_subset
           iintro Hmask
           iright
-          iexists W2.hist Hold2, 0, [(lk + 16#64, 8, W2'.hist HoldW)]
+          iexists W2.hist Hold2, 0, [(lk + 16#64, 8, W2'.hist HoldW)], none
           iframe Hb2
           isplitl []
           · iapply topLbAt_0
@@ -1302,8 +1304,10 @@ theorem wp_s_amoswap_lock_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
               subst hp
               exact ⟨some (i, b), B2, lockWordAt_spin hst2.1 t (hartAgent cpu), hst2.2,
                 lockRsvW_spin hx2.2 (by omega) cpu.isLt⟩)
+          isplitr
+          · simp only [hopIn]; iempintro
           inext
-          iintro %t %_ %ht %hheads2 Hvlb Hb2 HbW #Hau #Htop
+          iintro %t %_ %ht %hheads2 Hvlb Hb2 HbW #Hau #Htop _
           unfold compBytes
           ihave HbW := BigSepL.bigSepL_singleton.1 $$ HbW
           ihave Hc2 := wordCellH_intro (lk + 16#64) 8 W2' HoldW htailW $$ HbW
@@ -1634,15 +1638,17 @@ theorem wp_s_sd_lkcpu_acquire_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
         iapply fupd_mask_intro LawfulSet.empty_subset
         iintro Hmask
         iright
-        iexists W'.hist Hold, [(lk, 4, W.hist HoldW)]
+        iexists W'.hist Hold, [(lk, 4, W.hist HoldW)], none
         iframe Hb
         isplitl [HbW]
         · unfold compBytes; iapply BigSepL.bigSepL_singleton.2; iexact HbW
         isplitr
         · ipureintro
           exact lkRsv_storeOkC hm cpu _ W W' HoldW Hold htailW htail (fun t ht => ⟨some (cpu, true), B0, hst.1, lkCpuAt_set hst.2 t, lockRsvW_set hx.2 (by omega)⟩)
+        isplitr
+        · simp only [rtIn]; iempintro
         inext
-        iintro %t %ht Hb HbW #Hau #Htop
+        iintro %t %ht Hb HbW #Hau #Htop _
         unfold compBytes
         ihave HbW := BigSepL.bigSepL_singleton.1 $$ HbW
         ihave Hw := wordCellH_intro lk 4 W HoldW htailW $$ HbW
@@ -1844,15 +1850,17 @@ theorem wp_s_sd_zero_lkcpu_release_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = fa
         iapply fupd_mask_intro LawfulSet.empty_subset
         iintro Hmask
         iright
-        iexists W'.hist Hold, [(lk, 4, W.hist HoldW)]
+        iexists W'.hist Hold, [(lk, 4, W.hist HoldW)], none
         iframe Hb
         isplitl [HbW]
         · unfold compBytes; iapply BigSepL.bigSepL_singleton.2; iexact HbW
         isplitr
         · ipureintro
           exact lkRsv_storeOkC hm cpu _ W W' HoldW Hold htailW htail (fun t ht => ⟨some (cpu, false), B0, hst.1, lkCpuAt_clear hst.2 t, lockRsvW_clear hx.2 (by omega)⟩)
+        isplitr
+        · simp only [rtIn]; iempintro
         inext
-        iintro %t %ht Hb HbW #Hau #Htop
+        iintro %t %ht Hb HbW #Hau #Htop _
         unfold compBytes
         ihave HbW := BigSepL.bigSepL_singleton.1 $$ HbW
         ihave Hw := wordCellH_intro lk 4 W HoldW htailW $$ HbW
@@ -2068,15 +2076,17 @@ theorem wp_s_sw_zero_release_hook (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
         iapply fupd_mask_intro LawfulSet.empty_subset
         iintro Hmask
         iright
-        iexists W.hist Hold, [(lk + 16#64, 8, W'.hist HoldW)]
+        iexists W.hist Hold, [(lk + 16#64, 8, W'.hist HoldW)], none
         iframe Hb
         isplitl [HbW]
         · unfold compBytes; iapply BigSepL.bigSepL_singleton.2; iexact HbW
         isplitr
         · ipureintro
           exact lkRsv_storeOkW hm cpu _ W W' Hold HoldW htail htailW (fun t ht => ⟨none, B0, lockWordAt_release W B0 t (hartAgent cpu), lkCpuAt_free hst.2, lockRsvW_release hx.2 (by omega)⟩)
+        isplitr
+        · simp only [rtIn]; iempintro
         inext
-        iintro %t %ht Hb HbW #Hau #Htop
+        iintro %t %ht Hb HbW #Hau #Htop _
         unfold compBytes
         ihave HbW := BigSepL.bigSepL_singleton.1 $$ HbW
         ihave Hc := wordCellH_intro (lk + 16#64) 8 W' HoldW htailW $$ HbW
@@ -2307,15 +2317,17 @@ theorem wp_s_sw_zero_release_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
         iapply fupd_mask_intro LawfulSet.empty_subset
         iintro Hmask
         iright
-        iexists W.hist Hold, [(lk + 16#64, 8, W'.hist HoldW)]
+        iexists W.hist Hold, [(lk + 16#64, 8, W'.hist HoldW)], none
         iframe Hb
         isplitl [HbW]
         · unfold compBytes; iapply BigSepL.bigSepL_singleton.2; iexact HbW
         isplitr
         · ipureintro
           exact lkRsv_storeOkW hm cpu _ W W' Hold HoldW htail htailW (fun t ht => ⟨none, B0, lockWordAt_release W B0 t (hartAgent cpu), lkCpuAt_free hst.2, lockRsvW_release hx.2 (by omega)⟩)
+        isplitr
+        · simp only [rtIn]; iempintro
         inext
-        iintro %t %ht Hb HbW #Hau #Htop
+        iintro %t %ht Hb HbW #Hau #Htop _
         unfold compBytes
         ihave HbW := BigSepL.bigSepL_singleton.1 $$ HbW
         ihave Hc := wordCellH_intro (lk + 16#64) 8 W' HoldW htailW $$ HbW
@@ -3143,15 +3155,17 @@ theorem wp_s_sd_zero_lkcpu_release_refute (cpu : CPU) (k : KCtx) (hsie : k.sie =
         iapply fupd_mask_intro LawfulSet.empty_subset
         iintro Hmask
         iright
-        iexists W'.hist Hold, [(lk, 4, W.hist HoldW)]
+        iexists W'.hist Hold, [(lk, 4, W.hist HoldW)], none
         iframe Hb
         isplitl [HbW]
         · unfold compBytes; iapply BigSepL.bigSepL_singleton.2; iexact HbW
         isplitr
         · ipureintro
           exact lkRsv_storeOkC hm cpu _ W W' HoldW Hold htailW htail (fun t ht => ⟨some (cpu, false), B0, hst.1, lkCpuAt_clear hst.2 t, lockRsvW_clear hx.2 (by omega)⟩)
+        isplitr
+        · simp only [rtIn]; iempintro
         inext
-        iintro %t %ht Hb HbW #Hau #Htop
+        iintro %t %ht Hb HbW #Hau #Htop _
         unfold compBytes
         ihave HbW := BigSepL.bigSepL_singleton.1 $$ HbW
         ihave Hw := wordCellH_intro lk 4 W HoldW htailW $$ HbW
@@ -3351,15 +3365,17 @@ theorem wp_s_sw_zero_release_refute (cpu : CPU) (k : KCtx) (hsie : k.sie = false
         iapply fupd_mask_intro LawfulSet.empty_subset
         iintro Hmask
         iright
-        iexists W.hist Hold, [(lk + 16#64, 8, W'.hist HoldW)]
+        iexists W.hist Hold, [(lk + 16#64, 8, W'.hist HoldW)], none
         iframe Hb
         isplitl [HbW]
         · unfold compBytes; iapply BigSepL.bigSepL_singleton.2; iexact HbW
         isplitr
         · ipureintro
           exact lkRsv_storeOkW hm cpu _ W W' Hold HoldW htail htailW (fun t ht => ⟨none, B0, lockWordAt_release W B0 t (hartAgent cpu), lkCpuAt_free hst.2, lockRsvW_release hx.2 (by omega)⟩)
+        isplitr
+        · simp only [rtIn]; iempintro
         inext
-        iintro %t %ht Hb HbW #Hau #Htop
+        iintro %t %ht Hb HbW #Hau #Htop _
         unfold compBytes
         ihave HbW := BigSepL.bigSepL_singleton.1 $$ HbW
         ihave Hc := wordCellH_intro (lk + 16#64) 8 W' HoldW htailW $$ HbW

@@ -190,7 +190,7 @@ theorem ms_spin [CurCtx] (cpu : CPU) (hcpu : cpu ≠ startedPrimary)
   iintro %w Hk Hpc Hseen
   case ha => rw [KCtx.rget_ne cpu k 14#5 (by decide) (by decide), ha4]; rfl
   unfold startedSeen
-  icases Hseen with (%hw | ⟨%t, %hw, #Hidx, #Hrv, #HP⟩)
+  icases Hseen with (%hw | ⟨%t, %hw, #Hidx, #Hrv, #HP, #Hgp⟩)
   · -- read 0: the fence, and round again
     subst hw
     k_step (wp_s_fence_r_rw cpu _ (KA.«main» + 24#64) false 0#5 0#5)

@@ -2024,13 +2024,15 @@ theorem disk_used_idx_read [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (cpu : 
   icases usedIdxCell_cases (usedIdxAt c0.used) b dl $$ Hui with ⟨%Hold, Hb, %htail⟩
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
-  iexists (fun _ => DFrac.own 1), ((usedW dl).hist Hold)
+  iexists (fun _ => DFrac.own 1), ((usedW dl).hist Hold), none
   iframe Hb
   isplit
   · ipureintro
     exact fun j hj => usedIdxCell_ne_nil b dl Hold htail j hj
+  isplitr
+  · simp only [rdIn]; iempintro
   inext
-  iintro %w %tvn %hKt %hrd %hauth #Hrv Hb
+  iintro %w %tvn %hKt %hrd %hauth #Hrv _ Hb
   imod Hmask
   obtain ⟨m, hwm, hmm, hdom⟩ :=
     usedIdx_read dl Hold b cpu tvn w htail (by omega) hok.2.2.2.1 hrd

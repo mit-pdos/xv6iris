@@ -171,7 +171,7 @@ theorem bootShared_carveT (σ : MState) (hbf : bootFacts σ) :
     rsvHalvesC (MachGS.era (hlc := hlc) (GF := GF)) KernelRsv.static (imgFlat bootImage) by rw [hbf.1]) $$ Hhalf
   icases bootRsvHalves _ _ $$ Hhalf with ⟨Hpre, Hhc, Hhpr, Hpost⟩
   unfold bootPreHalves bootPostHalves
-  icases Hpre with ⟨Hhu0, Hhu1, Hhcons, Hhprk, Hhkm, Hhp, Hhw⟩
+  icases Hpre with ⟨Hhu0, Hhu1, Hhst, Hhcons, Hhprk, Hhkm, Hhp, Hhw⟩
   icases Hpost with ⟨Hhtl, Hhbc, Hhbufs, Hhit, Hhinodes, Hhlog, Hhft, Hhdk⟩
   imod bootShared_harts σ hbf hrsv $$ [] Ht Hr Hl Hs0 Hcpus Hhc with Hh
   · iframe Hk Hg
@@ -226,7 +226,7 @@ theorem bootShared_carveT (σ : MState) (hbf : bootFacts σ) :
   icases bootShared_peel _ $$ Hh with ⟨⟨⟨%ξ0, Ht0⟩, Hb0⟩, Hrest⟩
   have hB := (letI : CurCtx := bootSharedX ξ0; bootShared_bareRows (GF := GF))
   imod hB $$ Hk Hc Hpr Hkm Hkm2 Hdv Hkp Hu0 Hu1 Hfree with ⟨HL, HG, HU0, HU1, HP⟩
-  ihave Hsc := bootShared_startedCell (GF := GF) $$ Hst
+  ihave Hsc := bootShared_startedCell (GF := GF) hrsv $$ Hhst
   imodintro
   iexists ξ0
   unfold bsCarveOut bsKptWin

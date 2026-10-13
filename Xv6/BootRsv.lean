@@ -370,10 +370,11 @@ theorem bootInodesWin_intro (heq : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)
   iframe H Hh
   ipureintro; exact heq
 
-/-- xv6's client halves of the singleton locks before `cpus`, one by one. -/
+/-- xv6's client halves of the singleton regions before `cpus` (the locks, and
+`started`), one by one. -/
 def bootPreHalves (E : EraGS) (m : MemF Hist) : IProp GF := iprop%
   rsvRegionHalfC E (xv6LockR (rsvUartLk 0)) m ∗ rsvRegionHalfC E (xv6LockR (rsvUartLk 1)) m ∗
-  rsvRegionHalfC E (xv6LockR KA.«cons») m ∗ rsvRegionHalfC E (xv6LockR KA.«pr») m ∗
+  rsvRegionHalfC E xv6StartedR m ∗ rsvRegionHalfC E (xv6LockR KA.«cons») m ∗ rsvRegionHalfC E (xv6LockR KA.«pr») m ∗
   rsvRegionHalfC E (xv6LockR KA.«kmem») m ∗
   rsvRegionHalfC E (xv6LockR KA.«pid_lock») m ∗ rsvRegionHalfC E (xv6LockR KA.«wait_lock») m
 
@@ -410,8 +411,9 @@ theorem bootRsvHalves (E : EraGS) (m : MemF Hist) :
     icases BigSepL.bigSepL_cons.1 $$ H with ⟨H4, H⟩
     icases BigSepL.bigSepL_cons.1 $$ H with ⟨H5, H⟩
     icases BigSepL.bigSepL_cons.1 $$ H with ⟨H6, H⟩
-    icases BigSepL.bigSepL_cons.1 $$ H with ⟨H7, -⟩
-    iframe H1 H2 H3 H4 H5 H6 H7
+    icases BigSepL.bigSepL_cons.1 $$ H with ⟨H7, H⟩
+    icases BigSepL.bigSepL_cons.1 $$ H with ⟨H8, -⟩
+    iframe H1 H2 H3 H4 H5 H6 H7 H8
   have hb : ([∗list] R ∈ xv6BufLockRegions, rsvRegionHalfC (GF := GF) E R m) ⊢
       [∗list] i ∈ List.range 30, rsvRegionHalfC E (xv6LockR (rsvBufLk i)) m := by
     unfold xv6BufLockRegions; rw [BigSepL.bigSepL_map]

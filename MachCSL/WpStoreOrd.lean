@@ -16,7 +16,10 @@ arm needs the deposit's stamp `T` at or below the store's position `t`
 
 Additive: a copy of the plain-store chain at width 4 (the leaf, the
 physical-write stage, the execute stage and the `wpLoop` rule), with the
-accessor strengthened.
+accessor strengthened; (W8 (f2-ctx), [R35.2]) the accessor's RESERVED arm
+(`MachCSL.writeAURsv`'s shape, with the history-aware obligation
+`MachCSL.rsvStoreOk`): `started` is a one-shot publication word, whose
+discipline (`MachCSL.oneShotOk`) only a history-aware obligation can keep.
 -/
 import MachCSL.WpSmodeRules
 import MachCSL.WpSmodeAtomic
@@ -34,23 +37,41 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 histories it names a position `T` of the store order (`topLb T`), and the
 continuation learns that the store's own position `t` passes it. -/
 def writeAUT (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) (Ψ : IProp GF) : IProp GF := iprop%
-  |={⊤,∅}=> ∃ (Hs : Nat → Hist) (T : Nat), histBytes pa n (fun _ => DFrac.own 1) Hs ∗ topLb T ∗
-    ▷ (∀ t : Nat, ⌜T ≤ t⌝ -∗ histBytes pa n (fun _ => DFrac.own 1) (pushed Hs t (hartAgent cpu) w') -∗
-        authoredBy t (hartAgent cpu) -∗ topLb t ={∅,⊤}=∗ Ψ)
+  |={⊤,∅}=>
+    ((∃ (Hs : Nat → Hist) (T : Nat), histBytes pa n (fun _ => DFrac.own 1) Hs ∗ topLb T ∗
+      ▷ (∀ t : Nat, ⌜T ≤ t⌝ -∗ histBytes pa n (fun _ => DFrac.own 1) (pushed Hs t (hartAgent cpu) w') -∗
+          authoredBy t (hartAgent cpu) -∗ topLb t ={∅,⊤}=∗ Ψ)) ∨
+     (∃ (Hs : Nat → Hist) (T : Nat) (cs : RsvComps), histBytes pa n (fun _ => DFrac.own (1 : Qp).half) Hs ∗
+      topLb T ∗ compBytes cs ∗ ⌜rsvStoreOk (hlc := hlc) (GF := GF) cpu pa n w' Hs cs⌝ ∗
+      ▷ (∀ t : Nat, ⌜T ≤ t⌝ -∗ ⌜0 < t⌝ -∗
+          histBytes pa n (fun _ => DFrac.own (1 : Qp).half) (pushed Hs t (hartAgent cpu) w') -∗
+          compBytes cs -∗ authoredBy t (hartAgent cpu) -∗ topLb t ={∅,⊤}=∗ Ψ)))
 
 theorem writeAUT_wand (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) (Ψ Ψ' : IProp GF) :
     writeAUT cpu pa n w' Ψ ⊢ ▷ (Ψ -∗ Ψ') -∗ writeAUT cpu pa n w' Ψ' := by
   unfold writeAUT
   iintro H HW
-  imod H with ⟨%Hs, %T, Hb, #HT, Hcont⟩
-  imodintro
-  iexists Hs, T
-  iframe Hb HT
-  inext
-  iintro %t %hT Hb Hau Htop
-  imod Hcont $$ %t %hT Hb Hau Htop with HΨ
-  imodintro
-  iapply HW $$ HΨ
+  imod H with (⟨%Hs, %T, Hb, #HT, Hcont⟩ | ⟨%Hs, %T, %cs, Hb, #HT, Hc, %hok, Hcont⟩)
+  · imodintro
+    ileft
+    iexists Hs, T
+    iframe Hb HT
+    inext
+    iintro %t %hT Hb Hau Htop
+    imod Hcont $$ %t %hT Hb Hau Htop with HΨ
+    imodintro
+    iapply HW $$ HΨ
+  · imodintro
+    iright
+    iexists Hs, T, cs
+    iframe Hb HT Hc
+    isplitr
+    · ipureintro; exact hok
+    inext
+    iintro %t %hT %ht Hb Hc Hau Htop
+    imod Hcont $$ %t %hT %ht Hb Hc Hau Htop with HΨ
+    imodintro
+    iapply HW $$ HΨ
 
 /-- **The ordered plain-store leaf**: `swp_sail_mem_write_plain_au` with the
 order receipt. -/
@@ -92,7 +113,56 @@ theorem swp_sail_mem_write_plain_auT (cpu : CPU) {n vasize : Nat}
       isplitl [Hregs Hmem Hmm Hclose]
       · iapply Hclose $$ %σ %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
       · iapply IH $$ Hfrag H
-  · imod H with ⟨%Hs, %T, Hb, #HT, Hcont⟩
+  · imod H with (⟨%Hs, %T, Hb, #HT, Hcont⟩ | ⟨%Hs, %T, %cs, Hb, #HT, Hc, %hok, Hcont⟩)
+    rotate_left
+    · -- a RESERVED word (W8 (f2-ctx): `started`)
+      obtain ⟨i, k, R, hi, hk', hpres⟩ := hok
+      ihave %hget : ⌜histsAt σ.mem req.pa n Hs⌝ $$ [Hmem Hb]
+      · iapply histBytes_valid σ.mem req.pa n _ Hs $$ [Hmem Hb]
+        iframe
+      ihave %hcget : ⌜∀ c ∈ cs, histsAt σ.mem c.1 c.2.1 c.2.2⌝ $$ [Hmem Hc]
+      · iapply compBytes_valid σ.mem cs $$ [Hmem Hc]
+        iframe
+      ihave %hT : ⌜T ≤ σ.top⌝ $$ [Hmm HT]
+      · iapply memModel_topLb _ σ T $$ [Hmm HT]
+        iframe Hmm
+        iexact HT
+      have hram : ramBytes req.pa n := ramBytes_of_cells hmm.2.2.2.1 (fun j hj => ⟨Hs j, hget j hj⟩)
+      imodintro
+      isplit
+      · ipureintro
+        exact Or.inl ⟨.Ok (some true), _, Or.inr ⟨hram, w', hv, hno, rfl, rfl⟩⟩
+      inext
+      iintro %σ'
+      isplit
+      · iintro %v %Hev
+        rcases Hev with ⟨hdev, w₀, ds₀, _, hdw, _, _⟩ | ⟨_, w'', hv', _, rfl, rfl⟩
+        · exact absurd hdev (not_devBytes_of_ramBytes hram (devWrite_pos hdw))
+        rw [hv] at hv'
+        obtain rfl := Option.some.inj hv'
+        icases resvFragAny_cases cpu r $$ Hfrag with ⟨%b, Hfrag⟩
+        icases memModel_rsvHalf_acc σ hi hk' $$ Hmm with ⟨Hh, Hmmc⟩
+        ihave Hb := rsvJoinHalf req.pa n Hs $$ [Hb Hh]
+        · iframe
+        imod histBytes_update σ.mem req.pa n Hs (σ.top + 1) (hartAgent cpu) w' $$ [$Hmem $Hb]
+          with ⟨Hmem, Hb⟩
+        icases rsvSplitHalf req.pa n _ $$ Hb with ⟨Hb, Hh⟩
+        ihave Hmm := Hmmc $$ [Hh]
+        · iapply rsvWordHalf_intro $$ Hh
+        imod memModel_store_plain _ σ cpu req.pa n w' r b hram hno
+          (rsvAllOk_store_in w' (σ.top + 1) (hartAgent cpu)
+            (MachFixedGS.rsvStatic_wf (hlc := hlc) (GF := GF)).1 hi (List.mem_of_getElem? hk')
+            (hpres σ.mem (σ.top + 1) (by omega) hget hcget)) $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag, #Hau, #Htop'⟩
+        imod Hcont $$ %(σ.top + 1) %(by omega) %(by omega) Hb Hc Hau Htop' with HΦ
+        rw [hk]
+        imodintro
+        isplitl [Hregs Hmem Hmm Hclose]
+        · iapply Hclose $$ %(σ.store cpu req.pa n w' false) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
+        · iapply swp_ret
+          iapply HΦ $$ Hfrag
+      · iintro %Hbk
+        obtain ⟨hno', _⟩ := Hbk
+        exact absurd hno' hno
     ihave %hnr := memModel_notRsv_hist σ req.pa Hs n $$ [Hmm Hb]
     · iframe
     ihave %hget : ⌜histsAt σ.mem req.pa n Hs⌝ $$ [Hmem Hb]

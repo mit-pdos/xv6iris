@@ -222,7 +222,7 @@ no reserved byte is the full image's; the registered locks' 24-byte windows,
 `cpus[]`'s and the proc table's stay erased. -/
 theorem bcpBssWindowsR :
     bootRan (GF := GF) (rsvErase KernelRsv.static (imgFlat bootImage)) MachCSL.KernelSyms.«_bss» MachCSL.KernelSyms.«end» ⊢
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«started» (MachCSL.KernelSyms.«started» + 4) ∗
+      bootRan (rsvErase KernelRsv.static (imgFlat bootImage)) MachCSL.KernelSyms.«started» (MachCSL.KernelSyms.«started» + 4) ∗
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«kernel_pagetable» (MachCSL.KernelSyms.«kernel_pagetable» + 8) ∗
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«initproc» (MachCSL.KernelSyms.«initproc» + 8) ∗
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«ticks» (MachCSL.KernelSyms.«ticks» + 4) ∗
@@ -265,7 +265,6 @@ theorem bcpBssWindowsR :
     (by omega) (by omega)).1 $$ H20 with ⟨H20, H20b⟩
   icases (bootRan_split (GF := GF) _ MachCSL.KernelSyms.«disk» (MachCSL.KernelSyms.«disk» + 296) (MachCSL.KernelSyms.«disk» + 0x140)
     (by omega) (by omega)).1 $$ H21 with ⟨H21a, H21⟩
-  ihave H0 := bootRan_rsvErase_off_le (imgFlat bootImage) _ _ (by decide +kernel) $$ H0
   ihave H1 := bootRan_rsvErase_off_le (imgFlat bootImage) _ _ (by decide +kernel) $$ H1
   ihave H2 := bootRan_rsvErase_off_le (imgFlat bootImage) _ _ (by decide +kernel) $$ H2
   ihave H3 := bootRan_rsvErase_off_le (imgFlat bootImage) _ _ (by decide +kernel) $$ H3
@@ -328,24 +327,34 @@ theorem bootShared_harts (σ : MState) (hbf : bootFacts σ)
   iframe Ht1 HB
 
 /-- **The handover cell** (Rocq's `started` row of `boot_bss_carve`): the
-`.bss` word `started`, never written, as `started_alloc`'s window. -/
-theorem bootShared_startedCell :
-    bootRan (GF := GF) (imgFlat bootImage) MachCSL.KernelSyms.«started» (MachCSL.KernelSyms.«started» + 4) ⊢
-      wordCell startedAddr 4 0 startedClear [] := by
-  have hS : MachCSL.KernelSyms.«started» = 0x8000a400 := rfl
-  have hA : bcInRam 0x8000a400 4 := by unfold bcInRam ramBase ramEnd; omega
-  rw [hS]
-  refine (bootImg_run (GF := GF) bootImage 0x8000a400 4 (fun _ => 0#8) hA (fun j hj => ?_)).trans ?_
-  · have := bc_addr_toNat 0x8000a400 j (by omega)
-    exact bootImage_wf.bss _ (by rw [this, bc_bss_val]; omega) (by rw [this, bc_end_val]; omega)
-  refine .trans ?_ (wordCell_of_fresh startedAddr 4 startedClear (fun _ => 0))
-  rw [show startedAddr = BitVec.ofNat 64 0x8000a400 from rfl]
-  unfold histBytes
-  apply BigSepL.bigSepL_mono
-  intro k j hj
-  have e : nthByte startedClear j = 0#8 := by simp [startedClear, nthByte]
-  simp only [e]
-  exact .rfl
+`.bss` word `started`, never written, as `started_alloc`'s window -- (W8
+(f2-ctx) [R35.2]) the client's HALF of the reserved publication word, at the
+image history. -/
+theorem bootShared_startedCell (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) :
+    rsvRegionHalfC (MachGS.era (hlc := hlc) (GF := GF)) xv6StartedR (imgFlat bootImage) ⊢ startedCell (GF := GF) := by
+  have hb : MachCSL.KernelSyms.«_bss» = 0x8000a400 := rfl
+  have he : MachCSL.KernelSyms.«end» = 0x80023b10 := rfl
+  unfold startedCell startedWin
+  dsimp only [rsvRegionHalfC, xv6StartedR, RsvRegion.words]
+  iintro H
+  icases BigSepL.bigSepL_cons.1 $$ H with ⟨H1, -⟩
+  isplitl [H1]
+  · rw [WordHist.hist_nil]
+    unfold histBytes
+    iapply BigSepL.bigSepL_mono ?_ $$ H1
+    intro _ j hj
+    have hjn : j < 4 := List.mem_range.1 (List.mem_of_getElem? hj)
+    have ht : (KA.«started» + BitVec.ofNat 64 j).toNat = 0x8000a400 + j := by
+      rw [BitVec.toNat_add]; simp only [BitVec.toNat_ofNat]
+      show (MachCSL.KernelSyms.«started» % 2 ^ 64 + j % 2 ^ 64) % 2 ^ 64 = _
+      rw [show MachCSL.KernelSyms.«started» = 0x8000a400 from rfl]; omega
+    have hr1 : inRam (KA.«started» + BitVec.ofNat 64 j) 1 := by unfold inRam ramBase ramEnd; omega
+    have hz := bootImage_wf.bss (KA.«started» + BitVec.ofNat 64 j) (by omega) (by omega)
+    have hg : get? (M := MemF) (imgFlat bootImage) (KA.«started» + BitVec.ofNat 64 j) = some [⟨0, 0, 0#8⟩] :=
+      bc_imgFlat_get bootImage _ _ hr1 hz
+    rw [hg, Option.getD_some]
+    exact .rfl
+  · ipureintro; exact hrsv
 
 set_option maxRecDepth 100000 in
 /-- **The rows spent before the tier switch** (at the entry context,
@@ -476,7 +485,7 @@ def bsCarveOut (σ : MState) (ξ0 : CtxId) : IProp GF := iprop%
   bcpUartCells (Y := bootSharedX ξ0) .uart0 ∗ bcpUartCells (Y := bootSharedX ξ0) .uart1 ∗
   @pageRange hlc GF _ (bootSharedX ξ0) kinitBase kinitPages ∗
   bsKptWin (GF := GF) ∗
-  wordCell startedAddr 4 0 startedClear []
+  startedCell
 
 /-- **THE WHOLE CARVE** (Rocq `boot_shared_alloc`'s memory half): the era's
 memory cells, the per-hart rows and tokens; hart 0's token is destructed
@@ -499,7 +508,7 @@ theorem bootShared_carve (σ : MState) (hbf : bootFacts σ) :
       Hit, Hlogl, Hlog, Hdv, Hftl, Hft, Hdk, Hdkl⟩
   icases bootRsvHalves _ _ $$ Hhalf with ⟨Hpre, Hhc, Hhpr, Hpost⟩
   unfold bootPreHalves bootPostHalves
-  icases Hpre with ⟨Hhu0, Hhu1, Hhcons, Hhprk, Hhkm, Hhp, Hhw⟩
+  icases Hpre with ⟨Hhu0, Hhu1, Hhst, Hhcons, Hhprk, Hhkm, Hhp, Hhw⟩
   icases Hpost with ⟨Hhtl, Hhbc, Hhbufs, Hhit, Hhinodes, Hhlog, Hhft, Hhdk⟩
   imod bootShared_harts σ hbf hrsv $$ [] Ht Hr Hl Hs0 Hcpus Hhc with Hh
   · iframe Hk Hg
@@ -554,7 +563,7 @@ theorem bootShared_carve (σ : MState) (hbf : bootFacts σ) :
   icases bootShared_peel _ $$ Hh with ⟨⟨⟨%ξ0, Ht0⟩, Hb0⟩, Hrest⟩
   have hB := (letI : CurCtx := bootSharedX ξ0; bootShared_bareRows (GF := GF))
   imod hB $$ Hk Hc Hpr Hkm Hkm2 Hdv Hkp Hu0 Hu1 Hfree with ⟨HL, HG, HU0, HU1, HP⟩
-  ihave Hsc := bootShared_startedCell (GF := GF) $$ Hst
+  ihave Hsc := bootShared_startedCell (GF := GF) hrsv $$ Hhst
   imodintro
   iexists ξ0
   unfold bsCarveOut bsKptWin
@@ -671,7 +680,7 @@ def bootSharedOut [WchG GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [Icfg] [Fs
   bootHartRes (σ.regs startedPrimary) startedPrimary ∗
   ([∗list] c ∈ cpus.tail, (∃ ξ : CtxId, ctxTok (hlc := hlc) (GF := GF) c ξ) ∗
     bootHartRes (σ.regs c) c) ∗
-  wordCell startedAddr 4 0 startedClear [] ∗ ctxStamped ξd 0 ∗
+  startedCell ∗ ctxStamped ξd 0 ∗
   bootSupplyCore (bootSharedX ξ0) Γ γ0 γ1 γc γl0 γl1 γd γt cn [] [] Virtio.cfg0 dk sb nib cov Pb Rspent ∗
   appInv (hlc := hlc) (GF := GF) fscFs ∗
   uartInv .uart0 γ0 ∗ uartInv .uart1 γ1 ∗ plicInv γ0 γ1 ∗ wireInv (hlc := hlc) (GF := GF) ∗
@@ -800,7 +809,7 @@ become the channel at the concrete deposit `mainDeposit Γ …` and the
 primary's half. -/
 theorem bootShared_started (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName)
     (γd : DiskNames) (γdl γt : GName) (ξd : CtxId) :
-    wordCell (GF := GF) startedAddr 4 0 startedClear [] ∗ ctxStamped ξd 0 ⊢
+    startedCell (GF := GF) ∗ ctxStamped ξd 0 ⊢
       |={⊤}=> ∃ γi : GName, startedInv γi ξd (mainDeposit Γ γ0 γ1 γc γl0 γl1 γd γdl γt) ∗
         startedPrim γi :=
   started_alloc ⊤ ξd _ 0

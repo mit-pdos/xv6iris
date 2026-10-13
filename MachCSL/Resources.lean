@@ -400,6 +400,10 @@ class MachFixedGS (hlc : outParam HasLC) (GF : BundledGFunctors) where
   rsvStatic : List RsvRegion
   /-- ...byte-distinct image bytes (`rsvWf`). -/
   rsvStatic_wf : rsvWf rsvStatic
+  /-- THE DYNAMIC LOCKS' NAMES (W8 (f2-ctx) [R35.1]): the client's
+  `KernelRsv.names`; a live dynamic spinlock whose name word holds one is a
+  hop byte (`MachCSL.nameLockAt`, the time-indexed registry). -/
+  rsvNames : List (BitVec 64)
 
 attribute [reducible, instance] MachFixedGS.reg
 attribute [reducible, instance] MachFixedGS.memPre
@@ -1052,9 +1056,11 @@ entries before the deadline, or the boot hop through a publication word
 def pubByteIn (rs : List RsvRegion) (f : PAddr) (w : CPU) : Prop :=
   (⟨f, .pub w⟩ : RsvRegion) ∈ rs
 
-/-- What the certificates of a machine state are checked against. -/
-def chainEnvAt (rs : List RsvRegion) (σ : MState) : ChainEnv :=
-  ⟨σ.mem, fun j => (σ.hr j).coh, lockByteIn rs, pubByteIn rs⟩
+/-- What the certificates of a machine state are checked against: the hop
+registry is the static lock bytes, or (time-indexed [R35.1]) a live dynamic
+lock named in `names` at the state's memory and top. -/
+def chainEnvAt (rs : List RsvRegion) (names : List (BitVec 64)) (σ : MState) : ChainEnv :=
+  ⟨σ.mem, fun j => (σ.hr j).coh, fun b a => lockByteIn rs b ∨ nameLockAt names σ.mem σ.top b a, pubByteIn rs⟩
 
 /-- **The certificate map's invariant**: every certificate key names a valid
 certificate, every gate key a hart past the gate. -/
@@ -1096,18 +1102,21 @@ theorem certsOk_insertGate {X : ChainEnv} {Z : RegMapF Agent} (h : certsOk X Z)
 
 /-- A machine state whose memory is unchanged and whose coherence floors are
 unchanged has the same certificate environment. -/
-theorem chainEnvAt_congr (rs : List RsvRegion) {σ σ' : MState} (h : σ'.mem = σ.mem)
-    (hc : ∀ (j : CPU) (a : PAddr), (σ'.hr j).coh a = (σ.hr j).coh a) : chainEnvAt rs σ' = chainEnvAt rs σ := by
-  unfold chainEnvAt
-  rw [h]
+theorem chainEnvAt_congr (rs : List RsvRegion) (names : List (BitVec 64)) {σ σ' : MState}
+    (h : σ'.mem = σ.mem) (hl : σ'.log = σ.log)
+    (hc : ∀ (j : CPU) (a : PAddr), (σ'.hr j).coh a = (σ.hr j).coh a) :
+    chainEnvAt rs names σ' = chainEnvAt rs names σ := by
+  unfold chainEnvAt MState.top
+  rw [h, hl]
   congr 1
   funext j a
   exact hc j a
 
 /-- A load raises its hart's coherence floors only. -/
-theorem chainEnvAt_ext_load (rs : List RsvRegion) (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) :
-    (chainEnvAt rs σ).ext (chainEnvAt rs (σ.afterLoad cpu pa n tvn)) := by
-  refine ⟨memExt_refl _, fun _ h => h, fun _ _ => Iff.rfl, fun j f w _ _ => ?_⟩
+theorem chainEnvAt_ext_load (rs : List RsvRegion) (names : List (BitVec 64))
+    (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) :
+    (chainEnvAt rs names σ).ext (chainEnvAt rs names (σ.afterLoad cpu pa n tvn)) := by
+  refine ⟨memExt_refl _, fun _ _ h => h, fun _ _ => Iff.rfl, fun j f w _ _ => ?_⟩
   simp only [chainEnvAt, updCpu]
   split
   · rename_i hj; subst hj; simp only [HRead.afterLoad]; exact Nat.le_max_left _ _
@@ -1116,11 +1125,17 @@ theorem chainEnvAt_ext_load (rs : List RsvRegion) (σ : MState) (cpu : CPU) (pa 
 /-- **A store keeps the environment growing**: its memory extends, and it
 cannot reset another writer's publication byte's floor -- the publication
 region's discipline at the new memory makes the storing hart its writer. -/
-theorem chainEnvAt_ext_store (rs : List RsvRegion) (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
+theorem chainEnvAt_ext_store (rs : List RsvRegion) (names : List (BitVec 64))
+    (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
     (w : BitVec (8 * n)) (excl : Bool)
     (hnew : rsvAllOk rs (σ.mem.writeBytes pa n w (σ.top + 1) (hartAgent cpu))) :
-    (chainEnvAt rs σ).ext (chainEnvAt rs (σ.store cpu pa n w excl)) := by
-  refine ⟨memExt_writeBytes _ _ _ _ _, fun _ h => h, fun _ _ => Iff.rfl, fun j f w' hp hj => ?_⟩
+    (chainEnvAt rs names σ).ext (chainEnvAt rs names (σ.store cpu pa n w excl)) := by
+  refine ⟨memExt_writeBytes _ _ _ _ _, fun b r h => ?_, fun _ _ => Iff.rfl, fun j f w' hp hj => ?_⟩
+  · rcases h with h | h
+    · exact Or.inl h
+    · refine Or.inr (nameLockAt_mono (memGrow_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _)) ?_ h)
+      simp only [MState.top, List.length_append, List.length_singleton]
+      omega
   simp only [chainEnvAt, updCpu]
   split
   · rename_i hjc
@@ -1144,31 +1159,45 @@ theorem chainEnvAt_ext_store (rs : List RsvRegion) (σ : MState) (cpu : CPU) (pa
   · exact Nat.le_refl _
 
 /-- A DMA write extends the memory and moves no hart's floor. -/
-theorem chainEnvAt_ext_dma (rs : List RsvRegion) (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
-    (chainEnvAt rs σ).ext (chainEnvAt rs (σ.storeDma pa n w)) := by
-  refine ⟨?_, fun _ h => h, fun _ _ => Iff.rfl, fun _ _ _ _ _ => Nat.le_refl _⟩
-  show memExt σ.mem (σ.storeDma pa n w).mem
+theorem chainEnvAt_ext_dma (rs : List RsvRegion) (names : List (BitVec 64))
+    (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
+    (chainEnvAt rs names σ).ext (chainEnvAt rs names (σ.storeDma pa n w)) := by
   by_cases hn : n = 0
-  · rw [MState.storeDma_zero σ pa n w hn]; exact memExt_refl _
-  · rw [MState.storeDma_mem_of_ne σ pa n w hn]; exact memExt_writeBytes _ _ _ _ _
+  · rw [MState.storeDma_zero σ pa n w hn]; exact ChainEnv.ext_refl _
+  refine ⟨?_, fun b r h => ?_, fun _ _ => Iff.rfl, fun _ _ _ _ _ => Nat.le_refl _⟩
+  · show memExt σ.mem (σ.storeDma pa n w).mem
+    rw [MState.storeDma_mem_of_ne σ pa n w hn]; exact memExt_writeBytes _ _ _ _ _
+  · rcases h with h | h
+    · exact Or.inl h
+    · refine Or.inr (nameLockAt_mono (t := σ.top) ?_ ?_ h)
+      · show memGrow σ.mem σ.top (σ.storeDma pa n w).mem
+        rw [MState.storeDma_mem_of_ne σ pa n w hn]
+        exact memGrow_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _)
+      · simp only [MState.top, if_neg hn, List.length_append, List.length_singleton]
+        omega
 
 /-- The publication words of a list whose disciplines hold are one-shot. -/
-theorem pubOneShot_of_rsv {rs : List RsvRegion} {σ : MState} (h : rsvAllOk rs σ.mem) :
-    pubOneShot (chainEnvAt rs σ) := by
+theorem pubOneShot_of_rsv {rs : List RsvRegion} {names : List (BitVec 64)} {σ : MState}
+    (h : rsvAllOk rs σ.mem) : pubOneShot (chainEnvAt rs names σ) := by
   intro f w H e e' hp hf he he' ht ht'
   obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 hp
   have hR := h i _ hi
   unfold regionOk at hR
   exact hR.2 f (RsvRegion.base_mem _) H hf e he e' he' ht ht'
 
-/-- The lock bytes of the ambient record's static reserved spinlocks: the hops
-the chain certificates may use. -/
+/-- The lock bytes of the ambient record's static reserved spinlocks: hops the
+chain certificates may use at every position. -/
 def rsvLockByte [MachFixedGS hlc GF] (b : PAddr) : Prop :=
   lockByteIn (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) b
 
 /-- The ambient record's certificate environment at `σ`. -/
 abbrev chainEnv [MachFixedGS hlc GF] (σ : MState) : ChainEnv :=
-  chainEnvAt (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ
+  chainEnvAt (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.rsvNames (hlc := hlc) (GF := GF)) σ
+
+/-- A static lock byte is a hop byte at every position. -/
+theorem chainEnv_isLk_rsv [MachFixedGS hlc GF] (σ : MState) {b : PAddr} (r : Nat)
+    (h : rsvLockByte (hlc := hlc) (GF := GF) b) : (chainEnv (hlc := hlc) (GF := GF) σ).isLk b r :=
+  Or.inl h
 
 /-- The issued elements of a certificate map, kept beside the authority (so
 re-issuing a certificate hands out its element; `MachCSL.dirtyElems`'s
@@ -1208,10 +1237,10 @@ def memModelAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) : IProp GF := ipro
 
 /-- The reserved conjunct reads only the memory and the coherence floors. -/
 theorem rsvModelAt_congr [MachFixedGS hlc GF] (E : EraGS) {σ σ' : MState} (h : σ'.mem = σ.mem)
-    (hc : ∀ (j : CPU) (a : PAddr), (σ'.hr j).coh a = (σ.hr j).coh a) :
+    (hl : σ'.log = σ.log) (hc : ∀ (j : CPU) (a : PAddr), (σ'.hr j).coh a = (σ.hr j).coh a) :
     rsvModelAt (GF := GF) E σ' = rsvModelAt E σ := by
   unfold rsvModelAt reservedOk chainModelAt chainEnv
-  rw [chainEnvAt_congr _ h hc, h]
+  rw [chainEnvAt_congr _ _ h hl hc, h]
 
 /-- `cpus` lists every hart at its own index. -/
 theorem cpus_get? (cpu : CPU) : cpus[cpu.val]? = some cpu := by

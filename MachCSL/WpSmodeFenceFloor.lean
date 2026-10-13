@@ -93,7 +93,7 @@ theorem memModel_load_rv (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (h
   unfold memModelAt
   iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
   ihave Hrsv := rsvModel_mono E σ (σ.afterLoad cpu pa n tvn) id
-    (fun _ => chainEnvAt_ext_load _ σ cpu pa n tvn) $$ Hrsv
+    (fun _ => chainEnvAt_ext_load _ _ σ cpu pa n tvn) $$ Hrsv
   icases hartViews_acc E σ cpu $$ Hviews with ⟨Hc, Hclose⟩
   icases hartViewsAt_cases E σ cpu $$ Hc with ⟨Hv, Hi, Hr⟩
   imod MonoNat.own_update _ (.ofNat (σ.hr cpu).rv) (.ofNat (max (σ.hr cpu).rv tvn))
@@ -215,7 +215,7 @@ theorem swp_sail_mem_read_plain_aur (cpu : CPU) {n vasize : Nat}
       exact absurd h1 (by decide))
   iintro %σ Hσ
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
-  imod H with ⟨%dqs, %Hs, Hb, %hne, Hcont⟩
+  imod H with ⟨%dqs, %Hs, %o, Hb, %hne, Ho, Hcont⟩
   ihave %hget : ⌜histsAt σ.mem req.pa n Hs⌝ $$ [Hmem Hb]
   · iapply histBytes_valid σ.mem req.pa n dqs Hs $$ [Hmem Hb]
     iframe
@@ -256,7 +256,9 @@ theorem swp_sail_mem_read_plain_aur (cpu : CPU) {n vasize : Nat}
       unfold FlatMem.read at this
       rw [hget j hj, Option.bind_some] at this
       exact this
-    imod Hcont $$ %w' %tvn %(by omega) %hreads %hauthors Hrv Hb with HΦ
+    imod memModel_rdIssue σ cpu req.pa n tvn Hs w' hget hreads o $$ [Hmm Ho] with ⟨Hmm, Hout⟩
+    · iframe Hmm Ho
+    imod Hcont $$ %w' %tvn %(by omega) %hreads %hauthors Hrv Hout Hb with HΦ
     imodintro
     isplitl [Hregs Hmem Hmm Hclose]
     · iapply Hclose $$ %(σ.afterLoad cpu req.pa n tvn) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm

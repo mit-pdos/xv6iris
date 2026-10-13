@@ -1253,7 +1253,7 @@ theorem memModel_dropResv (σ : MState) (cpu : CPU) (r : Option Resv) (b : Bool)
   · iapply memModel_resv E σ cpu r b $$ [Hmm Hfrag]
     iframe
   unfold memModelAt
-  rw [rsvModelAt_congr E (σ := σ) (σ' := σ.dropResv cpu) rfl (fun _ _ => rfl)]
+  rw [rsvModelAt_congr E (σ := σ) (σ' := σ.dropResv cpu) rfl rfl (fun _ _ => rfl)]
   icases Hmm with ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
   unfold resvFragAt
   imod ghost_map_update ((none, b) : ResvVal) $$ Hresv Hfrag with ⟨Hresv, Hfrag⟩
@@ -1302,7 +1302,7 @@ theorem memModel_load (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv 
   unfold memModelAt
   iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
   ihave Hrsv := rsvModel_mono E σ (σ.afterLoad cpu pa n tvn) id
-    (fun _ => chainEnvAt_ext_load _ σ cpu pa n tvn) $$ Hrsv
+    (fun _ => chainEnvAt_ext_load _ _ σ cpu pa n tvn) $$ Hrsv
   icases hartViews_acc E σ cpu $$ Hviews with ⟨Hc, Hclose⟩
   icases hartViewsAt_cases E σ cpu $$ Hc with ⟨Hv, Hi, Hr⟩
   imod MonoNat.own_update _ (.ofNat (σ.hr cpu).rv) (.ofNat (max (σ.hr cpu).rv tvn))
@@ -1333,7 +1333,7 @@ theorem memModel_fence (σ : MState) (cpu : CPU) (b : barrier_kind) :
     memModelAt E σ ⊢@{IProp GF}
       |==> (memModelAt E (σ.fence cpu b) ∗ viewLbAt E cpu ((σ.fence cpu b).tv cpu)) := by
   unfold memModelAt
-  rw [rsvModelAt_congr E (σ := σ) (σ' := σ.fence cpu b) rfl (fun _ _ => rfl)]
+  rw [rsvModelAt_congr E (σ := σ) (σ' := σ.fence cpu b) rfl rfl (fun _ _ => rfl)]
   iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
   icases hartViews_acc E σ cpu $$ Hviews with ⟨Hc, Hclose⟩
   icases hartViewsAt_cases E σ cpu $$ Hc with ⟨Hv, Hi, Hr⟩
@@ -1402,7 +1402,7 @@ theorem memModel_store_plain (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w
   unfold memModelAt
   icases Hmm with ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
   ihave Hrsv := rsvModel_mono E σ (σ.store cpu pa n w false) hrsv
-    (chainEnvAt_ext_store _ σ cpu pa n w false) $$ Hrsv
+    (chainEnvAt_ext_store _ _ σ cpu pa n w false) $$ Hrsv
   imod MonoNat.own_update _ (.ofNat σ.top) (.ofNat (σ.top + 1))
     (by simp only [MaxNat.le_toNat]; omega) $$ Htop with ⟨Htop, #Htoplb⟩
   imod ghost_map_insert_persist (σ.top + 1) (hartAgent cpu)

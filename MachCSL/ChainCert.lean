@@ -5,8 +5,10 @@ MachCSL: THE CHAIN CERTIFICATES' LAWS (W8 (f2-ctx); `MachCSL.ChainDefs`,
 What the state interpretation's certificate map gives and takes:
 
 * `memModel_chainCert` / `memModel_chainLb` / `memModel_gate`: an issued
-  certificate is VALID of the machine -- a sync chain through the static
-  spinlocks' lock bytes, own entries before the deadline, or the boot hop --
+  certificate is VALID of the machine -- a sync chain through the registry's
+  lock bytes (the static spinlocks', and the client's dynamic registry at the
+  release positions, [R35.1]), own entries before the deadline, or the boot
+  hop --
   and an issued gate is a hart past the boot gate;
 * `memModel_certIssue` / `memModel_gateIssue`: a valid certificate / gate may
   be issued (a ghost update under the interpretation; re-issuing hands out
@@ -24,7 +26,7 @@ What the state interpretation's certificate map gives and takes:
 The lock rules (`MachCSL.WpLock`) are where the last two run; nothing here
 names a lock invariant.
 -/
-import MachCSL.WpAtomic
+import MachCSL.Wp
 
 namespace MachCSL
 
@@ -163,13 +165,14 @@ theorem memModel_chainRetime (σ : MState) (h : CPU) (t : Nat) (A : CPU) (τ : N
     iframe Hmm
     iapply chainLbAt_of_cert E _ $$ Hc
 
-/-- **The acquire's extension**: the lock byte `b`'s history headed by the
-winning AMO's entry `⟨a, B, va⟩` (the newest entry of the memory) over the
-release entry `⟨r, A, 0⟩` over a nonzero entry; a lower bound to `A` before
-`r` is one to `B` past `a`, given `B`'s gate. -/
+/-- **The acquire's extension**: the lock byte `b` -- a hop byte for the
+acquire at `a` -- with its history headed by the winning AMO's entry
+`⟨a, B, va⟩` (the newest entry of the memory) over the release entry
+`⟨r, A, 0⟩` over a nonzero entry; a lower bound to `A` before `r` is one to `B`
+past `a`, given `B`'s gate. -/
 theorem memModel_chainHop (σ : MState) (b : PAddr) (A B : CPU) (r a : Nat) (va : BitVec 8) (e0 : HEnt)
     (H2 : Hist) (hb : σ.mem[b]? = some (⟨a, hartAgent B, va⟩ :: ⟨r, hartAgent A, 0⟩ :: e0 :: H2))
-    (hva : va ≠ 0) (he0 : e0.v ≠ 0) (hlk : rsvLockByte (hlc := hlc) (GF := GF) b) (ha : σ.top = a)
+    (hva : va ≠ 0) (he0 : e0.v ≠ 0) (hlk : (chainEnv (hlc := hlc) (GF := GF) σ).isLk b a) (ha : σ.top = a)
     (h : CPU) (t : Nat) :
     memModelAt E σ ∗ gatePassedAt E B ∗ chainLbAt E h t A r ⊢@{IProp GF}
       |==> (memModelAt E σ ∗ chainLbAt E h t B (a + 1)) := by
@@ -196,6 +199,57 @@ theorem memModel_chainHop (σ : MState) (b : PAddr) (A B : CPU) (r a : Nat) (va 
     imodintro
     iframe Hmm
     iapply chainLbAt_of_cert E _ $$ Hc
+
+/-- The release's record, for a list of lower bounds (each with a store-order
+receipt of its entries, at any deadline). -/
+theorem memModel_chainRetimeL (σ : MState) (A : CPU) :
+    ∀ L : List (CPU × Nat),
+      memModelAt E σ ∗ ([∗list] p ∈ L, (∃ τ : Nat, chainLbAt E p.1 p.2 A τ) ∗ topLbAt E p.2) ⊢@{IProp GF}
+        |==> (memModelAt E σ ∗ [∗list] p ∈ L, chainLbAt E p.1 p.2 A (σ.top + 1))
+  | [] => by
+    iintro ⟨Hmm, _⟩
+    imodintro
+    iframe Hmm
+    iapply BigSepL.bigSepL_nil.2
+    itrivial
+  | p :: L => by
+    iintro ⟨Hmm, HL⟩
+    icases BigSepL.bigSepL_cons.1 $$ HL with ⟨⟨⟨%τ, #Hp⟩, #Ht⟩, HL⟩
+    ihave %ht := memModel_topLb E σ p.2 $$ [Hmm Ht]
+    · iframe Hmm Ht
+    imod memModel_chainRetime E σ p.1 p.2 A τ (fun _ => ht) $$ [Hmm] with ⟨Hmm, #Hp'⟩
+    · iframe Hmm Hp
+    imod memModel_chainRetimeL σ A L $$ [Hmm HL] with ⟨Hmm, HL'⟩
+    · iframe Hmm HL
+    imodintro
+    iframe Hmm
+    iapply BigSepL.bigSepL_cons.2
+    iframe Hp' HL'
+
+/-- The acquire's extension, for a list of lower bounds. -/
+theorem memModel_chainHopL (σ : MState) (b : PAddr) (A B : CPU) (r a : Nat) (va : BitVec 8) (e0 : HEnt)
+    (H2 : Hist) (hb : σ.mem[b]? = some (⟨a, hartAgent B, va⟩ :: ⟨r, hartAgent A, 0⟩ :: e0 :: H2))
+    (hva : va ≠ 0) (he0 : e0.v ≠ 0) (hlk : (chainEnv (hlc := hlc) (GF := GF) σ).isLk b a) (ha : σ.top = a) :
+    ∀ L : List (CPU × Nat),
+      memModelAt E σ ∗ gatePassedAt E B ∗ ([∗list] p ∈ L, chainLbAt E p.1 p.2 A r) ⊢@{IProp GF}
+        |==> (memModelAt E σ ∗ [∗list] p ∈ L, chainLbAt E p.1 p.2 B (a + 1))
+  | [] => by
+    iintro ⟨Hmm, _, _⟩
+    imodintro
+    iframe Hmm
+    iapply BigSepL.bigSepL_nil.2
+    itrivial
+  | p :: L => by
+    iintro ⟨Hmm, #Hg, HL⟩
+    icases BigSepL.bigSepL_cons.1 $$ HL with ⟨#Hp, HL⟩
+    imod memModel_chainHop E σ b A B r a va e0 H2 hb hva he0 hlk ha p.1 p.2 $$ [Hmm] with ⟨Hmm, #Hp'⟩
+    · iframe Hmm Hg Hp
+    imod memModel_chainHopL σ b A B r a va e0 H2 hb hva he0 hlk ha L $$ [Hmm HL] with ⟨Hmm, HL'⟩
+    · iframe Hmm Hg HL
+    imodintro
+    iframe Hmm
+    iapply BigSepL.bigSepL_cons.2
+    iframe Hp' HL'
 
 end era
 

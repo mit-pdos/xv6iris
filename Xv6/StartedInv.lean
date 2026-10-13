@@ -76,11 +76,21 @@ handler's own fence -- `DiskInvDefs.diskPayFl`.)
    reading) and `agent_zero_cid`/`cid_zero_agent` are the spin loop's
    stage facts, not the invariant's; the reader's side is stated at
    `cpu ≠ startedPrimary`.
+7. **(W8 (f2-ctx), Q-F2-BOOTGATE (a) as amended by [R35.2]) `started` is a
+   RESERVED one-shot PUBLICATION word** (`Xv6.xv6StartedR`,
+   `MachCSL.RsvKind.pub`): the invariant holds HALF of its four bytes at the
+   image history (`startedWin`; the state interpretation holds the other
+   half and keeps `MachCSL.oneShotOk`), main's store is the ordered store's
+   RESERVED arm with the history-aware obligation (`started_rsvStoreOk`),
+   and a secondary's read of the set value is the BOOT GATE: the read's
+   issue request (`MachCSL.rdIn`) hands it `MachCSL.gatePassed cpu`
+   (`startedSeen`), issued inside the load's atomic step.
 -/
 import MachCSL.CtxBox
 import MachCSL.ReadAUr
 import Xv6.UartTrace
 import MachCSL.WpStoreOrd
+import Xv6.KernelRsv
 
 namespace Xv6
 
@@ -99,6 +109,27 @@ def startedSet : BitVec (8 * 4) := 1
 /-- The hart that writes it: `cpuid() == 0`. -/
 def startedPrimary : CPU := ⟨0, by decide⟩
 
+/-- The flag's image history: a never-written `.bss` word (four zero bytes at
+timestamp 0). -/
+def startedImg : Nat → Hist := fun _ => [⟨0, 0, 0#8⟩]
+
+theorem startedImg_tail : tailOk 4 0 startedClear startedImg :=
+  fun j _ => ⟨_, _, rfl, by simp [startedClear, nthByte], rfl⟩
+
+/-- `started`'s region is xv6's ONLY publication word (W8 (f2-ctx)). -/
+theorem xv6Pub_only (f : PAddr) (w : CPU) (h : (⟨f, .pub w⟩ : RsvRegion) ∈ xv6RsvStatic) :
+    f = startedAddr ∧ w = startedPrimary := by
+  have hall : xv6RsvStatic.all (fun R => match R.kind with
+      | .pub w' => decide (R.base = startedAddr) && decide (w' = startedPrimary)
+      | _ => true) = true := by decide +kernel
+  have := List.all_eq_true.1 hall _ h
+  simpa using this
+
+theorem xv6Started_mem : xv6StartedR ∈ xv6RsvStatic := xv6RsvStatic_mem_pre (by simp [xv6PreLockRegions])
+
+theorem xv6Started_idx : xv6RsvStatic[2]? = some xv6StartedR := by
+  unfold xv6RsvStatic xv6PreLockRegions; rfl
+
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 
@@ -115,36 +146,51 @@ instance startedIdx_persistent (γ : GName) (t : Nat) : Persistent (startedIdx (
 instance startedIdx_timeless (γ : GName) (t : Nat) : Timeless (startedIdx (GF := GF) γ t) := by
   unfold startedIdx; infer_instance
 
+/-- **THE WINDOW** (W8 (f2-ctx) [R35.2]): `started` is a reserved word, so the
+invariant holds HALF of its bytes, over the image history; `W` lists the
+stores on top (none, or main's one). -/
+def startedWin (W : WordHist 4) : IProp GF :=
+  histBytes startedAddr 4 (fun _ => DFrac.own (1 : Qp).half) (W.hist startedImg)
+
+instance startedWin_timeless (W : WordHist 4) : Timeless (startedWin (GF := GF) W) := by
+  unfold startedWin histBytes; infer_instance
+
 /-- The ARMED arm: the one store at `t`, its position frozen, the record
 stamped at or below it carrying the deposit. -/
 def startedArmed (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) : IProp GF := iprop%
-  ∃ t T : Nat, wordCell startedAddr 4 0 startedClear [⟨t, hartAgent startedPrimary, startedSet⟩] ∗
-    startedIdx γ t ∗ ⌜T ≤ t⌝ ∗ ctxStamped ξd T ∗ P ξd
+  ∃ t T : Nat, startedWin [⟨t, hartAgent startedPrimary, startedSet⟩] ∗
+    startedIdx γ t ∗ ⌜T ≤ t ∧ 0 < t⌝ ∗ ctxStamped ξd T ∗ P ξd
 
 /-- The UNARMED arm. -/
 def startedUnarmed (γ : GName) (ξd : CtxId) : IProp GF := iprop%
-  wordCell startedAddr 4 0 startedClear [] ∗ ghost_var γ (.own (1 : Qp).half) (0 : Nat) ∗
+  startedWin [] ∗ ghost_var γ (.own (1 : Qp).half) (0 : Nat) ∗
     ∃ T0 : Nat, ctxStamped ξd T0
 
 /-- The invariant's body (Rocq `started_body`). -/
 def startedBody (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) : IProp GF :=
   iprop(startedUnarmed γ ξd ∨ startedArmed γ ξd P)
 
-/-- **THE INVARIANT** (Rocq `started_inv`). -/
+/-- **THE INVARIANT** (Rocq `started_inv`), with the era's reserved list
+named (so the flag's region is the ambient record's). -/
 def startedInv (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) : IProp GF :=
-  inv startedN (startedBody γ ξd P)
+  iprop(⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static⌝ ∗ inv startedN (startedBody γ ξd P))
 
 instance startedInv_persistent (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) :
     Persistent (startedInv (GF := GF) γ ξd P) := by
   unfold startedInv; infer_instance
 
+/-- **The handover cell** as the boot carve hands it out (W8 (f2-ctx)): the
+never-written window's half, and which list the era reserved. -/
+def startedCell : IProp GF := iprop(startedWin [] ∗ ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static⌝)
+
 /-- **Allocation** (Rocq `started_alloc`): the never-written window out of
 the boot carve and a stamped record context; the primary keeps half the
 position ghost. -/
 theorem started_alloc (E : CoPset) (ξd : CtxId) (P : CtxId → IProp GF) (T0 : Nat) :
-    wordCell startedAddr 4 0 startedClear [] ∗ ctxStamped ξd T0 ⊢
+    startedCell ∗ ctxStamped ξd T0 ⊢
       |={E}=> ∃ γ : GName, startedInv γ ξd P ∗ startedPrim γ := by
-  iintro ⟨Hw, Hst⟩
+  unfold startedCell
+  iintro ⟨⟨Hw, %hrsv⟩, Hst⟩
   imod ghost_var_alloc (GF := GF) (0 : Nat) with ⟨%γ, Hg⟩
   rw [show (DFrac.own 1 : DFrac) = .own ((1 : Qp).half + (1 : Qp).half) by rw [Qp.half_add_half]]
   icases ghost_var_split γ (0 : Nat) (1 : Qp).half (1 : Qp).half $$ Hg with ⟨Hg1, Hg2⟩
@@ -159,7 +205,9 @@ theorem started_alloc (E : CoPset) (ξd : CtxId) (P : CtxId → IProp GF) (T0 : 
   imodintro
   iexists γ
   isplitr [Hg2]
-  · unfold startedInv; iexact Hinv
+  · unfold startedInv
+    iframe Hinv
+    ipureintro; exact hrsv
   · unfold startedPrim; iexact Hg2
 
 /-- The primary's token refutes the armed arm. -/
@@ -214,10 +262,11 @@ theorem startedRviewLb_le (cpu : CPU) (K K' : Nat) (h : K' ≤ K) :
 
 /-- What a secondary's read of the flag leaves (Rocq `started_W`): the
 cleared value, or the set value with the store's position, a read receipt
-past it, and the deposit as the record holds it. -/
+past it, the deposit as the record holds it, and (W8 (f2-ctx)) the reader's
+BOOT GATE. -/
 def startedSeen (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) (cpu : CPU)
     (w : BitVec (8 * 4)) : IProp GF := iprop%
-  ⌜w = startedClear⌝ ∨ ∃ t : Nat, ⌜w = startedSet⌝ ∗ startedIdx γ t ∗ rviewLb cpu t ∗ P ξd
+  ⌜w = startedClear⌝ ∨ ∃ t : Nat, ⌜w = startedSet⌝ ∗ startedIdx γ t ∗ rviewLb cpu t ∗ P ξd ∗ gatePassed cpu
 
 /-- The pure half of the read: a non-primary reader of the armed window
 reads the store only at or below its view. -/
@@ -249,74 +298,105 @@ theorem started_read_unarmed (Hold : Nat → Hist) (h : Agent) (tvn : Nat) (w : 
   · simp at hW
   · exact h
 
+/-- The read's issue request (W8 (f2-ctx)): `started` is the only publication
+word, hart 0's, and in the armed window the only nonzero entry is main's
+store. -/
+theorem started_rdIn (cpu : CPU) (hcpu : cpu ≠ startedPrimary) (W : WordHist 4)
+    (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static)
+    (hW : ∀ e ∈ W, e.tid = hartAgent startedPrimary ∧ 0 < e.t) :
+    ⊢@{IProp GF} rdIn cpu startedAddr 4 (W.hist startedImg)
+      (some (startedPrimary, [], fun v => decide (v ≠ 0))) := by
+  simp only [rdIn]
+  iintro
+  ipureintro
+  refine ⟨by omega, Ne.symm hcpu, ?_, ?_, ?_⟩
+  · unfold pubByteIn; rw [hrsv]; exact xv6Started_mem
+  · intro f w' hp hne
+    rw [hrsv] at hp
+    exact xv6Pub_only f w' hp
+  · intro e he hv
+    unfold WordHist.hist at he
+    rcases List.mem_append.1 he with he | he
+    · obtain ⟨x, hx, rfl⟩ := List.mem_map.1 he
+      exact ⟨(hW x hx).1, (hW x hx).2, fun _ h => by simp at h⟩
+    · simp only [startedImg, List.mem_singleton] at he
+      subst he
+      simp at hv
+
 /-- **THE READ, a secondary's** (Rocq `started_read_open` +
 `started_read_obl`): the invariant is the accessor of the racy `lw` of the
-flag, and the load's continuation learns `startedSeen`. -/
+flag (at its half, W8 (f2-ctx)), and the load's continuation learns
+`startedSeen` -- the set value with the reader's boot gate. -/
 theorem started_readAUr (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) [∀ ξ, Persistent (P ξ)]
     (cpu : CPU) (hcpu : cpu ≠ startedPrimary) (K : Nat) :
     startedInv (GF := GF) γ ξd P ⊢
       readAUr cpu startedAddr 4 K [] (fun w => startedSeen γ ξd P cpu w) := by
   have hh : hartAgent cpu ≠ hartAgent startedPrimary := by
     intro h; exact hcpu (Fin.ext h)
-  iintro #Hinv
+  unfold startedInv
+  iintro ⟨%hrsv, #Hinv⟩
   unfold readAUr
   isplitl []
   · simp only [Iris.Algebra.BigOpL.bigOpL_nil]; iempintro
-  unfold startedInv
   imod (inv_acc (E := ⊤) (N := startedN) (P := startedBody γ ξd P) (CoPset.subseteq_top)) $$ Hinv
     with ⟨Hbody, Hclose⟩
   unfold startedBody startedUnarmed startedArmed
-  icases Hbody with (⟨>Hw, >Hg, >Hst⟩ | ⟨%t, %T, >Hw, >Hidx, >%hT, >Hst, HP⟩)
-  · icases wordCell_cases _ 4 0 startedClear [] $$ Hw with ⟨%Hold, Hb, %htail⟩
-    iapply fupd_mask_intro LawfulSet.empty_subset
+  icases Hbody with (⟨>Hw, >Hg, >Hst⟩ | ⟨%t, %T, >Hw, >Hidx, >%⟨hT, ht0⟩, >Hst, HP⟩)
+  · iapply fupd_mask_intro LawfulSet.empty_subset
     iintro Hmask
-    iexists (fun _ => DFrac.own 1), WordHist.hist ([] : WordHist 4) Hold
-    iframe Hb
+    iexists (fun _ => DFrac.own (1 : Qp).half), WordHist.hist ([] : WordHist 4) startedImg, none
+    unfold startedWin
+    iframe Hw
     isplit
-    · ipureintro; exact fun j hj => WordHist.hist_ne_nil _ Hold htail j hj
+    · ipureintro; exact fun j hj => WordHist.hist_ne_nil _ startedImg startedImg_tail j hj
+    isplitr
+    · simp only [rdIn]; iempintro
     inext
-    iintro %w %tvn %hKt %hrd %hauth #Hrv Hb
+    iintro %w %tvn %hKt %hrd %hauth #Hrv _ Hb
     imod Hmask
-    ihave Hw := wordCell_intro _ 4 0 startedClear [] Hold htail $$ Hb
-    imod Hclose $$ [Hw Hg Hst]
+    imod Hclose $$ [Hb Hg Hst]
     · inext
       ileft
-      iframe Hw Hg Hst
+      iframe Hb Hg Hst
     imodintro
     dsimp only; unfold startedSeen
     ileft
     ipureintro
-    exact started_read_unarmed Hold (hartAgent cpu) tvn w htail hrd
+    exact started_read_unarmed startedImg (hartAgent cpu) tvn w startedImg_tail hrd
   · icases Hidx with #Hidx
-    icases wordCell_cases _ 4 0 startedClear _ $$ Hw with ⟨%Hold, Hb, %htail⟩
     iapply fupd_mask_intro LawfulSet.empty_subset
     iintro Hmask
-    iexists (fun _ => DFrac.own 1),
-      WordHist.hist ([⟨t, hartAgent startedPrimary, startedSet⟩] : WordHist 4) Hold
-    iframe Hb
+    iexists (fun _ => DFrac.own (1 : Qp).half),
+      WordHist.hist ([⟨t, hartAgent startedPrimary, startedSet⟩] : WordHist 4) startedImg,
+      some (startedPrimary, [], fun v => decide (v ≠ 0))
+    unfold startedWin
+    iframe Hw
     isplit
-    · ipureintro; exact fun j hj => WordHist.hist_ne_nil _ Hold htail j hj
+    · ipureintro; exact fun j hj => WordHist.hist_ne_nil _ startedImg startedImg_tail j hj
+    isplitr
+    · iapply started_rdIn cpu hcpu _ hrsv (fun e he => by simp at he; subst he; exact ⟨rfl, ht0⟩)
     inext
     icases HP with #HP
-    iintro %w %tvn %hKt %hrd %hauth #Hrv Hb
+    iintro %w %tvn %hKt %hrd %hauth #Hrv Hout Hb
     imod Hmask
-    ihave Hw := wordCell_intro _ 4 0 startedClear _ Hold htail $$ Hb
-    imod Hclose $$ [Hw Hst]
+    imod Hclose $$ [Hb Hst]
     · inext
       iright
       iexists t, T
-      iframe Hw Hidx Hst HP
-      ipureintro; exact hT
+      iframe Hb Hidx Hst HP
+      ipureintro; exact ⟨hT, ht0⟩
     imodintro
     dsimp only; unfold startedSeen
-    rcases started_read_armed Hold (hartAgent cpu) t tvn w htail hh hrd with hw | ⟨hw, htv⟩
+    rcases started_read_armed startedImg (hartAgent cpu) t tvn w startedImg_tail hh hrd with hw | ⟨hw, htv⟩
     · ileft; ipureintro; exact hw
     · iright
+      subst hw
+      simp only [rdOut]
+      rw [if_pos (by decide)]
+      icases Hout with ⟨#Hgp, _⟩
       iexists t
-      iframe Hidx HP
-      isplit
-      · ipureintro; exact hw
-      · iapply startedRviewLb_le cpu tvn t htv $$ Hrv
+      iframe Hidx HP Hgp
+      iapply startedRviewLb_le cpu tvn t htv $$ Hrv
 
 /-- **THE ABSORB**, at a second opening after the fence (Rocq
 `started_absorb`): a reader whose floor has passed the store's position
@@ -327,8 +407,8 @@ theorem started_absorb [CurCtx] (E : CoPset) (γ : GName) (ξd : CtxId) (P : Ctx
     (hE : (↑startedN : CoPset) ⊆ E) :
     startedInv γ ξd P ∗ startedIdx γ t ∗ viewLb cpu K ∗ ownCtx cpu curCtx ∗ P ξd ⊢
       |={E}=> (ownCtx cpu curCtx ∗ P curCtx) := by
-  iintro ⟨#Hinv, #Hidx, #HK, Hrun, #HP⟩
   unfold startedInv
+  iintro ⟨⟨%hrsv, #Hinv⟩, #Hidx, #HK, Hrun, #HP⟩
   imod (inv_acc (E := E) (N := startedN) (P := startedBody γ ξd P) hE) $$ Hinv with ⟨Hbody, Hclose⟩
   unfold startedBody startedUnarmed startedArmed
   icases Hbody with (⟨>Hw, >Hg, >Hst⟩ | ⟨%t', %T, >Hw, >Hidx', >%hT, >Hst, HPd⟩)
@@ -368,8 +448,8 @@ theorem started_deposit_open [CurCtx] (γ : GName) (ξd : CtxId) (P : CtxId → 
     [∀ ξ, Persistent (P ξ)] (cpu : CPU) :
     startedInv γ ξd P ∗ startedPrim γ ∗ ownCtx cpu curCtx ∗ P curCtx ⊢
       |={⊤}=> (ownCtx cpu curCtx ∗ startedPrim γ ∗ P ξd) := by
-  iintro ⟨#Hinv, Hprim, Hrun, HP⟩
   unfold startedInv
+  iintro ⟨⟨%hrsv, #Hinv⟩, Hprim, Hrun, HP⟩
   imod (inv_acc (E := ⊤) (N := startedN) (P := startedBody γ ξd P) CoPset.subseteq_top) $$ Hinv
     with ⟨Hbody, Hclose⟩
   unfold startedBody startedUnarmed startedArmed
@@ -386,39 +466,81 @@ theorem started_deposit_open [CurCtx] (γ : GName) (ξd : CtxId) (P : CtxId → 
   · iexfalso
     iapply startedPrim_idx γ t $$ Hprim Hidx
 
-/-- **The store's accessor**, at a second opening: the window's histories,
-the stamp's receipt as the order bound, and the arming. -/
+/-- **The flag store's obligation, history-aware** (W8 (f2-ctx) [R35.2]): the
+first post-power-on store of hart 0 into the never-written window keeps the
+publication region's discipline -- every post-power-on entry is hart 0's, at
+one timestamp.  (The history-free `MachCSL.rsvWordOk` cannot say this.) -/
+theorem started_rsvStoreOk (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) :
+    rsvStoreOk (hlc := hlc) (GF := GF) startedPrimary startedAddr 4 startedSet startedImg [] := by
+  refine ⟨2, 0, xv6StartedR, by rw [hrsv]; exact xv6Started_idx, rfl, fun m t ht hget _ _ => ?_⟩
+  have hbytes : ∀ a ∈ xv6StartedR.bytes, ∃ j, j < 4 ∧ a = startedAddr + BitVec.ofNat 64 j := by
+    intro a ha
+    simp only [xv6StartedR, RsvRegion.bytes, RsvRegion.words, wordBytes, List.flatMap_cons, List.flatMap_nil,
+      List.append_nil, List.mem_map, List.mem_range] at ha
+    obtain ⟨j, hj, rfl⟩ := ha
+    exact ⟨j, hj, rfl⟩
+  have hnew : ∀ j, j < 4 → (m.writeBytes startedAddr 4 startedSet t (hartAgent startedPrimary))[startedAddr +
+      BitVec.ofNat 64 j]? = some [⟨t, hartAgent startedPrimary, nthByte startedSet j⟩, ⟨0, 0, 0#8⟩] := by
+    intro j hj
+    rw [writeBytes_at m startedAddr startedSet t _ (by decide) hj (startedImg j) (hget j hj)]
+    rfl
+  unfold regionOk
+  simp only [xv6StartedR]
+  refine ⟨fun a ha H hH e he he0 => ?_, fun a ha H hH e he e' he' he0 he0' => ?_⟩
+  · obtain ⟨j, hj, rfl⟩ := hbytes a ha
+    rw [hnew j hj] at hH
+    cases hH
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at he
+    rcases he with rfl | rfl
+    · rfl
+    · exact absurd rfl he0
+  · obtain ⟨j, hj, rfl⟩ := hbytes a ha
+    rw [hnew j hj] at hH
+    cases hH
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at he he'
+    rcases he with rfl | rfl <;> rcases he' with rfl | rfl <;> simp_all
+
+/-- **The store's accessor**, at a second opening: the window's histories
+(the reserved half, W8 (f2-ctx)), the stamp's receipt as the order bound, the
+history-aware obligation, and the arming. -/
 theorem started_writeAUT (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) [∀ ξ, Persistent (P ξ)] :
     startedInv (GF := GF) γ ξd P ∗ startedPrim γ ∗ P ξd ⊢
       writeAUT startedPrimary startedAddr 4 startedSet iprop(emp) := by
-  iintro ⟨#Hinv, Hprim, #HP⟩
-  unfold writeAUT startedInv
+  unfold startedInv
+  iintro ⟨⟨%hrsv, #Hinv⟩, Hprim, #HP⟩
+  unfold writeAUT
   imod (inv_acc (E := ⊤) (N := startedN) (P := startedBody γ ξd P) CoPset.subseteq_top) $$ Hinv
     with ⟨Hbody, Hclose⟩
   unfold startedBody startedUnarmed startedArmed
   icases Hbody with (⟨>Hw, >Hg, >⟨%T0, Hst⟩⟩ | ⟨%t, %T, >Hw, >Hidx, >%hT, >Hst, HPd⟩)
-  · icases wordCell_cases _ 4 0 startedClear [] $$ Hw with ⟨%Hold, Hb, %htail⟩
-    icases startedStamped_topLb ξd T0 $$ Hst with ⟨Hst, #HT⟩
+  · icases startedStamped_topLb ξd T0 $$ Hst with ⟨Hst, #HT⟩
     iapply fupd_mask_intro LawfulSet.empty_subset
     iintro Hmask
-    iexists WordHist.hist ([] : WordHist 4) Hold, T0
-    iframe Hb HT
+    iright
+    iexists WordHist.hist ([] : WordHist 4) startedImg, T0, []
+    unfold startedWin
+    iframe Hw HT
+    isplitr
+    · unfold compBytes; iempintro
+    isplitr
+    · ipureintro
+      rw [WordHist.hist_nil]
+      exact started_rsvStoreOk hrsv
     inext
-    iintro %t %hTt Hb _ _
+    iintro %t %hTt %ht0 Hb _ _ _
     rw [WordHist.hist_push] at *
     imod Hmask
-    ihave Hw := wordCell_intro _ 4 0 startedClear _ Hold htail $$ Hb
     unfold startedPrim
     imod ghost_var_update_halves (t + 1) γ (0 : Nat) (0 : Nat) $$ Hprim Hg with ⟨H1, -⟩
     imod ghost_var_persist γ _ (t + 1) $$ H1 with #H1
-    imod Hclose $$ [Hw Hst]
+    imod Hclose $$ [Hb Hst]
     · inext
       iright
       iexists t, T0
-      iframe Hw Hst HP
+      iframe Hb Hst HP
       isplit
       · unfold startedIdx; iexact H1
-      · ipureintro; exact hTt
+      · ipureintro; exact ⟨hTt, ht0⟩
     imodintro
     iempintro
   · iexfalso

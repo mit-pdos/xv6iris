@@ -215,11 +215,47 @@ theorem rsvWf_of_check (rs : List RsvRegion) (h1 : strictSorted (rsvBytes rs) = 
     have := List.all_eq_true.1 h2 a ha
     simpa using this⟩
 
+/-- `m'` grows `m` above `t`: every history only gained entries newer than
+`t`, on top (what a machine step at top `t` does to the memory). -/
+def memGrow (m : FlatMem) (t : Nat) (m' : FlatMem) : Prop :=
+  ∀ (a : PAddr) (H : Hist), m[a]? = some H → ∃ N : Hist, m'[a]? = some (N ++ H) ∧ ∀ e ∈ N, t < e.t
+
+/-- The latest entry of `H` at or below `a` is at `tn` with value `v`. -/
+def latestAt (H : Hist) (a tn : Nat) (v : BitVec 8) : Prop :=
+  ∃ (H1 H2 : Hist) (h : Agent), H = H1 ++ ⟨tn, h, v⟩ :: H2 ∧ (∀ e ∈ H1, a < e.t) ∧ tn ≤ a
+
+/-- **The dynamic hop registry** (W8 (f2-ctx) [R35.1], time-indexed): at
+memory `m` with top `top`, `b` is the lock word of a LIVE dynamic spinlock
+for an acquire at `a ≤ top` -- its name word (`lk->name`, at `b + 8`) holds,
+as of `a`, one of the client's registered names (xv6: the address of the
+string `"pipe"`, which only `initlock(&pi->lock, "pipe")` stores there).  The
+window opens at `initlock`'s name store and closes when the word is
+overwritten (`kfree`'s junk fill of the pipe's page); it reopens when the
+page is a pipe again.  A pure fact of the memory, never falsified by a step
+(`nameLockAt_mono`). -/
+def nameLockAt (names : List (BitVec 64)) (m : FlatMem) (top : Nat) (b : PAddr) (a : Nat) : Prop :=
+  a ≤ top ∧ ∃ nm ∈ names, ∀ j, j < 8 → ∃ (H : Hist) (tn : Nat),
+    m[b + 8#64 + BitVec.ofNat 64 j]? = some H ∧ latestAt H a tn (nthByte (n := 8) nm j)
+
+theorem nameLockAt_mono {names : List (BitVec 64)} {m m' : FlatMem} {t t' : Nat} {b : PAddr} {a : Nat}
+    (hg : memGrow m t m') (ht : t ≤ t') (h : nameLockAt names m t b a) : nameLockAt names m' t' b a := by
+  obtain ⟨hat, nm, hnm, hj⟩ := h
+  refine ⟨Nat.le_trans hat ht, nm, hnm, fun j hjl => ?_⟩
+  obtain ⟨H, tn, hH, H1, H2, h0, hHe, h1, htn⟩ := hj j hjl
+  obtain ⟨N, hN, hNt⟩ := hg _ H hH
+  refine ⟨N ++ H, tn, hN, N ++ H1, H2, h0, by rw [hHe, List.append_assoc], fun e he => ?_, htn⟩
+  rcases List.mem_append.1 he with he | he
+  · have := hNt e he; omega
+  · exact h1 e he
+
 /-- **The client's static reserved regions** (the `KernelMap.static`
-pattern): reserved at the `PowerOn` mint, from timestamp 0, never released. -/
+pattern): reserved at the `PowerOn` mint, from timestamp 0, never released;
+and (W8 (f2-ctx) [R35.1]) the NAMES of its dynamic spinlocks whose lock
+bytes are hops while they live (`nameLockAt`). -/
 class KernelRsv where
   static : List RsvRegion
   wf : rsvWf static
+  names : List (BitVec 64)
 
 /-! ## Membership facts -/
 

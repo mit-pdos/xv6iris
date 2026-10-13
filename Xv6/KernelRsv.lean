@@ -5,6 +5,8 @@ every era (the `KernelMap.static` pattern, `Xv6.KernelMap`).
 
 * `cpus[h]`'s three cells (`c->proc`, `c->noff`, `c->intena`), one region per
   hart (`xv6CpuRegions`): written only by hart `h` after power-on;
+* (W8 (f2-ctx), [R35.2]) `started`, a one-shot PUBLICATION word written only
+  by hart 0 (`xv6StartedR`, `MachCSL.RsvKind.pub`): the boot gate;
 * the static spinlocks' two words (`lk->locked`, `lk->cpu`, `xv6LockR`):
   the singletons before `cpus` (`xv6PreLockRegions`: both ports'
   `uarts[i].lock`, `cons.lock`, `pr.lock`, `kmem.lock`, `pid_lock`,
@@ -13,7 +15,7 @@ every era (the `KernelMap.static` pattern, `Xv6.KernelMap`).
   the 30 buffers' sleeplocks' inner locks, `itable.lock`, the 50 inodes'
   sleeplocks' inner locks, `log.lock`, `ftable.lock`, `disk.vdisk_lock`).
 
-The list is in address order (`uarts < cons < pr < kmem < pid_lock <
+The list is in address order (`uarts < started < cons < pr < kmem < pid_lock <
 wait_lock < cpus < proc < tickslock < bcache < buf[] < itable < inode[] <
 log < ftable < disk`).
 
@@ -45,10 +47,15 @@ def rsvUartLk (i : Nat) : BitVec 64 := KA.«uarts» + BitVec.ofNat 64 (40 * i + 
 /-- `&disk.vdisk_lock` (+296). -/
 def rsvDiskLk : BitVec 64 := KA.«disk» + 296#64
 
-/-- The singleton locks before `cpus`, in address order. -/
+/-- `started` (`main.c`), the boot handover's ONE-SHOT PUBLICATION word (W8
+(f2-ctx), Q-F2-BOOTGATE (a) as amended by [R35.2]): written once, by hart 0. -/
+def xv6StartedR : RsvRegion := ⟨KA.«started», .pub ⟨0, by decide⟩⟩
+
+/-- The singleton regions before `cpus`, in address order: both ports' transmit
+locks, `started`, the console/printf/allocator/pid/wait locks. -/
 def xv6PreLockRegions : List RsvRegion :=
-  [xv6LockR (rsvUartLk 0), xv6LockR (rsvUartLk 1), xv6LockR KA.«cons», xv6LockR KA.«pr», xv6LockR KA.«kmem»,
-    xv6LockR KA.«pid_lock», xv6LockR KA.«wait_lock»]
+  [xv6LockR (rsvUartLk 0), xv6LockR (rsvUartLk 1), xv6StartedR, xv6LockR KA.«cons», xv6LockR KA.«pr»,
+    xv6LockR KA.«kmem», xv6LockR KA.«pid_lock», xv6LockR KA.«wait_lock»]
 
 /-- `&bcache.buf[i].lock.lk`, the inner spinlock of buffer `i`'s sleeplock
 (`buf[i]` at `bcache + 24 + 1112 i`, its sleeplock at +16, the spinlock at +8). -/
@@ -79,7 +86,7 @@ theorem xv6RsvStatic_eq :
     xv6RsvStatic = xv6PreLockRegions ++ (xv6CpuRegions ++ (xv6ProcLockRegions ++ xv6PostLockRegions)) := rfl
 
 /-- Hart `h`'s region's index. -/
-def rsvCpuIdx (h : CPU) : Nat := h.val + 7
+def rsvCpuIdx (h : CPU) : Nat := h.val + 8
 
 theorem xv6RsvStatic_sorted : strictSorted (rsvBytes xv6RsvStatic) = true := by decide +kernel
 
@@ -89,12 +96,21 @@ theorem xv6RsvStatic_ramB : (rsvBytes xv6RsvStatic).all (fun a => decide (inRam 
 theorem xv6RsvStatic_wf : rsvWf xv6RsvStatic :=
   rsvWf_of_check _ xv6RsvStatic_sorted xv6RsvStatic_ramB
 
-/-- xv6's static reserved regions, as the machine's class. -/
+/-- The address of the string `"pipe"` (`.rodata`), the name `pipealloc`
+passes to `initlock` (`auipc a1,0x3 ; addi a1,a1,222` at `pipealloc+0x48`):
+the name of xv6's only dynamic spinlocks, the pipe locks (W8 (f2-ctx)
+[R35.1]: their lock bytes are hops while the name word holds it,
+`MachCSL.nameLockAt`). -/
+def pipeLockNameStr : BitVec 64 := KA.«pipealloc» + 0x48#64 + 0x3000#64 + 222#64
+
+/-- xv6's static reserved regions, as the machine's class (and its dynamic
+spinlocks' name). -/
 instance : KernelRsv where
   static := xv6RsvStatic
   wf := xv6RsvStatic_wf
+  names := [pipeLockNameStr]
 
-/-- Hart `h`'s cells are registered, at index `h + 7`. -/
+/-- Hart `h`'s cells are registered, at index `h + 8`. -/
 theorem xv6RsvStatic_cpu (h : CPU) : xv6RsvStatic[rsvCpuIdx h]? = some ⟨cpuAddr h, .cpu h⟩ := by
   have hh := h.isLt
   have hl : xv6CpuRegions.length = NCPU := by simp [xv6CpuRegions, cpus]
