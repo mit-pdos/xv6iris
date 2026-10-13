@@ -646,5 +646,6 @@ import Weak.CatFloorWit
 import Weak.WeakRvwmoKillIO
 import Weak.WeakRvwmoKillIOC
 import Weak.GraphFabConf
+import Weak.WeakRvwmoPinBridge3
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
