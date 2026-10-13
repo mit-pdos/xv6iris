@@ -66,6 +66,9 @@ its one-byte `WCrel` release makes F3′'s fold `none`.)
    witnesses, the engine of every case split, as `WeakRvwmoLockWit.lkgLbl`).
 5. §7 (`Print Assumptions`) is a command, not a declaration; the lint's
    sorry/axiom/native_decide checks stand in for it.
+6. W13 (K) (plan §C W13 (K); Lean-only): `csChainedMem` — `csChained` with the entry's two
+   orderings given as gmo facts (`gmoLt w entry`, `gmoLt entry REL`: "entry = any `gmem` event
+   of the critical section"); `csChained` is now its corollary (statement unchanged).
 
 **Name map** (Rocq → Lean): `gmsg` ↦ `WeakRvwmoKillArms.gmsg`; `log_of` ↦
 `logOf`; `gcls`; `gmsg_is_Some` ↦ `gmsgIsSome`; `gmsg_tid` ↦ `gmsgTid`;
@@ -496,7 +499,13 @@ protects.  WRITER-FIRST is a derivation (the handoff); READER-FIRST is refuted b
 a three-step gmo cycle through the reader's own release.  The two acquires cannot
 be the SAME event: their authors differ (`ACQ.1 ≠ w.1`). -/
 
-theorem csChained (G : Gexec) (log : List Wmsg) (b a : Int) (n0 r0 : Nat)
+/-- W13 (K) (plan §C W13 (K): "`csChained` generalized to entry = any `gmem` event of the
+critical section"; Lean-only): the CS arm with the entry's two orderings given AS gmo facts —
+`gmoLt w entry` for the edge into the entry (any gmo-forward cross order: rf/co/fr, or W13 (K)'s
+I/O arms) and `gmoLt entry REL` for the entry inside the reader's section (the release fence for a
+RAM entry, as `csChained`; residue arm (R2) for an I/O entry, `WeakRvwmoKillIO.ioEntryRelGmo`).
+The proof is `csChained`'s; the two orderings are its only uses of the cross edge and the fence. -/
+theorem csChainedMem (G : Gexec) (log : List Wmsg) (b a : Int) (n0 r0 : Nat)
     (h : Option Nat) (w entry exit ACQ REL : Geid) :
     rvwmoMinusConsistent G →
     -- the log, the fold, and the byte/word bridge
@@ -512,9 +521,9 @@ theorem csChained (G : Gexec) (log : List Wmsg) (b a : Int) (n0 r0 : Nat)
     -- the READER's row: its acquire, its section, and the release fence
     lockAcq G b ACQ → glblIs G ACQ lbAq →
     n0 < gwix G ACQ → gwix G ACQ ≤ log.length →
-    lockCs G b ACQ REL → WeakRvwmoGraph.gpo G ACQ entry → gfenceCovers G entry REL →
-    -- the cross-hart edge into the entry, and the segment's exit
-    gcross G w entry → WeakRvwmoGraph.gpo G ACQ exit → gmem G exit →
+    lockCs G b ACQ REL → WeakRvwmoGraph.gpo G ACQ entry → gmoLt G entry REL →
+    -- the (gmo-forward) edge into the entry, and the segment's exit
+    gmoLt G w entry → WeakRvwmoGraph.gpo G ACQ exit → gmem G exit →
     ACQ.1 ≠ w.1 →
     gmoLt G w exit := by
   intro hcons hlog hlwb halt hrow hpr hwa hcl hr0 hlew hnob hacq haq hn0A hleA hcs _hpoe hfen
@@ -582,10 +591,37 @@ theorem csChained (G : Gexec) (log : List Wmsg) (b a : Int) (n0 r0 : Nat)
       · omega
     have hmoRw : gmoLt G REL w :=
       gwixLtGmo G REL w hwf (lockRelGwrites G b REL hwf hRel) hw (by omega)
-    have hmoWe := gcrossGmo G w entry hcons hcross
-    have hmoeR := fenceGmoAfter G entry REL hppo hfen
+    have hmoWe := hcross
+    have hmoeR := hfen
     exact absurd (gmoLtTrans G w entry w hmoWe (gmoLtTrans G entry REL w hmoeR hmoRw))
       (gmoLtIrrefl G w)
+
+theorem csChained (G : Gexec) (log : List Wmsg) (b a : Int) (n0 r0 : Nat)
+    (h : Option Nat) (w entry exit ACQ REL : Geid) :
+    rvwmoMinusConsistent G →
+    -- the log, the fold, and the byte/word bridge
+    logOf G log → lockWordByte log b → wlpAlt log b n0 h →
+    -- the reader's acquire is a SUCCESSFUL one (its ROW)
+    acqRow G b ACQ →
+    -- F3″ at the protected byte
+    wprotAt log a b n0 r0 →
+    -- the PREVIOUS EXIT `w`
+    (∃ v, gwritesByte G w a v) → gcls G w .WCplain →
+    r0 < gwix G w → gwix G w ≤ log.length →
+    (∀ v, ¬ gwritesByte G w b v) →
+    -- the READER's row: its acquire, its section, and the release fence
+    lockAcq G b ACQ → glblIs G ACQ lbAq →
+    n0 < gwix G ACQ → gwix G ACQ ≤ log.length →
+    lockCs G b ACQ REL → WeakRvwmoGraph.gpo G ACQ entry → gfenceCovers G entry REL →
+    -- the cross-hart edge into the entry, and the segment's exit
+    gcross G w entry → WeakRvwmoGraph.gpo G ACQ exit → gmem G exit →
+    ACQ.1 ≠ w.1 →
+    gmoLt G w exit := by
+  intro hcons hlog hlwb halt hrow hpr hwa hcl hr0 hlew hnob hacq haq hn0A hleA hcs hpoe hfen
+    hcross hpox hmx hhart
+  exact csChainedMem G log b a n0 r0 h w entry exit ACQ REL hcons hlog hlwb halt hrow hpr hwa hcl
+    hr0 hlew hnob hacq haq hn0A hleA hcs hpoe (fenceGmoAfter G entry REL hcons.2.1 hfen)
+    (gcrossGmo G w entry hcons hcross) hpox hmx hhart
 
 /-! # 5. Non-vacuity (a): the LB cycle IS a two-segment cycle
 

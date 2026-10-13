@@ -643,5 +643,6 @@ import Weak.CatLinChain
 import Weak.CatLinWit
 import Weak.CatFloor
 import Weak.CatFloorWit
+import Weak.WeakRvwmoKillIO
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/

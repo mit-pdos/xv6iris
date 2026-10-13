@@ -81,6 +81,12 @@ graph (`CatLin.rvwmoCatAD`) is a legal input; the output is unchanged (RVWMO⁻ 
 the ppo⁻ arm from `racyD`'s `gppo`).  [R21.2]: `normalizeOfAcyclic` ALSO concludes
 `gppoCat6Gmo GD'.gdG` (last conjunct; `AxGraphCat.gppoCat6Gppo`).  RVWMO⁻ callers are
 unchanged in text (`WeakRvwmoAcyc.coeCoreOfMinus`).
+
+**W13 (K) (plan §C W13 (K); Lean-only).**  §6: `topoExistsX`/`normalizeOfAcyclicX` — the
+existence theorem and the normalization over `racyDX GD X = racyD ∪ X` (any `X` between gmo
+members): the same output as `normalizeOfAcyclic`, and every `X` edge gmo-forward in it.
+`WeakRvwmoKillIO.normalizeOfAcyclicIO` instantiates `X` with the residue, gmo|IO and the disk-read
+pairs.  `normalizeOfAcyclic` is unchanged.
 -/
 import Weak.WeakMem
 import Weak.WeakAxiomatic
@@ -621,5 +627,53 @@ theorem normalizeOfAcyclic (GD : Gdexec) :
   refine ⟨⟨retime GD.gdG L, GD.gdDeps⟩, tren GD.gdG L, hc', h14, hr, rfl, hw, ?_⟩
   -- [R21.2]: the cat chain's six arms, from the output's RVWMO⁻ (`racyD` keeps `gppo`)
   exact fun e1 e2 h => hc'.1.2.1 e1 e2 (gppoCat6Gppo _ e1 e2 hc'.1.2.2.1 h)
+
+/-! # 6. W13 (K): the normalization over an EXTENDED racy relation
+
+`racyDX GD X = racyD GD ∪ X` (`WeakRvwmoAcyc`).  A topological order of the extended relation is
+still a linear extension of `racyD`, so the re-timing is `topoLinearizes`' unchanged; what is NEW
+is that every `X` edge comes out gmo-forward in the re-timed graph.  The I/O instance
+(`WeakRvwmoKillIO.normalizeOfAcyclicIO`) takes `X :=` the residue, gmo|IO and the disk-read
+pairs, so the re-timed graph keeps `ioResidueGmo`, the relative order of the I/O events and
+`gdiskRead14` — the premises of W13 (L)'s `fconfTraceRealizeIO`. -/
+
+/-- THE EXISTENCE THEOREM over `racyDX`: one order puts `racyD` AND `X` forward. -/
+theorem topoExistsX (GD : Gdexec) (X : Geid → Geid → Prop) :
+    rvwmoCoreD GD →
+    (∀ x y, X x y → x ∈ GD.gdG.gxGmo ∧ y ∈ GD.gdG.gxGmo) →
+    (∀ x y, Decidable (racyDX GD X x y)) →
+    (∀ x, ¬ tc (racyDX GD X) x x) →
+    ∃ L, linExtD GD L ∧ ∀ x y, X x y → before L x y := by
+  intro hcons hXm hdec hacy
+  have hnd : GD.gdG.gxGmo.Nodup := hcons.1.1
+  obtain ⟨L, hL, hord⟩ := topoSortExists (racyDX GD X) hdec hacy _ hnd
+  refine ⟨L, ⟨hL, ?_⟩, ?_⟩
+  · intro x y hR
+    obtain ⟨hx, hy⟩ := racyDMem GD x y hcons hR
+    exact hord x y hx hy (Or.inl hR)
+  · intro x y hX
+    obtain ⟨hx, hy⟩ := hXm x y hX
+    exact hord x y hx hy (Or.inr hX)
+
+/-- `normalizeOfAcyclic` over `racyDX`: the same output, and every `X` edge gmo-forward in it. -/
+theorem normalizeOfAcyclicX (GD : Gdexec) (X : Geid → Geid → Prop) :
+    rvwmoCoreD GD →
+    (∀ x y, X x y → x ∈ GD.gdG.gxGmo ∧ y ∈ GD.gdG.gxGmo) →
+    (∀ x y, Decidable (racyDX GD X x y)) →
+    (∀ x, ¬ tc (racyDX GD X) x x) →
+    ∃ (GD' : Gdexec) (pi : Nat → Nat),
+      rvwmoMinusDepsConsistent GD' ∧
+      grule14 GD'.gdG ∧
+      rowsRel pi GD.gdG GD'.gdG ∧
+      GD'.gdDeps = GD.gdDeps ∧
+      wperm pi GD.gdG GD'.gdG ∧
+      gppoCat6Gmo GD'.gdG ∧
+      (∀ x y, X x y → gmoLt GD'.gdG x y) := by
+  intro hcons hXm hdec hacy
+  obtain ⟨L, hlin, hX⟩ := topoExistsX GD X hcons hXm hdec hacy
+  obtain ⟨hc', h14, hr, hw⟩ := topoLinearizes GD L hcons hlin
+  refine ⟨⟨retime GD.gdG L, GD.gdDeps⟩, tren GD.gdG L, hc', h14, hr, rfl, hw, ?_, ?_⟩
+  · exact fun e1 e2 h => hc'.1.2.1 e1 e2 (gppoCat6Gppo _ e1 e2 hc'.1.2.2.1 h)
+  · exact fun x y hxy => (linBefore GD L hcons hlin x y).1 (hX x y hxy)
 
 end Weak

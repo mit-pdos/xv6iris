@@ -83,6 +83,11 @@ A LEAF: nothing imports this file.
 `tcHeadDecomp`, `tcHeadInd` (deviation 3).
 
 **Not ported:** nothing.
+
+**W13 (K) (plan §C W13 (K); Lean-only, no Rocq twin).**  `racyDX GD X := racyD GD ∪ X`, the
+parametric extension the I/O-aware normalization consumes (`WeakRvwmoTopo.normalizeOfAcyclicX`);
+the I/O instance `racyDIO` is `WeakRvwmoKillIO`'s (its arms name the fabric bundle, downstream of
+this file).  `racyD` itself is unchanged.
 -/
 import Weak.WeakMem
 import Weak.WeakAxiomatic
@@ -199,6 +204,14 @@ def racy (G : Gexec) (x y : Geid) : Prop :=
 /-- … and its `Gdexec` form, with the store-dep fragment. -/
 def racyD (GD : Gdexec) (x y : Geid) : Prop :=
   racy GD.gdG x y ∨ (x, y) ∈ GD.gdDeps
+
+/-- W13 (K) (plan §C W13 (K); Lean-only): `racyD` EXTENDED by an extra relation `X` — the form
+the I/O-aware normalization consumes (`WeakRvwmoTopo.normalizeOfAcyclicX`).  The I/O instance
+`racyDIO GF := racyDX GF.gfGd (ioExtra GF)` (= `racyD ∪ ioResidue ∪ gmo|IO ∪` the `gdiskRead14`
+pairs) lives in `WeakRvwmoKillIO`: its arms name the fabric bundle, which is downstream of this
+file. -/
+def racyDX (GD : Gdexec) (X : Geid → Geid → Prop) (x y : Geid) : Prop :=
+  racyD GD x y ∨ X x y
 
 /-- W12 (1) (plan §C W12; D25 (a) [OWN.5]): THE CORE the topo / normalize / hull kit
 consumes — well-formedness, load value, atomicity and the dep fragment's shape.  No ppo
