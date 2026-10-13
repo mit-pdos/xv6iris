@@ -121,12 +121,18 @@ inductive RsvKind where
   hop: xv6's `started`): every post-power-on entry is `w`'s, all at one
   timestamp -/
   | pub (w : CPU)
-  /-- a REGISTERED NAME of the client's dynamic spinlocks (W8 (f2-ctx) [R35.1],
-  the time-indexed hop registry, `nameLockAt`): the region's base IS the
-  name pointer (xv6: the address of `"pipe"`); no footprint, no discipline --
-  a registry entry, so the boot's pinning of the list pins the names too -/
-  | name
+  /-- the client's DYNAMIC-LOCK SLOTS (W8 (f2-ctx) [OWN.49] (a′-r)): `cnt`
+  doubleword slots at `base + stride·k` whose stores NAME a live dynamic
+  spinlock (xv6: the `struct file` table's `f->pipe` words, `slotWit`); a
+  registry entry -- no footprint, no discipline, so the boot's pinning of
+  the list pins the slots too -/
+  | slots (cnt stride : Nat)
   deriving DecidableEq
+
+/-- The kinds with a footprint (all but a `.slots` registry entry). -/
+def RsvKind.hasFoot : RsvKind → Bool
+  | .slots _ _ => false
+  | _ => true
 
 /-- A reserved region: its base address and kind. -/
 structure RsvRegion where
@@ -143,7 +149,7 @@ def RsvRegion.words (R : RsvRegion) : List (PAddr × Nat) :=
   | .cpu _ => [(R.base, 8), (R.base + 120#64, 4), (R.base + 124#64, 4)]
   | .lock _ => [(R.base, 4), (R.base + 16#64, 8)]
   | .pub _ => [(R.base, 4)]
-  | .name => []
+  | .slots _ _ => []
 
 /-- The bytes of a word. -/
 def wordBytes (w : PAddr × Nat) : List PAddr :=
@@ -170,7 +176,7 @@ def regionOk (m : FlatMem) (R : RsvRegion) : Prop :=
   | .cpu h => cpuRegionOk h m R
   | .lock cb => lockRegionOk (cpuPtrAt cb) m R.base
   | .pub w => cpuRegionOk w m R ∧ oneShotOk m R
-  | .name => True
+  | .slots _ _ => True
 
 /-- Every region of the list keeps its discipline. -/
 def rsvAllOk (rs : List RsvRegion) (m : FlatMem) : Prop :=
@@ -178,8 +184,7 @@ def rsvAllOk (rs : List RsvRegion) (m : FlatMem) : Prop :=
 
 /-- The list is well formed: its bytes are pairwise distinct and every one is
 a RAM byte, hence an image byte (so the mint can split its points-to); and
-(W8 (f2-ctx)) its regions' bases are distinct (a footprint-free `.name`
-entry's base is not one of its bytes). -/
+its regions' bases are distinct. -/
 def rsvWf (rs : List RsvRegion) : Prop :=
   (rsvBytes rs).Nodup ∧ (∀ a ∈ rsvBytes rs, inRam a 1) ∧ (rs.map (fun R => R.base.toNat)).Nodup
 
@@ -231,44 +236,20 @@ theorem rsvWf_of_check (rs : List RsvRegion) (h1 : strictSorted (rsvBytes rs) = 
 def memGrow (m : FlatMem) (t : Nat) (m' : FlatMem) : Prop :=
   ∀ (a : PAddr) (H : Hist), m[a]? = some H → ∃ N : Hist, m'[a]? = some (N ++ H) ∧ ∀ e ∈ N, t < e.t
 
-/-- The latest entry of `H` at or below `a` is at `tn` with value `v`. -/
-def latestAt (H : Hist) (a tn : Nat) (v : BitVec 8) : Prop :=
-  ∃ (H1 H2 : Hist) (h : Agent), H = H1 ++ ⟨tn, h, v⟩ :: H2 ∧ (∀ e ∈ H1, a < e.t) ∧ tn ≤ a
-
-/-- **The dynamic hop registry** (W8 (f2-ctx) [R35.1], time-indexed): at
-memory `m` with top `top`, `b` is the lock word of a LIVE dynamic spinlock
-for an acquire at `a ≤ top` -- its name word (`lk->name`, at `b + 8`) holds,
-as of `a`, one of the client's registered names (xv6: the address of the
-string `"pipe"`, which only `initlock(&pi->lock, "pipe")` stores there).  The
-window opens at `initlock`'s name store and closes when the word is
-overwritten (`kfree`'s junk fill of the pipe's page); it reopens when the
-page is a pipe again.  A pure fact of the memory, never falsified by a step
-(`nameLockAt_mono`). -/
-def nameLockAt (names : List (BitVec 64)) (m : FlatMem) (top : Nat) (b : PAddr) (a : Nat) : Prop :=
-  a ≤ top ∧ ∃ nm ∈ names, ∀ j, j < 8 → ∃ (H : Hist) (tn : Nat),
-    m[b + 8#64 + BitVec.ofNat 64 j]? = some H ∧ latestAt H a tn (nthByte (n := 8) nm j)
-
-theorem nameLockAt_mono {names : List (BitVec 64)} {m m' : FlatMem} {t t' : Nat} {b : PAddr} {a : Nat}
-    (hg : memGrow m t m') (ht : t ≤ t') (h : nameLockAt names m t b a) : nameLockAt names m' t' b a := by
-  obtain ⟨hat, nm, hnm, hj⟩ := h
-  refine ⟨Nat.le_trans hat ht, nm, hnm, fun j hjl => ?_⟩
-  obtain ⟨H, tn, hH, H1, H2, h0, hHe, h1, htn⟩ := hj j hjl
-  obtain ⟨N, hN, hNt⟩ := hg _ H hH
-  refine ⟨N ++ H, tn, hN, N ++ H1, H2, h0, by rw [hHe, List.append_assoc], fun e he => ?_, htn⟩
-  rcases List.mem_append.1 he with he | he
-  · have := hNt e he; omega
-  · exact h1 e he
-
-/-- **The registered names** of a region list (its `.name` entries): the names
-of the dynamic spinlocks whose lock bytes are hops while they live
-(`nameLockAt`). -/
-def rsvNameList (rs : List RsvRegion) : List (BitVec 64) :=
-  rs.filterMap (fun R => match R.kind with | .name => some R.base | _ => none)
+/-- **The slot witness of the dynamic hop registry** (W8 (f2-ctx) [OWN.49]
+(a′-r), the RULED (a′) window [OWN.46]): `L` is the eight entries of ONE
+doubleword store, by one agent at position `te`, of the value `b` into a
+slot the list registers (`.slots`) -- xv6: `f->pipe = pi` into a `struct
+file` slot.  The machine's registry (`MachCSL.dynLkAt`) closes the window at
+the first non-word entry on `b`'s lock word (`kfree`'s junk fill). -/
+def slotWit (rs : List RsvRegion) (L : List (PAddr × HEnt)) (b : PAddr) (te : Nat) : Prop :=
+  ∃ (base : PAddr) (cnt stride k : Nat) (g : Agent), (⟨base, .slots cnt stride⟩ : RsvRegion) ∈ rs ∧ k < cnt ∧
+    L = (List.range 8).map (fun j =>
+      (base + BitVec.ofNat 64 (stride * k) + BitVec.ofNat 64 j, (⟨te, g, nthByte (n := 8) b j⟩ : HEnt)))
 
 /-- **The client's static reserved regions** (the `KernelMap.static`
-pattern): reserved at the `PowerOn` mint, from timestamp 0, never released;
-(W8 (f2-ctx) [R35.1]) its `.name` entries register the NAMES of its dynamic
-spinlocks (`rsvNameList`). -/
+pattern): reserved at the `PowerOn` mint, from timestamp 0, never released
+(W8 (f2-ctx) [OWN.49] (a′-r): with its dynamic-lock slots, `.slots`). -/
 class KernelRsv where
   static : List RsvRegion
   wf : rsvWf static
@@ -293,13 +274,12 @@ theorem mem_rsvBytes {rs : List RsvRegion} {i : Nat} {R : RsvRegion} (hi : rs[i]
     (ha : a ∈ R.bytes) : a ∈ rsvBytes rs :=
   List.mem_flatMap.2 ⟨R, List.mem_of_getElem? hi, ha⟩
 
-/-- A region's base is one of its bytes (every kind but a footprint-free
-`.name` entry). -/
-theorem RsvRegion.base_mem (R : RsvRegion) (hk : R.kind ≠ .name) : R.base ∈ R.bytes := by
+/-- A region's base is one of its bytes (every kind with a footprint). -/
+theorem RsvRegion.base_mem (R : RsvRegion) (hk : R.kind.hasFoot = true) : R.base ∈ R.bytes := by
   have hw : ∃ n, 0 < n ∧ (R.base, n) ∈ R.words := by
     unfold RsvRegion.words
     cases h : R.kind with
-    | name => exact absurd h hk
+    | slots _ _ => rw [h] at hk; simp [RsvKind.hasFoot] at hk
     | _ => exact ⟨_, by decide, List.mem_cons_self⟩
   obtain ⟨n, hn, hw⟩ := hw
   have := mem_regionBytes hw hn
@@ -346,7 +326,7 @@ theorem regionOk_congr {m m' : FlatMem} {R : RsvRegion}
     (h : ∀ a ∈ R.bytes, m'[a]? = m[a]?) (hR : regionOk m R) : regionOk m' R := by
   unfold regionOk at hR ⊢
   cases hk : R.kind with
-  | name => trivial
+  | slots _ _ => trivial
   | cpu c =>
     rw [hk] at hR
     intro a ha H hH
@@ -450,7 +430,7 @@ theorem rsvAllOk_boot {rs : List RsvRegion} (hwf : rsvWf rs) : rsvAllOk rs (imgF
     · simp at hs
   unfold regionOk
   cases hk : R.kind with
-  | name => trivial
+  | slots _ _ => trivial
   | cpu c =>
     intro a ha H hH e he het
     obtain ⟨v, hv⟩ := himg a ha

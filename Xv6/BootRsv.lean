@@ -49,13 +49,13 @@ def rsvSpan : RsvKind → Nat
   | .cpu _ => 128
   | .lock _ => 24
   | .pub _ => 4
-  | .name => 0
+  | .slots _ _ => 0
 
 theorem regionBytes_span (R : RsvRegion) (hR : R.base.toNat + rsvSpan R.kind ≤ 2 ^ 64) (a : PAddr)
     (ha : a ∈ R.bytes) : R.base.toNat ≤ a.toNat ∧ a.toNat < R.base.toNat + rsvSpan R.kind := by
   obtain ⟨b, k⟩ := R
   cases k with
-  | name => simp [RsvRegion.bytes, RsvRegion.words] at ha
+  | slots _ _ => simp [RsvRegion.bytes, RsvRegion.words] at ha
   | pub w =>
     simp only [rsvSpan] at hR ⊢
     simp only [RsvRegion.bytes, RsvRegion.words, wordBytes, List.flatMap_cons, List.flatMap_nil,
@@ -78,12 +78,12 @@ theorem lockBytes_cases (L cb : BitVec 64) (hw : L.toNat + 24 ≤ 2 ^ 64) (a : P
   · left; bv_omega
   · right; bv_omega
 
-/-- A footprint-free region (a `.name` registry entry, W8 (f2-ctx)) has no
+/-- A footprint-free region (a `.slots` registry entry, W8 (f2-ctx)) has no
 bytes. -/
 theorem regionBytes_span0 (R : RsvRegion) (h0 : rsvSpan R.kind = 0) (a : PAddr) (ha : a ∈ R.bytes) : False := by
   obtain ⟨b, k⟩ := R
   cases k with
-  | name => simp [RsvRegion.bytes, RsvRegion.words] at ha
+  | slots _ _ => simp [RsvRegion.bytes, RsvRegion.words] at ha
   | _ => simp [rsvSpan] at h0
 
 /-- No region of `rs` meets `[lo, hi)`. -/

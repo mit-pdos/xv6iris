@@ -372,7 +372,7 @@ theorem release_cancel_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_CANCEL := �
   k_step (wp_s_sw_zero_release_cancel cpu _ ?hs (KA.«release» + 0x1a#64) false 0#12 9#5 γ (k.regs 10#5) s R D Out hrefuteHalf ?haddr hdyn) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc $Hlp $Hheld $HR $Hlic]
   case haddr => k_norm [h29]
-  iintro Hk Hpc %hmem Hword Hcpu Hname HOut
+  iintro Hk Hpc %hmem Hword Hcpu HOut
   -- jal pop_off
   k_step (wp_s_jal cpu _ (KA.«release» + 0x1e#64) false 2097050#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [release_br_ffffffffffffffb8]
   iintro Hk Hpc
@@ -433,7 +433,7 @@ theorem release_cancel_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_CANCEL := �
   iapply wpNext_mono _ _ _ _ _ $$ HΦ1
   iintro %cpu' HK Hk Hpc
   k_norm
-  iapply HK $$ %_ Hk Hpc [] Hword Hcpu Hname HOut
+  iapply HK $$ %_ Hk Hpc [] Hword Hcpu HOut
   ipureintro
   obtain ⟨c3_2, c3_8, c3_9, c3_18, c3_19, c3_20, c3_21, c3_22, c3_23, c3_24, c3_25, c3_26, c3_27⟩ := hcs3
   obtain ⟨c2_2, c2_8, c2_9, c2_18, c2_19, c2_20, c2_21, c2_22, c2_23, c2_24, c2_25, c2_26, c2_27⟩ := hcs2

@@ -28,7 +28,6 @@ This file is definitional (Spec-importable): it never touches a proof.
 -/
 import Xv6.PipeInvDefs
 import MachCSL.ByteWord4
-import MachCSL.DmaCtxSplit
 
 namespace Xv6
 
@@ -217,75 +216,14 @@ theorem bytesFree_snoc_at (a : BitVec 64) (L1 L2 : List (BitVec 8)) (off : Nat) 
   rw [← h]
   exact (bytesFree_append a L1 L2).2
 
-/-! ## The name word's two halves (W8 (f2-ctx))
-
-A live pipe's lock holds HALF its name word raw (`MachCSL.lkName`); the
-payload holds the other half as a context cell.  The destroying release hands
-the raw half back; joined, the cell is whole again. -/
-
-/-- A raw half beside a context half of the same byte is the whole context
-byte. -/
-theorem pipeCtxByte_join (ξ : CtxId) (a : PAddr) (H : Hist) (b : BitVec 8) :
-    iprop((a ↦ₕ{DFrac.own (1 : Qp).half} H) ∗ ctxByte (GF := GF) ξ a (DFrac.own (1 : Qp).half) b)
-      ⊢ ctxByte ξ a (DFrac.own 1) b := by
-  iintro ⟨Hpt, Hc⟩
-  icases ctxByte_cases ξ a (DFrac.own (1 : Qp).half) b $$ Hc with ⟨%e, %He, Hpt2, %hev, #Hkey⟩
-  icases histByte_join_half a H (e :: He) $$ [Hpt Hpt2] with ⟨Hpt, %heq⟩
-  · iframe Hpt Hpt2
-  rw [heq]
-  unfold ctxByte
-  iexists e, He
-  iframe Hpt
-  isplit
-  · ipureintro; exact hev
-  · iexact Hkey
-
-/-- ... and a raw half window beside a context half window. -/
-theorem pipeCtxBytes_join (ξ : CtxId) (pa : PAddr) (n : Nat) (Hs : Nat → Hist) (w : BitVec (8 * n)) :
-    iprop(histBytes (GF := GF) pa n (fun _ => DFrac.own (1 : Qp).half) Hs ∗
-      ctxBytes ξ pa n (DFrac.own (1 : Qp).half) w) ⊢ ctxBytes ξ pa n (DFrac.own 1) w := by
-  unfold histBytes ctxBytes
-  refine .trans BigSepL.bigSepL_sep_eqv_symm.1 (BigSepL.bigSepL_mono_of_forall ?_)
-  intro k j
-  exact pipeCtxByte_join ξ (pa + BitVec.ofNat 64 j) (Hs j) (nthByte w j)
-
-/-- The name word shares its page with the pipe. -/
-theorem pipeName_vpn {pi : BitVec 64} (h : pageValid pi) : vpnOf (pipeLockName pi) = vpnOf pi := by
-  obtain ⟨h0, -, -⟩ := h
-  unfold vpnOf pipeLockName
-  bv_decide
-
-theorem pipeName_kmapId {pi : BitVec 64} (h : pageValid pi) :
-    kmapId (GF := GF) pi ⊢ kmapId (pi + 8#64) := by
-  have e : vpnOf (pi + 8#64) = vpnOf pi := pipeName_vpn h
-  show kmapAt _ _ ⊢ kmapAt _ _
-  rw [e]
-
-/-- **The name word, rejoined**: the destroying release's raw half and the
-payload's half are the whole word again. -/
-theorem pipeName_join (pi : BitVec 64) (hpv : pageValid pi) (vname : BitVec 64) :
-    kmapId (GF := GF) pi ⊢
-      (∃ Hs : Nat → Hist, histBytes (pi + 8#64) 8 (fun _ => DFrac.own (1 : Qp).half) Hs) -∗
-      wordPointsTo (pipeLockName pi) 8 (DFrac.own (1 : Qp).half) vname -∗
-      wordPointsTo (pipeLockName pi) 8 (DFrac.own 1) vname := by
-  unfold pipeLockName
-  iintro #Hid ⟨%Hs, Hraw⟩ Hw
-  ihave #Hid' := pipeName_kmapId hpv $$ Hid
-  ihave Hp := wordPointsTo_phys (pi + 8#64) 8 _ vname $$ Hid' Hw
-  icases pwordPointsTo_cases _ 8 _ vname $$ Hp with ⟨%⟨hram, hal⟩, Hb⟩
-  iapply wordPointsTo_intro_id (pi + 8#64) 8 _ vname hram hal $$ Hid'
-  iapply pipeCtxBytes_join curCtx (pi + 8#64) 8 Hs vname
-  iframe Hraw Hb
-
 /-- **THE PAGE REASSEMBLY** (the Lean port of Rocq `pipe_bytes_page_own`).
-The two reclaimed lock words, the name word's raw half, plus `pipeBytes pi`, with the page's identity
+The two reclaimed lock words plus `pipeBytes pi`, with the page's identity
 claims from `is_pipe`, make the whole page a visibility-free `pageFree pi`
 for `kfree`. -/
-theorem pipeBytes_pageFree (pi : BitVec 64) (hok : lockAddrOk pi) (hpv : pageValid pi) :
+theorem pipeBytes_pageFree (pi : BitVec 64) (hok : lockAddrOk pi) :
     kmapId (GF := GF) pi -∗ kmapId (pi + 16#64) -∗
     (∃ Hs : Nat → Hist, histBytes pi 4 (fun _ => DFrac.own 1) Hs) -∗
     (∃ Hs : Nat → Hist, histBytes (pi + 16#64) 8 (fun _ => DFrac.own 1) Hs) -∗
-    (∃ Hs : Nat → Hist, histBytes (pi + 8#64) 8 (fun _ => DFrac.own (1 : Qp).half) Hs) -∗
     pipeBytes pi -∗ pageFree pi := by
   obtain ⟨hR4, hpi4, hR16, hpi16⟩ := hok
   -- pi is 8-aligned (pi+16 is)
@@ -295,7 +233,7 @@ theorem pipeBytes_pageFree (pi : BitVec 64) (hok : lockAddrOk pi) (hpv : pageVal
     simp only [BitVec.toNat_ofNat, Nat.reducePow] at this
     omega
   unfold pipeBytes pipeSlack
-  iintro #Hid0 #Hid16 Hlk Hcpu Hnmr Hbytes
+  iintro #Hid0 #Hid16 Hlk Hcpu Hbytes
   -- reclaimed lock word -> bytesFree pi (replicate 4 0)
   icases Hlk with ⟨%Hs0, Hlk⟩
   ihave Hlk := histBytes_byteFree pi 4 Hs0 $$ Hlk
@@ -311,7 +249,6 @@ theorem pipeBytes_pageFree (pi : BitVec 64) (hok : lockAddrOk pi) (hpv : pageVal
   -- open pipeBytes
   simp only [wordAtN_cur]
   icases Hbytes with ⟨%vname, %nr, %nw, %ro, %wo, %bs, Hnm, Hnr, Hnw, Hro, Hwo, %hbslen, Hdat, Hslack⟩
-  ihave Hnm := pipeName_join pi hpv vname $$ Hid0 Hnmr Hnm
   icases Hslack with ⟨⟨%b1, %hb1, Hslack1⟩, ⟨%b2, %hb2, Hslack2⟩⟩
   -- field addresses
   have e_nr : aPnread pi = pi + 536#64 := by unfold aPnread poffOf; congr 1

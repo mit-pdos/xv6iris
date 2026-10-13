@@ -562,6 +562,58 @@ theorem memModel_rtIssue (σ : MState) (cpu : CPU) (o : Option (List (CPU × Nat
     iapply memModel_chainRetimeL _ σ cpu L
     iframe Hmm HL
 
+/-- **Entry receipts** (W8 (f2-ctx) [OWN.49] (a′-r)) for a store of `w` at
+position `t` by `g` into `pa .. pa+n-1`: each byte's entry, receipted
+(`MachCSL.entryAtE`). -/
+def entsAt (pa : PAddr) (n t : Nat) (g : Agent) (w : BitVec (8 * n)) : IProp GF := iprop%
+  [∗list] j ∈ List.range n, entryAt (pa + BitVec.ofNat 64 j) ⟨t, g, nthByte w j⟩
+
+instance (pa : PAddr) (n t : Nat) (g : Agent) (w : BitVec (8 * n)) :
+    Persistent (PROP := IProp GF) (entsAt pa n t g w) := by
+  unfold entsAt; infer_instance
+
+/-- After a store whose entries the window's histories now head, their
+receipts may be issued. -/
+theorem memModel_entsIssueL (σ : MState) (pa : PAddr) (n : Nat) (Hs : Nat → Hist) (t : Nat) (g : Agent)
+    (w : BitVec (8 * n)) (hbs : histsAt σ.mem pa n (pushed Hs t g w)) :
+    ∀ l : List Nat, (∀ j ∈ l, j < n) →
+      memModelAt (MachGS.era (hlc := hlc) (GF := GF)) σ ⊢@{IProp GF}
+        |==> (memModelAt (MachGS.era (hlc := hlc) (GF := GF)) σ ∗
+          [∗list] j ∈ l, entryAt (pa + BitVec.ofNat 64 j) ⟨t, g, nthByte w j⟩)
+  | [], _ => by
+    simp only [Iris.Algebra.BigOpL.bigOpL_nil]
+    iintro Hmm
+    imodintro
+    iframe Hmm
+  | j :: l, hl => by
+    iintro Hmm
+    imod memModel_entIssue _ σ (pa + BitVec.ofNat 64 j) ⟨t, g, nthByte w j⟩
+      ⟨_, hbs j (hl j List.mem_cons_self), List.mem_cons_self⟩ $$ Hmm with ⟨Hmm, #He⟩
+    imod memModel_entsIssueL σ pa n Hs t g w hbs l (fun i hi => hl i (List.mem_cons_of_mem _ hi)) $$ Hmm
+      with ⟨Hmm, #HL⟩
+    imodintro
+    iframe Hmm
+    iapply BigSepL.bigSepL_cons.2
+    isplit
+    · iexact He
+    · iexact HL
+
+theorem memModel_entsIssue (σ : MState) (pa : PAddr) (n : Nat) (Hs : Nat → Hist) (t : Nat) (g : Agent)
+    (w : BitVec (8 * n)) (hbs : histsAt σ.mem pa n (pushed Hs t g w)) :
+    memModelAt (MachGS.era (hlc := hlc) (GF := GF)) σ ⊢@{IProp GF}
+      |==> (memModelAt (MachGS.era (hlc := hlc) (GF := GF)) σ ∗ entsAt pa n t g w) := by
+  unfold entsAt
+  exact memModel_entsIssueL σ pa n Hs t g w hbs (List.range n) (fun j hj => List.mem_range.1 hj)
+
+/-- The receipts, as the list a registration names. -/
+def entsList (pa : PAddr) (n t : Nat) (g : Agent) (w : BitVec (8 * n)) : List (PAddr × HEnt) :=
+  (List.range n).map (fun j => (pa + BitVec.ofNat 64 j, (⟨t, g, nthByte w j⟩ : HEnt)))
+
+theorem entsAt_list (pa : PAddr) (n t : Nat) (g : Agent) (w : BitVec (8 * n)) :
+    entsAt (GF := GF) pa n t g w ⊢ [∗list] p ∈ entsList pa n t g w, entryAt p.1 p.2 := by
+  unfold entsAt entsList
+  rw [BigSepL.bigSepL_map]
+
 /-- The accessor of the read half of an exclusive pair: the value is the
 heads of the histories. -/
 def exclReadAU (pa : PAddr) (n : Nat) (Ψ : BitVec (8 * n) → IProp GF) : IProp GF := iprop%
@@ -614,22 +666,46 @@ def hopHead (Hs : Nat → Hist) (A : CPU) (r : Nat) : Prop :=
   ∃ (e0 : HEnt) (H2 : Hist), Hs 0 = ⟨r, hartAgent A, 0⟩ :: e0 :: H2 ∧ e0.v ≠ 0 ∧
     ∀ i, i < 4 → (∃ e ∈ Hs i, e.t = r ∧ e.tid = hartAgent A) ∧ (∃ e ∈ Hs i, e.t = e0.t ∧ e.tid = e0.tid)
 
-/-- A hop's registration: a static spinlock (`none`), or a dynamic one whose
-name word's histories `Hn` (lent at `dqn`) are headed by a registered name. -/
-def hopRegAt (pa : PAddr) : Option ((Nat → DFrac) × (Nat → Hist)) → IProp GF
+/-- A hop's registration: a static spinlock (`none`), or ([OWN.49] (a′-r)) a
+dynamic one -- entry receipts `L` that the client's witness
+(`MachCSL.slotWit` over the static list) accepts for `pa` at a position `te` of the store
+order.  Persistent. -/
+def hopRegAt (pa : PAddr) : Option (List (PAddr × HEnt) × Nat) → IProp GF
   | none => iprop(⌜rsvLockByte (hlc := hlc) (GF := GF) pa⌝)
-  | some (dqn, Hn) => iprop(histBytes (pa + 8#64) 8 dqn Hn ∗
-      ⌜∃ nm ∈ rsvNameList (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)), headsAre Hn 8 nm⌝)
+  | some (L, te) => iprop(topLb te ∗ ([∗list] p ∈ L, entryAt p.1 p.2) ∗
+      ⌜slotWit (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) L pa te⌝)
+
+instance (pa : PAddr) (reg : Option (List (PAddr × HEnt) × Nat)) :
+    Persistent (PROP := IProp GF) (hopRegAt pa reg) := by
+  cases reg with
+  | none => unfold hopRegAt; infer_instance
+  | some p => obtain ⟨L, te⟩ := p; unfold hopRegAt; infer_instance
+
+instance (pa : PAddr) (reg : Option (List (PAddr × HEnt) × Nat)) :
+    Timeless (PROP := IProp GF) (hopRegAt pa reg) := by
+  cases reg with
+  | none => unfold hopRegAt; infer_instance
+  | some p => obtain ⟨L, te⟩ := p; unfold hopRegAt; infer_instance
+
+/-- A dynamic registration's window test on the request's histories (what
+`MachCSL.dynLkAt` reads off the memory): each of the lock word's four bytes'
+histories is a prefix of WORD-sized entries (each with a twin, same position
+and author, in every byte) over a remainder whose head is at or below `te`. -/
+def hopRegWord (Hs : Nat → Hist) : Option (List (PAddr × HEnt) × Nat) → Prop
+  | none => True
+  | some (_, te) => ∀ i, i < 4 → ∃ P Q : Hist, Hs i = P ++ Q ∧
+      (∀ e ∈ P, ∀ j, j < 4 → ∃ e' ∈ Hs j, e'.t = e.t ∧ e'.tid = e.tid) ∧ ∀ q ∈ Q.head?, q.t ≤ te
 
 /-- A hop request's data: the releaser, its release position, the
 certificates `(author, entries)` to convert, the registration. -/
-abbrev HopData := CPU × Nat × List (CPU × Nat) × Option ((Nat → DFrac) × (Nat → Hist))
+abbrev HopData := CPU × Nat × List (CPU × Nat) × Option (List (PAddr × HEnt) × Nat)
 
 /-- What a hop request lends the leaf. -/
 def hopIn (cpu : CPU) (pa : PAddr) (n : Nat) (Hs : Nat → Hist) (w' : BitVec (8 * n)) :
     Option HopData → IProp GF
   | none => iprop(emp)
-  | some (A, r, L, reg) => iprop(⌜hopHead Hs A r ∧ nthByte w' 0 ≠ 0 ∧ 4 ≤ n ∧ n ≤ 8⌝ ∗ hopRegAt pa reg ∗
+  | some (A, r, L, reg) => iprop(⌜hopHead Hs A r ∧ nthByte w' 0 ≠ 0 ∧ 4 ≤ n ∧ n ≤ 8 ∧ hopRegWord Hs reg⌝ ∗
+      hopRegAt pa reg ∗
       gatePassed cpu ∗ [∗list] p ∈ L, chainLb p.1 p.2 A r)
 
 /-- What a hop request hands back after the store at `t`. -/
@@ -1160,7 +1236,7 @@ theorem memModel_hopIssue (σ' : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w' 
   | some d =>
     obtain ⟨A, r, L, reg⟩ := d
     unfold hopIn hopOut
-    iintro ⟨Hmem, Hmm, %⟨hhead, hw0, hn0, _⟩, Hreg, #Hg, HL⟩
+    iintro ⟨Hmem, Hmm, %⟨hhead, hw0, hn0, _, hrw⟩, #Hreg, #Hg, HL⟩
     obtain ⟨e0, H2, hH, he0, hw⟩ := hhead
     have hb : σ'.mem[pa]? = some (⟨t, hartAgent cpu, nthByte w' 0⟩ :: ⟨r, hartAgent A, 0⟩ :: e0 :: H2) := by
       have h0 := hbs 0 (by omega)
@@ -1176,7 +1252,7 @@ theorem memModel_hopIssue (σ' : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w' 
       exact ⟨_, e, hbs i (by omega), List.mem_cons_of_mem _ he, het, heg⟩
     ihave %hmm := memModel_mmOk _ σ' $$ Hmm
     -- the registration: a hop byte at `t`
-    ihave %hlk : ⌜(chainEnv (hlc := hlc) (GF := GF) σ').isLk pa t⌝ $$ [Hmem Hreg]
+    ihave %hlk : ⌜(chainEnv (hlc := hlc) (GF := GF) σ').isLk pa t⌝ $$ [Hmem Hreg Hmm]
     · cases reg with
       | none =>
         unfold hopRegAt
@@ -1184,30 +1260,46 @@ theorem memModel_hopIssue (σ' : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w' 
         ipureintro
         exact Or.inl hr
       | some p =>
-        obtain ⟨dqn, Hn⟩ := p
+        obtain ⟨Ld, te⟩ := p
         unfold hopRegAt
-        icases Hreg with ⟨Hn, %⟨nm, hnm, hheads⟩⟩
-        ihave %hget := histBytes_valid σ'.mem (pa + 8#64) 8 dqn Hn $$ [Hmem Hn]
-        · iframe Hmem Hn
+        icases Hreg with ⟨#Hte, #HLd, %hwit⟩
+        ihave %hte : ⌜te ≤ σ'.top⌝ $$ [Hmm]
+        · iapply memModel_topLb _ σ' te $$ [Hmm Hte]
+          iframe Hmm
+          iexact Hte
+        ihave %hLd := memModel_entryAtL _ σ' Ld $$ [Hmm HLd]
+        · iframe Hmm
+          iexact HLd
         ipureintro
-        refine Or.inr ⟨by omega, nm, hnm, fun j hj => ?_⟩
-        have hg := hget j hj
-        have hh := hheads j hj
-        cases hHn : Hn j with
-        | nil => rw [hHn] at hh; simp at hh
-        | cons e H' =>
-          rw [hHn] at hh hg
-          simp only [List.head?_cons, Option.map_some, Option.some.injEq] at hh
-          have het : e.t ≤ σ'.log.length := ((hmm.1 _ _ hg).2 e List.mem_cons_self).1
-          refine ⟨e :: H', e.t, hg, [], H', e.tid, ?_, fun x hx => by simp at hx, ?_⟩
-          · rw [← hh]; rfl
-          · simp only [MState.top] at htop; omega
+        simp only [hopRegWord] at hrw
+        refine Or.inr ⟨by omega, Ld, te, hwit, hLd, by omega, fun i hi => ⟨_, hbs i (by omega), ?_⟩⟩
+        intro e he hte' _
+        obtain ⟨P, Q, hPQ, hP, hQ⟩ := hrw i hi
+        have hok := (hmm.1 _ _ (hbs i (by omega))).1
+        simp only [pushed] at he hok
+        rcases List.mem_cons.1 he with rfl | he
+        · exact hwa
+        rw [hPQ] at he hok
+        rcases List.mem_append.1 he with he | he
+        · intro j hj
+          obtain ⟨e', he', h1, h2⟩ := hP e he j hj
+          exact ⟨_, e', hbs j (by omega), List.mem_cons_of_mem _ he', h1, h2⟩
+        · exfalso
+          cases Q with
+          | nil => cases he
+          | cons q Q' =>
+            have hq := hQ q rfl
+            rcases List.mem_cons.1 he with rfl | he
+            · omega
+            · have hpw := (List.pairwise_append.1 (List.pairwise_cons.1 hok).2).2.1
+              have := (List.pairwise_cons.1 hpw).1 e he
+              omega
     imod memModel_chainHopL _ σ' pa A cpu r t (nthByte w' 0) e0 H2 hb hw0 he0 hwa hwr hwe hlk htop L $$ [Hmm HL]
       with ⟨Hmm, HL⟩
     · iframe Hmm Hg HL
     imodintro
     iframe Hmem Hmm
-    isplitl [Hreg]
+    isplitr
     · iexact Hreg
     · iexact HL
 

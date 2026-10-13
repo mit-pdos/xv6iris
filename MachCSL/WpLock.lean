@@ -1226,7 +1226,7 @@ theorem wp_s_amoswap_lock_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
           icases Hpay with ⟨%ξL, %T, %V, %g, Hst, HR, >#Hrec⟩
           ihave Hst' := BI.later_mono (ctxStamped_topLb ξL T V g) $$ Hst
           icases Hst' with ⟨>#HT, Hst⟩
-          icases lockRec_hopReq cpu lk W2 Hold2 V Vb g none $$ [] with ⟨%o, Ho, Hwin⟩
+          icases lockRec_hopReq cpu lk W2 Hold2 V Vb g none trivial $$ [] with ⟨%o, Ho, Hwin⟩
           · iframe Hrec Hgp
             simp only [hopRegAt]
             ipureintro; exact ⟨_, hm⟩
@@ -1442,7 +1442,7 @@ theorem wp_s_amoswap_lock_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
         rotate_left
         · iexfalso; iapply hrefute $$ Hcred Hdead
         try unfold lockBody
-        icases Hbody with ⟨%W2, %W2', %st2, %B2, >Hw2, Hc2, >%hst2, >Hhalf2, Hfr2, >Hnm, Harm2⟩
+        icases Hbody with ⟨%W2, %W2', %st2, %B2, >Hw2, Hc2, >%hst2, >Hhalf2, Hfr2, >#Hnm, Harm2⟩
         icases wordCell_cases lk 4 lo 0 W2 $$ Hw2 with ⟨%Hold2, Hb2, %htail2⟩
         icases Harm2 with ⟨⟨>%hfree, >Hhalf3, Hpay⟩ | >%hheld⟩
         · -- free: the winning AMO
@@ -1451,14 +1451,11 @@ theorem wp_s_amoswap_lock_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
           icases Hpay with ⟨%ξL, %T, %V, %g, Hst, HR, >#Hrec⟩
           ihave Hst' := BI.later_mono (ctxStamped_topLb ξL T V g) $$ Hst
           icases Hst' with ⟨>#HT, Hst⟩
-          unfold lkName
-          icases Hnm with ⟨%Hn, Hnb, %hnm⟩
-          icases lockRec_hopReq cpu lk W2 Hold2 V Vb g (some ((fun _ => DFrac.own (1 : Qp).half), Hn)) $$ [Hnb] with
-            ⟨%o, Ho, Hwin⟩
-          · iframe Hrec Hgp
-            simp only [hopRegAt]
-            iframe Hnb
-            ipureintro; exact hnm
+          unfold lkDynReg
+          icases Hnm with ⟨%Ld, %te, %hlo, #Hreg⟩
+          icases lockRec_hopReq cpu lk W2 Hold2 V Vb g (some (Ld, te)) (hopRegWord_cell W2 Hold2 Ld htail2 hlo)
+            $$ [] with ⟨%o, Ho, Hwin⟩
+          · iframe Hrec Hgp Hreg
           iapply fupd_mask_intro LawfulSet.empty_subset
           iintro Hmask
           ileft
@@ -1479,14 +1476,12 @@ theorem wp_s_amoswap_lock_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
           imod lockSet_insert cpu k.locks s hs $$ Hlocks with ⟨Hlocks, Hin⟩
           imod ctx_absorb cpu curCtx t $$ [$Hctx $Hvlb] with ⟨Hctx, #Hflt⟩
           ihave #HflT := ctxFloor_le curCtx t T (by omega : T ≤ t) $$ Hflt
-          icases Hwin $$ %t Hout Hctx Hvf with ⟨Hnb, Hctx, #Hcw⟩
-          simp only [hopRegAt]
-          icases Hnb with ⟨Hnb, _⟩
+          icases Hwin $$ %t Hout Hctx Hvf with ⟨_, Hctx, #Hcw⟩
           ihave Hwon := lockPayWon_intro R cpu ξL T V g $$ [Hst HflT HR Hcw]
           case' _ => iframe Hst HR; iframe HflT Hcw
           imod lock_pay_take cpu R $$ [$Hctx $Hwon] with ⟨Hctx, HR, Hheld⟩
           imod Hmask
-          ihave Hcl := Hclose $$ [Hb2 Hc2 Hhalf2 Hin Hnb]
+          ihave Hcl := Hclose $$ [Hb2 Hc2 Hhalf2 Hin]
           case' _ =>
             inext
             ileft
@@ -1498,10 +1493,11 @@ theorem wp_s_amoswap_lock_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
               iexact Hb2
             isplit
             · ipureintro; exact ⟨lockWordAt_take W2 t cpu, lkCpuAt_take hst2.2 cpu⟩
-            isplitl [Hnb]
-            · iexists Hn
-              iframe Hnb
-              ipureintro; exact hnm
+            isplitr
+            · iexists Ld, te
+              isplit
+              · ipureintro; exact hlo
+              · iexact Hreg
             · iright; ipureintro; simp
           imod Hcl
           imodintro
@@ -2563,7 +2559,6 @@ theorem wp_s_sw_zero_release_cancel (cpu : CPU) (k : KCtx) (hsie : k.sie = false
           pcIs cpu' (pc + instrLen is_rvc) -∗ ⌜s ∈ k.locks⌝ -∗
           (∃ Hs : Nat → Hist, histBytes lk 4 (fun _ => DFrac.own 1) Hs) -∗
           (∃ Hs : Nat → Hist, histBytes (lk + 16#64) 8 (fun _ => DFrac.own 1) Hs) -∗
-          (∃ Hs : Nat → Hist, histBytes (lk + 8#64) 8 (fun _ => DFrac.own (1 : Qp).half) Hs) -∗
           Out -∗ wpLoop cpu'))
     ⊢ wpLoop cpu := by
   iintro ⟨HI, Hk, Hpc, #Hlk, Hlp, Hheld, HR, Hlic, HΦ⟩
@@ -2588,7 +2583,7 @@ theorem wp_s_sw_zero_release_cancel (cpu : CPU) (k : KCtx) (hsie : k.sie = false
           lockSet cpu (k.locks.filter (fun x => x ≠ s)) ∗ (⌜s ∈ k.locks⌝ ∗
             (∃ Hs : Nat → Hist, histBytes lk 4 (fun _ => DFrac.own 1) Hs) ∗
             (∃ Hs : Nat → Hist, histBytes (lk + 16#64) 8 (fun _ => DFrac.own 1) Hs) ∗
-            (∃ Hs : Nat → Hist, histBytes (lk + 8#64) 8 (fun _ => DFrac.own (1 : Qp).half) Hs) ∗ Out)) := by
+            Out)) := by
     intro c hok' _ Φ
     iintro ⟨HmConf, HPC, HnextPC, ⟨HT, HF, Hlocks, #Hlk, Hlp, Hheld, HR, Hlic⟩, HΦ⟩
     icases lockOpenable_cases_dyn γ lk s R D hdyn $$ Hlk with ⟨%_, #Hcl, #Hcl', ⟨%lo, %lc, %Vb, #Hinv, #Hflo, #Hflc, #Hvf, #Hgf⟩⟩
@@ -2597,7 +2592,7 @@ theorem wp_s_sw_zero_release_cancel (cpu : CPU) (k : KCtx) (hsie : k.sie = false
       (tpPin cpu k.regs) iprop(ownCtx cpu curCtx ∗ lockSet cpu (k.locks.filter (fun x => x ≠ s)) ∗
         (⌜s ∈ k.locks⌝ ∗ (∃ Hs : Nat → Hist, histBytes lk 4 (fun _ => DFrac.own 1) Hs) ∗
           (∃ Hs : Nat → Hist, histBytes (lk + 16#64) 8 (fun _ => DFrac.own 1) Hs) ∗
-          (∃ Hs : Nat → Hist, histBytes (lk + 8#64) 8 (fun _ => DFrac.own (1 : Qp).half) Hs) ∗ Out))
+          Out))
       hram hal
     simp only [KCtx.rget] at haddr
     have hz : BitVec.extractLsb' 0 32 (RegMap.get (tpPin cpu k.regs) 0#5) = 0#32 := by
@@ -2648,15 +2643,10 @@ theorem wp_s_sw_zero_release_cancel (cpu : CPU) (k : KCtx) (hsie : k.sie = false
       isplitl [Hb]
       · iexists _
         iexact Hb
-      isplitl [Hhc]
-      · iexists _
-        iexact Hhc
-      · unfold lkName
-        icases Hnm with ⟨%Hn, Hnb, _⟩
-        iexists Hn
-        iexact Hnb
+      iexists _
+      iexact Hhc
     · inext
-      iintro HmConf HPC HnextPC ⟨Htrans, Hfrag, HF, Hctx, Hlocks, %hmem, Hword, Hcpu, Hname, HOut⟩
+      iintro HmConf HPC HnextPC ⟨Htrans, Hfrag, HF, Hctx, Hlocks, %hmem, Hword, Hcpu, HOut⟩
       ihave Htok := ctxTok_introB cpu curCtx none false $$ [Hctx Hfrag]
       case' _ => iframe
       ihave HT := transTok_intro cpu curTier k.root $$ [Htrans Htok]
@@ -2665,23 +2655,23 @@ theorem wp_s_sw_zero_release_cancel (cpu : CPU) (k : KCtx) (hsie : k.sie = false
       iframe HT
       iexists ()
       iframe HF Hlocks
-      iframe Hword Hcpu Hname HOut
+      iframe Hword Hcpu HOut
       ipureintro; exact hmem
   iapply (wpLoop_k_lock cpu k hsie pc (pc + instrLen is_rvc) is_rvc _
     (fun _ : Unit => k.regs) (fun _ => rfl) (fun _ => k.locks.filter (fun x => x ≠ s)) hwf' _
     (fun _ => iprop(⌜s ∈ k.locks⌝ ∗ (∃ Hs : Nat → Hist, histBytes lk 4 (fun _ => DFrac.own 1) Hs) ∗
       (∃ Hs : Nat → Hist, histBytes (lk + 16#64) 8 (fun _ => DFrac.own 1) Hs) ∗
-      (∃ Hs : Nat → Hist, histBytes (lk + 8#64) 8 (fun _ => DFrac.own (1 : Qp).half) Hs) ∗ Out)) hexec)
+      Out)) hexec)
   iframe HI Hk Hpc Hlp Hheld HR Hlic
   isplitl []
   · iexact Hlk
   inext
   iapply wpNext_mono $$ HΦ
-  iintro %cpu' HK %_ Hk Hpc ⟨%hmem, Hword, Hcpu, Hname, HOut⟩
+  iintro %cpu' HK %_ Hk Hpc ⟨%hmem, Hword, Hcpu, HOut⟩
   ihave Hk' := (show kctxL lent cpu' ((k.withRegs k.regs).withLocks (k.locks.filter (fun x => x ≠ s))) ⊢
       kctxL lent cpu' (k.withLocks (k.locks.filter (fun x => x ≠ s))) from by
     rw [KCtx.withRegs_self]) $$ Hk
-  iapply HK $$ Hk' Hpc %hmem Hword Hcpu Hname HOut
+  iapply HK $$ Hk' Hpc %hmem Hword Hcpu HOut
 
 
 set_option maxHeartbeats 4000000 in

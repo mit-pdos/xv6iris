@@ -623,7 +623,8 @@ them back converted for the winner (`hopOut`); the BIRTH arm requests no
 hop, and the winner's own certificates for the handle's birth vector cover
 the payload's.  The registration (`reg`) and the winner's gate are lent. -/
 theorem lockRec_hopReq [CurCtx] (cpu : CPU) (lk : BitVec 64) (W : WordHist 4) (Hold : Nat → Hist)
-    (V Vb : CPU → Nat) (g : Nat) (reg : Option ((Nat → DFrac) × (Nat → Hist))) :
+    (V Vb : CPU → Nat) (g : Nat) (reg : Option (List (PAddr × HEnt) × Nat))
+    (hrw : hopRegWord (W.hist Hold) reg) :
     lockRec W V Vb ∗ hopRegAt lk reg ∗ gatePassed cpu ⊢@{IProp GF}
       ∃ o : Option HopData, hopIn cpu lk 4 (W.hist Hold) lkOne o ∗
         (∀ t : Nat, hopOut cpu lk t o -∗ ownCtx cpu curCtx -∗ vecFloors curCtx Vb -∗
@@ -637,7 +638,7 @@ theorem lockRec_hopReq [CurCtx] (cpu : CPU) (lk : BitVec 64) (W : WordHist 4) (H
     · iframe Hreg Hg Hl
       ipureintro
       refine ⟨⟨e0.proj 0, (W2.map (WEnt.proj 0)) ++ Hold 0, ?_, ?_, fun i _ => ⟨?_, ?_⟩⟩,
-        lock_nthByte_one, by omega, by omega⟩
+        lock_nthByte_one, by omega, by omega, hrw⟩
       · subst hW
         simp only [WordHist.hist, List.map_cons, List.cons_append, WEnt.proj]
         rw [lock_nthByte_zero]
@@ -980,16 +981,33 @@ theorem locked_intro [CurCtx] (γ : GName) (i : CPU) :
 section geom
 variable [KernelGeom]
 
-/-- A DYNAMIC lock's NAME word (W8 (f2-ctx) [R35.1]): the histories of
-`lk->name`, headed by a registered name of the ambient record -- what makes
-the lock byte a hop while the lock lives (`MachCSL.nameLockAt`, through the
-winning AMO's hop request, `MachCSL.hopRegAt`). -/
-def lkName (lk : BitVec 64) : IProp GF := iprop%
-  ∃ Hn : Nat → Hist, histBytes (lk + 8#64) 8 (fun _ => DFrac.own (1 : Qp).half) Hn ∗
-    ⌜∃ nm ∈ rsvNameList (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)), headsAre Hn 8 nm⌝
+/-- A DYNAMIC lock's REGISTRATION (W8 (f2-ctx) [OWN.49] (a′-r), the RULED
+(a′) window [OWN.46]): entry receipts the client's witness accepts for the
+lock at a position `te` at or past the lock word's floor `lo` -- what makes
+the lock byte a hop while the lock lives (`MachCSL.dynLkAt`, through the
+winning AMO's hop request, `MachCSL.hopRegAt`).  Persistent. -/
+def lkDynReg (lk : BitVec 64) (lo : Nat) : IProp GF := iprop%
+  ∃ (L : List (PAddr × HEnt)) (te : Nat), ⌜lo ≤ te⌝ ∗ hopRegAt lk (some (L, te))
 
-instance lkName_timeless (lk : BitVec 64) : Timeless (lkName (GF := GF) lk) := by
-  unfold lkName histBytes; infer_instance
+instance lkDynReg_timeless (lk : BitVec 64) (lo : Nat) : Timeless (lkDynReg (GF := GF) lk lo) := by
+  unfold lkDynReg; infer_instance
+
+instance lkDynReg_persistent (lk : BitVec 64) (lo : Nat) : Persistent (lkDynReg (GF := GF) lk lo) := by
+  unfold lkDynReg; infer_instance
+
+/-- A dynamic registration's window test holds of a lock word's histories:
+the word's own entries are word-sized, and the tail's head sits at the
+floor `lo ≤ te`. -/
+theorem hopRegWord_cell (W : WordHist 4) (Hold : Nat → Hist) {lo te : Nat} (L : List (PAddr × HEnt))
+    (htail : tailOk 4 lo 0 Hold) (hle : lo ≤ te) : hopRegWord (W.hist Hold) (some (L, te)) := by
+  intro i hi
+  refine ⟨W.map (WEnt.proj i), Hold i, rfl, fun e he j hj => ?_, fun q hq => ?_⟩
+  · obtain ⟨x, hx, rfl⟩ := List.mem_map.1 he
+    exact ⟨WEnt.proj j x, List.mem_append_left _ (List.mem_map_of_mem hx), rfl, rfl⟩
+  · obtain ⟨e, H, hH, _, het⟩ := htail i hi
+    rw [hH] at hq
+    cases hq
+    omega
 
 
 
@@ -1001,7 +1019,7 @@ def lockBody (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF)
     (Vb : CPU → Nat) : IProp GF := iprop%
   ∃ (W : WordHist 4) (W' : WordHist 8) (st : LockState) (B : Nat),
     wordCell lk 4 lo 0 W ∗ wordCell (lk + 16#64) 8 lc 0 W' ∗
-    ⌜lockWordAt st B W ∧ lkCpuAt st W'⌝ ∗ lockHalf γ st B ∗ lkCpuFrag st s ∗ lkName lk ∗
+    ⌜lockWordAt st B W ∧ lkCpuAt st W'⌝ ∗ lockHalf γ st B ∗ lkCpuFrag st s ∗ lkDynReg lk lo ∗
     ((⌜st = none⌝ ∗ lockHalf γ none B ∗ lockPay R W Vb) ∨ ⌜st ≠ none⌝)
 
 /-- The lock's two fields are aligned RAM words. -/
@@ -1020,16 +1038,18 @@ of the address (`lockBodyM`). -/
 def lkRsvIn (lk : BitVec 64) : Prop :=
   (⟨lk, .lock KernelGeom.cpusBase⟩ : RsvRegion) ∈ MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)
 
-/-- What a lock's birth needs of its name word (W8 (f2-ctx)): nothing at a
-RESERVED lock (its byte is a static hop byte); a DYNAMIC lock's name word,
-headed by a registered name, goes into its invariant. -/
-def lkNameFor (lk : BitVec 64) : IProp GF := iprop(⌜lkRsvIn (hlc := hlc) (GF := GF) lk⌝ ∨ lkName lk)
+/-- What a GENERIC lock birth needs of its registration (W8 (f2-ctx)): the
+lock is a RESERVED one (its byte a static hop byte).  A DYNAMIC lock is
+registered by entry receipts at or past its own floor ([OWN.49] (a′-r)), so
+its birth takes them beside the fresh words (`MachCSL.newlock_written`, the
+pipe's own birth). -/
+def lkNameFor (lk : BitVec 64) : IProp GF := iprop(⌜lkRsvIn (hlc := hlc) (GF := GF) lk⌝)
 
 instance lkNameFor_timeless (lk : BitVec 64) : Timeless (lkNameFor (GF := GF) lk) := by
   unfold lkNameFor; infer_instance
 
 theorem lkNameFor_rsv (lk : BitVec 64) (hm : lkRsvIn (hlc := hlc) (GF := GF) lk) : ⊢@{IProp GF} lkNameFor lk := by
-  unfold lkNameFor; iintro; ileft; ipureintro; exact hm
+  unfold lkNameFor; iintro; ipureintro; exact hm
 
 instance (lk : BitVec 64) : Decidable (lkRsvIn (hlc := hlc) (GF := GF) lk) := by
   unfold lkRsvIn; infer_instance
@@ -1284,7 +1304,7 @@ theorem newlock_written [CurCtx] (cpu : CPU) (lk : BitVec 64) (s : String) (R : 
     [CtxMorph R] (hok : lockAddrOk lk) (hm : ¬ lkRsvIn (hlc := hlc) (GF := GF) lk) (lo lc : Nat) (E : CoPset) :
     kmapId lk ∗ kmapId (lk + 16#64) ∗ ownCtx cpu curCtx ∗ R curCtx ∗
     wordCell lk 4 lo 0 [] ∗ lkFloor curCtx lo ∗
-    wordCell (lk + 16#64) 8 lc 0 [] ∗ lkFloor curCtx lc ∗ lkName lk ∗ gateFloor curCtx
+    wordCell (lk + 16#64) 8 lc 0 [] ∗ lkFloor curCtx lc ∗ lkDynReg lk lo ∗ gateFloor curCtx
     ⊢ |={E}=> (ownCtx cpu curCtx ∗ ∃ γ, isLock (GF := GF) γ lk s R) := by
   iintro ⟨#Hcl, #Hcl', Hrun, HR, Hw', #Hflo, Hc', #Hflc, Hnm, #Hg⟩
   imod lock_pay_born cpu R [] (fun _ h => by simp at h) $$ [$Hrun $HR] with ⟨Hrun, ⟨%Vb, Hpay, #Hvf⟩⟩
@@ -1428,13 +1448,8 @@ theorem newlock_of_fresh [CurCtx] (cpu : CPU) (lk : BitVec 64) (s : String) (R :
     ⊢ |={E}=> (ownCtx cpu curCtx ∗ ∃ γ, isLock (GF := GF) γ lk s R) := by
   unfold lkFresh lkNameFor
   iintro ⟨#Hcl, #Hcl', Hrun, HR, ⟨%hok, (⟨%hm, ⟨%lo, %lc, Hw, #Hflo, Hc, #Hflc⟩⟩ | ⟨%hm, Hf⟩)⟩, Hnmf, #Hg⟩
-  · icases Hnmf with (%hm' | Hnm)
-    · exact absurd hm' hm
-    iapply newlock_written cpu lk s R hok hm lo lc E
-    iframe Hcl Hcl' Hrun HR Hw Hc Hnm Hg
-    isplit
-    · iexact Hflo
-    · iexact Hflc
+  · icases Hnmf with %hm'
+    exact absurd hm' hm
   · unfold lkFreshR
     icases Hf with ⟨%W, %W', Hw, Hc, %⟨hW, hW'⟩⟩
     iapply newlockR_written cpu lk s R hok hm W W' hW hW' E

@@ -79,6 +79,11 @@ def resvFragAnyAt (cpu : CPU) (r : Option Resv) : IProp GF :=
 certificate valid of the memory (`MachCSL.chainModelAt`). -/
 def chainCertAt (c : ChainCert) : IProp GF := iprop(∃ v : Agent, E.chainName ↪◯MAP[c.key]{.discard} v)
 
+/-- **An entry receipt** (persistent; W8 (f2-ctx), [OWN.49] (a′-r)): the
+history at `pa` holds `e` -- histories only grow, so a past fact of the
+memory the state interpretation keeps (`MachCSL.certsOk`). -/
+def entryAtE (pa : PAddr) (e : HEnt) : IProp GF := iprop(∃ v : Agent, E.chainName ↪◯MAP[entKey pa e]{.discard} v)
+
 /-- **The entries of author `h` at or below `t` reach hart `j` before `τ`**
 (persistent): they are boot-image entries (`t = 0`), or `j`'s own entries
 before `τ`, or an issued certificate covers them (at least as many entries,
@@ -147,6 +152,10 @@ instance (c : ChainCert) : Persistent (PROP := IProp GF) (chainCertAt E c) := by
   unfold chainCertAt; infer_instance
 instance (c : ChainCert) : Timeless (PROP := IProp GF) (chainCertAt E c) := by
   unfold chainCertAt; infer_instance
+instance (pa : PAddr) (e : HEnt) : Persistent (PROP := IProp GF) (entryAtE E pa e) := by
+  unfold entryAtE; infer_instance
+instance (pa : PAddr) (e : HEnt) : Timeless (PROP := IProp GF) (entryAtE E pa e) := by
+  unfold entryAtE; infer_instance
 instance (h : CPU) (t : Nat) (j : CPU) (τ : Nat) : Persistent (PROP := IProp GF) (chainLbAt E h t j τ) := by
   unfold chainLbAt; infer_instance
 instance (h : CPU) (t : Nat) (j : CPU) (τ : Nat) : Timeless (PROP := IProp GF) (chainLbAt E h t j τ) := by
@@ -754,6 +763,7 @@ abbrev lockSet (cpu : CPU) (locks : List String) : IProp GF :=
 abbrev lkIn (cpu : CPU) (s : String) : IProp GF := lkInAt (MachGS.era (hlc := hlc) (GF := GF)) cpu s
 abbrev chainCert (c : ChainCert) : IProp GF := chainCertAt (MachGS.era (hlc := hlc) (GF := GF)) c
 abbrev gatePassed (j : CPU) : IProp GF := gatePassedAt (MachGS.era (hlc := hlc) (GF := GF)) j
+abbrev entryAt (pa : PAddr) (e : HEnt) : IProp GF := entryAtE (MachGS.era (hlc := hlc) (GF := GF)) pa e
 abbrev chainLb (h : CPU) (t : Nat) (j : CPU) (τ : Nat) : IProp GF :=
   chainLbAt (MachGS.era (hlc := hlc) (GF := GF)) h t j τ
 

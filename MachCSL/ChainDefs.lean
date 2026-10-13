@@ -181,6 +181,39 @@ theorem wordEntAt_mono {m m' : FlatMem} (hx : memExt m m') {b : PAddr} {t : Nat}
   obtain ⟨N, hN⟩ := hx _ H hH
   exact ⟨N ++ H, e, hN, List.mem_append_right _ he, het, heg⟩
 
+/-- **The dynamic hop registry** (W8 (f2-ctx), [OWN.49] (a′-r), the RULED
+(a′) window [OWN.46] made provable by persistent entry receipts): at memory
+`m` with top `top`, `b` is a hop byte for an acquire at `a ≤ top` when some
+receipts `L` -- entries the memory holds -- satisfy the client's witness
+`wit L b te` (xv6: a `struct file` slot's `f->pipe` word held `b`'s pipe at
+`te`), `te ≤ a`, and every entry on `b`'s word after `te` up to `a` is
+WORD-sized (no reclaim: `kfree`'s junk fill and `kalloc`'s are byte stores).
+A pure fact of the memory, never falsified by a step (`dynLkAt_mono`). -/
+def dynLkAt (wit : List (PAddr × HEnt) → PAddr → Nat → Prop) (m : FlatMem) (top : Nat) (b : PAddr)
+    (a : Nat) : Prop :=
+  a ≤ top ∧ ∃ (L : List (PAddr × HEnt)) (te : Nat), wit L b te ∧
+    (∀ p ∈ L, ∃ H, m[p.1]? = some H ∧ p.2 ∈ H) ∧ te ≤ a ∧
+    ∀ i, i < 4 → ∃ H, m[b + BitVec.ofNat 64 i]? = some H ∧ ∀ e ∈ H, te < e.t → e.t ≤ a →
+      wordEntAt m b e.t e.tid
+
+theorem dynLkAt_mono {wit : List (PAddr × HEnt) → PAddr → Nat → Prop} {m m' : FlatMem} {t t' : Nat}
+    {b : PAddr} {a : Nat} (hg : memGrow m t m') (ht : t ≤ t') (h : dynLkAt wit m t b a) :
+    dynLkAt wit m' t' b a := by
+  obtain ⟨hat, L, te, hw, hL, hte, hwd⟩ := h
+  have hx : memExt m m' := fun a H hH => by
+    obtain ⟨N, hN, _⟩ := hg a H hH
+    exact ⟨N, hN⟩
+  refine ⟨Nat.le_trans hat ht, L, te, hw, fun p hp => ?_, hte, fun i hi => ?_⟩
+  · obtain ⟨H, hH, hpe⟩ := hL p hp
+    obtain ⟨N, hN, _⟩ := hg _ H hH
+    exact ⟨N ++ H, hN, List.mem_append_right _ hpe⟩
+  · obtain ⟨H0, hH0, hw0⟩ := hwd i hi
+    obtain ⟨N, hN, hNt⟩ := hg _ H0 hH0
+    refine ⟨N ++ H0, hN, fun e he hte' hea => ?_⟩
+    rcases List.mem_append.1 he with he | he
+    · have := hNt e he; omega
+    · exact wordEntAt_mono hx (hw0 e he hte' hea)
+
 /-- **A release → acquire hop** at the lock byte `b`: the acquire entry
 `⟨a, B, va⟩` (nonzero) immediately above the release entry `⟨r, A, 0⟩`,
 itself above a nonzero entry (the lock was held); all three WORD-sized
@@ -376,6 +409,34 @@ theorem ChainCert.key_ne_gate (c : ChainCert) (j : CPU) : c.key ≠ gateKey j :=
   have := (chainPair_inj h).1
   omega
 
+/-- An ENTRY RECEIPT's key in the ghost map (kind 2; W8 (f2-ctx) [OWN.49]
+(a′-r)): the history at `pa` holds `e` (histories only grow, so a receipt is a
+past fact of the memory). -/
+def entKey (pa : PAddr) (e : HEnt) : Nat :=
+  chainPair 2 (chainPair pa.toNat (chainPair e.t (chainPair e.tid e.v.toNat)))
+
+theorem entKey_inj {pa pa' : PAddr} {e e' : HEnt} (h : entKey pa e = entKey pa' e') : pa = pa' ∧ e = e' := by
+  obtain ⟨_, h0⟩ := chainPair_inj h
+  obtain ⟨h1, h2⟩ := chainPair_inj h0
+  obtain ⟨h3, h4⟩ := chainPair_inj h2
+  obtain ⟨h5, h6⟩ := chainPair_inj h4
+  refine ⟨BitVec.eq_of_toNat_eq h1, ?_⟩
+  cases e
+  cases e'
+  simp only at h3 h5 h6
+  subst h3 h5
+  rw [BitVec.eq_of_toNat_eq h6]
+
+theorem entKey_ne_cert (pa : PAddr) (e : HEnt) (c : ChainCert) : entKey pa e ≠ c.key := by
+  intro h
+  have := (chainPair_inj h).1
+  omega
+
+theorem entKey_ne_gate (pa : PAddr) (e : HEnt) (j : CPU) : entKey pa e ≠ gateKey j := by
+  intro h
+  have := (chainPair_inj h).1
+  omega
+
 /-- What a certificate says: own entries before `τ`, or a chain whose last
 acquire is below `τ`, or the boot hop. -/
 def ChainCert.valid (X : ChainEnv) (c : ChainCert) : Prop :=
@@ -447,5 +508,110 @@ theorem ChainCert.valid_hop {X : ChainEnv} {h A B : CPU} {t r a : Nat} {b : PAdd
       have heq : r' = r2 := hone f w H _ _ hp hf he he2 hr0 (show r2 ≠ 0 by omega)
       subst heq
       exact .inr (.inr ⟨f, w, r', v2, H, hBw, hp, hf, he2, hr2, harm⟩)
+
+
+/-! ## The load-side invariant (W8 (f2-ctx) S3 -- STATED; wired by S3's load rules)
+
+The MachCSL-generic form of `Xv6.AccessDiscipline`'s `chainOkAt` (plan §C W8
+skeleton (iii+), [R26.s4]): what every load step must keep, and what the
+export reads off the state interpretation.  Not yet a conjunct of
+`MachCSL.certsOk`: S3 adds it there, with `memModel_load` taking the load's
+certificates (established INSIDE the load's step [R35.s5]). -/
+
+/-- `m'` adds to `m` only entries above `top`: every entry of `m'` at or
+below `top` is an entry of `m` (what a machine step at top `top` does to the
+memory: a store pushes entries at `top + 1`, a load pushes none). -/
+def memAbove (m : FlatMem) (top : Nat) (m' : FlatMem) : Prop :=
+  ∀ (a : PAddr) (H' : Hist), m'[a]? = some H' → ∀ e ∈ H', e.t ≤ top → ∃ H, m[a]? = some H ∧ e ∈ H
+
+theorem memAbove_refl (m : FlatMem) (top : Nat) : memAbove m top m :=
+  fun _ H' h e he _ => ⟨H', h, he⟩
+
+theorem memAbove_trans {m m' m'' : FlatMem} {top : Nat} (h1 : memAbove m top m') (h2 : memAbove m' top m'') :
+    memAbove m top m'' := by
+  intro a H'' hH e he het
+  obtain ⟨H', hH', he'⟩ := h2 a H'' hH e he het
+  exact h1 a H' hH' e he' het
+
+theorem memAbove_push (m : FlatMem) (a : PAddr) (e : HEnt) (top : Nat) (ht : top < e.t) :
+    memAbove m top (m.push a e) := by
+  intro a' H' hH x hx hxt
+  by_cases ha : a' = a
+  · subst ha
+    rw [FlatMem.push_get?_eq] at hH
+    cases hH
+    rcases List.mem_cons.1 hx with hx | hx
+    · subst hx; omega
+    · rw [Std.ExtTreeMap.getD_eq_getD_getElem?] at hx
+      cases hm : m[a']? with
+      | none => rw [hm] at hx; simp at hx
+      | some H => rw [hm] at hx; exact ⟨H, rfl, hx⟩
+  · rw [FlatMem.push_get?_ne _ _ _ _ ha] at hH
+    exact ⟨H', hH, hx⟩
+
+theorem memAbove_foldlPush {n : Nat} (pa : PAddr) (w : BitVec (8 * n)) (top t : Nat) (h : Agent) (ht : top < t) :
+    ∀ (l : List Nat) (m : FlatMem),
+      memAbove m top (l.foldl (fun (m : FlatMem) j => m.push (pa + BitVec.ofNat 64 j) ⟨t, h, nthByte w j⟩) m)
+  | [], m => memAbove_refl m top
+  | j :: l, m => by
+    simp only [List.foldl_cons]
+    exact memAbove_trans (memAbove_push _ _ _ _ ht) (memAbove_foldlPush pa w top t h ht l _)
+
+/-- A store above `top` adds entries above `top` only. -/
+theorem memAbove_writeBytes {n : Nat} (m : FlatMem) (pa : PAddr) (w : BitVec (8 * n)) (top t : Nat) (h : Agent)
+    (ht : top < t) : memAbove m top (m.writeBytes pa n w t h) :=
+  memAbove_foldlPush pa w top t h ht _ m
+
+/-- **Every observed foreign hart entry is chained** (W8 (f2-ctx) S3; plan
+§C W8 (iii+)): hart `j`'s coherence floor at byte `a` is the timestamp of the
+latest FOREIGN entry a load of `j` read there since `j` last stored to it
+(`HRead.afterLoad`, `HRead.resetCoh`); when the entry at that timestamp is a
+HART's (DMA authors are exempt: the device-key arm), not `j`'s own, and the
+byte is not exempt as of the entry (`ex a t`: the client's registry -- the
+lock layer's words, PTE bytes of both tables), some certificate of it to `j`
+is VALID.  A pure fact of `X`. -/
+def loadsChained (X : ChainEnv) (ex : PAddr → Nat → Prop) : Prop :=
+  ∀ (j : CPU) (a : PAddr) (H : Hist) (e : HEnt), X.m[a]? = some H → e ∈ H → e.t ≠ 0 →
+    e.t = X.coh j a → ∀ hA : e.tid < NCPU, e.tid ≠ hartAgent j → ¬ ex a e.t →
+      ∃ τ, ChainCert.valid X ⟨⟨e.tid, hA⟩, e.t, j, τ⟩
+
+/-- The power-on state: every coherence floor is 0. -/
+theorem loadsChained_zero (X : ChainEnv) (ex : PAddr → Nat → Prop) (h0 : ∀ j a, X.coh j a = 0) :
+    loadsChained X ex := by
+  intro j a H e _ _ het hc
+  rw [h0 j a] at hc
+  exact absurd hc het
+
+/-- **The invariant's step law**: a step at top `top` (every coherence floor
+at or below it) that extends the environment, adds only entries above `top`,
+and only GROWS the exemption keeps the invariant at every floor it leaves
+alone or resets to 0; a floor it moves (a load's foreign source) needs the
+step's own certificates (`hnew`). -/
+theorem loadsChained_step {X Y : ChainEnv} {ex ex' : PAddr → Nat → Prop} {top : Nat}
+    (hx : X.ext Y) (hm : memAbove X.m top Y.m) (hle : ∀ j a, X.coh j a ≤ top)
+    (hex : ∀ a t, ex a t → ex' a t)
+    (hnew : ∀ (j : CPU) (a : PAddr), Y.coh j a ≠ X.coh j a → ∀ (H : Hist) (e : HEnt), Y.m[a]? = some H →
+      e ∈ H → e.t ≠ 0 → e.t = Y.coh j a → ∀ hA : e.tid < NCPU, e.tid ≠ hartAgent j → ¬ ex' a e.t →
+        ∃ τ, ChainCert.valid Y ⟨⟨e.tid, hA⟩, e.t, j, τ⟩)
+    (h : loadsChained X ex) : loadsChained Y ex' := by
+  intro j a H e hH he het hc hA hne hnex
+  by_cases hcj : Y.coh j a = X.coh j a
+  · have hle' : e.t ≤ top := by rw [hc, hcj]; exact hle j a
+    obtain ⟨H0, hH0, he0⟩ := hm a H hH e he hle'
+    obtain ⟨τ, hv⟩ := h j a H0 e hH0 he0 het (by rw [hc, hcj]) hA hne (fun hx' => hnex (hex a e.t hx'))
+    exact ⟨τ, ChainCert.valid_mono hx hv⟩
+  · exact hnew j a hcj H e hH he het hc hA hne hnex
+
+/-- A step that resets or keeps every floor (a store, a device step, an
+exclusive access) keeps the invariant. -/
+theorem loadsChained_keep {X Y : ChainEnv} {ex ex' : PAddr → Nat → Prop} {top : Nat}
+    (hx : X.ext Y) (hm : memAbove X.m top Y.m) (hle : ∀ j a, X.coh j a ≤ top)
+    (hex : ∀ a t, ex a t → ex' a t) (hcoh : ∀ j a, Y.coh j a = X.coh j a ∨ Y.coh j a = 0)
+    (h : loadsChained X ex) : loadsChained Y ex' := by
+  refine loadsChained_step hx hm hle hex (fun j a hne' H e _ _ het hc => ?_) h
+  rcases hcoh j a with h1 | h1
+  · exact absurd h1 hne'
+  · rw [h1] at hc
+    exact absurd hc het
 
 end MachCSL

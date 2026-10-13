@@ -89,9 +89,8 @@ HELD `lockedCore` (`hrefuteCore`), and the word clear -- which DESTROYS the
 lock -- rules it out with the held lock half (`hrefuteHalf`) and consumes
 the destroy licence: given the parked state half and the surrendered
 payload `R curCtx`, it produces the dead invariant `D` and the caller's
-carry-out `Out`.  The lock's two words -- and (W8 (f2-ctx)) the half of its
-name word a dynamic lock's invariant keeps -- come back as raw byte
-histories, to be freed with the page. -/
+carry-out `Out`.  The lock's two words come back as raw byte histories, to
+be freed with the page. -/
 def wp_release_cancel_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γ : GName) (s : String) (R : CtxId → IProp GF) [CtxMorph R]
     (D Out : IProp GF) [Timeless D]
@@ -110,7 +109,6 @@ def wp_release_cancel_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
     pcIs cpu' (jumpPc (k.regs 1#5)) -∗ ⌜calleeSaved k.regs R'⌝ -∗
     (∃ Hs : Nat → Hist, histBytes (k.regs 10#5) 4 (fun _ => DFrac.own 1) Hs) -∗
     (∃ Hs : Nat → Hist, histBytes (k.regs 10#5 + 16#64) 8 (fun _ => DFrac.own 1) Hs) -∗
-    (∃ Hs : Nat → Hist, histBytes (k.regs 10#5 + 8#64) 8 (fun _ => DFrac.own (1 : Qp).half) Hs) -∗
     Out -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 

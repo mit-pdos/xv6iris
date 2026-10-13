@@ -23,6 +23,8 @@ discipline (`MachCSL.oneShotOk`) only a history-aware obligation can keep.
 -/
 import MachCSL.WpSmodeRules
 import MachCSL.WpSmodeAtomic
+import MachCSL.CtxKeyMint
+import MachCSL.WpPtWalkOwn
 
 namespace MachCSL
 
@@ -33,17 +35,28 @@ open LeanRV64D LeanRV64D.Functions
 
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
+/-- A position of the store order the client can name: a store-order
+receipt, or an authorship receipt (the position of a store already in the
+log -- what a context key in its DIRTY arm carries, `MachCSL.keyAt`). -/
+def posLb (T : Nat) : IProp GF := iprop(topLb T ∨ ∃ g : Agent, authoredBy T g)
+
+instance (T : Nat) : Persistent (PROP := IProp GF) (posLb T) := by
+  unfold posLb; infer_instance
+
 /-- **The accessor of a plain store of `w'` by `cpu`, ordered**: beside the
-histories it names a position `T` of the store order (`topLb T`), and the
+histories it names a position `T` of the store order (`posLb T`), and the
 continuation learns that the store's own position `t` passes it.  (W8
 (f2-ctx): the RESERVED arm -- the `started` publication store -- may carry a
 retime request, `MachCSL.rtIn`: the storer's certificates re-dated to the
-store's own position, which the boot hop carries to the readers, F-B.) -/
+store's own position, which the boot hop carries to the readers, F-B.)
+The OWNED arm's continuation also gets the store's entry receipts
+(`MachCSL.entsAt`, [OWN.49] (a′-r)): what a `struct file`'s `f->pipe`
+store hands the pipe lock it names (`wp_s_sd_ent`). -/
 def writeAUT (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) (Ψ : IProp GF) : IProp GF := iprop%
   |={⊤,∅}=>
-    ((∃ (Hs : Nat → Hist) (T : Nat), histBytes pa n (fun _ => DFrac.own 1) Hs ∗ topLb T ∗
+    ((∃ (Hs : Nat → Hist) (T : Nat), histBytes pa n (fun _ => DFrac.own 1) Hs ∗ posLb T ∗
       ▷ (∀ t : Nat, ⌜T ≤ t⌝ -∗ histBytes pa n (fun _ => DFrac.own 1) (pushed Hs t (hartAgent cpu) w') -∗
-          authoredBy t (hartAgent cpu) -∗ topLb t ={∅,⊤}=∗ Ψ)) ∨
+          authoredBy t (hartAgent cpu) -∗ topLb t -∗ entsAt pa n t (hartAgent cpu) w' ={∅,⊤}=∗ Ψ)) ∨
      (∃ (Hs : Nat → Hist) (T : Nat) (cs : RsvComps) (o : Option (List (CPU × Nat))),
       histBytes pa n (fun _ => DFrac.own (1 : Qp).half) Hs ∗
       topLb T ∗ compBytes cs ∗ ⌜rsvStoreOk (hlc := hlc) (GF := GF) cpu pa n w' Hs cs⌝ ∗ rtIn cpu o ∗
@@ -61,8 +74,8 @@ theorem writeAUT_wand (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) (
     iexists Hs, T
     iframe Hb HT
     inext
-    iintro %t %hT Hb Hau Htop
-    imod Hcont $$ %t %hT Hb Hau Htop with HΨ
+    iintro %t %hT Hb Hau Htop Hent
+    imod Hcont $$ %t %hT Hb Hau Htop Hent with HΨ
     imodintro
     iapply HW $$ HΨ
   · imodintro
@@ -175,9 +188,18 @@ theorem swp_sail_mem_write_plain_auT (cpu : CPU) {n vasize : Nat}
     · iapply histBytes_valid σ.mem req.pa n _ Hs $$ [Hmem Hb]
       iframe
     ihave %hT : ⌜T ≤ σ.top⌝ $$ [Hmm HT]
-    · iapply memModel_topLb _ σ T $$ [Hmm HT]
-      iframe Hmm
-      iexact HT
+    · unfold posLb
+      icases HT with (#HT | ⟨%g, #HT⟩)
+      · iapply memModel_topLb _ σ T $$ [Hmm HT]
+        iframe Hmm
+        iexact HT
+      · ihave %ha := memModel_authored _ σ T g $$ [Hmm HT]
+        · iframe Hmm
+          iexact HT
+        ipureintro
+        have := (List.getElem?_eq_some_iff.1 ha.2).1
+        simp only [MState.top]
+        omega
     have hram : ramBytes req.pa n := ramBytes_of_cells hmm.2.2.2.1 (fun j hj => ⟨Hs j, hget j hj⟩)
     imodintro
     isplit
@@ -196,7 +218,11 @@ theorem swp_sail_mem_write_plain_auT (cpu : CPU) {n vasize : Nat}
         (rsvAllOk_store_off w' (σ.top + 1) (hartAgent cpu) hnr) $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag, #Hau, #Htop'⟩
       imod histBytes_update σ.mem req.pa n Hs (σ.top + 1) (hartAgent cpu) w' $$ [$Hmem $Hb]
         with ⟨Hmem, Hb⟩
-      imod Hcont $$ %(σ.top + 1) %(by omega) Hb Hau Htop' with HΦ
+      ihave %hbs := histBytes_valid _ req.pa n _ _ $$ [Hmem Hb]
+      · iframe Hmem Hb
+      imod memModel_entsIssue (σ.store cpu req.pa n w' false) req.pa n Hs (σ.top + 1) (hartAgent cpu) w' hbs
+        $$ Hmm with ⟨Hmm, #Hent⟩
+      imod Hcont $$ %(σ.top + 1) %(by omega) Hb Hau Htop' Hent with HΦ
       rw [hk]
       imodintro
       isplitl [Hregs Hmem Hmm Hclose]
@@ -307,5 +333,174 @@ theorem wp_s_sw_auT [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx
     iprop(kmapId va ∗ writeAUT cpu va 4 (BitVec.extractLsb' 0 32 (k.rget cpu rs2)) Ψ) (fun _ => Ψ) hexec)
   iframe HI Hk Hpc HAU HΦ
   iexact Hcl
+
+set_option maxHeartbeats 4000000 in
+set_option maxRecDepth 100000 in
+set_option swp_run.memStop true in
+/-- An 8-byte aligned ordered store into the accessor's bytes. -/
+theorem swp_checked_mem_write_store8_S_auT (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
+    (hok : SConfPhys (GF := GF) c sie)
+    (pa : BitVec 64) (data : BitVec (8 * 8)) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0) (r : Option Resv) (Ψ : IProp GF)
+    (Φ : Result Bool (physaddr × ExceptionType) → IProp GF) :
+    confCells cpu dq Privilege.Supervisor c ∗ resvFragAny cpu r ∗ writeAUT cpu pa 8 data Ψ ∗
+    ▷ (confCells cpu dq Privilege.Supervisor c -∗ resvFrag cpu none false -∗ Ψ -∗ Φ (.Ok true))
+    ⊢ swp cpu (checked_mem_write (physaddr.Physaddr pa) 8 data
+        (MemoryAccessType.Store mem_payload.Data) page_based_mem_type.PBMT_PMA
+        Privilege.Supervisor () false false false) Φ := by
+  iintro ⟨HmConf, Hfrag, HAU, HΦ⟩
+  unfold checked_mem_write
+  checked_mem_S_au_prefix pa 8 hram hal
+  iapply swp_bind
+  iapply (swp_sail_mem_write_plain_auT cpu _ data rfl rfl r)
+  iframe Hfrag
+  iapply writeAUT_wand cpu pa 8 data Ψ $$ HAU
+  inext
+  iintro HΨ Hfrag
+  swp_run 60
+  conf_intro HmConf
+  iapply HΦ $$ HmConf Hfrag HΨ
+
+set_option maxHeartbeats 4000000 in
+set_option maxRecDepth 100000 in
+/-- `sd rs2, imm(rs1)` into an ordered accessor's 8-aligned RAM word. -/
+theorem execSpecF_sd_auT [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
+    (root : BitVec 44) (hok : SConfAt (GF := GF) curTier c root sie)
+    (pc npc₀ : BitVec 64) (imm : BitVec 12) (rs1 rs2 : BitVec 5) (R : RegMap) (Ψ : IProp GF)
+    (hram : inRam (RegMap.get R rs1 + BitVec.signExtend 64 imm) 8)
+    (hal : (RegMap.get R rs1 + BitVec.signExtend 64 imm).toNat % 8 = 0) :
+    execSpecPP (GF := GF) cpu dq Privilege.Supervisor c Privilege.Supervisor c
+      (instruction.STORE (imm, regidx.Regidx rs2, regidx.Regidx rs1, 8)) pc npc₀ npc₀
+      iprop(transTok cpu curTier root ∗ kmapId (RegMap.get R rs1 + BitVec.signExtend 64 imm) ∗ gprFile cpu R ∗
+        (ownCtx cpu curCtx -∗ writeAUT cpu (RegMap.get R rs1 + BitVec.signExtend 64 imm) 8 (RegMap.get R rs2) Ψ))
+      iprop(transSlotAt cpu curTier root ∗ resvFrag cpu none false ∗ gprFile cpu R ∗ Ψ) := by
+  store_file_S_au_proof swp_checked_mem_write_store8_S_auT (RegMap.get R rs1 + BitVec.signExtend 64 imm) 8 (split_on_page_boundary_8 (RegMap.get R rs1 + BitVec.signExtend 64 imm) hal)
+
+variable {lent : Bool} in
+set_option maxHeartbeats 4000000 in
+/-- **`sd rs2, imm(rs1)` into an OWNED identity-mapped word, RECEIPTED**
+(W8 (f2-ctx) [OWN.49] (a′-r)): `wp_s_sd` through the ordered accessor --
+the word comes out valued at the new value (its era keys minted from the
+store's own authorship), and the store's position `te`, at or past the
+position `lo` of a key of the running context (a lock's floor), comes with
+the receipts of its eight entries
+(`MachCSL.entsAt`).  The `struct file`'s `f->pipe` store: what its pipe's
+lock is registered by (`MachCSL.hopRegAt`). -/
+theorem wp_s_sd_ent [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
+    (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rs1 rs2 : BitVec 5) (hrs1 : rs1 ≠ 4#5)
+    (va : BitVec 64) (haddr : k.rget cpu rs1 + BitVec.signExtend 64 imm = va)
+    (old : BitVec 64) (lo : Nat) :
+    instr (GF := GF) pc is_rvc (instruction.STORE (imm, regidx.Regidx rs2, regidx.Regidx rs1, 8)) ∗
+    kctxL lent cpu k ∗ pcIs cpu pc ∗ kmapId va ∗
+    wordPointsTo va 8 (DFrac.own 1) old ∗
+    keyAt (MachGS.era (hlc := hlc) (GF := GF)) curCtx lo ∗
+    ▷ wpNext k.sie k.proc cpu (fun cpu' =>
+        iprop(kctxL lent cpu' k -∗ pcIs cpu' (pc + instrLen is_rvc) -∗
+          (wordPointsTo va 8 (DFrac.own 1) (k.rget cpu' rs2) ∗
+            ∃ te : Nat, ⌜lo ≤ te⌝ ∗ topLb te ∗
+              entsAt va 8 te (hartAgent cpu') (k.rget cpu' rs2)) -∗
+          wpLoop cpu'))
+    ⊢ wpLoop cpu := by
+  subst haddr
+  iintro ⟨HI, Hk, Hpc, #Hid, Hw, #Hlo, HΦ⟩
+  ihave Hpw := wordPointsTo_phys _ 8 _ old $$ Hid Hw
+  icases pwordPointsTo_cases _ 8 _ old $$ Hpw with ⟨%⟨hram, hal⟩, Hb⟩
+  unfold bytesPointsTo ctxBytes
+  icases ctxBytes_hist curCtx _ (DFrac.own 1) (fun j => nthByte (n := 8) old j) 8 $$ Hb with ⟨%Hs, Hcell, %_, _⟩
+  ihave Hcell := (show ([∗list] j ∈ List.range 8,
+      (k.rget cpu rs1 + BitVec.signExtend 64 imm + BitVec.ofNat 64 j) ↦ₕ{DFrac.own 1} Hs j) ⊢
+    histBytes (GF := GF) (k.rget cpu rs1 + BitVec.signExtend 64 imm) 8 (fun _ => DFrac.own 1) Hs from .rfl) $$ Hcell
+  have hexec : ∀ (cpu' : CPU) (c : MConf), (k.sie = false ∨ k.proc = 0#64 → cpu' = cpu) →
+      SConfAt (GF := GF) curTier c k.root k.sie → c.menvcfg = menvcfgS →
+      execSpecPP (GF := GF) cpu' (DFrac.own 1) Privilege.Supervisor c Privilege.Supervisor c
+        (instruction.STORE (imm, regidx.Regidx rs2, regidx.Regidx rs1, 8)) pc (pc + instrLen is_rvc)
+        (pc + instrLen is_rvc)
+        iprop(transTok cpu' curTier k.root ∗ gprFile cpu' (tpPin cpu' k.regs) ∗
+          (kmapId (k.rget cpu rs1 + BitVec.signExtend 64 imm) ∗ keyAt (MachGS.era (hlc := hlc) (GF := GF)) curCtx lo ∗
+            histBytes (k.rget cpu rs1 + BitVec.signExtend 64 imm) 8 (fun _ => DFrac.own 1) Hs))
+        iprop(transTok cpu' curTier k.root ∗ gprFile cpu' (tpPin cpu' k.regs) ∗
+          (wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 8 (DFrac.own 1) (k.rget cpu' rs2) ∗
+            ∃ te : Nat, ⌜lo ≤ te⌝ ∗ topLb te ∗
+              entsAt (k.rget cpu rs1 + BitVec.signExtend 64 imm) 8 te (hartAgent cpu') (k.rget cpu' rs2))) := by
+    intro cpu' c _ hok' _ Φ
+    iintro ⟨HmConf, HPC, HnextPC, ⟨HT, HF, #Hcl, #Hlo, Hcell⟩, HΦ⟩
+    have e := execSpecF_sd_auT (GF := GF) cpu' (DFrac.own 1) c k.sie k.root hok' pc
+      (pc + instrLen is_rvc) imm rs1 rs2 (tpPin cpu' k.regs)
+      iprop(ownCtx cpu' curCtx ∗
+        (wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 8 (DFrac.own 1) (k.rget cpu' rs2) ∗
+          ∃ te : Nat, ⌜lo ≤ te⌝ ∗ topLb te ∗
+            entsAt (k.rget cpu rs1 + BitVec.signExtend 64 imm) 8 te (hartAgent cpu') (k.rget cpu' rs2)))
+    have hdata : RegMap.get (tpPin cpu' k.regs) rs2 = k.rget cpu' rs2 := rfl
+    rw [KCtx.rget_hart cpu cpu' k rs1 hrs1, hdata] at e
+    iapply (e hram hal Φ)
+    iframe HmConf HPC HnextPC HT HF Hcl
+    isplitl [Hcell]
+    · iintro Hctx
+      icases ownCtx_key_vis cpu' curCtx lo $$ [Hctx Hlo] with ⟨Hctx, ⟨%K, %ts, #HK, #Hts, %hlo⟩⟩
+      · iframe Hctx
+        iexact Hlo
+      ihave #Hpos : posLb lo $$ []
+      · unfold posLb
+        rcases hlo with h | h
+        · ileft
+          iapply topLb_le K lo h
+          iapply viewLb_topLb cpu' K $$ HK
+        · iright
+          iexists (hartAgent cpu')
+          obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 h
+          iapply BigSepL.bigSepL_lookup (Φ := fun _ p => authoredBy (GF := GF) p.1 p.2) hi $$ Hts
+      unfold writeAUT
+      iapply fupd_mask_intro LawfulSet.empty_subset
+      iintro Hmask
+      ileft
+      iexists Hs, lo
+      iframe Hcell Hpos
+      inext
+      iintro %t %hlot Hb #Hau #Htop #Hent
+      imod Hmask
+      imod ctx_key_mint cpu' curCtx t $$ [Hctx Hau Htop] with ⟨Hctx, #Hkey⟩
+      · iframe Hctx
+        isplit
+        · iexact Hau
+        · iexact Htop
+      imodintro
+      iframe Hctx
+      isplitl [Hb]
+      · iapply wordPointsTo_intro_id (k.rget cpu rs1 + BitVec.signExtend 64 imm) 8 (DFrac.own 1)
+          (k.rget cpu' rs2) hram hal $$ Hcl
+        have hcb : ∀ (pa : PAddr) (v : BitVec 8) (H : Hist),
+            pa ↦ₕ{DFrac.own 1} (⟨t, hartAgent cpu', v⟩ :: H) ∗
+              keyAt (MachGS.era (hlc := hlc) (GF := GF)) curCtx t ⊢ ctxByte curCtx pa (DFrac.own 1) v :=
+          fun pa v H => ctxByte_intro curCtx pa (DFrac.own 1) ⟨t, hartAgent cpu', v⟩ H
+        unfold bytesPointsTo ctxBytes
+        unfold histBytes
+        iapply BigSepL.bigSepL_impl $$ Hb
+        imodintro
+        iintro %n %j %hj Hj
+        iapply hcb
+        isplitl [Hj]
+        · iexact Hj
+        · iexact Hkey
+      · iexists t
+        iframe Htop Hent
+        ipureintro; exact hlot
+    · inext
+      iintro HmConf HPC HnextPC ⟨Htrans, Hfrag, HF, Hctx, Hpost⟩
+      ihave Htok := ctxTok_introB cpu' curCtx none false $$ [Hctx Hfrag]
+      case' _ => iframe
+      ihave HT := transTok_intro cpu' curTier k.root $$ [Htrans Htok]
+      case' _ => iframe
+      iapply HΦ $$ HmConf HPC HnextPC
+      iframe HT HF Hpost
+  iapply (wpLoop_k_keep_mem cpu k pc (fun _ => pc + instrLen is_rvc) is_rvc _
+    iprop(kmapId (k.rget cpu rs1 + BitVec.signExtend 64 imm) ∗ keyAt (MachGS.era (hlc := hlc) (GF := GF)) curCtx lo ∗
+      histBytes (k.rget cpu rs1 + BitVec.signExtend 64 imm) 8 (fun _ => DFrac.own 1) Hs)
+    (fun cpu' => iprop(wordPointsTo (k.rget cpu rs1 + BitVec.signExtend 64 imm) 8 (DFrac.own 1) (k.rget cpu' rs2) ∗
+      ∃ te : Nat, ⌜lo ≤ te⌝ ∗ topLb te ∗
+        entsAt (k.rget cpu rs1 + BitVec.signExtend 64 imm) 8 te (hartAgent cpu') (k.rget cpu' rs2)))
+    hexec)
+  iframe HI Hk Hpc Hcell HΦ
+  isplit
+  · iexact Hid
+  · iexact Hlo
 
 end MachCSL

@@ -51,6 +51,7 @@ import Xv6.DinodeSlot
 import Xv6.KmemTier
 import Xv6.VirtioDiskRwDefs3
 import MachCSL.BvLemmas
+import MachCSL.WpStoreOrd
 
 namespace Xv6
 
@@ -486,6 +487,44 @@ theorem pipealloc_br_ffffffffffffc5ce : KA.«pipealloc» + 0xffffffffffffc5ce#64
 
 theorem pipealloc_br_2fb6 : KA.«pipealloc» + 0x2fb6#64 = KStr.«pipe» := by decide
 
+/-- `&f->pipe` of a `struct file` slot is a static read-write kernel page. -/
+theorem pa_fpipe_kmapRw (k : Nat) (hk : k < NFILE) :
+    kmapClass (vpnOf (fnode k + 16#64)).toNat = some .rw := by
+  have hf := fnode_toNat k (Nat.le_of_lt hk)
+  have hs : KernelSyms.«ftable» = 0x80022a18 := rfl
+  have hk' : k < 100 := hk
+  have h16 : (16#64 : BitVec 64).toNat = 16 := rfl
+  have ha : (fnode k + 16#64).toNat = 0x80022a18 + 0x18 + 40 * k + 16 := by
+    rw [BitVec.toNat_add, hf, hs, h16]
+    omega
+  have hv : (vpnOf (fnode k + 16#64)).toNat
+      = (fnode k + 16#64).toNat / 4096 % 134217728 := by
+    simp only [vpnOf, BitVec.extractLsb'_toNat, Nat.reducePow, Nat.shiftRight_eq_div_pow]
+  rw [hv, ha]
+  have hq : (0x80022a18 + 0x18 + 40 * k + 16) / 4096 < 134217728 := by omega
+  rw [Nat.mod_eq_of_lt hq]
+  have hlo : 0x80007 ≤ (0x80022a18 + 0x18 + 40 * k + 16) / 4096 := by omega
+  have hhi : (0x80022a18 + 0x18 + 40 * k + 16) / 4096 < 0x88000 := by omega
+  unfold kmapClass
+  rw [if_neg (by omega), if_pos (Or.inl ⟨hlo, hhi⟩)]
+
+/-- A `struct file` slot's `f->pipe` word is the registry's `k`-th slot
+(`Xv6.xv6PipeSlotBase` is `&ftable.file[0].pipe`). -/
+theorem aFpipe_slot (k : Nat) : aFpipe k = xv6PipeSlotBase + BitVec.ofNat 64 (40 * k) := by
+  unfold aFpipe fnode fileBase ftableAddr fileStride xv6PipeSlotBase
+  have h : (40#64 : BitVec 64) = 24#64 + 16#64 := by decide
+  rw [h]
+  first | ac_rfl | bv_omega
+
+/-- **The registration's witness** (W8 (f2-ctx) [OWN.49] (a′-r)): the eight
+entries of `f->pipe = pi` into slot `k` are the static list's pipe slots'
+witness for `pi`. -/
+theorem pa_slotWit (k : Nat) (hk : k < NFILE) (te : Nat) (g : Agent) (b : BitVec 64) :
+    slotWit KernelRsv.static (entsList (fnode k + 16#64) 8 te g b) b te := by
+  refine ⟨xv6PipeSlotBase, 100, 40, k, g, xv6RsvStatic_pipeSlots, hk, ?_⟩
+  unfold entsList
+  rw [aFpipe_eq', aFpipe_slot k]
+
 theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γk : KmemNames) (on : Option Nat)
     (pidv : BitVec 32) (dqp : DFrac) (ke : Nat)
     (k0 k1 : Nat) (hk0 : k0 < NFILE) (hk1 : k1 < NFILE) (pi : BitVec 64) (hpv : pageValid pi)
@@ -586,12 +625,17 @@ theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γ
       wordPointsTo (aPopen pi false) 4 (DFrac.own 1) 1#32 from by rw [pw_addr_ro]) $$ Hro
   ihave Hwo := (show wordPointsTo (GF := GF) (pi + 548#64) 4 (DFrac.own 1) 1#32 ⊢
       wordPointsTo (aPopen pi true) 4 (DFrac.own 1) 1#32 from by rw [pa_addr_wo]) $$ Hwo
-  iapply wpLoop_fupd
-  imod (kctx_newPipe cA _ pi hpv KStr.«pipe» rfl bs hbs) $$ [Hk Hid0 Hid16 Hfresh Hnm Hnr Hnw Hro Hwo Hdat Hslack]
-    with ⟨Hk, %γlp, %γp, #Hpipe, Hr0, Hr1, Hqf⟩
-  · iframe Hid0 Hid16 Hfresh Hnm Hnr Hnw Hro Hwo Hdat Hslack Hg
-    iexact Hk
-  imodintro
+  -- the fresh lock, opened: its lock word's floor `lo` bounds the
+  -- registration's receipts (W8 (f2-ctx) [OWN.49] (a′-r))
+  icases kctx_lkHigh cA _ (lk := pi) hpv.2.1 $$ Hk with ⟨%hm, Hk⟩
+  unfold lkFresh
+  icases Hfresh with ⟨%hokL, Hfr⟩
+  icases Hfr with (⟨%_, %lo, %lc, Hlw, #Hflo, Hlc, #Hflc⟩ | ⟨%hr, _⟩)
+  rotate_left
+  · exfalso; exact hm hr
+  ihave #HfloK := (show lkFloor (GF := GF) curCtx lo ⊢ keyAt (MachGS.era (hlc := hlc) (GF := GF)) curCtx lo
+    from .rfl) $$ Hflo
+  ihave #HidP0 := kmapStatic_rw (fnode k0 + 16#64) (pa_fpipe_kmapRw k0 hk0) $$ HS
   -- the eight stores into *f0 and *f1
   icases fileRef_elim γ k0 1 .closed $$ Href0 with ⟨%C0, %id0, He0, Hf0, Hp0⟩
   icases fileRef_elim γ k1 1 .closed $$ Href1 with ⟨%C1, %id1, He1, Hf1, Hp1⟩
@@ -642,9 +686,35 @@ theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γ
   k_step_gen (wp_s_ld cG _ (KA.«pipealloc» + 0x66#64) true 0#12 15#5 9#5 (by decide) (by decide) (DFrac.own 1) (fnode k0))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9A, Xv6.dsOff0, pa_add0'] next cH hpH
   iintro Hk Hpc Hc0
-  k_step_gen (wp_s_sd cH _ (KA.«pipealloc» + 0x68#64) false 16#12 15#5 18#5 (by decide) C0.pipe)
+  k_step_gen (wp_s_sd_ent cH _ (KA.«pipealloc» + 0x68#64) false 16#12 15#5 18#5 (by decide)
+      (fnode k0 + 16#64) ?ha C0.pipe lo)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h18A] next cI hpI
-  iintro Hk Hpc Hpp0
+  case ha =>
+    rw [KCtx.rget_withRegs']
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+    rfl
+  iintro Hk Hpc ⟨Hpp0, %te, %hlote, #Htop, #Hent⟩
+  -- the pipe is born, registered by the receipts of `f0->pipe = pi`
+  icases kctx_rsvEq cI _ $$ Hk with ⟨%heqR, Hk⟩
+  ihave #Hreg : lkDynReg (GF := GF) pi lo $$ []
+  · unfold lkDynReg
+    iexists entsList (fnode k0 + 16#64) 8 te (hartAgent cI) pi, te
+    isplit
+    · ipureintro; exact hlote
+    unfold hopRegAt
+    isplit
+    · iexact Htop
+    isplit
+    · iapply entsAt_list $$ Hent
+    · ipureintro
+      rw [heqR]
+      exact pa_slotWit k0 hk0 te (hartAgent cI) pi
+  iapply wpLoop_fupd
+  imod (kctx_newPipe cI _ pi hpv hokL lo lc _ bs hbs) $$ [Hk Hid0 Hid16 Hlw Hlc Hnm Hnr Hnw Hro Hwo Hdat Hslack]
+    with ⟨Hk, %γlp, %γp, #Hpipe, Hr0, Hr1, Hqf⟩
+  · iframe Hid0 Hid16 Hlw Hlc Hnm Hnr Hnw Hro Hwo Hdat Hslack Hg Hflo Hflc Hreg
+    iexact Hk
+  imodintro
   -- *f1: type, readable = 0, writable = 1, pipe
   k_step_gen (wp_s_ld cI _ (KA.«pipealloc» + 0x6c#64) false 0#12 15#5 20#5 (by decide) (by decide) (DFrac.own 1) (fnode k1))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h20A, Xv6.dsOff0, pa_add0'] next cJ hpJ

@@ -47,19 +47,18 @@ def rsvUartLk (i : Nat) : BitVec 64 := KA.«uarts» + BitVec.ofNat 64 (40 * i + 
 /-- `&disk.vdisk_lock` (+296). -/
 def rsvDiskLk : BitVec 64 := KA.«disk» + 296#64
 
-/-- The address of the string `"pipe"` (`.rodata`, `KStr.«pipe»`), the name
-`pipealloc` passes to `initlock` (`auipc a1,0x3 ; addi a1,a1,-146` at
-`pipealloc+0x48`; the tie to the image is the `pipealloc` proof's own
-computation, `Xv6.pipealloc_br_2fb6 : KA.«pipealloc» + 0x2fb6 = KStr.«pipe»`,
-`0x2fb6 = 0x48 + 0x3000 - 146`): the name of xv6's only dynamic spinlocks,
-the pipe locks (W8 (f2-ctx) [R35.1]/[R36.2]: their lock bytes are hops while
-the name word holds it, `MachCSL.nameLockAt`). -/
-def pipeLockNameStr : BitVec 64 := KStr.«pipe»
+/-- **The pipe locks' registration slots** (W8 (f2-ctx) [OWN.49] (a′-r), the
+RULED (a′) window [OWN.46]): xv6's only dynamic spinlocks are the pipe
+locks, and a pipe's lock word `b` is live from the position at which a
+`struct file` slot's `f->pipe` word (`aFpipe k`, `k < NFILE = 100`, stride
+`sizeof (struct file) = 40`) took `b` (`pipealloc`'s `f0->pipe = pi`,
+`MachCSL.wp_s_sd_ent`; `MachCSL.slotWit`) -- a footprint-free registry entry
+of the static list.  The base is `&ftable.file[0].pipe` as a literal
+(`ftable` + 24 + 16; `Xv6.aFpipe_slot` in `ProofPipealloc` ties it to the file
+geometry), so the file geometry stays out of the statements' trusted base. -/
+def xv6PipeSlotBase : BitVec 64 := KA.«ftable» + 40#64
 
-/-- The pipe locks' registered name (W8 (f2-ctx) [R35.1]/[R36.2]): a
-footprint-free `.name` registry entry of the static list, so the boot's
-pinning of the list (`MachFixedGS.rsvStatic = KernelRsv.static`) pins it. -/
-def xv6PipeNameR : RsvRegion := ⟨pipeLockNameStr, .name⟩
+def xv6PipeSlotsR : RsvRegion := ⟨xv6PipeSlotBase, .slots 100 40⟩
 
 /-- `started` (`main.c`), the boot handover's ONE-SHOT PUBLICATION word (W8
 (f2-ctx), Q-F2-BOOTGATE (a) as amended by [R35.2]): written once, by hart 0. -/
@@ -87,11 +86,11 @@ def xv6InodeLockRegions : List RsvRegion := (List.range 50).map (fun k => xv6Loc
 
 /-- The locks after `proc`, in address order: `tickslock`, `bcache.lock`, the
 buffers' inner locks, `itable.lock`, the inodes' inner locks, `log.lock`,
-`ftable.lock`, `disk.vdisk_lock`; and (W8 (f2-ctx)) the pipe locks' registered
-name, a footprint-free registry entry (`xv6PipeNameR`). -/
+`ftable.lock`, `disk.vdisk_lock`; and (W8 (f2-ctx)) the pipe locks'
+registration slots, a footprint-free registry entry (`xv6PipeSlotsR`). -/
 def xv6PostLockRegions : List RsvRegion :=
   [xv6LockR KA.«tickslock», xv6LockR KA.«bcache»] ++ (xv6BufLockRegions ++ ([xv6LockR KA.«itable»] ++
-    (xv6InodeLockRegions ++ [xv6LockR KA.«log», xv6LockR KA.«ftable», xv6LockR rsvDiskLk, xv6PipeNameR])))
+    (xv6InodeLockRegions ++ [xv6LockR KA.«log», xv6LockR KA.«ftable», xv6LockR rsvDiskLk, xv6PipeSlotsR])))
 
 /-- xv6's static reserved regions, in address order. -/
 def xv6RsvStatic : List RsvRegion :=
@@ -116,13 +115,13 @@ theorem xv6RsvStatic_wf : rsvWf xv6RsvStatic :=
 
 
 /-- xv6's static reserved regions, as the machine's class (with its dynamic
-spinlocks' registered name). -/
+spinlocks' registration slots, `xv6PipeSlotsR`). -/
 instance : KernelRsv where
   static := xv6RsvStatic
   wf := xv6RsvStatic_wf
 
-/-- xv6's ONLY registered dynamic-lock name is `"pipe"`'s (W8 (f2-ctx)). -/
-theorem xv6RsvNames : rsvNameList xv6RsvStatic = [pipeLockNameStr] := by decide +kernel
+/-- The pipe slots are registered. -/
+theorem xv6RsvStatic_pipeSlots : xv6PipeSlotsR ∈ xv6RsvStatic := by decide +kernel
 
 /-- Hart `h`'s cells are registered, at index `h + 8`. -/
 theorem xv6RsvStatic_cpu (h : CPU) : xv6RsvStatic[rsvCpuIdx h]? = some ⟨cpuAddr h, .cpu h⟩ := by
@@ -204,7 +203,7 @@ def rsvLocksLow (rs : List RsvRegion) : Bool :=
     | .lock _ => R.base.ult KA.«end»
     | .cpu _ => true
     | .pub _ => true
-    | .name => true)
+    | .slots _ _ => true)
 
 theorem xv6RsvStatic_locksLow : rsvLocksLow xv6RsvStatic = true := by decide +kernel
 

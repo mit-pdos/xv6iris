@@ -91,8 +91,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors}
 
 /-- The SC record's reserved regions (W8-β′): none -- the weak adequacy runs no
 `PowerOn` mint and reads no reserved-region discipline; no dynamic hop
-registry either (W8 (f2-ctx) [R35.1]: no registered name, the static list is
-empty). -/
+registry either (W8 (f2-ctx) [OWN.49]: the static list is empty, so it
+registers no pipe slots). -/
 def WeakAdequacy.rsvNone : KernelRsv :=
   ⟨[], ⟨List.nodup_nil, fun a ha => by simp [rsvBytes] at ha, List.nodup_nil⟩⟩
 

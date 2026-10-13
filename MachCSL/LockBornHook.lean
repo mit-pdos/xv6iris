@@ -107,38 +107,8 @@ theorem newlockAt_llb [CurCtx] (cpu : CPU) (E : CoPset) (γ : GName) (lk : BitVe
   iintro ⟨⟨%B, H1, H2⟩, #Hcl, #Hcl', Hrun, ⟨%hok, Hfr⟩, Hnmf, #Htl, HR, #Hgf⟩
   ihave #Hhook := lockHook_llb Rdep R tl hfold $$ Htl
   icases Hfr with (⟨%hm, ⟨%lo, %lc, Hw, #Hflo, Hc, #Hflc⟩⟩ | ⟨%hm, Hfr⟩)
-  · icases Hnmf with (%hm' | Hnm)
-    · exact absurd hm' hm
-    imod lock_pay_born_hook cpu R Rdep [] (fun _ h => by simp at h) $$ [$Hrun $HR $Hhook]
-      with ⟨Hrun, ⟨%Vb, Hpay, #Hvf⟩⟩
-    imod inv_alloc lockN E (lockBody γ lk s R lo lc Vb) $$ [Hw Hc H1 H2 Hpay Hnm] with #Hinv
-    · inext
-      unfold lockBody
-      iexists [], [], none, B
-      iframe Hw Hc H1 Hnm
-      isplit
-      · ipureintro
-        refine ⟨rfl, fun e he => absurd he (by simp), fun c _ e hl => ?_, fun _ h => by cases h⟩
-        obtain ⟨W1, W2, hW, _, _⟩ := hl
-        cases W1 <;> cases hW
-      isplitr [H2 Hpay]
-      · unfold lkCpuFrag; iempintro
-      · ileft
-        isplit
-        · ipureintro; rfl
-        iframe H2 Hpay
-    imodintro
-    iframe Hrun
-    unfold isLock
-    simp only [lockBodyM_dyn hm]
-    isplit
-    · ipureintro; exact hok
-    isplit
-    · iexact Hcl
-    isplit
-    · iexact Hcl'
-    iexists lo, lc, Vb
-    iframe Hinv Hflo Hflc Hvf Hgf
+  · icases Hnmf with %hm'
+    exact absurd hm' hm
   · -- a RESERVED lock (W8-β′)
     unfold lkFreshR
     icases Hfr with ⟨%W, %W', Hw, Hc, %⟨hW, hW'⟩⟩

@@ -474,7 +474,7 @@ theorem pw_copyin_one (M' : Nat → List (BitVec 8)) (src : Nat) (b : BitVec 8) 
 theorem pw_res_elim (γp : PipeNames) (pi : BitVec 64) :
     pipeResAt (GF := GF) γp pi curCtx ⊢
       ∃ (nr nw ro wo : BitVec 32) (vname : BitVec 64) (bs : List (BitVec 8)),
-        wordAtN curCtx (pipeLockName pi) 8 (DFrac.own (1 : Qp).half) vname ∗
+        wordAtN curCtx (pipeLockName pi) 8 (DFrac.own 1) vname ∗
         wordAtN curCtx (aPnread pi) 4 (DFrac.own 1) nr ∗
         wordAtN curCtx (aPnwrite pi) 4 (DFrac.own 1) nw ∗
         wordAtN curCtx (aPopen pi false) 4 (DFrac.own 1) ro ∗
@@ -486,7 +486,7 @@ theorem pw_res_elim (γp : PipeNames) (pi : BitVec 64) :
 
 theorem pw_res_intro (γp : PipeNames) (pi : BitVec 64) (nr nw ro wo : BitVec 32)
     (vname : BitVec 64) (bs : List (BitVec 8)) (hcnt : pipeCountOk nr nw) (hlen : bs.length = PIPESIZE) :
-    wordAtN (GF := GF) curCtx (pipeLockName pi) 8 (DFrac.own (1 : Qp).half) vname ∗
+    wordAtN (GF := GF) curCtx (pipeLockName pi) 8 (DFrac.own 1) vname ∗
     wordAtN curCtx (aPnread pi) 4 (DFrac.own 1) nr ∗
     wordAtN curCtx (aPnwrite pi) 4 (DFrac.own 1) nw ∗
     wordAtN curCtx (aPopen pi false) 4 (DFrac.own 1) ro ∗

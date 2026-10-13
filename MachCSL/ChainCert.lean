@@ -58,7 +58,7 @@ theorem memModel_gate (σ : MState) (j : CPU) :
     exact absurd (hw f w hp).symm hj
   · ihave %Hl := ghost_map_lookup $$ HZ Hc
     ipureintro
-    exact hZ.2 j (by rw [Hl]; rfl)
+    exact hZ.2.1 j (by rw [Hl]; rfl)
 
 /-- A chain lower bound: boot-image entries, or a valid certificate. -/
 theorem memModel_chainLb (σ : MState) (h : CPU) (t : Nat) (j : CPU) (τ : Nat) :
@@ -137,6 +137,40 @@ theorem memModel_gateIssue (σ : MState) (j : CPU) (hv : gateOk (chainEnv (hlc :
   unfold gatePassedAt
   iright
   iexact Hg
+
+/-- An entry the memory holds may be receipted (W8 (f2-ctx) [OWN.49] (a′-r)). -/
+theorem memModel_entIssue (σ : MState) (pa : PAddr) (e : HEnt) (he : ∃ H, σ.mem[pa]? = some H ∧ e ∈ H) :
+    memModelAt E σ ⊢@{IProp GF} |==> (memModelAt E σ ∗ entryAtE E pa e) := by
+  unfold entryAtE
+  exact memModel_chainIssueKey E σ (entKey pa e) (fun Z hZ => certsOk_insertEnt hZ pa e he 0)
+
+/-- A receipted entry is in the memory. -/
+theorem memModel_entryAt (σ : MState) (pa : PAddr) (e : HEnt) :
+    memModelAt E σ ∗ entryAtE E pa e ⊢@{IProp GF} ⌜∃ H, σ.mem[pa]? = some H ∧ e ∈ H⌝ := by
+  unfold memModelAt rsvModelAt chainModelAt entryAtE
+  iintro ⟨⟨_, _, _, _, _, _, _, %Z, HZ, %hZ, _⟩, %v, Hc⟩
+  ihave %Hl := ghost_map_lookup $$ HZ Hc
+  ipureintro
+  exact hZ.2.2 pa e (by rw [Hl]; rfl)
+
+/-- Receipts, for a list. -/
+theorem memModel_entryAtL (σ : MState) :
+    ∀ L : List (PAddr × HEnt),
+      memModelAt E σ ∗ ([∗list] p ∈ L, entryAtE E p.1 p.2) ⊢@{IProp GF}
+        ⌜∀ p ∈ L, ∃ H, σ.mem[p.1]? = some H ∧ p.2 ∈ H⌝
+  | [] => by iintro _; ipureintro; intro p hp; cases hp
+  | p :: L => by
+    iintro ⟨Hmm, HL⟩
+    icases BigSepL.bigSepL_cons.1 $$ HL with ⟨Hp, HL⟩
+    ihave %h1 := memModel_entryAt E σ p.1 p.2 $$ [Hmm Hp]
+    · iframe
+    ihave %h2 := memModel_entryAtL σ L $$ [Hmm HL]
+    · iframe
+    ipureintro
+    intro q hq
+    rcases List.mem_cons.1 hq with rfl | hq
+    · exact h1
+    · exact h2 q hq
 
 /-- **The release's record**: a chain lower bound to the releasing hart `A`,
 re-dated to the next position of the order. -/

@@ -445,11 +445,10 @@ instance instCtxMorphPipeSlackAt (pi : BitVec 64) :
 
 /-- The resource `pi->lock` protects: every byte of the page except the lock's
 own two WORDS.  THE PAYLOAD OVER AN EXPLICIT CONTEXT -- what the lock surface
-takes as its `CtxId → IProp`.  HALF the lock's NAME field is here (W8 (f2-ctx): the
-other half, raw, is the lock's `lkName`). -/
+takes as its `CtxId → IProp`.  The lock's NAME field is here, held raw. -/
 def pipeResAt (γp : PipeNames) (pi : BitVec 64) (ξ : CtxId) : IProp GF := iprop%
   ∃ (nr nw ro wo : BitVec 32) (vname : BitVec 64) (bs : List (BitVec 8)),
-    wordAtN ξ (pipeLockName pi) 8 (DFrac.own (1 : Qp).half) vname ∗
+    wordAtN ξ (pipeLockName pi) 8 (DFrac.own 1) vname ∗
     wordAtN ξ (aPnread pi) 4 (DFrac.own 1) nr ∗
     wordAtN ξ (aPnwrite pi) 4 (DFrac.own 1) nw ∗
     wordAtN ξ (aPopen pi false) 4 (DFrac.own 1) ro ∗
@@ -481,7 +480,7 @@ instance instCtxMorphPipeResAt (γp : PipeNames) (pi : BitVec 64) :
 its ghosts are spent, and what pipeclose reassembles into `pageOwn` for kfree. -/
 def pipeBytes (pi : BitVec 64) : IProp GF := iprop%
   ∃ (vname : BitVec 64) (nr nw ro wo : BitVec 32) (bs : List (BitVec 8)),
-    wordAtN curCtx (pipeLockName pi) 8 (DFrac.own (1 : Qp).half) vname ∗
+    wordAtN curCtx (pipeLockName pi) 8 (DFrac.own 1) vname ∗
     wordAtN curCtx (aPnread pi) 4 (DFrac.own 1) nr ∗
     wordAtN curCtx (aPnwrite pi) 4 (DFrac.own 1) nw ∗
     wordAtN curCtx (aPopen pi false) 4 (DFrac.own 1) ro ∗
