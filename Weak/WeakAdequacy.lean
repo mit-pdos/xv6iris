@@ -127,6 +127,7 @@ other name a placeholder. -/
   devName := dn
   mirrorName := 0
   rsvName := 0
+  chainName := 0
   gen := gen
   claimP := fun _ _ => iprop(True)
   claim_idle := fun _ => true_intro

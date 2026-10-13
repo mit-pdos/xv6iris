@@ -30,7 +30,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 /-! ## A brand-new context -/
 
-/-- **A context is born**: two fresh ghost names, bound `0`, no dirty keys.
+/-- **A context is born**: fresh ghost names, bound `0`, no dirty keys.
 Its running token is immediately hart `cpu`'s to dispose of (the newborn
 inherits the creator's keys through `ctx_move`, not through its own
 authority). -/
@@ -38,9 +38,10 @@ theorem ctx_fresh (cpu : CPU) : ⊢@{IProp GF} |==> ∃ ξ : CtxId, ownCtx cpu �
   imod (MonoNat.own_alloc (GF := GF) (.ofNat 0)) with ⟨%γb, Hb, _⟩
   imod (ghost_map_alloc_empty (GF := GF) (K := Nat) (V := CPU) (H := RegMapF)) with ⟨%γd, Hd⟩
   imod (MonoNat.lb_own_0 (GF := GF) ((MachGS.era (hlc := hlc) (GF := GF)).viewName cpu)) with #Hv
+  imod (vecAt_alloc (GF := GF)) with ⟨%γc, %γg, _, _⟩
   imodintro
-  iexists ⟨γb, γd⟩
-  iapply ownCtx_intro cpu ⟨γb, γd⟩ 0 0 0 ∅
+  iexists ⟨γb, γd, γc, γg⟩
+  iapply ownCtx_intro cpu ⟨γb, γd, γc, γg⟩ 0 0 0 ∅
   unfold ctxAt
   isplitl [Hb Hd]
   · iframe Hb Hd

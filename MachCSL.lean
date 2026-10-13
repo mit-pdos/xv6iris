@@ -258,3 +258,4 @@ import MachCSL.Rel
 import MachCSL.QpLemmas
 import MachCSL.FinToSet
 import MachCSL.WeakAuxWeakLock
+import MachCSL.ChainCert

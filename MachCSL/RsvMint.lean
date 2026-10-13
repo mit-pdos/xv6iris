@@ -67,14 +67,7 @@ theorem rsvRegMapAux_static : ∀ (rs : List RsvRegion) (i : Nat), (rs.map (fun 
       congr 1
       omega
 
-/-- A region's base is one of its bytes. -/
-theorem RsvRegion.base_mem (R : RsvRegion) : R.base ∈ R.bytes := by
-  have hw : ∃ n, 0 < n ∧ (R.base, n) ∈ R.words := by
-    unfold RsvRegion.words
-    cases R.kind <;> exact ⟨_, by decide, List.mem_cons_self⟩
-  obtain ⟨n, hn, hw⟩ := hw
-  have := mem_regionBytes hw hn
-  simpa using this
+-- `RsvRegion.base_mem` moved to `MachCSL.Reserved` (W8 (f2-ctx)).
 
 theorem rsvBases_nodup : ∀ {rs : List RsvRegion}, (rsvBytes rs).Nodup →
     (rs.map (fun R => R.base.toNat)).Nodup

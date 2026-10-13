@@ -170,7 +170,7 @@ instance (lk : BitVec 64) : Decidable (rsvLockAt lk) := by unfold rsvLockAt; inf
 /-- Every registered LOCK region lies below the linker's `end` (in the image's
 `.data`/`.bss`), so no kalloc page carries a reserved lock. -/
 def rsvLocksLow (rs : List RsvRegion) : Bool :=
-  rs.all (fun R => match R.kind with | .lock _ => R.base.ult KA.«end» | .cpu _ => true)
+  rs.all (fun R => match R.kind with | .lock _ => R.base.ult KA.«end» | .cpu _ => true | .pub _ => true)
 
 theorem xv6RsvStatic_locksLow : rsvLocksLow xv6RsvStatic = true := by decide +kernel
 

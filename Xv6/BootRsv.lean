@@ -48,11 +48,20 @@ a window `[lo, hi)` holds reserved bytes is decided per region (`rsvOff`: none;
 def rsvSpan : RsvKind → Nat
   | .cpu _ => 128
   | .lock _ => 24
+  | .pub _ => 4
 
 theorem regionBytes_span (R : RsvRegion) (hR : R.base.toNat + rsvSpan R.kind ≤ 2 ^ 64) (a : PAddr)
     (ha : a ∈ R.bytes) : R.base.toNat ≤ a.toNat ∧ a.toNat < R.base.toNat + rsvSpan R.kind := by
   obtain ⟨b, k⟩ := R
-  cases k <;> simp only [rsvSpan] at hR ⊢ <;>
+  cases k with
+  | pub w =>
+    simp only [rsvSpan] at hR ⊢
+    simp only [RsvRegion.bytes, RsvRegion.words, wordBytes, List.flatMap_cons, List.flatMap_nil,
+      List.append_nil, List.mem_map, List.mem_range] at ha
+    obtain ⟨j, hj, rfl⟩ := ha
+    bv_omega
+  | _ =>
+    simp only [rsvSpan] at hR ⊢ <;>
     simp only [RsvRegion.bytes, RsvRegion.words, wordBytes, List.flatMap_cons, List.flatMap_nil,
       List.append_nil, List.mem_append, List.mem_map, List.mem_range] at ha <;>
     rcases ha with ⟨j, hj, rfl⟩ | ⟨j, hj, rfl⟩ | ⟨j, hj, rfl⟩ <;> bv_omega

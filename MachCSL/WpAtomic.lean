@@ -47,7 +47,10 @@ theorem memModel_read_excl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w :
       |==> (memModelAt E (σ.afterExcl cpu pa n w acq) ∗ resvFragAt E cpu (some (snapOf pa n w)) acq) := by
   iintro ⟨Hmm, Hfrag⟩
   unfold memModelAt
-  rw [rsvModelAt_congr E (σ := σ) (σ' := σ.afterExcl cpu pa n w acq) rfl]
+  rw [rsvModelAt_congr E (σ := σ) (σ' := σ.afterExcl cpu pa n w acq) rfl (fun j a => by
+    simp only [updCpu]; split
+    · rename_i hj; subst hj; rfl
+    · rfl)]
   icases Hmm with ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
   unfold resvFragAt
   imod ghost_map_update ((some (snapOf pa n w), acq) : ResvVal) $$ Hresv Hfrag with ⟨Hresv, Hfrag⟩
@@ -141,7 +144,8 @@ theorem memModel_store_excl_any (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
     iframe
   unfold memModelAt
   icases Hmm with ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
-  ihave Hrsv := rsvModel_mono E σ (σ.store cpu pa n w true) hrsv $$ Hrsv
+  ihave Hrsv := rsvModel_mono E σ (σ.store cpu pa n w true) hrsv
+    (chainEnvAt_ext_store _ σ cpu pa n w true) $$ Hrsv
   imod MonoNat.own_update _ (.ofNat σ.top) (.ofNat (σ.top + 1))
     (by simp only [MaxNat.le_toNat]; omega) $$ Htop with ⟨Htop, #Htoplb⟩
   imod ghost_map_insert_persist (σ.top + 1) (hartAgent cpu)
@@ -646,11 +650,11 @@ theorem memModel_rsvHalf_acc (σ : MState) {i k : Nat} {R : RsvRegion} {pa : PAd
       rsvWordHalfAt (MachGS.era (hlc := hlc) (GF := GF)) pa n ∗
       (rsvWordHalfAt (MachGS.era (hlc := hlc) (GF := GF)) pa n -∗ memModel σ) := by
   unfold memModel memModelAt rsvModelAt
-  iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hreg, Hh⟩
+  iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hreg, Hh, Hch⟩
   icases rsvHalves_acc _ _ hi hk $$ Hh with ⟨Hw, Hc⟩
   iframe Hw
   iintro Hw
-  iframe Htop Hauth Hviews Hresv Hreg
+  iframe Htop Hauth Hviews Hresv Hreg Hch
   isplit
   · ipureintro; exact hmm
   · iapply Hc $$ Hw

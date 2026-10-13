@@ -571,17 +571,19 @@ theorem wp_power [KernelMap] [KernelRsv]
     -- every reserved byte's cell split in two halves
     imod (ghost_map_alloc (K := Nat) (V := Agent) (H := RegMapF)
       (rsvRegMap (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)))) with ⟨%γrsv, HrG, -⟩
+    -- THE CHAIN CERTIFICATES (W8 (f2-ctx)): none issued yet
+    imod (ghost_map_alloc_empty (K := Nat) (V := Agent) (H := RegMapF)) with ⟨%γch, HcG⟩
     have hrwf := MachFixedGS.rsvStatic_wf (hlc := hlc) (GF := GF)
     have hin : ∀ a ∈ rsvBytes (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)), (get? (M := MemF) g₂.m.mem a).isSome := by
       intro a ha
       rw [hmem0]
       exact rsvWf_img hrwf ha
-    icases memCellsRaw_rsv_split ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir, γrsv⟩
+    icases memCellsRaw_rsv_split ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir, γrsv, γch⟩
       _ g₂.m.mem _ hrwf.1 hin (fun _ _ => .rfl) $$ Hpts with ⟨Hpts, HrH, HrC⟩
-    imod (kmapStatic_persist ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir, γrsv⟩) $$ Hkfrags with Hkst
+    imod (kmapStatic_persist ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir, γrsv, γch⟩) $$ Hkfrags with Hkst
     icases BigSepL.bigSepL_sep_eqv.1 $$ Hv with ⟨Hva, Hvlb⟩
-    imod (ctxs_boot ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir, γrsv⟩) $$ Hvlb with Hctx
-    imod registry_insert R g.gen ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir, γrsv⟩ (registryOk_none Hok)
+    imod (ctxs_boot ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir, γrsv, γch⟩) $$ Hvlb with Hctx
+    imod registry_insert R g.gen ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir, γrsv, γch⟩ (registryOk_none Hok)
       $$ HR with ⟨HR, #Hreg⟩
     imod startAuth_bump _ $$ Hstart with ⟨Hstart, #Hstarted⟩
     ihave #Hborn := genAuth_get_born _ $$ Hgen
@@ -593,7 +595,7 @@ theorem wp_power [KernelMap] [KernelRsv]
     · iframe Hdisk HPc
     icases Hyield with ⟨Hyield, Hturn, Huo, Huet⟩
     -- THE SWAP, LENT THE ERA'S TURN (Rocq sync SY3-A1)
-    imod (Hswap ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir, γrsv⟩ g.gen
+    imod (Hswap ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir, γrsv, γch⟩ g.gen
       (diskOf g.m.devs)) $$ [Hreg Hstarted Hstart Hdisk Hmir HPc Hturn]
       with >⟨Hstart, Hdisk, HPc, Hmir, #Hswlb, HRb, Hturn⟩
     · iframe Hstart Hdisk Hmir HPc Hturn
@@ -616,7 +618,7 @@ theorem wp_power [KernelMap] [KernelRsv]
       (fun c => (g₂.m.resv c, (g₂.m.hr c).acq)) cpus (resvMap g₂.m) (List.nodup_finRange NCPU)
       (fun c _ => resvMap_get? g₂.m c) $$ Hfrags
     have hfrag : ∀ c : CPU, (γresv ↪◯MAP[c.val] ((g₂.m.resv c, (g₂.m.hr c).acq) : ResvVal)) ⊢@{IProp GF}
-        resvFragAt ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir, γrsv⟩ c none false := by
+        resvFragAt ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir, γrsv, γch⟩ c none false := by
       intro c
       unfold resvFragAt
       rw [(hhart0 c).2.2.2, (hhart0 c).2.2.1]
@@ -625,10 +627,10 @@ theorem wp_power [KernelMap] [KernelRsv]
       iexact H
     -- the boot client
     ihave Hdf := (show ([∗list] d ∈ DevId.all, devFragN (GF := GF) dn d (g₂.m.devs.st d)) ⊢
-        [∗list] d ∈ DevId.all, devFragAt ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir, γrsv⟩ d (g₂.m.devs.st d)
+        [∗list] d ∈ DevId.all, devFragAt ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir, γrsv, γch⟩ d (g₂.m.devs.st d)
         from by unfold devFragAt devFragN; iintro H; iexact H) $$ Hdf
     ihave Hda := (show ([∗list] d ∈ DevId.all, devAuthN (GF := GF) dn d (g₂.m.devs.st d)) ⊢
-        [∗list] d ∈ DevId.all, devAuthAt ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir, γrsv⟩ d (g₂.m.devs.st d)
+        [∗list] d ∈ DevId.all, devAuthAt ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir, γrsv, γch⟩ d (g₂.m.devs.st d)
         from by unfold devAuthAt devAuthN; iintro H; iexact H) $$ Hda
     -- the two interrupt pins of every hart leave the client's frame: they are
     -- sealed into the wire invariant, which the PLIC's wire step drives
@@ -641,11 +643,11 @@ theorem wp_power [KernelMap] [KernelRsv]
     · iapply hartObsPermit_of_hook HuserExit HuserEnter
       unfold obsInv
       iexact Hoinv
-    imod (wireInvAt_alloc ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir, γrsv⟩ ⊤
+    imod (wireInvAt_alloc ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir, γrsv, γch⟩ ⊤
       (fun c => g₂.m.regs c Register.sig_seip) (fun c => g₂.m.regs c Register.sig_meip))
       $$ [Hhp Hpins] with #Hwire
     · iframe Hhp Hpins
-    ihave Hres : powerBootRes Mof Rb Tn'' ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir, γrsv⟩ g.gen g₂.m $$ [Hrc Hpts HrC Hctx Hfrags' Hls Hkmap Hkst Hkroot Hdf Hyield Hturn Huo Huet Hmir HRb]
+    ihave Hres : powerBootRes Mof Rb Tn'' ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir, γrsv, γch⟩ g.gen g₂.m $$ [Hrc Hpts HrC Hctx Hfrags' Hls Hkmap Hkst Hkroot Hdf Hyield Hturn Huo Huet Hmir HRb]
     · unfold powerBootRes genCertAt memCells kmapStaticAt crashInv
       rw [hdk, ← hrsv]
       isplitr
@@ -668,7 +670,7 @@ theorem wp_power [KernelMap] [KernelRsv]
           iapply BigSepL.bigSepL_mono (fun {_ c} _ => hfrag c) $$ Hfrags'
         · unfold lockSetAt locksMap
           iexact Hls
-    imod (Hboot ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir, γrsv⟩ g.gen g₂.m hbf
+    imod (Hboot ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir, γrsv, γch⟩ g.gen g₂.m hbf
       ⟨g.m.devs, hdevs⟩ (by rw [hdk]; exact hpure)) $$ [Hres] with ⟨Hwps, Hdwps⟩
     · isplitl []
       · unfold obsInv; iexact Hoinv
@@ -686,14 +688,14 @@ theorem wp_power [KernelMap] [KernelRsv]
     unfold diskFixedInterp
     rw [hdk]
     iframe Hdisk
-    isplitl [HR Hheap Hri Hva Hiv Hrv Htop Hauth Hresv Hda HrG HrH]
-    · iexists (insert R g.gen ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir, γrsv⟩)
+    isplitl [HR Hheap Hri Hva Hiv Hrv Htop Hauth Hresv Hda HrG HrH HcG]
+    · iexists (insert R g.gen ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir, γrsv, γch⟩)
       iframe HR
       isplit
       · ipureintro
         exact registryOk_insert Hok _
       rw [eraCur_true hpow', hgen]
-      iexists ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir, γrsv⟩
+      iexists ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir, γrsv, γch⟩
       isplit
       · ipureintro
         exact get?_insert_eq rfl
@@ -702,7 +704,7 @@ theorem wp_power [KernelMap] [KernelRsv]
       rw [show g₂.m.top = 0 by simp [MState.top, hlog0], hlog0, authMap_nil]
       iframe Htop Hauth
       isplitl [Hva Hiv Hrv]
-      · rw [BigSepL.bigSepL_eq (Φ := fun _ c => hartViewsAt ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir, γrsv⟩ g₂.m c)
+      · rw [BigSepL.bigSepL_eq (Φ := fun _ c => hartViewsAt ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir, γrsv, γch⟩ g₂.m c)
           (Ψ := fun _ c => iprop(MonoNat.auth_own (vn c) (DFrac.own 1) (.ofNat 0) ∗
             MonoNat.auth_own (ivn c) (DFrac.own 1) (.ofNat 0) ∗
             MonoNat.auth_own (rvn c) (DFrac.own 1) (.ofNat 0)))
@@ -718,14 +720,24 @@ theorem wp_power [KernelMap] [KernelRsv]
       · isplit
         · ipureintro
           exact mmOk_boot g₂.m hbf
-        · unfold rsvModelAt
+        · unfold rsvModelAt chainModelAt
           iframe HrH
-          iexists (rsvRegMap (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)))
-          iframe HrG
-          ipureintro
-          refine ⟨rsvRegMap_staticIn hrwf.1, rsvRegMap_exact _, reservedOk_of_all (rsvRegMap_exact _) ?_⟩
-          rw [hmem0]
-          exact rsvAllOk_boot hrwf
+          isplitl [HrG]
+          · iexists (rsvRegMap (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)))
+            iframe HrG
+            ipureintro
+            refine ⟨rsvRegMap_staticIn hrwf.1, rsvRegMap_exact _, reservedOk_of_all (rsvRegMap_exact _) ?_⟩
+            rw [hmem0]
+            exact rsvAllOk_boot hrwf
+          · iexists ∅
+            iframe HcG
+            isplit
+            · ipureintro
+              exact certsOk_empty _
+            · unfold chainElemsAt
+              imodintro
+              iintro %k %v %hk
+              simp [LawfulPartialMap.get?_empty] at hk
     isplitr [Hwps Hdwps]
     · iexact IH
     · unfold powerFork
@@ -800,7 +812,7 @@ handler ∃-packs it (`MachCSL.KCtx.intrResP`, Rocq `IntrDefs.intr_res`). -/
   { regName := E.regName, heapName := E.heapName, metaName := E.metaName, viewName := E.viewName, iviewName := E.iviewName,
     rviewName := E.rviewName, topName := E.topName, authName := E.authName, resvName := E.resvName,
     lockSetName := E.lockSetName, kmapName := E.kmapName, kptRootName := E.kptRootName,
-    devName := E.devName, mirrorName := E.mirrorName, rsvName := E.rsvName, gen := gen, claimP := cP,
+    devName := E.devName, mirrorName := E.mirrorName, rsvName := E.rsvName, chainName := E.chainName, gen := gen, claimP := cP,
     claim_idle := cI }
 
 theorem wpLoop_ofEra (E : EraGS) (gen : Nat) (cP : CPU → BitVec 64 → IProp GF)

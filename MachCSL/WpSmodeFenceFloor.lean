@@ -91,8 +91,9 @@ theorem memModel_load_rv (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (h
     memModelAt E σ ⊢@{IProp GF}
       |==> (memModelAt E (σ.afterLoad cpu pa n tvn) ∗ rviewLbAt E cpu tvn) := by
   unfold memModelAt
-  rw [rsvModelAt_congr E (σ := σ) (σ' := σ.afterLoad cpu pa n tvn) rfl]
   iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
+  ihave Hrsv := rsvModel_mono E σ (σ.afterLoad cpu pa n tvn) id
+    (fun _ => chainEnvAt_ext_load _ σ cpu pa n tvn) $$ Hrsv
   icases hartViews_acc E σ cpu $$ Hviews with ⟨Hc, Hclose⟩
   icases hartViewsAt_cases E σ cpu $$ Hc with ⟨Hv, Hi, Hr⟩
   imod MonoNat.own_update _ (.ofNat (σ.hr cpu).rv) (.ofNat (max (σ.hr cpu).rv tvn))

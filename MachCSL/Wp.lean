@@ -1158,15 +1158,23 @@ theorem memModel_rsvOk (σ : MState) :
 discipline does. -/
 theorem rsvModel_mono (σ σ' : MState)
     (h : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem →
-      rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ'.mem) :
+      rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ'.mem)
+    (hext : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ'.mem →
+      (chainEnv (hlc := hlc) (GF := GF) σ).ext (chainEnv (hlc := hlc) (GF := GF) σ')) :
     rsvModelAt E σ ⊢@{IProp GF} rsvModelAt E σ' := by
-  unfold rsvModelAt
-  iintro ⟨⟨%reg, Hreg, %⟨hin, hex, hok⟩⟩, Hh⟩
+  unfold rsvModelAt chainModelAt
+  iintro ⟨⟨%reg, Hreg, %⟨hin, hex, hok⟩⟩, Hh, ⟨%Z, HZ, %hZ, #Hels⟩⟩
+  have hnew := h (all_of_reservedOk hin hok)
   iframe Hh
-  iexists reg
-  iframe Hreg
-  ipureintro
-  exact ⟨hin, hex, reservedOk_of_all hex (h (all_of_reservedOk hin hok))⟩
+  isplitl [Hreg]
+  · iexists reg
+    iframe Hreg
+    ipureintro
+    exact ⟨hin, hex, reservedOk_of_all hex hnew⟩
+  · iexists Z
+    iframe HZ Hels
+    ipureintro
+    exact certsOk_mono (hext hnew) hZ
 
 /-- The mirrors move with the task bookkeeping (only the pure conjunct
 `devRtOk` of `mmOk` sees `devrt` at all). -/
@@ -1245,7 +1253,7 @@ theorem memModel_dropResv (σ : MState) (cpu : CPU) (r : Option Resv) (b : Bool)
   · iapply memModel_resv E σ cpu r b $$ [Hmm Hfrag]
     iframe
   unfold memModelAt
-  rw [rsvModelAt_congr E (σ := σ) (σ' := σ.dropResv cpu) rfl]
+  rw [rsvModelAt_congr E (σ := σ) (σ' := σ.dropResv cpu) rfl (fun _ _ => rfl)]
   icases Hmm with ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
   unfold resvFragAt
   imod ghost_map_update ((none, b) : ResvVal) $$ Hresv Hfrag with ⟨Hresv, Hfrag⟩
@@ -1292,8 +1300,9 @@ theorem hartViews_acc (σ : MState) (cpu : CPU) :
 theorem memModel_load (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv : tvn ≤ σ.top) :
     memModelAt E σ ⊢@{IProp GF} |==> memModelAt E (σ.afterLoad cpu pa n tvn) := by
   unfold memModelAt
-  rw [rsvModelAt_congr E (σ := σ) (σ' := σ.afterLoad cpu pa n tvn) rfl]
   iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
+  ihave Hrsv := rsvModel_mono E σ (σ.afterLoad cpu pa n tvn) id
+    (fun _ => chainEnvAt_ext_load _ σ cpu pa n tvn) $$ Hrsv
   icases hartViews_acc E σ cpu $$ Hviews with ⟨Hc, Hclose⟩
   icases hartViewsAt_cases E σ cpu $$ Hc with ⟨Hv, Hi, Hr⟩
   imod MonoNat.own_update _ (.ofNat (σ.hr cpu).rv) (.ofNat (max (σ.hr cpu).rv tvn))
@@ -1324,7 +1333,7 @@ theorem memModel_fence (σ : MState) (cpu : CPU) (b : barrier_kind) :
     memModelAt E σ ⊢@{IProp GF}
       |==> (memModelAt E (σ.fence cpu b) ∗ viewLbAt E cpu ((σ.fence cpu b).tv cpu)) := by
   unfold memModelAt
-  rw [rsvModelAt_congr E (σ := σ) (σ' := σ.fence cpu b) rfl]
+  rw [rsvModelAt_congr E (σ := σ) (σ' := σ.fence cpu b) rfl (fun _ _ => rfl)]
   iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
   icases hartViews_acc E σ cpu $$ Hviews with ⟨Hc, Hclose⟩
   icases hartViewsAt_cases E σ cpu $$ Hc with ⟨Hv, Hi, Hr⟩
@@ -1392,7 +1401,8 @@ theorem memModel_store_plain (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w
     iframe
   unfold memModelAt
   icases Hmm with ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
-  ihave Hrsv := rsvModel_mono E σ (σ.store cpu pa n w false) hrsv $$ Hrsv
+  ihave Hrsv := rsvModel_mono E σ (σ.store cpu pa n w false) hrsv
+    (chainEnvAt_ext_store _ σ cpu pa n w false) $$ Hrsv
   imod MonoNat.own_update _ (.ofNat σ.top) (.ofNat (σ.top + 1))
     (by simp only [MaxNat.le_toNat]; omega) $$ Htop with ⟨Htop, #Htoplb⟩
   imod ghost_map_insert_persist (σ.top + 1) (hartAgent cpu)
@@ -1667,7 +1677,7 @@ theorem memModel_notRsv (σ : MState) (a : PAddr) (H : Hist) :
   by_cases ha : a ∈ rsvBytes (rsvList (hlc := hlc) (GF := GF))
   · obtain ⟨i, R, k, w, j, hi, hk, hj, rfl⟩ := rsvBytes_locate ha
     unfold memModel memModelAt rsvModelAt
-    iintro ⟨⟨_, _, _, _, _, _, Hh⟩, Hpt⟩
+    iintro ⟨⟨_, _, _, _, _, _, Hh, _⟩, Hpt⟩
     icases rsvHalves_acc _ _ hi hk $$ Hh with ⟨Hw, _⟩
     unfold rsvWordHalfAt
     icases Hw with ⟨%Hs, Hw⟩

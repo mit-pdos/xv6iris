@@ -47,6 +47,7 @@ import Iris.Instances.Lib.GhostVar
 import Iris.ProgramLogic.WeakestPre
 import MachCSL.FrameFilter
 import MachCSL.Reserved
+import MachCSL.ChainDefs
 
 namespace MachCSL
 
@@ -153,6 +154,11 @@ structure EraGS where
   list (`staticIn`).  The camera is the author log's (`Nat ↦ Agent = Nat`);
   the region itself is read off the list (`rsvExact`). -/
   rsvName : GName
+  /-- THE CHAIN CERTIFICATES (W8 (f2-ctx), `MachCSL.ChainDefs`): the era's
+  ghost map whose KEYS are the certificates issued so far
+  (`MachCSL.ChainCert.key`; persistent elements), every one valid of the
+  memory (`MachCSL.certsOk`).  The camera is the author log's. -/
+  chainName : GName
 
 /-- The functors the machine needs (for adequacy: what a `BundledGFunctors`
 must contain). -/
@@ -419,13 +425,39 @@ attribute [instance] MachFixedGS.wild_persistent MachFixedGS.wild_timeless
 attribute [instance] MachFixedGS.rdwild_persistent MachFixedGS.rdwild_timeless
 
 /-- A context: a thread of control's ghost identity -- its bound (a monotone
-counter) and its dirty set (a ghost map keyed by timestamp).  The laws live
+counter), its dirty set (a ghost map keyed by timestamp), and (W8 (f2-ctx))
+its per-author chain vector and boot-gate flag.  The laws live
 in `MachCSL.Ctx`; the identity itself is declared here because the ambient
 instance carries the handler ENVIRONMENT, a family indexed by contexts. -/
 structure CtxId where
   bound : GName
   dirty : GName
-  deriving DecidableEq, Inhabited, Repr
+  /-- W8 (f2-ctx) [OWN.38]: the PER-AUTHOR CHAIN VECTOR, one monotone counter
+  per hart (`MachCSL.vecAt`) -/
+  chain : CPU → GName
+  /-- W8 (f2-ctx): the BOOT GATE flag, a monotone counter (0: the context
+  carries no boot-hop cover; ≥ 1: whoever runs it has passed the boot gate,
+  `MachCSL.gateFloor`) -/
+  gate : GName
+  deriving Inhabited
+
+/-- A context's names as a tuple (the chain vector listed over the harts). -/
+def CtxId.toTuple (ξ : CtxId) : GName × GName × GName × List GName :=
+  (ξ.bound, ξ.dirty, ξ.gate, (List.finRange NCPU).map ξ.chain)
+
+theorem CtxId.toTuple_inj {a b : CtxId} (h : a.toTuple = b.toTuple) : a = b := by
+  obtain ⟨b1, d1, c1, g1⟩ := a
+  obtain ⟨b2, d2, c2, g2⟩ := b
+  simp only [CtxId.toTuple, Prod.mk.injEq] at h
+  obtain ⟨rfl, rfl, rfl, hl⟩ := h
+  have hc : c1 = c2 := funext fun i => (List.map_inj_left.1 hl) i (List.mem_finRange i)
+  subst hc
+  rfl
+
+instance : DecidableEq CtxId := fun a b =>
+  if h : a.toTuple = b.toTuple then isTrue (CtxId.toTuple_inj h) else isFalse (fun e => h (e ▸ rfl))
+
+instance : Repr CtxId := ⟨fun ξ n => reprPrec ξ.toTuple n⟩
 
 /-- The ambient instance: the fixed layer, one era (its register names and
 memory heap, spelled out as fields so the heap can be an instance), and the
@@ -455,6 +487,8 @@ class MachGS (hlc : outParam HasLC) (GF : BundledGFunctors) where
   mirrorName : GName
   /-- the era's reserved-region registry (see `EraGS.rsvName`) -/
   rsvName : GName
+  /-- the era's chain certificates (see `EraGS.chainName`) -/
+  chainName : GName
   gen : Nat
   /-- the running-proc claim of a hart (`MachCSL.KCtx.cpuClaim`): the client
   chooses it when it instantiates the machine (the xv6 client: the claimed
@@ -491,7 +525,7 @@ field projection.) -/
    MachGS.lockSetName (hlc := hlc) (GF := GF), MachGS.kmapName (hlc := hlc) (GF := GF),
    MachGS.kptRootName (hlc := hlc) (GF := GF),
    MachGS.devName (hlc := hlc) (GF := GF), MachGS.mirrorName (hlc := hlc) (GF := GF),
-   MachGS.rsvName (hlc := hlc) (GF := GF)⟩
+   MachGS.rsvName (hlc := hlc) (GF := GF), MachGS.chainName (hlc := hlc) (GF := GF)⟩
 
 /-- The register-map ghost name of hart `cpu` in the ambient era. -/
 def regName [MachGS hlc GF] (cpu : CPU) : GName := MachGS.regName (hlc := hlc) (GF := GF) cpu
@@ -1004,14 +1038,165 @@ def rsvWordHalfAt [MachFixedGS hlc GF] (E : EraGS) (pa : PAddr) (n : Nat) : IPro
 def rsvHalvesAt [MachFixedGS hlc GF] (E : EraGS) (rs : List RsvRegion) : IProp GF := iprop%
   [∗list] R ∈ rs, [∗list] w ∈ R.words, rsvWordHalfAt E w.1 w.2
 
+/-! ## The chain certificates (W8 (f2-ctx))
+
+The era's certificate map (`EraGS.chainName`): its keys are the
+certificates issued so far (`MachCSL.ChainCert`) and the harts that have
+passed the boot gate (`MachCSL.gateKey`), each VALID of the machine -- a sync
+chain through the static spinlocks' lock bytes (`MachCSL.lockByteIn`), own
+entries before the deadline, or the boot hop through a publication word
+(`MachCSL.pubByteIn`).  Validity is stable under every machine step
+(`MachCSL.certsOk_mono`). -/
+
+/-- `f` is the base byte of a publication word of `rs`, written by `w`. -/
+def pubByteIn (rs : List RsvRegion) (f : PAddr) (w : CPU) : Prop :=
+  (⟨f, .pub w⟩ : RsvRegion) ∈ rs
+
+/-- What the certificates of a machine state are checked against. -/
+def chainEnvAt (rs : List RsvRegion) (σ : MState) : ChainEnv :=
+  ⟨σ.mem, fun j => (σ.hr j).coh, lockByteIn rs, pubByteIn rs⟩
+
+/-- **The certificate map's invariant**: every certificate key names a valid
+certificate, every gate key a hart past the gate. -/
+def certsOk (X : ChainEnv) (Z : RegMapF Agent) : Prop :=
+  (∀ c : ChainCert, (get? Z c.key).isSome → c.valid X) ∧
+  (∀ j : CPU, (get? Z (gateKey j)).isSome → gateOk X j)
+
+theorem certsOk_empty (X : ChainEnv) : certsOk X ∅ := by
+  refine ⟨fun c hc => ?_, fun j hj => ?_⟩
+  · simp [LawfulPartialMap.get?_empty] at hc
+  · simp [LawfulPartialMap.get?_empty] at hj
+
+theorem certsOk_mono {X Y : ChainEnv} {Z : RegMapF Agent} (hx : X.ext Y) (h : certsOk X Z) : certsOk Y Z :=
+  ⟨fun c hc => ChainCert.valid_mono hx (h.1 c hc), fun j hj => gateOk_mono hx (h.2 j hj)⟩
+
+theorem certsOk_insert {X : ChainEnv} {Z : RegMapF Agent} (h : certsOk X Z)
+    (c : ChainCert) (hc : c.valid X) (v : Agent) :
+    certsOk X (Iris.Std.PartialMap.insert Z c.key v) := by
+  refine ⟨fun c' hc' => ?_, fun j hj => ?_⟩
+  · by_cases he : c.key = c'.key
+    · rw [ChainCert.key_inj he] at hc
+      exact hc
+    · rw [LawfulPartialMap.get?_insert_ne he] at hc'
+      exact h.1 c' hc'
+  · rw [LawfulPartialMap.get?_insert_ne (ChainCert.key_ne_gate c j)] at hj
+    exact h.2 j hj
+
+theorem certsOk_insertGate {X : ChainEnv} {Z : RegMapF Agent} (h : certsOk X Z)
+    (j : CPU) (hj : gateOk X j) (v : Agent) :
+    certsOk X (Iris.Std.PartialMap.insert Z (gateKey j) v) := by
+  refine ⟨fun c hc => ?_, fun j' hj' => ?_⟩
+  · rw [LawfulPartialMap.get?_insert_ne (fun e => ChainCert.key_ne_gate c j e.symm)] at hc
+    exact h.1 c hc
+  · by_cases he : gateKey j = gateKey j'
+    · rw [← gateKey_inj he]
+      exact hj
+    · rw [LawfulPartialMap.get?_insert_ne he] at hj'
+      exact h.2 j' hj'
+
+/-- A machine state whose memory is unchanged and whose coherence floors are
+unchanged has the same certificate environment. -/
+theorem chainEnvAt_congr (rs : List RsvRegion) {σ σ' : MState} (h : σ'.mem = σ.mem)
+    (hc : ∀ (j : CPU) (a : PAddr), (σ'.hr j).coh a = (σ.hr j).coh a) : chainEnvAt rs σ' = chainEnvAt rs σ := by
+  unfold chainEnvAt
+  rw [h]
+  congr 1
+  funext j a
+  exact hc j a
+
+/-- A load raises its hart's coherence floors only. -/
+theorem chainEnvAt_ext_load (rs : List RsvRegion) (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) :
+    (chainEnvAt rs σ).ext (chainEnvAt rs (σ.afterLoad cpu pa n tvn)) := by
+  refine ⟨memExt_refl _, fun _ h => h, fun _ _ => Iff.rfl, fun j f w _ _ => ?_⟩
+  simp only [chainEnvAt, updCpu]
+  split
+  · rename_i hj; subst hj; simp only [HRead.afterLoad]; exact Nat.le_max_left _ _
+  · exact Nat.le_refl _
+
+/-- **A store keeps the environment growing**: its memory extends, and it
+cannot reset another writer's publication byte's floor -- the publication
+region's discipline at the new memory makes the storing hart its writer. -/
+theorem chainEnvAt_ext_store (rs : List RsvRegion) (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
+    (w : BitVec (8 * n)) (excl : Bool)
+    (hnew : rsvAllOk rs (σ.mem.writeBytes pa n w (σ.top + 1) (hartAgent cpu))) :
+    (chainEnvAt rs σ).ext (chainEnvAt rs (σ.store cpu pa n w excl)) := by
+  refine ⟨memExt_writeBytes _ _ _ _ _, fun _ h => h, fun _ _ => Iff.rfl, fun j f w' hp hj => ?_⟩
+  simp only [chainEnvAt, updCpu]
+  split
+  · rename_i hjc
+    subst j
+    simp only [HRead.clearAcq, HRead.resetCoh]
+    split
+    · rename_i hin
+      exfalso
+      obtain ⟨j', hj', heq⟩ : ∃ j', j' < n ∧ f = pa + BitVec.ofNat 64 j' := by
+        simp only [List.any_eq_true, List.mem_range, beq_iff_eq] at hin
+        exact hin
+      obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 hp
+      have hR := hnew i _ hi
+      unfold regionOk at hR
+      simp only at hR
+      obtain ⟨H, hH, he⟩ := ChainDefs.writeBytes_mem σ.mem pa w (σ.top + 1) (hartAgent cpu) hj'
+      rw [← heq] at hH
+      have := hR.1 f (RsvRegion.base_mem _) H hH _ he (by simp)
+      exact hj (Fin.ext this)
+    · exact Nat.le_refl _
+  · exact Nat.le_refl _
+
+/-- A DMA write extends the memory and moves no hart's floor. -/
+theorem chainEnvAt_ext_dma (rs : List RsvRegion) (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
+    (chainEnvAt rs σ).ext (chainEnvAt rs (σ.storeDma pa n w)) := by
+  refine ⟨?_, fun _ h => h, fun _ _ => Iff.rfl, fun _ _ _ _ _ => Nat.le_refl _⟩
+  show memExt σ.mem (σ.storeDma pa n w).mem
+  by_cases hn : n = 0
+  · rw [MState.storeDma_zero σ pa n w hn]; exact memExt_refl _
+  · rw [MState.storeDma_mem_of_ne σ pa n w hn]; exact memExt_writeBytes _ _ _ _ _
+
+/-- The publication words of a list whose disciplines hold are one-shot. -/
+theorem pubOneShot_of_rsv {rs : List RsvRegion} {σ : MState} (h : rsvAllOk rs σ.mem) :
+    pubOneShot (chainEnvAt rs σ) := by
+  intro f w H e e' hp hf he he' ht ht'
+  obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 hp
+  have hR := h i _ hi
+  unfold regionOk at hR
+  exact hR.2 f (RsvRegion.base_mem _) H hf e he e' he' ht ht'
+
+/-- The lock bytes of the ambient record's static reserved spinlocks: the hops
+the chain certificates may use. -/
+def rsvLockByte [MachFixedGS hlc GF] (b : PAddr) : Prop :=
+  lockByteIn (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) b
+
+/-- The ambient record's certificate environment at `σ`. -/
+abbrev chainEnv [MachFixedGS hlc GF] (σ : MState) : ChainEnv :=
+  chainEnvAt (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ
+
+/-- The issued elements of a certificate map, kept beside the authority (so
+re-issuing a certificate hands out its element; `MachCSL.dirtyElems`'s
+pattern). -/
+def chainElemsAt [MachFixedGS hlc GF] (E : EraGS) (Z : RegMapF Agent) : IProp GF := iprop%
+  □ ∀ (k : Nat) (v : Agent), ⌜get? Z k = some v⌝ -∗ E.chainName ↪◯MAP[k]{.discard} v
+
+instance [MachFixedGS hlc GF] (E : EraGS) (Z : RegMapF Agent) :
+    Persistent (PROP := IProp GF) (chainElemsAt E Z) := by
+  unfold chainElemsAt; infer_instance
+
+/-- **The chain conjunct** of era `E`'s interpretation: the certificate map,
+every key valid, every element issued. -/
+def chainModelAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) : IProp GF := iprop%
+  ∃ Z : RegMapF Agent, (E.chainName ↪●MAP Z) ∗ ⌜certsOk (chainEnv (hlc := hlc) (GF := GF) σ) Z⌝ ∗
+    chainElemsAt E Z
+
 /-- **The reserved-region conjunct** of era `E`'s interpretation (plan [R25.2]
-deliverable (i): `⌜staticIn reg ∧ reservedOk σ reg⌝` beside `⌜mmOk σ⌝`). -/
+deliverable (i): `⌜staticIn reg ∧ reservedOk σ reg⌝` beside `⌜mmOk σ⌝`), and
+-- W8 (f2-ctx) -- the chain certificates (`chainModelAt`): the two conjuncts
+that read only the memory (`rsvModelAt_congr`). -/
 def rsvModelAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) : IProp GF := iprop%
   (∃ reg : RegMapF Agent, (E.rsvName ↪●MAP reg) ∗
     ⌜staticIn (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) reg ∧
       rsvExact (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) reg ∧
       reservedOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ reg⌝) ∗
-  rsvHalvesAt E (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))
+  rsvHalvesAt E (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) ∗
+  chainModelAt E σ
 
 /-- Era `E`'s memory-model mirrors at the machine `σ`. -/
 def memModelAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) : IProp GF := iprop%
@@ -1021,11 +1206,12 @@ def memModelAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) : IProp GF := ipro
   (E.resvName ↪●MAP resvMap σ) ∗
   ⌜mmOk σ⌝ ∗ rsvModelAt E σ
 
-/-- The reserved conjunct reads only the memory. -/
-theorem rsvModelAt_congr [MachFixedGS hlc GF] (E : EraGS) {σ σ' : MState} (h : σ'.mem = σ.mem) :
+/-- The reserved conjunct reads only the memory and the coherence floors. -/
+theorem rsvModelAt_congr [MachFixedGS hlc GF] (E : EraGS) {σ σ' : MState} (h : σ'.mem = σ.mem)
+    (hc : ∀ (j : CPU) (a : PAddr), (σ'.hr j).coh a = (σ.hr j).coh a) :
     rsvModelAt (GF := GF) E σ' = rsvModelAt E σ := by
-  unfold rsvModelAt reservedOk
-  rw [h]
+  unfold rsvModelAt reservedOk chainModelAt chainEnv
+  rw [chainEnvAt_congr _ h hc, h]
 
 /-- `cpus` lists every hart at its own index. -/
 theorem cpus_get? (cpu : CPU) : cpus[cpu.val]? = some cpu := by

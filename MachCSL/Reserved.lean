@@ -117,6 +117,10 @@ inductive RsvKind where
   | cpu (h : CPU)
   /-- a spinlock's two words; `cb` is `&cpus[0]`: hart `c` stores `cb + 128 c` to `lk->cpu` -/
   | lock (cb : BitVec 64)
+  /-- a ONE-SHOT PUBLICATION word written only by hart `w` (W8 (f2-ctx)'s boot
+  hop: xv6's `started`): every post-power-on entry is `w`'s, all at one
+  timestamp -/
+  | pub (w : CPU)
   deriving DecidableEq
 
 /-- A reserved region: its base address and kind. -/
@@ -133,6 +137,7 @@ def RsvRegion.words (R : RsvRegion) : List (PAddr × Nat) :=
   match R.kind with
   | .cpu _ => [(R.base, 8), (R.base + 120#64, 4), (R.base + 124#64, 4)]
   | .lock _ => [(R.base, 4), (R.base + 16#64, 8)]
+  | .pub _ => [(R.base, 4)]
 
 /-- The bytes of a word. -/
 def wordBytes (w : PAddr × Nat) : List PAddr :=
@@ -148,11 +153,17 @@ def rsvBytes (rs : List RsvRegion) : List PAddr := rs.flatMap RsvRegion.bytes
 def cpuRegionOk (h : CPU) (m : FlatMem) (R : RsvRegion) : Prop :=
   ∀ a ∈ R.bytes, ∀ H, m[a]? = some H → ∀ e ∈ H, e.t ≠ 0 → e.tid = hartAgent h
 
+/-- A publication word's bytes were written at most once after power-on:
+every post-power-on entry is at one timestamp. -/
+def oneShotOk (m : FlatMem) (R : RsvRegion) : Prop :=
+  ∀ a ∈ R.bytes, ∀ H, m[a]? = some H → ∀ e ∈ H, ∀ e' ∈ H, e.t ≠ 0 → e'.t ≠ 0 → e.t = e'.t
+
 /-- A region's discipline. -/
 def regionOk (m : FlatMem) (R : RsvRegion) : Prop :=
   match R.kind with
   | .cpu h => cpuRegionOk h m R
   | .lock cb => lockRegionOk (cpuPtrAt cb) m R.base
+  | .pub w => cpuRegionOk w m R ∧ oneShotOk m R
 
 /-- Every region of the list keeps its discipline. -/
 def rsvAllOk (rs : List RsvRegion) (m : FlatMem) : Prop :=
@@ -230,6 +241,15 @@ theorem mem_rsvBytes {rs : List RsvRegion} {i : Nat} {R : RsvRegion} (hi : rs[i]
     (ha : a ∈ R.bytes) : a ∈ rsvBytes rs :=
   List.mem_flatMap.2 ⟨R, List.mem_of_getElem? hi, ha⟩
 
+/-- A region's base is one of its bytes. -/
+theorem RsvRegion.base_mem (R : RsvRegion) : R.base ∈ R.bytes := by
+  have hw : ∃ n, 0 < n ∧ (R.base, n) ∈ R.words := by
+    unfold RsvRegion.words
+    cases R.kind <;> exact ⟨_, by decide, List.mem_cons_self⟩
+  obtain ⟨n, hn, hw⟩ := hw
+  have := mem_regionBytes hw hn
+  simpa using this
+
 /-- Two regions at different indices of a byte-distinct list share no byte. -/
 theorem rsvBytes_disjoint {rs : List RsvRegion} (hnd : (rsvBytes rs).Nodup) :
     ∀ {i i' : Nat} {R R' : RsvRegion}, rs[i]? = some R → rs[i']? = some R' → i ≠ i' →
@@ -283,6 +303,11 @@ theorem regionOk_congr {m m' : FlatMem} {R : RsvRegion}
       wordHistAt_congr (fun j hj => h _ ?_) h2, h3⟩
     · exact mem_regionBytes (w := (R.base, 4)) (by rw [hw]; simp) hj
     · exact mem_regionBytes (w := (R.base + 16#64, 8)) (by rw [hw]; simp) hj
+  | pub w =>
+    rw [hk] at hR
+    obtain ⟨h1, h2⟩ := hR
+    exact ⟨fun a ha H hH => h1 a ha H ((h a ha).symm.trans hH),
+      fun a ha H hH => h2 a ha H ((h a ha).symm.trans hH)⟩
 
 /-- A store whose bytes lie off every region keeps every discipline. -/
 theorem rsvAllOk_store_off {rs : List RsvRegion} {m : FlatMem} {pa : PAddr} {n : Nat}
@@ -397,5 +422,19 @@ theorem rsvAllOk_boot {rs : List RsvRegion} (hwf : rsvWf rs) : rsvAllOk rs (imgF
       refine ⟨fun e he => by simp at he, fun c _ e hl => ?_, fun i hi => by simp at hi⟩
       obtain ⟨W1, W2, hW, _, _⟩ := hl
       cases W1 <;> cases hW
+  | pub w =>
+    refine ⟨fun a ha H hH e he het => ?_, fun a ha H hH e he e' _ het _ => ?_⟩
+    · obtain ⟨v, hv⟩ := himg a ha
+      rw [hv] at hH
+      obtain rfl := Option.some.inj hH
+      simp only [List.mem_singleton] at he
+      subst he
+      exact absurd rfl het
+    · obtain ⟨v, hv⟩ := himg a ha
+      rw [hv] at hH
+      obtain rfl := Option.some.inj hH
+      simp only [List.mem_singleton] at he
+      subst he
+      exact absurd rfl het
 
 end MachCSL

@@ -19,12 +19,13 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 /-- A fresh context, stamped at 0 (Rocq `ctx_stamped_alloc`): bound 0, empty
-dirty set. -/
+dirty set.  (Its W8 (f2-ctx) chain names are allocated, unused until S2.) -/
 theorem ctxStamped_boot : ⊢@{IProp GF} |==> ∃ ξ : CtxId, ctxStamped ξ 0 := by
   imod (MonoNat.own_alloc (GF := GF) (.ofNat 0)) with ⟨%γb, Hb, _⟩
   imod (ghost_map_alloc_empty (GF := GF) (K := Nat) (V := CPU) (H := RegMapF)) with ⟨%γd, Hd⟩
+  imod (vecAt_alloc (GF := GF)) with ⟨%γc, %γg, _, _⟩
   imodintro
-  iexists ⟨γb, γd⟩
+  iexists ⟨γb, γd, γc, γg⟩
   unfold ctxStamped ctxAt
   iexists ∅
   iframe Hb Hd
@@ -58,8 +59,9 @@ theorem ownCtx_boot (E : EraGS) (cpu : CPU) :
   iintro HK
   imod (MonoNat.own_alloc (.ofNat 0)) with ⟨%γb, Hb, _⟩
   imod (ghost_map_alloc_empty (K := Nat) (V := CPU) (H := RegMapF)) with ⟨%γd, Hd⟩
+  imod (vecAt_alloc (GF := GF)) with ⟨%γc, %γg, _, _⟩
   imodintro
-  iexists ⟨γb, γd⟩
+  iexists ⟨γb, γd, γc, γg⟩
   unfold ownCtxAt ctxAt viewLbAt
   iexists 0, 0, 0, ∅
   iframe Hb Hd HK
