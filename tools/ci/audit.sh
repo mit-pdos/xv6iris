@@ -12,10 +12,12 @@
 #             Without it a stale .lake/build is audited as it stands.
 #   --weak    audit the weak-memory tier's top theorems instead (Theorem 2 /
 #             Theorem 1 / the AxSpin certificates, and the allocproc plan's
-#             INTERNAL milestone M1 Weak.srvwmoXv6M1Core;
+#             INTERNAL milestone M1 Weak.srvwmoXv6M1Core and its corollary
+#             Weak.srvwmoXv6M1 without the Sail-cycle premise;
 #             tools/ci/roots-weak.txt) against tools/audit/baseline-weak.json,
 #             importing the modules of $XV6_AUDIT_MODULES below
-#             (Weak.AxSpinT2b ... Weak.AxSpinT2q4, Weak.SrvwmoXv6Adequacy;
+#             (Weak.AxSpinT2b ... Weak.AxSpinT2q4, Weak.SrvwmoXv6Adequacy,
+#             Weak.SailCycleOrderCycle;
 #             Weak/ is not in the Xv6/MachCSL build CI audits); output in
 #             $XV6_CI_OUT/weak.  With --build, `lake build` of those same
 #             modules first.
@@ -44,14 +46,14 @@ for a in "$@"; do
 done
 if [ "$weak" -eq 1 ]; then
   export XV6_CI_OUT="$XV6_CI_OUT/weak"
-  export XV6_AUDIT_MODULES="Weak.AxSpinT2b,Weak.AxSpinT2b2,Weak.AxSpinT2c,Weak.AxSpinT2e3,Weak.AxSpinT2q1,Weak.AxSpinT2q3,Weak.AxSpinT2q2,Weak.AxSpinT2q4,Weak.SrvwmoXv6Adequacy"
+  export XV6_AUDIT_MODULES="Weak.AxSpinT2b,Weak.AxSpinT2b2,Weak.AxSpinT2c,Weak.AxSpinT2e3,Weak.AxSpinT2q1,Weak.AxSpinT2q3,Weak.AxSpinT2q2,Weak.AxSpinT2q4,Weak.SrvwmoXv6Adequacy,Weak.SailCycleOrderCycle"
   export XV6_AUDIT_BASELINE="tools/audit/baseline-weak.json"
 fi
 mkdir -p "$XV6_CI_OUT"
 rm -f "$XV6_CI_OUT/audit.json" "$XV6_CI_OUT/audit.md"
 
 if [ "$build" -eq 1 ]; then
-  if [ "$weak" -eq 1 ]; then lake build Weak.AxSpinT2b Weak.AxSpinT2b2 Weak.AxSpinT2c Weak.AxSpinT2e3 Weak.AxSpinT2q1 Weak.AxSpinT2q3 Weak.AxSpinT2q2 Weak.AxSpinT2q4 Weak.SrvwmoXv6Adequacy; else lake build Xv6 MachCSL; fi
+  if [ "$weak" -eq 1 ]; then lake build Weak.AxSpinT2b Weak.AxSpinT2b2 Weak.AxSpinT2c Weak.AxSpinT2e3 Weak.AxSpinT2q1 Weak.AxSpinT2q3 Weak.AxSpinT2q2 Weak.AxSpinT2q4 Weak.SrvwmoXv6Adequacy Weak.SailCycleOrderCycle; else lake build Xv6 MachCSL; fi
 fi
 
 rc=0

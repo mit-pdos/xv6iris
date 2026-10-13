@@ -6,7 +6,9 @@
     "tools/ci/lint.sh checks that this file and tools/ci/roots-weak.txt name the same theorems.",
     "Weak.srvwmoXv6M1Core (the allocproc plan's INTERNAL milestone M1, NOT published) carries EXACTLY",
     "Xv6.xv6FsAdequacy_closed's baseline.json entry: the three standard axioms (its bv_decide certificates are",
-    "counted, never listed) and the two reservation opaques + MachCSL.bootImageSealed (already in baseline.json)."
+    "counted, never listed) and the two reservation opaques + MachCSL.bootImageSealed (already in baseline.json).",
+    "Weak.srvwmoXv6M1 (M1 without the Sail-cycle premise: srvwmoXv6M1Core applied to sailCycleOrder_holds, W-SCO (A))",
+    "carries EXACTLY Weak.srvwmoXv6M1Core's entry (the cycle proof's decide/bv_decide certificates counted, no new opaque)."
   ],
   "theorems": [
     {
@@ -131,6 +133,19 @@
     },
     {
       "name": "Weak.srvwmoXv6M1Core",
+      "axioms": [
+        "propext",
+        "Classical.choice",
+        "Quot.sound"
+      ],
+      "opaques": [
+        "LeanRV64D.Functions.xv6_resv_is_valid",
+        "LeanRV64D.Functions.xv6_resv_matches",
+        "MachCSL.bootImageSealed"
+      ]
+    },
+    {
+      "name": "Weak.srvwmoXv6M1",
       "axioms": [
         "propext",
         "Classical.choice",
