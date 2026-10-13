@@ -634,7 +634,7 @@ def byteB : BitVec 8 := BitVec.ofNat 8 98
 
 /-- Two harts (agents 0, 1) each write one console byte; the device agent (2) transmits one.
 RAM rows are empty. -/
-def witGd : Gdexec := ⟨⟨fun _ => none, [[], [], []], []⟩, []⟩
+def witGd : Gdexec := ⟨⟨fun _ => none, [[], [], []], []⟩, [], []⟩
 
 def witRows : List (List (Nat × Dlbl)) :=
   [[(0, .DMmioW uartThrPa 1 byteA)],

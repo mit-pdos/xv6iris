@@ -269,7 +269,7 @@ def prow : List Lbl :=
     Lbl.LLoad false pa1 (List.replicate 8 0) (rdI pa1 8),
     Lbl.LLoad false pa0 (List.replicate 8 0) (rdI pa0 8) ]
 
-def gpT : Gdexec := ⟨⟨pTImg, [prow], [(0, 0), (0, 1), (0, 2)]⟩, []⟩
+def gpT : Gdexec := ⟨⟨pTImg, [prow], [(0, 0), (0, 1), (0, 2)]⟩, [], []⟩
 
 theorem gpTRowLen : (AxOpsem.grow gpT 0).length = 3 := rfl
 

@@ -150,7 +150,7 @@ def mprRow1 : List Lbl :=
 
 /-- `AxViol.mp` with x = 0x80001000, y = 0x80002000 (RAM) instead of 0 / 1. -/
 def AxTokLedgerMp.mpr : Gdexec :=
-  ⟨⟨vimg, [mprRow0, mprRow1], [(0, 0), (0, 2), (1, 0), (1, 1)]⟩, []⟩
+  ⟨⟨vimg, [mprRow0, mprRow1], [(0, 0), (0, 2), (1, 0), (1, 1)]⟩, [], []⟩
 
 theorem AxTokLedgerMp.mprCat : rvwmoCatConsistent AxTokLedgerMp.mpr :=
   catConsistentBSound _ (by decide +kernel)
@@ -168,7 +168,7 @@ def mprPlainRow0 : List Lbl :=
    .LStore false ya [b1] .WCplain]
 
 def mprPlain : Gdexec :=
-  ⟨⟨vimg, [mprPlainRow0, mprRow1], [(0, 0), (0, 2), (1, 0), (1, 1)]⟩, []⟩
+  ⟨⟨vimg, [mprPlainRow0, mprRow1], [(0, 0), (0, 2), (1, 0), (1, 1)]⟩, [], []⟩
 
 theorem mprPlainCat : rvwmoCatConsistent mprPlain :=
   catConsistentBSound _ (by decide +kernel)

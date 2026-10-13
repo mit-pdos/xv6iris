@@ -33,9 +33,11 @@ closing comment enumerates FIVE obligations (O1–O5) for the CONFORMANCE restri
    `RacyD` ↦ `racyD`; `tc_mono` ↦ `tcMono`.  `dev_state` ↦ `Efab` (the event instance's fabric,
    `WeakEvPf` deviation 9 / owner decision Q1).
 2. O2 / STAGE C — THE PINNED LTS (`WeakRvwmoFab` deviation 2; owner ruling Q-C1).
-   `gfexecConfIO` carries `emZifencei GF.gfGd.gdG.gxImg em` (content `emFetchImg`) per row;
-   `gfexecConfRen` / `gfexecConfHull` transport it (`emFetchImgRen`, `emFetchImgPrefix`; the image is fixed by the
-   renaming and the hull).  `fconfSupply` supplies the trace at the PINNED LTS, so the supply
+   `gfexecConfIO` carries the PINNED `emFetchImg GF.gfGd.gdG.gxImg em` per row (W5d-G G1: the
+   unpinned twin `gfexecConfZ` carries `emZifencei G i em`);
+   `gfexecConfRen` / `gfexecConfHull` transport it (`emFetchImgRen` at `π 0 = 0` — W5d-G G2,
+   `wlblRen` renames fetch tags — and `emFetchImgPrefix`; the image is fixed by the renaming and
+   the hull).  `fconfSupply` supplies the trace at the PINNED LTS, so the supply
    conjunct of `fconfRealize`, `hullRealizableOfAcyclicF` and `t2linSupplyF` is Rocq's
    `trDevOrdered GF' c → ∃ pst, …` with `exec_prog_ok' pstep_ev …` read as
    `execProgOk' (pstepPin c.cdImg pstepEv) …`.  Stage B's `candFetchInertF` premise is gone.
@@ -103,8 +105,9 @@ theorem WeakRvwmoFabInd.admRunTRen (π : Nat → Nat) (instr : Bool) (p : Pexv6)
   induction h with
   | ATnil p d => exact .ATnil p d
   | ATcons p d l p1 d1 ls p' d' b ha hs _ ih =>
-    rw [List.map_cons, wlblRenAdmin π instr l ha]
-    exact .ATcons p d l p1 d1 _ p' d' b ha hs ih
+    rw [List.map_cons, ← WeakRvwmoFabInd.pdevEvRen π p l p1]
+    exact .ATcons p d _ p1 d1 _ p' d' b (wlblRenAdmin π instr l ha)
+      (pstepEvWrenAdmin π instr p d l p1 d1 ha hs) ih
 
 theorem hemitfRen (π : Nat → Nat) (dvi dvo : Nat → Efab) (tq : Nat → Bool) (k : Nat)
     (ws : Wstate) (row : List Lbl) (p : Pexv6) (es : List Eitem) (pfin : Pexv6) :
@@ -370,7 +373,7 @@ theorem gfexecConfRen (π : Nat → Nat) (boot : Nat → Pexv6) (d0 : Efab)
         rw [hdev] at hn
         exact hpin k n hn
       · rw [rowsRelImg π _ _ hrr]
-        exact emFetchImgRen π _ em hfi
+        exact emFetchImgRen π _ em (rowsRelZero π _ _ hrr) hfi
       · intro jk hjk
         rw [hdeps]
         apply hdep
@@ -435,7 +438,7 @@ theorem gfexecConfHull (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab)
           exact ⟨fun h => h.1, fun h => ⟨h, gcutIntro cs (i, k) c hcs hkc⟩⟩
         · intro k n hn
           exact hpin k n (gfHullDevLookup GF cs n (i, k) hdc hn)
-        · exact emFetchImgRen _ _ em' (emFetchImgPrefix _ em em' hpre hfi)
+        · exact emFetchImgRen _ _ em' (hrenZero GF.gfGd.gdG cs) (emFetchImgPrefix _ em em' hpre hfi)
         · intro jk hjk
           simp only [emRen] at hjk
           rw [rowDepsRen] at hjk

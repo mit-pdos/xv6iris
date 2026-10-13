@@ -98,7 +98,7 @@ def AxEpiRace2Run.row1' : List Lbl :=
 
 def race2' : Gdexec :=
   ⟨⟨race2Img, [AxEpiRace2.row0, AxEpiRace2Run.row1'],
-    [AxEpiRace2.eSD, AxEpiRace2.eW1, AxEpiRace2.eLD]⟩, []⟩
+    [AxEpiRace2.eSD, AxEpiRace2.eW1, AxEpiRace2.eLD]⟩, [], []⟩
 
 /-- (Lean-only) Under Stage C the widening is the identity. -/
 theorem AxEpiRace2Run.race2'Eq : race2' = race2 := rfl
@@ -360,7 +360,7 @@ def AxEpiRace2Run.row1o : List Lbl :=
 
 def race2o : Gdexec :=
   ⟨⟨race2Img, [AxEpiSdLdSat.row, AxEpiRace2Run.row1o],
-    [AxEpiRace2.eSD, AxEpiRace2.eW1, AxEpiRace2.eLD]⟩, []⟩
+    [AxEpiRace2.eSD, AxEpiRace2.eW1, AxEpiRace2.eLD]⟩, [], []⟩
 
 theorem race2oCat : rvwmoCatConsistent race2o :=
   catConsistentBSound _ (by decide +kernel)

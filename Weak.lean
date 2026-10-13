@@ -650,5 +650,6 @@ import Weak.WeakRvwmoPinBridge3
 import Weak.GraphFetch
 import Weak.W13WitRun
 import Weak.W13Wit
+import Weak.GraphFetchRetime
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/

@@ -88,6 +88,15 @@ A LEAF: nothing imports this file.
 parametric extension the I/O-aware normalization consumes (`WeakRvwmoTopo.normalizeOfAcyclicX`);
 the I/O instance `racyDIO` is `WeakRvwmoKillIO`'s (its arms name the fabric bundle, downstream of
 this file).  `racyD` itself is unchanged.
+
+**W5d-G G3 (plan §C W5d-G; D42 (a) [OWN.18]; Lean-only).**  `gfetchE GD` — the FETCH ARM: an
+edge of the stored fetch fragment `GD.gdFetch` (`WeakRvwmoGraph` deviation 8) between memory
+events that is gmo-forward in `GD`.  It enters the racy relation as a further `racyDX` arm
+beside the I/O arms (`WeakRvwmoKillIO.ioExtra`), not as a `racyD` disjunct, so `racyD` and
+everything stated over it are unchanged.  The gmo guard makes the arm gmo-forward BY
+CONSTRUCTION (like `gmoIo`): the kill composes it in the cross order with no new premise, and
+the Zifencei clause (`GraphFetch.emZif`, whose (Z2)/(Z3) make every edge of the emission's
+fragment gmo-forward) is what puts the fragment's edges in the arm.
 -/
 import Weak.WeakMem
 import Weak.WeakAxiomatic
@@ -212,6 +221,11 @@ pairs) lives in `WeakRvwmoKillIO`: its arms name the fabric bundle, which is dow
 file. -/
 def racyDX (GD : Gdexec) (X : Geid → Geid → Prop) (x y : Geid) : Prop :=
   racyD GD x y ∨ X x y
+
+/-- W5d-G G3 (Lean-only): THE FETCH ARM — a stored fetch-fragment edge between memory events,
+gmo-forward in `GD`. -/
+def gfetchE (GD : Gdexec) (x y : Geid) : Prop :=
+  (x, y) ∈ GD.gdFetch ∧ gmem GD.gdG x ∧ gmem GD.gdG y ∧ gmoLt GD.gdG x y
 
 /-- W12 (1) (plan §C W12; D25 (a) [OWN.5]): THE CORE the topo / normalize / hull kit
 consumes — well-formedness, load value, atomicity and the dep fragment's shape.  No ppo

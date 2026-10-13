@@ -87,6 +87,14 @@ existence theorem and the normalization over `racyDX GD X = racyD ∪ X` (any `X
 members): the same output as `normalizeOfAcyclic`, and every `X` edge gmo-forward in it.
 `WeakRvwmoKillIO.normalizeOfAcyclicIO` instantiates `X` with the residue, gmo|IO and the disk-read
 pairs.  `normalizeOfAcyclic` is unchanged.
+
+**W5d-G G3 (plan §C W5d-G; Lean-only).**  The re-timed graph keeps the fetch fragment
+(`WeakRvwmoGraph` deviation 8): `topoLinearizes` and the two normalizations build it as
+`⟨retime GD.gdG L, GD.gdDeps, GD.gdFetch⟩`, and `normalizeOfAcyclicX` gains the conjunct
+`GD'.gdFetch = GD.gdFetch`; the fetch arm's edges come out gmo-forward through `X`
+(`WeakRvwmoKillIO.normalizeOfAcyclicIO`).  W5d-G G4: `normalizeOfAcyclicX` also exports that every
+`racyD` edge (co among them) is gmo-forward in the output — `GraphFetch.retimeZifencei`'s
+coherence premise (`Weak/GraphFetchRetime.lean`).
 -/
 import Weak.WeakMem
 import Weak.WeakAxiomatic
@@ -450,7 +458,7 @@ theorem linGdepsGmo : gdepsGmo (retime GD.gdG L) GD.gdDeps := by
 
 /-- THE DELIVERABLE. -/
 theorem topoLinearizes :
-    rvwmoMinusDepsConsistent ⟨retime GD.gdG L, GD.gdDeps⟩ ∧
+    rvwmoMinusDepsConsistent ⟨retime GD.gdG L, GD.gdDeps, GD.gdFetch⟩ ∧
     grule14 (retime GD.gdG L) ∧
     rowsRel (tren GD.gdG L) GD.gdG (retime GD.gdG L) ∧
     wperm (tren GD.gdG L) GD.gdG (retime GD.gdG L) :=
@@ -624,7 +632,7 @@ theorem normalizeOfAcyclic (GD : Gdexec) :
   intro hcons hdec hacy
   obtain ⟨L, hlin⟩ := topoExists GD hcons hdec hacy
   obtain ⟨hc', h14, hr, hw⟩ := topoLinearizes GD L hcons hlin
-  refine ⟨⟨retime GD.gdG L, GD.gdDeps⟩, tren GD.gdG L, hc', h14, hr, rfl, hw, ?_⟩
+  refine ⟨⟨retime GD.gdG L, GD.gdDeps, GD.gdFetch⟩, tren GD.gdG L, hc', h14, hr, rfl, hw, ?_⟩
   -- [R21.2]: the cat chain's six arms, from the output's RVWMO⁻ (`racyD` keeps `gppo`)
   exact fun e1 e2 h => hc'.1.2.1 e1 e2 (gppoCat6Gppo _ e1 e2 hc'.1.2.2.1 h)
 
@@ -655,7 +663,9 @@ theorem topoExistsX (GD : Gdexec) (X : Geid → Geid → Prop) :
     obtain ⟨hx, hy⟩ := hXm x y hX
     exact hord x y hx hy (Or.inr hX)
 
-/-- `normalizeOfAcyclic` over `racyDX`: the same output, and every `X` edge gmo-forward in it. -/
+/-- `normalizeOfAcyclic` over `racyDX`: the same output, and every `X` edge gmo-forward in it;
+the re-timing keeps the fetch fragment (W5d-G G3: `GD'.gdFetch = GD.gdFetch`) and puts every
+`racyD` edge gmo-forward (W5d-G G4: the coherence order `retimeZifencei` consumes). -/
 theorem normalizeOfAcyclicX (GD : Gdexec) (X : Geid → Geid → Prop) :
     rvwmoCoreD GD →
     (∀ x y, X x y → x ∈ GD.gdG.gxGmo ∧ y ∈ GD.gdG.gxGmo) →
@@ -666,14 +676,18 @@ theorem normalizeOfAcyclicX (GD : Gdexec) (X : Geid → Geid → Prop) :
       grule14 GD'.gdG ∧
       rowsRel pi GD.gdG GD'.gdG ∧
       GD'.gdDeps = GD.gdDeps ∧
+      GD'.gdFetch = GD.gdFetch ∧
       wperm pi GD.gdG GD'.gdG ∧
       gppoCat6Gmo GD'.gdG ∧
-      (∀ x y, X x y → gmoLt GD'.gdG x y) := by
+      (∀ x y, X x y → gmoLt GD'.gdG x y) ∧
+      (∀ x y, racyD GD x y → gmoLt GD'.gdG x y) := by
   intro hcons hXm hdec hacy
   obtain ⟨L, hlin, hX⟩ := topoExistsX GD X hcons hXm hdec hacy
   obtain ⟨hc', h14, hr, hw⟩ := topoLinearizes GD L hcons hlin
-  refine ⟨⟨retime GD.gdG L, GD.gdDeps⟩, tren GD.gdG L, hc', h14, hr, rfl, hw, ?_, ?_⟩
+  refine ⟨⟨retime GD.gdG L, GD.gdDeps, GD.gdFetch⟩, tren GD.gdG L, hc', h14, hr, rfl, rfl, hw, ?_, ?_,
+    ?_⟩
   · exact fun e1 e2 h => hc'.1.2.1 e1 e2 (gppoCat6Gppo _ e1 e2 hc'.1.2.2.1 h)
   · exact fun x y hxy => (linBefore GD L hcons hlin x y).1 (hX x y hxy)
+  · exact fun x y hxy => (linBefore GD L hcons hlin x y).1 (hlin.2 x y hxy)
 
 end Weak

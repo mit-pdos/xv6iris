@@ -93,7 +93,7 @@ def AxLitmus.imgw : Image := fun _ => some b0
 
 def AxLitmus.mkgd (prog : List (List Lbl)) (gmo : List Geid)
     (deps : List (Geid × Geid)) : Gdexec :=
-  ⟨⟨AxLitmus.imgw, prog, gmo⟩, deps⟩
+  ⟨⟨AxLitmus.imgw, prog, gmo⟩, deps, []⟩
 
 /-! # 1. General infrastructure -/
 
@@ -327,7 +327,7 @@ theorem corrNo2Accepts : catConsistentNo2B corr = true := by decide +kernel
 
 /-- LB with a data dependency on EACH side (also the LB+ctrl shape: `gdDeps` does
 not tag edges by kind). -/
-def lbgdDeps : Gdexec := ⟨lbg, [((0, 0), (0, 1)), ((1, 0), (1, 1))]⟩
+def lbgdDeps : Gdexec := ⟨lbg, [((0, 0), (0, 1)), ((1, 0), (1, 1))], []⟩
 
 /-- Certifies the `gdepsGmo` AXIOM, not a `gppoCat` arm. -/
 theorem lbDepsCandInconsistent : ¬ rvwmoCatConsistent lbgdDeps := by

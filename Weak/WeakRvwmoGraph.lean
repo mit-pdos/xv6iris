@@ -72,6 +72,13 @@ four-event LB execution is RVWMO⁻-consistent, so tier 2 is about a real gap.
    built on it) WIDENS with NO text change: those premises must now exclude rule-7-wide
    cycles — EMPTY on xv6 graphs, which carry no `W.rl` (the kernel's only annotated atomic is
    `acquire`'s `amoswap.w.aq`).
+8. W5d-G G3 (plan `notes/weak-allocproc-plan.md` §C W5d-G; D42 (a) [OWN.18]): `Gdexec` gains
+   the FETCH FRAGMENT `gdFetch` (a list of event pairs, the edges E1′/E2/E3 the Zifencei clause
+   `GraphFetch.emZif` orders, stored as graph DATA beside `gdDeps`), a field with DEFAULT `[]`:
+   structure-syntax sites and `{ GD with … }` updates are untouched, the anonymous `⟨G, deps⟩`
+   literals read `⟨G, deps, []⟩`.  No model text names it: RVWMO⁻ and the cat model ignore it
+   (riscv.cat has no fetch); its consumer is the racy relation's fetch arm
+   (`WeakRvwmoAcyc.gfetchE`), kept by the hull (`gdHull` filters it) and the re-timing.
 
 **Name map** (Rocq → Lean): `geid` ↦ `Geid`; `gexec` ↦ `Gexec` (`gx_img`/
 `gx_prog`/`gx_gmo` ↦ `gxImg`/`gxProg`/`gxGmo`); `gdexec` ↦ `Gdexec`
@@ -669,6 +676,8 @@ consistency. -/
 structure Gdexec where
   gdG : Gexec
   gdDeps : List (Geid × Geid)
+  /-- W5d-G G3 (deviation 8): the fetch fragment, default empty (kernel-only executions). -/
+  gdFetch : List (Geid × Geid) := []
 
 /-- Well-formedness: each edge runs from a READ to a po-LATER WRITE of the same
 hart. -/
@@ -687,7 +696,7 @@ def rvwmoMinusDepsConsistent (GD : Gdexec) : Prop :=
 /-- NON-COLLAPSE, re-checked for the extended model: LB's load;store pairs are
 syntactically independent, so the LB witness carries the EMPTY dep set and
 stays consistent. -/
-def lbgd : Gdexec := ⟨lbg, []⟩
+def lbgd : Gdexec := ⟨lbg, [], []⟩
 
 theorem lbGraphDepsConsistent : rvwmoMinusDepsConsistent lbgd :=
   ⟨lbGraphConsistent, fun _ h => by simp [lbgd] at h, fun _ h => by simp [lbgd] at h⟩

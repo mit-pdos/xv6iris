@@ -114,7 +114,7 @@ def eSY : Geid := (1, 0)
 
 /-- gmo: `[sd y; ld x; sd x]`: the load is gmo-BEFORE its own source. -/
 def gfwd : Gdexec :=
-  ⟨⟨fwdImg, [frow0, frow1], [eSY, eLX, eSX]⟩, []⟩
+  ⟨⟨fwdImg, [frow0, frow1], [eSY, eLX, eSX]⟩, [], []⟩
 
 theorem AxCutProbe.fwdCat : rvwmoCatConsistent gfwd :=
   catConsistentBSound _ (by decide +kernel)

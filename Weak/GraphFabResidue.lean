@@ -257,7 +257,7 @@ def w13fIoG : Gexec :=
     [GraphFabResidue.uartIer, LStore false 0 [b1] .WCplain]],
    [(0, 0), (1, 0), (1, 1), (0, 1)]⟩
 
-def w13fIo : Gfexec := ⟨⟨w13fIoG, []⟩, [(0, 0), (1, 0)]⟩
+def w13fIo : Gfexec := ⟨⟨w13fIoG, [], []⟩, [(0, 0), (1, 0)]⟩
 
 /-- The four labels of `w13fIoG`. -/
 theorem GraphFabResidue.w13fIoLbl (e : Geid) :
@@ -310,7 +310,7 @@ theorem w13fIoResidueOk : ioResidueGmo w13fIo := by
 
 /-- …and the item is not vacuous: the same graph with the fabric order REVERSED (MMIO₁ first) is
 excluded, since gmo puts MMIO₀ first. -/
-theorem w13fIoRevExcluded : ¬ ioResidueGmo ⟨⟨w13fIoG, []⟩, [(1, 0), (0, 0)]⟩ := by
+theorem w13fIoRevExcluded : ¬ ioResidueGmo ⟨⟨w13fIoG, [], []⟩, [(1, 0), (0, 0)]⟩ := by
   intro h
   have := h (1, 0) (0, 0) (Or.inr (Or.inr (Or.inr (Or.inr
     ⟨GraphFabResidue.gisIoGmem _ _ rfl, GraphFabResidue.gisIoGmem _ _ rfl,
@@ -336,7 +336,7 @@ def GraphFabResidue.diskFabG : Gexec :=
    [[GraphFabResidue.uartIer], [], [], [], [], [], [], [], [GraphFabResidue.usedIdxSt]],
    [(0, 0), (NCPU, 0)]⟩
 
-def GraphFabResidue.diskFab : Gfexec := ⟨⟨GraphFabResidue.diskFabG, []⟩, [(0, 0), (NCPU, 0)]⟩
+def GraphFabResidue.diskFab : Gfexec := ⟨⟨GraphFabResidue.diskFabG, [], []⟩, [(0, 0), (NCPU, 0)]⟩
 
 /-- The member `(NCPU, 0)` is a disk-row RAM WRITE, not an I/O event. -/
 theorem GraphFabResidue.diskFabMember :
@@ -386,7 +386,7 @@ theorem GraphFabResidue.diskFabResidueOk : ioResidueGmo GraphFabResidue.diskFab 
 
 /-- …and the widened arm bites on the non-I/O member: the reversed fabric order is excluded. -/
 theorem GraphFabResidue.diskFabRevExcluded :
-    ¬ ioResidueGmo ⟨⟨GraphFabResidue.diskFabG, []⟩, [(NCPU, 0), (0, 0)]⟩ := by
+    ¬ ioResidueGmo ⟨⟨GraphFabResidue.diskFabG, [], []⟩, [(NCPU, 0), (0, 0)]⟩ := by
   intro h
   have := h (NCPU, 0) (0, 0) (Or.inr (Or.inr (Or.inr (Or.inr
     ⟨⟨GraphFabResidue.usedIdxSt, rfl, rfl⟩, GraphFabResidue.gisIoGmem _ _ rfl,

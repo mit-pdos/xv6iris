@@ -514,7 +514,7 @@ def cyImg : Image := fun _ => some 0#8
 def cyg : Gexec :=
   ⟨cyImg, [cyRow cyA cyB cyTs2, cyRow cyB cyA cyTs1], [(0, 1), (1, 0), (1, 1), (0, 0)]⟩
 
-def cygd : Gdexec := ⟨cyg, []⟩
+def cygd : Gdexec := ⟨cyg, [], []⟩
 
 theorem cygLbl (e : Geid) (l : Lbl) :
     gxLbl cyg e = some l →

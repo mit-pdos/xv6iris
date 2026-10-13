@@ -55,7 +55,8 @@ WHAT IS HERE.
      item reads the image at timestamp 0; `True` off the fetch) and the extra `gdexecQconf`
      conjunct `emFetchImg im em` (between `emDevfree em` and the deps clause; also returned by
      `gdexecQconfRows` and `qconfRows`).  Stable under the hull (`emFetchImgPrefix`) and the
-     renaming (`emFetchImgRen`, since `wlblRen` fixes `LIFetch`, Q-C4).
+     renaming (`emFetchImgRen`, at a renaming fixing the image tag `π 0 = 0` — W5d-G G2: `wlblRen`
+     renames fetch tags, reverting Q-C4; both callers have it, `rowsRelZero` / `hrenZero`).
    - Lean-only `admRunPin` (an `admRun` whose labels are pinned is an `admStar` of the pinned
      LTS) and `hblockPin` / `hemitStatesPin` / `hartConfStatesPin` (Rocq's `hblock` /
      `hemitStates` / `hartConfStates` at the pinned LTS, from a pinned emission; Rocq's three
@@ -426,18 +427,32 @@ theorem emDevfreePrefix (em em' : Hemission) :
 
 /-! ### 3.1b `emFetchImg` is stable under the two emission operations (deviation 2) -/
 
-/-- (Lean-only) `wlblRen` fixes the fetch (Q-C4), so the pin is renaming-invariant. -/
+/-- (Lean-only; W5d-G G2) `wlblRen` renames a fetch's tags (Q-C4 reverted), so the pin (every tag
+is the image tag `0`) survives a renaming that fixes `0`. -/
 theorem fetchPinRen (π : Nat → Nat) (im : Image) (l : Wlabel) :
-    WeakAxRealize.fetchPin im (wlblRen π l) ↔ WeakAxRealize.fetchPin im l := by
-  cases l <;> exact Iff.rfl
+    π 0 = 0 → WeakAxRealize.fetchPin im l → WeakAxRealize.fetchPin im (wlblRen π l) := by
+  intro hπ h
+  cases l with
+  | LIFetch base tvs =>
+    obtain ⟨h0, himg⟩ := h
+    refine ⟨?_, ?_⟩
+    · intro t ht
+      rw [tvRenFst] at ht
+      obtain ⟨t0, ht0, rfl⟩ := List.mem_map.1 ht
+      rw [h0 t0 ht0, hπ]
+    · intro j hj
+      rw [tvRenLength] at hj
+      rw [tvRenSnd]
+      exact himg j hj
+  | _ => exact h
 
 theorem emFetchImgRen (π : Nat → Nat) (im : Image) (em : Hemission) :
-    emFetchImg im em → emFetchImg im (emRen π em) := by
+    π 0 = 0 → emFetchImg im em → emFetchImg im (emRen π em) := by
   unfold emFetchImg
   rw [emLabelsRen]
-  intro h l hl
+  intro hπ h l hl
   obtain ⟨l0, hl0, rfl⟩ := List.mem_map.1 hl
-  exact (fetchPinRen π im l0).2 (h l0 hl0)
+  exact fetchPinRen π im l0 hπ (h l0 hl0)
 
 theorem emFetchImgPrefix (im : Image) (em em' : Hemission) :
     em'.emItems <+: em.emItems → emFetchImg im em → emFetchImg im em' := by
@@ -492,7 +507,7 @@ theorem gdexecQconfHull (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Na
         obtain ⟨em', hem', hpre⟩ := hartConfPrefix i p (boot i) (fun _ => d0) em c hem
         refine ⟨emRen (hren GD.gdG cs) em', hartConfRen _ _ _ _ _ _ hem',
           emDevfreeRen _ _ (emDevfreePrefix em em' hpre hdf),
-          emFetchImgRen _ _ _ (emFetchImgPrefix im em em' hpre hfi), ?_⟩
+          emFetchImgRen _ _ _ (hrenZero GD.gdG cs) (emFetchImgPrefix im em em' hpre hfi), ?_⟩
         intro jk hjk
         simp only [emRen] at hjk
         rw [rowDepsRen] at hjk
@@ -521,7 +536,7 @@ theorem gdexecQconfRen (π : Nat → Nat) (boot : Nat → Pexv6) (d0 : Efab) (im
   refine ⟨by rw [rowsRelImg π _ _ hrr]; exact himg,
     by rw [rowsRelNharts π _ _ hrr]; exact hnh, ?_⟩
   intro i row' hrow'
-  obtain ⟨_, hprog, _⟩ := hrr
+  obtain ⟨_, hprog, _⟩ := id hrr
   rw [hprog, List.getElem?_map] at hrow'
   cases hrow0 : GD.gdG.gxProg[i]? with
   | none => rw [hrow0] at hrow'; simp at hrow'
@@ -531,7 +546,7 @@ theorem gdexecQconfRen (π : Nat → Nat) (boot : Nat → Pexv6) (d0 : Efab) (im
     subst hrow'
     obtain ⟨em, hem, hdf, hfi, hdep⟩ := hq i row hrow0
     refine ⟨emRen π em, hartConfRen π i row (boot i) _ em hem, emDevfreeRen π em hdf,
-      emFetchImgRen π im em hfi, ?_⟩
+      emFetchImgRen π im em (rowsRelZero π _ _ hrr) hfi, ?_⟩
     intro jk hjk
     rw [hdeps]
     apply hdep

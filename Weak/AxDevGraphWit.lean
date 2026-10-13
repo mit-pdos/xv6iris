@@ -149,7 +149,7 @@ theorem AxDevGraphWit.thrPaDecode : devDecode thrPa = some (.uart .uart0, 0) := 
 gmo = the one write. -/
 def gvwGd : Gdexec :=
   ⟨⟨AxDevGraphWit.imgw, [[LStore false 0 [b1] .WCplain, LFence true true true true], []],
-    [(0, 0)]⟩, []⟩
+    [(0, 0)]⟩, [], []⟩
 
 def gvw : GdexecDev :=
   ⟨gvwGd, [[(2, .DMmioW thrPa 1 b1)], [(0, .DUartTx .uart0 b1)]], [(0, 0), (1, 0)], 1⟩

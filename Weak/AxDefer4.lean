@@ -71,7 +71,7 @@ def gdefv : Gdexec :=
             LFence true true false true,
             LStore false 1 [b1] .WCrel]],
     [(1, 0), (0, 1), (1, 2), (0, 0), (0, 2)]⟩,
-   [((0, 0), (0, 2))]⟩
+   [((0, 0), (0, 2))], []⟩
 
 theorem gdefvCat : rvwmoCatConsistent gdefv :=
   catConsistentBSound _ (by decide +kernel)

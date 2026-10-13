@@ -923,7 +923,7 @@ def epc : Gdexec :=
     [[LStore false 0 [b1] .WCplain, LLoad false 0 [2] [b2], LStore false 0 [b1] .WCplain],
      [LStore false 0 [b2] .WCplain]],
     [(0, 0), (1, 0), (0, 1), (0, 2)]⟩,
-   []⟩
+   [], []⟩
 
 theorem epcLbl (e : Geid) (l : Lbl) :
     gxLbl epc.gdG e = some l →
@@ -1126,7 +1126,7 @@ def iswRowExp : List Lbl :=
 def isw : Gdexec :=
   ⟨⟨imgZero, [iswRowReal, [LStore false 0 [b2] .WCplain]],
     [(0, 2), (1, 0), (0, 0), (0, 1)]⟩,
-   []⟩
+   [], []⟩
 
 theorem iswLbl (e : Geid) (l : Lbl) :
     gxLbl isw.gdG e = some l →
@@ -1252,7 +1252,7 @@ theorem iswWriteBeforeRead :
 
 /-- With the general rule-13 edge (0,2): `dCovers` HOLDS by computation, and
 `isw`'s order violates `gdepsGmo`. -/
-def isw13 : Gdexec := ⟨isw.gdG, [((0, 0), (0, 2))]⟩
+def isw13 : Gdexec := ⟨isw.gdG, [((0, 0), (0, 2))], []⟩
 
 theorem isw13DCovers :
     dCoversB [(0, 2)] iswRowReal 1 = true ∧
@@ -1272,7 +1272,7 @@ def iswOkRow : List Lbl :=
 def iswOk : Gdexec :=
   ⟨⟨imgZero, [iswOkRow, [LStore false 0 [b2] .WCplain]],
     [(1, 0), (0, 0), (0, 1), (0, 2)]⟩,
-   [((0, 0), (0, 2))]⟩
+   [((0, 0), (0, 2))], []⟩
 
 theorem iswOkSameIdent : iswOkRow.map AxGraphCat.ident = iswRowReal.map AxGraphCat.ident := by
   decide

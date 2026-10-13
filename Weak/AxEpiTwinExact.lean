@@ -235,7 +235,7 @@ def row1x : List Lbl :=
 
 def race2x : Gdexec :=
   ⟨⟨race2Img, [AxEpiSdLdSat.row, row1x],
-    [AxEpiRace2.eSD, AxEpiRace2.eW1, AxEpiRace2.eLD]⟩, []⟩
+    [AxEpiRace2.eSD, AxEpiRace2.eW1, AxEpiRace2.eLD]⟩, [], []⟩
 
 theorem race2xCat : rvwmoCatConsistent race2x :=
   catConsistentBSound _ (by decide +kernel)

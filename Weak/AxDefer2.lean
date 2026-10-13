@@ -92,7 +92,7 @@ def gdefer : Gdexec :=
             LFence true true false true,
             LStore false 1 [b1] .WCrel]],
     [(0, 1), (1, 0), (1, 2), (0, 0), (0, 2)]⟩,
-   [((0, 0), (0, 2))]⟩
+   [((0, 0), (0, 2))], []⟩
 
 @[reducible] def AxDefer2.rE : Geid := (0, 0)
 @[reducible] def AxDefer2.dE : Geid := (0, 1)

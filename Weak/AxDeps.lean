@@ -248,7 +248,7 @@ def forgetDeps (G : Gexec) (deps : List Tdep) : List (Geid × Geid) :=
   deps.filterMap (fun e : Tdep => if gisRd G e.1.1 && gisW G e.1.2 then some e.1 else none)
 
 def forget (GT : GdexecT) : Gdexec :=
-  ⟨GT.gtG, forgetDeps GT.gtG GT.gtDeps⟩
+  ⟨GT.gtG, forgetDeps GT.gtG GT.gtDeps, []⟩
 
 /-- The addr/data edges from RAM READS INTO RAM WRITES, untagged — the chain's projection of rule
 12's domain (W13 (F-dep) (0b): RAM sources only, so `gtAd ⊆ forgetDeps` stays syntactic).  (The
@@ -258,7 +258,7 @@ def gtAd (G : Gexec) (deps : List Tdep) : List (Geid × Geid) :=
     if dtagAd e.2 && gisRd G e.1.1 && gisW G e.1.2 then some e.1 else none)
 
 def gtAdGd (GT : GdexecT) : Gdexec :=
-  ⟨GT.gtG, gtAd GT.gtG GT.gtDeps⟩
+  ⟨GT.gtG, gtAd GT.gtG GT.gtDeps, []⟩
 
 /-- RULE 12'S FULL DOMAIN (W13 (F-dep) (0e), RULED (A1) [OWN.52]): the addr/data edges into RAM
 writes from ANY read, I/O loads included — riscv.cat's `r12 = [M];(addr|data);[W];rfi;[R]`. -/
@@ -266,7 +266,7 @@ def gtAdFull (G : Gexec) (deps : List Tdep) : List (Geid × Geid) :=
   deps.filterMap (fun e : Tdep => if dtagAd e.2 && gisW G e.1.2 then some e.1 else none)
 
 def gtAdFullGd (GT : GdexecT) : Gdexec :=
-  ⟨GT.gtG, gtAdFull GT.gtG GT.gtDeps⟩
+  ⟨GT.gtG, gtAdFull GT.gtG GT.gtDeps, []⟩
 
 /-- RULE 12 over addr/data edges only (from any read, (A1)). -/
 def gppo12T (GT : GdexecT) (a b : Geid) : Prop :=

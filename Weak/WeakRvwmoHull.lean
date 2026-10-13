@@ -729,11 +729,18 @@ theorem hullRule14 (G : Gexec) (cs : List Nat) :
 
 def gdHull (GD : Gdexec) (cs : List Nat) : Gdexec :=
   ⟨gxHull GD.gdG cs,
-   GD.gdDeps.filter (fun p : Geid × Geid => gcut cs p.1 && gcut cs p.2)⟩
+   GD.gdDeps.filter (fun p : Geid × Geid => gcut cs p.1 && gcut cs p.2),
+   GD.gdFetch.filter (fun p : Geid × Geid => gcut cs p.1 && gcut cs p.2)⟩
 
 theorem gdHullDeps (GD : Gdexec) (cs : List Nat) (p : Geid × Geid) :
     p ∈ (gdHull GD cs).gdDeps ↔
       p ∈ GD.gdDeps ∧ gcut cs p.1 = true ∧ gcut cs p.2 = true := by
+  simp [gdHull, List.mem_filter]
+
+/-- (Lean-only, W5d-G G3) The hull keeps exactly the fetch-fragment edges inside the cut. -/
+theorem gdHullFetch (GD : Gdexec) (cs : List Nat) (p : Geid × Geid) :
+    p ∈ (gdHull GD cs).gdFetch ↔
+      p ∈ GD.gdFetch ∧ gcut cs p.1 = true ∧ gcut cs p.2 = true := by
   simp [gdHull, List.mem_filter]
 
 theorem hullDepsConsistent (GD : Gdexec) (cs : List Nat) :
@@ -918,7 +925,7 @@ theorem ergHullViolFree :
   rintro ⟨⟨_, hlt, _⟩, _⟩
   exact Nat.lt_irrefl _ hlt
 
-def ergd : Gdexec := ⟨erg, []⟩
+def ergd : Gdexec := ⟨erg, [], []⟩
 
 theorem ergdConsistent : rvwmoMinusDepsConsistent ergd :=
   ⟨ergConsistent, fun _ h => by simp [ergd] at h, fun _ h => by simp [ergd] at h⟩

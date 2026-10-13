@@ -85,7 +85,7 @@ def AxEpiSdLdSat.eSD : Geid := (0, 0)
 def AxEpiSdLdSat.eLD : Geid := (0, 1)
 
 def gsdld : Gdexec :=
-  ⟨⟨sdldImg, [AxEpiSdLdSat.row], [AxEpiSdLdSat.eSD, AxEpiSdLdSat.eLD]⟩, []⟩
+  ⟨⟨sdldImg, [AxEpiSdLdSat.row], [AxEpiSdLdSat.eSD, AxEpiSdLdSat.eLD]⟩, [], []⟩
 
 theorem gsdldCat : rvwmoCatConsistent gsdld :=
   catConsistentBSound _ (by decide +kernel)

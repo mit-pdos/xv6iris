@@ -502,7 +502,7 @@ def mprRaceRow1 : List Lbl :=
 
 /-- W x (e0); R y = 0 (init) (e2); R x = 1 (e3); W y (e1). -/
 def mprRace : Gdexec :=
-  ⟨⟨vimg, [mprRow0, mprRaceRow1], [(0, 0), (1, 0), (1, 1), (0, 2)]⟩, []⟩
+  ⟨⟨vimg, [mprRow0, mprRaceRow1], [(0, 0), (1, 0), (1, 1), (0, 2)]⟩, [], []⟩
 
 theorem mprRaceCat : rvwmoCatConsistent mprRace :=
   catConsistentBSound _ (by decide +kernel)
@@ -545,7 +545,7 @@ def plRow0 : List Lbl :=
 
 /-- W x (e0); W y (f1); R y = 1 (e2); R x = 1 (e3). -/
 def plG : Gdexec :=
-  ⟨⟨vimg, [plRow0, mprRow1], [(0, 0), (0, 1), (1, 0), (1, 1)]⟩, []⟩
+  ⟨⟨vimg, [plRow0, mprRow1], [(0, 0), (0, 1), (1, 0), (1, 1)]⟩, [], []⟩
 
 theorem plGCat : rvwmoCatConsistent plG :=
   catConsistentBSound _ (by decide +kernel)

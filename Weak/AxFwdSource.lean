@@ -212,7 +212,7 @@ theorem epiReloadFwd (GD : Gdexec) (a : Int) (aq : Bool)
 
 /-- `gsdld` with the spill moved gmo-LAST. -/
 def gsdldFwd : Gdexec :=
-  ⟨⟨sdldImg, [AxEpiSdLdSat.row], [AxEpiSdLdSat.eLD, AxEpiSdLdSat.eSD]⟩, []⟩
+  ⟨⟨sdldImg, [AxEpiSdLdSat.row], [AxEpiSdLdSat.eLD, AxEpiSdLdSat.eSD]⟩, [], []⟩
 
 theorem gsdldFwdCat : rvwmoCatConsistent gsdldFwd :=
   catConsistentBSound _ (by decide +kernel)

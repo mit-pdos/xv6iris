@@ -94,7 +94,7 @@ def AxGraphWit.imgw : Image := fun _ => some b0
 
 def AxGraphWit.mkgd (prog : List (List Lbl)) (gmo : List Geid) (deps : List (Geid × Geid)) :
     Gdexec :=
-  ⟨⟨AxGraphWit.imgw, prog, gmo⟩, deps⟩
+  ⟨⟨AxGraphWit.imgw, prog, gmo⟩, deps, []⟩
 
 /-! # 1. FWD+acq — the two models separate
 

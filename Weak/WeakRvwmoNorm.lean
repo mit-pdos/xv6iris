@@ -853,7 +853,7 @@ theorem descent (GD0 : Gdexec) (hK1 : killK1 GD0) (hK2 : killK2 GD0) (hK3 : kill
           hdisj hnppo hdep
         have hk : 0 < gwix GD.gdG w :=
           WeakRvwmoGraph.gwixPos _ _ (gisWGwrites _ _ hwf hsw hwisw)
-        refine ⟨⟨gswapw GD.gdG (gpos GD.gdG w) (gwix GD.gdG w), GD.gdDeps⟩,
+        refine ⟨⟨gswapw GD.gdG (gpos GD.gdG w) (gwix GD.gdG w), GD.gdDeps, GD.gdFetch⟩,
           ⟨fun t => tswap (gwix GD.gdG w) (π t), ?_, ?_, hdeps0, hcons'⟩, ?_⟩
         · exact rowsRelTrans _ _ _ _ _ _ hrows0 (rowsRelGswapw GD.gdG _ _ hk) (fun _ => rfl)
         · exact wpermTrans _ _ _ _ _ _ hwp0
@@ -873,7 +873,7 @@ theorem descent (GD0 : Gdexec) (hK1 : killK1 GD0) (hK2 : killK2 GD0) (hK3 : kill
           have := (hppo e w hpl).2.2
           omega
         have hcons' := gswapReadDownDeps GD _ w e hcons hn hSn' hew hnrf hnppo
-        refine ⟨⟨gswap GD.gdG (gpos GD.gdG w), GD.gdDeps⟩, ⟨π, ?_, ?_, hdeps0, hcons'⟩, ?_⟩
+        refine ⟨⟨gswap GD.gdG (gpos GD.gdG w), GD.gdDeps, GD.gdFetch⟩, ⟨π, ?_, ?_, hdeps0, hcons'⟩, ?_⟩
         · exact rowsRelTrans _ _ _ _ _ _ hrows0 (rowsRelGswap GD.gdG _) (fun _ => rfl)
         · exact wpermTrans _ _ _ _ _ _ hwp0 (wpermGswapHi GD.gdG _ w e hn hSn' hew)
             (fun _ => rfl)
@@ -913,7 +913,7 @@ theorem descent (GD0 : Gdexec) (hK1 : killK1 GD0) (hK2 : killK2 GD0) (hK3 : kill
       have hstep : ∃ (π' : Nat → Nat) (G' : Gexec),
           rowsRel π' GD.gdG G' ∧ wperm π' GD.gdG G' ∧
           G'.gxGmo = (gswap GD.gdG n).gxGmo ∧
-          rvwmoMinusDepsConsistent ⟨G', GD.gdDeps⟩ ∧
+          rvwmoMinusDepsConsistent ⟨G', GD.gdDeps, GD.gdFetch⟩ ∧
           (∀ e' w', gviol G' e' w' → gviol GD.gdG e' w') := by
         cases hew : gisW GD.gdG e with
         | true =>
@@ -978,10 +978,10 @@ theorem descent (GD0 : Gdexec) (hK1 : killK1 GD0) (hK2 : killK2 GD0) (hK3 : kill
       obtain ⟨π', G', hrows', hwp', hgmo', hcons', hmono'⟩ := hstep
       obtain ⟨hnle, hv', hmin', hpmin', hpe', hpw'⟩ :=
         swapInvariant π' GD.gdG G' w e z n hwf hz hSn' hrows' hgmo' hmono' hv hwn hmin hpmin
-      have heq' : gdEquiv GD0 ⟨G', GD.gdDeps⟩ :=
+      have heq' : gdEquiv GD0 ⟨G', GD.gdDeps, GD.gdFetch⟩ :=
         ⟨fun t => π' (π t), rowsRelTrans _ _ _ _ _ _ hrows0 hrows' (fun _ => rfl),
           wpermTrans _ _ _ _ _ _ hwp0 hwp' (fun _ => rfl), hdeps0, hcons'⟩
-      obtain ⟨GD'', heq'', hlt''⟩ := ih ⟨G', GD.gdDeps⟩ w e heq' hv' hmin' hpmin'
+      obtain ⟨GD'', heq'', hlt''⟩ := ih ⟨G', GD.gdDeps, GD.gdFetch⟩ w e heq' hv' hmin' hpmin'
         (by show gpos G' e - gpos G' w ≤ D; rw [hpe', hpw']; omega)
       have hlt2 : nviol GD''.gdG < nviol G' := hlt''
       exact ⟨GD'', heq'', by omega⟩

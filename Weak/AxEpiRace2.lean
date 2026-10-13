@@ -109,7 +109,7 @@ def AxEpiRace2.eW1 : Geid := (1, 0)
 
 def race2 : Gdexec :=
   ⟨⟨race2Img, [AxEpiRace2.row0, AxEpiRace2.row1],
-    [AxEpiRace2.eSD, AxEpiRace2.eW1, AxEpiRace2.eLD]⟩, []⟩
+    [AxEpiRace2.eSD, AxEpiRace2.eW1, AxEpiRace2.eLD]⟩, [], []⟩
 
 theorem race2Cat : rvwmoCatConsistent race2 :=
   catConsistentBSound _ (by decide +kernel)

@@ -253,7 +253,7 @@ def AxEpiRetCert.row0r : List Lbl := AxEpiRace2.row0
 
 def raceRet : Gdexec :=
   ⟨⟨retImg, [AxEpiRetCert.row0r, AxEpiRace2Run.row1'],
-    [AxEpiRace2.eSD, AxEpiRace2.eW1, AxEpiRace2.eLD]⟩, []⟩
+    [AxEpiRace2.eSD, AxEpiRace2.eW1, AxEpiRace2.eLD]⟩, [], []⟩
 
 theorem raceRetCat : rvwmoCatConsistent raceRet :=
   catConsistentBSound _ (by decide +kernel)
@@ -463,7 +463,7 @@ theorem raceRetRefutesHwp1 (cpu : CPU) :
 def AxEpiRetCert.row0o : List Lbl := AxEpiSdLdSat.row
 
 def okRet : Gdexec :=
-  ⟨⟨retImg, [AxEpiRetCert.row0o, row1x], [AxEpiRace2.eSD, AxEpiRace2.eW1, AxEpiRace2.eLD]⟩, []⟩
+  ⟨⟨retImg, [AxEpiRetCert.row0o, row1x], [AxEpiRace2.eSD, AxEpiRace2.eW1, AxEpiRace2.eLD]⟩, [], []⟩
 
 theorem okRetCat : rvwmoCatConsistent okRet :=
   catConsistentBSound _ (by decide +kernel)

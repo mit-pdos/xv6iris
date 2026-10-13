@@ -107,7 +107,7 @@ def AxEpiSat.eSD : Geid := (0, 0)
 def AxEpiSat.eLD : Geid := (0, 1)
 
 def gepi : Gdexec :=
-  ⟨⟨epiImg, [AxEpiSat.row], [AxEpiSat.eSD, AxEpiSat.eLD]⟩, []⟩
+  ⟨⟨epiImg, [AxEpiSat.row], [AxEpiSat.eSD, AxEpiSat.eLD]⟩, [], []⟩
 
 /-- (1) -/
 theorem gepiCat : rvwmoCatConsistent gepi :=

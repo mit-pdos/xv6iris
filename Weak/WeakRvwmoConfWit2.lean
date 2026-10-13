@@ -388,7 +388,7 @@ theorem WeakRvwmoConfWit2.wbytesLookupInv (w : BitVec 32) (j : Nat) (v : BitVec 
 def WeakRvwmoConfWit2.mpw : Gexec :=
   ⟨mpImg, [evRow, WeakRvwmoConfWit2.ldRow 1 lockOne], [(0, 0), (1, 0)]⟩
 
-def mpwd : Gdexec := ⟨WeakRvwmoConfWit2.mpw, []⟩
+def mpwd : Gdexec := ⟨WeakRvwmoConfWit2.mpw, [], []⟩
 
 theorem mpwGwrites : gwrites WeakRvwmoConfWit2.mpw = [(0, 0)] := by decide
 theorem mpwGwix0 : gwix WeakRvwmoConfWit2.mpw (0, 0) = 1 := by decide
@@ -477,7 +477,7 @@ theorem mpwQconf (cpu0 cpu1 : CPU) (rs0 rs1 : RegFile) (ib0 ib1 : Ibch) (d0 : Ef
 def mpw' : Gexec :=
   ⟨mpImg, [evRow, WeakRvwmoConfWit2.ldRow 0 lockZero], [(1, 0), (0, 0)]⟩
 
-def mpwd' : Gdexec := ⟨mpw', []⟩
+def mpwd' : Gdexec := ⟨mpw', [], []⟩
 
 theorem mpw'Gwrites : gwrites mpw' = [(0, 0)] := by decide
 theorem mpw'Gwix0 : gwix mpw' (0, 0) = 1 := by decide

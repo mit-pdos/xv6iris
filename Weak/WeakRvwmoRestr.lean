@@ -545,7 +545,8 @@ theorem restrictRule14 (G : Gexec) (cs : List Nat) (n : Nat) :
 
 def gdRestrict (GD : Gdexec) (cs : List Nat) (n : Nat) : Gdexec :=
   ⟨gxRestrict GD.gdG cs n,
-   GD.gdDeps.filter (fun p : Geid × Geid => gcut cs p.1 && gcut cs p.2)⟩
+   GD.gdDeps.filter (fun p : Geid × Geid => gcut cs p.1 && gcut cs p.2),
+   GD.gdFetch.filter (fun p : Geid × Geid => gcut cs p.1 && gcut cs p.2)⟩
 
 theorem gdRestrictDeps (GD : Gdexec) (cs : List Nat) (n : Nat) (p : Geid × Geid) :
     p ∈ (gdRestrict GD cs n).gdDeps ↔

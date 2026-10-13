@@ -746,7 +746,7 @@ noncomputable def mp2Img : Image := fun a =>
 noncomputable def mp2 : Gexec :=
   ⟨mp2Img, [evRow, laRow 1 lockOne], [(0, 0), (1, 0)]⟩
 
-noncomputable def mp2d : Gdexec := ⟨mp2, []⟩
+noncomputable def mp2d : Gdexec := ⟨mp2, [], []⟩
 
 /-- THE ADDRESS ARITHMETIC: the flag word and the fetched halfword do not overlap. -/
 theorem laTxtPaVal : laTxtPa = 2147487462 := laFetchPa

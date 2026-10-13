@@ -347,7 +347,7 @@ theorem descentWw (GD0 : Gdexec) (hK2 : killWwK2 GD0) (hK3 : killWwK3 GD0)
         hdisj hnppo hdep
       have hk : 0 < gwix GD.gdG w :=
         WeakRvwmoGraph.gwixPos _ _ (gisWGwrites _ _ hwf hsw hwisw)
-      refine ⟨⟨gswapw GD.gdG (gpos GD.gdG w) (gwix GD.gdG w), GD.gdDeps⟩,
+      refine ⟨⟨gswapw GD.gdG (gpos GD.gdG w) (gwix GD.gdG w), GD.gdDeps, GD.gdFetch⟩,
         ⟨fun t => tswap (gwix GD.gdG w) (π t), ?_, ?_, hdeps0, hcons'⟩, ?_⟩
       · exact rowsRelTrans _ _ _ _ _ _ hrows0 (rowsRelGswapw GD.gdG _ _ hk) (fun _ => rfl)
       · exact wpermTrans _ _ _ _ _ _ hwp0
@@ -388,7 +388,7 @@ theorem descentWw (GD0 : Gdexec) (hK2 : killWwK2 GD0) (hK3 : killWwK3 GD0)
       have hstep : ∃ (π' : Nat → Nat) (G' : Gexec),
           rowsRel π' GD.gdG G' ∧ wperm π' GD.gdG G' ∧
           G'.gxGmo = (gswap GD.gdG n).gxGmo ∧
-          rvwmoMinusDepsConsistent ⟨G', GD.gdDeps⟩ ∧
+          rvwmoMinusDepsConsistent ⟨G', GD.gdDeps, GD.gdFetch⟩ ∧
           (∀ e' w', gviolw G' e' w' → gviol GD.gdG e' w') := by
         cases hzw : gisW GD.gdG z with
         | true =>
@@ -447,10 +447,10 @@ theorem descentWw (GD0 : Gdexec) (hK2 : killWwK2 GD0) (hK3 : killWwK3 GD0)
         violwMonoRows π' GD.gdG G' hrows' hmono0
       obtain ⟨_, hv', hmin', hpmin', hpe', hpw'⟩ :=
         swapInvariantW π' GD.gdG G' w e z n hwf hz hSn' hrows' hgmo' hmono' hv hwn hmin hpmin
-      have heq' : gdEquiv GD0 ⟨G', GD.gdDeps⟩ :=
+      have heq' : gdEquiv GD0 ⟨G', GD.gdDeps, GD.gdFetch⟩ :=
         ⟨fun t => π' (π t), rowsRelTrans _ _ _ _ _ _ hrows0 hrows' (fun _ => rfl),
           wpermTrans _ _ _ _ _ _ hwp0 hwp' (fun _ => rfl), hdeps0, hcons'⟩
-      obtain ⟨GD'', heq'', hlt''⟩ := ih ⟨G', GD.gdDeps⟩ w e heq' hv' hmin' hpmin'
+      obtain ⟨GD'', heq'', hlt''⟩ := ih ⟨G', GD.gdDeps, GD.gdFetch⟩ w e heq' hv' hmin' hpmin'
         (by show gpos G' e - gpos G' w ≤ D; rw [hpe', hpw']; omega)
       have hlt2 : nviolw GD''.gdG < nviolw G' := hlt''
       have hnle : nviolw G' ≤ nviolw GD.gdG :=

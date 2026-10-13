@@ -207,7 +207,7 @@ theorem raceRetNoWpd1Fwd (cpu : CPU) :
 /-- `okRet`'s rows; the spill `(0,0)` is gmo-AFTER the reload `(0,1)` (it stays the first WRITE
 in gmo): the reload is forwarded (rfi) from its po-earlier spill. -/
 def okRetFwd : Gdexec :=
-  ⟨⟨retImg, [AxEpiRetCert.row0o, row1x], [AxEpiRace2.eLD, AxEpiRace2.eSD, AxEpiRace2.eW1]⟩, []⟩
+  ⟨⟨retImg, [AxEpiRetCert.row0o, row1x], [AxEpiRace2.eLD, AxEpiRace2.eSD, AxEpiRace2.eW1]⟩, [], []⟩
 
 theorem okRetFwdCat : rvwmoCatConsistent okRetFwd :=
   catConsistentBSound _ (by decide +kernel)

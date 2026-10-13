@@ -513,7 +513,7 @@ theorem linwGdepsGmo : gdepsGmo (retime GD.gdG L) GD.gdDeps := by
 
 /-- THE DELIVERABLE. -/
 theorem topoLinearizesW :
-    rvwmoMinusDepsConsistent ⟨retime GD.gdG L, GD.gdDeps⟩ ∧
+    rvwmoMinusDepsConsistent ⟨retime GD.gdG L, GD.gdDeps, GD.gdFetch⟩ ∧
     gwrowGmo (retime GD.gdG L) ∧
     rowsRel (tren GD.gdG L) GD.gdG (retime GD.gdG L) ∧
     wperm (tren GD.gdG L) GD.gdG (retime GD.gdG L) :=
@@ -546,7 +546,7 @@ theorem normalizeWw3 (GD : Gdexec) :
   intro hcons hacy
   obtain ⟨L, hlin⟩ := topoExistsW GD hcons hacy
   obtain ⟨hc', hrow, hr, hw⟩ := topoLinearizesW GD L hcons hlin
-  exact ⟨⟨retime GD.gdG L, GD.gdDeps⟩, ⟨tren GD.gdG L, hr, hw, rfl, hc'⟩, hrow⟩
+  exact ⟨⟨retime GD.gdG L, GD.gdDeps, GD.gdFetch⟩, ⟨tren GD.gdG L, hr, hw, rfl, hc'⟩, hrow⟩
 
 /-- … and `normalizeWw2` is now a corollary. -/
 theorem normalizeWw2OfWw3 (GD : Gdexec) :

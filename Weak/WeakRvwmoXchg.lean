@@ -490,7 +490,7 @@ theorem gswapReadDownDeps (GD : Gdexec) (n : Nat) (x r : Geid) :
     gisW GD.gdG r = false →
     (∀ a t v, greadsByte GD.gdG r a t v → gwriteAt GD.gdG t ≠ some x) →
     ¬ gppo GD.gdG x r →
-    rvwmoMinusDepsConsistent ⟨gswap GD.gdG n, GD.gdDeps⟩ := by
+    rvwmoMinusDepsConsistent ⟨gswap GD.gdG n, GD.gdDeps, GD.gdFetch⟩ := by
   rintro ⟨hcons, hdwf, hdgmo⟩ hx hr hnw hnrf hnppo
   have hnd := hcons.1.1
   refine ⟨gswapReadDown _ n x r hcons hx hr hnw hnrf hnppo, ?_, ?_⟩
@@ -654,7 +654,7 @@ theorem gswapWriteDownDeps (GD : Gdexec) (n : Nat) (x e : Geid) :
     (∀ a t v, greadsByte GD.gdG x a t v →
        (∃ v', gwritesByte GD.gdG e a v') → gwix GD.gdG e ≤ t) →
     (x, e) ∉ GD.gdDeps →
-    rvwmoMinusDepsConsistent ⟨gswap GD.gdG n, GD.gdDeps⟩ := by
+    rvwmoMinusDepsConsistent ⟨gswap GD.gdG n, GD.gdDeps, GD.gdFetch⟩ := by
   rintro ⟨hcons, hdwf, hdgmo⟩ hx he hnwx hwe hnppo hcomax hdep
   have hnd := hcons.1.1
   refine ⟨gswapWriteDown _ n x e hcons hx he hnwx hwe hnppo hcomax, ?_, ?_⟩
@@ -1155,7 +1155,7 @@ theorem gswapwWwDeps (GD : Gdexec) (n : Nat) (x e : Geid) :
     (∀ a, (∃ v, gwritesByte GD.gdG x a v) → ¬ ∃ v', gwritesByte GD.gdG e a v') →
     ¬ gppo GD.gdG x e →
     (x, e) ∉ GD.gdDeps →
-    rvwmoMinusDepsConsistent ⟨gswapw GD.gdG n (gwix GD.gdG x), GD.gdDeps⟩ := by
+    rvwmoMinusDepsConsistent ⟨gswapw GD.gdG n (gwix GD.gdG x), GD.gdDeps, GD.gdFetch⟩ := by
   rintro ⟨hcons, hdwf, hdgmo⟩ hx he hwx hwe hdisj hnppo hdep
   have hnd := hcons.1.1
   refine ⟨gswapwWw _ n x e hcons hx he hwx hwe hdisj hnppo, ?_, ?_⟩

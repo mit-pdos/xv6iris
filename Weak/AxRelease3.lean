@@ -98,7 +98,7 @@ def rlg : Gdexec :=
       .LFence true true false true,
       .LStore false 0 AxRelease3.z4 .WCrel],
      [.LRmw true false 0 [3, 3, 3, 3] AxRelease3.z4 AxRelease3.o4 .WCexcl]],
-    [(0, 0), (0, 1), (0, 3), (1, 0)]⟩, []⟩
+    [(0, 0), (0, 1), (0, 3), (1, 0)]⟩, [], []⟩
 
 theorem rlgCat : rvwmoCatConsistent rlg := catConsistentBSound _ (by decide +kernel)
 

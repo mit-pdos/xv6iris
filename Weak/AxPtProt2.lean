@@ -398,7 +398,7 @@ def gad : Gdexec :=
       LLoad false 0 (ts8 1) (wb8 AxPtProt2.w0),
       LRmw false false 0 (ts8 1) (wb8 AxPtProt2.w0) (wb8 w1) .WCplain,
       LLoad false 0x80001010 [0] [0]]],
-    [(0, 0), (0, 2), (0, 3), (0, 4)]⟩, []⟩
+    [(0, 0), (0, 2), (0, 3), (0, 4)]⟩, [], []⟩
 
 def GPad : Gptw :=
   mkptw gad [((0, 2), (0, 4)), ((0, 3), (0, 4))] [(0, 1)]
@@ -535,7 +535,7 @@ def grace : Gdexec :=
     [[LLoad false 0 (ts8 0) (wb8 wOld),
       LLoad false 0x80001010 [0] [0]],
      [LStore false 0 (wb8 wNew) .WCplain]],
-    [(0, 0), (1, 0), (0, 1)]⟩, []⟩
+    [(0, 0), (1, 0), (0, 1)]⟩, [], []⟩
 
 def GPrace : Gptw := mkptw grace [((0, 0), (0, 1))] []
 
@@ -578,13 +578,13 @@ def gsfRows (wr : List Nat) (wv : BitVec 64) (dpa : Int) : List (List Lbl) :=
 /-- STALE: the walk reads the image (gmo-first).  riscv.cat allows it. -/
 def gsf : Gdexec :=
   ⟨⟨imgOld, gsfRows (ts8 0) wOld 0x80001010,
-    [(0, 2), (1, 0), (1, 2), (0, 0), (0, 3)]⟩, []⟩
+    [(0, 2), (1, 0), (1, 2), (0, 0), (0, 3)]⟩, [], []⟩
 def GPsf : Gptw := mkptw gsf [((0, 2), (0, 3))] [(0, 1)]
 
 /-- FRESH: the walk reads the remap. -/
 def gsfok : Gdexec :=
   ⟨⟨imgOld, gsfRows (ts8 1) wNew 0x80002010,
-    [(1, 0), (1, 2), (0, 0), (0, 2), (0, 3)]⟩, []⟩
+    [(1, 0), (1, 2), (0, 0), (0, 2), (0, 3)]⟩, [], []⟩
 def GPsfok : Gptw := mkptw gsfok [((0, 2), (0, 3))] [(0, 1)]
 
 theorem gsfCover (GD : Gdexec) (fl : List (Geid × Geid)) (sfl : List Geid) :

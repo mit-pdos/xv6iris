@@ -58,8 +58,14 @@ on fence bits and on whether a write writes a byte (`rowWsRelp`, `lpostRelpRen`)
    Q-C1/Q-C4, `notes/weak-port-o2-stageC.md`).  Rocq's fetch was an `LLoad false` row item; in
    Lean the fetch is NOT a graph event (riscv.cat has none): it is an ADMINISTRATIVE label
    (`WeakAxRealize.lbAdmin`, at the `LInstr` slot), `projLbl (LIFetch ..) = none`.  So:
-   - `wlblRen π (LIFetch base tvs) = LIFetch base tvs` (fetch tags are not graph write indices,
-     Q-C4); `projLblWren` and `pstepEvWren` are trivial at it, and `wlblRenAdmin` holds;
+   - W5d-G G2 (plan rev 45 §C W5d-G; REVERTS Q-C4): fetch tags ARE graph write indices (`0` =
+     the image, `gzFetch`'s (Z1)), so `wlblRen π (LIFetch base tvs) = LIFetch base (tvs.map
+     (tvRen π))`, like a load; `projLblWren` is trivial at it (`projLbl` is `none`), `pstepEvWren`
+     gains the arm (`WeakEvInst.pstepEvTsIfetch`), `wlblRenAdmin` reads "the renaming keeps the
+     administrative alphabet" (no longer the identity on it) and the Lean-only
+     `pstepEvWrenAdmin` re-runs an administrative step at the renamed label (`admRunRen`'s
+     step).  The M1 kernel-text pin survives exactly when `π 0 = 0`
+     (`WeakRvwmoSupply.fetchPinRen`);
    - `elbIsR (LIFetch ..) = false`, and `dstep`'s `LIFetch` arm is `(s, [])` (no `dsLd` push,
      no dependency edges);
    - `hlblRealizes` and `WeakAxRealize.lblRealizes` are both Rocq's four-conjunct relation, and
@@ -67,7 +73,7 @@ on fence bits and on whether a write writes a byte (`rowWsRelp`, `lpostRelpRen`)
      `hlblRealizesAxNoFetch` are deleted).
 4. PROOFS: per-constructor case analysis (Rocq `destruct l; simpl; try done`); the smoke tests
    (Rocq `Example … vm_compute`) are named `theorem`s closed by `decide`.
-5. Lean-only helpers: `dprovSet`, `dedgesSnd`, and the `dstepWithin`
+5. Lean-only helpers: `dprovSet`, `dedgesSnd`, `pstepEvWrenAdmin` (W5d-G G2), and the `dstepWithin`
    sub-lemmas `dsWithinPush`/`dsWithinInstr`/`dsWithinRegw`/`dsWithinCtrl`.
 
 **Rocq → Lean name map.**  `pcls_ev_relp` `WeakRvwmoConf.pclsEvRelp`, `tv_ren` `tvRen`,
@@ -144,7 +150,7 @@ def wlblRen (π : Nat → Nat) (l : Wlabel) : Wlabel :=
   | LLoad aq lat base tvs asrc => LLoad aq lat base (tvs.map (tvRen π)) asrc
   | LRmw aq rl base tvs data asrc vsrc => LRmw aq rl base (tvs.map (tvRen π)) data asrc vsrc
   | LExLoad aq base tvs asrc => LExLoad aq base (tvs.map (tvRen π)) asrc
-  | LIFetch base tvs => LIFetch base tvs
+  | LIFetch base tvs => LIFetch base (tvs.map (tvRen π))
   | LSilent => LSilent
   | LStore rl base data asrc vsrc => LStore rl base data asrc vsrc
   | LFence pr pw sr sw => LFence pr pw sr sw
@@ -180,10 +186,11 @@ theorem wlblRenRfoldfree (π : Nat → Nat) (l : Wlabel) :
     lbRfoldfree (wlblRen π l) ↔ lbRfoldfree l := by
   cases l <;> exact Iff.rfl
 
-/-- ... and to the administrative alphabet, on which it is the identity. -/
+/-- ... and it keeps the administrative alphabet (W5d-G G2: it renames a fetch's tags, so it is
+no longer the identity there). -/
 theorem wlblRenAdmin (π : Nat → Nat) (instr : Bool) (l : Wlabel) :
-    lbAdmin instr l → wlblRen π l = l := by
-  cases l <;> intro h <;> first | rfl | exact h.elim
+    lbAdmin instr l → lbAdmin instr (wlblRen π l) := by
+  cases l <;> intro h <;> exact h
 
 /-- THE PROJECTION SQUARE: renaming a wlabel renames its axiomatic image. -/
 theorem projLblWren (k : WmClass) (π : Nat → Nat) (l : Wlabel) :
@@ -199,7 +206,7 @@ theorem pclsEvWren (p : Pexv6) (π : Nat → Nat) (l : Wlabel) (we wi : Wstate) 
   exact WeakRvwmoConf.pclsEvRelp p l we wi h
 
 /-- THE TIMESTAMP-OBLIVIOUSNESS OF THE PROGRAM, at the renaming (every arm is one of
-`WeakEvInst`'s `ts_oblivious` exports; the fetch is fixed by the renaming, deviation 3). -/
+`WeakEvInst`'s `ts_oblivious` exports; the fetch's arm is `pstepEvTsIfetch`, deviation 3). -/
 theorem pstepEvWren (π : Nat → Nat) (p : Pexv6) (d : Efab) (l : Wlabel) (p' : Pexv6)
     (d' : Efab) :
     latFree l → lbRfoldfree l → pstepEv p d l p' d' → pstepEv p d (wlblRen π l) p' d' := by
@@ -216,7 +223,23 @@ theorem pstepEvWren (π : Nat → Nat) (p : Pexv6) (d : Efab) (l : Wlabel) (p' :
   | LExLoad aq base tvs asrc =>
     intro _ _ h
     exact pstepEvTsExload p d aq base tvs _ asrc p' d' h (tvRenSnd π tvs)
+  | LIFetch base tvs =>
+    intro _ _ h
+    exact pstepEvTsIfetch p d base tvs _ p' d' h (tvRenSnd π tvs)
   | _ => intro _ _ h; exact h
+
+/-- (Lean-only, W5d-G G2) An ADMINISTRATIVE step re-runs at the renamed label (the fetch by
+`WeakEvInst.pstepEvTsIfetch`, the rest are fixed by the renaming). -/
+theorem pstepEvWrenAdmin (π : Nat → Nat) (instr : Bool) (p : Pexv6) (d : Efab) (l : Wlabel)
+    (p' : Pexv6) (d' : Efab) :
+    lbAdmin instr l → pstepEv p d l p' d' → pstepEv p d (wlblRen π l) p' d' := by
+  intro ha h
+  cases l with
+  | LIFetch base tvs => exact pstepEvTsIfetch p d base tvs _ p' d' h (tvRenSnd π tvs)
+  | LLoad aq lat base tvs asrc => exact ha.elim
+  | LRmw aq rl base tvs data asrc vsrc => exact ha.elim
+  | LExLoad aq base tvs asrc => exact ha.elim
+  | _ => exact h
 
 /-! ## 3. The row's representative wstate fold -/
 
@@ -419,8 +442,9 @@ theorem admRunRen (π : Nat → Nat) (instr : Bool) (p : Pexv6) (d : Efab) (ls :
   induction h with
   | ARnil p d => exact .ARnil p d
   | ARcons p d l p1 d1 ls p' d' ha hs _ ih =>
-    rw [List.map_cons, wlblRenAdmin π instr l ha]
-    exact .ARcons p d l p1 d1 _ p' d' ha hs ih
+    rw [List.map_cons]
+    exact .ARcons p d _ p1 d1 _ p' d' (wlblRenAdmin π instr l ha)
+      (pstepEvWrenAdmin π instr p d l p1 d1 ha hs) ih
 
 /-! ## 6. Emission items and `rowDeps` -/
 

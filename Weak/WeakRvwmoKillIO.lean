@@ -7,7 +7,9 @@ twin).
       (`racyDX GF.gfGd (ioExtra GF)`, `WeakRvwmoAcyc`): `ioExtra` = the residue (R1)–(R3)
       (`GraphFabResidue`, (R3)'s fabric arm over `gmem` members since W13 (R3′)), `gmoIo` (the
       memory order among I/O events) and `gdiskRd` (a non-I/O memory access po-before a disk-row
-      RAM read — G3-Q (a″), W13 (L)'s anchor class).  Decidable (`racyDIODec`).
+      RAM read — G3-Q (a″), W13 (L)'s anchor class) and — W5d-G G3 — the FETCH ARM
+      `WeakRvwmoAcyc.gfetchE` (the stored fetch fragment's gmo-forward edges).  Decidable
+      (`racyDIODec`).
   §2  EVERY EXTRA ARM IS GMO-FORWARD in the ORIGINAL graph under the trusted item and the
       disk-read premise (`ioExtraGmo`) — "(T) directly"; endpoints are memory events
       (`ioExtraGmem`).
@@ -82,9 +84,10 @@ disk-row RAM read. -/
 def gdiskRd (G : Gexec) (e a : Geid) : Prop :=
   WeakRvwmoGraph.gpo G e a ∧ gmem G e ∧ gisIo G e = false ∧ gisR G a = true ∧ a.1 = NCPU
 
-/-- THE EXTRA ARMS: the residue, gmo|IO, the disk-read pairs. -/
+/-- THE EXTRA ARMS: the residue, gmo|IO, the disk-read pairs and (W5d-G G3) the fetch arm — the
+combined instance of plan §C W5d-G G3 is `racyDIO` itself, whose `ioExtra` gains the arm. -/
 def ioExtra (GF : Gfexec) (x y : Geid) : Prop :=
-  ioResidue GF x y ∨ gmoIo GF.gfGd.gdG x y ∨ gdiskRd GF.gfGd.gdG x y
+  ioResidue GF x y ∨ gmoIo GF.gfGd.gdG x y ∨ gdiskRd GF.gfGd.gdG x y ∨ gfetchE GF.gfGd x y
 
 /-- **`racyDIO := racyD ∪ ioResidue ∪ gmo|IO ∪` the `gdiskRead14` pairs.** -/
 def racyDIO (GF : Gfexec) (x y : Geid) : Prop :=
@@ -106,6 +109,9 @@ instance gmoIoDec (G : Gexec) (x y : Geid) : Decidable (gmoIo G x y) := by
 
 instance gdiskRdDec (G : Gexec) (x y : Geid) : Decidable (gdiskRd G x y) := by
   unfold gdiskRd; infer_instance
+
+instance gfetchEDec (GD : Gdexec) (x y : Geid) : Decidable (gfetchE GD x y) := by
+  unfold gfetchE; infer_instance
 
 instance ioExtraDec (GF : Gfexec) (x y : Geid) : Decidable (ioExtra GF x y) := by
   unfold ioExtra; infer_instance
@@ -130,7 +136,7 @@ theorem WeakRvwmoKillIO.gisRGmem (G : Gexec) (e : Geid) : gisR G e = true → gm
 theorem ioExtraGmem (GF : Gfexec) (x y : Geid) :
     ioExtra GF x y → gmem GF.gfGd.gdG x ∧ gmem GF.gfGd.gdG y := by
   rintro ((⟨-, hm, -, hy⟩ | ⟨-, hx, hy⟩ | ⟨-, hx, hy, -⟩ | ⟨hx, hy, -⟩ | ⟨hx, hy, -⟩) |
-    ⟨hx, hy, -⟩ | ⟨-, hm, -, hr, -⟩)
+    ⟨hx, hy, -⟩ | ⟨-, hm, -, hr, -⟩ | ⟨-, hfx, hfy, -⟩)
   · exact ⟨hm, GraphFabResidue.gisIoGmem _ _ hy⟩
   · exact ⟨GraphFabResidue.gisIoGmem _ _ hx, WeakRvwmoAcyc.gisWGmem _ _ hy⟩
   · exact ⟨GraphFabResidue.gisIoGmem _ _ hx, WeakRvwmoKillIO.gisRGmem _ _ hy⟩
@@ -138,16 +144,18 @@ theorem ioExtraGmem (GF : Gfexec) (x y : Geid) :
   · exact ⟨hx, hy⟩
   · exact ⟨GraphFabResidue.gisIoGmem _ _ hx, GraphFabResidue.gisIoGmem _ _ hy⟩
   · exact ⟨hm, WeakRvwmoKillIO.gisRGmem _ _ hr⟩
+  · exact ⟨hfx, hfy⟩
 
-/-- Every extra arm is gmo-forward: the residue by the trusted item, gmo|IO by definition, the
-disk-read pairs by `gdiskRead14`. -/
+/-- Every extra arm is gmo-forward: the residue by the trusted item, gmo|IO and the fetch arm by
+definition, the disk-read pairs by `gdiskRead14`. -/
 theorem ioExtraGmo (GF : Gfexec) :
     ioResidueGmo GF → gdiskRead14 GF.gfGd.gdG →
     ∀ x y, ioExtra GF x y → gmoLt GF.gfGd.gdG x y := by
-  rintro hres hdr x y (h | ⟨-, -, h⟩ | ⟨hp, hm, hio, hr, hn⟩)
+  rintro hres hdr x y (h | ⟨-, -, h⟩ | ⟨hp, hm, hio, hr, hn⟩ | ⟨-, -, -, h⟩)
   · exact hres x y h
   · exact h
   · exact hdr x y hp hm hio hr hn
+  · exact h
 
 /-! # 3. Transport -/
 
@@ -303,8 +311,9 @@ theorem gfDevWIoHull (GF : Gfexec) (cs : List Nat) : gfDevWIo GF → gfDevWIo (g
 /-! # 4. THE NORMALIZATION -/
 
 /-- **`normalizeOfAcyclic` over `racyDIO`**: the re-timed graph is RVWMO⁻ + rule 14 (+ the cat
-arms, [R21.2]) AND keeps the residue, the I/O events' relative positions and the disk-read
-anchors. -/
+arms, [R21.2]) AND keeps the residue, the I/O events' relative positions, the disk-read
+anchors and (W5d-G G3) the fetch fragment with its fetch arm, and (W5d-G G4) the coherence
+order. -/
 theorem normalizeOfAcyclicIO (GF : Gfexec) :
     rvwmoCoreD GF.gfGd →
     (∀ x, ¬ tc (racyDIO GF) x x) →
@@ -317,26 +326,34 @@ theorem normalizeOfAcyclicIO (GF : Gfexec) :
       gppoCat6Gmo GD'.gdG ∧
       ioResidueGmo ⟨GD', GF.gfDev⟩ ∧
       gdiskRead14 GD'.gdG ∧
-      (∀ x y, gmoIo GF.gfGd.gdG x y → gmoIo GD'.gdG x y) := by
+      (∀ x y, gmoIo GF.gfGd.gdG x y → gmoIo GD'.gdG x y) ∧
+      GD'.gdFetch = GF.gfGd.gdFetch ∧
+      (∀ x y, gfetchE GF.gfGd x y → gfetchE GD' x y) ∧
+      (∀ x y, gco GF.gfGd.gdG x y → gmoLt GD'.gdG x y) := by
   intro hcore hacy
   have hXm : ∀ x y, ioExtra GF x y → x ∈ GF.gfGd.gdG.gxGmo ∧ y ∈ GF.gfGd.gdG.gxGmo := by
     intro x y h
     obtain ⟨hx, hy⟩ := ioExtraGmem GF x y h
     exact ⟨gwfMemGmo _ x hcore.1 hx, gwfMemGmo _ y hcore.1 hy⟩
-  obtain ⟨GD', pi, hc', h14, hrr, hdeps, hw, h6, hX⟩ :=
+  obtain ⟨GD', pi, hc', h14, hrr, hdeps, hfe, hw, h6, hX, hR⟩ :=
     normalizeOfAcyclicX GF.gfGd (ioExtra GF) hcore hXm (fun x y => racyDIODec GF x y) hacy
   have hio : ∀ a, gisIo GD'.gdG a = gisIo GF.gfGd.gdG a :=
     fun a => WeakRvwmoKillIO.rowsRelGisIo pi _ _ a hrr
-  refine ⟨GD', pi, hc', h14, hrr, hdeps, hw, h6, ?_, ?_, ?_⟩
+  refine ⟨GD', pi, hc', h14, hrr, hdeps, hw, h6, ?_, ?_, ?_, hfe, ?_,
+    fun x y h => hR x y (Or.inl (Or.inr (Or.inr (Or.inl h))))⟩
   · intro x y hr
     exact hX x y (Or.inl ((ioResidueRen pi GF ⟨GD', GF.gfDev⟩ hrr rfl x y).1 hr))
   · intro e a hp hm hie hr hn
-    refine hX e a (Or.inr (Or.inr ⟨(rowsRelGpo pi _ _ e a hrr).1 hp, (rowsRelGmem pi _ _ e hrr).1 hm,
-      ?_, ?_, hn⟩))
+    refine hX e a (Or.inr (Or.inr (Or.inl ⟨(rowsRelGpo pi _ _ e a hrr).1 hp,
+      (rowsRelGmem pi _ _ e hrr).1 hm, ?_, ?_, hn⟩)))
     · rw [← hio]; exact hie
     · rw [← WeakRvwmoKillIO.rowsRelGisR pi _ _ a hrr]; exact hr
   · rintro x y ⟨hx, hy, hmo⟩
     exact ⟨by rw [hio]; exact hx, by rw [hio]; exact hy, hX x y (Or.inr (Or.inl ⟨hx, hy, hmo⟩))⟩
+  · intro x y hf
+    obtain ⟨hmem, hx, hy, -⟩ := id hf
+    exact ⟨by rw [hfe]; exact hmem, (rowsRelGmem pi _ _ x hrr).2 hx, (rowsRelGmem pi _ _ y hrr).2 hy,
+      hX x y (Or.inr (Or.inr (Or.inr hf)))⟩
 
 /-- **THE NORMALIZED GRAPH'S (L) TRACE REALIZES IT** (a corollary of `rule14LinearizationIO`
 through `fconfTraceRealizeIO`): a `racyDIO`-acyclic conformant core graph is re-timed to `GF'`
@@ -698,7 +715,7 @@ theorem w13fIoRacyDIOAcyclic : ∀ x, ¬ tc (racyDIO w13fIo) x x :=
 /-- …and `racyDIO` BITES: with the fabric order REVERSED against gmo, the fabric arm and gmo|IO
 form a two-cycle (so acyclicity of `racyDIO` excludes a fabric order that disagrees with the
 memory order of the I/O events). -/
-theorem w13fIoRevRacyDIOCycle : tc (racyDIO ⟨⟨w13fIoG, []⟩, [(1, 0), (0, 0)]⟩) (0, 0) (0, 0) := by
+theorem w13fIoRevRacyDIOCycle : tc (racyDIO ⟨⟨w13fIoG, [], []⟩, [(1, 0), (0, 0)]⟩) (0, 0) (0, 0) := by
   have hmo : gmoLt w13fIoG (0, 0) (1, 0) := by unfold gmoLt; decide +kernel
   refine tc_l (Or.inr (Or.inr (Or.inl ⟨rfl, rfl, hmo⟩))) (tc_once ?_)
   exact Or.inr (Or.inl (Or.inr (Or.inr (Or.inr (Or.inr

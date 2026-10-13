@@ -861,7 +861,7 @@ def mpPlain : Gdexec :=
             LStore false 1 [b1] .WCplain],
            [LLoad true 1 [2] [b1],
             LLoad false 0 [1] [b1]]],
-    [(0, 0), (0, 2), (1, 0), (1, 1)]⟩, []⟩
+    [(0, 0), (0, 2), (1, 0), (1, 1)]⟩, [], []⟩
 
 theorem mpPlainCat : rvwmoCatConsistent mpPlain :=
   catConsistentBSound _ (by decide +kernel)

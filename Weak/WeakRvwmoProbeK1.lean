@@ -77,7 +77,7 @@ def mpg : Gexec :=
     [LStore false 0 [b1] .WCplain]],
    [(0, 1), (1, 0), (0, 0)]⟩
 
-def mpgd : Gdexec := ⟨mpg, []⟩
+def mpgd : Gdexec := ⟨mpg, [], []⟩
 
 /-- `mpg'`: gmo = `[w0; e; w]`.  The SAME rows with the read's `ts` entry
 renamed by `tswap 1` (2 ↦ 1). -/
@@ -87,7 +87,7 @@ def mpg' : Gexec :=
     [LStore false 0 [b1] .WCplain]],
    [(1, 0), (0, 0), (0, 1)]⟩
 
-def mpgd' : Gdexec := ⟨mpg', []⟩
+def mpgd' : Gdexec := ⟨mpg', [], []⟩
 
 /-! # 2. The byte footprints -/
 

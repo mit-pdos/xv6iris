@@ -272,7 +272,7 @@ gmo = [W0x; R1x]. -/
 def viol2 : Gdexec :=
   ⟨⟨vimg, [[LStore false 0 [b1] .WCplain],
            [LLoad false 0 [1] [b1]]],
-    [(0, 0), (1, 0)]⟩, []⟩
+    [(0, 0), (1, 0)]⟩, [], []⟩
 
 theorem viol2Cat : rvwmoCatConsistent viol2 :=
   catConsistentBSound _ (by decide +kernel)
@@ -318,7 +318,7 @@ def AxViol.mp : Gdexec :=
             LStore false 1 [b1] .WCrel],
            [LLoad true 1 [2] [b1],
             LLoad false 0 [1] [b1]]],
-    [(0, 0), (0, 2), (1, 0), (1, 1)]⟩, []⟩
+    [(0, 0), (0, 2), (1, 0), (1, 1)]⟩, [], []⟩
 
 theorem mpCat : rvwmoCatConsistent AxViol.mp :=
   catConsistentBSound _ (by decide +kernel)

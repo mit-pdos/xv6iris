@@ -683,7 +683,7 @@ def gadm : Gdexec :=
       LLoad false 0 (ts8 1) (wb8 AxPtProt2.w0),
       LRmw false false 0 (ts8 1) (wb8 AxPtProt2.w0) (wb8 w1) .WCplain,
       LLoad false 0x80001010 [0] [0]]],
-    [(0, 0), (0, 3), (0, 4), (0, 5)]⟩, []⟩
+    [(0, 0), (0, 3), (0, 4), (0, 5)]⟩, [], []⟩
 
 def flM : List (Geid × Geid) := [((0, 3), (0, 5)), ((0, 4), (0, 5))]
 

@@ -991,7 +991,7 @@ theorem linExtFLinExtD (GF : Gfexec) (L : List Geid) : linExtF GF L → linExtD 
 /-- `topoLinearizes` applies VERBATIM — the fabric arm only strengthens the hypothesis. -/
 theorem topoLinearizesF (GF : Gfexec) (L : List Geid) :
     rvwmoCoreD GF.gfGd → linExtF GF L →
-    rvwmoMinusDepsConsistent ⟨retime GF.gfGd.gdG L, GF.gfGd.gdDeps⟩ ∧
+    rvwmoMinusDepsConsistent ⟨retime GF.gfGd.gdG L, GF.gfGd.gdDeps, GF.gfGd.gdFetch⟩ ∧
     grule14 (retime GF.gfGd.gdG L) ∧
     rowsRel (tren GF.gfGd.gdG L) GF.gfGd.gdG (retime GF.gfGd.gdG L) ∧
     wperm (tren GF.gfGd.gdG L) GF.gfGd.gdG (retime GF.gfGd.gdG L) :=
