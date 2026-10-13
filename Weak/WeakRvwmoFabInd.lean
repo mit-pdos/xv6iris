@@ -53,6 +53,12 @@ closing comment enumerates FIVE obligations (O1–O5) for the CONFORMANCE restri
    endpoints and bits are the row's own); the interim disk-row clause and its transport are GONE.
    `fconfRealize`, `hullRealizableOfAcyclicF` and `t2linSupplyF` take NO quiet-boot hypothesis;
    `cycleKillOfF` takes `∀ i, devQuiet (boot i)` (for `gfexecConfOfQconf`).
+5. FabInd-S (plan rev 44/45, §C top): `gfexecConfHull` takes NEITHER Rocq's `gfexec_consistent GF`
+   NOR `hull_ok` — both premises were unused by the proof (the conformance transport is about the
+   rows, emissions and fabric list only, never the model).  Dropping them lets the cat-side
+   induction (`WeakRvwmoKillIO`, whose graphs are `rvwmoCatAD`, not `gfexecConsistent`) use the
+   transport; every caller (`hullRealizableOfAcyclicF`, `t2linAuxF`,
+   `WeakRvwmoKillIO.hullPremises`) passes two fewer arguments.
 
 **Rocq → Lean name map.**  `hemitf_ren` `hemitfRen`, `hart_conff_ren` `hartConffRen`,
 `hemitf_tag_lt` `hemitfTagLt`, `hemitf_tag_ge` `hemitfTagGe`, `hemitf_prefix` `hemitfPrefix`,
@@ -374,14 +380,14 @@ theorem gfexecConfRen (π : Nat → Nat) (boot : Nat → Pexv6) (d0 : Efab)
 
 /-! ### 3.2 THE HULL: O1–O5 assembled -/
 
+/-- O4/O5: the conformance bundle passes to a `gfDev`-closed hull.  Model-free (FabInd-S,
+deviation 5): no `gfexecConsistent`, no `hullOk`. -/
 theorem gfexecConfHull (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab)
     (GF : Gfexec) (cs : List Nat) :
-    gfexecConsistent GF →
     dclosed cs GF.gfDev →
-    hullOk GF.gfGd.gdG cs →
     gfexecConfIO boot d0 fab GF →
     gfexecConfIO boot d0 fab (gfHull GF cs) := by
-  rintro _ hdc _ ⟨h0, hnd, hbnd, hc⟩
+  rintro hdc ⟨h0, hnd, hbnd, hc⟩
   refine ⟨h0, List.Nodup.sublist (List.filter_sublist) hnd, ?_, ?_⟩
   · intro n i k hn
     have hn' := gfHullDevLookup GF cs n (i, k) hdc hn
@@ -532,7 +538,7 @@ theorem hullRealizableOfAcyclicF (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat �
   have hok : hullOk GF.gfGd.gdG cs := properCutOk _ _ hpc.1
   have hch : gfexecConsistent (gfHull GF cs) := gfHullConsistent GF cs hc hok hpc.2
   have hcnf : gfexecConfIO boot d0 fab (gfHull GF cs) :=
-    gfexecConfHull boot d0 fab GF cs hc hpc.2 hok hconf
+    gfexecConfHull boot d0 fab GF cs hpc.2 hconf
   have hNh : (gfHull GF cs).gfGd.gdG.gxProg.length ≤ N := by
     have := gxhNharts GF.gfGd.gdG cs
     change (gxHull GF.gfGd.gdG cs).gxProg.length ≤ N
@@ -567,7 +573,7 @@ theorem t2linAuxF (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) :
     intro cs hpc
     have hok := properCutOk _ _ hpc.1
     refine ih (gfHull GF cs) ?_ (gfHullConsistent GF cs hcons hok hpc.2)
-      (gfexecConfHull boot d0 fab GF cs hcons hpc.2 hok hconf)
+      (gfexecConfHull boot d0 fab GF cs hpc.2 hconf)
     have := gfHullEventsLt GF cs hpc
     omega
 

@@ -53,10 +53,10 @@ facts the kill needs are §3 here.  (3) The same-row residue arms (R1)/(R2)/(R2�
 the disk-read pairs go into the CROSS order `ioCross`, not into the segment relation: they are all
 gmo-forward, so the raw chain composes in gmo unchanged (plan: "KillArms' chain composes in
 `gmoLt` AS TODAY") and `CatLin`'s kit is reused as is.  (4) The induction is stated over RVWMO⁻
-(`cycleKill`/`cycleKillF`'s model): `gfexecConfHull` (`WeakRvwmoFabInd`, not this item's file)
-takes `gfexecConsistent`, which a cat graph lacks; `hullRunIO`/`fconfRealizeIO` themselves take
-only the core `rvwmoCoreD` and the hull's conformance, so a cat induction needs only that hull
-fact.
+(`cycleKill`/`cycleKillF`'s model).  [FabInd-S, rev 44/45: `gfexecConfHull` no longer takes
+`gfexecConsistent` (nor `hullOk`) — `WeakRvwmoFabInd` deviation 5 — so the hull's conformance is
+model-free; `hullRunIO`/`fconfRealizeIO` take only the core `rvwmoCoreD` and the hull's
+conformance, and the cat-side induction has no remaining hull gap there.]
 
 **Spec standing.**  No new trusted text: `racyDIO` is a proof device (an acyclicity premise), its
 extra arms are the trusted residue (`ioResidueGmo`, §A(6)), the order gmo already has on I/O
@@ -402,7 +402,8 @@ def cycleKillIO (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) : Prop :
     ∀ x, tc (racyDIO GF) x x → False
 
 /-- (Lean-only) the bundle's model arm `gfexecConsistent`, DERIVED: the fabric steps are gmo-forward
-by the residue's fabric arm on write/I/O members. -/
+by the residue's fabric arm on write/I/O members.  (Since FabInd-S no caller in this file needs it;
+kept as the bridge to the `gfexecConsistent`-stated `WeakRvwmoFabInd` lemmas.) -/
 theorem WeakRvwmoKillIO.gfexecConsistentOfRes (GF : Gfexec) :
     rvwmoMinusDepsConsistent GF.gfGd → ioResidueGmo GF → gfDevWIo GF → gfexecConsistent GF :=
   fun hc hres hwio => ⟨hc, fun a b hadj =>
@@ -420,8 +421,7 @@ theorem WeakRvwmoKillIO.hullPremises (boot : Nat → Pexv6) (d0 : Efab) (fab : N
   have hok : hullOk GF.gfGd.gdG cs := properCutOk _ _ hpc.1
   have hnd := hc.1.1.1
   exact ⟨hullDepsConsistent _ cs hc hok,
-    gfexecConfHull boot d0 fab GF cs (WeakRvwmoKillIO.gfexecConsistentOfRes GF hc hres hwio)
-      hpc.2 hok hconf,
+    gfexecConfHull boot d0 fab GF cs hpc.2 hconf,
     ioResidueGmoHull GF cs hnd hpc.2 hres, gdiskRead14Hull GF.gfGd.gdG cs hnd hdr,
     gfDevWIoHull GF cs hwio⟩
 
