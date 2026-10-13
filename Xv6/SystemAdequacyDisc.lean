@@ -3,7 +3,7 @@
 rev 30 §C top [R25.2] (iii), review R27.s4; the (r2) sibling root's
 generic part [OWN.37]): `xv6PowerAdequacy` at the final reading
 `phi g := g.pow = true → AccessDiscipline.xv6AccessDisc g.m`, its hook
-discharged by `AccessDiscipline.powerInterp_accessDiscβ` (the record
+discharged by `AccessDiscipline.powerInterp_accessDisc` (the record
 literal's static list is xv6's, `rfl`).
 
 * `xv6DiscAdequacy` (the unit application, as `xv6FsAdequacy`),
@@ -31,7 +31,8 @@ include hlc GF in
 /-- **THE ACCESS DISCIPLINE HOLDS ON EVERY REACHABLE POWERED STATE** (the
 unit application, `xv6PowerAdequacy`'s arbitrary-`phi` slot): every
 reachable thread is reducible and, whenever the power is on, the machine's
-memory obeys `xv6AccessDisc` (β′: `lockWordDiscAt ∧ cpuStaticAt`). -/
+memory obeys `xv6AccessDisc` (W8 (f2-ctx): `chainOkAt ∧ lockWordDiscAt ∧
+cpuStaticAt`). -/
 theorem xv6DiscAdequacy (US : USER) (g : GState) (sb : FsSb) (nib : Nat)
     (cov : ExtTreeSet Nat compare)
     (Hgen0 : g.gen = 0) (Hpow : g.pow = false)
@@ -46,7 +47,7 @@ theorem xv6DiscAdequacy (US : USER) (g : GState) (sb : FsSb) (nib : Nat)
         (appIfaceTriv GF) Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs)
         (appTrivTk c) (appTrivHk c)
       iintro ⟨H, -⟩
-      ihave %h := AccessDiscipline.powerInterp_accessDiscβ (hlc := hlc) (GF := GF) rfl g' $$ H
+      ihave %h := AccessDiscipline.powerInterp_accessDisc (hlc := hlc) (GF := GF) rfl g' $$ H
       imodintro
       ipureintro
       exact h)
