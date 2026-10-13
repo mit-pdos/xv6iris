@@ -64,7 +64,7 @@ W2a, above); (3) the hart-index of the shadow is the agent `hartAgent cpu` (TsoS
 (4) `rowFence` needs the shadow's `fiArm` exactly at `fence.i` (`emFenceI`'s criterion) and
 `rowSfenceMarker` its negation — facts of the Sail cycle's event order, the named premise
 `sailCycleOrder` [OWN.35] (`Weak/SrvwmoXv6Adequacy.lean`, derived for the shadow by `fiOfSco`);
-`sailCycleOrderK_holds` (W-SCO, `Weak/SailCycleOrderK.lean`) proves it for kernel text; (5) `LDev` is matched by a WILDCARD arm only (`lbInert`), so W13 (E)/(I)'s payload changes
+`sailCycleOrder_holds` (W-SCO (A), `Weak/SailCycleOrderK.lean`) proves it for every instruction [R32.s2]; (5) `LDev` is matched by a WILDCARD arm only (`lbInert`), so W13 (E)/(I)'s payload changes
 join without a rebase.
 -/
 import Weak.TsoShadow

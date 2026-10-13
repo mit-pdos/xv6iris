@@ -1,23 +1,20 @@
 /-
-Weak: **W-SCO — `sailCycleOrder` for xv6's kernel text, the GENERIC half** (allocproc plan
-`notes/weak-allocproc-plan.md` rev 34 §C W-SCO, Shape (rev 32) [R28.2]; [OWN.35] Q-FIARM RULED
-(b)+(a′); [R28.s2] the generic/per-word split; [R29.s1] the past-fetch recipe).  Lean-only (no
-Rocq source).
+Weak: **W-SCO (A) — `sailCycleOrder`, the GENERIC half** (allocproc plan
+`notes/weak-allocproc-plan.md` rev 36 §C W-SCO (A); [OWN.42] the cycle fact for EVERY
+instruction; [OWN.45] Q-SCO-PMA = (α); [R32.1][R33.1] the boot register filter; [R28.2] shape
+(0); [R29.s1] the past-fetch recipe).  Lean-only (no Rocq source).
 
-STATUS: PARTIAL — see `PROGRESS-WSCO.md` at the workspace root.  This file proves everything of
-W-SCO that does NOT depend on the instructions executed: the statement `sailCycleOrderK` (i′),
-the reduction of it — and of the general premise `sailCycleOrder` — to ONE closed proposition
-about the Sail cycle's monad tree (`SailCycleOrderK.cycleOkK` / `cycleOkAll`), and the corollary
-machinery (iii)/(iv) conditional on `sailCycleOrderK`.  The per-word half (`cycleOkK` itself, the
-"no fetch during execute" fact for the words M1's runs can execute) is NOT here: the brief's
-per-word lemma over the 2-aligned 4-byte words of `[bcRoLo, bcRoHi)` does not cover the words
-the cycle can announce (a 4-byte instruction at `pc ≡ 2 (mod 4)` is fetched as two halfwords
-whose physical addresses are translated SEPARATELY, `Fetch.lean:267-280`), so its scope is an
-owner/advisor question (`PROGRESS-WSCO.md`).  Nothing here is registered.
+This file proves everything of W-SCO that does NOT depend on the instructions executed: the
+reduction of the named premise `sailCycleOrder` (restated under `wbootFacts σ0`,
+`Weak/SrvwmoXv6Adequacy.lean`) — and of its kernel-text restriction `sailCycleOrderK` (i′) — to
+ONE closed proposition about the Sail cycle's monad tree, `SailCycleOrderK.cycleOkBoot`, plus the
+(iii)/(iv) corollary machinery conditional on `sailCycleOrderK`.  The tree fact itself
+(`cycleOkBoot_holds`, the per-instruction half) lives in `Weak/SailCycleOrder*.lean`.  Nothing
+here is registered.
 
-## The residual invariant (`SailCycleOrderK.good`) [R28.s2]
+## The residual invariant (`SailCycleOrderK.good`) [R28.s2][R32.1][R33.1]
 
-`good A Q ph m` is an all-paths predicate on a Sail tree `m` started at cycle PHASE `ph` (the
+`good A R Q ph m` is an all-paths predicate on a Sail tree `m` started at cycle PHASE `ph` (the
 latest own `LInstr`/`LIFetch` label: `instr`, `fetch`, or none yet), mirroring the event
 instance's node dispatch `pnodeStep` (`WeakEvInst.lean:294`):
 * a RAM instruction-fetch read (`devAddr = false`, `akIfetch`; label `LIFetch`) continues at
@@ -28,47 +25,58 @@ instance's node dispatch `pnodeStep` (`WeakEvInst.lean:294`):
 * an announce requires phase `fetch` if it is an SFENCE.VMA word (`sfAnnB`, the marker
   `LFence false×4`) and continues at the same phase; any other announce (`LInstr`) continues
   at phase `instr`;
+* a register READ continues for every answer the REGISTER FILTER `R` admits; a register WRITE
+  must write a value `R` admits (so "every register admitted" is a run invariant);
 * every other node continues, any answer, at the same phase; a failure node is stuck (`True`);
   at `.pure` the post `Q` holds.
 The hart's own `.pure` boundary (`LInstr`) restarts the cycle `riscvStep tick` at phase
-`instr`, so a per-run invariant needs exactly `∀ tick, good A (fun _ _ => True) .instr
-(riscvStep tick)` — `cycleOk A`.  `invRun` proves, by induction over `pfRunST`, that every hart's
-residual tree satisfies `good` at the phase of its latest cycle label, provided every fetch of
-the run returns bytes `A` admits (`hF`); the conclusion `scoOfInv` reads `sailCycleOrder`'s two
-clauses off the head node.
+`instr`, so a per-run invariant needs exactly `cycleOk A R := ∀ tick, good A R (fun _ _ => True)
+.instr (riscvStep tick)`.  `invRun` proves, by induction over `pfRunST`, that every hart's
+register file is admitted by `R` and its residual tree satisfies `good` at the phase of its
+latest cycle label, provided the boot register files are admitted (`hR0`), the PLIC wire's pin
+writes are (`hpin`), and every fetch of the run returns bytes `A` admits (`hF`); `scoOfInv`
+reads `sailCycleOrder`'s two clauses off the head node.
+
+## The boot register filter `Rboot` [R32.1][R33.1] (platform note)
+
+`sailCycleOrder` is FALSE over arbitrary register files: `pnodeStep` labels a read at a device
+address `LDev` whatever its kind (`WeakEvInst.lean:315-321`), so a fetch from MMIO under a
+`pma_regions` marking an I/O region executable leaves no `LIFetch`; and with an HTIF window over
+RAM (`htif_tohost_base = some _`), `checked_mem_read` answers a fetch from the `htif_tohost`
+register through `within_mmio_readable` (`Mem.lean:437-446`, `Platform.lean:243-249`) with NO
+memory node at all.  Either way an SFENCE.VMA word is announced at phase `instr`.  On THIS board
+both registers are pinned at reset (`bootPost`, `MachCSL/BootInitModel.lean:39,41`: `pma_regions =
+bootPMA`, both I/O regions non-executable; `htif_tohost_base = none`) and are never written by
+the cycle; `Rboot` pins exactly these two.  `rbootInit` reads them off `wbootFacts σ0` through
+`resetRegsRun_of_run` (`MachCSL/BootReset.lean`, [R33.s2]); `rbootPin`: the PLIC wire writes
+`sig_meip`/`sig_seip` only.
 
 ## The two instances
 
-* **All answers** (`A = True`): `sailCycleOrderOfCycle : cycleOkAll → sailCycleOrder` — the
-  general premise from the tree fact for every fetched word (option (a) of §B(11)).
-* **Kernel text** (`A = kWin`: inside `[bcRoLo, bcRoHi)` and equal to the boot image's byte):
-  `sailCycleOrderKOfCycle : cycleOkK → sailCycleOrderK`.  Every fetch of an M1 run is admitted:
-  its addresses by `candKfetch` (`pfStepFacts`), its bytes by [R29.s1] — the FINAL configuration's
-  log writes no window byte (`MachOfPf.noWriteOfPristine` from `SimRel` and `winPristine`, which
-  W3's root gives at every reachable powered state, `SrvwmoXv6Adequacy.winOfText`), logs only
-  grow along the run (`SailCycleOrderK.stepLogPrefix`, so the fetch's PRE-configuration log is
-  clean too), and an admissible fetch of unwritten bytes reads the image at timestamp 0
-  (`MachOfPf.fetchIsImage`, factored out of `cutOfPristine`); the image is the run's constant
-  `imgZ σ0.wgimg = imgZ bootImage` (`wbootFacts`).
+* **Every fetched word** (`A = True`, `R = Rboot`): `sailCycleOrderOfCycle : cycleOkBoot →
+  sailCycleOrder` — the general premise from the tree fact (option (a) of §B(11), [OWN.42]).
+* **Kernel text** (`A = kWin`): `sailCycleOrderKOfCycle : cycleOkK → sailCycleOrderK` (the (i′)
+  record; `cycleOkKOfBoot : cycleOkBoot → cycleOkK`).  Every fetch of an M1 run is admitted:
+  its addresses by `candKfetch` (`pfStepFacts`), its bytes by [R29.s1] (`MachOfPf.noWriteOfPristine`,
+  `SailCycleOrderK.stepLogPrefix`, `MachOfPf.fetchIsImage`).
 
 ## The corollary machinery (iii)/(iv)
 
-`SailCycleOrderK.fiOfScoK` is `SrvwmoXv6Adequacy.fiOfSco` restated from `sailCycleOrderK` at
-`fok = candKfetch bcRoLo bcRoHi` under the widened `Hyps.fi` shape; `SailCycleOrderK.m1HypsK`
-discharges `MachOfPf.Hyps` with it (no `hsco`); `SailCycleOrderK.srvwmoXv6M1OfK` is
-`srvwmoXv6M1Core`'s statement WITHOUT `hsco`, from `sailCycleOrderK`, by re-running the
-composition with `m1HypsK` (not through `srvwmoXv6M1Core`).  Once `cycleOkK` is proved,
-`srvwmoXv6M1 := SailCycleOrderK.srvwmoXv6M1OfK (sailCycleOrderKOfCycle cycleOkK)`.
+`SailCycleOrderK.fiOfScoK`, `m1HypsK`, `srvwmoXv6M1OfK` (M1 without `hsco`, from
+`sailCycleOrderK`) — REDUNDANT once `sailCycleOrder_holds` lands (`srvwmoXv6M1` applies
+`srvwmoXv6M1Core` directly); kept as a record.
 
 ## Deviations from the brief
 
-1. `sailCycleOrderK_holds` and `srvwmoXv6M1` are NOT stated (their proofs need `cycleOkK`,
-   `PROGRESS-WSCO.md`); the file stops at the reduction.  No registration.
-2. [R29.s1]'s `fetchIsImage` is stated per fetch STEP (an `ifetchOk` read plus "no log message
-   writes the fetched bytes" ⇒ timestamp 0 and the image byte) rather than over "a fetch label at
-   any position of `st`"; the position-generic use is `SailCycleOrderK.invRun`'s induction, which
-   carries the final log's cleanliness BACKWARD (`stepLogPrefix`) — the recipe's `pclsEv`
-   log-prefix lemma, read off the step's shape (`wpPfStepShape`), no class function needed.
+1. (rev 36 §C W-SCO (A) (ii)) `good`'s `.regWrite r v` arm requires `R r v` (the written value is
+   admitted) rather than `r ≠ pma_regions ∧ r ≠ htif_tohost_base`: for `Rboot` this is the same
+   up to also admitting a write of the pinned value itself; the run invariant is preserved
+   generically (`rSet`).  `Rboot` uses the `match` form ([R33.s3]).
+2. `cycleOkAll` (FALSE as defined — fetch from MMIO, [R32.1]) is DELETED; `cycleOkK` is kept with
+   the register filter (now implied by `cycleOkBoot`).
+3. [R29.s1]'s `fetchIsImage` is stated per fetch STEP; the position-generic use is
+   `SailCycleOrderK.invRun`'s induction, which carries the final log's cleanliness BACKWARD
+   (`stepLogPrefix`).
 
 Every helper is `Weak.SailCycleOrderK.*`; `Weak.sailCycleOrderK` is top-level.
 -/
@@ -135,8 +143,10 @@ theorem SailCycleOrderK.phOfFetch (x : Option Wlabel) (h : SailCycleOrderK.phOf 
   · cases l <;> first | exact ⟨_, _, rfl⟩ | cases h
 
 /-- **THE RESIDUAL INVARIANT** (header): all paths of `m`, from phase `ph`, under the fetch filter
-`A` (per byte: address, value) and the post `Q`. -/
+`A` (per byte: address, value), the REGISTER FILTER `R` [R32.1][R33.1] (a register read is
+answered by a value `R` admits; a register write must write one) and the post `Q`. -/
 def SailCycleOrderK.good {α : Type} (A : Int → BitVec 8 → Prop)
+    (R : (r : Register) → RegisterType r → Prop)
     (Q : SailCycleOrderK.Ph → α → Prop) : SailCycleOrderK.Ph → SailM α → Prop
   | ph, .pure a => Q ph a
   | _, .impure (.error _) _ => True
@@ -145,37 +155,38 @@ def SailCycleOrderK.good {α : Type} (A : Int → BitVec 8 → Prop)
     | .memRead n _ req, k =>
         (devAddr req.pa = false → (classify req.access_kind).akIfetch = true →
           ∀ w : BitVec (8 * n), (∀ j, j < n → A (paZ req.pa + (j : Int)) (nthByte w j)) →
-            SailCycleOrderK.good A Q .fetch (k (.Ok (w, none)))) ∧
+            SailCycleOrderK.good A R Q .fetch (k (.Ok (w, none)))) ∧
         ((devAddr req.pa = false → (classify req.access_kind).akIfetch = false) →
-          ∀ v, SailCycleOrderK.good A Q ph (k v))
+          ∀ v, SailCycleOrderK.good A R Q ph (k v))
     | .barrier b, k =>
-        (b = .Barrier_RISCV_i → ph = .instr) ∧ SailCycleOrderK.good A Q ph (k ())
+        (b = .Barrier_RISCV_i → ph = .instr) ∧ SailCycleOrderK.good A R Q ph (k ())
     | .instrAnnounce n w, k =>
         (sfAnnB n w = true → ph = .fetch) ∧
-        SailCycleOrderK.good A Q (if sfAnnB n w then ph else .instr) (k ())
-    | .regRead _, k => ∀ v, SailCycleOrderK.good A Q ph (k v)
-    | .regWrite _ _, k => ∀ v, SailCycleOrderK.good A Q ph (k v)
-    | .memWrite .., k => ∀ v, SailCycleOrderK.good A Q ph (k v)
-    | .branchAnnounce .., k => ∀ v, SailCycleOrderK.good A Q ph (k v)
-    | .cacheOp _, k => ∀ v, SailCycleOrderK.good A Q ph (k v)
-    | .tlbi _, k => ∀ v, SailCycleOrderK.good A Q ph (k v)
-    | .takeException _, k => ∀ v, SailCycleOrderK.good A Q ph (k v)
-    | .returnException _, k => ∀ v, SailCycleOrderK.good A Q ph (k v)
-    | .translationStart _, k => ∀ v, SailCycleOrderK.good A Q ph (k v)
-    | .translationEnd _, k => ∀ v, SailCycleOrderK.good A Q ph (k v)
-    | .cycleCount, k => ∀ v, SailCycleOrderK.good A Q ph (k v)
-    | .getCycleCount, k => ∀ v, SailCycleOrderK.good A Q ph (k v)
-    | .message _, k => ∀ v, SailCycleOrderK.good A Q ph (k v)
-    | .choose _, k => ∀ v, SailCycleOrderK.good A Q ph (k v)
-    | .readRam .., k => ∀ v, SailCycleOrderK.good A Q ph (k v)
-    | .writeRam .., k => ∀ v, SailCycleOrderK.good A Q ph (k v)
+        SailCycleOrderK.good A R Q (if sfAnnB n w then ph else .instr) (k ())
+    | .regRead r, k => ∀ v, R r v → SailCycleOrderK.good A R Q ph (k v)
+    | .regWrite r v, k => R r v ∧ ∀ u, SailCycleOrderK.good A R Q ph (k u)
+    | .memWrite .., k => ∀ v, SailCycleOrderK.good A R Q ph (k v)
+    | .branchAnnounce .., k => ∀ v, SailCycleOrderK.good A R Q ph (k v)
+    | .cacheOp _, k => ∀ v, SailCycleOrderK.good A R Q ph (k v)
+    | .tlbi _, k => ∀ v, SailCycleOrderK.good A R Q ph (k v)
+    | .takeException _, k => ∀ v, SailCycleOrderK.good A R Q ph (k v)
+    | .returnException _, k => ∀ v, SailCycleOrderK.good A R Q ph (k v)
+    | .translationStart _, k => ∀ v, SailCycleOrderK.good A R Q ph (k v)
+    | .translationEnd _, k => ∀ v, SailCycleOrderK.good A R Q ph (k v)
+    | .cycleCount, k => ∀ v, SailCycleOrderK.good A R Q ph (k v)
+    | .getCycleCount, k => ∀ v, SailCycleOrderK.good A R Q ph (k v)
+    | .message _, k => ∀ v, SailCycleOrderK.good A R Q ph (k v)
+    | .choose _, k => ∀ v, SailCycleOrderK.good A R Q ph (k v)
+    | .readRam .., k => ∀ v, SailCycleOrderK.good A R Q ph (k v)
+    | .writeRam .., k => ∀ v, SailCycleOrderK.good A R Q ph (k v)
 
 /-- The kit's bind law: `good` of `m >>= f` from `good` of `m` with post "`good` of `f`". -/
 theorem SailCycleOrderK.goodBind {α β : Type} (A : Int → BitVec 8 → Prop)
+    (R : (r : Register) → RegisterType r → Prop)
     (Q : SailCycleOrderK.Ph → β → Prop) (f : α → SailM β) :
     ∀ (m : SailM α) (ph : SailCycleOrderK.Ph),
-      SailCycleOrderK.good A (fun ph' a => SailCycleOrderK.good A Q ph' (f a)) ph m →
-      SailCycleOrderK.good A Q ph (m >>= f) := by
+      SailCycleOrderK.good A R (fun ph' a => SailCycleOrderK.good A R Q ph' (f a)) ph m →
+      SailCycleOrderK.good A R Q ph (m >>= f) := by
   intro m
   induction m with
   | pure a => intro ph h; exact h
@@ -184,20 +195,23 @@ theorem SailCycleOrderK.goodBind {α β : Type} (A : Int → BitVec 8 → Prop)
     cases call with
     | error e => trivial
     | ok o =>
-      show SailCycleOrderK.good A Q ph (FreeM.impure (.ok o) (fun v => k v >>= f))
+      show SailCycleOrderK.good A R Q ph (FreeM.impure (.ok o) (fun v => k v >>= f))
       cases o
       case memRead n va req =>
         exact ⟨fun h1 h2 w hw => ih _ _ (hm.1 h1 h2 w hw), fun h v => ih _ _ (hm.2 h v)⟩
       case barrier b => exact ⟨hm.1, ih _ _ hm.2⟩
       case instrAnnounce n w => exact ⟨hm.1, ih _ _ hm.2⟩
+      case regRead r => exact fun v hv => ih _ _ (hm v hv)
+      case regWrite r v => exact ⟨hm.1, fun u => ih _ _ (hm.2 u)⟩
       all_goals exact fun v => ih _ _ (hm v)
 
 /-- The kit's consequence law (posts and fetch filters). -/
 theorem SailCycleOrderK.goodMono {α : Type} (A A' : Int → BitVec 8 → Prop)
+    (R : (r : Register) → RegisterType r → Prop)
     (Q Q' : SailCycleOrderK.Ph → α → Prop) (hA : ∀ a v, A' a v → A a v)
     (hQ : ∀ ph a, Q ph a → Q' ph a) :
     ∀ (m : SailM α) (ph : SailCycleOrderK.Ph),
-      SailCycleOrderK.good A Q ph m → SailCycleOrderK.good A' Q' ph m := by
+      SailCycleOrderK.good A R Q ph m → SailCycleOrderK.good A' R Q' ph m := by
   intro m
   induction m with
   | pure a => intro ph h; exact hQ ph a h
@@ -212,24 +226,42 @@ theorem SailCycleOrderK.goodMono {α : Type} (A A' : Int → BitVec 8 → Prop)
           fun h v => ih _ _ (hm.2 h v)⟩
       case barrier b => exact ⟨hm.1, ih _ _ hm.2⟩
       case instrAnnounce n w => exact ⟨hm.1, ih _ _ hm.2⟩
+      case regRead r => exact fun v hv => ih _ _ (hm v hv)
+      case regWrite r v => exact ⟨hm.1, fun u => ih _ _ (hm.2 u)⟩
       all_goals exact fun v => ih _ _ (hm v)
 
-/-- **THE TREE OBLIGATION** under fetch filter `A`: every cycle `riscvStep tick`, started at the
-boundary (phase `instr`), satisfies the residual invariant. -/
-def SailCycleOrderK.cycleOk (A : Int → BitVec 8 → Prop) : Prop :=
-  ∀ tick : Bool, SailCycleOrderK.good A (fun _ _ => True) .instr (riscvStep tick)
+/-- **The boot register filter** [R32.1][R33.1] (Q-SCO-PMA (α), [OWN.45]): the two configuration
+registers on the instruction-fetch path that this board pins at reset (`bootPost`,
+`MachCSL/BootInitModel.lean:39,41`; `MachCSL.hwVal`) — the PMA table `pma_regions = bootPMA`
+(both I/O regions non-executable) and the HTIF window `htif_tohost_base = none` (disabled); every
+other register unconstrained. -/
+def SailCycleOrderK.Rboot : (r : Register) → RegisterType r → Prop
+  | .pma_regions, v => v = bootPMA
+  | .htif_tohost_base, v => v = none
+  | _, _ => True
+
+/-- **THE TREE OBLIGATION** under fetch filter `A` and register filter `R`: every cycle
+`riscvStep tick`, started at the boundary (phase `instr`), satisfies the residual invariant. -/
+def SailCycleOrderK.cycleOk (A : Int → BitVec 8 → Prop)
+    (R : (r : Register) → RegisterType r → Prop) : Prop :=
+  ∀ tick : Bool, SailCycleOrderK.good A R (fun _ _ => True) .instr (riscvStep tick)
+
+/-- **W-SCO (A)'s deliverable (1)** [R32.1][R33.1]: the cycle obligation for EVERY fetched word,
+under the boot register filter. -/
+def SailCycleOrderK.cycleOkBoot : Prop :=
+  SailCycleOrderK.cycleOk (fun _ _ => True) SailCycleOrderK.Rboot
 
 /-- The kernel-text fetch filter: a byte inside `[bcRoLo, bcRoHi)` holding the boot image's
 byte. -/
 def SailCycleOrderK.kWin (a : Int) (v : BitVec 8) : Prop :=
   (Xv6.bcRoLo : Int) ≤ a ∧ a < (Xv6.bcRoHi : Int) ∧ imgZ bootImage a = some v
 
-/-- **The per-word half's target** (NOT proved here, `PROGRESS-WSCO.md`): the cycle obligation
-for fetches of xv6's kernel text. -/
-def SailCycleOrderK.cycleOkK : Prop := SailCycleOrderK.cycleOk SailCycleOrderK.kWin
+/-- The kernel-text cycle obligation (the (i′) record; implied by `cycleOkBoot`,
+`cycleOkKOfBoot`). -/
+def SailCycleOrderK.cycleOkK : Prop := SailCycleOrderK.cycleOk SailCycleOrderK.kWin SailCycleOrderK.Rboot
 
-/-- **Option (a)'s target** (NOT proved here): the cycle obligation for every fetched word. -/
-def SailCycleOrderK.cycleOkAll : Prop := SailCycleOrderK.cycleOk (fun _ _ => True)
+theorem SailCycleOrderK.cycleOkKOfBoot (h : SailCycleOrderK.cycleOkBoot) : SailCycleOrderK.cycleOkK :=
+  fun tick => SailCycleOrderK.goodMono _ _ _ _ _ (fun _ _ _ => trivial) (fun _ _ h => h) _ _ (h tick)
 
 /-! ## (3) The run invariant -/
 
@@ -259,18 +291,32 @@ theorem SailCycleOrderK.phSnocOther (i j : Nat) (l : Wlabel) (st : List (Nat × 
       SailCycleOrderK.phOf (SrvwmoXv6Adequacy.lastCyc i st) := by
   rw [SailCycleOrderK.lastCycSnoc, if_neg (by rw [h]; simp)]
 
-/-- The run invariant: every hart's residual tree is `good` at the phase of its latest cycle
-label. -/
-def SailCycleOrderK.inv (A : Int → BitVec 8 → Prop) (st : List (Nat × Wlabel))
-    (c : Wpcfg Pexv6 Efab) : Prop :=
+/-- A register write of an admitted value keeps "every register admitted". -/
+theorem SailCycleOrderK.rSet (R : (r : Register) → RegisterType r → Prop) (rs : RegFile)
+    (r : Register) (v : RegisterType r) (hrs : ∀ r', R r' (rs r')) (hv : R r v) :
+    ∀ r', R r' (rs.set r v r') := by
+  intro r'
+  by_cases h : r' = r
+  · subst h
+    rw [RegFile.set_same]
+    exact hv
+  · rw [RegFile.set_other _ _ _ _ h]
+    exact hrs r'
+
+/-- The run invariant: every hart's register file is admitted by `R`, and its residual tree is
+`good` at the phase of its latest cycle label. -/
+def SailCycleOrderK.inv (A : Int → BitVec 8 → Prop) (R : (r : Register) → RegisterType r → Prop)
+    (st : List (Nat × Wlabel)) (c : Wpcfg Pexv6 Efab) : Prop :=
   ∀ (cpu : CPU) (m : SailM Unit) (rs : RegFile) (fn : Option (Bool × Bool × Bool × Bool))
     (ib : Ibch) (ws : Wstate) (pr : GSet Nat),
     c.pcAgs[cpu.val]? = some ⟨.PHart cpu m rs fn ib, ws, pr⟩ →
-    SailCycleOrderK.good A (fun _ _ => True)
+    (∀ r, R r (rs r)) ∧
+    SailCycleOrderK.good A R (fun _ _ => True)
       (SailCycleOrderK.phOf (SrvwmoXv6Adequacy.lastCyc (hartAgent cpu) st)) m
 
 /-- The ONE-NODE step of the invariant (the hart's own `pnodeStep`, not at the boundary). -/
-theorem SailCycleOrderK.nodeStep (A : Int → BitVec 8 → Prop) (ph : SailCycleOrderK.Ph)
+theorem SailCycleOrderK.nodeStep (A : Int → BitVec 8 → Prop)
+    (R : (r : Register) → RegisterType r → Prop) (ph : SailCycleOrderK.Ph)
     (o : Outcome Register RegisterType) (k : o.ret → SailM Unit) (rs : RegFile) (ib : Ibch)
     (d : DevStates) (l : Wlabel) (m' : SailM Unit) (ors : Option RegFile)
     (fn' : Option (Bool × Bool × Bool × Bool)) (d' : DevStates) (oib : Option Ibch)
@@ -278,54 +324,57 @@ theorem SailCycleOrderK.nodeStep (A : Int → BitVec 8 → Prop) (ph : SailCycle
     (hn : pnodeStep (.impure (.ok o) k) rs ib d l m' ors fn' d' oib obar)
     (hA : ∀ base tvs, l = .LIFetch base tvs →
       ∀ (j t : Nat) (v : BitVec 8), tvs[j]? = some (t, v) → A (base + (j : Int)) v)
-    (hg : SailCycleOrderK.good A (fun _ _ => True) ph (.impure (.ok o) k)) :
-    SailCycleOrderK.good A (fun _ _ => True)
+    (hrs : ∀ r, R r (rs r))
+    (hg : SailCycleOrderK.good A R (fun _ _ => True) ph (.impure (.ok o) k)) :
+    (∀ r, R r ((ors.getD rs) r)) ∧
+    SailCycleOrderK.good A R (fun _ _ => True)
       (if SrvwmoXv6Adequacy.lbCyc l = true then SailCycleOrderK.phOf (some l) else ph) m' := by
   cases o
   case memRead nb va req =>
     simp only [pnodeStep] at hn
     split at hn
     · rename_i hdev
-      obtain ⟨w, -, rfl, rfl, -⟩ := hn
-      exact hg.2 (fun h => by rw [hdev] at h; cases h) _
+      obtain ⟨w, -, rfl, rfl, rfl, -⟩ := hn
+      exact ⟨hrs, hg.2 (fun h => by rw [hdev] at h; cases h) _⟩
     · rename_i hdev
       have hdev' : devAddr req.pa = false := by simpa using hdev
-      rcases hn with ⟨hif, w, tvs, hlen, hbytes, rfl, rfl, -⟩ | ⟨hif, hn⟩
+      rcases hn with ⟨hif, w, tvs, hlen, hbytes, rfl, rfl, rfl, -⟩ | ⟨hif, hn⟩
       · simp only [SrvwmoXv6Adequacy.lbCyc, ↓reduceIte, SailCycleOrderK.phOf]
-        refine hg.1 hdev' hif w (fun j hj => ?_)
+        refine ⟨hrs, hg.1 hdev' hif w (fun j hj => ?_)⟩
         have hj' : j < tvs.length := by omega
         obtain ⟨⟨t, v⟩, hx⟩ : ∃ x, tvs[j]? = some x := ⟨_, List.getElem?_eq_getElem hj'⟩
         have hv : (tvs.map Prod.snd)[j]? = some v := by simp [hx]
         rw [hbytes j hj] at hv
         cases hv
         exact hA _ _ rfl j t _ hx
-      · rcases hn with ⟨-, w, tvs, -, -, rfl, rfl, -⟩ | ⟨-, w, tvs, -, -, rfl, rfl, -⟩
-        · exact hg.2 (fun _ => hif) _
-        · exact hg.2 (fun _ => hif) _
+      · rcases hn with ⟨-, w, tvs, -, -, rfl, rfl, rfl, -⟩ | ⟨-, w, tvs, -, -, rfl, rfl, rfl, -⟩
+        · exact ⟨hrs, hg.2 (fun _ => hif) _⟩
+        · exact ⟨hrs, hg.2 (fun _ => hif) _⟩
   case memWrite nb va req =>
     simp only [pnodeStep] at hn
     split at hn
     · split at hn
-      · obtain ⟨-, rfl, rfl, -⟩ := hn
-        exact hg _
+      · obtain ⟨-, rfl, rfl, rfl, -⟩ := hn
+        exact ⟨hrs, hg _⟩
       · exact hn.elim
     · split at hn
-      · obtain ⟨-, ⟨-, rfl, rfl, -⟩ | ⟨-, ⟨rfl, rfl, -⟩ | ⟨rfl, rfl, -⟩⟩⟩ := hn
-        · exact hg _
-        · exact hg _
-        · exact hg
+      · obtain ⟨-, ⟨-, rfl, rfl, rfl, -⟩ | ⟨-, ⟨rfl, rfl, rfl, -⟩ | ⟨rfl, rfl, rfl, -⟩⟩⟩ := hn
+        · exact ⟨hrs, hg _⟩
+        · exact ⟨hrs, hg _⟩
+        · exact ⟨hrs, hg⟩
       · exact hn.elim
   case barrier b =>
     simp only [pnodeStep] at hn
-    obtain ⟨rfl, rfl, -⟩ := hn
+    obtain ⟨rfl, rfl, rfl, -⟩ := hn
     have : SrvwmoXv6Adequacy.lbCyc (ebarLabel b) = false := by
       unfold ebarLabel; split <;> rfl
     rw [if_neg (by rw [this]; simp)]
-    exact hg.2
+    exact ⟨hrs, hg.2⟩
   case instrAnnounce n w =>
     simp only [pnodeStep] at hn
-    obtain ⟨rfl, rfl, -⟩ := hn
+    obtain ⟨rfl, rfl, rfl, -⟩ := hn
     have hg2 := hg.2
+    refine ⟨hrs, ?_⟩
     unfold annLabel
     cases hs : sfAnnB n w
     · simp only [hs, Bool.false_eq_true, ↓reduceIte] at hg2 ⊢
@@ -334,34 +383,36 @@ theorem SailCycleOrderK.nodeStep (A : Int → BitVec 8 → Prop) (ph : SailCycle
       exact hg2
   case regRead r =>
     simp only [pnodeStep] at hn
-    obtain ⟨rfl, rfl, -⟩ := hn
-    exact hg _
+    obtain ⟨rfl, rfl, rfl, -⟩ := hn
+    exact ⟨hrs, hg _ (hrs r)⟩
   case regWrite r v =>
     simp only [pnodeStep] at hn
-    obtain ⟨rfl, rfl, -⟩ := hn
+    obtain ⟨rfl, rfl, rfl, -⟩ := hn
     have : SrvwmoXv6Adequacy.lbCyc (erwLabel (erwOf (depsOfIb ib.ibBits) ib.ibRds r)) = false := by
       unfold erwLabel; split <;> rfl
     rw [if_neg (by rw [this]; simp)]
-    exact hg _
+    exact ⟨SailCycleOrderK.rSet R rs r v hrs hg.1, hg.2 _⟩
   case choose _ =>
     simp only [pnodeStep] at hn
-    obtain ⟨ch, rfl, rfl, -⟩ := hn
-    exact hg _
+    obtain ⟨ch, rfl, rfl, rfl, -⟩ := hn
+    exact ⟨hrs, hg _⟩
   case readRam => exact hn.elim
   case writeRam => exact hn.elim
   all_goals
     simp only [pnodeStep] at hn
-    obtain ⟨rfl, rfl, -⟩ := hn
-    exact hg _
+    obtain ⟨rfl, rfl, rfl, -⟩ := hn
+    exact ⟨hrs, hg _⟩
 
 /-- **The step of the run invariant**: one `wpPfStep` keeps `inv`, provided a fetch step returns
-bytes the filter admits. -/
-theorem SailCycleOrderK.invStep (A : Int → BitVec 8 → Prop) (hcyc : SailCycleOrderK.cycleOk A)
+bytes the filter admits and the PLIC wire's pin writes are admitted (`hpin`). -/
+theorem SailCycleOrderK.invStep (A : Int → BitVec 8 → Prop)
+    (R : (r : Register) → RegisterType r → Prop) (hcyc : SailCycleOrderK.cycleOk A R)
+    (hpin : ∀ (rs : RegFile) (mm b : Bool), (∀ r, R r (rs r)) → ∀ r, R r (pinSet rs mm b r))
     (st : List (Nat × Wlabel)) (i : Nat) (l : Wlabel) (c1 c2 : Wpcfg Pexv6 Efab)
     (hs : wpPfStep pstepEv pclsEv i l c1 c2)
     (hA : ∀ base tvs, l = .LIFetch base tvs →
       ∀ (j t : Nat) (v : BitVec 8), tvs[j]? = some (t, v) → A (base + (j : Int)) v)
-    (hI : SailCycleOrderK.inv A st c1) : SailCycleOrderK.inv A (st ++ [(i, l)]) c2 := by
+    (hI : SailCycleOrderK.inv A R st c1) : SailCycleOrderK.inv A R (st ++ [(i, l)]) c2 := by
   intro cpu m rs fn ib ws pr hlk
   obtain ⟨ag, p', d', ws', hlk1, hps, -, -, hags⟩ := MachOfPf.wpPfStepInv _ _ i l c1 c2 hs
   rw [hags] at hlk
@@ -375,9 +426,10 @@ theorem SailCycleOrderK.invStep (A : Int → BitVec 8 → Prop) (hcyc : SailCycl
     cases p0 with
     | PDisk dp => exact hps.elim
     | PHart cpu0 m0 rs0 fn0 ib0 =>
-      obtain ⟨hcpu, ors, oib, obar, -, -, hh⟩ := hps
+      obtain ⟨hcpu, ors, oib, obar, hrs', -, hh⟩ := hps
       subst hcpu
-      have hg := hI cpu m0 rs0 fn0 ib0 ws0 pr0 hlk1
+      subst hrs'
+      obtain ⟨hR0, hg⟩ := hI cpu m0 rs0 fn0 ib0 ws0 pr0 hlk1
       have hph : SailCycleOrderK.phOf (SrvwmoXv6Adequacy.lastCyc (hartAgent cpu)
             (st ++ [(cpu.val, l)])) =
           if SrvwmoXv6Adequacy.lbCyc l = true then SailCycleOrderK.phOf (some l)
@@ -387,68 +439,76 @@ theorem SailCycleOrderK.invStep (A : Int → BitVec 8 → Prop) (hcyc : SailCycl
         · rw [if_pos ⟨rfl, hc⟩, if_pos hc]
         · rw [if_neg (fun h => hc h.2), if_neg hc]
       rw [hph]
-      rcases hh with ⟨hnd, -⟩ | ⟨mm, b, kp, -, rfl, rfl, -⟩
+      rcases hh with ⟨hnd, -⟩ | ⟨mm, b, kp, -, rfl, rfl, -, -, -, -, rfl⟩
       · unfold pstepNode at hnd
         split at hnd
-        · obtain ⟨rfl, rfl, -⟩ := hnd
+        · obtain ⟨rfl, rfl, rfl, -⟩ := hnd
           rw [if_neg (by simp [SrvwmoXv6Adequacy.lbCyc])]
-          exact hg
+          exact ⟨hR0, hg⟩
         · cases m0 with
           | pure u =>
             simp only [pnodeStep] at hnd
-            obtain ⟨tick, rfl, rfl, -⟩ := hnd
+            obtain ⟨tick, rfl, rfl, rfl, -⟩ := hnd
             simp only [SrvwmoXv6Adequacy.lbCyc, ↓reduceIte, SailCycleOrderK.phOf]
-            exact hcyc tick
+            exact ⟨hR0, hcyc tick⟩
           | impure call kk =>
             cases call with
             | error e => exact hnd.elim
-            | ok o => exact SailCycleOrderK.nodeStep A _ o kk rs0 ib0 _ l m _ _ _ _ _ hnd hA hg
+            | ok o => exact SailCycleOrderK.nodeStep A R _ o kk rs0 ib0 _ l m _ _ _ _ _ hnd hA hR0 hg
       · rw [if_neg (by simp [SrvwmoXv6Adequacy.lbCyc])]
-        exact hg
+        exact ⟨hpin rs0 mm b hR0, hg⟩
   · rw [List.getElem?_set_ne hi] at hlk
     have hg := hI cpu m rs fn ib ws pr hlk
     rw [SailCycleOrderK.lastCycSnoc, if_neg (fun h => hi h.1)]
     exact hg
 
-/-- Every hart of the pf boot configuration sits at the boundary (`.pure ()`). -/
-theorem SailCycleOrderK.invInit (A : Int → BitVec 8 → Prop) (img : Image) (d0 : Efab)
-    (σ0 : WGState) : SailCycleOrderK.inv A [] (wpInit img d0 (epsInit σ0)) := by
+/-- Every hart of the pf boot configuration sits at the boundary (`.pure ()`) on its boot
+register file. -/
+theorem SailCycleOrderK.invInit (A : Int → BitVec 8 → Prop)
+    (R : (r : Register) → RegisterType r → Prop) (img : Image) (d0 : Efab)
+    (σ0 : WGState) (hR0 : ∀ (c : CPU) r, R r (σ0.wgregs c r)) :
+    SailCycleOrderK.inv A R [] (wpInit img d0 (epsInit σ0)) := by
   intro cpu m rs fn ib ws pr hlk
   have hm := List.mem_of_getElem? hlk
   simp only [wpInit, epsInit, List.map_append, List.map_map, List.mem_append, List.mem_map,
     List.mem_singleton, Function.comp_def] at hm
   rcases hm with ⟨c, -, hc⟩ | hc
   · simp only [Wpagent.mk.injEq, Pexv6.PHart.injEq] at hc
-    obtain ⟨⟨-, rfl, -⟩, -⟩ := hc
-    trivial
+    obtain ⟨⟨-, rfl, rfl, -⟩, -⟩ := hc
+    exact ⟨hR0 c, trivial⟩
   · simp at hc
 
 /-- **THE RUN INVARIANT** (induction over `pfRunST`): under the cycle obligation, along every run
-from the pf boot configuration whose fetches return bytes the filter admits — as read off a
-backward-stable fact `E` of the run's configurations (`hE`, `hF`) — every hart's residual tree is
+from the pf boot configuration whose register files `R` admits (`hR0`, `hpin`) and whose fetches
+return bytes the filter admits — as read off a backward-stable fact `E` of the run's
+configurations (`hE`, `hF`) — every hart's register file is admitted and its residual tree is
 `good` at the phase of its latest cycle label. -/
-theorem SailCycleOrderK.invRun (A : Int → BitVec 8 → Prop) (hcyc : SailCycleOrderK.cycleOk A)
+theorem SailCycleOrderK.invRun (A : Int → BitVec 8 → Prop)
+    (R : (r : Register) → RegisterType r → Prop) (hcyc : SailCycleOrderK.cycleOk A R)
     (fok : Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop)
-    (img : Image) (d0 : Efab) (σ0 : WGState) (E : Wpcfg Pexv6 Efab → Prop)
+    (img : Image) (d0 : Efab) (σ0 : WGState) (hR0 : ∀ (c : CPU) r, R r (σ0.wgregs c r))
+    (hpin : ∀ (rs : RegFile) (mm b : Bool), (∀ r, R r (rs r)) → ∀ r, R r (pinSet rs mm b r))
+    (E : Wpcfg Pexv6 Efab → Prop)
     (hE : ∀ i l c1 c2, wpPfStep pstepEv pclsEv i l c1 c2 → E c2 → E c1)
     (hF : ∀ i base tvs c1 c2, wpPfStep pstepEv pclsEv i (.LIFetch base tvs) c1 c2 →
       pfStepFacts fok c1 i (.LIFetch base tvs) → E c1 →
       ∀ (j t : Nat) (v : BitVec 8), tvs[j]? = some (t, v) → A (base + (j : Int)) v) :
     ∀ (st : List (Nat × Wlabel)) (c : Wpcfg Pexv6 Efab),
       pfRunST pstepEv pclsEv fok TsoShadow.cohSrc (wpInit img d0 (epsInit σ0)) st c → E c →
-      SailCycleOrderK.inv A st c := by
+      SailCycleOrderK.inv A R st c := by
   intro st c hrun
   induction hrun with
-  | nil => intro _; exact SailCycleOrderK.invInit A img d0 σ0
+  | nil => intro _; exact SailCycleOrderK.invInit A R img d0 σ0 hR0
   | snoc c1 c2 st i l _ hs hf _ _ ih =>
     intro hE2
     have hE1 := hE i l c1 c2 hs hE2
-    exact SailCycleOrderK.invStep A hcyc st i l c1 c2 hs
+    exact SailCycleOrderK.invStep A R hcyc hpin st i l c1 c2 hs
       (fun base tvs hl => by subst hl; exact hF i base tvs c1 c2 hs hf hE1) (ih hE1)
 
 /-- **The conclusion** read off the invariant at a hart's head node. -/
-theorem SailCycleOrderK.scoOfInv (A : Int → BitVec 8 → Prop) (st : List (Nat × Wlabel))
-    (c : Wpcfg Pexv6 Efab) (hI : SailCycleOrderK.inv A st c) :
+theorem SailCycleOrderK.scoOfInv (A : Int → BitVec 8 → Prop)
+    (R : (r : Register) → RegisterType r → Prop) (st : List (Nat × Wlabel))
+    (c : Wpcfg Pexv6 Efab) (hI : SailCycleOrderK.inv A R st c) :
     ∀ (cpu : CPU) (o : Outcome Register RegisterType) (k : o.ret → SailM Unit) (rs : RegFile)
       (ib : Ibch) (ws : Wstate) (pr : GSet Nat),
       c.pcAgs[cpu.val]? = some ⟨.PHart cpu (.impure (.ok o) k) rs none ib, ws, pr⟩ →
@@ -457,7 +517,7 @@ theorem SailCycleOrderK.scoOfInv (A : Int → BitVec 8 → Prop) (st : List (Nat
       (∀ n w, o = .instrAnnounce n w → sfAnnB n w = true →
          ∃ base tvs, SrvwmoXv6Adequacy.lastCyc (hartAgent cpu) st = some (.LIFetch base tvs)) := by
   intro cpu o k rs ib ws pr hlk
-  have hg := hI cpu _ rs none ib ws pr hlk
+  have hg := (hI cpu _ rs none ib ws pr hlk).2
   refine ⟨fun ho => ?_, fun n w ho hsf => ?_⟩
   · subst ho
     exact SailCycleOrderK.phOfInstr _ (hg.1 rfl)
@@ -466,12 +526,34 @@ theorem SailCycleOrderK.scoOfInv (A : Int → BitVec 8 → Prop) (st : List (Nat
 
 /-! ## (4) The two instances -/
 
-/-- **The general premise from option (a)'s tree fact**: `cycleOkAll → sailCycleOrder`. -/
-theorem SailCycleOrderK.sailCycleOrderOfCycle (h : SailCycleOrderK.cycleOkAll) :
+/-- The boot register files are admitted by `Rboot` (`wbootFacts` → `resetRegsRun_of_run`
+[R33.s2]: `bootPost`'s `pma_regions = bootPMA` and `htif_tohost_base = none`). -/
+theorem SailCycleOrderK.rbootInit (σ0 : WGState) (hb : wbootFacts σ0) :
+    ∀ (c : CPU) r, SailCycleOrderK.Rboot r (σ0.wgregs c r) := by
+  intro c r
+  obtain ⟨f₀, hf⟩ := hb.2.2.2.2.2.1 c
+  have h := (resetRegsRun_of_run c f₀ _ hf).1
+  unfold SailCycleOrderK.Rboot
+  split
+  · exact h _ _ rfl
+  · exact h _ _ rfl
+  · trivial
+
+/-- The PLIC wire writes `sig_meip`/`sig_seip` only: `Rboot` is kept. -/
+theorem SailCycleOrderK.rbootPin (rs : RegFile) (mm b : Bool)
+    (h : ∀ r, SailCycleOrderK.Rboot r (rs r)) : ∀ r, SailCycleOrderK.Rboot r (pinSet rs mm b r) := by
+  unfold pinSet
+  split
+  · exact SailCycleOrderK.rSet _ rs _ _ h trivial
+  · exact SailCycleOrderK.rSet _ rs _ _ h trivial
+
+/-- **The general premise from the tree fact** [R32.1]: `cycleOkBoot → sailCycleOrder`. -/
+theorem SailCycleOrderK.sailCycleOrderOfCycle (h : SailCycleOrderK.cycleOkBoot) :
     sailCycleOrder := by
-  intro fok σ0 st c hrun
-  exact SailCycleOrderK.scoOfInv _ st c
-    (SailCycleOrderK.invRun _ h fok _ _ σ0 (fun _ => True) (fun _ _ _ _ _ _ => trivial)
+  intro fok σ0 hb st c hrun
+  exact SailCycleOrderK.scoOfInv _ _ st c
+    (SailCycleOrderK.invRun _ _ h fok _ _ σ0 (SailCycleOrderK.rbootInit σ0 hb)
+      SailCycleOrderK.rbootPin (fun _ => True) (fun _ _ _ _ _ _ => trivial)
       (fun _ _ _ _ _ _ _ _ _ _ _ _ => trivial) st c hrun trivial)
 
 /-- [R29.s1] (b): a step only APPENDS to the log and keeps the image. -/
@@ -544,8 +626,9 @@ theorem SailCycleOrderK.sailCycleOrderKOfCycle (h : SailCycleOrderK.cycleOkK) :
       rw [hb.2.1]
     · exact MachOfPf.noWriteOfPristine Xv6.bcRoLo Xv6.bcRoHi (Nat.le_refl _)
         SrvwmoXv6Adequacy.bcRoHiLe hR hwin a h1 h2
-  exact SailCycleOrderK.scoOfInv _ st c
-    (SailCycleOrderK.invRun _ h _ _ _ σ0 SailCycleOrderK.cleanK SailCycleOrderK.cleanKBack
+  exact SailCycleOrderK.scoOfInv _ _ st c
+    (SailCycleOrderK.invRun _ _ h _ _ _ σ0 (SailCycleOrderK.rbootInit σ0 hb)
+      SailCycleOrderK.rbootPin SailCycleOrderK.cleanK SailCycleOrderK.cleanKBack
       SailCycleOrderK.fetchK st c hrun hclean)
 
 /-! ## (5) The corollary machinery (iii)/(iv), conditional on `sailCycleOrderK` -/

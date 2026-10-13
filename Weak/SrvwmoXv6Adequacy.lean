@@ -15,7 +15,10 @@ on an OUT buffer wrapping past `2^64`, so no disk side condition remains either)
 M1 — composition milestone, INTERNAL (not published [OWN.2]): kernel-only by premise
 `candKfetch`, loads single-copy-atomic at or above the TsoMem floor by premise `candScaT`,
 disk-row loads latest by premise `candDiskLat`, under the named ISA-model premise
-`sailCycleOrder` [OWN.35] (W-SCO demotes it for kernel text); the disk rows PROVED (W4 F9), no
+`sailCycleOrder` [OWN.35] (TRUE of the model from this platform's reset — the boot PMA table
+forbids instruction fetch from I/O regions and the HTIF window is disabled; FALSE over arbitrary
+register files; stated under `wbootFacts σ0` [R32.1][R33.1][OWN.45]; W-SCO (A) proves it for every
+instruction); the disk rows PROVED (W4 F9), no
 side condition; the realizing MachCSL run satisfies `xv6FsAdequacy_closed`'s conclusions,
 `xv6NiPhi`, `unionPhiSync`, `textPristine` and the allocproc shadow; axioms = the SC roots'
 (`propext`, `Classical.choice`, `Quot.sound`; opaques the two `resv` predicates +
@@ -57,27 +60,34 @@ opaque relation.
 ## `sailCycleOrder` [OWN.35] — the named ISA-model premise, LABEL-LIST form [R21.s1]
 
 Along every `pfRunST` run from `wpInit (imgZ σ0.wgimg) (efInit σ0.wgdev) (epsInit σ0)` (any
-`fok`, any `σ0`), at each own `.barrier Barrier_RISCV_i` node the LATEST own `LInstr`/`LIFetch`
+`fok`, any BOOTED `σ0`: `wbootFacts σ0` [R32.1][OWN.45]), at each own `.barrier Barrier_RISCV_i` node the LATEST own `LInstr`/`LIFetch`
 step of the step list is `LInstr`, and at each own `sfence.vma` announce node it is an `LIFetch`
 — Sail's cycle fetch → announce → execute, no instruction fetch during execute
 (`model/Lean_RV64D/LeanRV64D/Step.lean:331-404`).  Stated on the label list
-(`SrvwmoXv6Adequacy.lastCyc`), NOT through `tsoShadow`'s `fiArm` bit.  FAITHFUL (true of the
-Sail model by inspection; RVWMO / riscv.cat / Zifencei / PMAs are silent on in-cycle order).
-W-SCO (after M1) proves it for xv6's kernel text and removes it from M1.
+(`SrvwmoXv6Adequacy.lastCyc`), NOT through `tsoShadow`'s `fiArm` bit.  TRUE of the model from
+this platform's reset (the boot PMA table forbids instruction fetch from I/O regions and the HTIF
+window is disabled); FALSE over arbitrary register files (a fetch from MMIO under a `pma_regions`
+marking the PLIC executable is labelled `LDev`, leaves no `LIFetch`, and an SFENCE.VMA word fetched
+there refutes the second clause [R32.1]; likewise an HTIF window over RAM answers the fetch from a
+register [R33.1]) — hence stated under `wbootFacts σ0`, which pins both registers (`bootPost`).
+RVWMO / riscv.cat / Zifencei are silent on in-cycle order.  W-SCO (A) proves it for every
+instruction (`SailCycleOrderK.sailCycleOrderOfCycle`, `Weak/SailCycleOrderK.lean`).
 
 ## Remaining hypotheses of `srvwmoXv6M1Core`
 
 * M1's premise set `srvwmoXv6M1Premises σ0 c pst dv` (satisfiable: `srvwmoXv6M1Satisfiable`);
 * the MachCSL boot state `g0`: `g0.gen = 0`, `g0.pow = false`, `σ0.wgdev = g0.m.devs.reset`,
   `diskOf g0.m.devs = fsImgDisk` (always constructible: `SrvwmoXv6Adequacy.bootStateOf`);
-* `sailCycleOrder` [OWN.35].
+* `sailCycleOrder` [OWN.35] (restated under `wbootFacts σ0` [R32.1][OWN.45]: the premise got
+  WEAKER, the theorem STRONGER and non-vacuous; discharged by W-SCO (A), `srvwmoXv6M1`).
 
 ## Deviations from the plan text
 
 1. The plan's §C W5 says W5 CORE also corrects `MachOfPf.lean`'s header deviation 3 ("its owner
    is OPEN") to [OWN.35]; W4 F9 made that correction in `MachOfPf.lean`'s header
    (`PfStepTsoView.lean`'s deviation (4) is corrected by the W5 CLOSE-OUT, naming
-   `sailCycleOrder` and W-SCO's `sailCycleOrderK_holds`).
+   `sailCycleOrder` and W-SCO's `sailCycleOrderK_holds`, since renamed `sailCycleOrder_holds`
+   [R32.s2]).
 2. (W4 F9) The former `diskRows` (a copy of `MachOfPf.Hyps.disk`'s type) and its `DR`
    parameter are DELETED with that field.
 3. `allocprocAns` is a COPY of `Xv6.allocprocTraceAns`'s conclusion (proved by `exact`).
@@ -118,14 +128,18 @@ def SrvwmoXv6Adequacy.lastCyc (i : Nat) (st : List (Nat × Wlabel)) : Option Wla
   ((st.filter (fun y => y.1 == i && SrvwmoXv6Adequacy.lbCyc y.2)).getLast?).map Prod.snd
 
 /-- **THE NAMED ISA-MODEL PREMISE `sailCycleOrder`** [OWN.35][R20.s4][R21.s1]: along every
-`pfRunST` run from the pf boot configuration (any fetch clause `fok`, any boot state `σ0`), at an
+`pfRunST` run from the pf boot configuration (any fetch clause `fok`, any BOOTED state `σ0`,
+`wbootFacts σ0` [R32.1][R33.1][OWN.45]), at an
 own `fence.i` BARRIER node the latest own `LInstr`/`LIFetch` step is `LInstr` (the announce), and
 at an own `sfence.vma` ANNOUNCE node it is an `LIFetch` (the instruction's fetch) — "the Sail
 cycle fetches, then announces, then executes, and fetches nothing while executing"
-(`Step.lean:331-404`).  A closed proposition (the shape `bootImageSealed` has); FAITHFUL. -/
+(`Step.lean:331-404`).  A closed proposition (the shape `bootImageSealed` has); TRUE of the
+model from this platform's reset (the boot PMA table forbids instruction fetch from I/O regions
+and the HTIF window is disabled); FALSE over arbitrary register files. -/
 def sailCycleOrder : Prop :=
-  ∀ (fok : Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop) (σ0 : WGState)
-    (st : List (Nat × Wlabel)) (c : Wpcfg Pexv6 Efab),
+  ∀ (fok : Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop) (σ0 : WGState),
+    wbootFacts σ0 →
+    ∀ (st : List (Nat × Wlabel)) (c : Wpcfg Pexv6 Efab),
     pfRunST pstepEv pclsEv fok TsoShadow.cohSrc
       (wpInit (imgZ σ0.wgimg) (efInit σ0.wgdev) (epsInit σ0)) st c →
     ∀ (cpu : CPU) (o : Outcome Register RegisterType) (k : o.ret → SailM Unit) (rs : RegFile)
@@ -174,7 +188,8 @@ theorem SrvwmoXv6Adequacy.fiArmLastCyc (stamp : CohStamp) (i : Nat) :
 
 /-- `MachOfPf.Hyps.fi` from `sailCycleOrder`. -/
 theorem SrvwmoXv6Adequacy.fiOfSco (hsco : sailCycleOrder)
-    (fok : Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop) (σ0 : WGState) :
+    (fok : Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop) (σ0 : WGState)
+    (hb : wbootFacts σ0) :
     ∀ (st : List (Nat × Wlabel)) (c : Wpcfg Pexv6 Efab),
       pfRunST pstepEv pclsEv fok TsoShadow.cohSrc
         (wpInit (imgZ σ0.wgimg) (efInit σ0.wgdev) (epsInit σ0)) st c →
@@ -186,7 +201,7 @@ theorem SrvwmoXv6Adequacy.fiOfSco (hsco : sailCycleOrder)
         (∀ n w, o = .instrAnnounce n w → sfAnnB n w = true →
            (tsoShadow TsoShadow.cohSrc st (hartAgent cpu)).fiArm = false) := by
   intro st c hrun cpu o k rs ib ws pr hag
-  obtain ⟨hb, ha⟩ := hsco fok σ0 st c hrun cpu o k rs ib ws pr hag
+  obtain ⟨hb, ha⟩ := hsco fok σ0 hb st c hrun cpu o k rs ib ws pr hag
   rw [SrvwmoXv6Adequacy.fiArmLastCyc]
   refine ⟨fun h => by rw [hb h]; rfl, fun n w h hs => ?_⟩
   obtain ⟨base, tvs, e⟩ := ha n w h hs
@@ -213,7 +228,7 @@ theorem SrvwmoXv6Adequacy.bcRoHiLe : Xv6.bcRoHi ≤ ramEnd := by decide
 /-- **`MachOfPf.Hyps` at M1** (`fok = candKfetch bcRoLo bcRoHi`, the pf boot configuration):
 `tso`, `safe`, `cut`, `fi` discharged (the disk rows are W4 F9's `MachOfPf.simDisk`, no longer a
 field). -/
-theorem SrvwmoXv6Adequacy.m1Hyps (σ0 : WGState) (g0 : GState) (hg0 : g0.gen = 0)
+theorem SrvwmoXv6Adequacy.m1Hyps (σ0 : WGState) (hb : wbootFacts σ0) (g0 : GState) (hg0 : g0.gen = 0)
     (hp0 : g0.pow = false) (hfs : diskOf g0.m.devs = Xv6.fsImgDisk)
     (hsco : sailCycleOrder) :
     MachOfPf.Hyps (candKfetch (Xv6.bcRoLo : Int) (Xv6.bcRoHi : Int)) g0
@@ -223,7 +238,7 @@ theorem SrvwmoXv6Adequacy.m1Hyps (σ0 : WGState) (g0 : GState) (hg0 : g0.gen = 0
     (Xv6.xv6FsAdequacy_closed (hlc := Iris.HasLC.hasLC) g0 hg0 hp0 hfs n κs t g hm).1
   cut := MachOfPf.cutIgnore <| MachOfPf.cutOfPristine Xv6.bcRoLo Xv6.bcRoHi (Nat.le_refl _) SrvwmoXv6Adequacy.bcRoHiLe
     g0 _ (SrvwmoXv6Adequacy.winOfText g0 hg0 hp0 hfs)
-  fi := fun st c _ _ _ _ hrun _ _ => SrvwmoXv6Adequacy.fiOfSco hsco _ σ0 st c hrun
+  fi := fun st c _ _ _ _ hrun _ _ => SrvwmoXv6Adequacy.fiOfSco hsco _ σ0 hb st c hrun
 
 /-- The MachCSL machine-off state `srvwmoXv6M1Core` starts from exists for every M1 premise set
 (from the premises' `ds`): the extra boot hypotheses are never vacuous. -/
@@ -315,7 +330,7 @@ theorem srvwmoXv6M1Core (σ0 : WGState) (c : Cand) (pst : Nat → List Pexv6) (d
       SrvwmoXv6Adequacy.allocprocAns (Obs.powerOn :: MachOfPf.pfObsOf r) := by
   have hb : wbootFacts σ0 := hP.1
   obtain ⟨cf, st, hrun, hadj, h1, h2, h3, h4⟩ := srvwmoXv6M1PfRun σ0 c pst dv hP
-  have hH := SrvwmoXv6Adequacy.m1Hyps σ0 g0 hg0 hp0 hfs hsco
+  have hH := SrvwmoXv6Adequacy.m1Hyps σ0 hb g0 hg0 hp0 hfs hsco
   obtain ⟨r, hr, hl, n, t, g, hm, hR⟩ :=
     MachOfPf.machRunOfPfRun _ σ0 g0.m.devs g0 hb hgd hg0 hp0 rfl hH st cf hrun hadj
   obtain ⟨hred, hpure, hni, hun, htext, hap⟩ :=

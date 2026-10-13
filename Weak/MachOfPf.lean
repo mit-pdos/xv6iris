@@ -71,8 +71,11 @@ parameter is DISCHARGED (`simDisk`).
    at a parked fence or at the boundary, the disk agent's UART/PLIC moves).
 3. Item (3) (`fiArm`) is a PARAMETER (`Hyps.fi`, stated over every `pfRunST` run from the boot
    configuration, at a related boot-reachable MachCSL state — `cut`'s shape, W-SCO [R28.2]): W2 CLOSE disowned it (a fact of Sail's event order inside `try_step`, not of
-   the step list); Q-FIARM RULED [OWN.35]: it is the named trusted premise `sailCycleOrder`
-   (`Weak/SrvwmoXv6Adequacy.lean`, `fiOfSco`), to be proved for xv6's kernel text after M1.
+   the step list); Q-FIARM RULED [OWN.35]: it is the named premise `sailCycleOrder`
+   (`Weak/SrvwmoXv6Adequacy.lean`, `fiOfSco`) — TRUE of the model from this platform's reset (the
+   boot PMA table forbids instruction fetch from I/O regions and the HTIF window is disabled);
+   FALSE over arbitrary register files; stated under `wbootFacts σ0` [R32.1][R33.1][OWN.45]; W-SCO
+   (A) proves it for every instruction (`Weak/SailCycleOrderK.lean`).
 4. The fetch cut is a PARAMETER over related, boot-reachable states (`Hyps.cut`), discharged at
    M1 by `cutOfPristine` from a SECOND MachCSL-side hypothesis (the pristine window at every
    reachable powered state; W5: `powerInterp_textPristine`) — `candKfetch` alone does not give it.
@@ -692,7 +695,10 @@ theorem rmemDropResv {P D : Type} {c : Wpcfg P D} {st : List (Nat × Wlabel)} {�
   [R29.1]; M1: `fcutTTriv`, the cut from `candKfetch` and the pristine kernel text, `cutIgnore`;
   M2: the clause IS the cut form, `Weak/PfRunUnpinned.lean`);
 * `fi` — plan item (3): `fiArm` at `fence.i` / the `sfence.vma` marker, along every run from
-  `c0` (a fact of the Sail model's event order; [OWN.35]: the named premise `sailCycleOrder`),
+  `c0` (a fact of the Sail model's event order; [OWN.35]: the named premise `sailCycleOrder` —
+  TRUE of the model from this platform's reset (the boot PMA table forbids instruction fetch from
+  I/O regions and the HTIF window is disabled); FALSE over arbitrary register files; stated under
+  `wbootFacts σ0` [R32.1][R33.1]),
   at a related MachCSL state reachable from boot — the `cut` shape [R28.2], so that a
   kernel-text discharge (W-SCO) can pin the fetched words to the image through `SimRel`.
 The disk rows are `simDisk`, no longer a parameter.  The runs `cut` and `fi` quantify are the

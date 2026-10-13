@@ -629,7 +629,7 @@ theorem srvwmoXv6M2PfRun (σ0 : WGState) (c : Cand) (pst : Nat → List Pexv6) (
 /-- **`MachOfPf.HypsC` at M2** (`fok = fokTriv`, `fcutT = fcutM2`, the pf boot configuration):
 `tso` and `safe` as at M1; `cut` IS the step's cut clause (`pfCutFactsT`) verbatim — no
 MachCSL-side source; `fi` from the named premise `sailCycleOrder` (`fiOfSco`). -/
-theorem PfRunUnpinned.m2Hyps (σ0 : WGState) (g0 : GState) (hg0 : g0.gen = 0)
+theorem PfRunUnpinned.m2Hyps (σ0 : WGState) (hb : wbootFacts σ0) (g0 : GState) (hg0 : g0.gen = 0)
     (hp0 : g0.pow = false) (hfs : diskOf g0.m.devs = Xv6.fsImgDisk)
     (hsco : sailCycleOrder) :
     MachOfPf.HypsC PfRunUnpinned.fokTriv PfRunUnpinned.fcutM2 g0
@@ -638,7 +638,7 @@ theorem PfRunUnpinned.m2Hyps (σ0 : WGState) (g0 : GState) (hg0 : g0.gen = 0)
   safe := fun n κs t g hm =>
     (Xv6.xv6FsAdequacy_closed (hlc := Iris.HasLC.hasLC) g0 hg0 hp0 hfs n κs t g hm).1
   cut := fun _ _ _ _ _ _ _ _ _ _ base tvs _ _ _ hcf => hcf base tvs rfl
-  fi := fun st c _ _ _ _ hrun _ _ => SrvwmoXv6Adequacy.fiOfSco hsco _ σ0 st c hrun
+  fi := fun st c _ _ _ _ hrun _ _ => SrvwmoXv6Adequacy.fiOfSco hsco _ σ0 hb st c hrun
 
 /-- **M2 — THE FORK PATH, COMPOSED** (plan §C W5d; [OWN.3]).  From M2's premise set (an
 UNPINNED sRVWMO candidate whose fetches satisfy the Zifencei cut form at the free instruction
@@ -682,7 +682,7 @@ theorem srvwmoXv6M2Core (σ0 : WGState) (c : Cand) (pst : Nat → List Pexv6) (d
   have hb : wbootFacts σ0 := hP.1
   obtain ⟨cf, st, hrun, hadj, h1, h2, h3, h4, h5⟩ :=
     srvwmoXv6M2PfRun σ0 c pst dv itvOf fiOf hP
-  have hH := PfRunUnpinned.m2Hyps σ0 g0 hg0 hp0 hfs hsco
+  have hH := PfRunUnpinned.m2Hyps σ0 hb g0 hg0 hp0 hfs hsco
   obtain ⟨r, hr, hl, n, t, g, hm, hR⟩ :=
     MachOfPf.machRunOfPfRun _ σ0 g0.m.devs g0 hb hgd hg0 hp0 rfl hH st cf hrun hadj
   obtain ⟨hred, hpure, hni, hun, htext, hap⟩ :=
