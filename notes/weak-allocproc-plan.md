@@ -1,6 +1,31 @@
 # allocproc on RVWMO: target theorem, gap analysis, roadmap (design advisor, 2026-10-09)
 
-**Status: rev 40 (2026-10-13) = rev 39 + review R36 (4 required changes, tags [R36.n]; NOT SATISFIED — all plan TEXT on the W8 (f2-ctx)
+**Status: rev 41 (2026-10-13) = rev 40 + review R38 (6 required changes, tags [R38.n]; NOT SATISFIED — all on W13 (F-dep)'s GRAPH side, ONE
+memory-model TEXT change (the tagged well-formedness `gtdepsWf`), no shrinking; adopted [R38.s1]–[R38.s5]) + RULINGS [OWN.48]–[OWN.51] + RESULTS (Stage 2
+first batch LAUNCHED; **W13 (F-dep) STOPPED GREEN before any edit**) + Q-FDEP (OPEN, provisionally (A2), (A1) recommended).**  What changed: **[R38.1]** the
+W13 (F-dep) worker's STOP finding (`~/dev/weak-orch/parked/PROGRESS-W13Fdep.md`) is CORRECT: §C W13 (F-dep) told the worker to emit D50 (b)'s edges
+(`DTdata`/`DTctrl`/`DTtrans`/`DTr13` INTO I/O stores, every edge OUT OF an I/O load) that the PUBLISHED model's `gtdepsWf` (`Weak/AxDeps.lean:168-171`, a
+conjunct of `rvwmoCatConsistentT :208-211`) cannot hold — it demands a `lbIsR` source and a `lbIsW` write-tag target, both `false` on `Lbl.LIo`
+(`WeakAxiomatic.lean:174-182`, D47 (a)) — so once `rowDepsT ⊆ GT.gtDeps` enters `gdexecQconfT`/`xv6ConfS` the published premise is UNSATISFIABLE on
+every row that prints a byte (hart 0's first `printk`: `acquire`'s RAM loads → the never-reset `dtCtl` → `DTctrl` into the THR store `sb a5,0(a3)`
+`0x800009fa`) — VACUITY; FIXED by **option A**: (F-dep) gains item **(0)** (the first green increment after the payload sweep) — `gtdepsWf` admits
+`lbIsR ∨ lbIsIoRd` sources and `lbIsW ∨ lbIsIoWr` write-tag targets (FAITHFUL to riscv.cat's `R`/`W` under appendix (c1)); `forgetDeps`/`gtAd` filter to
+RAM endpoints so `catTAd`, `catTForgetAxioms`, W12's `catADOfCatT` and the registered LB roots keep their STATEMENTS (their premise WEAKENS — a strictly
+stronger theorem, no re-registration); `AxSpinGate.gsrcT` filters to `lbIsR` sources; the Bool/SC tier in step; a computed-satisfiability smoke test;
+§A(3)/(6)/(†) name the trusted-surface change; **[R38.2]** the UNTAGGED `dstep` (`WeakRvwmoConf.lean:497-499`) stays INERT — only `dstepT` gets the arms
+(an untagged `LDev .wr` arm would push W13-wit's own addr edge `ld a5,0(a0)` → `sb zero,1(a5)` into `gfexecConfIO`'s `rowDeps ⊆ gdDeps`, `Fab.lean:857`,
+whose `gdepsWf` is RAM-only — the non-vacuity witness would die); `WeakRvwmoConf` leaves (F-dep)'s owner list, `WeakPromise.lean:89` (`Wlabel.LDev`) and
+`AxSpinGate.lean` join it; **[R38.3]** the `LDev` payload sweep is an ARITY change — ≈ 180 positional sites in 35 files (grep; R38 177/35, the worker
+146/38), not "`Supply` 4, `FabInd` 2" — landed as increment (1) ALONE; (F-dep) re-sized **M–L ≈ 1k, three increments**; **[R38.4]** **Q-FDEP** (rule 12
+from an I/O-load source): provisional **(A2)** — `gppoCatT` over the source-filtered `gtAd`, WEAKER than riscv.cat by exactly the
+`[IoR];(addr|data);[W];rfi;[R]` instances (sound) — **(A1)** recommended (`gtAdFull` + two one-line monotonicity proofs); **[R38.5]** header, launch
+state and the (F-dep)/W12 launch paragraphs rewritten (the batch is APPROVED [OWN.48], not "awaiting"); **[R38.6]** what the RUNNING W12 worker must
+know (course note, §C W12 launch paragraph; its brief is not changed here).  **RULINGS 05:18 2026-10-13**: [OWN.48] Stage 2 first batch LAUNCHED — W12
+(+W12b) w1 RUNNING, W13 (L) w4 RUNNING, W13 (F-dep) STOPPED GREEN before edits (RELAUNCH when rev 41 is signed off); [OWN.49] Q-F2-PIPEHOP-2 =
+(a′-r) (inside W8 (f2-ctx) RELAUNCH 2, RUNNING w2); [OWN.50] F-C = (i); [OWN.51] weekly cap — no new launch at seven_day ≥ 90%, wind down green at
+95%.  New owner questions: **Q-FDEP** (§D FIRST; provisionally (A2), (A1) recommended, awaiting ruling).  History: rev 41 — R38 (6 req., 0 alt; s1–s5
+adopted) + [OWN.48]–[OWN.51] + RESULTS ((F-dep) STOPPED GREEN) + Q-FDEP.
+**Rev 40 (2026-10-13) = rev 39 + review R36 (4 required changes, tags [R36.n]; NOT SATISFIED — all plan TEXT on the W8 (f2-ctx)
 lane, no memory-model change, no shrinking; adopted [R36.s1]–[R36.s6]) + RESULTS (**M2 CLOSE DONE**; W8 (f2-ctx) S1′ + S2-pre MERGED, worker
 STOPPED GREEN) + RELAUNCH 2 (W8 (f2-ctx)) + Q-F2-PIPEHOP-2 (OPEN, provisionally (a″+shape)).**  What changed: **[R36.1]** rev 39's "W8 (f2-ctx)
 continuation RUNNING" was STALE — the worker STOPPED GREEN 2026-10-13 after two increments that are IN THE TIP (`diff -rq` w2 ↔ tip empty):
@@ -32,7 +57,7 @@ PROGRESS.  **RESULTS: M2 CLOSE DONE** — `Weak.srvwmoXv6M2` REGISTERED (`roots-
 headers `PfRunUnpinned.lean:55` "M2 CLOSED: registered", `SailCycleOrderCycle.lean:177`, `MachOfPf.lean:73-77`/`SrvwmoXv6Adequacy.lean:18-21`
 "proved: `sailCycleOrder_holds`"; `audit.sh:49,56` unchanged, the optional core NOT registered) — **both Stage 1 milestones M1 + M2 DONE
 (INTERNAL, NOT published [OWN.2]); Stage 1b CLOSED.**  Launch state: W8 (f2-ctx) RELAUNCH 2 LAUNCHABLE (serial MachCSL lane; S0 first);
-Stage 2 FIRST LAUNCH SET unchanged — **W12 (+W12b) ∥ W13 (F-dep) ∥ W13 (L)**, [R36.s3]'s edge named — awaiting the owner's batch approval.
+Stage 2 FIRST LAUNCH SET unchanged — **W12 (+W12b) ∥ W13 (F-dep) ∥ W13 (L)**, [R36.s3]'s edge named — awaiting the owner's batch approval [rev 41: APPROVED and LAUNCHED [OWN.48]].
 New owner questions: **Q-F2-PIPEHOP-2** (§D FIRST; provisionally (a″+shape), awaiting ruling; (a′-r) the named S4 follow-up).  History: rev 40
 — R36 (4 req., 0 alt; s1–s6 adopted) + RESULTS (M2 CLOSE DONE; (f2-ctx) S1′ + S2-pre MERGED) + RELAUNCH 2 + Q-F2-PIPEHOP-2.
 **Rev 39 (2026-10-13) = rev 38 + review R35 (2 required changes, tags [R35.n]; NOT SATISFIED — both S text in Q-F2-PIPEHOP (a) /
@@ -525,6 +550,7 @@ rev 37 (2026-10-12) R33 (1 req.: `Rboot` ALSO pins `htif_tohost_base = none` —
 rev 38 (2026-10-12) R34 (3 req., all S text in the W8 (f2-ctx) launch paragraph — (5) FOUR of six conjuncts, `cpuProcDiscAt`/`utextDiscAt` → W8 (f3-rest) [R34.1]; `W8-Rctx.md` carve-out for [OWN.39]/[OWN.38]/[OWN.41] [R34.2]; ghost plumbing route (A) in Files, 13 MachCSL [R34.3]; applied at launch; s1–s6 adopted) + RESULTS (W8 (f2-ctx) S1 MERGED: `ChainDefs`/`ChainCert`, worker stopped green with 3 findings) + Q-F2-PIPEHOP/Q-F2-BOOTGATE provisional (a) + RELAUNCH W8 (f2-ctx) + W8 (f3-rest) named; OPEN owner questions: Q-F2-PIPEHOP, Q-F2-BOOTGATE.
 rev 40 (2026-10-13) R36 (4 req., all plan text on the (f2-ctx) lane: RESULTS (S1′ + S2-pre MERGED, deviations D1–D4, findings F-A–F-D) + RELAUNCH 2 deciding F-B (guard `j ≠ w`) and F-C ((i) as rows first, (ii) fallback) [R36.1]; `pipeLockNameStr` = `"digits"`, not `"pipe"` → `KS.«pipe»`, S0 [R36.2]; the merged (a″) name-word window is a DEVIATION from RULED (a′), word-shaped hop entries + windowed `lockRegionOk`, provisional pending Q-F2-PIPEHOP-2 [R36.3]; F-C (i) rows before wiring, 27 client files, (ii) sized [R36.4]; s1–s6 adopted) + RESULTS (**M2 CLOSE DONE** — `Weak.srvwmoXv6M2` registered; M1 + M2 DONE, Stage 1b CLOSED); OPEN owner question: Q-F2-PIPEHOP-2 (provisionally (a″+shape)).
 rev 39 (2026-10-13) R35 (2 req., both S text: Q-F2-PIPEHOP (a) → (a′) time-indexed `isLk b r` + `pipeLockAt` [R35.1]; Q-F2-BOOTGATE (a) + history-aware reserved store over `rsvStoreOk`, `started`'s cell/carve moved [R35.2]; applied at launch in the (f2-ctx) continuation brief; s1–s6 adopted) + [OWN.46] (Q-F2-PIPEHOP = (a) as amended = (a′)) + [OWN.47] (Q-F2-BOOTGATE = (a) as amended) + RESULTS (W-SCO (A) DONE: `sailCycleOrder_holds` a THEOREM, M1/M2 non-vacuous, `Weak.srvwmoXv6M1` REGISTERED, `srvwmoXv6M2` stated) + M2 CLOSE launch paragraph (LAUNCHABLE) + the first Stage 2 launch set (W12 (+W12b) ∥ W13 (F-dep) ∥ W13 (L)); OPEN owner questions: NONE.
+rev 41 (2026-10-13) R38 (6 req., all on W13 (F-dep)'s graph side: option A — `gtdepsWf` admits I/O-read sources / I/O-write targets, `forgetDeps`/`gtAd`/`gsrcT` filter to RAM endpoints so `catTAd`/`catTForgetAxioms`/`catADOfCatT`/the LB roots keep their statements (premise weakens) [R38.1]; the untagged `dstep` STAYS inert, `dstepT` only, `WeakRvwmoConf` not an owner, `WeakPromise.lean:89` + `AxSpinGate.lean` are [R38.2]; the `LDev` payload sweep ≈ 180 sites / 35 files as increment (1) alone, (F-dep) M–L ≈ 1k [R38.3]; Q-FDEP provisional (A2), (A1) recommended [R38.4]; header/launch text [R38.5]; the W12 course note [R38.6]; s1–s5 adopted) + [OWN.48]–[OWN.51] (batch LAUNCHED; Q-F2-PIPEHOP-2 = (a′-r); F-C = (i); weekly cap) + RESULTS (W13 (F-dep) STOPPED GREEN before any edit, `PROGRESS-W13Fdep.md`); OPEN owner question: Q-FDEP.
 
 **The kernel [OWN.4][R1.9]: xv6-riscv `b72cbac1`, branch `verified`** (`notes/STATUS.md:8-11`, `README.md:89-90`)
 = upstream plus (a) a per-process root (`p->root`, `sys_chroot`, `igetroot`, root-aware `dirlookup`/walk) and
@@ -646,14 +672,18 @@ riscv.cat-tier validation of the handle-based lock protocol; do NOT extend it.
    row `.PDisk none` (`WeakEvCapstone.lean:1027`, booted by `xboot`, `Capstone.lean:90-91`) [R7.3][R5.s5][R5.1];
 3. memory [OWN.2]: **RVWMO as the ISA defines it — the TAGGED cat model `rvwmoCatConsistentT GT` over `GdexecT`
    (`Weak/AxDeps.lean:208-211`: `gwf ∧ gppoCatTGmo ∧ gloadValue ∧ gatomicity ∧ gtdepsWf ∧ gtdepsGmo`, rule 12 over
-   `gtAd` = the addr/data edges only; rules 1–5, 7-RCsc, 12; omits 6, 7-RCpc, 8; fidelity by litmus,
+   `gtAd` = the addr/data edges only — [R38.4] from RAM-read sources (**provisional (A2)**: the rule-12 instances sourced at an I/O load,
+   `[IoR];(addr|data);[W];rfi;[R]`, are OMITTED — WEAKER than riscv.cat by exactly them, sound; **(A1)**, recommended, re-points `gppoCatT` at
+   `gtAdFull`; Q-FDEP, §D FIRST); rules 1–5, 7-RCsc, 12; omits 6, 7-RCpc, 8; fidelity by litmus,
    `Weak/AxLitmus.lean:29`)** [R6.1].  **NOT the untagged `rvwmoCatConsistent` (`Weak/AxGraphCat.lean:191-194`)**:
    its `gppo12` ranges over the untagged `gdDeps` and so also orders `ctrl;[W];rfi;[R]`, which riscv.cat does NOT —
    the tree calls it "UNSOUND for safety" (`AxDeps.lean:12-18`), machine-checked by `twCatT :876` with
    `twNotCatForget :883`; `catTOfCat` goes cat→tagged, the converse fails (`:22-27`).  The chain runs on `forget GT`
    (W12 spike F1; D33 RULED (a) [OWN.13]).  **I/O accesses are events of the rows** [OWN.14]: `gmem` (hence gmo,
    `gwf`'s membership clause, `Graph.lean:169-171`) includes the new `Lbl.LIo` labels; ppo applies to them as
-   riscv.cat is written (§B(11)); their values are device-supplied (no `lbRd`, so `gloadValue`/`grf`/`gfr` are vacuous
+   riscv.cat is written (§B(11)) **and [R38.1] the tagged well-formedness `gtdepsWf` ADMITS I/O-read sources and I/O-write targets**
+   ((F-dep) (0a): `lbIsR ∨ lbIsIoRd` / `lbIsW ∨ lbIsIoWr`; `.dev` events in neither — until it lands, the D50 (b) edges make the premise
+   unsatisfiable on I/O rows); their values are device-supplied (no `lbRd`, so `gloadValue`/`grf`/`gfr` are vacuous
    for them BY CONSTRUCTION — the appendix "I/O Ordering": "For I/O, the load value axiom and atomicity axiom in
    general do not apply" [R8.s1]).  W→W reordering and load buffering ALLOWED; every strengthening NAMED;
 4. page tables live: shared kernel table with concurrent hardware A/D write-back (`MachCSL/KptInv.lean:39,85`;
@@ -677,7 +707,10 @@ riscv.cat-tier validation of the handle-based lock protocol; do NOT extend it.
    STATED under `wbootFacts σ0` (Q-SCO-PMA (α), RULED [OWN.45]) — [rev 39] DONE: `sailCycleOrder_holds` (`Weak/SailCycleOrderCycle.lean:137`, from `cycleOkBoot_holds :128`, 122/122
    clauses) IS that theorem, so `sailCycleOrder` is NOT a trusted item and `srvwmoXv6M1Core`/`srvwmoXv6M2Core` are non-vacuous**), image dump, the TAGGED cat
    transcription and its tagged conformance text `gdexecQconfT` (new trusted-SURFACE text — covering I/O items' sources
-   under D50 (b), W13 (F-dep), and [OWN.31][R22.2] the sentence "the device's request-service RAM stores are fabric
+   under D50 (b), W13 (F-dep) — **[R38.1] and `rvwmoCatConsistentT`'s TEXT changes in ONE definition, `gtdepsWf` (I/O-read sources /
+   I/O-write targets admitted; (F-dep) (0a)), a trusted-SURFACE change: the registered LB roots (`allocpidOpen`, `AxSpinT2b.lean:251`,
+   premise `HconsT : rvwmoCatConsistentT GT`; the 13 `Hcons := catTAd GT HconsT` files) keep their TEXT and their PREMISE WEAKENS (admits
+   I/O-endpoint deps) — a strictly stronger theorem, no re-registration, noted in `tools/ci/roots-weak.txt:13-18`'s gloss** —, and [OWN.31][R22.2] the sentence "the device's request-service RAM stores are fabric
    transactions (each reads the device state at the store and may move it); the used-idx store is the one that raises the
    interrupt" —
    reviewed against `rowDepsT`'s correction (5), `AxDeps.lean:56-60`) [R6.1], **[R22.1][OWN.37] W8's root is (r2) — the SIBLING root
@@ -828,8 +861,9 @@ abort/skip moves are ADMIN-run moves (inside `hemitf`'s `admRun … (dvi k)`, `F
 keeps the threaded fabric through admin runs on the disk row and does not re-impose `admRunDevfree` (`Supply.lean:175`)
 there beyond W-DISK's `devQuiet` form.  The landed (M) clause `gfIoDev` (`GraphFabResidue.lean:172`, `gisIo ↔ gfDev`) is the
 INTERIM form (I) restates; admin stars carry NO `gfDev` member), `fab 0 = efInit
-σ0.wgdev`, `rowDepsT` tags in `GT.gtDeps` (`gdexecQconfT`-style; `rowDepsSubT`, `AxDeps.lean:690`, gives the untagged
-bundle back), the fetch clause `emZifencei` (W5d-G, replacing `emFetchImg`, `Fab.lean:534`/`Supply.lean:277-278`)
+σ0.wgdev`, `rowDepsT` tags in `GT.gtDeps` (`gdexecQconfT`-style — [R38.6] stated against the GENERALIZED `gtdepsWf`, NO RAM-endpoint
+filter, and only after (F-dep) (0) merges; `rowDepsSubT`, `AxDeps.lean:690`, gives the untagged
+bundle back through the inclusion untagged ⊆ tagged [R38.2]), the fetch clause `emZifencei` (W5d-G, replacing `emFetchImg`, `Fab.lean:534`/`Supply.lean:277-278`)
 with `F_em ⊆ GT.gdFetch`, exclusive pairs FUSED (the `execProgOk'S` shape of [R3.2], LANDED by W5b [R6.4]) — NOT
 today's quiescent `gdexecQconf` (`Weak/WeakRvwmoSupply.lean:292`), whose `emDevfree` (`:284` [R16.s1]) forbids every
 `LDev`.  **Quiescence is VACUOUS for allocproc** (W13 spike CONFIRMS): the event LTS emits `LDev` for EVERY MMIO
@@ -851,7 +885,8 @@ RETIRED — the used-idx `DWriteDev` carries the completion's fabric move (W-DIS
 guard-pop is a separate step, `Virtio.lean:576-578`)**) AND the device threads' fabric
 moves at the disk agent (`pdiskUart :518-524` — UART tx/rx, PLIC gateway) — all kind `dev` [R7.3a][D49].  `lbRd`/`lbWr` are `none` on `LIo`, so rf, co, fr, load-value,
 atomicity and the log message `gmsg` (`Lin.lean:463`) ignore I/O events BY CONSTRUCTION (device-supplied values,
-[OWN.14]); `lbIsR`/`lbIsW` stay RAM-only, so rule 4 (`gfenceCovers`, `Graph.lean:204-209`) and rule 7 skip them —
+[OWN.14]); `lbIsR`/`lbIsW` stay RAM-only, so rule 4 (`gfenceCovers`, `Graph.lean:204-209`) and rule 7 skip them ([R38.1] the tagged
+dependency well-formedness `gtdepsWf` no longer keys on them ALONE: `lbIsR ∨ lbIsIoRd` sources, `lbIsW ∨ lbIsIoWr` write-tag targets) —
 Sail's `execute_FENCE` keys on `extractLsb pred 1 0` only (`InstsEnd.lean:18299-18313`), after `effective_fence_set`
 (`BaseInsts.lean:568-573`), which with FIOM = 1 ORs the i/o bits INTO the memory bits and never the reverse — so the
 i/o bits produce NO I/O ordering in Sail unconditionally, and never reach `LFence` at all because xv6 powers on with
@@ -860,7 +895,7 @@ the i/o bits still never reach `LFence`) [R8.3d][R25.1 (e)]; the graph can give 
 (D48); rules 1–3 give none (`gaccesses` is byte-footprint based); rule 5 `gacqPo`'s `gmem e2` (`:214-215`) DOES
 order an acquire read before a later I/O event — a strengthening the appendix's condition (c1) EXCLUDES (quoted in
 §B(11b)), subsumed by (R1), vacuous as a trusted use — D52 RULED (a) [OWN.18]; **dependency edges through `LIo` are
-ON — D50 RULED (b) [OWN.17]**: the taggers get the (c1) edges (addr/data/ctrl → I/O store, addr → I/O load, provenance
+ON — D50 RULED (b) [OWN.17]; graph side = (F-dep) (0) [R38.1]**: the TAGGED tagger `dstepT` (NOT `dstep` [R38.2]) gets the (c1) edges (addr/data/ctrl → I/O store, addr → I/O load, provenance
 OUT of an I/O load; NO ctrl → I/O load), W13 (F-dep), §C — in-edges are subsumed by (R1) (RAM source) / (R3) (I/O
 source), out-edges into RAM STORES by (R2); the ONE edge class beyond (R1)–(R3) is I/O-load →addr→ RAM LOAD (rule 9),
 expected absent in xv6 (MMIO values flow to ctrl, to RAM/I/O stores as data — **unverified** census).  **The trusted item
@@ -1586,8 +1621,9 @@ faithful edges alone is syntactically possible (`ioOrdF ⊆ ioResidue`) but (L)'
 faithful (L) needs the residue as a premise anyway.  **Hence (a′) stays [OWN.12], re-encoded as (R1)–(R3) [OWN.14];
 D46 RULED (a) [OWN.17] keeps the fence fragment `emIoFence` (S–M), the trap-boundary edges (S) and `ioOrdF ⊆
 ioResidue` (S) as PROSE (header-only value); D50 RULED (b) [OWN.17] puts the DEPENDENCY part IN SCOPE — W13 (F-dep),
-M: the taggers `dstep` (`WeakRvwmoConf.lean:493-495`) / `dstepT` (`AxDeps.lean:461-463`) are inert on `LDev` and the
-MMIO arms of `pnodeStep` emit `LDev` with NO source fields (`WeakEvInst.lean:300-304,335-338`; rev 10's "`oib = none`
+M–L [R38.3]: the taggers `dstep` (`WeakRvwmoConf.lean:497-499` — STAYS inert [R38.2]) / `dstepT` (`AxDeps.lean:461-463` — gets the arms) are
+inert on `LDev`, the graph's `gtdepsWf` must FIRST admit I/O endpoints ((F-dep) (0) [R38.1]), and the
+MMIO arms of `pnodeStep` emit `LDev` with NO source fields (`WeakEvInst.lean:316-320,351-356` [R38.s3]; rev 10's "`oib = none`
 discard" was a misnomer [R11.s1] — in `pnodeStep` `oib = none` means "`ib` UNCHANGED" (`.pure → some ibNone`, `regRead →
 some (ibRd ib r)`, every other arm `none`, `:284-296`), the RAM store arm has it too; what the MMIO arms lack is the
 read set `depsOfIb ib.ibBits` ON THE LABEL, as `LExLoad`/`LStore`/`LExStore` carry `asrc`/`vsrc`, `:329-331,344-355`),
@@ -1843,7 +1879,7 @@ list EMPTY); M1 ✓.  *Deliverables*: (1) the PER-AUTHOR chain vector `chain ξ 
 the release → acquire hop)/`ctxStamped_raise :577`/`ctx_park :760`/`ctx_resume :788`/`ctx_move :848` (`CtxLaws.lean`), `kctx_floor_of_view`
 (`KCtxMove.lean:303`); (2) `CtxBox.lean` (2,131 lines) stamps/registers lifted to join-vectors + row X2 (`boxRows :1117-1121`; `ctxDeposit
 :156`, uses `:1489`, `:1824` [R34.s1]) — **[R36.4] X2 as written is SCALAR (finding F-C): the vector rows (C′)/(D′)/(E) of option (i) are
-STATED as Lean invariants in `CtxBox.lean` BEFORE any wiring, (ii) is the sized fallback — RELAUNCH 2 (§C top)**; (3) X1 — hooks re-floored from the releaser's own vector (`lockHook_llb` `Lock.lean:597`,
+STATED as Lean invariants in `CtxBox.lean` BEFORE any wiring, (ii) is the sized fallback — RELAUNCH 2 (§C top) — **RULED (i) [OWN.50] 05:18 2026-10-13**; (3) X1 — hooks re-floored from the releaser's own vector (`lockHook_llb` `Lock.lean:597`,
 `WpLock.lean:1255,1461` absorb at the stamp `T` — `:1141` is now β′'s `lkRsvIn` split [R34.s1]; rows 13–18, 24–25), X3 — a birth key for a
 lock born after boot in `lkFresh :1115`/`isLock :861` (`lock_pay_take :541`, `lock_pay_born :660`; `LockBornHook`, `PipeBirth` (`:307`),
 `ProofInitlog`'s `"log"` lock), X4 — the device-only absorb (`ProofVirtioDiskIntr`, `DiskInvDefs`), X5 — `ACQUIRE_LLB` (`SpecAcquire.lean:123`)/
@@ -2039,6 +2075,13 @@ MachCSL rule edit — the brief says which), and `utextDiscAt`, needing custody 
 `userret` `fence.i` image fact (`KernelImage.lean:17614`; unsized); exported by the SAME root ("four of six" → "six of six" in the header
 and `roots.txt:20`); gates W5d-G G7 (`utextDiscAt`) and W11 (ii)'s `kOwnerAt` uniqueness (`cpuProcDiscAt`); nothing consumes either before
 W13 (XL).  All options FAITHFUL (the conjuncts are facts about xv6's code; the spec is silent on how a proof partitions them).
+**WAITS / LAUNCHABLE (rev 41) [R38.5][OWN.48]–[OWN.51]**: **Stage 2 FIRST BATCH LAUNCHED 05:18 2026-10-13 [OWN.48]** — **W12 (+W12b) RUNNING** (w1,
+`allocproc_S2_w1_prompt.txt`; brief unchanged — the coordinator sends [R38.6]'s course note), **W13 (L) RUNNING** (w4; brief unchanged), **W13 (F-dep)
+STOPPED GREEN before any edit** (`~/dev/weak-orch/parked/PROGRESS-W13Fdep.md`; the tree is the launch tip): §C's clause was incomplete and WRONG on the
+graph side — FIXED by [R38.1]–[R38.4]; **RELAUNCH when rev 41 is signed off**, under option (A) with the (A2) shape (the (F-dep) paragraph below);
+**W8 (f2-ctx) RELAUNCH 2 RUNNING** (w2; Q-F2-PIPEHOP-2 RULED (a′-r) [OWN.49] and F-C = (i) [OWN.50] inside it; brief unchanged); **W8 (f3-rest)** after
+it.  **Weekly cap [OWN.51]**: no new launch at seven_day ≥ 90%, workers wound down green at 95% — the (F-dep) relaunch is the only pending launch and
+obeys it.  The rev-40 record follows.
 **WAITS / LAUNCHABLE (rev 40)**: **M2 CLOSE — DONE 2026-10-13** (below; Stage 1b CLOSED, M1 + M2 DONE — INTERNAL, NOT published [OWN.2]);
 **W8 (f2-ctx) RELAUNCH 2 — LAUNCHABLE** (serial MachCSL lane; S0 the `pipeLockNameStr` + hop-shape fix first [R36.2][R36.3]; launch authority
 [OWN.37] + [OWN.41] as before; Q-F2-PIPEHOP-2 provisional, non-blocking); **W8 (f3-rest)** after it; **Stage 2** the FIRST LAUNCH SET below —
@@ -2097,20 +2140,48 @@ for the I/O arms; W13 (K)'s `racyDIO` NOT needed — the cat arms are written ON
 `WeakRvwmoFab.lean:909` (`topoLinearizesF`), `WeakRvwmoAcyc.lean:200` (`racyD`, `racyDMem`); `Lin*`/`Norm`/`PreNorm` untouched.  Parallel-safe
 vs (f2-ctx) ✓, vs W13 (L) ✓ (no shared file), vs W13 (F-dep) — `Supply`/`Fab` shared at different sites (rebase S) **and W12 DEPENDS on
 `AxDeps` (`CatOfMinusSpike.lean:20 import Weak.AxDeps`; `catADOfCatT :37` over `rvwmoCatConsistentT`/`gtAd`), which (F-dep) EDITS — rebuild/
-re-elaboration after each (F-dep) merge, not a file conflict [R36.s3]**; NOT vs W5d-G G3/G4 and
+re-elaboration after each (F-dep) merge, not a file conflict [R36.s3] — **[R38.6] no longer exact: (F-dep) increment (0) CHANGES `gtdepsWf`,
+`forgetDeps`, `gtAd`, `rvwmoCatConsistentT` (course note for the RUNNING worker, sent by the coordinator): (i) `catADOfCatT :37`'s STATEMENT survives;
+its proof survives under (A2) and needs ONE line under (A1) (`gppo12` monotonicity over `gtAd ⊆ gtAdFull`, lemma exported by (F-dep)); (ii) W12 (5)'s
+`gdexecQconfT` is stated as `rowDepsT em ⊆ GT.gtDeps` against the GENERALIZED `gtdepsWf` — NO RAM-endpoint filter (that is D50 (a), contrary to
+[OWN.17]) — and NOT before increment (0) has merged (until then `rvwmoCatConsistentT ∧ gdexecQconfT` is unsatisfiable on I/O rows); (iii) `rvwmoCoreD`
+over the UNTAGGED `gdepsWf` is unaffected (option A leaves the untagged world alone); (iv) new W12 lemmas take `lbIsR`/`lbIsW` of a tagged edge's
+endpoints from `forget GT`/`gtAd`'s `gdepsWf`, never from `gtdepsWf`; (v) rebase ONCE after increment (1)'s `Supply`/`Fab` sweep (`LDev` sites,
+disjoint from `topoSupply :954`/`topoLinearizesF :909`)**; NOT vs W5d-G G3/G4 and
 W13 (K) (the same `Topo`/`Acyc`/`Glue`/`Hull` statements) — those follow W12's FIRST commit (the statement edits over `rvwmoCoreD`, S, landing
 first).  Size M–L ≈ 1.2–1.8k.  Acceptance: build/lint/`audit.sh --weak` unchanged (no new axiom/opaque); the forwarding witness (SB+rfi-pos)
 through `rvwmoCatAD`, cat-consistent and NOT RVWMO⁻ [R6.s2]; `hullCatAD`; `xv6RvwmoSafeModuloT` STATED (its premises are W11's — not
 registered); the restated `normalizeOfAcyclic` concludes `gppoCat6Gmo GD'.gdG` [R21.2].  **W12b** (§C W12b): deps = W12's `rvwmoCatAD` (the
 spike's exists — a start against it re-points once W12 (1)–(2) land); files NEW `Weak/CatFloor*.lean` + `Floor`/`Cert3` restatements;
 conflicts with W5d-G G5 (`Floor`).  Size M–L ≈ 0.5–1k.  Acceptance: the `finvStep` coh-hook forwarding read certified [R7.s5].  RECOMMENDED as
-the W12 worker's second increment (one lane, `Floor` single-writer).  **W13 (F-dep)** (§C W13): deps MET ((E) ✓; D50 (b) [OWN.17]; census
-[W13c]: rule-9 graph hits NONE).  Files: `Weak/AxDeps.lean`, `Weak/WeakRvwmoConf.lean`, `Weak/WeakEvInst.lean` (owners) + arm sites
-(`PinBridge`/`PinBridge2`, `Supply` 4, `FabInd` 2, the witness files, the retired `Ax*` tier).  Parallel-safe vs (f2-ctx) ✓, vs W12 (rebase S
-at `Supply`), vs W13 (L) (`FabInd`/`Supply` at different sites, rebase S); NOT vs W5d-G G1/G2 (`WeakEvInst` lemma, `WeakRvwmoConf.lean:57-66,
-147`) — G1/G2 rebase on it.  Size M.  Acceptance: `LIo rd`'s `asrc` as the `LExLoad` arm, `LIo wr`'s as `LStore`'s [R11.4]; `rowDepsSubT`/
-`rowDepsTSub`, `pinSegPin`/`pinSegPin'`/`checkerTaintSubProv` re-proved; `gdexecQconfT`'s trusted-surface text covers I/O items (header, §A(6));
-the `Ax*` tier builds; no `gen_weak_pins.py` change.  **W13 (L)** (§C W13): deps MET ((T) ✓; (I) ✓ `gfexecConfIO`/`gfDev`; G3-Q (a″)
+the W12 worker's second increment (one lane, `Floor` single-writer).  **W13 (F-dep) — RELAUNCH (rev 41) [R38.5]** (§C W13 (F-dep); STOPPED GREEN before any edit, `PROGRESS-W13Fdep.md`): deps MET ((E) ✓;
+D50 (b) [OWN.17]; census [W13c]: rule-9 graph hits NONE); proceeds under **option (A)** with the **(A2) shape** and switches to (A1) after the Q-FDEP
+ruling by the one-line edits named in (0e).  **Increments, in this order** — **(1)** the `LDev` payload sweep ALONE: the arity change `Wlabel.LDev kind
+base vs` → `+ asrc` (rd) / `+ asrc vsrc` (wr) at `WeakPromise.lean:89`, ≈ 180 positional sites in 35 files [R38.3] (`WeakEvInst` 35, `WeakRvwmoSupply`
+18, `WeakEvCapstone` 16, `WeakRvwmoFab` 12, `WeakRvwmoCert3b` 10, `AxOpsem` 10, `WeakEvPf`/`MachOfPf`/`AxRunGV2` 7, `WeakPromiseBridge` 6, `PfStepTso` 5,
+`WeakRvwmoWalkb`/`AxPair`/`AxFetch1` 4, `WeakAxRealize` 3, …; `LDev ..` wildcards need nothing) + the per-row fill in `pnodeStep` (`LDev .rd`
+`WeakEvInst.lean:319` with `asrc := depsAsrc (depsOfIb ib.ibBits)` as the `LExLoad` arm `:345-346`, NOT the plain `LLoad` arm `:336`; `LDev .wr` `:355`
+as the `LStore` arm) — mechanical, ONE build, so W12 (`Supply.lean:954`, `Fab.lean:909`) and (L) (`FabInd`) rebase on it ONCE; **(0)** the model text in
+the (A2) shape (§C (0a)–(0d): `gtdepsWf` generalized, `forgetDeps`/`gtAd` source-filtered, `gtdepsRdOk` widened, `AxSpinGate.gsrcT` filtered +
+`gsrcTSrc`/`gsrcTSrcPo` restated, the Bool/SC tier, the `AxDeps` header deviation, the computed-satisfiability smoke test); **(2)/(3)** `dstepT` arms
+ONLY (`dstep` inert, deviation in the `AxDeps` header), `dstepTState` as the erasure/inclusion lemma, `rowDepsSubT`/`rowDepsTSub`/`rowDepsTAddr`
+restated, the pin bridge `pinSegPin`/`pinSegPin'`/`checkerTaintSubProv` re-proved; **(0e)** after the ruling — (A1): `gtAdFull`, `gppoCatT` re-pointed,
+two monotonicity lines (`catTAd`; `catADOfCatT` in W12's file after W12's statement commit, or by W12) and `AxScCat.scPpo`'s rule-12 case; (A2):
+nothing.  **NEVER merge (1)+(2) without (0)** — that is exactly the Gap-1 vacuity for W12's `gdexecQconfT`.  Files: owners `Weak/AxDeps.lean`,
+`Weak/WeakEvInst.lean`, `Weak/WeakPromise.lean`, `Weak/AxSpinGate.lean` ((0c) only — the registered roots' TEXT must not change; audit line "registered
+roots unchanged in statement") + the sweep list + `PinBridge`/`PinBridge2`, the witness files (`ConfWit2`, `CycWit`, `Adm` — `LDev`-free rows, trivial),
+the retired `Ax*` tier (`AxGate`, `AxScRun`, `AxScCat`, `AxFetch5`, `AxSpinSpike.cDw`); `Weak/WeakRvwmoConf.lean` is NOT an owner file [R38.2].
+Parallel-safe vs (f2-ctx) ✓, vs W12 (rebase S at `Supply`/`Fab`, disjoint sites; W12 rebuilds after each (F-dep) merge [R38.6]), vs W13 (L)
+(`FabInd`/`Supply`, rebase S); vs W5d-G G1/G2 only the `WeakEvInst` lemma remains (the `WeakRvwmoConf.lean:57-66,147` half of that conflict
+disappears [R38.2]) — G1/G2 rebase on it.  Size **M–L ≈ 1k, three increments** [R38.3].  Acceptance: build green per increment; **`gtdepsWfB` over
+`rowDepsT` of W13-wit's row (or `tw` + one `LDev` item) evaluates `true` — a PERMANENT smoke test beside `catTConsistentBSound` [R38.1]**; `LIo rd`'s
+`asrc` as the `LExLoad` arm, `LIo wr`'s as `LStore`'s [R11.4]; the row lemmas and the pin bridge re-proved; `catTAd`/`catTForgetAxioms`/`catADOfCatT`
+statements UNCHANGED; registered roots unchanged in statement; the `Ax*` tier builds; `gdexecQconfT`'s trusted-surface text covers I/O items (header,
+§A(6)); no `gen_weak_pins.py` change.  Owner question: **Q-FDEP** (§D FIRST; provisionally (A2), recommended (A1)).  Relaunch-brief corrections
+[R38.s2] (not plan facts): W13-wit's `ld a5,0(a0)` → `sb zero,1(a5)` is an ADDRESS edge (`dtagW DTaddr = false`, target clause `gmem`) — representable
+in the tagged model TODAY, dying only on the untagged route; the tagged vacuity comes from `DTdata`/`DTctrl`/`DTr13` → I/O store and from every
+I/O-load-sourced edge (first instance: the first `printk`'s THR store `0x800009fa`); `uartstart` does not exist in this image (census `:314`) — the data
+example is `uartwrite`'s THR `0x80000988`.  **W13 (L)** (§C W13): deps MET ((T) ✓; (I) ✓ `gfexecConfIO`/`gfDev`; G3-Q (a″)
 [OWN.17]).  Files: `Weak/WeakRvwmoLin2.lean` (`ptraceRel :130` → `ptraceRelIO`, `gtraceLinearizationMin :634`, `fconfSupply' :1006`),
 `Weak/WeakRvwmoLin.lean` (`gnxw :440` → `gnxa`, `glinEids`/`linCand :471`), `Weak/WeakRvwmoFabInd.lean` (`trDevOrdered :464`, discharged
 from `ptraceExtIO`), `RvwmoXv6Sca*.lean` (only `linGmoEmitBefore :144`/`linLogEmitted :172` re-proved).  Parallel-safe vs (f2-ctx) ✓, vs W12
@@ -2133,7 +2204,7 @@ G3; size M–L; acceptance `cycleKillIO` through `hullRun`, `ioSegPinned` with i
 `gdexecQconfT` text + W13-wit) — NOT NOW.  **W14**: deps W13 (W) + W5d-G — NOT NOW.  **W9a**: targets W12's `segPinC` — after W12.  **W10**:
 on W12b's floor kit — after W12b.  **W11**: W8's export ((f2-ctx) RELAUNCH 2, rev 40) + W12 + W13 (K) — NOT NOW; (iv)c after (L).  **W8 (f3-rest)**:
 after (f2-ctx) (serial lane).  **RECOMMENDED BATCH (≤ 3, parallel, pairwise file-disjoint up to the named S rebases): W12 (then W12b, same
-worker) ∥ W13 (F-dep) ∥ W13 (L)** — graph lane, three workers, no owner gate beyond the batch approval; landing order inside the batch: W12's
+worker) ∥ W13 (F-dep) ∥ W13 (L)** — graph lane, three workers, no owner gate beyond the batch approval (GIVEN [OWN.48], rev 41 — LAUNCHED); landing order inside the batch: W12's
 statement edits FIRST (S), then any order; **W5d-G G1–G5 + W13 (K) are the SECOND batch** (G3/G4/(K) on W12's restated `Topo`/`Acyc`; G1/G2
 on (F-dep); G5 on (L)).  **M2 CLOSE (S) launches beside them at once** (not counted among the three) — **DONE rev 40**.  The rev-31 record follows.
 **Rev 31 RESULTS (2026-10-12) and the rev-31 launch set.**  DONE and MERGED: **W4 F9** (`Weak/MachOfPfDisk.lean` NEW 1290 lines +
@@ -3553,7 +3624,7 @@ nothing non-trivial enters M1's premise, `itvOf` is no shared parameter; M1 repl
   **`LIo` SHAPE ARMS are `False`** (`gwf`, `candShape`, `mstepOk`, `AxScRun.gshape`/`shapeInB`, `gshapeB`, the
   Topo/Hull/Floor/ConfWit2 copies — `linCand` replays every graph event on the machine and has no `LIo` step until (I);
   `mnext (LIo ..) = σ`), flipped to `True` in (I)/(M); the taggers `dstep`/`dstepT` stay INERT on `LDev ..` ((F-dep)'s
-  item (1) owns the payload's `asrc`/`vsrc`).  Next W13 steps IN PLAN ORDER [OWN.27]: (T) then (M) — **BOTH DONE
+  item (1) owns the payload's `asrc`/`vsrc`; [R38.2] only `dstepT` ever gets arms — `dstep` stays inert for good).  Next W13 steps IN PLAN ORDER [OWN.27]: (T) then (M) — **BOTH DONE
   (2026-10-11, tip working copy)**; **(I) — gate MET (W-DISK DONE 2026-10-12: the fused `DWriteDev`, the state-aware `pdevEv :604` and the interim
   `gfexecConf` clause `Fab.lean:633` it DELETES are in the tree; [R16.1 (iv)]; W-DISK-Q2/Q3 RULED [OWN.31][OWN.32]) —
   launchable in the graph lane when a worker is free [rev 28]**.  [The
@@ -3662,31 +3733,76 @@ nothing non-trivial enters M1's premise, `itvOf` is no shared parameter; M1 repl
   before it (`timerinit` is Sstc CSR-only, `Xv6/SpecTimerinit.lean:5-7`), by kernel evaluation on W5c's `esilAdmRun`;
   **gate 2 [R7.3c]: a device-ACTIVE DISK witness** "first disk START → DRead/DWrite → COMMIT" on the disk row (the first
   disk request is `fsinit`'s `bread(dev, 1)`, `Xv6/SpecFsinit.lean:7`, on the first `forkret`, past `kinit`'s
-  `freerange` — shares D44's infeasibility, so W14 covers it).  **(F-dep) — IN SCOPE, D50 RULED (b) [OWN.17] (M;
-  owner files `Weak/AxDeps.lean` + `Weak/WeakRvwmoConf.lean` + `Weak/WeakEvInst.lean`; after (E))**: (1) the `LDev`/
-  `LIo` payload gains `asrc` (rd) / `asrc vsrc` (wr), filled by `pnodeStep`'s MMIO arms (`WeakEvInst.lean:300-304,
-  335-338`): **`LIo rd`'s `asrc := depsAsrc (depsOfIb ib.ibBits)` as the `LExLoad` arm does (`:329-331`), NOT as the
-  plain `LLoad` arm, whose `asrc` is D-8's `[]` (`:323`; `AxDeps.lean:405-406`; `WeakAxiomatic3.lean:2065-2067` "rule 9
+  `freerange` — shares D44's infeasibility, so W14 covers it).  **(F-dep) — IN SCOPE, D50 RULED (b) [OWN.17] (M–L ≈ 1k, three increments
+  [R38.3]; owner files `Weak/AxDeps.lean` + `Weak/WeakEvInst.lean` + `Weak/WeakPromise.lean` (`Wlabel.LDev :89`) + `Weak/AxSpinGate.lean` ((0c)
+  only) — `Weak/WeakRvwmoConf.lean` is NOT an owner [R38.2]; after (E); **STOPPED GREEN 2026-10-13 before any edit** (`PROGRESS-W13Fdep.md`),
+  RELAUNCH per the launch paragraph)**: **(0) THE GRAPH-SIDE MODEL TEXT — option A, the first green increment after the sweep (statement
+  commit, S–M) [R38.1].**  The gap: `gtdepsWf` (`AxDeps.lean:168-171`, a conjunct of `rvwmoCatConsistentT :208-211`) demands `glblIs G e.1.1
+  lbIsR` of every source and `lbIsW` of every `dtagW` target (`DTdata`/`DTctrl`/`DTtrans`/`DTr13`, `:150-152`; only `DTaddr`/`DTctx` targets are
+  `gmem`); `lbIsR`/`lbIsW` are `false` on `LIo` (`WeakAxiomatic.lean:174-182`, D47 (a)), so the D50 (b) edges of (1)–(3) make `rvwmoCatConsistentT GT
+  ∧ gdexecQconfT GT` UNSATISFIABLE on every I/O-active row — hart 0's first `printk` (`consoleinit → consputc → uartputc_sync`, `0x800009ac–
+  0x80000a14`): `acquire`'s RAM loads → the never-reset `dtCtl` (`:461-463`) → `DTctrl` into the THR store `sb a5,0(a3)` `0x800009fa` (an `LIo .wr`,
+  `dtagW DTctrl = true`, needs `lbIsW`); the LSR poll `lbu a5,0(a4)` `0x800009ec` → `beqz` → the same store (an I/O-load SOURCE, needs `lbIsR`);
+  `uartwrite`'s THR `0x80000988` (`DTdata` from the RAM tx-buffer load); virtio init's six address-register stores `0x80005a46…a70` (`DTdata` from the
+  `disk.*` loads); FEATURES → DRIVER_FEATURES `0x800059b2` (I/O→I/O data) — VACUITY ("no graph conforms"), not a false ordering.  Spec: riscv.cat's
+  `r9`–`r13` range over ALL reads/writes (herd has no I/O class); appendix (c1) keeps ppo 9–13 when one access is I/O; Sail/Zifencei/PMAs SILENT on
+  dependencies.  **(0a)** `gtdepsWf G deps := ∀ e ∈ deps, same row ∧ po-forward ∧ glblIs G e.1.1 (lbIsR ∨ lbIsIoRd) ∧ (if dtagW e.2 then glblIs G
+  e.1.2 (lbIsW ∨ lbIsIoWr) else gmem G e.1.2)`, `lbIsIoRd (LIo .rd ..) = true`, `lbIsIoWr (LIo .wr ..) = true`, `.dev` events in NEITHER (device-side
+  fabric moves carry no hart register dataflow, D49) — FAITHFUL to riscv.cat's `R`/`W` under (c1); `gtdepsGmo :174` unchanged (every edge gmo-forward).
+  **(0b)** the chain projections filter the SOURCE too: `forgetDeps :175` and `gtAd :185` keep edges with a `lbIsR` source and a `lbIsW` target (`gisW` +
+  a Bool `gisRd`), so `catTAd :301` (via `gtdepsWfAd :292`/`gtdepsGmoAd`), `catTForgetAxioms :340`, W12's `catADOfCatT` (`CatOfMinusSpike.lean:37-43`)
+  and `RvwmoXv6ScaT.lean:783` keep their STATEMENTS — the untagged chain sees FEWER deps (sound: the residue arms (R1)/(R2), `GraphFabResidue.lean:
+  84-99`, carry the RAM→I/O and I/O→RAM-store orderings for the chain, as today); `catTOfCat :316`'s side condition `gtdepsRdOk :310` widens to
+  "every edge `forget` drops" (read-targeted OR I/O-endpoint), still discharged by `tw`/`tw2` (§5; no I/O there); the `AxDeps` header's deviation list
+  gains "`gtdepsWf` admits I/O endpoints (Rocq's is RAM-only)".  **(0c)** `AxSpinGate.gsrcT :205` filters its sources to `lbIsR` reads (the
+  `filterMap` gains `gisRd d.1.1`); `gsrcTSpec :210`, `gsrcTSrc :247` (target conjunct `lbIsW ∨ lbIsIoWr`, or dropped — `gsrcTReal' :272` uses only
+  the source conjunct), `gsrcTSrcPo :262` restated; `ctrlClosed :232` UNCHANGED — its quantifier asks for closure onto RAM-write targets only, and the
+  never-reset `dtCtl` satisfies it for I/O-sourced edges and I/O-store targets too, so NO new premise reaches the LB roots [R38.s4]; the registered
+  roots (`allocpidOpen`, `AxSpinT2b.lean:251`, `HconsT : rvwmoCatConsistentT GT`; 13 `Hcons := catTAd GT HconsT` files; `rvwmoCatConsistentT` in 35
+  files, `gtAd`/`gtAdGd` in ~94, `gsrcT` in 6) keep their TEXT; their PREMISE is now weaker — a strictly stronger theorem, no re-registration (§A(6);
+  `tools/ci/roots-weak.txt:13-18` gloss).  **(0d)** the Bool/SC tier in step: `gtdepsWfB :776`/`gtdepsWfBSound :784` (`AxSpinSpike.cDw :658`,
+  `AxScCat.scGraphB :249`), `AxScCat.scGraph :112`/`scTdepsGmo :154`/`scPpo :168` (an `LIo` source's `gmem` from `lbIsIo`, not `glblIsRGmem`),
+  `AxScRun.gDepsWf :1356` (`rowEdges` generalized).  **(0e) rule 12 from an I/O-load source — provisional (A2) [R38.4]**: `gppoCatT :195` UNCHANGED
+  over the source-filtered `gtAd`, so the `[IoR];(addr|data);[W];rfi;[R]` instances are OMITTED — WEAKER than riscv.cat by exactly them (sound), NAMED
+  in §A(3); **if Q-FDEP is RULED (A1)**: `gtAdFull G deps` := the addr/data edges into `lbIsW` targets from ANY source, `gppo12T`/`gppoCatT` over it,
+  `catTAd` and `catADOfCatT` close by `gppo12` monotonicity (`gtAd ⊆ gtAdFull`, one line each — the second in W12's file after W12's statement commit,
+  or by W12 [R38.6]), `AxScCat.scPpo :168`'s rule-12 case re-cased — S, a separate increment (`gppoCatT` is used directly only by `AxScCat`).
+  Acceptance for (0): build green; the tagged premise is SATISFIABLE on an I/O-active row BY COMPUTATION — `gtdepsWfB` over `rowDepsT` of W13-wit's
+  row (or of `tw` extended by one `LDev` item) evaluates `true`, kept as a PERMANENT smoke test beside `catTConsistentBSound` (the check that would
+  have caught the gap; **[R38.s1] the same computed check is a standing acceptance item for EVERY conformance text — (W)'s `xv6ConfS`, W12's
+  `gdexecQconfT`**).  **(1)** the `LDev`/`LIo` payload gains `asrc` (rd) / `asrc vsrc` (wr) — an ARITY change of `Wlabel.LDev` (`WeakPromise.lean:
+  89`): ≈ 180 positional constructor sites in 35 files (grep; R38 counts 177/35, the worker 146/38; file list in the launch paragraph), landed as
+  increment (1) ALONE (mechanical, one build) so W12 and (L) rebase ONCE [R38.3]; filled by `pnodeStep`'s MMIO arms (`WeakEvInst.lean:316-320`,
+  `LDev .rd` `:319`; `:351-356`, `LDev .wr` `:355` [R38.s3]): **`LIo rd`'s `asrc := depsAsrc (depsOfIb ib.ibBits)` as the `LExLoad` arm does
+  (`:345-346`), NOT as the plain `LLoad` arm, whose `asrc` is D-8's `[]` (`:336`; `AxDeps.lean:405-406`; `WeakAxiomatic3.lean:2065-2067` "rule 9
   (LOAD half) OMITTED BECAUSE OF D-8") — a worker mirroring `LLoad` would emit NO addr→I/O-load edge, i.e. D50 (a)
-  [R11.4]; `LIo wr`'s `asrc/vsrc` as the `LStore` arm (`:344-355`)**; `oib` stays `none` ("`ib` unchanged" [R11.s1]);
-  the I/O item is already tagged `(l, some k)` (§A(†)); (2) `dstepT`/`dstep` arms: `LIo rd` = the `LLoad`/`LExLoad` arm
-  SHAPE (`dedgesR` `AxDeps.lean:445`: ADDR edges in, `k :: dtLd` provenance OUT, `dtAcc` for rule 13, NO ctrl — exactly
-  "no ctrl → I/O load"), `LIo wr` = the `LStore` arm shape (`dedgesW :448`: addr/data/ctrl/trans/r13/ctx in); `dev`-kind
-  items stay inert; (3) **the I/O-load edges are the FIRST load-half `DTaddr` edges the emission produces** [R11.4]:
+  [R11.4]; `LIo wr`'s `asrc/vsrc` as the `LStore` arm (`:351-356`)**; `oib` stays `none` ("`ib` unchanged" [R11.s1]);
+  the I/O item is already tagged `(l, some k)` (§A(†)); (2) **`dstepT` arms ONLY (`AxDeps.lean:461-479`) [R38.2]**: `LDev .rd` = the `LLoad`/`LExLoad` arm
+  SHAPE (`dedgesR :445`: ADDR edges in, `k :: dtLd` provenance OUT, `dtAcc` for rule 13, NO ctrl — exactly
+  "no ctrl → I/O load"), `LDev .wr` = the `LStore` arm shape (`dedgesW :448`: addr/data/ctrl/trans/r13/ctx in); `dev`-kind
+  items stay inert; **the UNTAGGED `WeakRvwmoConf.dstep :497-499` is NOT edited** (DEVIATION recorded in the `AxDeps` header: the untagged tree
+  never sees I/O edges — sound; `gfexecConfIO`'s `rowDeps ⊆ gdDeps` (`Fab.lean:857`) and `gdepsWf` (`Graph.lean:629-631`, RAM read → RAM write,
+  under `gfexecConsistent :864` → `rvwmoMinusDepsConsistent :638`) stay RAM-only; the chain's I/O orderings are (R1)/(R2)) — an untagged `LDev .wr`
+  arm would put W13-wit's own target edge `ld a5,0(a0)` `0x8000089e` → `sb zero,1(a5)` `0x800008a0` (`KernelImage.lean:1523-1525`, an ADDRESS edge
+  into an I/O store) into `rowDeps`, falsifying `gfexecConfIO ∧ gfexecConsistent` for row 0 and `gdexecConfDepsWf` (`Conf.lean:934-940`, concludes
+  `lbIsW` targets) — the non-vacuity witness dies; and W12 (1)'s `rvwmoCoreD` is stated over that SAME untagged `gdepsWf` — the reason option (B)
+  (loosen both models) is rejected; (3) **the I/O-load edges are the FIRST load-half `DTaddr` edges the emission produces** [R11.4]:
   RAM loads stay D-8-masked (rule 9's RAM load half remains omitted — a faithful ADDITION, not a D-8 unmasking);
   `lbLdepfree`/`pstepEvLdepfree` constrain `LLoad` ONLY (`WeakPromise.lean:112-115`), so an `LIo rd` with sources does
   not falsify `wpPfStepInv`/`pstepEvLatFreeHalf`/`pstepEvLatFreeProg`/`pstepEvTsOblivious` (`WeakEvCapstone.lean:238,
   714,1048,1058`); `rowDepsTAddr` (C) already admits `DTaddr` edges into pure READ items (`AxDeps.lean:702-707`);
-  **proofs re-opened**: `rowDepsSubT`/`rowDepsTSub` (`AxDeps.lean:690ff`, the tree/tagged correspondence),
-  `dstepTState`, the pin bridge `pinSegPin`/`pinSegPin'`/`checkerTaintSubProv` (`PinBridge.lean` 21 sites,
+  **proofs re-opened [R38.2]**: `dstepTState :592` becomes "the tagged state with I/O-load positions erased from `dtLd`/`dtProv` equals the
+  untagged state" (or a pointwise INCLUSION invariant untagged ⊆ tagged); `rowDepsSubT :690` KEPT via that inclusion (tree edge ⇒ tagged edge);
+  `rowDepsTSub :695` restated for RAM-read-sourced edges; `rowDepsTAddr :702-707` (C) gains the disjunct "or targets an `LDev .rd` item" (its
+  `elbIsR` test, `Conf.lean:448-451`, is `false` on `LDev`); the pin bridge `pinSegPin`/`pinSegPin'`/`checkerTaintSubProv` (`PinBridge.lean` 21 sites,
   `PinBridge2.lean` 11) — DIRECTION [R11.4]: `pinSegPin` consumes "`rowDeps` ⊆ `gdDeps`" and proves checker `PDep` ⇒
   edge (`PinBridge.lean:312-316`), `checkerTaintSubProv` proves checker taint ⊆ provenance (`PinBridge2.lean:518-521`)
   — both PRESERVED when `rowDeps`/provenance GROW, so `gen_weak_pins.py` need not tag MMIO reads unless xv6 pins are
   to USE MMIO-sourced dependencies (none expected; rev 14's "or state the correspondence for RAM items only" was the
-  wrong dichotomy), `WeakRvwmoSupply` 4, `FabInd` 2,
-  the witness files (`ConfWit2` 3, `CycWit` 4, `Adm` 5 — `LDev`-free rows, trivial), the retired `Ax*` tier (`AxGate`
+  wrong dichotomy), the `LDev` sweep sites of (1) (`WeakRvwmoSupply` 18, `WeakRvwmoFab` 12, `FabInd` … — not "`Supply` 4, `FabInd` 2"
+  [R38.3]), the witness files (`ConfWit2` 3, `CycWit` 4, `Adm` 5 — `LDev`-free rows, trivial), the retired `Ax*` tier (`AxGate`
   30, `AxScRun` 28, `AxScCat` 33, `AxFetch5` 8 — new arms only, must build); `gdexecQconfT`'s trusted-surface TEXT now
-  covers I/O items (name it, §A(6)).  **Coverage check against (R1)/(R3)** (§A(†)): in-edges from RAM accesses ⊆ (R1),
+  covers I/O items AND `rvwmoCatConsistentT`'s text changes in the one definition `gtdepsWf` (named: §A(3)/(6)/(†) [R38.1]).  **Coverage check against (R1)/(R3)** (§A(†)): in-edges from RAM accesses ⊆ (R1),
   from I/O loads ⊆ (R3); out-edges into RAM STORES ⊆ (R2); the one class beyond the residue is I/O-load →addr→ RAM
   LOAD (rule 9) — expected absent in xv6 (**unverified** census; a hit would be a graph-tier PIN, never a STOP).  So
   (F-dep) changes the trusted PROSE (the (F3) uses move to the graph tier) and the published quantifier at most by
@@ -4177,6 +4293,11 @@ nothing non-trivial enters M1's premise, `itvOf` is no shared parameter; M1 repl
 
 **Stage 3 — AxSL tier: retired** [OWN.1].  One-paragraph note on Theorem 2 (D6).
 
+**Status of the launch (rev 41, 2026-10-13) [OWN.48]–[OWN.51][R38.5]:** **IN FLIGHT: W8 (f2-ctx) RELAUNCH 2** (w2; Q-F2-PIPEHOP-2 = (a′-r) [OWN.49] and
+F-C = (i) [OWN.50] inside it), **W12 (+W12b)** (w1; course note [R38.6]), **W13 (L)** (w4) — briefs unchanged.  **STOPPED GREEN, RELAUNCH when rev 41 is
+signed off: W13 (F-dep)** (no edit made; §C W13 (F-dep) (0) + its launch paragraph; (A2) shape now, (A1) on the ruling).  **Gated**: as at rev 40.
+**Weekly cap [OWN.51]**: no new launch at seven_day ≥ 90%, wind down green at 95%.  **OPEN owner question: Q-FDEP** (§D FIRST; provisionally (A2),
+recommended (A1)); Q-F2-PIPEHOP-2 RULED (a′-r) [OWN.49].  The rev-40 record follows.
 **Status of the launch (rev 40, 2026-10-13) [R36.1]:** DONE since rev 39 — **M2 CLOSE** (`Weak.srvwmoXv6M2` REGISTERED; **M1 + M2 DONE, Stage 1b
 CLOSED**; §C top), **W8 (f2-ctx) S1′ + S2-pre** (MERGED; the worker STOPPED GREEN 2026-10-13; §C top RESULTS (rev 40)).  **IN FLIGHT: none.**
 **LAUNCHABLE NOW: W8 (f2-ctx) RELAUNCH 2** (serial MachCSL; S0 = `pipeLockNameStr` + hop-shape fix [R36.2][R36.3], then S2b with F-B, S2
@@ -4316,9 +4437,54 @@ Q-F2-BOOTGATE** (raised by the W8 (f2-ctx) worker at its S1 stop, `PROGRESS-W8f2
 non-blocking rule) — **RULED 23:25 2026-10-12 (rev 39): Q-F2-PIPEHOP = (a) as amended by [R35.1] = (a′) [OWN.46]; Q-F2-BOOTGATE = (a) as
 amended by [R35.2] [OWN.47]; R35 found no missing question (both corrected options FAITHFUL).  OPEN: NONE (rev 39).**  **OPEN (rev 40):
 Q-F2-PIPEHOP-2 [R36.3] — the W8 (f2-ctx) worker MERGED Q-F2-PIPEHOP as (a″) (the lock's NAME-WORD window, indexed at the acquire), a DEVIATION
-from the RULED (a′); adopted PROVISIONALLY as (a″+shape) under the non-blocking rule (owner informed), FIRST below; then Q-F2-PIPEHOP, Q-F2-BOOTGATE, Q-SCO-PMA.**  R34 found no missing owner question ([R34.1]'s include-or-defer is a
+from the RULED (a′); adopted PROVISIONALLY as (a″+shape) under the non-blocking rule (owner informed), FIRST below; then Q-F2-PIPEHOP, Q-F2-BOOTGATE, Q-SCO-PMA.**  **RULED 05:18 2026-10-13 (rev 41): Q-F2-PIPEHOP-2 = (a′-r) [OWN.49] (the entry-receipt
+anchor, inside W8 (f2-ctx)); F-C = (i) [OWN.50].  OPEN (rev 41): Q-FDEP [R38.4] — rule 12 from an I/O-load source, after the W13 (F-dep) graph-side
+fix (option A — a plan DECISION [R38.1], not a question); adopted PROVISIONALLY as (A2) under the non-blocking rule, (A1) recommended; FIRST below,
+then Q-F2-PIPEHOP-2 (RULED).**  R34 found no missing owner question ([R34.1]'s include-or-defer is a
 scope choice, both options FAITHFUL; taken by the coordinator: DEFERRED to W8 (f3-rest)).**
-- **Q-F2-PIPEHOP-2 — OPEN (rev 40), provisionally (a″+shape), awaiting ruling [R36.3] (raised by R36 from the W8 (f2-ctx) worker's deviation
+- **Q-FDEP — OPEN (rev 41), provisionally (A2), (A1) recommended, awaiting ruling [R38.4] (raised by R38 from the W13 (F-dep) worker's STOP,
+  `PROGRESS-W13Fdep.md`).  Rule 12 from an I/O-load source: (A1) faithful vs (A2) weaker; the graph-side fix (A) itself is a plan decision
+  [R38.1], not a question.**  *Plain language.*  xv6 drivers read device registers (MMIO loads) and then do things with the value: branch on
+  it, store it to RAM, store it to another device register.  The RISC-V memory model says a load that FEEDS a later store (by address, data or a
+  branch) is ordered before that store — and the appendix says this still holds when the load or the store is to a device.  The plan already
+  decided (D50 (b)) to record those edges.  But the published model's well-formedness clause currently says "every recorded edge starts at a RAM
+  load and (for data/control edges) ends at a RAM store", so a graph with a device-sourced or device-targeted edge is REJECTED — not "the
+  ordering is false" but "no graph of this program conforms".  Then the theorem's premise is false for every xv6 run that prints a character,
+  and the theorem says nothing (it is VACUOUS).  [R38.1] fixes that by admitting device endpoints (option A, §C W13 (F-dep) (0)).  One corner
+  remains to rule: riscv.cat's rule 12 (`[R];(addr|data);[W];rfi;[R]`): "a load `a`, a store `m` that depends on `a`, and a later load `b` of the
+  SAME hart that reads `m`'s value (store-to-load forwarding) — then `a` is ordered before `b`".  Should that hold when `a` is a DEVICE load?
+  *Tiny example* (one hart, the UART echo path): L1 = `lbu` RHR (device read, the typed key `c`); S = `sb c → cons.buf[i]` (RAM store,
+  data-dependent on L1); L2 = a later `lb cons.buf[i]` by the same hart, satisfied by forwarding from S.  Rule 12 says gmo: L1 < L2.  Under (A1)
+  the model asserts it; under (A2) it does not (L2 may sit anywhere gmo-after S's own constraints).  No hart ordering, lock or proof in the plan
+  currently needs L1 < L2 (census [W13c]: no xv6 pin uses an MMIO-sourced dependency), so the choice is about the FAITHFULNESS of the published
+  model text, not about closing a proof.  *Definitions.*  *ppo* — preserved program order, the same-hart orderings the ISA guarantees; *gmo* —
+  the global memory order the model totalises; *tagged graph `GT`* — the published graph with its dependency list `gtDeps`, each edge carrying a
+  tag (addr/data/ctrl/…); *`gtdepsWf`* — the model's well-formedness clause saying what shape an edge may have; *`gtAd`* — the addr/data edges
+  the model's rule 12 ranges over (after [R38.1]: RAM-sourced only); *`rowDepsT`* — the edges the emission (the instruction-level tagger
+  `dstepT`) RECORDS for a row; *`gdexecQconfT`/`xv6ConfS`* — the conformance text saying "the recorded edges are in `gtDeps`"; *vacuous* — the
+  premise is never satisfiable, so the theorem is true but says nothing.  *Spec (FIRST).*  riscv.cat `r12 = [R];(addr|data);[W];rfi;[R]` over
+  ALL reads (herd has no I/O class); RVWMO rule 12 prose ("b is a load, and there exists some store m between a and b in program order such that
+  m has an address or data dependency on a, and b returns a value written by m"); appendix (c1): ppo applies when one access is I/O
+  (non-normative, "generally applies" — named by D50); Sail (`MachCSL/Dev/Fabric.lean:125-126`: MMIO is an ordinary `mem_read`/`mem_write`),
+  Zifencei (fetch only) and the PMAs (channel ordering among I/O accesses only): SILENT on dependencies.  *Why it matters.*  An xv6 expert
+  reading the model text will ask whether it is riscv.cat; (A2) is a NAMED departure (one rule instance), (A1) is not.  *Options.*
+  **(A1) FAITHFUL — recommended.**  `gppoCatT` ranges over the addr/data edges into RAM writes from ANY read (`gtAdFull`); the projections used
+  by the proof chain (`forget`/`gtAd`) keep RAM sources.  Concretely: one new list function, two one-line monotonicity proofs (`catTAd` in
+  `AxDeps`; `catADOfCatT` in W12's `CatOfMinusSpike.lean`), `AxScCat.scPpo`'s rule-12 case re-cased.  In practice: the model excludes exactly the
+  executions riscv.cat excludes.  Cost S (after W12's statement commit; one line in W12's file, by W12 or by (F-dep) after rebase).  Unblocks: the
+  §A(3) sentence "ppo applies as riscv.cat is written" stays literally true.  Risk: the "reuse hinge" `gppoCatT = gppoCat (gtAdGd GT)`
+  (`AxDeps.lean:195`) is no longer definitional — ~94 `AxSpin*` files use `gtAd`/`gtAdGd` but none uses `gppoCatT` directly (only `AxScCat`), so
+  the blast radius is two files; the worker verifies by build.  **(A2) WEAKER (sound) — the PROVISIONAL shape until ruled.**  `gppoCatT`
+  unchanged over the source-filtered `gtAd`; rule 12 from a device load is NOT asserted.  Concretely: nothing beyond [R38.1]; §A(3) names "rule 12
+  omitted for I/O-load sources".  In practice: the model admits a few executions riscv.cat forbids (the theorem covers them too — safe).  Cost 0;
+  no W12 contact.  Risk: a named departure in the published model; a later proof wanting L1 < L2 has to add it then.  **(B) FAITHFUL, rejected on
+  cost** — also loosen the UNTAGGED `gdepsWf` (`WeakRvwmoGraph.lean:629`) and give `dstep` the arms: changes the meaning of
+  `rvwmoMinusDepsConsistent`/`rvwmoCatConsistent` (hundreds of `Ax*` uses, W12's `rvwmoCoreD`, the G3 kill files) while W12 is running; L–XL.
+  **(C) WEAKER, rejected** — emission only; the conformance text admits RAM-endpoint `rowDepsT` edges only = D50 (a) in effect, contrary to
+  [OWN.17].  Non-blocking: (F-dep) proceeds under (A2); the ruling flips it by the (0e) edits.
+- **Q-F2-PIPEHOP-2 — RULED (a′-r) [OWN.49] (05:18 2026-10-13, rev 41: the RULED `f->pipe` window made provable by a persistent entry receipt —
+  MachCSL ghost `entryAt` over append-only histories, `PipeBirth` passes the slot's entry to the lock handle, `isLk = static ∨ pipeLockAt`,
+  user-forged lock shapes excluded σ-readably; inside W8 (f2-ctx) RELAUNCH 2; rev 40 OPEN, provisionally (a″+shape)) [R36.3] (raised by R36 from the W8 (f2-ctx) worker's deviation
   D1/D2, `PROGRESS-W8f2.md` finding F-A).  The MERGED registry (a″) versus the RULED (a′) [OWN.46]: which window may `chainOkAt`'s pipe hops
   use, and must the export exclude user-forged lock shapes by itself?**  *Spec (FIRST).*  RVWMO (PPO rules 4–7 and the load-value axiom): a
   store ordered by a FENCE or `.rl`, read by a load the reader orders behind it (`.aq`/FENCE), orders the writer's earlier accesses before the
@@ -5251,12 +5417,13 @@ scope choice, both options FAITHFUL; taken by the coordinator: DEFERRED to W8 (f
 - **D50 — RULED (b) [OWN.17], the NON-recommended option: EXTEND the taggers (W13 (F-dep), §C).**  Spec: appendix
   (c1) — ppo 9–13 apply to I/O accesses (addr/data/ctrl into an I/O STORE, addr into an I/O LOAD); a ctrl→I/O-LOAD
   edge is NOT ppo under either reading (the PMA non-idempotency "no speculative access" text is a reading to be NAMED);
-  this tree — the taggers `dstep`/`dstepT` are inert on `LDev` (`WeakRvwmoConf.lean:493-495`, `AxDeps.lean:461-463`),
+  this tree — the taggers `dstep`/`dstepT` are inert on `LDev` (`WeakRvwmoConf.lean:497-499`, `AxDeps.lean:461-463`),
   `pnodeStep`'s MMIO arms emit `LDev` without the read set the RAM arms put in `asrc`/`vsrc` (`WeakEvInst.lean:
   300-304,335-338`; `Eitem = Wlabel × Option Nat`, `Conf.lean:424` — the tagger reads sources from the LABEL).
   **(b) RULED**: addr/data/ctrl → I/O store and addr → I/O load edges, provenance OUT of an I/O load, NO ctrl →
   I/O-load edge (= the existing `LLoad`/`LStore` arm shapes, `dedgesR`/`dedgesW`, `AxDeps.lean:445-451`) — FAITHFUL
-  to (c1); M; coverage vs (R1)–(R3) in §C W13 (F-dep) (one class beyond the residue: I/O-load →addr→ RAM load).  (a)
+  to (c1) ONCE the graph side admits the edges ([R38.1], §C W13 (F-dep) (0): the emission shapes alone are not a model [R38.s5]); M–L [R38.3];
+  coverage vs (R1)–(R3) in §C W13 (F-dep) (one class beyond the residue: I/O-load →addr→ RAM load).  (a)
   taggers inert — WEAKER (sound; (R1) subsumes the in-edges, (R3) same-row I/O→I/O order), was recommended.
 - **D51 — RULED (a) [OWN.18]. The one-row device model.**  Spec: RVWMO/riscv.cat/Sail are SILENT on device threads; the
   DEVICE sentence orders a device's memory accesses only after the MMIO it receives; the UART and the virtio DMA are
