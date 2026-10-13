@@ -462,7 +462,9 @@ def cycleKillF (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) : Prop :=
 
 /-- The guard handed back: the trace visits the dev blocks in `gfDev`'s order.  (W13 (L):
 DISCHARGED on any I/O-aware trace by `trDevOrderedOfPtraceIO` (`WeakRvwmoLin2`), from `gfDevGmo` and
-`gfDevWIo`; the anchored rank trace `glinEidsIO` is one, `fconfTraceRealizeIO`.) -/
+`gfDevWIo`; the anchored rank trace `glinEidsIO` is one, `fconfTraceRealizeIO`, where since W13 (R3′)
+`gfDevGmo` is derived from the residue's widened fabric arm (`gfDevGmoOfRes`) and `gfDevWIo` is the
+named premise.) -/
 def trDevOrdered (GF : Gfexec) (c : Cand) : Prop :=
   ∀ k s, c.cdTr[k]? = some s →
     (s.esAg, tcnt s.esAg (c.cdTr.take k)) ∈ GF.gfDev →

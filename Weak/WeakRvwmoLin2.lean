@@ -54,17 +54,20 @@ not needed); §6 the rank trace is a `ptraceExt` (`glinPtraceExt`), non-vacuity 
    + `gfDevWIo` (every member is a write or an I/O event); `fconfTraceRealize` now composes
    `fconfSupply` with `trDevOrderedOfPtrace` itself (statement unchanged).  FabInd's
    handed-back guard `trDevOrdered` is discharged by `trDevOrderedOfPtraceIO` HERE (FabInd is
-   upstream of this file).  On I/O members `gfDevGmo` is the residue's (R3) (`gfDevGmoOfIo`); on
-   the non-I/O members it is not in the landed `ioResidue` — an open owner question (W13 (L)
-   report).  New: `gisWIo`, `ptraceRelIO`, `ptraceExtIO`, `ptraceExtIOExt`,
+   upstream of this file).  W13 (R3′) ([OWN.53], [R40.1] (α)): (R3)'s fabric arm now orders every
+   `gmem` fabric member (a TRUSTED-SURFACE TEXT change, `GraphFabResidue` header, plan §A(6)), so
+   `gfDevGmo` is a THEOREM (`gfDevGmoOfRes`, from `ioResidueGmo` + `gfDevWIo`; replaces the
+   I/O-members-only `gfDevGmoOfIo`) and `fconfTraceRealizeIO` drops it; `gfDevWIo` stays the NAMED
+   premise (what the members ARE, not how they are ordered — discharged by W13 (W)/W14).  New: `gisWIo`, `ptraceRelIO`, `ptraceExtIO`, `ptraceExtIOExt`,
    `gtraceLinearizationMinIO`, `candOfLinCandA`, `glinAPtraceExt`, `glinAPtraceExtIO`, `gisAnc`
    (writes, I/O events, disk-row reads), `glinEidsIO`, `linCandIO`, `gdiskRead14` (the
    disk-read anchor premise; W13 (K)'s normalization supplies it), `ancOkIO`, `glinIOPtraceExtIO`,
-   `rule14LinearizationIO`, `gfDevGmo`, `gfDevWIo`, `gfDevGmoOfIo`, `devOrderOfPtraceExtIO`,
+   `rule14LinearizationIO`, `gfDevGmo`, `gfDevWIo`, `gfDevGmoOfRes`, `devOrderOfPtraceExtIO`,
    `trDevOrderedOfPtraceIO`, `fconfTraceRealizeIO` (THE (L) DELIVERABLE); non-vacuity at a
    non-empty fabric `w13fIoConsistent`, `w13fIoRule14`, `w13fIoDiskRead14`, `w13fIoGlinEids`,
    `w13fIoGlinEidsIO`, `w13fLinNotDevOrdered`, `w13fIoDevOrdered`; Lean-only helpers
-   `WeakRvwmoLin2.glinABefore`, `WeakRvwmoLin2.wioAnc`, `WeakRvwmoLin2.w13fLbl`.
+   `WeakRvwmoLin2.glinABefore`, `WeakRvwmoLin2.wioAnc`, `WeakRvwmoLin2.wioGmem`,
+   `WeakRvwmoLin2.w13fLbl`.
 
 **Rocq → Lean name map.**  `before_index` `beforeIndex`, `elem_of_take_lookup`
 `elemOfTakeLookup`, `filter_all` `WeakRvwmoLin2.filterAll`, `filter_take_S` `filterTakeS`,
@@ -1068,9 +1071,9 @@ the disk-row reads).  On a `ptraceExtIO` trace the fabric order is trace order a
 gmo order (`devOrderOfPtraceExtIO`), so `fconfSupply'`'s former `before L` premise and FabInd's
 handed-back guard `trDevOrdered` are DISCHARGED (`trDevOrderedOfPtraceIO`,
 `fconfTraceRealizeIO`) from `gfDevGmo` — gmo agrees with the fabric order on every member — and
-`gfDevWIo` — every member is a write or an I/O event.  On the I/O members `gfDevGmo` is the
-landed (R3) (`gfDevGmoOfIo`); on the non-I/O members it is NOT in the landed `ioResidue`
-(see the report / PROGRESS-W13L.md: spec-first options). -/
+`gfDevWIo` — every member is a write or an I/O event.  Since W13 (R3′) ([OWN.53]) `gfDevGmo` is
+the residue's widened fabric arm on `gmem` members (`gfDevGmoOfRes`: writes and I/O events are
+`gmem`), so `fconfTraceRealizeIO` carries `gfDevWIo` alone. -/
 
 /-- A write or an I/O event. -/
 def gisWIo (G : Gexec) (e : Geid) : Bool := gisW G e || gisIo G e
@@ -1187,7 +1190,7 @@ theorem ancOkIO (GF : Gfexec) :
   · exact h14 e a hpo hm (WeakRvwmoLin.gisWGlblIs _ a haS hw)
   · cases he : gisIo GF.gfGd.gdG e with
     | false => exact hres e a (Or.inl ⟨hpo, hm, he, hio⟩)
-    | true => exact hres e a (Or.inr (Or.inr (Or.inr ⟨he, hio, Or.inl hpo⟩)))
+    | true => exact hres e a (Or.inr (Or.inr (Or.inr (Or.inl ⟨he, hio, hpo⟩))))
   · cases he : gisIo GF.gfGd.gdG e with
     | false => exact hdr e a hpo hm he hr hn
     | true => exact hres e a (Or.inr (Or.inr (Or.inl ⟨hpo, he, hr, hn⟩)))
@@ -1221,12 +1224,21 @@ def gfDevGmo (GF : Gfexec) : Prop := ∀ x y, gfBefore GF x y → gmoLt GF.gfGd.
 /-- Every fabric member is a write or an I/O event. -/
 def gfDevWIo (GF : Gfexec) : Prop := ∀ e, e ∈ GF.gfDev → gisWIo GF.gfGd.gdG e = true
 
-/-- On I/O members `gfDevGmo` IS the residue's fabric arm (R3). -/
-theorem gfDevGmoOfIo (GF : Gfexec) :
-    ioResidueGmo GF → (∀ e, e ∈ GF.gfDev → gisIo GF.gfGd.gdG e = true) → gfDevGmo GF := by
-  rintro hres hio x y ⟨i, j, hi, hj, hij⟩
-  exact hres x y (Or.inr (Or.inr (Or.inr ⟨hio x (elem_of_list_lookup_2 hi),
-    hio y (elem_of_list_lookup_2 hj), Or.inr ⟨i, j, hi, hj, hij⟩⟩)))
+/-- (Lean-only) a write or an I/O event has a memory-order position. -/
+theorem WeakRvwmoLin2.wioGmem (G : Gexec) (e : Geid) : gisWIo G e = true → gmem G e := by
+  unfold gisWIo
+  intro h
+  rcases Bool.or_eq_true_iff.mp h with h | h
+  · exact WeakRvwmoAcyc.gisWGmem G e h
+  · exact GraphFabResidue.gisIoGmem G e h
+
+/-- W13 (R3′): `gfDevGmo` IS the residue's widened fabric arm — on write/I/O members both
+endpoints are `gmem`, so the arm fires on every `gfBefore` pair (replaces `gfDevGmoOfIo`). -/
+theorem gfDevGmoOfRes (GF : Gfexec) : ioResidueGmo GF → gfDevWIo GF → gfDevGmo GF := by
+  rintro hres hwio x y ⟨i, j, hi, hj, hij⟩
+  exact hres x y (Or.inr (Or.inr (Or.inr (Or.inr
+    ⟨WeakRvwmoLin2.wioGmem _ x (hwio x (elem_of_list_lookup_2 hi)),
+      WeakRvwmoLin2.wioGmem _ y (hwio y (elem_of_list_lookup_2 hj)), ⟨i, j, hi, hj, hij⟩⟩))))
 
 /-- THE DISCHARGE of `fconfSupply'`'s former premise: an I/O-aware trace visits the fabric
 members in fabric order. -/
@@ -1267,12 +1279,13 @@ theorem fconfSupply' (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF
 
 /-- **THE (L) DELIVERABLE**: the anchored rank trace of a conformant RVWMO⁻ graph with rule 14,
 the residue and the disk-read anchors realizes the graph AND is supplied along the fabric —
-no topological sort, no handed-back guard. -/
+no topological sort, no handed-back guard.  (W13 (R3′): `gfDevGmo` is no longer a premise —
+`gfDevGmoOfRes` derives it from the residue and `gfDevWIo`.) -/
 theorem fconfTraceRealizeIO (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF : Gfexec)
     (N : Nat) :
     rvwmoMinusConsistent GF.gfGd.gdG → grule14 GF.gfGd.gdG → ioResidueGmo GF →
     gdiskRead14 GF.gfGd.gdG →
-    gfexecConfIO boot d0 fab GF → gfDevGmo GF → gfDevWIo GF →
+    gfexecConfIO boot d0 fab GF → gfDevWIo GF →
     GF.gfGd.gdG.gxProg.length ≤ N →
     srvwmoConsistent (linCandIO GF.gfGd.gdG) ∧
     (linCandIO GF.gfGd.gdG).cdImg = GF.gfGd.gdG.gxImg ∧
@@ -1288,7 +1301,8 @@ theorem fconfTraceRealizeIO (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Ef
       execProgOk' (pstepPin GF.gfGd.gdG.gxImg pstepEv) pclsEv pst
         (fun k => fab (dcnt GF (linCandIO GF.gfGd.gdG).cdTr k))
         (candExec (linCandIO GF.gfGd.gdG)) := by
-  intro hcons h14 hres hdr hconf hgmo hwio hN
+  intro hcons h14 hres hdr hconf hwio hN
+  have hgmo := gfDevGmoOfRes GF hres hwio
   have hext := glinIOPtraceExtIO GF hcons h14 hres hdr
   obtain ⟨h1, h2, h3, h4⟩ := rule14LinearizationIO GF hcons h14 hres hdr
   exact ⟨h1, h2, h3, h4,
@@ -1405,11 +1419,12 @@ theorem w13fIoDevOrdered : trDevOrdered w13fIo (linCandIO w13fIoG) := by
     intro e he
     simp only [w13fIo, List.mem_cons, List.not_mem_nil, or_false] at he
     rcases he with rfl | rfl <;> decide
+  have hwio : gfDevWIo w13fIo := fun e he => by unfold gisWIo; rw [hio e he]; simp
   exact trDevOrderedOfPtraceIO w13fIo _
     (glinIOPtraceExtIO w13fIo w13fIoConsistent w13fIoRule14 w13fIoResidueOk w13fIoDiskRead14)
     (by decide)
     (fun e he => GraphFabResidue.gisIoSome _ e (hio e he))
-    (gfDevGmoOfIo w13fIo w13fIoResidueOk hio)
-    (fun e he => by unfold gisWIo; rw [hio e he]; simp)
+    (gfDevGmoOfRes w13fIo w13fIoResidueOk hwio)
+    hwio
 
 end Weak
