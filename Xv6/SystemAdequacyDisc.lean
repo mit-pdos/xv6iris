@@ -31,8 +31,9 @@ include hlc GF in
 /-- **THE ACCESS DISCIPLINE HOLDS ON EVERY REACHABLE POWERED STATE** (the
 unit application, `xv6PowerAdequacy`'s arbitrary-`phi` slot): every
 reachable thread is reducible and, whenever the power is on, the machine's
-memory obeys `xv6AccessDisc` (W8 (f2-ctx): `chainOkAt ∧ lockWordDiscAt ∧
-cpuStaticAt`). -/
+memory obeys `xv6AccessDisc` (`chainOkAt ∧ lockWordDiscAt ∧ cpuStaticAt ∧
+lkCpuReadAt`: W8 (f2-ctx), (f3-hold) [OWN.64]; `chainOkAt`'s `ip->ref` value
+clause W8 (f3-racy) [OWN.63]). -/
 theorem xv6DiscAdequacy (US : USER) (g : GState) (sb : FsSb) (nib : Nat)
     (cov : ExtTreeSet Nat compare)
     (Hgen0 : g.gen = 0) (Hpow : g.pow = false)

@@ -85,12 +85,15 @@ def xv6ProcRootsR : RsvRegion := ⟨KA.«proc» + 80#64, .uroots 64 376⟩
 freed since that position (`MachCSL.ptFreedSince`). -/
 def xv6FreeHeadR : RsvRegion := ⟨KA.«kmem» + 0x18#64, .freeHead 1 8⟩
 
-/-- **The audited racy words** (W8 (f2-ctx) S3): `itable.inode[k].ref`
-(`inode[k]` at `itable + 24 + 136 k`, `ref` at +8; `NINODE = 50`), read
-lock-free by `ilock`'s guard `ip->ref < 1` -- a race the program has, so no
-load of them is claimed chained (`MachCSL.RsvKind.racy`, a footprint-free
-registry entry; the tie to `Xv6.iRef`/`Xv6.ientry` is `IcachePinwObl.iref_racy`). -/
-def xv6IrefRacyR : RsvRegion := ⟨KA.«itable» + 32#64, .racy 50 136 4⟩
+/-- **The audited racy words** (W8 (f2-ctx) S3; value set by W8 (f3-racy)
+[OWN.63]): `itable.inode[k].ref` (`inode[k]` at `itable + 24 + 136 k`, `ref`
+at +8; `NINODE = 50`), read lock-free by `ilock`'s/`iunlock`'s guard
+`ip->ref < 1` -- a race the program has (benign: the caller holds its own
+reference), so a load of them is claimed chained OR to return an entry whose
+word, as of its position, is in `[1, 2^31)` -- as a signed `int`, `≥ 1`
+(`MachCSL.RsvKind.racy`, a footprint-free registry entry; the tie to
+`Xv6.iRef`/`Xv6.ientry` and the value fact are `IcachePinwObl.iref_certs`). -/
+def xv6IrefRacyR : RsvRegion := ⟨KA.«itable» + 32#64, .racy 50 136 4 1 0x80000000⟩
 
 /-- `started` (`main.c`), the boot handover's ONE-SHOT PUBLICATION word (W8
 (f2-ctx), Q-F2-BOOTGATE (a) as amended by [R35.2]): written once, by hart 0. -/
@@ -254,7 +257,7 @@ def rsvLocksLow (rs : List RsvRegion) : Bool :=
     | .roots _ _ => true
     | .uroots _ _ => true
     | .freeHead _ _ => true
-    | .racy _ _ _ => true)
+    | .racy _ _ _ _ _ => true)
 
 theorem xv6RsvStatic_locksLow : rsvLocksLow xv6RsvStatic = true := by decide +kernel
 

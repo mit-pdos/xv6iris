@@ -635,7 +635,10 @@ ghost -- so that the pure export (`Xv6.AccessDiscipline.chainOkAt`'s
   (`RsvKind.freeHead`: `kmem.freelist`) since the naming word's last write
   (W8 (pte-ghost), [OWN.57] scoped to the freeable tables [R42.1]): a freed
   page-table page stops being covered at its push, not when the stale
-  pointer naming it is cleared.
+  pointer naming it is cleared;
+* the bytes of an AUDITED RACY word whose value, AS OF the entry's position,
+  lies in the registry's value set -- `racyValAt` (W8 (f3-racy) [OWN.63]; xv6:
+  `ip->ref`, `[1, 2^31)`): a value fact, not a blanket exemption.
 
 An exemption read AS OF a position is fixed once the position is below the
 top (`ptByteLiveAt_grow`), which is all the step laws need. -/
@@ -755,21 +758,43 @@ def lockWordsByte (b a : PAddr) : Prop :=
 
 /-- A byte of an audited racy word of `rs` (`RsvKind.racy`). -/
 def racyByteIn (rs : List RsvRegion) (a : PAddr) : Prop :=
-  ∃ (base : PAddr) (cnt stride n k j : Nat), (⟨base, .racy cnt stride n⟩ : RsvRegion) ∈ rs ∧ k < cnt ∧
-    j < n ∧ a = base + BitVec.ofNat 64 (stride * k) + BitVec.ofNat 64 j
+  ∃ (base : PAddr) (cnt stride n vlo vhi k j : Nat), (⟨base, .racy cnt stride n vlo vhi⟩ : RsvRegion) ∈ rs ∧
+    k < cnt ∧ j < n ∧ a = base + BitVec.ofNat 64 (stride * k) + BitVec.ofNat 64 j
+
+/-- The `n`-byte word at `w` holds, AS OF position `t` (`FlatMem.entAsOf`,
+byte by byte), a value in `[vlo, vhi)` (unsigned, little-endian). -/
+def racyWordOk (m : FlatMem) (w : PAddr) (n t vlo vhi : Nat) : Prop :=
+  ∃ v : BitVec (8 * n), vlo ≤ v.toNat ∧ v.toNat < vhi ∧
+    ∀ i, i < n → (m.entAsOf (w + BitVec.ofNat 64 i) t).map HEnt.v = some (nthByte v i)
+
+/-- **A VALUE-QUALIFIED racy byte as of `t`** (W8 (f3-racy) [OWN.63]): `a` is
+a byte of an audited racy word of `rs` whose value AS OF `t` lies in the
+region's value set (xv6: `ip->ref`, the set `[1, 2^31)` -- the signed guard
+`ip->ref < 1` of `ilock`/`iunlock` reads `≥ 1`). -/
+def racyValAt (rs : List RsvRegion) (m : FlatMem) (t : Nat) (a : PAddr) : Prop :=
+  ∃ (base : PAddr) (cnt stride n vlo vhi k j : Nat), (⟨base, .racy cnt stride n vlo vhi⟩ : RsvRegion) ∈ rs ∧
+    k < cnt ∧ j < n ∧ a = base + BitVec.ofNat 64 (stride * k) + BitVec.ofNat 64 j ∧
+    racyWordOk m (base + BitVec.ofNat 64 (stride * k)) n t vlo vhi
+
+theorem racyByteIn_of_racyValAt {rs : List RsvRegion} {m : FlatMem} {t : Nat} {a : PAddr}
+    (h : racyValAt rs m t a) : racyByteIn rs a :=
+  let ⟨base, cnt, stride, n, vlo, vhi, k, j, hR, hk, hj, ha, _⟩ := h
+  ⟨base, cnt, stride, n, vlo, vhi, k, j, hR, hk, hj, ha⟩
 
 /-- **The exemption of the load-side invariant**, at memory `m` with top
 `top`: byte `a` as of position `t` is a lock-layer byte (static, publication,
 or a dynamic lock live at `t`), a LIVE page-table byte (`ptByteLiveAt`: the
 permanent table's walk, or a freeable table's walk through pages not freed
 since their naming words' writes -- W8 (pte-ghost), [OWN.57]), a byte of an
-audited racy word (`racyByteIn`).  (W8 (f3-gate) [OWN.62] removed the
+audited racy word whose value as of `t` is in the region's value set
+(`racyValAt`, W8 (f3-racy) [OWN.63]: the exemption is VALUE-qualified, no
+longer every byte at every position).  (W8 (f3-gate) [OWN.62] removed the
 device-ring arm: the used ring's hart-authored entries -- hart 0's boot
 zeroes -- are now CERTIFIED, `Xv6.DiskAcc.usedIdx_certs`.) -/
 def chainExAt (rs : List RsvRegion) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop) (m : FlatMem)
     (top : Nat) (a : PAddr) (t : Nat) : Prop :=
   lockPubByteIn rs a ∨ (∃ b, dynLkAt wit m top b t ∧ lockWordsByte b a) ∨ ptByteLiveAt rs m t a ∨
-    racyByteIn rs a
+    racyValAt rs m t a
 
 /-- Reading AS OF a position at or below the top is unchanged by a step that
 adds entries above the top only. -/
@@ -804,6 +829,13 @@ theorem wordAsOf_grow {m m' : FlatMem} {top t : Nat} (hg : memGrow m top m') (hm
     (ht : t ≤ top) (a : PAddr) (v : BitVec 64) : wordAsOf m' a t v ↔ wordAsOf m a t v := by
   unfold wordAsOf
   simp only [FlatMem.entAsOf_grow hg hm ht]
+
+/-- **A value-qualified racy byte stays one** (and a non-qualified one stays
+non-qualified): as of a position at or below the top, under a step that adds
+entries above the top only. -/
+theorem racyValAt_grow {rs : List RsvRegion} {m m' : FlatMem} {top t : Nat} (hg : memGrow m top m')
+    (hm : memAbove m top m') (ht : t ≤ top) (a : PAddr) : racyValAt rs m' t a ↔ racyValAt rs m t a := by
+  simp only [racyValAt, racyWordOk, FlatMem.entAsOf_grow hg hm ht]
 
 /-- **A page-table byte stays one**: as of a position at or below the top,
 under a step that adds entries above the top only. -/
@@ -882,7 +914,7 @@ theorem chainExAt_grow {rs : List RsvRegion} {wit : List (PAddr × HEnt) → PAd
   · exact .inl h
   · exact .inr (.inl ⟨b, dynLkAt_mono hg htop hb, hw⟩)
   · exact .inr (.inr (.inl ((ptByteLiveAt_grow hg hm ht a).2 h)))
-  · exact .inr (.inr (.inr h))
+  · exact .inr (.inr (.inr ((racyValAt_grow hg hm ht a).2 h)))
 
 /-- A step that leaves the memory alone keeps the exemption (any new top). -/
 theorem chainExAt_top {rs : List RsvRegion} {wit : List (PAddr × HEnt) → PAddr → Nat → Prop}

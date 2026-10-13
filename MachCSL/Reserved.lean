@@ -151,13 +151,16 @@ inductive RsvKind where
   a page the word held after a position was FREED since that position
   (`MachCSL.ptFreedSince`); a registry entry -- no footprint, no discipline -/
   | freeHead (cnt stride : Nat)
-  /-- the client's AUDITED RACY words (W8 (f2-ctx) S3): `cnt` words of `n`
-  bytes at `base + stride·k` that the client reads WITHOUT synchronization
-  (xv6: `itable.inode[k].ref`, read lock-free by `ilock`'s guard
-  `ip->ref < 1`), so a load of them need not be chained: the load-side
-  exemption covers their bytes at every position (`MachCSL.racyByteIn`); a
-  registry entry -- no footprint, no discipline -/
-  | racy (cnt stride n : Nat)
+  /-- the client's AUDITED RACY words (W8 (f2-ctx) S3; VALUE-qualified by
+  W8 (f3-racy) [OWN.63]): `cnt` words of `n` bytes at `base + stride·k` that
+  the client reads WITHOUT synchronization (xv6: `itable.inode[k].ref`, read
+  lock-free by `ilock`'s/`iunlock`'s guard `ip->ref < 1`), with the VALUE SET
+  `[vlo, vhi)` (unsigned, of the little-endian word) every unchained entry's
+  word lies in: a load of them need not be chained WHEN the word, as of the
+  entry's position, is in the set (`MachCSL.racyValAt`; xv6: `[1, 2^31)`, i.e.
+  the signed guard reads a value `≥ 1`); a registry entry -- no footprint, no
+  discipline -/
+  | racy (cnt stride n vlo vhi : Nat)
   deriving DecidableEq
 
 /-- The kinds with a footprint (all but a `.slots` registry entry). -/
@@ -166,7 +169,7 @@ def RsvKind.hasFoot : RsvKind → Bool
   | .roots _ _ => false
   | .uroots _ _ => false
   | .freeHead _ _ => false
-  | .racy _ _ _ => false
+  | .racy _ _ _ _ _ => false
   | _ => true
 
 /-- A reserved region: its base address and kind. -/
@@ -188,7 +191,7 @@ def RsvRegion.words (R : RsvRegion) : List (PAddr × Nat) :=
   | .roots _ _ => []
   | .uroots _ _ => []
   | .freeHead _ _ => []
-  | .racy _ _ _ => []
+  | .racy _ _ _ _ _ => []
 
 /-- The bytes of a word. -/
 def wordBytes (w : PAddr × Nat) : List PAddr :=
@@ -219,7 +222,7 @@ def regionOk (m : FlatMem) (R : RsvRegion) : Prop :=
   | .roots _ _ => True
   | .uroots _ _ => True
   | .freeHead _ _ => True
-  | .racy _ _ _ => True
+  | .racy _ _ _ _ _ => True
 
 /-- Every region of the list keeps its discipline. -/
 def rsvAllOk (rs : List RsvRegion) (m : FlatMem) : Prop :=
@@ -326,7 +329,7 @@ theorem RsvRegion.base_mem (R : RsvRegion) (hk : R.kind.hasFoot = true) : R.base
     | roots _ _ => rw [h] at hk; simp [RsvKind.hasFoot] at hk
     | uroots _ _ => rw [h] at hk; simp [RsvKind.hasFoot] at hk
     | freeHead _ _ => rw [h] at hk; simp [RsvKind.hasFoot] at hk
-    | racy _ _ _ => rw [h] at hk; simp [RsvKind.hasFoot] at hk
+    | racy _ _ _ _ _ => rw [h] at hk; simp [RsvKind.hasFoot] at hk
     | _ => exact ⟨_, by decide, List.mem_cons_self⟩
   obtain ⟨n, hn, hw⟩ := hw
   have := mem_regionBytes hw hn
@@ -377,7 +380,7 @@ theorem regionOk_congr {m m' : FlatMem} {R : RsvRegion}
   | roots _ _ => trivial
   | uroots _ _ => trivial
   | freeHead _ _ => trivial
-  | racy _ _ _ => trivial
+  | racy _ _ _ _ _ => trivial
   | cpu c =>
     rw [hk] at hR
     intro a ha H hH
@@ -485,7 +488,7 @@ theorem rsvAllOk_boot {rs : List RsvRegion} (hwf : rsvWf rs) : rsvAllOk rs (imgF
   | roots _ _ => trivial
   | uroots _ _ => trivial
   | freeHead _ _ => trivial
-  | racy _ _ _ => trivial
+  | racy _ _ _ _ _ => trivial
   | cpu c =>
     intro a ha H hH e he het
     obtain ⟨v, hv⟩ := himg a ha

@@ -1,16 +1,30 @@
 /-
 **THE ACCESS DISCIPLINE** (weak-allocproc plan §C W8's skeleton, [R25.1],
-[R34.1]; W8 (f2-ctx) S4; W8 (f3-hold) [OWN.64]): W8's export `xv6AccessDisc`,
-`chainOkAt ∧ lockWordDiscAt ∧ cpuStaticAt ∧ lkCpuReadAt` -- FOUR conjuncts:
-THREE of the skeleton's six (W8 (f2-ctx)) and the ruled `holding()` clause
-`lkCpuReadAt` (W8 (f3-hold)).  NOT exported here: `pteDiscAt` (the A/D
+[R34.1]; W8 (f2-ctx) S4; W8 (f3-hold) [OWN.64]; W8 (f3-racy) [OWN.63]): W8's
+export `xv6AccessDisc`, `chainOkAt ∧ lockWordDiscAt ∧ cpuStaticAt ∧
+lkCpuReadAt` -- FOUR conjuncts: THREE of the skeleton's six (W8 (f2-ctx)) and
+the ruled `holding()` clause `lkCpuReadAt` (W8 (f3-hold)); `chainOkAt` carries
+the ruled `ip->ref` clause `racyValOk` (W8 (f3-racy)).
+
+**ONE benign-race class, two instances** ([OWN.63], [OWN.64]; plan §A(4′)):
+UNLOCKED reads of LOCK-PROTECTED words, harmless by a VALUE argument -- both
+C11 data races (real defects of the C program), benign on hardware (aligned
+word accesses, coherence):
+  - `holding()`'s read of `lk->cpu` by a non-holder inside `acquire`
+    (`spinlock.c`): `lkCpuReadAt` -- whatever it reads is not its own
+    pointer;
+  - `ilock`'s/`iunlock`'s guard `ip->ref < 1` (`fs.c`), read without
+    `itable.lock`: `chainOkAt`'s `racyValOk` arm -- every unchained value a
+    hart observed on `ip->ref` is `≥ 1` (the caller holds its own
+    reference).
+Each is stated as a VALUE clause of the export, NOT an exemption.  NOT exported here: `pteDiscAt` (the A/D
 write-back clause [R25.1]: no σ-pure fact of the state interpretation carries
 it -- `KptInv` is an Iris invariant; `PROGRESS-W8f2.md` S4, an open point),
 and W8 (f3-rest)'s `cpuProcDiscAt`/`utextDiscAt` [R34.1].  Later items only
 STRENGTHEN the conjunction.
 
 * `Cust` (the custody classes, W8-design §1 with [R25.1]'s `pte`, and the
-  S3 exemption classes `pub`, `racy`) and the custody map `custAt σ a
+  S3 classes `pub` (exempt), `racy` (value-qualified)) and the custody map `custAt σ a
   t`, σ-READABLE (a predicate of the memory and xv6's static registry
   `KernelRsv.static`, no ghost state), its arms read off the load-side
   invariant's exemption `MachCSL.chainExAt`, in this order:
@@ -67,10 +81,13 @@ STRENGTHEN the conjunction.
     `freeproc`), FAITHFUL;
   - `racy`: a byte of an AUDITED RACY word (`MachCSL.racyByteIn`; xv6:
     `itable.inode[k].ref`, read lock-free by `ilock`'s/`iunlock`'s guard
-    `ip->ref < 1`) -- finding **F-RACY**: a NAMED WEAKENING (no chain is
-    claimed for these bytes; the race is real).  Ruled [OWN.63]: W8
-    (f3-racy) replaces it by the value fact "every value the guard can read
-    is ≥ 1" -- the SAME defect class as `lkCpuReadAt` below;
+    `ip->ref < 1`).  NOT an exemption class since W8 (f3-racy) [OWN.63]
+    (finding F-RACY's weakening is gone): `chainOkAt` claims for such a byte
+    a sync path OR the value clause `racyValOk` -- the word, as of the
+    observed entry's position, is in the registry's value set `[1, 2^31)`,
+    i.e. the guard reads `≥ 1` (proved: `IcachePinwObl.iref_certs`, from
+    `irefSet`'s window invariant).  The race is real and benign -- the SAME
+    defect class as `lkCpuReadAt` below (see "ONE benign-race class");
   - (no device-ring class: W8 (f3-gate) [OWN.62] retired finding
     **F-DISKTAIL**'s exemption.  The used ring's hart-authored entries --
     hart 0's `kalloc` fill and `memset(disk.used, 0, PGSIZE)`
@@ -95,8 +112,13 @@ STRENGTHEN the conjunction.
 * **`chainOkAt σ`** (§C W8 (iii+)): every hart `j`'s coherence floor at a
   byte `a` names, when it is a FOREIGN hart's post-power-on entry (DMA
   authors exempt) on a byte whose custody as of the entry is not exempt
-  (`lockw`, `pub`, `pte`, `racy`), an entry SYNC-CHAINED to `j`
-  before `σ.top + 1`.
+  (`lockw`, `pub`, `pte`), an entry SYNC-CHAINED to `j` before
+  `σ.top + 1` -- or, on a `racy` byte (`ip->ref`), one AS OF which the word
+  is in the value set (`racyValOk`, W8 (f3-racy) [OWN.63]: "every unchained
+  value a hart observed on `ip->ref` is `≥ 1`").  Spec: RVWMO lets the
+  guard's load return any store not coherence-before what the hart has
+  observed; riscv.cat/Sail/Zifencei/PMAs say nothing about custody --
+  FAITHFUL (a value theorem about the program, no ISA assumption added).
 * `xv6LockWord σ b t`: `b` is the lock word of one of xv6's 157 STATIC image
   spinlocks (`xv6StaticLocks`).
 * `lockWordDiscAt σ`: every such lock's two word histories obey the spinlock
@@ -115,9 +137,9 @@ STRENGTHEN the conjunction.
   lock (`spinlock.c`), an unlocked read of `lk->cpu`, a lock-protected word
   -- a C11 data race, benign on hardware by a VALUE argument (whatever the
   non-holder reads, it is not its own pointer, so `holding` answers 0 and
-  `acquire` does not panic).  The SAME defect class as `ip->ref` (F-RACY,
-  [OWN.63], W8 (f3-racy)): unlocked reads of lock-protected words, benign by
-  a value argument.  A
+  `acquire` does not panic).  The SAME defect class as `ip->ref`'s guard
+  (`chainOkAt`'s `racyValOk`, [OWN.63], W8 (f3-racy)): unlocked reads of
+  lock-protected words, benign by a value argument.  A
   corollary of `lockWordDiscAt` (`MachCSL.lkCpu_read_not_mine`).  Static
   locks only, as `xv6LockWord` (every lock after W8 (f3-pipelk)).  Spec:
   RVWMO/riscv.cat/Sail are SILENT on lock disciplines (a proof notion);
@@ -136,8 +158,8 @@ discipline.
 Deviations from the plan's skeleton: the definitions are at xv6's
 `KernelGeom` instance (`Xv6.Geom`), not under a `[KernelGeom]` binder; the
 boot hop is `pubCover` (the implemented [R36.1] form), not "`t ≤ bootEnd`";
-the exemption has the S3 classes `pub`, `racy` beyond `lockw`/`pte` (S3's
-third, `dev`, retired by W8 (f3-gate)).
+the exemption has the S3 class `pub` beyond `lockw`/`pte` (S3's `dev` retired
+by W8 (f3-gate); S3's `racy` value-qualified by W8 (f3-racy)).
 -/
 import Xv6.KernelRsv
 import MachCSL.Adequacy
@@ -151,7 +173,8 @@ open Iris Iris.BI Iris.ProofMode Std MachCSL
 
 /-! ## The custody map -/
 
-/-- The custody classes (W8-design §1; [R25.1]'s `pte`; S3's `pub`, `racy`). -/
+/-- The custody classes (W8-design §1; [R25.1]'s `pte`; S3's `pub`, `racy` --
+`racy` value-qualified, not exempt, since W8 (f3-racy)). -/
 inductive Cust where
   /-- hart `h`'s own: `cpus[h]`'s three cells -/
   | hart (h : CPU)
@@ -165,7 +188,7 @@ inductive Cust where
   | pub (w : CPU)
   /-- a page-table byte of either table, as of the position -/
   | pte
-  /-- an audited racy word's byte (F-RACY: `ip->ref`) -/
+  /-- an audited racy word's byte (`ip->ref`: chained or value-safe, `racyValOk`) -/
   | racy
   /-- read-only after boot publication -/
   | ro
@@ -201,8 +224,8 @@ open Classical in
 of `MachCSL.chainExAt`'s arms (static lock words, publication words, live
 dynamic lock words, LIVE page-table bytes as of `t` -- no freed page of a
 freeable table, W8 (pte-ghost) [OWN.57], up to the as-of-entry residual of
-the header --, audited racy words (F-RACY)), then `cpus[h]`'s cells, then
-`free`. -/
+the header --, audited racy words (`ip->ref`; value-qualified in
+`chainOkAt`, W8 (f3-racy))), then `cpus[h]`'s cells, then `free`. -/
 noncomputable def custAt (σ : MState) (a : PAddr) (t : Nat) : Cust :=
   if h1 : ∃ b, staticLockByteOf b a then .lockw (Classical.choose h1) else
   if h2 : ∃ w, pubByteOf w a then .pub (Classical.choose h2) else
@@ -227,19 +250,29 @@ before `τ`: release → acquire hops through hop bytes, the last acquire below
 def syncPath (σ : MState) (A : CPU) (t : Nat) (B : CPU) (τ : Nat) : Prop :=
   (∃ a, a < τ ∧ hopChain σ.mem (hopByteAt σ) A t B a) ∨ pubCover (xv6Env σ) A t B
 
+/-- **The racy word's value clause** (W8 (f3-racy) [OWN.63]): `a` is a byte
+of an audited racy word whose value AS OF position `t` lies in the registry's
+value set -- for xv6's one racy region (`ip->ref`, `KernelRsv.xv6IrefRacyR`)
+the 4-byte word read as an unsigned number is in `[1, 2^31)`, i.e. as the
+signed `int` the guard `ip->ref < 1` compares, `≥ 1`. -/
+def racyValOk (σ : MState) (a : PAddr) (t : Nat) : Prop := racyValAt xv6Rsv σ.mem t a
+
 /-- **(iii+) Every observed foreign hart entry off the exempt classes is
-sync-chained**: hart `j`'s coherence floor at `a` names a post-power-on entry
-of a hart other than `j`; unless the byte is, as of the entry, a lock-layer
-word, a publication word, a LIVE page-table byte (no page of a freeable table
-from its push onto the free list on; the as-of-entry residual of the header)
-or an audited racy word (F-RACY), that entry reaches `j` along a sync path
-(the virtio used ring included: W8 (f3-gate) [OWN.62]). -/
+sync-chained, and on an audited racy word it is chained OR value-safe**: hart
+`j`'s coherence floor at `a` names a post-power-on entry of a hart other than
+`j`; unless the byte is, as of the entry, a lock-layer word, a publication
+word or a LIVE page-table byte (no page of a freeable table from its push onto
+the free list on; the as-of-entry residual of the header), that entry reaches
+`j` along a sync path (the virtio used ring included: W8 (f3-gate) [OWN.62]),
+or the byte is an audited racy word's (`ip->ref`) and the word, as of the
+entry, is in the value set (`racyValOk`: every unchained value a hart
+observed on `ip->ref` is `≥ 1` -- W8 (f3-racy) [OWN.63], replacing F-RACY's
+exemption). -/
 def chainOkAt (σ : MState) : Prop :=
   ∀ (j : CPU) (a : PAddr) (H : Hist) (e : HEnt), σ.mem[a]? = some H → e ∈ H → e.t ≠ 0 →
     e.t = (σ.hr j).coh a → ∀ hA : e.tid < NCPU, e.tid ≠ hartAgent j →
     (∀ b, custAt σ a e.t ≠ .lockw b) → (∀ w, custAt σ a e.t ≠ .pub w) → custAt σ a e.t ≠ .pte →
-    custAt σ a e.t ≠ .racy →
-    syncPath σ ⟨e.tid, hA⟩ e.t j (σ.top + 1)
+    syncPath σ ⟨e.tid, hA⟩ e.t j (σ.top + 1) ∨ (custAt σ a e.t = .racy ∧ racyValOk σ a e.t)
 
 /-! ## The lock layer and the per-hart cells -/
 
@@ -274,8 +307,8 @@ obeying the kit's discipline, and every hart `c` that is not `st`'s holder,
 reading `lk->cpu` at any view `tvn` with an image value `v0 ≠ &cpus[c]`,
 never obtains `&cpus[c]`.  The unlocked `lk->cpu == mycpu()` read of
 `holding(lk)` in `acquire` -- a benign race of the same class as `ip->ref`'s
-guard (F-RACY, [OWN.63]): an unlocked read of a lock-protected word, benign
-by a value argument. -/
+guard (`chainOkAt`'s `racyValOk`, [OWN.63]): an unlocked read of a
+lock-protected word, benign by a value argument. -/
 def lkCpuReadAt (σ : MState) : Prop :=
   ∀ (b : PAddr) (t : Nat), xv6LockWord σ b t →
     ∃ (W : WordHist 4) (W' : WordHist 8) (Hold Hold' : Nat → Hist) (st : Option (CPU × Bool)) (B : Nat),
@@ -285,8 +318,11 @@ def lkCpuReadAt (σ : MState) : Prop :=
         ReadCases W' (hartAgent c) tvn v0 w → w ≠ cpuAddr c
 
 /-- **W8's export** (W8 (f2-ctx): `chainOkAt ∧ lockWordDiscAt ∧ cpuStaticAt`,
-three of the skeleton's six; W8 (f3-hold) [OWN.64]: `lkCpuReadAt`;
-`pteDiscAt` open, `cpuProcDiscAt`/`utextDiscAt` W8 (f3-rest)'s). -/
+three of the skeleton's six; W8 (f3-hold) [OWN.64]: `lkCpuReadAt`; W8
+(f3-racy) [OWN.63]: `chainOkAt`'s `racyValOk` arm -- the two instances of ONE
+benign-race class (unlocked reads of lock-protected words, harmless by a
+value argument); `pteDiscAt` open, `cpuProcDiscAt`/`utextDiscAt` W8
+(f3-rest)'s). -/
 def xv6AccessDisc (σ : MState) : Prop :=
   chainOkAt σ ∧ lockWordDiscAt σ ∧ cpuStaticAt σ ∧ lkCpuReadAt σ
 
@@ -332,9 +368,11 @@ theorem xv6LockWord_registered (σ : MState) (b : PAddr) (t : Nat) (hb : xv6Lock
 
 /-! ## The extraction -/
 
-/-- Off the exempt classes, a byte is not in the load-side exemption. -/
+/-- Off the exempt classes and the value-safe racy bytes, a byte is not in
+the load-side exemption. -/
 theorem custAt_notEx {σ : MState} {a : PAddr} {t : Nat} (h1 : ∀ b, custAt σ a t ≠ .lockw b)
-    (h2 : ∀ w, custAt σ a t ≠ .pub w) (h3 : custAt σ a t ≠ .pte) (h4 : custAt σ a t ≠ .racy) :
+    (h2 : ∀ w, custAt σ a t ≠ .pub w) (h3 : custAt σ a t ≠ .pte)
+    (h4 : ¬ (custAt σ a t = .racy ∧ racyValOk σ a t)) :
     ¬ chainExAt xv6Rsv (slotWit xv6Rsv) σ.mem σ.top a t := by
   unfold custAt at h1 h2 h3 h4
   by_cases c1 : ∃ b, staticLockByteOf b a
@@ -350,7 +388,19 @@ theorem custAt_notEx {σ : MState} {a : PAddr} {t : Nat} (h1 : ∀ b, custAt σ 
   · rw [if_pos c4] at h3; exact absurd rfl h3
   rw [if_neg c4] at h1 h2 h3 h4
   by_cases c5 : racyByteIn xv6Rsv a
-  · rw [if_pos c5] at h4; exact absurd rfl h4
+  · rw [if_pos c5] at h4
+    intro hx
+    rcases hx with (⟨⟨base, kind⟩, hR, hk, ha⟩ | ⟨b, hd, hw⟩ | hp | hr)
+    · rcases hk with ⟨cb, hcb⟩ | ⟨w, hw⟩
+      · simp only at hcb
+        subst hcb
+        exact c1 ⟨base, cb, hR, ha⟩
+      · simp only at hw
+        subst hw
+        exact c2 ⟨w, base, hR, ha⟩
+    · exact c3 ⟨b, hd, hw⟩
+    · exact c4 hp
+    · exact h4 ⟨rfl, hr⟩
   rintro (⟨⟨base, kind⟩, hR, hk, ha⟩ | ⟨b, hd, hw⟩ | hp | hr)
   · rcases hk with ⟨cb, hcb⟩ | ⟨w, hw⟩
     · simp only at hcb
@@ -361,13 +411,16 @@ theorem custAt_notEx {σ : MState} {a : PAddr} {t : Nat} (h1 : ∀ b, custAt σ 
       exact c2 ⟨w, base, hR, ha⟩
   · exact c3 ⟨b, hd, hw⟩
   · exact c4 hp
-  · exact c5 hr
+  · exact c5 (racyByteIn_of_racyValAt hr)
 
 /-- **`chainOkAt` from the load-side invariant** (and `mmOk`: every hop's
 last acquire is an entry at or below the top). -/
 theorem chainOkAt_of (σ : MState) (hmm : mmOk σ)
     (h : loadsChained (xv6Env σ) (chainExAt xv6Rsv (slotWit xv6Rsv) σ.mem σ.top)) : chainOkAt σ := by
-  intro j a H e hH he het hc hA hne h1 h2 h3 h4
+  intro j a H e hH he het hc hA hne h1 h2 h3
+  by_cases h4 : custAt σ a e.t = .racy ∧ racyValOk σ a e.t
+  · exact .inr h4
+  left
   obtain ⟨τ, hv⟩ := h j a H e hH he het hc hA hne (custAt_notEx h1 h2 h3 h4)
   unfold ChainCert.valid at hv
   rcases hv with ⟨hj, _⟩ | ⟨b', _, hch⟩ | hp

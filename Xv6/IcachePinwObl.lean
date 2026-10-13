@@ -116,36 +116,127 @@ theorem irefPin_read_vis (W : WordHist 4) (Hold : Nat → Hist) (h : Agent) (tvn
 
 variable [IcacheG GF]
 
-/-- `ip->ref`'s bytes are an audited racy word's (W8 (f2-ctx) S3,
-`Xv6.xv6IrefRacyR`): `ilock`'s guard reads it lock-free. -/
-theorem iref_racy (k : Nat) (hk : k < NINODE)
-    (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) (j : Nat) (hj : j < 4) :
-    racyByteIn (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (iRef (ientry k) + BitVec.ofNat 64 j) := by
-  refine ⟨KA.«itable» + 32#64, 50, 136, 4, k, j, ?_, by unfold NINODE at hk; exact hk, hj, ?_⟩
-  · rw [hrsv]; exact xv6RsvStatic_irefRacy
-  · unfold NINODE at hk
-    apply BitVec.eq_of_toNat_eq
-    simp only [iRef, ientry, ISLOTSZ, KA.«itable», KernelSyms.«itable», BitVec.toNat_add,
-      BitVec.toNat_ofNat]
-    omega
+/-- An entry a read of a window can return (its tail's head visible) sits at
+a position of the window's word entries or at the tails' position. -/
+theorem IcachePinwObl.readEnt_pos {n : Nat} (lo : Nat) (v0 : BitVec (8 * n)) (Hold : Nat → Hist)
+    (htail : tailOk n lo v0 Hold) (h : Agent) (tv j : Nat) (hj : j < n)
+    (hv : ∀ e H, Hold j = e :: H → e.visible h tv = true) (e : HEnt) :
+    ∀ W : WordHist n, Hist.readEnt h tv (WordHist.hist W Hold j) = some e → (∃ x ∈ W, x.t = e.t) ∨ e.t = lo
+  | [], hr => by
+    obtain ⟨e0, H, hH, _, ht⟩ := htail j hj
+    have hv0 := hv e0 H hH
+    simp only [Hist.readEnt, WordHist.hist, List.map_nil, List.nil_append, hH, List.find?_cons, hv0,
+      Option.some.injEq] at hr
+    subst hr
+    exact Or.inr ht
+  | x :: W, hr => by
+    by_cases hx : (x.proj j).visible h tv = true
+    · simp only [Hist.readEnt, WordHist.hist, List.map_cons, List.cons_append, List.find?_cons, hx,
+        Option.some.injEq] at hr
+      subst hr
+      exact Or.inl ⟨x, List.mem_cons_self, rfl⟩
+    · have hr' : Hist.readEnt h tv (WordHist.hist W Hold j) = some e := by
+        simpa only [Hist.readEnt, WordHist.hist, List.map_cons, List.cons_append, List.find?_cons, hx]
+          using hr
+      rcases IcachePinwObl.readEnt_pos lo v0 Hold htail h tv j hj hv e W hr' with ⟨y, hy, hyt⟩ | hl
+      · exact Or.inl ⟨y, List.mem_cons_of_mem _ hy, hyt⟩
+      · exact Or.inr hl
 
-/-- **A read of `ip->ref` is exempt** (its bytes are an audited racy
-word's): the certificates every `ip->ref` load hands its rule. -/
+/-- The window's word AS OF a position at or above one of its word entries'
+(or the tails' position) is a word entry's value or the tails' `v0`: byte by
+byte, the latest entry at or below the position belongs to ONE whole-word
+store (the first word entry at or below it), or is the tails' head. -/
+theorem IcachePinwObl.find_asOf {n : Nat} (lo : Nat) (v0 : BitVec (8 * n)) (Hold : Nat → Hist)
+    (htail : tailOk n lo v0 Hold) (T : Nat) :
+    ∀ W : WordHist n, ((∃ x ∈ W, x.t ≤ T) ∨ lo ≤ T) →
+      ∃ v, (v = v0 ∨ ∃ x ∈ W, v = x.v) ∧
+        ∀ i, i < n → ((WordHist.hist W Hold i).find? (fun e => decide (e.t ≤ T))).map HEnt.v = some (nthByte v i)
+  | [], h => by
+    have hlo : lo ≤ T := by
+      rcases h with ⟨x, hx, _⟩ | h
+      · cases hx
+      · exact h
+    refine ⟨v0, Or.inl rfl, fun i hi => ?_⟩
+    obtain ⟨e, H, hH, hv, ht⟩ := htail i hi
+    have hle : e.t ≤ T := by omega
+    simp only [WordHist.hist, List.map_nil, List.nil_append, hH, List.find?_cons, hle, decide_true,
+      Option.map_some, hv]
+  | x :: W, h => by
+    by_cases hx : x.t ≤ T
+    · refine ⟨x.v, Or.inr ⟨x, List.mem_cons_self, rfl⟩, fun i _ => ?_⟩
+      simp only [WordHist.hist, List.map_cons, List.cons_append, List.find?_cons, WEnt.proj, hx,
+        decide_true, Option.map_some]
+    · have h' : (∃ y ∈ W, y.t ≤ T) ∨ lo ≤ T := by
+        rcases h with ⟨y, hy, hyT⟩ | h
+        · rcases List.mem_cons.1 hy with rfl | hy
+          · exact absurd hyT hx
+          · exact Or.inl ⟨y, hy, hyT⟩
+        · exact Or.inr h
+      obtain ⟨v, hv, hf⟩ := IcachePinwObl.find_asOf lo v0 Hold htail T W h'
+      refine ⟨v, ?_, fun i hi => ?_⟩
+      · rcases hv with hv | ⟨y, hy, hyv⟩
+        · exact Or.inl hv
+        · exact Or.inr ⟨y, List.mem_cons_of_mem _ hy, hyv⟩
+      · have := hf i hi
+        simp only [WordHist.hist, List.map_cons, List.cons_append, List.find?_cons, WEnt.proj, hx,
+          decide_false] at this ⊢
+        exact this
+
+/-- `ip->ref`'s word sits at the registry's racy region (`Xv6.xv6IrefRacyR`). -/
+theorem IcachePinwObl.iref_base (k : Nat) (hk : k < NINODE) :
+    KA.«itable» + 32#64 + BitVec.ofNat 64 (136 * k) = iRef (ientry k) := by
+  unfold NINODE at hk
+  apply BitVec.eq_of_toNat_eq
+  simp only [iRef, ientry, ISLOTSZ, KA.«itable», KernelSyms.«itable», BitVec.toNat_add,
+    BitVec.toNat_ofNat]
+  omega
+
+/-- **Every entry a read of `ip->ref` can return is VALUE-exempt** (W8
+(f3-racy) [OWN.63]): at every view at or above `K` (the slice's floor `lo`
+visible, `hvis`), the entry the read takes on each byte sits at a position
+AS OF which the whole word is a member of `irefSet` -- `0 < ref < 2^31` --,
+i.e. in the registry's value set `[1, 2^31)` (`MachCSL.racyValAt`): the
+certificates every `ip->ref` load hands its rule.  The race is real (no sync
+orders `ilock`'s guard after a foreign `idup`/`iput` store) and benign by
+this value argument -- the SAME defect class as `holding()`'s read of
+`lk->cpu` (`Xv6.AccessDiscipline.lkCpuReadAt`, [OWN.64]). -/
 theorem iref_certs (cpu : CPU) (k : Nat) (hk : k < NINODE)
     (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) (K : Nat)
-    (ts : List (Nat × Agent)) (Hs : Nat → Hist) :
-    ⊢@{IProp GF} readCertsAt cpu (iRef (ientry k)) 4 K ts Hs [] := by
-  iapply readCertsAt_of cpu _ 4 K ts Hs [] (fun _ _ => True) (fun _ _ _ _ _ _ _ => trivial)
+    (ts : List (Nat × Agent)) (W : WordHist 4) (Hold : Nat → Hist) (lo : Nat) (v0 : BitVec 32)
+    (htail : tailOk 4 lo v0 Hold) (h0 : irefSet v0) (hW : ∀ e ∈ W, irefSet e.v)
+    (hvis : lo ≤ K ∨ (lo, hartAgent cpu) ∈ ts) :
+    ⊢@{IProp GF} readCertsAt cpu (iRef (ientry k)) 4 K ts (W.hist Hold) [] := by
+  iapply readCertsAt_of cpu _ 4 K ts (W.hist Hold) [] (fun _ e => (∃ x ∈ W, x.t = e.t) ∨ e.t = lo)
+    (fun j e tvn hj hKt hau hr =>
+      IcachePinwObl.readEnt_pos lo v0 Hold htail (hartAgent cpu) tvn j hj
+        (fun e' H hH => tailOk_visible W (hartAgent cpu) ts htail hKt hvis hau j hj e' H hH) e W hr)
   imodintro
-  iintro %j %e %⟨hj, _⟩
+  iintro %j %e %⟨hj, hpos⟩
   iright
   unfold exCertAt
   iexists []
   isplitl []
   · exact BigSepL.bigSepL_nil_intro
   ipureintro
-  intro σ _ _ _ _
-  exact Or.inr (Or.inr (Or.inr (iref_racy k hk hrsv j hj)))
+  intro σ _ hget _ _
+  have hT : (∃ x ∈ W, x.t ≤ e.t) ∨ lo ≤ e.t := by
+    rcases hpos with ⟨x, hx, hxt⟩ | hl
+    · exact Or.inl ⟨x, hx, Nat.le_of_eq hxt⟩
+    · exact Or.inr (Nat.le_of_eq hl.symm)
+  obtain ⟨v, hv, hf⟩ := IcachePinwObl.find_asOf lo v0 Hold htail e.t W hT
+  have hset : irefSet v := by
+    rcases hv with rfl | ⟨x, hx, rfl⟩
+    · exact h0
+    · exact hW x hx
+  have hb := irefSet_read v hset
+  refine Or.inr (Or.inr (Or.inr ⟨KA.«itable» + 32#64, 50, 136, 4, 1, 0x80000000, k, j, ?_,
+    by unfold NINODE at hk; exact hk, hj, by rw [IcachePinwObl.iref_base k hk], ?_⟩))
+  · rw [hrsv]; exact xv6RsvStatic_irefRacy
+  · rw [IcachePinwObl.iref_base k hk]
+    refine ⟨v, by omega, by omega, fun i hi => ?_⟩
+    unfold FlatMem.entAsOf
+    rw [hget i hi, Option.bind_some]
+    exact hf i hi
 
 /-- A6.145/A6.146, Rocq `iref_read_obl ∘ iref_load_pinw_au` (deviation 1):
 THE LOCK-FREE GUARD READ.  A slice holder whose floor `lo` is visible to the
@@ -177,7 +268,7 @@ theorem iref_readAU [Icfg] (cpu : CPU) (k : Nat) (s : Qp) (g : GName) (lo K : Na
   isplitl []
   · iapply rdCompBytes_nil
   isplitl []
-  · iapply iref_certs cpu k hk hrsv K ts _
+  · iapply iref_certs cpu k hk hrsv K ts W Hold lo v0 htail h0 hW hvis
   inext
   iintro %w %tvn %hKt %hrd %hauth Hb _
   imod Hmask
@@ -233,7 +324,7 @@ theorem iref_readAU_locked [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [
   isplitl []
   · iapply rdCompBytes_nil
   isplitl []
-  · iapply iref_certs cpu k hk hrsv K ts _
+  · iapply iref_certs cpu k hk hrsv K ts W Hold lo v0 htail h0 hW (Or.inl (Nat.le_trans hlot htK))
   inext
   iintro %w %tvn %hKt %hrd %hauth Hb _
   imod Hmask
