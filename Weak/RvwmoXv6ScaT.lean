@@ -39,6 +39,16 @@ trace's po order, `glinAPoLt`): `linCandScaTA`, `linCandScaTMinusA`; `linCandSca
 unchanged) is the write instance.  The `RvwmoXv6ScaT.*` helpers and the shadow invariant take the
 class `anc` as a parameter.
 
+**W11 (iv)c** (plan §C W11 (iv)c; §B(10) "`candDiskLat` — G3-Q RULED (a″) [OWN.17]"), §(6): on the
+(L) trace `linCandIO` the disk-row (agent `NCPU`) loads read the LATEST write per byte —
+`candDiskLat` is a THEOREM there.  A disk-row read is an (L) anchor (`gisAnc`), so its prefix log
+holds exactly the writes gmo-before it (`linNwAAnc`): the SCA witness `tvnSca G r` IS the top of
+that log, and `RvwmoXv6ScaT.linScaBytes` (load value's co-maximality) at the top view is `latest`
+(`RvwmoXv6ScaT.latestOfScaByte`).  `linCandDiskLatA` (any admissible class containing the disk-row
+reads: `gwf`, `gloadValue`, `ancOk`), `linCandDiskLat` (on `linCandIO`, via `ancOkIO`: rule 14,
+`ioResidueGmo`, `gdiskRead14`), `linCandDiskLatMinus` (from RVWMO⁻).  `linCandScaT`'s premise list is
+unchanged.
+
 No new hypothesis beyond the cat fragment (`gatomicity` and rule 12 are not used).  `Lbl.LIo`
 events are handled without `gwf`'s interim `False` arm (they write nothing, and the shadow
 ignores them), so W13 (I)/(M)'s flip of that arm does not touch this file.  Lean-only helpers are
@@ -47,6 +57,7 @@ file-qualified (`RvwmoXv6ScaT.*`).
 import Weak.RvwmoXv6Sca
 import Weak.TsoShadow
 import Weak.AxDeps
+import Weak.WeakRvwmoLin2
 
 namespace Weak
 
@@ -791,5 +802,73 @@ theorem linCandScaTMinusA (G : Gexec) (anc : Geid → Bool) :
     rvwmoMinusConsistent G → ancOk G anc → candScaT cohSrc (linCandA G anc) := by
   rintro ⟨hwf, hppo, hlv, _⟩ hok
   exact linCandScaTA G anc hwf (fun e1 e2 h => hppo _ _ (gppoCat6Gppo G e1 e2 hlv h)) hlv hok
+
+/-! ## (6) W11 (iv)c — `linCandDiskLat`: disk-row loads read the LATEST write -/
+
+/-- Lean-only: a byte read at the TOP view (`tvn = |log|`) is the latest write to it. -/
+theorem RvwmoXv6ScaT.latestOfScaByte (img : Image) (log : List Wmsg) (i : Nat) (a : Int) (t : Nat) :
+    scaByte img log i log.length a t → latest img log a t := by
+  rintro ⟨hs, _, hno⟩
+  refine ⟨hs, fun hw => ?_⟩
+  obtain ⟨t', hlt, hle, hs'⟩ := (writesInLogByte img log a t log.length).1 hw
+  exact hno t' hlt hs' (Or.inl hle)
+
+/-- **W11 (iv)c, per load**: on the anchored linearization, a load that is an ANCHOR reads, at
+its trace position, the latest write to each of its bytes — the prefix log holds exactly the
+writes gmo-before it (`linNwAAnc`), so the SCA witness `tvnSca G r` is the TOP of that log, and
+load value's co-maximality (`RvwmoXv6ScaT.linScaBytes`) leaves no later same-byte write in it. -/
+theorem linAncLoadLatestA (G : Gexec) (anc : Geid → Bool) (hwf : gwf G) (hlv : gloadValue G)
+    (hok : ancOk G anc) (k : Nat) (r : Geid) (aq : Bool) (base : Int) (ts : List Nat)
+    (vs : List (BitVec 8)) :
+    (glinEidsA G anc)[k]? = some r → gxLbl G r = some (LLoad aq base ts vs) → anc r = true →
+    ∀ (j t : Nat), ts[j]? = some t →
+      latest G.gxImg (cdLog (linCandA G anc) k) (accAddr base j) t := by
+  intro hk hl hr j t hj
+  have hsb := RvwmoXv6ScaT.linScaBytes G anc hwf hlv hok k r aq base ts vs hk hl j t hj
+  have htop : tvnSca G r = (cdLog (linCandA G anc) k).length := by
+    rw [linALogLen]; exact (linNwAAnc G anc hwf hok k r hk hr).symm
+  rw [htop] at hsb
+  exact RvwmoXv6ScaT.latestOfScaByte _ _ _ _ _ hsb
+
+/-- **W11 (iv)c, on any admissible anchor class containing the disk-row reads**: every load of
+the disk row (agent `NCPU`) of the anchored linearization reads the latest write per byte —
+`candDiskLat` (G3-Q RULED (a″) [OWN.17]) is a THEOREM there, from `gwf`, load value and
+anchor-14 (`ancOk`), with no further premise. -/
+theorem linCandDiskLatA (G : Gexec) (anc : Geid → Bool) :
+    gwf G → gloadValue G → ancOk G anc →
+    (∀ e, gisR G e = true → e.1 = NCPU → anc e = true) →
+    candDiskLat (linCandA G anc) := by
+  intro hwf hlv hok hdisk k s hs aq base ts vs hlb hag
+  rw [candExTr] at hs
+  have hkle : k ≤ (linCandA G anc).cdTr.length := by have := lookup_lt_Some hs; omega
+  obtain ⟨e, he, rfl⟩ := linTrALookupInv G anc k s hs
+  have hl : gxLbl G e = some (LLoad aq base ts vs) := by
+    rw [linALbl G anc hwf hok k e he]
+    exact congrArg some hlb
+  have hr : gisR G e = true := by unfold gisR; rw [hl]; rfl
+  show ∀ (j t : Nat), ts[j]? = some t →
+    latest (eimg (candExec (linCandA G anc)) k) (elog (candExec (linCandA G anc)) k)
+      (accAddr base j) t
+  rw [candEimg _ k hkle, candElog _ k hkle]
+  exact linAncLoadLatestA G anc hwf hlv hok k e aq base ts vs he hl (hdisk e hr hag)
+
+/-- **W11 (iv)c `linCandDiskLat`** (plan §C W11 (iv)c, §B(10) `candDiskLat`): on the (L) trace
+`linCandIO` — whose anchors include the disk-row reads (`gisAnc`) — every disk-row load reads the
+latest write per byte, from rule 14, the residue (`ioResidueGmo`) and the disk-read anchor premise
+`gdiskRead14` (the three inputs of `ancOkIO`) plus `gwf` and load value. -/
+theorem linCandDiskLat (GF : Gfexec) :
+    gwf GF.gfGd.gdG → gloadValue GF.gfGd.gdG → grule14 GF.gfGd.gdG → ioResidueGmo GF →
+    gdiskRead14 GF.gfGd.gdG → candDiskLat (linCandIO GF.gfGd.gdG) := by
+  intro hwf hlv h14 hres hdr
+  refine linCandDiskLatA _ _ hwf hlv (ancOkIO GF h14 hres hdr) ?_
+  intro e hr hn
+  unfold gisAnc
+  simp [hr, hn]
+
+/-- From RVWMO⁻ (the output of today's `normalizeOfAcyclic`), on the (L) trace. -/
+theorem linCandDiskLatMinus (GF : Gfexec) :
+    rvwmoMinusConsistent GF.gfGd.gdG → grule14 GF.gfGd.gdG → ioResidueGmo GF →
+    gdiskRead14 GF.gfGd.gdG → candDiskLat (linCandIO GF.gfGd.gdG) :=
+  fun hc h14 hres hdr => linCandDiskLat GF hc.1 hc.2.2.1 h14 hres hdr
 
 end Weak
