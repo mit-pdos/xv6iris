@@ -12,6 +12,7 @@ empty after the `sfence.vma` that precedes the write.  Everything else in
 the bundle moves tier for free (`WpSmodeSatp`).
 -/
 import MachCSL.WpSmodeSatp
+import MachCSL.UEpochSatp
 
 namespace MachCSL
 
@@ -77,30 +78,42 @@ theorem wp_s_csrw_satp_kpt (X : CurCtx) [KernelGeom] [KernelImage GF] {lent : Bo
   rw [hsie] at hsm hsr
   simp only [hsie, hkt, trapRes_off]
   have hok := SConfAt_sConfOf (GF := GF) curTier k.root ms mdl mepc stc lf false hsm hlf
+  -- W8 (f3-utext) (F-REGS): the write's ghost step, the kernel root from
+  -- the installed table
+  subst hroot
+  icases kptOn_root t M $$ Hkpt with ⟨#Hkr, %S, #Hkw⟩
+  have hs0 : satpTable (sConfOf curTier k.root ms mdl mepc stc lf).satp = none ∨
+      satpTable (sConfOf curTier k.root ms mdl mepc stc lf).satp = some t.base := by
+    left; rw [hct]; exact satpTable_satpOf_bare k.root
+  ihave Hsatpw := satpStep_kern (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor (by intro h; cases h) _ t.base hs0 S
   have hexec := (execSpecF_csrw_satp_sv39 (GF := GF) cpu (sConfOf curTier k.root ms mdl mepc stc lf) false hok.phys
-    pc (pc + instrLen is_rvc) rs1 (tpPin cpu k.regs) root hv).frameL (transTok cpu curTier k.root)
+    pc (pc + instrLen is_rvc) rs1 (tpPin cpu k.regs) t.base hv
+    iprop((MachGS.kptRootName (hlc := hlc) (GF := GF) ↪VAR{.discard} t.base) ∗ kptRootW t.base S)
+    iprop(emp)).frameL (transTok cpu curTier k.root)
   iapply (wpLoop_s_instr cpu _ _ curTier k.root false hok hmdl rfl rfl pc _ is_rvc _ _ _ hexec)
-  iframe HI HmConf Hclock Hpc HF
+  iframe HI HmConf Hclock Hpc HF Hsatpw
   isplitl [Htrans Htok]
   · unfold transTok; iframe Htrans Htok
+  isplitr
+  · iframe Hkr Hkw
   isplit
   rotate_left 1
   · unfold trapBranch
     iintro %hs
     exact absurd hs Bool.false_ne_true
   inext
-  iintro HmConf Hclock Hpc HT HF
+  iintro HmConf Hclock Hpc HT ⟨HF, -⟩
   unfold transTok
   icases HT with ⟨Htrans, Htok⟩
   simp only [hct, transSlotAt] at *
   rw [sConfOf_setSatp]
-  ihave HConf := kConf_intro cpu KTier.kpt root false k.spie k.spp ms mdl mepc stc lf ⟨hsm, hsr, hmdl, hlf⟩ $$ HmConf
+  ihave HConf := kConf_intro cpu KTier.kpt t.base false k.spie k.spp ms mdl mepc stc lf ⟨hsm, hsr, hmdl, hlf⟩ $$ HmConf
   -- the bundle at the Kpt tier
   ihave Hstack := stackOwn_toKpt X _ _ $$ Hstack
   ihave Hcpu := cpuOwn_toKpt X _ _ _ _ _ _ _ $$ Hcpu
   iapply HΦ $$ [HConf HF Hstack Hcpu Htok Hclock Htlb] Hpc Htrans
   letI : CurCtx := X.toKpt
-  iapply (kctx_intro' cpu (k.toKpt root) (KCtx.wf_toKpt k root hwf))
+  iapply (kctx_intro' cpu (k.toKpt t.base) (KCtx.wf_toKpt k t.base hwf))
   simp only [KCtx.toKpt_regs, KCtx.toKpt_sie, KCtx.toKpt_spie, KCtx.toKpt_spp, KCtx.toKpt_avail, KCtx.toKpt_noff,
     KCtx.toKpt_intena, KCtx.toKpt_locks, KCtx.toKpt_tier, KCtx.toKpt_root, KCtx.toKpt_proc, KCtx.toKpt_sp, hsie, trapRes_off]
   unfold transSlot
@@ -115,7 +128,7 @@ theorem wp_s_csrw_satp_kpt (X : CurCtx) [KernelGeom] [KernelImage GF] {lent : Bo
       isplitl []
       · iexact Hkpt
       isplitl []
-      · ipureintro; exact hroot
+      · ipureintro; rfl
       · iexists (vectorInit none)
         iframe Htlb
         ipureintro; exact tlbOk_reset t

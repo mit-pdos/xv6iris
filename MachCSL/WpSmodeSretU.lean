@@ -45,11 +45,11 @@ theorem execSpecF_sretU (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys (G
     (pc npc₀ epc : BitVec 64) (R : RegMap) (Out : IProp GF) :
     execSpecPP (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c Privilege.User
       { c with mstatus := sretMs c.mstatus } (instruction.SRET ()) pc npc₀ (epc &&& 0xFFFFFFFFFFFFFFFE#64)
-      iprop(hartObsStep (.uEnter cpu c.satp epc (gprList R)) Out ∗ gprFile cpu R ∗
-        Register.sepc ↦ᵣ[cpu] epc)
+      iprop(uenterWit cpu Privilege.Supervisor c.satp ∗ hartObsStep (.uEnter cpu c.satp epc (gprList R)) Out ∗
+        gprFile cpu R ∗ Register.sepc ↦ᵣ[cpu] epc)
       iprop(gprFile cpu R ∗ Register.sepc ↦ᵣ[cpu] epc ∗ Out) := by
   intro Φ
-  iintro ⟨HmConf, HPC, HnextPC, ⟨Hpriv, HF, Hsepc⟩, HΦ⟩
+  iintro ⟨HmConf, HPC, HnextPC, ⟨Huent, Hpriv, HF, Hsepc⟩, HΦ⟩
   ihave Hgprs := (gprFile_gprCells cpu R).1 $$ HF
   conf_cases HmConf
   obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok

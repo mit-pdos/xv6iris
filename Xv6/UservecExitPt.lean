@@ -26,6 +26,7 @@ jump target with the kernel slot.
 -/
 import Xv6.UservecDefs
 import Xv6.UserretEntryPt
+import Xv6.UEpochRoots
 import MachCSL.WpSmodeJalr
 
 namespace Xv6
@@ -108,7 +109,9 @@ set_option maxHeartbeats 1000000 in
 `satp` becomes the kernel root. -/
 theorem uservec_ucsrw_satp [CurCtx] (cpu : CPU) (c : MConf) (P : UPtd) (hc : urConfOk GF c P)
     (kroot : BitVec 44) (pc npc : BitVec 64) (hpc : urPcOk pc) (hnpc : pc + 4#64 = npc) (R : RegMap)
-    (ht1 : R.get 6#5 = satpOf KTier.kpt kroot) (c' : MConf) (hc' : { c with satp := satpOf KTier.kpt kroot } = c') :
+    (ht1 : R.get 6#5 = satpOf KTier.kpt kroot) (c' : MConf) (hc' : { c with satp := satpOf KTier.kpt kroot } = c')
+    (hne : P.root ≠ kroot) :
+    (MachGS.kptRootName (hlc := hlc) (GF := GF) ↪VAR{.discard} kroot) ∗
     instrX (GF := GF) pc (paOf trampPpn pc) false uvCsrwSatp ∗ kmapStatic ∗ urSt cpu c P pc R ∗
     ▷ (confCells cpu (DFrac.own 1) Privilege.Supervisor c' -∗
         clockCells cpu -∗ pcIs cpu npc -∗ uptSlot cpu P -∗ ctxTok cpu curCtx -∗ gprFile cpu R -∗ wpLoop cpu)
@@ -118,21 +121,28 @@ theorem uservec_ucsrw_satp [CurCtx] (cpu : CPU) (c : MConf) (P : UPtd) (hc : urC
   obtain ⟨hlt, hlt2, hv, hv2⟩ := hpc
   subst hnpc hc'
   unfold urSt
-  iintro ⟨#HI, #HS, ⟨HmConf, Hclock, Hpc, Hslot, Htok, HF⟩, HΦ⟩
+  iintro ⟨#Hkr, #HI, #HS, ⟨HmConf, Hclock, Hpc, Hslot, Htok, HF⟩, HΦ⟩
+  -- the hart's user epoch closes (W8 (f3-utext), F-REGS: `satpStep_close`)
+  ihave Hsatpw := satpStep_close (GF := GF) cpu (DFrac.own 1) c.satp kroot P.root (satpTable_of_sconfKpt hok) hne
   iapply (wpLoop_sT_instr cpu c { c with satp := satpOf KTier.kpt kroot } hok.phys hmie hmenv
     Privilege.Supervisor (Or.inl rfl) pc (paOf trampPpn pc) (pc + 4#64) false uvCsrwSatp
-    iprop(uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx) (gprFile cpu R)
-    iprop((uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx) ∗ gprFile cpu R)
+    iprop(uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx)
+    iprop(gprFile cpu R ∗ satpStep cpu c.satp (satpOf KTier.kpt kroot)
+        iprop(Register.cur_privilege ↦ᵣ[cpu] Privilege.Supervisor ∗
+          (MachGS.kptRootName (hlc := hlc) (GF := GF) ↪VAR{.discard} kroot))
+        iprop(Register.cur_privilege ↦ᵣ[cpu] Privilege.Supervisor ∗ emp) ∗
+      (MachGS.kptRootName (hlc := hlc) (GF := GF) ↪VAR{.discard} kroot))
+    iprop((uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx) ∗ gprFile cpu R ∗ emp)
     (uptTransSpecX_tramp cpu c false P hok pc hlt hv)
     (by rw [← urPa2 pc hpc']; exact uptTransSpecX_tramp cpu c false P hok (pc + 2#64) hlt2 hv2)
-    ((execSpecF_csrw_satp_sv39 cpu c false hok.phys pc (pc + instrLen false) 6#5 R kroot ht1).frameL _)
+    ((execSpecF_csrw_satp_sv39 cpu c false hok.phys pc (pc + instrLen false) 6#5 R kroot ht1 _ _).frameL _)
     (resvOut_sepR _ (resvOut_sepR _ (resvOut_ctxTok cpu curCtx))))
-  iframe HI HmConf Hclock Hpc HF
+  iframe HI HmConf Hclock Hpc HF Hsatpw Hkr
   isplitl [Hslot Htok]
   · iframe Hslot Htok
     iexact HS
   inext
-  iintro HmConf Hclock Hpc ⟨⟨Hslot, _, Htok⟩, HF⟩
+  iintro HmConf Hclock Hpc ⟨⟨Hslot, _, Htok⟩, HF, -⟩
   iapply HΦ $$ HmConf Hclock Hpc Hslot Htok HF
 
 set_option maxHeartbeats 1000000 in
@@ -236,11 +246,16 @@ theorem uservec_exit [CurCtx] (cpu : CPU) (P : UPtd) (tk : PTree) (Mk : RegMapF 
   iframe HI HS Hst
   inext
   iintro Hst
-  -- step 1: csrw satp, t1 -- the kernel root installed
+  -- step 1: csrw satp, t1 -- the kernel root installed (the user root is
+  -- not the kernel's, by ownership: W8 (f3-utext), F-REGS)
+  ihave %hne : ⌜P.root ≠ tk.base⌝ $$ [Hst]
+  · iapply urSt_kptOn_ne cpu _ P _ R tk Mk
+    iframe Hst; iframe HS Hk
+  icases kptOn_root tk Mk $$ Hk with ⟨#Hkr, -⟩
   iapply (uservec_ucsrw_satp cpu _ P hc0 tk.base (urPc 0x92#64) (urPc 0x96#64) (by decide) (by decide) R ht1
-    (sConfOf KTier.kpt tk.base ms mdl mepc stc lf) rfl)
+    (sConfOf KTier.kpt tk.base ms mdl mepc stc lf) rfl hne)
   ihave HI := uvi_csrw_satp $$ Htext
-  iframe HI HS Hst
+  iframe Hkr HI HS Hst
   inext
   iintro HmConf Hclock Hpc Hslot Htok HF
   ihave Hwin := pt2Win_enterK cpu tk Mk P $$ [Hslot]

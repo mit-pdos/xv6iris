@@ -41,9 +41,11 @@ open LeanRV64D LeanRV64D.Functions
 written; the two wire pins are answered by the oracle. -/
 def urwDemoFoot : UFoot where
   Dr r := !(decide (r = .sig_meip) || decide (r = .sig_seip))
-  Dw r := !(decide (r = .sig_meip) || decide (r = .sig_seip) || decide (r = .cur_privilege))
+  Dw r := !(decide (r = .sig_meip) || decide (r = .sig_seip) || decide (r = .cur_privilege) ||
+    decide (r = .satp))
   Dany r := decide (r = .sig_meip) || decide (r = .sig_seip)
   noPriv := by decide
+  noSatp := by decide
 
 /-! ## RTYPE: `add x3, x1, x2` -/
 

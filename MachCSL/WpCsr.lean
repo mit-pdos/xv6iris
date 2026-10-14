@@ -238,15 +238,15 @@ theorem swp_write_CSR_mepc (cpu : CPU) (e v : BitVec 64)
 set_option maxHeartbeats 4000000 in
 /-- `csrw satp, zero` (the value xv6 writes) with `SXL = 64`. -/
 theorem swp_write_CSR_satp0 (cpu : CPU) (dq : DFrac) (ms s : BitVec 64)
-    (hSXL : BitVec.extractLsb' 34 2 ms = 2#2) (Φ : Result (BitVec 64) Unit → IProp GF) :
+    (hSXL : BitVec.extractLsb' 34 2 ms = 2#2) (P Q : IProp GF) (Φ : Result (BitVec 64) Unit → IProp GF) :
     hwConfig cpu ∗ Register.mstatus ↦ᵣ[cpu]{dq} ms ∗
-    Register.satp ↦ᵣ[cpu] s ∗
+    Register.satp ↦ᵣ[cpu] s ∗ satpStep cpu s 0#64 P Q ∗ P ∗
     ▷ (∀ x, Register.mstatus ↦ᵣ[cpu]{dq} ms -∗
-        Register.satp ↦ᵣ[cpu] x -∗ ⌜x = 0#64⌝ -∗ Φ (.Ok x))
+        Register.satp ↦ᵣ[cpu] x -∗ ⌜x = 0#64⌝ -∗ Q -∗ Φ (.Ok x))
     ⊢ swp cpu (write_CSR 0x180#12 0#64) Φ := by
-  iintro ⟨#Hhw, Hmstatus, Hsatp, HΦ⟩
+  iintro ⟨#Hhw, Hmstatus, Hsatp, Hsatpw, HsatpP, HΦ⟩
   swp_run 120
-  iapply HΦ $$ %_ Hmstatus Hsatp []
+  iapply HΦ $$ %_ Hmstatus Hsatp [] HsatpQ
   ipureintro
   decide
 

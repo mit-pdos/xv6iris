@@ -661,6 +661,14 @@ def swpStepCore (x fn : Lean.Expr) (bind : Bool) : TacticM Unit := do
         evalTactic (← `(tactic| first
           | (iapply (swp_writeReg_hw_bind (r := $rStx) (v := $wStx) (h := by rfl)); iframe $hw:ident; try inext)
           | (iapply (swp_writeReg_bind (r := $rStx) (w := $wStx) (hq := Or.inl (by decide))); (first | iframe $h:ident | iframe); try (inext; iintro $h:ident))))
+      else if rE.isAppOf ``LeanRV64D.Register.satp then
+        -- W8 (f3-utext) (F-REGS): a `satp` write moves the user-epoch record,
+        -- by the client's ghost step `Hsatpw : satpStep cpu s0 s1 P Q` run on
+        -- `HsatpP : P`; it hands back the cell and `HsatpQ : Q`
+        let hw := mkIdent `Hsatpw
+        let hP := mkIdent `HsatpP
+        let hQ := mkIdent `HsatpQ
+        evalTactic (← `(tactic| (iapply (swp_writeReg_satp_eq_bind (s1 := $wStx)); iframe $hw:ident $h:ident $hP:ident; isplitl []; (ipureintro; first | rfl | decide | bv_decide); try (inext; iintro $h:ident $hQ:ident))))
       else if rE.isAppOf ``LeanRV64D.Register.cur_privilege then
         -- THE USER BOUNDARY (NI M2-W1/W2a): a privilege write that stays on
         -- one side of the boundary is silent; a crossing write needs the
@@ -675,15 +683,15 @@ def swpStepCore (x fn : Lean.Expr) (bind : Bool) : TacticM Unit := do
         let hg := mkIdent `Hgprs
         let ho := mkIdent `Hout
         let hr := mkIdent `Hrcpt
+        let hu := mkIdent `Huent
         evalTactic (← `(tactic| first
-          | (iapply swp_writeReg_priv_quiet_bind; iframe $h:ident; isplitl []; (ipureintro; rfl); try (inext; iintro $h:ident))
+          | (iapply swp_writeReg_priv_quiet_bind; iframe $h:ident; isplitl []; (ipureintro; exact ⟨rfl, rfl⟩); try (inext; iintro $h:ident))
+          | (iapply (swp_writeReg_priv_mret_bind (hp' := rfl) (hs := by assumption)); iframe $h:ident $hs:ident;
+             try (inext; iintro $h:ident $hs:ident))
           | (iapply swp_writeReg_uexit_bind; iframe $hp:ident $h:ident $hs:ident $hsc:ident $hep:ident $hg:ident;
              try (inext; iintro $h:ident $hs:ident $hsc:ident $hep:ident $hg:ident $ho:ident $hr:ident))
           | (iapply (swp_writeReg_uenter_bind (p := Privilege.Supervisor) (hp := rfl));
-             iframe $hp:ident $h:ident $hs:ident $hep:ident $hg:ident;
-             try (inext; iintro $h:ident $hs:ident $hep:ident $hg:ident $ho:ident $hr:ident))
-          | (iapply (swp_writeReg_uenter_bind (p := Privilege.Machine) (hp := rfl));
-             iframe $hp:ident $h:ident $hs:ident $hep:ident $hg:ident;
+             iframe $hu:ident $hp:ident $h:ident $hs:ident $hep:ident $hg:ident;
              try (inext; iintro $h:ident $hs:ident $hep:ident $hg:ident $ho:ident $hr:ident))))
       else
         evalTactic (← `(tactic| (iapply (swp_writeReg_bind (r := $rStx) (w := $wStx) (hq := Or.inl (by decide))); (first | iframe $h:ident | iframe); try (inext; iintro $h:ident))))

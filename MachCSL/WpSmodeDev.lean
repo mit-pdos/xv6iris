@@ -156,7 +156,7 @@ theorem swp_sail_mem_write_dev (cpu : CPU) {n vasize : Nat}
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
   ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
   · iapply memModel_mmOk $$ Hmm
-  ihave Hσ := Hclose $$ %σ %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
+  ihave Hσ := Hclose $$ %σ %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
   have hnb : ¬ othersReserve σ.resv cpu req.pa n := not_othersReserve_dev hmm hdev
   imod HAU with ⟨%s, Hfrag, %hsome, Hcont⟩
   icases machInterp_acc_dev σ d $$ Hσ with ⟨Hauth, Hclose⟩

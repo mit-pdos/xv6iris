@@ -256,7 +256,7 @@ theorem swp_sail_mem_write_excl_ctx (cpu : CPU) {n vasize : Nat}
     imodintro
     rw [hk]
     isplitl [Hregs Hmem Hmm Hclose]
-    · iapply Hclose $$ %(σ.store cpu req.pa n w' true) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
+    · iapply Hclose $$ %(σ.store cpu req.pa n w' true) %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
     · iapply swp_ret
       iapply HΦ $$ Hctx Hfrag Hb
   · iintro %Hbk
@@ -265,7 +265,7 @@ theorem swp_sail_mem_write_excl_ctx (cpu : CPU) {n vasize : Nat}
     imod Hmask
     imodintro
     isplitl [Hregs Hmem Hmm Hclose]
-    · iapply Hclose $$ %σ %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
+    · iapply Hclose $$ %σ %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
     · iapply IH $$ Hctx Hfrag Hb
       inext
       iexact HΦ

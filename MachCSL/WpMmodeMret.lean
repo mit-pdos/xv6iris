@@ -47,7 +47,7 @@ set_option maxHeartbeats 4000000 in
 leaves for supervisor mode at `mepc` (bit 0 cleared). -/
 theorem execSpecP_mret (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64)
     (hMPP : BitVec.extractLsb' 11 2 c.mstatus = 1#2)
-    (hLPE : BitVec.extractLsb' 2 1 c.menvcfg = 0#1) :
+    (hLPE : BitVec.extractLsb' 2 1 c.menvcfg = 0#1) (hsat : satpTable c.satp = none) :
     execSpecP (GF := GF) cpu (DFrac.own 1) c Privilege.Supervisor { c with mstatus := mretMstatus c.mstatus }
       (instruction.MRET ()) pc npc₀ (c.mepc &&& 0xFFFFFFFFFFFFFFFE#64) iprop(⌜True⌝) iprop(⌜True⌝) := by
   intro Φ
@@ -72,7 +72,7 @@ theorem execSpecP_mret (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64)
 configuration with `mstatus` updated and `cur_privilege = Supervisor`. -/
 theorem wp_m_mret [CurCtx] (cpu : CPU) (c : MConf) (hok : MConf.ok (GF := GF) c) (pc : BitVec 64)
     (is_rvc : Bool) (hMPP : BitVec.extractLsb' 11 2 c.mstatus = 1#2)
-    (hLPE : BitVec.extractLsb' 2 1 c.menvcfg = 0#1) :
+    (hLPE : BitVec.extractLsb' 2 1 c.menvcfg = 0#1) (hsat : satpTable c.satp = none) :
     instr (GF := GF) pc is_rvc (instruction.MRET ()) ∗ mConf cpu (DFrac.own 1) c ∗ clockCells cpu ∗
     pcIs cpu pc ∗
     ctxTok cpu curCtx ∗
@@ -81,7 +81,7 @@ theorem wp_m_mret [CurCtx] (cpu : CPU) (c : MConf) (hok : MConf.ok (GF := GF) c)
     ⊢ wpLoop cpu := by
   iintro ⟨HI, HmConf, Hclock, Hpc, Htok, HΦ⟩
   iapply wpLoop_m_instrPF cpu curCtx (DFrac.own 1) c Privilege.Supervisor (Or.inr rfl) _ hok pc _ is_rvc _ _ _
-    (execSpecP_mret cpu c pc _ hMPP hLPE)
+    (execSpecP_mret cpu c pc _ hMPP hLPE hsat)
   iframe
   inext
   iintro HS Hclock Hpc _ Htok

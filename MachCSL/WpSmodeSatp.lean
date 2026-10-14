@@ -26,13 +26,13 @@ set_option maxHeartbeats 4000000 in
 /-- `csrw satp` with an Sv39 kernel root (`SXL = 64`): legalization keeps
 the value. -/
 theorem swp_write_CSR_satp_sv39 (cpu : CPU) (dq : DFrac) (ms s0 : BitVec 64) (root : BitVec 44)
-    (hSXL : BitVec.extractLsb' 34 2 ms = 2#2) (Φ : Result (BitVec 64) Unit → IProp GF) :
+    (hSXL : BitVec.extractLsb' 34 2 ms = 2#2) (P Q : IProp GF) (Φ : Result (BitVec 64) Unit → IProp GF) :
     hwConfig cpu ∗ Register.mstatus ↦ᵣ[cpu]{dq} ms ∗
-    Register.satp ↦ᵣ[cpu] s0 ∗
+    Register.satp ↦ᵣ[cpu] s0 ∗ satpStep cpu s0 (satpOf KTier.kpt root) P Q ∗ P ∗
     ▷ (Register.mstatus ↦ᵣ[cpu]{dq} ms -∗
-        Register.satp ↦ᵣ[cpu] (satpOf KTier.kpt root) -∗ Φ (.Ok (satpOf KTier.kpt root)))
+        Register.satp ↦ᵣ[cpu] (satpOf KTier.kpt root) -∗ Q -∗ Φ (.Ok (satpOf KTier.kpt root)))
     ⊢ swp cpu (write_CSR 0x180#12 (satpOf KTier.kpt root)) Φ := by
-  iintro ⟨#Hhw, Hmstatus, Hsatp, HΦ⟩
+  iintro ⟨#Hhw, Hmstatus, Hsatp, Hsatpw, HsatpP, HΦ⟩
   unfold satpOf
   swp_run 120
   rw [ppn_setW]
@@ -42,20 +42,23 @@ theorem swp_write_CSR_satp_sv39 (cpu : CPU) (dq : DFrac) (ms s0 : BitVec 64) (ro
   have hmode : BitVec.extractLsb' 60 4 (524288#20 +++ root) = 8#4 := by bv_decide
   rw [hid, hmode]
   swp_run 60
-  iapply HΦ $$ Hmstatus Hsatp
+  iapply HΦ $$ Hmstatus Hsatp HsatpQ
 
 set_option maxHeartbeats 4000000 in
 /-- The execute stage of `csrw satp, rs1` with an Sv39 kernel root in `rs1`:
 the configuration's `satp` takes the value, the file is untouched. -/
 theorem execSpecF_csrw_satp_sv39 (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys (GF := GF) c sie)
     (pc npc₀ : BitVec 64) (rs1 : BitVec 5) (R : RegMap) (root : BitVec 44)
-    (hv : R.get rs1 = satpOf KTier.kpt root) :
+    (hv : R.get rs1 = satpOf KTier.kpt root) (P Q : IProp GF) :
     execSpecPP (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c Privilege.Supervisor
       { c with satp := satpOf KTier.kpt root }
       (instruction.CSRReg (0x180#12, regidx.Regidx rs1, regidx.Regidx 0#5, csrop.CSRRW)) pc npc₀ npc₀
-      (gprFile cpu R) (gprFile cpu R) := by
+      iprop(gprFile cpu R ∗ satpStep cpu c.satp (satpOf KTier.kpt root)
+        iprop(Register.cur_privilege ↦ᵣ[cpu] Privilege.Supervisor ∗ P)
+        iprop(Register.cur_privilege ↦ᵣ[cpu] Privilege.Supervisor ∗ Q) ∗ P)
+      iprop(gprFile cpu R ∗ Q) := by
   intro Φ
-  iintro ⟨HmConf, HPC, HnextPC, HF, HΦ⟩
+  iintro ⟨HmConf, HPC, HnextPC, ⟨HF, Hsatpw, HP⟩, HΦ⟩
   conf_cases HmConf
   obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok
   obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
@@ -72,9 +75,11 @@ theorem execSpecF_csrw_satp_sv39 (cpu : CPU) (c : MConf) (sie : Bool) (hok : SCo
   subst hW
   iapply swp_bind
   iapply swp_write_CSR_satp_sv39 (hSXL := hSXL)
-  iframe; iframe Hhw
+    (P := iprop(Register.cur_privilege ↦ᵣ[cpu] Privilege.Supervisor ∗ P))
+    (Q := iprop(Register.cur_privilege ↦ᵣ[cpu] Privilege.Supervisor ∗ Q))
+  iframe Hhw Hmstatus Hsatp Hsatpw Hcur_privilege HP
   inext
-  iintro Hmstatus Hsatp
+  iintro Hmstatus Hsatp ⟨Hcur_privilege, HQ⟩
   swp_run 30
   unfold wX_bits wX
   simp only [Sail.BitVec.toNatInt, Int.ofNat_eq_natCast, Int.toNat_natCast]
@@ -83,7 +88,8 @@ theorem execSpecF_csrw_satp_sv39 (cpu : CPU) (c : MConf) (sie : Bool) (hok : SCo
     $$ [Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren
         Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n]
   case' _ => (iframe; iexact Hhw)
-  iapply HΦ $$ HmConf HPC HnextPC HF
+  iapply HΦ $$ HmConf HPC HnextPC [HF HQ]
+  iframe
 
 /-! ## Moving resources from the Bare tier to the kernel table
 

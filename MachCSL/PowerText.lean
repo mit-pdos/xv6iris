@@ -449,8 +449,11 @@ theorem wp_powerT [KernelMap] [KernelRsv] (lo hi : Nat)
       isplit
       · ipureintro
         exact get?_insert_eq rfl
+      ihave Huep : iprop(uepModelAt (GF := GF) ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir, γrsv, γch⟩ g₂.m) $$ []
+      · iapply uepModelAt_boot
+        exact fun c => (bootFacts_resetRegsRun hbf c).1 Register.cur_privilege Privilege.Machine rfl
       unfold eraInterp memModelAt devInterpAt
-      iframe Hheap Hri Hresv Hda
+      iframe Hheap Hri Hresv Hda Huep
       rw [show g₂.m.top = 0 by simp [MState.top, hlog0], hlog0, authMap_nil]
       iframe Htop Hauth
       isplitl [Hva Hiv Hrv]

@@ -204,6 +204,9 @@ structure UFoot where
   Dw : Register → Bool
   Dany : Register → Bool
   noPriv : Dw .cur_privilege = false
+  /-- W8 (f3-utext) (F-REGS): nor is `satp` -- its write moves the
+  interpretation's user-epoch record (`MachCSL.swp_writeReg_satp`). -/
+  noSatp : Dw .satp = false
 
 /-- One oracle answer: a value for every register (the wire pins) and for
 every nondeterministic choice. -/
@@ -660,8 +663,11 @@ theorem urw_regWrite {X : Type} (r : Register) (v : RegisterType r) (k : PUnit �
     icases RF.wr s.file r v hdw $$ HF with ⟨⟨%v0, Hreg⟩, HFc⟩
     have hne : r ≠ .cur_privilege := by
       rintro rfl; rw [D.noPriv] at hdw; exact Bool.noConfusion hdw
+    have hns : r ≠ .satp := by
+      rintro rfl; rw [D.noSatp] at hdw; exact Bool.noConfusion hdw
     have L : iprop(r ↦ᵣ[cpu] v0 ∗ ▷ (r ↦ᵣ[cpu] v -∗ swp cpu (k ()) Φ)) ⊢
-        swp cpu (FreeM.impure (.ok (.regWrite r v)) k) Φ := swp_writeReg_bind cpu r v0 v (Or.inl hne) k Φ
+        swp cpu (FreeM.impure (.ok (.regWrite r v)) k) Φ :=
+      swp_writeReg_bind cpu r v0 v (Or.inl ⟨hne, hns⟩) k Φ
     iapply L
     iframe Hreg
     inext
@@ -957,14 +963,15 @@ list.  `cur_privilege` is never writable (`UFoot.noPriv`), whichever list
 holds it. -/
 def uFootL (Lw Lr La : List Register) : UFoot where
   Dr r := Lw.contains r || Lr.contains r
-  Dw r := Lw.contains r && r != .cur_privilege
+  Dw r := Lw.contains r && r != .cur_privilege && r != .satp
   Dany r := La.contains r
   noPriv := by simp
+  noSatp := by simp
 
 theorem uFootL_dw (Lw Lr La : List Register) (r : Register) (h : (uFootL Lw Lr La).Dw r = true) :
     Lw.contains r = true := by
   simp only [uFootL, Bool.and_eq_true] at h
-  exact h.1
+  exact h.1.1
 
 /-- The register cells of the lists (Rocq `hreg_frame` ∗ `hreg_frame_ro`):
 the written ones in full, the read-only ones at `dq`. -/

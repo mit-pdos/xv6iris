@@ -419,17 +419,17 @@ theorem machInterp_setRt (σ : MState) (d : DevId) (rt : DevRt)
     machInterp (GF := GF) σ ⊢ machInterp (σ.setRt d rt) := by
   have e : machInterp (GF := GF) (σ.setRt d rt) =
       iprop(([∗list] cpu ∈ cpus, regInterp cpu (σ.regs cpu)) ∗ genHeapInterp σ.mem ∗
-        memModel (σ.setRt d rt) ∗ devInterp σ.devs) := rfl
+        memModel (σ.setRt d rt) ∗ devInterp σ.devs ∗ uepModel σ) := rfl
   rw [e]
-  iintro ⟨Hregs, Hmem, Hmm, Hdev⟩
-  iframe Hregs Hmem Hdev
+  iintro ⟨Hregs, Hmem, Hmm, Hdev, Huep⟩
+  iframe Hregs Hmem Hdev Huep
   iapply memModel_setRt _ σ d rt hnext $$ Hmm
 
 /-- Every device's next task id is a real task id: the pure `devRtOk`
 conjunct the interpretation carries.  What a bus-mastering device's root
 loop needs to know that a task it forks is not itself. -/
 theorem machInterp_devRtOk (σ : MState) : machInterp (GF := GF) σ ⊢ ⌜devRtOk σ⌝ := by
-  iintro ⟨_, _, Hmm, _⟩
+  iintro ⟨_, _, Hmm, _, _⟩
   ihave %h := memModel_mmOk _ σ $$ Hmm
   ipureintro
   exact h.2.2.2.2
@@ -450,10 +450,10 @@ theorem machInterp_setRt_next (σ : MState) (d : DevId) :
 /-- Re-assemble the interpretation after a device update. -/
 theorem machInterp_of_devs (σ : MState) (ds : DevStates) :
     ([∗list] cpu ∈ cpus, regInterp cpu (σ.regs cpu)) ∗ genHeapInterp σ.mem ∗ memModel σ ∗
-      devInterp ds ⊢@{IProp GF} machInterp { σ with devs := ds } := by
+      devInterp ds ∗ uepModel σ ⊢@{IProp GF} machInterp { σ with devs := ds } := by
   have e : machInterp (GF := GF) { σ with devs := ds } =
       iprop(([∗list] cpu ∈ cpus, regInterp cpu (σ.regs cpu)) ∗ genHeapInterp σ.mem ∗ memModel σ ∗
-        devInterp ds) := rfl
+        devInterp ds ∗ uepModel σ) := rfl
   rw [e]
 
 /-- Extract device `d`'s mirror from the interpretation, with a closing wand
@@ -465,16 +465,16 @@ theorem machInterp_acc_dev (σ : MState) (d : DevId) :
   have hget := DevId.all_get? d
   have e : machInterp (GF := GF) σ =
       iprop(([∗list] cpu ∈ cpus, regInterp cpu (σ.regs cpu)) ∗ genHeapInterp σ.mem ∗ memModel σ ∗
-        devInterp σ.devs) := rfl
+        devInterp σ.devs ∗ uepModel σ) := rfl
   rw [e]
   unfold devInterp devInterpAt
-  iintro ⟨Hregs, Hmem, Hmm, Hdev⟩
+  iintro ⟨Hregs, Hmem, Hmm, Hdev, Huep⟩
   icases BigSepL.bigSepL_lookup_acc_impl (Φ := fun _ d' => devAuthAt (MachGS.era (hlc := hlc) (GF := GF)) d' (σ.devs.st d')) hget $$ Hdev
     with ⟨Hd, Hclose⟩
   iframe Hd
   iintro %s' Hs'
   iapply machInterp_of_devs σ (σ.devs.set d s')
-  iframe Hregs Hmem Hmm
+  iframe Hregs Hmem Hmm Huep
   unfold devInterp devInterpAt
   iapply Hclose $$ %(fun _ d' => devAuthAt (MachGS.era (hlc := hlc) (GF := GF)) d' ((σ.devs.set d s').st d'))
   · imodintro

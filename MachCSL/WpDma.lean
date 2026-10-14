@@ -131,9 +131,10 @@ theorem machInterp_of_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec 
     (hn : n ≠ 0) :
     ([∗list] cpu ∈ cpus, regInterp cpu (σ.regs cpu)) ∗
       genHeapInterp (σ.mem.writeBytes pa n w (σ.top + 1) diskAgent) ∗
-      memModel (σ.storeDma pa n w) ∗ devInterp σ.devs ⊢@{IProp GF}
+      memModel (σ.storeDma pa n w) ∗ devInterp σ.devs ∗ uepModel σ ⊢@{IProp GF}
     machInterp (σ.storeDma pa n w) := by
   rw [MState.storeDma_of_ne σ pa n w hn]
+  exact .rfl
 
 /-- A position the client holds a top-bound for is below the machine's
 store-order top, hence strictly below the position a store about to
@@ -142,7 +143,7 @@ write know it is ordered after an EARLIER one whose position the client
 kept. -/
 theorem machInterp_topLb (σ : MState) (K : Nat) :
     machInterp (GF := GF) σ ∗ topLb K ⊢@{IProp GF} ⌜K ≤ σ.top⌝ := by
-  iintro ⟨⟨_, _, Hmm, _⟩, HK⟩
+  iintro ⟨⟨_, _, Hmm, _, _⟩, HK⟩
   iapply memModel_topLb _ σ K $$ [Hmm HK]
   iframe
 
@@ -159,7 +160,7 @@ theorem machInterp_storeDma (σ : MState) (pa : PAddr) (n : Nat) (Hs : Nat → H
       (machInterp (σ.storeDma pa n w) ∗
        histBytes pa n (fun _ => DFrac.own 1) (pushed Hs (σ.top + 1) diskAgent w) ∗
        authoredBy (σ.top + 1) diskAgent ∗ topLb (σ.top + 1)) := by
-  iintro ⟨⟨Hregs, Hmem, Hmm, Hdev⟩, Hb⟩
+  iintro ⟨⟨Hregs, Hmem, Hmm, Hdev, Huep⟩, Hb⟩
   ihave %hram : ⌜ramBytes pa n⌝ $$ [Hmem Hmm Hb]
   · iapply histBytes_ramBytes σ pa n _ Hs $$ [Hmem Hmm Hb]
     iframe
@@ -180,7 +181,7 @@ theorem machInterp_storeDma (σ : MState) (pa : PAddr) (n : Nat) (Hs : Nat → H
   imodintro
   iframe Hb Hau Htop
   iapply machInterp_of_storeDma σ pa n w hn
-  iframe Hregs Hmem Hmm Hdev
+  iframe Hregs Hmem Hmm Hdev Huep
 
 /-! ## The value form of a lease -/
 

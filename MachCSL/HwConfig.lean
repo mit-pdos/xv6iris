@@ -211,7 +211,7 @@ theorem swp_writeReg_same (cpu : CPU) (r : Register) (dq : DFrac) (v : RegisterT
   imod Hmask
   imodintro
   isplitl [Hregs Hclose]
-  · iapply Hclose
+  · iapply Hclose $$ %((σ.regs cpu).set r v) %(regFile_set_keep _ r v (Or.inr Hv))
     rw [RegFile.set_eq_self _ r v Hv]
     iexact Hregs
   · iapply swp_ret

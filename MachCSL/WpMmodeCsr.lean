@@ -12,6 +12,7 @@ directly.  `wp_m_csrw_*` / `wp_m_csrr_*` are the `wpLoop` rules over `instr`.
 import MachCSL.WpCsr
 import MachCSL.AluFacts
 import MachCSL.WpCycle
+import MachCSL.UEpochSatp
 
 namespace MachCSL
 
@@ -122,10 +123,13 @@ theorem execSpec_csrw_satp0 (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (rs1
   swp_run 300
   subst hW
   iapply swp_bind
+  ihave Hsatpw := satpStep_bare (GF := GF) cpu (DFrac.own 1) c.satp
   iapply swp_write_CSR_satp0 (hSXL := hSXL)
-  iframe; iframe Hhw
+    (P := iprop(Register.cur_privilege ↦ᵣ[cpu] Privilege.Machine))
+    (Q := iprop(Register.cur_privilege ↦ᵣ[cpu] Privilege.Machine))
+  iframe Hhw Hmstatus Hsatp Hsatpw Hcur_privilege
   inext
-  iintro %x Hmstatus Hsatp %hx
+  iintro %x Hmstatus Hsatp %hx Hcur_privilege
   subst hx
   swp_run 60
   try (unfold wX_bits wX; swp_run 40)

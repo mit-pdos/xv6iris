@@ -44,6 +44,7 @@ rule `wp_dead`; the two remaining cases (unborn, current but powered off) are
 refuted by the certificate.  Above this lemma no rule ever sees a generation.
 -/
 import MachCSL.Ctx
+import MachCSL.UEpochDefs
 import Iris.ProgramLogic.Lifting
 
 namespace MachCSL
@@ -122,13 +123,17 @@ abbrev memModel (σ : MState) : IProp GF := memModelAt (MachGS.era (hlc := hlc) 
 /-- The ambient era's device mirrors. -/
 abbrev devInterp (ds : DevStates) : IProp GF := devInterpAt (MachGS.era (hlc := hlc) (GF := GF)) ds
 
+/-- The ambient era's user-epoch record (W8 (f3-utext), `MachCSL.uepModelAt`). -/
+abbrev uepModel (σ : MState) : IProp GF := uepModelAt (MachGS.era (hlc := hlc) (GF := GF)) σ
+
 /-- The ambient era's interpretation of the machine: every hart's register
 map agrees with its register file, the memory heap is the byte histories,
-the memory-model mirrors are at the machine's values, and the device
-mirrors are at the devices' states. -/
+the memory-model mirrors are at the machine's values, the device
+mirrors are at the devices' states, and (W8 (f3-utext)) the user-epoch
+record is at the harts' `satp` and privilege. -/
 abbrev machInterp (σ : MState) : IProp GF := iprop%
   ([∗list] cpu ∈ cpus, regInterp cpu (σ.regs cpu)) ∗ genHeapInterp σ.mem ∗ memModel σ ∗
-  devInterp σ.devs
+  devInterp σ.devs ∗ uepModel σ
 
 theorem eraInterp_ambient (σ : MState) :
     eraInterp (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) σ = machInterp σ := rfl
@@ -136,10 +141,10 @@ theorem eraInterp_ambient (σ : MState) :
 /-- Re-assemble the interpretation after a register update. -/
 theorem machInterp_of_regs (σ : MState) (f : CPU → RegFile) :
     ([∗list] cpu ∈ cpus, regInterp cpu (f cpu)) ∗ genHeapInterp σ.mem ∗ memModel σ ∗
-      devInterp σ.devs ⊢@{IProp GF} machInterp { σ with regs := f } := by
+      devInterp σ.devs ∗ uepModel { σ with regs := f } ⊢@{IProp GF} machInterp { σ with regs := f } := by
   have e : machInterp (GF := GF) { σ with regs := f } =
       iprop(([∗list] cpu ∈ cpus, regInterp cpu (f cpu)) ∗ genHeapInterp σ.mem ∗ memModel σ ∗
-        devInterp σ.devs) := rfl
+        devInterp σ.devs ∗ uepModel { σ with regs := f }) := rfl
   rw [e]
 
 /-! ## The hart WP -/
@@ -368,7 +373,7 @@ theorem wpHart_interpUpd (cpu : CPU) (m : SailM Unit) (P : IProp GF) :
       subst hEq
       rw [eraInterp_ambient]
       unfold machInterp
-      icases Hera with ⟨Hregs, Hmem, Hmm, Hdev⟩
+      icases Hera with ⟨Hregs, Hmem, Hmm, Hdev, Huep⟩
       imod U $$ %g.m [Hmem Hmm] with ⟨Hmem, Hmm, HP⟩
       · iframe Hmem Hmm
       imodintro
@@ -384,7 +389,7 @@ theorem wpHart_interpUpd (cpu : CPU) (m : SailM Unit) (P : IProp GF) :
         · ipureintro; exact HE
         rw [eraInterp_ambient]
         unfold machInterp
-        iframe Hregs Hmem Hmm Hdev
+        iframe Hregs Hmem Hmm Hdev Huep
       · ileft; iexact HP
     · have hlt : genId (hlc := hlc) (GF := GF) < g.gen := by omega
       ihave #Hdead := genAuth_get_dead _ _ hlt $$ Hgen
@@ -467,21 +472,23 @@ theorem swp_wpHart (cpu : CPU) (m : SailM Unit) :
 
 /-! ## The per-event rules -/
 
-/-- Extract one hart's register interpretation from the state
-interpretation, with a closing wand that accepts an updated register file. -/
-theorem machInterp_acc (σ : MState) (cpu : CPU) :
+/-- Extract one hart's register interpretation AND the user-epoch record,
+with a closing wand that accepts an updated register file and the record at
+it (W8 (f3-utext): the writes of `satp` and `cur_privilege`). -/
+theorem machInterp_acc_uep (σ : MState) (cpu : CPU) :
     machInterp (GF := GF) σ ⊢
-      regInterp cpu (σ.regs cpu) ∗
-      ∀ (f : RegFile), regInterp cpu f -∗ machInterp { σ with regs := updCpu σ.regs cpu f } := by
+      regInterp cpu (σ.regs cpu) ∗ uepModel σ ∗
+      ∀ (f : RegFile), regInterp cpu f -∗ uepModel { σ with regs := updCpu σ.regs cpu f } -∗
+        machInterp { σ with regs := updCpu σ.regs cpu f } := by
   have hget := cpus_get? cpu
   unfold machInterp
-  iintro ⟨Hregs, Hmem, Hmm, Hdev⟩
+  iintro ⟨Hregs, Hmem, Hmm, Hdev, Huep⟩
   icases BigSepL.bigSepL_lookup_acc_impl (Φ := fun _ c => regInterp c (σ.regs c)) hget $$ Hregs
     with ⟨Hcpu, Hclose⟩
-  iframe Hcpu
-  iintro %f Hf
+  iframe Hcpu Huep
+  iintro %f Hf Huep
   iapply machInterp_of_regs σ (updCpu σ.regs cpu f)
-  iframe Hmem Hmm Hdev
+  iframe Hmem Hmm Hdev Huep
   iapply Hclose $$ %(fun _ c => regInterp c (updCpu σ.regs cpu f c))
   · imodintro
     iintro %k %y %hk %hne Hy
@@ -491,26 +498,49 @@ theorem machInterp_acc (σ : MState) (cpu : CPU) :
   · simp only [updCpu, if_true]
     iexact Hf
 
+/-- Extract one hart's register interpretation from the state
+interpretation, with a closing wand that accepts an updated register file
+keeping `satp` and `cur_privilege` (the user-epoch record reads only those,
+W8 (f3-utext)). -/
+theorem machInterp_acc (σ : MState) (cpu : CPU) :
+    machInterp (GF := GF) σ ⊢
+      regInterp cpu (σ.regs cpu) ∗
+      ∀ (f : RegFile), ⌜f Register.satp = σ.regs cpu Register.satp ∧
+          f Register.cur_privilege = σ.regs cpu Register.cur_privilege⌝ -∗
+        regInterp cpu f -∗ machInterp { σ with regs := updCpu σ.regs cpu f } := by
+  iintro Hσ
+  icases machInterp_acc_uep σ cpu $$ Hσ with ⟨Hcpu, Huep, Hclose⟩
+  iframe Hcpu
+  iintro %f %hf Hf
+  iapply Hclose $$ Hf
+  iapply uepModelAt_stable _ ?_ $$ Huep
+  refine ⟨fun c => ?_, fun _ => Nat.le_refl _⟩
+  by_cases hc : c = cpu
+  · subst hc; simp only [updCpu, if_true]; exact hf
+  · simp [updCpu, hc]
+
 /-- Extract everything one hart's memory event touches: its register
 interpretation, the heap and the memory-model mirrors; the closing wand
 accepts any state that agrees with `σ` on the other harts' registers. -/
 theorem machInterp_acc_mem (σ : MState) (cpu : CPU) :
     machInterp (GF := GF) σ ⊢
       regInterp cpu (σ.regs cpu) ∗ genHeapInterp σ.mem ∗ memModel σ ∗
-      ∀ (σ' : MState), ⌜(∀ c, c ≠ cpu → σ'.regs c = σ.regs c) ∧ σ'.devs = σ.devs⌝ -∗
+      ∀ (σ' : MState), ⌜(∀ c, c ≠ cpu → σ'.regs c = σ.regs c) ∧ σ'.devs = σ.devs ∧ uepStable σ σ'⌝ -∗
         regInterp cpu (σ'.regs cpu) -∗
         genHeapInterp σ'.mem -∗ memModel σ' -∗ machInterp σ' := by
   have hget := cpus_get? cpu
   unfold machInterp
-  iintro ⟨Hregs, Hmem, Hmm, Hdev⟩
+  iintro ⟨Hregs, Hmem, Hmm, Hdev, Huep⟩
   iframe Hmem Hmm
   icases BigSepL.bigSepL_lookup_acc_impl (Φ := fun _ c => regInterp c (σ.regs c)) hget $$ Hregs
     with ⟨Hcpu, Hclose⟩
   iframe Hcpu
   iintro %σ' %hσ' Hf Hmem Hmm
   iframe Hmem Hmm
-  ihave Hdev := (show devInterp (GF := GF) σ.devs ⊢ devInterp σ'.devs from by rw [hσ'.2]) $$ Hdev
+  ihave Hdev := (show devInterp (GF := GF) σ.devs ⊢ devInterp σ'.devs from by rw [hσ'.2.1]) $$ Hdev
   iframe Hdev
+  ihave Huep := uepModelAt_stable _ hσ'.2.2 $$ Huep
+  iframe Huep
   iapply Hclose $$ %(fun _ c => regInterp c (σ'.regs c))
   · imodintro
     iintro %k %y %hk %hne Hy
@@ -541,7 +571,7 @@ theorem machInterp_acc_read (σ : MState) (cpu : CPU) :
   iframe Hregs
   iintro Hregs
   iapply machInterp_eq_mono (MState.update_self σ cpu)
-  iapply Hclose $$ Hregs
+  iapply Hclose $$ %(σ.regs cpu) %⟨rfl, rfl⟩ Hregs
 
 /-! ## The generic per-event rules
 
@@ -739,12 +769,31 @@ theorem swp_readReg_any_bind (cpu : CPU) {X : Type} (r : Register)
   iapply swp_bind
   iapply swp_readReg_any cpu r (fun v => swp cpu (f v) Φ) $$ HΦ
 
+/-- A write of anything but `satp` and `cur_privilege`, or of the value
+already there, keeps both (what the user-epoch record reads). -/
+theorem regFile_set_keep (f : RegFile) (r : Register) (w : RegisterType r)
+    (h : (r ≠ .cur_privilege ∧ r ≠ .satp) ∨ f r = w) :
+    (f.set r w) Register.satp = f Register.satp ∧
+      (f.set r w) Register.cur_privilege = f Register.cur_privilege := by
+  rcases h with ⟨h1, h2⟩ | h
+  · exact ⟨RegFile.set_other f r _ w (Ne.symm h2), RegFile.set_other f r _ w (Ne.symm h1)⟩
+  · subst h
+    have e : f.set r (f r) = f := by
+      funext r'
+      by_cases hr : r' = r
+      · subst hr; exact RegFile.set_same _ _ _
+      · exact RegFile.set_other _ _ _ _ hr
+    rw [e]
+    exact ⟨rfl, rfl⟩
+
 /-- Write a register: needs the full cell, and hands back the updated cell.
-A SILENT write (NI M2-W1): any register but `cur_privilege`, or the value
-already there (`hq`); the crossing write of `cur_privilege` is
-`swp_writeReg_uexit`/`swp_writeReg_uenter`. -/
+A SILENT write (NI M2-W1): any register but `cur_privilege` and (W8
+(f3-utext)) `satp`, or the value already there (`hq`); the crossing write of
+`cur_privilege` is `swp_writeReg_uexit`/`swp_writeReg_uenter`, the quiet one
+`swp_writeReg_priv_quiet`/`_mret`, and a `satp` write
+`swp_writeReg_satp`. -/
 theorem swp_writeReg (cpu : CPU) (r : Register) (v w : RegisterType r)
-    (hq : r ≠ .cur_privilege ∨ v = w) (Φ : PUnit → IProp GF) :
+    (hq : (r ≠ .cur_privilege ∧ r ≠ .satp) ∨ v = w) (Φ : PUnit → IProp GF) :
     r ↦ᵣ[cpu] v ∗ ▷ (r ↦ᵣ[cpu] w -∗ Φ ()) ⊢ swp cpu (writeReg r w) Φ := by
   unfold writeReg PreSail.writeReg PreSail.emit
   iintro ⟨Hr, HΦ⟩
@@ -761,20 +810,24 @@ theorem swp_writeReg (cpu : CPU) (r : Register) (v w : RegisterType r)
   · ipureintro
     refine ⟨hartObs_regWrite_quiet cpu σ r w ?_, (), σ.setReg cpu r w, rfl⟩
     rcases hq with hq | hq
-    · exact Or.inl hq
+    · exact Or.inl hq.1
     · exact Or.inr (Hv.trans hq)
   inext
   iintro %v' %σ' %Hev
   obtain rfl := Hev
   imod Hmask
   imodintro
+  have hk := regFile_set_keep (σ.regs cpu) r w (by
+    rcases hq with hq | hq
+    · exact Or.inl hq
+    · exact Or.inr (Hv.trans hq))
   isplitl [Hregs Hclose]
-  · iapply Hclose $$ Hregs
+  · iapply Hclose $$ %((σ.regs cpu).set r w) %hk Hregs
   · iapply swp_ret
     iapply HΦ $$ Hr
 
 theorem swp_writeReg_bind (cpu : CPU) {X : Type} (r : Register) (v w : RegisterType r)
-    (hq : r ≠ .cur_privilege ∨ v = w) (f : PUnit → SailM X) (Φ : X → IProp GF) :
+    (hq : (r ≠ .cur_privilege ∧ r ≠ .satp) ∨ v = w) (f : PUnit → SailM X) (Φ : X → IProp GF) :
     r ↦ᵣ[cpu] v ∗ ▷ (r ↦ᵣ[cpu] w -∗ swp cpu (f ()) Φ) ⊢ swp cpu (writeReg r w >>= f) Φ := by
   iintro ⟨Hr, HΦ⟩
   iapply swp_bind
@@ -920,7 +973,7 @@ theorem swp_writeReg_uexit_cells (cpu : CPU) (s sc ep : BitVec 64) (gs : List (B
   iapply swp_event_obs cpu (.regWrite Register.cur_privilege Privilege.Supervisor) (fun v => FreeM.pure v) Φ
     (fun _ _ h => h)
   iintro %g %h %hf ⟨Hσ, Ha⟩
-  icases machInterp_acc g.m cpu $$ Hσ with ⟨Hregs, Hclose⟩
+  icases machInterp_acc_uep g.m cpu $$ Hσ with ⟨Hregs, Huep, Hclose⟩
   ihave %Hv : ⌜g.m.regs cpu Register.cur_privilege = Privilege.User⌝ $$ [Hregs Hr]
   · icases reg_valid cpu (g.m.regs cpu) Register.cur_privilege (DFrac.own 1) Privilege.User $$ [$Hregs $Hr] with %_
     itrivial
@@ -955,8 +1008,13 @@ theorem swp_writeReg_uexit_cells (cpu : CPU) (s sc ep : BitVec 64) (gs : List (B
   icases obsAuth_lb (h ++ [.uExit cpu s sc ep gs]) $$ Ha with ⟨Ha, #Hlb⟩
   imodintro
   rw [he]
-  isplitl [Hregs Hclose]
+  isplitl [Hregs Huep Hclose]
   · iapply Hclose $$ Hregs
+    iapply uepModelAt_regs _ g.m cpu _ ?_ $$ Huep
+    intro ksat oe hl
+    rw [RegFile.set_other _ _ _ _ (by decide), RegFile.set_same]
+    rw [Hv] at hl
+    exact uepLink_uexit hl _ (by intro h; cases h)
   isplitl [Ha]
   · iexact Ha
   · iapply swp_ret
@@ -997,21 +1055,38 @@ theorem swp_writeReg_uexit_bind (cpu : CPU) {X : Type} (s sc ep : BitVec 64) (gs
   iapply (swp_writeReg_uexit_cells cpu s sc ep gs Out (fun _ => swp cpu (f ()) Φ))
   iexact H
 
+/-- **The entry's user-epoch witness** (W8 (f3-utext), F-REGS): the hart
+enters user mode from supervisor mode with `satp` naming a table that is not
+the kernel's -- the epoch its `satp` write opened (`MachCSL.uepLink`); the
+kernel's root is named by the root ghost the installed kernel table
+publishes (`MachCSL.KptInv.kptOn`). -/
+def uenterWit (cpu : CPU) (p : Privilege) (s : BitVec 64) : IProp GF := iprop%
+  ∃ kroot r : BitVec 44, ⌜p = Privilege.Supervisor ∧ satpTable s = some r ∧ r ≠ kroot⌝ ∗
+    (MachGS.kptRootName (hlc := hlc) (GF := GF) ↪VAR{.discard} kroot)
+
+instance uenterWit_persistent (cpu : CPU) (p : Privilege) (s : BitVec 64) :
+    Persistent (uenterWit (GF := GF) cpu p s) := by
+  unfold uenterWit; infer_instance
+
+theorem uenterWit_eq (cpu : CPU) (p : Privilege) {s s' : BitVec 64} (h : s = s') :
+    uenterWit (GF := GF) cpu p s ⊢ uenterWit cpu p s' := by
+  subst h; exact .rfl
+
 /-- **The S→U privilege write, OBSERVED, cell form.** -/
 theorem swp_writeReg_uenter_cells (cpu : CPU) (p : Privilege) (hp : privUser p = false)
     (s ep : BitVec 64) (gs : List (BitVec 64)) (Out : IProp GF) (Φ : PUnit → IProp GF) :
-    hartObsStep (.uEnter cpu s ep gs) Out ∗ Register.cur_privilege ↦ᵣ[cpu] p ∗
+    uenterWit cpu p s ∗ hartObsStep (.uEnter cpu s ep gs) Out ∗ Register.cur_privilege ↦ᵣ[cpu] p ∗
       Register.satp ↦ᵣ[cpu] s ∗ Register.sepc ↦ᵣ[cpu] ep ∗ gprCells cpu gs ∗
       ▷ (Register.cur_privilege ↦ᵣ[cpu] Privilege.User -∗ Register.satp ↦ᵣ[cpu] s -∗
           Register.sepc ↦ᵣ[cpu] ep -∗ gprCells cpu gs -∗ Out -∗
           (∃ i, uRcpt (i, .uEnter cpu s ep gs)) -∗ Φ ())
     ⊢ swp cpu (writeReg Register.cur_privilege Privilege.User) Φ := by
-  unfold writeReg PreSail.writeReg PreSail.emit hartObsStep
-  iintro ⟨Hperm, Hr, Hs, Hep, Hg, HΦ⟩
+  unfold writeReg PreSail.writeReg PreSail.emit hartObsStep uenterWit
+  iintro ⟨⟨%kroot, %r, %⟨hpS, hsr, hne⟩, #Hkr⟩, Hperm, Hr, Hs, Hep, Hg, HΦ⟩
   iapply swp_event_obs cpu (.regWrite Register.cur_privilege Privilege.User) (fun v => FreeM.pure v) Φ
     (fun _ _ h => h)
   iintro %g %h %hf ⟨Hσ, Ha⟩
-  icases machInterp_acc g.m cpu $$ Hσ with ⟨Hregs, Hclose⟩
+  icases machInterp_acc_uep g.m cpu $$ Hσ with ⟨Hregs, Huep, Hclose⟩
   ihave %Hv : ⌜g.m.regs cpu Register.cur_privilege = p⌝ $$ [Hregs Hr]
   · icases reg_valid cpu (g.m.regs cpu) Register.cur_privilege (DFrac.own 1) p $$ [$Hregs $Hr] with %_
     itrivial
@@ -1045,8 +1120,11 @@ theorem swp_writeReg_uenter_cells (cpu : CPU) (p : Privilege) (hp : privUser p =
   icases obsAuth_lb (h ++ [.uEnter cpu s ep gs]) $$ Ha with ⟨Ha, #Hlb⟩
   imodintro
   rw [he]
-  isplitl [Hregs Hclose]
+  isplitl [Hregs Huep Hclose]
   · iapply Hclose $$ Hregs
+    iapply uepModelAt_uenter _ g.m cpu _ kroot r (by rw [hs]; exact hsr) hne (by rw [Hv]; exact hpS)
+      (RegFile.set_other _ _ _ _ (by decide)) (RegFile.set_same _ _ _)
+    iframe Huep Hkr
   isplitl [Ha]
   · iexact Ha
   · iapply swp_ret
@@ -1058,15 +1136,15 @@ of `swp_writeReg_uexit` -- `User` over a non-user `p`, the entry's read
 frame `hartRdE`. -/
 theorem swp_writeReg_uenter (cpu : CPU) (p : Privilege) (hp : privUser p = false)
     (s ep : BitVec 64) (gs : List (BitVec 64)) (Out : IProp GF) (Φ : PUnit → IProp GF) :
-    hartObsStep (.uEnter cpu s ep gs) Out ∗ Register.cur_privilege ↦ᵣ[cpu] p ∗
+    uenterWit cpu p s ∗ hartObsStep (.uEnter cpu s ep gs) Out ∗ Register.cur_privilege ↦ᵣ[cpu] p ∗
       hartRdE cpu s ep gs ∗
       ▷ (Register.cur_privilege ↦ᵣ[cpu] Privilege.User -∗ hartRdE cpu s ep gs -∗ Out -∗
           (∃ i, uRcpt (i, .uEnter cpu s ep gs)) -∗ Φ ())
     ⊢ swp cpu (writeReg Register.cur_privilege Privilege.User) Φ := by
   unfold hartRdE
-  iintro ⟨Hperm, Hr, ⟨Hs, Hep, Hg⟩, HΦ⟩
+  iintro ⟨Hw, Hperm, Hr, ⟨Hs, Hep, Hg⟩, HΦ⟩
   iapply swp_writeReg_uenter_cells cpu p hp s ep gs Out Φ
-  iframe Hperm Hr Hs Hep Hg
+  iframe Hw Hperm Hr Hs Hep Hg
   inext
   iintro Hr Hs Hep Hg HOut HR
   iapply HΦ $$ Hr [Hs Hep Hg] HOut HR
@@ -1074,7 +1152,7 @@ theorem swp_writeReg_uenter (cpu : CPU) (p : Privilege) (hp : privUser p = false
 
 theorem swp_writeReg_uenter_bind (cpu : CPU) {X : Type} (p : Privilege) (hp : privUser p = false)
     (s ep : BitVec 64) (gs : List (BitVec 64)) (Out : IProp GF) (f : PUnit → SailM X) (Φ : X → IProp GF) :
-    hartObsStep (.uEnter cpu s ep gs) Out ∗ Register.cur_privilege ↦ᵣ[cpu] p ∗
+    uenterWit cpu p s ∗ hartObsStep (.uEnter cpu s ep gs) Out ∗ Register.cur_privilege ↦ᵣ[cpu] p ∗
       Register.satp ↦ᵣ[cpu] s ∗ Register.sepc ↦ᵣ[cpu] ep ∗ gprCells cpu gs ∗
       ▷ (Register.cur_privilege ↦ᵣ[cpu] Privilege.User -∗ Register.satp ↦ᵣ[cpu] s -∗
           Register.sepc ↦ᵣ[cpu] ep -∗ gprCells cpu gs -∗ Out -∗
@@ -1089,15 +1167,15 @@ theorem swp_writeReg_uenter_bind (cpu : CPU) {X : Type} (p : Privilege) (hp : pr
 the same side of the user boundary (S→S, M→S, S→M, ...): silent, no
 consent. -/
 theorem swp_writeReg_priv_quiet (cpu : CPU) (p p' : Privilege) (Φ : PUnit → IProp GF) :
-    Register.cur_privilege ↦ᵣ[cpu] p ∗ ⌜privUser p = privUser p'⌝ ∗
+    Register.cur_privilege ↦ᵣ[cpu] p ∗ ⌜privUser p = privUser p' ∧ privMachine p = privMachine p'⌝ ∗
       ▷ (Register.cur_privilege ↦ᵣ[cpu] p' -∗ Φ ())
     ⊢ swp cpu (writeReg Register.cur_privilege p') Φ := by
   unfold writeReg PreSail.writeReg PreSail.emit
-  iintro ⟨Hr, %hq, HΦ⟩
+  iintro ⟨Hr, %⟨hq, hqm⟩, HΦ⟩
   iapply swp_event_dep cpu (.regWrite Register.cur_privilege p') (fun v => FreeM.pure v) Φ
     (fun _ _ h => h)
   iintro %σ Hσ
-  icases machInterp_acc σ cpu $$ Hσ with ⟨Hregs, Hclose⟩
+  icases machInterp_acc_uep σ cpu $$ Hσ with ⟨Hregs, Huep, Hclose⟩
   ihave %Hv : ⌜σ.regs cpu Register.cur_privilege = p⌝ $$ [Hregs Hr]
   · icases reg_valid cpu (σ.regs cpu) Register.cur_privilege (DFrac.own 1) p $$ [$Hregs $Hr] with %_
     itrivial
@@ -1113,14 +1191,19 @@ theorem swp_writeReg_priv_quiet (cpu : CPU) (p p' : Privilege) (Φ : PUnit → I
   obtain rfl := Hev
   imod Hmask
   imodintro
-  isplitl [Hregs Hclose]
+  isplitl [Hregs Huep Hclose]
   · iapply Hclose $$ Hregs
+    iapply uepModelAt_regs _ σ cpu _ ?_ $$ Huep
+    intro ksat oe hl
+    rw [RegFile.set_other _ _ _ _ (by decide), RegFile.set_same]
+    rw [Hv] at hl
+    exact uepLink_quiet hl hq hqm
   · iapply swp_ret
     iapply HΦ $$ Hr
 
 theorem swp_writeReg_priv_quiet_bind (cpu : CPU) {X : Type} (p p' : Privilege) (f : PUnit → SailM X)
     (Φ : X → IProp GF) :
-    Register.cur_privilege ↦ᵣ[cpu] p ∗ ⌜privUser p = privUser p'⌝ ∗
+    Register.cur_privilege ↦ᵣ[cpu] p ∗ ⌜privUser p = privUser p' ∧ privMachine p = privMachine p'⌝ ∗
       ▷ (Register.cur_privilege ↦ᵣ[cpu] p' -∗ swp cpu (f ()) Φ)
     ⊢ swp cpu (writeReg Register.cur_privilege p' >>= f) Φ := by
   iintro ⟨Hr, %hq, HΦ⟩
@@ -1128,6 +1211,147 @@ theorem swp_writeReg_priv_quiet_bind (cpu : CPU) {X : Type} (p p' : Privilege) (
   iapply swp_writeReg_priv_quiet cpu p p' $$ [Hr HΦ]
   iframe Hr HΦ
   ipureintro; exact hq
+
+/-- **Leaving machine mode** (W8 (f3-utext), F-REGS; xv6's `start`: the
+`mret` into supervisor mode): a quiet privilege write out of `Machine`, with
+a Bare `satp` -- no user epoch can be open in machine mode, and the hart
+enters supervisor mode with no table installed. -/
+theorem swp_writeReg_priv_mret (cpu : CPU) (p' : Privilege) (hp' : privUser p' = false) (dq : DFrac)
+    (s : BitVec 64) (hs : satpTable s = none) (Φ : PUnit → IProp GF) :
+    Register.cur_privilege ↦ᵣ[cpu] Privilege.Machine ∗ Register.satp ↦ᵣ[cpu]{dq} s ∗
+      ▷ (Register.cur_privilege ↦ᵣ[cpu] p' -∗ Register.satp ↦ᵣ[cpu]{dq} s -∗ Φ ())
+    ⊢ swp cpu (writeReg Register.cur_privilege p') Φ := by
+  unfold writeReg PreSail.writeReg PreSail.emit
+  iintro ⟨Hr, Hs, HΦ⟩
+  iapply swp_event_dep cpu (.regWrite Register.cur_privilege p') (fun v => FreeM.pure v) Φ
+    (fun _ _ h => h)
+  iintro %σ Hσ
+  icases machInterp_acc_uep σ cpu $$ Hσ with ⟨Hregs, Huep, Hclose⟩
+  ihave %Hv : ⌜σ.regs cpu Register.cur_privilege = Privilege.Machine⌝ $$ [Hregs Hr]
+  · icases reg_valid cpu (σ.regs cpu) Register.cur_privilege (DFrac.own 1) Privilege.Machine $$ [$Hregs $Hr]
+      with %_
+    itrivial
+  ihave %Hsv : ⌜σ.regs cpu Register.satp = s⌝ $$ [Hregs Hs]
+  · icases reg_valid cpu (σ.regs cpu) Register.satp dq s $$ [$Hregs $Hs] with %_
+    itrivial
+  imod reg_update cpu (σ.regs cpu) Register.cur_privilege Privilege.Machine p' $$ [$Hregs $Hr] with ⟨Hregs, Hr⟩
+  iapply fupd_mask_intro LawfulSet.empty_subset
+  iintro Hmask
+  isplit
+  · ipureintro
+    exact ⟨hartObsPriv_quiet cpu _ p' (by rw [Hv]; exact hp'.symm), (),
+      σ.setReg cpu Register.cur_privilege p', rfl⟩
+  inext
+  iintro %v' %σ' %Hev
+  obtain rfl := Hev
+  imod Hmask
+  imodintro
+  isplitl [Hregs Huep Hclose]
+  · iapply Hclose $$ Hregs
+    iapply uepModelAt_regs _ σ cpu _ ?_ $$ Huep
+    intro ksat oe hl
+    rw [RegFile.set_other _ _ _ _ (by decide), RegFile.set_same]
+    rw [Hv] at hl
+    rw [uepLink_machine hl]
+    rw [Hsv]
+    exact uepLink_none_bare ksat s p' hs (privUser_ne hp')
+  · iapply swp_ret
+    iapply HΦ $$ Hr Hs
+
+theorem swp_writeReg_priv_mret_bind (cpu : CPU) {X : Type} (p' : Privilege) (hp' : privUser p' = false)
+    (dq : DFrac) (s : BitVec 64) (hs : satpTable s = none) (f : PUnit → SailM X) (Φ : X → IProp GF) :
+    Register.cur_privilege ↦ᵣ[cpu] Privilege.Machine ∗ Register.satp ↦ᵣ[cpu]{dq} s ∗
+      ▷ (Register.cur_privilege ↦ᵣ[cpu] p' -∗ Register.satp ↦ᵣ[cpu]{dq} s -∗ swp cpu (f ()) Φ)
+    ⊢ swp cpu (writeReg Register.cur_privilege p' >>= f) Φ := by
+  iintro H
+  iapply swp_bind
+  iapply (swp_writeReg_priv_mret cpu p' hp' dq s hs (fun _ => swp cpu (f ()) Φ)) $$ H
+
+/-! ## The `satp` write (W8 (f3-utext), F-REGS)
+
+A write of `satp` moves the user-epoch record: it is the client's ghost step
+`satpStep` (on `ifenceStep`'s pattern), run at the machine the write sees,
+which updates the record from the old value's to the new value's and may
+consume `P` and return `Q`.  `MachCSL.UEpochSatp` proves the four steps xv6
+takes: the Bare write (`start`), the kernel table's install (`kvminithart`,
+`uservec`'s return to the kernel table when no epoch is open), and the
+epoch's open and close (`userret`, `uservec`). -/
+
+/-- **A ghost step at a `satp` write** of `s1` over `s0`: at every machine
+whose hart holds `s0`, from the hart's register map, the heap and the
+mirrors (all handed back) and the record at that machine, the record at the
+machine with `s1` written. -/
+def satpStep (cpu : CPU) (s0 s1 : BitVec 64) (P Q : IProp GF) : IProp GF := iprop%
+  ∀ σ : MState, ⌜σ.regs cpu Register.satp = s0⌝ -∗ regInterp cpu (σ.regs cpu) -∗ genHeapInterp σ.mem -∗
+    memModel σ -∗ uepModel σ -∗ P -∗
+    |==> (regInterp cpu (σ.regs cpu) ∗ genHeapInterp σ.mem ∗ memModel σ ∗
+      uepModel (σ.setReg cpu Register.satp s1) ∗ Q)
+
+/-- **The `satp` write**: the client's ghost step runs at the write. -/
+theorem swp_writeReg_satp (cpu : CPU) (s0 s1 : BitVec 64) (P Q : IProp GF) (Φ : PUnit → IProp GF) :
+    satpStep cpu s0 s1 P Q ∗ Register.satp ↦ᵣ[cpu] s0 ∗ P ∗
+      ▷ (Register.satp ↦ᵣ[cpu] s1 -∗ Q -∗ Φ ())
+    ⊢ swp cpu (writeReg Register.satp s1) Φ := by
+  unfold writeReg PreSail.writeReg PreSail.emit satpStep
+  iintro ⟨Hst, Hr, HP, HΦ⟩
+  iapply swp_event_dep cpu (.regWrite Register.satp s1) (fun v => FreeM.pure v) Φ (fun _ _ h => h)
+  iintro %σ Hσ
+  have hget := cpus_get? cpu
+  unfold machInterp
+  icases Hσ with ⟨Hregs, Hmem, Hmm, Hdev, Huep⟩
+  icases BigSepL.bigSepL_lookup_acc_impl (Φ := fun _ c => regInterp c (σ.regs c)) hget $$ Hregs
+    with ⟨Hcpu, Hclose⟩
+  ihave %Hv : ⌜σ.regs cpu Register.satp = s0⌝ $$ [Hcpu Hr]
+  · icases reg_valid cpu (σ.regs cpu) Register.satp (DFrac.own 1) s0 $$ [$Hcpu $Hr] with %_
+    itrivial
+  imod Hst $$ %σ %Hv Hcpu Hmem Hmm Huep HP with ⟨Hcpu, Hmem, Hmm, Huep, HQ⟩
+  imod reg_update cpu (σ.regs cpu) Register.satp s0 s1 $$ [$Hcpu $Hr] with ⟨Hcpu, Hr⟩
+  iapply fupd_mask_intro LawfulSet.empty_subset
+  iintro Hmask
+  isplit
+  · ipureintro
+    exact ⟨hartObs_regWrite_quiet cpu σ Register.satp s1 (Or.inl (by decide)), (),
+      σ.setReg cpu Register.satp s1, rfl⟩
+  inext
+  iintro %v' %σ' %Hev
+  obtain rfl := Hev
+  imod Hmask
+  imodintro
+  isplitl [Hcpu Hclose Hmem Hmm Hdev Huep]
+  · iapply machInterp_of_regs σ (updCpu σ.regs cpu ((σ.regs cpu).set Register.satp s1))
+    iframe Hmem Hmm Hdev Huep
+    iapply Hclose $$ %(fun _ c => regInterp c (updCpu σ.regs cpu ((σ.regs cpu).set Register.satp s1) c))
+    · imodintro
+      iintro %k %y %hk %hne Hy
+      have hy : y ≠ cpu := cpus_get?_ne hk cpu hne
+      simp only [updCpu, hy, if_false]
+      iexact Hy
+    · simp only [updCpu, if_true]
+      iexact Hcpu
+  · iapply swp_ret
+    iapply HΦ $$ Hr HQ
+
+/-- `swp_writeReg_satp_bind` with the step stated at a value EQUAL to the
+written one (what `swp_run` meets: the model's legalized value). -/
+theorem swp_writeReg_satp_eq_bind (cpu : CPU) {X : Type} (s0 s1 s1' : BitVec 64) (P Q : IProp GF)
+    (f : PUnit → SailM X) (Φ : X → IProp GF) :
+    satpStep cpu s0 s1' P Q ∗ Register.satp ↦ᵣ[cpu] s0 ∗ P ∗ ⌜s1' = s1⌝ ∗
+      ▷ (Register.satp ↦ᵣ[cpu] s1 -∗ Q -∗ swp cpu (f ()) Φ)
+    ⊢ swp cpu (writeReg Register.satp s1 >>= f) Φ := by
+  iintro ⟨Hst, Hr, HP, %he, HΦ⟩
+  subst he
+  iapply swp_bind
+  iapply (swp_writeReg_satp cpu s0 s1' P Q (fun _ => swp cpu (f ()) Φ))
+  iframe
+
+theorem swp_writeReg_satp_bind (cpu : CPU) {X : Type} (s0 s1 : BitVec 64) (P Q : IProp GF)
+    (f : PUnit → SailM X) (Φ : X → IProp GF) :
+    satpStep cpu s0 s1 P Q ∗ Register.satp ↦ᵣ[cpu] s0 ∗ P ∗
+      ▷ (Register.satp ↦ᵣ[cpu] s1 -∗ Q -∗ swp cpu (f ()) Φ)
+    ⊢ swp cpu (writeReg Register.satp s1 >>= f) Φ := by
+  iintro H
+  iapply swp_bind
+  iapply (swp_writeReg_satp cpu s0 s1 P Q (fun _ => swp cpu (f ()) Φ)) $$ H
 
 /-- An event that leaves the state alone is silent: the only candidate, a
 register write, then writes the value already there. -/
@@ -2239,7 +2463,7 @@ theorem swp_sail_mem_read_ifetch (cpu : CPU) {n vasize : Nat}
     imod Hmask
     imodintro
     isplitl [Hregs Hmem Hmm Hclose]
-    · iapply Hclose $$ %σ %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
+    · iapply Hclose $$ %σ %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
     · iapply swp_ret
       iapply HΦ $$ Hb
   · simp [akPlain, hk] at hpl
@@ -2298,7 +2522,7 @@ theorem swp_sail_mem_read_plain_ctx (cpu : CPU) {n vasize : Nat}
     imod Hmask
     imodintro
     isplitl [Hregs Hmem Hmm Hclose]
-    · iapply Hclose $$ %(σ.afterLoad cpu req.pa n tvn) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
+    · iapply Hclose $$ %(σ.afterLoad cpu req.pa n tvn) %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
     · iapply swp_ret
       iapply HΦ $$ Hctx Hb
   · rw [hk'.2] at hex'
@@ -2374,7 +2598,7 @@ theorem swp_sail_mem_write_plain (cpu : CPU) {n vasize : Nat}
     imodintro
     rw [hk]
     isplitl [Hregs Hmem Hmm Hclose]
-    · iapply Hclose $$ %(σ.store cpu req.pa n w' false) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
+    · iapply Hclose $$ %(σ.store cpu req.pa n w' false) %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
     · iapply swp_ret
       iapply HΦ $$ [Hctx Hfrag] Hb
       iapply ctxTok_introB cpu ξ none false
@@ -2385,7 +2609,7 @@ theorem swp_sail_mem_write_plain (cpu : CPU) {n vasize : Nat}
     imod Hmask
     imodintro
     isplitl [Hregs Hmem Hmm Hclose]
-    · iapply Hclose $$ %σ %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
+    · iapply Hclose $$ %σ %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
     · iapply IH $$ Htok Hb
       inext
       iexact HΦ
@@ -2410,7 +2634,7 @@ theorem swp_sail_barrier (cpu : CPU) (b : barrier_kind) (Φ : Unit → IProp GF)
   imod Hmask
   imodintro
   isplitl [Hregs Hmem Hmm Hclose]
-  · iapply Hclose $$ %(σ.fence cpu b) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
+  · iapply Hclose $$ %(σ.fence cpu b) %⟨fun _ _ => rfl, rfl, uepStable_fence _ _ _⟩ Hregs Hmem Hmm
   · iapply swp_ret
     iexact HΦ
 
@@ -2436,7 +2660,7 @@ theorem wpLoop_restartB (cpu : CPU) (r : Option Resv) (b : Bool) :
   iintro ⟨Hf, H⟩
   iapply wpHart_lift
   iintro %σ Hσ
-  icases Hσ with ⟨Hregs, Hmem, Hmm, Hdev⟩
+  icases Hσ with ⟨Hregs, Hmem, Hmm, Hdev, Huep⟩
   imod memModel_dropResv _ σ cpu r b $$ [$Hmm $Hf] with ⟨Hmm, Hf⟩
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hclose
@@ -2448,7 +2672,8 @@ theorem wpLoop_restartB (cpu : CPU) (r : Option Resv) (b : Bool) :
   obtain ⟨tick, rfl, rfl⟩ := Hs
   imod Hclose
   imodintro
-  isplitl [Hregs Hmem Hmm Hdev]
+  ihave Huep := uepModelAt_stable _ (σ := σ) (σ' := σ.dropResv cpu) (uepStable_of_eq rfl rfl) $$ Huep
+  isplitl [Hregs Hmem Hmm Hdev Huep]
   · unfold machInterp
     iframe
   · ispecialize H $$ %tick

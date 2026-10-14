@@ -189,7 +189,7 @@ theorem swp_sail_barrier_view (cpu : CPU) (b : barrier_kind) (hacq : fenceAcq b 
   imod Hmask
   imodintro
   isplitl [Hregs Hmem Hmm Hclose]
-  · iapply Hclose $$ %(σ.fence cpu b) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
+  · iapply Hclose $$ %(σ.fence cpu b) %⟨fun _ _ => rfl, rfl, uepStable_fence _ _ _⟩ Hregs Hmem Hmm
   · iapply swp_ret
     iapply HΦ $$ Hv
 
@@ -270,7 +270,7 @@ theorem swp_sail_mem_read_plain_aur (cpu : CPU) {n vasize : Nat}
     imod Hcont $$ %w' %tvn %(by omega) %hreads %hauthors Hrv Hout Hb Hcs with HΦ
     imodintro
     isplitl [Hregs Hmem Hmm Hclose]
-    · iapply Hclose $$ %(σ.afterLoad cpu req.pa n tvn) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
+    · iapply Hclose $$ %(σ.afterLoad cpu req.pa n tvn) %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
     · iapply swp_ret
       iexact HΦ
   · rw [hk'.2] at hex'

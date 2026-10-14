@@ -155,7 +155,7 @@ theorem swp_sail_mem_read_ifetch_ctx (cpu : CPU) {n vasize : Nat}
     imod Hmask
     imodintro
     isplitl [Hregs Hmem Hmm Hclose]
-    · iapply Hclose $$ %σ %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
+    · iapply Hclose $$ %σ %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
     · iapply swp_ret
       iapply HΦ $$ %w' Hb
   · simp [akPlain, hk] at hpl

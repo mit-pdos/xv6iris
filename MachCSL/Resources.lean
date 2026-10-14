@@ -1661,12 +1661,70 @@ theorem devUpdateAt [MachFixedGS hlc GF] (E : EraGS) (d : DevId) (s s' s'' : Dev
   iintro ⟨Ha, Hf⟩
   iapply ghost_var_update_halves (⟨d, s''⟩ : DevVal) (E.devName d) _ _ $$ Ha Hf
 
+/-! ## The user-epoch record (W8 (f3-utext) [OWN.89] (W-R), F-REGS)
+
+Per hart, the interpretation keeps the user epoch its `satp` opened
+(`MachCSL.UEp`), tied to the hart's `satp` and privilege by
+`MachCSL.uepLink`; the kernel table's root, once a hart installed it
+(`uepKsatAt`: its root ghost, discarded, and the root word frozen at its
+page).  The record reads only each hart's `satp` and `cur_privilege` and the
+instruction views (`MachCSL.uepStable`). -/
+
+/-- **The table a `satp` value names**: its root PPN in Sv39 mode (MODE =
+8), `none` in any other mode. -/
+def satpTable (s : BitVec 64) : Option (BitVec 44) :=
+  if BitVec.extractLsb' 60 4 s = 8#4 then some (BitVec.extractLsb' 0 44 s) else none
+
+/-- **One open user epoch**: the root of the table it installed. -/
+structure UEp where
+  root : BitVec 44
+
+/-- **The epoch record of one hart** (`satp` = `s`, privilege `p`, epoch
+`oe`; `ksat` the kernel table's root, once known): an open epoch names the
+table `satp` names, never the kernel's; with no epoch open the hart is not
+in user mode, and outside machine mode its `satp` is Bare or the kernel's. -/
+def uepLink (ksat : Option (BitVec 44)) (s : BitVec 64) (p : Privilege) (oe : Option UEp) : Prop :=
+  (∀ e, oe = some e → satpTable s = some e.root ∧ ksat.isSome = true ∧ ksat ≠ some e.root ∧
+    p ≠ Privilege.Machine) ∧
+  (oe = none → p ≠ Privilege.User ∧
+    (p ≠ Privilege.Machine → satpTable s = none ∨ (ksat.isSome = true ∧ satpTable s = ksat)))
+
+/-- The kernel table's root, once known: the root ghost and the root word's
+frozen fragments, holding the root page's address (`MachCSL.KptInv.kptRootW`
+at era `E`). -/
+def uepKsatAt [MachFixedGS hlc GF] (E : EraGS) : Option (BitVec 44) → IProp GF
+  | none => iprop(emp)
+  | some rk => iprop((E.kptRootName ↪VAR{.discard} rk) ∗
+      ∃ (ra : PAddr) (S : Nat) (Hr : Nat → Hist),
+        ⌜(⟨ra, .roots 1 8⟩ : RsvRegion) ∈ MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) ∧
+          ∀ j, j < 8 → ∃ e H, Hr j = e :: H ∧ e.v = nthByte (n := 8) (BitVec.setWidth 64 rk <<< 12) j ∧ e.t ≤ S⌝ ∗
+        [∗list] j ∈ List.range 8, pointsTo (G := E.mem) (ra + BitVec.ofNat 64 j) DFrac.discard (Hr j))
+
+instance [MachFixedGS hlc GF] (E : EraGS) (k : Option (BitVec 44)) :
+    Persistent (PROP := IProp GF) (uepKsatAt E k) := by
+  cases k <;> (unfold uepKsatAt; infer_instance)
+
+/-- The cells an open epoch holds. -/
+def uepCellsAt [MachFixedGS hlc GF] (_E : EraGS) (_σ : MState) (_h : CPU) : Option UEp → IProp GF
+  | _ => iprop(emp)
+
+/-- **One hart's epoch record.** -/
+def uepHartAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (ksat : Option (BitVec 44)) (h : CPU) :
+    IProp GF := iprop%
+  ∃ oe : Option UEp, ⌜uepLink ksat (σ.regs h Register.satp) (σ.regs h Register.cur_privilege) oe⌝ ∗
+    uepCellsAt E σ h oe
+
+/-- **The user-epoch conjunct** of era `E`'s interpretation. -/
+def uepModelAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) : IProp GF := iprop%
+  ∃ ksat : Option (BitVec 44), uepKsatAt E ksat ∗ [∗list] h ∈ cpus, uepHartAt E σ ksat h
+
 /-- Era `E`'s interpretation of the machine `σ`. -/
 def eraInterp [MachFixedGS hlc GF] (E : EraGS) (σ : MState) : IProp GF := iprop%
   ([∗list] cpu ∈ cpus, regInterpAt (E.regName cpu) (σ.regs cpu)) ∗
   genHeapInterp (G := E.mem) σ.mem ∗
   memModelAt E σ ∗
-  devInterpAt E σ.devs
+  devInterpAt E σ.devs ∗
+  uepModelAt E σ
 
 /-! ## The generation ghosts -/
 

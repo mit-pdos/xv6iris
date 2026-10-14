@@ -71,7 +71,7 @@ theorem swp_sail_barrier_fencei (cpu : CPU) (P : IProp GF) (Q : Nat → IProp GF
   imod Hmask
   imodintro
   isplitl [Hregs Hmem Hmm Hclose]
-  · iapply Hclose $$ %(σ.fence cpu .Barrier_RISCV_i) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
+  · iapply Hclose $$ %(σ.fence cpu .Barrier_RISCV_i) %⟨fun _ _ => rfl, rfl, uepStable_fence _ _ _⟩ Hregs Hmem Hmm
   · iapply swp_ret
     iapply HΦ $$ %((σ.fence cpu .Barrier_RISCV_i).itv cpu) Hiv HQ
 

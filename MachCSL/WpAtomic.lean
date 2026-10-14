@@ -1252,7 +1252,7 @@ theorem swp_sail_mem_read_plain_au (cpu : CPU) {n vasize : Nat}
     imod Hcont $$ %w' %tvn %(by omega) %hreads %hauthors Hb Hcs with HΦ
     imodintro
     isplitl [Hregs Hmem Hmm Hclose]
-    · iapply Hclose $$ %(σ.afterLoad cpu req.pa n tvn) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
+    · iapply Hclose $$ %(σ.afterLoad cpu req.pa n tvn) %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
     · iapply swp_ret
       iexact HΦ
   · rw [hk'.2] at hex'
@@ -1457,7 +1457,7 @@ theorem swp_sail_mem_write_plain_au (cpu : CPU) {n vasize : Nat}
       imod Hmask
       imodintro
       isplitl [Hregs Hmem Hmm Hclose]
-      · iapply Hclose $$ %σ %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
+      · iapply Hclose $$ %σ %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
       · iapply IH $$ Hfrag H
   · imod H with (⟨%Hs, %o, %T, Hb, #HT, Ho, Hcont⟩ | ⟨%Hs, %cs, %o, Hb, Hc, %hok, Ho, Hcont⟩)
     · -- OWNED bytes
@@ -1495,7 +1495,7 @@ theorem swp_sail_mem_write_plain_au (cpu : CPU) {n vasize : Nat}
         rw [hk]
         imodintro
         isplitl [Hregs Hmem Hmm Hclose]
-        · iapply Hclose $$ %(σ.store cpu req.pa n w' false) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
+        · iapply Hclose $$ %(σ.store cpu req.pa n w' false) %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
         · iapply swp_ret
           iapply HΦ $$ Hfrag
       · iintro %Hbk
@@ -1543,7 +1543,7 @@ theorem swp_sail_mem_write_plain_au (cpu : CPU) {n vasize : Nat}
         rw [hk]
         imodintro
         isplitl [Hregs Hmem Hmm Hclose]
-        · iapply Hclose $$ %(σ.store cpu req.pa n w' false) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
+        · iapply Hclose $$ %(σ.store cpu req.pa n w' false) %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
         · iapply swp_ret
           iapply HΦ $$ Hfrag
       · iintro %Hbk
@@ -1597,7 +1597,7 @@ theorem swp_sail_mem_read_excl_au_gen (cpu : CPU) {n vasize : Nat}
       imod Hmask
       imodintro
       isplitl [Hregs Hmem Hmm Hclose]
-      · iapply Hclose $$ %(σ.dropResv cpu) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
+      · iapply Hclose $$ %(σ.dropResv cpu) %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
       · ihave Hfrag := resvFragAny_of cpu none b $$ Hfrag
         iapply IH $$ %none Hfrag H
   · imod H with ⟨%dqs, %Hs, Hb, %hne, Hcont⟩
@@ -1631,7 +1631,7 @@ theorem swp_sail_mem_read_excl_au_gen (cpu : CPU) {n vasize : Nat}
         imod Hcont $$ %w' %hheads Hb with HΦ
         imodintro
         isplitl [Hregs Hmem Hmm Hclose]
-        · iapply Hclose $$ %(σ.afterExcl cpu req.pa n w' (akAcq req.access_kind)) %⟨fun _ _ => rfl, rfl⟩
+        · iapply Hclose $$ %(σ.afterExcl cpu req.pa n w' (akAcq req.access_kind)) %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩
             Hregs Hmem Hmm
         · iapply swp_ret
           iapply HΦ $$ Hfrag
@@ -1778,7 +1778,7 @@ theorem swp_sail_mem_write_excl_au (cpu : CPU) {n vasize : Nat}
       imod Hmask
       imodintro
       isplitl [Hregs Hmem Hmm Hclose]
-      · iapply Hclose $$ %σ %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
+      · iapply Hclose $$ %σ %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
       · iapply IH $$ Hfrag H
   · imod H with (⟨%Hs, %T, %o, Hb, #HT, Ho, Hcont⟩ | ⟨%Hs, %T, %cs, %o, Hb, #HT, Hc, %hok, Ho, Hcont⟩ |
       ⟨%Hs, %T, %c, Hb, #HT, #Hreg, %hks, Hcont⟩)
@@ -1840,7 +1840,7 @@ theorem swp_sail_mem_write_excl_au (cpu : CPU) {n vasize : Nat}
         rw [hk]
         imodintro
         isplitl [Hregs Hmem Hmm Hclose]
-        · iapply Hclose $$ %(σ.store cpu req.pa 8 w' true) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
+        · iapply Hclose $$ %(σ.store cpu req.pa 8 w' true) %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
         · iapply swp_ret
           iapply HΦ $$ Hfrag
       · iintro %Hbk
@@ -1892,7 +1892,7 @@ theorem swp_sail_mem_write_excl_au (cpu : CPU) {n vasize : Nat}
         rw [hk]
         imodintro
         isplitl [Hregs Hmem Hmm Hclose]
-        · iapply Hclose $$ %(σ.store cpu req.pa n w' true) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
+        · iapply Hclose $$ %(σ.store cpu req.pa n w' true) %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
         · iapply swp_ret
           iapply HΦ $$ Hfrag
       · iintro %Hbk
@@ -1955,7 +1955,7 @@ theorem swp_sail_mem_write_excl_au (cpu : CPU) {n vasize : Nat}
         rw [hk]
         imodintro
         isplitl [Hregs Hmem Hmm Hclose]
-        · iapply Hclose $$ %(σ.store cpu req.pa n w' true) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
+        · iapply Hclose $$ %(σ.store cpu req.pa n w' true) %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
         · iapply swp_ret
           iapply HΦ $$ Hfrag
       · iintro %Hbk

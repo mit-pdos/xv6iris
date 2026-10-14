@@ -98,7 +98,8 @@ theorem machInterp_setSeip (σ : MState) (cpu : CPU) (v : BitVec 1) :
   imod reg_update cpu (σ.regs cpu) Register.sig_seip s v $$ [$Hregs $Hs] with ⟨Hregs, Hs⟩
   imodintro
   isplitl [Hregs Hclose]
-  · iapply Hclose $$ %((σ.regs cpu).set Register.sig_seip v) Hregs
+  · iapply Hclose $$ %((σ.regs cpu).set Register.sig_seip v)
+      %(regFile_set_keep _ Register.sig_seip v (Or.inl ⟨by decide, by decide⟩)) Hregs
   · iapply Hwcl $$ %v %m Hs Hm
 
 /-- Overwrite one hart's `sig_meip` from the wire invariant's body. -/
@@ -111,7 +112,8 @@ theorem machInterp_setMeip (σ : MState) (cpu : CPU) (v : BitVec 1) :
   imod reg_update cpu (σ.regs cpu) Register.sig_meip m v $$ [$Hregs $Hm] with ⟨Hregs, Hm⟩
   imodintro
   isplitl [Hregs Hclose]
-  · iapply Hclose $$ %((σ.regs cpu).set Register.sig_meip v) Hregs
+  · iapply Hclose $$ %((σ.regs cpu).set Register.sig_meip v)
+      %(regFile_set_keep _ Register.sig_meip v (Or.inl ⟨by decide, by decide⟩)) Hregs
   · iapply Hwcl $$ %s %v Hs Hm
 
 /-- **The wire step at the interpretation**: the pin write of `devOpStep`,

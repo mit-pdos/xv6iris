@@ -22,6 +22,7 @@ slot before the switch consumed it) and the image.
 -/
 import Xv6.UserretEntryPt
 import Xv6.UserretPt
+import Xv6.UEpochRoots
 import Xv6.UkOpen
 
 namespace Xv6
@@ -47,6 +48,7 @@ theorem userret_user_run [CurCtx] (cpu : CPU) (P : UPtd) (ms mdl mepc stc : BitV
     (hf : MachFixedGS.uFit (hlc := hlc) (GF := GF) ox (.uEnter cpu (satpOf .kpt P.root) epc (tfGprs ws))) :
     kernelText ∗ kmapStatic ∗ wireInv ∗ uRcptOpt ox ∗ uClaimFor (hlc := hlc) (GF := GF) ox ∗
     MachFixedGS.uEvid (hlc := hlc) (GF := GF) ox (.uEnter cpu (satpOf .kpt P.root) epc (tfGprs ws)) ∗
+    uenterWit cpu Privilege.Supervisor (satpOf .kpt P.root) ∗
     urSt cpu (sConfOf KTier.kpt P.root ms mdl mepc stc lf) P (urPc 0xac#64) R ∗
     tfPageAt P.tfp ws ∗ Register.sepc ↦ᵣ[cpu] epc ∗
     ▷ (confCells cpu (DFrac.own 1) Privilege.User
@@ -56,7 +58,7 @@ theorem userret_user_run [CurCtx] (cpu : CPU) (P : UPtd) (ms mdl mepc stc : BitV
         gprFile cpu (tfResumeGpr0 ws) -∗ Register.sepc ↦ᵣ[cpu] epc -∗ tfPageAt P.tfp ws -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
   have hc := urConfOk_sConfOf (GF := GF) P.root ms mdl mepc stc lf P rfl hsm hlf hmdl
-  iintro ⟨#Htext, #HS, #Hwi, #Hrc, Hclm, #Hev, Hst, Hpage, Hsepc, HΦ⟩
+  iintro ⟨#Htext, #HS, #Hwi, #Hrc, Hclm, #Hev, #Huent, Hst, Hpage, Hsepc, HΦ⟩
   iapply (userret_li cpu _ P hc R)
   iframe Htext HS Hst
   inext
@@ -87,7 +89,9 @@ theorem userret_user_run [CurCtx] (cpu : CPU) (P : UPtd) (ms mdl mepc stc : BitV
           (gprList_tfResumeGpr0 ws)
       rw [hg]
       exact hf))
-  iframe Htext HS Hwi Hrc Hclm Hst Hpage Hsepc
+  ihave #Huent2 := uenterWit_eq cpu Privilege.Supervisor (sConfOf_satp KTier.kpt P.root ms mdl mepc stc lf).symm
+    $$ Huent
+  iframe Htext HS Hwi Hrc Hclm Hst Hpage Hsepc Huent2
   -- the record's evidence (NI M2-X1), at the same event
   isplitl []
   · have hg : gprList ((urLoadSeq urLoadsC ws (urLoadSeq urLoadsB ws (urLoadSeq urLoadsA ws
@@ -132,11 +136,17 @@ theorem userret_proof : USERRET :=
   have hv : pageValid (pageAddr P.tfp) := hwfP.2.2.1
   -- the pages, the text half as physical bytes for the mint
   icases umPages_split P hwfP M $$ HS Hum with ⟨%hl, HD, HT⟩
+  -- the user root is not the kernel's, by ownership (W8 (f3-utext), F-REGS)
+  ihave #Hkr := kptOnAt_rootName root $$ Hon
+  ihave %hne : ⌜P.root ≠ root⌝ $$ [Hfr]
+  · iapply uptFrame_kptOnAt_ne P root
+    iframe HS Hon
+    unfold uptFrame; unfold ptOwnRep at *; iexact Hfr
   -- the switch (its fence.i stamps the text: UserExec deviation 7)
   iapply (userret_entry cpu root P ms mdl mepc stc lf hsm hlf hmdl (tpPin cpu regs) (userret_a0_get cpu regs _ ha0)
     (ubOwnA curCtx (ukTextBytes P.um M)) (fun K => ukOwnX curCtx K (ukTextBytes P.um M))
-    (by unfold ubOwnA ukOwnX; exact ifenceStep_stamp cpu curCtx (ukTextBytes P.um M)))
-  iframe Htext HS Hcl HmConf Hclock Hpc Hkpt Htok HF HT
+    (by unfold ubOwnA ukOwnX; exact ifenceStep_stamp cpu curCtx (ukTextBytes P.um M)) hne)
+  iframe Hkr Htext HS Hcl HmConf Hclock Hpc Hkpt Htok HF HT
   isplitl [Hfr]
   · unfold uptFrame; unfold ptOwnRep at *; iexact Hfr
   inext
@@ -145,6 +155,12 @@ theorem userret_proof : USERRET :=
   -- the run under the user table
   iapply (userret_user_run cpu P ms mdl mepc stc lf hsm hlf hspp' hmdl hv (tpPin cpu regs) ws sep ox hf)
   iframe Htext HS Hwi Hrc Hclm Hev Hst Hpage Hsepc
+  isplitl []
+  · unfold uenterWit
+    iexists root, P.root
+    iframe Hkr
+    ipureintro
+    exact ⟨rfl, satpTable_satpOf P.root, hne⟩
   inext
   iintro HmConf Hclock Hpc Hslot Htok HF Hsepc Hpage
   -- the user machine, repackaged

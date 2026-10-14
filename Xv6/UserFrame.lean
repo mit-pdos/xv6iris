@@ -112,8 +112,10 @@ theorem ufFoot_wr (r : Register) (h : r ∈ ufRwList.erase .cur_privilege) : ufF
   have hm : r ∈ ufRwList := List.mem_of_mem_erase h
   have hne : r ≠ .cur_privilege := by
     rintro rfl; exact absurd h (by decide)
+  have hns : r ≠ .satp := by
+    rintro rfl; exact absurd hm (by decide)
   simp only [ufFoot, uFootL, Bool.and_eq_true, List.contains_iff_mem, bne_iff_ne, ne_eq]
-  exact ⟨hm, hne⟩
+  exact ⟨⟨hm, hne⟩, hns⟩
 
 /-- U1-X1's footprint premise. -/
 theorem ufFoot_uxa : UxaFoot ufFoot :=

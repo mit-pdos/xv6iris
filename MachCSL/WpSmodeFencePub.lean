@@ -118,7 +118,7 @@ theorem swp_sail_barrier_pub (cpu : CPU) (b : barrier_kind) (hdrain : fenceDrain
   imod Hmask
   imodintro
   isplitl [Hregs Hmem Hmm Hclose]
-  · iapply Hclose $$ %(σ.fence cpu b) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
+  · iapply Hclose $$ %(σ.fence cpu b) %⟨fun _ _ => rfl, rfl, uepStable_fence _ _ _⟩ Hregs Hmem Hmm
   · iapply swp_ret
     iapply HΦ $$ Hv
 

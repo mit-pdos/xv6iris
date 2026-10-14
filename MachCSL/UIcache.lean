@@ -187,7 +187,7 @@ theorem swp_sail_mem_read_ifetch_x (cpu : CPU) {n vasize : Nat}
     imod Hmask
     imodintro
     isplitl [Hregs Hmem Hmm Hclose]
-    · iapply Hclose $$ %σ %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
+    · iapply Hclose $$ %σ %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
     · iapply swp_ret
       iapply HΦ $$ Hb
   · simp [akPlain, hk] at hpl
@@ -251,7 +251,7 @@ theorem swp_sail_mem_read_plain_x (cpu : CPU) {n vasize : Nat}
     imod Hmask
     imodintro
     isplitl [Hregs Hmem Hmm Hclose]
-    · iapply Hclose $$ %(σ.afterLoad cpu req.pa n tvn) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
+    · iapply Hclose $$ %(σ.afterLoad cpu req.pa n tvn) %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
     · iapply swp_ret
       iapply HΦ $$ Hctx Hb
   · rw [hk'.2] at hex'

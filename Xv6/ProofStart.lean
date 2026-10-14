@@ -347,7 +347,7 @@ theorem StartProof (T : TIMERINIT) : START where
     st_norm
     -- 800000ca: mret
     iapply wp_m_mret cpu _ ok9 (KA.«start» + 0x72#64) false (by decide : BitVec.extractLsb' 11 2 0xA00000800#64 = 1#2)
-      (by decide : BitVec.extractLsb' 2 1 0xA000000000000000#64 = 0#1)
+      (by decide : BitVec.extractLsb' 2 1 0xA000000000000000#64 = 0#1) satpTable_zero
     -- Fold the `mepc` mask with a stated equation: letting `simp` fold it by
     -- `rfl` (`BitVec.reduceAnd`) makes the kernel's check of the resulting
     -- big `Eq.refl` recurse too deeply.

@@ -26,6 +26,7 @@ import MachCSL.WpSmodeSatp
 import MachCSL.WpSmodeSfence
 import Xv6.TransPt
 import MachCSL.UIcacheFencei
+import MachCSL.UEpochSatp
 
 namespace Xv6
 
@@ -141,7 +142,9 @@ the user table, landing at `+0xac` with the same file. -/
 theorem userret_entry [CurCtx] (cpu : CPU) (kroot : BitVec 44) (P : UPtd) (ms mdl mepc stc : BitVec 64) (lf : SLeft)
     (hsm : smFacts ms false) (hlf : lf.ok) (hmdl : 0x220#64 &&& ~~~mdl = 0#64) (R : RegMap)
     (ha0 : R.get 10#5 = satpOf KTier.kpt P.root) (Pf : IProp GF) (Qf : Nat → IProp GF)
-    (hstep : ⊢ ifenceStep cpu iprop(ownCtx cpu curCtx ∗ Pf) (fun K => iprop(ownCtx cpu curCtx ∗ Qf K))) :
+    (hstep : ⊢ ifenceStep cpu iprop(ownCtx cpu curCtx ∗ Pf) (fun K => iprop(ownCtx cpu curCtx ∗ Qf K)))
+    (hne : P.root ≠ kroot) :
+    (MachGS.kptRootName (hlc := hlc) (GF := GF) ↪VAR{.discard} kroot) ∗
     kernelText ∗ kmapStatic ∗ urTrampCl ∗
     confCells cpu (DFrac.own 1) Privilege.Supervisor (sConfOf KTier.kpt kroot ms mdl mepc stc lf) ∗
     clockCells cpu ∗ pcIs cpu (urPc 0x9c#64) ∗ kptSlot cpu kroot ∗ ctxTok cpu curCtx ∗ gprFile cpu R ∗
@@ -153,7 +156,7 @@ theorem userret_entry [CurCtx] (cpu : CPU) (kroot : BitVec 44) (P : UPtd) (ms md
     SConfAt_sConfOf KTier.kpt kroot ms mdl mepc stc lf false hsm hlf
   have hc1 : urConfOk GF (sConfOf KTier.kpt P.root ms mdl mepc stc lf) P :=
     urConfOk_sConfOf P.root ms mdl mepc stc lf P rfl hsm hlf hmdl
-  iintro ⟨#Htext, #HS, #Hcl, HmConf, Hclock, Hpc, Hkpt, Htok, HR, Hfr, HPf, HΦ⟩
+  iintro ⟨#Hkr, #Htext, #HS, #Hcl, HmConf, Hclock, Hpc, Hkpt, Htok, HR, Hfr, HPf, HΦ⟩
   ihave Htt : transTok cpu KTier.kpt kroot $$ [Hkpt Htok]
   · rw [userret_transTok_kpt]; iframe
   -- step 0: fence.i, running the caller's stamping step on the running token
@@ -194,15 +197,24 @@ theorem userret_entry [CurCtx] (cpu : CPU) (kroot : BitVec 44) (P : UPtd) (ms md
   iframe HI HmConf Hclock Hpc Htt HR Hcl
   inext
   iintro HmConf Hclock Hpc ⟨Htt, HR, _⟩
-  -- step 2: csrw satp, a0 -- the user root installed
+  -- step 2: csrw satp, a0 -- the user root installed, the hart's user
+  -- epoch opened (W8 (f3-utext), F-REGS: `satpStep_open`)
+  ihave Hsatpw := satpStep_open (GF := GF) cpu (DFrac.own 1) (sConfOf KTier.kpt kroot ms mdl mepc stc lf).satp
+    kroot P.root (satpTable_satpOf kroot) hne
   iapply (userret_kstep cpu _ (sConfOf KTier.kpt P.root ms mdl mepc stc lf) kroot hok0 hmdl rfl (urPc 0xa4#64)
     (urPc 0xa8#64) (by decide) (by decide)
-    urCsrw (gprFile cpu R) iprop((transTok cpu KTier.kpt kroot ∗ urTrampCl) ∗ gprFile cpu R)
-    ((execSpecF_csrw_satp_sv39 cpu _ false hok0.phys _ _ 10#5 R P.root ha0).frameL _))
+    urCsrw iprop(gprFile cpu R ∗ satpStep cpu (sConfOf KTier.kpt kroot ms mdl mepc stc lf).satp
+        (satpOf KTier.kpt P.root)
+        iprop(Register.cur_privilege ↦ᵣ[cpu] Privilege.Supervisor ∗
+          (MachGS.kptRootName (hlc := hlc) (GF := GF) ↪VAR{.discard} kroot))
+        iprop(Register.cur_privilege ↦ᵣ[cpu] Privilege.Supervisor ∗ emp) ∗
+      (MachGS.kptRootName (hlc := hlc) (GF := GF) ↪VAR{.discard} kroot))
+    iprop((transTok cpu KTier.kpt kroot ∗ urTrampCl) ∗ gprFile cpu R ∗ emp)
+    ((execSpecF_csrw_satp_sv39 cpu _ false hok0.phys _ _ 10#5 R P.root ha0 _ _).frameL _))
   ihave HI := ui_csrw $$ Htext
-  iframe HI HmConf Hclock Hpc Htt HR Hcl
+  iframe HI HmConf Hclock Hpc Htt HR Hcl Hsatpw Hkr
   inext
-  iintro HmConf Hclock Hpc ⟨⟨Htt, _⟩, HR⟩
+  iintro HmConf Hclock Hpc ⟨⟨Htt, _⟩, HR, -⟩
   rw [userret_transTok_kpt]
   icases Htt with ⟨Hkpt, Htok⟩
   ihave Hwin := pt2Win_enterU cpu kroot P $$ [Hkpt Hfr]
