@@ -216,5 +216,54 @@ theorem pfUxaRedirMem (c b : instruction) (he : execute c = pure (.ExecuteAs b))
   · exact Or.inl hr
   · exact Or.inr ⟨hm, hr⟩
 
+set_option maxHeartbeats 4000000 in
+/-- **THE PLAIN CLASS'S EXECUTE STAGE** (header). -/
+theorem pfUxaPlain (c : instruction) (hc : plainC c = true) :
+    pf (plainPost c) (uxaExecAs c) := by
+  cases c with
+  | UTYPE x => exact pfUxaBaseRet _ (pfExecUtype ..)
+  | ITYPE x => exact pfUxaBaseRet _ (pfExecItype ..)
+  | SHIFTIOP x => exact pfUxaBaseRet _ (pfExecShiftiop ..)
+  | RTYPE x => exact pfUxaBaseRet _ (pfExecRtype ..)
+  | ADDIW x => exact pfUxaBaseRet _ (pfExecAddiw ..)
+  | RTYPEW x => exact pfUxaBaseRet _ (pfExecRtypew ..)
+  | SHIFTIWOP x => exact pfUxaBaseRet _ (pfExecShiftiwop ..)
+  | MUL x => exact pfUxaBaseRet _ (pfExecMul ..)
+  | DIV x => exact pfUxaBaseRet _ (pfExecDiv ..)
+  | REM x => exact pfUxaBaseRet _ (pfExecRem ..)
+  | MULW x => exact pfUxaBaseRet _ (pfExecMulw ..)
+  | DIVW x => exact pfUxaBaseRet _ (pfExecDivw ..)
+  | REMW x => exact pfUxaBaseRet _ (pfExecRemw ..)
+  | LOAD x => exact pfUxaBaseMem _ rfl (pfExecLoad ..)
+  | STORE x => exact pfUxaBaseMem _ rfl (pfExecStore ..)
+  | C_ADDI4SPN x => exact pfUxaRedirRet _ _ rfl (by simp only [execute]; exact pfExecItype ..)
+  | C_LW x => exact pfUxaRedirMem _ _ rfl rfl (by simp only [execute]; exact pfExecLoad ..)
+  | C_LD x => exact pfUxaRedirMem _ _ rfl rfl (by simp only [execute]; exact pfExecLoad ..)
+  | C_SW x => exact pfUxaRedirMem _ _ rfl rfl (by simp only [execute]; exact pfExecStore ..)
+  | C_SD x => exact pfUxaRedirMem _ _ rfl rfl (by simp only [execute]; exact pfExecStore ..)
+  | C_ADDI x => exact pfUxaRedirRet _ _ rfl (by simp only [execute]; exact pfExecItype ..)
+  | C_ADDIW x => exact pfUxaRedirRet _ _ rfl (by simp only [execute]; exact pfExecAddiw ..)
+  | C_LI x => exact pfUxaRedirRet _ _ rfl (by simp only [execute]; exact pfExecItype ..)
+  | C_ADDI16SP x => exact pfUxaRedirRet _ _ rfl (by simp only [execute]; exact pfExecItype ..)
+  | C_LUI x => exact pfUxaRedirRet _ _ rfl (by simp only [execute]; exact pfExecUtype ..)
+  | C_SRLI x => exact pfUxaRedirRet _ _ rfl (by simp only [execute]; exact pfExecShiftiop ..)
+  | C_SRAI x => exact pfUxaRedirRet _ _ rfl (by simp only [execute]; exact pfExecShiftiop ..)
+  | C_ANDI x => exact pfUxaRedirRet _ _ rfl (by simp only [execute]; exact pfExecItype ..)
+  | C_SUB x => exact pfUxaRedirRet _ _ rfl (by simp only [execute]; exact pfExecRtype ..)
+  | C_XOR x => exact pfUxaRedirRet _ _ rfl (by simp only [execute]; exact pfExecRtype ..)
+  | C_OR x => exact pfUxaRedirRet _ _ rfl (by simp only [execute]; exact pfExecRtype ..)
+  | C_AND x => exact pfUxaRedirRet _ _ rfl (by simp only [execute]; exact pfExecRtype ..)
+  | C_SUBW x => exact pfUxaRedirRet _ _ rfl (by simp only [execute]; exact pfExecRtypew ..)
+  | C_ADDW x => exact pfUxaRedirRet _ _ rfl (by simp only [execute]; exact pfExecRtypew ..)
+  | C_SLLI x => exact pfUxaRedirRet _ _ rfl (by simp only [execute]; exact pfExecShiftiop ..)
+  | C_LWSP x => exact pfUxaRedirMem _ _ rfl rfl (by simp only [execute]; exact pfExecLoad ..)
+  | C_LDSP x => exact pfUxaRedirMem _ _ rfl rfl (by simp only [execute]; exact pfExecLoad ..)
+  | C_SWSP x => exact pfUxaRedirMem _ _ rfl rfl (by simp only [execute]; exact pfExecStore ..)
+  | C_SDSP x => exact pfUxaRedirMem _ _ rfl rfl (by simp only [execute]; exact pfExecStore ..)
+  | C_MV x => exact pfUxaRedirRet _ _ rfl (by simp only [execute]; exact pfExecRtype ..)
+  | C_ADD x => exact pfUxaRedirRet _ _ rfl (by simp only [execute]; exact pfExecRtype ..)
+  | C_NOP x => exact (Or.inl rfl : plainPost (.C_NOP x) RETIRE_SUCCESS)
+  | _ => exact absurd hc (by simp [plainC])
+
 end PinCycRun
 end Weak

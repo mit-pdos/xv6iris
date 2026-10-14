@@ -671,6 +671,9 @@ import Weak.PinFetchVal
 import Weak.PinFetchPaFp
 import Weak.PinFetchPaReg
 import Weak.PinCycRunExec
+import Weak.PinCycRunFetch
+import Weak.PinCycRunExec3
+import Weak.PinCycRunExec2
 import Weak.PinCycRunTab
 import Weak.PinCycRunReg
 import Weak.PinCycRunMem

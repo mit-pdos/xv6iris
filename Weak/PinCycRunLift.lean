@@ -95,7 +95,7 @@ theorem cyOfPfDf {X : Type} (hS : ∀ r, S r = true → pfProt r = true) (P : X 
           hq x st' h1 (cyFrameTrans _ _ _ (PinCycRun.frameWr st r v hrb hpf hb) h2) h3)
       case memRead n va req =>
         obtain ⟨hif, hk⟩ := hp
-        refine ⟨fun _ h2 => ?_, fun _ v => ih v st (hk v) (hd v) hrb hq⟩
+        refine ⟨fun _ h2 => ?_, fun _ w => ih _ st (hk _) (hd _) hrb hq⟩
         exact absurd h2 (by simp only [PinCycRunFp.ifOk] at hif; simp [classify, hif])
       case instrAnnounce => exact hp.elim
       case barrier b => exact fun v => ih v st hp.2 (hd v) hrb hq
@@ -153,7 +153,7 @@ theorem cyOfFp {X : Type} (P : X → Prop) (Q : X → CySt → Prop) :
         exact ih u (cyWr st r v) (hk u) (rbootAllSet _ r v hrb hb) hq hT
       case memRead n va req =>
         obtain ⟨hif, hk⟩ := hp
-        refine ⟨fun _ h2 => ?_, fun _ v => ih v st (hk v) hrb hq hT⟩
+        refine ⟨fun _ h2 => ?_, fun _ w => ih _ st (hk _) hrb hq hT⟩
         exact absurd h2 (by simp only [SailCycleOrderFp.ifOk] at hif; simp [classify, hif])
       case instrAnnounce => exact hp.elim
       case barrier b => exact fun v => ih v st hp.2 hrb hq hT

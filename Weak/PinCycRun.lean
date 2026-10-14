@@ -15,7 +15,7 @@ file (`st.rv`) and B1's dataflow bookkeeping (`st.d`, `PinDataflow.dfB`'s state)
   updates the mirror and moves the slots (`dfWr`);
 * a RAM instruction-fetch read is answered by every value whose bytes the FETCH FILTER `A`
   admits, and is LOGGED (`st.fe`: physical address, bytes, in order); every other read by every
-  value;
+  successful answer `.Ok (w, none)` (the only answers a hart step gives, `pnodeStep`);
 * the ANNOUNCE — at most one (`st.an`) — sets the decoded role and empties the read set
   (`dfAnn`, the emission's `ibAnn`);
 * every other node continues for every answer; a failure is stuck (`True`); at `.pure x`, `P`.
@@ -96,7 +96,7 @@ def cyB {X : Type} (A : Int → BitVec 8 → Prop) (Aa : Nat → Int → Prop) (
           ∀ w : BitVec (8 * n), (∀ j, j < n → A (paZ req.pa + (j : Int)) (nthByte w j)) →
             cyB A Aa S T P (k (.Ok (w, none))) (cyFe st (paZ req.pa) n w)) ∧
         ((devAddr req.pa = false → (classify req.access_kind).akIfetch = false) →
-          ∀ v, cyB A Aa S T P (k v) st)
+          ∀ w : BitVec (8 * n), cyB A Aa S T P (k (.Ok (w, none))) st)
     | .instrAnnounce n w, k => st.an = false ∧ ∀ u, cyB A Aa S T P (k u) (cyAnn st n w)
     | .barrier _, k => ∀ v, cyB A Aa S T P (k v) st
     | .memWrite .., k => ∀ v, cyB A Aa S T P (k v) st
@@ -136,7 +136,7 @@ theorem cyBBind {X Y : Type} (Q : X → CySt → Prop) (P : Y → CySt → Prop)
       case regRead => exact fun v hv => ih v _ (hm v hv) hf
       case regWrite => exact ⟨hm.1, fun h => ⟨(hm.2 h).1, fun u => ih u _ ((hm.2 h).2 u) hf⟩⟩
       case memRead =>
-        exact ⟨fun h1 h2 ha w hw => ih _ _ (hm.1 h1 h2 ha w hw) hf, fun h v => ih v _ (hm.2 h v) hf⟩
+        exact ⟨fun h1 h2 ha w hw => ih _ _ (hm.1 h1 h2 ha w hw) hf, fun h w => ih _ _ (hm.2 h w) hf⟩
       case instrAnnounce => exact ⟨hm.1, fun u => ih u _ (hm.2 u) hf⟩
       case getCycleCount => exact ih _ _ hm hf
       all_goals exact fun v => ih v _ (hm v) hf
@@ -155,7 +155,7 @@ theorem cyBMono {X : Type} (P P' : X → CySt → Prop) (hP : ∀ x st, P x st �
       case regRead => exact fun v hv => ih v _ (hm v hv)
       case regWrite => exact ⟨hm.1, fun h => ⟨(hm.2 h).1, fun u => ih u _ ((hm.2 h).2 u)⟩⟩
       case memRead =>
-        exact ⟨fun h1 h2 ha w hw => ih _ _ (hm.1 h1 h2 ha w hw), fun h v => ih v _ (hm.2 h v)⟩
+        exact ⟨fun h1 h2 ha w hw => ih _ _ (hm.1 h1 h2 ha w hw), fun h w => ih _ _ (hm.2 h w)⟩
       case instrAnnounce => exact ⟨hm.1, fun u => ih u _ (hm.2 u)⟩
       case getCycleCount => exact ih _ _ hm
       all_goals exact fun v => ih v _ (hm v)
