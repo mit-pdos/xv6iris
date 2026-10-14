@@ -669,5 +669,8 @@ import Weak.GraphFetchKill
 import Weak.GraphFetchRun
 import Weak.GraphFetchLinInd
 import Weak.GraphFetchBlocks
+import Weak.GraphFetchHullZ
+import Weak.GraphFetchAncSupply
+import Weak.GraphFetchAnc
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
