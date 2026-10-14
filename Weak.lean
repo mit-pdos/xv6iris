@@ -672,6 +672,13 @@ import Weak.WeakRvwmoPinBridge6
 import Weak.PinFetchVal
 import Weak.PinFetchPaFp
 import Weak.PinFetchPaReg
+import Weak.PinFetchPa
+import Weak.PinFetchPaXf
+import Weak.PinFetchPaRd
+import Weak.PinFetchPaWalk
+import Weak.PinFetchPaTlb
+import Weak.PinFetchPaAddr
+import Weak.PinFetchPaRun
 import Weak.PinCycRunExec
 import Weak.PinCycRunFetch
 import Weak.PinCycRunExec3
