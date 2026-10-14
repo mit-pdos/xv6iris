@@ -666,6 +666,8 @@ import Weak.WeakRvwmoPinBridge4
 import Weak.PinDataflowSatp
 import Weak.PinWalkTab
 import Weak.WeakRvwmoPinBridge5
+import Weak.WeakRvwmoPinBridge6
+import Weak.PinFetchVal
 import Weak.GraphFetchKill
 import Weak.GraphFetchRun
 import Weak.GraphFetchLinInd
