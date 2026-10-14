@@ -390,6 +390,61 @@ theorem cycRunOfHartConfF (G : Gexec) (i : Nat) (row : List Lbl) (p0 : Pexv6) (d
   cycRunOfHartConfE G i row p0 dv em pcL w own hcf hm hw hft
     (fun _ _ _ _ _ _ => PinCycRunFetch.fetchCyR1Of _) hfetch hdata hexc base rest hes hstart
 
+
+/-! ## 4. The walk start as a REALIZATION INTERFACE (provisional, FAITHFUL; Q-START (a))
+
+The walk-start premise does not follow from `hartConf` (an `hemit` run from an arbitrary `p0`)
+nor from the load's cycle certificate (word, role, address only). Its content is the program
+logic's: at every kernel instruction the WP proof holds the configuration bundle (`ctrlOkSI`,
+`Weak/AxIntr.lean:84`: priv `S`, `hart_state` active, `misa = misaC`, `menvcfg = menvcfgS`,
+`htif_tohost_base = none`, `elp` not `LP_EXPECTED`, `pma_regions = bootPMA`, `mstatus.TVM = 0`
+inside `sconfMsFacts`), plus `mseccfg = 0`. `walkStartRealized` is that fact at the load's
+boundary, an interface of `RvwmoXv6Adequacy.syncRealized`'s kind, which W11-F's composition
+supplies from the certified run. -/
+
+/-- The configuration bundle the walk needs (`kCfg` and the two boot-pinned registers of
+`Rboot`); field by field a projection of `ctrlOkSI` + `mseccfg = 0`. -/
+def wpCfgAt (rs : RegFile) : Prop :=
+  kCfg rs ∧ rs .pma_regions = bootPMA ∧ rs .htif_tohost_base = none
+
+/-- **THE WALK START, REALIZED (INTERFACE, header; W11-F's obligation)**: along the hart's run of
+the emission prefix `base` (ending with the load's cycle), the hart is at a cycle boundary whose
+`PC` is the walk start `pc` and whose registers hold the configuration bundle. -/
+def walkStartRealized (p0 : Pexv6) (d0 : Efab) (base : List Eitem) (pc : Int) : Prop :=
+  ∀ p d, pevrun (base.map Prod.fst) p0 d0 p d →
+    ∃ (cpu : CPU) (rs : RegFile) (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch),
+      p = .PHart cpu (.pure ()) rs fn ib ∧ rs .PC = BitVec.ofInt 64 pc ∧ wpCfgAt rs
+
+theorem PinCycRunFetch.rbootAllOf (rs : RegFile) (h1 : rs .pma_regions = bootPMA)
+    (h2 : rs .htif_tohost_base = none) : RbootAll rs := by
+  intro r
+  cases r <;> first | exact h1 | exact h2 | trivial
+
+theorem PinCycRunFetch.kInvOfCfg (pc : Int) (rs : RegFile) (hpc : rs .PC = BitVec.ofInt 64 pc)
+    (h : wpCfgAt rs) : kInv pc rs :=
+  ⟨hpc, h.1, PinCycRunFetch.rbootAllOf rs h.2.1 h.2.2⟩
+
+/-- **`cycRun` FROM `hartConf`, walk start realized** (header): `cycRunOfHartConfF` with the
+walk-start premise replaced by the interface `walkStartRealized`; left: `fetchOkR2` (r2),
+`dataOkR`, `excRetR` (owner questions). -/
+theorem cycRunOfHartConfW (G : Gexec) (i : Nat) (row : List Lbl) (p0 : Pexv6) (dv : Nat → Efab)
+    (em : Hemission) (pcL : Int) (w : Pin) (own : Bool)
+    (hcf : hartConf i row p0 dv em) (hm : (pcL, w) ∈ pinsW9a) (hw : walkOwn w = some own)
+    (hft : kFetchText em)
+    (hfetch : ∀ s n, preach own (pinStart pcL) s n → fetchOkR2 p0 (dv 0) em s.psPc)
+    (hdata : ∀ s n, preach own (pinStart pcL) s n → dataOkR p0 (dv 0) em s.psPc)
+    (hexc : ∀ s n, preach own (pinStart pcL) s n → excRetR G i p0 (dv 0) em s.psPc)
+    (base rest : List Eitem) (hes : em.emItems = base ++ rest)
+    (hreal : walkStartRealized p0 (dv 0) base (pinStart pcL).psPc) :
+    ∃ (mid rest' : List Eitem) (s : PState) (n : Nat) (p' : Pexv6) (d' : Efab),
+      rest = mid ++ rest' ∧ cycRun G i em own base (pinStart pcL) mid s ∧
+      preach own (pinStart pcL) s n ∧ walkBd p0 (dv 0) em (base ++ mid) s.psPc p' d' ∧
+      cycStop G i p0 (dv 0) em own (base ++ mid) s rest' :=
+  cycRunOfHartConfF G i row p0 dv em pcL w own hcf hm hw hft hfetch hdata hexc base rest hes
+    (fun p d hr => by
+      obtain ⟨cpu, rs, fn, ib, hp, hpc, hc⟩ := hreal p d hr
+      exact ⟨cpu, rs, fn, ib, hp, PinCycRunFetch.kInvOfCfg _ rs hpc hc⟩)
+
 end PinCycRun
 
 end Weak
