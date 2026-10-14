@@ -44,6 +44,13 @@ and is DEPRECATED, with its three consumers (vacuous).  Added:
        **`CatLin.cycleKillOfWalkCZCw`**, `CatLin.cycleKillOfWalkCZw`, **`CatLin.t2linOfWalkCZw`**.
 Q1 (b): `certSupplyCZ` (`GraphFetchKill`) also receives `ioResidueGmo`/`gdiskRead14`.
 
+**SUPERSEDED BY N2′ [OWN.94] (`Weak/GraphFetchN2.lean`).**  The `gwrowGmo` path of §3/§4
+(`walkPolicyCZw`, `walkMemberCZ`, `memberRunOfWalkCZw`, `cycleKillOfWalkCZCw`, `cycleKillOfWalkCZw`,
+`t2linOfWalkCZw`) is kept but OFF W11-F's path: it kills at a member in program write order, and
+`walkMemberCZ`'s rwwD-cyclic (2+2W) case is circular (N1 rejected).  N2′ keeps the cycle and the kill
+at `GF` and moves only the log to a realized member; W11-F consumes **`CatLin.cycleKillOfWalkCZRC`**
+(`tailPolicyCZ`, `acqAqCZ`, `relCoversCZ`, `l2ClaimCZR`) — no `gwrowGmo GF` premise anywhere.
+
 **Deviations from the pinned walk.**  (1) THE WALK INVARIANT IS A PARAMETER: the pinned
 `wlkInv` fixes the constant fabric through `cstOk`'s end clause; at the Zifencei bundle the fabric
 moves (`GraphFetchRun` §3, W13 (R′)), so the policy supplies its own invariant `I` (true at the
@@ -503,7 +510,7 @@ theorem certSupplyOfWalkCZ (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efa
   exact ⟨Sf.cstC, Sf.cstPst, Sf.cstDv,
     runDataZOfCyc boot d0 N GF.gfGd.gdG Sf hinv.1 hinv.2.1 hinv.2.2.1, logOfOfPfx _ _ hinv.2.2.2⟩
 
-/-- **THE WALK POLICY, STATED WITH `gwrowGmo` (W10-0 [OWN.94]) — THE NAMED PREMISE (W10-2..4's
+/-- **SUPERSEDED BY N2′ (`Weak/GraphFetchN2.lean`) — off W11-F's path: it needs a `gwrowGmo` graph at the kill; W11-F consumes `CatLin.cycleKillOfWalkCZRC`.** **THE WALK POLICY, STATED WITH `gwrowGmo` (W10-0 [OWN.94]) — THE NAMED PREMISE (W10-2..4's
 job, Z side)**: on every cat graph carrying the bundle at the image, with the I/O residue facts
 (Q1 (b)) and whose same-hart writes are gmo-ordered as in po (`gwrowGmo`, the walk's
 precondition), the macro-step walk policy holds.  `gwrowGmo` is what makes it no longer false: the
@@ -546,7 +553,7 @@ def memberRunCZ (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (im : Im
       tc (racyDIO GF') x' x' ∧
       RunDataZ boot d0 N GF'.gfGd.gdG c pst dv ∧ logOf GF'.gfGd.gdG (cdLog c c.cdTr.length)
 
-/-- **THE NORMALIZATION — NAMED (W10-0 [OWN.94]; W10-1's job, option N1 or N2 open)**: every
+/-- **SUPERSEDED BY N2′ (`Weak/GraphFetchN2.lean`) — off W11-F's path: it needs a `gwrowGmo` graph at the kill; W11-F consumes `CatLin.cycleKillOfWalkCZRC`.** **THE NORMALIZATION — NAMED (W10-0 [OWN.94]; W10-1's job, option N1 or N2 open)**: every
 cyclic class graph (with the class induction hypothesis) has a cyclic class graph satisfying
 `gwrowGmo` — intended: an equivalent member `GF'` of its orbit (same events, rf, co, deps and
 fabric up to the row renaming; only the mo witness differs) with the bundle, the residue facts
@@ -568,7 +575,7 @@ def walkMemberCZ (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (im : I
       ioResidueGmo GF' ∧ gdiskRead14 GF'.gfGd.gdG ∧
       gwrowGmo GF'.gfGd.gdG ∧ tc (racyDIO GF') x' x'
 
-/-- N1's member run: the normalization, then the walk at the normalized member. -/
+/-- **SUPERSEDED BY N2′ (`Weak/GraphFetchN2.lean`) — off W11-F's path: it needs a `gwrowGmo` graph at the kill; W11-F consumes `CatLin.cycleKillOfWalkCZRC`.** N1's member run: the normalization, then the walk at the normalized member. -/
 theorem memberRunOfWalkCZw (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (im : Image)
     (N : Nat) :
     walkPolicyCZw boot d0 fab im N → walkMemberCZ boot d0 fab im →
@@ -856,7 +863,7 @@ theorem cycleKillOfMemberCZC (hlc : HasLC) (GF0 : BundledGFunctors) [MachGpreS h
       hnB (hl2 GF' ad' him' hconf' (cdLog c c.cdTr.length) z ss hc' hlog hpr hne hch) z z ss
       (fun _ h => h) hch)
 
-/-- **`cycleKillOfWalkCZCw`** — WHAT W11-F CONSUMES (W10-0 [OWN.94], replacing the vacuous
+/-- **SUPERSEDED BY N2′ (`Weak/GraphFetchN2.lean`) — off W11-F's path: it needs a `gwrowGmo` graph at the kill; W11-F consumes `CatLin.cycleKillOfWalkCZRC`.** **`cycleKillOfWalkCZCw`** — (was) WHAT W11-F CONSUMES (W10-0 [OWN.94], replacing the vacuous
 `cycleKillOfWalkCZC`): the class kill from the WP package, the fetch-view premise, the L2′ claim,
 the walk policy WITH `gwrowGmo` (`walkPolicyCZw`) and the NAMED normalization (`walkMemberCZ`). -/
 theorem cycleKillOfWalkCZCw (hlc : HasLC) (GF0 : BundledGFunctors) [MachGpreS hlc GF0]
@@ -877,7 +884,7 @@ theorem cycleKillOfWalkCZCw (hlc : HasLC) (GF0 : BundledGFunctors) [MachGpreS hl
     cycleKillOfMemberCZC hlc GF0 gen σ0 D hD Nm P boot d0 fab N hfr hb1 hb2 hwp hwpp hcov
       (memberRunOfWalkCZw boot d0 fab _ N hpol hnorm) hl2
 
-/-- The guarded kill from the same premises (`cycleKillOfWalkCZCw` through `cycleKillCZOfC`). -/
+/-- **SUPERSEDED BY N2′ (`Weak/GraphFetchN2.lean`) — off W11-F's path: it needs a `gwrowGmo` graph at the kill; W11-F consumes `CatLin.cycleKillOfWalkCZRC`.** The guarded kill from the same premises (`cycleKillOfWalkCZCw` through `cycleKillCZOfC`). -/
 theorem cycleKillOfWalkCZw (hlc : HasLC) (GF0 : BundledGFunctors) [MachGpreS hlc GF0]
     [WeakGpreS GF0] (gen : Nat) (σ0 : WGState) (D : CPU → List Register) (hD : ∀ c, (D c).Nodup)
     (Nm : Int → Int → Namespace) (P : Int → Int → Prop)
@@ -897,7 +904,7 @@ theorem cycleKillOfWalkCZw (hlc : HasLC) (GF0 : BundledGFunctors) [MachGpreS hlc
       (cycleKillOfWalkCZCw hlc GF0 gen σ0 D hD Nm P boot d0 fab N hfr hb1 hb2 hwp hwpp hcov hpol
         hnorm hl2)
 
-/-- **`t2linOfWalkCZw`**: T2-LIN at the Zifencei bundle from the walk policy with `gwrowGmo` and
+/-- **SUPERSEDED BY N2′ (`Weak/GraphFetchN2.lean`) — off W11-F's path: it needs a `gwrowGmo` graph at the kill; W11-F consumes `CatLin.cycleKillOfWalkCZRC`.** **`t2linOfWalkCZw`**: T2-LIN at the Zifencei bundle from the walk policy with `gwrowGmo` and
 the named normalization. -/
 theorem t2linOfWalkCZw (hlc : HasLC) (GF0 : BundledGFunctors) [MachGpreS hlc GF0]
     [WeakGpreS GF0] (gen : Nat) (σ0 : WGState) (D : CPU → List Register) (hD : ∀ c, (D c).Nodup)
