@@ -2119,3 +2119,4 @@ import Xv6.AccessDiscipline
 import Xv6.SystemAdequacyDisc
 import Xv6.LinkDiscAdequacy
 import Xv6.KptTextIdent
+import Xv6.KptMapIdent
