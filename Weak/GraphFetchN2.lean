@@ -14,7 +14,8 @@ the classification and the kill STAY at `GF`; only the LOG moves to `GR`:
       bytes' co), its poisoned form **`GraphFetchN2.agreeRP`** (rows related by `lblReidxW ∘
       lblRen pi`, writes verbatim — W10-4 fixes it with the poison set, risk (R3)), the interface
       `GraphFetchN2.agreeW` both give (images, write footprints, write classes, lock co);
-  §2  THE TWO xv6 FACTS, per lock byte (`CatLin.acqAqB`: every acquire of `b` is an `.aq` read;
+  §2  THE TWO xv6 FACTS, per lock byte INSIDE ITS REGISTRATION WINDOW (`GraphFetchN2.inWin`, Q-N2c
+      (b) provisional) (`CatLin.acqAqB`: every acquire of `b` is an `.aq` read;
       `CatLin.relCoversB`: a release of `b` fence-covers the po-earlier writes of its hart after an
       acquire of `b`) and their GLOBAL named premises over the lock bytes of `P`
       (**`CatLin.acqAqCZ`**, **`CatLin.relCoversCZ`**; W11-F proves them per pc, Q-N2b);
@@ -236,34 +237,60 @@ theorem GraphFetchN2.poOfRowR (G GR : Gexec) (L : Int → Prop) (x y : Geid) (a1
 
 namespace CatLin
 
-/-- Every acquire of `b` is an `.aq` READ (xv6: `amoswap.w.aq`, the image's only AMO on a lock
-word; a failed swap is one too). -/
-def acqAqB (G : Gexec) (b : Int) : Prop :=
-  ∀ A, lockAcq G b A → glblIs G A lbIsR ∧ glblIs G A lbAq
+/-- THE REGISTRATION WINDOW of a lock byte in the member's log (Q-N2c (b), provisional): write
+indices after the registration point `n0` (the export's `wprotAt`/`wlpAt`/`wlpAlt` point: from `n0`
+on every write of the byte is lock-shaped, `wlpAt`, so a pipe lock's window opens at its birth and
+kfree's byte-wise wipe lies outside it), up to the log's end. -/
+def GraphFetchN2.inWin (GR : Gexec) (log : List Wmsg) (n0 : Nat) (e : Geid) : Prop :=
+  n0 < gwix GR e ∧ gwix GR e ≤ log.length
 
-/-- A release of `b` fence-covers every write of its hart po-between an acquire of `b` and it
-(xv6: `release` is `fence rw,rw; fence iorw,ow; amoswap.w zero`; deviation (4): the writes
-after an acquire only — `initlock`'s plain store follows no acquire of the same hart). -/
-def relCoversB (G : Gexec) (b : Int) : Prop :=
+/-- Every acquire of `b` INSIDE ITS REGISTRATION WINDOW is an `.aq` READ (xv6: `amoswap.w.aq`, the
+image's only AMO on a lock word; a failed swap is one too). -/
+def acqAqB (G GR : Gexec) (log : List Wmsg) (b : Int) (n0 : Nat) : Prop :=
+  ∀ A, lockAcq G b A → GraphFetchN2.inWin GR log n0 A → glblIs G A lbIsR ∧ glblIs G A lbAq
+
+/-- A release of `b` fence-covers every write of its hart po-between an acquire of `b` and it, both
+INSIDE THE REGISTRATION WINDOW (xv6: `release` is `fence rw,rw; fence iorw,ow; amoswap.w zero`;
+deviation (4): the writes after an acquire only — `initlock`'s plain store follows no acquire of
+the same hart). -/
+def relCoversB (G GR : Gexec) (log : List Wmsg) (b : Int) (n0 : Nat) : Prop :=
   ∀ A R x, lockAcq G b A → lockRel G b R →
+    GraphFetchN2.inWin GR log n0 A → GraphFetchN2.inWin GR log n0 R →
     WeakRvwmoGraph.gpo G A x → WeakRvwmoGraph.gpo G x R → glblIs G x lbIsW →
     gfenceCovers G x R
 
-/-- **NAMED PREMISE (W11-F proves it per pc, Q-N2b)**: on every class graph at the image, every
-acquire of a lock byte of `P` is an `.aq` read. -/
+/-- `acqAqB` at every registered byte of `P`, at its registration point in `log`. -/
+def acqAqLog (G GR : Gexec) (log : List Wmsg) (P : Int → Int → Prop) : Prop :=
+  ∀ a b n0 r0 h, P a b → wprotAt log a b n0 r0 → wlpAt log b b n0 → wlpAlt log b n0 h →
+    acqAqB G GR log b n0
+
+/-- `relCoversB` at every registered byte of `P`, at its registration point in `log`. -/
+def relCoversLog (G GR : Gexec) (log : List Wmsg) (P : Int → Int → Prop) : Prop :=
+  ∀ a b n0 r0 h, P a b → wprotAt log a b n0 r0 → wlpAt log b b n0 → wlpAlt log b n0 h →
+    relCoversB G GR log b n0
+
+/-- **NAMED PREMISE (W11-F proves it per pc; Q-N2b global, Q-N2c (b) WINDOWED)**: on every class
+graph at the image and every agreeing member whose log carries the export, every acquire of a
+registered lock byte of `P` inside its registration window is an `.aq` read.  Static locks: the
+window is the whole run after registration; pipe locks: only while registered. -/
 def acqAqCZ (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (im : Image)
     (P : Int → Int → Prop) : Prop :=
-  ∀ (GF : Gfexec) (ad : List (Geid × Geid)),
+  ∀ (GF : Gfexec) (ad : List (Geid × Geid)) (GR : Gexec) (pi : Nat → Nat) (log : List Wmsg),
     GF.gfGd.gdG.gxImg = im → rvwmoCatAD GF.gfGd ad → GraphFabConf.gfexecConfZF boot d0 fab GF →
-    ∀ b, GraphFetchN2.lockBytes P b → acqAqB GF.gfGd.gdG b
+    gwf GR → GraphFetchN2.agreeRP GF.gfGd.gdG GR pi (GraphFetchN2.lockBytes P) → gwrowGmo GR →
+    logOf GR log → protReg P log →
+    acqAqLog GF.gfGd.gdG GR log P
 
-/-- **NAMED PREMISE (W11-F proves it per pc, Q-N2b)**: on every class graph at the image, every
-release of a lock byte of `P` fence-covers its hart's writes after an acquire of that byte. -/
+/-- **NAMED PREMISE (W11-F proves it per pc; Q-N2b global, Q-N2c (b) WINDOWED)**: as `acqAqCZ`,
+every release of a registered lock byte of `P` fence-covers its hart's writes after an acquire of
+that byte, both inside the registration window. -/
 def relCoversCZ (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (im : Image)
     (P : Int → Int → Prop) : Prop :=
-  ∀ (GF : Gfexec) (ad : List (Geid × Geid)),
+  ∀ (GF : Gfexec) (ad : List (Geid × Geid)) (GR : Gexec) (pi : Nat → Nat) (log : List Wmsg),
     GF.gfGd.gdG.gxImg = im → rvwmoCatAD GF.gfGd ad → GraphFabConf.gfexecConfZF boot d0 fab GF →
-    ∀ b, GraphFetchN2.lockBytes P b → relCoversB GF.gfGd.gdG b
+    gwf GR → GraphFetchN2.agreeRP GF.gfGd.gdG GR pi (GraphFetchN2.lockBytes P) → gwrowGmo GR →
+    logOf GR log → protReg P log →
+    relCoversLog GF.gfGd.gdG GR log P
 
 end CatLin
 
@@ -366,7 +393,7 @@ theorem csChainedT (GD : Gdexec) (ad : List (Geid × Geid)) (GR : Gexec) (L : In
     (log : List Wmsg) (b a : Int) (n0 r0 : Nat) (h : Option Nat)
     (w entry exit ACQ REL : Geid) :
     rvwmoCatAD GD ad → gwf GR → GraphFetchN2.agreeW GD.gdG GR L → gwrowGmo GR → L b →
-    acqAqB GD.gdG b → relCoversB GD.gdG b →
+    acqAqB GD.gdG GR log b n0 → relCoversB GD.gdG GR log b n0 →
     logOf GR log → lockWordByte log b → wlpAlt log b n0 h →
     acqRow GD.gdG b ACQ →
     wprotAt log a b n0 r0 →
@@ -409,6 +436,7 @@ theorem csChainedT (GD : Gdexec) (ad : List (Geid × Geid)) (GR : Gexec) (L : In
   have hpoAw : WeakRvwmoGraph.gpo G ACQw w :=
     GraphFetchN2.poOfRowR G GR L ACQw w b a vq vw hag hrowR hvqG hvw hhw hwne (by omega)
   have hposA := WeakRvwmoGraph.gwixPos GR ACQ hAwR
+  have hwinA : GraphFetchN2.inWin GR log n0 ACQw := ⟨by omega, by omega⟩
   by_cases heq : q = gwix GR ACQ - 1
   · exfalso
     have hA : ACQw = ACQ := gwixInj GR ACQw ACQ hndR hAwwR hAwR (by omega)
@@ -438,7 +466,7 @@ theorem csChainedT (GD : Gdexec) (ad : List (Geid × Geid)) (GR : Gexec) (L : In
       GraphFetchN2.poOfRowR G GR L w R a b vw lockFree hag hrowR hvw hRG hRh.symm hwRne
         (by omega)
     have hfc : gfenceCovers G w R :=
-      hRC ACQw R w hacqw hRG hpoAw hpowR (gwritesByteGlblW G w a vw hvw)
+      hRC ACQw R w hacqw hRG hwinA ⟨by omega, by omega⟩ hpoAw hpowR (gwritesByteGlblW G w a vw hvw)
     have h1 : gmoLt G w R := fenceGmoAfterC G w R h6 hfc
     have h2 : gmoLt G R ACQ :=
       gwixLtGmo G R ACQ hwf (lockRelGwrites G b R hwf hRG) (lockAcqGwrites G b ACQ hwf hacq)
@@ -466,7 +494,7 @@ theorem csChainedT (GD : Gdexec) (ad : List (Geid × Geid)) (GR : Gexec) (L : In
     have hmoRA : gmoLt G REL ACQw :=
       gwixLtGmo G REL ACQw hwf (lockRelGwrites G b REL hwf hRel) (lockAcqGwrites G b ACQw hwf hacqw)
         ((hag.2.2.2 b REL ACQw lockFree vq hL hRel hvqG).2 (by omega))
-    obtain ⟨hrw, haqw⟩ := hAQ ACQw hacqw
+    obtain ⟨hrw, haqw⟩ := hAQ ACQw hacqw hwinA
     have hmoAw : gmoLt G ACQw w :=
       acqGmoAfterC G ACQw w h6 hpoAw hrw haqw
         (WeakRvwmoGraph.glblIsWGmem G w (gwritesByteGlblW G w a vw hvw))
@@ -497,19 +525,19 @@ theorem csHypsCertCR (GD : Gdexec) (ad : List (Geid × Geid)) (X : Geid → Geid
     (GR : Gexec) (P : Int → Int → Prop) (log : List Wmsg) (prev : Geid) (s : Seg) :
     rvwmoCatAD GD ad → (∀ x y, X x y → gmoLt GD.gdG x y) →
     gwf GR → GraphFetchN2.agreeW GD.gdG GR (GraphFetchN2.lockBytes P) → gwrowGmo GR →
-    (∀ b, GraphFetchN2.lockBytes P b → acqAqB GD.gdG b) →
-    (∀ b, GraphFetchN2.lockBytes P b → relCoversB GD.gdG b) →
+    acqAqLog GD.gdG GR log P → relCoversLog GD.gdG GR log P →
     logOf GR log → protReg P log →
     csHypsR GD GR P log prev s → X prev s.sgEntry →
     CertC GD.gdG X prev s := by
   rintro hc hX hwfR hag hrowR hAQ hRC hlog hpr
     ⟨b, a, ACQ, REL, hP, hlwb, hwa, hcl, hlew, hnob, hacq, hrow, haq, hleA, hcs, hpoe, hfen,
       hpox, hmx, hhart, hside⟩ hx
-  obtain ⟨n0, r0, h, hprot, -, halt⟩ := hpr a b hP
+  obtain ⟨n0, r0, h, hprot, hat, halt⟩ := hpr a b hP
   obtain ⟨hr0, hn0A⟩ := hside n0 r0 hprot
   have hL : GraphFetchN2.lockBytes P b := ⟨a, hP⟩
   exact .CSchained (csChainedT GD ad GR (GraphFetchN2.lockBytes P) log b a n0 r0 h prev
-    s.sgEntry s.sgExit ACQ REL hc hwfR hag hrowR hL (hAQ b hL) (hRC b hL) hlog hlwb halt hrow
+    s.sgEntry s.sgExit ACQ REL hc hwfR hag hrowR hL (hAQ a b n0 r0 h hP hprot hat halt)
+    (hRC a b n0 r0 h hP hprot hat halt) hlog hlwb halt hrow
     hprot hwa hcl hr0 hlew hnob hacq haq hn0A hleA hcs hpoe hfen (hX _ _ hx) hpox hmx hhart)
 
 /-- THE L2′ CLAIM, log at the member (the spike's `l2ClaimAtCZR`): the cycle and its segments are
@@ -646,8 +674,7 @@ theorem rawChainChainCZR (GF : Gfexec) (ad : List (Geid × Geid)) (GR : Gexec) (
     (P : Int → Int → Prop) (log : List Wmsg) (Bad : Prop) (ss : List Seg) :
     rvwmoCatAD GF.gfGd ad → ioResidueGmo GF → gdiskRead14 GF.gfGd.gdG →
     gwf GR → GraphFetchN2.agreeRP GF.gfGd.gdG GR pi (GraphFetchN2.lockBytes P) → gwrowGmo GR →
-    (∀ b, GraphFetchN2.lockBytes P b → acqAqB GF.gfGd.gdG b) →
-    (∀ b, GraphFetchN2.lockBytes P b → relCoversB GF.gfGd.gdG b) →
+    acqAqLog GF.gfGd.gdG GR log P → relCoversLog GF.gfGd.gdG GR log P →
     logOf GR log → protReg P log → ¬ Bad →
     (∀ prev s, s ∈ ss → ioCross GF prev s.sgEntry → segRunC GF.gfGd s →
        segPinC GF.gfGd ad s ∨ csHypsR GF.gfGd GR P log prev s ∨ Bad) →
@@ -724,7 +751,8 @@ theorem cycleKillOfL2CZRC (hlc : HasLC) (GF0 : BundledGFunctors) [MachGpreS hlc 
   have hnB : ¬ badRun gen σ0 := noBadRun hlc GF0 gen σ0 D hD hfr hwp
   exact cycleKillIOC GF ad z ss hc hres hdr hne
     (rawChainChainCZR GF ad GR pi P (cdLog c c.cdTr.length) (badRun gen σ0) ss hc hres hdr hwfR
-      hagR hrowR (hAQ GF ad him hc hconf) (hRC GF ad him hc hconf) hlog hpr hnB
+      hagR hrowR (hAQ GF ad GR pi _ him hc hconf hwfR hagR hrowR hlog hpr)
+      (hRC GF ad GR pi _ him hc hconf hwfR hagR hrowR hlog hpr) hlog hpr hnB
       (hl2 GF ad GR pi him hconf hwfR hagR hrowR (cdLog c c.cdTr.length) z ss hc hlog hpr hne
         hch) z z ss (fun _ h => h) hch)
 
