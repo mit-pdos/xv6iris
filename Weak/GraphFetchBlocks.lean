@@ -9,17 +9,18 @@ realizes a graph's rule-14 linearization at the PINNED program LTS `pstepPin im 
 plain conformance predicate `execProgOk'`.  M2 (`srvwmoXv6M2Premises`, `Weak/PfRunUnpinned.lean`)
 wants the SHAPED, UNPINNED predicate `execProgOk'SC pstepEv pclsEv fokTriv (fcutEM2 cohSrc E itvOf
 fiOf)` (and its shadow form `execProgOk'STC`).  This file supplies it from a Zifencei fabric bundle
-(`GraphFabConf.gfexecConfZF`, what `xv6ConfSZForget` returns):
+(`GraphFabConf.gfexecConfZF`, what `xv6ConfSForget` returns):
 
-  §1  the two EMISSION premises the shaped predicate needs and no bundle carries (below);
+  §1  the EMISSION premise (P2) the shaped predicate needs and no bundle carries (below);
   §2  the shaped block `GraphFetchBlocks.hblkS` (the star as a label-carrying `admRunG`, the left
       arm `lbFused`) and its two halves `blkOne`/`blkPair`;
   §3  **`GraphFetchBlocks.hemitfBlocks`** — from a `hemitf` derivation, per row slot: the program
       states, THE LEADING STAR'S LABELS (`g n`, the emission's administrative block of slot `n`)
-      and the row item (`r n`), the block's POSITION in the emission (`GraphFetch.emBlock`), the
-      block at its two fabric endpoints and, when contact-free, at ANY fabric;
+      and the row item (`r n`), the block's POSITION in the emission (`GraphFetch.emBlock`) with the
+      cycle labels before it (those of `GraphFetch.cycUpto g n`), the block at its two fabric
+      endpoints and, when contact-free, at ANY fabric;
   §4  `GraphFetchBlocks.rowBlocks` — per row: `GraphFetch.emBlockF` (the block premise of G5's
-      supply) DISCHARGED from the emission, modulo the fence-block premise (§1), and the shaped
+      supply) DISCHARGED from the emission ([OWN.86]: no fence-block premise), and the shaped
       blocks at the global fabric (members) / any fabric (non-members);
   §5  **`GraphFetchBlocks.supplyOfFconfZ`** — the interleaving theorem (`supplyOfFconf`'s twin) at
       the UNPINNED LTS, producing `execProgOk'SC` at any per-index clause the stars satisfy;
@@ -36,24 +37,16 @@ block of the trace step `K`'s slot in its hart's emission: hart `s.esAg`'s chose
 `GraphFetchFloor.ownCount`).  The SAME function `g` is the supply's leading star, so the per-index
 clause G5 proves for `lsOf` (`GraphFetch.normalizeFetchSupply`) is the one `execProgOk'SC` reads.
 
-**The two emission premises (§1) — NOT in any bundle; named here, spec-first.**
-(P1) `GraphFetchBlocks.emFenceCyc em` — between the previous row item and a `LFence false×4` row
-  item the emission has a cycle label (`LInstr`/`LIFetch`): the second conjunct of G5's `emBlockF`
-  (`lastCycL ls ≠ none`).  The plan (G6-3, "`emBlockF` discharged from the Sail cycle") expected it
-  from `cycleOkBoot` (`SailCycleOrderK.lean:251`) by `hemit`-induction.  It does NOT follow:
-  `SailCycleOrderK.good` tracks the PHASE (the latest own cycle label) and lets every data read /
-  write keep the phase (`:159-168`), so it does not say that no ROW event lies between that label
-  and the fence.  What holds on Sail: `LFence false×4` is `ebarLabel Barrier_RISCV_i` (`ebarNow`
-  maps every other barrier kind to a non-zero fence, `WeakEvInst.lean:741-753`) or the SFENCE.VMA
-  announce marker (`annLabel`); `execute FENCEI` is the one barrier after its own announce and
-  the marker follows the instruction's own fetch with no memory node between.  Proving it needs a
-  refined residual invariant (the phase plus a "row event since" bit) walked over the cycle — a
-  W-SCO-sized extension.  Spec-first: RVWMO/riscv.cat/Zifencei/PMAs are silent (block structure
-  is the pf LTS's); Sail is the reference.  (a) prove it from Sail (the refined walk) — FAITHFUL,
-  not done here (size M–L); (b) widen G1's `emFenceI` to the emission-wide latest cycle label —
-  STRONGER trusted fetch text on non-Sail emissions (G5 deviation 3 (b)), not taken; (c) THIS
-  FILE: a named premise of the supply, universally over the hart's emissions (a statement about
-  Sail emissions, no trusted text) — interim, WEAKER until (a).
+**The emission premise (§1) — NOT in any bundle; named here, spec-first.**
+(P1) RETIRED ([OWN.86] = Q-P1-FENCEI (b′)).  G6-3 named `GraphFetchBlocks.emFenceCyc` ("a cycle
+  label lies in every `LFence false×4` block"), the second conjunct of G5's block premise; G6-3b
+  found it FALSE on Sail emissions (a PLIC wire item, `pstepPlic`, may land between a `fence.i`'s
+  announce and its barrier, emptying the barrier's block).  The owner restated G1's `emFenceI` with
+  the EMISSION-WIDE latest own cycle label (FAITHFUL on every Sail emission,
+  `GraphFetchSail.fenceISiteIff`), and the supply's arm IS that label: `hemitfBlocks` now records,
+  per slot, that the cycle labels before the block are those of the earlier leading stars
+  (`GraphFetch.cycUpto g n`: row items and intra-pair stars carry none), and
+  `GraphFetchSupply.siteOfArm` turns a set arm at a fence into a site.  No Sail walk is needed.
 (P2) `GraphFetchBlocks.emNoDangle em` — every tagged `LExLoad` row item has an `LExStore` row
   item of the same slot (no DANGLING exclusive read).  `execProgOk'SC`'s clause (i) asks the left
   arm's realizing label to be `lbFused`; a `hemitf` `HFone` block may realize a plain `LLoad` by a
@@ -69,13 +62,13 @@ in `WeakRvwmoSupply`/`LinInd`/`FabInd`/`CatLinChain` — `PfRunUnpinned.fcutEM2`
 `Glue`, `Cert4`, `KillIO`), so every twin is in a NEW leaf; the pinned chain and the registered cone
 are untouched.  (2) `topoSupplyZ` is the FABRIC twin (`fconfRealize`'s statement shape over
 `gfexecConfZF`, the trace-order guard `trDevOrdered` kept as a guard): the Zifencei bundles are
-fabric bundles (`xv6ConfSZ`), there is no quiescent Zifencei bundle, and G5's supply needs
+fabric bundles (`xv6ConfS`), there is no quiescent Zifencei bundle, and G5's supply needs
 `racyDIO`-acyclicity (`normalizeOfAcyclicZ`).  (3) The trace is the RULE-14 linearization
 `linCand` (G5's); `candDiskLat` is PROVED on the anchored `linCandIO` only
-(`RvwmoXv6ScaT.linCandDiskLat`), so `topoSupplyZT` takes it as a premise.  (4) §1's premises.
+(`RvwmoXv6ScaT.linCandDiskLat`), so `topoSupplyZT` takes it as a premise.  (4) §1's premise (P2).
 
-Spec marks.  No new trusted text: (P1) is a Sail fact stated as a premise (interim), (P2) is D19;
-everything else is proof organisation (FAITHFUL).  Lean-only helpers are file-qualified
+Spec marks.  No new trusted text here: (P2) is D19; everything else is proof organisation
+(FAITHFUL); the fence.i sites are the owner-ruled `emFenceI` [OWN.86].  Lean-only helpers are file-qualified
 (`GraphFetchBlocks.*`).
 -/
 import Weak.GraphFetchSupply
@@ -88,13 +81,6 @@ open MachCSL MachCSL.Stdpp Iris.Std
 open TsoShadow
 
 /-! # 1. The two emission premises -/
-
-/-- (P1) Between the previous row item and every `LFence false×4` row item, the emission has an
-administrative cycle label (`LInstr`/`LIFetch`). -/
-def GraphFetchBlocks.emFenceCyc (em : Hemission) : Prop :=
-  ∀ (n k : Nat), em.emItems[n]? = some (Wlabel.LFence false false false false, some k) →
-    ∃ (m : Nat) (l : Wlabel), m < n ∧ em.emItems[m]? = some (l, none) ∧ GraphFetch.lbCyc l = true ∧
-      ∀ m', m < m' → m' < n → ∃ l', em.emItems[m']? = some (l', none)
 
 /-- (P2, D19) Every tagged exclusive read has an exclusive write of the same slot: no dangling
 `LExLoad`. -/
@@ -145,17 +131,6 @@ theorem GraphFetchBlocks.itemRen (π : Nat → Nat) (em : Hemission) (n : Nat) (
   intro h
   rw [GraphFetchBlocks.emItemsRen, h]
   rfl
-
-theorem GraphFetchBlocks.emFenceCycRen (π : Nat → Nat) (em : Hemission) :
-    GraphFetchBlocks.emFenceCyc em → GraphFetchBlocks.emFenceCyc (emRen π em) := by
-  intro h n k hn
-  obtain ⟨l0, hit, hl⟩ := GraphFetchBlocks.itemRenInv π em n _ _ hn
-  rw [GraphFetchBlocks.renFence π l0 _ _ _ _ hl.symm] at hit
-  obtain ⟨m, l, hm, hml, hc, hmid⟩ := h n k hit
-  refine ⟨m, wlblRen π l, hm, GraphFetchBlocks.itemRen π em m l none hml,
-    by rw [GraphFetchBlocks.lbCycRen]; exact hc, fun m' h1 h2 => ?_⟩
-  obtain ⟨l', hl'⟩ := hmid m' h1 h2
-  exact ⟨wlblRen π l', GraphFetchBlocks.itemRen π em m' l' none hl'⟩
 
 theorem GraphFetchBlocks.emNoDangleRen (π : Nat → Nat) (em : Hemission) :
     GraphFetchBlocks.emNoDangle em → GraphFetchBlocks.emNoDangle (emRen π em) := by
@@ -238,6 +213,32 @@ theorem GraphFetchBlocks.eadmTagNone (ls : List Wlabel) (it : Eitem) : it ∈ ea
   obtain ⟨_, _, rfl⟩ := h
   rfl
 
+/-- A realizing row label is not a cycle label (`projLbl` is `none` on `LInstr`/`LIFetch`). -/
+theorem GraphFetchBlocks.realizesNotCyc (p : Pexv6) (ws : Wstate) (lb : Lbl) (l : Wlabel) :
+    hlblRealizes p ws lb l → GraphFetch.lbCyc l = false := by
+  rintro ⟨-, -, -, hpr⟩
+  cases l <;> first | rfl | (simp [projLbl] at hpr)
+
+/-- Nor are a pair's two realizing labels. -/
+theorem GraphFetchBlocks.pairNotCyc (p pm : Pexv6) (ws : Wstate) (lb : Lbl) (l1 l2 : Wlabel) :
+    hlblRealizesPair p pm ws lb l1 l2 →
+    GraphFetch.lbCyc l1 = false ∧ GraphFetch.lbCyc l2 = false := by
+  rintro ⟨_, _, _, _, _, _, _, _, rfl, rfl, -⟩
+  exact ⟨rfl, rfl⟩
+
+/-- The intra-pair star (`lbAdmin false`) carries no cycle label. -/
+theorem GraphFetchBlocks.admFalseNoCyc (p : Pexv6) (d : Efab) (ls : List Wlabel) (p' : Pexv6)
+    (d' : Efab) (b : Bool) :
+    WeakRvwmoFab.admRunT false p d ls p' d' b → ls.filter GraphFetch.lbCyc = [] := by
+  intro h
+  induction h with
+  | ATnil => rfl
+  | ATcons p d l p1 d1 ls p' d' b ha _ _ ih =>
+    have hl : GraphFetch.lbCyc l = false := by
+      cases l <;> first | rfl | (simp [lbAdmin] at ha)
+    simp only [List.filter_cons, hl, Bool.false_eq_true, ↓reduceIte]
+    exact ih
+
 /-- **THE EXTRACTION**: per row slot `n` of a `hemitf` derivation at offset `k` — the program
 state `f n`, the leading star's labels `g n` and the row item `r n`; the block's position in the
 emission; its two fabric endpoints and, contact-free, any fabric; and the arm: a single step (whose
@@ -248,7 +249,9 @@ theorem GraphFetchBlocks.hemitfBlocks (dvi dvo : Nat → Efab) (tq : Nat → Boo
     ∃ (f : Nat → Pexv6) (g : Nat → List Wlabel) (r : Nat → Wlabel), f 0 = p ∧
       ∀ n lb, row[n]? = some lb →
         (∃ pre rest, es = pre ++ eadm (g n) ++ (r n, some (n + k)) :: rest ∧
-          ∀ it, pre.getLast? = some it → it.2.isSome = true) ∧
+          (∀ it, pre.getLast? = some it → it.2.isSome = true) ∧
+          (pre.map Prod.fst).filter GraphFetch.lbCyc =
+            (GraphFetch.cycUpto g n).filter GraphFetch.lbCyc) ∧
         (tq (n + k) = false → dvo (n + k) = dvi (n + k) ∧ lbIsIo lb = false) ∧
         ((GraphFetchBlocks.blkOne (dvi (n + k)) (dvo (n + k)) (rowWsAux k ws (row.take n)) lb
               (g n) (r n) (f n) (f (n + 1)) ∧
@@ -292,7 +295,7 @@ theorem GraphFetchBlocks.hemitfBlocks (dvi dvo : Nat → Efab) (tq : Nat → Boo
           GraphFetchBlocks.admRunGOfT _ _ _ _ _ _ _ (hall0 d), hre, ?_⟩⟩
         rw [hf0]; exact hall d
       simp only [Nat.zero_add]
-      refine ⟨⟨[], es, by simp, fun it h => by simp at h⟩,
+      refine ⟨⟨[], es, by simp, fun it h => by simp at h, rfl⟩,
         fun hk => ⟨(hq hk).1, (hq hk).2.1⟩,
         Or.inl ⟨⟨pa, da, GraphFetchBlocks.admRunGOfT _ _ _ _ _ _ _ har, hre, hst'⟩,
           fun hk => (hq hk).2.2, fun it hit htag => ?_⟩⟩
@@ -305,11 +308,16 @@ theorem GraphFetchBlocks.hemitfBlocks (dvi dvo : Nat → Efab) (tq : Nat → Boo
           omega
     | succ n =>
       simp only [List.getElem?_cons_succ] at hn
-      obtain ⟨⟨pre, rest, hes, hpre⟩, hq, harm⟩ := hf n lb0 hn
+      obtain ⟨⟨pre, rest, hes, hpre, hcyc⟩, hq, harm⟩ := hf n lb0 hn
       have e : n + 1 + k = n + (k + 1) := by omega
       rw [e]
+      have hl := GraphFetchBlocks.realizesNotCyc _ _ _ _ hre
       refine ⟨⟨eadm ls ++ (l, some k) :: pre, rest, by rw [hes]; simp,
-        GraphFetchBlocks.lastTagged _ _ _ rfl hpre⟩, hq, ?_⟩
+        GraphFetchBlocks.lastTagged _ _ _ rfl hpre, ?_⟩, hq, ?_⟩
+      · rw [GraphFetch.cycUptoCons]
+        show _ = (ls ++ GraphFetch.cycUpto g' n).filter GraphFetch.lbCyc
+        simp only [List.map_append, GraphFetch.eadmLabels, List.map_cons, List.filter_append,
+          List.filter_cons, hl, Bool.false_eq_true, ↓reduceIte, hcyc]
       rcases harm with ⟨h1, h2, h3⟩ | h4
       · refine Or.inl ⟨h1, h2, fun it hit htag => ?_⟩
         rcases List.mem_append.1 hit with hit | hit
@@ -351,19 +359,26 @@ theorem GraphFetchBlocks.hemitfBlocks (dvi dvo : Nat → Efab) (tq : Nat → Boo
           GraphFetchBlocks.admRunGOfT _ _ _ _ _ _ _ (hall2a d), ?_⟩⟩
         rw [hf0]; exact hall2 d
       simp only [Nat.zero_add]
-      exact ⟨⟨[], eadm ls2 ++ (l2, some k) :: es, by simp, fun it h => by simp at h⟩,
+      exact ⟨⟨[], eadm ls2 ++ (l2, some k) :: es, by simp, fun it h => by simp at h, rfl⟩,
         fun hk => ⟨(hq hk).1, hio⟩,
         Or.inr ⟨⟨pa, da, pm, dm, ls2, pm2, dm2, l2,
           GraphFetchBlocks.admRunGOfT _ _ _ _ _ _ _ har1, hre, hst1,
           GraphFetchBlocks.admRunGOfT _ _ _ _ _ _ _ har2, hst2'⟩, fun hk => (hq hk).2⟩⟩
     | succ n =>
       simp only [List.getElem?_cons_succ] at hn
-      obtain ⟨⟨pre, rest, hes, hpre⟩, hq, harm⟩ := hf n lb0 hn
+      obtain ⟨⟨pre, rest, hes, hpre, hcyc⟩, hq, harm⟩ := hf n lb0 hn
       have e : n + 1 + k = n + (k + 1) := by omega
       rw [e]
+      obtain ⟨hl1, hl2⟩ := GraphFetchBlocks.pairNotCyc _ _ _ _ _ _ hre
+      have hls2 := GraphFetchBlocks.admFalseNoCyc _ _ _ _ _ _ har2
       refine ⟨⟨eadm ls1 ++ (l1, some k) :: (eadm ls2 ++ (l2, some k) :: pre), rest,
         by rw [hes]; simp,
-        GraphFetchBlocks.lastTagged _ _ _ rfl (GraphFetchBlocks.lastTagged _ _ _ rfl hpre)⟩, hq, ?_⟩
+        GraphFetchBlocks.lastTagged _ _ _ rfl (GraphFetchBlocks.lastTagged _ _ _ rfl hpre), ?_⟩,
+        hq, ?_⟩
+      · rw [GraphFetch.cycUptoCons]
+        show _ = (ls1 ++ GraphFetch.cycUpto g' n).filter GraphFetch.lbCyc
+        simp only [List.map_append, GraphFetch.eadmLabels, List.map_cons, List.filter_append,
+          List.filter_cons, hl1, hl2, Bool.false_eq_true, ↓reduceIte, hls2, hcyc, List.nil_append]
       rcases harm with ⟨h1, h2, h3⟩ | h4
       · refine Or.inl ⟨h1, h2, fun it hit htag => ?_⟩
         rcases List.mem_append.1 hit with hit | hit
@@ -383,76 +398,27 @@ theorem GraphFetchBlocks.hemitfBlocks (dvi dvo : Nat → Efab) (tq : Nat → Boo
 
 /-! # 4. Per row: `emBlockF` and the shaped blocks -/
 
-/-- The fence-block premise (P1) at a block: a cycle label lies inside the block. -/
-theorem GraphFetchBlocks.cycInBlock (pre : List Eitem) (ls : List Wlabel) (x : Eitem)
-    (rest : List Eitem) :
-    (∀ it, pre.getLast? = some it → it.2.isSome = true) →
-    (∃ (m : Nat) (l : Wlabel), m < pre.length + ls.length ∧
-      (pre ++ eadm ls ++ x :: rest)[m]? = some (l, none) ∧ GraphFetch.lbCyc l = true ∧
-      ∀ m', m < m' → m' < pre.length + ls.length →
-        ∃ l', (pre ++ eadm ls ++ x :: rest)[m']? = some (l', none)) →
-    GraphFetch.lastCycL ls ≠ none := by
-  intro hpre ⟨m, l, hm, hml, hc, hmid⟩
-  have hlen : (eadm ls).length = ls.length := by simp [eadm]
-  by_cases hge : pre.length ≤ m
-  · rw [List.append_assoc, List.getElem?_append_right hge,
-      List.getElem?_append_left (by omega)] at hml
-    simp only [eadm, List.getElem?_map] at hml
-    cases hj : ls[m - pre.length]? with
-    | none => rw [hj] at hml; simp at hml
-    | some l' =>
-      rw [hj] at hml
-      simp only [Option.map_some, Option.some.injEq, Prod.mk.injEq] at hml
-      obtain ⟨rfl, -⟩ := hml
-      have hmem : l' ∈ ls.filter GraphFetch.lbCyc :=
-        List.mem_filter.2 ⟨List.mem_of_getElem? hj, hc⟩
-      unfold GraphFetch.lastCycL
-      intro hnone
-      rw [List.getLast?_eq_none_iff] at hnone
-      rw [hnone] at hmem
-      exact absurd hmem List.not_mem_nil
-  · exfalso
-    have hpl : 0 < pre.length := by omega
-    have hlast : pre.getLast? = pre[pre.length - 1]? := List.getLast?_eq_getElem?
-    obtain ⟨it, hit⟩ : ∃ it, pre[pre.length - 1]? = some it :=
-      someOfIsSome (lookup_lt_is_Some_2 (by omega))
-    have htag := hpre it (by rw [hlast, hit])
-    have hat : (pre ++ eadm ls ++ x :: rest)[pre.length - 1]? = some it := by
-      rw [List.append_assoc, List.getElem?_append_left (by omega), hit]
-    by_cases heq : m = pre.length - 1
-    · subst heq
-      rw [hat] at hml
-      simp only [Option.some.injEq] at hml
-      subst hml
-      simp at htag
-    · obtain ⟨l', hl'⟩ := hmid (pre.length - 1) (by omega) (by omega)
-      rw [hat] at hl'
-      simp only [Option.some.injEq] at hl'
-      subst hl'
-      simp at htag
-
 /-- **THE PER-ROW BLOCK DATA** at a renamed (or any) row: the leading stars `g`, the emission's
-block premise `GraphFetch.emBlockF` modulo (P1), the left arm `lbFused` by (P2), the shaped
+block premise `GraphFetch.emBlockF` (no fence premise, [OWN.86]), the left arm `lbFused` by (P2), the shaped
 blocks at the global fabric `fab` (members of `dev`) and at any fabric (non-members). -/
 theorem GraphFetchBlocks.rowBlocks (G : Gexec) (i : Nat) (row : List Lbl) (p0 : Pexv6)
     (dvi dvo : Nat → Efab) (tq : Nat → Bool) (em : Hemission) (dev : List Geid)
     (fab : Nat → Efab) :
-    hartConff i row p0 dvi dvo tq em →
-    GraphFetchBlocks.emFenceCyc em → GraphFetchBlocks.emNoDangle em →
+    hartConff i row p0 dvi dvo tq em → GraphFetchBlocks.emNoDangle em →
     (∀ n, n < row.length → (i, n) ∉ dev → tq n = false) →
     (∀ n m, dev[m]? = some (i, n) → dvi n = fab m ∧ dvo n = fab (m + 1)) →
     (∀ n lb, row[n]? = some lb → glbl G (i, n) = lb) →
     ∃ (f : Nat → Pexv6) (g : Nat → List Wlabel), f 0 = p0 ∧
       ∀ n lb, row[n]? = some lb →
-        GraphFetch.emBlockF G em i n (g n) ∧
+        GraphFetch.emBlockF G em i n g ∧
         (∀ m, dev[m]? = some (i, n) →
           GraphFetchBlocks.hblkS (fab m) (fab (m + 1)) (rowWs row n) lb (g n) (f n) (f (n + 1))) ∧
         ((i, n) ∉ dev → ∀ d, GraphFetchBlocks.hblkS d d (rowWs row n) lb (g n) (f n) (f (n + 1))) := by
-  intro hem hfc hnd hnm hpin hgl
+  intro hem hnd hnm hpin hgl
   have hem' : hemitf dvi dvo tq 0 wsInit row p0 em.emItems em.emFin := hem
   obtain ⟨f, g, r, hf0, hf⟩ := GraphFetchBlocks.hemitfBlocks _ _ _ _ _ _ _ _ _ hem'
   refine ⟨f, g, hf0, fun n lb hn => ?_⟩
-  obtain ⟨⟨pre, rest, hes, hpre⟩, hq, harm⟩ := hf n lb hn
+  obtain ⟨⟨pre, rest, hes, hpre, hcyc⟩, hq, harm⟩ := hf n lb hn
   simp only [Nat.add_zero] at hes hq harm
   have hws : rowWsAux 0 wsInit (row.take n) = rowWs row n := rfl
   rw [hws] at harm
@@ -480,26 +446,13 @@ theorem GraphFetchBlocks.rowBlocks (G : Gexec) (i : Nat) (row : List Lbl) (p0 : 
       · obtain ⟨_, _, _, _, _, _, _, _, h1, -⟩ := hpr
         rw [hr] at h1; simp at h1
     all_goals simp [lbFused]
-  refine ⟨⟨r n, ⟨pre, rest, hes, hpre⟩, fun hfen => ?_⟩, fun m hm => ?_, fun hnin d => ?_⟩
+  refine ⟨⟨r n, pre, rest, hes, hpre, hcyc, fun hfen => ?_⟩, fun m hm => ?_, fun hnin d => ?_⟩
   · rw [hgl n lb hn] at hfen
     subst hfen
-    have hrn : r n = Wlabel.LFence false false false false := by
-      rcases harm with ⟨⟨pa, da, -, ⟨-, -, -, hpr⟩, -⟩, -⟩ | ⟨⟨pa, da, pm, dm, ls2, pm2, dm2, l2, -, hpr, -⟩, -⟩
-      · exact GraphFetchSupply.projFence _ _ _ _ _ _ hpr
-      · obtain ⟨_, _, _, _, _, _, _, _, -, -, -, -, hlb⟩ := hpr
-        simp at hlb
-    refine ⟨hrn, ?_⟩
-    have hidx : em.emItems[pre.length + (g n).length]? =
-        some (Wlabel.LFence false false false false, some n) := by
-      rw [hes, List.append_assoc, List.getElem?_append_right (by omega)]
-      have : pre.length + (g n).length - pre.length = (eadm (g n)).length := by simp [eadm]
-      rw [this, List.getElem?_append_right (Nat.le_refl _), Nat.sub_self, hrn]
-      rfl
-    obtain ⟨m, l, hm, hml, hc, hmid⟩ := hfc _ n hidx
-    refine GraphFetchBlocks.cycInBlock pre (g n) (r n, some n) rest hpre ⟨m, l, hm, ?_, hc, ?_⟩
-    · rw [← hes]; exact hml
-    · intro m' h1 h2
-      rw [← hes]; exact hmid m' h1 h2
+    rcases harm with ⟨⟨pa, da, -, ⟨-, -, -, hpr⟩, -⟩, -⟩ | ⟨⟨pa, da, pm, dm, ls2, pm2, dm2, l2, -, hpr, -⟩, -⟩
+    · exact GraphFetchSupply.projFence _ _ _ _ _ _ hpr
+    · obtain ⟨_, _, _, _, _, _, _, _, -, -, -, -, hlb⟩ := hpr
+      simp at hlb
   · obtain ⟨hi, ho⟩ := hpin n m hm
     rw [← hi, ← ho]
     rcases harm with ⟨h1, -, h3⟩ | ⟨h1, -⟩
@@ -637,8 +590,8 @@ theorem GraphFetchBlocks.rowLbl (G : Gexec) (i k : Nat) (lb : Lbl) :
 
 /-- **`topoSupplyZ` — THE UNPINNED, SHAPED SUPPLY** (G6-3 L1; the Zifencei twin of
 `fconfRealize`/`topoSupply`, deviation 2): a `racyDIO`-acyclic core graph whose Zifencei fabric
-bundle holds (`GraphFabConf.gfexecConfZF`, what `xv6ConfSZForget` returns) and whose rows'
-emissions satisfy (P1)/(P2) normalizes to `GF'` (the same fabric order) whose rule-14
+bundle holds (`GraphFabConf.gfexecConfZF`, what `xv6ConfSForget` returns) and whose rows'
+emissions satisfy (P2) normalizes to `GF'` (the same fabric order) whose rule-14
 linearization is consistent, carries the rows (renamed), is `candScaT`, and — under the guard
 `trDevOrdered` (`fconfRealize`'s) — is supplied at the UNPINNED LTS by M2's shaped conjunct
 `execProgOk'SC pstepEv pclsEv fokTriv (fcutEM2 cohSrc E itvOfL fiOfL)` along the fabric
@@ -649,7 +602,7 @@ theorem topoSupplyZ (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF 
     GraphFabConf.gfexecConfZF boot d0 fab GF →
     (∀ (i : Nat) (row : List Lbl) (em : Hemission) (dvi dvo : Nat → Efab) (tq : Nat → Bool),
       GF.gfGd.gdG.gxProg[i]? = some row → hartConff i row (boot i) dvi dvo tq em →
-      GraphFetchBlocks.emFenceCyc em ∧ GraphFetchBlocks.emNoDangle em) →
+      GraphFetchBlocks.emNoDangle em) →
     GF.gfGd.gdG.gxProg.length ≤ N →
     ∃ (pi : Nat → Nat) (GF' : Gfexec),
       rowsRel pi GF.gfGd.gdG GF'.gfGd.gdG ∧
@@ -727,7 +680,7 @@ theorem topoSupplyZ (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF 
   -- the per-hart block data at the normalized graph
   have hblkData : ∀ i, i < N → ∃ a : (Nat → Pexv6) × (Nat → List Wlabel), a.1 0 = boot i ∧
       ∀ n lb, ((GD'.gdG.gxProg[i]?).getD [])[n]? = some lb →
-        GraphFetch.emBlockF GD'.gdG (emRen pi (emF i)) i n (a.2 n) ∧
+        GraphFetch.emBlockF GD'.gdG (emRen pi (emF i)) i n a.2 ∧
         (∀ m, GF.gfDev[m]? = some (i, n) →
           GraphFetchBlocks.hblkS (fab m) (fab (m + 1)) (rowWs ((GD'.gdG.gxProg[i]?).getD []) n) lb
             (a.2 n) (a.1 n) (a.1 (n + 1))) ∧
@@ -739,12 +692,12 @@ theorem topoSupplyZ (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF 
     · obtain ⟨row, hrow0⟩ := hrowOf i hi
       obtain ⟨hem, hiff, hpin, -⟩ := hE i hi row hrow0
       have hemF : emF i = (E i).1 := by simp only [emF, if_pos hi]
-      obtain ⟨hfc, hndg⟩ := hprem i row (E i).1 _ _ _ hrow0 hem
+      have hndg := hprem i row (E i).1 _ _ _ hrow0 hem
       have hrowG : GD'.gdG.gxProg[i]? = some (row.map (lblRen pi)) := by
         rw [hprog, hrow0]; rfl
       obtain ⟨f, g, hf0, hf⟩ := GraphFetchBlocks.rowBlocks GD'.gdG i (row.map (lblRen pi)) (boot i)
         _ _ _ (emRen pi (E i).1) GF.gfDev fab (hartConffRen pi i row (boot i) _ _ _ _ hem)
-        (GraphFetchBlocks.emFenceCycRen pi _ hfc) (GraphFetchBlocks.emNoDangleRen pi _ hndg)
+        (GraphFetchBlocks.emNoDangleRen pi _ hndg)
         (fun n hn hnin => by
           cases htq : (E i).2.2.2 n with
           | false => rfl
@@ -774,7 +727,7 @@ theorem topoSupplyZ (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF 
     intro K s hs
     simp only [lsOf, hs]
   have hblkF : ∀ K i k, (glinEids GD'.gdG)[K]? = some (i, k) →
-      GraphFetch.emBlockF GD'.gdG (emRen pi (emF i)) i k (lsOf K) := by
+      lsOf K = (Fx i).2 k ∧ GraphFetch.emBlockF GD'.gdG (emRen pi (emF i)) i k (Fx i).2 := by
     intro K i k he
     have hs := linTrLookup GD'.gdG K (i, k) he
     have hcnt := GraphFetchFloor.ownCount GD'.gdG hwf h14 K (i, k) he
@@ -785,11 +738,11 @@ theorem topoSupplyZ (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF 
       · have hnone : GD'.gdG.gxProg[i]? = none := List.getElem?_eq_none (by omega)
         rw [hnone] at hl
         simp at hl
+    refine ⟨?_, ((hFx i hiN).2 k _ hl).1⟩
     rw [hlsOf K _ hs]
     simp only [glinStep] at hcnt ⊢
     rw [hcnt]
-    exact ((hFx i hiN).2 k _ hl).1
-  obtain ⟨hi0, hf0', hcut⟩ := hsup lsOf hblkF
+  obtain ⟨hi0, hf0', hcut⟩ := hsup lsOf (fun i => (Fx i).2) hblkF
   have hscaT := linCandScaTMinus GD'.gdG hc'.1 h14
   refine ⟨pi, ⟨GD', GF.gfDev⟩, hrr, rfl, hc', h14, hsr, rowsRelImg pi _ _ hrr,
     fun i => (hrowL i).trans (by rw [hprog]; cases GF.gfGd.gdG.gxProg[i]? <;> rfl), hscaT, fun hord => ?_⟩
@@ -823,7 +776,7 @@ theorem topoSupplyZT (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF
     GraphFabConf.gfexecConfZF boot d0 fab GF →
     (∀ (i : Nat) (row : List Lbl) (em : Hemission) (dvi dvo : Nat → Efab) (tq : Nat → Bool),
       GF.gfGd.gdG.gxProg[i]? = some row → hartConff i row (boot i) dvi dvo tq em →
-      GraphFetchBlocks.emFenceCyc em ∧ GraphFetchBlocks.emNoDangle em) →
+      GraphFetchBlocks.emNoDangle em) →
     GF.gfGd.gdG.gxProg.length ≤ N →
     ∃ (pi : Nat → Nat) (GF' : Gfexec),
       rowsRel pi GF.gfGd.gdG GF'.gfGd.gdG ∧ GF'.gfDev = GF.gfDev ∧

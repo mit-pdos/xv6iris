@@ -309,11 +309,27 @@ theorem GraphFetchAnc.fencePostConeSrcA (G : Gexec) (anc : Geid → Bool) (hwf :
   rw [hcnt] at hpub htv hrv
   exact MachCSL.fencePost_le _ _ _ _ _ _ htv hrv hpub
 
+/-- On an anchored trace, a per-event leading-star choice is the acting hart's `g` at its own count
+(`GraphFetchSupply.lsOfLin`'s twin). -/
+theorem GraphFetchAnc.lsOfLinA (G : Gexec) (anc : Geid → Bool) (hwf : gwf G) (hok : ancOk G anc)
+    (lsOf : Nat → List Wlabel) (g : Nat → Nat → List Wlabel)
+    (hls : ∀ K i k, (glinEidsA G anc)[K]? = some (i, k) → lsOf K = g i k) :
+    ∀ K s, (linCandA G anc).cdTr[K]? = some s →
+      lsOf K = g s.esAg (tcnt s.esAg ((linCandA G anc).cdTr.take K)) := by
+  intro K s hs
+  obtain ⟨e, he, rfl⟩ := linTrALookupInv G anc K s hs
+  have hcnt := GraphFetchAnc.ownCountA G anc hwf hok K e he
+  obtain ⟨i, k⟩ := e
+  simp only [glinStep] at hcnt ⊢
+  rw [hcnt]
+  exact hls K i k he
+
 /-- **THE FLOOR BOUND for `itvOfL` on an anchored trace** (`GraphFetchSupply.itvFloor`'s twin). -/
 theorem GraphFetchAnc.itvFloorA (G : Gexec) (anc : Geid → Bool) (hc : rvwmoMinusConsistent G)
     (hok : ancOk G anc) (em : Nat → Hemission) (lsOf : Nat → List Wlabel)
+    (g : Nat → Nat → List Wlabel)
     (hblk : ∀ K i k, (glinEidsA G anc)[K]? = some (i, k) →
-      GraphFetch.emBlockF G (em i) i k (lsOf K)) :
+      lsOf K = g i k ∧ GraphFetch.emBlockF G (em i) i k (g i)) :
     ∀ K, K ≤ (glinEidsA G anc).length → ∀ i,
       GraphFetchSupply.itvOfL cohSrc (candExec (linCandA G anc)) lsOf K i ≤
         (GraphFetchCut.contribIdx G
@@ -353,16 +369,14 @@ theorem GraphFetchAnc.itvFloorA (G : Gexec) (anc : Geid → Bool) (hc : rvwmoMin
           revert this
           unfold PfRunUnpinned.lbFenceZeroL
           split <;> simp_all
-        obtain ⟨l, hb, hfen⟩ := hblk K ei f he
-        obtain ⟨rfl, hcyc⟩ := hfen hglbl
+        obtain ⟨hlsK, hbf⟩ := hblk K ei f he
         have hsite : emFenceI (em ei) f := by
-          refine GraphFetchSupply.emFenceIOfBlock _ f (lsOf K) hb ?_
-          rw [GraphFetchSupply.fiFoldEq, GraphFetch.fiFoldLast] at harm
-          cases hlc : GraphFetch.lastCycL (lsOf K) with
-          | none => exact absurd hlc hcyc
-          | some lc =>
-            rw [hlc] at harm
-            cases lc <;> simp_all [GraphFetch.isInstr]
+          refine GraphFetchSupply.siteOfArm G (em ei) ei f (g ei) hbf hglbl ?_
+          have hup := GraphFetchSupply.fiOfLUpto (linCandA G anc).cdTr lsOf g
+            (GraphFetchAnc.lsOfLinA G anc hwf hok lsOf g (fun K i k h => (hblk K i k h).1)) K ei
+          rw [hcnt] at hup
+          rw [← hup, ← hlsK]
+          exact harm
         have hfp := GraphFetchAnc.fencePostConeSrcA G anc hwf hok K ei f he
         have hcone := GraphFetchFloor.coneLeContrib G hc (emFenceI (em ei)) ei f (f + 1) hsite
           (by omega)
@@ -383,9 +397,9 @@ theorem GraphFetchAnc.itvFloorA (G : Gexec) (anc : Geid → Bool) (hc : rvwmoMin
 /-- **M2'S CUT CLAUSE, SUPPLIED ON AN ANCHORED TRACE** (`GraphFetch.linFcutEM2`'s twin). -/
 theorem GraphFetchAnc.linFcutEM2A (G : Gexec) (anc : Geid → Bool) (hc : rvwmoMinusConsistent G)
     (hok : ancOk G anc) (em : Nat → Hemission) (lsOf : Nat → List Wlabel)
-    (hz : ∀ i, GraphFetch.emZif G i (em i))
+    (g : Nat → Nat → List Wlabel) (hz : ∀ i, GraphFetch.emZif G i (em i))
     (hblk : ∀ K i k, (glinEidsA G anc)[K]? = some (i, k) →
-      GraphFetch.emBlockF G (em i) i k (lsOf K)) :
+      lsOf K = g i k ∧ GraphFetch.emBlockF G (em i) i k (g i)) :
     (∀ i, GraphFetchSupply.itvOfL cohSrc (candExec (linCandA G anc)) lsOf 0 i = 0) ∧
     (∀ i, GraphFetchSupply.fiOfL (candExec (linCandA G anc)).exTr lsOf 0 i = false) ∧
     ∀ K s, (candExec (linCandA G anc)).exTr[K]? = some s →
@@ -400,12 +414,14 @@ theorem GraphFetchAnc.linFcutEM2A (G : Gexec) (anc : Geid → Bool) (hc : rvwmoM
   obtain ⟨e, he, rfl⟩ := linTrALookupInv G anc K s hs'
   obtain ⟨i, k⟩ := e
   have hKl : K ≤ (linCandA G anc).cdTr.length := by have := lookup_lt_Some hs'; omega
-  obtain ⟨l, hb, -⟩ := hblk K i k he
-  obtain ⟨n, hn, hslot⟩ := GraphFetchSupply.emBlockFetch (em i) k (lsOf K) l base tvs hb hm
+  obtain ⟨hlsK, hbf⟩ := hblk K i k he
+  obtain ⟨l, hb⟩ := GraphFetch.emBlockOfF G (em i) i k (g i) hbf
+  rw [hlsK] at hm
+  obtain ⟨n, hn, hslot⟩ := GraphFetchSupply.emBlockFetch (em i) k (g i k) l base tvs hb hm
   have hzf := hz i n base tvs hn
   rw [hslot] at hzf
   have hcnt := GraphFetchAnc.ownCountA G anc hc.1 hok K (i, k) he
-  have hfl := GraphFetchAnc.itvFloorA G anc hc hok em lsOf hblk K
+  have hfl := GraphFetchAnc.itvFloorA G anc hc hok em lsOf g hblk K
     (by rw [linTrALen] at hKl; exact hKl) i
   simp only at hcnt
   rw [hcnt] at hfl
@@ -435,9 +451,9 @@ theorem GraphFetchAnc.normalizeFetchSupplyIO (GF : Gfexec) (em : Nat → Hemissi
       wperm pi GF.gfGd.gdG GD'.gdG ∧
       ioResidueGmo ⟨GD', GF.gfDev⟩ ∧
       gdiskRead14 GD'.gdG ∧
-      ∀ lsOf : Nat → List Wlabel,
+      ∀ (lsOf : Nat → List Wlabel) (g : Nat → Nat → List Wlabel),
         (∀ K i k, (glinEidsIO GD'.gdG)[K]? = some (i, k) →
-          GraphFetch.emBlockF GD'.gdG (emRen pi (em i)) i k (lsOf K)) →
+          lsOf K = g i k ∧ GraphFetch.emBlockF GD'.gdG (emRen pi (em i)) i k (g i)) →
         (∀ i, GraphFetchSupply.itvOfL cohSrc (candExec (linCandIO GD'.gdG)) lsOf 0 i = 0) ∧
         (∀ i, GraphFetchSupply.fiOfL (candExec (linCandIO GD'.gdG)).exTr lsOf 0 i = false) ∧
         ∀ K s, (candExec (linCandIO GD'.gdG)).exTr[K]? = some s →
@@ -454,8 +470,8 @@ theorem GraphFetchAnc.normalizeFetchSupplyIO (GF : Gfexec) (em : Nat → Hemissi
         obtain ⟨-, -, -, hmo⟩ := hfa x y h
         exact hmo) (hin i) (hz i)
   have hok : ancOk GD'.gdG (gisAnc GD'.gdG) := ancOkIO ⟨GD', GF.gfDev⟩ h14 hres hdr
-  refine ⟨GD', pi, hc', h14, hrr, hdeps, hfe, hw, hres, hdr, fun lsOf hblk => ?_⟩
+  refine ⟨GD', pi, hc', h14, hrr, hdeps, hfe, hw, hres, hdr, fun lsOf g hblk => ?_⟩
   exact GraphFetchAnc.linFcutEM2A GD'.gdG (gisAnc GD'.gdG) hc'.1 hok (fun i => emRen pi (em i))
-    lsOf hzren hblk
+    lsOf g hzren hblk
 
 end Weak

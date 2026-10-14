@@ -139,7 +139,9 @@ dummy default.
    (`AxDeps.GdexecT.gtFetch`, which `forget` puts in `gdFetch`); [G6-2] the tagged Zifencei bundle
    `gfexecConfZT`/`xv6ConfSZ` (`Weak/GraphFabConf.lean` §2′, slot `emZifencei ∧ emFetchIn`)
    projects to `gfexecConfZ` (`xv6ConfSZForget`), W13-wit re-discharged under it (`w13WitZ`);
-   [G6-3/G6-4] the supply re-thread and the collapse.  Spec: an encoding choice (the ISA is
+   [G6-3] the supply re-thread (`topoSupplyZIO`); [G6-4] the collapse: `xv6ConfSZ`/`w13WitZ`
+   renamed `xv6ConfS`/`w13Wit`, the pinned TAGGED bundle `gfexecConfIOT` retired; this untagged
+   `gfexecConfIO` stays while the pinned supply chain consumes it.  Spec: an encoding choice (the ISA is
    silent on proof organisation); `gfexecConfZ` is FAITHFUL to the Zifencei reading of `gzFetch`, `gfexecConfIO`
    is the pinned (kernel-only, STRONGER) M1 instance.
 

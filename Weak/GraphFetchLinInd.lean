@@ -13,8 +13,8 @@ pinned supply.  Their Zifencei twins here compose the same induction with `topoS
       `t2linAuxIOZ`, `t2linIOZ`, **`t2linSupplyFZ`** (`t2linRealizeIO`/`t2linSupplyF`'s twin: the
       whole graph's normalized rule-14 linearization supplied by M2's shaped conjunct);
   §2  `CatLin.cycleKillCZ`, `CatLin.t2linAuxCZ`, **`CatLin.t2linSupplyCZ`** (the cat twin);
-  §3  **`t2linSupplyZ`** — the composition over `xv6ConfSZForget` (the tagged Zifencei bundle of
-      G6-2): an `xv6ConfSZ` graph under the kill is supplied by M2's conjunct.
+  §3  **`t2linSupplyZ`** — the composition over `xv6ConfSForget` (the tagged Zifencei bundle of
+      G6-2): an `xv6ConfS` graph under the kill is supplied by M2's conjunct.
 
 **THE HULL GUARD (deviation 1; the plan's XL risk R1, §B(4)(iii)).**  The pinned induction passes
 its bundle to every proper hull (`gfexecConfHull`): the pinned fetch clause `emFetchImg` is a
@@ -36,8 +36,8 @@ Zifencei/PMAs are silent on how a proof cuts a graph; FAITHFUL, no trusted text.
 (3) The `WeakRvwmoFabInd` twin is the `racyDIO` one (`t2linRealizeIO`'s shape, `cycleKillIO`'s
 premise set): G5's supply needs `racyDIO`-acyclicity, and `racyF` (FabInd's) does not give it.
 (4) There is no quiescent Zifencei bundle (`gdexecQconf`'s clause is the pinned one); the
-`WeakRvwmoLinInd` twin `t2linSupplyZ` is the composition over `xv6ConfSZForget` (§3), the bundle the
-plan names.  (5) (P1)/(P2) of `GraphFetchBlocks` are premises of every corollary.
+`WeakRvwmoLinInd` twin `t2linSupplyZ` is the composition over `xv6ConfSForget` (§3), the bundle the
+plan names.  (5) (P2) of `GraphFetchBlocks` is a premise of every corollary ((P1) retired by [OWN.86]).
 
 Lean-only helpers are file-qualified (`GraphFetchLinInd.*`).
 -/
@@ -115,7 +115,7 @@ theorem t2linIOZ (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (im : I
   fun hk GF => t2linAuxIOZ boot d0 fab im hk (gevs' GF.gfGd.gdG).length GF (Nat.le_refl _)
 
 /-- **THE COROLLARY at the unpinned shaped supply** (`t2linRealizeIO`/`t2linSupplyF`'s twin):
-under the kill, a conformant Zifencei graph whose emissions satisfy (P1)/(P2) normalizes to `GF'`
+under the kill, a conformant Zifencei graph whose emissions satisfy (P2) normalizes to `GF'`
 whose rule-14 linearization is consistent, `candScaT`, and — under the guard `trDevOrdered` — is
 supplied by M2's shaped conjunct `execProgOk'SC … (fcutEM2 cohSrc E itvOfL fiOfL)` with M2's
 boot values. -/
@@ -126,7 +126,7 @@ theorem t2linSupplyFZ (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (G
     ioResidueGmo GF → gdiskRead14 GF.gfGd.gdG → gfDevWIo GF →
     (∀ (i : Nat) (row : List Lbl) (em : Hemission) (dvi dvo : Nat → Efab) (tq : Nat → Bool),
       GF.gfGd.gdG.gxProg[i]? = some row → hartConff i row (boot i) dvi dvo tq em →
-      GraphFetchBlocks.emFenceCyc em ∧ GraphFetchBlocks.emNoDangle em) →
+      GraphFetchBlocks.emNoDangle em) →
     GF.gfGd.gdG.gxProg.length ≤ N →
     ∃ (pi : Nat → Nat) (GF' : Gfexec),
       rowsRel pi GF.gfGd.gdG GF'.gfGd.gdG ∧ GF'.gfDev = GF.gfDev ∧
@@ -211,7 +211,7 @@ theorem t2linSupplyCZ (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (G
     ioResidueGmo GF → gdiskRead14 GF.gfGd.gdG →
     (∀ (i : Nat) (row : List Lbl) (em : Hemission) (dvi dvo : Nat → Efab) (tq : Nat → Bool),
       GF.gfGd.gdG.gxProg[i]? = some row → hartConff i row (boot i) dvi dvo tq em →
-      GraphFetchBlocks.emFenceCyc em ∧ GraphFetchBlocks.emNoDangle em) →
+      GraphFetchBlocks.emNoDangle em) →
     GF.gfGd.gdG.gxProg.length ≤ N →
     ∃ (pi : Nat → Nat) (GF' : Gfexec),
       rowsRel pi GF.gfGd.gdG GF'.gfGd.gdG ∧ GF'.gfDev = GF.gfDev ∧
@@ -238,21 +238,21 @@ theorem t2linSupplyCZ (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (G
 
 end CatLin
 
-/-! # 3. Over `xv6ConfSZForget` -/
+/-! # 3. Over `xv6ConfSForget` -/
 
-/-- **`t2linSupplyZ` — THE COROLLARY OVER THE TAGGED ZIFENCEI BUNDLE** (`xv6ConfSZ`, G6-2): under the
-kill at every fabric trace, an `xv6ConfSZ` graph whose untagged projection `forgetF GT` is RVWMO⁻,
-carries the I/O residue facts and whose emissions satisfy (P1)/(P2) is supplied — at some fabric
+/-- **`t2linSupplyZ` — THE COROLLARY OVER THE TAGGED ZIFENCEI BUNDLE** (`xv6ConfS`, G6-2): under the
+kill at every fabric trace, an `xv6ConfS` graph whose untagged projection `forgetF GT` is RVWMO⁻,
+carries the I/O residue facts and whose emissions satisfy (P2) is supplied — at some fabric
 trace `fab` of its bundle — by M2's shaped conjunct (`t2linSupplyFZ` on `forgetF GT`). -/
 theorem t2linSupplyZ (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat) (GT : GfexecT)
     (N : Nat) :
     (∀ fab, cycleKillIOZ boot d0 fab im) →
-    xv6ConfSZ boot d0 im nh GT →
+    xv6ConfS boot d0 im nh GT →
     rvwmoMinusDepsConsistent (forgetF GT).gfGd →
     ioResidueGmo (forgetF GT) → gdiskRead14 (forgetF GT).gfGd.gdG → gfDevWIo (forgetF GT) →
     (∀ (i : Nat) (row : List Lbl) (em : Hemission) (dvi dvo : Nat → Efab) (tq : Nat → Bool),
       (forgetF GT).gfGd.gdG.gxProg[i]? = some row → hartConff i row (boot i) dvi dvo tq em →
-      GraphFetchBlocks.emFenceCyc em ∧ GraphFetchBlocks.emNoDangle em) →
+      GraphFetchBlocks.emNoDangle em) →
     nh ≤ N →
     ∃ (fab : Nat → Efab) (pi : Nat → Nat) (GF' : Gfexec),
       (forgetF GT).gfGd.gdG.gxImg = im ∧
@@ -273,7 +273,7 @@ theorem t2linSupplyZ (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat) 
             pst (fun k => fab (dcnt GF' (linCand GF'.gfGd.gdG).cdTr k))
             (candExec (linCand GF'.gfGd.gdG))) := by
   intro hk hconf hc hres hdr hwio hprem hN
-  obtain ⟨himg, hnh, fab, -, hzf⟩ := xv6ConfSZForget boot d0 im nh GT hconf
+  obtain ⟨himg, hnh, fab, -, hzf⟩ := xv6ConfSForget boot d0 im nh GT hconf
   obtain ⟨pi, GF', hrr, hdev, hsr, himg', hscaT, hsup⟩ :=
     t2linSupplyFZ boot d0 fab (forgetF GT) N (himg ▸ hk fab) hc hzf hres hdr hwio hprem (by omega)
   exact ⟨fab, pi, GF', himg, hrr, hdev, hsr, himg'.trans himg, hscaT, hsup⟩

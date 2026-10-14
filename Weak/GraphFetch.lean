@@ -10,20 +10,24 @@ administrative fetch item of a row emission at its REAL slot tag `GraphFetchSpik
 
 * §1 `GraphFetch.emSlotShift` (G0 review item 2): the slot of an item is unchanged by a prefix
   of the item list, when a row item follows it (always, for a `hemit` emission);
-* §2 THE fence.i SITES `emFenceI em f` (D40 [OWN.15]): `fence.i` and the Q7 `sfence.vma` marker
-  share the label `LFence false false false false` (`WeakEvInst.ebarLabel .Barrier_RISCV_i`,
-  `WeakEvLang.annLabel`), so the sites come from the EMISSION STRUCTURE: the row item of slot `f`
-  is that fence AND, in its administrative block (the items since the previous row item), the
-  latest `LInstr`/`LIFetch` is `LInstr`.  fence.i's cycle is boundary `LInstr`, fetch, announce
-  `LInstr`, barrier; sfence.vma's is boundary `LInstr`, fetch, marker.
-  **`GraphFetch.emFenceISound`**: at an `emFenceI` site the latest cycle label of the block is
-  the announce `LInstr` (`GraphFetch.lastCycL`), so the hart's latest own `LInstr`/`LIFetch`
-  step before the realizing node is `LInstr` WHATEVER preceded the block
-  (`GraphFetch.fiFoldOfEmFenceI`: the shadow's `fiArm` fold is `true` from either start) -- by
-  `sailCycleOrder_holds`'s second clause (at an `sfence.vma` ANNOUNCE node the latest is an
-  `LIFetch`), the node is not the marker.  The converse `GraphFetch.emFenceIOfLast` (a
-  `LFence false×4` row item whose block's latest cycle label is `LInstr` is a site) gives
-  completeness for the Sail cycle, whose fence.i block always holds its own announce;
+* §2 THE fence.i SITES `emFenceI em f` (D40 [OWN.15]; RESTATED by [OWN.86] = Q-P1-FENCEI (b′)):
+  `fence.i` and the Q7 `sfence.vma` marker share the label `LFence false false false false`
+  (`WeakEvInst.ebarLabel .Barrier_RISCV_i`, `WeakEvLang.annLabel`), so the sites come from the
+  hart's OWN LABEL ORDER: the item of slot `f` is that fence AND the EMISSION-WIDE latest
+  `LInstr`/`LIFetch` before it (over ALL the hart's earlier items, row items included) is `LInstr`.
+  fence.i's cycle is boundary `LInstr`, fetch, announce `LInstr`, barrier; sfence.vma's is boundary
+  `LInstr`, fetch, marker; the hart's other steps (data reads/writes, the PLIC wire's `LDev` row
+  items, `pstepPlic`) are not cycle labels, so they may sit anywhere in between.  (Until [OWN.86]
+  the criterion read only the fence's administrative block; a PLIC wire item between the announce
+  and the barrier empties that block, and the block-local text then missed a real `fence.i`:
+  `PROGRESS-W5dG63b.md` §(1).)  **`GraphFetch.emFenceISound`**: at a site the shadow's `fiArm`
+  fold over the hart's labels before the item is `true` and the latest cycle label is not an
+  `LIFetch`.  **The Sail characterisation** (`Weak/GraphFetchSail.lean`,
+  `GraphFetchSail.fenceISiteIff`, from `sailCycleOrder_holds`): on every run from a booted state, an
+  own `LFence false×4` step of a hart has latest own cycle label `LInstr` IFF it is a
+  `Barrier_RISCV_i` barrier (the `sfence.vma` marker has an `LIFetch` there); the block form
+  `GraphFetch.emFenceIOfLast` (a block whose latest cycle label is `LInstr` makes a site) is kept
+  for the block-level proofs;
 * §3 the contributor instance `GraphFetch.emContrib` (`gzContrib` at `emFenceI em`) and THE SLOT
   CONTENT `GraphFetch.emZif G i em` (= `GraphFetchSpike.emZifencei G (emContrib G em i) i em`;
   `Weak.emZifencei` in `WeakRvwmoFab` is this);
@@ -35,7 +39,9 @@ administrative fetch item of a row emission at its REAL slot tag `GraphFetchSpik
 Spec marks.  RVWMO has NO instruction-fetch model; the Zifencei text ("a subsequent instruction
 fetch ... will see any previous data stores already visible to the same RISC-V hart") and the
 Sail model (`fence.i` is the bare `Barrier_RISCV_i`) are the reference.  `emFenceI` is FAITHFUL
-(it identifies exactly Sail's fence.i barriers on Sail-cycle runs; it adds no order).  The
+(it identifies exactly Sail's fence.i barriers on every Sail emission, `GraphFetchSail.fenceISiteIff`;
+it adds no order; on non-Sail LTS emissions it may count more sites than the block-local text did,
+which no Sail-boot bundle has [OWN.86]).  The
 contributor superset is D41 (a) (STRONGER than TsoMem's `itvPost` set, within the Zifencei text).
 (Z2)'s E1′ is a NAMED stronger hardware reading (see `gzFetch`).
 
@@ -169,55 +175,70 @@ theorem GraphFetch.fiFoldLast (b : Bool) (ls : List Wlabel) :
     | some l => rfl
     | none => cases x <;> rfl
 
-/-- **THE fence.i SITES** of an emission (D40 [OWN.15]): the row item of slot `f` is
-`LFence false false false false`, and the administrative block before it (the items since the
-previous row item, or since the start) has `LInstr` as its latest cycle label. -/
-def emFenceI (em : Hemission) (f : Nat) : Prop :=
-  ∃ (pre : List Eitem) (ls : List Wlabel) (rest : List Eitem),
-    em.emItems = pre ++ eadm ls ++ (Wlabel.LFence false false false false, some f) :: rest ∧
-    (∀ it, pre.getLast? = some it → it.2.isSome = true) ∧
-    GraphFetch.lastCycL ls = some Wlabel.LInstr
+/-- The latest cycle label of a concatenation: the second list's, else the first's. -/
+theorem GraphFetch.lastCycLAppend (A B : List Wlabel) :
+    GraphFetch.lastCycL (A ++ B) = (GraphFetch.lastCycL B).or (GraphFetch.lastCycL A) := by
+  unfold GraphFetch.lastCycL
+  rw [List.filter_append, List.getLast?_append]
 
-/-- At a site the shadow's `fiArm` fold over the block is `true` from EITHER start bit: whatever
-the hart did before the block, its latest own `LInstr`/`LIFetch` before the realizing node is the
-block's `LInstr`. -/
+/-- The labels of an administrative block are its label list. -/
+theorem GraphFetch.eadmLabels (ls : List Wlabel) : (eadm ls).map Prod.fst = ls := by
+  induction ls with
+  | nil => rfl
+  | cons l ls ih => exact congrArg (l :: ·) ih
+
+/-- **THE fence.i SITES** of an emission (D40 [OWN.15]; restated [OWN.86] Q-P1-FENCEI (b′)): an
+`LFence false false false false` row item of slot `f` such that the EMISSION-WIDE latest cycle label
+before it (the latest `LInstr`/`LIFetch` among ALL the hart's earlier items, whatever row items lie in
+between) is `LInstr` -- the hart's own `fence.i` announce.  (Before [OWN.86] the criterion read only
+the fence's administrative block, which a PLIC wire item between the announce and the barrier could
+leave empty: `PROGRESS-W5dG63b.md` §(1).) -/
+def emFenceI (em : Hemission) (f : Nat) : Prop :=
+  ∃ (pre rest : List Eitem),
+    em.emItems = pre ++ (Wlabel.LFence false false false false, some f) :: rest ∧
+    GraphFetch.lastCycL (pre.map Prod.fst) = some Wlabel.LInstr
+
+/-- The fold is `true` from EITHER start bit once the latest cycle label is `LInstr`. -/
 theorem GraphFetch.fiFoldOfEmFenceI (ls : List Wlabel) (b : Bool) :
     GraphFetch.lastCycL ls = some Wlabel.LInstr → GraphFetch.fiFold b ls = true := by
   intro h
   rw [GraphFetch.fiFoldLast, h]
   rfl
 
-/-- **`emFenceISound`**: an `emFenceI` site's row item is the all-false fence, its block is
-administrative (it follows a row item or the start), and the block's latest cycle label is
-`LInstr` -- so for ANY prefix `st` of the hart's own labels, the latest own cycle label before
-the realizing node is `LInstr`, never an `LIFetch`; by `sailCycleOrder_holds` (an `sfence.vma`
-ANNOUNCE node has an `LIFetch` there) the node is a `fence.i` barrier, not the marker. -/
+/-- **`emFenceISound`**: at an `emFenceI` site the hart's latest own cycle label before the fence
+item is `LInstr`, so the shadow's `fiArm` fold over the hart's labels up to the item is `true`
+(from the boot bit `false`), and the latest is never an `LIFetch`; by `sailCycleOrder_holds`'s
+second clause (an `sfence.vma` ANNOUNCE node has an `LIFetch` there) the item is a `fence.i`
+barrier, not the marker (`GraphFetchSail.fenceISiteIff`). -/
 theorem GraphFetch.emFenceISound (em : Hemission) (f : Nat) :
     emFenceI em f →
-    ∃ (pre : List Eitem) (ls : List Wlabel) (rest : List Eitem),
-      em.emItems = pre ++ eadm ls ++ (Wlabel.LFence false false false false, some f) :: rest ∧
-      ∀ st : List Wlabel,
-        GraphFetch.lastCycL (st ++ ls) = some Wlabel.LInstr ∧
-        GraphFetch.fiFold false (st ++ ls) = true ∧
-        ∀ base tvs, GraphFetch.lastCycL (st ++ ls) ≠ some (Wlabel.LIFetch base tvs) := by
-  rintro ⟨pre, ls, rest, he, _, hl⟩
-  refine ⟨pre, ls, rest, he, fun st => ?_⟩
-  have hl' : GraphFetch.lastCycL (st ++ ls) = some Wlabel.LInstr := by
-    unfold GraphFetch.lastCycL at hl ⊢
-    rw [List.filter_append, List.getLast?_append, hl]
-    rfl
-  refine ⟨hl', GraphFetch.fiFoldOfEmFenceI _ _ hl', fun base tvs h => ?_⟩
-  rw [hl'] at h
+    ∃ (pre rest : List Eitem),
+      em.emItems = pre ++ (Wlabel.LFence false false false false, some f) :: rest ∧
+      GraphFetch.lastCycL (pre.map Prod.fst) = some Wlabel.LInstr ∧
+      GraphFetch.fiFold false (pre.map Prod.fst) = true ∧
+      ∀ base tvs, GraphFetch.lastCycL (pre.map Prod.fst) ≠ some (Wlabel.LIFetch base tvs) := by
+  rintro ⟨pre, rest, he, hl⟩
+  refine ⟨pre, rest, he, hl, GraphFetch.fiFoldOfEmFenceI _ _ hl, fun base tvs h => ?_⟩
+  rw [hl] at h
   cases h
 
-/-- Completeness: an all-false fence row item whose administrative block's latest cycle label is
-`LInstr` IS a site. -/
+/-- Completeness at a block: an all-false fence row item whose administrative block's latest
+cycle label is `LInstr` IS a site (the block's label is then the emission-wide latest). -/
 theorem GraphFetch.emFenceIOfLast (em : Hemission) (f : Nat) (pre : List Eitem) (ls : List Wlabel)
     (rest : List Eitem) :
     em.emItems = pre ++ eadm ls ++ (Wlabel.LFence false false false false, some f) :: rest →
-    (∀ it, pre.getLast? = some it → it.2.isSome = true) →
-    GraphFetch.lastCycL ls = some Wlabel.LInstr → emFenceI em f :=
-  fun he hp hl => ⟨pre, ls, rest, he, hp, hl⟩
+    GraphFetch.lastCycL ls = some Wlabel.LInstr → emFenceI em f := by
+  intro he hl
+  refine ⟨pre ++ eadm ls, rest, by rw [he], ?_⟩
+  rw [List.map_append, GraphFetch.eadmLabels, GraphFetch.lastCycLAppend, hl]
+  rfl
+
+/-- A prefix's labels decide the site: an all-false fence row item whose prefix's latest cycle
+label is `LInstr` is a site. -/
+theorem GraphFetch.emFenceIOfPre (em : Hemission) (f : Nat) (pre rest : List Eitem) :
+    em.emItems = pre ++ (Wlabel.LFence false false false false, some f) :: rest →
+    GraphFetch.lastCycL (pre.map Prod.fst) = some Wlabel.LInstr → emFenceI em f :=
+  fun he hl => ⟨pre, rest, he, hl⟩
 
 /-- Non-vacuity, computed: fence.i's cycle (boundary `LInstr`, fetch, announce `LInstr`, barrier)
 is a site. -/
@@ -225,7 +246,7 @@ theorem GraphFetch.fenceICycleSite (base : Int) (tvs : List (Nat × BitVec 8)) (
     emFenceI ⟨eadm [Wlabel.LInstr, Wlabel.LIFetch base tvs, Wlabel.LInstr] ++
       [(Wlabel.LFence false false false false, some 0)], fin⟩ 0 :=
   GraphFetch.emFenceIOfLast _ 0 [] [Wlabel.LInstr, Wlabel.LIFetch base tvs, Wlabel.LInstr] []
-    rfl (fun _ h => by cases h) rfl
+    rfl rfl
 
 /-- ... and sfence.vma's (boundary `LInstr`, fetch, marker) does not arm the fold: its block's
 latest cycle label is the fetch. -/

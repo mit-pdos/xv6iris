@@ -157,8 +157,8 @@ theorem GraphFetchHullZ.slotPrefix (its' rest : List Eitem) (n : Nat) :
 /-- A fence.i site of a prefix emission is a site of the whole emission. -/
 theorem GraphFetchHullZ.emFenceIPrefix (em em' : Hemission) (rest : List Eitem) (f : Nat) :
     em.emItems = em'.emItems ++ rest → emFenceI em' f → emFenceI em f := by
-  rintro he ⟨pre, ls, rest', he', hpre, hl⟩
-  exact ⟨pre, ls, rest' ++ rest, by rw [he, he']; simp, hpre, hl⟩
+  rintro he ⟨pre, rest', he', hl⟩
+  exact ⟨pre, rest' ++ rest, by rw [he, he']; simp, hl⟩
 
 /-- A fetch item of the renamed prefix is a renamed fetch item of the whole emission. -/
 theorem GraphFetchHullZ.itemHull (π : Nat → Nat) (em em' : Hemission) (rest : List Eitem) (n : Nat)
@@ -543,7 +543,7 @@ theorem t2linSupplyFZIOC (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab)
     ioResidueGmo GF → gdiskRead14 GF.gfGd.gdG → gfDevWIo GF →
     (∀ (i : Nat) (row : List Lbl) (em : Hemission) (dvi dvo : Nat → Efab) (tq : Nat → Bool),
       GF.gfGd.gdG.gxProg[i]? = some row → hartConff i row (boot i) dvi dvo tq em →
-      GraphFetchBlocks.emFenceCyc em ∧ GraphFetchBlocks.emNoDangle em) →
+      GraphFetchBlocks.emNoDangle em) →
     GF.gfGd.gdG.gxProg.length ≤ N →
     ∃ (pi : Nat → Nat) (GF' : Gfexec),
       rowsRel pi GF.gfGd.gdG GF'.gfGd.gdG ∧ GF'.gfDev = GF.gfDev ∧

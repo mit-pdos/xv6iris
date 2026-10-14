@@ -36,8 +36,8 @@ row turned into `PResidue` (the classified residue W9b / W8 (ii)–(iii) handle)
       byte at a text address is `kbyte` — from the PINNED clause (`kFetchTextOfPin`,
       `emFetchImg`) and from the ZIFENCEI clause + the pristine text (`kFetchTextOfZif`,
       `emZifencei` + `kTextUnwritten G`: no graph write to a text byte — (Z1) then forces
-      timestamp 0); per bundle: `xv6ConfSFetchText` (pinned), `xv6ConfSZFetchText` (G6-2's
-      `xv6ConfSZ`);
+      timestamp 0); per bundle: `xv6ConfSZFetchText` (`xv6ConfS`, the Zifencei bundle; G6-4
+      retired the pinned bundle and its `xv6ConfSFetchText`);
   §6  the bytes give the word / role, per Sail fetch arm (`LeanRV64D/Fetch.lean:233-288`,
       `Step.lean:335-404`): a 4-byte ifetch read `w` (the node clause's `nthByte w j`, Lean
       `WeakEvInst.pnodeStep`'s i-cache arm) is `kword pc` (`kwordOfBytes`); `F_Base w` announces
@@ -456,22 +456,11 @@ theorem kFetchTextOfZif (G : Gexec) (i : Nat) (em : Hemission) :
         simp only [Option.bind_some, hm] at hv
         exact hnw w _ v h1 h2 (gmsgByteInv G w m _ v hm hv)
 
-/-- The per-row fetch fact of a PINNED bundle. -/
-theorem xv6ConfSFetchText (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat)
-    (GT : GfexecT) :
-    xv6ConfS boot d0 im nh GT → kTextImg im →
-    ∀ (i : Nat) (row : List Lbl), GT.gfGd.gtG.gxProg[i]? = some row →
-      ∃ (em : Hemission) (dvi dvo : Nat → Efab) (tq : Nat → Bool),
-        hartConff i row (boot i) dvi dvo tq em ∧ kFetchText em := by
-  rintro ⟨himg, -, fab, -, -, -, hrows⟩ hti i row hrow
-  obtain ⟨em, dvi, dvo, tq, hem, -, -, hpin, -⟩ := hrows i row hrow
-  exact ⟨em, dvi, dvo, tq, hem, kFetchTextOfPin _ em (himg ▸ hti) hpin⟩
-
-/-- The per-row fetch fact of the ZIFENCEI bundle (W5d-G G6-2's `xv6ConfSZ`), given the
-pristine text at the graph. -/
+/-- The per-row fetch fact of the ZIFENCEI bundle `xv6ConfS` (W5d-G G6-2's `xv6ConfSZ`, renamed at
+G6-4), given the pristine text at the graph. -/
 theorem xv6ConfSZFetchText (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat)
     (GT : GfexecT) :
-    xv6ConfSZ boot d0 im nh GT → kTextImg im → kTextUnwritten GT.gfGd.gtG →
+    xv6ConfS boot d0 im nh GT → kTextImg im → kTextUnwritten GT.gfGd.gtG →
     ∀ (i : Nat) (row : List Lbl), GT.gfGd.gtG.gxProg[i]? = some row →
       ∃ (em : Hemission) (dvi dvo : Nat → Efab) (tq : Nat → Bool),
         hartConff i row (boot i) dvi dvo tq em ∧ kFetchText em := by

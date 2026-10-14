@@ -11,7 +11,7 @@ here proves `CatLin.cycleKillCZ` (`Weak/GraphFetchLinInd.lean`, the GUARDED `rac
   §1  the classification over `ioCross`-entered segments (`CatLin.l2ClaimAtCZ`, the `l2ClaimAtC`
       twin at the I/O cross order; `CatLin.rawChainChainCZ`: a classified raw chain IS a
       `chainC … (ioCross GF)`, killed by `cycleKillIOC`);
-  §2  the supplies `CatLin.cutSupplyCZ` (a cut whose hull CARRIES the Zifencei bundle and (P1)/(P2) —
+  §2  the supplies `CatLin.cutSupplyCZ` (a cut whose hull CARRIES the Zifencei bundle and (P2) —
       the burden the guarded induction hypothesis puts on the kill, `GraphFetchLinInd` deviation 1)
       and `CatLin.certSupplyCZ` (from the acyclic hull, a `RunDataZ` whose log is the graph's);
   §3  **`CatLin.cycleKillOfL2CZ`** — the glue: the cycle as `ioCross` segments, the cut, the
@@ -40,11 +40,11 @@ namespace Weak
 open MachCSL MachCSL.Stdpp Iris.Std
 open TsoShadow
 
-/-- (P1)/(P2) at every row of a graph (`GraphFetchBlocks` §1), as one predicate. -/
+/-- (P2) at every row of a graph (`GraphFetchBlocks` §1; (P1) retired by [OWN.86]). -/
 def GraphFetchBlocks.emPremOk (boot : Nat → Pexv6) (G : Gexec) : Prop :=
   ∀ (i : Nat) (row : List Lbl) (em : Hemission) (dvi dvo : Nat → Efab) (tq : Nat → Bool),
     G.gxProg[i]? = some row → hartConff i row (boot i) dvi dvo tq em →
-    GraphFetchBlocks.emFenceCyc em ∧ GraphFetchBlocks.emNoDangle em
+    GraphFetchBlocks.emNoDangle em
 
 namespace CatLin
 
@@ -100,7 +100,7 @@ theorem rawChainChainCZ (GF : Gfexec) (ad : List (Geid × Geid)) (P : Int → In
 /-! # 2. The supplies -/
 
 /-- (G-2) at the Zifencei bundle: a cut, `gfDev`-closed, whose hull carries the bundle and
-(P1)/(P2) — what the guarded induction hypothesis asks for. -/
+(P2) — what the guarded induction hypothesis asks for. -/
 def cutSupplyCZ (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (im : Image) : Prop :=
   ∀ (GF : Gfexec) (ad : List (Geid × Geid)) (z : Geid) (ss : List Seg),
     GF.gfGd.gdG.gxImg = im → rvwmoCatAD GF.gfGd ad → GraphFabConf.gfexecConfZF boot d0 fab GF →

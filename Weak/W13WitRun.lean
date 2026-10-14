@@ -24,16 +24,14 @@ Lean-only, no Rocq twin.
       tagged conformance (row count; `gfDev` duplicate-free and in range; per row, membership by
       contact and the tagged dependency clause, over a per-row certificate `GfRowCert` = the run's
       `rowDepsT`, contact bits and moved flags) AND the tagged model's well-formedness `gtdepsWfB`
-      over the same edges.  **`xv6ConfSBSound`**: with each row's run facts (an emission whose deps,
-      contact bits and moved flags are the certificate's, fetches pinned, members' endpoints on
-      the fabric trace — what `runRowSound` supplies), a `true` twin gives `xv6ConfS` and
-      `gtdepsWf`.
+      over the same edges; its soundness at any fetch slot is `W13Wit.confSBRows`.  (G6-4: the
+      pinned soundness `xv6ConfSBSound`, onto the retired pinned `xv6ConfS`, is gone.)
   §4  **W5d-G G6-2 — the Zifencei twin** `xv6ConfSZB` = `xv6ConfSB` ∧ `emFetchUnwrittenB` (every
       byte the graph writes lies OFF the run's FETCH image, e.g. the kernel text); its soundness
-      **`xv6ConfSZBSound`** gives `xv6ConfSZ` (`Weak/GraphFabConf.lean` §2′) when each row's
+      **`xv6ConfSZBSound`** gives `xv6ConfS` (`Weak/GraphFabConf.lean` §2′) when each row's
       fetches are pinned to that sub-image of the graph's image (the slot by
-      `GraphFetch.emZifOfPinC`, the stored fragment by `GraphFetch.emFetchInOfUnwritten`).  Both
-      soundness theorems go through `W13Wit.confSBRows`, the twin's soundness at any fetch slot.
+      `GraphFetch.emZifOfPinC`, the stored fragment by `GraphFetch.emFetchInOfUnwritten`), through
+      `W13Wit.confSBRows`.
 
 **Trust.**  Nothing is trusted beyond the kernel: the runner is evaluated by `decide +kernel` and
 linked to `pstepEv` by the proofs above (no `native_decide`, unlike `vtest-lean`).  The runner
@@ -52,11 +50,11 @@ proved once; `SrvwmoXv6Witness.pstepEvNode`/`boundaryPstep`/`erwLabelAdm`/`fetch
 from `imgF` (a fetch whose bytes `imgF` lacks makes the run fail); `runRowSound`'s pins are to
 `imgF`.  W13-wit passes the boot image and its kernel-text restriction, so the run itself
 certifies that every fetch reads kernel text — what `emFetchUnwrittenB` needs (the plan's
-`xv6ConfSZBSound` "through `xv6ConfSBSound` + `xv6ConfSZOfPin`" would need the unwritten fact for
-EVERY emission of a row; the shared `confSBRows` keeps the run's own emission instead).
+`xv6ConfSZBSound` "through `xv6ConfSBSound` + `xv6ConfSZOfPin`" (both retired at G6-4) would need
+the unwritten fact for EVERY emission of a row; the shared `confSBRows` keeps the run's own emission instead).
 
 **Name map.**  None (Lean-only).  Lean-only names: `GfRowCert`, `gfRowCertOk`, `xv6ConfSB`,
-`xv6ConfSBSound`, `emFetchUnwrittenB`, `emFetchUnwrittenBSound`, `xv6ConfSZB`, `xv6ConfSZBSound`;
+`emFetchUnwrittenB`, `emFetchUnwrittenBSound`, `xv6ConfSZB`, `xv6ConfSZBSound`;
 helpers file-qualified `W13Wit.*`.
 -/
 import Weak.SrvwmoXv6Witness
@@ -581,7 +579,7 @@ structure GfRowCert where
   rcTq : List Bool
   rcMoved : List Bool
 
-/-- The decidable residue of `gfexecConfIOT`'s per-row clauses: membership by contact (an
+/-- The decidable residue of `gfexecConfZT`'s per-row clauses: membership by contact (an
 I/O-class event or a contact block is a member, a member is one of them, a moved block is a
 member) and the tagged dependency clause. -/
 def gfRowCertOk (G : Gexec) (gfDev : List Geid) (deps : List Tdep) (i : Nat) (row : List Lbl)
@@ -685,26 +683,6 @@ theorem W13Wit.confSBRows (boot : Nat → Pexv6) (nh : Nat) (GT : GfexecT)
         simpa using hds e he
     · cases h
 
-/-- **THE BOOL TWIN IS SOUND**: with each row's run facts (an emission realizing it whose tagged
-deps, contact bits and moved flags are the certificate's, fetches pinned, members' endpoints on the
-fabric trace), a `true` twin gives `xv6ConfS` and the tagged well-formedness. -/
-theorem xv6ConfSBSound (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat) (GT : GfexecT)
-    (cs : List GfRowCert) (fab : Nat → Efab) :
-    xv6ConfSB nh GT cs = true → GT.gfGd.gtG.gxImg = im → fab 0 = d0 →
-    (∀ (i : Nat) (row : List Lbl) (rc : GfRowCert), GT.gfGd.gtG.gxProg[i]? = some row →
-       cs[i]? = some rc →
-       ∃ (em : Hemission) (dvi dvo : Nat → Efab) (tq : Nat → Bool),
-         hartConff i row (boot i) dvi dvo tq em ∧ rowDepsT em.emItems = rc.rcDeps ∧
-         emFetchImg im em ∧
-         (∀ k, k < row.length → tq k = rc.rcTq.getD k false) ∧
-         (∀ k, k < row.length → rc.rcMoved.getD k false = false → dvi k = dvo k) ∧
-         (∀ k n, GT.gfDev[n]? = some (i, k) → dvi k = fab n ∧ dvo k = fab (n + 1))) →
-    xv6ConfS boot d0 im nh GT ∧ gtdepsWf GT.gfGd.gtG GT.gfGd.gtDeps := by
-  intro hb himg hfab hrows
-  obtain ⟨hnh, hnd, hbnd, hr, hwf⟩ := W13Wit.confSBRows boot nh GT cs fab
-    (fun _ em => emFetchImg GT.gfGd.gtG.gxImg em) hb (by rw [himg]; exact hrows)
-  exact ⟨⟨himg, hnh, fab, hfab, hnd, hbnd, hr⟩, hwf⟩
-
 /-! # 4. The Zifencei twin (W5d-G G6-2) -/
 
 /-- (Lean-only) A pin to a SUB-image is a pin to the image. -/
@@ -765,7 +743,7 @@ def xv6ConfSZB (nh : Nat) (GT : GfexecT) (cs : List GfRowCert) (imF : Image) : B
   xv6ConfSB nh GT cs && emFetchUnwrittenB GT.gfGd.gtG imF
 
 /-- **THE ZIFENCEI TWIN IS SOUND**: with each row's run facts, its fetches pinned to a SUB-image
-`imF` of the graph's image (e.g. the kernel text), a `true` twin gives `xv6ConfSZ` — the slot
+`imF` of the graph's image (e.g. the kernel text), a `true` twin gives `xv6ConfS` — the slot
 through the kernel-text instance `GraphFetch.emZifOfPinC`, the stored fragment through
 `GraphFetch.emFetchInOfUnwritten` — and the tagged well-formedness. -/
 theorem xv6ConfSZBSound (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat) (GT : GfexecT)
@@ -780,7 +758,7 @@ theorem xv6ConfSZBSound (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Na
          (∀ k, k < row.length → tq k = rc.rcTq.getD k false) ∧
          (∀ k, k < row.length → rc.rcMoved.getD k false = false → dvi k = dvo k) ∧
          (∀ k n, GT.gfDev[n]? = some (i, k) → dvi k = fab n ∧ dvo k = fab (n + 1))) →
-    xv6ConfSZ boot d0 im nh GT ∧ gtdepsWf GT.gfGd.gtG GT.gfGd.gtDeps := by
+    xv6ConfS boot d0 im nh GT ∧ gtdepsWf GT.gfGd.gtG GT.gfGd.gtDeps := by
   intro hb himg hfab hsub hrows
   simp only [xv6ConfSZB, Bool.and_eq_true] at hb
   obtain ⟨hb, hnw⟩ := hb

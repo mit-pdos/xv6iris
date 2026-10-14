@@ -19,16 +19,13 @@ traces (`Weak/GraphFetchAnc.lean`) everything is now ONE trace, `linCandIO` of t
 What W11-F consumes: these (§2) in place of G6-3's guarded statements; the premises are G6-3's
 minus the guards, plus `gfDevWIo` where the guarded twin lacked it (the cat corollary).
 
-**Note on (P1) (`GraphFetchBlocks.emFenceCyc`, still a premise here; G6-3b finding).**  (P1) is
-FALSE on Sail emissions in general, so no Sail walk can discharge it: the PLIC wire write
-(`pstepPlic`, `WeakEvInst.lean`, a disjunct of `pstepHart`) is a step of the HART's process, with
-the row label `LDev .dev 0 [] [] []`, "moving neither its monad nor its parked fence", enabled
-whenever the PLIC program sits at a `setPin` for the hart — so it may land between a `fence.i`'s
-announce (`LInstr`, administrative) and its `Barrier_RISCV_i` (`LFence false×4`), leaving the
-fence's block empty.  There MachCSL's `fiArm` (inherited from the PLIC item's block, whose latest
-cycle label is the announce) raises `itv`, while G1's block-local `emFenceI` misses the site: the
-trusted fetch clause is then WEAKER than Zifencei (it admits a stale fetch after that `fence.i`).
-Options (trusted fetch text, owner): `PROGRESS-W5dG63b.md`.
+**Note on (P1) (RETIRED, [OWN.86]).**  G6-3b found G6-3's (P1) (`emFenceCyc`, a cycle label inside
+every `LFence false×4` block) FALSE on Sail emissions: the PLIC wire write (`pstepPlic`,
+`WeakEvInst.lean`, a disjunct of `pstepHart`) may land between a `fence.i`'s announce and its
+`Barrier_RISCV_i`, leaving the fence's block empty, while MachCSL's `fiArm` still raises `itv`
+there.  The owner restated G1's `emFenceI` with the EMISSION-WIDE latest own cycle label
+(Q-P1-FENCEI (b′); FAITHFUL on Sail, `GraphFetchSail.fenceISiteIff`); the supply's arm is that
+label (`GraphFetchSupply.siteOfArm`), so the premise is gone (`PROGRESS-P1b.md`).
 
 Spec marks.  No new trusted text (FAITHFUL).  Lean-only helpers are file-qualified
 (`GraphFetchAncSupply.*`).
@@ -58,7 +55,7 @@ theorem GraphFetchAncSupply.devLblRen (boot : Nat → Pexv6) (d0 : Efab) (fab : 
 
 /-- **`topoSupplyZIO` — THE UNPINNED, SHAPED SUPPLY ON ONE TRACE** (`topoSupplyZT`'s twin on
 `linCandIO`, guard-free): a `racyDIO`-acyclic core graph whose Zifencei fabric bundle holds, whose
-fabric members are writes / I/O events (`gfDevWIo`) and whose rows' emissions satisfy (P1)/(P2)
+fabric members are writes / I/O events (`gfDevWIo`) and whose rows' emissions satisfy (P2)
 normalizes to `GF'` (same fabric) with the residue and the disk-read anchors, whose (L) trace
 `linCandIO` is consistent, carries the rows, is `candScaT` and `candDiskLat`, visits the fabric in
 order, and is supplied by M2's conjunct `execProgOk'STC pstepEv pclsEv fokTriv cohSrc
@@ -70,7 +67,7 @@ theorem topoSupplyZIO (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (G
     gfDevWIo GF →
     (∀ (i : Nat) (row : List Lbl) (em : Hemission) (dvi dvo : Nat → Efab) (tq : Nat → Bool),
       GF.gfGd.gdG.gxProg[i]? = some row → hartConff i row (boot i) dvi dvo tq em →
-      GraphFetchBlocks.emFenceCyc em ∧ GraphFetchBlocks.emNoDangle em) →
+      GraphFetchBlocks.emNoDangle em) →
     GF.gfGd.gdG.gxProg.length ≤ N →
     ∃ (pi : Nat → Nat) (GF' : Gfexec),
       rowsRel pi GF.gfGd.gdG GF'.gfGd.gdG ∧
@@ -149,7 +146,7 @@ theorem topoSupplyZIO (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (G
   -- the per-hart block data at the normalized graph
   have hblkData : ∀ i, i < N → ∃ a : (Nat → Pexv6) × (Nat → List Wlabel), a.1 0 = boot i ∧
       ∀ n lb, ((GD'.gdG.gxProg[i]?).getD [])[n]? = some lb →
-        GraphFetch.emBlockF GD'.gdG (emRen pi (emF i)) i n (a.2 n) ∧
+        GraphFetch.emBlockF GD'.gdG (emRen pi (emF i)) i n a.2 ∧
         (∀ m, GF.gfDev[m]? = some (i, n) →
           GraphFetchBlocks.hblkS (fab m) (fab (m + 1)) (rowWs ((GD'.gdG.gxProg[i]?).getD []) n) lb
             (a.2 n) (a.1 n) (a.1 (n + 1))) ∧
@@ -161,12 +158,12 @@ theorem topoSupplyZIO (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (G
     · obtain ⟨row, hrow0⟩ := hrowOf i hi
       obtain ⟨hem, hiff, hpin, -⟩ := hE i hi row hrow0
       have hemF : emF i = (E i).1 := by simp only [emF, if_pos hi]
-      obtain ⟨hfc, hndg⟩ := hprem i row (E i).1 _ _ _ hrow0 hem
+      have hndg := hprem i row (E i).1 _ _ _ hrow0 hem
       have hrowG : GD'.gdG.gxProg[i]? = some (row.map (lblRen pi)) := by
         rw [hprog, hrow0]; rfl
       obtain ⟨f, g, hf0, hf⟩ := GraphFetchBlocks.rowBlocks GD'.gdG i (row.map (lblRen pi)) (boot i)
         _ _ _ (emRen pi (E i).1) GF.gfDev fab (hartConffRen pi i row (boot i) _ _ _ _ hem)
-        (GraphFetchBlocks.emFenceCycRen pi _ hfc) (GraphFetchBlocks.emNoDangleRen pi _ hndg)
+        (GraphFetchBlocks.emNoDangleRen pi _ hndg)
         (fun n hn hnin => by
           cases htq : (E i).2.2.2 n with
           | false => rfl
@@ -196,7 +193,7 @@ theorem topoSupplyZIO (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (G
     intro K s hs
     simp only [lsOf, hs]
   have hblkF : ∀ K i k, (glinEidsIO GD'.gdG)[K]? = some (i, k) →
-      GraphFetch.emBlockF GD'.gdG (emRen pi (emF i)) i k (lsOf K) := by
+      lsOf K = (Fx i).2 k ∧ GraphFetch.emBlockF GD'.gdG (emRen pi (emF i)) i k (Fx i).2 := by
     intro K i k he
     have hs := linTrALookup GD'.gdG (gisAnc GD'.gdG) K (i, k) he
     have hcnt : tcnt i ((linCandIO GD'.gdG).cdTr.take K) = k :=
@@ -210,11 +207,11 @@ theorem topoSupplyZIO (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (G
       · have hnone : GD'.gdG.gxProg[i]? = none := List.getElem?_eq_none (by omega)
         rw [hnone] at hl
         simp at hl
+    refine ⟨?_, ((hFx i hiN).2 k _ hl).1⟩
     rw [hlsOf K _ hs]
     simp only [glinStep] at hcnt ⊢
     rw [hcnt]
-    exact ((hFx i hiN).2 k _ hl).1
-  obtain ⟨hi0, hf0', hcut⟩ := hsup lsOf hblkF
+  obtain ⟨hi0, hf0', hcut⟩ := hsup lsOf (fun i => (Fx i).2) hblkF
   have hscaT := linCandScaTMinusA GD'.gdG (gisAnc GD'.gdG) hc'.1 hok
   have hdl : candDiskLat (linCandIO GD'.gdG) := linCandDiskLatMinus GF' hc'.1 h14 hres' hdr'
   have hwio' : gfDevWIo GF' := gfDevWIoRen pi GF GF' hrr rfl hwio
@@ -241,7 +238,7 @@ theorem topoSupplyZIO (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (G
 /-! # 2. The guard-free consumers -/
 
 /-- **`t2linSupplyFZ` on one trace** (guard-free): under the kill, a conformant Zifencei graph
-with `gfDevWIo` whose emissions satisfy (P1)/(P2) is supplied on `linCandIO` of its
+with `gfDevWIo` whose emissions satisfy (P2) is supplied on `linCandIO` of its
 normalization by M2's conjunct, with `candDiskLat` and `trDevOrdered` proved. -/
 theorem t2linSupplyFZIO (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF : Gfexec)
     (N : Nat) :
@@ -250,7 +247,7 @@ theorem t2linSupplyFZIO (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) 
     ioResidueGmo GF → gdiskRead14 GF.gfGd.gdG → gfDevWIo GF →
     (∀ (i : Nat) (row : List Lbl) (em : Hemission) (dvi dvo : Nat → Efab) (tq : Nat → Bool),
       GF.gfGd.gdG.gxProg[i]? = some row → hartConff i row (boot i) dvi dvo tq em →
-      GraphFetchBlocks.emFenceCyc em ∧ GraphFetchBlocks.emNoDangle em) →
+      GraphFetchBlocks.emNoDangle em) →
     GF.gfGd.gdG.gxProg.length ≤ N →
     ∃ (pi : Nat → Nat) (GF' : Gfexec),
       rowsRel pi GF.gfGd.gdG GF'.gfGd.gdG ∧ GF'.gfDev = GF.gfDev ∧
@@ -281,7 +278,7 @@ theorem CatLin.t2linSupplyCZIO (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat →
     ioResidueGmo GF → gdiskRead14 GF.gfGd.gdG → gfDevWIo GF →
     (∀ (i : Nat) (row : List Lbl) (em : Hemission) (dvi dvo : Nat → Efab) (tq : Nat → Bool),
       GF.gfGd.gdG.gxProg[i]? = some row → hartConff i row (boot i) dvi dvo tq em →
-      GraphFetchBlocks.emFenceCyc em ∧ GraphFetchBlocks.emNoDangle em) →
+      GraphFetchBlocks.emNoDangle em) →
     GF.gfGd.gdG.gxProg.length ≤ N →
     ∃ (pi : Nat → Nat) (GF' : Gfexec),
       rowsRel pi GF.gfGd.gdG GF'.gfGd.gdG ∧ GF'.gfDev = GF.gfDev ∧
@@ -303,16 +300,16 @@ theorem CatLin.t2linSupplyCZIO (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat →
       (CatLin.t2linOfCycleKillCZ boot d0 fab _ hk GF ad rfl hc hconf hres hdr) hconf hwio hprem hN
   exact ⟨pi, GF', hrr, hdev, hsr, himg, hscaT, hdl, hord, hsup⟩
 
-/-- **`t2linSupplyZ` on one trace** (guard-free): over the tagged Zifencei bundle `xv6ConfSZ`. -/
+/-- **`t2linSupplyZ` on one trace** (guard-free): over the tagged Zifencei bundle `xv6ConfS`. -/
 theorem t2linSupplyZIO (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat) (GT : GfexecT)
     (N : Nat) :
     (∀ fab, cycleKillIOZ boot d0 fab im) →
-    xv6ConfSZ boot d0 im nh GT →
+    xv6ConfS boot d0 im nh GT →
     rvwmoMinusDepsConsistent (forgetF GT).gfGd →
     ioResidueGmo (forgetF GT) → gdiskRead14 (forgetF GT).gfGd.gdG → gfDevWIo (forgetF GT) →
     (∀ (i : Nat) (row : List Lbl) (em : Hemission) (dvi dvo : Nat → Efab) (tq : Nat → Bool),
       (forgetF GT).gfGd.gdG.gxProg[i]? = some row → hartConff i row (boot i) dvi dvo tq em →
-      GraphFetchBlocks.emFenceCyc em ∧ GraphFetchBlocks.emNoDangle em) →
+      GraphFetchBlocks.emNoDangle em) →
     nh ≤ N →
     ∃ (fab : Nat → Efab) (pi : Nat → Nat) (GF' : Gfexec),
       (forgetF GT).gfGd.gdG.gxImg = im ∧
@@ -330,7 +327,7 @@ theorem t2linSupplyZIO (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat
           (candExec (linCandIO GF'.gfGd.gdG)) ∧
         (∀ i, itvOf 0 i = 0) ∧ (∀ i, fiOf 0 i = false) := by
   intro hk hconf hc hres hdr hwio hprem hN
-  obtain ⟨himg, hnh, fab, -, hzf⟩ := xv6ConfSZForget boot d0 im nh GT hconf
+  obtain ⟨himg, hnh, fab, -, hzf⟩ := xv6ConfSForget boot d0 im nh GT hconf
   obtain ⟨pi, GF', hrr, hdev, hsr, himg', hscaT, hdl, hord, hsup⟩ :=
     t2linSupplyFZIO boot d0 fab (forgetF GT) N (himg ▸ hk fab) hc hzf hres hdr hwio hprem
       (by omega)
@@ -346,7 +343,7 @@ theorem hullRunZIO (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF :
     gfDevWIo GF →
     (∀ (i : Nat) (row : List Lbl) (em : Hemission) (dvi dvo : Nat → Efab) (tq : Nat → Bool),
       (gfHull GF cs).gfGd.gdG.gxProg[i]? = some row → hartConff i row (boot i) dvi dvo tq em →
-      GraphFetchBlocks.emFenceCyc em ∧ GraphFetchBlocks.emNoDangle em) →
+      GraphFetchBlocks.emNoDangle em) →
     (∀ x, ¬ tc (racyDIO (gfHull GF cs)) x x) →
     GF.gfGd.gdG.gxProg.length ≤ N →
     ∃ (c : Cand) (pst : Nat → List Pexv6) (pi : Nat → Nat) (GF' : Gfexec),
@@ -379,7 +376,7 @@ theorem hullRunOfKillIOZIO (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efa
     GraphFabConf.gfexecConfZF boot d0 fab (gfHull GF cs) →
     (∀ (i : Nat) (row : List Lbl) (em : Hemission) (dvi dvo : Nat → Efab) (tq : Nat → Bool),
       (gfHull GF cs).gfGd.gdG.gxProg[i]? = some row → hartConff i row (boot i) dvi dvo tq em →
-      GraphFetchBlocks.emFenceCyc em ∧ GraphFetchBlocks.emNoDangle em) →
+      GraphFetchBlocks.emNoDangle em) →
     GF.gfGd.gdG.gxProg.length ≤ N →
     ∃ (c : Cand) (pst : Nat → List Pexv6) (pi : Nat → Nat) (GF' : Gfexec),
       RunDataZ boot d0 N GF.gfGd.gdG c pst (fun k => fab (dcnt GF' c.cdTr k)) ∧

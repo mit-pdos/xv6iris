@@ -309,31 +309,28 @@ theorem GraphFetchRetime.eadmRenInv (π : Nat → Nat) (A : List Eitem) (ls' : L
 /-- The renamed emission's fence.i sites are the original's. -/
 theorem GraphFetchRetime.emFenceIRen (π : Nat → Nat) (em : Hemission) (f : Nat) :
     emFenceI (emRen π em) f → emFenceI em f := by
-  rintro ⟨pre', ls', rest', he, hpre, hl⟩
+  rintro ⟨pre', rest', he, hl⟩
   have he' : em.emItems.map (eitemRen π) =
-      pre' ++ (eadm ls' ++ (Wlabel.LFence false false false false, some f) :: rest') := by
-    rw [← List.append_assoc]
-    exact he
+      pre' ++ (Wlabel.LFence false false false false, some f) :: rest' := he
   obtain ⟨pre, tl, hsplit, hpre', htl⟩ := List.map_eq_append_iff.1 he'
-  obtain ⟨A, B, rfl, hA, hB⟩ := List.map_eq_append_iff.1 htl
-  obtain ⟨b, rest, rfl, hb, -⟩ := List.map_eq_cons_iff.1 hB
-  obtain ⟨ls, rfl, rfl⟩ := GraphFetchRetime.eadmRenInv π A ls' hA
+  obtain ⟨b, rest, rfl, hb, -⟩ := List.map_eq_cons_iff.1 htl
   obtain ⟨b1, b2⟩ := b
   simp only [eitemRen, Prod.mk.injEq] at hb
   obtain ⟨hb1, rfl⟩ := hb
   have hb1' : b1 = Wlabel.LFence false false false false := by
     cases b1 <;> simp [wlblRen] at hb1 ⊢ <;> exact hb1
   subst hb1'
-  refine ⟨pre, ls, rest, by rw [hsplit, List.append_assoc], ?_, ?_⟩
-  · intro it hit
-    exact hpre (eitemRen π it) (by rw [← hpre', List.getLast?_map, hit]; rfl)
-  · rw [GraphFetchRetime.lastCycLRen] at hl
-    cases h : GraphFetch.lastCycL ls with
-    | none => rw [h] at hl; cases hl
-    | some l =>
-      rw [h] at hl
-      simp only [Option.map_some, Option.some.injEq] at hl
-      cases l <;> simp [wlblRen] at hl ⊢
+  refine ⟨pre, rest, hsplit, ?_⟩
+  have hlab : pre'.map Prod.fst = (pre.map Prod.fst).map (wlblRen π) := by
+    rw [← hpre', List.map_map, List.map_map]
+    rfl
+  rw [hlab, GraphFetchRetime.lastCycLRen] at hl
+  cases h : GraphFetch.lastCycL (pre.map Prod.fst) with
+  | none => rw [h] at hl; cases hl
+  | some l =>
+    rw [h] at hl
+    simp only [Option.map_some, Option.some.injEq] at hl
+    cases l <;> simp [wlblRen] at hl ⊢
 
 /-- **CONTRIBUTOR INVARIANCE**: a contributor of the re-timed emission at the re-timed graph is a
 contributor of the original at the original. -/

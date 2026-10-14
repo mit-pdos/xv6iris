@@ -64,7 +64,7 @@ theorem hullRunZ (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF : G
     GraphFabConf.gfexecConfZF boot d0 fab (gfHull GF cs) →
     (∀ (i : Nat) (row : List Lbl) (em : Hemission) (dvi dvo : Nat → Efab) (tq : Nat → Bool),
       (gfHull GF cs).gfGd.gdG.gxProg[i]? = some row → hartConff i row (boot i) dvi dvo tq em →
-      GraphFetchBlocks.emFenceCyc em ∧ GraphFetchBlocks.emNoDangle em) →
+      GraphFetchBlocks.emNoDangle em) →
     (∀ x, ¬ tc (racyDIO (gfHull GF cs)) x x) →
     GF.gfGd.gdG.gxProg.length ≤ N →
     ∃ (pi : Nat → Nat) (GF' : Gfexec),
@@ -99,7 +99,7 @@ theorem hullRunOfKillIOZ (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab)
     GraphFabConf.gfexecConfZF boot d0 fab (gfHull GF cs) →
     (∀ (i : Nat) (row : List Lbl) (em : Hemission) (dvi dvo : Nat → Efab) (tq : Nat → Bool),
       (gfHull GF cs).gfGd.gdG.gxProg[i]? = some row → hartConff i row (boot i) dvi dvo tq em →
-      GraphFetchBlocks.emFenceCyc em ∧ GraphFetchBlocks.emNoDangle em) →
+      GraphFetchBlocks.emNoDangle em) →
     GF.gfGd.gdG.gxProg.length ≤ N →
     ∃ (pi : Nat → Nat) (GF' : Gfexec),
       GF'.gfDev = (gfHull GF cs).gfDev ∧

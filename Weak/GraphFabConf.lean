@@ -6,25 +6,29 @@ discharge of `gfDevWIo`** (plan `notes/weak-allocproc-plan.md` rev 45, §C top T
 Lean-only, no Rocq twin.
 
   §1  `GfexecT` (the fabric bundle over the TAGGED graph `GdexecT`) and `forgetF`.
-  §2  **`xv6ConfS`** — the SHAPED, UNPINNED, FABRIC-ORDERED, TAGGED conformance text of §A(†):
-      `gfexecConfIO`'s rows (per-row `hartConff` emission with two fabric endpoints and contact
-      bits, membership by fabric CONTACT [OWN.43], fabric endpoints read off the global trace
-      `fab`, the PINNED fetch clause `emFetchImg`) with the dependency clause TAGGED (every edge
-      `rowDepsT` emits is in `gtDeps` with its tag — `gdexecQconfT`'s clause, `CatLinChain.lean`
-      §3) and NO `emDevfree` (this is where W13 (F-dep)'s I/O-endpoint edges first have a
-      consumer).  `xv6ConfSForget`: the projection to the untagged `gfexecConfIO` on
-      `forgetF GT` (the `gdexecQconfTForget` pattern, over `hemitf`: `hemitfTagLbl`).
-  §2′ **W5d-G G6-2 — the Zifencei tagged bundle**: `gfexecConfZT` (`gfexecConfIOT` with the slot
-      `emZifencei ∧ GraphFetch.emFetchIn (forget GT.gfGd)` — the UNPINNED Zifencei fetch clause and
-      the stored fragment "F_em ⊆ gtFetch"), **`xv6ConfSZ`** over it, `xv6ConfSZForget` (onto
-      `gfexecConfZ` and its fragment-carrying form `GraphFabConf.gfexecConfZF`), and the
-      KERNEL-TEXT bridge `xv6ConfSZOfPin` (a pinned bundle whose fetched bytes are unwritten).
+  §2  `GraphFabConf.hemitfTagLbl` (a tagged item of a two-endpoint emission sits at its row
+      position and agrees with the row event on read/write).
+  §2′ **`xv6ConfS`** — the SHAPED, UNPINNED, FABRIC-ORDERED, TAGGED conformance text of §A(†)
+      (W5d-G G6-2's `xv6ConfSZ`, renamed at G6-4): `gfexecConfZT`, i.e. `gfexecConfIO`'s rows
+      (per-row `hartConff` emission with two fabric endpoints and contact bits, membership by
+      fabric CONTACT [OWN.43], fabric endpoints read off the global trace `fab`) with the
+      dependency clause TAGGED (every edge `rowDepsT` emits is in `gtDeps` with its tag —
+      `gdexecQconfT`'s clause, `CatLinChain.lean` §3), NO `emDevfree` (W13 (F-dep)'s I/O-endpoint
+      edges' consumer) and the ZIFENCEI fetch slot `emZifencei ∧ GraphFetch.emFetchIn (forget
+      GT.gfGd)` (the trusted `gzFetch` at every fetch item and the stored fragment
+      "F_em ⊆ gtFetch").  `xv6ConfSForget` projects onto `gfexecConfZ` and its fragment-carrying
+      form `GraphFabConf.gfexecConfZF` (what `topoSupplyZIO` consumes).  G6-4 RETIRED the pinned
+      tagged bundle (`gfexecConfIOT`, slot `emFetchImg`), its projection onto `gfexecConfIO` and the
+      bridge `xv6ConfSZOfPin`; the kernel-text instance is now the Bool twin's soundness
+      (`xv6ConfSZBSound`, `Weak/W13WitRun.lean`) and `WeakRvwmoFab`'s `gfexecConfZOfIO`/`OfText`/
+      `OfNoWrite`.  `xv6ConfSZ` stays as an ALIAS for in-flight consumers.
   §3  **`gfDevWIoOfXv6`** — the (R3′) named premise `gfDevWIo` (`WeakRvwmoLin2.lean` §8.3)
-      DISCHARGED on an xv6 bundle: the HART half PROVED ([R40.s2]: admin labels are never `LDev`,
-      a hart's non-`LDev` steps keep the fabric — `pdevEvOk` — and `LDev` projects to `LIo`:
-      `GraphFabConf.hemitfHartIo`), the DISK half the NAMED hypothesis **`usedElemGateOk`**
-      [R41.4].  `fconfTraceRealizeIOXv6`: `fconfTraceRealizeIO` with `gfDevWIo` replaced by
-      the xv6 boot shape + `usedElemGateOk`.
+      DISCHARGED on an xv6 (Zifencei, G6-4) bundle: the HART half PROVED ([R40.s2]: admin labels
+      are never `LDev`, a hart's non-`LDev` steps keep the fabric — `pdevEvOk` — and `LDev`
+      projects to `LIo`: `GraphFabConf.hemitfHartIo`), the DISK half the NAMED hypothesis
+      **`usedElemGateOk`** [R41.4].  `fconfTraceRealizeIOXv6`: the (L) trace's consistency, image
+      and fabric order on an xv6 bundle, `gfDevWIo` replaced by the xv6 boot shape +
+      `usedElemGateOk`.
 
 **`usedElemGateOk` (device-model text, owner informed under the non-blocking rule [R41.4]).**
 Stated at the bundle: every DISK-row fabric member is a RAM write or an I/O event.  On the disk
@@ -42,24 +46,22 @@ EQUAL to MachCSL's disk step on xv6 runs.  (The shape-to-gate equivalence is sta
 only; proving it is W14's.)
 
 **Deviations from the plan text.**  (1) `xv6ConfS` quantifies the fabric trace `fab`
-EXISTENTIALLY (§A's statement passes no `fab`; `fab 0 = d0` is inside).  (2) The fetch clause is
-the PINNED `emFetchImg` — `gfexecConfIO`'s clause after W5d-G G1 (D43 (a), kept for the pinned
-supply).  [W5d-G G6-2] The Zifencei twin is §2′: `gfexecConfZT` replaces that ONE conjunct by
-`emZifencei GT.gfGd.gtG i em ∧ GraphFetch.emFetchIn (forget GT.gfGd) i em`, `xv6ConfSZ` is
-`xv6ConfS`'s shape over it and `xv6ConfSZForget` projects to `gfexecConfZ`; W13-wit re-discharges
-it (`w13WitZ`, from the same image-answered fetches, all in the kernel text, which the run never
-writes).  The pinned `xv6ConfS` stays beside it until G6-4 renames `xv6ConfSZ` → `xv6ConfS`.  (3) The plan's
-W13-wit (hart 0 to its first UART store, by kernel evaluation) and the Bool twin of `xv6ConfS`
-(`xv6ConfSB`) are increment 2: `Weak/W13WitRun.lean` (runner, soundness, twin) and
-`Weak/W13Wit.lean` (`w13Wit`).
+EXISTENTIALLY (§A's statement passes no `fab`; `fab 0 = d0` is inside).  (2) [W5d-G G6-2 → G6-4]
+The fetch clause was first the PINNED `emFetchImg` (D43 (a)); G6-2 added the Zifencei twin
+`xv6ConfSZ`, G6-4 renamed it `xv6ConfS` and retired the pinned tagged bundle.  The UNTAGGED pinned
+bundle `gfexecConfIO` (`WeakRvwmoFab`) stays: the pinned supply chain (`fconfSupply`,
+`fconfTraceRealizeIO`, `WeakRvwmoKillIO`, `WeakRvwmoCapstone`, `CatLinChain`) still consumes it.
+(3) The plan's W13-wit (hart 0 to its first UART store, by kernel evaluation) and the Bool twin
+(`xv6ConfSB`/`xv6ConfSZB`) are `Weak/W13WitRun.lean` (runner, soundness, twin) and
+`Weak/W13Wit.lean` (`w13Wit`).  (4) G6-4: `fconfTraceRealizeIOXv6` no longer returns the PINNED
+supply (it is `topoSupplyZIO`'s, at the unpinned LTS) and lost its unused bound `N`.
 
-**Name map.**  Lean-only: `GfexecT`, `forgetF`, `gfexecConfIOT`, `xv6ConfS`, `xv6ConfSForget`,
-`GraphFabConf.hemitfTagLbl`, `GraphFabConf.isHart`, `GraphFabConf.isLDev`,
+**Name map.**  Lean-only: `GfexecT`, `forgetF`, `GraphFabConf.hemitfTagLbl`, `gfexecConfZT`,
+`xv6ConfS` (alias `xv6ConfSZ`), `GraphFabConf.gfexecConfZF`, `GraphFabConf.gfexecConfZFZ`,
+`GraphFabConf.rowDepsForget`, `xv6ConfSForget`, `GraphFabConf.isHart`, `GraphFabConf.isLDev`,
 `GraphFabConf.pstepEvHart`, `GraphFabConf.pdevEvHart`, `GraphFabConf.adminNotLDev`,
 `GraphFabConf.admRunTHart`, `GraphFabConf.realizesLDevIo`, `GraphFabConf.hemitfHartIo`,
-`GraphFabConf.xbootHart`, `usedElemGateOk`, `gfDevWIoOfXv6`, `fconfTraceRealizeIOXv6`;
-W5d-G G6-2: `gfexecConfZT`, `xv6ConfSZ`, `GraphFabConf.gfexecConfZF`, `GraphFabConf.gfexecConfZFZ`,
-`GraphFabConf.rowDepsForget`, `xv6ConfSZForget`, `xv6ConfSZOfPin`.
+`GraphFabConf.xbootHart`, `usedElemGateOk`, `gfDevWIoOfXv6`, `fconfTraceRealizeIOXv6`.
 -/
 import Weak.WeakRvwmoKillIO
 import Weak.WeakRvwmoCapstone
@@ -82,31 +84,7 @@ structure GfexecT where
 endpoints are not a RAM read and a RAM write). -/
 def forgetF (GT : GfexecT) : Gfexec := ⟨forget GT.gfGd, GT.gfDev⟩
 
-/-! # 2. `xv6ConfS` -/
-
-/-- The device-ACTIVE fabric conformance over the tagged graph: `gfexecConfIO`'s clauses with the
-dependency clause TAGGED (no `emDevfree`).  The fetch conjunct is the pinned `emFetchImg`; its
-Zifencei twin is `gfexecConfZT` (§2′, W5d-G G6-2; header, deviation 2). -/
-def gfexecConfIOT (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GT : GfexecT) : Prop :=
-  fab 0 = d0 ∧
-  GT.gfDev.Nodup ∧
-  (∀ (n i k : Nat), GT.gfDev[n]? = some (i, k) →
-     ∃ row, GT.gfGd.gtG.gxProg[i]? = some row ∧ k < row.length) ∧
-  (∀ (i : Nat) (row : List Lbl), GT.gfGd.gtG.gxProg[i]? = some row →
-     ∃ (em : Hemission) (dvi dvo : Nat → Efab) (tq : Nat → Bool),
-       hartConff i row (boot i) dvi dvo tq em ∧
-       (∀ k : Nat, k < row.length →
-          ((i, k) ∈ GT.gfDev ↔ (gisIo GT.gfGd.gtG (i, k) = true ∨ dvi k ≠ dvo k ∨ tq k = true))) ∧
-       (∀ (k n : Nat), GT.gfDev[n]? = some (i, k) → dvi k = fab n ∧ dvo k = fab (n + 1)) ∧
-       emFetchImg GT.gfGd.gtG.gxImg em ∧
-       (∀ e, e ∈ rowDepsT em.emItems → (((i, e.1.1), (i, e.1.2)), e.2) ∈ GT.gfGd.gtDeps))
-
-/-- **`xv6ConfS`** (§A(†)): the booted image, at most `nh` rows, and a fabric trace along which
-the tagged device-active conformance holds. -/
-def xv6ConfS (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat) (GT : GfexecT) : Prop :=
-  GT.gfGd.gtG.gxImg = im ∧
-  GT.gfGd.gtG.gxProg.length ≤ nh ∧
-  ∃ fab : Nat → Efab, gfexecConfIOT boot d0 fab GT
+/-! # 2. The tagged two-endpoint emission -/
 
 /-- (Lean-only) `hemitTagLbl` for the two-endpoint emission: a tagged item `(l, some j)` sits at
 row position `j` and agrees with the row event on read/write. -/
@@ -158,40 +136,15 @@ theorem GraphFabConf.hemitfTagLbl (dvi dvo : Nat → Efab) (tq : Nat → Bool) (
       rw [show j - k = (j - (k + 1)) + 1 by omega, List.getElem?_cons_succ]
       exact hlk
 
-/-- **The projection**: the tagged device-active bundle gives the untagged `gfexecConfIO` on
-`forgetF GT` (every tree edge is a tagged edge, `rowDepsSubT`; its source is a RAM read and its
-target a RAM write, so `forget` keeps it). -/
-theorem xv6ConfSForget (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat)
-    (GT : GfexecT) :
-    xv6ConfS boot d0 im nh GT →
-    (forgetF GT).gfGd.gdG.gxImg = im ∧ (forgetF GT).gfGd.gdG.gxProg.length ≤ nh ∧
-    ∃ fab, gfexecConfIO boot d0 fab (forgetF GT) := by
-  rintro ⟨himg, hnh, fab, h0, hnd, hbnd, hrows⟩
-  refine ⟨himg, hnh, fab, h0, hnd, hbnd, fun i row hrow => ?_⟩
-  obtain ⟨em, dvi, dvo, tq, hem, hiff, hpin, hfi, hdeps⟩ := hrows i row hrow
-  refine ⟨em, dvi, dvo, tq, hem, hiff, hpin, hfi, fun jk hjk => ?_⟩
-  obtain ⟨tg, htg, -⟩ := rowDepsSubT em.emItems jk.1 jk.2 hjk
-  have hem' : hemitf dvi dvo tq 0 wsInit row (boot i) em.emItems em.emFin := hem
-  obtain ⟨it, hit, hpos, hr⟩ := rowDepsSrc _ _ hjk
-  obtain ⟨lr, -, hlr, hrr, -⟩ := GraphFabConf.hemitfTagLbl _ _ _ _ _ _ _ _ _ it jk.1 hem' hit hpos
-  obtain ⟨it', hit', hpos', hw⟩ := rowDepsTgt _ _ hjk
-  obtain ⟨lw, -, hlw, -, hww⟩ :=
-    GraphFabConf.hemitfTagLbl _ _ _ _ _ _ _ _ _ it' jk.2 hem' hit' hpos'
-  rw [Nat.sub_zero] at hlr hlw
-  have hrow' : GT.gfGd.gtG.gxProg[i]? = some row := hrow
-  refine (elemOfForgetDeps GT.gfGd.gtG GT.gfGd.gtDeps (i, jk.1) (i, jk.2)).2
-    ⟨tg, hdeps _ htg, ?_, ?_⟩
-  · simp [gisRd, gxLbl, hrow', hlr, hrr hr]
-  · simp [gisW, gxLbl, hrow', hlw, hww hw]
+/-! # 2′. `xv6ConfS`: the Zifencei tagged bundle (W5d-G G6-2; G6-4: the only one) -/
 
-/-! # 2′. The Zifencei tagged bundle (W5d-G G6-2) -/
-
-/-- **THE ZIFENCEI TAGGED BUNDLE** (W5d-G G6-2; plan §C top rev 50): `gfexecConfIOT`'s text with
-the pinned slot `emFetchImg` replaced by the Zifencei fetch clause `emZifencei` (the trusted-base
-item `gzFetch` at every administrative fetch item; `WeakRvwmoFab` deviation 6) AND the stored
-fragment `GraphFetch.emFetchIn` ("F_em ⊆ GT.gtFetch", read through `forget`, which carries
-`gtFetch` — `AxDeps` deviation 10).  UNPINNED: a fetch may read any write the Zifencei reading
-allows. -/
+/-- **THE ZIFENCEI TAGGED BUNDLE** (W5d-G G6-2; plan §C top rev 50): the device-ACTIVE fabric
+conformance over the tagged graph -- `gfexecConfIO`'s clauses with the dependency clause TAGGED (no
+`emDevfree`) and the fetch slot the Zifencei fetch clause `emZifencei` (the trusted-base item
+`gzFetch` at every administrative fetch item; `WeakRvwmoFab` deviation 6) AND the stored fragment
+`GraphFetch.emFetchIn` ("F_em ⊆ GT.gtFetch", read through `forget`, which carries `gtFetch` —
+`AxDeps` deviation 10).  UNPINNED: a fetch may read any write the Zifencei reading allows.  (G6-4:
+its pinned twin `gfexecConfIOT`, slot `emFetchImg`, is retired.) -/
 def gfexecConfZT (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GT : GfexecT) : Prop :=
   fab 0 = d0 ∧
   GT.gfDev.Nodup ∧
@@ -206,12 +159,18 @@ def gfexecConfZT (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GT : G
        (emZifencei GT.gfGd.gtG i em ∧ GraphFetch.emFetchIn (forget GT.gfGd) i em) ∧
        (∀ e, e ∈ rowDepsT em.emItems → (((i, e.1.1), (i, e.1.2)), e.2) ∈ GT.gfGd.gtDeps))
 
-/-- **`xv6ConfSZ`** (§A(†), the Zifencei slot; W5d-G G6-2): `xv6ConfS`'s shape over
-`gfexecConfZT`.  (G6-4 renames it to `xv6ConfS`.) -/
-def xv6ConfSZ (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat) (GT : GfexecT) : Prop :=
+/-- **`xv6ConfS`** (§A(†); W5d-G G6-2's `xv6ConfSZ`, renamed at G6-4): the booted image, at most
+`nh` rows, and a fabric trace along which the tagged device-active Zifencei conformance
+`gfexecConfZT` holds. -/
+def xv6ConfS (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat) (GT : GfexecT) : Prop :=
   GT.gfGd.gtG.gxImg = im ∧
   GT.gfGd.gtG.gxProg.length ≤ nh ∧
   ∃ fab : Nat → Efab, gfexecConfZT boot d0 fab GT
+
+/-- (Lean-only, G6-4) The G6-2 name of `xv6ConfS`, kept as an ALIAS for in-flight consumers (W9a
+(B5)'s `WeakRvwmoPinBridge5`); to be removed once they use `xv6ConfS`. -/
+abbrev xv6ConfSZ (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat) (GT : GfexecT) : Prop :=
+  xv6ConfS boot d0 im nh GT
 
 /-- (Lean-only) The UNTAGGED Zifencei bundle WITH the stored fragment: `gfexecConfZ`'s text with
 the slot `emZifencei ∧ emFetchIn` — the per-row emission carries both (what the supply's
@@ -261,12 +220,12 @@ theorem GraphFabConf.rowDepsForget (boot : Nat → Pexv6) (GT : GfexecT) (i : Na
   · simp [gisRd, gxLbl, hrow, hlr, hrr hr]
   · simp [gisW, gxLbl, hrow, hlw, hww hw]
 
-/-- **The projection of the Zifencei bundle** (the `xv6ConfSForget` pattern onto `gfexecConfZ`):
-`xv6ConfSZ` gives the untagged Zifencei bundle on `forgetF GT`, and the same per-row emissions
+/-- **The projection** (G6-2's `xv6ConfSZForget`, renamed at G6-4; the pinned projection onto
+`gfexecConfIO` is retired): `xv6ConfS` gives the untagged Zifencei bundle on `forgetF GT`, and the same per-row emissions
 store their fragment in `(forgetF GT).gfGd.gdFetch` (= `GT.gfGd.gtFetch`). -/
-theorem xv6ConfSZForget (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat)
+theorem xv6ConfSForget (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat)
     (GT : GfexecT) :
-    xv6ConfSZ boot d0 im nh GT →
+    xv6ConfS boot d0 im nh GT →
     (forgetF GT).gfGd.gdG.gxImg = im ∧ (forgetF GT).gfGd.gdG.gxProg.length ≤ nh ∧
     ∃ fab, gfexecConfZ boot d0 fab (forgetF GT) ∧
       GraphFabConf.gfexecConfZF boot d0 fab (forgetF GT) := by
@@ -277,24 +236,6 @@ theorem xv6ConfSZForget (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Na
     exact ⟨em, dvi, dvo, tq, hem, hiff, hpin, hfi,
       GraphFabConf.rowDepsForget boot GT i row em dvi dvo tq hrow hem hdeps⟩
   exact ⟨himg, hnh, fab, GraphFabConf.gfexecConfZFZ boot d0 fab _ hzf, hzf⟩
-
-/-- **THE KERNEL-TEXT BRIDGE** (D43 (a)): a PINNED `xv6ConfS` bundle whose rows' fetched bytes the
-graph never writes is a Zifencei bundle — the slot by `GraphFetch.emZifOfPinC`, the stored
-fragment by `GraphFetch.emFetchInOfUnwritten` (such an emission has no fragment edge, so any
-`gtFetch` stores it). -/
-theorem xv6ConfSZOfPin (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat) (GT : GfexecT) :
-    xv6ConfS boot d0 im nh GT →
-    (∀ (i : Nat) (row : List Lbl) (em : Hemission) (dvi dvo : Nat → Efab) (tq : Nat → Bool),
-      GT.gfGd.gtG.gxProg[i]? = some row → hartConff i row (boot i) dvi dvo tq em →
-      emFetchImg GT.gfGd.gtG.gxImg em → GraphFetch.emFetchUnwritten GT.gfGd.gtG em) →
-    xv6ConfSZ boot d0 im nh GT := by
-  rintro ⟨himg, hnh, fab, h0, hnd, hbnd, hrows⟩ hnw
-  refine ⟨himg, hnh, fab, h0, hnd, hbnd, fun i row hrow => ?_⟩
-  obtain ⟨em, dvi, dvo, tq, hem, hiff, hpin, hfi, hdeps⟩ := hrows i row hrow
-  have hu := hnw i row em dvi dvo tq hrow hem hfi
-  exact ⟨em, dvi, dvo, tq, hem, hiff, hpin,
-    ⟨GraphFetch.emZifOfPinC _ i em hfi hu, GraphFetch.emFetchInOfUnwritten (forget GT.gfGd) i em hfi hu⟩,
-    hdeps⟩
 
 /-! # 3. `gfDevWIo` on an xv6 bundle: the hart half PROVED, the disk half NAMED -/
 
@@ -436,10 +377,10 @@ I/O event — on the disk program's shape, "no own-guard SKIP at the used-ELEMEN
 def usedElemGateOk (GF : Gfexec) : Prop :=
   ∀ k, (NCPU, k) ∈ GF.gfDev → gisWIo GF.gfGd.gdG (NCPU, k) = true
 
-/-- **`gfDevWIoOfXv6`**: `gfDevWIo` from the conformance, the boot's hart rows and the named
-disk-side hypothesis. -/
+/-- **`gfDevWIoOfXv6`**: `gfDevWIo` from the (Zifencei, G6-4) conformance, the boot's hart rows and
+the named disk-side hypothesis. -/
 theorem gfDevWIoOfXv6 (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (GF : Gfexec) :
-    gfexecConfIO boot d0 fab GF →
+    gfexecConfZ boot d0 fab GF →
     (∀ i, i < NCPU → GraphFabConf.isHart (boot i) = true) →
     GF.gfGd.gdG.gxProg.length ≤ NCPU + 1 →
     usedElemGateOk GF → gfDevWIo GF := by
@@ -473,23 +414,29 @@ theorem gfDevWIoOfXv6 (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (G
     rw [Nat.sub_zero] at hlk
     exact hio lb hlk hlb
 
-/-- **`fconfTraceRealizeIO` on an xv6 bundle**: its premise list with `gfDevWIo` DISCHARGED —
-what remains is `gdiskRead14` (supplied by W13 (K)'s normalization), the trusted `ioResidueGmo`,
-and the named `usedElemGateOk` (W14) [R41.4]. -/
-theorem fconfTraceRealizeIOXv6 (σ0 : WGState) (fab : Nat → Efab) (GF : Gfexec) (N : Nat) :
+/-- **The (L) trace of an xv6 bundle** (G6-4: over the Zifencei `gfexecConfZ`; was
+`fconfTraceRealizeIO` on the pinned bundle): consistency, the image and the fabric order of
+`linCandIO`, with `gfDevWIo` DISCHARGED — what remains is `gdiskRead14` (supplied by W13 (K)'s
+normalization), the trusted `ioResidueGmo`, and the named `usedElemGateOk` (W14) [R41.4].  The
+supply at the unpinned LTS is `topoSupplyZIO` (`Weak/GraphFetchAncSupply.lean`). -/
+theorem fconfTraceRealizeIOXv6 (σ0 : WGState) (fab : Nat → Efab) (GF : Gfexec) :
     rvwmoMinusConsistent GF.gfGd.gdG → grule14 GF.gfGd.gdG → ioResidueGmo GF →
     gdiskRead14 GF.gfGd.gdG →
-    gfexecConfIO (xboot σ0) (efInit σ0.wgdev) fab GF →
+    gfexecConfZ (xboot σ0) (efInit σ0.wgdev) fab GF →
     GF.gfGd.gdG.gxProg.length ≤ NCPU + 1 →
     usedElemGateOk GF →
-    GF.gfGd.gdG.gxProg.length ≤ N →
     srvwmoConsistent (linCandIO GF.gfGd.gdG) ∧
     (linCandIO GF.gfGd.gdG).cdImg = GF.gfGd.gdG.gxImg ∧
     trDevOrdered GF (linCandIO GF.gfGd.gdG) := by
-  intro hc h14 hres hdr hconf hlen hgate hN
+  intro hc h14 hres hdr hconf hlen hgate
   have hwio := gfDevWIoOfXv6 _ _ fab GF hconf (GraphFabConf.xbootHart σ0) hlen hgate
-  obtain ⟨hsr, himg, -, -, hord, -⟩ :=
-    fconfTraceRealizeIO (xboot σ0) (efInit σ0.wgdev) fab GF N hc h14 hres hdr hconf hwio hN
-  exact ⟨hsr, himg, hord⟩
+  obtain ⟨hsr, himg, -, -⟩ := rule14LinearizationIO GF hc h14 hres hdr
+  refine ⟨hsr, himg, trDevOrderedOfPtraceIO GF _ (glinIOPtraceExtIO GF hc h14 hres hdr) hconf.2.1
+    (fun e he => ?_) (gfDevGmoOfRes GF hres hwio) hwio⟩
+  obtain ⟨n, hn⟩ := elem_of_list_lookup_1 he
+  obtain ⟨i, k⟩ := e
+  obtain ⟨row, hrow, hlt⟩ := hconf.2.2.1 n i k hn
+  simp only [gxLbl, hrow, Option.bind_some]
+  exact lookup_lt_is_Some_2 hlt
 
 end Weak
