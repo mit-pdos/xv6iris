@@ -668,6 +668,17 @@ import Weak.PinWalkTab
 import Weak.WeakRvwmoPinBridge5
 import Weak.WeakRvwmoPinBridge6
 import Weak.PinFetchVal
+import Weak.PinCycRunExec
+import Weak.PinCycRunTab
+import Weak.PinCycRunReg
+import Weak.PinCycRunMem
+import Weak.PinCycRunLift
+import Weak.PinCycRunFp
+import Weak.PinCycRunCyc3
+import Weak.PinCycRunCyc2
+import Weak.PinCycRunCyc
+import Weak.PinCycRunAsm
+import Weak.PinCycRun
 import Weak.GraphFetchKill
 import Weak.GraphFetchRun
 import Weak.GraphFetchLinInd
