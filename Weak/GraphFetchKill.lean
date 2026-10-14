@@ -21,7 +21,9 @@ here proves `CatLin.cycleKillCZ` (`Weak/GraphFetchLinInd.lean`, the GUARDED `rac
 
 **Deviations from the pinned glue.**  (1) `certSupplyCZ` receives the hull's ACYCLICITY rather
 than a pinned `RunData` of it: the unpinned hull run (`hullRunZ`) has the guards `trDevOrdered`/
-`candDiskLat` (`GraphFetchRun` deviation 3), which only the certifier can discharge.  (2) The
+`candDiskLat` (`GraphFetchRun` deviation 3), which only the certifier can discharge.  W10-0
+[OWN.94]: it also receives `ioResidueGmo`/`gdiskRead14` (Q1 (b), FAITHFUL: both are the kill's own
+premises, passed on).  (2) The
 quiescent consumers `cycleKillOfL2''` (`Glue2`) and `cycleKillOfL2''''`/`t2linOfL2'''` (`Walk3`) have
 NO Zifencei twin: they are stated over the quiescent pinned bundle `gdexecQconf`, and there is no
 quiescent Zifencei bundle (`GraphFetchLinInd` deviation 4); the walk (`walkPolicy`/`segsRun`) has its
@@ -110,11 +112,14 @@ def cutSupplyCZ (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (im : Im
       GraphFetchBlocks.emPremOk boot (gfHull GF cs).gfGd.gdG
 
 /-- (G-3) at the Zifencei bundle: from the cut's acyclic hull, a run datum (M2's conjunct) whose
-log is the graph's. -/
+log is the graph's.  W10-0 [OWN.94] (Q1 (b), the WIDENING): it also receives the I/O residue facts
+`ioResidueGmo GF`/`gdiskRead14` the kill already holds — a walk runs device events in `gfDev` order
+(`GraphFetchWalkZ.fabMove`), and only the residue makes the gmo-ordered schedule agree with it. -/
 def certSupplyCZ (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (im : Image) (N : Nat) :
     Prop :=
   ∀ (GF : Gfexec) (ad : List (Geid × Geid)) (cs : List Nat) (z : Geid) (ss : List Seg),
     GF.gfGd.gdG.gxImg = im → rvwmoCatAD GF.gfGd ad → GraphFabConf.gfexecConfZF boot d0 fab GF →
+    ioResidueGmo GF → gdiskRead14 GF.gfGd.gdG →
     cutOk GF.gfGd.gdG cs → GraphFabConf.gfexecConfZF boot d0 fab (gfHull GF cs) →
     (∀ x, ¬ tc (racyDIO (gfHull GF cs)) x x) →
     ss ≠ [] → rawChainC GF.gfGd (ioCross GF) z z ss →
@@ -160,7 +165,8 @@ theorem cycleKillOfL2CZ (hlc : HasLC) (GF0 : BundledGFunctors) [MachGpreS hlc GF
   obtain ⟨cs, hcutok, hdc, hconfH, -⟩ := hcut GF ad z ss him hc hconf hne hch
   have hacyH := hIH cs (GraphFetchKill.properCutFOfCut GF cs hcutok hdc) hconfH
   -- (3) the certified run datum
-  obtain ⟨c, pst, dv, hrd, hlog⟩ := hcert GF ad cs z ss him hc hconf hcutok hconfH hacyH hne hch
+  obtain ⟨c, pst, dv, hrd, hlog⟩ :=
+    hcert GF ad cs z ss him hc hconf hres hdr hcutok hconfH hacyH hne hch
   -- (4) the erased run (M2's replay), and the exports at its log
   obtain ⟨t2, σ2, hrtc, hlgeq⟩ :=
     runErasedZ gen σ0 boot d0 N GF.gfGd.gdG c pst dv hfr hcov hb1 hb2 him hrd

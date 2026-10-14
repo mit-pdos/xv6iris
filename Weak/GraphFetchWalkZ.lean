@@ -28,6 +28,22 @@ This file is the Zifencei twin:
       `CatLin.cycleKillOfWalkCZ`, **`CatLin.t2linOfWalkCZ`** — the kill / T2-LIN from the WP
       package, the fetch-view premise, the L2′ claim and `CatLin.walkPolicyCZ` alone.
 
+**W10-0 [OWN.94] — the redesign after the W10 sizing (`weak-orch/parked/PROGRESS-W10size.md`).**
+`CatLin.walkPolicyCZ` is FALSE (it forces `gwrowGmo`; the memset counterexample is in its docstring)
+and is DEPRECATED, with its three consumers (vacuous).  Added:
+  §2.1 the `LRmw` exit (`wlkStepZOfRmw`, through `segStepZMsgsW`, any write exit) and the
+       message-free segment (`segStepZQuiet`);
+  §2.2 THE MACRO-STEP `wlkStepZ'` (a `segsRunZ` run appending one message: `gfDev`-earlier
+       message-free I/O segments of other harts may run first, `wlkStepZ'OfQuiet`), its supply
+       `walkStepsZ'`, iteration `wlkRunZ'`, policy `walkPolicyZ'` (`walkPolicyZ'OfZ`), run datum
+       `GraphFetchWalkZ.runOfWalkZ'`;
+  §3   **`CatLin.walkPolicyCZw`** (the policy WITH `gwrowGmo` and the Q1 (b) residue facts — W10's
+       named premise now), the generic member run `CatLin.memberRunCZ` (N1 or N2), and THE
+       NORMALIZATION, NAMED: **`CatLin.walkMemberCZ`** (`memberRunOfWalkCZw`: N1's member run);
+  §4   **`CatLin.cycleKillOfMemberCZC`** (the class kill at a member) and what W11-F consumes:
+       **`CatLin.cycleKillOfWalkCZCw`**, `CatLin.cycleKillOfWalkCZw`, **`CatLin.t2linOfWalkCZw`**.
+Q1 (b): `certSupplyCZ` (`GraphFetchKill`) also receives `ioResidueGmo`/`gdiskRead14`.
+
 **Deviations from the pinned walk.**  (1) THE WALK INVARIANT IS A PARAMETER: the pinned
 `wlkInv` fixes the constant fabric through `cstOk`'s end clause; at the Zifencei bundle the fabric
 moves (`GraphFetchRun` §3, W13 (R′)), so the policy supplies its own invariant `I` (true at the
@@ -45,6 +61,7 @@ graph; this is proof organisation (FAITHFUL, no trusted text).  Lean-only helper
 -/
 import Weak.GraphFetchKill
 import Weak.GraphFetchHullZ
+import Weak.WeakRvwmoWalkb
 
 namespace Weak
 
@@ -244,30 +261,324 @@ theorem runDataZOfCyc (boot : Nat → Pexv6) (d0 : Efab) (N : Nat) (G : Gexec) (
     exact hprg.2.1
   exact ⟨hc, himg, hpst, hdv, hsca, hpo⟩
 
+/-! ## 2.1 W10-0 [OWN.94]: the `LRmw` exit, and message-free segments -/
+
+/-- A write's re-indexed label publishes the same message (`lbWr`, `lbCls`): `lblReidxW` moves only
+a read's timestamps (an `LRmw` keeps base, both value lists and class; a store is verbatim). -/
+theorem GraphFetchWalkZ.lblReidxWWr (lb lb' : Lbl) :
+    lblReidxW lb lb' → lbIsW lb = true → lbWr lb' = lbWr lb ∧ lbCls lb' = lbCls lb := by
+  rintro (h | h | h) hw
+  · cases lb <;> cases lb' <;> simp_all [lblReidx, lbIsW, lbWr, lbCls]
+  · cases lb <;> cases lb' <;> simp_all [lblReidxSub, lbIsW]
+  · cases lb <;> cases lb' <;> simp_all [lblPoisoned, lbIsW]
+
+/-- A write-free row re-indexes to a write-free trace. -/
+theorem GraphFetchWalkZ.reidxNotw (l1 : List Lbl) (l2 : List Estep) :
+    List.Forall₂ (fun lb s => lblReidxW lb s.esLb) l1 l2 →
+    (∀ lb ∈ l1, lbIsW lb = false) → ∀ s' ∈ l2, lbIsW s'.esLb = false := by
+  intro h
+  induction h with
+  | nil => intro _ s' h; exact absurd h List.not_mem_nil
+  | @cons a b l1 l2 hab _ ih =>
+    intro hp s' hs'
+    rcases List.mem_cons.1 hs' with rfl | hs'
+    · exact lblReidxWNotw a _ hab (hp a (List.mem_cons_self ..))
+    · exact ih (fun lb hlb => hp lb (List.mem_cons_of_mem _ hlb)) s' hs'
+
+/-- A MESSAGE-FREE segment (no write in its row — e.g. one that only runs an I/O event, whose
+`LIo` label has no `lbWr`) leaves the log where it was. -/
+theorem segStepZQuiet (d0 : Efab) (o : Segout) (St St' : CycState) :
+    segStepZ d0 o St St' → (∀ lb ∈ o.soRow, lbIsW lb = false) →
+    cdLogEnd St'.cstC = cdLogEnd St.cstC := by
+  intro hst hrow
+  have hlog := segStepZLog d0 o St St' hst
+  obtain ⟨_, _, _, _, _, hf2⟩ := hst
+  have hf2' := Forall2_fmap_r.1 hf2
+  rw [hlog, trMsgsNotw _ (GraphFetchWalkZ.reidxNotw _ _ hf2' hrow), List.append_nil]
+
+/-- A "non-writes, then one WRITE" segment appends ONE message — the exit label's `lbWr`/`lbCls`
+(`segStepZMsgs` generalized from an `LStore` exit to any write exit, `LRmw` included). -/
+theorem segStepZMsgsW (d0 : Efab) (o : Segout) (St St' : CycState) (pre : List Lbl) (ex : Lbl)
+    (base : Int) (vs : List (BitVec 8)) :
+    segStepZ d0 o St St' →
+    o.soRow = pre ++ [ex] →
+    (∀ lb ∈ pre, lbIsW lb = false) →
+    lbWr ex = some (base, vs) →
+    cdLogEnd St'.cstC = cdLogEnd St.cstC ++ [⟨base, vs, some o.soHart, lbCls ex⟩] := by
+  intro hst hrow hpre hwr
+  have hlog := segStepZLog d0 o St St' hst
+  obtain ⟨_, _, _, _, hag, hf2⟩ := hst
+  rw [hrow] at hf2
+  have hf2' := Forall2_fmap_r.1 hf2
+  obtain ⟨t1, t2, h1, h2, htr⟩ := Forall2_app_inv_l.1 hf2'
+  obtain ⟨s, hs, hnil⟩ : ∃ s, lblReidxW ex s.esLb ∧ t2 = [s] := by
+    cases h2 with
+    | cons hab hrest => cases hrest; exact ⟨_, hab, rfl⟩
+  subst hnil
+  have hw : lbIsW ex = true := by
+    cases ex with
+    | LStore => rfl
+    | LRmw => rfl
+    | LLoad => simp [lbWr] at hwr
+    | LFence => simp [lbWr] at hwr
+    | LIo => simp [lbWr] at hwr
+  obtain ⟨hwr', hcl'⟩ := GraphFetchWalkZ.lblReidxWWr ex s.esLb hs hw
+  have hpre' : ∀ s' ∈ t1, lbIsW s'.esLb = false := GraphFetchWalkZ.reidxNotw pre t1 h1 hpre
+  have hsag : s.esAg = o.soHart := hag s (by rw [htr]; simp)
+  rw [hlog, htr, trMsgsApp, trMsgsNotw t1 hpre', List.nil_append]
+  show cdLogEnd St.cstC ++ (esMsg s ++ []) = _
+  rw [List.append_nil]
+  simp [esMsg, hwr', hwr, hcl', hsag]
+
+/-- **THE `LRmw` STEP** (W10-0 [OWN.94], Q2): a "non-writes, then one `LRmw`" segment is one
+`wlkStepZ`.  xv6's only AMO, `amoswap.w.aq` (`acquire`), is an `LRmw` exit: its `LExLoad`+`LExStore`
+pair becomes ONE graph `LRmw` (`HFpair`/`hlblRealizesPair`); there is no LR/SC in the kernel
+(`GraphFetchBlocks` header (P2)), so no other write exit arises besides `LStore`
+(`wlkStepZOfSeg`). -/
+theorem wlkStepZOfRmw (G : Gexec) (d0 : Efab) (St St' : CycState) (n : Nat) (o : Segout)
+    (pre : List Lbl) (aq rl : Bool) (base : Int) (ts : List Nat) (rvs wvs : List (BitVec 8))
+    (kc : WmClass) (w : Geid) :
+    segStepZ d0 o St St' →
+    o.soRow = pre ++ [Lbl.LRmw aq rl base ts rvs wvs kc] →
+    (∀ lb ∈ pre, lbIsW lb = false) →
+    St'.cstC.cdImg = St.cstC.cdImg →
+    St'.cstPst 0 = St.cstPst 0 →
+    gwriteAt G (n + 1) = some w →
+    WeakRvwmoKillArms.gmsg G w = some ⟨base, wvs, some o.soHart, kc⟩ →
+    wlkStepZ G d0 St St' n :=
+  fun hst hrow hpre himg hpst hw hm =>
+    ⟨o, w, ⟨base, wvs, some o.soHart, kc⟩, hst, himg, hpst, hw, hm,
+      segStepZMsgsW d0 o St St' pre _ base wvs hst hrow hpre rfl⟩
+
+/-! ## 2.2 W10-0 [OWN.94]: THE MACRO-STEP (device ordering) -/
+
+theorem GraphFetchWalkZ.segsRunZApp (d0 : Efab) (l1 l2 : List Segout) (S1 S2 S3 : CycState) :
+    segsRunZ d0 l1 S1 S2 → segsRunZ d0 l2 S2 S3 → segsRunZ d0 (l1 ++ l2) S1 S3 := by
+  intro h1
+  induction h1 with
+  | segsDone _ _ => exact fun h2 => h2
+  | segsMore o l St St' _ hst _ ih => exact fun h2 => .segsMore o (l ++ l2) St St' S3 hst (ih h2)
+
+/-- A run of message-free segments leaves the log where it was. -/
+theorem GraphFetchWalkZ.segsRunZQuiet (d0 : Efab) (l : List Segout) (St St' : CycState) :
+    segsRunZ d0 l St St' → (∀ o ∈ l, ∀ lb ∈ o.soRow, lbIsW lb = false) →
+    cdLogEnd St'.cstC = cdLogEnd St.cstC := by
+  intro h
+  induction h with
+  | segsDone _ _ => intro _; rfl
+  | segsMore o l St St' St'' hst _ ih =>
+    intro hq
+    rw [ih (fun o' ho' => hq o' (List.mem_cons_of_mem _ ho')),
+      segStepZQuiet d0 o St St' hst (hq o (List.mem_cons_self ..))]
+
+/-- **ONE MACRO-STEP** to `St'` (`wlkStepZ` widened, W10-0 [OWN.94]): a certified RUN of segments
+whose appended messages are exactly the one message of `G`'s `(n+1)`-st write.  Under the moving
+fabric (`GraphFetchWalkZ.fabMove`) a `gfDev`-earlier I/O event of another hart may have to run
+first, as a message-free segment (`segStepZQuiet`), before the writing segment. -/
+def wlkStepZ' (G : Gexec) (d0 : Efab) (St St' : CycState) (n : Nat) : Prop :=
+  ∃ (l : List Segout) (w : Geid) (m : Wmsg),
+    segsRunZ d0 l St St' ∧
+    St'.cstC.cdImg = St.cstC.cdImg ∧
+    St'.cstPst 0 = St.cstPst 0 ∧
+    gwriteAt G (n + 1) = some w ∧
+    WeakRvwmoKillArms.gmsg G w = some m ∧
+    cdLogEnd St'.cstC = cdLogEnd St.cstC ++ [m]
+
+/-- A single step is a macro-step. -/
+theorem wlkStepZ'OfStep (G : Gexec) (d0 : Efab) (St St' : CycState) (n : Nat) :
+    wlkStepZ G d0 St St' n → wlkStepZ' G d0 St St' n := by
+  rintro ⟨o, w, m, hst, himg, hpst, hw, hm, hlog⟩
+  exact ⟨[o], w, m, .segsMore o [] St St' St' hst (.segsDone St' hst.2.1), himg, hpst, hw, hm,
+    hlog⟩
+
+/-- A message-free prefix run (keeping the image and the boot programs) composes with a
+macro-step. -/
+theorem wlkStepZ'OfQuiet (G : Gexec) (d0 : Efab) (St S1 St' : CycState) (n : Nat)
+    (l : List Segout) :
+    segsRunZ d0 l St S1 → (∀ o ∈ l, ∀ lb ∈ o.soRow, lbIsW lb = false) →
+    S1.cstC.cdImg = St.cstC.cdImg → S1.cstPst 0 = St.cstPst 0 →
+    wlkStepZ' G d0 S1 St' n → wlkStepZ' G d0 St St' n := by
+  intro hrun hq himg hpst ⟨l', w, m, hrun', himg', hpst', hw, hm, hlog'⟩
+  refine ⟨l ++ l', w, m, GraphFetchWalkZ.segsRunZApp d0 l l' St S1 St' hrun hrun',
+    himg'.trans himg, hpst'.trans hpst, hw, hm, ?_⟩
+  rw [hlog', GraphFetchWalkZ.segsRunZQuiet d0 l St S1 hrun hq]
+
+theorem wlkInvStepZ' (boot : Nat → Pexv6) (d0 : Efab) (N : Nat) (G : Gexec) (St St' : CycState)
+    (n : Nat) :
+    wlkInvZ boot d0 N G St n →
+    wlkStepZ' G d0 St St' n →
+    ∃ l, segsRunZ d0 l St St' ∧ wlkInvZ boot d0 N G St' (n + 1) := by
+  rintro ⟨_, himg, hpst, hlog⟩ ⟨l, w, m, hrun, himg', hpst', hw, hm, hlog'⟩
+  refine ⟨l, hrun, segsRunZOk d0 l St St' hrun, by rw [himg', himg], by rw [hpst', hpst], ?_⟩
+  rw [hlog']
+  exact wlogPfxSnoc G n _ w m hlog hw hm
+
+/-- The per-graph MACRO-STEP SUPPLY at a walk invariant `I` (`walkStepsZ` widened). -/
+def walkStepsZ' (boot : Nat → Pexv6) (d0 : Efab) (N : Nat) (G : Gexec)
+    (I : CycState → Nat → Prop) : Prop :=
+  ∀ St n, wlkInvZ boot d0 N G St n → I St n → n < (gwrites G).length →
+    ∃ St', wlkStepZ' G d0 St St' n ∧ I St' (n + 1)
+
+/-- THE ITERATION at the macro-step (`wlkRunZ`'s widening). -/
+theorem wlkRunZ' (boot : Nat → Pexv6) (d0 : Efab) (N : Nat) (G : Gexec)
+    (I : CycState → Nat → Prop) (Hsup : walkStepsZ' boot d0 N G I) (k : Nat) :
+    ∀ n St, wlkInvZ boot d0 N G St n → I St n → n + k = (gwrites G).length →
+      ∃ l Sf, segsRunZ d0 l St Sf ∧ wlkInvZ boot d0 N G Sf (gwrites G).length ∧
+        I Sf (gwrites G).length := by
+  induction k with
+  | zero =>
+    intro n St hinv hI hn
+    refine ⟨[], St, .segsDone St hinv.1, ?_, ?_⟩
+    · rw [← hn, Nat.add_zero]
+      exact hinv
+    · rw [← hn, Nat.add_zero]
+      exact hI
+  | succ k ih =>
+    intro n St hinv hI hn
+    obtain ⟨St', hstep, hI'⟩ := Hsup St n hinv hI (by omega)
+    obtain ⟨l1, hrun1, hinv'⟩ := wlkInvStepZ' boot d0 N G St St' n hinv hstep
+    obtain ⟨l, Sf, hrun, hfin, hIf⟩ := ih (n + 1) St' hinv' hI' (by omega)
+    exact ⟨l1 ++ l, Sf, GraphFetchWalkZ.segsRunZApp d0 l1 l St St' Sf hrun1 hrun, hfin, hIf⟩
+
+/-- **THE PER-GRAPH POLICY at the macro-step** (`walkPolicyZ` widened, W10-0 [OWN.94]). -/
+def walkPolicyZ' (boot : Nat → Pexv6) (d0 : Efab) (N : Nat) (G : Gexec) : Prop :=
+  ∃ I : CycState → Nat → Prop, I (wlkStart boot d0 N G) 0 ∧ walkStepsZ' boot d0 N G I
+
+theorem walkPolicyZ'OfZ (boot : Nat → Pexv6) (d0 : Efab) (N : Nat) (G : Gexec) :
+    walkPolicyZ boot d0 N G → walkPolicyZ' boot d0 N G := by
+  rintro ⟨I, h0, hs⟩
+  refine ⟨I, h0, fun St n hinv hI hn => ?_⟩
+  obtain ⟨St', h, h'⟩ := hs St n hinv hI hn
+  exact ⟨St', wlkStepZ'OfStep G d0 St St' n h, h'⟩
+
+/-- The macro-step walk certifies a run datum whose log is the graph's (gmo order). -/
+theorem GraphFetchWalkZ.runOfWalkZ' (boot : Nat → Pexv6) (d0 : Efab) (N : Nat) (G : Gexec) :
+    walkPolicyZ' boot d0 N G →
+    ∃ (c : Cand) (pst : Nat → List Pexv6) (dv : Nat → Efab),
+      RunDataZ boot d0 N G c pst dv ∧ logOf G (cdLog c c.cdTr.length) := by
+  rintro ⟨I, hI0, hsteps⟩
+  obtain ⟨_, Sf, _, hinv, -⟩ :=
+    wlkRunZ' boot d0 N G I hsteps (gwrites G).length 0 (wlkStart boot d0 N G)
+      (wlkStartInvZ boot d0 N G) hI0 (Nat.zero_add _)
+  exact ⟨Sf.cstC, Sf.cstPst, Sf.cstDv, runDataZOfCyc boot d0 N G Sf hinv.1 hinv.2.1 hinv.2.2.1,
+    logOfOfPfx _ _ hinv.2.2.2⟩
+
 /-! # 3. THE SUPPLIES -/
 
 namespace CatLin
 
-/-- **(R-2) at the Zifencei bundle — THE NAMED PREMISE (W10's job, Z side)**: the certification
-walk's per-graph policy on every cat graph carrying the bundle at the image. -/
+/-- **DEPRECATED — FALSE (W10 sizing, [OWN.94]); W11-F must NOT consume it — use
+`CatLin.walkPolicyCZw` + `CatLin.walkMemberCZ`.**  (Was: (R-2) at the Zifencei bundle, the
+certification walk's per-graph policy on every cat graph carrying the bundle at the image.)
+
+Why it is false: `walkPolicyZ G` yields a certified run whose log is `G`'s writes in GMO order
+(`certSupplyOfWalkCZ`, unconditionally), while a candidate emits each hart's stores in PROGRAM
+order (`execProgOk'SC` threads each agent's program), so the policy forces `gwrowGmo G` — same-hart
+stores gmo-ordered as in po, a TSO-like order RVWMO does not impose (ppo orders two same-hart
+stores to different addresses only through a fence, an AMO, a dependency or rule 12; riscv.cat's
+co is per-location).  THE MEMSET COUNTEREXAMPLE: `memset`'s byte loop `sb a1,0(a5); addi a5,a5,1;
+bne` (`memset+0x14`, `Xv6/KernelImage.lean`), called by allocproc on `&p->context` (112 bytes,
+`p->lock` held), stores 0 to bytes `b` and `b+1` in consecutive iterations — different addresses,
+no fence, no AMO, no load-sourced dependency, so no ppo rule 1–13 orders them; a cat graph of a
+real boot prefix may put `sb(b+1)` gmo-before `sb(b)` (no read of `b`/`b+1` between them), and
+every candidate run of that hart emits `sb(b)` first, so `walkPolicyZ` fails on that graph.  (The
+argument needs the hart deterministic on that stretch; that step is not mechanized.) -/
 def walkPolicyCZ (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (im : Image) (N : Nat) :
     Prop :=
   ∀ (GF : Gfexec) (ad : List (Geid × Geid)),
     GF.gfGd.gdG.gxImg = im → rvwmoCatAD GF.gfGd ad → GraphFabConf.gfexecConfZF boot d0 fab GF →
     walkPolicyZ boot d0 N GF.gfGd.gdG
 
-/-- **(G-3) DISCHARGED**: the certification supply from the walk (`certSupplyOfWalkC ∘
-walkSupplyOfPolicyC`'s twin). -/
+/-- (G-3) from the walk (`certSupplyOfWalkC ∘ walkSupplyOfPolicyC`'s twin).  **DEPRECATED
+(W10-0 [OWN.94])**: its premise `walkPolicyCZ` is FALSE (see there), so this discharges nothing;
+the kill route is `CatLin.cycleKillOfWalkCZCw` (a walk at a normalized member). -/
 theorem certSupplyOfWalkCZ (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (im : Image)
     (N : Nat) :
     walkPolicyCZ boot d0 fab im N → certSupplyCZ boot d0 fab im N := by
-  intro hpol GF ad _ _ _ him hc hconf _ _ _ _ _
+  intro hpol GF ad _ _ _ him hc hconf _ _ _ _ _ _ _
   obtain ⟨I, hI0, hsteps⟩ := hpol GF ad him hc hconf
   obtain ⟨_, Sf, _, hinv, -⟩ :=
     wlkRunZ boot d0 N GF.gfGd.gdG I hsteps (gwrites GF.gfGd.gdG).length 0
       (wlkStart boot d0 N GF.gfGd.gdG) (wlkStartInvZ boot d0 N GF.gfGd.gdG) hI0 (Nat.zero_add _)
   exact ⟨Sf.cstC, Sf.cstPst, Sf.cstDv,
     runDataZOfCyc boot d0 N GF.gfGd.gdG Sf hinv.1 hinv.2.1 hinv.2.2.1, logOfOfPfx _ _ hinv.2.2.2⟩
+
+/-- **THE WALK POLICY, STATED WITH `gwrowGmo` (W10-0 [OWN.94]) — THE NAMED PREMISE (W10-2..4's
+job, Z side)**: on every cat graph carrying the bundle at the image, with the I/O residue facts
+(Q1 (b)) and whose same-hart writes are gmo-ordered as in po (`gwrowGmo`, the walk's
+precondition), the macro-step walk policy holds.  `gwrowGmo` is what makes it no longer false: the
+memset counterexample (`walkPolicyCZ`) has `sb(b+1)` gmo-before `sb(b)`, which `gwrowGmo` excludes.
+The kill gets a `gwrowGmo` graph from the normalization `walkMemberCZ` (FAITHFUL: a different mo
+witness of the same execution). -/
+def walkPolicyCZw (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (im : Image) (N : Nat) :
+    Prop :=
+  ∀ (GF : Gfexec) (ad : List (Geid × Geid)),
+    GF.gfGd.gdG.gxImg = im → rvwmoCatAD GF.gfGd ad → GraphFabConf.gfexecConfZF boot d0 fab GF →
+    ioResidueGmo GF → gdiskRead14 GF.gfGd.gdG →
+    gwrowGmo GF.gfGd.gdG →
+    walkPolicyZ' boot d0 N GF.gfGd.gdG
+
+/-- The old policy (deprecated) implies the new one (it is only weaker as a premise). -/
+theorem walkPolicyCZwOfCZ (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (im : Image)
+    (N : Nat) :
+    walkPolicyCZ boot d0 fab im N → walkPolicyCZw boot d0 fab im N :=
+  fun hpol GF ad him hc hconf _ _ _ =>
+    walkPolicyZ'OfZ boot d0 N GF.gfGd.gdG (hpol GF ad him hc hconf)
+
+/-- **THE MEMBER RUN** (W10-0 [OWN.94], generic over N1/N2): from every cyclic class graph with the
+class induction hypothesis, a cyclic class graph `GF'` (a normalized member) together with a
+certified run datum whose log is `GF'`'s.  N1 discharges it by `walkMemberCZ` + the walk
+(`memberRunOfWalkCZw`); N2 (the maximal cut, `hullRunZ` + a tail walk) would discharge it
+directly at its realized member. -/
+def memberRunCZ (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (im : Image) (N : Nat) :
+    Prop :=
+  ∀ (GF : Gfexec) (ad : List (Geid × Geid)),
+    GF.gfGd.gdG.gxImg = im → rvwmoCatAD GF.gfGd ad → GraphFabConf.gfexecConfZF boot d0 fab GF →
+    ioResidueGmo GF → gdiskRead14 GF.gfGd.gdG →
+    (∀ cs, properCutF GF cs → GraphFetchHullZ.fetchSrcClosedCut boot fab GF cs →
+      ∀ x, ¬ tc (racyDIO (gfHull GF cs)) x x) →
+    ∀ x, tc (racyDIO GF) x x →
+    ∃ (GF' : Gfexec) (ad' : List (Geid × Geid)) (x' : Geid) (c : Cand)
+      (pst : Nat → List Pexv6) (dv : Nat → Efab),
+      GF'.gfGd.gdG.gxImg = im ∧ rvwmoCatAD GF'.gfGd ad' ∧
+      GraphFabConf.gfexecConfZF boot d0 fab GF' ∧
+      ioResidueGmo GF' ∧ gdiskRead14 GF'.gfGd.gdG ∧
+      tc (racyDIO GF') x' x' ∧
+      RunDataZ boot d0 N GF'.gfGd.gdG c pst dv ∧ logOf GF'.gfGd.gdG (cdLog c c.cdTr.length)
+
+/-- **THE NORMALIZATION — NAMED (W10-0 [OWN.94]; W10-1's job, option N1 or N2 open)**: every
+cyclic class graph (with the class induction hypothesis) has a cyclic class graph satisfying
+`gwrowGmo` — intended: an equivalent member `GF'` of its orbit (same events, rf, co, deps and
+fabric up to the row renaming; only the mo witness differs) with the bundle, the residue facts
+and `gwrowGmo`, the cycle transported.  FAITHFUL: it picks another mo witness of the SAME RVWMO
+execution (RVWMO's mo is any total order containing ppo and consistent with rf/co; riscv.cat's
+co is per-location); assuming `gwrowGmo` of the graph itself would be STRONGER than RVWMO.  The
+equivalence is NOT stated: the glue needs only the listed facts, so either discharge fits.  OPEN
+(W10 sizing (5)): the `rwwD`-cyclic case (a 2+2W shape), where no member has `gwrowGmo`. -/
+def walkMemberCZ (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (im : Image) : Prop :=
+  ∀ (GF : Gfexec) (ad : List (Geid × Geid)),
+    GF.gfGd.gdG.gxImg = im → rvwmoCatAD GF.gfGd ad → GraphFabConf.gfexecConfZF boot d0 fab GF →
+    ioResidueGmo GF → gdiskRead14 GF.gfGd.gdG →
+    (∀ cs, properCutF GF cs → GraphFetchHullZ.fetchSrcClosedCut boot fab GF cs →
+      ∀ x, ¬ tc (racyDIO (gfHull GF cs)) x x) →
+    ∀ x, tc (racyDIO GF) x x →
+    ∃ (GF' : Gfexec) (ad' : List (Geid × Geid)) (x' : Geid),
+      GF'.gfGd.gdG.gxImg = im ∧ rvwmoCatAD GF'.gfGd ad' ∧
+      GraphFabConf.gfexecConfZF boot d0 fab GF' ∧
+      ioResidueGmo GF' ∧ gdiskRead14 GF'.gfGd.gdG ∧
+      gwrowGmo GF'.gfGd.gdG ∧ tc (racyDIO GF') x' x'
+
+/-- N1's member run: the normalization, then the walk at the normalized member. -/
+theorem memberRunOfWalkCZw (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (im : Image)
+    (N : Nat) :
+    walkPolicyCZw boot d0 fab im N → walkMemberCZ boot d0 fab im →
+    memberRunCZ boot d0 fab im N := by
+  intro hpol hnorm GF ad him hc hconf hres hdr hIH x hcyc
+  obtain ⟨GF', ad', x', him', hc', hconf', hres', hdr', hrow', hcyc'⟩ :=
+    hnorm GF ad him hc hconf hres hdr hIH x hcyc
+  obtain ⟨c, pst, dv, hrd, hlog⟩ := GraphFetchWalkZ.runOfWalkZ' boot d0 N GF'.gfGd.gdG
+    (hpol GF' ad' him' hc' hconf' hres' hdr' hrow')
+  exact ⟨GF', ad', x', c, pst, dv, him', hc', hconf', hres', hdr', hcyc', hrd, hlog⟩
 
 end CatLin
 
@@ -429,7 +740,8 @@ theorem cycleKillOfL2CZC (hlc : HasLC) (GF0 : BundledGFunctors) [MachGpreS hlc G
     GraphFetchHullZ.gfexecConfZFHull boot d0 fab GF cs hcore.1 hcore.2.1 hcutok.1 hdc hconf hcl
   have hacyH := hIH cs (GraphFetchKill.properCutFOfCut GF cs hcutok hdc) hcl
   -- (3) the certified run datum
-  obtain ⟨c, pst, dv, hrd, hlog⟩ := hcert GF ad cs z ss him hc hconf hcutok hconfH hacyH hne hch
+  obtain ⟨c, pst, dv, hrd, hlog⟩ :=
+    hcert GF ad cs z ss him hc hconf hres hdr hcutok hconfH hacyH hne hch
   -- (4) the erased run (M2's replay), and the exports at its log
   obtain ⟨t2, σ2, hrtc, hlgeq⟩ :=
     runErasedZ gen σ0 boot d0 N GF.gfGd.gdG c pst dv hfr hcov hb1 hb2 him hrd
@@ -443,8 +755,10 @@ theorem cycleKillOfL2CZC (hlc : HasLC) (GF0 : BundledGFunctors) [MachGpreS hlc G
       (hl2 GF ad him hconf (cdLog c c.cdTr.length) z ss hc hlog hpr hne hch) z z ss
       (fun _ h => h) hch)
 
-/-- **`cycleKillOfWalkCZC`** — WHAT W11-F CONSUMES: the class kill from the WP package, the
-fetch-view premise, the L2′ claim and the walk policy (both supplies discharged). -/
+/-- `cycleKillOfWalkCZC`: the class kill from the WP package, the fetch-view premise, the L2′
+claim and the walk policy (both supplies discharged).  **DEPRECATED — VACUOUS (W10-0 [OWN.94])**:
+its premise `walkPolicyCZ` is FALSE (the memset counterexample, see there); W11-F consumes
+`CatLin.cycleKillOfWalkCZCw` instead. -/
 theorem cycleKillOfWalkCZC (hlc : HasLC) (GF0 : BundledGFunctors) [MachGpreS hlc GF0]
     [WeakGpreS GF0] (gen : Nat) (σ0 : WGState) (D : CPU → List Register) (hD : ∀ c, (D c).Nodup)
     (Nm : Int → Int → Namespace) (P : Int → Int → Prop)
@@ -462,7 +776,9 @@ theorem cycleKillOfWalkCZC (hlc : HasLC) (GF0 : BundledGFunctors) [MachGpreS hlc
     cycleKillOfL2CZC hlc GF0 gen σ0 D hD Nm P boot d0 fab N hfr hb1 hb2 hwp hwpp hcov
       (cutSupplyOfCycleCZC boot d0 fab _) (certSupplyOfWalkCZ boot d0 fab _ N hpol) hl2
 
-/-- The guarded kill from the same premises (`cycleKillOfL2CZ` with both supplies discharged). -/
+/-- The guarded kill from the same premises (`cycleKillOfL2CZ` with both supplies discharged).
+**DEPRECATED — VACUOUS (W10-0 [OWN.94])**: `walkPolicyCZ` is FALSE; use
+`CatLin.cycleKillOfWalkCZw`. -/
 theorem cycleKillOfWalkCZ (hlc : HasLC) (GF0 : BundledGFunctors) [MachGpreS hlc GF0]
     [WeakGpreS GF0] (gen : Nat) (σ0 : WGState) (D : CPU → List Register) (hD : ∀ c, (D c).Nodup)
     (Nm : Int → Int → Namespace) (P : Int → Int → Prop)
@@ -480,8 +796,9 @@ theorem cycleKillOfWalkCZ (hlc : HasLC) (GF0 : BundledGFunctors) [MachGpreS hlc 
     cycleKillOfL2CZ hlc GF0 gen σ0 D hD Nm P boot d0 fab N hfr hb1 hb2 hwp hwpp hcov
       (cutSupplyOfCycleCZ boot d0 fab _) (certSupplyOfWalkCZ boot d0 fab _ N hpol) hl2
 
-/-- **`t2linOfWalkCZ`**: T2-LIN at the Zifencei bundle from the walk policy (`t2linOfL2CZ` with
-both supplies discharged). -/
+/-- `t2linOfWalkCZ`: T2-LIN at the Zifencei bundle from the walk policy (`t2linOfL2CZ` with
+both supplies discharged).  **DEPRECATED — VACUOUS (W10-0 [OWN.94])**: `walkPolicyCZ` is FALSE; use
+`CatLin.t2linOfWalkCZw`. -/
 theorem t2linOfWalkCZ (hlc : HasLC) (GF0 : BundledGFunctors) [MachGpreS hlc GF0] [WeakGpreS GF0]
     (gen : Nat) (σ0 : WGState) (D : CPU → List Register) (hD : ∀ c, (D c).Nodup)
     (Nm : Int → Int → Namespace) (P : Int → Int → Prop)
@@ -502,6 +819,108 @@ theorem t2linOfWalkCZ (hlc : HasLC) (GF0 : BundledGFunctors) [MachGpreS hlc GF0]
   fun hfr hb1 hb2 hwp hwpp hcov hpol hl2 =>
     t2linOfL2CZ hlc GF0 gen σ0 D hD Nm P boot d0 fab N hfr hb1 hb2 hwp hwpp hcov
       (cutSupplyOfCycleCZ boot d0 fab _) (certSupplyOfWalkCZ boot d0 fab _ N hpol) hl2
+
+/-- **`cycleKillOfMemberCZC`** (W10-0 [OWN.94]) — THE CLASS KILL AT A MEMBER: from the member run
+(N1 or N2), the classification at `ioCross`, the WP package and the fetch-view premise.  The cycle
+is killed at the member `GF'`, where the certified run's log is the graph's. -/
+theorem cycleKillOfMemberCZC (hlc : HasLC) (GF0 : BundledGFunctors) [MachGpreS hlc GF0]
+    [WeakGpreS GF0] (gen : Nat) (σ0 : WGState) (D : CPU → List Register) (hD : ∀ c, (D c).Nodup)
+    (Nm : Int → Int → Namespace) (P : Int → Int → Prop)
+    (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (N : Nat) :
+    freshEra gen σ0 →
+    (List.range' 0 N).map boot = epsInit σ0 →
+    d0 = efInit σ0.wgdev →
+    wpPackage hlc GF0 gen σ0 D →
+    (∀ a base, P a base → wpPackageProt hlc GF0 gen σ0 D (Nm a base) a base) →
+    (∀ ρ, rtc epfRun (epInit gen, σ0) ρ → efetchItvOk ρ.1 ρ.2) →
+    memberRunCZ boot d0 fab (imgZ σ0.wgimg) N →
+    l2ClaimCZ boot d0 fab (imgZ σ0.wgimg) P (badRun gen σ0) →
+    cycleKillCZC boot d0 fab (imgZ σ0.wgimg) := by
+  intro hfr hb1 hb2 hwp hwpp hcov hmem hl2
+  intro GF ad him hc hconf hres hdr hIH x hcyc
+  -- (1) the member, its cycle and its certified run datum
+  obtain ⟨GF', ad', x', c, pst, dv, him', hc', hconf', hres', hdr', hcyc', hrd, hlog⟩ :=
+    hmem GF ad him hc hconf hres hdr hIH x hcyc
+  -- (2) the member's cycle, as `ioCross`-entered segments
+  obtain ⟨z, ss, hne, hch⟩ := cycleSegmentsIO GF' ad' x' hc' hcyc'
+  -- (3) the erased run (M2's replay), and the exports at its log
+  obtain ⟨t2, σ2, hrtc, hlgeq⟩ :=
+    runErasedZ gen σ0 boot d0 N GF'.gfGd.gdG c pst dv hfr hcov hb1 hb2 him' hrd
+  have hpr : protReg P (cdLog c c.cdTr.length) := by
+    rw [← hlgeq]
+    exact protRegOfRun hlc GF0 gen σ0 D hD Nm P t2 σ2 hfr hwpp hrtc
+  -- (4) the classification, and the kill at `ioCross`, at the member
+  have hnB : ¬ badRun gen σ0 := noBadRun hlc GF0 gen σ0 D hD hfr hwp
+  exact cycleKillIOC GF' ad' z ss hc' hres' hdr' hne
+    (rawChainChainCZ GF' ad' P (cdLog c c.cdTr.length) (badRun gen σ0) ss hc' hres' hdr' hlog hpr
+      hnB (hl2 GF' ad' him' hconf' (cdLog c c.cdTr.length) z ss hc' hlog hpr hne hch) z z ss
+      (fun _ h => h) hch)
+
+/-- **`cycleKillOfWalkCZCw`** — WHAT W11-F CONSUMES (W10-0 [OWN.94], replacing the vacuous
+`cycleKillOfWalkCZC`): the class kill from the WP package, the fetch-view premise, the L2′ claim,
+the walk policy WITH `gwrowGmo` (`walkPolicyCZw`) and the NAMED normalization (`walkMemberCZ`). -/
+theorem cycleKillOfWalkCZCw (hlc : HasLC) (GF0 : BundledGFunctors) [MachGpreS hlc GF0]
+    [WeakGpreS GF0] (gen : Nat) (σ0 : WGState) (D : CPU → List Register) (hD : ∀ c, (D c).Nodup)
+    (Nm : Int → Int → Namespace) (P : Int → Int → Prop)
+    (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (N : Nat) :
+    freshEra gen σ0 →
+    (List.range' 0 N).map boot = epsInit σ0 →
+    d0 = efInit σ0.wgdev →
+    wpPackage hlc GF0 gen σ0 D →
+    (∀ a base, P a base → wpPackageProt hlc GF0 gen σ0 D (Nm a base) a base) →
+    (∀ ρ, rtc epfRun (epInit gen, σ0) ρ → efetchItvOk ρ.1 ρ.2) →
+    walkPolicyCZw boot d0 fab (imgZ σ0.wgimg) N →
+    walkMemberCZ boot d0 fab (imgZ σ0.wgimg) →
+    l2ClaimCZ boot d0 fab (imgZ σ0.wgimg) P (badRun gen σ0) →
+    cycleKillCZC boot d0 fab (imgZ σ0.wgimg) :=
+  fun hfr hb1 hb2 hwp hwpp hcov hpol hnorm hl2 =>
+    cycleKillOfMemberCZC hlc GF0 gen σ0 D hD Nm P boot d0 fab N hfr hb1 hb2 hwp hwpp hcov
+      (memberRunOfWalkCZw boot d0 fab _ N hpol hnorm) hl2
+
+/-- The guarded kill from the same premises (`cycleKillOfWalkCZCw` through `cycleKillCZOfC`). -/
+theorem cycleKillOfWalkCZw (hlc : HasLC) (GF0 : BundledGFunctors) [MachGpreS hlc GF0]
+    [WeakGpreS GF0] (gen : Nat) (σ0 : WGState) (D : CPU → List Register) (hD : ∀ c, (D c).Nodup)
+    (Nm : Int → Int → Namespace) (P : Int → Int → Prop)
+    (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (N : Nat) :
+    freshEra gen σ0 →
+    (List.range' 0 N).map boot = epsInit σ0 →
+    d0 = efInit σ0.wgdev →
+    wpPackage hlc GF0 gen σ0 D →
+    (∀ a base, P a base → wpPackageProt hlc GF0 gen σ0 D (Nm a base) a base) →
+    (∀ ρ, rtc epfRun (epInit gen, σ0) ρ → efetchItvOk ρ.1 ρ.2) →
+    walkPolicyCZw boot d0 fab (imgZ σ0.wgimg) N →
+    walkMemberCZ boot d0 fab (imgZ σ0.wgimg) →
+    l2ClaimCZ boot d0 fab (imgZ σ0.wgimg) P (badRun gen σ0) →
+    cycleKillCZ boot d0 fab (imgZ σ0.wgimg) :=
+  fun hfr hb1 hb2 hwp hwpp hcov hpol hnorm hl2 =>
+    cycleKillCZOfC boot d0 fab _
+      (cycleKillOfWalkCZCw hlc GF0 gen σ0 D hD Nm P boot d0 fab N hfr hb1 hb2 hwp hwpp hcov hpol
+        hnorm hl2)
+
+/-- **`t2linOfWalkCZw`**: T2-LIN at the Zifencei bundle from the walk policy with `gwrowGmo` and
+the named normalization. -/
+theorem t2linOfWalkCZw (hlc : HasLC) (GF0 : BundledGFunctors) [MachGpreS hlc GF0]
+    [WeakGpreS GF0] (gen : Nat) (σ0 : WGState) (D : CPU → List Register) (hD : ∀ c, (D c).Nodup)
+    (Nm : Int → Int → Namespace) (P : Int → Int → Prop)
+    (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (N : Nat) :
+    freshEra gen σ0 →
+    (List.range' 0 N).map boot = epsInit σ0 →
+    d0 = efInit σ0.wgdev →
+    wpPackage hlc GF0 gen σ0 D →
+    (∀ a base, P a base → wpPackageProt hlc GF0 gen σ0 D (Nm a base) a base) →
+    (∀ ρ, rtc epfRun (epInit gen, σ0) ρ → efetchItvOk ρ.1 ρ.2) →
+    walkPolicyCZw boot d0 fab (imgZ σ0.wgimg) N →
+    walkMemberCZ boot d0 fab (imgZ σ0.wgimg) →
+    l2ClaimCZ boot d0 fab (imgZ σ0.wgimg) P (badRun gen σ0) →
+    ∀ (GF : Gfexec) (ad : List (Geid × Geid)),
+      GF.gfGd.gdG.gxImg = imgZ σ0.wgimg →
+      rvwmoCatAD GF.gfGd ad → GraphFabConf.gfexecConfZF boot d0 fab GF →
+      ioResidueGmo GF → gdiskRead14 GF.gfGd.gdG →
+      ∀ x, ¬ tc (racyDIO GF) x x :=
+  fun hfr hb1 hb2 hwp hwpp hcov hpol hnorm hl2 =>
+    t2linOfCycleKillCZ boot d0 fab _
+      (cycleKillOfWalkCZw hlc GF0 gen σ0 D hD Nm P boot d0 fab N hfr hb1 hb2 hwp hwpp hcov hpol
+        hnorm hl2)
 
 end glue
 
