@@ -25,8 +25,9 @@ only by hart `h` after power-on; a non-holder's read of any such lock's
 only by a hart, whole, with an A/D variant of its sealed value.  The
 `ip->ref` and `holding()` clauses are ONE benign-race class (unlocked reads
 of lock-protected words, harmless by a value argument).  Not yet exported:
-the user tables' half of the A/D clause (W8 (f3-pteu)), and W8 (f3-rest)'s
-`cpuProcDiscAt`/`utextDiscAt`; later items only strengthen the conjunction.
+the user tables' half of the A/D clause (W8 (f3-pteu)), and W8 (f3-utext)'s
+`utextDiscAt` (`cpuProcDiscAt` is permanently out of the export, [OWN.80]);
+later items only strengthen the conjunction.
 -/
 import Xv6.SystemAdequacyDisc
 import Xv6.ProofUser

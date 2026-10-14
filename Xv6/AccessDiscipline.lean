@@ -23,8 +23,9 @@ word accesses, coherence):
     reference).
 Each is stated as a VALUE clause of the export, NOT an exemption.  NOT exported here: the USER
 tables' half of the A/D write-back clause [R25.1], [OWN.66] (W8 (f3-pteu)),
-and W8 (f3-rest)'s `cpuProcDiscAt`/`utextDiscAt` [R34.1].  Later items only
-STRENGTHEN the conjunction.
+and W8 (f3-utext)'s `utextDiscAt` [R34.1]; `cpuProcDiscAt` is permanently
+OUT of the export ([OWN.80]: W11-D needs no `kOwnerAt` uniqueness).  Later
+items only STRENGTHEN the conjunction.
 
 * `Cust` (the custody classes, W8-design §1 with [R25.1]'s `pte`, and the
   S3 classes `pub` (exempt), `racy` (value-qualified)) and the custody map `custAt σ a
@@ -581,7 +582,8 @@ benign-race class (unlocked reads of lock-protected words, harmless by a
 value argument); W8 (f3-pipelk) [OWN.65]: `lockWordDiscAt` and `lkCpuReadAt`
 over EVERY lock, the live pipe locks included; W8 (f3-ptek) [OWN.66]:
 `pteDiscAt`, the kernel page table's A/D discipline after the seal (the user
-tables' half is W8 (f3-pteu)'s; `cpuProcDiscAt`/`utextDiscAt` W8 (f3-rest)'s). -/
+tables' half is W8 (f3-pteu)'s, `utextDiscAt` W8 (f3-utext)'s; `cpuProcDiscAt`
+permanently dropped, [OWN.80]). -/
 def xv6AccessDisc (σ : MState) : Prop :=
   chainOkAt σ ∧ lockWordDiscAt σ ∧ cpuStaticAt σ ∧ lkCpuReadAt σ ∧ pteDiscAt σ
 
