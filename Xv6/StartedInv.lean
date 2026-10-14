@@ -597,12 +597,47 @@ theorem started_deposit_open [CurCtx] (γ : GName) (ξd : CtxId) (P : CtxId → 
   · iexfalso
     iapply startedPrim_idx γ t a $$ Hprim Hidx
 
+/-- **No publication word is written while hart 0 holds its token** (W8
+(f3-ptek) [OWN.66]: what the kernel table's seal needs, `MachCSL.kptOn_seal`'s
+`pubClean`): `started` is xv6's only publication word, and until hart 0's
+store its window is the image's. -/
+theorem started_pubClean (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) :
+    ⊢ startedInv γ ξd P -∗ startedPrim γ -∗ ∀ m : FlatMem, genHeapInterp m ={⊤}=∗
+      genHeapInterp m ∗ ⌜pubClean (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) m⌝ ∗ startedPrim γ := by
+  unfold startedInv
+  iintro ⟨%hrsv, #Hinv⟩ Hprim %m Hmem
+  imod (inv_acc (E := ⊤) (N := startedN) (P := startedBody γ ξd P) CoPset.subseteq_top) $$ Hinv
+    with ⟨Hbody, Hclose⟩
+  unfold startedBody startedUnarmed startedArmed
+  icases Hbody with (⟨>Hw, >Hg, >Hst⟩ | ⟨%t, %T, %a, >Hw, >Hidx, >%hT, >Hst, HPd, >HC⟩)
+  · ihave %hget := histBytes_valid m startedAddr 4 _ _ $$ [Hmem Hw]
+    · unfold startedWin; iframe Hmem Hw
+    imod Hclose $$ [Hw Hg Hst]
+    · inext
+      ileft
+      iframe Hw Hg Hst
+    imodintro
+    iframe Hmem Hprim
+    ipureintro
+    intro f w hf a ha H hH e he
+    rw [hrsv] at hf
+    obtain ⟨rfl, rfl⟩ := xv6Pub_only f w hf
+    simp only [RsvRegion.bytes, RsvRegion.words, wordBytes, List.flatMap_cons, List.flatMap_nil,
+      List.append_nil, List.mem_map, List.mem_range] at ha
+    obtain ⟨j, hj, rfl⟩ := ha
+    rw [hget j hj] at hH
+    obtain rfl := Option.some.inj hH
+    simp only [WordHist.hist, List.map_nil, List.nil_append, startedImg, List.mem_singleton] at he
+    rw [he]
+  · iexfalso
+    iapply startedPrim_idx γ t a $$ Hprim Hidx
+
 /-- **The flag store's obligation, history-aware** (W8 (f2-ctx) [R35.2]): the
 first post-power-on store of hart 0 into the never-written window keeps the
 publication region's discipline -- every post-power-on entry is hart 0's, at
 one timestamp.  (The history-free `MachCSL.rsvWordOk` cannot say this.) -/
 theorem started_rsvStoreOk (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) :
-    rsvStoreOk (hlc := hlc) (GF := GF) startedPrimary startedAddr 4 startedSet startedImg [] := by
+    rsvStoreOkP (hlc := hlc) (GF := GF) startedPrimary startedAddr 4 startedSet startedImg [] := by
   refine ⟨2, 0, xv6StartedR, by rw [hrsv]; exact xv6Started_idx, rfl, fun m t ht hget _ _ => ?_⟩
   have hbytes : ∀ a ∈ xv6StartedR.bytes, ∃ j, j < 4 ∧ a = startedAddr + BitVec.ofNat 64 j := by
     intro a ha
@@ -635,10 +670,10 @@ theorem started_rsvStoreOk (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)
 (the reserved half, W8 (f2-ctx)), the stamp's receipt as the order bound, the
 history-aware obligation, and the arming. -/
 theorem started_writeAUT (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) [∀ ξ, Persistent (P ξ)] :
-    startedInv (GF := GF) γ ξd P ∗ startedPrim γ ∗ P ξd ⊢
+    startedInv (GF := GF) γ ξd P ∗ startedPrim γ ∗ P ξd ∗ kptSealed ⊢
       writeAUT startedPrimary startedAddr 4 startedSet iprop(emp) := by
   unfold startedInv
-  iintro ⟨⟨%hrsv, #Hinv⟩, Hprim, #HP⟩
+  iintro ⟨⟨%hrsv, #Hinv⟩, Hprim, #HP, #Hsl⟩
   unfold writeAUT
   imod (inv_acc (E := ⊤) (N := startedN) (P := startedBody γ ξd P) CoPset.subseteq_top) $$ Hinv
     with ⟨Hbody, Hclose⟩
@@ -659,6 +694,8 @@ theorem started_writeAUT (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) [�
     · ipureintro
       rw [WordHist.hist_nil]
       exact started_rsvStoreOk hrsv
+    isplitr
+    · iexact Hsl
     isplitl [HL]
     · unfold rtIn; iexact HL
     inext

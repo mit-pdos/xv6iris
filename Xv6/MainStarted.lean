@@ -48,11 +48,11 @@ theorem mn_started [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsie : k.sie =
     (hcpu : cpu = startedPrimary)
     (γi : GName) (ξd : CtxId) (P : CtxId → IProp GF) [CtxMorph P] [∀ ξ, Persistent (P ξ)] :
     kctx cpu (k.withRegs R0) ∗ pcIs cpu (KA.«main» + 162#64) ∗
-    startedInv γi ξd P ∗ startedPrim γi ∗ P curCtx ∗
+    startedInv γi ξd P ∗ startedPrim γi ∗ P curCtx ∗ kptSealed ∗
     (∀ R : RegMap, kctx cpu (k.withRegs R) -∗ pcIs cpu (KA.«main» + 62#64) -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
   subst hcpu
-  iintro ⟨Hk, Hpc, #Hinv, Hprim, #HP, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hinv, Hprim, #HP, #Hsl, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
   ihave #Hid := kmapStatic_rw startedAddr (by decide) $$ HS
@@ -62,7 +62,7 @@ theorem mn_started [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsie : k.sie =
   imod started_deposit_open γi ξd P $$ [$Hinv $Hprim $Hrun $HP] with ⟨Hrun, Hprim, #HPd⟩
   imodintro
   ihave Hk := Hback $$ Hrun
-  ihave HAU := started_writeAUT γi ξd P $$ [$Hinv $Hprim $HPd]
+  ihave HAU := started_writeAUT γi ξd P $$ [$Hinv $Hprim $HPd $Hsl]
   ihave HAU := (show writeAUT (GF := GF) startedPrimary startedAddr 4 startedSet iprop(emp) ⊢
     writeAUT startedPrimary startedAddr 4 1#32 iprop(emp) from .rfl) $$ HAU
   -- +0xa2  auipc a5,0x9 ; +0xa6  addi a5,a5,1008

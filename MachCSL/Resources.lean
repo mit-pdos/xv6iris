@@ -1011,9 +1011,10 @@ registry may GROW past the static list without changing this conjunct). -/
 def staticIn (rs : List RsvRegion) (reg : RegMapF Agent) : Prop :=
   ∀ (i : Nat) (R : RsvRegion), rs[i]? = some R → get? reg R.base.toNat = some i
 
-/-- In β′ the registry holds nothing else (the dynamic part is W8 (f2-ctx)'s). -/
+/-- Below `2 ^ 64` the registry holds nothing else (the keys past it are the
+sealed kernel table's leaves, W8 (f3-ptek): `MachCSL.kptLinked`). -/
 def rsvExact (rs : List RsvRegion) (reg : RegMapF Agent) : Prop :=
-  ∀ (k i : Nat), get? reg k = some i → ∃ R, rs[i]? = some R ∧ R.base.toNat = k
+  ∀ (k i : Nat), k < 2 ^ 64 → get? reg k = some i → ∃ R, rs[i]? = some R ∧ R.base.toNat = k
 
 /-- **Every registered region keeps its discipline** at the machine `σ`. -/
 def reservedOk (rs : List RsvRegion) (σ : MState) (reg : RegMapF Agent) : Prop :=
@@ -1421,15 +1422,173 @@ def chainModelAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) : IProp GF := ip
   ∃ Z : RegMapF Agent, (E.chainName ↪●MAP Z) ∗ ⌜certsOk (chainEnv (hlc := hlc) (GF := GF) σ) Z⌝ ∗
     chainElemsAt E Z
 
+/-! ## The sealed kernel page table (W8 (f3-ptek) [OWN.66])
+
+The interpretation's record of the sealed kernel table (`MachCSL.KSlot`,
+`MachCSL.kslotHistOk`): a seal position `S` and the list of sealed slots,
+each with the interpretation's fragment of its bytes (discarded for a frozen
+slot, half for a leaf) and its discipline on the fragment's histories.  The
+LEAVES are registered in the era's reserved-region registry at keys past
+every static base (`kslotKey`), each at its canonical value, so the leaf's
+writer can find its slot (`kptLinked`).  Before the seal the list is empty
+and no publication word is written yet (`pubClean`: the boot gate opens only
+after the seal; a publication store presents the seal's certificate,
+`kptSealedAt`);
+from the seal on (`kptSealOk`) the seal position is at or below the top and
+before every post-power-on entry of every publication word (xv6: `started`),
+every permanent root word is a frozen slot naming a page every slot of which
+is sealed, and so is every page a frozen slot points to (the walk's
+closure); no sealed byte is a static reserved byte. -/
+
+/-- The interpretation's fraction of a sealed slot's bytes: discarded for a
+frozen slot, half for a leaf. -/
+def kslotFrac (d : KSlot) : DFrac := if d.frozen then DFrac.discard else DFrac.own (1 : Qp).half
+
+/-- The registry key of the sealed LEAF at `a`: past every static base. -/
+def kslotKey (a : PAddr) : Nat := 2 ^ 64 + a.toNat
+
+/-- The registry key marking the seal (its element is the client's
+certificate that the table is sealed, `kptSealedAt`): past every leaf's key. -/
+def kptSealKey : Nat := 2 ^ 65
+
+/-- Every slot of the page at `p` is sealed. -/
+def pageIn (dyn : List KSlot) (p : PAddr) : Prop :=
+  ∀ i, i < 512 → ∃ d ∈ dyn, d.addr = p + BitVec.ofNat 64 (8 * i)
+
+/-- Every post-power-on entry of every publication word of `rs` is after `S`. -/
+def pubAfter (rs : List RsvRegion) (m : FlatMem) (S : Nat) : Prop :=
+  ∀ (f : PAddr) (w : CPU), (⟨f, .pub w⟩ : RsvRegion) ∈ rs → ∀ a ∈ (⟨f, .pub w⟩ : RsvRegion).bytes,
+    ∀ H, m[a]? = some H → ∀ e ∈ H, e.t ≠ 0 → S < e.t
+
+/-- **The seal's facts** at the memory `m` with top `top`, seal position `S`,
+sealed slots `dyn`. -/
+def kptSealOk (rs : List RsvRegion) (m : FlatMem) (top S : Nat) (dyn : List KSlot) : Prop :=
+  S ≤ top ∧ pubAfter rs m S ∧
+  (∀ d ∈ dyn, (d.frozen = false → ∃ (ppn : BitVec 44) (perm : KPerm) (a dd : BitVec 1), d.c = kLeaf ppn perm a dd) ∧
+    ∀ j, j < 8 → d.addr + BitVec.ofNat 64 j ∉ rsvBytes rs) ∧
+  (∀ (base : PAddr) (cnt stride k : Nat), (⟨base, .roots cnt stride⟩ : RsvRegion) ∈ rs → k < cnt →
+    ∃ d ∈ dyn, d.addr = base + BitVec.ofNat 64 (stride * k) ∧ d.frozen = true ∧ d.c.toNat % 4096 = 0 ∧
+      (d.c ≠ 0 → pageIn dyn d.c)) ∧
+  (∀ d ∈ dyn, d.frozen = true → ∀ p, ptPtrTo d.c p → pageIn dyn p)
+
+/-- The registry's keys past every static base and below the seal key are
+the sealed leaves, each at its canonical value; the seal key is registered
+only once the table is sealed. -/
+def kptLinked (dyn : List KSlot) (reg : RegMapF Agent) : Prop :=
+  (∀ (k v : Nat), get? reg k = some v → 2 ^ 64 ≤ k → k < kptSealKey →
+    ∃ d ∈ dyn, d.frozen = false ∧ k = kslotKey d.addr ∧ v = d.c.toNat) ∧
+  ∀ v, get? reg kptSealKey = some v → dyn ≠ []
+
+/-- The interpretation's share of a sealed slot, sealed at `S`. -/
+def kslotCellAt [MachFixedGS hlc GF] (E : EraGS) (S : Nat) (d : KSlot) : IProp GF := iprop%
+  ∃ Hs : Nat → Hist, ([∗list] j ∈ List.range 8, pointsTo (G := E.mem) (d.addr + BitVec.ofNat 64 j) (kslotFrac d) (Hs j)) ∗
+    ⌜kslotHistOk S d Hs⌝
+
+/-- **The sealed kernel table's conjunct** of era `E`'s interpretation, at
+the registry `reg`. -/
+def kptModelAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (reg : RegMapF Agent) : IProp GF := iprop%
+  ∃ (S : Nat) (dyn : List KSlot),
+    ⌜kptLinked dyn reg ∧ ((dyn = [] ∧ pubClean (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem) ∨
+      kptSealOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem σ.top S dyn)⌝ ∗
+    [∗list] d ∈ dyn, kslotCellAt E S d
+
+/-- **The seal's certificate** (persistent): the era's record is sealed. -/
+def kptSealedAt [MachFixedGS hlc GF] (E : EraGS) : IProp GF := E.rsvName ↪◯MAP[kptSealKey]{.discard} 0
+
+instance [MachFixedGS hlc GF] (E : EraGS) : Persistent (PROP := IProp GF) (kptSealedAt E) := by
+  unfold kptSealedAt; infer_instance
+
+/-- The sealed slots' histories in the memory `m`, each disciplined
+(`kslotHistOk`): what the interpretation's fragments say of the machine. -/
+def kptHistsAt (m : FlatMem) (S : Nat) (dyn : List KSlot) : Prop :=
+  ∀ d ∈ dyn, ∃ Hs : Nat → Hist, (∀ j, j < 8 → m[d.addr + BitVec.ofNat 64 j]? = some (Hs j)) ∧ kslotHistOk S d Hs
+
+/-- **The sealed kernel table's pure fact** of the machine `σ` (W8 (f3-ptek)):
+before the seal no publication word is written; from the seal on, its facts
+(`kptSealOk`) hold and every sealed slot's histories in the memory are
+disciplined. -/
+def kptStateOk (rs : List RsvRegion) (σ : MState) : Prop :=
+  ∃ (S : Nat) (dyn : List KSlot), (dyn = [] ∧ pubClean rs σ.mem) ∨
+    (kptSealOk rs σ.mem σ.top S dyn ∧ kptHistsAt σ.mem S dyn)
+
+/-- Fragments of the bytes `pa .. pa+n-1` agree with the heap (era `E`). -/
+theorem kslotBytes_valid [MachFixedGS hlc GF] (E : EraGS) (m : FlatMem) (pa : PAddr) (dq : DFrac)
+    (Hs : Nat → Hist) : ∀ n : Nat,
+    genHeapInterp (G := E.mem) m ∗
+      ([∗list] j ∈ List.range n, pointsTo (G := E.mem) (pa + BitVec.ofNat 64 j) dq (Hs j)) ⊢@{IProp GF}
+      ⌜∀ j, j < n → m[pa + BitVec.ofNat 64 j]? = some (Hs j)⌝
+  | 0 => by
+    iintro ⟨_, _⟩
+    ipureintro
+    intro j hj
+    omega
+  | n + 1 => by
+    rw [List.range_succ]
+    iintro ⟨Hm, Hb⟩
+    icases BigSepL.bigSepL_snoc.1 $$ Hb with ⟨Hb1, Hb2⟩
+    ihave %H1 : ⌜∀ j, j < n → m[pa + BitVec.ofNat 64 j]? = some (Hs j)⌝ $$ [Hm Hb1]
+    · iapply kslotBytes_valid E m pa dq Hs n $$ [Hm Hb1]
+      iframe
+    ihave %H2 : ⌜m[pa + BitVec.ofNat 64 n]? = some (Hs n)⌝ $$ [Hm Hb2]
+    · letI : genHeapGS PAddr Hist GF MemF := E.mem
+      icases genHeap_valid $$ [$Hm $Hb2] with >%_
+      itrivial
+    ipureintro
+    intro j hj
+    rcases Nat.lt_succ_iff_lt_or_eq.1 hj with h | rfl
+    · exact H1 j h
+    · exact H2
+
+/-- The interpretation's sealed cells agree with the heap: `kptHistsAt`. -/
+theorem kptCells_hists [MachFixedGS hlc GF] (E : EraGS) (m : FlatMem) (S : Nat) : ∀ dyn : List KSlot,
+    genHeapInterp (G := E.mem) m ∗ ([∗list] d ∈ dyn, kslotCellAt E S d) ⊢@{IProp GF} ⌜kptHistsAt m S dyn⌝
+  | [] => by
+    iintro _
+    ipureintro
+    intro d hd
+    cases hd
+  | d :: dyn => by
+    iintro ⟨Hm, Hc⟩
+    icases BigSepL.bigSepL_cons.1 $$ Hc with ⟨Hd, Hc⟩
+    ihave %H1 : ⌜kptHistsAt m S dyn⌝ $$ [Hm Hc]
+    · iapply kptCells_hists E m S dyn $$ [Hm Hc]
+      iframe
+    unfold kslotCellAt
+    icases Hd with ⟨%Hs, Hb, %hk⟩
+    ihave %H2 : ⌜∀ j, j < 8 → m[d.addr + BitVec.ofNat 64 j]? = some (Hs j)⌝ $$ [Hm Hb]
+    · iapply kslotBytes_valid E m d.addr (kslotFrac d) Hs 8 $$ [Hm Hb]
+      iframe
+    ipureintro
+    intro d' hd'
+    rcases List.mem_cons.1 hd' with rfl | hd'
+    · exact ⟨Hs, H2, hk⟩
+    · exact H1 d' hd'
+
+/-- **The sealed table's record gives its pure fact** (`kptStateOk`). -/
+theorem kptModel_stateOk [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (reg : RegMapF Agent) :
+    genHeapInterp (G := E.mem) σ.mem ∗ kptModelAt E σ reg ⊢@{IProp GF}
+      ⌜kptStateOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ⌝ := by
+  unfold kptModelAt
+  iintro ⟨Hm, %S, %dyn, %⟨_, hseal⟩, Hc⟩
+  rcases hseal with hnil | hok
+  · ipureintro
+    exact ⟨S, dyn, .inl hnil⟩
+  · ihave %hh : ⌜kptHistsAt σ.mem S dyn⌝ $$ [Hm Hc]
+    · iapply kptCells_hists E σ.mem S dyn $$ [Hm Hc]
+      iframe
+    ipureintro
+    exact ⟨S, dyn, .inr ⟨hok, hh⟩⟩
+
 /-- **The reserved-region conjunct** of era `E`'s interpretation (plan [R25.2]
-deliverable (i): `⌜staticIn reg ∧ reservedOk σ reg⌝` beside `⌜mmOk σ⌝`), and
--- W8 (f2-ctx) -- the chain certificates (`chainModelAt`): the two conjuncts
+deliverable (i): `⌜staticIn reg ∧ reservedOk σ reg⌝` beside `⌜mmOk σ⌝`), with
+-- W8 (f3-ptek) -- the sealed kernel table's record (`kptModelAt`), and
+-- W8 (f2-ctx) -- the chain certificates (`chainModelAt`): the conjuncts
 that read only the memory (`rsvModelAt_congr`). -/
 def rsvModelAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) : IProp GF := iprop%
   (∃ reg : RegMapF Agent, (E.rsvName ↪●MAP reg) ∗
     ⌜staticIn (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) reg ∧
       rsvExact (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) reg ∧
-      reservedOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ reg⌝) ∗
+      reservedOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ reg⌝ ∗ kptModelAt E σ reg) ∗
   rsvHalvesAt E (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) ∗
   chainModelAt E σ
 
@@ -1446,7 +1605,7 @@ theorem rsvModelAt_congr [MachFixedGS hlc GF] (E : EraGS) {σ σ' : MState} (h :
     (hl : σ'.log = σ.log) (hc : ∀ (j : CPU) (a : PAddr), (σ'.hr j).coh a = (σ.hr j).coh a) :
     rsvModelAt (GF := GF) E σ' = rsvModelAt E σ := by
   have ht : σ'.top = σ.top := by simp only [MState.top, hl]
-  unfold rsvModelAt reservedOk chainModelAt chainEnv chainEx
+  unfold rsvModelAt reservedOk kptModelAt chainModelAt chainEnv chainEx
   rw [chainEnvAt_congr _ _ h hl hc, h, ht]
 
 /-- `cpus` lists every hart at its own index. -/

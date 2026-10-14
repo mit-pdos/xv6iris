@@ -32,13 +32,13 @@ of static region `i`, and any store of `w` there by `cpu` keeps the region's
 discipline. -/
 def rsvWordOk (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : Prop :=
   ∃ (i k : Nat) (R : RsvRegion), (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))[i]? = some R ∧
-    R.words[k]? = some (pa, n) ∧
+    R.words[k]? = some (pa, n) ∧ (∀ w', R.kind ≠ .pub w') ∧
     ∀ (m : FlatMem) (t : Nat), 0 < t → regionOk m R → regionOk (m.writeBytes pa n w t (hartAgent cpu)) R
 
 theorem rsvWordOk_storeOk (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (Hs : Nat → Hist)
     (h : rsvWordOk (hlc := hlc) (GF := GF) cpu pa n w) : rsvStoreOk (hlc := hlc) (GF := GF) cpu pa n w Hs [] := by
-  obtain ⟨i, k, R, hi, hk, hp⟩ := h
-  exact ⟨i, k, R, hi, hk, fun m t ht _ _ hR => hp m t ht hR⟩
+  obtain ⟨i, k, R, hi, hk, hnp, hp⟩ := h
+  exact ⟨i, k, R, hi, hk, hnp, fun m t ht _ _ hR => hp m t ht hR⟩
 
 theorem aCpuProc_eq [KernelGeom] (cpu : CPU) : aCpuProc cpu = cpuAddr cpu := by
   unfold aCpuProc procOff; simp
@@ -50,7 +50,7 @@ theorem cpuCellOk_wordOk [KernelGeom] {cpu : CPU} {va : PAddr} {n : Nat}
     rsvWordOk (hlc := hlc) (GF := GF) cpu va n w := by
   obtain ⟨⟨i, hi⟩, hw⟩ := h
   obtain ⟨k, hk⟩ := List.mem_iff_getElem?.1 hw
-  exact ⟨i, k, _, hi, hk, fun m t _ hR => cpuRegion_store rfl m _ n w t hR⟩
+  exact ⟨i, k, _, hi, hk, fun _ h => RsvKind.noConfusion h, fun m t _ hR => cpuRegion_store rfl m _ n w t hR⟩
 
 /-- The three cells are words of the region. -/
 theorem cpuWords_mem [KernelGeom] (cpu : CPU) :

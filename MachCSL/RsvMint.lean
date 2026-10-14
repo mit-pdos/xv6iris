@@ -76,9 +76,19 @@ theorem rsvRegMap_staticIn {rs : List RsvRegion} (hnd : (rs.map (fun R => R.base
   simpa [rsvRegMap] using this
 
 theorem rsvRegMap_exact (rs : List RsvRegion) : rsvExact rs (rsvRegMap rs) := by
-  intro k i h
+  intro k i _ h
   obtain ⟨_, R, hR, hb⟩ := rsvRegMapAux_exact rs 0 k i h
   exact ⟨R, by simpa using hR, hb⟩
+
+/-- The minted registry holds no sealed leaf (its keys are static bases,
+below `2 ^ 64`; W8 (f3-ptek)). -/
+theorem rsvRegMap_kptLinked (rs : List RsvRegion) : kptLinked [] (rsvRegMap rs) := by
+  have hbig : ∀ k i, get? (rsvRegMap rs) k = some i → k < 2 ^ 64 := fun k i h => by
+    obtain ⟨_, R, _, hb⟩ := rsvRegMapAux_exact rs 0 k i h
+    have := R.base.isLt
+    omega
+  refine ⟨fun k i h hk _ => absurd (hbig k i h) (by omega), fun v h => absurd (hbig _ v h) ?_⟩
+  unfold kptSealKey; omega
 
 /-! ## The heap's cells, reserved bytes split out -/
 

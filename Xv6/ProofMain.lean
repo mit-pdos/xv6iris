@@ -106,8 +106,12 @@ theorem mn_phaseD (SCH : SCHEDULER) (KV : KERNELVEC) (ξ : CtxId)
   iintro ⟨Hk, Hpc, #Hinv, Hprim, #Hrec, #Hbare, #Hcaps, Hstv, Hcsrs, Hfree⟩
   ihave #HP := mn_recipe ξ Γ γ0 γ1 γc γl0 γl1 γd γdl γt P γpr rootAddr t M pd pav pu hhi hroot
     $$ Hrec Hbare Hcaps
+  ihave #Hsl : iprop(kptSealed (hlc := hlc) (GF := GF)) $$ [Hbare]
+  · unfold mnRecipeBare
+    icases Hbare with ⟨_, _, _, #Hkpt, _⟩
+    iapply (@kptOn_sealed hlc GF _ ⟨ξ, KTier.bare⟩ t M) $$ Hkpt
   iapply (mn_started startedPrimary k R0 hsie rfl γi ξd P)
-  iframe Hk Hpc Hinv Hprim
+  iframe Hk Hpc Hinv Hprim Hsl
   isplitl []
   · iexact HP
   iintro %R Hk Hpc
@@ -558,10 +562,10 @@ theorem main_proof (CI : CPUID) (CN : CONSOLEINIT) (PI : PRINTKINIT) (PK : PRINT
   iintro %R8 %t %pas %hok Hk Hpc Htree Hstk Hkav Hrootw
   -- THE PUBLICATION
   icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
-  iapply wpLoop_fupd
-  imod mn_publish rfl startedPrimary _ t pas hok $$ [$Hk $Htree $Hauth $Hroot $Hrootw]
-    with ⟨Hk, #Hkpt, #Hsmap, #Htr, #Hrp⟩
-  imodintro
+  ihave Hpub := started_pubClean _ _ _ $$ Hinv Hprim
+  iapply (mn_publish rfl startedPrimary _ t pas hok (startedPrim γi))
+  iframe Hk Htree Hauth Hroot Hrootw Hpub
+  iintro Hk #Hkpt #Hsmap #Htr #Hrp Hprim
   -- +0x76  kvminithart: the switch
   iapply (mn_kvminithart KVH rfl startedPrimary (k.pushed 2) R8 hs2 (by simp; omega) tlb0 t (kvmMapT pas))
   iframe Hk Hpc Htlb Hkpt Hrp

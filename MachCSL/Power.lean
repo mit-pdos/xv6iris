@@ -725,10 +725,17 @@ theorem wp_power [KernelMap] [KernelRsv]
           isplitl [HrG]
           · iexists (rsvRegMap (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)))
             iframe HrG
-            ipureintro
-            refine ⟨rsvRegMap_staticIn hrwf.2.2, rsvRegMap_exact _, reservedOk_of_all (rsvRegMap_exact _) ?_⟩
-            rw [hmem0]
-            exact rsvAllOk_boot hrwf
+            isplit
+            · ipureintro
+              refine ⟨rsvRegMap_staticIn hrwf.2.2, rsvRegMap_exact _, reservedOk_of_all (rsvRegMap_exact _) ?_⟩
+              rw [hmem0]
+              exact rsvAllOk_boot hrwf
+            · unfold kptModelAt
+              iexists 0, []
+              isplit
+              · ipureintro
+                exact ⟨rsvRegMap_kptLinked _, Or.inl ⟨rfl, by rw [hmem0]; exact pubClean_boot hrwf⟩⟩
+              · exact BigSepL.bigSepL_nil_intro
           · isplit
             · ipureintro
               exact loadsChained_zero _ _ (fun j a => by

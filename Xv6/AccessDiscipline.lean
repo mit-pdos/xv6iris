@@ -1,12 +1,14 @@
 /-
 **THE ACCESS DISCIPLINE** (weak-allocproc plan §C W8's skeleton, [R25.1],
 [R34.1]; W8 (f2-ctx) S4; W8 (f3-hold) [OWN.64]; W8 (f3-racy) [OWN.63]; W8
-(f3-pipelk) [OWN.65]): W8's export `xv6AccessDisc`, `chainOkAt ∧
-lockWordDiscAt ∧ cpuStaticAt ∧ lkCpuReadAt` -- FOUR conjuncts: THREE of the
-skeleton's six (W8 (f2-ctx)) and the ruled `holding()` clause `lkCpuReadAt`
-(W8 (f3-hold)); `chainOkAt` carries the ruled `ip->ref` clause `racyValOk`
-(W8 (f3-racy)); `lockWordDiscAt` and `lkCpuReadAt` cover EVERY lock -- the
-static spinlocks and the live pipe locks (W8 (f3-pipelk)).
+(f3-pipelk) [OWN.65]; W8 (f3-ptek) [OWN.66]): W8's export `xv6AccessDisc`,
+`chainOkAt ∧ lockWordDiscAt ∧ cpuStaticAt ∧ lkCpuReadAt ∧ pteDiscAt` -- FIVE
+conjuncts: THREE of the skeleton's six (W8 (f2-ctx)), the ruled `holding()`
+clause `lkCpuReadAt` (W8 (f3-hold)) and the KERNEL half of the skeleton's
+A/D write-back clause `pteDiscAt` (W8 (f3-ptek)); `chainOkAt` carries the
+ruled `ip->ref` clause `racyValOk` (W8 (f3-racy)); `lockWordDiscAt` and
+`lkCpuReadAt` cover EVERY lock -- the static spinlocks and the live pipe
+locks (W8 (f3-pipelk)).
 
 **ONE benign-race class, two instances** ([OWN.63], [OWN.64]; plan §A(4′)):
 UNLOCKED reads of LOCK-PROTECTED words, harmless by a VALUE argument -- both
@@ -19,9 +21,8 @@ word accesses, coherence):
     `itable.lock`: `chainOkAt`'s `racyValOk` arm -- every unchained value a
     hart observed on `ip->ref` is `≥ 1` (the caller holds its own
     reference).
-Each is stated as a VALUE clause of the export, NOT an exemption.  NOT exported here: `pteDiscAt` (the A/D
-write-back clause [R25.1]: no σ-pure fact of the state interpretation carries
-it -- `KptInv` is an Iris invariant; `PROGRESS-W8f2.md` S4, an open point),
+Each is stated as a VALUE clause of the export, NOT an exemption.  NOT exported here: the USER
+tables' half of the A/D write-back clause [R25.1], [OWN.66] (W8 (f3-pteu)),
 and W8 (f3-rest)'s `cpuProcDiscAt`/`utextDiscAt` [R34.1].  Later items only
 STRENGTHEN the conjunction.
 
@@ -173,7 +174,8 @@ load-side invariant (`MachCSL.loadsChained`, S3) and `mmOk` (the deadline),
 `lockWordDiscAt ∧ cpuStaticAt ∧ lkCpuReadAt` from the reserved regions'
 discipline (static locks, `cpus`) and the live window's definition (pipe
 locks: the registry's `cpus` cells fix the owner word's pointers,
-`xv6Rsv_cpuBase`).
+`xv6Rsv_cpuBase`), `pteDiscAt` from the sealed kernel table's record
+(`MachCSL.kptStateOk`: its fragments agree with the heap).
 
 Deviations from the plan's skeleton: the definitions are at xv6's
 `KernelGeom` instance (`Xv6.Geom`), not under a `[KernelGeom]` binder; the
@@ -375,15 +377,214 @@ def lkCpuReadAt (σ : MState) : Prop :=
         ∀ (c : CPU), (∀ k, st ≠ some (c, k)) → ∀ (tvn : Nat) (v0 w : BitVec 64), v0 ≠ cpuAddr c →
           ReadCases W' (hartAgent c) tvn v0 w → w ≠ cpuAddr c)
 
+/-! ## The kernel page table's discipline (W8 (f3-ptek))
+
+[OWN.66] (Q-PTEDISC = (P-a)), kernel half: "after the seal every entry is the
+sealed value up to A/D".  Stated σ-readably here and carried by a pure fact
+of the state interpretation: the sealed table's record (`MachCSL.kptModelAt`,
+registered at `MachCSL.kptOn_seal`: the interpretation holds a discarded
+fragment of every frozen slot and half of every leaf, `MachCSL.kpt_exclWriteAU`
+the leaves' only writer) -- the final hook gets the interpretation under `◇`
+only, so no invariant is opened there (`pteDiscAt_of`).
+
+The seal is not a memory event, so the clause names a position `S` and pins
+it from both sides by memory events: every post-power-on entry of the root
+word `kernel_pagetable` is at or before `S` (once `kvminit` has stored the
+root, `S` is past that store, and the root is frozen after `S`), and every
+post-power-on entry of the boot gate `started` is after `S` (the seal
+precedes `started = 1`, so every hart but the boot hart runs after `S`).
+Spec: the privileged spec's Svadu A/D update is atomic per PTE; Sail
+performs it as `read_pte_exclusive`/`write_pte_conditional`
+(`Vmem.lean:237`/`:228`) -- one whole doubleword store of the same entry
+with A/D possibly set; RVWMO orders implicit page-table accesses only via
+`SFENCE.VMA`; Zifencei/PMAs silent.  FAITHFUL: a value fact of xv6's runs,
+no ISA assumption. -/
+
+/-- The kernel root word's bytes (`kernel_pagetable`, 8 bytes). -/
+def kptRootBytes : List PAddr := wordBytes (KA.«kernel_pagetable», 8)
+
+/-- **A seal position** `S` of the kernel table at `σ`: at or below the top,
+past every post-power-on entry of the root word, before every post-power-on
+entry of `started`. -/
+def kptSealAt (σ : MState) (S : Nat) : Prop :=
+  S ≤ σ.top ∧
+  (∀ a ∈ kptRootBytes, ∀ H, σ.mem[a]? = some H → ∀ e ∈ H, e.t ≠ 0 → e.t ≤ S) ∧
+  (∀ a ∈ xv6StartedR.bytes, ∀ H, σ.mem[a]? = some H → ∀ e ∈ H, e.t ≠ 0 → S < e.t)
+
+/-- **One slot's discipline after `S`**: every entry after `S` on a byte of
+the 8-byte slot at `addr` is a HART's (no DMA author), and part of one
+WHOLE-doubleword store, at the same position by the same hart, of an A/D
+variant of `c` (`MachCSL.pteVariant`: a leaf at any A/D, any other entry
+exactly). -/
+def kptSlotDisc (σ : MState) (S : Nat) (addr : PAddr) (c : BitVec 64) : Prop :=
+  ∀ (j : Nat) (H : Hist) (e : HEnt), j < 8 → σ.mem[addr + BitVec.ofNat 64 j]? = some H → e ∈ H → S < e.t →
+    e.tid < NCPU ∧ ∃ v : BitVec 64, pteVariant c v ∧ e.v = nthByte (n := 8) v j ∧
+      ∀ j', j' < 8 → ∃ H', σ.mem[addr + BitVec.ofNat 64 j']? = some H' ∧
+        (⟨e.t, e.tid, nthByte (n := 8) v j'⟩ : HEnt) ∈ H'
+
+/-- **`pteDiscAt`, the kernel table** ([OWN.66] (P-a), W8 (f3-ptek)):
+there is a seal position `S` (`kptSealAt`) such that every slot of the
+kernel table as of `S` -- an aligned doubleword in a page a Sv39 walk reaches,
+as of `S`, from the permanent root `kernel_pagetable` (`MachCSL.ptByteAt`) --
+holding `c` as of `S`, is after `S` written only by harts, whole, with A/D
+variants of `c`: a leaf's A/D bits may change, nothing else of any entry. -/
+def pteDiscAt (σ : MState) : Prop :=
+  ∃ S : Nat, kptSealAt σ S ∧ ∀ (addr : PAddr) (c : BitVec 64), addr.toNat % 8 = 0 →
+    ptByteAt xv6Rsv σ.mem S addr → wordAsOf σ.mem addr S c → kptSlotDisc σ S addr c
+
+/-- Before the boot gate opens the clause is trivial (`S` = the top: no entry
+is above it) -- its content is the run after `started = 1`, where `S` is pinned
+below the gate's store. -/
+theorem pteDiscAt_preGate (σ : MState) (hmm : mmOk σ)
+    (hg : ∀ a ∈ xv6StartedR.bytes, ∀ H, σ.mem[a]? = some H → ∀ e ∈ H, e.t = 0) :
+    pteDiscAt σ := by
+  have hle : ∀ (a : PAddr) (H : Hist) (e : HEnt), σ.mem[a]? = some H → e ∈ H → e.t ≤ σ.top :=
+    fun a H e hH he => by simp only [MState.top]; exact ((hmm.1 a H hH).2 e he).1
+  refine ⟨σ.top, ⟨Nat.le_refl _, fun a _ H hH e he _ => hle a H e hH he,
+    fun a ha H hH e he h0 => absurd (hg a ha H hH e he) h0⟩, ?_⟩
+  intro addr c _ _ _ j H e _ hH he hS
+  exact absurd (hle _ H e hH he) (Nat.not_le.2 hS)
+
+/-! ### `pteDiscAt` from the interpretation's record of the sealed table
+
+The record (`MachCSL.kptStateOk`, read off `MachCSL.kptModelAt`): before
+the seal `started` is unwritten (`pteDiscAt_preGate`); from the seal on, the
+seal's facts (`MachCSL.kptSealOk`: the root word a frozen slot naming a
+sealed page, the pointer closure, the leaves' shape, `started` after the
+seal) and every sealed slot's histories disciplined (`MachCSL.kslotHistOk`).
+A walk from the root as of the seal visits only sealed pages (the converse
+of `MachCSL.KptInv.leaf_ptByteAt`): a leaf is no pointer, a frozen slot's
+value as of the seal is its canonical one. -/
+
+/-- `started` is a publication word of xv6's list. -/
+theorem xv6StartedR_mem : xv6StartedR ∈ xv6RsvStatic := by decide +kernel
+
+/-- A variant of a variant of `c` is a variant of the first. -/
+theorem pteVariant_trans {c v w : BitVec 64} (hv : pteVariant c v) (hw : pteVariant c w) : pteVariant v w := by
+  rcases hv with rfl | ⟨ppn, perm, a, d, a', d', rfl, rfl⟩
+  · exact hw
+  · obtain ⟨a'', d'', rfl⟩ := pteVariant_of_kLeaf ppn perm a d hw
+    exact pteVariant_kLeaf ppn perm a' d' a'' d''
+
+/-- A page a pointer names is page-aligned. -/
+theorem ptPtrTo_aligned {v : BitVec 64} {p : PAddr} (h : ptPtrTo v p) : p.toNat % 4096 = 0 := by
+  obtain ⟨_, _, rfl⟩ := h
+  rw [BitVec.toNat_and, show (4096 : Nat) = 2 ^ 12 from rfl, Nat.and_mod_two_pow]
+  have hm : (0x00FFFFFFFFFFF000#64).toNat % 2 ^ 12 = 0 := by decide
+  rw [hm, Nat.and_zero]
+
+/-- The doubleword at `a` as of `S`, read off its histories. -/
+theorem kptHist_word {m : FlatMem} {a : PAddr} {S : Nat} {Hs : Nat → Hist} {v w : BitVec 64}
+    (hm : ∀ j, j < 8 → m[a + BitVec.ofNat 64 j]? = some (Hs j)) (hh : histWordAsOf Hs S v)
+    (hw : wordAsOf m a S w) : w = v := by
+  apply bv_eq_of_bytes (n := 8)
+  intro j hj
+  have h1 := hw j hj
+  unfold FlatMem.entAsOf at h1
+  rw [hm j hj, Option.bind_some, hh j hj] at h1
+  exact (Option.some.inj h1).symm
+
+/-- A sealed slot's value as of the seal: its canonical value (frozen) or
+a variant of it (a leaf). -/
+theorem kptSlot_asOf {m : FlatMem} {S : Nat} {dyn : List KSlot} (hh : kptHistsAt m S dyn) {d : KSlot}
+    (hd : d ∈ dyn) {v : BitVec 64} (hv : wordAsOf m d.addr S v) :
+    if d.frozen then v = d.c else pteVariant d.c v := by
+  obtain ⟨Hs, hm, ⟨v0, hv0, hc0⟩, _⟩ := hh d hd
+  rw [kptHist_word hm hv0 hv]
+  exact hc0
+
+/-- A child, as of the seal, of a sealed page is a sealed page. -/
+theorem kptChild_in {rs : List RsvRegion} {m : FlatMem} {top S : Nat} {dyn : List KSlot}
+    (hok : kptSealOk rs m top S dyn) (hh : kptHistsAt m S dyn) {q p : PAddr} (hq : pageIn dyn q)
+    (hc : ptChildAt m S q p) : pageIn dyn p := by
+  obtain ⟨i, v, hi, hv, hp⟩ := hc
+  obtain ⟨d, hd, haddr⟩ := hq i hi
+  have hs := kptSlot_asOf hh hd (v := v) (by rw [haddr]; exact hv)
+  cases hfz : d.frozen
+  · simp only [hfz, Bool.false_eq_true, ↓reduceIte] at hs
+    obtain ⟨ppn, perm, a, dd, hcd⟩ := (hok.2.2.1 d hd).1 hfz
+    rw [hcd] at hs
+    obtain ⟨a', d', rfl⟩ := pteVariant_of_kLeaf ppn perm a dd hs
+    exact absurd hp (KptInv.not_ptPtrTo_kLeaf ppn perm a' d' p)
+  · simp only [hfz, ↓reduceIte] at hs
+    subst hs
+    exact hok.2.2.2.2 d hd hfz p hp
+
+/-- A root page, as of the seal, of a permanent root word is a sealed,
+page-aligned page. -/
+theorem kptRoot_in {rs : List RsvRegion} {m : FlatMem} {top S : Nat} {dyn : List KSlot}
+    (hok : kptSealOk rs m top S dyn) (hh : kptHistsAt m S dyn) {r : PAddr} (hr : ptRootAt rs m S r) :
+    pageIn dyn r ∧ r.toNat % 4096 = 0 := by
+  obtain ⟨hr0, base, cnt, stride, k, hR, hk, hw⟩ := hr
+  obtain ⟨d, hd, haddr, hfz, halign, hpage⟩ := hok.2.2.2.1 base cnt stride k hR hk
+  have hs := kptSlot_asOf hh hd (v := r) (by rw [haddr]; exact hw)
+  simp only [hfz, ↓reduceIte] at hs
+  subst hs
+  exact ⟨hpage hr0, halign⟩
+
+/-- Every page a walk from a sealed root page visits as of the seal is a
+sealed, page-aligned page. -/
+theorem kptPage_in {rs : List RsvRegion} {m : FlatMem} {top S : Nat} {dyn : List KSlot}
+    (hok : kptSealOk rs m top S dyn) (hh : kptHistsAt m S dyn) {r p : PAddr} (hr : pageIn dyn r)
+    (hra : r.toNat % 4096 = 0) (hp : ptPageAt m S r p) : pageIn dyn p ∧ p.toNat % 4096 = 0 := by
+  rcases hp with rfl | hc | ⟨q, h1, h2⟩
+  · exact ⟨hr, hra⟩
+  · obtain ⟨_, _, _, _, hpp⟩ := id hc
+    exact ⟨kptChild_in hok hh hr hc, ptPtrTo_aligned hpp⟩
+  · obtain ⟨_, _, _, _, hpp⟩ := id h2
+    exact ⟨kptChild_in hok hh (kptChild_in hok hh hr h1) h2, ptPtrTo_aligned hpp⟩
+
+/-- **`pteDiscAt` from the sealed table's record.** -/
+theorem pteDiscAt_of (σ : MState) (hmm : mmOk σ) (hk : kptStateOk xv6Rsv σ) : pteDiscAt σ := by
+  obtain ⟨S, dyn, ⟨_, hclean⟩ | ⟨hok, hh⟩⟩ := hk
+  · exact pteDiscAt_preGate σ hmm (fun a ha H hH e he => hclean _ _ xv6StartedR_mem a ha H hH e he)
+  refine ⟨S, ⟨hok.1, ?_, fun a ha H hH e he he0 => hok.2.1 _ _ xv6StartedR_mem a ha H hH e he he0⟩, ?_⟩
+  · intro a ha H hH e he _
+    obtain ⟨d, hd, haddr, hfz, -, -⟩ := hok.2.2.2.1 KA.«kernel_pagetable» 1 8 0 xv6RsvStatic_kptRoot (by decide)
+    obtain ⟨Hs, hm, -, hent⟩ := hh d hd
+    simp only [kptRootBytes, wordBytes, List.mem_map, List.mem_range] at ha
+    obtain ⟨j, hj, rfl⟩ := ha
+    have hda : d.addr = KA.«kernel_pagetable» := by rw [haddr]; simp
+    rw [← hda, hm j hj] at hH
+    obtain rfl := Option.some.inj hH
+    refine Nat.le_of_not_lt (fun hlt => ?_)
+    have := (hent j hj e he hlt).1
+    rw [hfz] at this
+    cases this
+  · intro addr c halign hpt hw
+    obtain ⟨r, p, hroot, hpage, hlo, hhi⟩ := hpt
+    obtain ⟨hpr, hra⟩ := kptRoot_in hok hh hroot
+    obtain ⟨hpp, hpa⟩ := kptPage_in hok hh hpr hra hpage
+    obtain ⟨d, hd, hdaddr⟩ := hpp ((addr.toNat - p.toNat) / 8) (by omega)
+    have haddr : d.addr = addr := by
+      rw [hdaddr]
+      apply BitVec.eq_of_toNat_eq
+      have := addr.isLt
+      have := p.isLt
+      simp only [BitVec.toNat_add, BitVec.toNat_ofNat]
+      omega
+    obtain ⟨Hs, hm, ⟨v0, hv0, hc0⟩, hent⟩ := hh d hd
+    rw [haddr] at hm
+    have hc := kptHist_word hm hv0 hw
+    subst hc
+    intro j H e hj hH he hSe
+    rw [hm j hj] at hH
+    obtain rfl := Option.some.inj hH
+    obtain ⟨hfz, htid, v, hv, hev, hall⟩ := hent j hj e he hSe
+    simp only [hfz, Bool.false_eq_true, ↓reduceIte] at hc0
+    exact ⟨htid, v, pteVariant_trans hc0 hv, hev, fun j' hj' => ⟨Hs j', hm j' hj', hall j' hj'⟩⟩
+
 /-- **W8's export** (W8 (f2-ctx): `chainOkAt ∧ lockWordDiscAt ∧ cpuStaticAt`,
 three of the skeleton's six; W8 (f3-hold) [OWN.64]: `lkCpuReadAt`; W8
 (f3-racy) [OWN.63]: `chainOkAt`'s `racyValOk` arm -- the two instances of ONE
 benign-race class (unlocked reads of lock-protected words, harmless by a
 value argument); W8 (f3-pipelk) [OWN.65]: `lockWordDiscAt` and `lkCpuReadAt`
-over EVERY lock, the live pipe locks included; `pteDiscAt` open,
-`cpuProcDiscAt`/`utextDiscAt` W8 (f3-rest)'s). -/
+over EVERY lock, the live pipe locks included; W8 (f3-ptek) [OWN.66]:
+`pteDiscAt`, the kernel page table's A/D discipline after the seal (the user
+tables' half is W8 (f3-pteu)'s; `cpuProcDiscAt`/`utextDiscAt` W8 (f3-rest)'s). -/
 def xv6AccessDisc (σ : MState) : Prop :=
-  chainOkAt σ ∧ lockWordDiscAt σ ∧ cpuStaticAt σ ∧ lkCpuReadAt σ
+  chainOkAt σ ∧ lockWordDiscAt σ ∧ cpuStaticAt σ ∧ lkCpuReadAt σ ∧ pteDiscAt σ
+
 
 /-! ## The registration lemma -/
 
@@ -552,11 +753,12 @@ theorem lkCpuReadAt_of (σ : MState) (h : lockWordDiscAt σ) : lkCpuReadAt σ :=
     exact ⟨L, te, p, W, W', st, B, hwit, hp, hte, h1, h2, hdisc,
       fun c hst' tvn v0 w hv0 hres => lkCpuP_read_not_mine hdisc.2.2.2.2 c hst' tvn v0 w hv0 hres⟩
 
-/-- **The export from the three pure facts** of the state interpretation. -/
+/-- **The export from the four pure facts** of the state interpretation. -/
 theorem accessDisc_of (σ : MState) (hmm : mmOk σ) (hr : rsvAllOk KernelRsv.static σ.mem)
-    (h : loadsChained (xv6Env σ) (chainExAt xv6Rsv (slotWit xv6Rsv) σ.mem σ.top)) : xv6AccessDisc σ :=
+    (h : loadsChained (xv6Env σ) (chainExAt xv6Rsv (slotWit xv6Rsv) σ.mem σ.top))
+    (hk : kptStateOk xv6Rsv σ) : xv6AccessDisc σ :=
   have hl := lockCpuDisc_of_rsvAllOk σ hr
-  ⟨chainOkAt_of σ hmm h, hl.1, hl.2, lkCpuReadAt_of σ hl.1⟩
+  ⟨chainOkAt_of σ hmm h, hl.1, hl.2, lkCpuReadAt_of σ hl.1, pteDiscAt_of σ hmm hk⟩
 
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
 
@@ -575,7 +777,10 @@ theorem powerInterp_accessDisc (heq : MachFixedGS.rsvStatic (hlc := hlc) (GF := 
     intro h; cases h
   · iintro ⟨_, _, ⟨%R, _, _, %E, _, Hera⟩, _⟩
     unfold eraInterp memModelAt rsvModelAt chainModelAt
-    icases Hera with ⟨_, _, ⟨_, _, _, _, %hmm, ⟨%reg, _, %⟨hin, _, hok⟩⟩, _, %hch, _⟩, _⟩
+    icases Hera with ⟨_, Hm, ⟨_, _, _, _, %hmm, ⟨%reg, _, %⟨hin, _, hok⟩, Hk⟩, _, %hch, _⟩, _⟩
+    ihave %hk : ⌜kptStateOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) g.m⌝ $$ [Hm Hk]
+    · iapply kptModel_stateOk _ g.m reg $$ [Hm Hk]
+      iframe
     ipureintro
     intro _
     have hch' : loadsChained
@@ -584,7 +789,8 @@ theorem powerInterp_accessDisc (heq : MachFixedGS.rsvStatic (hlc := hlc) (GF := 
         (chainExAt (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))
           (slotWit (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))) g.m.mem g.m.top) := hch
     rw [heq] at hch'
-    exact accessDisc_of g.m hmm (heq ▸ all_of_reservedOk hin hok) hch'
+    rw [heq] at hk
+    exact accessDisc_of g.m hmm (heq ▸ all_of_reservedOk hin hok) hch' hk
 
 end AccessDiscipline
 

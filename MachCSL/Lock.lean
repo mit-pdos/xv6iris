@@ -1607,7 +1607,7 @@ theorem lkRsv_storeOkW {lk : BitVec 64} (hm : lkRsvIn (hlc := hlc) (GF := GF) lk
       lkCpuAt st W' ∧ lockRsvW st (⟨t, hartAgent cpu, w⟩ :: W) W') :
     rsvStoreOk (hlc := hlc) (GF := GF) cpu lk 4 w (W.hist Hold) [(lk + 16#64, 8, W'.hist Hold')] := by
   obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 hm
-  exact ⟨i, 0, _, hi, rfl, fun m t ht h1 h2 _ =>
+  exact ⟨i, 0, _, hi, rfl, fun _ h => RsvKind.noConfusion h, fun m t ht h1 h2 _ =>
     lockRegion_storeW (hartAgent cpu) w W W' Hold Hold' htail htail' hnew m t ht h1 (h2 _ List.mem_cons_self)⟩
 
 /-- A reserved owner-word store's obligation. -/
@@ -1618,7 +1618,7 @@ theorem lkRsv_storeOkC {lk : BitVec 64} (hm : lkRsvIn (hlc := hlc) (GF := GF) lk
       lkCpuAt st (⟨t, hartAgent cpu, w⟩ :: W') ∧ lockRsvW st W (⟨t, hartAgent cpu, w⟩ :: W')) :
     rsvStoreOk (hlc := hlc) (GF := GF) cpu (lk + 16#64) 8 w (W'.hist Hold') [(lk, 4, W.hist Hold)] := by
   obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 hm
-  exact ⟨i, 1, _, hi, rfl, fun m t ht h1 h2 _ =>
+  exact ⟨i, 1, _, hi, rfl, fun _ h => RsvKind.noConfusion h, fun m t ht h1 h2 _ =>
     lockRegion_storeC (hartAgent cpu) w W W' Hold Hold' htail htail' hnew m t ht h1 (h2 _ List.mem_cons_self)⟩
 
 /-- The lock predicate (persistent): the two words are identity-mapped

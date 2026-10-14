@@ -319,6 +319,93 @@ theorem wpHart_lift (cpu : CPU) (m : SailM Unit) :
   rw [hsil, List.append_nil]
   iframe Hσ' Ha Hwp
 
+/-- **Peeking at the state interpretation before a hart's step** (W8
+(f3-ptek)): an update of the interpretation that keeps its state and hands
+out `Q` may run before the step. -/
+theorem wp_hart_peek (gen : Nat) (cpu : CPU) (m : SailM Unit) (Q : IProp GF) :
+    (∀ (g : GState) (ns : Nat) (κs : List Obs) (nt : Nat),
+        stateInterp (GF := GF) g ns κs nt ={⊤}=∗ stateInterp g ns κs nt ∗ Q) ∗
+      (Q -∗ WP (Expr.hart gen cpu m) @ Stuckness.NotStuck; ⊤ {{ _v, True }}) ⊢@{IProp GF}
+    WP (Expr.hart gen cpu m) @ Stuckness.NotStuck; ⊤ {{ _v, True }} := by
+  rw [wp_unfold.to_eq]
+  simp only [wp.pre, show toVal (Expr.hart gen cpu m) = none from rfl]
+  iintro ⟨U, H⟩ %g %ns %obs %obs' %nt Hσ
+  imod U $$ %g %ns %(obs ++ obs') %nt Hσ with ⟨Hσ, HQ⟩
+  iapply H $$ HQ %g %ns %obs %obs' %nt Hσ
+
+/-- **A ghost update of the heap and memory-model mirrors at an instruction
+boundary** (W8 (f3-ptek): the kernel table's seal registers its slots with
+the interpretation): any update that keeps them at the same machine may run
+before the hart's next step. -/
+theorem wpHart_interpUpd (cpu : CPU) (m : SailM Unit) (P : IProp GF) :
+    (∀ σ : MState, genHeapInterp σ.mem ∗ memModel σ ={⊤}=∗ genHeapInterp σ.mem ∗ memModel σ ∗ P) ∗
+      (P -∗ wpHart cpu m) ⊢@{IProp GF} wpHart cpu m := by
+  unfold wpHart hartWP
+  iintro ⟨U, H⟩ #Hcert
+  ihave #Hparts := genCert_parts $$ Hcert
+  icases Hparts with ⟨Hborn, Hstarted, Hreg⟩
+  iapply wp_hart_peek _ cpu m iprop(P ∨ genDead (genId (hlc := hlc) (GF := GF)))
+  isplitl [U]
+  · iintro %g %ns %κs %nt Hσ
+    rw [stateInterp_eq]
+    icases Hσ with ⟨Hσ, Hobs⟩
+    unfold powerInterp
+    icases Hσ with ⟨Hgen, Hstart, ⟨%R, HR, %Hok, Hcur⟩, Hdisk⟩
+    ihave %Hb' := genAuth_born _ _ $$ Hgen Hborn
+    ihave %Hs' := startAuth_started _ _ $$ Hstart Hstarted
+    by_cases hge : g.gen = genId (hlc := hlc) (GF := GF)
+    · have hpow : g.pow = true := by
+        cases h : g.pow
+        · simp [startCount, h] at Hs'; omega
+        · rfl
+      rw [eraCur_true hpow]
+      icases Hcur with ⟨%E, %HE, Hera⟩
+      ihave %HRg := eraRegistered_lookup _ _ _ $$ HR Hreg
+      have hEq : E = MachGS.era (hlc := hlc) (GF := GF) := by
+        rw [← hge] at HRg
+        rw [HE] at HRg
+        exact Option.some.inj HRg
+      subst hEq
+      rw [eraInterp_ambient]
+      unfold machInterp
+      icases Hera with ⟨Hregs, Hmem, Hmm, Hdev⟩
+      imod U $$ %g.m [Hmem Hmm] with ⟨Hmem, Hmm, HP⟩
+      · iframe Hmem Hmm
+      imodintro
+      iframe Hobs Hgen Hstart Hdisk
+      isplitr [HP]
+      · iexists R
+        iframe HR
+        isplit
+        · ipureintro; exact Hok
+        rw [eraCur_true hpow]
+        iexists (MachGS.era (hlc := hlc) (GF := GF))
+        isplit
+        · ipureintro; exact HE
+        rw [eraInterp_ambient]
+        unfold machInterp
+        iframe Hregs Hmem Hmm Hdev
+      · ileft; iexact HP
+    · have hlt : genId (hlc := hlc) (GF := GF) < g.gen := by omega
+      ihave #Hdead := genAuth_get_dead _ _ hlt $$ Hgen
+      imodintro
+      iframe Hobs Hgen Hstart Hdisk
+      isplitr []
+      · iexists R
+        iframe HR Hcur
+        ipureintro; exact Hok
+      · iright; iexact Hdead
+  · iintro (HP | #Hdead)
+    · iapply H $$ HP Hcert
+    · iapply wp_dead
+      iexact Hdead
+
+/-- `wpHart_interpUpd` at a cycle boundary. -/
+theorem wpLoop_interpUpd (cpu : CPU) (P : IProp GF) :
+    (∀ σ : MState, genHeapInterp σ.mem ∗ memModel σ ={⊤}=∗ genHeapInterp σ.mem ∗ memModel σ ∗ P) ∗
+      (P -∗ wpLoop cpu) ⊢@{IProp GF} wpLoop cpu :=
+  wpHart_interpUpd cpu (pure ()) P
+
 /-! ## Sub-computation WPs -/
 
 /-- A monadic context: commutes with every (non-failure) event at the head.
@@ -1150,7 +1237,7 @@ theorem memModel_mmOk (σ : MState) : memModelAt E σ ⊢@{IProp GF} ⌜mmOk σ�
 theorem memModel_rsvOk (σ : MState) :
     memModelAt E σ ⊢@{IProp GF} ⌜rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem⌝ := by
   unfold memModelAt rsvModelAt
-  iintro ⟨_, _, _, _, _, ⟨%reg, _, %⟨hin, _, hok⟩⟩, _⟩
+  iintro ⟨_, _, _, _, _, ⟨%reg, _, %⟨hin, _, hok⟩, _⟩, _⟩
   ipureintro
   exact all_of_reservedOk hin hok
 
@@ -1179,9 +1266,47 @@ theorem memModel_chainLb (σ : MState) (h : CPU) (t : Nat) (j : CPU) (τ : Nat) 
     ipureintro
     exact Or.inr (ChainCert.valid_le hv hle.1 hle.2)
 
+/-- A load adds no entry. -/
+theorem kptGrow_load (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) :
+    memGrowR σ.mem σ.top (σ.afterLoad cpu pa n tvn).mem ∧ σ.top ≤ (σ.afterLoad cpu pa n tvn).top :=
+  ⟨memGrowR_refl _ _, Nat.le_refl _⟩
+
+/-- A hart's store adds only its own entries, at the next position. -/
+theorem kptGrow_store (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (excl : Bool) :
+    memGrowR σ.mem σ.top (σ.store cpu pa n w excl).mem ∧ σ.top ≤ (σ.store cpu pa n w excl).top :=
+  ⟨memGrowR_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _),
+    by simp only [MState.top, List.length_append, List.length_singleton]; omega⟩
+
+/-- A DMA write adds only the disk's entries, at the next position. -/
+theorem kptGrow_dma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
+    memGrowR σ.mem σ.top (σ.storeDma pa n w).mem ∧ σ.top ≤ (σ.storeDma pa n w).top := by
+  by_cases hn : n = 0
+  · rw [MState.storeDma_zero σ pa n w hn]; exact ⟨memGrowR_refl _ _, Nat.le_refl _⟩
+  · refine ⟨?_, ?_⟩
+    · rw [MState.storeDma_mem_of_ne σ pa n w hn]
+      exact memGrowR_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _)
+    · show σ.log.length ≤ (σ.storeDma pa n w).log.length
+      rw [MState.storeDma_log_of_ne σ pa n w hn, List.length_append]
+      exact Nat.le_add_right _ _
+
+/-- The sealed table's facts move with a step at the top: the seal stays at
+or below the top, and every new entry is past it (W8 (f3-ptek)). -/
+theorem kptSealOk_grow {rs : List RsvRegion} {σ σ' : MState} {S : Nat} {dyn : List KSlot}
+    (hg : memGrowR σ.mem σ.top σ'.mem ∧ σ.top ≤ σ'.top) (h : kptSealOk rs σ.mem σ.top S dyn) :
+    kptSealOk rs σ'.mem σ'.top S dyn := by
+  obtain ⟨hS, hpub, hrest⟩ := h
+  refine ⟨Nat.le_trans hS hg.2, fun f w hf a ha H' hH' e he h0 => ?_, hrest⟩
+  rcases hg.1 a H' hH' e he with ht | ⟨H, hH, he'⟩
+  · omega
+  · exact hpub f w hf a ha H hH e he' h0
+
 /-- The reserved conjunct moves with the memory, given the regions'
-discipline does. -/
+discipline does (and -- W8 (f3-ptek) -- the step adds only entries above the
+top). -/
 theorem rsvModel_mono (σ σ' : MState)
+    (hg : memGrowR σ.mem σ.top σ'.mem ∧ σ.top ≤ σ'.top)
+    (hpub : pubClean (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem →
+      pubClean (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ'.mem)
     (h : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem →
       rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ'.mem)
     (hext : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ'.mem →
@@ -1190,15 +1315,61 @@ theorem rsvModel_mono (σ σ' : MState)
       loadsChained (chainEnv (hlc := hlc) (GF := GF) σ) (chainEx (hlc := hlc) (GF := GF) σ) →
       loadsChained (chainEnv (hlc := hlc) (GF := GF) σ') (chainEx (hlc := hlc) (GF := GF) σ')) :
     rsvModelAt E σ ⊢@{IProp GF} rsvModelAt E σ' := by
-  unfold rsvModelAt chainModelAt
-  iintro ⟨⟨%reg, Hreg, %⟨hin, hex, hok⟩⟩, Hh, %hlc0, ⟨%Z, HZ, %hZ, #Hels⟩⟩
+  unfold rsvModelAt chainModelAt kptModelAt
+  iintro ⟨⟨%reg, Hreg, %⟨hin, hex, hok⟩, ⟨%S, %dyn, %⟨hlk, hseal⟩, Hcells⟩⟩, Hh, %hlc0, ⟨%Z, HZ, %hZ, #Hels⟩⟩
   have hnew := h (all_of_reservedOk hin hok)
   iframe Hh
-  isplitl [Hreg]
+  isplitl [Hreg Hcells]
   · iexists reg
     iframe Hreg
+    isplit
+    · ipureintro
+      exact ⟨hin, hex, reservedOk_of_all hex hnew⟩
+    iexists S, dyn
+    iframe Hcells
     ipureintro
-    exact ⟨hin, hex, reservedOk_of_all hex hnew⟩
+    exact ⟨hlk, hseal.imp (fun h0 => ⟨h0.1, hpub h0.2⟩) (kptSealOk_grow hg)⟩
+  · isplit
+    · ipureintro
+      exact hch hnew hlc0
+    iexists Z
+    iframe HZ Hels
+    ipureintro
+    exact certsOk_mono (hext hnew) hZ
+
+/-- `rsvModel_mono` for a step that may write a publication word, given the
+seal's certificate (W8 (f3-ptek): the boot gate opens only after the kernel
+table's seal). -/
+theorem rsvModel_mono_sealed (σ σ' : MState)
+    (hg : memGrowR σ.mem σ.top σ'.mem ∧ σ.top ≤ σ'.top)
+    (h : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem →
+      rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ'.mem)
+    (hext : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ'.mem →
+      (chainEnv (hlc := hlc) (GF := GF) σ).ext (chainEnv (hlc := hlc) (GF := GF) σ'))
+    (hch : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ'.mem →
+      loadsChained (chainEnv (hlc := hlc) (GF := GF) σ) (chainEx (hlc := hlc) (GF := GF) σ) →
+      loadsChained (chainEnv (hlc := hlc) (GF := GF) σ') (chainEx (hlc := hlc) (GF := GF) σ')) :
+    rsvModelAt E σ ∗ kptSealedAt E ⊢@{IProp GF} rsvModelAt E σ' := by
+  unfold rsvModelAt chainModelAt kptModelAt kptSealedAt
+  iintro ⟨⟨⟨%reg, Hreg, %⟨hin, hex, hok⟩, ⟨%S, %dyn, %⟨hlk, hseal⟩, Hcells⟩⟩, Hh, %hlc0, ⟨%Z, HZ, %hZ, #Hels⟩⟩,
+    #Hsl⟩
+  ihave %hget := ghost_map_lookup $$ Hreg Hsl
+  have hne := hlk.2 _ hget
+  have hnew := h (all_of_reservedOk hin hok)
+  iframe Hh
+  isplitl [Hreg Hcells]
+  · iexists reg
+    iframe Hreg
+    isplit
+    · ipureintro
+      exact ⟨hin, hex, reservedOk_of_all hex hnew⟩
+    iexists S, dyn
+    iframe Hcells
+    ipureintro
+    refine ⟨hlk, ?_⟩
+    rcases hseal with h0 | h0
+    · exact absurd h0.1 hne
+    · exact Or.inr (kptSealOk_grow hg h0)
   · isplit
     · ipureintro
       exact hch hnew hlc0
@@ -1235,6 +1406,14 @@ theorem memModel_topLb (σ : MState) (K : Nat) :
     ipureintro
     have := Hv.2
     simpa [MaxNat.le_toNat] using this
+
+/-- The top's lower bound, issued (W8 (f3-ptek): the kernel table's seal
+position). -/
+theorem memModel_topLbGet (σ : MState) : memModelAt E σ ⊢@{IProp GF} topLbAt E σ.top := by
+  unfold memModelAt topLbAt
+  iintro ⟨Htop, _⟩
+  iright
+  iapply MonoNat.lb_own_get $$ Htop
 
 theorem memModel_viewLb (σ : MState) (cpu : CPU) (K : Nat) :
     memModelAt E σ ∗ viewLbAt E cpu K ⊢@{IProp GF} ⌜K ≤ σ.tv cpu⌝ := by
@@ -1334,7 +1513,7 @@ theorem memModel_load (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv 
     memModelAt E σ ⊢@{IProp GF} |==> memModelAt E (σ.afterLoad cpu pa n tvn) := by
   unfold memModelAt
   iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
-  ihave Hrsv := rsvModel_mono E σ (σ.afterLoad cpu pa n tvn) id
+  ihave Hrsv := rsvModel_mono E σ (σ.afterLoad cpu pa n tvn) (kptGrow_load σ cpu pa n tvn) id id
     (fun _ => chainEnvAt_ext_load _ _ σ cpu pa n tvn)
     (fun _ h => chainLoads_load σ cpu pa n tvn hmm hsrc h) $$ Hrsv
   icases hartViews_acc E σ cpu $$ Hviews with ⟨Hc, Hclose⟩
@@ -1418,26 +1597,23 @@ theorem hartViews_store_plain (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (
     simp only [updCpu]; split <;> simp_all [HRead.clearAcq, HRead.resetCoh]
   rw [e1, e2, e3]
 
-/-- A plain store by a hart: the store order grows by the hart's message,
-whose authorship and position become persistent facts; the hart's
-reservation and pending acquire bit, whatever they were, are cleared. -/
-theorem memModel_store_plain (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (r : Option Resv) (b : Bool) (hram : ramBytes pa n) (hno : ¬ othersReserve σ.resv cpu pa n)
-    (hrsv : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem →
-      rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))
-        (σ.mem.writeBytes pa n w (σ.top + 1) (hartAgent cpu))) :
-    memModelAt E σ ∗ resvFragAt E cpu r b ⊢@{IProp GF} |==>
+/-- A plain store by a hart, its reserved conjunct moved by the caller's
+`hmono` from a premise `Q` (W8 (f3-ptek): `emp`, or the seal's certificate
+for a publication store). -/
+theorem memModel_store_plainQ (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (r : Option Resv) (b : Bool) (hram : ramBytes pa n) (hno : ¬ othersReserve σ.resv cpu pa n) (Q : IProp GF)
+    (hmono : rsvModelAt E σ ∗ Q ⊢@{IProp GF} rsvModelAt E (σ.store cpu pa n w false)) :
+    memModelAt E σ ∗ resvFragAt E cpu r b ∗ Q ⊢@{IProp GF} |==>
       (memModelAt E (σ.store cpu pa n w false) ∗ resvFragAt E cpu none false ∗
        authoredByAt E (σ.top + 1) (hartAgent cpu) ∗ topLbAt E (σ.top + 1)) := by
-  iintro ⟨Hmm, Hfrag⟩
+  iintro ⟨Hmm, Hfrag, HQ⟩
   ihave %hres : ⌜σ.resv cpu = r ∧ (σ.hr cpu).acq = b⌝ $$ [Hmm Hfrag]
   · iapply memModel_resv E σ cpu r b $$ [Hmm Hfrag]
     iframe
   unfold memModelAt
   icases Hmm with ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
-  ihave Hrsv := rsvModel_mono E σ (σ.store cpu pa n w false) hrsv
-    (chainEnvAt_ext_store _ _ σ cpu pa n w false)
-    (fun hnew h => chainLoads_store σ cpu pa n w false hmm hnew h) $$ Hrsv
+  ihave Hrsv := hmono $$ [Hrsv HQ]
+  · iframe Hrsv HQ
   imod MonoNat.own_update _ (.ofNat σ.top) (.ofNat (σ.top + 1))
     (by simp only [MaxNat.le_toNat]; omega) $$ Htop with ⟨Htop, #Htoplb⟩
   imod ghost_map_insert_persist (σ.top + 1) (hartAgent cpu)
@@ -1466,6 +1642,57 @@ theorem memModel_store_plain (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w
     iframe Hau
     iright
     iexact Htoplb
+
+/-- A plain store by a hart: the store order grows by the hart's message,
+whose authorship and position become persistent facts; the hart's
+reservation and pending acquire bit, whatever they were, are cleared.  W8
+(f3-ptek): the store keeps the publication words unwritten (`hpub`). -/
+theorem memModel_store_plain (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (r : Option Resv) (b : Bool) (hram : ramBytes pa n) (hno : ¬ othersReserve σ.resv cpu pa n)
+    (hpub : pubClean (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem →
+      pubClean (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))
+        (σ.mem.writeBytes pa n w (σ.top + 1) (hartAgent cpu)))
+    (hrsv : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem →
+      rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))
+        (σ.mem.writeBytes pa n w (σ.top + 1) (hartAgent cpu))) :
+    memModelAt E σ ∗ resvFragAt E cpu r b ⊢@{IProp GF} |==>
+      (memModelAt E (σ.store cpu pa n w false) ∗ resvFragAt E cpu none false ∗
+       authoredByAt E (σ.top + 1) (hartAgent cpu) ∗ topLbAt E (σ.top + 1)) := by
+  iintro ⟨Hmm, Hfrag⟩
+  ihave %hmm := memModel_mmOk E σ $$ Hmm
+  iapply memModel_store_plainQ E σ cpu pa n w r b hram hno iprop(emp)
+    (by
+      iintro ⟨H, _⟩
+      iapply rsvModel_mono E σ (σ.store cpu pa n w false) (kptGrow_store σ cpu pa n w false) hpub hrsv
+        (chainEnvAt_ext_store _ _ σ cpu pa n w false)
+        (fun hnew h => chainLoads_store σ cpu pa n w false hmm hnew h) $$ H)
+  isplitl [Hmm]
+  · iexact Hmm
+  isplitl [Hfrag]
+  · iexact Hfrag
+  iempintro
+
+/-- A plain store that may write a publication word, given the seal's
+certificate (W8 (f3-ptek): `started = 1` after the kernel table's seal). -/
+theorem memModel_store_plain_sealed (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (r : Option Resv) (b : Bool) (hram : ramBytes pa n) (hno : ¬ othersReserve σ.resv cpu pa n)
+    (hrsv : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem →
+      rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))
+        (σ.mem.writeBytes pa n w (σ.top + 1) (hartAgent cpu))) :
+    memModelAt E σ ∗ resvFragAt E cpu r b ∗ kptSealedAt E ⊢@{IProp GF} |==>
+      (memModelAt E (σ.store cpu pa n w false) ∗ resvFragAt E cpu none false ∗
+       authoredByAt E (σ.top + 1) (hartAgent cpu) ∗ topLbAt E (σ.top + 1)) := by
+  iintro ⟨Hmm, Hfrag, Hsl⟩
+  ihave %hmm := memModel_mmOk E σ $$ Hmm
+  iapply memModel_store_plainQ E σ cpu pa n w r b hram hno (kptSealedAt E)
+    (rsvModel_mono_sealed E σ (σ.store cpu pa n w false) (kptGrow_store σ cpu pa n w false) hrsv
+      (chainEnvAt_ext_store _ _ σ cpu pa n w false)
+      (fun hnew h => chainLoads_store σ cpu pa n w false hmm hnew h))
+  isplitl [Hmm]
+  · iexact Hmm
+  isplitl [Hfrag]
+  · iexact Hfrag
+  iexact Hsl
 
 end memmodel
 
@@ -1911,6 +2138,7 @@ theorem ctx_store (σ : MState) (cpu : CPU) (ξ : CtxId) (pa : PAddr) (n : Nat) 
     iframe Hmm
     iexact HW
   imod memModel_store_plain _ σ cpu pa n w r b hram hno
+    (pubClean_store_off w (σ.top + 1) (hartAgent cpu) hnr)
     (rsvAllOk_store_off w (σ.top + 1) (hartAgent cpu) hnr) $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag, #Hau, #Htop'⟩
   unfold ctxAt
   icases Hctx with ⟨Hbound, Hdirty⟩

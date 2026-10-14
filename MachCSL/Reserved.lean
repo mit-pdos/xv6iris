@@ -37,6 +37,7 @@ disjointness `rsvWf`); the boot image satisfies it (`rsvAllOk_boot`).
 -/
 import MachCSL.WordHistDefs
 import MachCSL.Lang
+import MachCSL.Pte
 
 namespace MachCSL
 
@@ -587,5 +588,133 @@ theorem rsvAllOk_boot {rs : List RsvRegion} (hwf : rsvWf rs) : rsvAllOk rs (imgF
       simp only [List.mem_singleton] at he
       subst he
       exact absurd rfl het
+
+
+/-! ## The sealed kernel page table's slots (W8 (f3-ptek) [OWN.66])
+
+After the kernel page table is SEALED (`MachCSL.kptOn_seal`) every slot of
+it -- the root word and every entry of every page the table occupies -- is
+registered with the state interpretation (`MachCSL.kptModelAt`): a FROZEN
+slot (the root word, a pointer or an empty entry) is never written again (the
+interpretation holds a discarded fragment of its bytes), a LEAF only by a
+hart's whole-doubleword A/D write-back of a variant of its canonical value
+(the interpretation holds half of its bytes, the table's invariant the other
+half; `MachCSL.kpt_exclWriteAU` the only writer).  The discipline is stated
+on the fragment's ghost histories (`kslotHistOk`), so no machine step but
+the leaf's own write-back can disturb it.  Spec: the privileged spec's Svadu
+A/D update is atomic per PTE; Sail performs it as
+`read_pte_exclusive`/`write_pte_conditional` (`Vmem.lean:237`/`:228`) -- one
+whole doubleword store of the same entry with A/D possibly set. -/
+
+/-- The values an entry of canonical value `c` may hold: a leaf at any
+A/D, anything else exactly. -/
+def pteVariant (c v : BitVec 64) : Prop :=
+  v = c ∨ ∃ (ppn : BitVec 44) (perm : KPerm) (a d a' d' : BitVec 1), c = kLeaf ppn perm a d ∧ v = kLeaf ppn perm a' d'
+
+/-- A sealed slot: its (doubleword-aligned) address, its canonical value,
+and whether it is frozen (the root word, a pointer, an empty entry) or a
+leaf. -/
+structure KSlot where
+  addr : PAddr
+  c : BitVec 64
+  frozen : Bool
+  deriving DecidableEq
+
+/-- The eight histories `Hs` hold the doubleword `v` as of position `t`
+(`MachCSL.wordAsOf` on histories). -/
+def histWordAsOf (Hs : Nat → Hist) (t : Nat) (v : BitVec 64) : Prop :=
+  ∀ j, j < 8 → ((Hs j).find? (fun e => decide (e.t ≤ t))).map HEnt.v = some (nthByte (n := 8) v j)
+
+/-- **A sealed slot's discipline** on its eight histories, sealed at `S`: as
+of `S` the slot holds its canonical value (a frozen slot) or a variant of it
+(a leaf); every entry after `S` is a leaf's, by a hart, and one byte of a
+WHOLE-doubleword store (same position, same author, every byte) of a variant
+of the canonical value. -/
+def kslotHistOk (S : Nat) (d : KSlot) (Hs : Nat → Hist) : Prop :=
+  (∃ v : BitVec 64, histWordAsOf Hs S v ∧ (if d.frozen then v = d.c else pteVariant d.c v)) ∧
+  ∀ j, j < 8 → ∀ e ∈ Hs j, S < e.t → d.frozen = false ∧ e.tid < NCPU ∧
+    ∃ v : BitVec 64, pteVariant d.c v ∧ e.v = nthByte (n := 8) v j ∧
+      ∀ j', j' < 8 → (⟨e.t, e.tid, nthByte (n := 8) v j'⟩ : HEnt) ∈ Hs j'
+
+/-- The discipline reads only the eight histories. -/
+theorem kslotHistOk_congr {S : Nat} {d : KSlot} {Hs Hs' : Nat → Hist} (h : ∀ j, j < 8 → Hs j = Hs' j)
+    (hk : kslotHistOk S d Hs) : kslotHistOk S d Hs' := by
+  obtain ⟨⟨v0, hv0, hc0⟩, hent⟩ := hk
+  refine ⟨⟨v0, fun j hj => by rw [← h j hj]; exact hv0 j hj, hc0⟩, fun j hj e he het => ?_⟩
+  rw [← h j hj] at he
+  obtain ⟨h1, h2, w, hw, hwv, hall⟩ := hent j hj e he het
+  exact ⟨h1, h2, w, hw, hwv, fun j' hj' => by rw [← h j' hj']; exact hall j' hj'⟩
+
+/-- A whole-doubleword hart store of a variant at a position `t` past the
+seal keeps a LEAF's discipline (the as-of-`S` value is unchanged). -/
+theorem kslotHistOk_push {S : Nat} {d : KSlot} {Hs : Nat → Hist} (h : kslotHistOk S d Hs)
+    (hleaf : d.frozen = false) (t : Nat) (hSt : S < t) (g : Agent) (hg : g < NCPU) (v : BitVec 64)
+    (hv : pteVariant d.c v) :
+    kslotHistOk S d (fun j => (⟨t, g, nthByte (n := 8) v j⟩ : HEnt) :: Hs j) := by
+  obtain ⟨⟨v0, hv0, hc0⟩, hent⟩ := h
+  refine ⟨⟨v0, fun j hj => ?_, hc0⟩, fun j hj e he het => ?_⟩
+  · have hn : ¬ (t ≤ S) := by omega
+    simp only [List.find?_cons, hn, decide_false]
+    exact hv0 j hj
+  · rcases List.mem_cons.1 he with rfl | he
+    · exact ⟨hleaf, hg, v, hv, rfl, fun j' _ => List.mem_cons_self⟩
+    · obtain ⟨h1, h2, w, hw, hwv, hall⟩ := hent j hj e he het
+      exact ⟨h1, h2, w, hw, hwv, fun j' hj' => List.mem_cons_of_mem _ (hall j' hj')⟩
+
+
+/-! ## Unwritten publication words (W8 (f3-ptek)) -/
+
+/-- Every publication word of `rs` is never written since power-on at `m`
+(before the kernel table's seal: `MachCSL.kptModelAt`). -/
+def pubClean (rs : List RsvRegion) (m : FlatMem) : Prop :=
+  ∀ (f : PAddr) (w : CPU), (⟨f, .pub w⟩ : RsvRegion) ∈ rs → ∀ a ∈ (⟨f, .pub w⟩ : RsvRegion).bytes,
+    ∀ H, m[a]? = some H → ∀ e ∈ H, e.t = 0
+
+/-- A store off every region keeps the publication words unwritten. -/
+theorem pubClean_store_off {rs : List RsvRegion} {m : FlatMem} {pa : PAddr} {n : Nat}
+    (w : BitVec (8 * n)) (t : Nat) (h : Agent)
+    (hoff : ∀ j, j < n → pa + BitVec.ofNat 64 j ∉ rsvBytes rs) (hc : pubClean rs m) :
+    pubClean rs (m.writeBytes pa n w t h) := by
+  intro f w' hf a ha H hH
+  obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 hf
+  rw [FlatMem.writeBytes_get?_notin _ _ _ _ _ _ (fun j hj heq => hoff j hj (heq ▸ mem_rsvBytes hi ha))] at hH
+  exact hc f w' hf a ha H hH
+
+/-- A store into a word of a region that is no publication word keeps the
+publication words unwritten. -/
+theorem pubClean_store_in {rs : List RsvRegion} {m : FlatMem} {pa : PAddr} {n : Nat}
+    (w : BitVec (8 * n)) (t : Nat) (h : Agent) (hnd : (rsvBytes rs).Nodup)
+    {i : Nat} {R : RsvRegion} (hi : rs[i]? = some R) (hw : (pa, n) ∈ R.words)
+    (hnp : ∀ w', R.kind ≠ .pub w') (hc : pubClean rs m) :
+    pubClean rs (m.writeBytes pa n w t h) := by
+  intro f w' hf a ha H hH
+  obtain ⟨i', hi'⟩ := List.mem_iff_getElem?.1 hf
+  have hii : i ≠ i' := by
+    intro he
+    subst he
+    rw [hi] at hi'
+    obtain rfl := Option.some.inj hi'
+    exact hnp w' rfl
+  rw [FlatMem.writeBytes_get?_notin _ _ _ _ _ _
+    (fun j hj heq => rsvBytes_disjoint hnd hi hi' hii _ (mem_regionBytes hw hj) (heq ▸ ha))] at hH
+  exact hc f w' hf a ha H hH
+
+/-- At power-on no publication word is written. -/
+theorem pubClean_boot {rs : List RsvRegion} (hwf : rsvWf rs) : pubClean rs (imgFlat bootImage) := by
+  intro f w hf a ha H hH e he
+  obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 hf
+  have hs := rsvWf_img hwf (mem_rsvBytes hi ha)
+  rw [imgFlat_get?] at hs hH
+  split at hs
+  · rename_i hram
+    cases hv : bootImage[a]? with
+    | none => rw [hv] at hs; simp at hs
+    | some v =>
+      simp [hram, hv] at hH
+      subst hH
+      simp only [List.mem_singleton] at he
+      subst he
+      rfl
+  · simp at hs
 
 end MachCSL

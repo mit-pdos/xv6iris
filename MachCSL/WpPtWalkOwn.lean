@@ -143,6 +143,7 @@ theorem ctx_store_excl (σ : MState) (cpu : CPU) (ξ : CtxId) (pa : PAddr) (n : 
     iframe Hmm
     iexact HW
   imod memModel_store_excl_any _ σ cpu pa n w r acq hram hno
+    (pubClean_store_off w (σ.top + 1) (hartAgent cpu) hnr)
     (rsvAllOk_store_off w (σ.top + 1) (hartAgent cpu) hnr) $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag, #Hau, #Htop', _⟩
   unfold ctxAt
   icases Hctx with ⟨Hbound, Hdirty⟩

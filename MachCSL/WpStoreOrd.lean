@@ -59,7 +59,7 @@ def writeAUT (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) (Ψ : IPro
           authoredBy t (hartAgent cpu) -∗ topLb t -∗ entsAt pa n t (hartAgent cpu) w' ={∅,⊤}=∗ Ψ)) ∨
      (∃ (Hs : Nat → Hist) (T : Nat) (cs : RsvComps) (o : Option (List (CPU × Nat))),
       histBytes pa n (fun _ => DFrac.own (1 : Qp).half) Hs ∗
-      topLb T ∗ compBytes cs ∗ ⌜rsvStoreOk (hlc := hlc) (GF := GF) cpu pa n w' Hs cs⌝ ∗ rtIn cpu o ∗
+      topLb T ∗ compBytes cs ∗ ⌜rsvStoreOkP (hlc := hlc) (GF := GF) cpu pa n w' Hs cs⌝ ∗ kptSealed ∗ rtIn cpu o ∗
       ▷ (∀ t : Nat, ⌜T ≤ t⌝ -∗ ⌜0 < t⌝ -∗
           histBytes pa n (fun _ => DFrac.own (1 : Qp).half) (pushed Hs t (hartAgent cpu) w') -∗
           compBytes cs -∗ authoredBy t (hartAgent cpu) -∗ topLb t -∗ rtOut cpu t o ={∅,⊤}=∗ Ψ)))
@@ -68,7 +68,7 @@ theorem writeAUT_wand (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) (
     writeAUT cpu pa n w' Ψ ⊢ ▷ (Ψ -∗ Ψ') -∗ writeAUT cpu pa n w' Ψ' := by
   unfold writeAUT
   iintro H HW
-  imod H with (⟨%Hs, %T, Hb, #HT, Hcont⟩ | ⟨%Hs, %T, %cs, %o, Hb, #HT, Hc, %hok, Ho, Hcont⟩)
+  imod H with (⟨%Hs, %T, Hb, #HT, Hcont⟩ | ⟨%Hs, %T, %cs, %o, Hb, #HT, Hc, %hok, #Hsl, Ho, Hcont⟩)
   · imodintro
     ileft
     iexists Hs, T
@@ -81,7 +81,7 @@ theorem writeAUT_wand (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) (
   · imodintro
     iright
     iexists Hs, T, cs, o
-    iframe Hb HT Hc Ho
+    iframe Hb HT Hc Ho Hsl
     isplitr
     · ipureintro; exact hok
     inext
@@ -130,7 +130,7 @@ theorem swp_sail_mem_write_plain_auT (cpu : CPU) {n vasize : Nat}
       isplitl [Hregs Hmem Hmm Hclose]
       · iapply Hclose $$ %σ %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
       · iapply IH $$ Hfrag H
-  · imod H with (⟨%Hs, %T, Hb, #HT, Hcont⟩ | ⟨%Hs, %T, %cs, %o, Hb, #HT, Hc, %hok, Ho, Hcont⟩)
+  · imod H with (⟨%Hs, %T, Hb, #HT, Hcont⟩ | ⟨%Hs, %T, %cs, %o, Hb, #HT, Hc, %hok, #Hsl, Ho, Hcont⟩)
     rotate_left
     · -- a RESERVED word (W8 (f2-ctx): `started`)
       obtain ⟨i, k, R, hi, hk', hpres⟩ := hok
@@ -168,10 +168,10 @@ theorem swp_sail_mem_write_plain_auT (cpu : CPU) {n vasize : Nat}
         icases rsvSplitHalf req.pa n _ $$ Hb with ⟨Hb, Hh⟩
         ihave Hmm := Hmmc $$ [Hh]
         · iapply rsvWordHalf_intro $$ Hh
-        imod memModel_store_plain _ σ cpu req.pa n w' r b hram hno
+        imod memModel_store_plain_sealed _ σ cpu req.pa n w' r b hram hno
           (rsvAllOk_store_in w' (σ.top + 1) (hartAgent cpu)
             (MachFixedGS.rsvStatic_wf (hlc := hlc) (GF := GF)).1 hi (List.mem_of_getElem? hk')
-            (hpres σ.mem (σ.top + 1) (by omega) hget hcget)) $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag, #Hau, #Htop'⟩
+            (hpres σ.mem (σ.top + 1) (by omega) hget hcget)) $$ [$Hmm $Hfrag $Hsl] with ⟨Hmm, Hfrag, #Hau, #Htop'⟩
         imod Hcont $$ %(σ.top + 1) %(by omega) %(by omega) Hb Hc Hau Htop' Hout with HΦ
         rw [hk]
         imodintro
@@ -215,6 +215,7 @@ theorem swp_sail_mem_write_plain_auT (cpu : CPU) {n vasize : Nat}
       obtain rfl := Option.some.inj hv'
       icases resvFragAny_cases cpu r $$ Hfrag with ⟨%b, Hfrag⟩
       imod memModel_store_plain _ σ cpu req.pa n w' r b hram hno
+        (pubClean_store_off w' (σ.top + 1) (hartAgent cpu) hnr)
         (rsvAllOk_store_off w' (σ.top + 1) (hartAgent cpu) hnr) $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag, #Hau, #Htop'⟩
       imod histBytes_update σ.mem req.pa n Hs (σ.top + 1) (hartAgent cpu) w' $$ [$Hmem $Hb]
         with ⟨Hmem, Hb⟩

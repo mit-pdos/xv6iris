@@ -506,7 +506,7 @@ theorem powerInterp_rsvOk (g : GState) :
     intro h; cases h
   · iintro ⟨_, _, ⟨%R, _, _, %E, _, Hera⟩, _⟩
     unfold eraInterp memModelAt rsvModelAt
-    icases Hera with ⟨_, _, ⟨_, _, _, _, _, ⟨%reg, _, %⟨hin, _, hok⟩⟩, _⟩, _⟩
+    icases Hera with ⟨_, _, ⟨_, _, _, _, _, ⟨%reg, _, %⟨hin, _, hok⟩, _⟩, _⟩, _⟩
     ipureintro
     exact fun _ => all_of_reservedOk hin hok
 

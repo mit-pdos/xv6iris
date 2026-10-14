@@ -147,19 +147,29 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 /-- **THE PUBLICATION** (Rocq's one-way door between kvminit and
 kvminithart): the tree sealed into the shared `kptOn` for the published map,
-the 64 stack claims and the trampoline claim, and the root cell persisted. -/
+the 64 stack claims and the trampoline claim, and the root cell persisted.
+W8 (f3-ptek) [OWN.66]: the seal registers the table with the state
+interpretation (`MachCSL.wpLoop_interpUpd`), given that `started` is not yet
+written (`Hpub`, handing back `R`). -/
 theorem mn_publish [CurCtx] (hct : curTier = KTier.bare) (cpu : CPU) (k : KCtx) (t : PTree)
-    (pas : Nat → BitVec 44) (hok : kvmTableOk t pas) :
+    (pas : Nat → BitVec 44) (hok : kvmTableOk t pas) (R : IProp GF) :
     kctx cpu k ∗ ptreeOwn 2 (DFrac.own 1) t ∗
     (MachGS.kmapName (hlc := hlc) (GF := GF) ↪●MAP KernelMap.static) ∗
     (∃ r : BitVec 44, MachGS.kptRootName (hlc := hlc) (GF := GF) ↪VAR r) ∗
-    wordPointsTo kernelPagetableAddr 8 (DFrac.own 1) (pageAddr t.base)
-    ⊢ |={⊤}=> (kctx (GF := GF) cpu k ∗ kptOn t (kvmMapT pas) ∗ kstackMapAt pas ∗ syscTrampCl ∗
-      pwordPointsTo kernelPagetableAddr 8 DFrac.discard (pageAddr t.base)) := by
-  iintro ⟨Hk, Ht, Hauth, ⟨%r0, Hroot⟩, Hw⟩
-  imod kctx_kptOn_publish cpu k t pas r0 hct hok $$ [$Hk $Ht $Hauth $Hroot $Hw] with ⟨Hk, #Hkpt, #Hs, #Htr, #Hrw⟩
-  imodintro
-  iframe Hk Hkpt Hs Htr Hrw
+    wordPointsTo kernelPagetableAddr 8 (DFrac.own 1) (pageAddr t.base) ∗
+    (∀ m : FlatMem, genHeapInterp m ={⊤}=∗ genHeapInterp m ∗
+      ⌜pubClean (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) m⌝ ∗ R) ∗
+    (kctx (GF := GF) cpu k -∗ kptOn t (kvmMapT pas) -∗ kstackMapAt pas -∗ syscTrampCl -∗
+      pwordPointsTo kernelPagetableAddr 8 DFrac.discard (pageAddr t.base) -∗ R -∗ wpLoop cpu)
+    ⊢ wpLoop (GF := GF) cpu := by
+  iintro ⟨Hk, Ht, Hauth, ⟨%r0, Hroot⟩, Hw, Hpub, HΦ⟩
+  iapply wpLoop_interpUpd cpu iprop(kctx (GF := GF) cpu k ∗ kptOn t (kvmMapT pas) ∗ kstackMapAt pas ∗ syscTrampCl ∗
+      pwordPointsTo kernelPagetableAddr 8 DFrac.discard (pageAddr t.base) ∗ R)
+  isplitl [Hk Ht Hauth Hroot Hw Hpub]
+  · iapply kctx_kptOn_publish cpu k t pas r0 hct hok R $$ [Hk Ht Hauth Hroot Hw Hpub]
+    iframe Hk Ht Hauth Hroot Hw Hpub
+  · iintro ⟨Hk, Hkpt, Hs, Htr, Hrp, HR⟩
+    iapply HΦ $$ Hk Hkpt Hs Htr Hrp HR
 
 set_option maxHeartbeats 4000000 in
 /-- **+0x76 → +0x7a**: `kvminithart()` switches the hart to the published

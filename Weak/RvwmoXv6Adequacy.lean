@@ -345,7 +345,7 @@ theorem lkCpuArm (σ : MState) (hD : Xv6.AccessDiscipline.xv6AccessDisc σ) (b :
       lockDiscW (cpuPtrAt KernelGeom.cpusBase) st B W W' ∧
       ∀ (c : CPU), (∀ k, st ≠ some (c, k)) → ∀ (tvn : Nat) (v0 w : BitVec 64), v0 ≠ cpuAddr c →
         ReadCases W' (hartAgent c) tvn v0 w → w ≠ cpuAddr c :=
-  (hD.2.2.2 b t hb).1 hs
+  (hD.2.2.2.1 b t hb).1 hs
 
 /-- **The `ip->ref` route** ([OWN.63]): on a `racy` byte whose entry is value-safe, the audited
 word, as of the entry, is in the registry's value set (`racyValAt`: `[1, 2^31)`, the guard

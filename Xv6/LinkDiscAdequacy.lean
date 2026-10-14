@@ -8,8 +8,8 @@ files import Proof files).
 
 Whenever the power is on, the machine's memory obeys W8's export
 `AccessDiscipline.xv6AccessDisc` = `chainOkAt ∧ lockWordDiscAt ∧ cpuStaticAt
-∧ lkCpuReadAt` (W8 (f2-ctx): three of §C W8's six conjuncts; W8 (f3-hold)
-[OWN.64]; W8 (f3-racy) [OWN.63]): every foreign hart entry a hart's coherence
+∧ lkCpuReadAt ∧ pteDiscAt` (W8 (f2-ctx): three of §C W8's six conjuncts; W8
+(f3-hold) [OWN.64]; W8 (f3-racy) [OWN.63]; W8 (f3-ptek) [OWN.66]): every foreign hart entry a hart's coherence
 floor names is SYNC-CHAINED to it (release → acquire hops through the
 spinlocks' lock bytes, or the boot hop through `started`) unless its byte is
 exempt as of the entry -- a lock-layer or publication word, or a LIVE
@@ -19,11 +19,13 @@ residual accepted [OWN.67]) -- or, on `ip->ref`, the word as of the entry is
 `≥ 1` (`racyValOk`; the virtio used ring is chained, W8 (f3-gate) [OWN.62]);
 every static spinlock's two word histories obey the spinlock kit's
 discipline; `cpus[h]`'s cells are written only by hart `h` after power-on;
-and a non-holder's read of a static lock's `lk->cpu` never returns its own
-pointer.  The `ip->ref` and `holding()` clauses are ONE benign-race class
-(unlocked reads of lock-protected words, harmless by a value argument).  Not
-yet exported: `pteDiscAt`, and W8 (f3-rest)'s `cpuProcDiscAt`/`utextDiscAt`;
-later items only strengthen the conjunction.
+a non-holder's read of a static lock's `lk->cpu` never returns its own
+pointer; and after the kernel page table's seal every entry of it is written
+only by a hart, whole, with an A/D variant of its sealed value.  The
+`ip->ref` and `holding()` clauses are ONE benign-race class (unlocked reads
+of lock-protected words, harmless by a value argument).  Not yet exported:
+the user tables' half of the A/D clause (W8 (f3-pteu)), and W8 (f3-rest)'s
+`cpuProcDiscAt`/`utextDiscAt`; later items only strengthen the conjunction.
 -/
 import Xv6.SystemAdequacyDisc
 import Xv6.ProofUser

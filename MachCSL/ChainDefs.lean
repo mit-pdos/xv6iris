@@ -161,6 +161,50 @@ theorem memGrow_writeBytes {n : Nat} (m : FlatMem) (pa : PAddr) (w : BitVec (8 *
     (ht : t0 < t) : memGrow m t0 (m.writeBytes pa n w t h) :=
   memGrow_foldlPush pa w t0 t h ht _ m
 
+/-- **Every entry of `m'` is an entry of `m` or newer than `t`** (W8
+(f3-ptek)): the converse growth a machine step at top `t` does -- what keeps
+a fact about the entries at or below `t` of EVERY byte (`MachCSL.pubAfter`). -/
+def memGrowR (m : FlatMem) (t : Nat) (m' : FlatMem) : Prop :=
+  ∀ (a : PAddr) (H' : Hist), m'[a]? = some H' → ∀ e ∈ H', t < e.t ∨ ∃ H, m[a]? = some H ∧ e ∈ H
+
+theorem memGrowR_refl (m : FlatMem) (t : Nat) : memGrowR m t m :=
+  fun _ H' h e he => .inr ⟨H', h, he⟩
+
+theorem memGrowR_push (m : FlatMem) (a : PAddr) (e : HEnt) (t : Nat) (ht : t < e.t) :
+    memGrowR m t (m.push a e) := by
+  intro a' H' h x hx
+  by_cases ha : a' = a
+  · subst ha
+    rw [FlatMem.push_get?_eq, Std.ExtTreeMap.getD_eq_getD_getElem?] at h
+    obtain rfl := Option.some.inj h
+    rcases List.mem_cons.1 hx with rfl | hx
+    · exact .inl ht
+    · cases hm : m[a']? with
+      | none => rw [hm] at hx; simp at hx
+      | some H => rw [hm] at hx; exact .inr ⟨H, rfl, hx⟩
+  · rw [FlatMem.push_get?_ne _ _ _ _ ha] at h
+    exact .inr ⟨H', h, hx⟩
+
+theorem memGrowR_trans {m m' m'' : FlatMem} {t : Nat} (h1 : memGrowR m t m') (h2 : memGrowR m' t m'') :
+    memGrowR m t m'' := by
+  intro a H'' h e he
+  rcases h2 a H'' h e he with ht | ⟨H', hH', he'⟩
+  · exact .inl ht
+  · exact h1 a H' hH' e he'
+
+theorem memGrowR_foldlPush {n : Nat} (pa : PAddr) (w : BitVec (8 * n)) (t0 t : Nat) (h : Agent) (ht : t0 < t) :
+    ∀ (l : List Nat) (m : FlatMem),
+      memGrowR m t0 (l.foldl (fun (m : FlatMem) j => m.push (pa + BitVec.ofNat 64 j) ⟨t, h, nthByte w j⟩) m)
+  | [], m => memGrowR_refl m t0
+  | j :: l, m => by
+    simp only [List.foldl_cons]
+    exact memGrowR_trans (memGrowR_push _ _ _ _ ht) (memGrowR_foldlPush pa w t0 t h ht l _)
+
+/-- A store at a position above `t0` adds only entries above `t0`. -/
+theorem memGrowR_writeBytes {n : Nat} (m : FlatMem) (pa : PAddr) (w : BitVec (8 * n)) (t0 t : Nat) (h : Agent)
+    (ht : t0 < t) : memGrowR m t0 (m.writeBytes pa n w t h) :=
+  memGrowR_foldlPush pa w t0 t h ht _ m
+
 /-! ## Lock bytes of a region list -/
 
 /-- `b` is the lock word (its low byte) of a reserved spinlock of `rs`. -/

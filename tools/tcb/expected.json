@@ -2425,6 +2425,7 @@
     "MachCSL.Lang",
     "MachCSL.Lock",
     "MachCSL.Platform",
+    "MachCSL.Pte",
     "MachCSL.Reserved",
     "MachCSL.Resources",
     "MachCSL.TsoMem",

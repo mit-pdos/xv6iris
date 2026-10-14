@@ -102,20 +102,30 @@ theorem kmap_insert_boot [CurCtx] (pas : Nat → BitVec 44) :
 
 /-- **THE PUBLICATION** (Rocq's `kvm_M_mint` + `kpt_inv_alloc`): `kvmmake`'s
 output becomes `kptOn` for the published map, and the 65 non-identity
-claims -- the 64 stacks and the trampoline -- are handed back. -/
+claims -- the 64 stacks and the trampoline -- are handed back.  W8 (f3-ptek)
+[OWN.66]: an update of the state interpretation (`MachCSL.kptOn_seal`
+registers every slot of the table with it), given that no publication word
+is written yet (`Hpub`, handing back `R`). -/
 theorem kctx_kptOn_publish [CurCtx] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     {lent : Bool} (cpu : CPU) (k : KCtx) (t : PTree) (pas : Nat → BitVec 44) (r0 : BitVec 44)
-    (hct : curTier = KTier.bare) (hok : kvmTableOk t pas) :
+    (hct : curTier = KTier.bare) (hok : kvmTableOk t pas) (R : IProp GF) :
     kctxL (GF := GF) lent cpu k ∗ ptreeOwn 2 (DFrac.own 1) t ∗
       (MachGS.kmapName (hlc := hlc) (GF := GF) ↪●MAP KernelMap.static) ∗
       (MachGS.kptRootName (hlc := hlc) (GF := GF) ↪VAR r0) ∗
-      wordPointsTo kernelPagetableAddr 8 (DFrac.own 1) (pageAddr t.base)
-    ⊢ |={⊤}=> (kctxL lent cpu k ∗ kptOn t (kvmMapT pas) ∗ kstackMapAt pas ∗ syscTrampCl ∗
-      pwordPointsTo kernelPagetableAddr 8 DFrac.discard (pageAddr t.base)) := by
-  iintro ⟨Hk, Ht, Hauth, Hroot, Hrw⟩
+      wordPointsTo kernelPagetableAddr 8 (DFrac.own 1) (pageAddr t.base) ∗
+      (∀ m : FlatMem, genHeapInterp m ={⊤}=∗ genHeapInterp m ∗
+        ⌜pubClean (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) m⌝ ∗ R)
+    ⊢ ∀ σ : MState, genHeapInterp σ.mem ∗ memModel σ ={⊤}=∗ genHeapInterp σ.mem ∗ memModel σ ∗
+      (kctxL lent cpu k ∗ kptOn t (kvmMapT pas) ∗ kstackMapAt pas ∗ syscTrampCl ∗
+        pwordPointsTo kernelPagetableAddr 8 DFrac.discard (pageAddr t.base) ∗ R) := by
+  iintro ⟨Hk, Ht, Hauth, Hroot, Hrw, Hpub⟩ %σ ⟨Hmem, Hmm⟩
   icases kctx_rsvEq cpu k $$ Hk with ⟨%heqR, Hk⟩
   have hra : (⟨kernelPagetableAddr, .roots 1 8⟩ : RsvRegion) ∈ MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) := by
     rw [heqR]; exact xv6RsvStatic_kptRoot
+  have hroots : ∀ (base : PAddr) (cnt stride : Nat),
+      (⟨base, .roots cnt stride⟩ : RsvRegion) ∈ MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) →
+        base = kernelPagetableAddr ∧ cnt = 1 := fun base cnt stride h => by
+    rw [heqR] at h; exact xv6Roots_only base cnt stride h
   imod kmap_insert_boot pas $$ Hauth with ⟨Hauth, #Hs, #Htr⟩
   icases kctx_cases cpu k $$ Hk with
     ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
@@ -123,10 +133,13 @@ theorem kctx_kptOn_publish [CurCtx] [Xv6G GF] [FdslotG GF] [BioslotG GF] [Irefsl
   ihave Hents := (ptreeOwn_entries (DFrac.own 1) 2 t).1 $$ Ht
   ihave Hrw := (show wordPointsTo (GF := GF) kernelPagetableAddr 8 (DFrac.own 1) (pageAddr t.base) ⊢
       wordPointsTo kernelPagetableAddr 8 (DFrac.own 1) (pteAddr t.base 0#9) from .rfl) $$ Hrw
-  imod kptOn_seal cpu t (kvmMapT pas) r0 hct (kvmTableOk_kptFacts_tramp t pas hok) kernelPagetableAddr hra
-    $$ [Hctx Hents Hrw Hauth Hroot] with ⟨Hctx, #Hkpt, Hrp⟩
-  · iframe Hctx Hents Hrw Hauth Hroot
+  ihave Hseal := kptOn_seal cpu t (kvmMapT pas) r0 hct (kvmTableOk_kptFacts_tramp t pas hok) kernelPagetableAddr hra
+    hroots R $$ [Hctx Hents Hrw Hauth Hroot Hpub]
+  · iframe Hctx Hents Hrw Hauth Hroot Hpub
+  imod Hseal $$ %σ [Hmem Hmm] with ⟨Hmem, Hmm, Hctx, #Hkpt, Hrp, HR⟩
+  · iframe Hmem Hmm
   imodintro
+  iframe Hmem Hmm HR
   isplitl [HConf HF Hstack Htrans Harm Hcpu Hctx Hfrag Hclock]
   · iapply kctx_intro' cpu k hwf
     iframe HConf HF Hstack Htrans Harm Hcpu Hclock

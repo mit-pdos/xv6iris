@@ -68,6 +68,8 @@ byte (`hn`): a zero-byte DMA write appends nothing (`MState.storeDma_zero`),
 so there is no position to mint receipts for. -/
 theorem memModel_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (hram : ramBytes pa n) (hno : ¬ anyReserve σ.resv pa n) (hn : n ≠ 0)
+    (hpub : pubClean (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem →
+      pubClean (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (σ.storeDma pa n w).mem)
     (hrsv : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem →
       rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (σ.storeDma pa n w).mem) :
     memModelAt E σ ⊢@{IProp GF} |==>
@@ -75,7 +77,7 @@ theorem memModel_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * 
        authoredByAt E (σ.top + 1) diskAgent ∗ topLbAt E (σ.top + 1)) := by
   unfold memModelAt
   iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
-  ihave Hrsv := rsvModel_mono E σ (σ.storeDma pa n w) hrsv
+  ihave Hrsv := rsvModel_mono E σ (σ.storeDma pa n w) (kptGrow_dma σ pa n w) hpub hrsv
     (fun _ => chainEnvAt_ext_dma _ _ σ pa n w) (fun _ h => chainLoads_dma σ pa n w hmm h) $$ Hrsv
   imod MonoNat.own_update _ (.ofNat σ.top) (.ofNat (σ.top + 1))
     (by simp only [MaxNat.le_toNat]; omega) $$ Htop with ⟨Htop, #Htoplb⟩
@@ -168,8 +170,13 @@ theorem machInterp_storeDma (σ : MState) (pa : PAddr) (n : Nat) (Hs : Nat → H
     intro h
     rw [MState.storeDma_of_ne σ pa n w hn]
     exact rsvAllOk_store_off w (σ.top + 1) diskAgent hnr h
+  have hpub : pubClean (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem →
+      pubClean (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (σ.storeDma pa n w).mem := by
+    intro h
+    rw [MState.storeDma_of_ne σ pa n w hn]
+    exact pubClean_store_off w (σ.top + 1) diskAgent hnr h
   imod histBytes_update σ.mem pa n Hs (σ.top + 1) diskAgent w $$ [$Hmem $Hb] with ⟨Hmem, Hb⟩
-  imod memModel_storeDma _ σ pa n w hram hno hn hrsv $$ Hmm with ⟨Hmm, #Hau, #Htop⟩
+  imod memModel_storeDma _ σ pa n w hram hno hn hpub hrsv $$ Hmm with ⟨Hmm, #Hau, #Htop⟩
   imodintro
   iframe Hb Hau Htop
   iapply machInterp_of_storeDma σ pa n w hn

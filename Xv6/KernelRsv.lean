@@ -168,6 +168,16 @@ theorem xv6RsvStatic_kptRoot : xv6KptRootR ∈ xv6RsvStatic := by decide +kernel
 
 theorem xv6RsvStatic_procRoots : xv6ProcRootsR ∈ xv6RsvStatic := by decide +kernel
 
+/-- `kernel_pagetable` is the list's ONLY permanent root word (W8 (f3-ptek):
+the kernel table's seal registers it, `MachCSL.kptOn_seal`'s `hroots`). -/
+theorem xv6Roots_only (base : PAddr) (cnt stride : Nat)
+    (h : (⟨base, .roots cnt stride⟩ : RsvRegion) ∈ xv6RsvStatic) : base = KA.«kernel_pagetable» ∧ cnt = 1 := by
+  have hall : xv6RsvStatic.all (fun R => match R.kind with
+      | .roots c _ => decide (R.base = KA.«kernel_pagetable») && decide (c = 1)
+      | _ => true) = true := by decide +kernel
+  have := List.all_eq_true.1 hall _ h
+  simpa using this
+
 theorem xv6RsvStatic_irefRacy : xv6IrefRacyR ∈ xv6RsvStatic := by decide +kernel
 
 /-- The free-list head word is registered. -/

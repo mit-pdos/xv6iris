@@ -1321,6 +1321,7 @@ theorem wp_s_amoswap_lock_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
           iapply fupd_mask_intro LawfulSet.empty_subset
           iintro Hmask
           iright
+          ileft
           iexists W2.hist Hold2, (max T tl), [(lk + 16#64, 8, W2'.hist HoldW)], o
           iframe Hb2 Ho
           isplitl []
@@ -1384,6 +1385,7 @@ theorem wp_s_amoswap_lock_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
           iapply fupd_mask_intro LawfulSet.empty_subset
           iintro Hmask
           iright
+          ileft
           iexists W2.hist Hold2, 0, [(lk + 16#64, 8, W2'.hist HoldW)], none
           iframe Hb2
           isplitl []
