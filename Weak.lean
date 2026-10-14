@@ -661,6 +661,7 @@ import Weak.CatRerouteIo
 import Weak.PinHoldingCtrl
 import Weak.PinTrapSites
 import Weak.PinTrap
+import Weak.PinTrapFrame
 import Weak.WeakRvwmoPinBridge4
 import Weak.PinDataflowSatp
 import Weak.PinWalkTab
