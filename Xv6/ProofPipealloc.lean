@@ -633,8 +633,15 @@ theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γ
   icases Hfr with (⟨%_, %lo, %lc, Hlw, #Hflo, Hlc, #Hflc⟩ | ⟨%hr, _⟩)
   rotate_left
   · exfalso; exact hm hr
-  ihave #HfloK := (show lkFloor (GF := GF) curCtx lo ⊢ keyAt (MachGS.era (hlc := hlc) (GF := GF)) curCtx lo
-    from .rfl) $$ Hflo
+  -- the registration is past BOTH words' floors (W8 (f3-pipelk) [OWN.65])
+  ihave #HfloK : keyAt (MachGS.era (hlc := hlc) (GF := GF)) curCtx (max lo lc) $$ []
+  · rcases Nat.le_total lo lc with h | h
+    · rw [Nat.max_eq_right h]
+      iapply (show lkFloor (GF := GF) curCtx lc ⊢ keyAt (MachGS.era (hlc := hlc) (GF := GF)) curCtx lc from .rfl)
+      iexact Hflc
+    · rw [Nat.max_eq_left h]
+      iapply (show lkFloor (GF := GF) curCtx lo ⊢ keyAt (MachGS.era (hlc := hlc) (GF := GF)) curCtx lo from .rfl)
+      iexact Hflo
   ihave #HidP0 := kmapStatic_rw (fnode k0 + 16#64) (pa_fpipe_kmapRw k0 hk0) $$ HS
   -- the eight stores into *f0 and *f1
   icases fileRef_elim γ k0 1 .closed $$ Href0 with ⟨%C0, %id0, He0, Hf0, Hp0⟩
@@ -687,7 +694,7 @@ theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γ
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9A, Xv6.dsOff0, pa_add0'] next cH hpH
   iintro Hk Hpc Hc0
   k_step_gen (wp_s_sd_ent cH _ (KA.«pipealloc» + 0x68#64) false 16#12 15#5 18#5 (by decide)
-      (fnode k0 + 16#64) ?ha C0.pipe lo)
+      (fnode k0 + 16#64) ?ha C0.pipe (max lo lc))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h18A] next cI hpI
   case ha =>
     rw [KCtx.rget_withRegs']
@@ -696,7 +703,7 @@ theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γ
   iintro Hk Hpc ⟨Hpp0, %te, %hlote, #Htop, #Hent⟩
   -- the pipe is born, registered by the receipts of `f0->pipe = pi`
   icases kctx_rsvEq cI _ $$ Hk with ⟨%heqR, Hk⟩
-  ihave #Hreg : lkDynReg (GF := GF) pi lo $$ []
+  ihave #Hreg : lkDynReg (GF := GF) pi (max lo lc) $$ []
   · unfold lkDynReg
     iexists entsList (fnode k0 + 16#64) 8 te (hartAgent cI) pi, te
     isplit

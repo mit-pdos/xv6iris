@@ -284,22 +284,30 @@ theorem wp_s_lw_lockword_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
         rotate_left
         · iexfalso; iapply hrefute $$ Hcred Hdead
         unfold lockBody
-        icases Hbody with ⟨%W, %W', %st, %B, >Hw, Hc, >%hst, Hhalf, Hfr, >Hnm, Harm⟩
+        icases Hbody with ⟨%W, %W', %st, %B, >Hw, >Hc, >%hst, Hhalf, Hfr, >Hnm, Harm⟩
         icases wordCell_cases lk 4 lo 0 W $$ Hw with ⟨%Hold, Hb, %htail⟩
-        icases Lock.dyn_certs4' cpu lk K ts W W' Hold lo htail hvis $$ [Hnm] with ⟨Hnm, #Hcert⟩
+        icases wordCell_cases (lk + 16#64) 8 lc 0 W' $$ Hc with ⟨%HoldC, HbC, %htailC⟩
+        icases Lock.dyn_certs4' cpu lk K ts st W W' Hold HoldC lo lc (DFrac.own 1) htail htailC hvis $$ [Hnm] with ⟨Hnm, #Hcert⟩
         · iframe Hnm; iexact Hkc
         iapply fupd_mask_intro LawfulSet.empty_subset
         iintro Hmask
-        iexists (fun _ => DFrac.own 1), W.hist Hold, []
+        iexists (fun _ => DFrac.own 1), W.hist Hold, [(lk + 16#64, 8, DFrac.own 1, W'.hist HoldC)]
         iframe Hb
         isplit
         · ipureintro; exact fun j hj => WordHist.hist_ne_nil W Hold htail j hj
-        isplitl []
-        · iapply rdCompBytes_nil
+        isplitl [HbC]
+        · unfold rdCompBytes
+          iapply BigSepL.bigSepL_cons.2
+          isplitl [HbC]
+          · iexact HbC
+          · exact BigSepL.bigSepL_nil_intro
         isplitl []
         · iexact Hcert
         inext
-        iintro %w %tvn %hKt %hrd' %_ Hb _
+        iintro %w %tvn %hKt %hrd' %_ Hb HcC
+        unfold rdCompBytes
+        icases BigSepL.bigSepL_cons.1 $$ HcC with ⟨HbC, _⟩
+        ihave Hc := wordCell_intro (lk + 16#64) 8 lc 0 W' HoldC htailC $$ HbC
         imod Hmask
         ihave Hcl := Hclose $$ [Hb Hc Hhalf Hfr Hnm Harm]
         case' _ =>
@@ -540,9 +548,10 @@ theorem wp_s_lw_lockword_locked_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false
         rotate_left
         · iexfalso; iapply hrefute $$ Hcred Hdead
         unfold lockBody
-        icases Hbody with ⟨%W, %W', %st, %B, >Hw, Hc, >%hst, >Hhalf, Hfr, >Hnm, Harm⟩
+        icases Hbody with ⟨%W, %W', %st, %B, >Hw, >Hc, >%hst, >Hhalf, Hfr, >Hnm, Harm⟩
         icases wordCell_cases lk 4 lo 0 W $$ Hw with ⟨%Hold, Hb, %htail⟩
-        icases Lock.dyn_certs4' cpu lk K ts W W' Hold lo htail hK.2 $$ [Hnm] with ⟨Hnm, #Hcert⟩
+        icases wordCell_cases (lk + 16#64) 8 lc 0 W' $$ Hc with ⟨%HoldC, HbC, %htailC⟩
+        icases Lock.dyn_certs4' cpu lk K ts st W W' Hold HoldC lo lc (DFrac.own 1) htail htailC hK.2 $$ [Hnm] with ⟨Hnm, #Hcert⟩
         · iframe Hnm; iexact Hkc
         ihave %hag := lockHalf_agree γ st (some (cpu, true)) B B0 $$ [Hhalf Hhalf0]
         case' _ => iframe
@@ -552,16 +561,23 @@ theorem wp_s_lw_lockword_locked_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false
         have hpin : wordPin W B0 cpu := hst.1
         iapply fupd_mask_intro LawfulSet.empty_subset
         iintro Hmask
-        iexists (fun _ => DFrac.own 1), W.hist Hold, []
+        iexists (fun _ => DFrac.own 1), W.hist Hold, [(lk + 16#64, 8, DFrac.own 1, W'.hist HoldC)]
         iframe Hb
         isplit
         · ipureintro; exact fun j hj => WordHist.hist_ne_nil W Hold htail j hj
-        isplitl []
-        · iapply rdCompBytes_nil
+        isplitl [HbC]
+        · unfold rdCompBytes
+          iapply BigSepL.bigSepL_cons.2
+          isplitl [HbC]
+          · iexact HbC
+          · exact BigSepL.bigSepL_nil_intro
         isplitl []
         · iexact Hcert
         inext
-        iintro %w %tvn %hKt %hrd' %hauth Hb _
+        iintro %w %tvn %hKt %hrd' %hauth Hb HcC
+        unfold rdCompBytes
+        icases BigSepL.bigSepL_cons.1 $$ HcC with ⟨HbC, _⟩
+        ihave Hc := wordCell_intro (lk + 16#64) 8 lc 0 W' HoldC htailC $$ HbC
         have hres := WordHist.read_cases_vis W Hold (hartAgent cpu) tvn K lo ts 0 w (by decide) htail
           (by omega) hK.2 hauth hrd'
         have hw := wordPin_read hpin (by omega) (hartAgent cpu) 0 w hres
@@ -815,7 +831,7 @@ theorem wp_s_ld_lkcpu_notheld_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
         icases Hbody with ⟨%W, %W', %st, %B, >Hw, >Hc, >%hst, Hhalf, >Hfr, >Hnm, Harm⟩
         icases wordCell_cases (lk + 16#64) 8 lc 0 W' $$ Hc with ⟨%Hold, Hb, %htail⟩
         icases wordCell_cases lk 4 lo 0 W $$ Hw with ⟨%HoldL, HbL, %htailL⟩
-        icases Lock.dyn_certs8' cpu lk K ts W W' HoldL Hold lo lc (DFrac.own 1) htailL htail hvis $$ [Hnm] with ⟨Hnm, #Hcert⟩
+        icases Lock.dyn_certs8' cpu lk K ts st W W' HoldL Hold lo lc (DFrac.own 1) htailL htail hvis $$ [Hnm] with ⟨Hnm, #Hcert⟩
         · iframe Hnm; iexact Hkc
         ihave %hne : ⌜∀ b, st ≠ some (cpu, b)⌝ $$ [Hlocks Hfr]
         · cases st with
@@ -1097,7 +1113,7 @@ theorem wp_s_ld_lkcpu_locked_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
         icases Hbody with ⟨%W, %W', %st, %B, >Hw, >Hc, >%hst, >Hhalf, Hfr, >Hnm, Harm⟩
         icases wordCell_cases (lk + 16#64) 8 lc 0 W' $$ Hc with ⟨%Hold, Hb, %htail⟩
         icases wordCell_cases lk 4 lo 0 W $$ Hw with ⟨%HoldL, HbL, %htailL⟩
-        icases Lock.dyn_certs8' cpu lk K ts W W' HoldL Hold lo lc (DFrac.own 1) htailL htail hvis $$ [Hnm] with ⟨Hnm, #Hcert⟩
+        icases Lock.dyn_certs8' cpu lk K ts st W W' HoldL Hold lo lc (DFrac.own 1) htailL htail hvis $$ [Hnm] with ⟨Hnm, #Hcert⟩
         · iframe Hnm; iexact Hkc
         ihave %hag := lockHalf_agree γ st (some (cpu, true)) B B0 $$ [Hhalf Hhalf0]
         case' _ => iframe
@@ -1516,7 +1532,7 @@ theorem wp_s_amoswap_lock_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
         try unfold lockBody
         icases Hbody with ⟨%W2, %W2', %st2, %B2, >Hw2, Hc2, >%hst2, >Hhalf2, Hfr2, >Hnm, Harm2⟩
         icases wordCell_cases lk 4 lo 0 W2 $$ Hw2 with ⟨%Hold2, Hb2, %htail2⟩
-        icases Lock.lkDynRegW_open lk lo W2 W2' $$ Hnm with ⟨%Ld, %te, %⟨hlo, hWt, hWt'⟩, #Hreg, #Hte⟩
+        icases Lock.lkDynRegW_open lk lo lc st2 W2 W2' $$ Hnm with ⟨%Ld, %te, %M, %⟨hf, hd⟩, #Hreg, #Hte, #HM⟩
         icases Harm2 with ⟨⟨>%hfree, >Hhalf3, Hpay⟩ | >%hheld⟩
         · -- free: the winning AMO
           subst hfree
@@ -1524,22 +1540,22 @@ theorem wp_s_amoswap_lock_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
           icases Hpay with ⟨%ξL, %T, %V, %g, Hst, HR, >#Hrec⟩
           ihave Hst' := BI.later_mono (ctxStamped_topLb ξL T V g) $$ Hst
           icases Hst' with ⟨>#HT, Hst⟩
-          icases lockRec_hopReq cpu lk W2 Hold2 V Vb g (some (Ld, te)) (hopRegWord_cell W2 Hold2 Ld htail2 hlo)
+          icases lockRec_hopReq cpu lk W2 Hold2 V Vb g (some (Ld, te)) (hopRegWord_cell W2 Hold2 Ld htail2 hf.lo_le)
             $$ [] with ⟨%o, Ho, Hwin⟩
           · iframe Hrec Hgp Hreg
           iapply fupd_mask_intro LawfulSet.empty_subset
           iintro Hmask
           ileft
-          iexists W2.hist Hold2, (max (max T tl) te), o
+          iexists W2.hist Hold2, (max (max T tl) M), o
           iframe Hb2 Ho
           isplit
-          · iapply topLb_max (max T tl) te
+          · iapply topLb_max (max T tl) M
             isplit
             · iapply topLb_max T tl
               isplit
               · iexact HT
               · iexact Htl
-            · iexact Hte
+            · iexact HM
           inext
           iintro %t %hTt %hheads2 Hvlb0 Hb2 #Hau #Htop Hout
           ihave #Hvlb := acq_view cpu t $$ Hvlb0
@@ -1568,9 +1584,11 @@ theorem wp_s_amoswap_lock_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
             isplit
             · ipureintro; exact ⟨lockWordAt_take W2 t cpu, lkCpuAt_take hst2.2 cpu⟩
             isplitr
-            · iapply Lock.lkDynRegW_push4' lk lo W2 W2' Ld te ⟨t, hartAgent cpu, lkOne⟩ hlo hWt hWt'
-                (by simp only; omega)
-              iexact Hreg
+            · iapply Lock.lkDynRegW_intro lk lo lc (some (cpu, false)) _ W2' Ld te t
+                (lkDynF_push4 hf (e := ⟨t, hartAgent cpu, lkOne⟩) (by show M < t; omega)
+                  (lockDiscWin_of ⟨lockWordAt_take W2 t cpu, lkCpuAt_take hst2.2 cpu⟩ (lockDynW_take hd t cpu)))
+                (lockDynW_take hd t cpu)
+              iframe Hreg Htop
             · iright; ipureintro; simp
           imod Hcl
           imodintro
@@ -1588,13 +1606,12 @@ theorem wp_s_amoswap_lock_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
           iapply fupd_mask_intro LawfulSet.empty_subset
           iintro Hmask
           ileft
-          iexists W2.hist Hold2, te, none
-          iframe Hb2 Hte
+          iexists W2.hist Hold2, M, none
+          iframe Hb2 HM
           isplitr
           · simp only [hopIn]; iempintro
           inext
           iintro %t %hte %hheads2 Hvlb Hb2 #Hau #Htop _
-          ihave Hnm := Lock.lkDynRegW_push4' lk lo W2 W2' Ld te ⟨t, hartAgent cpu, lkOne⟩ hlo hWt hWt' hte $$ Hreg
           have hcur : w0 = curVal W2 0 := WordHist.heads_eq W2 Hold2 0 w0 htail2 hheads2
           have hw0 : w0 ≠ 0#32 := by
             intro h
@@ -1603,6 +1620,11 @@ theorem wp_s_amoswap_lock_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
           obtain ⟨p, hp⟩ := Option.ne_none_iff_exists'.1 hheld
           obtain ⟨i, b⟩ := p
           subst hp
+          ihave Hnm := Lock.lkDynRegW_intro lk lo lc (some (i, b)) _ W2' Ld te t
+            (lkDynF_push4 hf (e := ⟨t, hartAgent cpu, lkOne⟩) (by show M < t; omega)
+              (lockDiscWin_of ⟨lockWordAt_spin hst2.1 t (hartAgent cpu), hst2.2⟩ (lockDynW_spin hd t cpu.isLt)))
+            (lockDynW_spin hd t cpu.isLt) $$ [Hreg Htop]
+          · iframe Hreg Htop
           imod Hmask
           ihave Hcl := Hclose $$ [Hb2 Hc2 Hhalf2 Hfr2 Hnm]
           case' _ =>
@@ -1814,7 +1836,7 @@ theorem wp_s_sd_lkcpu_acquire_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
         unfold lockBody
         icases Hbody with ⟨%W, %W', %st, %B, Hw, >Hc, >%hst, >Hhalf, Hfr, >Hnm, Harm⟩
         icases wordCell_cases (lk + 16#64) 8 lc 0 W' $$ Hc with ⟨%Hold, Hb, %htail⟩
-        icases Lock.lkDynRegW_open lk lo W W' $$ Hnm with ⟨%Ld, %te, %⟨hlo, hWt, hWt'⟩, #Hreg, #Hte⟩
+        icases Lock.lkDynRegW_open lk lo lc st W W' $$ Hnm with ⟨%Ld, %te, %M, %⟨hf, hd⟩, #Hreg, #Hte, #HM⟩
         ihave %hag := lockHalf_agree γ st (some (cpu, false)) B B0 $$ [Hhalf Hhalf0]
         case' _ => iframe
         obtain ⟨rfl, hB⟩ := hag
@@ -1822,11 +1844,14 @@ theorem wp_s_sd_lkcpu_acquire_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
         subst hB'
         iapply fupd_mask_intro LawfulSet.empty_subset
         iintro Hmask
-        iexists W'.hist Hold, te
-        iframe Hb Hte
+        iexists W'.hist Hold, M
+        iframe Hb HM
         inext
         iintro %t %hte Hb #Hau #Htop
-        ihave Hnm := Lock.lkDynRegW_push8' lk lo W W' Ld te ⟨t, hartAgent cpu, cpuAddr cpu⟩ hlo hWt hWt' hte $$ Hreg
+        ihave Hnm := Lock.lkDynRegW_intro lk lo lc (some (cpu, true)) W _ Ld te t
+          (lkDynF_push8 hf (e := ⟨t, hartAgent cpu, cpuAddr cpu⟩) (by show M < t; omega)
+            (lockDiscWin_of (st := some (cpu, true)) ⟨hst.1, lkCpuAt_set hst.2 t⟩ (lockDynW_set hd t))) (lockDynW_set hd t) $$ [Hreg Htop]
+        · iframe Hreg Htop
         imod lockHalf_update γ _ _ (some (cpu, true)) B0 B0 B0 $$ [$Hhalf $Hhalf0] with ⟨Hhalf, Hhalf0⟩
         imod Hmask
         ihave Hcl := Hclose $$ [Hw Hb Hhalf Hfr Hnm]
@@ -2028,7 +2053,7 @@ theorem wp_s_sd_zero_lkcpu_release_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = fa
         unfold lockBody
         icases Hbody with ⟨%W, %W', %st, %B, Hw, >Hc, >%hst, >Hhalf, Hfr, >Hnm, Harm⟩
         icases wordCell_cases (lk + 16#64) 8 lc 0 W' $$ Hc with ⟨%Hold, Hb, %htail⟩
-        icases Lock.lkDynRegW_open lk lo W W' $$ Hnm with ⟨%Ld, %te, %⟨hlo, hWt, hWt'⟩, #Hreg, #Hte⟩
+        icases Lock.lkDynRegW_open lk lo lc st W W' $$ Hnm with ⟨%Ld, %te, %M, %⟨hf, hd⟩, #Hreg, #Hte, #HM⟩
         ihave %hag := lockHalf_agree γ st (some (cpu, true)) B B0 $$ [Hhalf Hhalf0]
         case' _ => iframe
         obtain ⟨rfl, hB⟩ := hag
@@ -2036,11 +2061,14 @@ theorem wp_s_sd_zero_lkcpu_release_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = fa
         subst hB'
         iapply fupd_mask_intro LawfulSet.empty_subset
         iintro Hmask
-        iexists W'.hist Hold, te
-        iframe Hb Hte
+        iexists W'.hist Hold, M
+        iframe Hb HM
         inext
         iintro %t %hte Hb #Hau #Htop
-        ihave Hnm := Lock.lkDynRegW_push8' lk lo W W' Ld te ⟨t, hartAgent cpu, 0#64⟩ hlo hWt hWt' hte $$ Hreg
+        ihave Hnm := Lock.lkDynRegW_intro lk lo lc (some (cpu, false)) W _ Ld te t
+          (lkDynF_push8 hf (e := ⟨t, hartAgent cpu, 0#64⟩) (by show M < t; omega)
+            (lockDiscWin_of (st := some (cpu, false)) ⟨hst.1, lkCpuAt_clear hst.2 t⟩ (lockDynW_clear hd t))) (lockDynW_clear hd t) $$ [Hreg Htop]
+        · iframe Hreg Htop
         imod lockHalf_update γ _ _ (some (cpu, false)) B0 B0 B0 $$ [$Hhalf $Hhalf0] with ⟨Hhalf, Hhalf0⟩
         imod Hmask
         ihave Hcl := Hclose $$ [Hw Hb Hhalf Hfr Hnm]
@@ -2286,7 +2314,7 @@ theorem wp_s_sw_zero_release_hook (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
         unfold lockBody
         icases Hbody with ⟨%W, %W', %st, %B, >Hw, Hc, >%hst, >Hhalf, >Hfr, >Hnm, Harm⟩
         icases wordCell_cases lk 4 lo 0 W $$ Hw with ⟨%Hold, Hb, %htail⟩
-        icases Lock.lkDynRegW_open lk lo W W' $$ Hnm with ⟨%Ld, %te, %⟨hlo, hWt, hWt'⟩, #Hreg, #Hte⟩
+        icases Lock.lkDynRegW_open lk lo lc st W W' $$ Hnm with ⟨%Ld, %te, %M, %⟨hf, hd⟩, #Hreg, #Hte, #HM⟩
         ihave %hag := lockHalf_agree γ st (some (cpu, false)) B B0 $$ [Hhalf Hhalf0]
         case' _ => iframe
         obtain ⟨rfl, hB⟩ := hag
@@ -2299,13 +2327,17 @@ theorem wp_s_sw_zero_release_hook (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
         iintro Hmask
         obtain ⟨e0, W2, hW, he0⟩ := lockWordAt_held_head hst.1
         ileft
-        iexists W.hist Hold, some (cpus.map (fun h => (h, V h))), te
-        iframe Hb Hte
+        iexists W.hist Hold, some (cpus.map (fun h => (h, V h))), M
+        iframe Hb HM
         isplitr
         · simp only [rtIn]; iexact Hl
         inext
         iintro %t %hte Hb #Hau #Htop Hout
-        ihave Hnm := Lock.lkDynRegW_push4' lk lo W W' Ld te ⟨t, hartAgent cpu, 0#32⟩ hlo hWt hWt' hte $$ Hreg
+        ihave Hnm := Lock.lkDynRegW_intro lk lo lc none _ W' Ld te t
+          (lkDynF_push4 hf (e := ⟨t, hartAgent cpu, 0#32⟩) (by show M < t; omega)
+            (lockDiscWin_of ⟨lockWordAt_release W B0 t (hartAgent cpu), lkCpuAt_free hst.2⟩ (lockDynW_release hd t)))
+          (lockDynW_release hd t) $$ [Hreg Htop]
+        · iframe Hreg Htop
         simp only [rtOut]
         ihave Hpay := lockPay_release R W Vb ξL T V g cpu t e0 W2 hW he0 $$ [Hst HRL Hout]
         · iframe Hst HRL Hout
@@ -2545,7 +2577,7 @@ theorem wp_s_sw_zero_release_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
         unfold lockBody
         icases Hbody with ⟨%W, %W', %st, %B, >Hw, Hc, >%hst, >Hhalf, >Hfr, >Hnm, Harm⟩
         icases wordCell_cases lk 4 lo 0 W $$ Hw with ⟨%Hold, Hb, %htail⟩
-        icases Lock.lkDynRegW_open lk lo W W' $$ Hnm with ⟨%Ld, %te, %⟨hlo, hWt, hWt'⟩, #Hreg, #Hte⟩
+        icases Lock.lkDynRegW_open lk lo lc st W W' $$ Hnm with ⟨%Ld, %te, %M, %⟨hf, hd⟩, #Hreg, #Hte, #HM⟩
         ihave %hag := lockHalf_agree γ st (some (cpu, false)) B B0 $$ [Hhalf Hhalf0]
         case' _ => iframe
         obtain ⟨rfl, hB⟩ := hag
@@ -2558,13 +2590,17 @@ theorem wp_s_sw_zero_release_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
         iintro Hmask
         obtain ⟨e0, W2, hW, he0⟩ := lockWordAt_held_head hst.1
         ileft
-        iexists W.hist Hold, some (cpus.map (fun h => (h, V h))), te
-        iframe Hb Hte
+        iexists W.hist Hold, some (cpus.map (fun h => (h, V h))), M
+        iframe Hb HM
         isplitr
         · simp only [rtIn]; iexact Hl
         inext
         iintro %t %hte Hb #Hau #Htop Hout
-        ihave Hnm := Lock.lkDynRegW_push4' lk lo W W' Ld te ⟨t, hartAgent cpu, 0#32⟩ hlo hWt hWt' hte $$ Hreg
+        ihave Hnm := Lock.lkDynRegW_intro lk lo lc none _ W' Ld te t
+          (lkDynF_push4 hf (e := ⟨t, hartAgent cpu, 0#32⟩) (by show M < t; omega)
+            (lockDiscWin_of ⟨lockWordAt_release W B0 t (hartAgent cpu), lkCpuAt_free hst.2⟩ (lockDynW_release hd t)))
+          (lockDynW_release hd t) $$ [Hreg Htop]
+        · iframe Hreg Htop
         simp only [rtOut]
         ihave Hpay := lockPay_release R W Vb ξL T V g cpu t e0 W2 hW he0 $$ [Hst HRL Hout]
         · iframe Hst HRL Hout
@@ -2941,9 +2977,10 @@ theorem wp_s_lw_lockword_locked_refute (cpu : CPU) (k : KCtx) (hsie : k.sie = fa
           case' _ => iframe Hhalf0; iexact HflB
           iapply hrefute $$ Hlc' Hdead
         unfold lockBody
-        icases Hbody with ⟨%W, %W', %st, %B, >Hw, Hc, >%hst, >Hhalf, Hfr, >Hnm, Harm⟩
+        icases Hbody with ⟨%W, %W', %st, %B, >Hw, >Hc, >%hst, >Hhalf, Hfr, >Hnm, Harm⟩
         icases wordCell_cases lk 4 lo 0 W $$ Hw with ⟨%Hold, Hb, %htail⟩
-        icases Lock.dyn_certs4' cpu lk K ts W W' Hold lo htail hK.2 $$ [Hnm] with ⟨Hnm, #Hcert⟩
+        icases wordCell_cases (lk + 16#64) 8 lc 0 W' $$ Hc with ⟨%HoldC, HbC, %htailC⟩
+        icases Lock.dyn_certs4' cpu lk K ts st W W' Hold HoldC lo lc (DFrac.own 1) htail htailC hK.2 $$ [Hnm] with ⟨Hnm, #Hcert⟩
         · iframe Hnm; iexact Hkc
         ihave %hag := lockHalf_agree γ st (some (cpu, true)) B B0 $$ [Hhalf Hhalf0]
         case' _ => iframe
@@ -2953,16 +2990,23 @@ theorem wp_s_lw_lockword_locked_refute (cpu : CPU) (k : KCtx) (hsie : k.sie = fa
         have hpin : wordPin W B0 cpu := hst.1
         iapply fupd_mask_intro LawfulSet.empty_subset
         iintro Hmask
-        iexists (fun _ => DFrac.own 1), W.hist Hold, []
+        iexists (fun _ => DFrac.own 1), W.hist Hold, [(lk + 16#64, 8, DFrac.own 1, W'.hist HoldC)]
         iframe Hb
         isplit
         · ipureintro; exact fun j hj => WordHist.hist_ne_nil W Hold htail j hj
-        isplitl []
-        · iapply rdCompBytes_nil
+        isplitl [HbC]
+        · unfold rdCompBytes
+          iapply BigSepL.bigSepL_cons.2
+          isplitl [HbC]
+          · iexact HbC
+          · exact BigSepL.bigSepL_nil_intro
         isplitl []
         · iexact Hcert
         inext
-        iintro %w %tvn %hKt %hrd' %hauth Hb _
+        iintro %w %tvn %hKt %hrd' %hauth Hb HcC
+        unfold rdCompBytes
+        icases BigSepL.bigSepL_cons.1 $$ HcC with ⟨HbC, _⟩
+        ihave Hc := wordCell_intro (lk + 16#64) 8 lc 0 W' HoldC htailC $$ HbC
         have hres := WordHist.read_cases_vis W Hold (hartAgent cpu) tvn K lo ts 0 w (by decide) htail
           (by omega) hK.2 hauth hrd'
         have hw := wordPin_read hpin (by omega) (hartAgent cpu) 0 w hres
@@ -3191,7 +3235,7 @@ theorem wp_s_ld_lkcpu_locked_refute (cpu : CPU) (k : KCtx) (hsie : k.sie = false
         icases Hbody with ⟨%W, %W', %st, %B, >Hw, >Hc, >%hst, >Hhalf, Hfr, >Hnm, Harm⟩
         icases wordCell_cases (lk + 16#64) 8 lc 0 W' $$ Hc with ⟨%Hold, Hb, %htail⟩
         icases wordCell_cases lk 4 lo 0 W $$ Hw with ⟨%HoldL, HbL, %htailL⟩
-        icases Lock.dyn_certs8' cpu lk K ts W W' HoldL Hold lo lc (DFrac.own 1) htailL htail hvis $$ [Hnm] with ⟨Hnm, #Hcert⟩
+        icases Lock.dyn_certs8' cpu lk K ts st W W' HoldL Hold lo lc (DFrac.own 1) htailL htail hvis $$ [Hnm] with ⟨Hnm, #Hcert⟩
         · iframe Hnm; iexact Hkc
         ihave %hag := lockHalf_agree γ st (some (cpu, true)) B B0 $$ [Hhalf Hhalf0]
         case' _ => iframe
@@ -3405,7 +3449,7 @@ theorem wp_s_sd_zero_lkcpu_release_refute (cpu : CPU) (k : KCtx) (hsie : k.sie =
         unfold lockBody
         icases Hbody with ⟨%W, %W', %st, %B, Hw, >Hc, >%hst, >Hhalf, Hfr, >Hnm, Harm⟩
         icases wordCell_cases (lk + 16#64) 8 lc 0 W' $$ Hc with ⟨%Hold, Hb, %htail⟩
-        icases Lock.lkDynRegW_open lk lo W W' $$ Hnm with ⟨%Ld, %te, %⟨hlo, hWt, hWt'⟩, #Hreg, #Hte⟩
+        icases Lock.lkDynRegW_open lk lo lc st W W' $$ Hnm with ⟨%Ld, %te, %M, %⟨hf, hd⟩, #Hreg, #Hte, #HM⟩
         ihave %hag := lockHalf_agree γ st (some (cpu, true)) B B0 $$ [Hhalf Hhalf0]
         case' _ => iframe
         obtain ⟨rfl, hB⟩ := hag
@@ -3413,11 +3457,14 @@ theorem wp_s_sd_zero_lkcpu_release_refute (cpu : CPU) (k : KCtx) (hsie : k.sie =
         subst hB'
         iapply fupd_mask_intro LawfulSet.empty_subset
         iintro Hmask
-        iexists W'.hist Hold, te
-        iframe Hb Hte
+        iexists W'.hist Hold, M
+        iframe Hb HM
         inext
         iintro %t %hte Hb #Hau #Htop
-        ihave Hnm := Lock.lkDynRegW_push8' lk lo W W' Ld te ⟨t, hartAgent cpu, 0#64⟩ hlo hWt hWt' hte $$ Hreg
+        ihave Hnm := Lock.lkDynRegW_intro lk lo lc (some (cpu, false)) W _ Ld te t
+          (lkDynF_push8 hf (e := ⟨t, hartAgent cpu, 0#64⟩) (by show M < t; omega)
+            (lockDiscWin_of (st := some (cpu, false)) ⟨hst.1, lkCpuAt_clear hst.2 t⟩ (lockDynW_clear hd t))) (lockDynW_clear hd t) $$ [Hreg Htop]
+        · iframe Hreg Htop
         imod lockHalf_update γ _ _ (some (cpu, false)) B0 B0 B0 $$ [$Hhalf $Hhalf0] with ⟨Hhalf, Hhalf0⟩
         imod Hmask
         ihave Hcl := Hclose $$ [Hw Hb Hhalf Hfr Hnm]
@@ -3648,7 +3695,7 @@ theorem wp_s_sw_zero_release_refute (cpu : CPU) (k : KCtx) (hsie : k.sie = false
         unfold lockBody
         icases Hbody with ⟨%W, %W', %st, %B, >Hw, Hc, >%hst, >Hhalf, >Hfr, >Hnm, Harm⟩
         icases wordCell_cases lk 4 lo 0 W $$ Hw with ⟨%Hold, Hb, %htail⟩
-        icases Lock.lkDynRegW_open lk lo W W' $$ Hnm with ⟨%Ld, %te, %⟨hlo, hWt, hWt'⟩, #Hreg, #Hte⟩
+        icases Lock.lkDynRegW_open lk lo lc st W W' $$ Hnm with ⟨%Ld, %te, %M, %⟨hf, hd⟩, #Hreg, #Hte, #HM⟩
         ihave %hag := lockHalf_agree γ st (some (cpu, false)) B B0 $$ [Hhalf Hhalf0]
         case' _ => iframe
         obtain ⟨rfl, hB⟩ := hag
@@ -3661,13 +3708,17 @@ theorem wp_s_sw_zero_release_refute (cpu : CPU) (k : KCtx) (hsie : k.sie = false
         iintro Hmask
         obtain ⟨e0, W2, hW, he0⟩ := lockWordAt_held_head hst.1
         ileft
-        iexists W.hist Hold, some (cpus.map (fun h => (h, V h))), te
-        iframe Hb Hte
+        iexists W.hist Hold, some (cpus.map (fun h => (h, V h))), M
+        iframe Hb HM
         isplitr
         · simp only [rtIn]; iexact Hl
         inext
         iintro %t %hte Hb #Hau #Htop Hout
-        ihave Hnm := Lock.lkDynRegW_push4' lk lo W W' Ld te ⟨t, hartAgent cpu, 0#32⟩ hlo hWt hWt' hte $$ Hreg
+        ihave Hnm := Lock.lkDynRegW_intro lk lo lc none _ W' Ld te t
+          (lkDynF_push4 hf (e := ⟨t, hartAgent cpu, 0#32⟩) (by show M < t; omega)
+            (lockDiscWin_of ⟨lockWordAt_release W B0 t (hartAgent cpu), lkCpuAt_free hst.2⟩ (lockDynW_release hd t)))
+          (lockDynW_release hd t) $$ [Hreg Htop]
+        · iframe Hreg Htop
         simp only [rtOut]
         ihave Hpay := lockPay_release R W Vb ξL T V g cpu t e0 W2 hW he0 $$ [Hst HRL Hout]
         · iframe Hst HRL Hout

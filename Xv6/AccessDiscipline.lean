@@ -1,10 +1,12 @@
 /-
 **THE ACCESS DISCIPLINE** (weak-allocproc plan §C W8's skeleton, [R25.1],
-[R34.1]; W8 (f2-ctx) S4; W8 (f3-hold) [OWN.64]; W8 (f3-racy) [OWN.63]): W8's
-export `xv6AccessDisc`, `chainOkAt ∧ lockWordDiscAt ∧ cpuStaticAt ∧
-lkCpuReadAt` -- FOUR conjuncts: THREE of the skeleton's six (W8 (f2-ctx)) and
-the ruled `holding()` clause `lkCpuReadAt` (W8 (f3-hold)); `chainOkAt` carries
-the ruled `ip->ref` clause `racyValOk` (W8 (f3-racy)).
+[R34.1]; W8 (f2-ctx) S4; W8 (f3-hold) [OWN.64]; W8 (f3-racy) [OWN.63]; W8
+(f3-pipelk) [OWN.65]): W8's export `xv6AccessDisc`, `chainOkAt ∧
+lockWordDiscAt ∧ cpuStaticAt ∧ lkCpuReadAt` -- FOUR conjuncts: THREE of the
+skeleton's six (W8 (f2-ctx)) and the ruled `holding()` clause `lkCpuReadAt`
+(W8 (f3-hold)); `chainOkAt` carries the ruled `ip->ref` clause `racyValOk`
+(W8 (f3-racy)); `lockWordDiscAt` and `lkCpuReadAt` cover EVERY lock -- the
+static spinlocks and the live pipe locks (W8 (f3-pipelk)).
 
 **ONE benign-race class, two instances** ([OWN.63], [OWN.64]; plan §A(4′)):
 UNLOCKED reads of LOCK-PROTECTED words, harmless by a VALUE argument -- both
@@ -30,13 +32,20 @@ STRENGTHEN the conjunction.
   invariant's exemption `MachCSL.chainExAt`, in this order:
   - `lockw b`: a byte of the two words (`lk->locked`, `lk->cpu`) of a STATIC
     spinlock at `b` of the registry; or of a DYNAMIC (pipe) lock at `b` live
-    as of `t` (`MachCSL.dynLkAt`: an `f->pipe` slot named `b` and every later
-    entry on `b`'s word is word-sized -- the ruled (a′) window [OWN.46],
-    [OWN.49] (a′-r)).  The dynamic lock words are EXEMPT from `chainOkAt`
-    but NOT covered by `lockWordDiscAt` (static locks only): the windowed
-    `lockRegionOk` of the plan's S4 text [R36.3] is not a fact of the state
-    interpretation (a pipe lock's discipline is its Iris lock invariant,
-    `Lock.lkDynRegW`) -- a named gap, `PROGRESS-W8f2.md` S4;
+    as of `t` (`xv6DynLock`, `MachCSL.dynLkDiscAt`: an `f->pipe` slot named
+    `b` at `te`, every later entry on `b`'s word up to `t` is word-sized --
+    the ruled (a′) window [OWN.46], [OWN.49] (a′-r) -- AND the lock words'
+    history over a window `(p, t]` opening at or before `te` is a lock
+    history from free: the WINDOWED `lockRegionOk` [R36.3], W8 (f3-pipelk)
+    [OWN.65]).  So every lock word this class exempts from `chainOkAt` is
+    covered by `lockWordDiscAt` and `lkCpuReadAt`: a byte whose `f->pipe`
+    window is NOT so disciplined is not exempt (`chainOkAt` claims its
+    chains).  The window's discipline is proved at every racy read of a
+    pipe lock's word, from the lock's invariant (`Lock.lkDynRegW`: the
+    registration at or past both words' `initlock` floors, every time-cut
+    of the post-birth histories a lock history from free, `Lock.lkCutsOk`;
+    `Lock.dynLkDiscAt_of`); it ends σ-readably at the reclaim (`kfree`'s
+    junk fill is byte stores: no later `t` is live);
   - `pub w`: a byte of a one-shot publication word written only by hart `w`
     (xv6: `started`, the boot gate; its discipline is the registry's
     `RsvKind.pub`);
@@ -119,12 +128,18 @@ STRENGTHEN the conjunction.
   guard's load return any store not coherence-before what the hart has
   observed; riscv.cat/Sail/Zifencei/PMAs say nothing about custody --
   FAITHFUL (a value theorem about the program, no ISA assumption added).
-* `xv6LockWord σ b t`: `b` is the lock word of one of xv6's 157 STATIC image
-  spinlocks (`xv6StaticLocks`).
+* `xv6LockWord σ b t` (W8 (f3-pipelk) [OWN.65]: EVERY lock): `b` is the
+  lock word of one of xv6's 157 STATIC image spinlocks (`xv6StaticLocks`),
+  or of a pipe lock live as of `t` (`xv6DynLock`, the `lockw` class's
+  dynamic arm).
 * `lockWordDiscAt σ`: every such lock's two word histories obey the spinlock
-  kit's discipline (`MachCSL.lockRegionOk`: whole-word histories over the
-  image, every post-power-on entry a hart's, the lock word 0/1, the holder
-  fold legal, `lk->cpu` entries 0 or the writer's own `&cpus[c]`).
+  kit's discipline -- a static lock's whole histories (`MachCSL.lockRegionOk`:
+  whole-word histories over the image, every post-power-on entry a hart's,
+  the lock word 0/1, the holder fold legal, `lk->cpu` entries 0 or the
+  writer's own `&cpus[c]`), a pipe lock's over its window `(p, t]`, `p` at or
+  before the `f->pipe` store that named it (`dynLockWinAt`,
+  `MachCSL.lockWinAt`: the same discipline from free, the owner word's
+  pointers into xv6's `cpus`).
 * `cpuStaticAt σ`: every post-power-on entry on a byte of `cpus[h]`'s cells
   is `h`'s (custody-free: every byte of the cells, so at least the β′
   clause).
@@ -140,26 +155,35 @@ STRENGTHEN the conjunction.
   `acquire` does not panic).  The SAME defect class as `ip->ref`'s guard
   (`chainOkAt`'s `racyValOk`, [OWN.63], W8 (f3-racy)): unlocked reads of
   lock-protected words, benign by a value argument.  A
-  corollary of `lockWordDiscAt` (`MachCSL.lkCpu_read_not_mine`).  Static
-  locks only, as `xv6LockWord` (every lock after W8 (f3-pipelk)).  Spec:
+  corollary of `lockWordDiscAt` (`MachCSL.lkCpu_read_not_mine`).  EVERY
+  lock, as `xv6LockWord` (W8 (f3-pipelk) [OWN.65]): a pipe lock's over its
+  window, the initial value its window's opening's (`initlock`'s 0).  Spec:
   RVWMO/riscv.cat/Sail are SILENT on lock disciplines (a proof notion);
   the reads quantified are every value RVWMO lets the load return under the
   discipline -- FAITHFUL.
 
-**The registration lemma** [R26.1] (`xv6LockWord_registered`).
+**The registration lemma** [R26.1] (`xv6LockWord_registered`): every lock
+word is registered -- a static region, or named by a registered `f->pipe`
+slot.
 
 **`powerInterp_accessDisc`** (on `MachCSL.powerInterp_rsvOk`'s pattern): the
 state interpretation gives `g.pow = true → xv6AccessDisc g.m`, at a record
 whose static list is xv6's -- `chainOkAt` from the chain conjunct's
 load-side invariant (`MachCSL.loadsChained`, S3) and `mmOk` (the deadline),
 `lockWordDiscAt ∧ cpuStaticAt ∧ lkCpuReadAt` from the reserved regions'
-discipline.
+discipline (static locks, `cpus`) and the live window's definition (pipe
+locks: the registry's `cpus` cells fix the owner word's pointers,
+`xv6Rsv_cpuBase`).
 
 Deviations from the plan's skeleton: the definitions are at xv6's
 `KernelGeom` instance (`Xv6.Geom`), not under a `[KernelGeom]` binder; the
 boot hop is `pubCover` (the implemented [R36.1] form), not "`t ≤ bootEnd`";
 the exemption has the S3 class `pub` beyond `lockw`/`pte` (S3's `dev` retired
-by W8 (f3-gate); S3's `racy` value-qualified by W8 (f3-racy)).
+by W8 (f3-gate); S3's `racy` value-qualified by W8 (f3-racy)); W8 (f3-pipelk)
+[OWN.65]: the pipe locks' windowed discipline is carried by each lock's
+invariant and stated in the σ-readable live window (`MachCSL.dynLkDiscAt`, the
+exemption's dynamic arm) -- not by a dynamic registry in `reservedOk` (see
+`PROGRESS-W8pipelk.md`).
 -/
 import Xv6.KernelRsv
 import MachCSL.Adequacy
@@ -214,10 +238,18 @@ def staticLockByteOf (b a : PAddr) : Prop :=
 def pubByteOf (w : CPU) (a : PAddr) : Prop :=
   ∃ f, (⟨f, .pub w⟩ : RsvRegion) ∈ xv6Rsv ∧ a ∈ (⟨f, .pub w⟩ : RsvRegion).bytes
 
-/-- `a` is a byte of the two words of a dynamic lock at `b` live as of `t`
-(`MachCSL.dynLkAt` over the registry's `f->pipe` slots). -/
+/-- **A live dynamic (pipe) lock at `b` as of `t`** (W8 (f3-pipelk) [OWN.65]):
+`MachCSL.dynLkDiscAt` over the registry's `f->pipe` slots -- a slot store
+named `b` at `te ≤ t`, every later entry on `b`'s lock word up to `t` is
+word-sized, and the lock words' history over a window `(p, t]` with `p ≤ te`
+is a lock history from free, the owner-word pointers those of the registry's
+`cpus` array. -/
+def xv6DynLock (σ : MState) (b : PAddr) (t : Nat) : Prop :=
+  dynLkDiscAt xv6Rsv (slotWit xv6Rsv) σ.mem σ.top b t
+
+/-- `a` is a byte of the two words of a live dynamic lock at `b` as of `t`. -/
 def dynLockByteAt (σ : MState) (b a : PAddr) (t : Nat) : Prop :=
-  dynLkAt (slotWit xv6Rsv) σ.mem σ.top b t ∧ lockWordsByte b a
+  xv6DynLock σ b t ∧ lockWordsByte b a
 
 open Classical in
 /-- **The custody map** (σ-readable): the exempt classes first, in the order
@@ -286,43 +318,70 @@ def xv6StaticLocks : List PAddr :=
     KA.«tickslock», KA.«bcache», KA.«itable», KA.«log», KA.«ftable», rsvDiskLk] ++
   ((List.range 64).map rsvProcLk ++ ((List.range 30).map rsvBufLk ++ (List.range 50).map rsvInodeLk))
 
-/-- The lock words at `σ` as of `t` whose discipline is exported: the static
-locks (the dynamic pipe locks are a named gap, see the header). -/
-def xv6LockWord (_σ : MState) (b : PAddr) (_t : Nat) : Prop := b ∈ xv6StaticLocks
+/-- **The lock words at `σ` as of `t`** (W8 (f3-pipelk) [OWN.65]: EVERY lock):
+the static locks, and the dynamic (pipe) locks live as of `t`. -/
+def xv6LockWord (σ : MState) (b : PAddr) (t : Nat) : Prop := b ∈ xv6StaticLocks ∨ xv6DynLock σ b t
 
-/-- **The lock layer's discipline**: every lock word's two histories obey the
-spinlock kit's discipline (`MachCSL.lockRegionOk` at `&cpus[c]`). -/
+/-- A dynamic lock's WINDOWED discipline as of `t` [R36.3]: a registered
+`f->pipe` slot named `b` at `te ≤ t`, and the lock words' history over a
+window `(p, t]` opening at or before `te` is a lock history from free, the
+owner word's entries 0 or the writer's own `&cpus[c]`
+(`MachCSL.lockWinAt`). -/
+def dynLockWinAt (σ : MState) (b : PAddr) (t : Nat) : Prop :=
+  ∃ (L : List (PAddr × HEnt)) (te p : Nat), slotWit xv6Rsv L b te ∧ p ≤ te ∧ te ≤ t ∧
+    lockWinAt (cpuPtrAt KernelGeom.cpusBase) σ.mem b p t
+
+/-- **The lock layer's discipline** (W8 (f3-pipelk) [OWN.65]: every lock):
+a static lock's two histories obey the spinlock kit's discipline over the
+whole history (`MachCSL.lockRegionOk` at `&cpus[c]`); a live dynamic lock's,
+over its window (`dynLockWinAt`). -/
 def lockWordDiscAt (σ : MState) : Prop :=
-  ∀ (b : PAddr) (t : Nat), xv6LockWord σ b t → lockRegionOk (cpuPtrAt KernelGeom.cpusBase) σ.mem b
+  ∀ (b : PAddr) (t : Nat), xv6LockWord σ b t →
+    (b ∈ xv6StaticLocks → lockRegionOk (cpuPtrAt KernelGeom.cpusBase) σ.mem b) ∧
+    (xv6DynLock σ b t → dynLockWinAt σ b t)
 
 /-- **`PPerCpu`**: `cpus[h]`'s bytes are written only by `h` after power-on. -/
 def cpuStaticAt (σ : MState) : Prop :=
   ∀ (h : CPU) (a : PAddr) (H : Hist) (e : HEnt), a ∈ cpuCellBytes h → σ.mem[a]? = some H →
     e ∈ H → e.t ≠ 0 → e.tid = hartAgent h
 
-/-- **`holding()`'s harmlessness** (W8 (f3-hold) [OWN.64]): for every exported
-lock word `b`, its two word histories (`lk->locked` at `b`, `lk->cpu` at
-`b + 16`) decompose over the memory as in `lockRegionOk` at a state `st`
-obeying the kit's discipline, and every hart `c` that is not `st`'s holder,
-reading `lk->cpu` at any view `tvn` with an image value `v0 ≠ &cpus[c]`,
-never obtains `&cpus[c]`.  The unlocked `lk->cpu == mycpu()` read of
-`holding(lk)` in `acquire` -- a benign race of the same class as `ip->ref`'s
-guard (`chainOkAt`'s `racyValOk`, [OWN.63]): an unlocked read of a
-lock-protected word, benign by a value argument. -/
+/-- **`holding()`'s harmlessness** (W8 (f3-hold) [OWN.64]; W8 (f3-pipelk)
+[OWN.65]: every lock): for every lock word `b` as of `t`, its two word
+histories -- a STATIC lock's whole histories (`lk->locked` at `b`, `lk->cpu`
+at `b + 16`, over the image), a live DYNAMIC lock's over its window `(p, t]`
+(`p` at or before the `f->pipe` store that named it) -- decompose as word
+histories `W`/`W'` at a state `st` obeying the kit's discipline, and every
+hart `c` that is not `st`'s holder, reading `lk->cpu` at any view `tvn` with
+an initial value `v0 ≠ &cpus[c]` (the image's, resp. the value as of the
+window's opening -- `initlock`'s 0), never obtains `&cpus[c]`.  The unlocked
+`lk->cpu == mycpu()` read of `holding(lk)` in `acquire` -- a benign race of
+the same class as `ip->ref`'s guard (`chainOkAt`'s `racyValOk`, [OWN.63]):
+an unlocked read of a lock-protected word, benign by a value argument. -/
 def lkCpuReadAt (σ : MState) : Prop :=
   ∀ (b : PAddr) (t : Nat), xv6LockWord σ b t →
-    ∃ (W : WordHist 4) (W' : WordHist 8) (Hold Hold' : Nat → Hist) (st : Option (CPU × Bool)) (B : Nat),
-      wordHistAt σ.mem b 4 W Hold ∧ wordHistAt σ.mem (b + 16#64) 8 W' Hold' ∧
-      lockDiscW (cpuPtrAt KernelGeom.cpusBase) st B W W' ∧
-      ∀ (c : CPU), (∀ k, st ≠ some (c, k)) → ∀ (tvn : Nat) (v0 w : BitVec 64), v0 ≠ cpuAddr c →
-        ReadCases W' (hartAgent c) tvn v0 w → w ≠ cpuAddr c
+    (b ∈ xv6StaticLocks →
+      ∃ (W : WordHist 4) (W' : WordHist 8) (Hold Hold' : Nat → Hist) (st : Option (CPU × Bool)) (B : Nat),
+        wordHistAt σ.mem b 4 W Hold ∧ wordHistAt σ.mem (b + 16#64) 8 W' Hold' ∧
+        lockDiscW (cpuPtrAt KernelGeom.cpusBase) st B W W' ∧
+        ∀ (c : CPU), (∀ k, st ≠ some (c, k)) → ∀ (tvn : Nat) (v0 w : BitVec 64), v0 ≠ cpuAddr c →
+          ReadCases W' (hartAgent c) tvn v0 w → w ≠ cpuAddr c) ∧
+    (xv6DynLock σ b t →
+      ∃ (L : List (PAddr × HEnt)) (te p : Nat) (W : WordHist 4) (W' : WordHist 8) (st : Option (CPU × Bool))
+        (B : Nat), slotWit xv6Rsv L b te ∧ p ≤ te ∧ te ≤ t ∧
+        (∀ j, j < 4 → ∃ H, σ.mem[b + BitVec.ofNat 64 j]? = some H ∧ H.filter (lkWinIn p t) = W.map (WEnt.proj j)) ∧
+        (∀ j, j < 8 → ∃ H, σ.mem[b + 16#64 + BitVec.ofNat 64 j]? = some H ∧
+          H.filter (lkWinIn p t) = W'.map (WEnt.proj j)) ∧
+        lockDiscWin (cpuPtrAt KernelGeom.cpusBase) st B W W' ∧
+        ∀ (c : CPU), (∀ k, st ≠ some (c, k)) → ∀ (tvn : Nat) (v0 w : BitVec 64), v0 ≠ cpuAddr c →
+          ReadCases W' (hartAgent c) tvn v0 w → w ≠ cpuAddr c)
 
 /-- **W8's export** (W8 (f2-ctx): `chainOkAt ∧ lockWordDiscAt ∧ cpuStaticAt`,
 three of the skeleton's six; W8 (f3-hold) [OWN.64]: `lkCpuReadAt`; W8
 (f3-racy) [OWN.63]: `chainOkAt`'s `racyValOk` arm -- the two instances of ONE
 benign-race class (unlocked reads of lock-protected words, harmless by a
-value argument); `pteDiscAt` open, `cpuProcDiscAt`/`utextDiscAt` W8
-(f3-rest)'s). -/
+value argument); W8 (f3-pipelk) [OWN.65]: `lockWordDiscAt` and `lkCpuReadAt`
+over EVERY lock, the live pipe locks included; `pteDiscAt` open,
+`cpuProcDiscAt`/`utextDiscAt` W8 (f3-rest)'s). -/
 def xv6AccessDisc (σ : MState) : Prop :=
   chainOkAt σ ∧ lockWordDiscAt σ ∧ cpuStaticAt σ ∧ lkCpuReadAt σ
 
@@ -360,11 +419,32 @@ theorem xv6StaticLocks_registered (b : PAddr) (hb : b ∈ xv6StaticLocks) :
     · obtain ⟨k, hk, rfl⟩ := List.mem_map.1 hb
       exact xv6RsvStatic_inode k (List.mem_range.1 hk)
 
-/-- **The registration lemma** [R26.1]: every lock word at `σ` is registered
-in the static list (`xv6LockWord σ b t → b ∈ reg`). -/
+/-- **The registration lemma** [R26.1] (W8 (f3-pipelk) [OWN.65]): every lock
+word at `σ` is registered -- a static lock region of the list, or named by a
+store into a registered `f->pipe` slot (`.slots`). -/
 theorem xv6LockWord_registered (σ : MState) (b : PAddr) (t : Nat) (hb : xv6LockWord σ b t) :
-    (⟨b, .lock KernelGeom.cpusBase⟩ : RsvRegion) ∈ KernelRsv.static :=
-  xv6StaticLocks_registered b hb
+    (⟨b, .lock KernelGeom.cpusBase⟩ : RsvRegion) ∈ KernelRsv.static ∨
+      ∃ (L : List (PAddr × HEnt)) (te : Nat), slotWit xv6Rsv L b te := by
+  rcases hb with hb | ⟨_, L, te, _, _, _, hw, _⟩
+  · exact .inl (xv6StaticLocks_registered b hb)
+  · exact .inr ⟨L, te, hw⟩
+
+/-- Every per-hart region of xv6's list sits at its hart's `&cpus[h]` (by
+evaluation). -/
+def cpuRegsAt (rs : List RsvRegion) : Bool :=
+  rs.all (fun R => match R.kind with
+    | .cpu c => decide (R.base = cpuAddr c)
+    | _ => true)
+
+theorem xv6RsvStatic_cpuRegs : cpuRegsAt xv6RsvStatic = true := by decide +kernel
+
+/-- A per-hart region of xv6's list at `cpuPtrAt cb c` names xv6's `cpus`. -/
+theorem xv6Rsv_cpuBase {cb : BitVec 64} {c : CPU}
+    (h : (⟨cpuPtrAt cb c, .cpu c⟩ : RsvRegion) ∈ xv6Rsv) : cb = KernelGeom.cpusBase := by
+  have hall := List.all_eq_true.mp xv6RsvStatic_cpuRegs _ h
+  have h2 : cpuPtrAt cb c = cpuAddr c := by simpa using hall
+  have h3 : cb + BitVec.ofNat 64 (128 * c.val) = KernelGeom.cpusBase + BitVec.ofNat 64 (128 * c.val) := h2
+  exact (BitVec.add_left_inj _).1 h3
 
 /-! ## The extraction -/
 
@@ -430,11 +510,20 @@ theorem chainOkAt_of (σ : MState) (hmm : mmOk σ)
     exact .inl ⟨b', by simp only [MState.top]; omega, hch⟩
   · exact .inr hp
 
-/-- `lockWordDiscAt ∧ cpuStaticAt` from the static list's discipline. -/
+/-- A live dynamic lock's windowed discipline, at xv6's `cpus` (W8
+(f3-pipelk) [OWN.65]). -/
+theorem dynLockWinAt_of (σ : MState) (b : PAddr) (t : Nat) (h : xv6DynLock σ b t) : dynLockWinAt σ b t := by
+  obtain ⟨_, L, te, p, cb, c, hw, _, hte, _, hp, hR, hwin⟩ := h
+  have hcb := xv6Rsv_cpuBase hR
+  subst hcb
+  exact ⟨L, te, p, hw, hp, hte, hwin⟩
+
+/-- `lockWordDiscAt ∧ cpuStaticAt` from the static list's discipline (and,
+for the dynamic locks, the definition of a live one). -/
 theorem lockCpuDisc_of_rsvAllOk (σ : MState) (h : rsvAllOk KernelRsv.static σ.mem) :
     lockWordDiscAt σ ∧ cpuStaticAt σ := by
-  refine ⟨fun b t hb => ?_, fun c a H e ha hH he het => ?_⟩
-  · obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 (xv6LockWord_registered σ b t hb)
+  refine ⟨fun b t _ => ⟨fun hb => ?_, dynLockWinAt_of σ b t⟩, fun c a H e ha hH he het => ?_⟩
+  · obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 (xv6StaticLocks_registered b hb)
     exact h i _ hi
   · have hR := h (rsvCpuIdx c) _ (xv6RsvStatic_cpu c)
     exact hR a ha H hH e he het
@@ -450,12 +539,18 @@ theorem lkCpuP_read_not_mine {W : WordHist 8} {st : Option (CPU × Bool)}
   · exact lkCpu_read_not_mine (st := st) h c hst tvn w (Or.inl hr)
   · exact hv0
 
-/-- **(f3-hold) from the lock layer's discipline** [OWN.64]. -/
+/-- **(f3-hold) from the lock layer's discipline** [OWN.64] (W8 (f3-pipelk)
+[OWN.65]: static and dynamic locks). -/
 theorem lkCpuReadAt_of (σ : MState) (h : lockWordDiscAt σ) : lkCpuReadAt σ := by
   intro b t hb
-  obtain ⟨W, W', Hold, Hold', st, B, hw, hw', hd⟩ := h b t hb
-  exact ⟨W, W', Hold, Hold', st, B, hw, hw', hd,
-    fun c hst tvn v0 w hv0 hres => lkCpuP_read_not_mine hd.2.2.2.2 c hst tvn v0 w hv0 hres⟩
+  obtain ⟨hs, hd⟩ := h b t hb
+  refine ⟨fun hst => ?_, fun hdyn => ?_⟩
+  · obtain ⟨W, W', Hold, Hold', st, B, hw, hw', hdisc⟩ := hs hst
+    exact ⟨W, W', Hold, Hold', st, B, hw, hw', hdisc,
+      fun c hst' tvn v0 w hv0 hres => lkCpuP_read_not_mine hdisc.2.2.2.2 c hst' tvn v0 w hv0 hres⟩
+  · obtain ⟨L, te, p, hwit, hp, hte, W, W', st, B, h1, h2, hdisc⟩ := hd hdyn
+    exact ⟨L, te, p, W, W', st, B, hwit, hp, hte, h1, h2, hdisc,
+      fun c hst' tvn v0 w hv0 hres => lkCpuP_read_not_mine hdisc.2.2.2.2 c hst' tvn v0 w hv0 hres⟩
 
 /-- **The export from the three pure facts** of the state interpretation. -/
 theorem accessDisc_of (σ : MState) (hmm : mmOk σ) (hr : rsvAllOk KernelRsv.static σ.mem)

@@ -270,14 +270,16 @@ theorem pipe_ends_alloc :
 initialised fields, the data and the slack become a well-formed `struct pipe`
 and the two end references its creator keeps.  (W8 (f2-ctx) [OWN.49]
 (a′-r): the fresh lock's words come opened -- the lock word's floor `lo` is
-the one its registration `lkDynReg pi lo` is at or past: the receipts of the
-`f->pipe` store that named it.) -/
+the one its registration `lkDynReg pi (max lo lc)` is at or past -- with the
+owner word's floor, W8 (f3-pipelk) [OWN.65]: the receipts of the `f->pipe`
+store that named it.) -/
 theorem newPipe (cpu : CPU) (pi : BitVec 64) (hpv : pageValid pi)
-    (hm : ¬ lkRsvIn (hlc := hlc) (GF := GF) pi) (hok : lockAddrOk pi) (lo lc : Nat) (vname : BitVec 64)
+    (hm : ¬ lkRsvIn (hlc := hlc) (GF := GF) pi) (hok : lockAddrOk pi) (lo lc : Nat)
+    (hc : ∃ c : CPU, cpuRsvIn (hlc := hlc) (GF := GF) c) (vname : BitVec 64)
     (bs : List (BitVec 8)) (hlen : bs.length = PIPESIZE) (E : CoPset) :
     kmapId (GF := GF) pi ∗ kmapId (pi + 16#64) ∗ ownCtx cpu curCtx ∗
     wordCell pi 4 lo 0 [] ∗ lkFloor curCtx lo ∗ wordCell (pi + 16#64) 8 lc 0 [] ∗ lkFloor curCtx lc ∗
-    lkDynReg pi lo ∗
+    lkDynReg pi (max lo lc) ∗
     wordPointsTo (pipeLockName pi) 8 (DFrac.own 1) vname ∗
     wordPointsTo (aPnread pi) 4 (DFrac.own 1) 0#32 ∗ wordPointsTo (aPnwrite pi) 4 (DFrac.own 1) 0#32 ∗
     wordPointsTo (aPopen pi false) 4 (DFrac.own 1) 1#32 ∗ wordPointsTo (aPopen pi true) 4 (DFrac.own 1) 1#32 ∗
@@ -308,7 +310,7 @@ theorem newPipe (cpu : CPU) (pi : BitVec 64) (hpv : pageValid pi)
   imod lock_pay_born cpu (pipeResAt γp pi) [] (fun _ h => by simp at h) $$ [$Hrun $HR]
     with ⟨Hrun, ⟨%Vb, Hpay, #Hvf⟩⟩
   imod lockHalf_alloc with ⟨%γl, H1, H2⟩
-  ihave #HregW := lkDynRegW_nil pi lo $$ Hreg
+  ihave #HregW := lkDynRegW_nil pi lo lc hc $$ Hreg
   imod inv_alloc lockN E
     (iprop(lockBody γl pi "pipe" (pipeResAt γp pi) lo lc Vb ∨ pipeDead γl γp))
     $$ [Hw Hc H1 H2 Hpay] with #Hinv
@@ -356,7 +358,7 @@ theorem kctx_newPipe {lent : Bool} (cpu : CPU) (k : KCtx) (pi : BitVec 64)
     (bs : List (BitVec 8)) (hlen : bs.length = PIPESIZE) :
     kctxL lent cpu k ∗ kmapId (GF := GF) pi ∗ kmapId (pi + 16#64) ∗
     wordCell pi 4 lo 0 [] ∗ lkFloor curCtx lo ∗ wordCell (pi + 16#64) 8 lc 0 [] ∗ lkFloor curCtx lc ∗
-    lkDynReg pi lo ∗
+    lkDynReg pi (max lo lc) ∗
     wordPointsTo (pipeLockName pi) 8 (DFrac.own 1) vname ∗
     wordPointsTo (aPnread pi) 4 (DFrac.own 1) 0#32 ∗ wordPointsTo (aPnwrite pi) 4 (DFrac.own 1) 0#32 ∗
     wordPointsTo (aPopen pi false) 4 (DFrac.own 1) 1#32 ∗ wordPointsTo (aPopen pi true) 4 (DFrac.own 1) 1#32 ∗
@@ -368,7 +370,13 @@ theorem kctx_newPipe {lent : Bool} (cpu : CPU) (k : KCtx) (pi : BitVec 64)
   icases kctx_cases cpu k $$ Hk with
     ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
   icases ctxTok_cases cpu curCtx $$ Htok with ⟨Hctx, %r, Hfrag⟩
-  imod newPipe cpu pi hpv hm hok lo lc vname bs hlen ⊤
+  -- the running hart's cells are registered (W8 (f3-pipelk) [OWN.65]: the
+  -- lock's owner-word pointers are those of the registered `cpus` array)
+  ihave %hcr : ⌜cpuRsvIn (hlc := hlc) (GF := GF) cpu⌝ $$ [Hcpu]
+  · unfold cpuOwn cpuCells cpuCell
+    icases Hcpu with ⟨⟨⟨_, _, %hcok⟩, _, _⟩, _, _⟩
+    ipureintro; exact hcok.1
+  imod newPipe cpu pi hpv hm hok lo lc ⟨cpu, hcr⟩ vname bs hlen ⊤
     $$ [Hctx Hw Hc Hnm Hnr Hnw Hropen Hwopen Hdat Hslack]
     with ⟨Hctx, ⟨%γl, %γp, #Hpipe, Hr0, Hr1, Hqf⟩⟩
   · iframe Hcl Hcl' Hctx Hw Hc Hnm Hnr Hnw Hropen Hwopen Hdat Hslack Hg Hflo Hflc Hreg

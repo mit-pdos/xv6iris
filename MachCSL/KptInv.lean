@@ -638,7 +638,7 @@ theorem kpt_exclWriteAU [CurCtx] (cpu : CPU) (t : PTree) (M : RegMapF (BitVec 64
     refine ⟨hpin.1, fun e he => ?_⟩
     simp only [List.mem_cons] at he
     rcases he with rfl | he
-    · exact ⟨hw', hSt⟩
+    · exact ⟨hw', Nat.le_of_lt hSt⟩
     · exact hpin.2 e he
   ihave Hcell := pteCell_intro addr c (fl i) S v0 _ hpin' $$ Hw
   ihave Hcl := Hclose $$ (Hback $$ Hcell)

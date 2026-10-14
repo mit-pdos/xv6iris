@@ -747,7 +747,7 @@ def writeAU (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) (Ψ : IProp
   |={⊤,∅}=>
     ((∃ (Hs : Nat → Hist) (o : Option (List (CPU × Nat))) (T : Nat), histBytes pa n (fun _ => DFrac.own 1) Hs ∗
       topLb T ∗ rtIn cpu o ∗
-      ▷ (∀ t : Nat, ⌜T ≤ t⌝ -∗ histBytes pa n (fun _ => DFrac.own 1) (pushed Hs t (hartAgent cpu) w') -∗
+      ▷ (∀ t : Nat, ⌜T < t⌝ -∗ histBytes pa n (fun _ => DFrac.own 1) (pushed Hs t (hartAgent cpu) w') -∗
           authoredBy t (hartAgent cpu) -∗ topLb t -∗ rtOut cpu t o ={∅,⊤}=∗ Ψ)) ∨
      (∃ (Hs : Nat → Hist) (cs : RsvComps) (o : Option (List (CPU × Nat))),
       histBytes pa n (fun _ => DFrac.own (1 : Qp).half) Hs ∗
@@ -807,7 +807,7 @@ words, past its registration). -/
 def writeAUOwnT (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) (Ψ : IProp GF) :
     IProp GF := iprop%
   |={⊤,∅}=> ∃ (Hs : Nat → Hist) (T : Nat), histBytes pa n (fun _ => DFrac.own 1) Hs ∗ topLb T ∗
-    ▷ (∀ t : Nat, ⌜T ≤ t⌝ -∗ histBytes pa n (fun _ => DFrac.own 1) (pushed Hs t (hartAgent cpu) w') -∗
+    ▷ (∀ t : Nat, ⌜T < t⌝ -∗ histBytes pa n (fun _ => DFrac.own 1) (pushed Hs t (hartAgent cpu) w') -∗
         authoredBy t (hartAgent cpu) -∗ topLb t ={∅,⊤}=∗ Ψ)
 
 theorem writeAU_of_ownT (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) (Ψ : IProp GF) :
@@ -925,7 +925,7 @@ names; an acquire pair's view reaches `t`. -/
 def exclWriteAUOwn (cpu : CPU) (pa : PAddr) (n : Nat) (acq : Bool) (w0 w' : BitVec (8 * n)) (Ψ : IProp GF) :
     IProp GF := iprop%
   |={⊤,∅}=> ∃ (Hs : Nat → Hist) (T : Nat), histBytes pa n (fun _ => DFrac.own 1) Hs ∗ topLb T ∗
-    ▷ (∀ t : Nat, ⌜T ≤ t⌝ -∗ ⌜headsAre Hs n w0⌝ -∗ (if acq then viewLb cpu t else emp) -∗
+    ▷ (∀ t : Nat, ⌜T < t⌝ -∗ ⌜headsAre Hs n w0⌝ -∗ (if acq then viewLb cpu t else emp) -∗
         histBytes pa n (fun _ => DFrac.own 1) (pushed Hs t (hartAgent cpu) w') -∗
         authoredBy t (hartAgent cpu) -∗ topLb t ={∅,⊤}=∗ Ψ)
 
@@ -1015,7 +1015,7 @@ def exclWriteAUOwnHop (cpu : CPU) (pa : PAddr) (n : Nat) (acq : Bool) (w0 w' : B
     (o : Option HopData) (Ψ : IProp GF) : IProp GF := iprop%
   |={⊤,∅}=> ∃ (Hs : Nat → Hist) (T : Nat), histBytes pa n (fun _ => DFrac.own 1) Hs ∗ topLb T ∗
     hopIn cpu pa n Hs w' o ∗
-    ▷ (∀ t : Nat, ⌜T ≤ t⌝ -∗ ⌜headsAre Hs n w0⌝ -∗ (if acq then viewLb cpu t else emp) -∗
+    ▷ (∀ t : Nat, ⌜T < t⌝ -∗ ⌜headsAre Hs n w0⌝ -∗ (if acq then viewLb cpu t else emp) -∗
         histBytes pa n (fun _ => DFrac.own 1) (pushed Hs t (hartAgent cpu) w') -∗
         authoredBy t (hartAgent cpu) -∗ topLb t -∗ hopOut cpu pa t o ={∅,⊤}=∗ Ψ)
 
@@ -1037,7 +1037,7 @@ def exclWriteAU (cpu : CPU) (pa : PAddr) (n : Nat) (acq : Bool) (w0 w' : BitVec 
   |={⊤,∅}=>
     ((∃ (Hs : Nat → Hist) (T : Nat) (o : Option HopData), histBytes pa n (fun _ => DFrac.own 1) Hs ∗ topLb T ∗
       hopIn cpu pa n Hs w' o ∗
-      ▷ (∀ t : Nat, ⌜T ≤ t⌝ -∗ ⌜headsAre Hs n w0⌝ -∗ (if acq then viewLb cpu t else emp) -∗
+      ▷ (∀ t : Nat, ⌜T < t⌝ -∗ ⌜headsAre Hs n w0⌝ -∗ (if acq then viewLb cpu t else emp) -∗
           histBytes pa n (fun _ => DFrac.own 1) (pushed Hs t (hartAgent cpu) w') -∗
           authoredBy t (hartAgent cpu) -∗ topLb t -∗ hopOut cpu pa t o ={∅,⊤}=∗ Ψ)) ∨
      (∃ (Hs : Nat → Hist) (T : Nat) (cs : RsvComps) (o : Option HopData),

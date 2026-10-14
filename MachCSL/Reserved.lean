@@ -109,6 +109,40 @@ def lockRegionOk (ptr : CPU → BitVec 64) (m : FlatMem) (lk : PAddr) : Prop :=
   ∃ (W : WordHist 4) (W' : WordHist 8) (Hold Hold' : Nat → Hist) (st : Option (CPU × Bool)) (B : Nat),
     wordHistAt m lk 4 W Hold ∧ wordHistAt m (lk + 16#64) 8 W' Hold' ∧ lockDiscW ptr st B W W'
 
+/-! ## A spinlock's discipline over a WINDOW (W8 (f3-pipelk) [OWN.65])
+
+A DYNAMIC spinlock (xv6: a pipe's lock, in a page `kalloc` hands out and
+`kfree` takes back) is not a region of the static list: its words carry
+other data before its birth and after its reclaim.  Its discipline is stated
+over a WINDOW `(p, a]` of positions: the entries of its two words' bytes at
+positions in the window are WHOLE-WORD entries `W`/`W'` forming a lock history
+from free (`lockDiscWin`: `lockDiscW` without the power-on clause -- the
+window's entries are past `p`, so past 0).  As-of-`a` and never revoked:
+entries above the top never enter a window ending at or below it
+(`MachCSL.lockWinAt_grow`). -/
+
+/-- **A lock history over a window**: `lockDiscW` without its power-on
+clause -- the entries by harts, the lock word 0/1, the holder fold legal and
+naming `st`'s holder, the kit's per-state disciplines. -/
+def lockDiscWin (ptr : CPU → BitVec 64) (st : Option (CPU × Bool)) (B : Nat) (W : WordHist 4)
+    (W' : WordHist 8) : Prop :=
+  (∀ e ∈ W, e.tid < NCPU ∧ (e.v = 0 ∨ e.v = lkOne)) ∧ (∀ e ∈ W', e.tid < NCPU) ∧
+  lkFold W = some (st.map Prod.fst) ∧ lockWordAt st B W ∧ lkCpuAtP ptr st W'
+
+/-- An entry is in the window `(p, a]`. -/
+def lkWinIn (p a : Nat) (e : HEnt) : Bool := decide (p < e.t) && decide (e.t ≤ a)
+
+/-- **A spinlock's discipline over the window `(p, a]`** at `lk` (lock word at
+`lk`, owner word at `lk + 16`): each byte's entries in the window are the
+byte projections of the word histories `W`/`W'`, which form a lock history
+from free (`lockDiscWin`). -/
+def lockWinAt (ptr : CPU → BitVec 64) (m : FlatMem) (lk : PAddr) (p a : Nat) : Prop :=
+  ∃ (W : WordHist 4) (W' : WordHist 8) (st : Option (CPU × Bool)) (B : Nat),
+    (∀ j, j < 4 → ∃ H, m[lk + BitVec.ofNat 64 j]? = some H ∧ H.filter (lkWinIn p a) = W.map (WEnt.proj j)) ∧
+    (∀ j, j < 8 → ∃ H, m[lk + 16#64 + BitVec.ofNat 64 j]? = some H ∧
+      H.filter (lkWinIn p a) = W'.map (WEnt.proj j)) ∧
+    lockDiscWin ptr st B W W'
+
 /-! ## Regions -/
 
 /-- The kinds of reserved region. -/
@@ -281,6 +315,28 @@ theorem rsvWf_of_check (rs : List RsvRegion) (h1 : strictSorted (rsvBytes rs) = 
 `t`, on top (what a machine step at top `t` does to the memory). -/
 def memGrow (m : FlatMem) (t : Nat) (m' : FlatMem) : Prop :=
   ∀ (a : PAddr) (H : Hist), m[a]? = some H → ∃ N : Hist, m'[a]? = some (N ++ H) ∧ ∀ e ∈ N, t < e.t
+
+/-- A window ending at or below `t` is unchanged by entries above `t`. -/
+theorem lockWinAt_grow {ptr : CPU → BitVec 64} {m m' : FlatMem} {t : Nat} (hg : memGrow m t m') {lk : PAddr}
+    {p a : Nat} (hat : a ≤ t) (h : lockWinAt ptr m lk p a) : lockWinAt ptr m' lk p a := by
+  have key : ∀ (b : PAddr) (H : Hist), m[b]? = some H →
+      ∃ H', m'[b]? = some H' ∧ H'.filter (lkWinIn p a) = H.filter (lkWinIn p a) := by
+    intro b H hH
+    obtain ⟨N, hN, hNt⟩ := hg b H hH
+    refine ⟨N ++ H, hN, ?_⟩
+    rw [List.filter_append, List.filter_eq_nil_iff.2 (fun e he => ?_), List.nil_append]
+    have := hNt e he
+    simp only [lkWinIn, Bool.and_eq_true, decide_eq_true_eq, not_and, Nat.not_le]
+    intro _
+    omega
+  obtain ⟨W, W', st, B, h1, h2, h3⟩ := h
+  refine ⟨W, W', st, B, fun j hj => ?_, fun j hj => ?_, h3⟩
+  · obtain ⟨H, hH, hf⟩ := h1 j hj
+    obtain ⟨H', hH', hf'⟩ := key _ H hH
+    exact ⟨H', hH', hf'.trans hf⟩
+  · obtain ⟨H, hH, hf⟩ := h2 j hj
+    obtain ⟨H', hH', hf'⟩ := key _ H hH
+    exact ⟨H', hH', hf'.trans hf⟩
 
 /-- **The slot witness of the dynamic hop registry** (W8 (f2-ctx) [OWN.49]
 (a′-r), the RULED (a′) window [OWN.46]): `L` is the eight entries of ONE

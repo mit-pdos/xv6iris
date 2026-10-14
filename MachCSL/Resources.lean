@@ -1338,7 +1338,11 @@ abbrev chainEnv [MachFixedGS hlc GF] (σ : MState) : ChainEnv :=
   chainEnvAt (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (slotWit (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))) σ
 
 /-- The ambient record's load-side exemption at `σ` (W8 (f2-ctx) S3,
-`MachCSL.chainExAt`): lock-layer and page-table bytes, as of a position. -/
+`MachCSL.chainExAt`), as of a position: the lock layer's bytes (static
+spinlocks, publication words, and -- W8 (f3-pipelk) [OWN.65] -- live dynamic
+locks inside a DISCIPLINED window, `MachCSL.dynLkDiscAt`), the LIVE
+page-table bytes (W8 (pte-ghost) [OWN.57]), and the audited racy words'
+bytes whose value is in the registry's value set (W8 (f3-racy) [OWN.63]). -/
 abbrev chainEx [MachFixedGS hlc GF] (σ : MState) : PAddr → Nat → Prop :=
   chainExAt (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (slotWit (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)))
     σ.mem σ.top

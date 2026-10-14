@@ -214,6 +214,48 @@ theorem dynLkAt_mono {wit : List (PAddr × HEnt) → PAddr → Nat → Prop} {m 
     · have := hNt e he; omega
     · exact wordEntAt_mono hx (hw0 e he hte' hea)
 
+/-- **A live, DISCIPLINED dynamic lock** (W8 (f3-pipelk) [OWN.65]): `dynLkAt`'s
+live window -- a slot store naming `b` at `te` (the client's witness, its
+receipts held by the memory), every entry on `b`'s lock word in `(te, a]`
+word-sized -- whose lock words' history over a window `(p, a]` opening at or
+before `te` is a lock history from free (`lockWinAt`), the owner word's
+pointers those of a `cpus` array at `cb` the registry's per-hart cells sit at
+(`.cpu c` at `cb + 128 c`).  The load-side exemption's dynamic-lock arm: a
+racy read is exempt on a dynamic lock's word only inside such a window.  A
+pure fact of the memory, never falsified by a step (`dynLkDiscAt_mono`). -/
+def dynLkDiscAt (rs : List RsvRegion) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop) (m : FlatMem)
+    (top : Nat) (b : PAddr) (a : Nat) : Prop :=
+  a ≤ top ∧ ∃ (L : List (PAddr × HEnt)) (te p : Nat) (cb : BitVec 64) (c : CPU), wit L b te ∧
+    (∀ q ∈ L, ∃ H, m[q.1]? = some H ∧ q.2 ∈ H) ∧ te ≤ a ∧
+    (∀ i, i < 4 → ∃ H, m[b + BitVec.ofNat 64 i]? = some H ∧ ∀ e ∈ H, te < e.t → e.t ≤ a →
+      wordEntAt m b e.t e.tid) ∧
+    p ≤ te ∧ (⟨cpuPtrAt cb c, .cpu c⟩ : RsvRegion) ∈ rs ∧ lockWinAt (cpuPtrAt cb) m b p a
+
+/-- A disciplined dynamic lock is live. -/
+theorem dynLkAt_of_disc {rs : List RsvRegion} {wit : List (PAddr × HEnt) → PAddr → Nat → Prop} {m : FlatMem}
+    {top : Nat} {b : PAddr} {a : Nat} (h : dynLkDiscAt rs wit m top b a) : dynLkAt wit m top b a :=
+  let ⟨hat, L, te, _, _, _, hw, hL, hte, hwd, _⟩ := h
+  ⟨hat, L, te, hw, hL, hte, hwd⟩
+
+theorem dynLkDiscAt_mono {rs : List RsvRegion} {wit : List (PAddr × HEnt) → PAddr → Nat → Prop}
+    {m m' : FlatMem} {t t' : Nat} {b : PAddr} {a : Nat} (hg : memGrow m t m') (ht : t ≤ t')
+    (h : dynLkDiscAt rs wit m t b a) : dynLkDiscAt rs wit m' t' b a := by
+  obtain ⟨hat, L, te, p, cb, c, hw, hL, hte, hwd, hp, hR, hwin⟩ := h
+  have hx : memExt m m' := fun a H hH => by
+    obtain ⟨N, hN, _⟩ := hg a H hH
+    exact ⟨N, hN⟩
+  refine ⟨Nat.le_trans hat ht, L, te, p, cb, c, hw, fun q hq => ?_, hte, fun i hi => ?_, hp, hR,
+    lockWinAt_grow hg hat hwin⟩
+  · obtain ⟨H, hH, hpe⟩ := hL q hq
+    obtain ⟨N, hN, _⟩ := hg _ H hH
+    exact ⟨N ++ H, hN, List.mem_append_right _ hpe⟩
+  · obtain ⟨H0, hH0, hw0⟩ := hwd i hi
+    obtain ⟨N, hN, hNt⟩ := hg _ H0 hH0
+    refine ⟨N ++ H0, hN, fun e he hte' hea => ?_⟩
+    rcases List.mem_append.1 he with he | he
+    · have := hNt e he; omega
+    · exact wordEntAt_mono hx (hw0 e he hte' hea)
+
 /-- **A release → acquire hop** at the lock byte `b`: the acquire entry
 `⟨a, B, va⟩` (nonzero) immediately above the release entry `⟨r, A, 0⟩`,
 itself above a nonzero entry (the lock was held); all three WORD-sized
@@ -624,7 +666,9 @@ ghost -- so that the pure export (`Xv6.AccessDiscipline.chainOkAt`'s
 
 * the lock layer's bytes: the static spinlocks' two words and the
   publication words of the registry (`lockPubByteIn`), and a live dynamic
-  lock's two words (`dynLkAt` at the entry's position);
+  lock's two words INSIDE A DISCIPLINED WINDOW (`dynLkDiscAt` at the entry's
+  position: its words' history from at or before the window's opening is a
+  lock history from free -- W8 (f3-pipelk) [OWN.65]);
 * the PAGE-TABLE bytes of BOTH tables ([R25.1 (a)], [OWN.39]): the bytes of
   every page a Sv39 walk reaches, AS OF the entry's position, from a root
   word the registry names -- `ptByteLiveAt`.  From a PERMANENT root
@@ -783,7 +827,8 @@ theorem racyByteIn_of_racyValAt {rs : List RsvRegion} {m : FlatMem} {t : Nat} {a
 
 /-- **The exemption of the load-side invariant**, at memory `m` with top
 `top`: byte `a` as of position `t` is a lock-layer byte (static, publication,
-or a dynamic lock live at `t`), a LIVE page-table byte (`ptByteLiveAt`: the
+or a dynamic lock live at `t` inside a disciplined window, `dynLkDiscAt` --
+W8 (f3-pipelk) [OWN.65]), a LIVE page-table byte (`ptByteLiveAt`: the
 permanent table's walk, or a freeable table's walk through pages not freed
 since their naming words' writes -- W8 (pte-ghost), [OWN.57]), a byte of an
 audited racy word whose value as of `t` is in the region's value set
@@ -793,7 +838,7 @@ device-ring arm: the used ring's hart-authored entries -- hart 0's boot
 zeroes -- are now CERTIFIED, `Xv6.DiskAcc.usedIdx_certs`.) -/
 def chainExAt (rs : List RsvRegion) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop) (m : FlatMem)
     (top : Nat) (a : PAddr) (t : Nat) : Prop :=
-  lockPubByteIn rs a ∨ (∃ b, dynLkAt wit m top b t ∧ lockWordsByte b a) ∨ ptByteLiveAt rs m t a ∨
+  lockPubByteIn rs a ∨ (∃ b, dynLkDiscAt rs wit m top b t ∧ lockWordsByte b a) ∨ ptByteLiveAt rs m t a ∨
     racyValAt rs m t a
 
 /-- Reading AS OF a position at or below the top is unchanged by a step that
@@ -912,7 +957,7 @@ theorem chainExAt_grow {rs : List RsvRegion} {wit : List (PAddr × HEnt) → PAd
     (a : PAddr) (t : Nat) (ht : t ≤ top) (h : chainExAt rs wit m top a t) : chainExAt rs wit m' top' a t := by
   rcases h with h | ⟨b, hb, hw⟩ | h | h
   · exact .inl h
-  · exact .inr (.inl ⟨b, dynLkAt_mono hg htop hb, hw⟩)
+  · exact .inr (.inl ⟨b, dynLkDiscAt_mono hg htop hb, hw⟩)
   · exact .inr (.inr (.inl ((ptByteLiveAt_grow hg hm ht a).2 h)))
   · exact .inr (.inr (.inr ((racyValAt_grow hg hm ht a).2 h)))
 
@@ -922,7 +967,7 @@ theorem chainExAt_top {rs : List RsvRegion} {wit : List (PAddr × HEnt) → PAdd
     (h : chainExAt rs wit m top a t) : chainExAt rs wit m top' a t := by
   rcases h with h | ⟨b, hb, hw⟩ | h | h
   · exact .inl h
-  · exact .inr (.inl ⟨b, dynLkAt_mono (memGrow_refl m top) htop hb, hw⟩)
+  · exact .inr (.inl ⟨b, dynLkDiscAt_mono (memGrow_refl m top) htop hb, hw⟩)
   · exact .inr (.inr (.inl h))
   · exact .inr (.inr (.inr h))
 
