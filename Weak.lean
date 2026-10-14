@@ -657,6 +657,7 @@ import Weak.GraphFetchSupply
 import Weak.PinDataflowGlue
 import Weak.RvwmoXv6Adequacy
 import Weak.CatReroute
+import Weak.CatRerouteIo
 import Weak.PinHoldingCtrl
 import Weak.PinTrapSites
 import Weak.PinTrap
