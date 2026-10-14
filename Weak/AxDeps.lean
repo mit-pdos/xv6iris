@@ -121,6 +121,14 @@ rows, positions and kernel-checked verdicts are unchanged by Stage C.  Nothing i
    `dstepTSub`/`dstepTAddr` and the fold lemmas take the state relation; `rowDepsSubT` keeps its
    statement; `rowDepsTSub`/`rowDepsTAddr` gain the MMIO disjuncts (an edge leaving an MMIO
    load, entering an MMIO store, or — address — targeting an MMIO item).
+10. W5d-G G6-1 (plan §C top rev 50; D42 (a) [OWN.18]; Lean-only, no Rocq twin).  `GdexecT` gains
+   the DEFAULTED field `gtFetch` (the tagged graph's fetch fragment, default empty — mirroring
+   `Gdexec.gdFetch`, `WeakRvwmoGraph` deviation 8).  `forget` CARRIES it into `gdFetch`; `gtAdGd`
+   and `gtAdFullGd` keep `[]` (rule 12's domain is fetch-free).  `rvwmoCatConsistentT` does not
+   read the field, so every certificate's meaning is unchanged; the anonymous-constructor
+   literals (`mkgt` and its peers) gain the third component `[]`.  Spec: Zifencei names the
+   fetch/`fence.i` ordering only (the RULED reading (H3′)/E1′ [OWN.6]) — the fragment is that
+   clause's carrier, not a model edge; FAITHFUL.
 
 **Rocq → Lean name map.**  `dtag` `Dtag` (`DTaddr`…`DTctx` same), `dtag_w` `dtagW`, `dtag_ad`
 `dtagAd`, `gdexec_t` `GdexecT` (`GDExecT` `GdexecT.mk`, `gt_g`/`gt_deps` `gtG`/`gtDeps`),
@@ -228,6 +236,9 @@ structure GdexecT where
   mk ::
   gtG : Gexec
   gtDeps : List Tdep
+  /-- W5d-G G6-1 (deviation 10): the fetch fragment, default empty (kernel-only executions);
+  `forget` carries it into `Gdexec.gdFetch`. -/
+  gtFetch : List (Geid × Geid) := []
 
 /-- THE TAGGED WELL-FORMEDNESS (W13 (F-dep) (0a) [R38.1]): a same-hart po-forward edge from a READ
 in riscv.cat's sense (`lbIsRT`: RAM read or I/O load) to a WRITE in that sense (`lbIsWT`) for
@@ -247,8 +258,10 @@ edges are dropped too, so the untagged chain sees FEWER deps — sound). -/
 def forgetDeps (G : Gexec) (deps : List Tdep) : List (Geid × Geid) :=
   deps.filterMap (fun e : Tdep => if gisRd G e.1.1 && gisW G e.1.2 then some e.1 else none)
 
+/-- `forget` keeps the graph, the RAM-read → RAM-write deps and (W5d-G G6-1, deviation 10) the
+fetch fragment `gtFetch`. -/
 def forget (GT : GdexecT) : Gdexec :=
-  ⟨GT.gtG, forgetDeps GT.gtG GT.gtDeps, []⟩
+  ⟨GT.gtG, forgetDeps GT.gtG GT.gtDeps, GT.gtFetch⟩
 
 /-- The addr/data edges from RAM READS INTO RAM WRITES, untagged — the chain's projection of rule
 12's domain (W13 (F-dep) (0b): RAM sources only, so `gtAd ⊆ forgetDeps` stays syntactic).  (The
@@ -1351,7 +1364,7 @@ discharged by computation. -/
 def imgt : Image := fun _ => some b0
 
 def mkgt (prog : List (List Lbl)) (gmo : List Geid) (deps : List Tdep) : GdexecT :=
-  ⟨⟨imgt, prog, gmo⟩, deps⟩
+  ⟨⟨imgt, prog, gmo⟩, deps, []⟩
 
 def twProg : List (List Lbl) :=
   [[Lbl.LLoad false 0 [1] [b1],

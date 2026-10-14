@@ -135,8 +135,12 @@ dummy default.
    `emFetchImg GF.gfGd.gdG.gxImg em` directly (TEXT of the clause unchanged; the old slot def is
    gone) -- and `gfexecConfZOfIO` moves a pinned bundle to the Zifencei one given the per-row
    slot, e.g. by the kernel-text instance `GraphFetch.emZifOfPinC` (pinned fetches of unwritten
-   bytes).  G6 collapses the two.  Spec: an encoding choice (the ISA is silent on proof
-   organisation); `gfexecConfZ` is FAITHFUL to the Zifencei reading of `gzFetch`, `gfexecConfIO`
+   bytes).  G6 collapses the two: [G6-1] the tagged graph carries its fetch fragment
+   (`AxDeps.GdexecT.gtFetch`, which `forget` puts in `gdFetch`); [G6-2] the tagged Zifencei bundle
+   `gfexecConfZT`/`xv6ConfSZ` (`Weak/GraphFabConf.lean` §2′, slot `emZifencei ∧ emFetchIn`)
+   projects to `gfexecConfZ` (`xv6ConfSZForget`), W13-wit re-discharged under it (`w13WitZ`);
+   [G6-3/G6-4] the supply re-thread and the collapse.  Spec: an encoding choice (the ISA is
+   silent on proof organisation); `gfexecConfZ` is FAITHFUL to the Zifencei reading of `gzFetch`, `gfexecConfIO`
    is the pinned (kernel-only, STRONGER) M1 instance.
 
 **Rocq → Lean name map.**  `orb_false_split` `orbFalseSplit`, `lb_isdev` `lbIsdev`,

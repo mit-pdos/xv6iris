@@ -348,7 +348,8 @@ theorem restrictCatConsistent (GD : Gdexec) (cs : List Nat) (n : Nat) :
 
 def gtRestrict (GT : GdexecT) (cs : List Nat) (n : Nat) : GdexecT :=
   ⟨gxRestrict GT.gtG cs n,
-   GT.gtDeps.filter (fun e : Tdep => gcut cs e.1.1 && gcut cs e.1.2)⟩
+   GT.gtDeps.filter (fun e : Tdep => gcut cs e.1.1 && gcut cs e.1.2),
+   GT.gtFetch.filter (fun p : Geid × Geid => gcut cs p.1 && gcut cs p.2)⟩
 
 theorem gtRestrictDeps (GT : GdexecT) (cs : List Nat) (n : Nat) (e : Tdep) :
     e ∈ (gtRestrict GT cs n).gtDeps ↔

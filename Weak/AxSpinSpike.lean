@@ -602,7 +602,7 @@ def mkGT (harts : List (List Ti)) : GdexecT :=
   let s := sched 100000 16 s0 (gs.map fun g => (0, g.1))
   let deps := (imap (fun i (g : List Aev × List ((Nat × Nat) × Dtag)) =>
     g.2.map fun d => (((i, d.1.1), (i, d.1.2)), d.2)) gs).flatten
-  ⟨⟨fun _ => some b0, s.aRows.map List.reverse, s.aGmo.reverse⟩, deps⟩
+  ⟨⟨fun _ => some b0, s.aRows.map List.reverse, s.aGmo.reverse⟩, deps, []⟩
 
 /-! ### 2.2 Counts -/
 
@@ -796,7 +796,7 @@ def lvAtFast (GT : GdexecT) : Bool :=
 
 /-- Sanity: both checkers REJECT a reversed gmo. -/
 def revGmo (GT : GdexecT) : GdexecT :=
-  ⟨⟨GT.gtG.gxImg, GT.gtG.gxProg, GT.gtG.gxGmo.reverse⟩, GT.gtDeps⟩
+  ⟨⟨GT.gtG.gxImg, GT.gtG.gxProg, GT.gtG.gxGmo.reverse⟩, GT.gtDeps, GT.gtFetch⟩
 def g601 : GdexecT := gN 60 1
 
 /-! ## 6. The measurements

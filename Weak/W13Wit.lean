@@ -39,15 +39,18 @@ UART store's block, which moves it (its contact bit is the only `true` one).
 SCOPE ([R41.s6]).  The witness exercises `gfDevWIo`'s HART half only: there is no disk activity
 before the first UART store, so the disk half is vacuous here and the Bool twin cannot catch a
 wrong guess about it; the disk half's computed check is W14's device-active witness.  The run
-does not reach `allocproc` (W14).  The fetch clause is the PINNED `emFetchImg`
-(`gfexecConfIOT`'s current slot; W5d-G G1): every fetch of the run reads the boot image at
-timestamp 0, which also satisfies the Zifencei reading's image arm — when `xv6ConfS` moves to the
-unpinned `gfexecConfZ` slot at G6, this witness's fetch obligation becomes `emZifencei`, to be
-re-discharged from the same computed fetches.
+does not reach `allocproc` (W14).  The fetch clause of `w13Wit` is the PINNED `emFetchImg`
+(`gfexecConfIOT`'s slot; W5d-G G1): every fetch of the run reads the boot image at timestamp 0.
+**[W5d-G G6-2] `w13WitZ`**: the same bundle under the Zifencei slot `xv6ConfSZ` (`emZifencei ∧
+emFetchIn`), re-discharged from the same computed fetches: the runner answers fetches from the
+kernel-text image `W13Wit.imText` (`[0x80000000, etext = 0x80007000)`), so the run itself shows
+every fetch reads text, and `W13Wit.confZB` (`xv6ConfSZB`, kernel-evaluated) shows no write of the
+run touches text — a pinned fetch of unwritten bytes satisfies `gzFetch` and has no fragment edge
+(`xv6ConfSZBSound`).  G6-4 renames `w13WitZ` → `w13Wit`.
 
 **Name map.**  None (Lean-only).  Main declarations: `W13Wit.row`, `W13Wit.deps`, `W13Wit.GT`,
-`W13Wit.runOk`, `W13Wit.confB`, `W13Wit.catT`, `w13Wit`, `W13Wit.gfDevWIo`; helpers
-file-qualified `W13Wit.*`.
+`W13Wit.runOk`, `W13Wit.confB`, `W13Wit.catT`, `w13Wit`, `W13Wit.gfDevWIo`; W5d-G G6-2:
+`W13Wit.imText`, `W13Wit.rowsOk`, `W13Wit.confZB`, `w13WitZ`; helpers file-qualified `W13Wit.*`.
 -/
 import Weak.W13WitRun
 
@@ -69,9 +72,23 @@ def W13Wit.h0 : W13Wit.Hs := ⟨FreeM.pure (), SrvwmoXv6Witness.rs0, ibNone⟩
 /-- The boot fabric. -/
 def W13Wit.d0 : Efab := efInit SrvwmoXv6Witness.sigma0.wgdev
 
-/-- THE RUN (unevaluated): at most 64 events, at most 40 000 administrative nodes per block. -/
+/-- THE FETCH IMAGE (W5d-G G6-2): the boot image on the kernel TEXT `[0x80000000, etext)`
+(`etext = 0x80007000`, `Xv6/KernelImage.lean`), nothing elsewhere.  The runner answers fetches
+from it, so a fetch outside the text makes the run fail. -/
+def W13Wit.imText : Image := fun z =>
+  if decide (0x80000000 ≤ z ∧ z < 0x80007000) then W13Wit.imf z else none
+
+theorem W13Wit.imTextSub : ∀ z b, W13Wit.imText z = some b → W13Wit.imf z = some b := by
+  intro z b h
+  unfold W13Wit.imText at h
+  split at h
+  · exact h
+  · cases h
+
+/-- THE RUN (unevaluated): at most 64 events, at most 40 000 administrative nodes per block;
+loads answered over the boot image, fetches by the text image. -/
 noncomputable def W13Wit.out : Option W13Wit.Out :=
-  W13Wit.runRow W13Wit.c0 W13Wit.imf 40000 64 0 W13Wit.h0 wsInit dtInit [] 0 W13Wit.d0
+  W13Wit.runRow W13Wit.c0 W13Wit.imf W13Wit.imText 40000 64 0 W13Wit.h0 wsInit dtInit [] 0 W13Wit.d0
 
 /-- The `n` little-endian bytes of `v`. -/
 def W13Wit.bs (n v : Nat) : List (BitVec 8) := WeakInterpProj.wbytes n (BitVec.ofNat (8 * n) v)
@@ -204,7 +221,7 @@ def W13Wit.gmo : List Geid := (List.range 28).map (fun k => (0, k))
 fabric list `[(0, 27)]` (the UART store). -/
 def W13Wit.GT : GfexecT :=
   ⟨⟨⟨W13Wit.imf, [W13Wit.row], W13Wit.gmo⟩,
-    W13Wit.deps.map (fun e => (((0, e.1.1), (0, e.1.2)), e.2))⟩, [(0, 27)]⟩
+    W13Wit.deps.map (fun e => (((0, e.1.1), (0, e.1.2)), e.2)), []⟩, [(0, 27)]⟩
 
 /-- The contact bits = the moved flags: the last block only. -/
 def W13Wit.tqs : List Bool := (List.range 28).map (fun k => decide (k + 1 = 28))
@@ -225,24 +242,25 @@ theorem W13Wit.catT : rvwmoCatConsistentT W13Wit.GT.gfGd :=
 
 theorem W13Wit.boot0 : xboot SrvwmoXv6Witness.sigma0 0 = W13Wit.pex W13Wit.c0 W13Wit.h0 := rfl
 
-/-- **W13-wit**: xv6's hart 0, from `_entry` to its first UART store, is a device-ACTIVE
-`xv6ConfS` bundle (non-empty `gfDev`, its one member the I/O event), and the same graph is
-consistent under the tagged riscv.cat model. -/
-theorem w13Wit :
-    xv6ConfS (xboot SrvwmoXv6Witness.sigma0) (efInit SrvwmoXv6Witness.sigma0.wgdev)
-      (imgZ SrvwmoXv6Witness.sigma0.wgimg) (NCPU + 1) W13Wit.GT ∧
-    W13Wit.GT.gfDev = [(0, 27)] ∧
-    W13Wit.GT.gfGd.gtG.gxProg = [W13Wit.row] ∧
-    W13Wit.row[27]? = some (.LIo .wr 0x10000001 [0#8]) ∧
-    rvwmoCatConsistentT W13Wit.GT.gfGd := by
+/-- (Lean-only) THE ROW FACTS of the run, at any image `P` the text pins transfer to: the
+emission, its tagged deps, its fetches pinned to `P`, the contact bits / moved flags of the
+certificate, the fabric trace. -/
+theorem W13Wit.rowsOk (P : Image)
+    (hP : ∀ l, WeakAxRealize.fetchPin W13Wit.imText l → WeakAxRealize.fetchPin P l) :
+    ∃ fab : Nat → Efab, fab 0 = W13Wit.d0 ∧
+      ∀ (i : Nat) (row : List Lbl) (rc : GfRowCert), W13Wit.GT.gfGd.gtG.gxProg[i]? = some row →
+        [W13Wit.cert][i]? = some rc →
+        ∃ (em : Hemission) (dvi dvo : Nat → Efab) (tq : Nat → Bool),
+          hartConff i row (xboot SrvwmoXv6Witness.sigma0 i) dvi dvo tq em ∧
+          rowDepsT em.emItems = rc.rcDeps ∧
+          emFetchImg P em ∧
+          (∀ k, k < row.length → tq k = rc.rcTq.getD k false) ∧
+          (∀ k, k < row.length → rc.rcMoved.getD k false = false → dvi k = dvo k) ∧
+          (∀ k n, W13Wit.GT.gfDev[n]? = some (i, k) → dvi k = fab n ∧ dvo k = fab (n + 1)) := by
   obtain ⟨o, hO, hrow, hdeps⟩ := W13Wit.outSpec
-  obtain ⟨es, hem, hd, hf⟩ := W13Wit.runRowSound W13Wit.c0 W13Wit.imf 40000 W13Wit.d0 28 64 0
-    W13Wit.h0 wsInit dtInit [] 0 o hO (by rw [hrow, W13Wit.rowLen])
-  have himg : imgZ SrvwmoXv6Witness.sigma0.wgimg = W13Wit.imf := W13Wit.imfEq
-  refine ⟨(xv6ConfSBSound (xboot SrvwmoXv6Witness.sigma0) (efInit SrvwmoXv6Witness.sigma0.wgdev)
-    (imgZ SrvwmoXv6Witness.sigma0.wgimg) (NCPU + 1) W13Wit.GT [W13Wit.cert]
-    (fun n => if n = 0 then W13Wit.d0 else o.oDfin) W13Wit.confB himg.symm rfl ?_).1,
-    rfl, rfl, W13Wit.rowIo, W13Wit.catT⟩
+  obtain ⟨es, hem, hd, hf⟩ := W13Wit.runRowSound W13Wit.c0 W13Wit.imf W13Wit.imText 40000 W13Wit.d0
+    28 64 0 W13Wit.h0 wsInit dtInit [] 0 o hO (by rw [hrow, W13Wit.rowLen])
+  refine ⟨fun n => if n = 0 then W13Wit.d0 else o.oDfin, rfl, ?_⟩
   intro i row rc hrow' hrc
   cases i with
   | succ i => simp [W13Wit.GT] at hrow'
@@ -259,8 +277,7 @@ theorem w13Wit :
     · show rowDepsTAux dtInit es = W13Wit.deps
       rw [hd, hdeps]
     · intro l hl
-      rw [himg]
-      exact hf l hl
+      exact hP l (hf l hl)
     · intro k hk
       rw [W13Wit.rowLen] at hk
       exact (W13Wit.tqsGetD k hk).symm
@@ -281,6 +298,45 @@ theorem w13Wit :
         obtain ⟨-, rfl⟩ := hn
         exact ⟨rfl, rfl⟩
       | succ n => simp at hn
+
+/-- **W13-wit**: xv6's hart 0, from `_entry` to its first UART store, is a device-ACTIVE
+`xv6ConfS` bundle (non-empty `gfDev`, its one member the I/O event), and the same graph is
+consistent under the tagged riscv.cat model. -/
+theorem w13Wit :
+    xv6ConfS (xboot SrvwmoXv6Witness.sigma0) (efInit SrvwmoXv6Witness.sigma0.wgdev)
+      (imgZ SrvwmoXv6Witness.sigma0.wgimg) (NCPU + 1) W13Wit.GT ∧
+    W13Wit.GT.gfDev = [(0, 27)] ∧
+    W13Wit.GT.gfGd.gtG.gxProg = [W13Wit.row] ∧
+    W13Wit.row[27]? = some (.LIo .wr 0x10000001 [0#8]) ∧
+    rvwmoCatConsistentT W13Wit.GT.gfGd := by
+  have himg : imgZ SrvwmoXv6Witness.sigma0.wgimg = W13Wit.imf := W13Wit.imfEq
+  obtain ⟨fab, hfab, hr⟩ := W13Wit.rowsOk (imgZ SrvwmoXv6Witness.sigma0.wgimg)
+    (fun l h => by rw [himg]; exact W13Wit.fetchPinSub _ _ l W13Wit.imTextSub h)
+  exact ⟨(xv6ConfSBSound (xboot SrvwmoXv6Witness.sigma0) (efInit SrvwmoXv6Witness.sigma0.wgdev)
+    (imgZ SrvwmoXv6Witness.sigma0.wgimg) (NCPU + 1) W13Wit.GT [W13Wit.cert] fab W13Wit.confB
+    himg.symm hfab hr).1, rfl, rfl, W13Wit.rowIo, W13Wit.catT⟩
+
+/-- **THE ZIFENCEI BOOL TWIN EVALUATES `true`** (W5d-G G6-2): `xv6ConfSB` and no write of the
+run touches the kernel text. -/
+theorem W13Wit.confZB : xv6ConfSZB (NCPU + 1) W13Wit.GT [W13Wit.cert] W13Wit.imText = true := by
+  decide +kernel
+
+/-- **W13-wit, ZIFENCEI** (W5d-G G6-2; `w13WitZ`, renamed `w13Wit` at G6-4): the same bundle
+satisfies `xv6ConfSZ` — the UNPINNED fetch clause `emZifencei ∧ emFetchIn` — at the real boot:
+hart 0 fetches only kernel text (the runner's fetch image) and writes none of it. -/
+theorem w13WitZ :
+    xv6ConfSZ (xboot SrvwmoXv6Witness.sigma0) (efInit SrvwmoXv6Witness.sigma0.wgdev)
+      (imgZ SrvwmoXv6Witness.sigma0.wgimg) (NCPU + 1) W13Wit.GT ∧
+    W13Wit.GT.gfDev = [(0, 27)] ∧
+    W13Wit.GT.gfGd.gtG.gxProg = [W13Wit.row] ∧
+    W13Wit.row[27]? = some (.LIo .wr 0x10000001 [0#8]) ∧
+    rvwmoCatConsistentT W13Wit.GT.gfGd := by
+  have himg : imgZ SrvwmoXv6Witness.sigma0.wgimg = W13Wit.imf := W13Wit.imfEq
+  obtain ⟨fab, hfab, hr⟩ := W13Wit.rowsOk W13Wit.imText (fun _ h => h)
+  exact ⟨(xv6ConfSZBSound (xboot SrvwmoXv6Witness.sigma0) (efInit SrvwmoXv6Witness.sigma0.wgdev)
+    (imgZ SrvwmoXv6Witness.sigma0.wgimg) (NCPU + 1) W13Wit.GT [W13Wit.cert] fab W13Wit.imText
+    W13Wit.confZB himg.symm hfab (by rw [himg]; exact W13Wit.imTextSub) hr).1,
+    rfl, rfl, W13Wit.rowIo, W13Wit.catT⟩
 
 /-- The HART half of `gfDevWIo`, exercised: the projected bundle's fabric members are writes or
 I/O events (`gfDevWIoOfXv6`; `usedElemGateOk` is vacuous — the bundle has no disk row). -/

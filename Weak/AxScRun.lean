@@ -195,7 +195,7 @@ def gdepsOf (ems : List (List Eitem)) : List Tdep :=
 /-- THE CONSTRUCTION. -/
 def graphOfSc (img : Int → BitVec 8) (rows : List (List Lbl)) (il : List Geid)
     (ems : List (List Eitem)) : GdexecT :=
-  ⟨⟨fun a => some (img a), scProg rows (sim img rows il).sOut, il⟩, gdepsOf ems⟩
+  ⟨⟨fun a => some (img a), scProg rows (sim img rows il).sOut, il⟩, gdepsOf ems, []⟩
 
 /-! # 2. The checks -/
 

@@ -21,6 +21,11 @@ the coherence order and the FETCH FRAGMENT's edges.  This file:
   `GraphFetch.emFetchIn GD i em` — "F_em ⊆ GD.gdFetch", the bundle clause `xv6ConfS` takes
   (mirroring `rowDeps ⊆ gdDeps`); under it every fragment edge is a FETCH ARM edge
   (`GraphFetch.emFetchGfetchE`: `WeakRvwmoAcyc.gfetchE`, the `racyDIO` arm).
+  W5d-G G6-2: `GraphFetch.emFetchInOfUnwritten` — a PINNED emission (`emFetchImg`) whose
+  fetched bytes the graph never writes (`GraphFetch.emFetchUnwritten`) has NO fragment edge
+  (E1′'s source tag is 0, which names no write; E2/E3 need a write to a fetched byte), so
+  `emFetchIn` holds at any stored fragment, `[]` included — the kernel-text instance of the
+  clause, beside `GraphFetch.emZifOfPinC`.
 * §3 CONTRIBUTOR INVARIANCE.  The re-timed emission's fence.i sites are the original's
   (`GraphFetchRetime.emFenceIRen`) and its contributors are the original's
   (`GraphFetchRetime.emContribRen`: own writes po-before a site are fixed, an rf-source is named
@@ -245,6 +250,28 @@ theorem GraphFetch.emFetchGfetchE (GD : Gdexec) (i : Nat) (em : Hemission) :
     · exact hm
     · exact GraphFetchRetime.gwritesByteGmem _ y _ _ hy
     · exact GraphFetchRetime.gwritesByteGmem _ y _ _ hy
+
+/-- W5d-G G6-2: a pinned emission whose fetched bytes are unwritten has no fragment edge. -/
+theorem GraphFetch.emFetchEdgeOfUnwritten (G : Gexec) (i : Nat) (em : Hemission) :
+    emFetchImg G.gxImg em → GraphFetch.emFetchUnwritten G em →
+    ∀ x y, ¬ GraphFetch.emFetchEdge G i em x y := by
+  rintro hpin hnw x y ⟨n, base, tvs, hn, hfe⟩
+  have hp : WeakAxRealize.fetchPin G.gxImg (Wlabel.LIFetch base tvs) :=
+    hpin _ (List.mem_map.2 ⟨_, List.mem_of_getElem? hn, rfl⟩)
+  rcases hfe with ⟨j, t, v, _, hj, hx, _⟩ | ⟨j, t, v, v', hj, hy, _⟩ |
+    ⟨j, t, v, v', _, _, _, hj, hy, _⟩
+  · have ht : t = 0 := hp.1 t (GraphFetchSpike.mapFstOfLookup tvs j t v hj)
+    subst ht
+    simp [gwriteAt] at hx
+  · exact hnw n base tvs hn j (lookup_lt_Some hj) y v' hy
+  · exact hnw n base tvs hn j (lookup_lt_Some hj) y v' hy
+
+/-- W5d-G G6-2 (**the kernel-text instance of `emFetchIn`**): a pinned emission whose fetched
+bytes the graph never writes stores its (empty) fragment in any fetch fragment. -/
+theorem GraphFetch.emFetchInOfUnwritten (GD : Gdexec) (i : Nat) (em : Hemission) :
+    emFetchImg GD.gdG.gxImg em → GraphFetch.emFetchUnwritten GD.gdG em →
+    GraphFetch.emFetchIn GD i em :=
+  fun hpin hnw x y he => absurd he (GraphFetch.emFetchEdgeOfUnwritten GD.gdG i em hpin hnw x y)
 
 /-! # 3. Contributor invariance -/
 

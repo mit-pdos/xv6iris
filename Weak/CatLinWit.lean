@@ -92,7 +92,7 @@ def sbrfiGmo : List Geid := [(0, 1), (0, 2), (1, 1), (1, 2), (0, 0), (1, 0)]
 def sbrfi : Gdexec := AxGraphWit.mkgd sbrfiProg sbrfiGmo []
 
 /-- The same graph, TAGGED (no dependencies). -/
-def sbrfiT : GdexecT := ⟨sbrfi.gdG, []⟩
+def sbrfiT : GdexecT := ⟨sbrfi.gdG, [], []⟩
 
 theorem sbrfiCatT : rvwmoCatConsistentT sbrfiT :=
   catTConsistentBSound _ (by decide +kernel)

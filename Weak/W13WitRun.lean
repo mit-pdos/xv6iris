@@ -28,6 +28,12 @@ Lean-only, no Rocq twin.
       contact bits and moved flags are the certificate's, fetches pinned, members' endpoints on
       the fabric trace — what `runRowSound` supplies), a `true` twin gives `xv6ConfS` and
       `gtdepsWf`.
+  §4  **W5d-G G6-2 — the Zifencei twin** `xv6ConfSZB` = `xv6ConfSB` ∧ `emFetchUnwrittenB` (every
+      byte the graph writes lies OFF the run's FETCH image, e.g. the kernel text); its soundness
+      **`xv6ConfSZBSound`** gives `xv6ConfSZ` (`Weak/GraphFabConf.lean` §2′) when each row's
+      fetches are pinned to that sub-image of the graph's image (the slot by
+      `GraphFetch.emZifOfPinC`, the stored fragment by `GraphFetch.emFetchInOfUnwritten`).  Both
+      soundness theorems go through `W13Wit.confSBRows`, the twin's soundness at any fetch slot.
 
 **Trust.**  Nothing is trusted beyond the kernel: the runner is evaluated by `decide +kernel` and
 linked to `pstepEv` by the proofs above (no `native_decide`, unlike `vtest-lean`).  The runner
@@ -42,10 +48,16 @@ one level up (whole blocks, one kernel evaluation, register file answered direct
 proved once; `SrvwmoXv6Witness.pstepEvNode`/`boundaryPstep`/`erwLabelAdm`/`fetchPinNf` are reused.
 (2) The Bool twin checks the decidable clauses over a run CERTIFICATE (`GfRowCert`); the run facts
 (`hartConff`, the fabric pins) are its soundness theorem's hypothesis — on W13-wit they come from
-`runRowSound`.
+`runRowSound`.  (3) [W5d-G G6-2] The runner takes TWO images: loads are answered over `img`, fetches
+from `imgF` (a fetch whose bytes `imgF` lacks makes the run fail); `runRowSound`'s pins are to
+`imgF`.  W13-wit passes the boot image and its kernel-text restriction, so the run itself
+certifies that every fetch reads kernel text — what `emFetchUnwrittenB` needs (the plan's
+`xv6ConfSZBSound` "through `xv6ConfSBSound` + `xv6ConfSZOfPin`" would need the unwritten fact for
+EVERY emission of a row; the shared `confSBRows` keeps the run's own emission instead).
 
 **Name map.**  None (Lean-only).  Lean-only names: `GfRowCert`, `gfRowCertOk`, `xv6ConfSB`,
-`xv6ConfSBSound`; helpers file-qualified `W13Wit.*`.
+`xv6ConfSBSound`, `emFetchUnwrittenB`, `emFetchUnwrittenBSound`, `xv6ConfSZB`, `xv6ConfSZBSound`;
+helpers file-qualified `W13Wit.*`.
 -/
 import Weak.SrvwmoXv6Witness
 import Weak.GraphFabConf
@@ -215,13 +227,13 @@ structure W13Wit.Out where
   oFin : W13Wit.Hs
 
 /-- THE ROW RUNNER: blocks (administrative stretch + one event) until the first I/O event,
-which ends the row.  A non-I/O event keeps the fabric (`W13Wit.evNodeSound`), so the recursion
+which ends the row; loads over `img`, fetches from `imgF` (header, deviation 3).  A non-I/O event keeps the fabric (`W13Wit.evNodeSound`), so the recursion
 carries `d` unchanged. -/
-noncomputable def W13Wit.runRow (c : CPU) (img : Image) (fa : Nat) :
+noncomputable def W13Wit.runRow (c : CPU) (img imgF : Image) (fa : Nat) :
     Nat → Nat → W13Wit.Hs → Wstate → DstateT → W13Wit.Mm → Nat → Efab → Option W13Wit.Out
   | 0, _, _, _, _, _, _, _ => none
   | fe + 1, k, h, ws, dt, mm, nw, d =>
-    match W13Wit.admRun img fa h dt with
+    match W13Wit.admRun imgF fa h dt with
     | none => none
     | some (ha, dta) =>
       match W13Wit.evNode img mm nw ha d with
@@ -233,7 +245,7 @@ noncomputable def W13Wit.runRow (c : CPU) (img : Image) (fa : Nat) :
           if W13Wit.isDevB l then
             some ⟨[lb], (dstepT dta (l, some k)).2, d', hb⟩
           else
-            match W13Wit.runRow c img fa fe (k + 1) hb (lblPost k ws lb) (dstepT dta (l, some k)).1
+            match W13Wit.runRow c img imgF fa fe (k + 1) hb (lblPost k ws lb) (dstepT dta (l, some k)).1
                 mm' nw' d with
             | none => none
             | some o => some ⟨lb :: o.oRow, (dstepT dta (l, some k)).2 ++ o.oDeps, o.oDfin, o.oFin⟩
@@ -395,7 +407,7 @@ theorem W13Wit.evNodeSound (c : CPU) (img : Image) (mm : W13Wit.Mm) (nw : Nat) (
     (d : Efab) (l : Wlabel) (h' : W13Wit.Hs) (d' : Efab) (mm' : W13Wit.Mm) (nw' : Nat) :
     W13Wit.evNode img mm nw h d = some (l, h', d', mm', nw') →
     pstepEv (W13Wit.pex c h) d l (W13Wit.pex c h') d' ∧ lbNobarex l ∧ latFree l ∧
-      lbRfoldfree l ∧ (W13Wit.isDevB l = false → d' = d) ∧ WeakAxRealize.fetchPin img l ∧
+      lbRfoldfree l ∧ (W13Wit.isDevB l = false → d' = d) ∧ (∀ img', WeakAxRealize.fetchPin img' l) ∧
       pdevEv (W13Wit.pex c h) l (W13Wit.pex c h') = W13Wit.isDevB l := by
   obtain ⟨m, rs, ib⟩ := h
   intro hn
@@ -415,7 +427,7 @@ theorem W13Wit.evNodeSound (c : CPU) (img : Image) (mm : W13Wit.Mm) (nw : Nat) (
         simp only [Bool.or_eq_true, not_or, Bool.not_eq_true] at hc
         obtain ⟨⟨hdev, hif⟩, hlat⟩ := hc
         refine ⟨SrvwmoXv6Witness.pstepEvNode c _ _ rs rs ib ib d _ none none ?_ rfl rfl, trivial,
-          rfl, rfl, fun _ => rfl, trivial, rfl⟩
+          rfl, rfl, fun _ => rfl, fun _ => trivial, rfl⟩
         dsimp only [pnodeStep]
         rw [if_neg (by simp [hdev])]
         exact Or.inr ⟨hif, Or.inl ⟨hlat, _, _, W13Wit.tvsOfLen _ _ _, W13Wit.tvsOfSnd _ _ _,
@@ -432,7 +444,7 @@ theorem W13Wit.evNodeSound (c : CPU) (img : Image) (mm : W13Wit.Mm) (nw : Nat) (
             simp only [Option.some.injEq, Prod.mk.injEq] at hn
             obtain ⟨rfl, rfl, rfl, rfl, rfl⟩ := hn
             refine ⟨W13Wit.pstepEvNodeDev c _ _ rs ib d ds' _ ?_, trivial, trivial,
-              trivial, fun h => by simp [W13Wit.isDevB] at h, trivial, rfl⟩
+              trivial, fun h => by simp [W13Wit.isDevB] at h, fun _ => trivial, rfl⟩
             dsimp only [pnodeStep]
             rw [if_pos hdev, hv]
             exact ⟨hdw, rfl, rfl, rfl, rfl, rfl, rfl⟩
@@ -447,17 +459,17 @@ theorem W13Wit.evNodeSound (c : CPU) (img : Image) (mm : W13Wit.Mm) (nw : Nat) (
             obtain ⟨hn0, hlat⟩ := hc
             have hdev' : devAddr req.pa = false := by simpa using hdev
             refine ⟨SrvwmoXv6Witness.pstepEvNode c _ _ rs rs ib ib d _ none none ?_ rfl rfl,
-              trivial, trivial, trivial, fun _ => rfl, trivial, rfl⟩
+              trivial, trivial, trivial, fun _ => rfl, fun _ => trivial, rfl⟩
             dsimp only [pnodeStep]
             rw [if_neg (by simp [hdev']), hv]
             exact ⟨hn0, Or.inl ⟨hlat, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩⟩
     | _ => simp [W13Wit.evNode] at hn
 
 /-- A successful row run has at least one event. -/
-theorem W13Wit.runRowNe (c : CPU) (img : Image) (fa : Nat) :
+theorem W13Wit.runRowNe (c : CPU) (img imgF : Image) (fa : Nat) :
     ∀ (fe k : Nat) (h : W13Wit.Hs) (ws : Wstate) (dt : DstateT) (mm : W13Wit.Mm) (nw : Nat)
       (d : Efab) (o : W13Wit.Out),
-      W13Wit.runRow c img fa fe k h ws dt mm nw d = some o → 0 < o.oRow.length := by
+      W13Wit.runRow c img imgF fa fe k h ws dt mm nw d = some o → 0 < o.oRow.length := by
   intro fe k h ws dt mm nw d o hr
   cases fe with
   | zero => simp [W13Wit.runRow] at hr
@@ -482,19 +494,19 @@ theorem W13Wit.runRowNe (c : CPU) (img : Image) (fa : Nat) :
 /-- **THE ROW RUN IS AN EMISSION** (`hemitf`), at the fabric `d` throughout but for the last
 block (the I/O event, which moves it to `oDfin`), the contact bit set exactly there; its tagged
 deps are the run's; every fetch it carries is pinned to the image. -/
-theorem W13Wit.runRowSound (c : CPU) (img : Image) (fa : Nat) (d : Efab) (E : Nat) :
+theorem W13Wit.runRowSound (c : CPU) (img imgF : Image) (fa : Nat) (d : Efab) (E : Nat) :
     ∀ (fe k : Nat) (h : W13Wit.Hs) (ws : Wstate) (dt : DstateT) (mm : W13Wit.Mm) (nw : Nat)
       (o : W13Wit.Out),
-      W13Wit.runRow c img fa fe k h ws dt mm nw d = some o → k + o.oRow.length = E →
+      W13Wit.runRow c img imgF fa fe k h ws dt mm nw d = some o → k + o.oRow.length = E →
       ∃ es, hemitf (fun _ => d) (fun j => if j + 1 = E then o.oDfin else d)
           (fun j => decide (j + 1 = E)) k ws o.oRow (W13Wit.pex c h) es (W13Wit.pex c o.oFin) ∧
-        rowDepsTAux dt es = o.oDeps ∧ ∀ l, l ∈ es.map Prod.fst → WeakAxRealize.fetchPin img l := by
+        rowDepsTAux dt es = o.oDeps ∧ ∀ l, l ∈ es.map Prod.fst → WeakAxRealize.fetchPin imgF l := by
   intro fe
   induction fe with
   | zero => intro k h ws dt mm nw o hr; simp [W13Wit.runRow] at hr
   | succ fe ih =>
     intro k h ws dt mm nw o hr hE
-    rcases hA : W13Wit.admRun img fa h dt with _ | ⟨ha, dta⟩
+    rcases hA : W13Wit.admRun imgF fa h dt with _ | ⟨ha, dta⟩
     · simp only [W13Wit.runRow, hA] at hr; cases hr
     rcases hV : W13Wit.evNode img mm nw ha d with _ | ⟨l, hb, d', mm', nw'⟩
     · simp only [W13Wit.runRow, hA, hV] at hr; cases hr
@@ -503,18 +515,18 @@ theorem W13Wit.runRowSound (c : CPU) (img : Image) (fa : Nat) (d : Efab) (E : Na
     simp only [W13Wit.runRow, hA, hV, hP] at hr
     obtain ⟨hst, hnb, hlat, hrf, hkeep, hfp, hpd⟩ :=
       W13Wit.evNodeSound c img mm nw ha d l hb d' mm' nw' hV
-    obtain ⟨ls, hrun, hfls, hdeps⟩ := W13Wit.admRunSound c img fa h dt ha dta hA d
+    obtain ⟨ls, hrun, hfls, hdeps⟩ := W13Wit.admRunSound c imgF fa h dt ha dta hA d
     have hre : hlblRealizes (W13Wit.pex c ha) ws lb l := ⟨hnb, hlat, hrf, hP⟩
     cases hdv : W13Wit.isDevB l
     · rw [hdv] at hr
       simp only [Bool.false_eq_true, if_false] at hr
-      rcases hR : W13Wit.runRow c img fa fe (k + 1) hb (lblPost k ws lb)
+      rcases hR : W13Wit.runRow c img imgF fa fe (k + 1) hb (lblPost k ws lb)
           (dstepT dta (l, some k)).1 mm' nw' d with _ | o'
       · rw [hR] at hr; cases hr
       rw [hR] at hr
       simp only [Option.some.injEq] at hr
       subst hr
-      have hne := W13Wit.runRowNe c img fa fe (k + 1) hb _ _ mm' nw' d o' hR
+      have hne := W13Wit.runRowNe c img imgF fa fe (k + 1) hb _ _ mm' nw' d o' hR
       have hE' : (k + 1) + o'.oRow.length = E := by
         simp only [List.length_cons] at hE; omega
       obtain ⟨es, hem, hd, hf⟩ := ih (k + 1) hb (lblPost k ws lb) _ mm' nw' o' hR hE'
@@ -537,7 +549,7 @@ theorem W13Wit.runRowSound (c : CPU) (img : Image) (fa : Nat) (d : Efab) (E : Na
         rcases hl' with hl' | rfl | hl'
         · obtain ⟨l0, hl0, rfl⟩ := List.mem_map.1 hl'
           exact hfls l0 hl0
-        · exact hfp
+        · exact hfp imgF
         · exact hf l' hl'
     · rw [hdv] at hr
       simp only [if_true, Option.some.injEq] at hr
@@ -558,7 +570,7 @@ theorem W13Wit.runRowSound (c : CPU) (img : Image) (fa : Nat) (d : Efab) (E : Na
         rcases hl' with hl' | rfl
         · obtain ⟨l0, hl0, rfl⟩ := List.mem_map.1 hl'
           exact hfls l0 hl0
-        · exact hfp
+        · exact hfp imgF
 
 /-! # 3. `xv6ConfS`'s Bool twin ([R38.s1]) -/
 
@@ -595,25 +607,37 @@ def xv6ConfSB (nh : Nat) (GT : GfexecT) (cs : List GfRowCert) : Bool :=
     | _, _ => false) &&
   gtdepsWfB GT.gfGd.gtG GT.gfGd.gtDeps
 
-/-- **THE BOOL TWIN IS SOUND**: with each row's run facts (an emission realizing it whose tagged
-deps, contact bits and moved flags are the certificate's, fetches pinned, members' endpoints on the
-fabric trace), a `true` twin gives `xv6ConfS` and the tagged well-formedness. -/
-theorem xv6ConfSBSound (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat) (GT : GfexecT)
-    (cs : List GfRowCert) (fab : Nat → Efab) :
-    xv6ConfSB nh GT cs = true → GT.gfGd.gtG.gxImg = im → fab 0 = d0 →
+/-- (Lean-only, W5d-G G6-2) THE BOOL TWIN'S SOUNDNESS AT ANY FETCH SLOT `F`: with each row's run
+facts (an emission realizing it whose tagged deps, contact bits and moved flags are the
+certificate's, the slot `F`, members' endpoints on the fabric trace), a `true` twin gives every
+clause of the tagged conformance (with slot `F`) and the tagged well-formedness. -/
+theorem W13Wit.confSBRows (boot : Nat → Pexv6) (nh : Nat) (GT : GfexecT)
+    (cs : List GfRowCert) (fab : Nat → Efab) (F : Nat → Hemission → Prop) :
+    xv6ConfSB nh GT cs = true →
     (∀ (i : Nat) (row : List Lbl) (rc : GfRowCert), GT.gfGd.gtG.gxProg[i]? = some row →
        cs[i]? = some rc →
        ∃ (em : Hemission) (dvi dvo : Nat → Efab) (tq : Nat → Bool),
          hartConff i row (boot i) dvi dvo tq em ∧ rowDepsT em.emItems = rc.rcDeps ∧
-         emFetchImg im em ∧
+         F i em ∧
          (∀ k, k < row.length → tq k = rc.rcTq.getD k false) ∧
          (∀ k, k < row.length → rc.rcMoved.getD k false = false → dvi k = dvo k) ∧
          (∀ k n, GT.gfDev[n]? = some (i, k) → dvi k = fab n ∧ dvo k = fab (n + 1))) →
-    xv6ConfS boot d0 im nh GT ∧ gtdepsWf GT.gfGd.gtG GT.gfGd.gtDeps := by
-  intro hb himg hfab hrows
+    GT.gfGd.gtG.gxProg.length ≤ nh ∧ GT.gfDev.Nodup ∧
+    (∀ (n i k : Nat), GT.gfDev[n]? = some (i, k) →
+       ∃ row, GT.gfGd.gtG.gxProg[i]? = some row ∧ k < row.length) ∧
+    (∀ (i : Nat) (row : List Lbl), GT.gfGd.gtG.gxProg[i]? = some row →
+       ∃ (em : Hemission) (dvi dvo : Nat → Efab) (tq : Nat → Bool),
+         hartConff i row (boot i) dvi dvo tq em ∧
+         (∀ k : Nat, k < row.length →
+            ((i, k) ∈ GT.gfDev ↔ (gisIo GT.gfGd.gtG (i, k) = true ∨ dvi k ≠ dvo k ∨ tq k = true))) ∧
+         (∀ (k n : Nat), GT.gfDev[n]? = some (i, k) → dvi k = fab n ∧ dvo k = fab (n + 1)) ∧
+         F i em ∧
+         (∀ e, e ∈ rowDepsT em.emItems → (((i, e.1.1), (i, e.1.2)), e.2) ∈ GT.gfGd.gtDeps)) ∧
+    gtdepsWf GT.gfGd.gtG GT.gfGd.gtDeps := by
+  intro hb hrows
   simp only [xv6ConfSB, Bool.and_eq_true, decide_eq_true_eq, forallbForallTrue] at hb
   obtain ⟨⟨⟨⟨hnh, hnd⟩, hbnd⟩, hall⟩, hwf⟩ := hb
-  refine ⟨⟨himg, hnh, fab, hfab, hnd, ?_, ?_⟩, gtdepsWfBSound _ _ hwf⟩
+  refine ⟨hnh, hnd, ?_, ?_, gtdepsWfBSound _ _ hwf⟩
   · intro n i k hn
     have h := hbnd (i, k) (List.mem_of_getElem? hn)
     simp only at h
@@ -632,7 +656,7 @@ theorem xv6ConfSBSound (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat
       obtain ⟨em, dvi, dvo, tq, hem, hdeps, hfi, htq, hmv, hpin⟩ := hrows i row rc hrow hrc
       simp only [gfRowCertOk, Bool.and_eq_true, forallbForallTrue] at h
       obtain ⟨hks, hds⟩ := h
-      refine ⟨em, dvi, dvo, tq, hem, fun k hk => ?_, hpin, by rw [himg]; exact hfi, fun e he => ?_⟩
+      refine ⟨em, dvi, dvo, tq, hem, fun k hk => ?_, hpin, hfi, fun e he => ?_⟩
       · have hk' := hks k (by simp [hk])
         simp only [beq_iff_eq, Bool.or_eq_true, Bool.not_eq_true', decide_eq_true_eq] at hk'
         obtain ⟨hiff, hmov⟩ := hk'
@@ -660,5 +684,116 @@ theorem xv6ConfSBSound (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat
       · rw [hdeps] at he
         simpa using hds e he
     · cases h
+
+/-- **THE BOOL TWIN IS SOUND**: with each row's run facts (an emission realizing it whose tagged
+deps, contact bits and moved flags are the certificate's, fetches pinned, members' endpoints on the
+fabric trace), a `true` twin gives `xv6ConfS` and the tagged well-formedness. -/
+theorem xv6ConfSBSound (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat) (GT : GfexecT)
+    (cs : List GfRowCert) (fab : Nat → Efab) :
+    xv6ConfSB nh GT cs = true → GT.gfGd.gtG.gxImg = im → fab 0 = d0 →
+    (∀ (i : Nat) (row : List Lbl) (rc : GfRowCert), GT.gfGd.gtG.gxProg[i]? = some row →
+       cs[i]? = some rc →
+       ∃ (em : Hemission) (dvi dvo : Nat → Efab) (tq : Nat → Bool),
+         hartConff i row (boot i) dvi dvo tq em ∧ rowDepsT em.emItems = rc.rcDeps ∧
+         emFetchImg im em ∧
+         (∀ k, k < row.length → tq k = rc.rcTq.getD k false) ∧
+         (∀ k, k < row.length → rc.rcMoved.getD k false = false → dvi k = dvo k) ∧
+         (∀ k n, GT.gfDev[n]? = some (i, k) → dvi k = fab n ∧ dvo k = fab (n + 1))) →
+    xv6ConfS boot d0 im nh GT ∧ gtdepsWf GT.gfGd.gtG GT.gfGd.gtDeps := by
+  intro hb himg hfab hrows
+  obtain ⟨hnh, hnd, hbnd, hr, hwf⟩ := W13Wit.confSBRows boot nh GT cs fab
+    (fun _ em => emFetchImg GT.gfGd.gtG.gxImg em) hb (by rw [himg]; exact hrows)
+  exact ⟨⟨himg, hnh, fab, hfab, hnd, hbnd, hr⟩, hwf⟩
+
+/-! # 4. The Zifencei twin (W5d-G G6-2) -/
+
+/-- (Lean-only) A pin to a SUB-image is a pin to the image. -/
+theorem W13Wit.fetchPinSub (img imgF : Image) (l : Wlabel) :
+    (∀ z b, imgF z = some b → img z = some b) →
+    WeakAxRealize.fetchPin imgF l → WeakAxRealize.fetchPin img l := by
+  intro hsub hp
+  cases l with
+  | LIFetch base tvs =>
+    refine ⟨hp.1, fun j hj => ?_⟩
+    have h := hp.2 j hj
+    have hs : ((tvs.map Prod.snd)[j]?).isSome := by simp [hj]
+    obtain ⟨b, hb⟩ := Option.isSome_iff_exists.1 hs
+    rw [hb] at h ⊢
+    exact hsub _ _ h
+  | _ => trivial
+
+theorem W13Wit.emFetchImgSub (img imgF : Image) (em : Hemission) :
+    (∀ z b, imgF z = some b → img z = some b) → emFetchImg imgF em → emFetchImg img em :=
+  fun hsub h l hl => W13Wit.fetchPinSub img imgF l hsub (h l hl)
+
+/-- **`emFetchUnwritten`'s decidable side**: every byte the graph writes lies OFF the fetch image
+`imF` (finite: the rows' write labels). -/
+def emFetchUnwrittenB (G : Gexec) (imF : Image) : Bool :=
+  G.gxProg.all (fun row => row.all (fun l =>
+    match lbWr l with
+    | some (base, vs) => (List.range vs.length).all (fun j => (imF (accAddr base j)).isNone)
+    | none => true))
+
+theorem W13Wit.emFetchUnwrittenBOff (G : Gexec) (imF : Image) :
+    emFetchUnwrittenB G imF = true → ∀ w a v, gwritesByte G w a v → imF a = none := by
+  rintro hb w a v ⟨l, base, vs, j, hl, hwr, hv, rfl⟩
+  unfold gxLbl at hl
+  rcases hrow : G.gxProg[w.1]? with _ | row
+  · rw [hrow] at hl; cases hl
+  rw [hrow] at hl
+  simp only [Option.bind_some] at hl
+  simp only [emFetchUnwrittenB, List.all_eq_true] at hb
+  have h := hb row (List.mem_of_getElem? hrow) l (List.mem_of_getElem? hl)
+  simp only [hwr, List.all_eq_true, List.mem_range, Option.isNone_iff_eq_none] at h
+  exact h j (lookup_lt_Some hv)
+
+/-- **SOUND**: an emission pinned to the fetch image `imF` (so every fetched byte is ON it) fetches
+only bytes the graph never writes. -/
+theorem emFetchUnwrittenBSound (G : Gexec) (imF : Image) (em : Hemission) :
+    emFetchUnwrittenB G imF = true → emFetchImg imF em → GraphFetch.emFetchUnwritten G em := by
+  intro hb hpin n base tvs hn j hj w v hw
+  have hp : WeakAxRealize.fetchPin imF (Wlabel.LIFetch base tvs) :=
+    hpin _ (List.mem_map.2 ⟨_, List.mem_of_getElem? hn, rfl⟩)
+  have h1 := hp.2 j hj
+  have h2 := W13Wit.emFetchUnwrittenBOff G imF hb w _ v hw
+  rw [h2] at h1
+  simp [hj] at h1
+
+/-- **THE ZIFENCEI BOOL TWIN**: `xv6ConfSB` (its decidable side keeps the pinned fetches as a
+run fact) and `emFetchUnwrittenB` at the fetch image `imF`. -/
+def xv6ConfSZB (nh : Nat) (GT : GfexecT) (cs : List GfRowCert) (imF : Image) : Bool :=
+  xv6ConfSB nh GT cs && emFetchUnwrittenB GT.gfGd.gtG imF
+
+/-- **THE ZIFENCEI TWIN IS SOUND**: with each row's run facts, its fetches pinned to a SUB-image
+`imF` of the graph's image (e.g. the kernel text), a `true` twin gives `xv6ConfSZ` — the slot
+through the kernel-text instance `GraphFetch.emZifOfPinC`, the stored fragment through
+`GraphFetch.emFetchInOfUnwritten` — and the tagged well-formedness. -/
+theorem xv6ConfSZBSound (boot : Nat → Pexv6) (d0 : Efab) (im : Image) (nh : Nat) (GT : GfexecT)
+    (cs : List GfRowCert) (fab : Nat → Efab) (imF : Image) :
+    xv6ConfSZB nh GT cs imF = true → GT.gfGd.gtG.gxImg = im → fab 0 = d0 →
+    (∀ z b, imF z = some b → im z = some b) →
+    (∀ (i : Nat) (row : List Lbl) (rc : GfRowCert), GT.gfGd.gtG.gxProg[i]? = some row →
+       cs[i]? = some rc →
+       ∃ (em : Hemission) (dvi dvo : Nat → Efab) (tq : Nat → Bool),
+         hartConff i row (boot i) dvi dvo tq em ∧ rowDepsT em.emItems = rc.rcDeps ∧
+         emFetchImg imF em ∧
+         (∀ k, k < row.length → tq k = rc.rcTq.getD k false) ∧
+         (∀ k, k < row.length → rc.rcMoved.getD k false = false → dvi k = dvo k) ∧
+         (∀ k n, GT.gfDev[n]? = some (i, k) → dvi k = fab n ∧ dvo k = fab (n + 1))) →
+    xv6ConfSZ boot d0 im nh GT ∧ gtdepsWf GT.gfGd.gtG GT.gfGd.gtDeps := by
+  intro hb himg hfab hsub hrows
+  simp only [xv6ConfSZB, Bool.and_eq_true] at hb
+  obtain ⟨hb, hnw⟩ := hb
+  obtain ⟨hnh, hnd, hbnd, hr, hwf⟩ := W13Wit.confSBRows boot nh GT cs fab
+    (fun i em => emZifencei GT.gfGd.gtG i em ∧ GraphFetch.emFetchIn (forget GT.gfGd) i em) hb
+    (fun i row rc hrow hrc => by
+      obtain ⟨em, dvi, dvo, tq, hem, hd, hfi, h1, h2, h3⟩ := hrows i row rc hrow hrc
+      have hfi' : emFetchImg GT.gfGd.gtG.gxImg em := by
+        rw [himg]; exact W13Wit.emFetchImgSub im imF em hsub hfi
+      have hu := emFetchUnwrittenBSound GT.gfGd.gtG imF em hnw hfi
+      exact ⟨em, dvi, dvo, tq, hem, hd,
+        ⟨GraphFetch.emZifOfPinC _ i em hfi' hu,
+          GraphFetch.emFetchInOfUnwritten (forget GT.gfGd) i em hfi' hu⟩, h1, h2, h3⟩)
+  exact ⟨⟨himg, hnh, fab, hfab, hnd, hbnd, hr⟩, hwf⟩
 
 end Weak
