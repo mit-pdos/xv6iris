@@ -30,8 +30,8 @@ theorem uk_armOb_interrupt (Q : Step → UWSt → Prop) (sX : UWSt) (hc : UfCfg 
     (i : InterruptType)
     (hq : Q (Step.Step_Pending_Interrupt (i, Privilege.Supervisor))
       (ustTrapS sX (utrapMs 0#1 (sX.file .mstatus)) (sCause i) 0#64 (sX.file .PC) C.stvec)) :
-    hwConfig (GF := GF) cpu ∗ wireInv ∗ uFr (ufRegF cpu C) (ubFrame curCtx D) sX ∗ Rr ⊢
-      ucArmOb (ufRegF cpu C) (ubFrame curCtx D) Q (ukRider cpu Rr)
+    hwConfig (GF := GF) cpu ∗ wireInv ∗ uFr (ufRegF cpu C) (ufBF P D) sX ∗ Rr ⊢
+      ucArmOb (ufRegF cpu C) (ufBF P D) Q (ukRider cpu Rr)
         (Step.Step_Pending_Interrupt (i, Privilege.Supervisor)) :=
   ust_trapArmGen cpu C P D Rr Q sX hc hp hact _ (handle_interrupt i Privilege.Supervisor) (sCause i) 0#64 (sX.file .PC)
     (fun Out Φ => by
@@ -52,8 +52,8 @@ theorem uk_armOb_trap (Q : Step → UWSt → Prop) (sX : UWSt) (hc : UfCfg C P s
     (hq : Q (Step.Step_Execute (.Trap (Privilege.User, exc, pc0), ib))
       (ustTrapS sX (utrapMs 0#1 (sX.file .mstatus)) (utrapScause (.Exception exc.trap) (sX.file .scause))
         (tval exc.excinfo) pc0 C.stvec)) :
-    hwConfig (GF := GF) cpu ∗ wireInv ∗ uFr (ufRegF cpu C) (ubFrame curCtx D) sX ∗ Rr ⊢
-      ucArmOb (ufRegF cpu C) (ubFrame curCtx D) Q (ukRider cpu Rr)
+    hwConfig (GF := GF) cpu ∗ wireInv ∗ uFr (ufRegF cpu C) (ufBF P D) sX ∗ Rr ⊢
+      ucArmOb (ufRegF cpu C) (ufBF P D) Q (ukRider cpu Rr)
         (Step.Step_Execute (.Trap (Privilege.User, exc, pc0), ib)) :=
   ust_trapArmGen cpu C P D Rr Q sX hc hp hact _ (exception_handler Privilege.User exc pc0 >>= set_next_pc)
     (utrapScause (.Exception exc.trap) (sX.file .scause)) (tval exc.excinfo) pc0
@@ -71,8 +71,8 @@ theorem uk_armOb_trap (Q : Step → UWSt → Prop) (sX : UWSt) (hc : UfCfg C P s
 theorem uk_armOb_retire (Q : Step → UWSt → Prop) (s' : UWSt) (ib : BitVec 32)
     (hact : s'.file .hart_state = .HART_ACTIVE ()) (hpr : s'.file .cur_privilege = Privilege.User)
     (hq : Q (Step.Step_Execute (.Retire_Success (), ib)) s') :
-    uFr (ufRegF (GF := GF) cpu C) (ubFrame curCtx D) s' ∗ Rr ⊢
-      ucArmOb (ufRegF cpu C) (ubFrame curCtx D) Q (ukRider cpu Rr)
+    uFr (ufRegF (GF := GF) cpu C) (ufBF P D) s' ∗ Rr ⊢
+      ucArmOb (ufRegF cpu C) (ufBF P D) Q (ukRider cpu Rr)
         (Step.Step_Execute (.Retire_Success (), ib)) := by
   dsimp only [ucArmOb, ucArmBody, ukRider]
   iintro ⟨Hfr, HR⟩

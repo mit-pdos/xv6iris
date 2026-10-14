@@ -68,6 +68,28 @@ structure UstLand (C : UCfg) (P : UPtd) (t0 : PTree) (mm0 : BMap) (s : UWSt) : P
   ms : userMstatusOk (s.file .mstatus)
   act : s.file .hart_state = .HART_ACTIVE ()
   mem : ∃ t, UbMemStep P t0 t mm0 s.mm ∧ utlbOk t (s.file .tlb)
+  wp : s.ro = uRoOf P ∧ s.pt = uPtOf P
+
+/-- A window of the data pages is writable at a user machine. -/
+theorem ustLand_dataRw {C : UCfg} {P : UPtd} {t0 : PTree} {mm0 : BMap} {s : UWSt} (hl : UstLand C P t0 mm0 s)
+    {pa : PAddr} {n : Nat} (h : ∀ j, j < n → pa + BitVec.ofNat 64 j ∈ ukDataAddrs P.um) : ummRw s.ro pa n := by
+  rw [hl.wp.1]; exact uRoOf_data P h
+
+/-- A slot of the stepped tree may take an A/D write-back at a user machine. -/
+theorem ustLand_slot {C : UCfg} {P : UPtd} {t0 : PTree} {mm0 : BMap} {s : UWSt} (hl : UstLand C P t0 mm0 s)
+    {t : PTree} (hst : UbMemStep P t0 t mm0 s.mm) {a v : BitVec 64} (he : (a, v) ∈ t.entries 2) :
+    s.pt a = true := by
+  have ht : a ∈ ubTreeAddrs 2 t0 := by
+    rw [← ubTreeAddrs_shape 2 t0 t hst.shape]
+    exact ukm_entry_win he a ((ubWin_mem _ _ _).2 ⟨0, by decide, by simp⟩)
+  have hdis : a ∉ ubDataAddrs P.um := fun h2 => (List.nodup_append.1 hl.wf.nodup).2.2 _ ht _ h2 rfl
+  obtain ⟨b, -, i, hbi⟩ := Xv6.entries_page 2 t (a, v) he
+  have hbi' : a = pteAddr b i := hbi
+  rw [hl.wp.2]
+  apply uPtOf_slot
+  · rw [hbi']; exact pteAddr_al8 b i
+  · exact fun h => hdis (ukDataAddrs_sub h)
+  · exact fun h => hdis (ukTextAddrs_sub h)
 
 /-- **A machine a U→S trap tower left** (before the epilogue's tick). -/
 structure UstTrapped (C : UCfg) (P : UPtd) (t0 : PTree) (mm0 : BMap) (s : UWSt) : Prop where
@@ -142,7 +164,7 @@ structure UstTrapAt (C : UCfg) (P : UPtd) (t0 : PTree) (mm0 : BMap) (s : UWSt) :
 /-- **The entry state** (Rocq `u_rs`): the reference file of `userInv`'s
 values, no pins, the owned map, no exclusive read. -/
 noncomputable def ustS0 (C : UCfg) (P : UPtd) (v : UfVals) (mm : BMap) : UWSt :=
-  ⟨fun _ => none, ufFile C P v, mm, false⟩
+  ⟨fun _ => none, ufFile C P v, mm, false, uRoOf P, uPtOf P⟩
 
 theorem ustS0_file (C : UCfg) (P : UPtd) (v : UfVals) (mm : BMap) : (ustS0 C P v mm).file = ufFile C P v := rfl
 theorem ustS0_mm (C : UCfg) (P : UPtd) (v : UfVals) (mm : BMap) : (ustS0 C P v mm).mm = mm := rfl
@@ -151,7 +173,7 @@ theorem ustS0_rv (C : UCfg) (P : UPtd) (v : UfVals) (mm : BMap) : (ustS0 C P v m
 /-- **The state a U→S trap tower lands on** (the frame closed at
 `ufTrapSet`, UserFrame's `uf_trapCells`). -/
 def ustTrapS (s : UWSt) (ms sc stv sep npc : BitVec 64) : UWSt :=
-  ⟨fun r => some (ufTrapSet s.file Privilege.Supervisor ms sc stv sep npc r), s.rs, s.mm, s.rv⟩
+  ⟨fun r => some (ufTrapSet s.file Privilege.Supervisor ms sc stv sep npc r), s.rs, s.mm, s.rv, s.ro, s.pt⟩
 
 theorem ustTrapS_file (s : UWSt) (ms sc stv sep npc : BitVec 64) :
     (ustTrapS s ms sc stv sep npc).file = ufTrapSet s.file Privilege.Supervisor ms sc stv sep npc := rfl
@@ -180,7 +202,7 @@ variable {C : UCfg} {P : UPtd} {t0 : PTree} {mm0 : BMap}
 
 /-- The prelude (`minstret_increment` only) keeps a user machine. -/
 theorem ustLand_preS {s : UWSt} (h : UstLand C P t0 mm0 s) : UstLand C P t0 mm0 (ucPreS s) := by
-  refine ⟨h.wf, ust_cfg_of C P s _ h.cfg fun r _ _ _ h4 _ _ _ _ _ => ucPreS_file_other s r h4, ?_, ?_, ?_, ?_⟩
+  refine ⟨h.wf, ust_cfg_of C P s _ h.cfg fun r _ _ _ h4 _ _ _ _ _ => ucPreS_file_other s r h4, ?_, ?_, ?_, ?_, h.wp⟩
   · rw [ucPreS_file_other _ _ (by decide)]; exact h.priv
   · rw [ucPreS_file_other _ _ (by decide)]; exact h.ms
   · rw [ucPreS_file_other _ _ (by decide)]; exact h.act
@@ -242,7 +264,7 @@ theorem ust_land_of_q (st : Step) (s2 : UWSt) (hq : ustQ C P t0 mm0 st s2) :
 /-- The clock tick keeps a user landing. -/
 theorem ustUserAt_clock {s s' : UWSt} (h : UstUserAt C P t0 mm0 s) (hag : ucClockAgree s s') :
     UstUserAt C P t0 mm0 s' := by
-  obtain ⟨hmm, -, hf⟩ := hag
+  obtain ⟨hmm, -, hf, hwpc⟩ := hag
   refine ⟨h.wf, ust_cfg_of C P s s' h.cfg fun r _ _ _ _ _ h6 h7 h8 _ => hf r h6 h7 h8, ?_, ?_, ?_, ?_, ?_⟩
   · rw [hf _ (by decide) (by decide) (by decide)]; exact h.priv
   · rw [hf _ (by decide) (by decide) (by decide)]; exact h.hok
@@ -256,7 +278,7 @@ theorem ustUserAt_clock {s s' : UWSt} (h : UstUserAt C P t0 mm0 s) (hag : ucCloc
 /-- The clock tick keeps a trap landing. -/
 theorem ustTrapAt_clock {s s' : UWSt} (h : UstTrapAt C P t0 mm0 s) (hag : ucClockAgree s s') :
     UstTrapAt C P t0 mm0 s' := by
-  obtain ⟨hmm, -, hf⟩ := hag
+  obtain ⟨hmm, -, hf, hwpc⟩ := hag
   refine ⟨h.wf, ust_cfg_of C P s s' h.cfg fun r _ _ _ _ _ h6 h7 h8 _ => hf r h6 h7 h8, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · rw [hf _ (by decide) (by decide) (by decide)]; exact h.priv
   · rw [hf _ (by decide) (by decide) (by decide)]; exact h.hs
@@ -326,7 +348,7 @@ theorem ustUserAt_s0 (v : UfVals) (mm : BMap) (hu : UfUser v) (hwf : UbMemWf P t
 /-- The entry state of an ACTIVE hart is an active user machine. -/
 theorem ustLand_s0 (v : UfVals) (mm : BMap) (hu : UfUser v) (ha : v.hs = .HART_ACTIVE ())
     (hwf : UbMemWf P t0 mm) (htlb : utlbOk t0 v.tlb) : UstLand C P t0 mm (ustS0 C P v mm) :=
-  ⟨hwf, ufCfg_file C P v hu.2.2.2, rfl, hu.2.1, ha, ⟨t0, ubMemStep_refl P t0 mm hwf, htlb⟩⟩
+  ⟨hwf, ufCfg_file C P v hu.2.2.2, rfl, hu.2.1, ha, ⟨t0, ubMemStep_refl P t0 mm hwf, htlb⟩, ⟨rfl, rfl⟩⟩
 
 /-- The decoder's reference registers, off a user file (for
 `runRW_of_runRead`). -/

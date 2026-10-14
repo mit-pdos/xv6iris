@@ -35,28 +35,6 @@ theorem ukm_treeMem (h : UkMem P t mm T) : uwkTreeMem mm t := by
   rw [hi']
   exact Xv6.uptPteAddrOk b (h.rep.2.2.1 b hb) i
 
-/-- The window of an entry of the tree lies in the tree's addresses. -/
-theorem ukm_entry_win {a v : BitVec 64} (he : (a, v) ∈ t.entries 2) (x : PAddr) (hx : x ∈ ubWin a 8) :
-    x ∈ ubTreeAddrs 2 t := by
-  obtain ⟨j, hj, rfl⟩ := (ubWin_mem _ _ _).1 hx
-  rw [← ubTreeBytes_fst]
-  exact List.mem_map.2 ⟨(a + BitVec.ofNat 64 j, nthByte (n := 8) v j),
-    List.mem_flatMap.2 ⟨(a, v), he, List.mem_map.2 ⟨j, List.mem_range.2 hj, rfl⟩⟩, rfl⟩
-
-/-- A byte of a DATA page is a data address. -/
-theorem ukm_data_mem (um : RegMapF (BitVec 64)) (k : Nat) (w : BitVec 64) (h : get? um k = some w)
-    (ht : ukTextLeaf w = false) (j : Nat) (hj : j < 4096) : pte2pa w + BitVec.ofNat 64 j ∈ ukDataAddrs um := by
-  refine List.mem_flatMap.2 ⟨(k, w), toList_get.2 h, ?_⟩
-  simp only [ht, Bool.false_eq_true, if_false]
-  exact (ubWin_mem _ _ _).2 ⟨j, hj, rfl⟩
-
-/-- A byte of a TEXT page is a text address. -/
-theorem ukm_text_mem (um : RegMapF (BitVec 64)) (k : Nat) (w : BitVec 64) (h : get? um k = some w)
-    (ht : ukTextLeaf w = true) (j : Nat) (hj : j < 4096) : pte2pa w + BitVec.ofNat 64 j ∈ ukTextAddrs um := by
-  refine List.mem_flatMap.2 ⟨(k, w), toList_get.2 h, ?_⟩
-  simp only [ht, if_true]
-  exact (ubWin_mem _ _ _).2 ⟨j, hj, rfl⟩
-
 /-- The tree's bytes are off the data pages. -/
 theorem ukm_tree_data (h : UkMem P t mm T) {x : PAddr} (hx1 : x ∈ ubTreeAddrs 2 t)
     (hx2 : x ∈ ukDataAddrs P.um) : False :=
@@ -139,10 +117,10 @@ end mem
 the TLB is sound for, is an engine machine. -/
 theorem ukm_land {C : UCfg} {P : UPtd} {T : BMap} {s s2 : UWSt} (hl : UkLand C P T s)
     (hf : ∀ r, r ≠ .tlb → s2.file r = s.file r) (t' : PTree) (hm : UkMem P t' s2.mm T)
-    (ht : utlbOk t' (s2.file .tlb)) : UkLand C P T s2 :=
+    (ht : utlbOk t' (s2.file .tlb)) (hwp : s2.ro = s.ro ∧ s2.pt = s.pt := by exact ⟨rfl, rfl⟩) : UkLand C P T s2 :=
   ⟨ufCfg_of_ro C P s.file s2.file hl.cfg (fun r hr => hf r (by intro e; subst e; revert hr; decide)),
    by rw [hf _ (by decide)]; exact hl.priv, by rw [hf _ (by decide)]; exact hl.ms,
-   by rw [hf _ (by decide)]; exact hl.act, ⟨t', hm, ht⟩⟩
+   by rw [hf _ (by decide)]; exact hl.act, ⟨t', hm, ht⟩, ⟨hwp.1.trans hl.wp.1, hwp.2.trans hl.wp.2⟩⟩
 
 /-- The fetch's (and the walk's) pins at an engine machine. -/
 theorem ukm_pins {C : UCfg} {P : UPtd} {T : BMap} {s : UWSt} (h : UkLand C P T s) : UftPins ufFoot s :=

@@ -55,12 +55,12 @@ theorem ume_wf {s : UWSt} (hl : UstLand C P t0 mm0 s) : ∃ t, UbMemWf P t s.mm 
 
 /-- **A window of a granting user leaf's page** (Rocq `u_mem_wf_owned_data`
 + `addr_is_ram` at a data address): owned RAM, at a data page's address. -/
-theorem ume_page {t : PTree} {mm : BMap} (hwf : UbMemWf P t mm) {ppn : BitVec 44} (hpg : UftPageOf P ppn)
+theorem ume_page {t : PTree} {mm : BMap} (hwf : UbMemWf P t mm) {acc : MemoryAccessType mem_payload} {ppn : BitVec 44} (hpg : UftPageOf P acc ppn)
     (va : BitVec 64) (n : Nat) (hn : va.toNat % 4096 + n ≤ 4096) :
     ∃ k lw, Iris.Std.PartialMap.get? P.um k = some lw ∧
       paOf ppn va = pte2pa lw + BitVec.ofNat 64 (va.toNat % 4096) ∧
       inRam (paOf ppn va) n ∧ ummOwned mm (paOf ppn va) n := by
-  obtain ⟨k, lw, w, hk, had, rfl⟩ := hpg
+  obtain ⟨k, lw, w, hk, had, rfl, -⟩ := hpg
   obtain ⟨hpa, hv⟩ := ub_data_valid P hwf.wf k lw hk
   have hppn : ptePpn w = ptePpn lw := pteAD_ptePpn had
   have he : paOf (ptePpn w) va = pte2pa lw + BitVec.ofNat 64 (va.toNat % 4096) := by
@@ -71,12 +71,47 @@ theorem ume_page {t : PTree} {mm : BMap} (hwf : UbMemWf P t mm) {ppn : BitVec 44
   · rw [he]
     exact (bmOwned_iff _ _ _).1 (ubMemWf_data P t mm hwf k lw hk (va.toNat % 4096) n hn)
 
+/-- The write access kinds (their grant needs `W`). -/
+def umeWrAcc : MemoryAccessType mem_payload → Bool
+  | .Store _ => true
+  | .StoreConditional _ => true
+  | .Atomic _ => true
+  | _ => false
+
+theorem ume_permW {acc : MemoryAccessType mem_payload} (hacc : umeWrAcc acc = true) {w : BitVec 64}
+    (h : uwkPermOk acc false w = true) : uwkW w = true := by
+  cases acc <;> simp_all [umeWrAcc, uwkPermOk, uwkAccOk]
+
+/-- **A write's page is a DATA page** (W8 (f3-utext)): the grant has `W`,
+so the leaf is not text, and the window lies in `ukDataAddrs`. -/
+theorem ume_page_data (hwf : uptWf P) {acc : MemoryAccessType mem_payload} {ppn : BitVec 44}
+    (hpg : UftPageOf P acc ppn) (hacc : umeWrAcc acc = true) (va : BitVec 64) (n : Nat)
+    (hn : va.toNat % 4096 + n ≤ 4096) :
+    ∀ j, j < n → paOf ppn va + BitVec.ofNat 64 j ∈ ukDataAddrs P.um := by
+  intro j hj
+  obtain ⟨k, lw, w, hk, had, rfl, hperm⟩ := hpg
+  have hW : uwkW lw = true := by
+    obtain ⟨a, d, rfl⟩ := had
+    exact ume_permW hacc (by rw [← utlb_permOk_setAD acc false lw a d]; exact hperm)
+  have ht : ukTextLeaf lw = false := by
+    have e : uwkW lw = lw.getLsbD 2 := by
+      simp only [uwkW, uwk_bit_to_bool, _get_PTE_Flags_W, Mk_PTE_Flags, Sail.BitVec.extractLsb,
+        BitVec.extractLsb]
+      bv_decide
+    unfold ukTextLeaf; rw [← e, hW]; simp
+  obtain ⟨hpa, -⟩ := ub_data_valid P hwf k lw hk
+  have hppn : ptePpn w = ptePpn lw := pteAD_ptePpn had
+  have he : paOf (ptePpn w) va + BitVec.ofNat 64 j = pte2pa lw + BitVec.ofNat 64 (va.toNat % 4096 + j) := by
+    rw [hppn, uft_paOf_eq, uft_off_eq, hpa, BitVec.add_assoc, BitVec.ofNat_add]
+  rw [he]
+  exact ukm_data_mem P.um k lw hk ht _ (by omega)
+
 /-- **An aligned address translates to an aligned address** (the page is
 4 KiB-aligned; widths up to 16). -/
-theorem ume_pa_al {t : PTree} {mm : BMap} (hwf : UbMemWf P t mm) {ppn : BitVec 44} (hpg : UftPageOf P ppn)
+theorem ume_pa_al {t : PTree} {mm : BMap} (hwf : UbMemWf P t mm) {acc : MemoryAccessType mem_payload} {ppn : BitVec 44} (hpg : UftPageOf P acc ppn)
     (va : BitVec 64) (w : Nat) (hw : w = 1 ∨ w = 2 ∨ w = 4 ∨ w = 8 ∨ w = 16) (hal : va.toNat % w = 0) :
     (paOf ppn va).toNat % w = 0 := by
-  obtain ⟨k, lw, w', hk, had, rfl⟩ := hpg
+  obtain ⟨k, lw, w', hk, had, rfl, -⟩ := hpg
   obtain ⟨hpa, hv⟩ := ub_data_valid P hwf.wf k lw hk
   have hppn : ptePpn w' = ptePpn lw := pteAD_ptePpn had
   rw [hppn, uft_paOf_eq, uft_off_eq]
@@ -118,13 +153,15 @@ theorem ume_ubMemStep_fr (t : PTree) (mm : BMap) (hwf : UbMemWf P t mm) (k : Nat
 (same file, the map framed on the window). -/
 theorem ume_land_fr {s : UWSt} (hl : UstLand C P t0 mm0 s) {k : Nat} {lw : BitVec 64}
     (hk : Iris.Std.PartialMap.get? P.um k = some lw) (off n : Nat) (hn : off + n ≤ 4096) (s' : UWSt)
-    (hf : s'.file = s.file) (hfr : umeFr s.mm s'.mm (pte2pa lw + BitVec.ofNat 64 off) n) :
+    (hf : s'.file = s.file) (hfr : umeFr s.mm s'.mm (pte2pa lw + BitVec.ofNat 64 off) n)
+    (hwp : s'.ro = s.ro ∧ s'.pt = s.pt := by exact ⟨rfl, rfl⟩) :
     UstLand C P t0 mm0 s' := by
   obtain ⟨t, hstep, htlb⟩ := hl.mem
   have hwf := ubMemStep_wf P t0 t mm0 s.mm hl.wf hstep
   refine ⟨hl.wf, by rw [hf]; exact hl.cfg, by rw [hf]; exact hl.priv, by rw [hf]; exact hl.ms,
-    by rw [hf]; exact hl.act, t, ubMemStep_trans P t0 t t mm0 s.mm s'.mm hstep
-      (ume_ubMemStep_fr t s.mm hwf k lw hk off n hn _ hfr), by rw [hf]; exact htlb⟩
+    by rw [hf]; exact hl.act, ⟨t, ubMemStep_trans P t0 t t mm0 s.mm s'.mm hstep
+      (ume_ubMemStep_fr t s.mm hwf k lw hk off n hn _ hfr), by rw [hf]; exact htlb⟩,
+    ⟨hwp.1.trans hl.wp.1, hwp.2.trans hl.wp.2⟩⟩
 
 /-- A user machine that only took the reservation is a user machine. -/
 theorem ume_land_rv {s : UWSt} (hl : UstLand C P t0 mm0 s) (b : Bool) : UstLand C P t0 mm0 { s with rv := b } :=

@@ -104,7 +104,7 @@ theorem ukf_rr_any (T : BMap) (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (r 
 
 theorem ukf_rw (T : BMap) (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (r : Register) (v : RegisterType r)
     (k : PUnit → SailM X) (res : Option (X × UWSt × UOrc))
-    (hd : D.Dw r = true) (h : ukfRun T D orc (UWSt.mk (s.pin.set r v) s.rs s.mm s.rv) (k ()) = res) :
+    (hd : D.Dw r = true) (h : ukfRun T D orc (UWSt.mk (s.pin.set r v) s.rs s.mm s.rv s.ro s.pt) (k ()) = res) :
     ukfRun T D orc s (FreeM.impure (.ok (.regWrite r v)) k) = res := by
   rw [← h]
   exact ukf_node_of T D orc s (.ok (.regWrite r v)) k rfl PUnit.unit _ orc (by simp only [runRW, hd, if_true])
@@ -120,7 +120,7 @@ theorem ukf_mrdxA (T : BMap) (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n v
     (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * n))
     (hif : akIfetch req.access_kind = false) (hn : n < 2 ^ 64) (hex : akExcl req.access_kind = true)
     (hr : bmRead s.mm req.pa n = some w)
-    (h : ukfRun T D orc (UWSt.mk s.pin s.rs s.mm true) (k (.Ok (w, none))) = res) :
+    (h : ukfRun T D orc (UWSt.mk s.pin s.rs s.mm true s.ro s.pt) (k (.Ok (w, none))) = res) :
     ukfRun T D orc s (FreeM.impure (.ok (.memRead n vasize req)) k) = res := by
   rw [← h]
   exact ukf_node_of T D orc s (.ok (.memRead n vasize req)) k (ukf_isText_excl T req hex)
@@ -133,7 +133,7 @@ theorem ukf_mrdx (T : BMap) (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n va
     (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * n))
     (hif : akIfetch req.access_kind = false) (hn : n < 2 ^ 64) (hex : akExcl req.access_kind = true)
     (_hacq : akAcq req.access_kind = false) (hr : bmRead s.mm req.pa n = some w)
-    (h : ukfRun T D orc (UWSt.mk s.pin s.rs s.mm true) (k (.Ok (w, none))) = res) :
+    (h : ukfRun T D orc (UWSt.mk s.pin s.rs s.mm true s.ro s.pt) (k (.Ok (w, none))) = res) :
     ukfRun T D orc s (FreeM.impure (.ok (.memRead n vasize req)) k) = res :=
   ukf_mrdxA T X D orc s n vasize req k res w hif hn hex hr h
 
@@ -142,12 +142,13 @@ theorem ukf_mwrA (T : BMap) (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n va
     (k : Result (Option Bool) Arch.abort → SailM X)
     (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * n))
     (hn : n < 2 ^ 64) (hv : req.value = some w) (ho : bmOwned s.mm req.pa n = true)
-    (h : ukfRun T D orc (UWSt.mk s.pin s.rs (bmWrite s.mm req.pa n w) false) (k (.Ok (some true))) = res) :
+    (hw : uwOk s req.pa n w (akExcl req.access_kind) = true)
+    (h : ukfRun T D orc (UWSt.mk s.pin s.rs (bmWrite s.mm req.pa n w) false s.ro s.pt) (k (.Ok (some true))) = res) :
     ukfRun T D orc s (FreeM.impure (.ok (.memWrite n vasize req)) k) = res := by
   rw [← h]
   exact ukf_node_of T D orc s (.ok (.memWrite n vasize req)) k rfl
     (Result.Ok (some true) : Result (Option Bool) Arch.abort) _ orc
-    (by simp only [runRW, hn, hv, ho, ↓reduceIte])
+    (by simp only [runRW, hn, hv, ho, hw, Bool.and_self, ↓reduceIte])
 
 theorem ukf_mwr (T : BMap) (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat)
     (req : Mem_write_request n vasize Arch.pa Arch.translation Arch.arch_ak)
@@ -155,9 +156,10 @@ theorem ukf_mwr (T : BMap) (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vas
     (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * n))
     (hn : n < 2 ^ 64) (hv : req.value = some w) (ho : bmOwned s.mm req.pa n = true)
     (_hex : akExcl req.access_kind = false)
-    (h : ukfRun T D orc (UWSt.mk s.pin s.rs (bmWrite s.mm req.pa n w) false) (k (.Ok (some true))) = res) :
+    (hw : uwOk s req.pa n w (akExcl req.access_kind) = true)
+    (h : ukfRun T D orc (UWSt.mk s.pin s.rs (bmWrite s.mm req.pa n w) false s.ro s.pt) (k (.Ok (some true))) = res) :
     ukfRun T D orc s (FreeM.impure (.ok (.memWrite n vasize req)) k) = res :=
-  ukf_mwrA T X D orc s n vasize req k res w hn hv ho h
+  ukf_mwrA T X D orc s n vasize req k res w hn hv ho hw h
 
 theorem ukf_mwrx (T : BMap) (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat)
     (req : Mem_write_request n vasize Arch.pa Arch.translation Arch.arch_ak)
@@ -165,9 +167,10 @@ theorem ukf_mwrx (T : BMap) (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n va
     (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * n))
     (hn : n < 2 ^ 64) (hv : req.value = some w) (ho : bmOwned s.mm req.pa n = true)
     (_hex : akExcl req.access_kind = true) (_hrv : s.rv = true)
-    (h : ukfRun T D orc (UWSt.mk s.pin s.rs (bmWrite s.mm req.pa n w) false) (k (.Ok (some true))) = res) :
+    (hw : uwOk s req.pa n w (akExcl req.access_kind) = true)
+    (h : ukfRun T D orc (UWSt.mk s.pin s.rs (bmWrite s.mm req.pa n w) false s.ro s.pt) (k (.Ok (some true))) = res) :
     ukfRun T D orc s (FreeM.impure (.ok (.memWrite n vasize req)) k) = res :=
-  ukf_mwrA T X D orc s n vasize req k res w hn hv ho h
+  ukf_mwrA T X D orc s n vasize req k res w hn hv ho hw h
 
 theorem ukf_choose (T : BMap) (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (p : Sail.Primitive)
     (k : p.reflect → SailM X) (res : Option (X × UWSt × UOrc))

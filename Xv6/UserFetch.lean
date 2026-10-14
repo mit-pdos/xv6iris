@@ -6,7 +6,7 @@
 MachCSL's `UFetchTotal.swp_uftFetch` runs the fetch over any walker frames,
 from a translation hypothesis `UftTr`.  Here it is instantiated at the user
 tier: the footprint `ufFoot`, the frames `ufRegF cpu C` /
-`ubFrame curCtx (ubUAddrs P t0)`, the invariant `UstLand C P t0 mm0`, and
+`ufBF P (ubUAddrs P t0)`, the invariant `UstLand C P t0 mm0`, and
 the translation fact `UftXlate C P` -- the tree-level translation of an
 instruction fetch at a user machine (result, landing, the landing still a
 user machine at the same PC, a success an owned RAM page, a fault a user
@@ -92,7 +92,7 @@ translation of the fetch. -/
 theorem ustFetchSpec_of_xlate (cpu : CPU) (hX : UftXlate C P) : UstFetchSpec (GF := GF) cpu C P := by
   intro t0 mm0 s Ψ hl
   iintro ⟨_, Hfr, HΨ⟩
-  iapply swp_uftFetch (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) (uftTrOf hX t0 mm0) s hl Ψ
+  iapply swp_uftFetch (ufRegF cpu C) (ufBF P (ubUAddrs P t0)) (uftTrOf hX t0 mm0) s hl Ψ
   iframe Hfr
   iintro %fr %s' %hout Hfr
   iapply HΨ $$ %fr %s' %(ustFetchOut_of_uftOut hout) Hfr

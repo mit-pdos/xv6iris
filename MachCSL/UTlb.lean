@@ -144,7 +144,7 @@ theorem utlb_miss_ok (D : UFoot) (orc orc' : UOrc) (s s' : UWSt) (hdr : D.Dr .tl
     runRW D orc s (translate_TLB_miss 39 0#16 root vpn acc .User mxr sum ()) =
       some (.Ok (ptePpn w, .PBMT_PMA, ()),
         UWSt.mk (s'.pin.set .tlb (vectorUpdate tlb (tlbHash vpn)
-          (some (tlbEntryOf 0#16 vpn (ptePpn w) (po.getD w) addr)))) s'.rs s'.mm s'.rv,
+          (some (tlbEntryOf 0#16 vpn (ptePpn w) (po.getD w) addr)))) s'.rs s'.mm s'.rv s'.ro s'.pt,
         orc') := by
   cases po <;> uwk_run -bv [tlbHash_eq] <;>
     simp only [uwkOut, tlbHash_eq, Option.getD_none, Option.getD_some] <;>

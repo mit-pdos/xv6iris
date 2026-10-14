@@ -108,7 +108,7 @@ theorem uwk_rr_any (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (r : Register)
 
 theorem uwk_rw (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (r : Register) (v : RegisterType r)
     (k : PUnit → SailM X) (res : Option (X × UWSt × UOrc))
-    (hd : D.Dw r = true) (h : runRW D orc (UWSt.mk (s.pin.set r v) s.rs s.mm s.rv) (k ()) = res) :
+    (hd : D.Dw r = true) (h : runRW D orc (UWSt.mk (s.pin.set r v) s.rs s.mm s.rv s.ro s.pt) (k ()) = res) :
     runRW D orc s (FreeM.impure (.ok (.regWrite r v)) k) = res := by
   rw [← h]; simp only [runRW, hd, if_true]
 
@@ -129,7 +129,7 @@ theorem uwk_mrdxA (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat
     (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * n))
     (hif : akIfetch req.access_kind = false) (hn : n < 2 ^ 64) (hex : akExcl req.access_kind = true)
     (hr : bmRead s.mm req.pa n = some w)
-    (h : runRW D orc (UWSt.mk s.pin s.rs s.mm true) (k (.Ok (w, none))) = res) :
+    (h : runRW D orc (UWSt.mk s.pin s.rs s.mm true s.ro s.pt) (k (.Ok (w, none))) = res) :
     runRW D orc s (FreeM.impure (.ok (.memRead n vasize req)) k) = res := by
   rw [← h]; simp only [runRW, hif, hn, hex, hr, Bool.false_eq_true, ↓reduceIte]
 
@@ -141,7 +141,7 @@ theorem uwk_mrdx (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat)
     (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * n))
     (hif : akIfetch req.access_kind = false) (hn : n < 2 ^ 64) (hex : akExcl req.access_kind = true)
     (_hacq : akAcq req.access_kind = false) (hr : bmRead s.mm req.pa n = some w)
-    (h : runRW D orc (UWSt.mk s.pin s.rs s.mm true) (k (.Ok (w, none))) = res) :
+    (h : runRW D orc (UWSt.mk s.pin s.rs s.mm true s.ro s.pt) (k (.Ok (w, none))) = res) :
     runRW D orc s (FreeM.impure (.ok (.memRead n vasize req)) k) = res :=
   uwk_mrdxA X D orc s n vasize req k res w hif hn hex hr h
 
@@ -152,9 +152,10 @@ theorem uwk_mwrA (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat)
     (k : Result (Option Bool) Arch.abort → SailM X)
     (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * n))
     (hn : n < 2 ^ 64) (hv : req.value = some w) (ho : bmOwned s.mm req.pa n = true)
-    (h : runRW D orc (UWSt.mk s.pin s.rs (bmWrite s.mm req.pa n w) false) (k (.Ok (some true))) = res) :
+    (hw : uwOk s req.pa n w (akExcl req.access_kind) = true)
+    (h : runRW D orc (UWSt.mk s.pin s.rs (bmWrite s.mm req.pa n w) false s.ro s.pt) (k (.Ok (some true))) = res) :
     runRW D orc s (FreeM.impure (.ok (.memWrite n vasize req)) k) = res := by
-  rw [← h]; simp only [runRW, hn, hv, ho, ↓reduceIte]
+  rw [← h]; simp only [runRW, hn, hv, ho, hw, Bool.and_self, ↓reduceIte]
 
 /-- `uwk_mwrA` at a plain write (the stepper's first choice; the fetch
 walker's twin lemmas mirror this shape and `uwk_mwrx`'s). -/
@@ -163,10 +164,10 @@ theorem uwk_mwr (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat)
     (k : Result (Option Bool) Arch.abort → SailM X)
     (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * n))
     (hn : n < 2 ^ 64) (hv : req.value = some w) (ho : bmOwned s.mm req.pa n = true)
-    (_hex : akExcl req.access_kind = false)
-    (h : runRW D orc (UWSt.mk s.pin s.rs (bmWrite s.mm req.pa n w) false) (k (.Ok (some true))) = res) :
+    (_hex : akExcl req.access_kind = false) (hw : uwOk s req.pa n w (akExcl req.access_kind) = true)
+    (h : runRW D orc (UWSt.mk s.pin s.rs (bmWrite s.mm req.pa n w) false s.ro s.pt) (k (.Ok (some true))) = res) :
     runRW D orc s (FreeM.impure (.ok (.memWrite n vasize req)) k) = res :=
-  uwk_mwrA X D orc s n vasize req k res w hn hv ho h
+  uwk_mwrA X D orc s n vasize req k res w hn hv ho hw h
 
 /-- `uwk_mwrA` at an exclusive write whose walk took the reservation bit. -/
 theorem uwk_mwrx (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat)
@@ -175,9 +176,10 @@ theorem uwk_mwrx (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat)
     (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * n))
     (hn : n < 2 ^ 64) (hv : req.value = some w) (ho : bmOwned s.mm req.pa n = true)
     (_hex : akExcl req.access_kind = true) (_hrv : s.rv = true)
-    (h : runRW D orc (UWSt.mk s.pin s.rs (bmWrite s.mm req.pa n w) false) (k (.Ok (some true))) = res) :
+    (hw : uwOk s req.pa n w (akExcl req.access_kind) = true)
+    (h : runRW D orc (UWSt.mk s.pin s.rs (bmWrite s.mm req.pa n w) false s.ro s.pt) (k (.Ok (some true))) = res) :
     runRW D orc s (FreeM.impure (.ok (.memWrite n vasize req)) k) = res :=
-  uwk_mwrA X D orc s n vasize req k res w hn hv ho h
+  uwk_mwrA X D orc s n vasize req k res w hn hv ho hw h
 
 theorem uwk_choose (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (p : Sail.Primitive)
     (k : p.reflect → SailM X) (res : Option (X × UWSt × UOrc))
@@ -273,12 +275,13 @@ def parseRes (r : Lean.Expr) : MetaM (Option (Lean.Expr × Lean.Expr × Lean.Exp
 /-- Simplify a walker state: projections of a literal state reduced. -/
 def normState (s : Lean.Expr) : MetaM Lean.Expr := do
   let s ← instantiateMVars s
-  if s.isAppOfArity ``UWSt.mk 4 then
+  if s.isAppOfArity ``UWSt.mk 6 then
     let args ← s.getAppArgs.mapM fun a => do
       let a' ← whnfR a
       -- keep only projection reductions (whnfR may unfold reducible defs too)
       if a.isApp && (a.getAppFn.isConstOf ``UWSt.pin || a.getAppFn.isConstOf ``UWSt.rs ||
-          a.getAppFn.isConstOf ``UWSt.mm || a.getAppFn.isConstOf ``UWSt.rv) then return a' else return a
+          a.getAppFn.isConstOf ``UWSt.mm || a.getAppFn.isConstOf ``UWSt.rv ||
+          a.getAppFn.isConstOf ``UWSt.ro || a.getAppFn.isConstOf ``UWSt.pt) then return a' else return a
     return mkAppN s.getAppFn args
   return s
 
@@ -489,7 +492,7 @@ partial def fileValue (s r : Lean.Expr) : MetaM (Lean.Expr × Lean.Expr) := do
     return none
   if let some vp ← hyp then return vp
   let s' ← whnfR s
-  if s'.isAppOfArity ``UWSt.mk 4 then
+  if s'.isAppOfArity ``UWSt.mk 6 then
     let pin := s'.getArg! 0
     let rs := s'.getArg! 1
     -- the pins the walk set

@@ -28,7 +28,7 @@ values) through `uxc_zca`/`uxc_zicfilp`/`uxc_fiom`.
 
 **How the configuration walks are closed.**  They branch on configuration
 values, so they are closed by the KERNEL (`kernel_rfl`) at the pinned state
-`⟨drefU, rs, mm, rv⟩` over the read-only list footprint of `drefU`'s four
+`⟨drefU, rs, mm, rv, ro, pt⟩` over the read-only list footprint of `drefU`'s four
 registers, and moved to an arbitrary footprint and state by the read-only
 transfer `runRW_ro` (a walk that writes no register and reads only `Lr`
 gives the same answer from every state whose file agrees on `Lr`).  The
@@ -89,7 +89,7 @@ theorem uxcNpc_file_other (s : UWSt) (t : BitVec 64) (r : Register) (hr : r ≠ 
 def uxcCfgFoot : UFoot := uFootL [] uxcCfgRegs []
 
 /-- The pinned reference state: `drefU`'s values over any file. -/
-def uxcRef (s : UWSt) : UWSt := ⟨drefU, s.rs, s.mm, s.rv⟩
+def uxcRef (s : UWSt) : UWSt := ⟨drefU, s.rs, s.mm, s.rv, s.ro, s.pt⟩
 
 theorem uxcRef_file (s : UWSt) (h : UxcCfg s) : ∀ r ∈ uxcCfgRegs, (uxcRef s).file r = s.file r := by
   intro r hr
@@ -106,42 +106,42 @@ theorem uxc_cfg_walk {X : Type} {D : UFoot} (hD : UxcFoot D) (m : SailM X) (x : 
     (s : UWSt) (hU : UxcCfg s)
     (h0 : runRW uxcCfgFoot orc (uxcRef s) m = some (x, uxcRef s, orc)) :
     runRW D orc s m = some (x, s, orc) :=
-  runRW_ro uxcCfgRegs D hD.cfg m orc orc (uxcRef s) s (uxcRef s) x (uxcRef_file s hU) rfl rfl h0
+  runRW_ro uxcCfgRegs D hD.cfg m orc orc (uxcRef s) s (uxcRef s) x (uxcRef_file s hU) rfl rfl rfl rfl h0
 
 /-! ## The three configuration sub-walks -/
 
 /-- `Zca` is on at the reference state (`misa.C = 1`). -/
-theorem uxc_zca_ref (orc : UOrc) (rs : RegFile) (mm : BMap) (rv : Bool) :
-    runRW uxcCfgFoot orc ⟨drefU, rs, mm, rv⟩ (currentlyEnabled extension.Ext_Zca) =
-      some (true, ⟨drefU, rs, mm, rv⟩, orc) := by
+theorem uxc_zca_ref (orc : UOrc) (rs : RegFile) (mm : BMap) (rv : Bool) (ro pt : PAddr → Bool) :
+    runRW uxcCfgFoot orc ⟨drefU, rs, mm, rv, ro, pt⟩ (currentlyEnabled extension.Ext_Zca) =
+      some (true, ⟨drefU, rs, mm, rv, ro, pt⟩, orc) := by
   kernel_rfl
 
 /-- `Zicfilp` is off at User (`senvcfg.LPE = 0`). -/
-theorem uxc_zicfilp_ref (orc : UOrc) (rs : RegFile) (mm : BMap) (rv : Bool) :
-    runRW uxcCfgFoot orc ⟨drefU, rs, mm, rv⟩ (currentlyEnabled extension.Ext_Zicfilp) =
-      some (false, ⟨drefU, rs, mm, rv⟩, orc) := by
+theorem uxc_zicfilp_ref (orc : UOrc) (rs : RegFile) (mm : BMap) (rv : Bool) (ro pt : PAddr → Bool) :
+    runRW uxcCfgFoot orc ⟨drefU, rs, mm, rv, ro, pt⟩ (currentlyEnabled extension.Ext_Zicfilp) =
+      some (false, ⟨drefU, rs, mm, rv, ro, pt⟩, orc) := by
   kernel_rfl
 
 /-- `FIOM` is off at User (`menvcfg.FIOM = senvcfg.FIOM = 0`). -/
-theorem uxc_fiom_ref (orc : UOrc) (rs : RegFile) (mm : BMap) (rv : Bool) :
-    runRW uxcCfgFoot orc ⟨drefU, rs, mm, rv⟩ (is_fiom_active ()) =
-      some (false, ⟨drefU, rs, mm, rv⟩, orc) := by
+theorem uxc_fiom_ref (orc : UOrc) (rs : RegFile) (mm : BMap) (rv : Bool) (ro pt : PAddr → Bool) :
+    runRW uxcCfgFoot orc ⟨drefU, rs, mm, rv, ro, pt⟩ (is_fiom_active ()) =
+      some (false, ⟨drefU, rs, mm, rv, ro, pt⟩, orc) := by
   kernel_rfl
 
 /-- **`Zca` enabled** (Rocq's `Hzca` premise, discharged). -/
 theorem uxc_zca {D : UFoot} (hD : UxcFoot D) (orc : UOrc) (s : UWSt) (hU : UxcCfg s) :
     runRW D orc s (currentlyEnabled extension.Ext_Zca) = some (true, s, orc) :=
-  uxc_cfg_walk hD _ _ orc s hU (uxc_zca_ref orc s.rs s.mm s.rv)
+  uxc_cfg_walk hD _ _ orc s hU (uxc_zca_ref orc s.rs s.mm s.rv s.ro s.pt)
 
 /-- **`Zicfilp` disabled** (Rocq's `Hzic` premise, discharged). -/
 theorem uxc_zicfilp {D : UFoot} (hD : UxcFoot D) (orc : UOrc) (s : UWSt) (hU : UxcCfg s) :
     runRW D orc s (currentlyEnabled extension.Ext_Zicfilp) = some (false, s, orc) :=
-  uxc_cfg_walk hD _ _ orc s hU (uxc_zicfilp_ref orc s.rs s.mm s.rv)
+  uxc_cfg_walk hD _ _ orc s hU (uxc_zicfilp_ref orc s.rs s.mm s.rv s.ro s.pt)
 
 /-- **`FIOM` inactive** at User. -/
 theorem uxc_fiom {D : UFoot} (hD : UxcFoot D) (orc : UOrc) (s : UWSt) (hU : UxcCfg s) :
     runRW D orc s (is_fiom_active ()) = some (false, s, orc) :=
-  uxc_cfg_walk hD _ _ orc s hU (uxc_fiom_ref orc s.rs s.mm s.rv)
+  uxc_cfg_walk hD _ _ orc s hU (uxc_fiom_ref orc s.rs s.mm s.rv s.ro s.pt)
 
 /-! ## Stepping leaves: early-return blocks (`SailME.run`) -/
 

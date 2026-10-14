@@ -23,7 +23,7 @@ open Sail LeanRV64D LeanRV64D.Functions
 variable {C : UCfg} {P : UPtd} {t0 : PTree} {mm0 : BMap}
 
 /-- The walker state a store's physical write leaves. -/
-theorem ume_file_mk (s : UWSt) (m : BMap) (b : Bool) : (UWSt.mk s.pin s.rs m b).file = s.file := rfl
+theorem ume_file_mk (s : UWSt) (m : BMap) (b : Bool) : (UWSt.mk s.pin s.rs m b s.ro s.pt).file = s.file := rfl
 
 /-- **The store's access at a user machine**, any stored value: written (a
 user machine), or a user fault (at a user machine). -/
@@ -42,14 +42,15 @@ theorem ume_vstore (hv : UftLeavesValid P) {s : UWSt} (hl : UstLand C P t0 mm0 s
     by_cases hpg' : ummInPage va w
     · obtain ⟨k, lw, hk, hpa, hram, hown⟩ := ume_page hwf1 hpg va w hpg'
       obtain ⟨m, hfr, h⟩ := ume_vmem_write_addr_inpage ufFoot orc s hp va w h0 h8 hpg' data _ s1 orc (htr1 orc)
-        (ume_umaPhys hl1) hram hown
+        (ume_umaPhys hl1) hram hown (ustLand_dataRw hl1 (ume_page_data hwf1.wf hpg rfl va w hpg'))
       exact ⟨_, _, h, ume_land_fr hl1 hk (va.toNat % 4096) w hpg' _ (ume_file_mk s1 m false)
         (by rw [← hpa]; exact hfr), Or.inl rfl⟩
     · obtain ⟨hp0, hpw⟩ := umm_lo_bounds va w hpg'
       obtain ⟨k, lw, hk, hpa, hram1, hown1⟩ := ume_page hwf1 hpg va (ummLo va) (umm_lo_inPage va)
       obtain ⟨m, v2, hfr, hcont⟩ := ume_vmem_write_addr_straddle ufFoot orc s hp va w h8 hpg' data _ s1 orc
         (htr1 orc) (ume_umaPhys hl1) hram1 hown1
-      have hlm : UstLand C P t0 mm0 ⟨s1.pin, s1.rs, m, false⟩ :=
+        (ustLand_dataRw hl1 (ume_page_data hwf1.wf hpg rfl va (ummLo va) (umm_lo_inPage va)))
+      have hlm : UstLand C P t0 mm0 ⟨s1.pin, s1.rs, m, false, s1.ro, s1.pt⟩ :=
         ume_land_fr hl1 hk (va.toNat % 4096) (ummLo va) (umm_lo_inPage va) _ (ume_file_mk s1 m false)
           (by rw [← hpa]; exact hfr)
       obtain ⟨r2, s2, htr2, hl2, -, hok2, herr2⟩ :=
@@ -61,7 +62,7 @@ theorem ume_vstore (hv : UftLeavesValid P) {s : UWSt} (hl : UstLand C P t0 mm0 s
           rw [umm_hi_width w _ hpw]; exact umm_hi_inPage va w h8
         obtain ⟨k2, lw2, hk2, hpa2, hram2, hown2⟩ := ume_page hwf2 hpg2 _ _ hn2
         obtain ⟨m', hfr', hw2⟩ := ume_translate_and_write_value ufFoot orc _ _ _ v2 (by omega) (by omega) _ s2 orc
-          (htr2 orc) (ume_umaPhys hl2) hram2 hown2
+          (htr2 orc) (ume_umaPhys hl2) hram2 hown2 (ustLand_dataRw hl2 (ume_page_data hwf2.wf hpg2 rfl _ _ hn2))
         exact ⟨_, _, (hcont _ _ _ hw2).1 rfl,
           ume_land_fr hl2 hk2 ((va + BitVec.ofNat 64 (ummLo va)).toNat % 4096) _ hn2 _ (ume_file_mk s2 m' false)
             (by rw [← hpa2]; exact hfr'), Or.inl rfl⟩

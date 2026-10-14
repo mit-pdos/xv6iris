@@ -114,13 +114,13 @@ theorem ume_mem_read_amo (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UmaPhys D s) 
 reservation state. -/
 theorem ume_checked_mem_write_amo (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UmaPhys D s) (pa : BitVec 64)
     (w : Nat) (hw : umeAW w) (hr : UmaRam pa w) (op : amoop) (aq rl : Bool) (data : BitVec (8 * w))
-    (ho : bmOwned s.mm pa w = true) :
+    (ho : bmOwned s.mm pa w = true) (hrw : bmRw s.ro pa w = true) :
     runRW D orc s (checked_mem_write (.Physaddr pa) w data (umoAcc op aq rl) .PBMT_PMA .User () (aq && rl) rl true) =
       some (.Ok true, { s with mm := bmWrite s.mm pa w data, rv := false }, orc) := by
   have hpma := ume_check_pma_amo D orc s hp pa w hw hr op aq rl
   have hpmp := uma_pmp D orc s hp pa w hr.ram (umoAcc op aq rl) rfl
   have hmmio := uma_within_mmio_writable_ram D orc s pa w hp.pins.dhtif hp.pins.htif hr.ram
-  have hwr := uma_write_ram_cond D orc s _ (umaCondWk_sc aq rl) pa w (umeAW_lt hw) data ho
+  have hwr := uma_write_ram_cond D orc s _ (umaCondWk_sc aq rl) pa w (umeAW_lt hw) data ho hrw
   unfold checked_mem_write
   simp only [uma_wk_sc]
   rcases hw with rfl | rfl | rfl | rfl | rfl <;> (
@@ -145,10 +145,10 @@ theorem ume_checked_mem_write_amo (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UmaP
 drops. -/
 theorem ume_mem_write_value_amo (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UmaPhys D s) (pa : BitVec 64)
     (w : Nat) (hw : umeAW w) (hr : UmaRam pa w) (op : amoop) (aq rl : Bool) (data : BitVec (8 * w))
-    (ho : bmOwned s.mm pa w = true) :
+    (ho : bmOwned s.mm pa w = true) (hrw : bmRw s.ro pa w = true) :
     runRW D orc s (mem_write_value (.Physaddr pa) w data (umoAcc op aq rl) .PBMT_PMA (aq && rl) rl true) =
       some (.Ok true, { s with mm := bmWrite s.mm pa w data, rv := false }, orc) := by
-  have hc := ume_checked_mem_write_amo D orc s hp pa w hw hr op aq rl data ho
+  have hc := ume_checked_mem_write_amo D orc s hp pa w hw hr op aq rl data ho hrw
   unfold mem_write_value mem_write_value_meta mem_write_value_priv_meta
   sail_norm
   simp only [runRW_bind, utr_readReg D orc s _ hp.dms, utr_readReg D orc s _ hp.dcp, Option.bind_some, hp.cp,

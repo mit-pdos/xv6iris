@@ -133,14 +133,14 @@ theorem uma_vmem_write_addr_sc_ok (D : UFoot) (orc orc1 : UOrc) (s s1 : UWSt) (h
     (htr : runRW D orc s (utrTranslate s va (.StoreConditional (aq, rl, .Data))) =
       some (.Ok (ppn, .PBMT_PMA, ()), s1, orc1))
     (hr : UmaRam (paOf ppn va) w) (hm : Functions.match_reservation (paOf ppn va) = true)
-    (ho : bmOwned s1.mm (paOf ppn va) w = true) :
+    (ho : bmOwned s1.mm (paOf ppn va) w = true) (hrw : bmRw s1.ro (paOf ppn va) w = true) :
     runRW D orc s (vmem_write_addr (.Virtaddr va) w data (.StoreConditional (aq, rl, .Data)) (aq && rl) rl true) =
       some (.Ok true, { s1 with mm := bmWrite s1.mm (paOf ppn va) w data, rv := false }, orc1) :=
   uma_vmem_write_addr_al D orc orc1 s s1 hp va w hw hal data _ (aq && rl) rl true rfl
     (paOf ppn va) (by rw [hm]; rfl) true (fun d => { s1 with mm := bmWrite s1.mm (paOf ppn va) w d, rv := false })
     (uma_translateAddr_ok D orc orc1 s s1 hp va _ rfl hc ppn htr)
     (uma_mem_write_ea_sc D orc1 s1 hp1 (paOf ppn va) w hw hr aq rl)
-    (fun d => uma_mem_write_value_sc D orc1 s1 hp1 (paOf ppn va) w hw hr aq rl d ho)
+    (fun d => uma_mem_write_value_sc D orc1 s1 hp1 (paOf ppn va) w hw hr aq rl d ho hrw)
 
 /-- **An aligned SC whose reservation does not match**: checked, nothing
 written, the SC answers `false`; the reservation bit is untouched. -/

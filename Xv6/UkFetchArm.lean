@@ -177,14 +177,14 @@ theorem uk_fetchArm (cpu : CPU) (C : UCfg) (P : UPtd) (D : List PAddr) (T : BMap
     (Rt : UWSt → Prop) (hRt : ∀ s', Rt s' → s'.file .hart_state = .HART_ACTIVE ())
     (hRtU : ∀ s', Rt s' → s'.file .cur_privilege = Privilege.User) (Ex : sync_exception → Prop)
     (hX : UkExecOut C P T i len m pc V Rt Ex) :
-    hwConfig (GF := GF) cpu ∗ wireInv ∗ iviewLb cpu K ∗ uFr (ufRegF cpu C) (ubFrame curCtx D) s ∗
+    hwConfig (GF := GF) cpu ∗ wireInv ∗ iviewLb cpu K ∗ uFr (ufRegF cpu C) (ufBF P D) s ∗
       uxTextOwn curCtx K (ukTextAddrs P.um) T ⊢
       swp cpu (fetch () >>= ucAfterFetch)
-        (ucArmOb (ufRegF cpu C) (ubFrame curCtx D) (ukQ C P T m pc V Rt Ex)
+        (ucArmOb (ufRegF cpu C) (ufBF P D) (ukQ C P T m pc V Rt Ex)
           (ukRider cpu (uxTextOwn curCtx K (ukTextAddrs P.um) T))) := by
   iintro ⟨#Hhw, #Hwi, #HK, Hfr, HX⟩
   iapply swp_bind
-  iapply swp_uxRun_of (ufRegF cpu C) (ubFrame curCtx D) K (ukTextAddrs P.um) T (fetch ()) s
+  iapply swp_uxRun_of (ufRegF cpu C) (ufBF P D) K (ukTextAddrs P.um) T (fetch ()) s
     (fun fr' s1 => fr' = fr ∧ UkLand C P T s1 ∧ (∀ r, r ≠ .tlb → s1.file r = s.file r) ∧ ukView P.um s1.mm T = V)
     (fun orc => by
       obtain ⟨s1, o1, hw, hl1, hf1, hv1⟩ := hF s hop.land hop.hpc hop.view orc
@@ -218,7 +218,7 @@ theorem uk_fetchArm (cpu : CPU) (C : UCfg) (P : UPtd) (D : List PAddr) (T : BMap
         runRW_of_runRead ufFoot udrefU orc s1 hdref _ i₀ b hrd
       exact ⟨_, s2, o2, uk_afterFetch_rvc orc o2 s1 s2 h i₀ r hd1 help (uf_ucMisa C P s1 hl1.cfg) hdech
         ((uk_execAs_redirect orc _ i₀ i hexa).trans hw), r, _, rfl, hout⟩
-  iapply swp_uxRun_of (ufRegF cpu C) (ubFrame curCtx D) K (ukTextAddrs P.um) T (ucAfterFetch fr') s1
+  iapply swp_uxRun_of (ufRegF cpu C) (ufBF P D) K (ukTextAddrs P.um) T (ucAfterFetch fr') s1
     (fun st s2 => ∃ (r : ExecutionResult) (ib : BitVec 32), st = Step_Execute (r, ib) ∧
         ((r = RETIRE_SUCCESS ∧ Rt s2) ∨
          (∃ exc : sync_exception, r = .Trap (Privilege.User, exc, pc) ∧ Ex exc ∧ exc.ext = none ∧
@@ -231,7 +231,7 @@ theorem uk_fetchArm (cpu : CPU) (C : UCfg) (P : UPtd) (D : List PAddr) (T : BMap
   rcases hout with ⟨rfl, hpost⟩ | ⟨exc, rfl, hx, hext, huse, hl2, hr2, hv2⟩
   · have e : RETIRE_SUCCESS = ExecutionResult.Retire_Success () := rfl
     rw [e]
-    iapply uk_armOb_retire cpu C D (uxTextOwn curCtx K (ukTextAddrs P.um) T)
+    iapply uk_armOb_retire cpu C P D (uxTextOwn curCtx K (ukTextAddrs P.um) T)
       (ukQ C P T m pc V Rt Ex) s2 ib (hRt s2 hpost) (hRtU s2 hpost) hpost
     iframe
   · have hq : ukQ C P T m pc V Rt Ex (Step_Execute (.Trap (Privilege.User, exc, pc), ib))

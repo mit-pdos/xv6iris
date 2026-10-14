@@ -218,6 +218,37 @@ def ubDataBytes (um : RegMapF (BitVec 64)) (M : Nat → List (BitVec 8)) : List 
 def ubDataAddrs (um : RegMapF (BitVec 64)) : List PAddr :=
   (toList um).flatMap (fun kv => ubWin (pte2pa kv.2) 4096)
 
+/-- The physical addresses of the DATA pages (every mapped user page that is
+not text): what the walker's map owns beside the table. -/
+def ukDataAddrs (um : RegMapF (BitVec 64)) : List PAddr :=
+  (toList um).flatMap (fun kv => if ukTextLeaf kv.2 then [] else ubWin (pte2pa kv.2) 4096)
+
+/-- The physical addresses of the TEXT pages: the stamped map's domain. -/
+def ukTextAddrs (um : RegMapF (BitVec 64)) : List PAddr :=
+  (toList um).flatMap (fun kv => if ukTextLeaf kv.2 then ubWin (pte2pa kv.2) 4096 else [])
+
+/-- The window of an entry of the tree lies in the tree's addresses. -/
+theorem ukm_entry_win {t : PTree} {a v : BitVec 64} (he : (a, v) ∈ t.entries 2) (x : PAddr) (hx : x ∈ ubWin a 8) :
+    x ∈ ubTreeAddrs 2 t := by
+  obtain ⟨j, hj, rfl⟩ := (ubWin_mem _ _ _).1 hx
+  rw [← ubTreeBytes_fst]
+  exact List.mem_map.2 ⟨(a + BitVec.ofNat 64 j, nthByte (n := 8) v j),
+    List.mem_flatMap.2 ⟨(a, v), he, List.mem_map.2 ⟨j, List.mem_range.2 hj, rfl⟩⟩, rfl⟩
+
+/-- A byte of a DATA page is a data address. -/
+theorem ukm_data_mem (um : RegMapF (BitVec 64)) (k : Nat) (w : BitVec 64) (h : get? um k = some w)
+    (ht : ukTextLeaf w = false) (j : Nat) (hj : j < 4096) : pte2pa w + BitVec.ofNat 64 j ∈ ukDataAddrs um := by
+  refine List.mem_flatMap.2 ⟨(k, w), toList_get.2 h, ?_⟩
+  simp only [ht, Bool.false_eq_true, if_false]
+  exact (ubWin_mem _ _ _).2 ⟨j, hj, rfl⟩
+
+/-- A byte of a TEXT page is a text address. -/
+theorem ukm_text_mem (um : RegMapF (BitVec 64)) (k : Nat) (w : BitVec 64) (h : get? um k = some w)
+    (ht : ukTextLeaf w = true) (j : Nat) (hj : j < 4096) : pte2pa w + BitVec.ofNat 64 j ∈ ukTextAddrs um := by
+  refine List.mem_flatMap.2 ⟨(k, w), toList_get.2 h, ?_⟩
+  simp only [ht, if_true]
+  exact (ubWin_mem _ _ _).2 ⟨j, hj, rfl⟩
+
 theorem ubDataBytes_fst (um : RegMapF (BitVec 64)) (M : Nat → List (BitVec 8))
     (hl : ∀ kv ∈ toList um, (M kv.1).length = 4096) : (ubDataBytes um M).map Prod.fst = ubDataAddrs um := by
   unfold ubDataBytes ubDataAddrs

@@ -24,11 +24,11 @@ open LeanRV64D LeanRV64D.Functions
 file. -/
 theorem umm_umaPhys_sameRegs {D : UFoot} {s st : UWSt} (hp : UmaPhys D s) (h : ummSameRegs s st) :
     UmaPhys D st := by
-  obtain ⟨pin, rs, mm, rv⟩ := st
+  obtain ⟨pin, rs, mm, rv, ro, pt⟩ := st
   obtain ⟨h1, h2⟩ := h
   simp only at h1 h2
   subst h1 h2
-  exact hp.mm_rv mm rv
+  exact hp.mk_file mm rv ro pt
 
 /-- **A misaligned (or aligned) user load from owned RAM**: some value, the
 state unmoved. -/
@@ -46,17 +46,18 @@ theorem umm_checked_mem_read_ram (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UmaPh
 /-- **A misaligned (or aligned) user store to owned RAM**: the map keeps its
 domain, the reservation bit is cleared. -/
 theorem umm_checked_mem_write_ram (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UmaPhys D s) (pa : BitVec 64)
-    (W : Nat) (data : BitVec (8 * W)) (h0 : 0 < W) (hW : W ≤ 8) (hram : inRam pa W) (hown : ummOwned s.mm pa W) :
+    (W : Nat) (data : BitVec (8 * W)) (h0 : 0 < W) (hW : W ≤ 8) (hram : inRam pa W) (hown : ummOwned s.mm pa W)
+    (hrw : ummRw s.ro pa W) :
     ∃ m, ummSameDom s.mm m ∧
       runRW D orc s (checked_mem_write (.Physaddr pa) W data (.Store .Data) .PBMT_PMA .User () false false false) =
-        some (.Ok true, ⟨s.pin, s.rs, m, false⟩, orc) := by
+        some (.Ok true, ⟨s.pin, s.rs, m, false, s.ro, s.pt⟩, orc) := by
   obtain ⟨info, hpma⟩ := umm_check_pma_ram D orc s pa W (.Store .Data) .User (.inr rfl) hp.pins.dpma hp.pins.pma
     hram h0 hW
   exact umm_checked_mem_write D orc s pa W data .PBMT_PMA .User info h0 hW hpma
     (fun j c st _ hjc hst => uma_pmp D orc st (umm_umaPhys_sameRegs hp hst) _ c (umm_inRam_sub pa W j c hram hjc) _
       rfl)
     (fun j c st _ hjc hst => uma_within_mmio_writable_ram D orc st _ c (umm_umaPhys_sameRegs hp hst).pins.dhtif
-      (umm_umaPhys_sameRegs hp hst).pins.htif (umm_inRam_sub pa W j c hram hjc)) hown
+      (umm_umaPhys_sameRegs hp hst).pins.htif (umm_inRam_sub pa W j c hram hjc)) hown hrw
 
 /-- **The store's announce in RAM**, at User (`MPRV = 0`). -/
 theorem umm_mem_write_ea_ram (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UmaPhys D s) (pa : BitVec 64)

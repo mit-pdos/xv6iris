@@ -55,7 +55,7 @@ def ustStepObligation (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp G
 noncomputable def ustStepObligationActive (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp GF) : IProp GF :=
   iprop(□ ∀ (v : UfVals) (t : PTree) (mm : BMap), ⌜UfUser v⌝ -∗ ⌜v.hs = .HART_ACTIVE ()⌝ -∗
     ⌜UbMemWf pt t mm⌝ -∗ ⌜utlbOk t v.tlb⌝ -∗ (ufRegF cpu C).F (ufFile C pt v) -∗
-    (ubFrame curCtx (ubUAddrs pt t)).B mm -∗ ufAside cpu -∗ Rut pt -∗
+    (ufBF pt (ubUAddrs pt t)).B mm -∗ ufAside cpu -∗ Rut pt -∗
     ▷ ((userInv cpu C pt Rut -∗ wpLoop cpu) ∧ (userTrapFrame cpu C pt Rut -∗ wpLoop cpu)) -∗ wpLoop cpu)
 
 instance ustStepObligation_persistent (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp GF) :

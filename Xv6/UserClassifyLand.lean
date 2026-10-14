@@ -75,9 +75,10 @@ theorem ucl_ro_off : ∀ r ∈ ufRoList, r ∉ uxaGprs ∧ r ≠ .nextPC := by d
 /-- **The landing transport** (Rocq `finish_gpr`/`finish_unchanged`): off
 the GPRs and `nextPC` nothing moved, and the byte map is the same. -/
 theorem ucl_land_frame {s s' : UWSt} (h : UstLand C P t0 mm0 s) (hmm : s'.mm = s.mm)
-    (hf : ∀ r, r ∉ uxaGprs → r ≠ .nextPC → s'.file r = s.file r) : UstLand C P t0 mm0 s' := by
+    (hf : ∀ r, r ∉ uxaGprs → r ≠ .nextPC → s'.file r = s.file r)
+    (hwp : s'.ro = s.ro ∧ s'.pt = s.pt := by exact ⟨rfl, rfl⟩) : UstLand C P t0 mm0 s' := by
   refine ⟨h.wf, ufCfg_of_ro C P s.file s'.file h.cfg fun r hr => hf r (ucl_ro_off r hr).1 (ucl_ro_off r hr).2,
-    ?_, ?_, ?_, ?_⟩
+    ?_, ?_, ?_, ?_, ⟨hwp.1.trans h.wp.1, hwp.2.trans h.wp.2⟩⟩
   · rw [hf _ (by decide) (by decide)]; exact h.priv
   · rw [hf _ (by decide) (by decide)]; exact h.ms
   · rw [hf _ (by decide) (by decide)]; exact h.act
@@ -99,7 +100,7 @@ theorem ucl_land_wr {s : UWSt} (h : UstLand C P t0 mm0 s) (i : BitVec 5) (v : Bi
 /-- A control step lands. -/
 theorem ucl_land_uxc {s s' : UWSt} {res : ExecutionResult} (h : UstLand C P t0 mm0 s) (hs : UxcStep s res s') :
     UstLand C P t0 mm0 s' :=
-  ucl_land_frame h hs.2.1 hs.2.2.2.1
+  ucl_land_frame h hs.2.1 hs.2.2.2.1 hs.2.2.2.2.2
 
 /-! ## §3 The pins -/
 

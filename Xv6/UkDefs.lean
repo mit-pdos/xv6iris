@@ -37,15 +37,6 @@ open Sail LeanRV64D LeanRV64D.Functions
 
 /-! ## §1 The text pages, and the image split by them -/
 
-/-- The physical addresses of the DATA pages (every mapped user page that is
-not text): what the walker's map owns beside the table. -/
-def ukDataAddrs (um : RegMapF (BitVec 64)) : List PAddr :=
-  (toList um).flatMap (fun kv => if ukTextLeaf kv.2 then [] else ubWin (pte2pa kv.2) 4096)
-
-/-- The physical addresses of the TEXT pages: the stamped map's domain. -/
-def ukTextAddrs (um : RegMapF (BitVec 64)) : List PAddr :=
-  (toList um).flatMap (fun kv => if ukTextLeaf kv.2 then ubWin (pte2pa kv.2) 4096 else [])
-
 /-- **The page view the two halves give** (what the address space is
 re-sealed at after a step): a text page reads the text map, a data page the
 walker's map. -/
@@ -79,6 +70,25 @@ structure UkLand (C : UCfg) (P : UPtd) (T : BMap) (s : UWSt) : Prop where
   ms : userMstatusOk (s.file .mstatus)
   act : s.file .hart_state = .HART_ACTIVE ()
   mem : ∃ t, UkMem P t s.mm T ∧ utlbOk t (s.file .tlb)
+  wp : s.ro = uRoOf P ∧ s.pt = uPtOf P
+
+/-- A window of the data pages is writable at an engine machine. -/
+theorem ukLand_dataRw {C : UCfg} {P : UPtd} {T : BMap} {s : UWSt} (hl : UkLand C P T s) {pa : PAddr} {n : Nat}
+    (h : ∀ j, j < n → pa + BitVec.ofNat 64 j ∈ ukDataAddrs P.um) : bmRw s.ro pa n = true := by
+  rw [hl.wp.1]; exact bmRw_of_ummRw _ _ _ (uRoOf_data P h)
+
+/-- A slot of the engine's tree may take an A/D write-back. -/
+theorem ukLand_slot {C : UCfg} {P : UPtd} {T : BMap} {s : UWSt} (hl : UkLand C P T s) {t : PTree}
+    (hm : UkMem P t s.mm T) {a v : BitVec 64} (he : (a, v) ∈ t.entries 2) : s.pt a = true := by
+  have ht : a ∈ ubTreeAddrs 2 t := ukm_entry_win he a ((ubWin_mem _ _ _).2 ⟨0, by decide, by simp⟩)
+  have hnd := List.nodup_append.1 hm.nodup
+  obtain ⟨b, -, i, hbi⟩ := Xv6.entries_page 2 t (a, v) he
+  have hbi' : a = pteAddr b i := hbi
+  rw [hl.wp.2]
+  apply uPtOf_slot
+  · rw [hbi']; exact pteAddr_al8 b i
+  · exact fun h => (List.nodup_append.1 hnd.1).2.2 _ ht _ h rfl
+  · exact fun h => hnd.2.2 _ (List.mem_append_left _ ht) _ h rfl
 
 /-- The file's GPRs ARE the register map (x0 reads zero on both sides). -/
 def ukRegs (f : RegFile) (m : RegMap) : Prop := ∀ i : BitVec 5, uxaXget f i = m.get i

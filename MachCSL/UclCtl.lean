@@ -64,7 +64,7 @@ theorem uclCtlOut_execAs {orc : UOrc} {s s' : UWSt} {c : instruction} {res : Exe
   refine ⟨res, s', uxc_execAs_of D orc s s' c ?_ h, hs, hr⟩
   intro i he
   subst he
-  exact hs.2.2.2.2
+  exact hs.2.2.2.2.1
 
 theorem ucl_wrs_isWrs (op : wrsop) : uwIsWrs (uxcWrsReason op) = true := by cases op <;> rfl
 

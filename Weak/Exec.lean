@@ -617,7 +617,8 @@ theorem execOfRunRW (D : UFoot) {X : Type} (m : SailM X) :
           · exact absurd h (by simp)
           · rename_i w hv
             split at h
-            · rename_i hown
+            · rename_i hown0
+              have hown : bmOwned s.mm req.pa n = true := (Bool.and_eq_true _ _ ▸ hown0).1
               have hm : mmioAcc req.pa n = false :=
                 mmioAcc_false_of_base s.mm hram req.pa n (bmOwned_base s.mm req.pa n hown)
               rw [execMemWrite n va req k _ w hv hm]

@@ -30,23 +30,27 @@ token are the walker frames at `ustS0`; the wand returns the token to the
 residue. -/
 theorem ust_frames (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IProp GF)
     (hacc : Rut P ⊢ ctxToken cpu ∗ (ctxToken cpu -∗ Rut P)) (v : UfVals) (t0 : PTree) (mm : BMap) :
-    (ufRegF cpu C).F (ufFile C P v) ∗ (ubFrame curCtx (ubUAddrs P t0)).B mm ∗ Rut P ⊢
-      uFr (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) (ustS0 C P v mm) ∗ (ctxToken cpu -∗ Rut P) := by
+    (ufRegF cpu C).F (ufFile C P v) ∗ (ufBF P (ubUAddrs P t0)).B mm ∗ Rut P ⊢
+      uFr (ufRegF cpu C) (ufBF P (ubUAddrs P t0)) (ustS0 C P v mm) ∗ (ctxToken cpu -∗ Rut P) := by
   iintro ⟨HF, HB, Hrut⟩
   icases hacc $$ Hrut with ⟨Htok, Hres⟩
   icases ctxTok_uResvTok cpu curCtx $$ Htok with ⟨Hc, Hr⟩
   unfold uFr
   rw [ustS0_file, ustS0_mm, ustS0_rv]
-  iframe
+  isplitl [HF HB Hc Hr]
+  · isplitr
+    · ipureintro; exact ⟨rfl, rfl⟩
+    iframe
+  · iexact Hres
 
 /-- **Rocq `u_close_inv`** at a walker landing: `userInv` is back. -/
 theorem ust_close_user (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IProp GF) (t0 : PTree) (mm0 : BMap)
     (s : UWSt) (h : UstUserAt C P t0 mm0 s) :
-    kmapStatic ⊢ uFr (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) s -∗ ufAside cpu -∗
+    kmapStatic ⊢ uFr (ufRegF cpu C) (ufBF P (ubUAddrs P t0)) s -∗ ufAside cpu -∗
       (ctxToken cpu -∗ Rut P) -∗ userInv cpu C P Rut := by
   obtain ⟨t', hst, htlb⟩ := h.mem
   unfold uFr
-  iintro #HS ⟨HF, HB, Hc, Hr⟩ Ha Hres
+  iintro #HS ⟨%_, HF, HB, Hc, Hr⟩ Ha Hres
   ihave Htok := uResvTok_ctxTok cpu curCtx s.rv $$ [$Hc $Hr]
   ihave Hrut := Hres $$ Htok
   iapply uf_close_inv cpu C P Rut s.file t0 t' mm0 s.mm h.cfg h.priv h.hok h.ms h.act h.wf hst htlb $$ HS HF HB Ha Hrut
@@ -54,11 +58,11 @@ theorem ust_close_user (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IProp G
 /-- **The trap closer** at a walker landing: `userTrapFrame`. -/
 theorem ust_close_trap (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IProp GF) (t0 : PTree) (mm0 : BMap)
     (s : UWSt) (h : UstTrapAt C P t0 mm0 s) :
-    kmapStatic ⊢ uFr (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) s -∗ ufAside cpu -∗
+    kmapStatic ⊢ uFr (ufRegF cpu C) (ufBF P (ubUAddrs P t0)) s -∗ ufAside cpu -∗
       (ctxToken cpu -∗ Rut P) -∗ uxRcpt cpu s.file -∗ userTrapFrame cpu C P Rut := by
   obtain ⟨t', hst, htlb⟩ := h.mem
   unfold uFr
-  iintro #HS ⟨HF, HB, Hc, Hr⟩ Ha Hres Hrc
+  iintro #HS ⟨%_, HF, HB, Hc, Hr⟩ Ha Hres Hrc
   ihave Htok := uResvTok_ctxTok cpu curCtx s.rv $$ [$Hc $Hr]
   ihave Hrut := Hres $$ Htok
   ihave Hrc := uxRcpt_trap cpu s.file h.priv $$ Hrc
@@ -68,7 +72,7 @@ theorem ust_close_trap (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IProp G
 kind, the step obligation's continuation, and the machine goes on. -/
 theorem ust_close (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IProp GF) (t0 : PTree) (mm0 : BMap)
     (s : UWSt) (h : UstUserAt C P t0 mm0 s ∨ UstTrapAt C P t0 mm0 s) :
-    kmapStatic ⊢ uFr (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) s -∗ ufAside cpu -∗
+    kmapStatic ⊢ uFr (ufRegF cpu C) (ufBF P (ubUAddrs P t0)) s -∗ ufAside cpu -∗
       (ctxToken cpu -∗ Rut P) -∗ uxRcpt cpu s.file -∗
       ((userInv cpu C P Rut -∗ wpLoop cpu) ∧ (userTrapFrame cpu C P Rut -∗ wpLoop cpu)) -∗ wpLoop cpu := by
   iintro #HS Hfr Ha Hres Hrc Hk

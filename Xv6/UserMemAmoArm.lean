@@ -89,6 +89,7 @@ theorem ume_amo (t0 : PTree) (mm0 : BMap) (s : UWSt) (op : amoop) (aq rl : Bool)
           (mem_write_value (.Physaddr (paOf ppn (uxaXget s.file i1))) w x (umoAcc op aq rl) .PBMT_PMA (aq && rl) rl
             true) = some (.Ok true, umoSt s1 (paOf ppn (uxaXget s.file i1)) w x, orc) :=
         fun x => ume_mem_write_value_amo ufFoot orc (umoRv s1) (hq.mm_rv s1.mm true) _ w hwA hr op aq rl x ho
+          (bmRw_of_ummRw _ _ _ (ustLand_dataRw hl1 (ume_page_data hwf1.wf hpg rfl _ w hin)))
       have hst : ∀ x, UstLand C P t0 mm0 (umoSt s1 (paOf ppn (uxaXget s.file i1)) w x) := fun x =>
         ume_land_fr hl1 hk ((uxaXget s.file i1).toNat % 4096) w hin _ rfl
           (by rw [← hpa]; exact umeFr_write s1.mm _ w x (Nat.le_of_lt (umeAW_lt hwA)) ho)

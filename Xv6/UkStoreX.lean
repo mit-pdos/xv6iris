@@ -132,7 +132,7 @@ over engine maps at the same tree, is an engine machine. -/
 theorem ukm_land_mm {C : UCfg} {P : UPtd} {T : BMap} {s : UWSt} (hl : UkLand C P T s) (t : PTree)
     (htlb : utlbOk t (s.file .tlb)) (mm : BMap) (rv : Bool) (hm : UkMem P t mm T) :
     UkLand C P T { s with mm := mm, rv := rv } :=
-  ⟨hl.cfg, hl.priv, hl.ms, hl.act, ⟨t, hm, htlb⟩⟩
+  ⟨hl.cfg, hl.priv, hl.ms, hl.act, ⟨t, hm, htlb⟩, hl.wp⟩
 
 /-! ## §2 The store -/
 
@@ -176,7 +176,8 @@ theorem ukRetire_store (C : UCfg) (P : UPtd) (T : BMap) (imm : BitVec 12) (rs1 r
     exact uma_vmem_write_addr_al ufFoot orc orc _ s1 hp0 _ k hW hal _ (.Store .Data) false false false rfl
       _ rfl true (fun d => { s1 with mm := bmWrite s1.mm _ k d, rv := false }) (htr orc)
       (uma_mem_write_ea_store ufFoot orc s1 hp1 _ k hW hram)
-      (fun d => uma_mem_write_value_store ufFoot orc s1 hp1 _ k hW hram d ho)
+      (fun d => uma_mem_write_value_store ufFoot orc s1 hp1 _ k hW hram d ho (ukLand_dataRw hl1 (fun j hj => by
+        rw [BitVec.add_assoc, ← BitVec.ofNat_add]; exact ukm_data_mem P.um _ lw hk hd _ (by omega))))
   have hex := ume_exec_store ume_umoFoot orc (ucNpcS s len) (uf_drefU C P _ hl0.cfg hl0.priv) hp0 imm rs2 rs1 k hW
     true _ orc hvw
   refine ⟨_, _, uke_uxRun_of_runRW hl0 _ orc _ hex, ?_, ?_, ?_, ?_⟩

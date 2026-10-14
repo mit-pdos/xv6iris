@@ -154,6 +154,10 @@ def ucEpi (retired : Bool) (s : UWSt) : UWSt :=
 theorem ucTickS_file_other (s : UWSt) (x : Register) (h : x ≠ .PC) : (ucTickS s).file x = s.file x :=
   UWSt.setR_file_other _ _ _ _ h
 
+/-- The epilogue keeps the write-permission sets (W8 (f3-utext)). -/
+theorem ucEpi_wp (r : Bool) (s : UWSt) : (ucEpi r s).ro = s.ro ∧ (ucEpi r s).pt = s.pt := by
+  unfold ucEpi; split <;> exact ⟨rfl, rfl⟩
+
 @[simp] theorem ucEpi_mm (r : Bool) (s : UWSt) : (ucEpi r s).mm = s.mm := by
   unfold ucEpi ucTickS; split <;> rfl
 

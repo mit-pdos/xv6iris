@@ -41,11 +41,13 @@ theorem uke_uxRun_of_runRW {C : UCfg} {P : UPtd} {T : BMap} {s : UWSt} (h : UkLa
 
 /-- **`UkLand` is kept by any move of the GPRs and `nextPC` alone.** -/
 theorem uke_land_congr {C : UCfg} {P : UPtd} {T : BMap} {s s' : UWSt} (h : UkLand C P T s)
-    (hf : ∀ r, r ∉ uxaGprs → r ≠ .nextPC → s'.file r = s.file r) (hm : s'.mm = s.mm) :
+    (hf : ∀ r, r ∉ uxaGprs → r ≠ .nextPC → s'.file r = s.file r) (hm : s'.mm = s.mm)
+    (hwp : s'.ro = s.ro ∧ s'.pt = s.pt := by exact ⟨rfl, rfl⟩) :
     UkLand C P T s' := by
-  obtain ⟨hc, hp, hms, ha, t, hk, ht⟩ := h
+  obtain ⟨hc, hp, hms, ha, ⟨t, hk, ht⟩, hw⟩ := h
   refine ⟨ufCfg_of_ro C P s.file s'.file hc
-      (fun r hr => hf r (Xv6.ucl_ro_off r hr).1 (Xv6.ucl_ro_off r hr).2), ?_, ?_, ?_, t, hm ▸ hk, ?_⟩
+      (fun r hr => hf r (Xv6.ucl_ro_off r hr).1 (Xv6.ucl_ro_off r hr).2), ?_, ?_, ?_, ⟨t, hm ▸ hk, ?_⟩,
+      ⟨hwp.1.trans hw.1, hwp.2.trans hw.2⟩⟩
   · rw [hf _ (by decide) (by decide)]; exact hp
   · rw [hf _ (by decide) (by decide)]; exact hms
   · rw [hf _ (by decide) (by decide)]; exact ha

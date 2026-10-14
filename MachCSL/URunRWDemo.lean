@@ -58,8 +58,8 @@ def urwDemoNoPin : RegPin := fun _ => none
 
 /-- **RTYPE**: at a fully symbolic state, `x3 := x1 + x2`. -/
 theorem urwDemo_add (orc : UOrc) (rs : RegFile) (mm : BMap) (rv : Bool) :
-    runRW urwDemoFoot orc ⟨urwDemoNoPin, rs, mm, rv⟩ (execute urwDemoAdd) =
-      some (RETIRE_SUCCESS, ⟨urwDemoNoPin.set .x3 (rs .x1 + rs .x2), rs, mm, rv⟩, orc) := by
+    runRW urwDemoFoot orc ⟨urwDemoNoPin, rs, mm, rv, fun _ => false, fun _ => false⟩ (execute urwDemoAdd) =
+      some (RETIRE_SUCCESS, ⟨urwDemoNoPin.set .x3 (rs .x1 + rs .x2), rs, mm, rv, fun _ => false, fun _ => false⟩, orc) := by
   kernel_rfl
 
 /-! ## RTYPE at symbolic register indices, through the bind toolkit -/
@@ -138,8 +138,8 @@ def urwDemoXset (p : RegPin) (i : BitVec 5) (v : BitVec 64) : RegPin :=
 
 /-- `rX_bits` at a symbolic index (32 kernel walks). -/
 theorem urwDemo_rX (orc : UOrc) (rs : RegFile) (mm : BMap) (rv : Bool) (i : BitVec 5) :
-    runRW urwDemoFoot orc ⟨urwDemoNoPin, rs, mm, rv⟩ (rX_bits (regidx.Regidx i)) =
-      some (urwDemoXget rs i, ⟨urwDemoNoPin, rs, mm, rv⟩, orc) := by
+    runRW urwDemoFoot orc ⟨urwDemoNoPin, rs, mm, rv, fun _ => false, fun _ => false⟩ (rX_bits (regidx.Regidx i)) =
+      some (urwDemoXget rs i, ⟨urwDemoNoPin, rs, mm, rv, fun _ => false, fun _ => false⟩, orc) := by
   rcases MachCSL.uxa_bv5_cases i with
     rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
     rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
@@ -147,8 +147,8 @@ theorem urwDemo_rX (orc : UOrc) (rs : RegFile) (mm : BMap) (rv : Bool) (i : BitV
 
 /-- `wX_bits` at a symbolic index (32 kernel walks). -/
 theorem urwDemo_wX (orc : UOrc) (rs : RegFile) (mm : BMap) (rv : Bool) (i : BitVec 5) (v : BitVec 64) :
-    runRW urwDemoFoot orc ⟨urwDemoNoPin, rs, mm, rv⟩ (wX_bits (regidx.Regidx i) v) =
-      some ((), ⟨urwDemoXset urwDemoNoPin i v, rs, mm, rv⟩, orc) := by
+    runRW urwDemoFoot orc ⟨urwDemoNoPin, rs, mm, rv, fun _ => false, fun _ => false⟩ (wX_bits (regidx.Regidx i) v) =
+      some ((), ⟨urwDemoXset urwDemoNoPin i v, rs, mm, rv, fun _ => false, fun _ => false⟩, orc) := by
   rcases MachCSL.uxa_bv5_cases i with
     rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl |
     rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
@@ -157,10 +157,10 @@ theorem urwDemo_wX (orc : UOrc) (rs : RegFile) (mm : BMap) (rv : Bool) (i : BitV
 /-- **RTYPE at symbolic indices**: `add rd, rs1, rs2` for ALL 32768 register
 triples, composed from the two index lemmas by the bind toolkit. -/
 theorem urwDemo_add_sym (orc : UOrc) (rs : RegFile) (mm : BMap) (rv : Bool) (rs1 rs2 rd : BitVec 5) :
-    runRW urwDemoFoot orc ⟨urwDemoNoPin, rs, mm, rv⟩
+    runRW urwDemoFoot orc ⟨urwDemoNoPin, rs, mm, rv, fun _ => false, fun _ => false⟩
         (execute (instruction.RTYPE (regidx.Regidx rs2, regidx.Regidx rs1, regidx.Regidx rd, rop.ADD))) =
       some (RETIRE_SUCCESS,
-        ⟨urwDemoXset urwDemoNoPin rd (urwDemoXget rs rs1 + urwDemoXget rs rs2), rs, mm, rv⟩, orc) := by
+        ⟨urwDemoXset urwDemoNoPin rd (urwDemoXget rs rs1 + urwDemoXget rs rs2), rs, mm, rv, fun _ => false, fun _ => false⟩, orc) := by
   show runRW urwDemoFoot orc _ (execute_RTYPE _ _ _ rop.ADD) = _
   simp only [execute_RTYPE, runRW_bind, urwDemo_rX, Option.bind, Pure.pure, runRW_freeM_pure, urwDemo_wX]
 
@@ -215,7 +215,7 @@ def urwDemoLd : instruction :=
 
 /-- **LD**: the walk succeeds for every oracle and every page content. -/
 theorem urwDemo_ld_ok (orc : UOrc) (rs : RegFile) (pg : BitVec 12 → BitVec 8) (rv : Bool) :
-    (runRW urwDemoFoot orc ⟨urwDemoPinL, rs, urwDemoPage pg, rv⟩ (execute urwDemoLd)).isSome = true := by
+    (runRW urwDemoFoot orc ⟨urwDemoPinL, rs, urwDemoPage pg, rv, fun _ => false, fun _ => false⟩ (execute urwDemoLd)).isSome = true := by
   kernel_rfl
 
 /-- The doubleword at page offset 8, little-endian. -/
@@ -228,9 +228,9 @@ untouched.  The walk equation is the kernel's (`kernel_walk`: the result
 spine with every closed datum evaluated); the data equation on the page's
 symbolic bytes is `bv_decide`'s. -/
 theorem urwDemo_ld (orc : UOrc) (rs : RegFile) (pg : BitVec 12 → BitVec 8) (rv : Bool) :
-    runRW urwDemoFoot orc ⟨urwDemoPinL, rs, urwDemoPage pg, rv⟩ (execute urwDemoLd) =
-      some (RETIRE_SUCCESS, ⟨urwDemoPinL.set .x5 (urwDemoDword pg), rs, urwDemoPage pg, rv⟩, orc) := by
-  kernel_walk h : runRW urwDemoFoot orc ⟨urwDemoPinL, rs, urwDemoPage pg, rv⟩ (execute urwDemoLd)
+    runRW urwDemoFoot orc ⟨urwDemoPinL, rs, urwDemoPage pg, rv, fun _ => false, fun _ => false⟩ (execute urwDemoLd) =
+      some (RETIRE_SUCCESS, ⟨urwDemoPinL.set .x5 (urwDemoDword pg), rs, urwDemoPage pg, rv, fun _ => false, fun _ => false⟩, orc) := by
+  kernel_walk h : runRW urwDemoFoot orc ⟨urwDemoPinL, rs, urwDemoPage pg, rv, fun _ => false, fun _ => false⟩ (execute urwDemoLd)
   rw [h]
   simp only [Option.some.injEq, Prod.mk.injEq, UWSt.mk.injEq, and_true]
   refine ⟨rfl, congrArg _ ?_⟩
@@ -245,13 +245,13 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 /-- The RTYPE walk on the two-list footprint of the instruction. -/
 theorem urwDemo_addL (orc : UOrc) (rs : RegFile) (mm : BMap) (rv : Bool) :
-    runRW (uFootL [.x3] [.x1, .x2] []) orc ⟨urwDemoNoPin, rs, mm, rv⟩ (execute urwDemoAdd) =
-      some (RETIRE_SUCCESS, ⟨urwDemoNoPin.set .x3 (rs .x1 + rs .x2), rs, mm, rv⟩, orc) := by
+    runRW (uFootL [.x3] [.x1, .x2] []) orc ⟨urwDemoNoPin, rs, mm, rv, fun _ => false, fun _ => false⟩ (execute urwDemoAdd) =
+      some (RETIRE_SUCCESS, ⟨urwDemoNoPin.set .x3 (rs .x1 + rs .x2), rs, mm, rv, fun _ => false, fun _ => false⟩, orc) := by
   kernel_rfl
 
 theorem urwDemo_noPin_file (rs : RegFile) (mm : BMap) (rv : Bool) :
-    (UWSt.mk urwDemoNoPin rs mm rv).file = rs :=
-  UWSt.file_pin _ _ _ _ (fun _ _ h => by cases h)
+    (UWSt.mk urwDemoNoPin rs mm rv (fun _ => false) (fun _ => false)).file = rs :=
+  UWSt.file_pin _ _ _ _ _ _ (fun _ _ h => by cases h)
 
 /-- **RTYPE, as a `swp` spec** over the instruction's own cells. -/
 theorem urwDemo_swp_add (cpu : CPU) (ξ : CtxId) (dq : DFrac) (f : RegFile)
@@ -263,10 +263,12 @@ theorem urwDemo_swp_add (cpu : CPU) (ξ : CtxId) (dq : DFrac) (f : RegFile)
   iintro ⟨HF, Htok, HΦ⟩
   icases ctxTok_uResvTok cpu ξ $$ Htok with ⟨Hc, Hr⟩
   iapply swp_runRW (uRegFrameLF cpu [.x3] [.x1, .x2] [] dq hnd) (uNoBytesF ξ) (execute urwDemoAdd)
-    ⟨urwDemoNoPin, f, fun _ => none, false⟩ (fun orc => by rw [urwDemo_addL]; rfl) Φ
+    ⟨urwDemoNoPin, f, fun _ => none, false, fun _ => false, fun _ => false⟩ (fun orc => by rw [urwDemo_addL]; rfl) Φ
   unfold uFr uPost
   isplitl [HF Hc Hr]
-  · simp only [uRegFrameLF, uNoBytesF, urwDemo_noPin_file]
+  · isplitr
+    · ipureintro; exact ⟨rfl, rfl⟩
+    simp only [uRegFrameLF, uNoBytesF, urwDemo_noPin_file]
     iframe
     ipureintro; intro _; trivial
   · iintro %orc %x %s' %orc' %h HF _ Hc Hr
@@ -282,18 +284,21 @@ file agrees with the pinned configuration, and any byte frame holding the
 page: `x5` receives the doubleword. -/
 theorem urwDemo_swp_ld (cpu : CPU) (ξ : CtxId) (RF : URegFrame GF cpu urwDemoFoot)
     (BF : UByteFrame GF ξ) (f : RegFile) (pg : BitVec 12 → BitVec 8)
-    (hf : ∀ r v, urwDemoPinL r = some v → f r = v) (Φ : ExecutionResult → IProp GF) :
+    (hf : ∀ r v, urwDemoPinL r = some v → f r = v) (hro : BF.ro = fun _ => false) (hpt : BF.pt = fun _ => false)
+    (Φ : ExecutionResult → IProp GF) :
     RF.F f ∗ BF.B (urwDemoPage pg) ∗ ctxTok cpu ξ ∗
     (RF.F (f.set .x5 (urwDemoDword pg)) -∗ BF.B (urwDemoPage pg) -∗ ctxTok cpu ξ -∗ Φ RETIRE_SUCCESS)
     ⊢ swp cpu (execute urwDemoLd) Φ := by
-  have hfile := UWSt.file_pin urwDemoPinL f (urwDemoPage pg) false hf
+  have hfile := UWSt.file_pin urwDemoPinL f (urwDemoPage pg) false (fun _ => false) (fun _ => false) hf
   iintro ⟨HF, HB, Htok, HΦ⟩
   icases ctxTok_uResvTok cpu ξ $$ Htok with ⟨Hc, Hr⟩
-  iapply swp_runRW RF BF (execute urwDemoLd) ⟨urwDemoPinL, f, urwDemoPage pg, false⟩
+  iapply swp_runRW RF BF (execute urwDemoLd) ⟨urwDemoPinL, f, urwDemoPage pg, false, fun _ => false, fun _ => false⟩
     (fun orc => by rw [urwDemo_ld]; rfl) Φ
   unfold uFr uPost
   isplitl [HF HB Hc Hr]
-  · rw [hfile]
+  · isplitr
+    · ipureintro; exact ⟨hro.symm, hpt.symm⟩
+    rw [hfile]
     iframe
   · iintro %orc %x %s' %orc' %h HF HB Hc Hr
     rw [urwDemo_ld] at h

@@ -171,13 +171,12 @@ theorem ufm_swp_ifetch_frame (cpu : CPU) {ξ : CtxId} (BF : UByteFrame GF ξ) (m
     BF.B mm ∗ ▷ (∀ w' : BitVec (8 * n), BF.B mm -∗ Φ (.Ok (w', none)))
     ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_read req) Φ := by
   iintro ⟨HB, HΦ⟩
-  icases BF.acc mm req.pa n hn ho $$ HB with ⟨%w, %hw, Hb, HBc⟩
-  iapply swp_sail_mem_read_ifetch_ctx cpu req ξ (DFrac.own 1) w hk Φ
+  icases BF.accR mm req.pa n hn ho $$ HB with ⟨%dq, %w, %hw, Hb, HBc⟩
+  iapply swp_sail_mem_read_ifetch_ctx cpu req ξ dq w hk Φ
   iframe Hb
   inext
   iintro %w' Hb
-  ihave HB := HBc $$ %w Hb
-  ihave HB := UByteFrame.restore BF _ _ _ _ hw $$ HB
+  ihave HB := HBc $$ Hb
   iapply HΦ $$ %w' HB
 
 /-- The bind form: a fetch followed by its continuation. -/

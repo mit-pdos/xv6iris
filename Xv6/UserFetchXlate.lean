@@ -25,13 +25,13 @@ theorem uft_translate (hv : UftLeavesValid P) {t0 : PTree} {mm0 : BMap} (s : UWS
     (vpn : BitVec 27) (sum : Bool) :
     ∃ r s', (∀ orc, runRW ufFoot orc s
         (translate 39 0#16 P.root vpn (.InstructionFetch ()) .User false sum ()) = some (r, s', orc)) ∧
-      UftTrOut C P t0 mm0 s r s' := by
+      UftTrOut C P t0 mm0 (.InstructionFetch ()) s r s' := by
   obtain ⟨t, hstep, htlb⟩ := hl.mem
   have hdr : ufFoot.Dr .tlb = true := ufFoot_rd _ (by decide)
   have hmiss : (∀ orc, runRW ufFoot orc s (lookup_TLB 39 0#16 vpn) = some (none, s, orc)) →
       ∃ r s', (∀ orc, runRW ufFoot orc s
         (translate 39 0#16 P.root vpn (.InstructionFetch ()) .User false sum ()) = some (r, s', orc)) ∧
-      UftTrOut C P t0 mm0 s r s' := by
+      UftTrOut C P t0 mm0 (.InstructionFetch ()) s r s' := by
     intro hl0
     obtain ⟨r, s', hw, hout⟩ := uft_miss hv s hl t hstep htlb vpn sum
     exact ⟨r, s', fun orc => utlb_translate_of_miss ufFoot orc s _ vpn _ _ false sum _ (hl0 orc) (hw orc), hout⟩
@@ -65,7 +65,7 @@ theorem uftXlate_of_valid (hv : UftLeavesValid P) : UftXlate C P := by
     | Ok p =>
       obtain ⟨ppn, pbmt, u⟩ := p
       cases u
-      obtain ⟨hpb, k, lw, w, hk, had, rfl⟩ := hok _ _ rfl
+      obtain ⟨hpb, k, lw, w, hk, had, rfl, -⟩ := hok _ _ rfl
       subst hpb
       refine ⟨_, s', fun orc => utr_translateAddr_ok ufFoot orc orc s s' hp va _ rfl hc _ _ (hw' orc), hl', hpc, ?_, ?_⟩
       · intro pa pbmt' h

@@ -64,21 +64,21 @@ def uxcCtlRes (s : UWSt) : ExecutionResult → Prop
 GPRs and `nextPC` changed. -/
 def UxcStep (s : UWSt) (res : ExecutionResult) (s' : UWSt) : Prop :=
   s'.rs = s.rs ∧ s'.mm = s.mm ∧ s'.rv = s.rv ∧
-  (∀ r, r ∉ uxaGprs → r ≠ .nextPC → s'.file r = s.file r) ∧ uxcCtlRes s res
+  (∀ r, r ∉ uxaGprs → r ≠ .nextPC → s'.file r = s.file r) ∧ uxcCtlRes s res ∧ (s'.ro = s.ro ∧ s'.pt = s.pt)
 
 theorem uxcStep_self (s : UWSt) (res : ExecutionResult) (h : uxcCtlRes s res) : UxcStep s res s :=
-  ⟨rfl, rfl, rfl, fun _ _ _ => rfl, h⟩
+  ⟨rfl, rfl, rfl, fun _ _ _ => rfl, h, rfl, rfl⟩
 
 theorem uxcStep_wr (s : UWSt) (i : BitVec 5) (v : BitVec 64) : UxcStep s RETIRE_SUCCESS (uxaWr s i v) :=
-  ⟨rfl, rfl, rfl, fun r hr _ => uxaWr_file_other s i v r hr, trivial⟩
+  ⟨rfl, rfl, rfl, fun r hr _ => uxaWr_file_other s i v r hr, trivial, rfl, rfl⟩
 
 theorem uxcStep_npc (s : UWSt) (t : BitVec 64) : UxcStep s RETIRE_SUCCESS (uxcNpc s t) :=
-  ⟨rfl, rfl, rfl, fun r _ hn => uxcNpc_file_other s t r hn, trivial⟩
+  ⟨rfl, rfl, rfl, fun r _ hn => uxcNpc_file_other s t r hn, trivial, rfl, rfl⟩
 
 theorem uxcStep_wr_npc (s : UWSt) (t : BitVec 64) (i : BitVec 5) (v : BitVec 64) :
     UxcStep s RETIRE_SUCCESS (uxaWr (uxcNpc s t) i v) :=
   ⟨rfl, rfl, rfl, fun r hr hn => (uxaWr_file_other _ i v r hr).trans (uxcNpc_file_other s t r hn),
-    trivial⟩
+    trivial, rfl, rfl⟩
 
 theorem uxcStep_branch (s : UWSt) (c : Bool) (t : BitVec 64) :
     UxcStep s RETIRE_SUCCESS (if c then uxcNpc s t else s) := by

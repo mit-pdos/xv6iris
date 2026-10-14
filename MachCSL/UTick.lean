@@ -48,18 +48,19 @@ structure UcTickFoot (D : UFoot) : Prop where
 `reg_agree_on (D ∖ tk_clock3)`), with the same bytes and reservation bit. -/
 def ucClockAgree (s s' : UWSt) : Prop :=
   s'.mm = s.mm ∧ s'.rv = s.rv ∧
-    ∀ r, r ≠ .mcycle → r ≠ .mtime → r ≠ .mip → s'.file r = s.file r
+    (∀ r, r ≠ .mcycle → r ≠ .mtime → r ≠ .mip → s'.file r = s.file r) ∧ (s'.ro = s.ro ∧ s'.pt = s.pt)
 
-theorem ucClockAgree_refl (s : UWSt) : ucClockAgree s s := ⟨rfl, rfl, fun _ _ _ _ => rfl⟩
+theorem ucClockAgree_refl (s : UWSt) : ucClockAgree s s := ⟨rfl, rfl, fun _ _ _ _ => rfl, rfl, rfl⟩
 
 theorem ucClockAgree_setR (s : UWSt) (r : Register) (v : RegisterType r)
     (h : r = .mcycle ∨ r = .mtime ∨ r = .mip) : ucClockAgree s (s.setR r v) := by
-  refine ⟨rfl, rfl, fun x h1 h2 h3 => UWSt.setR_file_other _ _ _ _ ?_⟩
+  refine ⟨rfl, rfl, fun x h1 h2 h3 => UWSt.setR_file_other _ _ _ _ ?_, rfl, rfl⟩
   rcases h with rfl | rfl | rfl <;> assumption
 
 theorem ucClockAgree_trans {s s' s'' : UWSt} (h1 : ucClockAgree s s') (h2 : ucClockAgree s' s'') :
     ucClockAgree s s'' :=
-  ⟨h2.1.trans h1.1, h2.2.1.trans h1.2.1, fun r a b c => (h2.2.2 r a b c).trans (h1.2.2 r a b c)⟩
+  ⟨h2.1.trans h1.1, h2.2.1.trans h1.2.1, fun r a b c => (h2.2.2.1 r a b c).trans (h1.2.2.1 r a b c),
+    h2.2.2.2.1.trans h1.2.2.2.1, h2.2.2.2.2.trans h1.2.2.2.2⟩
 
 theorem uc_runRead_Sstc : runRead ucDrefMisa (currentlyEnabled extension.Ext_Sstc) = some (true, false) := by
   kernel_rfl
@@ -100,7 +101,7 @@ theorem uc_clintTail (hT : UcTickFoot D) (orc : UOrc) (t : UWSt) (hm : UcMisa D 
 theorem uc_clintDispatch (hT : UcTickFoot D) (orc : UOrc) (s : UWSt) (hm : UcMisa D s) :
     ∃ s' orc', runRW D orc s (clint_dispatch false) = some ((), s', orc') ∧ ucClockAgree s s' := by
   have hmS : ∀ (t : UWSt), ucClockAgree s t → UcMisa D t := fun t ht =>
-    ⟨hm.rd, by rw [ht.2.2 _ (by decide) (by decide) (by decide), hm.val]⟩
+    ⟨hm.rd, by rw [ht.2.2.1 _ (by decide) (by decide) (by decide), hm.val]⟩
   simp only [clint_dispatch, get_config_print_clint, Bool.false_eq_true, if_false,
     MachCSL.uxa_readReg_bind D _ _ _ _ hT.rd_mip, MachCSL.uxa_readReg_bind D _ _ _ _ hT.rd_mtimecmp,
     MachCSL.uxa_readReg_bind D _ _ _ _ hT.rd_mtime, ucRW_writeReg D _ _ _ _ _ hT.wr_mip]
@@ -126,7 +127,7 @@ theorem uc_clintDispatch (hT : UcTickFoot D) (orc : UOrc) (s : UWSt) (hm : UcMis
 theorem uc_tickClock (hT : UcTickFoot D) (orc : UOrc) (s : UWSt) (hm : UcMisa D s) :
     ∃ s' orc', runRW D orc s (tick_clock ()) = some ((), s', orc') ∧ ucClockAgree s s' := by
   have hmS : ∀ (t : UWSt), ucClockAgree s t → UcMisa D t := fun t ht =>
-    ⟨hm.rd, by rw [ht.2.2 _ (by decide) (by decide) (by decide), hm.val]⟩
+    ⟨hm.rd, by rw [ht.2.2.1 _ (by decide) (by decide) (by decide), hm.val]⟩
   simp only [tick_clock, should_inc_mcycle, bind_assoc, MachCSL.uxa_readReg_bind D _ _ _ _ hT.rd_priv,
     MachCSL.uxa_readReg_bind D _ _ _ _ hT.rd_mcountinhibit]
   have rest : ∀ (t : UWSt), ucClockAgree s t →

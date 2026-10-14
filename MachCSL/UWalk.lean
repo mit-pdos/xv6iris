@@ -220,12 +220,14 @@ set_option maxRecDepth 100000 in
 (Rocq `exec_write_pte_conditional_ram`): the entry takes the new word; the
 reservation is spent. -/
 theorem uwk_write_pte_cond (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file) (pa : BitVec 64)
-    (hok : pteAddrOk pa) (hown : bmOwned s.mm pa 8 = true) (hrv : s.rv = true) (w' : BitVec 64) :
+    (hok : pteAddrOk pa) (hown : bmOwned s.mm pa 8 = true) (hrv : s.rv = true) (w' : BitVec 64)
+    (hw : uwOk s pa 8 w' true = true) :
     runRW D orc s (write_pte_conditional (.Physaddr pa) 8 w') =
       some (.Ok true, { s with mm := bmWrite s.mm pa 8 w', rv := false }, orc) := by
   uwk_pins hp
   uwk_addr pa hok
-  uwk_run -bv [utr_pmpCheck_ent0, utr_pmpCheckRWX_pteLoad, utr_pmpCheckRWX_pteStore]
+  uwk_run -bv [utr_pmpCheck_ent0, utr_pmpCheckRWX_pteLoad, utr_pmpCheckRWX_pteStore, bits_of_physaddr, addInt_eq,
+    Int.cast_ofNat_Int, Int.zero_mul, uwk_add_ofInt0, Sail.BitVec.extractLsb, BitVec.setWidth_eq, uwk_extract_full]
   simp only [bits_of_physaddr, addInt_eq, Int.cast_ofNat_Int, Int.zero_mul, uwk_add_ofInt0,
     Sail.BitVec.extractLsb, BitVec.setWidth_eq, uwk_extract_full]
 
@@ -425,6 +427,41 @@ theorem uwk_pt_walk (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file) 
 
 /-! ## §5 The Svadu `A`/`D` write-back (Rocq `PtTreeAdue`) -/
 
+/-- The decidable `A`/`D`-variant test is `pteAD`. -/
+theorem pteADb_iff (c v : BitVec 64) : pteADb c v = true ↔ pteAD c v := by
+  constructor
+  · intro h
+    exact ⟨_, _, (beq_iff_eq.1 h).symm⟩
+  · rintro ⟨a, d, rfl⟩
+    unfold pteADb
+    apply beq_iff_eq.2
+    simp only [pteSetAD, Sail.BitVec.extractLsb, Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange',
+      BitVec.extractLsb, _update_PTE_Flags_A, _update_PTE_Flags_D]
+    bv_decide
+
+/-- The accesses the user walk translates are not prefetches. -/
+theorem accPlain_of_utrAcc {acc : MemoryAccessType mem_payload} (h : utrAcc acc = true) : accPlain acc := by
+  unfold accPlain
+  cases acc <;> (try rename_i p) <;> (try cases p) <;> simp_all [utrAcc, is_prefetch_access]
+
+/-- **The write-back is an `A`/`D` variant** of the entry it rewrites. -/
+theorem pteAD_update {acc : MemoryAccessType mem_payload} (hpl : accPlain acc) {m m' : BitVec 64}
+    (hum : update_PTE_Bits m acc = some m') : pteAD m m' := by
+  obtain ⟨a, d, he⟩ := pteAD_refl m
+  rw [he, update_PTE_Bits_pteSetAD m a d acc hpl] at hum
+  split at hum
+  · cases hum
+    exact ⟨_, _, rfl⟩
+  · cases hum
+
+/-- **An A/D write-back may land on a page-table slot** (W8 (f3-utext)). -/
+theorem uwOk_ptw (s : UWSt) (addr : PAddr) (m m' : BitVec 64) (hpt : s.pt addr = true)
+    (hr : bmRead s.mm addr 8 = some m) (had : pteAD m m') : uwOk s addr 8 m' true = true := by
+  unfold uwOk ptWok
+  rw [hr, hpt]
+  have h1 : pteADb m (BitVec.setWidth 64 m') = true := by rw [BitVec.setWidth_eq]; exact (pteADb_iff _ _).2 had
+  simp only [h1, Bool.and_self, Bool.or_true, beq_self_eq_true]
+
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 /-- **No update needed** (the cached or walked word already has the bits the
@@ -448,11 +485,15 @@ theorem uwk_upd_write (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file
     (acc : MemoryAccessType mem_payload) (hacc : utrAcc acc = true) (mxr sum : Bool)
     (hu : update_PTE_Bits w acc = some x) (hinv : uwkInv m = false) (hnl : pte_is_non_leaf (uwkFl m) = false)
     (hN : _get_PTE_Ext_N (uwkExt m) = 0#1) (hperm : uwkPermOk acc mxr m = true)
-    (hum : update_PTE_Bits m acc = some m') :
+    (hum : update_PTE_Bits m acc = some m') (hpt : bmRw s.ro addr 8 = true ∨ s.pt addr = true) :
     runRW D orc s (update_and_write_pte 39 vpn (.Physaddr addr) w 0 acc .User mxr sum ()) =
       some (.Ok (some m', ()), { s with mm := bmWrite s.mm addr 8 m', rv := false }, orc) := by
   have hrw := uwk_rw_of_valid m hinv
   have hown := bmOwned_of_read _ _ _ _ hr
+  have hw : uwOk { s with rv := true } addr 8 m' true = true := by
+    rcases hpt with h | h
+    · unfold uwOk; rw [show ({ s with rv := true } : UWSt).ro = s.ro from rfl, h]
+    · exact uwOk_ptw { s with rv := true } addr m m' h hr (pteAD_update (accPlain_of_utrAcc hacc) hum)
   uwk_pins hp
   uwk_run -bv [uwk_read_pte_excl, uwk_pte_is_invalid, uwk_check_perm, uwk_write_pte_cond, uwkPerm]
 

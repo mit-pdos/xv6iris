@@ -71,14 +71,14 @@ theorem umo_pmaOk_ram (op : amoop) (aq rl : Bool) (w : Nat) (hw : w ≤ 16) :
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 /-- Pointer masking at User reads `senvcfg.PMM` (0): disabled. -/
-theorem umo_get_pmm_ref (orc : UOrc) (rs : RegFile) (mm : BMap) (rv : Bool) :
-    runRW uxcCfgFoot orc ⟨drefU, rs, mm, rv⟩ (get_pmm .User) =
-      some (.PMM_Disabled, ⟨drefU, rs, mm, rv⟩, orc) := by
+theorem umo_get_pmm_ref (orc : UOrc) (rs : RegFile) (mm : BMap) (rv : Bool) (ro pt : PAddr → Bool) :
+    runRW uxcCfgFoot orc ⟨drefU, rs, mm, rv, ro, pt⟩ (get_pmm .User) =
+      some (.PMM_Disabled, ⟨drefU, rs, mm, rv, ro, pt⟩, orc) := by
   kernel_rfl
 
 theorem umo_get_pmm {D : UFoot} (hD : UxcFoot D) (orc : UOrc) (s : UWSt) (hU : UxcCfg s) :
     runRW D orc s (get_pmm .User) = some (.PMM_Disabled, s, orc) :=
-  uxc_cfg_walk hD _ _ orc s hU (umo_get_pmm_ref orc s.rs s.mm s.rv)
+  uxc_cfg_walk hD _ _ orc s hU (umo_get_pmm_ref orc s.rs s.mm s.rv s.ro s.pt)
 
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in

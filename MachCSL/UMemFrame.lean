@@ -80,21 +80,38 @@ theorem ume_ummOwned_win (mm : BMap) (pa : PAddr) (n : Nat) (h : ummOwned mm pa 
 
 /-! ## §2 The frame rule -/
 
+/-- The write check reads the map only on an owned footprint. -/
+theorem uwOk_union (mm m2 : BMap) (p : RegPin) (rs : RegFile) (v : Bool) (ro pt : PAddr → Bool) (pa : PAddr)
+    (n : Nat) (w : BitVec (8 * n)) (e : Bool) (ho : bmOwned mm pa n = true) :
+    uwOk ⟨p, rs, umeUnion mm m2, v, ro, pt⟩ pa n w e = uwOk ⟨p, rs, mm, v, ro, pt⟩ pa n w e := by
+  unfold uwOk ptWok
+  by_cases hn : n = 8
+  · subst hn
+    obtain ⟨c, hc⟩ := bmRead_of_owned mm pa 8 ho
+    show (bmRw ro pa 8 || (e && 8 == 8 && pt pa && match bmRead (umeUnion mm m2) pa 8 with
+        | some c => pteADb c (w.setWidth 64) | none => false)) =
+      (bmRw ro pa 8 || (e && 8 == 8 && pt pa && match bmRead mm pa 8 with
+        | some c => pteADb c (w.setWidth 64) | none => false))
+    rw [ume_bmRead_union mm m2 pa 8 c hc, hc]
+  · have : (n == 8) = false := by simp [hn]
+    simp only [this, Bool.and_false, Bool.false_and]
+
 /-- **The frame rule of the byte map**: a walk over `mm` runs the same over
 `umeUnion mm m2`, landing in the union of its landing map with `m2`. -/
 theorem ume_runRW_union (D : UFoot) (m2 : BMap) {X : Type} (m : SailM X) :
-    ∀ (orc : UOrc) (p : RegPin) (rs : RegFile) (mm : BMap) (v : Bool) (x : X) (p' : RegPin) (rs' : RegFile)
-      (mm' : BMap) (v' : Bool) (orc' : UOrc),
-      runRW D orc ⟨p, rs, mm, v⟩ m = some (x, ⟨p', rs', mm', v'⟩, orc') →
-      runRW D orc ⟨p, rs, umeUnion mm m2, v⟩ m = some (x, ⟨p', rs', umeUnion mm' m2, v'⟩, orc') := by
+    ∀ (orc : UOrc) (p : RegPin) (rs : RegFile) (mm : BMap) (v : Bool) (ro pt : PAddr → Bool) (x : X)
+      (p' : RegPin) (rs' : RegFile) (mm' : BMap) (v' : Bool) (ro' pt' : PAddr → Bool) (orc' : UOrc),
+      runRW D orc ⟨p, rs, mm, v, ro, pt⟩ m = some (x, ⟨p', rs', mm', v', ro', pt'⟩, orc') →
+      runRW D orc ⟨p, rs, umeUnion mm m2, v, ro, pt⟩ m =
+        some (x, ⟨p', rs', umeUnion mm' m2, v', ro', pt'⟩, orc') := by
   induction m with
   | pure y =>
-    intro orc p rs mm v x p' rs' mm' v' orc' h
+    intro orc p rs mm v ro pt x p' rs' mm' v' ro' pt' orc' h
     simp only [runRW, Option.some.injEq, Prod.mk.injEq, UWSt.mk.injEq] at h
-    obtain ⟨rfl, ⟨rfl, rfl, rfl, rfl⟩, rfl⟩ := h
+    obtain ⟨rfl, ⟨rfl, rfl, rfl, rfl, rfl, rfl⟩, rfl⟩ := h
     rfl
   | impure call k ih =>
-    intro orc p rs mm v x p' rs' mm' v' orc' h
+    intro orc p rs mm v ro pt x p' rs' mm' v' ro' pt' orc' h
     cases call with
     | error e => simp [runRW] at h
     | ok o =>
@@ -106,19 +123,19 @@ theorem ume_runRW_union (D : UFoot) (m2 : BMap) {X : Type} (m : SailM X) :
           cases ha : D.Dany r
           · simp [ha] at h
           · simp only [ha, ↓reduceIte] at h ⊢
-            exact ih _ _ _ _ _ _ _ _ _ _ _ _ h
+            exact ih _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ h
         · simp only [hd, ↓reduceIte] at h ⊢
           cases hp : p r
           · simp only [hp] at h ⊢
-            exact ih _ _ _ _ _ _ _ _ _ _ _ _ h
+            exact ih _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ h
           · simp only [hp] at h ⊢
-            exact ih _ _ _ _ _ _ _ _ _ _ _ _ h
+            exact ih _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ h
       case regWrite r val =>
         simp only [runRW] at h ⊢
         cases hd : D.Dw r
         · simp [hd] at h
         · simp only [hd, ↓reduceIte] at h ⊢
-          exact ih _ _ _ _ _ _ _ _ _ _ _ _ h
+          exact ih _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ h
       case memRead n vs req =>
         simp only [runRW] at h ⊢
         cases hi : akIfetch req.access_kind
@@ -131,9 +148,9 @@ theorem ume_runRW_union (D : UFoot) (m2 : BMap) {X : Type} (m : SailM X) :
               rw [ume_bmRead_union mm m2 req.pa n w hr]
               cases he : akExcl req.access_kind
               · simp only [he, hr, Bool.false_eq_true, ↓reduceIte] at h ⊢
-                exact ih _ _ _ _ _ _ _ _ _ _ _ _ h
+                exact ih _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ h
               · simp only [he, hr, ↓reduceIte] at h ⊢
-                exact ih _ _ _ _ _ _ _ _ _ _ _ _ h
+                exact ih _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ h
           · simp [hn] at h
         · simp [hi] at h
       case memWrite n vs req =>
@@ -146,14 +163,17 @@ theorem ume_runRW_union (D : UFoot) (m2 : BMap) {X : Type} (m : SailM X) :
             simp only [hv] at h ⊢
             cases ho : bmOwned mm req.pa n
             · simp [ho] at h
-            · simp only [ho, ume_bmOwned_union mm m2 req.pa n ho, ↓reduceIte] at h ⊢
-              rw [ume_bmWrite_union mm m2 req.pa n w hn]
-              exact ih _ _ _ _ _ _ _ _ _ _ _ _ h
+            · rw [uwOk_union mm m2 p rs v ro pt req.pa n w _ ho]
+              cases hw : uwOk ⟨p, rs, mm, v, ro, pt⟩ req.pa n w (akExcl req.access_kind)
+              · simp [ho, hw] at h
+              · simp only [ho, hw, ume_bmOwned_union mm m2 req.pa n ho, Bool.and_self, ↓reduceIte] at h ⊢
+                rw [ume_bmWrite_union mm m2 req.pa n w hn]
+                exact ih _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ h
         · simp [hn] at h
       all_goals
         simp only [runRW] at h ⊢
         first
-          | exact ih _ _ _ _ _ _ _ _ _ _ _ _ h
+          | exact ih _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ h
           | simp at h
 
 /-- **A walk over a window, framed** (`ume_runRW_union` at the window's
@@ -161,10 +181,10 @@ complement): a walk known over the window `[pa, pa + n)` of `s`'s map runs
 the same over the whole map, and lands in a map that agrees with `s`'s off
 the window. -/
 theorem ume_runRW_window (D : UFoot) {X : Type} (m : SailM X) (orc : UOrc) (s : UWSt) (pa : PAddr) (n : Nat)
-    (x : X) (p' : RegPin) (rs' : RegFile) (mw : BMap) (v' : Bool) (orc' : UOrc)
-    (h : runRW D orc ⟨s.pin, s.rs, umeWin s.mm pa n, s.rv⟩ m = some (x, ⟨p', rs', mw, v'⟩, orc')) :
-    runRW D orc s m = some (x, ⟨p', rs', umeUnion mw s.mm, v'⟩, orc') := by
-  have h' := ume_runRW_union D s.mm m orc s.pin s.rs _ s.rv x p' rs' mw v' orc' h
+    (x : X) (p' : RegPin) (rs' : RegFile) (mw : BMap) (v' : Bool) (ro' pt' : PAddr → Bool) (orc' : UOrc)
+    (h : runRW D orc ⟨s.pin, s.rs, umeWin s.mm pa n, s.rv, s.ro, s.pt⟩ m = some (x, ⟨p', rs', mw, v', ro', pt'⟩, orc')) :
+    runRW D orc s m = some (x, ⟨p', rs', umeUnion mw s.mm, v', ro', pt'⟩, orc') := by
+  have h' := ume_runRW_union D s.mm m orc s.pin s.rs _ s.rv s.ro s.pt x p' rs' mw v' ro' pt' orc' h
   rw [ume_union_win] at h'
   exact h'
 

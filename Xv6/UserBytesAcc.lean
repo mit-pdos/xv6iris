@@ -17,6 +17,58 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open Iris.Std.PartialMap Iris.Std.FiniteMap
 open Sail LeanRV64D LeanRV64D.Functions
 
+/-! ## §4′ The walker's write-permission labels (W8 (f3-utext)) -/
+
+/-- **The walker's write-permission sets at a user machine** (W8 (f3-utext)
+[OWN.89]): a plain write may touch only the DATA pages (`ukDataAddrs`: user
+leaves that are not text) -- every other byte (the table's pages, the TEXT
+pages, `ukTextLeaf`: X set, W clear) is read-only; an A/D write-back may land
+only on an 8-aligned byte on neither a data nor a text page (of the walker's
+map, whose ownership `runRW` checks first: a slot of the table). -/
+def uRoOf (P : UPtd) : PAddr → Bool := fun a => !decide (a ∈ ukDataAddrs P.um)
+
+def uPtOf (P : UPtd) : PAddr → Bool := fun a =>
+  (a.toNat % 8 == 0) && !decide (a ∈ ukDataAddrs P.um) && !decide (a ∈ ukTextAddrs P.um)
+
+/-- A window of the data pages is writable. -/
+theorem uRoOf_data (P : UPtd) {pa : PAddr} {n : Nat}
+    (h : ∀ j, j < n → pa + BitVec.ofNat 64 j ∈ ukDataAddrs P.um) : ummRw (uRoOf P) pa n := by
+  intro j hj; unfold uRoOf; simp [h j hj]
+
+/-- A slot off the user pages may take an A/D write-back. -/
+theorem uPtOf_slot (P : UPtd) {a : PAddr} (h8 : a.toNat % 8 = 0)
+    (hnd : a ∉ ukDataAddrs P.um) (hnt : a ∉ ukTextAddrs P.um) : uPtOf P a = true := by
+  unfold uPtOf; simp [h8, hnd, hnt]
+
+/-- **The user tier's byte frame** at table `P` (W8 (f3-utext)): the
+walker's labels are `P`'s write sets. -/
+abbrev ufBF {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] (P : UPtd) (D : List PAddr) :
+    UByteFrame GF curCtx :=
+  ubFrame curCtx D (uRoOf P) (uPtOf P)
+
+/-- The data and the text pages are user pages. -/
+theorem ukDataAddrs_sub {um : RegMapF (BitVec 64)} {a : PAddr} (h : a ∈ ukDataAddrs um) : a ∈ ubDataAddrs um := by
+  obtain ⟨kv, hkv, ha⟩ := List.mem_flatMap.1 h
+  refine List.mem_flatMap.2 ⟨kv, hkv, ?_⟩
+  split at ha
+  · cases ha
+  · exact ha
+
+theorem ukTextAddrs_sub {um : RegMapF (BitVec 64)} {a : PAddr} (h : a ∈ ukTextAddrs um) : a ∈ ubDataAddrs um := by
+  obtain ⟨kv, hkv, ha⟩ := List.mem_flatMap.1 h
+  refine List.mem_flatMap.2 ⟨kv, hkv, ?_⟩
+  split at ha
+  · exact ha
+  · cases ha
+
+/-- A table slot is 8-aligned. -/
+theorem pteAddr_al8 (b : BitVec 44) (i : BitVec 9) : (pteAddr b i).toNat % 8 = 0 := by
+  have h : BitVec.extractLsb' 0 3 (pteAddr b i) = 0#3 := by
+    unfold pteAddr zero_extend Sail.BitVec.zeroExtend; bv_decide
+  have h' := congrArg BitVec.toNat h
+  simp only [BitVec.extractLsb'_toNat, Nat.shiftRight_zero, BitVec.toNat_ofNat, Nat.reducePow] at h'
+  omega
+
 /-! ## §5 The accessor -/
 
 /-- The view a byte map gives the user pages (what `umPages` is re-sealed
@@ -64,7 +116,7 @@ well formed. -/
 theorem ub_userPtInv_open [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (BitVec 8)) :
     kmapStatic (GF := GF) ⊢ userPtInv cpu P M -∗
       ∃ (t : PTree) (tlb : Tlb) (mm : BMap), ⌜UbMemWf P t mm⌝ ∗ ⌜utlbOk t tlb⌝ ∗
-        ubPtRegs cpu P tlb ∗ (ubFrame curCtx (ubUAddrs P t)).B mm := by
+        ubPtRegs cpu P tlb ∗ (ufBF P (ubUAddrs P t)).B mm := by
   iintro #HS H
   unfold userPtInv
   icases H with ⟨Hs, Hp, %hwf, %t, %⟨hb, hrep⟩, Ho, ⟨%tlb, Htlb, %htlb⟩, Hum⟩
@@ -93,7 +145,7 @@ stepped to (`UbMemStep`) and a TLB sound for the new tree, the address
 space is back, at the pages' new contents. -/
 theorem ub_userPtInv_close [CurCtx] (cpu : CPU) (P : UPtd) (t t' : PTree) (mm mm' : BMap) (tlb' : Tlb)
     (hwf : UbMemWf P t mm) (hs : UbMemStep P t t' mm mm') (htlb : utlbOk t' tlb') :
-    kmapStatic (GF := GF) ⊢ ubPtRegs cpu P tlb' -∗ (ubFrame curCtx (ubUAddrs P t)).B mm' -∗ userPtAny cpu P := by
+    kmapStatic (GF := GF) ⊢ ubPtRegs cpu P tlb' -∗ (ufBF P (ubUAddrs P t)).B mm' -∗ userPtAny cpu P := by
   have hwf' := ubMemStep_wf P t t' mm mm' hwf hs
   have ha : ubUAddrs P t = (ubTreeBytes 2 t').map Prod.fst ++
       (ubDataBytes P.um (ubView P.um mm')).map Prod.fst := by

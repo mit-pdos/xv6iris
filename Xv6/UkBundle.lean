@@ -67,7 +67,7 @@ theorem uk_core_open [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → 
     hwConfig cpu ∗ kmapStatic ∗ ukCore (GF := GF) cpu C P Rut sz M m pc ⊢
       ∃ (s : UWSt) (D : List PAddr) (T : BMap) (K : Nat) (V : Nat → List (BitVec 8)),
         ⌜UkOpened C P T m pc V s ∧ umemLazy P sz V = M ∧ uszOk sz⌝ ∗
-        uFr (ufRegF cpu C) (ubFrame curCtx D) s ∗ uxTextOwn curCtx K (ukTextAddrs P.um) T ∗ iviewLb cpu K ∗
+        uFr (ufRegF cpu C) (ufBF P D) s ∗ uxTextOwn curCtx K (ukTextAddrs P.um) T ∗ iviewLb cpu K ∗
         ufAside cpu ∗ (ctxToken cpu -∗ Rut P) := by
   iintro ⟨#Hhw, #HS, Hcore⟩
   unfold ukCore
@@ -87,7 +87,7 @@ theorem uk_core_open [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → 
   ipureintro
   have htl : utlbOk t v.tlb := by rw [hvt]; exact htlb
   have hlz : umemLazy P sz (ukView P.um mm T) = M := by rw [← hM]; exact umemLazy_congr P sz _ _ hview
-  exact ⟨⟨⟨ufCfg_file C P v hu.2.2.2, rfl, hu.2.1, hhs, ⟨t, hmem, htl⟩⟩, ukRegs_ufFile C P v m hvg, hva, hva', rfl⟩,
+  exact ⟨⟨⟨ufCfg_file C P v hu.2.2.2, rfl, hu.2.1, hhs, ⟨t, hmem, htl⟩, ⟨rfl, rfl⟩⟩, ukRegs_ufFile C P v m hvg, hva, hva', rfl⟩,
     hlz, hsz⟩
 
 set_option maxRecDepth 10000 in
@@ -96,7 +96,7 @@ set_option maxRecDepth 10000 in
 theorem uk_core_close [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IProp GF) (sz : Nat)
     (D : List PAddr) (T : BMap) (K : Nat) (m' : RegMap) (pc' : BitVec 64) (V' : Nat → List (BitVec 8))
     (s : UWSt) (h : UkFinal C P T m' pc' V' s) (hsz : uszOk sz) :
-    kmapStatic (GF := GF) ⊢ uFr (ufRegF cpu C) (ubFrame curCtx D) s -∗ uxTextOwn curCtx K (ukTextAddrs P.um) T -∗
+    kmapStatic (GF := GF) ⊢ uFr (ufRegF cpu C) (ufBF P D) s -∗ uxTextOwn curCtx K (ukTextAddrs P.um) T -∗
       iviewLb cpu K -∗ ufAside cpu -∗ (ctxToken cpu -∗ Rut P) -∗
       ukCore cpu C P Rut sz (umemLazy P sz V') m' pc' := by
   obtain ⟨t', hm', htlb'⟩ := h.land.mem
@@ -125,7 +125,7 @@ theorem uk_trapped [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IP
     (sc stv : BitVec 64) (s : UWSt) (h : UkTrapLand C P T m pc V sc stv s) (hpc : s.file .PC = stvecBase C.stvec)
     (π : Nat → Option UPerm) (fdv : List FdState) (cw : Nat) (gn : GName) (cs : ExtTreeSet GName compare)
     (pidv : BitVec 32) (lz : Bool) (secc : BitVec 64) :
-    kmapStatic (GF := GF) ⊢ uFr (ufRegF cpu C) (ubFrame curCtx D) s -∗ uxTextOwn curCtx K (ukTextAddrs P.um) T -∗
+    kmapStatic (GF := GF) ⊢ uFr (ufRegF cpu C) (ufBF P D) s -∗ uxTextOwn curCtx K (ukTextAddrs P.um) T -∗
       iviewLb cpu K -∗ ufAside cpu -∗ (ctxToken cpu -∗ Rut P) -∗ uxRcpt cpu s.file -∗
       trappedMachine cpu C P Rut sz sc stv (uvisOfRun m pc (umemLazy P sz V) π sz fdv cw gn cs pidv lz secc) := by
   obtain ⟨t', hm', htlb'⟩ := h.mem

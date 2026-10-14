@@ -138,7 +138,7 @@ theorem swp_uxRun {X : Type} (K : Nat) (DT : List PAddr) (T : BMap) (m : SailM X
       | false =>
         have hpl : akPlain req.access_kind = true := by simp [akPlain, hif, hex]
         unfold uFr
-        icases Hfr with ⟨HF, HB, Hc, Hr⟩
+        icases Hfr with ⟨%hwp, HF, HB, Hc, Hr⟩
         iapply swp_sail_mem_read_plain_x cpu req ξ K (DFrac.own 1) w hpl (fun v => swp cpu (k v) Φ)
         iframe Hc Hb
         inext
@@ -147,6 +147,8 @@ theorem swp_uxRun {X : Type} (K : Nat) (DT : List PAddr) (T : BMap) (m : SailM X
         iapply ih (.Ok (w, none)) s hok' Φ
         iframe Htx Hiv HP
         unfold uFr
+        isplitr
+        · ipureintro; exact hwp
         iframe
     | false =>
       have hok1 : ∀ orc, (runRW D orc s (FreeM.impure c FreeM.pure)).isSome = true := fun orc => by
@@ -160,11 +162,13 @@ theorem swp_uxRun {X : Type} (K : Nat) (DT : List PAddr) (T : BMap) (m : SailM X
           uxPost RF BF T s (FreeM.impure c k) (fun x => iprop(uxTextOwn ξ K DT T -∗ Φ x)) ⊢
         swp cpu ((FreeM.impure c FreeM.pure : SailM (ArchSem.Effect.ret c)) >>= k) Φ
       iintro ⟨Hfr, Htx, #Hiv, HP⟩
+      ihave %hwp := uFr_wp RF BF s $$ Hfr
       iapply swp_bind
       iapply swp_runRW RF BF (FreeM.impure c FreeM.pure) s hok1 (fun v => swp cpu (k v) Φ)
       iframe Hfr
       unfold uPost
       iintro %orc %v %s' %orc' %h HF HB Hc Hr
+      have hw2 := runRW_wp D _ orc s _ _ _ h
       have hre : ∀ o, ∃ orc₀, uxRun D T orc₀ s (FreeM.impure c k) = uxRun D T o s' (k v) := fun o => by
         obtain ⟨orc₀, h0⟩ := uft_runRW_node_shift D c s orc v s' orc' h o
         refine ⟨orc₀, ?_⟩
@@ -174,7 +178,10 @@ theorem swp_uxRun {X : Type} (K : Nat) (DT : List PAddr) (T : BMap) (m : SailM X
         rw [← h0]; exact hok orc₀
       iapply ih v s' hok' Φ
       isplitl [HF HB Hc Hr]
-      · unfold uFr; iframe
+      · unfold uFr
+        isplitr
+        · ipureintro; exact ⟨hw2.1.trans hwp.1, hw2.2.trans hwp.2⟩
+        iframe
       iframe Htx Hiv
       iapply uxPost_step RF BF T s s' _ _ _ hre $$ HP
 

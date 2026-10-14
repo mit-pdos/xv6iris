@@ -27,7 +27,7 @@ theorem uft_hit (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 s) (
     ∃ r s', (∀ orc, runRW ufFoot orc s
         (translate_TLB_hit 39 0#16 vpn (.InstructionFetch ()) .User false sum () (tlbHash vpn) ent) =
           some (r, s', orc)) ∧
-      UftTrOut C P t0 mm0 s r s' := by
+      UftTrOut C P t0 mm0 (.InstructionFetch ()) s r s' := by
   have hwf : UbMemWf P t s.mm := ubMemStep_wf P t0 t mm0 s.mm hl.wf hstep
   have hwk : UwkPins ufFoot s.file := (uft_pins_land hl).wk
   have hrep := hwf.rep
@@ -44,7 +44,7 @@ theorem uft_hit (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 s) (
     rw [e, utlb_permOk_setAD]
   cases hperm' : uwkPermOk (.InstructionFetch ()) false w' with
   | false =>
-    have hout : UftTrOut C P t0 mm0 s (.Err (.PTW_No_Permission (), ())) s := by
+    have hout : UftTrOut C P t0 mm0 (.InstructionFetch ()) s (.Err (.PTW_No_Permission (), ())) s := by
       refine ⟨hl, fun _ _ => rfl, ?_, ?_⟩
       · intro ppn pbmt h; cases h
       · intro f hf x hx; cases hf; cases hx
@@ -57,10 +57,10 @@ theorem uft_hit (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 s) (
       unfold uwkPermOk at hperm
       simp only [Bool.and_eq_true] at hperm
       exact hperm.1
-    have hpage : UftPageOf P (ptePpn w) := ⟨_, lw, w, hlok.2 hU, had, rfl⟩
+    have hpage : UftPageOf P (.InstructionFetch ()) (ptePpn w) := ⟨_, lw, w, hlok.2 hU, had, rfl, hperm⟩
     cases hu : update_PTE_Bits w' (.InstructionFetch ()) with
     | none =>
-      have hout : UftTrOut C P t0 mm0 s (.Ok (ptePpn w, .PBMT_PMA, ())) s := by
+      have hout : UftTrOut C P t0 mm0 (.InstructionFetch ()) s (.Ok (ptePpn w, .PBMT_PMA, ())) s := by
         refine ⟨hl, fun _ _ => rfl, ?_, ?_⟩
         · intro ppn pbmt h; cases h; exact ⟨rfl, hpage⟩
         · intro f hf; cases hf
@@ -72,13 +72,13 @@ theorem uft_hit (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 s) (
         have hadm : pteAD w m' := pteAD_trans (pteAD_symm had) (uft_update_AD had hum)
         have hokm := uftLeafOk_AD hok hadm
         have hupd := fun orc => uwk_upd_write ufFoot orc s hwk vpn addr hmem.1 w' w m' x hmem.2 _ rfl false sum hu
-          hok.inv (uft_nonleaf hok) hok.n0 hperm hum
+          hok.inv (uft_nonleaf hok) hok.n0 hperm hum (Or.inr (ustLand_slot hl hstep (PTree.walk_mem_entries 2 t vpn addr w hw)))
         have hstep' : UbMemStep P t0 (t.setLeaf 2 vpn m') mm0 (bmWrite s.mm addr 8 m') :=
           ubMemStep_trans P t0 t _ mm0 s.mm _ hstep
             (ubMemStep_setLeaf P t s.mm hwf vpn addr w m' hw (uft_ne_zero hokm) (uft_ptRep_setLeaf hrep hw hadm hokm))
         refine ⟨_, _, fun orc => utlb_hit_refresh ufFoot orc orc s _ hwk hdr hdw _ rfl vpn _ rfl false sum (ptePpn w) w'
           addr m' hok'.inv hperm' (hupd orc), ?_⟩
-        refine ⟨uft_land hl (fun r hr => uft_file_tlb _ _ _ _ _ r hr) _ hstep' ?_, fun y hy => uft_file_tlb _ _ _ _ _ y hy,
+        refine ⟨uft_land hl (fun r hr => uft_file_tlb _ _ _ _ _ _ _ r hr) _ hstep' ?_, fun y hy => uft_file_tlb _ _ _ _ _ _ _ y hy,
           fun ppn pbmt h => ?_, fun f h => by cases h⟩
         · rw [uft_file_tlb_same]
           exact utlbOk_after t _ _ htlb vpn addr w m' hw hadm (uft_ne_zero hokm) (Or.inr rfl)
@@ -88,7 +88,7 @@ theorem uft_hit (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 s) (
           hok.inv (uft_nonleaf hok) hok.n0 hperm hum
         refine ⟨_, _, fun orc => utlb_hit_refresh ufFoot orc orc s _ hwk hdr hdw _ rfl vpn _ rfl false sum (ptePpn w) w'
           addr w hok'.inv hperm' (hupd orc), ?_⟩
-        refine ⟨uft_land hl (fun r hr => uft_file_tlb _ _ _ _ _ r hr) t hstep ?_, fun y hy => uft_file_tlb _ _ _ _ _ y hy,
+        refine ⟨uft_land hl (fun r hr => uft_file_tlb _ _ _ _ _ _ _ r hr) t hstep ?_, fun y hy => uft_file_tlb _ _ _ _ _ _ _ y hy,
           fun ppn pbmt h => ?_, fun f h => by cases h⟩
         · rw [uft_file_tlb_same]
           exact utlbOk_fill t _ htlb vpn addr w w hw (pteAD_refl w)

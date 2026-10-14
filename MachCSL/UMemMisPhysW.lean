@@ -41,10 +41,10 @@ theorem umm_checked_mem_write_plan (D : UFoot) (orc : UOrc) (s : UWSt) (pa : Bit
       runRW D orc st (pmpCheck (.Physaddr (pa + BitVec.ofNat 64 j)) c (.Store .Data) priv) = some (none, st, orc))
     (hmmio : ∀ j c st, 0 < c → j + c ≤ W → ummSameRegs s st →
       runRW D orc st (within_mmio_writable (.Physaddr (pa + BitVec.ofNat 64 j)) c) = some (false, st, orc))
-    (hown : ummOwned s.mm pa W) :
+    (hown : ummOwned s.mm pa W) (hrw : ummRw s.ro pa W) :
     ∃ m, ummSameDom s.mm m ∧
       runRW D orc s (checked_mem_write (.Physaddr pa) W data (.Store .Data) pbmt priv () false false false) =
-        some (.Ok true, ⟨s.pin, s.rs, m, false⟩, orc) := by
+        some (.Ok true, ⟨s.pin, s.rs, m, false, s.ro, s.pt⟩, orc) := by
   unfold checked_mem_write
   sail_norm
   simp only [runRW_bind, hpma, Option.bind_some, write_kind_of_flags]
@@ -53,18 +53,18 @@ theorem umm_checked_mem_write_plan (D : UFoot) (orc : UOrc) (s : UWSt) (pa : Bit
   sail_norm
   simp only [Option.bind_assoc]
   refine umm_loop_bind (α := Bool × Nat × Bool) D orc N hN (fun x => x.1) _
-    (fun k x st => ummSameRegs s st ∧ ummSameDom s.mm st.mm ∧ (0 < k → st.rv = false) ∧ x.2.2 = true ∧
-      (k < N → x.1 = false ∧ x.2.1 = k)) _ s ?h0 ?hf _
-    (fun o => ∃ m, ummSameDom s.mm m ∧ o = some (Result.Ok true, UWSt.mk s.pin s.rs m false, orc)) ?hG
-  case h0 => exact ⟨⟨rfl, rfl⟩, ummSameDom_refl _, fun h => absurd h (by omega), rfl, fun _ => ⟨rfl, rfl⟩⟩
+    (fun k x st => ummSameRegs s st ∧ (st.ro = s.ro ∧ st.pt = s.pt) ∧ ummSameDom s.mm st.mm ∧
+      (0 < k → st.rv = false) ∧ x.2.2 = true ∧ (k < N → x.1 = false ∧ x.2.1 = k)) _ s ?h0 ?hf _
+    (fun o => ∃ m, ummSameDom s.mm m ∧ o = some (Result.Ok true, UWSt.mk s.pin s.rs m false s.ro s.pt, orc)) ?hG
+  case h0 => exact ⟨⟨rfl, rfl⟩, ⟨rfl, rfl⟩, ummSameDom_refl _, fun h => absurd h (by omega), rfl, fun _ => ⟨rfl, rfl⟩⟩
   case hG =>
-    intro ⟨fin, i, ws⟩ ⟨pin, rs, m, rv⟩ ⟨⟨hp, hr⟩, hd, hrv, hws, _⟩
-    simp only at hp hr hd hrv hws
-    subst hp hr hws
+    intro ⟨fin, i, ws⟩ ⟨pin, rs, m, rv, ro, pt⟩ ⟨⟨hp, hr⟩, ⟨hro, hpt⟩, hd, hrv, hws, _⟩
+    simp only at hp hr hro hpt hd hrv hws
+    subst hp hr hro hpt hws
     obtain rfl := hrv hN
     exact ⟨m, hd, rfl⟩
   case hf =>
-    intro k ⟨d, i, ws⟩ st ⟨hsr, hd, _, hws, hI⟩ hk
+    intro k ⟨d, i, ws⟩ st ⟨hsr, ⟨hro, hpt⟩, hd, _, hws, hI⟩ hk
     obtain ⟨hf0, hik⟩ := hI hk
     simp only at hf0 hik hk hws
     subst hf0 hik hws
@@ -73,13 +73,15 @@ theorem umm_checked_mem_write_plan (D : UFoot) (orc : UOrc) (s : UWSt) (pa : Bit
     have hw := umm_chunk_le N b i W hNb hk'
     have ho : bmOwned st.mm (pa + BitVec.ofNat 64 (i * b)) b = true :=
       bmOwned_of_ummOwned _ _ _ (ummOwned_sameDom hd (ummOwned_sub s.mm pa W (i * b) b hown hw))
-    have hv' := fun v => uma_write_ram_plain D orc st (pa + BitVec.ofNat 64 (i * b)) b (by omega) v ho
+    have hrw' : bmRw st.ro (pa + BitVec.ofNat 64 (i * b)) b = true := by
+      rw [hro]; exact bmRw_of_ummRw _ _ _ (ummRw_sub s.ro pa W (i * b) b hrw hw)
+    have hv' := fun v => uma_write_ram_plain D orc st (pa + BitVec.ofNat 64 (i * b)) b (by omega) v ho hrw'
     simp only [utr_assert_true, umm_ofInt_mul, ExceptT.run_bind, run_liftM, runRW_bind, hpmp (i * b) b st hb hw hsr,
       hmmio (i * b) b st hb hw hsr, runRW_pure, Option.bind_some]
     sail_norm
     simp only [runRW_bind, hv', runRW_pure, Option.bind_some]
     obtain ⟨e1, e2⟩ := umm_idx N i
-    refine ⟨_, _, rfl, ⟨hsr, ummSameDom_trans hd (umm_bmWrite_dom _ _ _ _ ho), fun _ => rfl, rfl, ?_⟩, ?_⟩ <;>
+    refine ⟨_, _, rfl, ⟨hsr, ⟨hro, hpt⟩, ummSameDom_trans hd (umm_bmWrite_dom _ _ _ _ ho), fun _ => rfl, rfl, ?_⟩, ?_⟩ <;>
     · simp only [e1, e2]
       by_cases hi : i + 1 = N
       · have h1 : (i == N - 1) = true := by simp; omega
@@ -102,12 +104,12 @@ theorem umm_checked_mem_write (D : UFoot) (orc : UOrc) (s : UWSt) (pa : BitVec 6
       runRW D orc st (pmpCheck (.Physaddr (pa + BitVec.ofNat 64 j)) c (.Store .Data) priv) = some (none, st, orc))
     (hmmio : ∀ j c st, 0 < c → j + c ≤ W → ummSameRegs s st →
       runRW D orc st (within_mmio_writable (.Physaddr (pa + BitVec.ofNat 64 j)) c) = some (false, st, orc))
-    (hown : ummOwned s.mm pa W) :
+    (hown : ummOwned s.mm pa W) (hrw : ummRw s.ro pa W) :
     ∃ m, ummSameDom s.mm m ∧
       runRW D orc s (checked_mem_write (.Physaddr pa) W data (.Store .Data) pbmt priv () false false false) =
-        some (.Ok true, ⟨s.pin, s.rs, m, false⟩, orc) := by
+        some (.Ok true, ⟨s.pin, s.rs, m, false, s.ro, s.pt⟩, orc) := by
   obtain ⟨N, b, hN, hb, hNb, hsp⟩ := umm_split_misaligned_plan pa W info.granule_size_exp info.splittable h0 hW
-  exact umm_checked_mem_write_plan D orc s pa W data pbmt priv info N b hN hb hNb hW hpma hsp hpmp hmmio hown
+  exact umm_checked_mem_write_plan D orc s pa W data pbmt priv info N b hN hb hNb hW hpma hsp hpmp hmmio hown hrw
 
 /-- **The announce** (Rocq `GmMemWriteEaSplit`), at User privilege (`MPRV =
 0`): the PMA-first check, the plan, a PMP check per chunk; nothing moves. -/

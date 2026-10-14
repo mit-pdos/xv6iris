@@ -363,7 +363,7 @@ theorem uk_userPtInvX_open [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (Bi
     kmapStatic (GF := GF) ⊢ userPtInvX cpu P M -∗
       ∃ (t : PTree) (tlb : Tlb) (mm T : BMap) (K : Nat), ⌜UkMem P t mm T⌝ ∗ ⌜utlbOk t tlb⌝ ∗
         ⌜∀ k w, get? P.um k = some w → ukView P.um mm T k = M k⌝ ∗
-        ubPtRegs cpu P tlb ∗ (ubFrame curCtx (ubTreeAddrs 2 t ++ ukDataAddrs P.um)).B mm ∗
+        ubPtRegs cpu P tlb ∗ (ufBF P (ubTreeAddrs 2 t ++ ukDataAddrs P.um)).B mm ∗
         uxTextOwn curCtx K (ukTextAddrs P.um) T ∗ iviewLb cpu K := by
   iintro #HS H
   unfold userPtInvX
@@ -416,7 +416,7 @@ domain), the unchanged text map and the receipt, the address space is back at
 the landing's page view. -/
 theorem uk_userPtInvX_close [CurCtx] (cpu : CPU) (P : UPtd) (D : List PAddr) (t' : PTree) (mm' T : BMap) (K : Nat)
     (tlb' : Tlb) (hm' : UkMem P t' mm' T) (htlb : utlbOk t' tlb') :
-    kmapStatic (GF := GF) ⊢ ubPtRegs cpu P tlb' -∗ (ubFrame curCtx D).B mm' -∗
+    kmapStatic (GF := GF) ⊢ ubPtRegs cpu P tlb' -∗ (ufBF P D).B mm' -∗
       uxTextOwn curCtx K (ukTextAddrs P.um) T -∗ iviewLb cpu K -∗ userPtInvX cpu P (ukView P.um mm' T) := by
   have hl := ukView_length P.um mm' T
   iintro #HS Hr HB HX #HK

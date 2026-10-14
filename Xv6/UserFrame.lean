@@ -60,6 +60,8 @@ import MachCSL.WpSmodeSret
 
 namespace Xv6
 
+
+
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open Sail LeanRV64D LeanRV64D.Functions
 
@@ -396,7 +398,7 @@ owned map, the TLB sound for the tree, the aside cell and the residue. -/
 theorem uf_open [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp GF) :
     hwConfig cpu ∗ kmapStatic ∗ userInv cpu C pt Rut ⊢
       ∃ (v : UfVals) (t : PTree) (mm : BMap), ⌜UfUser v⌝ ∗ ⌜UbMemWf pt t mm⌝ ∗ ⌜utlbOk t v.tlb⌝ ∗
-        (ufRegF cpu C).F (ufFile C pt v) ∗ (ubFrame curCtx (ubUAddrs pt t)).B mm ∗ ufAside cpu ∗ Rut pt := by
+        (ufRegF cpu C).F (ufFile C pt v) ∗ (ufBF pt (ubUAddrs pt t)).B mm ∗ ufAside cpu ∗ Rut pt := by
   iintro ⟨#Hhw, #HS, Hinv⟩
   unfold userInv
   icases Hinv with ⟨%hs, %ms, %sc, %stv, %sep, %va, %va', %g, %hok, %hms, %hact, Hregs, Hpt, Hcfg, Hrut⟩
@@ -459,7 +461,7 @@ theorem uf_close_inv [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd →
     (hok : userHartOk (f .hart_state)) (hms : userMstatusOk (f .mstatus))
     (hact : ∀ u, f .hart_state = .HART_ACTIVE u → f .nextPC = f .PC)
     (hwf : UbMemWf pt t mm) (hs : UbMemStep pt t t' mm mm') (htlb : utlbOk t' (f .tlb)) :
-    kmapStatic ⊢ (ufRegF (GF := GF) cpu C).F f -∗ (ubFrame curCtx (ubUAddrs pt t)).B mm' -∗ ufAside cpu -∗
+    kmapStatic ⊢ (ufRegF (GF := GF) cpu C).F f -∗ (ufBF pt (ubUAddrs pt t)).B mm' -∗ ufAside cpu -∗
       Rut pt -∗ userInv cpu C pt Rut := by
   iintro #HS HF HB Ha Hrut
   icases (uf_F_split cpu C f).1 $$ HF with ⟨H1, H2, H3, H4, H5, -⟩
@@ -506,7 +508,7 @@ theorem uf_close_trap [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd �
     (hhs : f .hart_state = .HART_ACTIVE ()) (hms : trapMstatusOk (f .mstatus))
     (hpc : f .PC = stvecBase C.stvec) (hnpc : f .nextPC = stvecBase C.stvec)
     (hwf : UbMemWf pt t mm) (hs : UbMemStep pt t t' mm mm') (htlb : utlbOk t' (f .tlb)) :
-    kmapStatic ⊢ (ufRegF (GF := GF) cpu C).F f -∗ (ubFrame curCtx (ubUAddrs pt t)).B mm' -∗ ufAside cpu -∗
+    kmapStatic ⊢ (ufRegF (GF := GF) cpu C).F f -∗ (ufBF pt (ubUAddrs pt t)).B mm' -∗ ufAside cpu -∗
       Rut pt -∗ uExitTok (hlc := hlc) (ufExitEv cpu f) -∗ userTrapFrame cpu C pt Rut := by
   iintro #HS HF HB Ha Hrut Hrc
   ihave Hrc := uExitTok_eq (show ufExitEv cpu f =

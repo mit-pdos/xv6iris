@@ -388,14 +388,39 @@ theorem ubFrame_acc (ξ : CtxId) (D : List PAddr) (mm : BMap) (pa : PAddr) (n : 
     exact bmWrite_other mm pa n w' a ha.2
 
 /-- **The concrete byte frame** (U0-B's open item): the owned bytes of the
-fixed address list `D`, at context ξ. -/
-def ubFrame (ξ : CtxId) (D : List PAddr) : UByteFrame GF ξ where
+fixed address list `D`, at context ξ, every byte in full (so any read, any
+write, any A/D write-back; the walker's read-only bytes `ro` and slots `pt`
+are the frame's labels, W8 (f3-utext)). -/
+def ubFrame (ξ : CtxId) (D : List PAddr) (ro pt : PAddr → Bool) : UByteFrame GF ξ where
   B := ubFrameB ξ D
-  acc := fun mm pa n hn ho => ubFrame_acc ξ D mm pa n hn ho
+  ro := ro
+  pt := pt
+  accR := fun mm pa n hn ho => by
+    iintro HB
+    icases ubFrame_acc ξ D mm pa n hn ho $$ HB with ⟨%w, %hw, Hb, HBc⟩
+    iexists DFrac.own 1, w
+    iframe Hb
+    isplitr
+    · ipureintro; exact hw
+    iintro Hb
+    ihave HB := HBc $$ %w Hb
+    rw [bmWrite_self mm pa n w hw]
+    iexact HB
+  acc := fun mm pa n hn ho _ => ubFrame_acc ξ D mm pa n hn ho
+  accPt := fun mm pa n w' hn ho _ _ _ => by
+    iintro HB
+    icases ubFrame_acc ξ D mm pa n hn ho $$ HB with ⟨%w, %hw, Hb, HBc⟩
+    iexists w
+    iframe Hb
+    isplitr
+    · ipureintro; exact hw
+    iintro Hb
+    iapply HBc $$ %w' Hb
 
 /-- The frame out of an owned list. -/
-theorem ubFrame_intro (ξ : CtxId) (D : List PAddr) (mm : BMap) (hdom : ∀ a, (mm a).isSome = true ↔ a ∈ D) :
-    ubOwn (GF := GF) ξ D mm ⊢ (ubFrame ξ D).B mm := by
+theorem ubFrame_intro (ξ : CtxId) (D : List PAddr) {ro pt : PAddr → Bool} (mm : BMap)
+    (hdom : ∀ a, (mm a).isSome = true ↔ a ∈ D) :
+    ubOwn (GF := GF) ξ D mm ⊢ (ubFrame ξ D ro pt).B mm := by
   show _ ⊢ ubFrameB ξ D mm
   unfold ubFrameB
   iintro H
@@ -404,8 +429,8 @@ theorem ubFrame_intro (ξ : CtxId) (D : List PAddr) (mm : BMap) (hdom : ∀ a, (
   ipureintro; exact ⟨hnd, hdom⟩
 
 /-- ...and back. -/
-theorem ubFrame_elim (ξ : CtxId) (D : List PAddr) (mm : BMap) :
-    (ubFrame (GF := GF) ξ D).B mm ⊢
+theorem ubFrame_elim (ξ : CtxId) (D : List PAddr) {ro pt : PAddr → Bool} (mm : BMap) :
+    (ubFrame (GF := GF) ξ D ro pt).B mm ⊢
       ⌜D.Nodup ∧ ∀ a, (mm a).isSome = true ↔ a ∈ D⌝ ∗ ubOwn ξ D mm := by
   show ubFrameB ξ D mm ⊢ _
   unfold ubFrameB

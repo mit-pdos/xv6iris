@@ -246,23 +246,24 @@ theorem uma_mem_write_value (D : UFoot) (orc : UOrc) (s s' : UWSt) (hp : UmaPhys
 /-- **An aligned STORE's value write**: the map updated, the reservation bit
 dropped. -/
 theorem uma_mem_write_value_store (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UmaPhys D s) (pa : BitVec 64)
-    (w : Nat) (hw : umaW w) (hr : UmaRam pa w) (data : BitVec (8 * w)) (ho : bmOwned s.mm pa w = true) :
+    (w : Nat) (hw : umaW w) (hr : UmaRam pa w) (data : BitVec (8 * w)) (ho : bmOwned s.mm pa w = true)
+    (hrw : bmRw s.ro pa w = true) :
     runRW D orc s (mem_write_value (.Physaddr pa) w data (.Store .Data) .PBMT_PMA false false false) =
       some (.Ok true, { s with mm := bmWrite s.mm pa w data, rv := false }, orc) :=
   uma_mem_write_value D orc s _ hp pa w hw hr (.Store .Data) rfl false rfl false false .Write_plain uma_wk_store
-    data (uma_write_ram_plain D orc s pa w (umaW_lt hw) data ho)
+    data (uma_write_ram_plain D orc s pa w (umaW_lt hw) data ho hrw)
 
 /-- **An aligned SC's value write**, from any reservation state (Rocq
 `resv_any`): the map updated, the reservation bit dropped. -/
 theorem uma_mem_write_value_sc (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UmaPhys D s) (pa : BitVec 64)
     (w : Nat) (hw : umaW w) (hr : UmaRam pa w) (aq rl : Bool) (data : BitVec (8 * w))
-    (ho : bmOwned s.mm pa w = true) :
+    (ho : bmOwned s.mm pa w = true) (hrw : bmRw s.ro pa w = true) :
     runRW D orc s (mem_write_value (.Physaddr pa) w data (.StoreConditional (aq, rl, .Data)) .PBMT_PMA
         (aq && rl) rl true) =
       some (.Ok true, { s with mm := bmWrite s.mm pa w data, rv := false }, orc) :=
   uma_mem_write_value D orc s _ hp pa w hw hr (.StoreConditional (aq, rl, .Data)) rfl true rfl (aq && rl) rl
     (umaScWk aq rl) (uma_wk_sc aq rl) data
-    (uma_write_ram_cond D orc s _ (umaCondWk_sc aq rl) pa w (umaW_lt hw) data ho)
+    (uma_write_ram_cond D orc s _ (umaCondWk_sc aq rl) pa w (umaW_lt hw) data ho hrw)
 
 /-- An aligned STORE's announce. -/
 theorem uma_mem_write_ea_store (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UmaPhys D s) (pa : BitVec 64)

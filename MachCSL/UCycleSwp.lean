@@ -55,10 +55,12 @@ theorem swp_ucWalk {X : Type} (m : SailM X) (s : UWSt) (L : UOrc → X × UWSt �
     (hw : ∀ orc, runRW D orc s m = some (L orc)) (Φ : X → IProp GF) :
     uFr RF BF s ∗ (∀ orc, uFr RF BF (L orc).2.1 -∗ Φ (L orc).1) ⊢ swp cpu m Φ := by
   iintro ⟨Hfr, HΦ⟩
+  ihave %hwp := uFr_wp RF BF s $$ Hfr
   iapply swp_runRW RF BF m s (fun orc => by rw [hw]; rfl) Φ
   iframe Hfr
   unfold uPost
   iintro %orc %x %s' %orc' %h HF HB Hc Hr
+  have hw2 := runRW_wp D _ orc s _ _ _ h
   rw [hw orc] at h
   ispecialize HΦ $$ %orc
   generalize L orc = t at h ⊢
@@ -67,6 +69,8 @@ theorem swp_ucWalk {X : Type} (m : SailM X) (s : UWSt) (L : UOrc → X × UWSt �
   obtain ⟨rfl, rfl, -⟩ := h
   iapply HΦ
   unfold uFr
+  isplitr
+  · ipureintro; exact ⟨hw2.1.trans hwp.1, hw2.2.trans hwp.2⟩
   iframe
 
 /-- A walk whose value and landing do not depend on the oracle. -/
@@ -74,16 +78,20 @@ theorem swp_ucWalk_const {X : Type} (m : SailM X) (s s' : UWSt) (x : X)
     (hw : ∀ orc, ∃ orc', runRW D orc s m = some (x, s', orc')) (Φ : X → IProp GF) :
     uFr RF BF s ∗ (uFr RF BF s' -∗ Φ x) ⊢ swp cpu m Φ := by
   iintro ⟨Hfr, HΦ⟩
+  ihave %hwp := uFr_wp RF BF s $$ Hfr
   iapply swp_runRW RF BF m s (fun orc => by obtain ⟨o, e⟩ := hw orc; rw [e]; rfl) Φ
   iframe Hfr
   unfold uPost
   iintro %orc %x' %s'' %orc' %h HF HB Hc Hr
+  have hw2 := runRW_wp D _ orc s _ _ _ h
   obtain ⟨o, e⟩ := hw orc
   rw [e] at h
   simp only [Option.some.injEq, Prod.mk.injEq] at h
   obtain ⟨rfl, rfl, -⟩ := h
   iapply HΦ
   unfold uFr
+  isplitr
+  · ipureintro; exact ⟨hw2.1.trans hwp.1, hw2.2.trans hwp.2⟩
   iframe
 
 /-! ## The ACTIVE cycle (Rocq `swp_try_step_full`) -/
@@ -344,24 +352,28 @@ move. -/
 theorem swp_ucTick (hT : UcTickFoot D) (s : UWSt) (hm : UcMisa D s) (Φ : Unit → IProp GF) :
     uFr RF BF s ∗ (∀ s', ⌜ucClockAgree s s'⌝ -∗ uFr RF BF s' -∗ Φ ()) ⊢ swp cpu (tick_clock ()) Φ := by
   iintro ⟨Hfr, HΦ⟩
+  ihave %hwp := uFr_wp RF BF s $$ Hfr
   iapply swp_runRW RF BF _ s (fun orc => by
     obtain ⟨s', o', e, -⟩ := uc_tickClock hT orc s hm; rw [e]; rfl) Φ
   iframe Hfr
   unfold uPost
   iintro %orc %x %s' %orc' %h HF HB Hc Hr
+  have hw2 := runRW_wp D _ orc s _ _ _ h
   obtain ⟨s'', o'', e, ha⟩ := uc_tickClock hT orc s hm
   rw [e] at h
   simp only [Option.some.injEq, Prod.mk.injEq] at h
   obtain ⟨-, rfl, -⟩ := h
   iapply HΦ $$ %s'' %ha
   unfold uFr
+  isplitr
+  · ipureintro; exact ⟨hw2.1.trans hwp.1, hw2.2.trans hwp.2⟩
   iframe
 
 /-- The user frames hold the hart's reservation fragment (the walker
 `ctxTok`'s `uResvTok`, whatever the bookkeeping bit). -/
 theorem resvOut_uFr (s : UWSt) : resvOut cpu (uFr RF BF s) := by
   unfold uFr uResvTok
-  exact resvOut_sepR _ (resvOut_sepR _ (resvOut_sepR _ (resvOut_frag cpu)))
+  exact resvOut_sepR _ (resvOut_sepR _ (resvOut_sepR _ (resvOut_sepR _ (resvOut_frag cpu))))
 
 /-- The machine step, as the loop sees it: the cycle, then the tick if the
 machine chose one.  The boundary clears the hart's reservation (W-RSV): `T`

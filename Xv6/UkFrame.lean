@@ -176,22 +176,26 @@ the residue (as `UserStepClose.ust_frames`, at the engine's byte-frame
 domain). -/
 theorem uk_frames [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IProp GF)
     (hacc : Rut P ⊢ ctxToken cpu ∗ (ctxToken cpu -∗ Rut P)) (v : UfVals) (D : List PAddr) (mm : BMap) :
-    (ufRegF cpu C).F (ufFile C P v) ∗ (ubFrame curCtx D).B mm ∗ Rut P ⊢
-      uFr (ufRegF cpu C) (ubFrame curCtx D) (ustS0 C P v mm) ∗ (ctxToken cpu -∗ Rut P) := by
+    (ufRegF cpu C).F (ufFile C P v) ∗ (ufBF P D).B mm ∗ Rut P ⊢
+      uFr (ufRegF cpu C) (ufBF P D) (ustS0 C P v mm) ∗ (ctxToken cpu -∗ Rut P) := by
   iintro ⟨HF, HB, Hrut⟩
   icases hacc $$ Hrut with ⟨Htok, Hres⟩
   icases ctxTok_uResvTok cpu curCtx $$ Htok with ⟨Hc, Hr⟩
   unfold uFr
   rw [ustS0_file, ustS0_mm, ustS0_rv]
-  iframe
+  isplitl [HF HB Hc Hr]
+  · isplitr
+    · ipureintro; exact ⟨rfl, rfl⟩
+    iframe
+  · iexact Hres
 
 /-- ...and the token back at any landing. -/
 theorem uk_frames_close [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IProp GF) (D : List PAddr)
     (s : UWSt) :
-    uFr (ufRegF (GF := GF) cpu C) (ubFrame curCtx D) s ∗ (ctxToken cpu -∗ Rut P) ⊢
-      (ufRegF cpu C).F s.file ∗ (ubFrame curCtx D).B s.mm ∗ Rut P := by
+    uFr (ufRegF (GF := GF) cpu C) (ufBF P D) s ∗ (ctxToken cpu -∗ Rut P) ⊢
+      (ufRegF cpu C).F s.file ∗ (ufBF P D).B s.mm ∗ Rut P := by
   unfold uFr
-  iintro ⟨⟨HF, HB, Hc, Hr⟩, Hres⟩
+  iintro ⟨⟨%_, HF, HB, Hc, Hr⟩, Hres⟩
   ihave Htok := uResvTok_ctxTok cpu curCtx s.rv $$ [$Hc $Hr]
   ihave Hrut := Hres $$ Htok
   iframe

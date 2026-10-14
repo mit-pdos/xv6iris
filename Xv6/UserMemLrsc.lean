@@ -126,6 +126,7 @@ theorem ume_vsc (hv : UftLeavesValid P) {s : UWSt} (hl : UstLand C P t0 mm0 s) (
         have ho := bmOwned_of_ummOwned _ _ _ hown
         have h := uma_vmem_write_addr_sc_ok ufFoot orc orc s s1 hp (ume_umaPhys hl1) va w hw' hal hc data aq rl ppn
           (hwalk orc) ⟨hram, hal2⟩ hm ho
+          (bmRw_of_ummRw _ _ _ (ustLand_dataRw hl1 (ume_page_data hwf1.wf hpg rfl va w hin)))
         refine ⟨_, _, h, ume_land_fr hl1 hk (va.toNat % 4096) w hin _ rfl ?_, Or.inl ⟨_, rfl⟩⟩
         rw [← hpa]
         exact umeFr_write s1.mm (paOf ppn va) w data (by rcases hw with rfl | rfl <;> decide) ho

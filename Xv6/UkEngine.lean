@@ -175,7 +175,7 @@ theorem uk_engine (π : Nat → Option UPerm) (sz : Nat) (Qp : Int → IProp GF)
   have hRtU : ∀ s', ukRt ret C pt T sz m' pc' M' s' → s'.file .cur_privilege = Privilege.User :=
     fun s' h' => h'.2.choose_spec.1.1.priv
   unfold ukontF
-  iapply wpLoop_ucStep _ (resvOut_uFr (ufRegF h C) (ubFrame curCtx D) s0)
+  iapply wpLoop_ucStep _ (resvOut_uFr (ufRegF h C) (ufBF pt D) s0)
   iframe Hfr
   iintro %tick
   inext
@@ -185,7 +185,7 @@ theorem uk_engine (π : Nat → Option UPerm) (sz : Nat) (Qp : Int → IProp GF)
   isplitr [Hfr HX]
   rotate_left
   · -- THE CYCLE
-    iapply swp_ucTryStep_U (ufRegF h C) (ubFrame curCtx D) ufFoot_uc ufFoot_ucDisp s0 hm0 hl0.act hl0.priv hmm
+    iapply swp_ucTryStep_U (ufRegF h C) (ufBF pt D) ufFoot_uc ufFoot_ucDisp s0 hm0 hl0.act hl0.priv hmm
       (ukQ C pt T m pc V (ukRt ret C pt T sz m' pc' M') (ukEx ret e))
       (ukRider h (uxTextOwn curCtx Kt (ukTextAddrs pt.um) T))
     iframe Hfr
@@ -219,7 +219,7 @@ theorem uk_engine (π : Nat → Option UPerm) (sz : Nat) (Qp : Int → IProp GF)
     rcases hcase with ⟨⟨-, V', hpost, -⟩, hL⟩ | ⟨sc, stv, htl, -, -⟩
     · rw [hL]; exact (ukFinal_epi hpost).land.cfg
     · exact htl.cfg
-  iapply ust_tickOpt h C (ubFrame curCtx D) tick _ (uf_ucMisa C pt _ hcfgL)
+  iapply ust_tickOpt h C (ufBF pt D) tick _ (uf_ucMisa C pt _ hcfgL)
   iframe Hfr
   iintro %s3 %hag Hfr
   -- the receipt rider, past the landing and the tick (NI M2-W2b)

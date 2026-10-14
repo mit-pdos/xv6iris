@@ -96,11 +96,17 @@ reservation bit dropped. -/
 theorem uma_mwr {X : Type} (D : UFoot) (orc : UOrc) (s : UWSt) {n vasize : Nat}
     (req : Mem_write_request n vasize Arch.pa Arch.translation Arch.arch_ak)
     (k : Result (Option Bool) Arch.abort → SailM X) (w : BitVec (8 * n))
-    (hn : n < 2 ^ 64) (hv : req.value = some w) (ho : bmOwned s.mm req.pa n = true) :
+    (hn : n < 2 ^ 64) (hv : req.value = some w) (ho : bmOwned s.mm req.pa n = true)
+    (hw : uwOk s req.pa n w (akExcl req.access_kind) = true) :
     runRW D orc s (ConcurrencyInterfaceV1.sail_mem_write req >>= k) =
       runRW D orc { s with mm := bmWrite s.mm req.pa n w, rv := false } (k (.Ok (some true))) := by
   show runRW D orc s (FreeM.impure (.ok (.memWrite n vasize req)) k) = _
-  simp only [runRW, hn, hv, ho, ↓reduceIte]
+  simp only [runRW, hn, hv, ho, hw, Bool.and_self, ↓reduceIte]
+
+/-- A footprint off the read-only bytes may be written (W8 (f3-utext)). -/
+theorem uwOk_of_rw (s : UWSt) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (e : Bool)
+    (h : bmRw s.ro pa n = true) : uwOk s pa n w e = true := by
+  unfold uwOk; rw [h]
 
 /-! ## §2 The per-chunk atoms (Rocq `UserMemCert`'s RAM leaves) -/
 
@@ -134,12 +140,12 @@ theorem uma_read_ram_resv (D : UFoot) (orc : UOrc) (s : UWSt) (rk : read_kind) (
 /-- **A plain RAM write** of owned bytes: the map updated, the reservation
 bit dropped. -/
 theorem uma_write_ram_plain (D : UFoot) (orc : UOrc) (s : UWSt) (pa : BitVec 64) (n : Nat)
-    (hn : n < 2 ^ 64) (v : BitVec (8 * n)) (ho : bmOwned s.mm pa n = true) :
+    (hn : n < 2 ^ 64) (v : BitVec (8 * n)) (ho : bmOwned s.mm pa n = true) (hrw : bmRw s.ro pa n = true) :
     runRW D orc s (write_ram .Write_plain (.Physaddr pa) n v ()) =
       some (true, { s with mm := bmWrite s.mm pa n v, rv := false }, orc) := by
   unfold write_ram
   sail_norm
-  rw [uma_mwr D orc s _ _ v hn rfl ho]
+  rw [uma_mwr D orc s _ _ v hn rfl ho (uwOk_of_rw _ _ _ _ _ hrw)]
   rfl
 
 /-- The write kinds of a store-conditional. -/
@@ -153,12 +159,13 @@ def umaCondWk : write_kind → Bool
 state (Rocq `resv_any`; the model's `match_reservation` already let the SC
 through): the map updated, the reservation bit dropped. -/
 theorem uma_write_ram_cond (D : UFoot) (orc : UOrc) (s : UWSt) (wk : write_kind) (hwk : umaCondWk wk = true)
-    (pa : BitVec 64) (n : Nat) (hn : n < 2 ^ 64) (v : BitVec (8 * n)) (ho : bmOwned s.mm pa n = true) :
+    (pa : BitVec 64) (n : Nat) (hn : n < 2 ^ 64) (v : BitVec (8 * n)) (ho : bmOwned s.mm pa n = true)
+    (hrw : bmRw s.ro pa n = true) :
     runRW D orc s (write_ram wk (.Physaddr pa) n v ()) =
       some (true, { s with mm := bmWrite s.mm pa n v, rv := false }, orc) := by
   unfold write_ram
   cases wk <;> simp only [umaCondWk, Bool.false_eq_true] at hwk <;> sail_norm <;>
-    rw [uma_mwr D orc s _ _ v hn rfl ho] <;> rfl
+    rw [uma_mwr D orc s _ _ v hn rfl ho (uwOk_of_rw _ _ _ _ _ hrw)] <;> rfl
 
 /-- The signal window is not configured. -/
 theorem uma_within_sig (pa : BitVec 64) (n : Nat) : within_sig (.Physaddr pa) n = pure false := by
@@ -204,6 +211,12 @@ structure UmaPhys (D : UFoot) (s : UWSt) : Prop where
 update and a reservation-bit change. -/
 theorem UmaPhys.mm_rv {D : UFoot} {s : UWSt} (h : UmaPhys D s) (mm : BMap) (rv : Bool) :
     UmaPhys D { s with mm := mm, rv := rv } :=
+  ⟨h.pins, h.dms, h.dcp, h.cp, h.mprv⟩
+
+/-- ... and any change of the byte map, the reservation bit and the
+write-permission sets. -/
+theorem UmaPhys.mk_file {D : UFoot} {s : UWSt} (h : UmaPhys D s) (mm : BMap) (rv : Bool) (ro pt : PAddr → Bool) :
+    UmaPhys D ⟨s.pin, s.rs, mm, rv, ro, pt⟩ :=
   ⟨h.pins, h.dms, h.dcp, h.cp, h.mprv⟩
 
 /-- An aligned RAM access of a scalar width. -/

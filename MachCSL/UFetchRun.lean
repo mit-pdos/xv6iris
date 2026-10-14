@@ -249,17 +249,17 @@ theorem uftPost_step {X : Type} (s s'' : UWSt) (m m' : SailM X) (Φ : X → IPro
 every oracle's fetch-walk runs through, from the frames of `s`, with the
 obligation at every landing. -/
 theorem swp_uftRun {X : Type} (m : SailM X) :
-    ∀ (s : UWSt), (∀ orc, (uftRun D orc s m).isSome = true) → ∀ Φ : X → IProp GF,
+    ∀ (s : UWSt), s.ro = BF.ro → s.pt = BF.pt → (∀ orc, (uftRun D orc s m).isSome = true) → ∀ Φ : X → IProp GF,
       uFr RF BF s ∗ uftPost RF BF s m Φ ⊢ swp cpu m Φ := by
   induction m with
   | pure x =>
-    intro s _ Φ
+    intro s _ _ _ Φ
     iintro ⟨Hfr, HP⟩
     iapply swp_ret
     unfold uftPost
     iapply HP $$ %(UOrc.dflt s.rs) %x %s %(UOrc.dflt s.rs) %rfl Hfr
   | impure c k ih =>
-    intro s hok Φ
+    intro s hro hpt hok Φ
     cases hc : uftIsFetch c with
     | true =>
       obtain ⟨n, vasize, req, rfl, hk⟩ := uftIsFetch_true hc
@@ -279,16 +279,19 @@ theorem swp_uftRun {X : Type} (m : SailM X) :
       show uFr RF BF s ∗ uftPost RF BF s (FreeM.impure (.ok (.memRead n vasize req)) k) Φ ⊢
         swp cpu (ConcurrencyInterfaceV1.sail_mem_read req >>= k) Φ
       unfold uFr
-      iintro ⟨⟨HF, HB, Hc, Hr⟩, HP⟩
+      iintro ⟨⟨%_, HF, HB, Hc, Hr⟩, HP⟩
       iapply ufm_swp_ifetch_bind cpu BF s.mm req k hk hcond.1 hcond.2 Φ
       iframe HB
       inext
       iintro %w' HB
       have hok' : ∀ o, (uftRun D o s (k (.Ok (w', none)))).isSome = true := fun o => by
         rw [← hstep w' o]; exact hok _
-      iapply ih (.Ok (w', none)) s hok' Φ
+      iapply ih (.Ok (w', none)) s hro hpt hok' Φ
       isplitl [HF HB Hc Hr]
-      · unfold uFr; iframe
+      · unfold uFr
+        isplitr
+        · ipureintro; exact ⟨hro, hpt⟩
+        iframe
       iapply uftPost_step RF BF s s _ _ Φ (fun o => ⟨_, hstep w' o⟩) $$ HP
     | false =>
       have hok1 : ∀ orc, (runRW D orc s (FreeM.impure c FreeM.pure)).isSome = true := fun orc => by
@@ -313,9 +316,13 @@ theorem swp_uftRun {X : Type} (m : SailM X) :
       have hok' : ∀ o, (uftRun D o s' (k v)).isSome = true := fun o => by
         obtain ⟨orc₀, h0⟩ := hre o
         rw [← h0]; exact hok orc₀
-      iapply ih v s' hok' Φ
+      have hwp := runRW_wp D _ orc s v s' orc' h
+      iapply ih v s' (hwp.1.trans hro) (hwp.2.trans hpt) hok' Φ
       isplitl [HF HB Hc Hr]
-      · unfold uFr; iframe
+      · unfold uFr
+        isplitr
+        · ipureintro; exact ⟨hwp.1.trans hro, hwp.2.trans hpt⟩
+        iframe
       iapply uftPost_step RF BF s s' _ _ Φ hre $$ HP
 
 /-- **A fetch-walk with a described landing** (the form the cycle's fetch
@@ -328,7 +335,8 @@ theorem swp_uftRun_of {X : Type} (m : SailM X) (s : UWSt) (P : X → UWSt → Pr
   have hok : ∀ orc, (uftRun D orc s m).isSome = true := fun orc => by
     obtain ⟨x, s', orc', h, -⟩ := hw orc
     rw [h]; rfl
-  iapply swp_uftRun RF BF m s hok Φ
+  ihave %hwp := uFr_wp RF BF s $$ Hfr
+  iapply swp_uftRun RF BF m s hwp.1 hwp.2 hok Φ
   iframe Hfr
   unfold uftPost
   iintro %orc %x %s' %orc' %h Hfr

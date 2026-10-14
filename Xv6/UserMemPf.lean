@@ -28,7 +28,7 @@ theorem ume_pf_miss (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 
     (sum : Bool) :
     ∃ r s', (∀ orc, runRW ufFoot orc s
         (translate_TLB_miss 39 0#16 P.root vpn (umoPf c) .User false sum ()) = some (r, s', orc)) ∧
-      UftTrOut C P t0 mm0 s r s' := by
+      UftTrOut C P t0 mm0 (umePfAcc c) s r s' := by
   have hwf : UbMemWf P t s.mm := ubMemStep_wf P t0 t mm0 s.mm hl.wf hstep
   have hwk : UwkPins ufFoot s.file := (uft_pins_land hl).wk
   have hrep := hwf.rep
@@ -45,9 +45,9 @@ theorem ume_pf_miss (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 
       uwkWalkRes (umePfAcc c) false (t.walk 2 vpn) = .Err (e, ()) →
       ∃ r s', (∀ orc, runRW ufFoot orc s
         (translate_TLB_miss 39 0#16 t.base vpn (umoPf c) .User false sum ()) = some (r, s', orc)) ∧
-      UftTrOut C P t0 mm0 s r s' := by
+      UftTrOut C P t0 mm0 (umePfAcc c) s r s' := by
     intro e he hres
-    have hout : UftTrOut C P t0 mm0 s (.Err (e, ())) s := by
+    have hout : UftTrOut C P t0 mm0 (umePfAcc c) s (.Err (e, ())) s := by
       refine ⟨hl, fun _ _ => rfl, ?_, ?_⟩
       · intro ppn pbmt h; cases h
       · intro f hf x
@@ -77,10 +77,10 @@ theorem ume_pf_miss (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 
         unfold uwkPermOk at hperm
         simp only [Bool.and_eq_true] at hperm
         exact hperm.1
-      have hpage : UftPageOf P (ptePpn w) := ⟨_, lw, w, hlok.2 hU, had, rfl⟩
+      have hpage : UftPageOf P (umePfAcc c) (ptePpn w) := ⟨_, lw, w, hlok.2 hU, had, rfl, hperm⟩
       refine ⟨.Ok (ptePpn w, .PBMT_PMA, ()), _, fun orc => utlb_miss_ok ufFoot orc orc s s hdr hdw _ rfl vpn t.base
         _ false sum w addr none (hwalk' orc) (uwk_upd_none ufFoot orc s vpn addr w _ false sum (ume_upd_pf w c)), ?_⟩
-      refine ⟨uft_land hl (fun r hr => uft_file_tlb _ _ _ _ _ r hr) t hstep ?_, fun x hx => uft_file_tlb _ _ _ _ _ x hx,
+      refine ⟨uft_land hl (fun r hr => uft_file_tlb _ _ _ _ _ _ _ r hr) t hstep ?_, fun x hx => uft_file_tlb _ _ _ _ _ _ _ x hx,
         fun ppn pbmt h => ?_, fun f h => by cases h⟩
       · rw [uft_file_tlb_same]
         exact utlbOk_fill t _ htlb vpn addr w w hw (pteAD_refl w)
@@ -93,7 +93,7 @@ theorem ume_pf_hit (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 s
     (hm : match_TLB_Entry ent 0#16 (BitVec.signExtend 45 vpn) = true) :
     ∃ r s', (∀ orc, runRW ufFoot orc s
         (translate_TLB_hit 39 0#16 vpn (umoPf c) .User false sum () (tlbHash vpn) ent) = some (r, s', orc)) ∧
-      UftTrOut C P t0 mm0 s r s' := by
+      UftTrOut C P t0 mm0 (umePfAcc c) s r s' := by
   have hwf : UbMemWf P t s.mm := ubMemStep_wf P t0 t mm0 s.mm hl.wf hstep
   have hwk : UwkPins ufFoot s.file := (uft_pins_land hl).wk
   have hrep := hwf.rep
@@ -107,7 +107,7 @@ theorem ume_pf_hit (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 s
     rw [e, utlb_permOk_setAD]
   cases hperm' : uwkPermOk (umePfAcc c) false w' with
   | false =>
-    have hout : UftTrOut C P t0 mm0 s (.Err (.PTW_No_Permission (), ())) s := by
+    have hout : UftTrOut C P t0 mm0 (umePfAcc c) s (.Err (.PTW_No_Permission (), ())) s := by
       refine ⟨hl, fun _ _ => rfl, ?_, ?_⟩
       · intro ppn pbmt h; cases h
       · intro f hf x hx; cases hf; cases hx
@@ -120,8 +120,8 @@ theorem ume_pf_hit (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 s
       unfold uwkPermOk at hperm
       simp only [Bool.and_eq_true] at hperm
       exact hperm.1
-    have hpage : UftPageOf P (ptePpn w) := ⟨_, lw, w, hlok.2 hU, had, rfl⟩
-    have hout : UftTrOut C P t0 mm0 s (.Ok (ptePpn w, .PBMT_PMA, ())) s := by
+    have hpage : UftPageOf P (umePfAcc c) (ptePpn w) := ⟨_, lw, w, hlok.2 hU, had, rfl, hperm⟩
+    have hout : UftTrOut C P t0 mm0 (umePfAcc c) s (.Ok (ptePpn w, .PBMT_PMA, ())) s := by
       refine ⟨hl, fun _ _ => rfl, ?_, ?_⟩
       · intro ppn pbmt h; cases h; exact ⟨rfl, hpage⟩
       · intro f hf; cases hf
@@ -132,12 +132,12 @@ theorem ume_pf_hit (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 s
 theorem ume_pf_translate (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 s) (vpn : BitVec 27)
     (c : cbop_zicbop) (sum : Bool) :
     ∃ r s', (∀ orc, runRW ufFoot orc s (translate 39 0#16 P.root vpn (umoPf c) .User false sum ()) =
-        some (r, s', orc)) ∧ UftTrOut C P t0 mm0 s r s' := by
+        some (r, s', orc)) ∧ UftTrOut C P t0 mm0 (umePfAcc c) s r s' := by
   obtain ⟨t, hstep, htlb⟩ := hl.mem
   have hdr : ufFoot.Dr .tlb = true := ufFoot_rd _ (by decide)
   have hmiss : (∀ orc, runRW ufFoot orc s (lookup_TLB 39 0#16 vpn) = some (none, s, orc)) →
       ∃ r s', (∀ orc, runRW ufFoot orc s (translate 39 0#16 P.root vpn (umoPf c) .User false sum ()) =
-        some (r, s', orc)) ∧ UftTrOut C P t0 mm0 s r s' := by
+        some (r, s', orc)) ∧ UftTrOut C P t0 mm0 (umePfAcc c) s r s' := by
     intro hl0
     obtain ⟨r, s', hw, hout⟩ := ume_pf_miss hv s hl t hstep htlb vpn c sum
     exact ⟨r, s', fun orc => utlb_translate_of_miss ufFoot orc s _ vpn _ _ false sum _ (hl0 orc) (hw orc), hout⟩
@@ -154,9 +154,9 @@ theorem ume_pf_translate (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0
         (utlb_lookup_hit ufFoot orc s hdr _ rfl vpn ent hslot hm) (hw orc), hout⟩
 
 /-- A 64-byte-aligned address translates to a 64-byte-aligned address. -/
-theorem ume_pa_al64 {t : PTree} {mm : BMap} (hwf : UbMemWf P t mm) {ppn : BitVec 44} (hpg : UftPageOf P ppn)
+theorem ume_pa_al64 {t : PTree} {mm : BMap} (hwf : UbMemWf P t mm) {acc : MemoryAccessType mem_payload} {ppn : BitVec 44} (hpg : UftPageOf P acc ppn)
     (va : BitVec 64) (hal : va.toNat % 64 = 0) : (paOf ppn va).toNat % 64 = 0 := by
-  obtain ⟨k, lw, w', hk, had, rfl⟩ := hpg
+  obtain ⟨k, lw, w', hk, had, rfl, -⟩ := hpg
   obtain ⟨hpa, hv⟩ := ub_data_valid P hwf.wf k lw hk
   have hppn : ptePpn w' = ptePpn lw := pteAD_ptePpn had
   rw [hppn, uft_paOf_eq, uft_off_eq]

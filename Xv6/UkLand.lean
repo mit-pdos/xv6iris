@@ -68,7 +68,7 @@ variable {C : UCfg} {P : UPtd} {T : BMap}
 
 /-- The prelude keeps an engine machine. -/
 theorem ukLand_preS {s : UWSt} (h : UkLand C P T s) : UkLand C P T (ucPreS s) := by
-  refine ⟨ust_cfg_of C P s _ h.cfg fun r _ _ _ h4 _ _ _ _ _ => ucPreS_file_other s r h4, ?_, ?_, ?_, ?_⟩
+  refine ⟨ust_cfg_of C P s _ h.cfg fun r _ _ _ h4 _ _ _ _ _ => ucPreS_file_other s r h4, ?_, ?_, ?_, ?_, h.wp⟩
   · rw [ucPreS_file_other _ _ (by decide)]; exact h.priv
   · rw [ucPreS_file_other _ _ (by decide)]; exact h.ms
   · rw [ucPreS_file_other _ _ (by decide)]; exact h.act
@@ -120,7 +120,7 @@ theorem ukTrapLand_epi {m : RegMap} {pc : BitVec 64} {V : Nat → List (BitVec 8
 theorem ukTrapLand_clock {m : RegMap} {pc : BitVec 64} {V : Nat → List (BitVec 8)} {sc stv : BitVec 64}
     {s s' : UWSt} (h : UkTrapLand C P T m pc V sc stv s) (hag : ucClockAgree s s') :
     UkTrapLand C P T m pc V sc stv s' ∧ s'.file .PC = s.file .PC := by
-  obtain ⟨hmm, -, hf⟩ := hag
+  obtain ⟨hmm, -, hf, hwpc⟩ := hag
   refine ⟨⟨ust_cfg_of C P s s' h.cfg fun r _ _ _ _ _ h6 h7 h8 _ => hf r h6 h7 h8, ?_, ?_, ?_, ?_,
     ukRegs_congr (fun r hr => hf r (uk_gpr_ne r hr).2.2.2.2.2.1 (uk_gpr_ne r hr).2.2.2.2.2.2.1
       (uk_gpr_ne r hr).2.2.2.2.2.2.2.1) h.regs, ?_, ?_, ?_, ?_, ?_⟩, ?_⟩
@@ -141,7 +141,8 @@ theorem ukFinal_epi {m' : RegMap} {pc' : BitVec 64} {V' : Nat → List (BitVec 8
   obtain ⟨hl, hg, hn, hv⟩ := h
   have e : ∀ x, x ≠ .PC → x ≠ .minstret → (ucEpi true s).file x = s.file x :=
     fun x h1 h2 => ucEpi_file_other true s x h1 h2
-  refine ⟨⟨ust_cfg_of C P s _ hl.cfg fun x h1 _ h3 _ _ _ _ _ _ => e x h1 h3, ?_, ?_, ?_, ?_⟩,
+  refine ⟨⟨ust_cfg_of C P s _ hl.cfg fun x h1 _ h3 _ _ _ _ _ _ => e x h1 h3, ?_, ?_, ?_, ?_,
+    ⟨(ucEpi_wp true s).1.trans hl.wp.1, (ucEpi_wp true s).2.trans hl.wp.2⟩⟩,
     ukRegs_congr (fun r hr => e r (uk_gpr_ne r hr).1 (uk_gpr_ne r hr).2.2.1) hg, ?_, ?_, ?_⟩
   · rw [e _ (by decide) (by decide)]; exact hl.priv
   · rw [e _ (by decide) (by decide)]; exact hl.ms
@@ -154,9 +155,10 @@ theorem ukFinal_epi {m' : RegMap} {pc' : BitVec 64} {V' : Nat → List (BitVec 8
 /-- The clock tick keeps a final landing. -/
 theorem ukFinal_clock {m' : RegMap} {pc' : BitVec 64} {V' : Nat → List (BitVec 8)} {s s' : UWSt}
     (h : UkFinal C P T m' pc' V' s) (hag : ucClockAgree s s') : UkFinal C P T m' pc' V' s' := by
-  obtain ⟨hmm, -, hf⟩ := hag
+  obtain ⟨hmm, -, hf, hwpc⟩ := hag
   obtain ⟨hl, hg, hp, hn, hv⟩ := h
-  refine ⟨⟨ust_cfg_of C P s s' hl.cfg fun r _ _ _ _ _ h6 h7 h8 _ => hf r h6 h7 h8, ?_, ?_, ?_, ?_⟩,
+  refine ⟨⟨ust_cfg_of C P s s' hl.cfg fun r _ _ _ _ _ h6 h7 h8 _ => hf r h6 h7 h8, ?_, ?_, ?_, ?_,
+    ⟨hwpc.1.trans hl.wp.1, hwpc.2.trans hl.wp.2⟩⟩,
     ukRegs_congr (fun r hr => hf r (uk_gpr_ne r hr).2.2.2.2.2.1 (uk_gpr_ne r hr).2.2.2.2.2.2.1
       (uk_gpr_ne r hr).2.2.2.2.2.2.2.1) hg, ?_, ?_, ?_⟩
   · rw [hf _ (by decide) (by decide) (by decide)]; exact hl.priv
