@@ -661,5 +661,9 @@ import Weak.PinHoldingCtrl
 import Weak.PinTrapSites
 import Weak.PinTrap
 import Weak.WeakRvwmoPinBridge4
+import Weak.GraphFetchKill
+import Weak.GraphFetchRun
+import Weak.GraphFetchLinInd
+import Weak.GraphFetchBlocks
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
