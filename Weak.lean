@@ -662,6 +662,9 @@ import Weak.PinHoldingCtrl
 import Weak.PinTrapSites
 import Weak.PinTrap
 import Weak.WeakRvwmoPinBridge4
+import Weak.PinDataflowSatp
+import Weak.PinWalkTab
+import Weak.WeakRvwmoPinBridge5
 import Weak.GraphFetchKill
 import Weak.GraphFetchRun
 import Weak.GraphFetchLinInd
