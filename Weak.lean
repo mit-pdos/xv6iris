@@ -655,5 +655,6 @@ import Weak.GraphFetchCut
 import Weak.GraphFetchFloor
 import Weak.GraphFetchSupply
 import Weak.PinDataflowGlue
+import Weak.RvwmoXv6Adequacy
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
