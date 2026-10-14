@@ -249,6 +249,146 @@ theorem PinCycRunFetch.cyOfFaPf {X : Type} (hS : ∀ r, S r = true → pfProt r 
 
 end prod
 
+/-! ## 3. The shapes at `pc`, and `fetchCyR1` -/
+
+theorem PinCycRunFetch.feViewEq (e : FeEnt) (a : Int) (n : Nat) (v : BitVec (8 * n))
+    (h : PinCycRunFetch.feView e = ⟨a, n, v⟩) : e = ⟨a, n, v⟩ := by
+  obtain ⟨a', n', w'⟩ := e
+  simp only [PinCycRunFetch.feView, FRd.mk.injEq] at h
+  obtain ⟨rfl, rfl, h⟩ := h
+  rw [eq_of_heq h]
+
+theorem PinCycRunFetch.view1 (fe : List FeEnt) (a : Int) (n : Nat) (v : BitVec (8 * n))
+    (h : fe.map PinCycRunFetch.feView = [⟨a, n, v⟩]) : fe = [⟨a, n, v⟩] := by
+  rcases fe with _ | ⟨e, _ | ⟨e', fe⟩⟩
+  · simp at h
+  · simp only [List.map_cons, List.map_nil, List.cons.injEq, and_true] at h
+    rw [PinCycRunFetch.feViewEq e a n v h]
+  · simp at h
+
+theorem PinCycRunFetch.view2 (fe : List FeEnt) (a1 a2 : Int) (lo hi : BitVec 16)
+    (h : fe.map PinCycRunFetch.feView = [⟨a1, 2, lo⟩, ⟨a2, 2, hi⟩]) :
+    fe = [⟨a1, 2, lo⟩, ⟨a2, 2, hi⟩] := by
+  rcases fe with _ | ⟨e, _ | ⟨e', _ | ⟨e'', fe⟩⟩⟩
+  · simp at h
+  · simp at h
+  · simp only [List.map_cons, List.map_nil, List.cons.injEq, and_true] at h
+    rw [PinCycRunFetch.feViewEq e a1 2 lo h.1, PinCycRunFetch.feViewEq e' a2 2 hi h.2]
+  · simp at h
+
+theorem PinCycRunFetch.logAt (A : Int → BitVec 8 → Prop) (pc : Int) (fe : List FeEnt) (k : Nat)
+    (e : FeEnt) (hl : PinCycRunFetch.logOk A (kAa pc) fe) (he : fe[k]? = some e) :
+    e.a = pc + 2 * (k : Int) := (hl k e he).1
+
+set_option maxHeartbeats 4000000 in
+/-- The value post at `pc`: W5's shape over the log, with the oracle's addresses, is the arm
+`fetchShapeOk pc` names. -/
+theorem PinCycRunFetch.shapeOk (A : Int → BitVec 8 → Prop) (pc : Int) (fr : FetchResult)
+    (fe : List FeEnt) (hv : fetchPost [] fr (fe.map PinCycRunFetch.feView))
+    (hok : PinCycRunFp.PinCycRunFetch.frOk fr) (hl : PinCycRunFetch.logOk A (kAa pc) fe) :
+    fetchShapeOk pc fr fe := by
+  cases fr with
+  | F_Base w =>
+    obtain ⟨sh, hsh, hann⟩ := hv
+    rw [List.nil_append] at hsh
+    cases sh with
+    | s4 a v =>
+      simp only [FetchShape.ann] at hann
+      rcases hann with ⟨h, hr⟩ | ⟨h, _⟩
+      · obtain rfl : w = v := eq_of_heq (Sigma.mk.inj h).2
+        have hfe := PinCycRunFetch.view1 fe a 4 w hsh
+        have ha := PinCycRunFetch.logAt A pc fe 0 _ hl (by rw [hfe]; rfl)
+        obtain rfl : a = pc := by simpa using ha
+        exact Or.inl ⟨hfe, hr⟩
+      · exact absurd (Sigma.mk.inj h).1 (by decide)
+    | s2 a v =>
+      simp only [FetchShape.ann] at hann
+      exact absurd (Sigma.mk.inj hann.1).1 (by decide)
+    | s22 a1 a2 lo hi =>
+      simp only [FetchShape.ann] at hann
+      obtain ⟨h, hr⟩ := hann
+      obtain rfl : w = hi ++ lo := eq_of_heq (Sigma.mk.inj h).2
+      have hfe := PinCycRunFetch.view2 fe a1 a2 lo hi hsh
+      have h1 := PinCycRunFetch.logAt A pc fe 0 _ hl (by rw [hfe]; rfl)
+      have h2 := PinCycRunFetch.logAt A pc fe 1 _ hl (by rw [hfe]; rfl)
+      obtain rfl : a1 = pc := by simpa using h1
+      obtain rfl : a2 = a1 + 2 := by simpa using h2
+      exact Or.inr ⟨lo, hi, hfe, rfl, hr⟩
+  | F_RVC h =>
+    obtain ⟨sh, hsh, hann⟩ := hv
+    rw [List.nil_append] at hsh
+    cases sh with
+    | s4 a v =>
+      simp only [FetchShape.ann] at hann
+      rcases hann with ⟨h', _⟩ | ⟨h', hr⟩
+      · exact absurd (Sigma.mk.inj h').1 (by decide)
+      · obtain rfl : h = Sail.BitVec.extractLsb v 15 0 := eq_of_heq (Sigma.mk.inj h').2
+        have hfe := PinCycRunFetch.view1 fe a 4 v hsh
+        have ha := PinCycRunFetch.logAt A pc fe 0 _ hl (by rw [hfe]; rfl)
+        obtain rfl : a = pc := by simpa using ha
+        exact Or.inl ⟨v, hfe, rfl, hr⟩
+    | s2 a v =>
+      simp only [FetchShape.ann] at hann
+      obtain ⟨h', hr⟩ := hann
+      obtain rfl : h = v := eq_of_heq (Sigma.mk.inj h').2
+      have hfe := PinCycRunFetch.view1 fe a 2 h hsh
+      have ha := PinCycRunFetch.logAt A pc fe 0 _ hl (by rw [hfe]; rfl)
+      obtain rfl : a = pc := by simpa using ha
+      exact Or.inr ⟨hfe, hr⟩
+    | s22 a1 a2 lo hi =>
+      simp only [FetchShape.ann] at hann
+      exact absurd (Sigma.mk.inj hann.1).1 (by decide)
+  | F_Error e => trivial
+  | F_Ext_Error e => exact hok.elim
+
+/-- **r1 AT THE CYCLE, DISCHARGED** (header): `fetchCyR1 pc` holds at every `pc`, from W5's
+`faFetch` and the frame footprint `pfFetch`. -/
+theorem PinCycRunFetch.fetchCyR1Of (pc : Int) : fetchCyR1 pc := by
+  intro T st hfe _ _ _ hrb hro
+  have hS : ∀ r, cyS r = true → pfProt r = true := by
+    intro r hr
+    simp only [cyS, Bool.or_eq_true, decide_eq_true_eq] at hr
+    rcases hr with rfl | rfl <;> rfl
+  have hv : st.fe.map PinCycRunFetch.feView = [] := by rw [hfe]; rfl
+  refine PinCycRunFetch.cyOfFaPf kA (kAa pc) cyS T hS (fetchPost []) _ _ (fetch ()) st
+    (hv ▸ faFetch (Ann := fun _ _ _ => False) []) PinCycRunFp.PinCycRunFetch.pfFetch hrb
+    (by rw [hro]; rfl) (by rw [hro]; rfl) ?_
+  intro fr st' h1 h2 h3
+  obtain ⟨hp, hrb', han, hro', hn, hok, hlog⟩ := h3
+  have hl : PinCycRunFetch.logOk kA (kAa pc) st'.fe :=
+    hlog (by rw [hfe]; intro k e he; simp at he)
+  refine ⟨hp, hrb', han, hro', hn, hok, ?_, PinCycRunFetch.shapeOk kA pc fr st'.fe h1 h2 hl⟩
+  intro e he j hj
+  obtain ⟨k, hk⟩ := List.getElem?_of_mem he
+  exact (hl k e hk).2 j hj
+
+
+
+
+open KernelPinsDef PinWalkTab
+open WeakRvwmoPinBridge3 (preach)
+open WeakRvwmoPinBridge4 (walkOwn)
+
+/-- **`cycRun` FROM `hartConf`, r1 discharged** (header): `cycRunOfHartConfE` with
+`fetchCyR1Of`; the premises left are the run obligations `fetchOkR2` (r2) / `dataOkR` /
+`excRetR` and the walk start. -/
+theorem cycRunOfHartConfF (G : Gexec) (i : Nat) (row : List Lbl) (p0 : Pexv6) (dv : Nat → Efab)
+    (em : Hemission) (pcL : Int) (w : Pin) (own : Bool)
+    (hcf : hartConf i row p0 dv em) (hm : (pcL, w) ∈ pinsW9a) (hw : walkOwn w = some own)
+    (hft : kFetchText em)
+    (hfetch : ∀ s n, preach own (pinStart pcL) s n → fetchOkR2 p0 (dv 0) em s.psPc)
+    (hdata : ∀ s n, preach own (pinStart pcL) s n → dataOkR p0 (dv 0) em s.psPc)
+    (hexc : ∀ s n, preach own (pinStart pcL) s n → excRetR G i p0 (dv 0) em s.psPc)
+    (base rest : List Eitem) (hes : em.emItems = base ++ rest)
+    (hstart : ∀ p d, pevrun (base.map Prod.fst) p0 (dv 0) p d →
+      ∃ (cpu : CPU) (rs : RegFile) (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch),
+        p = .PHart cpu (.pure ()) rs fn ib ∧ kInv (pinStart pcL).psPc rs) :
+    ∃ (mid rest' : List Eitem) (s : PState) (n : Nat) (p' : Pexv6) (d' : Efab),
+      rest = mid ++ rest' ∧ cycRun G i em own base (pinStart pcL) mid s ∧
+      preach own (pinStart pcL) s n ∧ walkBd p0 (dv 0) em (base ++ mid) s.psPc p' d' ∧
+      cycStop G i p0 (dv 0) em own (base ++ mid) s rest' :=
+  cycRunOfHartConfE G i row p0 dv em pcL w own hcf hm hw hft
+    (fun _ _ _ _ _ _ => PinCycRunFetch.fetchCyR1Of _) hfetch hdata hexc base rest hes hstart
 
 end PinCycRun
 
