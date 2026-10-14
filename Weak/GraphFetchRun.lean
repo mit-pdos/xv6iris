@@ -13,7 +13,12 @@ PLAN [rev 50]", paragraph "G6-3 = W11 (iii)", layer L3).  Lean-only, no Rocq twi
       at the fabric `fab ∘ dcnt GF'` of the normalized hull, the trace `linCand`, the hull's rows;
       `hullRunOfKillIOZ`: under `cycleKillIOZ` every proper hull carrying the bundle runs.
   §3  `cstOkZ`/`segStepZ`/`segsRunZ` (`WeakRvwmoCert4` §4's twins: the threaded state's supply is
-      M2's conjunct) with `segsRunZOk`/`segsRunZStart`/`segsRunZPrefix`.
+      M2's conjunct) with `segsRunZOk`/`segsRunZStart`/`segsRunZPrefix`.  **W13 (R′) [OWN.88]**:
+      `cstOkZ`'s constant-fabric END clause `cstDv (cdEnd cstC) = d0` is RELAXED to the BOOT
+      clause `cstDv 0 = d0` — the fabric may move along the run (device-active segments); the
+      constant-fabric state is kept as `GraphFetchRun.cstOkZFix` (the old end clause on top), with
+      `GraphFetchRun.cstOkZFixStep` (a segment that leaves the end fabric where it was — e.g. one
+      without device events — stays on it) and `GraphFetchRun.cstOkZFixOfRunDataZ`.
 
 **Deviations.**  (1) FILE PLACEMENT (`GraphFetchBlocks` deviation 1).  (2) `RunDataZ.rdProg` existentially
 quantifies M2's `itvOf`/`fiOf` (M2 keeps them as free parameters [R30.1]; a run datum names
@@ -116,7 +121,9 @@ theorem hullRunOfKillIOZ (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab)
 
 /-! # 3. The cycle iteration at the unpinned supply -/
 
-/-- `cstOk`'s twin: the threaded candidate is supplied by M2's conjunct. -/
+/-- `cstOk`'s twin: the threaded candidate is supplied by M2's conjunct.  W13 (R′): the fabric
+STARTS at the boot fabric `d0` and may MOVE along the run (no end clause; the constant-fabric
+state is `GraphFetchRun.cstOkZFix`). -/
 def cstOkZ (d0 : Efab) (St : CycState) : Prop :=
   srvwmoConsistent St.cstC ∧
   (∃ (itvOf : Nat → Nat → Nat) (fiOf : Nat → Nat → Bool),
@@ -124,7 +131,12 @@ def cstOkZ (d0 : Efab) (St : CycState) : Prop :=
     execProgOk'STC pstepEv pclsEv PfRunUnpinned.fokTriv cohSrc
       (PfRunUnpinned.fcutEM2 cohSrc (candExec St.cstC) itvOf fiOf) St.cstPst St.cstDv
       (candExec St.cstC)) ∧
-  St.cstDv (cdEnd St.cstC) = d0
+  St.cstDv 0 = d0
+
+/-- The CONSTANT-FABRIC threaded state (the pre-W13 (R′) end clause, kept): the fabric also ENDS
+at `d0`. -/
+def GraphFetchRun.cstOkZFix (d0 : Efab) (St : CycState) : Prop :=
+  cstOkZ d0 St ∧ St.cstDv (cdEnd St.cstC) = d0
 
 /-- `segStep`'s twin. -/
 def segStepZ (d0 : Efab) (o : Segout) (St St' : CycState) : Prop :=
@@ -164,11 +176,24 @@ theorem segsRunZPrefix (d0 : Efab) (l : List Segout) (St St' : CycState) :
     obtain ⟨ext, he⟩ := ih
     exact ⟨o.soTr ++ ext, by rw [he, hst.2.2.2.1, List.append_assoc]⟩
 
-/-- A run datum whose fabric ends at `d0` is a valid threaded state. -/
+/-- A run datum is a valid threaded state (W13 (R′): at any end fabric). -/
 theorem GraphFetchRun.cstOkZOfRunDataZ (boot : Nat → Pexv6) (d0 : Efab) (N : Nat) (G : Gexec)
     (c : Cand) (pst : Nat → List Pexv6) (dv : Nat → Efab) :
-    RunDataZ boot d0 N G c pst dv → dv (cdEnd c) = d0 → cstOkZ d0 ⟨c, pst, dv⟩ :=
-  fun h he => ⟨h.rdCons, h.rdProg, he⟩
+    RunDataZ boot d0 N G c pst dv → cstOkZ d0 ⟨c, pst, dv⟩ :=
+  fun h => ⟨h.rdCons, h.rdProg, h.rdDv0⟩
+
+/-- A run datum whose fabric ends at `d0` is a constant-fabric threaded state. -/
+theorem GraphFetchRun.cstOkZFixOfRunDataZ (boot : Nat → Pexv6) (d0 : Efab) (N : Nat) (G : Gexec)
+    (c : Cand) (pst : Nat → List Pexv6) (dv : Nat → Efab) :
+    RunDataZ boot d0 N G c pst dv → dv (cdEnd c) = d0 → GraphFetchRun.cstOkZFix d0 ⟨c, pst, dv⟩ :=
+  fun h he => ⟨GraphFetchRun.cstOkZOfRunDataZ boot d0 N G c pst dv h, he⟩
+
+/-- THE CONSTANT-FABRIC LEMMA: a segment that leaves the end fabric where it was (e.g. one without
+device events) keeps a constant-fabric state constant-fabric. -/
+theorem GraphFetchRun.cstOkZFixStep (d0 : Efab) (o : Segout) (St St' : CycState) :
+    segStepZ d0 o St St' → GraphFetchRun.cstOkZFix d0 St →
+    St'.cstDv (cdEnd St'.cstC) = St.cstDv (cdEnd St.cstC) → GraphFetchRun.cstOkZFix d0 St' :=
+  fun hst hfix he => ⟨hst.2.1, he.trans hfix.2⟩
 
 /-! # 4. The erased run (L4 enabler: `runErased`'s twin) -/
 

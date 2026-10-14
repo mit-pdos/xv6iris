@@ -674,6 +674,7 @@ import Weak.GraphFetchLinInd
 import Weak.GraphFetchBlocks
 import Weak.GraphFetchHullZ
 import Weak.GraphFetchSail
+import Weak.GraphFetchWalkZ
 import Weak.GraphFetchAncSupply
 import Weak.GraphFetchAnc
 
