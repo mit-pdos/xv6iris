@@ -668,6 +668,8 @@ import Weak.PinWalkTab
 import Weak.WeakRvwmoPinBridge5
 import Weak.WeakRvwmoPinBridge6
 import Weak.PinFetchVal
+import Weak.PinFetchPaFp
+import Weak.PinFetchPaReg
 import Weak.PinCycRunExec
 import Weak.PinCycRunTab
 import Weak.PinCycRunReg
