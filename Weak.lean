@@ -701,6 +701,7 @@ import Weak.GraphFetchHullZ
 import Weak.GraphFetchSail
 import Weak.GraphFetchWalkZ
 import Weak.GraphFetchN2
+import Weak.CertZ8
 import Weak.CertZ7
 import Weak.CertZ6
 import Weak.CertZ5
