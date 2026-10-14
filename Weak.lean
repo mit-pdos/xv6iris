@@ -660,5 +660,6 @@ import Weak.CatReroute
 import Weak.PinHoldingCtrl
 import Weak.PinTrapSites
 import Weak.PinTrap
+import Weak.WeakRvwmoPinBridge4
 
 /-! # Weak — the weak-memory (RVWMO) development ported from Rocq (see notes/weak-port-map.md). -/
