@@ -688,6 +688,13 @@ import Weak.PinDataOkPmp
 import Weak.PinDataOkExec
 import Weak.PinDataOkAddr
 import Weak.PinDataOk
+import Weak.PinDataOkSail
+import Weak.PinDataOkRun
+import Weak.PinDataOkReg
+import Weak.PinDataOkIntr
+import Weak.PinDataOkFp
+import Weak.PinDataOkCy
+import Weak.PinDataOkAsm
 import Weak.PinCycRunExec
 import Weak.PinCycRunFetch
 import Weak.PinCycRunExec3
