@@ -771,6 +771,8 @@ import Weak.SilCand
 import Weak.SilCandLit
 import Weak.SilMember
 import Weak.SilLang
+import Weak.SilPf
+import Weak.SilEpf
 import Weak.CertZ34
 import Weak.CertZ33
 import Weak.CertZ24
