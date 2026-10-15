@@ -108,4 +108,45 @@ theorem CapPcLog.hartStepPc (cpu : CPU) (m : SailM Unit) (σ : MState) (m' : Sai
     · exact Or.inr ⟨n, va, req, w, h⟩
   | .impure (.ok o) k, Or.inr ⟨hb, _⟩ => exact Or.inl (CapPcLog.blockedPc cpu o σ σ' hb)
 
+/-- **A device primitive keeps the pc log, or is a DMA write** (`MachCSL.devOpStep`). -/
+theorem CapPcLog.devOpStepPc (gen : Nat) (d : DevId) (o : DevOp (DevSt d) (DevTask d)) (σ : MState)
+    (v : o.ret) (σ' : MState) (obs : List Obs) (efs : List Expr) (h : devOpStep gen d o σ v σ' obs efs) :
+    CapPcLog.keepsPc σ σ' ∨ ∃ (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (s' : DevSt d),
+      σ' = (σ.storeDma pa n w).setDev d s' := by
+  cases o with
+  | step g => obtain ⟨s', os, -, -, rfl, -⟩ := h; exact Or.inl ⟨rfl, rfl⟩
+  | get => obtain ⟨-, rfl, -⟩ := h; exact Or.inl ⟨rfl, rfl⟩
+  | choose => obtain ⟨rfl, -⟩ := h; exact Or.inl ⟨rfl, rfl⟩
+  | dmaRead pa n => obtain ⟨-, rfl, -⟩ := h; exact Or.inl ⟨rfl, rfl⟩
+  | dmaWrite g pa n w =>
+    obtain ⟨-, -, ⟨s', -, -, -, -, rfl⟩ | ⟨-, rfl⟩⟩ := h
+    · exact Or.inr ⟨pa, n, w, s', rfl⟩
+    · exact Or.inl ⟨rfl, rfl⟩
+  | sample src => obtain ⟨-, rfl, -⟩ := h; exact Or.inl ⟨rfl, rfl⟩
+  | setPin cpu mmode b =>
+    obtain ⟨-, -, rfl⟩ := h
+    cases mmode <;> exact Or.inl ⟨rfl, rfl⟩
+  | fork t => obtain ⟨-, -, rfl, -⟩ := h; exact Or.inl ⟨rfl, rfl⟩
+  | join tid => obtain ⟨-, rfl, -⟩ := h; exact Or.inl ⟨rfl, rfl⟩
+
+/-- **A device step keeps the pc log, or is a DMA write** (`MachCSL.devStep`). -/
+theorem CapPcLog.devStepPc (gen : Nat) (d : DevId) (tid : TaskId) (m : DevProg d) (σ : MState)
+    (obs : List Obs) (m' : DevProg d) (σ' : MState) (efs : List Expr) (h : devStep gen d tid m σ obs m' σ' efs) :
+    CapPcLog.keepsPc σ σ' ∨ ∃ (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (s' : DevSt d),
+      σ' = (σ.storeDma pa n w).setDev d s' := by
+  unfold devStep at h
+  match m, h with
+  | .pure _, ⟨_, _, Or.inl ⟨_, _, h⟩⟩ => subst h; exact Or.inl ⟨rfl, rfl⟩
+  | .pure _, ⟨_, _, Or.inr ⟨_, _, h⟩⟩ =>
+    subst h; split <;> exact Or.inl ⟨rfl, rfl⟩
+  | .op o k, Or.inl ⟨v, _, hv⟩ => exact CapPcLog.devOpStepPc gen d o σ v σ' obs efs hv
+  | .op o k, Or.inr ⟨_, _, h, _⟩ => subst h; exact Or.inl ⟨rfl, rfl⟩
+
+/-- The pc log after a DMA write and a device move. -/
+theorem CapPcLog.pcLogOfDmaDev (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (d : DevId)
+    (s' : DevSt d) :
+    RelSiteProvExp.pcLogOf ((σ.storeDma pa n w).setDev d s') =
+      if n = 0 then RelSiteProvExp.pcLogOf σ else RelSiteProvExp.pcLogOf σ ++ [-1] :=
+  CapPcLog.pcLogOfDma σ pa n w
+
 end Weak
