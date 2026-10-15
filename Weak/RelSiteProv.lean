@@ -34,7 +34,9 @@ open LeanRV64D
 open Wlabel
 
 /-- **(a1) NAMED — the MachCSL provenance export.**  `pl` is the issuing-pc log (one entry per
-store timestamp, aligned with `σ.log`); every entry that is a sync path's first move
+store timestamp, aligned with `σ.log`: the issuing hart's `PC` for a PLAIN store, `-1` for an
+exclusive / AMO write — including the page walker's A/D write-back — and for the disk; see
+`RelSiteProvPc.recPc`); every entry that is a sync path's first move
 (`RvwmoXv6Adequacy.relEntAt`) was issued at a pc in `releasePcs` (`release+0x1a`,
 `main+0xb0`). -/
 def RelSiteProv.relProvExport (σ : MState) (pl : List Int) : Prop :=

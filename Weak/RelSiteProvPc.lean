@@ -48,9 +48,18 @@ def pcOfSt : Pexv6 → Int
   | .PHart _ _ rs _ _ => ((rs .PC).toNat : Int)
   | .PDisk _ => -1
 
-/-- The pc of a recorded step, if it appends a message. -/
+/-- The PLAIN store label (`LStore`): the only appending label a release site issues. -/
+def lbStore : Wlabel → Bool
+  | .LStore .. => true
+  | _ => false
+
+/-- The pc of a recorded step, if it appends a message.  Only a PLAIN store (`LStore`) is stamped
+with its agent's pc; an exclusive or AMO write (`LExStore` / `LRmw`, including the page walker's
+A/D write-back, which Sail issues while the hart's `PC` is still the faulting-free access's pc,
+e.g. `release+0x1a`) is stamped `-1`, never a release pc. -/
 def recPc (x : PfRec) : Option Int :=
-  if lbAppends x.lb then some ((x.pre.pcAgs[x.ag]?).elim (-1) (fun ag => pcOfSt ag.paSt))
+  if lbAppends x.lb then
+    some (if lbStore x.lb then (x.pre.pcAgs[x.ag]?).elim (-1) (fun ag => pcOfSt ag.paSt) else -1)
   else none
 
 /-- **The issuing-pc log**: one entry per appended message, in log order. -/
@@ -118,10 +127,10 @@ theorem contRLogLength {fok : Image → List Wmsg → Nat → Int → List (Nat 
 
 /-! ## 2. (a3) as a per-step obligation -/
 
-/-- **(a3)'s STEP OBLIGATION**: every recorded appending step whose agent's issuing pc is a
+/-- **(a3)'s STEP OBLIGATION**: every recorded PLAIN store whose agent's issuing pc is a
 release pc is stamped `.WCrel` by the instance's class function at its pre-state. -/
 def relStepWCrel (r : List PfRec) : Prop :=
-  ∀ x, x ∈ r → lbAppends x.lb = true → ∀ ag, x.pre.pcAgs[x.ag]? = some ag →
+  ∀ x, x ∈ r → lbStore x.lb = true → ∀ ag, x.pre.pcAgs[x.ag]? = some ag →
     pcOfSt ag.paSt ∈ releasePcs → pclsEv ag.paSt x.lb ag.paWs = .WCrel
 
 theorem negOneNotRelease : (-1 : Int) ∉ releasePcs := by
@@ -150,9 +159,13 @@ theorem relPcWCrelOff {fok : Image → List Wmsg → Nat → Int → List (Nat �
       have hpre := contRPrefix hr
       cases q with
       | zero =>
-        have hpc : pc = (c.pcAgs[i]?).elim (-1) (fun ag => pcOfSt ag.paSt) := by
+        have hpc : pc = if lbStore l then (c.pcAgs[i]?).elim (-1) (fun ag => pcOfSt ag.paSt)
+            else -1 := by
           simpa [recPc, ha] using hp.symm
-        rw [hlk] at hpc
+        cases hst : lbStore l with
+        | false => simp [hst] at hpc; exact absurd (hpc ▸ hrel) negOneNotRelease
+        | true =>
+        rw [hst, if_pos rfl, hlk] at hpc
         simp only [Option.elim] at hpc
         have hm' : cN.pcLog[c.pcLog.length]? = some m := by
           rw [he] at hpre
@@ -162,7 +175,7 @@ theorem relPcWCrelOff {fok : Image → List Wmsg → Nat → Int → List (Nat �
         rw [Nat.add_zero, hm'] at hm
         cases hm
         rw [hk]
-        exact hob ⟨c, i, l, k⟩ (List.mem_cons_self) ha ag hlk (hpc ▸ hrel)
+        exact hob ⟨c, i, l, k⟩ (List.mem_cons_self) hst ag hlk (hpc ▸ hrel)
       | succ q =>
         have hp' : (recPcLog r)[q]? = some pc := by simpa [recPc, ha] using hp
         have hlen : c'.pcLog.length = c.pcLog.length + 1 := by rw [he]; simp
@@ -215,7 +228,7 @@ theorem simRunAt {fok : Image → List Wmsg → Nat → Int → List (Nat × Bit
       exact ih hR1 (mrunTrans hreach hm1) (pfRunST.snoc c c' st i l hrun hs hf hfT)
         (by simpa using hadj') x hx
 
-/-- **(a2), composed**: in every run W4 simulates from boot, each recorded store of hart `cpu`
+/-- **(a2), composed**: in every run W4 simulates from boot, each recorded PLAIN store of hart `cpu`
 has a reachable MachCSL configuration, related to the store's pre-configuration, whose hart
 `cpu` has `PC` equal to the store's entry in the issuing-pc log. -/
 theorem recPcLockstep (fok : Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop)
@@ -227,18 +240,20 @@ theorem recPcLockstep (fok : Image → List Wmsg → Nat → Int → List (Nat �
     (r : List PfRec) (cN : Wpcfg Pexv6 Efab)
     (hr : contRC fok fcutT (wpInit (imgZ σ0.wgimg) (efInit σ0.wgdev) (epsInit σ0)) [] r cN)
     (hadj : pairAdjacent (recLabels r)) :
-    ∀ x, x ∈ r → ∀ (cpu : CPU), x.ag = cpu.val → lbAppends x.lb = true →
+    ∀ x, x ∈ r → ∀ (cpu : CPU), x.ag = cpu.val → lbStore x.lb = true →
       ∃ (st' : List (Nat × Wlabel)) (n' : Nat) (κ' : List Obs) (t' : List Expr) (g' : GState),
         MRun n' ([Expr.power], g0) κ' (t', g') ∧ SimRel x.pre st' t' g' ∧
         recPc x = some (((g'.m.regs cpu) .PC).toNat : Int) := by
-  intro x hx cpu hag ha
+  intro x hx cpu hag hst
+  have ha : lbAppends x.lb = true := by
+    revert hst; cases x.lb <;> simp [lbStore, lbAppends]
   have hboot := powerOnRun g0 σ0 ds hb hg0 hp0 hgd
   have hR0 := simRelBoot σ0 ds hb hds
   obtain ⟨st', n', κ', t', g', hm, hR⟩ :=
     simRunAt hH hr hR0 hboot pfRunST.nil (by simpa using hadj) x hx
   obtain ⟨ag, hlk, hpc⟩ := simRelPc hR cpu
   refine ⟨st', n', κ', t', g', hm, hR, ?_⟩
-  simp only [recPc, ha, if_true, hag, hlk, Option.elim, hpc]
+  simp only [recPc, ha, hst, if_true, hag, hlk, Option.elim, hpc]
 
 end RelSiteProvPc
 
