@@ -375,4 +375,47 @@ theorem CapPcLog.mrunHartN {n : Nat} {ρ ρ' : List Expr × GState} {κ : List O
       exact CapPcLog.stepHartN hs hp cpu
     · simp only at hg hg2 hm; omega
 
+/-- One hart thread of each hart in the boot fork. -/
+theorem CapPcLog.hartNFork (gen : Nat) (cpu : CPU) : CapPcLog.hartN cpu (Expr.power :: powerFork gen) = 1 := by
+  have h1 : CapPcLog.hartN cpu (cpus.map (Loop gen)) = 1 := by
+    have : (List.filter (CapPcLog.isHartOf cpu) (cpus.map (Loop gen))) =
+        (cpus.filter (fun c => decide (c = cpu))).map (Loop gen) := by
+      rw [List.filter_map]; congr 1
+    simp only [CapPcLog.hartN, this, List.length_map]
+    clear this
+    revert cpu; decide
+  have h2 : CapPcLog.hartN cpu (DevId.all.map (DevLoop gen)) = 0 := by
+    simp [CapPcLog.hartN, List.filter_map, Function.comp_def, DevLoop, CapPcLog.isHartOf]
+  rw [CapPcLog.hartNCons, powerFork, CapPcLog.hartNApp, h1, h2]
+  rfl
+
+/-- A pool step, inverted. -/
+theorem CapPcLog.stepInv {ρ ρ' : List Expr × GState} {obs : List Obs}
+    (h : Iris.ProgramLogic.Language.Step ρ obs ρ') :
+    ∃ (e : Expr) (σ : GState) (e' : Expr) (σ' : GState) (eₜ t₁ t₂ : List Expr),
+      ρ = (t₁ ++ e :: t₂, σ) ∧ ρ' = (t₁ ++ e' :: t₂ ++ eₜ, σ') ∧ primStep (e, σ) obs (e', σ', eₜ) := by
+  cases h with
+  | @atomic e σ _ e' σ' eₜ H t₁ t₂ => exact ⟨e, σ, e', σ', eₜ, t₁, t₂, rfl, rfl, H⟩
+
+/-- **One thread per hart along a run from power-on** that ends powered on in generation 0. -/
+theorem CapPcLog.bootHartN {n : Nat} {g0 g : GState} {κ : List Obs} {t : List Expr}
+    (h : MachOfPf.MRun n ([Expr.power], g0) κ (t, g)) (hp0 : g0.pow = false) (hg0 : g0.gen = 0)
+    (hp : g.pow = true) (hg : g.gen = 0) (cpu : CPU) : CapPcLog.hartN cpu t = 1 := by
+  cases h with
+  | refl => rw [hp0] at hp; cases hp
+  | @cons _ _ ρ₂ _ _ _ hs hr =>
+    obtain ⟨e, σ, e', σ', eₜ, t₁, t₂, h1, h2, H⟩ := CapPcLog.stepInv hs
+    obtain ⟨hl, rfl⟩ := Prod.mk.inj h1
+    obtain ⟨rfl, rfl, rfl⟩ : t₁ = [] ∧ e = Expr.power ∧ t₂ = [] := by
+      cases t₁ with
+      | nil => simp only [List.nil_append, List.cons.injEq] at hl; exact ⟨rfl, hl.1.symm, hl.2.symm⟩
+      | cons x t₁ => simp at hl
+    obtain ⟨rfl, ⟨hp', -⟩ | ⟨-, -, rfl, hb⟩⟩ := H
+    · rw [hp0] at hp'; cases hp'
+    · subst h2
+      have hN := CapPcLog.mrunHartN hr hb.2.1 (by simp only; rw [hg, hb.1, hg0]) cpu
+      simp only at hN
+      rw [hN]
+      simpa using CapPcLog.hartNFork g0.gen cpu
+
 end Weak
