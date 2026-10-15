@@ -8,7 +8,8 @@ files import Proof files).
 
 Whenever the power is on, the machine's memory obeys W8's export
 `AccessDiscipline.xv6AccessDisc` = `chainOkAt ∧ lockWordDiscAt ∧ cpuStaticAt
-∧ lkCpuReadAt ∧ pteDiscAt` (W8 (f2-ctx): three of §C W8's six conjuncts; W8
+∧ lkCpuReadAt ∧ pteDiscAt ∧ utextDiscAt ∧ uptDiscAt` (W8 (f3-utext) O1 + T4
+[OWN.89]; W8 (f2-ctx): three of §C W8's six conjuncts; W8
 (f3-hold) [OWN.64]; W8 (f3-racy) [OWN.63]; W8 (f3-pipelk) [OWN.65]; W8 (f3-ptek) [OWN.66]): every foreign hart entry a hart's coherence
 floor names is SYNC-CHAINED to it (release → acquire hops through the
 spinlocks' lock bytes -- static, or a pipe lock's live as of the acquire --, or the boot hop through `started`) unless its byte is

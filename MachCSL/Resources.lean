@@ -1787,6 +1787,57 @@ def uepHartAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (ksat : Option (Bit
   ∃ oe : Option UEp, ⌜uepLink ksat (σ.regs h Register.satp) (σ.regs h Register.cur_privilege) oe⌝ ∗
     uepCellsAt E σ h oe
 
+/-! ### The user tables as of now (W8 (f3-utext) [OWN.89], the export's O1/T4) -/
+
+/-- The doubleword at `a` as of now: every byte's latest entry is `v`'s. -/
+def curWordAt (m : FlatMem) (a : PAddr) (v : BitVec 64) : Prop :=
+  ∀ j, j < 8 → (m[a + BitVec.ofNat 64 j]?).bind Hist.top = some (nthByte (n := 8) v j)
+
+/-- `a` is a slot (one of the 512 doublewords) of the page at `p`. -/
+def uSlotOf (p a : PAddr) : Prop := ∃ i, i < 512 ∧ a = p + BitVec.ofNat 64 (8 * i)
+
+/-- **A slot a Sv39 walk reaches, as of now**, from the table at root `r`: the
+slot at `a` (value `v`) of the root page, or of a page a root-page pointer
+names, or of a page a pointer of such a page names (the values read as of
+now). -/
+def uSlotNow (m : FlatMem) (r : BitVec 44) (a : PAddr) (v : BitVec 64) : Prop :=
+  (uSlotOf (uepRootPA r) a ∧ curWordAt m a v) ∨
+  ∃ (a2 : PAddr) (v2 : BitVec 64) (p1 : PAddr), uSlotOf (uepRootPA r) a2 ∧ curWordAt m a2 v2 ∧ ptPtrTo v2 p1 ∧
+    ((uSlotOf p1 a ∧ curWordAt m a v) ∨
+      ∃ (a1 : PAddr) (v1 : BitVec 64) (p0 : PAddr), uSlotOf p1 a1 ∧ curWordAt m a1 v1 ∧ ptPtrTo v1 p0 ∧
+        uSlotOf p0 a ∧ curWordAt m a v)
+
+/-- **O1, the user code** (W8 (f3-utext) [OWN.89] (W-R), [R34.1]): while hart
+`h` is in user mode, every history entry on a byte of a page a user TEXT leaf
+(`U`, `X`, not `W`) of the table its `satp` names maps is at or below `h`'s
+instruction view (raised only at `fence.i`). -/
+def uTextDiscAt (σ : MState) : Prop :=
+  ∀ (h : CPU) (r : BitVec 44), σ.regs h Register.cur_privilege = Privilege.User →
+    satpTable (σ.regs h Register.satp) = some r →
+    ∀ (a : PAddr) (v : BitVec 64), uSlotNow σ.mem r a v → uepTextB v = true →
+      ∀ j, j < 4096 → ∀ H : Hist, σ.mem[uepLeafPA v + BitVec.ofNat 64 j]? = some H → ∀ e ∈ H, e.t ≤ σ.itv h
+
+/-- **One user-table slot's discipline after `T`**: every entry after `T` on a
+byte of the 8-byte slot at `a` is a HART's, and one byte of a WHOLE-doubleword
+store (same position, same author, every byte) of an `A`/`D` variant of `c`. -/
+def uSlotDiscAfter (m : FlatMem) (T : Nat) (a : PAddr) (c : BitVec 64) : Prop :=
+  ∀ (j : Nat) (H : Hist) (e : HEnt), j < 8 → m[a + BitVec.ofNat 64 j]? = some H → e ∈ H → T < e.t →
+    e.tid < NCPU ∧ ∃ v : BitVec 64, uepAD c v ∧ e.v = nthByte (n := 8) v j ∧
+      ∀ j', j' < 8 → ∃ H', m[a + BitVec.ofNat 64 j']? = some H' ∧
+        (⟨e.t, e.tid, nthByte (n := 8) v j'⟩ : HEnt) ∈ H'
+
+/-- **T4, the user page tables** (W8 (f3-utext) [OWN.87], [OWN.89] (W-R)):
+while hart `h`'s `satp` names a USER table (outside machine mode, a root other
+than the one a registered root word of `rs` holds as of now -- the kernel's),
+every slot of it a walk reaches as of now is written after `σ.itv h` only by
+harts, whole, with `A`/`D` variants of its value as of `σ.itv h`. -/
+def uPtDiscAt (rs : List RsvRegion) (σ : MState) : Prop :=
+  ∀ (h : CPU) (r : BitVec 44), σ.regs h Register.cur_privilege ≠ Privilege.Machine →
+    satpTable (σ.regs h Register.satp) = some r →
+    (∀ ra : PAddr, (⟨ra, .roots 1 8⟩ : RsvRegion) ∈ rs → ¬ curWordAt σ.mem ra (uepRootPA r)) →
+    ∀ (a : PAddr) (v c : BitVec 64), uSlotNow σ.mem r a v → wordAsOf σ.mem a (σ.itv h) c →
+      uSlotDiscAfter σ.mem (σ.itv h) a c
+
 /-- **The user-epoch conjunct** of era `E`'s interpretation. -/
 def uepModelAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) : IProp GF := iprop%
   ∃ ksat : Option (BitVec 44), uepKsatAt E ksat ∗ [∗list] h ∈ cpus, uepHartAt E σ ksat h

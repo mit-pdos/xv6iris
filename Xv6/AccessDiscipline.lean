@@ -1,11 +1,15 @@
 /-
 **THE ACCESS DISCIPLINE** (weak-allocproc plan §C W8's skeleton, [R25.1],
 [R34.1]; W8 (f2-ctx) S4; W8 (f3-hold) [OWN.64]; W8 (f3-racy) [OWN.63]; W8
-(f3-pipelk) [OWN.65]; W8 (f3-ptek) [OWN.66]): W8's export `xv6AccessDisc`,
-`chainOkAt ∧ lockWordDiscAt ∧ cpuStaticAt ∧ lkCpuReadAt ∧ pteDiscAt` -- FIVE
-conjuncts: THREE of the skeleton's six (W8 (f2-ctx)), the ruled `holding()`
-clause `lkCpuReadAt` (W8 (f3-hold)) and the KERNEL half of the skeleton's
-A/D write-back clause `pteDiscAt` (W8 (f3-ptek)); `chainOkAt` carries the
+(f3-pipelk) [OWN.65]; W8 (f3-ptek) [OWN.66]; W8 (f3-utext) [OWN.89]): W8's
+export `xv6AccessDisc`, `chainOkAt ∧ lockWordDiscAt ∧ cpuStaticAt ∧ lkCpuReadAt
+∧ pteDiscAt ∧ utextDiscAt ∧ uptDiscAt` -- SEVEN conjuncts: THREE of the
+skeleton's six (W8 (f2-ctx)), the ruled `holding()` clause `lkCpuReadAt` (W8
+(f3-hold)), the KERNEL half of the skeleton's A/D write-back clause
+`pteDiscAt` (W8 (f3-ptek)), the user code clause `utextDiscAt` (W8
+(f3-utext), O1: every byte a user text leaf maps is at or below the hart's
+instruction view) and the USER tables' half of the A/D clause `uptDiscAt`
+(W8 (f3-utext) T4); `chainOkAt` carries the
 ruled `ip->ref` clause `racyValOk` (W8 (f3-racy)); `lockWordDiscAt` and
 `lkCpuReadAt` cover EVERY lock -- the static spinlocks and the live pipe
 locks (W8 (f3-pipelk)).
@@ -22,8 +26,9 @@ word accesses, coherence):
     hart observed on `ip->ref` is `≥ 1` (the caller holds its own
     reference).
 Each is stated as a VALUE clause of the export, NOT an exemption.  NOT exported here: the USER
-tables' half of the A/D write-back clause [R25.1], [OWN.66] (W8 (f3-pteu)),
-and W8 (f3-utext)'s `utextDiscAt` [R34.1]; `cpuProcDiscAt` is permanently
+tables' half of the A/D write-back clause as of the tables' creation
+[R25.1], [OWN.66] (W8 (f3-pteu) T1; T4, from userret's stamp on, IS exported:
+`uptDiscAt`); `cpuProcDiscAt` is permanently
 OUT of the export ([OWN.80]: W11-D needs no `kOwnerAt` uniqueness).  Later
 items only STRENGTHEN the conjunction.
 
@@ -191,6 +196,7 @@ exemption's dynamic arm) -- not by a dynamic registry in `reservedOk` (see
 import Xv6.KernelRsv
 import MachCSL.Adequacy
 import MachCSL.Lock
+import MachCSL.UEpochDisc
 
 namespace Xv6
 
@@ -575,6 +581,42 @@ theorem pteDiscAt_of (σ : MState) (hmm : mmOk σ) (hk : kptStateOk xv6Rsv σ) :
     simp only [hfz, Bool.false_eq_true, ↓reduceIte] at hc0
     exact ⟨htid, v, pteVariant_trans hc0 hv, hev, fun j' hj' => ⟨Hs j', hm j' hj', hall j' hj'⟩⟩
 
+/-- **`utextDiscAt`, the user code** (W8 (f3-utext) [OWN.89] (W-R), [R34.1],
+O1; `MachCSL.uTextDiscAt`): while hart `h` is in user mode, every history
+entry on a byte of a page that a user TEXT leaf (`U`, `X` set, `W` clear) of
+the table `h`'s `satp` names maps -- a slot a Sv39 walk reaches as of now from
+the root (`MachCSL.uSlotNow`) -- is at or below `σ.itv h`, the hart's
+instruction view (raised only at `fence.i`, `MachCSL.Lang`).  So every
+instruction byte user code can fetch is one its last `fence.i` covered.
+From the interpretation's user-epoch record (`MachCSL.uepModel_textDisc`):
+userret's `fence.i` stamps the text and the table and its `csrw satp` deposits
+a quarter of every byte (`Xv6.UEpochDeposit`), held until uservec's `csrw
+satp`.  Spec: Zifencei -- a hart's instruction fetches see the stores before
+its `fence.i` (Sail `Fetch.lean`, the model's `itv`); RVWMO orders nothing
+else for fetches.  FAITHFUL.  Deviations: the table is the one `satp` names
+(xv6: the running process's); a text leaf has `U` set (a `U = 0` page cannot be
+fetched from in user mode; the trampoline's is such a page). -/
+def utextDiscAt (σ : MState) : Prop := uTextDiscAt σ
+
+/-- **`uptDiscAt`, the user page tables** (W8 (f3-utext) [OWN.87], [OWN.89]
+(W-R), T4; `MachCSL.uPtDiscAt` at xv6's registry): while hart `h`'s `satp`
+names a USER table -- outside machine mode, a root other than the one
+`kernel_pagetable` (xv6's one registered root word) holds as of now -- every
+slot of it a Sv39 walk reaches as of now is written after `σ.itv h` only by
+HARTS (no DMA author), WHOLE (each entry one byte of a doubleword store at one
+position by one hart), with `A`/`D` variants (`MachCSL.pteAD`'s body) of its
+value as of `σ.itv h`: the walkers' write-backs, nothing else.  From the
+interpretation's user-epoch record (`MachCSL.uepModel_ptDisc`): the record's
+quarter of every slot carries `MachCSL.uslotHistOk` at the stamp `K ≤ itv h`,
+and `A`/`D` variance is an equivalence.  Spec: Sail's walker writes A/D as a
+whole-doubleword store (`MachCSL.PteClass`, the model's `update_PTE_Bits`
+write-back); RVWMO orders implicit page-table accesses only via
+`SFENCE.VMA`; Zifencei/PMAs silent.  FAITHFUL: a value fact of xv6's runs.
+Deviation: the stamp is userret's `fence.i` view; slots are those reached as
+of now (on xv6 runs the table's pointer slots do not change while the epoch is
+open). -/
+def uptDiscAt (σ : MState) : Prop := uPtDiscAt xv6Rsv σ
+
 /-- **W8's export** (W8 (f2-ctx): `chainOkAt ∧ lockWordDiscAt ∧ cpuStaticAt`,
 three of the skeleton's six; W8 (f3-hold) [OWN.64]: `lkCpuReadAt`; W8
 (f3-racy) [OWN.63]: `chainOkAt`'s `racyValOk` arm -- the two instances of ONE
@@ -582,10 +624,11 @@ benign-race class (unlocked reads of lock-protected words, harmless by a
 value argument); W8 (f3-pipelk) [OWN.65]: `lockWordDiscAt` and `lkCpuReadAt`
 over EVERY lock, the live pipe locks included; W8 (f3-ptek) [OWN.66]:
 `pteDiscAt`, the kernel page table's A/D discipline after the seal (the user
-tables' half is W8 (f3-pteu)'s, `utextDiscAt` W8 (f3-utext)'s; `cpuProcDiscAt`
-permanently dropped, [OWN.80]). -/
+tables' half is W8 (f3-pteu)'s; `cpuProcDiscAt` permanently dropped, [OWN.80]);
+W8 (f3-utext) [OWN.89]: `utextDiscAt`, the user code (O1), and `uptDiscAt`,
+the user page tables after the stamp (T4). -/
 def xv6AccessDisc (σ : MState) : Prop :=
-  chainOkAt σ ∧ lockWordDiscAt σ ∧ cpuStaticAt σ ∧ lkCpuReadAt σ ∧ pteDiscAt σ
+  chainOkAt σ ∧ lockWordDiscAt σ ∧ cpuStaticAt σ ∧ lkCpuReadAt σ ∧ pteDiscAt σ ∧ utextDiscAt σ ∧ uptDiscAt σ
 
 
 /-! ## The registration lemma -/
@@ -758,9 +801,9 @@ theorem lkCpuReadAt_of (σ : MState) (h : lockWordDiscAt σ) : lkCpuReadAt σ :=
 /-- **The export from the four pure facts** of the state interpretation. -/
 theorem accessDisc_of (σ : MState) (hmm : mmOk σ) (hr : rsvAllOk KernelRsv.static σ.mem)
     (h : loadsChained (xv6Env σ) (chainExAt xv6Rsv (slotWit xv6Rsv) σ.mem σ.top))
-    (hk : kptStateOk xv6Rsv σ) : xv6AccessDisc σ :=
+    (hk : kptStateOk xv6Rsv σ) (hu : uTextDiscAt σ) (hp : uPtDiscAt xv6Rsv σ) : xv6AccessDisc σ :=
   have hl := lockCpuDisc_of_rsvAllOk σ hr
-  ⟨chainOkAt_of σ hmm h, hl.1, hl.2, lkCpuReadAt_of σ hl.1, pteDiscAt_of σ hmm hk⟩
+  ⟨chainOkAt_of σ hmm h, hl.1, hl.2, lkCpuReadAt_of σ hl.1, pteDiscAt_of σ hmm hk, hu, hp⟩
 
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
 
@@ -779,7 +822,16 @@ theorem powerInterp_accessDisc (heq : MachFixedGS.rsvStatic (hlc := hlc) (GF := 
     intro h; cases h
   · iintro ⟨_, _, ⟨%R, _, _, %E, _, Hera⟩, _⟩
     unfold eraInterp memModelAt rsvModelAt chainModelAt
-    icases Hera with ⟨_, Hm, ⟨_, _, _, _, %hmm, ⟨%reg, _, %⟨hin, _, hok⟩, Hk⟩, _, %hch, _⟩, _⟩
+    icases Hera with ⟨_, Hm, Hmm, _, Huep⟩
+    ihave %hu := uepModel_textDisc E g.m $$ [Hm Hmm Huep]
+    · iframe Hm Huep
+      unfold memModelAt rsvModelAt chainModelAt
+      iexact Hmm
+    ihave %hpt := uepModel_ptDisc E g.m $$ [Hm Hmm Huep]
+    · iframe Hm Huep
+      unfold memModelAt rsvModelAt chainModelAt
+      iexact Hmm
+    icases Hmm with ⟨_, _, _, _, %hmm, ⟨%reg, _, %⟨hin, _, hok⟩, Hk⟩, _, %hch, _⟩
     ihave %hk : ⌜kptStateOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) g.m⌝ $$ [Hm Hk]
     · iapply kptModel_stateOk _ g.m reg $$ [Hm Hk]
       iframe
@@ -792,7 +844,8 @@ theorem powerInterp_accessDisc (heq : MachFixedGS.rsvStatic (hlc := hlc) (GF := 
           (slotWit (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))) g.m.mem g.m.top) := hch
     rw [heq] at hch'
     rw [heq] at hk
-    exact accessDisc_of g.m hmm (heq ▸ all_of_reservedOk hin hok) hch' hk
+    rw [heq] at hpt
+    exact accessDisc_of g.m hmm (heq ▸ all_of_reservedOk hin hok) hch' hk hu hpt
 
 end AccessDiscipline
 
