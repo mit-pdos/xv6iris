@@ -418,4 +418,29 @@ theorem CapPcLog.bootHartN {n : Nat} {g0 g : GState} {κ : List Obs} {t : List E
       rw [hN]
       simpa using CapPcLog.hartNFork g0.gen cpu
 
+/-- Two hart threads of `cpu` in a pool holding exactly one are the same thread. -/
+theorem CapPcLog.hartNUnique {cpu : CPU} {t : List Expr} (h1 : CapPcLog.hartN cpu t = 1) {x y : Expr}
+    (hx : x ∈ t) (hxh : CapPcLog.isHartOf cpu x = true) (hy : y ∈ t) (hyh : CapPcLog.isHartOf cpu y = true) :
+    x = y := by
+  unfold CapPcLog.hartN at h1
+  obtain ⟨z, hz⟩ := List.length_eq_one_iff.1 h1
+  have hx' : x ∈ t.filter (CapPcLog.isHartOf cpu) := List.mem_filter.2 ⟨hx, hxh⟩
+  have hy' : y ∈ t.filter (CapPcLog.isHartOf cpu) := List.mem_filter.2 ⟨hy, hyh⟩
+  rw [hz, List.mem_singleton] at hx' hy'
+  rw [hx', hy']
+
+/-- **The storing thread is hart `cpu`'s pool thread**: in a pool `poolOf H F vs` holding one thread per
+hart, a hart thread of `cpu` is `hartsOf H`'s, generation 0 running `H cpu`. -/
+theorem CapPcLog.hartThreadIs {H : CPU → SailM Unit} {F : Efab} {vs t₁ t₂ : List Expr} {gen : Nat} {cpu : CPU}
+    {m : SailM Unit} (hpool : t₁ ++ Expr.hart gen cpu m :: t₂ = MachOfPf.poolOf H F vs)
+    (h1 : CapPcLog.hartN cpu (MachOfPf.poolOf H F vs) = 1) : gen = 0 ∧ m = H cpu := by
+  have hx : Expr.hart gen cpu m ∈ MachOfPf.poolOf H F vs := by rw [← hpool]; simp
+  have hy : Expr.hart 0 cpu (H cpu) ∈ MachOfPf.poolOf H F vs := by
+    unfold MachOfPf.poolOf MachOfPf.hartsOf
+    refine List.mem_cons_of_mem _ (List.mem_append_left _ (List.mem_map.2 ⟨cpu, ?_, rfl⟩))
+    simp [cpus]
+  have he := CapPcLog.hartNUnique h1 hx (by simp [CapPcLog.isHartOf]) hy (by simp [CapPcLog.isHartOf])
+  cases he
+  exact ⟨rfl, rfl⟩
+
 end Weak
