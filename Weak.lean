@@ -789,6 +789,7 @@ import Weak.SilPf
 import Weak.SilPfBridge
 import Weak.SilReplay
 import Weak.SilOrd
+import Weak.SilDep
 import Weak.SilWalk2
 import Weak.SilWalk
 import Weak.SilKill
