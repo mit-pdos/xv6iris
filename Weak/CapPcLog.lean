@@ -197,4 +197,36 @@ theorem CapPcLog.mrunLe1 {m : Nat} {t t' : List Expr} {g g' : GState} {κ : List
     | refl => exact Or.inr (CapPcLog.stepPcOf hs hp)
     | cons _ _ => omega
 
+/-- `R-log`: the pf log and the machine log have one entry per position. -/
+theorem CapPcLog.logLen {c : Wpcfg Pexv6 Efab} {st : List (Nat × Wlabel)} {t : List Expr} {g : GState}
+    (hR : MachOfPf.SimRel c st t g) : c.pcLog.length = g.m.log.length := by
+  have h := congrArg List.length hR.mem.1.1
+  simpa using h
+
+/-- The machine log's length after one `stepPc` step: kept, or one more. -/
+theorem CapPcLog.stepPcLen {σ σ' : MState} (h : CapPcLog.stepPc σ σ') :
+    (σ'.log = σ.log ∧ RelSiteProvExp.pcLogOf σ' = RelSiteProvExp.pcLogOf σ) ∨
+    (σ'.log.length = σ.log.length + 1 ∧ ∃ v : Int, RelSiteProvExp.pcLogOf σ' = RelSiteProvExp.pcLogOf σ ++ [v]) := by
+  rcases h with ⟨hl, hp⟩ | ⟨cpu, n, va, req, w, rfl⟩ | ⟨d, pa, n, w, s', rfl⟩
+  · exact Or.inl ⟨hl, CapPcLog.pcLogOfCongr hl hp⟩
+  · exact Or.inr ⟨by simp, _, CapPcLog.pcLogOfStore _ cpu _ n w _⟩
+  · rw [CapPcLog.pcLogOfDmaDev]
+    by_cases hn : n = 0
+    · subst hn; exact Or.inl ⟨by simp, by simp⟩
+    · exact Or.inr ⟨by simp [MState.storeDma, hn], -1, by rw [if_neg hn]⟩
+
+/-- **A pf step that appends nothing, simulated by at most one machine step**, keeps the machine's
+pc log (`R-log` at both ends). -/
+theorem CapPcLog.noAppendKeeps {c c' : Wpcfg Pexv6 Efab} {st st' : List (Nat × Wlabel)} {t t' : List Expr}
+    {g g' : GState} (hR : MachOfPf.SimRel c st t g) (hR' : MachOfPf.SimRel c' st' t' g')
+    (hlen : c'.pcLog.length = c.pcLog.length) (hs : g' = g ∨ CapPcLog.stepPc g.m g'.m) :
+    RelSiteProvExp.pcLogOf g'.m = RelSiteProvExp.pcLogOf g.m := by
+  rcases hs with rfl | hs
+  · rfl
+  rcases CapPcLog.stepPcLen hs with ⟨-, h⟩ | ⟨hl, -⟩
+  · exact h
+  · have h1 := CapPcLog.logLen hR
+    have h2 := CapPcLog.logLen hR'
+    omega
+
 end Weak
