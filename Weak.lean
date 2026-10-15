@@ -745,6 +745,7 @@ import Weak.G7Fetch
 import Weak.CapF2
 import Weak.CapF4
 import Weak.CapF5
+import Weak.CapF6
 import Weak.PinConfF
 import Weak.CapF3
 import Weak.CapF1
