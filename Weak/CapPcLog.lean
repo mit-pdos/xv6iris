@@ -229,4 +229,50 @@ theorem CapPcLog.noAppendKeeps {c c' : Wpcfg Pexv6 Efab} {st st' : List (Nat × 
     have h2 := CapPcLog.logLen hR'
     omega
 
+/-- **A hart step that is a store names its event**: the residual program is the store's `memWrite`
+node, and the exclusivity is that event's access kind. -/
+theorem CapPcLog.hartStepStore (cpu : CPU) (m : SailM Unit) (σ : MState) (m' : SailM Unit) (σ' : MState)
+    (h : hartStep cpu m σ m' σ') :
+    CapPcLog.keepsPc σ σ' ∨ ∃ (n va : Nat) (req : Mem_write_request n va Arch.pa Arch.translation Arch.arch_ak)
+      (k : (Outcome.memWrite n va req).ret → SailM Unit) (w : BitVec (8 * n)),
+      m = .impure (.ok (.memWrite n va req)) k ∧ σ' = σ.store cpu req.pa n w (akExcl req.access_kind) := by
+  unfold hartStep at h
+  match m, h with
+  | .pure _, ⟨_, _, h⟩ => subst h; exact Or.inl ⟨rfl, rfl⟩
+  | .impure (.ok o) k, Or.inl ⟨v, _, hv⟩ =>
+    rcases CapPcLog.evStepPc cpu o σ v σ' hv with h | ⟨n, va, req, w, ho, h⟩
+    · exact Or.inl h
+    · subst ho; exact Or.inr ⟨n, va, req, k, w, rfl, h⟩
+  | .impure (.ok o) k, Or.inr ⟨hb, _⟩ => exact Or.inl (CapPcLog.blockedPc cpu o σ σ' hb)
+
+/-- **A machine step with the power on, its store arm naming the stepping hart thread.** -/
+theorem CapPcLog.stepStoreOf {t t' : List Expr} {g g' : GState} {obs : List Obs}
+    (h : Iris.ProgramLogic.Language.Step (t, g) obs (t', g')) (hp : g.pow = true) :
+    CapPcLog.keepsPc g.m g'.m ∨
+    (∃ (t₁ t₂ : List Expr) (gen : Nat) (cpu : CPU) (n va : Nat)
+      (req : Mem_write_request n va Arch.pa Arch.translation Arch.arch_ak)
+      (k : (Outcome.memWrite n va req).ret → SailM Unit) (w : BitVec (8 * n)),
+      t = t₁ ++ .hart gen cpu (.impure (.ok (.memWrite n va req)) k) :: t₂ ∧
+      g'.m = g.m.store cpu req.pa n w (akExcl req.access_kind)) ∨
+    (∃ (d : DevId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (s' : DevSt d), g'.m = (g.m.storeDma pa n w).setDev d s') := by
+  cases h with
+  | @atomic e σ₀ obs₀ e' σ₁ eₜ H t₁ t₂ =>
+    cases e with
+    | hart gen cpu m =>
+      obtain ⟨-, ⟨-, -, m', σ', -, hs, rfl⟩ | ⟨-, -, -, rfl⟩⟩ := H
+      · rcases CapPcLog.hartStepStore cpu m g.m m' σ' hs with hk | ⟨n, va, req, k, w, rfl, he⟩
+        · exact Or.inl hk
+        · exact Or.inr (Or.inl ⟨t₁, t₂, gen, cpu, n, va, req, k, w, rfl, he⟩)
+      · exact Or.inl ⟨rfl, rfl⟩
+    | dev gen d tid m =>
+      rcases H with ⟨-, m', σ', -, hs, rfl⟩ | ⟨-, -, -, -, rfl⟩
+      · rcases CapPcLog.devStepPc gen d tid m g.m _ m' σ' _ hs with hk | ⟨pa, n, w, s', he⟩
+        · exact Or.inl hk
+        · exact Or.inr (Or.inr ⟨d, pa, n, w, s', he⟩)
+      · exact Or.inl ⟨rfl, rfl⟩
+    | power =>
+      obtain ⟨-, ⟨-, -, -, rfl⟩ | ⟨hp', -⟩⟩ := H
+      · exact Or.inl ⟨rfl, rfl⟩
+      · rw [hp] at hp'; cases hp'
+
 end Weak
