@@ -276,7 +276,8 @@ namespace CatLin
 /-- **`csChainedT2` — THE TRANSPORT AT PROTOCOL LOCK CO** (`csChainedT`'s restatement, F1): the lock co
 used is among NON-PLAIN writes only — the reader's acquire, the writer's acquire and both releases found
 in the member's log lie in the export's window (`wlpAt`), hence are non-plain; the section's release
-`REL` is non-plain by hypothesis (xv6: `amoswap.w`). -/
+`REL` is non-plain by hypothesis (xv6: `release` is `fence rw,w; sw zero` — a plain store stamped
+`WCrel` by the fence's `wRelp`, `RelSiteProv.relPcWCrel`; NOT an AMO). -/
 theorem csChainedT2 (GD : Gdexec) (ad : List (Geid × Geid)) (GR : Gexec) (L : Int → Prop)
     (log : List Wmsg) (b a : Int) (n0 r0 : Nat) (h : Option Nat)
     (w entry exit ACQ REL : Geid) :

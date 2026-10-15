@@ -178,7 +178,12 @@ theorem certSupplyCZROfWalk2 (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → E
       rw [lblRenId]; exact h
     exact hre
 
-/-- **THE ORDER SUPPLY at protocol co (F2)** — derived from the named lock-discipline facts next. -/
+/-- **THE ORDER SUPPLY at protocol co (F2)** — derived from the named lock-discipline facts next.
+
+WARNING (2026-10-14, `PROGRESS-W10N2p.md`): FALSE on contended xv6 graphs — two harts each releasing one
+lock (`fence rw,w; sw zero`) then spinning (`amoswap.w.aq`, failed) on the other's give the po ∪ co
+cycle `R1 →po F2 →co R2 →po F1 →co R1`, RVWMO-consistent (a plain release store and a later acquire
+RMW are unordered).  Do not consume; superseded by the successful-protocol order (`ordCoSP`). -/
 def orderSupplyCZ2 (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (im : Image)
     (P : Int → Int → Prop) : Prop :=
   ∀ (GF : Gfexec) (ad : List (Geid × Geid)) (z : Geid) (ss : List Seg),

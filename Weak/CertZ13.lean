@@ -245,7 +245,12 @@ theorem CertZ13.hartStepOfSite (d0 : Efab) (TT : Nat → Nat → List Nat) :
 namespace CatLin
 
 /-- **THE SITE SUPPLY — W10-4's NAMED PREMISE (per pc)**: on every cyclic class graph with the residue
-facts and every fitting emission datum, a per-slot taint bound with the per-step site datum. -/
+facts and every fitting emission datum, a per-slot taint bound with the per-step site datum.
+
+WARNING (2026-10-14, `PROGRESS-W10N2p.md`): `siteStep` (like `CertZ9.hartStepR`) quantifies over EVERY
+walk state, but its value agreement for an RMW (no poison arm) holds only at states along the order
+(a successful acquire at a state whose lock byte is held fails it) — FALSE on graphs with an acquire.
+Do not consume; to be relativized to the walk invariant. -/
 def siteSupplyCZ (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (im : Image) : Prop :=
   ∀ (GF : Gfexec) (ad : List (Geid × Geid)) (z : Geid) (ss : List Seg),
     GF.gfGd.gdG.gxImg = im → rvwmoCatAD GF.gfGd ad → GraphFabConf.gfexecConfZF boot d0 fab GF →

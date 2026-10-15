@@ -20,7 +20,8 @@ open TsoShadow
 
 namespace CatLin
 
-/-- `csHypsR` with the section's release NON-PLAIN (xv6: `release` is `amoswap.w`). -/
+/-- `csHypsR` with the section's release NON-PLAIN (xv6: `release` is `fence rw,w; sw zero`,
+the store stamped `WCrel` — `RelSiteProv.relPcWCrel`; not an AMO). -/
 def csHypsR2 (GD : Gdexec) (GR : Gexec) (P : Int → Int → Prop) (log : List Wmsg) (prev : Geid)
     (s : Seg) : Prop :=
   ∃ (b a : Int) (ACQ REL : Geid),
