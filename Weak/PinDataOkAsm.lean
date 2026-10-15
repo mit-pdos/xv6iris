@@ -56,9 +56,10 @@ theorem splitLast {α : Type} (x : α) : ∀ (a b c : List α), x ∉ a → a ++
       obtain ⟨e1, e2⟩ := ih b' c (fun hm => hx (List.mem_cons_of_mem _ hm)) h2
       exact ⟨by rw [e1], e2⟩
 
-theorem pevrunNil {p : Pexv6} {d : Efab} {p' : Pexv6} {d' : Efab} (h : pevrun [] p d p' d') :
-    p' = p ∧ d' = d := by
-  cases h; exact ⟨rfl, rfl⟩
+/-- (W11-F, A13 (a): over jump runs the end fabric is free.) -/
+theorem pevrunNil {p : Pexv6} {d : Efab} {p' : Pexv6} {d' : Efab} (h : prunJ [] p d p' d') :
+    p' = p ∧ True :=
+  ⟨PinRunJ.prunJNil h, trivial⟩
 
 /-- A device read is never a walk slot (the walk's pages are RAM). -/
 theorem dAnsDev (c : DCfg) (hr : c.ram) (pa : BitVec 64) (n : Nat) (w : BitVec (8 * n))
@@ -103,8 +104,7 @@ theorem dataOkRFOf (p0 : Pexv6) (d0 : Efab) (em : Hemission) (pc : Int)
   obtain ⟨hs1, hs2⟩ := splitLast LInstr ls0 ls0' ls1' hni hls
   subst ls0'
   subst ls1'
-  obtain ⟨hq, hd1⟩ := pevrunNil hr1
-  subst d1''
+  obtain ⟨hq, -⟩ := pevrunNil hr1
   rw [hq] at hir hcs0 hruns
   clear hq
   have hkinv' : kInv pc rs'' := PinCycRun.kInvAgree pc rs rs'' hag hrb' hkinv

@@ -33,6 +33,7 @@ Spec: Sail is the reference for the tree (`Step.lean`, `SysControl.lean`); the p
 proof organisation.  Every Lean-only helper is `Weak.PinCycRun.*`.
 -/
 import Weak.PinDataflowGlue
+import Weak.PinRunJ
 
 namespace Weak
 
@@ -524,13 +525,17 @@ inductive irun : List Wlabel → Pexv6 → Efab → Pexv6 → Efab → Prop wher
       {p2 : Pexv6} {d2 : Efab} :
       pstepEv (.PHart cpu (.impure c k) rs fn ib) d l p1 d1 → irun ls p1 d1 p2 d2 →
       irun (l :: ls) (.PHart cpu (.impure c k) rs fn ib) d p2 d2
+  /-- (W11-F, A13 (a)) the fabric may JUMP between the hart's steps (other agents move it). -/
+  | jump {ls : List Wlabel} {p : Pexv6} {d e : Efab} {p2 : Pexv6} {d2 : Efab} :
+      irun ls p e p2 d2 → irun ls p d p2 d2
 
-theorem irunPevrun (ls : List Wlabel) (p : Pexv6) (d : Efab) (p' : Pexv6) (d' : Efab) :
-    irun ls p d p' d' → pevrun ls p d p' d' := by
+theorem irunPrunJ (ls : List Wlabel) (p : Pexv6) (d : Efab) (p' : Pexv6) (d' : Efab) :
+    irun ls p d p' d' → prunJ ls p d p' d' := by
   intro h
   induction h with
   | nil p d => exact .nil p d
   | more hs _ ih => exact .more hs ih
+  | jump _ ih => exact .jump ih
 
 /-- **THE RUN** (header): the three outcomes of a run of the hart from a tree under `cyB`. -/
 def cyOut (A : Int → BitVec 8 → Prop) (Aa : Nat → Int → Prop) (S : Register → Bool)
@@ -540,13 +545,13 @@ def cyOut (A : Int → BitVec 8 → Prop) (Aa : Nat → Int → Prop) (S : Regis
   (∃ (ls1 ls2 : List Wlabel) (m1 : SailM Unit) (rs1 : RegFile)
       (fn1 : Option (Bool × Bool × Bool × Bool)) (ib1 : Ibch) (d1 : Efab) (st1 : CySt),
     ls = ls1 ++ ls2 ∧ irun ls1 p d (.PHart cpu m1 rs1 fn1 ib1) d1 ∧
-    pevrun ls2 (.PHart cpu m1 rs1 fn1 ib1) d1 p' d' ∧
+    prunJ ls2 (.PHart cpu m1 rs1 fn1 ib1) d1 p' d' ∧
     cyStopAt S T st1 m1 ∧ cyMatch st1 rs1 ib1 ∧ cyTrace st ls1 st1) ∨
   -- the END of the cycle is reached (first `.pure`)
   (∃ (ls1 ls2 : List Wlabel) (rs1 : RegFile) (fn1 : Option (Bool × Bool × Bool × Bool))
       (ib1 : Ibch) (d1 : Efab) (st1 : CySt),
     ls = ls1 ++ ls2 ∧ irun ls1 p d (.PHart cpu (.pure ()) rs1 fn1 ib1) d1 ∧
-    pevrun ls2 (.PHart cpu (.pure ()) rs1 fn1 ib1) d1 p' d' ∧
+    prunJ ls2 (.PHart cpu (.pure ()) rs1 fn1 ib1) d1 p' d' ∧
     P () st1 ∧ cyMatch st1 rs1 ib1 ∧ cyTrace st ls1 st1) ∨
   -- the run ends INSIDE the cycle
   (∃ (m1 : SailM Unit) (rs1 : RegFile) (fn1 : Option (Bool × Bool × Bool × Bool)) (ib1 : Ibch)
@@ -554,9 +559,21 @@ def cyOut (A : Int → BitVec 8 → Prop) (Aa : Nat → Int → Prop) (S : Regis
     p' = .PHart cpu m1 rs1 fn1 ib1 ∧ (∀ x, m1 ≠ .pure x) ∧ irun ls p d p' d' ∧
     cyB A Aa S T P m1 st1 ∧ cyMatch st1 rs1 ib1 ∧ cyTrace st ls st1)
 
+/-- A jump at the run's start keeps the outcome (W11-F, A13 (a)). -/
+theorem PinCycRun.cyOutJump (A : Int → BitVec 8 → Prop) (Aa : Nat → Int → Prop) (S : Register → Bool)
+    (T : CySt → (r : Register) → RegisterType r → Prop) (P : Unit → CySt → Prop) (cpu : CPU)
+    (st : CySt) (ls : List Wlabel) (p : Pexv6) (d e : Efab) (p' : Pexv6) (d' : Efab) :
+    cyOut A Aa S T P cpu st ls p e p' d' → cyOut A Aa S T P cpu st ls p d p' d' := by
+  rintro (⟨ls1, ls2, m1, rs1, fn1, ib1, d1, st1, h1, h2, h3, h4, h5, h6⟩ |
+    ⟨ls1, ls2, rs1, fn1, ib1, d1, st1, h1, h2, h3, h4, h5, h6⟩ |
+    ⟨m1, rs1, fn1, ib1, st1, h1, h2, h3, h4, h5, h6⟩)
+  · exact Or.inl ⟨ls1, ls2, m1, rs1, fn1, ib1, d1, st1, h1, .jump h2, h3, h4, h5, h6⟩
+  · exact Or.inr (Or.inl ⟨ls1, ls2, rs1, fn1, ib1, d1, st1, h1, .jump h2, h3, h4, h5, h6⟩)
+  · exact Or.inr (Or.inr ⟨m1, rs1, fn1, ib1, st1, h1, h2, .jump h3, h4, h5, h6⟩)
+
 theorem cyRun (A : Int → BitVec 8 → Prop) (Aa : Nat → Int → Prop) (S : Register → Bool)
     (T : CySt → (r : Register) → RegisterType r → Prop) (P : Unit → CySt → Prop) :
-    ∀ (ls : List Wlabel) (p : Pexv6) (d : Efab) (p' : Pexv6) (d' : Efab), pevrun ls p d p' d' →
+    ∀ (ls : List Wlabel) (p : Pexv6) (d : Efab) (p' : Pexv6) (d' : Efab), prunJ ls p d p' d' →
     ∀ (cpu : CPU) (m : SailM Unit) (rs : RegFile) (fn : Option (Bool × Bool × Bool × Bool))
       (ib : Ibch) (st : CySt), p = .PHart cpu m rs fn ib → cyB A Aa S T P m st → cyMatch st rs ib →
       (∀ ls1 l ls2 pm dm, ls = ls1 ++ l :: ls2 → irun (ls1 ++ [l]) p d pm dm →
@@ -622,6 +639,10 @@ theorem cyRun (A : Int → BitVec 8 → Prop) (Aa : Nat → Int → Prop) (S : R
           PinCycRun.cyTraceCons A Aa S T P st st' st1 l ls1 h1 h2 h3 h4 ht⟩)
       · exact Or.inr (Or.inr ⟨mm, rr, ff, ii, st1, rfl, hnp, irun.more hst hir, hc, hmm,
           PinCycRun.cyTraceCons A Aa S T P st st' st1 l ls h1 h2 h3 h4 ht⟩)
+  | @jump ls p d e p2 d2 _ ih =>
+    intro cpu m rs fn ib st hp hcy hm hA
+    exact PinCycRun.cyOutJump A Aa S T P cpu st ls p d e p2 d2
+      (ih cpu m rs fn ib st hp hcy hm (fun ls1 l ls2 pm dm h hir => hA ls1 l ls2 pm dm h (.jump hir)))
 
 end PinCycRun
 end Weak

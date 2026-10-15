@@ -59,7 +59,7 @@ open SailCycleOrderK PinDataflow
 /-! ## 1. The emission is a run -/
 
 theorem PinCycRun.admRunPevrun (instr : Bool) (p : Pexv6) (d : Efab) (ls : List Wlabel) (p' : Pexv6)
-    (d' : Efab) : admRun instr p d ls p' d' → pevrun ls p d p' d' := by
+    (d' : Efab) : admRun instr p d ls p' d' → prunJ ls p d p' d' := by
   intro h
   induction h with
   | ARnil p d => exact .nil p d
@@ -67,23 +67,13 @@ theorem PinCycRun.admRunPevrun (instr : Bool) (p : Pexv6) (d : Efab) (ls : List 
 
 theorem pevrunApp {l1 l2 : List Wlabel} {p : Pexv6} {d : Efab} {p1 : Pexv6} {d1 : Efab}
     {p2 : Pexv6} {d2 : Efab} :
-    pevrun l1 p d p1 d1 → pevrun l2 p1 d1 p2 d2 → pevrun (l1 ++ l2) p d p2 d2 := by
-  intro h1 h2
-  induction h1 with
-  | nil => exact h2
-  | more hs _ ih => exact .more hs (ih h2)
+    prunJ l1 p d p1 d1 → prunJ l2 p1 d1 p2 d2 → prunJ (l1 ++ l2) p d p2 d2 := by
+  exact PinRunJ.prunJApp
 
 theorem pevrunSplit (l1 l2 : List Wlabel) :
-    ∀ (p : Pexv6) (d : Efab) (p2 : Pexv6) (d2 : Efab), pevrun (l1 ++ l2) p d p2 d2 →
-      ∃ p1 d1, pevrun l1 p d p1 d1 ∧ pevrun l2 p1 d1 p2 d2 := by
-  induction l1 with
-  | nil => intro p d p2 d2 h; exact ⟨p, d, .nil p d, h⟩
-  | cons l l1 ih =>
-    intro p d p2 d2 h
-    cases h with
-    | more hs hr =>
-      obtain ⟨p1, d1, h1, h2⟩ := ih _ _ _ _ hr
-      exact ⟨p1, d1, .more hs h1, h2⟩
+    ∀ (p : Pexv6) (d : Efab) (p2 : Pexv6) (d2 : Efab), prunJ (l1 ++ l2) p d p2 d2 →
+      ∃ p1 d1, prunJ l1 p d p1 d1 ∧ prunJ l2 p1 d1 p2 d2 :=
+  fun _ _ _ _ h => PinRunJ.prunJSplit l1 l2 h rfl
 
 theorem PinCycRun.eadmFst (ls : List Wlabel) : (eadm ls).map Prod.fst = ls := by
   induction ls with
@@ -93,7 +83,7 @@ theorem PinCycRun.eadmFst (ls : List Wlabel) : (eadm ls).map Prod.fst = ls := by
 /-- **The emission is a run** of real `pstepEv` steps, label by label. -/
 theorem hemitPevrun (dv : Nat → Efab) (k : Nat) (ws : Wstate) (row : List Lbl) (p : Pexv6)
     (es : List Eitem) (pfin : Pexv6) :
-    hemit dv k ws row p es pfin → pevrun (es.map Prod.fst) p (dv k) pfin (dv (k + row.length)) := by
+    hemit dv k ws row p es pfin → prunJ (es.map Prod.fst) p (dv k) pfin (dv (k + row.length)) := by
   intro h
   induction h with
   | HEnil k ws p => exact .nil _ _
@@ -112,7 +102,7 @@ theorem hemitPevrun (dv : Nat → Efab) (k : Nat) (ws : Wstate) (row : List Lbl)
 
 theorem hartConfPevrun (i : Nat) (row : List Lbl) (p0 : Pexv6) (dv : Nat → Efab) (em : Hemission) :
     hartConf i row p0 dv em →
-    pevrun (em.emItems.map Prod.fst) p0 (dv 0) em.emFin (dv row.length) := by
+    prunJ (em.emItems.map Prod.fst) p0 (dv 0) em.emFin (dv row.length) := by
   intro h
   have := hemitPevrun dv 0 wsInit row p0 em.emItems em.emFin h
   rwa [Nat.zero_add] at this
@@ -293,13 +283,13 @@ theorem PinCycRun.pureStepFacts (cpu : CPU) (rs : RegFile) (fn : Option (Bool ×
 boundary step, or takes PLIC writes / a parked fence (`ls0`) and then the boundary step `LInstr`
 to the fresh cycle `riscvStep tick`, the register file kept off the wires. -/
 theorem pureSplit : ∀ (ls : List Wlabel) (p : Pexv6) (d : Efab) (pE : Pexv6) (dE : Efab),
-    pevrun ls p d pE dE → ∀ cpu rs fn ib, p = .PHart cpu (.pure ()) rs fn ib → RbootAll rs →
+    prunJ ls p d pE dE → ∀ cpu rs fn ib, p = .PHart cpu (.pure ()) rs fn ib → RbootAll rs →
     LInstr ∉ ls ∨
     ∃ (ls0 ls1 : List Wlabel) (rs' : RegFile) (tick : Bool) (d1 : Efab),
       ls = ls0 ++ LInstr :: ls1 ∧ LInstr ∉ ls0 ∧
       (∀ l, l ∈ ls0 → (∀ rd srcs, l ≠ LRegW rd srcs) ∧ isFeLab l = false) ∧
-      pevrun (ls0 ++ [LInstr]) p d (.PHart cpu (riscvStep tick) rs' none ibNone) d1 ∧
-      pevrun ls1 (.PHart cpu (riscvStep tick) rs' none ibNone) d1 pE dE ∧
+      prunJ (ls0 ++ [LInstr]) p d (.PHart cpu (riscvStep tick) rs' none ibNone) d1 ∧
+      prunJ ls1 (.PHart cpu (riscvStep tick) rs' none ibNone) d1 pE dE ∧
       (∀ r, wireReg r = false → rs' r = rs r) ∧ RbootAll rs' := by
   intro ls p d pE dE h
   induction h with
@@ -330,6 +320,11 @@ theorem pureSplit : ∀ (ls : List Wlabel) (p : Pexv6) (d : Efab) (pE : Pexv6) (
         rcases List.mem_cons.1 hl' with rfl | hl'
         · exact ⟨hnr, hnf⟩
         · exact h0 l' hl'
+  | @jump ls p d e p2 d2 _ ih =>
+    intro cpu rs fn ib hp hrb
+    rcases ih cpu rs fn ib hp hrb with hni | ⟨ls0, ls1, rs', tick, d1, h1, h2, h3, h4, h5, h6, h7⟩
+    · exact Or.inl hni
+    · exact Or.inr ⟨ls0, ls1, rs', tick, d1, h1, h2, h3, .jump h4, h5, h6, h7⟩
 
 /-! ## 4. The walk's successors, the slots, the arm's reads -/
 
@@ -467,7 +462,7 @@ def atPure (p : Pexv6) : Prop :=
 boundary, in the kernel configuration at `pc`. -/
 def walkBd (p0 : Pexv6) (d0 : Efab) (em : Hemission) (pfx : List Eitem) (pc : Int) (p : Pexv6)
     (d : Efab) : Prop :=
-  (∃ rest, em.emItems = pfx ++ rest) ∧ pevrun (pfx.map Prod.fst) p0 d0 p d ∧
+  (∃ rest, em.emItems = pfx ++ rest) ∧ prunJ (pfx.map Prod.fst) p0 d0 p d ∧
   ∃ (cpu : CPU) (rs : RegFile) (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch),
     p = .PHart cpu (.pure ()) rs fn ib ∧ kInv pc rs
 
@@ -475,7 +470,7 @@ def walkBd (p0 : Pexv6) (d0 : Efab) (em : Hemission) (pfx : List Eitem) (pc : In
 parked fence) and the boundary step reach the fresh cycle `q`. -/
 def cycStart (p0 : Pexv6) (d0 : Efab) (em : Hemission) (pfx : List Eitem) (pc : Int)
     (ls0 : List Wlabel) (q : Pexv6) (d1 : Efab) : Prop :=
-  ∃ p d, walkBd p0 d0 em pfx pc p d ∧ pevrun (ls0 ++ [LInstr]) p d q d1 ∧
+  ∃ p d, walkBd p0 d0 em pfx pc p d ∧ prunJ (ls0 ++ [LInstr]) p d q d1 ∧
     ∃ (cpu : CPU) (tick : Bool) (rs : RegFile), q = .PHart cpu (riscvStep tick) rs none ibNone
 
 /-- The cycle's labels are the emission's after `pfx`. -/
@@ -521,15 +516,23 @@ def fetchOkRF (p0 : Pexv6) (d0 : Efab) (em : Hemission) (pc : Int) : Prop :=
 /-- `irun` of a prefix. -/
 theorem PinCycRun.irunPrefix : ∀ (ls1 ls2 : List Wlabel) (p : Pexv6) (d : Efab) (p' : Pexv6)
     (d' : Efab), irun (ls1 ++ ls2) p d p' d' → ∃ pm dm, irun ls1 p d pm dm := by
-  intro ls1
-  induction ls1 with
-  | nil => intro _ p d _ _ _; exact ⟨p, d, irun.nil _ _⟩
-  | cons l ls ih =>
-    intro ls2 p d p' d' h
-    cases h with
-    | more hst hr =>
-      obtain ⟨pm, dm, h'⟩ := ih ls2 _ _ _ _ hr
+  intro ls1 ls2 p d p' d' h
+  generalize e : ls1 ++ ls2 = ls at h
+  induction h generalizing ls1 with
+  | nil p d =>
+    obtain ⟨rfl, -⟩ := List.append_eq_nil_iff.1 e
+    exact ⟨p, d, irun.nil _ _⟩
+  | more hst _ ih =>
+    cases ls1 with
+    | nil => exact ⟨_, _, irun.nil _ _⟩
+    | cons a l1 =>
+      simp only [List.cons_append, List.cons.injEq] at e
+      obtain ⟨rfl, e⟩ := e
+      obtain ⟨pm, dm, h'⟩ := ih l1 e
       exact ⟨pm, dm, irun.more hst h'⟩
+  | jump _ ih =>
+    obtain ⟨pm, dm, h'⟩ := ih ls1 e
+    exact ⟨pm, dm, irun.jump h'⟩
 
 theorem fetchOkRFOfR2 (p0 : Pexv6) (d0 : Efab) (em : Hemission) (pc : Int)
     (h : fetchOkR2 p0 d0 em pc) : fetchOkRF p0 d0 em pc := by
@@ -571,7 +574,7 @@ def excRetR (G : Gexec) (i : Nat) (p0 : Pexv6) (d0 : Efab) (em : Hemission) (pc 
     atCause true pm → em.emItems = pfx ++ rest →
     (∃ gx rest', rest = gx ++ rest' ∧ texcRes G i em pfx gx) →
     ∃ gx rest', rest = gx ++ rest' ∧ texcRes G i em pfx gx ∧ gx ≠ [] ∧
-      ∀ p d p' d', walkBd p0 d0 em pfx pc p d → pevrun (gx.map Prod.fst) p d p' d' →
+      ∀ p d p' d', walkBd p0 d0 em pfx pc p d → prunJ (gx.map Prod.fst) p d p' d' →
         ∃ (cpu : CPU) (rs : RegFile) (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch),
           p' = .PHart cpu (.pure ()) rs fn ib ∧ kInv pc rs
 
@@ -655,10 +658,10 @@ theorem cycWalk (G : Gexec) (i : Nat) (em : Hemission) (own : Bool) (p0 : Pexv6)
     ∀ (N : Nat) (rest : List Eitem), rest.length ≤ N →
     ∀ (pfx : List Eitem) (s : PState) (n : Nat) (p : Pexv6) (d : Efab) (pE : Pexv6) (dE : Efab),
       preach own a0 s n → walkBd p0 d0 em pfx s.psPc p d → em.emItems = pfx ++ rest →
-      pevrun (rest.map Prod.fst) p d pE dE →
+      prunJ (rest.map Prod.fst) p d pE dE →
       ∃ (mid rest' : List Eitem) (s' : PState) (n' : Nat) (p' : Pexv6) (d' : Efab),
         rest = mid ++ rest' ∧ cycRun G i em own pfx s mid s' ∧ preach own a0 s' n' ∧
-        walkBd p0 d0 em (pfx ++ mid) s'.psPc p' d' ∧ pevrun (rest'.map Prod.fst) p' d' pE dE ∧
+        walkBd p0 d0 em (pfx ++ mid) s'.psPc p' d' ∧ prunJ (rest'.map Prod.fst) p' d' pE dE ∧
         cycStop G i p0 d0 em own (pfx ++ mid) s' rest' := by
   intro N
   induction N with
@@ -791,14 +794,14 @@ theorem cycWalk (G : Gexec) (i : Nat) (em : Hemission) (own : Bool) (p0 : Pexv6)
       have hbd' : walkBd p0 d0 em (pfx ++ g) s'.psPc (.PHart cpu (.pure ()) rs1 fn1 ib1) dm :=
         ⟨⟨restB, by rw [hes, hrsplit, List.append_assoc]⟩,
           by rw [List.map_append, hgl, show ls0 ++ LInstr :: la = (ls0 ++ [LInstr]) ++ la by simp]
-             exact pevrunApp hrun0 (pevrunApp hr0 (irunPevrun _ _ _ _ _ hira)),
+             exact pevrunApp hrun0 (pevrunApp hr0 (irunPrunJ _ _ _ _ _ hira)),
           cpu, rs1, fn1, ib1, rfl,
           PinCycRun.kCfgAgree s'.psPc rs1 st1.rv hm1.1 hm1.2.1 hcfg (by rw [hs'pc]; exact hPC)⟩
       have hlenB : restB.length ≤ N := by
         have h1 : g.length ≠ 0 := by
           intro h; rw [List.eq_nil_of_length_eq_zero h] at hgl; simp at hgl
         rw [hrsplit, List.length_append] at hlen; omega
-      have hrunB : pevrun (restB.map Prod.fst) (.PHart cpu (.pure ()) rs1 fn1 ib1) dm pE dE := by
+      have hrunB : prunJ (restB.map Prod.fst) (.PHart cpu (.pure ()) rs1 fn1 ib1) dm pE dE := by
         rw [hrl]; exact hrb
       obtain ⟨mid, rest2, s2, n2, p2, d2, hmid, hcr, hreach2, hbd2, hrun2, hstop2⟩ :=
         ih restB hlenB (pfx ++ g) s' (n + 1) _ dm pE dE hreach' hbd'
@@ -846,7 +849,7 @@ theorem cycRunOfHartConf (G : Gexec) (i : Nat) (row : List Lbl) (p0 : Pexv6) (dv
     (hexc : ∀ s n l, preach own (pinStart pcL) s n → pstep own s = some l → l ≠ [] →
       excRetR G i p0 (dv 0) em s.psPc)
     (base rest : List Eitem) (hes : em.emItems = base ++ rest)
-    (hstart : ∀ p d, pevrun (base.map Prod.fst) p0 (dv 0) p d →
+    (hstart : ∀ p d, prunJ (base.map Prod.fst) p0 (dv 0) p d →
       ∃ (cpu : CPU) (rs : RegFile) (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch),
         p = .PHart cpu (.pure ()) rs fn ib ∧ kInv (pinStart pcL).psPc rs) :
     ∃ (mid rest' : List Eitem) (s : PState) (n : Nat) (p' : Pexv6) (d' : Efab),

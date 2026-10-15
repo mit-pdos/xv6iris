@@ -75,8 +75,7 @@ theorem fetchOkRFiOf (p0 : Pexv6) (d0 : Efab) (em : Hemission) (pc : Int) (h0 : 
   obtain ⟨hs1, hs2⟩ := splitLast LInstr ls0 ls0' ls1' hni hls
   subst ls0'
   subst ls1'
-  obtain ⟨hq, hd1⟩ := pevrunNil hr1
-  subst d1''
+  obtain ⟨hq, -⟩ := pevrunNil hr1
   have hall := hrk cpu0 tick' rs'' hq
   subst hq
   have hkinv' : kInv pc rs'' := PinCycRun.kInvAgree pc rs rs'' hag hrb' hkinv

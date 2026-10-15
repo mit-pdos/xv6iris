@@ -295,6 +295,12 @@ theorem cyDRun :
         ⟨mm, rr, ff, ii, st1, rfl, hc, hmm⟩
       · exact Or.inl ⟨l :: ls1, ls2, mm, rr, ff, ii, dd, st1, rfl, irun.more hst r1, hs, hmm⟩
       · exact Or.inr ⟨mm, rr, ff, ii, st1, rfl, hc, hmm⟩
+  | @jump ls p d e p2 d2 _ ih =>
+    intro cpu m rs fn ib st hp hcy hm hP hdev
+    rcases ih cpu m rs fn ib st hp hcy hm (fun ls1 l ls2 pm dm h hir => hP ls1 l ls2 pm dm h (.jump hir))
+        hdev with ⟨ls1, ls2, m1, rs1, fn1, ib1, d1, st1, h1, h2, h3, h4⟩ | h
+    · exact Or.inl ⟨ls1, ls2, m1, rs1, fn1, ib1, d1, st1, h1, .jump h2, h3, h4⟩
+    · exact Or.inr h
 
 end run
 

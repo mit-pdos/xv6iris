@@ -361,7 +361,7 @@ theorem cycRunOfHartConfE (G : Gexec) (i : Nat) (row : List Lbl) (p0 : Pexv6) (d
     (hexc : ∀ s n l, preach own (pinStart pcL) s n → pstep own s = some l → l ≠ [] →
       excRetR G i p0 (dv 0) em s.psPc)
     (base rest : List Eitem) (hes : em.emItems = base ++ rest)
-    (hstart : ∀ p d, pevrun (base.map Prod.fst) p0 (dv 0) p d →
+    (hstart : ∀ p d, prunJ (base.map Prod.fst) p0 (dv 0) p d →
       ∃ (cpu : CPU) (rs : RegFile) (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch),
         p = .PHart cpu (.pure ()) rs fn ib ∧ kInv (pinStart pcL).psPc rs) :
     ∃ (mid rest' : List Eitem) (s : PState) (n : Nat) (p' : Pexv6) (d' : Efab),

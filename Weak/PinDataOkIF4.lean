@@ -106,19 +106,37 @@ theorem irunAnn : ∀ (ls : List Wlabel) (p : Pexv6) (d : Efab) (p' : Pexv6) (d'
     obtain ⟨rfl, ors, oib, obar, rfl, rfl, hh⟩ := hstep
     exact ih cpu1 m1 _ fn1 _ rfl (ibAnnHart cpu1 _ rs fn ib d l m1 ors fn1 d1 oib obar
       (fun x e => by cases e) hh hb)
+  | jump _ ih => exact ih
 
 /-- An in-cycle run splits at any prefix of its labels. -/
 theorem irunSplit : ∀ (xs ys : List Wlabel) (p : Pexv6) (d : Efab) (p' : Pexv6) (d' : Efab),
     irun (xs ++ ys) p d p' d' → ∃ p'' d'', irun xs p d p'' d'' ∧ irun ys p'' d'' p' d' := by
-  intro xs
-  induction xs with
-  | nil => intro ys p d p' d' h; exact ⟨p, d, .nil _ _, h⟩
-  | cons x xs ih =>
-    intro ys p d p' d' h
-    cases h with
-    | more hs hr =>
-      obtain ⟨p'', d'', h1, h2⟩ := ih ys _ _ p' d' hr
+  intro xs ys p d p' d' h
+  generalize e : xs ++ ys = ls at h
+  induction h generalizing xs with
+  | nil p d =>
+    obtain ⟨rfl, rfl⟩ := List.append_eq_nil_iff.1 e
+    exact ⟨p, d, .nil _ _, .nil _ _⟩
+  | more hs hr ih =>
+    cases xs with
+    | nil =>
+      simp only [List.nil_append] at e
+      subst e
+      exact ⟨_, _, .nil _ _, .more hs hr⟩
+    | cons x xs =>
+      simp only [List.cons_append, List.cons.injEq] at e
+      obtain ⟨rfl, e⟩ := e
+      obtain ⟨p'', d'', h1, h2⟩ := ih xs e
       exact ⟨p'', d'', .more hs h1, h2⟩
+  | jump hr ih =>
+    cases xs with
+    | nil =>
+      simp only [List.nil_append] at e
+      subst e
+      exact ⟨_, _, .nil _ _, .jump hr⟩
+    | cons x xs =>
+      obtain ⟨p'', d'', h1, h2⟩ := ih (x :: xs) e
+      exact ⟨p'', d'', .jump h1, h2⟩
 
 /-! ## 2. The run, to its actual end -/
 
@@ -172,6 +190,10 @@ theorem cyERun :
               simp only [feLabs, List.filter_cons, List.filter_nil]
               split <;> rfl
             rw [e2]; exact g3) hdev
+  | @jump ls p d e p2 d2 _ ih =>
+    intro cpu m rs fn ib st hp hcy hm hP hdev
+    exact ih cpu m rs fn ib st hp hcy hm (fun ls1 l ls2 pm dm h hir => hP ls1 l ls2 pm dm h (.jump hir))
+      hdev
 
 end run
 
@@ -218,8 +240,7 @@ theorem fetchOkRFiiOf (p0 : Pexv6) (d0 : Efab) (em : Hemission) (pc : Int)
   obtain ⟨hs1, hs2⟩ := splitLast LInstr ls0 ls0' ls1' hni hls
   subst ls0'
   subst ls1'
-  obtain ⟨hq, hd1⟩ := pevrunNil hr1
-  subst d1''
+  obtain ⟨hq, -⟩ := pevrunNil hr1
   subst hq
   have hkinv' : kInv pc rs'' := PinCycRun.kInvAgree pc rs rs'' hag hrb' hkinv
   let st0 : CySt := ⟨rs'', [], false, ⟨OpRoles.ORnone, [], 0, true⟩⟩

@@ -226,6 +226,9 @@ theorem cyFRun :
         split <;> rfl
       rw [e2] at this
       exact this
+  | @jump ls p d e p2 d2 _ ih =>
+    intro cpu m rs fn ib st hp hcy hm hL hdev ls1 a tvs ls2 he
+    exact ih cpu m rs fn ib st hp hcy hm hL hdev ls1 a tvs ls2 he
 
 end run
 
