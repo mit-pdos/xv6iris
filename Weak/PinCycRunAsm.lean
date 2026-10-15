@@ -646,9 +646,12 @@ theorem cycWalk (G : Gexec) (i : Nat) (em : Hemission) (own : Bool) (p0 : Pexv6)
     (hfeN : ∀ a tvs t, (LIFetch a tvs, t) ∈ em.emItems → t = none) (hft : kFetchText em)
     (hsome : ∀ s n, preach own a0 s n → pstep own s ≠ none)
     (hsail : ∀ s n l, preach own a0 s n → pstep own s = some l → l ≠ [] → cySailAt s.psPc)
-    (hfetch : ∀ s n, preach own a0 s n → fetchOkRF p0 d0 em s.psPc)
-    (hdata : ∀ s n, preach own a0 s n → dataOkRF p0 d0 em s.psPc)
-    (hexc : ∀ s n, preach own a0 s n → excRetR G i p0 d0 em s.psPc) :
+    (hfetch : ∀ s n l, preach own a0 s n → pstep own s = some l → l ≠ [] →
+      fetchOkRF p0 d0 em s.psPc)
+    (hdata : ∀ s n l, preach own a0 s n → pstep own s = some l → l ≠ [] →
+      dataOkRF p0 d0 em s.psPc)
+    (hexc : ∀ s n l, preach own a0 s n → pstep own s = some l → l ≠ [] →
+      excRetR G i p0 d0 em s.psPc) :
     ∀ (N : Nat) (rest : List Eitem), rest.length ≤ N →
     ∀ (pfx : List Eitem) (s : PState) (n : Nat) (p : Pexv6) (d : Efab) (pE : Pexv6) (dE : Efab),
       preach own a0 s n → walkBd p0 d0 em pfx s.psPc p d → em.emItems = pfx ++ rest →
@@ -699,7 +702,7 @@ theorem cycWalk (G : Gexec) (i : Nat) (em : Hemission) (own : Bool) (p0 : Pexv6)
       refine ⟨?_, PinCycRun.kAOfText em hft hfeN a tvs (hsub _ ?_)⟩
       · show a = s.psPc + 2 * ((0 + (feLabs ls1').length : Nat) : Int)
         rw [Nat.zero_add]
-        exact (hfetch s n hreach).1 pfx ls0 _ d1 ls1' pm dm a tvs hni0 hcs
+        exact (hfetch s n l hreach hps hl).1 pfx ls0 _ d1 ls1' pm dm a tvs hni0 hcs
           ⟨rest, hes, ⟨ls2, by rw [hls, e]; simp⟩⟩ hir
       · rw [hls, e]; simp
     rcases cyRun kA (kAa s.psPc) cyS (cyT s.psPc) (cyPost s.psPc) ls1 _ d1 pE dE hr1 cpu
@@ -715,17 +718,17 @@ theorem cycWalk (G : Gexec) (i : Nat) (em : Hemission) (own : Bool) (p0 : Pexv6)
         exfalso
         have hac : atCause false (.PHart cpu (.impure (.ok (.regWrite r v)) k) rs1 fn1 ib1) :=
           ⟨cpu, r, v, k, rs1, fn1, ib1, rfl, hsr, hcb⟩
-        obtain ⟨_, _, _, _, _, e, hib⟩ := (hfetch s n hreach).2 pfx ls0 _ d1 la _ dm hni0 hcs hcin hira hac
+        obtain ⟨_, _, _, _, _, e, hib⟩ := (hfetch s n l hreach hps hl).2 pfx ls0 _ d1 la _ dm hni0 hcs hcin hira hac
         cases e
         have han : st1.an = true := by rw [hm1.2.2.2.2.2]; exact hib
         have hmem := (hT han).2
-        exact hdata s n hreach hmem pfx ls0 _ d1 la _ dm hni0 hcs hcin hira hac
+        exact hdata s n l hreach hps hl hmem pfx ls0 _ d1 la _ dm hni0 hcs hcin hira hac
       | true =>
         have hac : atCause true (.PHart cpu (.impure (.ok (.regWrite r v)) k) rs1 fn1 ib1) :=
           ⟨cpu, r, v, k, rs1, fn1, ib1, rfl, hsr, hcb⟩
         by_cases hx : ∃ gx rest', rest = gx ++ rest' ∧ texcRes G i em pfx gx
         · obtain ⟨gx, rest', hrs, htx, hne, hret⟩ :=
-            hexc s n hreach pfx ls0 _ d1 la _ dm rest hcs hcin hira hac hes hx
+            hexc s n l hreach hps hl pfx ls0 _ d1 la _ dm rest hcs hcin hira hac hes hx
           rw [hrs, List.map_append] at hrun
           obtain ⟨p'', d'', hg, hr'⟩ := pevrunSplit _ _ _ _ _ _ hrun
           obtain ⟨cpu'', rs'', fn'', ib'', rfl, hk''⟩ := hret _ d p'' d'' hbd0 hg
@@ -836,9 +839,12 @@ theorem cycRunOfHartConf (G : Gexec) (i : Nat) (row : List Lbl) (p0 : Pexv6) (dv
     (hft : kFetchText em)
     (hsail : ∀ s n l, preach own (pinStart pcL) s n → pstep own s = some l → l ≠ [] →
       cySailAt s.psPc)
-    (hfetch : ∀ s n, preach own (pinStart pcL) s n → fetchOkRF p0 (dv 0) em s.psPc)
-    (hdata : ∀ s n, preach own (pinStart pcL) s n → dataOkRF p0 (dv 0) em s.psPc)
-    (hexc : ∀ s n, preach own (pinStart pcL) s n → excRetR G i p0 (dv 0) em s.psPc)
+    (hfetch : ∀ s n l, preach own (pinStart pcL) s n → pstep own s = some l → l ≠ [] →
+      fetchOkRF p0 (dv 0) em s.psPc)
+    (hdata : ∀ s n l, preach own (pinStart pcL) s n → pstep own s = some l → l ≠ [] →
+      dataOkRF p0 (dv 0) em s.psPc)
+    (hexc : ∀ s n l, preach own (pinStart pcL) s n → pstep own s = some l → l ≠ [] →
+      excRetR G i p0 (dv 0) em s.psPc)
     (base rest : List Eitem) (hes : em.emItems = base ++ rest)
     (hstart : ∀ p d, pevrun (base.map Prod.fst) p0 (dv 0) p d →
       ∃ (cpu : CPU) (rs : RegFile) (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch),

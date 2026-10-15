@@ -354,9 +354,12 @@ theorem cycRunOfHartConfE (G : Gexec) (i : Nat) (row : List Lbl) (p0 : Pexv6) (d
     (hft : kFetchText em)
     (hR1 : ∀ s n l, preach own (pinStart pcL) s n → pstep own s = some l → l ≠ [] →
       fetchCyR1 s.psPc)
-    (hfetch : ∀ s n, preach own (pinStart pcL) s n → fetchOkRF p0 (dv 0) em s.psPc)
-    (hdata : ∀ s n, preach own (pinStart pcL) s n → dataOkRF p0 (dv 0) em s.psPc)
-    (hexc : ∀ s n, preach own (pinStart pcL) s n → excRetR G i p0 (dv 0) em s.psPc)
+    (hfetch : ∀ s n l, preach own (pinStart pcL) s n → pstep own s = some l → l ≠ [] →
+      fetchOkRF p0 (dv 0) em s.psPc)
+    (hdata : ∀ s n l, preach own (pinStart pcL) s n → pstep own s = some l → l ≠ [] →
+      dataOkRF p0 (dv 0) em s.psPc)
+    (hexc : ∀ s n l, preach own (pinStart pcL) s n → pstep own s = some l → l ≠ [] →
+      excRetR G i p0 (dv 0) em s.psPc)
     (base rest : List Eitem) (hes : em.emItems = base ++ rest)
     (hstart : ∀ p d, pevrun (base.map Prod.fst) p0 (dv 0) p d →
       ∃ (cpu : CPU) (rs : RegFile) (fn : Option (Bool × Bool × Bool × Bool)) (ib : Ibch),

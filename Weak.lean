@@ -743,6 +743,8 @@ import Weak.GraphFetchHullZ
 import Weak.GraphFetchSail
 import Weak.G7Fetch
 import Weak.CapF2
+import Weak.CapF4
+import Weak.CapF3
 import Weak.CapF1
 import Weak.GraphFetchWalkZ
 import Weak.GraphFetchN2
