@@ -55,7 +55,7 @@ theorem effPrivData (acc : MemoryAccessType mem_payload) (perm : KPerm) (hk : dA
     (m : BitVec 64) (hm : dMstatusOk m) (p : Privilege) : effectivePrivilege acc m p = pure p := by
   unfold effectivePrivilege
   rw [hm.1]
-  rcases hk with rfl | ⟨rfl, -⟩ <;> rfl
+  rcases hk with rfl | ⟨rfl, -⟩ | ⟨rfl, -⟩ <;> rfl
 
 set_option maxHeartbeats 40000000 in
 set_option maxRecDepth 100000 in
@@ -73,7 +73,8 @@ theorem dkTranslateAddrData (c : DCfg) (hr : c.ram) (va : BitVec 64) (hva : va.t
   rw [effPrivData acc c.perm hk m (dGMstatus hm), pure_bind]
   refine dkBind _ _ _ _ dkTranslationModeS (fun mode hmode => ?_)
   subst hmode
-  have hss : is_shadow_stack_access acc = pure false := by rcases hk with rfl | ⟨rfl, -⟩ <;> rfl
+  have hss : is_shadow_stack_access acc = pure false := by
+    rcases hk with rfl | ⟨rfl, -⟩ | ⟨rfl, -⟩ <;> rfl
   simp (config := { decide := true }) only [hss, pure_bind, Bool.false_eq_true, ↓reduceIte,
     ExceptT.run_bind, run_liftM, bind_assoc, satp_mode_width_forwards, get_satp]
   reduce_closed_widths

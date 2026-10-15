@@ -233,7 +233,7 @@ set_option maxRecDepth 100000 in
 theorem dkVmemWriteAddr (c : DCfg) (hr : c.ram) (hp : c.perm = .rw) (va : BitVec 64) (hva : va.toNat < 2 ^ 38)
     (hv : c.vpn = vpnOf va) (w : Nat) (hw : accW w) (hal : va.toNat % w = 0) (data : BitVec (8 * w)) :
     dkB c (fun r => ∀ e, r ≠ .Err e) (vmem_write_addr (.Virtaddr va) w data (.Store .Data) false false false) := by
-  have hk : dAccKind (.Store .Data) c.perm := Or.inr ⟨rfl, hp⟩
+  have hk : dAccKind (.Store .Data) c.perm := Or.inr (Or.inl ⟨rfl, hp⟩)
   have hal' : is_aligned_vaddr (.Virtaddr va) w = true := by
     simp only [is_aligned_vaddr, BitVec.toNatInt, beq_iff_eq]
     rw [Int.ofNat_eq_natCast, ← Int.ofNat_tmod, hal]; rfl
@@ -284,7 +284,7 @@ theorem dkVmemWrite (c : DCfg) (hr : c.ram) (hp : c.perm = .rw) (rs : regidx) (i
   refine dkBind _ _ _ _ (dkRXBits i hbase h0) (fun v hv' => ?_)
   subst hv'
   try simp only [pure_bind]
-  refine dkBind _ _ _ _ (dkTransformEA (c.va imm) _ (Or.inr ⟨rfl, hp⟩)) (fun x hx => ?_)
+  refine dkBind _ _ _ _ (dkTransformEA (c.va imm) _ (Or.inr (Or.inl ⟨rfl, hp⟩))) (fun x hx => ?_)
   subst hx
   try simp only [pure_bind, ExceptT.run_pure]
   simp only [bind_assoc, pure_bind]

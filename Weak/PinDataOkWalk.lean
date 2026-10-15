@@ -35,9 +35,10 @@ theorem pteInvalidKPtr (b : BitVec 44) :
   rw [flags_of_kPtr, ext_of_kPtr]
   rfl
 
-/-- The data accesses of a walk load/store. -/
+/-- The data accesses of a walk load/store, and (r2 glue (ii)) an instruction fetch from a kernel
+text (`R|X`) page. -/
 def dAccKind (acc : MemoryAccessType mem_payload) (perm : KPerm) : Prop :=
-  acc = .Load .Data ∨ (acc = .Store .Data ∧ perm = .rw)
+  acc = .Load .Data ∨ (acc = .Store .Data ∧ perm = .rw) ∨ (acc = .InstructionFetch () ∧ perm = .rx)
 
 set_option maxHeartbeats 40000000 in
 /-- The permission check passes on a kernel leaf allowing the data access, in supervisor mode. -/
@@ -46,8 +47,10 @@ theorem checkPermKLeaf (acc : MemoryAccessType mem_payload) (perm : KPerm) (hk :
     check_PTE_permission acc .Supervisor mxr sum (Mk_PTE_Flags (Sail.BitVec.extractLsb (kLeaf ppn perm a d) 7 0))
       e u = pure (.PTE_Check_Success ()) := by
   rw [flags_of_kLeaf]
-  rcases hk with rfl | ⟨rfl, rfl⟩
+  rcases hk with rfl | ⟨rfl, rfl⟩ | ⟨rfl, rfl⟩
   · cases perm <;> rcases bv1_cases a with rfl | rfl <;> rcases bv1_cases d with rfl | rfl <;>
+      cases mxr <;> cases sum <;> rfl
+  · rcases bv1_cases a with rfl | rfl <;> rcases bv1_cases d with rfl | rfl <;>
       cases mxr <;> cases sum <;> rfl
   · rcases bv1_cases a with rfl | rfl <;> rcases bv1_cases d with rfl | rfl <;>
       cases mxr <;> cases sum <;> rfl
