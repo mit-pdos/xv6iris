@@ -12,7 +12,9 @@ interface's per-read / per-label premises gives a matched `cyDB` state at every 
 cause write, whose stop post says "not yet announced" — against `fetchOkR2` (ii) ("an exception's
 cause write comes after the announce").
 
-**Deviation (spec, FAITHFUL for the use):** `dataOkRF` is cycRun's `dataOkR` with the premise
+**Deviation (spec, FAITHFUL for the use):** `dataOkRF` (now defined in `PinCycRunAsm.lean`, next to
+`dataOkR`, so that `cycWalk` consumes it; r2 is taken in its restated form `fetchOkRF`) is cycRun's
+`dataOkR` with the premise
 `LInstr ∉ ls0` (the boundary labels before the cycle's `LInstr` contain no other `LInstr`).
 `dataOkR` as stated also quantifies over `cycStart`s whose `ls0` runs WHOLE further cycles (the run
 then starts a cycle at a later pc, about which the walk pc's access says nothing); its only use,
@@ -30,14 +32,6 @@ open Wlabel KernelPinsDef
 
 namespace PinDataOk
 open SailCycleOrderK PinCycRun PinDataflow
-
-/-- **`dataOkR` at the first `LInstr`** (header). -/
-def dataOkRF (p0 : Pexv6) (d0 : Efab) (em : Hemission) (pc : Int) : Prop :=
-  memPc pc = true →
-  ∀ (pfx : List Eitem) (ls0 : List Wlabel) (q : Pexv6) (d1 : Efab) (ls1 : List Wlabel)
-    (pm : Pexv6) (dm : Efab),
-    LInstr ∉ ls0 → cycStart p0 d0 em pfx pc ls0 q d1 → cycIn em pfx ls0 ls1 → irun ls1 q d1 pm dm →
-    ¬ atCause false pm
 
 /-- The last element splits uniquely off a list it does not occur in. -/
 theorem splitLast {α : Type} (x : α) : ∀ (a b c : List α), x ∉ a → a ++ [x] = b ++ x :: c → b = a ∧ c = [] := by
@@ -97,14 +91,14 @@ theorem dataOkRFOf (p0 : Pexv6) (d0 : Efab) (em : Hemission) (pc : Int)
     (htext : textLo ≤ pc ∧ pc + 3 < textHi) (a : instruction) (hdec : PinWalkTab.decS pc = some a)
     (hfetch1 : fetchCyR1 pc) (hexec : execCyAt pc) (hnw : dfNwRole (krole pc)) (hft : kFetchText em)
     (hfeN : ∀ a tvs t, (LIFetch a tvs, t) ∈ em.emItems → t = none)
-    (hfetch : fetchOkR2 p0 d0 em pc) (hreal : dataRealized p0 d0 em pc) : dataOkRF p0 d0 em pc := by
+    (hfetch : fetchOkRF p0 d0 em pc) (hreal : dataRealized p0 d0 em pc) : dataOkRF p0 d0 em pc := by
   intro hmem pfx ls0 q d1 ls1 pm dm hni hcs hcin hir hac
   obtain ⟨c, hr, hacc, hruns⟩ := hreal hmem pfx ls0 q d1 hcs
   have hcs0 := hcs
   obtain ⟨p, d, hbd, hrun0, cpu, tick, rs', rfl⟩ := hcs
   obtain ⟨-, -, cpu0, rs, fn, ib, rfl, hkinv⟩ := hbd
   rcases pureSplit _ _ _ _ _ hrun0 cpu0 rs fn ib rfl hkinv.2.2 with hni' |
-    ⟨ls0', ls1', rs'', tick', d1'', hls, -, hr0, hr1, hag, hrb'⟩
+    ⟨ls0', ls1', rs'', tick', d1'', hls, -, -, hr0, hr1, hag, hrb'⟩
   · exact hni' (List.mem_append_right _ List.mem_cons_self)
   obtain ⟨hs1, hs2⟩ := splitLast LInstr ls0 ls0' ls1' hni hls
   subst ls0'
@@ -137,20 +131,24 @@ theorem dataOkRFOf (p0 : Pexv6) (d0 : Efab) (em : Hemission) (pc : Int)
     refine ⟨?_, PinCycRun.kAOfText em hft hfeN a' tvs (hsub _ (by rw [e]; simp))⟩
     show a' = pc + 2 * ((0 + (feLabs ls1a).length : Nat) : Int)
     rw [Nat.zero_add]
-    exact hfetch.1 pfx ls0 _ d1 ls1a pmm dmm a' tvs hcs0
-      ⟨rest, hes, List.IsPrefix.trans ⟨ls2, by rw [e]; simp⟩ hpre⟩ hira
+    have hir' : irun ((ls1a ++ [LIFetch a' tvs]) ++ ls2)
+        (.PHart cpu0 (riscvStep tick') rs'' none ibNone) d1 pm dm := by
+      rw [e] at hir; simpa using hir
+    obtain ⟨pm', dm', hira'⟩ := PinCycRun.irunPrefix _ ls2 _ _ _ _ hir'
+    exact hfetch.1 pfx ls0 _ d1 ls1a pm' dm' a' tvs hni hcs0
+      ⟨rest, hes, List.IsPrefix.trans ⟨ls2, by rw [e]; simp⟩ hpre⟩ hira'
   rcases cyDRun ls1 _ d1 pm dm hir cpu0 (riscvStep tick') rs'' none ibNone st0 rfl hcy0 hm0 hP (dAnsDev c hr) with
     ⟨la, lb, m1, rs1, fn1, ib1, dd, st1, hl, hira, ⟨r, v, k, rfl, hsr, hcb, hT⟩, hm1⟩ |
     ⟨m1, rs1, fn1, ib1, st1, rfl, hc, hm1⟩
   · have hac1 : atCause false (.PHart cpu0 (.impure (.ok (.regWrite r v)) k) rs1 fn1 ib1) :=
       ⟨cpu0, r, v, k, rs1, fn1, ib1, rfl, hsr, hcb⟩
-    obtain ⟨_, _, _, _, _, e, hib⟩ := hfetch.2 pfx ls0 _ d1 la _ dd hcs0
+    obtain ⟨_, _, _, _, _, e, hib⟩ := hfetch.2 pfx ls0 _ d1 la _ dd hni hcs0
       (cycInOfPrefix em pfx ls0 ls1 la ⟨rest, hes, hpre⟩ ⟨lb, hl.symm⟩) hira hac1
     cases e
     have h1 : st1.an = true := by rw [hm1.2.2.2.2.2]; exact hib
     have h2 : st1.an = false := hT
     rw [h1] at h2; cases h2
-  · obtain ⟨_, _, _, _, _, e, hib⟩ := hfetch.2 pfx ls0 _ d1 ls1 _ dm hcs0 ⟨rest, hes, hpre⟩ hir hac
+  · obtain ⟨_, _, _, _, _, e, hib⟩ := hfetch.2 pfx ls0 _ d1 ls1 _ dm hni hcs0 ⟨rest, hes, hpre⟩ hir hac
     cases e
     obtain ⟨cpuX, r, v, k, rsX, fnX, ibX, hpm, hsr, hcb⟩ := hac
     injection hpm with e1 e2 e3 e4 e5

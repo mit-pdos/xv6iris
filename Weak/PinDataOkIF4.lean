@@ -213,7 +213,7 @@ theorem fetchOkRFiiOf (p0 : Pexv6) (d0 : Efab) (em : Hemission) (pc : Int)
   obtain ⟨p, d, hbd, hrun0, -⟩ := hcs
   obtain ⟨-, -, cpu0, rs, fn, ib, rfl, hkinv⟩ := hbd
   rcases pureSplit _ _ _ _ _ hrun0 cpu0 rs fn ib rfl hkinv.2.2 with hni' |
-    ⟨ls0', ls1', rs'', tick', d1'', hls, -, hr0, hr1, hag, hrb'⟩
+    ⟨ls0', ls1', rs'', tick', d1'', hls, -, -, hr0, hr1, hag, hrb'⟩
   · exact absurd (List.mem_append_right _ List.mem_cons_self) hni'
   obtain ⟨hs1, hs2⟩ := splitLast LInstr ls0 ls0' ls1' hni hls
   subst ls0'
@@ -259,6 +259,13 @@ theorem fetchOkRFiiOf (p0 : Pexv6) (d0 : Efab) (em : Hemission) (pc : Int)
     have h2 : st1.an = true := hcyc.1 hsr hcb
     exact ⟨cpu0, _, rs1, fn1, ib1, rfl, by rw [← hm1.2.2.2.2.2]; exact h2⟩
   · exact hann
+
+/-- **r2 feeds the cycle walk**: the two restated halves ARE cycRun's `fetchOkRF`
+(`PinCycRunAsm.lean`), the form `cycWalk` consumes. -/
+theorem fetchOkRFOfParts (p0 : Pexv6) (d0 : Efab) (em : Hemission) (pc : Int)
+    (hi : PinFetchPa.fetchOkRFi p0 d0 em pc) (hii : fetchOkRFii p0 d0 em pc) :
+    PinCycRun.fetchOkRF p0 d0 em pc :=
+  ⟨hi, hii⟩
 
 end PinDataOk
 end Weak

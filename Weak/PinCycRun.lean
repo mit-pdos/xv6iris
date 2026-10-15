@@ -559,7 +559,7 @@ theorem cyRun (A : Int → BitVec 8 → Prop) (Aa : Nat → Int → Prop) (S : R
     ∀ (ls : List Wlabel) (p : Pexv6) (d : Efab) (p' : Pexv6) (d' : Efab), pevrun ls p d p' d' →
     ∀ (cpu : CPU) (m : SailM Unit) (rs : RegFile) (fn : Option (Bool × Bool × Bool × Bool))
       (ib : Ibch) (st : CySt), p = .PHart cpu m rs fn ib → cyB A Aa S T P m st → cyMatch st rs ib →
-      (∀ ls1 l ls2 pm dm, ls = ls1 ++ l :: ls2 → irun ls1 p d pm dm →
+      (∀ ls1 l ls2 pm dm, ls = ls1 ++ l :: ls2 → irun (ls1 ++ [l]) p d pm dm →
         feAdm A Aa (st.fe.length + (feLabs ls1).length) l) →
       cyOut A Aa S T P cpu st ls p d p' d' := by
   intro ls p d p' d' h
@@ -593,7 +593,7 @@ theorem cyRun (A : Int → BitVec 8 → Prop) (Aa : Nat → Int → Prop) (S : R
         (.PHart cpu1 m1 (ors.getD rs) fn1 (oib.getD ib)) d1 :=
       ⟨rfl, ors, oib, obar, rfl, rfl, hh⟩
     have hA0 : feAdm A Aa st.fe.length l := by
-      have := hA [] l ls _ d rfl (irun.nil _ _)
+      have := hA [] l ls _ d1 rfl (irun.more hst (irun.nil _ _))
       simpa [feLabs] using this
     rcases cyHartStep A Aa S T P cpu1 _ rs fn ib d l m1 ors fn1 d1 oib obar st hh
         (fun x e => by cases e) hcy hm hA0 with hstop |

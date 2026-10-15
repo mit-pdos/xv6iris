@@ -296,7 +296,8 @@ theorem pureSplit : ∀ (ls : List Wlabel) (p : Pexv6) (d : Efab) (pE : Pexv6) (
     pevrun ls p d pE dE → ∀ cpu rs fn ib, p = .PHart cpu (.pure ()) rs fn ib → RbootAll rs →
     LInstr ∉ ls ∨
     ∃ (ls0 ls1 : List Wlabel) (rs' : RegFile) (tick : Bool) (d1 : Efab),
-      ls = ls0 ++ LInstr :: ls1 ∧ (∀ l, l ∈ ls0 → (∀ rd srcs, l ≠ LRegW rd srcs) ∧ isFeLab l = false) ∧
+      ls = ls0 ++ LInstr :: ls1 ∧ LInstr ∉ ls0 ∧
+      (∀ l, l ∈ ls0 → (∀ rd srcs, l ≠ LRegW rd srcs) ∧ isFeLab l = false) ∧
       pevrun (ls0 ++ [LInstr]) p d (.PHart cpu (riscvStep tick) rs' none ibNone) d1 ∧
       pevrun ls1 (.PHart cpu (riscvStep tick) rs' none ibNone) d1 pE dE ∧
       (∀ r, wireReg r = false → rs' r = rs r) ∧ RbootAll rs' := by
@@ -309,17 +310,22 @@ theorem pureSplit : ∀ (ls : List Wlabel) (p : Pexv6) (d : Efab) (pE : Pexv6) (
     rcases PinCycRun.pureStepFacts cpu rs fn ib d l p1 d1 hst with
       ⟨rfl, rfl, tick, rfl⟩ | ⟨hne, hnr, hnf, rs1, fn1, rfl, hag, hrb1⟩
     · right
-      exact ⟨[], ls, rs, tick, d1, rfl, (fun _ h => absurd h List.not_mem_nil),
+      exact ⟨[], ls, rs, tick, d1, rfl, List.not_mem_nil, (fun _ h => absurd h List.not_mem_nil),
         .more hst (.nil _ _), hrest, (fun _ _ => rfl), hrb⟩
-    · rcases ih cpu rs1 fn1 ib rfl (hrb1 hrb) with hni | ⟨ls0, ls1, rs', tick, dd, rfl, h0, r1, r2, hag', hrb'⟩
+    · rcases ih cpu rs1 fn1 ib rfl (hrb1 hrb) with hni |
+        ⟨ls0, ls1, rs', tick, dd, rfl, hn0, h0, r1, r2, hag', hrb'⟩
       · left
         intro hm
         rcases List.mem_cons.1 hm with e | hm
         · exact hne e.symm
         · exact hni hm
       · right
-        refine ⟨l :: ls0, ls1, rs', tick, dd, rfl, ?_, .more hst r1, r2,
+        refine ⟨l :: ls0, ls1, rs', tick, dd, rfl, ?_, ?_, .more hst r1, r2,
           fun r hr => (hag' r hr).trans (hag r hr), hrb'⟩
+        · intro hm
+          rcases List.mem_cons.1 hm with e | hm
+          · exact hne e.symm
+          · exact hn0 hm
         intro l' hl'
         rcases List.mem_cons.1 hl' with rfl | hl'
         · exact ⟨hnr, hnf⟩
@@ -497,6 +503,41 @@ def fetchOkR2 (p0 : Pexv6) (d0 : Efab) (em : Hemission) (pc : Int) : Prop :=
     cycStart p0 d0 em pfx pc ls0 q d1 → cycIn em pfx ls0 ls1 → irun ls1 q d1 pm dm →
     atCause false pm → atAnn pm)
 
+/-- **(4a′) r2 AT THE FIRST `LInstr`** (NAMED, header; the restated `fetchOkR2`, plan of
+`PROGRESS-r2glue-inc1.md` "Design (fixed)"): as `fetchOkR2`, with the premise `LInstr ∉ ls0` (the
+boundary labels before the cycle's `LInstr` hold no other `LInstr`) and, in (i), the fetch label a
+STEP of the in-cycle run (`irun (ls1 ++ [LIFetch a tvs])`). `fetchOkR2` implies it
+(`fetchOkRFOfR2`); its use `cycWalk` builds exactly these premises. -/
+def fetchOkRF (p0 : Pexv6) (d0 : Efab) (em : Hemission) (pc : Int) : Prop :=
+  (∀ (pfx : List Eitem) (ls0 : List Wlabel) (q : Pexv6) (d1 : Efab) (ls1 : List Wlabel)
+    (pm : Pexv6) (dm : Efab) (a : Int) (tvs : List (Nat × BitVec 8)),
+    LInstr ∉ ls0 → cycStart p0 d0 em pfx pc ls0 q d1 → cycIn em pfx ls0 (ls1 ++ [LIFetch a tvs]) →
+    irun (ls1 ++ [LIFetch a tvs]) q d1 pm dm → a = pc + 2 * ((feLabs ls1).length : Int)) ∧
+  (∀ (pfx : List Eitem) (ls0 : List Wlabel) (q : Pexv6) (d1 : Efab) (ls1 : List Wlabel)
+    (pm : Pexv6) (dm : Efab),
+    LInstr ∉ ls0 → cycStart p0 d0 em pfx pc ls0 q d1 → cycIn em pfx ls0 ls1 →
+    irun ls1 q d1 pm dm → atCause false pm → atAnn pm)
+
+/-- `irun` of a prefix. -/
+theorem PinCycRun.irunPrefix : ∀ (ls1 ls2 : List Wlabel) (p : Pexv6) (d : Efab) (p' : Pexv6)
+    (d' : Efab), irun (ls1 ++ ls2) p d p' d' → ∃ pm dm, irun ls1 p d pm dm := by
+  intro ls1
+  induction ls1 with
+  | nil => intro _ p d _ _ _; exact ⟨p, d, irun.nil _ _⟩
+  | cons l ls ih =>
+    intro ls2 p d p' d' h
+    cases h with
+    | more hst hr =>
+      obtain ⟨pm, dm, h'⟩ := ih ls2 _ _ _ _ hr
+      exact ⟨pm, dm, irun.more hst h'⟩
+
+theorem fetchOkRFOfR2 (p0 : Pexv6) (d0 : Efab) (em : Hemission) (pc : Int)
+    (h : fetchOkR2 p0 d0 em pc) : fetchOkRF p0 d0 em pc := by
+  refine ⟨fun pfx ls0 q d1 ls1 pm dm a tvs _ hcs hcin hir => ?_,
+    fun pfx ls0 q d1 ls1 pm dm _ hcs hcin hir hac => h.2 pfx ls0 q d1 ls1 pm dm hcs hcin hir hac⟩
+  obtain ⟨pm', dm', hir'⟩ := PinCycRun.irunPrefix ls1 _ q d1 pm dm hir
+  exact h.1 pfx ls0 q d1 ls1 pm' dm' a tvs hcs hcin hir'
+
 /-- **(4b) THE DATA ACCESS OF A WALK LOAD/STORE** (NAMED, header): a walk load/store cycle takes
 no synchronous exception (its data address translates, and passes PMP/PMA). -/
 def dataOkR (p0 : Pexv6) (d0 : Efab) (em : Hemission) (pc : Int) : Prop :=
@@ -505,6 +546,19 @@ def dataOkR (p0 : Pexv6) (d0 : Efab) (em : Hemission) (pc : Int) : Prop :=
     (pm : Pexv6) (dm : Efab),
     cycStart p0 d0 em pfx pc ls0 q d1 → cycIn em pfx ls0 ls1 → irun ls1 q d1 pm dm →
     ¬ atCause false pm
+
+/-- **(4b′) `dataOkR` at the first `LInstr`** (header; moved here from `PinDataOkAsm.lean`, where
+`dataOkRFOf` proves it from `dataRealized`): `dataOkR` with the premise `LInstr ∉ ls0`. -/
+def dataOkRF (p0 : Pexv6) (d0 : Efab) (em : Hemission) (pc : Int) : Prop :=
+  memPc pc = true →
+  ∀ (pfx : List Eitem) (ls0 : List Wlabel) (q : Pexv6) (d1 : Efab) (ls1 : List Wlabel)
+    (pm : Pexv6) (dm : Efab),
+    LInstr ∉ ls0 → cycStart p0 d0 em pfx pc ls0 q d1 → cycIn em pfx ls0 ls1 → irun ls1 q d1 pm dm →
+    ¬ atCause false pm
+
+theorem dataOkRFOfR (p0 : Pexv6) (d0 : Efab) (em : Hemission) (pc : Int)
+    (h : dataOkR p0 d0 em pc) : dataOkRF p0 d0 em pc :=
+  fun hm pfx ls0 q d1 ls1 pm dm _ => h hm pfx ls0 q d1 ls1 pm dm
 
 /-- **(4c) THE RETURN OF A FENCE-FREE INTERRUPT EXCURSION** (NAMED, header): an interrupt taken
 at a walk boundary whose excursion is fence-free and aligned (`texcRes`) has such an excursion
@@ -592,8 +646,8 @@ theorem cycWalk (G : Gexec) (i : Nat) (em : Hemission) (own : Bool) (p0 : Pexv6)
     (hfeN : ∀ a tvs t, (LIFetch a tvs, t) ∈ em.emItems → t = none) (hft : kFetchText em)
     (hsome : ∀ s n, preach own a0 s n → pstep own s ≠ none)
     (hsail : ∀ s n l, preach own a0 s n → pstep own s = some l → l ≠ [] → cySailAt s.psPc)
-    (hfetch : ∀ s n, preach own a0 s n → fetchOkR2 p0 d0 em s.psPc)
-    (hdata : ∀ s n, preach own a0 s n → dataOkR p0 d0 em s.psPc)
+    (hfetch : ∀ s n, preach own a0 s n → fetchOkRF p0 d0 em s.psPc)
+    (hdata : ∀ s n, preach own a0 s n → dataOkRF p0 d0 em s.psPc)
     (hexc : ∀ s n, preach own a0 s n → excRetR G i p0 d0 em s.psPc) :
     ∀ (N : Nat) (rest : List Eitem), rest.length ≤ N →
     ∀ (pfx : List Eitem) (s : PState) (n : Nat) (p : Pexv6) (d : Efab) (pE : Pexv6) (dE : Efab),
@@ -625,7 +679,7 @@ theorem cycWalk (G : Gexec) (i : Nat) (em : Hemission) (own : Bool) (p0 : Pexv6)
     have hbd0 := hbd
     obtain ⟨-, hrun0, cpu, rs, fn, ib, rfl, hkinv⟩ := hbd
     rcases pureSplit _ _ _ _ _ hrun cpu rs fn ib rfl hkinv.2.2 with hni |
-      ⟨ls0, ls1, rs', tick, d1, hls, h0, hr0, hr1, hag, hrb'⟩
+      ⟨ls0, ls1, rs', tick, d1, hls, hni0, h0, hr0, hr1, hag, hrb'⟩
     · exact ⟨[], rest, s, n, _, d, rfl, .stop pfx s, hreach, by rwa [List.append_nil], hrun,
         by rw [List.append_nil]; exact Or.inr (Or.inr (Or.inl hni))⟩
     have hkinv' : kInv s.psPc rs' := PinCycRun.kInvAgree s.psPc rs rs' hag hrb' hkinv
@@ -638,14 +692,14 @@ theorem cycWalk (G : Gexec) (i : Nat) (em : Hemission) (own : Bool) (p0 : Pexv6)
     have hcs : cycStart p0 d0 em pfx s.psPc ls0 (.PHart cpu (riscvStep tick) rs' none ibNone) d1 :=
       ⟨_, d, hbd0, hr0, cpu, tick, rs', rfl⟩
     have hA : ∀ ls1' l' ls2 pm dm, ls1 = ls1' ++ l' :: ls2 →
-        irun ls1' (.PHart cpu (riscvStep tick) rs' none ibNone) d1 pm dm →
+        irun (ls1' ++ [l']) (.PHart cpu (riscvStep tick) rs' none ibNone) d1 pm dm →
         feAdm kA (kAa s.psPc) (st0.fe.length + (feLabs ls1').length) l' := by
       intro ls1' l' ls2 pm dm e hir a tvs hl'
       subst hl'
       refine ⟨?_, PinCycRun.kAOfText em hft hfeN a tvs (hsub _ ?_)⟩
       · show a = s.psPc + 2 * ((0 + (feLabs ls1').length : Nat) : Int)
         rw [Nat.zero_add]
-        exact (hfetch s n hreach).1 pfx ls0 _ d1 ls1' pm dm a tvs hcs
+        exact (hfetch s n hreach).1 pfx ls0 _ d1 ls1' pm dm a tvs hni0 hcs
           ⟨rest, hes, ⟨ls2, by rw [hls, e]; simp⟩⟩ hir
       · rw [hls, e]; simp
     rcases cyRun kA (kAa s.psPc) cyS (cyT s.psPc) (cyPost s.psPc) ls1 _ d1 pE dE hr1 cpu
@@ -661,11 +715,11 @@ theorem cycWalk (G : Gexec) (i : Nat) (em : Hemission) (own : Bool) (p0 : Pexv6)
         exfalso
         have hac : atCause false (.PHart cpu (.impure (.ok (.regWrite r v)) k) rs1 fn1 ib1) :=
           ⟨cpu, r, v, k, rs1, fn1, ib1, rfl, hsr, hcb⟩
-        obtain ⟨_, _, _, _, _, e, hib⟩ := (hfetch s n hreach).2 pfx ls0 _ d1 la _ dm hcs hcin hira hac
+        obtain ⟨_, _, _, _, _, e, hib⟩ := (hfetch s n hreach).2 pfx ls0 _ d1 la _ dm hni0 hcs hcin hira hac
         cases e
         have han : st1.an = true := by rw [hm1.2.2.2.2.2]; exact hib
         have hmem := (hT han).2
-        exact hdata s n hreach hmem pfx ls0 _ d1 la _ dm hcs hcin hira hac
+        exact hdata s n hreach hmem pfx ls0 _ d1 la _ dm hni0 hcs hcin hira hac
       | true =>
         have hac : atCause true (.PHart cpu (.impure (.ok (.regWrite r v)) k) rs1 fn1 ib1) :=
           ⟨cpu, r, v, k, rs1, fn1, ib1, rfl, hsr, hcb⟩
@@ -782,8 +836,8 @@ theorem cycRunOfHartConf (G : Gexec) (i : Nat) (row : List Lbl) (p0 : Pexv6) (dv
     (hft : kFetchText em)
     (hsail : ∀ s n l, preach own (pinStart pcL) s n → pstep own s = some l → l ≠ [] →
       cySailAt s.psPc)
-    (hfetch : ∀ s n, preach own (pinStart pcL) s n → fetchOkR2 p0 (dv 0) em s.psPc)
-    (hdata : ∀ s n, preach own (pinStart pcL) s n → dataOkR p0 (dv 0) em s.psPc)
+    (hfetch : ∀ s n, preach own (pinStart pcL) s n → fetchOkRF p0 (dv 0) em s.psPc)
+    (hdata : ∀ s n, preach own (pinStart pcL) s n → dataOkRF p0 (dv 0) em s.psPc)
     (hexc : ∀ s n, preach own (pinStart pcL) s n → excRetR G i p0 (dv 0) em s.psPc)
     (base rest : List Eitem) (hes : em.emItems = base ++ rest)
     (hstart : ∀ p d, pevrun (base.map Prod.fst) p0 (dv 0) p d →

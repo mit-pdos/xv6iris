@@ -70,7 +70,7 @@ theorem fetchOkRFiOf (p0 : Pexv6) (d0 : Efab) (em : Hemission) (pc : Int) (h0 : 
   obtain ⟨p, d, hbd, hrun0, -⟩ := hcs
   obtain ⟨-, -, cpu0, rs, fn, ib, rfl, hkinv⟩ := hbd
   rcases pureSplit _ _ _ _ _ hrun0 cpu0 rs fn ib rfl hkinv.2.2 with hni' |
-    ⟨ls0', ls1', rs'', tick', d1'', hls, -, hr0, hr1, hag, hrb'⟩
+    ⟨ls0', ls1', rs'', tick', d1'', hls, -, -, hr0, hr1, hag, hrb'⟩
   · exact absurd (List.mem_append_right _ List.mem_cons_self) hni'
   obtain ⟨hs1, hs2⟩ := splitLast LInstr ls0 ls0' ls1' hni hls
   subst ls0'
