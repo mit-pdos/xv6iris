@@ -149,4 +149,35 @@ theorem CapPcLog.pcLogOfDmaDev (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec 
       if n = 0 then RelSiteProvExp.pcLogOf σ else RelSiteProvExp.pcLogOf σ ++ [-1] :=
   CapPcLog.pcLogOfDma σ pa n w
 
+/-- **What one pool step does to the pc record** (powered on): nothing, one hart store, or one DMA
+write (with its device's move). -/
+def CapPcLog.stepPc (σ σ' : MState) : Prop :=
+  CapPcLog.keepsPc σ σ' ∨
+  (∃ (cpu : CPU) (n va : Nat) (req : Mem_write_request n va Arch.pa Arch.translation Arch.arch_ak)
+    (w : BitVec (8 * n)), σ' = σ.store cpu req.pa n w (akExcl req.access_kind)) ∨
+  (∃ (d : DevId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (s' : DevSt d), σ' = (σ.storeDma pa n w).setDev d s')
+
+/-- **A thread-pool step with the power on** (`MachCSL.primStep`) is one of `stepPc`'s three
+kinds: the hart and device arms by `hartStepPc`/`devStepPc`, the corpse arms and power-off keep the
+machine state (power-on needs the power off). -/
+theorem CapPcLog.primStepPc {e : Expr} {g : GState} {obs : List Obs} {e' : Expr} {g' : GState}
+    {efs : List Expr} (h : primStep (e, g) obs (e', g', efs)) (hp : g.pow = true) : CapPcLog.stepPc g.m g'.m := by
+  cases e with
+  | hart gen cpu m =>
+    obtain ⟨-, ⟨-, -, m', σ', -, hs, rfl⟩ | ⟨-, -, -, rfl⟩⟩ := h
+    · rcases CapPcLog.hartStepPc cpu m g.m m' σ' hs with hk | ⟨n, va, req, w, he⟩
+      · exact Or.inl hk
+      · exact Or.inr (Or.inl ⟨cpu, n, va, req, w, he⟩)
+    · exact Or.inl ⟨rfl, rfl⟩
+  | dev gen d tid m =>
+    rcases h with ⟨-, m', σ', -, hs, rfl⟩ | ⟨-, -, -, -, rfl⟩
+    · rcases CapPcLog.devStepPc gen d tid m g.m obs m' σ' efs hs with hk | ⟨pa, n, w, s', he⟩
+      · exact Or.inl hk
+      · exact Or.inr (Or.inr ⟨d, pa, n, w, s', he⟩)
+    · exact Or.inl ⟨rfl, rfl⟩
+  | power =>
+    obtain ⟨-, ⟨-, -, -, rfl⟩ | ⟨hp', -⟩⟩ := h
+    · exact Or.inl ⟨rfl, rfl⟩
+    · rw [hp] at hp'; cases hp'
+
 end Weak
