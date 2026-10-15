@@ -330,4 +330,49 @@ theorem CapPcLog.stepHartN {t t' : List Expr} {g g' : GState} {obs : List Obs}
     simp only [CapPcLog.hartNApp, CapPcLog.hartNCons, hsame.1, hsame.2]
     omega
 
+/-- **A pool step's effect on the generation and the power**: the generation never drops; with the
+power on, either nothing changes or the power goes off and the generation rises. -/
+theorem CapPcLog.stepGen {t t' : List Expr} {g g' : GState} {obs : List Obs}
+    (h : Iris.ProgramLogic.Language.Step (t, g) obs (t', g')) :
+    g.gen ≤ g'.gen ∧ (g.pow = true → (g'.gen = g.gen ∧ g'.pow = true) ∨ g'.gen = g.gen + 1) := by
+  cases h with
+  | @atomic e σ₀ obs₀ e' σ₁ eₜ H t₁ t₂ =>
+    cases e with
+    | hart gen c m =>
+      obtain ⟨-, ⟨-, -, m', σ', -, -, rfl⟩ | ⟨-, -, -, rfl⟩⟩ := H <;>
+        exact ⟨Nat.le_refl _, fun hp => Or.inl ⟨rfl, hp⟩⟩
+    | dev gen d tid m =>
+      rcases H with ⟨-, m', σ', -, -, rfl⟩ | ⟨-, -, -, -, rfl⟩ <;>
+        exact ⟨Nat.le_refl _, fun hp => Or.inl ⟨rfl, hp⟩⟩
+    | power =>
+      obtain ⟨-, ⟨-, -, -, rfl⟩ | ⟨hp', -, -, hb⟩⟩ := H
+      · exact ⟨Nat.le_succ _, fun _ => Or.inr rfl⟩
+      · refine ⟨Nat.le_of_eq hb.1.symm, fun hp => ?_⟩
+        rw [hp] at hp'; cases hp'
+
+/-- The generation never drops along a run. -/
+theorem CapPcLog.mrunGen {n : Nat} {ρ ρ' : List Expr × GState} {κ : List Obs}
+    (h : MachOfPf.MRun n ρ κ ρ') : ρ.2.gen ≤ ρ'.2.gen := by
+  induction h with
+  | refl => exact Nat.le_refl _
+  | @cons _ ρ₁ ρ₂ ρ₃ _ _ hs _ ih =>
+    obtain ⟨t₁, g₁⟩ := ρ₁
+    obtain ⟨t₂, g₂⟩ := ρ₂
+    exact Nat.le_trans (CapPcLog.stepGen hs).1 ih
+
+/-- **Along a run that keeps the power on and the generation, every hart keeps its thread count.** -/
+theorem CapPcLog.mrunHartN {n : Nat} {ρ ρ' : List Expr × GState} {κ : List Obs}
+    (h : MachOfPf.MRun n ρ κ ρ') (hp : ρ.2.pow = true) (hg : ρ'.2.gen = ρ.2.gen) (cpu : CPU) :
+    CapPcLog.hartN cpu ρ'.1 = CapPcLog.hartN cpu ρ.1 := by
+  induction h with
+  | refl => rfl
+  | @cons _ ρ₁ ρ₂ ρ₃ _ _ hs hr ih =>
+    obtain ⟨t₁, g₁⟩ := ρ₁
+    obtain ⟨t₂, g₂⟩ := ρ₂
+    have hm := CapPcLog.mrunGen hr
+    rcases (CapPcLog.stepGen hs).2 hp with ⟨hg2, hp2⟩ | hg2
+    · rw [ih hp2 (by simp only at hg hg2 ⊢; omega)]
+      exact CapPcLog.stepHartN hs hp cpu
+    · simp only at hg hg2 hm; omega
+
 end Weak
