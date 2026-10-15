@@ -682,6 +682,8 @@ import Weak.PinFetchPaWalk
 import Weak.PinFetchPaTlb
 import Weak.PinFetchPaAddr
 import Weak.PinFetchPaRun
+import Weak.PinFetchPaFq
+import Weak.PinFetchPaCy
 import Weak.PinDataOkWr
 import Weak.PinDataOkWalk
 import Weak.PinDataOkVmem

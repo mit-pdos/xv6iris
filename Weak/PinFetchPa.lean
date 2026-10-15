@@ -43,6 +43,9 @@ structure TCfg where
   b1 : BitVec 44
   b0 : BitVec 44
   vpn : BitVec 27
+  /-- Further vpns whose resident TLB entries the filter also requires to be the identity (the
+  other halfword's vpn of a fetch crossing a page; r2 glue, `PROGRESS-r2glue.md`). -/
+  vs : List (BitVec 27) := []
 
 /-- The kernel's `satp`: mode Sv39 (8), ASID 0, root page `b` (`MAKE_SATP`). -/
 def kSatp (b : BitVec 44) : BitVec 64 := 8#4 ++ 0#16 ++ b
@@ -52,10 +55,12 @@ def tlbIdOk (vpn : BitVec 27) (tlb : Tlb) : Prop :=
   ∀ (i : Nat) (hi : i < 2 ^ 6) (ent : TLB_Entry), tlb[i] = some ent →
     match_TLB_Entry ent 0#16 (sign_extend (m := 45) vpn) = true → tlb_get_ppn 39 ent vpn = idPpn vpn
 
-/-- The filtered registers' clause: `satp` is `kSatp b`, the `tlb` is `tlbIdOk`. -/
+/-- The filtered registers' clause: `satp` is `kSatp b`, the `tlb` is `tlbIdOk` at `vpn` and at
+every vpn of `vs`. -/
 def tvFix (c : TCfg) (r : Register) (v : RegisterType r) : Prop :=
   (∀ h : r = .satp, cast (congrArg RegisterType h) v = kSatp c.b) ∧
-  (∀ h : r = .tlb, tlbIdOk c.vpn (cast (congrArg RegisterType h) v))
+  (∀ h : r = .tlb, tlbIdOk c.vpn (cast (congrArg RegisterType h) v) ∧
+    ∀ x ∈ c.vs, tlbIdOk x (cast (congrArg RegisterType h) v))
 
 /-- **The register filter**: boot-admitted, and the filtered registers' clause. -/
 def tvRk (c : TCfg) (r : Register) (v : RegisterType r) : Prop := Rboot r v ∧ tvFix c r v
@@ -100,7 +105,15 @@ theorem tvRkSatp {c : TCfg} {v : RegisterType .satp} (h : tvRk c .satp v) : v = 
 
 /-- A `tlb` answer is `tlbIdOk`. -/
 theorem tvRkTlb {c : TCfg} {v : RegisterType .tlb} (h : tvRk c .tlb v) : tlbIdOk c.vpn v :=
-  h.2.2 rfl
+  (h.2.2 rfl).1
+
+/-- A `tlb` answer is `tlbIdOk` at every vpn of `vs`. -/
+theorem tvRkTlbVs {c : TCfg} {v : RegisterType .tlb} (h : tvRk c .tlb v) : ∀ x ∈ c.vs, tlbIdOk x v :=
+  (h.2.2 rfl).2
+
+/-- An entry is the identity at every vpn of `vs` it matches (ASID 0). -/
+def tlbVsOk (c : TCfg) (ent : TLB_Entry) : Prop :=
+  ∀ x ∈ c.vs, match_TLB_Entry ent 0#16 (sign_extend (m := 45) x) = true → tlb_get_ppn 39 ent x = idPpn x
 
 /-- A write the `satp`/`tlb`-free footprint admits is `tvRk`-admitted. -/
 theorem tvRkOfW (c : TCfg) (r : Register) (v : RegisterType r) (h : xfW r v) : tvRk c r v := by
