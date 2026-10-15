@@ -111,6 +111,8 @@ structure XState where
   rtV : DevRt
   /-- the issuing pc of each store (`MState.pcAt`) -/
   pcAt : Nat → Int
+  /-- the pending stale exclusive read (`MState.xstale`) -/
+  xstale : CPU → Option Nat
 
 namespace XState
 
@@ -169,13 +171,15 @@ def abs (x : XState) : MState where
   devs := x.devs
   devrt := x.rt
   pcAt := x.pcAt
+  xstale := x.xstale
 
 end XState
 
 /-- Two language states with the same fields are the same state. -/
 theorem MState.ext' {a b : MState} (h1 : a.regs = b.regs) (h2 : a.mem = b.mem) (h3 : a.log = b.log)
     (h4 : a.tv = b.tv) (h5 : a.itv = b.itv) (h6 : a.hr = b.hr) (h7 : a.resv = b.resv)
-    (h8 : a.devs = b.devs) (h9 : a.devrt = b.devrt) (h10 : a.pcAt = b.pcAt) : a = b := by
+    (h8 : a.devs = b.devs) (h9 : a.devrt = b.devrt) (h10 : a.pcAt = b.pcAt)
+    (h11 : a.xstale = b.xstale) : a = b := by
   cases a; cases b; simp_all
 
 theorem updCpu_self {α : Type} (f : CPU → α) (c : CPU) : updCpu f c (f c) = f := by
@@ -300,6 +304,7 @@ theorem abs_store (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8
   · exact hi.trans (updCpu_self _ _)
   · exact hh
   · exact hv
+  · rfl
   · rfl
   · rfl
   · rfl

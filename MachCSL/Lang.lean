@@ -111,6 +111,12 @@ structure MState where
   records the hart's `PC`; an exclusive store (`sc`, an AMO's write, the page
   walker's A/D write-back) and a DMA write record `-1`. -/
   pcAt : Nat → Int
+  /-- THE PENDING STALE EXCLUSIVE READ (W11-F [OWN.105], narrow δ1; ghost of the
+  stale silent AMO): `some tvn` iff the hart's last exclusive read read the
+  footprint at the PAST view `tvn` (below the top) -- its write may then only
+  complete SILENTLY (value-preserving) or retry; `none` otherwise.  No step sets
+  it yet (increment 1: the field only). -/
+  xstale : CPU → Option Nat := fun _ => none
 
 /-- The top of the store order: the timestamp of the latest store. -/
 abbrev MState.top (σ : MState) : Nat := σ.log.length
@@ -351,7 +357,8 @@ def bootShape (g g' : GState) : Prop :=
 current file, reload the image, reset the devices. -/
 def bootWitness (g : GState) : GState :=
   { m := ⟨fun cpu => bootLand cpu (g.m.regs cpu), imgFlat bootImage, [], fun _ => 0, fun _ => 0,
-          fun _ => HRead.zero, fun _ => none, g.m.devs.reset, fun _ => DevRt.init, fun _ => -1⟩,
+          fun _ => HRead.zero, fun _ => none, g.m.devs.reset, fun _ => DevRt.init, fun _ => -1,
+          fun _ => none⟩,
     gen := g.gen, pow := true }
 
 /-- All harts. -/
