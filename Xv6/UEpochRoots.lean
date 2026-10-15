@@ -66,7 +66,7 @@ theorem ptreeOwn_kptOn_ne [CurCtx] (t tk : PTree) (M : RegMapF (BitVec 64)) (hpv
   icases Hb0 with ⟨%e, %H, Hp, -⟩
   -- the kernel's frozen first root entry
   unfold kptOn kptCore
-  icases Hk with ⟨%hf, _, _, %fl, ⟨%S, _, _, _, _, #Hptrs, _, _⟩, _⟩
+  icases Hk with ⟨%⟨hf, -⟩, _, _, %fl, ⟨%S, _, _, _, _, #Hptrs, _, _⟩, _⟩
   ihave #Hc := kptPtrs_acc tk fl 0 (pteAddr tk.base 0#9) (tk.ents 0#9) (entries_get0 tk)
     (kpt_root_nonleaf tk hf.1 0#9) $$ Hptrs
   unfold ptrCell histBytes

@@ -220,6 +220,12 @@ def kptFacts (t : PTree) (M : RegMapF (BitVec 64)) : Prop :=
   (∀ (vpn : BitVec 27) (v : BitVec 64), get? M vpn.toNat = some v →
     ∃ (addr : BitVec 64) (ppn : BitVec 44) (perm : KPerm), v = kLeaf ppn perm 0#1 0#1 ∧ t.maps vpn addr ppn perm)
 
+/-- **No entry of `t` is a static kernel-stack byte** (mcslrec (3) X1): the
+table's pages are off the client's static stacks (`RsvKind.stack`; xv6:
+`kalloc`'d pages, above `end`, and `stack0` below it). -/
+def kptStackOff (t : PTree) : Prop :=
+  ∀ e ∈ t.entries 2, ∀ j, j < 8 → ¬ stackByteIn (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (e.1 + BitVec.ofNat 64 j)
+
 /-- **The kernel page table is installed** (persistent): the table `t` is
 well-formed with distinct pages and entries in RAM, the mapping `M` is
 published (its auth discarded, so no element ever changes), the leaves sit
@@ -231,7 +237,7 @@ entry's POSITION in `t.entries 2`, not by its address: the seal chooses one
 function for the whole list by induction on it, which needs no argument
 that the addresses are distinct. -/
 def kptOn [CurCtx] (t : PTree) (M : RegMapF (BitVec 64)) : IProp GF := iprop%
-  ⌜kptFacts t M⌝ ∗ (MachGS.kmapName (hlc := hlc) (GF := GF) ↪●MAP{.discard} M) ∗
+  ⌜kptFacts t M ∧ kptStackOff (hlc := hlc) (GF := GF) t⌝ ∗ (MachGS.kmapName (hlc := hlc) (GF := GF) ↪●MAP{.discard} M) ∗
   (MachGS.kptRootName (hlc := hlc) (GF := GF) ↪VAR{.discard} t.base) ∗
   ∃ fl : Nat → Nat → Nat, kptCore t fl ∗ kptKeys t fl
 
@@ -251,7 +257,7 @@ theorem kptOn_sealed [CurCtx] (t : PTree) (M : RegMapF (BitVec 64)) :
 theorem kptOn_facts [CurCtx] (t : PTree) (M : RegMapF (BitVec 64)) :
     kptOn (GF := GF) t M ⊢ ⌜kptFacts t M⌝ := by
   unfold kptOn
-  iintro ⟨%h, _, _, _⟩
+  iintro ⟨%⟨h, -⟩, _, _, _⟩
   ipureintro
   exact h
 
@@ -259,7 +265,7 @@ theorem kptOn_kmapAt [CurCtx] (t : PTree) (M : RegMapF (BitVec 64)) (vpn : BitVe
     kptOn (GF := GF) t M ∗ kmapAt vpn v ⊢
       ⌜∃ (addr : BitVec 64) (ppn : BitVec 44) (perm : KPerm), v = kLeaf ppn perm 0#1 0#1 ∧ t.maps vpn addr ppn perm⌝ := by
   unfold kptOn kmapAt
-  iintro ⟨⟨%hf, Hauth, _, _⟩, Hel⟩
+  iintro ⟨⟨%⟨hf, -⟩, Hauth, _, _⟩, Hel⟩
   icases ghost_map_lookup $$ Hauth Hel with %hget
   ipureintro
   exact hf.2.2.2 vpn v hget
@@ -465,7 +471,7 @@ theorem kpt_readAU [CurCtx] (cpu : CPU) (t : PTree) (M : RegMapF (BitVec 64)) (a
       ownCtx cpu curCtx ∗ ∃ (K : Nat) (tsl : List (Nat × Agent)), viewLb cpu K ∗
         readAU cpu addr 8 K tsl (fun w => iprop(⌜pteVariant c w⌝)) := by
   unfold kptOn kptCore
-  iintro ⟨⟨%hf, _, _, %fl, ⟨%S, #Hinv, %hfl, #HS, #Hroot, #Hptrs, _⟩, #Hkeys⟩, Hctx⟩
+  iintro ⟨⟨%⟨hf, hso⟩, _, _, %fl, ⟨%S, #Hinv, %hfl, #HS, #Hroot, #Hptrs, _⟩, #Hkeys⟩, Hctx⟩
   obtain ⟨i, hi⟩ := List.getElem?_of_mem hmem
   ihave #Hk8 := kptKeys_acc t fl i (addr, c) hi $$ Hkeys
   icases srcCertAt_of_keys cpu curCtx (fl i) 8 $$ [Hctx Hk8] with ⟨Hctx, #Hkc⟩
@@ -585,9 +591,9 @@ theorem kpt_readAU [CurCtx] (cpu : CPU) (t : PTree) (M : RegMapF (BitVec 64)) (a
           have h0 := hcs _ (List.mem_cons_of_mem _ (List.mem_cons_of_mem _ List.mem_cons_self))
           have hpos : ∀ (n' : Nat) (x : BitVec 64 × BitVec 64), (t.entries 2)[n']? = some x →
               ∀ j', j' < 8 → fl n' j' ≤ e.t := fun n' x hx j' hj' => Nat.le_trans (hfl n' x hx j' hj') hSe
-          refine Or.inr (Or.inr (Or.inl ?_))
+          refine Or.inr (Or.inr (Or.inl (Or.inl ⟨?_, hso (addr, c) hmem j hj⟩)))
           rw [haddr]
-          refine KptInv.leaf_ptByteLiveAt _ σ.mem t.base c1.base g.base (KptInv.root_ne_zero t M hf) i1 i0 k
+          refine KptInv.leaf_ptByteAt _ σ.mem t.base c1.base g.base (KptInv.root_ne_zero t M hf) i1 i0 k
             S e.t hSe ra hra Hr hr hrh ?_ ?_ j hj
           · exact KptInv.wordAsOf_heads σ.mem _ e.t _ Hs1 h1 (fun j' hj' => by
               obtain ⟨x, H, h1', h2', h3'⟩ := ht1 j' hj'
@@ -613,7 +619,7 @@ theorem kpt_exclReadAU [CurCtx] (t : PTree) (M : RegMapF (BitVec 64)) (addr c : 
     (hmem : (addr, c) ∈ t.entries 2) (hleaf : pteLeafB c = true) :
     kptOn (GF := GF) t M ⊢ exclReadAU addr 8 (fun w0 => iprop(⌜pteVariant c w0⌝)) := by
   unfold kptOn kptCore
-  iintro ⟨%hf, _, _, %fl, ⟨%S, #Hinv, _⟩, #Hkeys⟩
+  iintro ⟨%⟨hf, -⟩, _, _, %fl, ⟨%S, #Hinv, _⟩, #Hkeys⟩
   obtain ⟨i, hi⟩ := List.getElem?_of_mem hmem
   unfold exclReadAU
   iinv Hinv with Hbody Hclose
@@ -648,7 +654,7 @@ theorem kpt_exclWriteAU [CurCtx] (cpu : CPU) (t : PTree) (M : RegMapF (BitVec 64
     (hw' : pteVariant c w') :
     kptOn (GF := GF) t M ⊢ exclWriteAU cpu addr 8 false w0 w' emp := by
   unfold kptOn kptCore
-  iintro ⟨%hf, _, _, %fl, ⟨%S, #Hinv, _, #HS, _, _, #Hregs, _⟩, #Hkeys⟩
+  iintro ⟨%⟨hf, -⟩, _, _, %fl, ⟨%S, #Hinv, _, #HS, _, _, #Hregs, _⟩, #Hkeys⟩
   obtain ⟨i, hi⟩ := List.getElem?_of_mem hmem
   ihave #Hreg := kptRegs_acc t addr c hmem hleaf $$ Hregs
   iapply exclWriteAU_of_kpt
@@ -1337,7 +1343,7 @@ frozen slots' discarded fragments), which needs every publication word
 unwritten (`pubClean`; the client's `Hpub` hands back `R`) and the root
 word the list's only permanent root (`hroots`). -/
 theorem kptOn_seal [CurCtx] (cpu : CPU) (t : PTree) (M : RegMapF (BitVec 64)) (r : BitVec 44)
-    (hct : curTier = KTier.bare) (hf : kptFacts t M) (ra : PAddr)
+    (hct : curTier = KTier.bare) (hf : kptFacts t M) (hso : kptStackOff (hlc := hlc) (GF := GF) t) (ra : PAddr)
     (hra : (⟨ra, .roots 1 8⟩ : RsvRegion) ∈ MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))
     (hroots : ∀ (base : PAddr) (cnt stride : Nat),
       (⟨base, .roots cnt stride⟩ : RsvRegion) ∈ MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) → base = ra ∧ cnt = 1)
@@ -1395,7 +1401,7 @@ theorem kptOn_seal [CurCtx] (cpu : CPU) (t : PTree) (M : RegMapF (BitVec 64)) (r
   isplitr
   · unfold kptOn
     isplit
-    · ipureintro; exact hf
+    · ipureintro; exact ⟨hf, hso⟩
     isplit
     · iexact Hauth
     isplit

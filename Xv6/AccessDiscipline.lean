@@ -272,7 +272,7 @@ noncomputable def custAt (σ : MState) (a : PAddr) (t : Nat) : Cust :=
   if h1 : ∃ b, staticLockByteOf b a then .lockw (Classical.choose h1) else
   if h2 : ∃ w, pubByteOf w a then .pub (Classical.choose h2) else
   if h3 : ∃ b, dynLockByteAt σ b a t then .lockw (Classical.choose h3) else
-  if ptByteLiveAt xv6Rsv σ.mem t a then .pte else
+  if ptByteExAt xv6Rsv σ.mem t a then .pte else
   if racyByteIn xv6Rsv a then .racy else
   if h7 : ∃ c, a ∈ cpuCellBytes c then .hart (Classical.choose h7) else .free
 
@@ -842,7 +842,7 @@ theorem custAt_notEx {σ : MState} {a : PAddr} {t : Nat} (h1 : ∀ b, custAt σ 
   by_cases c3 : ∃ b, dynLockByteAt σ b a t
   · rw [dif_pos c3] at h1; exact absurd rfl (h1 _)
   rw [dif_neg c3] at h1 h2 h3 h4
-  by_cases c4 : ptByteLiveAt xv6Rsv σ.mem t a
+  by_cases c4 : ptByteExAt xv6Rsv σ.mem t a
   · rw [if_pos c4] at h3; exact absurd rfl h3
   rw [if_neg c4] at h1 h2 h3 h4
   by_cases c5 : racyByteIn xv6Rsv a

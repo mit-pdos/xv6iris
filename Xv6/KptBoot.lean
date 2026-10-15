@@ -66,6 +66,33 @@ theorem kvmTableOk_tramp (t : PTree) (pas : Nat → BitVec 44) (h : kvmTableOk t
   have hr := h.2.2.2.1 _ hm 0 (by decide)
   simpa [trampVpn, trampPpn] using hr
 
+/-- **An allocator page is off `stack0`** (mcslrec (3) X1): `stack0` ends
+below `end`. -/
+theorem pageValid_stackOff (b : BitVec 44) (hv : pageValid (pageAddr b)) (i : BitVec 9) (j : Nat) (hj : j < 8) :
+    ¬ stackByteIn xv6RsvStatic (pteAddr b i + BitVec.ofNat 64 j) := by
+  rintro ⟨base, size, hR, h1, h2⟩
+  obtain ⟨rfl, rfl⟩ := xv6Stack_only base size hR
+  obtain ⟨-, h2', h3'⟩ := hv
+  simp only [BitVec.ult, decide_eq_true_eq, Nat.not_lt, kernelEndAddr, physTop,
+    BitVec.toNat_ofNat, Nat.reducePow, Nat.reduceMod, pageAddr_toNat] at h2' h3'
+  have hi : i.toNat < 512 := i.isLt
+  have hend : KA.«end».toNat = KernelSyms.«end» := rfl
+  have hs : KA.«stack0».toNat = KernelSyms.«stack0» := rfl
+  have hle : KernelSyms.«stack0» + 0x8000 ≤ KernelSyms.«end» := by decide
+  have hlt : (pteAddr b i).toNat + 8 ≤ 2 ^ 64 := by rw [pteAddr_toNat]; omega
+  rw [BitVec.toNat_add, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega : j < 2 ^ 64),
+    Nat.mod_eq_of_lt (by omega)] at h1 h2
+  rw [pteAddr_toNat] at h1 h2
+  omega
+
+/-- `kvmmake`'s table is off `stack0` (mcslrec (3) X1). -/
+theorem kvmTableOk_stackOff (t : PTree) (pas : Nat → BitVec 44) (h : kvmTableOk t pas) :
+    ∀ e ∈ t.entries 2, ∀ j, j < 8 → ¬ stackByteIn xv6RsvStatic (e.1 + BitVec.ofNat 64 j) := by
+  intro e he j hj
+  obtain ⟨b, hb, i, hi⟩ := entries_page 2 t e he
+  rw [hi]
+  exact pageValid_stackOff b (h.2.2.1 b hb) i j hj
+
 /-- `kvmmake`'s table satisfies the installed-table facts for the published
 map. -/
 theorem kvmTableOk_kptFacts_tramp (t : PTree) (pas : Nat → BitVec 44) (h : kvmTableOk t pas) :
@@ -137,7 +164,9 @@ theorem kctx_kptOn_publish [CurCtx] [Xv6G GF] [FdslotG GF] [BioslotG GF] [Irefsl
   ihave Hents := (ptreeOwn_entries (DFrac.own 1) 2 t).1 $$ Ht
   ihave Hrw := (show wordPointsTo (GF := GF) kernelPagetableAddr 8 (DFrac.own 1) (pageAddr t.base) ⊢
       wordPointsTo kernelPagetableAddr 8 (DFrac.own 1) (pteAddr t.base 0#9) from .rfl) $$ Hrw
-  ihave Hseal := kptOn_seal cpu t (kvmMapT pas) r0 hct (kvmTableOk_kptFacts_tramp t pas hok) kernelPagetableAddr hra
+  have hso : kptStackOff (hlc := hlc) (GF := GF) t := by
+    intro e he j hj; rw [heqR]; exact kvmTableOk_stackOff t pas hok e he j hj
+  ihave Hseal := kptOn_seal cpu t (kvmMapT pas) r0 hct (kvmTableOk_kptFacts_tramp t pas hok) hso kernelPagetableAddr hra
     hroots hkok R $$ [Hctx Hents Hrw Hauth Hroot Hpub]
   · iframe Hctx Hents Hrw Hauth Hroot Hpub
   imod Hseal $$ %σ [Hmem Hmm] with ⟨Hmem, Hmm, Hctx, #Hkpt, Hrp, HR⟩

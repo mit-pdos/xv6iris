@@ -95,6 +95,18 @@ word, as of its position, is in `[1, 2^31)` -- as a signed `int`, `≥ 1`
 `Xv6.iRef`/`Xv6.ientry` and the value fact are `IcachePinwObl.iref_certs`). -/
 def xv6IrefRacyR : RsvRegion := ⟨KA.«itable» + 32#64, .racy 50 136 4 1 0x80000000⟩
 
+/-- **The static kernel stacks** (mcslrec (3) [OWN.90]/[OWN.104] X1):
+`stack0` (`start.c`: `char stack0[4096 * NCPU]`, `0x8000` bytes), each hart's
+boot and scheduler stack -- a footprint-free registry entry
+(`MachCSL.RsvKind.stack`). -/
+def xv6Stack0R : RsvRegion := ⟨KA.«stack0», .stack 0x8000⟩
+
+/-- **The kernel-stack mappings** (mcslrec (3) X1): the 64 `KSTACK(i)` pages
+`0x3FFFFFF - 2 (i + 1)` of the kernel table (`memlayout.h`, `Xv6.kstackVpn`)
+-- a footprint-free registry entry (`MachCSL.RsvKind.kstacks`; the base is a
+tag, `0`). -/
+def xv6KstacksR : RsvRegion := ⟨0#64, .kstacks 64 0x3FFFFFF⟩
+
 /-- `started` (`main.c`), the boot handover's ONE-SHOT PUBLICATION word (W8
 (f2-ctx), Q-F2-BOOTGATE (a) as amended by [R35.2]): written once, by hart 0. -/
 def xv6StartedR : RsvRegion := ⟨KA.«started», .pub ⟨0, by decide⟩⟩
@@ -130,7 +142,7 @@ word). -/
 def xv6PostLockRegions : List RsvRegion :=
   [xv6LockR KA.«tickslock», xv6LockR KA.«bcache»] ++ (xv6BufLockRegions ++ ([xv6LockR KA.«itable»] ++
     (xv6InodeLockRegions ++ [xv6LockR KA.«log», xv6LockR KA.«ftable», xv6LockR rsvDiskLk, xv6PipeSlotsR,
-      xv6KptRootR, xv6ProcRootsR, xv6IrefRacyR, xv6FreeHeadR])))
+      xv6KptRootR, xv6ProcRootsR, xv6IrefRacyR, xv6FreeHeadR, xv6Stack0R, xv6KstacksR])))
 
 /-- xv6's static reserved regions, in address order. -/
 def xv6RsvStatic : List RsvRegion :=
@@ -225,6 +237,28 @@ theorem xv6Roots_only (base : PAddr) (cnt stride : Nat)
 
 theorem xv6RsvStatic_irefRacy : xv6IrefRacyR ∈ xv6RsvStatic := by decide +kernel
 
+/-- `stack0` is the list's only static kernel stack (mcslrec (3) X1). -/
+theorem xv6Stack_only (base : PAddr) (size : Nat)
+    (h : (⟨base, .stack size⟩ : RsvRegion) ∈ xv6RsvStatic) : base = KA.«stack0» ∧ size = 0x8000 := by
+  have hall : xv6RsvStatic.all (fun R => match R.kind with
+      | .stack sz => decide (R.base = KA.«stack0») && decide (sz = 0x8000)
+      | _ => true) = true := by decide +kernel
+  have := List.all_eq_true.1 hall _ h
+  simpa using this
+
+/-- The `KSTACK(i)` mappings are the list's only kernel-stack mappings (mcslrec (3) X1). -/
+theorem xv6Kstacks_only (base : PAddr) (cnt vhi : Nat)
+    (h : (⟨base, .kstacks cnt vhi⟩ : RsvRegion) ∈ xv6RsvStatic) : cnt = 64 ∧ vhi = 0x3FFFFFF := by
+  have hall : xv6RsvStatic.all (fun R => match R.kind with
+      | .kstacks c v => decide (c = 64) && decide (v = 0x3FFFFFF)
+      | _ => true) = true := by decide +kernel
+  have := List.all_eq_true.1 hall _ h
+  simpa using this
+
+theorem xv6RsvStatic_stack0 : xv6Stack0R ∈ xv6RsvStatic := by decide +kernel
+
+theorem xv6RsvStatic_kstacks : xv6KstacksR ∈ xv6RsvStatic := by decide +kernel
+
 /-- The free-list head word is registered. -/
 theorem xv6RsvStatic_freeHead : xv6FreeHeadR ∈ xv6RsvStatic := by decide +kernel
 
@@ -312,7 +346,9 @@ def rsvLocksLow (rs : List RsvRegion) : Bool :=
     | .roots _ _ => true
     | .uroots _ _ => true
     | .freeHead _ _ => true
-    | .racy _ _ _ _ _ => true)
+    | .racy _ _ _ _ _ => true
+    | .stack _ => true
+    | .kstacks _ _ => true)
 
 theorem xv6RsvStatic_locksLow : rsvLocksLow xv6RsvStatic = true := by decide +kernel
 

@@ -1322,6 +1322,68 @@ theorem ptPtrTo_fill01_notRam (mask : Nat) (hm : mask < 256) (c : PAddr) (hp : p
 def lockPubByteIn (rs : List RsvRegion) (a : PAddr) : Prop :=
   ∃ R ∈ rs, ((∃ cb, R.kind = .lock cb) ∨ (∃ w, R.kind = .pub w)) ∧ a ∈ R.bytes
 
+/-! ### The kernel stacks (mcslrec (3) [OWN.90]/[OWN.104] X1)
+
+The bytes the client's kernel code keeps its stack frames in: its STATIC
+stacks (`RsvKind.stack`; xv6: `stack0`), and -- once a publication word is
+written (after the kernel table's seal, `MachCSL.pubAfter`) -- the pages its
+permanent kernel table maps at the KERNEL-STACK virtual pages
+(`RsvKind.kstacks`; xv6: `KSTACK(i)`), read off the memory AS OF a position.
+No byte of them is exempt from the load-side invariant through a dynamic
+lock's window or a FREEABLE (user) table's walk, and a static stack's bytes
+not through the permanent table's either (`chainExAt`). -/
+
+/-- The Sv39 index of the virtual page `vpn` at level `l`. -/
+def kvpnIdx (vpn l : Nat) : Nat := vpn / 2 ^ (9 * l) % 512
+
+/-- A Sv39 LEAF entry (`V` set, one of `R`/`W`/`X` set) mapping the page `p`. -/
+def ptLeafTo (v : BitVec 64) (p : PAddr) : Prop :=
+  v.getLsbD 0 = true ∧ v &&& 0xE#64 ≠ 0#64 ∧ p = ((v >>> 10) <<< 12) &&& 0x00FFFFFFFFFFF000#64
+
+/-- **The walk from the root page `r` maps the virtual page `vpn` to the page
+`p`, as of `t`**: two pointer entries and a 4 KiB leaf. -/
+def ptLeafAt (m : FlatMem) (t : Nat) (r : PAddr) (vpn : Nat) (p : PAddr) : Prop :=
+  ∃ (v2 v1 v0 : BitVec 64) (p1 p0 : PAddr),
+    wordAsOf m (r + BitVec.ofNat 64 (8 * kvpnIdx vpn 2)) t v2 ∧ ptPtrTo v2 p1 ∧
+    wordAsOf m (p1 + BitVec.ofNat 64 (8 * kvpnIdx vpn 1)) t v1 ∧ ptPtrTo v1 p0 ∧
+    wordAsOf m (p0 + BitVec.ofNat 64 (8 * kvpnIdx vpn 0)) t v0 ∧ ptLeafTo v0 p
+
+/-- **`p` is a kernel-stack page as of `t`**: a permanent root word of `rs`
+holds a root page whose walk maps one of `rs`'s kernel-stack virtual pages
+to `p`. -/
+def kstkPageAt (rs : List RsvRegion) (m : FlatMem) (t : Nat) (p : PAddr) : Prop :=
+  ∃ (base : PAddr) (cnt vhi i : Nat) (r : PAddr), (⟨base, .kstacks cnt vhi⟩ : RsvRegion) ∈ rs ∧ i < cnt ∧
+    ptRootAt rs m t r ∧ ptLeafAt m t r (vhi - 2 * (i + 1)) p
+
+/-- A publication word of `rs` has been written as of `t`. -/
+def pubWrittenAt (rs : List RsvRegion) (m : FlatMem) (t : Nat) : Prop :=
+  ∃ (f : PAddr) (w : CPU) (e : HEnt), (⟨f, .pub w⟩ : RsvRegion) ∈ rs ∧ m.entAsOf f t = some e ∧ e.t ≠ 0
+
+/-- `a` is a byte of a static kernel stack of `rs`. -/
+def stackByteIn (rs : List RsvRegion) (a : PAddr) : Prop :=
+  ∃ (base : PAddr) (size : Nat), (⟨base, .stack size⟩ : RsvRegion) ∈ rs ∧
+    base.toNat ≤ a.toNat ∧ a.toNat < base.toNat + size
+
+/-- **A kernel-stack byte as of `t`**: of a static stack, or -- a publication
+word written -- of a kernel-stack page. -/
+def ksByteAt (rs : List RsvRegion) (m : FlatMem) (t : Nat) (a : PAddr) : Prop :=
+  stackByteIn rs a ∨
+    (pubWrittenAt rs m t ∧ ∃ p : PAddr, kstkPageAt rs m t p ∧ p.toNat ≤ a.toNat ∧ a.toNat < p.toNat + 4096)
+
+/-- **The exempt page-table bytes** (mcslrec (3) X1): the permanent table's
+walk off the static stacks, a FREEABLE table's live walk off every
+kernel-stack byte. -/
+def ptByteExAt (rs : List RsvRegion) (m : FlatMem) (t : Nat) (a : PAddr) : Prop :=
+  (ptByteAt rs m t a ∧ ¬ stackByteIn rs a) ∨
+    ((∃ r p : PAddr, ptURootAt rs m t r ∧ ptLivePageAt rs m t r p ∧ p.toNat ≤ a.toNat ∧ a.toNat < p.toNat + 4096) ∧
+      ¬ ksByteAt rs m t a)
+
+theorem ptByteExAt_live {rs : List RsvRegion} {m : FlatMem} {t : Nat} {a : PAddr} (h : ptByteExAt rs m t a) :
+    ptByteLiveAt rs m t a := by
+  rcases h with ⟨h, -⟩ | ⟨h, -⟩
+  · exact .inl h
+  · exact .inr h
+
 /-- A byte of the two words (`lk->locked`, `lk->cpu`) of the spinlock at `b`. -/
 def lockWordsByte (b a : PAddr) : Prop :=
   (∃ j, j < 4 ∧ a = b + BitVec.ofNat 64 j) ∨ (∃ j, j < 8 ∧ a = b + 16#64 + BitVec.ofNat 64 j)
@@ -1364,7 +1426,7 @@ device-ring arm: the used ring's hart-authored entries -- hart 0's boot
 zeroes -- are now CERTIFIED, `Xv6.DiskAcc.usedIdx_certs`.) -/
 def chainExAt (rs : List RsvRegion) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop) (m : FlatMem)
     (top : Nat) (a : PAddr) (t : Nat) : Prop :=
-  lockPubByteIn rs a ∨ (∃ b, dynLkDiscAt rs wit m top b t ∧ lockWordsByte b a) ∨ ptByteLiveAt rs m t a ∨
+  lockPubByteIn rs a ∨ (∃ b, dynLkDiscAt rs wit m top b t ∧ lockWordsByte b a) ∨ ptByteExAt rs m t a ∨
     racyValAt rs m t a
 
 /-- Reading AS OF a position at or below the top is unchanged by a step that
@@ -1436,6 +1498,16 @@ theorem ptByteLiveAt_grow {rs : List RsvRegion} {m m' : FlatMem} {top t : Nat} (
   simp only [ptByteLiveAt, ptByteAt_grow hg hm ht, ptURootAt, ptLivePageAt, ptLiveChildAt,
     wordAsOf_grow hg hm ht, wordPosAsOf_grow hg hm ht, ptFreedSince_grow hg hm ht]
 
+theorem ksByteAt_grow {rs : List RsvRegion} {m m' : FlatMem} {top t : Nat} (hg : memGrow m top m')
+    (hm : memAbove m top m') (ht : t ≤ top) (a : PAddr) : ksByteAt rs m' t a ↔ ksByteAt rs m t a := by
+  simp only [ksByteAt, pubWrittenAt, kstkPageAt, ptRootAt, ptLeafAt, wordAsOf_grow hg hm ht,
+    FlatMem.entAsOf_grow hg hm ht]
+
+theorem ptByteExAt_grow {rs : List RsvRegion} {m m' : FlatMem} {top t : Nat} (hg : memGrow m top m')
+    (hm : memAbove m top m') (ht : t ≤ top) (a : PAddr) : ptByteExAt rs m' t a ↔ ptByteExAt rs m t a := by
+  simp only [ptByteExAt, ptByteAt_grow hg hm ht, ksByteAt_grow hg hm ht, ptURootAt, ptLivePageAt, ptLiveChildAt,
+    wordAsOf_grow hg hm ht, wordPosAsOf_grow hg hm ht, ptFreedSince_grow hg hm ht]
+
 /-- A permanent-table byte is a live page-table byte (the kernel side: the
 kernel table is never freed, so its walk needs no freed-check). -/
 theorem ptByteLiveAt_of_ptByteAt {rs : List RsvRegion} {m : FlatMem} {t : Nat} {a : PAddr}
@@ -1484,7 +1556,7 @@ theorem chainExAt_grow {rs : List RsvRegion} {wit : List (PAddr × HEnt) → PAd
   rcases h with h | ⟨b, hb, hw⟩ | h | h
   · exact .inl h
   · exact .inr (.inl ⟨b, dynLkDiscAt_mono hg htop hb, hw⟩)
-  · exact .inr (.inr (.inl ((ptByteLiveAt_grow hg hm ht a).2 h)))
+  · exact .inr (.inr (.inl ((ptByteExAt_grow hg hm ht a).2 h)))
   · exact .inr (.inr (.inr ((racyValAt_grow hg hm ht a).2 h)))
 
 /-- A step that leaves the memory alone keeps the exemption (any new top). -/

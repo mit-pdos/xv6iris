@@ -196,6 +196,18 @@ inductive RsvKind where
   the signed guard reads a value `≥ 1`); a registry entry -- no footprint, no
   discipline -/
   | racy (cnt stride n vlo vhi : Nat)
+  /-- the client's STATIC KERNEL STACKS (mcslrec (3) [OWN.90]/[OWN.104] X1):
+  the `size` bytes at `base` (xv6: `stack0`, one 4 KiB stack per hart, the
+  boot and scheduler stacks); a registry entry -- no footprint, no
+  discipline: their bytes are never exempt from the load-side invariant
+  (`MachCSL.ksByteAt`) -/
+  | stack (size : Nat)
+  /-- the client's KERNEL-STACK MAPPINGS (mcslrec (3) X1): `cnt` virtual
+  pages `vhi - 2 (i + 1)` of the permanent kernel table (xv6: `KSTACK(i)`,
+  `memlayout.h`); the pages they map, once a publication word is written,
+  are kernel-stack pages (`MachCSL.kstkPageAt`); a registry entry -- no
+  footprint, no discipline -/
+  | kstacks (cnt vhi : Nat)
   deriving DecidableEq
 
 /-- The kinds with a footprint (all but a `.slots` registry entry). -/
@@ -205,6 +217,8 @@ def RsvKind.hasFoot : RsvKind → Bool
   | .uroots _ _ => false
   | .freeHead _ _ => false
   | .racy _ _ _ _ _ => false
+  | .stack _ => false
+  | .kstacks _ _ => false
   | _ => true
 
 /-- A reserved region: its base address and kind. -/
@@ -227,6 +241,8 @@ def RsvRegion.words (R : RsvRegion) : List (PAddr × Nat) :=
   | .uroots _ _ => []
   | .freeHead _ _ => []
   | .racy _ _ _ _ _ => []
+  | .stack _ => []
+  | .kstacks _ _ => []
 
 /-- The bytes of a word. -/
 def wordBytes (w : PAddr × Nat) : List PAddr :=
@@ -258,6 +274,8 @@ def regionOk (m : FlatMem) (R : RsvRegion) : Prop :=
   | .uroots _ _ => True
   | .freeHead _ _ => True
   | .racy _ _ _ _ _ => True
+  | .stack _ => True
+  | .kstacks _ _ => True
 
 /-- Every region of the list keeps its discipline. -/
 def rsvAllOk (rs : List RsvRegion) (m : FlatMem) : Prop :=
@@ -404,6 +422,8 @@ theorem RsvRegion.base_mem (R : RsvRegion) (hk : R.kind.hasFoot = true) : R.base
     | uroots _ _ => rw [h] at hk; simp [RsvKind.hasFoot] at hk
     | freeHead _ _ => rw [h] at hk; simp [RsvKind.hasFoot] at hk
     | racy _ _ _ _ _ => rw [h] at hk; simp [RsvKind.hasFoot] at hk
+    | stack _ => rw [h] at hk; simp [RsvKind.hasFoot] at hk
+    | kstacks _ _ => rw [h] at hk; simp [RsvKind.hasFoot] at hk
     | _ => exact ⟨_, by decide, List.mem_cons_self⟩
   obtain ⟨n, hn, hw⟩ := hw
   have := mem_regionBytes hw hn
@@ -464,6 +484,8 @@ theorem regionOk_congr {m m' : FlatMem} {R : RsvRegion}
   | uroots _ _ => trivial
   | freeHead _ _ => trivial
   | racy _ _ _ _ _ => trivial
+  | stack _ => trivial
+  | kstacks _ _ => trivial
   | cpu c =>
     rw [hk] at hR
     intro a ha H hH
@@ -572,6 +594,8 @@ theorem rsvAllOk_boot {rs : List RsvRegion} (hwf : rsvWf rs) : rsvAllOk rs (imgF
   | uroots _ _ => trivial
   | freeHead _ _ => trivial
   | racy _ _ _ _ _ => trivial
+  | stack _ => trivial
+  | kstacks _ _ => trivial
   | cpu c =>
     intro a ha H hH e he het
     obtain ⟨v, hv⟩ := himg a ha
