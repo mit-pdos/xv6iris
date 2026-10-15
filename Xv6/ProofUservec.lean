@@ -66,13 +66,13 @@ phases, the saved trapframe folded to `uservecTf ws g`, the file to
 theorem uservec_run [CurCtx] (cpu : CPU) (P : UPtd) (tk : PTree) (Mk : RegMapF (BitVec 64))
     (ms mdl mepc stc : BitVec 64) (lf : SLeft) (hsm : smFacts ms false) (hlf : lf.ok) (hmdl : 0x220#64 &&& ~~~mdl = 0#64)
     (hv : pageValid (pageAddr P.tfp)) (g : RegMap) (s0 : BitVec 64) (ws : List (BitVec 64))
-    (ht1 : tfW ws 0 = satpOf KTier.kpt tk.base) :
+    (ht1 : tfW ws 0 = satpOf KTier.kpt tk.base) (hwf : uptWf P) :
     kernelText ∗ kmapStatic ∗ urTrampCl ∗ kptOn tk Mk ∗
     urSt cpu (sConfOf KTier.kpt P.root ms mdl mepc stc lf) P (urPc 0x0#64) g ∗ Register.sscratch ↦ᵣ[cpu] s0 ∗
     tfPageAt P.tfp ws ∗
     ▷ (confCells cpu (DFrac.own 1) Privilege.Supervisor (sConfOf KTier.kpt tk.base ms mdl mepc stc lf) -∗
         clockCells cpu -∗ pcIs cpu (jumpPc (tfW ws 2)) -∗ kptSlot cpu tk.base -∗ ctxTok cpu curCtx -∗
-        uptFrame P -∗ gprFile cpu (uservecRegs g ws) -∗ Register.sscratch ↦ᵣ[cpu] g 10#5 -∗
+        uptFrame P -∗ uTextQ P -∗ gprFile cpu (uservecRegs g ws) -∗ Register.sscratch ↦ᵣ[cpu] g 10#5 -∗
         tfPageAt P.tfp (uservecTf ws g) -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
   have hc := urConfOk_sConfOf (GF := GF) P.root ms mdl mepc stc lf P rfl hsm hlf hmdl
@@ -109,10 +109,10 @@ theorem uservec_run [CurCtx] (cpu : CPU) (P : UPtd) (tk : PTree) (Mk : RegMapF (
   iapply (uservec_exit cpu P tk Mk ms mdl mepc stc lf hsm hlf hmdl
     ((((((g.set 10#5 TRAPFRAME).set 5#5 (g 10#5)).set 2#5 (tfW (uservecTf ws g) 1)).set 4#5
       (tfW (uservecTf ws g) 4)).set 5#5 (tfW (uservecTf ws g) 2)).set 6#5 (tfW (uservecTf ws g) 0))
-    (by rw [RegMap.get_ne _ 6#5 (by decide), RegMap.set_same, hw 0 (by decide)]; exact ht1))
+    (by rw [RegMap.get_ne _ 6#5 (by decide), RegMap.set_same, hw 0 (by decide)]; exact ht1) hwf)
   iframe Htext HS Hcl Hk Hst
   inext
-  iintro HmConf Hclock Hpc Hkpt Htok Hfr HF
+  iintro HmConf Hclock Hpc Hkpt Htok Hfr HQ HF
   have h5 : RegMap.get ((((((g.set 10#5 TRAPFRAME).set 5#5 (g 10#5)).set 2#5 (tfW (uservecTf ws g) 1)).set 4#5
       (tfW (uservecTf ws g) 4)).set 5#5 (tfW (uservecTf ws g) 2)).set 6#5 (tfW (uservecTf ws g) 0)) 5#5 =
       tfW ws 2 := by
@@ -122,17 +122,17 @@ theorem uservec_run [CurCtx] (cpu : CPU) (P : UPtd) (tk : PTree) (Mk : RegMapF (
       userretVa) = uservecRegs g ws := by
     unfold uservecRegs; rw [hw 0 (by decide), hw 1 (by decide), hw 2 (by decide), hw 4 (by decide)]
   rw [h5, hR]
-  iapply HΦ $$ HmConf Hclock Hpc Hkpt Htok Hfr HF Hss Hpage
+  iapply HΦ $$ HmConf Hclock Hpc Hkpt Htok Hfr HQ HF Hss Hpage
 
 end
 
 set_option maxHeartbeats 4000000 in
 /-- **uservec meets its specification.** -/
 theorem uservec_proof : USERVEC :=
-  ⟨fun {hlc GF} _ _ cpu C P Rut k sz M ws ms sc tv sep g hloop hsie htier hkw => by
+  ⟨fun {hlc GF} _ _ cpu C P Rut k sz M ws ms sc tv sep g hloop hsie htier hkw hroot => by
   unfold wp_uservec_body uservecPost userretLeft
   obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k
-  simp only at hsie htier
+  simp only at hsie htier hroot
   subst hsie htier
   obtain ⟨hstv, hdq, hmie, hmed, hwfP⟩ := hloop
   obtain ⟨hk0, hk1, hk2, hk4⟩ := hkw
@@ -140,12 +140,20 @@ theorem uservec_proof : USERVEC :=
   have hmdl : 0x220#64 &&& ~~~C.mideleg = 0#64 := by have h := C.mm; rw [hmie] at h; exact h
   have hv : pageValid (pageAddr P.tfp) := hwfP.2.2.1
   iintro ⟨#Hhw, Hfr, #Hcl, Hpage, ⟨%⟨hkwf, htc⟩, Hstack, Hcpu, Htok, #Hon, #Hro⟩, HΦ⟩
+  -- the open epoch's witness: the kernel root, and the user root another
+  -- (W8 (f3-utext) [OWN.89] (W-R))
+  ihave #Hkr := kptOnAt_rootName root $$ Hon
+  ihave #Hw : uptOpenWit (GF := GF) P.root Privilege.Supervisor $$ []
+  · unfold uptOpenWit
+    iright
+    iexists root
+    iframe Hkr
+    ipureintro; exact ⟨hroot, by intro h; cases h⟩
   icases uservec_frame_open cpu C P Rut sz M ms sc tv sep g hdq hmie hmed $$ [Hhw Hfr] with
     ⟨%mepc, %stc, %lf, %Mp, %⟨⟨hsm, hsr⟩, hM, hlf⟩, HmConf, Hclock, Hpc, HF, Hsep, Hsc, Hstv, Hstvec, %hwf, Hslot, Hum, HR,
       Hrc⟩
-  · isplitl []
-    · iexact Hhw
-    · iexact Hfr
+  · iframe Hw Hfr
+    iexact Hhw
   icases (show KernelImage.ro ⊢ iprop((kernelText ∗ kernelData ∗ kmapStatic ∗
       ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static⌝ : IProp GF)) from .rfl) $$ Hro with
     ⟨#Htext, _, #HS, _⟩
@@ -155,12 +163,16 @@ theorem uservec_proof : USERVEC :=
   icases Hon with ⟨%tk, %Mk, #Hk, %htk⟩
   subst htk
   rw [hstv, show stvecBase TRAMPOLINE = urPc 0x0#64 from by decide]
-  iapply (uservec_run cpu P tk Mk ms C.mideleg mepc stc lf hsm hlf hmdl hv g s0 ws hk0)
+  iapply (uservec_run cpu P tk Mk ms C.mideleg mepc stc lf hsm hlf hmdl hv g s0 ws hk0 hwf)
   iframe Htext HS Hcl Hk Hss Hpage
   isplitl [HmConf Hclock Hpc Hslot Htok HF]
   · unfold urSt; iframe
   inext
-  iintro HmConf Hclock Hpc Hkpt Htok Hfr HF Hss Hpage
+  iintro HmConf Hclock Hpc Hkpt Htok Hfr HQ HF Hss Hpage
+  -- the pages whole again: the user tier's shares and the record's text
+  -- quarters (W8 (f3-utext))
+  ihave Hum := uepClose_pages P hwf Mp $$ [HQ Hum]
+  · iframe HQ Hum; iexact HS
   -- the file is the context's pinned one (`tp` = this hart)
   have htp : tpPin cpu (uservecRegs g ws) = uservecRegs g ws := by
     have h4 : uservecRegs g ws 4#5 = hartId cpu := by

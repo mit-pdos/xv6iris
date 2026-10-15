@@ -44,8 +44,8 @@ theorem uk_text_page {π : Nat → Option UPerm} {sz : Nat} {pt : UPtd} (hsz : u
     have := congrArg UPerm.W hb; simpa [upermBits] using this
   refine ⟨lw, hk, hU, hR, hx, ?_⟩
   unfold ukTextLeaf
-  unfold pteBit at hx hw
-  rw [hx, hw]; rfl
+  unfold pteBit at hU hx hw
+  rw [hU, hx, hw]; rfl
 
 /-- **The instruction fact is the engine's fetch-and-decode premise.**  The
 fetch bytes are carried from the key's image to the page view through the

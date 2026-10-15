@@ -229,25 +229,28 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 /-- **The trapped machine, opened** (uservec's entry, at the named data):
 the kernel's supervisor configuration cells over the user root (interrupts
 off, `SPIE = 1`, `SPP = U`), the pc at the handler, the file, the trap
-cells, `stvec`, the installed user table, the pages at a page view `Mp`
-whose lazy view is `M`, and the residue. -/
+cells, `stvec`, the installed user table (with the open epoch's witness:
+W8 (f3-utext)), the pages at a page view `Mp` whose lazy view is `M` (at the
+user tier's shares), and the residue. -/
 theorem uservec_frame_open [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IProp GF) (sz : Nat)
     (M : ElfMem) (ms sc tv sep : BitVec 64) (g : RegMap)
     (hdq : C.dqc = DFrac.own 1) (hmie : C.mie = MIE_S) (hmed : C.medeleg = MEDELEG_S) :
-    hwConfig cpu ∗ userTrapFrameAtm (GF := GF) cpu C P Rut sz M ms sc tv sep g ⊢
+    uptOpenWit (GF := GF) P.root Privilege.Supervisor ∗ hwConfig cpu ∗
+      userTrapFrameAtm (GF := GF) cpu C P Rut sz M ms sc tv sep g ⊢
       ∃ (mepc stc : BitVec 64) (lf : SLeft) (Mp : Nat → List (BitVec 8)),
         ⌜(smFacts ms false ∧ sretFacts ms false true false) ∧ umemLazy P sz Mp = M ∧ lf.ok⌝ ∗
         confCells cpu (DFrac.own 1) Privilege.Supervisor (sConfOf KTier.kpt P.root ms C.mideleg mepc stc lf) ∗
         clockCells cpu ∗ pcIs cpu (stvecBase C.stvec) ∗ gprFile cpu g ∗
         Register.sepc ↦ᵣ[cpu] sep ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] tv ∗
-        Register.stvec ↦ᵣ[cpu] C.stvec ∗ ⌜uptWf P⌝ ∗ uptSlot cpu P ∗ umPages P Mp ∗ Rut P ∗
+        Register.stvec ↦ᵣ[cpu] C.stvec ∗ ⌜uptWf P⌝ ∗ uptSlot cpu P ∗ umPagesU P Mp ∗ Rut P ∗
         uExitTok (hlc := hlc) (.uExit cpu (satpOf .kpt P.root) sc sep (gprList g)) := by
   unfold userTrapFrameAtm userPtmInv userCfg userHwCells
   rw [hdq, hmie, hmed]
-  iintro ⟨#Hhw, %hms, Hhs, Hcp, Hms, Hsc, Hstv, Hsep, Hpc, Hclock, HF, ⟨%Mp, HP, %hM⟩,
+  iintro ⟨#Hw, #Hhw, %hms, Hhs, Hcp, Hms, Hsc, Hstv, Hsep, Hpc, Hclock, HF, ⟨%Mp, HP, %hM⟩,
     ⟨Hstvec, Hmie, Hmideleg, Hmedeleg, Hmenvcfg, %mc, %mtc, %htm, Hmcounteren, Hmtimecmp, %mepc, %stc, Hmepc,
       Hstimecmp⟩, HR, Hrc⟩
-  icases (userPtInv_uptSlot cpu P Mp).1 $$ HP with ⟨Hsatp, HPm, %hwf, Hslot, Hum⟩
+  icases (userPtInv_uptSlot cpu P Mp).1 $$ [HP] with ⟨Hsatp, HPm, %hwf, Hslot, Hum⟩
+  · iframe HP; iexact Hw
   unfold userPmp
   icases HPm with ⟨%cfg, %paddr, %h0, Hpmpcfg, Hpmpaddr⟩
   iexists mepc, stc, ⟨mc, mtc, cfg, paddr⟩, Mp

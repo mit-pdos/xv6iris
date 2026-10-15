@@ -232,43 +232,64 @@ def userCfg (cpu : CPU) (C : UCfg) : IProp GF := iprop%
   Register.mideleg ↦ᵣ[cpu]{C.dqc} C.mideleg ∗ Register.medeleg ↦ᵣ[cpu]{C.dqc} C.medeleg ∗
   Register.menvcfg ↦ᵣ[cpu]{C.dqc} MENVCFG_S ∗ userHwCells cpu
 
+/-- **Rocq `uva_text`'s leaf test**: a TEXT page's leaf has U (bit 4) and X
+(bit 3) set and W (bit 2) clear (deviation 7) -- a page user mode may fetch
+from and never store to.  (W8 (f3-utext) [OWN.78]: `U` is part of the test;
+a leaf without `U` -- user mode can neither fetch from nor store to its page
+-- is a data page here, owned in full.) -/
+def ukTextLeaf (w : BitVec 64) : Bool := w.getLsbD 4 && w.getLsbD 3 && !w.getLsbD 2
+
+/-- **The user tier's share of a custody byte** (W8 (f3-utext) [OWN.78], the
+USER restatement under [OWN.89] (W-R)): THREE QUARTERS.  While the hart's user
+epoch is open (from userret's `csrw satp` to uservec's), the interpretation's
+record (`MachCSL.uepCellsE`) holds the last quarter of every byte of the
+table's slots and of the text pages; a share over one half keeps the table's
+and the text pages' bytes disjoint by ownership. -/
+abbrev uCustQ : DFrac := DFrac.own Qp.threeQuarters
+
+/-- The share a user page is held at: a text page three quarters, a data
+page in full. -/
+def umPgFr (w : BitVec 64) : DFrac := if ukTextLeaf w then uCustQ else DFrac.own 1
+
+/-- **The user pages as the user tier holds them** (the USER restatement):
+`umPages` with the text pages at three quarters. -/
+def umPagesU [CurCtx] (P : UPtd) (M : Nat → List (BitVec 8)) : IProp GF := iprop%
+  [∗map] k ↦ w ∈ P.um, ⌜(M k).length = 4096⌝ ∗ byteBuf (pte2pa w) (umPgFr w) (M k)
+
 /-- **Rocq `UserPtTree.user_pt_inv`**: the translation state (satp at the
 user root, the PMP cells, the TLB sound for the tree) and the address space
 (the tree owned, representing the table's leaves; every user page's bytes at
-the view `M`), with the table's pure facts. -/
+the view `M`), with the table's pure facts.  The USER restatement (W8
+(f3-utext)): the tree and the text pages at three quarters (`uCustQ`). -/
 def userPtInv [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (BitVec 8)) : IProp GF := iprop%
   Register.satp ↦ᵣ[cpu] satpOf .kpt P.root ∗ userPmp cpu ∗
   ⌜uptWf P⌝ ∗
-  ∃ t : PTree, ⌜t.base = P.root ∧ ptRep t P.leaves⌝ ∗ ptreeOwn 2 (DFrac.own 1) t ∗
+  ∃ t : PTree, ⌜t.base = P.root ∧ ptRep t P.leaves⌝ ∗ ptreeOwn 2 uCustQ t ∗
     (∃ tlb : Tlb, Register.tlb ↦ᵣ[cpu] tlb ∗ ⌜utlbOk t tlb⌝) ∗
-    umPages P M
+    umPagesU P M
 
 /-- **Rocq `user_pt_any`**: with the memory quantified (what user execution
 preserves). -/
 def userPtAny [CurCtx] (cpu : CPU) (P : UPtd) : IProp GF :=
   iprop(∃ M : Nat → List (BitVec 8), userPtInv cpu P M)
 
-/-- **Rocq `uva_text`'s leaf test**: a TEXT page's leaf has X (bit 3) set
-and W (bit 2) clear (deviation 7). -/
-def ukTextLeaf (w : BitVec 64) : Bool := w.getLsbD 3 && !w.getLsbD 2
-
 /-- **Rocq `umem_text` on one page**: a text page's bytes, physical, stamped
 at `K`. -/
-def textPageX [CurCtx] (K : Nat) (pa : BitVec 64) (bs : List (BitVec 8)) : IProp GF :=
-  iprop([∗list] j ↦ b ∈ bs, ctxByteX curCtx K (pa + BitVec.ofNat 64 j) (DFrac.own 1) b)
+def textPageX [CurCtx] (K : Nat) (dq : DFrac) (pa : BitVec 64) (bs : List (BitVec 8)) : IProp GF :=
+  iprop([∗list] j ↦ b ∈ bs, ctxByteX curCtx K (pa + BitVec.ofNat 64 j) dq b)
 
 /-- **Rocq `umem_x`**: the user pages at the view `M`, the TEXT pages stamped
-at `K`, the data pages plain (as `umPages`). -/
+at `K` (at the user tier's three quarters, `uCustQ`), the data pages plain. -/
 def umPagesX [CurCtx] (K : Nat) (P : UPtd) (M : Nat → List (BitVec 8)) : IProp GF :=
   iprop([∗map] k ↦ w ∈ P.um, ⌜(M k).length = 4096⌝ ∗
-    (if ukTextLeaf w then textPageX K (pte2pa w) (M k) else byteBuf (pte2pa w) (DFrac.own 1) (M k)))
+    (if ukTextLeaf w then textPageX K uCustQ (pte2pa w) (M k) else byteBuf (pte2pa w) (DFrac.own 1) (M k)))
 
 /-- **Rocq `UmodeText.user_pt_inv_x`** (deviation 7): `userPtInv` with the
 text pages stamped at some `K` the hart's instruction view has passed. -/
 def userPtInvX [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (BitVec 8)) : IProp GF := iprop%
   Register.satp ↦ᵣ[cpu] satpOf .kpt P.root ∗ userPmp cpu ∗
   ⌜uptWf P⌝ ∗
-  ∃ t : PTree, ⌜t.base = P.root ∧ ptRep t P.leaves⌝ ∗ ptreeOwn 2 (DFrac.own 1) t ∗
+  ∃ t : PTree, ⌜t.base = P.root ∧ ptRep t P.leaves⌝ ∗ ptreeOwn 2 uCustQ t ∗
     (∃ tlb : Tlb, Register.tlb ↦ᵣ[cpu] tlb ∗ ⌜utlbOk t tlb⌝) ∗
     ∃ K : Nat, iviewLb cpu K ∗ umPagesX K P M
 

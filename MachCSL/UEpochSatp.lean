@@ -23,6 +23,7 @@ import MachCSL.Wp
 import MachCSL.KptInv
 import MachCSL.SConfDefs
 import MachCSL.SConfAtDefs
+import MachCSL.PteClass
 
 namespace MachCSL
 
@@ -145,16 +146,135 @@ theorem satpStep_kern (cpu : CPU) (dq : DFrac) (p : Privilege) (hp : p ≠ Privi
     exact uepLink_none_kern kroot _ p (satpTable_satpOf kroot) hp
   · unfold uepCellsAt; iempintro
 
+/-! ## The opening deposit
+
+At `userret`'s `csrw satp` the client hands the interpretation a quarter of
+every text byte and table-slot byte, each history headed at or below the
+stamp `K` (the `fence.i` just before raised the instruction view to `K`).
+The slot discipline (`uslotHistOk`) follows from the heads and the
+histories' order (`histOk`: newest first), which the step reads off the
+interpretation. -/
+
+/-- One slot's deposit: its eight bytes' histories, headed at or below `K` by
+the bytes of its value. -/
+abbrev uslotPreCell (K : Nat) (p : Nat × KSlot) : IProp GF := iprop%
+  [∗list] j ∈ List.range 8, ∃ (x : HEnt) (H : Hist),
+    pointsTo (G := (MachGS.era (hlc := hlc) (GF := GF)).mem) (p.2.addr + BitVec.ofNat 64 j)
+      (DFrac.own Qp.quarter) (x :: H) ∗ ⌜x.t ≤ K ∧ x.v = nthByte (n := 8) p.2.c j⌝
+
+/-- **The opening deposit** of an epoch: `uepCellsE` with each slot's
+discipline still to be read off its histories. -/
+def uepPreE (h : CPU) (e : UEp) : IProp GF :=
+  iprop(⌜uepFacts e⌝ ∗ MonoNat.lb_own ((MachGS.era (hlc := hlc) (GF := GF)).iviewName h) (.ofNat e.K) ∗
+      ([∗list] a ∈ e.text, ∃ (x : HEnt) (H : Hist),
+        pointsTo (G := (MachGS.era (hlc := hlc) (GF := GF)).mem) a (DFrac.own Qp.quarter) (x :: H) ∗
+          ⌜x.t ≤ e.K⌝) ∗
+      [∗list] p ∈ e.slots, uslotPreCell e.K p)
+
+/-- Per-byte headed histories as one history map. -/
+theorem preBytes_hist (pa : PAddr) (dq : DFrac) (P : Nat → HEnt → Prop) : ∀ n : Nat,
+    ([∗list] j ∈ List.range n, ∃ (x : HEnt) (H : Hist), (pa + BitVec.ofNat 64 j) ↦ₕ{dq} (x :: H) ∗ ⌜P j x⌝)
+      ⊢@{IProp GF} ∃ Hs : Nat → Hist, ([∗list] j ∈ List.range n, (pa + BitVec.ofNat 64 j) ↦ₕ{dq} Hs j) ∗
+        ⌜∀ j, j < n → ∃ x H, Hs j = x :: H ∧ P j x⌝
+  | 0 => by
+    iintro _
+    iexists (fun _ => [])
+    isplitl []
+    · simp only [List.range_zero, Iris.Algebra.BigOpL.bigOpL_nil]; iempintro
+    · ipureintro; intro j hj; omega
+  | n + 1 => by
+    rw [List.range_succ]
+    iintro Hb
+    icases BigSepL.bigSepL_snoc.1 $$ Hb with ⟨Hb1, %x, %H, Hpt, %hx⟩
+    icases preBytes_hist pa dq P n $$ Hb1 with ⟨%Hs1, H1, %h1⟩
+    have hmem : ∀ {k y : Nat}, (List.range n)[k]? = some y → y ≠ n := by
+      intro k y hk hy
+      have := List.mem_of_getElem? hk
+      rw [List.mem_range] at this
+      omega
+    iexists (fun j => if j = n then x :: H else Hs1 j)
+    have heq : ([∗list] j ∈ List.range n, (pa + BitVec.ofNat 64 j) ↦ₕ{dq}
+        (fun j => if j = n then x :: H else Hs1 j) j) =
+        ([∗list] j ∈ List.range n, (pa + BitVec.ofNat 64 j) ↦ₕ{dq} Hs1 j : IProp GF) := by
+      apply BigSepL.bigSepL_eq
+      intro k y hk
+      simp only [hmem hk, if_false]
+    isplitl [H1 Hpt]
+    · iapply BigSepL.bigSepL_snoc.2
+      simp only [if_true]
+      rw [heq]
+      iframe H1 Hpt
+    · ipureintro
+      intro j hj
+      by_cases hjn : j = n
+      · subst hjn; exact ⟨x, H, by simp, hx⟩
+      · simp only [hjn, if_false]; exact h1 j (by omega)
+
+/-- **A slot's discipline at the opening**: headed at or below `K` by its
+value, newest first. -/
+theorem uslotHistOk_of_pre (K : Nat) (d : KSlot) (Hs : Nat → Hist)
+    (hp : ∀ j, j < 8 → ∃ x H, Hs j = x :: H ∧ x.t ≤ K ∧ x.v = nthByte (n := 8) d.c j)
+    (hs : ∀ j, j < 8 → (Hs j).Pairwise (fun e e' => e'.t ≤ e.t)) : uslotHistOk K d Hs := by
+  refine ⟨fun j hj => ?_, ⟨d.c, fun j hj => ?_, ?_⟩, fun j hj e he hlt => ?_⟩
+  · obtain ⟨x, H, hx, hxt, hxv⟩ := hp j hj
+    rw [hx, List.find?_cons_of_pos (by simpa using hxt)]
+    simp [hxv]
+  · obtain ⟨x, H, hx, -, hxv⟩ := hp j hj
+    rw [hx]; simp [hxv]
+  · split
+    · rfl
+    · exact pteAD_refl d.c
+  · exfalso
+    obtain ⟨x, H, hx, hxt, -⟩ := hp j hj
+    have hsj := hs j hj
+    rw [hx] at he hsj
+    rcases List.mem_cons.1 he with rfl | he'
+    · omega
+    · have := List.rel_of_pairwise_cons hsj he'
+      omega
+
+/-- The deposit's slots, their discipline read off the heap. -/
+theorem uslotPre_cells (m : FlatMem) (hm : ∀ (a : PAddr) (H : Hist), m[a]? = some H →
+      H.Pairwise (fun e e' => e'.t ≤ e.t)) (K : Nat) : ∀ sl : List (Nat × KSlot),
+    genHeapInterp m ∗ ([∗list] p ∈ sl, uslotPreCell K p) ⊢@{IProp GF}
+      genHeapInterp m ∗ [∗list] p ∈ sl, ∃ Hs : Nat → Hist,
+        ([∗list] j ∈ List.range 8, pointsTo (G := (MachGS.era (hlc := hlc) (GF := GF)).mem)
+          (p.2.addr + BitVec.ofNat 64 j) (DFrac.own Qp.quarter) (Hs j)) ∗ ⌜uslotHistOk K p.2 Hs⌝
+  | [] => by
+    iintro ⟨Hm, _⟩
+    iframe Hm
+    simp only [Iris.Algebra.BigOpL.bigOpL_nil]; iempintro
+  | p :: sl => by
+    iintro ⟨Hm, Hl⟩
+    icases BigSepL.bigSepL_cons.1 $$ Hl with ⟨Hp, Hl⟩
+    icases uslotPre_cells m hm K sl $$ [Hm Hl] with ⟨Hm, Hl⟩
+    · iframe
+    icases preBytes_hist (GF := GF) p.2.addr (DFrac.own Qp.quarter)
+      (fun j x => x.t ≤ K ∧ x.v = nthByte (n := 8) p.2.c j) 8 $$ Hp with ⟨%Hs, Hh, %hh⟩
+    ihave %hget := histBytes_valid m p.2.addr 8 (fun _ => DFrac.own Qp.quarter) Hs $$ [Hm Hh]
+    · unfold histBytes; iframe
+    iframe Hm
+    iapply BigSepL.bigSepL_cons.2
+    iframe Hl
+    iexists Hs
+    iframe Hh
+    ipureintro
+    exact uslotHistOk_of_pre K p.2 Hs (fun j hj => by
+      obtain ⟨x, H, h1, h2, h3⟩ := hh j hj; exact ⟨x, H, h1, h2, h3⟩)
+      (fun j hj => hm _ _ (hget j hj))
+
 /-- **Installing a user table over the kernel's** (`userret`): the hart's
-epoch opens at the user root. -/
-theorem satpStep_open (cpu : CPU) (dq : DFrac) (s0 : BitVec 64) (kroot r : BitVec 44)
-    (hs0 : satpTable s0 = some kroot) (hne : r ≠ kroot) :
-    ⊢ satpStep (GF := GF) cpu s0 (satpOf KTier.kpt r)
+epoch opens at the user root, the interpretation taking the epoch's custody
+(`uepCellsE`: half of every text byte and table slot, W8 (f3-utext)). -/
+theorem satpStep_open (cpu : CPU) (dq : DFrac) (s0 : BitVec 64) (kroot : BitVec 44) (e : UEp)
+    (hs0 : satpTable s0 = some kroot) (hne : e.root ≠ kroot) :
+    ⊢ satpStep (GF := GF) cpu s0 (satpOf KTier.kpt e.root)
         iprop(Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Supervisor ∗
-          (MachGS.kptRootName (hlc := hlc) (GF := GF) ↪VAR{.discard} kroot))
+          ((MachGS.kptRootName (hlc := hlc) (GF := GF) ↪VAR{.discard} kroot) ∗
+            uepPreE cpu e))
         iprop(Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Supervisor ∗ emp) := by
   unfold satpStep
-  iintro %σ %hs Hregs Hmem Hmm Huep ⟨Hp, #Hkr⟩
+  iintro %σ %hs Hregs Hmem Hmm Huep ⟨Hp, #Hkr, Hdep⟩
   ihave %hpv : ⌜σ.regs cpu Register.cur_privilege = Privilege.Supervisor⌝ $$ [Hregs Hp]
   · icases reg_valid cpu (σ.regs cpu) Register.cur_privilege dq Privilege.Supervisor $$ [$Hregs $Hp] with %_
     itrivial
@@ -180,26 +300,35 @@ theorem satpStep_open (cpu : CPU) (dq : DFrac) (s0 : BitVec 64) (kroot r : BitVe
     · rw [hs0] at h0; exact nomatch h0
     · rw [hs0] at h0; exact h0.symm
   subst hks
+  ihave %hmm := memModel_mmOk _ σ $$ Hmm
+  unfold uepPreE
+  icases Hdep with ⟨%hf, #Hiv, Htext, Hslots⟩
+  icases uslotPre_cells σ.mem (fun a H h => (hmm.1 a H h).1) e.K e.slots $$ [Hmem Hslots] with ⟨Hmem, Hslots⟩
+  · iframe
   imodintro
   iframe Hregs Hmem Hmm Hp
-  iapply Hclose $$ %(σ.setReg cpu Register.satp (satpOf KTier.kpt r)) %(some kroot)
+  iapply Hclose $$ %(σ.setReg cpu Register.satp (satpOf KTier.kpt e.root)) %(some kroot)
     %⟨fun c hc => by simp [updCpu, hc], fun _ => Nat.le_refl _, Or.inl rfl⟩ Hk
-  iexists some ⟨r⟩
-  isplitr [Hcells]
+  iexists some e
+  isplitr [Htext Hslots]
   · ipureintro
     simp only [updCpu, if_true, RegFile.set_same]
     rw [RegFile.set_other _ _ _ _ (by decide), hpv]
-    exact uepLink_open kroot r _ _ (satpTable_satpOf r) hne (by intro h; cases h)
-  · unfold uepCellsAt; iempintro
+    exact uepLink_open kroot e _ _ (satpTable_satpOf e.root) hne (by intro h; cases h)
+  · rw [uepCellsAt_some]
+    unfold uepCellsE
+    iframe Hiv Htext Hslots
+    ipureintro; exact hf
 
 /-- **Reinstalling the kernel table over a user table** (`uservec`): the
-hart's epoch closes. -/
+hart's epoch closes, the interpretation handing its custody back. -/
 theorem satpStep_close (cpu : CPU) (dq : DFrac) (s0 : BitVec 64) (kroot r : BitVec 44)
     (hs0 : satpTable s0 = some r) (hne : r ≠ kroot) :
     ⊢ satpStep (GF := GF) cpu s0 (satpOf KTier.kpt kroot)
         iprop(Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Supervisor ∗
           (MachGS.kptRootName (hlc := hlc) (GF := GF) ↪VAR{.discard} kroot))
-        iprop(Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Supervisor ∗ emp) := by
+        iprop(Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Supervisor ∗
+          ∃ e : UEp, ⌜e.root = r⌝ ∗ uepCellsE (MachGS.era (hlc := hlc) (GF := GF)) cpu e) := by
   unfold satpStep
   iintro %σ %hs Hregs Hmem Hmm Huep ⟨Hp, #Hkr⟩
   ihave %hpv : ⌜σ.regs cpu Register.cur_privilege = Privilege.Supervisor⌝ $$ [Hregs Hp]
@@ -211,26 +340,33 @@ theorem satpStep_close (cpu : CPU) (dq : DFrac) (s0 : BitVec 64) (kroot r : BitV
   unfold uepHartAt
   icases Hc with ⟨%oe, %hl, Hcells⟩
   rw [hs, hpv] at hl
+  cases oe with
+  | none =>
+    exact (uepLink_none_ne hl (by intro h; cases h) hs0
+      (fun rk h => by rw [hk rk h]; exact hne)).elim
+  | some e =>
+  obtain ⟨h1, h2, -, -⟩ := hl.1 e rfl
+  have her : e.root = r := by rw [hs0] at h1; exact (Option.some.inj h1).symm
   have hkk : k = some kroot := by
-    cases oe with
-    | none =>
-      exact (uepLink_none_ne hl (by intro h; cases h) hs0
-        (fun rk h => by rw [hk rk h]; exact hne)).elim
-    | some e =>
-      obtain ⟨-, h2, -, -⟩ := hl.1 e rfl
-      obtain ⟨rk, hrk⟩ := Option.isSome_iff_exists.1 h2
-      rw [hrk, hk rk hrk]
+    obtain ⟨rk, hrk⟩ := Option.isSome_iff_exists.1 h2
+    rw [hrk, hk rk hrk]
   subst hkk
   imodintro
   iframe Hregs Hmem Hmm Hp
-  iapply Hclose $$ %(σ.setReg cpu Register.satp (satpOf KTier.kpt kroot)) %(some kroot)
-    %⟨fun c hc => by simp [updCpu, hc], fun _ => Nat.le_refl _, Or.inl rfl⟩ Hk
-  iexists none
   isplitr [Hcells]
-  · ipureintro
-    simp only [updCpu, if_true, RegFile.set_same]
-    rw [RegFile.set_other _ _ _ _ (by decide), hpv]
-    exact uepLink_none_kern kroot _ _ (satpTable_satpOf kroot) (by intro h; cases h)
-  · unfold uepCellsAt; iempintro
+  · iapply Hclose $$ %(σ.setReg cpu Register.satp (satpOf KTier.kpt kroot)) %(some kroot)
+      %⟨fun c hc => by simp [updCpu, hc], fun _ => Nat.le_refl _, Or.inl rfl⟩ Hk
+    iexists none
+    isplitr
+    · ipureintro
+      simp only [updCpu, if_true, RegFile.set_same]
+      rw [RegFile.set_other _ _ _ _ (by decide), hpv]
+      exact uepLink_none_kern kroot _ _ (satpTable_satpOf kroot) (by intro h; cases h)
+    · unfold uepCellsAt; iempintro
+  · iexists e
+    isplitr
+    · ipureintro; exact her
+    rw [uepCellsAt_some]
+    iexact Hcells
 
 end MachCSL

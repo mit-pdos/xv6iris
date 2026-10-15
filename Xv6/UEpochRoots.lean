@@ -90,16 +90,18 @@ theorem uptFrame_kptOn_ne [CurCtx] (P : UPtd) (tk : PTree) (M : RegMapF (BitVec 
   ipureintro
   rw [← hb]; exact h
 
-/-- `ptreeOwn_kptOn_ne` at the installed user table (`uptSlot`). -/
+/-- At the installed user table (`uptSlot`): the open epoch's witness names
+the kernel root and says the user root is another. -/
 theorem uptSlot_kptOn_ne [CurCtx] (cpu : CPU) (P : UPtd) (tk : PTree) (M : RegMapF (BitVec 64)) :
     kmapStatic (GF := GF) ∗ kptOn tk M ∗ uptSlot cpu P ⊢ ⌜P.root ≠ tk.base⌝ := by
-  unfold uptSlot
-  iintro ⟨#HS, #Hk, %t, %⟨hb, hrep⟩, Ho, -⟩
-  have hpv : pageValid (pageAddr t.base) := hrep.2.2.1 t.base (by simp [PTree.pages])
-  ihave %h := ptreeOwn_kptOn_ne t tk M hpv $$ [HS Hk Ho]
-  · iframe Ho; iframe HS Hk
+  unfold uptSlot uptOpenWit
+  iintro ⟨#HS, #Hk, %t, %⟨hb, hrep⟩, Ho, -, Hw⟩
+  icases Hw with (%hu | ⟨%kr, #Hr, %⟨hne, -⟩⟩)
+  · cases hu
+  icases kptOn_root tk M $$ Hk with ⟨#Hr', -⟩
+  ihave %he := ghost_var_agree _ kr _ tk.base _ $$ Hr Hr'
   ipureintro
-  rw [← hb]; exact h
+  rw [← he]; exact hne
 
 /-- ... and at userret's state under the user table (`urSt`). -/
 theorem urSt_kptOn_ne [CurCtx] (cpu : CPU) (c : MConf) (P : UPtd) (pc : BitVec 64) (R : RegMap) (tk : PTree)

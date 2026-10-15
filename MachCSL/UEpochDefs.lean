@@ -134,8 +134,8 @@ theorem uepLink_none_kern (rk : BitVec 44) (s : BitVec 64) (p : Privilege)
   ⟨fun _ h0 => (nomatch h0), fun _ => ⟨hp, fun _ => Or.inr ⟨rfl, hs⟩⟩⟩
 
 /-- A user table installed: the epoch at its root, past the kernel's. -/
-theorem uepLink_open (rk r : BitVec 44) (s : BitVec 64) (p : Privilege) (hs : satpTable s = some r)
-    (hne : r ≠ rk) (hp : p ≠ Privilege.Machine) : uepLink (some rk) s p (some ⟨r⟩) :=
+theorem uepLink_open (rk : BitVec 44) (e0 : UEp) (s : BitVec 64) (p : Privilege) (hs : satpTable s = some e0.root)
+    (hne : e0.root ≠ rk) (hp : p ≠ Privilege.Machine) : uepLink (some rk) s p (some e0) :=
   ⟨fun e he => by
     obtain rfl := Option.some.inj he
     exact ⟨hs, rfl, fun h => hne (Option.some.inj h).symm, hp⟩, fun h0 => (nomatch h0)⟩
@@ -206,8 +206,7 @@ theorem uepLink_some_ne {ksat : Option (BitVec 44)} {s : BitVec 64} {p : Privile
 least where it was. -/
 theorem uepCellsAt_mono [MachFixedGS hlc GF] (E : EraGS) {σ σ' : MState} (h : CPU)
     (_hi : σ.itv h ≤ σ'.itv h) (oe : Option UEp) : uepCellsAt (GF := GF) E σ h oe ⊢ uepCellsAt E σ' h oe := by
-  unfold uepCellsAt
-  exact .rfl
+  cases oe <;> exact .rfl
 
 theorem uepCellsAt_stable [MachFixedGS hlc GF] (E : EraGS) {σ σ' : MState} (hs : uepStable σ σ') (h : CPU)
     (oe : Option UEp) : uepCellsAt (GF := GF) E σ h oe ⊢ uepCellsAt E σ' h oe :=

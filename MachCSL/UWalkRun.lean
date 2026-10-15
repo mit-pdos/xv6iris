@@ -152,7 +152,7 @@ theorem uwk_mwrA (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat)
     (k : Result (Option Bool) Arch.abort → SailM X)
     (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * n))
     (hn : n < 2 ^ 64) (hv : req.value = some w) (ho : bmOwned s.mm req.pa n = true)
-    (hw : uwOk s req.pa n w (akExcl req.access_kind) = true)
+    (hw : uwOk D s req.pa n w (akExcl req.access_kind) = true)
     (h : runRW D orc (UWSt.mk s.pin s.rs (bmWrite s.mm req.pa n w) false s.ro s.pt) (k (.Ok (some true))) = res) :
     runRW D orc s (FreeM.impure (.ok (.memWrite n vasize req)) k) = res := by
   rw [← h]; simp only [runRW, hn, hv, ho, hw, Bool.and_self, ↓reduceIte]
@@ -164,7 +164,7 @@ theorem uwk_mwr (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat)
     (k : Result (Option Bool) Arch.abort → SailM X)
     (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * n))
     (hn : n < 2 ^ 64) (hv : req.value = some w) (ho : bmOwned s.mm req.pa n = true)
-    (_hex : akExcl req.access_kind = false) (hw : uwOk s req.pa n w (akExcl req.access_kind) = true)
+    (_hex : akExcl req.access_kind = false) (hw : uwOk D s req.pa n w (akExcl req.access_kind) = true)
     (h : runRW D orc (UWSt.mk s.pin s.rs (bmWrite s.mm req.pa n w) false s.ro s.pt) (k (.Ok (some true))) = res) :
     runRW D orc s (FreeM.impure (.ok (.memWrite n vasize req)) k) = res :=
   uwk_mwrA X D orc s n vasize req k res w hn hv ho hw h
@@ -176,7 +176,7 @@ theorem uwk_mwrx (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat)
     (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * n))
     (hn : n < 2 ^ 64) (hv : req.value = some w) (ho : bmOwned s.mm req.pa n = true)
     (_hex : akExcl req.access_kind = true) (_hrv : s.rv = true)
-    (hw : uwOk s req.pa n w (akExcl req.access_kind) = true)
+    (hw : uwOk D s req.pa n w (akExcl req.access_kind) = true)
     (h : runRW D orc (UWSt.mk s.pin s.rs (bmWrite s.mm req.pa n w) false s.ro s.pt) (k (.Ok (some true))) = res) :
     runRW D orc s (FreeM.impure (.ok (.memWrite n vasize req)) k) = res :=
   uwk_mwrA X D orc s n vasize req k res w hn hv ho hw h

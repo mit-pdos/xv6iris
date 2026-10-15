@@ -407,15 +407,16 @@ def ubFrame (ξ : CtxId) (D : List PAddr) (ro pt : PAddr → Bool) : UByteFrame 
     rw [bmWrite_self mm pa n w hw]
     iexact HB
   acc := fun mm pa n hn ho _ => ubFrame_acc ξ D mm pa n hn ho
-  accPt := fun mm pa n w' hn ho _ _ _ => by
-    iintro HB
-    icases ubFrame_acc ξ D mm pa n hn ho $$ HB with ⟨%w, %hw, Hb, HBc⟩
-    iexists w
-    iframe Hb
-    isplitr
-    · ipureintro; exact hw
-    iintro Hb
-    iapply HBc $$ %w' Hb
+  satpOk := fun _ => True
+  accPt := fun cpu mm {_} req w' r _ _ _ Φ hv hk ho _ _ _ => by
+    iintro ⟨Hc, Hfrag, HB, Hs, Hp, HΦ⟩
+    icases ubFrame_acc ξ D mm req.pa 8 (by decide) ho $$ HB with ⟨%w, %_, Hb, HBc⟩
+    iapply swp_sail_mem_write_excl_ctx cpu req ξ r w w' hv hk Φ
+    iframe Hc Hfrag Hb
+    inext
+    iintro Hc Hfrag Hb
+    ihave HB := HBc $$ %w' Hb
+    iapply HΦ $$ Hc Hfrag HB Hs Hp
 
 /-- The frame out of an owned list. -/
 theorem ubFrame_intro (ξ : CtxId) (D : List PAddr) {ro pt : PAddr → Bool} (mm : BMap)

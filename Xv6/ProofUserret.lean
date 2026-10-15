@@ -24,6 +24,7 @@ import Xv6.UserretEntryPt
 import Xv6.UserretPt
 import Xv6.UEpochRoots
 import Xv6.UkOpen
+import Xv6.UEpochDeposit
 
 namespace Xv6
 
@@ -110,6 +111,7 @@ theorem userret_user_run [CurCtx] (cpu : CPU) (P : UPtd) (ms mdl mepc stc : BitV
 
 end
 
+set_option maxRecDepth 10000 in
 set_option maxHeartbeats 4000000 in
 /-- **userret meets its specification.** -/
 theorem userret_proof : USERRET :=
@@ -142,13 +144,23 @@ theorem userret_proof : USERRET :=
   · iapply uptFrame_kptOnAt_ne P root
     iframe HS Hon
     unfold uptFrame; unfold ptOwnRep at *; iexact Hfr
-  -- the switch (its fence.i stamps the text: UserExec deviation 7)
+  -- the table's bytes, for the stamp
+  unfold ptOwnRep
+  icases Hfr with ⟨%t, %⟨htb, hrep⟩, Ho⟩
+  ihave HTr := ubTree_own_fwdQ 2 t hrep.2.2.1 (DFrac.own 1) $$ HS Ho
+  ihave HPf := (ubOwnA_app curCtx (ukTextBytes P.um M) (ubTreeBytes 2 t)).2 $$ [HT HTr]
+  · iframe HT; unfold ubOwnA; iexact HTr
+  -- the switch: its fence.i stamps the text AND the table (UserExec
+  -- deviation 7; W8 (f3-utext) [OWN.89] (W-R)), its csrw satp opens the
+  -- user epoch, the record taking a quarter of every stamped byte
+  -- (`userret_deposit`)
   iapply (userret_entry cpu root P ms mdl mepc stc lf hsm hlf hmdl (tpPin cpu regs) (userret_a0_get cpu regs _ ha0)
-    (ubOwnA curCtx (ukTextBytes P.um M)) (fun K => ukOwnX curCtx K (ukTextBytes P.um M))
-    (by unfold ubOwnA ukOwnX; exact ifenceStep_stamp cpu curCtx (ukTextBytes P.um M)) hne)
-  iframe Hkr Htext HS Hcl HmConf Hclock Hpc Hkpt Htok HF HT
-  isplitl [Hfr]
-  · unfold uptFrame; unfold ptOwnRep at *; iexact Hfr
+    (ubOwnA curCtx (ukTextBytes P.um M ++ ubTreeBytes 2 t))
+    (fun K => ukOwnX curCtx K (DFrac.own 1) (ukTextBytes P.um M ++ ubTreeBytes 2 t))
+    (fun K => ukOwnX curCtx K uCustQ (ukTextBytes P.um M))
+    (by unfold ubOwnA ukOwnX; exact ifenceStep_stamp cpu curCtx _)
+    (fun K => userret_deposit cpu P t M htb hrep hwfP hl K) hne)
+  iframe Hkr Htext HS Hcl HmConf Hclock Hpc Hkpt Htok HF HPf
   inext
   iintro Hst ⟨%K, #HK, HX⟩
   ihave Hum := ukPagesX_bwd K P hwfP M hl $$ HS HD HX
@@ -170,7 +182,7 @@ theorem userret_proof : USERRET :=
     iexact HK
   icases HU with ⟨HU, Hpt, Hcfg⟩
   iapply HΦ $$ %(userretUcfg mdl hmdl) %(sretMs ms)
-    %⟨userretUcfg_loopOk mdl hmdl P hwfP, userMstatusOk_sretMs ms hsm hspie'⟩ HU Hpt Hcfg Hpage
+    %⟨userretUcfg_loopOk mdl hmdl P hwfP, userMstatusOk_sretMs ms hsm hspie', hne⟩ HU Hpt Hcfg Hpage
   unfold userretLeft
   iframe Hstack Hcpu Htok Hro
   isplit

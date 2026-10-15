@@ -163,34 +163,39 @@ theorem ukView_lookup (um : RegMapF (BitVec 64)) (M : Nat → List (BitVec 8)) (
 section pages
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
-/-- Stamped ownership of an association list of bytes. -/
-def ukOwnX (ξ : CtxId) (K : Nat) (A : List (PAddr × BitVec 8)) : IProp GF :=
-  iprop([∗list] p ∈ A, ctxByteX ξ K p.1 (DFrac.own 1) p.2)
+/-- Stamped ownership of an association list of bytes, at `dq`. -/
+def ukOwnX (ξ : CtxId) (K : Nat) (dq : DFrac) (A : List (PAddr × BitVec 8)) : IProp GF :=
+  iprop([∗list] p ∈ A, ctxByteX ξ K p.1 dq p.2)
 
-theorem ukOwnX_flatMap {X : Type} (ξ : CtxId) (K : Nat) (l : List X) (f : X → List (PAddr × BitVec 8)) :
-    ukOwnX (GF := GF) ξ K (l.flatMap f) = iprop([∗list] x ∈ l, ukOwnX ξ K (f x)) := by
+theorem ukOwnX_flatMap {X : Type} (ξ : CtxId) (K : Nat) (dq : DFrac) (l : List X)
+    (f : X → List (PAddr × BitVec 8)) :
+    ukOwnX (GF := GF) ξ K dq (l.flatMap f) = iprop([∗list] x ∈ l, ukOwnX ξ K dq (f x)) := by
   unfold ukOwnX; exact BigSepL.bigSepL_flatMap f
 
-theorem ukOwnX_forget (ξ : CtxId) (K : Nat) (A : List (PAddr × BitVec 8)) :
-    ukOwnX (GF := GF) ξ K A ⊢ ubOwnA ξ A := by
-  unfold ukOwnX ubOwnA
+theorem ukOwnX_forget (ξ : CtxId) (K : Nat) (dq : DFrac) (A : List (PAddr × BitVec 8)) :
+    ukOwnX (GF := GF) ξ K dq A ⊢ [∗list] p ∈ A, ctxByte ξ p.1 dq p.2 := by
+  unfold ukOwnX
   apply BigSepL.bigSepL_mono
   intro k p _
-  exact ctxByteX_forget ξ K p.1 (DFrac.own 1) p.2
+  exact ctxByteX_forget ξ K p.1 dq p.2
 
-/-- The plain and the stamped bytes together are duplicate-free. -/
-theorem ukOwn_nodup (ξ : CtxId) (K : Nat) (A B : List (PAddr × BitVec 8)) :
-    ubOwnA (GF := GF) ξ A ∗ ukOwnX ξ K B ⊢ ⌜((A ++ B).map Prod.fst).Nodup⌝ := by
+/-- The labelled bytes and the stamped bytes at the user tier's share are
+disjoint (two shares over one half each). -/
+theorem ukOwn_disj (ξ : CtxId) (K : Nat) (hf : PAddr → Bool) (A B : List (PAddr × BitVec 8)) :
+    ubOwnAF (GF := GF) ξ hf A ∗ ukOwnX ξ K uCustQ B ⊢
+      ⌜(B.map Prod.fst).Nodup ∧ ∀ a ∈ A.map Prod.fst, ∀ b ∈ B.map Prod.fst, a ≠ b⌝ := by
   iintro ⟨HA, HB⟩
-  ihave HB := ukOwnX_forget ξ K B $$ HB
-  ihave HAB := (ubOwnA_app ξ A B).2 $$ [HA HB]
+  ihave HB := ukOwnX_forget ξ K uCustQ B $$ HB
+  ihave HB := (ubOwnAF_of_const ξ (fun _ => true) B uCustQ (fun _ _ => rfl)).2 $$ HB
+  ihave %hnd := ubOwnAF_nodup ξ _ B $$ HB
+  icases ubOwnAF_disj ξ hf (fun _ => true) A B $$ [HA HB] with ⟨%h, -, -⟩
   · iframe
-  iapply ubOwnA_nodup ξ (A ++ B) $$ HAB
+  ipureintro; exact ⟨hnd, h⟩
 
 /-- The stamped text as the text map's ownership. -/
-theorem ukOwnX_text (ξ : CtxId) (K : Nat) (A : List (PAddr × BitVec 8)) (T : BMap)
+theorem ukOwnX_text (ξ : CtxId) (K : Nat) (dq : DFrac) (A : List (PAddr × BitVec 8)) (T : BMap)
     (h : ∀ p ∈ A, T p.1 = some p.2) :
-    ukOwnX (GF := GF) ξ K A ⊢ [∗list] a ∈ A.map Prod.fst, ∃ b : BitVec 8, ⌜T a = some b⌝ ∗ ctxByteX ξ K a (DFrac.own 1) b := by
+    ukOwnX (GF := GF) ξ K dq A ⊢ [∗list] a ∈ A.map Prod.fst, ∃ b : BitVec 8, ⌜T a = some b⌝ ∗ ctxByteX ξ K a dq b := by
   unfold ukOwnX
   rw [BigSepL.bigSepL_map]
   apply BigSepL.bigSepL_mono
@@ -200,10 +205,10 @@ theorem ukOwnX_text (ξ : CtxId) (K : Nat) (A : List (PAddr × BitVec 8)) (T : B
   iframe H
   ipureintro; exact h p (List.mem_of_getElem? hk)
 
-theorem ukText_ownX (ξ : CtxId) (K : Nat) (A : List (PAddr × BitVec 8)) (T : BMap)
+theorem ukText_ownX (ξ : CtxId) (K : Nat) (dq : DFrac) (A : List (PAddr × BitVec 8)) (T : BMap)
     (h : ∀ p ∈ A, T p.1 = some p.2) :
-    ([∗list] a ∈ A.map Prod.fst, ∃ b : BitVec 8, ⌜T a = some b⌝ ∗ ctxByteX ξ K a (DFrac.own 1) b) ⊢
-      ukOwnX (GF := GF) ξ K A := by
+    ([∗list] a ∈ A.map Prod.fst, ∃ b : BitVec 8, ⌜T a = some b⌝ ∗ ctxByteX ξ K a dq b) ⊢
+      ukOwnX (GF := GF) ξ K dq A := by
   unfold ukOwnX
   rw [BigSepL.bigSepL_map]
   apply BigSepL.bigSepL_mono
@@ -214,11 +219,11 @@ theorem ukText_ownX (ξ : CtxId) (K : Nat) (A : List (PAddr × BitVec 8)) (T : B
   iexact H
 
 /-- One text page, as stamped bytes of its byte list. -/
-theorem ukTextPage_eq [CurCtx] (K : Nat) (a : PAddr) (bs : List (BitVec 8)) :
-    textPageX (GF := GF) K a bs ⊣⊢ ukOwnX curCtx K (ubPageBytes a bs) := by
+theorem ukTextPage_eq [CurCtx] (K : Nat) (dq : DFrac) (a : PAddr) (bs : List (BitVec 8)) :
+    textPageX (GF := GF) K dq a bs ⊣⊢ ukOwnX curCtx K dq (ubPageBytes a bs) := by
   unfold textPageX ukOwnX ubPageBytes
   rw [BigSepL.bigSepL_map]
-  exact ub_sepL_idx (fun j x => ctxByteX curCtx K (a + BitVec.ofNat 64 j) (DFrac.own 1) x) bs
+  exact ub_sepL_idx (fun j x => ctxByteX curCtx K (a + BitVec.ofNat 64 j) dq x) bs
 
 /-- One page's `if`, split into its data and text halves. -/
 theorem ukPage_split (c : Bool) (X D : IProp GF) :
@@ -232,7 +237,7 @@ physical bytes, the text pages as stamped bytes. -/
 theorem ukPagesX_fwd [CurCtx] (K : Nat) (P : UPtd) (hwf : uptWf P) (M : Nat → List (BitVec 8)) :
     kmapStatic (GF := GF) ⊢ umPagesX K P M -∗
       ⌜∀ kv ∈ toList P.um, (M kv.1).length = 4096⌝ ∗ ubOwnA curCtx (ukDataBytes P.um M) ∗
-        ukOwnX curCtx K (ukTextBytes P.um M) := by
+        ukOwnX curCtx K uCustQ (ukTextBytes P.um M) := by
   iintro #HS H
   unfold umPagesX
   ihave H := BigSepM.bigSepM_toList.1 $$ H
@@ -247,11 +252,11 @@ theorem ukPagesX_fwd [CurCtx] (K : Nat) (P : UPtd) (hwf : uptWf P) (M : Nat → 
   isplitr
   · ipureintro; exact hl
   ihave H := (BigSepL.bigSepL_mono (fun {k kv} _ => (ukPage_split (GF := GF) (ukTextLeaf kv.2)
-    (textPageX K (pte2pa kv.2) (M kv.1)) (byteBuf (pte2pa kv.2) (DFrac.own 1) (M kv.1))).1)) $$ H
+    (textPageX K uCustQ (pte2pa kv.2) (M kv.1)) (byteBuf (pte2pa kv.2) (DFrac.own 1) (M kv.1))).1)) $$ H
   ihave H := BigSepL.bigSepL_sep_eqv.1 $$ H
   icases H with ⟨HD, HT⟩
   unfold ukDataBytes ukTextBytes
-  rw [ubOwnA_flatMap, ukOwnX_flatMap]
+  rw [ubOwnA_flatMap, ukOwnX_flatMap curCtx K uCustQ]
   isplitl [HD]
   · iapply (ub_sepL_wand kmapStatic _ _ _ ?_) $$ HS HD
     intro kv hkv
@@ -274,12 +279,12 @@ theorem ukPagesX_fwd [CurCtx] (K : Nat) (P : UPtd) (hwf : uptWf P) (M : Nat → 
       simp only [Iris.Algebra.BigOpL.bigOpL_nil]
       iempintro
     · simp only [if_true]
-      exact (ukTextPage_eq K (pte2pa kv.2) (M kv.1)).1
+      exact (ukTextPage_eq K uCustQ (pte2pa kv.2) (M kv.1)).1
 
 /-- **The pages, joined** (Rocq `umem_x_bytes`, backward). -/
 theorem ukPagesX_bwd [CurCtx] (K : Nat) (P : UPtd) (hwf : uptWf P) (M : Nat → List (BitVec 8))
     (hl : ∀ kv ∈ toList P.um, (M kv.1).length = 4096) :
-    kmapStatic (GF := GF) ⊢ ubOwnA curCtx (ukDataBytes P.um M) -∗ ukOwnX curCtx K (ukTextBytes P.um M) -∗
+    kmapStatic (GF := GF) ⊢ ubOwnA curCtx (ukDataBytes P.um M) -∗ ukOwnX curCtx K uCustQ (ukTextBytes P.um M) -∗
       umPagesX K P M := by
   iintro #HS HD HT
   unfold umPagesX
@@ -291,10 +296,10 @@ theorem ukPagesX_bwd [CurCtx] (K : Nat) (P : UPtd) (hwf : uptWf P) (M : Nat → 
     intro k kv hk
     exact hl kv (List.mem_of_getElem? hk)
   iapply BigSepL.bigSepL_mono (fun {k kv} _ => (ukPage_split (GF := GF) (ukTextLeaf kv.2)
-    (textPageX K (pte2pa kv.2) (M kv.1)) (byteBuf (pte2pa kv.2) (DFrac.own 1) (M kv.1))).2)
+    (textPageX K uCustQ (pte2pa kv.2) (M kv.1)) (byteBuf (pte2pa kv.2) (DFrac.own 1) (M kv.1))).2)
   iapply BigSepL.bigSepL_sep_eqv.2
   unfold ukDataBytes ukTextBytes
-  rw [ubOwnA_flatMap, ukOwnX_flatMap]
+  rw [ubOwnA_flatMap, ukOwnX_flatMap curCtx K uCustQ]
   isplitl [HD]
   · iapply (ub_sepL_wand kmapStatic _ _ _ ?_) $$ HS HD
     intro kv hkv
@@ -313,7 +318,7 @@ theorem ukPagesX_bwd [CurCtx] (K : Nat) (P : UPtd) (hwf : uptWf P) (M : Nat → 
       iintro _
       iempintro
     · simp only [if_true]
-      exact (ukTextPage_eq K (pte2pa kv.2) (M kv.1)).2
+      exact (ukTextPage_eq K uCustQ (pte2pa kv.2) (M kv.1)).2
 
 /-- **The plain pages, split** (for the mint at userret's `fence.i`): the
 data pages and the text pages as physical bytes. -/
@@ -354,11 +359,31 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 theorem uk_nodup_left {X : Type} (l₁ l₂ : List X) (h : (l₁ ++ l₂).Nodup) : l₁.Nodup :=
   (List.nodup_append.1 h).1
 
+/-- Under the all-false label the labelled bytes are owned in full. -/
+theorem ukOwnAF_full (ξ : CtxId) (A : List (PAddr × BitVec 8)) :
+    ubOwnAF (GF := GF) ξ (fun _ => false) A ⊣⊢ ubOwnA ξ A := by
+  unfold ubOwnAF ubOwnA
+  constructor <;>
+  · apply BigSepL.bigSepL_mono
+    intro k p _
+    exact .rfl
+
+/-- The engine's maps carry the user frame's table facts. -/
+theorem ubTreeIn_of_uk {P : UPtd} {t : PTree} {mm T : BMap} (hm : UkMem P t mm T) : UbTreeIn P mm := by
+  have hnd := hm.nodup
+  rw [List.nodup_append, List.nodup_append] at hnd
+  refine ⟨t, hm.root, hm.rep.1, hm.rep.2.1, hm.tree, fun a ha => ?_, fun a ha => ⟨?_, ?_⟩⟩
+  · rcases List.mem_append.1 ((hm.dom a).1 ha) with h | h
+    · exact Or.inl h
+    · exact Or.inr (Or.inl h)
+  · exact fun h => hnd.1.2.2 a ha a h rfl
+  · exact fun h => hnd.2.2 a (List.mem_append_left _ ha) a h rfl
+
 set_option maxRecDepth 10000 in
 /-- **The stamped address space, opened** (Rocq `user_pt_inv_bytes` at the
 stamped view, `umem_x_to_bytes`): the translation registers, the walker's
-byte frame over the tree and the DATA pages, the stamped TEXT map, and the
-receipt. -/
+byte frame over the tree (at the user tier's share) and the DATA pages, the
+stamped TEXT map (at the user tier's share), and the receipt. -/
 theorem uk_userPtInvX_open [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (BitVec 8)) :
     kmapStatic (GF := GF) ⊢ userPtInvX cpu P M -∗
       ∃ (t : PTree) (tlb : Tlb) (mm T : BMap) (K : Nat), ⌜UkMem P t mm T⌝ ∗ ⌜utlbOk t tlb⌝ ∗
@@ -368,21 +393,45 @@ theorem uk_userPtInvX_open [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (Bi
   iintro #HS H
   unfold userPtInvX
   icases H with ⟨Hs, Hp, %hwf, %t, %⟨hb, hrep⟩, Ho, ⟨%tlb, Htlb, %htlb⟩, %K, #HK, Hum⟩
-  ihave HT := ubTree_own_fwd 2 t hrep.2.2.1 $$ HS Ho
+  ihave HT := ubTree_own_fwdQ 2 t hrep.2.2.1 uCustQ $$ HS Ho
+  ihave HT := (ubOwnAF_of_const curCtx (fun _ => true) (ubTreeBytes 2 t) uCustQ (fun _ _ => rfl)).2 $$ HT
   icases ukPagesX_fwd K P hwf M $$ HS Hum with ⟨%hl, HD, HX⟩
-  ihave HA := (ubOwnA_app curCtx (ubTreeBytes 2 t) (ukDataBytes P.um M)).2 $$ [HT HD]
+  ihave HD := (ukOwnAF_full curCtx (ukDataBytes P.um M)).2 $$ HD
+  icases ubOwnAF_disj curCtx _ _ _ _ $$ [HT HD] with ⟨%hdj, HT, HD⟩
+  · iframe HT HD
+  ihave %hndT := ubOwnAF_nodup curCtx _ _ $$ HT
+  ihave %hndD := ubOwnAF_nodup curCtx _ _ $$ HD
+  have hfT0 : (ubTreeBytes 2 t).map Prod.fst = ubTreeAddrs 2 t := ubTreeBytes_fst 2 t
+  have hfD0 : (ukDataBytes P.um M).map Prod.fst = ukDataAddrs P.um := ukDataBytes_fst _ _ hl
+  have hroT : ∀ p ∈ ubTreeBytes 2 t, (fun _ => true) p.1 = uRoOf P p.1 := by
+    intro p hp
+    have hnd' : p.1 ∉ ukDataAddrs P.um := fun h =>
+      hdj p.1 (List.mem_map_of_mem hp) p.1 (by rw [hfD0]; exact h) rfl
+    unfold uRoOf; simp [hnd']
+  have hroD : ∀ p ∈ ukDataBytes P.um M, (fun _ => false) p.1 = uRoOf P p.1 := by
+    intro p hp
+    have hin : p.1 ∈ ukDataAddrs P.um := by rw [← hfD0]; exact List.mem_map_of_mem hp
+    unfold uRoOf; simp [hin]
+  ihave HT := (ubOwnAF_relabel curCtx (fun _ => true) (uRoOf P) _ hroT).1 $$ HT
+  ihave HD := (ubOwnAF_relabel curCtx (fun _ => false) (uRoOf P) _ hroD).1 $$ HD
+  ihave HA := (ubOwnAF_app curCtx (uRoOf P) (ubTreeBytes 2 t) (ukDataBytes P.um M)).2 $$ [HT HD]
   · iframe
-  ihave %hnd := ukOwn_nodup curCtx K (ubTreeBytes 2 t ++ ukDataBytes P.um M) (ukTextBytes P.um M) $$ [HA HX]
+  ihave %hX := ukOwn_disj curCtx K (uRoOf P) (ubTreeBytes 2 t ++ ukDataBytes P.um M) (ukTextBytes P.um M)
+    $$ [HA HX]
   · iframe
   have hfA : (ubTreeBytes 2 t ++ ukDataBytes P.um M).map Prod.fst = ubTreeAddrs 2 t ++ ukDataAddrs P.um := by
-    rw [List.map_append, ubTreeBytes_fst, ukDataBytes_fst _ _ hl]
+    rw [List.map_append, hfT0, hfD0]
   have hfT : (ukTextBytes P.um M).map Prod.fst = ukTextAddrs P.um := ukTextBytes_fst _ _ hl
+  have hndA0 : (ubTreeAddrs 2 t ++ ukDataAddrs P.um).Nodup := by
+    rw [← hfT0, ← hfD0]
+    exact List.nodup_append.2 ⟨hndT, hndD, fun a ha b hb => hdj a ha b hb⟩
   have hnd3 : (ubTreeAddrs 2 t ++ ukDataAddrs P.um ++ ukTextAddrs P.um).Nodup := by
-    rw [List.map_append, hfA, hfT] at hnd; exact hnd
+    refine List.nodup_append.2 ⟨hndA0, hfT ▸ hX.1, fun a ha b hb => ?_⟩
+    rw [← hfA] at ha; rw [← hfT] at hb
+    exact hX.2 a ha b hb
   have hndA : ((ubTreeBytes 2 t ++ ukDataBytes P.um M).map Prod.fst).Nodup := by
-    rw [hfA]; exact uk_nodup_left _ _ hnd3
-  have hndT : ((ukTextBytes P.um M).map Prod.fst).Nodup := by
-    rw [hfT]; exact (List.nodup_append.1 hnd3).2.1
+    rw [hfA]; exact hndA0
+  have hndT' : ((ukTextBytes P.um M).map Prod.fst).Nodup := hX.1
   have hdom : ∀ a, (ubLookup (ubTreeBytes 2 t ++ ukDataBytes P.um M) a).isSome = true ↔
       a ∈ ubTreeAddrs 2 t ++ ukDataAddrs P.um := by
     intro a; rw [ubLookup_isSome, hfA]
@@ -394,19 +443,22 @@ theorem uk_userPtInvX_open [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (Bi
   have hview : ∀ k w, get? P.um k = some w →
       ukView P.um (ubLookup (ubTreeBytes 2 t ++ ukDataBytes P.um M)) (ubLookup (ukTextBytes P.um M)) k = M k :=
     ukView_lookup P.um M _ _ hl (fun p hp => ubLookup_mem _ hndA p (List.mem_append_right _ hp))
-      (fun p hp => ubLookup_mem _ hndT p hp)
-  ihave HO := ubOwnA_own curCtx _ (ubLookup (ubTreeBytes 2 t ++ ukDataBytes P.um M))
+      (fun p hp => ubLookup_mem _ hndT' p hp)
+  ihave HO := ubOwnAF_own curCtx (uRoOf P) _ (ubLookup (ubTreeBytes 2 t ++ ukDataBytes P.um M))
     (fun p hp => ubLookup_mem _ hndA p hp) $$ HA
-  ihave HO := ubOwn_eq curCtx _ _ _ hfA $$ HO
-  ihave HB := ubFrame_intro curCtx (ubTreeAddrs 2 t ++ ukDataAddrs P.um) _ hdom $$ HO
-  ihave HX := ukOwnX_text curCtx K _ (ubLookup (ukTextBytes P.um M)) (fun p hp => ubLookup_mem _ hndT p hp) $$ HX
+  ihave HO := (show ubOwnF (GF := GF) curCtx ((ubTreeBytes 2 t ++ ukDataBytes P.um M).map Prod.fst) (uRoOf P)
+      (ubLookup (ubTreeBytes 2 t ++ ukDataBytes P.um M)) ⊢
+      ubOwnF curCtx (ubTreeAddrs 2 t ++ ukDataAddrs P.um) (uRoOf P) (ubLookup (ubTreeBytes 2 t ++ ukDataBytes P.um M))
+    from by rw [hfA]) $$ HO
+  ihave HX := ukOwnX_text curCtx K uCustQ _ (ubLookup (ukTextBytes P.um M))
+    (fun p hp => ubLookup_mem _ hndT' p hp) $$ HX
   iexists t, tlb, ubLookup (ubTreeBytes 2 t ++ ukDataBytes P.um M), ubLookup (ukTextBytes P.um M), K
   unfold ubPtRegs uxTextOwn
-  rw [hfT]
-  iframe
-  iframe HK
+  rw [hfT, ufBF_B]
+  unfold ufBFB ubFrameFB
+  iframe Hs Hp Htlb HO HX HK
   ipureintro
-  exact ⟨hmem, htlb, hview, (List.nodup_append.1 hnd3).2.1, hdomT⟩
+  exact ⟨hmem, htlb, hview, ⟨ubTreeIn_of_uk hmem, hndA0, hdom⟩, (List.nodup_append.1 hnd3).2.1, hdomT⟩
 
 set_option maxRecDepth 10000 in
 /-- **The stamped address space, re-sealed** (Rocq `bytes_to_umem_x` +
@@ -419,29 +471,50 @@ theorem uk_userPtInvX_close [CurCtx] (cpu : CPU) (P : UPtd) (D : List PAddr) (t'
     kmapStatic (GF := GF) ⊢ ubPtRegs cpu P tlb' -∗ (ufBF P D).B mm' -∗
       uxTextOwn curCtx K (ukTextAddrs P.um) T -∗ iviewLb cpu K -∗ userPtInvX cpu P (ukView P.um mm' T) := by
   have hl := ukView_length P.um mm' T
-  iintro #HS Hr HB HX #HK
-  icases ubFrame_elim curCtx _ mm' $$ HB with ⟨%⟨hnd, hdom⟩, HO⟩
+  rw [ufBF_B]
+  unfold ufBFB ubFrameFB
+  iintro #HS Hr ⟨-, %⟨hnd, hdom⟩, HO⟩ HX #HK
   have hnd' : (ubTreeAddrs 2 t' ++ ukDataAddrs P.um).Nodup := uk_nodup_left _ _ hm'.nodup
   have hperm : D.Perm (ubTreeAddrs 2 t' ++ ukDataAddrs P.um) :=
     (List.perm_ext_iff_of_nodup hnd hnd').2 (fun a => (hdom a).symm.trans (hm'.dom a))
-  ihave HO := (ubOwn_perm curCtx _ _ mm' hperm).1 $$ HO
+  ihave HO := (ubOwnF_perm curCtx _ _ (uRoOf P) mm' hperm).1 $$ HO
   have ha : ubTreeAddrs 2 t' ++ ukDataAddrs P.um =
-      (ubTreeBytes 2 t').map Prod.fst ++ (ukDataBytes P.um (ukView P.um mm' T)).map Prod.fst := by
-    rw [ubTreeBytes_fst, ukDataBytes_fst _ _ hl]
-  ihave HO := ubOwn_eq curCtx _ _ mm' ha $$ HO
-  icases (ubOwn_app curCtx _ _ mm').1 $$ HO with ⟨HT, HD⟩
-  ihave HT := ubOwn_ownA curCtx _ mm' hm'.tree $$ HT
-  ihave HT := ubTree_own_bwd 2 t' hm'.rep.2.2.1 $$ HS HT
+      (ubTreeBytes 2 t' ++ ukDataBytes P.um (ukView P.um mm' T)).map Prod.fst := by
+    rw [List.map_append, ubTreeBytes_fst, ukDataBytes_fst _ _ hl]
+  ihave HO := (show ubOwnF (GF := GF) curCtx (ubTreeAddrs 2 t' ++ ukDataAddrs P.um) (uRoOf P) mm' ⊢
+      ubOwnF curCtx ((ubTreeBytes 2 t' ++ ukDataBytes P.um (ukView P.um mm' T)).map Prod.fst) (uRoOf P) mm'
+    from by rw [ha]) $$ HO
   have hdd : ∀ a ∈ ukDataAddrs P.um, (mm' a).isSome = true :=
     fun a ha => (hm'.dom a).2 (List.mem_append_right _ ha)
-  ihave HD := ubOwn_ownA curCtx _ mm' (ukDataBytes_view P.um mm' T hdd) $$ HD
+  have hDv := ukDataBytes_view P.um mm' T hdd
+  ihave HO := ubOwnF_ownAF curCtx (uRoOf P) _ mm' (fun p hp => by
+    rcases List.mem_append.1 hp with h | h
+    · exact hm'.tree p h
+    · exact hDv p h) $$ HO
+  icases (ubOwnAF_app curCtx (uRoOf P) _ _).1 $$ HO with ⟨HT, HD⟩
+  have hnd3 := hm'.nodup
+  rw [List.nodup_append, List.nodup_append] at hnd3
+  have hroT : ∀ p ∈ ubTreeBytes 2 t', uRoOf P p.1 = (fun _ => true) p.1 := by
+    intro p hp
+    have ha' : p.1 ∈ ubTreeAddrs 2 t' := by rw [← ubTreeBytes_fst]; exact List.mem_map_of_mem hp
+    have hnd' : p.1 ∉ ukDataAddrs P.um := fun h => hnd3.1.2.2 _ ha' _ h rfl
+    unfold uRoOf; simp [hnd']
+  have hroD : ∀ p ∈ ukDataBytes P.um (ukView P.um mm' T), uRoOf P p.1 = (fun _ => false) p.1 := by
+    intro p hp
+    have hin : p.1 ∈ ukDataAddrs P.um := by rw [← ukDataBytes_fst _ _ hl]; exact List.mem_map_of_mem hp
+    unfold uRoOf; simp [hin]
+  ihave HT := (ubOwnAF_relabel curCtx (uRoOf P) (fun _ => true) _ hroT).1 $$ HT
+  ihave HT := (ubOwnAF_of_const curCtx (fun _ => true) _ uCustQ (fun _ _ => rfl)).1 $$ HT
+  ihave HT := ubTree_own_bwdQ 2 t' hm'.rep.2.2.1 uCustQ $$ HS HT
+  ihave HD := (ubOwnAF_relabel curCtx (uRoOf P) (fun _ => false) _ hroD).1 $$ HD
+  ihave HD := (ukOwnAF_full curCtx _).1 $$ HD
   unfold uxTextOwn
   icases HX with ⟨%⟨hndT, hdomT⟩, HL⟩
   have hfT : ukTextAddrs P.um = (ukTextBytes P.um (ukView P.um mm' T)).map Prod.fst :=
     (ukTextBytes_fst _ _ hl).symm
   rw [hfT]
   have htt : ∀ a ∈ ukTextAddrs P.um, (T a).isSome = true := fun a ha => (hdomT a).2 ha
-  ihave HL := ukText_ownX curCtx K _ T (ukTextBytes_view P.um mm' T htt) $$ HL
+  ihave HL := ukText_ownX curCtx K uCustQ _ T (ukTextBytes_view P.um mm' T htt) $$ HL
   ihave Hpg := ukPagesX_bwd K P hm'.wf (ukView P.um mm' T) hl $$ HS HD HL
   unfold ubPtRegs
   icases Hr with ⟨Hs, Hp, Htlb⟩

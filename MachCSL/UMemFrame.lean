@@ -81,18 +81,17 @@ theorem ume_ummOwned_win (mm : BMap) (pa : PAddr) (n : Nat) (h : ummOwned mm pa 
 /-! ## §2 The frame rule -/
 
 /-- The write check reads the map only on an owned footprint. -/
-theorem uwOk_union (mm m2 : BMap) (p : RegPin) (rs : RegFile) (v : Bool) (ro pt : PAddr → Bool) (pa : PAddr)
-    (n : Nat) (w : BitVec (8 * n)) (e : Bool) (ho : bmOwned mm pa n = true) :
-    uwOk ⟨p, rs, umeUnion mm m2, v, ro, pt⟩ pa n w e = uwOk ⟨p, rs, mm, v, ro, pt⟩ pa n w e := by
+theorem uwOk_union (D : UFoot) (mm m2 : BMap) (p : RegPin) (rs : RegFile) (v : Bool) (ro pt : PAddr → Bool)
+    (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (e : Bool) (ho : bmOwned mm pa n = true) :
+    uwOk D ⟨p, rs, umeUnion mm m2, v, ro, pt⟩ pa n w e = uwOk D ⟨p, rs, mm, v, ro, pt⟩ pa n w e := by
   unfold uwOk ptWok
   by_cases hn : n = 8
   · subst hn
     obtain ⟨c, hc⟩ := bmRead_of_owned mm pa 8 ho
-    show (bmRw ro pa 8 || (e && 8 == 8 && pt pa && match bmRead (umeUnion mm m2) pa 8 with
-        | some c => pteADb c (w.setWidth 64) | none => false)) =
-      (bmRw ro pa 8 || (e && 8 == 8 && pt pa && match bmRead mm pa 8 with
-        | some c => pteADb c (w.setWidth 64) | none => false))
-    rw [ume_bmRead_union mm m2 pa 8 c hc, hc]
+    have h1 : bmRead (UWSt.mk p rs (umeUnion mm m2) v ro pt).mm pa 8 = some c := ume_bmRead_union mm m2 pa 8 c hc
+    have h2 : bmRead (UWSt.mk p rs mm v ro pt).mm pa 8 = some c := hc
+    rw [h1, h2]
+    rfl
   · have : (n == 8) = false := by simp [hn]
     simp only [this, Bool.and_false, Bool.false_and]
 
@@ -163,8 +162,8 @@ theorem ume_runRW_union (D : UFoot) (m2 : BMap) {X : Type} (m : SailM X) :
             simp only [hv] at h ⊢
             cases ho : bmOwned mm req.pa n
             · simp [ho] at h
-            · rw [uwOk_union mm m2 p rs v ro pt req.pa n w _ ho]
-              cases hw : uwOk ⟨p, rs, mm, v, ro, pt⟩ req.pa n w (akExcl req.access_kind)
+            · rw [uwOk_union D mm m2 p rs v ro pt req.pa n w _ ho]
+              cases hw : uwOk D ⟨p, rs, mm, v, ro, pt⟩ req.pa n w (akExcl req.access_kind)
               · simp [ho, hw] at h
               · simp only [ho, hw, ume_bmOwned_union mm m2 req.pa n ho, Bool.and_self, ↓reduceIte] at h ⊢
                 rw [ume_bmWrite_union mm m2 req.pa n w hn]

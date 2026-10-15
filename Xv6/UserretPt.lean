@@ -221,7 +221,7 @@ theorem userret_user_state [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (Bi
   iframe Hhart_state Hcur_privilege Hmstatus Hscause Hstval Hsepc HPC HnextPC Hclock HF
   isplitl [Hsatp Hpmpcfg_n Hpmpaddr_n Hslot Hum]
   · unfold uptSlot
-    icases Hslot with ⟨%t, %ht, Ho, Htlb⟩
+    icases Hslot with ⟨%t, %ht, Ho, Htlb, -⟩
     iframe Hsatp
     isplitl [Hpmpcfg_n Hpmpaddr_n]
     · iapply (userPmp_intro cpu _ _ hlf.2); iframe Hpmpcfg_n Hpmpaddr_n

@@ -221,7 +221,7 @@ set_option maxRecDepth 100000 in
 reservation is spent. -/
 theorem uwk_write_pte_cond (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file) (pa : BitVec 64)
     (hok : pteAddrOk pa) (hown : bmOwned s.mm pa 8 = true) (hrv : s.rv = true) (w' : BitVec 64)
-    (hw : uwOk s pa 8 w' true = true) :
+    (hw : uwOk D s pa 8 w' true = true) :
     runRW D orc s (write_pte_conditional (.Physaddr pa) 8 w') =
       some (.Ok true, { s with mm := bmWrite s.mm pa 8 w', rv := false }, orc) := by
   uwk_pins hp
@@ -454,13 +454,25 @@ theorem pteAD_update {acc : MemoryAccessType mem_payload} (hpl : accPlain acc) {
     exact ⟨_, _, rfl⟩
   · cases hum
 
+/-- A valid entry that is no pointer is a leaf. -/
+theorem uepLeafB_of_valid (m : BitVec 64) (hinv : uwkInv m = false) (hnl : pte_is_non_leaf (uwkFl m) = false) :
+    uepLeafB m = true := by
+  unfold uwkInv at hinv
+  unfold pte_is_non_leaf at hnl
+  simp only [uepLeafB, uwkFl, Mk_PTE_Flags, _get_PTE_Flags_V, _get_PTE_Flags_R, _get_PTE_Flags_W, _get_PTE_Flags_X,
+    _get_PTE_Flags_A, _get_PTE_Flags_D, _get_PTE_Flags_U, Sail.BitVec.extractLsb, BitVec.extractLsb,
+    Bool.or_eq_false_iff, Bool.and_eq_false_iff] at hinv hnl ⊢
+  bv_decide
+
 /-- **An A/D write-back may land on a page-table slot** (W8 (f3-utext)). -/
-theorem uwOk_ptw (s : UWSt) (addr : PAddr) (m m' : BitVec 64) (hpt : s.pt addr = true)
-    (hr : bmRead s.mm addr 8 = some m) (had : pteAD m m') : uwOk s addr 8 m' true = true := by
+theorem uwOk_ptw (D : UFoot) (s : UWSt) (addr : PAddr) (m m' : BitVec 64) (hpt : s.pt addr = true)
+    (hD : D.Dr .satp = true ∧ D.Dr .cur_privilege = true) (hpu : privUser (s.file .cur_privilege) = true)
+    (hleaf : uepLeafB m = true)
+    (hr : bmRead s.mm addr 8 = some m) (had : pteAD m m') : uwOk D s addr 8 m' true = true := by
   unfold uwOk ptWok
-  rw [hr, hpt]
+  rw [hr, hpt, hD.1, hD.2, hpu]
   have h1 : pteADb m (BitVec.setWidth 64 m') = true := by rw [BitVec.setWidth_eq]; exact (pteADb_iff _ _).2 had
-  simp only [h1, Bool.and_self, Bool.or_true, beq_self_eq_true]
+  simp only [hleaf, h1, Bool.and_self, Bool.or_true, beq_self_eq_true]
 
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
@@ -485,15 +497,18 @@ theorem uwk_upd_write (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file
     (acc : MemoryAccessType mem_payload) (hacc : utrAcc acc = true) (mxr sum : Bool)
     (hu : update_PTE_Bits w acc = some x) (hinv : uwkInv m = false) (hnl : pte_is_non_leaf (uwkFl m) = false)
     (hN : _get_PTE_Ext_N (uwkExt m) = 0#1) (hperm : uwkPermOk acc mxr m = true)
-    (hum : update_PTE_Bits m acc = some m') (hpt : bmRw s.ro addr 8 = true ∨ s.pt addr = true) :
+    (hum : update_PTE_Bits m acc = some m')
+    (hpt : bmRw s.ro addr 8 = true ∨ (s.pt addr = true ∧ (D.Dr .satp = true ∧ D.Dr .cur_privilege = true) ∧
+      privUser (s.file .cur_privilege) = true)) :
     runRW D orc s (update_and_write_pte 39 vpn (.Physaddr addr) w 0 acc .User mxr sum ()) =
       some (.Ok (some m', ()), { s with mm := bmWrite s.mm addr 8 m', rv := false }, orc) := by
   have hrw := uwk_rw_of_valid m hinv
   have hown := bmOwned_of_read _ _ _ _ hr
-  have hw : uwOk { s with rv := true } addr 8 m' true = true := by
-    rcases hpt with h | h
+  have hw : uwOk D { s with rv := true } addr 8 m' true = true := by
+    rcases hpt with h | ⟨h, hD, hpu⟩
     · unfold uwOk; rw [show ({ s with rv := true } : UWSt).ro = s.ro from rfl, h]
-    · exact uwOk_ptw { s with rv := true } addr m m' h hr (pteAD_update (accPlain_of_utrAcc hacc) hum)
+    · exact uwOk_ptw D { s with rv := true } addr m m' h hD hpu (uepLeafB_of_valid m hinv hnl) hr
+        (pteAD_update (accPlain_of_utrAcc hacc) hum)
   uwk_pins hp
   uwk_run -bv [uwk_read_pte_excl, uwk_pte_is_invalid, uwk_check_perm, uwk_write_pte_cond, uwkPerm]
 

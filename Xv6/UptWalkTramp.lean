@@ -26,6 +26,7 @@ physical.
 import Xv6.UptTree
 import Xv6.KstackMap
 import MachCSL.WpSmodeSatpU
+import MachCSL.UEpochWalk
 import Xv6.UserExec
 
 namespace Xv6
@@ -40,26 +41,37 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 /-- **An installed user table** (Rocq `utlb_inv_pt`, less `satp` and the PMP
 cells, which ride the configuration cells while the kernel runs): the tree,
-owned and representing the leaves, and the hart's TLB, sound for it. -/
+owned and representing the leaves, and the hart's TLB, sound for it.  W8
+(f3-utext): while the hart's user epoch is open the tree is three quarters
+the hart's (`uCustQ`), and the slot carries the open-epoch witness (the
+kernel root's ghost, the user root another) for the A/D write-backs. -/
 def uptSlot [CurCtx] (cpu : CPU) (P : UPtd) : IProp GF := iprop%
+  ∃ t : PTree, ⌜t.base = P.root ∧ ptRep t P.leaves⌝ ∗ ptreeOwn 2 uCustQ t ∗
+    (∃ tlb : Tlb, Register.tlb ↦ᵣ[cpu] tlb ∗ ⌜utlbOk t tlb⌝) ∗ uptOpenWit P.root Privilege.Supervisor
+
+/-- **The installed user table with the table in full** (outside the open
+epoch: uservec after its `csrw satp`, the custody given back). -/
+def uptSlotF [CurCtx] (cpu : CPU) (P : UPtd) : IProp GF := iprop%
   ∃ t : PTree, ⌜t.base = P.root ∧ ptRep t P.leaves⌝ ∗ ptreeOwn 2 (DFrac.own 1) t ∗
     ∃ tlb : Tlb, Register.tlb ↦ᵣ[cpu] tlb ∗ ⌜utlbOk t tlb⌝
 
-/-- `userPtInv` is the slot, the translation cells and the user pages. -/
+/-- `userPtInv` is the slot, the translation cells and the user pages (with
+the open-epoch witness on both sides). -/
 theorem userPtInv_uptSlot [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (BitVec 8)) :
-    userPtInv (GF := GF) cpu P M ⊣⊢
+    iprop(userPtInv (GF := GF) cpu P M ∗ uptOpenWit P.root Privilege.Supervisor) ⊣⊢
       Register.satp ↦ᵣ[cpu] satpOf .kpt P.root ∗ userPmp cpu ∗
-      ⌜uptWf P⌝ ∗ uptSlot cpu P ∗ umPages P M := by
+      ⌜uptWf P⌝ ∗ uptSlot cpu P ∗ umPagesU P M := by
   unfold userPtInv uptSlot
   constructor
-  · iintro ⟨Hs, Hp, %hwf, %t, %ht, Ho, Htlb, Hum⟩
+  · iintro ⟨⟨Hs, Hp, %hwf, %t, %ht, Ho, Htlb, Hum⟩, #Hw⟩
     iframe Hs Hp Hum
     isplit
     · ipureintro; exact hwf
     iexists t
-    iframe Ho Htlb
+    iframe Ho Htlb Hw
     ipureintro; exact ht
-  · iintro ⟨Hs, Hp, %hwf, ⟨%t, %ht, Ho, Htlb⟩, Hum⟩
+  · iintro ⟨Hs, Hp, %hwf, ⟨%t, %ht, Ho, Htlb, #Hw⟩, Hum⟩
+    iframe Hw
     iframe Hs Hp
     isplit
     · ipureintro; exact hwf
@@ -174,31 +186,33 @@ theorem uptTransSpec [CurCtx] (cpu : CPU) (c : MConf) (sie : Bool) (P : UPtd)
   unfold paOf
   iintro ⟨HmConf, ⟨Hslot, #HS, Htok⟩, HΦ⟩
   unfold uptSlot
-  icases Hslot with ⟨%t, %⟨hbase, hrep⟩, Ho, %tlb, Htlb, %htlb⟩
+  icases Hslot with ⟨%t, %⟨hbase, hrep⟩, Ho, ⟨%tlb, Htlb, %htlb⟩, #Hw⟩
   obtain ⟨c1, c0, a, d, hw, hk2, he2, hk1, he1, he0, hp1, hp0⟩ :=
     uptWalk_leaf t P.leaves hrep (vpnOf va) ppn perm hl
   have hpv := hrep.2.2.1
   have hv2 := hpv t.base (uptRoot_mem_pages t)
   have hv1 := hpv c1.base hp1
   have hv0 := hpv c0.base hp0
-  icases ptreeOwn_path3_acc (DFrac.own 1) t c1 c0 (vpnOf va) hk2 hk1 $$ Ho with ⟨H2, H1, H0, Wt⟩
+  icases ptreeOwn_path3_acc uCustQ t c1 c0 (vpnOf va) hk2 hk1 $$ Ho with ⟨H2, H1, H0, Wt⟩
   rw [he2, he1, he0]
-  icases uptCell_phys t.base hv2 (vpnIdx (vpnOf va) 2) (DFrac.own 1) (kPtr c1.base) $$ HS with ⟨C2, D2⟩
-  icases uptCell_phys c1.base hv1 (vpnIdx (vpnOf va) 1) (DFrac.own 1) (kPtr c0.base) $$ HS with ⟨C1, D1⟩
+  icases uptCell_phys t.base hv2 (vpnIdx (vpnOf va) 2) uCustQ (kPtr c1.base) $$ HS with ⟨C2, D2⟩
+  icases uptCell_phys c1.base hv1 (vpnIdx (vpnOf va) 1) uCustQ (kPtr c0.base) $$ HS with ⟨C1, D1⟩
   ihave B2 := C2 $$ H2
   ihave B1 := C1 $$ H1
-  ihave B0 := (uptCell_phys c0.base hv0 (vpnIdx (vpnOf va) 0) (DFrac.own 1) (kLeaf ppn perm a d)).trans
+  ihave B0 := (uptCell_phys c0.base hv0 (vpnIdx (vpnOf va) 0) uCustQ (kLeaf ppn perm a d)).trans
     and_elim_l $$ HS H0
   have htv := uptTlbVpnOk t tlb htlb (vpnOf va) _ ppn perm a d hw
-  iapply (swp_translateAddr_own cpu (DFrac.own 1) c sie t.base (hbase ▸ hok) c1.base c0.base tlb va (canonical_of_lt38 va hlt)
-    acc hacc ppn perm a d hperm (DFrac.own 1) (DFrac.own 1)
+  ihave #Hw' := (show uptOpenWit (GF := GF) P.root Privilege.Supervisor ⊢ uptOpenWit t.base Privilege.Supervisor
+    from by rw [hbase]) $$ Hw
+  iapply (swp_translateAddr_upt cpu (DFrac.own 1) c sie t.base (hbase ▸ hok) c1.base c0.base tlb va
+    (canonical_of_lt38 va hlt) acc hacc ppn perm a d hperm uCustQ uCustQ
     (uptPteAddrOk t.base hv2 _) (uptPteAddrOk c1.base hv1 _) (uptPteAddrOk c0.base hv0 _)
     htv)
-  iframe HmConf Htok B2 B1 B0 Htlb
+  iframe HmConf Htok B2 B1 B0 Htlb Hw'
   iintro HmConf Htok B2 B1 %a' %d' B0 %tlb' Htlb %hafter
   ihave H2 := D2 $$ B2
   ihave H1 := D1 $$ B1
-  ihave H0 := (uptCell_phys c0.base hv0 (vpnIdx (vpnOf va) 0) (DFrac.own 1) (kLeaf ppn perm a' d')).trans
+  ihave H0 := (uptCell_phys c0.base hv0 (vpnIdx (vpnOf va) 0) uCustQ (kLeaf ppn perm a' d')).trans
     and_elim_r $$ HS B0
   ihave Ho := Wt $$ H2 H1 %(kLeaf ppn perm a' d') H0
   iapply HΦ $$ HmConf
@@ -208,14 +222,15 @@ theorem uptTransSpec [CurCtx] (cpu : CPU) (c : MConf) (sie : Bool) (P : UPtd)
     isplit
     · ipureintro
       exact ⟨by rw [PTree.base_setLeaf, hbase], uptPtRep_setLeaf t P.leaves hrep (vpnOf va) _ ppn perm a d a' d' hw⟩
-    iexists tlb'
-    iframe Htlb
-    ipureintro
-    exact uptTlbOk_after t tlb tlb' htlb (vpnOf va) _ ppn perm a d a' d' hw hafter
+    isplitl [Htlb]
+    · iexists tlb'
+      iframe Htlb
+      ipureintro
+      exact uptTlbOk_after t tlb tlb' htlb (vpnOf va) _ ppn perm a d a' d' hw hafter
+    · iexact Hw
   isplit
   · iexact HS
   · iexact Htok
-
 end
 
 end Xv6

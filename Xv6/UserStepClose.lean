@@ -39,7 +39,7 @@ theorem ust_frames (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IProp GF)
   rw [ustS0_file, ustS0_mm, ustS0_rv]
   isplitl [HF HB Hc Hr]
   · isplitr
-    · ipureintro; exact ⟨rfl, rfl⟩
+    · ipureintro; exact ⟨rfl, rfl, satpTable_satpOf P.root⟩
     iframe
   · iexact Hres
 

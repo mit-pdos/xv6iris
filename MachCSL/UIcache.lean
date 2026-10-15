@@ -261,7 +261,7 @@ theorem swp_sail_mem_read_plain_x (cpu : CPU) {n vasize : Nat}
 
 /-- The stamped bytes of the addresses `D`, at the map's values. -/
 def uicOwnX (ξ : CtxId) (K : Nat) (D : List PAddr) (mm : BMap) : IProp GF :=
-  iprop([∗list] a ∈ D, ∃ b : BitVec 8, ⌜mm a = some b⌝ ∗ ctxByteX ξ K a (DFrac.own 1) b)
+  iprop([∗list] a ∈ D, ∃ b : BitVec 8, ⌜mm a = some b⌝ ∗ ctxByteX ξ K a (DFrac.own Qp.threeQuarters) b)
 
 theorem uicOwnX_app (ξ : CtxId) (K : Nat) (D₁ D₂ : List PAddr) (mm : BMap) :
     uicOwnX (GF := GF) ξ K (D₁ ++ D₂) mm ⊣⊢ iprop(uicOwnX ξ K D₁ mm ∗ uicOwnX ξ K D₂ mm) := by
@@ -274,7 +274,7 @@ theorem uicOwnX_perm (ξ : CtxId) (K : Nat) (D₁ D₂ : List PAddr) (mm : BMap)
 /-- A readable window's stamped bytes are a `ctxBytesX` word. -/
 theorem uicOwnX_win (ξ : CtxId) (K : Nat) (pa : PAddr) (n : Nat) (mm : BMap) (w : BitVec (8 * n))
     (hr : bmRead mm pa n = some w) :
-    uicOwnX (GF := GF) ξ K (ubWin pa n) mm ⊣⊢ ctxBytesX ξ K pa n (DFrac.own 1) w := by
+    uicOwnX (GF := GF) ξ K (ubWin pa n) mm ⊣⊢ ctxBytesX ξ K pa n (DFrac.own Qp.threeQuarters) w := by
   unfold uicOwnX ubWin ctxBytesX
   rw [BigSepL.bigSepL_map]
   constructor
@@ -301,7 +301,7 @@ text map is a stamped word, handed back unchanged. -/
 theorem uxTextOwn_acc (ξ : CtxId) (K : Nat) (DT : List PAddr) (T : BMap) (pa : PAddr) (n : Nat)
     (w : BitVec (8 * n)) (hn : n < 2 ^ 64) (hr : bmRead T pa n = some w) :
     uxTextOwn ξ K DT T ⊢@{IProp GF}
-      ctxBytesX ξ K pa n (DFrac.own 1) w ∗ (ctxBytesX ξ K pa n (DFrac.own 1) w -∗ uxTextOwn ξ K DT T) := by
+      ctxBytesX ξ K pa n (DFrac.own Qp.threeQuarters) w ∗ (ctxBytesX ξ K pa n (DFrac.own Qp.threeQuarters) w -∗ uxTextOwn ξ K DT T) := by
   unfold uxTextOwn
   iintro ⟨%⟨hnd, hdom⟩, H⟩
   have hsub : ∀ a ∈ ubWin pa n, a ∈ DT := by
@@ -309,7 +309,7 @@ theorem uxTextOwn_acc (ξ : CtxId) (K : Nat) (DT : List PAddr) (T : BMap) (pa : 
     obtain ⟨j, hj, rfl⟩ := (ubWin_mem pa n a).1 ha
     exact (hdom _).1 (by rw [bmRead_spec T pa n w hr j hj]; rfl)
   have hp := ub_perm_win DT pa n (by omega) hnd hsub
-  have e : iprop([∗list] a ∈ DT, ∃ b : BitVec 8, ⌜T a = some b⌝ ∗ ctxByteX ξ K a (DFrac.own 1) b) =
+  have e : iprop([∗list] a ∈ DT, ∃ b : BitVec 8, ⌜T a = some b⌝ ∗ ctxByteX ξ K a (DFrac.own Qp.threeQuarters) b) =
       uicOwnX (GF := GF) ξ K DT T := rfl
   rw [e]
   icases (uicOwnX_perm ξ K _ _ T hp).1 $$ H with H

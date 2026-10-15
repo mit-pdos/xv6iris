@@ -128,7 +128,7 @@ theorem swp_uxRun {X : Type} (K : Nat) (DT : List PAddr) (T : BMap) (m : SailM X
       iapply swp_bind
       cases hif : akIfetch req.access_kind with
       | true =>
-        iapply swp_sail_mem_read_ifetch_x cpu req ξ K (DFrac.own 1) w hif (fun v => swp cpu (k v) Φ)
+        iapply swp_sail_mem_read_ifetch_x cpu req ξ K (DFrac.own Qp.threeQuarters) w hif (fun v => swp cpu (k v) Φ)
         iframe Hb Hiv
         inext
         iintro Hb
@@ -139,7 +139,7 @@ theorem swp_uxRun {X : Type} (K : Nat) (DT : List PAddr) (T : BMap) (m : SailM X
         have hpl : akPlain req.access_kind = true := by simp [akPlain, hif, hex]
         unfold uFr
         icases Hfr with ⟨%hwp, HF, HB, Hc, Hr⟩
-        iapply swp_sail_mem_read_plain_x cpu req ξ K (DFrac.own 1) w hpl (fun v => swp cpu (k v) Φ)
+        iapply swp_sail_mem_read_plain_x cpu req ξ K (DFrac.own Qp.threeQuarters) w hpl (fun v => swp cpu (k v) Φ)
         iframe Hc Hb
         inext
         iintro Hc Hb
@@ -180,7 +180,7 @@ theorem swp_uxRun {X : Type} (K : Nat) (DT : List PAddr) (T : BMap) (m : SailM X
       isplitl [HF HB Hc Hr]
       · unfold uFr
         isplitr
-        · ipureintro; exact ⟨hw2.1.trans hwp.1, hw2.2.trans hwp.2⟩
+        · ipureintro; exact ⟨hw2.1.trans hwp.1, hw2.2.1.trans hwp.2.1, by rw [hw2.2.2]; exact hwp.2.2⟩
         iframe
       iframe Htx Hiv
       iapply uxPost_step RF BF T s s' _ _ _ hre $$ HP

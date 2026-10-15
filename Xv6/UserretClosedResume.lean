@@ -114,7 +114,7 @@ theorem urc_resume (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames →
   · ipureintro; exact uFit_of_niFit ox _ hfit
   inext
   unfold userretPost
-  iintro %C %ms %⟨hlo, hms⟩ HU Hpt Hcfg Htf Hleft
+  iintro %C %ms %⟨hlo, hms, hroot⟩ HU Hpt Hcfg Htf Hleft
   icases userretLeft_top cpu k ksp m hsp hav $$ [Hleft Hgap] with ⟨Hleft, %hstk⟩
   · iframe Hleft Hgap
   have hpins : UrcPins j V.sz.toNat V.fdg V.cwi gn V.pvLazy V.pvSecc (k.pop m) ksp V :=
@@ -125,7 +125,7 @@ theorem urc_resume (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames →
   · unfold urcRut
     iexists k.pop m, ksp, V
     iframe Hleft Htf Hclose Huh
-    ipureintro; exact hpins
+    ipureintro; exact ⟨hpins, hroot⟩
   ihave Hptm := urc_ptm cpu P M V.sz.toNat $$ Hpt
   -- the obligation at THE KEY RESUMED (NI M3 U-2a)
   ihave Hk : iprop(▷ ukb (hlc := hlc) cpu C P (fdFrags V.fdg)

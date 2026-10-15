@@ -249,17 +249,18 @@ theorem uftPost_step {X : Type} (s s'' : UWSt) (m m' : SailM X) (Φ : X → IPro
 every oracle's fetch-walk runs through, from the frames of `s`, with the
 obligation at every landing. -/
 theorem swp_uftRun {X : Type} (m : SailM X) :
-    ∀ (s : UWSt), s.ro = BF.ro → s.pt = BF.pt → (∀ orc, (uftRun D orc s m).isSome = true) → ∀ Φ : X → IProp GF,
+    ∀ (s : UWSt), s.ro = BF.ro → s.pt = BF.pt → BF.satpOk (s.file .satp) → (∀ orc, (uftRun D orc s m).isSome = true) →
+      ∀ Φ : X → IProp GF,
       uFr RF BF s ∗ uftPost RF BF s m Φ ⊢ swp cpu m Φ := by
   induction m with
   | pure x =>
-    intro s _ _ _ Φ
+    intro s _ _ _ _ Φ
     iintro ⟨Hfr, HP⟩
     iapply swp_ret
     unfold uftPost
     iapply HP $$ %(UOrc.dflt s.rs) %x %s %(UOrc.dflt s.rs) %rfl Hfr
   | impure c k ih =>
-    intro s hro hpt hok Φ
+    intro s hro hpt hsat hok Φ
     cases hc : uftIsFetch c with
     | true =>
       obtain ⟨n, vasize, req, rfl, hk⟩ := uftIsFetch_true hc
@@ -286,11 +287,11 @@ theorem swp_uftRun {X : Type} (m : SailM X) :
       iintro %w' HB
       have hok' : ∀ o, (uftRun D o s (k (.Ok (w', none)))).isSome = true := fun o => by
         rw [← hstep w' o]; exact hok _
-      iapply ih (.Ok (w', none)) s hro hpt hok' Φ
+      iapply ih (.Ok (w', none)) s hro hpt hsat hok' Φ
       isplitl [HF HB Hc Hr]
       · unfold uFr
         isplitr
-        · ipureintro; exact ⟨hro, hpt⟩
+        · ipureintro; exact ⟨hro, hpt, hsat⟩
         iframe
       iapply uftPost_step RF BF s s _ _ Φ (fun o => ⟨_, hstep w' o⟩) $$ HP
     | false =>
@@ -317,11 +318,11 @@ theorem swp_uftRun {X : Type} (m : SailM X) :
         obtain ⟨orc₀, h0⟩ := hre o
         rw [← h0]; exact hok orc₀
       have hwp := runRW_wp D _ orc s v s' orc' h
-      iapply ih v s' (hwp.1.trans hro) (hwp.2.trans hpt) hok' Φ
+      iapply ih v s' (hwp.1.trans hro) (hwp.2.1.trans hpt) (by rw [hwp.2.2]; exact hsat) hok' Φ
       isplitl [HF HB Hc Hr]
       · unfold uFr
         isplitr
-        · ipureintro; exact ⟨hwp.1.trans hro, hwp.2.trans hpt⟩
+        · ipureintro; exact ⟨hwp.1.trans hro, hwp.2.1.trans hpt, by rw [hwp.2.2]; exact hsat⟩
         iframe
       iapply uftPost_step RF BF s s' _ _ Φ hre $$ HP
 
@@ -336,7 +337,7 @@ theorem swp_uftRun_of {X : Type} (m : SailM X) (s : UWSt) (P : X → UWSt → Pr
     obtain ⟨x, s', orc', h, -⟩ := hw orc
     rw [h]; rfl
   ihave %hwp := uFr_wp RF BF s $$ Hfr
-  iapply swp_uftRun RF BF m s hwp.1 hwp.2 hok Φ
+  iapply swp_uftRun RF BF m s hwp.1 hwp.2.1 hwp.2.2 hok Φ
   iframe Hfr
   unfold uftPost
   iintro %orc %x %s' %orc' %h Hfr

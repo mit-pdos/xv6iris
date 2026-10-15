@@ -113,7 +113,8 @@ theorem ume_miss (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 s) 
         have hadx : pteAD w x := pteAD_trans (pteAD_symm had) (ume_update_AD hpl had hu)
         have hokx := uftLeafOk_AD hok hadx
         have hupd := fun orc => uwk_upd_write ufFoot orc s hwk vpn addr hmem.1 w w x x hmem.2 _ hacc false sum hu hok.inv
-          (uft_nonleaf hok) hok.n0 hperm hu (Or.inr (ustLand_slot hl hstep (PTree.walk_mem_entries 2 t vpn addr w hw)))
+          (uft_nonleaf hok) hok.n0 hperm hu (Or.inr ⟨ustLand_slot hl hstep (PTree.walk_mem_entries 2 t vpn addr w hw),
+            ⟨ufFoot_rd _ (by decide), ufFoot_rd _ (by decide)⟩, by rw [hl.priv]; rfl⟩)
         refine ⟨.Ok (ptePpn w, .PBMT_PMA, ()), _, fun orc => utlb_miss_ok ufFoot orc orc s _ hdr hdw _ rfl vpn t.base
           _ false sum w addr (some x) (hwalk' orc) (hupd orc), ?_⟩
         have hstep' : UbMemStep P t0 (t.setLeaf 2 vpn x) mm0 (bmWrite s.mm addr 8 x) :=
@@ -180,7 +181,8 @@ theorem ume_hit (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 s) (
         have hadm : pteAD w m' := pteAD_trans (pteAD_symm had) (ume_update_AD hpl had hum)
         have hokm := uftLeafOk_AD hok hadm
         have hupd := fun orc => uwk_upd_write ufFoot orc s hwk vpn addr hmem.1 w' w m' x hmem.2 _ hacc false sum hu
-          hok.inv (uft_nonleaf hok) hok.n0 hperm hum (Or.inr (ustLand_slot hl hstep (PTree.walk_mem_entries 2 t vpn addr w hw)))
+          hok.inv (uft_nonleaf hok) hok.n0 hperm hum (Or.inr ⟨ustLand_slot hl hstep (PTree.walk_mem_entries 2 t vpn addr w hw),
+            ⟨ufFoot_rd _ (by decide), ufFoot_rd _ (by decide)⟩, by rw [hl.priv]; rfl⟩)
         have hstep' : UbMemStep P t0 (t.setLeaf 2 vpn m') mm0 (bmWrite s.mm addr 8 m') :=
           ubMemStep_trans P t0 t _ mm0 s.mm _ hstep
             (ubMemStep_setLeaf P t s.mm hwf vpn addr w m' hw (uft_ne_zero hokm) (uft_ptRep_setLeaf hrep hw hadm hokm))

@@ -61,9 +61,9 @@ theorem uk_load_page {π : Nat → Option UPerm} {sz : Nat} {pt : UPtd} (hsz : u
 theorem uk_text_of_W {lw : BitVec 64} (h : pteBit lw 2 = true) : ukTextLeaf lw = false := by
   unfold ukTextLeaf; unfold pteBit at h; rw [h]; simp
 
-theorem uk_text_of_XnW {lw : BitVec 64} (hx : pteBit lw 3 = true) (hw : pteBit lw 2 = false) :
-    ukTextLeaf lw = true := by
-  unfold ukTextLeaf; unfold pteBit at hx hw; rw [hx, hw]; rfl
+theorem uk_text_of_XnW {lw : BitVec 64} (hu : pteBit lw 4 = true) (hx : pteBit lw 3 = true)
+    (hw : pteBit lw 2 = false) : ukTextLeaf lw = true := by
+  unfold ukTextLeaf; unfold pteBit at hu hx hw; rw [hu, hx, hw]; rfl
 
 end leaves
 
@@ -153,7 +153,7 @@ theorem ukLeaves_holds : UK_LEAVES where
       (fun C pt T V _ hpm hlf hsz hM _ => ⟨V, hM, ?_⟩) hUs
     obtain ⟨lw, hk, hU, hR, hXb, hWb⟩ := uk_load_page hsz hlf hpm hq
     exact ukRetire_loadText C pt T imm rs1 rd u k (ukLen isRvc) m pc V lw _ hW hal hk hU hR
-      (uk_text_of_XnW (hXb.trans hqX) (hWb.trans hqW)) (uk_view_bytes hM hk hpg (uMWord_bytes M _ k hpres))
+      (uk_text_of_XnW hU (hXb.trans hqX) (hWb.trans hqW)) (uk_view_bytes hM hk hpg (uMWord_bytes M _ k hpres))
   wp_uk_store := by
     intro hlc GF _ _ _ _ S K M m pc isRvc imm rs1 rs2 k hS hI hok hacc
     have hUs := ustep_store m S.sz K.fdv K.cw K.gn K.cs K.pid hI hok hacc

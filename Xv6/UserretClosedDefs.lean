@@ -195,7 +195,8 @@ the next round appends `(sc, Wr, W, W')` to it). -/
 def urcRut (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat) (cpu : CPU) (sz : Nat) (γfd : GName)
     (cw : Nat) (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32) (lz : Bool)
     (secc : BitVec 64) (Wr : Uvis) : UPtd → IProp GF :=
-  fun p => iprop(∃ (k : KCtx) (ksp : BitVec 64) (V : ProcPriv), ⌜UrcPins j sz γfd cw gn lz secc k ksp V⌝ ∗
+  fun p => iprop(∃ (k : KCtx) (ksp : BitVec 64) (V : ProcPriv),
+    ⌜UrcPins j sz γfd cw gn lz secc k ksp V ∧ p.root ≠ k.root⌝ ∗
     userretLeft cpu k ∗ tfPageAt p.tfp V.tf ∗
     (∀ sts' : List FdState, fdFrags γfd sts' -∗ usertrapResAt (hlc := hlc) PT Γ j cpu p ksp V sts' cs pid) ∗
     uhistAt Wr)

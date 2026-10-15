@@ -267,7 +267,7 @@ theorem urwDemo_swp_add (cpu : CPU) (ξ : CtxId) (dq : DFrac) (f : RegFile)
   unfold uFr uPost
   isplitl [HF Hc Hr]
   · isplitr
-    · ipureintro; exact ⟨rfl, rfl⟩
+    · ipureintro; exact ⟨rfl, rfl, trivial⟩
     simp only [uRegFrameLF, uNoBytesF, urwDemo_noPin_file]
     iframe
     ipureintro; intro _; trivial
@@ -285,6 +285,7 @@ page: `x5` receives the doubleword. -/
 theorem urwDemo_swp_ld (cpu : CPU) (ξ : CtxId) (RF : URegFrame GF cpu urwDemoFoot)
     (BF : UByteFrame GF ξ) (f : RegFile) (pg : BitVec 12 → BitVec 8)
     (hf : ∀ r v, urwDemoPinL r = some v → f r = v) (hro : BF.ro = fun _ => false) (hpt : BF.pt = fun _ => false)
+    (hsat : BF.satpOk (f .satp))
     (Φ : ExecutionResult → IProp GF) :
     RF.F f ∗ BF.B (urwDemoPage pg) ∗ ctxTok cpu ξ ∗
     (RF.F (f.set .x5 (urwDemoDword pg)) -∗ BF.B (urwDemoPage pg) -∗ ctxTok cpu ξ -∗ Φ RETIRE_SUCCESS)
@@ -297,7 +298,7 @@ theorem urwDemo_swp_ld (cpu : CPU) (ξ : CtxId) (RF : URegFrame GF cpu urwDemoFo
   unfold uFr uPost
   isplitl [HF HB Hc Hr]
   · isplitr
-    · ipureintro; exact ⟨hro.symm, hpt.symm⟩
+    · ipureintro; exact ⟨hro.symm, hpt.symm, by rw [hfile]; exact hsat⟩
     rw [hfile]
     iframe
   · iintro %orc %x %s' %orc' %h HF HB Hc Hr

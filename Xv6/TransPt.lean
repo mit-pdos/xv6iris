@@ -163,14 +163,26 @@ def pt2Win [CurCtx] (cpu : CPU) (kroot : BitVec 44) (P : UPtd) : IProp GF := ipr
 def uptFrame [CurCtx] (P : UPtd) : IProp GF := iprop%
   ∃ t : PTree, ⌜t.base = P.root ∧ ptRep t P.leaves⌝ ∗ ptreeOwn 2 (DFrac.own 1) t
 
+/-- The process's table at the user tier's three quarters (W8 (f3-utext):
+the open epoch's record holds the last quarter). -/
+def uptFrameH [CurCtx] (P : UPtd) : IProp GF := iprop%
+  ∃ t : PTree, ⌜t.base = P.root ∧ ptRep t P.leaves⌝ ∗ ptreeOwn 2 uCustQ t
+
+/-- **The window at userret, the epoch open** (W8 (f3-utext)): as `pt2Win`,
+the process's table at three quarters, with the open-epoch witness. -/
+def pt2WinU [CurCtx] (cpu : CPU) (kroot : BitVec 44) (P : UPtd) : IProp GF := iprop%
+  ∃ (tk : PTree) (M : RegMapF (BitVec 64)), kptOn tk M ∗ ⌜tk.base = kroot⌝ ∗
+    (∃ t : PTree, ⌜t.base = P.root ∧ ptRep t P.leaves⌝ ∗ ptreeOwn 2 uCustQ t ∗
+      ∃ tlb : Tlb, Register.tlb ↦ᵣ[cpu] tlb ∗ ⌜tlbOk2 tk t tlb⌝) ∗ uptOpenWit P.root Privilege.Supervisor
+
 /-- **Entering the window at userret's `csrw satp`** (Rocq
 `tlb_inv_pt2_kprev_enter`): the kernel slot's TLB becomes the window's. -/
 theorem pt2Win_enterU [CurCtx] (cpu : CPU) (kroot : BitVec 44) (P : UPtd) :
-    kptSlot (GF := GF) cpu kroot ∗ uptFrame P ⊢ pt2Win cpu kroot P := by
-  unfold kptSlot uptFrame pt2Win
-  iintro ⟨⟨%tk, %M, #Hkpt, %hb, %tlb, Htlb, %htlb⟩, ⟨%t, %ht, Ho⟩⟩
+    kptSlot (GF := GF) cpu kroot ∗ uptFrameH P ∗ uptOpenWit P.root Privilege.Supervisor ⊢ pt2WinU cpu kroot P := by
+  unfold kptSlot uptFrameH pt2WinU
+  iintro ⟨⟨%tk, %M, #Hkpt, %hb, %tlb, Htlb, %htlb⟩, ⟨%t, %ht, Ho⟩, #Hw⟩
   iexists tk, M
-  iframe Hkpt
+  iframe Hkpt Hw
   isplit
   · ipureintro; exact hb
   iexists t
@@ -181,12 +193,31 @@ theorem pt2Win_enterU [CurCtx] (cpu : CPU) (kroot : BitVec 44) (P : UPtd) :
   iframe Htlb
   ipureintro; exact tlbOk2_ofK tk t tlb htlb
 
+/-- **The `sfence.vma` that closes userret's window**: the TLB cell comes
+out; given back empty, the installed user table's slot re-forms. -/
+theorem pt2WinU_sfence [CurCtx] (cpu : CPU) (kroot : BitVec 44) (P : UPtd) :
+    pt2WinU (GF := GF) cpu kroot P ⊢ ∃ tlb : Tlb, Register.tlb ↦ᵣ[cpu] tlb ∗
+      (Register.tlb ↦ᵣ[cpu] (vectorInit none) -∗ uptSlot cpu P) := by
+  unfold pt2WinU
+  iintro ⟨%tk, %M, #Hkpt, %hb, ⟨%t, %ht, Ho, %tlb, Htlb, %_⟩, #Hw⟩
+  iexists tlb
+  iframe Htlb
+  iintro Htlb
+  unfold uptSlot
+  iexists t
+  iframe Ho Hw
+  isplit
+  · ipureintro; exact ht
+  iexists (vectorInit none)
+  iframe Htlb
+  ipureintro; exact utlbOk_reset t
+
 /-- **Entering the window at uservec's `csrw satp`** (Rocq
 `tlb_inv_pt2_kcur_enter`): the user slot's TLB becomes the window's; the
 kernel table comes back from its persistent invariant. -/
 theorem pt2Win_enterK [CurCtx] (cpu : CPU) (tk : PTree) (M : RegMapF (BitVec 64)) (P : UPtd) :
-    kptOn (GF := GF) tk M ∗ uptSlot cpu P ⊢ pt2Win cpu tk.base P := by
-  unfold uptSlot pt2Win
+    kptOn (GF := GF) tk M ∗ uptSlotF cpu P ⊢ pt2Win cpu tk.base P := by
+  unfold uptSlotF pt2Win
   iintro ⟨#Hkpt, ⟨%t, %ht, Ho, %tlb, Htlb, %htlb⟩⟩
   iexists tk, M
   iframe Hkpt
@@ -207,14 +238,14 @@ root installed), or the kernel's with the user table parked (uservec). -/
 theorem pt2Win_sfence [CurCtx] (cpu : CPU) (kroot : BitVec 44) (P : UPtd) :
     pt2Win (GF := GF) cpu kroot P ⊢ ∃ tlb : Tlb, Register.tlb ↦ᵣ[cpu] tlb ∗
       (Register.tlb ↦ᵣ[cpu] (vectorInit none) -∗
-        (uptSlot cpu P ∧ (kptSlot cpu kroot ∗ uptFrame P))) := by
+        (uptSlotF cpu P ∧ (kptSlot cpu kroot ∗ uptFrame P))) := by
   unfold pt2Win
   iintro ⟨%tk, %M, #Hkpt, %hb, %t, %ht, Ho, %tlb, Htlb, %_⟩
   iexists tlb
   iframe Htlb
   iintro Htlb
   isplit
-  · unfold uptSlot
+  · unfold uptSlotF
     iexists t
     iframe Ho
     isplit
@@ -241,12 +272,12 @@ theorem uptSlot_sfence [CurCtx] (cpu : CPU) (P : UPtd) :
     uptSlot (GF := GF) cpu P ⊢ ∃ tlb : Tlb, Register.tlb ↦ᵣ[cpu] tlb ∗
       (Register.tlb ↦ᵣ[cpu] (vectorInit none) -∗ uptSlot cpu P) := by
   unfold uptSlot
-  iintro ⟨%t, %ht, Ho, %tlb, Htlb, %_⟩
+  iintro ⟨%t, %ht, Ho, ⟨%tlb, Htlb, %_⟩, #Hw⟩
   iexists tlb
   iframe Htlb
   iintro Htlb
   iexists t
-  iframe Ho
+  iframe Ho Hw
   isplit
   · ipureintro; exact ht
   iexists (vectorInit none)
@@ -397,6 +428,149 @@ theorem pt2Trans [CurCtx] (cpu : CPU) (c : MConf) (sie : Bool) (kroot root : Bit
   isplitr [Htok]
   · iexists tk, M
     iframe Hkpt
+    isplit
+    · ipureintro; exact hkb
+    iexists (t.setLeaf 2 (vpnOf va) (kLeaf ppn perm a' d'))
+    iframe Ho
+    isplit
+    · ipureintro
+      exact ⟨by rw [PTree.base_setLeaf, hbase], uptPtRep_setLeaf t P.leaves hrep (vpnOf va) _ ppn perm a d a' d' hw⟩
+    iexists tlb'
+    iframe Htlb
+    ipureintro; exact htlb'
+  isplit
+  · iexact Hcl
+  isplit
+  · iexact HS
+  · iexact Htok
+
+set_option maxHeartbeats 2000000 in
+/-- **The fetch translation of userret's window, the epoch open** (W8
+(f3-utext); the twin of `pt2Trans` at the user root): a hit on a kernel
+entry, a hit on a user entry or the user table's miss, the user table's
+write-backs through the epoch's arm. -/
+theorem pt2TransU [CurCtx] (cpu : CPU) (c : MConf) (sie : Bool) (kroot : BitVec 44) (P : UPtd)
+    (hok : SConfKpt (GF := GF) c P.root sie) (va : BitVec 64) (hlt : va.toNat < 2 ^ 38)
+    (acc : MemoryAccessType mem_payload) (hacc : kernelAccess acc)
+    (ppn : BitVec 44) (perm : KPerm) (hperm : perm.allows acc = true)
+    (hl : Iris.Std.PartialMap.get? P.leaves (vpnOf va).toNat = some (kLeaf ppn perm 0#1 0#1)) :
+    transSpecA (GF := GF) cpu c
+      iprop(pt2WinU cpu kroot P ∗ □ kmapAt (vpnOf va) (kLeaf ppn perm 0#1 0#1) ∗ □ kmapStatic ∗ ctxTok cpu curCtx)
+      va acc (paOf ppn va) := by
+  intro Φ
+  unfold paOf
+  iintro ⟨HmConf, ⟨Hwin, #Hcl, #HS, Htok⟩, HΦ⟩
+  unfold pt2WinU
+  icases Hwin with ⟨%tk, %M, #Hkpt, %hkb, ⟨%t, %⟨hbase, hrep⟩, Ho, %tlb, Htlb, %htlb⟩, #Hw⟩
+  icases kptOn_kmapAt tk M (vpnOf va) _ $$ [Hkpt Hcl] with %⟨addrk, ppnk, permk, heqk, hmapsk⟩
+  · iframe Hkpt Hcl
+  obtain ⟨rfl, rfl⟩ := kLeaf_inj heqk
+  obtain ⟨c1, c0, a, d, hw, hk2, he2, hk1, he1, he0, hp1, hp0⟩ :=
+    uptWalk_leaf t P.leaves hrep (vpnOf va) ppn perm hl
+  have hpv := hrep.2.2.1
+  have hv2 := hpv t.base (uptRoot_mem_pages t)
+  have hv1 := hpv c1.base hp1
+  have hv0 := hpv c0.base hp0
+  have hok0 := uptPteAddrOk c0.base hv0 (vpnIdx (vpnOf va) 0)
+  obtain ⟨ak, dk, hwk⟩ := hmapsk
+  have hs : satpTable c.satp = some t.base := by
+    rw [hbase]; unfold satpTable; rw [if_pos hok.2.1, hok.2.2.2.1]
+  ihave #Hw' := (show uptOpenWit (GF := GF) P.root Privilege.Supervisor ⊢ uptOpenWit t.base Privilege.Supervisor
+    from by rw [hbase]) $$ Hw
+  icases ptreeOwn_path3_acc uCustQ t c1 c0 (vpnOf va) hk2 hk1 $$ Ho with ⟨H2, H1, H0, Wt⟩
+  rw [he2, he1, he0]
+  icases uptCell_phys t.base hv2 (vpnIdx (vpnOf va) 2) uCustQ (kPtr c1.base) $$ HS with ⟨C2, D2⟩
+  icases uptCell_phys c1.base hv1 (vpnIdx (vpnOf va) 1) uCustQ (kPtr c0.base) $$ HS with ⟨C1, D1⟩
+  ihave B2 := C2 $$ H2
+  ihave B1 := C1 $$ H1
+  ihave B0 := (uptCell_phys c0.base hv0 (vpnIdx (vpnOf va) 0) uCustQ (kLeaf ppn perm a d)).trans
+    and_elim_l $$ HS H0
+  iapply (swp_translateAddr_via cpu (DFrac.own 1) c sie P.root hok tlb va (canonical_of_lt38 va hlt) acc hacc ppn
+    iprop((kptOn tk M ∗ uptOpenWit t.base Privilege.Supervisor) ∗ ctxTok cpu curCtx ∗
+      bytesPointsTo (pteAddr t.base (vpnIdx (vpnOf va) 2)) 8 uCustQ (kPtr c1.base) ∗
+      bytesPointsTo (pteAddr c1.base (vpnIdx (vpnOf va) 1)) 8 uCustQ (kPtr c0.base) ∗
+      bytesPointsTo (pteAddr c0.base (vpnIdx (vpnOf va) 0)) 8 uCustQ (kLeaf ppn perm a d))
+    iprop(kptOn tk M ∗ ctxTok cpu curCtx ∗
+      bytesPointsTo (pteAddr t.base (vpnIdx (vpnOf va) 2)) 8 uCustQ (kPtr c1.base) ∗
+      bytesPointsTo (pteAddr c1.base (vpnIdx (vpnOf va) 1)) 8 uCustQ (kPtr c0.base) ∗
+      ∃ a' d' : BitVec 1, bytesPointsTo (pteAddr c0.base (vpnIdx (vpnOf va) 0)) 8 uCustQ
+        (kLeaf ppn perm a' d') ∗ ∃ tlb' : Tlb, Register.tlb ↦ᵣ[cpu] tlb' ∗
+        ⌜tlbOk2 tk (t.setLeaf 2 (vpnOf va) (kLeaf ppn perm a' d')) tlb'⌝) ?hit ?miss)
+  case hit =>
+    intro mxr do_sum i ent hres Ψ
+    have hadue := hok.2.2.2.2
+    rcases tlbOk2_hit tk t tlb htlb (vpnOf va) i ent hres with
+      ⟨addr₁, ppn₁, perm₁, a₁, d₁, a₁', d₁', hw₁, hent⟩ | ⟨addr₁, w, w', hw₁, hww, hent⟩
+    · -- a hit on a kernel entry
+      rw [hwk] at hw₁
+      obtain ⟨rfl, hkl⟩ := Prod.mk.inj (Option.some.inj hw₁)
+      obtain ⟨rfl, rfl⟩ := kLeaf_inj hkl
+      obtain ⟨hi, hget, -⟩ := hres
+      iintro ⟨HmConf, Htlb, ⟨⟨#Hkpt, #Hw⟩, Htok, B2, B1, B0⟩, HΨ⟩
+      iapply (swp_translate_TLB_hit_kptE cpu (DFrac.own 1) c sie hok.phys hadue tk M tlb (vpnOf va) acc hacc
+        mxr do_sum i ent hi hget _ _ _ ak dk a₁' d₁' hwk hent hperm ())
+      iframe HmConf Hkpt Htok Htlb
+      iintro HmConf Htok %tlb' Htlb %hafter
+      iapply HΨ $$ HmConf
+      iframe Hkpt Htok B2 B1
+      iexists a, d
+      iframe B0
+      iexists tlb'
+      iframe Htlb
+      ipureintro
+      rw [uptSetLeaf_self t (vpnOf va) _ _ hrep.1 hw]
+      exact tlbOk2_afterK tk t tlb tlb' htlb (vpnOf va) _ _ _ ak dk hwk hafter
+    · -- a hit on a user entry
+      rw [hw] at hw₁
+      obtain ⟨rfl, rfl⟩ := Prod.mk.inj (Option.some.inj hw₁)
+      obtain ⟨a₁, d₁, rfl⟩ := uptPteAD_kLeaf hww
+      obtain ⟨hi, hget, -⟩ := hres
+      rw [uptPtePpn_kLeaf] at hent
+      iintro ⟨HmConf, Htlb, ⟨⟨#Hkpt, #Hw⟩, Htok, B2, B1, B0⟩, HΨ⟩
+      iapply (swp_translate_TLB_hit_upt cpu (DFrac.own 1) c sie hok.phys hadue tlb (vpnOf va) acc hacc
+        mxr do_sum i ent hi hget _ hok0 ppn perm a₁ d₁ a d hent hperm () t.base hs _ _ _ _ uCustQ uCustQ
+        (uptPath_of t.base c1.base c0.base (vpnOf va)))
+      iframe HmConf Htok B0 B2 B1 Hw Htlb
+      iintro HmConf Htok B2 B1 %a' %d' B0 %tlb' Htlb %hafter
+      iapply HΨ $$ HmConf
+      iframe Hkpt Htok B2 B1
+      iexists a', d'
+      iframe B0
+      iexists tlb'
+      iframe Htlb
+      ipureintro
+      exact tlbOk2_afterU tk t tlb tlb' htlb (vpnOf va) _ ppn perm a d a' d' hw hafter
+  case miss =>
+    intro mxr do_sum Ψ
+    have hadue := hok.2.2.2.2
+    iintro ⟨HmConf, Htlb, ⟨⟨#Hkpt, #Hw⟩, Htok, B2, B1, B0⟩, HΨ⟩
+    rw [← hbase]
+    iapply (swp_translate_TLB_miss_upt cpu (DFrac.own 1) c sie hok.phys hadue tlb t.base c1.base c0.base
+      (vpnOf va) acc hacc mxr do_sum ppn perm a d hperm () uCustQ uCustQ hs
+      (uptPteAddrOk t.base hv2 _) (uptPteAddrOk c1.base hv1 _) hok0)
+    iframe HmConf Htok B2 B1 B0 Hw Htlb
+    iintro HmConf Htok B2 B1 %a' %d' B0 %tlb' Htlb %hafter
+    iapply HΨ $$ HmConf
+    iframe Hkpt Htok B2 B1
+    iexists a', d'
+    iframe B0
+    iexists tlb'
+    iframe Htlb
+    ipureintro
+    exact tlbOk2_afterU tk t tlb tlb' htlb (vpnOf va) _ ppn perm a d a' d' hw hafter
+  iframe HmConf Htlb Htok B2 B1 B0
+  isplit
+  · iframe Hkpt Hw'
+  iintro HmConf ⟨_, Htok, B2, B1, %a', %d', B0, %tlb', Htlb, %htlb'⟩
+  ihave H2 := D2 $$ B2
+  ihave H1 := D1 $$ B1
+  ihave H0 := (uptCell_phys c0.base hv0 (vpnIdx (vpnOf va) 0) uCustQ (kLeaf ppn perm a' d')).trans
+    and_elim_r $$ HS B0
+  ihave Ho := Wt $$ H2 H1 %(kLeaf ppn perm a' d') H0
+  iapply HΦ $$ HmConf
+  isplitr [Htok]
+  · iexists tk, M
+    iframe Hkpt Hw
     isplit
     · ipureintro; exact hkb
     iexists (t.setLeaf 2 (vpnOf va) (kLeaf ppn perm a' d'))

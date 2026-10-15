@@ -185,7 +185,7 @@ theorem uk_frames [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IPr
   rw [ustS0_file, ustS0_mm, ustS0_rv]
   isplitl [HF HB Hc Hr]
   · isplitr
-    · ipureintro; exact ⟨rfl, rfl⟩
+    · ipureintro; exact ⟨rfl, rfl, satpTable_satpOf P.root⟩
     iframe
   · iexact Hres
 
@@ -202,15 +202,15 @@ theorem uk_frames_close [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd �
 
 /-! ## §2 Forgetting the stamps (the trap back into the kernel) -/
 
-/-- **Rocq `umem_x_forget`** at the page view: every page as `umPages` has
-it (a text page's stamped physical bytes, forgotten and read back through the
-static kernel map). -/
+/-- **Rocq `umem_x_forget`** at the page view: every page as `umPagesU` has
+it (a text page's stamped physical bytes at the user tier's share, forgotten
+and read back through the static kernel map). -/
 theorem ukPagesX_forget [CurCtx] (K : Nat) (P : UPtd) (hwf : uptWf P) (M : Nat → List (BitVec 8)) :
-    kmapStatic (GF := GF) ⊢ umPagesX K P M -∗ umPages P M := by
+    kmapStatic (GF := GF) ⊢ umPagesX K P M -∗ umPagesU P M := by
   iintro #HS H
   icases ukPagesX_fwd K P hwf M $$ HS H with ⟨%hl, HD, HX⟩
-  ihave HX := ukOwnX_forget curCtx K _ $$ HX
-  unfold umPages
+  ihave HX := ukOwnX_forget curCtx K _ _ $$ HX
+  unfold umPagesU
   iapply BigSepM.bigSepM_toList.2
   iapply BigSepL.bigSepL_sep_eqv.2
   isplitr [HD HX]
@@ -218,10 +218,11 @@ theorem ukPagesX_forget [CurCtx] (K : Nat) (P : UPtd) (hwf : uptWf P) (M : Nat �
     ipureintro
     intro k kv hk
     exact hl kv (List.mem_of_getElem? hk)
-  have e : ∀ kv : Nat × BitVec 64, byteBuf (GF := GF) (pte2pa kv.2) (DFrac.own 1) (M kv.1) ⊣⊢
+  have e : ∀ kv : Nat × BitVec 64, byteBuf (GF := GF) (pte2pa kv.2) (umPgFr kv.2) (M kv.1) ⊣⊢
       iprop((if ukTextLeaf kv.2 then iprop(emp) else byteBuf (pte2pa kv.2) (DFrac.own 1) (M kv.1)) ∗
-        (if ukTextLeaf kv.2 then byteBuf (pte2pa kv.2) (DFrac.own 1) (M kv.1) else iprop(emp))) := by
+        (if ukTextLeaf kv.2 then byteBuf (pte2pa kv.2) uCustQ (M kv.1) else iprop(emp))) := by
     intro kv
+    unfold umPgFr
     cases ukTextLeaf kv.2
     · simp only [Bool.false_eq_true, if_false]; exact ⟨sep_emp.2, sep_emp.1⟩
     · simp only [if_true]; exact ⟨emp_sep.2, emp_sep.1⟩
@@ -229,6 +230,7 @@ theorem ukPagesX_forget [CurCtx] (K : Nat) (P : UPtd) (hwf : uptWf P) (M : Nat �
   iapply BigSepL.bigSepL_sep_eqv.2
   unfold ukDataBytes ukTextBytes
   rw [ubOwnA_flatMap] at *
+  rw [BigSepL.bigSepL_flatMap] at *
   isplitl [HD]
   · iapply (ub_sepL_wand kmapStatic _ _ _ ?_) $$ HS HD
     intro kv hkv
@@ -240,8 +242,7 @@ theorem ukPagesX_forget [CurCtx] (K : Nat) (P : UPtd) (hwf : uptWf P) (M : Nat �
     · simp only [if_true]
       iintro _ _
       iempintro
-  · rw [ubOwnA_flatMap]
-    iapply (ub_sepL_wand kmapStatic _ _ _ ?_) $$ HS HX
+  · iapply (ub_sepL_wand kmapStatic _ _ _ ?_) $$ HS HX
     intro kv hkv
     obtain ⟨he, hv⟩ := ub_data_valid P hwf kv.1 kv.2 (toList_get.1 hkv)
     cases ht : ukTextLeaf kv.2
@@ -250,7 +251,7 @@ theorem ukPagesX_forget [CurCtx] (K : Nat) (P : UPtd) (hwf : uptWf P) (M : Nat �
       iempintro
     · simp only [if_true]
       rw [he]
-      exact (ubPage_own (ptePpn kv.2) hv (M kv.1) (hl kv hkv)).trans and_elim_r
+      exact (ubPage_ownQ (ptePpn kv.2) hv (M kv.1) (hl kv hkv) uCustQ).trans and_elim_r
 
 /-- **Rocq `user_pt_inv_x_forget`**. -/
 theorem userPtInvX_forget [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (BitVec 8)) :

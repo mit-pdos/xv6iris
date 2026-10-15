@@ -55,10 +55,11 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 /-- **The text map, owned and stamped** (Rocq `bytes_own_p` at the stamped
 payload): its domain is exactly `DT` (duplicate-free), every byte of it held
-at context ξ, stamped at `K`. -/
+at context ξ, stamped at `K`, at the user tier's share `3/4` (the other quarter is the
+interpretation's custody record). -/
 def uxTextOwn (ξ : CtxId) (K : Nat) (DT : List PAddr) (T : BMap) : IProp GF :=
   iprop(⌜DT.Nodup ∧ ∀ a, (T a).isSome = true ↔ a ∈ DT⌝ ∗
-    [∗list] a ∈ DT, ∃ b : BitVec 8, ⌜T a = some b⌝ ∗ ctxByteX ξ K a (DFrac.own 1) b)
+    [∗list] a ∈ DT, ∃ b : BitVec 8, ⌜T a = some b⌝ ∗ ctxByteX ξ K a (DFrac.own Qp.threeQuarters) b)
 
 instance uxTextOwn_timeless (ξ : CtxId) (K : Nat) (DT : List PAddr) (T : BMap) :
     Timeless (uxTextOwn (GF := GF) ξ K DT T) := by

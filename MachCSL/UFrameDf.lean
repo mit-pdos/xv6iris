@@ -118,6 +118,12 @@ def ufRegFrame (cpu : CPU) (Df : Register → DFrac) (Lw Lr La : List Register) 
   F := ufFrameF cpu Df Lw Lr
   rd := fun f r h => ufFrameF_rd cpu Df Lw Lr f r h
   wr := fun f r v h => ufFrameF_wr cpu Df Lw Lr hnd f r v (uFootL_dw Lw Lr La r h)
+  rdSP := fun hs hp f => by
+    have hm : ∀ r, (uFootL Lw Lr La).Dr r = true → r ∈ Lw ++ Lr := fun r h => by
+      simp only [uFootL, Bool.or_eq_true, List.contains_iff_mem] at h
+      exact List.mem_append.2 h
+    unfold ufFrameF ufCells ufCellsD
+    exact uRegCells_rd2 cpu Df Lw Lr hnd f .satp .cur_privilege (by decide) (hm _ hs) (hm _ hp)
 
 end frames
 

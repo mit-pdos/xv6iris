@@ -173,12 +173,15 @@ end
 
 /-- **WP of `uservec`** (Rocq `wp_uservec_pt_body`, deviation 1): entered
 at the trapped user machine, with the kernel context's remainder and the
-trapframe page, it reaches usertrap's entry. -/
+trapframe page, it reaches usertrap's entry.  (`hroot`, W8 (f3-utext)
+[OWN.89]: the user root is not the kernel's -- userret's knowledge, kept in
+the kernel's residue; until uservec's `csrw satp` the hart's user epoch is
+open and its walker write-backs need it.) -/
 def wp_uservec_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IProp GF) (k : KCtx) (sz : Nat) (M : ElfMem)
     (ws : List (BitVec 64)) (ms sc tv sep : BitVec 64) (g : RegMap)
     (hloop : loopOk C P) (hsie : k.sie = false) (htier : k.tier = KTier.kpt)
-    (hkw : uservecKWords cpu k ws) : Prop :=
+    (hkw : uservecKWords cpu k ws) (hroot : P.root ≠ k.root) : Prop :=
   hwConfig cpu ∗ userTrapFrameAtm cpu C P Rut sz M ms sc tv sep g ∗ kmapAt trampVpn (kLeaf trampPpn .rx 0#1 0#1) ∗
   tfPageAt P.tfp ws ∗ userretLeft cpu k ∗
   ▷ uservecPost cpu k P Rut sz M ws g sep sc tv
@@ -188,7 +191,7 @@ def wp_uservec_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
 structure USERVEC : Prop where
   wp_uservec : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IProp GF) (k : KCtx) (sz : Nat) (M : ElfMem)
-    (ws : List (BitVec 64)) (ms sc tv sep : BitVec 64) (g : RegMap) hloop hsie htier hkw,
-    wp_uservec_body (hlc := hlc) (GF := GF) cpu C P Rut k sz M ws ms sc tv sep g hloop hsie htier hkw
+    (ws : List (BitVec 64)) (ms sc tv sep : BitVec 64) (g : RegMap) hloop hsie htier hkw hroot,
+    wp_uservec_body (hlc := hlc) (GF := GF) cpu C P Rut k sz M ws ms sc tv sep g hloop hsie htier hkw hroot
 
 end Xv6

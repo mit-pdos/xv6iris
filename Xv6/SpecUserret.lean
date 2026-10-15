@@ -113,10 +113,11 @@ def userretLeft [CurCtx] (cpu : CPU) (k : KCtx) : IProp GF := iprop%
 config record `C` the loop runs at, the user `mstatus` `ms`, the per-step
 cells at the resume pc `sep &&& ~1` with the restored file, the installed
 user table over the pages at `M`, the config cells, the trapframe page
-(unchanged), and the context's remainder. -/
+(unchanged), and the context's remainder; and (W8 (f3-utext) [OWN.89]) that
+the user root is not the context's kernel root. -/
 def userretPost [CurCtx] (cpu : CPU) (k : KCtx) (P : UPtd) (M : Nat → List (BitVec 8))
     (ws : List (BitVec 64)) (sep sc tv : BitVec 64) : IProp GF := iprop%
-  ∀ (C : UCfg) (ms : BitVec 64), ⌜loopOk C P ∧ userMstatusOk ms⌝ -∗
+  ∀ (C : UCfg) (ms : BitVec 64), ⌜loopOk C P ∧ userMstatusOk ms ∧ P.root ≠ k.root⌝ -∗
     uRegs cpu (HartState.HART_ACTIVE ()) ms sc tv sep
       (sep &&& 0xFFFFFFFFFFFFFFFE#64) (sep &&& 0xFFFFFFFFFFFFFFFE#64) (tfResumeGpr0 ws) -∗
     userPtInvX cpu P M -∗ userCfg cpu C -∗ tfPageAt P.tfp ws -∗ userretLeft cpu k -∗ wpLoop cpu

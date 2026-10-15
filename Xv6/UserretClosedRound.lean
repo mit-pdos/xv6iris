@@ -74,7 +74,7 @@ theorem urcRut_open (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat) (
     (γfd : GName) (cw : Nat) (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32) (lz : Bool)
     (secc : BitVec 64) (Wr : Uvis) (p : UPtd) :
     urcRut (hlc := hlc) PT Γ j cpu sz γfd cw gn cs pid lz secc Wr p ⊢
-      ∃ (k : KCtx) (ksp : BitVec 64) (V : ProcPriv), ⌜UrcPins j sz γfd cw gn lz secc k ksp V⌝ ∗
+      ∃ (k : KCtx) (ksp : BitVec 64) (V : ProcPriv), ⌜UrcPins j sz γfd cw gn lz secc k ksp V ∧ p.root ≠ k.root⌝ ∗
         userretLeft cpu k ∗ tfPageAt p.tfp V.tf ∗
         (∀ sts' : List FdState, fdFrags γfd sts' -∗ usertrapResAt (hlc := hlc) PT Γ j cpu p ksp V sts' cs pid) ∗
         uhistAt Wr :=
@@ -270,7 +270,7 @@ theorem urc_round (UT : USERTRAP) (UV : USERVEC) (UR : USERRET)
   icases urc_frame_rut h C pt _ sz W.M ms sc stv (tfW W.tf tfEpcIdx) (tfResumeGpr0 W.tf) $$ Htm with
     ⟨Hfr, Hrut⟩
   icases urcRut_open PT Γ j h sz γfd cw gn cs pid lz secc Wr pt $$ Hrut with
-    ⟨%k, %ksp, %V, %hp, Hleft, Htf, Hclose, Huh⟩
+    ⟨%k, %ksp, %V, %⟨hp, hroot⟩, Hleft, Htf, Hclose, Huh⟩
   obtain ⟨hsie, htier, hnoff, hproc, ⟨hksp, hkav⟩, hVsz, hVfdg, hVcwi, hVgen, hVlz, hVsc⟩ := hp
   -- the residue, at the view the process handed back
   ihave Hres := Hclose $$ %W.fd Hfrag
@@ -287,7 +287,7 @@ theorem urc_round (UT : USERTRAP) (UV : USERVEC) (UR : USERRET)
   icases uexecRet_split sc W $$ Hret with ⟨%f, Hdep, Harm⟩
   -- uservec
   have HUV := UV.wp_uservec (hlc := hlc) (GF := GF) h C pt (fun _ => iprop(emp)) k sz W.M V.tf ms sc stv
-    (tfW W.tf tfEpcIdx) (tfResumeGpr0 W.tf) hlo hsie htier hkw
+    (tfW W.tf tfEpcIdx) (tfResumeGpr0 W.tf) hlo hsie htier hkw hroot
   unfold wp_uservec_body uservecPost at HUV
   iapply HUV
   iframe Hhw Hfr Hcl Htf Hleft

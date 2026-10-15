@@ -302,25 +302,26 @@ theorem ummRw_sub (ro : PAddr → Bool) (pa : PAddr) (W i c : Nat) (h : ummRw ro
   rw [BitVec.add_assoc, ← BitVec.ofNat_add]
   exact h (i + j) (by omega)
 
+/-- The register file a walker state stands for. -/
+def UWSt.file (s : UWSt) : RegFile := fun r => (s.pin r).getD (s.rs r)
+
 /-- `v` is `c` up to its `A`/`D` bits (the decidable form of `pteAD`). -/
 def pteADb (c v : BitVec 64) : Bool :=
   pteSetAD c (BitVec.extractLsb' 6 1 v) (BitVec.extractLsb' 7 1 v) == v
 
 /-- An A/D write-back of a page-table slot: exclusive, a whole doubleword at
 a slot, an `A`/`D` variant of the slot's value. -/
-def ptWok (s : UWSt) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (excl : Bool) : Bool :=
-  excl && n == 8 && s.pt pa &&
+def ptWok (D : UFoot) (s : UWSt) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (excl : Bool) : Bool :=
+  excl && n == 8 && s.pt pa && D.Dr .satp && D.Dr .cur_privilege && privUser (s.file .cur_privilege) &&
     (match bmRead s.mm pa 8 with
-     | some c => pteADb c (w.setWidth 64)
+     | some c => uepLeafB c && pteADb c (w.setWidth 64)
      | none => false)
 
 /-- **What a walk may write** (W8 (f3-utext)): a footprint off the read-only
 bytes, or a page-table slot's A/D write-back. -/
-def uwOk (s : UWSt) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (excl : Bool) : Bool :=
-  bmRw s.ro pa n || ptWok s pa n w excl
+def uwOk (D : UFoot) (s : UWSt) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (excl : Bool) : Bool :=
+  bmRw s.ro pa n || ptWok D s pa n w excl
 
-/-- The register file a walker state stands for. -/
-def UWSt.file (s : UWSt) : RegFile := fun r => (s.pin r).getD (s.rs r)
 
 /-- **The walker.**  `runRW D orc s m = some (x, s', orc')`: `m` runs to `x`
 from `s`, landing in `s'`, touching only the footprint `D` and the owned
@@ -357,7 +358,7 @@ def runRW {X : Type} (D : UFoot) : UOrc → UWSt → SailM X → Option (X × UW
         match req.value with
         | none => none
         | some w' =>
-          if bmOwned s.mm req.pa n && uwOk s req.pa n w' (akExcl req.access_kind) then
+          if bmOwned s.mm req.pa n && uwOk D s req.pa n w' (akExcl req.access_kind) then
             runRW D orc { s with mm := bmWrite s.mm req.pa n w', rv := false } (k (.Ok (some true)))
           else none
       else none
@@ -579,6 +580,12 @@ structure URegFrame (GF : BundledGFunctors) [MachGS hlc GF] (cpu : CPU) (D : UFo
     F f ⊢ ∃ dq : DFrac, r ↦ᵣ[cpu]{dq} (f r) ∗ (r ↦ᵣ[cpu]{dq} (f r) -∗ F f)
   wr : ∀ (f : RegFile) (r : Register) (v : RegisterType r), D.Dw r = true →
     F f ⊢ (∃ v0 : RegisterType r, r ↦ᵣ[cpu] v0) ∗ (r ↦ᵣ[cpu] v -∗ F (f.set r v))
+  /-- `satp` and the privilege at once (W8 (f3-utext): the A/D write-back's
+  open-epoch evidence). -/
+  rdSP : D.Dr .satp = true → D.Dr .cur_privilege = true → ∀ f : RegFile,
+    F f ⊢ ∃ dqs dqp : DFrac, Register.satp ↦ᵣ[cpu]{dqs} (f .satp) ∗
+      Register.cur_privilege ↦ᵣ[cpu]{dqp} (f .cur_privilege) ∗
+      (Register.satp ↦ᵣ[cpu]{dqs} (f .satp) -∗ Register.cur_privilege ↦ᵣ[cpu]{dqp} (f .cur_privilege) -∗ F f)
 
 /-- A byte frame at context ξ (W8 (f3-utext): split by access): it hands
 out any owned footprint for a READ at some fraction, at the map's value, and
@@ -596,10 +603,18 @@ structure UByteFrame (GF : BundledGFunctors) [MachGS hlc GF] (ξ : CtxId) where
   acc : ∀ (mm : BMap) (pa : PAddr) (n : Nat), n < 2 ^ 64 → bmOwned mm pa n = true → bmRw ro pa n = true →
     B mm ⊢ ∃ w : BitVec (8 * n), ⌜bmRead mm pa n = some w⌝ ∗ ctxBytes ξ pa n (DFrac.own 1) w ∗
       ∀ w' : BitVec (8 * n), ctxBytes ξ pa n (DFrac.own 1) w' -∗ B (bmWrite mm pa n w')
-  accPt : ∀ (mm : BMap) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)), n < 2 ^ 64 → bmOwned mm pa n = true →
-    n = 8 → pt pa = true → (∃ c, bmRead mm pa 8 = some c ∧ pteADb c (w'.setWidth 64) = true) →
-    B mm ⊢ ∃ w : BitVec (8 * n), ⌜bmRead mm pa n = some w⌝ ∗ ctxBytes ξ pa n (DFrac.own 1) w ∗
-      (ctxBytes ξ pa n (DFrac.own 1) w' -∗ B (bmWrite mm pa n w'))
+  /-- What the frame needs of the walker's `satp` (the A/D arm's root). -/
+  satpOk : BitVec 64 → Prop
+  accPt : ∀ (cpu : CPU) (mm : BMap) {vasize : Nat} (req : Mem_write_request 8 vasize Arch.pa Arch.translation Arch.arch_ak)
+    (w' : BitVec 64) (r : Option Resv) (s : BitVec 64) (dqs dqp : DFrac) (Φ : Result (Option Bool) Arch.abort → IProp GF),
+    req.value = some w' → akExcl req.access_kind = true → bmOwned mm req.pa 8 = true → pt req.pa = true →
+    satpOk s → (∃ c, bmRead mm req.pa 8 = some c ∧ uepLeafB c = true ∧ pteADb c w' = true) →
+    ownCtx cpu ξ ∗ resvFragAny cpu r ∗ B mm ∗ Register.satp ↦ᵣ[cpu]{dqs} s ∗
+      Register.cur_privilege ↦ᵣ[cpu]{dqp} Privilege.User ∗
+      ▷ (ownCtx cpu ξ -∗ resvFrag cpu none false -∗ B (bmWrite mm req.pa 8 w') -∗
+          Register.satp ↦ᵣ[cpu]{dqs} s -∗ Register.cur_privilege ↦ᵣ[cpu]{dqp} Privilege.User -∗
+          Φ (.Ok (some true)))
+    ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_write req) Φ
 
 variable {cpu : CPU} {ξ : CtxId} {D : UFoot}
 
@@ -607,44 +622,14 @@ theorem UByteFrame.restore (BF : UByteFrame GF ξ) (mm : BMap) (pa : PAddr) (n :
     (w : BitVec (8 * n)) (h : bmRead mm pa n = some w) : BF.B (bmWrite mm pa n w) ⊢ BF.B mm := by
   rw [bmWrite_self mm pa n w h]
 
-/-- **The write accessor a walker's check grants** (W8 (f3-utext)): a
-footprint off the read-only bytes, or a slot's A/D write-back. -/
-theorem UByteFrame.accW (BF : UByteFrame GF ξ) (mm : BMap) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n))
-    (excl : Bool) (hn : n < 2 ^ 64) (ho : bmOwned mm pa n = true)
-    (hw : (bmRw BF.ro pa n || (excl && n == 8 && BF.pt pa &&
-      (match bmRead mm pa 8 with
-       | some c => pteADb c (w'.setWidth 64)
-       | none => false))) = true) :
-    BF.B mm ⊢ ∃ w : BitVec (8 * n), ⌜bmRead mm pa n = some w⌝ ∗ ctxBytes ξ pa n (DFrac.own 1) w ∗
-      (ctxBytes ξ pa n (DFrac.own 1) w' -∗ BF.B (bmWrite mm pa n w')) := by
-  cases hrw : bmRw BF.ro pa n with
-  | true =>
-    iintro HB
-    icases BF.acc mm pa n hn ho hrw $$ HB with ⟨%w, %hw0, Hb, HBc⟩
-    iexists w
-    iframe Hb
-    isplitr
-    · ipureintro; exact hw0
-    iintro Hb
-    iapply HBc $$ %w' Hb
-  | false =>
-    rw [hrw, Bool.false_or] at hw
-    simp only [Bool.and_eq_true, beq_iff_eq] at hw
-    obtain ⟨⟨⟨-, h8⟩, hpt⟩, hc⟩ := hw
-    have hc' : ∃ c, bmRead mm pa 8 = some c ∧ pteADb c (w'.setWidth 64) = true := by
-      revert hc
-      cases bmRead mm pa 8 with
-      | none => intro h; exact absurd h (by simp)
-      | some c => intro h; exact ⟨c, rfl, h⟩
-    exact BF.accPt mm pa n w' hn ho h8 hpt hc'
-
 /-- The resources a walk from `s` runs on. -/
 def uFr (RF : URegFrame GF cpu D) (BF : UByteFrame GF ξ) (s : UWSt) : IProp GF :=
-  iprop(⌜s.ro = BF.ro ∧ s.pt = BF.pt⌝ ∗ RF.F s.file ∗ BF.B s.mm ∗ ownCtx cpu ξ ∗ uResvTok cpu s.rv)
+  iprop(⌜s.ro = BF.ro ∧ s.pt = BF.pt ∧ BF.satpOk (s.file .satp)⌝ ∗ RF.F s.file ∗ BF.B s.mm ∗ ownCtx cpu ξ ∗
+    uResvTok cpu s.rv)
 
 /-- The walker state's labels are the frame's. -/
 theorem uFr_wp (RF : URegFrame GF cpu D) (BF : UByteFrame GF ξ) (s : UWSt) :
-    uFr RF BF s ⊢ ⌜s.ro = BF.ro ∧ s.pt = BF.pt⌝ := by
+    uFr RF BF s ⊢ ⌜s.ro = BF.ro ∧ s.pt = BF.pt ∧ BF.satpOk (s.file .satp)⌝ := by
   unfold uFr
   iintro ⟨%h, _⟩
   ipureintro
@@ -677,18 +662,21 @@ theorem urw_hok_step {X : Type} (s s'' : UWSt) (m m' : SailM X)
 
 /-- The induction statement. -/
 def URW (RF : URegFrame GF cpu D) (BF : UByteFrame GF ξ) {X : Type} (m : SailM X) : Prop :=
-  ∀ s : UWSt, s.ro = BF.ro → s.pt = BF.pt → (∀ orc, (runRW D orc s m).isSome = true) → ∀ Φ : X → IProp GF,
+  ∀ s : UWSt, s.ro = BF.ro → s.pt = BF.pt → BF.satpOk (s.file .satp) → (∀ orc, (runRW D orc s m).isSome = true) →
+    ∀ Φ : X → IProp GF,
     uFr RF BF s ∗ uPost RF BF s m Φ ⊢ swp cpu m Φ
 
 /-- Continue at a successor node the walk steps to. -/
 theorem urw_cont (RF : URegFrame GF cpu D) (BF : UByteFrame GF ξ) {X : Type} (m m' : SailM X)
     (ih : URW RF BF m') (s s'' : UWSt) (hro : s.ro = BF.ro) (hpt : s.pt = BF.pt)
+    (hsat : BF.satpOk (s.file .satp))
     (hok : ∀ orc, (runRW D orc s m).isSome = true)
     (hstep : ∀ orc', ∃ orc, runRW D orc s m = runRW D orc' s'' m') (Φ : X → IProp GF)
-    (hsame : s''.ro = s.ro ∧ s''.pt = s.pt := by exact ⟨rfl, rfl⟩) :
+    (hsame : s''.ro = s.ro ∧ s''.pt = s.pt ∧ s''.file .satp = s.file .satp := by exact ⟨rfl, rfl, rfl⟩) :
     uFr RF BF s'' ∗ uPost RF BF s m Φ ⊢ swp cpu m' Φ := by
   iintro ⟨Hfr, HP⟩
-  iapply ih s'' (hsame.1.trans hro) (hsame.2.trans hpt) (urw_hok_step s s'' m m' hok hstep) Φ
+  iapply ih s'' (hsame.1.trans hro) (hsame.2.1.trans hpt) (by rw [hsame.2.2]; exact hsat)
+    (urw_hok_step s s'' m m' hok hstep) Φ
   iframe Hfr
   iapply uPost_step RF BF s s'' m m' Φ hstep $$ HP
 
@@ -709,7 +697,7 @@ theorem urw_absurd {X : Type} (m : SailM X) (s : UWSt) (hok : ∀ orc, (runRW D 
 
 theorem urw_regRead {X : Type} (r : Register) (k : RegisterType r → SailM X)
     (ih : ∀ v, URW RF BF (k v)) : URW RF BF (FreeM.impure (.ok (.regRead r)) k) := by
-  intro s hro hpt hok Φ
+  intro s hro hpt hsat hok Φ
   cases hdr : D.Dr r with
   | true =>
     have hstep : ∀ orc', ∃ orc, runRW D orc s (FreeM.impure (.ok (.regRead r)) k) =
@@ -722,11 +710,11 @@ theorem urw_regRead {X : Type} (r : Register) (k : RegisterType r → SailM X)
     inext
     iintro Hreg
     ihave HF := HFc $$ Hreg
-    iapply urw_cont RF BF _ _ (ih (s.file r)) s s hro hpt hok hstep Φ
+    iapply urw_cont RF BF _ _ (ih (s.file r)) s s hro hpt hsat hok hstep Φ
     iframe HP
     unfold uFr
     isplitr
-    · ipureintro; exact ⟨hro, hpt⟩
+    · ipureintro; exact ⟨hro, hpt, hsat⟩
     iframe
   | false =>
     cases hda : D.Dany r with
@@ -744,12 +732,12 @@ theorem urw_regRead {X : Type} (r : Register) (k : RegisterType r → SailM X)
         refine ⟨UOrc.cons ⟨(o 0).reg.set r v, (o 0).ch⟩ o, ?_⟩
         rw [runRW_regRead_any D _ s r k hdr hda]
         simp only [UOrc.tail_cons, UOrc.cons_zero, RegFile.set_same]
-      iapply urw_cont RF BF _ _ (ih v) s s hro hpt hok hstep Φ
+      iapply urw_cont RF BF _ _ (ih v) s s hro hpt hsat hok hstep Φ
       iframe
 
 theorem urw_regWrite {X : Type} (r : Register) (v : RegisterType r) (k : PUnit → SailM X)
     (ih : ∀ u, URW RF BF (k u)) : URW RF BF (FreeM.impure (.ok (.regWrite r v)) k) := by
-  intro s hro hpt hok Φ
+  intro s hro hpt hsat hok Φ
   cases hdw : D.Dw r with
   | false =>
     exact (urw_absurd _ s hok (by simp only [runRW, hdw, Bool.false_eq_true, if_false])).elim
@@ -772,11 +760,13 @@ theorem urw_regWrite {X : Type} (r : Register) (v : RegisterType r) (k : PUnit �
     inext
     iintro Hreg
     ihave HF := HFc $$ Hreg
-    iapply urw_cont RF BF _ _ (ih ()) s _ hro hpt hok hstep Φ
+    have hsat' : ({ s with pin := s.pin.set r v } : UWSt).file .satp = s.file .satp := by
+      rw [UWSt.file_setPin]; exact RegFile.set_other _ _ _ _ (fun h => hns h.symm)
+    iapply urw_cont RF BF _ _ (ih ()) s _ hro hpt hsat hok hstep Φ ⟨rfl, rfl, hsat'⟩
     iframe HP
     unfold uFr
     isplitr
-    · ipureintro; exact ⟨hro, hpt⟩
+    · ipureintro; exact ⟨hro, hpt, by rw [hsat']; exact hsat⟩
     rw [UWSt.file_setPin]
     iframe
 
@@ -784,7 +774,7 @@ theorem urw_memRead {X : Type} (n vasize : Nat)
     (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
     (k : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → SailM X)
     (ih : ∀ v, URW RF BF (k v)) : URW RF BF (FreeM.impure (.ok (.memRead n vasize req)) k) := by
-  intro s hro hpt hok Φ
+  intro s hro hpt hsat hok Φ
   have e : (FreeM.impure (.ok (.memRead n vasize req)) k : SailM X) =
       (ConcurrencyInterfaceV1.sail_mem_read req >>= k) := rfl
   cases hif : akIfetch req.access_kind with
@@ -818,11 +808,11 @@ theorem urw_memRead {X : Type} (n vasize : Nat)
     iintro Hc Hb
     ihave HB := HBc $$ Hb
     rw [← e]
-    iapply urw_cont RF BF _ _ (ih _) s s hro hpt hok hstep Φ
+    iapply urw_cont RF BF _ _ (ih _) s s hro hpt hsat hok hstep Φ
     iframe HP
     unfold uFr
     isplitr
-    · ipureintro; exact ⟨hro, hpt⟩
+    · ipureintro; exact ⟨hro, hpt, hsat⟩
     iframe
   | true =>
     -- the read half of an exclusive pair (acquire or not), from any
@@ -846,11 +836,11 @@ theorem urw_memRead {X : Type} (n vasize : Nat)
     subst hw1
     ihave HB := HBc $$ Hb
     rw [← e]
-    iapply urw_cont RF BF _ _ (ih _) s _ hro hpt hok hstep Φ
+    iapply urw_cont RF BF _ _ (ih _) s _ hro hpt hsat hok hstep Φ
     iframe HP
     unfold uFr
     isplitr
-    · ipureintro; exact ⟨hro, hpt⟩
+    · ipureintro; exact ⟨hro, hpt, hsat⟩
     rw [show ({ s with rv := true } : UWSt).file = s.file from rfl]
     iframe HF HB Hc
     iapply uResvTok_of cpu true _ _ $$ Hfrag
@@ -859,7 +849,7 @@ theorem urw_memWrite {X : Type} (n vasize : Nat)
     (req : Mem_write_request n vasize Arch.pa Arch.translation Arch.arch_ak)
     (k : Result (Option Bool) Arch.abort → SailM X)
     (ih : ∀ v, URW RF BF (k v)) : URW RF BF (FreeM.impure (.ok (.memWrite n vasize req)) k) := by
-  intro s hro hpt hok Φ
+  intro s hro hpt hsat hok Φ
   have e : (FreeM.impure (.ok (.memWrite n vasize req)) k : SailM X) =
       (ConcurrencyInterfaceV1.sail_mem_write req >>= k) := rfl
   by_cases hn' : ¬ n < 2 ^ 64
@@ -872,23 +862,22 @@ theorem urw_memWrite {X : Type} (n vasize : Nat)
   | false => exact (urw_absurd _ s hok (by simp only [runRW, hn, hv, ho, Bool.false_eq_true, Bool.false_and,
       ↓reduceIte])).elim
   | true =>
-  cases hw : uwOk s req.pa n w' (akExcl req.access_kind) with
+  cases hw : uwOk D s req.pa n w' (akExcl req.access_kind) with
   | false => exact (urw_absurd _ s hok (by simp only [runRW, hn, hv, ho, hw, Bool.false_eq_true, Bool.and_false,
       ↓reduceIte])).elim
   | true =>
   have hstep : ∀ orc', ∃ orc, runRW D orc s (FreeM.impure (.ok (.memWrite n vasize req)) k) =
       runRW D orc' { s with mm := bmWrite s.mm req.pa n w', rv := false } (k (.Ok (some true))) :=
     fun o => ⟨o, by simp only [runRW, hn, hv, ho, hw, Bool.and_self, ↓reduceIte]⟩
-  have hw' : (bmRw BF.ro req.pa n || (akExcl req.access_kind && n == 8 && BF.pt req.pa &&
-      (match bmRead s.mm req.pa 8 with
-       | some c => pteADb c (w'.setWidth 64)
-       | none => false))) = true := by
-    rw [← hro, ← hpt]; exact hw
   cases hex : akExcl req.access_kind with
   | false =>
+    have hrw : bmRw BF.ro req.pa n = true := by
+      rw [hex] at hw
+      simp only [uwOk, ptWok, Bool.false_and, Bool.or_false] at hw
+      rw [← hro]; exact hw
     unfold uFr
     iintro ⟨⟨%_, HF, HB, Hc, Hr⟩, HP⟩
-    icases UByteFrame.accW BF s.mm req.pa n w' _ hn ho hw' $$ HB with ⟨%w0, %_, Hb, HBc⟩
+    icases BF.acc s.mm req.pa n hn ho hrw $$ HB with ⟨%w0, %_, Hb, HBc⟩
     ihave Htok := uResvTok_ctxTok cpu ξ s.rv $$ [$Hc $Hr]
     rw [e]
     iapply swp_bind
@@ -896,39 +885,83 @@ theorem urw_memWrite {X : Type} (n vasize : Nat)
     iframe Htok Hb
     inext
     iintro Htok Hb
-    ihave HB := HBc $$ Hb
+    ihave HB := HBc $$ %w' Hb
     icases ctxTok_uResvTok cpu ξ $$ Htok with ⟨Hc, Hr⟩
     rw [← e]
-    iapply urw_cont RF BF _ _ (ih _) s _ hro hpt hok hstep Φ
+    iapply urw_cont RF BF _ _ (ih _) s _ hro hpt hsat hok hstep Φ
     iframe HP
     unfold uFr
     isplitr
-    · ipureintro; exact ⟨hro, hpt⟩
+    · ipureintro; exact ⟨hro, hpt, hsat⟩
     rw [show ({ s with mm := bmWrite s.mm req.pa n w', rv := false } : UWSt).file = s.file from rfl]
     iframe
   | true =>
     -- the write half of an exclusive pair, from ANY reservation state
     -- (Rocq `resv_any`): the `SC` got here because `match_reservation`
     -- said so; the machine only asks that no other hart reserve the bytes
-    unfold uFr uResvTok
-    iintro ⟨⟨%_, HF, HB, Hc, %r, Hfrag⟩, HP⟩
-    icases UByteFrame.accW BF s.mm req.pa n w' _ hn ho hw' $$ HB with ⟨%w0, %_, Hb, HBc⟩
-    rw [e]
-    iapply swp_bind
-    iapply swp_sail_mem_write_excl_ctx cpu req ξ r w0 w' hv hex (fun v => swp cpu (k v) Φ)
-    iframe Hc Hfrag Hb
-    inext
-    iintro Hc Hfrag Hb
-    ihave HB := HBc $$ Hb
-    rw [← e]
-    iapply urw_cont RF BF _ _ (ih _) s _ hro hpt hok hstep Φ
-    iframe HP
-    unfold uFr
-    isplitr
-    · ipureintro; exact ⟨hro, hpt⟩
-    rw [show ({ s with mm := bmWrite s.mm req.pa n w', rv := false } : UWSt).file = s.file from rfl]
-    iframe HF HB Hc
-    iapply uResvTok_of cpu false none false $$ Hfrag
+    cases hrw : bmRw s.ro req.pa n with
+    | true =>
+      have hrw' : bmRw BF.ro req.pa n = true := by rw [← hro]; exact hrw
+      unfold uFr uResvTok
+      iintro ⟨⟨%_, HF, HB, Hc, %r, Hfrag⟩, HP⟩
+      icases BF.acc s.mm req.pa n hn ho hrw' $$ HB with ⟨%w0, %_, Hb, HBc⟩
+      rw [e]
+      iapply swp_bind
+      iapply swp_sail_mem_write_excl_ctx cpu req ξ r w0 w' hv hex (fun v => swp cpu (k v) Φ)
+      iframe Hc Hfrag Hb
+      inext
+      iintro Hc Hfrag Hb
+      ihave HB := HBc $$ %w' Hb
+      rw [← e]
+      iapply urw_cont RF BF _ _ (ih _) s _ hro hpt hsat hok hstep Φ
+      iframe HP
+      unfold uFr
+      isplitr
+      · ipureintro; exact ⟨hro, hpt, hsat⟩
+      rw [show ({ s with mm := bmWrite s.mm req.pa n w', rv := false } : UWSt).file = s.file from rfl]
+      iframe HF HB Hc
+      iapply uResvTok_of cpu false none false $$ Hfrag
+    | false =>
+      -- the A/D write-back of a page-table leaf (W8 (f3-utext))
+      have hpw : ptWok D s req.pa n w' true = true := by
+        rw [hex] at hw
+        simp only [uwOk, hrw, Bool.false_or] at hw
+        exact hw
+      unfold ptWok at hpw
+      simp only [Bool.and_eq_true, beq_iff_eq, Bool.true_and] at hpw
+      obtain ⟨⟨⟨⟨⟨h8, hpt'⟩, hDs⟩, hDp⟩, hpu⟩, hc⟩ := hpw
+      subst h8
+      have hc' : ∃ c, bmRead s.mm req.pa 8 = some c ∧ uepLeafB c = true ∧ pteADb c w' = true := by
+        revert hc
+        cases bmRead s.mm req.pa 8 with
+        | none => intro h; exact absurd h (by simp)
+        | some c =>
+          intro h
+          simp only [Bool.and_eq_true] at h
+          exact ⟨c, rfl, h.1, by simpa only [BitVec.setWidth_eq] using h.2⟩
+      have hp : s.file .cur_privilege = Privilege.User := by
+        revert hpu; cases s.file .cur_privilege <;> simp [privUser]
+      have hptB : BF.pt req.pa = true := by rw [← hpt]; exact hpt'
+      unfold uFr uResvTok
+      iintro ⟨⟨%_, HF, HB, Hc, %r, Hfrag⟩, HP⟩
+      icases RF.rdSP hDs hDp s.file $$ HF with ⟨%dqs, %dqp, Hs, Hp, HFc⟩
+      rw [hp]
+      rw [e]
+      iapply swp_bind
+      iapply BF.accPt cpu s.mm req w' r (s.file .satp) dqs dqp (fun v => swp cpu (k v) Φ) hv hex ho hptB hsat hc'
+      iframe Hc Hfrag HB Hs Hp
+      inext
+      iintro Hc Hfrag HB Hs Hp
+      ihave HF := HFc $$ Hs Hp
+      rw [← e]
+      iapply urw_cont RF BF _ _ (ih _) s _ hro hpt hsat hok hstep Φ
+      iframe HP
+      unfold uFr
+      isplitr
+      · ipureintro; exact ⟨hro, hpt, hsat⟩
+      rw [show ({ s with mm := bmWrite s.mm req.pa 8 w', rv := false } : UWSt).file = s.file from rfl]
+      iframe HF HB Hc
+      iapply uResvTok_of cpu false none false $$ Hfrag
 
 /-- A silent node: one step, the state unchanged. -/
 theorem urw_silent {X : Type} (o : Outcome Register RegisterType) (u : o.ret) (k : o.ret → SailM X)
@@ -936,17 +969,17 @@ theorem urw_silent {X : Type} (o : Outcome Register RegisterType) (u : o.ret) (k
     (hstep : ∀ orc s, runRW D orc s (FreeM.impure (.ok o) k) = runRW D orc s (k u))
     (hleaf : ∀ Φ : X → IProp GF, iprop(▷ swp cpu (k u) Φ) ⊢ swp cpu (FreeM.impure (.ok o) k) Φ) :
     URW RF BF (FreeM.impure (.ok o) k) := by
-  intro s hro hpt hok Φ
+  intro s hro hpt hsat hok Φ
   iintro ⟨Hfr, HP⟩
   iapply hleaf
   inext
-  iapply urw_cont RF BF _ _ ih s s hro hpt hok (fun o' => ⟨o', hstep o' s⟩) Φ
+  iapply urw_cont RF BF _ _ ih s s hro hpt hsat hok (fun o' => ⟨o', hstep o' s⟩) Φ
   iframe
 
 /-- A nondeterministic choice: every answer, each an oracle's. -/
 theorem urw_choose {X : Type} (p : Sail.Primitive) (k : p.reflect → SailM X)
     (ih : ∀ c, URW RF BF (k c)) : URW RF BF (FreeM.impure (.ok (.choose p)) k) := by
-  intro s hro hpt hok Φ
+  intro s hro hpt hsat hok Φ
   have L : iprop(∀ c, ▷ swp cpu (k c) Φ) ⊢ swp cpu (FreeM.impure (.ok (.choose p)) k) Φ := by
     have e : (FreeM.impure (.ok (.choose p)) k : SailM X) = (PreSail.choose p >>= k) := rfl
     rw [e]
@@ -962,7 +995,7 @@ theorem urw_choose {X : Type} (p : Sail.Primitive) (k : p.reflect → SailM X)
     classical
     refine ⟨UOrc.cons ⟨(o 0).reg, fun p' => if h : p' = p then h ▸ c else (o 0).ch p'⟩ o, ?_⟩
     simp only [runRW, UOrc.tail_cons, UOrc.cons_zero, dite_true]
-  iapply urw_cont RF BF _ _ (ih c) s s hro hpt hok hstep Φ
+  iapply urw_cont RF BF _ _ (ih c) s s hro hpt hsat hok hstep Φ
   iframe
 
 theorem urw_cacheOp (op : Arch.cache_op) {X : Type} (k : Unit → SailM X) (ih : ∀ u, URW RF BF (k u)) :
@@ -1030,7 +1063,7 @@ every landing give `swp`. -/
 theorem swp_runRW_gen {X : Type} (m : SailM X) : URW RF BF m := by
   induction m with
   | pure y =>
-    intro s _ _ _ Φ
+    intro s _ _ _ _ Φ
     unfold uFr uPost
     iintro ⟨⟨%_, HF, HB, Hc, Hr⟩, HP⟩
     iapply swp_ret
@@ -1038,15 +1071,15 @@ theorem swp_runRW_gen {X : Type} (m : SailM X) : URW RF BF m := by
     iapply HP $$ %(UOrc.dflt s.rs) %y %s %(UOrc.dflt s.rs) %h HF HB Hc Hr
   | impure call k ih =>
     cases call with
-    | error e => intro s _ _ hok _; exact (urw_absurd _ s hok rfl).elim
+    | error e => intro s _ _ _ hok _; exact (urw_absurd _ s hok rfl).elim
     | ok o =>
       cases o with
       | regRead r => exact urw_regRead RF BF r k ih
       | regWrite r v => exact urw_regWrite RF BF r v k ih
       | memRead n vasize req => exact urw_memRead RF BF n vasize req k ih
       | memWrite n vasize req => exact urw_memWrite RF BF n vasize req k ih
-      | readRam => intro s _ _ hok _; exact (urw_absurd _ s hok rfl).elim
-      | writeRam => intro s _ _ hok _; exact (urw_absurd _ s hok rfl).elim
+      | readRam => intro s _ _ _ hok _; exact (urw_absurd _ s hok rfl).elim
+      | writeRam => intro s _ _ _ hok _; exact (urw_absurd _ s hok rfl).elim
       | barrier bk => exact urw_barrier RF BF bk k ih
       | cacheOp op => exact urw_cacheOp RF BF op k ih
       | tlbi op => exact urw_tlbi RF BF op k ih
@@ -1068,7 +1101,7 @@ theorem swp_runRW {X : Type} (m : SailM X) (s : UWSt)
     uFr RF BF s ∗ uPost RF BF s m Φ ⊢ swp cpu m Φ := by
   unfold uFr
   iintro ⟨⟨%hw, Hfr⟩, HP⟩
-  iapply swp_runRW_gen RF BF m s hw.1 hw.2 hok Φ
+  iapply swp_runRW_gen RF BF m s hw.1 hw.2.1 hw.2.2 hok Φ
   iframe HP
   unfold uFr
   isplitr
@@ -1116,6 +1149,48 @@ theorem urw_nodup_getElem?_ne {L : List Register} (hnd : L.Nodup) {i k : Nat} {x
   subst e
   obtain ⟨hk1, _⟩ := List.getElem?_eq_some_iff.1 hk
   exact hki ((List.getElem?_inj hk1 hnd).1 (hk.trans hi.symm))
+
+/-- **Two distinct cells of a two-list frame at once** (the written list in
+full, the read-only list at `Df`). -/
+theorem uRegCells_rd2 (cpu : CPU) (Df : Register → DFrac) (Lw Lr : List Register) (hnd : (Lw ++ Lr).Nodup)
+    (f : RegFile) (r1 r2 : Register) (hne : r1 ≠ r2) (h1 : r1 ∈ Lw ++ Lr) (h2 : r2 ∈ Lw ++ Lr) :
+    iprop(([∗list] r ∈ Lw, r ↦ᵣ[cpu] (f r)) ∗ [∗list] r ∈ Lr, r ↦ᵣ[cpu]{Df r} (f r)) ⊢@{IProp GF}
+      ∃ dq1 dq2 : DFrac, r1 ↦ᵣ[cpu]{dq1} (f r1) ∗ r2 ↦ᵣ[cpu]{dq2} (f r2) ∗
+        (r1 ↦ᵣ[cpu]{dq1} (f r1) -∗ r2 ↦ᵣ[cpu]{dq2} (f r2) -∗
+          iprop(([∗list] r ∈ Lw, r ↦ᵣ[cpu] (f r)) ∗ [∗list] r ∈ Lr, r ↦ᵣ[cpu]{Df r} (f r))) := by
+  obtain ⟨_, _, hdisj⟩ := List.nodup_append.1 hnd
+  let g : Register → DFrac := fun r => if Lw.contains r then DFrac.own 1 else Df r
+  have hw : ([∗list] r ∈ Lw, r ↦ᵣ[cpu] (f r)) ⊣⊢@{IProp GF} [∗list] r ∈ Lw, r ↦ᵣ[cpu]{g r} (f r) := by
+    refine ⟨BigSepL.bigSepL_mono fun {k r} hk => ?_, BigSepL.bigSepL_mono fun {k r} hk => ?_⟩ <;>
+    · have hm : Lw.contains r = true := List.contains_iff_mem.2 (List.mem_of_getElem? hk)
+      simp only [g, hm, if_true]
+      exact .rfl
+  have hr : ([∗list] r ∈ Lr, r ↦ᵣ[cpu]{Df r} (f r)) ⊣⊢@{IProp GF} [∗list] r ∈ Lr, r ↦ᵣ[cpu]{g r} (f r) := by
+    refine ⟨BigSepL.bigSepL_mono fun {k r} hk => ?_, BigSepL.bigSepL_mono fun {k r} hk => ?_⟩ <;>
+    · have hm : r ∈ Lr := List.mem_of_getElem? hk
+      have hn : Lw.contains r = false := by
+        cases hc : Lw.contains r with
+        | false => rfl
+        | true => exact absurd rfl (hdisj r (List.contains_iff_mem.1 hc) r hm)
+      simp only [g, hn, Bool.false_eq_true, if_false]
+      exact .rfl
+  have hp : (Lw ++ Lr).Perm (r1 :: r2 :: ((Lw ++ Lr).erase r1).erase r2) := by
+    refine (List.perm_cons_erase h1).trans (List.Perm.cons _ ?_)
+    exact List.perm_cons_erase ((List.mem_erase_of_ne (Ne.symm hne)).2 h2)
+  have hall : iprop(([∗list] r ∈ Lw, r ↦ᵣ[cpu] (f r)) ∗ [∗list] r ∈ Lr, r ↦ᵣ[cpu]{Df r} (f r)) ⊣⊢@{IProp GF}
+      iprop(r1 ↦ᵣ[cpu]{g r1} (f r1) ∗ r2 ↦ᵣ[cpu]{g r2} (f r2) ∗
+        [∗list] r ∈ ((Lw ++ Lr).erase r1).erase r2, r ↦ᵣ[cpu]{g r} (f r)) := by
+    refine (sep_congr hw hr).trans ?_
+    refine (BigSepL.bigSepL_append (Φ := fun _ r => iprop(r ↦ᵣ[cpu]{g r} (f r)))).symm.trans ?_
+    refine (BigSepL.bigSepL_perm (Φ := fun r => iprop(r ↦ᵣ[cpu]{g r} (f r))) hp).trans ?_
+    refine BigSepL.bigSepL_cons.trans (sep_congr .rfl BigSepL.bigSepL_cons)
+  iintro H
+  icases hall.1 $$ H with ⟨H1, H2, Hrest⟩
+  iexists g r1, g r2
+  iframe H1 H2
+  iintro H1 H2
+  iapply hall.2
+  iframe
 
 theorem uRegFrameL_rd (cpu : CPU) (Lw Lr : List Register) (dq : DFrac) (f : RegFile) (r : Register)
     (h : (Lw.contains r || Lr.contains r) = true) :
@@ -1175,6 +1250,12 @@ def uRegFrameLF (cpu : CPU) (Lw Lr La : List Register) (dq : DFrac) (hnd : (Lw +
   F := uRegFrameL cpu Lw Lr dq
   rd := fun f r h => uRegFrameL_rd cpu Lw Lr dq f r h
   wr := fun f r v h => uRegFrameL_wr cpu Lw Lr dq hnd f r v (uFootL_dw Lw Lr La r h)
+  rdSP := fun hs hp f => by
+    have hm : ∀ r, (uFootL Lw Lr La).Dr r = true → r ∈ Lw ++ Lr := fun r h => by
+      simp only [uFootL, Bool.or_eq_true, List.contains_iff_mem] at h
+      exact List.mem_append.2 h
+    unfold uRegFrameL
+    exact uRegCells_rd2 cpu (fun _ => dq) Lw Lr hnd f .satp .cur_privilege (by decide) (hm _ hs) (hm _ hp)
 
 /-- An empty map owns no nonempty window. -/
 theorem uNoBytes_owned {mm : BMap} (h : ∀ a, mm a = none) {pa : PAddr} {n : Nat} (ho : bmOwned mm pa n = true) :
@@ -1217,8 +1298,9 @@ def uNoBytesF (ξ : CtxId) : UByteFrame GF ξ where
     · iintro %w' _
       ipureintro
       exact h
-  accPt := fun mm pa n w' _ ho h8 _ _ => by
-    iintro %h
+  satpOk := fun _ => True
+  accPt := fun cpu mm {_} req w' r s dqs dqp Φ _ _ ho _ _ _ => by
+    iintro ⟨_, _, %h, _⟩
     have := uNoBytes_owned h ho
     omega
 
@@ -1303,6 +1385,24 @@ theorem runRW_of_runRead (D : UFoot) (dref : (r : Register) → Option (Register
           exact ih (0 : Nat) x' b' hk
       | _ => simp [runRead] at h
 
+/-- A write a read-only-footprint walk allows, a walk at an agreeing state
+over a footprint reading those registers allows too. -/
+theorem uwOk_ro_transfer (Lr : List Register) (D : UFoot) (hD : ∀ r ∈ Lr, D.Dr r = true) (s₀ s : UWSt)
+    (hf : ∀ r ∈ Lr, s₀.file r = s.file r) (hm : s₀.mm = s.mm) (hro : s₀.ro = s.ro) (hpt : s₀.pt = s.pt)
+    {pa : PAddr} {n : Nat} {w : BitVec (8 * n)} {e : Bool}
+    (h : uwOk (uFootL [] Lr []) s₀ pa n w e = true) : uwOk D s pa n w e = true := by
+  unfold uwOk ptWok at h ⊢
+  rw [hm, hro, hpt] at h
+  simp only [Bool.or_eq_true, Bool.and_eq_true] at h ⊢
+  rcases h with h | ⟨⟨⟨⟨⟨h1, h2⟩, h3⟩, h4⟩, h5⟩, h6⟩
+  · exact Or.inl h
+  · have hs : Register.satp ∈ Lr := by
+      simp only [uFootL, List.contains_nil, Bool.false_or, List.contains_iff_mem] at h3; exact h3
+    have hp : Register.cur_privilege ∈ Lr := by
+      simp only [uFootL, List.contains_nil, Bool.false_or, List.contains_iff_mem] at h4; exact h4
+    rw [hf _ hp] at h5
+    exact Or.inr ⟨⟨⟨⟨⟨h1, h2⟩, hD _ hs⟩, hD _ hp⟩, h5⟩, h6⟩
+
 /-- **Read-only transfer**: a walk over the read-only list footprint `Lr`
 (no register written, no wire read) gives the same answer from any state
 whose file agrees on `Lr`, over any footprint reading `Lr`; the byte map and
@@ -1371,11 +1471,13 @@ theorem runRW_ro {X : Type} (Lr : List Register) (D : UFoot) (hD : ∀ r ∈ Lr,
           | none => simp only [hv, reduceCtorEq] at h
           | some w' =>
             simp only [hv] at h ⊢
-            have hu : uwOk s₀ req.pa n w' (akExcl req.access_kind) = uwOk s req.pa n w' (akExcl req.access_kind) := by
-              unfold uwOk ptWok; rw [hm, hro, hpt]
-            rw [hu] at h
-            by_cases h3 : (bmOwned s.mm req.pa n && uwOk s req.pa n w' (akExcl req.access_kind)) = true
-            · simp only [h3, ↓reduceIte] at h ⊢
+            by_cases h3 : (bmOwned s.mm req.pa n &&
+                uwOk (uFootL [] Lr []) s₀ req.pa n w' (akExcl req.access_kind)) = true
+            · have h3' : (bmOwned s.mm req.pa n && uwOk D s req.pa n w' (akExcl req.access_kind)) = true := by
+                simp only [Bool.and_eq_true] at h3 ⊢
+                exact ⟨h3.1, uwOk_ro_transfer Lr D hD s₀ s hf hm hro hpt h3.2⟩
+              simp only [h3, ↓reduceIte] at h
+              simp only [h3', ↓reduceIte]
               exact ih _ _ _ { s₀ with mm := bmWrite s.mm req.pa n w', rv := false }
                 { s with mm := bmWrite s.mm req.pa n w', rv := false } _ _ hf rfl rfl hro hpt h
             · simp only [h3, Bool.false_eq_true, ↓reduceIte, reduceCtorEq] at h
@@ -1450,10 +1552,17 @@ theorem runRW_preserves (D : UFoot) (R : UWSt → UWSt → Prop) (hrefl : ∀ s,
 
 /-- **A walk keeps the write-permission labels** (W8 (f3-utext)). -/
 theorem runRW_wp (D : UFoot) {X : Type} (m : SailM X) (orc : UOrc) (s : UWSt) (x : X) (s' : UWSt)
-    (orc' : UOrc) (h : runRW D orc s m = some (x, s', orc')) : s'.ro = s.ro ∧ s'.pt = s.pt :=
-  runRW_preserves D (fun s s' => s'.ro = s.ro ∧ s'.pt = s.pt) (fun _ => ⟨rfl, rfl⟩)
-    (fun _ _ _ h1 h2 => ⟨h2.1.trans h1.1, h2.2.trans h1.2⟩) (fun _ _ _ _ => ⟨rfl, rfl⟩) (fun _ => ⟨rfl, rfl⟩)
-    (fun _ _ _ _ _ _ => ⟨rfl, rfl⟩) m orc s x s' orc' h
+    (orc' : UOrc) (h : runRW D orc s m = some (x, s', orc')) :
+    s'.ro = s.ro ∧ s'.pt = s.pt ∧ s'.file .satp = s.file .satp :=
+  runRW_preserves D (fun s s' => s'.ro = s.ro ∧ s'.pt = s.pt ∧ s'.file .satp = s.file .satp)
+    (fun _ => ⟨rfl, rfl, rfl⟩)
+    (fun _ _ _ h1 h2 => ⟨h2.1.trans h1.1, h2.2.1.trans h1.2.1, h2.2.2.trans h1.2.2⟩)
+    (fun s r v hdw => ⟨rfl, rfl, by
+      rw [UWSt.file_setPin]
+      refine RegFile.set_other _ _ _ _ (fun hr => ?_)
+      subst hr; rw [D.noSatp] at hdw; exact Bool.noConfusion hdw⟩)
+    (fun _ => ⟨rfl, rfl, rfl⟩)
+    (fun _ _ _ _ _ _ => ⟨rfl, rfl, rfl⟩) m orc s x s' orc' h
 
 end preserves
 

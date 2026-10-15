@@ -70,7 +70,7 @@ theorem swp_ucWalk {X : Type} (m : SailM X) (s : UWSt) (L : UOrc → X × UWSt �
   iapply HΦ
   unfold uFr
   isplitr
-  · ipureintro; exact ⟨hw2.1.trans hwp.1, hw2.2.trans hwp.2⟩
+  · ipureintro; exact ⟨hw2.1.trans hwp.1, hw2.2.1.trans hwp.2.1, by rw [hw2.2.2]; exact hwp.2.2⟩
   iframe
 
 /-- A walk whose value and landing do not depend on the oracle. -/
@@ -91,7 +91,7 @@ theorem swp_ucWalk_const {X : Type} (m : SailM X) (s s' : UWSt) (x : X)
   iapply HΦ
   unfold uFr
   isplitr
-  · ipureintro; exact ⟨hw2.1.trans hwp.1, hw2.2.trans hwp.2⟩
+  · ipureintro; exact ⟨hw2.1.trans hwp.1, hw2.2.1.trans hwp.2.1, by rw [hw2.2.2]; exact hwp.2.2⟩
   iframe
 
 /-! ## The ACTIVE cycle (Rocq `swp_try_step_full`) -/
@@ -366,7 +366,7 @@ theorem swp_ucTick (hT : UcTickFoot D) (s : UWSt) (hm : UcMisa D s) (Φ : Unit �
   iapply HΦ $$ %s'' %ha
   unfold uFr
   isplitr
-  · ipureintro; exact ⟨hw2.1.trans hwp.1, hw2.2.trans hwp.2⟩
+  · ipureintro; exact ⟨hw2.1.trans hwp.1, hw2.2.1.trans hwp.2.1, by rw [hw2.2.2]; exact hwp.2.2⟩
   iframe
 
 /-- The user frames hold the hart's reservation fragment (the walker

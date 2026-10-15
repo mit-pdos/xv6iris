@@ -1675,9 +1675,64 @@ instruction views (`MachCSL.uepStable`). -/
 def satpTable (s : BitVec 64) : Option (BitVec 44) :=
   if BitVec.extractLsb' 60 4 s = 8#4 then some (BitVec.extractLsb' 0 44 s) else none
 
-/-- **One open user epoch**: the root of the table it installed. -/
+/-- The page a Sv39 root PPN names. -/
+def uepRootPA (r : BitVec 44) : PAddr := BitVec.setWidth 64 r <<< 12
+
+/-- A Sv39 LEAF entry: `V` set, one of `R`/`W`/`X` set. -/
+def uepLeafB (v : BitVec 64) : Bool := v.getLsbD 0 && (v &&& 0xE#64 != 0#64)
+
+/-- A TEXT leaf: a leaf with `X` (bit 3) set, `W` (bit 2) clear. -/
+def uepXB (v : BitVec 64) : Bool := uepLeafB v && v.getLsbD 3 && !v.getLsbD 2
+
+/-- A USER TEXT leaf: a text leaf with `U` (bit 4) set. -/
+def uepTextB (v : BitVec 64) : Bool := uepXB v && v.getLsbD 4
+
+/-- The page a leaf entry maps (its PPN, bits 53..10, shifted to a physical
+address). -/
+def uepLeafPA (v : BitVec 64) : PAddr := ((v >>> 10) <<< 12) &&& 0x00FFFFFFFFFFF000#64
+
+/-- `v` is `c` up to its `A`/`D` bits (`MachCSL.pteAD`'s body). -/
+def uepAD (c v : BitVec 64) : Prop := ∃ a d : BitVec 1, v = pteSetAD c a d
+
+/-- **One open user epoch** (W8 (f3-utext) [OWN.89] (W-R)): the root of the
+table it installed; the stamp `K` (the hart's instruction view at the
+opening `fence.i`, every entry of the custody's bytes at or below it); the
+table's SLOTS as of the opening, each with its level (2: the root page, 1,
+0) -- `frozen` exactly when it is no leaf; and the bytes of its user TEXT
+pages. -/
 structure UEp where
   root : BitVec 44
+  K : Nat
+  slots : List (Nat × KSlot)
+  text : List PAddr
+
+/-- Every slot of the page at `p` is a slot of level `lvl` of the epoch. -/
+def uepPageIn (sl : List (Nat × KSlot)) (lvl : Nat) (p : PAddr) : Prop :=
+  ∀ i, i < 512 → ∃ d : KSlot, (lvl, d) ∈ sl ∧ d.addr = p + BitVec.ofNat 64 (8 * i)
+
+/-- **The epoch's table shape**: the root page's slots are level-2 slots; a
+slot is frozen exactly when it holds no leaf, above level 0 always; a
+pointer slot is above level 0 and names a page of the next level; slots
+are doubleword-aligned; a user text leaf's page is text. -/
+def uepFacts (e : UEp) : Prop :=
+  uepPageIn e.slots 2 (uepRootPA e.root) ∧
+  ∀ (l : Nat) (d : KSlot), (l, d) ∈ e.slots →
+    d.frozen = !uepLeafB d.c ∧ (l ≠ 0 → d.frozen = true) ∧ d.addr.toNat % 8 = 0 ∧
+    (∀ p, ptPtrTo d.c p → l ≠ 0 ∧ uepPageIn e.slots (l - 1) p) ∧
+    (uepTextB d.c = true → ∀ j, j < 4096 → uepLeafPA d.c + BitVec.ofNat 64 j ∈ e.text)
+
+/-- **A user-table slot's discipline** (W8 (f3-utext), T4): as of the stamp
+`K` it holds its value `d.c`; every later entry is a leaf's, by a hart, and
+one byte of a WHOLE-doubleword store (same position, same author, every
+byte) of an `A`/`D` variant of `d.c`; the current word (the heads) is
+`d.c` for a frozen slot, a variant of it for a leaf. -/
+def uslotHistOk (K : Nat) (d : KSlot) (Hs : Nat → Hist) : Prop :=
+  histWordAsOf Hs K d.c ∧
+  (∃ w : BitVec 64, (∀ j, j < 8 → (Hs j).head?.map HEnt.v = some (nthByte (n := 8) w j)) ∧
+    (if d.frozen then w = d.c else uepAD d.c w)) ∧
+  ∀ j, j < 8 → ∀ e ∈ Hs j, K < e.t → d.frozen = false ∧ e.tid < NCPU ∧
+    ∃ v : BitVec 64, uepAD d.c v ∧ e.v = nthByte (n := 8) v j ∧
+      ∀ j', j' < 8 → (⟨e.t, e.tid, nthByte (n := 8) v j'⟩ : HEnt) ∈ Hs j'
 
 /-- **The epoch record of one hart** (`satp` = `s`, privilege `p`, epoch
 `oe`; `ksat` the kernel table's root, once known): an open epoch names the
@@ -1704,9 +1759,27 @@ instance [MachFixedGS hlc GF] (E : EraGS) (k : Option (BitVec 44)) :
     Persistent (PROP := IProp GF) (uepKsatAt E k) := by
   cases k <;> (unfold uepKsatAt; infer_instance)
 
-/-- The cells an open epoch holds. -/
-def uepCellsAt [MachFixedGS hlc GF] (_E : EraGS) (_σ : MState) (_h : CPU) : Option UEp → IProp GF
-  | _ => iprop(emp)
+/-- **The cells an open epoch holds** (W8 (f3-utext), the custody): its
+facts, the hart's instruction view at least the stamp, a QUARTER of every
+text byte (its history headed at or below the stamp: frozen), and a QUARTER
+of every slot's eight bytes, disciplined.  The other three quarters are the
+user tier's (`Xv6.userInv`): more than half each, so the user tier's text and
+table bytes stay disjoint by ownership. -/
+def uepCellsE [MachFixedGS hlc GF] (E : EraGS) (h : CPU) (e : UEp) : IProp GF :=
+  iprop(⌜uepFacts e⌝ ∗ MonoNat.lb_own (E.iviewName h) (.ofNat e.K) ∗
+      ([∗list] a ∈ e.text, ∃ (x : HEnt) (H : Hist),
+        pointsTo (G := E.mem) a (DFrac.own Qp.quarter) (x :: H) ∗ ⌜x.t ≤ e.K⌝) ∗
+      [∗list] p ∈ e.slots, ∃ Hs : Nat → Hist,
+        ([∗list] j ∈ List.range 8, pointsTo (G := E.mem) (p.2.addr + BitVec.ofNat 64 j)
+          (DFrac.own Qp.quarter) (Hs j)) ∗ ⌜uslotHistOk e.K p.2 Hs⌝)
+
+/-- The cells of a hart's record: none closed, an open epoch's custody. -/
+def uepCellsAt [MachFixedGS hlc GF] (E : EraGS) (_σ : MState) (h : CPU) : Option UEp → IProp GF
+  | none => iprop(emp)
+  | some e => uepCellsE E h e
+
+theorem uepCellsAt_some [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (h : CPU) (e : UEp) :
+    uepCellsAt (GF := GF) E σ h (some e) = uepCellsE E h e := rfl
 
 /-- **One hart's epoch record.** -/
 def uepHartAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (ksat : Option (BitVec 44)) (h : CPU) :

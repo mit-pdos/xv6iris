@@ -9,7 +9,10 @@ mirror of `UserretEntryPt`:
     table's trampoline leaf; the flush empties the user slot's TLB
     (`TransPt.uptSlot_sfence`);
   step 1 (`csrw satp,t1`): still fetched through the user table; the
-    configuration's `satp` becomes the kernel root.  In the continuation the
+    configuration's `satp` becomes the kernel root, the hart's user epoch
+    closes (`MachCSL.satpStep_close`, W8 (f3-utext) [OWN.89] (W-R)) and its
+    custody comes back: the table whole again (`uepClose_tree`), the text
+    pages' quarters handed out (`uTextQ`).  In the continuation the
     user slot and the kernel table's shared invariant enter the satp-switch
     WINDOW (`TransPt.pt2Win_enterK`, Rocq `tlb_inv_pt2_kcur_enter`);
   step 2 (`sfence.vma`, under the window): the fetch is the window's
@@ -27,6 +30,7 @@ jump target with the kernel slot.
 import Xv6.UservecDefs
 import Xv6.UserretEntryPt
 import Xv6.UEpochRoots
+import Xv6.UEpochClose
 import MachCSL.WpSmodeJalr
 
 namespace Xv6
@@ -110,11 +114,12 @@ set_option maxHeartbeats 1000000 in
 theorem uservec_ucsrw_satp [CurCtx] (cpu : CPU) (c : MConf) (P : UPtd) (hc : urConfOk GF c P)
     (kroot : BitVec 44) (pc npc : BitVec 64) (hpc : urPcOk pc) (hnpc : pc + 4#64 = npc) (R : RegMap)
     (ht1 : R.get 6#5 = satpOf KTier.kpt kroot) (c' : MConf) (hc' : { c with satp := satpOf KTier.kpt kroot } = c')
-    (hne : P.root ≠ kroot) :
+    (hne : P.root ≠ kroot) (hwf : uptWf P) :
     (MachGS.kptRootName (hlc := hlc) (GF := GF) ↪VAR{.discard} kroot) ∗
     instrX (GF := GF) pc (paOf trampPpn pc) false uvCsrwSatp ∗ kmapStatic ∗ urSt cpu c P pc R ∗
     ▷ (confCells cpu (DFrac.own 1) Privilege.Supervisor c' -∗
-        clockCells cpu -∗ pcIs cpu npc -∗ uptSlot cpu P -∗ ctxTok cpu curCtx -∗ gprFile cpu R -∗ wpLoop cpu)
+        clockCells cpu -∗ pcIs cpu npc -∗ uptSlotF cpu P -∗ uTextQ P -∗ ctxTok cpu curCtx -∗ gprFile cpu R -∗
+        wpLoop cpu)
     ⊢ wpLoop cpu := by
   obtain ⟨hok, hmie, hmenv⟩ := hc
   have hpc' := hpc
@@ -130,9 +135,11 @@ theorem uservec_ucsrw_satp [CurCtx] (cpu : CPU) (c : MConf) (P : UPtd) (hc : urC
     iprop(gprFile cpu R ∗ satpStep cpu c.satp (satpOf KTier.kpt kroot)
         iprop(Register.cur_privilege ↦ᵣ[cpu] Privilege.Supervisor ∗
           (MachGS.kptRootName (hlc := hlc) (GF := GF) ↪VAR{.discard} kroot))
-        iprop(Register.cur_privilege ↦ᵣ[cpu] Privilege.Supervisor ∗ emp) ∗
+        iprop(Register.cur_privilege ↦ᵣ[cpu] Privilege.Supervisor ∗
+          ∃ e : UEp, ⌜e.root = P.root⌝ ∗ uepCellsE (MachGS.era (hlc := hlc) (GF := GF)) cpu e) ∗
       (MachGS.kptRootName (hlc := hlc) (GF := GF) ↪VAR{.discard} kroot))
-    iprop((uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx) ∗ gprFile cpu R ∗ emp)
+    iprop((uptSlot cpu P ∗ □ kmapStatic ∗ ctxTok cpu curCtx) ∗ gprFile cpu R ∗
+      ∃ e : UEp, ⌜e.root = P.root⌝ ∗ uepCellsE (MachGS.era (hlc := hlc) (GF := GF)) cpu e)
     (uptTransSpecX_tramp cpu c false P hok pc hlt hv)
     (by rw [← urPa2 pc hpc']; exact uptTransSpecX_tramp cpu c false P hok (pc + 2#64) hlt2 hv2)
     ((execSpecF_csrw_satp_sv39 cpu c false hok.phys pc (pc + instrLen false) 6#5 R kroot ht1 _ _).frameL _)
@@ -142,8 +149,12 @@ theorem uservec_ucsrw_satp [CurCtx] (cpu : CPU) (c : MConf) (P : UPtd) (hc : urC
   · iframe Hslot Htok
     iexact HS
   inext
-  iintro HmConf Hclock Hpc ⟨⟨Hslot, _, Htok⟩, HF, -⟩
-  iapply HΦ $$ HmConf Hclock Hpc Hslot Htok HF
+  iintro HmConf Hclock Hpc ⟨⟨Hslot, _, Htok⟩, HF, %e, %her, Hcells⟩
+  -- the custody back: the table and the text pages whole again (W8
+  -- (f3-utext) [OWN.89] (W-R))
+  icases uepClose_tree cpu P e her hwf $$ [Hcells Hslot] with ⟨Hslot, HQ⟩
+  · iframe Hcells Hslot; iexact HS
+  iapply HΦ $$ HmConf Hclock Hpc Hslot HQ Htok HF
 
 set_option maxHeartbeats 1000000 in
 /-- **Step 2: the `sfence.vma` under the window**, the kernel root
@@ -228,12 +239,12 @@ table `tk`, the four instructions install the kernel table and jump to `t0`,
 `ra` = userret, the user table parked. -/
 theorem uservec_exit [CurCtx] (cpu : CPU) (P : UPtd) (tk : PTree) (Mk : RegMapF (BitVec 64))
     (ms mdl mepc stc : BitVec 64) (lf : SLeft) (hsm : smFacts ms false) (hlf : lf.ok) (hmdl : 0x220#64 &&& ~~~mdl = 0#64) (R : RegMap)
-    (ht1 : R.get 6#5 = satpOf KTier.kpt tk.base) :
+    (ht1 : R.get 6#5 = satpOf KTier.kpt tk.base) (hwf : uptWf P) :
     kernelText ∗ kmapStatic ∗ urTrampCl ∗ kptOn tk Mk ∗
     urSt cpu (sConfOf KTier.kpt P.root ms mdl mepc stc lf) P (urPc 0x8e#64) R ∗
     ▷ (confCells cpu (DFrac.own 1) Privilege.Supervisor (sConfOf KTier.kpt tk.base ms mdl mepc stc lf) -∗
         clockCells cpu -∗ pcIs cpu (jumpPc (R.get 5#5)) -∗ kptSlot cpu tk.base -∗ ctxTok cpu curCtx -∗
-        uptFrame P -∗ gprFile cpu (R.set 1#5 userretVa) -∗ wpLoop cpu)
+        uptFrame P -∗ uTextQ P -∗ gprFile cpu (R.set 1#5 userretVa) -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
   have hc0 : urConfOk GF (sConfOf KTier.kpt P.root ms mdl mepc stc lf) P :=
     urConfOk_sConfOf P.root ms mdl mepc stc lf P rfl hsm hlf hmdl
@@ -253,11 +264,11 @@ theorem uservec_exit [CurCtx] (cpu : CPU) (P : UPtd) (tk : PTree) (Mk : RegMapF 
     iframe Hst; iframe HS Hk
   icases kptOn_root tk Mk $$ Hk with ⟨#Hkr, -⟩
   iapply (uservec_ucsrw_satp cpu _ P hc0 tk.base (urPc 0x92#64) (urPc 0x96#64) (by decide) (by decide) R ht1
-    (sConfOf KTier.kpt tk.base ms mdl mepc stc lf) rfl hne)
+    (sConfOf KTier.kpt tk.base ms mdl mepc stc lf) rfl hne hwf)
   ihave HI := uvi_csrw_satp $$ Htext
   iframe Hkr HI HS Hst
   inext
-  iintro HmConf Hclock Hpc Hslot Htok HF
+  iintro HmConf Hclock Hpc Hslot HQ Htok HF
   ihave Hwin := pt2Win_enterK cpu tk Mk P $$ [Hslot]
   · iframe Hslot; iexact Hk
   -- step 2: sfence.vma under the window
@@ -279,7 +290,7 @@ theorem uservec_exit [CurCtx] (cpu : CPU) (P : UPtd) (tk : PTree) (Mk : RegMapF 
   rw [userret_transTok_kpt]
   icases Htt with ⟨Hkpt, Htok⟩
   rw [show urPc 0x9a#64 + 2#64 = userretVa from by decide]
-  iapply HΦ $$ HmConf Hclock Hpc Hkpt Htok Hfr HF
+  iapply HΦ $$ HmConf Hclock Hpc Hkpt Htok Hfr HQ HF
 
 end
 

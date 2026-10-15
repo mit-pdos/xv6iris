@@ -140,7 +140,7 @@ theorem uft_mwr (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat)
     (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * n))
     (hn : n < 2 ^ 64) (hv : req.value = some w) (ho : bmOwned s.mm req.pa n = true)
     (hex : akExcl req.access_kind = false)
-    (hw : uwOk s req.pa n w (akExcl req.access_kind) = true)
+    (hw : uwOk D s req.pa n w (akExcl req.access_kind) = true)
     (h : uftRun D orc (UWSt.mk s.pin s.rs (bmWrite s.mm req.pa n w) false s.ro s.pt) (k (.Ok (some true))) = res) :
     uftRun D orc s (FreeM.impure (.ok (.memWrite n vasize req)) k) = res := by
   rw [← h]
@@ -154,7 +154,7 @@ theorem uft_mwrx (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat)
     (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * n))
     (hn : n < 2 ^ 64) (hv : req.value = some w) (ho : bmOwned s.mm req.pa n = true)
     (hex : akExcl req.access_kind = true) (hrv : s.rv = true)
-    (hw : uwOk s req.pa n w (akExcl req.access_kind) = true)
+    (hw : uwOk D s req.pa n w (akExcl req.access_kind) = true)
     (h : uftRun D orc (UWSt.mk s.pin s.rs (bmWrite s.mm req.pa n w) false s.ro s.pt) (k (.Ok (some true))) = res) :
     uftRun D orc s (FreeM.impure (.ok (.memWrite n vasize req)) k) = res := by
   rw [← h]
