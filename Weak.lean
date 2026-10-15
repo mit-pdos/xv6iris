@@ -660,6 +660,7 @@ import Weak.RelSiteProv
 import Weak.RelSiteProvPc
 import Weak.RelSiteProvExp
 import Weak.CapRelSite
+import Weak.CapPcLog
 import Weak.WbPrimedArm
 import Weak.PinRelArmTab
 import Weak.PinRelArmStore
