@@ -21,6 +21,7 @@ import Weak.CapRelSite
 namespace Weak
 
 open MachCSL
+open Sail Sail.ConcurrencyInterfaceV1 LeanRV64D
 
 /-- The pc log of a state, by its two fields. -/
 theorem CapPcLog.pcLogOfEq (σ : MState) :
@@ -61,5 +62,50 @@ theorem CapPcLog.pcLogOfDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 
   · rw [if_neg hn]
     exact CapPcLog.pcLogOfSnoc diskAgent (-1) (by simp only [MState.storeDma, if_neg hn])
       (fun t => by simp only [MState.storeDma, if_neg hn, MState.top])
+
+/-- What a step does to the log and the pc record: nothing, or one store. -/
+def CapPcLog.keepsPc (σ σ' : MState) : Prop := σ'.log = σ.log ∧ σ'.pcAt = σ.pcAt
+
+/-- **A hart event keeps the pc log, or is a store** (`MachCSL.evStep`). -/
+theorem CapPcLog.evStepPc (cpu : CPU) (o : Outcome Register RegisterType) (σ : MState) (v : o.ret)
+    (σ' : MState) (h : evStep cpu o σ v σ') :
+    CapPcLog.keepsPc σ σ' ∨ ∃ (n va : Nat) (req : Mem_write_request n va Arch.pa Arch.translation Arch.arch_ak)
+      (w : BitVec (8 * n)), o = .memWrite n va req ∧ σ' = σ.store cpu req.pa n w (akExcl req.access_kind) := by
+  cases o with
+  | memWrite n va req =>
+    rcases h with ⟨-, w, ds', -, -, -, rfl⟩ | ⟨-, w, -, -, -, rfl⟩
+    · exact Or.inl ⟨rfl, rfl⟩
+    · exact Or.inr ⟨n, va, req, w, rfl, rfl⟩
+  | memRead n va req =>
+    left
+    rcases h with ⟨-, w, ds', -, -, rfl⟩ | ⟨-, -, tvn, w, -, -, -, -, rfl⟩ |
+      ⟨-, -, tvn, w, -, -, -, -, -, rfl⟩ | ⟨-, -, -, w, -, -, rfl⟩ <;> exact ⟨rfl, rfl⟩
+  | readRam => exact absurd h id
+  | writeRam => exact absurd h id
+  | regRead r => obtain ⟨-, rfl⟩ := h; exact Or.inl ⟨rfl, rfl⟩
+  | getCycleCount => obtain ⟨-, rfl⟩ := h; exact Or.inl ⟨rfl, rfl⟩
+  | _ => subst h; exact Or.inl ⟨rfl, rfl⟩
+
+/-- A blocked hart event keeps the pc log. -/
+theorem CapPcLog.blockedPc (cpu : CPU) (o : Outcome Register RegisterType) (σ σ' : MState)
+    (h : blockedStep cpu o σ σ') : CapPcLog.keepsPc σ σ' := by
+  cases o with
+  | memRead n va req => obtain ⟨-, -, rfl⟩ := h; exact ⟨rfl, rfl⟩
+  | memWrite n va req => obtain ⟨-, rfl⟩ := h; exact ⟨rfl, rfl⟩
+  | _ => exact absurd h id
+
+/-- **A hart step keeps the pc log, or is one of its events' stores** (`MachCSL.hartStep`). -/
+theorem CapPcLog.hartStepPc (cpu : CPU) (m : SailM Unit) (σ : MState) (m' : SailM Unit) (σ' : MState)
+    (h : hartStep cpu m σ m' σ') :
+    CapPcLog.keepsPc σ σ' ∨ ∃ (n va : Nat) (req : Mem_write_request n va Arch.pa Arch.translation Arch.arch_ak)
+      (w : BitVec (8 * n)), σ' = σ.store cpu req.pa n w (akExcl req.access_kind) := by
+  unfold hartStep at h
+  match m, h with
+  | .pure _, ⟨_, _, h⟩ => subst h; exact Or.inl ⟨rfl, rfl⟩
+  | .impure (.ok o) k, Or.inl ⟨v, _, hv⟩ =>
+    rcases CapPcLog.evStepPc cpu o σ v σ' hv with h | ⟨n, va, req, w, _, h⟩
+    · exact Or.inl h
+    · exact Or.inr ⟨n, va, req, w, h⟩
+  | .impure (.ok o) k, Or.inr ⟨hb, _⟩ => exact Or.inl (CapPcLog.blockedPc cpu o σ σ' hb)
 
 end Weak
