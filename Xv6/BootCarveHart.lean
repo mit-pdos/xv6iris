@@ -152,7 +152,9 @@ def bootHartBss (c : CPU) : IProp GF := iprop%
   bootRan (imgFlat bootImage) (bhStackLo c) (bhStackLo c + 4096) ∗
   -- W8-β′: `cpus[c]`'s cells are RESERVED -- the client's halves, the region registered
   rsvRegionHalfC (MachGS.era (hlc := hlc) (GF := GF)) ⟨cpuAddr c, .cpu c⟩ (imgFlat bootImage) ∗
-  ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static⌝ ∗
+  ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static ∧
+    (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs)⌝ ∗
   cpuCtxFree c
 
 /-- A top-down word family: the `n` words below `T`, slot `i` at
@@ -405,7 +407,9 @@ theorem bootCpuCells [CurCtx] (c : CPU) (hin : cpuRsvIn (hlc := hlc) (GF := GF) 
 /-- **One hart's `.bss` share, carved** (Rocq `boot_hart_bss_of_raw` over
 the two families' per-element outputs, with `boot_hart_pre`'s
 `cpu_ctx_free` mint). -/
-theorem bootHartBss_carve (c : CPU) (hin : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) :
+theorem bootHartBss_carve (c : CPU) (hin : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static ∧
+    (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs)) :
     kmapStatic (GF := GF) ⊢ viewLb c 0 -∗
       bootRan (imgFlat bootImage) (bhStackLo c) (bhStackLo c + 4096) -∗
       bootRan (rsvErase KernelRsv.static (imgFlat bootImage)) (bhCpuLo c) (bhCpuLo c + 128) -∗
@@ -428,7 +432,9 @@ theorem bootHartBss_carve (c : CPU) (hin : MachFixedGS.rsvStatic (hlc := hlc) (G
 families, `boot_cran_stride_family_seq` over `hart_stack_raw` and
 `cpu_slot_raw`, re-indexed by `big_sepL_cpu_of_nat`): `stack0[8][4096]` and
 `cpus[8]`, carved once for all harts. -/
-theorem bootCarve_harts (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) :
+theorem bootCarve_harts (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static ∧
+    (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs)) :
     kmapStatic (GF := GF) ⊢ ([∗list] c ∈ cpus, viewLb c 0) -∗
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«stack0» (MachCSL.KernelSyms.«stack0» + 4096 * NCPU) -∗
       bootRan (rsvErase KernelRsv.static (imgFlat bootImage)) MachCSL.KernelSyms.«cpus»
@@ -483,12 +489,14 @@ theorem bootHartBss_open [CurCtx] (c : CPU) :
       cpuCell c (aCpuProc c) 8 0#64 ∗
       cpuCell c (aCpuNoff c) 4 0#32 ∗
       (∃ b : Bool, cpuCell c (aCpuIntena c) 4 (intenaVal b)) ∗
-      cpuCtxFree c ∗ ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static⌝ := by
+      cpuCtxFree c ∗ ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static ∧
+    (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs)⌝ := by
   unfold bootHartBss
   iintro ⟨#Hk, #Hg, Hs, Hh, %hin, Hf⟩
   ihave Hw := bootGot_word $$ Hg
   icases bootStack_carve c $$ Hs with ⟨H16, H8, H32, H24, Hr⟩
-  icases bootCpuCells c (xv6CpuRsvIn hin c) $$ Hk Hh with ⟨Hp, Hn, Hi⟩
+  icases bootCpuCells c (xv6CpuRsvIn hin.1 c) $$ Hk Hh with ⟨Hp, Hn, Hi⟩
   iframe Hw H16 H8 H32 H24 Hr Hp Hn Hi Hf
   ipureintro; exact hin
 

@@ -35,7 +35,9 @@ def powerBootRowsT (Mof : (Nat → BitVec 8) → LogMirror) (σ : MState) : IPro
   ((winRoAt (MachGS.era (hlc := hlc) (GF := GF)).mem σ.mem bcRoLo bcRoHi ∗
     memCellsOut (MachGS.era (hlc := hlc) (GF := GF)) (rsvErase KernelRsv.static σ.mem) bcRoLo bcRoHi) ∗
     rsvHalvesC (MachGS.era (hlc := hlc) (GF := GF)) KernelRsv.static σ.mem ∗
-    ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static⌝) ∗
+    ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static ∧
+      (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs)⌝) ∗
   ([∗list] cpu ∈ cpus, ∃ ξ : CtxId, ctxTok (hlc := hlc) (GF := GF) cpu ξ) ∗
   ([∗list] cpu ∈ cpus, lockSet (hlc := hlc) (GF := GF) cpu []) ∗
   (MachGS.kmapName (hlc := hlc) (GF := GF) ↪●MAP KernelMap.static) ∗ kmapStatic (hlc := hlc) (GF := GF) ∗
@@ -155,12 +157,14 @@ theorem bootShared_carveT (σ : MState) (hbf : bootFacts σ) :
     kmapStatic (GF := GF) ∗ ((winRoAt (MachGS.era (hlc := hlc) (GF := GF)).mem σ.mem bcRoLo bcRoHi ∗
       memCellsOut (MachGS.era (hlc := hlc) (GF := GF)) (rsvErase KernelRsv.static σ.mem) bcRoLo bcRoHi) ∗
       rsvHalvesC (MachGS.era (hlc := hlc) (GF := GF)) KernelRsv.static σ.mem ∗
-      ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static⌝) ∗
+      ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static ∧
+      (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs)⌝) ∗
       ([∗list] cpu ∈ cpus, ∃ ξ : CtxId, ctxTok (hlc := hlc) (GF := GF) cpu ξ) ∗
       ([∗list] cpu ∈ cpus, regCellsNoPins (regName (hlc := hlc) (GF := GF) cpu) (σ.regs cpu)) ∗
       ([∗list] cpu ∈ cpus, lockSet (hlc := hlc) (GF := GF) cpu []) ⊢
       |==> ∃ ξ0 : CtxId, bsCarveOut σ ξ0 := by
-  iintro ⟨#Hk, ⟨Hmem, Hhalf, %hrsv⟩, Ht, Hr, Hl⟩
+  iintro ⟨#Hk, ⟨Hmem, Hhalf, %⟨hrsv, hkptEq⟩⟩, Ht, Hr, Hl⟩
   imod bootShared_imageT σ hbf $$ [Hmem] with
     ⟨#Htx, #Hd, #Hg, Hw1, Hw2, Hu0, Hu1, Hbss, Hfree⟩
   · iframe Hk Hmem
@@ -173,7 +177,7 @@ theorem bootShared_carveT (σ : MState) (hbf : bootFacts σ) :
   unfold bootPreHalves bootPostHalves
   icases Hpre with ⟨Hhu0, Hhu1, Hhst, Hhcons, Hhprk, Hhkm, Hhp, Hhw⟩
   icases Hpost with ⟨Hhtl, Hhbc, Hhbufs, Hhit, Hhinodes, Hhlog, Hhft, Hhdk⟩
-  imod bootShared_harts σ hbf hrsv $$ [] Ht Hr Hl Hs0 Hcpus Hhc with Hh
+  imod bootShared_harts σ hbf ⟨hrsv, hkptEq⟩ $$ [] Ht Hr Hl Hs0 Hcpus Hhc with Hh
   · iframe Hk Hg
   ihave Hc := bootLockWin_intro KA.«cons» MachCSL.KernelSyms.«cons» hrsv $$ [Hc Hhcons]
   · iframe Hc Hhcons

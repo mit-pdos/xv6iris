@@ -647,13 +647,13 @@ theorem releaseWpd5 :
         (Hloc := Hloc) (G := G) (HG := HG) (dreg := dreg) (damo := damo) (Hdmap := Hdmap)
         (stackOwn := stackOwn) (lockOpenable := lockOpenable) (lockedCore := lockedCore)
         (lockedPre := lockedPre) (held := held) (sdlkRule := sdlkRule) (kt := kt))
-      (wp_s_sw_zero_release_gen := wSwfin4 (i := i) (cid := cid) (cpu := cpu) (γm := γm)
+      (wp_s_sw_zero_release_gen := AxLeafS5.relLeafOfFree (wSwfin4 (i := i) (cid := cid) (cpu := cpu) (γm := γm)
         (γp := γp) (γn := γn) (σi := σi) (T := T) (satp0 := satp0) (hmode := hmode)
         (hasid := hasid) (hppn := hppn) (Ex := Ex) (Cond := Cond) (Htext := Htext) (Hflow := Hflow)
         (Hloc := Hloc) (G := G) (HG := HG) (dreg := dreg) (damo := damo) (Hdmap := Hdmap)
         (stackOwn := stackOwn) (payAt := payAt) (payOk := payOk) (lockOpenable := lockOpenable)
         (lockedPre := lockedPre) (lockCtxHeld := lockCtxHeld) (held := held)
-        (swlkRule := swlkRule) (kt := kt))) :=
+        (swlkRule := swlkRule) (kt := kt)))) :=
   AxLeafS5.wpReleaseGen (GF := GF) (Pay := Pay)
     (Goal := goalW4 i cid cpu γm γp γn T satp0 Ex Cond)
     (kctx := AxRelease4.kctxW4 γm γn stackOwn held kt) (pcIs := pcW4 γp)
@@ -698,13 +698,13 @@ theorem releaseWpd5 :
       (Hloc := Hloc) (G := G) (HG := HG) (dreg := dreg) (damo := damo) (Hdmap := Hdmap)
       (stackOwn := stackOwn) (lockOpenable := lockOpenable) (lockedCore := lockedCore)
       (lockedPre := lockedPre) (held := held) (sdlkRule := sdlkRule) (kt := kt))
-    (wp_s_sw_zero_release_gen := wSwfin4 (i := i) (cid := cid) (cpu := cpu) (γm := γm)
+    (wp_s_sw_zero_release_gen := AxLeafS5.relLeafOfFree (wSwfin4 (i := i) (cid := cid) (cpu := cpu) (γm := γm)
       (γp := γp) (γn := γn) (σi := σi) (T := T) (satp0 := satp0) (hmode := hmode)
       (hasid := hasid) (hppn := hppn) (Ex := Ex) (Cond := Cond) (Htext := Htext) (Hflow := Hflow)
       (Hloc := Hloc) (G := G) (HG := HG) (dreg := dreg) (damo := damo) (Hdmap := Hdmap)
       (stackOwn := stackOwn) (payAt := payAt) (payOk := payOk) (lockOpenable := lockOpenable)
       (lockedPre := lockedPre) (lockCtxHeld := lockCtxHeld) (held := held)
-      (swlkRule := swlkRule) (kt := kt))
+      (swlkRule := swlkRule) (kt := kt)))
 
 end WPdRelease5
 

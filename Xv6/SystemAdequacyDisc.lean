@@ -32,7 +32,8 @@ include hlc GF in
 unit application, `xv6PowerAdequacy`'s arbitrary-`phi` slot): every
 reachable thread is reducible and, whenever the power is on, the machine's
 memory obeys `xv6AccessDisc` (`chainOkAt ∧ lockWordDiscAt ∧ cpuStaticAt ∧
-lkCpuReadAt ∧ pteDiscAt ∧ utextDiscAt ∧ uptDiscAt`: W8 (f2-ctx), (f3-hold) [OWN.64],
+lkCpuReadAt ∧ pteDiscAt ∧ utextDiscAt ∧ uptDiscAt ∧ kptMapsExp`: mcslrec (1)
+[OWN.99]; W8 (f2-ctx), (f3-hold) [OWN.64],
 (f3-ptek) [OWN.66], (f3-utext) O1 + T4 [OWN.89]; `chainOkAt`'s `ip->ref` value clause W8 (f3-racy) [OWN.63]; the
 lock clauses over EVERY lock -- the static spinlocks and the live pipe locks,
 W8 (f3-pipelk) [OWN.65], [OWN.71]). -/
@@ -50,7 +51,7 @@ theorem xv6DiscAdequacy (US : USER) (g : GState) (sb : FsSb) (nib : Nat)
         (appIfaceTriv GF) Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs)
         (appTrivTk c) (appTrivHk c)
       iintro ⟨H, -⟩
-      ihave %h := AccessDiscipline.powerInterp_accessDisc (hlc := hlc) (GF := GF) rfl g' $$ H
+      ihave %h := AccessDiscipline.powerInterp_accessDisc (hlc := hlc) (GF := GF) rfl rfl rfl g' $$ H
       imodintro
       ipureintro
       exact h)

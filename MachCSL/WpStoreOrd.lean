@@ -57,18 +57,19 @@ def writeAUT (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) (Ψ : IPro
     ((∃ (Hs : Nat → Hist) (T : Nat), histBytes pa n (fun _ => DFrac.own 1) Hs ∗ posLb T ∗
       ▷ (∀ t : Nat, ⌜T ≤ t⌝ -∗ histBytes pa n (fun _ => DFrac.own 1) (pushed Hs t (hartAgent cpu) w') -∗
           authoredBy t (hartAgent cpu) -∗ topLb t -∗ entsAt pa n t (hartAgent cpu) w' ={∅,⊤}=∗ Ψ)) ∨
-     (∃ (Hs : Nat → Hist) (T : Nat) (cs : RsvComps) (o : Option (List (CPU × Nat))),
+     (∃ (Hs : Nat → Hist) (T : Nat) (cs : RsvComps) (o : Option (List (CPU × Nat))) (po : Option (BitVec 64)),
       histBytes pa n (fun _ => DFrac.own (1 : Qp).half) Hs ∗
       topLb T ∗ compBytes cs ∗ ⌜rsvStoreOkP (hlc := hlc) (GF := GF) cpu pa n w' Hs cs⌝ ∗ kptSealed ∗ rtIn cpu o ∗
+      rsvPcCell cpu po ∗ ⌜rsvPcObl (hlc := hlc) (GF := GF) pa n w' Hs po⌝ ∗
       ▷ (∀ t : Nat, ⌜T ≤ t⌝ -∗ ⌜0 < t⌝ -∗
           histBytes pa n (fun _ => DFrac.own (1 : Qp).half) (pushed Hs t (hartAgent cpu) w') -∗
-          compBytes cs -∗ authoredBy t (hartAgent cpu) -∗ topLb t -∗ rtOut cpu t o ={∅,⊤}=∗ Ψ)))
+          compBytes cs -∗ rsvPcCell cpu po -∗ authoredBy t (hartAgent cpu) -∗ topLb t -∗ rtOut cpu t o ={∅,⊤}=∗ Ψ)))
 
 theorem writeAUT_wand (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) (Ψ Ψ' : IProp GF) :
     writeAUT cpu pa n w' Ψ ⊢ ▷ (Ψ -∗ Ψ') -∗ writeAUT cpu pa n w' Ψ' := by
   unfold writeAUT
   iintro H HW
-  imod H with (⟨%Hs, %T, Hb, #HT, Hcont⟩ | ⟨%Hs, %T, %cs, %o, Hb, #HT, Hc, %hok, #Hsl, Ho, Hcont⟩)
+  imod H with (⟨%Hs, %T, Hb, #HT, Hcont⟩ | ⟨%Hs, %T, %cs, %o, %po, Hb, #HT, Hc, %hok, #Hsl, Ho, Hp, %hpo, Hcont⟩)
   · imodintro
     ileft
     iexists Hs, T
@@ -80,13 +81,15 @@ theorem writeAUT_wand (cpu : CPU) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) (
     iapply HW $$ HΨ
   · imodintro
     iright
-    iexists Hs, T, cs, o
-    iframe Hb HT Hc Ho Hsl
+    iexists Hs, T, cs, o, po
+    iframe Hb HT Hc Ho Hsl Hp
     isplitr
     · ipureintro; exact hok
+    isplitr
+    · ipureintro; exact hpo
     inext
-    iintro %t %hT %ht Hb Hc Hau Htop Hout
-    imod Hcont $$ %t %hT %ht Hb Hc Hau Htop Hout with HΨ
+    iintro %t %hT %ht Hb Hc Hp Hau Htop Hout
+    imod Hcont $$ %t %hT %ht Hb Hc Hp Hau Htop Hout with HΨ
     imodintro
     iapply HW $$ HΨ
 
@@ -130,7 +133,7 @@ theorem swp_sail_mem_write_plain_auT (cpu : CPU) {n vasize : Nat}
       isplitl [Hregs Hmem Hmm Hclose]
       · iapply Hclose $$ %σ %⟨fun _ _ => rfl, rfl, uepStable_of_eq rfl rfl⟩ Hregs Hmem Hmm
       · iapply IH $$ Hfrag H
-  · imod H with (⟨%Hs, %T, Hb, #HT, Hcont⟩ | ⟨%Hs, %T, %cs, %o, Hb, #HT, Hc, %hok, #Hsl, Ho, Hcont⟩)
+  · imod H with (⟨%Hs, %T, Hb, #HT, Hcont⟩ | ⟨%Hs, %T, %cs, %o, %po, Hb, #HT, Hc, %hok, #Hsl, Ho, Hp, %hpo, Hcont⟩)
     rotate_left
     · -- a RESERVED word (W8 (f2-ctx): `started`)
       obtain ⟨i, k, R, hi, hk', hpres⟩ := hok
@@ -145,6 +148,9 @@ theorem swp_sail_mem_write_plain_auT (cpu : CPU) {n vasize : Nat}
         iframe Hmm
         iexact HT
       have hram : ramBytes req.pa n := ramBytes_of_cells hmm.2.2.2.1 (fun j hj => ⟨Hs j, hget j hj⟩)
+      ihave %hpcv := rsvPcCell_valid cpu (σ.regs cpu) po $$ [Hregs Hp]
+      · iframe
+      have hst := storeRelOk_of_pcObl σ cpu req.pa n w' Hs po hget hpcv hpo
       imodintro
       isplit
       · ipureintro
@@ -171,8 +177,8 @@ theorem swp_sail_mem_write_plain_auT (cpu : CPU) {n vasize : Nat}
         imod memModel_store_plain_sealed _ σ cpu req.pa n w' r b hram hno
           (rsvAllOk_store_in w' (σ.top + 1) (hartAgent cpu)
             (MachFixedGS.rsvStatic_wf (hlc := hlc) (GF := GF)).1 hi (List.mem_of_getElem? hk')
-            (hpres σ.mem (σ.top + 1) (by omega) hget hcget)) $$ [$Hmm $Hfrag $Hsl] with ⟨Hmm, Hfrag, #Hau, #Htop'⟩
-        imod Hcont $$ %(σ.top + 1) %(by omega) %(by omega) Hb Hc Hau Htop' Hout with HΦ
+            (hpres σ.mem (σ.top + 1) (by omega) hget hcget)) hst $$ [$Hmm $Hfrag $Hsl] with ⟨Hmm, Hfrag, #Hau, #Htop'⟩
+        imod Hcont $$ %(σ.top + 1) %(by omega) %(by omega) Hb Hc Hp Hau Htop' Hout with HΦ
         rw [hk]
         imodintro
         isplitl [Hregs Hmem Hmm Hclose]
@@ -216,7 +222,7 @@ theorem swp_sail_mem_write_plain_auT (cpu : CPU) {n vasize : Nat}
       icases resvFragAny_cases cpu r $$ Hfrag with ⟨%b, Hfrag⟩
       imod memModel_store_plain _ σ cpu req.pa n w' r b hram hno
         (pubClean_store_off w' (σ.top + 1) (hartAgent cpu) hnr)
-        (rsvAllOk_store_off w' (σ.top + 1) (hartAgent cpu) hnr) $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag, #Hau, #Htop'⟩
+        (rsvAllOk_store_off w' (σ.top + 1) (hartAgent cpu) hnr) (storeRelOk_off hnr) $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag, #Hau, #Htop'⟩
       imod histBytes_update σ.mem req.pa n Hs (σ.top + 1) (hartAgent cpu) w' $$ [$Hmem $Hb]
         with ⟨Hmem, Hb⟩
       ihave %hbs := histBytes_valid _ req.pa n _ _ $$ [Hmem Hb]
@@ -275,6 +281,25 @@ theorem execSpecF_sw_auT [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bo
       iprop(transSlotAt cpu curTier root ∗ resvFrag cpu none false ∗ gprFile cpu R ∗ Ψ) := by
   store_file_S_au_proof swp_checked_mem_write_store4_S_auT (RegMap.get R rs1 + BitVec.signExtend 64 imm) 4 (split_on_page_boundary_4 (RegMap.get R rs1 + BitVec.signExtend 64 imm) hal)
 
+set_option maxHeartbeats 4000000 in
+set_option maxRecDepth 100000 in
+/-- `sw rs2, imm(rs1)` into an ordered accessor's 4-aligned RAM word, the
+accessor borrowing the hart's `PC` cell (mcslrec (2) [OWN.82] (a1): the
+publication store shows its issuing pc to the reserved arm). -/
+theorem execSpecF_sw_auT_pc [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
+    (root : BitVec 44) (hok : SConfAt (GF := GF) curTier c root sie)
+    (pc npc₀ : BitVec 64) (imm : BitVec 12) (rs1 rs2 : BitVec 5) (R : RegMap) (Ψ : IProp GF)
+    (hram : inRam (RegMap.get R rs1 + BitVec.signExtend 64 imm) 4)
+    (hal : (RegMap.get R rs1 + BitVec.signExtend 64 imm).toNat % 4 = 0) :
+    execSpecPP (GF := GF) cpu dq Privilege.Supervisor c Privilege.Supervisor c
+      (instruction.STORE (imm, regidx.Regidx rs2, regidx.Regidx rs1, 4)) pc npc₀ npc₀
+      iprop(transTok cpu curTier root ∗ kmapId (RegMap.get R rs1 + BitVec.signExtend 64 imm) ∗ gprFile cpu R ∗
+        (ownCtx cpu curCtx -∗ Register.PC ↦ᵣ[cpu] pc -∗
+          writeAUT cpu (RegMap.get R rs1 + BitVec.signExtend 64 imm) 4 (BitVec.extractLsb' 0 32 (RegMap.get R rs2))
+            iprop(Register.PC ↦ᵣ[cpu] pc ∗ Ψ)))
+      iprop(transSlotAt cpu curTier root ∗ resvFrag cpu none false ∗ gprFile cpu R ∗ Ψ) := by
+  store_file_S_au_pc_proof swp_checked_mem_write_store4_S_auT (RegMap.get R rs1 + BitVec.signExtend 64 imm) 4 (split_on_page_boundary_4 (RegMap.get R rs1 + BitVec.signExtend 64 imm) hal)
+
 variable {lent : Bool}
 
 set_option maxHeartbeats 4000000 in
@@ -332,6 +357,70 @@ theorem wp_s_sw_auT [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx
   iintro ⟨HI, Hk, Hpc, #Hcl, HAU, HΦ⟩
   iapply (wpLoop_k_keep_mem cpu k pc (fun _ => pc + instrLen is_rvc) is_rvc _
     iprop(kmapId va ∗ writeAUT cpu va 4 (BitVec.extractLsb' 0 32 (k.rget cpu rs2)) Ψ) (fun _ => Ψ) hexec)
+  iframe HI Hk Hpc HAU HΦ
+  iexact Hcl
+
+
+set_option maxHeartbeats 4000000 in
+/-- **`wp_s_sw_auT` lending the hart's `PC` cell to the accessor** (mcslrec
+(2) [OWN.82] (a1)): the accessor sees the store's own pc, which a reserved
+publication word's arm names. -/
+theorem wp_s_sw_auT_pc [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
+    (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rs1 rs2 : BitVec 5)
+    (va : BitVec 64) (haddr : k.rget cpu rs1 + BitVec.signExtend 64 imm = va)
+    (hram : inRam va 4) (hal : va.toNat % 4 = 0) (Ψ : IProp GF) :
+    instr (GF := GF) pc is_rvc (instruction.STORE (imm, regidx.Regidx rs2, regidx.Regidx rs1, 4)) ∗
+    kctxL lent cpu k ∗ pcIs cpu pc ∗ kmapId va ∗
+    (Register.PC ↦ᵣ[cpu] pc -∗
+      writeAUT cpu va 4 (BitVec.extractLsb' 0 32 (k.rget cpu rs2)) iprop(Register.PC ↦ᵣ[cpu] pc ∗ Ψ)) ∗
+    ▷ wpNext k.sie k.proc cpu (fun cpu' =>
+        iprop(kctxL lent cpu' k -∗ pcIs cpu' (pc + instrLen is_rvc) -∗ Ψ -∗ wpLoop cpu'))
+    ⊢ wpLoop cpu := by
+  have haddr' : RegMap.get (tpPin cpu k.regs) rs1 + BitVec.signExtend 64 imm = va := by
+    simpa only [KCtx.rget] using haddr
+  have hram' : inRam (RegMap.get (tpPin cpu k.regs) rs1 + BitVec.signExtend 64 imm) 4 := by
+    rw [haddr']; exact hram
+  have hal' : (RegMap.get (tpPin cpu k.regs) rs1 + BitVec.signExtend 64 imm).toNat % 4 = 0 := by
+    rw [haddr']; exact hal
+  have hexec : ∀ (cpu' : CPU) (c : MConf), (k.sie = false ∨ k.proc = 0#64 → cpu' = cpu) →
+      SConfAt (GF := GF) curTier c k.root k.sie → c.menvcfg = menvcfgS →
+      execSpecPP (GF := GF) cpu' (DFrac.own 1) Privilege.Supervisor c Privilege.Supervisor c
+        (instruction.STORE (imm, regidx.Regidx rs2, regidx.Regidx rs1, 4)) pc (pc + instrLen is_rvc)
+        (pc + instrLen is_rvc)
+        iprop(transTok cpu' curTier k.root ∗ gprFile cpu' (tpPin cpu' k.regs) ∗
+          (kmapId va ∗ (Register.PC ↦ᵣ[cpu] pc -∗
+            writeAUT cpu va 4 (BitVec.extractLsb' 0 32 (k.rget cpu rs2)) iprop(Register.PC ↦ᵣ[cpu] pc ∗ Ψ))))
+        iprop(transTok cpu' curTier k.root ∗ gprFile cpu' (tpPin cpu' k.regs) ∗ Ψ) := by
+    intro cpu' c hpin hok _
+    have hcpu : cpu' = cpu := hpin (Or.inl hsie)
+    subst cpu'
+    have hdata : (BitVec.extractLsb' 0 32 (RegMap.get (tpPin cpu k.regs) rs2)) = (BitVec.extractLsb' 0 32 (k.rget cpu rs2)) := rfl
+    have e := execSpecF_sw_auT_pc (GF := GF) cpu (DFrac.own 1) c k.sie k.root hok pc (pc + instrLen is_rvc)
+      imm rs1 rs2 (tpPin cpu k.regs) iprop(ownCtx cpu curCtx ∗ Ψ) hram' hal'
+    rw [haddr', hdata] at e
+    intro Φ
+    iintro ⟨HmConf, HPC, HnextPC, ⟨HT, HF, #Hcl, HAU⟩, HΦ⟩
+    iapply (e Φ)
+    iframe HmConf HPC HnextPC HT HF Hcl
+    isplitl [HAU]
+    · iintro Hctx HPC
+      ispecialize HAU $$ HPC
+      iapply writeAUT_wand cpu va 4 (BitVec.extractLsb' 0 32 (k.rget cpu rs2)) _ $$ HAU
+      inext
+      iintro ⟨HPC, HΨ⟩
+      iframe Hctx HΨ HPC
+    · inext
+      iintro HmConf HPC HnextPC ⟨Htrans, Hfrag, HF, Hctx, HΨ⟩
+      ihave Htok := ctxTok_introB cpu curCtx none false $$ [Hctx Hfrag]
+      case' _ => iframe
+      ihave HT := transTok_intro cpu curTier k.root $$ [Htrans Htok]
+      case' _ => iframe
+      iapply HΦ $$ HmConf HPC HnextPC
+      iframe HT HF HΨ
+  iintro ⟨HI, Hk, Hpc, #Hcl, HAU, HΦ⟩
+  iapply (wpLoop_k_keep_mem cpu k pc (fun _ => pc + instrLen is_rvc) is_rvc _
+    iprop(kmapId va ∗ (Register.PC ↦ᵣ[cpu] pc -∗
+      writeAUT cpu va 4 (BitVec.extractLsb' 0 32 (k.rget cpu rs2)) iprop(Register.PC ↦ᵣ[cpu] pc ∗ Ψ))) (fun _ => Ψ) hexec)
   iframe HI Hk Hpc HAU HΦ
   iexact Hcl
 

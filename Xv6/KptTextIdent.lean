@@ -21,9 +21,9 @@ off the sealed table's record in the machine:
 **What this does NOT give.**  The export's record `MachCSL.kptStateOk` keeps the sealed slots
 `dyn` existentially, so the shape `dyn = kptSlots kernel_pagetable t` with `kvmTableOk t pas`
 (what `MachCSL.kptOn_seal` registers at `Xv6.KptBoot`) is not visible at the final hook.
-`kptTextAt_of` takes it as the hypothesis `kptTreeStateOk`; carrying it to the export needs the
-record to remember the tree (`MachCSL.kptModelAt` / `kptStateOk` with `dyn = kptSlots ra t` and a
-client fact on `t`) -- a MachCSL/Xv6 edit outside this leaf.
+`kptTextAt_of` takes it as the hypothesis `kptTreeStateOk`.  (mcslrec (1) [OWN.99]: the record
+now keeps xv6's shape of the sealed slots and the export carries the walks in plain addresses,
+`AccessDiscipline.kptMapsExp`; `Xv6.kptTextAt_ofExp` gives `kptTextAt` from the export.)
 
 Spec: the privileged spec's Sv39 (three levels, a leaf `V ∧ (R ∨ X)`, PA = PPN ++ offset);
 Svadu A/D updates are whole-PTE (`pteVariant`).  FAITHFUL: facts of xv6's table, no ISA

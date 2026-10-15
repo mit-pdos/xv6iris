@@ -668,12 +668,15 @@ theorem started_rsvStoreOk (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)
 
 /-- **The store's accessor**, at a second opening: the window's histories
 (the reserved half, W8 (f2-ctx)), the stamp's receipt as the order bound, the
-history-aware obligation, and the arming. -/
-theorem started_writeAUT (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) [∀ ξ, Persistent (P ξ)] :
+history-aware obligation, the arming, and (mcslrec (2) [OWN.82] (a1)) the
+store's own pc, a release site, read off the lent `PC` cell. -/
+theorem started_writeAUT (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) [∀ ξ, Persistent (P ξ)]
+    (pc : BitVec 64) (hrel : ((pc.toNat : Nat) : Int) ∈ MachFixedGS.relPcs (hlc := hlc) (GF := GF)) :
     startedInv (GF := GF) γ ξd P ∗ startedPrim γ ∗ P ξd ∗ kptSealed ⊢
-      writeAUT startedPrimary startedAddr 4 startedSet iprop(emp) := by
+      LeanRV64D.Register.PC ↦ᵣ[startedPrimary] pc -∗
+      writeAUT startedPrimary startedAddr 4 startedSet iprop(LeanRV64D.Register.PC ↦ᵣ[startedPrimary] pc ∗ emp) := by
   unfold startedInv
-  iintro ⟨⟨%hrsv, #Hinv⟩, Hprim, #HP, #Hsl⟩
+  iintro ⟨⟨%hrsv, #Hinv⟩, Hprim, #HP, #Hsl⟩ HPC
   unfold writeAUT
   imod (inv_acc (E := ⊤) (N := startedN) (P := startedBody γ ξd P) CoPset.subseteq_top) $$ Hinv
     with ⟨Hbody, Hclose⟩
@@ -685,7 +688,7 @@ theorem started_writeAUT (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) [�
     iapply fupd_mask_intro LawfulSet.empty_subset
     iintro Hmask
     iright
-    iexists WordHist.hist ([] : WordHist 4) startedImg, T0, [], some (cpus.map (fun h => (h, a0.1 h)))
+    iexists WordHist.hist ([] : WordHist 4) startedImg, T0, [], some (cpus.map (fun h => (h, a0.1 h))), some pc
     unfold startedWin
     iframe Hw HT
     isplitr
@@ -698,8 +701,12 @@ theorem started_writeAUT (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) [�
     · iexact Hsl
     isplitl [HL]
     · unfold rtIn; iexact HL
+    isplitl [HPC]
+    · unfold rsvPcCell; iexact HPC
+    isplitr
+    · ipureintro; exact hrel
     inext
-    iintro %t %hTt %ht0 Hb _ _ _ Hout
+    iintro %t %hTt %ht0 Hb _ HPC _ _ Hout
     rw [WordHist.hist_push] at *
     imod Hmask
     unfold startedPrim
@@ -716,7 +723,10 @@ theorem started_writeAUT (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) [�
       · ipureintro; exact ⟨hTt, ht0⟩
       · unfold rtOut startedCerts; iexact Hout
     imodintro
-    iempintro
+    isplitl [HPC]
+    · iapply (show rsvPcCell (GF := GF) startedPrimary (some pc) ⊢
+        LeanRV64D.Register.PC ↦ᵣ[startedPrimary] pc from .rfl) $$ HPC
+    · iempintro
   · iexfalso
     iapply startedPrim_idx γ t a $$ Hprim Hidx
 

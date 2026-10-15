@@ -143,7 +143,7 @@ theorem wp_s_sw_zero_lkInitR [CurCtx] [KernelImage GF] (cpu : CPU) (k : KCtx)
       unfold writeAURsv
       iapply fupd_mask_intro LawfulSet.empty_subset
       iintro Hmask
-      iexists W.hist Hold, [(lk + 16#64, 8, W'.hist HoldW)]
+      iexists W.hist Hold, [(lk + 16#64, 8, W'.hist HoldW)], none
       iframe Hb
       isplitl [HbW]
       · unfold compBytes; iapply BigSepL.bigSepL_singleton.2; iexact HbW
@@ -151,8 +151,13 @@ theorem wp_s_sw_zero_lkInitR [CurCtx] [KernelImage GF] (cpu : CPU) (k : KCtx)
       · ipureintro
         exact lkRsv_storeOkW hm cpu' _ W W' Hold HoldW htail htailW (fun t ht => ⟨none, 0,
           lkZero_disc (lkZeroW_cons (t := t) hW (Nat.pos_iff_ne_zero.mp ht) cpu') hW'⟩)
+      isplitr
+      · unfold rsvPcCell; iempintro
+      isplitr
+      · ipureintro
+        exact lkRsv_relFreeZ hm _ W Hold (fun e he => (hW e he).2.2) htail
       inext
-      iintro %t %ht Hb HbW _ _
+      iintro %t %ht Hb HbW _ _ _
       unfold compBytes
       ihave HbW := BigSepL.bigSepL_singleton.1 $$ HbW
       ihave Hc := wordCellH_intro (lk + 16#64) 8 W' HoldW htailW $$ HbW
@@ -218,7 +223,7 @@ theorem wp_s_sd_zero_lkInitR [CurCtx] [KernelImage GF] (cpu : CPU) (k : KCtx)
       unfold writeAURsv
       iapply fupd_mask_intro LawfulSet.empty_subset
       iintro Hmask
-      iexists W'.hist Hold, [(lk, 4, W.hist HoldW)]
+      iexists W'.hist Hold, [(lk, 4, W.hist HoldW)], none
       iframe Hb
       isplitl [HbW]
       · unfold compBytes; iapply BigSepL.bigSepL_singleton.2; iexact HbW
@@ -226,8 +231,13 @@ theorem wp_s_sd_zero_lkInitR [CurCtx] [KernelImage GF] (cpu : CPU) (k : KCtx)
       · ipureintro
         exact lkRsv_storeOkC hm cpu' _ W W' HoldW Hold htailW htail (fun t ht => ⟨none, 0,
           lkZero_disc hW (lkZeroW_cons (t := t) hW' (Nat.pos_iff_ne_zero.mp ht) cpu')⟩)
+      isplitr
+      · unfold rsvPcCell; iempintro
+      isplitr
+      · ipureintro
+        exact lkRsv_relFreeC hm _ _
       inext
-      iintro %t %ht Hb HbW _ _
+      iintro %t %ht Hb HbW _ _ _
       unfold compBytes
       ihave HbW := BigSepL.bigSepL_singleton.1 $$ HbW
       ihave Hw := wordCellH_intro lk 4 W HoldW htailW $$ HbW

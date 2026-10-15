@@ -498,60 +498,6 @@ theorem lkCutsOk_push8 {W : WordHist 4} {W' : WordHist 8} {M : Nat} (hc : lkCuts
 
 /-! ### Where a word store's bytes go -/
 
-theorem rsvAddr_inj {pa : PAddr} {j j' : Nat} (hj : j < 2 ^ 64) (hj' : j' < 2 ^ 64)
-    (h : pa + BitVec.ofNat 64 j = pa + BitVec.ofNat 64 j') : j = j' := by
-  have := congrArg BitVec.toNat h
-  simp only [BitVec.toNat_add, BitVec.toNat_ofNat] at this
-  have hp := pa.isLt
-  omega
-
-/-- The store's own bytes, after it. -/
-theorem foldl_push_at {n : Nat} (pa : PAddr) (w : BitVec (8 * n)) (t : Nat) (h : Agent) :
-    ∀ (l : List Nat), (∀ j ∈ l, j < 2 ^ 64) → l.Nodup → ∀ (m : FlatMem) (j : Nat), j ∈ l →
-      (l.foldl (fun (m : FlatMem) j => m.push (pa + BitVec.ofNat 64 j) ⟨t, h, nthByte w j⟩) m)[pa + BitVec.ofNat 64 j]? =
-        some (⟨t, h, nthByte w j⟩ :: m.getD (pa + BitVec.ofNat 64 j) [])
-  | [], _, _, _, _, hj => by simp at hj
-  | j0 :: l, hb, hnd, m, j, hj => by
-    simp only [List.foldl_cons]
-    rw [List.nodup_cons] at hnd
-    have hb' : ∀ x ∈ l, x < 2 ^ 64 := fun x hx => hb x (List.mem_cons_of_mem _ hx)
-    rcases List.mem_cons.1 hj with rfl | hj
-    · have hj64 : j < 2 ^ 64 := hb j List.mem_cons_self
-      have key : ∀ (l : List Nat), (∀ x ∈ l, x < 2 ^ 64) → j ∉ l → ∀ m' : FlatMem,
-          (l.foldl (fun (m : FlatMem) j => m.push (pa + BitVec.ofNat 64 j) ⟨t, h, nthByte w j⟩) m')[pa + BitVec.ofNat 64 j]? =
-            m'[pa + BitVec.ofNat 64 j]? := by
-        intro l
-        induction l with
-        | nil => intros; rfl
-        | cons x l ih =>
-          intro hb hn m'
-          simp only [List.foldl_cons]
-          rw [ih (fun y hy => hb y (List.mem_cons_of_mem _ hy)) (fun h' => hn (List.mem_cons_of_mem _ h'))]
-          apply FlatMem.push_get?_ne
-          intro he
-          have := rsvAddr_inj (pa := pa) hj64 (hb x List.mem_cons_self) he
-          exact hn (this ▸ List.mem_cons_self)
-      rw [key l hb' hnd.1 _, FlatMem.push_get?_eq]
-    · rw [foldl_push_at pa w t h l hb' hnd.2 _ j hj]
-      congr 2
-      unfold FlatMem.push
-      rw [Std.ExtTreeMap.getD_insert]
-      have hne : ¬ (compare (pa + BitVec.ofNat 64 j0) (pa + BitVec.ofNat 64 j) = .eq) := by
-        intro he
-        have := Std.LawfulEqCmp.eq_of_compare he
-        exact hnd.1 (rsvAddr_inj (hb j0 List.mem_cons_self) (hb' j hj) this ▸ hj)
-      simp [hne]
-
-/-- A word store's bytes, after it. -/
-theorem writeBytes_at {n : Nat} (m : FlatMem) (pa : PAddr) (w : BitVec (8 * n)) (t : Nat) (h : Agent)
-    (hn : n ≤ 2 ^ 64) {j : Nat} (hj : j < n) (H : Hist) (hH : m[pa + BitVec.ofNat 64 j]? = some H) :
-    (m.writeBytes pa n w t h)[pa + BitVec.ofNat 64 j]? = some (⟨t, h, nthByte w j⟩ :: H) := by
-  unfold FlatMem.writeBytes
-  rw [foldl_push_at pa w t h (List.range n) (fun x hx => by have := List.mem_range.1 hx; omega)
-    List.nodup_range m j (List.mem_range.2 hj)]
-  rw [Std.ExtTreeMap.getD_eq_getD_getElem?, hH]
-  rfl
-
 /-- **A store into a reserved lock's lock word keeps the region's
 discipline**, given the new state's facts. -/
 theorem lockRegion_storeW {lk : BitVec 64} (h : Agent) (w : BitVec (8 * 4)) (W : WordHist 4) (W' : WordHist 8)
@@ -665,13 +611,14 @@ instance lkCpuFrag_timeless (st : LockState) (s : String) : Timeless (lkCpuFrag 
 history `W` is the release `⟨r, A, 0⟩` of hart `A` over the AMO's nonzero
 entry, with `A`'s certificates before `r` for the payload's chain vector `V`
 -- what the next winning AMO, reading that release, converts into its own
-(`MachCSL.memModel_chainHop`) -- or no acquire yet (the BIRTH arm, X3: every
+(`MachCSL.memModel_chainHop`), and (mcslrec (2) [OWN.82] (a1)) the release's
+pc receipt (`MachCSL.relRcpt`: it was issued at a release pc) -- or no acquire yet (the BIRTH arm, X3: every
 entry a zero) and `V` under the handle's birth vector `Vb`, which every
 context holding the handle has passed, so the first acquirer's own
 certificates cover it. -/
 def lockRec (W : WordHist 4) (V Vb : CPU → Nat) : IProp GF := iprop%
   (∃ (A : CPU) (r : Nat) (e0 : WEnt 4) (W2 : WordHist 4),
-      ⌜W = ⟨r, hartAgent A, 0#32⟩ :: e0 :: W2 ∧ e0.v = lkOne⌝ ∗
+      ⌜W = ⟨r, hartAgent A, 0#32⟩ :: e0 :: W2 ∧ e0.v = lkOne⌝ ∗ relRcpt r ∗
       [∗list] p ∈ cpus.map (fun h => (h, V h)), chainLb p.1 p.2 A r) ∨
   ⌜(∀ e ∈ W, e.v = 0#32) ∧ ∀ h, V h ≤ Vb h⌝
 
@@ -757,11 +704,11 @@ theorem lockRec_hopReq [CurCtx] (cpu : CPU) (lk : BitVec 64) (W : WordHist 4) (H
            hopRegAt lk reg ∗ ownCtx cpu curCtx ∗ vecCertsAt (MachGS.era (hlc := hlc) (GF := GF)) V g cpu) := by
   unfold lockRec
   iintro ⟨#Hrec, Hreg, #Hg⟩
-  icases Hrec with (⟨%A, %r, %e0, %W2, %⟨hW, he0⟩, #Hl⟩ | %⟨hz, hVb⟩)
+  icases Hrec with (⟨%A, %r, %e0, %W2, %⟨hW, he0⟩, #Hrc, #Hl⟩ | %⟨hz, hVb⟩)
   · iexists (some (A, r, cpus.map (fun h => (h, V h)), reg))
     simp only [hopIn, hopOut]
     isplitl [Hreg]
-    · iframe Hreg Hg Hl
+    · iframe Hreg Hg Hl Hrc
       ipureintro
       refine ⟨⟨e0.proj 0, (W2.map (WEnt.proj 0)) ++ Hold 0, ?_, ?_, fun i _ => ⟨?_, ?_⟩⟩,
         lock_nthByte_one, by omega, by omega, hrw⟩
@@ -865,15 +812,15 @@ the store's zero lands over the holder's nonzero head. -/
 theorem lockPay_release (R : CtxId → IProp GF) (W : WordHist 4) (Vb : CPU → Nat) (ξ : CtxId) (T : Nat)
     (V : CPU → Nat) (g : Nat) (A : CPU) (r : Nat) (e0 : WEnt 4) (W2 : WordHist 4) (hW : W = e0 :: W2)
     (he0 : e0.v = lkOne) :
-    ctxStamped ξ T V g ∗ R ξ ∗ ([∗list] p ∈ cpus.map (fun h => (h, V h)), chainLb p.1 p.2 A r) ⊢@{IProp GF}
-      lockPay R (⟨r, hartAgent A, 0#32⟩ :: W) Vb := by
+    ctxStamped ξ T V g ∗ R ξ ∗ relRcpt r ∗ ([∗list] p ∈ cpus.map (fun h => (h, V h)), chainLb p.1 p.2 A r)
+      ⊢@{IProp GF} lockPay R (⟨r, hartAgent A, 0#32⟩ :: W) Vb := by
   unfold lockPay lockRec
-  iintro ⟨Hst, HR, Hl⟩
+  iintro ⟨Hst, HR, #Hrc, Hl⟩
   iexists ξ, T, V, g
   iframe Hst HR
   ileft
   iexists A, r, e0, W2
-  iframe Hl
+  iframe Hl Hrc
   ipureintro
   exact ⟨by rw [hW], he0⟩
 
@@ -1609,6 +1556,38 @@ theorem lkRsv_storeOkW {lk : BitVec 64} (hm : lkRsvIn (hlc := hlc) (GF := GF) lk
   obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 hm
   exact ⟨i, 0, _, hi, rfl, fun _ h => RsvKind.noConfusion h, fun m t ht h1 h2 _ =>
     lockRegion_storeW (hartAgent cpu) w W W' Hold Hold' htail htail' hnew m t ht h1 (h2 _ List.mem_cons_self)⟩
+
+/-- A reserved lock-word store makes no release entry when it writes a
+nonzero first byte or over a zero head (mcslrec (2)). -/
+theorem lkRsv_relFreeW {lk : BitVec 64} (hm : lkRsvIn (hlc := hlc) (GF := GF) lk) (w : BitVec (8 * 4))
+    (Hs : Nat → Hist) (h : nthByte w 0 ≠ 0 ∨ (Hs 0).head?.map HEnt.v = some 0) :
+    rsvRelFree (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) lk 4 w Hs := by
+  obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 hm
+  exact rsvRelFree_word (MachFixedGS.rsvStatic_wf (hlc := hlc) (GF := GF)).1 hi (k := 0) rfl w Hs
+    (fun _ _ _ => h) (fun _ h => RsvKind.noConfusion h)
+
+/-- A zero store into a still-zero reserved lock word (`initlock`) makes no
+release entry: byte 0's head is already zero. -/
+theorem lkRsv_relFreeZ {lk : BitVec 64} (hm : lkRsvIn (hlc := hlc) (GF := GF) lk) (w : BitVec (8 * 4))
+    (W : WordHist 4) (Hold : Nat → Hist) (hW : ∀ e ∈ W, e.v = 0) (htail : tailOk 4 0 0 Hold) :
+    rsvRelFree (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) lk 4 w (W.hist Hold) := by
+  refine lkRsv_relFreeW hm w _ (Or.inr ?_)
+  cases W with
+  | nil =>
+    obtain ⟨e, H, h1, h2, _⟩ := htail 0 (by decide)
+    simp only [WordHist.hist, List.map_nil, List.nil_append, h1, List.head?_cons, Option.map_some, h2]
+    exact congrArg some lock_nthByte_zero
+  | cons e W =>
+    simp only [WordHist.hist, List.map_cons, List.cons_append, List.head?_cons, Option.map_some, WEnt.proj,
+      hW e List.mem_cons_self]
+    exact congrArg some lock_nthByte_zero
+
+/-- A reserved owner-word store makes no release entry. -/
+theorem lkRsv_relFreeC {lk : BitVec 64} (hm : lkRsvIn (hlc := hlc) (GF := GF) lk) (w : BitVec (8 * 8))
+    (Hs : Nat → Hist) : rsvRelFree (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (lk + 16#64) 8 w Hs := by
+  obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 hm
+  exact rsvRelFree_word (MachFixedGS.rsvStatic_wf (hlc := hlc) (GF := GF)).1 hi (k := 1) rfl w Hs
+    (fun _ _ h => nomatch h) (fun _ h => RsvKind.noConfusion h)
 
 /-- A reserved owner-word store's obligation. -/
 theorem lkRsv_storeOkC {lk : BitVec 64} (hm : lkRsvIn (hlc := hlc) (GF := GF) lk) (cpu : CPU)

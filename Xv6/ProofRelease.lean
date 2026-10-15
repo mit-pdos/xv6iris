@@ -30,6 +30,7 @@ theorem release_hook_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_HOOK := ⟨
   unfold wp_release_hook_body
   iintro ⟨Hk, Hpc, #Hlk, Hlocked, HR, Hhook, Harm, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
+  icases kctx_relPcsEq _ _ $$ Hk with ⟨%hpcs, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   simp only [releaseAddr]
   k_norm
@@ -84,7 +85,7 @@ theorem release_hook_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_HOOK := ⟨
   k_step (wp_s_fence_rw_w cpu _ (KA.«release» + 0x16#64) false 0#5 0#5) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- sw zero,0(s1): the lock is free
-  k_step (wp_s_sw_zero_release_hook cpu _ ?hs (KA.«release» + 0x1a#64) false 0#12 9#5 γ (k.regs 10#5) s R Rin ?haddr) from (text_instr _ _ _ _ rfl rfl) Htext
+  k_step (wp_s_sw_zero_release_hook cpu _ ?hs (KA.«release» + 0x1a#64) false 0#12 9#5 γ (k.regs 10#5) s R Rin ?haddr (xv6RelPc_release hpcs)) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc $Hlp $Hheld $HR $Hhook]
   case haddr => k_norm [h29]
   iintro Hk Hpc %hmem
@@ -172,6 +173,7 @@ theorem release_gen_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_GEN := ⟨
   unfold wp_release_gen_body
   iintro ⟨Hk, Hpc, #Hlk, Hcred, Hlocked, HR, Harm, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
+  icases kctx_relPcsEq _ _ $$ Hk with ⟨%hpcs, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   simp only [releaseAddr]
   k_norm
@@ -226,7 +228,7 @@ theorem release_gen_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_GEN := ⟨
   k_step (wp_s_fence_rw_w cpu _ (KA.«release» + 0x16#64) false 0#5 0#5) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- sw zero,0(s1): the lock is free
-  k_step (wp_s_sw_zero_release_gen cpu _ ?hs (KA.«release» + 0x1a#64) false 0#12 9#5 γ (k.regs 10#5) s R D Tc hrefute ?haddr) from (text_instr _ _ _ _ rfl rfl) Htext
+  k_step (wp_s_sw_zero_release_gen cpu _ ?hs (KA.«release» + 0x1a#64) false 0#12 9#5 γ (k.regs 10#5) s R D Tc hrefute ?haddr (xv6RelPc_release hpcs)) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc $Hcred $Hlp $Hheld $HR]
   case haddr => k_norm [h29]
   iintro Hk Hpc %hmem Hcred
@@ -460,6 +462,7 @@ theorem release_refute_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_REFUTE := �
   unfold wp_release_refute_body
   iintro ⟨Hk, Hpc, #Hlk, Hlocked, HR, Harm, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
+  icases kctx_relPcsEq _ _ $$ Hk with ⟨%hpcs, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   simp only [releaseAddr]
   k_norm
@@ -514,7 +517,7 @@ theorem release_refute_proof (HO : HOLDING) (PO : POPOFF) : RELEASE_REFUTE := �
   k_step (wp_s_fence_rw_w cpu _ (KA.«release» + 0x16#64) false 0#5 0#5) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- sw zero,0(s1): the lock is free
-  k_step (wp_s_sw_zero_release_refute cpu _ ?hs (KA.«release» + 0x1a#64) false 0#12 9#5 γ (k.regs 10#5) s R D hrefuteHalf ?haddr) from (text_instr _ _ _ _ rfl rfl) Htext
+  k_step (wp_s_sw_zero_release_refute cpu _ ?hs (KA.«release» + 0x1a#64) false 0#12 9#5 γ (k.regs 10#5) s R D hrefuteHalf ?haddr (xv6RelPc_release hpcs)) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc $Hlp $Hheld $HR]
   case haddr => k_norm [h29]
   iintro Hk Hpc %hmem

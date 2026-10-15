@@ -83,10 +83,14 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 /-- The kernel image `kctx` owns (Xv6's `KernelImage` instance), out of the
 text and the rodata. -/
-theorem bootChain_ro (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static) :
+theorem bootChain_ro (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static ∧
+      (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs)) :
     kernelText (GF := GF) ⊢ kernelData -∗ KernelImage.ro := by
   have e : (KernelImage.ro : IProp GF) = iprop(kernelText ∗ kernelData ∗ kmapStatic ∗
-      ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static⌝) := rfl
+      ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static ∧
+        (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs)⌝) := rfl
   rw [e]
   iintro #Ht #Hd
   ihave #Hk := kernelText_kmapStatic $$ Ht

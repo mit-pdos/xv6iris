@@ -14,9 +14,12 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 /-- The kernel's read-only image, as `kctx` owns it: the text, the rodata,
 the static mapping claims, and (W8-β′) which static list the era reserved
-(`MachCSL.powerBootRes`'s list row: every kernel thread can read it). -/
+(`MachCSL.powerBootRes`'s list row: every kernel thread can read it) and
+(mcslrec (1) [OWN.99]) which shape of the sealed kernel table it keeps. -/
 instance : KernelImage GF :=
-  ⟨iprop(kernelText ∗ kernelData ∗ kmapStatic ∗ ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static⌝),
+  ⟨iprop(kernelText ∗ kernelData ∗ kmapStatic ∗ ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static ∧
+      (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs)⌝),
     inferInstance⟩
 
 /-- The context's copy of the image, spelled out. -/
@@ -25,7 +28,9 @@ theorem kctx_image [CurCtx] [KernelGeom] {lent : Bool} (cpu : CPU) (k : KCtx) :
   iintro H
   icases kctx_ro cpu k $$ H with ⟨#Hro, H⟩
   icases (show (KernelImage.ro : IProp GF) ⊢ iprop(kernelText ∗ kernelData ∗ kmapStatic ∗
-      ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static⌝) from .rfl) $$ Hro with
+      ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static ∧
+      (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs)⌝) from .rfl) $$ Hro with
     ⟨#Ht, #Hd, #Hs, _⟩
   iframe H
   iframe Ht Hd Hs
@@ -37,10 +42,52 @@ theorem kctx_rsvEq [CurCtx] [KernelGeom] {lent : Bool} (cpu : CPU) (k : KCtx) :
   iintro H
   icases kctx_ro cpu k $$ H with ⟨#Hro, H⟩
   icases (show (KernelImage.ro : IProp GF) ⊢ iprop(kernelText ∗ kernelData ∗ kmapStatic ∗
-      ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static⌝) from .rfl) $$ Hro with
+      ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static ∧
+      (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs)⌝) from .rfl) $$ Hro with
     ⟨_, _, _, %h⟩
   iframe H
-  ipureintro; exact h
+  ipureintro; exact h.1
+
+/-- The sealed kernel table's shape the era keeps (mcslrec (1)), out of the
+context. -/
+theorem kctx_kptOkEq [CurCtx] [KernelGeom] {lent : Bool} (cpu : CPU) (k : KCtx) :
+    kctxL (GF := GF) lent cpu k ⊢
+      ⌜MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk⌝ ∗ kctxL lent cpu k := by
+  iintro H
+  icases kctx_ro cpu k $$ H with ⟨#Hro, H⟩
+  icases (show (KernelImage.ro : IProp GF) ⊢ iprop(kernelText ∗ kernelData ∗ kmapStatic ∗
+      ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static ∧
+      (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs)⌝) from .rfl) $$ Hro with
+    ⟨_, _, _, %h⟩
+  iframe H
+  ipureintro; exact h.2.1
+
+/-- The release-store pcs the era runs with (mcslrec (2) [OWN.82]), out of
+the context. -/
+theorem kctx_relPcsEq [CurCtx] [KernelGeom] {lent : Bool} (cpu : CPU) (k : KCtx) :
+    kctxL (GF := GF) lent cpu k ⊢
+      ⌜MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs⌝ ∗ kctxL lent cpu k := by
+  iintro H
+  icases kctx_ro cpu k $$ H with ⟨#Hro, H⟩
+  icases (show (KernelImage.ro : IProp GF) ⊢ iprop(kernelText ∗ kernelData ∗ kmapStatic ∗
+      ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static ∧
+      (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs)⌝) from .rfl) $$ Hro with
+    ⟨_, _, _, %h⟩
+  iframe H
+  ipureintro; exact h.2.2
+
+/-- `release`'s free store is a release site (mcslrec (2) [OWN.82] (a1)). -/
+theorem xv6RelPc_release (h : MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs) :
+    ((((KA.«release» + 0x1a#64 : BitVec 64).toNat : Nat) : Int)) ∈ MachFixedGS.relPcs (hlc := hlc) (GF := GF) := by
+  rw [h]; decide +kernel
+
+/-- `main`'s `started = 1` store is a release site (mcslrec (2) [OWN.82] (a1)). -/
+theorem xv6RelPc_main (h : MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs) :
+    ((((KA.«main» + 176#64 : BitVec 64).toNat : Nat) : Int)) ∈ MachFixedGS.relPcs (hlc := hlc) (GF := GF) := by
+  rw [h]; decide +kernel
 
 /-- The context's copy of the kernel text: a proof takes it out once
 (`icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩`) and derives every

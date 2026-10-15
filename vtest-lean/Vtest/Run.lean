@@ -140,6 +140,7 @@ def testMState (t : Test) : MState where
   resv _ := none
   devs := testDevs t
   devrt _ := DevRt.init
+  pcAt _ := -1
 
 /-- THE CONFIGURATION A TEST IS, as the language sees it: the language's own
 thread pool of a powered-on generation-0 machine, over the test's state
@@ -284,7 +285,8 @@ def initX (t : Test) : Option XState :=
         rtU0 := DevRt.init
         rtU1 := DevRt.init
         rtP := DevRt.init
-        rtV := DevRt.init }
+        rtV := DevRt.init
+        pcAt := fun _ => -1 }
   else none
 
 theorem initX_abs (t : Test) (x : XState) (h : initX t = some x) : x.abs = testMState t := by
@@ -316,6 +318,7 @@ theorem initX_abs (t : Test) (x : XState) (h : initX t = some x) : x.abs = testM
       rcases d with (_ | _) | _ | _ <;> rfl
     · funext d
       rcases d with (_ | _) | _ | _ <;> rfl
+    · rfl
   · exact absurd h (by simp)
 
 /-- A run of test `t`: an execution of the language from the test's own

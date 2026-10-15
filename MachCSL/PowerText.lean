@@ -114,7 +114,9 @@ def powerBootResT [KernelMap] [KernelRsv] (lo hi : Nat) (Mof : (Nat → BitVec 8
     (Rb : Nat → (Nat → BitVec 8) → IProp GF) (Tn : Nat → IProp GF) (E : EraGS) (gen : Nat)
     (σ : MState) : IProp GF := iprop%
   -- THE RESERVED REGIONS (W8-β′, `powerBootRes`'s rows): which list was reserved...
-  ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static⌝ ∗
+  ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static ∧
+    (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs)⌝ ∗
   (∃ r : BitVec 44, E.kptRootName ↪VAR r) ∗
   genCertAt gen E ∗
   ([∗list] cpu ∈ cpus, regCellsNoPins (E.regName cpu) (σ.regs cpu)) ∗
@@ -146,6 +148,8 @@ them and the invariant closes; the boot client gets `powerBootResT`.  Every
 other hook and step is `wp_power`'s. -/
 theorem wp_powerT [KernelMap] [KernelRsv] (lo hi : Nat)
     (hrsv : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static)
+    (hkpt : (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs))
     (hwin : ∀ a ∈ rsvBytes KernelRsv.static, ¬ (lo ≤ a.toNat ∧ a.toNat < hi))
     (Ppure : (Nat → BitVec 8) → Prop)
     (Hproj : ∀ dk : Nat → BitVec 8,
@@ -401,7 +405,7 @@ theorem wp_powerT [KernelMap] [KernelRsv] (lo hi : Nat)
     · unfold powerBootResT genCertAt kmapStaticAt crashInv
       rw [hdk, ← hrsv]
       isplitr
-      · ipureintro; rfl
+      · ipureintro; exact ⟨rfl, hkpt⟩
       iframe Hmir HRb Hswlb Hcinv HrC
       isplitl [Hkroot]
       · iexists 0#44
@@ -480,7 +484,8 @@ theorem wp_powerT [KernelMap] [KernelRsv] (lo hi : Nat)
             iframe HrG
             isplit
             · ipureintro
-              refine ⟨rsvRegMap_staticIn hrwf.2.2, rsvRegMap_exact _, reservedOk_of_all (rsvRegMap_exact _) ?_⟩
+              refine ⟨rsvRegMap_staticIn hrwf.2.2, rsvRegMap_exact _, reservedOk_of_all (rsvRegMap_exact _) ?_,
+                relPcOk_img g₂.m bootImage hmem0⟩
               rw [hmem0]
               exact rsvAllOk_boot hrwf
             · unfold kptModelAt
@@ -498,7 +503,7 @@ theorem wp_powerT [KernelMap] [KernelRsv] (lo hi : Nat)
             iframe HcG
             isplit
             · ipureintro
-              exact certsOk_empty _
+              exact ⟨certsOk_empty _, pcKeysOk_empty _⟩
             · unfold chainElemsAt
               imodintro
               iintro %k %v %hk
@@ -771,7 +776,7 @@ theorem riscvPowerAdequacyT [MachGpreS hlc GF] [KernelMap] [KernelRsv] (lo hi : 
           (Tk c) (Hk c) γobs T (Pt γreg γobs c) γhist
       (Tg c) (HTg c) (HTgt c) (Kc c) (HKc c) (HKct c) (Cres c) (HCrest c)
           (Wd c) (HWd c) (HWdt c) (Rw c) (HRw c) (HRwt c) Uf (Ucr c) (Ucx c) (Uco c)
-          (Ue c) (HUe c) (Uet c) (Uea c) (HUea c)).withInv Hinv) _ _ lo hi rfl hwin
+          (Ue c) (HUe c) (Uet c) (Uea c) (HUea c)).withInv Hinv) _ _ lo hi rfl ⟨rfl, rfl⟩ hwin
       Ppure (fun dk => Hproj γdisk γswap γreg γstart c dk)
       Mof (Rb c) (Tn c) (Tn' c) (Tn'' c) (fun E gen dk => Hswap γdisk γswap γreg γstart c hborn E gen dk)
       (Pon γreg γobs c)

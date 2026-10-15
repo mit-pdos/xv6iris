@@ -55,6 +55,7 @@ theorem mn_started [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsie : k.sie =
   iintro ⟨Hk, Hpc, #Hinv, Hprim, #HP, #Hsl, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
+  icases kctx_relPcsEq _ _ $$ Hk with ⟨%hpcs, Hk⟩
   ihave #Hid := kmapStatic_rw startedAddr (by decide) $$ HS
   -- the deposit, at a first opening
   icases kctx_token_acc startedPrimary _ $$ Hk with ⟨Hrun, Hback⟩
@@ -62,9 +63,13 @@ theorem mn_started [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsie : k.sie =
   imod started_deposit_open γi ξd P $$ [$Hinv $Hprim $Hrun $HP] with ⟨Hrun, Hprim, #HPd⟩
   imodintro
   ihave Hk := Hback $$ Hrun
-  ihave HAU := started_writeAUT γi ξd P $$ [$Hinv $Hprim $HPd $Hsl]
-  ihave HAU := (show writeAUT (GF := GF) startedPrimary startedAddr 4 startedSet iprop(emp) ⊢
-    writeAUT startedPrimary startedAddr 4 1#32 iprop(emp) from .rfl) $$ HAU
+  ihave HAU := started_writeAUT γi ξd P (KA.«main» + 176#64) (xv6RelPc_main hpcs) $$ [$Hinv $Hprim $HPd $Hsl]
+  ihave HAU := (show (LeanRV64D.Register.PC ↦ᵣ[startedPrimary] (KA.«main» + 176#64) -∗
+      writeAUT (GF := GF) startedPrimary startedAddr 4 startedSet
+        iprop(LeanRV64D.Register.PC ↦ᵣ[startedPrimary] (KA.«main» + 176#64) ∗ emp)) ⊢
+    (LeanRV64D.Register.PC ↦ᵣ[startedPrimary] (KA.«main» + 176#64) -∗
+      writeAUT startedPrimary startedAddr 4 1#32
+        iprop(LeanRV64D.Register.PC ↦ᵣ[startedPrimary] (KA.«main» + 176#64) ∗ emp)) from .rfl) $$ HAU
   -- +0xa2  auipc a5,0x9 ; +0xa6  addi a5,a5,1008
   k_step (wp_s_auipc startedPrimary _ (KA.«main» + 162#64) false 9#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -81,7 +86,7 @@ theorem mn_started [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsie : k.sie =
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0xb0  sw a4,0(a5): started = 1, the invariant armed
-  k_step (wp_s_sw_auT startedPrimary _ ?hs (KA.«main» + 176#64) true 0#12 15#5 14#5 startedAddr
+  k_step (wp_s_sw_auT_pc startedPrimary _ ?hs (KA.«main» + 176#64) true 0#12 15#5 14#5 startedAddr
       ?ha (by decide) (by decide) iprop(emp))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc $Hid]
   case ha => k_norm [mn_started_addr']; rfl

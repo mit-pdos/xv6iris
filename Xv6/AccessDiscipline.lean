@@ -3,13 +3,14 @@
 [R34.1]; W8 (f2-ctx) S4; W8 (f3-hold) [OWN.64]; W8 (f3-racy) [OWN.63]; W8
 (f3-pipelk) [OWN.65]; W8 (f3-ptek) [OWN.66]; W8 (f3-utext) [OWN.89]): W8's
 export `xv6AccessDisc`, `chainOkAt ∧ lockWordDiscAt ∧ cpuStaticAt ∧ lkCpuReadAt
-∧ pteDiscAt ∧ utextDiscAt ∧ uptDiscAt` -- SEVEN conjuncts: THREE of the
-skeleton's six (W8 (f2-ctx)), the ruled `holding()` clause `lkCpuReadAt` (W8
-(f3-hold)), the KERNEL half of the skeleton's A/D write-back clause
-`pteDiscAt` (W8 (f3-ptek)), the user code clause `utextDiscAt` (W8
-(f3-utext), O1: every byte a user text leaf maps is at or below the hart's
-instruction view) and the USER tables' half of the A/D clause `uptDiscAt`
-(W8 (f3-utext) T4); `chainOkAt` carries the
+∧ pteDiscAt ∧ utextDiscAt ∧ uptDiscAt ∧ kptMapsExp` -- EIGHT conjuncts:
+THREE of the skeleton's six (W8 (f2-ctx)), the ruled `holding()` clause
+`lkCpuReadAt` (W8 (f3-hold)), the KERNEL half of the skeleton's A/D
+write-back clause `pteDiscAt` (W8 (f3-ptek)), the user code clause
+`utextDiscAt` (W8 (f3-utext), O1: every byte a user text leaf maps is at or
+below the hart's instruction view), the USER tables' half of the A/D clause
+`uptDiscAt` (W8 (f3-utext) T4) and the sealed kernel table's mappings in
+plain addresses `kptMapsExp` (mcslrec (1) [OWN.99]); `chainOkAt` carries the
 ruled `ip->ref` clause `racyValOk` (W8 (f3-racy)); `lockWordDiscAt` and
 `lkCpuReadAt` cover EVERY lock -- the static spinlocks and the live pipe
 locks (W8 (f3-pipelk)).
@@ -278,12 +279,14 @@ noncomputable def custAt (σ : MState) (a : PAddr) (t : Nat) : Cust :=
 /-! ## Sync paths and the chain conjunct -/
 
 /-- The certificate environment of `σ` at xv6's registry. -/
-def xv6Env (σ : MState) : ChainEnv := chainEnvAt xv6Rsv (slotWit xv6Rsv) σ
+def xv6Env (σ : MState) : ChainEnv := chainEnvAt xv6Rsv KernelRsv.relPcs (slotWit xv6Rsv) σ
 
 /-- `b` is a hop byte for an acquire at `a`: a static spinlock's lock byte,
-or a dynamic lock's live as of `a`. -/
+or a dynamic lock's live as of `a` whose release under the acquire was issued
+at a release site (mcslrec (2) [OWN.82] (a1), Q-MCSL2-DYN ruled (i): the
+pc clause the winning AMO's hop carries, `MachCSL.relBelowOk`). -/
 def hopByteAt (σ : MState) (b : PAddr) (a : Nat) : Prop :=
-  lockByteIn xv6Rsv b ∨ dynLkAt (slotWit xv6Rsv) σ.mem σ.top b a
+  lockByteIn xv6Rsv b ∨ (dynLkAt (slotWit xv6Rsv) σ.mem σ.top b a ∧ relBelowOk KernelRsv.relPcs σ b a)
 
 /-- **A sync path** from the entries of hart `A` at or below `t` to hart `B`
 before `τ`: release → acquire hops through hop bytes, the last acquire below
@@ -581,6 +584,95 @@ theorem pteDiscAt_of (σ : MState) (hmm : mmOk σ) (hk : kptStateOk xv6Rsv σ) :
     simp only [hfz, Bool.false_eq_true, ↓reduceIte] at hc0
     exact ⟨htid, v, pteVariant_trans hc0 hv, hev, fun j' hj' => ⟨Hs j', hm j' hj', hall j' hj'⟩⟩
 
+/-! ### The sealed kernel table's mappings, in plain addresses (mcslrec (1), [OWN.99] (B)) -/
+
+/-- **One kernel mapping's walk at the seal `S` from the root page `b`, in plain addresses**:
+the root page's slot `kSlotP b (kIdxP vpn 2)` holds, as of `S`, a pointer to the page `b1`,
+`b1`'s slot `kIdxP vpn 1` a pointer to `b0`, `b0`'s slot `kIdxP vpn 0` an A/D variant of the
+leaf `kLeaf ppn perm a d`; each slot disciplined after `S` (`kptSlotDisc`). -/
+def kptWalkP (σ : MState) (S : Nat) (b : BitVec 44) (vpn : BitVec 27) (ppn : BitVec 44) (perm : KPerm) :
+    Prop :=
+  ∃ (b1 b0 : BitVec 44) (a d : BitVec 1),
+    wordAsOf σ.mem (kSlotP b (kIdxP vpn 2)) S (kPtr b1) ∧ kptSlotDisc σ S (kSlotP b (kIdxP vpn 2)) (kPtr b1) ∧
+    wordAsOf σ.mem (kSlotP b1 (kIdxP vpn 1)) S (kPtr b0) ∧ kptSlotDisc σ S (kSlotP b1 (kIdxP vpn 1)) (kPtr b0) ∧
+    (∃ v, wordAsOf σ.mem (kSlotP b0 (kIdxP vpn 0)) S v ∧ pteVariant (kLeaf ppn perm a d) v) ∧
+    kptSlotDisc σ S (kSlotP b0 (kIdxP vpn 0)) (kLeaf ppn perm a d)
+
+/-- **`kptMapsExp`, THE SEALED KERNEL TABLE'S MAPPINGS** (mcslrec (1), [OWN.99] (B): a
+self-contained statement in plain addresses and bit fields): before the boot gate (`started`
+unwritten) nothing; from then on there is a seal position `S` (`kptSealAt`) at which the root word
+`kernel_pagetable` holds the root page `b · 4096`, and for each of the kernel's mappings
+(`kMapP pas`: the text `0x80000000 ..< 0x80007000` identity `R|X`, the rest of RAM `..<
+0x88000000` identity `R|W`, the 64 kernel stacks `R|W` at some pages `pas i`) the Sv39 walk from
+`b` reads two pointers and an A/D variant of the leaf (`kptWalkP`), each slot written after `S`
+only by harts, whole, with A/D variants (`kptSlotDisc`).  From the interpretation's sealed-table
+record, which keeps xv6's shape of the sealed slots (`KernelRsv.kptOk` = `xv6KptOk`, registered at
+`Xv6.KptBoot` from `kvmmake`'s table).  Spec: the privileged spec's Sv39 (three levels, `pt_base
+@ vpn_i @ 0b000`, a leaf `V ∧ (R ∨ X)`); Svadu A/D updates whole-PTE.  FAITHFUL: facts of xv6's
+table, no ISA assumption.  Consumers: `Xv6.kptMapsAt_ofExp`, `Xv6.kptTextAt_ofExp`. -/
+def kptMapsExp (σ : MState) : Prop :=
+  (∀ a ∈ xv6StartedR.bytes, ∀ H : Hist, σ.mem[a]? = some H → ∀ e ∈ H, e.t = 0) ∨
+  ∃ (pas : Nat → BitVec 44) (S : Nat) (b : BitVec 44), kptSealAt σ S ∧
+    wordAsOf σ.mem KA.«kernel_pagetable» S (kSlotP b 0) ∧
+    ∀ (vpn : BitVec 27) (ppn : BitVec 44) (perm : KPerm), kMapP pas vpn ppn perm → kptWalkP σ S b vpn ppn perm
+
+/-- A sealed slot of the record: its value as of the seal (exact if frozen, a variant if a leaf)
+and its discipline after the seal. -/
+theorem kptDynSlot {σ : MState} {S : Nat} {dyn : List KSlot} (hh : kptHistsAt σ.mem S dyn) {d : KSlot}
+    (hd : d ∈ dyn) :
+    ∃ v, wordAsOf σ.mem d.addr S v ∧ (if d.frozen then v = d.c else pteVariant d.c v) ∧
+      kptSlotDisc σ S d.addr d.c := by
+  obtain ⟨Hs, hm, ⟨v0, hv0, hc0⟩, hent⟩ := hh d hd
+  refine ⟨v0, fun j hj => ?_, hc0, ?_⟩
+  · unfold FlatMem.entAsOf
+    rw [hm j hj, Option.bind_some]
+    exact hv0 j hj
+  · intro j H e hj hH he' hSe
+    rw [hm j hj] at hH
+    obtain rfl := Option.some.inj hH
+    obtain ⟨_, htid, v, hv, hev, hall⟩ := hent j hj e he' hSe
+    exact ⟨htid, v, hv, hev, fun j' hj' => ⟨Hs j', hm j' hj', hall j' hj'⟩⟩
+
+theorem kptDynFrozen {σ : MState} {S : Nat} {dyn : List KSlot} (hh : kptHistsAt σ.mem S dyn)
+    {a : PAddr} {c : BitVec 64} (hd : (⟨a, c, true⟩ : KSlot) ∈ dyn) :
+    wordAsOf σ.mem a S c ∧ kptSlotDisc σ S a c := by
+  obtain ⟨v, hw, hif, hdisc⟩ := kptDynSlot hh hd
+  simp only [if_true] at hif
+  subst hif
+  exact ⟨hw, hdisc⟩
+
+theorem kptDynLeaf {σ : MState} {S : Nat} {dyn : List KSlot} (hh : kptHistsAt σ.mem S dyn)
+    {a : PAddr} {c : BitVec 64} (hd : (⟨a, c, false⟩ : KSlot) ∈ dyn) :
+    (∃ v, wordAsOf σ.mem a S v ∧ pteVariant c v) ∧ kptSlotDisc σ S a c := by
+  obtain ⟨v, hw, hif, hdisc⟩ := kptDynSlot hh hd
+  simp only [Bool.false_eq_true, if_false] at hif
+  exact ⟨⟨v, hw, hif⟩, hdisc⟩
+
+/-- **`kptMapsExp` from the record** with xv6's shape of the sealed slots. -/
+theorem kptMapsExp_of (σ : MState) (hk : kptStateOkK xv6Rsv xv6KptOk σ) : kptMapsExp σ := by
+  obtain ⟨S, dyn, ⟨_, hclean⟩ | ⟨hok, hh, ⟨pas, b, hroot, hmaps⟩⟩⟩ := hk
+  · exact Or.inl (fun a ha H hH e he => hclean _ _ xv6StartedR_mem a ha H hH e he)
+  right
+  obtain ⟨hrw, -⟩ := kptDynFrozen hh hroot
+  refine ⟨pas, S, b, ⟨hok.1, ?_, fun a ha H hH e he he0 => hok.2.1 _ _ xv6StartedR_mem a ha H hH e he he0⟩,
+    hrw, fun vpn ppn perm hm => ?_⟩
+  · intro a ha H hH e he _
+    obtain ⟨Hs, hm, -, hent⟩ := hh _ hroot
+    simp only [kptRootBytes, wordBytes, List.mem_map, List.mem_range] at ha
+    obtain ⟨j, hj, rfl⟩ := ha
+    have hm' := hm j hj
+    simp only at hm'
+    rw [hm'] at hH
+    obtain rfl := Option.some.inj hH
+    refine Nat.le_of_not_lt (fun hlt => ?_)
+    have := (hent j hj e he hlt).1
+    cases this
+  · obtain ⟨b1, b0, a, d, h2, h1, h0⟩ := hmaps vpn ppn perm hm
+    obtain ⟨w2, d2⟩ := kptDynFrozen hh h2
+    obtain ⟨w1, d1⟩ := kptDynFrozen hh h1
+    obtain ⟨w0, d0⟩ := kptDynLeaf hh h0
+    exact ⟨b1, b0, a, d, w2, d2, w1, d1, w0, d0⟩
+
 /-- **`utextDiscAt`, the user code** (W8 (f3-utext) [OWN.89] (W-R), [R34.1],
 O1; `MachCSL.uTextDiscAt`): while hart `h` is in user mode, every history
 entry on a byte of a page that a user TEXT leaf (`U`, `X` set, `W` clear) of
@@ -617,6 +709,42 @@ of now (on xv6 runs the table's pointer slots do not change while the epoch is
 open). -/
 def uptDiscAt (σ : MState) : Prop := uPtDiscAt xv6Rsv σ
 
+/-- **A sync path's first move at position `r`** (mcslrec (2) [OWN.82] (a1);
+the self-contained copy of Weak's `RvwmoXv6Adequacy.relEntAt`, the same
+definition): a release on a hop byte, directly under an acquire on it, or an
+entry of a publication word by its writer. -/
+def relEntAtX (σ : MState) (r : Nat) : Prop :=
+  (∃ (b : PAddr) (A C : CPU) (a' : Nat), syncHop σ.mem b A r C a' ∧ hopByteAt σ b a') ∨
+  (∃ (f : PAddr) (w : CPU) (v : BitVec 8) (H : Hist),
+      (xv6Env σ).isPub f w ∧ σ.mem[f]? = some H ∧ (⟨r, hartAgent w, v⟩ : HEnt) ∈ H)
+
+/-- **The release sites' provenance** (mcslrec (2) [OWN.82] (a1), Q-MCSL2-DYN
+ruled (i)): every post-power-on first move of a sync path -- a release on a
+static spinlock's or a (pc-checked) pipe lock's lock byte, a store of
+`started` -- was issued (`MState.pcAt`, the per-store pc record) at one of
+xv6's release sites `KernelRsv.relPcs` (`release+0x1a`, `main+0xb0`; the
+self-contained copy of Weak's `releasePcs`).  Spec: the issuing pc of a
+store is the `PC` of the Sail instruction whose `memWrite` made it (the
+model's `sail_mem_write` inside `execute`); RVWMO/Zifencei/PMAs are silent on
+provenance (a proof notion).  FAITHFUL. -/
+def relProvAt (σ : MState) : Prop :=
+  ∀ r : Nat, r ≠ 0 → relEntAtX σ r → r ≤ σ.top ∧ σ.pcAt r ∈ KernelRsv.relPcs
+
+/-- The provenance, from the reserved regions' pc record (static locks,
+`started`) and the hop bytes' pc clause (pipe locks); the position is an
+issued one (`mmOk`'s histories). -/
+theorem relProvAt_of (σ : MState) (hle : ∀ (a : PAddr) (H : Hist) (e : HEnt), σ.mem[a]? = some H → e ∈ H → e.t ≤ σ.top)
+    (h : relPcOk xv6Rsv KernelRsv.relPcs σ) : relProvAt σ := by
+  intro r hr hrel
+  rcases hrel with ⟨b, A, C, a', hh, hb⟩ | ⟨f, w, v, H, hp, hf, he⟩
+  · refine ⟨?_, ?_⟩
+    · obtain ⟨H1, H2, e0, va, hm, -⟩ := hh
+      exact hle b _ ⟨r, hartAgent A, 0⟩ hm (by simp)
+    · rcases hb with hb | ⟨_, hpc⟩
+      · exact h.1 b r A hb (relPat_of_syncHop hh)
+      · exact relBelowOk_syncHop hh hpc
+  · exact ⟨hle f H _ hf he, h.2 f w H _ hp hf he hr⟩
+
 /-- **W8's export** (W8 (f2-ctx): `chainOkAt ∧ lockWordDiscAt ∧ cpuStaticAt`,
 three of the skeleton's six; W8 (f3-hold) [OWN.64]: `lkCpuReadAt`; W8
 (f3-racy) [OWN.63]: `chainOkAt`'s `racyValOk` arm -- the two instances of ONE
@@ -626,9 +754,13 @@ over EVERY lock, the live pipe locks included; W8 (f3-ptek) [OWN.66]:
 `pteDiscAt`, the kernel page table's A/D discipline after the seal (the user
 tables' half is W8 (f3-pteu)'s; `cpuProcDiscAt` permanently dropped, [OWN.80]);
 W8 (f3-utext) [OWN.89]: `utextDiscAt`, the user code (O1), and `uptDiscAt`,
-the user page tables after the stamp (T4). -/
+the user page tables after the stamp (T4); mcslrec (1) [OWN.99]: `kptMapsExp`,
+the sealed kernel table's mappings (text, data, kernel stacks) in plain
+addresses; mcslrec (2) [OWN.82] (a1): `relProvAt`, the release sites'
+provenance (the per-store pc record). -/
 def xv6AccessDisc (σ : MState) : Prop :=
-  chainOkAt σ ∧ lockWordDiscAt σ ∧ cpuStaticAt σ ∧ lkCpuReadAt σ ∧ pteDiscAt σ ∧ utextDiscAt σ ∧ uptDiscAt σ
+  chainOkAt σ ∧ lockWordDiscAt σ ∧ cpuStaticAt σ ∧ lkCpuReadAt σ ∧ pteDiscAt σ ∧ utextDiscAt σ ∧ uptDiscAt σ ∧
+    kptMapsExp σ ∧ relProvAt σ
 
 
 /-! ## The registration lemma -/
@@ -801,9 +933,11 @@ theorem lkCpuReadAt_of (σ : MState) (h : lockWordDiscAt σ) : lkCpuReadAt σ :=
 /-- **The export from the four pure facts** of the state interpretation. -/
 theorem accessDisc_of (σ : MState) (hmm : mmOk σ) (hr : rsvAllOk KernelRsv.static σ.mem)
     (h : loadsChained (xv6Env σ) (chainExAt xv6Rsv (slotWit xv6Rsv) σ.mem σ.top))
-    (hk : kptStateOk xv6Rsv σ) (hu : uTextDiscAt σ) (hp : uPtDiscAt xv6Rsv σ) : xv6AccessDisc σ :=
+    (hk : kptStateOk xv6Rsv σ) (hu : uTextDiscAt σ) (hp : uPtDiscAt xv6Rsv σ)
+    (hkk : kptStateOkK xv6Rsv xv6KptOk σ) (hrp : relPcOk xv6Rsv KernelRsv.relPcs σ) : xv6AccessDisc σ :=
   have hl := lockCpuDisc_of_rsvAllOk σ hr
-  ⟨chainOkAt_of σ hmm h, hl.1, hl.2, lkCpuReadAt_of σ hl.1, pteDiscAt_of σ hmm hk, hu, hp⟩
+  ⟨chainOkAt_of σ hmm h, hl.1, hl.2, lkCpuReadAt_of σ hl.1, pteDiscAt_of σ hmm hk, hu, hp, kptMapsExp_of σ hkk,
+    relProvAt_of σ (relPc_le_top hmm.1) hrp⟩
 
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
 
@@ -813,7 +947,8 @@ interpretation gives `xv6AccessDisc` -- `mmOk`, the reserved regions'
 discipline and the chain conjunct's load-side invariant, at a record whose
 static list is xv6's. -/
 theorem powerInterp_accessDisc (heq : MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static)
-    (g : GState) :
+    (heqK : MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk)
+    (heqP : MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs) (g : GState) :
     powerInterp g ⊢@{IProp GF} ⌜g.pow = true → xv6AccessDisc g.m⌝ := by
   unfold powerInterp eraCur
   cases hpw : g.pow
@@ -835,17 +970,24 @@ theorem powerInterp_accessDisc (heq : MachFixedGS.rsvStatic (hlc := hlc) (GF := 
     ihave %hk : ⌜kptStateOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) g.m⌝ $$ [Hm Hk]
     · iapply kptModel_stateOk _ g.m reg $$ [Hm Hk]
       iframe
+    ihave %hkk : ⌜kptStateOkK (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))
+        (MachFixedGS.kptOk (hlc := hlc) (GF := GF)) g.m⌝ $$ [Hm Hk]
+    · iapply kptModel_stateOkK _ g.m reg $$ [Hm Hk]
+      iframe
     ipureintro
     intro _
     have hch' : loadsChained
-        (chainEnvAt (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))
+        (chainEnvAt (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.relPcs (hlc := hlc) (GF := GF))
           (slotWit (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))) g.m)
         (chainExAt (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))
           (slotWit (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))) g.m.mem g.m.top) := hch
-    rw [heq] at hch'
+    have hrp := hok.2
+    rw [heq, heqP] at hch'
     rw [heq] at hk
     rw [heq] at hpt
-    exact accessDisc_of g.m hmm (heq ▸ all_of_reservedOk hin hok) hch' hk hu hpt
+    rw [heq, heqK] at hkk
+    rw [heq, heqP] at hrp
+    exact accessDisc_of g.m hmm (heq ▸ all_of_reservedOk hin hok.1) hch' hk hu hpt hkk hrp
 
 end AccessDiscipline
 

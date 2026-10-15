@@ -106,6 +106,11 @@ structure MState where
   devs : DevStates
   /-- every device's task bookkeeping -/
   devrt : DevId → DevRt
+  /-- THE ISSUING PC OF EACH STORE (mcslrec (2) [OWN.82] (a1); ghost, erasable:
+  no step reads it): at the timestamp a store creates, a hart's PLAIN store
+  records the hart's `PC`; an exclusive store (`sc`, an AMO's write, the page
+  walker's A/D write-back) and a DMA write record `-1`. -/
+  pcAt : Nat → Int
 
 /-- The top of the store order: the timestamp of the latest store. -/
 abbrev MState.top (σ : MState) : Nat := σ.log.length
@@ -153,6 +158,8 @@ abbrev MState.store (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec
     (excl : Bool) : MState :=
   { σ with mem := σ.mem.writeBytes pa n w (σ.top + 1) (hartAgent cpu),
            log := σ.log ++ [hartAgent cpu],
+           pcAt := fun t => if t = σ.top + 1 then
+             (if excl then -1 else (((σ.regs cpu) Register.PC).toNat : Int)) else σ.pcAt t,
            tv := updCpu σ.tv cpu (if excl && (σ.hr cpu).acq then σ.top + 1 else σ.tv cpu),
            hr := updCpu σ.hr cpu ((σ.hr cpu).clearAcq.resetCoh pa n),
            resv := updCpu σ.resv cpu none }
@@ -181,7 +188,8 @@ fields, so every field the store does not move is still definitionally
 `σ`'s. -/
 abbrev MState.storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : MState :=
   { σ with mem := if n = 0 then σ.mem else σ.mem.writeBytes pa n w (σ.top + 1) diskAgent,
-           log := if n = 0 then σ.log else σ.log ++ [diskAgent] }
+           log := if n = 0 then σ.log else σ.log ++ [diskAgent],
+           pcAt := if n = 0 then σ.pcAt else fun t => if t = σ.top + 1 then -1 else σ.pcAt t }
 
 /-- A zero-byte DMA write is the identity. -/
 theorem MState.storeDma_zero (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
@@ -192,7 +200,8 @@ theorem MState.storeDma_zero (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8
 theorem MState.storeDma_of_ne (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (hn : n ≠ 0) : σ.storeDma pa n w =
       { σ with mem := σ.mem.writeBytes pa n w (σ.top + 1) diskAgent,
-               log := σ.log ++ [diskAgent] } := by
+               log := σ.log ++ [diskAgent],
+               pcAt := fun t => if t = σ.top + 1 then -1 else σ.pcAt t } := by
   simp only [MState.storeDma, if_neg hn]
 
 theorem MState.storeDma_mem_of_ne (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
@@ -342,7 +351,7 @@ def bootShape (g g' : GState) : Prop :=
 current file, reload the image, reset the devices. -/
 def bootWitness (g : GState) : GState :=
   { m := ⟨fun cpu => bootLand cpu (g.m.regs cpu), imgFlat bootImage, [], fun _ => 0, fun _ => 0,
-          fun _ => HRead.zero, fun _ => none, g.m.devs.reset, fun _ => DevRt.init⟩,
+          fun _ => HRead.zero, fun _ => none, g.m.devs.reset, fun _ => DevRt.init, fun _ => -1⟩,
     gen := g.gen, pow := true }
 
 /-- All harts. -/

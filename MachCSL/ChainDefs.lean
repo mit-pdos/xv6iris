@@ -225,6 +225,451 @@ theorem wordEntAt_mono {m m' : FlatMem} (hx : memExt m m') {b : PAddr} {t : Nat}
   obtain ⟨N, hN⟩ := hx _ H hH
   exact ⟨N ++ H, e, hN, List.mem_append_right _ he, het, heg⟩
 
+/-! ### Release provenance (mcslrec (2) [OWN.82] (a1)) -/
+
+/-- **A release pattern** on the byte `b` at position `r` by hart `A`: a
+WORD-sized entry of value 0 directly above a word-sized NONZERO entry (the
+release half of a `syncHop`, without its acquire). -/
+def relPat (m : FlatMem) (b : PAddr) (r : Nat) (A : CPU) : Prop :=
+  ∃ (H1 H2 : Hist) (e0 : HEnt), m[b]? = some (H1 ++ ⟨r, hartAgent A, 0⟩ :: e0 :: H2) ∧ e0.v ≠ 0 ∧
+    wordEntAt m b r (hartAgent A) ∧ wordEntAt m b e0.t e0.tid
+
+/-- **The release sites' provenance** at `σ` for the static list `rs` and
+the release pcs `ps`: every release pattern on a static lock's byte, and every
+post-power-on entry of a publication word, was issued (`MState.pcAt`) at a pc
+of `ps`. -/
+def relPcOk (rs : List RsvRegion) (ps : List Int) (σ : MState) : Prop :=
+  (∀ (b : PAddr) (r : Nat) (A : CPU), lockByteIn rs b → relPat σ.mem b r A → σ.pcAt r ∈ ps) ∧
+  (∀ (f : PAddr) (w : CPU) (H : Hist) (e : HEnt), (⟨f, .pub w⟩ : RsvRegion) ∈ rs → σ.mem[f]? = some H →
+    e ∈ H → e.t ≠ 0 → σ.pcAt e.t ∈ ps)
+
+/-- **A store that makes no release entry**: on a static lock's byte it
+writes a nonzero byte or over a zero head, and it writes no publication word. -/
+def rsvRelFree (rs : List RsvRegion) (pa : PAddr) (n : Nat) (w' : BitVec (8 * n)) (Hs : Nat → Hist) : Prop :=
+  ∀ j, j < n → (lockByteIn rs (pa + BitVec.ofNat 64 j) →
+      nthByte w' j ≠ 0 ∨ (Hs j).head?.map HEnt.v = some 0) ∧
+    ∀ w, (⟨pa + BitVec.ofNat 64 j, .pub w⟩ : RsvRegion) ∉ rs
+
+theorem rsvAddr_inj {pa : PAddr} {j j' : Nat} (hj : j < 2 ^ 64) (hj' : j' < 2 ^ 64)
+    (h : pa + BitVec.ofNat 64 j = pa + BitVec.ofNat 64 j') : j = j' := by
+  have := congrArg BitVec.toNat h
+  simp only [BitVec.toNat_add, BitVec.toNat_ofNat] at this
+  have hp := pa.isLt
+  omega
+
+/-- The store's own bytes, after it. -/
+theorem foldl_push_at {n : Nat} (pa : PAddr) (w : BitVec (8 * n)) (t : Nat) (h : Agent) :
+    ∀ (l : List Nat), (∀ j ∈ l, j < 2 ^ 64) → l.Nodup → ∀ (m : FlatMem) (j : Nat), j ∈ l →
+      (l.foldl (fun (m : FlatMem) j => m.push (pa + BitVec.ofNat 64 j) ⟨t, h, nthByte w j⟩) m)[pa + BitVec.ofNat 64 j]? =
+        some (⟨t, h, nthByte w j⟩ :: m.getD (pa + BitVec.ofNat 64 j) [])
+  | [], _, _, _, _, hj => by simp at hj
+  | j0 :: l, hb, hnd, m, j, hj => by
+    simp only [List.foldl_cons]
+    rw [List.nodup_cons] at hnd
+    have hb' : ∀ x ∈ l, x < 2 ^ 64 := fun x hx => hb x (List.mem_cons_of_mem _ hx)
+    rcases List.mem_cons.1 hj with rfl | hj
+    · have hj64 : j < 2 ^ 64 := hb j List.mem_cons_self
+      have key : ∀ (l : List Nat), (∀ x ∈ l, x < 2 ^ 64) → j ∉ l → ∀ m' : FlatMem,
+          (l.foldl (fun (m : FlatMem) j => m.push (pa + BitVec.ofNat 64 j) ⟨t, h, nthByte w j⟩) m')[pa + BitVec.ofNat 64 j]? =
+            m'[pa + BitVec.ofNat 64 j]? := by
+        intro l
+        induction l with
+        | nil => intros; rfl
+        | cons x l ih =>
+          intro hb hn m'
+          simp only [List.foldl_cons]
+          rw [ih (fun y hy => hb y (List.mem_cons_of_mem _ hy)) (fun h' => hn (List.mem_cons_of_mem _ h'))]
+          apply FlatMem.push_get?_ne
+          intro he
+          have := rsvAddr_inj (pa := pa) hj64 (hb x List.mem_cons_self) he
+          exact hn (this ▸ List.mem_cons_self)
+      rw [key l hb' hnd.1 _, FlatMem.push_get?_eq]
+    · rw [foldl_push_at pa w t h l hb' hnd.2 _ j hj]
+      congr 2
+      unfold FlatMem.push
+      rw [Std.ExtTreeMap.getD_insert]
+      have hne : ¬ (compare (pa + BitVec.ofNat 64 j0) (pa + BitVec.ofNat 64 j) = .eq) := by
+        intro he
+        have := Std.LawfulEqCmp.eq_of_compare he
+        exact hnd.1 (rsvAddr_inj (hb j0 List.mem_cons_self) (hb' j hj) this ▸ hj)
+      simp [hne]
+
+/-- A word store's bytes, after it. -/
+theorem writeBytes_at {n : Nat} (m : FlatMem) (pa : PAddr) (w : BitVec (8 * n)) (t : Nat) (h : Agent)
+    (hn : n ≤ 2 ^ 64) {j : Nat} (hj : j < n) (H : Hist) (hH : m[pa + BitVec.ofNat 64 j]? = some H) :
+    (m.writeBytes pa n w t h)[pa + BitVec.ofNat 64 j]? = some (⟨t, h, nthByte w j⟩ :: H) := by
+  unfold FlatMem.writeBytes
+  rw [foldl_push_at pa w t h (List.range n) (fun x hx => by have := List.mem_range.1 hx; omega)
+    List.nodup_range m j (List.mem_range.2 hj)]
+  rw [Std.ExtTreeMap.getD_eq_getD_getElem?, hH]
+  rfl
+
+/-- A history split at an old entry: the new entries `N` (all above `top`) sit
+above it. -/
+theorem relPc_split_old {top : Nat} : ∀ (N H H1 L : Hist) (x : HEnt), (∀ e ∈ N, top < e.t) → x.t ≤ top →
+    N ++ H = H1 ++ x :: L → ∃ H1', H = H1' ++ x :: L
+  | [], H, H1, L, x, _, _, h => ⟨H1, by simpa using h⟩
+  | n :: N, H, [], L, x, hN, hx, h => by
+    simp only [List.cons_append, List.nil_append, List.cons.injEq] at h
+    obtain ⟨rfl, -⟩ := h
+    have := hN _ List.mem_cons_self
+    omega
+  | n :: N, H, h1 :: H1, L, x, hN, hx, h => by
+    simp only [List.cons_append, List.cons.injEq] at h
+    exact relPc_split_old N H H1 L x (fun e he => hN e (List.mem_cons_of_mem _ he)) hx h.2
+
+/-- A release pattern at an old position was already one. -/
+theorem relPat_old {m m' : FlatMem} {top : Nat} (hg : memGrow m top m') (hgr : memGrowR m top m')
+    (hle : ∀ (a : PAddr) (H : Hist) (e : HEnt), m[a]? = some H → e ∈ H → e.t ≤ top) {b : PAddr} {r : Nat}
+    {A : CPU} (hr : r ≤ top) (h : relPat m' b r A) : relPat m b r A := by
+  obtain ⟨H1, H2, e0, hb, hv, hw1, hw2⟩ := h
+  have hx : (⟨r, hartAgent A, 0⟩ : HEnt) ∈ H1 ++ ⟨r, hartAgent A, 0⟩ :: e0 :: H2 := by simp
+  rcases hgr b _ hb _ hx with hlt | ⟨H, hH, -⟩
+  · exact absurd hr (Nat.not_le.2 hlt)
+  obtain ⟨N, hN, hNt⟩ := hg b H hH
+  rw [hb] at hN
+  obtain ⟨H1', hH1'⟩ := relPc_split_old N H H1 (e0 :: H2) _ hNt hr (Option.some.inj hN).symm
+  have hwOld : ∀ (t : Nat) (g : Agent), t ≤ top → wordEntAt m' b t g → wordEntAt m b t g := by
+    intro t g ht hw i hi
+    obtain ⟨H', e, hH', he, het, heg⟩ := hw i hi
+    rcases hgr _ _ hH' e he with hlt | ⟨H'', hH'', he''⟩
+    · omega
+    · exact ⟨H'', e, hH'', he'', het, heg⟩
+  have he0 : e0.t ≤ top := hle b H e0 hH (by rw [hH1']; simp)
+  exact ⟨H1', H2, e0, by rw [hH, hH1'], hv, hwOld r _ hr hw1, hwOld e0.t e0.tid he0 hw2⟩
+
+/-- **The release sites' provenance across a step** at top `top`: old
+positions keep their pc and their patterns, the step's new patterns and
+publication entries are checked. -/
+theorem relPcOk_step {rs : List RsvRegion} {ps : List Int} {σ σ' : MState}
+    (hg : memGrow σ.mem σ.top σ'.mem) (hgr : memGrowR σ.mem σ.top σ'.mem)
+    (hle : ∀ (a : PAddr) (H : Hist) (e : HEnt), σ.mem[a]? = some H → e ∈ H → e.t ≤ σ.top)
+    (hpc : ∀ t, t ≤ σ.top → σ'.pcAt t = σ.pcAt t)
+    (hnewL : ∀ (b : PAddr) (r : Nat) (A : CPU), lockByteIn rs b → relPat σ'.mem b r A → σ.top < r →
+      σ'.pcAt r ∈ ps)
+    (hnewP : ∀ (f : PAddr) (w : CPU) (H : Hist) (e : HEnt), (⟨f, .pub w⟩ : RsvRegion) ∈ rs →
+      σ'.mem[f]? = some H → e ∈ H → σ.top < e.t → σ'.pcAt e.t ∈ ps)
+    (h : relPcOk rs ps σ) : relPcOk rs ps σ' := by
+  refine ⟨fun b r A hb hp => ?_, fun f w H e hf hH he h0 => ?_⟩
+  · by_cases hr : r ≤ σ.top
+    · rw [hpc r hr]; exact h.1 b r A hb (relPat_old hg hgr hle hr hp)
+    · exact hnewL b r A hb hp (Nat.lt_of_not_le hr)
+  · by_cases ht : e.t ≤ σ.top
+    · rw [hpc _ ht]
+      rcases hgr f H hH e he with hlt | ⟨H', hH', he'⟩
+      · omega
+      · exact h.2 f w H' e hf hH' he' h0
+    · exact hnewP f w H e hf hH he (Nat.lt_of_not_le ht)
+
+/-- A store keeps the old positions' pcs. -/
+theorem relPc_storeOld (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (excl : Bool) :
+    ∀ t, t ≤ σ.top → (σ.store cpu pa n w excl).pcAt t = σ.pcAt t := by
+  intro t ht; simp only [MState.store]; rw [if_neg (by omega)]
+
+/-- A DMA write keeps the old positions' pcs. -/
+theorem relPc_dmaOld (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
+    ∀ t, t ≤ σ.top → (σ.storeDma pa n w).pcAt t = σ.pcAt t := by
+  intro t ht
+  by_cases hn : n = 0
+  · simp only [MState.storeDma, if_pos hn]
+  · simp only [MState.storeDma, if_neg hn]; rw [if_neg (by omega)]
+
+/-- **The release under an acquire was issued at a release pc** (mcslrec (2)
+[OWN.82] (a1), Q-MCSL2-DYN ruled (i)): in `b`'s history, every entry at `r`
+of value 0 directly below an entry at `a` of nonzero value, itself over a
+nonzero entry (a `syncHop`'s release, its word-sizes left out), was issued
+(`MState.pcAt`) at a pc of `ps`.  The pc clause a DYNAMIC lock's hop carries
+(`MachCSL.chainEnvAt`'s hop registry): the winning AMO's hop request shows
+the release's pc receipt (`MachCSL.pcRcpt`). -/
+def relBelowOk (ps : List Int) (σ : MState) (b : PAddr) (a : Nat) : Prop :=
+  ∀ (H1 H2 : Hist) (B A : Agent) (va : BitVec 8) (r : Nat) (e0 : HEnt),
+    σ.mem[b]? = some (H1 ++ ⟨a, B, va⟩ :: ⟨r, A, 0⟩ :: e0 :: H2) → va ≠ 0 → e0.v ≠ 0 → σ.pcAt r ∈ ps
+
+/-- The pc clause survives a step at top `top` past the acquire: the
+acquire's entry and everything below it are old, and old positions keep
+their pc. -/
+theorem relBelowOk_grow {ps : List Int} {σ σ' : MState} {top : Nat} {b : PAddr} {a : Nat}
+    (hg : memGrow σ.mem top σ'.mem) (hgr : memGrowR σ.mem top σ'.mem)
+    (hle : ∀ (x : PAddr) (H : Hist) (e : HEnt), σ.mem[x]? = some H → e ∈ H → e.t ≤ top)
+    (hpc : ∀ t, t ≤ top → σ'.pcAt t = σ.pcAt t) (ha : a ≤ top)
+    (h : relBelowOk ps σ b a) : relBelowOk ps σ' b a := by
+  intro H1 H2 B A va r e0 hb hva he0
+  have hx : (⟨a, B, va⟩ : HEnt) ∈ H1 ++ ⟨a, B, va⟩ :: ⟨r, A, 0⟩ :: e0 :: H2 := by simp
+  rcases hgr b _ hb _ hx with hlt | ⟨H, hH, -⟩
+  · exact absurd ha (Nat.not_le.2 hlt)
+  obtain ⟨N, hN, hNt⟩ := hg b H hH
+  rw [hb] at hN
+  obtain ⟨H1', hH1'⟩ := relPc_split_old N H H1 _ _ hNt ha (Option.some.inj hN).symm
+  have hr : r ≤ top := hle b H ⟨r, A, 0⟩ hH (by rw [hH1']; simp)
+  rw [hpc r hr]
+  exact h H1' H2 B A va r e0 (by rw [hH, hH1']) hva he0
+
+/-- The pc clause at the acquire's own entry, the newest of the history:
+the release directly below it. -/
+theorem relBelowOk_head {ps : List Int} {σ : MState} {b : PAddr} {a r : Nat} {B A : Agent} {va : BitVec 8}
+    {e0 : HEnt} {H2 : Hist} (hb : σ.mem[b]? = some (⟨a, B, va⟩ :: ⟨r, A, 0⟩ :: e0 :: H2))
+    (hlt : ∀ e ∈ (⟨r, A, 0⟩ :: e0 :: H2 : Hist), e.t < a) (hpc : σ.pcAt r ∈ ps) : relBelowOk ps σ b a := by
+  intro H1 H2' B' A' va' r' e0' hb' _ _
+  rw [hb] at hb'
+  have hb'' := Option.some.inj hb'
+  cases H1 with
+  | nil =>
+    simp only [List.nil_append, List.cons.injEq] at hb''
+    obtain ⟨-, h2, -⟩ := hb''
+    have := congrArg HEnt.t h2
+    simp only at this
+    rw [← this]; exact hpc
+  | cons y H1' =>
+    simp only [List.cons_append, List.cons.injEq] at hb''
+    have hmem : (⟨a, B', va'⟩ : HEnt) ∈ (⟨r, A, 0⟩ :: e0 :: H2 : Hist) := by rw [hb''.2]; simp
+    have := hlt _ hmem
+    simp only at this
+    omega
+
+/-- **What a store owes the release sites' provenance**: it is a PLAIN store
+issued at a release pc, or it makes no release entry (on a static lock's byte
+a nonzero byte or one over a zero head) and writes no publication word. -/
+def storeRelOk (rs : List RsvRegion) (ps : List Int) (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
+    (w : BitVec (8 * n)) (excl : Bool) : Prop :=
+  (excl = false ∧ ((((σ.regs cpu) LeanRV64D.Register.PC).toNat : Nat) : Int) ∈ ps) ∨
+  ∀ j, j < n → (lockByteIn rs (pa + BitVec.ofNat 64 j) →
+      nthByte w j ≠ 0 ∨ ∀ (e0 : HEnt) (H : Hist), σ.mem[pa + BitVec.ofNat 64 j]? = some (e0 :: H) → e0.v = 0) ∧
+    ∀ w', (⟨pa + BitVec.ofNat 64 j, .pub w'⟩ : RsvRegion) ∉ rs
+
+/-- A written byte's history, after the store, from its history before. -/
+theorem relPc_written {n : Nat} (m : FlatMem) (pa : PAddr) (w : BitVec (8 * n)) (t : Nat) (h : Agent)
+    (hn : n ≤ 2 ^ 64) {j : Nat} (hj : j < n) :
+    (m.writeBytes pa n w t h)[pa + BitVec.ofNat 64 j]? =
+      some (⟨t, h, nthByte w j⟩ :: m.getD (pa + BitVec.ofNat 64 j) []) := by
+  unfold FlatMem.writeBytes
+  exact foldl_push_at pa w t h (List.range n) (fun x hx => by have := List.mem_range.1 hx; omega)
+    List.nodup_range m j (List.mem_range.2 hj)
+
+theorem relPc_getD {m : FlatMem} {a : PAddr} {e : HEnt} {H : Hist} (h : m.getD a [] = e :: H) :
+    m[a]? = some (e :: H) := by
+  rw [Std.ExtTreeMap.getD_eq_getD_getElem?] at h
+  cases ha : m[a]? with
+  | none => rw [ha] at h; cases h
+  | some H' => rw [ha] at h; simp only [Option.getD_some] at h; rw [h]
+
+/-- **A store keeps the release sites' provenance**, given what it owes. -/
+theorem relPcOk_store {rs : List RsvRegion} {ps : List Int} (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
+    (w : BitVec (8 * n)) (excl : Bool) (hn : n ≤ 2 ^ 64)
+    (hle : ∀ (a : PAddr) (H : Hist) (e : HEnt), σ.mem[a]? = some H → e ∈ H → e.t ≤ σ.top)
+    (hok : storeRelOk rs ps σ cpu pa n w excl) (h : relPcOk rs ps σ) :
+    relPcOk rs ps (σ.store cpu pa n w excl) := by
+  have htop : (σ.store cpu pa n w excl).top = σ.top + 1 := by
+    simp only [MState.top, List.length_append, List.length_singleton]
+  -- a new entry is the written byte's new head
+  have hnewE : ∀ (a : PAddr) (H : Hist) (e : HEnt), (σ.store cpu pa n w excl).mem[a]? = some H → e ∈ H →
+      σ.top < e.t → ∃ j, j < n ∧ a = pa + BitVec.ofNat 64 j ∧
+        H = ⟨σ.top + 1, hartAgent cpu, nthByte w j⟩ :: σ.mem.getD a [] ∧ e = ⟨σ.top + 1, hartAgent cpu, nthByte w j⟩ := by
+    intro a H e hH he hlt
+    by_cases hw : ∃ j, j < n ∧ a = pa + BitVec.ofNat 64 j
+    · obtain ⟨j, hj, rfl⟩ := hw
+      have hH' := relPc_written σ.mem pa w (σ.top + 1) (hartAgent cpu) hn hj
+      rw [show (σ.store cpu pa n w excl).mem = σ.mem.writeBytes pa n w (σ.top + 1) (hartAgent cpu) from rfl,
+        hH'] at hH
+      obtain rfl := Option.some.inj hH
+      refine ⟨j, hj, rfl, rfl, ?_⟩
+      rcases List.mem_cons.1 he with rfl | he'
+      · rfl
+      · exfalso
+        have hg : σ.mem[pa + BitVec.ofNat 64 j]? = some (σ.mem.getD (pa + BitVec.ofNat 64 j) []) := by
+          rw [Std.ExtTreeMap.getD_eq_getD_getElem?]
+          cases hx : σ.mem[pa + BitVec.ofNat 64 j]? with
+          | none => rw [Std.ExtTreeMap.getD_eq_getD_getElem?, hx] at he'; simp at he'
+          | some H0 => rfl
+        have := hle _ _ e hg he'
+        omega
+    · exfalso
+      have hna : ∀ j, j < n → a ≠ pa + BitVec.ofNat 64 j := fun j hj he => hw ⟨j, hj, he⟩
+      rw [show (σ.store cpu pa n w excl).mem = σ.mem.writeBytes pa n w (σ.top + 1) (hartAgent cpu) from rfl,
+        FlatMem.writeBytes_get?_notin _ _ _ _ _ _ hna] at hH
+      have := hle a H e hH he
+      omega
+  have hpcNew : (σ.store cpu pa n w excl).pcAt (σ.top + 1) =
+      (if excl then -1 else ((((σ.regs cpu) LeanRV64D.Register.PC).toNat : Nat) : Int)) := by
+    simp only [MState.store, if_pos]
+  refine relPcOk_step (memGrow_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _))
+    (memGrowR_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _)) hle
+    (fun t ht => by simp only [MState.store]; rw [if_neg (by omega)]) ?_ ?_ h
+  · intro b r A hb hp hr
+    obtain ⟨H1, H2, e0, hbH, hv, -, -⟩ := hp
+    obtain ⟨j, hj, rfl, hH, hx⟩ := hnewE _ _ ⟨r, hartAgent A, 0⟩ hbH (by simp) hr
+    have hrt : r = σ.top + 1 := by have := congrArg HEnt.t hx; simpa using this
+    subst hrt
+    rw [hpcNew]
+    rcases hok with ⟨hex, hpc⟩ | hfree
+    · rw [hex]; simpa using hpc
+    · exfalso
+      -- the pattern's entry is the new head, `e0` the old head
+      cases H1 with
+      | nil =>
+        simp only [List.nil_append] at hH
+        obtain ⟨hhd, htl⟩ := List.cons.inj hH
+        have hz : nthByte w j = 0 := by have := congrArg HEnt.v hhd; simpa using this.symm
+        have hold := relPc_getD htl.symm
+        rcases (hfree j hj).1 hb with hnz | hzero
+        · exact hnz hz
+        · exact hv (hzero e0 H2 hold)
+      | cons y H1' =>
+        simp only [List.cons_append] at hH
+        obtain ⟨-, htl⟩ := List.cons.inj hH
+        have hmem : (⟨σ.top + 1, hartAgent A, 0⟩ : HEnt) ∈ σ.mem.getD (pa + BitVec.ofNat 64 j) [] := by
+          rw [← htl]; simp
+        have hold : σ.mem[pa + BitVec.ofNat 64 j]? = some (σ.mem.getD (pa + BitVec.ofNat 64 j) []) := by
+          rw [Std.ExtTreeMap.getD_eq_getD_getElem?]
+          cases hx : σ.mem[pa + BitVec.ofNat 64 j]? with
+          | none => rw [Std.ExtTreeMap.getD_eq_getD_getElem?, hx] at hmem; simp at hmem
+          | some H0 => rfl
+        have := hle _ _ _ hold hmem
+        simp only at this
+        omega
+  · intro f wv H e hf hH he het
+    obtain ⟨j, hj, rfl, -, rfl⟩ := hnewE _ _ e hH he het
+    rw [hpcNew]
+    rcases hok with ⟨hex, hpc⟩ | hfree
+    · rw [hex]; simpa using hpc
+    · exact absurd hf ((hfree j hj).2 wv)
+
+theorem lockByteIn_rsvBytes {rs : List RsvRegion} {b : PAddr} (h : lockByteIn rs b) : b ∈ rsvBytes rs := by
+  obtain ⟨cb, hR⟩ := h
+  refine List.mem_flatMap.2 ⟨_, hR, ?_⟩
+  simp only [RsvRegion.bytes, RsvRegion.words, wordBytes, List.flatMap_cons, List.flatMap_nil, List.mem_append,
+    List.mem_map, List.mem_range]
+  exact Or.inl ⟨0, by decide, by simp⟩
+
+theorem pubByte_rsvBytes {rs : List RsvRegion} {f : PAddr} {w : CPU} (h : (⟨f, .pub w⟩ : RsvRegion) ∈ rs) :
+    f ∈ rsvBytes rs := by
+  refine List.mem_flatMap.2 ⟨_, h, ?_⟩
+  simp only [RsvRegion.bytes, RsvRegion.words, wordBytes, List.flatMap_cons, List.flatMap_nil, List.mem_append,
+    List.mem_map, List.mem_range]
+  exact Or.inl ⟨0, by decide, by simp⟩
+
+/-- A store off the reserved bytes owes nothing. -/
+theorem storeRelOk_off {rs : List RsvRegion} {ps : List Int} {σ : MState} {cpu : CPU} {pa : PAddr} {n : Nat}
+    {w : BitVec (8 * n)} {excl : Bool} (hnr : ∀ j, j < n → pa + BitVec.ofNat 64 j ∉ rsvBytes rs) :
+    storeRelOk rs ps σ cpu pa n w excl :=
+  Or.inr fun j hj => ⟨fun hb => absurd (lockByteIn_rsvBytes hb) (hnr j hj),
+    fun w' hp => hnr j hj (pubByte_rsvBytes hp)⟩
+
+/-- **A DMA write off the reserved bytes keeps the release sites' provenance.** -/
+theorem relPcOk_storeDma {rs : List RsvRegion} {ps : List Int} (σ : MState) (pa : PAddr) (n : Nat)
+    (w : BitVec (8 * n)) (hn : n ≤ 2 ^ 64)
+    (hle : ∀ (a : PAddr) (H : Hist) (e : HEnt), σ.mem[a]? = some H → e ∈ H → e.t ≤ σ.top)
+    (hnr : ∀ j, j < n → pa + BitVec.ofNat 64 j ∉ rsvBytes rs) (h : relPcOk rs ps σ) :
+    relPcOk rs ps (σ.storeDma pa n w) := by
+  by_cases hn0 : n = 0
+  · rw [MState.storeDma_zero σ pa n w hn0]; exact h
+  rw [MState.storeDma_of_ne σ pa n w hn0]
+  have hnewE : ∀ (a : PAddr) (H : Hist) (e : HEnt),
+      (σ.mem.writeBytes pa n w (σ.top + 1) diskAgent)[a]? = some H → e ∈ H → σ.top < e.t →
+      ∃ j, j < n ∧ a = pa + BitVec.ofNat 64 j := by
+    intro a H e hH he hlt
+    by_cases hw : ∃ j, j < n ∧ a = pa + BitVec.ofNat 64 j
+    · exact hw
+    · exfalso
+      have hna : ∀ j, j < n → a ≠ pa + BitVec.ofNat 64 j := fun j hj he => hw ⟨j, hj, he⟩
+      rw [FlatMem.writeBytes_get?_notin _ _ _ _ _ _ hna] at hH
+      have := hle a H e hH he
+      omega
+  refine relPcOk_step
+    (memGrow_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _))
+    (memGrowR_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _)) hle
+    (fun t ht => by simp only; rw [if_neg (by omega)]) ?_ ?_ h
+  · intro b r A hb hp hr
+    obtain ⟨H1, H2, e0, hbH, -, -, -⟩ := hp
+    obtain ⟨j, hj, rfl⟩ := hnewE _ _ ⟨r, hartAgent A, 0⟩ hbH (by simp) hr
+    exact absurd (lockByteIn_rsvBytes hb) (hnr j hj)
+  · intro f wv H e hf hH he het
+    obtain ⟨j, hj, rfl⟩ := hnewE _ _ e hH he het
+    exact absurd (pubByte_rsvBytes hf) (hnr j hj)
+
+/-- A DRAM footprint is at most the address space (address 0 is not DRAM). -/
+theorem ramBytes_le {pa : PAddr} {n : Nat} (h : ramBytes pa n) : n ≤ 2 ^ 64 := by
+  refine Nat.le_of_not_lt (fun hc => ?_)
+  have hp := pa.isLt
+  have hj : (2 ^ 64 - pa.toNat) % 2 ^ 64 < n := Nat.lt_of_lt_of_le (Nat.mod_lt _ (by decide)) (Nat.le_of_lt hc)
+  have hr := h _ hj
+  have h0 : (pa + BitVec.ofNat 64 ((2 ^ 64 - pa.toNat) % 2 ^ 64)).toNat = 0 := by
+    simp only [BitVec.toNat_add, BitVec.toNat_ofNat]
+    omega
+  unfold inRam at hr
+  rw [h0] at hr
+  have : (0 : Nat) < ramBase := by decide
+  omega
+
+/-- Every history entry is at or below the top (`mmOk`'s `histOk`). -/
+theorem relPc_le_top {σ : MState} (h : ∀ (a : PAddr) (H : Hist), σ.mem[a]? = some H → histOk σ.log H) :
+    ∀ (a : PAddr) (H : Hist) (e : HEnt), σ.mem[a]? = some H → e ∈ H → e.t ≤ σ.top :=
+  fun a H e hH he => ((h a H hH).2 e he).1
+
+/-- **The release sites' provenance at power-on**: the boot image's histories
+are single power-on entries, so no release pattern and no post-power-on
+publication entry. -/
+theorem relPcOk_img {rs : List RsvRegion} {ps : List Int} (σ : MState) (img : Mem) (hm : σ.mem = imgFlat img) :
+    relPcOk rs ps σ := by
+  have hone : ∀ (a : PAddr) (H : Hist), σ.mem[a]? = some H → ∃ v, H = [⟨0, 0, v⟩] := by
+    intro a H hH
+    rw [hm, imgFlat_get?] at hH
+    split at hH
+    · cases hv : img[a]? with
+      | none => rw [hv] at hH; cases hH
+      | some v => rw [hv] at hH; exact ⟨v, (Option.some.inj hH).symm⟩
+    · cases hH
+  refine ⟨fun b r A _ hp => ?_, fun f w H e _ hH he h0 => ?_⟩
+  · obtain ⟨H1, H2, e0, hb, -, -, -⟩ := hp
+    obtain ⟨v, hv⟩ := hone b _ hb
+    have := congrArg List.length hv
+    simp at this
+    omega
+  · obtain ⟨v, rfl⟩ := hone f H hH
+    simp at he
+    rw [he] at h0
+    exact absurd rfl h0
+
+/-- **A store into a word of a reserved region makes no release entry** unless
+it is the lock word's first byte (the caller then shows a nonzero byte or a
+zero head), and writes no publication word unless the region is one. -/
+theorem rsvRelFree_word {rs : List RsvRegion} (hnd : (rsvBytes rs).Nodup) {i k : Nat} {R : RsvRegion}
+    {pa : PAddr} {n : Nat} (hi : rs[i]? = some R) (hk : R.words[k]? = some (pa, n)) (w' : BitVec (8 * n))
+    (Hs : Nat → Hist)
+    (hlock : ∀ cb, R.kind = .lock cb → k = 0 → nthByte w' 0 ≠ 0 ∨ (Hs 0).head?.map HEnt.v = some 0)
+    (hpub : ∀ w, R.kind ≠ .pub w) : rsvRelFree rs pa n w' Hs := by
+  intro j hj
+  have hb : pa + BitVec.ofNat 64 j ∈ R.bytes := mem_regionBytes (List.mem_of_getElem? hk) hj
+  refine ⟨fun ⟨cb, hR'⟩ => ?_, fun w hR' => ?_⟩
+  · have hm := RsvRegion.base_mem (⟨pa + BitVec.ofNat 64 j, .lock cb⟩ : RsvRegion) rfl
+    have heq := rsvByte_region hnd hi hR' hb hm
+    subst heq
+    simp only [RsvRegion.words] at hk
+    cases k with
+    | zero =>
+      simp only [List.getElem?_cons_zero, Option.some.injEq, Prod.mk.injEq] at hk
+      obtain ⟨hpa, rfl⟩ := hk
+      have hj0 : j = 0 := by
+        have := congrArg BitVec.toNat hpa
+        simp only [BitVec.toNat_add, BitVec.toNat_ofNat] at this
+        have := pa.isLt
+        omega
+      subst hj0
+      exact hlock cb rfl rfl
+    | succ k =>
+      cases k with
+      | zero =>
+        exfalso
+        simp only [List.getElem?_cons_succ, List.getElem?_cons_zero, Option.some.injEq, Prod.mk.injEq] at hk
+        obtain ⟨hpa, rfl⟩ := hk
+        have := congrArg BitVec.toNat hpa
+        simp only [BitVec.toNat_add, BitVec.toNat_ofNat] at this
+        have := pa.isLt
+        omega
+      | succ k => simp at hk
+  · have hm := RsvRegion.base_mem (⟨pa + BitVec.ofNat 64 j, .pub w⟩ : RsvRegion) rfl
+    have heq := rsvByte_region hnd hi hR' hb hm
+    exact hpub w (by rw [← heq])
+
 /-- **The dynamic hop registry** (W8 (f2-ctx), [OWN.49] (a′-r), the RULED
 (a′) window [OWN.46] made provable by persistent entry receipts): at memory
 `m` with top `top`, `b` is a hop byte for an acquire at `a ≤ top` when some
@@ -308,6 +753,18 @@ def syncHop (m : FlatMem) (b : PAddr) (A : CPU) (r : Nat) (B : CPU) (a : Nat) : 
   ∃ (H1 H2 : Hist) (e0 : HEnt) (va : BitVec 8),
     m[b]? = some (H1 ++ ⟨a, hartAgent B, va⟩ :: ⟨r, hartAgent A, 0⟩ :: e0 :: H2) ∧ va ≠ 0 ∧ e0.v ≠ 0 ∧
     wordEntAt m b a (hartAgent B) ∧ wordEntAt m b r (hartAgent A) ∧ wordEntAt m b e0.t e0.tid
+
+/-- A hop's release is a release pattern (mcslrec (2)). -/
+theorem relPat_of_syncHop {m : FlatMem} {b : PAddr} {A B : CPU} {r a : Nat} (h : syncHop m b A r B a) :
+    relPat m b r A := by
+  obtain ⟨H1, H2, e0, va, hb, _, he0, _, hwr, hwe⟩ := h
+  exact ⟨H1 ++ [⟨a, hartAgent B, va⟩], H2, e0, by rw [hb]; simp, he0, hwr, hwe⟩
+
+/-- A hop's release, under a pc-checked dynamic lock byte (mcslrec (2)). -/
+theorem relBelowOk_syncHop {ps : List Int} {σ : MState} {b : PAddr} {A B : CPU} {r a : Nat}
+    (h : syncHop σ.mem b A r B a) (hb : relBelowOk ps σ b a) : σ.pcAt r ∈ ps := by
+  obtain ⟨H1, H2, e0, va, hm, hva, he0, -⟩ := h
+  exact hb H1 H2 _ _ va r e0 hm hva he0
 
 /-- **A sync chain** from the entries of author `A` at or below `t` to hart
 `B`, whose last acquire is at `a`. -/
@@ -519,6 +976,31 @@ theorem entKey_ne_cert (pa : PAddr) (e : HEnt) (c : ChainCert) : entKey pa e ≠
   omega
 
 theorem entKey_ne_gate (pa : PAddr) (e : HEnt) (j : CPU) : entKey pa e ≠ gateKey j := by
+  intro h
+  have := (chainPair_inj h).1
+  omega
+
+/-- A PC RECEIPT's key in the ghost map (kind 3; mcslrec (2) [OWN.82] (a1)):
+the store that created position `t` was issued at pc `v` (`MState.pcAt`; a
+position's pc never changes, so a receipt is a past fact of the machine). -/
+def pcKey (t : Nat) (v : BitVec 64) : Nat := chainPair 3 (chainPair t v.toNat)
+
+theorem pcKey_inj {t t' : Nat} {v v' : BitVec 64} (h : pcKey t v = pcKey t' v') : t = t' ∧ v = v' := by
+  obtain ⟨_, h0⟩ := chainPair_inj h
+  obtain ⟨h1, h2⟩ := chainPair_inj h0
+  exact ⟨h1, BitVec.eq_of_toNat_eq h2⟩
+
+theorem pcKey_ne_cert (t : Nat) (v : BitVec 64) (c : ChainCert) : pcKey t v ≠ c.key := by
+  intro h
+  have := (chainPair_inj h).1
+  omega
+
+theorem pcKey_ne_gate (t : Nat) (v : BitVec 64) (j : CPU) : pcKey t v ≠ gateKey j := by
+  intro h
+  have := (chainPair_inj h).1
+  omega
+
+theorem pcKey_ne_ent (t : Nat) (v : BitVec 64) (pa : PAddr) (e : HEnt) : pcKey t v ≠ entKey pa e := by
   intro h
   have := (chainPair_inj h).1
   omega

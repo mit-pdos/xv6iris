@@ -155,7 +155,9 @@ theorem uservec_proof : USERVEC :=
   · iframe Hw Hfr
     iexact Hhw
   icases (show KernelImage.ro ⊢ iprop((kernelText ∗ kernelData ∗ kmapStatic ∗
-      ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static⌝ : IProp GF)) from .rfl) $$ Hro with
+      ⌜MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) = KernelRsv.static ∧
+        (MachFixedGS.kptOk (hlc := hlc) (GF := GF) = KernelRsv.kptOk ∧
+      MachFixedGS.relPcs (hlc := hlc) (GF := GF) = KernelRsv.relPcs)⌝ : IProp GF)) from .rfl) $$ Hro with
     ⟨#Htext, _, #HS, _⟩
   unfold cpuOwn hartCsrs
   icases Hcpu with ⟨Hcells, Hlocks, %s0, Hss⟩

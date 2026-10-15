@@ -21,6 +21,7 @@ import Xv6.KstackMap
 import Xv6.SyscallEnv
 import Xv6.LogBoot
 import Xv6.SpecKvminithart
+import Xv6.KptPlain
 
 namespace Xv6
 
@@ -120,6 +121,9 @@ theorem kctx_kptOn_publish [CurCtx] [Xv6G GF] [FdslotG GF] [BioslotG GF] [Irefsl
         pwordPointsTo kernelPagetableAddr 8 DFrac.discard (pageAddr t.base) ∗ R) := by
   iintro ⟨Hk, Ht, Hauth, Hroot, Hrw, Hpub⟩ %σ ⟨Hmem, Hmm⟩
   icases kctx_rsvEq cpu k $$ Hk with ⟨%heqR, Hk⟩
+  icases kctx_kptOkEq cpu k $$ Hk with ⟨%heqK, Hk⟩
+  have hkok : MachFixedGS.kptOk (hlc := hlc) (GF := GF) (kptSlots kernelPagetableAddr t) := by
+    rw [heqK]; exact xv6KptOk_of hok
   have hra : (⟨kernelPagetableAddr, .roots 1 8⟩ : RsvRegion) ∈ MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) := by
     rw [heqR]; exact xv6RsvStatic_kptRoot
   have hroots : ∀ (base : PAddr) (cnt stride : Nat),
@@ -134,7 +138,7 @@ theorem kctx_kptOn_publish [CurCtx] [Xv6G GF] [FdslotG GF] [BioslotG GF] [Irefsl
   ihave Hrw := (show wordPointsTo (GF := GF) kernelPagetableAddr 8 (DFrac.own 1) (pageAddr t.base) ⊢
       wordPointsTo kernelPagetableAddr 8 (DFrac.own 1) (pteAddr t.base 0#9) from .rfl) $$ Hrw
   ihave Hseal := kptOn_seal cpu t (kvmMapT pas) r0 hct (kvmTableOk_kptFacts_tramp t pas hok) kernelPagetableAddr hra
-    hroots R $$ [Hctx Hents Hrw Hauth Hroot Hpub]
+    hroots hkok R $$ [Hctx Hents Hrw Hauth Hroot Hpub]
   · iframe Hctx Hents Hrw Hauth Hroot Hpub
   imod Hseal $$ %σ [Hmem Hmm] with ⟨Hmem, Hmm, Hctx, #Hkpt, Hrp, HR⟩
   · iframe Hmem Hmm

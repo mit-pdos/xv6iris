@@ -374,9 +374,9 @@ theorem releaseWpd3 :
         held sdlkRule kt)
       (wp_s_fence_rw_w := wFence3 i cid cpu γm γp γn σi T satp0 hmode hasid hppn Cond
         Htext Hflow Hloc G HG held kt)
-      (wp_s_sw_zero_release_gen := wSwfin3 i cid cpu γm γp γn σi T satp0 hmode hasid hppn
+      (wp_s_sw_zero_release_gen := AxLeafS5.relLeafOfFree (wSwfin3 i cid cpu γm γp γn σi T satp0 hmode hasid hppn
         Cond CondGate3 Htext Hflow Hloc G HG dreg damo Hdmap payAt payOk lockOpenable lockedPre
-        lockCtxHeld held swlkRule kt)) :=
+        lockCtxHeld held swlkRule kt))) :=
   AxLeafS5.wpReleaseGen (GF := GF) (Pay := Pay)
     (Goal := goalW3 i cid cpu γm γp γn T satp0 Cond)
     (kctx := kctxW3 γm γn held kt) (pcIs := pcW3 γp) (instr := instrW3 σi T satp0)
@@ -389,9 +389,9 @@ theorem releaseWpd3 :
       held sdlkRule kt)
     (wp_s_fence_rw_w := wFence3 i cid cpu γm γp γn σi T satp0 hmode hasid hppn Cond
       Htext Hflow Hloc G HG held kt)
-    (wp_s_sw_zero_release_gen := wSwfin3 i cid cpu γm γp γn σi T satp0 hmode hasid hppn
+    (wp_s_sw_zero_release_gen := AxLeafS5.relLeafOfFree (wSwfin3 i cid cpu γm γp γn σi T satp0 hmode hasid hppn
       Cond CondGate3 Htext Hflow Hloc G HG dreg damo Hdmap payAt payOk lockOpenable lockedPre
-      lockCtxHeld held swlkRule kt)
+      lockCtxHeld held swlkRule kt))
 
 omit [GhostVarG GF RegMap] [GhostVarG GF (BitVec 64 × Bool)] [GhostVarG GF Nat] in
 /-- Rocq `CondP_gate3_wpd`: `CondGate3` DISCHARGED at the pure model. -/

@@ -14,8 +14,9 @@ mapping of the table `kvmmake` returns; `PROGRESS-dataOk.md`).
   PTE_R | PTE_W)`), and the 64 process kernel stacks `kstackVpn i ↦ pas i` `R|W`
   (`proc_mapstacks`).  `kptKernelAt_of : kptTreeStateOk σ → ∃ pas, kptMapsAt σ (kvmMapK pas)`.
 
-The gap is `KptTextIdent`'s: `kptTreeStateOk` is not at the export (the MachCSL record keeps the
-sealed slots existentially).  FAITHFUL: facts of xv6's table.  Helpers are `Xv6.KptMapIdent.*`.
+`kptTreeStateOk` itself is not at the export; mcslrec (1) [OWN.99] exports the maps in plain
+addresses (`AccessDiscipline.kptMapsExp`) and `Xv6.kptMapsAt_ofExp` gives `kptMapsAt σ (kvmMapK
+pas)` from it.  FAITHFUL: facts of xv6's table.  Helpers are `Xv6.KptMapIdent.*`.
 -/
 import Xv6.KptTextIdent
 

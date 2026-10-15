@@ -1224,7 +1224,8 @@ becomes the built table's slots at the top, the leaves registered. -/
 theorem memModel_kptRegister [CurCtx] (σ : MState) (hmm : mmOk σ) (t : PTree) (ra : PAddr)
     (hra : (⟨ra, .roots 1 8⟩ : RsvRegion) ∈ rsvList (hlc := hlc) (GF := GF))
     (hnd : ((t.entries 2).map Prod.fst).Nodup)
-    (hseal : kptSealOk (rsvList (hlc := hlc) (GF := GF)) σ.mem σ.top σ.top (kptSlots ra t)) :
+    (hseal : kptSealOk (rsvList (hlc := hlc) (GF := GF)) σ.mem σ.top σ.top (kptSlots ra t))
+    (hkok : MachFixedGS.kptOk (hlc := hlc) (GF := GF) (kptSlots ra t)) :
     genHeapInterp σ.mem ∗ memModel σ ∗ ctxBytes curCtx ra 8 (DFrac.own 1) (pteAddr t.base 0#9) ∗
       ([∗list] e ∈ t.entries 2, kslotCellAt (MachGS.era (hlc := hlc) (GF := GF)) σ.top ⟨e.1, e.2, !pteLeafB e.2⟩)
       ⊢@{IProp GF} |==> (genHeapInterp σ.mem ∗ memModel σ ∗
@@ -1235,7 +1236,7 @@ theorem memModel_kptRegister [CurCtx] (σ : MState) (hmm : mmOk σ) (t : PTree) 
   -- the record is empty: an earlier seal would hold the root word's discarded byte
   rcases hseal0 with ⟨rfl, _⟩ | hs0
   rotate_left
-  · obtain ⟨d, hd, hda, _, _, _⟩ := hs0.2.2.2.1 ra 1 8 0 hra (by decide)
+  · obtain ⟨d, hd, hda, _, _, _⟩ := hs0.1.2.2.2.1 ra 1 8 0 hra (by decide)
     obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 hd
     icases (BigSepL.bigSepL_lookup_acc (Φ := fun _ d => kslotCellAt (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) S0 d)
       hi).1 $$ Hcells0 with ⟨Hc, _⟩
@@ -1301,11 +1302,11 @@ theorem memModel_kptRegister [CurCtx] (σ : MState) (hmm : mmOk σ) (t : PTree) 
       fun k i hk hg => by rw [hlt k hk] at hg; exact hex k i hk hg
     isplit
     · ipureintro
-      exact ⟨hin', hex', reservedOk_of_all hex' (all_of_reservedOk hin hok)⟩
+      exact ⟨hin', hex', reservedOk_of_all hex' (all_of_reservedOk hin hok.1), hok.2⟩
     iexists σ.top, (kptSlots ra t)
     isplit
     · ipureintro
-      refine ⟨⟨fun k v hv hk hk2 => ?_, fun v _ => List.cons_ne_nil _ _⟩, Or.inr hseal⟩
+      refine ⟨⟨fun k v hv hk hk2 => ?_, fun v _ => List.cons_ne_nil _ _⟩, Or.inr ⟨hseal, hkok⟩⟩
       rw [Iris.Std.LawfulPartialMap.get?_insert_ne (by omega)] at hv
       rcases h2 k v hv with h | ⟨e, he, hl, rfl, rfl⟩
       · obtain ⟨d, hd, _⟩ := hlk.1 _ _ h hk hk2; cases hd
@@ -1340,6 +1341,7 @@ theorem kptOn_seal [CurCtx] (cpu : CPU) (t : PTree) (M : RegMapF (BitVec 64)) (r
     (hra : (⟨ra, .roots 1 8⟩ : RsvRegion) ∈ MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))
     (hroots : ∀ (base : PAddr) (cnt stride : Nat),
       (⟨base, .roots cnt stride⟩ : RsvRegion) ∈ MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) → base = ra ∧ cnt = 1)
+    (hkok : MachFixedGS.kptOk (hlc := hlc) (GF := GF) (kptSlots ra t))
     (R : IProp GF) :
     ownCtx (GF := GF) cpu curCtx ∗
       ([∗list] e ∈ t.entries 2, wordPointsTo e.1 8 (DFrac.own 1) e.2) ∗
@@ -1374,7 +1376,7 @@ theorem kptOn_seal [CurCtx] (cpu : CPU) (t : PTree) (M : RegMapF (BitVec 64)) (r
     with ⟨Hmem, Hmm, %⟨hnrE, hfl⟩, Hbody, #Hptrs, Hks⟩
   have hseal := KptInv.kptSealOk_of (rsvList (hlc := hlc) (GF := GF)) σ.mem σ.top t hf.1 ra hroots hpub hnrR hnrE
   -- the registration: the root word frozen, every slot shared, the leaves registered
-  imod memModel_kptRegister σ hmm t ra hra (PTree.entries_addr_nodup 2 t hf.2.1) hseal
+  imod memModel_kptRegister σ hmm t ra hra (PTree.entries_addr_nodup 2 t hf.2.1) hseal hkok
     $$ [$Hmem $Hmm $Hb $Hks] with ⟨Hmem, Hmm, #Hbd, #Hregs, #Hsl⟩
   icases histBytes_keys_of_wordBytes ra 8 DFrac.discard (pteAddr t.base 0#9) $$ Hbd
     with ⟨%Hr, %fr, #Hrh, %hrt, _⟩

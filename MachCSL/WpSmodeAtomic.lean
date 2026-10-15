@@ -230,6 +230,84 @@ macro "store_file_S_au_proof" lem:ident va:term:max n:num spl:term:max : tactic 
     iapply HΦ $$ HmConf HPC HnextPC [Htrans Hfrag HF HΨ]
     iframe))
 
+set_option hygiene false in
+/-- `store_file_S_au_proof` lending the hart's `PC` cell to the accessor
+(mcslrec (2)): a release store's reserved arm shows its issuing pc. -/
+macro "store_file_S_au_pc_proof" lem:ident va:term:max n:num spl:term:max : tactic =>
+  `(tactic| (
+    intro Φ
+    iintro ⟨HmConf, HPC, HnextPC, ⟨HT, #Hcl, HF, HAUw⟩, HΦ⟩
+    have hva := is_aligned_vaddr_of $va $n hal
+    have hsplit := $spl
+    have hlt := inRam_lt38 _ _ hram
+    have hlt' := inRam_lt _ _ hram
+    have hpin := tierPin_id curTier $va hlt'
+    have hok' : SConfPhys (GF := GF) c sie := hok.phys
+    obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok'
+    obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
+    have hok' : SConfPhys (GF := GF) c sie := hok.phys
+    have hpma := matching_pma_ram $va $n hram (by decide) (by decide)
+    have hclint := within_clint_ram $va $n hram
+    have halign := is_aligned_paddr_of $va $n (by decide) hal
+    conf_cases HmConf
+    unfold execute
+    swp_run 60
+    iapply swp_bind
+    iapply swp_rX_file
+    iframe
+    iintro HF
+    swp_run 60
+    iapply swp_bind
+    iapply swp_rX_file
+    iframe
+    iintro HF
+    swp_run 150
+    iapply swp_bind
+    conf_intro HmConf
+    iapply (swp_transform_effective_address_S cpu dq c sie curTier root hok _ _ (Or.inr (Or.inr (Or.inl rfl))))
+    iframe HmConf
+    inext
+    iintro HmConf
+    conf_cases HmConf
+    swp_run 100
+    iapply swp_bind
+    conf_intro HmConf
+    iapply (swp_translationMode_tier cpu dq c sie curTier root hok)
+    iframe HmConf
+    inext
+    iintro HmConf
+    conf_cases HmConf
+    swp_run 100
+    iapply swp_bind
+    conf_intro HmConf
+    unfold transTok
+    icases HT with ⟨Htrans, Htok⟩
+    iapply (swp_translateAddr_tier cpu dq c sie curTier root hok _ hlt _ (Or.inr (Or.inr (Or.inl rfl))) (idPpn (vpnOf $va)) .rw rfl hpin)
+    iframe HmConf Hcl Htrans Htok
+    iintro HmConf Htrans Htok
+    rw [paOf_id $va hlt']
+    conf_cases HmConf
+    swp_run 40
+    iapply swp_bind
+    iapply (hpmp cpu dq _ $n _ _ (by simp [kernelAccess]) (pmpOk_of_inRam hram))
+    iframe
+    inext
+    iintro Hpmpcfg_n Hpmpaddr_n
+    swp_run 100
+    iapply swp_bind
+    conf_intro HmConf
+    icases ctxTok_cases cpu curCtx $$ Htok with ⟨Hctx, %r, Hfrag⟩
+    ispecialize HAUw $$ Hctx HPC
+    iapply ($lem:ident (hok := hok') (hram := hram) (hal := hal) (Ψ := iprop(Register.PC ↦ᵣ[cpu] pc ∗ Ψ)) (r := r))
+    iframe HmConf Hfrag HAUw
+    inext
+    iintro HmConf Hfrag ⟨HPC, HΨ⟩
+    conf_cases HmConf
+    swp_run 30
+    conf_intro HmConf
+    iapply HΦ $$ HmConf HPC HnextPC [Htrans Hfrag HF HΨ]
+    iframe))
+
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 /-- `sw rs2, imm(rs1)` into an accessor's 4-aligned RAM word. -/
@@ -244,6 +322,25 @@ theorem execSpecF_sw_au [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Boo
         (ownCtx cpu curCtx -∗ writeAU cpu (RegMap.get R rs1 + BitVec.signExtend 64 imm) 4 (BitVec.extractLsb' 0 32 (RegMap.get R rs2)) Ψ))
       iprop(transSlotAt cpu curTier root ∗ resvFrag cpu none false ∗ gprFile cpu R ∗ Ψ) := by
   store_file_S_au_proof swp_checked_mem_write_store4_S_au (RegMap.get R rs1 + BitVec.signExtend 64 imm) 4 (split_on_page_boundary_4 (RegMap.get R rs1 + BitVec.signExtend 64 imm) hal)
+
+set_option maxHeartbeats 4000000 in
+set_option maxRecDepth 100000 in
+/-- `sw rs2, imm(rs1)` into an accessor's 4-aligned RAM word, the accessor
+borrowing the hart's `PC` cell (mcslrec (2) [OWN.82] (a1): a release store
+shows its issuing pc to the reserved arm). -/
+theorem execSpecF_sw_au_pc [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
+    (root : BitVec 44) (hok : SConfAt (GF := GF) curTier c root sie)
+    (pc npc₀ : BitVec 64) (imm : BitVec 12) (rs1 rs2 : BitVec 5) (R : RegMap) (Ψ : IProp GF)
+    (hram : inRam (RegMap.get R rs1 + BitVec.signExtend 64 imm) 4)
+    (hal : (RegMap.get R rs1 + BitVec.signExtend 64 imm).toNat % 4 = 0) :
+    execSpecPP (GF := GF) cpu dq Privilege.Supervisor c Privilege.Supervisor c
+      (instruction.STORE (imm, regidx.Regidx rs2, regidx.Regidx rs1, 4)) pc npc₀ npc₀
+      iprop(transTok cpu curTier root ∗ kmapId (RegMap.get R rs1 + BitVec.signExtend 64 imm) ∗ gprFile cpu R ∗
+        (ownCtx cpu curCtx -∗ Register.PC ↦ᵣ[cpu] pc -∗
+          writeAU cpu (RegMap.get R rs1 + BitVec.signExtend 64 imm) 4 (BitVec.extractLsb' 0 32 (RegMap.get R rs2))
+            iprop(Register.PC ↦ᵣ[cpu] pc ∗ Ψ)))
+      iprop(transSlotAt cpu curTier root ∗ resvFrag cpu none false ∗ gprFile cpu R ∗ Ψ) := by
+  store_file_S_au_pc_proof swp_checked_mem_write_store4_S_au (RegMap.get R rs1 + BitVec.signExtend 64 imm) 4 (split_on_page_boundary_4 (RegMap.get R rs1 + BitVec.signExtend 64 imm) hal)
 
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in

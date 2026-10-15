@@ -350,12 +350,29 @@ def slotWit (rs : List RsvRegion) (L : List (PAddr × HEnt)) (b : PAddr) (te : N
     L = (List.range 8).map (fun j =>
       (base + BitVec.ofNat 64 (stride * k) + BitVec.ofNat 64 j, (⟨te, g, nthByte (n := 8) b j⟩ : HEnt)))
 
+/-- A sealed slot: its (doubleword-aligned) address, its canonical value,
+and whether it is frozen (the root word, a pointer, an empty entry) or a
+leaf. -/
+structure KSlot where
+  addr : PAddr
+  c : BitVec 64
+  frozen : Bool
+  deriving DecidableEq
+
 /-- **The client's static reserved regions** (the `KernelMap.static`
 pattern): reserved at the `PowerOn` mint, from timestamp 0, never released
 (W8 (f2-ctx) [OWN.49] (a′-r): with its dynamic-lock slots, `.slots`). -/
 class KernelRsv where
   static : List RsvRegion
   wf : rsvWf static
+  /-- THE SEALED KERNEL TABLE'S SHAPE (mcslrec (1) [OWN.99]): what the client
+  promises of the slots it seals (`MachCSL.kptModelAt` keeps it), a fact of
+  the slots alone. -/
+  kptOk : List KSlot → Prop
+  /-- THE RELEASE SITES (mcslrec (2) [OWN.82] (a1)): the pcs of the client's
+  release stores -- every release entry of a static spinlock and every
+  publication entry is a plain store issued at one of them. -/
+  relPcs : List Int
 
 /-! ## Membership facts -/
 
@@ -428,6 +445,15 @@ theorem wordHistAt_congr {m m' : FlatMem} {pa : PAddr} {n : Nat} {W : WordHist n
     (hw : wordHistAt m pa n W Hold) : wordHistAt m' pa n W Hold :=
   ⟨fun j hj => (h j hj).trans (hw.1 j hj), hw.2⟩
 
+
+/-- **A reserved byte names its region**: in a byte-distinct list, a byte of
+region `R` (at index `i`) that is a byte of a listed region `R'` is `R`'s. -/
+theorem rsvByte_region {rs : List RsvRegion} (hnd : (rsvBytes rs).Nodup) {i : Nat} {R R' : RsvRegion}
+    (hi : rs[i]? = some R) (hR' : R' ∈ rs) {a : PAddr} (ha : a ∈ R.bytes) (ha' : a ∈ R'.bytes) : R' = R := by
+  obtain ⟨i', hi'⟩ := List.mem_iff_getElem?.1 hR'
+  by_cases hii : i = i'
+  · subst hii; rw [hi] at hi'; exact (Option.some.inj hi').symm
+  · exact absurd ha' (rsvBytes_disjoint hnd hi hi' hii a ha)
 /-- A region's discipline reads only the region's bytes. -/
 theorem regionOk_congr {m m' : FlatMem} {R : RsvRegion}
     (h : ∀ a ∈ R.bytes, m'[a]? = m[a]?) (hR : regionOk m R) : regionOk m' R := by
@@ -611,14 +637,6 @@ A/D, anything else exactly. -/
 def pteVariant (c v : BitVec 64) : Prop :=
   v = c ∨ ∃ (ppn : BitVec 44) (perm : KPerm) (a d a' d' : BitVec 1), c = kLeaf ppn perm a d ∧ v = kLeaf ppn perm a' d'
 
-/-- A sealed slot: its (doubleword-aligned) address, its canonical value,
-and whether it is frozen (the root word, a pointer, an empty entry) or a
-leaf. -/
-structure KSlot where
-  addr : PAddr
-  c : BitVec 64
-  frozen : Bool
-  deriving DecidableEq
 
 /-- The eight histories `Hs` hold the doubleword `v` as of position `t`
 (`MachCSL.wordAsOf` on histories). -/

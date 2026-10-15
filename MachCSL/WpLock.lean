@@ -1333,6 +1333,7 @@ theorem wp_s_amoswap_lock_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
           · unfold compBytes; iapply BigSepL.bigSepL_singleton.2; iexact HbW
           isplitr
           · ipureintro
+            refine ⟨?_, lkRsv_relFreeW hm _ _ (Or.inl (by decide))⟩
             exact lkRsv_storeOkW hm cpu _ W2 W2' Hold2 HoldW htail2 htailW (fun t ht =>
               ⟨some (cpu, false), t, lockWordAt_take W2 t cpu, lkCpuAt_take hst2.2 cpu,
                 lockRsvW_take hx2.2 (by omega) cpu⟩)
@@ -1394,6 +1395,7 @@ theorem wp_s_amoswap_lock_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
           · unfold compBytes; iapply BigSepL.bigSepL_singleton.2; iexact HbW
           isplitr
           · ipureintro
+            refine ⟨?_, lkRsv_relFreeW hm _ _ (Or.inl (by decide))⟩
             exact lkRsv_storeOkW hm cpu _ W2 W2' Hold2 HoldW htail2 htailW (fun t ht => by
               obtain ⟨⟨i, b⟩, hp⟩ := Option.ne_none_iff_exists'.1 hheld
               subst hp
@@ -1755,7 +1757,7 @@ theorem wp_s_sd_lkcpu_acquire_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
         iapply fupd_mask_intro LawfulSet.empty_subset
         iintro Hmask
         iright
-        iexists W'.hist Hold, [(lk, 4, W.hist HoldW)], none
+        iexists W'.hist Hold, [(lk, 4, W.hist HoldW)], none, none
         iframe Hb
         isplitl [HbW]
         · unfold compBytes; iapply BigSepL.bigSepL_singleton.2; iexact HbW
@@ -1764,8 +1766,12 @@ theorem wp_s_sd_lkcpu_acquire_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
           exact lkRsv_storeOkC hm cpu _ W W' HoldW Hold htailW htail (fun t ht => ⟨some (cpu, true), B0, hst.1, lkCpuAt_set hst.2 t, lockRsvW_set hx.2 (by omega)⟩)
         isplitr
         · simp only [rtIn]; iempintro
+        isplitr
+        · unfold rsvPcCell; iempintro
+        isplitr
+        · ipureintro; exact lkRsv_relFreeC hm _ _
         inext
-        iintro %t %ht Hb HbW #Hau #Htop _
+        iintro %t %ht Hb HbW _ _ #Hau #Htop _
         unfold compBytes
         ihave HbW := BigSepL.bigSepL_singleton.1 $$ HbW
         ihave Hw := wordCellH_intro lk 4 W HoldW htailW $$ HbW
@@ -1972,7 +1978,7 @@ theorem wp_s_sd_zero_lkcpu_release_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = fa
         iapply fupd_mask_intro LawfulSet.empty_subset
         iintro Hmask
         iright
-        iexists W'.hist Hold, [(lk, 4, W.hist HoldW)], none
+        iexists W'.hist Hold, [(lk, 4, W.hist HoldW)], none, none
         iframe Hb
         isplitl [HbW]
         · unfold compBytes; iapply BigSepL.bigSepL_singleton.2; iexact HbW
@@ -1981,8 +1987,12 @@ theorem wp_s_sd_zero_lkcpu_release_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = fa
           exact lkRsv_storeOkC hm cpu _ W W' HoldW Hold htailW htail (fun t ht => ⟨some (cpu, false), B0, hst.1, lkCpuAt_clear hst.2 t, lockRsvW_clear hx.2 (by omega)⟩)
         isplitr
         · simp only [rtIn]; iempintro
+        isplitr
+        · unfold rsvPcCell; iempintro
+        isplitr
+        · ipureintro; exact lkRsv_relFreeC hm _ _
         inext
-        iintro %t %ht Hb HbW #Hau #Htop _
+        iintro %t %ht Hb HbW _ _ #Hau #Htop _
         unfold compBytes
         ihave HbW := BigSepL.bigSepL_singleton.1 $$ HbW
         ihave Hw := wordCellH_intro lk 4 W HoldW htailW $$ HbW
@@ -2143,7 +2153,8 @@ context and moved into the lock's; `s` leaves the held set. -/
 theorem wp_s_sw_zero_release_hook (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rs1 : BitVec 5)
     (γ : GName) (lk : BitVec 64) (s : String) (R Rin : CtxId → IProp GF) [CtxMorph Rin]
-    (haddr : k.rget cpu rs1 + BitVec.signExtend 64 imm = lk) :
+    (haddr : k.rget cpu rs1 + BitVec.signExtend 64 imm = lk)
+    (hrel : ((pc.toNat : Nat) : Int) ∈ MachFixedGS.relPcs (hlc := hlc) (GF := GF)) :
     instr (GF := GF) pc is_rvc (instruction.STORE (imm, regidx.Regidx 0#5, regidx.Regidx rs1, 4)) ∗
     kctxL lent cpu k ∗ pcIs cpu pc ∗ isLock γ lk s R ∗ lockedPre γ cpu ∗ lockCtxHeld ∗ Rin curCtx ∗ lockCtxHook R Rin ∗
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
@@ -2175,7 +2186,7 @@ theorem wp_s_sw_zero_release_hook (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
       iintro ⟨HmConf, HPC, HnextPC, ⟨HT, HF, Hlocks, #Hlk, Hlp, Hheld, HR, Hhook⟩, HΦ⟩
       icases isLock_cases_rsv γ lk s R hm $$ Hlk with ⟨%_, #Hcl, #Hcl', ⟨%lo, %lc, %Vb, #Hinv, #Hflo, #Hflc, #Hvf, #Hgf⟩⟩
       icases lockedPre_cases γ cpu $$ Hlp with ⟨%B0, Hhalf0, #HflB⟩
-      have e := execSpecF_sw_au (GF := GF) cpu (DFrac.own 1) c false k.root hok' pc (pc + instrLen is_rvc) imm rs1 0#5
+      have e := execSpecF_sw_au_pc (GF := GF) cpu (DFrac.own 1) c false k.root hok' pc (pc + instrLen is_rvc) imm rs1 0#5
         (tpPin cpu k.regs) iprop(ownCtx cpu curCtx ∗ lockSet cpu (k.locks.filter (fun x => x ≠ s)) ∗ ⌜s ∈ k.locks⌝)
         hram hal
       simp only [KCtx.rget] at haddr
@@ -2185,7 +2196,7 @@ theorem wp_s_sw_zero_release_hook (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
       iapply (e Φ)
       iframe HmConf HPC HnextPC HT HF Hcl
       isplitl [Hlocks Hhalf0 Hheld HR Hhook]
-      · iintro Hctx
+      · iintro Hctx HPC
         unfold writeAU
         imod lock_pay_stamp cpu R Rin $$ [$Hctx $Hheld $HR $Hhook] with ⟨Hctx, ⟨%ξL, %T, %V, %g, Hst, HRL, #Hc⟩⟩
         icases ctxStamped_rtList ξL T V g cpu $$ [Hst Hc] with ⟨Hst, #Hl⟩
@@ -2207,7 +2218,7 @@ theorem wp_s_sw_zero_release_hook (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
         iintro Hmask
         obtain ⟨e0, W2, hW, he0⟩ := lockWordAt_held_head hst.1
         iright
-        iexists W.hist Hold, [(lk + 16#64, 8, W'.hist HoldW)], some (cpus.map (fun h => (h, V h)))
+        iexists W.hist Hold, [(lk + 16#64, 8, W'.hist HoldW)], some (cpus.map (fun h => (h, V h))), some pc
         iframe Hb
         isplitl [HbW]
         · unfold compBytes; iapply BigSepL.bigSepL_singleton.2; iexact HbW
@@ -2216,14 +2227,23 @@ theorem wp_s_sw_zero_release_hook (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
           exact lkRsv_storeOkW hm cpu _ W W' Hold HoldW htail htailW (fun t ht => ⟨none, B0, lockWordAt_release W B0 t (hartAgent cpu), lkCpuAt_free hst.2, lockRsvW_release hx.2 (by omega)⟩)
         isplitr
         · simp only [rtIn]; iexact Hl
+        isplitl [HPC]
+        · unfold rsvPcCell; iexact HPC
+        isplitr
+        · ipureintro; exact hrel
         inext
-        iintro %t %ht Hb HbW #Hau #Htop Hout
+        iintro %t %ht Hb HbW HPC #Hrc #Hau #Htop Hout
+        ihave #Hrr : relRcpt t $$ [Hrc]
+        · unfold relRcpt; iexists pc
+          isplit
+          · iapply (show pcRcptO (GF := GF) t (some pc) ⊢ pcRcpt t pc from .rfl) $$ Hrc
+          · ipureintro; exact hrel
         unfold compBytes
         ihave HbW := BigSepL.bigSepL_singleton.1 $$ HbW
         ihave Hc := wordCellH_intro (lk + 16#64) 8 W' HoldW htailW $$ HbW
         simp only [rtOut]
         ihave Hpay := lockPay_release R W Vb ξL T V g cpu t e0 W2 hW he0 $$ [Hst HRL Hout]
-        · iframe Hst HRL Hout
+        · iframe Hst HRL Hrr Hout
         imod lockHalf_update γ _ _ none B0 B0 B0 $$ [$Hhalf $Hhalf0] with ⟨Hhalf, Hhalf0⟩
         imod lockSet_delete cpu k.locks s $$ [$Hlocks $Hfr] with Hlocks
         imod Hmask
@@ -2247,7 +2267,8 @@ theorem wp_s_sw_zero_release_hook (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
             ipureintro; rfl
         imod Hcl
         imodintro
-        iframe Hctx Hlocks
+        unfold rsvPcCell
+        iframe HPC Hctx Hlocks
         ipureintro; exact hmem
       · inext
         iintro HmConf HPC HnextPC ⟨Htrans, Hfrag, HF, Hctx, Hlocks, %hmem⟩
@@ -2297,7 +2318,7 @@ theorem wp_s_sw_zero_release_hook (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
       iintro ⟨HmConf, HPC, HnextPC, ⟨HT, HF, Hlocks, #Hlk, Hlp, Hheld, HR, Hhook⟩, HΦ⟩
       icases isLock_cases_dyn γ lk s R hm $$ Hlk with ⟨%_, #Hcl, #Hcl', ⟨%lo, %lc, %Vb, #Hinv, #Hflo, #Hflc, #Hvf, #Hgf⟩⟩
       icases lockedPre_cases γ cpu $$ Hlp with ⟨%B0, Hhalf0, #HflB⟩
-      have e := execSpecF_sw_au (GF := GF) cpu (DFrac.own 1) c false k.root hok' pc (pc + instrLen is_rvc) imm rs1 0#5
+      have e := execSpecF_sw_au_pc (GF := GF) cpu (DFrac.own 1) c false k.root hok' pc (pc + instrLen is_rvc) imm rs1 0#5
         (tpPin cpu k.regs) iprop(ownCtx cpu curCtx ∗ lockSet cpu (k.locks.filter (fun x => x ≠ s)) ∗ ⌜s ∈ k.locks⌝)
         hram hal
       simp only [KCtx.rget] at haddr
@@ -2307,7 +2328,7 @@ theorem wp_s_sw_zero_release_hook (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
       iapply (e Φ)
       iframe HmConf HPC HnextPC HT HF Hcl
       isplitl [Hlocks Hhalf0 Hheld HR Hhook]
-      · iintro Hctx
+      · iintro Hctx HPC
         unfold writeAU
         imod lock_pay_stamp cpu R Rin $$ [$Hctx $Hheld $HR $Hhook] with ⟨Hctx, ⟨%ξL, %T, %V, %g, Hst, HRL, #Hc⟩⟩
         icases ctxStamped_rtList ξL T V g cpu $$ [Hst Hc] with ⟨Hst, #Hl⟩
@@ -2329,12 +2350,19 @@ theorem wp_s_sw_zero_release_hook (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
         iintro Hmask
         obtain ⟨e0, W2, hW, he0⟩ := lockWordAt_held_head hst.1
         ileft
-        iexists W.hist Hold, some (cpus.map (fun h => (h, V h))), M
+        iexists W.hist Hold, some (cpus.map (fun h => (h, V h))), M, some pc
         iframe Hb HM
         isplitr
         · simp only [rtIn]; iexact Hl
+        isplitl [HPC]
+        · unfold rsvPcCell; iexact HPC
         inext
-        iintro %t %hte Hb #Hau #Htop Hout
+        iintro %t %hte Hb HPC #Hrc #Hau #Htop Hout
+        ihave #Hrr : relRcpt t $$ [Hrc]
+        · unfold relRcpt; iexists pc
+          isplit
+          · iapply (show pcRcptO (GF := GF) t (some pc) ⊢ pcRcpt t pc from .rfl) $$ Hrc
+          · ipureintro; exact hrel
         ihave Hnm := Lock.lkDynRegW_intro lk lo lc none _ W' Ld te t
           (lkDynF_push4 hf (e := ⟨t, hartAgent cpu, 0#32⟩) (by show M < t; omega)
             (lockDiscWin_of ⟨lockWordAt_release W B0 t (hartAgent cpu), lkCpuAt_free hst.2⟩ (lockDynW_release hd t)))
@@ -2342,7 +2370,7 @@ theorem wp_s_sw_zero_release_hook (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
         · iframe Hreg Htop
         simp only [rtOut]
         ihave Hpay := lockPay_release R W Vb ξL T V g cpu t e0 W2 hW he0 $$ [Hst HRL Hout]
-        · iframe Hst HRL Hout
+        · iframe Hst HRL Hrr Hout
         imod lockHalf_update γ _ _ none B0 B0 B0 $$ [$Hhalf $Hhalf0] with ⟨Hhalf, Hhalf0⟩
         imod lockSet_delete cpu k.locks s $$ [$Hlocks $Hfr] with Hlocks
         imod Hmask
@@ -2362,7 +2390,8 @@ theorem wp_s_sw_zero_release_hook (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
           ipureintro; rfl
         imod Hcl
         imodintro
-        iframe Hctx Hlocks
+        unfold rsvPcCell
+        iframe HPC Hctx Hlocks
         ipureintro; exact hmem
       · inext
         iintro HmConf HPC HnextPC ⟨Htrans, Hfrag, HF, Hctx, Hlocks, %hmem⟩
@@ -2399,7 +2428,8 @@ theorem wp_s_sw_zero_release_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rs1 : BitVec 5)
     (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF) [CtxMorph R]
     (D : IProp GF) [Timeless D] (Tc : IProp GF) (hrefute : ⊢ Tc -∗ D -∗ (False : IProp GF))
-    (haddr : k.rget cpu rs1 + BitVec.signExtend 64 imm = lk) :
+    (haddr : k.rget cpu rs1 + BitVec.signExtend 64 imm = lk)
+    (hrel : ((pc.toNat : Nat) : Int) ∈ MachFixedGS.relPcs (hlc := hlc) (GF := GF)) :
     instr (GF := GF) pc is_rvc (instruction.STORE (imm, regidx.Regidx 0#5, regidx.Regidx rs1, 4)) ∗
     kctxL lent cpu k ∗ pcIs cpu pc ∗ lockOpenable γ lk s R D ∗ Tc ∗ lockedPre γ cpu ∗ lockCtxHeld ∗ R curCtx ∗
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
@@ -2431,7 +2461,7 @@ theorem wp_s_sw_zero_release_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
       iintro ⟨HmConf, HPC, HnextPC, ⟨HT, HF, Hlocks, #Hlk, Hcred, Hlp, Hheld, HR⟩, HΦ⟩
       icases lockOpenable_cases_rsv γ lk s R D hm $$ Hlk with ⟨%_, #Hcl, #Hcl', ⟨%lo, %lc, %Vb, #Hinv, #Hflo, #Hflc, #Hvf, #Hgf⟩⟩
       icases lockedPre_cases γ cpu $$ Hlp with ⟨%B0, Hhalf0, #HflB⟩
-      have e := execSpecF_sw_au (GF := GF) cpu (DFrac.own 1) c false k.root hok' pc (pc + instrLen is_rvc) imm rs1 0#5
+      have e := execSpecF_sw_au_pc (GF := GF) cpu (DFrac.own 1) c false k.root hok' pc (pc + instrLen is_rvc) imm rs1 0#5
         (tpPin cpu k.regs) iprop(ownCtx cpu curCtx ∗ lockSet cpu (k.locks.filter (fun x => x ≠ s)) ∗ ⌜s ∈ k.locks⌝ ∗ Tc)
         hram hal
       simp only [KCtx.rget] at haddr
@@ -2441,7 +2471,7 @@ theorem wp_s_sw_zero_release_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
       iapply (e Φ)
       iframe HmConf HPC HnextPC HT HF Hcl
       isplitl [Hlocks Hhalf0 Hheld HR Hcred]
-      · iintro Hctx
+      · iintro Hctx HPC
         unfold writeAU
         imod lock_pay_stamp0 cpu R $$ [$Hctx $Hheld $HR] with ⟨Hctx, ⟨%ξL, %T, %V, %g, Hst, HRL, #Hc⟩⟩
         icases ctxStamped_rtList ξL T V g cpu $$ [Hst Hc] with ⟨Hst, #Hl⟩
@@ -2466,7 +2496,7 @@ theorem wp_s_sw_zero_release_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
         iintro Hmask
         obtain ⟨e0, W2, hW, he0⟩ := lockWordAt_held_head hst.1
         iright
-        iexists W.hist Hold, [(lk + 16#64, 8, W'.hist HoldW)], some (cpus.map (fun h => (h, V h)))
+        iexists W.hist Hold, [(lk + 16#64, 8, W'.hist HoldW)], some (cpus.map (fun h => (h, V h))), some pc
         iframe Hb
         isplitl [HbW]
         · unfold compBytes; iapply BigSepL.bigSepL_singleton.2; iexact HbW
@@ -2475,14 +2505,23 @@ theorem wp_s_sw_zero_release_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
           exact lkRsv_storeOkW hm cpu _ W W' Hold HoldW htail htailW (fun t ht => ⟨none, B0, lockWordAt_release W B0 t (hartAgent cpu), lkCpuAt_free hst.2, lockRsvW_release hx.2 (by omega)⟩)
         isplitr
         · simp only [rtIn]; iexact Hl
+        isplitl [HPC]
+        · unfold rsvPcCell; iexact HPC
+        isplitr
+        · ipureintro; exact hrel
         inext
-        iintro %t %ht Hb HbW #Hau #Htop Hout
+        iintro %t %ht Hb HbW HPC #Hrc #Hau #Htop Hout
+        ihave #Hrr : relRcpt t $$ [Hrc]
+        · unfold relRcpt; iexists pc
+          isplit
+          · iapply (show pcRcptO (GF := GF) t (some pc) ⊢ pcRcpt t pc from .rfl) $$ Hrc
+          · ipureintro; exact hrel
         unfold compBytes
         ihave HbW := BigSepL.bigSepL_singleton.1 $$ HbW
         ihave Hc := wordCellH_intro (lk + 16#64) 8 W' HoldW htailW $$ HbW
         simp only [rtOut]
         ihave Hpay := lockPay_release R W Vb ξL T V g cpu t e0 W2 hW he0 $$ [Hst HRL Hout]
-        · iframe Hst HRL Hout
+        · iframe Hst HRL Hrr Hout
         imod lockHalf_update γ _ _ none B0 B0 B0 $$ [$Hhalf $Hhalf0] with ⟨Hhalf, Hhalf0⟩
         imod lockSet_delete cpu k.locks s $$ [$Hlocks $Hfr] with Hlocks
         imod Hmask
@@ -2507,7 +2546,8 @@ theorem wp_s_sw_zero_release_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
             ipureintro; rfl
         imod Hcl
         imodintro
-        iframe Hctx Hlocks Hcred
+        unfold rsvPcCell
+        iframe HPC Hctx Hlocks Hcred
         ipureintro; exact hmem
       · inext
         iintro HmConf HPC HnextPC ⟨Htrans, Hfrag, HF, Hctx, Hlocks, %hmem, Hcred⟩
@@ -2557,7 +2597,7 @@ theorem wp_s_sw_zero_release_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
       iintro ⟨HmConf, HPC, HnextPC, ⟨HT, HF, Hlocks, #Hlk, Hcred, Hlp, Hheld, HR⟩, HΦ⟩
       icases lockOpenable_cases_dyn γ lk s R D hm $$ Hlk with ⟨%_, #Hcl, #Hcl', ⟨%lo, %lc, %Vb, #Hinv, #Hflo, #Hflc, #Hvf, #Hgf⟩⟩
       icases lockedPre_cases γ cpu $$ Hlp with ⟨%B0, Hhalf0, #HflB⟩
-      have e := execSpecF_sw_au (GF := GF) cpu (DFrac.own 1) c false k.root hok' pc (pc + instrLen is_rvc) imm rs1 0#5
+      have e := execSpecF_sw_au_pc (GF := GF) cpu (DFrac.own 1) c false k.root hok' pc (pc + instrLen is_rvc) imm rs1 0#5
         (tpPin cpu k.regs) iprop(ownCtx cpu curCtx ∗ lockSet cpu (k.locks.filter (fun x => x ≠ s)) ∗ ⌜s ∈ k.locks⌝ ∗ Tc)
         hram hal
       simp only [KCtx.rget] at haddr
@@ -2567,7 +2607,7 @@ theorem wp_s_sw_zero_release_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
       iapply (e Φ)
       iframe HmConf HPC HnextPC HT HF Hcl
       isplitl [Hlocks Hhalf0 Hheld HR Hcred]
-      · iintro Hctx
+      · iintro Hctx HPC
         unfold writeAU
         imod lock_pay_stamp0 cpu R $$ [$Hctx $Hheld $HR] with ⟨Hctx, ⟨%ξL, %T, %V, %g, Hst, HRL, #Hc⟩⟩
         icases ctxStamped_rtList ξL T V g cpu $$ [Hst Hc] with ⟨Hst, #Hl⟩
@@ -2592,12 +2632,19 @@ theorem wp_s_sw_zero_release_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
         iintro Hmask
         obtain ⟨e0, W2, hW, he0⟩ := lockWordAt_held_head hst.1
         ileft
-        iexists W.hist Hold, some (cpus.map (fun h => (h, V h))), M
+        iexists W.hist Hold, some (cpus.map (fun h => (h, V h))), M, some pc
         iframe Hb HM
         isplitr
         · simp only [rtIn]; iexact Hl
+        isplitl [HPC]
+        · unfold rsvPcCell; iexact HPC
         inext
-        iintro %t %hte Hb #Hau #Htop Hout
+        iintro %t %hte Hb HPC #Hrc #Hau #Htop Hout
+        ihave #Hrr : relRcpt t $$ [Hrc]
+        · unfold relRcpt; iexists pc
+          isplit
+          · iapply (show pcRcptO (GF := GF) t (some pc) ⊢ pcRcpt t pc from .rfl) $$ Hrc
+          · ipureintro; exact hrel
         ihave Hnm := Lock.lkDynRegW_intro lk lo lc none _ W' Ld te t
           (lkDynF_push4 hf (e := ⟨t, hartAgent cpu, 0#32⟩) (by show M < t; omega)
             (lockDiscWin_of ⟨lockWordAt_release W B0 t (hartAgent cpu), lkCpuAt_free hst.2⟩ (lockDynW_release hd t)))
@@ -2605,7 +2652,7 @@ theorem wp_s_sw_zero_release_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
         · iframe Hreg Htop
         simp only [rtOut]
         ihave Hpay := lockPay_release R W Vb ξL T V g cpu t e0 W2 hW he0 $$ [Hst HRL Hout]
-        · iframe Hst HRL Hout
+        · iframe Hst HRL Hrr Hout
         imod lockHalf_update γ _ _ none B0 B0 B0 $$ [$Hhalf $Hhalf0] with ⟨Hhalf, Hhalf0⟩
         imod lockSet_delete cpu k.locks s $$ [$Hlocks $Hfr] with Hlocks
         imod Hmask
@@ -2626,7 +2673,8 @@ theorem wp_s_sw_zero_release_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
           ipureintro; rfl
         imod Hcl
         imodintro
-        iframe Hctx Hlocks Hcred
+        unfold rsvPcCell
+        iframe HPC Hctx Hlocks Hcred
         ipureintro; exact hmem
       · inext
         iintro HmConf HPC HnextPC ⟨Htrans, Hfrag, HF, Hctx, Hlocks, %hmem, Hcred⟩
@@ -3365,7 +3413,7 @@ theorem wp_s_sd_zero_lkcpu_release_refute (cpu : CPU) (k : KCtx) (hsie : k.sie =
         iapply fupd_mask_intro LawfulSet.empty_subset
         iintro Hmask
         iright
-        iexists W'.hist Hold, [(lk, 4, W.hist HoldW)], none
+        iexists W'.hist Hold, [(lk, 4, W.hist HoldW)], none, none
         iframe Hb
         isplitl [HbW]
         · unfold compBytes; iapply BigSepL.bigSepL_singleton.2; iexact HbW
@@ -3374,8 +3422,12 @@ theorem wp_s_sd_zero_lkcpu_release_refute (cpu : CPU) (k : KCtx) (hsie : k.sie =
           exact lkRsv_storeOkC hm cpu _ W W' HoldW Hold htailW htail (fun t ht => ⟨some (cpu, false), B0, hst.1, lkCpuAt_clear hst.2 t, lockRsvW_clear hx.2 (by omega)⟩)
         isplitr
         · simp only [rtIn]; iempintro
+        isplitr
+        · unfold rsvPcCell; iempintro
+        isplitr
+        · ipureintro; exact lkRsv_relFreeC hm _ _
         inext
-        iintro %t %ht Hb HbW #Hau #Htop _
+        iintro %t %ht Hb HbW _ _ #Hau #Htop _
         unfold compBytes
         ihave HbW := BigSepL.bigSepL_singleton.1 $$ HbW
         ihave Hw := wordCellH_intro lk 4 W HoldW htailW $$ HbW
@@ -3517,7 +3569,8 @@ theorem wp_s_sw_zero_release_refute (cpu : CPU) (k : KCtx) (hsie : k.sie = false
     (γ : GName) (lk : BitVec 64) (s : String) (R : CtxId → IProp GF) [CtxMorph R]
     (D : IProp GF) [Timeless D]
     (hrefute : ∀ B : Nat, ⊢ lockHalf γ (some (cpu, false)) B -∗ D -∗ (False : IProp GF))
-    (haddr : k.rget cpu rs1 + BitVec.signExtend 64 imm = lk) :
+    (haddr : k.rget cpu rs1 + BitVec.signExtend 64 imm = lk)
+    (hrel : ((pc.toNat : Nat) : Int) ∈ MachFixedGS.relPcs (hlc := hlc) (GF := GF)) :
     instr (GF := GF) pc is_rvc (instruction.STORE (imm, regidx.Regidx 0#5, regidx.Regidx rs1, 4)) ∗
     kctxL lent cpu k ∗ pcIs cpu pc ∗ lockOpenable γ lk s R D ∗ lockedPre γ cpu ∗ lockCtxHeld ∗ R curCtx ∗
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
@@ -3549,7 +3602,7 @@ theorem wp_s_sw_zero_release_refute (cpu : CPU) (k : KCtx) (hsie : k.sie = false
       iintro ⟨HmConf, HPC, HnextPC, ⟨HT, HF, Hlocks, #Hlk, Hlp, Hheld, HR⟩, HΦ⟩
       icases lockOpenable_cases_rsv γ lk s R D hm $$ Hlk with ⟨%_, #Hcl, #Hcl', ⟨%lo, %lc, %Vb, #Hinv, #Hflo, #Hflc, #Hvf, #Hgf⟩⟩
       icases lockedPre_cases γ cpu $$ Hlp with ⟨%B0, Hhalf0, #HflB⟩
-      have e := execSpecF_sw_au (GF := GF) cpu (DFrac.own 1) c false k.root hok' pc (pc + instrLen is_rvc) imm rs1 0#5
+      have e := execSpecF_sw_au_pc (GF := GF) cpu (DFrac.own 1) c false k.root hok' pc (pc + instrLen is_rvc) imm rs1 0#5
         (tpPin cpu k.regs) iprop(ownCtx cpu curCtx ∗ lockSet cpu (k.locks.filter (fun x => x ≠ s)) ∗ ⌜s ∈ k.locks⌝)
         hram hal
       simp only [KCtx.rget] at haddr
@@ -3559,7 +3612,7 @@ theorem wp_s_sw_zero_release_refute (cpu : CPU) (k : KCtx) (hsie : k.sie = false
       iapply (e Φ)
       iframe HmConf HPC HnextPC HT HF Hcl
       isplitl [Hlocks Hhalf0 Hheld HR]
-      · iintro Hctx
+      · iintro Hctx HPC
         unfold writeAU
         imod lock_pay_stamp0 cpu R $$ [$Hctx $Hheld $HR] with ⟨Hctx, ⟨%ξL, %T, %V, %g, Hst, HRL, #Hc⟩⟩
         icases ctxStamped_rtList ξL T V g cpu $$ [Hst Hc] with ⟨Hst, #Hl⟩
@@ -3584,7 +3637,7 @@ theorem wp_s_sw_zero_release_refute (cpu : CPU) (k : KCtx) (hsie : k.sie = false
         iintro Hmask
         obtain ⟨e0, W2, hW, he0⟩ := lockWordAt_held_head hst.1
         iright
-        iexists W.hist Hold, [(lk + 16#64, 8, W'.hist HoldW)], some (cpus.map (fun h => (h, V h)))
+        iexists W.hist Hold, [(lk + 16#64, 8, W'.hist HoldW)], some (cpus.map (fun h => (h, V h))), some pc
         iframe Hb
         isplitl [HbW]
         · unfold compBytes; iapply BigSepL.bigSepL_singleton.2; iexact HbW
@@ -3593,14 +3646,23 @@ theorem wp_s_sw_zero_release_refute (cpu : CPU) (k : KCtx) (hsie : k.sie = false
           exact lkRsv_storeOkW hm cpu _ W W' Hold HoldW htail htailW (fun t ht => ⟨none, B0, lockWordAt_release W B0 t (hartAgent cpu), lkCpuAt_free hst.2, lockRsvW_release hx.2 (by omega)⟩)
         isplitr
         · simp only [rtIn]; iexact Hl
+        isplitl [HPC]
+        · unfold rsvPcCell; iexact HPC
+        isplitr
+        · ipureintro; exact hrel
         inext
-        iintro %t %ht Hb HbW #Hau #Htop Hout
+        iintro %t %ht Hb HbW HPC #Hrc #Hau #Htop Hout
+        ihave #Hrr : relRcpt t $$ [Hrc]
+        · unfold relRcpt; iexists pc
+          isplit
+          · iapply (show pcRcptO (GF := GF) t (some pc) ⊢ pcRcpt t pc from .rfl) $$ Hrc
+          · ipureintro; exact hrel
         unfold compBytes
         ihave HbW := BigSepL.bigSepL_singleton.1 $$ HbW
         ihave Hc := wordCellH_intro (lk + 16#64) 8 W' HoldW htailW $$ HbW
         simp only [rtOut]
         ihave Hpay := lockPay_release R W Vb ξL T V g cpu t e0 W2 hW he0 $$ [Hst HRL Hout]
-        · iframe Hst HRL Hout
+        · iframe Hst HRL Hrr Hout
         imod lockHalf_update γ _ _ none B0 B0 B0 $$ [$Hhalf $Hhalf0] with ⟨Hhalf, Hhalf0⟩
         imod lockSet_delete cpu k.locks s $$ [$Hlocks $Hfr] with Hlocks
         imod Hmask
@@ -3625,7 +3687,8 @@ theorem wp_s_sw_zero_release_refute (cpu : CPU) (k : KCtx) (hsie : k.sie = false
             ipureintro; rfl
         imod Hcl
         imodintro
-        iframe Hctx Hlocks
+        unfold rsvPcCell
+        iframe HPC Hctx Hlocks
         ipureintro; exact hmem
       · inext
         iintro HmConf HPC HnextPC ⟨Htrans, Hfrag, HF, Hctx, Hlocks, %hmem⟩
@@ -3675,7 +3738,7 @@ theorem wp_s_sw_zero_release_refute (cpu : CPU) (k : KCtx) (hsie : k.sie = false
       iintro ⟨HmConf, HPC, HnextPC, ⟨HT, HF, Hlocks, #Hlk, Hlp, Hheld, HR⟩, HΦ⟩
       icases lockOpenable_cases_dyn γ lk s R D hm $$ Hlk with ⟨%_, #Hcl, #Hcl', ⟨%lo, %lc, %Vb, #Hinv, #Hflo, #Hflc, #Hvf, #Hgf⟩⟩
       icases lockedPre_cases γ cpu $$ Hlp with ⟨%B0, Hhalf0, #HflB⟩
-      have e := execSpecF_sw_au (GF := GF) cpu (DFrac.own 1) c false k.root hok' pc (pc + instrLen is_rvc) imm rs1 0#5
+      have e := execSpecF_sw_au_pc (GF := GF) cpu (DFrac.own 1) c false k.root hok' pc (pc + instrLen is_rvc) imm rs1 0#5
         (tpPin cpu k.regs) iprop(ownCtx cpu curCtx ∗ lockSet cpu (k.locks.filter (fun x => x ≠ s)) ∗ ⌜s ∈ k.locks⌝)
         hram hal
       simp only [KCtx.rget] at haddr
@@ -3685,7 +3748,7 @@ theorem wp_s_sw_zero_release_refute (cpu : CPU) (k : KCtx) (hsie : k.sie = false
       iapply (e Φ)
       iframe HmConf HPC HnextPC HT HF Hcl
       isplitl [Hlocks Hhalf0 Hheld HR]
-      · iintro Hctx
+      · iintro Hctx HPC
         unfold writeAU
         imod lock_pay_stamp0 cpu R $$ [$Hctx $Hheld $HR] with ⟨Hctx, ⟨%ξL, %T, %V, %g, Hst, HRL, #Hc⟩⟩
         icases ctxStamped_rtList ξL T V g cpu $$ [Hst Hc] with ⟨Hst, #Hl⟩
@@ -3710,12 +3773,19 @@ theorem wp_s_sw_zero_release_refute (cpu : CPU) (k : KCtx) (hsie : k.sie = false
         iintro Hmask
         obtain ⟨e0, W2, hW, he0⟩ := lockWordAt_held_head hst.1
         ileft
-        iexists W.hist Hold, some (cpus.map (fun h => (h, V h))), M
+        iexists W.hist Hold, some (cpus.map (fun h => (h, V h))), M, some pc
         iframe Hb HM
         isplitr
         · simp only [rtIn]; iexact Hl
+        isplitl [HPC]
+        · unfold rsvPcCell; iexact HPC
         inext
-        iintro %t %hte Hb #Hau #Htop Hout
+        iintro %t %hte Hb HPC #Hrc #Hau #Htop Hout
+        ihave #Hrr : relRcpt t $$ [Hrc]
+        · unfold relRcpt; iexists pc
+          isplit
+          · iapply (show pcRcptO (GF := GF) t (some pc) ⊢ pcRcpt t pc from .rfl) $$ Hrc
+          · ipureintro; exact hrel
         ihave Hnm := Lock.lkDynRegW_intro lk lo lc none _ W' Ld te t
           (lkDynF_push4 hf (e := ⟨t, hartAgent cpu, 0#32⟩) (by show M < t; omega)
             (lockDiscWin_of ⟨lockWordAt_release W B0 t (hartAgent cpu), lkCpuAt_free hst.2⟩ (lockDynW_release hd t)))
@@ -3723,7 +3793,7 @@ theorem wp_s_sw_zero_release_refute (cpu : CPU) (k : KCtx) (hsie : k.sie = false
         · iframe Hreg Htop
         simp only [rtOut]
         ihave Hpay := lockPay_release R W Vb ξL T V g cpu t e0 W2 hW he0 $$ [Hst HRL Hout]
-        · iframe Hst HRL Hout
+        · iframe Hst HRL Hrr Hout
         imod lockHalf_update γ _ _ none B0 B0 B0 $$ [$Hhalf $Hhalf0] with ⟨Hhalf, Hhalf0⟩
         imod lockSet_delete cpu k.locks s $$ [$Hlocks $Hfr] with Hlocks
         imod Hmask
@@ -3744,7 +3814,8 @@ theorem wp_s_sw_zero_release_refute (cpu : CPU) (k : KCtx) (hsie : k.sie = false
           ipureintro; rfl
         imod Hcl
         imodintro
-        iframe Hctx Hlocks
+        unfold rsvPcCell
+        iframe HPC Hctx Hlocks
         ipureintro; exact hmem
       · inext
         iintro HmConf HPC HnextPC ⟨Htrans, Hfrag, HF, Hctx, Hlocks, %hmem⟩

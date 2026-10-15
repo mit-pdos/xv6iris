@@ -154,11 +154,56 @@ theorem xv6RsvStatic_wf : rsvWf xv6RsvStatic :=
 
 
 
+/-! ## The sealed kernel table's shape, in plain addresses (mcslrec (1) [OWN.99])
+
+What `kvmmake` builds and `main` seals (`Xv6.KptBoot`), stated of the sealed
+slots with explicit addresses and bit fields only: the root word
+`kernel_pagetable` holds the root page; for each of the kernel's mappings
+(`kMapP`: the text `0x80000000 ..< 0x80007000` identity `R|X`, the rest of RAM
+`..< 0x88000000` identity `R|W`, and the 64 kernel stacks `R|W` at some pages
+`pas i`) the Sv39 walk's level-2 and level-1 slots are frozen pointers and the
+level-0 slot is the leaf, at some A/D. -/
+
+/-- Slot `i` of the page whose PPN is `b`: the address `b · 4096 + 8 · i`. -/
+def kSlotP (b : BitVec 44) (i : Nat) : PAddr := (BitVec.setWidth 64 b <<< 12) + BitVec.ofNat 64 (8 * i)
+
+/-- The Sv39 index of the virtual page `vpn` at level `l`: its bits `9l .. 9l+8`. -/
+def kIdxP (vpn : BitVec 27) (l : Nat) : Nat := vpn.toNat / 2 ^ (9 * l) % 512
+
+/-- **The kernel's walked mappings** (`kvmmake`, kernel/vm.c): the text pages
+`0x80000 ..< 0x80007` identity `R|X`, the rest of RAM `0x80007 ..< 0x88000`
+identity `R|W`, and the 64 kernel stacks at `0x3FFFFFF - 2(i+1)` (`KSTACK(i)`,
+a guard page between) onto the pages `pas i`, `R|W`. -/
+def kMapP (pas : Nat → BitVec 44) (vpn : BitVec 27) (ppn : BitVec 44) (perm : KPerm) : Prop :=
+  (0x80000 ≤ vpn.toNat ∧ vpn.toNat < 0x80007 ∧ ppn = BitVec.setWidth 44 vpn ∧ perm = KPerm.rx) ∨
+  (0x80007 ≤ vpn.toNat ∧ vpn.toNat < 0x88000 ∧ ppn = BitVec.setWidth 44 vpn ∧ perm = KPerm.rw) ∨
+  (∃ i, i < 64 ∧ vpn = BitVec.ofNat 27 (0x3FFFFFF - 2 * (i + 1)) ∧ ppn = pas i ∧ perm = KPerm.rw)
+
+/-- **xv6's sealed slots** (`KernelRsv.kptOk`): the root word's frozen slot names
+the root page `b`; every kernel mapping's walk is two frozen pointer slots and
+a leaf slot. -/
+def xv6KptOk (dyn : List KSlot) : Prop :=
+  ∃ (pas : Nat → BitVec 44) (b : BitVec 44), (⟨KA.«kernel_pagetable», kSlotP b 0, true⟩ : KSlot) ∈ dyn ∧
+    ∀ (vpn : BitVec 27) (ppn : BitVec 44) (perm : KPerm), kMapP pas vpn ppn perm →
+      ∃ (b1 b0 : BitVec 44) (a d : BitVec 1),
+        (⟨kSlotP b (kIdxP vpn 2), kPtr b1, true⟩ : KSlot) ∈ dyn ∧
+        (⟨kSlotP b1 (kIdxP vpn 1), kPtr b0, true⟩ : KSlot) ∈ dyn ∧
+        (⟨kSlotP b0 (kIdxP vpn 0), kLeaf ppn perm a d, false⟩ : KSlot) ∈ dyn
+
+/-- **xv6's release sites** (mcslrec (2) [OWN.82] (a1)): `release+0x1a`, the
+`sw zero, 0(s1)` that frees a spinlock (`__sync_lock_release`), and
+`main+0xb0`, the `sw` of `started = 1`. -/
+def xv6RelPcs : List Int :=
+  [(MachCSL.KernelSyms.«release» : Int) + 0x1a, (MachCSL.KernelSyms.«main» : Int) + 0xb0]
+
 /-- xv6's static reserved regions, as the machine's class (with its dynamic
-spinlocks' registration slots, `xv6PipeSlotsR`). -/
+spinlocks' registration slots, `xv6PipeSlotsR`), and its sealed kernel table's
+shape. -/
 instance : KernelRsv where
   static := xv6RsvStatic
   wf := xv6RsvStatic_wf
+  kptOk := xv6KptOk
+  relPcs := xv6RelPcs
 
 /-- The pipe slots are registered. -/
 theorem xv6RsvStatic_pipeSlots : xv6PipeSlotsR ∈ xv6RsvStatic := by decide +kernel

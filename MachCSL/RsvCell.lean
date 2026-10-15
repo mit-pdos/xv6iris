@@ -32,13 +32,21 @@ of static region `i`, and any store of `w` there by `cpu` keeps the region's
 discipline. -/
 def rsvWordOk (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : Prop :=
   ∃ (i k : Nat) (R : RsvRegion), (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))[i]? = some R ∧
-    R.words[k]? = some (pa, n) ∧ (∀ w', R.kind ≠ .pub w') ∧
+    R.words[k]? = some (pa, n) ∧ (∀ w', R.kind ≠ .pub w') ∧ (∀ cb, R.kind ≠ .lock cb) ∧
     ∀ (m : FlatMem) (t : Nat), 0 < t → regionOk m R → regionOk (m.writeBytes pa n w t (hartAgent cpu)) R
 
 theorem rsvWordOk_storeOk (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (Hs : Nat → Hist)
     (h : rsvWordOk (hlc := hlc) (GF := GF) cpu pa n w) : rsvStoreOk (hlc := hlc) (GF := GF) cpu pa n w Hs [] := by
-  obtain ⟨i, k, R, hi, hk, hnp, hp⟩ := h
+  obtain ⟨i, k, R, hi, hk, hnp, -, hp⟩ := h
   exact ⟨i, k, R, hi, hk, hnp, fun m t ht _ _ hR => hp m t ht hR⟩
+
+/-- ...and it makes no release entry. -/
+theorem rsvWordOk_relFree (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (Hs : Nat → Hist)
+    (h : rsvWordOk (hlc := hlc) (GF := GF) cpu pa n w) :
+    rsvRelFree (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) pa n w Hs := by
+  obtain ⟨i, k, R, hi, hk, hnp, hnl, -⟩ := h
+  exact rsvRelFree_word (MachFixedGS.rsvStatic_wf (hlc := hlc) (GF := GF)).1 hi hk w Hs
+    (fun cb hc => absurd hc (hnl cb)) hnp
 
 theorem aCpuProc_eq [KernelGeom] (cpu : CPU) : aCpuProc cpu = cpuAddr cpu := by
   unfold aCpuProc procOff; simp
@@ -50,7 +58,8 @@ theorem cpuCellOk_wordOk [KernelGeom] {cpu : CPU} {va : PAddr} {n : Nat}
     rsvWordOk (hlc := hlc) (GF := GF) cpu va n w := by
   obtain ⟨⟨i, hi⟩, hw⟩ := h
   obtain ⟨k, hk⟩ := List.mem_iff_getElem?.1 hw
-  exact ⟨i, k, _, hi, hk, fun _ h => RsvKind.noConfusion h, fun m t _ hR => cpuRegion_store rfl m _ n w t hR⟩
+  exact ⟨i, k, _, hi, hk, fun _ h => RsvKind.noConfusion h, fun _ h => RsvKind.noConfusion h,
+    fun m t _ hR => cpuRegion_store rfl m _ n w t hR⟩
 
 /-- The three cells are words of the region. -/
 theorem cpuWords_mem [KernelGeom] (cpu : CPU) :
@@ -99,14 +108,18 @@ theorem ctxBytes_writeAURsv [CurCtx] (cpu : CPU) (pa : PAddr) (n : Nat) (w0 w : 
   icases histBytes_of_wordBytes curCtx pa n (DFrac.own (1 : Qp).half) w0 $$ Hb with ⟨%Hs, Hb⟩
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
-  iexists Hs, []
+  iexists Hs, [], none
   iframe Hb
   isplitr
   · unfold compBytes; iempintro
   isplit
   · ipureintro; exact rsvWordOk_storeOk cpu pa n w Hs hok
+  isplitr
+  · unfold rsvPcCell; iempintro
+  isplit
+  · ipureintro; exact rsvWordOk_relFree cpu pa n w Hs hok
   inext
-  iintro %t %_ Hb _ #Hau #Htop
+  iintro %t %_ Hb _ _ #Hau #Htop
   imod Hmask
   imod ctx_key_mint cpu curCtx t $$ [Hctx Hau Htop] with ⟨Hctx, #Hkey⟩
   · iframe Hctx

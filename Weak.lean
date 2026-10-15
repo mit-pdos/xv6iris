@@ -658,6 +658,7 @@ import Weak.PinDataflowGlue
 import Weak.RvwmoXv6Adequacy
 import Weak.RelSiteProv
 import Weak.RelSiteProvPc
+import Weak.RelSiteProvExp
 import Weak.WbPrimedArm
 import Weak.PinRelArmTab
 import Weak.PinRelArmStore

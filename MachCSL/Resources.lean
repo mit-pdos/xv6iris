@@ -400,6 +400,13 @@ class MachFixedGS (hlc : outParam HasLC) (GF : BundledGFunctors) where
   rsvStatic : List RsvRegion
   /-- ...byte-distinct image bytes (`rsvWf`). -/
   rsvStatic_wf : rsvWf rsvStatic
+  /-- THE SEALED KERNEL TABLE'S SHAPE (mcslrec (1) [OWN.99]): the client's
+  `KernelRsv.kptOk`, filled by `bootFixedGS`; the sealed record
+  (`MachCSL.kptModelAt`) keeps it of the slots it registered. -/
+  kptOk : List KSlot → Prop
+  /-- THE RELEASE SITES (mcslrec (2) [OWN.82] (a1)): the client's
+  `KernelRsv.relPcs`, filled by `bootFixedGS` (`MachCSL.relPcOk`). -/
+  relPcs : List Int
 
 attribute [reducible, instance] MachFixedGS.reg
 attribute [reducible, instance] MachFixedGS.memPre
@@ -1056,10 +1063,12 @@ def pubByteIn (rs : List RsvRegion) (f : PAddr) (w : CPU) : Prop :=
 /-- What the certificates of a machine state are checked against: the hop
 registry is the static lock bytes, or (time-indexed [R35.1]; [OWN.49] (a′-r))
 a live dynamic lock whose witness `wit` the state's memory holds
-(`dynLkAt`). -/
-def chainEnvAt (rs : List RsvRegion) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop) (σ : MState) :
-    ChainEnv :=
-  ⟨σ.mem, fun j => (σ.hr j).coh, fun b a => lockByteIn rs b ∨ dynLkAt wit σ.mem σ.top b a, pubByteIn rs⟩
+(`dynLkAt`) and whose release under the acquire was issued at a pc of `ps`
+(`relBelowOk`, mcslrec (2) [OWN.82] (a1)). -/
+def chainEnvAt (rs : List RsvRegion) (ps : List Int) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop)
+    (σ : MState) : ChainEnv :=
+  ⟨σ.mem, fun j => (σ.hr j).coh,
+    fun b a => lockByteIn rs b ∨ (dynLkAt wit σ.mem σ.top b a ∧ relBelowOk ps σ b a), pubByteIn rs⟩
 
 /-- **The certificate map's invariant**: every certificate key names a valid
 certificate, every gate key a hart past the gate, every entry key (W8
@@ -1125,22 +1134,38 @@ theorem certsOk_insertEnt {X : ChainEnv} {Z : RegMapF Agent} (h : certsOk X Z)
     · rw [LawfulPartialMap.get?_insert_ne hk] at he'
       exact h.2.2 pa' e' he'
 
+/-- Inserting a pc receipt's key keeps the certificates valid (it is none
+of their keys). -/
+theorem certsOk_insertPc {X : ChainEnv} {Z : RegMapF Agent} (h : certsOk X Z) (t : Nat) (v : BitVec 64)
+    (x : Agent) : certsOk X (Iris.Std.PartialMap.insert Z (pcKey t v) x) := by
+  refine ⟨fun c hc => ?_, fun j hj => ?_, fun pa e he => ?_⟩
+  · rw [LawfulPartialMap.get?_insert_ne (fun e => pcKey_ne_cert t v c e)] at hc
+    exact h.1 c hc
+  · rw [LawfulPartialMap.get?_insert_ne (fun e => pcKey_ne_gate t v j e)] at hj
+    exact h.2.1 j hj
+  · rw [LawfulPartialMap.get?_insert_ne (fun e' => pcKey_ne_ent t v pa e e')] at he
+    exact h.2.2 pa e he
+
 /-- A machine state whose memory is unchanged and whose coherence floors are
 unchanged has the same certificate environment. -/
-theorem chainEnvAt_congr (rs : List RsvRegion) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop) {σ σ' : MState}
+theorem chainEnvAt_congr (rs : List RsvRegion) (ps : List Int) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop) {σ σ' : MState}
     (h : σ'.mem = σ.mem) (hl : σ'.log = σ.log)
-    (hc : ∀ (j : CPU) (a : PAddr), (σ'.hr j).coh a = (σ.hr j).coh a) :
-    chainEnvAt rs wit σ' = chainEnvAt rs wit σ := by
-  unfold chainEnvAt MState.top
-  rw [h, hl]
+    (hc : ∀ (j : CPU) (a : PAddr), (σ'.hr j).coh a = (σ.hr j).coh a) (hp : σ'.pcAt = σ.pcAt) :
+    chainEnvAt rs ps wit σ' = chainEnvAt rs ps wit σ := by
+  have ht : σ'.top = σ.top := by simp only [MState.top, hl]
+  have hb : ∀ b a, relBelowOk ps σ' b a = relBelowOk ps σ b a := by
+    intro b a; unfold relBelowOk; rw [h, hp]
+  unfold chainEnvAt
+  rw [h, ht]
+  simp only [hb]
   congr 1
   funext j a
   exact hc j a
 
 /-- A load raises its hart's coherence floors only. -/
-theorem chainEnvAt_ext_load (rs : List RsvRegion) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop)
+theorem chainEnvAt_ext_load (rs : List RsvRegion) (ps : List Int) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop)
     (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) :
-    (chainEnvAt rs wit σ).ext (chainEnvAt rs wit (σ.afterLoad cpu pa n tvn)) := by
+    (chainEnvAt rs ps wit σ).ext (chainEnvAt rs ps wit (σ.afterLoad cpu pa n tvn)) := by
   refine ⟨memExt_refl _, fun _ _ h => h, fun _ _ => Iff.rfl, fun j f w _ _ => ?_⟩
   simp only [chainEnvAt, updCpu]
   split
@@ -1150,17 +1175,21 @@ theorem chainEnvAt_ext_load (rs : List RsvRegion) (wit : List (PAddr × HEnt) �
 /-- **A store keeps the environment growing**: its memory extends, and it
 cannot reset another writer's publication byte's floor -- the publication
 region's discipline at the new memory makes the storing hart its writer. -/
-theorem chainEnvAt_ext_store (rs : List RsvRegion) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop)
+theorem chainEnvAt_ext_store (rs : List RsvRegion) (ps : List Int) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop)
     (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
     (w : BitVec (8 * n)) (excl : Bool)
+    (hle : ∀ (a : PAddr) (H : Hist) (e : HEnt), σ.mem[a]? = some H → e ∈ H → e.t ≤ σ.top)
     (hnew : rsvAllOk rs (σ.mem.writeBytes pa n w (σ.top + 1) (hartAgent cpu))) :
-    (chainEnvAt rs wit σ).ext (chainEnvAt rs wit (σ.store cpu pa n w excl)) := by
+    (chainEnvAt rs ps wit σ).ext (chainEnvAt rs ps wit (σ.store cpu pa n w excl)) := by
   refine ⟨memExt_writeBytes _ _ _ _ _, fun b r h => ?_, fun _ _ => Iff.rfl, fun j f w' hp hj => ?_⟩
-  · rcases h with h | h
+  · rcases h with h | ⟨h, hr⟩
     · exact Or.inl h
-    · refine Or.inr (dynLkAt_mono (memGrow_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _)) ?_ h)
-      simp only [MState.top, List.length_append, List.length_singleton]
-      omega
+    · refine Or.inr ⟨dynLkAt_mono (memGrow_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _)) ?_ h, ?_⟩
+      · simp only [MState.top, List.length_append, List.length_singleton]
+        omega
+      · exact relBelowOk_grow (memGrow_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _))
+          (memGrowR_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _)) hle
+          (fun t ht => by simp only [MState.store]; rw [if_neg (by omega)]) h.1 hr
   simp only [chainEnvAt, updCpu]
   split
   · rename_i hjc
@@ -1184,26 +1213,31 @@ theorem chainEnvAt_ext_store (rs : List RsvRegion) (wit : List (PAddr × HEnt) �
   · exact Nat.le_refl _
 
 /-- A DMA write extends the memory and moves no hart's floor. -/
-theorem chainEnvAt_ext_dma (rs : List RsvRegion) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop)
-    (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
-    (chainEnvAt rs wit σ).ext (chainEnvAt rs wit (σ.storeDma pa n w)) := by
+theorem chainEnvAt_ext_dma (rs : List RsvRegion) (ps : List Int) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop)
+    (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (hle : ∀ (a : PAddr) (H : Hist) (e : HEnt), σ.mem[a]? = some H → e ∈ H → e.t ≤ σ.top) :
+    (chainEnvAt rs ps wit σ).ext (chainEnvAt rs ps wit (σ.storeDma pa n w)) := by
   by_cases hn : n = 0
   · rw [MState.storeDma_zero σ pa n w hn]; exact ChainEnv.ext_refl _
   refine ⟨?_, fun b r h => ?_, fun _ _ => Iff.rfl, fun _ _ _ _ _ => Nat.le_refl _⟩
   · show memExt σ.mem (σ.storeDma pa n w).mem
     rw [MState.storeDma_mem_of_ne σ pa n w hn]; exact memExt_writeBytes _ _ _ _ _
-  · rcases h with h | h
+  · rcases h with h | ⟨h, hr⟩
     · exact Or.inl h
-    · refine Or.inr (dynLkAt_mono (t := σ.top) ?_ ?_ h)
-      · show memGrow σ.mem σ.top (σ.storeDma pa n w).mem
+    · have hg : memGrow σ.mem σ.top (σ.storeDma pa n w).mem := by
         rw [MState.storeDma_mem_of_ne σ pa n w hn]
         exact memGrow_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _)
-      · simp only [MState.top, if_neg hn, List.length_append, List.length_singleton]
-        omega
+      have hgr : memGrowR σ.mem σ.top (σ.storeDma pa n w).mem := by
+        rw [MState.storeDma_mem_of_ne σ pa n w hn]
+        exact memGrowR_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _)
+      refine Or.inr ⟨dynLkAt_mono (t := σ.top) hg ?_ h, relBelowOk_grow hg hgr hle
+        (fun t ht => by simp only [MState.storeDma, if_neg hn]; rw [if_neg (by omega)]) h.1 hr⟩
+      simp only [MState.top, if_neg hn, List.length_append, List.length_singleton]
+      omega
 
 /-- The publication words of a list whose disciplines hold are one-shot. -/
-theorem pubOneShot_of_rsv {rs : List RsvRegion} {wit : List (PAddr × HEnt) → PAddr → Nat → Prop} {σ : MState}
-    (h : rsvAllOk rs σ.mem) : pubOneShot (chainEnvAt rs wit σ) := by
+theorem pubOneShot_of_rsv {rs : List RsvRegion} {ps : List Int} {wit : List (PAddr × HEnt) → PAddr → Nat → Prop} {σ : MState}
+    (h : rsvAllOk rs σ.mem) : pubOneShot (chainEnvAt rs ps wit σ) := by
   intro f w H e e' hp hf he he' ht ht'
   obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 hp
   have hR := h i _ hi
@@ -1227,12 +1261,12 @@ theorem Resources.foldrMax_mem : ∀ (l : List Nat), l.foldr max 0 ≠ 0 → l.f
 
 /-- **A store keeps the load-side invariant** (its footprint's floors reset,
 every other floor stays; its entries are above the top). -/
-theorem loadsChained_store (rs : List RsvRegion) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop)
+theorem loadsChained_store (rs : List RsvRegion) (ps : List Int) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop)
     {ex ex' : PAddr → Nat → Prop} (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (excl : Bool) (hle : ∀ (j : CPU) (a : PAddr), (σ.hr j).coh a ≤ σ.top)
-    (hx : (chainEnvAt rs wit σ).ext (chainEnvAt rs wit (σ.store cpu pa n w excl)))
-    (hex : ∀ a t, t ≤ σ.top → ex a t → ex' a t) (h : loadsChained (chainEnvAt rs wit σ) ex) :
-    loadsChained (chainEnvAt rs wit (σ.store cpu pa n w excl)) ex' := by
+    (hx : (chainEnvAt rs ps wit σ).ext (chainEnvAt rs ps wit (σ.store cpu pa n w excl)))
+    (hex : ∀ a t, t ≤ σ.top → ex a t → ex' a t) (h : loadsChained (chainEnvAt rs ps wit σ) ex) :
+    loadsChained (chainEnvAt rs ps wit (σ.store cpu pa n w excl)) ex' := by
   refine loadsChained_keep hx (memAbove_writeBytes _ _ _ σ.top (σ.top + 1) _ (Nat.lt_succ_self _)) hle hex
     (fun j a => ?_) h
   simp only [chainEnvAt, updCpu]
@@ -1246,15 +1280,16 @@ theorem loadsChained_store (rs : List RsvRegion) (wit : List (PAddr × HEnt) →
   · exact Or.inl rfl
 
 /-- **A DMA write keeps the load-side invariant** (no hart's floor moves). -/
-theorem loadsChained_dma (rs : List RsvRegion) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop)
+theorem loadsChained_dma (rs : List RsvRegion) (ps : List Int) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop)
     {ex ex' : PAddr → Nat → Prop} (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (hle : ∀ (j : CPU) (a : PAddr), (σ.hr j).coh a ≤ σ.top)
-    (hex : ∀ a t, t ≤ σ.top → ex a t → ex' a t) (h : loadsChained (chainEnvAt rs wit σ) ex) :
-    loadsChained (chainEnvAt rs wit (σ.storeDma pa n w)) ex' := by
+    (hleM : ∀ (a : PAddr) (H : Hist) (e : HEnt), σ.mem[a]? = some H → e ∈ H → e.t ≤ σ.top)
+    (hex : ∀ a t, t ≤ σ.top → ex a t → ex' a t) (h : loadsChained (chainEnvAt rs ps wit σ) ex) :
+    loadsChained (chainEnvAt rs ps wit (σ.storeDma pa n w)) ex' := by
   by_cases hn : n = 0
   · rw [MState.storeDma_zero σ pa n w hn]
     exact loadsChained_keep (ChainEnv.ext_refl _) (memAbove_refl _ σ.top) hle hex (fun _ _ => Or.inl rfl) h
-  refine loadsChained_keep (chainEnvAt_ext_dma rs wit σ pa n w) ?_ hle hex (fun _ _ => Or.inl rfl) h
+  refine loadsChained_keep (chainEnvAt_ext_dma rs ps wit σ pa n w hleM) ?_ hle hex (fun _ _ => Or.inl rfl) h
   show memAbove σ.mem σ.top (σ.storeDma pa n w).mem
   rw [MState.storeDma_mem_of_ne σ pa n w hn]
   exact memAbove_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _)
@@ -1286,14 +1321,14 @@ theorem FlatMem.loadSrcs_get? (m : FlatMem) (h : Agent) (tvn : Nat) (pa : PAddr)
 obligation S3's load rules discharge INSIDE the load's step [R35.s5],
 `loadSrcOk`).  Only the loader's floors move, each to its old value or a
 foreign source's timestamp. -/
-theorem loadsChained_load (rs : List RsvRegion) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop)
+theorem loadsChained_load (rs : List RsvRegion) (ps : List Int) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop)
     {ex ex' : PAddr → Nat → Prop} (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat)
     (hle : ∀ (j : CPU) (a : PAddr), (σ.hr j).coh a ≤ σ.top)
     (hex : ∀ a t, t ≤ σ.top → ex a t → ex' a t)
-    (hsrc : loadSrcOk (chainEnvAt rs wit σ) ex' σ.mem cpu pa n tvn)
-    (h : loadsChained (chainEnvAt rs wit σ) ex) :
-    loadsChained (chainEnvAt rs wit (σ.afterLoad cpu pa n tvn)) ex' := by
-  have hx := chainEnvAt_ext_load rs wit σ cpu pa n tvn
+    (hsrc : loadSrcOk (chainEnvAt rs ps wit σ) ex' σ.mem cpu pa n tvn)
+    (h : loadsChained (chainEnvAt rs ps wit σ) ex) :
+    loadsChained (chainEnvAt rs ps wit (σ.afterLoad cpu pa n tvn)) ex' := by
+  have hx := chainEnvAt_ext_load rs ps wit σ cpu pa n tvn
   refine loadsChained_step hx (memAbove_refl _ σ.top) hle hex
     (fun j a hne H e hH he het hc hA hne' hnex => ?_) h
   simp only [chainEnvAt, updCpu] at hne hc
@@ -1336,7 +1371,8 @@ def rsvLockByte [MachFixedGS hlc GF] (b : PAddr) : Prop :=
 
 /-- The ambient record's certificate environment at `σ`. -/
 abbrev chainEnv [MachFixedGS hlc GF] (σ : MState) : ChainEnv :=
-  chainEnvAt (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (slotWit (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))) σ
+  chainEnvAt (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.relPcs (hlc := hlc) (GF := GF))
+    (slotWit (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF))) σ
 
 /-- The ambient record's load-side exemption at `σ` (W8 (f2-ctx) S3,
 `MachCSL.chainExAt`), as of a position: the lock layer's bytes (static
@@ -1371,7 +1407,8 @@ theorem chainLoads_store [MachFixedGS hlc GF] (σ : MState) (cpu : CPU) (pa : PA
     (h : loadsChained (chainEnv (hlc := hlc) (GF := GF) σ) (chainEx (hlc := hlc) (GF := GF) σ)) :
     loadsChained (chainEnv (hlc := hlc) (GF := GF) (σ.store cpu pa n w excl))
       (chainEx (hlc := hlc) (GF := GF) (σ.store cpu pa n w excl)) :=
-  loadsChained_store _ _ σ cpu pa n w excl (mmOk_coh_le hmm) (chainEnvAt_ext_store _ _ σ cpu pa n w excl hnew)
+  loadsChained_store _ _ _ σ cpu pa n w excl (mmOk_coh_le hmm)
+    (chainEnvAt_ext_store _ _ _ σ cpu pa n w excl (relPc_le_top hmm.1) hnew)
     (fun a t ht hx => chainExAt_grow (memGrow_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _))
       (memAbove_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _))
       (by simp only [MState.top, List.length_append, List.length_singleton]; omega) a t ht hx) h
@@ -1384,7 +1421,7 @@ theorem chainLoads_dma [MachFixedGS hlc GF] (σ : MState) (pa : PAddr) (n : Nat)
       (chainEx (hlc := hlc) (GF := GF) (σ.storeDma pa n w)) := by
   by_cases hn : n = 0
   · rw [MState.storeDma_zero σ pa n w hn]; exact h
-  refine loadsChained_dma _ _ σ pa n w (mmOk_coh_le hmm) (fun a t ht hx => ?_) h
+  refine loadsChained_dma _ _ _ σ pa n w (mmOk_coh_le hmm) (relPc_le_top hmm.1) (fun a t ht hx => ?_) h
   show chainExAt _ _ (σ.storeDma pa n w).mem (σ.storeDma pa n w).top a t
   rw [MState.storeDma_mem_of_ne σ pa n w hn]
   refine chainExAt_grow (memGrow_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _))
@@ -1401,7 +1438,42 @@ theorem chainLoads_load [MachFixedGS hlc GF] (σ : MState) (cpu : CPU) (pa : PAd
     (h : loadsChained (chainEnv (hlc := hlc) (GF := GF) σ) (chainEx (hlc := hlc) (GF := GF) σ)) :
     loadsChained (chainEnv (hlc := hlc) (GF := GF) (σ.afterLoad cpu pa n tvn))
       (chainEx (hlc := hlc) (GF := GF) (σ.afterLoad cpu pa n tvn)) :=
-  loadsChained_load _ _ σ cpu pa n tvn (mmOk_coh_le hmm) (fun _ _ _ hx => hx) hsrc h
+  loadsChained_load _ _ _ σ cpu pa n tvn (mmOk_coh_le hmm) (fun _ _ _ hx => hx) hsrc h
+
+/-- **The pc receipts of a certificate map are valid** (mcslrec (2) [OWN.82]
+(a1)): each names an issued position and its issuing pc. -/
+def pcKeysOk (σ : MState) (Z : RegMapF Agent) : Prop :=
+  ∀ (t : Nat) (v : BitVec 64), (get? Z (pcKey t v)).isSome → t ≤ σ.top ∧ σ.pcAt t = ((v.toNat : Nat) : Int)
+
+/-- Inserting a key other than a pc receipt's keeps the receipts valid. -/
+theorem pcKeysOk_insert {σ : MState} {Z : RegMapF Agent} (h : pcKeysOk σ Z) (k : Nat)
+    (hk : ∀ t v, k ≠ pcKey t v) (x : Agent) : pcKeysOk σ (Iris.Std.PartialMap.insert Z k x) := by
+  intro t v hv
+  rw [LawfulPartialMap.get?_insert_ne (fun e => hk t v e)] at hv
+  exact h t v hv
+
+/-- A new pc receipt, valid of the machine. -/
+theorem pcKeysOk_insertPc {σ : MState} {Z : RegMapF Agent} (h : pcKeysOk σ Z) (t : Nat) (v : BitVec 64)
+    (hv : t ≤ σ.top ∧ σ.pcAt t = ((v.toNat : Nat) : Int)) (x : Agent) :
+    pcKeysOk σ (Iris.Std.PartialMap.insert Z (pcKey t v) x) := by
+  intro t' v' hv'
+  by_cases hk : pcKey t v = pcKey t' v'
+  · obtain ⟨rfl, rfl⟩ := pcKey_inj hk
+    exact hv
+  · rw [LawfulPartialMap.get?_insert_ne hk] at hv'
+    exact h t' v' hv'
+
+/-- A step that keeps the old positions' pcs keeps the receipts valid. -/
+theorem pcKeysOk_mono {σ σ' : MState} {Z : RegMapF Agent} (ht : σ.top ≤ σ'.top)
+    (hpc : ∀ t, t ≤ σ.top → σ'.pcAt t = σ.pcAt t) (h : pcKeysOk σ Z) : pcKeysOk σ' Z := by
+  intro t v hv
+  obtain ⟨h1, h2⟩ := h t v hv
+  exact ⟨Nat.le_trans h1 ht, by rw [hpc t h1]; exact h2⟩
+
+/-- No pc receipt in the empty map. -/
+theorem pcKeysOk_empty (σ : MState) : pcKeysOk σ ∅ := by
+  intro t v hv
+  simp [LawfulPartialMap.get?_empty] at hv
 
 /-- The issued elements of a certificate map, kept beside the authority (so
 re-issuing a certificate hands out its element; `MachCSL.dirtyElems`'s
@@ -1419,7 +1491,8 @@ exemption is chained, `MachCSL.loadsChained`), the certificate map, every
 key valid, every element issued. -/
 def chainModelAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) : IProp GF := iprop%
   ⌜loadsChained (chainEnv (hlc := hlc) (GF := GF) σ) (chainEx (hlc := hlc) (GF := GF) σ)⌝ ∗
-  ∃ Z : RegMapF Agent, (E.chainName ↪●MAP Z) ∗ ⌜certsOk (chainEnv (hlc := hlc) (GF := GF) σ) Z⌝ ∗
+  ∃ Z : RegMapF Agent, (E.chainName ↪●MAP Z) ∗
+    ⌜certsOk (chainEnv (hlc := hlc) (GF := GF) σ) Z ∧ pcKeysOk σ Z⌝ ∗
     chainElemsAt E Z
 
 /-! ## The sealed kernel page table (W8 (f3-ptek) [OWN.66])
@@ -1489,7 +1562,8 @@ the registry `reg`. -/
 def kptModelAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (reg : RegMapF Agent) : IProp GF := iprop%
   ∃ (S : Nat) (dyn : List KSlot),
     ⌜kptLinked dyn reg ∧ ((dyn = [] ∧ pubClean (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem) ∨
-      kptSealOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem σ.top S dyn)⌝ ∗
+      (kptSealOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem σ.top S dyn ∧
+        MachFixedGS.kptOk (hlc := hlc) (GF := GF) dyn))⌝ ∗
     [∗list] d ∈ dyn, kslotCellAt E S d
 
 /-- **The seal's certificate** (persistent): the era's record is sealed. -/
@@ -1510,6 +1584,12 @@ disciplined. -/
 def kptStateOk (rs : List RsvRegion) (σ : MState) : Prop :=
   ∃ (S : Nat) (dyn : List KSlot), (dyn = [] ∧ pubClean rs σ.mem) ∨
     (kptSealOk rs σ.mem σ.top S dyn ∧ kptHistsAt σ.mem S dyn)
+
+/-- `kptStateOk` with the client's shape of the sealed slots (mcslrec (1)
+[OWN.99]: `KernelRsv.kptOk`, kept by `kptModelAt`). -/
+def kptStateOkK (rs : List RsvRegion) (ok : List KSlot → Prop) (σ : MState) : Prop :=
+  ∃ (S : Nat) (dyn : List KSlot), (dyn = [] ∧ pubClean rs σ.mem) ∨
+    (kptSealOk rs σ.mem σ.top S dyn ∧ kptHistsAt σ.mem S dyn ∧ ok dyn)
 
 /-- Fragments of the bytes `pa .. pa+n-1` agree with the heap (era `E`). -/
 theorem kslotBytes_valid [MachFixedGS hlc GF] (E : EraGS) (m : FlatMem) (pa : PAddr) (dq : DFrac)
@@ -1577,7 +1657,22 @@ theorem kptModel_stateOk [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (reg : R
     · iapply kptCells_hists E σ.mem S dyn $$ [Hm Hc]
       iframe
     ipureintro
-    exact ⟨S, dyn, .inr ⟨hok, hh⟩⟩
+    exact ⟨S, dyn, .inr ⟨hok.1, hh⟩⟩
+
+/-- ...with the client's shape of the sealed slots. -/
+theorem kptModel_stateOkK [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (reg : RegMapF Agent) :
+    genHeapInterp (G := E.mem) σ.mem ∗ kptModelAt E σ reg ⊢@{IProp GF}
+      ⌜kptStateOkK (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.kptOk (hlc := hlc) (GF := GF)) σ⌝ := by
+  unfold kptModelAt
+  iintro ⟨Hm, %S, %dyn, %⟨_, hseal⟩, Hc⟩
+  rcases hseal with hnil | hok
+  · ipureintro
+    exact ⟨S, dyn, .inl hnil⟩
+  · ihave %hh : ⌜kptHistsAt σ.mem S dyn⌝ $$ [Hm Hc]
+    · iapply kptCells_hists E σ.mem S dyn $$ [Hm Hc]
+      iframe
+    ipureintro
+    exact ⟨S, dyn, .inr ⟨hok.1, hh, hok.2⟩⟩
 
 /-- **The reserved-region conjunct** of era `E`'s interpretation (plan [R25.2]
 deliverable (i): `⌜staticIn reg ∧ reservedOk σ reg⌝` beside `⌜mmOk σ⌝`), with
@@ -1588,7 +1683,9 @@ def rsvModelAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) : IProp GF := ipro
   (∃ reg : RegMapF Agent, (E.rsvName ↪●MAP reg) ∗
     ⌜staticIn (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) reg ∧
       rsvExact (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) reg ∧
-      reservedOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ reg⌝ ∗ kptModelAt E σ reg) ∗
+      reservedOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ reg ∧
+      relPcOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.relPcs (hlc := hlc) (GF := GF)) σ⌝ ∗
+      kptModelAt E σ reg) ∗
   rsvHalvesAt E (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) ∗
   chainModelAt E σ
 
@@ -1600,13 +1697,16 @@ def memModelAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) : IProp GF := ipro
   (E.resvName ↪●MAP resvMap σ) ∗
   ⌜mmOk σ⌝ ∗ rsvModelAt E σ
 
-/-- The reserved conjunct reads only the memory and the coherence floors. -/
+/-- The reserved conjunct reads only the memory, the coherence floors and the
+store pcs. -/
 theorem rsvModelAt_congr [MachFixedGS hlc GF] (E : EraGS) {σ σ' : MState} (h : σ'.mem = σ.mem)
-    (hl : σ'.log = σ.log) (hc : ∀ (j : CPU) (a : PAddr), (σ'.hr j).coh a = (σ.hr j).coh a) :
+    (hl : σ'.log = σ.log) (hc : ∀ (j : CPU) (a : PAddr), (σ'.hr j).coh a = (σ.hr j).coh a)
+    (hp : σ'.pcAt = σ.pcAt := by rfl) :
     rsvModelAt (GF := GF) E σ' = rsvModelAt E σ := by
   have ht : σ'.top = σ.top := by simp only [MState.top, hl]
-  unfold rsvModelAt reservedOk kptModelAt chainModelAt chainEnv chainEx
-  rw [chainEnvAt_congr _ _ h hl hc, h, ht]
+  unfold rsvModelAt reservedOk kptModelAt chainModelAt chainEnv chainEx relPcOk
+  have hpk : pcKeysOk σ' = pcKeysOk σ := by funext Z; unfold pcKeysOk; rw [ht, hp]
+  rw [chainEnvAt_congr _ _ _ h hl hc hp, h, ht, hp, hpk]
 
 /-- `cpus` lists every hart at its own index. -/
 theorem cpus_get? (cpu : CPU) : cpus[cpu.val]? = some cpu := by

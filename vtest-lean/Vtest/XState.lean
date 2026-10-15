@@ -109,6 +109,8 @@ structure XState where
   rtU1 : DevRt
   rtP : DevRt
   rtV : DevRt
+  /-- the issuing pc of each store (`MState.pcAt`) -/
+  pcAt : Nat → Int
 
 namespace XState
 
@@ -166,13 +168,14 @@ def abs (x : XState) : MState where
   resv c := (x.hart c).resv
   devs := x.devs
   devrt := x.rt
+  pcAt := x.pcAt
 
 end XState
 
 /-- Two language states with the same fields are the same state. -/
 theorem MState.ext' {a b : MState} (h1 : a.regs = b.regs) (h2 : a.mem = b.mem) (h3 : a.log = b.log)
     (h4 : a.tv = b.tv) (h5 : a.itv = b.itv) (h6 : a.hr = b.hr) (h7 : a.resv = b.resv)
-    (h8 : a.devs = b.devs) (h9 : a.devrt = b.devrt) : a = b := by
+    (h8 : a.devs = b.devs) (h9 : a.devrt = b.devrt) (h10 : a.pcAt = b.pcAt) : a = b := by
   cases a; cases b; simp_all
 
 theorem updCpu_self {α : Type} (f : CPU → α) (c : CPU) : updCpu f c (f c) = f := by
@@ -274,7 +277,9 @@ def store (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (
       hr := h.hr.clearAcq.resetCoh pa n,
       resv := none } with
     mem := x.mem.writeBytes pa n w (x.log.length + 1) (hartAgent cpu),
-    log := x.log ++ [hartAgent cpu] }
+    log := x.log ++ [hartAgent cpu],
+    pcAt := fun t => if t = x.log.length + 1 then
+      (if excl then -1 else ((((x.hart cpu).regs.file) Register.PC).toNat : Int)) else x.pcAt t }
 
 theorem abs_store (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (excl : Bool) : (x.store cpu pa n w excl).abs = x.abs.store cpu pa n w excl := by
@@ -297,6 +302,7 @@ theorem abs_store (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8
   · exact hv
   · rfl
   · rfl
+  · rfl
 
 def fence (x : XState) (cpu : CPU) (b : barrier_kind) : XState :=
   let h := x.hart cpu
@@ -314,7 +320,8 @@ theorem abs_fence (x : XState) (cpu : CPU) (b : barrier_kind) :
 /-- A DMA write by the disk (a zero-byte one is a no-op, as `MState.storeDma`). -/
 def storeDma (x : XState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : XState :=
   { x with mem := if n = 0 then x.mem else x.mem.writeBytes pa n w (x.log.length + 1) diskAgent,
-           log := if n = 0 then x.log else x.log ++ [diskAgent] }
+           log := if n = 0 then x.log else x.log ++ [diskAgent],
+           pcAt := if n = 0 then x.pcAt else fun t => if t = x.log.length + 1 then -1 else x.pcAt t }
 
 theorem abs_storeDma (x : XState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
     (x.storeDma pa n w).abs = x.abs.storeDma pa n w := rfl

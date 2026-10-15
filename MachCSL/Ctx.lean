@@ -84,6 +84,11 @@ history at `pa` holds `e` -- histories only grow, so a past fact of the
 memory the state interpretation keeps (`MachCSL.certsOk`). -/
 def entryAtE (pa : PAddr) (e : HEnt) : IProp GF := iprop(∃ v : Agent, E.chainName ↪◯MAP[entKey pa e]{.discard} v)
 
+/-- **A pc receipt** (persistent; mcslrec (2) [OWN.82] (a1)): the store that
+created position `t` was issued at pc `v` (`MState.pcAt`) -- a past fact of
+the machine the state interpretation keeps (`MachCSL.pcKeysOk`). -/
+def pcRcptE (t : Nat) (v : BitVec 64) : IProp GF := iprop(∃ x : Agent, E.chainName ↪◯MAP[pcKey t v]{.discard} x)
+
 /-- **The entries of author `h` at or below `t` reach hart `j` before `τ`**
 (persistent): they are boot-image entries (`t = 0`), or `j`'s own entries
 before `τ`, or an issued certificate covers them (at least as many entries,
@@ -156,6 +161,10 @@ instance (pa : PAddr) (e : HEnt) : Persistent (PROP := IProp GF) (entryAtE E pa 
   unfold entryAtE; infer_instance
 instance (pa : PAddr) (e : HEnt) : Timeless (PROP := IProp GF) (entryAtE E pa e) := by
   unfold entryAtE; infer_instance
+instance (t : Nat) (v : BitVec 64) : Persistent (PROP := IProp GF) (pcRcptE E t v) := by
+  unfold pcRcptE; infer_instance
+instance (t : Nat) (v : BitVec 64) : Timeless (PROP := IProp GF) (pcRcptE E t v) := by
+  unfold pcRcptE; infer_instance
 instance (h : CPU) (t : Nat) (j : CPU) (τ : Nat) : Persistent (PROP := IProp GF) (chainLbAt E h t j τ) := by
   unfold chainLbAt; infer_instance
 instance (h : CPU) (t : Nat) (j : CPU) (τ : Nat) : Timeless (PROP := IProp GF) (chainLbAt E h t j τ) := by
@@ -764,6 +773,7 @@ abbrev lkIn (cpu : CPU) (s : String) : IProp GF := lkInAt (MachGS.era (hlc := hl
 abbrev chainCert (c : ChainCert) : IProp GF := chainCertAt (MachGS.era (hlc := hlc) (GF := GF)) c
 abbrev gatePassed (j : CPU) : IProp GF := gatePassedAt (MachGS.era (hlc := hlc) (GF := GF)) j
 abbrev entryAt (pa : PAddr) (e : HEnt) : IProp GF := entryAtE (MachGS.era (hlc := hlc) (GF := GF)) pa e
+abbrev pcRcpt (t : Nat) (v : BitVec 64) : IProp GF := pcRcptE (MachGS.era (hlc := hlc) (GF := GF)) t v
 abbrev chainLb (h : CPU) (t : Nat) (j : CPU) (τ : Nat) : IProp GF :=
   chainLbAt (MachGS.era (hlc := hlc) (GF := GF)) h t j τ
 

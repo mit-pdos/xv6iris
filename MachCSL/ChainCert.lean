@@ -49,12 +49,13 @@ theorem memModel_gate (σ : MState) (j : CPU) :
     exact absurd (hw f w hp).symm hj
   · ihave %Hl := ghost_map_lookup $$ HZ Hc
     ipureintro
-    exact hZ.2.1 j (by rw [Hl]; rfl)
+    exact hZ.1.2.1 j (by rw [Hl]; rfl)
 
 /-- The certificate map's two halves, opened (shared by the two issues). -/
 theorem memModel_chainIssueKey (σ : MState) (k : Nat)
-    (hv : ∀ Z : RegMapF Agent, certsOk (chainEnv (hlc := hlc) (GF := GF) σ) Z →
-      certsOk (chainEnv (hlc := hlc) (GF := GF) σ) (Iris.Std.PartialMap.insert Z k (0 : Agent))) :
+    (hv : ∀ Z : RegMapF Agent, certsOk (chainEnv (hlc := hlc) (GF := GF) σ) Z ∧ pcKeysOk σ Z →
+      certsOk (chainEnv (hlc := hlc) (GF := GF) σ) (Iris.Std.PartialMap.insert Z k (0 : Agent)) ∧
+        pcKeysOk σ (Iris.Std.PartialMap.insert Z k (0 : Agent))) :
     memModelAt E σ ⊢@{IProp GF} |==> (memModelAt E σ ∗ ∃ v : Agent, E.chainName ↪◯MAP[k]{.discard} v) := by
   unfold memModelAt rsvModelAt chainModelAt
   iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hreg, Hh, %hlc0, %Z, HZ, %hZ, #Hels⟩
@@ -104,13 +105,15 @@ theorem memModel_certIssue (σ : MState) (c : ChainCert)
     (hv : c.valid (chainEnv (hlc := hlc) (GF := GF) σ)) :
     memModelAt E σ ⊢@{IProp GF} |==> (memModelAt E σ ∗ chainCertAt E c) := by
   unfold chainCertAt
-  exact memModel_chainIssueKey E σ c.key (fun Z hZ => certsOk_insert hZ c hv 0)
+  exact memModel_chainIssueKey E σ c.key (fun Z hZ => ⟨certsOk_insert hZ.1 c hv 0,
+    pcKeysOk_insert hZ.2 _ (fun t v e => pcKey_ne_cert t v c e.symm) 0⟩)
 
 /-- A hart past the gate may be issued its gate. -/
 theorem memModel_gateIssue (σ : MState) (j : CPU) (hv : gateOk (chainEnv (hlc := hlc) (GF := GF) σ) j) :
     memModelAt E σ ⊢@{IProp GF} |==> (memModelAt E σ ∗ gatePassedAt E j) := by
   iintro Hmm
-  imod memModel_chainIssueKey E σ (gateKey j) (fun Z hZ => certsOk_insertGate hZ j hv 0) $$ Hmm with ⟨Hmm, Hg⟩
+  imod memModel_chainIssueKey E σ (gateKey j) (fun Z hZ => ⟨certsOk_insertGate hZ.1 j hv 0,
+    pcKeysOk_insert hZ.2 _ (fun t v e => pcKey_ne_gate t v j e.symm) 0⟩) $$ Hmm with ⟨Hmm, Hg⟩
   imodintro
   iframe Hmm
   unfold gatePassedAt
@@ -121,7 +124,8 @@ theorem memModel_gateIssue (σ : MState) (j : CPU) (hv : gateOk (chainEnv (hlc :
 theorem memModel_entIssue (σ : MState) (pa : PAddr) (e : HEnt) (he : ∃ H, σ.mem[pa]? = some H ∧ e ∈ H) :
     memModelAt E σ ⊢@{IProp GF} |==> (memModelAt E σ ∗ entryAtE E pa e) := by
   unfold entryAtE
-  exact memModel_chainIssueKey E σ (entKey pa e) (fun Z hZ => certsOk_insertEnt hZ pa e he 0)
+  exact memModel_chainIssueKey E σ (entKey pa e) (fun Z hZ => ⟨certsOk_insertEnt hZ.1 pa e he 0,
+    pcKeysOk_insert hZ.2 _ (fun t v e' => pcKey_ne_ent t v pa e e'.symm) 0⟩)
 
 /-- A receipted entry is in the memory. -/
 theorem memModel_entryAt (σ : MState) (pa : PAddr) (e : HEnt) :
@@ -130,7 +134,24 @@ theorem memModel_entryAt (σ : MState) (pa : PAddr) (e : HEnt) :
   iintro ⟨⟨_, _, _, _, _, _, _, _, %Z, HZ, %hZ, _⟩, %v, Hc⟩
   ihave %Hl := ghost_map_lookup $$ HZ Hc
   ipureintro
-  exact hZ.2.2 pa e (by rw [Hl]; rfl)
+  exact hZ.1.2.2 pa e (by rw [Hl]; rfl)
+
+/-- **A position's pc may be receipted** (mcslrec (2) [OWN.82] (a1)). -/
+theorem memModel_pcIssue (σ : MState) (t : Nat) (v : BitVec 64)
+    (hv : t ≤ σ.top ∧ σ.pcAt t = ((v.toNat : Nat) : Int)) :
+    memModelAt E σ ⊢@{IProp GF} |==> (memModelAt E σ ∗ pcRcptE E t v) := by
+  unfold pcRcptE
+  exact memModel_chainIssueKey E σ (pcKey t v) (fun Z hZ => ⟨certsOk_insertPc hZ.1 t v 0,
+    pcKeysOk_insertPc hZ.2 t v hv 0⟩)
+
+/-- A receipted pc is the position's. -/
+theorem memModel_pcRcpt (σ : MState) (t : Nat) (v : BitVec 64) :
+    memModelAt E σ ∗ pcRcptE E t v ⊢@{IProp GF} ⌜t ≤ σ.top ∧ σ.pcAt t = ((v.toNat : Nat) : Int)⌝ := by
+  unfold memModelAt rsvModelAt chainModelAt pcRcptE
+  iintro ⟨⟨_, _, _, _, _, _, _, _, %Z, HZ, %hZ, _⟩, %x, Hc⟩
+  ihave %Hl := ghost_map_lookup $$ HZ Hc
+  ipureintro
+  exact hZ.2 t v (by rw [Hl]; rfl)
 
 /-- Receipts, for a list. -/
 theorem memModel_entryAtL (σ : MState) :
