@@ -749,6 +749,8 @@ import Weak.CapF5
 import Weak.CapF6
 import Weak.CapF7
 import Weak.CapF8
+import Weak.CapF10
+import Weak.CapF9
 import Weak.PinConfF
 import Weak.CapF3
 import Weak.CapF1
