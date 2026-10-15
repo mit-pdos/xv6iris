@@ -8,7 +8,7 @@ CONDITIONAL write — the window from the reservation's timestamps to the end of
 other harts' writes — with a retry self-loop.  The twin adds ONE disjunct at that write node
 (**`SilLang.silentWrite`**): the write completes WITHOUT a message when its bytes equal the bytes read
 (at the reservation's timestamps), the window is clean up to a position `q` (`exclOkTs … (q + 1)`), and
-`q` passes the write's ordering bounds (coherence, `fulfilVpre`, the hart's own latest exclusive message
+`q` passes the write's ordering bounds (coherence, `SilCand.ordOk`, the hart's own latest exclusive message
 `SilCand.ownExcl`) — the candidate-level `SilCand.silentOk` at the WP-verified machine; afterwards the views
 are those of a store at `q` with the read/write-ordering views raised to `q` (`SilCand.aqRaise`).
 
@@ -45,7 +45,7 @@ def SilLang.silentWrite (gen : Nat) (σ : WGState) (c : CPU) (m : SailM Unit)
     exclOkTs σ.wglog c.val (paZ req.pa) R.rvTs (q + 1) ∧
     q ≤ σ.wglog.length ∧
     (∀ j, j < n → coh (σ.wgws c) (paZ req.pa + (j : Int)) ≤ q) ∧
-    fulfilVpre (σ.wgws c) false ≤ q ∧ SilCand.ownExcl σ.wglog c.val ≤ q ∧
+    SilCand.ordOk (σ.wgws c) q ∧ SilCand.ownExcl σ.wglog c.val ≤ q ∧
     e' = ECycle gen c (k (.Ok (some true))) none ∧
     σ' = ewgWs σ c
       (storePostRunD (SilCand.aqRaise (σ.wgws c) q) false

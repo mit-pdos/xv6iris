@@ -777,6 +777,8 @@ import Weak.SilMember
 import Weak.SilLang
 import Weak.SilPf
 import Weak.SilPfBridge
+import Weak.SilReplay
+import Weak.SilPair
 import Weak.SilEpf
 import Weak.CertZ34
 import Weak.CertZ33

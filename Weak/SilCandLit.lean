@@ -56,14 +56,14 @@ theorem ws0 : S4.ms.msWs 0 = (S3.ms.msWs 0) := by
 theorem ws1 : S5.ms.msWs 1 = (S4.ms.msWs 1) := by
   simp [S5, silNext, SilCand.silentNext, updWs]
 
-theorem fv0 : fulfilVpre (S4.ms.msWs 0) false ≤ 2 := by
+theorem fv0 : SilCand.ordOk (loadPostRun (S4.ms.msWs 0) true 1 [2]) 2 := by
   simp [S4, S3, S2, S1, S0, oldNext, mnext, lA1, lA2, lR1, lR2, updWs, storePostRun, storePostBytes,
-    storePost, loadPostRun, loadPostBytes, loadPostAt, ctrlPost, fwdView, loadVpre, wsInit, fulfilVpre]
+    storePost, loadPostRun, loadPostBytes, loadPostAt, ctrlPost, fwdView, loadVpre, wsInit, SilCand.ordOk]
 
-theorem coh01 : coh (S4.ms.msWs 0) 1 = 0 := by
+theorem coh01 : coh (loadPostRun (S4.ms.msWs 0) true 1 [2]) 1 ≤ 2 := by
   simp [S4, S3, S2, S1, S0, oldNext, mnext, lA1, lA2, lR1, lR2, updWs, storePostRun, storePostBytes,
     storePost, loadPostRun, loadPostBytes, loadPostAt, ctrlPost, fwdView, loadVpre, wsInit, coh,
-    lookupInsertNe, lookupEmpty]
+    lookupInsertNe, lookupEmpty, lookupInsert]
 
 theorem noW (log : List Wmsg) (a : Int) (lo hi : Nat) :
     writesInb log a lo hi = false → ¬ writesIn log a lo hi := by
@@ -81,14 +81,14 @@ theorem vpre1 : max (loadVpre (S4.ms.msWs 1) true) (coh (S4.ms.msWs 1) 0) = 0 :=
     storePost, loadPostRun, loadPostBytes, loadPostAt, ctrlPost, fwdView, loadVpre, wsInit, coh,
     lookupInsertNe, lookupEmpty]
 
-theorem fv1 : fulfilVpre (S4.ms.msWs 1) false ≤ 2 := by
+theorem fv1 : SilCand.ordOk (loadPostRun (S4.ms.msWs 1) true 0 [1]) 2 := by
   simp [S4, S3, S2, S1, S0, oldNext, mnext, lA1, lA2, lR1, lR2, updWs, storePostRun, storePostBytes,
-    storePost, loadPostRun, loadPostBytes, loadPostAt, ctrlPost, fwdView, loadVpre, wsInit, fulfilVpre]
+    storePost, loadPostRun, loadPostBytes, loadPostAt, ctrlPost, fwdView, loadVpre, wsInit, SilCand.ordOk]
 
-theorem coh10 : coh (S4.ms.msWs 1) 0 = 0 := by
+theorem coh10 : coh (loadPostRun (S4.ms.msWs 1) true 0 [1]) 0 ≤ 2 := by
   simp [S4, S3, S2, S1, S0, oldNext, mnext, lA1, lA2, lR1, lR2, updWs, storePostRun, storePostBytes,
     storePost, loadPostRun, loadPostBytes, loadPostAt, ctrlPost, fwdView, loadVpre, wsInit, coh,
-    lookupInsertNe, lookupEmpty]
+    lookupInsertNe, lookupEmpty, lookupInsert]
 
 theorem ox40 : SilCand.ownExcl S4.ms.msLog 0 = 1 := by rw [log4]; rfl
 
@@ -113,8 +113,8 @@ theorem sil5 : SilCand.silentOk S4.ms 0 true 1 [2] [1#8] [1#8] 2 := by
     | succ j => simp at hj
   · have : j = 0 := by simp at hj; omega
     subst this
-    rw [show accAddr 1 0 = 1 from rfl, coh01]
-    omega
+    rw [show accAddr 1 0 = 1 from rfl]
+    exact coh01
 
 theorem log5 : S5.ms.msLog = S4.ms.msLog := rfl
 theorem ws51 : S5.ms.msWs 1 = S4.ms.msWs 1 := by simp [S5, silNext, SilCand.silentNext, updWs]
@@ -138,8 +138,8 @@ theorem sil6 : SilCand.silentOk S5.ms 1 true 0 [1] [1#8] [1#8] 2 := by
     | succ j => simp at hj
   · have : j = 0 := by simp at hj; omega
     subst this
-    rw [ws51, show accAddr 0 0 = 0 from rfl, coh10]
-    omega
+    rw [ws51, show accAddr 0 0 = 0 from rfl]
+    exact coh10
 
 theorem ok1 : mstepOk S0.ms 0 lA1 := by
   refine ⟨by simp, rfl, ⟨rfl, fun j t v hj hv => ?_⟩, fun j t hj => ?_⟩

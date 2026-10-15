@@ -4,7 +4,7 @@ Lean-only, no Rocq twin.
 
 **`SilPf.wpPfStepS`**: the registered `wpPfStep`, or a SILENT exclusive store (`exStoreSilent`): the
 `LExStore` of a reservation whose window is clean up to `q` (`exclOkTs … (q + 1)`), whose bytes equal the
-bytes at the reservation's timestamps, `q` passing the write's ordering bounds (coherence, `fulfilVpre`,
+bytes at the reservation's timestamps, `q` passing the write's ordering bounds (coherence, `SilCand.ordOk`,
 `SilCand.ownExcl`), not `rl` — the agent's views move as a store at `q` with the read/write-ordering views
 raised (`SilCand.aqRaise`), NO message.  `SilPf.wpPfRunS`, and the embedding of registered runs.
 
@@ -35,7 +35,7 @@ inductive SilPf.wpPfStepS (i : Nat) : Wlabel → Wpcfg P D → Wpcfg P D → Pro
       exclOkTs cfg.pcLog i base R.rvTs (q + 1) →
       q ≤ cfg.pcLog.length →
       (∀ j, j < data.length → coh ag.paWs (base + (j : Int)) ≤ q) →
-      fulfilVpre ag.paWs false ≤ q → SilCand.ownExcl cfg.pcLog i ≤ q →
+      SilCand.ordOk ag.paWs q → SilCand.ownExcl cfg.pcLog i ≤ q →
       SilPf.wpPfStepS i (.LExStore false base data asrc vsrc) cfg
         ⟨cfg.pcImg, cfg.pcLog, d',
          cfg.pcAgs.set i ⟨st',

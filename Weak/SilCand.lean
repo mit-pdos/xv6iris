@@ -8,8 +8,11 @@ machine (`mstep`, `execWf`, `srvwmoConsistent`) is untouched.
 earlier log position `q` — its write's virtual place, co-immediately after its source — subject to the
 write's own ordering constraints:
 
-  * `q` is at least the hart's coherence view of every byte (riscv.cat coherence), the fulfil pre-view
-    `fulfilVpre` (fences with a write successor, control/address dependencies: ppo rules 4, 9–11), and the
+  * `q` is at least — at the views AFTER the read half, where the write node evaluates them — the
+    hart's coherence view of every byte (riscv.cat coherence), the fulfil pre-view
+    the write-ordering view `wVwNew` (fences with a write successor: ppo rule 4), the read view `wVrOld`
+    (every earlier load — covers control/address/data dependencies, ppo rules 9–11, conservatively, and is
+    preserved by `wsEqr` across the machine levels, unlike the dependency capture `wVcap`), and the
     log position of the hart's own latest EXCLUSIVE (AMO) message (`SilCand.ownExcl`: ppo rule 5 for an
     earlier `aq` AMO; conservative for a non-`aq` one — xv6's only AMO is `amoswap.w.aq`) — the
     registered machine needs no such bound because its writes always append;
@@ -17,7 +20,7 @@ write's own ordering constraints:
     rmw ∩ (fre;coe) = ∅ with the write placed right after `q`);
   * afterwards the hart's views are those of an RMW written at `q` (`storePostRun … q`), its read and
     write-ordering views raised to `q` (`aqRaise`: later events follow the AMO; conservative when not `aq`).
-    An earlier SILENT AMO is covered by that raise (`fulfilVpre ≥ wVwNew`), so no extra state is needed —
+    An earlier SILENT AMO is covered by that raise (`wVwNew`), so no extra state is needed —
     the same bound is computable at the WP-verified machine (WeakEvLang's `WGState`).
 
 Faithful (riscv.cat): each silent AMO corresponds to an RVWMO AMO whose write sits in co immediately after
@@ -42,6 +45,14 @@ def SilCand.ownExcl (log : List Wmsg) (i : Nat) : Nat :=
   (log.zipIdx.filterMap (fun p =>
     if p.1.wmTid = some i ∧ p.1.wmAk = .WCexcl then some (p.2 + 1) else none)).foldr max 0
 
+/-- The silent write's ORDERING bound: after every fence-ordered predecessor and every earlier load. -/
+def SilCand.ordOk (ws : Wstate) (q : Nat) : Prop := ws.wVwNew ≤ q ∧ ws.wVrOld ≤ q
+
+theorem SilCand.ordOkEqr (w1 w2 : Wstate) (q : Nat) :
+    wsEqr w1 w2 → SilCand.ordOk w1 q → SilCand.ordOk w2 q := by
+  rintro ⟨-, h1, -, -, h4, -⟩ ⟨a, b⟩
+  exact ⟨by rw [← h4]; exact a, by rw [← h1]; exact b⟩
+
 /-- The side conditions of a SILENT AMO of agent `i` at position `q`. -/
 def SilCand.silentOk (σ : Mstate) (i : Nat) (aq : Bool) (base : Int)
     (ts : List Nat) (rvs wvs : List (BitVec 8)) (q : Nat) : Prop :=
@@ -49,8 +60,8 @@ def SilCand.silentOk (σ : Mstate) (i : Nat) (aq : Bool) (base : Int)
   rdOk σ.msImg σ.msLog (σ.msWs i) aq base ts rvs ∧
   q ≤ σ.msLog.length ∧
   (∀ (j t : Nat), ts[j]? = some t → t ≤ q ∧ ¬ writesIn σ.msLog (accAddr base j) t q) ∧
-  (∀ j, j < ts.length → coh (σ.msWs i) (accAddr base j) ≤ q) ∧
-  fulfilVpre (σ.msWs i) false ≤ q ∧ SilCand.ownExcl σ.msLog i ≤ q
+  (∀ j, j < ts.length → coh (loadPostRun (σ.msWs i) aq base ts) (accAddr base j) ≤ q) ∧
+  SilCand.ordOk (loadPostRun (σ.msWs i) aq base ts) q ∧ SilCand.ownExcl σ.msLog i ≤ q
 
 /-- The raise of the read and write-ordering views to the silent write's position. -/
 def SilCand.aqRaise (ws : Wstate) (q : Nat) : Wstate :=
