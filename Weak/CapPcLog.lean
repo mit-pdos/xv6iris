@@ -275,4 +275,59 @@ theorem CapPcLog.stepStoreOf {t t' : List Expr} {g g' : GState} {obs : List Obs}
       · exact Or.inl ⟨rfl, rfl⟩
       · rw [hp] at hp'; cases hp'
 
+/-- Is `e` a hart thread of hart `cpu` (any generation)? -/
+def CapPcLog.isHartOf (cpu : CPU) : Expr → Bool
+  | .hart _ c _ => decide (c = cpu)
+  | _ => false
+
+/-- The number of hart threads of `cpu` in a pool. -/
+def CapPcLog.hartN (cpu : CPU) (t : List Expr) : Nat := (t.filter (CapPcLog.isHartOf cpu)).length
+
+theorem CapPcLog.hartNApp (cpu : CPU) (a b : List Expr) :
+    CapPcLog.hartN cpu (a ++ b) = CapPcLog.hartN cpu a + CapPcLog.hartN cpu b := by
+  simp [CapPcLog.hartN, List.filter_append]
+
+theorem CapPcLog.hartNCons (cpu : CPU) (e : Expr) (a : List Expr) :
+    CapPcLog.hartN cpu (e :: a) = (if CapPcLog.isHartOf cpu e then 1 else 0) + CapPcLog.hartN cpu a := by
+  unfold CapPcLog.hartN
+  cases h : CapPcLog.isHartOf cpu e <;> simp [List.filter_cons, h] <;> omega
+
+/-- **A powered-on pool step keeps every hart's thread count**: a thread is replaced by one of the
+same kind (a hart's by the same hart's), and only device threads are forked. -/
+theorem CapPcLog.stepHartN {t t' : List Expr} {g g' : GState} {obs : List Obs}
+    (h : Iris.ProgramLogic.Language.Step (t, g) obs (t', g')) (hp : g.pow = true) (cpu : CPU) :
+    CapPcLog.hartN cpu t' = CapPcLog.hartN cpu t := by
+  cases h with
+  | @atomic e σ₀ obs₀ e' σ₁ eₜ H t₁ t₂ =>
+    have hsame : CapPcLog.isHartOf cpu e' = CapPcLog.isHartOf cpu e ∧ CapPcLog.hartN cpu eₜ = 0 := by
+      cases e with
+      | hart gen c m =>
+        obtain ⟨rfl, ⟨-, -, m', σ', rfl, -, -⟩ | ⟨-, -, rfl, -⟩⟩ := H <;> exact ⟨rfl, rfl⟩
+      | dev gen d tid m =>
+        rcases H with ⟨-, m', σ', rfl, hs, -⟩ | ⟨-, -, rfl, rfl, -⟩
+        · refine ⟨rfl, ?_⟩
+          unfold devStep at hs
+          split at hs
+          · obtain ⟨-, rfl, -⟩ := hs; rfl
+          · rcases hs with ⟨v, -, ho⟩ | ⟨-, -, -, -, rfl⟩
+            · rename_i o k
+              cases o with
+              | step g => obtain ⟨-, -, -, -, -, -, rfl⟩ := ho; rfl
+              | get => obtain ⟨-, -, -, rfl⟩ := ho; rfl
+              | choose => obtain ⟨-, -, rfl⟩ := ho; rfl
+              | dmaRead => obtain ⟨-, -, -, rfl⟩ := ho; rfl
+              | dmaWrite => obtain ⟨-, rfl, -⟩ := ho; rfl
+              | sample => obtain ⟨-, -, -, rfl⟩ := ho; rfl
+              | setPin => obtain ⟨-, rfl, -⟩ := ho; rfl
+              | fork tk => obtain ⟨-, -, -, rfl⟩ := ho; simp [CapPcLog.hartN, CapPcLog.isHartOf]
+              | join => obtain ⟨-, -, -, rfl⟩ := ho; rfl
+            · rfl
+        · exact ⟨rfl, rfl⟩
+      | power =>
+        obtain ⟨rfl, ⟨-, -, rfl, -⟩ | ⟨hp', -⟩⟩ := H
+        · exact ⟨rfl, rfl⟩
+        · rw [hp] at hp'; cases hp'
+    simp only [CapPcLog.hartNApp, CapPcLog.hartNCons, hsame.1, hsame.2]
+    omega
+
 end Weak
