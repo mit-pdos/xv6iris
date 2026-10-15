@@ -180,4 +180,21 @@ theorem CapPcLog.primStepPc {e : Expr} {g : GState} {obs : List Obs} {e' : Expr}
     · exact Or.inl ⟨rfl, rfl⟩
     · rw [hp] at hp'; cases hp'
 
+/-- **A machine step with the power on** is one of `stepPc`'s three kinds. -/
+theorem CapPcLog.stepPcOf {t t' : List Expr} {g g' : GState} {obs : List Obs}
+    (h : Iris.ProgramLogic.Language.Step (t, g) obs (t', g')) (hp : g.pow = true) : CapPcLog.stepPc g.m g'.m := by
+  cases h with
+  | atomic H t₁ t₂ => exact CapPcLog.primStepPc H hp
+
+/-- A run of at most one machine step from a powered-on state: no step (the state kept), or one. -/
+theorem CapPcLog.mrunLe1 {m : Nat} {t t' : List Expr} {g g' : GState} {κ : List Obs}
+    (h : MachOfPf.MRun m (t, g) κ (t', g')) (hm : m ≤ 1) (hp : g.pow = true) :
+    g' = g ∨ CapPcLog.stepPc g.m g'.m := by
+  cases h with
+  | refl => exact Or.inl rfl
+  | cons hs hr =>
+    cases hr with
+    | refl => exact Or.inr (CapPcLog.stepPcOf hs hp)
+    | cons _ _ => omega
+
 end Weak
