@@ -207,10 +207,10 @@ theorem ic_close_lu (M : RegMapF (Qp × PosNat)) (k : Nat) (q qt qr : Qp) (n : P
     refine (LocalUpdate.discrete _ _ _ _).mpr fun mz hv he => ?_
     rcases mz with _ | _ | ⟨qf, nf⟩
     · have e := congrArg (fun o : Option (Qp × PosNat) => o.map (fun p => p.2.val)) he
-      simp [CMRA.op?, PosNat.one] at e
+      simp [ORA.op?, PosNat.one] at e
       exact absurd e (Nat.pos_iff_ne_zero.mp n.pos)
     · have e := congrArg (fun o : Option (Qp × PosNat) => o.map (fun p => p.2.val)) he
-      simp [CMRA.op?, CMRA.op, optionOp, PosNat.one] at e
+      simp [ORA.op?, ORA.op, optionOp, PosNat.one] at e
       exact absurd e (Nat.pos_iff_ne_zero.mp n.pos)
     · have e : ((qt, n.succ) : Qp × PosNat) = (q + qf, PosNat.one + nf) :=
         Option.some.inj he

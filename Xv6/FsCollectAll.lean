@@ -155,7 +155,7 @@ theorem colEscrowsOpen_list [Icfg] [CurCtx] (ks : List Nat) (E : CoPset) (cn : I
     · iempintro
     · iintro -
       imodintro
-      iempintro
+      first | iempintro | (ipureintro; trivial) | ipureintro
   | cons k ks ih =>
     obtain ⟨hk, hnd'⟩ := List.nodup_cons.1 hnd
     have hk1 : (↑(ndot icEscN k) : CoPset) ⊆ E := fun p hp =>

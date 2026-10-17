@@ -38,12 +38,12 @@ theorem iOwn_alloc_same_name (hτ : E1.τ ≠ E2.τ)
   unfold iOwn
   refine .trans (Q := iprop(|==> ∃ m, ⌜∃ γ, m = iSingleton F1 γ a1 • iSingleton F2 γ a2⌝ ∧
     UPred.ownM m)) ?_ (BIUpdate.mono ?_)
-  · refine .trans (@UPred.ownM_unit (IResUR GF) _ iprop(emp)) ?_
+  · refine .trans (@UPred.ownM_unit (IResUR GF) _ _ iprop(emp)) ?_
     refine .trans intuitionistically_elim ?_
     apply UPred.bupd_ownM_updateP
     apply UpdateP.total.mpr
     intros n mf Hvalid
-    replace Hvalid : ✓{n} mf := CMRA.validN_ne UCMRA.unit_left_id.dist Hvalid
+    replace Hvalid : ✓{n} mf := ORA.validN_ne UORA.unit_left_id.dist Hvalid
     have hinf : ∀ N, ∃ k, N ≤ k ∧ (mf E2.τ).car k = none := by
       intro N
       obtain ⟨M, hM⟩ := (mf E2.τ).bound
@@ -54,8 +54,8 @@ theorem iOwn_alloc_same_name (hτ : E1.τ ≠ E2.τ)
     have hfree : IsFree ((iSingleton F2 γ a2 • mf) E1.τ).car γ := by
       show ((iSingleton F2 γ a2 E1.τ • mf E1.τ).car γ) = none
       simp only [iSingleton, dif_neg hτ]
-      simp [CMRA.op, GenMap.empty, optionOp, Hf1]
-    exact CMRA.validN_ne CMRA.assoc.dist (validN_iSingleton_op hv2 h1.validN hfree)
+      simp [ORA.op, GenMap.empty, optionOp, Hf1]
+    exact ORA.validN_ne Op.assoc.dist (validN_iSingleton_op hv2 h1.validN hfree)
   · refine BI.exists_elim (fun m => BI.pure_elim_left (fun ⟨γ, Hm⟩ => ?_))
     subst Hm
     exact BI.exists_intro_trans γ (UPred.ownM_op _ _).1

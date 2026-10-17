@@ -122,7 +122,7 @@ its class `Xv6.OffboxBoxG`.  See deviation 6.
    `fscLog` / `fscInodestart` were removed in wave 0d).
 8. **`gset_to_gmap_singletons` is stated at `P.toList`** (the port's
    `ExtTreeSet` has no big-op); the Rocq lemma's `[^op set] z ∈ P` is
-   `[^ CMRA.op list] z ∈ P.toList`, and it is an EQUATION (`RegMapF` is
+   `[^ ORA.op list] z ∈ P.toList`, and it is an EQUATION (`RegMapF` is
    extensional).
 9. **`icfg_alloc` returns the class instance as an existential** exactly as
    Rocq does; its projections are written `I.icfgIref` etc.  `own icfg_boot
@@ -206,7 +206,7 @@ instance : _root_.Std.Commutative (α := PosNat) (· + ·) :=
 instance : COFE PosNat := COFE.ofDiscrete _
 instance : OFE.Discrete PosNat := ⟨fun h => h⟩
 instance instCMRAPosNat : CMRA PosNat := PosCommMonoidLike.instCMRA
-instance : CMRA.Discrete PosNat := PosCommMonoidLike.instDiscrete (α := PosNat)
+instance : ORA.Discrete PosNat := PosCommMonoidLike.instDiscrete (α := PosNat)
 
 /-- RustBelt's Arc algebra, exactly as `FileInvDefs.frefUR` uses it for
 `struct file`: `M !! k = Some (q, n)` means "itable slot `k` is live, with
@@ -580,7 +580,7 @@ theorem gsetToGmap_get {V : Type _} (x : V) (P : ExtTreeSet Nat compare) (k : Na
 
 private theorem foldrConst_bigOp {A : Type _} [CMRA A] (x : A) (L : List Nat) (hL : L.Nodup) :
     L.foldr (fun z m => PartialMap.insert m z x) (∅ : RegMapF A) =
-      [^ CMRA.op list] z ∈ L, (PartialMap.singleton z x : RegMapF A) := by
+      [^ ORA.op list] z ∈ L, (PartialMap.singleton z x : RegMapF A) := by
   induction L with
   | nil => rfl
   | cons z L ih =>
@@ -597,7 +597,7 @@ the one fact the `_split` lemmas of `IcacheRef` need, so that
 `bigOpL_iOwn` can turn one `iOwn` of the whole map into the per-inum
 big-op (deviation 8). -/
 theorem gsetToGmap_singletons {A : Type _} [CMRA A] (x : A) (P : ExtTreeSet Nat compare) :
-    gsetToGmap x P = [^ CMRA.op list] z ∈ P.toList, (PartialMap.singleton z x : RegMapF A) :=
+    gsetToGmap x P = [^ ORA.op list] z ∈ P.toList, (PartialMap.singleton z x : RegMapF A) :=
   foldrConst_bigOp x P.toList (toList_nodup P)
 
 private theorem gsetToGmap_valid {A : Type _} [CMRA A] (x : A) (hx : ✓ x)
@@ -642,7 +642,7 @@ theorem lelemBoot_valid : ✓ lelemBoot := by
   exact ⟨⟨⟨trivial, trivial⟩, trivial⟩, trivial⟩
 
 theorem linkBootMap_valid (P : ExtTreeSet Nat compare) : ✓ linkBootMap P :=
-  gsetToGmap_valid _ (Auth.auth_both_valid_2 lelemBoot_valid (CMRA.inc_refl _)) P
+  gsetToGmap_valid _ (Auth.auth_both_valid_2 lelemBoot_valid (ORA.inc_refl _)) P
 
 /-! ### The checkout deposit's descriptor accessors (design §14.8) -/
 
@@ -760,14 +760,14 @@ def liveElem (g : GName) (k : Nat) : IliveUR :=
   PartialMap.singleton k ((1 : Qp), toAgree (⟨(g, 0)⟩ : DiscreteO (GName × Nat)))
 
 @[irreducible] def liveBootMap (g : GName) : IliveUR :=
-  [^ CMRA.op list] k ∈ List.range (NINODE + NINODE), liveElem g k
+  [^ ORA.op list] k ∈ List.range (NINODE + NINODE), liveElem g k
 
 /-- `liveBootMap` is SEALED (`@[irreducible]`): a transparent 100-element
 big-op is evaluated by `whnf` whenever a term mentioning it is checked in
 another module (measured: `maximum recursion depth`, `List.range.loop`
 unfolded 101 times).  This is its unfolding. -/
 theorem liveBootMap_eq (g : GName) :
-    liveBootMap g = [^ CMRA.op list] k ∈ List.range (NINODE + NINODE), liveElem g k := by
+    liveBootMap g = [^ ORA.op list] k ∈ List.range (NINODE + NINODE), liveElem g k := by
   unfold liveBootMap; rfl
 
 /-- THE LOCK-WINDOW PIN AT BOOT: one WHOLE element per SLOT at `none` --
@@ -776,16 +776,16 @@ def hpnElem (k : Nat) : HpnUR :=
   PartialMap.singleton k (DFracAgree.mk (.own 1) (⟨none⟩ : DiscreteO (Option (Nat × Qp))))
 
 @[irreducible] def hpnBootMap : HpnUR :=
-  [^ CMRA.op list] k ∈ List.range NINODE, hpnElem k
+  [^ ORA.op list] k ∈ List.range NINODE, hpnElem k
 
 /-- The unfolding of the SEALED `hpnBootMap` (`liveBootMap_eq`'s reason). -/
-theorem hpnBootMap_eq : hpnBootMap = [^ CMRA.op list] k ∈ List.range NINODE, hpnElem k := by
+theorem hpnBootMap_eq : hpnBootMap = [^ ORA.op list] k ∈ List.range NINODE, hpnElem k := by
   unfold hpnBootMap; rfl
 
 /-- The lookup of a big-op of singletons over a run of keys (replaces
 Rocq's `Local` `live_seq_lookup_lt` / `hpn_seq_lookup_lt`). -/
 theorem seqSingletons_get {A : Type _} [CMRA A] (v : A) (n m i : Nat) :
-    get? ([^ CMRA.op list] k ∈ List.range' n m, (PartialMap.singleton k v : RegMapF A)) i =
+    get? ([^ ORA.op list] k ∈ List.range' n m, (PartialMap.singleton k v : RegMapF A)) i =
       if n ≤ i ∧ i < n + m then some v else none := by
   induction m generalizing n with
   | zero =>
@@ -805,7 +805,7 @@ theorem seqSingletons_get {A : Type _} [CMRA A] (v : A) (n m i : Nat) :
 
 /-- ...and its validity (replaces `live_seq_valid` / `hpn_seq_valid`). -/
 theorem seqSingletons_valid {A : Type _} [CMRA A] (v : A) (hv : ✓ v) (n m : Nat) :
-    ✓ ([^ CMRA.op list] k ∈ List.range' n m, (PartialMap.singleton k v : RegMapF A)) := by
+    ✓ ([^ ORA.op list] k ∈ List.range' n m, (PartialMap.singleton k v : RegMapF A)) := by
   intro i
   rw [seqSingletons_get]
   split

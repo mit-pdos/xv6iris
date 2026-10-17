@@ -237,7 +237,7 @@ theorem offGv_whole_half (γo : GName) (q : Qp) (z z' : Int) :
   unfold offGv
   iintro H1 H2
   ihave %hv := @ghost_var_valid_2 GF Int OffboxG.offG γo z (.own 1) z' (.own q) $$ H1 H2
-  exact absurd hv.1 (CMRA.not_valid_excl_op_left (x := (DFrac.own 1 : DFrac)))
+  exact absurd hv.1 (ORA.not_valid_excl_op_left (x := (DFrac.own 1 : DFrac)))
 
 /-- Rocq's `vacuity_link_not_taint`: THE LINK IS NOT PAYABLE FROM THE TAINT
 -- a publish that still owns the whole shadow would be inconsistent. -/

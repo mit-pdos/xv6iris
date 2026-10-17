@@ -68,20 +68,20 @@ open Iris Iris.BI Iris.Std Std MachCSL COFE
 slot per new camera. -/
 def unionGF : BundledGFunctors.{0} :=
   xv6GF
-  |>.set 95 ⟨ULiftOF (xgfGm Nat EraPins RegMapF), inferInstance⟩
-  |>.set 96 ⟨ULiftOF (GhostVarF Dst), inferInstance⟩
-  |>.set 97 ⟨ULiftOF (xgfMl FlLine), inferInstance⟩
-  |>.set 98 ⟨ULiftOF (xgfMl EscRec), inferInstance⟩
-  |>.set 99 ⟨ULiftOF (xgfGm Nat FileEra RegMapF), inferInstance⟩
-  |>.set 100 ⟨ULiftOF (xgfMl Fstate), inferInstance⟩
-  |>.set 101 ⟨ULiftOF (xgfGm Nat PipeEra RegMapF), inferInstance⟩
-  |>.set 102 ⟨ULiftOF (GhostVarF (Nat × GName × Bool)), inferInstance⟩
-  |>.set 103 ⟨ULiftOF (constOF PipeEofR), inferInstance⟩
-  |>.set 104 ⟨ULiftOF (HfpReg.RegF Pdev), inferInstance⟩
-  |>.set 105 ⟨ULiftOF (GhostVarF (Option (List (BitVec 8)))), inferInstance⟩
-  |>.set 106 ⟨ULiftOF (HfpReg.RegF CfDev), inferInstance⟩
-  |>.set 107 ⟨ULiftOF (HfpReg.RegF Fdev), inferInstance⟩
-  |>.set 108 ⟨ULiftOF (xgfMl Srec), inferInstance⟩
+  |>.set 95 ⟨ULiftOF (xgfGm Nat EraPins RegMapF)⟩
+  |>.set 96 ⟨ULiftOF (GhostVarF Dst)⟩
+  |>.set 97 ⟨ULiftOF (xgfMl FlLine)⟩
+  |>.set 98 ⟨ULiftOF (xgfMl EscRec)⟩
+  |>.set 99 ⟨ULiftOF (xgfGm Nat FileEra RegMapF)⟩
+  |>.set 100 ⟨ULiftOF (xgfMl Fstate)⟩
+  |>.set 101 ⟨ULiftOF (xgfGm Nat PipeEra RegMapF)⟩
+  |>.set 102 ⟨ULiftOF (GhostVarF (Nat × GName × Bool))⟩
+  |>.set 103 ⟨ULiftOF (constOF PipeEofR)⟩
+  |>.set 104 ⟨ULiftOF (HfpReg.RegF Pdev)⟩
+  |>.set 105 ⟨ULiftOF (GhostVarF (Option (List (BitVec 8))))⟩
+  |>.set 106 ⟨ULiftOF (HfpReg.RegF CfDev)⟩
+  |>.set 107 ⟨ULiftOF (HfpReg.RegF Fdev)⟩
+  |>.set 108 ⟨ULiftOF (xgfMl Srec)⟩
 
 /-! ## One instance per camera -/
 
