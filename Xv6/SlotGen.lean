@@ -310,7 +310,7 @@ theorem sg_one_op (pa : BitVec 64) (dq dq' : DFrac) (g : GName) :
 generation (Rocq `sg_boot_map`, deviation 5).  There is no incarnation at
 boot, so the name is junk. -/
 def sgBootMap (g0 : GName) (l : List (BitVec 64)) : SgenUR :=
-  [^ CMRA.op list] pa ∈ l, sgOne pa (.own 1) g0
+  [^ ORA.op list] pa ∈ l, sgOne pa (.own 1) g0
 
 theorem sgBootMap_get (g0 : GName) (l : List (BitVec 64)) (hl : l.Nodup) (a : BitVec 64) :
     get? (sgBootMap g0 l) a =

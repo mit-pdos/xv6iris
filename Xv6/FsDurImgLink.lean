@@ -137,7 +137,7 @@ theorem imgLink_incl (P : Nat → List (BitVec 8)) (sb : FsSb) (nib : Nat)
   have hdottl : entTokenless ROOTINO (fnOrphan (imgNode P sb ROOTINO)) DOT ROOTINO = false := by
     rw [hro, entTokenless_dot]
   -- THE REMAINING ENTRIES are covered by the root's own tickets
-  have hone : bigOpM (M' := FnameMapF) CMRA.op
+  have hone : bigOpM (M' := FnameMapF) ORA.op
       (fun s t => entElem ROOTINO (fnOrphan (imgNode P sb ROOTINO)) s t
         (lcTyf (imgF P sb) ROOTINO s))
       (PartialMap.delete (M := FnameMapF) (dirEntries (imgNode P sb ROOTINO)) DOT)
@@ -152,12 +152,12 @@ theorem imgLink_incl (P : Nat → List (BitVec 8)) (sb : FsSb) (nib : Nat)
       (lcTyf (imgF P sb) ROOTINO DOT) = linkTokElem (ROOTINO : Int) (imgV P sb ROOTINO) := by
     unfold entElem; rw [hdottl, hdotty]; rfl
   rw [hdotel]
-  refine CMRA.inc_trans (y := toksOfList (imgV P sb)
+  refine ORA.inc_trans (y := toksOfList (imgV P sb)
     (ROOTINO :: ROOTINO :: fsDirTickets P ROOTINO (fsDinode P sb ROOTINO))) ?_ ?_
   · -- STEP ONE: the two spare fragments are the two consed heads
     rw [toksOfList_cons, toksOfList_cons]
-    rw [CMRA.comm (x := linkTokElem (ROOTINO : Int) (imgV P sb ROOTINO) • _)]
-    exact CMRA.op_mono CMRA.Included.rfl (CMRA.op_mono CMRA.Included.rfl hone)
+    rw [Op.comm (x := linkTokElem (ROOTINO : Int) (imgV P sb ROOTINO) • _)]
+    exact ORA.op_mono Included.rfl (ORA.op_mono Included.rfl hone)
   · -- STEP TWO: the counts are covered by the inodes' multiplicities
     apply toksOfList_incl
     intro z hz

@@ -43,15 +43,15 @@ open FsStateLink
 /-- One inode's outgoing tokens, as ONE resource-algebra element: the second
 half of `linkElemNode` (Rocq's `ent_ops`). -/
 def entOps (i : Nat) (n : FsNode) (tyf : Fname → Ity) : FsLinkUR :=
-  bigOpM (M' := FnameMapF) CMRA.op (fun s t => entElem i (fnOrphan n) s t (tyf s)) (dirEntries n)
+  bigOpM (M' := FnameMapF) ORA.op (fun s t => entElem i (fnOrphan n) s t (tyf s)) (dirEntries n)
 
 /-- Rocq's `link_auths`. -/
 def linkAuths (I : RegMapF FsNode) (fv : Nat → Ity) : FsLinkUR :=
-  [^ CMRA.op map] i ↦ n ∈ I, linkAuthElem ((i : Nat) : Int) (fnMult n) (fv i)
+  [^ ORA.op map] i ↦ n ∈ I, linkAuthElem ((i : Nat) : Int) (fnMult n) (fv i)
 
 /-- Rocq's `link_toks_of`. -/
 def linkToksOf (I : RegMapF FsNode) (fv : Nat → Ity) : FsLinkUR :=
-  [^ CMRA.op map] i ↦ n ∈ I, linkToksElem ((i : Nat) : Int) (linkReps (fnMult n) (fv i))
+  [^ ORA.op map] i ↦ n ∈ I, linkToksElem ((i : Nat) : Int) (linkReps (fnMult n) (fv i))
 
 /-- Rocq's `link_full_map_split` (deviation 1). -/
 theorem linkFullMap_split (I : RegMapF FsNode) (fv : Nat → Ity) :
@@ -62,14 +62,14 @@ theorem linkFullMap_split (I : RegMapF FsNode) (fv : Nat → Ity) :
 /-- Rocq's `link_elem_split` (deviation 1). -/
 theorem linkElem_split (I : RegMapF FsNode) (f : LinkChoice) :
     linkElem I f = linkAuths I (lcV f) •
-      [^ CMRA.op map] i ↦ n ∈ I, entOps i n (lcTyf f i) := by
+      [^ ORA.op map] i ↦ n ∈ I, entOps i n (lcTyf f i) := by
   unfold linkElem linkAuths
   exact BigOpM.bigOpM_op_eq (fun i n => linkAuthElem ((i : Nat) : Int) (fnMult n) (lcV f i))
     (fun i n => entOps i n (lcTyf f i)) I
 
 /-- Rocq's `ent_ops_empty`. -/
 theorem entOps_empty (i : Nat) (n : FsNode) (tyf : Fname → Ity) (h : dirEntries n = ∅) :
-    entOps i n tyf = UCMRA.unit := by
+    entOps i n tyf = UORA.unit := by
   unfold entOps
   rw [h]
   exact BigOpM.bigOpM_empty _
@@ -79,10 +79,10 @@ one node's (Rocq's `ent_ops_one`). -/
 theorem entOps_one (I : RegMapF FsNode) (f : LinkChoice) (d : Nat) (nd : FsNode)
     (hd : PartialMap.get? I d = some nd)
     (hrest : ∀ i n, PartialMap.get? I i = some n → i ≠ d → dirEntries n = ∅) :
-    ([^ CMRA.op map] i ↦ n ∈ I, entOps i n (lcTyf f i)) = entOps d nd (lcTyf f d) := by
+    ([^ ORA.op map] i ↦ n ∈ I, entOps i n (lcTyf f i)) = entOps d nd (lcTyf f d) := by
   rw [BigOpM.bigOpM_delete_eq _ hd]
-  have hu : ([^ CMRA.op map] i ↦ n ∈ PartialMap.delete I d, entOps i n (lcTyf f i)) =
-      ([^ CMRA.op map] _i ↦ _n ∈ PartialMap.delete I d, (UCMRA.unit : FsLinkUR)) := by
+  have hu : ([^ ORA.op map] i ↦ n ∈ PartialMap.delete I d, entOps i n (lcTyf f i)) =
+      ([^ ORA.op map] _i ↦ _n ∈ PartialMap.delete I d, (UORA.unit : FsLinkUR)) := by
     refine BigOpM.bigOpM_eq fun {i n} hi => ?_
     have hid : i ≠ d := by
       intro e; subst e
@@ -90,7 +90,7 @@ theorem entOps_one (I : RegMapF FsNode) (f : LinkChoice) (d : Nat) (nd : FsNode)
       cases hi
     rw [LawfulPartialMap.get?_delete_ne (Ne.symm hid)] at hi
     exact entOps_empty i n _ (hrest i n hi hid)
-  rw [hu, BigOpM.bigOpM_const_unit_eq, CMRA.unit_right_id]
+  rw [hu, BigOpM.bigOpM_const_unit_eq, ORA.unit_right_id]
 
 /-- THE REDUCTION, WITH A SLACK ELEMENT `e` (the region's keep-alive token
 the boot mint allocates out of the same `own_alloc`): validity from ONE
@@ -100,15 +100,15 @@ theorem linkElemValid_ofRoot (I : RegMapF FsNode) (f : LinkChoice) (d : Nat) (nd
     (hrest : ∀ i n, PartialMap.get? I i = some n → i ≠ d → dirEntries n = ∅)
     (hinc : entOps d nd (lcTyf f d) • e ≼ linkToksOf I (lcV f)) : ✓ (linkElem I f • e) := by
   obtain ⟨x, hx⟩ := hinc
-  refine CMRA.valid_of_inc ⟨x, ?_⟩ (linkFullMap_valid I (lcV f))
+  refine ORA.valid_of_inc ⟨x, ?_⟩ (linkFullMap_valid I (lcV f))
   rw [linkFullMap_split, linkElem_split, entOps_one I f d nd hd hrest, hx]
-  simp only [CMRA.assoc]
+  simp only [Op.assoc]
 
 /-! ## 9b.  A list of tokens as one RA element -/
 
 /-- Rocq's `toks_of_list` (deviation 2). -/
 def toksOfList (fv : Nat → Ity) (L : List Nat) : FsLinkUR :=
-  [^ CMRA.op list] t ∈ L, linkTokElem ((t : Nat) : Int) (fv t)
+  [^ ORA.op list] t ∈ L, linkTokElem ((t : Nat) : Int) (fv t)
 
 /-- Rocq's `toks_of_list_cons`. -/
 theorem toksOfList_cons (fv : Nat → Ity) (t : Nat) (L : List Nat) :

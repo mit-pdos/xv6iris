@@ -126,7 +126,7 @@ theorem liveVal_singleton_op_valid {k : Nat} {s1 s2 : Qp} {g1 g2 : GName} {lo1 l
 theorem liveVal_one_update (k : Nat) (g g' : GName) (lo lo' : Nat) :
     (PartialMap.singleton k (liveVal 1 g lo) : IliveUR) ~~>
       PartialMap.singleton k (liveVal 1 g' lo') := by
-  haveI : CMRA.Exclusive (liveVal 1 g lo) := by unfold liveVal; infer_instance
+  haveI : ORA.Exclusive (liveVal 1 g lo) := by unfold liveVal; infer_instance
   exact Heap.singleton_update (Update.exclusive ⟨Rat.le_refl, Agree.toAgree_valid⟩)
 
 section IcacheRefGhost
@@ -263,7 +263,7 @@ private theorem liveElem_frac0 [Icfg] (g : GName) (k : Nat) :
   iexact H
 
 private theorem liveBoot_fan [Icfg] (g : GName) : ∀ l : List Nat,
-    iOwn (GF := GF) (F := constOF IliveUR) icfgLive ([^ CMRA.op list] k ∈ l, liveElem g k) ⊢
+    iOwn (GF := GF) (F := constOF IliveUR) icfgLive ([^ ORA.op list] k ∈ l, liveElem g k) ⊢
       [∗list] k ∈ l, liveFrac0 (GF := GF) k 1
   | [] => BigSepL.bigSepL_nil_intro
   | k :: l => iOwn_op.1.trans (sep_mono (liveElem_frac0 g k) (liveBoot_fan g l))

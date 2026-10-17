@@ -304,7 +304,7 @@ theorem irefSlots_alloc {GF : BundledGFunctors.{0}} [Xv6G GF] :
       @irefSlotsAuth GF _ I ∗ @irefSlots GF _ I IREFSLOTS := by
   imod iOwn_alloc (F := IrefslotRF) (GF := GF)
       ((● natUfrac IREFSLOTS : IrefslotUR) • ◯ natUfrac IREFSLOTS) with ⟨%γ, H⟩
-  · exact Auth.auth_both_valid_discrete.mpr ⟨CMRA.inc_refl _, by simp [IREFSLOTS, natUfrac]; trivial⟩
+  · exact Auth.auth_both_valid_discrete.mpr ⟨ORA.inc_refl _, by simp [IREFSLOTS, natUfrac]; trivial⟩
   imodintro
   iexists ({ irefslotName := γ } : IrefslotG GF)
   unfold irefSlotsAuth irefSlots

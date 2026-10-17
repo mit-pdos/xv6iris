@@ -136,7 +136,7 @@ theorem frz_incl_eq {T : Type} [COFE T] (f : Option (Excl T)) (v : T)
 `*_split` lemma below runs on). -/
 theorem singleton_frac_split {V : Type} [OFE V] (z : Nat) (a : V) :
     (PartialMap.singleton z (DFracAgree.Frac.mk 1 a) : RegMapF (DFracAgree.DFracAgreeR V)) =
-      CMRA.op (PartialMap.singleton z (DFracAgree.Frac.mk (1 : Qp).half a))
+      ORA.op (PartialMap.singleton z (DFracAgree.Frac.mk (1 : Qp).half a))
         (PartialMap.singleton z (DFracAgree.Frac.mk (1 : Qp).half a)) := by
   rw [Heap.singleton_op_singleton, ← DFracAgree.Frac.mk_op, Qp.half_add_half]
 
@@ -148,7 +148,7 @@ variable {GF : BundledGFunctors.{0}} [IcacheG GF]
 is not the one the icache classes provide). -/
 theorem iOwn_bigOpL_entail {A B : Type} [UCMRA A] [ElemG GF (constOF A)] (γ : GName)
     (f : B → A) (l : List B) :
-    iOwn (GF := GF) (F := constOF A) γ ([^ CMRA.op list] x ∈ l, f x) ⊢
+    iOwn (GF := GF) (F := constOF A) γ ([^ ORA.op list] x ∈ l, f x) ⊢
       [∗list] x ∈ l, iOwn (F := constOF A) γ (f x) := by
   induction l with
   | nil => exact affine
@@ -400,7 +400,7 @@ theorem link_update_alloc [Icfg] (z : Nat) (a a' b' : LinkElemUR)
     linkAuthE (GF := GF) z a ⊢ |==> (linkAuthE z a' ∗ linkFragE z b') := by
   unfold linkAuthE linkFragE
   iintro Ha
-  imod iOwn_update (a' := CMRA.op (PartialMap.singleton z (● a' : Auth LinkElemUR) : LinkUR)
+  imod iOwn_update (a' := ORA.op (PartialMap.singleton z (● a' : Auth LinkElemUR) : LinkUR)
       (PartialMap.singleton z (◯ b' : Auth LinkElemUR))) $$ Ha with ⟨Ha, Hb⟩
   · rw [Heap.singleton_op_singleton]
     exact Heap.singleton_update (Auth.auth_update_alloc hlu)
@@ -412,7 +412,7 @@ theorem link_update [Icfg] (z : Nat) (a b a' b' : LinkElemUR)
     linkAuthE (GF := GF) z a ∗ linkFragE z b ⊢ |==> (linkAuthE z a' ∗ linkFragE z b') := by
   unfold linkAuthE linkFragE
   iintro ⟨Ha, Hb⟩
-  imod iOwn_update_op (a' := CMRA.op (PartialMap.singleton z (● a' : Auth LinkElemUR) : LinkUR)
+  imod iOwn_update_op (a' := ORA.op (PartialMap.singleton z (● a' : Auth LinkElemUR) : LinkUR)
       (PartialMap.singleton z (◯ b' : Auth LinkElemUR))) $$ [$Ha $Hb] with ⟨Ha, Hb⟩
   · rw [Heap.singleton_op_singleton, Heap.singleton_op_singleton]
     exact Heap.singleton_update (Auth.auth_update hlu)
@@ -546,7 +546,7 @@ theorem icnt_update [Icfg] (z : Nat) (n m : Nat) :
     icntHalf (GF := GF) z n ∗ icntHalf z n ⊢ |==> (icntHalf z m ∗ icntHalf z m) := by
   unfold icntHalf icntAt
   iintro ⟨H1, H2⟩
-  imod iOwn_update_op (a' := CMRA.op
+  imod iOwn_update_op (a' := ORA.op
       (PartialMap.singleton z (DFracAgree.Frac.mk (1 : Qp).half (⟨m⟩ : DiscreteO Nat)) : IcntUR)
       (PartialMap.singleton z (DFracAgree.Frac.mk (1 : Qp).half (⟨m⟩ : DiscreteO Nat))))
     $$ [$H1 $H2] with ⟨H1, H2⟩
@@ -610,7 +610,7 @@ theorem frzm_update [Icfg] (z : Nat) (b b' : Bool) :
     frzmH (GF := GF) z b ∗ frzmH z b ⊢ |==> (frzmH z b' ∗ frzmH z b') := by
   unfold frzmH frzmAt
   iintro ⟨H1, H2⟩
-  imod iOwn_update_op (a' := CMRA.op
+  imod iOwn_update_op (a' := ORA.op
       (PartialMap.singleton z (DFracAgree.Frac.mk (1 : Qp).half (⟨b'⟩ : DiscreteO Bool)) : FrzmUR)
       (PartialMap.singleton z (DFracAgree.Frac.mk (1 : Qp).half (⟨b'⟩ : DiscreteO Bool))))
     $$ [$H1 $H2] with ⟨H1, H2⟩

@@ -170,7 +170,7 @@ def entTyOk (self : Nat) (dd : Option Nat) (isd : Bool) (s : Fname) (ty : Ity) :
 
 /-- The per-inode element's per-entry piece (Rocq's `ent_elem`). -/
 def entElem (self : Nat) (orph : Bool) (s : Fname) (t : Nat) (ty : Ity) : FsLinkUR :=
-  if entTokenless self orph s t then UCMRA.unit else FsStateLink.linkTokElem (t : Int) ty
+  if entTokenless self orph s t then UORA.unit else FsStateLink.linkTokElem (t : Int) ty
 
 /-- THE PER-INODE ELEMENT.  `v` is the node's own register value and `tyf`
 its entries'; the CLAUSE on the pair is `nodeEntOk`, and at the value level
@@ -178,7 +178,7 @@ its entries'; the CLAUSE on the pair is `nodeEntOk`, and at the value level
 reading in the whole design (Rocq's `link_elem_node`). -/
 def linkElemNode (i : Nat) (n : FsNode) (v : Ity) (tyf : Fname → Ity) : FsLinkUR :=
   FsStateLink.linkAuthElem (i : Int) (fnMult n) v •
-    bigOpM (M' := FnameMapF) CMRA.op (fun s t => entElem i (fnOrphan n) s t (tyf s)) (dirEntries n)
+    bigOpM (M' := FnameMapF) ORA.op (fun s t => entElem i (fnOrphan n) s t (tyf s)) (dirEntries n)
 
 /-- Rocq's `node_ent_ok`. -/
 def nodeEntOk (i : Nat) (n : FsNode) (D : Std.ExtTreeSet Fname compare) (v : Ity)

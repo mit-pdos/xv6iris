@@ -401,7 +401,7 @@ theorem omass_nonneg (o : Option UFrac) : 0 ≤ omass o := by
   | some q => exact Rat.le_of_lt q.frac.2
 
 theorem omass_op (a b : Option UFrac) : omass (a • b) = omass a + omass b := by
-  cases a <;> cases b <;> simp [omass, CMRA.op, optionOp] <;> grind
+  cases a <;> cases b <;> simp [omass, ORA.op, optionOp] <;> grind
 
 /-- The keys of a stamps map. -/
 def skeys (m : StampMap Id) : List (Id × Nat) := (FiniteMap.toList m).map Prod.fst
@@ -451,7 +451,7 @@ theorem get?_sop (m1 m2 : StampMap Id) (p : Id × Nat) :
 theorem isSome_sop (m1 m2 : StampMap Id) (p : Id × Nat) :
     (get? (m1 • m2) p).isSome ↔ (get? m1 p).isSome ∨ (get? m2 p).isSome := by
   rw [get?_sop]
-  cases get? m1 p <;> cases get? m2 p <;> simp [CMRA.op, optionOp]
+  cases get? m1 p <;> cases get? m2 p <;> simp [ORA.op, optionOp]
 
 theorem qsum_empty : qsum (∅ : StampMap Id) = 0 := by
   rw [qsum_cover (∅ : StampMap Id) [] List.nodup_nil (fun p hp => by
@@ -669,7 +669,7 @@ theorem mscale_split (s s' : Qp) (m : StampMap Id) (hss : s + s' = 1) :
   cases get? m p with
   | none => rfl
   | some q =>
-    simp only [Option.map_some, CMRA.op, optionOp, UFrac.ext_iff, qpMul, Option.some.injEq]
+    simp only [Option.map_some, ORA.op, optionOp, UFrac.ext_iff, qpMul, Option.some.injEq]
     apply Subtype.ext
     have h : s.val + s'.val = 1 := congrArg Subtype.val hss
     show q.frac.val = q.frac.val * s.val + q.frac.val * s'.val
@@ -766,7 +766,7 @@ omit [MachGS GF] in
 /-- The empty fragment is free (Rocq's `own_unit` at the stamps camera). -/
 theorem stampsFrag_empty (γ : BoxNames) : ⊢ |==> stampsFrag (GF := GF) (Id := Id) γ ∅ := by
   unfold stampsFrag
-  exact iOwn_unit (F := StampsRF Id) (ε := (UCMRA.unit : Auth (StampMap Id)))
+  exact iOwn_unit (F := StampsRF Id) (ε := (UORA.unit : Auth (StampMap Id)))
 
 omit [MachGS GF] in
 /-- The stamps authority at `∅`, fresh. -/
@@ -809,9 +809,9 @@ theorem stamps_alloc_upd (m : StampMap Id) (p : Id × Nat) (q : UFrac) :
     (● m : Auth (StampMap Id)) ~~>
       ((● ((PartialMap.singleton p q : StampMap Id) • m)) • ◯ (PartialMap.singleton p q : StampMap Id)) := by
   refine Auth.auth_update_alloc ?_
-  have h := LocalUpdate.op_discrete m (UCMRA.unit : StampMap Id) (PartialMap.singleton p q : StampMap Id)
+  have h := LocalUpdate.op_discrete m (UORA.unit : StampMap Id) (PartialMap.singleton p q : StampMap Id)
     (fun _ => stampMap_valid _)
-  have he : (PartialMap.singleton p q : StampMap Id) • (UCMRA.unit : StampMap Id) =
+  have he : (PartialMap.singleton p q : StampMap Id) • (UORA.unit : StampMap Id) =
       PartialMap.singleton p q := Heap.op_empty_right
   rw [he] at h
   exact h

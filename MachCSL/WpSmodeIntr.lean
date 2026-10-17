@@ -645,7 +645,7 @@ theorem armExt_split (cpu : CPU) (sie : Bool) (p : BitVec 64) :
     iframe Ht Hc
     isplitl [Hr]
     · unfold intrRes; iexact Hr
-    · isplit <;> iempintro
+    · isplit <;> first | iempintro | (ipureintro; trivial) | ipureintro
 
 /-- Rocq `arm_pay_ext_join`. -/
 theorem armExt_join (cpu : CPU) (sie : Bool) (p : BitVec 64) :

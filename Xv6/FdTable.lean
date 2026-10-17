@@ -163,9 +163,9 @@ omit [MachGS GF] in
 theorem fdSt_update (γd : GName) (fd : Nat) (st st' st'' : FdState) :
     fdStAuth (GF := GF) γd fd st ∗ fdSt γd fd st' ⊢ |==> (fdStAuth γd fd st'' ∗ fdSt γd fd st'') := by
   unfold fdStAuth fdSt fdStAt
-  have hu : CMRA.op (PartialMap.singleton fd (fdstElt (.own (1 : Qp).half) st) : FdstUR)
+  have hu : ORA.op (PartialMap.singleton fd (fdstElt (.own (1 : Qp).half) st) : FdstUR)
         (PartialMap.singleton fd (fdstElt (.own (1 : Qp).half) st')) ~~>
-      CMRA.op (PartialMap.singleton fd (fdstElt (.own (1 : Qp).half) st'') : FdstUR)
+      ORA.op (PartialMap.singleton fd (fdstElt (.own (1 : Qp).half) st'') : FdstUR)
         (PartialMap.singleton fd (fdstElt (.own (1 : Qp).half) st'')) := by
     rw [Heap.singleton_op_singleton, Heap.singleton_op_singleton]
     exact Heap.singleton_update (DFracAgree.Frac.update₂ (Qp.half_add_half 1))
@@ -180,7 +180,7 @@ omit [MachGS GF] in
 theorem fdSt_halves (γd : GName) (fd : Nat) (st : FdState) :
     fdStAt (GF := GF) γd fd (.own 1) st ⊢ fdStAuth γd fd st ∗ fdSt γd fd st := by
   unfold fdStAuth fdSt fdStAt
-  have h : fdstElt (.own 1) st = CMRA.op (fdstElt (.own (1 : Qp).half) st) (fdstElt (.own (1 : Qp).half) st) := by
+  have h : fdstElt (.own 1) st = ORA.op (fdstElt (.own (1 : Qp).half) st) (fdstElt (.own (1 : Qp).half) st) := by
     have := @DFracAgree.Frac.mk_op (DiscreteO FdState) _ (1 : Qp).half (1 : Qp).half ⟨st⟩
     rw [Qp.half_add_half] at this
     exact this
@@ -866,7 +866,7 @@ omit [MachGS GF] in
 theorem fdSt_join (γd : GName) (fd : Nat) (st : FdState) :
     fdStAuth (GF := GF) γd fd st ∗ fdSt γd fd st ⊢ fdStAt γd fd (.own 1) st := by
   unfold fdStAuth fdSt fdStAt
-  have h : fdstElt (.own 1) st = CMRA.op (fdstElt (.own (1 : Qp).half) st) (fdstElt (.own (1 : Qp).half) st) := by
+  have h : fdstElt (.own 1) st = ORA.op (fdstElt (.own (1 : Qp).half) st) (fdstElt (.own (1 : Qp).half) st) := by
     have := @DFracAgree.Frac.mk_op (DiscreteO FdState) _ (1 : Qp).half (1 : Qp).half ⟨st⟩
     rw [Qp.half_add_half] at this
     exact this

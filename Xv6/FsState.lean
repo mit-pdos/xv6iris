@@ -297,7 +297,7 @@ def linkElemOk (I : RegMapF FsNode) (f : LinkChoice) : Prop :=
 
 /-- Rocq's `link_elem`. -/
 def linkElem (I : RegMapF FsNode) (f : LinkChoice) : FsLinkUR :=
-  [^ CMRA.op map] i ↦ n ∈ I, linkElemNode i n (lcV f i) (lcTyf f i)
+  [^ ORA.op map] i ↦ n ∈ I, linkElemNode i n (lcV f i) (lcTyf f i)
 
 /-- ONE inode's whole contribution, under the existential its register
 authority is bound by (Rocq's `fs_link_node`). -/
@@ -336,7 +336,7 @@ theorem linkElem_ext (I : RegMapF FsNode) (f g : LinkChoice)
   unfold lcV lcTyf
   rw [hfg i ⟨n, hi⟩]
 
-theorem linkElem_empty (f : LinkChoice) : linkElem ∅ f = UCMRA.unit := by
+theorem linkElem_empty (f : LinkChoice) : linkElem ∅ f = UORA.unit := by
   unfold linkElem
   exact BigOpM.bigOpM_empty _
 
@@ -351,7 +351,7 @@ induction every "the family is valid" argument needs (Rocq's
 `big_op_singletons_lookup`, deviation 4). -/
 theorem fsStateBigOpSingletons_lookup {A : Type} [UCMRA A] (I : RegMapF FsNode)
     (h : Nat → FsNode → A) (j : Nat) :
-    get? ([^ CMRA.op map] i ↦ n ∈ I, (PartialMap.singleton ((i : Nat) : Int) (h i n) : FsLinkMapF A))
+    get? ([^ ORA.op map] i ↦ n ∈ I, (PartialMap.singleton ((i : Nat) : Int) (h i n) : FsLinkMapF A))
       ((j : Nat) : Int) = (get? I j).map (h j) := by
   induction I using LawfulFiniteMap.induction_on with
   | hemp =>
@@ -370,7 +370,7 @@ theorem fsStateBigOpSingletons_lookup {A : Type} [UCMRA A] (I : RegMapF FsNode)
 /-- ...and at a NEGATIVE key no singleton lands (deviation 4). -/
 theorem fsStateBigOpSingletons_neg {A : Type} [UCMRA A] (I : RegMapF FsNode)
     (h : Nat → FsNode → A) (j : Nat) :
-    get? ([^ CMRA.op map] i ↦ n ∈ I, (PartialMap.singleton ((i : Nat) : Int) (h i n) : FsLinkMapF A))
+    get? ([^ ORA.op map] i ↦ n ∈ I, (PartialMap.singleton ((i : Nat) : Int) (h i n) : FsLinkMapF A))
       (Int.negSucc j) = none := by
   induction I using LawfulFiniteMap.induction_on with
   | hemp =>
@@ -425,7 +425,7 @@ theorem fsLinks_gather (g : GName) (I : RegMapF FsNode) (x : FsLinkUR) :
       intro j m hj
       rw [LawfulPartialMap.get?_empty] at hj
       cases hj
-    · rw [linkElem_empty, CMRA.unit_right_id_L]
+    · rw [linkElem_empty, ORA.unit_right_id_L]
       iexact Hx
   | hins i n I hi ih =>
     unfold fsLinks
@@ -458,7 +458,7 @@ theorem fsLinks_gather (g : GName) (I : RegMapF FsNode) (x : FsLinkUR) :
         exact Hf j m hj
     · rw [linkElem_insert I i n _ hi, ← linkElem_ext I f _ hext]
       simp only [lcV, lcTyf, if_true]
-      rw [CMRA.assoc]
+      rw [Op.assoc]
       iexact Hr
 
 /-- The gather's validity, read off ONE `iOwn` (helper). -/
@@ -482,14 +482,14 @@ theorem fsLinks_valid_tok (g : GName) (I : RegMapF FsNode) (i : Int) (v : Ity) :
   ihave %Hv := fsLinks_own_valid g _ $$ H
   ipureintro
   refine ⟨f, Hf, ?_⟩
-  rw [CMRA.comm]
+  rw [Op.comm]
   exact Hv
 
 /-- `bigOpM_iOwn_entail` at the register's camera, with the contractive
 instance passed by hand (`Xv6/FsStateLink.lean` §6's reason). -/
 theorem fsLinkOwn_scatter {K V : Type _} {M : Type _ → Type _} [LawfulFiniteMap M K]
     (γ : GName) (f : K → V → FsLinkUR) (m : M V) :
-    iOwn (GF := GF) (F := constOF FsLinkUR) γ ([^ CMRA.op map] k ↦ v ∈ m, f k v) ⊢
+    iOwn (GF := GF) (F := constOF FsLinkUR) γ ([^ ORA.op map] k ↦ v ∈ m, f k v) ⊢
       [∗map] k ↦ v ∈ m, iOwn (GF := GF) (F := constOF FsLinkUR) γ (f k v) :=
   @bigOpM_iOwn_entail GF (constOF FsLinkUR) OFunctor.constOF_URFunctorContractive
     FsLinkG.fsLinkInG K M V _ γ f m
@@ -544,7 +544,7 @@ free (`linkFullElem_valid`) and NO image sweep is spent.  `FsDurImg`'s
 
 /-- Rocq's `link_full_map`. -/
 def linkFullMap (I : RegMapF FsNode) (fv : Nat → Ity) : FsLinkUR :=
-  [^ CMRA.op map] i ↦ n ∈ I, FsStateLink.linkFullElem ((i : Nat) : Int) (fnMult n) (fv i)
+  [^ ORA.op map] i ↦ n ∈ I, FsStateLink.linkFullElem ((i : Nat) : Int) (fnMult n) (fv i)
 
 /-- Rocq's `link_full_map_lookup` (deviation 4: at a cast key). -/
 theorem linkFullMap_lookup (I : RegMapF FsNode) (fv : Nat → Ity) (j : Nat) :

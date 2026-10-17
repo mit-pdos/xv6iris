@@ -352,11 +352,11 @@ theorem linkReturn (Γ : FsViewNames GF) (i : Int) (n : Nat) (ty ty' : Ity) :
 which is the AUTHORITY's own unit factor.  Splitting it off is the `k = 0`
 corner every `k`-at-a-time mover below has. -/
 theorem linkToksElem_empty (i : Int) :
-    linkToksElem i (∅ : ItyMS) = PartialMap.singleton i (UCMRA.unit : FsLinkElemUR) := rfl
+    linkToksElem i (∅ : ItyMS) = PartialMap.singleton i (UORA.unit : FsLinkElemUR) := rfl
 
 theorem linkAuthElem_frag_empty (i : Int) (n : Nat) (ty : Ity) :
     linkAuthElem i n ty = linkAuthElem i n ty • linkToksElem i ∅ := by
-  rw [linkToksElem_empty, linkAuthElem, Heap.singleton_op_singleton, CMRA.unit_right_id_L]
+  rw [linkToksElem_empty, linkAuthElem, Heap.singleton_op_singleton, ORA.unit_right_id_L]
 
 theorem linkToks_empty (Γ : FsViewNames GF) (i : Int) (n : Nat) (ty : Ity) :
     linkAuth Γ i n ty ⊣⊢ linkAuth Γ i n ty ∗ linkToks Γ i ∅ := by
@@ -473,10 +473,10 @@ theorem ownGather_mapOpt {K V : Type _} {M : Type _ → Type _} [LawfulFiniteMap
     [DecidableEq K] (γ : GName) (f : K → V → F.ap (IProp GF)) (p : K → V → Bool)
     (m : M V) (x : F.ap (IProp GF)) :
     iOwn γ x ∗ ([∗map] k ↦ v ∈ m, if p k v then emp else iOwn γ (f k v)) ⊢
-      iOwn γ (x • [^ CMRA.op map] k ↦ v ∈ m, (if p k v then UCMRA.unit else f k v)) := by
+      iOwn γ (x • [^ ORA.op map] k ↦ v ∈ m, (if p k v then UORA.unit else f k v)) := by
   induction m using LawfulFiniteMap.induction_on generalizing x with
   | hemp =>
-    rw [BigOpM.bigOpM_empty, CMRA.unit_right_id_L]
+    rw [BigOpM.bigOpM_empty, ORA.unit_right_id_L]
     exact sep_elim_left
   | hins k v m hk ih =>
     rw [BigOpM.bigOpM_insert_eq _ _ hk]
@@ -484,15 +484,15 @@ theorem ownGather_mapOpt {K V : Type _} {M : Type _ → Type _} [LawfulFiniteMap
     cases hp : p k v
     · simp only [Bool.false_eq_true, if_false]
       refine sep_assoc.2.trans ((sep_mono_left iOwn_op.2).trans ((ih (x • f k v)).trans ?_))
-      rw [CMRA.assoc]
+      rw [Op.assoc]
     · simp only [if_true]
       refine (sep_mono_right emp_sep.1).trans ((ih x).trans ?_)
-      rw [CMRA.unit_left_id_L]
+      rw [ORA.unit_left_id_L]
 
 /-- The distribution direction of the `_opt` map form. -/
 theorem ownScatter_mapOpt {K V : Type _} {M : Type _ → Type _} [LawfulFiniteMap M K]
     (γ : GName) (f : K → V → F.ap (IProp GF)) (p : K → V → Bool) (m : M V) :
-    iOwn γ ([^ CMRA.op map] k ↦ v ∈ m, (if p k v then UCMRA.unit else f k v)) ⊢
+    iOwn γ ([^ ORA.op map] k ↦ v ∈ m, (if p k v then UORA.unit else f k v)) ⊢
       [∗map] k ↦ v ∈ m, if p k v then emp else iOwn γ (f k v) := by
   refine (bigOpM_iOwn_entail γ _ m).trans (BigSepM.bigSepM_mono_of_forall ?_)
   intro k v
@@ -520,13 +520,13 @@ theorem linkGather_mapOpt {K V : Type _} {M : Type _ → Type _} [LawfulFiniteMa
     (m : M V) (x : FsLinkUR) :
     iOwn (GF := GF) (F := constOF FsLinkUR) γ x ∗
         ([∗map] k ↦ v ∈ m, if p k v then emp else iOwn (GF := GF) (F := constOF FsLinkUR) γ (f k v)) ⊢
-      iOwn (GF := GF) (F := constOF FsLinkUR) γ (x • [^ CMRA.op map] k ↦ v ∈ m, (if p k v then UCMRA.unit else f k v)) :=
+      iOwn (GF := GF) (F := constOF FsLinkUR) γ (x • [^ ORA.op map] k ↦ v ∈ m, (if p k v then UORA.unit else f k v)) :=
   @ownGather_mapOpt GF (constOF FsLinkUR) OFunctor.constOF_URFunctorContractive FsLinkG.fsLinkInG
     K V M _ _ γ f p m x
 
 theorem linkScatter_mapOpt {K V : Type _} {M : Type _ → Type _} [LawfulFiniteMap M K]
     (γ : GName) (f : K → V → FsLinkUR) (p : K → V → Bool) (m : M V) :
-    iOwn (GF := GF) (F := constOF FsLinkUR) γ ([^ CMRA.op map] k ↦ v ∈ m, (if p k v then UCMRA.unit else f k v)) ⊢
+    iOwn (GF := GF) (F := constOF FsLinkUR) γ ([^ ORA.op map] k ↦ v ∈ m, (if p k v then UORA.unit else f k v)) ⊢
       [∗map] k ↦ v ∈ m, if p k v then emp else iOwn (GF := GF) (F := constOF FsLinkUR) γ (f k v) :=
   @ownScatter_mapOpt GF (constOF FsLinkUR) OFunctor.constOF_URFunctorContractive FsLinkG.fsLinkInG
     K V M _ γ f p m

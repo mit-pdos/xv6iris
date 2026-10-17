@@ -144,7 +144,7 @@ theorem viewOps_incl (data : Nat → List (BitVec 8)) (self : Nat) (orph : Bool)
     (hself : ∀ k, k < n → dirWins data k = true → dirBname data k ≠ ex →
       entTokenless self orph (dirBname data k) (dirInum data k).toNat = false →
       tick k = some (dirInum data k).toNat ∧ tyf (dirBname data k) = fv (dirInum data k).toNat) :
-    bigOpM (M' := FnameMapF) CMRA.op (fun s t => entElem self orph s t (tyf s))
+    bigOpM (M' := FnameMapF) ORA.op (fun s t => entElem self orph s t (tyf s))
         (PartialMap.delete (M := FnameMapF) (dirView data n) ex)
       ≼ toksOfList fv ((List.range n).filterMap tick) := by
   induction n with
@@ -157,39 +157,39 @@ theorem viewOps_incl (data : Nat → List (BitVec 8)) (self : Nat) (orph : Bool)
       · rw [LawfulPartialMap.get?_delete_ne hs]
         rfl
     rw [h0, BigOpM.bigOpM_empty]
-    exact CMRA.inc_unit
+    exact ORA.inc_unit
   | succ n ih =>
     have ihn := ih (fun k hk => hself k (by omega))
     rw [List.range_succ, List.filterMap_append, toksOfList_app]
     cases hw : dirWins data n with
     | false =>
       rw [dirViewSucc_loses data n hw]
-      exact CMRA.inc_trans ihn (CMRA.inc_op_left _ _)
+      exact ORA.inc_trans ihn (ORA.inc_op_left _ _)
     | true =>
       rw [dirViewSucc_wins data n hw]
       by_cases hex : dirBname data n = ex
       · -- THE EXEMPT NAME: the caller carries it, so nothing is added
         rw [hex, fsDurImgDelete_insertSame]
-        exact CMRA.inc_trans ihn (CMRA.inc_op_left _ _)
+        exact ORA.inc_trans ihn (ORA.inc_op_left _ _)
       · rw [fsDurImgDelete_insertNe _ _ _ _ hex]
         have hfresh : PartialMap.get? (M := FnameMapF)
             (PartialMap.delete (M := FnameMapF) (dirView data n) ex) (dirBname data n) = none := by
           rw [LawfulPartialMap.get?_delete_ne (Ne.symm hex)]
           exact dirViewSucc_fresh data n hw
-        rw [BigOpM.bigOpM_insert_eq _ _ hfresh, CMRA.comm]
-        refine CMRA.op_mono ihn ?_
+        rw [BigOpM.bigOpM_insert_eq _ _ hfresh, Op.comm]
+        refine ORA.op_mono ihn ?_
         -- the one record's comparison
         cases htl : entTokenless self orph (dirBname data n) (dirInum data n).toNat with
         | true =>
           unfold entElem
           rw [if_pos htl]
-          exact CMRA.inc_unit
+          exact ORA.inc_unit
         | false =>
           obtain ⟨ht, hpv⟩ := hself n (by omega) hw hex htl
           rw [List.filterMap_cons, List.filterMap_nil, ht, toksOfList_singleton]
           unfold entElem
           rw [htl, hpv]
-          exact CMRA.Included.rfl
+          exact Included.rfl
 
 /-- ...at the image's ticket function; the exempt name is `DOT` (Rocq's
 `view_ops_incl_tickets`). -/
@@ -199,7 +199,7 @@ theorem viewOps_inclTickets (P : Nat → List (BitVec 8)) (self : Nat) (dn : Din
       dirBname (fsDataOf P dn) k ≠ DOT →
       entTokenless self orph (dirBname (fsDataOf P dn) k) (dirInum (fsDataOf P dn) k).toNat = false →
       tyf (dirBname (fsDataOf P dn) k) = fv (dirInum (fsDataOf P dn) k).toNat) :
-    bigOpM (M' := FnameMapF) CMRA.op (fun s t => entElem self orph s t (tyf s))
+    bigOpM (M' := FnameMapF) ORA.op (fun s t => entElem self orph s t (tyf s))
         (PartialMap.delete (M := FnameMapF) (dirView (fsDataOf P dn) (dirNrec dn.diSize.toNat)) DOT)
       ≼ toksOfList fv (fsDirTickets P self dn) := by
   unfold fsDirTickets
