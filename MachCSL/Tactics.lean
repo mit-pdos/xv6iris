@@ -882,13 +882,19 @@ def swpStepCore (x fn : Lean.Expr) (bind : Bool) : TacticM Unit := do
       else
         evalTactic (← `(tactic| (iapply (swp_sail_mem_address_announce _ $reqStx); inext)))
     else if n == ``LeanRV64D.ArchSem.sail_barrier then
-      evalTactic (← `(tactic| (iapply swp_bind; iapply swp_sail_barrier; inext; iapply swp_ret)))
+      -- (the silent leaves `▷ Φ v ⊢ swp cpu x Φ`: under a bind the continuation runs on; a
+      -- bare one leaves the postcondition)
+      if bind then evalTactic (← `(tactic| (iapply swp_bind; iapply swp_sail_barrier; inext)))
+      else evalTactic (← `(tactic| (iapply swp_sail_barrier; inext)))
     else if n == ``LeanRV64D.cycle_count then
-      evalTactic (← `(tactic| (iapply swp_bind; iapply swp_cycle_count; inext; iapply swp_ret)))
+      if bind then evalTactic (← `(tactic| (iapply swp_bind; iapply swp_cycle_count; inext)))
+      else evalTactic (← `(tactic| (iapply swp_cycle_count; inext)))
     else if n == ``LeanRV64D.get_cycle_count then
-      evalTactic (← `(tactic| (iapply swp_bind; iapply swp_get_cycle_count; inext; iapply swp_ret)))
+      if bind then evalTactic (← `(tactic| (iapply swp_bind; iapply swp_get_cycle_count; inext)))
+      else evalTactic (← `(tactic| (iapply swp_get_cycle_count; inext)))
     else if n == ``LeanRV64D.print_effect then
-      evalTactic (← `(tactic| (iapply swp_bind; iapply swp_print_effect; inext; iapply swp_ret)))
+      if bind then evalTactic (← `(tactic| (iapply swp_bind; iapply swp_print_effect; inext)))
+      else evalTactic (← `(tactic| (iapply swp_print_effect; inext)))
     else if (n == ``Pure.pure || n == ``Sail.ArchSem.FreeM.pure) && !bind then
       evalTactic (← `(tactic| iapply swp_ret))
     else
