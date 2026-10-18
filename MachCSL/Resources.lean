@@ -954,7 +954,7 @@ theorem mmOk_setRt (σ : MState) (d : DevId) (rt : DevRt)
 
 /-- A booted machine satisfies the step invariant. -/
 theorem mmOk_boot (σ : MState) (h : bootFacts σ) : mmOk σ := by
-  obtain ⟨hmem, hlog, hhart, _, hrt⟩ := h
+  obtain ⟨hmem, hlog, hhart, _, hrt, _⟩ := h
   refine ⟨?_, ?_, ?_, ?_, fun d => by rw [hrt d]; exact Nat.zero_lt_one⟩
   · intro a H hget
     rw [hmem, imgFlat_get?] at hget

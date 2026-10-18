@@ -380,7 +380,7 @@ def bootG1 (σ0 : WGState) (ds : DevStates) : GState :=
 theorem bootShapeG1 (g0 : GState) (σ0 : WGState) (ds : DevStates) (hb : wbootFacts σ0)
     (hg : g0.gen = 0) (hd : g0.m.devs = ds) : bootShape g0 (bootG1 σ0 ds) := by
   obtain ⟨-, -, -, -, -, hregs, -, -⟩ := hb
-  refine ⟨hg.symm, rfl, ⟨rfl, rfl, fun _ => ⟨rfl, rfl, rfl, rfl⟩, hregs, fun _ => rfl⟩, ?_⟩
+  refine ⟨hg.symm, rfl, ⟨rfl, rfl, fun _ => ⟨rfl, rfl, rfl, rfl⟩, hregs, fun _ => rfl, fun _ => rfl⟩, ?_⟩
   show ds.reset = g0.m.devs.reset
   rw [hd]
 
@@ -430,7 +430,7 @@ theorem simRelBoot (σ0 : WGState) (ds : DevStates) (hb : wbootFacts σ0) (hds :
       fun _ h => by cases h⟩, hdisk, hDS⟩, ?_, ?_, by simp [wpInit, stAuthors],
     ownCohInit _ _ _⟩
   · rw [himg]
-    exact rmemBoot _ _ _ ⟨rfl, rfl, fun _ => ⟨rfl, rfl, rfl, rfl⟩, hb.2.2.2.2.2.1, fun _ => rfl⟩
+    exact rmemBoot _ _ _ ⟨rfl, rfl, fun _ => ⟨rfl, rfl, rfl, rfl⟩, hb.2.2.2.2.2.1, fun _ => rfl, fun _ => rfl⟩
   · exact viewRelNil _ _ (fun _ => rfl) (fun _ => rfl) (fun _ => rfl)
 
 /-! ## (F1, cont.) Step kinds, inversion, the run record -/

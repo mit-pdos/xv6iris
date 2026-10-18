@@ -112,11 +112,15 @@ structure MState where
   walker's A/D write-back) and a DMA write record `-1`. -/
   pcAt : Nat → Int
   /-- THE PENDING STALE EXCLUSIVE READ (W11-F [OWN.105], narrow δ1; ghost of the
-  stale silent AMO): `some tvn` iff the hart's last exclusive read read the
-  footprint at the PAST view `tvn` (below the top) -- its write may then only
-  complete SILENTLY (value-preserving) or retry; `none` otherwise.  No step sets
-  it yet (increment 1: the field only). -/
-  xstale : CPU → Option Nat := fun _ => none
+  stale silent AMO): `some s` iff the hart's last exclusive read read its
+  footprint at a PAST view (at or below the top) and saw the bytes of the
+  snapshot `s` (`snapOf pa n w`) -- its write may then only complete SILENTLY
+  (storing exactly `s`'s bytes) or retry; `none` otherwise.  A stale read takes
+  NO reservation (it blocks no other hart: its write is placed in the
+  coherence order right after the bytes it read, so later writes stay later).
+  Set by `MState.afterExclStale`; cleared by `afterExcl`, `dropResv` (the
+  instruction boundary) and `storeSilent`; `none` at power-on. -/
+  xstale : CPU → Option Resv := fun _ => none
 
 /-- The top of the store order: the timestamp of the latest store. -/
 abbrev MState.top (σ : MState) : Nat := σ.log.length
@@ -143,17 +147,45 @@ abbrev MState.afterLoad (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
 
 /-- After an exclusive read of `w` at `pa`: the watermark to the top, the
 floor to the top iff an acquire, the acquire bit recorded, the snapshot
-reserved. -/
+reserved (a FRESH one: no pending stale read). -/
 abbrev MState.afterExcl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (acq : Bool) : MState :=
   { σ with tv := updCpu σ.tv cpu (if acq then σ.top else σ.tv cpu),
            hr := updCpu σ.hr cpu ((σ.hr cpu).afterExcl σ.top acq),
-           resv := updCpu σ.resv cpu (some (snapOf pa n w)) }
+           resv := updCpu σ.resv cpu (some (snapOf pa n w)),
+           xstale := updCpu σ.xstale cpu none }
 
-/-- A blocked exclusive read abandons the hart's own reservation; so does the
-instruction boundary (`hartStep`'s `.pure` arm). -/
+/-- After a STALE exclusive read of `w` at `pa` at the past view `tvn` (narrow
+δ1 [OWN.105]): the read side moves as a plain load's at `tvn` (watermark,
+foreign-source coherence stamps), the acquire bit is recorded, the floor rises
+to `tvn` iff an acquire (RVWMO ppo rule 5 orders the hart's later accesses
+after the read, which reads at `tvn`), NO reservation is held, and the
+snapshot of the bytes read is recorded as the pending stale read (`xstale`):
+the paired write may then only complete silently (`storeSilent`) or retry. -/
+abbrev MState.afterExclStale (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
+    (w : BitVec (8 * n)) (tvn : Nat) (acq : Bool) : MState :=
+  { σ with tv := updCpu σ.tv cpu (if acq then max (σ.tv cpu) tvn else σ.tv cpu),
+           hr := updCpu σ.hr cpu
+             { (σ.hr cpu).afterLoad (hartAgent cpu) pa n tvn
+                 (σ.mem.loadSrcs (hartAgent cpu) tvn pa n) with acq := acq },
+           resv := updCpu σ.resv cpu none,
+           xstale := updCpu σ.xstale cpu (some (snapOf pa n w)) }
+
+/-- The SILENT write of a stale exclusive pair (narrow δ1 [OWN.105]): the
+write stores the very bytes its read saw, placed in the coherence order right
+after them, so it is invisible to every read -- no history entry, no log
+entry, no view moves; the acquire bit and the pending stale read clear (the
+hart holds no reservation). -/
+abbrev MState.storeSilent (σ : MState) (cpu : CPU) : MState :=
+  { σ with hr := updCpu σ.hr cpu (σ.hr cpu).clearAcq,
+           resv := updCpu σ.resv cpu none,
+           xstale := updCpu σ.xstale cpu none }
+
+/-- A blocked exclusive read abandons the hart's own reservation (and any
+pending stale read); so does the instruction boundary (`hartStep`'s `.pure`
+arm). -/
 abbrev MState.dropResv (σ : MState) (cpu : CPU) : MState :=
-  { σ with resv := updCpu σ.resv cpu none }
+  { σ with resv := updCpu σ.resv cpu none, xstale := updCpu σ.xstale cpu none }
 
 /-- After a store of `w` at `pa` by `cpu`: the bytes' histories grow, the
 author log grows, the floor passes the store iff it is the write half of an
@@ -338,13 +370,16 @@ boot image (the language constant `bootImage`, Rocq `boot_facts`' memory
 clauses) and every hart's register file IS the output of a run of the boot
 program from SOME power-on file (Rocq `boot_facts`' register clause: anchored
 on a run, not on a table of values -- `MachCSL.resetRegsRun_of_run` derives
-Rocq's `reset_regs` from it).  This is the fact set the power thread hands
-the boot client (`wp_power`'s `Hboot`). -/
+Rocq's `reset_regs` from it).  No hart has a pending stale exclusive read
+(`MState.xstale`, narrow δ1 [OWN.105]: ghost, reset like the reservations).
+This is the fact set the power thread hands the boot client (`wp_power`'s
+`Hboot`). -/
 def bootFacts (σ : MState) : Prop :=
   σ.mem = imgFlat bootImage ∧ σ.log = [] ∧
   (∀ cpu, σ.tv cpu = 0 ∧ σ.itv cpu = 0 ∧ σ.hr cpu = HRead.zero ∧ σ.resv cpu = none) ∧
   (∀ cpu, ∃ f₀ : RegFile, bootRun (bootProg (bootHid cpu) bootPMA) f₀ = some ((), σ.regs cpu)) ∧
-  ∀ d, σ.devrt d = DevRt.init
+  (∀ d, σ.devrt d = DevRt.init) ∧
+  ∀ cpu, σ.xstale cpu = none
 
 /-- The state a `PowerOn` hands over: same generation (`PowerOff` already
 bumped it), power on, a booted machine, and every device reset from what it

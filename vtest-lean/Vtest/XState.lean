@@ -111,8 +111,8 @@ structure XState where
   rtV : DevRt
   /-- the issuing pc of each store (`MState.pcAt`) -/
   pcAt : Nat → Int
-  /-- the pending stale exclusive read (`MState.xstale`) -/
-  xstale : CPU → Option Nat
+  /-- the pending stale exclusive read's snapshot (`MState.xstale`) -/
+  xstale : CPU → Option Resv
 
 namespace XState
 
@@ -254,23 +254,28 @@ theorem abs_afterLoad (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (tvn : Nat
   rw [afterLoad, abs_setHart, afterLoadHR_eq]
   apply MState.ext' <;> first | rfl | exact updCpu_self _ _
 
+/-- Replacing the pending stale reads denotes the same replacement. -/
+theorem abs_withXstale (x : XState) (f : CPU → Option Resv) :
+    ({ x with xstale := f } : XState).abs = { x.abs with xstale := f } := rfl
+
 def afterExcl (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (acq : Bool) :
     XState :=
-  x.setHart cpu { x.hart cpu with
-    tv := if acq then x.log.length else (x.hart cpu).tv,
-    hr := (x.hart cpu).hr.afterExcl x.log.length acq,
-    resv := some (snapOf pa n w) }
+  { x.setHart cpu { x.hart cpu with
+      tv := if acq then x.log.length else (x.hart cpu).tv,
+      hr := (x.hart cpu).hr.afterExcl x.log.length acq,
+      resv := some (snapOf pa n w) } with
+    xstale := updCpu x.xstale cpu none }
 
 theorem abs_afterExcl (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (acq : Bool) : (x.afterExcl cpu pa n w acq).abs = x.abs.afterExcl cpu pa n w acq := by
-  rw [afterExcl, abs_setHart]
+  rw [afterExcl, abs_withXstale, abs_setHart]
   apply MState.ext' <;> first | rfl | exact updCpu_self _ _
 
 def dropResv (x : XState) (cpu : CPU) : XState :=
-  x.setHart cpu { x.hart cpu with resv := none }
+  { x.setHart cpu { x.hart cpu with resv := none } with xstale := updCpu x.xstale cpu none }
 
 theorem abs_dropResv (x : XState) (cpu : CPU) : (x.dropResv cpu).abs = x.abs.dropResv cpu := by
-  rw [dropResv, abs_setHart]
+  rw [dropResv, abs_withXstale, abs_setHart]
   apply MState.ext' <;> first | rfl | exact updCpu_self _ _
 
 def store (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (excl : Bool) :
