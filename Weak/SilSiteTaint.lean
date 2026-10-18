@@ -26,9 +26,13 @@ census site, over the image:
     register differing in mask `m`, KILLS the difference before any sink.
 
 **Per-site results** (§3; all `decide +kernel`):
-  * `holding+0x12` (`lk->cpu`): passes with ONE value kill — `seqz a0` at `holding+0x1e` yields `0` on
-    both sides (premise: neither value is the hart's own `&cpus[x]`, [OWN.64]); fails without it
-    (`holding12NeedsKill`).
+  * `holding+0x12` (`lk->cpu`): passes with ONE value kill — `seqz a0` at `holding+0x1e` agrees on
+    both sides (premise: both values are, or both are not, the hart's own `&cpus[x]`; from `acquire`
+    both are not, [OWN.64]; from `release`/`sched` both are); fails without it (`holding12NeedsKill`).
+  * `holding+0x0` (`lk->locked`, every call context): passes with the `bnez` rule at `holding+0x2`
+    (both zero or both non-zero; `hold0Ok`, `hold0NeedsRule`) — the census's per-context split
+    (`acquire`: order; `release`/`sched`: the holder's value) is a split of the rule premise's
+    discharge, not of the walk.
   * `ilock+0xe`, `iunlock+0x1c` (`ip->ref`): pass with the `blez` value premise (both values ≥ 1,
     [OWN.63]); the difference in `a5` dies inside `acquiresleep`/`releasesleep`.
   * the PTE sites, initial mask {bit 6, bit 7} (A/D — premise: the two values differ only in A/D):
@@ -696,6 +700,16 @@ theorem uvmcopyFails : siteOk (sym KernelSyms.«uvmcopy» 0x36) adMask ruStop = 
 theorem uvmclearFails : siteOk (sym KernelSyms.«uvmclear» 0x10) adMask ruStop = false := by
   decide +kernel
 
+/-- `holding+0x0`'s rule (every call context): the `bnez a5` at `holding+0x2` takes the same arm
+(both values zero or both non-zero); `a5` is then overwritten by the `lk->cpu` load or dies at the
+callers. -/
+def ruHold0 : Rules := ⟨[sym KernelSyms.«holding» 0x2], [], false⟩
+
+theorem hold0Ok : siteOk (sym KernelSyms.«holding» 0x0) FULL ruHold0 = true := by decide +kernel
+
+theorem hold0NeedsRule : siteOk (sym KernelSyms.«holding» 0x0) FULL noRules = false := by
+  decide +kernel
+
 /-- The ORDER-FREE census rows with their mask and rule (`tSites` order). -/
 def tTab : List (Int × Nat × Rules) :=
   [ (sym KernelSyms.«holding» 0x12, FULL, ruHolding)
@@ -726,6 +740,17 @@ theorem tTabOk : ∀ e, e ∈ tTab → siteOk e.1 e.2.1 e.2.2 = true := by
   · exact freewalkOk
   · exact ismappedOk
   · exact copyoutOk
+
+/-- The rows the static walk covers: the order-free rows and `holding+0x0` (whose rule premise is
+discharged per call context: by the holder's value from `release`/`sched`, by the order from
+`acquire`). -/
+def tTabAll : List (Int × Nat × Rules) := (sym KernelSyms.«holding» 0x0, FULL, ruHold0) :: tTab
+
+theorem tTabAllOk : ∀ e, e ∈ tTabAll → siteOk e.1 e.2.1 e.2.2 = true := by
+  intro e he
+  rcases List.mem_cons.1 he with rfl | h
+  · exact hold0Ok
+  · exact tTabOk e h
 
 end SilSite
 

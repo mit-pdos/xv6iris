@@ -794,6 +794,9 @@ import Weak.SilClose
 import Weak.SilRegZero
 import Weak.CapFetchProv
 import Weak.SilKillT
+import Weak.SilSiteTab
+import Weak.SilSiteTaint
+import Weak.SilSite
 import Weak.SilWalk2
 import Weak.SilWalk
 import Weak.SilKill
