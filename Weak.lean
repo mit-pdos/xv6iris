@@ -791,6 +791,7 @@ import Weak.SilReplay
 import Weak.SilOrd
 import Weak.SilDep
 import Weak.SilClose
+import Weak.SilRegZero
 import Weak.SilWalk2
 import Weak.SilWalk
 import Weak.SilKill
