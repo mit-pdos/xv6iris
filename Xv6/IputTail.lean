@@ -65,7 +65,7 @@ private theorem iputTail_sub_of_inc {q qt : Qp} {n : PosNat}
     have hlt := Frac.inc_iff.mp hq
     refine Or.inr ⟨⟨qt.val - q.val, by grind⟩, ?_⟩
     unfold qpSub Qp.ofRat?
-    rw [dif_pos (by grind)]
+    rw [dite_eq_left (by grind)]
 
 theorem iput_tail_ref_sub [Icfg] {GF : BundledGFunctors.{0}} [IcacheG GF]
     (M : RegMapF (Qp × PosNat)) (k : Nat) (q : Qp) :

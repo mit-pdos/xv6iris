@@ -106,7 +106,7 @@ theorem uvmclear_proof (W : WALK_NOALLOC) : UVMCLEAR :=
   -- the table still represents its leaf map, with `U` cleared on this leaf
   have hz : t.entAt 2 (vpnOf (k.regs 11#5)) ≠ 0#64 := by
     intro h0
-    rw [PTree.walk_eq, if_pos h0] at hwalk
+    rw [PTree.walk_eq, ite_eq_left h0] at hwalk
     exact absurd hwalk (by simp)
   have hleaf : isLeafPte (t.entAt 2 (vpnOf (k.regs 11#5))) := by
     rcases UPtFault.wfU_entAt 2 t _ hrep.1 hcomp with h | h

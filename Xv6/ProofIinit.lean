@@ -76,10 +76,10 @@ theorem ii_bne_last {α : Type} (i : Nat) (hi : i < 50) (p q : α) :
     (if bcond bop.BNE (KA.«itable» + (0x28#64 + BitVec.ofNat 64 (136 * (i + 1)))) (KA.«log» + 0x10#64)
       then p else q) = if i + 1 = 50 then q else p := by
   by_cases he : i + 1 = 50
-  · rw [if_pos he,
-      if_neg (by simp only [bcond, bne_iff_ne, ne_eq]; exact fun hc => hc ((ii_s1_eq i hi).mpr he))]
-  · rw [if_neg he,
-      if_pos (by simp only [bcond, bne_iff_ne, ne_eq]; exact fun hc => he ((ii_s1_eq i hi).mp hc))]
+  · rw [ite_eq_left he,
+      ite_eq_right (by simp only [bcond, bne_iff_ne, ne_eq]; exact fun hc => hc ((ii_s1_eq i hi).mpr he))]
+  · rw [ite_eq_right he,
+      ite_eq_left (by simp only [bcond, bne_iff_ne, ne_eq]; exact fun hc => he ((ii_s1_eq i hi).mp hc))]
 
 /-- The inodes still to initialise, as a list. -/
 theorem ii_drop_cons (i : Nat) (hi : i < 50) :
@@ -295,7 +295,7 @@ theorem ii_loop (IS : INITSLEEPLOCK) [CurCtx] (k : KCtx) (hK : 12 ≤ k.avail) (
     iapply (ii_iter IS k hK i hi R h9 h18 h19 cur) $$ [- $Hk $Hpc $Hin]
     iapply wpNext_intro_pin_lc
     iintro %c1 %hp1 Hlc %R2 Hk Hpc Hout %hpost
-    rw [if_pos hlast]
+    rw [ite_eq_left hlast]
     obtain ⟨hkept, _⟩ := hpost
     ihave Hdone := ii_done_succ i 50 hlast $$ [Hdone Hout]
     case' _ => iframe
@@ -312,7 +312,7 @@ theorem ii_loop (IS : INITSLEEPLOCK) [CurCtx] (k : KCtx) (hK : 12 ≤ k.avail) (
     iapply (ii_iter IS k hK i hi R h9 h18 h19 cur) $$ [- $Hk $Hpc $Hin]
     iapply wpNext_intro_pin
     iintro %c1 %hp1 %R2 Hk Hpc Hout %hpost
-    rw [if_neg hlast]
+    rw [ite_eq_right hlast]
     obtain ⟨hkept, hcur⟩ := hpost
     ihave Hdone := ii_done_succ i (i + 1) rfl $$ [Hdone Hout]
     case' _ => iframe

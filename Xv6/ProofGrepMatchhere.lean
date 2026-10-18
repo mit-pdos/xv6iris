@@ -90,12 +90,12 @@ theorem grepMatchhere_call (UL : UK_LEAVES) (N : UkNames GF) (lr1 : Nat)
   inext
   iintro %h5 Hrun
   rw [show BitVec.ofNat 64 0xac + BitVec.signExtend 64 2097110#21 = BitVec.ofNat 64 0x82 from by decide,
-    show ukWr m4 0#5 (BitVec.ofNat 64 0xac + instrLen true) = m4 by unfold ukWr; rw [if_pos rfl]]
+    show ukWr m4 0#5 (BitVec.ofNat 64 0xac + instrLen true) = m4 by unfold ukWr; rw [ite_eq_left rfl]]
   ihave Htx := grepUstr_cons_join N.d dqt ax lt1 ft (htne 0 (by omega)) htlen $$ Ht0 Htx
   iapply Hcont $$ Hre Htx %h5 %m4 [] [] Hrun
   · ipureintro
     rw [ha04, grepMapRange_succ ft lt1]
-    simp only [grepMhLit, matchLit, htest, if_true]
+    simp only [grepMhLit, matchLit, htest, ite_true]
   · ipureintro; exact grepRkeep_call _ mx m3 m4 (grepRin_caller []) hk3 hcs4
 
 /-- **Rocq `wp_kgrep_mh_lit`**: matchhere's LITERAL ARM, 0x70..0x80 (and the
@@ -149,12 +149,12 @@ theorem grepMatchhere_lit (UL : UK_LEAVES) (N : UkNames GF) (lr1 : Nat)
   cases lt with
   | zero =>
     -- no text: the arm answers 0
-    rw [if_pos (by decide), show BitVec.ofNat 64 0x76 + BitVec.signExtend 64 12#13 = BitVec.ofNat 64 0x82 from by decide]
+    rw [ite_eq_left (by decide), show BitVec.ofNat 64 0x76 + BitVec.signExtend 64 12#13 = BitVec.ofNat 64 0x82 from by decide]
     iapply Hcont $$ Hre Htx %h3 %m2 [] [] Hrun
     · ipureintro; rw [ha02]; rfl
     · ipureintro; exact hk2
   | succ lt1 =>
-    rw [decide_eq_false (show ¬ lt1 + 1 = 0 by omega), if_neg (by decide), ukPc 0x76 0x78 true rfl]
+    rw [decide_eq_false (show ¬ lt1 + 1 = 0 by omega), ite_eq_right (by decide), ukPc 0x76 0x78 true rfl]
     have eT : (List.range (lt1 + 1)).map ft = ft 0 :: (List.range lt1).map (fun j => ft (j + 1)) :=
       grepMapRange_succ ft lt1
     have f14 : m2.get 14#5 = BitVec.setWidth 64 c := by ureg; exact ha4
@@ -169,7 +169,7 @@ theorem grepMatchhere_lit (UL : UK_LEAVES) (N : UkNames GF) (lr1 : Nat)
     rw [f14, show m2.get 13#5 = BitVec.setWidth 64 (ft 0) by ureg; rfl, kgrep_beq_byte,
       show decide (c = ft 0) = bdec c (ft 0) from rfl]
     cases ect : bdec c (ft 0)
-    · rw [if_neg (by decide), ukPc 0x78 0x7c false rfl]
+    · rw [ite_eq_right (by decide), ukPc 0x78 0x7c false rfl]
       -- 0x7c  addi a4,a4,-46
       gfetch 0x7c false (.ITYPE (4050#12, .Regidx 14#5, .Regidx 14#5, .ADDI))
       iapply wp_uk_itype UL N h4 m2 (BitVec.ofNat 64 0x7c) false 4050#12 14#5 14#5 .ADDI n
@@ -189,14 +189,14 @@ theorem grepMatchhere_lit (UL : UK_LEAVES) (N : UkNames GF) (lr1 : Nat)
         kgrep_dot_eqz, show decide (c = cDot) = bdec c cDot from rfl]
       cases ecd : bdec c cDot
       · -- neither: 0
-        rw [if_neg (by decide), ukPc 0x80 0x82 true rfl]
+        rw [ite_eq_right (by decide), ukPc 0x80 0x82 true rfl]
         iapply Hcont $$ Hre Htx %h6 %m3 [] [] Hrun
         · ipureintro
           rw [ukWr_get_other _ _ _ _ (by decide), ha02, eT]
-          simp only [grepMhLit, matchLit, ect, ecd, Bool.false_or, Bool.false_eq_true, if_false]
+          simp only [grepMhLit, matchLit, ect, ecd, Bool.false_or, Bool.false_eq_true, ite_false]
         · ipureintro; exact hk3
       · -- re[0] == '.'
-        rw [if_pos rfl, show BitVec.ofNat 64 0x80 + BitVec.signExtend 64 34#13 = BitVec.ofNat 64 0xa2 from by decide]
+        rw [ite_eq_left rfl, show BitVec.ofNat 64 0x80 + BitVec.signExtend 64 34#13 = BitVec.ofNat 64 0xa2 from by decide]
         iapply grepMatchhere_call UL N lr1 IH h6 m3 dqr dqt ar ax lt1 c fr1 ft n (by simp [ecd])
           (by ureg; exact ha5) (by ureg; exact ha1) hn $$ Hc Hre Htx Hrun
         iintro Hre Htx %h' %m' %ha0' %hk' Hrun
@@ -204,7 +204,7 @@ theorem grepMatchhere_lit (UL : UK_LEAVES) (N : UkNames GF) (lr1 : Nat)
         · ipureintro; exact ha0'
         · ipureintro; exact grepRkeep_trans _ _ _ _ hk3 hk'
     · -- re[0] == *text
-      rw [if_pos rfl, show BitVec.ofNat 64 0x78 + BitVec.signExtend 64 42#13 = BitVec.ofNat 64 0xa2 from by decide]
+      rw [ite_eq_left rfl, show BitVec.ofNat 64 0x78 + BitVec.signExtend 64 42#13 = BitVec.ofNat 64 0xa2 from by decide]
       iapply grepMatchhere_call UL N lr1 IH h4 m2 dqr dqt ar ax lt1 c fr1 ft n (by simp [ect]) f15 f11 hn
         $$ Hc Hre Htx Hrun
       iintro Hre Htx %h' %m' %ha0' %hk' Hrun
@@ -278,7 +278,7 @@ theorem grepMatchhere_star (UL : UK_LEAVES) (N : UkNames GF) (lr2 : Nat)
   inext
   iintro %h6 Hrun
   rw [show BitVec.ofNat 64 0x96 + BitVec.signExtend 64 2097132#21 = BitVec.ofNat 64 0x82 from by decide,
-    show ukWr m5 0#5 (BitVec.ofNat 64 0x96 + instrLen true) = m5 by unfold ukWr; rw [if_pos rfl]]
+    show ukWr m5 0#5 (BitVec.ofNat 64 0x96 + instrLen true) = m5 by unfold ukWr; rw [ite_eq_left rfl]]
   iapply Hcont $$ Hre Htx %h6 %m5 [] [] Hrun
   · ipureintro; exact ha05
   · ipureintro; exact grepRkeep_call _ m m4 m5 (grepRin_caller []) hk4 hcs5
@@ -319,7 +319,7 @@ theorem grepMatchhere_step (UL : UK_LEAVES) (MS : GREP_MATCHSTAR) (lr : Nat)
   cases lr with
   | zero =>
     -- the empty pattern: 1, and no frame
-    rw [if_pos (by decide), show BitVec.ofNat 64 0x50 + BitVec.signExtend 64 94#13 = BitVec.ofNat 64 0xae from by decide]
+    rw [ite_eq_left (by decide), show BitVec.ofNat 64 0x50 + BitVec.signExtend 64 94#13 = BitVec.ofNat 64 0xae from by decide]
     -- 0xae  c.li a0,1
     gfetch 0xae true (.ITYPE (1#12, .Regidx 0#5, .Regidx 10#5, .ADDI))
     iapply wp_uk_itype UL N h2 m1 (BitVec.ofNat 64 0xae) true 1#12 0#5 10#5 .ADDI n
@@ -346,7 +346,7 @@ theorem grepMatchhere_step (UL : UK_LEAVES) (MS : GREP_MATCHSTAR) (lr : Nat)
       rfl
   | succ lr1 =>
     -- a nonempty pattern: re[0] is not the NUL
-    rw [decide_eq_false (show ¬ lr1 + 1 = 0 by omega), if_neg (by decide), ukPc 0x50 0x52 true rfl]
+    rw [decide_eq_false (show ¬ lr1 + 1 = 0 by omega), ite_eq_right (by decide), ukPc 0x50 0x52 true rfl]
     have eR : (List.range (lr1 + 1)).map fr = fr 0 :: (List.range lr1).map (fun j => fr (j + 1)) :=
       grepMapRange_succ fr lr1
     have hfr0 : fr 0 ≠ ubyte0 := hrne 0 (by omega)
@@ -458,7 +458,7 @@ theorem grepMatchhere_step (UL : UK_LEAVES) (MS : GREP_MATCHSTAR) (lr : Nat)
       show m5.get 12#5 = BitVec.ofNat 64 42 by ureg; exact ukLi m4 42#12 42 (by decide), kgrep_star_beq]
     cases estar : bdec (grepUstrHd lr1 (fun j => fr (j + 1))) cStar
     · -- re[1] is not '*'
-      rw [if_neg (by decide), ukPc 0x64 0x68 false rfl]
+      rw [ite_eq_right (by decide), ukPc 0x64 0x68 false rfl]
       -- 0x68  c.bnez a3,0x70 : re[1] != 0
       gfetch 0x68 true (.BTYPE (8#13, .Regidx 0#5, .Regidx 13#5, .BNE))
       iapply wp_uk_btype0 UL N h7 m5 (BitVec.ofNat 64 0x68) true 8#13 13#5 .BNE n1 (fun _ => by decide)
@@ -470,7 +470,7 @@ theorem grepMatchhere_step (UL : UK_LEAVES) (MS : GREP_MATCHSTAR) (lr : Nat)
       cases lr1 with
       | zero =>
         -- re = [c] : the '$' test
-        rw [show (!decide ((0 : Nat) = 0)) = false from rfl, if_neg (by decide), ukPc 0x68 0x6a true rfl]
+        rw [show (!decide ((0 : Nat) = 0)) = false from rfl, ite_eq_right (by decide), ukPc 0x68 0x6a true rfl]
         -- 0x6a  addi a3,a4,-36
         gfetch 0x6a false (.ITYPE (4060#12, .Regidx 14#5, .Regidx 13#5, .ADDI))
         iapply wp_uk_itype UL N h8 m5 (BitVec.ofNat 64 0x6a) false 4060#12 14#5 13#5 .ADDI n1
@@ -492,7 +492,7 @@ theorem grepMatchhere_step (UL : UK_LEAVES) (MS : GREP_MATCHSTAR) (lr : Nat)
           kgrep_dollar_eqz, show decide (fr 0 = cDollar) = bdec (fr 0) cDollar from rfl]
         cases edol : bdec (fr 0) cDollar
         · -- re = [c], c <> '$' : the literal arm
-          rw [if_neg (by decide), ukPc 0x6e 0x70 true rfl]
+          rw [ite_eq_right (by decide), ukPc 0x6e 0x70 true rfl]
           iapply grepMatchhere_lit UL N 0 (IHall 0 (by omega)) h10 m6 dqr dqt ar ax lt (fr 0) (fun j => fr (j + 1))
             ft n1 (by ureg; exact g14) (by ureg; exact g15) (by ureg; exact g11) (by simp [grepMhWords])
             $$ Hc Hre1 Htx Hrun
@@ -504,7 +504,7 @@ theorem grepMatchhere_step (UL : UK_LEAVES) (MS : GREP_MATCHSTAR) (lr : Nat)
             (by rw [hkc 2#5 (by decide)]; exact hsp6) $$ Hc Hwra Hws0 Hrun
           iapply Hcont $$ Hre Htx
         · -- re = "$" : *text == 0
-          rw [if_pos rfl, show BitVec.ofNat 64 0x6e + BitVec.signExtend 64 42#13 = BitVec.ofNat 64 0x98 from by decide]
+          rw [ite_eq_left rfl, show BitVec.ofNat 64 0x6e + BitVec.signExtend 64 42#13 = BitVec.ofNat 64 0x98 from by decide]
           -- 0x98  lbu a0,0(a1)
           icases grepUstr_hd_acc N.d dqt ax lt ft $$ Htx with ⟨Hb, Hcl⟩
           gfetch 0x98 false (.LOAD (0#12, .Regidx 11#5, .Regidx 10#5, true, 1))
@@ -533,7 +533,7 @@ theorem grepMatchhere_step (UL : UK_LEAVES) (MS : GREP_MATCHSTAR) (lr : Nat)
           rw [show BitVec.ofNat 64 0xa0 + BitVec.signExtend 64 2097122#21 = BitVec.ofNat 64 0x82 from by decide]
           let m7 := ukWr m6 10#5 (BitVec.setWidth 64 (grepUstrHd lt ft))
           let m8 := ukWr m7 10#5 (ukItypeVal .SLTIU (m7.get 10#5) 1#12)
-          rw [show ukWr m8 0#5 (BitVec.ofNat 64 0xa0 + instrLen true) = m8 by unfold ukWr; rw [if_pos rfl]]
+          rw [show ukWr m8 0#5 (BitVec.ofNat 64 0xa0 + instrLen true) = m8 by unfold ukWr; rw [ite_eq_left rfl]]
           ihave Hre := grepUstr_cons_join N.d dqr ar 0 fr hfr0 hrlen $$ Hr0 Hre1
           have hk8 : grepRkeep ([2, 8] ++ grepWcaller) m1 m8 := by
             refine grepRkeep_upd _ _ _ _ _ (by decide) ?_
@@ -542,7 +542,7 @@ theorem grepMatchhere_step (UL : UK_LEAVES) (MS : GREP_MATCHSTAR) (lr : Nat)
           have ha : m8.get 10#5 = kgrepB01 (matchhere ((List.range (0 + 1)).map fr) ((List.range lt).map ft)) := by
             rw [ukWr_get_same _ _ _ (by decide), ukWr_get_same _ _ _ (by decide), kgrep_seqz_byte,
               grepUstrHd_nul lt ft htne, eR, show (List.range 0).map (fun j => fr (j + 1)) = [] from rfl,
-              grepMh_one, if_pos (by simp [edol])]
+              grepMh_one, ite_eq_left (by simp [edol])]
             cases lt with
             | zero => rfl
             | succ k => rw [grepMapRange_succ]; simp
@@ -550,7 +550,7 @@ theorem grepMatchhere_step (UL : UK_LEAVES) (MS : GREP_MATCHSTAR) (lr : Nat)
           iapply Hcont $$ Hre Htx
       | succ lr1' =>
         -- re[1] is a body byte, not '*' : the literal arm
-        rw [decide_eq_false (show ¬ lr1' + 1 = 0 by omega), if_pos (by decide),
+        rw [decide_eq_false (show ¬ lr1' + 1 = 0 by omega), ite_eq_left (by decide),
           show BitVec.ofNat 64 0x68 + BitVec.signExtend 64 8#13 = BitVec.ofNat 64 0x70 from by decide]
         have eR1 : (List.range (lr1' + 1)).map (fun j => fr (j + 1)) =
             fr (0 + 1) :: (List.range lr1').map (fun j => fr (j + 1 + 1)) := grepMapRange_succ _ lr1'
@@ -567,7 +567,7 @@ theorem grepMatchhere_step (UL : UK_LEAVES) (MS : GREP_MATCHSTAR) (lr : Nat)
           (by rw [hkc 2#5 (by decide)]; exact hsp5) $$ Hc Hwra Hws0 Hrun
         iapply Hcont $$ Hre Htx
     · -- re[1] == '*' : matchstar(re[0], re+2, text)
-      rw [if_pos rfl, show BitVec.ofNat 64 0x64 + BitVec.signExtend 64 38#13 = BitVec.ofNat 64 0x8a from by decide]
+      rw [ite_eq_left rfl, show BitVec.ofNat 64 0x64 + BitVec.signExtend 64 38#13 = BitVec.ofNat 64 0x8a from by decide]
       cases lr1 with
       | zero => exact absurd estar (by rw [show grepUstrHd 0 (fun j => fr (j + 1)) = ubyte0 from rfl]; decide)
       | succ lr2 =>

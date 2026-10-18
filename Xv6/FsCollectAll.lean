@@ -300,7 +300,7 @@ theorem colKeep_root (γfs : FsNames) (kv : Ity) :
     iregKeep (GF := GF) γfs ROOTINO kv ⊣⊢
       iOwn (F := constOF FsLinkUR) (fsGammaL (GF := GF) γfs).link (FsStateLink.linkTokElem (ROOTINO : Int) kv) := by
   unfold iregKeep
-  rw [if_pos (by rfl)]
+  rw [ite_eq_left (by rfl)]
   exact .rfl
 
 /-- ONE GHOST STEP, SEVEN INVARIANT FAMILIES, EVERY ONE CLOSED WITH THE BODY

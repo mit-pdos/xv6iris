@@ -245,7 +245,7 @@ theorem udepw_mint (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (M :
 theorem tfOf_a0 (m : RegMap) (pc : BitVec 64) : tfW (tfOf m pc) (tfArgIdx 0) = m.get 10#5 := by
   rw [tfOf_arg m pc 0 (by decide)]
   unfold RegMap.get
-  rw [if_neg (by decide)]
+  rw [ite_eq_right (by decide)]
 
 /-- **Rocq `urun_nopipe`**: THE RUN'S PIPE ROW -- one registration per row of
 the table (`UexecSG.srowReg`), or the taint. -/
@@ -569,7 +569,7 @@ theorem unotSp_wr (rd : BitVec 5) (v : BitVec 64) (m : RegMap) (h : unotSp rd) :
   · rfl
   · unfold RegMap.get
     have hs : spIdx ≠ 0#5 := by decide
-    simp only [hs, if_false]
+    simp only [hs, ite_false]
     exact RegMap.set_other _ _ _ _ (Ne.symm h)
 
 /-- The leaves never write x0 (deviation 1). -/

@@ -108,7 +108,7 @@ theorem memModel_read_excl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w :
       intro c hc
       simp [updCpu, hc]
     · iapply hartViewsAt_intro
-      simp only [updCpu, if_true, HRead.afterExcl]
+      simp only [updCpu, ite_true, HRead.afterExcl]
       iframe Hv Hi Hr
   · ipureintro
     obtain ⟨h1, h2, h3, h4⟩ := hmm
@@ -117,14 +117,14 @@ theorem memModel_read_excl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w :
       simp only [MState.top] at *
       by_cases hc : c = cpu
       · subst hc
-        simp only [updCpu, if_true, HRead.afterExcl]
+        simp only [updCpu, ite_true, HRead.afterExcl]
         refine ⟨by split <;> omega, a2, Nat.le_refl _, a4⟩
-      · simp only [updCpu, hc, if_false]
+      · simp only [updCpu, hc, ite_false]
         exact ⟨a1, a2, a3, a4⟩
     · simp only [updCpu] at hr ⊢
       by_cases hc : c = cpu
       · subst hc
-        simp only [if_true, Option.some.injEq] at hr
+        simp only [ite_true, Option.some.injEq] at hr
         subst hr
         intro a v hav
         -- the snapshot's bytes are the top bytes
@@ -148,14 +148,14 @@ theorem memModel_read_excl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w :
                 intro hl m
                 simp only [List.foldl_cons]
                 rw [ih (fun j' hj' => hl j' (List.mem_cons_of_mem _ hj')), Std.ExtTreeMap.getElem?_insert]
-                rw [if_neg]
+                rw [ite_eq_right]
                 intro h
                 exact hl j List.mem_cons_self ((Std.LawfulEqCmp.compare_eq_iff_eq).1 h).symm
             rw [key _ (fun j hj heq => hin ⟨j, List.mem_range.1 hj, heq⟩) ∅]
             simp
           rw [this] at hav
           cases hav
-      · simp only [hc, if_false] at hr
+      · simp only [hc, ite_false] at hr
         exact h3 c r hr
 
 /-- The write half of an exclusive pair (the store consumes the
@@ -176,7 +176,7 @@ theorem memModel_store_excl_any (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
   imod MonoNat.own_update _ (.ofNat σ.top) (.ofNat (σ.top + 1))
     (by simp only [MaxNat.le_toNat]; omega) $$ Htop with ⟨Htop, #Htoplb⟩
   imod ghost_map_insert_persist (σ.top + 1) (hartAgent cpu)
-    (by rw [authMap_get?, if_neg (by simp only [MState.top]; omega)]) $$ Hauth with ⟨Hauth, #Hau⟩
+    (by rw [authMap_get?, ite_eq_right (by simp only [MState.top]; omega)]) $$ Hauth with ⟨Hauth, #Hau⟩
   unfold resvFragAt
   imod ghost_map_update ((none, false) : ResvVal) $$ Hresv Hfrag with ⟨Hresv, Hfrag⟩
   icases hartViews_acc E σ cpu $$ Hviews with ⟨Hc, Hclose⟩
@@ -201,7 +201,7 @@ theorem memModel_store_excl_any (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
         intro c hc
         simp [updCpu, hc]
       · iapply hartViewsAt_intro
-        simp only [updCpu, if_true, HRead.clearAcq, Bool.true_and, hres.2]
+        simp only [updCpu, ite_true, HRead.clearAcq, Bool.true_and, hres.2]
         iframe Hv Hi Hr
     · ipureintro
       exact mmOk_store σ cpu pa n w true hram hno hmm

@@ -452,7 +452,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [Bioslot
 
 /-- A null `int *pfd` owes argfd nothing (Rocq `ofd_out_null`). -/
 theorem sysfile_ofdOut_null (w : BitVec 32) : ⊢ ofdOut (GF := GF) 0#64 w := by
-  unfold ofdOut; rw [if_pos rfl]; exact .rfl
+  unfold ofdOut; rw [ite_eq_left rfl]; exact .rfl
 
 /-- THE TRAPFRAME around argaddr (Rocq `proc_priv_tf`): the pointer cell
 and the page, out of the core at the ambient context and back. -/

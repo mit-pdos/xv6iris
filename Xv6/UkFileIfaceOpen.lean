@@ -59,7 +59,7 @@ theorem fif_fds_bind (fdm : Fdmap) (l : List FdState) (vs : FifVs) (k : Int) (d 
     intro fd' d' h
     have hne : d ≠ d' := fun e => hfr fd' (e ▸ h)
     unfold fifHf
-    rw [LawfulPartialMap.get?_insert, if_neg hne]
+    rw [LawfulPartialMap.get?_insert, ite_eq_right hne]
   iintro Hstd Hcwd Hpool Htoks Hhs Hh Hdq #He Hk
   ihave Hpool := (HfpReg.pool_own_take (GF := GF) X.γreg (fifDom vs) (fun _ => v) d hnd).1 $$ Hpool
   icases Hpool with ⟨Hpool, Htk⟩
@@ -72,7 +72,7 @@ theorem fif_fds_bind (fdm : Fdmap) (l : List FdState) (vs : FifVs) (k : Int) (d 
   · iapply (BigSepM.bigSepM_insert (Φ := fun d v => fifTok (GF := GF) X.γreg d (1 : Qp).half v) hvd).2
     iframe Htk1 Htoks
   · iapply fifHdls_insert X.N.fd fdm vs (insert vs d v) k d hnone hag
-    rw [LawfulPartialMap.get?_insert, if_pos rfl]
+    rw [LawfulPartialMap.get?_insert, ite_eq_left rfl]
     iframe Hh Hhs
 
 /-- **Rocq `fif_open`**: `eiOpen` for a present class name. -/

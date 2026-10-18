@@ -238,13 +238,13 @@ theorem wp_epilogue14_gen [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k 
 
 theorem co_bltu_out {α : Type _} (m : Nat) (h : 2 ^ 38 ≤ m) (hm : m < 2 ^ 64) (p q : α) :
     (if bcond bop.BLTU 0x3FFFFFFFFF#64 (BitVec.ofNat 64 m) then p else q) = p := by
-  refine if_pos ?_
+  refine ite_eq_left ?_
   simp only [bcond, BitVec.ult, BitVec.toNat_ofNat, decide_eq_true_eq]
   omega
 
 theorem co_bltu_in {α : Type _} (m : Nat) (h : m < 2 ^ 38) (p q : α) :
     (if bcond bop.BLTU 0x3FFFFFFFFF#64 (BitVec.ofNat 64 m) then p else q) = q := by
-  refine if_neg ?_
+  refine ite_eq_right ?_
   simp only [bcond, BitVec.ult, BitVec.toNat_ofNat, decide_eq_true_eq]
   omega
 

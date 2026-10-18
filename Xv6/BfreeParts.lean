@@ -84,7 +84,7 @@ theorem bf_shift (bno : BitVec 32) (h : bno.toNat < 8192) :
 (Rocq's `bf_test_val`, from `BitmapEnc.bm_bit_test`). -/
 theorem bf_test_val (u : BitSet) (bi : Nat) (hin : bi ∈ u) :
     (1#64 <<< (bi % 8)) &&& BitVec.setWidth 64 (bmByte u (bi / 8)) = 1#64 <<< (bi % 8) := by
-  rw [BitVec.and_comm, bmBit_test_64 u bi, if_pos hin]
+  rw [BitVec.and_comm, bmBit_test_64 u bi, ite_eq_left hin]
 
 /-- `not a5,a5` is `xori a5,a5,-1`. -/
 theorem bf_xori_not (x : BitVec 64) : x ^^^ 0xFFFFFFFFFFFFFFFF#64 = ~~~x := by
@@ -187,7 +187,7 @@ theorem bf_pay_L (γ : BcacheNames) (γfs : FsNames) (V : BioView GF)
       fsChalf γfs bno.toNat bs ∗ (fsChalf γfs bno.toNat bs -∗ bioPay γ V k dv bno bs bsd d) := by
   unfold bioPay fsChalf
   cases d
-  · simp only [Bool.false_eq_true, if_false]
+  · simp only [Bool.false_eq_true, ite_false]
     rw [hcl]
     unfold fsMclean
     iintro ⟨⟨HL, HD⟩, %heq⟩
@@ -195,7 +195,7 @@ theorem bf_pay_L (γ : BcacheNames) (γfs : FsNames) (V : BioView GF)
     iintro HL
     iframe HL HD
     ipureintro; exact heq
-  · simp only [if_true]
+  · simp only [ite_true]
     rw [hdt]
     unfold fsMdirty
     iintro ⟨⟨HL, HD⟩, Hb⟩

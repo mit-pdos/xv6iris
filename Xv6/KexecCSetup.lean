@@ -179,12 +179,12 @@ theorem kxcC_setup_rows {fb ef : List (BitVec 8)} {P P' : UPtd} {Mi M' : Nat →
   have hlt : ¬ (8192#64 + BitVec.ofNat 64 (pgRoundUpN szv.toNat)).toNat <
       (BitVec.ofNat 64 (pgRoundUpN szv.toNat)).toNat := by rw [hsz1, hs8n]; omega
   have hgi := kxc_grow_inv hb8 hc8 hok
-  rw [if_neg hlt] at hgi
+  rw [ite_eq_right hlt] at hgi
   have hv0 : uvmaVpn0 (BitVec.ofNat 64 (pgRoundUpN szv.toNat)) = pgRoundUpN szv.toNat / 4096 := by
     unfold uvmaVpn0; rw [hs8n, hpgi]
   have hnp : uvmaNp (BitVec.ofNat 64 (pgRoundUpN szv.toNat))
       (8192#64 + BitVec.ofNat 64 (pgRoundUpN szv.toNat)) = 2 := by
-    unfold uvmaNp; rw [hs8n, hpgi, hsz1, if_neg (by omega)]; omega
+    unfold uvmaNp; rw [hs8n, hpgi, hsz1, ite_eq_right (by omega)]; omega
   have hfree : ∀ i, i < uvmaNp (BitVec.ofNat 64 (pgRoundUpN szv.toNat))
       (8192#64 + BitVec.ofNat 64 (pgRoundUpN szv.toNat)) →
       get? P.um (uvmaVpn0 (BitVec.ofNat 64 (pgRoundUpN szv.toNat)) + i) = none :=
@@ -266,7 +266,7 @@ theorem kxcC_setup_ok (UC : UVMCLEAR)
     unfold uvmaVpn0; rw [hs8n, hpgi]
   have hnp : uvmaNp (BitVec.ofNat 64 (pgRoundUpN szv.toNat))
       (8192#64 + BitVec.ofNat 64 (pgRoundUpN szv.toNat)) = 2 := by
-    unfold uvmaNp; rw [hs8n, hpgi, hsz1, if_neg (by omega)]; omega
+    unfold uvmaNp; rw [hs8n, hpgi, hsz1, ite_eq_right (by omega)]; omega
   obtain ⟨⟨r0, -, hv⟩, -⟩ := hok.2.2 0 (by rw [hnp]; omega)
   rw [hv0, Nat.add_zero] at hv
   iintro ⟨Hk, Hpc, Hte, Hce, Hirs, Hbs, Hpt, Hpriv, Hbufs, Helf, Hfr, Hcl, HK⟩
@@ -371,7 +371,7 @@ theorem kxcC_setup_ok (UC : UVMCLEAR)
     isplitr
     · ipureintro
       refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, if_true, if_false,
+        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, ite_true, ite_false,
           a2, a8, a18, a19, a21, a22, a27, hok.1.1, kxcSp, Xv6.umoi_of_toNat, hbase, UPtd.clearU]
     isplitr
     · ipureintro
@@ -405,7 +405,7 @@ theorem kxcC_setup_ok (UC : UVMCLEAR)
     isplitr
     · ipureintro
       refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, if_true, if_false,
+        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, ite_true, ite_false,
           a2, a8, a18, a19, a21, a22, a27, hok.1.1, kxcSp, Xv6.umoi_of_toNat, hbase, UPtd.clearU,
           kxcUstackBuf]
     isplitr
@@ -579,9 +579,9 @@ theorem kxc_c_setup (MP : MYPROC) (UA : UVMALLOC) (UC : UVMCLEAR) (PFP : PROC_FR
       case f22 => simp [RegMap.set_apply, b22]
       case f27 => simp [RegMap.set_apply, b27]
     · -- ===== uvmalloc SUCCEEDED: +0x1d4 taken, to +0x1f6 =====
-      try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, if_true, if_false] at hok h10
+      try simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, ite_true, ite_false] at hok h10
       have h10' : R2 10#5 = 8192#64 + BitVec.ofNat 64 (pgRoundUpN szv.toNat) := by
-        rw [h10, if_neg]
+        rw [h10, ite_eq_right]
         have := kxcC_sz1_ge _ hpg
         first | exact this | (simp only [BitVec.toNat_ofNat] at this; exact this)
       clear h10

@@ -231,7 +231,7 @@ theorem utr_translateAddr_canon (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UtrPin
       (runRW D orc s (utrTranslate s va acc)).map (fun r => (utrBack acc va r.1, r.2.1, r.2.2)) := by
   unfold utrCanon at hc
   utr_front hp hacc
-  simp only [hc, bne_self_eq_false, Bool.false_eq_true, if_false]
+  simp only [hc, bne_self_eq_false, Bool.false_eq_true, ite_false]
   sail_norm
   simp only [runRW_bind, utr_readReg D _ _ _ hms, Option.bind_some,
     satp_to_asid_of _ hasid, satp_to_ppn_of _ _ rfl, utr_vpn]
@@ -260,7 +260,7 @@ theorem utr_translateAddr_noncanon (D : UFoot) (orc : UOrc) (s : UWSt) (hp : Utr
   have hb : (va != BitVec.signExtend 64 (BitVec.extractLsb' 0 39 va)) = true := by
     simp only [bne_iff_ne, ne_eq]
     exact fun h => hc h.symm
-  simp only [hb, if_true]
+  simp only [hb, ite_true]
   sail_norm
   simp only [utr_texc acc hacc]
   sail_norm

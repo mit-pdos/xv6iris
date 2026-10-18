@@ -154,7 +154,7 @@ theorem uwk_check_perm (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.fil
     unfold check_PTE_permission
     simp only [uwkU, uwkR, uwkW, uwkX] at *
     simp only [uwk_perm_assert _ _ (bit_to_bool (_get_PTE_Flags_X (uwkFl w))) hrw,
-      uwk_perm_noss _ _ (bit_to_bool (_get_PTE_Flags_X (uwkFl w))) hrw, Bool.false_eq_true, if_false]
+      uwk_perm_noss _ _ (bit_to_bool (_get_PTE_Flags_X (uwkFl w))) hrw, Bool.false_eq_true, ite_false]
     obtain ⟨U, hU⟩ : ∃ U, bit_to_bool (_get_PTE_Flags_U (uwkFl w)) = U := ⟨_, rfl⟩
     obtain ⟨R, hR⟩ : ∃ R, bit_to_bool (_get_PTE_Flags_R (uwkFl w)) = R := ⟨_, rfl⟩
     obtain ⟨W, hW⟩ : ∃ W, bit_to_bool (_get_PTE_Flags_W (uwkFl w)) = W := ⟨_, rfl⟩
@@ -381,7 +381,7 @@ theorem uwk_pt_walk (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file) 
     rw [hk2] at h2
     rw [h2] at rd2
     rw [uwk_walk_inv D orc s hp vpn acc mxr sum t.base 2 (by omega) false _ ok2 rd2 uwk_inv_zero]
-    simp only [PTree.walk, hk2, h2, if_true, uwkWalkRes]
+    simp only [PTree.walk, hk2, h2, ite_true, uwkWalkRes]
   | some c1 =>
     rw [hk2] at h2
     obtain ⟨he2, h1w⟩ := h2
@@ -396,7 +396,7 @@ theorem uwk_pt_walk (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file) 
       rw [hk1] at h1
       rw [h1] at rd1
       rw [uwk_walk_inv D orc s hp vpn acc mxr sum c1.base 1 (by omega) false _ ok1 rd1 uwk_inv_zero]
-      simp only [PTree.walk, hk2, hk1, h1, if_true, uwkWalkRes]
+      simp only [PTree.walk, hk2, hk1, h1, ite_true, uwkWalkRes]
     | some c0 =>
       rw [hk1] at h1
       obtain ⟨he1, h0w⟩ := h1
@@ -411,19 +411,19 @@ theorem uwk_pt_walk (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file) 
       rcases h0 with h0 | ⟨hv, hrwx⟩
       · rw [h0] at rd0
         rw [uwk_walk_inv D orc s hp vpn acc mxr sum c0.base 0 (by omega) false _ ok0 rd0 uwk_inv_zero]
-        simp only [PTree.walk, h0, if_true, uwkWalkRes]
+        simp only [PTree.walk, h0, ite_true, uwkWalkRes]
       · have hne : c0.ents (vpnIdx vpn 0) ≠ 0#64 := by
           intro h; rw [h] at hv; exact absurd hv (by decide)
         have hwalk : c0.walk 0 vpn = some (pteAddr c0.base (vpnIdx vpn 0), c0.ents (vpnIdx vpn 0)) := by
-          simp only [PTree.walk, hne, if_false]
+          simp only [PTree.walk, hne, ite_false]
         rw [hwalk]
         have hN0 := hN _ _ (hw.trans hwalk)
         cases hinv : uwkInv (c0.ents (vpnIdx vpn 0))
         · rw [uwk_walk_leaf0 D orc s hp vpn acc hacc mxr sum c0.base false _ ok0 rd0 hinv
             (uwk_leaf_of_rwx _ hrwx) hN0]
-          simp only [uwkWalkRes, hinv, Bool.false_or, Bool.false_eq_true, if_false]
+          simp only [uwkWalkRes, hinv, Bool.false_or, Bool.false_eq_true, ite_false]
         · rw [uwk_walk_inv D orc s hp vpn acc mxr sum c0.base 0 (by omega) false _ ok0 rd0 hinv]
-          simp only [uwkWalkRes, hinv, if_true]
+          simp only [uwkWalkRes, hinv, ite_true]
 
 /-! ## §5 The Svadu `A`/`D` write-back (Rocq `PtTreeAdue`) -/
 

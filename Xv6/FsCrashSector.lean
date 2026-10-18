@@ -61,11 +61,11 @@ theorem diskWrite_out (dk : Nat → BitVec 8) (off : Nat) (bs : List (BitVec 8))
     (h : a < off ∨ off + bs.length ≤ a) : Virtio.diskWrite dk off bs a = dk a := by
   unfold Virtio.diskWrite
   by_cases hle : off ≤ a
-  · rw [if_pos hle]
+  · rw [ite_eq_left hle]
     rcases h with h | h
     · omega
     · rw [List.getElem?_eq_none (by omega)]
-  · rw [if_neg hle]
+  · rw [ite_eq_right hle]
 
 /-- A byte inside the written range reads the written byte (Rocq
 `VirtioModel.disk_write_in`). -/
@@ -73,7 +73,7 @@ theorem diskWrite_in (dk : Nat → BitVec 8) (off : Nat) (bs : List (BitVec 8)) 
     (x : BitVec 8) (hle : off ≤ a) (hx : bs[a - off]? = some x) :
     Virtio.diskWrite dk off bs a = x := by
   unfold Virtio.diskWrite
-  rw [if_pos hle, hx]
+  rw [ite_eq_left hle, hx]
 
 /-- One byte of the view (Rocq `fs_blocks_lookup`). -/
 theorem fsBlocks_lookup (dk : Nat → BitVec 8) (b k : Nat) (hk : k < BSIZE) :
@@ -126,7 +126,7 @@ theorem fsBlocks_splice (dk : Nat → BitVec 8) (b o : Nat) (bs : List (BitVec 8
       rw [List.length_take, hL]; omega
     by_cases hbef : k < o
     · rw [List.append_assoc, List.getElem?_append_left (by omega), List.getElem?_take,
-        if_pos hbef, fsBlocks_lookup _ b k hk]
+        ite_eq_left hbef, fsBlocks_lookup _ b k hk]
       exact congrArg some (diskWrite_out dk _ bs _ (Or.inl (by omega)))
     · rw [List.append_assoc, List.getElem?_append_right (by omega), htl]
       by_cases hin : k < o + bs.length

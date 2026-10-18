@@ -144,7 +144,7 @@ theorem ulibPutcCode_of_text (L : UlibRun GF) (t : Xv6.User.UTextTree) (base : N
       | some e =>
         rw [hf] at hat
         simp only [Option.map_some, Option.some.injEq, Prod.mk.injEq] at hat
-        simp only [Option.bind_some, hat.1, hat.2, hg, if_true]
+        simp only [Option.bind_some, hat.1, hat.2, hg, ite_true]
         exact ulibPutcTab_decode k x hk
     iintro #H'
     iapply L.utext_instr t _ x.rvc x.ast hdec

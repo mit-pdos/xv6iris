@@ -139,7 +139,7 @@ theorem fkr_argstrs [CurCtx] (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : P
   rw [hr]
   iintro H
   iapply BigSepL.bigSepL_singleton.2
-  simp only [fkrKA, fkrArgv, if_true]
+  simp only [fkrKA, fkrArgv, ite_true]
   iexact H
 
 set_option maxHeartbeats 4000000 in
@@ -320,7 +320,7 @@ theorem fkr_exec_tail [X : CurCtx] (PN : PANIC) (c : CPU) (kx : KCtx) (eb : Bool
   simp only [KCtx.setReg_sie, KCtx.setReg_proc, hs, hp] at hp1 hp2 hp3 hp4 hp5 hp6
   rcases hr with rfl | rfl
   · -- kexec FAILED: the branch is taken, panic("exec")
-    simp only [fkr_bcond_m1, if_true, ite_true]
+    simp only [fkr_bcond_m1, ite_true, ite_true]
     -- +0x8a  auipc a0,0x5
     k_step_gen (wp_s_auipc c6 _ (KA.«forkret» + 0x8a#64) false 5#20 10#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hp7
@@ -343,7 +343,7 @@ theorem fkr_exec_tail [X : CurCtx] (PN : PANIC) (c : CPU) (kx : KCtx) (eb : Bool
     case hpr => k_norm_g; simp [KCtx.setReg, h.locks]
     case hu => k_norm_g; simp [KCtx.setReg, h.locks]
   · -- kexec SUCCEEDED: a0 = argc = 1, the branch falls through
-    simp only [fkr_bcond_1, Bool.false_eq_true, if_false]
+    simp only [fkr_bcond_1, Bool.false_eq_true, ite_false]
     ihave Hn := Hcont $$ %(by first | rfl | trivial)
     ihave Hn := wpNext_at eb pa c c6 _ (fun e => (hp6 e).trans ((hp5 e).trans ((hp4 e).trans
       ((hp3 e).trans ((hp2 e).trans (hp1 e)))))) $$ Hn Hlc

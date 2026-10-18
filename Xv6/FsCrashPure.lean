@@ -339,7 +339,7 @@ theorem fsRecovery_untouched (P : Nat → List (BitVec 8)) (D : BlockMap)
     (hhome : fsHome cov logstart b) (hout : b ∉ (hdrDec (P (logHdrBno logstart))).2) :
     PartialMap.get? D b = some (P b) := by
   rw [hrec, fsInstall_miss _ _ _ _ b hout, fsRestrict_lookup,
-    if_pos ((mem_fsHomeList cov logstart b).2 hhome)]
+    ite_eq_left ((mem_fsHomeList cov logstart b).2 hhome)]
 
 /-! ## §1c''' The committed view as a block view -/
 
@@ -378,8 +378,8 @@ theorem fsRecovery_dom (P : Nat → List (BitVec 8)) (D : BlockMap)
     exact ⟨fun _ => ⟨(hwf.2.2 b hin).1, (hwf.2.2 b hin).2.1⟩, fun _ => ⟨_, rfl⟩⟩
   · rw [fsInstall_miss P ls _ _ b hin, fsRestrict_lookup]
     by_cases hb : b ∈ fsHomeList cov ls
-    · rw [if_pos hb]; exact ⟨fun _ => (mem_fsHomeList cov ls b).1 hb, fun _ => ⟨_, rfl⟩⟩
-    · rw [if_neg hb]
+    · rw [ite_eq_left hb]; exact ⟨fun _ => (mem_fsHomeList cov ls b).1 hb, fun _ => ⟨_, rfl⟩⟩
+    · rw [ite_eq_right hb]
       exact ⟨fun ⟨_, h⟩ => absurd h (by simp),
         fun h => absurd ((mem_fsHomeList cov ls b).2 h) hb⟩
 
@@ -390,11 +390,11 @@ theorem fsRecovery_restrict (P : Nat → List (BitVec 8)) (D : BlockMap)
   refine equiv_iff_eq.1 (fun b => ?_)
   rw [fsRestrict_lookup]
   by_cases hin : b ∈ fsHomeList cov ls
-  · rw [if_pos hin]
+  · rw [ite_eq_left hin]
     obtain ⟨bs, hbs⟩ :=
       (fsRecovery_dom P D cov ls b hrec hwf).2 ((mem_fsHomeList cov ls b).1 hin)
     unfold fsRecView; rw [hbs]
-  · rw [if_neg hin]
+  · rw [ite_eq_right hin]
     cases hbs : PartialMap.get? D b with
     | none => rfl
     | some bs =>
@@ -472,17 +472,17 @@ theorem fsInstall_is_logged (V : Nat → List (BitVec 8)) (L : BlockMap)
   refine equiv_iff_eq.1 (fun b => ?_)
   by_cases hb : fsHome cov ls b
   · have hbl := (mem_fsHomeList cov ls b).2 hb
-    rw [fsRestrict_lookup (dvOfD L), if_pos hbl]
+    rw [fsRestrict_lookup (dvOfD L), ite_eq_left hbl]
     by_cases hbw : b ∈ Ws
     · obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 hbw
       rw [fsInstall_hit V ls Ws _ i b hnd hi]
       unfold dvOfD; rw [hhit i b hi]; rfl
-    · rw [fsInstall_miss V ls Ws _ b hbw, fsRestrict_lookup, if_pos hbl]
+    · rw [fsInstall_miss V ls Ws _ b hbw, fsRestrict_lookup, ite_eq_left hbl]
       unfold dvOfD; rw [hmiss b hb hbw]; rfl
   · have hbw : b ∉ Ws := fun h => hb (hin b h)
     have hbl : b ∉ fsHomeList cov ls := fun h => hb ((mem_fsHomeList cov ls b).1 h)
-    rw [fsInstall_miss V ls Ws _ b hbw, fsRestrict_lookup, if_neg hbl, fsRestrict_lookup,
-      if_neg hbl]
+    rw [fsInstall_miss V ls Ws _ b hbw, fsRestrict_lookup, ite_eq_right hbl, fsRestrict_lookup,
+      ite_eq_right hbl]
 
 /-! ## The four recovery transitions -/
 

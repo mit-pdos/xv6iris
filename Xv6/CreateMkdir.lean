@@ -322,13 +322,13 @@ theorem createMkdir_iupdate (IU : IUPDATE) (Γ : SchedNames) [ClaimIs GF Γ]
   isplitl [Hdev Hinum Hmeta Hmap Hsi]
   · unfold iuCells; iframe Hdev Hinum Hmeta Hmap Hsi
   isplitl []
-  · unfold iregLinkPin; simp only [Bool.false_eq_true, if_false]; ipureintro; exact hlive
+  · unfold iregLinkPin; simp only [Bool.false_eq_true, ite_false]; ipureintro; exact hlive
   iapply wpNext_intro_pin_lc
   iintro %c %_ Hlc %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hcells Hdi ⟨%w, -, Htok⟩ - Hbs Hop
   unfold iuCells
   icases Hcells with ⟨Hdev, Hinum, Hmeta, Hmap, Hsi⟩
   rw [iregDotDelta_live _ _ hlive, FsStateLink.linkReps_1] at *
-  simp only [if_true]
+  simp only [ite_true]
   unfold FsStateLink.linkTok
   iapply HK $$ %c Hlc %spie %spp %R' %w %hcs Hk Hpc Hte Hce Hpid Hdev Hinum Hmeta Hmap Hsi Hdi Htok
     Hbs Hop
@@ -401,11 +401,11 @@ theorem createMkdir_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF 
   iframe Hk Hpc Hte Hce Hsl Hdep Hoff Hdev Hinum Hval Hshot Hfrz Hsb Hsi Hpid Hbs Hop
   iframe #
   isplitl [Hload]
-  · unfold icDepHeld; simp only [icDepRd, Bool.false_eq_true, if_false]; iexact Hload
+  · unfold icDepHeld; simp only [icDepRd, Bool.false_eq_true, ite_false]; iexact Hload
   isplitl [Hkeep Hru]
   · unfold inodeRefpShort; iframe
   isplitl []
-  · simp only [Bool.false_eq_true, if_false]; iempintro
+  · simp only [Bool.false_eq_true, ite_false]; iempintro
   iapply wpNext_intro_pin_lc
   iintro %c %_ Hlc %spie %spp %R' %n' %Sb' %w %hcs Hk Hpc Hte Hce Hpid Hsb Hsi Hbs %hf Hops Hslot Hside
   unfold icDepSide icDepSideTx txPinO
@@ -1119,7 +1119,7 @@ theorem createMkdir_par_post (plen : Nat) (pfun : Nat → BitVec 8) (kd : Nat)
         else fileByte data x) ∧
       ((a0 = 0#64 ∧ tot = 16) ∨ (a0 = -1#64 ∧ tot < 16)) := by
   have harms := hout.arms
-  simp only [Bool.false_eq_true, if_false] at harms
+  simp only [Bool.false_eq_true, ite_false] at harms
   obtain ⟨_, hwf3, hholes3, haddr3, hsz313, hcov3, hdp3, hdp03, htot16, hrng3, hbl3⟩ := harms
   have hdp03' := hdp03 trivial
   have hty : dp3.diType = dn.diType := by rw [hdp3]; rfl
@@ -1183,7 +1183,7 @@ theorem createMkdir_app_facts (plen : Nat) (pfun : Nat → BitVec 8) (kd : Nat)
   · rw [hszmax]
     exact create_max_div16 _ _ (hpar.hrl.2.2 htz)
       ⟨dirSlot data (dirNrec dn.diSize.toNat) + 1, by omega⟩
-  · rw [dirEntries_eraNode dn bm data hpar.hiok.2.2.2.2.2.1 hszcap, if_pos htz]
+  · rw [dirEntries_eraNode dn bm data hpar.hiok.2.2.2.2.2.1 hszcap, ite_eq_left htz]
     exact (dirView_lookup_None _ _ _).mpr hpar.hnone
 
 /-- the name the parent's lookup missed is neither dot (Rocq's
@@ -1226,7 +1226,7 @@ theorem createMkdir_parW (ty : BitVec 16) (plen : Nat) (pfun : Nat → BitVec 8)
   obtain ⟨hnfd, hnfdd⟩ := createMkdir_nm_not_dots plen pfun kd dind dn bm data nf hpar
   have hok : entTyOk dind.toNat (fnDd (eraNode dn bm data)) true (bname 14 nf)
       (createIty ty (dind.toNat : Int)) :=
-    entTyOk_name _ _ _ true _ hnfd hnfdd (by simp only [if_true]; exact create_ity_dir ty _ htd)
+    entTyOk_name _ _ _ true _ hnfd hnfdd (by simp only [ite_true]; exact create_ity_dir ty _ htd)
   unfold createMkdirParW createMkdirBump
   iintro Hdl Htok %hmtnz
   icases dlinks_open fscFs dind.toNat dn bm data $$ Hdl with ⟨%D, %hDx, Hetk⟩
@@ -1244,7 +1244,7 @@ theorem createMkdir_parW (ty : BitVec 16) (plen : Nat) (pfun : Nat → BitVec 8)
     (dirSlot data (dirNrec dn.diSize.toNat)) 16 D true rfl rfl (Or.inr rfl)
     (bname_length_le 14 nf) (cutNul_nonul _) htz happ.hty happ.hnl hszmax hrng3 hpar.hnone
     hpar.hiok.2.2.2.2.2.1 happ.hiok.2.2.2.2.2.1 hszcap happ.hiok.2.2.2.2.1 hsD hnfdd $$ Hetk Htok
-  rw [if_pos rfl]
+  rw [ite_eq_left rfl]
   ihave Hetk := entToks_eraNlink (fsGammaL fscFs) dind.toNat dp3
     (createSetf dp3 dp3.diMajor dp3.diMinor (dp3.diNlink + 1#16)) bm3 dat3
     (D.insert (bname 14 nf)) (createSetf_type _ _ _ _) (createSetf_size _ _ _ _) hlive3
@@ -1262,7 +1262,7 @@ theorem createMkdir_parW (ty : BitVec 16) (plen : Nat) (pfun : Nat → BitVec 8)
     · subst hss
       exact ⟨⟨cinum.toNat, by rw [hents]; exact Std.ExtTreeMap.getElem?_insert_self⟩, hnfd, hnfdd⟩
     · have hs'D : s' ∈ D :=
-        (mem_iteInsert D (bname 14 nf) s' true hss).1 (by rw [if_pos rfl]; exact hs')
+        (mem_iteInsert D (bname 14 nf) s' true hss).1 (by rw [ite_eq_left rfl]; exact hs')
       obtain ⟨⟨t, ht⟩, h1, h2⟩ := hdok0 s' hs'D
       exact ⟨⟨t, by rw [hents, fmap_lookup_insert_ne _ (Ne.symm hss)]; exact ht⟩, h1, h2⟩
   have hxb : nodeExact (eraNode (createSetf dp3 dp3.diMajor dp3.diMinor (dp3.diNlink + 1#16))
@@ -1350,7 +1350,7 @@ end ParLink
 theorem createMkdir_dots_comm (i d : Nat) :
     ((∅ : Std.ExtTreeMap Fname Nat compare).insert DOT i).insert DOTDOT d = dotsEnts true i d := by
   unfold dotsEnts
-  simp only [if_true]
+  simp only [ite_true]
   apply Std.ExtTreeMap.ext_getElem?
   intro a
   rw [Std.ExtTreeMap.getElem?_insert, Std.ExtTreeMap.getElem?_insert,
@@ -1403,14 +1403,14 @@ theorem createMkdir_dd_post [Fscfg] [Icfg] (ty major minor : BitVec 16) (cinum d
   cases found
   case true =>
     have harms := hout.arms
-    simp only [if_true] at harms
+    simp only [ite_true] at harms
     -- the record arm by the `"."` record, the SELF arm by R1
     exact harms.1.elim
       (fun h => absurd (show dirFirst dat1 (dirNrec dc1.diSize.toNat) (bname 14 createDotdotF) = none
         by rw [hnr1]; exact hdot.hmiss) h)
       (fun h => (hcrt h.2).elim)
   have harms := hout.arms
-  simp only [Bool.false_eq_true, if_false] at harms
+  simp only [Bool.false_eq_true, ite_false] at harms
   obtain ⟨hnone, hwf2, hholes2, haddr2, _, hcov2, hdc2, hdc02, htot16, hrng2, hbl2⟩ := harms
   rw [hnr1] at hrng2 hdc2 hnone
   rw [hsl1] at hrng2 hdc2
@@ -1438,7 +1438,7 @@ theorem createMkdir_dd_post [Fscfg] [Icfg] (ty major minor : BitVec 16) (cinum d
     1 1 tot hnr1.symm hsl1.symm hatom (bname_length_le 14 _) (cutNul_nonul _) hty2 hszmax'
     hrng2' (by rw [hdd]; exact hnone) hdot.hduq
   have hw0 : dirWinAgree dat1 dat2 0 := by
-    intro jj hjj; rw [hrng2, if_neg (by omega)]
+    intro jj hjj; rw [hrng2, ite_eq_right (by omega)]
   have hn0 : bname 14 (dirName dat2 0) = dotName := by
     rw [dirBname_agree dat1 dat2 0 hw0]; exact hdot.hnm0
   have hdots : dirDotsOnly dc2 dat2 := by
@@ -1455,7 +1455,7 @@ theorem createMkdir_dd_post [Fscfg] [Icfg] (ty major minor : BitVec 16) (cinum d
       rcases (show kk = 0 ∨ kk = 1 by omega) with rfl | rfl
       · exact Or.inl hn0
       · refine Or.inr (create_dotdot_record dat2 (createLow16 dind) (fun jj hjj => ?_)).2
-        rw [hrng2, if_pos (by omega), show 16 * 1 + jj - 16 * 1 = jj by omega, hdd]
+        rw [hrng2, ite_eq_left (by omega), show 16 * 1 + jj - 16 * 1 = jj by omega, hdd]
   have hrl2 : inodeRecLocal dc2 := by
     refine ⟨Or.inr (Or.inl (by rw [hty2, hdot.hty, htd]; rfl)),
       by rw [hnl2, hdot.hnl]; decide, fun _ => ?_⟩
@@ -1491,9 +1491,9 @@ theorem createMkdir_dd_full [Fscfg] [Icfg] (ty major minor : BitVec 16) (cinum d
   have hcl : (createLow16 cinum).toNat = cinum.toNat := create_low16_toNat cinum hc16
   have hdl : (createLow16 dind).toNat = dind.toNat := create_low16_toNat dind hd16
   have hw0 : dirWinAgree dat1 dat2 0 := by
-    intro jj hjj; rw [hrng2, if_neg (by omega)]
+    intro jj hjj; rw [hrng2, ite_eq_right (by omega)]
   obtain ⟨hi1, hn1⟩ := create_dotdot_record dat2 (createLow16 dind) (fun jj hjj => by
-    rw [hrng2, if_pos (by omega), show 16 * 1 + jj - 16 * 1 = jj by omega, hdd])
+    rw [hrng2, ite_eq_left (by omega), show 16 * 1 + jj - 16 * 1 = jj by omega, hdd])
   have hty1z : dc1.diType.toNat = T_DIR_z := by rw [hdot.hty, htd]; rfl
   have hty2z : dc2.diType.toNat = T_DIR_z := by rw [hty2, htd]; rfl
   have hddix : dirDotsIx cinum.toNat dc2 dat2 := by
@@ -1737,7 +1737,7 @@ theorem create_mkdir_name (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs GF Γ]
   cases found
   case true =>
     have harms := hout.arms
-    simp only [if_true] at harms
+    simp only [ite_true] at harms
     exact harms.1.elim (absurd hpar.hnone) (fun h =>
       ((dirDots_miss_not_dots dind.toNat dn data (bname 14 nf) (by rw [hpar.hty]; rfl)
         (create_nl0z dn hpar.hnl0) hpar.hddix hpar.hnone).2 h.1).elim)
@@ -1849,7 +1849,7 @@ theorem createMkdir_dot_post [Fscfg] [Icfg] (ty major minor : BitVec 16) (cinum 
   cases found
   case true =>
     have harms := hout.arms
-    simp only [if_true] at harms
+    simp only [ite_true] at harms
     -- the record arm: an empty directory has no records; the SELF arm: `"."`
     -- is not `".."`
     exact harms.1.elim
@@ -1857,7 +1857,7 @@ theorem createMkdir_dot_post [Fscfg] [Icfg] (ty major minor : BitVec 16) (cinum 
           (bname 14 createDotF) = none by rw [hnr0]; exact create_first_0 datc _) h)
       (fun h => absurd (create_dot_name.symm.trans h.1) (by decide))
   have harms := hout.arms
-  simp only [Bool.false_eq_true, if_false] at harms
+  simp only [Bool.false_eq_true, ite_false] at harms
   obtain ⟨hnone, hwf1, hholes1, haddr1, _, hcov1, hdc1, hdc01, htot16, hrng1, hbl1⟩ := harms
   rw [hnr0, hsl0] at hrng1 hdc1
   have hatom := (hout.w16 rfl).2.1
@@ -1906,7 +1906,7 @@ theorem createMkdir_dot_full [Fscfg] [Icfg] (ty major minor : BitVec 16) (cinum 
         (∅ : Std.ExtTreeMap Fname Nat compare).insert DOT cinum.toNat := by
   have hwin : ∀ j, j < 16 → fileByte dat1 (16 * 0 + j) =
       (direntBytes (deOfName (createLow16 cinum) (bname 14 createDotF)))[j]! := by
-    intro j hj; rw [hrng1, if_pos (by omega), show 16 * 0 + j - 16 * 0 = j by omega]
+    intro j hj; rw [hrng1, ite_eq_left (by omega), show 16 * 0 + j - 16 * 0 = j by omega]
   obtain ⟨hi0, hn0⟩ := create_dot_record dat1 (createLow16 cinum) hwin
   have hsz0 : (createSetf dnc major minor 1#16).diSize.toNat = 0 := by
     rw [createSetf_size]; exact hfresh.2.1
@@ -1986,7 +1986,7 @@ theorem createMkdir_dot_park (ty major minor : BitVec 16) (cinum : BitVec 32) (d
     (fnOrphan (eraNode (createSetf dnc major minor 1#16) bmc datc)) false (bname 14 createDotF)
     (createLow16 cinum).toNat (createIty ty (dind.toNat : Int)) hok
   rw [create_low16_toNat cinum hc16] at HT
-  simp only [Bool.false_eq_true, if_false] at HA
+  simp only [Bool.false_eq_true, ite_false] at HA
   have HI := dlinks_intro (GF := GF) fscFs cinum.toNat dc1 bm1 dat1 ∅
     (fun s hs => absurd hs Std.ExtTreeSet.not_mem_empty)
     (fun _ => by rw [ho1, Xv6.cafEra_nlink, hnl1, Std.ExtTreeSet.size_empty]; rfl)
@@ -2615,7 +2615,7 @@ theorem create_mkdir_cok (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
   iframe Hk Hpc Hframe Hnm Htl Hte Hce
   iintro %c' Hlc %R' %hfin Hk Hpc Hte Hce
   obtain ⟨hcsf, ha0f⟩ := hfin
-  simp only [RegMap.set_apply, BitVec.reduceEq, if_false, if_true] at ha0f
+  simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at ha0f
   -- THE CHILD'S ARM GROWS BACK TO THE HALF (the parent's parked quarter) and
   -- joins the registry's half into the transaction token `icTxDep` needs
   unfold createEnv
@@ -2656,18 +2656,18 @@ theorem create_mkdir_cok (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
   unfold createPost
   iapply Hcont $$ Hcrd %spie1 %spp1 %R' %true %true %kslot %q.half %q.half %g %cinum %dc2 %bm2 %n7
     %Sb7 %(ns - 1) %hcsf Hk Hpc Hte Hce Hsbn Hsi Hss Hsb Hpriv Hpath Hbs [] Hisl [] Hop
-  · ipureintro; simp only [if_true]; omega
+  · ipureintro; simp only [ite_true]; omega
   · ipureintro
     have hw : w = false := by simpa using hcrb7
     subst hw
     have hsp : n6 ≤ n7 := by simpa [ipSpendW, ipBm] using hsp7
     refine ⟨fun x hx => hsub7 x (hsub6 x hx), by omega, fun _ => le_trans hip6 hsp⟩
-  simp only [if_true]
+  simp only [ite_true]
   iframe Hlocked Harms
   ipureintro
   refine ⟨ha0f, hkid.hk, hkid.hpos, hkid.hnib, ?_⟩
   unfold creOkPure
-  simp only [if_true]
+  simp only [ite_true]
   refine ⟨hc2ty, hc2mj, hc2mn, by rw [hc2nl]; rfl, fun h => absurd htd h⟩
 
 end StageCok

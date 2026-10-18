@@ -74,9 +74,9 @@ theorem utPins_set (A : UtArgs GF) (R : RegMap) (i : BitVec 5) (v : BitVec 64) (
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
     simp only [RegMap.set_apply] <;>
     first
-      | (rw [if_neg (Ne.symm h2)]; assumption)
-      | (rw [if_neg (Ne.symm h9)]; assumption)
-      | (rw [if_neg (hne _ (by decide) (by decide))]; assumption)
+      | (rw [ite_eq_right (Ne.symm h2)]; assumption)
+      | (rw [ite_eq_right (Ne.symm h9)]; assumption)
+      | (rw [ite_eq_right (hne _ (by decide) (by decide))]; assumption)
 
 /-- Peel caller-saved register writes off a pinned map (`utPins_set`), then
 close with the pins hypothesis in context. -/

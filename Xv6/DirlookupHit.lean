@@ -244,7 +244,7 @@ theorem dirlookup_found_iget (IG : IGET) (cpu : CPU) (k : KCtx) (spie spp : Bool
   ihave Harm : dirlookupArm data dn fn hasp (k.regs 12#5) pofv true i kslot q (ientry kslot)
     $$ [Href Hru Hpf]
   · unfold dirlookupArm
-    simp only [if_true]
+    simp only [ite_true]
     iframe Href Hru Hpf
     ipureintro
     exact ⟨hsome, hkq.1, by first | rfl | trivial⟩
@@ -300,7 +300,7 @@ theorem dirlookup_found (IG : IGET) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R 
   icases Hin with ⟨Hsl, Hpf⟩
   cases hasp
   · -- no poff: +0xbc beqz s7 TAKEN
-    simp only [Bool.false_eq_true, if_false] at hpoff ⊢
+    simp only [Bool.false_eq_true, ite_false] at hpoff ⊢
     k_step_e (wp_s_branch cpu _ (KA.«dirlookup» + 0xbc#64) false 8#13 23#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [r23, hpoff, (show bcond bop.BEQ 0#64 0#64 = true by decide)]
@@ -308,10 +308,10 @@ theorem dirlookup_found (IG : IGET) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R 
     iapply (dirlookup_found_iget IG cpu k spie spp R j ip dinum bm data dn dr fn false pofv pidv
         dqp dqd dqn i v10 hs hr hlive hsome)
       $$ [$Hk $Hpc $Hframe $Hhalf $Hname $Hte $Hce $Hkeep $Hsl $Hit2 $Hiti $Hinv $Hpe $Hnext]
-    simp only [Bool.false_eq_true, if_false]
+    simp only [Bool.false_eq_true, ite_false]
     iempintro
   · -- poff: +0xbc falls, +0xc0 sw s1,0(s7)
-    simp only [if_true] at hpoff ⊢
+    simp only [ite_true] at hpoff ⊢
     k_step_e (wp_s_branch cpu _ (KA.«dirlookup» + 0xbc#64) false 8#13 23#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [r23, dirlookup_beqz, decide_eq_false hpoff]
@@ -322,7 +322,7 @@ theorem dirlookup_found (IG : IGET) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R 
     iapply (dirlookup_found_iget IG cpu k spie spp R j ip dinum bm data dn dr fn true pofv pidv
         dqp dqd dqn i v10 hs hr hlive hsome)
       $$ [$Hk $Hpc $Hframe $Hhalf $Hname $Hte $Hce $Hkeep $Hsl $Hit2 $Hiti $Hinv $Hpe $Hnext Hpf]
-    simp only [if_true]
+    simp only [ite_true]
     isimp only [r9, hoff] at Hpf
     iexact Hpf
 

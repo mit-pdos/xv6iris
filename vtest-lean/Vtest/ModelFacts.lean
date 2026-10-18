@@ -45,7 +45,7 @@ theorem model_flush_needs_empty_cache (v : VirtioState) (r : VioReq) (h : BitVec
     v.cache.isEmpty = true := by
   have hne : r.type.toNat ≠ Virtio.blkTOut := by rw [hf]; decide
   unfold Virtio.completeOk at hok
-  rw [if_neg hne, if_pos hf] at hok
+  rw [ite_eq_right hne, ite_eq_left hf] at hok
   exact hok
 
 /-- A completion answers the head it was handed: exactly that head leaves the
@@ -62,7 +62,7 @@ write-through mode, drained: the gate `disk_rw`'s run waits at. -/
 theorem model_write_gated (v : VirtioState) (r : VioReq) (h : BitVec 16)
     (ho : r.type.toNat = Virtio.blkTOut) (hok : Virtio.completeOk v r h = true) :
     v.taken = some h ∧ (Virtio.wce v.cfg = true ∨ Virtio.reqCached v r = false) := by
-  simp only [Virtio.completeOk, ho, if_true, Bool.and_eq_true, decide_eq_true_eq,
+  simp only [Virtio.completeOk, ho, ite_true, Bool.and_eq_true, decide_eq_true_eq,
     Bool.or_eq_true, Bool.not_eq_true'] at hok
   exact hok
 

@@ -250,7 +250,7 @@ theorem iput_main (AC : ACQUIRE_LLB) (HN : IputTailNeSpec) (HE : IputEntrySpec)
     obtain rfl : q = qt := hone rfl
     k_step (wp_s_branch c1 _ (KA.«iput» + 0x1c#64) false 30#13 15#5 14#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [iput_main_beq_one, if_true]
+      with [iput_main_beq_one, ite_true]
     iintro Hk Hpc
     ihave #Hcred := logCredit_own (GF := GF) icfgLog cru Sb e0 (IBLOCK inum icfgIst) hcru
     iapply (HE Γ c1 (k.withSpie a b) γl pd pav pu j γil γisl kk q inum Mt ci n Sb crb cru crz e0 tid qtx
@@ -276,7 +276,7 @@ theorem iput_main (AC : ACQUIRE_LLB) (HN : IputTailNeSpec) (HE : IputEntrySpec)
   · -- ---- REF > 1: fall through into the non-last close ----
     k_step (wp_s_branch c1 _ (KA.«iput» + 0x1c#64) false 30#13 15#5 14#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [iput_main_beq cnt.val hcntb, hc1, decide_false, Bool.false_eq_true, if_false]
+      with [iput_main_beq cnt.val hcntb, hc1, decide_false, Bool.false_eq_true, ite_false]
     iintro Hk Hpc
     iapply (HN Γ c1 (k.withSpie a b) γl pd pav pu γil γisl kk q inum n Sb crb cru crz tid qtx pidv dqp dqb dqs
       rg _ Mt ci qt cnt hwf hnoff hlocks hK hkk hMwf hciwf hMk hc1 e9 e15 e2 e18 e19

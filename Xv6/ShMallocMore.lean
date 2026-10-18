@@ -116,8 +116,8 @@ theorem shMalloc_more (UL : UK_LEAVES) (HS : SH_SBRK) (hps : ∀ k : Int, freeNu
     (if r = BitVec.ofInt 64 (-1) then BitVec.ofNat 64 0x121c else BitVec.ofNat 64 0x11f4)
     (by
       by_cases hr : r = BitVec.ofInt 64 (-1)
-      · rw [if_pos hr, show (!decide (r = BitVec.ofInt 64 (-1))) = false by rw [decide_eq_true hr]; rfl]; decide
-      · rw [if_neg hr, show (!decide (r = BitVec.ofInt 64 (-1))) = true by rw [decide_eq_false hr]; rfl]; decide)
+      · rw [ite_eq_left hr, show (!decide (r = BitVec.ofInt 64 (-1))) = false by rw [decide_eq_true hr]; rfl]; decide
+      · rw [ite_eq_right hr, show (!decide (r = BitVec.ofInt 64 (-1))) = true by rw [decide_eq_false hr]; rfl]; decide)
     (fun _ => by decide) $$ Hi Hrun
   inext
   iintro %h7 Hrun

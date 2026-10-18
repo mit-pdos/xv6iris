@@ -73,7 +73,7 @@ theorem ukm_view_bytes {P : UPtd} {t : PTree} {mm T : BMap} (hm : UkMem P t mm T
   intro j hj
   have hw' := hw j hj
   rw [ukm_view_get _ _ _ _ _ h _ (by omega), ht] at hw'
-  simp only [Bool.false_eq_true, if_false, Option.some.injEq] at hw'
+  simp only [Bool.false_eq_true, ite_false, Option.some.injEq] at hw'
   rw [BitVec.add_assoc, ← BitVec.ofNat_add]
   have hs : (mm (pte2pa lw + BitVec.ofNat 64 (off + j))).isSome = true :=
     (hm.dom _).2 (List.mem_append_right _ (ukm_data_mem P.um k lw h ht (off + j) (by omega)))
@@ -91,7 +91,7 @@ theorem ukm_view_bytesT {P : UPtd} {t : PTree} {mm T : BMap} (hm : UkMem P t mm 
   intro j hj
   have hw' := hw j hj
   rw [ukm_view_get _ _ _ _ _ h _ (by omega), ht] at hw'
-  simp only [if_true, Option.some.injEq] at hw'
+  simp only [ite_true, Option.some.injEq] at hw'
   rw [BitVec.add_assoc, ← BitVec.ofNat_add]
   have hs : (T (pte2pa lw + BitVec.ofNat 64 (off + j))).isSome = true :=
     (hm.domT _).2 (ukm_text_mem P.um k lw h ht (off + j) (by omega))

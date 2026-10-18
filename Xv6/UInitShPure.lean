@@ -226,7 +226,7 @@ theorem shCode_none (a : Nat) (h : 0x1c74 ≤ a) : User.Sh.code.byte a = none :=
   have hv : User.Sh.code.vaddr = 0 := rfl
   have hs : User.Sh.code.size = 0x1c74 := rfl
   unfold User.USeg.byte
-  rw [if_neg (by rw [hv, hs]; omega)]
+  rw [ite_eq_right (by rw [hv, hs]; omega)]
 
 /-- sh's .data window is `[0x2000, 0x2010)`. -/
 theorem shData_range (a : Nat) (b : BitVec 8) (h : User.Sh.data.byte a = some b) : 0x2000 ≤ a ∧ a < 0x2010 := by
@@ -256,7 +256,7 @@ theorem sh_bss_img (a : Nat) (h1 : 0x2010 ≤ a) (h2 : a < 0x2098) : elfImage Us
   have hsz : User.Sh.bssSize = 0x88 := rfl
   rw [User.Sh.elf_image, elfUnion_r]
   · unfold elfSeq
-    rw [if_pos (by rw [hlo]; omega), List.getElem?_replicate, if_pos (by rw [hlo, hsz]; omega)]
+    rw [ite_eq_left (by rw [hlo]; omega), List.getElem?_replicate, ite_eq_left (by rw [hlo, hsz]; omega)]
     rfl
   · rw [elfUnion_r _ _ _ (shCode_none a (by omega)), elfUnion_r _ _ _ hd]
     rfl

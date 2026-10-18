@@ -298,7 +298,7 @@ theorem creOkFile_exists (Γ : FsViewNames GF) (ma mi : Nat) (Nm : Fname → Pro
         pfAt (acreCommitAtNm Γ appE (.AFile []) Nm (P (nparElems pl).length) Farm) Fok ∗
         creChildUnfiredNdp Γ (.AFile []) Nd Farm Fun := by
   unfold creOkArms creExFired creCommits creChildUnfiredNdp acreCommitAtNm
-  simp only [Bool.false_eq_true, if_false, creC0_file, creChild_file_fun]
+  simp only [Bool.false_eq_true, ite_false, creC0_file, creChild_file_fun]
   iintro ⟨%d, %nm, %hl, HP, ⟨%av, %ents, %nl, %hrow, %hent, HΦ⟩, Ha, -, Hu, Hac⟩
   iexists d, nm, av, ents, nl
   iframe HP HΦ Hac Ha Hu

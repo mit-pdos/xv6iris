@@ -72,7 +72,7 @@ theorem ume_pf_translateAddr_canon (D : UFoot) (orc : UOrc) (s : UWSt) (hp : Utr
             Result (physaddr × page_based_mem_type × Unit) (ExceptionType × Unit)), r.2.1, r.2.2)) := by
   unfold utrCanon at hc
   ume_pf_front hp c
-  simp only [hc, bne_self_eq_false, Bool.false_eq_true, if_false]
+  simp only [hc, bne_self_eq_false, Bool.false_eq_true, ite_false]
   sail_norm
   simp only [runRW_bind, utr_readReg D _ _ _ hms, Option.bind_some,
     satp_to_asid_of _ hasid, satp_to_ppn_of _ _ rfl, utr_vpn]
@@ -116,7 +116,7 @@ theorem ume_pf_translateAddr_noncanon (D : UFoot) (orc : UOrc) (s : UWSt) (hp : 
   have hb : (va != BitVec.signExtend 64 (BitVec.extractLsb' 0 39 va)) = true := by
     simp only [bne_iff_ne, ne_eq]
     exact fun h => hc h.symm
-  simp only [hb, if_true]
+  simp only [hb, ite_true]
   sail_norm
   simp only [ume_texc_pf c]
   sail_norm
@@ -141,9 +141,9 @@ theorem ume_matching_pma_ram (pa : BitVec 64) (n : Nat) (h : inRam pa n) (hn : 0
   rw [hslice]
   simp only [Int.ofNat_eq_natCast, Int.ofNat_le]
   -- Lean ≥ 4.34: `bv_omega` no longer strips Sail's `(x ≤b y) = true` (`decide`)
-  rw [if_neg (by intro hc; obtain ⟨c1, c2, c3⟩ := hc; simp only [decide_eq_true_eq] at c1 c2 c3; bv_omega),
-    if_neg (by intro hc; obtain ⟨c1, c2, c3⟩ := hc; simp only [decide_eq_true_eq] at c1 c2 c3; bv_omega),
-    if_pos (by refine ⟨?_, ?_, ?_⟩ <;> simp only [decide_eq_true_eq] <;> bv_omega)]
+  rw [ite_eq_right (by intro hc; obtain ⟨c1, c2, c3⟩ := hc; simp only [decide_eq_true_eq] at c1 c2 c3; bv_omega),
+    ite_eq_right (by intro hc; obtain ⟨c1, c2, c3⟩ := hc; simp only [decide_eq_true_eq] at c1 c2 c3; bv_omega),
+    ite_eq_left (by refine ⟨?_, ?_, ?_⟩ <;> simp only [decide_eq_true_eq] <;> bv_omega)]
   rfl
 
 theorem ume_pmpCheckRWX_pf (c : cbop_zicbop) : pmpCheckRWX 15#8 (umoPf c) = pure true := by

@@ -126,7 +126,7 @@ theorem dirlookup_latch (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (j
       dirlookup_first_none data (i + 1) _ _ (dirlookup_nrec_le _ i hex) hnone
     ihave Harm : dirlookupArm data dn fn hasp (k.regs 12#5) pofv false 0 0 1 0#64 $$ [Hin]
     · unfold dirlookupArm dirlookupIn
-      simp only [Bool.false_eq_true, if_false]
+      simp only [Bool.false_eq_true, ite_false]
       icases Hin with ⟨Hsl, Hpf⟩
       iframe Hsl Hpf
       ipureintro

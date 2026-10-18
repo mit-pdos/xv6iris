@@ -399,7 +399,7 @@ theorem ushm_bltu (x y : Nat) (hx : x < 2 ^ 64) (hy : y < 2 ^ 64) :
 
 /-- A jump through x0 writes nothing. -/
 theorem ushm_wr0 (m : RegMap) (v : BitVec 64) : ukWr m 0#5 v = m := by
-  unfold ukWr; rw [if_pos rfl]
+  unfold ukWr; rw [ite_eq_left rfl]
 
 /-! ## §7 The two-word frame (deviation 4) -/
 
@@ -497,7 +497,7 @@ theorem ushm_epi2 (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (me : RegMap) (q0 
   have hsp2 : m2.get spIdx + BitVec.ofNat 64 (8 * 2) = sp0 := by
     show (ukWr (ukWr me 1#5 vra) 8#5 vs0).get 2#5 + _ = _
     simp only [ukWr_get]
-    simp (config := {decide := true}) only [if_false, ne_eq, and_true, and_false]
+    simp (config := {decide := true}) only [ite_false, ne_eq, and_true, and_false]
     rw [hsp]
     apply BitVec.eq_of_toNat_eq
     rw [Xv6.paAddToNat' _ _ (by rw [uv_avi_neg sp0 16 hlo]; have := sp0.isLt; omega), uv_avi_neg sp0 16 hlo]

@@ -173,7 +173,7 @@ theorem pns_ok_close (Dp : List Nat) (fdm : Fdmap) (l : List FdState) (vs : RegM
     · left
       refine ⟨fd', ?_⟩
       unfold fdDelete
-      rw [if_neg]
+      rw [ite_eq_right]
       · exact hfd'
       · intro hq; subst hq; rw [hfd] at hfd'; exact he (Option.some.inj hfd').symm
     · exact .inr hD
@@ -219,10 +219,10 @@ theorem pns_ok_close_shared (Dp : List Nat) (fdm : Fdmap) (l : List FdState) (vs
         · exact .inr hD
         · left
           refine ⟨fd'', ?_⟩
-          unfold fdDelete; rw [if_neg hne]; exact hfd''
+          unfold fdDelete; rw [ite_eq_right hne]; exact hfd''
       · left
         refine ⟨fd', ?_⟩
-        unfold fdDelete; rw [if_neg hq]; exact hfd'
+        unfold fdDelete; rw [ite_eq_right hq]; exact hfd'
     · exact .inr hD
   · intro fd' d' hf
     unfold fdDelete at hf

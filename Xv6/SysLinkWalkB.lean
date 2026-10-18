@@ -595,7 +595,7 @@ theorem sys_link_walk_dp (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
     unfold fnIsDir; rw [Xv6.cafEra_type]; exact decide_eq_true hdtyz
   rcases found with _ | _
   · -- ===== THE APPEND ARM =====
-    simp only [Bool.false_eq_true, ite_false, if_false] at harms
+    simp only [Bool.false_eq_true, ite_false, ite_false] at harms
     obtain ⟨hnone, hwf', hholes', hda', hsz31', hcov', hdn', hdn0imp, htotle, hrng, hbl⟩ := harms
     obtain ⟨hsp16, hatom, hmemtrio⟩ := hw16 rfl
     have hdn0 : dn0' = dn' := by simpa using hdn0imp
@@ -626,7 +626,7 @@ theorem sys_link_walk_dp (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
       obtain ⟨hnd1, hnd2⟩ := dirDots_miss_not_dots dinum.toNat dnd datd (bname 14 nf) hdtyz hnl0 hddixd
         hnone
       have hentnone : (dirEntries (eraNode dnd bmd datd))[bname 14 nf]? = none := by
-        rw [dirEntries_eraNode dnd bmd datd hholesd hszbd, if_pos hdtyz]
+        rw [dirEntries_eraNode dnd bmd datd hholesd hszbd, ite_eq_left hdtyz]
         exact (dirView_lookup_None _ _ _).mpr hnone
       have hsD : bname 14 nf ∉ D := fun hin => by
         obtain ⟨⟨t, ht⟩, -, -⟩ := hDok _ hin
@@ -721,7 +721,7 @@ theorem sys_link_walk_dp (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
           (fun _ => hn3.1) (fun h => hn3.2 (fun hb => by simp at h; exact h (hsub3 _ hb))))
         $$ [$Hcells $Hbufs $Henv $Hcwd $Hcwr $Hhole $HΦ $Hip $Hshot $Htok $Hcmu $Hltgt $Hlent $Hir]
   · -- ===== ARM F-FOUND: the name was there =====
-    simp only [ite_true, if_true] at harms
+    simp only [ite_true, ite_true] at harms
     obtain ⟨hfst, ha0m, hbm', hdata', hdn', hdn0', htot0⟩ := harms
     subst bm' data' dn' dn0'
     have hn3 := sys_link_n3 n2 n3 iputUnits Sb2 (by decide) (fun _ => by decide) (hfnd rfl) hn2a hn2b

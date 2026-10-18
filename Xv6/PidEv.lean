@@ -167,11 +167,11 @@ theorem cycAt_succ (pidmax n i : Nat) (hp : 0 < pidmax) :
   have hlt := Nat.mod_lt (n - 1 + i) hp
   rw [← Nat.add_assoc, Nat.add_mod (n - 1 + i) 1 pidmax]
   by_cases he : (n - 1 + i) % pidmax + 1 = pidmax
-  · rw [if_pos he]
+  · rw [ite_eq_left he]
     by_cases h1 : pidmax = 1
     · subst h1; simp only [Nat.mod_one]
     · rw [Nat.mod_eq_of_lt (show 1 < pidmax by omega), he, Nat.mod_self]
-  · rw [if_neg he]
+  · rw [ite_eq_right he]
     by_cases h1 : pidmax = 1
     · subst h1; omega
     · rw [Nat.mod_eq_of_lt (show 1 < pidmax by omega), Nat.mod_eq_of_lt (by omega)]

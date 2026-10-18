@@ -86,7 +86,7 @@ theorem wp_shMallocFirst (UL : UK_LEAVES) (HS : SH_SBRK) (HF : SH_FREE)
   have ha0' : m1.get 10#5 = BitVec.ofNat 64 nbytes := by rw [k1 _ (by decide), ha0]
   iapply shMalloc_head UL N h1 m1 nbytes 0#64 (2 + avail) ha0' hnbhi $$ Hc Hfp Hrun
   iintro %h2 %m2 %k2 %f19 %f18 %f10 Hfp Hrun
-  rw [if_pos rfl]
+  rw [ite_eq_left rfl]
   have hs2 : (m2.get 2#5).toNat = (m.get 2#5).toNat - 64 := by rw [k2 _ (by decide), hs1]
   iapply shMalloc_init UL N h2 m2 (m.get 2#5).toNat 0#64 fb (2 + avail) hs2 hlo hal $$ Hc W2 W5 W6 W7 Hfp Hbase Hrun
   iintro %h3 %m3 %k3 %g15 W2 W5 W6 W7 Hfp Hbh Hrun
@@ -112,7 +112,7 @@ theorem wp_shMallocFirst (UL : UK_LEAVES) (HS : SH_SBRK) (HF : SH_FREE)
   icases Hans with (⟨%hr, Hsz⟩ | ⟨%hr, Hsz, %g, Hg⟩)
   · -- sbrk FAILED: malloc returns 0
     subst hr
-    rw [if_pos rfl]
+    rw [ite_eq_left rfl]
     iapply shMalloc_fail UL N h5 m5 (m.get 2#5).toNat (m.get 9#5) (m.get 20#5) (m.get 21#5) (m.get 22#5)
       (2 + avail) j2 hlo hal $$ Hc W2 W5 W6 W7 Hrun
     iintro %h6 %m6 %k6 %l10 %l9 %l20 %l21 %l22 W2 W5 W6 W7 Hrun
@@ -143,7 +143,7 @@ theorem wp_shMallocFirst (UL : UK_LEAVES) (HS : SH_SBRK) (HF : SH_FREE)
       have := congrArg BitVec.toNat he
       rw [Xv6.bcOfNatToNat sz (by omega), show (BitVec.ofInt 64 (-1)).toNat = 2 ^ 64 - 1 from by decide] at this
       omega
-    rw [if_neg hne]
+    rw [ite_eq_right hne]
     have o18 : m5.get 18#5 = BitVec.ofNat 64 (ushmNu nbytes) := by
       rw [k5 _ (by decide), k4 _ (by decide), k3 _ (by decide), f18]
     have o19 : m5.get 19#5 = BitVec.ofNat 64 (ushmNu nbytes) := by
@@ -211,7 +211,7 @@ theorem wp_shMallocOne (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) 
   have ha0' : m1.get 10#5 = BitVec.ofNat 64 nbytes := by rw [k1 _ (by decide), ha0]
   iapply shMalloc_head UL N h1 m1 nbytes _ (2 + avail) ha0' hnbhi $$ Hc Hfp Hrun
   iintro %h2 %m2 %k2 %f19 %f18 %f10 Hfp Hrun
-  rw [if_neg (by rw [hB]; decide)]
+  rw [ite_eq_right (by rw [hB]; decide)]
   iapply shMalloc_find UL N h2 m2 c R (ushmNu nbytes) (2 + avail) f10 f19 (by omega) hR31 hc16 (by omega)
     $$ Hc Hbn Hcsz Hrun
   iintro %h3 %m3 %k3 %g15 %g14 Hbn Hcsz Hrun

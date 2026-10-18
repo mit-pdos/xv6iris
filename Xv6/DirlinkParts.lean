@@ -139,10 +139,10 @@ theorem dirlink_ret_val (x : BitVec 64) :
       (if (0#64).ult (x + 0xFFFFFFFFFFFFFFF0#64) = true then 1#64 else 0#64))
       = if x = 16#64 then 0#64 else 0xFFFFFFFFFFFFFFFF#64 := by
   by_cases h : x = 16#64
-  · subst h; rw [if_pos rfl]; bv_decide
-  · rw [if_neg h]
+  · subst h; rw [ite_eq_left rfl]; bv_decide
+  · rw [ite_eq_right h]
     by_cases h2 : (0#64).ult (x + 0xFFFFFFFFFFFFFFF0#64) = true
-    · rw [if_pos h2]; bv_decide
+    · rw [ite_eq_left h2]; bv_decide
     · exfalso; apply h; bv_decide
 
 /-- readi's delivered count at a full record: `ofNat t = 16` exactly at
@@ -171,7 +171,7 @@ theorem dirlink_wiDinode_id (dn : Dinode) (bm : Blkmap) (off : Nat)
     (hoff : off ≤ dn.diSize.toNat) (haddr : dn.diAddrs = bmCells bm) :
     wiDinode dn bm off 0 = dn := by
   unfold wiDinode
-  rw [Nat.add_zero, if_neg (by omega), ← haddr]
+  rw [Nat.add_zero, ite_eq_right (by omega), ← haddr]
 
 /-- The latch's exit: `size ≤ 16 (i+1)` with `i < nrec` makes `i + 1 = nrec`
 (Rocq's `dl_eqn` + `dlk_nle_of_ge`). -/

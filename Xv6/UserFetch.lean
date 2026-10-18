@@ -60,21 +60,21 @@ noncomputable def uftTrOf (hX : UftXlate C P) (t0 : PTree) (mm0 : BMap) : UftTr 
   res s va := if h : UstLand C P t0 mm0 s then (hX t0 mm0 s va h).choose else .Err (.E_Fetch_Page_Fault (), ())
   land s va := if h : UstLand C P t0 mm0 s then (hX t0 mm0 s va h).choose_spec.choose else s
   walk s va orc hI := by
-    simp only [dif_pos hI]
+    simp only [dite_eq_left hI]
     exact (hX t0 mm0 s va hI).choose_spec.choose_spec.1 orc
   inv s va hI := by
-    simp only [dif_pos hI]
+    simp only [dite_eq_left hI]
     exact (hX t0 mm0 s va hI).choose_spec.choose_spec.2.1
   pc s va hI := by
-    simp only [dif_pos hI]
+    simp only [dite_eq_left hI]
     exact (hX t0 mm0 s va hI).choose_spec.choose_spec.2.2.1
   pins s hI := uft_pins_land hI
   page s va pa pbmt n hI hr hn hal := by
-    simp only [dif_pos hI] at hr ⊢
+    simp only [dite_eq_left hI] at hr ⊢
     obtain ⟨hpb, hw⟩ := (hX t0 mm0 s va hI).choose_spec.choose_spec.2.2.2.1 pa pbmt hr
     exact ⟨hpb, hw n hn hal⟩
   exc s va e hI hr := by
-    simp only [dif_pos hI] at hr
+    simp only [dite_eq_left hI] at hr
     exact (hX t0 mm0 s va hI).choose_spec.choose_spec.2.2.2.2 e hr
 
 /-- `uftOut` at a user machine is the loop's `UstFetchOut`. -/

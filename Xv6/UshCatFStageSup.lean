@@ -205,7 +205,7 @@ theorem catf_lend_of (C : CfeCtx (GF := GF)) (hR : C.R = D.toPns)
       iintro Hw0
       rw [pdep_unfold D (Wid.WLeft 0) (catDgOpen f) (catDgOpen_ne f) hfo]
       dsimp only [PdRound.pdepNe]
-      rw [if_pos hfso]
+      rw [ite_eq_left hfso]
       isplitl []
       · iapply cfs_shotsF_zero
       iframe Hw0 HGs

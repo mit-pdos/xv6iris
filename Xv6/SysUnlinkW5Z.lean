@@ -58,7 +58,7 @@ structure SuZeroed [Fscfg] [Icfg] (inum : Nat) (dnd dnW : Dinode) (bmW : Blkmap)
   ok : sysUnlinkOpenOk inum dnW bmW datW
 
 theorem sys_unlink_getD_rep (i : Nat) (hi : i < 16) : (List.replicate 16 (0#8 : BitVec 8))[i]! = 0#8 := by
-  rw [List.getElem!_eq_getElem?_getD, List.getElem?_replicate, if_pos hi]; rfl
+  rw [List.getElem!_eq_getElem?_getD, List.getElem?_replicate, ite_eq_left hi]; rfl
 
 theorem sys_unlink_dz_get (j : Nat) (hj : j < 16) : (direntBytes direntZero)[j]! = 0#8 := by
   rw [List.getElem!_eq_getElem?_getD, sys_unlink_dz_byte j hj]; rfl
@@ -92,21 +92,21 @@ theorem sys_unlink_zeroed [Fscfg] [Icfg] (inum : Nat) (dnd dnW dn0W : Dinode) (b
   have hty' : dnW.diType = dnd.diType := by rw [hdnW]; rfl
   have hnl' : dnW.diNlink = dnd.diNlink := by rw [hdnW]; rfl
   have hsz' : dnW.diSize = dnd.diSize := by
-    rw [hdnW]; unfold wiDinode; simp only; rw [if_neg (by omega)]
+    rw [hdnW]; unfold wiDinode; simp only; rw [ite_eq_right (by omega)]
   have hrng : ∀ x, fileByte datW x =
       if 16 * kk ≤ x ∧ x < 16 * kk + 16 then 0#8 else fileByte datd x := by
     intro x
     rw [hout.range x, hdist]
     by_cases hx : 16 * kk ≤ x ∧ x < 16 * kk + 16
-    · rw [if_pos hx, if_pos hx, hout.ker rfl _ (by omega), sys_unlink_getD_rep _ (by omega)]
-    · rw [if_neg hx, if_neg hx, if_neg (by omega)]
+    · rw [ite_eq_left hx, ite_eq_left hx, hout.ker rfl _ (by omega), sys_unlink_getD_rep _ (by omega)]
+    · rw [ite_eq_right hx, ite_eq_right hx, ite_eq_right (by omega)]
   have hz : dirInum datW kk = 0#16 := by
     rw [dirInum_of_two datW kk direntZero (fun j hj => by
-      rw [hrng, if_pos (by omega), sys_unlink_dz_get j (by omega)])]
+      rw [hrng, ite_eq_left (by omega), sys_unlink_dz_get j (by omega)])]
     rfl
   have hag : ∀ q, q ≠ kk → dirWinAgree datd datW q := by
     intro q hq j hj
-    rw [hrng, if_neg]
+    rw [hrng, ite_eq_right]
     intro ⟨h1, h2⟩
     rcases Nat.lt_or_gt_of_ne hq with hl | hl <;> omega
   have hzer : dirZeroedAt datd datW kk :=

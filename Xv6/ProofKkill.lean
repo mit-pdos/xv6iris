@@ -78,10 +78,10 @@ theorem kk_bne_last {α : Type} (i : Nat) (hi : i < NPROC) (p q : α) :
     (if bcond bop.BNE (procAddr (i + 1)) KA.«tickslock» then p else q)
       = if i + 1 = NPROC then q else p := by
   by_cases he : i + 1 = NPROC
-  · rw [if_pos he, if_neg (by
+  · rw [ite_eq_left he, ite_eq_right (by
       simp only [bcond, bne_iff_ne, ne_eq]
       exact fun hc => hc ((kk_cursor_eq i hi).mpr he))]
-  · rw [if_neg he, if_pos (by
+  · rw [ite_eq_right he, ite_eq_left (by
       simp only [bcond, bne_iff_ne, ne_eq]
       exact fun hc => he ((kk_cursor_eq i hi).mp hc))]
 
@@ -159,12 +159,12 @@ theorem kk_lockRes_wake (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) (ch : B
   iintro ⟨Hs, Hg, Hc, Hr, Hsl⟩
   ihave Hg := (pstateWhole_split (GF := GF) Γ pa SLEEPING).mpr $$ [Hg]
   case' _ =>
-    rw [if_pos (by decide : unclaimed SLEEPING)]
+    rw [ite_eq_left (by decide : unclaimed SLEEPING)]
     iframe Hg
   imod pstateWhole_update Γ pa SLEEPING RUNNABLE (by decide) $$ Hg with Hg
   imodintro
   ihave Hg := (pstateWhole_split (GF := GF) Γ pa RUNNABLE).mp $$ Hg
-  rw [if_pos (by decide : unclaimed RUNNABLE)]
+  rw [ite_eq_left (by decide : unclaimed RUNNABLE)]
   icases Hg with ⟨Hg, _⟩
   ihave Hsl := procSlots_recast Γ ξl pa SLEEPING RUNNABLE
     (by constructor <;> (intro _; first | (left; rfl) | (right; left; rfl)))
@@ -677,7 +677,7 @@ theorem kk_loop (AC : ACQUIRE) (RE : RELEASE) {GF : BundledGFunctors.{0}}
         (if (false : Bool) then (KA.«kkill» + 0x54#64) else
           if i + 1 = NPROC then (KA.«kkill» + 0x3c#64) else (KA.«kkill» + 0x22#64))
         (if i + 1 = NPROC then (KA.«kkill» + 0x3c#64) else (KA.«kkill» + 0x22#64)) rfl $$ Hpc
-      rw [if_pos hlast]
+      rw [ite_eq_left hlast]
       obtain ⟨hkept2, -, -⟩ := hpost
       -- c.li a0,-1
       k_step_gen (wp_s_addi c1 _ (KA.«kkill» + 0x3c#64) true 4095#12 10#5 0#5 (by decide))
@@ -724,7 +724,7 @@ theorem kk_loop (AC : ACQUIRE) (RE : RELEASE) {GF : BundledGFunctors.{0}}
         (if (false : Bool) then (KA.«kkill» + 0x54#64) else
           if i + 1 = NPROC then (KA.«kkill» + 0x3c#64) else (KA.«kkill» + 0x22#64))
         (if i + 1 = NPROC then (KA.«kkill» + 0x3c#64) else (KA.«kkill» + 0x22#64)) rfl $$ Hpc
-      rw [if_neg hlast]
+      rw [ite_eq_right hlast]
       obtain ⟨hkept2, -, hrest⟩ := hpost
       obtain ⟨hc9, hc18, hc19⟩ := hrest rfl
       ihave HPhi := wpNext_shift _ _ _ _ _ hq1 $$ HPhi

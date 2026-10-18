@@ -85,7 +85,7 @@ theorem memModel_fence_pub (σ : MState) (cpu : CPU) (b : barrier_kind)
   have hle : T ≤ (σ.fence cpu b).tv cpu := by
     rw [e, hdrain]
     unfold fencePost
-    simp only [if_true]
+    simp only [ite_true]
     omega
   iapply viewLbAt_le E cpu ((σ.fence cpu b).tv cpu) T hle
   iexact Hv

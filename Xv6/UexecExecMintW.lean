@@ -58,7 +58,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG 
 theorem xv6Sbundle_close_taint (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) :
     □ uKillCred ⊢ xv6Sbundle X 21 f W := by
   unfold xv6Sbundle xv6SbundleRest USYS_exec
-  simp only [Int.reduceEq, if_false, if_true]
+  simp only [Int.reduceEq, ite_false, ite_true]
   iintro #Hkc
   iapply filecloseCpay_taint _ _ $$ Hkc
 
@@ -66,7 +66,7 @@ theorem xv6Sbundle_close_taint (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) 
 theorem xv6Sbundle_exit_taint (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) :
     □ uKillCred ⊢ xv6Sbundle X USYS_exit f W := by
   unfold xv6Sbundle xv6SbundleRest USYS_exec USYS_exit
-  simp only [Int.reduceEq, if_false, if_true]
+  simp only [Int.reduceEq, ite_false, ite_true]
   exact filecloseCpays_taint _
 
 /-- **Rocq `xv6_sbundle_close_nonpipe`**: row 21 at a key whose argument 0 is
@@ -74,7 +74,7 @@ not a pipe end is `emp`. -/
 theorem xv6Sbundle_close_nonpipe (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (h : ukeyNonpipe W) :
     ⊢ xv6Sbundle X 21 f W := by
   unfold xv6Sbundle xv6SbundleRest USYS_exec
-  simp only [Int.reduceEq, if_false, if_true]
+  simp only [Int.reduceEq, ite_false, ite_true]
   have h' : ∀ (rb wb : Bool) (gp : PipeNames), fdStOfKey (xkA W 0) W.fd ≠ .open rb wb (.pipe gp) := h
   unfold filecloseCpay
   generalize fdStOfKey (xkA W 0) W.fd = st at h' ⊢
@@ -88,7 +88,7 @@ theorem xv6Sbundle_close_nonpipe (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis
 theorem xv6Sbundle_exit_regs (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) :
     ([∗list] st ∈ W.fd, pipeRowReg (GF := GF) st) ⊢ xv6Sbundle X USYS_exit f W := by
   unfold xv6Sbundle xv6SbundleRest USYS_exec USYS_exit
-  simp only [Int.reduceEq, if_false, if_true]
+  simp only [Int.reduceEq, ite_false, ite_true]
   exact fileclose_cpays_of_regs _
 
 /-- A flagged deposit at the point family re-keyed at the run's own payload:
@@ -148,12 +148,12 @@ theorem udepw_of_sup (PSx : UprogSG GF) (N : UkNames GF) (m : RegMap) (pc : BitV
   refine udepw_of_row PSx N m pc n _ (fun W => ?_)
   rcases hn with rfl | rfl
   · unfold xv6Sbundle xv6SbundleRest USYS_exec xrowOpen
-    simp only [Int.reduceEq, if_false, if_true]
+    simp only [Int.reduceEq, ite_false, ite_true]
     dsimp only [xfamAt, xfamPt]
     iintro #Hsup %Mv %_ %rt
     iapply (fsabsOpenIn fscFs) $$ Hsup
   · unfold xv6Sbundle xv6SbundleRest USYS_exec xrowMknod
-    simp only [Int.reduceEq, if_false, if_true]
+    simp only [Int.reduceEq, ite_false, ite_true]
     dsimp only [xfamAt, xfamPt]
     iintro #Hsup %Mv %_ %rt
     iapply (fsabsMknodPre fscFs) $$ Hsup
@@ -174,7 +174,7 @@ theorem udepw_of_sup_read (PSx : UprogSG GF) (N : UkNames GF) (m : RegMap) (pc :
       udepw (SG := uexecSGXv6) (PS := PSx) N m pc 5 := by
   refine udepw_of_row PSx N m pc 5 _ (fun W => ?_)
   unfold xv6Sbundle xv6SbundleRest USYS_exec xrowRead
-  simp only [Int.reduceEq, if_false, if_true]
+  simp only [Int.reduceEq, ite_false, ite_true]
   dsimp only [xfamAt, xfamPt]
   iintro #⟨Hsup, Hkc, Hlic⟩
   iapply (fsabsFilereadIn _ _ iprop(True)) $$ Hsup Hlic Hkc
@@ -198,7 +198,7 @@ theorem udepw_of_sup_write (PSx : UprogSG GF) (N : UkNames GF) (m : RegMap) (pc 
       udepw (SG := uexecSGXv6) (PS := PSx) N m pc 16 := by
   refine udepw_of_row PSx N m pc 16 _ (fun W => ?_)
   unfold xv6Sbundle xv6SbundleRest USYS_exec xrowWrite
-  simp only [Int.reduceEq, if_false, if_true]
+  simp only [Int.reduceEq, ite_false, ite_true]
   dsimp only [xfamAt, xfamPt]
   iintro #⟨Hsup, Hkc, Hlic⟩ %Mv %_
   iapply (fsabsFilewriteIn) $$ Hsup Hlic Hkc

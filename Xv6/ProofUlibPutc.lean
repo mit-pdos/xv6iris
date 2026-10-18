@@ -159,7 +159,7 @@ theorem wp_ulibPutc (L : UlibRun GF) (base : BitVec 64) (m : RegMap) (n : Nat) (
   iapply (L.wp_sb _ _ n false 4079#12 11#5 8#5 ((m 2#5).toNat - 24 + 7) _ ?ha4) $$ Hi4 Hb7 Hrun
   case ha4 =>
     simp (config := { decide := true }) only [RegMap.get, MachCSL.RegMap.set_apply, ulibPutc_sext_32,
-      ulibPutc_sext_m17, if_true, if_false]
+      ulibPutc_sext_m17, ite_true, ite_false]
     exact (ulibPutc_byte _ hsp).symm
   rw [Xv6.ulibPc_next base 8 12 false rfl]
   iintro Hb7 Hrun
@@ -184,7 +184,7 @@ theorem wp_ulibPutc (L : UlibRun GF) (base : BitVec 64) (m : RegMap) (n : Nat) (
   case h10 => simp [MachCSL.RegMap.set_apply]
   case h11 =>
     simp (config := { decide := true }) only [RegMap.get, MachCSL.RegMap.set_apply, ulibPutc_sext_32,
-      ulibPutc_sext_m17, if_true, if_false]
+      ulibPutc_sext_m17, ite_true, ite_false]
     exact ulibPutc_byte_ofNat _ hsp
   case h12 => simp [MachCSL.RegMap.set_apply, RegMap.get, ulibPutc_sext_1]
   case hb => simp [MachCSL.RegMap.set_apply, RegMap.get]
@@ -229,11 +229,11 @@ theorem wp_ulibPutc (L : UlibRun GF) (base : BitVec 64) (m : RegMap) (n : Nat) (
   case hcs =>
     intro r hr
     rcases hr with rfl | rfl | rfl | rfl | rfl | ⟨h1, h2⟩
-    all_goals try (simp (config := { decide := true }) only [MachCSL.RegMap.set_apply, RegMap.get, if_true,
-        if_false]; done)
+    all_goals try (simp (config := { decide := true }) only [MachCSL.RegMap.set_apply, RegMap.get, ite_true,
+        ite_false]; done)
     have e : ∀ k : BitVec 5, k.toNat < 18 → r ≠ k := fun k hk e => by subst e; omega
     simp only [MachCSL.RegMap.set_apply, e 1#5 (by decide), e 2#5 (by decide), e 8#5 (by decide),
-      e 10#5 (by decide), e 11#5 (by decide), e 12#5 (by decide), e 17#5 (by decide), if_false]
+      e 10#5 (by decide), e 11#5 (by decide), e 12#5 (by decide), e 17#5 (by decide), ite_false]
 
 end
 

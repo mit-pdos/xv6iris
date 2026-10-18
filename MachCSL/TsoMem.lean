@@ -196,11 +196,11 @@ theorem exists_bv_of_bytes : ∀ (n : Nat) (bs : Nat → BitVec 8),
     by_cases hjn : j < n
     · have := congrArg (fun b : BitVec 8 => b.getLsbD i) (hw j hjn)
       simp only [nthByte, BitVec.getLsbD_extractLsb', hi, decide_true, Bool.true_and] at this
-      rw [if_pos (by omega)]
+      rw [ite_eq_left (by omega)]
       exact this
     · have hj' : j = n := by omega
       subst hj'
-      rw [if_neg (by omega)]
+      rw [ite_eq_right (by omega)]
       congr 1
       omega
 
@@ -230,7 +230,7 @@ theorem Mem.foldl_insert_get? (m : Mem) (pa : PAddr) (bs : Nat → BitVec 8) :
         simp only [BitVec.toNat_add, BitVec.toNat_ofNat] at h1
         rw [Nat.mod_eq_of_lt (by omega), Nat.mod_eq_of_lt (a := j) (by omega)] at h1
         omega
-      rw [if_neg hne]
+      rw [ite_eq_right hne]
       exact Mem.foldl_insert_get? m pa bs n (by omega) j hlt
 
 theorem Mem.writeBytes_get?_in {n : Nat} (m : Mem) (pa : PAddr) (w : BitVec (8 * n)) (hn : n < 2 ^ 64)

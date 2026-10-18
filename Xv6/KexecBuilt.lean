@@ -127,7 +127,7 @@ theorem umemGet_mapped {P : UPtd} {M : Nat → List (BitVec 8)} {n : Nat} {b : B
 theorem umemGet_some_of_mapped {P : UPtd} {M : Nat → List (BitVec 8)} (hlen : umPageLen P M)
     {n : Nat} (hm : (get? P.um (n / 4096)).isSome) : umemGet P M n = some (umemByte M n) := by
   unfold umemGet umemByte
-  rw [if_pos hm]
+  rw [ite_eq_left hm]
   cases hk : get? P.um (n / 4096) with
   | none => rw [hk] at hm; cases hm
   | some w =>
@@ -147,7 +147,7 @@ theorem umemGet_none_above {P : UPtd} (M : Nat → List (BitVec 8)) {sz : BitVec
     (hb : umBelow sz P) {bnd : Nat} (halign : bnd % 4096 = 0) (hge : sz.toNat ≤ bnd)
     {n : Nat} (hn : bnd ≤ n) : umemGet P M n = none := by
   unfold umemGet
-  rw [if_neg]
+  rw [ite_eq_right]
   intro hm
   cases hk : get? P.um (n / 4096) with
   | none => rw [hk] at hm; cases hm
@@ -195,9 +195,9 @@ theorem umemGet_uvmalloc_zero {P P' : UPtd} {M M' : Nat → List (BitVec 8)} {o 
     at hr hz
   unfold umemGet
   rw [hr, hz]
-  simp only [Option.isSome_some, if_true]
+  simp only [Option.isSome_some, ite_true]
   rw [List.getElem?_replicate]
-  rw [if_pos (by omega)]
+  rw [ite_eq_left (by omega)]
 
 /-! ## §0.3 A page write (Rocq `umem_write`), the table unchanged -/
 
@@ -212,7 +212,7 @@ theorem umemGet_write_out (P : UPtd) (M : Nat → List (BitVec 8)) (va : Nat) (b
     | none => rfl
     | some b =>
       simp only [Option.map_some]
-      rw [if_neg (by rw [Nat.div_add_mod' n 4096]; exact hn)]
+      rw [ite_eq_right (by rw [Nat.div_add_mod' n 4096]; exact hn)]
   · rfl
 
 /-- **A byte the write hits** (Rocq `umem_write_lookup_in`), where the view
@@ -222,12 +222,12 @@ theorem umemGet_write_in (P : UPtd) (M : Nat → List (BitVec 8)) (va : Nat) (bs
     umemGet P (umemWrite M va bs) (va + j) = bs[j]? := by
   unfold umemGet at hdef ⊢
   split at hdef
-  · rw [if_pos (by assumption), UMemL.umemWrite_getElem?]
+  · rw [ite_eq_left (by assumption), UMemL.umemWrite_getElem?]
     cases hb : (M ((va + j) / 4096))[(va + j) % 4096]? with
     | none => rw [hb] at hdef; cases hdef
     | some b =>
       simp only [Option.map_some]
-      rw [Nat.div_add_mod' (va + j) 4096, if_pos ⟨by omega, by omega⟩,
+      rw [Nat.div_add_mod' (va + j) 4096, ite_eq_left ⟨by omega, by omega⟩,
         show va + j - va = j by omega, List.getElem?_eq_getElem hj]
       rfl
   · cases hdef
@@ -270,7 +270,7 @@ theorem kxCopyout_covered {P P' : UPtd} (M : Nat → List (BitVec 8)) {psz : Bit
   refine ⟨hsame, ?_⟩
   funext k
   unfold viewFaulted
-  rw [if_neg]
+  rw [ite_eq_right]
   rintro ⟨h1, h2⟩
   rw [hsame k] at h2
   rw [Option.isNone_iff_eq_none] at h1
@@ -419,7 +419,7 @@ theorem kx_page_zero_uvmalloc {P P' : UPtd} {M M' : Nat → List (BitVec 8)} {s 
   refine umemGet_uvmalloc_zero hok ?_
   have hpg : pgRoundUpN s.toNat = s.toNat := by unfold pgRoundUpN; omega
   have hv0 : uvmaVpn0 s = s.toNat / 4096 := by unfold uvmaVpn0; rw [hpg]
-  have hnp : uvmaNp s nw = 2 := by unfold uvmaNp; rw [hpg, if_neg (by omega)]; omega
+  have hnp : uvmaNp s nw = 2 := by unfold uvmaNp; rw [hpg, ite_eq_right (by omega)]; omega
   unfold uvmaInRun; rw [hv0, hnp]; omega
 
 theorem kx_zero_except_of_page {top : Int} (Pz : Int → Prop) {Mv : ElfMem}
@@ -856,7 +856,7 @@ theorem kxb_walk_step {f ef : ElfBytes} {i : Nat} (hw : kxbWalkOk f ef) (hi : i 
     have h1 : ((elfLoads f).take ((kxbLoads f ef i).length + 1))[(kxbLoads f ef i).length]? =
         some (kxbPhdr f ef i) := by
       rw [htSk]; simp
-    rwa [List.getElem?_take, if_pos (by omega)] at h1
+    rwa [List.getElem?_take, ite_eq_left (by omega)] at h1
   obtain ⟨hle, heq⟩ := kexecSzAfter_take_step hw.2.2 _ _ hlk
   rw [htk] at hle
   rw [htSk, ← hS] at heq
@@ -1027,7 +1027,7 @@ theorem kxbAt_step_load {f ef : ElfBytes} {i szv : Nat} {Pi Pg : UPtd}
       have := umemGet_some_of_mapped hlen hm
       rw [hfresh _ (by omega)] at this; cases this
     unfold uvmaInRun uvmaNp
-    rw [hv0, if_neg (by omega)]
+    rw [hv0, ite_eq_right (by omega)]
     omega
 
 /-! ### The loop's exit, and what the argument block cannot disturb -/
@@ -1166,7 +1166,7 @@ theorem kexecPg_in_run {s e : BitVec 64} {b : Nat} (hb : b % 4096 = 0)
     uvmaVpn0 s ≤ kexecPg b ∧ kexecPg b < uvmaVpn0 s + uvmaNp s e := by
   obtain ⟨q, hq⟩ := UPtAlloc.pgRoundUpN_dvd s.toNat
   unfold kexecPg uvmaVpn0 uvmaNp
-  rw [if_neg (by omega)]
+  rw [ite_eq_right (by omega)]
   omega
 
 theorem kexecPg_top_stack_ne {top : Nat} (hm : top % 4096 = 0) : kexecPg top ≠ kexecPg (top + 4096) := by

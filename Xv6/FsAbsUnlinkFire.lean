@@ -131,7 +131,7 @@ theorem ufDots_only (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8))
     (hty : dn.diType.toNat = T_DIR_z) (hdo : dirDotsOnly dn data) :
     dotsOnly (dirEntries (eraNode dn bm data)) := by
   intro nm hsome
-  rw [dirEntries_eraNode dn bm data hh hb, if_pos hty] at hsome
+  rw [dirEntries_eraNode dn bm data hh hb, ite_eq_left hty] at hsome
   obtain ⟨z, hz⟩ := Option.isSome_iff_exists.1 hsome
   obtain ⟨k, hk, hlive, hnm, _⟩ := dirView_lookup_rec _ _ _ _ hz
   rcases hdo k hk hlive with hd | hd
@@ -153,7 +153,7 @@ theorem ufNot_dots_only (self : Nat) (dn : Dinode) (bm : Blkmap) (data : Nat →
   intro hdo
   obtain ⟨hnrec2, hlv0, _, hname0, hlv1, hname1⟩ := hdix hty hnz
   have hents : dirEntries (eraNode dn bm data) = dirView data (dirNrec dn.diSize.toNat) := by
-    rw [dirEntries_eraNode dn bm data hh hb, if_pos hty]
+    rw [dirEntries_eraNode dn bm data hh hb, ite_eq_left hty]
   have hlk := dirView_live data _ k hu hk hlive
   have hin : ((dirEntries (eraNode dn bm data))[dirBname data k]?).isSome := by
     rw [hents, hlk]; rfl

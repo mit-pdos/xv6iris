@@ -62,12 +62,12 @@ def vdrwPayw (c : Chain) (dataBuf dataDisk : List (BitVec 8)) : BitVec (8 * BSIZ
 theorem vdrwPayw_read (c : Chain) (dataBuf dataDisk : List (BitVec 8)) (h : c.dwr = true) :
     vdrwPayw c dataBuf dataDisk = bvOfBytes BSIZE dataDisk := by
   unfold vdrwPayw
-  exact congrArg (bvOfBytes BSIZE) (if_pos h)
+  exact congrArg (bvOfBytes BSIZE) (ite_eq_left h)
 
 theorem vdrwPayw_write (c : Chain) (dataBuf dataDisk : List (BitVec 8)) (h : c.dwr = false) :
     vdrwPayw c dataBuf dataDisk = bvOfBytes BSIZE dataBuf := by
   unfold vdrwPayw
-  exact congrArg (bvOfBytes BSIZE) (if_neg (by simp [h]))
+  exact congrArg (bvOfBytes BSIZE) (ite_eq_right (by simp [h]))
 
 /-- **The chain is well formed**: three distinct descriptors of the queue
 and a block-aligned sector. -/
@@ -718,7 +718,7 @@ theorem vdrw3_snez (v : BitVec 64) :
   by_cases h : v = 0#64
   · subst h; decide
   · simp only [h, ne_eq, not_false_eq_true, decide_true, ite_true]
-    rw [if_pos]
+    rw [ite_eq_left]
     rw [BitVec.ult]
     simpa using Nat.pos_of_ne_zero (fun hz => h (BitVec.eq_of_toNat_eq (by simpa using hz)))
 
@@ -729,7 +729,7 @@ theorem vdrw3_seqz (v : BitVec 64) :
   by_cases h : v = 0#64
   · subst h; decide
   · simp only [h, ne_eq, not_false_eq_true, decide_true, ite_true]
-    rw [if_neg]
+    rw [ite_eq_right]
     rw [BitVec.ult]
     simp only [BitVec.toNat_ofNat, Nat.reducePow, Nat.reduceMod, decide_eq_true_eq]
     exact Nat.not_lt.2 (Nat.pos_of_ne_zero

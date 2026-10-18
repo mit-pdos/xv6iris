@@ -68,11 +68,11 @@ theorem co_li_zero : (0#64 : BitVec 64) + BitVec.signExtend 64 0#12 = 0#64 := by
 theorem co_beq_ofNat_zero {α : Type _} (m : Nat) (h : m = 0) (p q : α) :
     (if bcond bop.BEQ (BitVec.ofNat 64 m) 0#64 then p else q) = p := by
   subst h
-  rw [if_pos (by simp [bcond])]
+  rw [ite_eq_left (by simp [bcond])]
 
 theorem co_beq_ofNat_nz {α : Type _} (m : Nat) (h : m ≠ 0) (hm : m < 2 ^ 64) (p q : α) :
     (if bcond bop.BEQ (BitVec.ofNat 64 m) 0#64 then p else q) = q := by
-  refine if_neg ?_
+  refine ite_eq_right ?_
   simp only [bcond, beq_iff_eq]
   intro hc
   have := congrArg BitVec.toNat hc
@@ -82,13 +82,13 @@ theorem co_beq_ofNat_nz {α : Type _} (m : Nat) (h : m ≠ 0) (hm : m < 2 ^ 64) 
 
 theorem co_bgeu_ge {α : Type _} (a b : Nat) (ha : a < 2 ^ 64) (hb : b < 2 ^ 64) (h : b ≤ a)
     (p q : α) : (if bcond bop.BGEU (BitVec.ofNat 64 a) (BitVec.ofNat 64 b) then p else q) = p := by
-  refine if_pos ?_
+  refine ite_eq_left ?_
   simp only [bcond, co_ult_ofNat a b ha hb, Bool.not_eq_true', decide_eq_false_iff_not]
   omega
 
 theorem co_bgeu_lt {α : Type _} (a b : Nat) (ha : a < 2 ^ 64) (hb : b < 2 ^ 64) (h : a < b)
     (p q : α) : (if bcond bop.BGEU (BitVec.ofNat 64 a) (BitVec.ofNat 64 b) then p else q) = q := by
-  refine if_neg ?_
+  refine ite_eq_right ?_
   simp only [bcond, co_ult_ofNat a b ha hb, Bool.not_eq_true', decide_eq_false_iff_not]
   omega
 

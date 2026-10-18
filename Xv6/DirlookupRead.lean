@@ -174,7 +174,7 @@ theorem dirlookup_read (RD : READI) (NC : NAMECMP) (IG : IGET) (PA : PANIC)
   by_cases hshort : dn.diSize.toNat < 16 * i + 16
   · -- THE SHORT READ: dirlookup DIVERGES
     have hne : tot ≠ 16 := by
-      rw [htot]; unfold rdClamp; rw [if_pos (by omega)]; omega
+      rw [htot]; unfold rdClamp; rw [ite_eq_left (by omega)]; omega
     k_step_e (wp_s_branch cpu _ (KA.«dirlookup» + 0xa8#64) false 8156#13 10#5 19#5 (by decide)
         bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -184,7 +184,7 @@ theorem dirlookup_read (RD : READI) (NC : NAMECMP) (IG : IGET) (PA : PANIC)
       $$ [$Hk $Hpc $Hpe]
   -- THE FULL READ: exactly sixteen bytes, record `i < nrec`
   have htot' : tot = 16 := by
-    rw [htot]; unfold rdClamp; rw [if_neg (by omega)]
+    rw [htot]; unfold rdClamp; rw [ite_eq_right (by omega)]
   subst htot'
   have hrec := dirlookup_full_lt _ i hshort
   k_step_e (wp_s_branch cpu _ (KA.«dirlookup» + 0xa8#64) false 8156#13 10#5 19#5 (by decide) bop.BNE)
@@ -321,7 +321,7 @@ theorem dirlookup_scan (RD : READI) (NC : NAMECMP) (IG : IGET) (PA : PANIC)
       rw [hz]; exact (dirFirst_None data _ _).mpr (fun j hj => absurd hj (by unfold dirNrec; omega))
     ihave Harm : dirlookupArm data dn fn hasp (k.regs 12#5) pofv false 0 0 1 0#64 $$ [Hin]
     · unfold dirlookupArm dirlookupIn
-      simp only [Bool.false_eq_true, if_false]
+      simp only [Bool.false_eq_true, ite_false]
       icases Hin with ⟨Hsl, Hpf⟩
       iframe Hsl Hpf
       ipureintro

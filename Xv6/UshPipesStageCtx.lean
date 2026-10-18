@@ -209,7 +209,7 @@ theorem pdep_left_fail_mk (k : Nat) (s : List (BitVec 8)) (hs : s ≠ [])
     D.shotsF k ∗ osS (D.gG k) ∗ wcur (D.P k) 0 ⊢ pdep D (WLeft k) s := by
   rw [pdep_unfold D (WLeft k) s hs (Or.inl hf)]
   simp only [PdRound.pdepNe]
-  rw [if_pos hf]
+  rw [ite_eq_left hf]
 
 end CtxD
 

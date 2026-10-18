@@ -357,10 +357,10 @@ theorem proDone_rounds (ps : List Nat) : proDone ps ↔ 0 < proRounds ps := by
       · rcases hx with rfl | hx
         · exact absurd ha hnx
         · have := ih.mp ⟨x, hx, hnx⟩; simp [ha]; omega
-      · simp only [ha, if_false]; omega
+      · simp only [ha, ite_false]; omega
     · intro h
       by_cases ha : proCont a
-      · simp only [ha, if_true] at h
+      · simp only [ha, ite_true] at h
         obtain ⟨x, hx, hnx⟩ := ih.mpr (by omega)
         exact ⟨x, List.mem_cons_of_mem _ hx, hnx⟩
       · exact ⟨a, List.mem_cons_self, ha⟩
@@ -496,7 +496,7 @@ theorem proTail_snoc (ps : List Nat) (a : Nat) (h : 0 < proRounds ps) :
   | cons c ps ih =>
     simp only [List.cons_append, proTail, proRounds] at h ⊢
     by_cases hc : proCont c
-    · simp only [hc, if_true] at h ⊢; exact ih (by omega)
+    · simp only [hc, ite_true] at h ⊢; exact ih (by omega)
     · simp [hc]
 
 theorem proFrom_snoc_le (r : Nat) (ps : List Nat) (a : Nat) (hr : r ≤ proRounds ps) :
@@ -528,7 +528,7 @@ theorem proTail_open_snoc (ps : List Nat) (a : Nat) (hnd : ¬ proDone ps) :
   | cons c ps ih =>
     have hc1 : proCont c :=
       Classical.byContradiction fun hne => hnd ⟨c, List.mem_cons_self, hne⟩
-    simp only [List.cons_append, proTail, hc1, if_true]
+    simp only [List.cons_append, proTail, hc1, ite_true]
     exact ih (fun ⟨x, hx, hnx⟩ => hnd ⟨x, List.mem_cons_of_mem _ hx, hnx⟩)
 
 /-- AN OPEN PROLOGUE GROWS STRICTLY when a letter is filed. -/

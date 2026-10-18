@@ -216,7 +216,7 @@ theorem kx_dormant_build (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : Pr
   · iexists xsv
     iframe Hxs Hesc Hzs
   unfold dormantSpace
-  rw [if_neg (by decide : ¬ (ZOMBIE = UNUSED))]
+  rw [ite_eq_right (by decide : ¬ (ZOMBIE = UNUSED))]
   iexists M
   isplitl []
   · ipureintro; exact ⟨hpure.2.2.1, hpure.2.2.2, hpure.2.1⟩
@@ -294,13 +294,13 @@ theorem kx_setReg_frame {availval : Nat} {eb : Bool} (k : KCtx) (j : Nat) (statu
   · simp only [KCtx.setReg_proc]; exact hp
   · simp only [KCtx.setReg_avail]; exact hK
   · show (k.setReg i v).regs 18#5 = pCwd (procAddr j)
-    rw [KCtx.setReg_regs, RegMap.set_apply, if_neg (fun e => h18 e.symm)]; exact hh18
+    rw [KCtx.setReg_regs, RegMap.set_apply, ite_eq_right (fun e => h18 e.symm)]; exact hh18
   · show (k.setReg i v).regs 19#5 = procAddr j
-    rw [KCtx.setReg_regs, RegMap.set_apply, if_neg (fun e => h19 e.symm)]; exact hh19
+    rw [KCtx.setReg_regs, RegMap.set_apply, ite_eq_right (fun e => h19 e.symm)]; exact hh19
   · show (k.setReg i v).regs 20#5 = status
-    rw [KCtx.setReg_regs, RegMap.set_apply, if_neg (fun e => h20 e.symm)]; exact hh20
+    rw [KCtx.setReg_regs, RegMap.set_apply, ite_eq_right (fun e => h20 e.symm)]; exact hh20
   · show (k.setReg i v).regs 2#5 = spval
-    rw [KCtx.setReg_regs, RegMap.set_apply, if_neg (fun e => h2 e.symm)]; exact hsp
+    rw [KCtx.setReg_regs, RegMap.set_apply, ite_eq_right (fun e => h2 e.symm)]; exact hsp
   · show (k.setReg i v).avail = availval
     rw [KCtx.setReg_avail]; exact hav
 
@@ -309,7 +309,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
 /-- The resume pc of a call whose return address `v` (even) sits in `ra`. -/
 theorem kx_pcIs_jump (cpu : CPU) (X : KCtx) (R : RegMap) (v : BitVec 64) (hv : jumpPc v = v) :
     pcIs (GF := GF) cpu (jumpPc ((X.withRegs (R.set 1#5 v)).regs 1#5)) ⊢ pcIs cpu v := by
-  rw [KCtx.withRegs_regs, RegMap.set_apply, if_pos rfl, hv]
+  rw [KCtx.withRegs_regs, RegMap.set_apply, ite_eq_left rfl, hv]
 end
 
 section
@@ -451,7 +451,7 @@ theorem kx_loop (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs GF Γ]
       kx_setReg_frame k j status spval 10#5 _ hf0
         (by decide) (by decide) (by decide) (by decide)
     have h9_10 : (k.setReg 10#5 (L[fd]'hfdlt2)).regs 9#5 = pOfile (procAddr j) fd := by
-      rw [KCtx.setReg_regs, RegMap.set_apply, if_neg (by decide), h9]
+      rw [KCtx.setReg_regs, RegMap.set_apply, ite_eq_right (by decide), h9]
     by_cases hz : L[fd]'hfdlt2 = 0#64
     · -- already null: the slot owns its unit already; jump to the increment
       ihave Hpc := MachCSL.pcIs_pos cpu _ _ _ hz $$ Hpc
@@ -511,11 +511,11 @@ theorem kx_loop (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs GF Γ]
           status spval availval :=
         kx_setReg_frame _ j status spval 1#5 _ hkframe10 (by decide) (by decide) (by decide) (by decide)
       have hR9 : R' 9#5 = pOfile (procAddr j) fd := by
-        rw [hcs.2.2.1, KCtx.setReg_regs, RegMap.set_apply, if_neg (by decide),
-          KCtx.setReg_regs, RegMap.set_apply, if_neg (by decide), h9]
+        rw [hcs.2.2.1, KCtx.setReg_regs, RegMap.set_apply, ite_eq_right (by decide),
+          KCtx.setReg_regs, RegMap.set_apply, ite_eq_right (by decide), h9]
       have hjump : jumpPc (((k.setReg 10#5 (L[fd]'hfdlt2)).setReg 1#5 (KA.«kexit» + 0x46#64)).regs 1#5)
           = (KA.«kexit» + 0x46#64) := by
-        rw [KCtx.setReg_regs, RegMap.set_apply, if_pos rfl]; decide
+        rw [KCtx.setReg_regs, RegMap.set_apply, ite_eq_left rfl]; decide
       ihave Hpc := (show pcIs (GF := GF) cpu (jumpPc (((k.setReg 10#5 (L[fd]'hfdlt2)).setReg 1#5
           (KA.«kexit» + 0x46#64)).regs 1#5)) ⊢ pcIs cpu (KA.«kexit» + 0x46#64) from by rw [hjump]) $$ Hpc
       -- sd zero,0(s1): the cell nulled, settled by fileclose's unit and the retyped authority
@@ -609,7 +609,7 @@ theorem kx_loop (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs GF Γ]
       kx_setReg_frame k'' j status spval 9#5 _ hf0
         (by decide) (by decide) (by decide) (by decide)
     have h9r : (k''.setReg 9#5 (pOfile (procAddr j) (fd + 1))).regs 9#5 = pOfile (procAddr j) (fd + 1) := by
-      rw [KCtx.setReg_regs, RegMap.set_apply, if_pos rfl]
+      rw [KCtx.setReg_regs, RegMap.set_apply, ite_eq_left rfl]
     iapply (IH (fd + 1) (by omega) cpu
       (k''.setReg 9#5 (pOfile (procAddr j) (fd + 1))) L' hkf h9r hlen' hinv')
     iframe Hk Hpc Hte Hce Hft Hpe Hcore Hofs Hfr Hpenv Hfenv Hir HΨ
@@ -893,7 +893,7 @@ theorem kx_rest_root (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP)
   iintro %cpu %_
   iintro %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hop
   have hjp1 : jumpPc ((k.setReg 1#5 (KA.«kexit» + 0x64#64)).regs 1#5) = (KA.«kexit» + 0x64#64) := by
-    rw [KCtx.setReg_regs, RegMap.set_apply, if_pos rfl]; decide
+    rw [KCtx.setReg_regs, RegMap.set_apply, ite_eq_left rfl]; decide
   ihave Hpc := (show pcIs (GF := GF) cpu (jumpPc ((k.setReg 1#5 (KA.«kexit» + 0x64#64)).regs 1#5)) ⊢
       pcIs cpu (KA.«kexit» + 0x64#64) from by rw [hjp1]) $$ Hpc
   have hf1 := kxFrame_cross hf1 spie1 spp1 R1 hcs1
@@ -1160,7 +1160,7 @@ theorem kx_rest_root (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP)
   icases procSlots_running Γ ξ0 j cpu st hj $$ [$Hhart $Hslots] with ⟨%hstr, Htag, Hcells, Hvc, Hzs⟩
   subst hstr
   have hsplit := pstateWhole_split (GF := GF) Γ (procAddr j) RUNNING
-  rw [if_neg (by decide : ¬ unclaimed RUNNING)] at hsplit
+  rw [ite_eq_right (by decide : ¬ unclaimed RUNNING)] at hsplit
   ihave Hpst := pstateAt_intro Γ j (1 : Qp).half RUNNING hj $$ Hpst
   ihave Hwhole := hsplit.mpr $$ [$Hpsl $Hpst]
   icases kx_procPubRest_split (procAddr j) kl xs pid2 $$ Hrest with ⟨Hkilled, Hxstate, Hpidpub, Hkrow⟩
@@ -1270,8 +1270,8 @@ theorem kx_rest_root (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP)
     have hfe : (fun i => if i = j then reparented parents (procAddr j) ip j
         else reparented parents (procAddr j) ip i) = rpMap (procAddr j) ip parents := by
       funext i; by_cases h : i = j
-      · subst h; simp only [if_true]; rfl
-      · simp only [h, if_false]; rfl
+      · subst h; simp only [ite_true]; rfl
+      · simp only [h, ite_false]; rfl
     iapply (show waitResAt (GF := GF) curCtx (fun i => if i = j then reparented parents (procAddr j) ip j
         else reparented parents (procAddr j) ip i) ⊢ parentsOwnAt curCtx (rpMap (procAddr j) ip parents) from by
       rw [hfe]; unfold waitResAt parentsOwnAt; exact .rfl)
@@ -1309,7 +1309,7 @@ theorem kx_rest_root (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP)
     have h := SC.wp_sched (GF := GF) Γ cpu k' j ZOMBIE ch' hj
       kx_parkOk_zombie hK' hsie' hnoff' hlocks' htier' hproc'
     unfold wp_sched_body at h
-    rw [if_neg kx_needsCtx_zombie] at h
+    rw [ite_eq_right kx_needsCtx_zombie] at h
     simp only [schedAddr] at h
     rw [hsp', hav'] at h
     iintro ⟨Hk, Hpc, #Hpinv, Hheld, Hwand, Htc, Hres, Hcells, Htag, Hvc⟩
@@ -1352,7 +1352,7 @@ theorem kx_rest_root (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP)
     ihave Hdorm := kx_dormant_build ξ0 (procAddr j) pid
       { V with ofile := List.replicate NOFILE 0#64, cwd := 0#64, root := 0#64, ev := V.ev + 1 } M rfl rfl rfl $$ [$Hpriv $Hal $Hch $Hstack512 $Hgh $Hxpark]
     unfold parkPay parkPayAt
-    rw [if_pos kx_invDormant_zombie]
+    rw [ite_eq_left kx_invDormant_zombie]
     iexact Hdorm
   iapply (hsc _ ch ?hKsc ?hssc ?hnsc ?hlsc ?htsc ?hpsc ?hspsc ?havsc)
     $$ [- $Hk $Hpc $Hpinv $Hheld $Hwand $Htc $Hres $Hcells $Htag $Hvc]
@@ -1446,7 +1446,7 @@ theorem kx_rest (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC 
   iintro %cpu %_
   iintro %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hop
   have hjp1 : jumpPc ((k.setReg 1#5 (KA.«kexit» + 0x50#64)).regs 1#5) = (KA.«kexit» + 0x50#64) := by
-    rw [KCtx.setReg_regs, RegMap.set_apply, if_pos rfl]; decide
+    rw [KCtx.setReg_regs, RegMap.set_apply, ite_eq_left rfl]; decide
   ihave Hpc := (show pcIs (GF := GF) cpu (jumpPc ((k.setReg 1#5 (KA.«kexit» + 0x50#64)).regs 1#5)) ⊢
       pcIs cpu (KA.«kexit» + 0x50#64) from by rw [hjp1]) $$ Hpc
   have hf1 := kxFrame_cross hf1 spie1 spp1 R1 hcs1

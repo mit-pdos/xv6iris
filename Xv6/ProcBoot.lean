@@ -85,7 +85,7 @@ theorem procBoot_names {K : Type} [DecidableEq K] (key : Nat → K) (N : Nat)
     iapply BigSepL.bigSepL_snoc.2
     have heq : ([∗list] j ∈ List.range n, P j ((fun x => if x = key n then γ else f x) (key j))) =
         [∗list] j ∈ List.range n, P j (f (key j)) :=
-      BigSepL.bigSepL_eq fun hk => by simp only [if_neg (hne hk)]
+      BigSepL.bigSepL_eq fun hk => by simp only [ite_eq_right (hne hk)]
     have hγ : (fun x => if x = key n then γ else f x) (key n) = γ := by simp
     rw [heq, hγ]
     iframe Hf Hγ

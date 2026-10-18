@@ -132,11 +132,11 @@ theorem invPure_fork (ps : Nat → BitVec 64) (gs : Nat → GName) (m : ChMap) (
     intro k1 k2 h1 h2 hn1 hn2 hg
     by_cases e1 : k1 = j <;> by_cases e2 : k2 = j
     · rw [e1, e2]
-    · simp only [e1, e2, if_true, if_false] at hn2 hg
+    · simp only [e1, e2, ite_true, ite_false] at hn2 hg
       exact absurd (hinj k2 j h2 hjlt (hfresh k2 h2 hn2 hg.symm)) e2
-    · simp only [e1, e2, if_true, if_false] at hn1 hg
+    · simp only [e1, e2, ite_true, ite_false] at hn1 hg
       exact absurd (hinj k1 j h1 hjlt (hfresh k1 h1 hn1 hg)) e1
-    · simp only [e1, e2, if_false] at hn1 hn2 hg
+    · simp only [e1, e2, ite_false] at hn1 hn2 hg
       exact hig k1 k2 h1 h2 hn1 hn2 hg
   · -- invRows
     intro γ1 pa' S' g' h1 hnz hin
@@ -147,26 +147,26 @@ theorem invPure_fork (ps : Nat → BitVec 64) (gs : Nat → GName) (m : ChMap) (
       rcases mem_union.mp hin with hin | hin
       · obtain ⟨k, hk, hpk, hgk⟩ := hir γ1 pa cs g' hm hnz hin
         have hkj := hne k (by rw [hpk]; exact hnz)
-        exact ⟨k, hk, by simp only [hkj, if_false]; exact hpk, by simp only [hkj, if_false]; exact hgk⟩
+        exact ⟨k, hk, by simp only [hkj, ite_false]; exact hpk, by simp only [hkj, ite_false]; exact hgk⟩
       · have := mem_singleton.mp hin
         subst this
         exact ⟨j, hjlt, by simp, by simp⟩
     · rw [get?_insert_ne (Ne.symm e)] at h1
       obtain ⟨k, hk, hpk, hgk⟩ := hir γ1 pa' S' g' h1 hnz hin
       have hkj := hne k (by rw [hpk]; exact hnz)
-      exact ⟨k, hk, by simp only [hkj, if_false]; exact hpk, by simp only [hkj, if_false]; exact hgk⟩
+      exact ⟨k, hk, by simp only [hkj, ite_false]; exact hpk, by simp only [hkj, ite_false]; exact hgk⟩
   · -- invOrph
     intro pa' g' hnz hin
     obtain ⟨k, hk, hpk, hgk⟩ := hio pa' g' hnz hin
     have hkj := hne k (by rw [hpk]; exact hnz)
-    exact ⟨k, hk, by simp only [hkj, if_false]; exact hpk, by simp only [hkj, if_false]; exact hgk⟩
+    exact ⟨k, hk, by simp only [hkj, ite_false]; exact hpk, by simp only [hkj, ite_false]; exact hgk⟩
   · -- invSlots
     intro k hk hnz
     by_cases e : k = j
     · subst e
-      simp only [if_true]
+      simp only [ite_true]
       exact Or.inl ⟨γ0, cs ∪ {g}, get?_insert_eq rfl, mem_union.mpr (Or.inr (mem_singleton.mpr rfl))⟩
-    · simp only [e, if_false] at hnz ⊢
+    · simp only [e, ite_false] at hnz ⊢
       rcases hisl k hk hnz with ⟨γ1, S1, h1, hg1⟩ | horph
       · by_cases e1 : γ1 = γ0
         · subst e1
@@ -204,10 +204,10 @@ theorem childrenInv_fork [CurCtx] (ξ : CtxId) (ps : Nat → BitVec 64) (gs : Na
   isplitl [Hgh Hsg Hpr]
   · iapply Hgh
     unfold genHalvesEnt
-    simp only [if_true]
+    simp only [ite_true]
     by_cases hpa : pa = 0#64
-    · rw [if_pos hpa]; itrivial
-    · rw [if_neg hpa]
+    · rw [ite_eq_left hpa]; itrivial
+    · rw [ite_eq_right hpa]
       iexists pid
       isplitl [Hsg]
       · iexact Hsg
@@ -232,9 +232,9 @@ theorem invPure_reparent (ps : Nat → BitVec 64) (gs : Nat → GName) (m : ChMa
     rpSlot_nonzero pa ip (ps k) hpa h
   -- a cell that did not name the dying process is where it was
   have hkeep : ∀ k, ps k ≠ pa → rpMap pa ip ps k = ps k := fun k h => by
-    unfold rpMap rpSlot; rw [if_neg h]
+    unfold rpMap rpSlot; rw [ite_eq_right h]
   have hmove : ∀ k, ps k = pa → rpMap pa ip ps k = ip := fun k h => by
-    unfold rpMap rpSlot; rw [if_pos h]
+    unfold rpMap rpSlot; rw [ite_eq_left h]
   refine ⟨rowsUnique_upd m γ0 pa S ∅ hm hru, ?_, ?_, ?_, ?_⟩
   · intro k1 k2 h1 h2 hn1 hn2 hg
     exact hig k1 k2 h1 h2 (hocc k1 hn1) (hocc k2 hn2) hg
@@ -337,8 +337,8 @@ theorem invPure_reap (ps : Nat → BitVec 64) (gs : Nat → GName) (m : ChMap) (
   have hocc : ∀ k', (if k' = k then 0#64 else ps k') ≠ 0#64 → k' ≠ k ∧ ps k' ≠ 0#64 := by
     intro k' h
     by_cases e : k' = k
-    · rw [if_pos e] at h; exact absurd rfl h
-    · rw [if_neg e] at h; exact ⟨e, h⟩
+    · rw [ite_eq_left e] at h; exact absurd rfl h
+    · rw [ite_eq_right e] at h; exact ⟨e, h⟩
   refine ⟨?_, rowsUnique_upd m γ0 pj cs _ hm hru, ?_, ?_, ?_, ?_⟩
   · rcases hisl k hk (by rw [hks]; exact hpj) with ⟨γ1, S1, h1, hg1⟩ | horph
     · rw [hks] at h1
@@ -359,12 +359,12 @@ theorem invPure_reap (ps : Nat → BitVec 64) (gs : Nat → GName) (m : ChMap) (
       have ⟨hin', hne⟩ := mem_diff.mp hin
       obtain ⟨k', hk', hpk, hgk⟩ := hir γ1 pj cs g' hm hpj hin'
       have hnk : k' ≠ k := fun e => by subst e; exact hne (mem_singleton.mpr (hgk.symm.trans hg0))
-      exact ⟨k', hk', by simp only [hnk, if_false]; exact hpk, hgk⟩
+      exact ⟨k', hk', by simp only [hnk, ite_false]; exact hpk, hgk⟩
     · rw [get?_insert_ne (Ne.symm e)] at h1
       obtain ⟨k', hk', hpk, hgk⟩ := hir γ1 pa' S' g' h1 hnz hin
       have hnk : k' ≠ k := fun ek => by
         subst ek; rw [hks] at hpk; subst hpk; exact e (hru _ _ _ _ _ h1 hm)
-      exact ⟨k', hk', by simp only [hnk, if_false]; exact hpk, hgk⟩
+      exact ⟨k', hk', by simp only [hnk, ite_false]; exact hpk, hgk⟩
   · intro pa' g' hnz hin
     by_cases e : pa' = pj
     · subst e
@@ -372,14 +372,14 @@ theorem invPure_reap (ps : Nat → BitVec 64) (gs : Nat → GName) (m : ChMap) (
       have ⟨hin', hne⟩ := mem_diff.mp hin
       obtain ⟨k', hk', hpk, hgk⟩ := hio pa' g' hnz hin'
       have hnk : k' ≠ k := fun ek => by subst ek; exact hne (mem_singleton.mpr (hgk.symm.trans hg0))
-      exact ⟨k', hk', by simp only [hnk, if_false]; exact hpk, hgk⟩
+      exact ⟨k', hk', by simp only [hnk, ite_false]; exact hpk, hgk⟩
     · rw [orphRow_insert_ne O pj pa' _ (Ne.symm e)] at hin
       obtain ⟨k', hk', hpk, hgk⟩ := hio pa' g' hnz hin
       have hnk : k' ≠ k := fun ek => by subst ek; exact e (hpk.symm.trans hks)
-      exact ⟨k', hk', by simp only [hnk, if_false]; exact hpk, hgk⟩
+      exact ⟨k', hk', by simp only [hnk, ite_false]; exact hpk, hgk⟩
   · intro k' hk' hnz
     have ⟨hnk, hnz'⟩ := hocc k' hnz
-    simp only [hnk, if_false]
+    simp only [hnk, ite_false]
     have hne : gs k' ≠ g := fun he => hnk (hother k' hk' hnz' he)
     rcases hisl k' hk' hnz' with ⟨γ1, S1, h1, hg1⟩ | horph
     · by_cases e1 : γ1 = γ0
@@ -424,7 +424,7 @@ theorem childrenInv_reap [CurCtx] (ξ : CtxId) (ps : Nat → BitVec 64) (gs : Na
   iintro ⟨⟨Hgh, %hp, #Hoi⟩, Hsg⟩
   icases genHalves_take ps gs k hk $$ Hgh with ⟨He, Hgh⟩
   unfold genHalvesEnt
-  rw [hks, if_neg hpj]
+  rw [hks, ite_eq_right hpj]
   icases He with ⟨%pid0, Hsg0, Hpr0, -, #Hgp0⟩
   -- the ZOMBIE block in the reaper's hands IS entry `k` of the payload
   icases waitInv_keep (slotGen_agree (procAddr k) _ _ (gs k) g) $$ [Hsg0 Hsg] with ⟨%hg0, Hsg0, Hsg⟩
@@ -469,12 +469,12 @@ theorem childrenInv_pid_one [CurCtx] (ξ : CtxId) (ps : Nat → BitVec 64) (gs :
   icases genHalves_acc ps gs k hk $$ Hgh with ⟨He, Hback⟩
   have hid : (fun i => if i = k then ps k else ps i) = ps := funext fun i => by
     by_cases e : i = k
-    · rw [if_pos e, e]
-    · rw [if_neg e]
+    · rw [ite_eq_left e, e]
+    · rw [ite_eq_right e]
   ihave Hback := Hback $$ %(ps k)
   rw [hid]
   unfold genHalvesEnt
-  rw [hpk, if_neg hpj, hgk]
+  rw [hpk, ite_eq_right hpj, hgk]
   icases He with ⟨%pid0, Hsg0, Hpr0, #Hgs0, #Hgp0⟩
   -- the implication, decided here: at the reaped pid the two shares are at
   -- ONE key and agree on the generation
@@ -673,7 +673,7 @@ theorem famLed_fork (ps : Nat → BitVec 64) (gs : Nat → GName) (i : Nat) (pa 
       intro k hk
       by_cases e : k = i
       · subst e; simp [famStep]
-      · simp only [famStep, e, if_false]; exact hT k hk
+      · simp only [famStep, e, ite_false]; exact hT k hk
     · iapply zsAuth_congr _ _ ?_ $$ Hzs
       intro k _
       by_cases e : k = i
@@ -708,19 +708,19 @@ theorem famLed_exit (ps : Nat → BitVec 64) (gs : Nat → GName) (j : Nat) (hj 
     by_cases e : ps k = procAddr j
     · have e' : (famOf h k).par = procAddr j := hp ▸ e
       refine ⟨?_, fun _ => ?_⟩
-      · simp only [e, if_true, famStep, e']; split <;> rfl
+      · simp only [e, ite_true, famStep, e']; split <;> rfl
       · simp only [famStep, e']; split <;> exact hg (e ▸ hpj)
     · have e' : ¬ (famOf h k).par = procAddr j := hp ▸ e
       refine ⟨?_, fun hne => ?_⟩
-      · simp only [e, if_false, famStep, e']; split <;> exact hp
-      · simp only [e, if_false] at hne
+      · simp only [e, ite_false, famStep, e']; split <;> exact hp
+      · simp only [e, ite_false] at hne
         simp only [famStep, e']; split <;> exact hg hne
   · iapply zsAuth_congr _ _ ?_ $$ Hzs
     intro k hk
     by_cases e : k = j
     · subst e; simp [famStep]
     · have e' : procAddr k ≠ procAddr j := fun h => e (procAddr_inj hk hj h)
-      simp only [e, if_false, famStep, e']
+      simp only [e, ite_false, famStep, e']
       split <;> rfl
 
 omit [MachGS GF] in
@@ -748,7 +748,7 @@ theorem famLed_reap (ps : Nat → BitVec 64) (gs : Nat → GName) (n : Nat) (hn 
       intro k hk
       by_cases e : k = n
       · subst e; simp [famStep, ZSlot.empty]
-      · simp only [e, if_false, famStep]; exact hT k hk
+      · simp only [e, ite_false, famStep]; exact hT k hk
     · iapply zsAuth_congr _ _ ?_ $$ Hzs
       intro k _
       by_cases e : k = n
@@ -866,8 +866,8 @@ theorem parentsOwn_acc [CurCtx] (ξ : CtxId) (ps : Nat → BitVec 64) (j : Nat) 
   unfold parentsOwnAt
   refine (waitInv_range_acc NPROC j hj (fun i => wordAtN (GF := GF) ξ (pParent (procAddr i)) 8 (.own 1) (ps i))
     (fun v' i => wordAtN ξ (pParent (procAddr i)) 8 (.own 1) (if i = j then v' else ps i)) ?_).trans ?_
-  · intro v' i hi; simp only [hi, if_false]
-  · simp only [if_true]; exact .rfl
+  · intro v' i hi; simp only [hi, ite_false]
+  · simp only [ite_true]; exact .rfl
 
 end WaitInvTies
 

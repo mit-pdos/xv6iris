@@ -29,7 +29,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [P
 /-- The number a stub's `c.li a7,N` leaves, as the trap reads it. -/
 theorem secc_usysno (m : RegMap) (k : Int) (hk : (BitVec.extractLsb' 0 32 (BitVec.ofInt 64 k)).toInt = k) :
     UkSysP.usysno (ukWr m 17#5 (BitVec.ofInt 64 k)) = k := by
-  simp only [UkSysP.usysno, ukWr, if_neg (show (17#5 : BitVec 5) ≠ 0#5 by decide), RegMap.set_same]
+  simp only [UkSysP.usysno, ukWr, ite_eq_right (show (17#5 : BitVec 5) ≠ 0#5 by decide), RegMap.set_same]
   exact hk
 
 unseal LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled in

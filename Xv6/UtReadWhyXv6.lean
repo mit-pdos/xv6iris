@@ -31,7 +31,7 @@ theorem utReadWhy_xv6 : UtReadWhy (GF := GF) (SG := uexecSGXv6) := by
     unfold fdStOfKey
     have h0' : 0 ≤ argZ (xkA W 0) := h0
     have hlt' : argZ (xkA W 0) < (NOFILE : Int) := hlt
-    rw [if_pos ⟨h0', hlt'⟩]
+    rw [ite_eq_left ⟨h0', hlt'⟩]
     have hst' : W.fd[(argZ (xkA W 0)).toNat]? = some (.open true rb (.device 1)) := hst
     rw [hst']
     rfl

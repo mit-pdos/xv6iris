@@ -143,10 +143,10 @@ theorem fsParseSb_fields (bs : List (BitVec 8)) (sb : FsSb)
       sb.sbBmapstart = fsLeAt bs 28 4 := by
   unfold fsParseSb at h
   by_cases hl : 32 ≤ bs.length
-  · rw [if_pos hl] at h
+  · rw [ite_eq_left hl] at h
     cases h
     exact ⟨rfl, rfl, rfl, rfl, rfl, rfl⟩
-  · rw [if_neg hl] at h; cases h
+  · rw [ite_eq_right hl] at h; cases h
 
 /-- **Rocq `first_fsinit_pures_of_snap`**: `SpecFsinit`'s (a)/(a')/(a'')/(g)/
 (g'') and its two block-1 corners, OFF THE DURABLE SNAPSHOT.  (a)/(a') are
@@ -186,7 +186,7 @@ theorem firstFsinitPures_ofSnap [Fscfg] [Icfg] (dk : Nat → BitVec 8) (S : FsSt
   have hsbb : fsBlocks dk 1 = S.fssSbb := by
     rw [← hagr 1 h1home (hdrWset_sb (fsBlocks dk) cov _ hhwf)]
     have hs := hb.skSb
-    rw [fsRestrict_lookup, if_pos (show SB_BNO ∈ _ from h1home)] at hs
+    rw [fsRestrict_lookup, ite_eq_left (show SB_BNO ∈ _ from h1home)] at hs
     exact Option.some.inj hs
   -- THE PARSE, at the RAW block 1
   have hparse0 : fsParseSb (fun _ => fsBlocks dk 1) = some S.fssSb := by

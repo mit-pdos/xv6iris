@@ -370,7 +370,7 @@ theorem uartObsPermit_ledger (i : UartId) (R : List Obs → IProp GF) (Tg : List
       obtain ⟨rfl, rfl⟩ := htx
       cases hlb : Uart.loopback u
       · -- a byte reached the wire
-        simp only [Bool.false_eq_true, if_false]
+        simp only [Bool.false_eq_true, ite_false]
         ihave #Htx := Htx
         rw [hchist]
         imod Htx $$ %h %b %u %u'' %(o0.getD []) %CH
@@ -390,7 +390,7 @@ theorem uartObsPermit_ledger (i : UartId) (R : List Obs → IProp GF) (Tg : List
           ipureintro; exact ⟨hacc0, hlok, hlins⟩
         · unfold uartTagOf; iempintro
       · -- under LOOP nothing reached the wire
-        simp only [if_true]
+        simp only [ite_true]
         imod Hclose $$ [Hfrag HR]
         · iexists h; iframe Hfrag HR
         imodintro

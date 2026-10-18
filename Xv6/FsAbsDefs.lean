@@ -150,7 +150,7 @@ theorem absOf_none (n : FsNode) : fnType n = 0 ∨ fnNlink n = 0 ↔ absOf n = n
 theorem absOf_live (n : FsNode) (hnz : fnType n ≠ 0) (hnl : fnNlink n ≠ 0) :
     absOf n = some (absRow n) := by
   unfold absOf
-  rw [if_neg (by omega)]
+  rw [ite_eq_right (by omega)]
 
 /-- ...and a TYPED record's row is present exactly when its count is: the
 form the fd-side fires read the view in (the node's type is theirs to
@@ -158,8 +158,8 @@ know from the record, its count is not). -/
 theorem absOf_counted (n : FsNode) (hnz : fnType n ≠ 0) :
     absOf n = if fnNlink n = 0 then none else some (absRow n) := by
   by_cases hz : fnNlink n = 0
-  · rw [if_pos hz]; exact (absOf_none n).1 (Or.inr hz)
-  · rw [if_neg hz]; exact absOf_live n hnz hz
+  · rw [ite_eq_left hz]; exact (absOf_none n).1 (Or.inr hz)
+  · rw [ite_eq_right hz]; exact absOf_live n hnz hz
 
 /-- a directory is typed: `T_DIR_z` is 1 (Rocq's `fn_is_dir_typed`) -/
 theorem fnIsDir_typed (n : FsNode) (h : fnIsDir n = true) : fnType n ≠ 0 := by
@@ -193,11 +193,11 @@ theorem absRow_dir_inv (n : FsNode) (e : Std.ExtTreeMap Fname Nat compare)
     (h : (absRow n).anNode = .ADir e) : fnIsDir n = true ∧ e = dirEntries n := by
   unfold absRow absNode at h
   by_cases hd : fnIsDir n = true
-  · rw [if_pos hd] at h; cases h; exact ⟨hd, rfl⟩
-  · rw [if_neg hd] at h
+  · rw [ite_eq_left hd] at h; cases h; exact ⟨hd, rfl⟩
+  · rw [ite_eq_right hd] at h
     by_cases ht : fnType n = T_FILE
-    · rw [if_pos ht] at h; cases h
-    · rw [if_neg ht] at h; cases h
+    · rw [ite_eq_left ht] at h; cases h
+    · rw [ite_eq_right ht] at h; cases h
 
 theorem absRow_file (n : FsNode) (hd : fnIsDir n = false) (ht : fnType n = T_FILE) :
     (absRow n).anNode = .AFile (fnFileBytes n) := by
@@ -247,11 +247,11 @@ def arowAt (av : Aview) (i : Nat) (a : Anode) : Prop :=
 
 theorem arowAt_live (av : Aview) (i : Nat) (a : Anode) (h : arowAt av i a)
     (hnl : a.anNlink ≠ 0) : PartialMap.get? av i = some a := by
-  unfold arowAt at h; rw [h, if_neg hnl]
+  unfold arowAt at h; rw [h, ite_eq_right hnl]
 
 theorem arowAt_gone (av : Aview) (i : Nat) (a : Anode) (h : arowAt av i a)
     (hz : a.anNlink = 0) : PartialMap.get? av i = none := by
-  unfold arowAt at h; rw [h, if_pos hz]
+  unfold arowAt at h; rw [h, ite_eq_left hz]
 
 theorem arowAt_cases (av : Aview) (i : Nat) (a : Anode) (h : arowAt av i a) :
     (a.anNlink = 0 ∧ PartialMap.get? av i = none) ∨
@@ -274,8 +274,8 @@ theorem arowAt_witness (i : Nat) (a : Anode) :
     arowAt (if a.anNlink = 0 then (∅ : Aview) else PartialMap.singleton i a) i a := by
   unfold arowAt
   by_cases hz : a.anNlink = 0
-  · rw [if_pos hz, if_pos hz]; exact LawfulPartialMap.get?_empty i
-  · rw [if_neg hz, if_neg hz]; exact LawfulPartialMap.get?_singleton_eq rfl
+  · rw [ite_eq_left hz, ite_eq_left hz]; exact LawfulPartialMap.get?_empty i
+  · rw [ite_eq_right hz, ite_eq_right hz]; exact LawfulPartialMap.get?_singleton_eq rfl
 
 /-- THE VIEW-PRESERVING RETAG (app-instances.md section 7, round E1).  A
 kernel move whose reading is unchanged owes the application nothing
@@ -292,16 +292,16 @@ theorem absOf_dir_same (n n' : FsNode) (hd : fnIsDir n = true) (hty : fnType n =
     absOf n = absOf n' := by
   have hd' : fnIsDir n' = true := by unfold fnIsDir at hd ⊢; rw [← hty]; exact hd
   unfold absOf absRow absNode
-  rw [hty, hnl, if_pos hd, if_pos hd', he]
+  rw [hty, hnl, ite_eq_left hd, ite_eq_left hd', he]
 
 /-- ...and a directory at size 0 has no entries whatever its bytes say -/
 theorem dirEntries_size_0 (n : FsNode) (hsz : fnSize n = 0) : dirEntries n = ∅ := by
   unfold dirEntries
   by_cases hd : fnIsDir n = true
-  · rw [if_pos hd]
+  · rw [ite_eq_left hd]
     unfold fnNrec; rw [hsz, dirNrec_zero]
     exact dirView_nil _
-  · rw [if_neg hd]
+  · rw [ite_eq_right hd]
 
 /-! ## 2.  `apathAt`: THE HOP-BY-HOP FIRST-MATCH LOOKUP
 
@@ -429,8 +429,8 @@ theorem absView_insert (I : RegMapF FsNode) (i : Nat) (n : FsNode) (a : Anode)
   rw [LawfulPartialMap.get?_bindAlter, LawfulPartialMap.get?_insert,
     LawfulPartialMap.get?_insert, LawfulPartialMap.get?_bindAlter]
   by_cases hk : i = k
-  · rw [if_pos hk, if_pos hk]; exact ha
-  · rw [if_neg hk, if_neg hk]
+  · rw [ite_eq_left hk, ite_eq_left hk]; exact ha
+  · rw [ite_eq_right hk, ite_eq_right hk]
 
 /-- ...a free or unlinked node deletes the row (the doc's `δ_free`;
 stdpp's `omap_insert_None`) -/
@@ -443,8 +443,8 @@ theorem absView_insert_none (I : RegMapF FsNode) (i : Nat) (n : FsNode)
   rw [LawfulPartialMap.get?_bindAlter, LawfulPartialMap.get?_insert,
     LawfulPartialMap.get?_delete, LawfulPartialMap.get?_bindAlter]
   by_cases hk : i = k
-  · rw [if_pos hk, if_pos hk]; exact ha
-  · rw [if_neg hk, if_neg hk]
+  · rw [ite_eq_left hk, ite_eq_left hk]; exact ha
+  · rw [ite_eq_right hk, ite_eq_right hk]
 
 /-- THE COUNTED INSERT (E2-V2): a TYPED record lands as its row when its
 count is nonzero and DELETES the row when the count is zero.  This is the
@@ -458,8 +458,8 @@ theorem absView_insert_row (I : RegMapF FsNode) (i : Nat) (n : FsNode) (a : Anod
   subst hrow
   rw [absRow_nlink]
   by_cases hz : fnNlink n = 0
-  · rw [if_pos hz]; exact absView_insert_none I i n ((absOf_none n).1 (Or.inr hz))
-  · rw [if_neg hz]; exact absView_insert I i n _ (absOf_live n hnz hz)
+  · rw [ite_eq_left hz]; exact absView_insert_none I i n ((absOf_none n).1 (Or.inr hz))
+  · rw [ite_eq_right hz]; exact absView_insert I i n _ (absOf_live n hnz hz)
 
 /-- A RETAG THAT KEEPS THE READING KEEPS THE VIEW (app-instances.md
 section 7, the `_same` mover form): block addresses and records are

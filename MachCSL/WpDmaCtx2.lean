@@ -153,7 +153,7 @@ theorem glueHist_lo (k : Nat) (Hs1 Hs2 : Nat → Hist) (j : Nat) (hj : j < k) :
 
 theorem glueHist_hi (k : Nat) (Hs1 Hs2 : Nat → Hist) (j : Nat) :
     glueHist k Hs1 Hs2 (k + j) = Hs2 j := by
-  simp only [glueHist, if_neg (by omega : ¬ k + j < k)]
+  simp only [glueHist, ite_eq_right (by omega : ¬ k + j < k)]
   congr 1
   omega
 

@@ -377,7 +377,7 @@ theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK
         subst hst
         obtain ⟨-, hw', -⟩ := hok
         rw [hw] at hw'; exact absurd hw' (by decide)
-    · iapply fwConsOut_neg; simp only [RegMap.set_apply, if_true]; rfl
+    · iapply fwConsOut_neg; simp only [RegMap.set_apply, ite_true]; rfl
     · unfold filewriteArms
       isplitr
       · ipureintro; simp only [RegMap.set_apply]; exact filewriteRet_m1 n

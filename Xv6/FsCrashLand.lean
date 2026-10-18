@@ -142,7 +142,7 @@ theorem fsClear_recWf (cov : ExtTreeSet Nat compare) (ls : Nat) (M0 : LogMirror)
     (hok b (Or.inl hbc.1)).symm.trans ((hoff b (home_ne_hdr ls b hbc.2.1)).trans
       ((hcaught j b hjb).trans ((hoff _ (logSlot_ne_hdr ls j)).symm.trans
         (hok _ (logSlot_in_ext cov ls j hjlt)))))
-  rw [fsRestrict_lookup, if_pos hbhome, hv]
+  rw [fsRestrict_lookup, ite_eq_left hbhome, hv]
 
 section
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF]

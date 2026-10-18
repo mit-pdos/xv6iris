@@ -432,13 +432,13 @@ def UOrc.dflt (f : RegFile) : UOrc := fun _ => UAns.dflt f
 theorem runRW_regRead_dr {X : Type} (orc : UOrc) (s : UWSt) (r : Register)
     (k : RegisterType r → SailM X) (h : D.Dr r = true) :
     runRW D orc s (FreeM.impure (.ok (.regRead r)) k) = runRW D orc s (k (s.file r)) := by
-  simp only [runRW, h, if_true, UWSt.file]
+  simp only [runRW, h, ite_true, UWSt.file]
   cases s.pin r <;> rfl
 
 theorem runRW_regRead_any {X : Type} (orc : UOrc) (s : UWSt) (r : Register)
     (k : RegisterType r → SailM X) (h : D.Dr r = false) (h' : D.Dany r = true) :
     runRW D orc s (FreeM.impure (.ok (.regRead r)) k) = runRW D orc.tail s (k ((orc 0).reg r)) := by
-  simp only [runRW, h, h', if_true, Bool.false_eq_true, if_false]
+  simp only [runRW, h, h', ite_true, Bool.false_eq_true, ite_false]
 
 end steps
 
@@ -620,7 +620,7 @@ theorem urw_regRead {X : Type} (r : Register) (k : RegisterType r → SailM X)
   | false =>
     cases hda : D.Dany r with
     | false =>
-      exact (urw_absurd _ s hok (by simp only [runRW, hdr, hda, Bool.false_eq_true, if_false])).elim
+      exact (urw_absurd _ s hok (by simp only [runRW, hdr, hda, Bool.false_eq_true, ite_false])).elim
     | true =>
       have L : iprop(▷ (∀ v, swp cpu (k v) Φ)) ⊢ swp cpu (FreeM.impure (.ok (.regRead r)) k) Φ :=
         swp_readReg_any_bind cpu r k Φ
@@ -641,11 +641,11 @@ theorem urw_regWrite {X : Type} (r : Register) (v : RegisterType r) (k : PUnit �
   intro s hok Φ
   cases hdw : D.Dw r with
   | false =>
-    exact (urw_absurd _ s hok (by simp only [runRW, hdw, Bool.false_eq_true, if_false])).elim
+    exact (urw_absurd _ s hok (by simp only [runRW, hdw, Bool.false_eq_true, ite_false])).elim
   | true =>
     have hstep : ∀ orc', ∃ orc, runRW D orc s (FreeM.impure (.ok (.regWrite r v)) k) =
         runRW D orc' { s with pin := s.pin.set r v } (k ()) := fun o =>
-      ⟨o, by simp only [runRW, hdw, if_true]⟩
+      ⟨o, by simp only [runRW, hdw, ite_true]⟩
     unfold uFr
     iintro ⟨⟨HF, HB, Hc, Hr⟩, HP⟩
     icases RF.wr s.file r v hdw $$ HF with ⟨⟨%v0, Hreg⟩, HFc⟩
@@ -672,7 +672,7 @@ theorem urw_memRead {X : Type} (n vasize : Nat)
   have e : (FreeM.impure (.ok (.memRead n vasize req)) k : SailM X) =
       (ConcurrencyInterfaceV1.sail_mem_read req >>= k) := rfl
   cases hif : akIfetch req.access_kind with
-  | true => exact (urw_absurd _ s hok (by simp only [runRW, hif, if_true])).elim
+  | true => exact (urw_absurd _ s hok (by simp only [runRW, hif, ite_true])).elim
   | false =>
   by_cases hn' : ¬ n < 2 ^ 64
   · exact (urw_absurd _ s hok (by simp only [runRW, hif, hn', Bool.false_eq_true, ↓reduceIte])).elim
@@ -1163,9 +1163,9 @@ theorem runRW_ro {X : Type} (Lr : List Register) (D : UFoot) (hD : ∀ r ∈ Lr,
           rw [e, ← hf r hrL]
           exact ih _ _ _ _ _ _ _ hf hm hr h
         · simp only [runRW, uFootL, List.contains_nil, Bool.false_or, hc, Bool.false_eq_true,
-            if_false, reduceCtorEq] at h
+            ite_false, reduceCtorEq] at h
       | regWrite r v =>
-        simp only [runRW, uFootL, List.contains_nil, Bool.false_and, Bool.false_eq_true, if_false,
+        simp only [runRW, uFootL, List.contains_nil, Bool.false_and, Bool.false_eq_true, ite_false,
           reduceCtorEq] at h
       | memRead n vs req =>
         simp only [runRW] at h ⊢

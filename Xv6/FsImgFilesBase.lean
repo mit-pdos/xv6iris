@@ -105,7 +105,7 @@ theorem fsimgFileBytes_rows (i n nb : Nat) (ads rows : List Nat)
   intro j
   rw [List.getElem?_take, rowsBytes_getElem? rows n j hn]
   by_cases hj : j < n
-  · simp only [hj, if_true]
+  · simp only [hj, ite_true]
     have hcov := fsNblk_cover n
     rw [hnb] at hcov
     rw [fsTakeBlocks_lookup _ hlen nb 0 j (by omega), Nat.zero_mul, Nat.zero_add]
@@ -119,9 +119,9 @@ theorem fsimgFileBytes_rows (i n nb : Nat) (ads rows : List Nat)
       rw [List.getElem?_eq_getElem (by omega)] at this
       exact Option.some.inj this
     unfold fileByte
-    rw [hB, fsDataOf_addr, haddr, if_neg ha0]
+    rw [hB, fsDataOf_addr, haddr, ite_eq_right ha0]
     unfold fsImgBlock
-    rw [if_pos ha2, getElem!_pos _ (j % 1024) (by simp; omega), List.getElem_map,
+    rw [ite_eq_left ha2, getElem!_pos _ (j % 1024) (by simp; omega), List.getElem_map,
       List.getElem_range, show j % 1024 = 32 * (j % 1024 / 32) + j % 32 by omega,
       fsImgBlkByte_row _ _ _ (by omega) (by omega), hrow _ (by omega), rowByte_eq]
     congr 2

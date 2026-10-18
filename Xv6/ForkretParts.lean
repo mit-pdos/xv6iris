@@ -264,7 +264,7 @@ theorem fkr_first_steady [CurCtx] (c : CPU) (kr : KCtx) (eb : Bool) (root : BitV
   iintro Hk Hpc
   simp only [KCtx.setReg_sie, KCtx.setReg_proc, hs, hp] at hp1 hp2 hp3
   ihave Hn := wpNext_at eb pa c c3 _ (fun h => (hp3 h).trans ((hp2 h).trans (hp1 h))) $$ Hnext Hlc
-  simp only [MachCSL.beqz_zero, if_true]
+  simp only [MachCSL.beqz_zero, ite_true]
   iapply Hn $$ %_ %?_ Hk Hpc
   exact (h.setReg 15#5 _ (by decide) (by decide) (by decide)).setReg 15#5 _ (by decide) (by decide) (by decide)
 
@@ -295,7 +295,7 @@ theorem fkr_first_boot [CurCtx] (c : CPU) (kr : KCtx) (eb : Bool) (root : BitVec
   iintro Hk Hpc
   simp only [KCtx.setReg_sie, KCtx.setReg_proc, hs, hp] at hp1 hp2 hp3
   ihave Hn := wpNext_at eb pa c c3 _ (fun h => (hp3 h).trans ((hp2 h).trans (hp1 h))) $$ Hnext Hlc
-  simp only [MachCSL.bcond_beq_one, Bool.false_eq_true, if_false]
+  simp only [MachCSL.bcond_beq_one, Bool.false_eq_true, ite_false]
   iapply Hn $$ %_ %?_ Hk Hpc Hf
   exact (h.setReg 15#5 _ (by decide) (by decide) (by decide)).setReg 15#5 _ (by decide) (by decide) (by decide)
 

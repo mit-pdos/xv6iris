@@ -122,7 +122,7 @@ theorem toNat_mod8 (p : BitVec 64) (hal : p &&& 0xfff#64 = 0#64) : p.toNat % 8 =
 theorem leaves_get (P : UPtd) (k : Nat) (h1 : k ≠ tfVpn.toNat) (h2 : k ≠ trampVpn.toNat) :
     get? P.leaves k = get? P.um k := by
   unfold UPtd.leaves
-  rw [get?_insert, if_neg (fun hc => h2 hc.symm), get?_insert, if_neg (fun hc => h1 hc.symm)]
+  rw [get?_insert, ite_eq_right (fun hc => h2 hc.symm), get?_insert, ite_eq_right (fun hc => h1 hc.symm)]
 
 /-- Inserting a user leaf below the trapframe commutes with the fixed
 mappings. -/
@@ -238,7 +238,7 @@ theorem ptRep_setLeaf_insert {t : PTree} {L : RegMapF (BitVec 64)} (vpn : BitVec
         simp only [Option.some.injEq] at this
         exact this
       refine ⟨pteAddr ((t.setLeaf 2 vpn v).slot 2 vpn).1 ((t.setLeaf 2 vpn v).slot 2 vpn).2, v, ?_, ?_⟩
-      · rw [PTree.walk_eq, PTree.entAt_setLeaf_self, if_neg hvne]
+      · rw [PTree.walk_eq, PTree.entAt_setLeaf_self, ite_eq_right hvne]
       · rw [← hcw]; exact hv
     · rw [get?_insert_ne (fun hcc => he (BitVec.eq_of_toNat_eq hcc))] at hw
       obtain ⟨addr, v', hwalk, had⟩ := hsome vpn' w hw

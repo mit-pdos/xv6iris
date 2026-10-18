@@ -191,7 +191,7 @@ theorem fkr_tail [X : CurCtx] (PR : PREPARE_RETURN) (c : CPU) (k : KCtx) (γ : F
   k_norm_g at hcs
   obtain ⟨c_2, c_8, c_9, -⟩ := hcs
   have hR9 : R1 9#5 = pa := by rw [c_9]; k_norm_g; exact hs1
-  simp only [KCtx.setReg_regs, RegMap.set_apply, if_true]
+  simp only [KCtx.setReg_regs, RegMap.set_apply, ite_true]
   rw [fkr_ret58']
   icases fkr_priv_pt hct γ pa pid _ M $$ Hpv with ⟨Hpg, Hpvb⟩
   -- +0x58  ld a0,80(s1)

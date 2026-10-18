@@ -645,11 +645,11 @@ theorem sched_proof (SW : SWTCH) (MP : MYPROC) (HO : HOLDING) : SCHED :=
   by_cases hnc : needsCtx st
   · -- A RESUMABLE PARK: the caller comes back
     have hdec : decide (needsCtx st) = true := decide_eq_true hnc
-    rw [if_pos hnc]
+    rw [ite_eq_left hnc]
     ihave Hpay : parkPayAt (GF := GF) ξ0 (procAddr j) st $$ []
     case' _ =>
       unfold parkPayAt
-      rw [if_neg (needsCtx_not_invDormant hnc)]
+      rw [ite_eq_right (needsCtx_not_invDormant hnc)]
       iempintro
     have hto := pSched_to_cpu (GF := GF) Γ ξ0 cpu j st ch hj hpark
     rw [hdec] at hto

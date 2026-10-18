@@ -482,10 +482,10 @@ theorem ownGather_mapOpt {K V : Type _} {M : Type _ → Type _} [LawfulFiniteMap
     rw [BigOpM.bigOpM_insert_eq _ _ hk]
     refine (sep_mono_right (BigSepM.bigSepM_insert hk).1).trans ?_
     cases hp : p k v
-    · simp only [Bool.false_eq_true, if_false]
+    · simp only [Bool.false_eq_true, ite_false]
       refine sep_assoc.2.trans ((sep_mono_left iOwn_op.2).trans ((ih (x • f k v)).trans ?_))
       rw [Op.assoc]
-    · simp only [if_true]
+    · simp only [ite_true]
       refine (sep_mono_right emp_sep.1).trans ((ih x).trans ?_)
       rw [ORA.unit_left_id_L]
 

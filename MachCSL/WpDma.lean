@@ -71,7 +71,7 @@ theorem memModel_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * 
   imod MonoNat.own_update _ (.ofNat σ.top) (.ofNat (σ.top + 1))
     (by simp only [MaxNat.le_toNat]; omega) $$ Htop with ⟨Htop, #Htoplb⟩
   imod ghost_map_insert_persist (σ.top + 1) diskAgent
-    (by rw [authMap_get?, if_neg (by simp only [MState.top]; omega)]) $$ Hauth with ⟨Hauth, #Hau⟩
+    (by rw [authMap_get?, ite_eq_right (by simp only [MState.top]; omega)]) $$ Hauth with ⟨Hauth, #Hau⟩
   imodintro
   have hresv : resvMap (σ.storeDma pa n w) = resvMap σ := resvMap_congr _ _ (fun c => ⟨rfl, rfl⟩)
   rw [hresv]

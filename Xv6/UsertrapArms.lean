@@ -60,7 +60,7 @@ theorem utA_killIn_arm (f : UexecSG.sfam GF) (sc : BitVec 64) (W : Uvis) (gn : G
     (sts : List FdState) (hne : sc ≠ uecallScause) :
     utKillIn f sc W gn sts ⊢ ⌜W.gen = gn⌝ ∗ uexecKillArm sc W f := by
   unfold utKillIn
-  rw [if_neg hne]
+  rw [ite_eq_right hne]
   iintro ⟨%h, H⟩
   iframe H
   ipureintro; exact h.1
@@ -70,12 +70,12 @@ theorem utA_killIn_arm2 (f : UexecSG.sfam GF) (sc : BitVec 64) (W : Uvis) (gn : 
     (sts : List FdState) (hne : sc ≠ uecallScause) :
     utKillIn f sc W gn sts ⊢ ⌜W.gen = gn ∧ W.fd = sts⌝ ∗ uexecKillArm sc W f := by
   unfold utKillIn
-  rw [if_neg hne]
+  rw [ite_eq_right hne]
 
 /-- ...and off the ecall the kill row owed back is the slot. -/
 theorem utA_killOut_slot (sc : BitVec 64) (W : Uvis) (hne : sc ≠ uecallScause) :
     uslot (GF := GF) W ⊢ utKillOut sc W := by
-  unfold utKillOut; rw [if_neg hne]
+  unfold utKillOut; rw [ite_eq_right hne]
 
 end KillRows
 

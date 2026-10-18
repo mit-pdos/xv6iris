@@ -153,18 +153,18 @@ theorem regs_alloc_list (F : CPU → RegFile) (l : List CPU) (hl : l.Nodup) :
     have ei : (([∗list] cpu ∈ l, regInterpAt (if cpu = c then γ else names cpu) (F cpu)) : IProp GF) =
         [∗list] cpu ∈ l, regInterpAt (names cpu) (F cpu) :=
       BigSepL.bigSepL_eq fun {k x} hk => by
-        rw [if_neg (fun (h : x = c) => hc (h ▸ List.mem_of_getElem? hk))]
+        rw [ite_eq_right (fun (h : x = c) => hc (h ▸ List.mem_of_getElem? hk))]
     have ec : (([∗list] cpu ∈ l, regCells (if cpu = c then γ else names cpu) (F cpu)) : IProp GF) =
         [∗list] cpu ∈ l, regCells (names cpu) (F cpu) :=
       BigSepL.bigSepL_eq fun {k x} hk => by
-        rw [if_neg (fun (h : x = c) => hc (h ▸ List.mem_of_getElem? hk))]
+        rw [ite_eq_right (fun (h : x = c) => hc (h ▸ List.mem_of_getElem? hk))]
     isplitl [Hic Hi]
     · iapply BigSepL.bigSepL_cons.2
-      simp only [if_true]
+      simp only [ite_true]
       rw [ei]
       iframe Hic Hi
     · iapply BigSepL.bigSepL_cons.2
-      simp only [if_true]
+      simp only [ite_true]
       rw [ec]
       iframe Hcc Hc
 
@@ -196,9 +196,9 @@ theorem names_alloc_list (P : GName → CPU → IProp GF)
     have e : (([∗list] cpu ∈ l, P (if cpu = c then γ else names cpu) cpu) : IProp GF) =
         [∗list] cpu ∈ l, P (names cpu) cpu :=
       BigSepL.bigSepL_eq fun {k x} hk => by
-        rw [if_neg (fun (h : x = c) => hc (h ▸ List.mem_of_getElem? hk))]
+        rw [ite_eq_right (fun (h : x = c) => hc (h ▸ List.mem_of_getElem? hk))]
     iapply BigSepL.bigSepL_cons.2
-    simp only [if_true]
+    simp only [ite_true]
     rw [e]
     iframe Hc Hl
 
@@ -293,22 +293,22 @@ theorem devs_alloc_list (ds : DevStates) (l : List DevId) (hl : l.Nodup) :
         [∗list] d ∈ l, devAuthN names d (ds.st d) :=
       BigSepL.bigSepL_eq fun {k x} hk => by
         simp only [devAuthN]
-        rw [if_neg (fun (h : x = c) => hc (h ▸ List.mem_of_getElem? hk))]
+        rw [ite_eq_right (fun (h : x = c) => hc (h ▸ List.mem_of_getElem? hk))]
     have ec : (([∗list] d ∈ l, devFragN (fun c' => if c' = c then γ else names c') d (ds.st d)) : IProp GF) =
         [∗list] d ∈ l, devFragN names d (ds.st d) :=
       BigSepL.bigSepL_eq fun {k x} hk => by
         simp only [devFragN]
-        rw [if_neg (fun (h : x = c) => hc (h ▸ List.mem_of_getElem? hk))]
+        rw [ite_eq_right (fun (h : x = c) => hc (h ▸ List.mem_of_getElem? hk))]
     isplitl [Hic Hi]
     · iapply BigSepL.bigSepL_cons.2
       rw [ei]
       unfold devAuthN
-      simp only [if_true]
+      simp only [ite_true]
       iframe Hic Hi
     · iapply BigSepL.bigSepL_cons.2
       rw [ec]
       unfold devFragN
-      simp only [if_true]
+      simp only [ite_true]
       iframe Hcc Hc
 
 theorem devs_alloc (ds : DevStates) :

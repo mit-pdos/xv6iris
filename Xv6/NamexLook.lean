@@ -208,7 +208,7 @@ theorem namex_look (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimI
   have hbz := Xv6.dirlookup_beqz (R' 10#5)
   cases found
   · -- ===== MISS: +0xea c.beqz a0 TAKEN, L_miss =====
-    simp only [Bool.false_eq_true, if_false]
+    simp only [Bool.false_eq_true, ite_false]
     icases Harm with ⟨%⟨-, hnone, ha0⟩, Hs1'⟩
     have hd : decide (R' 10#5 = 0#64) = true := by simp [ha0]
     k_step_e (wp_s_branch cpu _ (KA.«namex» + 0xee#64) true 8098#13 10#5 0#5 (by decide) bop.BEQ)
@@ -223,7 +223,7 @@ theorem namex_look (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimI
     case f27 => simp [RegMap.set_apply, s27, r27]
     case f18 => simp [RegMap.set_apply, ha0]
   · -- ===== FOUND =====
-    simp only [if_true]
+    simp only [ite_true]
     icases Harm with ⟨%inum2, %self, %kd, %⟨hks, ha0⟩, %harm, Href, Hru2⟩
     ihave Hip := namex_dl_found_held data dn inum A.rti kd kslot ik qq (bname 14 nf) self inum2 hty
       hdok hf.hnib hf.hpos hks harm $$ [$Href $Hru2]
@@ -245,7 +245,7 @@ theorem namex_look (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimI
     isplitr
     · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
     isplitr
-    · simp only [if_true]; iexact Hobs
+    · simp only [ite_true]; iexact Hobs
     unfold namexAfterIup
     iintro %c %spie'' %spp'' %R'' %n' %Sb' %w %⟨hcs2, hsub, hwr, hww, hn1, hn2⟩ Hk Hpc Hte Hce
       Hkeep Hbs Hops Htx Hslot

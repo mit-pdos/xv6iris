@@ -219,8 +219,8 @@ theorem ukPagesX_forget [CurCtx] (K : Nat) (P : UPtd) (hwf : uptWf P) (M : Nat �
         (if ukTextLeaf kv.2 then byteBuf (pte2pa kv.2) (DFrac.own 1) (M kv.1) else iprop(emp))) := by
     intro kv
     cases ukTextLeaf kv.2
-    · simp only [Bool.false_eq_true, if_false]; exact ⟨sep_emp.2, sep_emp.1⟩
-    · simp only [if_true]; exact ⟨emp_sep.2, emp_sep.1⟩
+    · simp only [Bool.false_eq_true, ite_false]; exact ⟨sep_emp.2, sep_emp.1⟩
+    · simp only [ite_true]; exact ⟨emp_sep.2, emp_sep.1⟩
   iapply BigSepL.bigSepL_mono (fun {k kv} _ => (e kv).2)
   iapply BigSepL.bigSepL_sep_eqv.2
   unfold ukDataBytes ukTextBytes
@@ -230,10 +230,10 @@ theorem ukPagesX_forget [CurCtx] (K : Nat) (P : UPtd) (hwf : uptWf P) (M : Nat �
     intro kv hkv
     obtain ⟨he, hv⟩ := ub_data_valid P hwf kv.1 kv.2 (toList_get.1 hkv)
     cases ht : ukTextLeaf kv.2
-    · simp only [Bool.false_eq_true, if_false]
+    · simp only [Bool.false_eq_true, ite_false]
       rw [he]
       exact (ubPage_own (ptePpn kv.2) hv (M kv.1) (hl kv hkv)).trans and_elim_r
-    · simp only [if_true]
+    · simp only [ite_true]
       iintro _ _
       iempintro
   · rw [ubOwnA_flatMap]
@@ -241,10 +241,10 @@ theorem ukPagesX_forget [CurCtx] (K : Nat) (P : UPtd) (hwf : uptWf P) (M : Nat �
     intro kv hkv
     obtain ⟨he, hv⟩ := ub_data_valid P hwf kv.1 kv.2 (toList_get.1 hkv)
     cases ht : ukTextLeaf kv.2
-    · simp only [Bool.false_eq_true, if_false]
+    · simp only [Bool.false_eq_true, ite_false]
       iintro _ _
       iempintro
-    · simp only [if_true]
+    · simp only [ite_true]
       rw [he]
       exact (ubPage_own (ptePpn kv.2) hv (M kv.1) (hl kv hkv)).trans and_elim_r
 

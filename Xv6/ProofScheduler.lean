@@ -538,7 +538,7 @@ theorem scheduler_tail_last [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h1, h5, KCtx.rget_eq]
   iintro Hk Hpc
   by_cases hfound : bcond bop.BNE (k'.regs 25#5) 0#64 = true
-  · rw [if_pos hfound]
+  · rw [ite_eq_left hfound]
     k_norm [h1, h5]
     unfold headInv
     iapply Hhead $$ %k' [] Hk Hpc Hcells Htc Hir
@@ -548,7 +548,7 @@ theorem scheduler_tail_last [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] 
       cases hb : bcond bop.BNE (k'.regs 25#5) 0#64
       · rfl
       · exact absurd hb hfound
-    rw [if_neg (by rw [hf]; exact Bool.false_ne_true)]
+    rw [ite_eq_right (by rw [hf]; exact Bool.false_ne_true)]
     k_norm [h1, h5]
     -- wfi
     iapply (wp_s_wfi cpu k' h1 (KA.«scheduler» + 0x92#64))
@@ -615,7 +615,7 @@ theorem scheduler_dispatch (SW : SWTCH) [Xv6G GF] [FdslotG GF] [BioslotG GF] [Ir
     iapply (pstateWhole_split Γ (procAddr n) RUNNABLE).mpr
     isplitl [Hpl]
     · iexact Hpl
-    · simp only [if_pos sc_unclaimed_RUNNABLE]
+    · simp only [ite_eq_left sc_unclaimed_RUNNABLE]
       iempintro
   iapply wpLoop_bupd
   imod (pstateWhole_update Γ (procAddr n) RUNNABLE RUNNING (by decide)) $$ [$Hpw] with Hpw

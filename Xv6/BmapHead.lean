@@ -51,7 +51,7 @@ theorem bm_get_noind (cov : ExtTreeSet Nat compare) (ls : Nat) (bm : Blkmap) (fb
     (hlt : fbn < MAXFILE) : (blkmapGet bm fbn).toNat = 0 := by
   rw [blkmapGet_ent bm fbn hge, blkmapWf_no_ind hwf hiz]
   unfold MAXFILE NDIRECT NINDIRECT at *
-  rw [List.getElem!_eq_getElem?_getD, List.getElem?_replicate, if_pos (by omega)]
+  rw [List.getElem!_eq_getElem?_getD, List.getElem?_replicate, ite_eq_left (by omega)]
   rfl
 
 /-- The zeroed indirect block's run, at the entry list it encodes. -/

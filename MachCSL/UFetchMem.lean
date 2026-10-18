@@ -204,6 +204,6 @@ theorem ufm_runRW_ifetch (D : UFoot) {X : Type} (orc : UOrc) (s : UWSt) {n vasiz
     (k : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → SailM X)
     (hk : akIfetch req.access_kind = true) :
     runRW D orc s (FreeM.impure (.ok (.memRead n vasize req)) k) = none := by
-  simp only [runRW, hk, if_true]
+  simp only [runRW, hk, ite_true]
 
 end MachCSL

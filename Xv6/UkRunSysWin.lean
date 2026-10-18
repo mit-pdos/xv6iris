@@ -55,7 +55,7 @@ theorem tfOf_aget (m : RegMap) (pc : BitVec 64) (k : Nat) (hk : k < 8) :
     tfW (tfOf m pc) (tfArgIdx k) = m.get (BitVec.ofNat 5 (10 + k)) := by
   rw [tfOf_arg m pc k hk]
   unfold RegMap.get
-  rw [if_neg (by intro h; have := congrArg BitVec.toNat h; simp at this; omega)]
+  rw [ite_eq_right (by intro h; have := congrArg BitVec.toNat h; simp at this; omega)]
 
 /-- **Rocq `usyswin_tf_of`**. -/
 theorem usyswin_tf_of (m : RegMap) (pc : BitVec 64) (n : Int) : usysWin n (tfOf m pc) = usyswin m n := by
@@ -69,16 +69,16 @@ theorem usysWin_num {n : Int} {tf : List (BitVec 64)} {dst : BitVec 64} {cap : N
   unfold usysWin at h
   by_cases h3 : n = USYS_wait
   · subst h3; decide
-  rw [if_neg h3] at h
+  rw [ite_eq_right h3] at h
   by_cases h4 : n = USYS_pipe
   · subst h4; decide
-  rw [if_neg h4] at h
+  rw [ite_eq_right h4] at h
   by_cases h5 : n = USYS_read
   · subst h5; decide
-  rw [if_neg h5] at h
+  rw [ite_eq_right h5] at h
   by_cases h8 : n = USYS_fstat
   · subst h8; decide
-  rw [if_neg h8] at h
+  rw [ite_eq_right h8] at h
   cases h
 
 /-- **Rocq `usys_mem_ok_window`**: the kernel wrote SOME run, no longer than
@@ -90,31 +90,31 @@ theorem usysMemOk_window {n : Int} {tf : List (BitVec 64)} {r : BitVec 64} {M M'
   obtain ⟨-, -, h7, h12, -⟩ := usysWin_num hw
   unfold usysWin at hw
   unfold usysMemOk at H
-  rw [if_neg h7, if_neg h12] at H
+  rw [ite_eq_right h7, ite_eq_right h12] at H
   by_cases h3 : n = USYS_wait
-  · rw [if_pos h3] at hw H
+  · rw [ite_eq_left h3] at hw H
     cases hw
     obtain ⟨⟨bs, hl, -, hM⟩, hp, hs, -⟩ := H
     exact ⟨⟨bs, hl, hM⟩, hp, hs⟩
-  rw [if_neg h3] at hw H
+  rw [ite_eq_right h3] at hw H
   by_cases h4 : n = USYS_pipe
-  · rw [if_pos h4] at hw H
+  · rw [ite_eq_left h4] at hw H
     cases hw
     obtain ⟨⟨bs, hl, hM⟩, hp, hs, -⟩ := H
     exact ⟨⟨bs, hl, hM⟩, hp, hs⟩
-  rw [if_neg h4] at hw H
+  rw [ite_eq_right h4] at hw H
   by_cases h5 : n = USYS_read
-  · rw [if_pos h5] at hw H
+  · rw [ite_eq_left h5] at hw H
     cases hw
     obtain ⟨⟨bs, hl, hM⟩, hp, hs, -⟩ := H
     exact ⟨⟨bs, by omega, hM⟩, hp, hs⟩
-  rw [if_neg h5] at hw H
+  rw [ite_eq_right h5] at hw H
   by_cases h8 : n = USYS_fstat
-  · rw [if_pos h8] at hw H
+  · rw [ite_eq_left h8] at hw H
     cases hw
     obtain ⟨⟨bs, hl, hM⟩, hp, hs, -⟩ := H
     exact ⟨⟨bs, hl, hM⟩, hp, hs⟩
-  rw [if_neg h8] at hw
+  rw [ite_eq_right h8] at hw
   cases hw
 
 /-- **Rocq `umem_wr_write`**: at a run that does not wrap, the table's
@@ -129,11 +129,11 @@ theorem usysWr_uMWrite (M : ElfMem) (a : BitVec 64) (bs : List (BitVec 8)) (g : 
   funext x
   unfold uMWrite
   by_cases hx : a.toNat ≤ x ∧ x < a.toNat + bs.length
-  · rw [if_pos hx]
+  · rw [ite_eq_left hx]
     have e : x = (a + BitVec.ofNat 64 (x - a.toNat)).toNat := by rw [hadd _ (by omega)]; omega
     rw [e, usysWr_in M a bs (by omega) _ (by omega), ← e]
     exact hg _ (by omega)
-  · rw [if_neg hx]
+  · rw [ite_eq_right hx]
     apply usysWr_out
     intro j hj he
     rw [hadd j hj] at he
@@ -216,20 +216,20 @@ theorem wp_uk_ecall_window (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegM
     apply usysWr_uMWrite M dst bs g hnw
     intro j hj
     show bs[j]? = some (if j < d then bs[j]?.getD 0#8 else f j)
-    rw [if_pos hj, List.getElem?_eq_getElem hj]; rfl
+    rw [ite_eq_left hj, List.getElem?_eq_getElem hj]; rfl
   subst hMw
   iapply uslot_bupd
   icases (ubytes_split N.d dst.toNat d k f hdk).1 $$ Hbuf with ⟨Hlo, Hhi⟩
   imod uheap_store_run N.t N.d N.s M pm sz dst.toNat d f g $$ Hheap Hlo with ⟨Hheap, Hlo⟩
   ihave Hhi := ubytes_ext N.d (dst.toNat + d) (k - d) (fun j => f (d + j)) (fun j => g (d + j))
-    (fun j _ => by show f (d + j) = (if d + j < d then _ else f (d + j)); rw [if_neg (by omega)]) $$ Hhi
+    (fun j _ => by show f (d + j) = (if d + j < d then _ else f (d + j)); rw [ite_eq_right (by omega)]) $$ Hhi
   ihave Hbuf := (ubytes_split N.d dst.toNat d k g hdk).2 $$ [Hlo Hhi]
   · iframe Hlo Hhi
   imodintro
   iapply uslot_bump_closeM N m pc M _ pm sz fdv fdv cw cw gn cs pidv r avail hx0 hal4
     $$ Hheap Hstk Hufd Hcwda Hids Hmy Hdep Hrows
   iintro %h' Hrun
-  iapply Hcont $$ %h' %r %d %g %(by omega) %(fun j hj _ => by show (if j < d then _ else f j) = f j; rw [if_neg (by omega)])
+  iapply Hcont $$ %h' %r %d %g %(by omega) %(fun j hj _ => by show (if j < d then _ else f j) = f j; rw [ite_eq_right (by omega)])
     %hrd Hrun Hbuf
 
 /-- **Rocq `urun_ubytes_run`**, the bound half: a run the program owns is
@@ -274,7 +274,7 @@ theorem wp_uk_ecall_read (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap
     · right; rw [BitVec.toNat_ofNat]; unfold uCap at hlt; exact Nat.mod_eq_of_lt (by omega)
   have hwin : usyswin m USYS_read = some (BitVec.ofNat 64 a, cnt) := by
     unfold usyswin
-    rw [if_neg (by decide), if_neg (by decide), if_pos rfl, ha1, ukSys_lo32, hcnt]
+    rw [ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_left rfl, ha1, ukSys_lo32, hcnt]
     simp
   ihave Hbs := ubytes_rebase N.d a (BitVec.ofNat 64 a).toNat cnt f (ha.imp id Eq.symm) $$ Hbs
   iapply wp_uk_ecall_window UL N h m pc USYS_read (BitVec.ofNat 64 a) cnt cnt f avail hn hwin (Nat.le_refl _)

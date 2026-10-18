@@ -101,10 +101,10 @@ theorem rowsBytesAll_getElem? (rows : List Nat) (i : Nat) :
     · rw [List.getElem?_append_left (by simp [rowBytes32_eq]; omega)]
       simp [rowBytes32_eq, h]; omega
     · rw [List.getElem?_append_right (by simp [rowBytes32_eq]; omega)]
-      simp only [rowBytes32_eq, List.length_map, List.length_range, ih, h, if_false]
+      simp only [rowBytes32_eq, List.length_map, List.length_range, ih, h, ite_false]
       by_cases h2 : i - 32 < 32 * rs.length
-      · rw [if_pos h2, if_pos (by omega)]
-      · rw [if_neg h2, if_neg (by omega)]
+      · rw [ite_eq_left h2, ite_eq_left (by omega)]
+      · rw [ite_eq_right h2, ite_eq_right (by omega)]
 
 theorem rowsBytes_getElem? (rows : List Nat) (n i : Nat) (hn : n ≤ 32 * rows.length) :
     (rowsBytes rows n)[i]? = if i < n then some (rowByte rows i) else none := by
@@ -124,8 +124,8 @@ theorem rowByte_eq (rows : List Nat) (i : Nat) : rowByte rows i = rowAt (rows.ge
   | cons r rs ih =>
     simp only [rowByte]
     by_cases h : i < 32
-    · rw [if_pos h, show i / 32 = 0 by omega, show i % 32 = i by omega]; rfl
-    · rw [if_neg h, ih, show i / 32 = (i - 32) / 32 + 1 by omega, show i % 32 = (i - 32) % 32 by omega]
+    · rw [ite_eq_left h, show i / 32 = 0 by omega, show i % 32 = i by omega]; rfl
+    · rw [ite_eq_right h, ih, show i / 32 = (i - 32) / 32 + 1 by omega, show i % 32 = (i - 32) % 32 by omega]
       rfl
 
 /-- A row list as a balanced tree keyed by row INDEX: a node stores the size
@@ -157,12 +157,12 @@ theorem RowTree.get_eq : ∀ (t : RowTree), t.wf = true → ∀ i, t.get i = t.t
     obtain ⟨⟨hn, hl⟩, hr⟩ := h
     simp only [RowTree.get, RowTree.toList, List.getD_eq_getElem?_getD]
     by_cases h1 : i < n
-    · rw [if_pos h1, RowTree.get_eq l hl, List.getD_eq_getElem?_getD,
+    · rw [ite_eq_left h1, RowTree.get_eq l hl, List.getD_eq_getElem?_getD,
         List.getElem?_append_left (by omega)]
-    · rw [if_neg h1, List.getElem?_append_right (by omega)]
+    · rw [ite_eq_right h1, List.getElem?_append_right (by omega)]
       by_cases h2 : i = n
-      · subst h2; rw [if_pos rfl, hn, Nat.sub_self]; rfl
-      · rw [if_neg h2, RowTree.get_eq r hr, List.getD_eq_getElem?_getD, hn,
+      · subst h2; rw [ite_eq_left rfl, hn, Nat.sub_self]; rfl
+      · rw [ite_eq_right h2, RowTree.get_eq r hr, List.getD_eq_getElem?_getD, hn,
           show i - n = (i - n - 1) + 1 by omega, List.getElem?_cons_succ]
         rfl
 
@@ -192,11 +192,11 @@ theorem USeg.byte_eq_elfSeq (s : USeg) (hwf : s.wf) : s.byte = elfSeq s.vaddr s.
   funext a
   unfold USeg.byte elfSeq USeg.bytes
   by_cases h1 : s.vaddr ≤ a
-  · rw [if_pos h1, rowsBytes_getElem? _ _ _ hwf]
+  · rw [ite_eq_left h1, rowsBytes_getElem? _ _ _ hwf]
     by_cases h2 : a - s.vaddr < s.size
-    · rw [if_pos ⟨h1, by omega⟩, if_pos h2]
-    · rw [if_neg (by omega), if_neg h2]
-  · rw [if_neg (by omega), if_neg h1]
+    · rw [ite_eq_left ⟨h1, by omega⟩, ite_eq_left h2]
+    · rw [ite_eq_right (by omega), ite_eq_right h2]
+  · rw [ite_eq_right (by omega), ite_eq_right h1]
 
 /-- Every byte of `k` sits in `m` at its address (checked for a whole text by
 `decide +kernel`, once per image). -/
@@ -272,7 +272,7 @@ theorem scanIn_instrIn (s : USeg) (hwf : s.wf) (ks : List UInstr)
   rw [List.mem_range] at hj
   rw [USeg.byte_eq_elfSeq s hwf, beq_iff_eq]
   unfold elfSeq
-  rw [if_pos (by omega), show k.addr + j - s.vaddr = k.addr - s.vaddr + j by omega]
+  rw [ite_eq_left (by omega), show k.addr + j - s.vaddr = k.addr - s.vaddr + j by omega]
   exact hb j hj
 
 /-! ## The fetch premise -/

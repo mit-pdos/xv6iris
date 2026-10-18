@@ -30,7 +30,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 /-- `seqz` of a nonzero difference (in the executor's normal form). -/
 theorem sltiu_diff_ne (a b : BitVec 64) (h : a ≠ b) :
     (if (a + -b).ult 1#64 then 1#64 else 0#64) = 0#64 := by
-  rw [if_neg]
+  rw [ite_eq_right]
   intro hlt
   apply h
   bv_decide
@@ -38,7 +38,7 @@ theorem sltiu_diff_ne (a b : BitVec 64) (h : a ≠ b) :
 /-- `seqz` of a zero difference. -/
 theorem sltiu_diff_eq (a : BitVec 64) :
     (if (a + -a).ult 1#64 then 1#64 else 0#64) = 1#64 := by
-  rw [if_pos]
+  rw [ite_eq_left]
   bv_decide
 
 /-- The context inside `holding`'s frame. -/

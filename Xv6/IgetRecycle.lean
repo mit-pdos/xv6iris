@@ -115,17 +115,17 @@ theorem ig_pool_insert (ci : RegMapF (BitVec 32 × BitVec 32)) (nib : Nat) (e : 
     · rw [LawfulPartialMap.get?_insert]
       by_cases h : e = k
       · subst h; rw [hci] at hk; cases hk
-      · simp only [h, if_false]; exact hk
+      · simp only [h, ite_false]; exact hk
     · rw [LawfulPartialMap.get?_insert]; simp
     · exact hz
   · rintro ⟨⟨hr, hn⟩, hz⟩
     refine ⟨hr, fun ⟨k, p, hk, hzk⟩ => ?_⟩
     rw [LawfulPartialMap.get?_insert] at hk
     by_cases h : e = k
-    · simp only [h, if_true] at hk
+    · simp only [h, ite_true] at hk
       cases hk
       exact hz hzk
-    · simp only [h, if_false] at hk
+    · simp only [h, ite_false] at hk
       exact hn ⟨k, p, hk, hzk⟩
 
 /-- `icCiWf` after the recycle (Rocq's inline four-clause re-proof;
@@ -142,24 +142,24 @@ theorem ig_ciwf_insert (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × 
     rw [LawfulPartialMap.get?_insert] at h1 h2
     by_cases e1 : e = k1 <;> by_cases e2 : e = k2
     · exact e1.symm.trans e2
-    · rw [if_pos e1] at h1; rw [if_neg e2] at h2
+    · rw [ite_eq_left e1] at h1; rw [ite_eq_right e2] at h2
       cases h1
       exact absurd ((ciInums_spec ci _).mpr ⟨k2, p2, h2, heq⟩) hnotin
-    · rw [if_neg e1] at h1; rw [if_pos e2] at h2
+    · rw [ite_eq_right e1] at h1; rw [ite_eq_left e2] at h2
       cases h2
       exact absurd ((ciInums_spec ci _).mpr ⟨k1, p1, h1, heq.symm⟩) hnotin
-    · rw [if_neg e1] at h1; rw [if_neg e2] at h2
+    · rw [ite_eq_right e1] at h1; rw [ite_eq_right e2] at h2
       exact hinj k1 k2 p1 p2 h1 h2 heq
   · intro k p h
     rw [LawfulPartialMap.get?_insert] at h
     by_cases e1 : e = k
-    · simp only [e1, if_true] at h; cases h; exact hnib
-    · simp only [e1, if_false] at h; exact hrange k p h
+    · simp only [e1, ite_true] at h; cases h; exact hnib
+    · simp only [e1, ite_false] at h; exact hrange k p h
   · intro k p h
     rw [LawfulPartialMap.get?_insert] at h
     by_cases e1 : e = k
-    · simp only [e1, if_true] at h; cases h; rfl
-    · simp only [e1, if_false] at h; exact hdv k p h
+    · simp only [e1, ite_true] at h; cases h; rfl
+    · simp only [e1, ite_false] at h; exact hdv k p h
 
 section
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]

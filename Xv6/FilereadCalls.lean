@@ -337,10 +337,10 @@ theorem frd_readi (RD : READI) (Γ : SchedNames) [ClaimIs GF Γ]
     (ientry ik) bm data dn true off n.toNat [] pid V M pidPriv (DFrac.own Qp.quarter)
     (DFrac.own (1 : Qp).half) hj hproc hK hnoff htier hgo.fgoLog hwf hcovs hcap (by omega)
     (fun _ => by omega) rfl rfl rfl hpd ha0
-    (by simp only [if_true]; rw [ha1]; decide) ha3
+    (by simp only [ite_true]; rw [ha1]; decide) ha3
     (by rw [ha4]; exact frd_n_arg n hn0 hn1) (fun h => absurd h (by decide))
   unfold wp_readi_eb_body at h
-  simp only [readiAddr, if_true, fsView_gd] at h
+  simp only [readiAddr, ite_true, fsView_gd] at h
   iapply h
   iframe Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk Hbs
   iframe #

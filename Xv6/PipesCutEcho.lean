@@ -159,7 +159,7 @@ theorem pcutFs_stage (p : Producer) (fs : List Filt) (f : Nat → BitVec 8) (len
     · rfl
     · have hle := wlOff_le_body (filtWords F) co i w j hi hj
       rw [ushpNulfold_miss]
-      · simp only [ushpExt]; rw [if_pos (by omega)]
+      · simp only [ushpExt]; rw [ite_eq_left (by omega)]
       · intro i' tk hi'
         have := wlToks_end_le (prodWords p) tk (List.mem_of_getElem? hi')
         have := wlOff_ge (filtWords F) co i
@@ -171,7 +171,7 @@ theorem pcutFs_stage (p : Producer) (fs : List Filt) (f : Nat → BitVec 8) (len
     rw [hwi] at hj
     unfold ushEchoOff
     show pcutFs _ _ len f (co + (wlOff 0 (filtWords F) i + j)) = _
-    rw [hval i w j hw (by omega), if_neg (by omega)]
+    rw [hval i w j hw (by omega), ite_eq_right (by omega)]
     have hle := wlOff_le_body (filtWords F) 0 i w w.length hw (Nat.le_refl _)
     have hbj := hb (wlOff 0 (filtWords F) i + j) (by omega)
     simp only [Nat.zero_add] at hbj
@@ -183,6 +183,6 @@ theorem pcutFs_stage (p : Producer) (fs : List Filt) (f : Nat → BitVec 8) (len
     unfold ushEchoOff ushEchoAlen
     rw [hwi]
     show pcutFs _ _ len f (co + (wlOff 0 (filtWords F) i + w.length)) = _
-    rw [hval i w w.length hw (Nat.le_refl _), if_pos rfl]
+    rw [hval i w w.length hw (Nat.le_refl _), ite_eq_left rfl]
 
 end Xv6

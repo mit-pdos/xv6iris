@@ -146,7 +146,7 @@ theorem usysWrN_out (M : ElfMem) (a : BitVec 64) (bs : List (BitVec 8)) (x : Nat
   | 0, _ => rfl
   | k + 1, h => by
     simp only [usysWrN]
-    rw [if_neg (fun e => h k (Nat.lt_succ_self k) e.symm)]
+    rw [ite_eq_right (fun e => h k (Nat.lt_succ_self k) e.symm)]
     exact usysWrN_out M a bs x k (fun j hj => h j (Nat.lt_succ_of_lt hj))
 
 /-- **Outside the run nothing moved** (Rocq `umem_wr_lookup_out`): what a
@@ -161,7 +161,7 @@ theorem usysWrN_in (M : ElfMem) (a : BitVec 64) (bs : List (BitVec 8)) (hnw : a.
   | k + 1, hk, j, hj => by
     simp only [usysWrN]
     by_cases hjk : j = k
-    · subst hjk; rw [if_pos rfl]
+    · subst hjk; rw [ite_eq_left rfl]
     · have hne : (a + BitVec.ofNat 64 j).toNat ≠ (a + BitVec.ofNat 64 k).toNat := by
         rw [BitVec.toNat_add, BitVec.toNat_add, BitVec.toNat_ofNat, BitVec.toNat_ofNat]
         have : j < 2 ^ 64 := by omega
@@ -169,7 +169,7 @@ theorem usysWrN_in (M : ElfMem) (a : BitVec 64) (bs : List (BitVec 8)) (hnw : a.
         rw [Nat.mod_eq_of_lt (by omega : j < 2 ^ 64), Nat.mod_eq_of_lt (by omega : k < 2 ^ 64),
           Nat.mod_eq_of_lt (by omega), Nat.mod_eq_of_lt (by omega)]
         omega
-      rw [if_neg hne]
+      rw [ite_eq_right hne]
       exact usysWrN_in M a bs hnw k (by omega) j (by omega)
 
 /-- **Inside a run that does not wrap, the bytes are `bs`.** -/
@@ -235,7 +235,7 @@ def usysWaitBytes (a0 : BitVec 64) (xs : Int) : List (BitVec 8) :=
   if a0 = 0#64 then [] else wordToBytes4 (BitVec.ofInt 32 xs)
 
 theorem usysWaitBytes_null (xs : Int) : usysWaitBytes 0#64 xs = [] := by
-  unfold usysWaitBytes; rw [if_pos rfl]
+  unfold usysWaitBytes; rw [ite_eq_left rfl]
 
 theorem usysWaitBytes_length (a0 : BitVec 64) (xs : Int) : (usysWaitBytes a0 xs).length ≤ 4 := by
   unfold usysWaitBytes; split <;> simp [wordToBytes4]
@@ -282,13 +282,13 @@ theorem usysMemOk_quiet {n : Int} {tf : List (BitVec 64)} {r : BitVec 64} {M M' 
     (h5 : n ≠ USYS_read) (h8 : n ≠ USYS_fstat)
     (H : usysMemOk n tf r M π szv lz M' π' szv' lz') : M' = M ∧ π' = π ∧ szv' = szv := by
   unfold usysMemOk at H
-  rw [if_neg h7, if_neg h12, if_neg h3, if_neg h4, if_neg h5, if_neg h8] at H
+  rw [ite_eq_right h7, ite_eq_right h12, ite_eq_right h3, ite_eq_right h4, ite_eq_right h5, ite_eq_right h8] at H
   by_cases hf : n = USYS_fork
-  · rw [if_pos hf] at H; exact ⟨H.2.1, H.2.2.1, H.2.2.2.1⟩
-  rw [if_neg hf] at H
+  · rw [ite_eq_left hf] at H; exact ⟨H.2.1, H.2.2.1, H.2.2.2.1⟩
+  rw [ite_eq_right hf] at H
   by_cases hu : n = USYS_uptime
-  · rw [if_pos hu] at H; exact ⟨H.2.1, H.2.2.1, H.2.2.2.1⟩
-  · rw [if_neg hu] at H; exact ⟨H.1, H.2.1, H.2.2.1⟩
+  · rw [ite_eq_left hu] at H; exact ⟨H.2.1, H.2.2.1, H.2.2.2.1⟩
+  · rw [ite_eq_right hu] at H; exact ⟨H.1, H.2.1, H.2.2.1⟩
 
 /-- The lazy bit at every entry but sbrk (Rocq `usys_mem_ok_lazy`). -/
 theorem usysMemOk_lazy {n : Int} {tf : List (BitVec 64)} {r : BitVec 64} {M M' : ElfMem}
@@ -296,33 +296,33 @@ theorem usysMemOk_lazy {n : Int} {tf : List (BitVec 64)} {r : BitVec 64} {M M' :
     (h12 : n ≠ USYS_sbrk) (H : usysMemOk n tf r M π szv lz M' π' szv' lz') : lz' = lz := by
   unfold usysMemOk at H
   by_cases h7 : n = USYS_exec
-  · rw [if_pos h7] at H; exact H.2.2.2.2
-  rw [if_neg h7, if_neg h12] at H
+  · rw [ite_eq_left h7] at H; exact H.2.2.2.2
+  rw [ite_eq_right h7, ite_eq_right h12] at H
   by_cases h3 : n = USYS_wait
-  · rw [if_pos h3] at H; exact H.2.2.2.1
-  rw [if_neg h3] at H
+  · rw [ite_eq_left h3] at H; exact H.2.2.2.1
+  rw [ite_eq_right h3] at H
   by_cases h4 : n = USYS_pipe
-  · rw [if_pos h4] at H; exact H.2.2.2
-  rw [if_neg h4] at H
+  · rw [ite_eq_left h4] at H; exact H.2.2.2
+  rw [ite_eq_right h4] at H
   by_cases h5 : n = USYS_read
-  · rw [if_pos h5] at H; exact H.2.2.2.1
-  rw [if_neg h5] at H
+  · rw [ite_eq_left h5] at H; exact H.2.2.2.1
+  rw [ite_eq_right h5] at H
   by_cases h8 : n = USYS_fstat
-  · rw [if_pos h8] at H; exact H.2.2.2
-  rw [if_neg h8] at H
+  · rw [ite_eq_left h8] at H; exact H.2.2.2
+  rw [ite_eq_right h8] at H
   by_cases hf : n = USYS_fork
-  · rw [if_pos hf] at H; exact H.2.2.2.2
-  rw [if_neg hf] at H
+  · rw [ite_eq_left hf] at H; exact H.2.2.2.2
+  rw [ite_eq_right hf] at H
   by_cases hu : n = USYS_uptime
-  · rw [if_pos hu] at H; exact H.2.2.2.2
-  · rw [if_neg hu] at H; exact H.2.2.2
+  · rw [ite_eq_left hu] at H; exact H.2.2.2.2
+  · rw [ite_eq_right hu] at H; exact H.2.2.2
 
 /-- Read's answer (Rocq `usys_mem_ok_read_ret`). -/
 theorem usysMemOk_readRet {tf : List (BitVec 64)} {r : BitVec 64} {M M' : ElfMem}
     {π π' : Nat → Option UPerm} {szv szv' : Nat} {lz lz' : Bool}
     (H : usysMemOk USYS_read tf r M π szv lz M' π' szv' lz') : usysReadRet tf r := by
   unfold usysMemOk at H
-  rw [if_neg (by decide), if_neg (by decide), if_neg (by decide), if_neg (by decide), if_pos rfl] at H
+  rw [ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_left rfl] at H
   exact H.2.2.2.2
 
 /-- Exec's failure row (Rocq `usys_mem_ok_exec_row`). -/
@@ -331,7 +331,7 @@ theorem usysMemOk_execRow {tf : List (BitVec 64)} {r : BitVec 64} {M M' : ElfMem
     (H : usysMemOk USYS_exec tf r M π szv lz M' π' szv' lz') :
     r = -1#64 ∧ M' = M ∧ π' = π ∧ szv' = szv := by
   unfold usysMemOk at H
-  rw [if_pos rfl] at H
+  rw [ite_eq_left rfl] at H
   exact ⟨H.1, H.2.1, H.2.2.1, H.2.2.2.1⟩
 
 /-- Wait at a NULL status pointer moves nothing (Rocq `usys_mem_ok_wait_null`). -/
@@ -340,7 +340,7 @@ theorem usysMemOk_waitNull {tf : List (BitVec 64)} {r : BitVec 64} {M M' : ElfMe
     (hz : (tfW tf (tfArgIdx 0)).toNat = 0)
     (H : usysMemOk USYS_wait tf r M π szv lz M' π' szv' lz') : M' = M ∧ π' = π ∧ szv' = szv := by
   unfold usysMemOk at H
-  rw [if_neg (by decide), if_neg (by decide), if_pos rfl] at H
+  rw [ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_left rfl] at H
   obtain ⟨⟨bs, -, hnull, hM⟩, hp, hs, -⟩ := H
   rw [hnull hz] at hM
   exact ⟨hM, hp, hs⟩
@@ -350,7 +350,7 @@ theorem usysMemOk_waitRet {tf : List (BitVec 64)} {r : BitVec 64} {M M' : ElfMem
     {π π' : Nat → Option UPerm} {szv szv' : Nat} {lz lz' : Bool}
     (H : usysMemOk USYS_wait tf r M π szv lz M' π' szv' lz') : usysWaitRet r := by
   unfold usysMemOk at H
-  rw [if_neg (by decide), if_neg (by decide), if_pos rfl] at H
+  rw [ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_left rfl] at H
   exact H.2.2.2.2
 
 /-- Fork's return value (Rocq `usys_mem_ok_fork_ret`). -/
@@ -359,8 +359,8 @@ theorem usysMemOk_forkRet {tf : List (BitVec 64)} {r : BitVec 64} {M M' : ElfMem
     (H : usysMemOk USYS_fork tf r M π szv lz M' π' szv' lz') :
     r = -1#64 ∨ (1 ≤ r.toInt ∧ r.toInt ≤ PIDMAX) := by
   unfold usysMemOk at H
-  rw [if_neg (by decide), if_neg (by decide), if_neg (by decide), if_neg (by decide),
-    if_neg (by decide), if_neg (by decide), if_pos rfl] at H
+  rw [ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_right (by decide),
+    ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_left rfl] at H
   exact H.1
 
 /-- ...and it is never 0: a returning fork is a PARENT (Rocq
@@ -378,8 +378,8 @@ theorem usysMemOk_uptimeRet {tf : List (BitVec 64)} {r : BitVec 64} {M M' : ElfM
     {π π' : Nat → Option UPerm} {szv szv' : Nat} {lz lz' : Bool}
     (H : usysMemOk USYS_uptime tf r M π szv lz M' π' szv' lz') : usysUptimeRet r := by
   unfold usysMemOk at H
-  rw [if_neg (by decide), if_neg (by decide), if_neg (by decide), if_neg (by decide),
-    if_neg (by decide), if_neg (by decide), if_neg (by decide), if_pos rfl] at H
+  rw [ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_right (by decide),
+    ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_left rfl] at H
   exact H.1
 
 /-! ## §2b The descriptor table's rows -/
@@ -487,8 +487,8 @@ def usysFdOk (n : Int) (tf : List (BitVec 64)) (r : BitVec 64) (sts sts' : List 
 theorem usysFdOk_pipe_neg1 (tf : List (BitVec 64)) (r : BitVec 64) (sts sts' : List FdState)
     (h : usysFdOk USYS_pipe tf r sts sts') (hr : r.toNat ≠ 0) : r = -1#64 ∧ sts' = sts := by
   unfold usysFdOk at h
-  simp only [USYS_pipe, USYS_close, USYS_dup, USYS_open, Int.reduceEq, if_false, if_true] at h
-  rw [if_neg hr] at h
+  simp only [USYS_pipe, USYS_close, USYS_dup, USYS_open, Int.reduceEq, ite_false, ite_true] at h
+  rw [ite_eq_right hr] at h
   exact h
 
 /-- Rocq `usys_fd_ok_quiet`. -/
@@ -496,7 +496,7 @@ theorem usysFdOk_quiet {n : Int} {tf : List (BitVec 64)} {r : BitVec 64} {sts st
     (hc : n ≠ USYS_close) (hd : n ≠ USYS_dup) (ho : n ≠ USYS_open) (hp : n ≠ USYS_pipe)
     (H : usysFdOk n tf r sts sts') : sts' = sts := by
   unfold usysFdOk at H
-  rwa [if_neg hc, if_neg hd, if_neg ho, if_neg hp] at H
+  rwa [ite_eq_right hc, ite_eq_right hd, ite_eq_right ho, ite_eq_right hp] at H
 
 /-- The quiet row, supplied (Rocq `usys_fd_ok_refl_at`). -/
 theorem usysFdOk_refl_at (n k : Int) (tf : List (BitVec 64)) (r : BitVec 64) (sts : List FdState)
@@ -504,7 +504,7 @@ theorem usysFdOk_refl_at (n k : Int) (tf : List (BitVec 64)) (r : BitVec 64) (st
     usysFdOk n tf r sts sts := by
   subst hk
   unfold usysFdOk
-  rw [if_neg hc, if_neg hd, if_neg ho, if_neg hp]
+  rw [ite_eq_right hc, ite_eq_right hd, ite_eq_right ho, ite_eq_right hp]
 
 /-- Rocq `usys_fd_ok_arg_cong`. -/
 theorem usysFdOk_argCong {n : Int} {tf1 tf2 : List (BitVec 64)} {r : BitVec 64} {sts sts' : List FdState}
@@ -578,11 +578,11 @@ def usysCwdOk (n : Int) (r : BitVec 64) (c c' : Nat) : Prop :=
 
 theorem usysCwdOk_quiet {n : Int} {r : BitVec 64} {c c' : Nat} (h : n ≠ USYS_chdir)
     (H : usysCwdOk n r c c') : c' = c := by
-  unfold usysCwdOk at H; rwa [if_neg h] at H
+  unfold usysCwdOk at H; rwa [ite_eq_right h] at H
 
 theorem usysCwdOk_refl_at (n k : Int) (r : BitVec 64) (c : Nat) (hk : n = k) (h : k ≠ USYS_chdir) :
     usysCwdOk n r c c := by
-  subst hk; unfold usysCwdOk; rw [if_neg h]
+  subst hk; unfold usysCwdOk; rw [ite_eq_right h]
 
 /-! ## §2e The generation row: no entry re-incarnates the caller -/
 
@@ -643,17 +643,17 @@ theorem usysEff_all (tf : List (BitVec 64)) (h0 : 0 ≤ usysNum tf) (h1 : usysNu
   have hb : (-1#64 : BitVec 64).getLsbD (usysNum tf).toNat = true := by
     rw [show (-1#64 : BitVec 64) = BitVec.allOnes 64 by decide, BitVec.getLsbD_allOnes]
     simp only [decide_eq_true_eq]; omega
-  rw [if_pos (by rw [hb]; simp [h0])]
+  rw [ite_eq_left (by rw [hb]; simp [h0])]
 
 /-- Rocq `usys_eff_allowed`. -/
 theorem usysEff_allowed (secc : BitVec 64) (tf : List (BitVec 64))
     (h : usysTestbit secc (usysNum tf) = true) : usysEff secc tf = usysNum tf := by
-  unfold usysEff; rw [if_pos h]
+  unfold usysEff; rw [ite_eq_left h]
 
 /-- Rocq `usys_eff_blocked`. -/
 theorem usysEff_blocked (secc : BitVec 64) (tf : List (BitVec 64))
     (h : usysTestbit secc (usysNum tf) = false) : usysEff secc tf = 0 := by
-  unfold usysEff; rw [if_neg (by simp [h])]
+  unfold usysEff; rw [ite_eq_right (by simp [h])]
 
 /-- Rocq `usys_eff_arg_cong`. -/
 theorem usysEff_argCong (secc : BitVec 64) (tf1 tf2 : List (BitVec 64))
@@ -683,17 +683,17 @@ def usysSeccOk (n : Int) (tf : List (BitVec 64)) (secc secc' r : BitVec 64) : Pr
 /-- Rocq `usys_secc_ok_quiet`. -/
 theorem usysSeccOk_quiet {n : Int} {tf : List (BitVec 64)} {secc secc' r : BitVec 64}
     (hn : n ≠ USYS_seccomp) (h : usysSeccOk n tf secc secc' r) : secc' = secc := by
-  unfold usysSeccOk at h; rw [if_neg hn] at h; exact h
+  unfold usysSeccOk at h; rw [ite_eq_right hn] at h; exact h
 
 /-- Rocq `usys_secc_ok_refl`. -/
 theorem usysSeccOk_refl (n : Int) (tf : List (BitVec 64)) (secc r : BitVec 64) (hn : n ≠ USYS_seccomp) :
     usysSeccOk n tf secc secc r := by
-  unfold usysSeccOk; rw [if_neg hn]
+  unfold usysSeccOk; rw [ite_eq_right hn]
 
 /-- Rocq `usys_secc_ok_seccomp`. -/
 theorem usysSeccOk_seccomp (tf : List (BitVec 64)) (secc r : BitVec 64) (hr : r = 0#64) :
     usysSeccOk USYS_seccomp tf secc (secc &&& tfW tf (tfArgIdx 0)) r := by
-  unfold usysSeccOk; rw [if_pos rfl]; exact ⟨rfl, hr⟩
+  unfold usysSeccOk; rw [ite_eq_left rfl]; exact ⟨rfl, hr⟩
 
 /-- Rocq `usys_secc_ok_arg_cong`. -/
 theorem usysSeccOk_argCong {n : Int} {tf1 tf2 : List (BitVec 64)} {secc secc' r : BitVec 64}

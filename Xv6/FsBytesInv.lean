@@ -303,8 +303,8 @@ theorem mapSeq_splice_sub (L' L : RegMapF (BitVec 8)) (b off : Nat)
     have hnone : PartialMap.get? (mapSeq (b * BSZ + off) subNew) a = none := by
       rw [mapSeq_get?]
       by_cases hs : b * BSZ + off ≤ a
-      · rw [if_pos hs, List.getElem?_eq_none (by omega)]
-      · rw [if_neg hs]
+      · rw [ite_eq_left hs, List.getElem?_eq_none (by omega)]
+      · rw [ite_eq_right hs]
     rw [hnone]
     exact hbs a v ((mapSeq_get?_some _ _ a v).2 ⟨hge, hout⟩)
 

@@ -219,9 +219,9 @@ theorem wp_shGetcmd (UL : UK_LEAVES) (HS : UK_SYS_P) (MS : USH_MEMSET) (SGt : SH
     rw [e]
     refine ⟨fun h0 => ?_, fun h0 => ?_⟩
     · have h0' : g 0 = 0#8 := h0
-      rw [if_pos h0']
+      rw [ite_eq_left h0']
     · have h0' : ¬ g 0 = 0#8 := h0
-      rw [if_neg h0']
+      rw [ite_eq_right h0']
 
 end
 

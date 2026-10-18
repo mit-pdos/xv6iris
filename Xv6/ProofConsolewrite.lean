@@ -290,7 +290,7 @@ theorem cw_at (M : Nat → List (BitVec 8)) (ua a : BitVec 64) (i nn : Nat)
   subst hbs
   rw [UMemL.umemRead_getElem?] at hd
   by_cases hdl : d < nn
-  · rw [if_pos hdl, Option.some.injEq] at hd
+  · rw [ite_eq_left hdl, Option.some.injEq] at hd
     rw [← hd]
     congr 1
     have hadd : ua + BitVec.ofNat 64 (i + d) = a + BitVec.ofNat 64 d := by
@@ -300,7 +300,7 @@ theorem cw_at (M : Nat → List (BitVec 8)) (ua a : BitVec 64) (i nn : Nat)
       omega
     rw [hadd, BitVec.toNat_add, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (a := d) (by omega),
       Nat.mod_eq_of_lt (by omega)]
-  · rw [if_neg hdl] at hd; cases hd
+  · rw [ite_eq_right hdl] at hd; cases hd
 
 /-- THE SHORT COUNT'S REASON (Rocq `ProofConsolewrite`'s relay, lane
 TRAP-ROWS T1): the failing chunk's byte, read at `a + e = ua + (i + e)`,

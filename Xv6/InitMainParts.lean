@@ -59,8 +59,8 @@ theorem kinit_pid_ne_0 (p : BitVec 32) (h1 : 1 ≤ p.toNat) (hp : p.toNat ≤ PI
 /-- Two writes to one register are the last one. -/
 theorem ukWr_twice (m : RegMap) (rd : BitVec 5) (a b : BitVec 64) : ukWr (ukWr m rd a) rd b = ukWr m rd b := by
   by_cases h : rd = 0#5
-  · simp only [ukWr, if_pos h]
-  · simp only [ukWr, if_neg h]
+  · simp only [ukWr, ite_eq_left h]
+  · simp only [ukWr, ite_eq_right h]
     funext j
     unfold RegMap.set
     by_cases hj : j = rd <;> simp [hj]

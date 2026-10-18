@@ -117,9 +117,9 @@ theorem ush_pipe_call_paid_gen (UL : UK_LEAVES) (hps : ∀ k : Int, freeNum k �
     -- THE EIGHT BYTES ARE THE TWO NUMBERS, split at four
     icases (ubytes_split (GF := GF) N.d _ 4 8 g (by decide)).1 $$ Hbuf with ⟨Hlo, Hhi⟩
     ihave Hlo := ubytes_ext (GF := GF) N.d _ 4 g (nthByte (n := 4) (BitVec.ofNat 32 a))
-      (fun j hj => by rw [hg j (by omega), if_pos hj]) $$ Hlo
+      (fun j hj => by rw [hg j (by omega), ite_eq_left hj]) $$ Hlo
     ihave Hhi := ubytes_ext (GF := GF) N.d _ 4 (fun j => g (4 + j)) (nthByte (n := 4) (BitVec.ofNat 32 b))
-      (fun j hj => by rw [hg (4 + j) (by omega), if_neg (by omega), Nat.add_sub_cancel_left]) $$ Hhi
+      (fun j hj => by rw [hg (4 + j) (by omega), ite_eq_right (by omega), Nat.add_sub_cancel_left]) $$ Hhi
     iframe Hlo Hhi Hstd Hra Hrb HR
     isplitr
     · ipureintro; exact ⟨hr0, hab, hage, hbge, halt, hblt⟩

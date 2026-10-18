@@ -109,7 +109,7 @@ theorem sl_pstateWhole_intro (Γ : SchedNames) (pa : BitVec 64) :
   iapply (pstateWhole_split Γ pa RUNNING).2
   isplitl [H1]
   · iexact H1
-  · rw [if_neg (by decide : ¬ unclaimed RUNNING)]
+  · rw [ite_eq_right (by decide : ¬ unclaimed RUNNING)]
     iexact H2
 
 /-- ...and back, at the release. -/
@@ -117,7 +117,7 @@ theorem sl_pstateWhole_elim (Γ : SchedNames) (pa : BitVec 64) :
     pstateWhole (GF := GF) Γ pa RUNNING ⊢ pstateLock Γ pa RUNNING ∗ pstateAtHlf Γ pa RUNNING := by
   iintro H
   icases (pstateWhole_split Γ pa RUNNING).1 $$ H with ⟨H1, H2⟩
-  rw [if_neg (by decide : ¬ unclaimed RUNNING)] at *
+  rw [ite_eq_right (by decide : ¬ unclaimed RUNNING)] at *
   iframe
 
 end
@@ -438,7 +438,7 @@ theorem sleep_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : S
         hK' hs' hn' hl' ht' hp'
       unfold wp_sched_body at h
       simp only [schedAddr] at h
-      rw [if_pos sl_needsCtx_sleeping] at h
+      rw [ite_eq_left sl_needsCtx_sleeping] at h
       exact h
     iapply (hsc _ ?hKS ?hsS ?hnS ?hlS ?htS ?hpS) $$ [- $Hk $Hpc $Hheld $Htc $Hir $Hcells $Hfull $Hvc]
     rotate_right 1

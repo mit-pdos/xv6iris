@@ -38,10 +38,10 @@ theorem umm_go {α ε : Type} (D : UFoot) (orc : UOrc) (N : Nat) (fin : α → B
     simp only [ExceptT.run_pure, runRW_pure, Option.bind_some, hfin]
     by_cases hk1 : k + 1 = N
     · subst hk1
-      simp only [beq_self_eq_true, if_true, ExceptT.run_pure, runRW_pure]
+      simp only [beq_self_eq_true, ite_true, ExceptT.run_pure, runRW_pure]
       exact ⟨x', s', rfl, hI'⟩
     · have hb : (k + 1 == N) = false := by simpa using hk1
-      simp only [hb, Bool.false_eq_true, if_false]
+      simp only [hb, Bool.false_eq_true, ite_false]
       exact ih (k + 1) x' s' hI' (by omega) (by omega)
 
 /-- **The loop** (Rocq `gm_untilMT'_chain`), from the invariant at chunk 0. -/

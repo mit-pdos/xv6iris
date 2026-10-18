@@ -74,10 +74,10 @@ theorem ctxBytes_hist (ξ : CtxId) (pa : PAddr) (dq : DFrac) (bs : Nat → BitVe
         ([∗list] j ∈ List.range n, (pa + BitVec.ofNat 64 j) ↦ₕ{dq} Hs1 j : IProp GF) := by
       apply BigSepL.bigSepL_eq
       intro k x hk
-      simp only [hmem hk, if_false]
+      simp only [hmem hk, ite_false]
     isplitl [H1 Hpt]
     · iapply BigSepL.bigSepL_snoc.2
-      simp only [if_true]
+      simp only [ite_true]
       rw [heq]
       iframe H1 Hpt
     isplit
@@ -85,10 +85,10 @@ theorem ctxBytes_hist (ξ : CtxId) (pa : PAddr) (dq : DFrac) (bs : Nat → BitVe
       intro j hj
       by_cases hjn : j = n
       · subst hjn; simp [he]
-      · simp only [hjn, if_false]; exact h1 j (by omega)
+      · simp only [hjn, ite_false]; exact h1 j (by omega)
     · iintro Hh
       icases BigSepL.bigSepL_snoc.1 $$ Hh with ⟨Hh1, Hh2⟩
-      simp only [if_true]
+      simp only [ite_true]
       rw [heq]
       iapply BigSepL.bigSepL_snoc.2
       isplitl [Hh1 W1]

@@ -133,7 +133,7 @@ theorem blkSplice_getElem?_lt (off : Nat) (sub bs : List (BitVec 8)) (j : Nat)
     (blkSplice off sub bs)[j]? = bs[j]? := by
   have hlt : j < (bs.take off).length := by rw [List.length_take]; omega
   unfold blkSplice
-  rw [List.getElem?_append_left hlt, List.getElem?_take, if_pos hj]
+  rw [List.getElem?_append_left hlt, List.getElem?_take, ite_eq_left hj]
 
 theorem blkSplice_getElem?_mid (off : Nat) (sub bs : List (BitVec 8)) (j : Nat)
     (hb : off ≤ bs.length) (h1 : off ≤ j) (h2 : j < off + sub.length) :

@@ -41,7 +41,7 @@ theorem ushPk_snez_nat (v : Nat) (hv : v < 2 ^ 64) :
   · have : 0 < v := Nat.pos_of_ne_zero h
     have e : zopz0zI_u (0#64) (BitVec.ofNat 64 v) = true := by
       simp [zopz0zI_u, Sail.BitVec.toNatInt, Nat.mod_eq_of_lt hv]; omega
-    simp only [ukRtypeVal, e, h, if_false]; decide
+    simp only [ukRtypeVal, e, h, ite_false]; decide
 
 section
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]

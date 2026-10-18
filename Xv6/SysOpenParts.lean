@@ -415,11 +415,11 @@ theorem sys_open_publish [Icfg] [CurCtx] (omo : OffMode) (E : CoPset) (γ : File
     else .open rb wb (.device C.major.toNat)
   have hok : fdstateOk inum γo omo pn.pipe C stpub := by
     rcases hty with h | h
-    · have e : stpub = .open rb wb (.inode inum.toNat γo omo) := if_pos h
+    · have e : stpub = .open rb wb (.inode inum.toNat γo omo) := ite_eq_left h
       rw [e]
       exact ⟨hrdb, hwdb, h, rfl, rfl, rfl⟩
     · have hne : C.type ≠ FD_INODE := by rw [h]; decide
-      have e : stpub = .open rb wb (.device C.major.toNat) := if_neg hne
+      have e : stpub = .open rb wb (.device C.major.toNat) := ite_eq_right hne
       rw [e]
       exact ⟨hrdb, hwdb, h, rfl⟩
   imodintro
@@ -434,7 +434,7 @@ theorem sys_open_publish [Icfg] [CurCtx] (omo : OffMode) (E : CoPset) (γ : File
   isplitr
   · ipureintro; exact hok
   unfold fileCore fileCoreNoff fileCoreOff
-  rw [if_neg hnp, if_pos hty]
+  rw [ite_eq_right hnp, ite_eq_left hty]
   simp only [pn']
   rw [← hip]
   iframe Hpay

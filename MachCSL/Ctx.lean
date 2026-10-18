@@ -88,11 +88,11 @@ theorem locksMap_get? : ∀ (l : List String) (s : String),
     simp only [locksMap]
     by_cases h : s' = s
     · subst h
-      rw [LawfulPartialMap.get?_insert_eq rfl, if_pos (List.mem_cons_self)]
+      rw [LawfulPartialMap.get?_insert_eq rfl, ite_eq_left (List.mem_cons_self)]
     · rw [LawfulPartialMap.get?_insert_ne h, locksMap_get? l s]
       by_cases hs : s ∈ l
-      · rw [if_pos hs, if_pos (List.mem_cons_of_mem _ hs)]
-      · rw [if_neg hs, if_neg (by simp [hs]; exact fun e => h e.symm)]
+      · rw [ite_eq_left hs, ite_eq_left (List.mem_cons_of_mem _ hs)]
+      · rw [ite_eq_right hs, ite_eq_right (by simp [hs]; exact fun e => h e.symm)]
 
 /-- Hart `cpu`'s held-lock authority: exactly the locks in `locks`. -/
 def lockSetAt (cpu : CPU) (locks : List String) : IProp GF :=
@@ -340,7 +340,7 @@ theorem lockSet_insert (cpu : CPU) (locks : List String) (s : String) (hs : s �
     lockSet cpu locks ⊢@{IProp GF} |==> (lockSet cpu (s :: locks) ∗ lkIn cpu s) := by
   unfold lockSet lockSetAt lkIn lkInAt
   iintro Ha
-  imod ghost_map_insert s () (by rw [locksMap_get?, if_neg hs]) $$ Ha with ⟨Ha, He⟩
+  imod ghost_map_insert s () (by rw [locksMap_get?, ite_eq_right hs]) $$ Ha with ⟨Ha, He⟩
   imodintro
   rw [show locksMap (s :: locks) = Iris.Std.PartialMap.insert (locksMap locks) s () from rfl]
   iframe Ha He
@@ -352,7 +352,7 @@ theorem locksMap_filter (locks : List String) (s : String) :
   rw [locksMap_get?]
   by_cases hk : k = s
   · subst hk
-    rw [LawfulPartialMap.get?_delete_eq rfl, if_neg]
+    rw [LawfulPartialMap.get?_delete_eq rfl, ite_eq_right]
     simp
   · rw [LawfulPartialMap.get?_delete_ne (Ne.symm hk), locksMap_get?]
     simp [hk]

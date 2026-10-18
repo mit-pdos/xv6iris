@@ -72,14 +72,14 @@ theorem echo_argv_bytes_of_redir (ws : List (List (BitVec 8))) (file : List (Bit
     have hle := wlOff_le_body ws 0 i (ws[i]!) (j + 1) hw (by unfold ushEchoAlen at hj; omega)
     unfold ushEchoOff at hle ⊢
     unfold ushsNulcut ushpSetb
-    rw [if_neg (by omega), wlCut_in ws (fun x => f (k + x)) len i (ws[i]!) j hw (by unfold ushEchoAlen at hj; exact hj)
+    rw [ite_eq_right (by omega), wlCut_in ws (fun x => f (k + x)) len i (ws[i]!) j hw (by unfold ushEchoAlen at hj; exact hj)
       (by omega), hbody _ (by omega)]
     exact (wlLta_app_l (wlBody ws) [wlNl] _ (by omega)).symm
   · have hw := lineOk_at ws i hok hi
     have hle := wlOff_le_body ws 0 i (ws[i]!) (ws[i]!).length hw (Nat.le_refl _)
     unfold ushEchoOff ushEchoAlen
     unfold ushsNulcut ushpSetb
-    rw [if_neg (by omega)]
+    rw [ite_eq_right (by omega)]
     exact wlCut_end ws (fun x => f (k + x)) len i (ws[i]!) hw
 
 /-! ## §3c The cat line -/

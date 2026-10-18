@@ -315,7 +315,7 @@ theorem catCat_loop (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (m0 : R
   iintro %h7 Hrun
   rw [h6a0, kcat_bge0]
   by_cases hle : ret.toInt ≤ 0
-  · rw [decide_eq_true hle, if_pos rfl,
+  · rw [decide_eq_true hle, ite_eq_left rfl,
       show BitVec.ofNat 64 0x2e + BitVec.signExtend 64 0x26#13 = BitVec.ofNat 64 0x54 from by decide]
     -- 0x54  bltz a0,0x6a
     ihave Hi := cat_uis N.t 0x54 false (.BTYPE (0x16#13, .Regidx 0#5, .Regidx 10#5, .BLT)) udec%
@@ -327,14 +327,14 @@ theorem catCat_loop (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (m0 : R
     rw [h6a0, kcat_blt0]
     by_cases hlt : ret.toInt < 0
     · -- the read failed: the read-error tail
-      rw [decide_eq_true hlt, if_pos rfl,
+      rw [decide_eq_true hlt, ite_eq_left rfl,
         show BitVec.ofNat 64 0x54 + BitVec.signExtend 64 0x16#13 = BitVec.ofNat 64 0x6a from by decide]
       icases Hpick with ⟨Hcr, -⟩
       iapply catCat_dieCr UL HF N h8 m6 n $$ [Hcr] Hc Hrun
       iapply Hcr
       ipureintro; exact hlt
     · -- end of file: the epilogue
-      rw [decide_eq_false hlt, if_neg (by decide), ukPc 0x54 0x58 false rfl]
+      rw [decide_eq_false hlt, ite_eq_right (by decide), ukPc 0x54 0x58 false rfl]
       icases Hpick with ⟨-, Hend, -⟩
       ihave HCend := Hend $$ []
       · ipureintro; omega
@@ -344,7 +344,7 @@ theorem catCat_loop (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (m0 : R
       iapply Hcont $$ %h9 %m9 %g [] HCend Hbuf Hrun
       ipureintro; exact hcs9
   · -- nb bytes: the write of the prefix the read filled
-    rw [decide_eq_false hle, if_neg (by decide), ukPc 0x2e 0x32 false rfl]
+    rw [decide_eq_false hle, ite_eq_right (by decide), ukPc 0x2e 0x32 false rfl]
     have hnb : ret.toInt = ((ret.toInt.toNat : Nat) : Int) := by omega
     have hret : BitVec.ofNat 64 ret.toInt.toNat = ret := kcat_ofNat_of_toInt ret _ hnb
     -- 0x32  c.mv a2,s1
@@ -413,13 +413,13 @@ theorem catCat_loop (UL : UK_LEAVES) (HF : CAT_FPRINTF) (N : UkNames GF) (m0 : R
     iintro %h13 Hrun
     rw [h11a0, h11s1]
     by_cases hw : wret = ret
-    · rw [show ukBtaken .BEQ wret ret = true from by simp [ukBtaken, hw], if_pos rfl,
+    · rw [show ukBtaken .BEQ wret ret = true from by simp [ukBtaken, hw], ite_eq_left rfl,
         show BitVec.ofNat 64 0x3c + BitVec.signExtend 64 0x1fe6#13 = BitVec.ofNat 64 0x22 from by decide]
       icases Hwp with ⟨HwI, -⟩
       ihave HI := HwI $$ []
       · ipureintro; rw [hret]; exact hw
       iapply IH $$ %h13 %m11 %g %hinv11 HI Hfr Hbuf Hrun Hcont
-    · rw [show ukBtaken .BEQ wret ret = false from by simp [ukBtaken, hw], if_neg (by decide),
+    · rw [show ukBtaken .BEQ wret ret = false from by simp [ukBtaken, hw], ite_eq_right (by decide),
         ukPc 0x3c 0x40 false rfl]
       icases Hwp with ⟨-, Hdg⟩
       iapply catCat_dieCw UL HF N h13 m11 n $$ [Hdg] Hc Hrun

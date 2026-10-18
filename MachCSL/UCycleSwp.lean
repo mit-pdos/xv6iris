@@ -400,11 +400,11 @@ theorem wpLoop_uwStep (hD : UcFoot D) (hW : UwFoot D) (hT : UcTickFoot D) (s : U
   iintro Hfr
   cases tick with
   | false =>
-    simp only [Bool.false_eq_true, if_false]
+    simp only [Bool.false_eq_true, ite_false]
     iapply swp_ret
     iapply HK $$ %_ %(ucClockAgree_refl _) Hfr
   | true =>
-    simp only [if_true]
+    simp only [ite_true]
     iapply swp_ucTick RF BF hT _ hmL
     iframe Hfr
     iintro %s' %ha Hfr

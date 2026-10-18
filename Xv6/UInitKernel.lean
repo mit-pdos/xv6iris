@@ -75,7 +75,7 @@ theorem initImgSub_of_elf (M : ElfMem) (h : uimgSub (elfImage User.Init.elf) M) 
   have hr := initArgvMap_range a b hab
   have hc : User.Init.code.byte a = none := by
     unfold User.USeg.byte
-    rw [initCode_vaddr, initCode_size, if_neg (by omega)]
+    rw [initCode_vaddr, initCode_size, ite_eq_right (by omega)]
   have hd : User.Init.data.byte a = some b := hab
   apply hf
   simp only [elfUnion, hc, hd]

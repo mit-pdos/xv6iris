@@ -113,15 +113,15 @@ theorem procsInv_alloc_slot [X : CurCtx] (hT : curTier = KTier.kpt) (cpu : CPU) 
   iframe Hst Hch
   isplitl [Hp1 Hp2 Hso]
   · unfold pstateLock
-    rw [if_pos (show unclaimed UNUSED by decide), occBit_unused]
+    rw [ite_eq_left (show unclaimed UNUSED by decide), occBit_unused]
     iframe Hp1 Hp2 Hso
   isplitl [Hpub]
   · iexists kl, xs, pid
     iexact Hpub
   unfold procSlotsAt
-  rw [if_neg (show ¬ needsCtx UNUSED by decide), if_neg (show ¬ isRunning UNUSED by decide),
-    if_pos (show invDormant UNUSED by decide), if_pos (show notRunning UNUSED by decide),
-    if_neg (show ¬ UNUSED = ZOMBIE by decide)]
+  rw [ite_eq_right (show ¬ needsCtx UNUSED by decide), ite_eq_right (show ¬ isRunning UNUSED by decide),
+    ite_eq_left (show invDormant UNUSED by decide), ite_eq_left (show notRunning UNUSED by decide),
+    ite_eq_right (show ¬ UNUSED = ZOMBIE by decide)]
   iframe Hdorm Hhart Hpav Hzs
 
 /-- The seals threaded over the first `n` slots. -/

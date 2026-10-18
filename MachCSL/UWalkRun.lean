@@ -71,22 +71,22 @@ theorem uwk_congr (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (m m' : SailM X
 theorem uwk_ite_pos (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (c : Prop) (inst : Decidable c)
     (a b : SailM X) (r : Option (X × UWSt × UOrc)) (hc : c) (h : runRW D orc s a = r) :
     runRW D orc s (@ite _ c inst a b) = r := by
-  rw [if_pos hc]; exact h
+  rw [ite_eq_left hc]; exact h
 
 theorem uwk_ite_neg (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (c : Prop) (inst : Decidable c)
     (a b : SailM X) (r : Option (X × UWSt × UOrc)) (hc : ¬ c) (h : runRW D orc s b = r) :
     runRW D orc s (@ite _ c inst a b) = r := by
-  rw [if_neg hc]; exact h
+  rw [ite_eq_right hc]; exact h
 
 theorem uwk_dite_pos (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (c : Prop) (inst : Decidable c)
     (a : c → SailM X) (b : ¬ c → SailM X) (r : Option (X × UWSt × UOrc)) (hc : c)
     (h : runRW D orc s (a hc) = r) : runRW D orc s (@dite _ c inst a b) = r := by
-  rw [dif_pos hc]; exact h
+  rw [dite_eq_left hc]; exact h
 
 theorem uwk_dite_neg (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (c : Prop) (inst : Decidable c)
     (a : c → SailM X) (b : ¬ c → SailM X) (r : Option (X × UWSt × UOrc)) (hc : ¬ c)
     (h : runRW D orc s (b hc) = r) : runRW D orc s (@dite _ c inst a b) = r := by
-  rw [dif_neg hc]; exact h
+  rw [dite_eq_right hc]; exact h
 
 theorem uwk_error (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (e : Sail.Error exception)
     (k : Empty → SailM X) :
@@ -106,13 +106,13 @@ theorem uwk_rr_any (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (r : Register)
     (k : RegisterType r → SailM X) (res : Option (X × UWSt × UOrc))
     (hd : D.Dr r = false) (ha : D.Dany r = true) (h : runRW D orc.tail s (k ((orc 0).reg r)) = res) :
     runRW D orc s (FreeM.impure (.ok (.regRead r)) k) = res := by
-  rw [← h]; simp only [runRW, hd, ha, if_true, Bool.false_eq_true, if_false]
+  rw [← h]; simp only [runRW, hd, ha, ite_true, Bool.false_eq_true, ite_false]
 
 theorem uwk_rw (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (r : Register) (v : RegisterType r)
     (k : PUnit → SailM X) (res : Option (X × UWSt × UOrc))
     (hd : D.Dw r = true) (h : runRW D orc (UWSt.mk (s.pin.set r v) s.rs s.mm s.rv) (k ()) = res) :
     runRW D orc s (FreeM.impure (.ok (.regWrite r v)) k) = res := by
-  rw [← h]; simp only [runRW, hd, if_true]
+  rw [← h]; simp only [runRW, hd, ite_true]
 
 theorem uwk_mrd (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat)
     (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
@@ -201,8 +201,8 @@ theorem uwk_ite_merge (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (c : Prop) 
     (ha : c → runRW D orc s a = some (x1, s', orc')) (hb : ¬ c → runRW D orc s b = some (x2, s', orc')) :
     runRW D orc s (@ite _ c inst a b) = some (@ite X c inst x1 x2, s', orc') := by
   by_cases hc : c
-  · rw [if_pos hc, if_pos hc]; exact ha hc
-  · rw [if_neg hc, if_neg hc]; exact hb hc
+  · rw [ite_eq_left hc, ite_eq_left hc]; exact ha hc
+  · rw [ite_eq_right hc, ite_eq_right hc]; exact hb hc
 
 /-! ## The stepper -/
 

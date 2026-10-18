@@ -296,7 +296,7 @@ theorem itrunc_join (IU : IUPDATE) (Γ : SchedNames) [ClaimIs GF Γ]
   · ipureintro
     refine ⟨fun x hx => List.mem_cons_of_mem _ (hsub x hx), List.mem_cons_self,
       fun hw => List.mem_cons_of_mem _ (hwb hw), hcw, ?_, ?_⟩ <;>
-      cases cru <;> simp only [itIu, if_true, if_false, Bool.false_eq_true] <;> omega
+      cases cru <;> simp only [itIu, ite_true, ite_false, Bool.false_eq_true] <;> omega
   · iexact H
 
 end

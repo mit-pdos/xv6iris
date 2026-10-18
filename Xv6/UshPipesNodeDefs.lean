@@ -287,7 +287,7 @@ theorem rcrf_of (k : Nat) (st0 : FdState) (γp : PipeNames) (hk : k < D.nc) :
       osP (D.gF k) -∗ rtok (D.P k) -∗ sideR (D.P k) -∗ below D k -∗ RcRf D k st0 γp := by
   unfold RcRf
   by_cases hlast : k + 1 = D.nc
-  · rw [if_pos hlast]
+  · rw [ite_eq_left hlast]
     iintro #Hinv #Hsk #Hinvs HF Hr HsR Hbel
     ihave Hbel := (below_last D k hlast).mp $$ Hbel
     unfold halvesN
@@ -300,7 +300,7 @@ theorem rcrf_of (k : Nat) (st0 : FdState) (γp : PipeNames) (hk : k < D.nc) :
     unfold PdRound.pinv
     iexists γp
     iexact Hinv
-  · rw [if_neg hlast]
+  · rw [ite_eq_right hlast]
     iintro #Hinv #Hsk #Hinvs HF Hr HsR Hbel
     ihave ⟨Hn, Hbel⟩ := (below_cons D k (by omega)).mp $$ Hbel
     unfold nraw nknow rtok

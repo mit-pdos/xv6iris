@@ -403,24 +403,24 @@ theorem pstateWhole_split (Γ : SchedNames) (pa : BitVec 64) (st : BitVec 32) :
   unfold pstateWhole pstateLock pstateAtHlf
   constructor
   · by_cases hu : unclaimed st
-    · rw [if_pos hu, if_pos hu]
+    · rw [ite_eq_left hu, ite_eq_left hu]
       iintro ⟨H, Hs⟩
       icases hs $$ H with ⟨H1, H2⟩
       isplitl [H1 H2 Hs]
       · iframe H1 H2 Hs
       · iempintro
-    · rw [if_neg hu, if_neg hu]
+    · rw [ite_eq_right hu, ite_eq_right hu]
       iintro ⟨H, Hs⟩
       icases hs $$ H with ⟨H1, H2⟩
       isplitl [H1 Hs]
       · iframe H1 Hs
       · iexact H2
   · by_cases hu : unclaimed st
-    · rw [if_pos hu, if_pos hu]
+    · rw [ite_eq_left hu, ite_eq_left hu]
       iintro ⟨⟨H1, H2, Hs⟩, _⟩
       iframe Hs
       iapply hj $$ [$H1 $H2]
-    · rw [if_neg hu, if_neg hu]
+    · rw [ite_eq_right hu, ite_eq_right hu]
       iintro ⟨⟨H1, _, Hs⟩, H2⟩
       iframe Hs
       iapply hj $$ [$H1 $H2]
@@ -731,7 +731,7 @@ theorem procHeldAt_live_cases (Γ : SchedNames) (ξ : CtxId) (h : CPU) (j : Nat)
         @wordPointsTo GF _ ⟨ξ, KTier.kpt⟩ (pChan (procAddr j)) 8 (DFrac.own 1) ch ∗
         @procPubRest GF _ ⟨ξ, KTier.kpt⟩ _ _ (procAddr j) kl xs pid) ∗ zsElem (procAddr j) none := by
   have h := procHeldAt_gen_cases (GF := GF) Γ ξ h j st ch
-  rw [if_pos hz] at h
+  rw [ite_eq_left hz] at h
   exact h
 
 theorem procHeldAt_live_intro (Γ : SchedNames) (ξ : CtxId) (h : CPU) (j : Nat) (st : BitVec 32)
@@ -742,7 +742,7 @@ theorem procHeldAt_live_intro (Γ : SchedNames) (ξ : CtxId) (h : CPU) (j : Nat)
       @procPubRest GF _ ⟨ξ, KTier.kpt⟩ _ _ (procAddr j) kl xs pid ∗ zsElem (procAddr j) none ⊢
       procHeldAt Γ ξ h j st ch := by
   have h := procHeldAt_gen_intro (GF := GF) Γ ξ h j st ch kl xs pid
-  rw [if_pos hz] at h
+  rw [ite_eq_left hz] at h
   exact h
 
 theorem procHeldAt_cases (Γ : SchedNames) (ξ : CtxId) (h : CPU) (j : Nat) (st : BitVec 32)
@@ -754,7 +754,7 @@ theorem procHeldAt_cases (Γ : SchedNames) (ξ : CtxId) (h : CPU) (j : Nat) (st 
         @wordPointsTo GF _ ⟨ξ, KTier.kpt⟩ (pChan (procAddr j)) 8 (DFrac.own 1) ch ∗
         @procPubRest GF _ ⟨ξ, KTier.kpt⟩ _ _ (procAddr j) kl xs pid := by
   unfold procHeldAt procPub procPubRest
-  rw [if_neg hr]
+  rw [ite_eq_right hr]
   iintro ⟨Hl, Hp, H, -⟩
   iframe Hl Hp
   iexact H
@@ -767,7 +767,7 @@ theorem procHeldAt_intro (Γ : SchedNames) (ξ : CtxId) (h : CPU) (j : Nat) (st 
       @procPubRest GF _ ⟨ξ, KTier.kpt⟩ _ _ (procAddr j) kl xs pid ⊢
       procHeldAt Γ ξ h j st ch := by
   unfold procHeldAt procPub procPubRest
-  rw [if_neg hr]
+  rw [ite_eq_right hr]
   iintro ⟨Hl, Hp, Hs, Hc, Hr⟩
   iframe Hl Hp
   isplitl [Hs Hc Hr]
@@ -784,7 +784,7 @@ def parkPayAt (ξ : CtxId) (pa : BitVec 64) (st : BitVec 32) : IProp GF :=
 theorem parkPay_live (ξ : CtxId) (pa : BitVec 64) (st : BitVec 32) (h : ¬ invDormant st) :
     ⊢ parkPayAt (GF := GF) ξ pa st := by
   unfold parkPayAt
-  rw [if_neg h]
+  rw [ite_eq_right h]
   iempintro
 
 theorem parkPay_needsCtx (ξ : CtxId) (pa : BitVec 64) (st : BitVec 32) (h : needsCtx st) :
@@ -874,9 +874,9 @@ instance instCtxMorphDormantSpace (tier : KTier) (st : BitVec 32) (V : ProcPriv)
     CtxMorph (GF := GF) (fun ξ => @dormantSpace GF _ ⟨ξ, tier⟩ st V pid) := by
   unfold dormantSpace
   by_cases h : st = UNUSED
-  · simp only [if_pos h]
+  · simp only [ite_eq_left h]
     exact @instCtxMorphSep GF _ _ _ (instCtxMorphConst _) (MachCSL.instCtxMorphStackOwn _ _ _)
-  · simp only [if_neg h]
+  · simp only [ite_eq_right h]
     exact @instCtxMorphExists GF _ _ _
       (fun _ => @instCtxMorphSep GF _ _ _ (instCtxMorphConst _)
         (@instCtxMorphSep GF _ _ _ (instCtxMorphProcPtAt _ _ _)
@@ -1021,8 +1021,8 @@ instance instCtxMorphParkPay (pa : BitVec 64) (st : BitVec 32) :
     CtxMorph (GF := GF) (fun ξ => parkPayAt ξ pa st) := by
   unfold parkPayAt
   by_cases h : invDormant st
-  · simp only [if_pos h]; exact instCtxMorphProcDormantNoctx _ _ _
-  · simp only [if_neg h]; exact instCtxMorphConst _
+  · simp only [ite_eq_left h]; exact instCtxMorphProcDormantNoctx _ _ _
+  · simp only [ite_eq_right h]; exact instCtxMorphConst _
 
 instance instCtxMorphProcPubRest (tier : KTier) (pa : BitVec 64) (kl xs pid : BitVec 32) :
     CtxMorph (GF := GF) (fun ξ => @procPubRest GF _ ⟨ξ, tier⟩ _ _ pa kl xs pid) :=
@@ -1312,22 +1312,22 @@ def pavSlot (Γ : SchedNames) (pa : BitVec 64) (st : BitVec 32) : IProp GF := ip
 omit [MachGS GF] in
 theorem pavSlot_used (Γ : SchedNames) (pa : BitVec 64) (st : BitVec 32) (h : ¬ isUnused st) :
     pavSlot (GF := GF) Γ pa st ⊢ slotUsed Γ pa := by
-  unfold pavSlot; rw [if_neg h]
+  unfold pavSlot; rw [ite_eq_right h]
 
 omit [MachGS GF] in
 theorem pavSlot_intro (Γ : SchedNames) (pa : BitVec 64) (st : BitVec 32) (h : ¬ isUnused st) :
     slotUsed (GF := GF) Γ pa ⊢ pavSlot Γ pa st := by
-  unfold pavSlot; rw [if_neg h]
+  unfold pavSlot; rw [ite_eq_right h]
 
 omit [MachGS GF] in
 theorem pavSlot_unused_elim (Γ : SchedNames) (pa : BitVec 64) :
     pavSlot (GF := GF) Γ pa UNUSED ⊢ slotFree Γ pa ∨ slotUsed Γ pa := by
-  unfold pavSlot; rw [if_pos (show isUnused UNUSED from rfl)]
+  unfold pavSlot; rw [ite_eq_left (show isUnused UNUSED from rfl)]
 
 omit [MachGS GF] in
 theorem pavSlot_unused_intro (Γ : SchedNames) (pa : BitVec 64) :
     (slotFree (GF := GF) Γ pa ∨ slotUsed Γ pa) ⊢ pavSlot Γ pa UNUSED := by
-  unfold pavSlot; rw [if_pos (show isUnused UNUSED from rfl)]
+  unfold pavSlot; rw [ite_eq_left (show isUnused UNUSED from rfl)]
 
 omit [MachGS GF] in
 theorem pavSlot_unused_of_used (Γ : SchedNames) (pa : BitVec 64) :
@@ -1376,17 +1376,17 @@ instance instCtxMorphProcSlotsAt (Γ : SchedNames) (pa : BitVec 64) (st : BitVec
     (@instCtxMorphSep GF _ _ _ ?_ (@instCtxMorphSep GF _ _ _ ?_
       (@instCtxMorphSep GF _ _ _ (instCtxMorphConst _) (instCtxMorphConst _)))))
   · by_cases h : needsCtx st
-    · simp only [if_pos h]; exact instCtxMorphProcCtxAt _ _
-    · simp only [if_neg h]; exact instCtxMorphConst _
+    · simp only [ite_eq_left h]; exact instCtxMorphProcCtxAt _ _
+    · simp only [ite_eq_right h]; exact instCtxMorphConst _
   · by_cases h : isRunning st
-    · simp only [if_pos h]; exact instCtxMorphRunSlotAt _ _
-    · simp only [if_neg h]; exact instCtxMorphConst _
+    · simp only [ite_eq_left h]; exact instCtxMorphRunSlotAt _ _
+    · simp only [ite_eq_right h]; exact instCtxMorphConst _
   · by_cases h : invDormant st
-    · simp only [if_pos h]; exact instCtxMorphProcDormant _ _ _
-    · simp only [if_neg h]; exact instCtxMorphConst _
+    · simp only [ite_eq_left h]; exact instCtxMorphProcDormant _ _ _
+    · simp only [ite_eq_right h]; exact instCtxMorphConst _
   · by_cases h : notRunning st
-    · simp only [if_pos h]; exact instCtxMorphConst _
-    · simp only [if_neg h]; exact instCtxMorphConst _
+    · simp only [ite_eq_left h]; exact instCtxMorphConst _
+    · simp only [ite_eq_right h]; exact instCtxMorphConst _
 
 /-- A state change that moves no resource. -/
 theorem procSlots_recast (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) (st st' : BitVec 32)
@@ -1400,25 +1400,25 @@ theorem procSlots_recast (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) (st st
   have e1 : (if needsCtx st' then procCtxAt (GF := GF) Γ ξl pa else iprop(emp)) =
       (if needsCtx st then procCtxAt Γ ξl pa else iprop(emp)) := by
     by_cases h : needsCtx st
-    · rw [if_pos h, if_pos (hn.2 h)]
-    · rw [if_neg h, if_neg (show ¬ needsCtx st' from fun hc => h (hn.1 hc))]
+    · rw [ite_eq_left h, ite_eq_left (hn.2 h)]
+    · rw [ite_eq_right h, ite_eq_right (show ¬ needsCtx st' from fun hc => h (hn.1 hc))]
   have e2 : (if isRunning st' then runSlotAt (GF := GF) Γ ξl pa else iprop(emp)) =
       (if isRunning st then runSlotAt Γ ξl pa else iprop(emp)) := by
     by_cases h : isRunning st
-    · rw [if_pos h, if_pos (hir.2 h)]
-    · rw [if_neg h, if_neg (show ¬ isRunning st' from fun hc => h (hir.1 hc))]
+    · rw [ite_eq_left h, ite_eq_left (hir.2 h)]
+    · rw [ite_eq_right h, ite_eq_right (show ¬ isRunning st' from fun hc => h (hir.1 hc))]
   have e4 : (if notRunning st' then hartAtAny (GF := GF) Γ pa else iprop(emp)) =
       (if notRunning st then hartAtAny Γ pa else iprop(emp)) := by
     by_cases h : notRunning st
-    · rw [if_pos h, if_pos (hr.2 h)]
-    · rw [if_neg h, if_neg (show ¬ notRunning st' from fun hc => h (hr.1 hc))]
+    · rw [ite_eq_left h, ite_eq_left (hr.2 h)]
+    · rw [ite_eq_right h, ite_eq_right (show ¬ notRunning st' from fun hc => h (hr.1 hc))]
   have e5 : pavSlot (GF := GF) Γ pa st' = pavSlot Γ pa st := by
     unfold pavSlot
-    rw [if_neg (not_isUnused_of_not_invDormant hd'), if_neg (not_isUnused_of_not_invDormant hd)]
+    rw [ite_eq_right (not_isUnused_of_not_invDormant hd'), ite_eq_right (not_isUnused_of_not_invDormant hd)]
   have hz : ¬ st = ZOMBIE := fun h => hd (Or.inr h)
   have hz' : ¬ st' = ZOMBIE := fun h => hd' (Or.inr h)
   unfold procSlotsAt
-  rw [e1, e2, e4, e5, if_neg hd, if_neg hd', if_neg hz, if_neg hz']
+  rw [e1, e2, e4, e5, ite_eq_right hd, ite_eq_right hd', ite_eq_right hz, ite_eq_right hz']
 
 /-- The scheduler's dispatch: a slot that owns a record hands it over
 together with the whole hart tag. -/
@@ -1426,9 +1426,9 @@ theorem procSlots_dispatch (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) (st 
     (hn : needsCtx st) :
     procSlotsAt (GF := GF) Γ ξl pa st ⊢ procCtxAt Γ ξl pa ∗ hartAtAny Γ pa ∗ zsElem pa none := by
   unfold procSlotsAt
-  rw [if_pos hn, if_neg (needsCtx_not_isRunning hn), if_neg (needsCtx_not_invDormant hn),
-    if_pos (needsCtx_notRunning hn),
-    if_neg (fun h => needsCtx_not_invDormant hn (Or.inr h))]
+  rw [ite_eq_left hn, ite_eq_right (needsCtx_not_isRunning hn), ite_eq_right (needsCtx_not_invDormant hn),
+    ite_eq_left (needsCtx_notRunning hn),
+    ite_eq_right (fun h => needsCtx_not_invDormant hn (Or.inr h))]
   iintro ⟨H1, _, _, H4, _, H6⟩
   iframe
 
@@ -1444,19 +1444,19 @@ theorem procSlots_park_gen (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) (st 
   have hnu : ¬ isUnused st := not_isUnused_of_parkOk hst
   have hzh := parkOk_zsHeld hst
   unfold procSlotsAt parkPayAt pavSlot
-  rw [if_neg hnu]
+  rw [ite_eq_right hnu]
   rcases hst.1 with hn | hz
-  · rw [if_pos hn, if_pos hn, if_neg (needsCtx_not_isRunning hn),
-      if_neg (needsCtx_not_invDormant hn), if_pos (needsCtx_notRunning hn),
-      if_neg (needsCtx_not_invDormant hn),
-      if_neg (fun h => needsCtx_not_invDormant hn (Or.inr h)), if_pos (hzh.2 hn)]
+  · rw [ite_eq_left hn, ite_eq_left hn, ite_eq_right (needsCtx_not_isRunning hn),
+      ite_eq_right (needsCtx_not_invDormant hn), ite_eq_left (needsCtx_notRunning hn),
+      ite_eq_right (needsCtx_not_invDormant hn),
+      ite_eq_right (fun h => needsCtx_not_invDormant hn (Or.inr h)), ite_eq_left (hzh.2 hn)]
     iintro ⟨Hu, H1, H2, _, Hz⟩
     iframe H1 H2 Hu Hz
   · subst hz
-    rw [if_neg (by decide : ¬ needsCtx ZOMBIE), if_neg (by decide : ¬ needsCtx ZOMBIE),
-      if_neg (by decide : ¬ isRunning ZOMBIE), if_pos (by decide : invDormant ZOMBIE),
-      if_pos (by decide : notRunning ZOMBIE), if_pos (by decide : invDormant ZOMBIE), if_pos rfl,
-      if_neg (by decide : ¬ zsHeld ZOMBIE)]
+    rw [ite_eq_right (by decide : ¬ needsCtx ZOMBIE), ite_eq_right (by decide : ¬ needsCtx ZOMBIE),
+      ite_eq_right (by decide : ¬ isRunning ZOMBIE), ite_eq_left (by decide : invDormant ZOMBIE),
+      ite_eq_left (by decide : notRunning ZOMBIE), ite_eq_left (by decide : invDormant ZOMBIE), ite_eq_left rfl,
+      ite_eq_right (by decide : ¬ zsHeld ZOMBIE)]
     iintro ⟨Hu, Hc, Htag, Hpay, -⟩
     isplitl []
     · iempintro
@@ -1483,7 +1483,7 @@ theorem procSlots_park_gen' (Γ : SchedNames) (ξl : CtxId) (n : Nat) (hn : n < 
     simp only [reduceIte]
     iintro ⟨Hu, ⟨%ξo, Htok, Hvc⟩, Htag, Hpay, Hz⟩
     iapply (procSlots_park_gen Γ ξl (procAddr n) st hpark)
-    rw [if_pos hnc]
+    rw [ite_eq_left hnc]
     iframe Hu Hz
     isplitl [Htok Hvc]
     · iapply procCtx_of_tok Γ ξl ξo (procAddr n) $$ [$Htok $Hvc]
@@ -1491,10 +1491,10 @@ theorem procSlots_park_gen' (Γ : SchedNames) (ξl : CtxId) (n : Nat) (hn : n < 
     · iapply hartAtAny_intro Γ n h hn $$ Htag
     · iexact Hpay
   · rw [decide_eq_false hnc]
-    simp only [Bool.false_eq_true, if_false]
+    simp only [Bool.false_eq_true, ite_false]
     iintro ⟨Hu, Hc, Htag, Hpay, Hz⟩
     iapply (procSlots_park_gen Γ ξl (procAddr n) st hpark)
-    rw [if_neg hnc]
+    rw [ite_eq_right hnc]
     iframe Hu Hz
     isplitl [Hc]
     · iexact Hc
@@ -1511,15 +1511,15 @@ theorem procSlots_running (Γ : SchedNames) (ξl : CtxId) (j : Nat) (h : CPU) (s
       ▷ schedVcAt Γ h (cpuCtxAddr h) (procAddr j) ∗ zsElem (procAddr j) none := by
   unfold procSlotsAt
   by_cases hnr : notRunning st
-  · rw [if_pos hnr]
+  · rw [ite_eq_left hnr]
     iintro ⟨Hhlf, _, _, _, Hany, _, _⟩
     icases hartAtAny_elim Γ j hj $$ Hany with ⟨%h', Hfull⟩
     iexfalso
     iapply hart_excl Γ j h h' $$ [$Hhlf $Hfull]
   · have hrun : st = RUNNING := isRunning_of_not_notRunning hnr
     subst hrun
-    rw [if_neg (by decide : ¬ needsCtx RUNNING), if_pos (by decide : isRunning RUNNING),
-      if_neg (by decide : ¬ invDormant RUNNING), if_neg hnr, if_neg (by decide : ¬ RUNNING = ZOMBIE)]
+    rw [ite_eq_right (by decide : ¬ needsCtx RUNNING), ite_eq_left (by decide : isRunning RUNNING),
+      ite_eq_right (by decide : ¬ invDormant RUNNING), ite_eq_right hnr, ite_eq_right (by decide : ¬ RUNNING = ZOMBIE)]
     unfold runSlotAt
     iintro ⟨Hhlf, _, ⟨Hcells, %h', Hhlf', Hvc⟩, _, _, _, Hz⟩
     ihave Hhlf' := hartAt_elim Γ j (1 : Qp).half h' hj $$ Hhlf'
@@ -1537,9 +1537,9 @@ theorem procSlots_running_intro (Γ : SchedNames) (ξl : CtxId) (j : Nat) (h : C
       ▷ schedVcAt Γ h (cpuCtxAddr h) (procAddr j) ∗ zsElem (procAddr j) none ⊢
       procSlotsAt Γ ξl (procAddr j) RUNNING := by
   unfold procSlotsAt runSlotAt pavSlot
-  rw [if_neg (by decide : ¬ needsCtx RUNNING), if_pos (by decide : isRunning RUNNING),
-    if_neg (by decide : ¬ invDormant RUNNING), if_neg (by decide : ¬ notRunning RUNNING),
-    if_neg (by decide : ¬ isUnused RUNNING), if_neg (by decide : ¬ RUNNING = ZOMBIE)]
+  rw [ite_eq_right (by decide : ¬ needsCtx RUNNING), ite_eq_left (by decide : isRunning RUNNING),
+    ite_eq_right (by decide : ¬ invDormant RUNNING), ite_eq_right (by decide : ¬ notRunning RUNNING),
+    ite_eq_right (by decide : ¬ isUnused RUNNING), ite_eq_right (by decide : ¬ RUNNING = ZOMBIE)]
   iintro ⟨Hu, Hhlf, Hcells, Hvc, Hz⟩
   isplitl []
   · iempintro

@@ -73,8 +73,8 @@ theorem pool_valid (B : Nat → Prop) (w : Nat → X) : ✓ pool B w := by
   intro d
   unfold pool
   by_cases h : B d
-  · rw [if_pos h]; trivial
-  · rw [if_neg h]; exact dfa_valid (w d)
+  · rw [ite_eq_left h]; trivial
+  · rw [ite_eq_right h]; exact dfa_valid (w d)
 
 /-- **Rocq `*_pool_take`** (deviation 1). -/
 theorem pool_take (B : Nat → Prop) (w : Nat → X) (d : Nat) (hd : ¬ B d) :
@@ -84,13 +84,13 @@ theorem pool_take (B : Nat → Prop) (w : Nat → X) (d : Nat) (hd : ¬ B d) :
   unfold pool single
   by_cases hx : x = d
   · subst hx
-    rw [if_neg hd, if_pos (Or.inl rfl), discreteFunSingleton_self]
+    rw [ite_eq_right hd, ite_eq_left (Or.inl rfl), discreteFunSingleton_self]
     rfl
   · rw [discreteFunSingleton_of_ne _ (Ne.symm hx)]
     have e : (x = d ∨ B x) ↔ B x := ⟨fun h => h.resolve_left hx, Or.inr⟩
     by_cases hb : B x
-    · rw [if_pos hb, if_pos (e.2 hb)]; rfl
-    · rw [if_neg hb, if_neg (fun h => hb (e.1 h))]; rfl
+    · rw [ite_eq_left hb, ite_eq_left (e.2 hb)]; rfl
+    · rw [ite_eq_right hb, ite_eq_right (fun h => hb (e.1 h))]; rfl
 
 /-- **Rocq `*_pool_ext`**. -/
 theorem pool_ext (B B' : Nat → Prop) (w w' : Nat → X) (hB : ∀ x, B x ↔ B' x)
@@ -98,8 +98,8 @@ theorem pool_ext (B B' : Nat → Prop) (w w' : Nat → X) (hB : ∀ x, B x ↔ B
   funext x
   unfold pool
   by_cases h : B x
-  · rw [if_pos h, if_pos ((hB x).1 h)]
-  · rw [if_neg h, if_neg (fun h' => h ((hB x).2 h')), hw x h]
+  · rw [ite_eq_left h, ite_eq_left ((hB x).1 h)]
+  · rw [ite_eq_right h, ite_eq_right (fun h' => h ((hB x).2 h')), hw x h]
 
 /-- **Rocq `*_pool_update`**: the pool's free values move at will. -/
 theorem pool_update (B : Nat → Prop) (w : Nat → X) (v : X) :
@@ -108,8 +108,8 @@ theorem pool_update (B : Nat → Prop) (w : Nat → X) (v : X) :
   intro a
   unfold pool
   by_cases h : B a
-  · rw [if_pos h, if_pos h]; exact Update.id
-  · rw [if_neg h, if_neg h]
+  · rw [ite_eq_left h, ite_eq_left h]; exact Update.id
+  · rw [ite_eq_right h, ite_eq_right h]
     exact Update.option _ _ (Update.exclusive (dfa_valid v))
 
 /-- Two singletons at one number combine. -/
@@ -195,7 +195,7 @@ theorem pool_give (γ : GName) (vs : RegMapF X) (wv : Nat → X) (d : Nat) (x : 
     simp [this]
   have e1 := pool_ext _ _ wv _ hB hw
   have e2 := pool_take (PartialMap.dom (PartialMap.delete vs d)) (fun y => if y = d then x else wv y) d hnd
-  have e3 : (if d = d then x else wv d) = x := if_pos rfl
+  have e3 : (if d = d then x else wv d) = x := ite_eq_left rfl
   rw [e3] at e2
   unfold tok
   rw [e1, e2]

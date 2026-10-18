@@ -63,9 +63,9 @@ theorem ukRetire_btype (imm : BitVec 13) (rs2 rs1 : BitVec 5) (op : bop)
   rw [hr1 rs1, hr1 rs2, hpc1] at hw
   refine ⟨_, orc, uke_uxRun_of_runRW hl1 _ orc _ hw, ?_⟩
   cases ht : ukBtaken op (m.get rs1) (m.get rs2)
-  · rw [if_neg Bool.false_ne_true, if_neg Bool.false_ne_true]
+  · rw [ite_eq_right Bool.false_ne_true, ite_eq_right Bool.false_ne_true]
     exact hn1 ▸ uke_post_self hl1 hr1 hv1
-  · rw [if_pos rfl, if_pos rfl]
+  · rw [ite_eq_left rfl, ite_eq_left rfl]
     exact uke_post_npc hl1 hr1 hv1 _
 
 theorem ukTrap_ecall : UkExecTrap C P T (.ECALL ()) len m pc V (.E_U_EnvCall ()) := by

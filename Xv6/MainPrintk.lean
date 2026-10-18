@@ -191,7 +191,7 @@ theorem mn_console (CN : CONSOLEINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegM
   simp only [KCtx.withRegs_sie, KCtx.withRegs_proc, hsie]
   iapply wpNext_off_intro
   iintro %R' Hk Hpc %_ Hnm Hfr Hp0 Hp1 #Htbl
-  simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, if_pos, mn_ret_46]
+  simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, ite_eq_left, mn_ret_46]
   unfold uartinitonePost
   icases Hp0 with ⟨Htx0, #Hdo0, ⟨%kk0, %hla0, Hrt0, %hfl0⟩, Hn0, Hf0⟩
   icases Hp1 with ⟨Htx1, #Hdo1, ⟨%kk1, %hla1, Hrt1, -⟩, Hn1, Hf1⟩
@@ -310,7 +310,7 @@ theorem mn_prinit (PI : PRINTKINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap
   simp only [KCtx.withRegs_sie, KCtx.withRegs_proc, hsie]
   iapply wpNext_off_intro
   iintro %R' Hk Hpc Hli %_
-  simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, if_pos, mn_ret_4a]
+  simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, ite_eq_left, mn_ret_4a]
   icases (show lockInited (GF := GF) prLock prNameAddr ⊢
       wordPointsTo (prLock + 8#64) 8 (DFrac.own 1) prNameAddr ∗ lkFresh prLock from by
     unfold lockInited; iintro H; iexact H) $$ Hli with ⟨-, Hprf⟩

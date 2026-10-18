@@ -165,7 +165,7 @@ theorem wp_kinit_main_loop (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
           (fun _ => by decide) $$ Hi Hrun
         inext
         iintro %hp2 Hrun
-        rw [hbt, if_pos rfl, show BitVec.ofNat 64 0x3e + BitVec.signExtend 64 0x46#13 = BitVec.ofNat 64 0x84
+        rw [hbt, ite_eq_left rfl, show BitVec.ofNat 64 0x3e + BitVec.signExtend 64 0x46#13 = BitVec.ofNat 64 0x84
           from by decide]
         ihave Hpay := hpayfree
         ihave Hstd := ustdOk_ustd T N.fd l $$ Hstd
@@ -178,7 +178,7 @@ theorem wp_kinit_main_loop (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
           (fun h => by rw [hbt] at h; exact absurd h (by decide)) $$ Hi Hrun
         inext
         iintro %hp2 Hrun
-        rw [hbt, if_neg (by decide), ukPc 0x3e 0x42 false rfl]
+        rw [hbt, ite_eq_right (by decide), ukPc 0x3e 0x42 false rfl]
         -- 0x42  c.beqz a0,0x96 -- not taken
         ihave Hi := init_uis N.t 0x42 true (.BTYPE (0x54#13, .Regidx 0#5, .Regidx 10#5, .BEQ)) udec%
           (by decide) $$ Hc
@@ -190,7 +190,7 @@ theorem wp_kinit_main_loop (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
           (fun h => by rw [hbz] at h; exact absurd h (by decide)) $$ Hi Hrun
         inext
         iintro %hp3 Hrun
-        rw [hbz, if_neg (by decide), ukPc 0x42 0x44 true rfl]
+        rw [hbz, ite_eq_right (by decide), ukPc 0x42 0x44 true rfl]
         icases IH with ⟨-, IH2⟩
         unfold kinitWaitHead
         iapply IH2 $$ %hp3 %mp1 %(Sc ∪ {γc}) %γ %γc %pidv [] [] [] [] Hsz [Hstd] Hcwd Hch Htok Hrun
@@ -227,7 +227,7 @@ theorem wp_kinit_main_loop (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
         (fun h => by rw [hbt] at h; exact absurd h (by decide)) $$ Hi Hrun
       inext
       iintro %hc2 Hrun
-      rw [hbt, if_neg (by decide), ukPc 0x3e 0x42 false rfl]
+      rw [hbt, ite_eq_right (by decide), ukPc 0x3e 0x42 false rfl]
       -- 0x42  c.beqz a0,0x96 -- TAKEN: this is the child
       ihave Hi := init_uis N'.t 0x42 true (.BTYPE (0x54#13, .Regidx 0#5, .Regidx 10#5, .BEQ)) udec%
         (by decide) $$ Hc'
@@ -236,7 +236,7 @@ theorem wp_kinit_main_loop (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
         (fun _ => by decide) $$ Hi Hrun
       inext
       iintro %hc3 Hrun
-      rw [hbz, if_pos rfl, show BitVec.ofNat 64 0x42 + BitVec.signExtend 64 0x54#13 = BitVec.ofNat 64 0x96
+      rw [hbz, ite_eq_left rfl, show BitVec.ofNat 64 0x42 + BitVec.signExtend 64 0x54#13 = BitVec.ofNat 64 0x96
         from by decide]
       iapply wp_kinit_main_child UL HS HP T stc cn Cr γ np l N' hc3 mc1 n hpeq $$ Hdeps Hdlaw Hc' Hxs Hargv'
         Hcwd Hch Hpid Hstd Hrow' Hcred Hpos HQ Hrun
@@ -297,7 +297,7 @@ theorem wp_kinit_main_loop (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
         (fun _ => by decide) $$ Hi Hrun
       inext
       iintro %h4 Hrun
-      rw [hbt, if_pos rfl, show BitVec.ofNat 64 0x4a + BitVec.signExtend 64 0x1fe8#13 = BitVec.ofNat 64 0x32
+      rw [hbt, ite_eq_left rfl, show BitVec.ofNat 64 0x4a + BitVec.signExtend 64 0x1fe8#13 = BitVec.ofNat 64 0x32
         from by decide]
       ihave Htk := uinitRedeem cn γ T (initRd Cr.ccRd (ccWbn Cr)) xs $$ HQ
       icases IH with ⟨IH1, -⟩
@@ -312,7 +312,7 @@ theorem wp_kinit_main_loop (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
         (fun h => by rw [hbt] at h; exact absurd h (by decide)) $$ Hi Hrun
       inext
       iintro %h4 Hrun
-      rw [hbt, if_neg (by decide), ukPc 0x4a 0x4e false rfl]
+      rw [hbt, ite_eq_right (by decide), ukPc 0x4a 0x4e false rfl]
       icases Hwa with (⟨⟨%hm1, %hcseq⟩, -⟩ | ⟨%γ', ⟨%hcseq, %hr1, %hr2⟩, -, Hesc, -⟩)
       · -- wait failed: refuted, init's own set holds the shell
         exfalso
@@ -329,7 +329,7 @@ theorem wp_kinit_main_loop (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
         (fun _ => by decide) $$ Hi Hrun
       inext
       iintro %h5 Hrun
-      rw [hbg, if_pos rfl, show BitVec.ofNat 64 0x4e + BitVec.signExtend 64 0x1ff6#13 = BitVec.ofNat 64 0x44
+      rw [hbg, ite_eq_left rfl, show BitVec.ofNat 64 0x4e + BitVec.signExtend 64 0x1ff6#13 = BitVec.ofNat 64 0x44
         from by decide]
       have hne : rv ≠ pidsh := fun e => heq (by rw [hret, e])
       ihave %hγne := exitTok_tok_ne γ' γsh rv pidsh xs _ hne $$ [Hesc Htok]

@@ -103,7 +103,7 @@ theorem gclPure_write_blk (M : LModel) (K : LmHooks M) (B : LmByteLaws M) (sd : 
     unfold lmPending
     rw [hlenE]
     unfold lmPendingAt
-    rw [if_neg hne0, if_pos hr0]
+    rw [ite_eq_right hne0, ite_eq_left hr0]
     unfold lmContAt
     rw [hidx0, hfst]
     have hlt : 0 < (M.lmCont (lmUpto M so.gsCs (gsState M sd so) (bodiesOf I0) (nlines I0 - 1))

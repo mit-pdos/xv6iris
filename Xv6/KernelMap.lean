@@ -52,11 +52,11 @@ theorem mem_kmapEntries (k : Nat) (v : BitVec 64) :
   simp only [List.mem_append, mem_kmapRange]
   constructor
   · rintro ((((⟨h1, h2, rfl⟩ | ⟨h1, h2, rfl⟩) | ⟨h1, h2, rfl⟩) | ⟨h1, h2, rfl⟩) | ⟨h1, h2, rfl⟩)
-    · exact ⟨.rx, by rw [if_pos ⟨h1, by omega⟩], rfl⟩
-    · exact ⟨.rw, by rw [if_neg (by omega), if_pos (Or.inl ⟨h1, by omega⟩)], rfl⟩
-    · exact ⟨.rw, by rw [if_neg (by omega), if_pos (Or.inr (Or.inl ⟨h1, by omega⟩))], rfl⟩
-    · exact ⟨.rw, by rw [if_neg (by omega), if_pos (Or.inr (Or.inr (Or.inl ⟨h1, by omega⟩)))], rfl⟩
-    · exact ⟨.rw, by rw [if_neg (by omega), if_pos (Or.inr (Or.inr (Or.inr ⟨h1, by omega⟩)))], rfl⟩
+    · exact ⟨.rx, by rw [ite_eq_left ⟨h1, by omega⟩], rfl⟩
+    · exact ⟨.rw, by rw [ite_eq_right (by omega), ite_eq_left (Or.inl ⟨h1, by omega⟩)], rfl⟩
+    · exact ⟨.rw, by rw [ite_eq_right (by omega), ite_eq_left (Or.inr (Or.inl ⟨h1, by omega⟩))], rfl⟩
+    · exact ⟨.rw, by rw [ite_eq_right (by omega), ite_eq_left (Or.inr (Or.inr (Or.inl ⟨h1, by omega⟩)))], rfl⟩
+    · exact ⟨.rw, by rw [ite_eq_right (by omega), ite_eq_left (Or.inr (Or.inr (Or.inr ⟨h1, by omega⟩)))], rfl⟩
   · rintro ⟨perm, hc, rfl⟩
     split at hc
     · rename_i h

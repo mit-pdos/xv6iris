@@ -900,10 +900,10 @@ theorem bd_recyc (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_R
       (if (bnos kk).toNat ∈ V.cov then poolBlk (GF := GF) V (bnos kk).toNat
        else iprop(emp)) := by
     by_cases hoc : (bnos kk).toNat ∈ V.cov
-    · rw [if_pos hoc, if_pos hoc]
+    · rw [ite_eq_left hoc, ite_eq_left hoc]
       iintro ⟨-, H⟩
       iexact H
-    · rw [if_neg hoc, if_neg hoc]
+    · rw [ite_eq_right hoc, ite_eq_right hoc]
   ihave Hold := hconv $$ Hev
   ihave Hpool := Hpback $$ Hold
   ihave Hpay' := bufPay_of_pool γ V kk dev bno 0#32 x0 hcov hdev rfl $$ HpoolB

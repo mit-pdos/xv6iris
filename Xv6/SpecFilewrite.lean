@@ -636,7 +636,7 @@ theorem filewriteExtra_cons (gn : GName) (P : UPtd) (rb : Bool) (n : Int) (M : N
     (ua : BitVec 64) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (r : BitVec 64) :
     writeConsArms P ua Q n r ⊢
       filewriteExtra gn P (.open rb true (.device CONSOLE)) n M ua Q Qe r := by
-  unfold filewriteExtra; simp only [if_true]; exact .rfl
+  unfold filewriteExtra; simp only [ite_true]; exact .rfl
 
 /-- Rocq `filewrite_extra_dev_other`: a device at any OTHER major arms
 nothing. -/
@@ -647,7 +647,7 @@ theorem filewriteExtra_dev_other (gn : GName) (P : UPtd) (rb wb : Bool) (mj : Na
   unfold filewriteExtra
   cases wb
   · exact .rfl
-  · simp only [hmj, if_false]; exact .rfl
+  · simp only [hmj, ite_false]; exact .rfl
 
 /-- Rocq `filewrite_extra_dev_drop`: ... so the chain is simply dropped. -/
 theorem filewriteExtra_dev_drop (gn : GName) (P : UPtd) (rb : Bool) (mj : Nat) (hmj : mj ≠ CONSOLE)

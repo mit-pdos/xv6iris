@@ -108,7 +108,7 @@ theorem consBlkByte (M : LModel) (ps cs : List Nat) (s0 : M.lmSt) (I : List (Bit
   rw [hlow, List.getElem?_append_right (by omega),
     show pos + j - (lmProcBefore M ps cs s0 I).length = j by omega]
   unfold lmPendingAt lmContAt
-  rw [if_neg hne, if_pos hr, lmBlk_snoc_at M cs I c hn, lmBlk_snoc_upto M cs s0 I c hn]
+  rw [ite_eq_right hne, ite_eq_left hr, lmBlk_snoc_at M cs I c hn, lmBlk_snoc_upto M cs s0 I c hn]
   exact (List.getElem?_append_left hj).trans hb
 
 /-! ## S2 THE SOURCE RUN -/

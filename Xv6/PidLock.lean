@@ -99,9 +99,9 @@ theorem pidNext_toNat (c : BitVec 32) (h : c.toNat ≤ PIDMAX) :
     (pidNext c).toNat = if c.toNat = PIDMAX then 1 else c.toNat + 1 := by
   unfold pidNext PIDMAX at *
   by_cases hc : c = 1000#32
-  · rw [if_pos hc, if_pos (by rw [hc]; rfl)]; rfl
+  · rw [ite_eq_left hc, ite_eq_left (by rw [hc]; rfl)]; rfl
   · have hn : c.toNat ≠ 1000 := fun e => hc (BitVec.eq_of_toNat_eq (by rw [e]; rfl))
-    rw [if_neg hc, if_neg hn, BitVec.toNat_add, BitVec.toNat_ofNat]
+    rw [ite_eq_right hc, ite_eq_right hn, BitVec.toNat_add, BitVec.toNat_ofNat]
     omega
 
 section

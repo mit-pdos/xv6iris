@@ -147,11 +147,11 @@ theorem umo_rX_pair {D : UFoot} (hD : UxaFoot D) (orc : UOrc) (s : UWSt) (i : Bi
     runRW D orc s (rX_pair_bits (.Regidx i)) = some (umoXpair s.file i, s, orc) := by
   have hx := uxa_rX hD
   by_cases h : i = 0
-  · subst h; simp only [umoXpair, if_true]; rfl
+  · subst h; simp only [umoXpair, ite_true]; rfl
   · have hb := umo_bne_zreg i h
     unfold rX_pair_bits
     uwk_run [hx, hb]
-    simp only [umoXpair, h, if_false]
+    simp only [umoXpair, h, ite_false]
     rfl
 
 set_option maxHeartbeats 4000000 in
@@ -161,11 +161,11 @@ theorem umo_wX_pair {D : UFoot} (hD : UxaFoot D) (orc : UOrc) (s : UWSt) (i : Bi
     runRW D orc s (wX_pair_bits (.Regidx i) v) = some ((), umoWrPair s i v, orc) := by
   have hx := uxa_wX hD
   by_cases h : i = 0
-  · subst h; simp only [umoWrPair, if_true]; rfl
+  · subst h; simp only [umoWrPair, ite_true]; rfl
   · have hb := umo_bne_zreg i h
     unfold wX_pair_bits
     uwk_run [hx, hb]
-    simp only [umoWrPair, h, if_false]
+    simp only [umoWrPair, h, ite_false]
     rfl
 
 /-! ## §3 The AMO result -/

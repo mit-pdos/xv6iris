@@ -157,7 +157,7 @@ theorem uxa_writeReg_bind {X : Type} (orc : UOrc) (s : UWSt) (r : Register) (v :
     (k : PUnit → SailM X) (h : D.Dw r = true) :
     runRW D orc s (writeReg r v >>= k) = runRW D orc { s with pin := s.pin.set r v } (k ()) := by
   show runRW D orc s (FreeM.impure (.ok (.regWrite r v)) k) = _
-  simp only [runRW, h, if_true]
+  simp only [runRW, h, ite_true]
 
 end leaves
 

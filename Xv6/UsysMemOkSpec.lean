@@ -50,33 +50,33 @@ theorem syscMemOk_usys (V V' : ProcPriv) (M M' : ElfMem) (r : BitVec 64)
     (H : syscMemOk V V' M M') : usysMemOk (syscNum V) V.tf r M π szv lz M' π' szv' lz' := by
   unfold syscMemOk at H
   unfold usysMemOk
-  rw [if_neg h7, if_neg h12] at H ⊢
+  rw [ite_eq_right h7, ite_eq_right h12] at H ⊢
   by_cases h3 : syscNum V = USYS_wait
-  · rw [if_pos h3] at H ⊢
+  · rw [ite_eq_left h3] at H ⊢
     obtain ⟨bs, hl, hz, hM⟩ := H
     refine ⟨⟨bs, hl, fun h0 => hz (BitVec.eq_of_toNat_eq (by simpa using h0)), hM⟩, hp, hs, hlz, hwt h3⟩
-  rw [if_neg h3] at H ⊢
+  rw [ite_eq_right h3] at H ⊢
   by_cases h4 : syscNum V = USYS_pipe
-  · rw [if_pos h4] at H ⊢; exact ⟨H, hp, hs, hlz⟩
-  rw [if_neg h4] at H ⊢
+  · rw [ite_eq_left h4] at H ⊢; exact ⟨H, hp, hs, hlz⟩
+  rw [ite_eq_right h4] at H ⊢
   by_cases h5 : syscNum V = USYS_read
-  · rw [if_pos h5] at H ⊢; exact ⟨H, hp, hs, hlz, hrd h5⟩
-  rw [if_neg h5] at H ⊢
+  · rw [ite_eq_left h5] at H ⊢; exact ⟨H, hp, hs, hlz, hrd h5⟩
+  rw [ite_eq_right h5] at H ⊢
   by_cases h8 : syscNum V = USYS_fstat
-  · rw [if_pos h8] at H ⊢; exact ⟨H, hp, hs, hlz⟩
-  rw [if_neg h8] at H ⊢
+  · rw [ite_eq_left h8] at H ⊢; exact ⟨H, hp, hs, hlz⟩
+  rw [ite_eq_right h8] at H ⊢
   by_cases hf : syscNum V = USYS_fork
-  · rw [if_pos hf]; exact ⟨hfk hf, H, hp, hs, hlz⟩
-  rw [if_neg hf]
+  · rw [ite_eq_left hf]; exact ⟨hfk hf, H, hp, hs, hlz⟩
+  rw [ite_eq_right hf]
   by_cases hu : syscNum V = USYS_uptime
-  · rw [if_pos hu]; exact ⟨hup hu, H, hp, hs, hlz⟩
-  · rw [if_neg hu]; exact ⟨H, hp, hs, hlz⟩
+  · rw [ite_eq_left hu]; exact ⟨hup hu, H, hp, hs, hlz⟩
+  · rw [ite_eq_right hu]; exact ⟨H, hp, hs, hlz⟩
 
 /-- sbrk: the dispatcher's row (Rocq `sysc_mem_ok_sbrk_row`). -/
 theorem syscMemOk_sbrkRow {V V' : ProcPriv} {M M' : ElfMem} (hn : syscNum V = USYS_sbrk)
     (H : syscMemOk V V' M M') : syscSbrkOk V.upt V'.upt V.sz V'.sz M M' := by
   unfold syscMemOk at H
-  rw [if_neg (by rw [hn]; decide), if_pos hn] at H
+  rw [ite_eq_right (by rw [hn]; decide), ite_eq_left hn] at H
   exact H.1
 
 /-- ...and which arm ran, on the lazy bit's terms (Rocq
@@ -84,7 +84,7 @@ theorem syscMemOk_sbrkRow {V V' : ProcPriv} {M M' : ElfMem} (hn : syscNum V = US
 theorem syscMemOk_sbrkLazy {V V' : ProcPriv} {M M' : ElfMem} (hn : syscNum V = USYS_sbrk)
     (H : syscMemOk V V' M M') : usysSbrkLazy V.pvLazy V'.pvLazy V.tf V.sz.toNat V'.sz.toNat := by
   unfold syscMemOk at H
-  rw [if_neg (by rw [hn]; decide), if_pos hn] at H
+  rw [ite_eq_right (by rw [hn]; decide), ite_eq_left hn] at H
   exact H.2
 
 /-- The dealloc run's byte length (Rocq's `4096 * uvmd_np`) is the gap
@@ -92,7 +92,7 @@ between the two rounded breaks. -/
 theorem uvmdNp_bytes (sz sz' : BitVec 64) (h : sz'.toNat < sz.toNat) :
     4096 * uvmdNp sz sz' = pgRoundUpN sz.toNat - pgRoundUpN sz'.toNat := by
   unfold uvmdNp pgRoundUpN
-  rw [if_pos h]
+  rw [ite_eq_left h]
   omega
 
 /-- The IMAGE half is the dispatcher's row with the descriptor forgotten
@@ -102,8 +102,8 @@ theorem usysSbrkImg_of_row {P P' : UPtd} {szv szv' : BitVec 64} {M M' : ElfMem}
   unfold syscSbrkOk at H
   unfold usysSbrkImg
   split at H
-  · rename_i hle; rw [if_pos hle]; exact H.2
-  · rename_i hgt; rw [if_neg hgt, ← uvmdNp_bytes szv szv' (by omega)]; exact H.2
+  · rename_i hle; rw [ite_eq_left hle]; exact H.2
+  · rename_i hgt; rw [ite_eq_right hgt, ← uvmdNp_bytes szv szv' (by omega)]; exact H.2
 
 /-- **sbrk's whole user row**, from the dispatcher's row plus what the
 dispatcher's post says of the permission view, the answer and the arm (Rocq
@@ -117,7 +117,7 @@ theorem syscMemOk_usys_sbrk (V V' : ProcPriv) (M M' : ElfMem) (r : BitVec 64)
     usysMemOk (syscNum V) V.tf r M π V.sz.toNat lz M' π' V'.sz.toNat lz' := by
   have hrow := syscMemOk_sbrkRow hn H
   unfold usysMemOk
-  rw [if_neg (by rw [hn]; decide), if_pos hn]
+  rw [ite_eq_right (by rw [hn]; decide), ite_eq_left hn]
   exact ⟨usysSbrkImg_of_row hrow, hp, hret, hlz⟩
 
 /-! ## The permission half, derived from the dispatcher's row -/
@@ -153,7 +153,7 @@ theorem permOf_extSz {P P' : UPtd} {sz : BitVec 64} (hext : P.extSz sz P') :
       have hk := hext.2.1 k w hP hP'
       obtain ⟨r, rfl⟩ := hext.2.2 k w hP hP'
       dsimp only
-      rw [permLeaf_vmfault, if_pos (by unfold pgRoundUpN; omega)]
+      rw [permLeaf_vmfault, ite_eq_left (by unfold pgRoundUpN; omega)]
 
 /-- **At a larger break the view gains exactly the newly-live pages at
 `upermRw`** (Rocq `perm_of_grow` + `perm_of_grow_below`): under `umBelow`
@@ -173,22 +173,22 @@ theorem permOf_grow_below (P : UPtd) (szv szv' : BitVec 64) (hb : umBelow szv P)
     dsimp only
     cases permLeaf w with
     | some q => rfl
-    | none => dsimp only; rw [if_neg (fun h => h.2 hlt)]
+    | none => dsimp only; rw [ite_eq_right (fun h => h.2 hlt)]
   | none =>
     simp only
     by_cases h1 : k * 4096 < pgRoundUpN szv.toNat
-    · rw [if_pos h1, if_pos (by omega)]
-    · rw [if_neg h1]
+    · rw [ite_eq_left h1, ite_eq_left (by omega)]
+    · rw [ite_eq_right h1]
       by_cases h2 : k * 4096 < pgRoundUpN szv'.toNat
-      · rw [if_pos h2, if_pos ⟨h2, h1⟩]
-      · rw [if_neg h2, if_neg (fun h => h2 h.1)]
+      · rw [ite_eq_left h2, ite_eq_left ⟨h2, h1⟩]
+      · rw [ite_eq_right h2, ite_eq_right (fun h => h2 h.1)]
 
 /-- GROW (Rocq `usys_sbrk_perm_grow`). -/
 theorem usysSbrkPerm_grow (P P' : UPtd) (szv szv' : BitVec 64) (hb : umBelow szv P)
     (hle : szv.toNat ≤ szv'.toNat) (hext : P.extSz szv' P') :
     usysSbrkPerm (permOf P.um szv.toNat) (permOf P'.um szv'.toNat) szv.toNat szv'.toNat := by
   unfold usysSbrkPerm
-  rw [if_pos hle, permOf_extSz hext]
+  rw [ite_eq_left hle, permOf_extSz hext]
   exact permOf_grow_below P szv szv' hb hle
 
 /-- SHRINK (Rocq `usys_sbrk_perm_shrink`, with `perm_of_del_run` inlined):
@@ -199,23 +199,23 @@ theorem usysSbrkPerm_shrink (P : UPtd) (szv szv' : BitVec 64) (hb : umBelow szv 
       (permOf (P.delRun (pgRoundUpN szv'.toNat / 4096) (uvmdNp szv szv')).um szv'.toNat)
       szv.toNat szv'.toNat := by
   unfold usysSbrkPerm
-  rw [if_neg (by omega)]
+  rw [ite_eq_right (by omega)]
   have hn : uvmdNp szv szv' = (pgRoundUpN szv.toNat - pgRoundUpN szv'.toNat) / 4096 := by
-    unfold uvmdNp; rw [if_pos hlt]
+    unfold uvmdNp; rw [ite_eq_left hlt]
   have hpr : pgRoundUpN szv'.toNat ≤ pgRoundUpN szv.toNat := by unfold pgRoundUpN; omega
   funext k
   by_cases hk : k * 4096 < pgRoundUpN szv'.toNat
-  · rw [if_pos hk]
+  · rw [ite_eq_left hk]
     unfold permOf
     rw [UPt.delRun_get_not_mem P _ _ k (Or.inl (by unfold pgRoundUpN at hk ⊢; omega))]
     cases get? P.um k with
     | some w => rfl
-    | none => simp only; rw [if_pos hk, if_pos (by omega)]
-  · rw [if_neg hk]
+    | none => simp only; rw [ite_eq_left hk, ite_eq_left (by omega)]
+  · rw [ite_eq_right hk]
     unfold permOf
     by_cases hrun : k < pgRoundUpN szv'.toNat / 4096 + uvmdNp szv szv'
     · rw [UPt.delRun_get_mem P _ _ k (by unfold pgRoundUpN at hk ⊢; omega) hrun]
-      simp only; rw [if_neg hk]
+      simp only; rw [ite_eq_right hk]
     · rw [UPt.delRun_get_not_mem P _ _ k (Or.inr (by omega))]
       cases hw : get? P.um k with
       | some w =>
@@ -224,7 +224,7 @@ theorem usysSbrkPerm_shrink (P : UPtd) (szv szv' : BitVec 64) (hb : umBelow szv 
         rw [hn] at hrun
         unfold pgRoundUpN at this hrun hk
         omega
-      | none => simp only; rw [if_neg hk]
+      | none => simp only; rw [ite_eq_right hk]
 
 /-- **THE ROW**: both arms at once, out of the dispatcher's own sbrk row
 (Rocq `usys_sbrk_perm_of_row`). -/

@@ -170,9 +170,9 @@ theorem syscPins_set (k : KCtx) (R : RegMap) (i : BitVec 5) (v : BitVec 64)
     syscPins k (R.set i v) := by
   obtain ⟨h2, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩ := hp
   obtain ⟨n2, n19, n20, n21, n22, n23, n24, n25, n26, n27⟩ := hi
-  simp only [syscPins, RegMap.set_apply, if_neg (Ne.symm n2), if_neg (Ne.symm n19), if_neg (Ne.symm n20),
-    if_neg (Ne.symm n21), if_neg (Ne.symm n22), if_neg (Ne.symm n23), if_neg (Ne.symm n24),
-    if_neg (Ne.symm n25), if_neg (Ne.symm n26), if_neg (Ne.symm n27)]
+  simp only [syscPins, RegMap.set_apply, ite_eq_right (Ne.symm n2), ite_eq_right (Ne.symm n19), ite_eq_right (Ne.symm n20),
+    ite_eq_right (Ne.symm n21), ite_eq_right (Ne.symm n22), ite_eq_right (Ne.symm n23), ite_eq_right (Ne.symm n24),
+    ite_eq_right (Ne.symm n25), ite_eq_right (Ne.symm n26), ite_eq_right (Ne.symm n27)]
   exact ⟨h2, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩
 
 /-- `syscPins k (R.set i₁ v₁ … .set iₙ vₙ)` from `syscPins k R` in scope, each
@@ -291,7 +291,7 @@ theorem syscall_head_split (PT : SchedNames → IProp GF) (Γ : SchedNames) [Cla
     · -- ALLOWED: +0x42  beqz a5 falls through, +0x44  jalr a4, INTO THE ARM
       have hnum : syscNum V = ((n : Nat) : Int) := syscall_eff_allowed V n hraw hb
       k_step_e (wp_s_branch cpu _ (KA.«syscall» + 0x42#64) true 0xa#13 15#5 0#5 (by decide) bop.BEQ)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [syscall_mask_bit1 V.pvSecc n (by omega), syscall_beqz_bit, MachCSL.bcond_beq_one, MachCSL.beqz_zero, hb, Bool.not_true, Bool.not_false, eq_self_iff_true, if_true, if_false, ite_true, ite_false, Bool.false_eq_true]
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [syscall_mask_bit1 V.pvSecc n (by omega), syscall_beqz_bit, MachCSL.bcond_beq_one, MachCSL.beqz_zero, hb, Bool.not_true, Bool.not_false, eq_self_iff_true, ite_true, ite_false, ite_true, ite_false, Bool.false_eq_true]
       iintro Hk Hpc
       k_step_e (wp_s_jalr cpu _ (KA.«syscall» + 0x44#64) true 14#5 1#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [syscall_head_jump n hn1' hn22']
@@ -314,7 +314,7 @@ theorem syscall_head_split (PT : SchedNames → IProp GF) (Γ : SchedNames) [Cla
       have hb' : V.pvSecc.getLsbD n = false := by simpa using hb
       have hblk : syscNum V = 0 := syscall_eff_blocked V n hraw hb'
       k_step_e (wp_s_branch cpu _ (KA.«syscall» + 0x42#64) true 0xa#13 15#5 0#5 (by decide) bop.BEQ)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [syscall_mask_bit1 V.pvSecc n (by omega), syscall_beqz_bit, MachCSL.bcond_beq_one, MachCSL.beqz_zero, hb', Bool.not_true, Bool.not_false, eq_self_iff_true, if_true, if_false, ite_true, ite_false, Bool.false_eq_true]
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [syscall_mask_bit1 V.pvSecc n (by omega), syscall_beqz_bit, MachCSL.bcond_beq_one, MachCSL.beqz_zero, hb', Bool.not_true, Bool.not_false, eq_self_iff_true, ite_true, ite_false, ite_true, ite_false, Bool.false_eq_true]
       iintro Hk Hpc
       have hbl : KA.«syscall» + 76#64 = syscallBlocked := rfl
       rw [hbl]

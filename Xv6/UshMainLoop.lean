@@ -137,12 +137,12 @@ theorem ushMain_tail (UL : UK_LEAVES) (N : UkNames GF) [UknConst N] (X : UshCtx 
   inext
   iintro %h1 Hrun
   cases htk : ukBtaken .BEQ (mm.get 15#5) (mm.get 20#5)
-  · simp only [Bool.false_eq_true, if_false]
+  · simp only [Bool.false_eq_true, ite_false]
     rw [ukPc 0x952 0x956 false rfl]
     unfold ushRestLAt
     iapply Hrest $$ %l %(inferInstanceAs (UknConst N)) %L.pm_of_at %L.at_of_pm_wb Hc Hjt Hgen IH %h1 %mm %g %kk
       %i2 %n0 %ws %hrm %hsm %ham %⟨hkk, hi2, hnul⟩ %hfd0 Hrl Hstd HR Hbs Hrun
-  · rw [if_pos rfl, show BitVec.ofNat 64 0x952 + BitVec.signExtend 64 8130#13 = BitVec.ofNat 64 0x914 from by decide]
+  · rw [ite_eq_left rfl, show BitVec.ofNat 64 0x952 + BitVec.signExtend 64 8130#13 = BitVec.ofNat 64 0x914 from by decide]
     -- a blank line: round the command loop again -- UNDER THE TAINT.  The byte at `kk` is the
     -- newline, and a line the read delivered clean has a letter there: the rest line's own
     -- head (`ushUline_head_nonnl`), read over the NUL-free window the read's line gives it

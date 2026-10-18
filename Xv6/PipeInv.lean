@@ -254,9 +254,9 @@ theorem pipeBytes_pageFree (pi : BitVec 64) (hok : lockAddrOk pi) :
   have e_nr : aPnread pi = pi + 536#64 := by unfold aPnread poffOf; congr 1
   have e_nw : aPnwrite pi = pi + 540#64 := by unfold aPnwrite poffOf; congr 1
   have e_ro : aPopen pi false = pi + 544#64 := by
-    unfold aPopen poffOf; simp only [Bool.false_eq_true, if_false]; congr 1
+    unfold aPopen poffOf; simp only [Bool.false_eq_true, ite_false]; congr 1
   have e_wo : aPopen pi true = pi + 548#64 := by
-    unfold aPopen poffOf; simp only [if_true]; congr 1
+    unfold aPopen poffOf; simp only [ite_true]; congr 1
   have e_nm : pipeLockName pi = pi + 8#64 := by unfold pipeLockName; rfl
   -- P1: slack1
   ihave P1 := byteBuf_bytesFree (pi + 4#64) b1 $$ Hslack1

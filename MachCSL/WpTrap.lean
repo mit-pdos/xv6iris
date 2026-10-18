@@ -39,7 +39,7 @@ def dispatchS (c : MConf) (ip : BitVec 64) : Option (InterruptType × Privilege)
 
 theorem dispatchS_off (c : MConf) (ip : BitVec 64) (h : BitVec.extractLsb' 1 1 c.mstatus = 0#1) :
     dispatchS c ip = none := by
-  unfold dispatchS; rw [if_neg]; intro ⟨h1, _⟩; rw [h] at h1; cases h1
+  unfold dispatchS; rw [ite_eq_right]; intro ⟨h1, _⟩; rw [h] at h1; cases h1
 
 /-- Under xv6's `mie = SEIE | STIE`, a pending supervisor interrupt is the
 timer's or the external one. -/
@@ -116,7 +116,7 @@ theorem swp_dispatchInterrupt_S (cpu : CPU) (dq : DFrac) (c : MConf) (hmie : c.m
   by_cases hc : BitVec.extractLsb' 1 1 c.mstatus = 1#1 ∧ ip' &&& (c.mie &&& c.mideleg) ≠ 0#64
   · have hc' : (BitVec.extractLsb' 1 1 c.mstatus == 1#1 && ip' &&& (c.mie &&& c.mideleg) != 0#64) = true := by
       simp only [Bool.and_eq_true, beq_iff_eq, bne_iff_ne]; exact hc
-    rw [if_pos hc]
+    rw [ite_eq_left hc]
     simp only [hc', ite_true, pure_bind]
     generalize findPendingInterrupt (ip' &&& (c.mie &&& c.mideleg)) = r
     cases r
@@ -134,7 +134,7 @@ theorem swp_dispatchInterrupt_S (cpu : CPU) (dq : DFrac) (c : MConf) (hmie : c.m
         · exact h2
         · exact absurd ⟨h1, h2⟩ hc
       · left; exact h1
-    rw [if_neg hc]
+    rw [ite_eq_right hc]
     simp only [hc']
     swp_run 10
     conf_intro HmConf

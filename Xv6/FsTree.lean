@@ -148,11 +148,11 @@ structure Fstree where
 
 theorem fmap_lookup_insert_ne {β : Type} (m : Std.ExtTreeMap Fname β compare)
     {k a : Fname} {v : β} (h : k ≠ a) : (m.insert k v)[a]? = m[a]? := by
-  rw [Std.ExtTreeMap.getElem?_insert, if_neg (by rwa [Std.compare_eq_iff_eq])]
+  rw [Std.ExtTreeMap.getElem?_insert, ite_eq_right (by rwa [Std.compare_eq_iff_eq])]
 
 theorem fmap_lookup_erase_ne {β : Type} (m : Std.ExtTreeMap Fname β compare)
     {k a : Fname} (h : k ≠ a) : (m.erase k)[a]? = m[a]? := by
-  rw [Std.ExtTreeMap.getElem?_erase, if_neg (by rwa [Std.compare_eq_iff_eq])]
+  rw [Std.ExtTreeMap.getElem?_erase, ite_eq_right (by rwa [Std.compare_eq_iff_eq])]
 
 /-- stdpp's `list_to_map`: `foldr` of `insert`, first occurrence wins. -/
 def listToMap {β : Type} (l : List (Fname × β)) : Std.ExtTreeMap Fname β compare :=
@@ -241,7 +241,7 @@ theorem dirView_S_lookup (data : Nat → List (BitVec 8)) (n : Nat) (s : Fname) 
   · by_cases heq : dirBname data n = s
     · subst heq
       cases (dirView data n)[dirBname data n]? <;> simp
-    · rw [if_pos rfl, fmap_lookup_insert_ne _ heq, Std.ExtTreeMap.getElem?_empty]
+    · rw [ite_eq_left rfl, fmap_lookup_insert_ne _ heq, Std.ExtTreeMap.getElem?_empty]
       simp only [heq, decide_false, Bool.and_false]
       cases (dirView data n)[s]? <;> rfl
 
@@ -765,7 +765,7 @@ theorem dirUniq_dirlink (dn dn' : Dinode) (data data' : Nat → List (BitVec 8))
   · -- ======== tot = 0: nothing was written, and the size did not move ===
     subst htot
     have hagr : ∀ q, dirWinAgree data data' q := by
-      intro q j hj; rw [hrng, if_neg (by omega)]
+      intro q j hj; rw [hrng, ite_eq_right (by omega)]
     have hnre : dirNrec dn'.diSize.toNat ≤ nrec := by rw [hsz] at hr' ⊢; omega
     intro j k hj hk hlj hlk heq
     apply h j k (by omega) (by omega)
@@ -779,12 +779,12 @@ theorem dirUniq_dirlink (dn dn' : Dinode) (data data' : Nat → List (BitVec 8))
     have hwin : ∀ j, j < 16 →
         fileByte data' (16 * k0 + j) = (direntBytes (deOfName inum s))[j]! := by
       intro j hj
-      rw [hrng, if_pos (by omega), show 16 * k0 + j - 16 * k0 = j by omega]
+      rw [hrng, ite_eq_left (by omega), show 16 * k0 + j - 16 * k0 = j by omega]
     obtain ⟨hrin, hrnm⟩ := dirRecord_ofName data' k0 inum s hlen hs hwin
     have hwrit : dirWrittenAt data data' k0 s inum := by
       refine ⟨hrin, hrnm, ?_⟩
       intro q hq j hj
-      rw [hrng, if_neg]
+      rw [hrng, ite_eq_right]
       rintro ⟨hlo, hhi⟩
       exact hq (by omega)
     have hk0lt : k0 < dirNrec dn'.diSize.toNat := by rw [hsz] at hr' ⊢; omega

@@ -54,7 +54,7 @@ theorem ireclaim_refb_buf [Icfg] [CurCtx] (bno : Nat) (ds : List Dinode) (kk : N
     inodeRefb (GF := GF) (isClaim (.bufL bno ds)) kk q dev inum ⊢
       inodeRef kk q dev inum ∗ runitPlain inum.toNat := by
   unfold inodeRefb isClaim runit
-  simp only [Bool.false_eq_true, if_false]
+  simp only [Bool.false_eq_true, ite_false]
   exact .rfl
 
 set_option maxHeartbeats 16000000 in
@@ -262,7 +262,7 @@ theorem ireclaim_orphan (PK : PRINTK) (BE : BRELSE) (IG : IGET) (BO : BEGIN_OP) 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [h19''', ireclaim_ientry_beq kslot hkq.1]
   iintro Hk Hpc
-  try simp only [Bool.false_eq_true, if_false]
+  try simp only [Bool.false_eq_true, ite_false]
   subst hi
   iapply (ireclaim_orphan_b BO IL IU IP EO Γ cpu k spie3 spp3 R3 γl pd pav pu j pidv dqp dqb
       dqs dqn n kslot q hj hproc hK hnoff hlocks htier hgeom hblk hbg hbel hn31 hnnib hpd hn

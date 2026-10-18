@@ -464,7 +464,7 @@ theorem ms_tail (KVH : KVMINITHART) (TIH : TRAPINITHART) (PIH : PLICINITHART) (S
   iapply hkv
   iframe Hk Hpc Htlb Hkpt Hroot
   iintro %R2 Hk Hpc Hstv _ _
-  simp only [KCtx.withRegs_regs, RegMap.set_apply, if_pos, ms_ret_32', KCtx.toKpt_withRegs]
+  simp only [KCtx.withRegs_regs, RegMap.set_apply, ite_eq_left, ms_ret_32', KCtx.toKpt_withRegs]
   iapply (ms_tail_kpt (Y := X.toKpt) TIH PIH SCH KV rfl Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu cpu
     (k.toKpt (BitVec.extractLsb' 12 44 rootAddr)) R2 (by simp [hsie]) (by simp; omega)
     (by simp [hnoff]) (by simp [hlocks]) (by simp [hproc]) (by simp))

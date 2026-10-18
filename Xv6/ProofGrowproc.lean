@@ -58,26 +58,26 @@ theorem gp_toInt_zero : (0#64 : BitVec 64).toInt = 0 := by decide
 
 theorem bge0_pos {α : Type _} (x : BitVec 64) (h : ¬ (0 < x.toInt)) (p q : α) :
     (if bcond bop.BGE 0#64 x then p else q) = p := by
-  refine if_pos ?_
+  refine ite_eq_left ?_
   simp only [bcond, Bool.not_eq_true', BitVec.slt, decide_eq_false_iff_not, gp_toInt_zero]
   exact h
 
 theorem bge0_neg {α : Type _} (x : BitVec 64) (h : 0 < x.toInt) (p q : α) :
     (if bcond bop.BGE 0#64 x then p else q) = q := by
-  refine if_neg ?_
+  refine ite_eq_right ?_
   simp only [bcond, Bool.not_eq_true', BitVec.slt, decide_eq_true_eq, gp_toInt_zero,
     Bool.not_eq_true, ne_eq, Bool.not_eq_false]
   exact h
 
 theorem bge0'_pos {α : Type _} (x : BitVec 64) (h : ¬ (x.toInt < 0)) (p q : α) :
     (if bcond bop.BGE x 0#64 then p else q) = p := by
-  refine if_pos ?_
+  refine ite_eq_left ?_
   simp only [bcond, Bool.not_eq_true', BitVec.slt, decide_eq_false_iff_not, gp_toInt_zero]
   exact h
 
 theorem bge0'_neg {α : Type _} (x : BitVec 64) (h : x.toInt < 0) (p q : α) :
     (if bcond bop.BGE x 0#64 then p else q) = q := by
-  refine if_neg ?_
+  refine ite_eq_right ?_
   simp only [bcond, Bool.not_eq_true', BitVec.slt, decide_eq_true_eq, gp_toInt_zero,
     Bool.not_eq_true, ne_eq, Bool.not_eq_false]
   exact h
@@ -284,10 +284,10 @@ theorem umBelow_grow (oldsz newsz xperm : BitVec 64) (P P' : UPtd) (M M' : Nat �
     have hne : ¬ (newsz.toNat < pgRoundUpN oldsz.toNat) := by
       intro hc
       unfold uvmaNp at hnp
-      rw [if_pos hc] at hnp
+      rw [ite_eq_left hc] at hnp
       omega
     have hnpe : uvmaNp oldsz newsz = (newsz.toNat - pgRoundUpN oldsz.toNat + 4095) / 4096 := by
-      unfold uvmaNp; rw [if_neg hne]
+      unfold uvmaNp; rw [ite_eq_right hne]
     have hup := Xv6.pgRoundUpN_split (pgRoundUpN oldsz.toNat) newsz.toNat q hq (by omega)
     rw [hnpe, hq] at h2
     rw [hq] at hup
@@ -305,14 +305,14 @@ theorem umBelow_shrink (oldsz newsz : BitVec 64) (P : UPtd) (h : umBelow oldsz P
       (P.delRun (pgRoundUpN newsz.toNat / 4096) (uvmdNp oldsz newsz)) := by
   by_cases hlt : newsz.toNat < oldsz.toNat
   case neg =>
-    have hnp : uvmdNp oldsz newsz = 0 := by unfold uvmdNp; rw [if_neg hlt]
-    have hrs : uvmdRsz oldsz newsz = oldsz := by unfold uvmdRsz; rw [if_neg hlt]
+    have hnp : uvmdNp oldsz newsz = 0 := by unfold uvmdNp; rw [ite_eq_right hlt]
+    have hrs : uvmdRsz oldsz newsz = oldsz := by unfold uvmdRsz; rw [ite_eq_right hlt]
     rw [hnp, hrs, Xv6.delRun_zero]; exact h
   case pos =>
     have hnp : uvmdNp oldsz newsz
         = (pgRoundUpN oldsz.toNat - pgRoundUpN newsz.toNat) / 4096 := by
-      unfold uvmdNp; rw [if_pos hlt]
-    have hrs : uvmdRsz oldsz newsz = newsz := by unfold uvmdRsz; rw [if_pos hlt]
+      unfold uvmdNp; rw [ite_eq_left hlt]
+    have hrs : uvmdRsz oldsz newsz = newsz := by unfold uvmdRsz; rw [ite_eq_left hlt]
     obtain ⟨a, ha⟩ := pgRoundUpN_dvd oldsz.toNat
     obtain ⟨b, hb⟩ := pgRoundUpN_dvd newsz.toNat
     have hmono : pgRoundUpN newsz.toNat ≤ pgRoundUpN oldsz.toNat := pgRoundUpN_le (by omega)
@@ -695,7 +695,7 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
               | exact e24 | exact e25 | exact e26 | exact e27
       · -- the space grew
         obtain ⟨hok, hr10⟩ := hokr
-        rw [if_neg (show ¬ ((k.regs 10#5 + V.sz).toNat < V.sz.toNat) from by omega)] at hr10
+        rw [ite_eq_right (show ¬ ((k.regs 10#5 + V.sz).toNat < V.sz.toNat) from by omega)] at hr10
         have hne0 : k.regs 10#5 + V.sz ≠ 0#64 := by
           intro hc
           have : (k.regs 10#5 + V.sz).toNat = 0 := by rw [hc]; rfl

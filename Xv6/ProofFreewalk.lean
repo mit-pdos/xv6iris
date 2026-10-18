@@ -83,14 +83,14 @@ theorem fw_branch_last {α : Type _} (b : BitVec 44) (i : Nat) (hi : i < 512) (p
   by_cases he : i + 1 = 512
   · have hb : pageAddr b + BitVec.ofNat 64 (8 * (i + 1)) = pageAddr b + 4096#64 := by
       rw [he]
-    rw [if_pos he, if_pos (by simp only [bcond, beq_iff_eq]; exact hb)]
+    rw [ite_eq_left he, ite_eq_left (by simp only [bcond, beq_iff_eq]; exact hb)]
   · have hb : pageAddr b + BitVec.ofNat 64 (8 * (i + 1)) ≠ pageAddr b + 4096#64 := by
       intro hc
       have hcc := fw_add_cancel _ _ _ hc
       have h2 := congrArg BitVec.toNat hcc
       simp only [BitVec.toNat_ofNat, Nat.reducePow] at h2
       omega
-    rw [if_neg he, if_neg (by simp only [bcond, beq_iff_eq]; exact hb)]
+    rw [ite_eq_right he, ite_eq_right (by simp only [bcond, beq_iff_eq]; exact hb)]
 
 /-! ## The contract, as a level-indexed proposition -/
 
@@ -447,14 +447,14 @@ theorem freewalk_iter [WchG GF] [CurCtx] (lvl : Nat) (t : PTree)
     iintro Hk Hpc
     k_step_gen (wp_s_branch c2 _ (KA.«freewalk» + 0x30#64) true 8180#13 14#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [MachCSL.ite_beq, if_neg (show ¬ (1#64 : BitVec 64) = 0#64 by decide)] next c3 hp3
+      with [MachCSL.ite_beq, ite_eq_right (show ¬ (1#64 : BitVec 64) = 0#64 by decide)] next c3 hp3
     iintro Hk Hpc
     k_step_gen (wp_s_andi c3 _ (KA.«freewalk» + 0x32#64) false 14#12 14#5 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fw_kPtr_nonleaf] next c4 hp4
     iintro Hk Hpc
     k_step_gen (wp_s_branch c4 _ (KA.«freewalk» + 0x36#64) true 8162#13 14#5 0#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [fw_ite_bne, if_pos (show (0#64 : BitVec 64) = 0#64 from rfl)] next c5 hp5
+      with [fw_ite_bne, ite_eq_left (show (0#64 : BitVec 64) = 0#64 from rfl)] next c5 hp5
     iintro Hk Hpc
     k_step_gen (wp_s_srli c5 _ (KA.«freewalk» + 0x38#64) true 10#6 15#5 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c6 hp6
@@ -555,7 +555,7 @@ theorem freewalk_loop [WchG GF] (KF : KFREE) [CurCtx] (lvl : Nat) (t : PTree)
     iframe #
     iapply wpNext_intro_pin
     iintro %c1 %hp1 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hlend Hw %hsaved
-    rw [if_pos hlast]
+    rw [ite_eq_left hlast]
     ihave Hdone := fwDone_snoc' t.base i hi $$ [Hdone Hw]
     case' _ => iframe
     rw [hlast, fwTodo_all lvl t]
@@ -592,7 +592,7 @@ theorem freewalk_loop [WchG GF] (KF : KFREE) [CurCtx] (lvl : Nat) (t : PTree)
     iframe #
     iapply wpNext_intro_pin
     iintro %c1 %hp1 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hlend Hw %hsaved
-    rw [if_neg hne]
+    rw [ite_eq_right hne]
     ihave Hdone := fwDone_snoc' t.base i hi $$ [Hdone Hw]
     case' _ => iframe
     obtain ⟨s2, s8, s18, s19, s20, s21, s22, s23, s24, s25, s26, s27⟩ := hsaved.1

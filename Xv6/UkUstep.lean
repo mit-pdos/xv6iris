@@ -68,7 +68,7 @@ theorem ufetch_of_instr {π : Nat → Option UPerm} {M : ElfMem} {pc : BitVec 64
   unfold ufetch
   cases isRvc with
   | false =>
-    simp only [Bool.false_eq_true, if_false] at hcode
+    simp only [Bool.false_eq_true, ite_false] at hcode
     obtain ⟨w, hrvc, hb, b, hdec⟩ := hcode
     have hb2 := uMBytes_lo hb
     have h2 : ubytesOk M pc.toNat 2 = true := (ubytesOk_iff _ _ _).2 (uMBytes_present hb2)
@@ -77,17 +77,17 @@ theorem ufetch_of_instr {π : Nat → Option UPerm} {M : ElfMem} {pc : BitVec 64
     have hw4 : uMWord M pc.toNat 4 = w := uMWord_eq hb
     have hhi' : pc.toNat % 4 ≠ 0 → (pc + 2#64).toNat = pc.toNat + 2 ∧ utextPerm π (pc + 2#64) = true :=
       fun h => ⟨(hhi rfl h).1, (utextPerm_iff _ _).2 (hhi rfl h).2⟩
-    rw [if_pos ⟨hal2, ht, h2⟩]
+    rw [ite_eq_left ⟨hal2, ht, h2⟩]
     try dsimp only
     rw [hw2, hrvc]
-    simp only [Bool.false_eq_true, if_false]
-    rw [if_pos ⟨hhi', h4⟩]
+    simp only [Bool.false_eq_true, ite_false]
+    rw [ite_eq_left ⟨hhi', h4⟩]
     try dsimp only
     rw [hw4, hrvc]
-    simp only [if_true]
+    simp only [ite_true]
     rw [hdec]
   | true =>
-    simp only [if_true] at hcode
+    simp only [ite_true] at hcode
     obtain ⟨h, hrvc, hb, ⟨i₀, b, hdec, hex⟩, hhi4⟩ := hcode
     have h2 : ubytesOk M pc.toNat 2 = true := (ubytesOk_iff _ _ _).2 (uMBytes_present hb)
     have hw2 : uMWord M pc.toNat 2 = h := uMWord_eq hb
@@ -98,11 +98,11 @@ theorem ufetch_of_instr {π : Nat → Option UPerm} {M : ElfMem} {pc : BitVec 64
       rcases (by omega : j = 0 ∨ j = 1) with rfl | rfl
       · simpa using a2
       · simpa [Nat.add_assoc] using a3
-    rw [if_pos ⟨hal2, ht, h2⟩]
+    rw [ite_eq_left ⟨hal2, ht, h2⟩]
     try dsimp only
     rw [hw2, hrvc]
-    simp only [if_true]
-    rw [if_pos h4, hdec]
+    simp only [ite_true]
+    rw [ite_eq_left h4, hdec]
     try dsimp only
     rw [hex]
     rfl
@@ -126,7 +126,7 @@ theorem instr_of_ufetch {π : Nat → Option UPerm} {M : ElfMem} {pc : BitVec 64
           · rename_i i' hex
             cases h
             refine ⟨hal2, htext, (fun h => absurd h (by decide)), ?_⟩
-            simp only [if_true]
+            simp only [ite_true]
             refine ⟨uMWord M pc.toNat 2, hrvc, uMWord_bytes M _ 2 ((ubytesOk_iff _ _ _).1 h2),
               ⟨i₀, b, hdec, hex⟩, fun h4' => ?_⟩
             have := (ubytesOk_iff _ _ _).1 (h4 h4')
@@ -144,7 +144,7 @@ theorem instr_of_ufetch {π : Nat → Option UPerm} {M : ElfMem} {pc : BitVec 64
           · rename_i i' b hdec
             cases h
             refine ⟨hal2, htext, fun _ h => ⟨(hhi h).1, (utextPerm_iff _ _).1 (hhi h).2⟩, ?_⟩
-            simp only [Bool.false_eq_true, if_false]
+            simp only [Bool.false_eq_true, ite_false]
             exact ⟨uMWord M pc.toNat 4, hlo, uMWord_bytes M _ 4 ((ubytesOk_iff _ _ _).1 h4), b, hdec⟩
           · cases h
         · cases h
@@ -160,7 +160,7 @@ abbrev urz (m : RegMap) (pc : BitVec 64) : RegMap := tfResumeGpr0 (tfOf m pc)
 theorem urz_off (m : RegMap) (pc : BitVec 64) : ∀ i, i ≠ 0#5 → urz m pc i = m i := by
   intro i hi
   show (if i = 0#5 then zeroRf 0#5 else tfW (tfOf m pc) (4 + i.toNat)) = m i
-  rw [if_neg hi, tfOf_reg m pc i hi]
+  rw [ite_eq_right hi, tfOf_reg m pc i hi]
 
 theorem urz_get (m : RegMap) (pc : BitVec 64) (r : BitVec 5) : (urz m pc).get r = m.get r := by
   unfold RegMap.get
@@ -201,7 +201,7 @@ theorem ustep_key {i : instruction} (hI : UkInstr π M pc isRvc i) :
     simp [uclassOk, uvisOfRun]
   have hp : tfResumePc (tfOf m pc) = pc := tfOf_resumePc m pc (ukInstr_al2 hI)
   unfold ustep
-  rw [if_pos hc]
+  rw [ite_eq_left hc]
   show (match ufetch π M (tfResumePc (tfOf m pc)) with
     | some (isRvc, i) => uexec _ (tfResumeGpr0 (tfOf m pc)) (tfResumePc (tfOf m pc)) isRvc i
     | none => .stuck) = _
@@ -311,7 +311,7 @@ theorem ustep_jal {imm : BitVec 21} {rd : BitVec 5}
       .run (uvisOfRun (ukWr m rd (pc + instrLen isRvc)) (pc + BitVec.signExtend 64 imm) M π sz fdv cw
         g cs pid false seccAll) := by
   rw [ustep_key m sz fdv cw g cs pid hI]
-  simp only [uexec, ustepJal, hal, if_true]
+  simp only [uexec, ustepJal, hal, ite_true]
   exact uretire_key m sz fdv cw g cs pid _ _ (ukWr_off (urz_off m pc) _ _)
 
 theorem ustep_jalr {imm : BitVec 12} {rs1 rd : BitVec 5}
@@ -332,9 +332,9 @@ theorem ustep_btype {imm : BitVec 13} {rs2 rs1 : BitVec 5} {op : bop}
   rw [ustep_key m sz fdv cw g cs pid hI]
   simp only [uexec, ustepBtype, urz_get]
   by_cases ht : ukBtaken op (m.get rs1) (m.get rs2) = true
-  · simp only [ht, if_true, hal ht]
+  · simp only [ht, ite_true, hal ht]
     exact uretire_key m sz fdv cw g cs pid _ _ (urz_off m pc)
-  · simp only [ht, Bool.false_eq_true, if_false]
+  · simp only [ht, Bool.false_eq_true, ite_false]
     exact uretire_key m sz fdv cw g cs pid _ _ (urz_off m pc)
 
 theorem ustep_load {imm : BitVec 12} {rs1 rd : BitVec 5} {u : Bool} {k : Nat}
@@ -468,7 +468,7 @@ theorem ukCase_of_uexec {W : Uvis} {m : RegMap} {pc : BitVec 64} {b : Bool} {i :
   · rename_i imm rs2 rs1 op
     unfold ustepBtype at h
     refine .btype _ _ _ _ _ hI (fun ht => ?_)
-    rw [if_pos ht] at h
+    rw [ite_eq_left ht] at h
     split at h
     · assumption
     · exact absurd rfl h
@@ -531,7 +531,7 @@ theorem ukWr_x0' (m : RegMap) (rd : BitVec 5) (v : BitVec 64) (h0 : m 0#5 = 0#64
   unfold ukWr
   split
   · exact h0
-  · unfold RegMap.set; rw [if_neg (by intro h; rename_i hne; exact hne h.symm)]; exact h0
+  · unfold RegMap.set; rw [ite_eq_right (by intro h; rename_i hne; exact hne h.symm)]; exact h0
 
 theorem al_of_lsb {x : BitVec 64} (h : x.getLsbD 0 = false) : x &&& 1#64 = 0#64 := by
   have he := (lsb0_iff_even x).1 h

@@ -289,7 +289,7 @@ theorem qpSub_some {p q c : Qp} : qpSub p q = some c ↔ p = q + c := by
     have hpos : 0 < (q + c).val - q.val := by
       show 0 < (q.val + c.val) - q.val
       grind
-    rw [dif_pos hpos]
+    rw [dite_eq_left hpos]
     congr 1
     apply Subtype.ext
     show (q.val + c.val) - q.val = c.val

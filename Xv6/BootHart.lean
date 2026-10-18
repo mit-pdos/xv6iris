@@ -98,7 +98,7 @@ theorem bootStack_rw (cpu : CPU) (i : Nat) (hi : i < bootStackSlots) :
   have h3 : ¬ (0x80000 ≤ (0x8000a420 + 4096 * (cpu.val + 1) - 16 - 8 * (i + 1)) / 2 ^ 12 % 2 ^ 27 ∧
       (0x8000a420 + 4096 * (cpu.val + 1) - 16 - 8 * (i + 1)) / 2 ^ 12 % 2 ^ 27 < 0x80007) := by
     omega
-  rw [if_neg h3, if_pos (Or.inl ⟨h1, h2⟩)]
+  rw [ite_eq_right h3, ite_eq_left (Or.inl ⟨h1, h2⟩)]
 
 /-! ## §2 The M-mode precondition, out of one hart's reset residue -/
 

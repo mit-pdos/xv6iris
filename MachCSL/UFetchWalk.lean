@@ -61,22 +61,22 @@ theorem uft_congr (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (m m' : SailM X
 theorem uft_ite_pos (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (c : Prop) (inst : Decidable c)
     (a b : SailM X) (r : Option (X × UWSt × UOrc)) (hc : c) (h : uftRun D orc s a = r) :
     uftRun D orc s (@ite _ c inst a b) = r := by
-  rw [if_pos hc]; exact h
+  rw [ite_eq_left hc]; exact h
 
 theorem uft_ite_neg (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (c : Prop) (inst : Decidable c)
     (a b : SailM X) (r : Option (X × UWSt × UOrc)) (hc : ¬ c) (h : uftRun D orc s b = r) :
     uftRun D orc s (@ite _ c inst a b) = r := by
-  rw [if_neg hc]; exact h
+  rw [ite_eq_right hc]; exact h
 
 theorem uft_dite_pos (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (c : Prop) (inst : Decidable c)
     (a : c → SailM X) (b : ¬ c → SailM X) (r : Option (X × UWSt × UOrc)) (hc : c)
     (h : uftRun D orc s (a hc) = r) : uftRun D orc s (@dite _ c inst a b) = r := by
-  rw [dif_pos hc]; exact h
+  rw [dite_eq_left hc]; exact h
 
 theorem uft_dite_neg (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (c : Prop) (inst : Decidable c)
     (a : c → SailM X) (b : ¬ c → SailM X) (r : Option (X × UWSt × UOrc)) (hc : ¬ c)
     (h : uftRun D orc s (b hc) = r) : uftRun D orc s (@dite _ c inst a b) = r := by
-  rw [dif_neg hc]; exact h
+  rw [dite_eq_right hc]; exact h
 
 theorem uft_error (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (e : Sail.Error exception)
     (k : Empty → SailM X) :
@@ -109,7 +109,7 @@ theorem uft_rw (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (r : Register) (v 
     (hd : D.Dw r = true) (h : uftRun D orc (UWSt.mk (s.pin.set r v) s.rs s.mm s.rv) (k ()) = res) :
     uftRun D orc s (FreeM.impure (.ok (.regWrite r v)) k) = res := by
   rw [← h]
-  exact uft_node_of D orc s (.ok (.regWrite r v)) k rfl PUnit.unit _ orc (by simp only [runRW, hd, if_true])
+  exact uft_node_of D orc s (.ok (.regWrite r v)) k rfl PUnit.unit _ orc (by simp only [runRW, hd, ite_true])
 
 theorem uft_mrd (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat)
     (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)

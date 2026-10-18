@@ -107,7 +107,7 @@ theorem catMain_loop (UL : UK_LEAVES) (HF : CAT_FPRINTF) (HC : CAT_CAT) (N : UkN
     iintro %h2 Hrun
     rw [hs2, hs3, show av + 8 * (i + 1) = av + 8 * args.length by omega,
       show ukBtaken .BNE (BitVec.ofNat 64 (av + 8 * args.length)) (BitVec.ofNat 64 (av + 8 * args.length)) = false
-        from by simp [ukBtaken], if_neg (by decide), ukPc 0xc2 0xc6 false rfl]
+        from by simp [ukBtaken], ite_eq_right (by decide), ukPc 0xc2 0xc6 false rfl]
     ihave Hi0 := cat_uis N.t 0xc6 true (.ITYPE (0#12, .Regidx 0#5, .Regidx 10#5, .ADDI)) udec%
       (by decide) $$ Hc
     ihave Hi1 := cat_uis N.t 0xc8 false (.JAL (0x2e4#21, .Regidx 1#5)) udec%
@@ -133,7 +133,7 @@ theorem catMain_loop (UL : UK_LEAVES) (HF : CAT_FPRINTF) (HC : CAT_CAT) (N : UkN
       rw [BitVec.toNat_ofNat, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega), Nat.mod_eq_of_lt (by omega)] at this
       omega
     rw [hs2, hs3, show ukBtaken .BNE (BitVec.ofNat 64 (av + 8 * (i + 1))) (BitVec.ofNat 64 (av + 8 * args.length))
-        = true from by simp [ukBtaken, hne], if_pos rfl,
+        = true from by simp [ukBtaken, hne], ite_eq_left rfl,
       show BitVec.ofNat 64 0xc2 + BitVec.signExtend 64 0x1fe4#13 = BitVec.ofNat 64 0xa6 from by decide]
     iapply ih (i + 1) h2 m1 f1 n Cm (by omega) hinv1 $$ Hpay Hend Hc Hargv HCm Hbuf Hrun
 
@@ -212,7 +212,7 @@ theorem wp_catMain (UL : UK_LEAVES) (HF : CAT_FPRINTF) (HC : CAT_CAT) (N : UkNam
   rw [show m5.get 15#5 = BitVec.ofNat 64 1 from by ureg, h5a0, catMain_bge _ h31]
   by_cases hL : args.length ≤ 1
   · -- argc ≤ 1: cat the standard input
-    rw [decide_eq_true hL, if_pos rfl,
+    rw [decide_eq_true hL, ite_eq_left rfl,
       show BitVec.ofNat 64 0x88 + BitVec.signExtend 64 0x44#13 = BitVec.ofNat 64 0xcc from by decide]
     unfold kcatPayAll kcatRun0
     icases Hpay with ⟨Hp, -⟩
@@ -276,7 +276,7 @@ theorem wp_catMain (UL : UK_LEAVES) (HF : CAT_FPRINTF) (HC : CAT_CAT) (N : UkNam
     iapply HCm
     iframe HCi
     iapply HCc $$ HCc'
-  · rw [decide_eq_false hL, if_neg (by decide), ukPc 0x88 0x8c false rfl]
+  · rw [decide_eq_false hL, ite_eq_right (by decide), ukPc 0x88 0x8c false rfl]
     have hL2 : 2 ≤ args.length := by omega
     unfold kcatPayAll
     icases Hpay with ⟨-, Hp⟩

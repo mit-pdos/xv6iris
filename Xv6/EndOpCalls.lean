@@ -238,10 +238,10 @@ theorem eo_it (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs GF Γ]
   have h := IT.wp_install_trans_eb (GF := GF) Γ c k' γl γb V γdl γfs pd pav pu j
     logstart dev false n W Lw L D pidv dqp homeL Xv Xexc Rt
     hj hproc hK hnoff htier hgeom hdev
-    hcl hdt (by simp only [Bool.false_eq_true, if_false]; exact ha0) hn hnodup hhome hlen
+    hcl hdt (by simp only [Bool.false_eq_true, ite_false]; exact ha0) hn hnodup hhome hlen
     (fun _ => hcommit) (by simp) (by simp) hpd
   unfold wp_install_trans_eb_body at h
-  simp only [installTransAddr, Bool.false_eq_true, if_false] at h
+  simp only [installTransAddr, Bool.false_eq_true, ite_false] at h
   exact h
 
 end

@@ -146,7 +146,7 @@ theorem imgSnapOk (dk : Nat → BitVec 8) (ndisk : Nat) (sb : FsSb) (nib : Nat)
       PartialMap.get? (fsRestrict P (fsHomeList cov sb.sbLogstart)) b =
         some (P b) := by
     intro b hb
-    rw [fsRestrict_lookup, if_pos hb]
+    rw [fsRestrict_lookup, ite_eq_left hb]
   -- every metadata block sits below the data region
   have hmetaBelow : ∀ b, snapMeta (imgState P sb nib) b →
       1 ≤ b ∧ b < fsDataStart sb := by

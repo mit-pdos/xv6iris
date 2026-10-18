@@ -156,10 +156,10 @@ theorem ushr_fname_img (γd : GName) (x : UArg) (nm : List (BitVec 8)) (hu : una
       rw [useqMap_get]
       rcases strImg_lookup x.ptr nm.length x.bytes a b hab with ⟨ha, hb'⟩ | ⟨j, hj, ha, hb'⟩
       · subst ha hb'
-        rw [if_pos ⟨by omega, by omega⟩]
+        rw [ite_eq_left ⟨by omega, by omega⟩]
         simp [ushpExt]
       · subst ha hb'
-        rw [if_pos ⟨by omega, by omega⟩]
+        rw [ite_eq_left ⟨by omega, by omega⟩]
         simp [ushpExt, hj]
   · iapply (useqMap_bigSep (fun k b => ubyteq (GF := GF) γd DFrac.discard k b) x.ptr (nm.length + 1)
       (ushpExt nm.length x.bytes)).2
@@ -172,7 +172,7 @@ theorem ushr_fname_img (γd : GName) (x : UArg) (nm : List (BitVec 8)) (hu : una
         (fun {k j} hk => by
           have hj : j < x.len := List.mem_range.1 (List.mem_of_getElem? hk)
           simp [ushpExt, hj]) $$ Hbs
-    · simp only [ushpExt, Nat.lt_irrefl, if_false]
+    · simp only [ushpExt, Nat.lt_irrefl, ite_false]
       rw [← hlen]
       iexact Hn
 

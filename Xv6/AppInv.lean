@@ -402,8 +402,8 @@ theorem appDom_insert [Icfg] (I : RegMapF FsNode) (i : Nat) (n n' : FsNode)
   intro z
   rw [← hd z, LawfulPartialMap.get?_insert]
   by_cases hz : i = z
-  · subst hz; rw [if_pos rfl, hi]; rfl
-  · rw [if_neg hz]
+  · subst hz; rw [ite_eq_left rfl, hi]; rfl
+  · rw [ite_eq_right hz]
 
 /-- THE BODY (Rocq's `app_body`): the application's half of the
 authority, the claim about the map it carries (read through the view) and

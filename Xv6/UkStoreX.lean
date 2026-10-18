@@ -77,19 +77,19 @@ theorem ukm_view_store {P : UPtd} {t : PTree} {mm T : BMap} (hm : UkMem P t mm T
   unfold ukViewStore
   by_cases hk' : k' = va.toNat / 4096
   · subst hk'
-    rw [if_pos rfl]
+    rw [ite_eq_left rfl]
     apply List.ext_getElem?
     intro i
     by_cases hi : i < 4096
     · rw [List.getElem?_mapIdx, ukm_view_get _ _ _ _ _ h i hi, ukm_view_get _ _ _ _ _ h i hi, hd]
-      simp only [Bool.false_eq_true, if_false, Option.map_some, Option.some.injEq]
+      simp only [Bool.false_eq_true, ite_false, Option.map_some, Option.some.injEq]
       by_cases hin : va.toNat % 4096 ≤ i ∧ i < va.toNat % 4096 + n
-      · rw [if_pos hin]
+      · rw [ite_eq_left hin]
         have e : pte2pa lw + BitVec.ofNat 64 i =
             pte2pa lw + BitVec.ofNat 64 (va.toNat % 4096) + BitVec.ofNat 64 (i - va.toNat % 4096) := by
           rw [BitVec.add_assoc, ← BitVec.ofNat_add, Nat.add_sub_cancel' hin.1]
         rw [e, bmWrite_at _ _ _ _ (by omega) _ (by omega), Option.getD_some, hv _ (by omega)]
-      · rw [if_neg hin, bmWrite_other]
+      · rw [ite_eq_right hin, bmWrite_other]
         intro hw
         obtain ⟨j, hj, hpj⟩ := (ubWin_mem _ _ _).1 hw
         have h1 := congrArg BitVec.toNat hpj
@@ -104,7 +104,7 @@ theorem ukm_view_store {P : UPtd} {t : PTree} {mm T : BMap} (hm : UkMem P t mm T
           else b))[i]? = none :=
         List.getElem?_eq_none (by rw [List.length_mapIdx, ukm_view_length _ _ _ _ _ h]; omega)
       rw [h1, h2]
-  · rw [if_neg hk']
+  · rw [ite_eq_right hk']
     unfold ukView
     cases hk2 : get? P.um k' with
     | none => rfl
@@ -114,7 +114,7 @@ theorem ukm_view_store {P : UPtd} {t : PTree} {mm T : BMap} (hm : UkMem P t mm T
       intro j hj
       have hj' := List.mem_range.1 hj
       cases ht : ukTextLeaf lw'
-      · simp only [Bool.false_eq_true, if_false]
+      · simp only [Bool.false_eq_true, ite_false]
         rw [bmWrite_other]
         intro hw
         obtain ⟨j2, hj2, hpj⟩ := (ubWin_mem _ _ _).1 hw
@@ -125,7 +125,7 @@ theorem ukm_view_store {P : UPtd} {t : PTree} {mm T : BMap} (hm : UkMem P t mm T
         obtain ⟨ha2, -, -⟩ := ukm_page_geom P hwf _ lw h
         have hpa : pte2pa lw' = pte2pa lw := BitVec.eq_of_toNat_eq (by omega)
         exact hk' (hwf.2.1 _ _ _ _ hk2 h (ukm_ppn_of_pa _ _ hpa))
-      · simp only [if_true]
+      · simp only [ite_true]
 
 /-- A landing that changed only the walker's map (and the reservation bit),
 over engine maps at the same tree, is an engine machine. -/

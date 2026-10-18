@@ -130,14 +130,14 @@ theorem cif_ok_reg_insert (fdm : Fdmap) (vs : RegMapF CfDev) (k d : Nat) (v : Cf
         unfold fdInsert
         by_cases hx : fd = (k : Int)
         · subst hx; rw [hnone] at hfd; cases hfd
-        · rw [if_neg hx]; exact hfd
+        · rw [ite_eq_right hx]; exact hfd
       · right; exact hD
   · intro fd d' hfd
     rw [cif_dom_insert]
     unfold fdInsert at hfd
     by_cases hx : fd = (k : Int)
-    · rw [if_pos hx] at hfd; cases hfd; left; rfl
-    · rw [if_neg hx] at hfd; right; exact H4 fd d' hfd
+    · rw [ite_eq_left hx] at hfd; cases hfd; left; rfl
+    · rw [ite_eq_right hx] at hfd; right; exact H4 fd d' hfd
 
 theorem cif_kds_ne (vs : RegMapF CfDev) (d : Nat) (v : CfDev) (hD : d ∉ kds.map Prod.fst)
     (H6 : ∀ dk, dk ∈ kds → get? vs dk.1 = some dk.2) :
@@ -160,13 +160,13 @@ theorem cif_ok_open (fdm : Fdmap) (l : List FdState) (vs : RegMapF CfDev) (k d :
     unfold fdInsert at hfd
     by_cases hx : fd = (k : Int)
     · subst hx; omega
-    · rw [if_neg hx] at hfd; exact H1 fd d' hfd
+    · rw [ite_eq_right hx] at hfd; exact H1 fd d' hfd
   · intro fd d' hfd
     unfold fdInsert at hfd
     by_cases hx : fd = (k : Int)
-    · rw [if_pos hx] at hfd; cases hfd
+    · rw [ite_eq_left hx] at hfd; cases hfd
       rw [LawfulPartialMap.get?_insert_eq rfl]; simp only [cifRow]; omega
-    · rw [if_neg hx] at hfd
+    · rw [ite_eq_right hx] at hfd
       have hne : d ≠ d' := fun h => hfr fd (h ▸ hfd)
       rw [LawfulPartialMap.get?_insert_ne hne]; exact H2 fd d' hfd
   · intro fd fd' d' s' nm' i' γo' ha hb hv
@@ -176,14 +176,14 @@ theorem cif_ok_open (fdm : Fdmap) (l : List FdState) (vs : RegMapF CfDev) (k d :
       by_cases hx : fd = (k : Int)
       · by_cases hy : fd' = (k : Int)
         · rw [hx, hy]
-        · rw [if_neg hy] at hb; exact absurd hb (hfr fd')
-      · rw [if_neg hx] at ha; exact absurd ha (hfr fd)
+        · rw [ite_eq_right hy] at hb; exact absurd hb (hfr fd')
+      · rw [ite_eq_right hx] at ha; exact absurd ha (hfr fd)
     · rw [LawfulPartialMap.get?_insert_ne hdd] at hv
       by_cases hx : fd = (k : Int)
-      · rw [if_pos hx] at ha; cases ha; exact absurd rfl hdd
+      · rw [ite_eq_left hx] at ha; cases ha; exact absurd rfl hdd
       · by_cases hy : fd' = (k : Int)
-        · rw [if_pos hy] at hb; cases hb; exact absurd rfl hdd
-        · rw [if_neg hx] at ha; rw [if_neg hy] at hb; exact H5 fd fd' d' s' nm' i' γo' ha hb hv
+        · rw [ite_eq_left hy] at hb; cases hb; exact absurd rfl hdd
+        · rw [ite_eq_right hx] at ha; rw [ite_eq_right hy] at hb; exact H5 fd fd' d' s' nm' i' γo' ha hb hv
   · intro d' s' nm' i' γo' hv
     by_cases hdd : d = d'
     · subst hdd; rw [LawfulPartialMap.get?_insert_eq rfl] at hv; cases hv; exact hu
@@ -275,16 +275,16 @@ theorem cif_ok_open_std (fdm : Fdmap) (l : List FdState) (vs : RegMapF CfDev) (k
     by_cases hx : fd = (k : Int)
     · subst hx; have : NSTD ≤ NOFILE := by decide
       omega
-    · rw [if_neg hx] at hfd; exact H1 fd d' hfd
+    · rw [ite_eq_right hx] at hfd; exact H1 fd d' hfd
   · intro fd d' hfd
     unfold fdInsert at hfd
     by_cases hx : fd = (k : Int)
-    · rw [if_pos hx] at hfd; cases hfd; subst hx
+    · rw [ite_eq_left hx] at hfd; cases hfd; subst hx
       rw [LawfulPartialMap.get?_insert_eq rfl]
       refine ⟨by omega, ?_⟩
       simp only [Int.toNat_natCast]
       exact List.getElem?_set_self hkl
-    · rw [if_neg hx] at hfd
+    · rw [ite_eq_right hx] at hfd
       have hne : d ≠ d' := fun h => hfr fd (h ▸ hfd)
       rw [LawfulPartialMap.get?_insert_ne hne]; exact H2 fd d' hfd
   · intro fd fd' d' s' nm' i' γo' ha hb hv
@@ -294,14 +294,14 @@ theorem cif_ok_open_std (fdm : Fdmap) (l : List FdState) (vs : RegMapF CfDev) (k
       by_cases hx : fd = (k : Int)
       · by_cases hy : fd' = (k : Int)
         · rw [hx, hy]
-        · rw [if_neg hy] at hb; exact absurd hb (hfr fd')
-      · rw [if_neg hx] at ha; exact absurd ha (hfr fd)
+        · rw [ite_eq_right hy] at hb; exact absurd hb (hfr fd')
+      · rw [ite_eq_right hx] at ha; exact absurd ha (hfr fd)
     · rw [LawfulPartialMap.get?_insert_ne hdd] at hv
       by_cases hx : fd = (k : Int)
-      · rw [if_pos hx] at ha; cases ha; exact absurd rfl hdd
+      · rw [ite_eq_left hx] at ha; cases ha; exact absurd rfl hdd
       · by_cases hy : fd' = (k : Int)
-        · rw [if_pos hy] at hb; cases hb; exact absurd rfl hdd
-        · rw [if_neg hx] at ha; rw [if_neg hy] at hb; exact H5 fd fd' d' s' nm' i' γo' ha hb hv
+        · rw [ite_eq_left hy] at hb; cases hb; exact absurd rfl hdd
+        · rw [ite_eq_right hx] at ha; rw [ite_eq_right hy] at hb; exact H5 fd fd' d' s' nm' i' γo' ha hb hv
   · intro d' s' nm' i' γo' hv
     by_cases hdd : d = d'
     · subst hdd; rw [LawfulPartialMap.get?_insert_eq rfl] at hv; cases hv; exact hu
@@ -333,7 +333,7 @@ theorem cif_ok_close (fdm : Fdmap) (l : List FdState) (vs : RegMapF CfDev) (fd :
       unfold fdDelete
       by_cases hx : fd' = fd
       · subst hx; rw [hfd] at hfd'; cases hfd'; exact absurd rfl hd'.2
-      · rw [if_neg hx]; exact hfd'
+      · rw [ite_eq_right hx]; exact hfd'
     · right; exact hk
   · intro fd' d' h
     unfold fdDelete at h; split at h
@@ -379,8 +379,8 @@ theorem cif_ok_close_shared (fdm : Fdmap) (l : List FdState) (vs : RegMapF CfDev
       · subst hx; rw [hfd] at hfd'; cases hfd'
         rcases hsh with hD | ⟨fd'', hne, hfd''⟩
         · right; exact hD
-        · left; exact ⟨fd'', by unfold fdDelete; rw [if_neg hne]; exact hfd''⟩
-      · left; exact ⟨fd', by unfold fdDelete; rw [if_neg hx]; exact hfd'⟩
+        · left; exact ⟨fd'', by unfold fdDelete; rw [ite_eq_right hne]; exact hfd''⟩
+      · left; exact ⟨fd', by unfold fdDelete; rw [ite_eq_right hx]; exact hfd'⟩
     · right; exact hk
   · intro fd' d' h; unfold fdDelete at h; split at h
     · cases h

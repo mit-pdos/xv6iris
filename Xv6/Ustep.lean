@@ -195,7 +195,7 @@ theorem uwidth_eq_some {w : Int} {k : Nat} (h : uwidth w = some k) : ukWidth k �
 
 theorem uwidth_of {k : Nat} (hk : ukWidth k) : uwidth (k : Int) = some k := by
   unfold uwidth ukWidth at *
-  rw [if_pos (by omega)]
+  rw [ite_eq_left (by omega)]
   simp
 
 theorem uloadPerm_iff (π : Nat → Option UPerm) (va : BitVec 64) :

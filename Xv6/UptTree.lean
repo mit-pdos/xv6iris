@@ -77,7 +77,7 @@ theorem uptWalk_path (t : PTree) (vpn : BitVec 27) (addr v : BitVec 64) (hwf : t
   | none =>
     have h := hwf (vpnIdx vpn 2)
     rw [hk2] at h
-    simp only [hk2, h, if_true] at hw
+    simp only [hk2, h, ite_true] at hw
     exact absurd hw (by simp)
   | some c1 =>
     have h2 := hwf (vpnIdx vpn 2)
@@ -87,7 +87,7 @@ theorem uptWalk_path (t : PTree) (vpn : BitVec 27) (addr v : BitVec 64) (hwf : t
     | none =>
       have h := h2.2 (vpnIdx vpn 1)
       rw [hk1] at h
-      simp only [hk1, h, if_true] at hw
+      simp only [hk1, h, ite_true] at hw
       exact absurd hw (by simp)
     | some c0 =>
       have h1 := h2.2 (vpnIdx vpn 1)

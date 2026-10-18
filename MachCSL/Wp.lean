@@ -450,9 +450,9 @@ theorem machInterp_acc (σ : MState) (cpu : CPU) :
   · imodintro
     iintro %k %y %hk %hne Hy
     have hy : y ≠ cpu := cpus_get?_ne hk cpu hne
-    simp only [updCpu, hy, if_false]
+    simp only [updCpu, hy, ite_false]
     iexact Hy
-  · simp only [updCpu, if_true]
+  · simp only [updCpu, ite_true]
     iexact Hf
 
 /-- Extract everything one hart's memory event touches: its register
@@ -1217,7 +1217,7 @@ theorem hartObs_of_evStep_fix (cpu : CPU) (o : InstructionEffect) (u : Instructi
   case regWrite r a w =>
     have hfix := ((h σ () (σ.setReg cpu r w)).1 rfl).2
     have hr := congrArg (fun s : MState => s.regs cpu r) hfix
-    simp only [if_true, RegFile.set_same] at hr
+    simp only [ite_true, RegFile.set_same] at hr
     exact hartObs_regWrite_quiet cpu σ r a w (Or.inr hr.symm)
   all_goals rfl
 
@@ -1414,7 +1414,7 @@ theorem memModel_load (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv 
       intro c hc
       simp [updCpu, hc]
     · iapply hartViewsAt_intro
-      simp only [updCpu, if_true, HRead.afterLoad]
+      simp only [updCpu, ite_true, HRead.afterLoad]
       iframe Hv Hi Hr
   · ipureintro
     exact mmOk_afterLoad σ cpu pa n tvn htv hmm
@@ -1492,7 +1492,7 @@ theorem memModel_store_plain (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w
   imod MonoNat.own_update _ (.ofNat σ.top) (.ofNat (σ.top + 1))
     (by simp only [MaxNat.le_toNat]; omega) $$ Htop with ⟨Htop, #Htoplb⟩
   imod ghost_map_insert_persist (σ.top + 1) (hartAgent cpu)
-    (by rw [authMap_get?, if_neg (by simp only [MState.top]; omega)]) $$ Hauth with ⟨Hauth, #Hau⟩
+    (by rw [authMap_get?, ite_eq_right (by simp only [MState.top]; omega)]) $$ Hauth with ⟨Hauth, #Hau⟩
   unfold resvFragAt
   imod ghost_map_update ((none, false) : ResvVal) $$ Hresv Hfrag with ⟨Hresv, Hfrag⟩
   imodintro

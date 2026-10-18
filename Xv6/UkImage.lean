@@ -68,27 +68,27 @@ theorem uk_store_view {pt : UPtd} {sz : Nat} {V : Nat → List (BitVec 8)} {M : 
   funext n
   unfold uMStore
   by_cases hn : a ≤ n ∧ n < a + k
-  · rw [if_pos hn]
+  · rw [ite_eq_left hn]
     have e1 : n / 4096 = a / 4096 := by omega
     have e2 : n % 4096 = a % 4096 + (n - a) := by omega
     unfold umemLazy ukViewStore
     rw [e1, hk]
-    simp only [Option.isSome_some, if_true, List.getElem?_mapIdx, e2]
+    simp only [Option.isSome_some, ite_true, List.getElem?_mapIdx, e2]
     rw [List.getElem?_eq_getElem (by omega)]
     simp only [Option.map_some]
-    rw [if_pos ⟨by omega, by omega⟩]
+    rw [ite_eq_left ⟨by omega, by omega⟩]
     congr 2
     omega
-  · rw [if_neg hn, ← hM]
+  · rw [ite_eq_right hn, ← hM]
     unfold umemLazy ukViewStore
     by_cases hp : n / 4096 = a / 4096
-    · rw [if_pos hp, hp, hk]
-      simp only [Option.isSome_some, if_true, List.getElem?_mapIdx]
+    · rw [ite_eq_left hp, hp, hk]
+      simp only [Option.isSome_some, ite_true, List.getElem?_mapIdx]
       rcases Nat.lt_or_ge (n % 4096) 4096 with h4 | h4
       · rw [List.getElem?_eq_getElem (by omega)]
         simp only [Option.map_some]
-        rw [if_neg (by omega)]
+        rw [ite_eq_right (by omega)]
       · omega
-    · rw [if_neg hp]
+    · rw [ite_eq_right hp]
 
 end Xv6

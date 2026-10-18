@@ -68,7 +68,7 @@ theorem frd_envout_dev (r w : Bool) (mj : Nat) :
 
 theorem frd_devenv_in (mj : Nat) (h : mj ≤ NDEV_max) :
     filereadDevEnv (GF := GF) mj ⊢ consoleReadyApp := by
-  unfold filereadDevEnv; rw [if_pos h]
+  unfold filereadDevEnv; rw [ite_eq_left h]
 
 set_option maxHeartbeats 8000000 in
 /-- The two device `-1` exits (`+0xba` and `+0xc4`), after the tail: the

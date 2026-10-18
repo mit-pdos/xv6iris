@@ -79,7 +79,7 @@ theorem sc_sext_nat (w : BitVec 32) (h0 : 0 ≤ w.toInt) :
   have hint : w.toInt = w.toNat := BitVec.toInt_eq_toNat_of_msb hmsb
   apply BitVec.eq_of_toNat_eq
   rw [BitVec.toNat_signExtend, hmsb, hint]
-  simp only [BitVec.toNat_setWidth, BitVec.toNat_ofNat, Nat.reducePow, Bool.false_eq_true, if_false, Nat.add_zero,
+  simp only [BitVec.toNat_setWidth, BitVec.toNat_ofNat, Nat.reducePow, Bool.false_eq_true, ite_false, Nat.add_zero,
     Int.toNat_natCast]
 
 theorem sc_ofile_addr (pa : BitVec 64) (fd : Nat) (h : fd < 16) :
@@ -103,11 +103,11 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [Bioslot
 
 theorem sc_ofdOut_intro (a : BitVec 64) (w : BitVec 32) (h : a ≠ 0#64) :
     wordPointsTo (GF := GF) a 4 (DFrac.own 1) w ⊢ ofdOut a w := by
-  unfold ofdOut; rw [if_neg h]
+  unfold ofdOut; rw [ite_eq_right h]
 
 theorem sc_ofdOut_elim (a : BitVec 64) (w : BitVec 32) (h : a ≠ 0#64) :
     ofdOut (GF := GF) a w ⊢ wordPointsTo a 4 (DFrac.own 1) w := by
-  unfold ofdOut; rw [if_neg h]
+  unfold ofdOut; rw [ite_eq_right h]
 
 /-! ## The callees -/
 

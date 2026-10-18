@@ -206,7 +206,7 @@ theorem itable_kmapRw (a : BitVec 64) (h1 : 0x80020e28 ≤ a.toNat)
     simp only [vpnOf, BitVec.extractLsb'_toNat, Nat.reducePow, Nat.shiftRight_eq_div_pow]
   rw [hv, Nat.mod_eq_of_lt (by omega)]
   unfold kmapClass
-  rw [if_neg (by omega), if_pos (Or.inl ⟨by omega, by omega⟩)]
+  rw [ite_eq_right (by omega), ite_eq_left (Or.inl ⟨by omega, by omega⟩)]
 
 theorem ientry_off_toNat (k m : Nat) (hk : k < NINODE) (hm : m < ISLOTSZ) :
     (ientry k + BitVec.ofNat 64 m).toNat = 0x80020e28 + 24 + ISLOTSZ * k + m := by

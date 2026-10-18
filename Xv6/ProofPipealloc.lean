@@ -721,7 +721,7 @@ theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γ
     · ipureintro; exact ⟨rfl, rfl, rfl, rfl, rfl⟩
     iframe Ht0
     unfold fileCore fileCoreNoff fileCoreOff
-    rw [if_pos rfl, if_neg (show ¬ (FD_PIPE = FD_INODE) by decide)]
+    rw [ite_eq_left rfl, ite_eq_right (show ¬ (FD_PIPE = FD_INODE) by decide)]
     iframe Ho0
     isplitl []
     · iexact Hpipe
@@ -738,7 +738,7 @@ theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γ
     · ipureintro; exact ⟨rfl, rfl, rfl, rfl, rfl⟩
     iframe Ht1
     unfold fileCore fileCoreNoff fileCoreOff
-    rw [if_pos rfl, if_neg (show ¬ (FD_PIPE = FD_INODE) by decide)]
+    rw [ite_eq_left rfl, ite_eq_right (show ¬ (FD_PIPE = FD_INODE) by decide)]
     iframe Ho1
     isplitl []
     · iexact Hpipe

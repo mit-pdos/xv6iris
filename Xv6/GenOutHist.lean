@@ -101,10 +101,10 @@ theorem lmDlOk_out (so so' : GStage M) (dl : List (List Obs × BitVec 8)) (hE : 
     (hcase : so.gsW ≠ [] ∨ restOf (so.gsE.map Prod.snd) ≠ [] ∨ so.gsE.map Prod.snd = [])
     (hdl : lmDlOk M so dl) : lmDlOk M so' dl := by
   unfold lmDlOk at hdl ⊢
-  rw [hE, if_neg (fun h => hw h.2)]
+  rw [hE, ite_eq_right (fun h => hw h.2)]
   rcases hcase with hc | hc | hc
-  · rwa [if_neg (fun h => hc h.2)] at hdl
-  · rwa [if_neg (fun h => hc h.1)] at hdl
+  · rwa [ite_eq_right (fun h => hc h.2)] at hdl
+  · rwa [ite_eq_right (fun h => hc h.1)] at hdl
   · rw [hc, linesBytes_nil]; exact Nat.zero_le _
 
 /-- ...AND AT A BLOCK'S FIRST BYTE the clause is paid by the writer's own
@@ -113,7 +113,7 @@ theorem lmDlOk_out_full (so so' : GStage M) (dl : List (List Obs × BitVec 8)) (
     (hw : so'.gsW ≠ []) (hr : restOf (so.gsE.map Prod.snd) = [])
     (hlen : (so.gsE.map Prod.snd).length ≤ dl.length) : lmDlOk M so' dl := by
   unfold lmDlOk
-  rw [hE, if_neg (fun h => hw h.2)]
+  rw [hE, ite_eq_right (fun h => hw h.2)]
   have hsum := linesBytes_rest (so.gsE.map Prod.snd)
   rw [hr, List.length_nil] at hsum
   omega

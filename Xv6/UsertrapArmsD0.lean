@@ -68,13 +68,13 @@ theorem utD0_umemLazy_fill (P : UPtd) (sz : Nat) (M : Nat → List (BitVec 8)) (
     have h1 : n % 4096 < 4096 := Nat.mod_lt _ (by decide)
     have h2 : n < pgRoundUpN sz := by unfold pgRoundUpN; omega
     rw [hk]
-    simp only [e1, e2, ite_true, Bool.false_eq_true, ite_false, if_pos h2]
-    rw [viewZero, if_pos rfl, List.getElem?_replicate, if_pos h1]
+    simp only [e1, e2, ite_true, Bool.false_eq_true, ite_false, ite_eq_left h2]
+    rw [viewZero, ite_eq_left rfl, List.getElem?_replicate, ite_eq_left h1]
   · have e1 : Iris.Std.PartialMap.get? (P.insertLeaf vpn r perm).um (n / 4096) =
         Iris.Std.PartialMap.get? P.um (n / 4096) := by
       simp only [UPtd.insertLeaf]; exact LawfulPartialMap.get?_insert_ne (fun h => hk h.symm)
     simp only [e1]
-    rw [viewZero, if_neg hk]
+    rw [viewZero, ite_eq_right hk]
 
 /-! ## §2 The call site -/
 
@@ -144,7 +144,7 @@ theorem utD0_rows {Γ : SchedNames} (A : UtArgs GF) (hok : UtOk Γ A) (hne : A.s
     utFdEcall_quiet _ _ _ _ _ _ hne,
     utPipeEcall_quiet _ _ _ _ _ _ _ _ hne, fun hc => absurd hc hne, by rw [← hok.hP]; rfl, rfl⟩
   unfold utRound uroundOk
-  rw [if_neg hne]
+  rw [ite_eq_right hne]
   refine ⟨⟨rfl, rfl⟩, ?_, permOf_extSz hext, rfl, rfl, rfl, rfl⟩
   exact utD0_umemLazy_fill _ _ _ _ _ _ hn hlt
 

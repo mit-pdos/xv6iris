@@ -54,10 +54,10 @@ theorem uexitst_exit_xs (m : RegMap) (pc : BitVec 64) : exitXs (tfOf m pc) = uex
   rw [h]
 
 theorem tfOf_a1 (m : RegMap) (pc : BitVec 64) : tfW (tfOf m pc) (tfArgIdx 1) = m.get 11#5 := by
-  rw [tfOf_arg m pc 1 (by decide)]; unfold RegMap.get; rw [if_neg (by decide)]
+  rw [tfOf_arg m pc 1 (by decide)]; unfold RegMap.get; rw [ite_eq_right (by decide)]
 
 theorem tfOf_a2 (m : RegMap) (pc : BitVec 64) : tfW (tfOf m pc) (tfArgIdx 2) = m.get 12#5 := by
-  rw [tfOf_arg m pc 2 (by decide)]; unfold RegMap.get; rw [if_neg (by decide)]
+  rw [tfOf_arg m pc 2 (by decide)]; unfold RegMap.get; rw [ite_eq_right (by decide)]
 
 /-- The key's effective number at the run's full mask is the raw one. -/
 theorem ukSys_numE (m : RegMap) (pc : BitVec 64) (n : Int) (hn : usysno m = n) (h0 : 0 ≤ n) (h1 : n < 64) :
@@ -257,7 +257,7 @@ theorem ukSys_fdStOfKey (m : RegMap) (fdv : List FdState) (fd : Nat) (st : FdSta
     (ha : (BitVec.setWidth 32 (m.get 10#5)).toInt = (fd : Int)) (hs : fdv[fd]? = some st) (hlt : fd < NOFILE) :
     ukFdStOfKey (m.get 10#5) fdv = st := by
   unfold ukFdStOfKey
-  rw [ukSys_lo32, ha, if_pos ⟨by omega, by exact_mod_cast hlt⟩]
+  rw [ukSys_lo32, ha, ite_eq_left ⟨by omega, by exact_mod_cast hlt⟩]
   simp [hs]
 
 /-- **Rocq `fd_lowest_closed_app`**, the half the dup leaves read: a table

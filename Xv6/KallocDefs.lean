@@ -323,12 +323,12 @@ instance kRcpt_persistent (γk : KmemNames) (act r : BitVec 64) :
 omit [MachGS GF] in
 theorem kRcpt_null (γk : KmemNames) (act r : BitVec 64) (hr : r = 0#64) :
     kRcpt (GF := GF) γk act r = kNullRcpt γk act := by
-  unfold kRcpt; rw [if_pos hr]
+  unfold kRcpt; rw [ite_eq_left hr]
 
 omit [MachGS GF] in
 theorem kRcpt_page (γk : KmemNames) (act r : BitVec 64) (hr : r ≠ 0#64) :
     kRcpt (GF := GF) γk act r = kAllocRcpt γk act := by
-  unfold kRcpt; rw [if_neg hr]
+  unfold kRcpt; rw [ite_eq_right hr]
 
 /-! ## The allocator's authority -/
 

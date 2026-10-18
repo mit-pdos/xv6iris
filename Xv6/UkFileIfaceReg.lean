@@ -163,12 +163,12 @@ theorem fif_ok_reg_insert (fdm : Fdmap) (vs : FifVs) (k : Nat) (d : Nat) (v : Fd
     rw [LawfulPartialMap.get?_insert] at hd'
     by_cases e : d = d'
     · subst e; left; exact ⟨(k : Int), by simp [fdInsert]⟩
-    · rw [if_neg e] at hd'
+    · rw [ite_eq_right e] at hd'
       rcases h3 d' hd' with ⟨fd, hfd⟩ | hD
       · left
         refine ⟨fd, ?_⟩
         unfold fdInsert
-        rw [if_neg]; · exact hfd
+        rw [ite_eq_right]; · exact hfd
         rintro rfl; rw [hnone] at hfd; cases hfd
       · exact Or.inr hD
   · intro fd d' h
@@ -176,11 +176,11 @@ theorem fif_ok_reg_insert (fdm : Fdmap) (vs : FifVs) (k : Nat) (d : Nat) (v : Fd
     unfold fifDom PartialMap.dom
     rw [LawfulPartialMap.get?_insert]
     by_cases e : fd = (k : Int)
-    · rw [if_pos e] at h; cases h; simp
-    · rw [if_neg e] at h
+    · rw [ite_eq_left e] at h; cases h; simp
+    · rw [ite_eq_right e] at h
       by_cases e' : d = d'
       · simp [e']
-      · rw [if_neg e']; exact h4 fd d' h
+      · rw [ite_eq_right e']; exact h4 fd d' h
 
 /-- **Rocq `fif_ok_open`**: an open landing at a tail descriptor. -/
 theorem fif_ok_open (fdm : Fdmap) (l : List FdState) (vs : FifVs) (k : Nat) (d : Nat) (nm : Bytes)
@@ -194,15 +194,15 @@ theorem fif_ok_open (fdm : Fdmap) (l : List FdState) (vs : FifVs) (k : Nat) (d :
     unfold fdInsert at h
     by_cases e : fd = (k : Int)
     · subst e; constructor <;> omega
-    · rw [if_neg e] at h; exact h1 fd d' h
+    · rw [ite_eq_right e] at h; exact h1 fd d' h
   · intro fd d' h
     unfold fdInsert at h
     by_cases e : fd = (k : Int)
-    · rw [if_pos e] at h; cases h
-      rw [LawfulPartialMap.get?_insert, if_pos rfl]
+    · rw [ite_eq_left e] at h; cases h
+      rw [LawfulPartialMap.get?_insert, ite_eq_left rfl]
       simp only [fifRow]; omega
-    · rw [if_neg e] at h
-      rw [LawfulPartialMap.get?_insert, if_neg (fun e' => hfr fd (by rw [e']; exact h))]
+    · rw [ite_eq_right e] at h
+      rw [LawfulPartialMap.get?_insert, ite_eq_right (fun e' => hfr fd (by rw [e']; exact h))]
       exact h2 fd d' h
   · intro fa fb d' s nm' i' γo' ha hb hv
     unfold fdInsert at ha hb
@@ -212,17 +212,17 @@ theorem fif_ok_open (fdm : Fdmap) (l : List FdState) (vs : FifVs) (k : Nat) (d :
       by_cases ea : fa = (k : Int)
       · by_cases eb : fb = (k : Int)
         · rw [ea, eb]
-        · rw [if_neg eb] at hb; exact absurd hb (hfr fb)
-      · rw [if_neg ea] at ha; exact absurd ha (hfr fa)
-    · rw [if_neg e] at hv
+        · rw [ite_eq_right eb] at hb; exact absurd hb (hfr fb)
+      · rw [ite_eq_right ea] at ha; exact absurd ha (hfr fa)
+    · rw [ite_eq_right e] at hv
       by_cases ea : fa = (k : Int)
-      · rw [if_pos ea] at ha; cases ha; exact absurd rfl e
+      · rw [ite_eq_left ea] at ha; cases ha; exact absurd rfl e
       · by_cases eb : fb = (k : Int)
-        · rw [if_pos eb] at hb; cases hb; exact absurd rfl e
-        · rw [if_neg ea] at ha; rw [if_neg eb] at hb
+        · rw [ite_eq_left eb] at hb; cases hb; exact absurd rfl e
+        · rw [ite_eq_right ea] at ha; rw [ite_eq_right eb] at hb
           exact h5 fa fb d' s nm' i' γo' ha hb hv
   · intro d' hd'
-    rw [LawfulPartialMap.get?_insert, if_neg (fun e => hD (by rw [e]; exact hd'))]
+    rw [LawfulPartialMap.get?_insert, ite_eq_right (fun e => hD (by rw [e]; exact hd'))]
     exact h6 d' hd'
 
 /-- **Rocq `fif_ok_closed_fresh`**: a closed standard slot is named by no
@@ -278,18 +278,18 @@ theorem fif_ok_open_std (fdm : Fdmap) (l : List FdState) (vs : FifVs) (k : Nat) 
     unfold fdInsert at h
     by_cases e : fd = (k : Int)
     · subst e; constructor <;> omega
-    · rw [if_neg e] at h; exact h1 fd d' h
+    · rw [ite_eq_right e] at h; exact h1 fd d' h
   · intro fd d' h
     unfold fdInsert at h
     by_cases e : fd = (k : Int)
-    · rw [if_pos e] at h; cases h
-      rw [LawfulPartialMap.get?_insert, if_pos rfl]
+    · rw [ite_eq_left e] at h; cases h
+      rw [LawfulPartialMap.get?_insert, ite_eq_left rfl]
       subst e
       simp only [fifRow]
       refine ⟨by omega, ?_⟩
       simp [hkl]
-    · rw [if_neg e] at h
-      rw [LawfulPartialMap.get?_insert, if_neg (fun e' => hfr fd (by rw [e']; exact h))]
+    · rw [ite_eq_right e] at h
+      rw [LawfulPartialMap.get?_insert, ite_eq_right (fun e' => hfr fd (by rw [e']; exact h))]
       have hr := h2 fd d' h
       have h0 := (h1 fd d' h).1
       have hne : k ≠ fd.toNat := fif_slot_ne k fd h0 e
@@ -305,17 +305,17 @@ theorem fif_ok_open_std (fdm : Fdmap) (l : List FdState) (vs : FifVs) (k : Nat) 
       by_cases ea : fa = (k : Int)
       · by_cases eb : fb = (k : Int)
         · rw [ea, eb]
-        · rw [if_neg eb] at hb; exact absurd hb (hfr fb)
-      · rw [if_neg ea] at ha; exact absurd ha (hfr fa)
-    · rw [if_neg e] at hv
+        · rw [ite_eq_right eb] at hb; exact absurd hb (hfr fb)
+      · rw [ite_eq_right ea] at ha; exact absurd ha (hfr fa)
+    · rw [ite_eq_right e] at hv
       by_cases ea : fa = (k : Int)
-      · rw [if_pos ea] at ha; cases ha; exact absurd rfl e
+      · rw [ite_eq_left ea] at ha; cases ha; exact absurd rfl e
       · by_cases eb : fb = (k : Int)
-        · rw [if_pos eb] at hb; cases hb; exact absurd rfl e
-        · rw [if_neg ea] at ha; rw [if_neg eb] at hb
+        · rw [ite_eq_left eb] at hb; cases hb; exact absurd rfl e
+        · rw [ite_eq_right ea] at ha; rw [ite_eq_right eb] at hb
           exact h5 fa fb d' s nm' i' γo' ha hb hv
   · intro d' hd'
-    rw [LawfulPartialMap.get?_insert, if_neg (fun e => hD (by rw [e]; exact hd'))]
+    rw [LawfulPartialMap.get?_insert, ite_eq_right (fun e => hD (by rw [e]; exact hd'))]
     exact h6 d' hd'
 
 /-- **Rocq `fif_ok_close`**: the close of an UNPROTECTED device's last
@@ -336,19 +336,19 @@ theorem fif_ok_close (fdm : Fdmap) (l : List FdState) (vs : FifVs) (fd : Int) (d
     split at h
     · cases h
     · rename_i hne
-      rw [LawfulPartialMap.get?_delete, if_neg (fun e => hn fd' hne (by rw [e]; exact h))]
+      rw [LawfulPartialMap.get?_delete, ite_eq_right (fun e => hn fd' hne (by rw [e]; exact h))]
       exact h2 fd' d' h
   · intro d' hd'
     unfold fifDom PartialMap.dom at hd'
     rw [LawfulPartialMap.get?_delete] at hd'
     by_cases e : d = d'
-    · rw [if_pos e] at hd'; simp at hd'
-    · rw [if_neg e] at hd'
+    · rw [ite_eq_left e] at hd'; simp at hd'
+    · rw [ite_eq_right e] at hd'
       rcases h3 d' hd' with ⟨fd', hfd'⟩ | hD'
       · left
         refine ⟨fd', ?_⟩
         unfold fdDelete
-        rw [if_neg]; · exact hfd'
+        rw [ite_eq_right]; · exact hfd'
         rintro rfl; rw [hfd] at hfd'; cases hfd'; exact e rfl
       · exact Or.inr hD'
   · intro fd' d' h
@@ -357,7 +357,7 @@ theorem fif_ok_close (fdm : Fdmap) (l : List FdState) (vs : FifVs) (fd : Int) (d
     · cases h
     · rename_i hne
       unfold fifDom PartialMap.dom
-      rw [LawfulPartialMap.get?_delete, if_neg (fun e => hn fd' hne (by rw [e]; exact h))]
+      rw [LawfulPartialMap.get?_delete, ite_eq_right (fun e => hn fd' hne (by rw [e]; exact h))]
       exact h4 fd' d' h
   · intro fa fb d' s nm i γo ha hb hv
     unfold fdDelete at ha hb
@@ -367,7 +367,7 @@ theorem fif_ok_close (fdm : Fdmap) (l : List FdState) (vs : FifVs) (fd : Int) (d
     split at hv; · cases hv
     exact h5 fa fb d' s nm i γo ha hb hv
   · intro d' hd'
-    rw [LawfulPartialMap.get?_delete, if_neg (fun e => hD (by rw [e]; exact hd'))]
+    rw [LawfulPartialMap.get?_delete, ite_eq_right (fun e => hD (by rw [e]; exact hd'))]
     exact h6 d' hd'
 
 /-- **Rocq `fif_ok_close_shared`**: ...and of a descriptor whose device
@@ -396,9 +396,9 @@ theorem fif_ok_close_shared (fdm : Fdmap) (l : List FdState) (vs : FifVs) (fd : 
         rcases hsh with hD | ⟨fd'', hne, hfd''⟩
         · exact Or.inr hD
         · left; refine ⟨fd'', ?_⟩
-          unfold fdDelete; rw [if_neg hne]; exact hfd''
+          unfold fdDelete; rw [ite_eq_right hne]; exact hfd''
       · left; refine ⟨fd', ?_⟩
-        unfold fdDelete; rw [if_neg e]; exact hfd'
+        unfold fdDelete; rw [ite_eq_right e]; exact hfd'
     · exact Or.inr hD'
   · intro fd' d' h
     unfold fdDelete at h

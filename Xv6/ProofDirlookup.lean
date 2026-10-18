@@ -223,7 +223,7 @@ theorem dirlookup_self (RD : READI) (NC : NAMECMP) (IG : IGET) (PA : PANIC) (ID 
       icases Hkeep with ⟨Hdev, Hmeta, Hmap, Hblk, Hnm, Hpid, Hbsl, Hlk, Hdi⟩
       iapply Hnext $$ %spie' %spp' %R' %true %0 %kd %qn %true %hcs' Hk Hpc Hte Hce Hdev Hmeta Hmap
         Hblk Hshr Hru Hnm Hpid Hrc Hrr Hbsl Hlk Hdi
-      simp only [if_true]
+      simp only [ite_true]
       iexists dinum
       iframe Hnew Hru2 Hpf
       ipureintro

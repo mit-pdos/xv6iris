@@ -298,8 +298,8 @@ theorem iregRecs_acc_upd (γfs : FsNames) (inodestart bi : Nat) (ds : List Dinod
   · intro k x hkx
     obtain ⟨rfl, _⟩ := Xv6.rangeGetElem? hkx
     by_cases hk : x = i
-    · rw [if_pos hk, if_pos hk]
-    · rw [if_neg hk, if_neg hk, getElem!_set_ne ds i x d' hk]
+    · rw [ite_eq_left hk, ite_eq_left hk]
+    · rw [ite_eq_right hk, ite_eq_right hk, getElem!_set_ne ds i x d' hk]
 
 end Recs
 
@@ -900,8 +900,8 @@ theorem iregBlks_acc_upd [Icfg] (γi : GName) (γfs : FsNames) (inodestart : Nat
   iapply (BigSepL.bigSepL_mono (fun {k x} hkx => ?_)) $$ Hrest
   obtain ⟨rfl, _⟩ := Xv6.rangeGetElem? hkx
   by_cases hk : x = bi
-  · rw [if_pos hk, if_pos hk]
-  · rw [if_neg hk, if_neg hk]
+  · rw [ite_eq_left hk, ite_eq_left hk]
+  · rw [ite_eq_right hk, ite_eq_right hk]
     exact iregBlk_mono γi γfs inodestart m m' x fun i hi => hag x i hk hi
 
 /-- ONE SLOT OF ONE BLOCK, with the fifteen others re-buildable at the
@@ -921,8 +921,8 @@ theorem iregSlots_acc_upd [Icfg] (γfs : FsNames) (γi : GName) (bi : Nat) (ds :
   · intro k x hkx
     obtain ⟨rfl, _⟩ := Xv6.rangeGetElem? hkx
     by_cases hk : x = i
-    · rw [if_pos hk, if_pos hk]
-    · rw [if_neg hk, if_neg hk, getElem!_set_ne ds i x d' hk]
+    · rw [ite_eq_left hk, ite_eq_left hk]
+    · rw [ite_eq_right hk, ite_eq_right hk, getElem!_set_ne ds i x d' hk]
 
 end Acc
 

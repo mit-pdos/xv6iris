@@ -23,7 +23,7 @@ theorem ulibPc_next (b : BitVec 64) (x y : Nat) (r : Bool) (h : x + (if r then 2
     b + BitVec.ofNat 64 x + ulibLen r = b + BitVec.ofNat 64 y := by
   rw [BitVec.add_assoc]
   congr 1
-  cases r <;> simp only [ulibLen, if_true, Bool.false_eq_true, if_false] at h ⊢ <;>
+  cases r <;> simp only [ulibLen, ite_true, Bool.false_eq_true, ite_false] at h ⊢ <;>
     (subst h; apply BitVec.eq_of_toNat_eq; simp [BitVec.toNat_add])
 
 /-- A pc-relative target, folded. -/
@@ -130,7 +130,7 @@ theorem ulibS_brT {b : BitVec 64} {x : Nat} {rvc : Bool} {imm : BitVec 13} {rs2 
   ihave #Hi := hc $$ HC
   iapply (L.wp_btype m _ av rvc imm rs2 rs1 op ?hal) $$ Hi Hrun
   case hal => intro _; rw [ulibPc_jmp b x t imm ht]; exact ulibPc_even b hb t ht2
-  rw [htk, if_pos rfl, ulibPc_jmp b x t imm ht]
+  rw [htk, ite_eq_left rfl, ulibPc_jmp b x t imm ht]
   iexact Hk
 
 /-- A branch that falls through. -/
@@ -145,7 +145,7 @@ theorem ulibS_brN {b : BitVec 64} {x : Nat} {rvc : Bool} {imm : BitVec 13} {rs2 
   iapply (L.wp_btype m _ av rvc imm rs2 rs1 op ?hal) $$ Hi Hrun
   case hal => intro h; rw [htk] at h; cases h
   rw [htk]
-  simp only [Bool.false_eq_true, if_false]
+  simp only [Bool.false_eq_true, ite_false]
   rw [ulibPc_next b x y rvc hy]
   iexact Hk
 
@@ -357,7 +357,7 @@ namespace Xv6
 /-- Register-file reads through a chain of literal writes, and the literal
 immediates: the one normalizer the walks use on their side conditions. -/
 macro "ulib_regs" : tactic =>
-  `(tactic| simp (config := { decide := true }) only [MachCSL.RegMap.get, MachCSL.RegMap.set_apply, if_true, if_false,
+  `(tactic| simp (config := { decide := true }) only [MachCSL.RegMap.get, MachCSL.RegMap.set_apply, ite_true, ite_false,
     BitVec.reduceSignExtend, ukRtypeVal, ukBtaken, BitVec.zero_add, BitVec.add_zero])
 
 end Xv6

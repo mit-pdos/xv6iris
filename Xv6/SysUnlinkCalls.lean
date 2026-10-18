@@ -559,9 +559,9 @@ theorem sys_unlink_dirlookup (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimIs GF Γ]
     fsReadyKmem (ientry ik) inum bm data dn dn nf true pofv pidv pidPriv (DFrac.own (1 : Qp).half)
     (DFrac.own 1) ik sd rootv rti (DFrac.own 1) hj hproc hK hnoff htier htype hg.fgoLog hwf hcov
     hsz hholes hinums (Or.inr ⟨hnd, hndd⟩) horph hty0 rfl hpd ha0 rfl hik
-    (by simp only [if_true]; exact ha2)
+    (by simp only [ite_true]; exact ha2)
   unfold wp_dirlookup_eb_body at h
-  simp only [dirlookupAddr, if_true] at h
+  simp only [dirlookupAddr, ite_true] at h
   iapply h
   iframe Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk Hshr Hru Hnm Hoff Hpid Hrc Hrr Hbs Hslot Hlk Hdi
   iframe #
@@ -573,18 +573,18 @@ theorem sys_unlink_dirlookup (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimIs GF Γ]
     Hshr Hru Hnm Hpid Hrc Hrr Hbs Hlk Hdi
   -- THE SELF ARM IS REFUTED by the name; the record arms at their old shape
   cases found
-  · simp only [Bool.false_eq_true, if_false]
+  · simp only [Bool.false_eq_true, ite_false]
     icases Harm with ⟨%⟨-, hf, ha⟩, Hs, Hp⟩
     iframe Hs Hp
     ipureintro; exact ⟨hf, ha⟩
-  · simp only [if_true]
+  · simp only [ite_true]
     icases Harm with ⟨%inum2, %⟨hks, ha⟩, %harm, Href, Hru2, Hp⟩
     cases self
-    · simp only [Bool.false_eq_true, if_false] at harm ⊢
+    · simp only [Bool.false_eq_true, ite_false] at harm ⊢
       obtain ⟨-, hf, rfl⟩ := harm
       iframe Href Hru2 Hp
       ipureintro; exact ⟨hf, hks, ha⟩
-    · simp only [if_true] at harm
+    · simp only [ite_true] at harm
       exact absurd harm.1 hns
 
 /-! ## writei: the zeroing, on the kernel arm -/
@@ -657,9 +657,9 @@ theorem sys_unlink_writei (WI : WRITEI) (Γ : SchedNames) [ClaimIs GF Γ]
     pidv pidPriv (DFrac.own 1) (DFrac.own (1 : Qp).half) (DFrac.own (1 : Qp).half) DFrac.discard
     DFrac.discard DFrac.discard hj hproc hK hnoff htier hcost hg.fgoLog (hg.iblockCov inum hnib)
     (hg.iblockOut inum hnib) hnib hda hnz hstab hnl hwf hhz hcovs hsum hsz hg.fgoBitmap hsbs hpd
-    ha0 (by simp only [Bool.false_eq_true, if_false]; exact ha1) ha3 ha4
+    ha0 (by simp only [Bool.false_eq_true, ite_false]; exact ha1) ha3 ha4
   unfold wp_writei_gen_eb_body at h
-  simp only [writeiAddr, Bool.false_eq_true, if_false] at h
+  simp only [writeiAddr, Bool.false_eq_true, ite_false] at h
   iapply h
   iframe Hk Hpc Hte Hce Hdev Hinum Hmeta Hmap Hblk Hdi Hbs Hop
   iframe #
@@ -849,7 +849,7 @@ theorem sys_unlink_iunlockput_tx (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs G
   isplitl [Hkeep Hru]
   · unfold inodeRefpShort; iframe
   isplitl []
-  · simp only [Bool.false_eq_true, if_false]; iempintro
+  · simp only [Bool.false_eq_true, ite_false]; iempintro
   iapply wpNext_intro_pin_lc
   iintro %c %_ Hlc %spie %spp %R' %n' %Sb' %w %hcs Hk Hpc Hte Hce Hpid - - Hbs %hf Hops Htx Hslot
   obtain ⟨hsub, -, -, hlo, hhi⟩ := hf
@@ -921,7 +921,7 @@ theorem sys_unlink_iunlockput_dep (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs 
   isplitl [Hkeep Hru]
   · unfold inodeRefpShort; iframe
   isplitl []
-  · simp only [Bool.false_eq_true, if_false]; iempintro
+  · simp only [Bool.false_eq_true, ite_false]; iempintro
   iapply wpNext_intro_pin_lc
   iintro %c %_ Hlc %spie %spp %R' %n' %Sb' %w %hcs Hk Hpc Hte Hce Hpid - - Hbs %hf Hops Hslot Hside
   rw [icDepSide_ofTx _ t qa rfl]

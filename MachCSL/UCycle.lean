@@ -81,12 +81,12 @@ theorem ucRW_writeReg {X : Type} (orc : UOrc) (s : UWSt) (r : Register) (v : Reg
     (k : PUnit → SailM X) (h : D.Dw r = true) :
     runRW D orc s (writeReg r v >>= k) = runRW D orc (s.setR r v) (k ()) := by
   show runRW D orc s (FreeM.impure (.ok (.regWrite r v)) fun u => k u) = _
-  simp only [runRW, h, if_true]; rfl
+  simp only [runRW, h, ite_true]; rfl
 
 theorem ucRW_writeReg_pure (orc : UOrc) (s : UWSt) (r : Register) (v : RegisterType r)
     (h : D.Dw r = true) : runRW D orc s (writeReg r v) = some ((), s.setR r v, orc) := by
   show runRW D orc s (FreeM.impure (.ok (.regWrite r v)) FreeM.pure) = _
-  simp only [runRW, h, if_true]; rfl
+  simp only [runRW, h, ite_true]; rfl
 
 end steps
 
@@ -192,15 +192,15 @@ theorem uc_epilogue_active (hD : UcFoot D) (orc : UOrc) (s : UWSt) (r : Bool)
     (h : s.file .hart_state = .HART_ACTIVE ()) :
     runRW D orc s (ucEpilogue r) = some (false, ucEpi r s, orc) := by
   simp only [ucEpilogue, MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_hs, h]
-  simp only [uc_tickPc hD, get_config_rvfi, Bool.false_eq_true, if_false]
+  simp only [uc_tickPc hD, get_config_rvfi, Bool.false_eq_true, ite_false]
   unfold ucEpi
   cases r
-  · simp only [Bool.false_and, Bool.false_eq_true, if_false, pure_bind]; rfl
-  · simp only [if_true, Bool.true_and, MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_mi]
+  · simp only [Bool.false_and, Bool.false_eq_true, ite_false, pure_bind]; rfl
+  · simp only [ite_true, Bool.true_and, MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_mi]
     rw [ucTickS_file_other _ _ (by decide)]
     cases hb : s.file .minstret_increment
-    · simp only [Bool.false_eq_true, if_false]; rfl
-    · simp only [if_true, MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_minstret, ucRW_writeReg D _ _ _ _ _ hD.wr_minstret]
+    · simp only [Bool.false_eq_true, ite_false]; rfl
+    · simp only [ite_true, MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_minstret, ucRW_writeReg D _ _ _ _ _ hD.wr_minstret]
       rw [ucTickS_file_other _ _ (by decide)]
       rfl
 
@@ -237,7 +237,7 @@ theorem uc_finish_wait (hD : UcFoot D) (orc : UOrc) (s : UWSt) (wr : WaitReason)
   unfold ucFinish
   rw [runRW_bind_some D _ _ orc orc s (ucWaitS s wr ib) ()]
   · exact uc_epilogue_waiting hD orc _ _ wr ib (UWSt.setR_file_same _ _ _)
-  · simp only [ucArm, uc_waitIsNop, Bool.false_eq_true, if_false, get_config_print_instr]
+  · simp only [ucArm, uc_waitIsNop, Bool.false_eq_true, ite_false, get_config_print_instr]
     exact ucRW_writeReg_pure D orc s _ _ hD.wr_hs
 
 /-- **The parked step's arm** (`Step_Waiting wr` on a WAITING hart): the
@@ -327,7 +327,7 @@ theorem uc_dispatch (hD : UcDispFoot D) (orc : UOrc) (s : UWSt) (hm : UcMisa D s
     MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_mip, MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_mie,
     MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_mideleg, 
     ucRW_readReg_any D _ _ _ _ hD.meip_nr hD.meip_any, ucRW_readReg_any D _ _ _ _ hD.seip_nr hD.seip_any,
-    if_true]
+    ite_true]
   have e1 : (Privilege.User == Privilege.Machine) = false := rfl
   have e2 : (Privilege.User == Privilege.Supervisor) = false := rfl
   have e3 : (Privilege.User == Privilege.User) = true := rfl
@@ -338,13 +338,13 @@ theorem uc_dispatch (hD : UcDispFoot D) (orc : UOrc) (s : UWSt) (hm : UcMisa D s
       ucIp (s.file .mip) ((orc 0).reg .sig_meip) ((orc 1).reg .sig_seip) from rfl]
   generalize ucIp (s.file .mip) ((orc 0).reg .sig_meip) ((orc 1).reg .sig_seip) = ip'
   simp only [e1, e2, e3, hmm, ez, BitVec.and_zero, bne_self_eq_false, 
-    Bool.true_and, Bool.or_true, Bool.and_false, Bool.false_eq_true, if_false]
+    Bool.true_and, Bool.or_true, Bool.and_false, Bool.false_eq_true, ite_false]
   unfold dispatchU dispatchOfPending pendingU
   by_cases hc : ip' &&& (s.file .mie &&& s.file .mideleg) = 0#64
-  · simp only [hc, bne_self_eq_false, Bool.false_eq_true, if_false, ne_eq, not_true_eq_false, pure_bind]
+  · simp only [hc, bne_self_eq_false, Bool.false_eq_true, ite_false, ne_eq, not_true_eq_false, pure_bind]
     rfl
   · have hc' : (ip' &&& (s.file .mie &&& s.file .mideleg) != 0#64) = true := by simp [hc]
-    simp only [hc', hc, if_true, ne_eq, not_false_eq_true, pure_bind]
+    simp only [hc', hc, ite_true, ne_eq, not_false_eq_true, pure_bind]
     cases findPendingInterrupt (ip' &&& (s.file .mie &&& s.file .mideleg)) <;> rfl
 
 /-! ## §5 After the fetch: decode, landing pad, execute -/
@@ -379,7 +379,7 @@ theorem uc_afterFetch_base (hD : UcFoot D) (orc orc2 : UOrc) (s s2 : UWSt) (w : 
     runRW D orc s (ucAfterFetch (F_Base w)) = some (Step_Execute (r, zero_extend (m := 32) w), s2, orc2) := by
   simp only [ucAfterFetch, ext_fetch_hook]
   rw [runRW_bind_some D _ _ orc orc s s i hdec, uc_lpad orc s hrd hv]
-  simp only [Bool.false_and, Bool.false_eq_true, if_false, MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_pc,
+  simp only [Bool.false_and, Bool.false_eq_true, ite_false, MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_pc,
     ucRW_writeReg D _ _ _ _ _ hD.wr_npc]
   exact runRW_bind_some D _ _ orc orc2 _ s2 r hex
 
@@ -393,7 +393,7 @@ theorem uc_afterFetch_rvc (hD : UcFoot D) (orc orc2 : UOrc) (s s2 : UWSt) (h : B
     runRW D orc s (ucAfterFetch (F_RVC h)) = some (Step_Execute (r, zero_extend (m := 32) h), s2, orc2) := by
   simp only [ucAfterFetch, ext_fetch_hook]
   rw [runRW_bind_some D _ _ orc orc s s i hdec, uc_lpad orc s hrd hv]
-  simp only [Bool.false_eq_true, if_false, uc_currentlyEnabled_Zca hm, if_true,
+  simp only [Bool.false_eq_true, ite_false, uc_currentlyEnabled_Zca hm, ite_true,
     MachCSL.uxa_readReg_bind D _ _ _ _ hD.rd_pc, ucRW_writeReg D _ _ _ _ _ hD.wr_npc]
   exact runRW_bind_some D _ _ orc orc2 _ s2 r hex
 
