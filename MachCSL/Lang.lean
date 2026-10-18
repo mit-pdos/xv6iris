@@ -83,8 +83,12 @@ interface forced it (`notes/design-rulings.md`, "The sail-riscv 0.16 bump"):
 
 Model-side changes this semantics merely runs: WFI retires on a pending
 enabled platform interrupt; `STIP`/`MTIP` are recomputed from the timer at
-each cycle start; the fork keeps the atomic PTE A/D update and, as before the
-bump, leaves the F/D instructions out of the generated model.
+each cycle start (the tick no longer writes `mip`); every physical access
+reads `mhartid` (`within_clint`); a supervisor or user trap also writes H's
+`hstatus`/`htval`/`htinst` (invisible without H).  The fork keeps the atomic
+PTE A/D update, leaves the F/D instructions out of the generated model (as
+before the bump), and resets `hideleg`/`hgeie`, which the interrupt check reads
+whether or not H is enabled.
 -/
 import MachCSL.Platform
 import MachCSL.BootImage
