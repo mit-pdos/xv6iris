@@ -17,6 +17,7 @@ FAITHFUL: facts of xv6's table; Sv39 walk addresses (`pt_base @ vpn_i @ 0b000`).
 `Xv6.KptPlain.*`.
 -/
 import Xv6.KptMapIdent
+import Xv6.KvmSeal
 
 namespace Xv6
 
@@ -59,10 +60,36 @@ theorem KptPlain.mem_kptSlots {ra : PAddr} {t : PTree} {e : BitVec 64 × BitVec 
 returns, sealed with its root word at `kernel_pagetable`. -/
 theorem xv6KptOk_of {t : PTree} {pas : Nat → BitVec 44} (h : kvmTableOk t pas) :
     xv6KptOk (kptSlots KA.«kernel_pagetable» t) := by
-  refine ⟨pas, t.base, ?_, fun vpn ppn perm hk => ?_⟩
+  refine ⟨pas, t.base, ?_, fun vpn ppn perm hk => ?_, fun i hi => ?_⟩
   · have e : kSlotP t.base 0 = pteAddr t.base 0#9 := kSlotP_pteAddr t.base 0#9
     rw [e]
     exact List.mem_cons_self
+  rotate_left
+  · obtain ⟨hpv, hnp⟩ := h.2.2.2.2.2.2 i hi
+    have e : kSlotP (pas i) 0 = pageAddr (pas i) := kSlotP_pteAddr (pas i) 0#9
+    rw [e]
+    refine ⟨?_, fun d hd => ?_⟩
+    · obtain ⟨-, h2, -⟩ := hpv
+      simp only [BitVec.ult, decide_eq_true_eq, Nat.not_lt, kernelEndAddr] at h2
+      exact h2
+    · rcases List.mem_cons.1 hd with rfl | hd
+      · intro heq
+        have h1 : KA.«kernel_pagetable».toNat = (pageAddr (pas i)).toNat := congrArg BitVec.toNat heq
+        obtain ⟨-, h2, -⟩ := hpv
+        simp only [BitVec.ult, decide_eq_true_eq, Nat.not_lt, kernelEndAddr] at h2
+        have h3 : KA.«end».toNat ≤ KA.«kernel_pagetable».toNat := by rw [h1]; exact h2
+        revert h3
+        decide +kernel
+      · obtain ⟨e, he, rfl⟩ := List.mem_map.1 hd
+        obtain ⟨b, hb, k, hk⟩ := entries_page 2 t e he
+        intro heq0
+        have heq : e.1 = pageAddr (pas i) := heq0
+        rw [hk] at heq
+        have h1 := congrArg BitVec.toNat heq
+        rw [KptInv.pteAddr_toNat, pageAddr_toNat] at h1
+        have hk' := k.isLt
+        have hbb : b = pas i := BitVec.eq_of_toNat_eq (by omega)
+        exact hnp (hbb ▸ hb)
   · obtain ⟨addr, a, d, hw⟩ := kvmMapK_maps h vpn ppn perm ((kMapP_iff pas vpn ppn perm).1 hk)
     obtain ⟨c1, g, h2, h1, rfl⟩ := KptTextIdent.walk_path t h.1 vpn _ _ hw
     have h0 := PTree.walk_mem_entries 2 t vpn _ _ hw

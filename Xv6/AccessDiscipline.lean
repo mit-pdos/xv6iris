@@ -651,7 +651,7 @@ theorem kptDynLeaf {σ : MState} {S : Nat} {dyn : List KSlot} (hh : kptHistsAt �
 
 /-- **`kptMapsExp` from the record** with xv6's shape of the sealed slots. -/
 theorem kptMapsExp_of (σ : MState) (hk : kptStateOkK xv6Rsv xv6KptOk σ) : kptMapsExp σ := by
-  obtain ⟨S, dyn, ⟨_, hclean⟩ | ⟨hok, hh, ⟨pas, b, hroot, hmaps⟩⟩⟩ := hk
+  obtain ⟨S, dyn, ⟨_, hclean⟩ | ⟨hok, hh, ⟨pas, b, hroot, hmaps, -⟩⟩⟩ := hk
   · exact Or.inl (fun a ha H hH e he => hclean _ _ xv6StartedR_mem a ha H hH e he)
   right
   obtain ⟨hrw, -⟩ := kptDynFrozen hh hroot
@@ -673,6 +673,144 @@ theorem kptMapsExp_of (σ : MState) (hk : kptStateOkK xv6Rsv xv6KptOk σ) : kptM
     obtain ⟨w1, d1⟩ := kptDynFrozen hh h1
     obtain ⟨w0, d0⟩ := kptDynLeaf hh h0
     exact ⟨b1, b0, a, d, w2, d2, w1, d1, w0, d0⟩
+
+/-! ### The kernel-stack pages past the seal (mcslrec (3) X1-b, [OWN.90] [OWN.104] (b))
+
+As of every position past the seal, the permanent root's walk at a `KSTACK(i)` page reads the
+same frozen pointers and an `A`/`D` variant of the same leaf (`MachCSL.KptInv.slot_asOfGe`), so
+the kernel-stack pages (`MachCSL.kstkPageAt`) are exactly xv6's 64 `pas i` (`kstkPage_walk`,
+`kstkPage_build`), and a kernel-stack byte stays one (`ksByteAt_mono`). -/
+
+/-- A pointer entry names the page `kSlotP b 0`. -/
+theorem kPtr_target (b : BitVec 44) : ((kPtr b >>> 10) <<< 12) &&& 0x00FFFFFFFFFFF000#64 = kSlotP b 0 := by
+  simp only [kPtr, mkPte, ptrFlags, kSlotP, Nat.mul_zero]
+  bv_decide
+
+/-- A kernel leaf names the page `kSlotP ppn 0`. -/
+theorem kLeaf_target (ppn : BitVec 44) (perm : KPerm) (a d : BitVec 1) :
+    ((kLeaf ppn perm a d >>> 10) <<< 12) &&& 0x00FFFFFFFFFFF000#64 = kSlotP ppn 0 := by
+  cases perm <;>
+    simp only [kLeaf, pteSetAD, mkPte, KPerm.flags, Sail.BitVec.extractLsb, Sail.BitVec.updateSubrange,
+      Sail.BitVec.updateSubrange', BitVec.extractLsb, LeanRV64D.Functions._update_PTE_Flags_A, LeanRV64D.Functions._update_PTE_Flags_D, kSlotP,
+      Nat.mul_zero] <;>
+    bv_decide
+
+theorem ptLeafTo_kLeaf (ppn : BitVec 44) (perm : KPerm) (a d : BitVec 1) : ptLeafTo (kLeaf ppn perm a d) (kSlotP ppn 0) := by
+  refine ⟨?_, ?_, (kLeaf_target ppn perm a d).symm⟩ <;> cases perm <;>
+    simp only [kLeaf, pteSetAD, mkPte, KPerm.flags, Sail.BitVec.extractLsb, Sail.BitVec.updateSubrange,
+      Sail.BitVec.updateSubrange', BitVec.extractLsb, LeanRV64D.Functions._update_PTE_Flags_A, LeanRV64D.Functions._update_PTE_Flags_D] <;>
+    bv_decide
+
+theorem ptPtrTo_kPtr_slot (b : BitVec 44) : ptPtrTo (kPtr b) (kSlotP b 0) := by
+  refine ⟨?_, ?_, (kPtr_target b).symm⟩ <;> simp only [kPtr, mkPte, ptrFlags] <;> bv_decide
+
+theorem kSlotP_add (b : BitVec 44) (k : Nat) : kSlotP b 0 + BitVec.ofNat 64 (8 * k) = kSlotP b k := by
+  simp [kSlotP]
+
+theorem kstk_idx (i l : Nat) (hi : i < 64) :
+    kIdxP (BitVec.ofNat 27 (0x3FFFFFF - 2 * (i + 1))) l = kvpnIdx (0x3FFFFFF - 2 * (i + 1)) l := by
+  simp only [kIdxP, kvpnIdx, BitVec.toNat_ofNat]
+  rw [Nat.mod_eq_of_lt (a := 0x3FFFFFF - 2 * (i + 1)) (by omega)]
+
+/-- xv6's root word, read off a permanent root as of `t`. -/
+theorem kstk_root {m : FlatMem} {top S : Nat} {dyn : List KSlot} (hok : kptSealOk xv6Rsv m top S dyn)
+    (hh : kptHistsAt m S dyn) {b : BitVec 44} (hroot : (⟨KA.«kernel_pagetable», kSlotP b 0, true⟩ : KSlot) ∈ dyn)
+    {t : Nat} (hSt : S ≤ t) {r : PAddr} (hr : ptRootAt xv6Rsv m t r) : r = kSlotP b 0 := by
+  obtain ⟨_, base, cnt, stride, k, hR, hk, hw⟩ := hr
+  obtain ⟨rfl, rfl⟩ := xv6Roots_only base cnt stride hR
+  have hk0 : k = 0 := by omega
+  subst hk0
+  have hs := KptInv.slot_asOfGe hok hh hroot hSt (v := r) (by simpa using hw)
+  simpa using hs
+
+/-- **A kernel-stack page past the seal is one of the 64 `pas i`.** -/
+theorem kstkPage_walk {m : FlatMem} {top S : Nat} {dyn : List KSlot} (hok : kptSealOk xv6Rsv m top S dyn)
+    (hh : kptHistsAt m S dyn) {pas : Nat → BitVec 44} {b : BitVec 44}
+    (hroot : (⟨KA.«kernel_pagetable», kSlotP b 0, true⟩ : KSlot) ∈ dyn)
+    (hmaps : ∀ (vpn : BitVec 27) (ppn : BitVec 44) (perm : KPerm), kMapP pas vpn ppn perm →
+      ∃ (b1 b0 : BitVec 44) (a d : BitVec 1),
+        (⟨kSlotP b (kIdxP vpn 2), kPtr b1, true⟩ : KSlot) ∈ dyn ∧
+        (⟨kSlotP b1 (kIdxP vpn 1), kPtr b0, true⟩ : KSlot) ∈ dyn ∧
+        (⟨kSlotP b0 (kIdxP vpn 0), kLeaf ppn perm a d, false⟩ : KSlot) ∈ dyn)
+    {t : Nat} (hSt : S ≤ t) {p : PAddr} (hp : kstkPageAt xv6Rsv m t p) :
+    ∃ i, i < 64 ∧ p = kSlotP (pas i) 0 ∧ kSlotP b 0 ≠ 0 := by
+  obtain ⟨base, cnt, vhi, i, r, hR, hi, hr, v2, v1, v0, p1, p0, w2, pp2, w1, pp1, w0, pl⟩ := hp
+  obtain ⟨rfl, rfl⟩ := xv6Kstacks_only base cnt vhi hR
+  have hr0 := hr.1
+  have hrb := kstk_root hok hh hroot hSt hr
+  subst hrb
+  obtain ⟨b1, b0, a, d, h2, h1, h0⟩ := hmaps _ (pas i) .rw (Or.inr (Or.inr ⟨i, hi, rfl, rfl, rfl⟩))
+  rw [kSlotP_add, ← kstk_idx i 2 hi] at w2
+  have e2 := KptInv.slot_asOfGe hok hh h2 hSt w2
+  simp only [↓reduceIte] at e2
+  subst e2
+  have hp1 : p1 = kSlotP b1 0 := by rw [pp2.2.2, kPtr_target]
+  subst hp1
+  rw [kSlotP_add, ← kstk_idx i 1 hi] at w1
+  have e1 := KptInv.slot_asOfGe hok hh h1 hSt w1
+  simp only [↓reduceIte] at e1
+  subst e1
+  have hp0 : p0 = kSlotP b0 0 := by rw [pp1.2.2, kPtr_target]
+  subst hp0
+  rw [kSlotP_add, ← kstk_idx i 0 hi] at w0
+  have e0 := KptInv.slot_asOfGe hok hh h0 hSt w0
+  simp only [Bool.false_eq_true, ↓reduceIte] at e0
+  obtain ⟨a', d', rfl⟩ := pteVariant_of_kLeaf _ _ _ _ e0
+  exact ⟨i, hi, by rw [pl.2.2, kLeaf_target], hr0⟩
+
+/-- **Every `pas i` is a kernel-stack page past the seal** (the root page nonzero). -/
+theorem kstkPage_build {m : FlatMem} {top S : Nat} {dyn : List KSlot} (hok : kptSealOk xv6Rsv m top S dyn)
+    (hh : kptHistsAt m S dyn) {pas : Nat → BitVec 44} {b : BitVec 44}
+    (hroot : (⟨KA.«kernel_pagetable», kSlotP b 0, true⟩ : KSlot) ∈ dyn)
+    (hmaps : ∀ (vpn : BitVec 27) (ppn : BitVec 44) (perm : KPerm), kMapP pas vpn ppn perm →
+      ∃ (b1 b0 : BitVec 44) (a d : BitVec 1),
+        (⟨kSlotP b (kIdxP vpn 2), kPtr b1, true⟩ : KSlot) ∈ dyn ∧
+        (⟨kSlotP b1 (kIdxP vpn 1), kPtr b0, true⟩ : KSlot) ∈ dyn ∧
+        (⟨kSlotP b0 (kIdxP vpn 0), kLeaf ppn perm a d, false⟩ : KSlot) ∈ dyn)
+    (hb0 : kSlotP b 0 ≠ 0) {t : Nat} (hSt : S ≤ t) {i : Nat} (hi : i < 64) :
+    kstkPageAt xv6Rsv m t (kSlotP (pas i) 0) := by
+  obtain ⟨b1, b0, a, d, h2, h1, h0⟩ := hmaps _ (pas i) .rw (Or.inr (Or.inr ⟨i, hi, rfl, rfl, rfl⟩))
+  obtain ⟨vr, wr⟩ := KptInv.slot_existsGe hh hroot hSt
+  have er := KptInv.slot_asOfGe hok hh hroot hSt wr
+  simp only [↓reduceIte] at er
+  subst er
+  obtain ⟨v2, w2⟩ := KptInv.slot_existsGe hh h2 hSt
+  have e2 := KptInv.slot_asOfGe hok hh h2 hSt w2
+  simp only [↓reduceIte] at e2
+  subst e2
+  obtain ⟨v1, w1⟩ := KptInv.slot_existsGe hh h1 hSt
+  have e1 := KptInv.slot_asOfGe hok hh h1 hSt w1
+  simp only [↓reduceIte] at e1
+  subst e1
+  obtain ⟨v0, w0⟩ := KptInv.slot_existsGe hh h0 hSt
+  have e0 := KptInv.slot_asOfGe hok hh h0 hSt w0
+  simp only [Bool.false_eq_true, ↓reduceIte] at e0
+  obtain ⟨a', d', rfl⟩ := pteVariant_of_kLeaf _ _ _ _ e0
+  refine ⟨0#64, 64, 0x3FFFFFF, i, kSlotP b 0, xv6RsvStatic_kstacks, hi,
+    ⟨hb0, KA.«kernel_pagetable», 1, 8, 0, xv6RsvStatic_kptRoot, by omega, by simpa using wr⟩,
+    kPtr b1, kPtr b0, kLeaf (pas i) .rw a' d', kSlotP b1 0, kSlotP b0 0, ?_, ptPtrTo_kPtr_slot b1, ?_,
+    ptPtrTo_kPtr_slot b0, ?_, ptLeafTo_kLeaf _ _ _ _⟩
+  · rw [kSlotP_add, ← kstk_idx i 2 hi]; exact w2
+  · rw [kSlotP_add, ← kstk_idx i 1 hi]; exact w1
+  · rw [kSlotP_add, ← kstk_idx i 0 hi]; exact w0
+
+/-- **A kernel-stack byte stays one** at every later position (the record's facts). -/
+theorem ksByteAt_mono {σ : MState} (hk : kptStateOkK xv6Rsv xv6KptOk σ) {s t : Nat} (hst : s ≤ t) {a : PAddr}
+    (h : ksByteAt xv6Rsv σ.mem s a) : ksByteAt xv6Rsv σ.mem t a := by
+  rcases h with h | ⟨hpw, p, hp, hlo, hhi⟩
+  · exact .inl h
+  obtain ⟨S, dyn, ⟨_, hclean⟩ | ⟨hok, hh, ⟨pas, b, hroot, hmaps, -⟩⟩⟩ := hk
+  · exfalso
+    obtain ⟨f, w, e, hR, he, he0⟩ := hpw
+    unfold FlatMem.entAsOf at he
+    cases hH : σ.mem[f]? with
+    | none => rw [hH] at he; cases he
+    | some H =>
+      rw [hH, Option.bind_some] at he
+      exact he0 (hclean f w hR f (RsvRegion.base_mem _ rfl) H hH e (List.mem_of_find?_eq_some he))
+  have hSs := KptInv.pubWritten_gt hok hpw
+  obtain ⟨i, hi, rfl, hb0⟩ := kstkPage_walk hok hh hroot hmaps (by omega) hp
+  exact .inr ⟨KptInv.pubWritten_mono hst hpw, _, kstkPage_build hok hh hroot hmaps hb0 (by omega) hi, hlo, hhi⟩
 
 /-- **`utextDiscAt`, the user code** (W8 (f3-utext) [OWN.89] (W-R), [R34.1],
 O1; `MachCSL.uTextDiscAt`): while hart `h` is in user mode, every history

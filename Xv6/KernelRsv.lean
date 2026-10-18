@@ -193,14 +193,17 @@ def kMapP (pas : Nat → BitVec 44) (vpn : BitVec 27) (ppn : BitVec 44) (perm : 
 
 /-- **xv6's sealed slots** (`KernelRsv.kptOk`): the root word's frozen slot names
 the root page `b`; every kernel mapping's walk is two frozen pointer slots and
-a leaf slot. -/
+a leaf slot; and (mcslrec (3) X1-b) every kernel-stack page `pas i` lies at or
+above `end` (an allocator page) and is no page-table page (its first doubleword
+is no sealed slot). -/
 def xv6KptOk (dyn : List KSlot) : Prop :=
   ∃ (pas : Nat → BitVec 44) (b : BitVec 44), (⟨KA.«kernel_pagetable», kSlotP b 0, true⟩ : KSlot) ∈ dyn ∧
-    ∀ (vpn : BitVec 27) (ppn : BitVec 44) (perm : KPerm), kMapP pas vpn ppn perm →
+    (∀ (vpn : BitVec 27) (ppn : BitVec 44) (perm : KPerm), kMapP pas vpn ppn perm →
       ∃ (b1 b0 : BitVec 44) (a d : BitVec 1),
         (⟨kSlotP b (kIdxP vpn 2), kPtr b1, true⟩ : KSlot) ∈ dyn ∧
         (⟨kSlotP b1 (kIdxP vpn 1), kPtr b0, true⟩ : KSlot) ∈ dyn ∧
-        (⟨kSlotP b0 (kIdxP vpn 0), kLeaf ppn perm a d, false⟩ : KSlot) ∈ dyn
+        (⟨kSlotP b0 (kIdxP vpn 0), kLeaf ppn perm a d, false⟩ : KSlot) ∈ dyn) ∧
+    ∀ i, i < 64 → KA.«end».toNat ≤ (kSlotP (pas i) 0).toNat ∧ ∀ d ∈ dyn, d.addr ≠ kSlotP (pas i) 0
 
 /-- **xv6's release sites** (mcslrec (2) [OWN.82] (a1)): `release+0x1a`, the
 `sw zero, 0(s1)` that frees a spinlock (`__sync_lock_release`), and
