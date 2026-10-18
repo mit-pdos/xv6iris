@@ -3,6 +3,12 @@ MachCSL: the supervisor-mode cycle lemmas over an ABSTRACT fetch
 (`fetchSpecS`): the trap branch and the retire scripts; `wpLoop_s_base` /
 `wpLoop_s_rvc` themselves are `MachCSL.WpSmodeCycleB32` / `WpSmodeCycleRvc`.  Split from `WpSmodeCycle`: nothing here translates, so this
 file does not wait for `Translate`.
+
+Since sail-riscv 0.16 (see `MachCSL.WpCycle`): the cycle refreshes `mip` first
+(`cycle_prologue`), checks breakpoint reentrancy before the fetch
+(`cycle_prefetch_s`: in S-mode `medeleg`'s breakpoint bit decides whether
+`mstatus` is read), and the trap also writes the hypervisor trap CSRs, which
+ride in the trap-CSR bundle (`hTrapCsrs` in `trapCsrsAt`/`trapCsrs`).
 -/
 import MachCSL.SConfAtDefs
 import MachCSL.WpCycleDefs

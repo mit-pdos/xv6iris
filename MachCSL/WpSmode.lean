@@ -47,11 +47,8 @@ theorem swp_dispatchInterrupt_S_off (cpu : CPU) (dq : DFrac) (c : MConf)
   iframe Hhw Hmip
   inext
   iintro %ip' Hmip
+  -- no machine-level interrupt is deliverable; `SIE = 0` (`hsie`) closes the supervisor one
   have hm : ip' &&& c.mie &&& ~~~c.mideleg = 0#64 := by rw [BitVec.and_assoc, hmie, BitVec.and_zero]
-  have hc : (_get_Mstatus_SIE c.mstatus == 1#1 &&
-      ip' &&& c.mie &&& (c.mideleg &&& 18446744073709551615#64) != 0#64) = false := by
-    simp only [_get_Mstatus_SIE, Sail.BitVec.extractLsb, BitVec.extractLsb, hsie]
-    rfl
   swp_run 40
   conf_intro HmConf
   iapply HΦ $$ HmConf Hmip

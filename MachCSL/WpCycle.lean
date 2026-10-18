@@ -7,6 +7,14 @@ decode, execute, retire, optional clock tick — assembled from the stage
 specifications, parametric in the instruction's fetch, decode and execute
 behaviour.  Instruction rules (`WpMmode.lean`) instantiate the execute part;
 code files instantiate the fetch and decode parts.
+
+Since sail-riscv 0.16 a cycle (`try_step`) also refreshes `mip` first
+(`update_mip`: `swp_update_mip`, the script `cycle_prologue`), runs the Sdtrig
+checks (all disabled) and the breakpoint-reentrancy check around the fetch
+(they read the privilege, `PC` and `mstatus`, so the configuration is opened
+around them), and ends by clearing `written_event_index` and checking
+`written_trigger_index = none`: the cells `cycleAux` that `clockCells` now
+carries.  The statements are unchanged.
 -/
 import MachCSL.WpCycleDefs
 import MachCSL.WpStagesM
