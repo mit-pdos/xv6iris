@@ -30,10 +30,11 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-! ### The written values, as pure functions
 
-Where the model's legalisation is pure (`legalize_xepc`, `legalize_medeleg`,
-`legalize_sie`, `legalize_mcounteren`) the lemmas use it directly; where it is
-monadic (it consults `misa`), the value below is what it computes under the
-boot `misa` (extracted from the symbolic run). -/
+Where the model's legalisation is pure (`legalize_xepc`, `legalize_mcounteren`)
+the lemmas use it directly; where it is monadic (it consults `misa` or the
+extension gates; since sail-riscv 0.16 also `legalize_medeleg` and
+`legalize_sie`), the value below is what it computes on this platform
+(extracted from the symbolic run). -/
 
 /-- `legalize_mstatus o v` with `MPP(v) = S` (the only case xv6 writes): since
 sail-riscv 0.16 this is `mstatusLegalize` of `MachCSL.WpCsrS` (which also clears
