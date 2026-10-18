@@ -37,7 +37,7 @@ theorem swp_transform_effective_address_S [CurCtx] (cpu : CPU) (dq : DFrac) (c :
   -- run it once per access kind and let `swp_translationMode_tier` answer
   -- the mode, so only the two-line tail is split by tier (it was the whole
   -- run per tier: 12 runs, now 6)
-  generalize htm : satp_mode = tm
+  generalize htm : Functions.satp_mode = tm
   rcases hacc with rfl | rfl | rfl | rfl | rfl | rfl
   all_goals
     swp_run 120

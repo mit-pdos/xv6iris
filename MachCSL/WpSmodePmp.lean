@@ -64,12 +64,12 @@ set_option maxHeartbeats 4000000 in
 theorem swp_translationMode_bare (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
     (hok : SConfBare (GF := GF) c sie) (Φ : SATPMode → IProp GF) :
     confCells cpu dq Privilege.Supervisor c ∗ ▷ (confCells cpu dq Privilege.Supervisor c -∗ Φ SATPMode.Bare)
-    ⊢ swp cpu (satp_mode Privilege.Supervisor) Φ := by
+    ⊢ swp cpu (Functions.satp_mode Privilege.Supervisor) Φ := by
   iintro ⟨HmConf, HΦ⟩
   obtain ⟨⟨hpmp, hms, hpmm, hlpe⟩, hmode⟩ := hok
   obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
   conf_cases HmConf
-  unfold satp_mode
+  unfold Functions.satp_mode
   swp_run 80
   conf_intro HmConf
   iapply HΦ $$ HmConf

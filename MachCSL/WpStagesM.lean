@@ -113,9 +113,9 @@ theorem swp_checked_mem_read_load8_conf [CurCtx] (cpu : CPU) (dq dq' : DFrac) (c
 
 /-- The translation mode in machine mode: Bare, at once. -/
 theorem swp_translationMode_M (cpu : CPU) (Φ : SATPMode → IProp GF) :
-    Φ SATPMode.Bare ⊢ swp cpu (satp_mode Privilege.Machine) Φ := by
+    Φ SATPMode.Bare ⊢ swp cpu (Functions.satp_mode Privilege.Machine) Φ := by
   iintro HΦ
-  unfold satp_mode
+  unfold Functions.satp_mode
   swp_run 20
   iexact HΦ
 
