@@ -35,6 +35,10 @@ theorem bind_assoc (x : FreeM E α) (f : α → FreeM E β) (g : β → FreeM E 
   | pure a => rfl
   | impure op k ih => simp only [bind_impure]; congr; funext r; exact ih r
 
+/-- A raw `FreeM.pure` at the head of a bind (lean-sail's primitives build their results with
+it, e.g. a passing `sail_assert`) feeds its value to the continuation. -/
+theorem freeM_pure_bind (a : α) (f : α → FreeM E β) : (FreeM.pure a : FreeM E α) >>= f = f a := rfl
+
 instance : LawfulMonad (FreeM E) := LawfulMonad.mk'
   (id_map := fun x => by
     show x.bind (fun a => FreeM.pure a) = x
