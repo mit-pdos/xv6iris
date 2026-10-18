@@ -729,7 +729,7 @@ theorem demo_sync_only (s : Fstate) (a : Ualt) (h : ulmG.lmOk s .LSync a) :
 exec diagnostic, sh's panic line or the out-of-memory diagnostic. -/
 theorem demo_sync_neg (s : Fstate) (a : Ualt) (h : ulmG.lmOk s .LSync a) :
     ulmG.lmCont s .LSync a ∈ [uPrompt, altExecsync, altPanic, altOom] := by
-  rcases demo_sync_only s a h with rfl | rfl | rfl | rfl <;> simp [ulmG, ulm, ucont, cont]
+  rcases demo_sync_only s a h with rfl | rfl | rfl | rfl <;> simp [ucont, cont]
 
 /-- **Rocq `demo_sync_neg_x`**: e.g. a transcript showing `sync` answered by
 `x` and the prompt. -/

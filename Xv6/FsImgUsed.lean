@@ -194,7 +194,7 @@ theorem fsSlotInj_of_nodup (P : Nat → List (BitVec 8)) (sb : FsSb) (dn : Dinod
       rcases h : (fsInodeBlocks P dn)[fsSlotPos (fsNblk dn.diSize.toNat) i]? with _ | x
       · rw [h] at hli; cases hli
       · exact (List.getElem?_eq_some_iff.1 h).1
-    exact (List.getElem?_inj hlen hnd).1 (by rw [hli, hlj, heq])
+    exact (List.Nodup.getElem?_inj hlen hnd).1 (by rw [hli, hlj, heq])
   unfold fsSlotPos at hpos
   by_cases him : i = MAXFILE <;> by_cases hjm : j = MAXFILE
   · omega
