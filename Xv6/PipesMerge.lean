@@ -543,7 +543,7 @@ theorem map_supd_insert (src : W → List α) (ws : List W) (i : Nat) (w : W) (r
       rw [ite_eq_right]
       rintro rfl
       have hlt := (List.getElem?_eq_some_iff.1 hi).1
-      exact hj ((List.getElem?_inj hlt hnd).1 (hi.trans hwj.symm))
+      exact hj ((List.Nodup.getElem?_inj hlt hnd).1 (hi.trans hwj.symm))
 
 
 /-- Rocq `mergeN_merge_all`: every writer of `ws` exhausted, no other named. -/

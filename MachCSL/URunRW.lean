@@ -963,7 +963,7 @@ theorem urw_nodup_getElem?_ne {L : List Register} (hnd : L.Nodup) {i k : Nat} {x
   intro e
   subst e
   obtain ⟨hk1, _⟩ := List.getElem?_eq_some_iff.1 hk
-  exact hki ((List.getElem?_inj hk1 hnd).1 (hk.trans hi.symm))
+  exact hki ((List.Nodup.getElem?_inj hk1 hnd).1 (hk.trans hi.symm))
 
 theorem uRegFrameL_rd (cpu : CPU) (Lw Lr : List Register) (dq : DFrac) (f : RegFile) (r : Register)
     (h : (Lw.contains r || Lr.contains r) = true) :

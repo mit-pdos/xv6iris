@@ -82,8 +82,8 @@ theorem usync_prompt_ran (s : Fstate) (a : Nat) (hok : ulmG.lmOk s .LSync (ulmG.
     rw [h] at hc
     revert hc
     first
-      | (simp [ulmG, ulm, ucont, cont]; done)
-      | (simp [ulmG, ulm, ucont, cont]; decide)
+      | (simp [ucont, cont]; done)
+      | (simp [ucont, cont]; decide)
 
 /-- the out-of-memory alternative is not /sync's run -/
 theorem uoom_nsync : ulmG.lmDec uoom ≠ Ualt.UR .RSyncRan := by

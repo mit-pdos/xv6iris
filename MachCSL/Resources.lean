@@ -710,8 +710,7 @@ theorem devWrite_pos {ds ds' : DevStates} {pa : PAddr} {n : Nat} {w : BitVec (8 
     | none => simp
     | some p =>
       obtain ⟨d, off⟩ := p
-      cases d <;> simp [devSig, Uart.sig, Uart.writeN, Plic.sig, Plic.writeN,
-        Virtio.sig, Virtio.writeN, Option.map]
+      cases d <;> simp [Uart.writeN, Plic.writeN, Virtio.writeN, Option.map]
   · exact hn
 
 /-! ### Getting `ramBytes` out of the memory -/
