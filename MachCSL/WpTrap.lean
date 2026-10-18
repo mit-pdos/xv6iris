@@ -8,16 +8,19 @@ vocabulary (`trapMs`, `trapConf`, `sCause`, `sCauseOk`, `stvecDirect`) is
 in `MachCSL.KCtx`, where the handler contract needs it.
 
 Since sail-riscv 0.16: the effective pending word is read through `read_mip`
-(`swp_read_mip_any`, which also reads `hgeie` off the frozen bundle), the
-pending split reads `hideleg` (frozen at 0, so nothing goes to VS), and the
+(`swp_read_mip_any`, in `MachCSL.WpStepHooks`, which also reads `hgeie` off the
+frozen bundle), the pending split reads `hideleg` (frozen at 0, so nothing goes to VS), and the
 supervisor trap also writes the hypervisor trap CSRs whether H is enabled or
 not -- `hstatus` (`hstatusTrap`: `SPV := 0`, `GVA := 0`), `htval := 0`,
-`htinst := 0` -- so `swp_handle_interrupt_S` owns those three cells too.
+`htinst := 0` -- so `swp_handle_interrupt_S` owns those three cells too (the
+trap-CSR bundles `trapCsrsAt`/`trapCsrs` of `MachCSL.KCtx` carry them, as
+`hTrapCsrs`).
 -/
 import MachCSL.ModelFacts
 import MachCSL.PlatformFacts
 import MachCSL.KCtx
 import MachCSL.Tactics
+import MachCSL.WpStepHooks
 import MachCSL.BvEnums -- `bv_decide`'s enum encodings, declared once
 
 noncomputable section
@@ -89,19 +92,7 @@ theorem dispatchS_sie (c : MConf) (ip : BitVec 64) (x : InterruptType × Privile
   · rename_i hc; exact hc.1
   · cases h
 
-set_option maxHeartbeats 4000000 in
-/-- The effective pending word the interrupt check reads (`read_mip`): `mip`
-ORed with the interrupt PINS (`sig_meip`/`sig_seip`, read off-frame) and with
-the H-extension wires (`hgeie`, off the frozen bundle; H is disabled, so they
-contribute nothing).  The answer is an ARBITRARY word: the pins are not in the
-hart's frame.  `mip` itself is owned and unmoved. -/
-theorem swp_read_mip_any (cpu : CPU) (ip : BitVec 64) (Φ : BitVec 64 → IProp GF) :
-    hwConfig cpu ∗ Register.mip ↦ᵣ[cpu] ip ∗ ▷ (∀ ip', Register.mip ↦ᵣ[cpu] ip -∗ Φ ip')
-    ⊢ swp cpu (read_mip .IncludePlatformInterrupts) Φ := by
-  iintro ⟨#Hhw, Hmip, HΦ⟩
-  unfold read_mip
-  swp_run 60
-  iapply HΦ $$ Hmip
+-- `swp_read_mip_any` lives in `MachCSL.WpStepHooks`.
 
 set_option maxHeartbeats 4000000 in
 /-- Dispatch in supervisor mode, at any `SIE`, with no machine-level

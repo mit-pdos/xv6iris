@@ -13,6 +13,7 @@ interrupts disabled -- the regime of early boot (`main` before
 import MachCSL.WpPmpXv6
 import MachCSL.SConfPhysDefs
 import MachCSL.ModelFacts
+import MachCSL.WpStepHooks
 
 
 namespace MachCSL
@@ -36,8 +37,22 @@ theorem swp_dispatchInterrupt_S_off (cpu : CPU) (dq : DFrac) (c : MConf)
     ⊢ swp cpu (dispatchInterrupt Privilege.Supervisor) Φ := by
   iintro ⟨HmConf, Hmip, HΦ⟩
   conf_cases HmConf
-  unfold dispatchInterrupt
-  swp_run 80
+  unfold dispatchInterrupt getPendingSet
+  -- the effective pending word is read off-frame (the pins), at an arbitrary value
+  generalize hR : read_mip XipReadType.IncludePlatformInterrupts = R
+  swp_run 20
+  subst hR
+  iapply swp_bind
+  iapply swp_read_mip_any
+  iframe Hhw Hmip
+  inext
+  iintro %ip' Hmip
+  have hm : ip' &&& c.mie &&& ~~~c.mideleg = 0#64 := by rw [BitVec.and_assoc, hmie, BitVec.and_zero]
+  have hc : (_get_Mstatus_SIE c.mstatus == 1#1 &&
+      ip' &&& c.mie &&& (c.mideleg &&& 18446744073709551615#64) != 0#64) = false := by
+    simp only [_get_Mstatus_SIE, Sail.BitVec.extractLsb, BitVec.extractLsb, hsie]
+    rfl
+  swp_run 40
   conf_intro HmConf
   iapply HΦ $$ HmConf Hmip
 
