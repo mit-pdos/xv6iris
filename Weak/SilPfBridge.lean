@@ -151,7 +151,7 @@ theorem SilPf.wpPfStepSEpfStepS (i : Nat) (l : Wlabel) (P : Epool) (σ : WGState
             .silent c _ P σ _ (some (k (.Ok (some true)), none)) _ hl hP ?_, ?_⟩
           · refine ⟨rfl, n, va, req, k, rfl, v, q, R, hdev, hv, hn, hlat, hrl.symm, hR,
               by rw [hb, hbase], by rw [hlen, hlen'], fun j t hj => ?_, by rw [← hbase]; exact hex,
-              hq, fun j hj => ?_, hfv, hox, rfl, ?_⟩
+              hq, fun j hj => ?_, by rw [hasrc, hvsrc] at hfv; exact hfv, hox, rfl, ?_⟩
             · obtain ⟨h1, h2⟩ := hval j t hj
               refine ⟨h1, ?_⟩
               rw [← hbase, ← hdata]

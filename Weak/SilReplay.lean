@@ -205,11 +205,11 @@ theorem SilReplay.prefixRun (pst : Nat → List P) (dv : Nat → D) (sh : Nat �
       · rw [ho] at hn0; cases hn0
       · rw [hl] at hre
         rw [ho] at hpsh
-        obtain ⟨-, hshq⟩ := hpsh
+        obtain ⟨hdep, hshq⟩ := hpsh
         obtain ⟨c2, hr2, hm2, hst2, hdev2, ⟨ag2, hl2, hw2⟩, hot2⟩ :=
           SilPair.pairSimS pstep pcls (SilCand.stAt c n) s.esAg c0 ag0 pm pm2 p' l1 l2 ls2 dm dm2
             (dv (n + 1)) aq base ts rvs wvs kc q hm0 hlk0 (by rw [hs0]; exact hre)
-            (by rw [hs0, hd0]; exact hps1) hstar2 hps2 hok
+            (by rw [hs0, hd0]; exact hps1) hstar2 hps2 hok (by rw [hw0, hlog0]; exact hdep)
         refine hfin c2 hr2 hst2 hdev2 (by rw [hnx']; exact hm2) ⟨ag2, hl2, ?_⟩ hot2
         rw [hw2, hshq, hlog0, hw0]
         rfl

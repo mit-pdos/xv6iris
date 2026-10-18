@@ -73,6 +73,7 @@ theorem SilPair.pairSimS (σ : Mstate) (i : Nat) (c : Wpcfg P D) (ag : Wpagent P
     admRunG pstep false pm dm ls2 pm2 dm2 →
     pstep pm2 dm2 l2 p' dn →
     SilCand.silentOk σ i aq base ts rvs wvs q →
+    SilDep.depOkL (SilDep.starWs (SilDep.wsStep ag.paWs l1 c.pcLog.length) ls2 c.pcLog.length) l2 q →
     ∃ c', rtc (SilPf.wpPfRunS pstep pcls) c c' ∧
       cfgMatchd c' (SilCand.silentNext σ i aq base ts wvs q) ∧
       c'.pcAgs.map Wpagent.paSt = (c.pcAgs.map Wpagent.paSt).set i p' ∧
@@ -81,16 +82,16 @@ theorem SilPair.pairSimS (σ : Mstate) (i : Nat) (c : Wpcfg P D) (ag : Wpagent P
         ag'.paWs = SilDep.silentWsL
           (SilDep.starWs (SilDep.wsStep ag.paWs l1 c.pcLog.length) ls2 c.pcLog.length) l2 q) ∧
       (∀ j, j ≠ i → c'.pcAgs[j]? = c.pcAgs[j]?) := by
-  intro hm hlk hre hps1 hstar hps2 hsil
+  intro hm hlk hre hps1 hstar hps2 hsil hdep
   have hew := cfgMatchdWs c σ i ag hm hlk
   have hlti := lookup_lt_Some hlk
   obtain ⟨aq', rl, base', tvs, wvs, asrc1, asrc2, vsrc2, rfl, rfl, hnn, hlen, hlb⟩ := hre
   injection hlb with e1 e2 e3 e4 e5 e6 _
   subst e1 e2 e3 e4 e5 e6
-  obtain ⟨hwr, -, -, hrd, hq, hts, hcoh, hord, hown⟩ := hsil
+  obtain ⟨hwr, -, -, hrd, hq, hts, hcoh, -, hown⟩ := hsil
   obtain ⟨img, lg, f⟩ := σ
   obtain ⟨himg, hlg, hf⟩ := hm
-  dsimp only at himg hlg hf hew hrd hq hts hcoh hord hown ⊢
+  dsimp only at himg hlg hf hew hrd hq hts hcoh hown ⊢
   subst himg hlg
   have hro : readOk c.pcImg c.pcLog ag.paWs aq false base tvs := by
     have h := wsEqrReadOk _ _ _ _ _ _ _ _ hew (rdOkReadOk _ _ _ _ _ _ _ hrd)
@@ -135,7 +136,7 @@ theorem SilPair.pairSimS (σ : Mstate) (i : Nat) (c : Wpcfg P D) (ag : Wpagent P
       ⟨base, tvs.map Prod.fst, ldvOf ag.paWs aq 0 base (tvs.map Prod.fst)⟩ q p' dn hlk2
       (by rw [hs2, hd2]; exact hps2) hnn hres2 rfl
       (by show (tvs.map Prod.fst).length = wvs.length; rw [List.length_map]; exact hlen)
-      ?_ ?_ (by rw [hlog2]; exact hq) ?_ (SilCand.ordOkEqr _ _ q hwm hord) (by rw [hlog2]; exact hown)
+      ?_ ?_ (by rw [hlog2]; exact hq) ?_ (by rw [hwx2]; exact hdep) (by rw [hlog2]; exact hown)
     · intro j t ht
       refine ⟨(hts j t ht).1, ?_⟩
       rw [himg2, hlog2]

@@ -9,13 +9,14 @@ earlier log position `q` — its write's virtual place, co-immediately after its
 write's own ordering constraints:
 
   * `q` is at least — at the views AFTER the read half, where the write node evaluates them — the
-    hart's coherence view of every byte (riscv.cat coherence), the fulfil pre-view
-    the write-ordering view `wVwNew` (fences with a write successor: ppo rule 4), the read view `wVrOld`
-    (every earlier load — covers control/address/data dependencies, ppo rules 9–11, conservatively, and is
-    preserved by `wsEqr` across the machine levels, unlike the dependency capture `wVcap`), and the
-    log position of the hart's own latest EXCLUSIVE (AMO) message (`SilCand.ownExcl`: ppo rule 5 for an
-    earlier `aq` AMO; conservative for a non-`aq` one — xv6's only AMO is `amoswap.w.aq`) — the
-    registered machine needs no such bound because its writes always append;
+    hart's coherence view of every byte (riscv.cat coherence), the write-ordering view `wVwNew` (fences
+    with a write successor, `aq`: ppo rules 4/5), and the log position of the hart's own latest EXCLUSIVE
+    (AMO) message (`SilCand.ownExcl`: ppo rule 5 for an earlier `aq` AMO; conservative for a non-`aq` one —
+    xv6's only AMO is `amoswap.w.aq`) — the registered machine needs no such bound because its writes
+    always append.  The DEPENDENCY part of the bound (control / address / data dependencies, ppo rules
+    9–11/13, and the reservation) is not visible at this level (the candidate tracks no registers): the
+    pf / Iris machines check `SilCand.depView ≤ q` (PARM's exclusive-store fulfil pre-view), and the twin
+    program data (`SilReplay.progOkD`) carries it through the dependency shadow;
   * the read is an ordinary `rdOk` read and no write of the byte lies in `(t, q]` (atomicity:
     rmw ∩ (fre;coe) = ∅ with the write placed right after `q`);
   * afterwards the hart's views are those of an RMW written at `q` (`storePostRun … q`), its read and
@@ -45,13 +46,15 @@ def SilCand.ownExcl (log : List Wmsg) (i : Nat) : Nat :=
   (log.zipIdx.filterMap (fun p =>
     if p.1.wmTid = some i ∧ p.1.wmAk = .WCexcl then some (p.2 + 1) else none)).foldr max 0
 
-/-- The silent write's ORDERING bound: after every fence-ordered predecessor and every earlier load. -/
-def SilCand.ordOk (ws : Wstate) (q : Nat) : Prop := ws.wVwNew ≤ q ∧ ws.wVrOld ≤ q
+/-- The silent write's candidate-level ORDERING bound: after every fence- / `aq`-ordered predecessor.
+(The dependency part is `SilCand.depView`, at the pf / Iris levels.) -/
+def SilCand.ordOk (ws : Wstate) (q : Nat) : Prop := ws.wVwNew ≤ q
 
 theorem SilCand.ordOkEqr (w1 w2 : Wstate) (q : Nat) :
     wsEqr w1 w2 → SilCand.ordOk w1 q → SilCand.ordOk w2 q := by
-  rintro ⟨-, h1, -, -, h4, -⟩ ⟨a, b⟩
-  exact ⟨by rw [← h4]; exact a, by rw [← h1]; exact b⟩
+  rintro ⟨-, -, -, -, h4, -⟩ a
+  show w2.wVwNew ≤ q
+  rw [← h4]; exact a
 
 /-- The silent write's DEPENDENCY bound at the pf / Iris levels: PARM's exclusive-store fulfil
 pre-view (not `rl`) — `wVwNew` (fences, `aq`: ppo rules 4/5), `wVcap` (control dependencies), the
