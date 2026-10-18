@@ -274,7 +274,9 @@ theorem SilRegZero.regZeroOfZ (hlc : HasLC) (GF0 : BundledGFunctors) [MachGpreS 
 /-! # 3. kill′ with the zero in the package -/
 
 /-- **`cycleKillZS`** — `SilClose.cycleKillS` with ONE `wpPackageProtZS` in place of
-`wpPackageProtS` + `regZeroS`. -/
+`wpPackageProtS` + `regZeroS`. SUPERSEDED by the trimmed route (`Weak/SilKillT.lean`,
+`SilKillT.cycleKillZS`): concludes the untrimmed `cycleKillCZC`, likely false as quantified
+(`fetchProv` fails at an untrimmed class graph, `Weak/CapFetchProv.lean`). -/
 theorem SilRegZero.cycleKillZS (hlc : HasLC) (GF0 : BundledGFunctors) [MachGpreS hlc GF0]
     [WeakGpreS GF0] (gen : Nat) (σ0 : WGState) (D : CPU → List Register) (hD : ∀ c, (D c).Nodup)
     (Nm : Int → Int → Namespace) (P : Int → Int → Prop)
@@ -302,7 +304,10 @@ theorem SilRegZero.cycleKillZS (hlc : HasLC) (GF0 : BundledGFunctors) [MachGpreS
       hcov hpre hordS h1b hstep hAQ hRC
       (SilRegZero.regZeroOfZ hlc GF0 gen σ0 D hD Nm P boot d0 fab N hfr hwpz) hl2
 
-/-- `SilClose.cycleKillDiscS` (the order derived) with the zero in the package. -/
+/-- `SilClose.cycleKillDiscS` (the order derived) with the zero in the package. SUPERSEDED by the
+trimmed route (`Weak/SilKillT.lean`, `SilKillT.cycleKillDiscZS`): concludes the untrimmed
+`cycleKillCZC`, likely false as quantified (`fetchProv` fails at an untrimmed class graph,
+`Weak/CapFetchProv.lean`). -/
 theorem SilRegZero.cycleKillDiscZS (hlc : HasLC) (GF0 : BundledGFunctors) [MachGpreS hlc GF0]
     [WeakGpreS GF0] (gen : Nat) (σ0 : WGState) (D : CPU → List Register) (hD : ∀ c, (D c).Nodup)
     (Nm : Int → Int → Namespace) (P : Int → Int → Prop)
@@ -331,7 +336,10 @@ theorem SilRegZero.cycleKillDiscZS (hlc : HasLC) (GF0 : BundledGFunctors) [MachG
       (SilRegZero.regZeroOfZ hlc GF0 gen σ0 D hD Nm P boot d0 fab N hfr hwpz) hl2
 
 /-- `SilClose.cycleKillCZS` (⇒ `cycleKillCZ`, `t2linSupplyCZIO`'s input) with the zero in the
-package. -/
+package. SUPERSEDED by the trimmed route (`Weak/SilKillT.lean`, `SilKillT.cycleKillZS`;
+`CapFetchProv.t2linSupplyCZT` takes `cycleKillCZT` directly): rests on the untrimmed `cycleKillCZC`,
+likely false as quantified (`fetchProv` fails at an untrimmed class graph,
+`Weak/CapFetchProv.lean`). -/
 theorem SilRegZero.cycleKillCZZS (hlc : HasLC) (GF0 : BundledGFunctors) [MachGpreS hlc GF0]
     [WeakGpreS GF0] (gen : Nat) (σ0 : WGState) (D : CPU → List Register) (hD : ∀ c, (D c).Nodup)
     (Nm : Int → Int → Namespace) (P : Int → Int → Prop)

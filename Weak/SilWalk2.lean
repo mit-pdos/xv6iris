@@ -253,11 +253,20 @@ def SilWalk.walkSupplyS (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) 
         (∀ x, x < GF.gfGd.gdG.gxProg.length → (GF.gfGd.gdG.gxProg.getD x []).length ≤ cntF x) →
         CertZ18.lockCoSP GF.gfGd.gdG (SilAgree.memberS N Sf.c) (GraphFetchN2.lockBytes P))
 
-/-- **(G-3) AT THE REALIZED TWIN MEMBER, FROM THE FREE TWIN WALK.** -/
-theorem SilWalk.certSupplyOfWalkS (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (im : Image)
+/-- The realized twin member and its silent agreement from the free twin walk, at the class graph
+itself (no hull premise is read; shared by `certSupplyOfWalkS` and the trimmed
+`SilKillT.certSupplyOfWalkS`). -/
+theorem SilWalk.certOfWalkS (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (im : Image)
     (N : Nat) (P : Int → Int → Prop) :
-    SilWalk.walkSupplyS boot d0 fab im N P → SilKill.certSupplyS boot d0 fab im N P := by
-  intro hws GF ad _ z ss him hc hconf hres hdr _ _ _ _ _ hne hch
+    SilWalk.walkSupplyS boot d0 fab im N P →
+    ∀ (GF : Gfexec) (ad : List (Geid × Geid)) (z : Geid) (ss : List Seg),
+      GF.gfGd.gdG.gxImg = im → rvwmoCatAD GF.gfGd ad → GraphFabConf.gfexecConfZF boot d0 fab GF →
+      ioResidueGmo GF → gdiskRead14 GF.gfGd.gdG →
+      ss ≠ [] → rawChainC GF.gfGd (ioCross GF) z z ss →
+      ∃ (c : SilCand.CandS) (pst : Nat → List Pexv6) (dv : Nat → Efab) (pi : Nat → Nat),
+        SilAgree.RunDataS boot d0 N GF.gfGd.gdG c pst dv ∧
+        SilAgree.agreeRPS GF.gfGd.gdG (SilAgree.memberS N c) pi (GraphFetchN2.lockBytes P) := by
+  intro hws GF ad z ss him hc hconf hres hdr hne hch
   obtain ⟨Inv, hI0, hpol, hco⟩ := hws GF ad z ss him hc hconf hres hdr hne hch
   obtain ⟨Sf, cntF, pr, hokF, hinvF, hdone, -, htr, hsil, hf2, -, himg, hpst⟩ :=
     SilWalk.walkRun d0 GF.gfGd.gdG.gxProg _ Inv hpol _ (SilWalk.start boot d0 N GF.gfGd.gdG)
@@ -284,6 +293,13 @@ theorem SilWalk.certSupplyOfWalkS (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat 
       · rw [List.getD_eq_getElem?_getD, List.getElem?_eq_none (by omega)]; simp
     rw [hrow] at hfx
     exact SilWalk.forall₂Map _ _ _ _ _ hfx (fun a b h => SilWalk.relSOfW _ a b h)
+
+/-- **(G-3) AT THE REALIZED TWIN MEMBER, FROM THE FREE TWIN WALK.** -/
+theorem SilWalk.certSupplyOfWalkS (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (im : Image)
+    (N : Nat) (P : Int → Int → Prop) :
+    SilWalk.walkSupplyS boot d0 fab im N P → SilKill.certSupplyS boot d0 fab im N P :=
+  fun hws GF ad _ z ss him hc hconf hres hdr _ _ _ _ _ hne hch =>
+    SilWalk.certOfWalkS boot d0 fab im N P hws GF ad z ss him hc hconf hres hdr hne hch
 
 end CatLin
 

@@ -58,7 +58,8 @@ theorem SilKill.rawChainChainW4 (GF : Gfexec) (ad : List (Geid × Geid)) (GR : G
         hx
     · exact absurd hb hnB
 
-/-- **THE L2′ CLAIM AT EVERY REALIZED MEMBER** (W11-F's obligation). -/
+/-- **THE L2′ CLAIM AT EVERY REALIZED MEMBER** (W11-F's obligation). SUPERSEDED on the trimmed route
+by `SilKillT.l2ClaimS` (`Weak/SilKillT.lean`). -/
 def SilKill.l2ClaimS (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (im : Image) (N : Nat)
     (P : Int → Int → Prop) (Bad : Prop) : Prop :=
   ∀ (GF : Gfexec) (ad : List (Geid × Geid)) (c : SilCand.CandS) (pst : Nat → List Pexv6)
@@ -68,7 +69,8 @@ def SilKill.l2ClaimS (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (im
     SilAgree.agreeRPS GF.gfGd.gdG (SilAgree.memberS N c) pi (GraphFetchN2.lockBytes P) →
     l2ClaimAtCZR4 GF ad (SilAgree.memberS N c) P Bad
 
-/-- (G-3) at the twin: a twin run datum and the silent agreement at its realized member. -/
+/-- (G-3) at the twin: a twin run datum and the silent agreement at its realized member. SUPERSEDED
+on the trimmed route by `SilKillT.certSupplyS` (`Weak/SilKillT.lean`). -/
 def SilKill.certSupplyS (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (im : Image) (N : Nat)
     (P : Int → Int → Prop) : Prop :=
   ∀ (GF : Gfexec) (ad : List (Geid × Geid)) (cs : List Nat) (z : Geid) (ss : List Seg),
@@ -138,7 +140,10 @@ def SilKill.regZeroRunS (gen : Nat) (σ0 : WGState) (P : Int → Int → Prop) :
   ∀ (t2 : List SilLang.EExprS) (σ2 : WGState), (SilLang.epowerForkS gen, σ0) -·->ₜₚ* (t2, σ2) →
     CertZ18.protRegZ P (imgZ σ0.wgimg) σ2.wglog
 
-/-- **`cycleKillOfL2S`** — the class kill at the REALIZED twin member. -/
+/-- **`cycleKillOfL2S`** — the class kill at the REALIZED twin member. SUPERSEDED by the trimmed
+route (`Weak/SilKillT.lean`, `SilKillT.cycleKillOfL2S`): concludes the untrimmed `cycleKillCZC`,
+likely false as quantified (`fetchProv` fails at an untrimmed class graph,
+`Weak/CapFetchProv.lean`). -/
 theorem SilKill.cycleKillOfL2S (hlc : HasLC) (GF0 : BundledGFunctors) [MachGpreS hlc GF0]
     [WeakGpreS GF0] (gen : Nat) (σ0 : WGState) (D : CPU → List Register) (hD : ∀ c, (D c).Nodup)
     (P : Int → Int → Prop)

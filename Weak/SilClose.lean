@@ -117,7 +117,9 @@ def SilClose.regZeroS (gen : Nat) (σ0 : WGState) (boot : Nat → Pexv6) (d0 : E
 /-! # 3. kill′ -/
 
 /-- `SilKill.cycleKillOfL2S` with the footprint from `adequacyProtS` and `regZeroS` in place of the
-run fact `regZeroRunS`. -/
+run fact `regZeroRunS`. SUPERSEDED by the trimmed route (`Weak/SilKillT.lean`,
+`SilKillT.cycleKillOfL2CloseS`): concludes the untrimmed `cycleKillCZC`, likely false as quantified
+(`fetchProv` fails at an untrimmed class graph, `Weak/CapFetchProv.lean`). -/
 theorem SilClose.cycleKillOfL2 (hlc : HasLC) (GF0 : BundledGFunctors) [MachGpreS hlc GF0]
     [WeakGpreS GF0] (gen : Nat) (σ0 : WGState) (D : CPU → List Register) (hD : ∀ c, (D c).Nodup)
     (Nm : Int → Int → Namespace) (P : Int → Int → Prop)
@@ -166,7 +168,10 @@ theorem SilClose.cycleKillOfL2 (hlc : HasLC) (GF0 : BundledGFunctors) [MachGpreS
 
 /-- **`cycleKillS` — kill′, THE TWIN'S KILL CLOSED**: the twin WP packages (fed to `pfViolationFreeS`
 and `adequacyProtS`), the fetch view, (harts ≤ N ∧ P2), the walk ORDER (input) with NF2c, the twin STEP
-supply, the lock facts / zero-at-registration / L2′ claim at REALIZED twin members. -/
+supply, the lock facts / zero-at-registration / L2′ claim at REALIZED twin members. SUPERSEDED by
+the trimmed route (`Weak/SilKillT.lean`, `SilKillT.cycleKillS`): concludes the untrimmed
+`cycleKillCZC`, likely false as quantified (`fetchProv` fails at an untrimmed class graph,
+`Weak/CapFetchProv.lean`). -/
 theorem SilClose.cycleKillS (hlc : HasLC) (GF0 : BundledGFunctors) [MachGpreS hlc GF0]
     [WeakGpreS GF0] (gen : Nat) (σ0 : WGState) (D : CPU → List Register) (hD : ∀ c, (D c).Nodup)
     (Nm : Int → Int → Namespace) (P : Int → Int → Prop)
@@ -197,7 +202,9 @@ theorem SilClose.cycleKillS (hlc : HasLC) (GF0 : BundledGFunctors) [MachGpreS hl
       hAQ hRC hrz hl2
 
 /-- kill′ with the order DERIVED (`orderSupplyOfDisc3`: the lock discipline + `gfDevWIoCZ`, the shape
-of the registered `cycleKillOfOrdStepCZRC4`). -/
+of the registered `cycleKillOfOrdStepCZRC4`). SUPERSEDED by the trimmed route (`Weak/SilKillT.lean`,
+`SilKillT.cycleKillDiscS`): concludes the untrimmed `cycleKillCZC`, likely false as quantified
+(`fetchProv` fails at an untrimmed class graph, `Weak/CapFetchProv.lean`). -/
 theorem SilClose.cycleKillDiscS (hlc : HasLC) (GF0 : BundledGFunctors) [MachGpreS hlc GF0]
     [WeakGpreS GF0] (gen : Nat) (σ0 : WGState) (D : CPU → List Register) (hD : ∀ c, (D c).Nodup)
     (Nm : Int → Int → Namespace) (P : Int → Int → Prop)
@@ -224,7 +231,10 @@ theorem SilClose.cycleKillDiscS (hlc : HasLC) (GF0 : BundledGFunctors) [MachGpre
       (orderSupplyOfDisc3 boot d0 fab _ P hdisc hwio)
       (SilClose.oneByteOfDisc3 boot d0 fab _ P hdisc) hstep hAQ hRC hrz hl2
 
-/-- kill′ at `cycleKillCZ` (the input of `CatLin.t2linSupplyCZIO`). -/
+/-- kill′ at `cycleKillCZ` (the input of `CatLin.t2linSupplyCZIO`). SUPERSEDED by the trimmed route
+(`Weak/SilKillT.lean`, `SilKillT.cycleKillS`; `CapFetchProv.t2linSupplyCZT` takes `cycleKillCZT`
+directly): rests on the untrimmed `cycleKillCZC`, likely false as quantified (`fetchProv` fails at
+an untrimmed class graph, `Weak/CapFetchProv.lean`). -/
 theorem SilClose.cycleKillCZS (hlc : HasLC) (GF0 : BundledGFunctors) [MachGpreS hlc GF0]
     [WeakGpreS GF0] (gen : Nat) (σ0 : WGState) (D : CPU → List Register) (hD : ∀ c, (D c).Nodup)
     (Nm : Int → Int → Namespace) (P : Int → Int → Prop)
