@@ -226,7 +226,7 @@ open AtomicSupport
 open Architecture
 open AmocasOddRegisterReservedBehavior
 
-/-- Type quantifiers: k_ex1237649_ : Bool, k_ex1237648_ : Bool -/
+/-- Type quantifiers: k_ex1237642_ : Bool, k_ex1237641_ : Bool -/
 def neq_bool (x : Bool) (y : Bool) : Bool :=
   (! (x == y))
 

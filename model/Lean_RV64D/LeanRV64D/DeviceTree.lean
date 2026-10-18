@@ -312,11 +312,11 @@ def generate_dts_memories (pmas : (List PMA_Region)) : String :=
 " (generate_dts_memories rest))))))))))))))))
     else (generate_dts_memories rest))
 
-def generate_cbo_block_size (prefix : String) (ext : extension) : String :=
+def generate_cbo_block_size (prefix' : String) (ext : extension) : String :=
   if ((hartSupports ext) : Bool)
   then
     (HAppend.hAppend "      riscv,"
-      (HAppend.hAppend prefix
+      (HAppend.hAppend prefix'
         (HAppend.hAppend "-block-size = <"
           (HAppend.hAppend (Int.repr (2 ^i plat_cache_block_size_exp)) ">;
 "))))

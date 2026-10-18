@@ -298,7 +298,7 @@ def get_sum (stage : TranslationStage) : SailM Bool := do
   then (pure ((_get_Mstatus_SUM (← readReg vsstatus)) == 1#1))
   else (pure ((_get_Mstatus_SUM (← readReg mstatus)) == 1#1))
 
-/-- Type quantifiers: level : Nat, k_ex1240980_ : Bool, k_ex1240979_ : Bool, sv_width : Nat, (is_sv_or_svx4_mode
+/-- Type quantifiers: level : Nat, k_ex1240973_ : Bool, k_ex1240972_ : Bool, sv_width : Nat, (is_sv_or_svx4_mode
   sv_width), 0 ≤ level ∧
   level ≤
   (if ( sv_width = 32 ∨ sv_width = 34  : Bool) then 1 else (if ( sv_width = 39 ∨ sv_width = 41  : Bool) then 2 else (if ( sv_width
@@ -408,7 +408,7 @@ def translate_PTE_addr_mutrec_vv_zG_Stagev (pte_addr : (BitVec 64)) (access : (M
 termination_by (let (_, _, _) := (pte_addr, access, ext_ptw)
 1000).toNat
 
-/-- Type quantifiers: level : Nat, k_ex579447_ : Bool, k_ex579448_ : Bool, sv_width : Nat, (is_sv_or_svx4_mode
+/-- Type quantifiers: level : Nat, k_ex579444_ : Bool, k_ex579445_ : Bool, sv_width : Nat, (is_sv_or_svx4_mode
   sv_width), 0 ≤ level ∧
   level ≤
   (if ( sv_width = 32 ∨ sv_width = 34  : Bool) then 1 else (if ( sv_width = 39 ∨ sv_width = 41  : Bool) then 2 else (if ( sv_width
@@ -460,7 +460,7 @@ termination_by (let (_, _, _, _, _, _, _, _, _) :=
   (sv_width, vpn, pteAddr, pte, level, access, mxr, do_sum, ext_ptw)
 1000).toNat
 
-/-- Type quantifiers: k_ex579466_ : Bool, k_ex579467_ : Bool, tlb_index : Nat, sv_width : Nat, (is_sv_or_svx4_mode
+/-- Type quantifiers: k_ex579463_ : Bool, k_ex579464_ : Bool, tlb_index : Nat, sv_width : Nat, (is_sv_or_svx4_mode
   sv_width), 0 ≤ tlb_index ∧ tlb_index ≤ (2 ^ 6 - 1) -/
 def translate_TLB_hit_mutrec_vvvvv_zUservvvv_zG_Stagev (sv_width : Nat) (_asid : (BitVec (if ( 64 =
   32  : Bool) then 9 else 16))) (_vmid : (BitVec 14)) (vpn : (BitVec (sv_width - 12))) (access : (MemoryAccessType mem_payload)) (mxr : Bool) (do_sum : Bool) (tlb_index : Nat) (ent : TLB_Entry) (ext_ptw : Unit) : SailM (Result ((BitVec (if ( sv_width
@@ -489,7 +489,7 @@ def translate_TLB_hit_mutrec_vvvvv_zUservvvv_zG_Stagev (sv_width : Nat) (_asid :
         (pure (Ok ((tlb_get_ppn sv_width ent vpn), (← (tlb_get_pbmt ent)), ext_ptw)))
       | .Err (e, ext_ptw) => (pure (Err (e, ext_ptw))))
 
-/-- Type quantifiers: k_ex579456_ : Bool, k_ex579457_ : Bool, level : Nat, k_ex579459_ : Bool, sv_width
+/-- Type quantifiers: k_ex579453_ : Bool, k_ex579454_ : Bool, level : Nat, k_ex579456_ : Bool, sv_width
   : Nat, (is_sv_or_svx4_mode sv_width), 0 ≤ level ∧
   level ≤
   (if ( sv_width = 32 ∨ sv_width = 34  : Bool) then 1 else (if ( sv_width = 39 ∨ sv_width = 41  : Bool) then 2 else (if ( sv_width
@@ -564,7 +564,7 @@ termination_by (let (_, _, _, _, _, _, level, _, _) :=
   (sv_width, vpn, access, mxr, do_sum, pt_base, level, global, ext_ptw)
 level).toNat
 
-/-- Type quantifiers: k_ex579456_ : Bool, k_ex579457_ : Bool, level : Nat, sv_width : Nat, (is_sv_or_svx4_mode
+/-- Type quantifiers: k_ex579453_ : Bool, k_ex579454_ : Bool, level : Nat, sv_width : Nat, (is_sv_or_svx4_mode
   sv_width), 0 ≤ level ∧
   level ≤
   (if ( sv_width = 32 ∨ sv_width = 34  : Bool) then 1 else (if ( sv_width = 39 ∨ sv_width = 41  : Bool) then 2 else (if ( sv_width
@@ -639,7 +639,7 @@ termination_by (let (_, _, _, _, _, _, level, _) :=
   (sv_width, vpn, access, mxr, do_sum, pt_base, level, ext_ptw)
 level).toNat
 
-/-- Type quantifiers: k_ex579474_ : Bool, k_ex579475_ : Bool, sv_width : Nat, (is_sv_or_svx4_mode
+/-- Type quantifiers: k_ex579471_ : Bool, k_ex579472_ : Bool, sv_width : Nat, (is_sv_or_svx4_mode
   sv_width) -/
 def translate_TLB_miss_mutrec_vvvvvv_zUservv_zG_Stagev (sv_width : Nat) (asid : (BitVec (if ( 64 =
   32  : Bool) then 9 else 16))) (vmid : (BitVec 14)) (base_ppn : (BitVec (if ( sv_width
@@ -665,7 +665,7 @@ def translate_TLB_miss_mutrec_vvvvvv_zUservv_zG_Stagev (sv_width : Nat) (asid : 
           (pure (Ok (ppn, pbmt, ext_ptw))))
       | .Err (e, ext_ptw) => (pure (Err (e, ext_ptw))))
 
-/-- Type quantifiers: k_ex579485_ : Bool, k_ex579486_ : Bool, sv_width : Nat, (is_sv_or_svx4_mode
+/-- Type quantifiers: k_ex579482_ : Bool, k_ex579483_ : Bool, sv_width : Nat, (is_sv_or_svx4_mode
   sv_width) -/
 def translate_mutrec_vvvvvv_zUservv_zG_Stagev (sv_width : Nat) (asid : (BitVec 16)) (vmid : (BitVec (if ( 64
   = 32  : Bool) then 7 else 14))) (base_ppn : (BitVec (if ( sv_width = 32 ∨ sv_width = 34  : Bool) then 22 else 44))) (vpn : (BitVec (sv_width - 12))) (access : (MemoryAccessType mem_payload)) (mxr : Bool) (do_sum : Bool) (ext_ptw : Unit) : SailM (Result ((BitVec (if ( sv_width
@@ -725,7 +725,7 @@ def translate_PTE_addr (pte_addr : (BitVec 64)) (access : (MemoryAccessType mem_
 termination_by (let (_, _, _, _) := (pte_addr, access, stage, ext_ptw)
 1000).toNat
 
-/-- Type quantifiers: k_ex1241038_ : Bool, level : Nat, k_ex1241036_ : Bool, k_ex1241035_ : Bool, sv_width
+/-- Type quantifiers: k_ex1241031_ : Bool, level : Nat, k_ex1241029_ : Bool, k_ex1241028_ : Bool, sv_width
   : Nat, (is_sv_or_svx4_mode sv_width), 0 ≤ level ∧
   level ≤
   (if ( sv_width = 32 ∨ sv_width = 34  : Bool) then 1 else (if ( sv_width = 39 ∨ sv_width = 41  : Bool) then 2 else (if ( sv_width
@@ -799,7 +799,7 @@ termination_by (let (_, _, _, _, _, _, _, level, _, _, _) :=
   (sv_width, vpn, access, priv, mxr, do_sum, pt_base, level, global, stage, ext_ptw)
 level).toNat
 
-/-- Type quantifiers: k_ex1241047_ : Bool, k_ex1241046_ : Bool, level : Nat, sv_width : Nat, (is_sv_or_svx4_mode
+/-- Type quantifiers: k_ex1241040_ : Bool, k_ex1241039_ : Bool, level : Nat, sv_width : Nat, (is_sv_or_svx4_mode
   sv_width), 0 ≤ level ∧
   level ≤
   (if ( sv_width = 32 ∨ sv_width = 34  : Bool) then 1 else (if ( sv_width = 39 ∨ sv_width = 41  : Bool) then 2 else (if ( sv_width
@@ -853,7 +853,7 @@ termination_by (let (_, _, _, _, _, _, _, _, _, _, _) :=
   (sv_width, vpn, pteAddr, pte, level, access, priv, mxr, do_sum, stage, ext_ptw)
 1000).toNat
 
-/-- Type quantifiers: tlb_index : Nat, k_ex1241055_ : Bool, k_ex1241054_ : Bool, sv_width : Nat, (is_sv_or_svx4_mode
+/-- Type quantifiers: tlb_index : Nat, k_ex1241048_ : Bool, k_ex1241047_ : Bool, sv_width : Nat, (is_sv_or_svx4_mode
   sv_width), 0 ≤ tlb_index ∧ tlb_index ≤ (2 ^ 6 - 1) -/
 def translate_TLB_hit (sv_width : Nat) (_asid : (BitVec 16)) (_vmid : (BitVec (if ( 64
   = 32  : Bool) then 7 else 14))) (vpn : (BitVec (sv_width - 12))) (access : (MemoryAccessType mem_payload)) (priv : Privilege) (mxr : Bool) (do_sum : Bool) (tlb_index : Nat) (ent : TLB_Entry) (stage : TranslationStage) (ext_ptw : Unit) : SailM (Result ((BitVec (if ( sv_width
@@ -881,7 +881,7 @@ def translate_TLB_hit (sv_width : Nat) (_asid : (BitVec 16)) (_vmid : (BitVec (i
         (pure (Ok ((tlb_get_ppn sv_width ent vpn), (← (tlb_get_pbmt ent)), ext_ptw)))
       | .Err (e, ext_ptw) => (pure (Err (e, ext_ptw))))
 
-/-- Type quantifiers: k_ex1241063_ : Bool, k_ex1241062_ : Bool, sv_width : Nat, (is_sv_or_svx4_mode
+/-- Type quantifiers: k_ex1241056_ : Bool, k_ex1241055_ : Bool, sv_width : Nat, (is_sv_or_svx4_mode
   sv_width) -/
 def translate_TLB_miss (sv_width : Nat) (asid : (BitVec 16)) (vmid : (BitVec (if ( 64
   = 32  : Bool) then 7 else 14))) (base_ppn : (BitVec (if ( sv_width = 32 ∨ sv_width = 34  : Bool) then 22 else 44))) (vpn : (BitVec (sv_width - 12))) (access : (MemoryAccessType mem_payload)) (priv : Privilege) (mxr : Bool) (do_sum : Bool) (stage : TranslationStage) (ext_ptw : Unit) : SailM (Result ((BitVec (if ( sv_width
@@ -905,7 +905,7 @@ def translate_TLB_miss (sv_width : Nat) (asid : (BitVec 16)) (vmid : (BitVec (if
           (pure (Ok (ppn, pbmt, ext_ptw))))
       | .Err (e, ext_ptw) => (pure (Err (e, ext_ptw))))
 
-/-- Type quantifiers: k_ex1241070_ : Bool, k_ex1241069_ : Bool, sv_width : Nat, (is_sv_or_svx4_mode
+/-- Type quantifiers: k_ex1241063_ : Bool, k_ex1241062_ : Bool, sv_width : Nat, (is_sv_or_svx4_mode
   sv_width) -/
 def translate (sv_width : Nat) (asid : (BitVec 16)) (vmid : (BitVec (if ( 64
   = 32  : Bool) then 7 else 14))) (base_ppn : (BitVec (if ( sv_width = 32 ∨ sv_width = 34  : Bool) then 22 else 44))) (vpn : (BitVec (sv_width - 12))) (access : (MemoryAccessType mem_payload)) (priv : Privilege) (mxr : Bool) (do_sum : Bool) (stage : TranslationStage) (ext_ptw : Unit) : SailM (Result ((BitVec (if ( sv_width

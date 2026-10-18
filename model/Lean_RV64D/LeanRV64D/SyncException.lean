@@ -231,7 +231,7 @@ def exception_context (e : ExceptionType) (excinfo : (BitVec 64)) : SailM Except
           excinst_offset := (zeros (n := 5))
           ext := none })
 
-/-- Type quantifiers: k_ex1240713_ : Bool -/
+/-- Type quantifiers: k_ex1240706_ : Bool -/
 def make_exception_context (trap : ExceptionType) (excinfo : (BitVec 64)) (excinfo_is_gva : Bool) (excinfo2 : (Option (BitVec 64))) : ExceptionContext :=
   { trap := trap
     excinfo_is_gva := excinfo_is_gva

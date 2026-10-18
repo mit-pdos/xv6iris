@@ -23,19 +23,23 @@
 # SAIL_RISCV_DIR defaults to $SAIL_RISCV_DIR in the environment, else
 # ./sail-riscv (gitignored; cloned here on demand).  The model is taken from
 # the fork dongjaelee1/sail-riscv (branch `xv6`) pinned at $SAIL_RISCV_REV:
-# upstream riscv/sail-riscv release 0.16 (e5acebb0) plus three commits --
+# upstream riscv/sail-riscv release 0.16 (e5acebb0) plus four commits --
 # the atomic PTE A/D-bit update (upstream PR #1860); the external-interrupt
 # pin registers consulted without the Simple Interrupt Generator (so
 # MachCSL's PLIC device can drive sig_meip/sig_seip with the SIG's MMIO
-# window, which collides with the PLIC's, switched off); and a
-# width-monomorphic Sdtrig `MemoryTriggerPayload` (the existential union of
-# upstream #2018 does not elaborate in Lean; Sdtrig is disabled by our
-# config, and trigger matching is unchanged).
+# window, which collides with the PLIC's, switched off); and two Lean-target
+# repairs of code added by upstream #2018 -- a width-monomorphic Sdtrig
+# `MemoryTriggerPayload` (its existential union does not elaborate in Lean;
+# Sdtrig is disabled by our config, and trigger matching is unchanged) and
+# the AMO's result tested by pattern instead of `==` on `ExecutionResult`
+# (which the backend gives no equality).
 #
 # Requires on PATH: `sail` with `sail_lean_backend` built from the fork
-# dongjaelee1/sail, branch `xv6` (merge 2d36c5de), = rems-project/sail master
-# $SAIL_REV with the two still-unmerged Lean-backend fixes cherry-picked on top
-# (both from github.com/zeldovich/sail):
+# dongjaelee1/sail, branch `xv6` (merge d7222d57), = rems-project/sail master
+# $SAIL_REV with three Lean-backend fixes on top: the escaping of the Lean
+# command keywords `prefix`, `infix`, `notation`, ... in identifiers (ours;
+# sail-riscv's DeviceTree has a parameter named `prefix`), and two still-
+# unmerged fixes from github.com/zeldovich/sail:
 #   3c03fced  "Lean: make boolean & and | short-circuit with effectful
 #             operands" (upstream PR #1750; without it the backend hoists an
 #             effectful right operand of `&`/`|` out of the condition and
@@ -49,9 +53,9 @@
 # live under /work/toolchain (built by the recipe in
 # local-plan/model-bump/HOST.md, user space, no root):
 #   export PATH=/work/toolchain/sail-v2/bin:/work/toolchain/bin:$PATH
-# `sail --version` then prints "Sail 0.20.3… (lean-xv6-v2 @ …)".  Once an
-# upstream Sail release contains both fixes, build that release instead and
-# drop this paragraph.
+# `sail --version` then prints "Sail 0.20.3 (xv6 @ …)".  Once an upstream Sail
+# release contains the fixes, build that release instead and drop this
+# paragraph.
 # ======================================================================
 set -euo pipefail
 
@@ -59,12 +63,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 SAIL_RISCV_URL="${SAIL_RISCV_URL:-https://github.com/dongjaelee1/sail-riscv}"
-SAIL_RISCV_REV="${SAIL_RISCV_REV:-69ed097e1f608085516e0116a7fa41bef6cf053d}"
+SAIL_RISCV_REV="${SAIL_RISCV_REV:-9da94b63c66e02eb943a09a47983f857c095f27b}"
 SAIL_RISCV_DIR="${1:-${SAIL_RISCV_DIR:-$REPO_ROOT/sail-riscv}}"
 case "$SAIL_RISCV_DIR" in /*) ;; *) SAIL_RISCV_DIR="$PWD/$SAIL_RISCV_DIR" ;; esac
 # the Sail compiler this model was generated with (informational; checked by name only):
-# upstream master $SAIL_REV; the built branch is dongjaelee1/sail `xv6` = that + the two fixes
-# (merge 2d36c5de29ce764d0a4330d687b47c8160c230e4)
+# upstream master $SAIL_REV; the built branch is dongjaelee1/sail `xv6` = that + the three fixes
+# (merge d7222d57393313a35dd2b8d74b8ae640d770e9c1)
 SAIL_REV="e49821011450d2c26dad90e8806fc82d9698b627"
 # lean-sail: the revision the generated lakefile requires (= the root lakefile.toml's)
 LEAN_SAIL_GIT="https://github.com/rems-project/lean-sail"
@@ -112,7 +116,7 @@ else
   SAIL_REQUIRED_VER="0.20.3"
 fi
 SAIL_HAVE_VER="$(sail --version | sed -E 's/^Sail ([0-9.]+).*/\1/')"
-if ! sail --version | grep -q 'lean-xv6-v2\|lean-short-circuit\|lean-sc-pin'; then
+if ! sail --version | grep -q '(xv6 @\|lean-xv6-v2'; then
   echo "WARNING: '$(sail --version)' does not look like the patched sail (short-circuit + type-level parens);" >&2
   echo "         see this script's header." >&2
 fi
@@ -216,4 +220,7 @@ else echo "patch C: not needed (sail_assert)"; fi
 # (sail only substitutes THE_MODULE_NAME, which the master does not use).
 cmp -s "$XV6_EXTRAS" "$OUT_DIR/Lean_RV64D/LeanRV64D/Xv6Extras.lean" || {
   echo "error: installed Xv6Extras.lean differs from $XV6_EXTRAS" >&2; exit 1; }
-echo "Done.  Review 'git diff --stat model/', then: lake update Sail Lean_RV64D (once, after a pin change) and lake build LeanRV64D."
+echo "Done.  Review 'git diff --stat model/', then: lake update Sail Lean_RV64D (once, after a pin change)"
+echo "and build EVERY generated module -- \`lake build LeanRV64D\` covers only the root's import closure,"
+echo "which omits Step, InstsEnd, DecodeExt, DeviceTree, ...:"
+echo "  lake build \$(cd model/Lean_RV64D && ls LeanRV64D/*.lean | sed -e 's/\\.lean\$//' -e 's|/|.|g')"

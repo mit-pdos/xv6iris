@@ -1410,7 +1410,7 @@ def maybe_hlvx_forwards (arg_ : hlvop) : String :=
   | .HLV => ""
   | .HLVX => "x"
 
-/-- Type quantifiers: k_ex1237904_ : Bool -/
+/-- Type quantifiers: k_ex1237897_ : Bool -/
 def maybe_u_forwards (arg_ : Bool) : String :=
   match arg_ with
   | true => "u"
@@ -3610,7 +3610,7 @@ def _update_Mstateen0_SE0 (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
 def _update_Mstateen0_SRMCFG (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
   (Sail.BitVec.updateSubrange v 55 55 x)
 
-/-- Type quantifiers: k_ex1238041_ : Bool -/
+/-- Type quantifiers: k_ex1238034_ : Bool -/
 def legalize_csr_bit (c : CSRBitConfig) (feature_enabled : Bool) (v : (BitVec 1)) : (BitVec 1) :=
   if ((not feature_enabled) : Bool)
   then 0#1
@@ -4828,7 +4828,7 @@ def lrsc_width_valid (width : Nat) : Bool :=
 def validDoubleRegs {n : _} (regs : (Vector fregidx n)) : Bool :=
   true
 
-/-- Type quantifiers: k_ex1240005_ : Bool, width : Nat, List.elem width [1, 2, 4, 8] -/
+/-- Type quantifiers: k_ex1239998_ : Bool, width : Nat, List.elem width [1, 2, 4, 8] -/
 def valid_load_encdec (width : Nat) (is_unsigned : Bool) : Bool :=
   ((width <b xlen_bytes) || ((not is_unsigned) && (width ≤b xlen_bytes)))
 
