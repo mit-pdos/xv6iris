@@ -316,7 +316,7 @@ cells and `STCE` are now only framed; `mip'` is the old `mip`), outside a virtua
 privilege. -/
 theorem swp_write_CSR_stimecmp (cpu : CPU) (dp : DFrac) (p : Privilege) (hp : privLevel_is_virtual p = false)
     (dq : DFrac) (s v mt mtc mip me : BitVec 64)
-    (_hstce : BitVec.extractLsb' 63 1 me = 1#1) (Φ : Result (BitVec 64) Unit → IProp GF) :
+    (hstce : BitVec.extractLsb' 63 1 me = 1#1) (Φ : Result (BitVec 64) Unit → IProp GF) :
     hwConfig cpu ∗ Register.cur_privilege ↦ᵣ[cpu]{dp} p ∗ Register.stimecmp ↦ᵣ[cpu] s ∗
     Register.mtime ↦ᵣ[cpu]{dq} mt ∗ Register.mtimecmp ↦ᵣ[cpu]{dq} mtc ∗ Register.mip ↦ᵣ[cpu] mip ∗
     Register.menvcfg ↦ᵣ[cpu]{dq} me ∗
