@@ -282,10 +282,18 @@ BitVec.reduceNeg, BitVec.reduceNot, BitVec.reduceAnd, BitVec.reduceOr, BitVec.re
 
 /-! ## The step tactic -/
 
-/-- Find the `swp cpu m Φ` in the goal and return `m`. -/
-def findSwp (e : Lean.Expr) : Option Lean.Expr :=
-  -- `@swp GF inst cpu X m Φ`: six arguments, the program at index 4
-  (e.find? fun t => t.isAppOfArity ``MachCSL.swp 6).map fun t => t.getAppArgs[4]!
+/-- Find the `swp cpu m Φ` of the goal and return `m`: the one in the CONCLUSION (reached by
+descending through the last argument, the proof-mode entailment's conclusion), and anywhere in the
+goal only if the conclusion has none -- a hypothesis can itself mention `swp` (e.g. a loop body's
+spec over the rest of an early-return block, `MachCSL.swp_run_intrange_loop`). -/
+partial def findSwp (e : Lean.Expr) : Option Lean.Expr :=
+  let rec concl (t : Lean.Expr) : Option Lean.Expr :=
+    if let .mdata _ e := t then concl e
+    else if t.isAppOfArity ``MachCSL.swp 6 then some t.getAppArgs[4]!
+    else if t.isApp then concl t.appArg! else none
+  match concl e with
+  | some m => some m
+  | none => (e.find? fun t => t.isAppOfArity ``MachCSL.swp 6).map fun t => t.getAppArgs[4]!
 
 /-- The head action of `m`: for `x >>= k` it is `x`, otherwise `m` itself. -/
 def headAction (m : Lean.Expr) : Lean.Expr :=
@@ -337,13 +345,17 @@ def regHypName (r : Lean.Expr) : Name :=
 argument at each level (the proof-mode entailment's conclusion is its last
 argument), so that neither finding nor rewriting it traverses the context. -/
 partial def getSwp (tgt : Lean.Expr) : Option Lean.Expr :=
-  if tgt.isAppOfArity ``MachCSL.swp 6 then some tgt.getAppArgs[4]!
-  else if tgt.isApp then getSwp tgt.appArg!
-  else none
+  match tgt with
+  | .mdata _ e => getSwp e
+  | _ =>
+    if tgt.isAppOfArity ``MachCSL.swp 6 then some tgt.getAppArgs[4]!
+    else if tgt.isApp then getSwp tgt.appArg!
+    else none
 
 /-- Rewrite the `swp` computation of a goal (see `getSwp`); a full traversal
 if it is not on the last-argument path. -/
 partial def mapSwp (tgt : Lean.Expr) (f : Lean.Expr → Lean.Expr) : Lean.Expr :=
+  if let .mdata d e := tgt then .mdata d (mapSwp e f) else
   if tgt.isAppOfArity ``MachCSL.swp 6 then
     let args := tgt.getAppArgs
     mkAppN tgt.getAppFn (args.set! 4 (f args[4]!))
@@ -944,7 +956,7 @@ elab "swp_at_spec" : tactic => withMainContext do
 computation has been consumed and only the continuation is left.) -/
 elab "swp_done" : tactic => withMainContext do
   let tgt ← instantiateMVars (← getMainTarget)
-  if (findSwp tgt).isSome then throwError "swp_done: still an `swp` goal"
+  if (getSwp tgt).isSome then throwError "swp_done: still an `swp` goal"
 
 elab "swp_step" : tactic => withMainContext do
   let tgt ← instantiateMVars (← getMainTarget)

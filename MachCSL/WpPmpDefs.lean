@@ -66,20 +66,26 @@ theorem pmpAllOff_bootPmpcfg : pmpAllOff bootPmpcfg := by
 /-! ### lean-sail's integer-range loop (`IntRange.forIn'_eq`, `IntRange.loop_unfold`:
 `MachCSL/SailBytes.lean`) -/
 
-/-- A unit-state loop over `SailME` (step 1) whose body keeps the resource `P`
-and always yields: from any index, without a later. -/
-theorem swp_intrange_loop (cpu : CPU) {ε : Type} (range : IntRange) (hstep : range.step = 1)
-    (f : (i : Int) → i ∈ range → Unit → ExceptT ε SailM (ForInStep Unit))
-    (P : IProp GF) (Φ : Except ε Unit → IProp GF) (i : Int)
+/-- A unit-state loop inside an early-return block (`SailME`, step 1) whose body keeps the resource
+`P` and always yields: from any index, without a later.  The block is `SailME.run (loop >>= k)`;
+the body is specified together with the rest of the block (any continuation `g`), since an early
+return in the body would skip it. -/
+theorem swp_run_intrange_loop (cpu : CPU) {α : Type} (range : IntRange) (hstep : range.step = 1)
+    (f : (i : Int) → i ∈ range → Unit → SailME α (ForInStep Unit))
+    (P : IProp GF) (k : Unit → SailME α α) (Φ : α → IProp GF) (i : Int)
     (hs : (i - range.start) % range.step = 0) :
-    □ (∀ (i : Int) (h : i ∈ range) (Ψ : Except ε (ForInStep Unit) → IProp GF),
-        P ∗ ▷ (P -∗ Ψ (.ok (ForInStep.yield ()))) -∗ swp cpu (ExceptT.run (f i h ())) Ψ) ∗
-    P ∗ (P -∗ Φ (.ok ())) ⊢ swp cpu (ExceptT.run (IntRange.forIn'.loop range f () i hs)) Φ := by
+    □ (∀ (i : Int) (h : i ∈ range) (g : ForInStep Unit → SailME α α) (Ψ : α → IProp GF),
+        P ∗ ▷ (P -∗ swp cpu (SailME.run (g (ForInStep.yield ()))) Ψ) -∗
+          swp cpu (SailME.run (f i h () >>= g)) Ψ) ∗
+    P ∗ (P -∗ swp cpu (SailME.run (k ())) Φ) ⊢
+      swp cpu (SailME.run (IntRange.forIn'.loop range f () i hs >>= k)) Φ := by
   suffices H : ∀ (n : Nat) (i : Int) (hs : (i - range.start) % range.step = 0),
       (range.stop - i + 1).toNat = n →
-      □ (∀ (i : Int) (h : i ∈ range) (Ψ : Except ε (ForInStep Unit) → IProp GF),
-          P ∗ ▷ (P -∗ Ψ (.ok (ForInStep.yield ()))) -∗ swp cpu (ExceptT.run (f i h ())) Ψ) ∗
-      P ∗ (P -∗ Φ (.ok ())) ⊢ swp cpu (ExceptT.run (IntRange.forIn'.loop range f () i hs)) Φ from
+      □ (∀ (i : Int) (h : i ∈ range) (g : ForInStep Unit → SailME α α) (Ψ : α → IProp GF),
+          P ∗ ▷ (P -∗ swp cpu (SailME.run (g (ForInStep.yield ()))) Ψ) -∗
+            swp cpu (SailME.run (f i h () >>= g)) Ψ) ∗
+      P ∗ (P -∗ swp cpu (SailME.run (k ())) Φ) ⊢
+        swp cpu (SailME.run (IntRange.forIn'.loop range f () i hs >>= k)) Φ from
     H _ i hs rfl
   intro n
   induction n with
@@ -92,19 +98,16 @@ theorem swp_intrange_loop (cpu : CPU) {ε : Type} (range : IntRange) (hstep : ra
       simp only [Membership.mem, hstep, show (1 : Int) > 0 from by decide, ite_true] at h
       have := Int.toNat_eq_zero.mp hn
       omega
-    simp only [dite_eq_right hni, ExceptT.run_pure]
-    iapply swp_ret
+    simp only [dite_eq_right hni, pure_bind]
     iapply HΦ $$ HP
   | succ n ih =>
     intro i hs hn
     iintro ⟨#Hf, HP, HΦ⟩
     rw [IntRange.loop_unfold]
     by_cases h : i ∈ range
-    · simp only [dite_eq_left h, ExceptT.run_bind]
-      iapply swp_bind
+    · simp only [dite_eq_left h, bind_assoc]
       iapply Hf $$ %i %h
       iframe
-      simp only []
       inext
       iintro HP
       have hn' : (range.stop - (i + range.step) + 1).toNat = n := by
@@ -118,28 +121,27 @@ theorem swp_intrange_loop (cpu : CPU) {ε : Type} (range : IntRange) (hstep : ra
       iapply ih (i + range.step) _ hn'
       iframe
       iexact Hf
-    · simp only [dite_eq_right h, ExceptT.run_pure]
-      iapply swp_ret
+    · simp only [dite_eq_right h, pure_bind]
       iapply HΦ $$ HP
 
-/-- The same from an index in the range, with the continuation under a later. -/
-theorem swp_intrange_loop_later (cpu : CPU) {ε : Type} (range : IntRange) (hstep : range.step = 1)
-    (f : (i : Int) → i ∈ range → Unit → ExceptT ε SailM (ForInStep Unit))
-    (P : IProp GF) (Φ : Except ε Unit → IProp GF) (i : Int) (hi : i ∈ range)
+/-- The same from an index in the range, with the rest of the block under a later. -/
+theorem swp_run_intrange_loop_later (cpu : CPU) {α : Type} (range : IntRange)
+    (hstep : range.step = 1) (f : (i : Int) → i ∈ range → Unit → SailME α (ForInStep Unit))
+    (P : IProp GF) (k : Unit → SailME α α) (Φ : α → IProp GF) (i : Int) (hi : i ∈ range)
     (hs : (i - range.start) % range.step = 0) :
-    □ (∀ (i : Int) (h : i ∈ range) (Ψ : Except ε (ForInStep Unit) → IProp GF),
-        P ∗ ▷ (P -∗ Ψ (.ok (ForInStep.yield ()))) -∗ swp cpu (ExceptT.run (f i h ())) Ψ) ∗
-    P ∗ ▷ (P -∗ Φ (.ok ())) ⊢ swp cpu (ExceptT.run (IntRange.forIn'.loop range f () i hs)) Φ := by
+    □ (∀ (i : Int) (h : i ∈ range) (g : ForInStep Unit → SailME α α) (Ψ : α → IProp GF),
+        P ∗ ▷ (P -∗ swp cpu (SailME.run (g (ForInStep.yield ()))) Ψ) -∗
+          swp cpu (SailME.run (f i h () >>= g)) Ψ) ∗
+    P ∗ ▷ (P -∗ swp cpu (SailME.run (k ())) Φ) ⊢
+      swp cpu (SailME.run (IntRange.forIn'.loop range f () i hs >>= k)) Φ := by
   iintro ⟨#Hf, HP, HΦ⟩
   rw [IntRange.loop_unfold]
-  simp only [dite_eq_left hi, ExceptT.run_bind]
-  iapply swp_bind
+  simp only [dite_eq_left hi, bind_assoc]
   iapply Hf $$ %i %hi
   iframe
-  simp only []
   inext
   iintro HP
-  iapply swp_intrange_loop cpu range hstep f P Φ (i + range.step) _
+  iapply swp_run_intrange_loop cpu range hstep f P k Φ (i + range.step) _
   iframe
   iexact Hf
 
