@@ -43,8 +43,7 @@ noncomputable section
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
-open Sail.ArchSem (FreeM)
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 /-- The registers frozen at reset, at their (pinned) value. -/

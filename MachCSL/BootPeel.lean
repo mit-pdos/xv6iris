@@ -36,8 +36,7 @@ noncomputable section
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
-open Sail.ArchSem (FreeM)
+open Sail Sail.ArchSem
 open LeanRV64D
 
 /-- "Only register `r₀` differs between `f₁` and `g`": the frame a sealed head
@@ -189,23 +188,27 @@ def step (cx : Ctx) (g : MVarId) : MetaM (Option (List MVarId)) := g.withContext
     let ma := m.getAppArgs
     let call ← whnf ma[ma.size - 2]!
     let k := ma[ma.size - 1]!
+    -- concurrency interface v2: an event node is `Sum.inl (Except.ok o)`; a failure
+    -- (`Sum.inl (Except.error _)`) or a finite choice (`Sum.inr n`) stops the walk
+    unless call.isAppOfArity ``Sum.inl 3 do throwError "boot_peel: choice reached{indentExpr m}"
+    let call ← whnf call.appArg!
     unless call.isAppOfArity ``Except.ok 3 do throwError "boot_peel: failure reached{indentExpr m}"
     let o ← whnf call.appArg!
     let oa := o.getAppArgs
-    if o.getAppFn.isConstOf ``Outcome.regRead then
-      let r := oa[oa.size - 1]!
+    if o.getAppFn.isConstOf ``InstructionEffect.regRead then
+      let r := oa[oa.size - 2]!; let acc := oa[oa.size - 1]!
       let (v, hv) ← resolve f r
       let g' ← mkFreshExprSyntheticOpaqueMVar (bootFinTy X Q (k.beta #[v]) f)
-      g.assign (mkAppN (mkConst ``bootFin_regRead) #[X, Q, r, k, f, v, hv, g'])
+      g.assign (mkAppN (mkConst ``bootFin_regRead) #[X, Q, r, acc, k, f, v, hv, g'])
       return some [g'.mvarId!]
-    if o.getAppFn.isConstOf ``Outcome.regWrite then
-      let r := oa[oa.size - 2]!; let v := oa[oa.size - 1]!
+    if o.getAppFn.isConstOf ``InstructionEffect.regWrite then
+      let r := oa[oa.size - 3]!; let acc := oa[oa.size - 2]!; let v := oa[oa.size - 1]!
       let f' := mkAppN (mkConst ``BootRegs.set) #[f, r, v]
       let g' ← mkFreshExprSyntheticOpaqueMVar
-        (bootFinTy X Q (k.beta #[mkConst ``PUnit.unit [Level.one]]) f')
-      g.assign (mkAppN (mkConst ``bootFin_regWrite) #[X, Q, r, v, k, f, g'])
+        (bootFinTy X Q (k.beta #[mkConst ``Unit.unit]) f')
+      g.assign (mkAppN (mkConst ``bootFin_regWrite) #[X, Q, r, acc, v, k, f, g'])
       return some [g'.mvarId!]
-    if o.getAppFn.isConstOf ``Outcome.message then
+    if o.getAppFn.isConstOf ``InstructionEffect.printMessage then
       let s := oa[oa.size - 1]!
       let g' ← mkFreshExprSyntheticOpaqueMVar (bootFinTy X Q (k.beta #[mkConst ``Unit.unit]) f)
       g.assign (mkAppN (mkConst ``bootFin_message) #[X, Q, s, k, f, g'])

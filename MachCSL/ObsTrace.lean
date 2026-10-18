@@ -59,7 +59,7 @@ noncomputable section
 namespace MachCSL
 
 open Iris.ProgramLogic
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D
 
 /-! ## 1. The output projection, and the wire lemmas
@@ -483,21 +483,19 @@ theorem obsIns_user (i : UartId) (κ : List Obs) (hκ : ∀ e ∈ κ, isUser e =
 /-- A hart node never moves a wire: register effects and RAM accesses do not
 touch the device fabric, and an MMIO transaction goes through
 `devRead`/`devWrite` (the Rocq `mnode_step_u_wire`). -/
-theorem evStep_wire (cpu : CPU) (o : Sail.ConcurrencyInterfaceV1.Outcome LeanRV64D.Register
-      LeanRV64D.RegisterType) (σ : MState) (v : o.ret) (σ' : MState) (h : evStep cpu o σ v σ')
+theorem evStep_wire (cpu : CPU) (o : InstructionEffect) (σ : MState) (v : InstructionEffect.ret o)
+    (σ' : MState) (h : evStep cpu o σ v σ')
     (j : UartId) : σ'.devs.wire j = σ.devs.wire j := by
   cases o
-  case memRead n _ req =>
+  case memRead req =>
     rcases h with ⟨_, w, ds', hr, _, rfl⟩ | ⟨_, _, _, _, _, _, _, _, rfl⟩ |
       ⟨_, _, _, _, _, _, _, _, _, rfl⟩ | ⟨_, _, _, _, _, _, rfl⟩
     · exact devRead_wire _ _ _ _ _ hr j
     all_goals rfl
-  case memWrite n _ req =>
-    rcases h with ⟨_, w, ds', _, hw, _, rfl⟩ | ⟨_, _, _, _, _, rfl⟩
+  case memWrite req w _ =>
+    rcases h with ⟨_, ds', hw, _, rfl⟩ | ⟨_, _, _, rfl⟩
     · exact devWrite_wire _ _ _ _ _ hw j
     · rfl
-  case readRam => exact h.elim
-  case writeRam => exact h.elim
   case regRead => obtain ⟨_, rfl⟩ := h; rfl
   case getCycleCount => obtain ⟨_, rfl⟩ := h; rfl
   all_goals (have h' := h; simp only [evStep] at h'; subst h'; rfl)
@@ -516,23 +514,22 @@ theorem hartStep_wire (cpu : CPU) (m m' : SailM Unit) (σ σ' : MState) (h : har
       · obtain ⟨_, _, rfl⟩ := hb; rfl
       · obtain ⟨_, rfl⟩ := hb; rfl
       · exact hb.elim
+  · obtain ⟨_, _, rfl⟩ := h; rfl
 
 /-- ...and never makes a byte arrive (Rocq `mnode_step_u_recv`). -/
-theorem evStep_recvd (cpu : CPU) (o : Sail.ConcurrencyInterfaceV1.Outcome LeanRV64D.Register
-      LeanRV64D.RegisterType) (σ : MState) (v : o.ret) (σ' : MState) (h : evStep cpu o σ v σ')
+theorem evStep_recvd (cpu : CPU) (o : InstructionEffect) (σ : MState) (v : InstructionEffect.ret o)
+    (σ' : MState) (h : evStep cpu o σ v σ')
     (j : UartId) : σ'.devs.recvd j = σ.devs.recvd j := by
   cases o
-  case memRead n _ req =>
+  case memRead req =>
     rcases h with ⟨_, w, ds', hr, _, rfl⟩ | ⟨_, _, _, _, _, _, _, _, rfl⟩ |
       ⟨_, _, _, _, _, _, _, _, _, rfl⟩ | ⟨_, _, _, _, _, _, rfl⟩
     · exact devRead_recvd _ _ _ _ _ hr j
     all_goals rfl
-  case memWrite n _ req =>
-    rcases h with ⟨_, w, ds', _, hw, _, rfl⟩ | ⟨_, _, _, _, _, rfl⟩
+  case memWrite req w _ =>
+    rcases h with ⟨_, ds', hw, _, rfl⟩ | ⟨_, _, _, rfl⟩
     · exact devWrite_recvd _ _ _ _ _ hw j
     · rfl
-  case readRam => exact h.elim
-  case writeRam => exact h.elim
   case regRead => obtain ⟨_, rfl⟩ := h; rfl
   case getCycleCount => obtain ⟨_, rfl⟩ := h; rfl
   all_goals (have h' := h; simp only [evStep] at h'; subst h'; rfl)
@@ -551,6 +548,7 @@ theorem hartStep_recvd (cpu : CPU) (m m' : SailM Unit) (σ σ' : MState) (h : ha
       · obtain ⟨_, _, rfl⟩ := hb; rfl
       · obtain ⟨_, rfl⟩ := hb; rfl
       · exact hb.elim
+  · obtain ⟨_, _, rfl⟩ := h; rfl
 
 /-- THE OBSERVATIONS ARE FAITHFUL: a device step's events are device events,
 and they grow every port's wire by exactly that port's output events -- a

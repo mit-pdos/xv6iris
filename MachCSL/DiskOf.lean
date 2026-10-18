@@ -19,7 +19,7 @@ noncomputable section
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D
 
 /-- The durable disk image of a device state vector. -/
@@ -153,7 +153,7 @@ theorem hartStep_diskOf {cpu : CPU} {m : SailM Unit} {σ : MState} {m' : SailM U
         · exact devRead_diskOf _ _ _ _ _ hr
         all_goals rfl
       · -- a store: MMIO or DRAM
-        rcases hev with ⟨_, w, ds', _, hw, _, rfl⟩ | ⟨_, _, _, _, _, rfl⟩
+        rcases hev with ⟨_, ds', hw, _, rfl⟩ | ⟨_, _, _, rfl⟩
         · exact devWrite_diskOf _ _ _ _ _ hw
         · rfl
     · cases o <;> simp only [blockedStep] at hb
@@ -161,6 +161,8 @@ theorem hartStep_diskOf {cpu : CPU} {m : SailM Unit} {σ : MState} {m' : SailM U
         | exact hb.elim
         | (obtain ⟨_, _, rfl⟩ := hb; rfl)
         | (obtain ⟨_, rfl⟩ := hb; rfl)
+  · -- a finite choice: nothing moves
+    obtain ⟨_, _, rfl⟩ := h; rfl
 
 /-! ## A device step frames the image, unless it is the disk's own -/
 

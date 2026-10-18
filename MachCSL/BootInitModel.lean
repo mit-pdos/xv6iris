@@ -23,7 +23,7 @@ noncomputable section
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 /-- Rocq `post_ok` = `reset_regs`: the reset facts of a booted hart with id
