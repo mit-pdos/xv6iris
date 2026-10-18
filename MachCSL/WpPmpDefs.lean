@@ -8,13 +8,14 @@ configuration (`MachCSL.MConf`, and through it `SConfDefs`, `KCtx`,
 symbolic-execution tactics (`MachCSL.Tactics`), which these do not.
 -/
 import MachCSL.HwConfig
+import MachCSL.SailBytes
 
 noncomputable section
 
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 variable {GF : BundledGFunctors.{0}} [MachGS GF]
@@ -62,24 +63,8 @@ theorem pmpEntryOff_zero : pmpEntryOff 0#8 := ⟨rfl, rfl⟩
 theorem pmpAllOff_bootPmpcfg : pmpAllOff bootPmpcfg := by
   intro j; rw [bootPmpcfg_get]; exact pmpEntryOff_zero
 
-/-! ### lean-sail's integer-range loop -/
-
-theorem IntRange.forIn'_eq {m : Type → Type} [Monad m] {β : Type} (range : IntRange) (init : β)
-    (f : (i : Int) → i ∈ range → β → m (ForInStep β)) :
-    IntRange.forIn' range init f = IntRange.forIn'.loop range f init range.start (by simp) := rfl
-
-/-- One unrolling of the loop. -/
-theorem IntRange.loop_unfold {m : Type → Type} [Monad m] {β : Type} (range : IntRange)
-    (f : (i : Int) → i ∈ range → β → m (ForInStep β)) (b : β) (i : Int) (hs) :
-    IntRange.forIn'.loop range f b i hs =
-      (if h : i ∈ range then
-        f i h b >>= fun r =>
-          match r with
-          | .done b => (Pure.pure b : m β)
-          | .yield b => IntRange.forIn'.loop range f b (i + range.step)
-              (by rw [Int.add_comm, Int.add_sub_assoc]; simp_all)
-      else (Pure.pure b : m β)) := by
-  rw [IntRange.forIn'.loop]; rfl
+/-! ### lean-sail's integer-range loop (`IntRange.forIn'_eq`, `IntRange.loop_unfold`:
+`MachCSL/SailBytes.lean`) -/
 
 /-- A unit-state loop over `SailME` (step 1) whose body keeps the resource `P`
 and always yields: from any index, without a later. -/

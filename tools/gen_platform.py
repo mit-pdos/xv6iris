@@ -20,7 +20,7 @@ import LeanRV64D.Defs
 import LeanRV64D.Xv6Extras
 
 namespace MachCSL
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 {opens}
 
