@@ -97,6 +97,13 @@ bump's plan, kept outside the repository):
   softfloat externs into `execute`.  The fork drops that dependency and the two FP arms.  The
   generated model has no F/D instructions, as before the bump, and the softfloat axioms stay
   outside every audited cone (`notes/adequacy_axioms_baseline.md`).
+- **H's interrupt registers are reset.** 0.16's interrupt check reads `hideleg` and `hgeie` on every
+  cycle, H enabled or not, and nothing reset them; under this development's arbitrary power-on
+  state a hart could route a delegated supervisor interrupt to VS and never take it.  The model fork
+  zeroes both in `reset_sys` (as an emulator that zero-initialises registers already sees).
+- **The frozen bundle grows.** `hwConfig cpu` also holds `hideleg ↦□ 0`, `hgeie ↦□ 0` and
+  `mhartid ↦□ bootHid cpu`: registers written by the boot program only and read on hot paths
+  (every physical access reads `mhartid` in `within_clint` since 0.16).
 - **Answer types.** lean-sail's `InstructionEffect.ret` is a plain `def`, and an imported
   definition's reducibility cannot be changed without a check-disabling option.  So the WP's
   event rules come with `_at` variants that take the program and an equation to its event node.
