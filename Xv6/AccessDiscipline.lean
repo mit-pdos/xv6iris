@@ -3,14 +3,15 @@
 [R34.1]; W8 (f2-ctx) S4; W8 (f3-hold) [OWN.64]; W8 (f3-racy) [OWN.63]; W8
 (f3-pipelk) [OWN.65]; W8 (f3-ptek) [OWN.66]; W8 (f3-utext) [OWN.89]): W8's
 export `xv6AccessDisc`, `chainOkAt ∧ lockWordDiscAt ∧ cpuStaticAt ∧ lkCpuReadAt
-∧ pteDiscAt ∧ utextDiscAt ∧ uptDiscAt ∧ kptMapsExp` -- EIGHT conjuncts:
+∧ pteDiscAt ∧ utextDiscAt ∧ uptDiscAt ∧ kptMapsExp ∧ relProvAt` -- NINE conjuncts:
 THREE of the skeleton's six (W8 (f2-ctx)), the ruled `holding()` clause
 `lkCpuReadAt` (W8 (f3-hold)), the KERNEL half of the skeleton's A/D
 write-back clause `pteDiscAt` (W8 (f3-ptek)), the user code clause
 `utextDiscAt` (W8 (f3-utext), O1: every byte a user text leaf maps is at or
 below the hart's instruction view), the USER tables' half of the A/D clause
 `uptDiscAt` (W8 (f3-utext) T4) and the sealed kernel table's mappings in
-plain addresses `kptMapsExp` (mcslrec (1) [OWN.99]); `chainOkAt` carries the
+plain addresses `kptMapsExp` (mcslrec (1) [OWN.99]) and the release sites'
+provenance `relProvAt` (mcslrec (2) [OWN.82] (a1)); `chainOkAt` carries the
 ruled `ip->ref` clause `racyValOk` (W8 (f3-racy)); `lockWordDiscAt` and
 `lkCpuReadAt` cover EVERY lock -- the static spinlocks and the live pipe
 locks (W8 (f3-pipelk)).
@@ -806,6 +807,56 @@ theorem xv6LockWord_registered (σ : MState) (b : PAddr) (t : Nat) (hb : xv6Lock
   rcases hb with hb | ⟨_, L, te, _, _, _, hw, _⟩
   · exact .inl (xv6StaticLocks_registered b hb)
   · exact .inr ⟨L, te, hw⟩
+
+/-! ## The static locks' boot value (plan row 5′ E3, [R43.3], [OWN.107])
+
+Every static spinlock's two words (`lk->locked`, `lk->cpu`) are 0 in the boot
+image: 155 of the 157 sit in `.bss` (past `KernelElf.elfEnd`, zero by the
+loader), the two `uarts[i].lock` in `.data`, whose file bytes there are 0.
+Decided over `MachCSL.bootByte`.  Spec: RVWMO/riscv.cat/Sail/Zifencei/PMAs are
+silent (an image fact: the initial value of a memory location); FAITHFUL. -/
+
+/-- The loaded byte at `n` is a RAM byte holding 0. -/
+def bootZeroB (n : Nat) : Bool := decide (ramBase ≤ n ∧ n < ramEnd) && bootByte n == 0#8
+
+/-- Both words of the spinlock at `b` are 0 in the boot image, byte by byte. -/
+def staticLockZeroB (b : Nat) : Bool :=
+  (List.range 4).all (fun j => bootZeroB (b + j)) && (List.range 8).all (fun j => bootZeroB (b + 16 + j))
+
+/-- **E3, decided**: every static lock's words are 0 in the boot image. -/
+theorem xv6StaticLocks_zeroB : xv6StaticLocks.all (fun b => staticLockZeroB b.toNat) = true := by
+  decide +kernel
+
+theorem bootImage_zeroB {a : PAddr} (h : bootZeroB a.toNat = true) : bootImage[a]? = some 0#8 := by
+  simp only [bootZeroB, Bool.and_eq_true, decide_eq_true_eq, beq_iff_eq] at h
+  rw [bootImage_get?, if_pos (by unfold inRam; omega), h.2]
+
+theorem bootZero_addr {b : PAddr} {j : Nat} (h : b.toNat + j < ramEnd) :
+    (b + BitVec.ofNat 64 j).toNat = b.toNat + j := by
+  have hr : ramEnd < 2 ^ 64 := by decide
+  rw [BitVec.toNat_add, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (a := j) (by omega), Nat.mod_eq_of_lt (by omega)]
+
+/-- **The static lock words are 0 in the boot image** (E3): the lock word's
+four bytes and the owner word's eight. -/
+theorem xv6StaticLocks_bootZero (b : PAddr) (hb : b ∈ xv6StaticLocks) :
+    (∀ j, j < 4 → bootImage[b + BitVec.ofNat 64 j]? = some 0#8) ∧
+      (∀ j, j < 8 → bootImage[b + 16#64 + BitVec.ofNat 64 j]? = some 0#8) := by
+  have hz := List.all_eq_true.1 xv6StaticLocks_zeroB b hb
+  simp only [staticLockZeroB, Bool.and_eq_true, List.all_eq_true, List.mem_range] at hz
+  refine ⟨fun j hj => ?_, fun j hj => ?_⟩
+  · have h := hz.1 j hj
+    have hlt : b.toNat + j < ramEnd := by
+      simp only [bootZeroB, Bool.and_eq_true, decide_eq_true_eq] at h; omega
+    apply bootImage_zeroB
+    rw [bootZero_addr hlt]
+    exact h
+  · have h := hz.2 j hj
+    have hlt : b.toNat + 16 + j < ramEnd := by
+      simp only [bootZeroB, Bool.and_eq_true, decide_eq_true_eq] at h; omega
+    have h16 : (b + 16#64).toNat = b.toNat + 16 := bootZero_addr (j := 16) (by omega)
+    apply bootImage_zeroB
+    rw [bootZero_addr (b := b + 16#64) (by rw [h16]; exact hlt), h16]
+    exact h
 
 /-- Every per-hart region of xv6's list sits at its hart's `&cpus[h]` (by
 evaluation). -/
