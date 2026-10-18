@@ -65,7 +65,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 SAIL_RISCV_URL="${SAIL_RISCV_URL:-https://github.com/dongjaelee1/sail-riscv}"
-SAIL_RISCV_REV="${SAIL_RISCV_REV:-d2cb43fcc6fac8f459e7d7725e600e771a67c547}"
+SAIL_RISCV_REV="${SAIL_RISCV_REV:-a54604147bac6646c0a8b62a31eab15ce58027c7}"
 SAIL_RISCV_DIR="${1:-${SAIL_RISCV_DIR:-$REPO_ROOT/sail-riscv}}"
 case "$SAIL_RISCV_DIR" in /*) ;; *) SAIL_RISCV_DIR="$PWD/$SAIL_RISCV_DIR" ;; esac
 # the Sail compiler this model was generated with (informational; checked by name only):

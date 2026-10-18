@@ -48,7 +48,10 @@ def bootPost (hid : BitVec 64) (pma : List PMA_Region) (f : BootRegs) : Prop :=
   f .senvcfg = 0#64 ∧
   -- mstateen0 from the spec's `reset_stateen`; sstateen0 from the board
   f .mstateen0 = 0#64 ∧
-  f .sstateen0 = 0#32
+  f .sstateen0 = 0#32 ∧
+  -- H's interrupt delegation and guest-external enables, zeroed by the fork's `reset_sys`
+  f .hideleg = 0#64 ∧
+  f .hgeie = 0#64
 
 /-- Rocq `exec_init_model`: from a file the board has initialised, the model's
 own `init_model ""` lands in a file satisfying `bootPost`. -/
@@ -57,7 +60,7 @@ theorem bootFin_init_model (hid : BitVec 64) (f : BootRegs) (hb : bootBoardOk hi
   obtain ⟨hmisa, hmstat, hmsec, hmenv, hhtif, hpma, hpcr, hmhid, hmie, hmdl, hsenv, hsse⟩ := hb
   boot_peel [bootFin_reset_pmp]
   refine bootFin_pure _ _ _
-    ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+    ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
   all_goals boot_lk
   all_goals first | rfl | assumption | decide +kernel
 

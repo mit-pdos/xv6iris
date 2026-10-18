@@ -326,7 +326,8 @@ def stripWrappers (x : Lean.Expr) : Lean.Expr := Id.run do
 def isHwReg (r : Lean.Expr) : Bool :=
   [``LeanRV64D.Register.misa, ``LeanRV64D.Register.mseccfg, ``LeanRV64D.Register.pma_regions,
    ``LeanRV64D.Register.htif_tohost_base, ``LeanRV64D.Register.elp, ``LeanRV64D.Register.senvcfg,
-   ``LeanRV64D.Register.mstateen0, ``LeanRV64D.Register.sstateen0].any r.isConstOf
+   ``LeanRV64D.Register.mstateen0, ``LeanRV64D.Register.sstateen0, ``LeanRV64D.Register.hideleg,
+   ``LeanRV64D.Register.hgeie].any r.isConstOf
 
 /-- The frozen counter registers the cycle reads (`MachCSL.hwAny`): cells of
 the persistent `hwConfig` bundle at an EXISTENTIAL value, so a read is
@@ -770,6 +771,12 @@ def swpStepCore (x fn : Lean.Expr) (bind : Bool) : TacticM Unit := do
       -- quantifies over the answer instead of pinning it
       if rE.isAppOf ``LeanRV64D.Register.sig_seip || rE.isAppOf ``LeanRV64D.Register.sig_meip then
         evalTactic (← `(tactic| (iapply swp_readReg_any_bind; try (inext; iintro %$h:ident))))
+      -- the hart's id: off the bundle (`Hhw`, at `bootHid cpu`), or an owned cell (M-mode boot)
+      else if rE.isConstOf ``LeanRV64D.Register.mhartid then
+        let hw := mkIdent `Hhw
+        evalTactic (← `(tactic| first
+          | (iapply swp_readReg_mhartid_bind; iframe $hw:ident; try inext)
+          | (iapply swp_readReg_bind; (first | iframe $h:ident | iframe); try (inext; iintro $h:ident))))
       -- the frozen configuration registers are read off the persistent
       -- `hwConfig` bundle (`Hhw`), at their pinned value
       else if isHwReg rE then

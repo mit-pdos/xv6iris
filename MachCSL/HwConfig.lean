@@ -56,6 +56,8 @@ def hwVal : (r : Register) → Option (RegisterType r)
   | .senvcfg => some 0#64
   | .mstateen0 => some 0#64
   | .sstateen0 => some 0#32
+  | .hideleg => some 0#64
+  | .hgeie => some 0#64
   | _ => none
 
 /-- The frozen counter cells the cycle reads, at their power-on values (Rocq
@@ -79,7 +81,7 @@ def hwAny (r : Register) : Bool :=
 counter cells; `scounteren`, existential, keeps its historical slot). -/
 def hwRegs : List Register :=
   [.misa, .mseccfg, .pma_regions, .htif_tohost_base, .elp, .senvcfg, .scounteren, .mstateen0,
-   .sstateen0, .mcountinhibit, .minstretcfg, .mcyclecfg, .mhpmcounter]
+   .sstateen0, .mcountinhibit, .minstretcfg, .mcyclecfg, .mhpmcounter, .hideleg, .hgeie, .mhartid]
 
 variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
@@ -99,6 +101,9 @@ def hwConfig (cpu : CPU) : IProp GF := iprop%
   Register.senvcfg ↦ᵣ[cpu]□ 0#64 ∗
   Register.mstateen0 ↦ᵣ[cpu]□ 0#64 ∗
   Register.sstateen0 ↦ᵣ[cpu]□ 0#32 ∗
+  Register.hideleg ↦ᵣ[cpu]□ 0#64 ∗
+  Register.hgeie ↦ᵣ[cpu]□ 0#64 ∗
+  Register.mhartid ↦ᵣ[cpu]□ bootHid cpu ∗
   ∃ ctr : HwCounters,
     Register.mcountinhibit ↦ᵣ[cpu]□ ctr.mci ∗ Register.minstretcfg ↦ᵣ[cpu]□ ctr.mic ∗
     Register.mcyclecfg ↦ᵣ[cpu]□ ctr.mcc ∗ Register.mhpmcounter ↦ᵣ[cpu]□ ctr.hpm ∗
@@ -115,9 +120,18 @@ theorem hwConfig_reg (cpu : CPU) (r : Register) (v : RegisterType r) (h : hwVal 
   all_goals first | subst h | (have h := Option.some.inj h; subst h)
   all_goals
     unfold hwConfig
-    iintro ⟨#H1, #H2, #H3, #H4, #H5, #H6, #H7, #H8, -⟩
+    iintro ⟨#H1, #H2, #H3, #H4, #H5, #H6, #H7, #H8, #H9, #H10, -, -⟩
     first
     | iexact H1 | iexact H2 | iexact H3 | iexact H4 | iexact H5 | iexact H6 | iexact H7 | iexact H8
+    | iexact H9 | iexact H10
+
+/-- The hart's id, off the bundle: `mhartid` is written once, by the boot program, and is
+read-only after (since sail-riscv 0.16 every physical access reads it, `within_clint`). -/
+theorem hwConfig_mhartid (cpu : CPU) :
+    hwConfig (GF := GF) cpu ⊢ Register.mhartid ↦ᵣ[cpu]□ bootHid cpu := by
+  unfold hwConfig
+  iintro ⟨-, -, -, -, -, -, -, -, -, -, #H, -⟩
+  iexact H
 
 /-- The existential counter cells, off the bundle. -/
 theorem hwConfig_counters (cpu : CPU) :
@@ -126,7 +140,7 @@ theorem hwConfig_counters (cpu : CPU) :
       Register.mcyclecfg ↦ᵣ[cpu]□ ctr.mcc ∗ Register.mhpmcounter ↦ᵣ[cpu]□ ctr.hpm ∗
       Register.scounteren ↦ᵣ[cpu]□ ctr.scen := by
   unfold hwConfig
-  iintro ⟨-, -, -, -, -, -, -, -, H⟩
+  iintro ⟨-, -, -, -, -, -, -, -, -, -, -, H⟩
   iexact H
 
 /-- An existential counter cell (`hwAny`), at some value, off the bundle. -/
@@ -155,9 +169,12 @@ theorem hwConfig_intro (cpu : CPU) (ctr : HwCounters) :
     Register.mcountinhibit ↦ᵣ[cpu] ctr.mci ∗
     Register.minstretcfg ↦ᵣ[cpu] ctr.mic ∗
     Register.mcyclecfg ↦ᵣ[cpu] ctr.mcc ∗
-    Register.mhpmcounter ↦ᵣ[cpu] ctr.hpm ⊢@{IProp GF} |==> hwConfig cpu := by
+    Register.mhpmcounter ↦ᵣ[cpu] ctr.hpm ∗
+    Register.hideleg ↦ᵣ[cpu] 0#64 ∗
+    Register.hgeie ↦ᵣ[cpu] 0#64 ∗
+    Register.mhartid ↦ᵣ[cpu] bootHid cpu ⊢@{IProp GF} |==> hwConfig cpu := by
   unfold hwConfig regPointsTo regPointsToAt
-  iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, H12, H13⟩
+  iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16⟩
   imod ghost_map_elem_persist _ _ _ _ $$ H1 with #H1
   imod ghost_map_elem_persist _ _ _ _ $$ H2 with #H2
   imod ghost_map_elem_persist _ _ _ _ $$ H3 with #H3
@@ -171,8 +188,11 @@ theorem hwConfig_intro (cpu : CPU) (ctr : HwCounters) :
   imod ghost_map_elem_persist _ _ _ _ $$ H11 with #H11
   imod ghost_map_elem_persist _ _ _ _ $$ H12 with #H12
   imod ghost_map_elem_persist _ _ _ _ $$ H13 with #H13
+  imod ghost_map_elem_persist _ _ _ _ $$ H14 with #H14
+  imod ghost_map_elem_persist _ _ _ _ $$ H15 with #H15
+  imod ghost_map_elem_persist _ _ _ _ $$ H16 with #H16
   imodintro
-  iframe H1 H2 H3 H4 H5 H6 H8 H9
+  iframe H1 H2 H3 H4 H5 H6 H8 H9 H14 H15 H16
   iexists ctr
   iframe H10 H11 H12 H13
   iexact H7
@@ -226,6 +246,18 @@ theorem swp_readReg_hw_bind (cpu : CPU) {X : Type} (r : Register) (v : RegisterT
   iintro ⟨#Hhw, HΦ⟩
   ihave #Hr := hwConfig_reg cpu r v h $$ Hhw
   iapply swp_readReg_bind cpu r DFrac.discard v f Φ
+  iframe Hr
+  inext
+  iintro -
+  iexact HΦ
+
+/-- Read the hart's id off the bundle. -/
+theorem swp_readReg_mhartid_bind (cpu : CPU) {X : Type} (f : BitVec 64 → SailM X)
+    (Φ : X → IProp GF) :
+    hwConfig cpu ∗ ▷ swp cpu (f (bootHid cpu)) Φ ⊢ swp cpu (readReg Register.mhartid >>= f) Φ := by
+  iintro ⟨#Hhw, HΦ⟩
+  ihave #Hr := hwConfig_mhartid cpu $$ Hhw
+  iapply swp_readReg_bind cpu Register.mhartid DFrac.discard (bootHid cpu) f Φ
   iframe Hr
   inext
   iintro -

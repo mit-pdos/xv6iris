@@ -1913,6 +1913,8 @@ def reset_sys (_ : Unit) : SailM Unit := do
   then writeReg mseccfg (Sail.BitVec.updateSubrange (← readReg mseccfg) 10 10 0#1)
   else (pure ())
   (reset_stateen ())
+  writeReg hideleg (zeros (n := 64))
+  writeReg hgeie (zeros (n := 64))
   writeReg vstart (zeros (n := 64))
   writeReg vl (zeros (n := 64))
   writeReg vcsr (Sail.BitVec.updateSubrange (← readReg vcsr) 2 1 0b00#2)
