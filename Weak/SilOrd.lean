@@ -30,9 +30,9 @@ open TsoShadow
 def SilOrd.pairs (S : SilWalk.St) : List (Estep × Option Nat) := S.c.tr.zip S.c.sil
 
 theorem SilOrd.pairsSnoc (S : SilWalk.St) (x : Nat) (lb : Lbl) (o : Option Nat) (pC' : Pexv6)
-    (d' : Efab) :
+    (d' : Efab) (w' : Wstate) :
     S.c.sil.length = S.c.tr.length →
-    SilOrd.pairs (SilWalk.snoc S x lb o pC' d') = SilOrd.pairs S ++ [(⟨x, lb⟩, o)] := by
+    SilOrd.pairs (SilWalk.snoc S x lb o pC' d' w') = SilOrd.pairs S ++ [(⟨x, lb⟩, o)] := by
   intro h
   show (S.c.tr ++ [(⟨x, lb⟩ : Estep)]).zip (S.c.sil ++ [o]) = _
   rw [List.zip_append h.symm]
@@ -44,15 +44,15 @@ theorem SilOrd.hartPrSnoc (pr : List (Estep × Option Nat)) (p : Estep × Option
   by_cases h : p.1.esAg = y <;> simp [SilWalk.hartPr, h]
 
 theorem SilOrd.snocPstEnd (S : SilWalk.St) (x : Nat) (lb : Lbl) (o : Option Nat) (pC' : Pexv6)
-    (d' : Efab) :
-    (SilWalk.snoc S x lb o pC' d').pst (SilWalk.snoc S x lb o pC' d').c.tr.length
+    (d' : Efab) (w' : Wstate) :
+    (SilWalk.snoc S x lb o pC' d' w').pst (SilWalk.snoc S x lb o pC' d' w').c.tr.length
       = (S.pst S.c.tr.length).set x pC' := by
   simp only [SilWalk.snoc, List.length_append, List.length_singleton]
   rw [if_neg (by omega)]
 
 theorem SilOrd.snocDvEnd (S : SilWalk.St) (x : Nat) (lb : Lbl) (o : Option Nat) (pC' : Pexv6)
-    (d' : Efab) :
-    (SilWalk.snoc S x lb o pC' d').dv (SilWalk.snoc S x lb o pC' d').c.tr.length = d' := by
+    (d' : Efab) (w' : Wstate) :
+    (SilWalk.snoc S x lb o pC' d' w').dv (SilWalk.snoc S x lb o pC' d' w').c.tr.length = d' := by
   simp only [SilWalk.snoc, List.length_append, List.length_singleton]
   rw [if_neg (by omega)]
 
@@ -93,8 +93,9 @@ def SilOrd.hartStepRIS (d0 : Efab) (rows : List (List Lbl)) (Lb : Int → Prop) 
         ((rows.getD y []).take (((L.take k).filter (fun e => decide (e.1 = y))).length))
         (SilWalk.hartPr (SilOrd.pairs S) y)) →
     (rows.getD x [])[n]? = some lb →
-    ∃ (lb' : Lbl) (o : Option Nat) (pa : Pexv6) (da : Efab) (ls' : List Wlabel) (pC' : Pexv6),
-      SilWalk.relW Lb lb (lb', o) ∧ SilWalk.stepOk S x lb' o pC pa da ls' pC' d' ∧
+    ∃ (lb' : Lbl) (o : Option Nat) (pa : Pexv6) (da : Efab) (ls' : List Wlabel) (pC' : Pexv6)
+      (w' : Wstate),
+      SilWalk.relW Lb lb (lb', o) ∧ SilWalk.stepOk S x lb' o pC pa da ls' pC' d' w' ∧
       Rel x (n + 1) pE' pC'
 
 /-- **THE TWIN POLICY FROM THE ORDER AND THE DATUM.** -/
@@ -164,7 +165,7 @@ theorem SilOrd.walkPolOfOrdS (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → E
     intro y hy
     rw [← hcnt y]
     exact (hper y hy).2.2
-  obtain ⟨lb', o, pa, da, ls', pC', hre, hok', hrel'⟩ := hstep S x (cnt x) lb _ _ _ _ _ pC d' k hok
+  obtain ⟨lb', o, pa, da, ls', pC', w', hre, hok', hrel'⟩ := hstep S x (cnt x) lb _ _ _ _ _ pC d' k hok
     hp hrel (hshape x _ lb hlb) hblkD hags hk hperF hlb
   have hcntS : ∀ y, CertZ2.bump cnt x y =
       ((L.take (k + 1)).filter (fun e => decide (e.1 = y))).length := by
@@ -174,10 +175,10 @@ theorem SilOrd.walkPolOfOrdS (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → E
     · subst hy; rw [CertZ2.bumpSelf, hcnt y]; simp
     · rw [CertZ2.bumpNe cnt x y hy, hcnt y]
       simp [Ne.symm hy]
-  refine ⟨x, lb, hx, hlb, lb', o, pC, pa, da, ls', pC', d', hp, hre, hok',
+  refine ⟨x, lb, hx, hlb, lb', o, pC, pa, da, ls', pC', d', w', hp, hre, hok',
     ⟨fun y hy => ?_, fun s hs => ?_, k + 1, hkl, hcntS, ?_, ?_⟩⟩
   · obtain ⟨hle, ⟨pCy, hpy, hrely⟩, hfy⟩ := hper y hy
-    rw [SilOrd.snocPstEnd, SilOrd.pairsSnoc _ _ _ _ _ _ hok.1, SilOrd.hartPrSnoc]
+    rw [SilOrd.snocPstEnd, SilOrd.pairsSnoc _ _ _ _ _ _ _ hok.1, SilOrd.hartPrSnoc]
     by_cases hy' : y = x
     · subst hy'
       rw [CertZ2.bumpSelf, if_pos rfl]

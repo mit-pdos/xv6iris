@@ -121,7 +121,7 @@ theorem SilAgree.pstLen {P D : Type} (pstep : P → D → Wlabel → P → D →
     (c : SilCand.CandS) (N : Nat) :
     SilReplay.progOk pstep pcls pst dv c → (pst 0).length = N →
     ∀ k, k ≤ c.tr.length → (pst k).length = N := by
-  intro hpr h0 k
+  rintro ⟨_, -, hpr⟩ h0 k
   induction k with
   | zero => intro _; exact h0
   | succ k ih =>
@@ -140,7 +140,8 @@ theorem SilAgree.agBound {P D : Type} (pstep : P → D → Wlabel → P → D �
   intro hpr h0 s hs
   obtain ⟨k, hk⟩ := List.mem_iff_getElem?.1 hs
   have hkl : k < c.tr.length := lookup_lt_Some hk
-  obtain ⟨_, _, _, _, _, hp, _⟩ := hpr k s hk
+  obtain ⟨_, -, hpr2⟩ := id hpr
+  obtain ⟨_, _, _, _, _, hp, _⟩ := hpr2 k s hk
   have := lookup_lt_Some hp
   rw [SilAgree.pstLen pstep pcls pst dv c N hpr h0 k (by omega)] at this
   exact this

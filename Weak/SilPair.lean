@@ -12,7 +12,7 @@ over the reservation the load made — ending `cfgMatchd`-matched to `SilCand.si
 
 Spec: FAITHFUL (the same pair the registered rmw replay uses; the write half is the silent one; no pin).
 -/
-import Weak.SilPfBridge
+import Weak.SilDep
 
 namespace Weak
 
@@ -76,7 +76,11 @@ theorem SilPair.pairSimS (σ : Mstate) (i : Nat) (c : Wpcfg P D) (ag : Wpagent P
     ∃ c', rtc (SilPf.wpPfRunS pstep pcls) c c' ∧
       cfgMatchd c' (SilCand.silentNext σ i aq base ts wvs q) ∧
       c'.pcAgs.map Wpagent.paSt = (c.pcAgs.map Wpagent.paSt).set i p' ∧
-      c'.pcDev = dn := by
+      c'.pcDev = dn ∧
+      (∃ ag' : Wpagent P, c'.pcAgs[i]? = some ag' ∧
+        ag'.paWs = SilDep.silentWsL
+          (SilDep.starWs (SilDep.wsStep ag.paWs l1 c.pcLog.length) ls2 c.pcLog.length) l2 q) ∧
+      (∀ j, j ≠ i → c'.pcAgs[j]? = c.pcAgs[j]?) := by
   intro hm hlk hre hps1 hstar hps2 hsil
   have hew := cfgMatchdWs c σ i ag hm hlk
   have hlti := lookup_lt_Some hlk
@@ -102,8 +106,8 @@ theorem SilPair.pairSimS (σ : Mstate) (i : Nat) (c : Wpcfg P D) (ag : Wpagent P
       = some ⟨pm, exloadPostRunD ag.paWs aq (srcsView ag.paWs asrc1) base (tvs.map Prod.fst),
           ag.paProm⟩ :=
     list_lookup_insert hlti
-  obtain ⟨c2, ag2, hrun2, heq2, hd2, hlk2, hs2, hw2, hr2, hfm2⟩ :=
-    SilPair.admRunRtc pstep pcls false pm dm ls2 pm2 dm2 hstar
+  obtain ⟨c2, ag2, hrun2, heq2, hd2, hlk2, hs2, hwx2, hoth2, hfm2, hw2, hr2⟩ :=
+    SilDep.admRunRtcW pstep pcls false pm dm ls2 pm2 dm2 hstar
       ⟨c.pcImg, c.pcLog, dm, c.pcAgs.set i
         ⟨pm, exloadPostRunD ag.paWs aq (srcsView ag.paWs asrc1) base (tvs.map Prod.fst),
          ag.paProm⟩⟩ i
@@ -153,7 +157,11 @@ theorem SilPair.pairSimS (σ : Mstate) (i : Nat) (c : Wpcfg P D) (ag : Wpagent P
   have hrunS : rtc (SilPf.wpPfRunS pstep pcls) c c2 :=
     SilPf.rtcOfOld pstep pcls _ _
       (rtc_l ⟨i, _, hstep1⟩ hrun2)
-  refine ⟨_, rtc_r hrunS ⟨i, _, hstep2⟩, ?_, ?_, rfl⟩
+  refine ⟨_, rtc_r hrunS ⟨i, _, hstep2⟩, ?_, ?_, rfl, ⟨_, List.getElem?_set_self
+    (lookup_lt_Some hlk2), by rw [hwx2]; rfl⟩, fun j hj => ?_⟩
+  rotate_left 2
+  · dsimp only
+    rw [List.getElem?_set_ne (Ne.symm hj), hoth2 j hj, List.getElem?_set_ne (Ne.symm hj)]
   · dsimp only [SilCand.silentNext, SilCand.silentPost]
     rw [hlog2, himg2]
     refine cfgMatchdUpdGen _ _ _ _ i ag2 p' _ _ (updWs f i ag2.paWs) _ ?_ hlk2 ?_ ?_

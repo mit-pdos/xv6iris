@@ -8,9 +8,14 @@ Lean-only, no Rocq twin.
 the other agents' list entries), and its twin **`SilDep.stepWsS`** (the silent exclusive store's update).
 The shadow of increment 6c is this function folded over each step's labels.
 
+6b: the shadow's block transitions (`SilDep.preW`, the write node's state of a pair block;
+`SilDep.depOkL` / `SilDep.silentWsL`, the silent write's dependency bound and update read off its label;
+`SilDep.pairSh`), and the labelled-run fold **`SilDep.pfRunSWs`** (a labelled pf run of one agent moves
+that agent's state by `runWs` and keeps the others).
+
 Spec: FAITHFUL (proof organisation).
 -/
-import Weak.SilOrd
+import Weak.SilPfBridge
 
 namespace Weak
 
@@ -93,6 +98,11 @@ def SilDep.wcount (l : Wlabel) : Nat :=
 def SilDep.runWs (p : Wstate × Nat) (ls : List Wlabel) : Wstate × Nat :=
   ls.foldl (fun p l => (SilDep.wsStep p.1 l p.2, p.2 + SilDep.wcount l)) p
 
+theorem SilDep.runWsAppend (p : Wstate × Nat) (ls ls' : List Wlabel) :
+    SilDep.runWs p (ls ++ ls') = SilDep.runWs (SilDep.runWs p ls) ls' := by
+  unfold SilDep.runWs
+  exact List.foldl_append ..
+
 /-- A star (no appends): the agent state folded at a fixed log length. -/
 def SilDep.starWs (ws : Wstate) (ls : List Wlabel) (n : Nat) : Wstate :=
   ls.foldl (fun w l => SilDep.wsStep w l n) ws
@@ -121,16 +131,18 @@ theorem SilDep.admRunRtcW (instr : Bool) (p : P) (d : D) (ls : List Wlabel) (p' 
         c'.pcAgs[i]? = some ag' ∧ ag'.paSt = p' ∧
         ag'.paWs = SilDep.starWs ag.paWs ls c.pcLog.length ∧
         (∀ j, j ≠ i → c'.pcAgs[j]? = c.pcAgs[j]?) ∧
-        c'.pcAgs.map Wpagent.paSt = (c.pcAgs.map Wpagent.paSt).set i p' := by
+        c'.pcAgs.map Wpagent.paSt = (c.pcAgs.map Wpagent.paSt).set i p' ∧
+        wsEqr ag.paWs ag'.paWs ∧ (instr = false → ag'.paWs.wRes = ag.paWs.wRes) := by
   intro h
   induction h with
   | nil p d =>
     intro c i ag hlk hst hdev _
-    refine ⟨c, ag, rtc_refl _, cfgEqrRefl c, hdev, hlk, hst, rfl, fun _ _ => rfl, ?_⟩
+    refine ⟨c, ag, rtc_refl _, cfgEqrRefl c, hdev, hlk, hst, rfl, fun _ _ => rfl, ?_,
+      wsEqrRefl _, fun _ => rfl⟩
     exact (listSetLookupId (by simp [List.getElem?_map, hlk, hst])).symm
   | cons p d l p1 d1 ls p' d' hadm hps _ ih =>
     intro c i ag hlk hst hdev hf
-    obtain ⟨c1, ag1, hstep, he1, hd1, hl1, hs1, -, -, hf1⟩ :=
+    obtain ⟨c1, ag1, hstep, he1, hd1, hl1, hs1, hwe1, hr1, hf1⟩ :=
       PfRunUnpinned.admStepPfF pstep pcls instr c i ag l p1 d1 hadm
         (fun b t hl => by subst hl; exact hf b t (List.mem_cons.2 (.inl rfl))) hlk
         (by rw [hst, hdev]; exact hps)
@@ -142,14 +154,111 @@ theorem SilDep.admRunRtcW (instr : Bool) (p : P) (d : D) (ls : List Wlabel) (p' 
       rw [← hl1]
     have hoth1 : ∀ j, j ≠ i → c1.pcAgs[j]? = c.pcAgs[j]? := by
       intro j hj; rw [hset, List.getElem?_set_ne (Ne.symm hj)]
-    obtain ⟨c2, ag2, hrun, he2, hd2, hl2, hs2, hw2, hoth2, hf2⟩ :=
+    obtain ⟨c2, ag2, hrun, he2, hd2, hl2, hs2, hw2, hoth2, hf2, hwe2, hr2⟩ :=
       ih c1 i ag1 hl1 hs1 hd1
         (fun b t hm => by rw [he1.1, he1.2.1]; exact hf b t (List.mem_cons.2 (.inr hm)))
     refine ⟨c2, ag2, rtc_l ⟨i, l, hstep⟩ hrun, cfgEqrTrans _ _ _ he1 he2, hd2, hl2, hs2, ?_,
-      fun j hj => (hoth2 j hj).trans (hoth1 j hj), ?_⟩
+      fun j hj => (hoth2 j hj).trans (hoth1 j hj), ?_, wsEqrTrans hwe1 hwe2,
+      fun hi => (hr2 hi).trans (hr1 hi)⟩
     · rw [hw2, hw1, he1.2.1]; rfl
     · rw [hf2, hf1, list_insert_insert]
 
+/-- A labelled pf run of agent `i` alone moves agent `i`'s state and the log length by `runWs`, and
+keeps every other agent's entry. -/
+theorem SilDep.pfRunSWs (fok : Image → List Wmsg → Nat → Int → List (Nat × BitVec 8) → Prop)
+    (c c' : Wpcfg P D) (st : List (Nat × Wlabel)) :
+    pfRunS pstep pcls fok c st c' →
+    ∀ (i : Nat) (ag : Wpagent P), c.pcAgs[i]? = some ag → (∀ x, x ∈ st → x.1 = i) →
+      ∃ ag' : Wpagent P, c'.pcAgs[i]? = some ag' ∧
+        (ag'.paWs, c'.pcLog.length) = SilDep.runWs (ag.paWs, c.pcLog.length) (st.map Prod.snd) ∧
+        ∀ j, j ≠ i → c'.pcAgs[j]? = c.pcAgs[j]? := by
+  intro h
+  induction h with
+  | nil =>
+    intro i ag hlk _
+    exact ⟨ag, hlk, rfl, fun _ _ => rfl⟩
+  | snoc c1 c2 st i' l _ hs _ ih =>
+    intro i ag hlk hall
+    have hi : i' = i := hall (i', l) (List.mem_append.2 (.inr (List.mem_singleton.2 rfl)))
+    subst hi
+    obtain ⟨ag1, hl1, hw1, ho1⟩ :=
+      ih i' ag hlk (fun x hx => hall x (List.mem_append.2 (.inl hx)))
+    obtain ⟨ag0, st', hlk0, hset⟩ := SilDep.stepWs pstep pcls i' l c1 c2 hs
+    rw [hl1, Option.some.injEq] at hlk0
+    subst hlk0
+    refine ⟨⟨st', SilDep.wsStep ag1.paWs l c1.pcLog.length, ag1.paProm⟩, ?_, ?_, ?_⟩
+    · rw [hset]; exact List.getElem?_set_self (lookup_lt_Some hl1)
+    · rw [List.map_append, SilDep.runWsAppend, ← hw1, SilDep.stepLog pstep pcls i' l c1 c2 hs]
+      rfl
+    · intro j hj
+      rw [hset, List.getElem?_set_ne (Ne.symm hj)]
+      exact ho1 j hj
+
 end twin2
+
+/-! # The shadow's block transitions -/
+
+/-- The write node's state of a pair block: the leading star `ls`, the exclusive read `l1`, the
+intra-pair star `ls2`, from `w` at log length `n`. -/
+def SilDep.preW (w : Wstate) (ls : List Wlabel) (l1 : Wlabel) (ls2 : List Wlabel) (n : Nat) :
+    Wstate :=
+  SilDep.starWs (SilDep.wsStep (SilDep.starWs w ls n) l1 n) ls2 n
+
+/-- The silent write's dependency bound, read off its label. -/
+def SilDep.depOkL (w : Wstate) (l : Wlabel) (q : Nat) : Prop :=
+  match l with
+  | .LExStore _ _ _ asrc vsrc => SilCand.depView w asrc vsrc ≤ q
+  | _ => True
+
+/-- The silent write's update, read off its label. -/
+def SilDep.silentWsL (w : Wstate) (l : Wlabel) (q : Nat) : Wstate :=
+  match l with
+  | .LExStore _ base data asrc vsrc => SilDep.silentWs w data asrc vsrc base q
+  | _ => w
+
+/-- **THE SHADOW OF A PAIR BLOCK**: ordinary, the registered pair's update; silent at `q`, the
+dependency bound at the write node and the silent update. -/
+def SilDep.pairSh (w : Wstate) (ls : List Wlabel) (l1 : Wlabel) (ls2 : List Wlabel) (l2 : Wlabel)
+    (n : Nat) (o : Option Nat) (w' : Wstate) : Prop :=
+  match o with
+  | none => w' = SilDep.wsStep (SilDep.preW w ls l1 ls2 n) l2 n
+  | some q => SilDep.depOkL (SilDep.preW w ls l1 ls2 n) l2 q ∧
+      w' = SilDep.silentWsL (SilDep.preW w ls l1 ls2 n) l2 q
+
+/-- A label that appends nothing leaves `runWs`'s log length; a list of them folds as `starWs`. -/
+theorem SilDep.runWsZero (ls : List Wlabel) :
+    (∀ l, l ∈ ls → SilDep.wcount l = 0) →
+    ∀ (w : Wstate) (n : Nat), SilDep.runWs (w, n) ls = (SilDep.starWs w ls n, n) := by
+  induction ls with
+  | nil => intro _ w n; rfl
+  | cons l ls ih =>
+    intro h w n
+    have h0 := h l (List.mem_cons_self ..)
+    have := ih (fun x hx => h x (List.mem_cons_of_mem _ hx)) (SilDep.wsStep w l n) n
+    show SilDep.runWs (SilDep.wsStep w l n, n + SilDep.wcount l) ls = _
+    rw [h0, Nat.add_zero, this]
+    rfl
+
+theorem SilDep.adminWcount (instr : Bool) (l : Wlabel) : lbAdmin instr l → SilDep.wcount l = 0 := by
+  cases l <;> simp [lbAdmin, SilDep.wcount]
+
+/-- The registered pair block's labels fold to the pair's shadow. -/
+theorem SilDep.runWsPair (i : Nat) (w : Wstate) (n : Nat) (aq : Bool) (base : Int)
+    (tvs : List (Nat × BitVec 8)) (asrc1 : List Dsrc) (ls2 : List Wlabel) (l2 : Wlabel) :
+    (∀ l, l ∈ ls2 → lbAdmin false l) →
+    (SilDep.runWs (w, n) (((i, Wlabel.LExLoad aq base tvs asrc1) ::
+        (ls2.map (fun l => (i, l)) ++ [(i, l2)])).map Prod.snd)).1
+      = SilDep.wsStep (SilDep.starWs (SilDep.wsStep w (.LExLoad aq base tvs asrc1) n) ls2 n) l2 n := by
+  intro had
+  have hm : (((i, Wlabel.LExLoad aq base tvs asrc1) ::
+      (ls2.map (fun l => (i, l)) ++ [(i, l2)])).map Prod.snd)
+      = (Wlabel.LExLoad aq base tvs asrc1 :: ls2) ++ [l2] := by
+    simp [List.map_map, Function.comp_def]
+  rw [hm, SilDep.runWsAppend,
+    SilDep.runWsZero (Wlabel.LExLoad aq base tvs asrc1 :: ls2) (fun l hl => by
+      rcases List.mem_cons.1 hl with rfl | hl
+      · rfl
+      · exact SilDep.adminWcount false l (had l hl)) w n]
+  rfl
 
 end Weak

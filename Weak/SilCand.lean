@@ -53,6 +53,12 @@ theorem SilCand.ordOkEqr (w1 w2 : Wstate) (q : Nat) :
   rintro ⟨-, h1, -, -, h4, -⟩ ⟨a, b⟩
   exact ⟨by rw [← h4]; exact a, by rw [← h1]; exact b⟩
 
+/-- The silent write's DEPENDENCY bound at the pf / Iris levels: PARM's exclusive-store fulfil
+pre-view (not `rl`) — `wVwNew` (fences, `aq`: ppo rules 4/5), `wVcap` (control dependencies), the
+address and data dependencies of the write (`asrc`, `vsrc`: rules 9–11), the reservation's view. -/
+def SilCand.depView (ws : Wstate) (asrc vsrc : List Dsrc) : Nat :=
+  fulfilVpreD ws false (max (max (srcsView ws asrc) (srcsView ws vsrc)) (resView ws))
+
 /-- The side conditions of a SILENT AMO of agent `i` at position `q`. -/
 def SilCand.silentOk (σ : Mstate) (i : Nat) (aq : Bool) (base : Int)
     (ts : List Nat) (rvs wvs : List (BitVec 8)) (q : Nat) : Prop :=

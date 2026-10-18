@@ -43,10 +43,10 @@ def SilWalk.walkPol (d0 : Efab) (rows : List (List Lbl)) (L : Int → Prop)
     (∃ x, x < rows.length ∧ cnt x < (rows.getD x []).length) →
     ∃ (x : Nat) (lb : Lbl), x < rows.length ∧ (rows.getD x [])[cnt x]? = some lb ∧
       ∃ (lb' : Lbl) (o : Option Nat) (pC pa : Pexv6) (da : Efab) (ls : List Wlabel) (pC' : Pexv6)
-        (d' : Efab),
+        (d' : Efab) (w' : Wstate),
         (S.pst S.c.tr.length)[x]? = some pC ∧ SilWalk.relW L lb (lb', o) ∧
-        SilWalk.stepOk S x lb' o pC pa da ls pC' d' ∧
-        Inv (SilWalk.snoc S x lb' o pC' d') (CertZ2.bump cnt x)
+        SilWalk.stepOk S x lb' o pC pa da ls pC' d' w' ∧
+        Inv (SilWalk.snoc S x lb' o pC' d' w') (CertZ2.bump cnt x)
 
 /-- **THE FREE TWIN WALK.** -/
 theorem SilWalk.walkRun (d0 : Efab) (rows : List (List Lbl)) (L : Int → Prop)
@@ -78,13 +78,13 @@ theorem SilWalk.walkRun (d0 : Efab) (rows : List (List Lbl)) (L : Int → Prop)
   | succ m ih =>
     intro S cnt hm hok hinv
     by_cases hd : ∃ x, x < rows.length ∧ cnt x < (rows.getD x []).length
-    · obtain ⟨x, lb, hx, hlb, lb', o, pC, pa, da, ls, pC', d', hp, hre, hstep, hinv1⟩ :=
+    · obtain ⟨x, lb, hx, hlb, lb', o, pC, pa, da, ls, pC', d', w', hp, hre, hstep, hinv1⟩ :=
         hpol S cnt hok hinv hd
       have hcx : cnt x < (rows.getD x []).length := lookup_lt_Some hlb
       have hrem := CertZ2.remStep (fun x => (rows.getD x []).length) cnt x rows.length hx hcx
-      have hok1 := SilWalk.okSnoc d0 S x lb' o pC pa da ls pC' d' hok hp hstep
+      have hok1 := SilWalk.okSnoc d0 S x lb' o pC pa da ls pC' d' w' hok hp hstep
       obtain ⟨Sf, cntF, pr, hokF, hinvF, hdone, hmono, htr, hsil, hf2, hagt, himg, hpst⟩ :=
-        ih (SilWalk.snoc S x lb' o pC' d') (CertZ2.bump cnt x) (by omega) hok1 hinv1
+        ih (SilWalk.snoc S x lb' o pC' d' w') (CertZ2.bump cnt x) (by omega) hok1 hinv1
       have hmonoF : ∀ y, cnt y ≤ cntF y := by
         intro y
         have := hmono y
