@@ -319,7 +319,7 @@ theorem createFound_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF 
   isplitl [Hkeep Hru]
   · unfold inodeRefpShort; iframe
   isplitl []
-  · simp only [Bool.false_eq_true, if_false]; iempintro
+  · simp only [Bool.false_eq_true, ite_false]; iempintro
   iapply wpNext_intro_pin
   iintro %c %_ %spie %spp %R' %n' %Sb' %w %hcs Hk Hpc Hte Hce Hpid Hsb Hsi Hbs %hf Hops Htx Hslot
   unfold createFoundIupK
@@ -395,9 +395,9 @@ theorem createFound_dirlookup (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimIs GF Γ]
     γk (ientry ik) inum bm data dn dn nf false 0#32 pidv dqp (DFrac.own (1 : Qp).half)
     (DFrac.own 1) ik sd rootv rti dqr hj hproc hK hnoff htier htype hgeom hwf hcov hsz hholes hinums
     (Or.inl hnl) horph hty0 rfl hpd ha0 rfl hik
-    (by simp only [Bool.false_eq_true, if_false]; exact ha2)
+    (by simp only [Bool.false_eq_true, ite_false]; exact ha2)
   unfold wp_dirlookup_eb_body at h
-  simp only [dirlookupAddr, Bool.false_eq_true, if_false] at h
+  simp only [dirlookupAddr, Bool.false_eq_true, ite_false] at h
   unfold createEnv
   iintro ⟨Hk, Hpc, Hte, Hce, ⟨#Hpi, #Hpe, #Hbc, #Hlc, #Hdc, #Hkl, #Hav, #Hit2, #Hiti, #Hslks,
     #Hinv, #Hopen, #Hbmi⟩, Hdev, Hmeta, Hmap, Hblk, Hshr, Hru, Hnm, Hpid, Hrt, Hrh, Hbs, Hslot, Hlk,
@@ -412,11 +412,11 @@ theorem createFound_dirlookup (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimIs GF Γ]
   iapply HK $$ %c %spie %spp %R' %found %kd %kslot %qq %hcs Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk
     Hshr Hru Hnm Hpid Hrt Hrh Hbs Hlk Hdi
   cases found
-  · simp only [Bool.false_eq_true, if_false]
+  · simp only [Bool.false_eq_true, ite_false]
     icases Harm with ⟨%hf, Hslot, -⟩
     iframe Hslot
     ipureintro; exact hf
-  · simp only [if_true]
+  · simp only [ite_true]
     icases Harm with ⟨%inum2, %hks, %harm, Href, Hru2, -⟩
     iexists inum2, self
     iframe Href Hru2
@@ -670,7 +670,7 @@ theorem createFound_exit_fail (cpu : CPU) (k : KCtx) (A : CreateFoundArgs)
     %Sb' %A.ns %hcs Hk Hpc Hte Hce Hsn Hsi Hss Hsb Hpriv Hpath Hbs [] Hsl [] Hop
   · ipureintro; rfl
   · ipureintro; exact ⟨hsub, hu, fun h => absurd h (by decide)⟩
-  simp only [Bool.false_eq_true, if_false]
+  simp only [Bool.false_eq_true, ite_false]
   iframe Htx Harms
   ipureintro
   rw [ha0, h18]
@@ -714,7 +714,7 @@ theorem createFound_exit_ok (cpu : CPU) (k : KCtx) (A : CreateFoundArgs)
     %Sb' %(1 + (A.ns - 2)) %hcs Hk Hpc Hte Hce Hsn Hsi Hss Hsb Hpriv Hpath Hbs [] Hsl [] Hop
   · ipureintro; exact create_slots_1 true A.ns rfl hns
   · ipureintro; exact ⟨hsub, hu, fun _ => hip⟩
-  simp only [if_true]
+  simp only [ite_true]
   iframe Hlk Harms
   ipureintro
   exact ⟨by rw [ha0, h18], hkk, hpos, hnib, hpure⟩
@@ -1106,7 +1106,7 @@ theorem createFound_tests (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
   iintro Hk Hpc
   by_cases hf : A.ty.toNat = T_FILE
   · have hb0 : decide (A.ty.toNat ≠ T_FILE) = false := by simp [hf]
-    simp only [hb0, Bool.false_eq_true, if_false]
+    simp only [hb0, Bool.false_eq_true, ite_false]
     icases createFound_meta_open kc cinum dnc bmc $$ Hload with ⟨Hmeta, Hclose⟩
     unfold inodeMeta
     icases Hmeta with ⟨Hty, Hmaj, Hmin, Hnl, Hsz⟩
@@ -1139,7 +1139,7 @@ theorem createFound_tests (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     · -- ===== ARM F-OK: fall into the funnel =====
       have hb : (dnc.diType == 2#16 || dnc.diType == 3#16) = true := by
         rcases hin with h | h <;> simp [h]
-      simp only [hb, Bool.not_true, Bool.false_eq_true, if_false]
+      simp only [hb, Bool.not_true, Bool.false_eq_true, ite_false]
       unfold createFoundLk
       icases Hlk with ⟨#Hslk, -, #Hfl, Hsl, Hdep, Hoff, Hdev, Hinum, Hval, #Hshot, Hfrz, Hkeep,
         Hru⟩
@@ -1159,7 +1159,7 @@ theorem createFound_tests (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
         have hty : A.ty = T_FILE_w := BitVec.eq_of_toNat_eq (by rw [hf]; rfl)
         have hpure : creOkPure A.ty A.major A.minor false dnc := by
           unfold creOkPure
-          simp only [Bool.false_eq_true, if_false]
+          simp only [Bool.false_eq_true, ite_false]
           exact ⟨hty, hin⟩
         iapply (createFound_exit_ok cpu k A F spie spp _ v3 nf tl n2 Sb2 kc qc.half gc cinum dnc bmc
           hK10 hal htl (createTregs_of_regs k _ _ _ _ _ _ ?hr6) ?h18
@@ -1174,7 +1174,7 @@ theorem createFound_tests (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     · -- ===== ARM F-BAD, second entry =====
       have hb : (dnc.diType == 2#16 || dnc.diType == 3#16) = false := by
         simp only [not_or] at hin; simp [hin.1, hin.2]
-      simp only [hb, Bool.not_false, if_true]
+      simp only [hb, Bool.not_false, ite_true]
       iclear Hsel
       ihave Hcf := create_fail_of_seen (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat
         A.major.toNat A.minor.toNat F.Nm F.Nd F.P F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex
@@ -1187,7 +1187,7 @@ theorem createFound_tests (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
       case hr7 => exact createFound_regs_caller k _ _ _ _ _ R _ hr (by simp [RegMap.set_apply])
   · -- ===== ARM F-BAD, first entry: the requested type is not T_FILE =====
     have hb : decide (A.ty.toNat ≠ T_FILE) = true := decide_eq_true hf
-    simp only [hb, if_true]
+    simp only [hb, ite_true]
     iclear Hsel
     ihave Hcf := create_fail_of_seen (fsGammaL fscFs) fscFs A.V.rti A.ty.toNat
       A.major.toNat A.minor.toNat F.Nm F.Nd F.P F.Pmiss F.Farm F.Fdots F.Fun F.Fok F.Fex
@@ -1430,7 +1430,7 @@ theorem createFound_join (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : 
   ihave Hbs := bslots_cons 2 $$ [$Hb1 $Hb2]
   cases found
   · -- ===== MISS: +0x4a c.mv s2,a0 ; +0x4c c.beqz TAKEN -> the allocate half =====
-    simp only [Bool.false_eq_true, if_false]
+    simp only [Bool.false_eq_true, ite_false]
     icases Harm with ⟨%⟨-, hnone, ha0⟩, Hs1⟩
     k_step_e (wp_s_add cpu _ (KA.«create» + 0x4a#64) true 18#5 0#5 10#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0]
@@ -1466,7 +1466,7 @@ theorem createFound_join (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : 
       Hinum Hval Hdl Hdi Hmeta Hmap Hblk Htop Hshot Hfrz Hkeep Hru Hsn Hsi Hss Hsb Hpriv Hpath Hbs
       Hslots Hop Htp HP Hdlc Hcre Hpost
   · -- ===== HIT: THE FIRE, then +0x4a c.mv s2,a0 ; +0x4c c.beqz falls =====
-    simp only [if_true]
+    simp only [ite_true]
     icases Harm with ⟨%cinum, %self, %⟨hks, ha0⟩, %hsel, Href, Hru2⟩
     -- the child's reference, generation-NAMED once, here (chroot): on the
     -- SELF arm it is a fresh reference to dp's own slot, and while the
@@ -1484,7 +1484,7 @@ theorem createFound_join (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : 
           (self = false → cexv = cinum.toNat) := by
       cases self with
       | true =>
-        simp only [if_true] at hsel
+        simp only [ite_true] at hsel
         obtain ⟨⟨hdd, -⟩, heq, hkeq⟩ := hsel
         refine ⟨by rw [heq]; exact hdnib, by rw [heq]; exact hdpos,
           fun _ => ientry_inj kslot kd (Nat.le_of_lt hks) (Nat.le_of_lt hkd) hkeq, ?_⟩
@@ -1492,17 +1492,17 @@ theorem createFound_join (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : 
         · exact absurd hdd
             (dirDots_miss_not_dots dind.toNat dn data (bname 14 nf) htyz hnlz hddix hfd).2
         · refine ⟨(dirInum data k1).toNat, ?_, (fun h => by cases h)⟩
-          rw [dirEntries_eraNode dn bm data hok.2.2.2.2.2.1 hok.2.2.2.2.1, if_pos htyz]
+          rw [dirEntries_eraNode dn bm data hok.2.2.2.2.2.1 hok.2.2.2.2.1, ite_eq_left htyz]
           exact dv_lookup_found _ data _ _ k1 rfl hfd
       | false =>
-        simp only [Bool.false_eq_true, if_false] at hsel
+        simp only [Bool.false_eq_true, ite_false] at hsel
         obtain ⟨-, hsome, rfl⟩ := hsel
         have hlt := dirFirst_lt _ _ _ _ hsome
         have hlive := dirFirst_live _ _ _ _ hsome
         refine ⟨?_, Xv6.dirlookup_live_pos data kk hlive, (fun h => by cases h),
           (BitVec.setWidth 32 (dirInum data kk)).toNat, ?_, (fun _ => rfl)⟩
         · rw [MachCSL.zext32_toNat]; exact dirOk_dir icfgNib dn data htype hdok kk hlt hlive
-        · rw [dirEntries_eraNode dn bm data hok.2.2.2.2.2.1 hok.2.2.2.2.1, if_pos htyz,
+        · rw [dirEntries_eraNode dn bm data hok.2.2.2.2.2.1 hok.2.2.2.2.1, ite_eq_left htyz,
             MachCSL.zext32_toNat]
           exact dv_lookup_found _ data _ _ kk rfl hsome
     obtain ⟨hcnib, hcpos, hkself, cexv, hents, hcexs⟩ := hcfacts
@@ -1626,7 +1626,7 @@ theorem createFound_gate (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : 
   iintro Hk Hpc
   by_cases hm : dn.diNlink = 32767#16
   · have hb : decide (dn.diNlink ≠ 32767#16) = false := by simp [hm]
-    simp only [hb, Bool.false_eq_true, if_false]
+    simp only [hb, Bool.false_eq_true, ite_false]
     -- +0x38  addi a5,s4,-1 ; +0x3c  c.beqz a5 -> +0x8e
     k_step_e (wp_s_addi cpu _ (KA.«create» + 0x38#64) false 4095#12 15#5 20#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r20]
@@ -1637,7 +1637,7 @@ theorem createFound_gate (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : 
     by_cases ht : A.ty = T_DIR
     · -- ===== ARM G2 =====
       have hb2 : decide (A.ty = T_DIR) = true := decide_eq_true ht
-      simp only [hb2, if_true]
+      simp only [hb2, ite_true]
       iapply (createFound_armG2 IUP Γ cpu k A F hS spie spp _ v3 ansv nf tl kd qd gd lod tld dind
         dn bm γil γisl n1 Sb1 ?hrg hkd hdnib hle hal htl (create_ip_of9 n1 hn9) hsub hled.2)
       rotate_left 1
@@ -1645,7 +1645,7 @@ theorem createFound_gate (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : 
       iframe #
       case hrg => exact createFound_regs_caller k _ _ _ _ _ R _ hr (by simp [RegMap.set_apply])
     · have hb2 : decide (A.ty = T_DIR) = false := by simp [ht]
-      simp only [hb2, Bool.false_eq_true, if_false]
+      simp only [hb2, Bool.false_eq_true, ite_false]
       iapply (createFound_join IL IUP DL Γ cpu k A F hS hA spie spp _ v3 ansv nf tl kd qd gd lod tld
         dind dn bm γil γisl n1 Sb1 w ?hrj hkd hdnib hdpos hle htype hnl (fun h => absurd h ht) hal htl
         hname hsub hw hled)
@@ -1654,7 +1654,7 @@ theorem createFound_gate (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : 
       iframe #
       case hrj => exact createFound_regs_caller k _ _ _ _ _ R _ hr (by simp [RegMap.set_apply])
   · have hb : decide (dn.diNlink ≠ 32767#16) = true := decide_eq_true hm
-    simp only [hb, if_true]
+    simp only [hb, ite_true]
     iapply (createFound_join IL IUP DL Γ cpu k A F hS hA spie spp _ v3 ansv nf tl kd qd gd lod tld
       dind dn bm γil γisl n1 Sb1 w ?hrj hkd hdnib hdpos hle htype hnl (fun _ => hm) hal htl
       hname hsub hw hled)
@@ -1765,7 +1765,7 @@ theorem createFound_parent (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ 
   by_cases hz : dn.diNlink = 0#16
   · -- ===== ARM G =====
     have hb : decide (dn.diNlink = 0#16) = true := decide_eq_true hz
-    simp only [hb, if_true]
+    simp only [hb, ite_true]
     iapply (createFound_armG IUP Γ cpu k A F hS spie1 spp1 _ v3 ansv nf tl kd qd gd lod tld dind
       dn bm γil γisl n1 Sb1 ?hrg hkd hdnib hle hal htl (create_ip_of9 n1 hn9) hsub hled.2)
     rotate_left 1
@@ -1773,7 +1773,7 @@ theorem createFound_parent (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ 
     iframe #
     case hrg => exact createFound_regs_caller k _ _ _ _ _ R1 _ hr1 (by simp [RegMap.set_apply])
   · have hb : decide (dn.diNlink = 0#16) = false := by simp [hz]
-    simp only [hb, Bool.false_eq_true, if_false]
+    simp only [hb, Bool.false_eq_true, ite_false]
     iapply (createFound_gate IL IUP DL Γ cpu k A F hS hA spie1 spp1 (R1.set 15#5
       (BitVec.signExtend 64 dn.diNlink)) v3 ansv nf tl kd qd gd lod tld dind dn bm γil γisl n1 Sb1
       w (createRegs_set k _ _ _ _ _ R1 15#5 _ createFound_caller15 hr1)
@@ -1888,14 +1888,14 @@ theorem createFound_entry (NP : NPAR_WRAP_ERA) (IL : ILOCK) (IUP : IUNLOCKPUT) (
     (R1.set 9#5 (R1 10#5))) (by kctx_ext) $$ Hk
   cases ok
   · -- ===== ARM N =====
-    simp only [Bool.false_eq_true, if_false]
+    simp only [Bool.false_eq_true, ite_false]
     icases Harms with ⟨%ha0, Hs2, Hdead⟩
     iapply (createFound_armN cpu k A F hS spie1 spp1 (R1.set 9#5 (R1 10#5)) v3 (k.regs 18#5) nf tl
       n1 Sb1 (createRegs_s1 k _ _ _ _ _ _ R1 _ ha0 hr1) (by simp [RegMap.set_apply, ha0]) hal htl
       hsub1 hhi1)
     iframe Hk Hpc Hfr Hte Hce Hsi Hsb Howe Hpid Hbs Hs2 Hop Htx Hdead Hdlc Hcre Hpost
   · -- ===== the parent =====
-    simp only [if_true]
+    simp only [ite_true]
     icases Harms with ⟨%iL, %es, %e, %⟨ha0, hnp, hbn⟩, Hheld, HP, Hs1⟩
     unfold inodeHeldTyAt
     icases Hheld with ⟨%kd, %qd, %dind, %gd, %lod, %tld, %hie, %hkd, %hdnib, %hdpos, %hiL, %hle,

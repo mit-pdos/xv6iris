@@ -135,7 +135,7 @@ theorem itrunc_enext (Γ : SchedNames) (cpu : CPU) (k : KCtx) (spie spp : Bool) 
   iintro Hk Hpc
   by_cases hlast : q + 1 = NINDIRECT
   · -- the 256th entry is done: leave the loop
-    simp only [hlast, decide_true, if_true]
+    simp only [hlast, decide_true, ite_true]
     have hexit' := hexit cpu spie spp
       (R.set 9#5 (aBufData (bnode kk) + BitVec.ofNat 64 (4 * NINDIRECT))) ?xp ?x19 ?x20
     unfold itEPre at hexit'
@@ -146,7 +146,7 @@ theorem itrunc_enext (Γ : SchedNames) (cpu : CPU) (k : KCtx) (spie spp : Bool) 
     case x19 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h19
     case x20 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h20
   · -- more entries to go
-    simp only [hlast, decide_false, Bool.false_eq_true, if_false]
+    simp only [hlast, decide_false, Bool.false_eq_true, ite_false]
     have IH' := IH (by omega) cpu spie spp
       (R.set 9#5 (aBufData (bnode kk) + BitVec.ofNat 64 (4 * (q + 1)))) ?ir
     unfold itEPre at IH'

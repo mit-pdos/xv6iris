@@ -79,13 +79,13 @@ theorem uxr_isAcc_dflt (c : BitVec 12) (p : Privilege) (acc : CSRAccessType) (h 
   split
   case h_36 =>
     uxr_dflt_arm
-    rw [h1, if_neg Bool.false_ne_true, h2, if_neg Bool.false_ne_true, h3, if_neg Bool.false_ne_true,
-      h4, if_neg Bool.false_ne_true, h5, if_neg Bool.false_ne_true]
+    rw [h1, ite_eq_right Bool.false_ne_true, h2, ite_eq_right Bool.false_ne_true, h3, ite_eq_right Bool.false_ne_true,
+      h4, ite_eq_right Bool.false_ne_true, h5, ite_eq_right Bool.false_ne_true]
     split
     case h_36 =>
       uxr_dflt_arm
-      rw [h6, if_neg Bool.false_ne_true, h7, if_neg Bool.false_ne_true, h8, if_neg Bool.false_ne_true,
-        h9, if_neg Bool.false_ne_true, h10, if_neg Bool.false_ne_true, h11, if_neg Bool.false_ne_true]
+      rw [h6, ite_eq_right Bool.false_ne_true, h7, ite_eq_right Bool.false_ne_true, h8, ite_eq_right Bool.false_ne_true,
+        h9, ite_eq_right Bool.false_ne_true, h10, ite_eq_right Bool.false_ne_true, h11, ite_eq_right Bool.false_ne_true]
       split
       case h_16 => rfl
       all_goals uxr_lit h

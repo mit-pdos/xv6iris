@@ -168,7 +168,7 @@ theorem freePool_usedRun (Γ : FsViewNames GF) (hex : phiExcl Γ) (nb : Nat) (u 
     ipureintro; exact hin
   · refine (freePool_split Γ nb u b hb).1.trans ?_
     unfold poolElt
-    rw [if_neg hin]
+    rw [ite_eq_right hin]
     simp only [FsView.blkOwned_1, FsView.byteRange_1]
     iintro ⟨⟨%bs', Helt⟩, -⟩ Hr
     iexfalso

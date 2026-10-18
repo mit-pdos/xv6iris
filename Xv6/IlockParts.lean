@@ -148,14 +148,14 @@ theorem ilPins5_set (k : KCtx) (R : RegMap) (h : ilPins5 k R) (r : BitVec 5) (v 
   obtain ⟨b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := h
   have hne : ∀ x : BitVec 5, 18 ≤ x.toNat → x ≠ r := fun x hx e => by subst e; omega
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-    rw [RegMap.set_apply, if_neg (hne _ (by decide))] <;> assumption
+    rw [RegMap.set_apply, ite_eq_right (hne _ (by decide))] <;> assumption
 
 theorem ilPins6_set (k : KCtx) (R : RegMap) (h : ilPins6 k R) (r : BitVec 5) (v : BitVec 64)
     (hr : r.toNat ≤ 18) : ilPins6 k (R.set r v) := by
   obtain ⟨b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := h
   have hne : ∀ x : BitVec 5, 19 ≤ x.toNat → x ≠ r := fun x hx e => by subst e; omega
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-    rw [RegMap.set_apply, if_neg (hne _ (by decide))] <;> assumption
+    rw [RegMap.set_apply, ite_eq_right (hne _ (by decide))] <;> assumption
 
 /-- ...and restoring `s2` re-establishes the join's pins. -/
 theorem ilPins5_of6 (k : KCtx) (R : RegMap) (h : ilPins6 k R) :

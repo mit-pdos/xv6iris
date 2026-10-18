@@ -120,8 +120,8 @@ theorem sbrkArm_lazy_alloc (P P' : UPtd) (M M' : Nat → List (BitVec 8)) (sz sz
       have hx1 : ¬ x < pgRoundUpN sz.toNat := by omega
       have hx2 : x < pgRoundUpN sz'.toNat := by omega
       have hmod : x % 4096 < 4096 := Nat.mod_lt _ (by decide)
-      rw [hr, hz, hPn, List.getElem?_replicate, if_pos hmod]
-      simp only [Option.isSome_some, Option.isSome_none, if_true, Bool.false_eq_true, if_false, hx1, hx2]
+      rw [hr, hz, hPn, List.getElem?_replicate, ite_eq_left hmod]
+      simp only [Option.isSome_some, Option.isSome_none, ite_true, Bool.false_eq_true, ite_false, hx1, hx2]
     · obtain ⟨hPe, hMe⟩ := hout _ hk
       rw [hPe, hMe]
       cases hP : Iris.Std.PartialMap.get? P.um (x / 4096) with
@@ -142,7 +142,7 @@ theorem sbrkArm_lazy_dealloc (P : UPtd) (M : Nat → List (BitVec 8)) (sz sz' : 
     umemLazy (P.delRun (pgRoundUpN sz'.toNat / 4096) (uvmdNp sz sz')) sz'.toNat M =
       umemDel (umemLazy P sz.toNat M) (pgRoundUpN sz'.toNat) (4096 * uvmdNp sz sz') := by
   have hnp : uvmdNp sz sz' = (pgRoundUpN sz.toNat - pgRoundUpN sz'.toNat) / 4096 := by
-    unfold uvmdNp; rw [if_pos hlt]
+    unfold uvmdNp; rw [ite_eq_left hlt]
   have hRle := Xv6.UPtAlloc.pgRoundUpN_le (Nat.le_of_lt hlt)
   have hR : pgRoundUpN sz.toNat % 4096 = 0 := by unfold pgRoundUpN; omega
   have hR' : pgRoundUpN sz'.toNat % 4096 = 0 := by unfold pgRoundUpN; omega
@@ -154,20 +154,20 @@ theorem sbrkArm_lazy_dealloc (P : UPtd) (M : Nat → List (BitVec 8)) (sz sz' : 
       x < pgRoundUpN sz'.toNat + 4096 * ((pgRoundUpN sz.toNat - pgRoundUpN sz'.toNat) / 4096)
   · have hd := UPt.delRunL_get_mem P.um (pgRoundUpN sz'.toNat / 4096)
       ((pgRoundUpN sz.toNat - pgRoundUpN sz'.toNat) / 4096) (x / 4096) (by omega) (by omega)
-    simp only [if_pos hin, hd]
+    simp only [ite_eq_left hin, hd]
     have : ¬ x < pgRoundUpN sz'.toNat := by omega
     simp [this]
   · have hd := UPt.delRunL_get_not_mem P.um (pgRoundUpN sz'.toNat / 4096)
       ((pgRoundUpN sz.toNat - pgRoundUpN sz'.toNat) / 4096) (x / 4096) (by omega)
-    simp only [if_neg hin, hd]
+    simp only [ite_eq_right hin, hd]
     cases hP : Iris.Std.PartialMap.get? P.um (x / 4096) with
     | some w => simp [hP]
     | none =>
       by_cases h1 : x < pgRoundUpN sz'.toNat
       · have h2 : x < pgRoundUpN sz.toNat := by omega
-        simp only [hP, Option.isSome_none, Bool.false_eq_true, if_false, h1, h2, if_true]
+        simp only [hP, Option.isSome_none, Bool.false_eq_true, ite_false, h1, h2, ite_true]
       · have h2 : ¬ x < pgRoundUpN sz.toNat := by omega
-        simp only [hP, Option.isSome_none, Bool.false_eq_true, if_false, h1, h2]
+        simp only [hP, Option.isSome_none, Bool.false_eq_true, ite_false, h1, h2]
 
 /-! ## §2 sys_sbrk's post read as the dispatch's rows -/
 
@@ -210,7 +210,7 @@ theorem sbrkArm_shape (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (v0 v1 
 theorem sbrkArm_still (P : UPtd) (sz : BitVec 64) (M : Nat → List (BitVec 8)) (hlen : umPageLen P M) :
     syscSbrkOk P P sz sz (umemLazy P sz.toNat M) (umemLazy P sz.toNat M) := by
   unfold syscSbrkOk
-  rw [if_pos (Nat.le_refl _)]
+  rw [ite_eq_left (Nat.le_refl _)]
   exact ⟨UMemL.extSz_refl _ _, sbrkArm_lazy_grow P M _ _ (Nat.le_refl _) hlen⟩
 
 /-- **Rocq `sysc_sbrk_ok_of_ok` + `sysc_sbrk_lazy_of_ok` + `sysc_sbrk_ret_of_ok`**:
@@ -241,15 +241,15 @@ theorem sbrkArm_ok (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (v0 v1 r :
       rw [hsz, hupt]
       by_cases hlt : (V.sz + sysSbrkArg v0).toNat < V.sz.toNat
       · have hr' : uvmdRsz V.sz (V.sz + sysSbrkArg v0) = V.sz + sysSbrkArg v0 := by
-          unfold uvmdRsz; rw [if_pos hlt]
+          unfold uvmdRsz; rw [ite_eq_left hlt]
         rw [hr']
         unfold syscSbrkOk
-        rw [if_neg (by omega)]
+        rw [ite_eq_right (by omega)]
         exact ⟨rfl, sbrkArm_lazy_dealloc V.upt _ _ _ hlt⟩
       · have hr' : uvmdRsz V.sz (V.sz + sysSbrkArg v0) = V.sz := by
-          unfold uvmdRsz; rw [if_neg hlt]
+          unfold uvmdRsz; rw [ite_eq_right hlt]
         have hn0 : uvmdNp V.sz (V.sz + sysSbrkArg v0) = 0 := by
-          unfold uvmdNp; rw [if_neg hlt]
+          unfold uvmdNp; rw [ite_eq_right hlt]
         rw [hr', hn0]
         exact sbrkArm_still _ _ _ hlen
     · -- n = 0
@@ -267,7 +267,7 @@ theorem sbrkArm_ok (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (v0 v1 r :
         Or.inr ⟨hrsz r hr, fun _ => by rw [harg, hsz, hadd]; omega⟩⟩
       rw [← hsz] at halloc
       unfold syscSbrkOk
-      rw [if_pos hle]
+      rw [ite_eq_left hle]
       exact sbrkArm_lazy_alloc V.upt V'.upt M M' V.sz V'.sz hle hlen hbelow halloc
   · -- GREW, lazily
     have hsz : V'.sz = V.sz + sysSbrkArg v0 := by rw [hV]
@@ -276,7 +276,7 @@ theorem sbrkArm_ok (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (v0 v1 r :
     refine ⟨⟨?_, fun hg => ?_⟩, Or.inr ⟨hrsz r hr, fun _ => by rw [harg, hsz, hadd]; omega⟩⟩
     · rw [hupt, hsz]
       unfold syscSbrkOk
-      rw [if_pos hle]
+      rw [ite_eq_left hle]
       exact ⟨UMemL.extSz_refl _ _, sbrkArm_lazy_grow V.upt _ _ _ hle hlen⟩
     · rcases hg with hg | hg
       · exact absurd (heag.1 hg) hne
@@ -355,7 +355,7 @@ theorem sbrkArm_fits (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (v0 v1 r
           rw [sbrkArm_sum V.sz _ hszb (by omega)] at hu
           rw [harg] at hp hu
           exact ⟨heag.mp he, hp, by omega⟩
-    simp only [hf, if_true, not_true_eq_false, _root_.false_and, if_false]
+    simp only [hf, ite_true, not_true_eq_false, _root_.false_and, ite_false]
     rw [hV]
     exact ⟨hr, rfl, rfl⟩
   · -- SUCCEEDED: no overrun, and the boot reading
@@ -373,7 +373,7 @@ theorem sbrkArm_fits (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (v0 v1 r
           · omega
       · omega
     have hnf : ¬ usysSbrkFails V.sz.toNat v0 v1 ι := fun h => h.elim hno (fun h => hnk h.2)
-    simp only [hnf, if_false, not_false_eq_true, _root_.true_and]
+    simp only [hnf, ite_false, not_false_eq_true, _root_.true_and]
     refine ⟨by rw [hr]; simp, ?_⟩
     rcases hpath with ⟨hpe, hz, hpos, hneg⟩ | ⟨hne, hnn, hbd, hV, -, -⟩
     · -- growproc at 0: the shrink, `n = 0`, or the eager grow
@@ -382,18 +382,18 @@ theorem sbrkArm_fits (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (v0 v1 r
         have hsz : V'.sz = uvmdRsz V.sz (V.sz + sysSbrkArg v0) := by rw [hV]
         have hlz : V'.pvLazy = V.pvLazy := by rw [hV]
         rw [hlz, harg] at *
-        refine ⟨?_, by rw [if_neg (by omega)]⟩
+        refine ⟨?_, by rw [ite_eq_right (by omega)]⟩
         have := sbrkArm_shrink_sz V.sz (sbrkArgW v0) hszb h hrg.1
         rw [← hsz] at this
-        split at this <;> rename_i hc <;> simp only [hc, if_true, if_false] <;> omega
+        split at this <;> rename_i hc <;> simp only [hc, ite_true, ite_false] <;> omega
       · obtain ⟨-, rfl, -⟩ := hz h
         rw [harg] at h
-        refine ⟨by rw [if_pos (by omega)]; omega, ?_⟩
+        refine ⟨by rw [ite_eq_left (by omega)]; omega, ?_⟩
         have he : sbrkEagerW v1 := by
           rcases hpe with he | he
           · exact heag.mp he
           · rw [harg] at he; omega
-        rw [if_neg (fun hc => hc.1 he)]
+        rw [ite_eq_right (fun hc => hc.1 he)]
       · rcases hpos h with ⟨h0, -⟩ | ⟨-, hbd, hV, -⟩
         · exact absurd h0 (by decide)
         have hsz : V'.sz = V.sz + sysSbrkArg v0 := by rw [hV]
@@ -404,8 +404,8 @@ theorem sbrkArm_fits (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (v0 v1 r
           · exact heag.mp he
           · omega
         rw [harg] at h hadd
-        refine ⟨?_, by rw [hlz, if_neg (fun hc => hc.1 he)]⟩
-        rw [if_pos (by omega), hsz, harg, hadd]
+        refine ⟨?_, by rw [hlz, ite_eq_right (fun hc => hc.1 he)]⟩
+        rw [ite_eq_left (by omega), hsz, harg, hadd]
         omega
     · -- the lazy grow: the break rises, the bit is raised
       have hsz : V'.sz = V.sz + sysSbrkArg v0 := by rw [hV]
@@ -413,9 +413,9 @@ theorem sbrkArm_fits (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (v0 v1 r
       have hadd := sbrkArm_sum V.sz (sysSbrkArg v0) hszb hnn
       rw [harg] at hnn hadd
       refine ⟨?_, ?_⟩
-      · rw [if_pos (by omega), hsz, harg, hadd]
+      · rw [ite_eq_left (by omega), hsz, harg, hadd]
         omega
-      · rw [hlz, if_pos ⟨fun hc => hne (heag.mpr hc), hnn⟩]
+      · rw [hlz, ite_eq_left ⟨fun hc => hne (heag.mpr hc), hnn⟩]
 
 /-- **The rows of sbrk's arm** (Rocq `sysc_arm_sbrk`'s premises of
 `sysc_ret_tail`, `sysc_mem_ok_sbrk`): the block back at sys_sbrk's record
@@ -438,7 +438,7 @@ theorem syscRows_sbrk (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (sts : 
     by rw [show (syscStore V' r).pvSecc = V.pvSecc from hsc]; exact usysSeccOk_refl _ _ _ _ (hn 23 (by decide)),
     Or.inl (hn 14 (by decide)), Or.inl (hn 3 (by decide))⟩
   · unfold syscMemOk
-    rw [if_neg (hn USYS_exec (by decide)), if_pos (show syscNum V = USYS_sbrk from hnum)]
+    rw [ite_eq_right (hn USYS_exec (by decide)), ite_eq_left (show syscNum V = USYS_sbrk from hnum)]
     exact ⟨hmem, hlz⟩
   · exact syscFdOk_refl_at V _ sts 12 hnum (by decide) (by decide) (by decide) (by decide)
 

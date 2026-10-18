@@ -56,7 +56,7 @@ theorem uxr_run_node {X : Type} (orc : UOrc) (s : UWSt) (c : Eff RegisterType ex
   · cases op with
     | memRead n vasize req =>
       simp only [uxrIsText] at hc
-      simp only [uxRun, hc, Bool.false_eq_true, if_false]
+      simp only [uxRun, hc, Bool.false_eq_true, ite_false]
     | _ => simp only [uxRun]
 
 theorem uxr_run_text_none {X : Type} (orc : UOrc) (s : UWSt) {n vasize : Nat}
@@ -64,7 +64,7 @@ theorem uxr_run_text_none {X : Type} (orc : UOrc) (s : UWSt) {n vasize : Nat}
     (k : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → SailM X)
     (hc : uxTextRead T req = true) (hw : bmRead T req.pa n = none) :
     uxRun D T orc s (FreeM.impure (.ok (.memRead n vasize req)) k) = none := by
-  simp only [uxRun, hc, if_true, hw]
+  simp only [uxRun, hc, ite_true, hw]
 
 end walker
 

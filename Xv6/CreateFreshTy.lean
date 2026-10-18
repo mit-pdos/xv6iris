@@ -321,7 +321,7 @@ theorem create_ilock_claim (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF Γ] (cpu :
   ihave Hru : runitAny inum.toNat $$ [Hru]
   · unfold runitAny; iexact Hru
   unfold icDepHeld
-  simp only [icDepRd, Bool.false_eq_true, if_false]
+  simp only [icDepRd, Bool.false_eq_true, ite_false]
   iapply HK $$ %c Hlc %spie %spp %R' %g %lo %tl %γil %γisl %dn %bm [] Hk Hpc Hte Hce Hsi Hpid Hb1 Hslk
     Hsl Hfl Hdep Hoff Hdev Hinum Hval Hload Hshot Hfrz Hpar Hru Htc
   ipureintro
@@ -408,7 +408,7 @@ theorem create_fresh_ty (IA : IALLOC) (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF
   iintro Hk Hpc
   cases alloc
   · -- ===== NO INODES: a0 = 0, the branch is TAKEN, to +0xec (ARM A-FAIL) =====
-    simp only [Bool.false_eq_true, if_false]
+    simp only [Bool.false_eq_true, ite_false]
     icases Harm with ⟨%ha0, Hisl, Htc, Hop⟩
     k_step_e (wp_s_branch cpu _ (KA.«create» + 0xae#64) true 62#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0, MachCSL.beqz_zero] £ Hlc
@@ -424,12 +424,12 @@ theorem create_fresh_ty (IA : IALLOC) (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF
     · ipureintro
       refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
         simp [RegMap.set_apply, e2, e8, e9, e18, e20, e21, e22, e23, e24, e25, e26, e27]
-    simp only [Bool.false_eq_true, if_false]
+    simp only [Bool.false_eq_true, ite_false]
     iframe Hpc Hisl Htx Htc Hop
     ipureintro
     simp [RegMap.set_apply, ha0]
   · -- ===== ALLOCATED: a0 = ientry kslot, the branch FALLS THROUGH =====
-    simp only [if_true]
+    simp only [ite_true]
     icases Harm with ⟨%hp, Hcl, Hop⟩
     obtain ⟨ha0, hkk, hpos, hlt, hnib, -, -, -⟩ := hp
     obtain ⟨hcov, -⟩ := hblk inum hnib
@@ -498,7 +498,7 @@ theorem create_fresh_ty (IA : IALLOC) (IL : ILOCK) (Γ : SchedNames) [ClaimIs GF
       exact ⟨by simp [f2, e2], by simp [f8, e8], by simp [f9, e9], by simp [f18, e18],
         by simp [f20, e20], by simp [f21, e21], by simp [f22, e22], by simp [f23, e23],
         by simp [f24, e24], by simp [f25, e25], by simp [f26, e26], by simp [f27, e27]⟩
-    simp only [if_true]
+    simp only [ite_true]
     iframe Hpc Hslk Hsl Hfl Hdep Hoff Hdevc Hinum Hval Hload Hshot Hfrz Hpar Hru Htc Hop
     ipureintro
     exact ⟨by simp [f19, ha0], hkk, hpos, hlt, hnib, htyeq, hfresh, hle, hnrt⟩

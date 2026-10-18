@@ -195,7 +195,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [Bioslot
 /-- Rocq `sysc_mem_ok_exec`: at exec the image row is `True`. -/
 theorem syscMemOk_exec (V V' : ProcPriv) (M M' : ElfMem) (h : syscNum V = USYS_exec) :
     syscMemOk V V' M M' := by
-  unfold syscMemOk; rw [if_pos h]; trivial
+  unfold syscMemOk; rw [ite_eq_left h]; trivial
 
 /-- The rows at exec (Rocq `sysc_arm_exec`'s `sysc_ret_tail` premises). -/
 theorem syscRows_exec (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPriv)

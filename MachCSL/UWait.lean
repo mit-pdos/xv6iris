@@ -74,19 +74,19 @@ theorem uw_runHartWaiting (hD : UcFoot D) (hW : UwFoot D) (orc : UOrc) (s : UWSt
         uwBodyS s (uwWake wr (s.file .mip) (s.file .mie)), orc) := by
   simp only [run_hart_waiting, shouldWakeForInterrupt, bind_assoc, pure_bind,
     MachCSL.uxa_readReg_bind D _ _ _ _ hW.rd_mip, MachCSL.uxa_readReg_bind D _ _ _ _ hW.rd_mie, get_config_print_instr,
-    Bool.false_eq_true, if_false]
+    Bool.false_eq_true, ite_false]
   unfold uwStep uwBodyS uwWake
   have ez : (zeros : BitVec 64) = 0#64 := rfl
   rw [ez]
   cases hw : (s.file .mip &&& s.file .mie != 0#64)
-  · simp only [Bool.false_eq_true, if_false, Bool.false_or]
+  · simp only [Bool.false_eq_true, ite_false, Bool.false_or]
     cases hv : Functions.valid_reservation () <;> cases wr <;>
       simp only [uwIsWrs, Bool.not_true, Bool.not_false, Bool.false_and, Bool.true_and,
-        Bool.false_eq_true, if_false, if_true] <;>
+        Bool.false_eq_true, ite_false, ite_true] <;>
       first
       | rfl
       | exact ucRW_writeReg D orc s _ _ _ hD.wr_hs
-  · simp only [if_true, Bool.true_or]
+  · simp only [ite_true, Bool.true_or]
     exact ucRW_writeReg D orc s _ _ _ hD.wr_hs
 
 /-- Where a parked cycle lands: `(true, prelude state)` if it stays; if it
@@ -107,9 +107,9 @@ theorem uw_tryStep (hD : UcFoot D) (hW : UwFoot D) (orc : UOrc) (s : UWSt) (wr :
   rw [runRW_bind_some D _ _ orc orc _ _ _ (uw_runHartWaiting hD hW orc (ucPreS s) wr ib)]
   unfold uwLand uwStep uwBodyS
   cases hw : uwWake wr ((ucPreS s).file .mip) ((ucPreS s).file .mie)
-  · simp only [Bool.false_eq_true, if_false]
+  · simp only [Bool.false_eq_true, ite_false]
     exact uc_finish_waiting hD orc _ wr wr ib (by rw [ucPreS_file_other _ _ (by decide), h])
-  · simp only [if_true]
+  · simp only [ite_true]
     exact uc_finish_retire hD orc _ ib (UWSt.setR_file_same _ _ _)
 
 end MachCSL

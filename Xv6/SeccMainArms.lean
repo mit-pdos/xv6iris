@@ -190,7 +190,7 @@ theorem wp_ksecc_parent (UL : UK_LEAVES) (HS : UK_SYS_P)
     $$ Hi Hrun
   inext
   iintro %h1 Hrun
-  rw [ha0, secc_pid_blt pidv hrng, if_neg (by decide), ukPc 0x16 0x1a false rfl]
+  rw [ha0, secc_pid_blt pidv hrng, ite_eq_right (by decide), ukPc 0x16 0x1a false rfl]
   -- 0x1a  c.bnez a0,0x8a -- taken
   ihave Hi := secc_uis N.t 0x1a true (.BTYPE (0x70#13, .Regidx 0#5, .Regidx 10#5, .BNE)) udec%
     (by decide) $$ Hc
@@ -198,7 +198,7 @@ theorem wp_ksecc_parent (UL : UK_LEAVES) (HS : UK_SYS_P)
     $$ Hi Hrun
   inext
   iintro %h2 Hrun
-  rw [ha0, secc_pid_ne0 pidv hrng, if_pos rfl,
+  rw [ha0, secc_pid_ne0 pidv hrng, ite_eq_left rfl,
     show BitVec.ofNat 64 0x1a + BitVec.signExtend 64 0x70#13 = BitVec.ofNat 64 0x8a from by decide]
   -- 0x8a  c.li a0,0
   ihave Hi := secc_uis N.t 0x8a true (.ITYPE (0#12, .Regidx 0#5, .Regidx 10#5, .ADDI)) udec%
@@ -255,7 +255,7 @@ theorem wp_ksecc_forkneg (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : SECC_FPRINTF)
     $$ Hi Hrun
   inext
   iintro %h1 Hrun
-  rw [ha0, show ukBtaken .BLT (-1#64) 0#64 = true from by decide, if_pos rfl,
+  rw [ha0, show ukBtaken .BLT (-1#64) 0#64 = true from by decide, ite_eq_left rfl,
     show BitVec.ofNat 64 0x16 + BitVec.signExtend 64 0x4c#13 = BitVec.ofNat 64 0x62 from by decide]
   iapply wp_ksecc_forkfail UL HS HF N h1 m n l $$ Hq Hc Hwd Hstd Hrun
 
@@ -277,7 +277,7 @@ theorem wp_ksecc_child (UL : UK_LEAVES)
     $$ Hi Hrun
   inext
   iintro %h1 Hrun
-  rw [ha0, show ukBtaken .BLT 0#64 0#64 = false from by decide, if_neg (by decide), ukPc 0x16 0x1a false rfl]
+  rw [ha0, show ukBtaken .BLT 0#64 0#64 = false from by decide, ite_eq_right (by decide), ukPc 0x16 0x1a false rfl]
   -- 0x1a  c.bnez a0 -- not taken
   ihave Hi := secc_uis N.t 0x1a true (.BTYPE (0x70#13, .Regidx 0#5, .Regidx 10#5, .BNE)) udec%
     (by decide) $$ Hc
@@ -285,7 +285,7 @@ theorem wp_ksecc_child (UL : UK_LEAVES)
     $$ Hi Hrun
   inext
   iintro %h2 Hrun
-  rw [ha0, show ukBtaken .BNE 0#64 0#64 = false from by decide, if_neg (by decide), ukPc 0x1a 0x1c true rfl]
+  rw [ha0, show ukBtaken .BNE 0#64 0#64 = false from by decide, ite_eq_right (by decide), ukPc 0x1a 0x1c true rfl]
   -- 0x1c  lui a0,0xffe18
   ihave Hi := secc_uis N.t 0x1c false (.UTYPE (0xffe18#20, .Regidx 10#5, .LUI)) udec%
     (by decide) $$ Hc

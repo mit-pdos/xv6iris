@@ -137,7 +137,7 @@ theorem grepBuf_close_set (γd : GName) (i k : Nat) (F : Nat → BitVec 8) (b : 
   ihave HM := grepUbytes_snoc_close γd (User.Grep.Sym.«buf» + i) k (fun j => grepFset F (i + k) b (i + j)) b
     (by simp [grepFset]) $$ [HM] Hb
   · iapply (grepUbytesq_ext γd (DFrac.own 1) _ k (fun j => F (i + j)) (fun j => grepFset F (i + k) b (i + j))
-      (fun j hj => by simp only [grepFset, show ¬ i + j = i + k by omega, if_false])).1
+      (fun j hj => by simp only [grepFset, show ¬ i + j = i + k by omega, ite_false])).1
     iexact HM
   iapply grepUbytes_close3 (GF := GF) γd User.Grep.Sym.«buf» i (k + 1) (1024 - i - (k + 1)) 1024 (grepFset F (i + k) b) F
     (fun j => grepFset F (i + k) b (i + j)) (fun j => F (i + (k + 1) + j)) (by omega)
@@ -384,7 +384,7 @@ theorem grepLoop_pro (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (a
   let m9 := ukWr m8 23#5 (ukItypeVal .ADDI (m8.get 23#5) 3822#12)
   let m10 := ukWr m9 21#5 (ukItypeVal .ADDI (m9.get 0#5) 10#12)
   let m11 := ukWr m10 27#5 (ukItypeVal .ADDI (m10.get 0#5) 1#12)
-  rw [show ukWr m11 0#5 (BitVec.ofNat 64 0x12e + instrLen true) = m11 by unfold ukWr; rw [if_pos rfl]]
+  rw [show ukWr m11 0#5 (BitVec.ofNat 64 0x12e + instrLen true) = m11 by unfold ukWr; rw [ite_eq_left rfl]]
   iapply Hcont $$ %h25 %m11 [] [] [] [] [] [Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14] Hrun
   · ipureintro; exact hal8
   · ipureintro; exact hlo

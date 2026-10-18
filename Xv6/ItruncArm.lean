@@ -76,7 +76,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FdslotG GF] [Bioslot
 theorem itrunc_indRes_zero (γfs : FsNames) (d e : List (BitVec 32)) :
     ⊢ indRes (GF := GF) γfs ⟨d, 0#32, e⟩ := by
   unfold indRes indBlk indBlkQ
-  rw [if_pos (show (0#32 : BitVec 32).toNat = 0 from rfl)]
+  rw [ite_eq_left (show (0#32 : BitVec 32).toNat = 0 from rfl)]
   iempintro
 
 /-- The indirect cell and the indirect block's RUN out of the direct-zeroed

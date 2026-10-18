@@ -46,11 +46,11 @@ def fsImgByte (b j : Nat) : BitVec 8 :=
 theorem fsImgBlock_getElem! (b j : Nat) : (fsImgBlock b)[j]! = fsImgByte b j := by
   unfold fsImgBlock fsImgByte
   by_cases hb : b < 2000
-  · rw [if_pos hb, if_pos hb, List.getElem!_eq_getElem?_getD, List.getElem?_map]
+  · rw [ite_eq_left hb, ite_eq_left hb, List.getElem!_eq_getElem?_getD, List.getElem?_map]
     by_cases hj : j < BSIZE
-    · rw [List.getElem?_range hj, if_pos hj]; rfl
-    · rw [List.getElem?_eq_none (by simp; omega), if_neg hj]; rfl
-  · rw [if_neg hb, if_neg hb, List.getElem!_eq_getElem?_getD, List.getElem?_replicate]
+    · rw [List.getElem?_range hj, ite_eq_left hj]; rfl
+    · rw [List.getElem?_eq_none (by simp; omega), ite_eq_right hj]; rfl
+  · rw [ite_eq_right hb, ite_eq_right hb, List.getElem!_eq_getElem?_getD, List.getElem?_replicate]
     split <;> rfl
 
 theorem getElem!_drop {α : Type _} [Inhabited α] (l : List α) (o t : Nat) :
@@ -70,8 +70,8 @@ theorem getElem!_map_range {α : Type _} [Inhabited α] (n j : Nat) (f : Nat →
     ((List.range n).map f)[j]! = if j < n then f j else default := by
   rw [List.getElem!_eq_getElem?_getD, List.getElem?_map]
   by_cases hj : j < n
-  · rw [List.getElem?_range hj, if_pos hj]; rfl
-  · rw [List.getElem?_eq_none (by simp; omega), if_neg hj]; rfl
+  · rw [List.getElem?_range hj, ite_eq_left hj]; rfl
+  · rw [List.getElem?_eq_none (by simp; omega), ite_eq_right hj]; rfl
 
 /-- A field IS its bytes, read by index (past the end, both sides read
 zeroes). -/
@@ -153,14 +153,14 @@ theorem nodupMask_spec : ∀ (l : List Nat),
     · obtain ⟨s0, hs0, hmem⟩ := ih2 m0 hr
       by_cases hx : m0.testBit x = true
       · have hxs : x ∈ s0 := (hmem x).2 hx
-        exact ⟨fun _ => by simp only [gsetNodup, hs0, hxs, if_true],
-          fun m h => by simp only [nodupMask, hr, hx, if_true, reduceCtorEq] at h⟩
+        exact ⟨fun _ => by simp only [gsetNodup, hs0, hxs, ite_true],
+          fun m h => by simp only [nodupMask, hr, hx, ite_true, reduceCtorEq] at h⟩
       · have hxs : x ∉ s0 := fun h => hx ((hmem x).1 h)
-        refine ⟨fun h => by simp only [nodupMask, hr, hx, Bool.false_eq_true, if_false, reduceCtorEq] at h,
+        refine ⟨fun h => by simp only [nodupMask, hr, hx, Bool.false_eq_true, ite_false, reduceCtorEq] at h,
           fun m h => ?_⟩
-        simp only [nodupMask, hr, hx, Bool.false_eq_true, if_false, Option.some.injEq] at h
+        simp only [nodupMask, hr, hx, Bool.false_eq_true, ite_false, Option.some.injEq] at h
         subst h
-        refine ⟨s0.insert x, by simp only [gsetNodup, hs0, hxs, if_false], fun y => ?_⟩
+        refine ⟨s0.insert x, by simp only [gsetNodup, hs0, hxs, ite_false], fun y => ?_⟩
         rw [ExtTreeSet.mem_insert, compare_eq_iff_eq, hmem y, Nat.testBit_or,
           Nat.testBit_two_pow, Bool.or_eq_true, decide_eq_true_eq]
         exact Or.comm

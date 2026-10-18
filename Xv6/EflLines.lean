@@ -90,11 +90,11 @@ theorem eflLines_snoc (h : List Obs) (e : Obs) : eflLines h <+: eflLines (h ++ [
 theorem eflLines_power (h : List Obs) (on : Bool) :
     eflLines (h ++ [if on then .powerOff else .powerOn]) = eflLines h := by
   cases on
-  · simp only [eflLines, cyclesOf_on, Bool.false_eq_true, if_false, List.map_append,
+  · simp only [eflLines, cyclesOf_on, Bool.false_eq_true, ite_false, List.map_append,
       List.flatten_append, List.map_cons, List.map_nil, List.flatten_cons, List.flatten_nil,
       List.append_nil]
     have : linesOf (consIns []) = [] := rfl
     rw [this, List.append_nil]
-  · simp only [eflLines, if_true, cyclesOf_off]
+  · simp only [eflLines, ite_true, cyclesOf_off]
 
 end Xv6

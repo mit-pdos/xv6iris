@@ -212,7 +212,7 @@ theorem ut_killIn_cred (A : UtArgs GF) (hne : A.sc ≠ uecallScause) :
     utKillIn (GF := GF) A.f A.sc A.Wk A.gn A.sts ⊢
       ⌜A.Wk.fd = A.sts⌝ ∗ ukillCredAt uslot A.gn A.sc A.Wk A.f := by
   unfold utKillIn
-  rw [if_neg hne]
+  rw [ite_eq_right hne]
   iintro ⟨%⟨hg, hf⟩, H⟩
   isplitr
   · ipureintro; exact hf

@@ -31,11 +31,11 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 /-! ## The write of a chain -/
 
 theorem chainWr_read (c : Chain) (h : c.dwr = true) : chainWr c = none := by
-  unfold chainWr; rw [if_pos h]
+  unfold chainWr; rw [ite_eq_left h]
 
 theorem chainWr_write (c : Chain) (h : c.dwr = false) :
     chainWr c = some (BSIZE * c.blk, c.pay) := by
-  unfold chainWr; rw [if_neg (by simp [h])]
+  unfold chainWr; rw [ite_eq_right (by simp [h])]
 
 /-- The sectors a fresh deposit owes: none for a read, the block's for a write. -/
 theorem crashRow_range_chainWr (c : Chain) :

@@ -166,7 +166,7 @@ theorem namexEra_tests (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKUP)
   cases hnp : A.npar
   · -- namei: straight to the lookup
     rw [hnp] at hnpar
-    simp only [Bool.false_eq_true, if_false] at hnpar
+    simp only [Bool.false_eq_true, ite_false] at hnpar
     have hd6 : decide (R 22#5 = 0#64) = true := by simp [r22, hnpar]
     k_step_e (wp_s_branch cpu _ (KA.«namex» + 0xd8#64) false 10#13 22#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbz6, hd6]
@@ -176,7 +176,7 @@ theorem namexEra_tests (IUP : IUNLOCKPUT) (IU : IUNLOCK) (DL : DIRLOOKUP)
       $$ [$Hk $Hpc $Hframe $Hte $Hce $Henv $Hlk $Hload $Hs1 $Hkeep $Hpath $Hnm $Hbs $Hobs $Hop $HP
         $Hhops $Hnext $IH]
   · rw [hnp] at hnpar
-    simp only [if_true] at hnpar
+    simp only [ite_true] at hnpar
     have hd6 : decide (R 22#5 = 0#64) = false := by simp [r22, hnpar]
     k_step_e (wp_s_branch cpu _ (KA.«namex» + 0xd8#64) false 10#13 22#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbz6, hd6]

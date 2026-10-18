@@ -195,7 +195,7 @@ theorem filePin_create (nm : Fname) (ino : Nat) (bs : List (BitVec 8)) (d : Nat)
       rw [astep_of_dir _ _ _ _ nm (get?_insert_eq rfl)]
       have hne : nmn ≠ nm := by
         intro h; subst h; rw [hnm] at hfresh; cases hfresh
-      rw [Std.ExtTreeMap.getElem?_insert, if_neg (by rwa [Std.compare_eq_iff_eq])]
+      rw [Std.ExtTreeMap.getElem?_insert, ite_eq_right (by rwa [Std.compare_eq_iff_eq])]
       exact hnm
     · rw [astep_of_dir _ _ rents rnl nm (by rw [get?_insert_ne hdr]; exact hroot)]
       exact hnm

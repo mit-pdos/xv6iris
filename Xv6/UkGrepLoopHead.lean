@@ -134,14 +134,14 @@ theorem grepLoop_head (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m m0 : RegMap
   rw [h5a0, kgrep_bge0]
   by_cases hle : ret.toInt ≤ 0
   · -- n <= 0: the loop ends, and so does grep's share of the tree
-    rw [decide_eq_true hle, if_pos rfl,
+    rw [decide_eq_true hle, ite_eq_left rfl,
       show BitVec.ofNat 64 0x17c + BitVec.signExtend 64 54#13 = BitVec.ofNat 64 0x1b2 from by decide]
     rw [grepRk_nonpos pat fd skip left rest ret g' hle]
     icases Hk with ⟨Hx, -⟩
     iapply Hx $$ %h6 %m5 %F2 [] Hbuf HK Hrun
     ipureintro; exact hgl5
   · -- n > 0
-    rw [decide_eq_false hle, if_neg (by decide), ukPc 0x17c 0x180 false rfl]
+    rw [decide_eq_false hle, ite_eq_right (by decide), ukPc 0x17c 0x180 false rfl]
     have hpos : 0 < ret.toInt := by omega
     have hle' : ret.toInt ≤ (grepRoom left : Int) := by
       rcases hok with h1 | ⟨_, h2⟩
@@ -210,7 +210,7 @@ theorem grepLoop_head (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m m0 : RegMap
     iintro %h12 Hrun
     let m9 := ukWr m8 18#5 (ukRtypeVal .ADD (m8.get 0#5) (m8.get 23#5))
     rw [show BitVec.ofNat 64 0x190 + BitVec.signExtend 64 2097062#21 = BitVec.ofNat 64 0x136 from by decide,
-      show ukWr m9 0#5 (BitVec.ofNat 64 0x190 + instrLen true) = m9 by unfold ukWr; rw [if_pos rfl]]
+      show ukWr m9 0#5 (BitVec.ofNat 64 0x190 + instrLen true) = m9 by unfold ukWr; rw [ite_eq_left rfl]]
     have hk9 : grepRkeep [12, 11, 10, 1, 17, 20, 22, 15, 18] m m9 := by
       refine grepRkeep_upd _ _ _ _ _ (by decide) ?_
       refine grepRkeep_upd _ _ _ _ _ (by decide) ?_

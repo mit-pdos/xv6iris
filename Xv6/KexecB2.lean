@@ -309,7 +309,7 @@ theorem kxcB2_call_readi (RD : READI) (Γ : SchedNames) [ClaimIs GF Γ]
     (by k_norm_g; simp [RegMap.set_apply, ha1]) (by k_norm_g; simp [RegMap.set_apply, ha3])
     (by k_norm_g; simp [RegMap.set_apply, ha4]) (fun _ => holds)
   unfold wp_readi_eb_body at h
-  simp only [readiAddr, Bool.false_eq_true, if_false, _root_.and_false, _root_.false_and, _root_.false_or, fsView_gd] at h
+  simp only [readiAddr, Bool.false_eq_true, ite_false, _root_.and_false, _root_.false_and, _root_.false_or, fsView_gd] at h
   ihave Hmap : inodeMapQ fscFs (DFrac.own 1) (ientry kf) bmf $$ [Haddrs Hind]
   · iapply inodeMapQ_1_to fscFs (DFrac.own 1) (ientry kf) bmf rfl
     unfold inodeMap; iframe
@@ -940,7 +940,7 @@ theorem kxcB2_ls_step (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPU
       iapply (kxcB2_ls_da RD IUP EO PFP Γ Q QF cpu k A spie spp _ kf qf sf gyf loyf tlyf inumf dnf bmf
           data gilf gislf n2 w63 w65 w67 ef P Mi Mb ip va fz po ii (fz - ii) kv w hqf hK hnoff htier hj
           hproc (by simp [RegMap.set_apply, a2, a8, a9, hrw, a19, a20, a21, a22, a23, a24, a25, a26, a27])
-          hs hl (by rw [if_pos hsm]) hkv hkva)
+          hs hl (by rw [ite_eq_left hsm]) hkv hkva)
         $$ [$Hk $Hpc $Hte $Hce $Hfab Hop Hlog Hirs Hbs Hpt Hpriv Hbufs He Hfr $Hcl $H116 $HF6]
       unfold kxcResB; iframe
     · have hbr2 : bcond bop.BGEU 4096#64 (kxcSx32 (fz - ii)) = false := by
@@ -958,7 +958,7 @@ theorem kxcB2_ls_step (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPU
       iapply (kxcB2_ls_da RD IUP EO PFP Γ Q QF cpu k A spie spp _ kf qf sf gyf loyf tlyf inumf dnf bmf
           data gilf gislf n2 w63 w65 w67 ef P Mi Mb ip va fz po ii 4096 kv w hqf hK hnoff htier hj
           hproc (by simp [RegMap.set_apply, a2, a8, a9, hrw, a19, a20, a21, a22, a23, a24, a25, a26, a27,
-            kxcB2_sx32_4096]) hs hl (by rw [if_neg hsm]) hkv hkva)
+            kxcB2_sx32_4096]) hs hl (by rw [ite_eq_right hsm]) hkv hkva)
         $$ [$Hk $Hpc $Hte $Hce $Hfab Hop Hlog Hirs Hbs Hpt Hpriv Hbufs He Hfr $Hcl $H116 $HF6]
       unfold kxcResB; iframe
 

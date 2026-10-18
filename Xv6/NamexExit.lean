@@ -117,7 +117,7 @@ theorem namex_fail_out (k : KCtx) (A : NamexArgs) (nf : Nat → BitVec 8) (ncur 
   have hsp := namex_wi_spend A.n ncur n' wc w cz hA hB hww hn1 hn2
   unfold namexOut namexArm
   iintro ⟨Hkeep, Hpath, Hnm, Hbs, Hop, Htx, Hs1, Hs2⟩
-  simp only [Bool.false_eq_true, if_false]
+  simp only [Bool.false_eq_true, ite_false]
   iframe Hkeep Hpath Hnm Hbs Hop Htx
   isplitr
   · ipureintro
@@ -189,7 +189,7 @@ theorem namex_notdir (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
   isplitr
   · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
   isplitr
-  · simp only [Bool.false_eq_true, if_false]; iempintro
+  · simp only [Bool.false_eq_true, ite_false]; iempintro
   unfold namexAfterIup
   iintro %c %spie' %spp' %R' %n' %Sb' %w %⟨hcs, hff⟩ Hk Hpc Hte Hce Hkeep Hbs Hop Htx Hslot
   obtain ⟨c2, -, -, -, -, -, -, -, -, -, -, -, c27⟩ := hcs
@@ -240,7 +240,7 @@ theorem namex_nlink (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
   isplitr
   · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
   isplitr
-  · simp only [Bool.false_eq_true, if_false]; iempintro
+  · simp only [Bool.false_eq_true, ite_false]; iempintro
   unfold namexAfterIup
   iintro %c %spie' %spp' %R' %n' %Sb' %w %⟨hcs, hff⟩ Hk Hpc Hte Hce Hkeep Hbs Hop Htx Hslot
   obtain ⟨c2, -, -, -, -, -, -, -, -, -, -, -, c27⟩ := hcs
@@ -295,7 +295,7 @@ theorem namex_miss (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF Γ]
   isplitr
   · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
   isplitr
-  · simp only [if_true]; iexact Hobs
+  · simp only [ite_true]; iexact Hobs
   unfold namexAfterIup
   iintro %c %spie' %spp' %R' %n' %Sb' %w %⟨hcs, hff⟩ Hk Hpc Hte Hce Hkeep Hbs Hop Htx Hslot
   obtain ⟨c2, -, -, c18, -, -, -, -, -, -, -, -, c27⟩ := hcs
@@ -403,7 +403,7 @@ theorem namex_par (IU : IUNLOCK) (Γ : SchedNames) [ClaimIs GF Γ]
   case t2 => k_norm_g; rw [c2]; simp [RegMap.set_apply, hf.h2]
   case t27 => k_norm_g; rw [c27]; simp [RegMap.set_apply, hf.h27]
   unfold namexOut namexArm namexKeep
-  simp only [if_true, hnpar]
+  simp only [ite_true, hnpar]
   k_norm_g [hr20]
   iframe Hsb Hsi Hpid Hcwd Hcwr Hpath Hnm Hbs Hop Htx Hheld Hs1
   ipureintro
@@ -435,7 +435,7 @@ theorem namex_done (IP : IPUT) (Γ : SchedNames) [ClaimIs GF Γ]
   cases hnp : A.npar
   · -- namei: +0x140 beqz s6,+0x5c TAKEN
     rw [hnp] at hnpar
-    simp only [Bool.false_eq_true, if_false] at hnpar
+    simp only [Bool.false_eq_true, ite_false] at hnpar
     have hd : decide (R 22#5 = 0#64) = true := by simp [r22, hnpar]
     k_step_e (wp_s_branch cpu _ (KA.«namex» + 0x144#64) false 7964#13 22#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbz, hd]
@@ -444,14 +444,14 @@ theorem namex_done (IP : IPUT) (Γ : SchedNames) [ClaimIs GF Γ]
     iapply (namex_tail cpu k A spie spp R ncur Scur true nf ipv wc hK12 r2 r27)
       $$ [- $Hk $Hpc $Hframe $Hte $Hce $Hnext]
     unfold namexOut namexArm
-    simp only [if_true, hnp, Bool.false_eq_true, if_false]
+    simp only [ite_true, hnp, Bool.false_eq_true, ite_false]
     iframe Hkeep Hpath Hnm Hbs Hop Htx Hip Hs1
     ipureintro
     refine ⟨⟨hSb, hW, ?_, hfree.2⟩, r20, fun h => absurd h (by decide)⟩
     simpa using hfree.1
   · -- nameiparent: +0x140 falls
     rw [hnp] at hnpar
-    simp only [if_true] at hnpar
+    simp only [ite_true] at hnpar
     have hd : decide (R 22#5 = 0#64) = false := by simp [r22, hnpar]
     k_step_e (wp_s_branch cpu _ (KA.«namex» + 0x144#64) false 7964#13 22#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbz, hd]

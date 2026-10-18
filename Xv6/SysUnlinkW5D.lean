@@ -68,7 +68,7 @@ theorem sys_unlink_size_pos (D : Std.ExtTreeSet Fname compare) (s : Fname) (h : 
 
 theorem sys_unlink_size_erase (D : Std.ExtTreeSet Fname compare) (s : Fname) (h : s ∈ D) :
     (D.erase s).size = D.size - 1 := by
-  rw [Std.ExtTreeSet.size_erase, if_pos (Std.ExtTreeSet.mem_iff_contains.1 h)]
+  rw [Std.ExtTreeSet.size_erase, ite_eq_left (Std.ExtTreeSet.mem_iff_contains.1 h)]
 
 /-- The marker set loses exactly the zeroed name (Rocq's `ent_dset_ok_delete`
 at `Dd ∖ {[nm]}`). -/
@@ -96,7 +96,7 @@ theorem sys_unlink_exact_dec (n n' : FsNode) (D : Std.ExtTreeSet Fname compare) 
   rw [ho] at hx'
   rw [ho', hnl, sys_unlink_size_erase D s hs]
   have := sys_unlink_size_pos D s hs
-  simp only [Bool.false_eq_true, if_false] at hx' ⊢
+  simp only [Bool.false_eq_true, ite_false] at hx' ⊢
   omega
 
 /-- The orphan's (empty) marker set is exact (Rocq's `HxactiZ`). -/
@@ -197,7 +197,7 @@ theorem sys_unlink_w5d_ghost (dinum : BitVec 32) (dnd dnW : Dinode) (bmd bmW : B
   have hnl1 : dni.diNlink.toNat = 1 := by
     have h := hDxi hdiri
     rw [fnOrphan_eraNz dni bmi dati hnli, Std.ExtTreeSet.size_empty] at h
-    simp only [Bool.false_eq_true, if_false, Nat.zero_add] at h
+    simp only [Bool.false_eq_true, ite_false, Nat.zero_add] at h
     exact h
   -- (D1) AND (D2), off the type register: the parent's record for the
   -- child, and the child's own "."
@@ -206,7 +206,7 @@ theorem sys_unlink_w5d_ghost (dinum : BitVec 32) (dnd dnW : Dinode) (bmd bmW : B
       hok.2.2.2.2.2.1 hok.2.2.2.2.1 (hduq htyz) hklt hklive hnD hnDD hne' $$ Hetkd
     with ⟨⟨%vkk, Htokb, %hvkk⟩, Hbackd⟩
   have hentsi : dirEntries (eraNode dni bmi dati) = dirView dati (dirNrec dni.diSize.toNat) := by
-    rw [dirEntries_eraNode dni bmi dati hhi hbi, if_pos htyi]
+    rw [dirEntries_eraNode dni bmi dati hhi hbi, ite_eq_left htyi]
   have hdoti : (dirEntries (eraNode dni bmi dati))[DOT]? =
       some (BitVec.setWidth 32 (dirInum datd kk)).toNat := by
     rw [hentsi, ← hself0i, show DOT = dirBname dati 0 from hname0i.symm]
@@ -227,11 +227,11 @@ theorem sys_unlink_w5d_ghost (dinum : BitVec 32) (dnd dnW : Dinode) (bmd bmW : B
   have hmark : dirBname datd kk ∈ Dd := by
     by_cases hin : dirBname datd kk ∈ Dd
     · exact hin
-    · rw [if_neg (by simpa using hin)] at hvkk
+    · rw [ite_eq_right (by simpa using hin)] at hvkk
       rw [hvkk] at hvok
       exact absurd htyi hvok
   have hvkkd : vkk = .tDir (dinum.toNat : Int) := by
-    rw [if_pos (decide_eq_true hmark)] at hvkk; exact hvkk
+    rw [ite_eq_left (decide_eq_true hmark)] at hvkk; exact hvkk
   have hpar : (dirInum dati 1).toNat = dinum.toNat := by
     have h := hvdot (dinum.toNat : Int) (dirInum dati 1).toNat (by rw [← hvag]; exact hvkkd) hddi
     exact_mod_cast h
@@ -240,7 +240,7 @@ theorem sys_unlink_w5d_ghost (dinum : BitVec 32) (dnd dnW : Dinode) (bmd bmW : B
     rw [fnOrphan_eraNz dnd bmd datd hlive] at h
     have h1 := sys_unlink_size_pos Dd _ hmark
     have h2 : fnNlink (eraNode dnd bmd datd) = dnd.diNlink.toNat := rfl
-    simp only [Bool.false_eq_true, if_false] at h
+    simp only [Bool.false_eq_true, ite_false] at h
     omega
   -- the two fragments go home
   ihave Htokb := (show FsStateLink.linkTok (GF := GF) (fsGammaL fscFs)
@@ -302,7 +302,7 @@ theorem sys_unlink_w5d_ghost (dinum : BitVec 32) (dnd dnW : Dinode) (bmd bmW : B
     rw [sysfile_setnl_type]; exact htyi
   have hdd2 : iregDotDelta (sysUnlinkDni2 dni).diType.toNat (sysUnlinkDni2 dni).diNlink.toNat
       = 1 + 1 := by
-    simp only [iregDotDelta, hnl2z, ht2, decide_true, Bool.and_self, if_true]
+    simp only [iregDotDelta, hnl2z, ht2, decide_true, Bool.and_self, ite_true]
   rw [hdd2]
   subst hagd
   iapply (FsStateLink.linkToks_reps_S _ _ 1 uty).2

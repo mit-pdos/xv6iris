@@ -47,7 +47,7 @@ theorem funOfBig {A : Type} [Inhabited A] (Φ : Nat → A → IProp GF) :
       have hjn : j < n := by
         obtain ⟨h1, h⟩ := List.getElem?_eq_some_iff.mp hj
         rw [← h, List.getElem_range]; rw [List.length_range] at h1; exact h1
-      simp only [if_neg (Nat.ne_of_lt hjn)]
+      simp only [ite_eq_right (Nat.ne_of_lt hjn)]
       exact .rfl
     · iapply BigSepL.bigSepL_singleton.2
       simp only [reduceIte]

@@ -97,7 +97,7 @@ theorem grepMs_loop (UL : UK_LEAVES) (N : UkNames GF) (lr : Nat) (IH : grepMhSpe
   rw [ha04, kgrep_bnez_b01]
   cases ebh : matchhere ((List.range lr).map fr) ((List.range lt).map ft)
   · -- matchhere(re, text) failed
-    rw [if_neg (by decide), ukPc 0x26 0x28 true rfl]
+    rw [ite_eq_right (by decide), ukPc 0x26 0x28 true rfl]
     -- 0x28  lbu a5,0(s1) : the text's first byte
     icases grepUstr_hd_acc N.d dqt ax lt ft $$ Htx with ⟨Hb, Hcl⟩
     gfetch 0x28 false (.LOAD (0#12, .Regidx 9#5, .Regidx 15#5, true, 1))
@@ -121,13 +121,13 @@ theorem grepMs_loop (UL : UK_LEAVES) (N : UkNames GF) (lr : Nat) (IH : grepMhSpe
     cases lt with
     | zero =>
       -- the text is used up: 0
-      rw [if_pos (by decide), show BitVec.ofNat 64 0x2c + BitVec.signExtend 64 16#13 = BitVec.ofNat 64 0x3c from by decide]
+      rw [ite_eq_left (by decide), show BitVec.ofNat 64 0x2c + BitVec.signExtend 64 16#13 = BitVec.ofNat 64 0x3c from by decide]
       iapply Hcont $$ Hre Htx %h7 %m5 [] [] Hrun
       · ipureintro
         rw [ukWr_get_other _ _ _ _ (by decide), ha04, show (List.range 0).map ft = [] from rfl, grepMs_nil]
       · ipureintro; exact grepRkeep_upd _ _ _ _ _ (by decide) hk4
     | succ lt1 =>
-      rw [decide_eq_false (show ¬ lt1 + 1 = 0 by omega), if_neg (by decide), ukPc 0x2c 0x2e true rfl]
+      rw [decide_eq_false (show ¬ lt1 + 1 = 0 by omega), ite_eq_right (by decide), ukPc 0x2c 0x2e true rfl]
       have hft0 : ft 0 ≠ ubyte0 := htne 0 (by omega)
       -- 0x2e  c.addi s1,s1,1
       gfetch 0x2e true (.ITYPE (1#12, .Regidx 9#5, .Regidx 9#5, .ADDI))
@@ -164,14 +164,14 @@ theorem grepMs_loop (UL : UK_LEAVES) (N : UkNames GF) (lr : Nat) (IH : grepMhSpe
           $$ Hi Hrun
         inext
         iintro %h9 Hrun
-        rw [hbeq m6 ha56 hs26, e1, if_neg (by decide), ukPc 0x30 0x34 false rfl]
+        rw [hbeq m6 ha56 hs26, e1, ite_eq_right (by decide), ukPc 0x30 0x34 false rfl]
         -- 0x34  bnez s4,0x1e : not taken
         gfetch 0x34 false (.BTYPE (8170#13, .Regidx 0#5, .Regidx 20#5, .BNE))
         iapply wp_uk_btype0 UL N h9 m6 (BitVec.ofNat 64 0x34) false 8170#13 20#5 .BNE n (fun _ => by decide)
           $$ Hi Hrun
         inext
         iintro %h10 Hrun
-        rw [hs46, kgrep_bnez_b01, e2, if_neg (by decide), ukPc 0x34 0x38 false rfl]
+        rw [hs46, kgrep_bnez_b01, e2, ite_eq_right (by decide), ukPc 0x34 0x38 false rfl]
         -- 0x38  c.j 0x3c
         gfetch 0x38 true (.JAL (4#21, .Regidx 0#5))
         iapply wp_uk_jal UL N h10 m6 (BitVec.ofNat 64 0x38) true 4#21 0#5 n (by unfold unotSp spIdx; decide)
@@ -179,7 +179,7 @@ theorem grepMs_loop (UL : UK_LEAVES) (N : UkNames GF) (lr : Nat) (IH : grepMhSpe
         inext
         iintro %h11 Hrun
         rw [show BitVec.ofNat 64 0x38 + BitVec.signExtend 64 4#21 = BitVec.ofNat 64 0x3c from by decide,
-          show ukWr m6 0#5 (BitVec.ofNat 64 0x38 + instrLen true) = m6 by unfold ukWr; rw [if_pos rfl]]
+          show ukWr m6 0#5 (BitVec.ofNat 64 0x38 + instrLen true) = m6 by unfold ukWr; rw [ite_eq_left rfl]]
         iapply Hcont $$ Hre Htx %h11 %m6 [] [] Hrun
         · ipureintro
           rw [ha06, eT, grepMs_cons, ebh, etest]
@@ -206,7 +206,7 @@ theorem grepMs_loop (UL : UK_LEAVES) (N : UkNames GF) (lr : Nat) (IH : grepMhSpe
         iintro %h9 Hrun
         rw [hbeq m6 ha56 hs26]
         cases e1 : bdec (ft 0) c
-        · rw [if_neg (by decide), ukPc 0x30 0x34 false rfl]
+        · rw [ite_eq_right (by decide), ukPc 0x30 0x34 false rfl]
           have e2 : bdec c cDot = true := by simp_all
           -- 0x34  bnez s4,0x1e : c == '.'
           gfetch 0x34 false (.BTYPE (8170#13, .Regidx 0#5, .Regidx 20#5, .BNE))
@@ -214,13 +214,13 @@ theorem grepMs_loop (UL : UK_LEAVES) (N : UkNames GF) (lr : Nat) (IH : grepMhSpe
             $$ Hi Hrun
           inext
           iintro %h10 Hrun
-          rw [hs46, kgrep_bnez_b01, e2, if_pos rfl,
+          rw [hs46, kgrep_bnez_b01, e2, ite_eq_left rfl,
             show BitVec.ofNat 64 0x34 + BitVec.signExtend 64 8170#13 = BitVec.ofNat 64 0x1e from by decide]
           iapply Hnext $$ %h10 Hrun
-        · rw [if_pos rfl, show BitVec.ofNat 64 0x30 + BitVec.signExtend 64 8174#13 = BitVec.ofNat 64 0x1e from by decide]
+        · rw [ite_eq_left rfl, show BitVec.ofNat 64 0x30 + BitVec.signExtend 64 8174#13 = BitVec.ofNat 64 0x1e from by decide]
           iapply Hnext $$ %h9 Hrun
   · -- matchhere(re, text) held: 1
-    rw [if_pos (by decide), show BitVec.ofNat 64 0x26 + BitVec.signExtend 64 20#13 = BitVec.ofNat 64 0x3a from by decide]
+    rw [ite_eq_left (by decide), show BitVec.ofNat 64 0x26 + BitVec.signExtend 64 20#13 = BitVec.ofNat 64 0x3a from by decide]
     -- 0x3a  c.li a0,1
     gfetch 0x3a true (.ITYPE (1#12, .Regidx 0#5, .Regidx 10#5, .ADDI))
     iapply wp_uk_itype UL N h5 m4 (BitVec.ofNat 64 0x3a) true 1#12 0#5 10#5 .ADDI n

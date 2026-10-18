@@ -54,8 +54,8 @@ theorem ite_some_pres {α : Type} {P : α → Prop} {c : Prop} [Decidable c] {a 
     ∀ x, (if c then a else b) = some x → P x := by
   intro x h
   by_cases hc : c
-  · rw [if_pos hc] at h; exact ha x h
-  · rw [if_neg hc] at h; exact hb x h
+  · rw [ite_eq_left hc] at h; exact ha x h
+  · rw [ite_eq_right hc] at h; exact hb x h
 
 theorem Virtio.write_disk (v v' : VirtioState) (off : Nat) (w : BitVec 32)
     (h : Virtio.write v off w = some v') : v'.disk = v.disk := by

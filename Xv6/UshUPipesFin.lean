@@ -137,7 +137,7 @@ theorem pls_nodes_alloc : ∀ n : Nat,
         [∗list] j ∈ List.range n, iprop(osP (GF := GF) (gF j) ∗ osP (gG j) ∗ pbundle (P j)) :=
       BigSepL.bigSepL_eq (fun {_ j} hk => by
         have hj : j < n := List.mem_range.1 (List.mem_of_getElem? hk)
-        rw [if_neg (Nat.ne_of_lt hj), if_neg (Nat.ne_of_lt hj), if_neg (Nat.ne_of_lt hj)])
+        rw [ite_eq_right (Nat.ne_of_lt hj), ite_eq_right (Nat.ne_of_lt hj), ite_eq_right (Nat.ne_of_lt hj)])
     rw [List.range_succ]
     iapply BigSepL.bigSepL_snoc.2
     simp only [↓reduceIte]

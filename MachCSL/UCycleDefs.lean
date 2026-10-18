@@ -228,26 +228,26 @@ theorem uc_runHartActive_eq : run_hart_active 0 =
     all_goals try rfl
     all_goals (congr 1; funext i; congr 1; funext lp)
     · by_cases hlp : (lp && Functions.not (is_lpad_instruction i)) = true
-      · rw [if_pos hlp, if_pos hlp]
+      · rw [ite_eq_left hlp, ite_eq_left hlp]
         simp only [ExceptT.run_bind, ExceptT.run_pure, pure_bind, run_liftM, bind_assoc]
-      · rw [if_neg hlp, if_neg hlp]
+      · rw [ite_eq_right hlp, ite_eq_right hlp]
         simp only [ExceptT.run_bind, ExceptT.run_pure, pure_bind, run_liftM, bind_assoc, bindCont_ok]
         congr 1; funext pc; congr 1; funext u; congr 1; funext r
         split <;> simp only [ExceptT.run_bind, ExceptT.run_pure, pure_bind, run_liftM, bind_assoc,
           bindCont_ok]
     · by_cases hlp : lp = true
-      · rw [if_pos hlp, if_pos hlp]
+      · rw [ite_eq_left hlp, ite_eq_left hlp]
         simp only [ExceptT.run_bind, ExceptT.run_pure, pure_bind, run_liftM, bind_assoc]
-      · rw [if_neg hlp, if_neg hlp]
+      · rw [ite_eq_right hlp, ite_eq_right hlp]
         simp only [ExceptT.run_bind, pure_bind, run_liftM, bind_assoc, bindCont_ok]
         congr 1; funext z
         by_cases hz : z = true
-        · rw [if_pos hz, if_pos hz]
+        · rw [ite_eq_left hz, ite_eq_left hz]
           simp only [ExceptT.run_bind, ExceptT.run_pure, pure_bind, run_liftM, bind_assoc, bindCont_ok]
           congr 1; funext pc; congr 1; funext u; congr 1; funext r
           split <;> simp only [ExceptT.run_bind, ExceptT.run_pure, pure_bind, run_liftM, bind_assoc,
             bindCont_ok]
-        · rw [if_neg hz, if_neg hz]
+        · rw [ite_eq_right hz, ite_eq_right hz]
           simp only [ExceptT.run_pure, pure_bind]
 
 end MachCSL

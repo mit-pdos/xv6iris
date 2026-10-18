@@ -210,18 +210,18 @@ theorem uservecTf_reg (ws : List (BitVec 64)) (g : RegMap) (hlen : ws.length = 3
   rcases hall i hi with h | h | h | h
   · simp [h]
   · have h0 : i ∉ [10#5] := by intro h'; simp at h'; subst h'; revert h; decide
-    rw [if_neg h0, uvSaveSeq_hi _ _ _ i l3, if_pos h]; rfl
+    rw [ite_eq_right h0, uvSaveSeq_hi _ _ _ i l3, ite_eq_left h]; rfl
   · have h0 : i ∉ [10#5] := by intro h'; simp at h'; subst h'; revert h; decide
     have hC : i ∉ uvSavesC := by
       intro hc; revert hc h; generalize i = x; revert x; decide
-    rw [if_neg h0, uvSaveSeq_hi _ _ _ i l3, if_neg hC, uvSaveSeq_hi _ _ _ i l2, if_pos h]; rfl
+    rw [ite_eq_right h0, uvSaveSeq_hi _ _ _ i l3, ite_eq_right hC, uvSaveSeq_hi _ _ _ i l2, ite_eq_left h]; rfl
   · have h0 : i ∉ [10#5] := by intro h'; simp at h'; subst h'; revert h; decide
     have hC : i ∉ uvSavesC := by
       intro hc; revert hc h; generalize i = x; revert x; decide
     have hB : i ∉ uvSavesB := by
       intro hc; revert hc h; generalize i = x; revert x; decide
-    rw [if_neg h0, uvSaveSeq_hi _ _ _ i l3, if_neg hC, uvSaveSeq_hi _ _ _ i l2, if_neg hB,
-      uvSaveSeq_hi _ _ _ i l1, if_pos h]; rfl
+    rw [ite_eq_right h0, uvSaveSeq_hi _ _ _ i l3, ite_eq_right hC, uvSaveSeq_hi _ _ _ i l2, ite_eq_right hB,
+      uvSaveSeq_hi _ _ _ i l1, ite_eq_left h]; rfl
 
 /-! ## §3 The trapped machine, opened -/
 

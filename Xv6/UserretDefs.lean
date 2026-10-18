@@ -279,7 +279,7 @@ theorem urLoadSeq_resume (ws : List (BitVec 64)) (R : RegMap) (i : BitVec 5) (hi
 /-- A load of a register other than `a0` keeps `a0`. -/
 theorem urLoadSeq_a0 (ns : List (BitVec 5)) (ws : List (BitVec 64)) (R : RegMap) (h : 10#5 ∉ ns) :
     urLoadSeq ns ws R 10#5 = R 10#5 := by
-  rw [urLoadSeq_apply, if_neg h]
+  rw [urLoadSeq_apply, ite_eq_right h]
 
 /-! ## §5 Consequence rules for the abstract obligations -/
 

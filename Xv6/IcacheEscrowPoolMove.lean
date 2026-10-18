@@ -90,7 +90,7 @@ theorem icLiveInums_flipOn (ids : List (Bool × BitVec 32 × BitVec 32)) (k : Na
     (hnu : nu1.toNat = z) :
     icLiveInums (ids.set k (true, dv1, nu1)) = icLiveInums ids ∪ {z} := by
   have h := icLiveInums_insert ids k (false, d0, n0) (true, dv1, nu1) hk
-  simp only [icIdInum, if_true, Bool.false_eq_true, if_false, hnu] at h
+  simp only [icIdInum, ite_true, Bool.false_eq_true, ite_false, hnu] at h
   rw [LawfulSet.union_empty_right] at h
   exact h
 
@@ -100,7 +100,7 @@ theorem icLiveInums_flipOff (ids : List (Bool × BitVec 32 × BitVec 32)) (k : N
     (hnu : n0.toNat = z) :
     icLiveInums (ids.set k (false, dv1, nu1)) ∪ {z} = icLiveInums ids := by
   have h := icLiveInums_insert ids k (true, d0, n0) (false, dv1, nu1) hk
-  simp only [icIdInum, if_true, Bool.false_eq_true, if_false, hnu] at h
+  simp only [icIdInum, ite_true, Bool.false_eq_true, ite_false, hnu] at h
   rw [LawfulSet.union_empty_right] at h
   exact h
 

@@ -114,15 +114,15 @@ theorem pns_copy_ok (Dp : List Nat) (x0 : Pdev) (pin : PNames) (gin : PipeNames)
     simp only [pnsCopyFdm] at h
     rw [pnsCopyVs_get]
     by_cases h0 : fd = 0
-    · subst h0; simp only [if_true, Option.some.injEq] at h; subst h
+    · subst h0; simp only [ite_true, Option.some.injEq] at h; subst h
       exact .inl ⟨rfl, wb, hl0⟩
     by_cases h1 : fd = 1
-    · subst h1; simp only [if_true, Option.some.injEq, show (1 : Int) ≠ 0 from by decide, if_false] at h
+    · subst h1; simp only [ite_true, Option.some.injEq, show (1 : Int) ≠ 0 from by decide, ite_false] at h
       subst h
       exact .inr ⟨rfl, rb1, hl1⟩
     by_cases h2 : fd = 2
     · subst h2
-      simp only [show (2 : Int) ≠ 0 from by decide, show (2 : Int) ≠ 1 from by decide, if_true, if_false,
+      simp only [show (2 : Int) ≠ 0 from by decide, show (2 : Int) ≠ 1 from by decide, ite_true, ite_false,
         Option.some.injEq] at h
       subst h
       simpa using hx0
@@ -138,13 +138,13 @@ theorem pns_copy_ok (Dp : List Nat) (x0 : Pdev) (pin : PNames) (gin : PipeNames)
     rw [pnsCopyVs_dom]
     simp only [pnsCopyFdm] at h
     by_cases h0 : fd = 0
-    · subst h0; simp only [if_true, Option.some.injEq] at h; subst h; simp
+    · subst h0; simp only [ite_true, Option.some.injEq] at h; subst h; simp
     by_cases h1 : fd = 1
-    · subst h1; simp only [if_true, Option.some.injEq, show (1 : Int) ≠ 0 from by decide, if_false] at h
+    · subst h1; simp only [ite_true, Option.some.injEq, show (1 : Int) ≠ 0 from by decide, ite_false] at h
       subst h; simp
     by_cases h2 : fd = 2
     · subst h2
-      simp only [show (2 : Int) ≠ 0 from by decide, show (2 : Int) ≠ 1 from by decide, if_true, if_false,
+      simp only [show (2 : Int) ≠ 0 from by decide, show (2 : Int) ≠ 1 from by decide, ite_true, ite_false,
         Option.some.injEq] at h
       subst h; simp
     simp [h0, h1, h2] at h
@@ -181,9 +181,9 @@ theorem pns_echo_ok (Dp : List Nat) (pn : PNames) (gp : PipeNames) (l : List FdS
   · intro fd d h
     simp only [pnsEchoFdm] at h
     by_cases h1 : fd = 1
-    · subst h1; simp only [if_true, Option.some.injEq] at h; subst h
+    · subst h1; simp only [ite_true, Option.some.injEq] at h; subst h
       rw [pnsEchoVs_get]
-      simp only [if_true]
+      simp only [ite_true]
       exact ⟨by decide, rb, by simpa using hl1⟩
     simp [h1] at h
   · intro d hd
@@ -195,7 +195,7 @@ theorem pns_echo_ok (Dp : List Nat) (pn : PNames) (gp : PipeNames) (l : List FdS
     rw [pnsEchoVs_dom]
     simp only [pnsEchoFdm] at h
     by_cases h1 : fd = 1
-    · subst h1; simp only [if_true, Option.some.injEq] at h; subst h; simp
+    · subst h1; simp only [ite_true, Option.some.injEq] at h; subst h; simp
     simp [h1] at h
 
 /-! ## The resource halves (deviation 1) -/

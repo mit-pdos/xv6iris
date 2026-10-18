@@ -118,7 +118,7 @@ theorem pdep_left_write (k : Nat) (hk : haltsAt D.fcR D.pr (lfilts D.lR) k) :
     ⊢ D.shotsF k -∗ osS (D.gG k) -∗ pdep D (WLeft k) catDgWrite := by
   rw [pdep_unfold D (WLeft k) catDgWrite Xv6.catDgWrite_ne (Or.inr ⟨hk, rfl⟩)]
   simp only [PdRound.pdepNe]
-  rw [if_neg (fun hq => failSrc_ne_write _ _ _ _ hq rfl)]
+  rw [ite_eq_right (fun hq => failSrc_ne_write _ _ _ _ hq rfl)]
   iintro #Hs #HG
   iframe Hs HG
 

@@ -344,9 +344,9 @@ theorem hdls_insert (fdm : Fdmap) (vs : RegMapF CfDev) (k d : Nat) (nm : List (B
     unfold fdInsert
     by_cases hx : fd = (k : Int)
     · subst hx
-      rw [LawfulPartialMap.get?_insert_eq rfl, if_pos rfl]
+      rw [LawfulPartialMap.get?_insert_eq rfl, ite_eq_left rfl]
       simp [cifHf, LawfulPartialMap.get?_insert_eq]
-    · rw [LawfulPartialMap.get?_insert_ne (Ne.symm hx), if_neg hx, hhm fd]
+    · rw [LawfulPartialMap.get?_insert_ne (Ne.symm hx), ite_eq_right hx, hhm fd]
       cases e : fdm fd with
       | none => rfl
       | some d' =>
@@ -376,8 +376,8 @@ theorem hdls_delete (fdm : Fdmap) (vs : RegMapF CfDev) (fd : Int) (d : Nat) (nm 
   intro fd'
   unfold fdDelete
   by_cases hx : fd' = fd
-  · subst hx; rw [LawfulPartialMap.get?_delete_eq rfl, if_pos rfl]; rfl
-  · rw [LawfulPartialMap.get?_delete_ne (Ne.symm hx), if_neg hx, hhm fd']
+  · subst hx; rw [LawfulPartialMap.get?_delete_eq rfl, ite_eq_left rfl]; rfl
+  · rw [LawfulPartialMap.get?_delete_ne (Ne.symm hx), ite_eq_right hx, hhm fd']
     cases e : fdm fd' with
     | none => rfl
     | some d' =>

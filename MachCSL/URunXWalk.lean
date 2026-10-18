@@ -46,7 +46,7 @@ theorem uxw_node {X : Type} (orc : UOrc) (s : UWSt) (c : Eff RegisterType except
   · cases op with
     | memRead n vasize req =>
       simp only [uxwIsText] at hc
-      simp only [uxRun, hc, Bool.false_eq_true, if_false]
+      simp only [uxRun, hc, Bool.false_eq_true, ite_false]
     | _ => simp only [uxRun]
 
 /-- A text read: the text map's bytes. -/
@@ -58,7 +58,7 @@ theorem uxw_text {X : Type} (orc : UOrc) (s : UWSt) {n vasize : Nat}
       match bmRead T req.pa n with
       | some w => uxRun D T orc s (k (.Ok (w, none)))
       | none => none := by
-  simp only [uxRun, hk, if_true]
+  simp only [uxRun, hk, ite_true]
   cases bmRead T req.pa n <;> rfl
 
 /-- **The T-read node**: a text read of bytes `w` of the text map. -/

@@ -313,7 +313,7 @@ theorem uexecRet_ecall (W : Uvis) :
        else if uvisNum W = USYS_wait then
          iprop(sbundleAt uslot (uvisNum W) f W ∗ uexecWaitF uslot (uvisNum W) f W)
        else iprop(sbundleAt uslot (uvisNum W) f W ∗ uexecRetContF uslot (uvisNum W) f W))) := by
-  unfold uexecRet uexecRetF; simp only [if_true]
+  unfold uexecRet uexecRetF; simp only [ite_true]
 
 /-- Rocq `uexec_arm_ecall`. -/
 theorem uexecArm_ecall (W : Uvis) (f : sfam GF) :
@@ -322,17 +322,17 @@ theorem uexecArm_ecall (W : Uvis) (f : sfam GF) :
        else if uvisNum W = USYS_fork then uexecForkParentF uslot W (sforkPay f) (sforkLend f)
        else if uvisNum W = USYS_wait then uexecWaitF uslot (uvisNum W) f W
        else uexecRetContF uslot (uvisNum W) f W) := by
-  unfold uexecArm uexecArmF; simp only [if_true]
+  unfold uexecArm uexecArmF; simp only [ite_true]
 
 /-- Rocq `uexec_ret_transparent`: THE TRANSPARENT ARM PAYS TOO. -/
 theorem uexecRet_transparent (sc : BitVec 64) (W : Uvis) (h : sc ≠ uecallScause) :
     uexecRet (GF := GF) sc W = iprop(∃ f : sfam GF, uexecPayDep sc W f ∗ uexecKillArm sc W f) := by
-  unfold uexecRet uexecRetF; simp only [if_neg h]
+  unfold uexecRet uexecRetF; simp only [ite_eq_right h]
 
 /-- Rocq `uexec_arm_transparent`. -/
 theorem uexecArm_transparent (sc : BitVec 64) (W : Uvis) (f : sfam GF) (h : sc ≠ uecallScause) :
     uexecArm (GF := GF) sc W f = uexecKillArm sc W f := by
-  unfold uexecArm uexecArmF; simp only [if_neg h]
+  unfold uexecArm uexecArmF; simp only [ite_eq_right h]
 
 /-- Rocq `uexec_kill_arm_not`. -/
 theorem uexecKillArm_not (sc : BitVec 64) (W : Uvis) (f : sfam GF) (h : ¬ ukillSc sc) :
@@ -353,10 +353,10 @@ theorem uexecRetF_split (X : Uvis → IProp GF) (sc : BitVec 64) (W : Uvis) :
     uexecRetF X sc W ⊢ ∃ f : sfam GF, uexecDepF X sc W f ∗ uexecArmF X sc W f := by
   unfold uexecRetF uexecDepF uexecArmF
   by_cases h1 : sc = uecallScause
-  · simp only [if_pos h1]
+  · simp only [ite_eq_left h1]
     by_cases h2 : uvisNum W = USYS_exit
     · have h3 : ¬ uvisNum W = USYS_fork := by rw [h2]; decide
-      simp only [if_pos h2, if_neg h3]
+      simp only [ite_eq_left h2, ite_eq_right h3]
       iintro ⟨%f, Hpay, Hb⟩
       iexists f
       isplitl [Hpay Hb]
@@ -364,9 +364,9 @@ theorem uexecRetF_split (X : Uvis → IProp GF) (sc : BitVec 64) (W : Uvis) :
         · iexact Hpay
         · iexact Hb
       · iempintro
-    simp only [if_neg h2]
+    simp only [ite_eq_right h2]
     by_cases h3 : uvisNum W = USYS_fork
-    · simp only [if_pos h3]
+    · simp only [ite_eq_left h3]
       iintro ⟨%f, Hpay, H⟩
       iexists f
       unfold uexecForkF
@@ -381,9 +381,9 @@ theorem uexecRetF_split (X : Uvis → IProp GF) (sc : BitVec 64) (W : Uvis) :
           · iexact HRc
           · iexact Hc
       · iexact Hp
-    simp only [if_neg h3]
+    simp only [ite_eq_right h3]
     by_cases h4 : uvisNum W = USYS_wait
-    · simp only [if_pos h4]
+    · simp only [ite_eq_left h4]
       iintro ⟨%f, Hpay, Hd, Ha⟩
       iexists f
       isplitl [Hpay Hd]
@@ -391,7 +391,7 @@ theorem uexecRetF_split (X : Uvis → IProp GF) (sc : BitVec 64) (W : Uvis) :
         · iexact Hpay
         · iexact Hd
       · iexact Ha
-    · simp only [if_neg h4]
+    · simp only [ite_eq_right h4]
       iintro ⟨%f, Hpay, Hd, Ha⟩
       iexists f
       isplitl [Hpay Hd]
@@ -399,7 +399,7 @@ theorem uexecRetF_split (X : Uvis → IProp GF) (sc : BitVec 64) (W : Uvis) :
         · iexact Hpay
         · iexact Hd
       · iexact Ha
-  · simp only [if_neg h1]
+  · simp only [ite_eq_right h1]
     iintro ⟨%f, Hpay, Ha⟩
     iexists f
     isplitl [Hpay]
@@ -413,18 +413,18 @@ theorem uexecRetF_join (X : Uvis → IProp GF) (sc : BitVec 64) (W : Uvis) (f : 
     uexecDepF X sc W f ∗ uexecArmF X sc W f ⊢ uexecRetF X sc W := by
   unfold uexecRetF uexecDepF uexecArmF
   by_cases h1 : sc = uecallScause
-  · simp only [if_pos h1]
+  · simp only [ite_eq_left h1]
     by_cases h2 : uvisNum W = USYS_exit
     · have h3 : ¬ uvisNum W = USYS_fork := by rw [h2]; decide
-      simp only [if_pos h2, if_neg h3]
+      simp only [ite_eq_left h2, ite_eq_right h3]
       iintro ⟨⟨Hpay, Hb⟩, -⟩
       iexists f
       isplitl [Hpay]
       · iexact Hpay
       · iexact Hb
-    simp only [if_neg h2]
+    simp only [ite_eq_right h2]
     by_cases h3 : uvisNum W = USYS_fork
-    · simp only [if_pos h3]
+    · simp only [ite_eq_left h3]
       iintro ⟨⟨Hpay, Hd⟩, Ha⟩
       iexists f
       isplitl [Hpay]
@@ -438,9 +438,9 @@ theorem uexecRetF_join (X : Uvis → IProp GF) (sc : BitVec 64) (W : Uvis) (f : 
       isplitl [HRc]
       · iexact HRc
       · iexact Hc
-    simp only [if_neg h3]
+    simp only [ite_eq_right h3]
     by_cases h4 : uvisNum W = USYS_wait
-    · simp only [if_pos h4]
+    · simp only [ite_eq_left h4]
       iintro ⟨⟨Hpay, Hd⟩, Ha⟩
       iexists f
       isplitl [Hpay]
@@ -448,7 +448,7 @@ theorem uexecRetF_join (X : Uvis → IProp GF) (sc : BitVec 64) (W : Uvis) (f : 
       isplitl [Hd]
       · iexact Hd
       · iexact Ha
-    · simp only [if_neg h4]
+    · simp only [ite_eq_right h4]
       iintro ⟨⟨Hpay, Hd⟩, Ha⟩
       iexists f
       isplitl [Hpay]
@@ -456,7 +456,7 @@ theorem uexecRetF_join (X : Uvis → IProp GF) (sc : BitVec 64) (W : Uvis) (f : 
       isplitl [Hd]
       · iexact Hd
       · iexact Ha
-  · simp only [if_neg h1]
+  · simp only [ite_eq_right h1]
     iintro ⟨⟨Hpay, -⟩, Ha⟩
     iexists f
     isplitl [Hpay]
@@ -499,10 +499,10 @@ theorem uexecDepF_of_supply (R : IProp GF) (X : Uvis → IProp GF) (sc : BitVec 
     rw [sforkLend_at]; exact sforkLend_pt
   unfold uexecDepF
   by_cases h1 : sc = uecallScause
-  · simp only [if_pos h1]
+  · simp only [ite_eq_left h1]
     by_cases h2 : uvisNum W = USYS_exit
     · have h3 : ¬ uvisNum W = USYS_fork := by rw [h2]; decide
-      simp only [if_neg h3]
+      simp only [ite_eq_right h3]
       ihave #Hallb : iprop(□ (∀ W' : Uvis, myPay W'.gen (fun _ => R) -∗ □ R -∗ X W')) $$ []
       · imodintro
         iintro %W' #Hp #Hr
@@ -523,7 +523,7 @@ theorem uexecDepF_of_supply (R : IProp GF) (X : Uvis → IProp GF) (sc : BitVec 
         · iexact HRb
       · iexact Hb
     by_cases h3 : uvisNum W = USYS_fork
-    · simp only [if_pos h3]
+    · simp only [ite_eq_left h3]
       imodintro
       iexists fR
       isplitr
@@ -543,7 +543,7 @@ theorem uexecDepF_of_supply (R : IProp GF) (X : Uvis → IProp GF) (sc : BitVec 
       iapply Halltriv
       dsimp only [bumpAt]
       iexact Hp
-    · simp only [if_neg h3]
+    · simp only [ite_eq_right h3]
       ihave #Hallb : iprop(□ (∀ W' : Uvis, myPay W'.gen (fun _ => R) -∗ □ R -∗ X W')) $$ []
       · imodintro
         iintro %W' #Hp #Hr
@@ -561,7 +561,7 @@ theorem uexecDepF_of_supply (R : IProp GF) (X : Uvis → IProp GF) (sc : BitVec 
       · iapply uexecPayDep_free sc W _ f (fun h => h2 h.2) hfp
         iexact Hpay
       · iexact Hb
-  · simp only [if_neg h1]
+  · simp only [ite_eq_right h1]
     imodintro
     iexists fR
     isplitr
@@ -580,20 +580,20 @@ theorem uexecArm_of_all (R : IProp GF) (sc : BitVec 64) (W : Uvis) (f : sfam GF)
   iintro #Hpay #HR #Hkc #H
   unfold uexecArm uexecArmF
   by_cases h1 : sc = uecallScause
-  · simp only [if_pos h1]
+  · simp only [ite_eq_left h1]
     by_cases h2 : uvisNum W = USYS_exit
-    · simp only [if_pos h2]; iempintro
-    simp only [if_neg h2]
+    · simp only [ite_eq_left h2]; iempintro
+    simp only [ite_eq_right h2]
     by_cases h3 : uvisNum W = USYS_fork
-    · simp only [if_pos h3]
+    · simp only [ite_eq_left h3]
       unfold uexecForkParentF
       iintro %r %fdv' %cw' %cs' %_ %_ %_ -
       iapply H $$ %(bump W r W.M W.perm W.sz fdv' cw' W.gen cs' W.lazy W.secc) [] HR
       dsimp only [bump, bumpAt]
       iexact Hpay
-    simp only [if_neg h3]
+    simp only [ite_eq_right h3]
     by_cases h4 : uvisNum W = USYS_wait
-    · simp only [if_pos h4]
+    · simp only [ite_eq_left h4]
       unfold uexecWaitF uexecRetContGen
       iintro %r %M' %π' %szv' %fdv' %cw' %g' %cs' %lz' %secc' %_ %_ %_ %_ %hg %_ %_ %_ - -
       have hg' : g' = W.gen := hg
@@ -601,7 +601,7 @@ theorem uexecArm_of_all (R : IProp GF) (sc : BitVec 64) (W : Uvis) (f : sfam GF)
       iapply H $$ %(bump W r M' π' szv' fdv' cw' W.gen cs' lz' secc') [] HR
       dsimp only [bump, bumpAt]
       iexact Hpay
-    · simp only [if_neg h4]
+    · simp only [ite_eq_right h4]
       unfold uexecRetContF uexecRetContGen
       iintro %r %M' %π' %szv' %fdv' %cw' %g' %cs' %lz' %secc' %_ %_ %_ %_ %hg %_ %_ %_ - -
       have hg' : g' = W.gen := hg
@@ -609,7 +609,7 @@ theorem uexecArm_of_all (R : IProp GF) (sc : BitVec 64) (W : Uvis) (f : sfam GF)
       iapply H $$ %(bump W r M' π' szv' fdv' cw' W.gen cs' lz' secc') [] HR
       dsimp only [bump, bumpAt]
       iexact Hpay
-  · simp only [if_neg h1]
+  · simp only [ite_eq_right h1]
     iapply uexecKillArmF_of_cred uslot sc W f
     isplitl []
     · iexact Hkc

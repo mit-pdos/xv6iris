@@ -108,9 +108,9 @@ theorem std_fd_st_of_key (v0 : BitVec 64) (fdv l : List FdState) (fd : Nat) (st 
   have hz : argZ v0 = (fd : Int) := by rw [argZ_setWidth]; exact h0
   have hN : NSTD ≤ NOFILE := NSTD_le_NOFILE
   unfold fdStOfKey
-  rw [if_pos (by rw [hz]; omega), hz]
+  rw [ite_eq_left (by rw [hz]; omega), hz]
   simp only [Int.toNat_natCast]
-  rw [← htake, List.getElem?_take, if_pos hlt] at hl
+  rw [← htake, List.getElem?_take, ite_eq_left hlt] at hl
   rw [hl]; rfl
 
 /-- **Rocq `ufd_fd_st_of_key`**: ...and a handle's slot, off the view. -/
@@ -119,7 +119,7 @@ theorem ufd_fd_st_of_key (v0 : BitVec 64) (fdv : List FdState) (fd : Nat) (st : 
     fdStOfKey v0 fdv = st := by
   have hz : argZ v0 = (fd : Int) := by rw [argZ_setWidth]; exact h0
   unfold fdStOfKey
-  rw [if_pos (by rw [hz]; omega), hz]
+  rw [ite_eq_left (by rw [hz]; omega), hz]
   simp only [Int.toNat_natCast]
   rw [hlk]; rfl
 

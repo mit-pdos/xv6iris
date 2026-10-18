@@ -36,8 +36,8 @@ theorem cifHf_delete (fdm : Fdmap) (vs : RegMapF CfDev) (fd : Int) (d : Nat) (hf
     (fdm x).bind (cifHf vs) = (fdDelete fdm fd x).bind (cifHf (delete vs d)) := by
   unfold fdDelete
   by_cases hx : x = fd
-  · subst hx; rw [hfd, if_pos rfl]; exact hnone
-  · rw [if_neg hx]
+  · subst hx; rw [hfd, ite_eq_left rfl]; exact hnone
+  · rw [ite_eq_right hx]
     cases e : fdm x with
     | none => rfl
     | some d' =>
@@ -50,8 +50,8 @@ theorem cifHf_delete_shared (fdm : Fdmap) (vs : RegMapF CfDev) (fd : Int) (d : N
     (fdm x).bind (cifHf vs) = (fdDelete fdm fd x).bind (cifHf vs) := by
   unfold fdDelete
   by_cases hx : x = fd
-  · subst hx; rw [hfd, if_pos rfl]; exact hnone
-  · rw [if_neg hx]
+  · subst hx; rw [hfd, ite_eq_left rfl]; exact hnone
+  · rw [ite_eq_right hx]
 
 section CifClose
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FileAppG GF] [FsTopG GF] [OffboxG GF] [IcacheG GF] [PipeProtoG GF] [PipeOutG GF]
@@ -114,8 +114,8 @@ theorem fds_after_close (fdm : Fdmap) (l l' : List FdState) (vs : RegMapF CfDev)
     intro fd' d' h
     unfold fdDelete at h
     by_cases hx : fd' = fd
-    · rw [if_pos hx] at h; cases h
-    · rw [if_neg hx] at h; exact hl fd' d' hx h
+    · rw [ite_eq_left hx] at h; cases h
+    · rw [ite_eq_right hx] at h; exact hl fd' d' hx h
   iapply E.fds_of (fdDelete fdm fd) l' (delete vs d) _ hok'' $$ Hstd Hcwd Hpool Htoks Hhs Hdq He' Hxk
 
 /-- **Rocq `cif_close`**: `ei_close`, the last descriptor of an UNPROTECTED
@@ -218,8 +218,8 @@ theorem close_shared (fdm : Fdmap) (fd : Int) (d : Nat) (K : Int → IProp GF) (
     intro fd' d' h
     unfold fdDelete at h
     by_cases hx : fd' = (k : Int)
-    · rw [if_pos hx] at h; cases h
-    · rw [if_neg hx] at h
+    · rw [ite_eq_left hx] at h; cases h
+    · rw [ite_eq_right hx] at h
       exact List.getElem?_set_ne (cif_slot_ne k fd' (hok.1 fd' d' h).1 hx)
   ihave Hhs := E.hdls_ext fdm (fdDelete fdm _) vs vs (cifHf_delete_shared fdm vs _ d hfd hnone) $$ Hhs
   iapply E.fds_of (fdDelete fdm (k : Int)) (l.set k .closed) vs wv hok'' $$ Hstd Hcwd Hpool Htoks Hhs Hdq He Hxk

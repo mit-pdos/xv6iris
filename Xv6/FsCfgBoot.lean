@@ -121,7 +121,7 @@ theorem imgNode_bare (P : Nat → List (BitVec 8)) (sb : FsSb) (nib z : Nat)
     apply List.ext_getElem?
     intro k
     by_cases hk : k < 13
-    · rw [List.getElem?_replicate, if_pos hk, getElem?_pos _ k (by omega)]
+    · rw [List.getElem?_replicate, ite_eq_left hk, getElem?_pos _ k (by omega)]
       have := ha k hk
       rw [getElem!_pos _ k (by omega)] at this
       exact congrArg some (BitVec.eq_of_toNat_eq (by simpa using this))
@@ -137,7 +137,7 @@ theorem imgNode_bare (P : Nat → List (BitVec 8)) (sb : FsSb) (nib z : Nat)
     split
     · rename_i hd; exact ha k (by unfold NDIRECT at hd; omega)
     · have h12 : ((fsDinode P sb z).diAddrs[12]!).toNat = 0 := ha 12 (by omega)
-      simp only [fsIndEnts, h12, if_true]
+      simp only [fsIndEnts, h12, ite_true]
       rw [getElem!_pos _ _ (by rw [List.length_replicate]; unfold MAXFILE NDIRECT NINDIRECT at *; omega),
         List.getElem_replicate]
   refine ⟨haddrs, hent, ?_, fsRegionBare_size P sb nib z hbare hz hty,
@@ -243,8 +243,8 @@ theorem fsTickCount_cons (t z : Nat) (L : List Nat) :
     fsTickCount (t :: L) z = if t = z then fsTickCount L z + 1 else fsTickCount L z := by
   unfold fsTickCount
   by_cases h : t = z
-  · rw [if_pos h, List.filter_cons_of_pos (by simp [h]), List.length_cons]
-  · rw [if_neg h, List.filter_cons_of_neg (by simp [h])]
+  · rw [ite_eq_left h, List.filter_cons_of_pos (by simp [h]), List.length_cons]
+  · rw [ite_eq_right h, List.filter_cons_of_neg (by simp [h])]
 
 /-! ## What the era's disk must be, for the era-0 mint -/
 

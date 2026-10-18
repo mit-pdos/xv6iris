@@ -65,7 +65,7 @@ theorem bd_prevVal (n : Nat) (hn : n < NBUF) :
   unfold bufPrevVal bhead bnode NBUF at *
   by_cases h : n = 29
   · subst h; simp
-  · rw [if_neg h, if_neg (by omega)]
+  · rw [ite_eq_right h, ite_eq_right (by omega)]
 
 theorem bd_nextVal (n : Nat) :
     bufNextVal n = bhd bhead (List.map bnode (List.range n).reverse) := by
@@ -73,7 +73,7 @@ theorem bd_nextVal (n : Nat) :
   cases n with
   | zero => simp
   | succ m =>
-    rw [if_neg (by omega)]
+    rw [ite_eq_right (by omega)]
     rw [show (List.range (m + 1)).reverse = m :: (List.range m).reverse from by
       rw [List.range_succ]; simp]
     simp
@@ -107,7 +107,7 @@ theorem bd_lru_seg (ξ : CtxId) :
     ihave Hseg := (show bsegAt (GF := GF) ξ bhead (if m = NBUF then bhead else bnode m)
           (List.map bnode (List.range m).reverse) ⊢
         bsegAt ξ bhead (bnode m) (List.map bnode (List.range m).reverse) from by
-      rw [if_neg (by omega)]) $$ Hseg
+      rw [ite_eq_right (by omega)]) $$ Hseg
     rw [show (List.range m ++ [m]).reverse = m :: (List.range m).reverse from by simp]
     rw [List.map_cons, bsegAt_cons ξ bhead _ (bnode m) _]
     ihave Hp := (show wordAtN (GF := GF) ξ (bPrev (bnode m)) 8 (DFrac.own 1) (bufPrevVal m) ⊢
@@ -130,7 +130,7 @@ theorem bd_lru_boot (ξ : CtxId) :
   ihave Hseg := (show ([∗list] i ∈ List.range NBUF, bdLinks (GF := GF) ξ i) ⊢
       bsegAt ξ bhead bhead (List.map bnode (List.range NBUF).reverse) from by
     have h := bd_lru_seg (GF := GF) ξ NBUF (Nat.le_refl _)
-    rw [if_pos rfl] at h
+    rw [ite_eq_left rfl] at h
     exact h) $$ H
   unfold bcacheLruAt
   ihave Hhn := (show wordAtN (GF := GF) ξ (bNext bhead) 8 (DFrac.own 1) (bufAddr (NBUF - 1)) ⊢
@@ -173,7 +173,7 @@ theorem bd_funAlloc {A : Type} [Inhabited A] (P : Nat → A → IProp GF)
     iapply BigSepL.bigSepL_append.2
     isplitl [Hf]
     · iapply bigSepL_range_congr (fun j => P j (f j))
-        (fun j => P j (if j = n then a else f j)) n (fun j hj => by rw [if_neg (by omega)])
+        (fun j => P j (if j = n then a else f j)) n (fun j hj => by rw [ite_eq_right (by omega)])
       iexact Hf
     · iapply BigSepL.bigSepL_singleton.2
       simp only [reduceIte]
@@ -210,7 +210,7 @@ theorem bd_funAllocK {A : Type} [Inhabited A] (Q : Nat → IProp GF) (P : Nat �
     iapply BigSepL.bigSepL_append.2
     isplitl [Hf]
     · iapply bigSepL_range_congr (fun j => P j (f j))
-        (fun j => P j (if j = n then a else f j)) n (fun j hj => by rw [if_neg (by omega)])
+        (fun j => P j (if j = n then a else f j)) n (fun j hj => by rw [ite_eq_right (by omega)])
       iexact Hf
     · iapply BigSepL.bigSepL_singleton.2
       simp only [reduceIte]
@@ -342,7 +342,7 @@ theorem bioPool_boot (V : BioView GF) (h0 : (0 : Nat) ∉ V.cov) :
   refine BigSepS.bigSepS_mono (fun {b} hb => ?_)
   have hb0 : (0#32 : BitVec 32).toNat = 0 := by decide
   rw [not_bcached (fun _ => 0#32) b (fun j _ he => h0 (by rw [← hb0, he]; exact hb))]
-  simp only [Bool.false_eq_true, if_false]
+  simp only [Bool.false_eq_true, ite_false]
   exact .rfl
 
 /-! ## The kernel map at the buffers' sleeplocks -/

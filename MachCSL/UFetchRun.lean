@@ -87,7 +87,7 @@ theorem uftRun_node {X : Type} (orc : UOrc) (s : UWSt) (c : Eff RegisterType exc
   · cases op with
     | memRead n vasize req =>
       simp only [uftIsFetch] at hc
-      simp only [uftRun, hc, Bool.false_eq_true, if_false]
+      simp only [uftRun, hc, Bool.false_eq_true, ite_false]
     | _ => simp only [uftRun]
 
 /-- A fetch node: the owned bytes' check, then the oracle's answer. -/
@@ -99,7 +99,7 @@ theorem uftRun_fetch {X : Type} (orc : UOrc) (s : UWSt) {n vasize : Nat}
       if n < 2 ^ 64 ∧ bmOwned s.mm req.pa n = true then
         uftRun D orc.tail s (k (.Ok ((orc 0).ch (.bitvector (8 * n)), none)))
       else none := by
-  simp only [uftRun, hk, if_true]
+  simp only [uftRun, hk, ite_true]
 
 theorem uftIsFetch_true {c : Eff RegisterType exception} (h : uftIsFetch c = true) :
     ∃ (n vasize : Nat) (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak),
@@ -182,7 +182,7 @@ theorem uftRun_sail_mem_read_ifetch (orc : UOrc) (s : UWSt) {n vasize : Nat}
     uftRun D orc s (ConcurrencyInterfaceV1.sail_mem_read req) =
       some (.Ok ((orc 0).ch (.bitvector (8 * n)), none), s, orc.tail) := by
   show uftRun D orc s (FreeM.impure (.ok (.memRead n vasize req)) FreeM.pure) = _
-  rw [uftRun_fetch D orc s req _ hk, if_pos ⟨hn, ho⟩]
+  rw [uftRun_fetch D orc s req _ hk, ite_eq_left ⟨hn, ho⟩]
   rfl
 
 /-- The one-node walks can be re-run on any continuation of the oracle
@@ -211,7 +211,7 @@ theorem uft_runRW_node_shift (c : Eff RegisterType exception) (s : UWSt) (orc : 
           cases h'
           rfl
         · have ha' : D.Dany r = false := by simpa using ha
-          simp only [runRW, hr', ha', Bool.false_eq_true, if_false] at h
+          simp only [runRW, hr', ha', Bool.false_eq_true, ite_false] at h
           cases h
     | choose p =>
       refine ⟨UOrc.cons (orc 0) o, ?_⟩
@@ -270,14 +270,14 @@ theorem swp_uftRun {X : Type} (m : SailM X) :
         rw [uftRun_fetch D _ s req k hk] at h
         by_cases hn : n < 2 ^ 64 ∧ bmOwned s.mm req.pa n = true
         · exact hn
-        · rw [if_neg hn] at h
+        · rw [ite_eq_right hn] at h
           cases h
       -- the oracle that answers `w'` at the fetch, then continues with `o`
       have hstep : ∀ (w' : BitVec (8 * n)) (o : UOrc),
           uftRun D (UOrc.cons ((o 0).setBv (8 * n) w') o) s (FreeM.impure (.ok (.memRead n vasize req)) k) =
             uftRun D o s (k (.Ok (w', none))) := by
         intro w' o
-        rw [uftRun_fetch D _ s req k hk, if_pos hcond, UOrc.tail_cons, UOrc.cons_zero, UAns.setBv_ch]
+        rw [uftRun_fetch D _ s req k hk, ite_eq_left hcond, UOrc.tail_cons, UOrc.cons_zero, UAns.setBv_ch]
       show uFr RF BF s ∗ uftPost RF BF s (FreeM.impure (.ok (.memRead n vasize req)) k) Φ ⊢
         swp cpu (ConcurrencyInterfaceV1.sail_mem_read req >>= k) Φ
       unfold uFr

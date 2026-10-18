@@ -33,7 +33,7 @@ theorem lbLookup_total_drop {A : Type} [Inhabited A] (n i : Nat) (l : List A) :
 theorem lbLta_take_eq {A : Type} [Inhabited A] (l l' : List A) (q j : Nat)
     (heq : l'.take q = l.take q) (hj : j < q) : l'[j]! = l[j]! := by
   have h := congrArg (fun m => m[j]?) heq
-  simp only [List.getElem?_take, hj, if_true] at h
+  simp only [List.getElem?_take, hj, ite_true] at h
   simp [List.getElem!_eq_getElem?_getD, h]
 
 /-- Rocq `lb_nonl_lta`. -/

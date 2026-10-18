@@ -371,7 +371,7 @@ theorem imgKexecArgsc (E : ElfBytes) (frame na : Nat) (alen : Nat → Nat) (afun
     have hp : ukArgvP W'.M (kxcSpFinal 0x4000 alen na).toNat i = (kxcSp 0x4000 alen (i + 1)).toNat := by
       have := hptr i (by omega)
       unfold kexecUstack at this
-      rw [if_pos hi] at this
+      rw [ite_eq_left hi] at this
       omega
     have hs := hsi i hi
     obtain ⟨hle, hcs⟩ := hslen i hi
@@ -415,7 +415,7 @@ theorem imgKexecAvs (E : ElfBytes) (frame na : Nat) (alen : Nat → Nat) (afun :
   have hp : ukArgvP W'.M (uvisAv W') i = (kxcSp 0x4000 alen (i + 1)).toNat := by
     have := hptr i (by omega)
     unfold kexecUstack at this
-    rw [if_pos hi] at this
+    rw [ite_eq_left hi] at this
     rw [hav']
     omega
   have hs := hsi i hi
@@ -543,7 +543,7 @@ theorem imgKeyArgs_holds (E : ElfBytes) (hE : kexecSz E = 0x4000) : imgKeyArgs E
     rw [ukArgvP_of_bytes _ _ _ (BitVec.ofInt 64 (kxcSp 0x4000 alen (i + 1))) (fun k hk => by
       have h := hvec i k (by omega) hk
       unfold kexecUstack at h
-      rw [if_pos hi, memAtZ_nonneg _ _ (by omega)] at h
+      rw [ite_eq_left hi, memAtZ_nonneg _ _ (by omega)] at h
       rw [hav', show (kxcSpFinal 0x4000 alen na).toNat + 8 * i + k =
         (kxcSpFinal 0x4000 alen na + 8 * (i : Int) + (k : Int)).toNat by omega]
       exact h)]

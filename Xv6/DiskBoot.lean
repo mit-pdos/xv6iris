@@ -127,7 +127,7 @@ theorem diskBoot_headAlloc :
           (f j ↪VAR{.own (1 : Qp).half} HState.inactive)))
         (fun j => iprop(((if j = n then a else f j) ↪VAR{.own (1 : Qp).half} HState.inactive) ∗
           ((if j = n then a else f j) ↪VAR{.own (1 : Qp).half} HState.inactive)))
-        n (fun j hj => by rw [if_neg (by omega)])
+        n (fun j hj => by rw [ite_eq_right (by omega)])
       iexact Hf
     · iapply BigSepL.bigSepL_singleton.2
       simp only [reduceIte]
@@ -168,8 +168,8 @@ theorem diskBoot_imgGrow (gi : GName) (B : Nat → List (BitVec 8)) :
       · subst hk; rw [LawfulPartialMap.get?_insert_eq rfl]; simp
       · rw [LawfulPartialMap.get?_insert_ne (Ne.symm hk), hm k]
         by_cases hkn : k < n
-        · rw [if_pos hkn, if_pos (by omega)]
-        · rw [if_neg hkn, if_neg (by omega)]
+        · rw [ite_eq_left hkn, ite_eq_left (by omega)]
+        · rw [ite_eq_right hkn, ite_eq_right (by omega)]
     · rw [List.range_succ]
       iapply BigSepL.bigSepL_append.2
       iframe Hl
@@ -268,10 +268,10 @@ theorem diskBootAlloc (v : VirtioState) (nb : Nat) (hlive : Virtio.live v.cfg = 
       right
       rw [hm bno] at hget
       by_cases hb : bno < nb
-      · rw [if_pos hb] at hget
+      · rw [ite_eq_left hb] at hget
         rw [← Option.some.inj hget]
         exact (diskBoot_blockView v hcache bno).symm
-      · rw [if_neg hb] at hget
+      · rw [ite_eq_right hb] at hget
         exact absurd hget (by simp)
     · intro k h c p u hk
       rw [LawfulPartialMap.get?_empty] at hk

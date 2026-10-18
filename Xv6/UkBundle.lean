@@ -37,7 +37,7 @@ theorem umemLazy_congr (P : UPtd) (sz : Nat) (V V' : Nat → List (BitVec 8))
   unfold umemLazy
   cases hk : get? P.um (n / 4096) with
   | none => rfl
-  | some w => simp only [Option.isSome_some, if_true]; rw [h _ w hk]
+  | some w => simp only [Option.isSome_some, ite_true]; rw [h _ w hk]
 
 /-- **An opened engine machine** (Rocq `uv_pre`'s pure half at the entry):
 at registers `m`, PC and nextPC `pc`, pages `V`. -/
@@ -148,7 +148,7 @@ theorem uk_trapped [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IP
     intro i hi
     rw [ukRegs_ne s.file m h.regs i hi]
     show m i = (if i = 0#5 then zeroRf 0#5 else tfW (tfOf m (s.file .sepc)) (4 + i.toNat))
-    rw [if_neg hi, tfOf_reg m (s.file .sepc) i hi]
+    rw [ite_eq_right hi, tfOf_reg m (s.file .sepc) i hi]
   ihave Hg := MachCSL.gprFile_ext cpu (uxaXget s.file) (tfResumeGpr0 (tfOf m (s.file .sepc))) hg $$ Hg
   ihave Hrc := uExitTok_eq (show ufExitEv cpu s.file =
       .uExit cpu (satpOf .kpt P.root) (s.file .scause) (s.file .sepc) (gprList (uxaXget s.file)) by

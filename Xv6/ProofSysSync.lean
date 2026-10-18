@@ -173,19 +173,19 @@ theorem ssRegs_set (k : KCtx) (nv : BitVec 64) (R : RegMap) (h : ssRegs k nv R)
   obtain ⟨a2, a8, a9, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩ := h
   obtain ⟨n2, n8, n9, n18, n19, n20, n21, n22, n23, n24, n25, n26, n27⟩ := hi
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-  · rw [RegMap.set_apply, if_neg (Ne.symm n2)]; exact a2
-  · rw [RegMap.set_apply, if_neg (Ne.symm n8)]; exact a8
-  · rw [RegMap.set_apply, if_neg (Ne.symm n9)]; exact a9
-  · rw [RegMap.set_apply, if_neg (Ne.symm n18)]; exact a18
-  · rw [RegMap.set_apply, if_neg (Ne.symm n19)]; exact a19
-  · rw [RegMap.set_apply, if_neg (Ne.symm n20)]; exact a20
-  · rw [RegMap.set_apply, if_neg (Ne.symm n21)]; exact a21
-  · rw [RegMap.set_apply, if_neg (Ne.symm n22)]; exact a22
-  · rw [RegMap.set_apply, if_neg (Ne.symm n23)]; exact a23
-  · rw [RegMap.set_apply, if_neg (Ne.symm n24)]; exact a24
-  · rw [RegMap.set_apply, if_neg (Ne.symm n25)]; exact a25
-  · rw [RegMap.set_apply, if_neg (Ne.symm n26)]; exact a26
-  · rw [RegMap.set_apply, if_neg (Ne.symm n27)]; exact a27
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n2)]; exact a2
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n8)]; exact a8
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n9)]; exact a9
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n18)]; exact a18
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n19)]; exact a19
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n20)]; exact a20
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n21)]; exact a21
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n22)]; exact a22
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n23)]; exact a23
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n24)]; exact a24
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n25)]; exact a25
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n26)]; exact a26
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n27)]; exact a27
 
 /-- The pins at the EXIT: `s1` and `s2` are back at the caller's values
 (the fast arm never wrote them; the loop arm restored them at `+0x5a`). -/
@@ -211,19 +211,19 @@ theorem ssRegsE_set (k : KCtx) (R : RegMap) (h : ssRegsE k R) (i : BitVec 5) (v 
   obtain ⟨a2, a8, a9, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩ := h
   obtain ⟨n2, n8, n9, n18, n19, n20, n21, n22, n23, n24, n25, n26, n27⟩ := hi
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
-  · rw [RegMap.set_apply, if_neg (Ne.symm n2)]; exact a2
-  · rw [RegMap.set_apply, if_neg (Ne.symm n8)]; exact a8
-  · rw [RegMap.set_apply, if_neg (Ne.symm n9)]; exact a9
-  · rw [RegMap.set_apply, if_neg (Ne.symm n18)]; exact a18
-  · rw [RegMap.set_apply, if_neg (Ne.symm n19)]; exact a19
-  · rw [RegMap.set_apply, if_neg (Ne.symm n20)]; exact a20
-  · rw [RegMap.set_apply, if_neg (Ne.symm n21)]; exact a21
-  · rw [RegMap.set_apply, if_neg (Ne.symm n22)]; exact a22
-  · rw [RegMap.set_apply, if_neg (Ne.symm n23)]; exact a23
-  · rw [RegMap.set_apply, if_neg (Ne.symm n24)]; exact a24
-  · rw [RegMap.set_apply, if_neg (Ne.symm n25)]; exact a25
-  · rw [RegMap.set_apply, if_neg (Ne.symm n26)]; exact a26
-  · rw [RegMap.set_apply, if_neg (Ne.symm n27)]; exact a27
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n2)]; exact a2
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n8)]; exact a8
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n9)]; exact a9
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n18)]; exact a18
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n19)]; exact a19
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n20)]; exact a20
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n21)]; exact a21
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n22)]; exact a22
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n23)]; exact a23
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n24)]; exact a24
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n25)]; exact a25
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n26)]; exact a26
+  · rw [RegMap.set_apply, ite_eq_right (Ne.symm n27)]; exact a27
 
 /-- The pins at the loop head, after the wait arm's set-up writes `s2`
 (twice: the `auipc` and the `lw`) and `s1` (twice: the `auipc` and the
@@ -1140,7 +1140,7 @@ theorem ss_entry (AC : ACQUIRE) (RE : RELEASE) (Γ : SchedNames) [ClaimIs GF Γ]
   isimp only [wordAtN_cur] at Hcmt
   cases cmt
   · -- ============ log.committing == 0 ============
-    isimp only [Bool.false_eq_true, if_false] at Hcmt
+    isimp only [Bool.false_eq_true, ite_false] at Hcmt
     -- +0x14 auipc a5,0x1e ; +0x18 lw a5,1080(a5) ; +0x1c bnez a5 (not taken)
     k_step (wp_s_auipc cpu _ (KA.«sys_sync» + 0x14#64) false 0x1f#20 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ssK_sie (k.withSpie s0 p0)]
@@ -1222,7 +1222,7 @@ theorem ss_entry (AC : ACQUIRE) (RE : RELEASE) (Γ : SchedNames) [ClaimIs GF Γ]
         repeat refine ssRegsE_set _ _ ?_ _ _ (by decide)
         exact hRE
   · -- ============ log.committing != 0: wait ============
-    isimp only [if_true] at Hcmt
+    isimp only [ite_true] at Hcmt
     k_step (wp_s_auipc cpu _ (KA.«sys_sync» + 0x14#64) false 0x1f#20 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ssK_sie (k.withSpie s0 p0)]
     iintro Hk Hpc

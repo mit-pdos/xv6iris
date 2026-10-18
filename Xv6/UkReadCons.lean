@@ -148,7 +148,7 @@ theorem udepwf_std_read_cons (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (l :
     (Xv6.tfOf_a0 m pc) (Xv6.tfOf_a2 m pc) rfl
   rw [std_fd_st_of_key (m.get 10#5) fdv l fd _ h0 hlt htake hl]
   unfold filereadIn
-  simp only [if_true]
+  simp only [ite_true]
   iintro -
   dsimp only [readConsFam, xfamRd]
   isplitl [Hacc]
@@ -165,7 +165,7 @@ theorem readCons_extra (gn : GName) (pt : UPtd) (st : FdState) (wr : Bool) (n : 
       consoleReceipt gn pt Rd Rin n r M' addr := by
   subst hst
   unfold filereadExtraCore
-  simp only [if_true]
+  simp only [ite_true]
   exact .rfl
 
 /-- **THE POST'S READING AT THE CONSOLE** (deviation 3): row 5's post at
@@ -192,7 +192,7 @@ theorem readCons_ans (N : UkNames GF) (Rd : Nat → Nat → IProp GF)
   -- THE ANSWER IS NOT -1 AT AN OPEN READABLE CONSOLE DESCRIPTOR
   have hne1 : r ≠ -1#64 := by
     have hfdw : W.fd[fd]? = some (.open true wr (.device CONSOLE)) := by
-      rw [← htake, List.getElem?_take, if_pos hfdlt] at hl0; exact hl0
+      rw [← htake, List.getElem?_take, ite_eq_left hfdlt] at hl0; exact hl0
     have hz0 : usysArgfd W.tf = (fd : Int) := by
       unfold usysArgfd; rw [harg0]; rw [← argZ_setWidth] at h0; exact h0
     have hz2 : usysRdcount W.tf = (cap : Int) := by

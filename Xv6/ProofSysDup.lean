@@ -266,7 +266,7 @@ theorem sys_dup_proof (AF : ARGFD) (FD : FDALLOC) (FU : FILEDUP) : SYSDUP := ⟨
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_dup_br_fffffffffffffe02] next c5 hp5
   iintro Hk Hpc
   ihave Hpfd : ofdOut (GF := GF) 0#64 0#32 $$ []
-  case' _ => unfold ofdOut; rw [if_pos rfl]; iempintro
+  case' _ => unfold ofdOut; rw [ite_eq_left rfl]; iempintro
   iapply (sysfile_argfd_wp AF c5 _ γ pa pid V M [] 0 v 0#32 wf (by decide) ?ha0 hv ?hpf ?hpr ?ht ?hn ?hKa)
     $$ [- $Hk $Hpc]
   rotate_right 1

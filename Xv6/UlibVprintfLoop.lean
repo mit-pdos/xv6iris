@@ -43,8 +43,8 @@ theorem ulibPutc_callAt [MachGS GF] (P : ULIB_PUTC) (L : UlibRun GF) (base : Bit
 theorem ulibTextStr_at (L : UlibRunP GF) (a len : Nat) (f : Nat → BitVec 8) (j : Nat) (hj : j ≤ len) :
     ulibTextStr L a len f ⊢ L.utextB (a + j) (if j < len then f j else ubyte0) := by
   by_cases h : j < len
-  · rw [if_pos h]; exact ulibTextStr_byte L a len f j h
-  · rw [if_neg h, show j = len by omega]; exact ulibTextStr_nul L a len f
+  · rw [ite_eq_left h]; exact ulibTextStr_byte L a len f j h
+  · rw [ite_eq_right h, show j = len by omega]; exact ulibTextStr_nul L a len f
 
 /-- **THE EPILOGUE**, `+0x2e2 → ret` (Rocq `wp_kcat_vprintf_epi`): the
 spilled registers come back, the frame is popped. -/
@@ -221,7 +221,7 @@ theorem ulibVprintf_loop [MachGS GF] (P : ULIB_PUTC) (L : UlibRunP GF) (base : B
     iapply (ulibVprintf_step P L base hb m0 m a fd ap i (f i) _ n Ci Cm (by omega)
       (hpct i hi (by omega)) hinv hs1) $$ Hw Hpc Hc Hb1 HCi Hrun
     iintro %m1 %hinv1 %hs1' HCm Hrun
-    rw [if_neg (by omega)] at hs1'
+    rw [ite_eq_right (by omega)] at hs1'
     obtain ⟨h2, _, _, _, _, _, _, _, _, hkeep⟩ := hinv1
     -- +0x10e  beqz s1 → +0x2e2 : the terminator
     iapply (ulibS_brT L _ (ulibVprintf_i10e L.toUlibRun base) 0x2e2 (by decide) hb (by decide) _ _
@@ -239,7 +239,7 @@ theorem ulibVprintf_loop [MachGS GF] (P : ULIB_PUTC) (L : UlibRunP GF) (base : B
     iapply (ulibVprintf_step P L base hb m0 m a fd ap i (f i) _ n Ci Cm (by omega)
       (hpct i hi (by omega)) hinv hs1) $$ Hw Hpc Hc Hb1 HCi Hrun
     iintro %m1 %hinv1 %hs1' HCm Hrun
-    rw [if_pos (by omega)] at hs1'
+    rw [ite_eq_left (by omega)] at hs1'
     -- +0x10e  beqz s1 : not taken, a body character
     iapply (ulibS_brN L _ (ulibVprintf_i10e L.toUlibRun base) 0x112 rfl _ _
       (by ulib_regs; rw [hs1']; exact ulibZ_beq0 _ (hnn _ (by omega)))) $$ Hc Hrun

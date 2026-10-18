@@ -114,7 +114,7 @@ theorem utextDecode_facts (dref : (r : Register) → Option (RegisterType r)) {t
   rename_i k hfind
   have hbyte := hok.byte hfind
   by_cases hw4 : k.width = 4
-  · rw [if_pos hw4] at h
+  · rw [ite_eq_left hw4] at h
     split at h
     · rename_i i₁ hdec
       split at h
@@ -125,9 +125,9 @@ theorem utextDecode_facts (dref : (r : Register) → Option (RegisterType r)) {t
           fun _ => ⟨rfl, rfl, hgeo.1, hdec⟩, fun h => absurd h (by simp)⟩
       · exact absurd h (by simp)
     · exact absurd h (by simp)
-  · rw [if_neg hw4] at h
+  · rw [ite_eq_right hw4] at h
     by_cases hw2 : k.width = 2
-    · rw [if_pos hw2] at h
+    · rw [ite_eq_left hw2] at h
       split at h
       · rename_i i₁ hdec
         split at h
@@ -136,19 +136,19 @@ theorem utextDecode_facts (dref : (r : Register) → Option (RegisterType r)) {t
           · rename_i hgeo
             obtain ⟨hrvc, hev, hwf, hlt⟩ := hgeo
             by_cases h2 : pc % 4 = 2
-            · rw [if_pos h2] at h
+            · rw [ite_eq_left h2] at h
               simp only [Option.some.injEq, Prod.mk.injEq] at h
               obtain ⟨rfl, rfl, rfl, rfl, rfl⟩ := h
               exact ⟨hev, hwf, fun j hj => hbyte j (hw2 ▸ hj), fun h => absurd h (by simp),
-                fun _ => ⟨by rw [if_pos h2], hrvc, hdec, hex⟩⟩
-            · rw [if_neg h2] at h
+                fun _ => ⟨by rw [ite_eq_left h2], hrvc, hdec, hex⟩⟩
+            · rw [ite_eq_right h2] at h
               split at h
               · rename_i b2 b3 hb2 hb3
                 simp only [Option.some.injEq, Prod.mk.injEq] at h
                 obtain ⟨rfl, rfl, rfl, rfl, rfl⟩ := h
                 have hhi := utextDecode_byte_hi k.enc b2.toNat b3.toNat hlt b2.isLt b3.isLt
                 refine ⟨hev, hwf, fun j hj => ?_, fun h => absurd h (by simp),
-                  fun _ => ⟨by rw [if_neg h2], ?_, ?_, hex⟩⟩
+                  fun _ => ⟨by rw [ite_eq_right h2], ?_, ?_, hex⟩⟩
                 · by_cases hj2 : j < 2
                   · rw [utextDecode_byte_lo _ _ _ hj2]; exact hbyte j (by omega)
                   · have : j = 2 ∨ j = 3 := by omega
@@ -163,7 +163,7 @@ theorem utextDecode_facts (dref : (r : Register) → Option (RegisterType r)) {t
           · exact absurd h (by simp)
         · exact absurd h (by simp)
       · exact absurd h (by simp)
-    · rw [if_neg hw2] at h; exact absurd h (by simp)
+    · rw [ite_eq_right hw2] at h; exact absurd h (by simp)
 
 /-! ## The fetch-and-decode step
 
@@ -194,7 +194,7 @@ theorem utext_step_base (dref : (r : Register) → Option (RegisterType r)) {t :
   · iapply (swp_runRead cpu dref P hacc (ext_decode (BitVec.ofNat 32 w)) i true hdec Φ)
     isplitl [HP]
     · iexact HP
-    · simp only [laterIf, if_true]; iexact HΦ
+    · simp only [laterIf, ite_true]; iexact HΦ
 
 /-- A compressed half: its window (2 or 4 bytes, by the pc's alignment), its
 decode step to the raw AST `i₀`, and the expansion `i₀ ↦ i`. -/
@@ -219,7 +219,7 @@ theorem utext_step_rvc (dref : (r : Register) → Option (RegisterType r)) {t : 
   · iapply (swp_runRead cpu dref P hacc (ext_decode_compressed (BitVec.ofNat 16 w)) i₀ true hdec Φ)
     isplitl [HP]
     · iexact HP
-    · simp only [laterIf, if_true]; iexact HΦ
+    · simp only [laterIf, ite_true]; iexact HΦ
 
 end Step
 

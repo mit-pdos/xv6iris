@@ -127,7 +127,7 @@ theorem bd_vdr (VR : VIRTIO_DISK_RW) (Γ : SchedNames) [ClaimIs GF Γ]
     iprop(True) hj hproc hK hnoff htier hbno hbsd hpd hkm
   unfold wp_virtio_disk_rw_eb_body at h
   simp only [virtioDiskRwAddr, ha0, ha1, ne_eq, BitVec.reduceEq, not_false_eq_true,
-    decide_true, if_true, decide_false, if_false, not_true_eq_false, Bool.false_eq_true,
+    decide_true, ite_true, decide_false, ite_false, not_true_eq_false, Bool.false_eq_true,
     ite_false] at h
   iintro ⟨Hk, Hpc, Hpi, Hte, Hce, Hcaps, Hbuf, Hblk, Hnext⟩
   iapply h

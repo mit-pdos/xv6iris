@@ -48,7 +48,7 @@ theorem ci_cs_bs : consputcCs 256#64 = consputcBs := by decide
 
 theorem ci_cs_byte (c : BitVec 8) (h : c ≠ 13#8) : consputcCs (BitVec.setWidth 64 c) = [echoOf c] := by
   have h1 : BitVec.setWidth 64 c ≠ cpBackspace := by unfold cpBackspace; bv_decide
-  simp only [consputcCs, h1, if_false, echoOf, h, ci_byte_lo]
+  simp only [consputcCs, h1, ite_false, echoOf, h, ci_byte_lo]
 
 /-- The ring-space test `bltu 127, e - r` falling through: there is room. -/
 theorem ci_room (r e : BitVec 32)

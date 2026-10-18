@@ -368,7 +368,7 @@ theorem altsOk_c1 (s : Fstate) : lmAltsOk ulmG s Ic1 csC1 := by
 theorem usyncAt_nsync (ps cs : List Nat) (s : Fstate) (I w : List (BitVec 8)) (i : Nat)
     (hl : ulineOfU ((bodiesOf I)[i]!) ≠ .LSync) : usyncAt ps cs s I w i = none := by
   unfold usyncAt
-  rw [if_neg]
+  rw [ite_eq_right]
   exact fun h => hl h.1
 
 theorem usyncLast_none (ps cs : List Nat) (s : Fstate) (I w : List (BitVec 8))
@@ -423,7 +423,7 @@ theorem stB_txtA : stB[txtA]? = some cB := by simp [stB]
 
 theorem lookup_ne (c : List (BitVec 8)) (N : List (BitVec 8)) (hN : N ≠ txtA) :
     ((∅ : Fstate).insert txtA c)[N]? = none := by
-  rw [Std.ExtTreeMap.getElem?_insert, if_neg (by rw [Std.compare_eq_iff_eq]; exact fun h => hN h.symm)]
+  rw [Std.ExtTreeMap.getElem?_insert, ite_eq_right (by rw [Std.compare_eq_iff_eq]; exact fun h => hN h.symm)]
   simp
 
 /-- the state /sync found: `a.txt` holds `b\n` -/
@@ -443,7 +443,7 @@ theorem s0b_upto : lmUpto ulmG csS0b (∅ : Fstate) [bA, bB, bSync] 2 = stB := b
     decide
   · show _ = ((∅ : Fstate).insert txtA cB)[N]?
     rw [lookup_ne _ N hN, Std.ExtTreeMap.getElem?_insert,
-      if_neg (by rw [Std.compare_eq_iff_eq]; exact fun h => hN h.symm)]
+      ite_eq_right (by rw [Std.compare_eq_iff_eq]; exact fun h => hN h.symm)]
     exact lookup_ne _ N hN
 
 theorem s0b_good : lmGoodSync ∅ segS0 (some (3, stB)) := by
@@ -455,7 +455,7 @@ theorem s0b_good : lmGoodSync ∅ segS0 (some (3, stB)) := by
     symm
     apply usyncLast_s0
     unfold usyncAt
-    rw [if_pos, s0_bodies, s0b_upto]
+    rw [ite_eq_left, s0_bodies, s0b_upto]
     refine ⟨?_, ?_, ?_⟩
     · rw [s0_bodies]; exact bSync_line
     · exact at_code lS0b 2 (by decide)
@@ -636,7 +636,7 @@ theorem s0_rec (o : Option Srec) (h : lmGoodSync ∅ segS0 o) :
   have hat2 : usyncAt ps cs (∅ : Fstate) Is0 wS0 2
       = some (3, lmUpto ulmG cs (∅ : Fstate) [bA, bB, bSync] 2) := by
     unfold usyncAt
-    rw [if_pos]
+    rw [ite_eq_left]
     · rw [s0_bodies] <;> rfl
     refine ⟨?_, hr2, ?_⟩
     · rw [s0_bodies]; exact bSync_line
@@ -785,7 +785,7 @@ theorem f0_good : lmGoodSync ∅ segF0 none := by
     symm
     apply usyncLast_s0
     unfold usyncAt
-    rw [if_neg]
+    rw [ite_eq_right]
     rintro ⟨_, _, hp⟩
     have e : proOf [0] ++ lmSeq ulmG [0] csS0 (∅ : Fstate) (bodiesOf Is0) (2 + 1) = wS0 := by
       rw [← sess_s0 ∅]

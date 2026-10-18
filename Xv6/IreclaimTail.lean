@@ -149,7 +149,7 @@ theorem ireclaim_step [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) (cpu : CPU) (k :
   iintro Hk Hpc
   by_cases hge : fscNinodes ≤ m
   · -- OUT: the scan is done
-    simp only [hge, _root_.decide_true, if_true]
+    simp only [hge, _root_.decide_true, ite_true]
     iapply (ireclaim_epilogue cpu k spie spp _ pidv dqp dqb dqs dqn hK8 ?e2 ?ep)
       $$ [$Hk $Hpc Hte Hce Hsn Hsi Hsb Hpid Hframe Hnext $Hsl $Hiref $Hboot]
     rotate_right 1
@@ -160,7 +160,7 @@ theorem ireclaim_step [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) (cpu : CPU) (k :
         simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;> assumption
     case e2 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; exact a2
   · -- the next inum
-    simp only [hge, decide_false, Bool.false_eq_true, if_false]
+    simp only [hge, decide_false, Bool.false_eq_true, ite_false]
     have IH' := IH (by omega)
     unfold ireclaimLoopPre at IH'
     iapply (IH' cpu spie spp _ ?hr)

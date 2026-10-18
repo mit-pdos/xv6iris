@@ -102,7 +102,7 @@ theorem ctxBytes_split_bytes (ξ : CtxId) (pa : PAddr) (bs : Nat → BitVec 8) :
           (Φ := fun _ (j : Nat) => iprop((pa + BitVec.ofNat 64 j) ↦ₕ{DFrac.own (1 : Qp).half}
             (if j = n then e :: He else Hs j)))
           (Ψ := fun _ (j : Nat) => iprop((pa + BitVec.ofNat 64 j) ↦ₕ{DFrac.own (1 : Qp).half} Hs j))
-          (fun {_ x} hx => by rw [if_neg (Nat.ne_of_lt (MachCSL.rangeIdx_lt hx))])]
+          (fun {_ x} hx => by rw [ite_eq_right (Nat.ne_of_lt (MachCSL.rangeIdx_lt hx))])]
         iexact Hb
       · simp only [↓reduceIte]
         iexact Hpt1
@@ -111,8 +111,8 @@ theorem ctxBytes_split_bytes (ξ : CtxId) (pa : PAddr) (bs : Nat → BitVec 8) :
       intro j hj
       show Option.map HEnt.v (List.head? (if j = n then e :: He else Hs j)) = some (bs j)
       rcases Nat.lt_succ_iff_lt_or_eq.1 hj with h | h
-      · rw [if_neg (Nat.ne_of_lt h)]; exact hh j h
-      · subst h; rw [if_pos rfl, List.head?_cons, Option.map_some, hev]
+      · rw [ite_eq_right (Nat.ne_of_lt h)]; exact hh j h
+      · subst h; rw [ite_eq_left rfl, List.head?_cons, Option.map_some, hev]
     · iapply BigSepL.bigSepL_snoc.2
       isplitl [Hc]
       · iexact Hc

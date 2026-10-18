@@ -276,19 +276,19 @@ theorem lwPins_set (kR : RegMap) (kk : Nat) (R : RegMap) (h : lwPins kR kk R)
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
     simp only [RegMap.set_apply] <;>
     first
-      | (rw [if_neg (Ne.symm n2)]; exact a2)
-      | (rw [if_neg (Ne.symm n8)]; exact a8)
-      | (rw [if_neg (Ne.symm n9)]; exact a9)
-      | (rw [if_neg (Ne.symm n18)]; exact a18)
-      | (rw [if_neg (Ne.symm n19)]; exact a19)
-      | (rw [if_neg (Ne.symm n20)]; exact a20)
-      | (rw [if_neg (Ne.symm n21)]; exact a21)
-      | (rw [if_neg (Ne.symm n22)]; exact a22)
-      | (rw [if_neg (Ne.symm n23)]; exact a23)
-      | (rw [if_neg (Ne.symm n24)]; exact a24)
-      | (rw [if_neg (Ne.symm n25)]; exact a25)
-      | (rw [if_neg (Ne.symm n26)]; exact a26)
-      | (rw [if_neg (Ne.symm n27)]; exact a27)
+      | (rw [ite_eq_right (Ne.symm n2)]; exact a2)
+      | (rw [ite_eq_right (Ne.symm n8)]; exact a8)
+      | (rw [ite_eq_right (Ne.symm n9)]; exact a9)
+      | (rw [ite_eq_right (Ne.symm n18)]; exact a18)
+      | (rw [ite_eq_right (Ne.symm n19)]; exact a19)
+      | (rw [ite_eq_right (Ne.symm n20)]; exact a20)
+      | (rw [ite_eq_right (Ne.symm n21)]; exact a21)
+      | (rw [ite_eq_right (Ne.symm n22)]; exact a22)
+      | (rw [ite_eq_right (Ne.symm n23)]; exact a23)
+      | (rw [ite_eq_right (Ne.symm n24)]; exact a24)
+      | (rw [ite_eq_right (Ne.symm n25)]; exact a25)
+      | (rw [ite_eq_right (Ne.symm n26)]; exact a26)
+      | (rw [ite_eq_right (Ne.symm n27)]; exact a27)
 
 
 theorem lw_cs_refl (R : RegMap) : calleeSaved R R :=
@@ -674,11 +674,11 @@ theorem lw_res_elim (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
   · ipureintro; exact hTlen
   cases cmt
   · ileft
-    isimp only [Bool.false_eq_true, if_false] at Hcmt
-    isimp only [Bool.false_eq_true, if_false] at Harm
+    isimp only [Bool.false_eq_true, ite_false] at Hcmt
+    isimp only [Bool.false_eq_true, ite_false] at Harm
     iframe Hcmt Harm Hhelp
   · iright
-    isimp only [if_true] at Hcmt
+    isimp only [ite_true] at Hcmt
     iframe Hcmt Hhelp
     ipureintro
     exact hcmt0 rfl
@@ -792,9 +792,9 @@ def lwScanExit (i n : Nat) : BitVec 64 :=
   if i < n then KA.«log_write» + 0x94#64 else KA.«log_write» + 0x52#64
 
 theorem lwScanExit_lt (i n : Nat) (h : i < n) :
-    lwScanExit i n = KA.«log_write» + 0x94#64 := by unfold lwScanExit; rw [if_pos h]
+    lwScanExit i n = KA.«log_write» + 0x94#64 := by unfold lwScanExit; rw [ite_eq_left h]
 theorem lwScanExit_eq (n : Nat) : lwScanExit n n = KA.«log_write» + 0x52#64 := by
-  unfold lwScanExit; rw [if_neg (by omega)]
+  unfold lwScanExit; rw [ite_eq_right (by omega)]
 
 set_option maxHeartbeats 4000000 in
 theorem lw_scan (c : CPU) (kc : KCtx) (hsie : kc.sie = false) (kR : RegMap)
@@ -840,7 +840,7 @@ theorem lw_scan (c : CPU) (kc : KCtx) (hsie : kc.sie = false) (kR : RegMap)
       ihave Hpc := (show pcIs (GF := GF) c (KA.«log_write» + 0x94#64) ⊢
           pcIs c (lwScanExit i n) from by
         rw [show lwScanExit i n = KA.«log_write» + 0x94#64 from by
-          unfold lwScanExit; rw [if_pos hi]] <;> (iintro H; iexact H)) $$ Hpc
+          unfold lwScanExit; rw [ite_eq_left hi]] <;> (iintro H; iexact H)) $$ Hpc
       iapply HC $$ %i %_ [] Hk Hpc Hblk
       ipureintro
       refine ⟨?_, ?_, ?_, by omega, Or.inl ⟨hi, ?_⟩⟩
@@ -889,7 +889,7 @@ theorem lw_scan (c : CPU) (kc : KCtx) (hsie : kc.sie = false) (kR : RegMap)
         ihave Hpc := (show pcIs (GF := GF) c (KA.«log_write» + 0x52#64) ⊢
             pcIs c (lwScanExit n n) from by
           rw [show lwScanExit n n = KA.«log_write» + 0x52#64 from by
-            unfold lwScanExit; rw [if_neg (by omega)]] <;> (iintro H; iexact H)) $$ Hpc
+            unfold lwScanExit; rw [ite_eq_right (by omega)]] <;> (iintro H; iexact H)) $$ Hpc
         iapply HC $$ %n %_ [] Hk Hpc Hblk
         ipureintro
         refine ⟨hcs', ?_, ?_, by omega, Or.inr ⟨rfl, ?_⟩⟩
@@ -923,10 +923,10 @@ def lwStoreExit (i n : Nat) : BitVec 64 :=
   if i = n then KA.«log_write» + 0x66#64 else KA.«log_write» + 0xae#64
 
 theorem lwStoreExit_eq (n : Nat) : lwStoreExit n n = KA.«log_write» + 0x66#64 := by
-  unfold lwStoreExit; rw [if_pos rfl]
+  unfold lwStoreExit; rw [ite_eq_left rfl]
 theorem lwStoreExit_lt (i n : Nat) (h : i < n) :
     lwStoreExit i n = KA.«log_write» + 0xae#64 := by
-  unfold lwStoreExit; rw [if_neg (by omega)]
+  unfold lwStoreExit; rw [ite_eq_right (by omega)]
 
 set_option maxHeartbeats 4000000 in
 theorem lw_store (c : CPU) (kc : KCtx) (hsie : kc.sie = false) (kk i n : Nat)
@@ -985,7 +985,7 @@ theorem lw_store (c : CPU) (kc : KCtx) (hsie : kc.sie = false) (kk i n : Nat)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h12, h15, hcond]
     iintro Hk Hpc
     rw [show lwStoreExit i n = KA.«log_write» + 0x66#64 from by
-      unfold lwStoreExit; rw [if_pos heq]]
+      unfold lwStoreExit; rw [ite_eq_left heq]]
     iapply HC $$ %_ [] Hk Hpc Hbno Hcell
     ipureintro
     repeat refine MachCSL.cs_set _ _ ?_ _ _ (by decide)
@@ -997,7 +997,7 @@ theorem lw_store (c : CPU) (kc : KCtx) (hsie : kc.sie = false) (kk i n : Nat)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h12, h15, hcond]
     iintro Hk Hpc
     rw [show lwStoreExit i n = KA.«log_write» + 0xae#64 from by
-      unfold lwStoreExit; rw [if_neg heq]]
+      unfold lwStoreExit; rw [ite_eq_right heq]]
     iapply HC $$ %_ [] Hk Hpc Hbno Hcell
     ipureintro
     repeat refine MachCSL.cs_set _ _ ?_ _ _ (by decide)
@@ -1182,11 +1182,11 @@ theorem lw_ledger_sum (om : RegMapF OpEntry) (i u : Nat) (Sb Sb' : List Nat) (e0
       (if cr then 0 else 1) = opSum om := by
   have hge := lw_opSum_ge om i _ h
   cases cr
-  · simp only [Bool.false_eq_true, if_false]
+  · simp only [Bool.false_eq_true, ite_false]
     rw [opSum_spend om i u Sb Sb' e0 h]
     simp only [OpEntry.bud] at hge
     omega
-  · simp only [if_true]
+  · simp only [ite_true]
     rw [opSum_absorb om i (u + 1) Sb Sb' e0 h]
     omega
 
@@ -1201,7 +1201,7 @@ theorem lw_ledger_bud (om : RegMapF OpEntry) (i u : Nat) (Sb Sb' : List Nat) (e0
   · rw [get?_insert_eq hij] at hj; cases hj
     have := hbud i _ h
     simp only [OpEntry.bud] at this ⊢
-    cases cr <;> simp only [Bool.false_eq_true, if_false, if_true] <;> omega
+    cases cr <;> simp only [Bool.false_eq_true, ite_false, ite_true] <;> omega
   · rw [get?_insert_ne hij] at hj; exact hbud j e hj
 
 /-! ## The ABSORB arm's ghost step
@@ -1280,7 +1280,7 @@ theorem lw_closeA (γ : LogNames) (γb : BcacheNames) (γfs : FsNames) (V : BioV
   ihave %hvE := logEpochLb_le γ e0 v $$ Hep Hlb
   -- the payload, opened
   icases fsPay_split γb γfs V hcl hdt kk dev bno bsl bsd true $$ Hpay with ⟨Hmc, Hmd, Href⟩
-  isimp only [if_true] at Href
+  isimp only [ite_true] at Href
   ihave %hlbs := lw_hold_len γb V kk pidv dev bno bs bsd $$ Hhold
   -- the ledger records the block: a unit burns unless credited
   imod (lw_ledger γ om u Sb e0 bno.toNat cr) $$ Hops Hope with ⟨%i, %hik, Hops, Hope⟩
@@ -1350,7 +1350,7 @@ theorem lw_closeA (γ : LogNames) (γb : BcacheNames) (γfs : FsNames) (V : BioV
         (γfs.dirty ↪◯MAP[bno.toNat]{.own (1 : Qp).half} true) ∗ bref γb kk dev bno ⊢
       bioPay (GF := GF) γb V kk dev bno bs bsd true from by
     unfold bioPay
-    simp only [if_true]
+    simp only [ite_true]
     rw [hdt]
     unfold fsMdirty
     iintro ⟨H1, H2, H3⟩
@@ -1593,7 +1593,7 @@ theorem lw_closeB (γ : LogNames) (γb : BcacheNames) (γfs : FsNames) (V : BioV
         (γfs.dirty ↪◯MAP[bno.toNat]{.own (1 : Qp).half} true) ∗ bref γb kk dev bno ⊢
       bioPay (GF := GF) γb V kk dev bno bs bsd true from by
     unfold bioPay
-    simp only [if_true]
+    simp only [ite_true]
     rw [hdt]
     unfold fsMdirty
     iintro ⟨H1, H2, H3⟩
@@ -2240,7 +2240,7 @@ theorem lw_held_of_au (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb 
     iexact Hfsb
   iapply wpNext_mono _ _ _ _ _ $$ Hnext
   iintro %c HΦ %spie %spp %R' %hsp Hk Hpc %hcs Hsw Hfsb Hlk Hsl
-  isimp only [Bool.false_eq_true, if_false] at Hsw
+  isimp only [Bool.false_eq_true, ite_false] at Hsw
   ihave Hsw := logOpSwe_opSw γ u (bno.toNat :: Sb) bno.toNat v e0 $$ Hsw
   iapply HΦ $$ %spie %spp %R' %(bno.toNat :: Sb) [] Hk Hpc [] Hsw Htx Hfsb Hlk Hsl
   · ipureintro; exact hsp

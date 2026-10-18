@@ -450,7 +450,7 @@ theorem devRes_set (I : EpIfaceP N P Dp) (dv : Nat → Dspec) (ds : ExtTreeSet N
     devRes I (fun d' => if d' = d then x else dv d') ds ⊣⊢ devRes I dv ds := by
   refine BigSepS.bigSepS_eqv (fun {d'} hd' => ?_)
   have hne : d' ≠ d := fun h => hd (h ▸ hd')
-  simp only [hne, if_false]
+  simp only [hne, ite_false]
   exact .rfl
 
 /-- The device moved back in: a new spec at `d`, the rest unchanged. -/
@@ -460,7 +460,7 @@ theorem devRes_move (I : EpIfaceP N P Dp) (dv : Nat → Dspec) (ds : ExtTreeSet 
   refine .trans ?_ (devRes_take I _ ds d hd).2
   have hnot : d ∉ ds \ {d} := fun h => (mem_diff.1 h).2 (mem_singleton.2 rfl)
   refine sep_mono ?_ (devRes_set I dv (ds \ {d}) d x hnot).2
-  simp only [if_true]
+  simp only [ite_true]
   exact .rfl
 
 /-- A device added at a fresh number. -/
@@ -577,8 +577,8 @@ theorem cfInv_step_open (I : EpIfaceP N P Dp) (E : Penv) (ds : ExtTreeSet Nat co
   have htaint : ∀ x : Int, x = -1 ∨ 0 ≤ x → SafeFds (openHeld E.fd x) (k x) := by
     intro x hx
     rcases hx with rfl | hx
-    · simp only [openHeld, show ¬ ((0 : Int) ≤ -1) by decide, if_false]; exact hs.2
-    · simp only [openHeld, if_pos hx]; exact hs.1 x hx
+    · simp only [openHeld, show ¬ ((0 : Int) ≤ -1) by decide, ite_false]; exact hs.2
+    · simp only [openHeld, ite_eq_left hx]; exact hs.1 x hx
   rcases hc with ⟨rfl, content, hfile, hk, hk1⟩ | ⟨hnc, hfile, hk1⟩
   · -- present
     obtain ⟨d, hdnot⟩ := FiniteSet.fresh (A := Nat) ds
@@ -595,8 +595,8 @@ theorem cfInv_step_open (I : EpIfaceP N P Dp) (E : Penv) (ds : ExtTreeSet Nat co
         intro fd' d' h
         unfold fdInsert at h
         by_cases hx : fd' = fd
-        · rw [if_pos hx] at h; cases h; exact mem_union.2 (Or.inl (mem_singleton.2 rfl))
-        · rw [if_neg hx] at h; exact mem_union.2 (Or.inr (hdom _ _ h))
+        · rw [ite_eq_left hx] at h; cases h; exact mem_union.2 (Or.inl (mem_singleton.2 rfl))
+        · rw [ite_eq_right hx] at h; exact mem_union.2 (Or.inr (hdom _ _ h))
       have hs' : SafeFds (fdDom (fdInsert E.fd fd d)) (k fd) := by
         rw [fdDom_insert]; exact hs.1 fd hfd0
       have H : ⊢ I.eiFds (fdInsert E.fd fd d) -∗ I.eiFiles E.files E.paths -∗
@@ -642,8 +642,8 @@ theorem cfInv_step_close (I : EpIfaceP N P Dp) (E : Penv) (ds : ExtTreeSet Nat c
       intro fd' d' h
       unfold fdDelete at h
       by_cases hx : fd' = fd
-      · rw [if_pos hx] at h; cases h
-      · rw [if_neg hx] at h; exact hdom _ _ h
+      · rw [ite_eq_left hx] at h; cases h
+      · rw [ite_eq_right hx] at h; exact hdom _ _ h
     have H : ⊢ I.eiFds (fdDelete E.fd fd) -∗ I.eiFiles E.files E.paths -∗ devRes I E.dev ds -∗ cfInv I (k 0) :=
       cfInv_intro I (envUnbind E fd) ds (k 0) hk hs0 hdp hdom'
     iapply I.eiCloseShared E.fd fd d _ hfd hsh $$ Hfds
@@ -663,8 +663,8 @@ theorem cfInv_step_close (I : EpIfaceP N P Dp) (E : Penv) (ds : ExtTreeSet Nat c
       intro fd' d' h
       unfold fdDelete at h
       by_cases hx : fd' = fd
-      · rw [if_pos hx] at h; cases h
-      · rw [if_neg hx] at h
+      · rw [ite_eq_left hx] at h; cases h
+      · rw [ite_eq_right hx] at h
         refine mem_diff.2 ⟨hdom _ _ h, fun e => ?_⟩
         rw [mem_singleton] at e; subst e
         exact hsh' ⟨fd', hx, h⟩

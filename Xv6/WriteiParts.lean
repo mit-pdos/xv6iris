@@ -48,11 +48,11 @@ theorem writei_splice_get (bs : List (BitVec 8)) (o : Nat) (c : List (BitVec 8))
   have e1 : (bs.take o).length = o := by rw [List.length_take]; omega
   simp only [getElem!_def]
   by_cases h1 : j < o
-  · rw [List.getElem?_append_left (by omega), List.getElem?_take, if_pos h1, if_neg (by omega)]
+  · rw [List.getElem?_append_left (by omega), List.getElem?_take, ite_eq_left h1, ite_eq_right (by omega)]
   · rw [List.getElem?_append_right (by omega), e1]
     by_cases h2 : j < o + c.length
-    · rw [List.getElem?_append_left (by omega), if_pos ⟨by omega, h2⟩]
-    · rw [List.getElem?_append_right (by omega), List.getElem?_drop, if_neg (by omega)]
+    · rw [List.getElem?_append_left (by omega), ite_eq_left ⟨by omega, h2⟩]
+    · rw [List.getElem?_append_right (by omega), List.getElem?_drop, ite_eq_right (by omega)]
       congr 2
       omega
 
@@ -64,8 +64,8 @@ theorem writei_fileByte_same (data : Nat → List (BitVec 8)) (i : Nat) (v : Lis
     (h : data i = v) (k : Nat) : fileByte (dataUpd data i v) k = fileByte data k := by
   unfold fileByte dataUpd
   by_cases he : k / BSIZE = i
-  · rw [if_pos he, he, h]
-  · rw [if_neg he]
+  · rw [ite_eq_left he, he, h]
+  · rw [ite_eq_right he]
 
 /-- THE step of the loop's range invariant (Rocq's `wi_file_byte_splice`). -/
 theorem writei_fileByte_splice (data : Nat → List (BitVec 8)) (fb o : Nat) (c : List (BitVec 8))
@@ -76,16 +76,16 @@ theorem writei_fileByte_splice (data : Nat → List (BitVec 8)) (fb o : Nat) (c 
   unfold fileByte dataUpd
   have hB : BSIZE = 1024 := rfl
   by_cases he : k / BSIZE = fb
-  · rw [if_pos he, he]
+  · rw [ite_eq_left he, he]
     have hm : k % BSIZE < BSIZE := Nat.mod_lt _ (by rw [hB]; decide)
     have hdm : k = fb * BSIZE + k % BSIZE := by
       have := Nat.div_add_mod k BSIZE; rw [he] at this; rw [Nat.mul_comm]; omega
     rw [writei_splice_get (data fb) o c (by omega) (k % BSIZE) (by omega)]
     by_cases hin : o ≤ k % BSIZE ∧ k % BSIZE < o + c.length
-    · rw [if_pos hin, if_pos (by omega)]
+    · rw [ite_eq_left hin, ite_eq_left (by omega)]
       congr 1; omega
-    · rw [if_neg hin, if_neg (by omega)]
-  · rw [if_neg he, if_neg]
+    · rw [ite_eq_right hin, ite_eq_right (by omega)]
+  · rw [ite_eq_right he, ite_eq_right]
     intro ⟨h1, h2⟩
     apply he
     rw [hB] at hol h1 h2 ⊢
@@ -143,12 +143,12 @@ theorem writei_range_step (data dataI : Nat → List (BitVec 8)) (off tot fb o :
   rw [writei_fileByte_splice dataI fb o c hol hlen k, hfb]
   unfold writei_wrote2
   by_cases hc : off + tot ≤ k ∧ k < off + tot + c.length
-  · rw [if_pos hc, if_pos (by omega), if_neg (by omega)]
+  · rw [ite_eq_left hc, ite_eq_left (by omega), ite_eq_right (by omega)]
     congr 1; omega
-  · rw [if_neg hc, hinv k]
+  · rw [ite_eq_right hc, hinv k]
     by_cases hd : off ≤ k ∧ k < off + tot
-    · rw [if_pos hd, if_pos (by omega), if_pos (by omega)]
-    · rw [if_neg hd, if_neg (by omega)]
+    · rw [ite_eq_left hd, ite_eq_left (by omega), ite_eq_left (by omega)]
+    · rw [ite_eq_right hd, ite_eq_right (by omega)]
 
 /-- The FAILURE step (Rocq's `wi_range_fail`): the chunk lands in the
 DISTURBED region instead. -/
@@ -164,11 +164,11 @@ theorem writei_range_fail (data dataI : Nat → List (BitVec 8)) (off tot fb o :
       else fileByte data k := by
   rw [writei_fileByte_splice dataI fb o c hol hlen k, hfb]
   by_cases hc : off + tot ≤ k ∧ k < off + tot + c.length
-  · rw [if_pos hc, if_neg (by omega), if_pos hc]
-  · rw [if_neg hc, hinv k]
+  · rw [ite_eq_left hc, ite_eq_right (by omega), ite_eq_left hc]
+  · rw [ite_eq_right hc, hinv k]
     by_cases hd : off ≤ k ∧ k < off + tot
-    · rw [if_pos hd, if_pos hd]
-    · rw [if_neg hd, if_neg hd, if_neg hc]
+    · rw [ite_eq_left hd, ite_eq_left hd]
+    · rw [ite_eq_right hd, ite_eq_right hd, ite_eq_right hc]
 
 /-- An UNDISTURBED exit (Rocq's `wi_range_dist0`). -/
 theorem writei_range_dist0 (data data' : Nat → List (BitVec 8)) (off tot : Nat)
@@ -181,8 +181,8 @@ theorem writei_range_dist0 (data data' : Nat → List (BitVec 8)) (off tot : Nat
       else fileByte data k := by
   rw [h k]
   by_cases hd : off ≤ k ∧ k < off + tot
-  · rw [if_pos hd, if_pos hd]
-  · rw [if_neg hd, if_neg hd, if_neg (by omega)]
+  · rw [ite_eq_left hd, ite_eq_left hd]
+  · rw [ite_eq_right hd, ite_eq_right hd, ite_eq_right (by omega)]
 
 /-- The kernel-arm tie, extended by one chunk (Rocq's `wi_ker_step`). -/
 theorem writei_ker_step (user : Bool) (sbs : List (BitVec 8)) (wroteI : Nat → BitVec 8)
@@ -193,11 +193,11 @@ theorem writei_ker_step (user : Bool) (sbs : List (BitVec 8)) (wroteI : Nat → 
   intro hu i hi
   unfold writei_wrote2
   by_cases h : i < tot
-  · rw [if_pos h]; exact h1 hu i h
-  · rw [if_neg h]
+  · rw [ite_eq_left h]; exact h1 hu i h
+  · rw [ite_eq_right h]
     have hl := hle hu
     simp only [getElem!_def, List.getElem?_take, List.getElem?_drop]
-    rw [if_pos (by omega)]
+    rw [ite_eq_left (by omega)]
     congr 2; omega
 
 /-- ...and it survives a later extension of the descriptor. -/
@@ -230,13 +230,13 @@ theorem writei_usr_step (P0 PI P2 : UPtd) (M : Nat → List (BitVec 8)) (src : B
   refine ⟨by omega, fun i hi => ?_⟩
   unfold writei_wrote2
   by_cases hlt : i < tot
-  · rw [if_pos hlt]
+  · rw [ite_eq_left hlt]
     obtain ⟨P1, e1, e2, e3⟩ := h i hlt
     exact ⟨P1, e1, UMemL.ext_trans e2 h2, e3⟩
-  · rw [if_neg hlt]
+  · rw [ite_eq_right hlt]
     refine ⟨P2, UMemL.ext_trans h0 h2, UMemL.ext_refl P2, ?_⟩
     simp only [getElem!_def, UMemL.umemRead_getElem?, hsrc]
-    rw [if_pos (by omega)]
+    rw [ite_eq_left (by omega)]
     simp only []
     congr 1; omega
 
@@ -357,12 +357,12 @@ theorem wi16Pre_spend (bms : Nat) (inum : BitVec 32) (inodestart : Nat)
   obtain ⟨hs, -, -⟩ := hpre h1
   unfold wi16Spend
   by_cases hc : IBLOCK inum inodestart ∈ Sc
-  · simp only [hc, decide_true, if_true]
+  · simp only [hc, decide_true, ite_true]
     by_cases hb : IBLOCK inum inodestart ∈ Sb
-    · simp only [hb, decide_true, if_true]; omega
-    · simp only [hb, decide_false, Bool.false_eq_true, if_false]; omega
+    · simp only [hb, decide_true, ite_true]; omega
+    · simp only [hb, decide_false, Bool.false_eq_true, ite_false]; omega
   · have hb : IBLOCK inum inodestart ∉ Sb := fun h => hc (hsub _ h)
-    simp only [hc, hb, decide_false, Bool.false_eq_true, if_false]
+    simp only [hc, hb, decide_false, Bool.false_eq_true, ite_false]
     omega
 
 /-- The granularity fact crosses the flush untouched (Rocq's

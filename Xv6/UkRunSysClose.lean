@@ -33,11 +33,11 @@ theorem uk_close_row (m : RegMap) (pc : BitVec 64) (fd : Nat) (st : FdState) (fd
     r.toNat = 0 ∧ fdv' = fdv.set fd .closed := by
   have haz : usysArgfd (tfOf m pc) = (fd : Int) := by rw [ukSys_argfd]; exact harg
   unfold usysFdOk at hrow
-  rw [if_pos rfl] at hrow
+  rw [ite_eq_left rfl] at hrow
   obtain ⟨hmove, hdet⟩ := hrow
   have hr0 := hdet fd st haz hi hne
   refine ⟨hr0, ?_⟩
-  rw [if_pos hr0, haz] at hmove
+  rw [ite_eq_left hr0, haz] at hmove
   simpa using hmove
 
 section UkRunSysClose
@@ -130,7 +130,7 @@ theorem wp_uk_ecall_close_std (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : R
   ihave %hst := ustd_agree N.fd fdv l $$ Hufd Hstd
   have hi : fdv[fd]? = some st := by
     have : (fdv.take NSTD)[fd]? = some st := by rw [hst]; exact hkl
-    rw [List.getElem?_take, if_pos hs] at this; exact this
+    rw [List.getElem?_take, ite_eq_left hs] at this; exact this
   have hlt : fd < NOFILE := by have := NSTD_le_NOFILE; omega
   imod udepwCl_mint N m pc st M pm sz fdv cw gn cs pidv (ukSys_fdStOfKey m fdv fd st harg hi hlt)
     $$ Hdep Hmy Hsb Hheap Hufd with ⟨Hheap, Hufd, Hdepn⟩

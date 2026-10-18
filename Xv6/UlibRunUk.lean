@@ -92,15 +92,15 @@ theorem uTextDecode_real {t : User.UTextTree} {img : ElfMem} (hok : User.UTextOk
     rw [hf] at h
     simp only [Option.bind_some] at h
     by_cases hg : uTextGeom t k.width pc.toNat = true
-    case neg => rw [if_neg hg] at h; cases h
-    rw [if_pos hg] at h
+    case neg => rw [ite_eq_right hg] at h; cases h
+    rw [ite_eq_left hg] at h
     obtain ⟨h2, hnext⟩ := uTextGeom_spec hg
     unfold User.utextDecodeWith
     rw [hf]
     simp only
     unfold ulibDecodeEnc at h
     by_cases hw4 : k.width = 4
-    · rw [if_pos hw4] at h ⊢
+    · rw [ite_eq_left hw4] at h ⊢
       cases hr : runRead udrefU (ext_decode (BitVec.ofNat 32 k.enc)) with
       | none => rw [hr] at h; cases h
       | some p =>
@@ -110,15 +110,15 @@ theorem uTextDecode_real {t : User.UTextTree} {img : ElfMem} (hok : User.UTextOk
         rw [hr] at h
         simp only at h ⊢
         by_cases hc : isRVC (BitVec.extractLsb' 0 16 (BitVec.ofNat 32 k.enc)) = false ∧ instrWf i'
-        · rw [if_pos hc] at h
+        · rw [ite_eq_left hc] at h
           simp only [Option.some.injEq, Prod.mk.injEq] at h
           obtain ⟨rfl, rfl⟩ := h
-          exact ⟨_, _, _, by rw [if_pos ⟨hc.1, h2, hc.2⟩]⟩
-        · rw [if_neg hc] at h; cases h
-    · rw [if_neg hw4] at h ⊢
+          exact ⟨_, _, _, by rw [ite_eq_left ⟨hc.1, h2, hc.2⟩]⟩
+        · rw [ite_eq_right hc] at h; cases h
+    · rw [ite_eq_right hw4] at h ⊢
       by_cases hw2 : k.width = 2
-      case neg => rw [if_neg hw2] at h; cases h
-      rw [if_pos hw2] at h ⊢
+      case neg => rw [ite_eq_right hw2] at h; cases h
+      rw [ite_eq_left hw2] at h ⊢
       cases hr : runRead udrefU (ext_decode_compressed (BitVec.ofNat 16 k.enc)) with
       | none => rw [hr] at h; cases h
       | some p =>
@@ -140,13 +140,13 @@ theorem uTextDecode_real {t : User.UTextTree} {img : ElfMem} (hok : User.UTextOk
           rw [hex]
           simp only
           by_cases hc : isRVC (BitVec.ofNat 16 k.enc) = true ∧ instrWf i' ∧ k.enc < 65536
-          · rw [if_pos hc] at h
+          · rw [ite_eq_left hc] at h
             simp only [Option.some.injEq, Prod.mk.injEq] at h
             obtain ⟨rfl, rfl⟩ := h
-            rw [if_pos ⟨hc.1, h2, hc.2.1, hc.2.2⟩]
+            rw [ite_eq_left ⟨hc.1, h2, hc.2.1, hc.2.2⟩]
             by_cases h42 : pc.toNat % 4 = 2
-            · exact ⟨_, _, _, by rw [if_pos h42]⟩
-            · rw [if_neg h42]
+            · exact ⟨_, _, _, by rw [ite_eq_left h42]⟩
+            · rw [ite_eq_right h42]
               obtain ⟨k', hk', hw'⟩ := hnext hw2 (by omega)
               have hb2 := hok.byte hk' 0 (by omega)
               have hb3 := hok.byte hk' 1 (by omega)
@@ -154,7 +154,7 @@ theorem uTextDecode_real {t : User.UTextTree} {img : ElfMem} (hok : User.UTextOk
               rw [show pc.toNat + 2 + 1 = pc.toNat + 3 by omega] at hb3
               rw [hb2, hb3]
               exact ⟨_, _, _, rfl⟩
-          · rw [if_neg hc] at h; cases h
+          · rw [ite_eq_right hc] at h; cases h
 
 section UlibUk
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
@@ -527,7 +527,7 @@ theorem ulibUk_wp_j (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (imm :
       ulibUkGoal γ :=
   ulibUk_lift0 N γ fun h => by
     have H := wp_uk_jal UL N h m pc rvc imm 0#5 av (by unfold unotSp spIdx; decide) hal
-    rw [show ukWr m 0#5 (pc + instrLen rvc) = m by unfold ukWr; rw [if_pos rfl]] at H
+    rw [show ukWr m 0#5 (pc + instrLen rvc) = m by unfold ukWr; rw [ite_eq_left rfl]] at H
     exact H
 
 theorem ulibUk_wp_ret (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (rs1 : BitVec 5) (h0 : rs1 ≠ 0#5) :

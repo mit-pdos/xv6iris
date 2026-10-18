@@ -1070,10 +1070,10 @@ theorem wp_sys_open_eb_of_arms (omo : OffMode) (Γ : SchedNames) [ClaimIs GF Γ]
   unfold wp_sys_open_eb_body openIn openArms
   cases hc : omCreate vom
   · have h := hplain hc
-    simp only [Bool.false_eq_true, if_false]
+    simp only [Bool.false_eq_true, ite_false]
     exact h
   · have h := hcreate hc
-    simp only [if_true]
+    simp only [ite_true]
     exact h
 
 end Frame

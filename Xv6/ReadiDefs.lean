@@ -80,12 +80,12 @@ theorem rdDst_pid (user : Bool) (dst : BitVec 64) (j : Nat) (pidv : BitVec 32) (
         (wordPointsTo (pPid (procAddr j)) 4 (rdQ user dqp) pidv -∗
           rdDst user dst j pidv Vp P Mi dqp data olds off tot)) := by
   cases user
-  · simp only [rdDst, rdQ, Bool.false_eq_true, if_false]
+  · simp only [rdDst, rdQ, Bool.false_eq_true, ite_false]
     iintro ⟨Hb, Hp⟩
     iframe Hp
     iintro Hp
     iframe Hb Hp
-  · simp only [rdDst, rdQ, if_true]
+  · simp only [rdDst, rdQ, ite_true]
     unfold procPrivExt
     iintro ⟨%kv, %hkv, %h1, Hp, Hf, Hpt, Htf, %h2, Hev⟩
     iframe Hp
@@ -214,10 +214,10 @@ theorem rd_copyout (EC : EITHER_COPYOUT) (c : CPU) (k' : KCtx) (γkl : GName) (�
     have h := EC.wp_either_copyout (GF := GF) c k' γkl γk j pidv Vp P Mi false
       (DFrac.own 1) bs (((rdDelivered data olds off tot).drop tot).take m) hj
       (fun h => absurd h (by decide)) hnoff hK hlk huser (by rw [ha3, hbs])
-      (by simp only [Bool.false_eq_true, if_false]; omega)
+      (by simp only [Bool.false_eq_true, ite_false]; omega)
       (by simp only [List.length_take, List.length_drop]; omega)
     unfold wp_either_copyout_body at h
-    simp only [eitherCopyoutAddr, Bool.false_eq_true, if_false] at h
+    simp only [eitherCopyoutAddr, Bool.false_eq_true, ite_false] at h
     rw [rdDst_false]
     iintro ⟨Hk, Hpc, #Hkl, #Hav, Hsrc, ⟨Hbuf, Hpid⟩, Hnext⟩
     icases UMemL.byteBuf_split_td dst (DFrac.own 1) (rdDelivered data olds off tot) tot m
@@ -245,9 +245,9 @@ theorem rd_copyout (EC : EITHER_COPYOUT) (c : CPU) (k' : KCtx) (γkl : GName) (�
     -- the block at the count the earlier rounds raised it to (deviation 3)
     have h := EC.wp_either_copyout (GF := GF) c k' γkl γk j pidv (Vp.updEv kv) P Mi true
       (DFrac.own 1) bs bs hj (fun _ => hproc) hnoff hK hlk huser (by rw [ha3, hbs])
-      (by simp only [if_true]; omega) rfl
+      (by simp only [ite_true]; omega) rfl
     unfold wp_either_copyout_body at h
-    simp only [eitherCopyoutAddr, if_true] at h
+    simp only [eitherCopyoutAddr, ite_true] at h
     iapply h
     iframe Hk Hpc Hsrc Hpriv
     iframe #

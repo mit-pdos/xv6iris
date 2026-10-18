@@ -100,11 +100,11 @@ theorem namexEra_found_heldAt (data : Nat → List (BitVec 8)) (dn : Dinode) (di
   have hfacts : inum2.toNat < 16 * icfgNib ∧ 0 < inum2.toNat := by
     cases self with
     | true =>
-      simp only [if_true] at harm
+      simp only [ite_true] at harm
       obtain ⟨-, heq, -⟩ := harm
       rw [heq]; exact ⟨hib, hip⟩
     | false =>
-      simp only [Bool.false_eq_true, if_false] at harm
+      simp only [Bool.false_eq_true, ite_false] at harm
       obtain ⟨-, hf, heq⟩ := harm
       have hlt := dirFirst_lt _ _ _ _ hf
       have hlive := dirFirst_live _ _ _ _ hf
@@ -222,7 +222,7 @@ theorem namexEra_look (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : SchedNames)
   have hbz := Xv6.dirlookup_beqz (R' 10#5)
   cases found
   · -- ===== MISS: THE FIRE MISSES, then +0xea c.beqz a0 TAKEN, L_miss =====
-    simp only [Bool.false_eq_true, if_false]
+    simp only [Bool.false_eq_true, ite_false]
     icases Harm with ⟨%⟨hnself, hnone, ha0⟩, Hs1'⟩
     have hents : (dirView data (dirNrec dn.diSize.toNat))[el]? = none := by
       rw [← hf.hel]; exact dv_lookup_none _ data _ _ rfl hnone
@@ -248,7 +248,7 @@ theorem namexEra_look (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : SchedNames)
     case f27 => simp [RegMap.set_apply, s27, r27]
     case f18 => simp [RegMap.set_apply, ha0]
   · -- ===== FOUND: THE FIRE HITS, the cursor steps to the child =====
-    simp only [if_true]
+    simp only [ite_true]
     icases Harm with ⟨%inum2, %self, %kk, %⟨hks, ha0⟩, %harm, Href, Hru2⟩
     -- THE FIRE, on both of the lookup's arms (chroot): at the matched record's
     -- child (`elend_fire_hit`), or -- the SELF arm, `..` at the process's
@@ -260,13 +260,13 @@ theorem namexEra_look (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : SchedNames)
             P (es0.length + 1) inum2.toNat := by
       cases self with
       | true =>
-        simp only [if_true] at harm
+        simp only [ite_true] at harm
         obtain ⟨⟨hdd, hrt⟩, heq, -⟩ := harm
         rw [heq]
         exact elend_fire_self A.rti fscFs fscCov fscLogst P Pmiss es0.length el inum.toNat dn bm
           data hok htyz hnl (by rw [← hf.hel, hdd]; exact DOTDOT_dotdot.symm) hrt
       | false =>
-        simp only [Bool.false_eq_true, if_false] at harm
+        simp only [Bool.false_eq_true, ite_false] at harm
         obtain ⟨hns, hsome, heq⟩ := harm
         have hents : (dirView data (dirNrec dn.diSize.toNat))[el]? = some inum2.toNat := by
           rw [heq, MachCSL.zext32_toNat, ← hf.hel]; exact dv_lookup_found _ data _ _ kk rfl hsome
@@ -298,7 +298,7 @@ theorem namexEra_look (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : SchedNames)
     isplitr
     · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
     isplitr
-    · simp only [if_true]; iexact Hobs
+    · simp only [ite_true]; iexact Hobs
     unfold namexAfterIup
     iintro %c %spie'' %spp'' %R'' %n' %Sb' %w %⟨hcs2, hsub, hwr, hww, hn1, hn2⟩ Hk Hpc Hte Hce
       Hkeep Hbs Hops Htx Hslot

@@ -82,8 +82,8 @@ theorem umemLazy_of_lazyFree {P : UPtd} {sz : BitVec 64} (M : Nat → List (BitV
   funext n
   unfold umemLazy umemGet
   by_cases hm : (get? P.um (n / 4096)).isSome
-  · rw [if_pos hm, if_pos hm]
-  · rw [if_neg hm, if_neg hm, if_neg]
+  · rw [ite_eq_left hm, ite_eq_left hm]
+  · rw [ite_eq_right hm, ite_eq_right hm, ite_eq_right]
     intro hlt
     exact hm (hlf (n / 4096) (by have := UPtAlloc.pgRoundUpN_dvd sz.toNat; omega))
 

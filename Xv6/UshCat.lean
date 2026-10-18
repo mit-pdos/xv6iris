@@ -104,16 +104,16 @@ theorem catBssImg (a : Nat) (h1 : 0x1000 ≤ a) (h2 : a < 0x1220) : elfImage Use
     have hv : User.Cat.code.vaddr = 0 := rfl
     have hs : User.Cat.code.size = 0xedc := rfl
     unfold User.USeg.byte
-    rw [if_neg (by omega)]
+    rw [ite_eq_right (by omega)]
   have hd : User.Cat.data.byte a = none := by
     have hv : User.Cat.data.vaddr = 0x1000 := rfl
     have hs : User.Cat.data.size = 0 := rfl
     unfold User.USeg.byte
-    rw [if_neg (by omega)]
+    rw [ite_eq_right (by omega)]
   have hlo : User.Cat.bssLo = 0x1000 := rfl
   have hsz : User.Cat.bssSize = 0x220 := rfl
-  simp only [elfUnion, hc, hd, elfEmpty, elfSeq, hlo, hsz, if_pos h1]
-  rw [List.getElem?_replicate, if_pos (by omega)]
+  simp only [elfUnion, hc, hd, elfEmpty, elfSeq, hlo, hsz, ite_eq_left h1]
+  rw [List.getElem?_replicate, ite_eq_left (by omega)]
   rfl
 
 /-! ## 3. The push geometry, as twelve closed readings of the key -/
@@ -177,8 +177,8 @@ theorem catKexecBufrow (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → B
   have hb : User.Cat.Sym.«buf» = 0x1010 := rfl
   intro j hj
   refine ⟨?_, by omega⟩
-  rw [udataLo_get, if_pos (by rw [hszv]; omega), udataPart_get,
-    if_pos ⟨by unfold uCap; omega, hdw _ (by omega) (by omega)⟩, hbuf j hj]
+  rw [udataLo_get, ite_eq_left (by rw [hszv]; omega), udataPart_get,
+    ite_eq_left ⟨by unfold uCap; omega, hdw _ (by omega) (by omega)⟩, hbuf j hj]
 
 /-- **Rocq `cat_kexec_argnz`**: every argv slot points inside the stack
 page, so no pointer the vector spells is NULL (cat dereferences argv[1]). -/
@@ -192,7 +192,7 @@ theorem catKexecArgnz (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → Bi
   have hav' : uvisAv W' = (kxcSpFinal 0x4000 alen na).toNat := by omega
   have hp := hptr i (by omega)
   unfold kexecUstack at hp
-  rw [if_pos hi] at hp
+  rw [ite_eq_left hi] at hp
   have hs := hsi i hi
   rw [hav']
   omega

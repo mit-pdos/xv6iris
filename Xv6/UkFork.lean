@@ -133,7 +133,7 @@ theorem wp_uk_ecall_fork_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Reg
     rw [usysEff_seccAll _ (by rw [hnum]; decide) (by rw [hnum]; decide), hnum]
   have hnumW : uvisNum (uvisOfRun m pc M pm sz fdv c gn Sc pidv false seccAll) = USYS_fork := hnumE
   rw [hnumW]
-  simp only [show ¬ (USYS_fork = USYS_exit) by decide, if_false, if_true]
+  simp only [show ¬ (USYS_fork = USYS_exit) by decide, ite_false, ite_true]
   -- the families: the point family at the child's payload and the lend
   let f : sfam GF := sfamAt N.pay (sfamPay Q Rc)
   have hfx : sexitPay f = N.pay := sexitPay_at _ _

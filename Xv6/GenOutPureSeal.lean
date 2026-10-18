@@ -121,13 +121,13 @@ theorem lmD_pending_sess (ps cs : List Nat) (s : M.lmSt) (E : List (List Obs × 
           = lmContAt M ps cs s (bodiesOf (E.map Prod.snd) ++ [restOf (E.map Prod.snd)])
               (nlines (E.map Prod.snd)) := by
         unfold lmPendingAt
-        rw [if_neg (by simp), if_pos (restOf_snoc_nl _), bodiesOf_snoc_nl, nlines_snoc_nl,
+        rw [ite_eq_right (by simp), ite_eq_left (restOf_snoc_nl _), bodiesOf_snoc_nl, nlines_snoc_nl,
           Nat.add_sub_cancel]
       rw [hp, lmSess_snoc_nl]
       simp [List.append_assoc]
     · have hp : lmPendingAt M ps cs s (E.map Prod.snd ++ [x.2]) = [] := by
         unfold lmPendingAt
-        rw [if_neg (by simp), if_neg (by rw [restOf_snoc_other _ _ hnl]; simp)]
+        rw [ite_eq_right (by simp), ite_eq_right (by rw [restOf_snoc_other _ _ hnl]; simp)]
       rw [hp, List.append_nil, lmSess_snoc_other M ps cs s _ x.2 hnl]
 
 include B in

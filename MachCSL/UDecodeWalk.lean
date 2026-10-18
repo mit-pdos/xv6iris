@@ -201,15 +201,15 @@ theorem runReadP_ite (P : X → Bool) (c : Prop) [Decidable c] (a b : SailM X)
     (ha : c → runReadP d P a = true) (hb : ¬ c → runReadP d P b = true) :
     runReadP d P (ite c a b) = true := by
   by_cases hc : c
-  · rw [if_pos hc]; exact ha hc
-  · rw [if_neg hc]; exact hb hc
+  · rw [ite_eq_left hc]; exact ha hc
+  · rw [ite_eq_right hc]; exact hb hc
 
 theorem runReadP_dite (P : X → Bool) (c : Prop) [Decidable c] (a : c → SailM X) (b : ¬ c → SailM X)
     (ha : ∀ h, runReadP d P (a h) = true) (hb : ∀ h, runReadP d P (b h) = true) :
     runReadP d P (dite c a b) = true := by
   by_cases hc : c
-  · rw [dif_pos hc]; exact ha hc
-  · rw [dif_neg hc]; exact hb hc
+  · rw [dite_eq_left hc]; exact ha hc
+  · rw [dite_eq_right hc]; exact hb hc
 
 theorem udecode_and_left {a b : Bool} (h : (a && b) = true) : a = true := by
   cases a <;> simp_all

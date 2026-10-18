@@ -243,15 +243,15 @@ theorem grepBssImg (a : Nat) (h1 : 0x2000 ≤ a) (h2 : a < 0x2420) : elfImage Us
     have hv : User.Grep.code.vaddr = 0 := rfl
     have hs : User.Grep.code.size = 0x10dc := rfl
     unfold User.USeg.byte
-    rw [if_neg (by rw [hv, hs]; omega)]
+    rw [ite_eq_right (by rw [hv, hs]; omega)]
   have hd : User.Grep.data.byte a = none := by
     have hv : User.Grep.data.vaddr = 0x2000 := rfl
     have hs : User.Grep.data.size = 0 := rfl
     unfold User.USeg.byte
-    rw [if_neg (by rw [hv, hs]; omega)]
+    rw [ite_eq_right (by rw [hv, hs]; omega)]
   have hs : elfSeq User.Grep.bssLo (List.replicate User.Grep.bssSize elfZeroByte) a = some elfZeroByte := by
     unfold elfSeq User.Grep.bssLo User.Grep.bssSize
-    rw [if_pos h1, List.getElem?_replicate, if_pos (by omega)]
+    rw [ite_eq_left h1, List.getElem?_replicate, ite_eq_left (by omega)]
   simp only [elfUnion, hc, hd, elfEmpty, hs]
   all_goals rfl
 
@@ -417,7 +417,7 @@ theorem grepKexecArgsc (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → B
     have hp : ukArgvP W'.M (kxcSpFinal 0x5000 alen na).toNat i = (kxcSp 0x5000 alen (i + 1)).toNat := by
       have := hptr i (by omega)
       unfold kexecUstack at this
-      rw [if_pos hi] at this
+      rw [ite_eq_left hi] at this
       omega
     have hs := hsi i hi
     obtain ⟨hle, hcs⟩ := hslen i hi
@@ -463,7 +463,7 @@ theorem grepKexecAvs (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → Bit
   have hp : ukArgvP W'.M (uvisAv W') i = (kxcSp 0x5000 alen (i + 1)).toNat := by
     have := hptr i (by omega)
     unfold kexecUstack at this
-    rw [if_pos hi] at this
+    rw [ite_eq_left hi] at this
     rw [hav']
     omega
   have hs := hsi i hi
@@ -506,8 +506,8 @@ theorem grepKexecBufrow (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → 
   have hb : User.Grep.Sym.«buf» = 0x2010 := rfl
   intro j hj
   refine ⟨?_, by rw [hb]; omega⟩
-  rw [udataLo_get, if_pos (by rw [hszv, hb]; omega), udataPart_get,
-    if_pos ⟨by rw [hb]; unfold uCap; omega, hdw _ (by rw [hb]; omega) (by rw [hb]; omega)⟩, hbuf j hj]
+  rw [udataLo_get, ite_eq_left (by rw [hszv, hb]; omega), udataPart_get,
+    ite_eq_left ⟨by rw [hb]; unfold uCap; omega, hdw _ (by rw [hb]; omega) (by rw [hb]; omega)⟩, hbuf j hj]
 
 /-- **Rocq `grep_kexec_argnz`**: every argv slot points inside the stack
 page, so no pointer the vector spells is NULL. -/
@@ -522,7 +522,7 @@ theorem grepKexecArgnz (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → B
   rw [hargc] at hi
   have := hptr i (by omega)
   unfold kexecUstack at this
-  rw [if_pos hi, ← hav'] at this
+  rw [ite_eq_left hi, ← hav'] at this
   have hs := hsi i hi
   omega
 
@@ -604,7 +604,7 @@ theorem grepKeyArgs_holds : grepKeyArgs := by
     rw [ukArgvP_of_bytes _ _ _ (BitVec.ofInt 64 (kxcSp 0x5000 alen (i + 1))) (fun k hk => by
       have h := hvec i k (by omega) hk
       unfold kexecUstack at h
-      rw [if_pos hi, memAtZ_nonneg _ _ (by omega)] at h
+      rw [ite_eq_left hi, memAtZ_nonneg _ _ (by omega)] at h
       rw [hav', show (kxcSpFinal 0x5000 alen na).toNat + 8 * i + k =
         (kxcSpFinal 0x5000 alen na + 8 * (i : Int) + (k : Int)).toNat by omega]
       exact h)]

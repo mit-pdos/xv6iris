@@ -120,10 +120,10 @@ theorem uvmdealloc_proof (UM : UVMUNMAP) : UVMDEALLOC :=
       iapply wpNext_mono _ _ _ _ _ $$ HΦ
       iintro %c' HΦ %R'' Hk Hpc %hpost
       have hnp : uvmdNp (k.regs 11#5) (k.regs 12#5) = 0 := by
-        unfold uvmdNp; rw [if_neg hge]
+        unfold uvmdNp; rw [ite_eq_right hge]
       rw [hnp, Xv6.delRun_zero]
       have hrsz : uvmdRsz (k.regs 11#5) (k.regs 12#5) = k.regs 11#5 := by
-        unfold uvmdRsz; rw [if_neg hge]
+        unfold uvmdRsz; rw [ite_eq_right hge]
       ihave Hlend := actLend_ret_intro _ _ $$ Hlend
       iapply HΦ $$ %k.spie %k.spp %R'' %(fun _ => ⟨rfl, rfl⟩) Hk Hpc Hlend HP
       ipureintro
@@ -185,10 +185,10 @@ theorem uvmdealloc_proof (UM : UVMUNMAP) : UVMDEALLOC :=
       pgRoundUpN_le (by omega)
     have hmax : uvmMaxsz < 2 ^ 38 := by unfold uvmMaxsz; omega
     have hrsz : uvmdRsz (k.regs 11#5) (k.regs 12#5) = k.regs 12#5 := by
-      unfold uvmdRsz; rw [if_pos hge]
+      unfold uvmdRsz; rw [ite_eq_left hge]
     have hnpe : uvmdNp (k.regs 11#5) (k.regs 12#5)
         = (pgRoundUpN (k.regs 11#5).toNat - pgRoundUpN (k.regs 12#5).toNat) / 4096 := by
-      unfold uvmdNp; rw [if_pos hge]
+      unfold uvmdNp; rw [ite_eq_left hge]
     by_cases hlt : pgRoundUpN (k.regs 12#5).toNat < pgRoundUpN (k.regs 11#5).toNat
     case neg =>
       -- the rounded sizes agree: nothing to unmap

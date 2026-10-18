@@ -51,7 +51,7 @@ theorem tlbClear_zero (tlb0 : Tlb) : tlbClear tlb0 0 = tlb0 := by
 theorem tlbClear_full (tlb0 : Tlb) : tlbClear tlb0 (2 ^ 6) = vectorInit none := by
   apply Vector.ext
   intro j hj
-  rw [tlbClear_get tlb0 _ j hj, vectorInit, Vector.getElem_replicate, if_pos hj]
+  rw [tlbClear_get tlb0 _ j hj, vectorInit, Vector.getElem_replicate, ite_eq_left hj]
 
 theorem tlbClear_succ (tlb0 : Tlb) (n : Nat) (hn : n < 2 ^ 6) :
     vectorUpdate (tlbClear tlb0 n) n none = tlbClear tlb0 (n + 1) := by
@@ -59,10 +59,10 @@ theorem tlbClear_succ (tlb0 : Tlb) (n : Nat) (hn : n < 2 ^ 6) :
   intro j hj
   rw [tlbClear_get tlb0 _ j hj, vectorUpdate, Vector.getElem_set! hj, tlbClear_get tlb0 _ j hj]
   rcases Nat.lt_trichotomy j n with hc | hc | hc
-  · rw [if_neg (by omega : ¬ n = j), if_pos hc, if_pos (by omega : j < n + 1)]
+  · rw [ite_eq_right (by omega : ¬ n = j), ite_eq_left hc, ite_eq_left (by omega : j < n + 1)]
   · subst hc
-    rw [if_pos (rfl : j = j), if_pos (by omega : j < j + 1)]
-  · rw [if_neg (by omega : ¬ n = j), if_neg (by omega : ¬ j < n), if_neg (by omega : ¬ j < n + 1)]
+    rw [ite_eq_left (rfl : j = j), ite_eq_left (by omega : j < j + 1)]
+  · rw [ite_eq_right (by omega : ¬ n = j), ite_eq_right (by omega : ¬ j < n), ite_eq_right (by omega : ¬ j < n + 1)]
 
 theorem tlbClear_succ_none (tlb0 : Tlb) (n : Nat) (hn : n < 2 ^ 6)
     (h : tlb0[n]'hn = none) : tlbClear tlb0 (n + 1) = tlbClear tlb0 n := by
@@ -70,11 +70,11 @@ theorem tlbClear_succ_none (tlb0 : Tlb) (n : Nat) (hn : n < 2 ^ 6)
   intro j hj
   rw [tlbClear_get tlb0 _ j hj, tlbClear_get tlb0 _ j hj]
   rcases Nat.lt_trichotomy j n with hc | hc | hc
-  · rw [if_pos hc, if_pos (by omega : j < n + 1)]
+  · rw [ite_eq_left hc, ite_eq_left (by omega : j < n + 1)]
   · subst hc
-    rw [if_pos (by omega : j < j + 1), if_neg (by omega : ¬ j < j)]
+    rw [ite_eq_left (by omega : j < j + 1), ite_eq_right (by omega : ¬ j < j)]
     exact h.symm
-  · rw [if_neg (by omega : ¬ j < n), if_neg (by omega : ¬ j < n + 1)]
+  · rw [ite_eq_right (by omega : ¬ j < n), ite_eq_right (by omega : ¬ j < n + 1)]
 
 /-! ### A `SailM` loop with an index-dependent invariant -/
 
@@ -83,7 +83,7 @@ theorem mem_intrange_iff (range : IntRange) (hstep : range.step = 1) (i : Int) :
     i ∈ range ↔ (range.start ≤ i ∧ i ≤ range.stop) := by
   show ((if range.step > 0 then range.start ≤ i ∧ i ≤ range.stop
       else range.stop ≤ i ∧ i ≤ range.start) ∧ (i - range.start) % range.step = 0) ↔ _
-  rw [hstep, if_pos (by decide : (1 : Int) > 0)]
+  rw [hstep, ite_eq_left (by decide : (1 : Int) > 0)]
   simp [Int.emod_one]
 
 /-- A unit-state `SailM` loop (step 1) whose body always yields and moves the
@@ -110,7 +110,7 @@ theorem swp_intrange_loop_inv (cpu : CPU) (range : IntRange) (hstep : range.step
     rw [IntRange.loop_unfold]
     have hi : range.stop + 1 = i := by omega
     have hni : ¬ i ∈ range := by rw [mem_intrange_iff range hstep]; omega
-    simp only [dif_neg hni]
+    simp only [dite_eq_right hni]
     iapply swp_ret
     iapply HΦ
     rw [hi]
@@ -120,7 +120,7 @@ theorem swp_intrange_loop_inv (cpu : CPU) (range : IntRange) (hstep : range.step
     iintro ⟨#Hf, HP, HΦ⟩
     rw [IntRange.loop_unfold]
     have hmem : i ∈ range := by rw [mem_intrange_iff range hstep]; omega
-    simp only [dif_pos hmem]
+    simp only [dite_eq_left hmem]
     iapply swp_bind
     iapply Hf $$ %i %hmem
     iframe
@@ -169,7 +169,7 @@ theorem swp_flush_TLB_all (cpu : CPU) (tlb0 : Tlb) (Φ : Unit → IProp GF) :
     have hsucc : (j + 1).toNat = j.toNat + 1 := by omega
     swp_run 4
     simp only [← tlbClear_def]
-    rw [tlbClear_getInt tlb0 j.toNat j hj64, if_neg (Nat.lt_irrefl _)]
+    rw [tlbClear_getInt tlb0 j.toNat j hj64, ite_eq_right (Nat.lt_irrefl _)]
     cases hcase : tlb0[j.toNat]'hj64 with
     | none =>
       try rw [hsucc]

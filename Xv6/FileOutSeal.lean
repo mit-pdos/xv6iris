@@ -100,7 +100,7 @@ theorem f0Map_on (g : FileGn) (h : List Obs) (vf : FileEra) :
 theorem f0Pinned_undrained (g : FileGn) (h : List Obs) (s0s : List Fstate)
     (hw : obsWire .uart0 (openSeg h) = []) : ⊢@{IProp GF} f0Pinned g h s0s := by
   unfold f0Pinned
-  rw [if_pos hw]
+  rw [ite_eq_left hw]
   iempintro
 
 /-- An event that puts nothing on the console's wire moves neither the
@@ -120,7 +120,7 @@ theorem f0Pinned_drained (g : FileGn) (h : List Obs) (s0s : List Fstate) (vf : F
     fileEraPin (GF := GF) g (obsBoots h) vf ∗ f0Lb g vf s0 ∗ f0Pinned g h s0s ⊢
       ⌜∃ u1, s0s = u1 ++ [s0]⌝ := by
   unfold f0Pinned
-  rw [if_neg hw]
+  rw [ite_eq_right hw]
   iintro ⟨#Hfp, #Hlb, ⟨%vf', %s0', %hl, #Hfp', #Hlb'⟩⟩
   ihave %hv : ⌜vf = vf'⌝ $$ []
   · iapply fileEraPin_agree (GF := GF) g (obsBoots h) vf vf'
@@ -150,7 +150,7 @@ theorem f0Pinned_drain (g : FileGn) (h : List Obs) (b : BitVec 8) (u1 : List Fst
     rw [obsWire_app]
     simp [obsWire]
   unfold f0Pinned
-  rw [hs, if_neg hne, hb]
+  rw [hs, ite_eq_right hne, hb]
   iintro ⟨#Hfp, #Hlb⟩
   iexists vf, s0
   isplitr

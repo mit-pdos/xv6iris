@@ -196,11 +196,11 @@ theorem create_alloc_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs GF
   iframe Hk Hpc Hte Hce Hsl Hdep Hoff Hdev Hinum Hval Hshot Hfrz Hpid Hsb Hsi Hbs Hop
   iframe #
   isplitl [Hload]
-  · unfold icDepHeld; simp only [icDepRd, Bool.false_eq_true, if_false]; iexact Hload
+  · unfold icDepHeld; simp only [icDepRd, Bool.false_eq_true, ite_false]; iexact Hload
   isplitl [Hkeep Hru]
   · unfold inodeRefpShort; iframe
   isplitl []
-  · simp only [Bool.false_eq_true, if_false]; iempintro
+  · simp only [Bool.false_eq_true, ite_false]; iempintro
   iapply wpNext_intro_pin_lc
   iintro %c %_ Hlc %spie %spp %R' %n' %Sb' %w %hcs Hk Hpc Hte Hce Hpid Hsb Hsi Hbs %hf Hops Hslot Hside
   iapply HK $$ %c Hlc %spie %spp %R' %n' %Sb' %w [] Hk Hpc Hte Hce Hpid Hsb Hsi Hbs Hops Hslot [Hside]
@@ -495,7 +495,7 @@ theorem create_alloc_repark (dind cinum : BitVec 32) (dn dn' : Dinode) (bm bm' :
   have hnl0z := create_nl0z dn hnl0
   have hnd := dirDots_miss_not_dots dind.toNat dn data (bname 14 nf) hdz hnl0z hddix hnone
   have hnoneE : (dirEntries (eraNode dn bm data))[bname 14 nf]? = none := by
-    rw [dirEntries_eraNode dn bm data hholes hcap, if_pos hdz]
+    rw [dirEntries_eraNode dn bm data hholes hcap, ite_eq_left hdz]
     exact (dirView_lookup_None _ _ _).mpr hnone
   have hl16 := create_low16_toNat cinum hc16
   have hnz16 : createLow16 cinum ≠ 0#16 := by
@@ -542,7 +542,7 @@ theorem create_alloc_repark (dind cinum : BitVec 32) (dn dn' : Dinode) (bm bm' :
     (createLow16 cinum) (bname 14 nf) _ _ 16 D false rfl rfl (Or.inr rfl) (bname_length_le 14 nf)
     (cutNul_nonul _) hdz hty' hnl' hszmax hrng hnone hholes hholes' hcap hcap' hsD
     (by rw [DOTDOT_dotdot]; exact hnd.2)
-  simp only [Bool.false_eq_true, if_false] at harm
+  simp only [Bool.false_eq_true, ite_false] at harm
   ihave Htok := htok $$ Htok
   ihave Hetk := harm $$ Hetk Htok
   ihave Hdl := dlinks_intro fscFs dind.toNat dn' bm' data' D (entDsetOk_grow _ _ D hgrow hdok0)
@@ -1052,12 +1052,12 @@ theorem create_alloc_file (IUP : IUNLOCKPUT) (DLK : DIRLINK) (Γ : SchedNames)
   | true =>
     -- dirlink's own lookup found the name: refuted by the found half's miss
     -- on both of its arms (a live directory's `..` is never a miss)
-    simp only [if_true] at harms
+    simp only [ite_true] at harms
     exact harms.1.elim (absurd hnone) (fun h =>
       ((dirDots_miss_not_dots dind.toNat dn data (bname 14 nf) hdz (create_nl0z dn hnl0) hddix
         hnone).2 h.1).elim)
   | false =>
-  simp only [Bool.false_eq_true, if_false] at harms
+  simp only [Bool.false_eq_true, ite_false] at harms
   obtain ⟨-, hwf', hholes', haddr', hsz31', hcov', hdn', hdn0', htot16, hrng, hbl⟩ := harms
   obtain ⟨hsp, hatom, hmem⟩ := hw16 rfl
   have hn'4 : iputUnits + 1 ≤ n' := create_alloc_ip4 n3 n' _ _ _ _ _ hn3.1 hsp
@@ -1349,7 +1349,7 @@ theorem create_alloc_made (IUP : IUNLOCKPUT) (IU : IUPDATE) (DLK : DIRLINK) (Γ 
   icases bslots_uncons 2 $$ Hbs with ⟨Hb1, Hb2⟩
   -- THE FREEZE PIN, PAID WITH THE SPAN'S TOKEN (Rocq :649–671)
   ihave Hpin : iregLinkPin true cinum.toNat dnc $$ [Hcfrz]
-  · rw [iregLinkPin, if_pos rfl]; iexact Hcfrz
+  · rw [iregLinkPin, ite_eq_left rfl]; iexact Hcfrz
   iapply (create_alloc_iupdate IU Γ cpu _ j γl pd pav pu γkl γk (ientry kslot) cinum
       (createSetf dnc major minor 1#16) dnc bmc q2 (IBLOCK cinum icfgIst :: Sb1) true true
       (createIty ty (dind.toNat : Int)) pid dqs hj ?gp ?gK ?gn ?gt (fun _ => create_mem_cons _ _)
@@ -1382,7 +1382,7 @@ theorem create_alloc_made (IUP : IUNLOCKPUT) (IU : IUPDATE) (DLK : DIRLINK) (Γ 
   ihave Hbs := bslots_cons 2 $$ [Hb1 Hb2]
   · iframe
   ihave Hcfrz : ifreezeOff cinum.toNat $$ [Hpin]
-  · rw [iregLinkPin, if_pos rfl]; iexact Hpin
+  · rw [iregLinkPin, ite_eq_left rfl]; iexact Hpin
   -- the pile is `createDelta ty` wide (Rocq :680–699)
   have hdelta : iregDotDelta dnc.diType.toNat dnc.diNlink.toNat = createDelta ty :=
     create_delta_eq ty major minor dnc dnc.diNlink htyc hfresh.2.2.2
@@ -1556,7 +1556,7 @@ theorem create_alloc_half (IL : ILOCK) (IUP : IUNLOCKPUT) (IA : IALLOC) (IU : IU
   cases alloc with
   | false =>
     -- ===== ARM A-FAIL (+0xec): ialloc returned 0, nothing was claimed =====
-    simp only [Bool.false_eq_true, if_false]
+    simp only [Bool.false_eq_true, ite_false]
     icases Hres with ⟨%hs3z, Hpc, Hislg, Htp, Htcl, Hop⟩
     ihave Htx := create_tx_join t (1 : Qp).half Qp.quarter Qp.quarter create_alloc_quarters
       $$ [Htcl Htx]
@@ -1648,7 +1648,7 @@ theorem create_alloc_half (IL : ILOCK) (IUP : IUNLOCKPUT) (IA : IALLOC) (IU : IU
     · ipureintro; exact create_slots_2 false ns rfl hns
     · ipureintro
       exact ⟨fun x hx => hsub2 x (hsb1 x hx), by omega, fun h => absurd h (by decide)⟩
-    simp only [Bool.false_eq_true, if_false]
+    simp only [Bool.false_eq_true, ite_false]
     isplitl []
     · ipureintro
       rw [ha0f]; simp [RegMap.set_apply, f19, s19]
@@ -1657,7 +1657,7 @@ theorem create_alloc_half (IL : ILOCK) (IUP : IUNLOCKPUT) (IA : IALLOC) (IU : IU
       minor.toNat Nm Nd P Pmiss Farm Fdots Fun Fok Fex (bview plen pfun) dind.toNat) $$ HP Hdlk Hcre
   | true =>
     -- ===== THE INODE WAS CLAIMED, LOCKED AND FILLED -- control at +0xb4 =====
-    simp only [if_true]
+    simp only [ite_true]
     icases Hres with ⟨%hp, Hpc, #Hcslk, Hcsl, #Hcfl, Hcdep, Hcoff, Hcdev, Hcinum, Hcval, Hcload,
       Hcshot, Hcfrz, Hckeep, Hcru, Htcl, Hop⟩
     obtain ⟨hs3, hkslot, hcpos, hclt, hcinb, htyc, hfresh, hle0, hnrt⟩ := hp

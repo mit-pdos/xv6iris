@@ -165,10 +165,10 @@ theorem dsSext_mod16 (w : BitVec 32) :
   have hw := w.isLt
   simp only [BitVec.msb_eq_decide]
   by_cases hm : 2 ^ 31 ≤ w.toNat
-  · rw [if_pos (by simpa using hm)]
+  · rw [ite_eq_left (by simpa using hm)]
     rw [BitVec.toNat_setWidth]
     omega
-  · rw [if_neg (by simpa using hm), BitVec.toNat_setWidth]
+  · rw [ite_eq_right (by simpa using hm), BitVec.toNat_setWidth]
     omega
 
 /-- `slli a4,a4,0x6`: scale the slot index to a byte offset (Rocq's
@@ -583,7 +583,7 @@ theorem dsPay_content [CurCtx] (E : CoPset) (γ : BcacheNames) (γfs : FsNames)
           bioPay γ (fsView γfs γd dev cov) k dv bno bs bsd d)) := by
   unfold bioPay
   cases d
-  · simp only [Bool.false_eq_true, if_false, fsView_clean]
+  · simp only [Bool.false_eq_true, ite_false, fsView_clean]
     unfold fsMclean
     iintro Hany Hc ⟨⟨HL, HD⟩, %heq⟩
     ihave Hag := fsBytes_agree_any E γfs bno.toNat bs0 bs hE $$ Hany Hc HL
@@ -593,7 +593,7 @@ theorem dsPay_content [CurCtx] (E : CoPset) (γ : BcacheNames) (γfs : FsNames)
     · ipureintro; exact he
     · iframe Hc HL HD
       ipureintro; exact heq
-  · simp only [if_true, fsView_dirty]
+  · simp only [ite_true, fsView_dirty]
     unfold fsMdirty
     iintro Hany Hc ⟨⟨HL, HD⟩, Hb⟩
     ihave Hag := fsBytes_agree_any E γfs bno.toNat bs0 bs hE $$ Hany Hc HL
@@ -616,14 +616,14 @@ theorem dsHeld_L [CurCtx] (γ : BcacheNames) (γfs : FsNames) (γd : DiskNames)
           bioPay γ (fsView γfs γd dev cov) k dv bno bs bsd d)) := by
   unfold bioPay
   cases d
-  · simp only [Bool.false_eq_true, if_false, fsView_clean]
+  · simp only [Bool.false_eq_true, ite_false, fsView_clean]
     unfold fsMclean
     iintro ⟨⟨HL, HD⟩, %heq⟩
     iframe HL
     iintro HL
     iframe HL HD
     ipureintro; exact heq
-  · simp only [if_true, fsView_dirty]
+  · simp only [ite_true, fsView_dirty]
     unfold fsMdirty
     iintro ⟨⟨HL, HD⟩, Hb⟩
     iframe HL

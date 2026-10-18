@@ -438,8 +438,8 @@ theorem ui_rxloop (CI : CONSOLEINTR) [CurCtx]
       · repeat refine uiPres_set _ _ _ _ ?_ (by decide)
         exact hpres2
       · simpa only [RegMap.set_apply, BitVec.reduceEq, ite_false] using hR29
-      · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, if_true]
-      · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, if_true]
+      · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+      · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   · -- +0x4c  beqz a5,+0x76 taken: the FIFO is empty, out to the epilogue
     k_step (wp_s_branch cpu _ (KA.«uartintr» + 0x4c#64) true 42#13 15#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hb, ui_dr_taken u hdr]
@@ -512,9 +512,9 @@ theorem ui_l0 (CI : CONSOLEINTR) [CurCtx]
   refine ⟨?_, ?_, ?_, ?_⟩
   · repeat refine uiPres_set _ _ _ _ ?_ (by decide)
     exact hpres
-  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, if_true]
-  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, if_true]
-  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, if_true]
+  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
 
 /-! ## The epilogue, packaged as the drain's exit continuation -/
 
@@ -540,7 +540,7 @@ theorem ui_exit [CurCtx] (cpu : CPU) (k : KCtx) (i : UartId) (γ : UartNames)
   iapply HΦ $$ Hlc %_ Hk Hpc
   · ipureintro
     unfold calleeSaved
-    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, if_true, true_and, and_true]
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, true_and, and_true]
     exact hpres'.2
   · iexact Hrtok
 
@@ -603,7 +603,7 @@ theorem ui_wake (CI : CONSOLEINTR) (WK : WAKEUP) [CurCtx]
   have hR29 : R2 9#5 = BitVec.ofNat 64 i.idx := by
     have h9 := hcs2.2.2.1
     simp only [KCtx.withRegs_regs, KCtx.pushed_regs, RegMap.set_apply, BitVec.reduceEq,
-      ite_false, if_true] at h9
+      ite_false, ite_true] at h9
     rw [h9]; exact hR9
   have hpres2 : uiPres k R2 := by
     refine uiPres_call k _ R2 ?_ hcs2
@@ -638,7 +638,7 @@ theorem uartintr_proof (CI : CONSOLEINTR) (WK : WAKEUP) : UARTINTR :=
       ((k.regs.set 2#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)).set 8#5 (k.regs 2#5)) := by
     unfold uiPres
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, if_true]
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   -- the prologue
   iapply (wp_prologue4s1 cpu k hsie KA.«uartintr» (by unfold uartintrSlots at hK; omega))
   k_code (text_instr _ _ _ _ rfl rfl) Htext
@@ -716,8 +716,8 @@ theorem uartintr_proof (CI : CONSOLEINTR) (WK : WAKEUP) : UARTINTR :=
     refine ⟨?_, ?_, ?_⟩
     · repeat refine uiPres_set _ _ _ _ ?_ (by decide)
       exact hpres0
-    · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, if_true] <;> exact hid
-    · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, if_true] <;> exact hid
+    · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;> exact hid
+    · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;> exact hid
   · -- +0x2c  bnez a5,+0x5e not taken: straight to the drain
     k_step (wp_s_branch cpu _ (KA.«uartintr» + 0x2c#64) true 50#13 15#5 0#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hb, ui_thre_fall u hth]
@@ -729,7 +729,7 @@ theorem uartintr_proof (CI : CONSOLEINTR) (WK : WAKEUP) : UARTINTR :=
     refine ⟨?_, ?_⟩
     · repeat refine uiPres_set _ _ _ _ ?_ (by decide)
       exact hpres0
-    · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, if_true] <;> exact hid⟩
+    · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;> exact hid⟩
 
 end
 

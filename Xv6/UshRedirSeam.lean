@@ -49,9 +49,9 @@ theorem ushs_skipws_trunc : ∀ (n n' i : Nat) (f : Nat → BitVec 8), n' ≤ n 
   | n + 1, n' + 1, i, f, hle, hb => by
     simp only [ushpSkipws] at hb ⊢
     by_cases hw : ushpIsWs (f i) = true
-    · simp only [hw, if_true] at hb ⊢
+    · simp only [hw, ite_true] at hb ⊢
       rw [ushs_skipws_trunc n n' (i + 1) f (by omega) (by omega)]
-    · simp only [hw, if_false, Bool.false_eq_true]
+    · simp only [hw, ite_false, Bool.false_eq_true]
 
 /-- **Rocq `ushs_toklen_trunc`**. -/
 theorem ushs_toklen_trunc : ∀ (n n' i : Nat) (f : Nat → BitVec 8), n' ≤ n → ushpToklen n i f ≤ n' →
@@ -61,8 +61,8 @@ theorem ushs_toklen_trunc : ∀ (n n' i : Nat) (f : Nat → BitVec 8), n' ≤ n 
   | n + 1, n' + 1, i, f, hle, hb => by
     simp only [ushpToklen] at hb ⊢
     by_cases hw : (ushpIsWs (f i) || ushpIsSym (f i)) = true
-    · simp only [hw, if_true]
-    · simp only [hw, if_false, Bool.false_eq_true] at hb ⊢
+    · simp only [hw, ite_true]
+    · simp only [hw, ite_false, Bool.false_eq_true] at hb ⊢
       rw [ushs_toklen_trunc n n' (i + 1) f (by omega) (by omega)]
 
 /-- **Rocq `ushs_toks_below`**: the argument tokens are `UshpTokens` of the
@@ -105,10 +105,10 @@ theorem ushs_nulcut_filebyte (len : Nat) (f : Nat → BitVec 8) (gp fe : Nat) (a
   intro j hj
   have ⟨_, _, _, _, h2e, hel, _, _⟩ := hred
   unfold ushsNulcut ushpSetb
-  rw [if_neg (by omega), ushpNulfold_miss args _ _ (fun i tk hi => by
+  rw [ite_eq_right (by omega), ushpNulfold_miss args _ _ (fun i tk hi => by
     have := ushs_arg_below len f gp fe args hred htoks i tk hi; omega)]
   unfold ushpExt
-  rw [if_pos (by omega)]
+  rw [ite_eq_left (by omega)]
 
 /-- The redirect line's cut is the reference's. -/
 theorem ushs_nulcut_ref (len : Nat) (f : Nat → BitVec 8) (gp fe : Nat) (args : List (Nat × Nat)) :

@@ -146,8 +146,8 @@ theorem poolElt_congr (Γ : FsViewNames GF) (u u' : BitSet) (b : Nat)
     (h : b ∈ u ↔ b ∈ u') : poolElt Γ u b = poolElt Γ u' b := by
   unfold poolElt
   by_cases hb : b ∈ u
-  · rw [if_pos hb, if_pos (h.1 hb)]
-  · rw [if_neg hb, if_neg (fun hc => hb (h.2 hc))]
+  · rw [ite_eq_left hb, ite_eq_left (h.1 hb)]
+  · rw [ite_eq_right hb, ite_eq_right (fun hc => hb (h.2 hc))]
 
 /-- Changing `u` at ONE block does not disturb the rest of the pool
 (Rocq's `free_pool_but_eq`). -/
@@ -158,8 +158,8 @@ theorem freePoolBut_eq (Γ : FsViewNames GF) (nb : Nat) (u u' : BitSet) (i0 : Na
   refine BigSepL.bigSepL_eq ?_
   intro k x hk
   by_cases hki : k = i0
-  · rw [if_pos hki, if_pos hki]
-  · rw [if_neg hki, if_neg hki]
+  · rw [ite_eq_left hki, ite_eq_left hki]
+  · rw [ite_eq_right hki, ite_eq_right hki]
     obtain ⟨hx, -⟩ := rangeGetElem? hk
     exact poolElt_congr Γ u u' x (hoff x (by rw [hx]; exact hki))
 
@@ -168,12 +168,12 @@ theorem freePoolBut_eq (Γ : FsViewNames GF) (nb : Nat) (u u' : BitSet) (i0 : Na
 /-- The clear-bit reading of one slot. -/
 theorem poolElt_free (Γ : FsViewNames GF) (u : BitSet) (b : Nat) (hb : b ∉ u) :
     poolElt Γ u b = iprop(∃ bs, FsView.blkOwned Γ b bs) := by
-  unfold poolElt; rw [if_neg hb]
+  unfold poolElt; rw [ite_eq_right hb]
 
 /-- ...and the set-bit reading. -/
 theorem poolElt_used (Γ : FsViewNames GF) (u : BitSet) (b : Nat) (hb : b ∈ u) :
     poolElt Γ u b = (emp : IProp GF) := by
-  unfold poolElt; rw [if_pos hb]
+  unfold poolElt; rw [ite_eq_left hb]
 
 /-- The pool, OPENED AT ONE CLEAR BIT.  Rocq inlines this pair of
 rewrites at each of its three use sites (`free_pool_take`,
@@ -254,12 +254,12 @@ theorem mem_freeSet (nb : Nat) (u : BitSet) (x : Nat) :
   constructor
   · rintro ⟨a, ha, he⟩
     by_cases hu : a ∈ u
-    · rw [if_pos hu] at he; exact absurd he (by simp)
-    · rw [if_neg hu] at he
+    · rw [ite_eq_left hu] at he; exact absurd he (by simp)
+    · rw [ite_eq_right hu] at he
       obtain rfl := Option.some.inj he
       exact ⟨List.mem_range.1 ha, hu⟩
   · rintro ⟨hx, hu⟩
-    exact ⟨x, List.mem_range.2 hx, by rw [if_neg hu]⟩
+    exact ⟨x, List.mem_range.2 hx, by rw [ite_eq_right hu]⟩
 
 /-- The pool IS the big-op over the free set (deviation 3: an equality
 where Rocq states only one direction). -/
@@ -288,9 +288,9 @@ theorem freePool_shed (Γ Γ1 Γ2 : FsViewNames GF) (Hs : FsView.viewShed Γ Γ1
   intro k b _
   unfold poolElt
   by_cases h : b ∈ u
-  · rw [if_pos h, if_pos h, if_pos h]
+  · rw [ite_eq_left h, ite_eq_left h, ite_eq_left h]
     exact emp_sep.2
-  · rw [if_neg h, if_neg h, if_neg h]
+  · rw [ite_eq_right h, ite_eq_right h, ite_eq_right h]
     iintro ⟨%bs, H⟩
     ihave ⟨H1, H2⟩ := FsView.blkOwned_shed Γ Γ1 Γ2 Hs b bs $$ H
     isplitl [H1]

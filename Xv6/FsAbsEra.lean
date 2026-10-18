@@ -141,7 +141,7 @@ theorem dirEntries_eraOk (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (dn
     dirEntries (eraNode dn bm data) = dirView data (dirNrec dn.diSize.toNat) := by
   rw [dirEntries_eraNode dn bm data hok.2.2.2.2.2.1 hok.2.2.2.2.1]
   have hty : dn.diType.toNat = T_DIR_z := of_decide_eq_true hd
-  rw [if_pos hty]
+  rw [ite_eq_left hty]
 
 /-- a record with a nonzero link count has a nonzero `fnNlink` (Rocq's
 `era_nlink_nz`; E2-V2).  `FsAbsMknodFire.mkfEra_live` is the same fact
@@ -189,11 +189,11 @@ def umStartOf (rt cw : Nat) (pl : List (BitVec 8)) : Nat :=
 
 theorem umStartOf_slash (rt cw : Nat) (pl : List (BitVec 8)) (h : pl[0]? = some SLASH) :
     umStartOf rt cw pl = rt := by
-  unfold umStartOf; rw [if_pos h]
+  unfold umStartOf; rw [ite_eq_left h]
 
 theorem umStartOf_rel (rt cw : Nat) (pl : List (BitVec 8)) (h : pl[0]? ≠ some SLASH) :
     umStartOf rt cw pl = cw := by
-  unfold umStartOf; rw [if_neg h]
+  unfold umStartOf; rw [ite_eq_right h]
 
 /-! ## The hop family, generically (deviation 4) -/
 

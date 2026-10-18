@@ -60,7 +60,7 @@ theorem wp_uk_ecall_seccomp (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Reg
   have hfd' : fdv' = fdv := usysFdOk_quiet (by decide) (by decide) (by decide) (by decide) hfd
   have hsc' : secc' = seccAll &&& m.get 10#5 := by
     unfold usysSeccOk at hsc
-    rw [if_pos rfl] at hsc
+    rw [ite_eq_left rfl] at hsc
     rw [hsc.1]
     show seccAll &&& tfW (tfOf m pc) (tfArgIdx 0) = _
     rw [tfOf_a0]

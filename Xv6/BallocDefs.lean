@@ -85,17 +85,17 @@ theorem baBody_set (k : KCtx) (dev : BitVec 32) (s2 : BitVec 64) (R : RegMap) (r
   obtain ⟨a2, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩ := h
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;> simp only [RegMap.set_apply] <;>
     first
-      | (rw [if_neg (Ne.symm n2)]; assumption)
-      | (rw [if_neg (Ne.symm n18)]; assumption)
-      | (rw [if_neg (Ne.symm n19)]; assumption)
-      | (rw [if_neg (Ne.symm n20)]; assumption)
-      | (rw [if_neg (Ne.symm n21)]; assumption)
-      | (rw [if_neg (Ne.symm n22)]; assumption)
-      | (rw [if_neg (Ne.symm n23)]; assumption)
-      | (rw [if_neg (Ne.symm n24)]; assumption)
-      | (rw [if_neg (Ne.symm n25)]; assumption)
-      | (rw [if_neg (Ne.symm n26)]; assumption)
-      | (rw [if_neg (Ne.symm n27)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n2)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n18)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n19)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n20)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n21)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n22)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n23)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n24)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n25)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n26)]; assumption)
+      | (rw [ite_eq_right (Ne.symm n27)]; assumption)
 
 /-- The epilogue's `calleeSaved`: balloc restores `ra`, `s0`..`s8` and
 `sp`, so only s9..s11 have to have come back from the callees. -/

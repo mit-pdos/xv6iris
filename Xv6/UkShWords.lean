@@ -312,7 +312,7 @@ theorem wl_nulfold_spec (toks : List (Nat × Nat)) : ∀ (g : Nat → BitVec 8) 
       fix_dec
       split
       · rfl
-      · simp only [ushpSetb]; rw [if_neg (Ne.symm h)]
+      · simp only [ushpSetb]; rw [ite_eq_right (Ne.symm h)]
 
 theorem wl_nulfold_other (toks : List (Nat × Nat)) (g : Nat → BitVec 8) (x : Nat) (h : wlEndsAt toks x = false) :
     ushpNulfold toks g x = g x := by
@@ -343,7 +343,7 @@ theorem wl_nulfold_at (ws : List (List (BitVec 8))) : ∀ (off : Nat) (g : Nat �
       simp only [ushpSetb]
       by_cases hje : j = w0.length
       · subst hje; simp
-      · rw [if_neg (by omega), if_neg hje]
+      · rw [ite_eq_right (by omega), ite_eq_right hje]
     | succ i' =>
       simp only [List.getElem?_cons_succ] at hi
       simp only [wlOff]
@@ -351,18 +351,18 @@ theorem wl_nulfold_at (ws : List (List (BitVec 8))) : ∀ (off : Nat) (g : Nat �
       have hge := wlOff_ge r (off + w0.length + 1) i'
       split
       · rfl
-      · simp only [ushpSetb]; rw [if_neg (by omega)]
+      · simp only [ushpSetb]; rw [ite_eq_right (by omega)]
 
 theorem wlCut_in (ws : List (List (BitVec 8))) (g : Nat → BitVec 8) (len i : Nat) (w : List (BitVec 8)) (j : Nat)
     (hi : ws[i]? = some w) (hj : j < w.length) (hlt : wlOff 0 ws i + j < len) :
     ushpNulfold (wlToks ws) (ushpExt len g) (wlOff 0 ws i + j) = g (wlOff 0 ws i + j) := by
   unfold wlToks
-  rw [wl_nulfold_at ws 0 (ushpExt len g) i w j hi (by omega), if_neg (by omega)]
+  rw [wl_nulfold_at ws 0 (ushpExt len g) i w j hi (by omega), ite_eq_right (by omega)]
   simp [ushpExt, hlt]
 
 theorem wlCut_end (ws : List (List (BitVec 8))) (g : Nat → BitVec 8) (len i : Nat) (w : List (BitVec 8)) (hi : ws[i]? = some w) :
     ushpNulfold (wlToks ws) (ushpExt len g) (wlOff 0 ws i + w.length) = ubyte0 := by
   unfold wlToks
-  rw [wl_nulfold_at ws 0 (ushpExt len g) i w w.length hi (Nat.le_refl _), if_pos rfl]
+  rw [wl_nulfold_at ws 0 (ushpExt len g) i w w.length hi (Nat.le_refl _), ite_eq_left rfl]
 
 end Xv6

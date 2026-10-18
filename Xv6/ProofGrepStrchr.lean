@@ -59,9 +59,9 @@ theorem grepStrchr_loop (UL : UK_LEAVES) (N : UkNames GF) (dq : DFrac) (p : Nat)
     iintro %h1 Hrun
     have htk : ukBtaken .BEQ (mc.get 11#5) (mc.get 15#5) = true := by
       rw [ha1, ha5, kgrep_beq_byte, hgk]; simp
-    rw [htk, if_pos rfl, show BitVec.ofNat 64 0x326 + BitVec.signExtend 64 14#13 = BitVec.ofNat 64 0x334 from by decide]
+    rw [htk, ite_eq_left rfl, show BitVec.ofNat 64 0x326 + BitVec.signExtend 64 14#13 = BitVec.ofNat 64 0x334 from by decide]
     iapply Hcont $$ Hbs %h1 %mc [] [] Hrun
-    · ipureintro; rw [if_pos hgk, ha0]
+    · ipureintro; rw [ite_eq_left hgk, ha0]
     · ipureintro; exact grepRkeep_refl _ _
   | succ i ih =>
     intro j h mc n hji hgj ha0 ha1 ha5
@@ -77,7 +77,7 @@ theorem grepStrchr_loop (UL : UK_LEAVES) (N : UkNames GF) (dq : DFrac) (p : Nat)
     have htk : ukBtaken .BEQ (mc.get 11#5) (mc.get 15#5) = false := by
       rw [ha1, ha5, kgrep_beq_byte]; simp [Ne.symm hgjc]
     rw [htk]
-    simp only [Bool.false_eq_true, if_false]
+    simp only [Bool.false_eq_true, ite_false]
     rw [ukPc 0x326 0x32a false rfl]
     -- 0x32a  c.addi a0,a0,1
     gfetch 0x32a true (.ITYPE (1#12, .Regidx 10#5, .Regidx 10#5, .ADDI))
@@ -123,7 +123,7 @@ theorem grepStrchr_loop (UL : UK_LEAVES) (N : UkNames GF) (dq : DFrac) (p : Nat)
         · exact absurd hz (hpre (j + 1) hlt).2
         · omega
       rw [show (!decide (g (j + 1) = ubyte0)) = false by simp [hz]]
-      simp only [Bool.false_eq_true, if_false]
+      simp only [Bool.false_eq_true, ite_false]
       rw [ukPc 0x330 0x332 true rfl]
       -- 0x332  c.li a0,0
       gfetch 0x332 true (.ITYPE (0#12, .Regidx 0#5, .Regidx 10#5, .ADDI))
@@ -135,13 +135,13 @@ theorem grepStrchr_loop (UL : UK_LEAVES) (N : UkNames GF) (dq : DFrac) (p : Nat)
       iapply Hcont $$ Hcl %h5 %_ [] [] Hrun
       · ipureintro
         have hgkc : g k ≠ c := by rw [← hSk, hz]; exact fun e => hc0 e.symm
-        rw [if_neg hgkc, ukWr_get_same _ _ _ (by decide)]
+        rw [ite_eq_right hgkc, ukWr_get_same _ _ _ (by decide)]
         exact ukLi m2 0#12 0 (by decide)
       · ipureintro
         exact grepRkeep_upd _ _ _ _ _ (by decide) hk2
     · -- a body byte: round again at `j + 1`
       rw [show (!decide (g (j + 1) = ubyte0)) = true by simp [hz]]
-      simp only [if_true]
+      simp only [ite_true]
       rw [show BitVec.ofNat 64 0x330 + BitVec.signExtend 64 8182#13 = BitVec.ofNat 64 0x326 from by decide]
       have h10' : m2.get 10#5 = BitVec.ofNat 64 (p + (j + 1)) := by
         rw [ukWr_get_other _ _ _ _ (by decide)]; exact h10
@@ -249,7 +249,7 @@ theorem wp_grepStrchr (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (
       · exact absurd hz (hpre 0 hpos).2
     subst hk0
     rw [show decide (g 0 = ubyte0) = true by simp [hz]]
-    simp only [if_true]
+    simp only [ite_true]
     rw [show BitVec.ofNat 64 0x324 + BitVec.signExtend 64 24#13 = BitVec.ofNat 64 0x33c from by decide]
     -- 0x33c  c.li a0,0
     gfetch 0x33c true (.ITYPE (0#12, .Regidx 0#5, .Regidx 10#5, .ADDI))
@@ -266,11 +266,11 @@ theorem wp_grepStrchr (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (
     iintro %h5 Hrun
     rw [show BitVec.ofNat 64 0x33e + BitVec.signExtend 64 2097142#21 = BitVec.ofNat 64 0x334 from by decide]
     let m3 := ukWr m2 10#5 (ukItypeVal .ADDI (m2.get 0#5) 0#12)
-    have e4 : ukWr m3 0#5 (BitVec.ofNat 64 0x33e + instrLen true) = m3 := by unfold ukWr; rw [if_pos rfl]
+    have e4 : ukWr m3 0#5 (BitVec.ofNat 64 0x33e + instrLen true) = m3 := by unfold ukWr; rw [ite_eq_left rfl]
     rw [e4]
     have f10 : m3.get 10#5 = BitVec.ofNat 64 (if g 0 = c then p + 0 else 0) := by
       have hgkc : g 0 ≠ c := by rw [hz]; exact fun e => hc0 e.symm
-      rw [if_neg hgkc, ukWr_get_same _ _ _ (by decide)]
+      rw [ite_eq_right hgkc, ukWr_get_same _ _ _ (by decide)]
       exact ukLi m2 0#12 0 (by decide)
     have fk : grepRkeep ([2, 8] ++ grepWcaller) m m3 := grepRkeep_upd _ _ _ _ _ (by decide) hk2
     have f2 : m3.get 2#5 = m.get spIdx + BitVec.ofInt 64 (-((8 * 2 : Nat) : Int)) := by
@@ -279,7 +279,7 @@ theorem wp_grepStrchr (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (
     iapply Hcont $$ Hcl
   · -- the scan, from byte 0
     rw [show decide (g 0 = ubyte0) = false by simp [hz]]
-    simp only [Bool.false_eq_true, if_false]
+    simp only [Bool.false_eq_true, ite_false]
     rw [ukPc 0x324 0x326 true rfl]
     have h10 : m2.get 10#5 = BitVec.ofNat 64 (p + 0) := by
       rw [ukWr_get_other _ _ _ _ (by decide)]; exact ha01

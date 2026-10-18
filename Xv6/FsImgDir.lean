@@ -67,12 +67,12 @@ theorem uniqStep_some (data : Nat → List (BitVec 8)) (m : Nat) (s s' : ExtTree
       (¬ dirLive data m ∧ s' = s) := by
   unfold uniqStep at h
   by_cases hl : dirLiveb data m = true
-  · rw [if_pos hl] at h
+  · rw [ite_eq_left hl] at h
     split at h
     · cases h
     · cases h
       exact Or.inl ⟨(dirLiveb_true data m).1 hl, by assumption, rfl⟩
-  · rw [if_neg hl] at h
+  · rw [ite_eq_right hl] at h
     cases h
     exact Or.inr ⟨fun hlv => hl ((dirLiveb_true data m).2 hlv), rfl⟩
 
@@ -220,7 +220,7 @@ theorem fsDirsWf_spec (P : Nat → List (BitVec 8)) (sb : FsSb) (i : Nat)
     (hty : (fsDinode P sb i).diType.toNat = T_DIR_z) : FsDirOk P sb i (fsDinode P sb i) := by
   apply fsDirWf_ok
   have := forallb_range _ _ i h hi
-  simp only [if_pos hty] at this
+  simp only [ite_eq_left hty] at this
   exact this
 
 /-! ## 10b.  W8 -- THE DOT RECORDS, BY INDEX -/
@@ -255,7 +255,7 @@ theorem fsDotsAll_spec (P : Nat → List (BitVec 8)) (sb : FsSb) (i : Nat)
     dirDotsIx i (fsDinode P sb i) (fsDataOf P (fsDinode P sb i)) := by
   apply fsDotsWf_ok
   have := forallb_range _ _ i h hi
-  simp only [if_pos hty] at this
+  simp only [ite_eq_left hty] at this
   exact this
 
 /-! ## 11.  W7 -- THE ROOT -/
@@ -383,7 +383,7 @@ theorem fsLinksWf_at (P : Nat → List (BitVec 8)) (sb : FsSb) (z : Nat)
   simp only [Bool.and_eq_true, decide_eq_true_eq] at this
   refine ⟨this.1, fun hty => ?_⟩
   have h2 := this.2
-  simp only [if_pos hty, Bool.and_eq_true, decide_eq_true_eq] at h2
+  simp only [ite_eq_left hty, Bool.and_eq_true, decide_eq_true_eq] at h2
   exact ⟨h2.1.1, h2.1.2, h2.2⟩
 
 /-! ## 11c.  THE DURABLE-STATE SHARPENING OF W9's BOUND -/
@@ -403,7 +403,7 @@ theorem fsLinksEq_at (P : Nat → List (BitVec 8)) (sb : FsSb) (z : Nat)
     (hty : (fsDinode P sb z).diType.toNat ≠ 0) (hnd : (fsDinode P sb z).diType.toNat ≠ T_DIR_z) :
     (fsDinode P sb z).diNlink.toNat = fsLinkCount P sb z := by
   have := forallb_range _ _ z h hz
-  simp only [hty, hnd, decide_false, Bool.or_false, Bool.false_eq_true, if_false,
+  simp only [hty, hnd, decide_false, Bool.or_false, Bool.false_eq_true, ite_false,
     decide_eq_true_eq] at this
   exact this
 

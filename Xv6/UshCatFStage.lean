@@ -157,7 +157,7 @@ theorem stage_catf (OK : PdRoundOk D) (SE : SH_RUNCMD_EXEC)
     iintro ⟨⟨Hw, HsL, Hcw, Hmw⟩, #HG', -, -, HRd⟩
     rw [pdep_unfold D (Wid.WLeft 0) dgExecR (by decide) hsrc]
     dsimp only [PdRound.pdepNe]
-    rw [if_pos (show failSrc D.pr (lfilts D.lR) 0 dgExecR from Or.inl hdg0)]
+    rw [ite_eq_left (show failSrc D.pr (lfilts D.lR) 0 dgExecR from Or.inl hdg0)]
     iframe HsL HRd Hcw Hmw Hw HG'
     unfold PdRound.shotsF
     rw [List.range_zero]

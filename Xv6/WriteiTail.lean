@@ -280,14 +280,14 @@ theorem writei_meta_store (ip : BitVec 64) (dn : Dinode) (bm' : Blkmap) (off tot
     (h : dn.diSize.toNat < off + tot) :
     inodeMeta (GF := GF) ip { dn with diSize := w } ⊢
       inodeMeta ip (wiDinode dn bm' off tot) := by
-  subst hw; unfold wiDinode; rw [if_pos h]; unfold inodeMeta; exact .rfl
+  subst hw; unfold wiDinode; rw [ite_eq_left h]; unfold inodeMeta; exact .rfl
 
 /-- THE KEEP ARM: the file was already this long. -/
 theorem writei_meta_keep (ip : BitVec 64) (dn : Dinode) (bm' : Blkmap) (off tot : Nat)
     (h : ¬ dn.diSize.toNat < off + tot) :
     inodeMeta (GF := GF) ip { dn with diSize := dn.diSize } ⊢
       inodeMeta ip (wiDinode dn bm' off tot) := by
-  unfold wiDinode; rw [if_neg h]; unfold inodeMeta; exact .rfl
+  unfold wiDinode; rw [ite_eq_right h]; unfold inodeMeta; exact .rfl
 
 theorem writei_ext_ofNat (x : Nat) : BitVec.extractLsb' 0 32 (BitVec.ofNat 64 x) = BitVec.ofNat 32 x := by
   apply BitVec.eq_of_toNat_eq

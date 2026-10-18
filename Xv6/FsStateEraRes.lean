@@ -215,7 +215,7 @@ theorem inodeBlocksEraQ (γfs : FsNames) (dq : DFrac) (i : Nat) (n : FsNode)
     rw [bmOf_get n k hl.inlRecWf hk]
     cases hbs : PartialMap.get? n.fnBlk k with
     | some bs =>
-      rw [if_neg ((hl.inlBlkDom k hk).1 ⟨bs, hbs⟩)]
+      rw [ite_eq_right ((hl.inlBlkDom k hk).1 ⟨bs, hbs⟩)]
       unfold fnData
       rw [hbs]
       rfl
@@ -225,7 +225,7 @@ theorem inodeBlocksEraQ (γfs : FsNames) (dq : DFrac) (i : Nat) (n : FsNode)
         obtain ⟨bs, h⟩ := (hl.inlBlkDom k hk).2 hnz
         rw [h] at hbs
         cases hbs
-      rw [if_pos hz]
+      rw [ite_eq_left hz]
       rfl
   · intro k ⟨bs, hbs⟩
     have := (inodeLocal_beyondSize i n k bs hl hbs).1

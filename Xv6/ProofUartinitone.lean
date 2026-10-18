@@ -229,7 +229,7 @@ theorem uartinitone_body [CurCtx] (cpu : CPU) (k : KCtx) (R : RegMap)
   have hpin : k.sie = false ∨ k.proc = 0#64 → c20 = cpu := fun h => (hp20 h).trans ((hp19 h).trans ((hp18 h).trans ((hp17 h).trans ((hp16 h).trans ((hp15 h).trans ((hp14 h).trans ((hp13 h).trans ((hp12 h).trans ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))))))))))))))))
   ihave HΦ' := wpNext_at _ _ _ c20 _ hpin $$ HΦ Hlc
   iapply HΦ' $$ %_ Hk Hpc
-    %(by intro r h14 h15; simp only [RegMap.set_apply, if_neg h14, if_neg h15])
+    %(by intro r h14 h15; simp only [RegMap.set_apply, ite_eq_right h14, ite_eq_right h15])
     Htx Hdlab Hrtok
 
 end
@@ -330,7 +330,7 @@ theorem uartinitone_proof (IL : INITLOCK) : UARTINITONE :=
   k_norm_g at hcs
   obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs
   have hRk : ∀ r : BitVec 5, r ≠ 14#5 → r ≠ 15#5 → r ≠ 8#5 → r ≠ 2#5 → R2 r = k.regs r := by
-    intro r a b c d; rw [hRR r a b]; simp only [if_neg c, if_neg d]
+    intro r a b c d; rw [hRR r a b]; simp only [ite_eq_right c, ite_eq_right d]
   have hR2' : R3 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFF0#64 := by
     rw [e2, hRR 2#5 (by decide) (by decide)]; k_norm_g
   have hpin5 : k.sie = false ∨ k.proc = 0#64 → c5 = cpu := fun h => (hp5 h).trans (hpin4 h)

@@ -40,10 +40,10 @@ theorem rdDst_init (k : KCtx) (user : Bool) (j : Nat) (pidv : BitVec 32) (Vp : P
       rdDst user (k.regs 12#5) j pidv Vp Vp.upt M dqp data olds off 0 := by
   cases user
   · rw [rdDst_false, rdDelivered_zero, hproc]
-    simp only [Bool.false_eq_true, if_false]
+    simp only [Bool.false_eq_true, ite_false]
     iintro H; iexact H
   · rw [rdDst_true]
-    simp only [if_true]
+    simp only [ite_true]
     iintro H
     iexists Vp.ev
     rw [ProcPriv.updEv_id]
@@ -119,7 +119,7 @@ theorem rd_early (cpu c0 : CPU) (k : KCtx) (R : RegMap)
   · ipureintro
     refine Or.inr ⟨?_, ?_⟩
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-    · unfold rdClamp; rw [if_pos (by omega)]; omega
+    · unfold rdClamp; rw [ite_eq_left (by omega)]; omega
   · rw [hk]; iexact Hk
 
 set_option maxHeartbeats 16000000 in

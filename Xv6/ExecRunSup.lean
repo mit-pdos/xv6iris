@@ -101,7 +101,7 @@ theorem xkA_uvisOfRun (m : RegMap) (pc : BitVec 64) (M : ElfMem) (π : Nat → O
   show tfW (tfOf m pc) (tfArgIdx k) = _
   rw [tfOf_arg m pc k hk]
   unfold RegMap.get
-  rw [if_neg (by intro h; have := congrArg BitVec.toNat h; simp at this; omega)]
+  rw [ite_eq_right (by intro h; have := congrArg BitVec.toNat h; simp at this; omega)]
 
 /-- **Rocq `sbundle_pay_refR_of_exec`**: the bundle at the trapping key out
 of (W), (L) and (E), with the refund's consequence `R` (`□ (Pay -∗ R)`:

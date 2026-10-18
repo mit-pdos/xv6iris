@@ -181,7 +181,7 @@ theorem namexEra_dead_level (A : NamexArgs) (P Pmiss : Nat → Nat → IProp GF)
   obtain ⟨hlt, hle⟩ := namexEra_ps_le A es0 el R hes
   unfold namexEraDead
   cases h : A.npar
-  · simp only [Bool.false_eq_true, if_false]
+  · simp only [Bool.false_eq_true, ite_false]
     rw [namexEraHops_ex A P Pmiss _ h]
     iintro ⟨HP, Hh⟩
     iexists es0.length, d
@@ -189,7 +189,7 @@ theorem namexEra_dead_level (A : NamexArgs) (P Pmiss : Nat → Nat → IProp GF)
     · ipureintro; exact hlt h
     ileft
     iframe
-  · simp only [if_true]
+  · simp only [ite_true]
     rw [namexEraHops_ep A P Pmiss _ h]
     iintro ⟨HP, Hh⟩
     iapply (npDead_unfired A.rti fscFs P Pmiss A.pl es0.length d (hle h)) $$ HP Hh
@@ -203,7 +203,7 @@ theorem namexEra_dead_missed (A : NamexArgs) (P Pmiss : Nat → Nat → IProp GF
   have hlt := namexEra_ps_lt A es0 el R hes hR
   unfold namexEraDead
   cases h : A.npar
-  · simp only [Bool.false_eq_true, if_false]
+  · simp only [Bool.false_eq_true, ite_false]
     rw [namexEraHops_ex A P Pmiss _ h]
     rw [namexEraPs_false A h] at hlt
     iintro ⟨HP, Hh⟩
@@ -212,7 +212,7 @@ theorem namexEra_dead_missed (A : NamexArgs) (P Pmiss : Nat → Nat → IProp GF
     · ipureintro; exact hlt
     iright
     iframe
-  · simp only [if_true]
+  · simp only [ite_true]
     rw [namexEraHops_ep A P Pmiss _ h]
     rw [namexEraPs_true A h] at hlt
     iintro ⟨HP, Hh⟩
@@ -225,7 +225,7 @@ theorem namexEra_dead_noelems (A : NamexArgs) (P Pmiss : Nat → Nat → IProp G
     P 0 d ∗ namexEraHops A P Pmiss 0 ⊢ namexEraDead A P Pmiss := by
   unfold namexEraDead
   rw [hnp, namexEraHops_ep A P Pmiss _ hnp]
-  simp only [if_true]
+  simp only [ite_true]
   iintro ⟨HP, Hh⟩
   iapply (npDead_unfired A.rti fscFs P Pmiss A.pl 0 d (Nat.zero_le _)) $$ HP Hh
 
@@ -392,7 +392,7 @@ theorem namexEra_post_of_spec (k : KCtx) (A : NamexArgs) (P Pmiss : Nat → Nat 
     Hnm Hbs %hf Hop Htx
   unfold namexEraArm namexEraDead
   rw [hnp]
-  simp only [Bool.false_eq_true, if_false, hrti]
+  simp only [Bool.false_eq_true, ite_false, hrti]
   iexact Harm
 
 /-- THE NAMEIPARENT SIDE's continuation, in row form. -/
@@ -419,7 +419,7 @@ theorem nparEra_post_of_spec (k : KCtx) (A : NamexArgs) (P Pmiss : Nat → Nat �
     Hnm Hbs %hf Hop Htx
   unfold namexEraArm namexEraDead
   rw [hnp]
-  simp only [if_true, hrti]
+  simp only [ite_true, hrti]
   iexact Harm
 
 end Seal

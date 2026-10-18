@@ -30,7 +30,7 @@ theorem blkOfSeq_lookup (f : Nat → Option (List (BitVec 8))) (n b k : Nat) :
     PartialMap.get? (blkOfSeq f b n) k = if b ≤ k ∧ k < b + n then f k else none := by
   induction n generalizing b with
   | zero =>
-    rw [if_neg (by omega)]
+    rw [ite_eq_right (by omega)]
     exact LawfulPartialMap.get?_empty k
   | succ n ih =>
     cases hb : f b with
@@ -38,23 +38,23 @@ theorem blkOfSeq_lookup (f : Nat → Option (List (BitVec 8))) (n b k : Nat) :
       simp only [blkOfSeq, hb]
       by_cases hk : b = k
       · subst hk
-        rw [LawfulPartialMap.get?_insert_eq rfl, if_pos (by omega), hb]
+        rw [LawfulPartialMap.get?_insert_eq rfl, ite_eq_left (by omega), hb]
       · rw [LawfulPartialMap.get?_insert_ne hk, ih]
         by_cases h1 : b + 1 ≤ k ∧ k < b + 1 + n
-        · rw [if_pos h1, if_pos (by omega)]
-        · rw [if_neg h1, if_neg (by omega)]
+        · rw [ite_eq_left h1, ite_eq_left (by omega)]
+        · rw [ite_eq_right h1, ite_eq_right (by omega)]
     | none =>
       simp only [blkOfSeq, hb]
       rw [ih]
       by_cases hk : b = k
       · subst hk
-        rw [if_neg (by omega)]
+        rw [ite_eq_right (by omega)]
         by_cases h2 : b ≤ b ∧ b < b + (n + 1)
-        · rw [if_pos h2, hb]
-        · rw [if_neg h2]
+        · rw [ite_eq_left h2, hb]
+        · rw [ite_eq_right h2]
       · by_cases h1 : b + 1 ≤ k ∧ k < b + 1 + n
-        · rw [if_pos h1, if_pos (by omega)]
-        · rw [if_neg h1, if_neg (by omega)]
+        · rw [ite_eq_left h1, ite_eq_left (by omega)]
+        · rw [ite_eq_right h1, ite_eq_right (by omega)]
 
 -- nothing ever needs the recursion itself; sealing it keeps a conversion
 -- check from unrolling 268 matches (Rocq's `Global Opaque blk_of_seq`)
@@ -71,11 +71,11 @@ theorem nodeBlk_lookup (bm : Blkmap) (data : Nat → List (BitVec 8)) (k : Nat) 
   unfold nodeBlk
   rw [blkOfSeq_lookup]
   by_cases hk : k < MAXFILE
-  · rw [if_pos (by omega)]
+  · rw [ite_eq_left (by omega)]
     by_cases hz : (blkmapGet bm k).toNat = 0
-    · rw [if_pos hz, if_neg (fun h => h.2 hz)]
-    · rw [if_neg hz, if_pos ⟨hk, hz⟩]
-  · rw [if_neg (by omega), if_neg (fun h => hk h.1)]
+    · rw [ite_eq_left hz, ite_eq_right (fun h => h.2 hz)]
+    · rw [ite_eq_right hz, ite_eq_left ⟨hk, hz⟩]
+  · rw [ite_eq_right (by omega), ite_eq_right (fun h => hk h.1)]
 
 /-- A blkmap and a TOTAL data function, as a node (Rocq's `era_node`). -/
 def eraNode (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8)) : FsNode :=
@@ -106,11 +106,11 @@ theorem bmOf_get (n : FsNode) (k : Nat) (hwf : dinodeWf n.fnRec) (_hk : k < MAXF
     (blkmapGet (bmOf n) k).toNat = fnNaddr n k := by
   unfold blkmapGet fnNaddr
   by_cases hd : k < NDIRECT
-  · rw [if_pos hd, if_pos hd]
+  · rw [ite_eq_left hd, ite_eq_left hd]
     unfold dinodeWf at hwf
     show ((n.fnRec.diAddrs.take NDIRECT)[k]!).toNat = _
     rw [era_getElem!_take _ _ _ hd (by rw [hwf]; unfold NDIRECT at hd; omega)]
-  · rw [if_neg hd, if_neg hd]
+  · rw [ite_eq_right hd, ite_eq_right hd]
     rfl
 
 /-- Rocq's `era_node_rec`. -/
@@ -128,9 +128,9 @@ theorem eraNode_data (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8)
   unfold fnData
   rw [eraNode_blk, nodeBlk_lookup]
   by_cases hz : (blkmapGet bm k).toNat = 0
-  · rw [if_neg (fun h => h.2 hz), hh k hk hz]
+  · rw [ite_eq_right (fun h => h.2 hz), hh k hk hz]
     rfl
-  · rw [if_pos ⟨hk, hz⟩]
+  · rw [ite_eq_left ⟨hk, hz⟩]
     rfl
 
 /-- Rocq's `node_shape_ok`. -/

@@ -118,7 +118,7 @@ theorem secc_code_run (γ : GName) :
     iapply User.utextImg_run (utext γ) User.Seccomp.code.byte _ _ _ _
     · intro j hj
       unfold User.USeg.byte
-      rw [if_pos ⟨by omega, by omega⟩]
+      rw [ite_eq_left ⟨by omega, by omega⟩]
       congr 2; omega
     iexact H
   · iintro #H

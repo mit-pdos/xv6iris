@@ -211,13 +211,13 @@ def iregOut (γi : GName) (inum : BitVec 32) (dn : Dinode) : IProp GF :=
 theorem iregOut_alloc_inv (γi : GName) (inum : BitVec 32) (dn : Dinode)
     (h : dn.diType.toNat ≠ 0) : iregOut (GF := GF) γi inum dn ⊢ dinodeAt γi inum dn := by
   unfold iregOut
-  rw [if_neg h]
+  rw [ite_eq_right h]
 
 theorem iregOut_free_inv (γi : GName) (inum : BitVec 32) (dn : Dinode)
     (h : dn.diType.toNat = 0) :
     iregOut (GF := GF) γi inum dn ⊢ imark γi (inum.toNat : Int) := by
   unfold iregOut
-  rw [if_pos h]
+  rw [ite_eq_left h]
 
 end
 

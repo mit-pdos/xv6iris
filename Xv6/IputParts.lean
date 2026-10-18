@@ -175,7 +175,7 @@ theorem iputPins_set (KR R : RegMap) (h : iputPins KR R) (r : BitVec 5) (v : Bit
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
     simp only [RegMap.set_apply] <;>
     first
-      | (rw [if_neg (ne _ (by decide) (by decide))]; assumption)
+      | (rw [ite_eq_right (ne _ (by decide) (by decide))]; assumption)
 
 /-- The epilogue's register file is the caller's (Rocq's closing
 `callee_saved m P4`). -/

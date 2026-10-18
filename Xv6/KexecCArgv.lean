@@ -482,7 +482,7 @@ theorem kxcC_argv_tail (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
     isplitr
     · ipureintro
       refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, if_true, if_false,
+        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, ite_true, ite_false,
           h2, h8, h18, h19, h20, h21, hroot', h24, h27, kxcC_ci_succ]
     isplitr
     · ipureintro; exact ⟨by omega, hc1, h0, hsp⟩
@@ -502,7 +502,7 @@ theorem kxcC_argv_tail (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
     isplitr
     · ipureintro
       refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, if_true, if_false,
+        simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, ite_true, ite_false,
           h2, h8, h18, h19, h20, h21, hroot', h23, h24, h27, kxcC_ci_succ]
     isplitr
     · ipureintro; exact ⟨hc1na, hc1, h0, hsp⟩
@@ -600,7 +600,7 @@ theorem kxc_argv_step (SL : STRLEN) (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (�
   iintro Hk Hpc
   by_cases hov : kxcSp (sz1.toNat : Int) A.alen (ci + 1) < (sz1.toNat : Int) - 4096
   · -- ===== THE STACK OVERFLOWED: +0x352 =====
-    simp only [hov, decide_true, if_true]
+    simp only [hov, decide_true, ite_true]
     -- THE CAUSE: `sp < stackbase` after argument `ci`, so the fit condition
     -- fails already at index `ci + 1 ≤ na`
     have hfit : QF .argsFit := kxcC_argsFit hqfa himg fun hok => by
@@ -624,7 +624,7 @@ theorem kxc_argv_step (SL : STRLEN) (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (�
     · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
     unfold kxcCRes kxcBufs kxcArgStrs
     iframe
-  simp only [hov, decide_false, Bool.false_eq_true, if_false]
+  simp only [hov, decide_false, Bool.false_eq_true, ite_false]
   -- +0x22c  ld s10,-512(s0) : &argv[ci]
   unfold kxcFrameC
   icases Hfr with ⟨F1, F2, F3, F4, F5, F6, F7, F8, F9, F10, F11, F12, F13, Fu, Fw, Fp, F64, F65, F66,

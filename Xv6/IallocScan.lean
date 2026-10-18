@@ -236,7 +236,7 @@ theorem ialloc_scan_next (BE : BRELSE) (PK : PRINTK) [Fscfg] [Icfg] [CurCtx]
   iintro Hk Hpc
   by_cases hlt : m < fscNinodes
   · -- the next inum
-    simp only [hlt, _root_.decide_true, if_true]
+    simp only [hlt, _root_.decide_true, ite_true]
     have IH' := IH (hm ▸ hlt)
     unfold iallocScanPre at IH'
     iapply (IH' cpu spie1 spp1 _ ?hr)
@@ -247,7 +247,7 @@ theorem ialloc_scan_next (BE : BRELSE) (PK : PRINTK) [Fscfg] [Icfg] [CurCtx]
       · ialloc_body_tac
       · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; rw [hm]
   · -- OUT: no free inode (THE LIVE ARM)
-    simp only [hlt, decide_false, Bool.false_eq_true, if_false]
+    simp only [hlt, decide_false, Bool.false_eq_true, ite_false]
     subst hm
     iapply (ialloc_out PK cpu c0 k spie1 spp1 _ ty u Sb t qt pidv dqp dqs dqn hK hnoff hlocks
         hty ?e2 ?ep hpn)

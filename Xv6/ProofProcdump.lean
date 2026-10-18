@@ -221,8 +221,8 @@ theorem pd_beq_last {α : Type} (i : Nat) (hi : i < NPROC) (p q : α) :
     (if bcond bop.BEQ (pName (procAddr (i + 1))) (KA.«bcache» + 0x148#64) then p else q)
       = if i + 1 = NPROC then p else q := by
   by_cases he : i + 1 = NPROC
-  · rw [if_pos he, if_pos (by simp only [bcond, beq_iff_eq]; exact (pd_cursor_eq i hi).mpr he)]
-  · rw [if_neg he, if_neg (by
+  · rw [ite_eq_left he, ite_eq_left (by simp only [bcond, beq_iff_eq]; exact (pd_cursor_eq i hi).mpr he)]
+  · rw [ite_eq_right he, ite_eq_right (by
       simp only [bcond, beq_iff_eq]
       exact fun hc => he ((pd_cursor_eq i hi).mp hc))]
 
@@ -231,11 +231,11 @@ theorem pd_cursor_zero : pName (procAddr 0) = (KA.«proc» + 0x160#64) := by dec
 
 theorem pd_bltu_true {α : Type} (a b : BitVec 64) (h : a.ult b = true) (p q : α) :
     (if bcond bop.BLTU a b then p else q) = p := by
-  rw [if_pos (by simp only [bcond]; exact h)]
+  rw [ite_eq_left (by simp only [bcond]; exact h)]
 
 theorem pd_bltu_false {α : Type} (a b : BitVec 64) (h : a.ult b = false) (p q : α) :
     (if bcond bop.BLTU a b then p else q) = q := by
-  rw [if_neg (by simp only [bcond, h]; exact Bool.false_ne_true)]
+  rw [ite_eq_right (by simp only [bcond, h]; exact Bool.false_ne_true)]
 
 /-- The five live states: not `UNUSED`, and not above `ZOMBIE`. -/
 theorem pd_state_cases (st : BitVec 32) (hz : BitVec.signExtend 64 st ≠ 0#64)
@@ -979,7 +979,7 @@ theorem pd_loop (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : Uart
     iframe #
     iapply wpNext_intro_pin_lc
     iintro %c1 %hq1 Hlc %spie2 %spp2 %R2 %cs %hsp2 Hk Hpc %hpost Hview Hsent
-    rw [if_pos hlast]
+    rw [ite_eq_left hlast]
     obtain ⟨hkept2, -⟩ := hpost
     ihave HPhi := wpNext_at _ _ _ c1 _ hq1 $$ HPhi Hlc
     iapply HPhi $$ %spie2 %spp2 %R2 %cs %hsp2 Hk Hpc %hkept2 Hview Hsent
@@ -994,7 +994,7 @@ theorem pd_loop (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : Uart
     iframe #
     iapply wpNext_intro_pin
     iintro %c1 %hq1 %spie2 %spp2 %R2 %cs %hsp2 Hk Hpc %hpost Hview Hsent
-    rw [if_neg hlast]
+    rw [ite_eq_right hlast]
     obtain ⟨hkept2, hcur2⟩ := hpost
     ihave HPhi := wpNext_shift _ _ _ _ _ hq1 $$ HPhi
     iapply (ih (i + 1) (by unfold NPROC at hf ⊢; omega) (bs' ++ cs) spie2 spp2 R2 hcur2

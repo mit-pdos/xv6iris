@@ -126,14 +126,14 @@ theorem ukm_miss (s : UWSt) (hl : UkLand C P T s) (t : PTree) (hm : UkMem P t s.
   cases hperm : uwkPermOk acc false lw with
   | false =>
     have hres : ukmRes acc lw = .Err (.PTW_No_Permission (), ()) := by
-      simp only [ukmRes, hperm, Bool.false_eq_true, if_false]
+      simp only [ukmRes, hperm, Bool.false_eq_true, ite_false]
     rw [hres]
     refine ⟨s, fun orc => utlb_miss_err ufFoot orc s vpn t.base _ false sum _ ?_, ukmOut_refl hl⟩
     rw [hwalk orc, hw]
-    simp only [uwkWalkRes, hok.inv, hpermEq, hperm, Bool.false_eq_true, if_false]
+    simp only [uwkWalkRes, hok.inv, hpermEq, hperm, Bool.false_eq_true, ite_false]
   | true =>
     have hres : ukmRes acc lw = .Ok (ptePpn w, .PBMT_PMA, ()) := by
-      simp only [ukmRes, hperm, if_true, hppn]
+      simp only [ukmRes, hperm, ite_true, hppn]
     rw [hres]
     have hperm' : uwkPermOk acc false w = true := hpermEq.trans hperm
     have hwalk' : ∀ orc, runRW ufFoot orc s (pt_walk 39 vpn acc .User false sum t.base 2 false ()) =
@@ -194,13 +194,13 @@ theorem ukm_hit (s : UWSt) (hl : UkLand C P T s) (t : PTree) (hm : UkMem P t s.m
   cases hperm : uwkPermOk acc false lw with
   | false =>
     have hres : ukmRes acc lw = .Err (.PTW_No_Permission (), ()) := by
-      simp only [ukmRes, hperm, Bool.false_eq_true, if_false]
+      simp only [ukmRes, hperm, Bool.false_eq_true, ite_false]
     rw [hres]
     exact ⟨s, fun orc => utlb_hit_denied ufFoot orc s hwk vpn _ hacc false sum (ptePpn w) w' addr hok'.inv
       (hpermEq.trans hperm), ukmOut_refl hl⟩
   | true =>
     have hres : ukmRes acc lw = .Ok (ptePpn w, .PBMT_PMA, ()) := by
-      simp only [ukmRes, hperm, if_true, hppn]
+      simp only [ukmRes, hperm, ite_true, hppn]
     rw [hres]
     have hperm' : uwkPermOk acc false w' = true := hpermEq.trans hperm
     have hpermw : uwkPermOk acc false w = true := by
@@ -294,10 +294,10 @@ theorem ukm_xlate (s : UWSt) (hl : UkLand C P T s) (va lw : BitVec 64)
   unfold ukmXRes
   cases hperm : uwkPermOk acc false lw with
   | false =>
-    simp only [hperm, Bool.false_eq_true, if_false] at hw' ⊢
+    simp only [hperm, Bool.false_eq_true, ite_false] at hw' ⊢
     exact utr_translateAddr_err ufFoot orc orc s s' hp va acc hacc hc _ hw'
   | true =>
-    simp only [hperm, if_true] at hw' ⊢
+    simp only [hperm, ite_true] at hw' ⊢
     rw [utr_translateAddr_ok ufFoot orc orc s s' hp va acc hacc hc _ _ hw']
     have hpa := (ub_data_valid P hm.wf _ lw hk).1
     rw [uft_paOf_eq, uft_off_eq, ← hpa]
@@ -313,7 +313,7 @@ theorem ukm_xlate_ok (s : UWSt) (hl : UkLand C P T s) (va lw : BitVec 64)
   obtain ⟨s', hw, hout⟩ := ukm_xlate s hl va lw hk acc hacc hpl
   refine ⟨s', fun orc => ?_, hout⟩
   rw [hw orc]
-  simp only [ukmXRes, hperm, if_true]
+  simp only [ukmXRes, hperm, ite_true]
 
 /-- **C1, fetch** (U and X). -/
 theorem ukm_xlate_fetch (s : UWSt) (hl : UkLand C P T s) (va lw : BitVec 64)
@@ -350,7 +350,7 @@ theorem ukm_xlate_storeDenied (s : UWSt) (hl : UkLand C P T s) (va lw : BitVec 6
   refine ⟨s', fun orc => ?_, hout⟩
   rw [hw orc]
   have hperm : uwkPermOk (.Store .Data) false lw = false := by rw [ukm_perm_store, hW, Bool.and_false]
-  simp only [ukmXRes, hperm, Bool.false_eq_true, if_false]
+  simp only [ukmXRes, hperm, Bool.false_eq_true, ite_false]
   rfl
 
 end tr

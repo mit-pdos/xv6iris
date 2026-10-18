@@ -278,7 +278,7 @@ theorem foffRow_of_ok (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : Pip
     | inode n g m =>
       obtain ⟨-, -, ht, -, hg, hom⟩ := hok
       subst hg; subst hom
-      rw [if_pos ht]
+      rw [ite_eq_left ht]
       cases m <;> (unfold foffRow; iintro H; iexact H)
 
 /-- The rows of a table (Rocq `foff_rows`). -/
@@ -435,20 +435,20 @@ def procOfiles (γ : FileNames) (γd : GName) (pa : BitVec 64) (fs : List (BitVe
 theorem ofileLentOrSlot_in (γ : FileNames) (γd : GName) (pa : BitVec 64) (D : List Nat) (fd : Nat)
     (v : BitVec 64) (h : fd ∈ D) :
     ofileLentOrSlot (GF := GF) γ γd pa D fd v = iprop(⌜v ≠ 0#64⌝ ∗ wordPointsTo (pOfile pa fd) 8 (DFrac.own 1) v) := by
-  unfold ofileLentOrSlot; rw [if_pos h]
+  unfold ofileLentOrSlot; rw [ite_eq_left h]
 
 theorem ofileLentOrSlot_out (γ : FileNames) (γd : GName) (pa : BitVec 64) (D : List Nat) (fd : Nat)
     (v : BitVec 64) (h : fd ∉ D) :
     ofileLentOrSlot (GF := GF) γ γd pa D fd v = ofileSlot γ γd pa fd v := by
-  unfold ofileLentOrSlot; rw [if_neg h]
+  unfold ofileLentOrSlot; rw [ite_eq_right h]
 
 theorem ofileLentOrSlot_congr (γ : FileNames) (γd : GName) (pa : BitVec 64) (D D' : List Nat) (fd : Nat)
     (v : BitVec 64) (h : fd ∈ D ↔ fd ∈ D') :
     ofileLentOrSlot (GF := GF) γ γd pa D fd v ⊢ ofileLentOrSlot γ γd pa D' fd v := by
   unfold ofileLentOrSlot
   by_cases hd : fd ∈ D
-  · rw [if_pos hd, if_pos (h.1 hd)]
-  · rw [if_neg hd, if_neg (fun h' => hd (h.2 h'))]
+  · rw [ite_eq_left hd, ite_eq_left (h.1 hd)]
+  · rw [ite_eq_right hd, ite_eq_right (fun h' => hd (h.2 h'))]
 
 theorem procOfilesOwe_len (γ : FileNames) (γd : GName) (pa : BitVec 64) (fs : List (BitVec 64))
     (D : List Nat) :

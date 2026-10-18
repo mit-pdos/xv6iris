@@ -118,7 +118,7 @@ theorem namex_skip_loop (base pv : BitVec 64) (K : KCtx) (plen : Nat) (f : Nat �
   have hR : ∀ r : BitVec 5, r ≠ 9#5 → r ≠ 15#5 →
       ((R.set 9#5 (pv + (BitVec.ofNat 64 off + 1#64))).set 15#5 (BitVec.setWidth 64 (f (off + 1)))) r
         = R0 r := by
-    intro r hr9 hr15; simp only [RegMap.set_apply, if_neg hr9, if_neg hr15]; exact hag r hr9 hr15
+    intro r hr9 hr15; simp only [RegMap.set_apply, ite_eq_right hr9, ite_eq_right hr15]; exact hag r hr9 hr15
   have hR9 : ((R.set 9#5 (pv + (BitVec.ofNat 64 off + 1#64))).set 15#5
       (BitVec.setWidth 64 (f (off + 1)))) 9#5 = pv + BitVec.ofNat 64 (off + 1) := by
     simp [RegMap.set_apply, BitVec.ofNat_add]
@@ -165,7 +165,7 @@ theorem namex_skip (base pv : BitVec 64) (K : KCtx) (plen : Nat) (f : Nat → Bi
   iintro Hk Hpc Hb
   ihave Hbuf := Hbk $$ Hb
   have hR : ∀ r : BitVec 5, r ≠ 9#5 → r ≠ 15#5 → (R.set 15#5 (BitVec.setWidth 64 (f off0))) r = R r := by
-    intro r hr9 hr15; simp only [RegMap.set_apply, if_neg hr15]
+    intro r hr9 hr15; simp only [RegMap.set_apply, ite_eq_right hr15]
   -- base+4  bne a5,s3,base+0x12
   by_cases hs : f off0 = SLASH
   · have hd : decide (f off0 ≠ SLASH) = false := by simp [hs]
@@ -243,7 +243,7 @@ theorem namex_scan_loop (pv : BitVec 64) (K : KCtx) (plen : Nat) (f : Nat → Bi
   have hR : ∀ r : BitVec 5, r ≠ 18#5 → r ≠ 15#5 → r ≠ 14#5 →
       (((R.set 18#5 (pv + (BitVec.ofNat 64 ii + 1#64))).set 15#5 (BitVec.setWidth 64 (f (ii + 1)))).set
         14#5 (BitVec.setWidth 64 (f (ii + 1)) + 0xffffffffffffffd1#64)) r = R0 r := by
-    intro r h1 h2 h3; simp only [RegMap.set_apply, if_neg h1, if_neg h2, if_neg h3]; exact hag r h1 h2 h3
+    intro r h1 h2 h3; simp only [RegMap.set_apply, ite_eq_right h1, ite_eq_right h2, ite_eq_right h3]; exact hag r h1 h2 h3
   have hR18 : (((R.set 18#5 (pv + (BitVec.ofNat 64 ii + 1#64))).set 15#5
       (BitVec.setWidth 64 (f (ii + 1)))).set 14#5
         (BitVec.setWidth 64 (f (ii + 1)) + 0xffffffffffffffd1#64)) 18#5

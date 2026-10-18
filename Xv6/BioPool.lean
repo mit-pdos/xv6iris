@@ -214,8 +214,8 @@ theorem bioPool_recycle (V : BioView GF) (bnos bnos' : Nat → BitVec 32) (k : N
         else poolBlk (GF := GF) V b) hcovB).to_eq,
       (BigSepS.bigSepS_delete (Φ := fun b => if bcached bnos' b then iprop(emp)
         else poolBlk (GF := GF) V b) holdmem).to_eq,
-      hcB, holdc, hcB', holdc', if_pos hcov]
-    simp only [Bool.false_eq_true, if_false, if_true]
+      hcB, holdc, hcB', holdc', ite_eq_left hcov]
+    simp only [Bool.false_eq_true, ite_false, ite_true]
     iintro ⟨HB, -, Hrest⟩
     iframe HB
     iintro Hold
@@ -239,8 +239,8 @@ theorem bioPool_recycle (V : BioView GF) (bnos bnos' : Nat → BitVec 32) (k : N
         else poolBlk (GF := GF) V b) hcovB).to_eq,
       (BigSepS.bigSepS_delete (Φ := fun b => if bcached bnos' b then iprop(emp)
         else poolBlk (GF := GF) V b) hcovB).to_eq,
-      hcB, hcB', if_neg hcov]
-    simp only [Bool.false_eq_true, if_false, if_true]
+      hcB, hcB', ite_eq_right hcov]
+    simp only [Bool.false_eq_true, ite_false, ite_true]
     iintro ⟨HB, Hrest⟩
     iframe HB
     iintro -

@@ -115,7 +115,7 @@ theorem memModel_load_rv (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (h
         intro c hc
         simp [updCpu, hc]
       · iapply hartViewsAt_intro
-        simp only [updCpu, if_true, HRead.afterLoad]
+        simp only [updCpu, ite_true, HRead.afterLoad]
         iframe Hv Hi Hr
     · ipureintro
       exact mmOk_afterLoad σ cpu pa n tvn htv hmm
@@ -150,7 +150,7 @@ theorem memModel_fence_acq (σ : MState) (cpu : CPU) (b : barrier_kind)
   have hle : T ≤ (σ.fence cpu b).tv cpu := by
     rw [e, hacq]
     unfold fencePost
-    simp only [if_true]
+    simp only [ite_true]
     omega
   iapply viewLbAt_le E cpu ((σ.fence cpu b).tv cpu) T hle
   iexact Hv

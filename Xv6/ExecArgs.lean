@@ -113,15 +113,15 @@ theorem execArgsOf_uargvImg (E : ElfMem) (Mv : Nat → List (BitVec 8)) (av : Na
     rw [ea]
     dsimp only
     by_cases hlt : i < args.length
-    · rw [if_pos hlt]
+    · rw [ite_eq_left hlt]
       rw [imgWord_of_bytes E Mv (av + 8 * i) _ hag (hword i _ (hel i hlt)), bytesToWord_wordToBytes]
-    · rw [if_neg hlt]
+    · rw [ite_eq_right hlt]
       have hi' : i = args.length := by omega
       subst hi'
       rw [imgWord_of_bytes E Mv (av + 8 * args.length) _ hag hcap, bytesToWord_wordToBytes]
   · intro i hi
     dsimp only
-    rw [if_pos hi]
+    rw [ite_eq_left hi]
     have hpos := (hs i _ (hel i hi)).1
     have hhi := hphi i _ (hel i hi)
     intro hc
@@ -132,7 +132,7 @@ theorem execArgsOf_uargvImg (E : ElfMem) (Mv : Nat → List (BitVec 8)) (av : Na
   · simp
   · intro i hi q hq
     dsimp only
-    rw [if_pos hi]
+    rw [ite_eq_left hi]
     have hhi := hphi i _ (hel i hi)
     have hp : (BitVec.ofNat 64 (uaNth args i).ptr).toNat = (uaNth args i).ptr := by
       rw [BitVec.toNat_ofNat]; omega

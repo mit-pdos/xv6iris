@@ -108,8 +108,8 @@ theorem syscPath_rows (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts sts' : L
     by rw [show (syscStore V1 r).pvSecc = V.pvSecc from hsc]; exact usysSeccOk_refl _ _ _ _ (hn 23 h23),
     Or.inl (hn 14 h14), Or.inl (hn 3 h3)⟩
   · unfold syscMemOk
-    rw [if_neg (hn USYS_exec h7), if_neg (hn USYS_sbrk h12), if_neg (hn USYS_wait h3),
-      if_neg (hn USYS_pipe h4), if_neg (hn USYS_read h5), if_neg (hn USYS_fstat h8)]
+    rw [ite_eq_right (hn USYS_exec h7), ite_eq_right (hn USYS_sbrk h12), ite_eq_right (hn USYS_wait h3),
+      ite_eq_right (hn USYS_pipe h4), ite_eq_right (hn USYS_read h5), ite_eq_right (hn USYS_fstat h8)]
     show umemLazy (syscStore V1 r).upt (syscStore V1 r).sz.toNat (viewFaulted V.upt P' M) =
       umemLazy V.upt V.sz.toNat M
     rw [syscStore_upt, syscStore_sz, hup, hsz]
@@ -142,13 +142,13 @@ theorem syscPath_imgLazy (P : UPtd) (sz : BitVec 64) (M : Nat → List (BitVec 8
   unfold umemLazy at h
   unfold umemByte viewLazy
   by_cases hm : (Iris.Std.PartialMap.get? P.um (a / 4096)).isSome
-  · rw [if_pos hm] at h
+  · rw [ite_eq_left hm] at h
     have hn : ¬ ((Iris.Std.PartialMap.get? P.um (a / 4096)).isNone ∧ a / 4096 * 4096 < sz.toNat) := by
       intro hc; rw [Option.isNone_iff_eq_none] at hc; rw [hc.1] at hm; simp at hm
-    rw [if_neg hn, h]; rfl
-  · rw [if_neg hm] at h
+    rw [ite_eq_right hn, h]; rfl
+  · rw [ite_eq_right hm] at h
     by_cases hb : a < pgRoundUpN sz.toNat
-    · rw [if_pos hb] at h
+    · rw [ite_eq_left hb] at h
       cases h
       have hn : (Iris.Std.PartialMap.get? P.um (a / 4096)).isNone ∧ a / 4096 * 4096 < sz.toNat := by
         refine ⟨?_, ?_⟩
@@ -156,9 +156,9 @@ theorem syscPath_imgLazy (P : UPtd) (sz : BitVec 64) (M : Nat → List (BitVec 8
           | none => rfl
           | some _ => rw [hq] at hm; simp at hm
         · unfold pgRoundUpN at hb; omega
-      rw [if_pos hn, List.getElem?_replicate, if_pos (Nat.mod_lt a (by decide))]
+      rw [ite_eq_left hn, List.getElem?_replicate, ite_eq_left (Nat.mod_lt a (by decide))]
       rfl
-    · rw [if_neg hb] at h; cases h
+    · rw [ite_eq_right hb] at h; cases h
 
 /-! ## §2 The deposit laws (§4 template; deviation 1) -/
 
@@ -775,7 +775,7 @@ theorem syscPath_openFdOk (V V' : ProcPriv) (P' : UPtd) (k' : Nat) (sts sts' : L
   unfold syscFdOk
   rw [hn]
   unfold usysFdOk
-  rw [if_neg (by decide), if_neg (by decide), if_pos (by decide)]
+  rw [ite_eq_right (by decide), ite_eq_right (by decide), ite_eq_left (by decide)]
   rcases hrow with ⟨hr, -, rfl⟩ | ⟨fd, l, kk, rb, wb, t, hr, hfree, rfl, hcl, rfl, hnp⟩
   · exact Or.inr ⟨hr.trans (by decide), rfl⟩
   · refine Or.inl ⟨fd, rb, wb, t, hr, ?_, rfl, hnp⟩

@@ -84,7 +84,7 @@ theorem mn_kinit (KI : KINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsi
   iintro %spie %spp %R' %hsp Hk Hpc #Hlk Hav _ %_
   obtain ⟨rfl, rfl⟩ := hsp (by simp [])
   rw [KCtx.withSpie_self' _ _ _ rfl rfl]
-  simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, if_pos, mn_ret_72]
+  simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, ite_eq_left, mn_ret_72]
   iapply HΦ $$ %R' Hk Hpc Hlk Hav
 
 end
@@ -130,7 +130,7 @@ theorem mn_kvminit (KV : KVMINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) 
   iintro %spie %spp %R' %t %pas %hsp Hk Hpc Htree Hstk Hav Hroot %⟨_, hok⟩
   obtain ⟨rfl, rfl⟩ := hsp (by simp [])
   rw [KCtx.withSpie_self' _ _ _ rfl rfl]
-  simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, if_pos, mn_ret_76]
+  simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, ite_eq_left, mn_ret_76]
   iapply HΦ $$ %R' %t %pas %hok Hk Hpc Htree Hstk Hav Hroot
 
 end
@@ -188,7 +188,7 @@ theorem mn_kvminithart (KVH : KVMINITHART) [X : CurCtx] (hX : curTier = KTier.ba
   iapply hkv
   iframe Hk Hpc Htlb Hkpt Hroot
   iintro %R' Hk Hpc Hstv _ _
-  simp only [KCtx.withRegs_regs, RegMap.set_apply, if_pos, mn_ret_7a, KCtx.toKpt_withRegs,
+  simp only [KCtx.withRegs_regs, RegMap.set_apply, ite_eq_left, mn_ret_7a, KCtx.toKpt_withRegs,
     Xv6.kxc_tfp_extract, KCtx.withRegs_withRegs]
   iapply HΦ $$ %R' Hk Hpc Hstv
 
@@ -230,7 +230,7 @@ theorem mn_procinit (PR : PROCINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap
   simp only [KCtx.withRegs_sie, KCtx.withRegs_proc, hsie]
   iapply wpNext_off_intro
   iintro %R' Hk Hpc Hpid Hwait Hready %_
-  simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, if_pos, mn_ret_7e]
+  simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, ite_eq_left, mn_ret_7e]
   iapply HΦ $$ %R' Hk Hpc Hpid Hwait Hready
 
 /-- A byte buffer travels to the kernel table. -/
@@ -275,7 +275,7 @@ theorem mn_slotIn [CurCtx] (hct : curTier = KTier.kpt) (Γ : SchedNames) (pas : 
   · iexists startedPrimary; iexact Hh
   isplitl [Hsf]
   · unfold pavSlot
-    rw [if_pos mn_unused_isUnused]
+    rw [ite_eq_left mn_unused_isUnused]
     ileft; iexact Hsf
   iapply kstackOwn_of_page pas i hi (List.replicate 4096 5#8) mn_replicate_len hct hpv $$ HS Hst Hbuf
 

@@ -142,8 +142,8 @@ theorem soAuth_step (h : List Sev) (e : Sev) (k : Nat) (hk : k < NPROC) (b b' : 
   intro i hi
   rw [occOf_snoc, he i]
   by_cases e' : i = k
-  · subst e'; simp only [if_true]; exact get?_insert_eq rfl
-  · simp only [e', if_false]
+  · subst e'; simp only [ite_true]; exact get?_insert_eq rfl
+  · simp only [e', ite_false]
     rw [get?_insert_ne (fun h => e' (procAddr_inj hi hk h.symm))]
     exact hM i hi
 

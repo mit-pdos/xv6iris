@@ -48,7 +48,7 @@ theorem histBytes_of_bytes (ξ : CtxId) (pa : PAddr) (dq : DFrac) (bs : Nat → 
     · rw [BigSepL.bigSepL_eq (l := List.range n)
         (Φ := fun _ (j : Nat) => iprop((pa + BitVec.ofNat 64 j) ↦ₕ{dq} (if j = n then e :: He else Hs j)))
         (Ψ := fun _ (j : Nat) => iprop((pa + BitVec.ofNat 64 j) ↦ₕ{dq} Hs j))
-        (fun {_ x} hx => by rw [if_neg (Nat.ne_of_lt (MachCSL.rangeIdx_lt hx))])]
+        (fun {_ x} hx => by rw [ite_eq_right (Nat.ne_of_lt (MachCSL.rangeIdx_lt hx))])]
       iexact Hb
     · simp only [↓reduceIte]
       iexact Hpt

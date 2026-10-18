@@ -461,7 +461,7 @@ theorem ub_entries_setLeaf (vpn : BitVec 27) (v : BitVec 64) : ∀ (lvl : Nat) (
     obtain ⟨i, hi, rfl⟩ := he
     by_cases h : i = vpnIdx vpn 0
     · subst h; right; simp [PTree.slot]
-    · left; simp only [h, if_false, PTree.entries, List.mem_map]; exact ⟨i, hi, rfl⟩
+    · left; simp only [h, ite_false, PTree.entries, List.mem_map]; exact ⟨i, hi, rfl⟩
   | lvl + 1, t, e, he => by
     simp only [PTree.setLeaf] at he
     cases hk : t.kids (vpnIdx vpn (lvl + 1)) with
@@ -472,11 +472,11 @@ theorem ub_entries_setLeaf (vpn : BitVec 27) (v : BitVec 64) : ∀ (lvl : Nat) (
       rcases he with ⟨i, hi, rfl⟩ | ⟨j, hj, he⟩
       · left; exact PTree.self_mem_entries (lvl + 1) t i
       · by_cases hj' : j = vpnIdx vpn (lvl + 1)
-        · simp only [hj', if_true] at he
+        · simp only [hj', ite_true] at he
           rcases ub_entries_setLeaf vpn v lvl c e he with h | h
           · left; exact PTree.kid_mem_entries lvl t c _ hk e h
           · right; rw [h]; simp [PTree.slot, hk]
-        · simp only [hj', if_false] at he
+        · simp only [hj', ite_false] at he
           left
           simp only [PTree.entries, List.mem_append, List.mem_flatMap]
           exact Or.inr ⟨j, hj, he⟩
@@ -487,7 +487,7 @@ theorem ub_entries_setLeaf (vpn : BitVec 27) (v : BitVec 64) : ∀ (lvl : Nat) (
       rcases he with ⟨i, hi, rfl⟩ | ⟨j, hj, he⟩
       · by_cases h : i = vpnIdx vpn (lvl + 1)
         · subst h; right; simp [PTree.slot, hk]
-        · left; simp only [h, if_false]; exact PTree.self_mem_entries (lvl + 1) t i
+        · left; simp only [h, ite_false]; exact PTree.self_mem_entries (lvl + 1) t i
       · left
         simp only [PTree.entries, List.mem_append, List.mem_flatMap]
         exact Or.inr ⟨j, hj, he⟩

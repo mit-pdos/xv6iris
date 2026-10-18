@@ -170,7 +170,7 @@ theorem usertrap_56_proof (PK : PRINTK) (SK : SETKILLED) (hEX : UtExitElim (GF :
   ihave Hpay := (show ukillCredAt (GF := GF) uslot A.gn A.sc A.Wk A.f ⊢
     iprop(□ MachFixedGS.killCred (GF := GF) ∨
       (killOwed A.gn ∗ UexecSG.sbundleAt uslot USYS_exit A.f A.Wk)) from by
-      unfold ukillCredAt; rw [if_pos hks]) $$ Hpay
+      unfold ukillCredAt; rw [ite_eq_left hks]) $$ Hpay
   ihave Hmk := (show takenAt (GF := GF) ((utV1 A).updEv kv).gen ⊢ takenAt A.gn from by rw [hok.hgn]) $$ Hmk
   -- WHICH PARTY PAYS: keyed, so the side setkilled hands back is known
   icases (show iprop(□ MachFixedGS.killCred (GF := GF) ∨

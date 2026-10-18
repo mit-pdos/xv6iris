@@ -36,9 +36,9 @@ def clockCells (cpu : CPU) : IProp GF := iprop%
     Register.mip ↦ᵣ[cpu] mip
 
 theorem pcIs_neg (cpu : CPU) (p : Prop) [Decidable p] (a b : BitVec 64) (h : ¬p) :
-    pcIs (GF := GF) cpu (if p then a else b) ⊢ pcIs cpu b := by rw [if_neg h]
+    pcIs (GF := GF) cpu (if p then a else b) ⊢ pcIs cpu b := by rw [ite_eq_right h]
 
 theorem pcIs_pos (cpu : CPU) (p : Prop) [Decidable p] (a b : BitVec 64) (h : p) :
-    pcIs (GF := GF) cpu (if p then a else b) ⊢ pcIs cpu a := by rw [if_pos h]
+    pcIs (GF := GF) cpu (if p then a else b) ⊢ pcIs cpu a := by rw [ite_eq_left h]
 
 end MachCSL

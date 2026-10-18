@@ -61,10 +61,10 @@ theorem listToMap_mem {β : Type} (l : List (Fname × β)) (k : Fname) (v : β)
     unfold listToMap at h
     rw [List.foldr_cons, Std.ExtTreeMap.getElem?_insert] at h
     by_cases hk : p.1 = k
-    · rw [if_pos (by rw [Std.compare_eq_iff_eq]; exact hk)] at h
+    · rw [ite_eq_left (by rw [Std.compare_eq_iff_eq]; exact hk)] at h
       cases h
       exact List.mem_cons.2 (Or.inl (by rw [← hk]))
-    · rw [if_neg (by rw [Std.compare_eq_iff_eq]; exact hk)] at h
+    · rw [ite_eq_right (by rw [Std.compare_eq_iff_eq]; exact hk)] at h
       exact List.mem_cons_of_mem _ (ih h)
 
 /-- Rocq `txt_sys_ok`. -/

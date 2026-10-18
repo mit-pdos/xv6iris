@@ -39,7 +39,7 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF] [Xv6G GF] [FsTopG GF] [OffboxG 
 /-- The registry without `d` reads as the registry at every other device. -/
 theorem fifHf_delete_ne (vs : FifVs) (d d' : Nat) (h : d ≠ d') : fifHf (delete vs d) d' = fifHf vs d' := by
   unfold fifHf
-  rw [LawfulPartialMap.get?_delete, if_neg h]
+  rw [LawfulPartialMap.get?_delete, ite_eq_right h]
 
 /-- The ledger after a close at slot `k`, read at every other descriptor. -/
 theorem fif_set_closed_ne (l : List FdState) (k : Nat) (fd' : Int) (h0 : 0 ≤ fd') (hne : fd' ≠ (k : Int)) :

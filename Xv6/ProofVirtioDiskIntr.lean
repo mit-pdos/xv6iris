@@ -492,7 +492,7 @@ theorem vdis_exit (RE : RELEASE) (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : 
   iapply HΦ $$ Hlc %_ Hk Hpc
   ipureintro
   unfold calleeSaved
-  simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, if_true, true_and, and_true]
+  simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, true_and, and_true]
   exact hpres3.2
 
 end
@@ -954,7 +954,7 @@ theorem virtio_disk_intr_proof
       ((k.regs.set 2#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)).set 8#5 (k.regs 2#5)) := by
     unfold vdisPres
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, if_true]
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
   -- the prologue
   iapply (wp_prologue4s1 cpu k hsie KA.«virtio_disk_intr» (by omega))
   k_code (text_instr _ _ _ _ rfl rfl) Htext
@@ -1002,7 +1002,7 @@ theorem virtio_disk_intr_proof
   have hR19 : R1 9#5 = KA.«disk» := by
     first
       | exact f9
-      | (rw [f9]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, if_true])
+      | (rw [f9]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true])
   have hpres1 : vdisPres k R1 :=
     ⟨f2, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27⟩
   -- +0x1e  lui a5,0x10001 ; +0x22  lw a5,96(a5)   INTERRUPT_STATUS

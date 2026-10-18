@@ -417,8 +417,8 @@ theorem KCtx.pushOffB_intrOff (k : KCtx) (a b : Bool) (hwf : k.wf) :
   simp only [KCtx.intrOff_noff, KCtx.intrOff_intena]
   simp only [KCtx.pushOffB, KCtx.intrOff, KCtx.pushOffAt, KCtx.mk.injEq, _root_.true_and, _root_.and_true]
   by_cases hn : noff = 0
-  · rw [if_pos hn]; exact w1 hn
-  · rw [if_neg hn, w2 (by omega)]; rfl
+  · rw [ite_eq_left hn]; exact w1 hn
+  · rw [ite_eq_right hn, w2 (by omega)]; rfl
 
 theorem KCtx.intrOff_withRegs (k : KCtx) (R : RegMap) (a b : Bool) :
     (k.withRegs R).intrOff a b = (k.intrOff a b).withRegs R := rfl

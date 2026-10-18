@@ -94,7 +94,7 @@ theorem sys_open_pub_off (cpu : CPU) (kk kf : Nat) (γo : GName) (C : FContent) 
       · exact e
       · rw [h] at hc; exact absurd hc (by decide)
     subst ht'
-    simp only [if_pos h]
+    simp only [ite_eq_left h]
     iintro ⟨Hctx, Hrows, ⟨%vo, Hcell, %hwf, Hgv⟩⟩
     obtain ⟨hwf, rfl⟩ := hwf
     cases omo with
@@ -140,7 +140,7 @@ theorem sys_open_pub_off (cpu : CPU) (kk kf : Nat) (γo : GName) (C : FContent) 
       · exact absurd hc h
       · exact e
     subst ht'
-    simp only [if_neg h]
+    simp only [ite_eq_right h]
     iintro ⟨Hctx, Hrows, Hoff⟩
     imodintro
     iframe Hctx Hrows

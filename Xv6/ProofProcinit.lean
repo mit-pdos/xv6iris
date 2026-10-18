@@ -155,10 +155,10 @@ theorem pi_bne_last {α : Type} (i : Nat) (hi : i < 64) (p q : α) :
     (if bcond bop.BNE (procAddr (i + 1)) KA.«tickslock» then p else q)
       = if i + 1 = 64 then q else p := by
   by_cases he : i + 1 = 64
-  · rw [if_pos he,
-      if_neg (by simp only [bcond, bne_iff_ne, ne_eq]; exact fun hc => hc ((pi_s1_eq i hi).mpr he))]
-  · rw [if_neg he,
-      if_pos (by simp only [bcond, bne_iff_ne, ne_eq]; exact fun hc => he ((pi_s1_eq i hi).mp hc))]
+  · rw [ite_eq_left he,
+      ite_eq_right (by simp only [bcond, bne_iff_ne, ne_eq]; exact fun hc => hc ((pi_s1_eq i hi).mpr he))]
+  · rw [ite_eq_right he,
+      ite_eq_left (by simp only [bcond, bne_iff_ne, ne_eq]; exact fun hc => he ((pi_s1_eq i hi).mp hc))]
 
 /-- What the loop keeps across an iteration (everything callee-saved but the
 cursor `s1`). -/
@@ -535,7 +535,7 @@ theorem pi_loop (IL : INITLOCK) [CurCtx] (k : KCtx) (hK : 10 ≤ k.avail) (fuel 
     iapply (pi_iter IL k hK i hi R h9 h18 h19 h20 h21 h22 cur) $$ [- $Hk $Hpc $Hin]
     iapply wpNext_intro_pin_lc
     iintro %c1 %hp1 Hlc %R2 Hk Hpc Hout %hpost
-    rw [if_pos hlast]
+    rw [ite_eq_left hlast]
     obtain ⟨hkept, hcur⟩ := hpost
     ihave Hlist := pi_range_out_cons i 0 $$ [Hout Hrest]
     case' _ => iframe; exact BigSepL.bigSepL_nil_intro
@@ -552,7 +552,7 @@ theorem pi_loop (IL : INITLOCK) [CurCtx] (k : KCtx) (hK : 10 ≤ k.avail) (fuel 
     iapply (pi_iter IL k hK i hi R h9 h18 h19 h20 h21 h22 cur) $$ [- $Hk $Hpc $Hin]
     iapply wpNext_intro_pin
     iintro %c1 %hp1 %R2 Hk Hpc Hout %hpost
-    rw [if_neg hlast]
+    rw [ite_eq_right hlast]
     obtain ⟨hkept, hcur⟩ := hpost
     ihave HΦ := wpNext_shift _ _ _ _ _ hp1 $$ HΦ
     iapply (ih (i + 1) (by omega) R2 hcur (hkept.2.2.1.trans h18) (hkept.2.2.2.1.trans h19)

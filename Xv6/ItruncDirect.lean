@@ -105,7 +105,7 @@ theorem itrunc_dnext (Γ : SchedNames) (cpu : CPU) (k : KCtx) (spie spp : Bool) 
   iintro Hk Hpc
   by_cases hlast : kx + 1 = NDIRECT
   · -- the twelfth entry is done: leave the loop
-    simp only [hlast, decide_true, if_true]
+    simp only [hlast, decide_true, ite_true]
     have hexit' := hexit cpu spie spp (R.set 9#5 (iAddr ip NDIRECT)) ?xp ?x19
     unfold itDPre at hexit'
     iapply hexit'
@@ -114,7 +114,7 @@ theorem itrunc_dnext (Γ : SchedNames) (cpu : CPU) (k : KCtx) (spie spp : Bool) 
     case xp => itpins_tac
     case x19 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h19
   · -- more entries to go: round again
-    simp only [hlast, decide_false, Bool.false_eq_true, if_false]
+    simp only [hlast, decide_false, Bool.false_eq_true, ite_false]
     have IH' := IH (by omega) cpu spie spp (R.set 9#5 (iAddr ip (kx + 1))) ?ir
     unfold itDPre at IH'
     iapply IH'

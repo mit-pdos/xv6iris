@@ -74,8 +74,8 @@ theorem fifHdls_insert (γfd : GName) (fdm : Fdmap) (vs vs' : FifVs) (k : Int) (
     intro fd
     unfold fdInsert
     by_cases h : fd = k
-    · subst h; rw [if_pos rfl, hk]; simp [e]
-    · rw [if_neg h, hhm]
+    · subst h; rw [ite_eq_left rfl, hk]; simp [e]
+    · rw [ite_eq_right h, hhm]
       cases e' : fdm fd with
       | none => rfl
       | some d' => simp [hagree fd d' e']
@@ -88,8 +88,8 @@ theorem fifHdls_insert (γfd : GName) (fdm : Fdmap) (vs vs' : FifVs) (k : Int) (
       unfold fdInsert
       rw [LawfulPartialMap.get?_insert]
       by_cases h : fd = k
-      · subst h; rw [if_pos rfl, if_pos rfl]; simp [e]
-      · rw [if_neg (Ne.symm h), if_neg h, hhm]
+      · subst h; rw [ite_eq_left rfl, ite_eq_left rfl]; simp [e]
+      · rw [ite_eq_right (Ne.symm h), ite_eq_right h, hhm]
         cases e' : fdm fd with
         | none => rfl
         | some d' => simp [hagree fd d' e']
@@ -109,7 +109,7 @@ theorem fifHdls_delete (γfd : GName) (fdm : Fdmap) (vs vs' : FifVs) (fd : Int) 
   have hagree' : ∀ x, x ≠ fd → get? hm x = ((fdDelete fdm fd) x).bind (fifHf vs') := by
     intro x hx
     unfold fdDelete
-    rw [if_neg hx, hhm]
+    rw [ite_eq_right hx, hhm]
     cases e' : fdm x with
     | none => rfl
     | some d' => simp [hagree x d' hx e']
@@ -140,8 +140,8 @@ theorem fifHdls_delete (γfd : GName) (fdm : Fdmap) (vs vs' : FifVs) (fd : Int) 
     intro x
     rw [LawfulPartialMap.get?_delete]
     by_cases h : x = fd
-    · subst h; rw [if_pos rfl]; unfold fdDelete; simp
-    · rw [if_neg (Ne.symm h)]; exact hagree' x h
+    · subst h; rw [ite_eq_left rfl]; unfold fdDelete; simp
+    · rw [ite_eq_right (Ne.symm h)]; exact hagree' x h
 
 end FifHdls
 

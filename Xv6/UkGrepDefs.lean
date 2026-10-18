@@ -122,10 +122,10 @@ theorem grepMmPost_step (d i : Nat) (f : Nat → BitVec 8) (j : Nat) (hd : 0 < d
   unfold grepFset grepMmPost
   by_cases hj : j = i
   · subst hj; simp; omega
-  · rw [if_neg hj]
+  · rw [ite_eq_right hj]
     by_cases h1 : j < i
-    · rw [if_pos h1, if_pos (by omega)]
-    · rw [if_neg h1, if_neg (by omega)]
+    · rw [ite_eq_left h1, ite_eq_left (by omega)]
+    · rw [ite_eq_right h1, ite_eq_right (by omega)]
 
 /-! ## §2 Byte facts at the leaves' values (deviation 2) -/
 
@@ -359,11 +359,11 @@ theorem grepUbytes_byte_upd (γd : GName) (a n : Nat) (f : Nat → BitVec 8) (i 
     subst hy
     dsimp only
     unfold grepFset
-    rw [if_neg hne]
+    rw [ite_eq_right hne]
     iexact H
   · dsimp only
     unfold grepFset
-    rw [if_pos rfl]
+    rw [ite_eq_left rfl]
     iexact Hb
 
 /-- A run of `1 + n` bytes is its first byte and the rest one address up. -/
@@ -558,7 +558,7 @@ theorem kgrep_epi2 (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (sp0
   have hsp2 : m2.get spIdx + BitVec.ofNat 64 (8 * 2) = sp0 := by
     show (ukWr (ukWr m 1#5 vra) 8#5 vs0).get 2#5 + _ = _
     simp only [ukWr_get]
-    simp (config := {decide := true}) only [if_false, ne_eq, and_true, and_false]
+    simp (config := {decide := true}) only [ite_false, ne_eq, and_true, and_false]
     rw [hsp]
     apply BitVec.eq_of_toNat_eq
     rw [Xv6.paAddToNat' _ _ (by rw [uv_avi_neg sp0 16 hlo]; have := sp0.isLt; omega), uv_avi_neg sp0 16 hlo]
@@ -581,15 +581,15 @@ theorem kgrep_epi2 (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (sp0
   iintro %h4 Hrun
   have hra : (ukWr m2 spIdx sp0).get 1#5 = vra := by
     show (ukWr (ukWr (ukWr m 1#5 vra) 8#5 vs0) 2#5 sp0).get 1#5 = vra
-    simp (config := {decide := true}) only [ukWr_get, if_false, if_true, ne_eq, and_true, and_false, not_false_eq_true]
+    simp (config := {decide := true}) only [ukWr_get, ite_false, ite_true, ne_eq, and_true, and_false, not_false_eq_true]
   rw [hra]
   iapply Hcont $$ %h4 %_ [] [] [] Hrun
   · ipureintro
     show (ukWr (ukWr (ukWr m 1#5 vra) 8#5 vs0) 2#5 sp0).get 2#5 = sp0
-    simp (config := {decide := true}) only [ukWr_get, if_false, if_true, ne_eq, and_true, and_false, not_false_eq_true]
+    simp (config := {decide := true}) only [ukWr_get, ite_false, ite_true, ne_eq, and_true, and_false, not_false_eq_true]
   · ipureintro
     show (ukWr (ukWr (ukWr m 1#5 vra) 8#5 vs0) 2#5 sp0).get 8#5 = vs0
-    simp (config := {decide := true}) only [ukWr_get, if_false, if_true, ne_eq, and_true, and_false, not_false_eq_true]
+    simp (config := {decide := true}) only [ukWr_get, ite_false, ite_true, ne_eq, and_true, and_false, not_false_eq_true]
   · ipureintro
     apply grepRkeep_upd _ _ _ _ _ (by decide)
     apply grepRkeep_upd _ _ _ _ _ (by decide)

@@ -35,15 +35,15 @@ theorem wa_bgeu_fall (va : BitVec 64) (h : ¬ va.toNat < 2 ^ 38) :
 
 theorem wa_beq_ne {α : Type} (x : BitVec 64) (h : x ≠ 0#64) (p q : α) :
     (if bcond bop.BEQ x 0#64 then p else q) = q := by
-  rw [if_neg (by simp only [bcond, beq_iff_eq]; exact h)]
+  rw [ite_eq_right (by simp only [bcond, beq_iff_eq]; exact h)]
 
 theorem wa_beq_eq {α : Type} (x y : BitVec 64) (h : x = y) (p q : α) :
     (if bcond bop.BEQ x y then p else q) = p := by
-  rw [if_pos (by simp only [bcond, beq_iff_eq]; exact h)]
+  rw [ite_eq_left (by simp only [bcond, beq_iff_eq]; exact h)]
 
 theorem wa_beq_neq {α : Type} (x y : BitVec 64) (h : x ≠ y) (p q : α) :
     (if bcond bop.BEQ x y then p else q) = q := by
-  rw [if_neg (by simp only [bcond, beq_iff_eq]; exact h)]
+  rw [ite_eq_right (by simp only [bcond, beq_iff_eq]; exact h)]
 
 /-- `ret` out of `walk` in `walkaddr`. -/
 theorem wa_ret_fc4 : jumpPc (KA.«walkaddr» + 0x1a#64) = (KA.«walkaddr» + 0x1a#64) := by

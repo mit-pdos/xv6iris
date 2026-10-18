@@ -81,7 +81,7 @@ theorem sys_pipe_sext_nat (n : Nat) (h : n < 16) : BitVec.signExtend 64 (BitVec.
     rw [BitVec.msb_eq_decide]; simp only [BitVec.toNat_ofNat, decide_eq_false_iff_not]; omega
   apply BitVec.eq_of_toNat_eq
   rw [BitVec.toNat_signExtend, hmsb]
-  simp only [BitVec.toNat_setWidth, BitVec.toNat_ofNat, Nat.reducePow, Bool.false_eq_true, if_false,
+  simp only [BitVec.toNat_setWidth, BitVec.toNat_ofNat, Nat.reducePow, Bool.false_eq_true, ite_false,
     Nat.add_zero]
   omega
 
@@ -168,13 +168,13 @@ theorem sys_pipe_unset2 (fs : List (BitVec 64)) (fd0 fd1 : Nat) (a b : BitVec 64
   intro i
   simp only [List.getElem?_set]
   by_cases hi1 : fd1 = i
-  · subst hi1; simp only [if_true, List.length_set]
-    rw [if_pos (List.getElem?_eq_some_iff.mp h1).1, h1]
-  · rw [if_neg hi1]
+  · subst hi1; simp only [ite_true, List.length_set]
+    rw [ite_eq_left (List.getElem?_eq_some_iff.mp h1).1, h1]
+  · rw [ite_eq_right hi1]
     by_cases hi0 : fd0 = i
-    · subst hi0; simp only [if_true, List.length_set]
-      rw [if_pos (List.getElem?_eq_some_iff.mp h0).1, h0]
-    · rw [if_neg hi0, if_neg hi1, if_neg hi0]
+    · subst hi0; simp only [ite_true, List.length_set]
+      rw [ite_eq_left (List.getElem?_eq_some_iff.mp h0).1, h0]
+    · rw [ite_eq_right hi0, ite_eq_right hi1, ite_eq_right hi0]
 
 /-- The first install, undone: `fdalloc(wf)` failed. -/
 theorem sys_pipe_unset1 (fs : List (BitVec 64)) (fd0 : Nat) (a : BitVec 64) (h0 : fs[fd0]? = some 0#64) :

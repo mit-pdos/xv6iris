@@ -39,7 +39,7 @@ theorem umemWrite_nil (M : Nat → List (BitVec 8)) (va : Nat) : umemWrite M va 
   | none => rfl
   | some b =>
     simp only [Option.map_some, List.length_nil, Nat.add_zero]
-    rw [if_neg (by omega)]
+    rw [ite_eq_right (by omega)]
 
 /-- A write whose range misses page `k` leaves it alone. -/
 theorem umemWrite_other (M : Nat → List (BitVec 8)) (va : Nat) (bs : List (BitVec 8)) (k : Nat)
@@ -51,7 +51,7 @@ theorem umemWrite_other (M : Nat → List (BitVec 8)) (va : Nat) (bs : List (Bit
   | none => rfl
   | some b =>
     have hj : j < (M k).length := List.getElem?_eq_some_iff.mp hh |>.1
-    simp only [Option.map_some, if_neg (h j hj)]
+    simp only [Option.map_some, ite_eq_right (h j hj)]
 
 /-- A write that lands inside one page, spliced into that page. -/
 theorem umemWrite_in (M : Nat → List (BitVec 8)) (va : Nat) (bs : List (BitVec 8)) (k off : Nat)
@@ -62,23 +62,23 @@ theorem umemWrite_in (M : Nat → List (BitVec 8)) (va : Nat) (bs : List (BitVec
   rw [umemWrite_getElem?, List.getElem?_append, List.length_take, hlen,
     Nat.min_eq_left (show off ≤ 4096 by omega)]
   by_cases h1 : j < off
-  · rw [if_pos (by omega), List.getElem?_take, if_pos h1]
+  · rw [ite_eq_left (by omega), List.getElem?_take, ite_eq_left h1]
     cases hh : (M k)[j]? with
     | none => rfl
-    | some b => simp only [Option.map_some]; rw [if_neg (by omega)]
+    | some b => simp only [Option.map_some]; rw [ite_eq_right (by omega)]
   · have hoj : off ≤ j := Nat.le_of_not_lt h1
     obtain ⟨m, rfl⟩ : ∃ m, j = off + m := ⟨j - off, by omega⟩
-    rw [if_neg (by omega), List.getElem?_append, Nat.add_sub_cancel_left]
+    rw [ite_eq_right (by omega), List.getElem?_append, Nat.add_sub_cancel_left]
     by_cases h2 : m < bs.length
-    · rw [if_pos h2]
+    · rw [ite_eq_left h2]
       have hj : off + m < (M k).length := by rw [hlen]; omega
       rw [List.getElem?_eq_getElem hj]
       simp only [Option.map_some]
-      rw [if_pos ⟨by omega, by omega⟩]
+      rw [ite_eq_left ⟨by omega, by omega⟩]
       have he : k * 4096 + (off + m) - (k * 4096 + off) = m := by omega
       rw [he, List.getElem?_eq_getElem h2]
       rfl
-    · rw [if_neg h2, List.getElem?_drop]
+    · rw [ite_eq_right h2, List.getElem?_drop]
       cases hh : (M k)[off + m]? with
       | none =>
         have hnl : ¬ off + m < (M k).length := by
@@ -88,7 +88,7 @@ theorem umemWrite_in (M : Nat → List (BitVec 8)) (va : Nat) (bs : List (BitVec
         rw [List.getElem?_eq_none (by omega)]
       | some b =>
         simp only [Option.map_some]
-        rw [if_neg (fun hc => h2 (by have hc1 := hc.1; have hc2 := hc.2; omega))]
+        rw [ite_eq_right (fun hc => h2 (by have hc1 := hc.1; have hc2 := hc.2; omega))]
         rw [show off + bs.length + (m - bs.length) = off + m from by omega, hh]
 
 /-- Two writes in a row are one write of the concatenation. -/
@@ -103,17 +103,17 @@ theorem umemWrite_append (M : Nat → List (BitVec 8)) (va : Nat) (bs1 bs2 : Lis
     simp only [Option.map_some, List.length_append]
     by_cases ha : va ≤ k * 4096 + j
     · by_cases hb1 : k * 4096 + j < va + bs1.length
-      · rw [if_pos ⟨ha, by omega⟩, if_neg (fun hc => absurd hc.1 (by omega)), if_pos ⟨ha, hb1⟩,
-          List.getElem?_append, if_pos (by omega)]
+      · rw [ite_eq_left ⟨ha, by omega⟩, ite_eq_right (fun hc => absurd hc.1 (by omega)), ite_eq_left ⟨ha, hb1⟩,
+          List.getElem?_append, ite_eq_left (by omega)]
       · by_cases hb2 : k * 4096 + j < va + (bs1.length + bs2.length)
-        · rw [if_pos ⟨ha, by omega⟩, if_pos ⟨by omega, by omega⟩,
-            if_neg (fun hc => hb1 hc.2), List.getElem?_append, if_neg (by omega)]
+        · rw [ite_eq_left ⟨ha, by omega⟩, ite_eq_left ⟨by omega, by omega⟩,
+            ite_eq_right (fun hc => hb1 hc.2), List.getElem?_append, ite_eq_right (by omega)]
           rw [Nat.sub_sub]
-        · rw [if_neg (fun hc => hb2 (by have hc2 := hc.2; omega)),
-            if_neg (fun hc => hb2 (by have hc2 := hc.2; omega)),
-            if_neg (fun hc => hb1 hc.2)]
-    · rw [if_neg (fun hc => ha hc.1), if_neg (fun hc => ha (by have hc1 := hc.1; omega)),
-        if_neg (fun hc => ha hc.1)]
+        · rw [ite_eq_right (fun hc => hb2 (by have hc2 := hc.2; omega)),
+            ite_eq_right (fun hc => hb2 (by have hc2 := hc.2; omega)),
+            ite_eq_right (fun hc => hb1 hc.2)]
+    · rw [ite_eq_right (fun hc => ha hc.1), ite_eq_right (fun hc => ha (by have hc1 := hc.1; omega)),
+        ite_eq_right (fun hc => ha hc.1)]
 
 /-! ## `viewZero` and `viewFaulted` -/
 
@@ -133,9 +133,9 @@ theorem viewZero_umemWrite (M : Nat → List (BitVec 8)) (va : Nat) (bs : List (
     have he : va + (k * 4096 + j - va) = k * 4096 + j := by omega
     rw [he]
     omega
-  · have hv : viewZero M kz k = M k := by simp only [viewZero, if_neg hk]
+  · have hv : viewZero M kz k = M k := by simp only [viewZero, ite_eq_right hk]
     have hv2 : viewZero (umemWrite M va bs) kz k = umemWrite M va bs k := by
-      simp only [viewZero, if_neg hk]
+      simp only [viewZero, ite_eq_right hk]
     rw [hv2]
     refine List.ext_getElem? fun j => ?_
     rw [umemWrite_getElem?, umemWrite_getElem?, hv]
@@ -144,7 +144,7 @@ theorem viewZero_umemWrite (M : Nat → List (BitVec 8)) (va : Nat) (bs : List (
 theorem viewFaulted_self (P : UPtd) (M : Nat → List (BitVec 8)) : viewFaulted P P M = M := by
   funext k
   simp only [viewFaulted]
-  rw [if_neg]
+  rw [ite_eq_right]
   rintro ⟨h1, h2⟩
   rw [Option.isNone_iff_eq_none] at h1
   rw [h1] at h2
@@ -164,7 +164,7 @@ theorem viewFaulted_insertLeaf (P P' : UPtd) (M : Nat → List (BitVec 8)) (vpn 
     simp only [viewZero, viewFaulted, UPtd.insertLeaf,
       LawfulPartialMap.get?_insert_eq (m := P'.um) rfl, hP]
     simp
-  · simp only [viewZero, if_neg hk, viewFaulted, UPtd.insertLeaf,
+  · simp only [viewZero, ite_eq_right hk, viewFaulted, UPtd.insertLeaf,
       LawfulPartialMap.get?_insert_ne (m := P'.um) (fun hc => hk hc.symm)]
 
 /-! ## `umemRead` -/
@@ -177,8 +177,8 @@ theorem umemRead_getElem? (M : Nat → List (BitVec 8)) (va n j : Nat) :
     (umemRead M va n)[j]? = if j < n then some (umemByte M (va + j)) else none := by
   simp only [umemRead, List.getElem?_map]
   by_cases h : j < n
-  · rw [List.getElem?_range h, if_pos h]; rfl
-  · rw [List.getElem?_eq_none (by simp; omega), if_neg h]; rfl
+  · rw [List.getElem?_range h, ite_eq_left h]; rfl
+  · rw [List.getElem?_eq_none (by simp; omega), ite_eq_right h]; rfl
 
 theorem umemRead_zero (M : Nat → List (BitVec 8)) (va : Nat) : umemRead M va 0 = [] := rfl
 
@@ -193,21 +193,21 @@ theorem umemRead_append (M : Nat → List (BitVec 8)) (va n1 n2 : Nat) :
   rw [umemRead_getElem?, List.getElem?_append, umemRead_length, umemRead_getElem?,
     umemRead_getElem?]
   by_cases h1 : j < n1
-  · rw [if_pos h1, if_pos h1, if_pos (by omega)]
-  · rw [if_neg h1]
+  · rw [ite_eq_left h1, ite_eq_left h1, ite_eq_left (by omega)]
+  · rw [ite_eq_right h1]
     by_cases h2 : j < n1 + n2
-    · rw [if_pos h2, if_pos (by omega)]
+    · rw [ite_eq_left h2, ite_eq_left (by omega)]
       congr 2
       omega
-    · rw [if_neg h2, if_neg (by omega)]
+    · rw [ite_eq_right h2, ite_eq_right (by omega)]
 
 theorem umemRead_take (M : Nat → List (BitVec 8)) (va n m : Nat) (h : m ≤ n) :
     (umemRead M va n).take m = umemRead M va m := by
   refine List.ext_getElem? fun j => ?_
   rw [List.getElem?_take, umemRead_getElem?, umemRead_getElem?]
   by_cases h1 : j < m
-  · rw [if_pos h1, if_pos h1, if_pos (by omega)]
-  · rw [if_neg h1, if_neg h1]
+  · rw [ite_eq_left h1, ite_eq_left h1, ite_eq_left (by omega)]
+  · rw [ite_eq_right h1, ite_eq_right h1]
 
 /-- A read inside one page reads that page's bytes. -/
 theorem umemRead_in (M : Nat → List (BitVec 8)) (va n k off : Nat)
@@ -217,13 +217,13 @@ theorem umemRead_in (M : Nat → List (BitVec 8)) (va n k off : Nat)
   refine List.ext_getElem? fun j => ?_
   rw [umemRead_getElem?, List.getElem?_take, List.getElem?_drop]
   by_cases h1 : j < n
-  · rw [if_pos h1, if_pos h1]
+  · rw [ite_eq_left h1, ite_eq_left h1]
     have hd : (k * 4096 + off + j) / 4096 = k := by omega
     have hm : (k * 4096 + off + j) % 4096 = off + j := by omega
     simp only [umemByte, hd, hm]
     rw [List.getElem?_eq_getElem (by omega)]
     rfl
-  · rw [if_neg h1, if_neg h1]
+  · rw [ite_eq_right h1, ite_eq_right h1]
 
 /-- Zeroing a page a read misses does not change the read. -/
 theorem umemRead_viewZero (M : Nat → List (BitVec 8)) (va n kz : Nat)
@@ -232,9 +232,9 @@ theorem umemRead_viewZero (M : Nat → List (BitVec 8)) (va n kz : Nat)
   refine List.ext_getElem? fun j => ?_
   rw [umemRead_getElem?, umemRead_getElem?]
   by_cases h1 : j < n
-  · rw [if_pos h1, if_pos h1]
-    simp only [umemByte, viewZero, if_neg (h j h1)]
-  · rw [if_neg h1, if_neg h1]
+  · rw [ite_eq_left h1, ite_eq_left h1]
+    simp only [umemByte, viewZero, ite_eq_right (h j h1)]
+  · rw [ite_eq_right h1, ite_eq_right h1]
 
 /-! ## `umemStr` -/
 
@@ -248,10 +248,10 @@ theorem findIdx?_eq_some {α : Type _} (l : List α) (p : α → Bool) (d : Nat)
     | zero =>
       simp only [List.getElem?_cons_zero, Option.some.injEq] at hd
       subst hd
-      simp only [List.findIdx?_cons, hpx, if_pos]
+      simp only [List.findIdx?_cons, hpx, ite_eq_left]
     | succ d =>
       have ha : p a = false := hlt 0 (by omega) a (by simp)
-      simp only [List.findIdx?_cons, ha, Bool.false_eq_true, if_false]
+      simp only [List.findIdx?_cons, ha, Bool.false_eq_true, ite_false]
       simp only [List.getElem?_cons_succ] at hd
       rw [ih d hd (fun j hj y hy => hlt (j+1) (by omega) y (by simpa using hy))]
       simp
@@ -262,10 +262,10 @@ theorem umemStr_of_nul (M : Nat → List (BitVec 8)) (va max d : Nat) (hd : d < 
     umemStr M va max = some (umemRead M va (d + 1)) := by
   have hf : (umemRead M va max).findIdx? (· = 0#8) = some d := by
     refine findIdx?_eq_some _ _ d (umemByte M (va + d)) ?_ ?_ ?_
-    · rw [umemRead_getElem?, if_pos hd]
+    · rw [umemRead_getElem?, ite_eq_left hd]
     · simp [hz]
     · intro j hj y hy
-      rw [umemRead_getElem?, if_pos (by omega)] at hy
+      rw [umemRead_getElem?, ite_eq_left (by omega)] at hy
       simp only [Option.some.injEq] at hy
       subst hy
       simp only [decide_eq_false_iff_not]
@@ -698,9 +698,9 @@ theorem viewFaulted_umemWrite {P1 P2 : UPtd} (X : Nat → List (BitVec 8)) (va :
   funext k
   by_cases hc : (get? P1.um k).isNone ∧ (get? P2.um k).isSome
   · have e1 : viewFaulted P1 P2 (umemWrite X va bs) k = List.replicate 4096 0#8 := by
-      simp only [viewFaulted, if_pos hc]
+      simp only [viewFaulted, ite_eq_left hc]
     have e2 : viewFaulted P1 P2 X k = List.replicate 4096 0#8 := by
-      simp only [viewFaulted, if_pos hc]
+      simp only [viewFaulted, ite_eq_left hc]
     rw [e1, umemWrite_other _ _ _ _ ?_, e2]
     intro j hj hin
     rw [e2, List.length_replicate] at hj
@@ -710,8 +710,8 @@ theorem viewFaulted_umemWrite {P1 P2 : UPtd} (X : Nat → List (BitVec 8)) (va :
     rw [hc.1] at this
     cases this
   · have e1 : viewFaulted P1 P2 (umemWrite X va bs) k = umemWrite X va bs k := by
-      simp only [viewFaulted, if_neg hc]
-    have e2 : viewFaulted P1 P2 X k = X k := by simp only [viewFaulted, if_neg hc]
+      simp only [viewFaulted, ite_eq_right hc]
+    have e2 : viewFaulted P1 P2 X k = X k := by simp only [viewFaulted, ite_eq_right hc]
     rw [e1]
     refine List.ext_getElem? fun j => ?_
     rw [umemWrite_getElem?, umemWrite_getElem?, e2]
@@ -789,7 +789,7 @@ theorem umemByte_write (V : Nat → List (BitVec 8)) (a : Nat) (bs : List (BitVe
   have he : (a + j) / 4096 * 4096 + (a + j) % 4096 = a + j := by
     have := Nat.div_add_mod (a + j) 4096
     rw [Nat.mul_comm] at this; exact this
-  rw [he, if_pos (by omega), Nat.add_sub_cancel_left, List.getElem?_eq_getElem hj]
+  rw [he, ite_eq_left (by omega), Nat.add_sub_cancel_left, List.getElem?_eq_getElem hj]
   simp only [Option.getD_some]
   exact (getElem!_pos bs j hj).symm
 

@@ -181,8 +181,8 @@ theorem fpInds_owned (Γ : FsViewNames GF) (S : FsStateRec) (D : BlockMap) (hb :
     FsView.byteRange Γ (fpBlk S (.ind i)) (fpOff (.ind i)) (fpBs S D (.ind i))) fun {i n} hi => ?_
   unfold indOwned
   by_cases hz : fnIndb n = 0
-  · rw [if_pos hz] <;> exact Affine.affine
-  · rw [if_neg hz, fpIndb_blk S i n hi, fpIndb_off, fpIndb_bs S D i n hi hz]
+  · rw [ite_eq_left hz] <;> exact Affine.affine
+  · rw [ite_eq_right hz, fpIndb_blk S i n hi, fpIndb_off, fpIndb_bs S D i n hi hz]
     exact byteRange_blkOwned Γ _ _ (hb.skBsz _ _ (hb.skInd i n hi hz))
 
 /-- The pool group (helper). -/
@@ -195,8 +195,8 @@ theorem fpPools_owned (Γ : FsViewNames GF) (S : FsStateRec) (D : BlockMap) (hb 
   have hb' : b < S.fssSb.sbSize := List.mem_range.1 (List.mem_of_getElem? hk)
   unfold poolElt
   by_cases hu : b ∈ S.fssUsed
-  · rw [if_pos hu] <;> exact Affine.affine
-  · rw [if_neg hu]
+  · rw [ite_eq_left hu] <;> exact Affine.affine
+  · rw [ite_eq_right hu]
     obtain ⟨bs, hbs⟩ := hb.skPool b hb' hu
     rw [fpPool_blk, fpPool_off, fpPool_bs_free S D b bs hu hbs]
     exact (byteRange_blkOwned Γ b bs (hb.skBsz b bs hbs)).trans (exists_intro (Ψ := fun bs =>

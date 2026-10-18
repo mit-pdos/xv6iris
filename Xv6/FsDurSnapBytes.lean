@@ -87,11 +87,11 @@ def fnSlotInj (n : FsNode) : Prop :=
 
 /-- Rocq's `fn_slot_data`. -/
 theorem fnSlot_data (n : FsNode) (k : Nat) (hk : k < MAXFILE) : fnSlot n k = fnNaddr n k := by
-  unfold fnSlot; rw [if_neg (by omega)]
+  unfold fnSlot; rw [ite_eq_right (by omega)]
 
 /-- Rocq's `fn_slot_ind`. -/
 theorem fnSlot_ind (n : FsNode) : fnSlot n MAXFILE = fnIndb n := by
-  unfold fnSlot; rw [if_pos rfl]
+  unfold fnSlot; rw [ite_eq_left rfl]
 
 /-- Rocq's `fn_slot_data_ne`. -/
 theorem fnSlot_data_ne (n : FsNode) (k j : Nat) (hinj : fnSlotInj n) (hk : k < MAXFILE)
@@ -195,8 +195,8 @@ theorem fnSlotInj_bare (n : FsNode) (hbare : fnBare n) : fnSlotInj n := by
   exfalso; apply hnz
   unfold fnSlot
   by_cases hkM : k = MAXFILE
-  · rw [if_pos hkM]; exact fnBare_indb n hbare
-  · rw [if_neg hkM]; exact fnBare_naddr n k hbare (by omega)
+  · rw [ite_eq_left hkM]; exact fnBare_indb n hbare
+  · rw [ite_eq_right hkM]; exact fnBare_naddr n k hbare (by omega)
 
 /-- Rocq's `snap_reg_blk`. -/
 theorem snapRegBlk (S : FsStateRec) (D : BlockMap) (i : Nat) (n : FsNode) (hb : SnapBytes S D)
@@ -310,7 +310,7 @@ theorem snapNames_home (S : FsStateRec) (P : Nat → List (BitVec 8)) (home : Li
   rw [fsRestrict_lookup] at hbs
   by_cases hin : b ∈ home
   · exact hin
-  · rw [if_neg hin] at hbs; cases hbs
+  · rw [ite_eq_right hin] at hbs; cases hbs
 
 /-- Rocq's `snap_names_cov`. -/
 theorem snapNames_cov (S : FsStateRec) (P : Nat → List (BitVec 8)) (cov : ExtTreeSet Nat compare)
@@ -364,7 +364,7 @@ theorem snapCovWindow (S : FsStateRec) (P : Nat → List (BitVec 8)) (cov : ExtT
   · rw [fsRestrict_lookup] at hbs
     by_cases hh : b ∈ fsHomeList cov S.fssSb.sbLogstart
     · exact ((mem_fsHomeList _ _ _).1 hh).1
-    · rw [if_neg hh] at hbs; cases hbs
+    · rw [ite_eq_right hh] at hbs; cases hbs
   · exact hlog b hin
 
 /-- ...AND THE OTHER DIRECTION: every covered block is a real file-system
@@ -384,6 +384,6 @@ theorem snapCovBelow (S : FsStateRec) (P : Nat → List (BitVec 8)) (cov : ExtTr
   | false =>
     have hh : b ∈ fsHomeList cov S.fssSb.sbLogstart := (mem_fsHomeList _ _ _).2 ⟨hcov, hlr⟩
     apply hb.skDombelow b
-    exact ⟨P b, by rw [fsRestrict_lookup, if_pos hh]⟩
+    exact ⟨P b, by rw [fsRestrict_lookup, ite_eq_left hh]⟩
 
 end Xv6

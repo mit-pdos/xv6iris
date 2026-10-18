@@ -93,7 +93,7 @@ theorem ulibTabCode_of_text (L : UlibRun GF) (tab : List UlibIns) (hd : ulibTabD
       | some e =>
         rw [hf] at hat
         simp only [Option.map_some, Option.some.injEq, Prod.mk.injEq] at hat
-        simp only [Option.bind_some, hat.1, hat.2, hg, if_true]
+        simp only [Option.bind_some, hat.1, hat.2, hg, ite_true]
         exact ulibTabDecodes_get tab hd k x hk
     iintro #H'
     iapply L.utext_instr t _ x.rvc x.ast hdec

@@ -51,9 +51,9 @@ theorem mapSeq_get?_some (start : Nat) (xs : List (BitVec 8)) (a : Nat) (v : Bit
     PartialMap.get? (mapSeq start xs) a = some v ↔ start ≤ a ∧ xs[a - start]? = some v := by
   rw [mapSeq_get?]
   by_cases h : start ≤ a
-  · rw [if_pos h]
+  · rw [ite_eq_left h]
     exact ⟨fun hv => ⟨h, hv⟩, fun hv => hv.2⟩
-  · rw [if_neg h]
+  · rw [ite_eq_right h]
     exact ⟨fun hv => absurd hv (by simp), fun hv => absurd hv.1 h⟩
 
 /-- Rocq's `lookup_map_seqZ_is_Some`. -/
@@ -132,7 +132,7 @@ theorem mapSeq_slice (xs ys : List (BitVec 8)) (start o : Nat) (L : RegMapF (Bit
     have e1 := hy _ _ hsy
     have e2 := hx _ _ hsx
     rw [e1] at e2
-    rw [hyk, List.getElem?_take, if_pos hk, List.getElem?_drop, hxk]
+    rw [hyk, List.getElem?_take, ite_eq_left hk, List.getElem?_drop, hxk]
     exact congrArg some (Option.some.inj e2)
   · rw [List.getElem?_eq_none (by omega),
       List.getElem?_eq_none (by rw [List.length_take, List.length_drop]; omega)]
@@ -156,8 +156,8 @@ theorem mapSeq_dom_eq (start : Nat) (xs ys : List (BitVec 8)) (hlen : xs.length 
       = (PartialMap.get? (mapSeq start ys) a).isSome := by
     rw [mapSeq_get?, mapSeq_get?]
     by_cases hs : start ≤ a
-    · simp only [if_pos hs, getElem?_isSome, hlen]
-    · simp only [if_neg hs]
+    · simp only [ite_eq_left hs, getElem?_isSome, hlen]
+    · simp only [ite_eq_right hs]
   unfold PartialMap.dom
   rw [h]
 

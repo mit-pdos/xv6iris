@@ -36,9 +36,9 @@ theorem matching_pma_ram (pa : BitVec 64) (n : Nat) (h : inRam pa n) (hn : 0 < n
     omega
   simp only [Int.ofNat_eq_natCast, Int.ofNat_le] at hslice ⊢
   rw [hslice]
-  rw [if_neg (by intro hc; simp only [decide_eq_true_eq] at hc; obtain ⟨c1, c2, c3⟩ := hc; bv_omega),
-    if_neg (by intro hc; simp only [decide_eq_true_eq] at hc; obtain ⟨c1, c2, c3⟩ := hc; bv_omega),
-    if_pos (by simp only [decide_eq_true_eq]; refine ⟨?_, ?_, ?_⟩ <;> bv_omega)]
+  rw [ite_eq_right (by intro hc; simp only [decide_eq_true_eq] at hc; obtain ⟨c1, c2, c3⟩ := hc; bv_omega),
+    ite_eq_right (by intro hc; simp only [decide_eq_true_eq] at hc; obtain ⟨c1, c2, c3⟩ := hc; bv_omega),
+    ite_eq_left (by simp only [decide_eq_true_eq]; refine ⟨?_, ?_, ?_⟩ <;> bv_omega)]
   rfl
 
 /-- The I/O region of the platform's PMA table: `[0x2000000, 0x12000000)`,
@@ -58,8 +58,8 @@ theorem matching_pma_io (pa : BitVec 64) (n : Nat) (h1 : 0x2000000 ≤ pa.toNat)
     omega
   simp only [Int.ofNat_eq_natCast, Int.ofNat_le] at hslice ⊢
   rw [hslice]
-  rw [if_neg (by intro hc; simp only [decide_eq_true_eq] at hc; obtain ⟨c1, c2, c3⟩ := hc; bv_omega),
-    if_pos (by simp only [decide_eq_true_eq]; refine ⟨?_, ?_, ?_⟩ <;> bv_omega)]
+  rw [ite_eq_right (by intro hc; simp only [decide_eq_true_eq] at hc; obtain ⟨c1, c2, c3⟩ := hc; bv_omega),
+    ite_eq_left (by simp only [decide_eq_true_eq]; refine ⟨?_, ?_, ?_⟩ <;> bv_omega)]
   rfl
 
 /-- The CLINT window's configured base and size. -/
@@ -73,7 +73,7 @@ theorem within_clint_ram (pa : BitVec 64) (n : Nat) (h : inRam pa n) :
   obtain ⟨h1, h2⟩ := h
   simp only [ramBase, ramEnd] at h1 h2
   simp only [within_clint, plat_have_clint, plat_clint_base_eq, plat_clint_size_eq, Sail.BitVec.toNatInt,
-    Functions.not, Bool.not_true, Bool.false_eq_true, if_false]
+    Functions.not, Bool.not_true, Bool.false_eq_true, ite_false]
   congr 1
   simp only [Bool.and_eq_false_iff, decide_eq_false_iff_not, Int.not_le, Int.ofNat_eq_natCast]
   bv_omega
@@ -83,7 +83,7 @@ is outside it. -/
 theorem within_clint_io (pa : BitVec 64) (n : Nat) (h : 0x20C0000 < pa.toNat) :
     within_clint (physaddr.Physaddr pa) n = pure false := by
   simp only [within_clint, plat_have_clint, plat_clint_base_eq, plat_clint_size_eq, Sail.BitVec.toNatInt,
-    Functions.not, Bool.not_true, Bool.false_eq_true, if_false]
+    Functions.not, Bool.not_true, Bool.false_eq_true, ite_false]
   congr 1
   simp only [Bool.and_eq_false_iff, decide_eq_false_iff_not, Int.not_le, Int.ofNat_eq_natCast]
   bv_omega
@@ -183,7 +183,7 @@ theorem split_on_page_boundary_8 (va : BitVec 64) (h : va.toNat % 8 = 0) :
     omega
   unfold split_on_page_boundary
   dsimp only
-  rw [if_pos]
+  rw [ite_eq_left]
   · rfl
   · simp only [Functions.pagesize_bits, Functions.ones, Functions.zeros, Sail.BitVec.updateSubrange,
       Sail.BitVec.subInt, Sail.BitVec.updateSubrange', Sail.BitVec.length, sail_ones, Sail.BitVec.addInt,

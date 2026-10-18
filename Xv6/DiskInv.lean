@@ -408,7 +408,7 @@ theorem diskProto_pop_live (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (
       cases hd : c.dwr
       · ileft
         iapply Hmk
-        rw [hst, crashRow_popped γ _ i c (sb i) hph2, if_neg (by simp [hd])]
+        rw [hst, crashRow_popped γ _ i c (sb i) hph2, ite_eq_right (by simp [hd])]
         iexact Hrow
       · iright
         iexists c.kq, chainWr c
@@ -416,7 +416,7 @@ theorem diskProto_pop_live (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (
         iframe Hrow
         iintro Hd
         iapply Hmk
-        rw [hst, crashRow_popped γ _ i c (sb i) hph2, if_pos hd]
+        rw [hst, crashRow_popped γ _ i c (sb i) hph2, ite_eq_left hd]
         iexact Hd
     · iexists pn, c
       unfold permTok
@@ -541,7 +541,7 @@ theorem diskProto_drain_acc (γ : DiskNames) (v : VirtioState) (k : Nat) :
         rw [hkj]
         exact crashRow_key_ne c' c (hwfall j' c' hj' hc') hwf
           (hinj j' i c' c hj' hi hne' hc' hst) jj' j hjj' hj) $$ Hcr with ⟨Hrow, Hcr⟩
-    rw [hst, crashRow_capped γ v i c (sb i) hd ph hph1 hpc, if_neg hne]
+    rw [hst, crashRow_capped γ v i c (sb i) hd ph hph1 hpc, ite_eq_right hne]
     iright
     iexists c.kq, chainWr c, j, rowCached v c
     isplitl []
@@ -688,12 +688,12 @@ theorem diskDrain_step (γ : DiskNames) (v : VirtioState) (k : Nat) :
       rw [wrApply_none]
       iframe Hpb Hst Hdk HP HC
       iapply Hback
-      rw [if_pos he]
+      rw [ite_eq_left he]
       iexact Hdone
     · imodintro
       iframe Hpb Hst Hdk HP HC
       iapply Hback
-      rw [if_neg he]
+      rw [ite_eq_right he]
       iexact Hpend
 
 /-- **Settling a possibly-owed leaf under the lend** (the pop's step, Rocq
@@ -2257,7 +2257,7 @@ theorem cacheReq_chain (v : VirtioState) (c : Chain) (bs : List (BitVec 8)) :
 /-- A slice of the payload, by position. -/
 theorem pay_slice (l : List (BitVec 8)) (d i : Nat) (hi : i < Virtio.sectorSize) :
     ((l.drop d).take Virtio.sectorSize)[i]? = l[d + i]? := by
-  rw [List.getElem?_take, if_pos hi, List.getElem?_drop]
+  rw [List.getElem?_take, ite_eq_left hi, List.getElem?_drop]
 
 set_option maxRecDepth 8000 in
 /-- **The capture fills the block**: after both sectors are laid into the
@@ -2632,7 +2632,7 @@ theorem leaseL_capture (γ : DiskNames) (h : BitVec 16) (c0 : VirtioCfg) (key : 
       rw [(hp.2.2.1 (VPhase.fetched c.req) rfl).1]
       rfl
     have hfet : Virtio.phase s1 h = some (.fetched c.req) := (hp.2.2.1 _ rfl).1
-    rw [if_pos hreq]
+    rw [ite_eq_left hreq]
     have hbyt : bytesOf c.payw = c.pay := rfl
     rw [hbyt, cacheReq_chain]
     have hsl0 : Virtio.reqSectorLen c.req 0 = Virtio.sectorSize :=
@@ -2737,9 +2737,9 @@ theorem completeOk_uncached (s : VirtioState) (c : Chain) (h : BitVec 16) (hd : 
     (j : Nat) (hj : j < SPB) : ∀ e ∈ s.cache, e.1 ≠ Virtio.reqKey c.req j := by
   have hty : c.req.type.toNat = Virtio.blkTOut := by
     show (if c.dwr then BitVec.ofNat 32 Virtio.blkTIn else BitVec.ofNat 32 Virtio.blkTOut).toNat = _
-    rw [if_neg (by simp [hd])]; rfl
+    rw [ite_eq_right (by simp [hd])]; rfl
   unfold Virtio.completeOk at hg
-  rw [if_pos hty, hwce] at hg
+  rw [ite_eq_left hty, hwce] at hg
   simp only [Bool.false_or, Bool.and_eq_true, Bool.not_eq_true'] at hg
   intro e he hek
   have hs := crashRow_get_mem_isSome s.cache e he
@@ -3043,7 +3043,7 @@ theorem leaseL_serve (γ : DiskNames) (h : BitVec 16) :
             | true =>
               exfalso
               rw [show (Chain.req c).type = (if c.dwr then BitVec.ofNat 32 Virtio.blkTIn
-                else BitVec.ofNat 32 Virtio.blkTOut) from rfl, hd, if_pos rfl] at hty
+                else BitVec.ofNat 32 Virtio.blkTOut) from rfl, hd, ite_eq_left rfl] at hty
               exact absurd hty (by decide)
           refine leaseL_capture γ h xc0 xkey c s
             iprop(dmaOwn c.status 1 ∗ diskBlockQ γ c.blk c.pay ∗ bufFree c)
@@ -3065,7 +3065,7 @@ theorem leaseL_serve (γ : DiskNames) (h : BitVec 16) :
             | false =>
               exfalso
               rw [show (Chain.req c).type = (if c.dwr then BitVec.ofNat 32 Virtio.blkTIn
-                else BitVec.ofNat 32 Virtio.blkTOut) from rfl, hd, if_neg (by simp)] at hty
+                else BitVec.ofNat 32 Virtio.blkTOut) from rfl, hd, ite_eq_right (by simp)] at hty
               exact absurd hty (by decide)
           refine leaseL_fill γ h xc0 xkey c s xhlive hdwr _ ?_
           refine DevM.LeaseL.step _
@@ -3097,11 +3097,11 @@ theorem leaseL_serve (γ : DiskNames) (h : BitVec 16) :
           cases hd : c.dwr with
           | true =>
             rw [show (Chain.req c).type = (if c.dwr then BitVec.ofNat 32 Virtio.blkTIn
-              else BitVec.ofNat 32 Virtio.blkTOut) from rfl, hd, if_pos rfl] at hty2
+              else BitVec.ofNat 32 Virtio.blkTOut) from rfl, hd, ite_eq_left rfl] at hty2
             exact hty2 (by decide)
           | false =>
             rw [show (Chain.req c).type = (if c.dwr then BitVec.ofNat 32 Virtio.blkTIn
-              else BitVec.ofNat 32 Virtio.blkTOut) from rfl, hd, if_neg (by simp)] at hty1
+              else BitVec.ofNat 32 Virtio.blkTOut) from rfl, hd, ite_eq_right (by simp)] at hty1
             exact hty1 (by decide)
 
 /-! ## `Virtio.body`: the root loop

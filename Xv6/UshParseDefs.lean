@@ -124,7 +124,7 @@ theorem ushSstr_byte (N : UkNames GF) (tx : Bool) (dq : DFrac) (a len : Nat) (f 
   cases tx
   · exact ustr_byte N.d dq a len f j hj
   · unfold ushSstr ushSbq
-    simp only [if_true]
+    simp only [ite_true]
     iintro #H
     isplitr
     · iapply utextStr_byte N.t a len f j hj $$ H
@@ -138,7 +138,7 @@ theorem ushSstr_nul (N : UkNames GF) (tx : Bool) (dq : DFrac) (a len : Nat) (f :
   cases tx
   · exact ustr_nul N.d dq a len f
   · unfold ushSstr ushSbq
-    simp only [if_true]
+    simp only [ite_true]
     iintro #H
     isplitr
     · iapply utextStr_nul N.t a len f $$ H
@@ -158,7 +158,7 @@ theorem ushS_lbuQ (UL : UK_LEAVES) (N : UkNames GF) {C : IProp GF} [Persistent C
   cases tx
   · exact ushS_lbu UL N hi y h m av dq a b ha hy hns
   · unfold ushSbq
-    simp only [if_true]
+    simp only [ite_true]
     iintro #HC #Hb Hrun Hk
     iapply ushS_lbuT UL N hi y h m av a b ha hy hns $$ HC Hb Hrun
     iapply Hk $$ Hb

@@ -128,7 +128,7 @@ theorem dirlink_read (RD : READI) (SN : STRNCPY) (WI : WRITEI) (PA : PANIC)
   by_cases hshort : dn.diSize.toNat < 16 * i + 16
   · -- THE SHORT READ: dirlink DIVERGES
     have hne : tot ≠ 16 := by
-      rw [htot]; unfold rdClamp; rw [if_pos (by omega)]; omega
+      rw [htot]; unfold rdClamp; rw [ite_eq_left (by omega)]; omega
     have htot16 : tot ≤ 16 := by rw [htot]; exact rdClamp_le _ _ _
     k_step_e (wp_s_branch cpu _ (KA.«dirlink» + 0x3e#64) false 34#13 10#5 19#5 (by decide)
         bop.BNE)
@@ -138,7 +138,7 @@ theorem dirlink_read (RD : READI) (SN : STRNCPY) (WI : WRITEI) (PA : PANIC)
     iapply (dirlink_short PA cpu k spie1 spp1 _ hs.hK hs.hnoff hs.hlocks) $$ [$Hk $Hpc $Hpe]
   -- THE FULL READ: exactly sixteen bytes, record `i < nrec`
   have htot' : tot = 16 := by
-    rw [htot]; unfold rdClamp; rw [if_neg (by omega)]
+    rw [htot]; unfold rdClamp; rw [ite_eq_right (by omega)]
   subst htot'
   have hrec := Xv6.dirlookup_full_lt _ i hshort
   k_step_e (wp_s_branch cpu _ (KA.«dirlink» + 0x3e#64) false 34#13 10#5 19#5 (by decide) bop.BNE)

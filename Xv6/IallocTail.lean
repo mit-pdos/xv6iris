@@ -93,12 +93,12 @@ theorem ialloc_epilogue [Fscfg] [Icfg] [CurCtx] (cpu c0 : CPU) (k : KCtx) (spie 
   icases Harms with (⟨%h0, Hiref, Htx, Hop⟩ | ⟨%kslot, %q, %inum, %hcl, Hclaim, Hop⟩)
   · iapply HΦ $$ %spie %spp %_ %false %0 %1 %0#32 %iallocDzero %hcs Hk Hpc Hte Hce Hsn Hsi Hpid
       Hsl
-    simp only [Bool.false_eq_true, if_false]
+    simp only [Bool.false_eq_true, ite_false]
     iframe Hiref Htx Hop
     ipureintro; rw [ha0]; exact h0
   · iapply HΦ $$ %spie %spp %_ %true %kslot %q %inum %(iallocFresh ty) %hcs Hk Hpc Hte Hce
       Hsn Hsi Hpid Hsl
-    simp only [if_true]
+    simp only [ite_true]
     iframe Hclaim Hop
     ipureintro
     obtain ⟨e0, e1, e2, e3, e4⟩ := hcl

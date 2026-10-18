@@ -107,7 +107,7 @@ theorem swp_intrange_loop (cpu : CPU) {ε : Type} (range : IntRange) (hstep : ra
       simp only [Membership.mem, hstep, show (1 : Int) > 0 from by decide, ite_true] at h
       have := Int.toNat_eq_zero.mp hn
       omega
-    simp only [dif_neg hni, ExceptT.run_pure]
+    simp only [dite_eq_right hni, ExceptT.run_pure]
     iapply swp_ret
     iapply HΦ $$ HP
   | succ n ih =>
@@ -115,7 +115,7 @@ theorem swp_intrange_loop (cpu : CPU) {ε : Type} (range : IntRange) (hstep : ra
     iintro ⟨#Hf, HP, HΦ⟩
     rw [IntRange.loop_unfold]
     by_cases h : i ∈ range
-    · simp only [dif_pos h, ExceptT.run_bind]
+    · simp only [dite_eq_left h, ExceptT.run_bind]
       iapply swp_bind
       iapply Hf $$ %i %h
       iframe
@@ -133,7 +133,7 @@ theorem swp_intrange_loop (cpu : CPU) {ε : Type} (range : IntRange) (hstep : ra
       iapply ih (i + range.step) _ hn'
       iframe
       iexact Hf
-    · simp only [dif_neg h, ExceptT.run_pure]
+    · simp only [dite_eq_right h, ExceptT.run_pure]
       iapply swp_ret
       iapply HΦ $$ HP
 
@@ -147,7 +147,7 @@ theorem swp_intrange_loop_later (cpu : CPU) {ε : Type} (range : IntRange) (hste
     P ∗ ▷ (P -∗ Φ (.ok ())) ⊢ swp cpu (ExceptT.run (IntRange.forIn'.loop range f () i hs)) Φ := by
   iintro ⟨#Hf, HP, HΦ⟩
   rw [IntRange.loop_unfold]
-  simp only [dif_pos hi, ExceptT.run_bind]
+  simp only [dite_eq_left hi, ExceptT.run_bind]
   iapply swp_bind
   iapply Hf $$ %i %hi
   iframe

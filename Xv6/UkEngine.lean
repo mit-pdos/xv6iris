@@ -246,7 +246,7 @@ theorem uk_engine (π : Nat → Option UPerm) (sz : Nat) (Qp : Int → IProp GF)
         iexists Wr
         isplitr
         · ipureintro
-          exact Ustep.ureachK_step hR (by rw [hU, if_pos hret])
+          exact Ustep.ureachK_step hR (by rw [hU, ite_eq_left hret])
         unfold ukontF
         inext
         iexact Hk
@@ -269,7 +269,7 @@ theorem uk_engine (π : Nat → Option UPerm) (sz : Nat) (Qp : Int → IProp GF)
       ihave Hb' := uk_uvb_x0 (xi := xi') h' C' pt' Rfd' Rut' sz π K.fdv K.cw K.gn K.cs K.pid false seccAll M
         (tfResumeGpr0 (tfOf m pc)) m pc (fun j hj => by
           show (if j = 0#5 then zeroRf 0#5 else tfW (tfOf m pc) (4 + j.toNat)) = m j
-          rw [if_neg hj, tfOf_reg m pc j hj]) $$ Hb'
+          rw [ite_eq_right hj, tfOf_reg m pc j hj]) $$ Hb'
       iapply IH $$ %h' %xi' %C' %pt' %Rfd' %Rut' %hacc' %hlo' %hpm' %(hlf' rfl) Hb'
       inext
       iframe Hmy HR

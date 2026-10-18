@@ -262,7 +262,7 @@ theorem runS_committed (RUN : (Wid → List (BitVec 8)) → Prop) (md : Wid → 
   obtain ⟨src, hr, hag⟩ := h
   refine ⟨src, hr, fun w s hc hs => ?_⟩
   rw [hag]
-  simp only [rmd, (cmtN_iff md sel w).2 hc, if_true, hs]
+  simp only [rmd, (cmtN_iff md sel w).2 hc, ite_true, hs]
   rfl
 
 /-- Rocq `tokN_blocks`: the block of a family state the invariant holds at is
@@ -337,7 +337,7 @@ theorem prompt_okN_mdupd (md : Wid → Option (List (BitVec 8))) (sel : List Wid
   obtain ⟨s', hs', hc⟩ := hpo s1 s2 k hsel hmT' hle j hj
   refine ⟨s', ?_, hc⟩
   simp only [mdupd]
-  rw [if_neg]
+  rw [ite_eq_right]
   · exact hs'
   · rintro rfl; rw [hw] at hs'; cases hs'
 

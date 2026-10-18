@@ -101,7 +101,7 @@ theorem grepMain_body (UL : UK_LEAVES) (GG : GREP_GREP) (N : UkNames GF) (sp0 : 
   · ipureintro; exact Xv6.uargBytes_of g
   · ipureintro; ureg
   · ipureintro; ureg; rw [ukLi _ 0#12 0 (by decide)]; decide
-  · simp only [upathAt, Bool.false_eq_true, if_false, uargBytes_length]
+  · simp only [upathAt, Bool.false_eq_true, ite_false, uargBytes_length]
     iexact Hstr
   iintro %h4 %ret %hok HK - Hrun
   rw [show retPc (m3.get 1#5) = BitVec.ofNat 64 0x20e by rw [ukWr_get_same _ _ _ (by decide)]; decide,
@@ -128,17 +128,17 @@ theorem grepMain_body (UL : UK_LEAVES) (GG : GREP_GREP) (N : UkNames GF) (sp0 : 
   rw [ha05, kgrep_blt0]
   by_cases hneg : ret.toInt < 0
   · -- IT FAILED: the diagnostic, and no return
-    rw [decide_eq_true hneg, if_pos rfl,
+    rw [decide_eq_true hneg, ite_eq_left rfl,
       show BitVec.ofNat 64 0x210 + BitVec.signExtend 64 64#13 = BitVec.ofNat 64 0x250 from by decide]
     irevert HK
-    simp only [hneg, if_true]
+    simp only [hneg, ite_true]
     rw [grepProg_lit]
     iintro HK
     iapply grepMain_die UL N h6 m5 av args i g na h28 hg (hptr i g hg) hinv5.2.1 $$ HK Hc Hargv Hrun
   -- IT SUCCEEDED: grep(pattern, fd), close(fd)
-  rw [decide_eq_false hneg, if_neg (show ¬ (false = true) from by decide), ukPc 0x210 0x214 false rfl]
+  rw [decide_eq_false hneg, ite_eq_right (show ¬ (false = true) from by decide), ukPc 0x210 0x214 false rfl]
   irevert HK
-  simp only [hneg, if_false]
+  simp only [hneg, ite_false]
   rw [grepProg_lit]
   iintro HK
   have hfd : ret.toInt < 16 ∧ 0 ≤ ret.toInt := by

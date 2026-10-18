@@ -60,22 +60,22 @@ theorem ukf_congr (T : BMap) (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (m m
 theorem ukf_ite_pos (T : BMap) (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (c : Prop) (inst : Decidable c)
     (a b : SailM X) (r : Option (X × UWSt × UOrc)) (hc : c) (h : ukfRun T D orc s a = r) :
     ukfRun T D orc s (@ite _ c inst a b) = r := by
-  rw [if_pos hc]; exact h
+  rw [ite_eq_left hc]; exact h
 
 theorem ukf_ite_neg (T : BMap) (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (c : Prop) (inst : Decidable c)
     (a b : SailM X) (r : Option (X × UWSt × UOrc)) (hc : ¬ c) (h : ukfRun T D orc s b = r) :
     ukfRun T D orc s (@ite _ c inst a b) = r := by
-  rw [if_neg hc]; exact h
+  rw [ite_eq_right hc]; exact h
 
 theorem ukf_dite_pos (T : BMap) (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (c : Prop) (inst : Decidable c)
     (a : c → SailM X) (b : ¬ c → SailM X) (r : Option (X × UWSt × UOrc)) (hc : c)
     (h : ukfRun T D orc s (a hc) = r) : ukfRun T D orc s (@dite _ c inst a b) = r := by
-  rw [dif_pos hc]; exact h
+  rw [dite_eq_left hc]; exact h
 
 theorem ukf_dite_neg (T : BMap) (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (c : Prop) (inst : Decidable c)
     (a : c → SailM X) (b : ¬ c → SailM X) (r : Option (X × UWSt × UOrc)) (hc : ¬ c)
     (h : ukfRun T D orc s (b hc) = r) : ukfRun T D orc s (@dite _ c inst a b) = r := by
-  rw [dif_neg hc]; exact h
+  rw [dite_eq_right hc]; exact h
 
 theorem ukf_error (T : BMap) (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (e : Sail.Error exception)
     (k : Empty → SailM X) :
@@ -109,7 +109,7 @@ theorem ukf_rw (T : BMap) (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (r : Re
     (hd : D.Dw r = true) (h : ukfRun T D orc (UWSt.mk (s.pin.set r v) s.rs s.mm s.rv) (k ()) = res) :
     ukfRun T D orc s (FreeM.impure (.ok (.regWrite r v)) k) = res := by
   rw [← h]
-  exact ukf_node_of T D orc s (.ok (.regWrite r v)) k rfl PUnit.unit _ orc (by simp only [runRW, hd, if_true])
+  exact ukf_node_of T D orc s (.ok (.regWrite r v)) k rfl PUnit.unit _ orc (by simp only [runRW, hd, ite_true])
 
 theorem ukf_isText_excl {n vasize : Nat} (T : BMap)
     (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak) (hex : akExcl req.access_kind = true) :

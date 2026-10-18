@@ -211,8 +211,8 @@ theorem bmOf_slot (n : FsNode) (k : Nat) (hwf : dinodeWf n.fnRec) (hk : k ≤ MA
     (bmSlot (bmOf n) k).toNat = if k = MAXFILE then fnIndb n else fnNaddr n k := by
   unfold bmSlot
   by_cases he : k = MAXFILE
-  · rw [if_pos he, if_pos he]; rfl
-  · rw [if_neg he, if_neg he]
+  · rw [ite_eq_left he, ite_eq_left he]; rfl
+  · rw [ite_eq_right he, ite_eq_right he]
     exact bmOf_get n k hwf (by omega)
 
 /-! ### `fn*` of `eraNode` -/
@@ -223,10 +223,10 @@ theorem eraNode_naddr (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8
     fnNaddr (eraNode dn bm data) k = (blkmapGet bm k).toNat := by
   unfold fnNaddr blkmapGet
   by_cases hd : k < NDIRECT
-  · rw [if_pos hd, if_pos hd]
+  · rw [ite_eq_left hd, ite_eq_left hd]
     show (dn.diAddrs[k]!).toNat = _
     rw [haddr, bmCells, era_getElem!_appendLeft _ _ _ (by omega)]
-  · rw [if_neg hd, if_neg hd]
+  · rw [ite_eq_right hd, ite_eq_right hd]
     rfl
 
 /-- Rocq's `era_node_indb`. -/
@@ -254,7 +254,7 @@ theorem eraNode_bmOf (i : Nat) (n : FsNode) (hl : InodeLocal i n) :
       cases hbs : PartialMap.get? n.fnBlk k with
       | some bs =>
         have hnz : fnNaddr n k ≠ 0 := (hdom k hk).1 ⟨bs, hbs⟩
-        rw [if_pos ⟨hk, hnz⟩]
+        rw [ite_eq_left ⟨hk, hnz⟩]
         unfold fnData
         rw [hbs]
         rfl
@@ -264,8 +264,8 @@ theorem eraNode_bmOf (i : Nat) (n : FsNode) (hl : InodeLocal i n) :
           obtain ⟨bs, hbs'⟩ := (hdom k hk).2 hnz
           rw [hbs'] at hbs
           cases hbs
-        rw [if_neg (fun h => h.2 hz)]
-    · rw [if_neg (fun h => hk h.1), htop k (by omega)]
+        rw [ite_eq_right (fun h => h.2 hz)]
+    · rw [ite_eq_right (fun h => hk h.1), htop k (by omega)]
   unfold eraNode
   rw [hblk]
   rfl
@@ -406,25 +406,25 @@ theorem inodeLocal_ofOk (i : Nat) (cov : ExtTreeSet Nat compare) (ls : Nat) (dn 
     intro k hk
     rw [eraNode_blk, nodeBlk_lookup, hnaddr k hk]
     by_cases hz : (blkmapGet bm k).toNat = 0
-    · rw [if_neg (fun h => h.2 hz)]
+    · rw [ite_eq_right (fun h => h.2 hz)]
       constructor
       · rintro ⟨_, h⟩
         cases h
       · intro h
         exact absurd hz h
-    · rw [if_pos ⟨hk, hz⟩]
+    · rw [ite_eq_left ⟨hk, hz⟩]
       exact ⟨fun _ => hz, fun _ => ⟨_, rfl⟩⟩
   · -- inlBlkTop
     intro k hk
-    rw [eraNode_blk, nodeBlk_lookup, if_neg (fun h => by omega)]
+    rw [eraNode_blk, nodeBlk_lookup, ite_eq_right (fun h => by omega)]
   · -- inlBlkLen
     intro k bs hk
     rw [eraNode_blk, nodeBlk_lookup] at hk
     by_cases hc : k < MAXFILE ∧ (blkmapGet bm k).toNat ≠ 0
-    · rw [if_pos hc] at hk
+    · rw [ite_eq_left hc] at hk
       cases hk
       exact hsized k hc.1
-    · rw [if_neg hc] at hk
+    · rw [ite_eq_right hc] at hk
       cases hk
   · -- inlCovers
     intro k hk hlt
@@ -445,7 +445,7 @@ theorem inodeLocal_ofOk (i : Nat) (cov : ExtTreeSet Nat compare) (ls : Nat) (dn 
     have hbn : dirBname (fnData (eraNode dn bm data)) 0 = DOT := hname0
     have hn : 2 ≤ fnNrec (eraNode dn bm data) := h2
     unfold dirEntries
-    rw [if_pos hd, ← hbn, dirView_live _ (fnNrec (eraNode dn bm data)) 0 (huniq (hdirb hd))
+    rw [ite_eq_left hd, ← hbn, dirView_live _ (fnNrec (eraNode dn bm data)) 0 (huniq (hdirb hd))
       (by omega) hlive0, hinum0]
   · -- inlDirDotdot: ".." -- record 1, the same way
     intro hd hnz
@@ -453,7 +453,7 @@ theorem inodeLocal_ofOk (i : Nat) (cov : ExtTreeSet Nat compare) (ls : Nat) (dn 
     have hbn : dirBname (fnData (eraNode dn bm data)) 1 = DOTDOT := hname1
     have hn : 2 ≤ fnNrec (eraNode dn bm data) := h2
     unfold dirEntries
-    rw [if_pos hd, ← hbn, dirView_live _ (fnNrec (eraNode dn bm data)) 1 (huniq (hdirb hd))
+    rw [ite_eq_left hd, ← hbn, dirView_live _ (fnNrec (eraNode dn bm data)) 1 (huniq (hdirb hd))
       (by omega) hlive1]
     exact ⟨_, rfl⟩
   · -- inlBareFree (durable-disk lane E-boot): VACUOUS here, because
@@ -634,10 +634,10 @@ theorem dirEntries_eraNode (dn : Dinode) (bm : Blkmap) (data : Nat → List (Bit
   unfold dirEntries fnIsDir
   by_cases hd : dn.diType.toNat = T_DIR_z
   · have hd' : fnType (eraNode dn bm data) = T_DIR_z := hd
-    rw [if_pos (decide_eq_true hd'), if_pos hd]
+    rw [ite_eq_left (decide_eq_true hd'), ite_eq_left hd]
     exact dirView_dataExt _ _ _ (eraNode_fbAgree_nrec dn bm data hh hsz)
   · have hd' : ¬ fnType (eraNode dn bm data) = T_DIR_z := hd
-    rw [if_neg (fun h => hd' (of_decide_eq_true h)), if_neg hd]
+    rw [ite_eq_right (fun h => hd' (of_decide_eq_true h)), ite_eq_right hd]
 
 /-- Rocq's `fn_orphan_era_node`. -/
 theorem fnOrphan_eraNode (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8)) :

@@ -110,15 +110,15 @@ theorem sys_open_trunc_zero_iff (vom : BitVec 64) :
 theorem sys_open_rd_word (om : BitVec 32) :
     BitVec.extractLsb' 0 8 (soRdWord om) = if om.getLsbD 0 then 0#8 else 1#8 := by
   unfold soRdWord soAnd soOmv
-  cases h : om.getLsbD 0 <;> simp only [Bool.false_eq_true, if_true, if_false] <;> bv_decide
+  cases h : om.getLsbD 0 <;> simp only [Bool.false_eq_true, ite_true, ite_false] <;> bv_decide
 
 theorem sys_open_wr_word (om : BitVec 32) :
     BitVec.extractLsb' 0 8 (soWrWord om) =
       if om.getLsbD 0 || om.getLsbD 1 then 1#8 else 0#8 := by
   unfold soWrWord soAnd soOmv
   cases h0 : om.getLsbD 0 <;> cases h1 : om.getLsbD 1 <;>
-    simp only [Bool.false_eq_true, Bool.or_false, Bool.or_true, if_true,
-      if_false] <;> split <;> bv_decide
+    simp only [Bool.false_eq_true, Bool.or_false, Bool.or_true, ite_true,
+      ite_false] <;> split <;> bv_decide
 
 /-- `f->readable = !(omode & O_WRONLY)` (Rocq's `soau_rd_byte`). -/
 theorem sys_open_rd_byte (vom : BitVec 64) :

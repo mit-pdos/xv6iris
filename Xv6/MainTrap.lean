@@ -76,7 +76,7 @@ theorem mn_trapinit [WchG GF] (TI : TRAPINIT) [CurCtx] (cpu : CPU) (k : KCtx) (R
   simp only [KCtx.withRegs_sie, KCtx.withRegs_proc, hsie]
   iapply wpNext_off_intro
   iintro %R' Hk Hpc _ Hfr %_
-  simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, if_pos, mn_ret_82]
+  simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, ite_eq_left, mn_ret_82]
   iapply wpLoop_fupd
   -- THE MIRROR IS RAISED TO THE CELL'S BOOT VALUE (design ni-ticks-ledger.md
   -- D2, Rocq `mn_grp_trap`): the payload's tie founded before the seal
@@ -108,7 +108,7 @@ theorem mn_trapinithart (TIH : TRAPINITHART) [CurCtx] (cpu : CPU) (k : KCtx) (R0
   iapply htih
   iframe Hk Hpc Hstv
   iintro %R' Hk Hpc Hstv _
-  simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, if_pos, mn_ret_86]
+  simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, ite_eq_left, mn_ret_86]
   iapply HΦ $$ %R' Hk Hpc Hstv
 
 set_option maxHeartbeats 4000000 in
@@ -130,7 +130,7 @@ theorem mn_plic (PI : PLICINIT) (PIH : PLICINITHART) [CurCtx] (cpu : CPU) (k : K
   iapply hpi
   iframe Hk Hpc Hplic
   iintro %R1 Hk Hpc _
-  simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, if_pos, mn_ret_8a]
+  simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, ite_eq_left, mn_ret_8a]
   k_step (wp_s_jal cpu _ (KA.«main» + 138#64) false 18658#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_8a]
   iintro Hk Hpc
@@ -141,7 +141,7 @@ theorem mn_plic (PI : PLICINIT) (PIH : PLICINITHART) [CurCtx] (cpu : CPU) (k : K
   iapply hpih
   iframe Hk Hpc Hplic
   iintro %R2 Hk Hpc _
-  simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, if_pos, mn_ret_8e]
+  simp only [KCtx.withRegs_withRegs, KCtx.withRegs_regs, RegMap.set_apply, ite_eq_left, mn_ret_8e]
   iapply HΦ $$ %R2 Hk Hpc
 
 end

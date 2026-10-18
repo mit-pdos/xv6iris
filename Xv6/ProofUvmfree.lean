@@ -281,7 +281,7 @@ theorem uvmfree_proof (UB : UVMUNMAP_BARE) (FW : FREEWALK) : UVMFREE :=
     fun h => (hp3 h).trans ((hp2 h).trans (hp1 h))
   by_cases hsz0 : k.regs 11#5 = 0#64
   · -- sz = 0: the table maps nothing already
-    rw [if_pos hsz0]
+    rw [ite_eq_left hsz0]
     have hempty : P.um = ∅ := by
       have h := delRunL_eq_empty P.um 0
         (fun kk w hg => absurd (hbelow kk w hg) (by rw [hsz0]; simp [pgRoundUpN]))
@@ -311,7 +311,7 @@ theorem uvmfree_proof (UB : UVMUNMAP_BARE) (FW : FREEWALK) : UVMFREE :=
     case e26 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
     case e27 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
   · -- sz > 0: unmap the whole user region first
-    rw [if_neg hsz0]
+    rw [ite_eq_right hsz0]
     k_step_gen (wp_s_lui c3 _ (KA.«uvmfree» + 0x1e#64) true 1#20 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [uf_lui_4096] next c4 hp4
     iintro Hk Hpc

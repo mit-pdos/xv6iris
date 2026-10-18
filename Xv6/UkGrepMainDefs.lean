@@ -225,11 +225,11 @@ theorem kgrepWb_tree (N : UkNames GF) (fdw : BitVec 64) (fd : Int) (b : BitVec 8
   · ipureintro; rw [ha0]; exact hfd
   · ipureintro; rw [ha1]; simp
   · ipureintro; rw [ha2]; rfl
-  · simp only [usrcAt, Bool.false_eq_true, if_false, List.length_singleton]
+  · simp only [usrcAt, Bool.false_eq_true, ite_false, List.length_singleton]
     iapply (ubytesq_one N.d (DFrac.own 1) ua.toNat (fun _ => b)).2
     iexact Hb
   · iintro %h' %ret HK Hs Hrun
-    simp only [usrcAt, Bool.false_eq_true, if_false, List.length_singleton]
+    simp only [usrcAt, Bool.false_eq_true, ite_false, List.length_singleton]
     iapply Hcont $$ %h' %ret [HK Hs] Hrun
     iframe HK
     iapply (ubytesq_one N.d (DFrac.own 1) ua.toNat (fun _ => b)).1

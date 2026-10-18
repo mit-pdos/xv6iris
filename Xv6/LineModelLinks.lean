@@ -223,19 +223,19 @@ theorem lmPendingAt_ps_ext (ps ps' cs : List Nat) (s0 : M.lmSt) (I : List (BitVe
   unfold lmPendingAt
   by_cases h0 : I = []
   · subst h0
-    rw [if_pos rfl, if_pos rfl]
+    rw [ite_eq_left rfl, ite_eq_left rfl]
     exact proOf_from_done_ext 0 ps ps' hp hr
-  · rw [if_neg h0, if_neg h0]
+  · rw [ite_eq_right h0, ite_eq_right h0]
     by_cases hm : restOf I = []
-    · rw [if_pos hm, if_pos hm]
+    · rw [ite_eq_left hm, ite_eq_left hm]
       unfold lmContAt
       congr 1
       cases h3 : M.lmPanic (lmAt M cs (nlines I - 1))
       · rfl
-      · simp only [if_true]
+      · simp only [ite_true]
         rw [lmProIdx_nlines M cs I h0 hm h3]
         exact proOf_from_done_ext _ ps ps' hp hr
-    · rw [if_neg hm, if_neg hm]
+    · rw [ite_eq_right hm, ite_eq_right hm]
 
 include L in
 theorem lmPendingAt_round_pre (ps cs : List Nat) (s0 : M.lmSt) (I : List (BitVec 8))
@@ -244,13 +244,13 @@ theorem lmPendingAt_round_pre (ps cs : List Nat) (s0 : M.lmSt) (I : List (BitVec
   unfold lmPendingAt lmWrPre
   by_cases h0 : I = []
   · subst h0; rfl
-  · rw [if_neg h0, if_neg h0, if_pos hm]
+  · rw [ite_eq_right h0, ite_eq_right h0, ite_eq_left hm]
     have h3 : M.lmPanic (lmAt M cs (nlines I - 1)) = true := by
       rcases hopen with hn | h3
       · exact absurd hn h0
       · exact h3
     unfold lmContAt
-    rw [if_pos h3, lmProIdx_nlines M cs I h0 hm h3, L.lmlContPanic _ _ _ h3]
+    rw [ite_eq_left h3, lmProIdx_nlines M cs I h0 hm h3, L.lmlContPanic _ _ _ h3]
 
 include L in
 theorem lmPendingAt_round_snoc (ps cs : List Nat) (s0 : M.lmSt) (I : List (BitVec 8)) (a : Nat)
@@ -266,10 +266,10 @@ theorem lmPendingAt_cs_ext (ps cs0 cs : List Nat) (s0 : M.lmSt) (I : List (BitVe
     lmPendingAt M ps cs0 s0 I = lmPendingAt M ps cs s0 I := by
   unfold lmPendingAt
   by_cases h0 : I = []
-  · rw [if_pos h0, if_pos h0]
-  · rw [if_neg h0, if_neg h0]
+  · rw [ite_eq_left h0, ite_eq_left h0]
+  · rw [ite_eq_right h0, ite_eq_right h0]
     by_cases hr : restOf I = []
-    · rw [if_pos hr, if_pos hr]
+    · rw [ite_eq_left hr, ite_eq_left hr]
       have hpos := nlines_pos_of_rest_nil I h0 hr
       have hlk : ∀ j, j < nlines I → cs0[j]! = cs[j]! :=
         fun j hj => (ll_lta_prefix cs0 cs j hp (by omega)).symm
@@ -279,7 +279,7 @@ theorem lmPendingAt_cs_ext (ps cs0 cs : List Nat) (s0 : M.lmSt) (I : List (BitVe
       rw [hat, lmUpto_ext M cs0 cs s0 (bodiesOf I) (bodiesOf I) (nlines I - 1)
           (fun j hj => hlk j (by omega)) (fun _ _ => rfl),
         lmProIdx_ext M cs0 cs (nlines I) hlk (nlines I - 1) (by omega)]
-    · rw [if_neg hr, if_neg hr]
+    · rw [ite_eq_right hr, ite_eq_right hr]
 
 theorem lmPendingAt_cs_prefix (ps0 ps cs0 cs : List Nat) (s0 : M.lmSt) (I : List (BitVec 8))
     (hps : ps0 <+: ps) (hcs : cs0 <+: cs) (hn : nlines I ≤ cs0.length)
@@ -433,7 +433,7 @@ theorem lmProcBefore_line (ps cs : List Nat) (s0 : M.lmSt) (I l : List (BitVec 8
       have h2 : restOf (I ++ b :: J) ≠ [] := by
         rw [ll_restOf_app_nonl I (b :: J) hr (wlNonl_cons_2 b J hb hJn)]; simp
       unfold lmPendingAt
-      rw [if_neg h1, if_neg h2]
+      rw [ite_eq_right h1, ite_eq_right h2]
     simp only [List.cons_append, lmProcBeforeFrom, hgap, List.append_nil]
 
 /-! ## §4 The line that was typed, and its alternatives' output -/
@@ -475,7 +475,7 @@ theorem lmAb_ok (I : List (BitVec 8)) (a i : Nat) (b : BitVec 8) (h : (lmAb M K 
 theorem lmAb_is (I : List (BitVec 8)) (a : Nat) (hok : M.lmOk K.lmhSt0 (lmLineAt M I) (M.lmDec a))
     (hfr : K.lmhFree (M.lmDec a) = true) :
     lmAb M K I a = M.lmCont K.lmhSt0 (lmLineAt M I) (M.lmDec a) := by
-  unfold lmAb; rw [if_pos ⟨hok, hfr⟩]
+  unfold lmAb; rw [ite_eq_left ⟨hok, hfr⟩]
 
 theorem lmAb_at (I : List (BitVec 8)) (a : Nat) (s : M.lmSt)
     (hok : M.lmOk K.lmhSt0 (lmLineAt M I) (M.lmDec a)) (hfr : K.lmhFree (M.lmDec a) = true) :
@@ -611,7 +611,7 @@ theorem lmWrBlk_pending_s (ps cs : List Nat) (s0 : M.lmSt) (I : List (BitVec 8))
   have hne := lmWrBlk_nonnil M ps cs s0 I P hw
   obtain ⟨_, hr, hn, _⟩ := hw
   unfold lmPendingAt lmContAt
-  rw [if_neg hne, if_pos hr, lmBlk_snoc_at M cs I a hn, lmBlk_snoc_upto M cs s0 I a hn, hnp]
+  rw [ite_eq_right hne, ite_eq_left hr, lmBlk_snoc_at M cs I a hn, lmBlk_snoc_upto M cs s0 I a hn, hnp]
   simp [lmAbs, lmLineAt]
 
 /-- THE STREAM BYTE THE WRITE LINK ASKS FOR. -/
@@ -630,7 +630,7 @@ theorem lmWrBlk_pending_pre (ps cs : List Nat) (s0 : M.lmSt) (I : List (BitVec 8
   have hne := lmWrBlk_nonnil M ps cs s0 I P hw
   obtain ⟨_, hr, hn, _⟩ := hw
   unfold lmPendingAt lmContAt
-  rw [if_neg hne, if_pos hr, lmBlk_snoc_at M cs I a hn, lmBlk_snoc_upto M cs s0 I a hn,
+  rw [ite_eq_right hne, ite_eq_left hr, lmBlk_snoc_at M cs I a hn, lmBlk_snoc_upto M cs s0 I a hn,
     lmAb_at M K I a (lmUpto M cs s0 (bodiesOf I) (nlines I - 1)) hok hfr]
   exact List.prefix_append _ _
 
@@ -816,7 +816,7 @@ theorem lmWrBlk_ban (ps cs : List Nat) (s0 : M.lmSt) (I : List (BitVec 8)) (P : 
     exact ht
   · rw [hlow, ← hP]
     unfold lmWrPre
-    rw [if_neg hne, lmAb_pan M L K I]
+    rw [ite_eq_right hne, lmAb_pan M L K I]
     omega
 
 /-- The shapes the era's HEAD lands on after its first byte. -/
@@ -861,7 +861,7 @@ theorem lmPendingAt_nonnil_at (ps cs0 : List Nat) (s0 : M.lmSt) (I I0 : List (Bi
     lmPendingAt M ps cs0 s0 I ≠ [] := by
   have hq := nlines_pos_of_rest_nil I hne hr
   unfold lmPendingAt lmContAt
-  rw [if_neg hne, if_pos hr]
+  rw [ite_eq_right hne, ite_eq_left hr]
   intro hc
   rw [List.append_eq_nil_iff] at hc
   refine K.lmhContNonnil _ _ _ ?_ hc.1

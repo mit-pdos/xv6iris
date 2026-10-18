@@ -460,7 +460,7 @@ theorem IPUT.wp_iput_sconf_eb (IP : IPUT) {GF : BundledGFunctors.{0}}
   isplitl []
   · rw [iregRegime_true]; iexact Hopen
   isplitl []
-  · simp only [Bool.false_eq_true, if_false]
+  · simp only [Bool.false_eq_true, ite_false]
     iempintro
   iapply wpNext_mono _ _ _ _ _ $$ Hnext
   iintro %c HΦ %spie %spp %R' %n' %Sb' %w %hcs Hk Hpc Hte Hce Hpid Hsb Hsi Hsl %hf HopS

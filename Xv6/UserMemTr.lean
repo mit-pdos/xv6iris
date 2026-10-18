@@ -87,7 +87,7 @@ theorem ume_miss (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 s) 
     cases hperm : uwkPermOk acc false w with
     | false =>
       exact herr (.PTW_No_Permission ()) (fun x h => by cases h)
-        (by rw [hw]; simp only [uwkWalkRes, hok.inv, hperm, Bool.false_eq_true, if_false])
+        (by rw [hw]; simp only [uwkWalkRes, hok.inv, hperm, Bool.false_eq_true, ite_false])
     | true =>
       have hwalk' : ∀ orc, runRW ufFoot orc s (pt_walk 39 vpn acc .User false sum t.base 2 false ()) =
           some (.Ok (uwkOut w addr false, ()), s, orc) := fun orc => by

@@ -101,7 +101,7 @@ theorem uke_get_ukWr (m : RegMap) (rd : BitVec 5) (v : BitVec 64) (i : BitVec 5)
   · simp [hrd]
   · by_cases hi : i = rd
     · subst hi; simp [hrd, RegMap.get]
-    · simp only [hrd, if_false, RegMap.get, RegMap.set, hi, ne_eq, not_false_eq_true, true_and]
+    · simp only [hrd, ite_false, RegMap.get, RegMap.set, hi, ne_eq, not_false_eq_true, true_and]
 
 /-- **A GPR write is `ukWr`.** -/
 theorem uke_regs_uxaWr {s : UWSt} {m : RegMap} (hr : ukRegs s.file m) (rd : BitVec 5) (v : BitVec 64) :

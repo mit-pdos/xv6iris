@@ -82,7 +82,7 @@ theorem uc_readMip {X : Type} (hT : UcTickFoot D) {s : UWSt} (hm : UcMisa D s) (
       runRW D orc.tail.tail s (k (ucIp (s.file .mip) ((orc 0).reg .sig_meip) ((orc 1).reg .sig_seip))) := by
   simp only [read_mip, external_interrupts_pending, bind_assoc, pure_bind,
     MachCSL.uxa_readReg_bind D _ _ _ _ hT.rd_mip, ucRW_readReg_any D _ _ _ _ hT.meip_nr hT.meip_any,
-    uc_currentlyEnabled_S hm, if_true, ucRW_readReg_any D _ _ _ _ hT.seip_nr hT.seip_any]
+    uc_currentlyEnabled_S hm, ite_true, ucRW_readReg_any D _ _ _ _ hT.seip_nr hT.seip_any]
   rfl
 
 /-- The CLINT dispatch's last test: if `mip` changed, the write callback
@@ -103,7 +103,7 @@ theorem uc_clintDispatch (hT : UcTickFoot D) (orc : UOrc) (s : UWSt) (hm : UcMis
     ∃ s' orc', runRW D orc s (clint_dispatch false) = some ((), s', orc') ∧ ucClockAgree s s' := by
   have hmS : ∀ (t : UWSt), ucClockAgree s t → UcMisa D t := fun t ht =>
     ⟨hm.rd, by rw [ht.2.2 _ (by decide) (by decide) (by decide), hm.val]⟩
-  simp only [clint_dispatch, get_config_print_clint, Bool.false_eq_true, if_false,
+  simp only [clint_dispatch, get_config_print_clint, Bool.false_eq_true, ite_false,
     MachCSL.uxa_readReg_bind D _ _ _ _ hT.rd_mip, MachCSL.uxa_readReg_bind D _ _ _ _ hT.rd_mtimecmp,
     MachCSL.uxa_readReg_bind D _ _ _ _ hT.rd_mtime, ucRW_writeReg D _ _ _ _ _ hT.wr_mip]
   generalize hs1 : s.setR .mip _ = s1

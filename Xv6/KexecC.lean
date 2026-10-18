@@ -399,7 +399,7 @@ theorem kxc_c_close (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
   iintro Hk Hpc
   by_cases hov : kxcSpFinal (sz1.toNat : Int) A.alen ci < (sz1.toNat : Int) - 4096
   · -- ===== THE VECTOR OVERFLOWED: to the shared -1 tail =====
-    simp only [hov, decide_true, if_true]
+    simp only [hov, decide_true, ite_true]
     -- THE CAUSE: the vector does not fit at the count `ci` the loop reached;
     -- `kxcSpFinal` is antitone, so `ci ≤ na` carries the overflow up
     have hfit : QF .argsFit := kxcC_argsFit hqfa himg fun hok => by
@@ -419,7 +419,7 @@ theorem kxc_c_close (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
     case s24 => simp [RegMap.set_apply, h18]
     case s22 => simp [RegMap.set_apply, h22]
     case s27 => simp [RegMap.set_apply, h27]
-  simp only [hov, decide_false, Bool.false_eq_true, if_false]
+  simp only [hov, decide_false, Bool.false_eq_true, ite_false]
   have hfin : (sz1.toNat : Int) - 4096 ≤ kxcSpFinal (sz1.toNat : Int) A.alen ci := by omega
   have hub := kxcC_ub_align (k.regs 2#5) hal
   -- +0x28a  addi a3,s0,-368 ; the copyout's arguments
@@ -458,7 +458,7 @@ theorem kxc_c_close (CO : COPYOUT) (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
   case c11 => simp only [RegMap.set_apply]; simp; omega
   case c14 =>
     rw [kxcVecBytes_length]
-    simp only [RegMap.set_apply, BitVec.reduceEq, if_false, ite_false, if_true, ite_true]
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_false, ite_true, ite_true]
     rw [kxcC_ofInt_8 _ (by omega)]
   isplitr
   · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext

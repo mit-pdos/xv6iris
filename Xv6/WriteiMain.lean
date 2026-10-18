@@ -52,7 +52,7 @@ theorem writei_out_m1 (A : WiArgs) (k : KCtx) (hA : WiFactsEb k A) (src a0 : Bit
   distKer := fun _ => rfl
   why := fun h => absurd h (Nat.lt_irrefl 0)
   range := fun k => by
-    rw [if_neg (by omega), if_neg (by omega)]
+    rw [ite_eq_right (by omega), ite_eq_right (by omega)]
   ker := fun _ i hi => absurd hi (by omega)
   usr := fun _ => writei_usr_zero _ _ _ _ _
   arms := Or.inl ⟨ha0, hwhy, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
@@ -76,7 +76,7 @@ theorem writei_loop_enter (A : WiArgs) (k : KCtx) (hA : WiFactsEb k A)
     sized := id
     covS := hA.hcovs
     covT := bmCovers_mono A.bm _ _ hA.hcovs (by omega)
-    range := fun k => by rw [if_neg (by omega)]
+    range := fun k => by rw [ite_eq_right (by omega)]
     ker := fun _ i hi => absurd hi (by omega)
     usr := fun _ => writei_usr_zero _ _ _ _ _
     ext := UMemL.extSz_refl _ _
@@ -107,7 +107,7 @@ theorem writei_zero_ok (A : WiArgs) (k : KCtx) (hA : WiFactsEb k A) (hn : A.n = 
     distFull := fun _ => rfl
     distKer := fun _ => rfl
     why := fun h => absurd h (Nat.lt_irrefl 0)
-    range := fun k => by rw [if_neg (by omega), if_neg (by omega)]
+    range := fun k => by rw [ite_eq_right (by omega), ite_eq_right (by omega)]
     ker := fun _ i hi => absurd hi (by omega)
     usr := fun _ => writei_usr_zero _ _ _ _ _
     totle := Nat.zero_le _

@@ -53,7 +53,7 @@ theorem grepLoop_post (UL : UK_LEAVES) (MM : GREP_MEMMOVE) (N : UkNames GF) (h :
   iapply wp_uk_btype0l UL N h m (BitVec.ofNat 64 0x16a) false 40#13 22#5 .BLT _ (fun _ => by decide) $$ Hi Hrun
   inext
   iintro %h1 Hrun
-  rw [hs6, kgrep_bgtz_nat mv (by omega), decide_eq_true hmv, if_pos rfl,
+  rw [hs6, kgrep_bgtz_nat mv (by omega), decide_eq_true hmv, ite_eq_left rfl,
     show BitVec.ofNat 64 0x16a + BitVec.signExtend 64 40#13 = BitVec.ofNat 64 0x192 from by decide]
   -- 0x192  sub a5,s2,s7 : p - buf
   gfetch 0x192 false (.RTYPE (.Regidx 23#5, .Regidx 18#5, .Regidx 15#5, .SUB))
@@ -161,7 +161,7 @@ theorem grepLoop_post (UL : UK_LEAVES) (MM : GREP_MEMMOVE) (N : UkNames GF) (h :
     kgrep_bne_nat _ _ (by omega) (by decide)]
   by_cases hfull : mv - i = 1023
   · -- m == 1023: the line is too long; skip = 1, m = 0
-    rw [decide_eq_true hfull, show (!true) = false from rfl, if_neg (by decide), ukPc 0x1a8 0x1ac false rfl]
+    rw [decide_eq_true hfull, show (!true) = false from rfl, ite_eq_right (by decide), ukPc 0x1a8 0x1ac false rfl]
     have h27 : m8.get 27#5 = BitVec.ofNat 64 1 := hgl8.2.2.2.2.2.2.2.2
     gfetch 0x1ac true (.RTYPE (.Regidx 27#5, .Regidx 0#5, .Regidx 19#5, .ADD))
     iapply wp_uk_rtype UL N h10 m8 (BitVec.ofNat 64 0x1ac) true 27#5 0#5 19#5 .ADD _
@@ -183,7 +183,7 @@ theorem grepLoop_post (UL : UK_LEAVES) (MM : GREP_MEMMOVE) (N : UkNames GF) (h :
     let m9 := ukWr m8 19#5 (ukRtypeVal .ADD (m8.get 0#5) (m8.get 27#5))
     let m10 := ukWr m9 22#5 (ukItypeVal .ADDI (m9.get 0#5) 0#12)
     rw [show BitVec.ofNat 64 0x1b0 + BitVec.signExtend 64 2097086#21 = BitVec.ofNat 64 0x16e from by decide,
-      show ukWr m10 0#5 (BitVec.ofNat 64 0x1b0 + instrLen true) = m10 by unfold ukWr; rw [if_pos rfl]]
+      show ukWr m10 0#5 (BitVec.ofNat 64 0x1b0 + instrLen true) = m10 by unfold ukWr; rw [ite_eq_left rfl]]
     rw [grepK_full _ fd rest _ sk (by simp; omega)]
     iapply Hloop $$ %h13 %m10 %F' %true %([] : Bytes) [] [] [] [] [] Hbuf Ht Hrun
     · ipureintro
@@ -196,7 +196,7 @@ theorem grepLoop_post (UL : UK_LEAVES) (MM : GREP_MEMMOVE) (N : UkNames GF) (h :
     · ipureintro; simp
     · ipureintro; rfl
   · -- m < 1023: the leftover is carried to the next read
-    rw [decide_eq_false hfull, show (!false) = true from rfl, if_pos rfl,
+    rw [decide_eq_false hfull, show (!false) = true from rfl, ite_eq_left rfl,
       show BitVec.ofNat 64 0x1a8 + BitVec.signExtend 64 8134#13 = BitVec.ofNat 64 0x16e from by decide]
     rw [grepK_short _ fd rest _ sk (by simp; omega)]
     iapply Hloop $$ %h10 %m8 %F' %sk %((List.range (mv - i)).map (fun j => F (i + j))) [] [] [] [] [] Hbuf Ht Hrun

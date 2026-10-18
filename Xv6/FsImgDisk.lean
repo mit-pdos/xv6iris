@@ -67,16 +67,16 @@ theorem fsimgP_eq : fsimgP = fsImgBlock := by
   have hs : FsImgRaw.fsimgSize = 2000 * BSIZE := by unfold FsImgRaw.fsimgSize BSIZE; rfl
   have hB : BSIZE = 1024 := rfl
   by_cases hb : b < 2000
-  · rw [if_pos hb]
+  · rw [ite_eq_left hb]
     refine List.map_congr_left (fun j hj => ?_)
     rw [List.mem_range] at hj
-    rw [fsImgDisk_eq, if_pos (by rw [hs]; rw [hB] at hj ⊢; omega)]
+    rw [fsImgDisk_eq, ite_eq_left (by rw [hs]; rw [hB] at hj ⊢; omega)]
     congr 2
     · rw [hB] at hj ⊢; omega
     · rw [hB] at hj ⊢; omega
-  · rw [if_neg hb, List.map_congr_left (g := fun _ => (0#8 : BitVec 8)) (fun j hj => ?_),
+  · rw [ite_eq_right hb, List.map_congr_left (g := fun _ => (0#8 : BitVec 8)) (fun j hj => ?_),
       List.map_const', List.length_range]
     rw [List.mem_range] at hj
-    rw [fsImgDisk_eq, if_neg (by rw [hs]; rw [hB] at hj ⊢; omega)]
+    rw [fsImgDisk_eq, ite_eq_right (by rw [hs]; rw [hB] at hj ⊢; omega)]
 
 end Xv6

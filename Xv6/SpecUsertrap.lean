@@ -234,7 +234,7 @@ theorem utRound_entry (sep sc : BitVec 64) (V : ProcPriv) (M : Nat → List (Bit
     utRound sep sc V M V' M' := by
   obtain ⟨htf, hupt, hsz, hM, hcwi, -, hlz, hsc⟩ := h
   unfold utRound uroundOk syscImg
-  rw [if_neg hne, htf, hupt, hsz, hM, hcwi, hlz, hsc]
+  rw [ite_eq_right hne, htf, hupt, hsz, hM, hcwi, hlz, hsc]
   exact ⟨⟨rfl, rfl⟩, rfl, rfl, rfl, rfl, rfl, rfl⟩
 
 end Pure
@@ -303,7 +303,7 @@ def utKillOut (sc : BitVec 64) (W : Uvis) : IProp GF :=
 
 /-- Rocq `ut_kill_out_ecall`. -/
 theorem utKillOut_ecall (W : Uvis) : ⊢ utKillOut (GF := GF) uecallScause W := by
-  unfold utKillOut; rw [if_pos rfl]; iintro; iempintro
+  unfold utKillOut; rw [ite_eq_left rfl]; iintro; iempintro
 
 /-- The out rows at a non-ecall cause owe nothing (Rocq `ut_sys_out_quiet`,
 `ut_exec_out_quiet`, `ut_fork_out_quiet`, `ut_wait_out_quiet`). -/

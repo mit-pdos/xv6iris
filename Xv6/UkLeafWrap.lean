@@ -88,7 +88,7 @@ theorem uk_leaf_retire (S : UkSec GF) (K : UkKey) (M : ElfMem) (m : RegMap) (pc 
       obtain ⟨V', hM', hR⟩ := hX C pt T V h1 h2 h3 h4 h5 h6
       exact ⟨hF C pt T V h1 h2 h3 h4 h5 h6, ukExecOut_mono (fun s hs => ⟨rfl, V', hs, hM'⟩)
         (fun _ h => h) (ukExecOut_retire (ukEx true (.E_U_EnvCall ())) hR)⟩)
-    (fun _ => rfl) (fun h => by cases h) (by rw [if_pos rfl]; exact hU)
+    (fun _ => rfl) (fun h => by cases h) (by rw [ite_eq_left rfl]; exact hU)
   unfold ukStep ukUvb ukcq
   iintro Hb HKc
   unfold ukLeafGoal at hG
@@ -116,7 +116,7 @@ theorem uk_leaf_ecall (S : UkSec GF) (K : UkKey) (M : ElfMem) (m : RegMap) (pc :
       icases H with ⟨H, -⟩
       imodintro
       iexact H)
-    (by rw [if_neg (by decide), uk_ecall_scause]; exact hU)
+    (by rw [ite_eq_right (by decide), uk_ecall_scause]; exact hU)
   unfold ukUvb
   iintro Hb #Hmy HR
   unfold ukLeafGoal at hG
@@ -175,7 +175,7 @@ theorem uk_leaf_storeDenied (S : UkSec GF) (K : UkKey) (M : ElfMem) (m : RegMap)
         · iexact Hrow
       · icases H with ⟨-, H⟩
         iexact H)
-    (by rw [if_neg (by decide)]; exact hU)
+    (by rw [ite_eq_right (by decide)]; exact hU)
   unfold ukUvb
   iintro Hb #Hmy Hp Hrow
   unfold ukLeafGoal at hG
@@ -209,7 +209,7 @@ theorem uk_leaf_trap (π : Nat → Option UPerm) (sz : Nat) (Qp : Int → IProp 
     (fun C pt T V h1 h2 h3 h4 h5 h6 =>
       ⟨hF C pt T V h1 h2 h3 h4 h5 h6, ukExecOut_mono (fun _ h => h.elim) (fun _ h => ⟨rfl, h⟩)
         (ukExecOut_trap hue (hX C pt T V h1 h2 h3 h4 h5 h6))⟩)
-    (fun h => by cases h) (fun _ => hTrap) (by rw [if_neg (by decide)]; exact hU)
+    (fun h => by cases h) (fun _ => hTrap) (by rw [ite_eq_right (by decide)]; exact hU)
 
 end trapGen
 

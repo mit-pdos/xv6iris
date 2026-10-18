@@ -76,7 +76,7 @@ theorem af_sext_nat (w : BitVec 32) (h0 : 0 ≤ w.toInt) :
   have hint : w.toInt = w.toNat := BitVec.toInt_eq_toNat_of_msb hmsb
   apply BitVec.eq_of_toNat_eq
   rw [BitVec.toNat_signExtend, hmsb, hint]
-  simp only [BitVec.toNat_setWidth, BitVec.toNat_ofNat, Nat.reducePow, Bool.false_eq_true, if_false, Nat.add_zero,
+  simp only [BitVec.toNat_setWidth, BitVec.toNat_ofNat, Nat.reducePow, Bool.false_eq_true, ite_false, Nat.add_zero,
     Int.toNat_natCast]
 
 theorem af_calleeSaved_mk (KR R : RegMap)
@@ -447,7 +447,7 @@ theorem argfd_proof (AI : ARGINT) (MP : MYPROC) : ARGFD := ⟨
     by_cases hz : fv = 0#64
     · -- a free descriptor: beqz taken to 4ba8 ; li a0,-1 ; j 4b98
       have hnone : argFd v V.ofile = none := by
-        unfold argFd; rw [if_pos (by unfold NOFILE; exact_mod_cast hr), hfd, hfv]; dsimp only; rw [if_pos hz]
+        unfold argFd; rw [ite_eq_left (by unfold NOFILE; exact_mod_cast hr), hfd, hfv]; dsimp only; rw [ite_eq_left hz]
       k_step_gen (wp_s_branch c16 _ (KA.«argfd» + 0x36#64) true 32#13 15#5 0#5 (by decide) bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [af_beq_z fv hz] next c17 hp17
       iintro Hk Hpc
@@ -487,7 +487,7 @@ theorem argfd_proof (AI : ARGINT) (MP : MYPROC) : ARGFD := ⟨
         $$ [- $Hk $Hpc $Hframe $Hcore $Howe $Hpost $Hnext]
     · -- a file: beqz not taken ; the two conditional stores ; li a0,0
       have hsome : argFd v V.ofile = some (fd, fv) := by
-        unfold argFd; rw [if_pos (by unfold NOFILE; exact_mod_cast hr), hfd, hfv]; dsimp only; rw [if_neg hz]
+        unfold argFd; rw [ite_eq_left (by unfold NOFILE; exact_mod_cast hr), hfd, hfv]; dsimp only; rw [ite_eq_right hz]
       k_step_gen (wp_s_branch c16 _ (KA.«argfd» + 0x36#64) true 32#13 15#5 0#5 (by decide) bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.beq_ne fv hz] next c17 hp17
       iintro Hk Hpc
@@ -527,13 +527,13 @@ theorem argfd_proof (AI : ARGINT) (MP : MYPROC) : ARGFD := ⟨
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [d18', MachCSL.beq_ne _ hpfd] next c18 hp18
         iintro Hk Hpc
         ihave Hpfd := (show ofdOut (GF := GF) (k.regs 11#5) oldfd ⊢ wordPointsTo (k.regs 11#5) 4 (DFrac.own 1) oldfd from by
-          unfold ofdOut; rw [if_neg hpfd]) $$ Hpfd
+          unfold ofdOut; rw [ite_eq_right hpfd]) $$ Hpfd
         k_step_gen (wp_s_sw c18 _ (KA.«argfd» + 0x3c#64) false 0#12 18#5 14#5 (by decide) oldfd)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [d18', Xv6.dsOff0, af_add0', hext] next c19 hp19
         iintro Hk Hpc Hpfd
         have hpin19 : k.sie = false ∨ k.proc = 0#64 → c19 = cpu := fun h => (hp19 h).trans ((hp18 h).trans (hpin17 h))
         ihave Hpfd := (show wordPointsTo (GF := GF) (k.regs 11#5) 4 (DFrac.own 1) (BitVec.extractLsb' 0 32 v) ⊢
-            ofdOut (k.regs 11#5) (BitVec.extractLsb' 0 32 v) from by unfold ofdOut; rw [if_neg hpfd]) $$ Hpfd
+            ofdOut (k.regs 11#5) (BitVec.extractLsb' 0 32 v) from by unfold ofdOut; rw [ite_eq_right hpfd]) $$ Hpfd
         iapply (af_pf_tail cpu c19 k γ V.fdg pa pid V M D v oldfd oldf fd fv hsome hpf hK6 hpin19 spie2 spp2 hsp2' _
             (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact d9')
             (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true])
@@ -545,7 +545,7 @@ theorem argfd_proof (AI : ARGINT) (MP : MYPROC) : ARGFD := ⟨
           $$ [- $Hk $Hpc $Hframe $Hcore $Howe $Hpfd $Hpf $Hnext]
   · -- out of range: bltu taken to 4ba4 ; li a0,-1 ; j 4b98
     have hnone : argFd v V.ofile = none := by
-      unfold argFd; rw [if_neg (by unfold NOFILE; exact_mod_cast hr)]
+      unfold argFd; rw [ite_eq_right (by unfold NOFILE; exact_mod_cast hr)]
     k_step_gen (wp_s_branch c8 _ (KA.«argfd» + 0x1e#64) false 52#13 15#5 14#5 (by decide) bop.BLTU)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [af_li15, af_bltu_out _ hr] next c9 hp9
     iintro Hk Hpc

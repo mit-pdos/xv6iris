@@ -85,11 +85,11 @@ theorem umm_checked_mem_write_plan (D : UFoot) (orc : UOrc) (s : UWSt) (pa : Bit
     · simp only [e1, e2]
       by_cases hi : i + 1 = N
       · have h1 : (i == N - 1) = true := by simp; omega
-        simp only [h1, if_true, hi, beq_self_eq_true]
+        simp only [h1, ite_true, hi, beq_self_eq_true]
         try omega
       · have h1 : (i == N - 1) = false := by simp; omega
         have h2 : (i + 1 == N) = false := by simpa using hi
-        simp only [h1, h2, Bool.false_eq_true, if_false]
+        simp only [h1, h2, Bool.false_eq_true, ite_false]
         try simp
 
 /-- **The misaligned physical write**: whatever the granule check answered,
@@ -156,11 +156,11 @@ theorem umm_mem_write_ea (D : UFoot) (orc : UOrc) (s : UWSt) (pa : BitVec 64) (W
     · simp only [e1, e2]
       by_cases hi : i + 1 = N
       · have h1 : (i == N - 1) = true := by simp; omega
-        simp only [h1, if_true, hi, beq_self_eq_true]
+        simp only [h1, ite_true, hi, beq_self_eq_true]
         try omega
       · have h1 : (i == N - 1) = false := by simp; omega
         have h2 : (i + 1 == N) = false := by simpa using hi
-        simp only [h1, h2, Bool.false_eq_true, if_false]
+        simp only [h1, h2, Bool.false_eq_true, ite_false]
         try simp
 
 end MachCSL

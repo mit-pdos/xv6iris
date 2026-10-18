@@ -102,10 +102,10 @@ theorem imgNode_ownsSlot (P : Nat → List (BitVec 8)) (sb : FsSb) (z b : Nat)
     · obtain ⟨hklt, hbnz⟩ := hc
       refine ⟨k, Nat.le_of_lt hklt, ?_, ?_⟩
       · unfold fsSlot
-        rw [if_neg (by omega), ← imgNode_fnNaddr P sb z k hklt, hnad]
+        rw [ite_eq_right (by omega), ← imgNode_fnNaddr P sb z k hklt, hnad]
       · rw [← hnad, imgNode_fnNaddr P sb z k hklt, ← imgBlkmap_get P _ k hwf hklt]
         exact hbnz
-    · rw [if_neg hc] at hk; cases hk
+    · rw [ite_eq_right hc] at hk; cases hk
   · refine ⟨MAXFILE, Nat.le_refl _, ?_, ?_⟩
     · rw [fsSlot_max, ← heq]; rfl
     · rw [← heq]; exact hnz
@@ -116,8 +116,8 @@ theorem imgNode_fnSlot (P : Nat → List (BitVec 8)) (sb : FsSb) (z k : Nat) (hk
     fnSlot (imgNode P sb z) k = fsSlot P (fsDinode P sb z) k := by
   unfold fnSlot fsSlot
   by_cases hm : k = MAXFILE
-  · rw [if_pos hm, if_pos hm]; rfl
-  · rw [if_neg hm, if_neg hm]
+  · rw [ite_eq_left hm, ite_eq_left hm]; rfl
+  · rw [ite_eq_right hm, ite_eq_right hm]
     exact imgNode_fnNaddr P sb z k (by omega)
 
 /-- W4 at one inum, in the node vocabulary (Rocq's `img_node_slot_inj`). -/
@@ -138,11 +138,11 @@ theorem imgNode_blkAt (P : Nat → List (BitVec 8)) (sb : FsSb) (z k : Nat) (bs 
   rw [imgNode_blk, nodeBlk_lookup] at hk
   by_cases hc : k < MAXFILE ∧ (blkmapGet (imgBlkmap P (fsDinode P sb z)) k).toNat ≠ 0
   · obtain ⟨hklt, hbnz⟩ := hc
-    rw [if_pos ⟨hklt, hbnz⟩] at hk
+    rw [ite_eq_left ⟨hklt, hbnz⟩] at hk
     cases hk
     rw [imgBlkmap_get P _ k hwf hklt] at hbnz
-    rw [imgNode_fnNaddr P sb z k hklt, fsDataOf_addr, if_neg hbnz]
-  · rw [if_neg hc] at hk; cases hk
+    rw [imgNode_fnNaddr P sb z k hklt, fsDataOf_addr, ite_eq_right hbnz]
+  · rw [ite_eq_right hc] at hk; cases hk
 
 /-- ...and for the INDIRECT block: its bytes are `indBytes` of the node's
 entry array (Rocq's `img_node_ind_at`). -/

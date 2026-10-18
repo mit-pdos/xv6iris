@@ -149,7 +149,7 @@ theorem creChild_nondir (tyz ma mi d i : Nat) (hne : tyz ≠ T_DIR_z) :
 /-- a non-directory child bumps nothing (Rocq's `acre_bump_cre_c0`) -/
 theorem acreBump_creC0 (tyz ma mi : Nat) (hne : tyz ≠ T_DIR_z) : acreBump (creC0 tyz ma mi) = 0 := by
   unfold creC0
-  rw [if_neg hne]
+  rw [ite_eq_right hne]
   split <;> rfl
 
 theorem acreBump_creChild_dir (ma mi d i : Nat) : acreBump (creChild T_DIR_z ma mi d i) = 1 := by

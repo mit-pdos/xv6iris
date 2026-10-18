@@ -61,7 +61,7 @@ theorem lmRdOpen_nows (M : LModel) (sd : M.lmSt) (k : Nat) (ho : List Obs) (so :
   obtain ⟨_, hr, _⟩ := lmBlkOpen_cs M sd so r pre hop
   obtain ⟨_, hwp, hne, _⟩ := hop
   unfold lmDlOk at hdlok
-  rw [if_neg (fun h => hne (by rw [← hwp]; exact h.2))] at hdlok
+  rw [ite_eq_right (fun h => hne (by rw [← hwp]; exact h.2))] at hdlok
   have hlb := linesBytes_rest (so.gsE.map Prod.snd)
   rw [hr, List.length_nil, List.length_map] at hlb
   have hEpre : (H.chDl ++ ws).map Prod.snd <+: so.gsE.map Prod.snd := by
@@ -234,7 +234,7 @@ theorem wildPure_facts (M : LModel) (sd : M.lmSt) (WL : M.lmLine → Bool)
   obtain ⟨hall, _, hw, _, _, _, hne, hr, hwl⟩ := h
   obtain ⟨hout, hcsl, _⟩ := hall
   refine ⟨hout, hw, hne, hr, ?_, HWL _ hwl, ?_, ?_⟩
-  · unfold lmCsLenOk at hcsl; rw [if_pos ⟨hw, hr⟩] at hcsl; exact hcsl
+  · unfold lmCsLenOk at hcsl; rw [ite_eq_left ⟨hw, hr⟩] at hcsl; exact hcsl
   · have hf0n := hout.2.2.2.2.2.2.2.2.2.2.2.2.1
     cases hf : so.gsSt with
     | some s1 => simp [gsState, hf]
