@@ -1695,7 +1695,7 @@ def check_misc_extension_dependencies (_ : Unit) : SailM Bool := do
       if (((Use_interrupt_enables : Sdtrig_breakpoint_reentrancy) == Use_tcontrol) : Bool)
       then
         (let medelegation :=
-          (Mk_Medeleg 0b0000000000000000000000000000000000000000111111001011011111111111#64)
+          (Mk_Medeleg 0b0000000000000000000000000000000000000000000011001011001111111111#64)
         if (((_get_Medeleg_Breakpoint medelegation) != 0#1) : Bool)
         then
           (let valid : Bool := false
@@ -1854,7 +1854,7 @@ def check_extension_param_constraints (_ : Unit) : Bool :=
     if ((true : Bool) : Bool)
     then
       (let medelegation :=
-        (Mk_Medeleg 0b0000000000000000000000000000000000000000111111001011011111111111#64)
+        (Mk_Medeleg 0b0000000000000000000000000000000000000000000011001011001111111111#64)
       let valid : Bool :=
         if (((_get_Medeleg_Double_Trap medelegation) != 0#1) : Bool)
         then

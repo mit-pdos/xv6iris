@@ -42,10 +42,15 @@ variable {GF : BundledGFunctors.{0}} [MachFixedGS GF]
 
 /-! ## A whole register file as a ghost map -/
 
-/-- Every register (the model's `Register` has 180 constructors). -/
-def allRegs : List Register := (List.range 180).map Register.ofNat
+/-- The number of the model's registers: the constructors of `Register` (213 since sail-riscv 0.16,
+which added the H, Sdtrig, counter and interrupt-controller state; 180 before).  `ctorIdx_lt`
+checks it against the generated type, so a regeneration that changes it fails here. -/
+def regCount : Nat := 213
 
-theorem ctorIdx_lt (r : Register) : r.ctorIdx < 180 := by cases r <;> decide
+/-- Every register. -/
+def allRegs : List Register := (List.range regCount).map Register.ofNat
+
+theorem ctorIdx_lt (r : Register) : r.ctorIdx < regCount := by cases r <;> decide
 
 theorem mem_allRegs (r : Register) : r ∈ allRegs :=
   List.mem_map.mpr ⟨r.ctorIdx, List.mem_range.mpr (ctorIdx_lt r), Register.ofNat_ctorIdx r⟩

@@ -21,9 +21,14 @@
 //      H (and the H-dependent Sha, Shcounterenw, Shgatpa, Shtvala, Shvsatpa, Shvstvala, Shvstvecd),
 //      Sdtrig (its code is compiled in: `sys` requires the module), Zilx, Svukte.
 //   4. the RAM region's `size` := 0x8000000 (128 MiB), matching xv6's PHYSTOP.
-// Everything else is unmodified sail-riscv 0.16 default config -- INCLUDING two defaults that
-// changed since the previous pin and are accepted: `platform.clint.size` 0xC000 (was 0xC0000) and
-// `base.medeleg.delegatable_bits` 0x…00fc_b7FF (was 0x…000c_b3FF).
+//   5. `base.medeleg.delegatable_bits` := 0x…000c_b3FF (the previous pin's value): 0.16's default
+//      0x…00fc_b7FF adds the hypervisor exceptions 10 and 20-23, which the model's own
+//      `config_is_valid` rejects as reserved when H is off (`reserved_exception_mask`).
+//   6. `extensions.Stateen.mstateen0.CONTEXT` := "CSRBit_ReadOnlyZero": the bit's feature (Sdtrig's
+//      scontext/hcontext) is unsupported with Sdtrig off, and `config_is_valid` requires the bits
+//      of unsupported features to be read-only zero (`check_stateen_config`).
+// Everything else is unmodified sail-riscv 0.16 default config -- INCLUDING one default that
+// changed since the previous pin and is accepted: `platform.clint.size` 0xC000 (was 0xC0000).
 //
 // To refresh after a sail-riscv bump: resolve the new config/config.json.in with the cmake values
 // above, re-apply the four edits (tools/../local-plan/model-bump/patches has the script that did
@@ -184,7 +189,7 @@
       // not exist.
       "delegatable_bits": {
         "len": 64,
-        "value": "0x0000_0000_00fc_b7FF"
+        "value": "0x0000_0000_000c_b3FF"
       }
     },
     "mideleg": {
@@ -1256,7 +1261,7 @@
       "mstateen0": {
         "SE0": "CSRBit_Writable",
         "ENVCFG": "CSRBit_Writable",
-        "CONTEXT": "CSRBit_Writable",
+        "CONTEXT": "CSRBit_ReadOnlyZero",
         "P1P13": "CSRBit_ReadOnlyZero",
         "SRMCFG": "CSRBit_Writable",
         "FCSR": "CSRBit_ReadOnlyZero",

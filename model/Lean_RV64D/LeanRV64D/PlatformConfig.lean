@@ -260,7 +260,7 @@ def plat_stvec_vectored_base_alignment_exp : tvec_alignment := 2
 def plat_vstvec_vectored_base_alignment_exp : tvec_alignment := 2
 
 def plat_medeleg_delegatable_bits : (BitVec 64) :=
-  0b0000000000000000000000000000000000000000111111001011011111111111#64
+  0b0000000000000000000000000000000000000000000011001011001111111111#64
 
 def plat_mideleg_delegatable_bits : xlenbits :=
   (sail_mask 64 0b0000000000000000000000000000000000000000000000000010001000100010#64)
@@ -3622,7 +3622,7 @@ def legalize_csr_bit (c : CSRBitConfig) (feature_enabled : Bool) (v : (BitVec 1)
 
 def mstateen0_c : CSRBitConfig := CSRBit_ReadOnlyZero
 
-def mstateen0_context : CSRBitConfig := CSRBit_Writable
+def mstateen0_context : CSRBitConfig := CSRBit_ReadOnlyZero
 
 def mstateen0_envcfg : CSRBitConfig := CSRBit_Writable
 
