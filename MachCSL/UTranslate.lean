@@ -53,7 +53,7 @@ noncomputable section
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
@@ -177,8 +177,8 @@ theorem utr_effPriv (acc : MemoryAccessType mem_payload) (ms : BitVec 64) (p : P
 theorem utr_translationMode_U (D : UFoot) (orc : UOrc) (s : UWSt) (hms : D.Dr .mstatus = true)
     (hsatp : D.Dr .satp = true) (hsxl : BitVec.extractLsb' 34 2 (s.file .mstatus) = 2#2)
     (hmode : BitVec.extractLsb' 60 4 (s.file .satp) = 8#4) :
-    runRW D orc s (translationMode Privilege.User) = some (SATPMode.Sv39, s, orc) := by
-  unfold translationMode architecture
+    runRW D orc s (satp_mode Privilege.User) = some (SATPMode.Sv39, s, orc) := by
+  unfold satp_mode architecture
   sail_norm
   simp only [runRW_bind, utr_readReg D _ _ _ hms, utr_readReg D _ _ _ hsatp, Option.bind_some, utr_sxl,
     utr_satpMode, hsxl, hmode, utr_arch2, runRW_pure, utr_assert_true, utr_sv39]

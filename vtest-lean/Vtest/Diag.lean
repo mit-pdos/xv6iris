@@ -21,7 +21,7 @@ import Vtest.Sched
 
 namespace Vtest
 
-open MachCSL LeanRV64D Sail Sail.ConcurrencyInterfaceV1
+open MachCSL LeanRV64D Sail Sail.ArchSem
 
 def hex (n : Nat) : String := "0x" ++ String.ofList (Nat.toDigits 16 n)
 

@@ -62,7 +62,7 @@ noncomputable section
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
@@ -168,8 +168,8 @@ read watermark has reached. -/
 theorem swp_sail_barrier_view (cpu : CPU) (b : barrier_kind) (hacq : fenceAcq b = true)
     (T : Nat) (Φ : Unit → IProp GF) :
     rviewLb cpu T ∗ ▷ (viewLb cpu T -∗ Φ ())
-    ⊢ swp cpu (ConcurrencyInterfaceV1.sail_barrier b) Φ := by
-  unfold ConcurrencyInterfaceV1.sail_barrier PreSail.sail_barrier PreSail.emit
+    ⊢ swp cpu (ArchSem.sail_barrier b) Φ := by
+  unfold ArchSem.sail_barrier PreSail.sail_barrier PreSail.emit
   iintro ⟨#Hrv, HΦ⟩
   iapply swp_event cpu (.barrier b) (fun v => FreeM.pure v) Φ (fun _ _ h => h)
   iintro %σ Hσ
@@ -201,8 +201,8 @@ theorem swp_sail_mem_read_plain_aur (cpu : CPU) {n vasize : Nat}
     (hk : akPlain req.access_kind = true) (K : Nat) (ts : List (Nat × Agent))
     (Φ : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → IProp GF) :
     viewLb cpu K ∗ readAUr cpu req.pa n K ts (fun w => Φ (.Ok (w, none)))
-    ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_read req) Φ := by
-  unfold ConcurrencyInterfaceV1.sail_mem_read PreSail.sail_mem_read PreSail.emit readAUr
+    ⊢ swp cpu (ArchSem.sail_mem_read req) Φ := by
+  unfold ArchSem.sail_mem_read PreSail.sail_mem_read PreSail.emit readAUr
   iintro ⟨#HK, #Hts, H⟩
   have hk' : akIfetch req.access_kind = false ∧ akExcl req.access_kind = false := by
     unfold akPlain at hk
@@ -404,7 +404,7 @@ def atSailBarrier : TacticM Bool := withMainContext do
           n == ``ExceptT.lift) && x.getAppNumArgs > 0 then
         x := x.getAppArgs.back!
   if let .const n _ := x.getAppFn then
-    return n == ``LeanRV64D.ConcurrencyInterfaceV1.sail_barrier
+    return n == ``LeanRV64D.ArchSem.sail_barrier
   return false
 
 open Lean Elab Tactic in

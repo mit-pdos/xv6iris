@@ -50,7 +50,7 @@ noncomputable section
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
@@ -76,7 +76,7 @@ theorem uma_mrd {X : Type} (D : UFoot) (orc : UOrc) (s : UWSt) {n vasize : Nat}
     (k : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → SailM X) (w : BitVec (8 * n))
     (hif : akIfetch req.access_kind = false) (hn : n < 2 ^ 64) (hex : akExcl req.access_kind = false)
     (hr : bmRead s.mm req.pa n = some w) :
-    runRW D orc s (ConcurrencyInterfaceV1.sail_mem_read req >>= k) = runRW D orc s (k (.Ok (w, none))) := by
+    runRW D orc s (ArchSem.sail_mem_read req >>= k) = runRW D orc s (k (.Ok (w, none))) := by
   show runRW D orc s (FreeM.impure (.ok (.memRead n vasize req)) k) = _
   simp only [runRW, hif, hn, hex, hr, Bool.false_eq_true, ↓reduceIte]
 
@@ -87,7 +87,7 @@ theorem uma_mrdx {X : Type} (D : UFoot) (orc : UOrc) (s : UWSt) {n vasize : Nat}
     (k : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → SailM X) (w : BitVec (8 * n))
     (hif : akIfetch req.access_kind = false) (hn : n < 2 ^ 64) (hex : akExcl req.access_kind = true)
     (hr : bmRead s.mm req.pa n = some w) :
-    runRW D orc s (ConcurrencyInterfaceV1.sail_mem_read req >>= k) =
+    runRW D orc s (ArchSem.sail_mem_read req >>= k) =
       runRW D orc { s with rv := true } (k (.Ok (w, none))) := by
   show runRW D orc s (FreeM.impure (.ok (.memRead n vasize req)) k) = _
   simp only [runRW, hif, hn, hex, hr, Bool.false_eq_true, ↓reduceIte]
@@ -99,7 +99,7 @@ theorem uma_mwr {X : Type} (D : UFoot) (orc : UOrc) (s : UWSt) {n vasize : Nat}
     (req : Mem_write_request n vasize Arch.pa Arch.translation Arch.arch_ak)
     (k : Result (Option Bool) Arch.abort → SailM X) (w : BitVec (8 * n))
     (hn : n < 2 ^ 64) (hv : req.value = some w) (ho : bmOwned s.mm req.pa n = true) :
-    runRW D orc s (ConcurrencyInterfaceV1.sail_mem_write req >>= k) =
+    runRW D orc s (ArchSem.sail_mem_write req >>= k) =
       runRW D orc { s with mm := bmWrite s.mm req.pa n w, rv := false } (k (.Ok (some true))) := by
   show runRW D orc s (FreeM.impure (.ok (.memWrite n vasize req)) k) = _
   simp only [runRW, hn, hv, ho, ↓reduceIte]

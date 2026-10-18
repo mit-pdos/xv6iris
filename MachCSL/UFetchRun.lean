@@ -33,7 +33,7 @@ noncomputable section
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
@@ -179,7 +179,7 @@ theorem uftRun_bind_none {X Y : Type} (m : SailM X) (f : X → SailM Y) (orc : U
 theorem uftRun_sail_mem_read_ifetch (orc : UOrc) (s : UWSt) {n vasize : Nat}
     (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
     (hk : akIfetch req.access_kind = true) (hn : n < 2 ^ 64) (ho : bmOwned s.mm req.pa n = true) :
-    uftRun D orc s (ConcurrencyInterfaceV1.sail_mem_read req) =
+    uftRun D orc s (ArchSem.sail_mem_read req) =
       some (.Ok ((orc 0).ch (.bitvector (8 * n)), none), s, orc.tail) := by
   show uftRun D orc s (FreeM.impure (.ok (.memRead n vasize req)) FreeM.pure) = _
   rw [uftRun_fetch D orc s req _ hk, ite_eq_left ⟨hn, ho⟩]
@@ -279,7 +279,7 @@ theorem swp_uftRun {X : Type} (m : SailM X) :
         intro w' o
         rw [uftRun_fetch D _ s req k hk, ite_eq_left hcond, UOrc.tail_cons, UOrc.cons_zero, UAns.setBv_ch]
       show uFr RF BF s ∗ uftPost RF BF s (FreeM.impure (.ok (.memRead n vasize req)) k) Φ ⊢
-        swp cpu (ConcurrencyInterfaceV1.sail_mem_read req >>= k) Φ
+        swp cpu (ArchSem.sail_mem_read req >>= k) Φ
       unfold uFr
       iintro ⟨⟨HF, HB, Hc, Hr⟩, HP⟩
       iapply ufm_swp_ifetch_bind cpu BF s.mm req k hk hcond.1 hcond.2 Φ

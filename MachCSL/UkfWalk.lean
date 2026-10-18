@@ -30,7 +30,7 @@ noncomputable section
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
@@ -187,7 +187,7 @@ bytes the text map owns answers them. -/
 theorem ukf_leaf (T : BMap) (D : UFoot) (o : UOrc) (s : UWSt) (n vasize : Nat)
     (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
     (hn0 : 0 < n) (hn : n < 2 ^ 64) (hex : akExcl req.access_kind = false) (ho : bmOwned T req.pa n = true) :
-    ukfRun T D o s (ConcurrencyInterfaceV1.sail_mem_read req) =
+    ukfRun T D o s (ArchSem.sail_mem_read req) =
       some (.Ok ((bmRead T req.pa n).getD 0, none), s, o) := by
   have hk : uxTextRead T req = true := by
     simp only [uxTextRead, hn0, hn, hex, ho, decide_true, Bool.not_false, Bool.and_self]

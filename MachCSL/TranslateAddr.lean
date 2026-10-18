@@ -20,7 +20,7 @@ import MachCSL.WpSmodePmp
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 variable {GF : BundledGFunctors.{0}} [MachGS GF]
@@ -51,7 +51,7 @@ theorem SConfAt_sConfOf (tier : KTier) (root : BitVec 44) (ms mdl mepc stc : Bit
 theorem swp_translationMode_tier (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool) (tier : KTier)
     (root : BitVec 44) (hok : SConfAt (GF := GF) tier c root sie) (Φ : SATPMode → IProp GF) :
     confCells cpu dq Privilege.Supervisor c ∗ ▷ (confCells cpu dq Privilege.Supervisor c -∗ Φ (satpModeOf tier))
-    ⊢ swp cpu (translationMode Privilege.Supervisor) Φ := by
+    ⊢ swp cpu (satp_mode Privilege.Supervisor) Φ := by
   cases tier
   · exact swp_translationMode_bare cpu dq c sie hok Φ
   · exact swp_translationMode_kpt cpu dq c sie root hok Φ

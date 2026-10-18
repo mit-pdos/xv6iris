@@ -17,7 +17,7 @@ import MachCSL.UMemMisPma
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 /-- The physical configuration holds at every state with the same register

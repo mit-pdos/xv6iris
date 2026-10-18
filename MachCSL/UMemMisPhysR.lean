@@ -23,7 +23,7 @@ import MachCSL.UMemPhys
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 /-- **The chunked read, at a given plan** (Rocq `GmCheckedMemReadSplit`). -/

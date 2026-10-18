@@ -15,7 +15,7 @@ import MachCSL.UTranslate
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 /-- **The PMA check of a (possibly misaligned) data load or store**: a

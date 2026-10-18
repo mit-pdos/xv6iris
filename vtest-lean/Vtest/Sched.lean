@@ -27,7 +27,7 @@ import Vtest.Run
 
 namespace Vtest
 
-open MachCSL LeanRV64D Sail Sail.ConcurrencyInterfaceV1
+open MachCSL LeanRV64D Sail Sail.ArchSem
 
 /-! ## The pool's layout
 

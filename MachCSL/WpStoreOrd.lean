@@ -26,7 +26,7 @@ noncomputable section
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
@@ -63,8 +63,8 @@ theorem swp_sail_mem_write_plain_auT (cpu : CPU) {n vasize : Nat}
     (r : Option Resv) (Φ : Result (Option Bool) Arch.abort → IProp GF) :
     resvFragAny cpu r ∗
     writeAUT cpu req.pa n w' iprop(resvFrag cpu none false -∗ Φ (.Ok (some true)))
-    ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_write req) Φ := by
-  unfold ConcurrencyInterfaceV1.sail_mem_write PreSail.sail_mem_write PreSail.emit writeAUT
+    ⊢ swp cpu (ArchSem.sail_mem_write req) Φ := by
+  unfold ArchSem.sail_mem_write PreSail.sail_mem_write PreSail.emit writeAUT
   iintro ⟨Hfrag, H⟩
   iloeb as IH
   iapply swp_event_step cpu (.memWrite n vasize req) (fun v => FreeM.pure v) Φ

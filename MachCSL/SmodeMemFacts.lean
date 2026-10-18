@@ -8,7 +8,7 @@ import MachCSL.PlatformFacts
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 /-- A one-byte access never crosses a page boundary. -/

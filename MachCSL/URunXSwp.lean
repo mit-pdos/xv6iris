@@ -23,7 +23,7 @@ noncomputable section
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
@@ -123,7 +123,7 @@ theorem swp_uxRun {X : Type} (K : Nat) (DT : List PAddr) (T : BMap) (m : SailM X
       show uFr RF BF s ∗ uxTextOwn ξ K DT T ∗ iviewLb cpu K ∗
           uxPost RF BF T s (FreeM.impure (.ok (.memRead n vasize req)) k)
             (fun x => iprop(uxTextOwn ξ K DT T -∗ Φ x)) ⊢
-        swp cpu (ConcurrencyInterfaceV1.sail_mem_read req >>= k) Φ
+        swp cpu (ArchSem.sail_mem_read req >>= k) Φ
       iintro ⟨Hfr, Htx, #Hiv, HP⟩
       ihave HP := uxPost_step RF BF T s s _ _ _ (fun o => ⟨o, hstep o⟩) $$ HP
       icases uxTextOwn_acc ξ K DT T req.pa n w hn hw $$ Htx with ⟨Hb, Hcl⟩

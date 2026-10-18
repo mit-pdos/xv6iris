@@ -19,7 +19,7 @@ import Vtest.DevExec
 
 namespace Vtest
 
-open MachCSL LeanRV64D Sail Sail.ConcurrencyInterfaceV1
+open MachCSL LeanRV64D Sail Sail.ArchSem
 open Iris.ProgramLogic
 
 /-- The global state an executable state denotes: generation 0, power on. -/

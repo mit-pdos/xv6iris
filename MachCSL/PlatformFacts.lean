@@ -16,7 +16,7 @@ noncomputable section
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 /-- The RAM region of the platform's PMA table. -/
@@ -98,7 +98,7 @@ end MachCSL
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 theorem is_aligned_vaddr_of (va : BitVec 64) (n : Nat) (h : va.toNat % n = 0) :
@@ -257,7 +257,7 @@ end MachCSL
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 /-- The CSR-name lookup the write callbacks perform is a long string match;

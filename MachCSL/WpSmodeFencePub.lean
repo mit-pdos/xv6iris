@@ -39,7 +39,7 @@ import MachCSL.WpSmodeFenceFloor
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
@@ -99,8 +99,8 @@ itself written. -/
 theorem swp_sail_barrier_pub (cpu : CPU) (b : barrier_kind) (hdrain : fenceDrains b = true)
     (T : Nat) (Φ : Unit → IProp GF) :
     authoredBy T (hartAgent cpu) ∗ ▷ (viewLb cpu T -∗ Φ ())
-    ⊢ swp cpu (ConcurrencyInterfaceV1.sail_barrier b) Φ := by
-  unfold ConcurrencyInterfaceV1.sail_barrier PreSail.sail_barrier PreSail.emit
+    ⊢ swp cpu (ArchSem.sail_barrier b) Φ := by
+  unfold ArchSem.sail_barrier PreSail.sail_barrier PreSail.emit
   iintro ⟨#Hau, HΦ⟩
   iapply swp_event cpu (.barrier b) (fun v => FreeM.pure v) Φ (fun _ _ h => h)
   iintro %σ Hσ

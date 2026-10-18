@@ -80,7 +80,7 @@ noncomputable section
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
@@ -670,7 +670,7 @@ theorem urw_memRead {X : Type} (n vasize : Nat)
     (ih : ∀ v, URW RF BF (k v)) : URW RF BF (FreeM.impure (.ok (.memRead n vasize req)) k) := by
   intro s hok Φ
   have e : (FreeM.impure (.ok (.memRead n vasize req)) k : SailM X) =
-      (ConcurrencyInterfaceV1.sail_mem_read req >>= k) := rfl
+      (ArchSem.sail_mem_read req >>= k) := rfl
   cases hif : akIfetch req.access_kind with
   | true => exact (urw_absurd _ s hok (by simp only [runRW, hif, ite_true])).elim
   | false =>
@@ -743,7 +743,7 @@ theorem urw_memWrite {X : Type} (n vasize : Nat)
     (ih : ∀ v, URW RF BF (k v)) : URW RF BF (FreeM.impure (.ok (.memWrite n vasize req)) k) := by
   intro s hok Φ
   have e : (FreeM.impure (.ok (.memWrite n vasize req)) k : SailM X) =
-      (ConcurrencyInterfaceV1.sail_mem_write req >>= k) := rfl
+      (ArchSem.sail_mem_write req >>= k) := rfl
   by_cases hn' : ¬ n < 2 ^ 64
   · exact (urw_absurd _ s hok (by simp only [runRW, hn', ↓reduceIte])).elim
   have hn : n < 2 ^ 64 := Classical.not_not.1 hn'

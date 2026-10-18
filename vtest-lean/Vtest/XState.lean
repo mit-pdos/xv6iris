@@ -23,7 +23,7 @@ import Std.Data.DHashMap
 
 namespace Vtest
 
-open MachCSL LeanRV64D Sail Sail.ConcurrencyInterfaceV1
+open MachCSL LeanRV64D Sail Sail.ArchSem
 
 /-! ## Register files -/
 

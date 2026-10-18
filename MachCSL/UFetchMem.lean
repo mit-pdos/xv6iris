@@ -37,7 +37,7 @@ noncomputable section
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
@@ -124,8 +124,8 @@ theorem swp_sail_mem_read_ifetch_ctx (cpu : CPU) {n vasize : Nat}
     (Φ : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → IProp GF) :
     ctxBytes ξ req.pa n dq w ∗
     ▷ (∀ w' : BitVec (8 * n), ctxBytes ξ req.pa n dq w -∗ Φ (.Ok (w', none)))
-    ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_read req) Φ := by
-  unfold ConcurrencyInterfaceV1.sail_mem_read PreSail.sail_mem_read PreSail.emit
+    ⊢ swp cpu (ArchSem.sail_mem_read req) Φ := by
+  unfold ArchSem.sail_mem_read PreSail.sail_mem_read PreSail.emit
   iintro ⟨Hb, HΦ⟩
   have hex := akExcl_of_ifetch _ hk
   iapply swp_event cpu (.memRead n vasize req) (fun v => FreeM.pure v) Φ
@@ -171,7 +171,7 @@ theorem ufm_swp_ifetch_frame (cpu : CPU) {ξ : CtxId} (BF : UByteFrame GF ξ) (m
     (hk : akIfetch req.access_kind = true) (hn : n < 2 ^ 64) (ho : bmOwned mm req.pa n = true)
     (Φ : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → IProp GF) :
     BF.B mm ∗ ▷ (∀ w' : BitVec (8 * n), BF.B mm -∗ Φ (.Ok (w', none)))
-    ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_read req) Φ := by
+    ⊢ swp cpu (ArchSem.sail_mem_read req) Φ := by
   iintro ⟨HB, HΦ⟩
   icases BF.acc mm req.pa n hn ho $$ HB with ⟨%w, %hw, Hb, HBc⟩
   iapply swp_sail_mem_read_ifetch_ctx cpu req ξ (DFrac.own 1) w hk Φ
@@ -189,7 +189,7 @@ theorem ufm_swp_ifetch_bind (cpu : CPU) {ξ : CtxId} (BF : UByteFrame GF ξ) (mm
     (hk : akIfetch req.access_kind = true) (hn : n < 2 ^ 64) (ho : bmOwned mm req.pa n = true)
     (Φ : X → IProp GF) :
     BF.B mm ∗ ▷ (∀ w' : BitVec (8 * n), BF.B mm -∗ swp cpu (k (.Ok (w', none))) Φ)
-    ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_read req >>= k) Φ := by
+    ⊢ swp cpu (ArchSem.sail_mem_read req >>= k) Φ := by
   iintro H
   iapply swp_bind
   iapply ufm_swp_ifetch_frame cpu BF mm req hk hn ho (fun v => swp cpu (k v) Φ) $$ H

@@ -30,7 +30,7 @@ noncomputable section
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open Sail.ArchSem (FreeM)
 open LeanRV64D
 
@@ -471,8 +471,8 @@ theorem swp_sail_mem_read_plain_au (cpu : CPU) {n vasize : Nat}
     (hk : akPlain req.access_kind = true) (K : Nat) (ts : List (Nat × Agent))
     (Φ : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → IProp GF) :
     viewLb cpu K ∗ readAU cpu req.pa n K ts (fun w => Φ (.Ok (w, none)))
-    ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_read req) Φ := by
-  unfold ConcurrencyInterfaceV1.sail_mem_read PreSail.sail_mem_read PreSail.emit readAU
+    ⊢ swp cpu (ArchSem.sail_mem_read req) Φ := by
+  unfold ArchSem.sail_mem_read PreSail.sail_mem_read PreSail.emit readAU
   iintro ⟨#HK, #Hts, H⟩
   have hk' : akIfetch req.access_kind = false ∧ akExcl req.access_kind = false := by
     unfold akPlain at hk
@@ -544,8 +544,8 @@ theorem swp_sail_mem_write_plain_au (cpu : CPU) {n vasize : Nat}
     (r : Option Resv) (Φ : Result (Option Bool) Arch.abort → IProp GF) :
     resvFragAny cpu r ∗
     writeAU cpu req.pa n w' iprop(resvFrag cpu none false -∗ Φ (.Ok (some true)))
-    ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_write req) Φ := by
-  unfold ConcurrencyInterfaceV1.sail_mem_write PreSail.sail_mem_write PreSail.emit writeAU
+    ⊢ swp cpu (ArchSem.sail_mem_write req) Φ := by
+  unfold ArchSem.sail_mem_write PreSail.sail_mem_write PreSail.emit writeAU
   iintro ⟨Hfrag, H⟩
   iloeb as IH
   iapply swp_event_step cpu (.memWrite n vasize req) (fun v => FreeM.pure v) Φ
@@ -616,9 +616,9 @@ theorem swp_sail_mem_read_excl_au_gen (cpu : CPU) {n vasize : Nat}
     ⊢@{IProp GF} ∀ r : Option Resv, resvFragAny cpu r -∗
     exclReadAU req.pa n (fun w =>
       iprop(resvFrag cpu (some (snapOf req.pa n w)) acq -∗ Φ (.Ok (w, none)))) -∗
-    swp cpu (ConcurrencyInterfaceV1.sail_mem_read req) Φ := by
+    swp cpu (ArchSem.sail_mem_read req) Φ := by
   subst hacq
-  unfold ConcurrencyInterfaceV1.sail_mem_read PreSail.sail_mem_read PreSail.emit exclReadAU
+  unfold ArchSem.sail_mem_read PreSail.sail_mem_read PreSail.emit exclReadAU
   have hif : akIfetch req.access_kind = false := by
     cases hh : akIfetch req.access_kind
     · rfl
@@ -704,7 +704,7 @@ theorem swp_sail_mem_read_excl_au (cpu : CPU) {n vasize : Nat}
     resvFragAny cpu r ∗
     exclReadAU req.pa n (fun w =>
       iprop(resvFrag cpu (some (snapOf req.pa n w)) acq -∗ Φ (.Ok (w, none))))
-    ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_read req) Φ := by
+    ⊢ swp cpu (ArchSem.sail_mem_read req) Φ := by
   iintro ⟨Hfrag, H⟩
   ihave HG := swp_sail_mem_read_excl_au_gen cpu req acq hk hacq hn Φ
   iapply HG $$ %r Hfrag H
@@ -717,8 +717,8 @@ theorem swp_sail_mem_write_excl_au (cpu : CPU) {n vasize : Nat}
     (Φ : Result (Option Bool) Arch.abort → IProp GF) :
     resvFrag cpu (some (snapOf req.pa n w0)) acq ∗
     exclWriteAU cpu req.pa n acq w0 w' iprop(resvFrag cpu none false -∗ Φ (.Ok (some true)))
-    ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_write req) Φ := by
-  unfold ConcurrencyInterfaceV1.sail_mem_write PreSail.sail_mem_write PreSail.emit exclWriteAU
+    ⊢ swp cpu (ArchSem.sail_mem_write req) Φ := by
+  unfold ArchSem.sail_mem_write PreSail.sail_mem_write PreSail.emit exclWriteAU
   iintro ⟨Hfrag, H⟩
   iloeb as IH
   iapply swp_event_step cpu (.memWrite n vasize req) (fun v => FreeM.pure v) Φ

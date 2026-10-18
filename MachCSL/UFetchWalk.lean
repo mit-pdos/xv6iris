@@ -34,7 +34,7 @@ noncomputable section
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
@@ -177,7 +177,7 @@ theorem uft_silent (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (m m' : SailM 
 theorem uft_leaf (D : UFoot) (o : UOrc) (s : UWSt) (n vasize : Nat)
     (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
     (hk : akIfetch req.access_kind = true) (hn : n < 2 ^ 64) (ho : bmOwned s.mm req.pa n = true) :
-    uftRun D o s (ConcurrencyInterfaceV1.sail_mem_read req) =
+    uftRun D o s (ArchSem.sail_mem_read req) =
       some (.Ok ((o 0).ch (.bitvector (8 * n)), none), s, o.tail) :=
   uftRun_sail_mem_read_ifetch D o s req hk hn ho
 

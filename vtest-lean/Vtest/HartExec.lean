@@ -21,7 +21,7 @@ import Vtest.XState
 
 namespace Vtest
 
-open MachCSL LeanRV64D Sail Sail.ConcurrencyInterfaceV1
+open MachCSL LeanRV64D Sail Sail.ArchSem
 open Sail.ArchSem (FreeM Effect)
 
 /-! ## The decidable forms of the relation's premises -/

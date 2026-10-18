@@ -30,7 +30,7 @@ import MachCSL.SmodeDevDefs
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 open Sail.ArchSem (FreeM)
 
@@ -95,9 +95,9 @@ theorem swp_sail_mem_read_dev (cpu : CPU) {n vasize : Nat}
     (hn : 0 < n) (hk : akPlain req.access_kind = true)
     (Ψ : BitVec (8 * n) → IProp GF) (Φ : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → IProp GF) :
     devReadAU d off n Ψ ∗ ▷ (∀ w, Ψ w -∗ Φ (.Ok (w, none)))
-    ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_read req) Φ := by
+    ⊢ swp cpu (ArchSem.sail_mem_read req) Φ := by
   subst hpa
-  unfold ConcurrencyInterfaceV1.sail_mem_read PreSail.sail_mem_read PreSail.emit devReadAU
+  unfold ArchSem.sail_mem_read PreSail.sail_mem_read PreSail.emit devReadAU
   iintro ⟨HAU, HΦ⟩
   have hk' : akIfetch req.access_kind = false ∧ akExcl req.access_kind = false := by
     unfold akPlain at hk
@@ -146,9 +146,9 @@ theorem swp_sail_mem_write_dev (cpu : CPU) {n vasize : Nat}
     (hn : 0 < n) (w' : BitVec (8 * n)) (hv : req.value = some w')
     (Ψ : IProp GF) (Φ : Result (Option Bool) Arch.abort → IProp GF) :
     devWriteAU d off n w' Ψ ∗ ▷ (Ψ -∗ Φ (.Ok (some true)))
-    ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_write req) Φ := by
+    ⊢ swp cpu (ArchSem.sail_mem_write req) Φ := by
   subst hpa
-  unfold ConcurrencyInterfaceV1.sail_mem_write PreSail.sail_mem_write PreSail.emit devWriteAU
+  unfold ArchSem.sail_mem_write PreSail.sail_mem_write PreSail.emit devWriteAU
   iintro ⟨HAU, HΦ⟩
   iapply swp_event_step cpu (.memWrite n vasize req) (fun v => FreeM.pure v) Φ
   iintro %σ Hσ

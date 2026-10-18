@@ -25,7 +25,7 @@ noncomputable section
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
@@ -152,8 +152,8 @@ theorem swp_sail_mem_read_ifetch_x (cpu : CPU) {n vasize : Nat}
     (ξ : CtxId) (K : Nat) (dq : DFrac) (w : BitVec (8 * n)) (hk : akIfetch req.access_kind = true)
     (Φ : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → IProp GF) :
     ctxBytesX ξ K req.pa n dq w ∗ iviewLb cpu K ∗ ▷ (ctxBytesX ξ K req.pa n dq w -∗ Φ (.Ok (w, none)))
-    ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_read req) Φ := by
-  unfold ConcurrencyInterfaceV1.sail_mem_read PreSail.sail_mem_read PreSail.emit
+    ⊢ swp cpu (ArchSem.sail_mem_read req) Φ := by
+  unfold ArchSem.sail_mem_read PreSail.sail_mem_read PreSail.emit
   iintro ⟨Hb, #Hiv, HΦ⟩
   have hex := akExcl_of_ifetch _ hk
   iapply swp_event cpu (.memRead n vasize req) (fun v => FreeM.pure v) Φ
@@ -206,8 +206,8 @@ theorem swp_sail_mem_read_plain_x (cpu : CPU) {n vasize : Nat}
     (Φ : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → IProp GF) :
     ownCtx cpu ξ ∗ ctxBytesX ξ K req.pa n dq w ∗
     ▷ (ownCtx cpu ξ -∗ ctxBytesX ξ K req.pa n dq w -∗ Φ (.Ok (w, none)))
-    ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_read req) Φ := by
-  unfold ConcurrencyInterfaceV1.sail_mem_read PreSail.sail_mem_read PreSail.emit
+    ⊢ swp cpu (ArchSem.sail_mem_read req) Φ := by
+  unfold ArchSem.sail_mem_read PreSail.sail_mem_read PreSail.emit
   iintro ⟨Hctx, Hb, HΦ⟩
   have hk' : akIfetch req.access_kind = false ∧ akExcl req.access_kind = false := by
     unfold akPlain at hk

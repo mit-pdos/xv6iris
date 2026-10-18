@@ -15,7 +15,7 @@ import MachCSL.Tactics
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 variable {GF : BundledGFunctors.{0}} [MachGS GF]
@@ -113,9 +113,9 @@ theorem swp_checked_mem_read_load8_conf [CurCtx] (cpu : CPU) (dq dq' : DFrac) (c
 
 /-- The translation mode in machine mode: Bare, at once. -/
 theorem swp_translationMode_M (cpu : CPU) (Φ : SATPMode → IProp GF) :
-    Φ SATPMode.Bare ⊢ swp cpu (translationMode Privilege.Machine) Φ := by
+    Φ SATPMode.Bare ⊢ swp cpu (satp_mode Privilege.Machine) Φ := by
   iintro HΦ
-  unfold translationMode
+  unfold satp_mode
   swp_run 20
   iexact HΦ
 

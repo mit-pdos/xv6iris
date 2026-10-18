@@ -31,7 +31,7 @@ import MachCSL.UMemMisTrv
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 /-- **The (low or only) part's translation faults**: the store's fault, at

@@ -20,7 +20,7 @@ noncomputable section
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
@@ -73,7 +73,7 @@ theorem uxw_text_some {X : Type} (orc : UOrc) (s : UWSt) {n vasize : Nat}
 theorem uxw_sail_mem_read_text (orc : UOrc) (s : UWSt) {n vasize : Nat}
     (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
     (hk : uxTextRead T req = true) (w : BitVec (8 * n)) (hw : bmRead T req.pa n = some w) :
-    uxRun D T orc s (ConcurrencyInterfaceV1.sail_mem_read req) = some (.Ok (w, none), s, orc) := by
+    uxRun D T orc s (ArchSem.sail_mem_read req) = some (.Ok (w, none), s, orc) := by
   show uxRun D T orc s (FreeM.impure (.ok (.memRead n vasize req)) FreeM.pure) = _
   rw [uxw_text_some D T orc s req _ hk w hw]
   rfl

@@ -18,7 +18,7 @@ noncomputable section
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 variable {GF : BundledGFunctors.{0}} [MachGS GF]
@@ -822,12 +822,12 @@ set_option maxHeartbeats 4000000 in
 theorem swp_translationMode_kpt (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool) (root : BitVec 44)
     (hok : SConfKpt (GF := GF) c root sie) (Φ : SATPMode → IProp GF) :
     confCells cpu dq Privilege.Supervisor c ∗ ▷ (confCells cpu dq Privilege.Supervisor c -∗ Φ SATPMode.Sv39)
-    ⊢ swp cpu (translationMode Privilege.Supervisor) Φ := by
+    ⊢ swp cpu (satp_mode Privilege.Supervisor) Φ := by
   iintro ⟨HmConf, HΦ⟩
   obtain ⟨⟨hpmp, hms, hpmm, hlpe⟩, hmode, hasid, hroot, hadue⟩ := hok
   obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
   conf_cases HmConf
-  unfold translationMode
+  unfold satp_mode
   swp_run 80
   conf_intro HmConf
   iapply HΦ $$ HmConf

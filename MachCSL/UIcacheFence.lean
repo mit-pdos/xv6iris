@@ -24,7 +24,7 @@ noncomputable section
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
@@ -45,8 +45,8 @@ def ifenceStep (cpu : CPU) (P : IProp GF) (Q : Nat → IProp GF) : IProp GF := i
 at the raised instruction view `K`, whose receipt is handed out. -/
 theorem swp_sail_barrier_fencei (cpu : CPU) (P : IProp GF) (Q : Nat → IProp GF) (Φ : Unit → IProp GF) :
     ifenceStep cpu P Q ∗ P ∗ ▷ (∀ K, iviewLb cpu K -∗ Q K -∗ Φ ()) ⊢
-      swp cpu (ConcurrencyInterfaceV1.sail_barrier .Barrier_RISCV_i) Φ := by
-  unfold ConcurrencyInterfaceV1.sail_barrier PreSail.sail_barrier PreSail.emit ifenceStep
+      swp cpu (ArchSem.sail_barrier .Barrier_RISCV_i) Φ := by
+  unfold ArchSem.sail_barrier PreSail.sail_barrier PreSail.emit ifenceStep
   iintro ⟨Hs, HP, HΦ⟩
   iapply swp_event cpu (.barrier .Barrier_RISCV_i) (fun v => FreeM.pure v) Φ (fun _ _ h => h)
   iintro %σ Hσ

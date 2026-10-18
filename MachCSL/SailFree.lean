@@ -4,7 +4,7 @@ MachCSL: the generic laws of lean-sail's free monad `Sail.ArchSem.FreeM`.
 The Sail model's monad is `SailM = FreeM ((Except (Sail.Error ue) InstructionEffect) ⊕ FinChoice)`
 (concurrency interface v2, lean-sail v7).  lean-sail ships the monad but not its laws; the
 vendored V1 runtime this tree used before the 0.16 bump had them
-(`Sail.ConcurrencyInterfaceV1.FreeMLemmas`), and this file is their home now: the two
+(`MachCSL.FreeMLemmas`), and this file is their home now: the two
 computation rules of `bind`, the right-unit and associativity laws, and the `LawfulMonad`
 instance that makes `pure_bind`/`bind_assoc` available to `simp`.
 -/

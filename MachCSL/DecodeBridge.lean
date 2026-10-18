@@ -28,7 +28,7 @@ noncomputable section
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
@@ -101,7 +101,7 @@ theorem swp_barrier_k (cpu : CPU) (bk : barrier_kind) {X : Type}
     (k : Unit → SailM X) (Φ : X → IProp GF) :
     ▷ swp cpu (k ()) Φ ⊢ swp cpu (FreeM.impure (.ok (.barrier bk)) k) Φ := by
   have e : (FreeM.impure (.ok (.barrier bk)) k : SailM X) =
-      (ConcurrencyInterfaceV1.sail_barrier bk >>= k) := rfl
+      (ArchSem.sail_barrier bk >>= k) := rfl
   rw [e]
   iintro H
   iapply swp_bind

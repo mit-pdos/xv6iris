@@ -25,7 +25,7 @@ import MachCSL.UExecCsrTabRW
 
 namespace MachCSL
 
-open Sail Sail.ConcurrencyInterfaceV1
+open Sail Sail.ArchSem
 open LeanRV64D LeanRV64D.Functions
 
 -- `uxrExc`/`uxrIll`/`uxrChk`/`uxrQuarter` live in `MachCSL.UExecCsrTabDefs`, the
