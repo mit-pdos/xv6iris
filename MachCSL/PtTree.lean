@@ -616,21 +616,24 @@ theorem PTree.walk_levels (t : PTree) (vpn : BitVec 27) (addr v : BitVec 64) (hw
 /-- The `tlb` register: 64 slots (`num_tlb_entries_exp = 6`). -/
 abbrev Tlb := Vector (Option TLB_Entry) (2 ^ 6)
 
-/-- The slot `vpn` hashes to. -/
+/-- The slot `vpn` hashes to (for supervisor-stage translation, whose stage code is 0). -/
 def tlbHash (vpn : BitVec 27) : Nat := (Sail.BitVec.extractLsb vpn 5 0).toNat
 
-theorem tlbHash_eq (vpn : BitVec 27) : tlb_hash 39 vpn = tlbHash vpn := by
+theorem tlbHash_eq (vpn : BitVec 27) :
+    tlb_hash 39 vpn TranslationStage.S_Stage = tlbHash vpn := by
   unfold tlb_hash tlbHash Sail.BitVec.toNatInt Functions.num_tlb_entries_exp
-  simp
+  simp [zero_extend, Sail.BitVec.zeroExtend]
 
 theorem tlbHash_lt (vpn : BitVec 27) : tlbHash vpn < 2 ^ 6 :=
   (Sail.BitVec.extractLsb vpn 5 0).isLt
 
-/-- The entry `add_to_TLB` builds for a level-0 walk, non-global. -/
+/-- The entry `add_to_TLB` builds for a level-0 supervisor-stage walk, non-global
+(`get_vmid S_Stage = 0`). -/
 def tlbEntryOf (asid : BitVec 16) (vpn : BitVec 27) (ppn : BitVec 44) (pte : BitVec 64)
     (addr : BitVec 64) : TLB_Entry :=
-  { asid := asid, global := false, pte := pte, pteAddr := physaddr.Physaddr addr,
-    levelMask := 0#45, vpn := sign_extend (m := 45) vpn, ppn := ppn }
+  { asid := asid, vmid := 0#14, stage := TranslationStage.S_Stage, global := false, pte := pte,
+    pteAddr := physaddr.Physaddr addr, levelMask := 0#47, vpn := sign_extend (m := 47) vpn,
+    ppn := ppn }
 
 theorem zext64_self (x : BitVec 64) : zero_extend (m := 64) x = x := by
   unfold zero_extend Sail.BitVec.zeroExtend; simp
@@ -657,7 +660,7 @@ theorem tlb_get_ppn_tlbEntryOf (asid : BitVec 16) (vpn : BitVec 27) (ppn : BitVe
   simp
 
 /-- A cached level-0 entry has an empty level mask, so its level is 0. -/
-theorem tlb_get_level_zero (ent : TLB_Entry) (h : ent.levelMask = 0#45) :
+theorem tlb_get_level_zero (ent : TLB_Entry) (h : ent.levelMask = 0#47) :
     tlb_get_level 39 ent = 0 := by
   unfold tlb_get_level; simp only [h]; decide +kernel
 
@@ -665,12 +668,14 @@ theorem tlb_get_level_tlbEntryOf (asid : BitVec 16) (vpn : BitVec 27) (ppn : Bit
     (pte addr : BitVec 64) : tlb_get_level 39 (tlbEntryOf asid vpn ppn pte addr) = 0 :=
   tlb_get_level_zero _ rfl
 
-/-- A cached entry matches exactly its own `vpn` (ASID 0, not global). -/
+/-- A cached entry matches exactly its own `vpn` (ASID 0, not global), under the
+supervisor-stage lookup (VMID 0, stage `S_Stage`). -/
 theorem match_tlbEntryOf (vpn vpn' : BitVec 27) (ppn : BitVec 44) (pte addr : BitVec 64) :
-    match_TLB_Entry (tlbEntryOf 0#16 vpn ppn pte addr) 0#16 (sign_extend (m := 45) vpn')
-      = decide (vpn' = vpn) := by
+    match_TLB_Entry (tlbEntryOf 0#16 vpn ppn pte addr) 0#16 0#14 (sign_extend (m := 47) vpn')
+      TranslationStage.S_Stage = decide (vpn' = vpn) := by
   unfold match_TLB_Entry tlbEntryOf
-  simp only [sign_extend, Sail.BitVec.signExtend]
+  simp only [show (TranslationStage.S_Stage == TranslationStage.S_Stage) = true from rfl,
+    Bool.and_true, sign_extend, Sail.BitVec.signExtend]
   bv_decide
 
 theorem tlb_set_pte_tlbEntryOf (asid : BitVec 16) (vpn : BitVec 27) (ppn : BitVec 44)
