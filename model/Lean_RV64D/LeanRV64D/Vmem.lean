@@ -405,8 +405,6 @@ def xatp_to_ppn (stage : TranslationStage) : SailM (BitVec 44) := do
 
 def translate_PTE_addr_mutrec_vv_zG_Stagev (pte_addr : (BitVec 64)) (access : (MemoryAccessType mem_payload)) (ext_ptw : Unit) : (Result (physaddr × page_based_mem_type × Unit) (PTW_Error × Unit)) :=
   (Ok ((Physaddr pte_addr), PBMT_PMA, ext_ptw))
-termination_by (let (_, _, _) := (pte_addr, access, ext_ptw)
-1000).toNat
 
 /-- Type quantifiers: level : Nat, k_ex555662_ : Bool, k_ex555663_ : Bool, sv_width : Nat, (is_sv_or_svx4_mode
   sv_width), 0 ≤ level ∧
@@ -456,9 +454,6 @@ def update_and_write_pte_mutrec_vvvvvv_zUservv_zG_Stagev (sv_width : Nat) (vpn :
                         (internal_error "sys/vmem.sail" 271 "PTE conditional write failed")
                       | .Err _ => (pure (Err ((PTW_No_Access ()), ext_ptw)))))))
       else (pure (Err ((PTW_PTE_Needs_Update ()), ext_ptw))))
-termination_by (let (_, _, _, _, _, _, _, _, _) :=
-  (sv_width, vpn, pteAddr, pte, level, access, mxr, do_sum, ext_ptw)
-1000).toNat
 
 /-- Type quantifiers: k_ex555681_ : Bool, k_ex555682_ : Bool, tlb_index : Nat, sv_width : Nat, (is_sv_or_svx4_mode
   sv_width), 0 ≤ tlb_index ∧ tlb_index ≤ (2 ^ 6 - 1) -/
@@ -635,9 +630,6 @@ def pt_walk_mutrec_vvv_zUservvvvF_zG_Stagev (sv_width : Nat) (vpn : (BitVec (sv_
                    level := level
                    pbmt := pbmt
                    global := global }, ext_ptw))))))
-termination_by (let (_, _, _, _, _, _, level, _) :=
-  (sv_width, vpn, access, mxr, do_sum, pt_base, level, ext_ptw)
-level).toNat
 
 /-- Type quantifiers: k_ex555689_ : Bool, k_ex555690_ : Bool, sv_width : Nat, (is_sv_or_svx4_mode
   sv_width) -/
@@ -722,8 +714,6 @@ def translate_PTE_addr (pte_addr : (BitVec 64)) (access : (MemoryAccessType mem_
       | .Ok (pa, pbmt, ext_ptw) => (pure (Ok ((Physaddr pa), pbmt, ext_ptw)))
       | .Err (f, ext_ptw) => (pure (Err (f, ext_ptw))))
   else (pure (Ok ((Physaddr pte_addr), PBMT_PMA, ext_ptw)))
-termination_by (let (_, _, _, _) := (pte_addr, access, stage, ext_ptw)
-1000).toNat
 
 /-- Type quantifiers: k_ex1173285_ : Bool, level : Nat, k_ex1173283_ : Bool, k_ex1173282_ : Bool, sv_width
   : Nat, (is_sv_or_svx4_mode sv_width), 0 ≤ level ∧
@@ -849,9 +839,6 @@ def update_and_write_pte (sv_width : Nat) (vpn : (BitVec (sv_width - 12))) (pteA
                         (internal_error "sys/vmem.sail" 271 "PTE conditional write failed")
                       | .Err _ => (pure (Err ((PTW_No_Access ()), ext_ptw)))))))
       else (pure (Err ((PTW_PTE_Needs_Update ()), ext_ptw))))
-termination_by (let (_, _, _, _, _, _, _, _, _, _, _) :=
-  (sv_width, vpn, pteAddr, pte, level, access, priv, mxr, do_sum, stage, ext_ptw)
-1000).toNat
 
 /-- Type quantifiers: tlb_index : Nat, k_ex1173302_ : Bool, k_ex1173301_ : Bool, sv_width : Nat, (is_sv_or_svx4_mode
   sv_width), 0 ≤ tlb_index ∧ tlb_index ≤ (2 ^ 6 - 1) -/

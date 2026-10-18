@@ -35,11 +35,13 @@
 # (which the backend gives no equality).
 #
 # Requires on PATH: `sail` with `sail_lean_backend` built from the fork
-# dongjaelee1/sail, branch `xv6` (merge d7222d57), = rems-project/sail master
-# $SAIL_REV with three Lean-backend fixes on top: the escaping of the Lean
+# dongjaelee1/sail, branch `xv6` (merge b49c997e), = rems-project/sail master
+# $SAIL_REV with four Lean-backend fixes on top: the escaping of the Lean
 # command keywords `prefix`, `infix`, `notation`, ... in identifiers (ours;
-# sail-riscv's DeviceTree has a parameter named `prefix`), and two still-
-# unmerged fixes from github.com/zeldovich/sail:
+# sail-riscv's DeviceTree has a parameter named `prefix`), `termination_by`
+# only on a definition that calls itself (ours; Lean warns about the measure
+# of a non-recursive one, and the specialised copies of the two-stage page
+# walk have one), and two still-unmerged fixes from github.com/zeldovich/sail:
 #   3c03fced  "Lean: make boolean & and | short-circuit with effectful
 #             operands" (upstream PR #1750; without it the backend hoists an
 #             effectful right operand of `&`/`|` out of the condition and
@@ -67,8 +69,8 @@ SAIL_RISCV_REV="${SAIL_RISCV_REV:-d2cb43fcc6fac8f459e7d7725e600e771a67c547}"
 SAIL_RISCV_DIR="${1:-${SAIL_RISCV_DIR:-$REPO_ROOT/sail-riscv}}"
 case "$SAIL_RISCV_DIR" in /*) ;; *) SAIL_RISCV_DIR="$PWD/$SAIL_RISCV_DIR" ;; esac
 # the Sail compiler this model was generated with (informational; checked by name only):
-# upstream master $SAIL_REV; the built branch is dongjaelee1/sail `xv6` = that + the three fixes
-# (merge d7222d57393313a35dd2b8d74b8ae640d770e9c1)
+# upstream master $SAIL_REV; the built branch is dongjaelee1/sail `xv6` = that + the four fixes
+# (merge b49c997e91215c561f928d01f5bdadc0b8f406af)
 SAIL_REV="e49821011450d2c26dad90e8806fc82d9698b627"
 # lean-sail: the revision the generated lakefile requires (= the root lakefile.toml's)
 LEAN_SAIL_GIT="https://github.com/rems-project/lean-sail"
