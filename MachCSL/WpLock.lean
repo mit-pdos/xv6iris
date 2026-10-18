@@ -1268,7 +1268,14 @@ theorem wp_s_amoswap_lock_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
       · iintro Hctx
         icases ownCtx_gate cpu curCtx $$ [Hctx Hgf] with ⟨Hctx, #Hgp⟩
         · iframe Hctx; iexact Hgf
-        unfold amoAU exclReadAU
+        icases ownCtx_lkFloor_vis cpu lo $$ [Hctx Hflo] with ⟨Hctx, ⟨%K, %ts, #HK, #Hts, %_⟩⟩
+        · iframe Hctx; iexact Hflo
+        iexists K, ts
+        isplit
+        · iexact HK
+        unfold amoAUS exclReadAUS
+        isplitl []
+        · iexact Hts
         iinv Hinv with Hbody Hclose
         icases Hbody with ⟨Hbody | >Hdead⟩
         rotate_left
@@ -1278,12 +1285,38 @@ theorem wp_s_amoswap_lock_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
         icases wordCellH_cases lk 4 W $$ Hw with ⟨%Hold, Hb, %htail⟩
         iapply fupd_mask_intro LawfulSet.empty_subset
         iintro Hmask
-        iexists (fun _ => DFrac.own (1 : Qp).half), W.hist Hold
+        iexists (fun _ => DFrac.own (1 : Qp).half), W.hist Hold, []
         iframe Hb
         isplit
         · ipureintro; exact fun j hj => WordHist.hist_ne_nil W Hold htail j hj
+        isplitl []
+        · iapply rdCompBytes_nil
+        isplitl []
+        · iapply Lock.rsv_certs4 cpu lk hm K ts _
         inext
-        iintro %w0 %hheads Hb
+        isplit
+        rotate_left
+        · -- a STALE read half (narrow δ1 [OWN.105]): the lock is untouched; only a value-preserving
+          -- swap (the word read was 1) completes, silently -- a failed iteration
+          iintro %w0 %tvn %_ %_ %_ Hb _
+          imod Hmask
+          ihave Hcl := Hclose $$ [Hb Hc Hhalf Hfr Harm]
+          case' _ =>
+            inext
+            ileft
+            iexists W, W', st, B
+            iframe Hc Hhalf Hfr Harm
+            isplitl [Hb]
+            · iapply wordCellH_intro lk 4 W Hold htail
+              iexact Hb
+            · ipureintro; exact ⟨hst, hx⟩
+          imod Hcl
+          imodintro
+          iintro %hw0
+          subst hw0
+          rw [acqLocks_ne s k.locks (by decide), acqPost_ne γ R cpu tl (by decide)]
+          iframe Hctx Hlocks Hcred
+        iintro %w0 %hheads Hb _
         imod Hmask
         ihave Hcl := Hclose $$ [Hb Hc Hhalf Hfr Harm]
         case' _ =>
@@ -1498,22 +1531,71 @@ theorem wp_s_amoswap_lock_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
       · iintro Hctx
         icases ownCtx_gate cpu curCtx $$ [Hctx Hgf] with ⟨Hctx, #Hgp⟩
         · iframe Hctx; iexact Hgf
-        unfold amoAU exclReadAU
+        icases ownCtx_lkFloor_vis cpu lo $$ [Hctx Hflo] with ⟨Hctx, ⟨%K, %ts, #HK, #Hts, %hvis⟩⟩
+        · iframe Hctx; iexact Hflo
+        icases Lock.key_certs cpu lo $$ [Hctx Hflo] with ⟨Hctx, #Hkc⟩
+        · iframe Hctx; iexact Hflo
+        iexists K, ts
+        isplit
+        · iexact HK
+        unfold amoAUS exclReadAUS
+        isplitl []
+        · iexact Hts
         iinv Hinv with Hbody Hclose
         icases Hbody with ⟨Hbody | >Hdead⟩
         rotate_left
         · iexfalso; iapply hrefute $$ Hcred Hdead
         unfold lockBody
-        icases Hbody with ⟨%W, %W', %st, %B, >Hw, Hc, >%hst, Hhalf, Hfr, Hnm, Harm⟩
+        icases Hbody with ⟨%W, %W', %st, %B, >Hw, >Hc, >%hst, Hhalf, Hfr, >Hnm, Harm⟩
         icases wordCell_cases lk 4 lo 0 W $$ Hw with ⟨%Hold, Hb, %htail⟩
+        icases wordCell_cases (lk + 16#64) 8 lc 0 W' $$ Hc with ⟨%HoldC, HbC, %htailC⟩
+        icases Lock.dyn_certs4' cpu lk K ts st W W' Hold HoldC lo lc (DFrac.own 1) htail htailC hvis $$ [Hnm]
+          with ⟨Hnm, #Hcert⟩
+        · iframe Hnm; iexact Hkc
         iapply fupd_mask_intro LawfulSet.empty_subset
         iintro Hmask
-        iexists (fun _ => DFrac.own 1), W.hist Hold
+        iexists (fun _ => DFrac.own 1), W.hist Hold, [(lk + 16#64, 8, DFrac.own 1, W'.hist HoldC)]
         iframe Hb
         isplit
         · ipureintro; exact fun j hj => WordHist.hist_ne_nil W Hold htail j hj
+        isplitl [HbC]
+        · unfold rdCompBytes
+          iapply BigSepL.bigSepL_cons.2
+          isplitl [HbC]
+          · iexact HbC
+          · exact BigSepL.bigSepL_nil_intro
+        isplitl []
+        · iexact Hcert
         inext
-        iintro %w0 %hheads Hb
+        isplit
+        rotate_left
+        · -- a STALE read half (narrow δ1 [OWN.105]): the lock is untouched; only a value-preserving
+          -- swap (the word read was 1) completes, silently -- a failed iteration
+          iintro %w0 %tvn %_ %_ %_ Hb HcC
+          unfold rdCompBytes
+          icases BigSepL.bigSepL_cons.1 $$ HcC with ⟨HbC, _⟩
+          ihave Hc := wordCell_intro (lk + 16#64) 8 lc 0 W' HoldC htailC $$ HbC
+          imod Hmask
+          ihave Hcl := Hclose $$ [Hb Hc Hhalf Hfr Hnm Harm]
+          case' _ =>
+            inext
+            ileft
+            iexists W, W', st, B
+            iframe Hc Hhalf Hfr Hnm Harm
+            isplitl [Hb]
+            · iapply wordCell_intro lk 4 lo 0 W Hold htail
+              iexact Hb
+            · ipureintro; exact hst
+          imod Hcl
+          imodintro
+          iintro %hw0
+          subst hw0
+          rw [acqLocks_ne s k.locks (by decide), acqPost_ne γ R cpu tl (by decide)]
+          iframe Hctx Hlocks Hcred
+        iintro %w0 %hheads Hb HcC
+        unfold rdCompBytes
+        icases BigSepL.bigSepL_cons.1 $$ HcC with ⟨HbC, _⟩
+        ihave Hc := wordCell_intro (lk + 16#64) 8 lc 0 W' HoldC htailC $$ HbC
         imod Hmask
         ihave Hcl := Hclose $$ [Hb Hc Hhalf Hfr Hnm Harm]
         case' _ =>

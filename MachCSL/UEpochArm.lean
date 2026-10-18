@@ -460,6 +460,10 @@ theorem swp_sail_mem_write_excl_upt (cpu : CPU) {vasize : Nat}
   iapply swp_event_step cpu (.memWrite 8 vasize req) (fun v => FreeM.pure v) Φ
   iintro %σ Hσ
   icases machInterp_acc_memU σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Huep, Hclose⟩
+  ihave %hrdw : ⌜∀ tvn, σ.tv cpu ≤ tvn → σ.mem.readBytes (hartAgent cpu) tvn req.pa 8 w⌝
+      $$ [Hmm Hctx Hmem Hb]
+  · iapply ctxBytes_readable σ cpu ξ req.pa 8 _ w $$ [Hmm Hctx Hmem Hb]
+    iframe
   ihave %hsv : ⌜σ.regs cpu Register.satp = s⌝ $$ [Hregs Hs]
   · icases reg_valid cpu (σ.regs cpu) Register.satp dqs s $$ [$Hregs $Hs] with %_
     itrivial
@@ -526,14 +530,45 @@ theorem swp_sail_mem_write_excl_upt (cpu : CPU) {vasize : Nat}
   iintro Hmask
   isplit
   · ipureintro
-    by_cases hno : othersReserve σ.resv cpu req.pa 8
-    · exact Or.inr ⟨σ, hno, rfl⟩
-    · exact Or.inl ⟨.Ok (some true), _, Or.inr ⟨hram, w', hv, hno, rfl, rfl⟩⟩
+    by_cases hsf : σ.staleFree cpu req.access_kind
+    · by_cases hno : othersReserve σ.resv cpu req.pa 8
+      · exact Or.inr ⟨σ, Or.inl hno, rfl⟩
+      · exact Or.inl ⟨.Ok (some true), _, Or.inr (Or.inl ⟨hram, w', hv, hno, hsf, rfl, rfl⟩)⟩
+    · by_cases hs : σ.silentOk cpu req.pa 8 req.access_kind req.value
+      · exact Or.inl ⟨.Ok (some true), _, Or.inr (Or.inr ⟨hs, rfl, rfl⟩)⟩
+      · exact Or.inr ⟨σ, Or.inr ⟨hram, hsf, hs⟩, rfl⟩
   inext
   iintro %σ'
   isplit
   · iintro %v %Hev
-    rcases Hev with ⟨hdev, w₀, ds₀, _, hdw, _, _⟩ | ⟨_, w'', hv', hno, rfl, rfl⟩
+    rcases Hev with ⟨hdev, w₀, ds₀, _, hdw, _, _⟩ | ⟨_, w'', hv', hno, _, rfl, rfl⟩ | ⟨hsil, rfl, rfl⟩
+    rotate_right
+    · -- the SILENT write of a stale pair (narrow δ1 [OWN.105]): it stores the bytes the hart
+      -- reads -- the owned value -- so nothing moves
+      obtain ⟨_, _, _, _, w1, hv1, _, tv', htv', _, hrd1⟩ := hsil
+      rw [hv] at hv1
+      obtain rfl := Option.some.inj hv1
+      obtain rfl := readBytes_unique _ _ _ _ _ _ _ (hrdw tv' htv') hrd1
+      icases resvFragAny_cases cpu r $$ Hfrag with ⟨%b, Hfrag⟩
+      imod memModel_store_silent _ σ cpu r b $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag⟩
+      ihave Hb := Wb $$ Hh'
+      ihave Hd0 := uslotCell_close e.K (0, d0) req.pa hd0a _ hk0 $$ Hh0
+      ihave Hslots := HslotsC $$ Hd0
+      ihave Huep := HcloseU $$ %(σ.storeSilent cpu) %k %⟨fun c _ => ⟨rfl, rfl⟩, fun _ => Nat.le_refl _, Or.inl rfl⟩
+        Hk [Htext Hslots]
+      · iexists some e
+        isplitr
+        · ipureintro; exact hl
+        rw [uepCellsAt_some]
+        unfold uepCellsE
+        iframe Hiv Htext Hslots
+        ipureintro; exact hf
+      imod Hmask
+      imodintro
+      isplitl [Hregs Hmem Hmm Huep Hclose]
+      · iapply Hclose $$ %(σ.storeSilent cpu) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm Huep
+      · iapply swp_ret
+        iapply HΦ $$ Hctx Hfrag Hb H2 H1 Hs Hp
     · exact absurd hdev (not_devBytes_of_ramBytes hram (devWrite_pos hdw))
     rw [hv] at hv'
     obtain rfl := Option.some.inj hv'

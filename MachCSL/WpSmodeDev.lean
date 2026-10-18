@@ -175,7 +175,9 @@ theorem swp_sail_mem_write_dev (cpu : CPU) {n vasize : Nat}
   iintro %σ'
   isplit
   · iintro %v %Hev
-    rcases Hev with ⟨_, w₀, ds₀, hv', hdw', rfl, rfl⟩ | ⟨hr, _⟩
+    rcases Hev with ⟨_, w₀, ds₀, hv', hdw', rfl, rfl⟩ | ⟨hr, _⟩ | ⟨⟨hr, _⟩, _⟩
+    rotate_right
+    · exact absurd hr (not_ramBytes_of_devBytes hdev hn)
     · rw [hv] at hv'
       obtain rfl := Option.some.inj hv'
       rw [hdw] at hdw'
@@ -189,7 +191,9 @@ theorem swp_sail_mem_write_dev (cpu : CPU) {n vasize : Nat}
         iapply HΦ $$ HΨ
     · exact absurd hr (not_ramBytes_of_devBytes hdev hn)
   · iintro %Hbk
-    exact absurd Hbk.1 hnb
+    rcases Hbk.1 with h | ⟨hr, _⟩
+    · exact absurd h hnb
+    · exact absurd hr (not_ramBytes_of_devBytes hdev hn)
 
 /-! ## The physical stage: a byte through the PMA, PMP and MMIO checks -/
 

@@ -487,13 +487,14 @@ theorem evStep_wire (cpu : CPU) (o : Sail.ConcurrencyInterfaceV1.Outcome LeanRV6
   cases o
   case memRead n _ req =>
     rcases h with ⟨_, w, ds', hr, _, rfl⟩ | ⟨_, _, _, _, _, _, _, _, rfl⟩ |
-      ⟨_, _, _, _, _, _, _, _, _, rfl⟩ | ⟨_, _, _, _, _, _, rfl⟩
+      ⟨_, _, _, _, _, _, _, _, _, rfl⟩ |
+      ⟨_, _, _, ⟨_, _, _, rfl⟩ | ⟨_, _, _, _, _, _, _, _, _, rfl⟩⟩
     · exact devRead_wire _ _ _ _ _ hr j
     all_goals rfl
   case memWrite n _ req =>
-    rcases h with ⟨_, w, ds', _, hw, _, rfl⟩ | ⟨_, _, _, _, _, rfl⟩
+    rcases h with ⟨_, w, ds', _, hw, _, rfl⟩ | ⟨_, _, _, _, _, _, rfl⟩ | ⟨_, _, rfl⟩
     · exact devWrite_wire _ _ _ _ _ hw j
-    · rfl
+    all_goals rfl
   case readRam => exact h.elim
   case writeRam => exact h.elim
   case regRead => obtain ⟨_, rfl⟩ := h; rfl
@@ -522,13 +523,14 @@ theorem evStep_recvd (cpu : CPU) (o : Sail.ConcurrencyInterfaceV1.Outcome LeanRV
   cases o
   case memRead n _ req =>
     rcases h with ⟨_, w, ds', hr, _, rfl⟩ | ⟨_, _, _, _, _, _, _, _, rfl⟩ |
-      ⟨_, _, _, _, _, _, _, _, _, rfl⟩ | ⟨_, _, _, _, _, _, rfl⟩
+      ⟨_, _, _, _, _, _, _, _, _, rfl⟩ |
+      ⟨_, _, _, ⟨_, _, _, rfl⟩ | ⟨_, _, _, _, _, _, _, _, _, rfl⟩⟩
     · exact devRead_recvd _ _ _ _ _ hr j
     all_goals rfl
   case memWrite n _ req =>
-    rcases h with ⟨_, w, ds', _, hw, _, rfl⟩ | ⟨_, _, _, _, _, rfl⟩
+    rcases h with ⟨_, w, ds', _, hw, _, rfl⟩ | ⟨_, _, _, _, _, _, rfl⟩ | ⟨_, _, rfl⟩
     · exact devWrite_recvd _ _ _ _ _ hw j
-    · rfl
+    all_goals rfl
   case readRam => exact h.elim
   case writeRam => exact h.elim
   case regRead => obtain ⟨_, rfl⟩ := h; rfl

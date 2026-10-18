@@ -661,10 +661,10 @@ theorem memFrame {c c' : Wpcfg Pexv6 Efab} {st rest : List (Nat × Wlabel)} {i :
     (hadj : pairAdjacent (st ++ (i, l) :: rest)) (hR : rmem c st σ)
     (hV : viewRel TsoShadow.cohSrc σ st) (hA : c.pcLog.map Wmsg.wmTid = (stAuthors st).map some)
     (hC : ownCoh c) (hmem : σ'.mem = σ.mem) (hlog : σ'.log = σ.log) (hres : σ'.resv = σ.resv)
-    (hsr : sameRead σ σ') :
+    (hsr : sameRead σ σ') (hxs : σ'.xstale = σ.xstale := by rfl) :
     rmem c' (st ++ [(i, l)]) σ' ∧ viewRel TsoShadow.cohSrc σ' (st ++ [(i, l)]) ∧
       c'.pcLog.map Wmsg.wmTid = (stAuthors (st ++ [(i, l)])).map some ∧ ownCoh c' := by
-  refine ⟨(pfFrameRowMem pstepEv pclsEv c c' st rest σ i l hR hs hl hadj).2.2 σ' hmem hlog hres,
+  refine ⟨(pfFrameRowMem pstepEv pclsEv c c' st rest σ i l hR hs hl hadj).2.2 σ' hmem hlog hres hxs,
     ?_, authStep hs hA, ownCohStep pstepEv pclsEv i l c c' hC hs⟩
   rcases hin with hin | rfl
   · exact viewRelInert _ σ σ' st i l hin hV hsr
@@ -674,14 +674,18 @@ theorem memFrame {c c' : Wpcfg Pexv6 Efab} {st rest : List (Nat × Wlabel)} {i :
 arm is `σ.dropResv cpu`, the pf twin's `instrPost` clears `wRes` alike). -/
 theorem rmemDropResv {P D : Type} {c : Wpcfg P D} {st : List (Nat × Wlabel)} {σ : MState} (cpu : CPU)
     (h : rmem c st σ) : rmem c st (σ.dropResv cpu) := by
-  obtain ⟨hl, hi, hh, hr⟩ := h
-  refine ⟨hl, hi, hh, fun c' => ?_⟩
-  by_cases hc : c' = cpu
-  · subst hc
-    left
-    simp [updCpu]
-  · have := hr c'
-    simpa [updCpu, hc] using this
+  obtain ⟨hl, hi, hh, hr, hx⟩ := h
+  refine ⟨hl, hi, hh, fun c' => ?_, fun c' => ?_⟩
+  · by_cases hc : c' = cpu
+    · subst hc
+      left
+      simp [updCpu]
+    · have := hr c'
+      simpa [updCpu, hc] using this
+  · by_cases hc : c' = cpu
+    · subst hc
+      simp [updCpu]
+    · simpa [updCpu, hc] using hx c'
 
 /-! ## The hypotheses W4 is parametric in -/
 
@@ -810,14 +814,15 @@ theorem evStepShape (cpu : CPU) (o : Outcome Register RegisterType) (σ σ' : MS
   | memRead n va req =>
     have hda := hR n va req rfl
     rcases h with ⟨-, w, ds', hdr, -, -⟩ | ⟨-, -, -, -, -, -, -, -, rfl⟩ |
-        ⟨-, -, -, -, -, -, -, -, -, rfl⟩ | ⟨-, -, -, -, -, -, rfl⟩
+        ⟨-, -, -, -, -, -, -, -, -, rfl⟩ |
+        ⟨-, -, -, ⟨-, -, -, rfl⟩ | ⟨-, -, -, -, -, -, -, -, -, rfl⟩⟩
     · rw [devReadNone _ _ _ hda] at hdr; cases hdr
     all_goals exact ⟨rfl, rfl, rfl⟩
   | memWrite n va req =>
     have hda := hW n va req rfl
-    rcases h with ⟨-, w, ds', -, hdw, -, -⟩ | ⟨-, w, -, -, -, rfl⟩
+    rcases h with ⟨-, w, ds', -, hdw, -, -⟩ | ⟨-, w, -, -, -, -, rfl⟩ | ⟨-, -, rfl⟩
     · rw [devWriteNone _ _ _ _ hda] at hdw; cases hdw
-    · exact ⟨rfl, rfl, rfl⟩
+    all_goals exact ⟨rfl, rfl, rfl⟩
   | regRead r => obtain ⟨-, rfl⟩ := h; exact ⟨rfl, rfl, rfl⟩
   | regWrite r v => subst h; exact ⟨rfl, rfl, rfl⟩
   | readRam => exact h.elim
@@ -852,11 +857,12 @@ theorem ramOfSafe {g : GState} {cpu : CPU} {o : Outcome Register RegisterType}
         all_goals exact hb
       · exact absurd hor (hno _ _)
     · subst ho
-      rcases hh with ⟨v, -, hev⟩ | ⟨⟨hor, -⟩, -⟩
-      · rcases hev with ⟨-, w, ds', -, hdw, -, -⟩ | ⟨hb, -⟩
+      rcases hh with ⟨v, -, hev⟩ | ⟨⟨hor | hsb, -⟩, -⟩
+      · rcases hev with ⟨-, w, ds', -, hdw, -, -⟩ | ⟨hb, -⟩ | ⟨⟨hb, -⟩, -⟩
         · rw [devWriteNone _ _ _ _ hda] at hdw; cases hdw
-        · exact hb
+        all_goals exact hb
       · exact absurd hor (hno _ _)
+      · exact hsb.1
   · exact absurd hlive hd
 
 /-- A DRAM byte is no device address. -/
@@ -885,11 +891,12 @@ theorem devOfSafe {g : GState} {cpu : CPU} {o : Outcome Register RegisterType}
         all_goals exact ramNotDev hb hda
       · exact absurd hor (hno _ _)
     · subst ho
-      rcases hh with ⟨v, -, hev⟩ | ⟨⟨hor, -⟩, -⟩
-      · rcases hev with ⟨hb, -⟩ | ⟨hb, -⟩
+      rcases hh with ⟨v, -, hev⟩ | ⟨⟨hor | hsb, -⟩, -⟩
+      · rcases hev with ⟨hb, -⟩ | ⟨hb, -⟩ | ⟨⟨hb, -⟩, -⟩
         · exact hb
-        · exact ramNotDev hb hda
+        all_goals exact ramNotDev hb hda
       · exact absurd hor (hno _ _)
+      · exact ramNotDev hsb.1 hda
   · exact absurd hlive hd
 
 /-! ## `R-dev` through the hart MMIO transactions and the UART / PLIC programs (F9) -/
@@ -1486,7 +1493,7 @@ theorem simWire {c c' : Wpcfg Pexv6 Efab}
   have hrun := mrunOne (t := t) (j := plicThr) (by rw [ht]; exact poolPlic H c.pcDev vs) hst
   obtain ⟨hpm, hpl', hpr, hpsr, hpd, hpc, hpo⟩ := pinMFields g.m cpu mm b
   obtain ⟨hm1, hv1, ha1, hc1⟩ := memFrame (σ' := pinM g.m cpu mm b) hs trivial (Or.inl rfl) hadj
-    hmem hview hauth hcoh hpm hpl' hpr hpsr
+    hmem hview hauth hcoh hpm hpl' hpr hpsr (by unfold pinM; split <;> rfl)
   refine ⟨1, t.set plicThr (.dev 0 .plic rootTask (kp ())), { g with m := pinM g.m cpu mm b },
     Nat.le_refl _, by simpa [pfStepObs] using hrun, hgen, hpow,
     ⟨H, vs, dp, dws, dpr, ?_, by rw [hags, List.length_set, hlen], fun c'' => ?_, ?_, ?_⟩,
@@ -1637,25 +1644,26 @@ structure DevOnly (σ σ' : MState) : Prop where
   log : σ'.log = σ.log
   resv : σ'.resv = σ.resv
   read : sameRead σ σ'
+  xs : σ'.xstale = σ.xstale
 
-theorem devOnlyRefl (σ : MState) : DevOnly σ σ := ⟨rfl, rfl, rfl, rfl, sameReadRefl σ⟩
+theorem devOnlyRefl (σ : MState) : DevOnly σ σ := ⟨rfl, rfl, rfl, rfl, sameReadRefl σ, rfl⟩
 
 theorem devOnlyTrans {σ1 σ2 σ3 : MState} (h1 : DevOnly σ1 σ2) (h2 : DevOnly σ2 σ3) :
     DevOnly σ1 σ3 :=
   ⟨h2.regs.trans h1.regs, h2.mem.trans h1.mem, h2.log.trans h1.log, h2.resv.trans h1.resv,
-    sameReadTrans h1.read h2.read⟩
+    sameReadTrans h1.read h2.read, h2.xs.trans h1.xs⟩
 
 theorem devOnlySetDev (σ : MState) (d : DevId) (s : DevSt d) : DevOnly σ (σ.setDev d s) :=
-  ⟨rfl, rfl, rfl, rfl, sameReadSetDev σ d s⟩
+  ⟨rfl, rfl, rfl, rfl, sameReadSetDev σ d s, rfl⟩
 
 theorem devOnlySetRt (σ : MState) (d : DevId) (rt : DevRt) : DevOnly σ (σ.setRt d rt) :=
-  ⟨rfl, rfl, rfl, rfl, sameReadSetRt σ d rt⟩
+  ⟨rfl, rfl, rfl, rfl, sameReadSetRt σ d rt, rfl⟩
 
 theorem rmemCongr {c : Wpcfg Pexv6 Efab} {st : List (Nat × Wlabel)} {σ σ' : MState}
     (h : rmem c st σ) (hd : DevOnly σ σ') : rmem c st σ' := by
-  obtain ⟨⟨h1, h2⟩, h3, h4, h5⟩ := h
+  obtain ⟨⟨h1, h2⟩, h3, h4, h5, h6⟩ := h
   refine ⟨⟨by rw [hd.log]; exact h1, by rw [hd.log]; exact h2⟩, h3, by rw [hd.mem]; exact h4,
-    fun cpu => by rw [hd.resv]; exact h5 cpu⟩
+    fun cpu => by rw [hd.resv]; exact h5 cpu, fun cpu => by rw [hd.xs]; exact h6 cpu⟩
 
 /-- **The disk's frame rows** (`DRead`, `DFence`, `LDev`, `LSilent`): the MachCSL state with the
 same memory fields is related (W2a `pfFrameRowMem`, W2b `viewRelForeign`). -/
@@ -1664,7 +1672,7 @@ theorem diskFrame {c c' : Wpcfg Pexv6 Efab} {st rest : List (Nat × Wlabel)} {l 
     (hadj : pairAdjacent (st ++ (NCPU, l) :: rest)) (hR : rmem c st σ)
     (hV : viewRel TsoShadow.cohSrc σ st) (hd : DevOnly σ σ') :
     rmem c' (st ++ [(NCPU, l)]) σ' ∧ viewRel TsoShadow.cohSrc σ' (st ++ [(NCPU, l)]) :=
-  ⟨(pfFrameRowMem pstepEv pclsEv c c' st rest σ NCPU l hR hs hl hadj).2.2 σ' hd.mem hd.log hd.resv,
+  ⟨(pfFrameRowMem pstepEv pclsEv c c' st rest σ NCPU l hR hs hl hadj).2.2 σ' hd.mem hd.log hd.resv hd.xs,
     viewRelForeign _ σ σ' st NCPU l (fun c => diskNotHart c) hV hd.read⟩
 
 /-- **The disk's store row** (a `DWriteDev` STORE): the DMA store with the device's move, at a

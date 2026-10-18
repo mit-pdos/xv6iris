@@ -424,6 +424,62 @@ def cpus : List CPU := List.finRange NCPU
 each at its cycle boundary, and every device's root thread. -/
 def powerFork (gen : Nat) : List Expr := cpus.map (Loop gen) ++ DevId.all.map (DevLoop gen)
 
+/-! ## The stale silent AMO (narrow δ1 [OWN.105], W11-F) -/
+
+/-- Every own entry of the footprint's histories is at or below `tvn`: a
+pair whose read is at `tvn` places its (silent) write right after the bytes
+it read, so no own earlier store of those bytes may sit above `tvn`
+(coherence of the hart's writes to a byte). -/
+def FlatMem.ownBelow (m : FlatMem) (h : Agent) (tvn : Nat) (pa : PAddr) (n : Nat) : Prop :=
+  ∀ j, j < n → ∀ H, m[pa + BitVec.ofNat 64 j]? = some H → ∀ e ∈ H, e.tid = h → e.t ≤ tvn
+
+/-- The guard of a write that may land at the top: not the write of a STALE
+exclusive pair (a hart holding a fresh reservation, or no pending stale read,
+or a plain write). -/
+def MState.staleFree (σ : MState) (cpu : CPU) (ak : AK) : Prop :=
+  akExcl ak = true → σ.resv cpu ≠ none ∨ σ.xstale cpu = none
+
+/-- The SILENT completion of a stale exclusive pair: an exclusive, non-release
+write to DRAM by a hart with no reservation, whose pending stale read saw
+exactly the bytes it writes, and which the hart can still read at a view in
+its window (so the write preserves the value the hart sees). -/
+def MState.silentOk (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (ak : AK)
+    (val : Option (BitVec (8 * n))) : Prop :=
+  ramBytes pa n ∧ akExcl ak = true ∧ akAcq ak = false ∧ σ.resv cpu = none ∧
+    ∃ w : BitVec (8 * n), val = some w ∧ σ.xstale cpu = some (snapOf pa n w) ∧
+      ∃ tv', σ.tv cpu ≤ tv' ∧ tv' ≤ σ.top ∧ σ.mem.readBytes (hartAgent cpu) tv' pa n w
+
+/-- The DRAM write of a stale exclusive pair that can neither land at the top
+nor complete silently: it is blocked (the hart hangs). -/
+def MState.staleBlocked (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (ak : AK)
+    (val : Option (BitVec (8 * n))) : Prop :=
+  ramBytes pa n ∧ ¬ σ.staleFree cpu ak ∧ ¬ σ.silentOk cpu pa n ak val
+
+theorem MState.staleFree_of_plain (σ : MState) (cpu : CPU) (ak : AK) (h : akExcl ak = false) :
+    σ.staleFree cpu ak := fun h' => absurd (h.symm.trans h') (by decide)
+
+theorem MState.staleFree_of_resv (σ : MState) (cpu : CPU) (ak : AK) {r : Resv}
+    (h : σ.resv cpu = some r) : σ.staleFree cpu ak := fun _ => Or.inl (by rw [h]; exact Option.some_ne_none r)
+
+theorem MState.staleFree_of_fresh (σ : MState) (cpu : CPU) (ak : AK) (h : σ.xstale cpu = none) :
+    σ.staleFree cpu ak := fun _ => Or.inr h
+
+theorem MState.not_silentOk_of_plain (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (ak : AK)
+    (val : Option (BitVec (8 * n))) (h : akExcl ak = false) : ¬ σ.silentOk cpu pa n ak val :=
+  fun ⟨_, h', _⟩ => absurd (h.symm.trans h') (by decide)
+
+theorem MState.not_silentOk_of_resv (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (ak : AK)
+    (val : Option (BitVec (8 * n))) {r : Resv} (h : σ.resv cpu = some r) : ¬ σ.silentOk cpu pa n ak val :=
+  fun ⟨_, _, _, h', _⟩ => absurd (h.symm.trans h') (Option.some_ne_none r)
+
+theorem MState.not_silentOk_of_fresh (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (ak : AK)
+    (val : Option (BitVec (8 * n))) (h : σ.xstale cpu = none) : ¬ σ.silentOk cpu pa n ak val :=
+  fun ⟨_, _, _, _, _, _, h', _⟩ => by rw [h] at h'; cases h'
+
+theorem MState.not_staleBlocked_of_free (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (ak : AK)
+    (val : Option (BitVec (8 * n))) (h : σ.staleFree cpu ak) : ¬ σ.staleBlocked cpu pa n ak val :=
+  fun hb => hb.2.1 h
+
 /-! ## The per-event step relation -/
 
 /-- `evStep cpu o σ v σ'`: in state `σ`, hart `cpu`'s event `o` can be
@@ -451,8 +507,20 @@ The memory transactions:
   takes the reservation, and moves the floor to the top iff it is an
   acquire -- unless another hart reserves a byte of the footprint, in which
   case it is blocked (`blockedStep`);
+* a **stale exclusive read** (narrow δ1 [OWN.105], W11-F): an exclusive read
+  (blocked by the same reservations) may instead read at a PAST view `tvn` -- at or above the hart's floor, its
+  write-order view (`MState.wv`: RVWMO ppo rule 4 for the pair's write) and
+  the footprint's coherence floors, with every own entry of the footprint at
+  or below `tvn` (coherence of the pair's write against the hart's earlier
+  stores) -- taking NO reservation and recording the bytes it read as the
+  pending stale read (`MState.afterExclStale`, `xstale`);
 * a **write** appends at the top (`MState.store`) unless another hart
-  reserves a byte of the footprint (blocked);
+  reserves a byte of the footprint (blocked); an exclusive write after a
+  STALE read never does: it completes SILENTLY (`MState.storeSilent`, no
+  entry: the write is placed in the coherence order right after the bytes
+  its read saw, and stores those very bytes -- so only a value-preserving,
+  non-release write, whose value the hart can still read, completes) and is
+  blocked otherwise (the hart hangs: `blockedStep`);
 * a **fence** moves the hart's views (`MState.fence`). -/
 abbrev evStep (cpu : CPU) (o : Outcome Register RegisterType) (σ : MState) :
     o.ret → MState → Prop :=
@@ -473,15 +541,22 @@ abbrev evStep (cpu : CPU) (o : Outcome Register RegisterType) (σ : MState) :
           σ' = σ.afterLoad cpu req.pa n tvn) ∨
       (ramBytes req.pa n ∧ akExcl req.access_kind = true ∧
         ¬ othersReserve σ.resv cpu req.pa n ∧
-        ∃ w : BitVec (8 * n), σ.mem.topBytes req.pa n w ∧ v = .Ok (w, none) ∧
-          σ' = σ.afterExcl cpu req.pa n w (akAcq req.access_kind))
+        ((∃ w : BitVec (8 * n), σ.mem.topBytes req.pa n w ∧ v = .Ok (w, none) ∧
+            σ' = σ.afterExcl cpu req.pa n w (akAcq req.access_kind)) ∨
+         (∃ (tvn : Nat) (w : BitVec (8 * n)), σ.tv cpu ≤ tvn ∧ σ.wv cpu ≤ tvn ∧ tvn ≤ σ.top ∧
+          (σ.hr cpu).cohOk req.pa n tvn ∧ σ.mem.ownBelow (hartAgent cpu) tvn req.pa n ∧
+          σ.mem.readBytes (hartAgent cpu) tvn req.pa n w ∧ v = .Ok (w, none) ∧
+          σ' = σ.afterExclStale cpu req.pa n w tvn (akAcq req.access_kind))))
   | .memWrite n _ req => fun v σ' =>
       (devBytes req.pa n ∧
         ∃ w ds', req.value = some w ∧ devWrite σ.devs req.pa n w = some ds' ∧
           v = .Ok (some true) ∧ σ' = { σ with devs := ds' }) ∨
       (ramBytes req.pa n ∧
         ∃ w : BitVec (8 * n), req.value = some w ∧ ¬ othersReserve σ.resv cpu req.pa n ∧
-          v = .Ok (some true) ∧ σ' = σ.store cpu req.pa n w (akExcl req.access_kind))
+          σ.staleFree cpu req.access_kind ∧
+          v = .Ok (some true) ∧ σ' = σ.store cpu req.pa n w (akExcl req.access_kind)) ∨
+      (σ.silentOk cpu req.pa n req.access_kind req.value ∧
+          v = .Ok (some true) ∧ σ' = σ.storeSilent cpu)
   | .readRam .. => fun _ _ => False
   | .writeRam .. => fun _ _ => False
   | .barrier b => fun _ σ' => σ' = σ.fence cpu b
@@ -499,14 +574,18 @@ abbrev evStep (cpu : CPU) (o : Outcome Register RegisterType) (σ : MState) :
   | .branchAnnounce _ _ => fun _ σ' => σ' = σ
 
 /-- `blockedStep cpu o σ σ'`: event `o` is blocked by another hart's
-reservation; the hart self-loops (the event is retried), a blocked exclusive
-read dropping the hart's own reservation. -/
+reservation -- or, for the write of a STALE exclusive pair, by its own
+staleness when it cannot complete silently (narrow δ1 [OWN.105]: the hart
+then hangs at the write); the hart self-loops (the event is retried), a
+blocked exclusive read dropping the hart's own reservation. -/
 abbrev blockedStep (cpu : CPU) (o : Outcome Register RegisterType) (σ σ' : MState) : Prop :=
   match o with
   | .memRead n _ req =>
       akExcl req.access_kind = true ∧ othersReserve σ.resv cpu req.pa n ∧
         σ' = σ.dropResv cpu
-  | .memWrite n _ req => othersReserve σ.resv cpu req.pa n ∧ σ' = σ
+  | .memWrite n _ req =>
+      (othersReserve σ.resv cpu req.pa n ∨ σ.staleBlocked cpu req.pa n req.access_kind req.value) ∧
+        σ' = σ
   | _ => False
 
 /-! ## The user boundary (NI M2-W1)

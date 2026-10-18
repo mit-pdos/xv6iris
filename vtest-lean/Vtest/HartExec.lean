@@ -292,7 +292,7 @@ theorem memReadExec_sound (pol : HPol) (cpu : CPU) (x : XState) (n vs : Nat) (re
             · rename_i hc
               simp only [Option.some.injEq, Prod.mk.injEq] at h
               obtain ⟨rfl, rfl⟩ := h
-              refine ⟨hram', hex, ?_, _, (topBytesB_iff _ _ _ _).1 hc, rfl, ?_⟩
+              refine ⟨hram', hex, ?_, Or.inl ⟨_, (topBytesB_iff _ _ _ _).1 hc, rfl, ?_⟩⟩
               · intro ho
                 exact hoth ((othersReserveB_iff _ _ _ _).2 ho)
               · exact XState.abs_afterExcl ..
@@ -326,7 +326,9 @@ def memWriteExec (cpu : CPU) (x : XState) (n vs : Nat) (req : WriteReq n vs) :
       | none => none
     else if ramBytesB pa n then
       if othersReserveB x cpu pa n then none
-      else some (.Ok (some true), x.store cpu pa n w (akExcl req.access_kind))
+      else if !(akExcl req.access_kind) || ((x.hart cpu).resv).isSome || (x.xstale cpu).isNone then
+        some (.Ok (some true), x.store cpu pa n w (akExcl req.access_kind))
+      else none
     else none
 
 theorem memWriteExec_sound (cpu : CPU) (x : XState) (n vs : Nat) (req : WriteReq n vs)
@@ -334,7 +336,7 @@ theorem memWriteExec_sound (cpu : CPU) (x : XState) (n vs : Nat) (req : WriteReq
     evStep cpu (.memWrite n vs req) x.abs v x'.abs := by
   unfold memWriteExec at h
   simp only at h
-  show (devBytes req.pa n ∧ _) ∨ (ramBytes req.pa n ∧ _)
+  show (devBytes req.pa n ∧ _) ∨ (ramBytes req.pa n ∧ _) ∨ _
   split at h
   · exact absurd h (by simp)
   · rename_i w hval
@@ -351,15 +353,25 @@ theorem memWriteExec_sound (cpu : CPU) (x : XState) (n vs : Nat) (req : WriteReq
       · exact absurd h (by simp)
     · split at h
       · rename_i hram
-        right
+        right; left
         split at h
         · exact absurd h (by simp)
         · rename_i hoth
-          simp only [Option.some.injEq, Prod.mk.injEq] at h
-          obtain ⟨rfl, rfl⟩ := h
-          refine ⟨(ramBytesB_iff _ _).1 hram, w, hval, ?_, rfl, XState.abs_store ..⟩
-          intro ho
-          exact hoth ((othersReserveB_iff _ _ _ _).2 ho)
+          split at h
+          · rename_i hsf
+            simp only [Option.some.injEq, Prod.mk.injEq] at h
+            obtain ⟨rfl, rfl⟩ := h
+            refine ⟨(ramBytesB_iff _ _).1 hram, w, hval, ?_, ?_, rfl, XState.abs_store ..⟩
+            · intro ho
+              exact hoth ((othersReserveB_iff _ _ _ _).2 ho)
+            · intro hex
+              simp only [Bool.or_eq_true, Bool.not_eq_true', Option.isSome_iff_ne_none,
+                Option.isNone_iff_eq_none] at hsf
+              rcases hsf with (h1 | h1) | h1
+              · rw [hex] at h1; exact absurd h1 (by decide)
+              · exact Or.inl h1
+              · exact Or.inr h1
+          · exact absurd h (by simp)
       · exact absurd h (by simp)
 
 /-! ## One event -/
@@ -442,7 +454,7 @@ theorem blockedExec_sound (cpu : CPU) (x : XState) (o : Outcome Register Registe
     · rename_i hc
       simp only [Option.some.injEq] at h
       subst h
-      exact ⟨(othersReserveB_iff _ _ _ _).1 hc, rfl⟩
+      exact ⟨Or.inl ((othersReserveB_iff _ _ _ _).1 hc), rfl⟩
     · exact absurd h (by simp)
   | _ => simp [blockedExec] at h
 

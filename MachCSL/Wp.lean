@@ -2652,13 +2652,15 @@ theorem swp_sail_mem_write_plain (cpu : CPU) {n vasize : Nat}
   isplit
   · ipureintro
     by_cases hno : othersReserve σ.resv cpu req.pa n
-    · exact Or.inr ⟨σ, hno, rfl⟩
-    · exact Or.inl ⟨.Ok (some true), _, Or.inr ⟨hram, w', hv, hno, rfl, rfl⟩⟩
+    · exact Or.inr ⟨σ, Or.inl hno, rfl⟩
+    · exact Or.inl ⟨.Ok (some true), _, Or.inr (Or.inl ⟨hram, w', hv, hno, MState.staleFree_of_plain _ _ _ hk, rfl, rfl⟩)⟩
   inext
   iintro %σ'
   isplit
   · iintro %v %Hev
-    rcases Hev with ⟨hdev, w₀, ds₀, _, hdw, _, _⟩ | ⟨_, w'', hv', hno, rfl, rfl⟩
+    rcases Hev with ⟨hdev, w₀, ds₀, _, hdw, _, _⟩ | ⟨_, w'', hv', hno, _, rfl, rfl⟩ | ⟨hsil, _, _⟩
+    rotate_right
+    · exact absurd hsil (MState.not_silentOk_of_plain _ _ _ _ _ _ hk)
     · exact absurd hdev (not_devBytes_of_ramBytes hram (devWrite_pos hdw))
     rw [hv] at hv'
     obtain rfl := Option.some.inj hv'

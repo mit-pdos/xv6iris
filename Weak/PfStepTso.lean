@@ -259,7 +259,7 @@ theorem loadRow {P D : Type} (pstep : P → D → Wlabel → P → D → Prop)
     rowLoad σ st cpu pa aq lat tvs asrc hV hlog (ramBytesFit hram) hsrc
   refine ⟨_, h1, h2, h3, ?_,
     (pfFrameRowMem pstep pcls c c' st rest σ _ _ hR hstep (by simp [frameLbl]) hadj).2.2 _ rfl rfl
-      rfl, hview⟩
+      rfl rfl, hview⟩
   exact pfLoadRowMem c st σ cpu (hartAgent cpu) pa (paZ pa) tvs.length tvs _ tvn₀ w hR rfl rfl
     hram rfl (fun j t v hj => ⟨hlb j t v hj, hb₀ j t (hfst j t v hj), hvis j t v hj⟩) hmin'
     (fun j hj => by rw [← List.getElem?_map]; exact hw j hj)
@@ -332,13 +332,13 @@ theorem pfStepTso (fok : Image → List Wmsg → Nat → Int → List (Nat × Bi
   have hlog := logEq c st σ hR hA
   obtain ⟨m', ors, fn', dd, oib, obar, hn, rs', ib', rfl⟩ := nodeOf cpu _ rs fn ib c.pcDev l p' d' hp hld hfn
   have frame : frameLbl l → ∀ σ' : MState, σ'.mem = σ.mem → σ'.log = σ.log → σ'.resv = σ.resv →
-      rmem c' (st ++ [(hartAgent cpu, l)]) σ' := fun hl =>
+      σ'.xstale = σ.xstale → rmem c' (st ++ [(hartAgent cpu, l)]) σ' := fun hl =>
     (pfFrameRowMem pstepEv pclsEv c c' st rest σ _ l hR hstep hl hadj).2.2
   cases o with
   | regRead r => exact absurd hn.1 hls
   | regWrite r v =>
     obtain ⟨rfl, rfl, -⟩ := hn
-    exact ⟨PUnit.unit, σ.setReg cpu r v, rfl, ⟨_, _, _, rfl⟩, frame (erwFrame _) _ rfl rfl rfl,
+    exact ⟨PUnit.unit, σ.setReg cpu r v, rfl, ⟨_, _, _, rfl⟩, frame (erwFrame _) _ rfl rfl rfl rfl,
       viewRelInert cohSrc σ _ st _ _ (erwInert _) hV (sameReadSetReg σ cpu r v)⟩
   | memRead n va req =>
     have hram := hramR n va req rfl
@@ -353,7 +353,7 @@ theorem pfStepTso (fok : Image → List Wmsg → Nat → Int → List (Nat × Bi
         have hfr := pfFetchRowMemCut c st σ cpu q req.pa (paZ req.pa) n tvs w hR hq3 hq4 rfl hram
           (fun j hj => by rw [← List.getElem?_map]; exact hw j hj)
         refine ⟨.Ok (w, none), σ, Or.inr (Or.inl ⟨hram, hif, q, w, ?_, ?_, hfr, rfl, rfl⟩),
-          ⟨_, _, _, rfl⟩, frame trivial σ rfl rfl rfl,
+          ⟨_, _, _, rfl⟩, frame trivial σ rfl rfl rfl rfl,
           viewRelInert cohSrc σ σ st _ _ rfl hV (sameReadRefl σ)⟩
         · rw [(hV cpu).itvEq]; exact hq1
         · show q ≤ σ.log.length
@@ -373,8 +373,8 @@ theorem pfStepTso (fok : Image → List Wmsg → Nat → Int → List (Nat × Bi
         obtain ⟨htop, hnor, hrm⟩ := pfExLoadRowMem pstepEv pclsEv c c' st rest σ cpu
           (hartAgent cpu) _ (paZ req.pa) tvs _ req.pa n w hR hstep hoc hex hadj rfl rfl hram hlen
           (fun j hj => by rw [← List.getElem?_map]; exact hw j hj)
-        exact ⟨.Ok (w, none), _, Or.inr (Or.inr (Or.inr ⟨hram, hlat, hnor, w, htop, rfl, rfl⟩)),
-          ⟨_, _, _, rfl⟩, hrm _ rfl rfl rfl,
+        exact ⟨.Ok (w, none), _, Or.inr (Or.inr (Or.inr ⟨hram, hlat, hnor, Or.inl ⟨w, htop, rfl, rfl⟩⟩)),
+          ⟨_, _, _, rfl⟩, hrm _ rfl rfl rfl rfl,
           rowExLoad cohSrc σ st cpu req.pa n w _ (paZ req.pa) tvs _ hV hlog⟩
   | memWrite n va req =>
     have hram := hramW n va req rfl
@@ -395,13 +395,15 @@ theorem pfStepTso (fok : Image → List Wmsg → Nat → Int → List (Nat × Bi
             false _ (paZ req.pa) _ _ _ req.pa n v hR hstep hadj rfl rfl hram hd hb
           have e : akExcl req.access_kind = false := hlat
           refine ⟨.Ok (some true), σ.store cpu req.pa n v false,
-            Or.inr ⟨hram, v, hval, hnor, rfl, by rw [e]⟩, ⟨_, _, _, rfl⟩, hrm _ rfl rfl rfl,
+            Or.inr (Or.inl ⟨hram, v, hval, hnor, MState.staleFree_of_plain _ _ _ e, rfl, by rw [e]⟩),
+            ⟨_, _, _, rfl⟩, hrm _ rfl rfl rfl rfl,
             rowStore σ st cpu req.pa n v _ _ _ _ hd hV hlog hfit⟩
         · obtain ⟨hnor, hrm⟩ := pfStoreRowMem pstepEv pclsEv c c' st rest σ cpu (hartAgent cpu)
             true _ (paZ req.pa) _ _ _ req.pa n v hR hstep hadj rfl rfl hram hd hb
           have e : akExcl req.access_kind = true := hlat
           refine ⟨.Ok (some true), σ.store cpu req.pa n v true,
-            Or.inr ⟨hram, v, hval, hnor, rfl, by rw [e]⟩, ⟨_, _, _, rfl⟩, hrm _ rfl rfl rfl,
+            Or.inr (Or.inl ⟨hram, v, hval, hnor, MState.staleFree_of_fresh _ _ _ (hR.2.2.2.2 cpu), rfl,
+              by rw [e]⟩), ⟨_, _, _, rfl⟩, hrm _ rfl rfl rfl rfl,
             rowExStore σ st cpu req.pa n v _ _ _ _ hd hV hlog hfit⟩
         · exact absurd hl hls
       · exact hn.elim
@@ -409,7 +411,7 @@ theorem pfStepTso (fok : Image → List Wmsg → Nat → Int → List (Nat × Bi
   | writeRam => exact hn.elim
   | barrier b =>
     obtain ⟨rfl, rfl, -⟩ := hn
-    exact ⟨(), σ.fence cpu b, rfl, ⟨_, _, _, rfl⟩, frame (ebarFrame b) _ rfl rfl rfl,
+    exact ⟨(), σ.fence cpu b, rfl, ⟨_, _, _, rfl⟩, frame (ebarFrame b) _ rfl rfl rfl rfl,
       rowFence cohSrc σ st cpu b hV hlog (fun hb => hfi (by rw [hb]))⟩
   | cacheOp _ => exact absurd hn.1 hls
   | tlbi _ => exact absurd hn.1 hls
@@ -425,7 +427,7 @@ theorem pfStepTso (fok : Image → List Wmsg → Nat → Int → List (Nat × Bi
     exact absurd hl hls
   | instrAnnounce n w =>
     obtain ⟨rfl, rfl, -⟩ := hn
-    refine ⟨(), σ, rfl, ⟨_, _, _, rfl⟩, frame (annFrame n w) σ rfl rfl rfl, ?_⟩
+    refine ⟨(), σ, rfl, ⟨_, _, _, rfl⟩, frame (annFrame n w) σ rfl rfl rfl rfl, ?_⟩
     unfold annLabel
     split
     · exact rowSfenceMarker cohSrc σ st cpu hV (hsf n w rfl ‹_›)
@@ -456,7 +458,7 @@ theorem pfStepTsoStutter (c c' : Wpcfg Pexv6 Efab) (st : List (Nat × Wlabel)) (
       viewRel TsoShadow.cohSrc σ (st ++ [(hartAgent cpu, l)]) := by
   intro hp hstep hadj hR hV hpark hcase
   have frame : frameLbl l → rmem c' (st ++ [(hartAgent cpu, l)]) σ := fun hl =>
-    (pfFrameRowMem pstepEv pclsEv c c' st rest σ _ l hR hstep hl hadj).2.2 σ rfl rfl rfl
+    (pfFrameRowMem pstepEv pclsEv c c' st rest σ _ l hR hstep hl hadj).2.2 σ rfl rfl rfl rfl
   cases p' with
   | PDisk dp => exact hp.elim
   | PHart cpu' m' rs' fn' ib' =>
@@ -507,16 +509,17 @@ theorem pfStepTsoSame {P D : Type} (pstep : P → D → Wlabel → P → D → P
   intro hstep hadj hR hV hl
   have hfr : frameLbl l := by rcases hl with rfl | ⟨_, _, _, _, _, _, _, rfl⟩ <;> trivial
   have hin : lbInert l = true := by rcases hl with rfl | ⟨_, _, _, _, _, _, _, rfl⟩ <;> rfl
-  exact ⟨(pfFrameRowMem pstep pcls c c' st rest σ i l hR hstep hfr hadj).2.2 σ rfl rfl rfl,
+  exact ⟨(pfFrameRowMem pstep pcls c c' st rest σ i l hR hstep hfr hadj).2.2 σ rfl rfl rfl rfl,
     viewRelInert cohSrc σ σ st i l hin hV (sameReadRefl σ)⟩
 
 /-- E-M2: `rmem` reads only `mem`, `log`, `resv`. -/
 theorem rmemSameMem {P D : Type} (c : Wpcfg P D) (st : List (Nat × Wlabel)) (σ σ' : MState)
-    (hm : σ'.mem = σ.mem) (hl : σ'.log = σ.log) (hr : σ'.resv = σ.resv) (h : rmem c st σ) :
+    (hm : σ'.mem = σ.mem) (hl : σ'.log = σ.log) (hr : σ'.resv = σ.resv) (h : rmem c st σ)
+    (hx : σ'.xstale = σ.xstale := by rfl) :
     rmem c st σ' := by
-  obtain ⟨⟨h1, h2⟩, h3, h4, h5⟩ := h
+  obtain ⟨⟨h1, h2⟩, h3, h4, h5, h6⟩ := h
   exact ⟨⟨by rw [hl]; exact h1, by rw [hl]; exact h2⟩, h3, by rw [hm]; exact h4,
-    fun cpu => by rw [hr]; exact h5 cpu⟩
+    fun cpu => by rw [hr]; exact h5 cpu, fun cpu => by rw [hx]; exact h6 cpu⟩
 
 /-- E-M2: `viewRel` reads only `tv`, `hr`, `itv`. -/
 theorem viewRelSameRead (stamp : CohStamp) (σ σ' : MState) (st : List (Nat × Wlabel))

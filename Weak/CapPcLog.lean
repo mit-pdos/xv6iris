@@ -76,13 +76,15 @@ theorem CapPcLog.evStepPc (cpu : CPU) (o : Outcome Register RegisterType) (σ : 
       (w : BitVec (8 * n)), o = .memWrite n va req ∧ σ' = σ.store cpu req.pa n w (akExcl req.access_kind) := by
   cases o with
   | memWrite n va req =>
-    rcases h with ⟨-, w, ds', -, -, -, rfl⟩ | ⟨-, w, -, -, -, rfl⟩
+    rcases h with ⟨-, w, ds', -, -, -, rfl⟩ | ⟨-, w, -, -, -, -, rfl⟩ | ⟨-, -, rfl⟩
     · exact Or.inl ⟨rfl, rfl⟩
     · exact Or.inr ⟨n, va, req, w, rfl, rfl⟩
+    · exact Or.inl ⟨rfl, rfl⟩
   | memRead n va req =>
     left
     rcases h with ⟨-, w, ds', -, -, rfl⟩ | ⟨-, -, tvn, w, -, -, -, -, rfl⟩ |
-      ⟨-, -, tvn, w, -, -, -, -, -, rfl⟩ | ⟨-, -, -, w, -, -, rfl⟩ <;> exact ⟨rfl, rfl⟩
+      ⟨-, -, tvn, w, -, -, -, -, -, rfl⟩ |
+      ⟨-, -, -, ⟨w, -, -, rfl⟩ | ⟨tvn, w, -, -, -, -, -, -, -, rfl⟩⟩ <;> exact ⟨rfl, rfl⟩
   | readRam => exact absurd h id
   | writeRam => exact absurd h id
   | regRead r => obtain ⟨-, rfl⟩ := h; exact Or.inl ⟨rfl, rfl⟩
