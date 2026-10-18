@@ -249,6 +249,13 @@ def num_of_Architecture (arg_ : Architecture) : Int :=
   | .RV64 => 1
   | .RV128 => 2
 
+def architecture_bits_backwards (arg_ : (BitVec 2)) : SailM Architecture := do
+  match arg_ with
+  | 0b01 => (pure RV32)
+  | 0b10 => (pure RV64)
+  | 0b11 => (pure RV128)
+  | _ => (internal_error "core/types.sail" 62 "architecture(0b00) is invalid")
+
 def architecture_bits_forwards_matches (arg_ : Architecture) : Bool :=
   match arg_ with
   | .RV32 => true

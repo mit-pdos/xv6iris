@@ -790,95 +790,6 @@ def cbop_mnemonic_forwards (arg_ : cbop_zicbom) : String :=
   | .CBO_FLUSH => "cbo.flush"
   | .CBO_INVAL => "cbo.inval"
 
-def freg_abi_name_raw_forwards (arg_ : (BitVec 5)) : String :=
-  match arg_ with
-  | 0b00000 => "ft0"
-  | 0b00001 => "ft1"
-  | 0b00010 => "ft2"
-  | 0b00011 => "ft3"
-  | 0b00100 => "ft4"
-  | 0b00101 => "ft5"
-  | 0b00110 => "ft6"
-  | 0b00111 => "ft7"
-  | 0b01000 => "fs0"
-  | 0b01001 => "fs1"
-  | 0b01010 => "fa0"
-  | 0b01011 => "fa1"
-  | 0b01100 => "fa2"
-  | 0b01101 => "fa3"
-  | 0b01110 => "fa4"
-  | 0b01111 => "fa5"
-  | 0b10000 => "fa6"
-  | 0b10001 => "fa7"
-  | 0b10010 => "fs2"
-  | 0b10011 => "fs3"
-  | 0b10100 => "fs4"
-  | 0b10101 => "fs5"
-  | 0b10110 => "fs6"
-  | 0b10111 => "fs7"
-  | 0b11000 => "fs8"
-  | 0b11001 => "fs9"
-  | 0b11010 => "fs10"
-  | 0b11011 => "fs11"
-  | 0b11100 => "ft8"
-  | 0b11101 => "ft9"
-  | 0b11110 => "ft10"
-  | _ => "ft11"
-
-def freg_arch_name_raw_forwards (arg_ : (BitVec 5)) : String :=
-  match arg_ with
-  | 0b00000 => "f0"
-  | 0b00001 => "f1"
-  | 0b00010 => "f2"
-  | 0b00011 => "f3"
-  | 0b00100 => "f4"
-  | 0b00101 => "f5"
-  | 0b00110 => "f6"
-  | 0b00111 => "f7"
-  | 0b01000 => "f8"
-  | 0b01001 => "f9"
-  | 0b01010 => "f10"
-  | 0b01011 => "f11"
-  | 0b01100 => "f12"
-  | 0b01101 => "f13"
-  | 0b01110 => "f14"
-  | 0b01111 => "f15"
-  | 0b10000 => "f16"
-  | 0b10001 => "f17"
-  | 0b10010 => "f18"
-  | 0b10011 => "f19"
-  | 0b10100 => "f20"
-  | 0b10101 => "f21"
-  | 0b10110 => "f22"
-  | 0b10111 => "f23"
-  | 0b11000 => "f24"
-  | 0b11001 => "f25"
-  | 0b11010 => "f26"
-  | 0b11011 => "f27"
-  | 0b11100 => "f28"
-  | 0b11101 => "f29"
-  | 0b11110 => "f30"
-  | _ => "f31"
-
-def freg_name_forwards (arg_ : fregidx) : SailM String := do
-  match arg_ with
-  | .Fregidx i =>
-    (do
-      if ((get_config_use_abi_names ()) : Bool)
-      then (pure (freg_abi_name_raw_forwards i))
-      else
-        (do
-          if ((not (get_config_use_abi_names ())) : Bool)
-          then (pure (freg_arch_name_raw_forwards i))
-          else
-            (do
-              sail_assert false "Pattern match failure at unknown location"
-              throw Error.Exit)))
-
-def cfreg_name_forwards (arg_ : cfregidx) : SailM String := do
-  match arg_ with
-  | .Cfregidx i => (freg_name_forwards (Fregidx (0b01#2 +++ (i : (BitVec 3)))))
-
 def base_E_enabled := false
 
 def regidx_bit_width := 5
@@ -1008,173 +919,6 @@ def csr_mnemonic_forwards (arg_ : csrop) : String :=
   | .CSRRS => "csrrs"
   | .CSRRC => "csrrc"
 
-def f_bin_f_type_mnemonic_D_forwards (arg_ : f_bin_f_op_D) : String :=
-  match arg_ with
-  | .FSGNJ_D => "fsgnj.d"
-  | .FSGNJN_D => "fsgnjn.d"
-  | .FSGNJX_D => "fsgnjx.d"
-  | .FMIN_D => "fmin.d"
-  | .FMAX_D => "fmax.d"
-
-def f_bin_f_type_mnemonic_H_forwards (arg_ : f_bin_f_op_H) : String :=
-  match arg_ with
-  | .FSGNJ_H => "fsgnj.h"
-  | .FSGNJN_H => "fsgnjn.h"
-  | .FSGNJX_H => "fsgnjx.h"
-  | .FMIN_H => "fmin.h"
-  | .FMAX_H => "fmax.h"
-
-def f_bin_rm_type_mnemonic_D_forwards (arg_ : f_bin_rm_op_D) : String :=
-  match arg_ with
-  | .FADD_D => "fadd.d"
-  | .FSUB_D => "fsub.d"
-  | .FMUL_D => "fmul.d"
-  | .FDIV_D => "fdiv.d"
-
-def f_bin_rm_type_mnemonic_H_forwards (arg_ : f_bin_rm_op_H) : String :=
-  match arg_ with
-  | .FADD_H => "fadd.h"
-  | .FSUB_H => "fsub.h"
-  | .FMUL_H => "fmul.h"
-  | .FDIV_H => "fdiv.h"
-
-def f_bin_rm_type_mnemonic_S_forwards (arg_ : f_bin_rm_op_S) : String :=
-  match arg_ with
-  | .FADD_S => "fadd.s"
-  | .FSUB_S => "fsub.s"
-  | .FMUL_S => "fmul.s"
-  | .FDIV_S => "fdiv.s"
-
-def f_bin_type_mnemonic_f_S_forwards (arg_ : f_bin_op_f_S) : String :=
-  match arg_ with
-  | .FSGNJ_S => "fsgnj.s"
-  | .FSGNJN_S => "fsgnjn.s"
-  | .FSGNJX_S => "fsgnjx.s"
-  | .FMIN_S => "fmin.s"
-  | .FMAX_S => "fmax.s"
-
-def f_bin_type_mnemonic_x_S_forwards (arg_ : f_bin_op_x_S) : String :=
-  match arg_ with
-  | .FEQ_S => "feq.s"
-  | .FLT_S => "flt.s"
-  | .FLE_S => "fle.s"
-
-def f_bin_x_type_mnemonic_D_forwards (arg_ : f_bin_x_op_D) : String :=
-  match arg_ with
-  | .FEQ_D => "feq.d"
-  | .FLT_D => "flt.d"
-  | .FLE_D => "fle.d"
-
-def f_bin_x_type_mnemonic_H_forwards (arg_ : f_bin_x_op_H) : String :=
-  match arg_ with
-  | .FEQ_H => "feq.h"
-  | .FLT_H => "flt.h"
-  | .FLE_H => "fle.h"
-
-def f_madd_type_mnemonic_D_forwards (arg_ : f_madd_op_D) : String :=
-  match arg_ with
-  | .FMADD_D => "fmadd.d"
-  | .FMSUB_D => "fmsub.d"
-  | .FNMSUB_D => "fnmsub.d"
-  | .FNMADD_D => "fnmadd.d"
-
-def f_madd_type_mnemonic_H_forwards (arg_ : f_madd_op_H) : String :=
-  match arg_ with
-  | .FMADD_H => "fmadd.h"
-  | .FMSUB_H => "fmsub.h"
-  | .FNMSUB_H => "fnmsub.h"
-  | .FNMADD_H => "fnmadd.h"
-
-def f_madd_type_mnemonic_S_forwards (arg_ : f_madd_op_S) : String :=
-  match arg_ with
-  | .FMADD_S => "fmadd.s"
-  | .FMSUB_S => "fmsub.s"
-  | .FNMSUB_S => "fnmsub.s"
-  | .FNMADD_S => "fnmadd.s"
-
-def f_un_f_type_mnemonic_D_forwards (arg_ : f_un_f_op_D) : String :=
-  match arg_ with
-  | .FMV_D_X => "fmv.d.x"
-
-def f_un_f_type_mnemonic_H_forwards (arg_ : f_un_f_op_H) : String :=
-  match arg_ with
-  | .FMV_H_X => "fmv.h.x"
-
-def f_un_rm_ff_type_mnemonic_D_forwards (arg_ : f_un_rm_ff_op_D) : String :=
-  match arg_ with
-  | .FSQRT_D => "fsqrt.d"
-  | .FCVT_S_D => "fcvt.s.d"
-  | .FCVT_D_S => "fcvt.d.s"
-
-def f_un_rm_ff_type_mnemonic_H_forwards (arg_ : f_un_rm_ff_op_H) : String :=
-  match arg_ with
-  | .FSQRT_H => "fsqrt.h"
-  | .FCVT_H_S => "fcvt.h.s"
-  | .FCVT_H_D => "fcvt.h.d"
-  | .FCVT_S_H => "fcvt.s.h"
-  | .FCVT_D_H => "fcvt.d.h"
-
-def f_un_rm_fx_type_mnemonic_D_forwards (arg_ : f_un_rm_fx_op_D) : String :=
-  match arg_ with
-  | .FCVT_W_D => "fcvt.w.d"
-  | .FCVT_WU_D => "fcvt.wu.d"
-  | .FCVT_L_D => "fcvt.l.d"
-  | .FCVT_LU_D => "fcvt.lu.d"
-
-def f_un_rm_fx_type_mnemonic_H_forwards (arg_ : f_un_rm_fx_op_H) : String :=
-  match arg_ with
-  | .FCVT_W_H => "fcvt.w.h"
-  | .FCVT_WU_H => "fcvt.wu.h"
-  | .FCVT_L_H => "fcvt.l.h"
-  | .FCVT_LU_H => "fcvt.lu.h"
-
-def f_un_rm_fx_type_mnemonic_S_forwards (arg_ : f_un_rm_fx_op_S) : String :=
-  match arg_ with
-  | .FCVT_W_S => "fcvt.w.s"
-  | .FCVT_WU_S => "fcvt.wu.s"
-  | .FCVT_L_S => "fcvt.l.s"
-  | .FCVT_LU_S => "fcvt.lu.s"
-
-def f_un_rm_xf_type_mnemonic_D_forwards (arg_ : f_un_rm_xf_op_D) : String :=
-  match arg_ with
-  | .FCVT_D_W => "fcvt.d.w"
-  | .FCVT_D_WU => "fcvt.d.wu"
-  | .FCVT_D_L => "fcvt.d.l"
-  | .FCVT_D_LU => "fcvt.d.lu"
-
-def f_un_rm_xf_type_mnemonic_H_forwards (arg_ : f_un_rm_xf_op_H) : String :=
-  match arg_ with
-  | .FCVT_H_W => "fcvt.h.w"
-  | .FCVT_H_WU => "fcvt.h.wu"
-  | .FCVT_H_L => "fcvt.h.l"
-  | .FCVT_H_LU => "fcvt.h.lu"
-
-def f_un_rm_xf_type_mnemonic_S_forwards (arg_ : f_un_rm_xf_op_S) : String :=
-  match arg_ with
-  | .FCVT_S_W => "fcvt.s.w"
-  | .FCVT_S_WU => "fcvt.s.wu"
-  | .FCVT_S_L => "fcvt.s.l"
-  | .FCVT_S_LU => "fcvt.s.lu"
-
-def f_un_type_mnemonic_f_S_forwards (arg_ : f_un_op_f_S) : String :=
-  match arg_ with
-  | .FMV_W_X => "fmv.w.x"
-
-def f_un_type_mnemonic_x_S_forwards (arg_ : f_un_op_x_S) : String :=
-  match arg_ with
-  | .FCLASS_S => "fclass.s"
-  | .FMV_X_W => "fmv.x.w"
-
-def f_un_x_type_mnemonic_D_forwards (arg_ : f_un_x_op_D) : String :=
-  match arg_ with
-  | .FMV_X_D => "fmv.x.d"
-  | .FCLASS_D => "fclass.d"
-
-def f_un_x_type_mnemonic_H_forwards (arg_ : f_un_x_op_H) : String :=
-  match arg_ with
-  | .FMV_X_H => "fmv.x.h"
-  | .FCLASS_H => "fclass.h"
-
 def bit_maybe_i_forwards (arg_ : (BitVec 1)) : String :=
   match arg_ with
   | 1 => "i"
@@ -1209,193 +953,6 @@ def fence_bits_forwards (arg_ : (BitVec 4)) : String :=
       (String.append (bit_maybe_o_forwards o)
         (String.append (bit_maybe_r_forwards r) (String.append (bit_maybe_w_forwards w) "")))))
 
-def fregidx_to_regidx (app_0 : fregidx) : regidx :=
-  let .Fregidx b := app_0
-  (Regidx (trunc (m := 5) b))
-
-def hartSupports_measure (ext : extension) : Int :=
-  match ext with
-  | .Ext_D => 1
-  | .Ext_Ssu64xl => 1
-  | .Ext_Zvkn => 1
-  | .Ext_Zvks => 1
-  | .Ext_Sspm => 1
-  | .Ext_Supm => 1
-  | .Ext_C => 2
-  | .Ext_Zvknc => 2
-  | .Ext_Zvkng => 2
-  | .Ext_Zvksc => 2
-  | .Ext_Zvksg => 2
-  | _ => 0
-
-def hartSupports (merge_var : extension) : Bool :=
-  match merge_var with
-  | .Ext_M => true
-  | .Ext_A => true
-  | .Ext_F => true
-  | .Ext_D => (true && (hartSupports Ext_F))
-  | .Ext_B => false
-  | .Ext_V => ((8 ≥b 7) && (vector_support_ge vector_support_level Full))
-  | .Ext_S => true
-  | .Ext_U => true
-  | .Ext_H => false
-  | .Ext_Sha => false
-  | .Ext_Shcounterenw => false
-  | .Ext_Shgatpa => false
-  | .Ext_Shtvala => false
-  | .Ext_Shvsatpa => false
-  | .Ext_Shvstvala => false
-  | .Ext_Shvstvecd => false
-  | .Ext_Zibi => ((sys_enable_experimental_extensions ()) && (true : Bool))
-  | .Ext_Zic64b => true
-  | .Ext_Zicbom => true
-  | .Ext_Zicbop => true
-  | .Ext_Zicboz => true
-  | .Ext_Zicfilp => true
-  | .Ext_Zicfiss => true
-  | .Ext_Zicntr => true
-  | .Ext_Zicond => true
-  | .Ext_Zicsr => true
-  | .Ext_Zifencei => true
-  | .Ext_Zihintntl => true
-  | .Ext_Zihintpause => true
-  | .Ext_Zihpm => true
-  | .Ext_Zilx => ((sys_enable_experimental_extensions ()) && (false : Bool))
-  | .Ext_Zimop => true
-  | .Ext_Zmmul => false
-  | .Ext_Zaamo => false
-  | .Ext_Zabha => true
-  | .Ext_Zacas => true
-  | .Ext_Zalrsc => false
-  | .Ext_Zama16b => true
-  | .Ext_Zawrs => true
-  | .Ext_Za64rs => ((plat_reservation_set_size_exp ≤b 6) && ((false : Bool) || (true : Bool)))
-  | .Ext_Za128rs => ((plat_reservation_set_size_exp ≤b 7) && ((false : Bool) || (true : Bool)))
-  | .Ext_Zfa => true
-  | .Ext_Zfbfmin => true
-  | .Ext_Zfh => true
-  | .Ext_Zfhmin => true
-  | .Ext_Zfinx => false
-  | .Ext_Zdinx => false
-  | .Ext_Zca => true
-  | .Ext_Zcb => true
-  | .Ext_Zcd => true
-  | .Ext_Zcf => ((false : Bool) && (xlen == 32))
-  | .Ext_Zcmop => true
-  | .Ext_C =>
-    ((hartSupports Ext_Zca) && (((hartSupports Ext_Zcf) || ((not (hartSupports Ext_F)) || (xlen != 32))) && ((hartSupports
-            Ext_Zcd) || (not (hartSupports Ext_D)))))
-  | .Ext_Zba => false
-  | .Ext_Zbb => false
-  | .Ext_Zbc => true
-  | .Ext_Zbkb => true
-  | .Ext_Zbkc => true
-  | .Ext_Zbkx => true
-  | .Ext_Zbs => false
-  | .Ext_Ziccamoa => true
-  | .Ext_Ziccamoc => true
-  | .Ext_Ziccif => true
-  | .Ext_Zicclsm => true
-  | .Ext_Ziccrse => true
-  | .Ext_Zknd => true
-  | .Ext_Zkne => true
-  | .Ext_Zknh => true
-  | .Ext_Zkr => true
-  | .Ext_Zksed => true
-  | .Ext_Zksh => true
-  | .Ext_Zkt => true
-  | .Ext_Zhinx => false
-  | .Ext_Zhinxmin => false
-  | .Ext_Zvl32b => (8 ≥b 5)
-  | .Ext_Zvl64b => (8 ≥b 6)
-  | .Ext_Zvl128b => (8 ≥b 7)
-  | .Ext_Zvl256b => (8 ≥b 8)
-  | .Ext_Zvl512b => (8 ≥b 9)
-  | .Ext_Zvl1024b => (8 ≥b 10)
-  | .Ext_Zve32f => ((6 ≥b 5) && (vector_support_ge vector_support_level Float_single))
-  | .Ext_Zve32x => ((6 ≥b 5) && (vector_support_ge vector_support_level Integer))
-  | .Ext_Zve64d => ((6 ≥b 6) && (vector_support_ge vector_support_level Float_double))
-  | .Ext_Zve64f => ((6 ≥b 6) && (vector_support_ge vector_support_level Float_single))
-  | .Ext_Zve64x => ((6 ≥b 6) && (vector_support_ge vector_support_level Integer))
-  | .Ext_Zvabd => ((sys_enable_experimental_extensions ()) && (false : Bool))
-  | .Ext_Zvfbfmin => false
-  | .Ext_Zvfbfwma => false
-  | .Ext_Zvfh => false
-  | .Ext_Zvfhmin => false
-  | .Ext_Zvbb => false
-  | .Ext_Zvbc => false
-  | .Ext_Zvkb => false
-  | .Ext_Zvkg => false
-  | .Ext_Zvkned => false
-  | .Ext_Zvknha => false
-  | .Ext_Zvknhb => false
-  | .Ext_Zvksed => false
-  | .Ext_Zvksh => false
-  | .Ext_Zvkt => false
-  | .Ext_Zvkn =>
-    ((hartSupports Ext_Zvkned) && ((hartSupports Ext_Zvknhb) && ((hartSupports Ext_Zvkb) && (hartSupports
-            Ext_Zvkt))))
-  | .Ext_Zvknc => ((hartSupports Ext_Zvkn) && (hartSupports Ext_Zvbc))
-  | .Ext_Zvkng => ((hartSupports Ext_Zvkn) && (hartSupports Ext_Zvkg))
-  | .Ext_Zvks =>
-    ((hartSupports Ext_Zvksed) && ((hartSupports Ext_Zvksh) && ((hartSupports Ext_Zvkb) && (hartSupports
-            Ext_Zvkt))))
-  | .Ext_Zvksc => ((hartSupports Ext_Zvks) && (hartSupports Ext_Zvbc))
-  | .Ext_Zvksg => ((hartSupports Ext_Zvks) && (hartSupports Ext_Zvkg))
-  | .Ext_Ssccptr => true
-  | .Ext_Sscofpmf => true
-  | .Ext_Sscounterenw => true
-  | .Ext_Ssdbltrp => false
-  | .Ext_Ssnpm => ((true : Bool) && (xlen == 64))
-  | .Ext_Ssstateen => true
-  | .Ext_Ssstrict => true
-  | .Ext_Sdtrig => false
-  | .Ext_Sstc => true
-  | .Ext_Sstvala => true
-  | .Ext_Sstvecd => true
-  | .Ext_Ssu64xl => ((hartSupports Ext_S) && (xlen == 64))
-  | .Ext_Svbare => true
-  | .Ext_Sv32 => ((false : Bool) && (xlen == 32))
-  | .Ext_Sv39 => ((true : Bool) && (xlen == 64))
-  | .Ext_Sv48 => ((true : Bool) && (xlen == 64))
-  | .Ext_Sv57 => ((true : Bool) && (xlen == 64))
-  | .Ext_Svade => true
-  | .Ext_Svadu => true
-  | .Ext_Svinval => true
-  | .Ext_Svnapot => ((true : Bool) && (xlen == 64))
-  | .Ext_Svpbmt => ((true : Bool) && (xlen == 64))
-  | .Ext_Svrsw60t59b => true
-  | .Ext_Svukte => ((sys_enable_experimental_extensions ()) && ((false : Bool) && (xlen == 64)))
-  | .Ext_Svvptc => true
-  | .Ext_Smcntrpmf => true
-  | .Ext_Smdbltrp => false
-  | .Ext_Smmpm => ((true : Bool) && (xlen == 64))
-  | .Ext_Smnpm => ((true : Bool) && (xlen == 64))
-  | .Ext_Smstateen => true
-  | .Ext_Ssqosid => true
-  | .Ext_Sspm => ((hartSupports Ext_Smnpm) && (hartSupports Ext_S))
-  | .Ext_Supm =>
-    ((hartSupports Ext_U) && (if ((hartSupports Ext_S) : Bool)
-      then (hartSupports Ext_Ssnpm)
-      else (hartSupports Ext_Smnpm)))
-termination_by (let ext := merge_var
-(hartSupports_measure ext)).toNat
-
-def freg_or_reg_name_forwards (arg_ : fregidx) : SailM String := do
-  let f := arg_
-  if ((hartSupports Ext_Zfinx) : Bool)
-  then (reg_name_forwards (fregidx_to_regidx f))
-  else (freg_name_forwards f)
-
-def frm_mnemonic_forwards (arg_ : rounding_mode) : String :=
-  match arg_ with
-  | .RM_RNE => "rne"
-  | .RM_RTZ => "rtz"
-  | .RM_RDN => "rdn"
-  | .RM_RUP => "rup"
-  | .RM_RMM => "rmm"
-  | .RM_DYN => "dyn"
-
 def itype_mnemonic_forwards (arg_ : iop) : String :=
   match arg_ with
   | .ADDI => "addi"
@@ -1410,7 +967,7 @@ def maybe_hlvx_forwards (arg_ : hlvop) : String :=
   | .HLV => ""
   | .HLVX => "x"
 
-/-- Type quantifiers: k_ex1237897_ : Bool -/
+/-- Type quantifiers: k_ex1170496_ : Bool -/
 def maybe_u_forwards (arg_ : Bool) : String :=
   match arg_ with
   | true => "u"
@@ -2309,492 +1866,6 @@ def assembly_forwards (arg_ : instruction) : SailM String := do
         (String.append (spc_forwards ())
           (String.append (← (reg_name_forwards rs1))
             (String.append (sep_forwards ()) (String.append (← (reg_name_forwards rs2)) ""))))))
-  | .LOAD_FP (imm, rs1, rd, width) =>
-    (pure (String.append "fl"
-        (String.append (width_mnemonic_forwards width)
-          (String.append (spc_forwards ())
-            (String.append (← (freg_name_forwards rd))
-              (String.append (sep_forwards ())
-                (String.append (← (hex_bits_signed_12_forwards imm))
-                  (String.append (opt_spc_forwards ())
-                    (String.append "("
-                      (String.append (opt_spc_forwards ())
-                        (String.append (← (reg_name_forwards rs1))
-                          (String.append (opt_spc_forwards ()) (String.append ")" "")))))))))))))
-  | .STORE_FP (imm, rs2, rs1, width) =>
-    (pure (String.append "fs"
-        (String.append (width_mnemonic_forwards width)
-          (String.append (spc_forwards ())
-            (String.append (← (freg_name_forwards rs2))
-              (String.append (sep_forwards ())
-                (String.append (← (hex_bits_signed_12_forwards imm))
-                  (String.append (opt_spc_forwards ())
-                    (String.append "("
-                      (String.append (opt_spc_forwards ())
-                        (String.append (← (reg_name_forwards rs1))
-                          (String.append (opt_spc_forwards ()) (String.append ")" "")))))))))))))
-  | .F_MADD_TYPE_S (rs3, rs2, rs1, rm, rd, op) =>
-    (pure (String.append (f_madd_type_mnemonic_S_forwards op)
-        (String.append (spc_forwards ())
-          (String.append (← (freg_or_reg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_or_reg_name_forwards rs1))
-                (String.append (sep_forwards ())
-                  (String.append (← (freg_or_reg_name_forwards rs2))
-                    (String.append (sep_forwards ())
-                      (String.append (← (freg_or_reg_name_forwards rs3))
-                        (String.append (sep_forwards ())
-                          (String.append (frm_mnemonic_forwards rm) ""))))))))))))
-  | .F_BIN_RM_TYPE_S (rs2, rs1, rm, rd, op) =>
-    (pure (String.append (f_bin_rm_type_mnemonic_S_forwards op)
-        (String.append (spc_forwards ())
-          (String.append (← (freg_or_reg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_or_reg_name_forwards rs1))
-                (String.append (sep_forwards ())
-                  (String.append (← (freg_or_reg_name_forwards rs2))
-                    (String.append (sep_forwards ()) (String.append (frm_mnemonic_forwards rm) ""))))))))))
-  | .F_UN_RM_FF_TYPE_S (rs1, rm, rd, .FSQRT_S) =>
-    (pure (String.append "fsqrt.s"
-        (String.append (spc_forwards ())
-          (String.append (← (freg_or_reg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_or_reg_name_forwards rs1))
-                (String.append (sep_forwards ()) (String.append (frm_mnemonic_forwards rm) ""))))))))
-  | .F_UN_RM_FX_TYPE_S (rs1, rm, rd, op) =>
-    (pure (String.append (f_un_rm_fx_type_mnemonic_S_forwards op)
-        (String.append (spc_forwards ())
-          (String.append (← (reg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_or_reg_name_forwards rs1))
-                (String.append (sep_forwards ()) (String.append (frm_mnemonic_forwards rm) ""))))))))
-  | .F_UN_RM_XF_TYPE_S (rs1, rm, rd, op) =>
-    (pure (String.append (f_un_rm_xf_type_mnemonic_S_forwards op)
-        (String.append (spc_forwards ())
-          (String.append (← (freg_or_reg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (reg_name_forwards rs1))
-                (String.append (sep_forwards ()) (String.append (frm_mnemonic_forwards rm) ""))))))))
-  | .F_BIN_TYPE_F_S (rs2, rs1, rd, op) =>
-    (pure (String.append (f_bin_type_mnemonic_f_S_forwards op)
-        (String.append (spc_forwards ())
-          (String.append (← (freg_or_reg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_or_reg_name_forwards rs1))
-                (String.append (sep_forwards ())
-                  (String.append (← (freg_or_reg_name_forwards rs2)) ""))))))))
-  | .F_BIN_TYPE_X_S (rs2, rs1, rd, op) =>
-    (pure (String.append (f_bin_type_mnemonic_x_S_forwards op)
-        (String.append (spc_forwards ())
-          (String.append (← (reg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_or_reg_name_forwards rs1))
-                (String.append (sep_forwards ())
-                  (String.append (← (freg_or_reg_name_forwards rs2)) ""))))))))
-  | .F_UN_TYPE_X_S (rs1, rd, op) =>
-    (pure (String.append (f_un_type_mnemonic_x_S_forwards op)
-        (String.append (spc_forwards ())
-          (String.append (← (reg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_or_reg_name_forwards rs1)) ""))))))
-  | .F_UN_TYPE_F_S (rs1, rd, op) =>
-    (pure (String.append (f_un_type_mnemonic_f_S_forwards op)
-        (String.append (spc_forwards ())
-          (String.append (← (freg_name_forwards rd))
-            (String.append (sep_forwards ()) (String.append (← (reg_name_forwards rs1)) ""))))))
-  | .C_FLWSP (imm, rd) =>
-    (do
-      if ((xlen == 32) : Bool)
-      then
-        (pure (String.append "c.flwsp"
-            (String.append (spc_forwards ())
-              (String.append (← (freg_name_forwards rd))
-                (String.append (sep_forwards ())
-                  (String.append (← (hex_bits_8_forwards ((imm : (BitVec 6)) +++ 0b00#2)))
-                    (String.append "("
-                      (String.append (← (sp_reg_name_forwards ())) (String.append ")" "")))))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .C_FSWSP (uimm, rs2) =>
-    (do
-      if ((xlen == 32) : Bool)
-      then
-        (pure (String.append "c.fswsp"
-            (String.append (spc_forwards ())
-              (String.append (← (freg_name_forwards rs2))
-                (String.append (sep_forwards ())
-                  (String.append (← (hex_bits_8_forwards ((uimm : (BitVec 6)) +++ 0b00#2)))
-                    (String.append "("
-                      (String.append (← (sp_reg_name_forwards ())) (String.append ")" "")))))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .C_FLW (uimm, rsc, rdc) =>
-    (do
-      if ((xlen == 32) : Bool)
-      then
-        (pure (String.append "c.flw"
-            (String.append (spc_forwards ())
-              (String.append (← (cfreg_name_forwards rdc))
-                (String.append (sep_forwards ())
-                  (String.append (← (hex_bits_7_forwards ((uimm : (BitVec 5)) +++ 0b00#2)))
-                    (String.append "("
-                      (String.append (← (creg_name_forwards rsc)) (String.append ")" "")))))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .C_FSW (uimm, rsc1, rsc2) =>
-    (do
-      if ((xlen == 32) : Bool)
-      then
-        (pure (String.append "c.fsw"
-            (String.append (spc_forwards ())
-              (String.append (← (cfreg_name_forwards rsc2))
-                (String.append (sep_forwards ())
-                  (String.append (← (hex_bits_7_forwards ((uimm : (BitVec 5)) +++ 0b00#2)))
-                    (String.append "("
-                      (String.append (← (creg_name_forwards rsc1)) (String.append ")" "")))))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_MADD_TYPE_D (rs3, rs2, rs1, rm, rd, op) =>
-    (pure (String.append (f_madd_type_mnemonic_D_forwards op)
-        (String.append (spc_forwards ())
-          (String.append (← (freg_or_reg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_or_reg_name_forwards rs1))
-                (String.append (sep_forwards ())
-                  (String.append (← (freg_or_reg_name_forwards rs2))
-                    (String.append (sep_forwards ())
-                      (String.append (← (freg_or_reg_name_forwards rs3))
-                        (String.append (sep_forwards ())
-                          (String.append (frm_mnemonic_forwards rm) ""))))))))))))
-  | .F_BIN_RM_TYPE_D (rs2, rs1, rm, rd, op) =>
-    (pure (String.append (f_bin_rm_type_mnemonic_D_forwards op)
-        (String.append (spc_forwards ())
-          (String.append (← (freg_or_reg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_or_reg_name_forwards rs1))
-                (String.append (sep_forwards ())
-                  (String.append (← (freg_or_reg_name_forwards rs2))
-                    (String.append (sep_forwards ()) (String.append (frm_mnemonic_forwards rm) ""))))))))))
-  | .F_UN_RM_FF_TYPE_D (rs1, rm, rd, op) =>
-    (pure (String.append (f_un_rm_ff_type_mnemonic_D_forwards op)
-        (String.append (spc_forwards ())
-          (String.append (← (freg_or_reg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_or_reg_name_forwards rs1))
-                (String.append (sep_forwards ()) (String.append (frm_mnemonic_forwards rm) ""))))))))
-  | .F_UN_RM_FX_TYPE_D (rs1, rm, rd, op) =>
-    (pure (String.append (f_un_rm_fx_type_mnemonic_D_forwards op)
-        (String.append (spc_forwards ())
-          (String.append (← (reg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_or_reg_name_forwards rs1))
-                (String.append (sep_forwards ()) (String.append (frm_mnemonic_forwards rm) ""))))))))
-  | .F_UN_RM_XF_TYPE_D (rs1, rm, rd, op) =>
-    (pure (String.append (f_un_rm_xf_type_mnemonic_D_forwards op)
-        (String.append (spc_forwards ())
-          (String.append (← (freg_or_reg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (reg_name_forwards rs1))
-                (String.append (sep_forwards ()) (String.append (frm_mnemonic_forwards rm) ""))))))))
-  | .F_BIN_F_TYPE_D (rs2, rs1, rd, op) =>
-    (pure (String.append (f_bin_f_type_mnemonic_D_forwards op)
-        (String.append (spc_forwards ())
-          (String.append (← (freg_or_reg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_or_reg_name_forwards rs1))
-                (String.append (sep_forwards ())
-                  (String.append (← (freg_or_reg_name_forwards rs2)) ""))))))))
-  | .F_BIN_X_TYPE_D (rs2, rs1, rd, op) =>
-    (pure (String.append (f_bin_x_type_mnemonic_D_forwards op)
-        (String.append (spc_forwards ())
-          (String.append (← (reg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_or_reg_name_forwards rs1))
-                (String.append (sep_forwards ())
-                  (String.append (← (freg_or_reg_name_forwards rs2)) ""))))))))
-  | .F_UN_X_TYPE_D (rs1, rd, op) =>
-    (pure (String.append (f_un_x_type_mnemonic_D_forwards op)
-        (String.append (spc_forwards ())
-          (String.append (← (reg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_or_reg_name_forwards rs1)) ""))))))
-  | .F_UN_F_TYPE_D (rs1, rd, op) =>
-    (pure (String.append (f_un_f_type_mnemonic_D_forwards op)
-        (String.append (spc_forwards ())
-          (String.append (← (freg_name_forwards rd))
-            (String.append (sep_forwards ()) (String.append (← (reg_name_forwards rs1)) ""))))))
-  | .C_FLDSP (uimm, rd) =>
-    (pure (String.append "c.fldsp"
-        (String.append (spc_forwards ())
-          (String.append (← (freg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (hex_bits_9_forwards ((uimm : (BitVec 6)) +++ 0b000#3)))
-                (String.append "("
-                  (String.append (← (sp_reg_name_forwards ())) (String.append ")" "")))))))))
-  | .C_FSDSP (uimm, rs2) =>
-    (pure (String.append "c.fsdsp"
-        (String.append (spc_forwards ())
-          (String.append (← (freg_name_forwards rs2))
-            (String.append (sep_forwards ())
-              (String.append (← (hex_bits_9_forwards ((uimm : (BitVec 6)) +++ 0b000#3)))
-                (String.append "("
-                  (String.append (← (sp_reg_name_forwards ())) (String.append ")" "")))))))))
-  | .C_FLD (uimm, rsc, rdc) =>
-    (pure (String.append "c.fld"
-        (String.append (spc_forwards ())
-          (String.append (← (cfreg_name_forwards rdc))
-            (String.append (sep_forwards ())
-              (String.append (← (hex_bits_8_forwards ((uimm : (BitVec 5)) +++ 0b000#3)))
-                (String.append "("
-                  (String.append (← (creg_name_forwards rsc)) (String.append ")" "")))))))))
-  | .C_FSD (uimm, rsc1, rsc2) =>
-    (pure (String.append "c.fsd"
-        (String.append (spc_forwards ())
-          (String.append (← (cfreg_name_forwards rsc2))
-            (String.append (sep_forwards ())
-              (String.append (← (hex_bits_8_forwards ((uimm : (BitVec 5)) +++ 0b000#3)))
-                (String.append "("
-                  (String.append (← (creg_name_forwards rsc1)) (String.append ")" "")))))))))
-  | .F_BIN_RM_TYPE_H (rs2, rs1, rm, rd, op) =>
-    (pure (String.append (f_bin_rm_type_mnemonic_H_forwards op)
-        (String.append (spc_forwards ())
-          (String.append (← (freg_or_reg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_or_reg_name_forwards rs1))
-                (String.append (sep_forwards ())
-                  (String.append (← (freg_or_reg_name_forwards rs2))
-                    (String.append (sep_forwards ()) (String.append (frm_mnemonic_forwards rm) ""))))))))))
-  | .F_MADD_TYPE_H (rs3, rs2, rs1, rm, rd, op) =>
-    (pure (String.append (f_madd_type_mnemonic_H_forwards op)
-        (String.append (spc_forwards ())
-          (String.append (← (freg_or_reg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_or_reg_name_forwards rs1))
-                (String.append (sep_forwards ())
-                  (String.append (← (freg_or_reg_name_forwards rs2))
-                    (String.append (sep_forwards ())
-                      (String.append (← (freg_or_reg_name_forwards rs3))
-                        (String.append (sep_forwards ())
-                          (String.append (frm_mnemonic_forwards rm) ""))))))))))))
-  | .F_BIN_F_TYPE_H (rs2, rs1, rd, op) =>
-    (pure (String.append (f_bin_f_type_mnemonic_H_forwards op)
-        (String.append (spc_forwards ())
-          (String.append (← (freg_or_reg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_or_reg_name_forwards rs1))
-                (String.append (sep_forwards ())
-                  (String.append (← (freg_or_reg_name_forwards rs2)) ""))))))))
-  | .F_BIN_X_TYPE_H (rs2, rs1, rd, op) =>
-    (pure (String.append (f_bin_x_type_mnemonic_H_forwards op)
-        (String.append (spc_forwards ())
-          (String.append (← (reg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_or_reg_name_forwards rs1))
-                (String.append (sep_forwards ())
-                  (String.append (← (freg_or_reg_name_forwards rs2)) ""))))))))
-  | .F_UN_RM_FF_TYPE_H (rs1, rm, rd, op) =>
-    (pure (String.append (f_un_rm_ff_type_mnemonic_H_forwards op)
-        (String.append (spc_forwards ())
-          (String.append (← (freg_or_reg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_or_reg_name_forwards rs1))
-                (String.append (sep_forwards ()) (String.append (frm_mnemonic_forwards rm) ""))))))))
-  | .F_UN_RM_FX_TYPE_H (rs1, rm, rd, op) =>
-    (pure (String.append (f_un_rm_fx_type_mnemonic_H_forwards op)
-        (String.append (spc_forwards ())
-          (String.append (← (reg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_or_reg_name_forwards rs1))
-                (String.append (sep_forwards ()) (String.append (frm_mnemonic_forwards rm) ""))))))))
-  | .F_UN_RM_XF_TYPE_H (rs1, rm, rd, op) =>
-    (pure (String.append (f_un_rm_xf_type_mnemonic_H_forwards op)
-        (String.append (spc_forwards ())
-          (String.append (← (freg_or_reg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (reg_name_forwards rs1))
-                (String.append (sep_forwards ()) (String.append (frm_mnemonic_forwards rm) ""))))))))
-  | .F_UN_F_TYPE_H (rs1, rd, op) =>
-    (pure (String.append (f_un_f_type_mnemonic_H_forwards op)
-        (String.append (spc_forwards ())
-          (String.append (← (freg_name_forwards rd))
-            (String.append (sep_forwards ()) (String.append (← (reg_name_forwards rs1)) ""))))))
-  | .F_UN_X_TYPE_H (rs1, rd, op) =>
-    (pure (String.append (f_un_x_type_mnemonic_H_forwards op)
-        (String.append (spc_forwards ())
-          (String.append (← (reg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_or_reg_name_forwards rs1)) ""))))))
-  | .FLI_H (constantidx, rd) =>
-    (pure (String.append "fli.h"
-        (String.append (spc_forwards ())
-          (String.append (← (freg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (hex_bits_5_forwards constantidx)) ""))))))
-  | .FLI_S (constantidx, rd) =>
-    (pure (String.append "fli.s"
-        (String.append (spc_forwards ())
-          (String.append (← (freg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (hex_bits_5_forwards constantidx)) ""))))))
-  | .FLI_D (constantidx, rd) =>
-    (pure (String.append "fli.d"
-        (String.append (spc_forwards ())
-          (String.append (← (freg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (hex_bits_5_forwards constantidx)) ""))))))
-  | .FMINM_H (rs2, rs1, rd) =>
-    (pure (String.append "fminm.h"
-        (String.append (spc_forwards ())
-          (String.append (← (freg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_name_forwards rs1))
-                (String.append (sep_forwards ()) (String.append (← (freg_name_forwards rs2)) ""))))))))
-  | .FMAXM_H (rs2, rs1, rd) =>
-    (pure (String.append "fmaxm.h"
-        (String.append (spc_forwards ())
-          (String.append (← (freg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_name_forwards rs1))
-                (String.append (sep_forwards ()) (String.append (← (freg_name_forwards rs2)) ""))))))))
-  | .FMINM_S (rs2, rs1, rd) =>
-    (pure (String.append "fminm.s"
-        (String.append (spc_forwards ())
-          (String.append (← (freg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_name_forwards rs1))
-                (String.append (sep_forwards ()) (String.append (← (freg_name_forwards rs2)) ""))))))))
-  | .FMAXM_S (rs2, rs1, rd) =>
-    (pure (String.append "fmaxm.s"
-        (String.append (spc_forwards ())
-          (String.append (← (freg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_name_forwards rs1))
-                (String.append (sep_forwards ()) (String.append (← (freg_name_forwards rs2)) ""))))))))
-  | .FMINM_D (rs2, rs1, rd) =>
-    (pure (String.append "fminm.d"
-        (String.append (spc_forwards ())
-          (String.append (← (freg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_name_forwards rs1))
-                (String.append (sep_forwards ()) (String.append (← (freg_name_forwards rs2)) ""))))))))
-  | .FMAXM_D (rs2, rs1, rd) =>
-    (pure (String.append "fmaxm.d"
-        (String.append (spc_forwards ())
-          (String.append (← (freg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_name_forwards rs1))
-                (String.append (sep_forwards ()) (String.append (← (freg_name_forwards rs2)) ""))))))))
-  | .FROUND_H (rs1, rm, rd) =>
-    (pure (String.append "fround.h"
-        (String.append (spc_forwards ())
-          (String.append (← (freg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_name_forwards rs1))
-                (String.append (sep_forwards ()) (String.append (frm_mnemonic_forwards rm) ""))))))))
-  | .FROUNDNX_H (rs1, rm, rd) =>
-    (pure (String.append "froundnx.h"
-        (String.append (spc_forwards ())
-          (String.append (← (freg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_name_forwards rs1))
-                (String.append (sep_forwards ()) (String.append (frm_mnemonic_forwards rm) ""))))))))
-  | .FROUND_S (rs1, rm, rd) =>
-    (pure (String.append "fround.s"
-        (String.append (spc_forwards ())
-          (String.append (← (freg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_name_forwards rs1))
-                (String.append (sep_forwards ()) (String.append (frm_mnemonic_forwards rm) ""))))))))
-  | .FROUNDNX_S (rs1, rm, rd) =>
-    (pure (String.append "froundnx.s"
-        (String.append (spc_forwards ())
-          (String.append (← (freg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_name_forwards rs1))
-                (String.append (sep_forwards ()) (String.append (frm_mnemonic_forwards rm) ""))))))))
-  | .FROUND_D (rs1, rm, rd) =>
-    (pure (String.append "fround.d"
-        (String.append (spc_forwards ())
-          (String.append (← (freg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_name_forwards rs1))
-                (String.append (sep_forwards ()) (String.append (frm_mnemonic_forwards rm) ""))))))))
-  | .FROUNDNX_D (rs1, rm, rd) =>
-    (pure (String.append "froundnx.d"
-        (String.append (spc_forwards ())
-          (String.append (← (freg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_name_forwards rs1))
-                (String.append (sep_forwards ()) (String.append (frm_mnemonic_forwards rm) ""))))))))
-  | .FMVH_X_D (rs1, rd) =>
-    (pure (String.append "fmvh.x.d"
-        (String.append (spc_forwards ())
-          (String.append (← (reg_name_forwards rd))
-            (String.append (sep_forwards ()) (String.append (← (freg_name_forwards rs1)) ""))))))
-  | .FMVP_D_X (rs2, rs1, rd) =>
-    (pure (String.append "fmvp.d.x"
-        (String.append (spc_forwards ())
-          (String.append (← (freg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (reg_name_forwards rs1))
-                (String.append (sep_forwards ()) (String.append (← (reg_name_forwards rs2)) ""))))))))
-  | .FLEQ_H (rs2, rs1, rd) =>
-    (pure (String.append "fleq.h"
-        (String.append (spc_forwards ())
-          (String.append (← (reg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_name_forwards rs1))
-                (String.append (sep_forwards ()) (String.append (← (freg_name_forwards rs2)) ""))))))))
-  | .FLTQ_H (rs2, rs1, rd) =>
-    (pure (String.append "fltq.h"
-        (String.append (spc_forwards ())
-          (String.append (← (reg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_name_forwards rs1))
-                (String.append (sep_forwards ()) (String.append (← (freg_name_forwards rs2)) ""))))))))
-  | .FLEQ_S (rs2, rs1, rd) =>
-    (pure (String.append "fleq.s"
-        (String.append (spc_forwards ())
-          (String.append (← (reg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_name_forwards rs1))
-                (String.append (sep_forwards ()) (String.append (← (freg_name_forwards rs2)) ""))))))))
-  | .FLTQ_S (rs2, rs1, rd) =>
-    (pure (String.append "fltq.s"
-        (String.append (spc_forwards ())
-          (String.append (← (reg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_name_forwards rs1))
-                (String.append (sep_forwards ()) (String.append (← (freg_name_forwards rs2)) ""))))))))
-  | .FLEQ_D (rs2, rs1, rd) =>
-    (pure (String.append "fleq.d"
-        (String.append (spc_forwards ())
-          (String.append (← (reg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_name_forwards rs1))
-                (String.append (sep_forwards ()) (String.append (← (freg_name_forwards rs2)) ""))))))))
-  | .FLTQ_D (rs2, rs1, rd) =>
-    (pure (String.append "fltq.d"
-        (String.append (spc_forwards ())
-          (String.append (← (reg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_name_forwards rs1))
-                (String.append (sep_forwards ()) (String.append (← (freg_name_forwards rs2)) ""))))))))
-  | .FCVTMOD_W_D (rs1, rd) =>
-    (pure (String.append "fcvtmod.w.d"
-        (String.append (spc_forwards ())
-          (String.append (← (reg_name_forwards rd))
-            (String.append (sep_forwards ())
-              (String.append (← (freg_name_forwards rs1))
-                (String.append (sep_forwards ()) (String.append "rtz" ""))))))))
   | .CSRImm (csr, imm, rd, op) =>
     (pure (String.append (csr_mnemonic_forwards op)
         (String.append "i"
@@ -3071,79 +2142,6 @@ def assembly_forwards_matches (arg_ : instruction) : Bool :=
   | .HSV (width, rs1, rs2) => true
   | .HFENCE_VVMA (rs1, rs2) => true
   | .HFENCE_GVMA (rs1, rs2) => true
-  | .LOAD_FP (imm, rs1, rd, width) => true
-  | .STORE_FP (imm, rs2, rs1, width) => true
-  | .F_MADD_TYPE_S (rs3, rs2, rs1, rm, rd, op) => true
-  | .F_BIN_RM_TYPE_S (rs2, rs1, rm, rd, op) => true
-  | .F_UN_RM_FF_TYPE_S (rs1, rm, rd, .FSQRT_S) => true
-  | .F_UN_RM_FX_TYPE_S (rs1, rm, rd, op) => true
-  | .F_UN_RM_XF_TYPE_S (rs1, rm, rd, op) => true
-  | .F_BIN_TYPE_F_S (rs2, rs1, rd, op) => true
-  | .F_BIN_TYPE_X_S (rs2, rs1, rd, op) => true
-  | .F_UN_TYPE_X_S (rs1, rd, op) => true
-  | .F_UN_TYPE_F_S (rs1, rd, op) => true
-  | .C_FLWSP (imm, rd) =>
-    (if ((xlen == 32) : Bool)
-    then true
-    else false)
-  | .C_FSWSP (uimm, rs2) =>
-    (if ((xlen == 32) : Bool)
-    then true
-    else false)
-  | .C_FLW (uimm, rsc, rdc) =>
-    (if ((xlen == 32) : Bool)
-    then true
-    else false)
-  | .C_FSW (uimm, rsc1, rsc2) =>
-    (if ((xlen == 32) : Bool)
-    then true
-    else false)
-  | .F_MADD_TYPE_D (rs3, rs2, rs1, rm, rd, op) => true
-  | .F_BIN_RM_TYPE_D (rs2, rs1, rm, rd, op) => true
-  | .F_UN_RM_FF_TYPE_D (rs1, rm, rd, op) => true
-  | .F_UN_RM_FX_TYPE_D (rs1, rm, rd, op) => true
-  | .F_UN_RM_XF_TYPE_D (rs1, rm, rd, op) => true
-  | .F_BIN_F_TYPE_D (rs2, rs1, rd, op) => true
-  | .F_BIN_X_TYPE_D (rs2, rs1, rd, op) => true
-  | .F_UN_X_TYPE_D (rs1, rd, op) => true
-  | .F_UN_F_TYPE_D (rs1, rd, op) => true
-  | .C_FLDSP (uimm, rd) => true
-  | .C_FSDSP (uimm, rs2) => true
-  | .C_FLD (uimm, rsc, rdc) => true
-  | .C_FSD (uimm, rsc1, rsc2) => true
-  | .F_BIN_RM_TYPE_H (rs2, rs1, rm, rd, op) => true
-  | .F_MADD_TYPE_H (rs3, rs2, rs1, rm, rd, op) => true
-  | .F_BIN_F_TYPE_H (rs2, rs1, rd, op) => true
-  | .F_BIN_X_TYPE_H (rs2, rs1, rd, op) => true
-  | .F_UN_RM_FF_TYPE_H (rs1, rm, rd, op) => true
-  | .F_UN_RM_FX_TYPE_H (rs1, rm, rd, op) => true
-  | .F_UN_RM_XF_TYPE_H (rs1, rm, rd, op) => true
-  | .F_UN_F_TYPE_H (rs1, rd, op) => true
-  | .F_UN_X_TYPE_H (rs1, rd, op) => true
-  | .FLI_H (constantidx, rd) => true
-  | .FLI_S (constantidx, rd) => true
-  | .FLI_D (constantidx, rd) => true
-  | .FMINM_H (rs2, rs1, rd) => true
-  | .FMAXM_H (rs2, rs1, rd) => true
-  | .FMINM_S (rs2, rs1, rd) => true
-  | .FMAXM_S (rs2, rs1, rd) => true
-  | .FMINM_D (rs2, rs1, rd) => true
-  | .FMAXM_D (rs2, rs1, rd) => true
-  | .FROUND_H (rs1, rm, rd) => true
-  | .FROUNDNX_H (rs1, rm, rd) => true
-  | .FROUND_S (rs1, rm, rd) => true
-  | .FROUNDNX_S (rs1, rm, rd) => true
-  | .FROUND_D (rs1, rm, rd) => true
-  | .FROUNDNX_D (rs1, rm, rd) => true
-  | .FMVH_X_D (rs1, rd) => true
-  | .FMVP_D_X (rs2, rs1, rd) => true
-  | .FLEQ_H (rs2, rs1, rd) => true
-  | .FLTQ_H (rs2, rs1, rd) => true
-  | .FLEQ_S (rs2, rs1, rd) => true
-  | .FLTQ_S (rs2, rs1, rd) => true
-  | .FLEQ_D (rs2, rs1, rd) => true
-  | .FLTQ_D (rs2, rs1, rd) => true
-  | .FCVTMOD_W_D (rs1, rd) => true
   | .CSRImm (csr, imm, rd, op) => true
   | .CSRReg (csr, rs1, rd, op) => true
   | .SINVAL_VMA (rs1, rs2) => true
@@ -3247,6 +2245,174 @@ def _update_MEnvcfg_SSE (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
 
 def _update_MEnvcfg_STCE (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
   (Sail.BitVec.updateSubrange v 63 63 x)
+
+def hartSupports_measure (ext : extension) : Int :=
+  match ext with
+  | .Ext_D => 1
+  | .Ext_Ssu64xl => 1
+  | .Ext_Zvkn => 1
+  | .Ext_Zvks => 1
+  | .Ext_Sspm => 1
+  | .Ext_Supm => 1
+  | .Ext_C => 2
+  | .Ext_Zvknc => 2
+  | .Ext_Zvkng => 2
+  | .Ext_Zvksc => 2
+  | .Ext_Zvksg => 2
+  | _ => 0
+
+def hartSupports (merge_var : extension) : Bool :=
+  match merge_var with
+  | .Ext_M => true
+  | .Ext_A => true
+  | .Ext_F => true
+  | .Ext_D => (true && (hartSupports Ext_F))
+  | .Ext_B => false
+  | .Ext_V => ((8 ≥b 7) && (vector_support_ge vector_support_level Full))
+  | .Ext_S => true
+  | .Ext_U => true
+  | .Ext_H => false
+  | .Ext_Sha => false
+  | .Ext_Shcounterenw => false
+  | .Ext_Shgatpa => false
+  | .Ext_Shtvala => false
+  | .Ext_Shvsatpa => false
+  | .Ext_Shvstvala => false
+  | .Ext_Shvstvecd => false
+  | .Ext_Zibi => ((sys_enable_experimental_extensions ()) && (true : Bool))
+  | .Ext_Zic64b => true
+  | .Ext_Zicbom => true
+  | .Ext_Zicbop => true
+  | .Ext_Zicboz => true
+  | .Ext_Zicfilp => true
+  | .Ext_Zicfiss => true
+  | .Ext_Zicntr => true
+  | .Ext_Zicond => true
+  | .Ext_Zicsr => true
+  | .Ext_Zifencei => true
+  | .Ext_Zihintntl => true
+  | .Ext_Zihintpause => true
+  | .Ext_Zihpm => true
+  | .Ext_Zilx => ((sys_enable_experimental_extensions ()) && (false : Bool))
+  | .Ext_Zimop => true
+  | .Ext_Zmmul => false
+  | .Ext_Zaamo => false
+  | .Ext_Zabha => true
+  | .Ext_Zacas => true
+  | .Ext_Zalrsc => false
+  | .Ext_Zama16b => true
+  | .Ext_Zawrs => true
+  | .Ext_Za64rs => ((plat_reservation_set_size_exp ≤b 6) && ((false : Bool) || (true : Bool)))
+  | .Ext_Za128rs => ((plat_reservation_set_size_exp ≤b 7) && ((false : Bool) || (true : Bool)))
+  | .Ext_Zfa => true
+  | .Ext_Zfbfmin => true
+  | .Ext_Zfh => true
+  | .Ext_Zfhmin => true
+  | .Ext_Zfinx => false
+  | .Ext_Zdinx => false
+  | .Ext_Zca => true
+  | .Ext_Zcb => true
+  | .Ext_Zcd => true
+  | .Ext_Zcf => ((false : Bool) && (xlen == 32))
+  | .Ext_Zcmop => true
+  | .Ext_C =>
+    ((hartSupports Ext_Zca) && (((hartSupports Ext_Zcf) || ((not (hartSupports Ext_F)) || (xlen != 32))) && ((hartSupports
+            Ext_Zcd) || (not (hartSupports Ext_D)))))
+  | .Ext_Zba => false
+  | .Ext_Zbb => false
+  | .Ext_Zbc => true
+  | .Ext_Zbkb => true
+  | .Ext_Zbkc => true
+  | .Ext_Zbkx => true
+  | .Ext_Zbs => false
+  | .Ext_Ziccamoa => true
+  | .Ext_Ziccamoc => true
+  | .Ext_Ziccif => true
+  | .Ext_Zicclsm => true
+  | .Ext_Ziccrse => true
+  | .Ext_Zknd => true
+  | .Ext_Zkne => true
+  | .Ext_Zknh => true
+  | .Ext_Zkr => true
+  | .Ext_Zksed => true
+  | .Ext_Zksh => true
+  | .Ext_Zkt => true
+  | .Ext_Zhinx => false
+  | .Ext_Zhinxmin => false
+  | .Ext_Zvl32b => (8 ≥b 5)
+  | .Ext_Zvl64b => (8 ≥b 6)
+  | .Ext_Zvl128b => (8 ≥b 7)
+  | .Ext_Zvl256b => (8 ≥b 8)
+  | .Ext_Zvl512b => (8 ≥b 9)
+  | .Ext_Zvl1024b => (8 ≥b 10)
+  | .Ext_Zve32f => ((6 ≥b 5) && (vector_support_ge vector_support_level Float_single))
+  | .Ext_Zve32x => ((6 ≥b 5) && (vector_support_ge vector_support_level Integer))
+  | .Ext_Zve64d => ((6 ≥b 6) && (vector_support_ge vector_support_level Float_double))
+  | .Ext_Zve64f => ((6 ≥b 6) && (vector_support_ge vector_support_level Float_single))
+  | .Ext_Zve64x => ((6 ≥b 6) && (vector_support_ge vector_support_level Integer))
+  | .Ext_Zvabd => ((sys_enable_experimental_extensions ()) && (false : Bool))
+  | .Ext_Zvfbfmin => false
+  | .Ext_Zvfbfwma => false
+  | .Ext_Zvfh => false
+  | .Ext_Zvfhmin => false
+  | .Ext_Zvbb => false
+  | .Ext_Zvbc => false
+  | .Ext_Zvkb => false
+  | .Ext_Zvkg => false
+  | .Ext_Zvkned => false
+  | .Ext_Zvknha => false
+  | .Ext_Zvknhb => false
+  | .Ext_Zvksed => false
+  | .Ext_Zvksh => false
+  | .Ext_Zvkt => false
+  | .Ext_Zvkn =>
+    ((hartSupports Ext_Zvkned) && ((hartSupports Ext_Zvknhb) && ((hartSupports Ext_Zvkb) && (hartSupports
+            Ext_Zvkt))))
+  | .Ext_Zvknc => ((hartSupports Ext_Zvkn) && (hartSupports Ext_Zvbc))
+  | .Ext_Zvkng => ((hartSupports Ext_Zvkn) && (hartSupports Ext_Zvkg))
+  | .Ext_Zvks =>
+    ((hartSupports Ext_Zvksed) && ((hartSupports Ext_Zvksh) && ((hartSupports Ext_Zvkb) && (hartSupports
+            Ext_Zvkt))))
+  | .Ext_Zvksc => ((hartSupports Ext_Zvks) && (hartSupports Ext_Zvbc))
+  | .Ext_Zvksg => ((hartSupports Ext_Zvks) && (hartSupports Ext_Zvkg))
+  | .Ext_Ssccptr => true
+  | .Ext_Sscofpmf => true
+  | .Ext_Sscounterenw => true
+  | .Ext_Ssdbltrp => false
+  | .Ext_Ssnpm => ((true : Bool) && (xlen == 64))
+  | .Ext_Ssstateen => true
+  | .Ext_Ssstrict => true
+  | .Ext_Sdtrig => false
+  | .Ext_Sstc => true
+  | .Ext_Sstvala => true
+  | .Ext_Sstvecd => true
+  | .Ext_Ssu64xl => ((hartSupports Ext_S) && (xlen == 64))
+  | .Ext_Svbare => true
+  | .Ext_Sv32 => ((false : Bool) && (xlen == 32))
+  | .Ext_Sv39 => ((true : Bool) && (xlen == 64))
+  | .Ext_Sv48 => ((true : Bool) && (xlen == 64))
+  | .Ext_Sv57 => ((true : Bool) && (xlen == 64))
+  | .Ext_Svade => true
+  | .Ext_Svadu => true
+  | .Ext_Svinval => true
+  | .Ext_Svnapot => ((true : Bool) && (xlen == 64))
+  | .Ext_Svpbmt => ((true : Bool) && (xlen == 64))
+  | .Ext_Svrsw60t59b => true
+  | .Ext_Svukte => ((sys_enable_experimental_extensions ()) && ((false : Bool) && (xlen == 64)))
+  | .Ext_Svvptc => true
+  | .Ext_Smcntrpmf => true
+  | .Ext_Smdbltrp => false
+  | .Ext_Smmpm => ((true : Bool) && (xlen == 64))
+  | .Ext_Smnpm => ((true : Bool) && (xlen == 64))
+  | .Ext_Smstateen => true
+  | .Ext_Ssqosid => true
+  | .Ext_Sspm => ((hartSupports Ext_Smnpm) && (hartSupports Ext_S))
+  | .Ext_Supm =>
+    ((hartSupports Ext_U) && (if ((hartSupports Ext_S) : Bool)
+      then (hartSupports Ext_Ssnpm)
+      else (hartSupports Ext_Smnpm)))
+termination_by (let ext := merge_var
+(hartSupports_measure ext)).toNat
 
 def xenvcfg_cbie_reserved_behavior : XenvcfgCbieReservedBehavior := Xenvcfg_ClearPermissions
 
@@ -3610,7 +2776,7 @@ def _update_Mstateen0_SE0 (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
 def _update_Mstateen0_SRMCFG (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
   (Sail.BitVec.updateSubrange v 55 55 x)
 
-/-- Type quantifiers: k_ex1238034_ : Bool -/
+/-- Type quantifiers: k_ex1170609_ : Bool -/
 def legalize_csr_bit (c : CSRBitConfig) (feature_enabled : Bool) (v : (BitVec 1)) : (BitVec 1) :=
   if ((not feature_enabled) : Bool)
   then 0#1
@@ -4181,68 +3347,6 @@ def currentlyEnabled (merge_var : extension) : SailM Bool := do
       if ((hartSupports Ext_Zcb) : Bool)
       then (currentlyEnabled Ext_Zca)
       else (pure false))
-  | .Ext_Zfh =>
-    (do
-      if ((hartSupports Ext_Zfh) : Bool)
-      then (currentlyEnabled Ext_F)
-      else (pure false))
-  | .Ext_Zfhmin =>
-    (do
-      if ((← do
-           if ((hartSupports Ext_Zfhmin) : Bool)
-           then (currentlyEnabled Ext_F)
-           else (pure false)) : Bool)
-      then (pure true)
-      else (currentlyEnabled Ext_Zfh))
-  | .Ext_Zcf =>
-    (do
-      if ((hartSupports Ext_Zcf) : Bool)
-      then
-        (do
-          if ((← (currentlyEnabled Ext_F)) : Bool)
-          then
-            (do
-              if ((← (currentlyEnabled Ext_Zca)) : Bool)
-              then (pure ((← (currentlyEnabled Ext_C)) || (not (hartSupports Ext_C))))
-              else (pure false))
-          else (pure false))
-      else (pure false))
-  | .Ext_Zdinx =>
-    (do
-      if ((hartSupports Ext_Zdinx) : Bool)
-      then (currentlyEnabled Ext_Zfinx)
-      else (pure false))
-  | .Ext_Zcd =>
-    (do
-      if ((hartSupports Ext_Zcd) : Bool)
-      then
-        (do
-          if ((← (currentlyEnabled Ext_D)) : Bool)
-          then
-            (do
-              if ((← (currentlyEnabled Ext_Zca)) : Bool)
-              then (pure ((← (currentlyEnabled Ext_C)) || (not (hartSupports Ext_C))))
-              else (pure false))
-          else (pure false))
-      else (pure false))
-  | .Ext_Zhinx =>
-    (do
-      if ((hartSupports Ext_Zhinx) : Bool)
-      then (currentlyEnabled Ext_Zfinx)
-      else (pure false))
-  | .Ext_Zhinxmin =>
-    (do
-      if ((← do
-           if ((hartSupports Ext_Zhinxmin) : Bool)
-           then (currentlyEnabled Ext_Zfinx)
-           else (pure false)) : Bool)
-      then (pure true)
-      else (currentlyEnabled Ext_Zhinx))
-  | .Ext_Zfa =>
-    (do
-      if ((hartSupports Ext_Zfa) : Bool)
-      then (currentlyEnabled Ext_F)
-      else (pure false))
   | .Ext_Zicsr => (pure (hartSupports Ext_Zicsr))
   | .Ext_Svinval => (pure (hartSupports Ext_Svinval))
   | .Ext_Zihpm =>
@@ -4688,10 +3792,6 @@ def encdec_csrop_forwards (arg_ : csrop) : (BitVec 2) :=
   | .CSRRS => 0b10#2
   | .CSRRC => 0b11#2
 
-def encdec_freg_forwards (arg_ : fregidx) : (BitVec 5) :=
-  match arg_ with
-  | .Fregidx r => r
-
 def encdec_iop_forwards (arg_ : iop) : (BitVec 3) :=
   match arg_ with
   | .ADDI => 0b000#3
@@ -4719,15 +3819,6 @@ def encdec_ntl_forwards (arg_ : ntl_type) : (BitVec 5) :=
   | .NTL_S1 => 0b00100#5
   | .NTL_ALL => 0b00101#5
 
-def encdec_rounding_mode_forwards (arg_ : rounding_mode) : (BitVec 3) :=
-  match arg_ with
-  | .RM_RNE => 0b000#3
-  | .RM_RTZ => 0b001#3
-  | .RM_RDN => 0b010#3
-  | .RM_RUP => 0b011#3
-  | .RM_RMM => 0b100#3
-  | .RM_DYN => 0b111#3
-
 def encdec_uop_forwards (arg_ : uop) : (BitVec 7) :=
   match arg_ with
   | .LUI => 0b0110111#7
@@ -4744,91 +3835,13 @@ def encdec_zicondop_forwards (arg_ : zicondop) : (BitVec 3) :=
   | .CZERO_NEZ => 0b111#3
 
 /-- Type quantifiers: width : Nat, List.elem width [1, 2, 4, 8] -/
-def float_load_store_width_supported (width : Nat) : SailM Bool := do
-  match width with
-  | 1 => (pure false)
-  | 2 =>
-    (do
-      if ((← (currentlyEnabled Ext_Zfhmin)) : Bool)
-      then (pure true)
-      else (currentlyEnabled Ext_Zfbfmin))
-  | 4 => (currentlyEnabled Ext_F)
-  | _ => (currentlyEnabled Ext_D)
-
-def haveDoubleFPU (_ : Unit) : SailM Bool := do
-  if ((← (currentlyEnabled Ext_D)) : Bool)
-  then (pure true)
-  else (currentlyEnabled Ext_Zdinx)
-
-def haveHalfFPU (_ : Unit) : SailM Bool := do
-  if ((← (currentlyEnabled Ext_Zfh)) : Bool)
-  then (pure true)
-  else (currentlyEnabled Ext_Zhinx)
-
-def haveHalfMin (_ : Unit) : SailM Bool := do
-  if ((← (haveHalfFPU ())) : Bool)
-  then (pure true)
-  else
-    (do
-      if ((← (currentlyEnabled Ext_Zfhmin)) : Bool)
-      then (pure true)
-      else (currentlyEnabled Ext_Zhinxmin))
-
-def haveSingleFPU (_ : Unit) : SailM Bool := do
-  if ((← (currentlyEnabled Ext_F)) : Bool)
-  then (pure true)
-  else (currentlyEnabled Ext_Zfinx)
-
-def Mk_Hstatus (v : (BitVec 64)) : (BitVec 64) :=
-  v
-
-def _update_Hstatus_VSXL (v : (BitVec 64)) (x : (BitVec 2)) : (BitVec 64) :=
-  (Sail.BitVec.updateSubrange v 33 32 x)
-
-def _get_Hstatus_VSXL (v : (BitVec 64)) : (BitVec 2) :=
-  (Sail.BitVec.extractLsb v 33 32)
-
-def _get_Misa_MXL (v : (BitVec 64)) : (BitVec (64 - 1 - (64 - 2) + 1)) :=
-  (Sail.BitVec.extractLsb v (64 -i 1) (64 -i 2))
-
-def _get_Mstatus_SXL (v : (BitVec 64)) : (BitVec 2) :=
-  (Sail.BitVec.extractLsb v 35 34)
-
-def _get_Mstatus_UXL (v : (BitVec 64)) : (BitVec 2) :=
-  (Sail.BitVec.extractLsb v 33 32)
-
-def architecture_bits_backwards (arg_ : (BitVec 2)) : SailM Architecture := do
-  match arg_ with
-  | 0b01 => (pure RV32)
-  | 0b10 => (pure RV64)
-  | 0b11 => (pure RV128)
-  | _ => (internal_error "core/types.sail" 62 "architecture(0b00) is invalid")
-
-def architecture (priv : Privilege) : SailM Architecture := do
-  (architecture_bits_backwards
-    (← do
-      match priv with
-      | .Machine => (pure (_get_Misa_MXL (← readReg misa)))
-      | .Supervisor => (pure (_get_Mstatus_SXL (← readReg mstatus)))
-      | .User => (pure (_get_Mstatus_UXL (← readReg mstatus)))
-      | .VirtualSupervisor => (pure (_get_Hstatus_VSXL (← readReg hstatus)))
-      | .VirtualUser => (pure (_get_Mstatus_UXL (← readReg vsstatus)))))
-
-def in32BitMode (_ : Unit) : SailM Bool := do
-  (pure ((← (architecture (← readReg cur_privilege))) == RV32))
-
-/-- Type quantifiers: width : Nat, List.elem width [1, 2, 4, 8] -/
 def lrsc_width_valid (width : Nat) : Bool :=
   match width with
   | 4 => true
   | 8 => (xlen ≥b 64)
   | _ => false
 
-/-- Type quantifiers: n : Nat, n ≥ 0, n > 0 -/
-def validDoubleRegs {n : _} (regs : (Vector fregidx n)) : Bool :=
-  true
-
-/-- Type quantifiers: k_ex1239998_ : Bool, width : Nat, List.elem width [1, 2, 4, 8] -/
+/-- Type quantifiers: k_ex1172248_ : Bool, width : Nat, List.elem width [1, 2, 4, 8] -/
 def valid_load_encdec (width : Nat) (is_unsigned : Bool) : Bool :=
   ((width <b xlen_bytes) || ((not is_unsigned) && (width ≤b xlen_bytes)))
 
@@ -5651,1240 +4664,6 @@ noncomputable def encdec_forwards (arg_ : instruction) : SailM (BitVec 32) := do
       if ((← (currentlyEnabled Ext_H)) : Bool)
       then
         (pure (0b0110001#7 +++ ((encdec_reg_forwards rs2) +++ ((encdec_reg_forwards rs1) +++ (0b000#3 +++ (0b00000#5 +++ 0b1110011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .LOAD_FP (imm, rs1, rd, width) =>
-    (do
-      if ((← (float_load_store_width_supported width)) : Bool)
-      then
-        (pure ((imm : (BitVec 12)) +++ ((encdec_reg_forwards rs1) +++ (0#1 +++ ((width_enc_forwards
-                    width) +++ ((encdec_freg_forwards rd) +++ 0b0000111#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .STORE_FP (imm, rs2, rs1, width) =>
-    (do
-      if ((← (float_load_store_width_supported width)) : Bool)
-      then
-        (pure ((Sail.BitVec.extractLsb imm 11 5) +++ ((encdec_freg_forwards rs2) +++ ((encdec_reg_forwards
-                  rs1) +++ (0#1 +++ ((width_enc_forwards width) +++ ((Sail.BitVec.extractLsb imm 4 0) +++ 0b0100111#7)))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_MADD_TYPE_S (rs3, rs2, rs1, rm, rd, .FMADD_S) =>
-    (do
-      if ((← (haveSingleFPU ())) : Bool)
-      then
-        (pure ((encdec_freg_forwards rs3) +++ (0b00#2 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards
-                    rs1) +++ ((encdec_rounding_mode_forwards rm) +++ ((encdec_freg_forwards rd) +++ 0b1000011#7)))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_MADD_TYPE_S (rs3, rs2, rs1, rm, rd, .FMSUB_S) =>
-    (do
-      if ((← (haveSingleFPU ())) : Bool)
-      then
-        (pure ((encdec_freg_forwards rs3) +++ (0b00#2 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards
-                    rs1) +++ ((encdec_rounding_mode_forwards rm) +++ ((encdec_freg_forwards rd) +++ 0b1000111#7)))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_MADD_TYPE_S (rs3, rs2, rs1, rm, rd, .FNMSUB_S) =>
-    (do
-      if ((← (haveSingleFPU ())) : Bool)
-      then
-        (pure ((encdec_freg_forwards rs3) +++ (0b00#2 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards
-                    rs1) +++ ((encdec_rounding_mode_forwards rm) +++ ((encdec_freg_forwards rd) +++ 0b1001011#7)))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_MADD_TYPE_S (rs3, rs2, rs1, rm, rd, .FNMADD_S) =>
-    (do
-      if ((← (haveSingleFPU ())) : Bool)
-      then
-        (pure ((encdec_freg_forwards rs3) +++ (0b00#2 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards
-                    rs1) +++ ((encdec_rounding_mode_forwards rm) +++ ((encdec_freg_forwards rd) +++ 0b1001111#7)))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_RM_TYPE_S (rs2, rs1, rm, rd, .FADD_S) =>
-    (do
-      if ((← (haveSingleFPU ())) : Bool)
-      then
-        (pure (0b0000000#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_RM_TYPE_S (rs2, rs1, rm, rd, .FSUB_S) =>
-    (do
-      if ((← (haveSingleFPU ())) : Bool)
-      then
-        (pure (0b0000100#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_RM_TYPE_S (rs2, rs1, rm, rd, .FMUL_S) =>
-    (do
-      if ((← (haveSingleFPU ())) : Bool)
-      then
-        (pure (0b0001000#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_RM_TYPE_S (rs2, rs1, rm, rd, .FDIV_S) =>
-    (do
-      if ((← (haveSingleFPU ())) : Bool)
-      then
-        (pure (0b0001100#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_RM_FF_TYPE_S (rs1, rm, rd, .FSQRT_S) =>
-    (do
-      if ((← (haveSingleFPU ())) : Bool)
-      then
-        (pure (0b0101100#7 +++ (0b00000#5 +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_RM_FX_TYPE_S (rs1, rm, rd, .FCVT_W_S) =>
-    (do
-      if ((← (haveSingleFPU ())) : Bool)
-      then
-        (pure (0b1100000#7 +++ (0b00000#5 +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_reg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_RM_FX_TYPE_S (rs1, rm, rd, .FCVT_WU_S) =>
-    (do
-      if ((← (haveSingleFPU ())) : Bool)
-      then
-        (pure (0b1100000#7 +++ (0b00001#5 +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_reg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_RM_XF_TYPE_S (rs1, rm, rd, .FCVT_S_W) =>
-    (do
-      if ((← (haveSingleFPU ())) : Bool)
-      then
-        (pure (0b1101000#7 +++ (0b00000#5 +++ ((encdec_reg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_RM_XF_TYPE_S (rs1, rm, rd, .FCVT_S_WU) =>
-    (do
-      if ((← (haveSingleFPU ())) : Bool)
-      then
-        (pure (0b1101000#7 +++ (0b00001#5 +++ ((encdec_reg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_RM_FX_TYPE_S (rs1, rm, rd, .FCVT_L_S) =>
-    (do
-      if (((← (haveSingleFPU ())) && (xlen ≥b 64)) : Bool)
-      then
-        (pure (0b1100000#7 +++ (0b00010#5 +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_reg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_RM_FX_TYPE_S (rs1, rm, rd, .FCVT_LU_S) =>
-    (do
-      if (((← (haveSingleFPU ())) && (xlen ≥b 64)) : Bool)
-      then
-        (pure (0b1100000#7 +++ (0b00011#5 +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_reg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_RM_XF_TYPE_S (rs1, rm, rd, .FCVT_S_L) =>
-    (do
-      if (((← (haveSingleFPU ())) && (xlen ≥b 64)) : Bool)
-      then
-        (pure (0b1101000#7 +++ (0b00010#5 +++ ((encdec_reg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_RM_XF_TYPE_S (rs1, rm, rd, .FCVT_S_LU) =>
-    (do
-      if (((← (haveSingleFPU ())) && (xlen ≥b 64)) : Bool)
-      then
-        (pure (0b1101000#7 +++ (0b00011#5 +++ ((encdec_reg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_TYPE_F_S (rs2, rs1, rd, .FSGNJ_S) =>
-    (do
-      if ((← (haveSingleFPU ())) : Bool)
-      then
-        (pure (0b0010000#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b000#3 +++ ((encdec_freg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_TYPE_F_S (rs2, rs1, rd, .FSGNJN_S) =>
-    (do
-      if ((← (haveSingleFPU ())) : Bool)
-      then
-        (pure (0b0010000#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b001#3 +++ ((encdec_freg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_TYPE_F_S (rs2, rs1, rd, .FSGNJX_S) =>
-    (do
-      if ((← (haveSingleFPU ())) : Bool)
-      then
-        (pure (0b0010000#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b010#3 +++ ((encdec_freg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_TYPE_F_S (rs2, rs1, rd, .FMIN_S) =>
-    (do
-      if ((← (haveSingleFPU ())) : Bool)
-      then
-        (pure (0b0010100#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b000#3 +++ ((encdec_freg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_TYPE_F_S (rs2, rs1, rd, .FMAX_S) =>
-    (do
-      if ((← (haveSingleFPU ())) : Bool)
-      then
-        (pure (0b0010100#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b001#3 +++ ((encdec_freg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_TYPE_X_S (rs2, rs1, rd, .FEQ_S) =>
-    (do
-      if ((← (haveSingleFPU ())) : Bool)
-      then
-        (pure (0b1010000#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b010#3 +++ ((encdec_reg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_TYPE_X_S (rs2, rs1, rd, .FLT_S) =>
-    (do
-      if ((← (haveSingleFPU ())) : Bool)
-      then
-        (pure (0b1010000#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b001#3 +++ ((encdec_reg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_TYPE_X_S (rs2, rs1, rd, .FLE_S) =>
-    (do
-      if ((← (haveSingleFPU ())) : Bool)
-      then
-        (pure (0b1010000#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b000#3 +++ ((encdec_reg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_TYPE_X_S (rs1, rd, .FCLASS_S) =>
-    (do
-      if ((← (haveSingleFPU ())) : Bool)
-      then
-        (pure (0b1110000#7 +++ (0b00000#5 +++ ((encdec_freg_forwards rs1) +++ (0b001#3 +++ ((encdec_reg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_TYPE_X_S (rs1, rd, .FMV_X_W) =>
-    (do
-      if ((← (currentlyEnabled Ext_F)) : Bool)
-      then
-        (pure (0b1110000#7 +++ (0b00000#5 +++ ((encdec_freg_forwards rs1) +++ (0b000#3 +++ ((encdec_reg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_TYPE_F_S (rs1, rd, .FMV_W_X) =>
-    (do
-      if ((← (currentlyEnabled Ext_F)) : Bool)
-      then
-        (pure (0b1111000#7 +++ (0b00000#5 +++ ((encdec_reg_forwards rs1) +++ (0b000#3 +++ ((encdec_freg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_MADD_TYPE_D (rs3, rs2, rs1, rm, rd, .FMADD_D) =>
-    (do
-      if (((← (haveDoubleFPU ())) && (validDoubleRegs (n := 4) #v[rd, rs1, rs2, rs3])) : Bool)
-      then
-        (pure ((encdec_freg_forwards rs3) +++ (0b01#2 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards
-                    rs1) +++ ((encdec_rounding_mode_forwards rm) +++ ((encdec_freg_forwards rd) +++ 0b1000011#7)))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_MADD_TYPE_D (rs3, rs2, rs1, rm, rd, .FMSUB_D) =>
-    (do
-      if (((← (haveDoubleFPU ())) && (validDoubleRegs (n := 4) #v[rd, rs1, rs2, rs3])) : Bool)
-      then
-        (pure ((encdec_freg_forwards rs3) +++ (0b01#2 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards
-                    rs1) +++ ((encdec_rounding_mode_forwards rm) +++ ((encdec_freg_forwards rd) +++ 0b1000111#7)))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_MADD_TYPE_D (rs3, rs2, rs1, rm, rd, .FNMSUB_D) =>
-    (do
-      if (((← (haveDoubleFPU ())) && (validDoubleRegs (n := 4) #v[rd, rs1, rs2, rs3])) : Bool)
-      then
-        (pure ((encdec_freg_forwards rs3) +++ (0b01#2 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards
-                    rs1) +++ ((encdec_rounding_mode_forwards rm) +++ ((encdec_freg_forwards rd) +++ 0b1001011#7)))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_MADD_TYPE_D (rs3, rs2, rs1, rm, rd, .FNMADD_D) =>
-    (do
-      if (((← (haveDoubleFPU ())) && (validDoubleRegs (n := 4) #v[rd, rs1, rs2, rs3])) : Bool)
-      then
-        (pure ((encdec_freg_forwards rs3) +++ (0b01#2 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards
-                    rs1) +++ ((encdec_rounding_mode_forwards rm) +++ ((encdec_freg_forwards rd) +++ 0b1001111#7)))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_RM_TYPE_D (rs2, rs1, rm, rd, .FADD_D) =>
-    (do
-      if (((← (haveDoubleFPU ())) && (validDoubleRegs (n := 3) #v[rd, rs1, rs2])) : Bool)
-      then
-        (pure (0b0000001#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_RM_TYPE_D (rs2, rs1, rm, rd, .FSUB_D) =>
-    (do
-      if (((← (haveDoubleFPU ())) && (validDoubleRegs (n := 3) #v[rd, rs1, rs2])) : Bool)
-      then
-        (pure (0b0000101#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_RM_TYPE_D (rs2, rs1, rm, rd, .FMUL_D) =>
-    (do
-      if (((← (haveDoubleFPU ())) && (validDoubleRegs (n := 3) #v[rd, rs1, rs2])) : Bool)
-      then
-        (pure (0b0001001#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_RM_TYPE_D (rs2, rs1, rm, rd, .FDIV_D) =>
-    (do
-      if (((← (haveDoubleFPU ())) && (validDoubleRegs (n := 3) #v[rd, rs1, rs2])) : Bool)
-      then
-        (pure (0b0001101#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_RM_FF_TYPE_D (rs1, rm, rd, .FSQRT_D) =>
-    (do
-      if (((← (haveDoubleFPU ())) && (validDoubleRegs (n := 2) #v[rd, rs1])) : Bool)
-      then
-        (pure (0b0101101#7 +++ (0b00000#5 +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_RM_FX_TYPE_D (rs1, rm, rd, .FCVT_W_D) =>
-    (do
-      if (((← (haveDoubleFPU ())) && (validDoubleRegs (n := 1) #v[rs1])) : Bool)
-      then
-        (pure (0b1100001#7 +++ (0b00000#5 +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_reg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_RM_FX_TYPE_D (rs1, rm, rd, .FCVT_WU_D) =>
-    (do
-      if (((← (haveDoubleFPU ())) && (validDoubleRegs (n := 1) #v[rs1])) : Bool)
-      then
-        (pure (0b1100001#7 +++ (0b00001#5 +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_reg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_RM_XF_TYPE_D (rs1, rm, rd, .FCVT_D_W) =>
-    (do
-      if (((← (haveDoubleFPU ())) && (validDoubleRegs (n := 1) #v[rd])) : Bool)
-      then
-        (pure (0b1101001#7 +++ (0b00000#5 +++ ((encdec_reg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_RM_XF_TYPE_D (rs1, rm, rd, .FCVT_D_WU) =>
-    (do
-      if (((← (haveDoubleFPU ())) && (validDoubleRegs (n := 1) #v[rd])) : Bool)
-      then
-        (pure (0b1101001#7 +++ (0b00001#5 +++ ((encdec_reg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_RM_FF_TYPE_D (rs1, rm, rd, .FCVT_S_D) =>
-    (do
-      if (((← (haveDoubleFPU ())) && (validDoubleRegs (n := 1) #v[rs1])) : Bool)
-      then
-        (pure (0b0100000#7 +++ (0b00001#5 +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_RM_FF_TYPE_D (rs1, rm, rd, .FCVT_D_S) =>
-    (do
-      if (((← (haveDoubleFPU ())) && (validDoubleRegs (n := 1) #v[rd])) : Bool)
-      then
-        (pure (0b0100001#7 +++ (0b00000#5 +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_RM_FX_TYPE_D (rs1, rm, rd, .FCVT_L_D) =>
-    (do
-      if (((← (haveDoubleFPU ())) && (xlen ≥b 64)) : Bool)
-      then
-        (pure (0b1100001#7 +++ (0b00010#5 +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_reg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_RM_FX_TYPE_D (rs1, rm, rd, .FCVT_LU_D) =>
-    (do
-      if (((← (haveDoubleFPU ())) && (xlen ≥b 64)) : Bool)
-      then
-        (pure (0b1100001#7 +++ (0b00011#5 +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_reg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_RM_XF_TYPE_D (rs1, rm, rd, .FCVT_D_L) =>
-    (do
-      if (((← (haveDoubleFPU ())) && (xlen ≥b 64)) : Bool)
-      then
-        (pure (0b1101001#7 +++ (0b00010#5 +++ ((encdec_reg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_RM_XF_TYPE_D (rs1, rm, rd, .FCVT_D_LU) =>
-    (do
-      if (((← (haveDoubleFPU ())) && (xlen ≥b 64)) : Bool)
-      then
-        (pure (0b1101001#7 +++ (0b00011#5 +++ ((encdec_reg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_F_TYPE_D (rs2, rs1, rd, .FSGNJ_D) =>
-    (do
-      if (((← (haveDoubleFPU ())) && (validDoubleRegs (n := 3) #v[rd, rs1, rs2])) : Bool)
-      then
-        (pure (0b0010001#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b000#3 +++ ((encdec_freg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_F_TYPE_D (rs2, rs1, rd, .FSGNJN_D) =>
-    (do
-      if (((← (haveDoubleFPU ())) && (validDoubleRegs (n := 3) #v[rd, rs1, rs2])) : Bool)
-      then
-        (pure (0b0010001#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b001#3 +++ ((encdec_freg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_F_TYPE_D (rs2, rs1, rd, .FSGNJX_D) =>
-    (do
-      if (((← (haveDoubleFPU ())) && (validDoubleRegs (n := 3) #v[rd, rs1, rs2])) : Bool)
-      then
-        (pure (0b0010001#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b010#3 +++ ((encdec_freg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_F_TYPE_D (rs2, rs1, rd, .FMIN_D) =>
-    (do
-      if (((← (haveDoubleFPU ())) && (validDoubleRegs (n := 3) #v[rd, rs1, rs2])) : Bool)
-      then
-        (pure (0b0010101#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b000#3 +++ ((encdec_freg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_F_TYPE_D (rs2, rs1, rd, .FMAX_D) =>
-    (do
-      if (((← (haveDoubleFPU ())) && (validDoubleRegs (n := 3) #v[rd, rs1, rs2])) : Bool)
-      then
-        (pure (0b0010101#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b001#3 +++ ((encdec_freg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_X_TYPE_D (rs2, rs1, rd, .FEQ_D) =>
-    (do
-      if (((← (haveDoubleFPU ())) && (validDoubleRegs (n := 2) #v[rs1, rs2])) : Bool)
-      then
-        (pure (0b1010001#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b010#3 +++ ((encdec_reg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_X_TYPE_D (rs2, rs1, rd, .FLT_D) =>
-    (do
-      if (((← (haveDoubleFPU ())) && (validDoubleRegs (n := 2) #v[rs1, rs2])) : Bool)
-      then
-        (pure (0b1010001#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b001#3 +++ ((encdec_reg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_X_TYPE_D (rs2, rs1, rd, .FLE_D) =>
-    (do
-      if (((← (haveDoubleFPU ())) && (validDoubleRegs (n := 2) #v[rs1, rs2])) : Bool)
-      then
-        (pure (0b1010001#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b000#3 +++ ((encdec_reg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_X_TYPE_D (rs1, rd, .FCLASS_D) =>
-    (do
-      if (((← (haveDoubleFPU ())) && (validDoubleRegs (n := 1) #v[rs1])) : Bool)
-      then
-        (pure (0b1110001#7 +++ (0b00000#5 +++ ((encdec_freg_forwards rs1) +++ (0b001#3 +++ ((encdec_reg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_X_TYPE_D (rs1, rd, .FMV_X_D) =>
-    (do
-      if (((← (currentlyEnabled Ext_D)) && (xlen ≥b 64)) : Bool)
-      then
-        (pure (0b1110001#7 +++ (0b00000#5 +++ ((encdec_freg_forwards rs1) +++ (0b000#3 +++ ((encdec_reg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_F_TYPE_D (rs1, rd, .FMV_D_X) =>
-    (do
-      if (((← (currentlyEnabled Ext_D)) && (xlen ≥b 64)) : Bool)
-      then
-        (pure (0b1111001#7 +++ (0b00000#5 +++ ((encdec_reg_forwards rs1) +++ (0b000#3 +++ ((encdec_freg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_RM_TYPE_H (rs2, rs1, rm, rd, .FADD_H) =>
-    (do
-      if ((← (haveHalfFPU ())) : Bool)
-      then
-        (pure (0b0000010#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_RM_TYPE_H (rs2, rs1, rm, rd, .FSUB_H) =>
-    (do
-      if ((← (haveHalfFPU ())) : Bool)
-      then
-        (pure (0b0000110#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_RM_TYPE_H (rs2, rs1, rm, rd, .FMUL_H) =>
-    (do
-      if ((← (haveHalfFPU ())) : Bool)
-      then
-        (pure (0b0001010#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_RM_TYPE_H (rs2, rs1, rm, rd, .FDIV_H) =>
-    (do
-      if ((← (haveHalfFPU ())) : Bool)
-      then
-        (pure (0b0001110#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_MADD_TYPE_H (rs3, rs2, rs1, rm, rd, .FMADD_H) =>
-    (do
-      if ((← (haveHalfFPU ())) : Bool)
-      then
-        (pure ((encdec_freg_forwards rs3) +++ (0b10#2 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards
-                    rs1) +++ ((encdec_rounding_mode_forwards rm) +++ ((encdec_freg_forwards rd) +++ 0b1000011#7)))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_MADD_TYPE_H (rs3, rs2, rs1, rm, rd, .FMSUB_H) =>
-    (do
-      if ((← (haveHalfFPU ())) : Bool)
-      then
-        (pure ((encdec_freg_forwards rs3) +++ (0b10#2 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards
-                    rs1) +++ ((encdec_rounding_mode_forwards rm) +++ ((encdec_freg_forwards rd) +++ 0b1000111#7)))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_MADD_TYPE_H (rs3, rs2, rs1, rm, rd, .FNMSUB_H) =>
-    (do
-      if ((← (haveHalfFPU ())) : Bool)
-      then
-        (pure ((encdec_freg_forwards rs3) +++ (0b10#2 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards
-                    rs1) +++ ((encdec_rounding_mode_forwards rm) +++ ((encdec_freg_forwards rd) +++ 0b1001011#7)))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_MADD_TYPE_H (rs3, rs2, rs1, rm, rd, .FNMADD_H) =>
-    (do
-      if ((← (haveHalfFPU ())) : Bool)
-      then
-        (pure ((encdec_freg_forwards rs3) +++ (0b10#2 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards
-                    rs1) +++ ((encdec_rounding_mode_forwards rm) +++ ((encdec_freg_forwards rd) +++ 0b1001111#7)))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_F_TYPE_H (rs2, rs1, rd, .FSGNJ_H) =>
-    (do
-      if ((← (haveHalfFPU ())) : Bool)
-      then
-        (pure (0b0010010#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b000#3 +++ ((encdec_freg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_F_TYPE_H (rs2, rs1, rd, .FSGNJN_H) =>
-    (do
-      if ((← (haveHalfFPU ())) : Bool)
-      then
-        (pure (0b0010010#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b001#3 +++ ((encdec_freg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_F_TYPE_H (rs2, rs1, rd, .FSGNJX_H) =>
-    (do
-      if ((← (haveHalfFPU ())) : Bool)
-      then
-        (pure (0b0010010#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b010#3 +++ ((encdec_freg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_F_TYPE_H (rs2, rs1, rd, .FMIN_H) =>
-    (do
-      if ((← (haveHalfFPU ())) : Bool)
-      then
-        (pure (0b0010110#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b000#3 +++ ((encdec_freg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_F_TYPE_H (rs2, rs1, rd, .FMAX_H) =>
-    (do
-      if ((← (haveHalfFPU ())) : Bool)
-      then
-        (pure (0b0010110#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b001#3 +++ ((encdec_freg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_X_TYPE_H (rs2, rs1, rd, .FEQ_H) =>
-    (do
-      if ((← (haveHalfFPU ())) : Bool)
-      then
-        (pure (0b1010010#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b010#3 +++ ((encdec_reg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_X_TYPE_H (rs2, rs1, rd, .FLT_H) =>
-    (do
-      if ((← (haveHalfFPU ())) : Bool)
-      then
-        (pure (0b1010010#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b001#3 +++ ((encdec_reg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_BIN_X_TYPE_H (rs2, rs1, rd, .FLE_H) =>
-    (do
-      if ((← (haveHalfFPU ())) : Bool)
-      then
-        (pure (0b1010010#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b000#3 +++ ((encdec_reg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_RM_FF_TYPE_H (rs1, rm, rd, .FSQRT_H) =>
-    (do
-      if ((← (haveHalfFPU ())) : Bool)
-      then
-        (pure (0b0101110#7 +++ (0b00000#5 +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_RM_FX_TYPE_H (rs1, rm, rd, .FCVT_W_H) =>
-    (do
-      if ((← (haveHalfFPU ())) : Bool)
-      then
-        (pure (0b1100010#7 +++ (0b00000#5 +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_reg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_RM_FX_TYPE_H (rs1, rm, rd, .FCVT_WU_H) =>
-    (do
-      if ((← (haveHalfFPU ())) : Bool)
-      then
-        (pure (0b1100010#7 +++ (0b00001#5 +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_reg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_RM_XF_TYPE_H (rs1, rm, rd, .FCVT_H_W) =>
-    (do
-      if ((← (haveHalfFPU ())) : Bool)
-      then
-        (pure (0b1101010#7 +++ (0b00000#5 +++ ((encdec_reg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_RM_XF_TYPE_H (rs1, rm, rd, .FCVT_H_WU) =>
-    (do
-      if ((← (haveHalfFPU ())) : Bool)
-      then
-        (pure (0b1101010#7 +++ (0b00001#5 +++ ((encdec_reg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_RM_FF_TYPE_H (rs1, rm, rd, .FCVT_H_S) =>
-    (do
-      if ((← (haveHalfMin ())) : Bool)
-      then
-        (pure (0b0100010#7 +++ (0b00000#5 +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_RM_FF_TYPE_H (rs1, rm, rd, .FCVT_H_D) =>
-    (do
-      if ((← do
-           if ((← (haveHalfMin ())) : Bool)
-           then (pure ((← (haveDoubleFPU ())) && (validDoubleRegs (n := 1) #v[rs1])))
-           else (pure false)) : Bool)
-      then
-        (pure (0b0100010#7 +++ (0b00001#5 +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_RM_FF_TYPE_H (rs1, rm, rd, .FCVT_S_H) =>
-    (do
-      if ((← (haveHalfMin ())) : Bool)
-      then
-        (pure (0b0100000#7 +++ (0b00010#5 +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_RM_FF_TYPE_H (rs1, rm, rd, .FCVT_D_H) =>
-    (do
-      if ((← do
-           if ((← (haveHalfMin ())) : Bool)
-           then (pure ((← (haveDoubleFPU ())) && (validDoubleRegs (n := 1) #v[rd])))
-           else (pure false)) : Bool)
-      then
-        (pure (0b0100001#7 +++ (0b00010#5 +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_RM_FX_TYPE_H (rs1, rm, rd, .FCVT_L_H) =>
-    (do
-      if (((← (haveHalfFPU ())) && (xlen ≥b 64)) : Bool)
-      then
-        (pure (0b1100010#7 +++ (0b00010#5 +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_reg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_RM_FX_TYPE_H (rs1, rm, rd, .FCVT_LU_H) =>
-    (do
-      if (((← (haveHalfFPU ())) && (xlen ≥b 64)) : Bool)
-      then
-        (pure (0b1100010#7 +++ (0b00011#5 +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_reg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_RM_XF_TYPE_H (rs1, rm, rd, .FCVT_H_L) =>
-    (do
-      if (((← (haveHalfFPU ())) && (xlen ≥b 64)) : Bool)
-      then
-        (pure (0b1101010#7 +++ (0b00010#5 +++ ((encdec_reg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_RM_XF_TYPE_H (rs1, rm, rd, .FCVT_H_LU) =>
-    (do
-      if (((← (haveHalfFPU ())) && (xlen ≥b 64)) : Bool)
-      then
-        (pure (0b1101010#7 +++ (0b00011#5 +++ ((encdec_reg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_X_TYPE_H (rs1, rd, .FCLASS_H) =>
-    (do
-      if ((← (haveHalfFPU ())) : Bool)
-      then
-        (pure (0b1110010#7 +++ (0b00000#5 +++ ((encdec_freg_forwards rs1) +++ (0b001#3 +++ ((encdec_reg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_X_TYPE_H (rs1, rd, .FMV_X_H) =>
-    (do
-      if ((← do
-           if ((← (currentlyEnabled Ext_Zfhmin)) : Bool)
-           then (pure true)
-           else (currentlyEnabled Ext_Zfbfmin)) : Bool)
-      then
-        (pure (0b1110010#7 +++ (0b00000#5 +++ ((encdec_freg_forwards rs1) +++ (0b000#3 +++ ((encdec_reg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .F_UN_F_TYPE_H (rs1, rd, .FMV_H_X) =>
-    (do
-      if ((← do
-           if ((← (currentlyEnabled Ext_Zfhmin)) : Bool)
-           then (pure true)
-           else (currentlyEnabled Ext_Zfbfmin)) : Bool)
-      then
-        (pure (0b1111010#7 +++ (0b00000#5 +++ ((encdec_reg_forwards rs1) +++ (0b000#3 +++ ((encdec_freg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .FLI_H (constantidx, rd) =>
-    (do
-      if ((← do
-           if ((← do
-                if ((← (currentlyEnabled Ext_Zfh)) : Bool)
-                then (pure true)
-                else (currentlyEnabled Ext_Zvfh)) : Bool)
-           then (currentlyEnabled Ext_Zfa)
-           else (pure false)) : Bool)
-      then
-        (pure (0b1111010#7 +++ (0b00001#5 +++ ((constantidx : (BitVec 5)) +++ (0b000#3 +++ ((encdec_freg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .FLI_S (constantidx, rd) =>
-    (do
-      if ((← (currentlyEnabled Ext_Zfa)) : Bool)
-      then
-        (pure (0b1111000#7 +++ (0b00001#5 +++ ((constantidx : (BitVec 5)) +++ (0b000#3 +++ ((encdec_freg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .FLI_D (constantidx, rd) =>
-    (do
-      if ((← do
-           if ((← (currentlyEnabled Ext_D)) : Bool)
-           then (currentlyEnabled Ext_Zfa)
-           else (pure false)) : Bool)
-      then
-        (pure (0b1111001#7 +++ (0b00001#5 +++ ((constantidx : (BitVec 5)) +++ (0b000#3 +++ ((encdec_freg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .FMINM_H (rs2, rs1, rd) =>
-    (do
-      if ((← do
-           if ((← (currentlyEnabled Ext_Zfh)) : Bool)
-           then (currentlyEnabled Ext_Zfa)
-           else (pure false)) : Bool)
-      then
-        (pure (0b0010110#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b010#3 +++ ((encdec_freg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .FMAXM_H (rs2, rs1, rd) =>
-    (do
-      if ((← do
-           if ((← (currentlyEnabled Ext_Zfh)) : Bool)
-           then (currentlyEnabled Ext_Zfa)
-           else (pure false)) : Bool)
-      then
-        (pure (0b0010110#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b011#3 +++ ((encdec_freg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .FMINM_S (rs2, rs1, rd) =>
-    (do
-      if ((← (currentlyEnabled Ext_Zfa)) : Bool)
-      then
-        (pure (0b0010100#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b010#3 +++ ((encdec_freg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .FMAXM_S (rs2, rs1, rd) =>
-    (do
-      if ((← (currentlyEnabled Ext_Zfa)) : Bool)
-      then
-        (pure (0b0010100#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b011#3 +++ ((encdec_freg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .FMINM_D (rs2, rs1, rd) =>
-    (do
-      if ((← do
-           if ((← (currentlyEnabled Ext_D)) : Bool)
-           then (currentlyEnabled Ext_Zfa)
-           else (pure false)) : Bool)
-      then
-        (pure (0b0010101#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b010#3 +++ ((encdec_freg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .FMAXM_D (rs2, rs1, rd) =>
-    (do
-      if ((← do
-           if ((← (currentlyEnabled Ext_D)) : Bool)
-           then (currentlyEnabled Ext_Zfa)
-           else (pure false)) : Bool)
-      then
-        (pure (0b0010101#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b011#3 +++ ((encdec_freg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .FROUND_H (rs1, rm, rd) =>
-    (do
-      if ((← do
-           if ((← (currentlyEnabled Ext_Zfh)) : Bool)
-           then (currentlyEnabled Ext_Zfa)
-           else (pure false)) : Bool)
-      then
-        (pure (0b0100010#7 +++ (0b00100#5 +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .FROUNDNX_H (rs1, rm, rd) =>
-    (do
-      if ((← do
-           if ((← (currentlyEnabled Ext_Zfh)) : Bool)
-           then (currentlyEnabled Ext_Zfa)
-           else (pure false)) : Bool)
-      then
-        (pure (0b0100010#7 +++ (0b00101#5 +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .FROUND_S (rs1, rm, rd) =>
-    (do
-      if ((← (currentlyEnabled Ext_Zfa)) : Bool)
-      then
-        (pure (0b0100000#7 +++ (0b00100#5 +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .FROUNDNX_S (rs1, rm, rd) =>
-    (do
-      if ((← (currentlyEnabled Ext_Zfa)) : Bool)
-      then
-        (pure (0b0100000#7 +++ (0b00101#5 +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .FROUND_D (rs1, rm, rd) =>
-    (do
-      if ((← do
-           if ((← (currentlyEnabled Ext_D)) : Bool)
-           then (currentlyEnabled Ext_Zfa)
-           else (pure false)) : Bool)
-      then
-        (pure (0b0100001#7 +++ (0b00100#5 +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .FROUNDNX_D (rs1, rm, rd) =>
-    (do
-      if ((← do
-           if ((← (currentlyEnabled Ext_D)) : Bool)
-           then (currentlyEnabled Ext_Zfa)
-           else (pure false)) : Bool)
-      then
-        (pure (0b0100001#7 +++ (0b00101#5 +++ ((encdec_freg_forwards rs1) +++ ((encdec_rounding_mode_forwards
-                    rm) +++ ((encdec_freg_forwards rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .FMVH_X_D (rs1, rd) =>
-    (do
-      if ((← do
-           if ((← (currentlyEnabled Ext_D)) : Bool)
-           then
-             (do
-               if ((← (currentlyEnabled Ext_Zfa)) : Bool)
-               then (in32BitMode ())
-               else (pure false))
-           else (pure false)) : Bool)
-      then
-        (pure (0b1110001#7 +++ (0b00001#5 +++ ((encdec_freg_forwards rs1) +++ (0b000#3 +++ ((encdec_reg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .FMVP_D_X (rs2, rs1, rd) =>
-    (do
-      if ((← do
-           if ((← (currentlyEnabled Ext_D)) : Bool)
-           then
-             (do
-               if ((← (currentlyEnabled Ext_Zfa)) : Bool)
-               then (in32BitMode ())
-               else (pure false))
-           else (pure false)) : Bool)
-      then
-        (pure (0b1011001#7 +++ ((encdec_reg_forwards rs2) +++ ((encdec_reg_forwards rs1) +++ (0b000#3 +++ ((encdec_freg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .FLEQ_H (rs2, rs1, rd) =>
-    (do
-      if ((← do
-           if ((← (currentlyEnabled Ext_Zfh)) : Bool)
-           then (currentlyEnabled Ext_Zfa)
-           else (pure false)) : Bool)
-      then
-        (pure (0b1010010#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b100#3 +++ ((encdec_reg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .FLTQ_H (rs2, rs1, rd) =>
-    (do
-      if ((← do
-           if ((← (currentlyEnabled Ext_Zfh)) : Bool)
-           then (currentlyEnabled Ext_Zfa)
-           else (pure false)) : Bool)
-      then
-        (pure (0b1010010#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b101#3 +++ ((encdec_reg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .FLEQ_S (rs2, rs1, rd) =>
-    (do
-      if ((← (currentlyEnabled Ext_Zfa)) : Bool)
-      then
-        (pure (0b1010000#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b100#3 +++ ((encdec_reg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .FLTQ_S (rs2, rs1, rd) =>
-    (do
-      if ((← (currentlyEnabled Ext_Zfa)) : Bool)
-      then
-        (pure (0b1010000#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b101#3 +++ ((encdec_reg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .FLEQ_D (rs2, rs1, rd) =>
-    (do
-      if ((← do
-           if ((← (currentlyEnabled Ext_D)) : Bool)
-           then (currentlyEnabled Ext_Zfa)
-           else (pure false)) : Bool)
-      then
-        (pure (0b1010001#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b100#3 +++ ((encdec_reg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .FLTQ_D (rs2, rs1, rd) =>
-    (do
-      if ((← do
-           if ((← (currentlyEnabled Ext_D)) : Bool)
-           then (currentlyEnabled Ext_Zfa)
-           else (pure false)) : Bool)
-      then
-        (pure (0b1010001#7 +++ ((encdec_freg_forwards rs2) +++ ((encdec_freg_forwards rs1) +++ (0b101#3 +++ ((encdec_reg_forwards
-                      rd) +++ 0b1010011#7))))))
-      else
-        (do
-          sail_assert false "Pattern match failure at unknown location"
-          throw Error.Exit))
-  | .FCVTMOD_W_D (rs1, rd) =>
-    (do
-      if ((← do
-           if ((← (currentlyEnabled Ext_D)) : Bool)
-           then (currentlyEnabled Ext_Zfa)
-           else (pure false)) : Bool)
-      then
-        (pure (0b1100001#7 +++ (0b01000#5 +++ ((encdec_freg_forwards rs1) +++ (0b001#3 +++ ((encdec_reg_forwards
-                      rd) +++ 0b1010011#7))))))
       else
         (do
           sail_assert false "Pattern match failure at unknown location"

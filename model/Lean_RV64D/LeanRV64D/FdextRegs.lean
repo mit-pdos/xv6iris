@@ -293,6 +293,14 @@ def encdec_cfreg_backwards_matches (arg_ : (BitVec 3)) : Bool :=
   match arg_ with
   | r => true
 
+def fregidx_to_regidx (app_0 : fregidx) : regidx :=
+  let .Fregidx b := app_0
+  (Regidx (trunc (m := 5) b))
+
+def encdec_freg_forwards (arg_ : fregidx) : (BitVec 5) :=
+  match arg_ with
+  | .Fregidx r => r
+
 def encdec_freg_backwards (arg_ : (BitVec 5)) : fregidx :=
   match arg_ with
   | r => (Fregidx r)
@@ -502,6 +510,41 @@ def wF_or_X_D (i : fregidx) (data : (BitVec 64)) : SailM Unit := do
   then (wF_D i data)
   else (wX_bits (fregidx_to_regidx i) (sign_extend (m := 64) data))
 
+def freg_abi_name_raw_forwards (arg_ : (BitVec 5)) : String :=
+  match arg_ with
+  | 0b00000 => "ft0"
+  | 0b00001 => "ft1"
+  | 0b00010 => "ft2"
+  | 0b00011 => "ft3"
+  | 0b00100 => "ft4"
+  | 0b00101 => "ft5"
+  | 0b00110 => "ft6"
+  | 0b00111 => "ft7"
+  | 0b01000 => "fs0"
+  | 0b01001 => "fs1"
+  | 0b01010 => "fa0"
+  | 0b01011 => "fa1"
+  | 0b01100 => "fa2"
+  | 0b01101 => "fa3"
+  | 0b01110 => "fa4"
+  | 0b01111 => "fa5"
+  | 0b10000 => "fa6"
+  | 0b10001 => "fa7"
+  | 0b10010 => "fs2"
+  | 0b10011 => "fs3"
+  | 0b10100 => "fs4"
+  | 0b10101 => "fs5"
+  | 0b10110 => "fs6"
+  | 0b10111 => "fs7"
+  | 0b11000 => "fs8"
+  | 0b11001 => "fs9"
+  | 0b11010 => "fs10"
+  | 0b11011 => "fs11"
+  | 0b11100 => "ft8"
+  | 0b11101 => "ft9"
+  | 0b11110 => "ft10"
+  | _ => "ft11"
+
 def freg_abi_name_raw_backwards (arg_ : String) : SailM (BitVec 5) := do
   match arg_ with
   | "ft0" => (pure 0b00000#5)
@@ -612,6 +655,41 @@ def freg_abi_name_raw_backwards_matches (arg_ : String) : Bool :=
   | "ft10" => true
   | "ft11" => true
   | _ => false
+
+def freg_arch_name_raw_forwards (arg_ : (BitVec 5)) : String :=
+  match arg_ with
+  | 0b00000 => "f0"
+  | 0b00001 => "f1"
+  | 0b00010 => "f2"
+  | 0b00011 => "f3"
+  | 0b00100 => "f4"
+  | 0b00101 => "f5"
+  | 0b00110 => "f6"
+  | 0b00111 => "f7"
+  | 0b01000 => "f8"
+  | 0b01001 => "f9"
+  | 0b01010 => "f10"
+  | 0b01011 => "f11"
+  | 0b01100 => "f12"
+  | 0b01101 => "f13"
+  | 0b01110 => "f14"
+  | 0b01111 => "f15"
+  | 0b10000 => "f16"
+  | 0b10001 => "f17"
+  | 0b10010 => "f18"
+  | 0b10011 => "f19"
+  | 0b10100 => "f20"
+  | 0b10101 => "f21"
+  | 0b10110 => "f22"
+  | 0b10111 => "f23"
+  | 0b11000 => "f24"
+  | 0b11001 => "f25"
+  | 0b11010 => "f26"
+  | 0b11011 => "f27"
+  | 0b11100 => "f28"
+  | 0b11101 => "f29"
+  | 0b11110 => "f30"
+  | _ => "f31"
 
 def freg_arch_name_raw_backwards (arg_ : String) : SailM (BitVec 5) := do
   match arg_ with
@@ -724,6 +802,21 @@ def freg_arch_name_raw_backwards_matches (arg_ : String) : Bool :=
   | "f31" => true
   | _ => false
 
+def freg_name_forwards (arg_ : fregidx) : SailM String := do
+  match arg_ with
+  | .Fregidx i =>
+    (do
+      if ((get_config_use_abi_names ()) : Bool)
+      then (pure (freg_abi_name_raw_forwards i))
+      else
+        (do
+          if ((not (get_config_use_abi_names ())) : Bool)
+          then (pure (freg_arch_name_raw_forwards i))
+          else
+            (do
+              sail_assert false "Pattern match failure at unknown location"
+              throw Error.Exit)))
+
 def freg_name_backwards (arg_ : String) : SailM fregidx := do
   let head_exp_ := arg_
   match (← do
@@ -786,6 +879,12 @@ def freg_name_backwards_matches (arg_ : String) : SailM Bool := do
       | none =>
         (match head_exp_ with
         | _ => (pure false)))
+
+def freg_or_reg_name_forwards (arg_ : fregidx) : SailM String := do
+  let f := arg_
+  if ((hartSupports Ext_Zfinx) : Bool)
+  then (reg_name_forwards (fregidx_to_regidx f))
+  else (freg_name_forwards f)
 
 def freg_or_reg_name_backwards (arg_ : String) : SailM fregidx := do
   let head_exp_ := arg_
@@ -851,6 +950,10 @@ def freg_or_reg_name_backwards_matches (arg_ : String) : SailM Bool := do
       | none =>
         (match head_exp_ with
         | _ => (pure false)))
+
+def cfreg_name_forwards (arg_ : cfregidx) : SailM String := do
+  match arg_ with
+  | .Cfregidx i => (freg_name_forwards (Fregidx (0b01#2 +++ (i : (BitVec 3)))))
 
 def cfreg_name_backwards (arg_ : String) : SailM cfregidx := do
   let head_exp_ := arg_

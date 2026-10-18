@@ -414,6 +414,9 @@ def _set_Misa_M (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : SailM Uni
   let r ← do (reg_deref r_ref)
   writeRegRef r_ref (_update_Misa_M r v)
 
+def _get_Misa_MXL (v : (BitVec 64)) : (BitVec (64 - 1 - (64 - 2) + 1)) :=
+  (Sail.BitVec.extractLsb v (64 -i 1) (64 -i 2))
+
 def _set_Misa_MXL (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec (64 - 1 - (64 - 2) + 1))) : SailM Unit := do
   let r ← do (reg_deref r_ref)
   writeRegRef r_ref (_update_Misa_MXL r v)
@@ -1036,6 +1039,9 @@ def _set_Sstatus_SUM (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : Sail
   let r ← do (reg_deref r_ref)
   writeRegRef r_ref (_update_Sstatus_SUM r v)
 
+def _get_Mstatus_SXL (v : (BitVec 64)) : (BitVec 2) :=
+  (Sail.BitVec.extractLsb v 35 34)
+
 def _set_Mstatus_SXL (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 2)) : SailM Unit := do
   let r ← do (reg_deref r_ref)
   writeRegRef r_ref (_update_Mstatus_SXL r v)
@@ -1069,6 +1075,9 @@ def _update_Mstatus_TW (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
 def _set_Mstatus_TW (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : SailM Unit := do
   let r ← do (reg_deref r_ref)
   writeRegRef r_ref (_update_Mstatus_TW r v)
+
+def _get_Mstatus_UXL (v : (BitVec 64)) : (BitVec 2) :=
+  (Sail.BitVec.extractLsb v 33 32)
 
 def _update_Sstatus_UXL (v : (BitVec 64)) (x : (BitVec 2)) : (BitVec 64) :=
   (Sail.BitVec.updateSubrange v 33 32 x)
@@ -1235,6 +1244,9 @@ def read_mstatus (_ : Unit) : SailM (BitVec 64) := do
 def undefined_Hstatus (_ : Unit) : SailM (BitVec 64) := do
   (undefined_bitvector 64)
 
+def Mk_Hstatus (v : (BitVec 64)) : (BitVec 64) :=
+  v
+
 def _get_Hstatus_HU (v : (BitVec 64)) : (BitVec 1) :=
   (Sail.BitVec.extractLsb v 9 9)
 
@@ -1304,6 +1316,12 @@ def _update_Hstatus_VSBE (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
 def _set_Hstatus_VSBE (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : SailM Unit := do
   let r ← do (reg_deref r_ref)
   writeRegRef r_ref (_update_Hstatus_VSBE r v)
+
+def _get_Hstatus_VSXL (v : (BitVec 64)) : (BitVec 2) :=
+  (Sail.BitVec.extractLsb v 33 32)
+
+def _update_Hstatus_VSXL (v : (BitVec 64)) (x : (BitVec 2)) : (BitVec 64) :=
+  (Sail.BitVec.updateSubrange v 33 32 x)
 
 def _set_Hstatus_VSXL (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 2)) : SailM Unit := do
   let r ← do (reg_deref r_ref)
@@ -1592,7 +1610,7 @@ def _set_Satp64_Mode (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 4)) : Sail
   let r ← do (reg_deref r_ref)
   writeRegRef r_ref (_update_Satp64_Mode r v)
 
-/-- Type quantifiers: vectored_alignment_exp : Nat, k_ex1240635_ : Bool, direct_alignment_exp : Nat, k_ex1240633_
+/-- Type quantifiers: vectored_alignment_exp : Nat, k_ex1172885_ : Bool, direct_alignment_exp : Nat, k_ex1172883_
   : Bool, 2 ≤ direct_alignment_exp ∧ direct_alignment_exp ≤ 24, 2 ≤ vectored_alignment_exp
   ∧ vectored_alignment_exp ≤ 24 -/
 def legalize_tvec (o : (BitVec 64)) (v : (BitVec 64)) (direct_supported : Bool) (direct_alignment_exp : Nat) (vectored_supported : Bool) (vectored_alignment_exp : Nat) : SailM (BitVec 64) := do
@@ -1655,7 +1673,7 @@ def _set_Mcause_IsInterrupt (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec (64
   let r ← do (reg_deref r_ref)
   writeRegRef r_ref (_update_Mcause_IsInterrupt r v)
 
-/-- Type quantifiers: k_ex1240637_ : Bool -/
+/-- Type quantifiers: k_ex1172887_ : Bool -/
 def legalize_cause (o : (BitVec 64)) (v : (BitVec 64)) (is_scause : Bool) : SailM (BitVec 64) := SailME.run do
   let v := (Mk_Mcause v)
   let code := (_get_Mcause_Cause v)
@@ -1845,7 +1863,7 @@ def undefined_Sstatus (_ : Unit) : SailM (BitVec 64) := do
 def Mk_Sstatus (v : (BitVec 64)) : (BitVec 64) :=
   v
 
-/-- Type quantifiers: k_ex1240663_ : Bool -/
+/-- Type quantifiers: k_ex1172913_ : Bool -/
 def lower_mstatus (m : (BitVec 64)) (virt : Bool) : SailM (BitVec 64) := do
   let s := (Mk_Sstatus (zeros (n := 64)))
   (pure (_update_Sstatus_SIE
@@ -1894,7 +1912,7 @@ def lift_sstatus (m : (BitVec 64)) (s : (BitVec 64)) : (BitVec 64) :=
             (_get_Sstatus_FS s)) (_get_Sstatus_VS s)) (_get_Sstatus_SPP s)) (_get_Sstatus_SPIE s))
     (_get_Sstatus_SIE s))
 
-/-- Type quantifiers: k_ex1240664_ : Bool -/
+/-- Type quantifiers: k_ex1172914_ : Bool -/
 def legalize_sstatus (m : (BitVec 64)) (v : (BitVec 64)) (virt : Bool) : SailM (BitVec 64) := do
   let s := (Mk_Sstatus (zero_extend (m := 64) v))
   let s ← do
@@ -2055,7 +2073,7 @@ def get_vmid (stage : TranslationStage) : SailM (BitVec 14) := do
   then (pure (zeros (n := 14)))
   else (pure (_get_Hgatp64_VMID (Mk_Hgatp64 (← readReg hgatp))))
 
-/-- Type quantifiers: k_ex1240665_ : Bool -/
+/-- Type quantifiers: k_ex1172915_ : Bool -/
 def legalize_satp (arch : Architecture) (is_vsatp : Bool) (prev_value : (BitVec 64)) (written_value : (BitVec 64)) : SailM (BitVec 64) := do
   let s := (Mk_Satp64 written_value)
   let s :=
@@ -2160,4 +2178,17 @@ def counter_enabled (index : Nat) (priv : Privilege) : SailM Bool := do
       (BitVec.access (← readReg scounteren) index) (BitVec.access (← readReg hcounteren) index))) with
   | .FEATURE_ENABLED => (pure true)
   | _ => (pure false)
+
+def architecture (priv : Privilege) : SailM Architecture := do
+  (architecture_bits_backwards
+    (← do
+      match priv with
+      | .Machine => (pure (_get_Misa_MXL (← readReg misa)))
+      | .Supervisor => (pure (_get_Mstatus_SXL (← readReg mstatus)))
+      | .User => (pure (_get_Mstatus_UXL (← readReg mstatus)))
+      | .VirtualSupervisor => (pure (_get_Hstatus_VSXL (← readReg hstatus)))
+      | .VirtualUser => (pure (_get_Mstatus_UXL (← readReg vsstatus)))))
+
+def in32BitMode (_ : Unit) : SailM Bool := do
+  (pure ((← (architecture (← readReg cur_privilege))) == RV32))
 

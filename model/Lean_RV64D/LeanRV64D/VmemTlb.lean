@@ -350,7 +350,7 @@ def lookup_TLB (sv_width : Nat) (asid : (BitVec 16)) (vmid : (BitVec (if ( 64
     then (pure (some (index, entry)))
     else (pure none))
 
-/-- Type quantifiers: k_ex1240953_ : Bool, level : Nat, sv_width : Nat, (is_sv_or_svx4_mode sv_width), 0
+/-- Type quantifiers: k_ex1173207_ : Bool, level : Nat, sv_width : Nat, (is_sv_or_svx4_mode sv_width), 0
   ≤ level ∧
   level ≤
   (if ( sv_width = 32 ∨ sv_width = 34  : Bool) then 1 else (if ( sv_width = 39 ∨ sv_width = 41  : Bool) then 2 else (if ( sv_width

@@ -260,16 +260,6 @@ inductive bop where | BEQ | BNE | BLT | BGE | BLTU | BGEU
   deriving BEq, Inhabited, Repr
   open bop
 
-inductive fregidx where
-  | Fregidx (_ : (BitVec 5))
-  deriving Inhabited, BEq, Repr
-  open fregidx
-
-inductive cfregidx where
-  | Cfregidx (_ : (BitVec 3))
-  deriving Inhabited, BEq, Repr
-  open cfregidx
-
 inductive cregidx where
   | Cregidx (_ : (BitVec 3))
   deriving Inhabited, BEq, Repr
@@ -278,118 +268,6 @@ inductive cregidx where
 inductive csrop where | CSRRW | CSRRS | CSRRC
   deriving BEq, Inhabited, Repr
   open csrop
-
-inductive f_bin_f_op_D where | FSGNJ_D | FSGNJN_D | FSGNJX_D | FMIN_D | FMAX_D
-  deriving BEq, Inhabited, Repr
-  open f_bin_f_op_D
-
-inductive f_bin_f_op_H where | FSGNJ_H | FSGNJN_H | FSGNJX_H | FMIN_H | FMAX_H
-  deriving BEq, Inhabited, Repr
-  open f_bin_f_op_H
-
-inductive f_bin_rm_op_D where | FADD_D | FSUB_D | FMUL_D | FDIV_D
-  deriving BEq, Inhabited, Repr
-  open f_bin_rm_op_D
-
-inductive f_bin_rm_op_H where | FADD_H | FSUB_H | FMUL_H | FDIV_H
-  deriving BEq, Inhabited, Repr
-  open f_bin_rm_op_H
-
-inductive f_bin_rm_op_S where | FADD_S | FSUB_S | FMUL_S | FDIV_S
-  deriving BEq, Inhabited, Repr
-  open f_bin_rm_op_S
-
-inductive f_bin_op_f_S where | FSGNJ_S | FSGNJN_S | FSGNJX_S | FMIN_S | FMAX_S
-  deriving BEq, Inhabited, Repr
-  open f_bin_op_f_S
-
-inductive f_bin_op_x_S where | FEQ_S | FLT_S | FLE_S
-  deriving BEq, Inhabited, Repr
-  open f_bin_op_x_S
-
-inductive f_bin_x_op_D where | FEQ_D | FLT_D | FLE_D
-  deriving BEq, Inhabited, Repr
-  open f_bin_x_op_D
-
-inductive f_bin_x_op_H where | FEQ_H | FLT_H | FLE_H
-  deriving BEq, Inhabited, Repr
-  open f_bin_x_op_H
-
-inductive f_madd_op_D where | FMADD_D | FMSUB_D | FNMSUB_D | FNMADD_D
-  deriving BEq, Inhabited, Repr
-  open f_madd_op_D
-
-inductive f_madd_op_H where | FMADD_H | FMSUB_H | FNMSUB_H | FNMADD_H
-  deriving BEq, Inhabited, Repr
-  open f_madd_op_H
-
-inductive f_madd_op_S where | FMADD_S | FMSUB_S | FNMSUB_S | FNMADD_S
-  deriving BEq, Inhabited, Repr
-  open f_madd_op_S
-
-inductive f_un_f_op_D where | FMV_D_X
-  deriving BEq, Inhabited, Repr
-  open f_un_f_op_D
-
-inductive f_un_f_op_H where | FMV_H_X
-  deriving BEq, Inhabited, Repr
-  open f_un_f_op_H
-
-inductive f_un_rm_ff_op_D where | FSQRT_D | FCVT_S_D | FCVT_D_S
-  deriving BEq, Inhabited, Repr
-  open f_un_rm_ff_op_D
-
-inductive f_un_rm_ff_op_H where | FSQRT_H | FCVT_H_S | FCVT_H_D | FCVT_S_H | FCVT_D_H
-  deriving BEq, Inhabited, Repr
-  open f_un_rm_ff_op_H
-
-inductive f_un_rm_fx_op_D where | FCVT_W_D | FCVT_WU_D | FCVT_L_D | FCVT_LU_D
-  deriving BEq, Inhabited, Repr
-  open f_un_rm_fx_op_D
-
-inductive f_un_rm_fx_op_H where | FCVT_W_H | FCVT_WU_H | FCVT_L_H | FCVT_LU_H
-  deriving BEq, Inhabited, Repr
-  open f_un_rm_fx_op_H
-
-inductive f_un_rm_fx_op_S where | FCVT_W_S | FCVT_WU_S | FCVT_L_S | FCVT_LU_S
-  deriving BEq, Inhabited, Repr
-  open f_un_rm_fx_op_S
-
-inductive f_un_rm_xf_op_D where | FCVT_D_W | FCVT_D_WU | FCVT_D_L | FCVT_D_LU
-  deriving BEq, Inhabited, Repr
-  open f_un_rm_xf_op_D
-
-inductive f_un_rm_xf_op_H where | FCVT_H_W | FCVT_H_WU | FCVT_H_L | FCVT_H_LU
-  deriving BEq, Inhabited, Repr
-  open f_un_rm_xf_op_H
-
-inductive f_un_rm_xf_op_S where | FCVT_S_W | FCVT_S_WU | FCVT_S_L | FCVT_S_LU
-  deriving BEq, Inhabited, Repr
-  open f_un_rm_xf_op_S
-
-inductive f_un_op_f_S where | FMV_W_X
-  deriving BEq, Inhabited, Repr
-  open f_un_op_f_S
-
-inductive f_un_op_x_S where | FCLASS_S | FMV_X_W
-  deriving BEq, Inhabited, Repr
-  open f_un_op_x_S
-
-inductive f_un_x_op_D where | FCLASS_D | FMV_X_D
-  deriving BEq, Inhabited, Repr
-  open f_un_x_op_D
-
-inductive f_un_x_op_H where | FCLASS_H | FMV_X_H
-  deriving BEq, Inhabited, Repr
-  open f_un_x_op_H
-
-inductive extension where | Ext_M | Ext_A | Ext_F | Ext_D | Ext_B | Ext_V | Ext_S | Ext_U | Ext_H | Ext_Sha | Ext_Shcounterenw | Ext_Shgatpa | Ext_Shtvala | Ext_Shvsatpa | Ext_Shvstvala | Ext_Shvstvecd | Ext_Zibi | Ext_Zic64b | Ext_Zicbom | Ext_Zicbop | Ext_Zicboz | Ext_Zicfilp | Ext_Zicfiss | Ext_Zicntr | Ext_Zicond | Ext_Zicsr | Ext_Zifencei | Ext_Zihintntl | Ext_Zihintpause | Ext_Zihpm | Ext_Zilx | Ext_Zimop | Ext_Zmmul | Ext_Zaamo | Ext_Zabha | Ext_Zacas | Ext_Zalrsc | Ext_Zama16b | Ext_Zawrs | Ext_Za64rs | Ext_Za128rs | Ext_Zfa | Ext_Zfbfmin | Ext_Zfh | Ext_Zfhmin | Ext_Zfinx | Ext_Zdinx | Ext_Zca | Ext_Zcb | Ext_Zcd | Ext_Zcf | Ext_Zcmop | Ext_C | Ext_Zba | Ext_Zbb | Ext_Zbc | Ext_Zbkb | Ext_Zbkc | Ext_Zbkx | Ext_Zbs | Ext_Ziccamoa | Ext_Ziccamoc | Ext_Ziccif | Ext_Zicclsm | Ext_Ziccrse | Ext_Zknd | Ext_Zkne | Ext_Zknh | Ext_Zkr | Ext_Zksed | Ext_Zksh | Ext_Zkt | Ext_Zhinx | Ext_Zhinxmin | Ext_Zvl32b | Ext_Zvl64b | Ext_Zvl128b | Ext_Zvl256b | Ext_Zvl512b | Ext_Zvl1024b | Ext_Zve32f | Ext_Zve32x | Ext_Zve64d | Ext_Zve64f | Ext_Zve64x | Ext_Zvabd | Ext_Zvfbfmin | Ext_Zvfbfwma | Ext_Zvfh | Ext_Zvfhmin | Ext_Zvbb | Ext_Zvbc | Ext_Zvkb | Ext_Zvkg | Ext_Zvkned | Ext_Zvknha | Ext_Zvknhb | Ext_Zvksed | Ext_Zvksh | Ext_Zvkt | Ext_Zvkn | Ext_Zvknc | Ext_Zvkng | Ext_Zvks | Ext_Zvksc | Ext_Zvksg | Ext_Ssccptr | Ext_Sscofpmf | Ext_Sscounterenw | Ext_Ssdbltrp | Ext_Ssnpm | Ext_Ssstateen | Ext_Ssstrict | Ext_Sdtrig | Ext_Sstc | Ext_Sstvala | Ext_Sstvecd | Ext_Ssu64xl | Ext_Svbare | Ext_Sv32 | Ext_Sv39 | Ext_Sv48 | Ext_Sv57 | Ext_Svade | Ext_Svadu | Ext_Svinval | Ext_Svnapot | Ext_Svpbmt | Ext_Svrsw60t59b | Ext_Svukte | Ext_Svvptc | Ext_Smcntrpmf | Ext_Smdbltrp | Ext_Smmpm | Ext_Smnpm | Ext_Smstateen | Ext_Ssqosid | Ext_Sspm | Ext_Supm
-  deriving BEq, Inhabited, Repr
-  open extension
-
-inductive rounding_mode where | RM_RNE | RM_RTZ | RM_RDN | RM_RUP | RM_RMM | RM_DYN
-  deriving BEq, Inhabited, Repr
-  open rounding_mode
 
 inductive iop where | ADDI | SLTI | SLTIU | XORI | ORI | ANDI
   deriving BEq, Inhabited, Repr
@@ -452,10 +330,6 @@ inductive brop_zbs where | BCLR | BEXT | BINV | BSET
 inductive zicondop where | CZERO_EQZ | CZERO_NEZ
   deriving BEq, Inhabited, Repr
   open zicondop
-
-inductive f_un_rm_ff_op_S where | FSQRT_S
-  deriving BEq, Inhabited, Repr
-  open f_un_rm_ff_op_S
 
 abbrev half := (BitVec 16)
 
@@ -581,67 +455,6 @@ inductive instruction where
   | HSV (_ : (word_width × regidx × regidx))
   | HFENCE_VVMA (_ : (regidx × regidx))
   | HFENCE_GVMA (_ : (regidx × regidx))
-  | LOAD_FP (_ : ((BitVec 12) × regidx × fregidx × word_width))
-  | STORE_FP (_ : ((BitVec 12) × fregidx × regidx × word_width))
-  | F_MADD_TYPE_S (_ : (fregidx × fregidx × fregidx × rounding_mode × fregidx × f_madd_op_S))
-  | F_BIN_RM_TYPE_S (_ : (fregidx × fregidx × rounding_mode × fregidx × f_bin_rm_op_S))
-  | F_UN_RM_FF_TYPE_S (_ : (fregidx × rounding_mode × fregidx × f_un_rm_ff_op_S))
-  | F_UN_RM_FX_TYPE_S (_ : (fregidx × rounding_mode × regidx × f_un_rm_fx_op_S))
-  | F_UN_RM_XF_TYPE_S (_ : (regidx × rounding_mode × fregidx × f_un_rm_xf_op_S))
-  | F_BIN_TYPE_F_S (_ : (fregidx × fregidx × fregidx × f_bin_op_f_S))
-  | F_BIN_TYPE_X_S (_ : (fregidx × fregidx × regidx × f_bin_op_x_S))
-  | F_UN_TYPE_F_S (_ : (regidx × fregidx × f_un_op_f_S))
-  | F_UN_TYPE_X_S (_ : (fregidx × regidx × f_un_op_x_S))
-  | C_FLWSP (_ : ((BitVec 6) × fregidx))
-  | C_FSWSP (_ : ((BitVec 6) × fregidx))
-  | C_FLW (_ : ((BitVec 5) × cregidx × cfregidx))
-  | C_FSW (_ : ((BitVec 5) × cregidx × cfregidx))
-  | F_MADD_TYPE_D (_ : (fregidx × fregidx × fregidx × rounding_mode × fregidx × f_madd_op_D))
-  | F_BIN_RM_TYPE_D (_ : (fregidx × fregidx × rounding_mode × fregidx × f_bin_rm_op_D))
-  | F_UN_RM_FF_TYPE_D (_ : (fregidx × rounding_mode × fregidx × f_un_rm_ff_op_D))
-  | F_UN_RM_XF_TYPE_D (_ : (regidx × rounding_mode × fregidx × f_un_rm_xf_op_D))
-  | F_UN_RM_FX_TYPE_D (_ : (fregidx × rounding_mode × regidx × f_un_rm_fx_op_D))
-  | F_BIN_F_TYPE_D (_ : (fregidx × fregidx × fregidx × f_bin_f_op_D))
-  | F_BIN_X_TYPE_D (_ : (fregidx × fregidx × regidx × f_bin_x_op_D))
-  | F_UN_X_TYPE_D (_ : (fregidx × regidx × f_un_x_op_D))
-  | F_UN_F_TYPE_D (_ : (regidx × fregidx × f_un_f_op_D))
-  | C_FLDSP (_ : ((BitVec 6) × fregidx))
-  | C_FSDSP (_ : ((BitVec 6) × fregidx))
-  | C_FLD (_ : ((BitVec 5) × cregidx × cfregidx))
-  | C_FSD (_ : ((BitVec 5) × cregidx × cfregidx))
-  | F_BIN_RM_TYPE_H (_ : (fregidx × fregidx × rounding_mode × fregidx × f_bin_rm_op_H))
-  | F_MADD_TYPE_H (_ : (fregidx × fregidx × fregidx × rounding_mode × fregidx × f_madd_op_H))
-  | F_BIN_F_TYPE_H (_ : (fregidx × fregidx × fregidx × f_bin_f_op_H))
-  | F_BIN_X_TYPE_H (_ : (fregidx × fregidx × regidx × f_bin_x_op_H))
-  | F_UN_RM_FF_TYPE_H (_ : (fregidx × rounding_mode × fregidx × f_un_rm_ff_op_H))
-  | F_UN_RM_FX_TYPE_H (_ : (fregidx × rounding_mode × regidx × f_un_rm_fx_op_H))
-  | F_UN_RM_XF_TYPE_H (_ : (regidx × rounding_mode × fregidx × f_un_rm_xf_op_H))
-  | F_UN_F_TYPE_H (_ : (regidx × fregidx × f_un_f_op_H))
-  | F_UN_X_TYPE_H (_ : (fregidx × regidx × f_un_x_op_H))
-  | FLI_H (_ : ((BitVec 5) × fregidx))
-  | FLI_S (_ : ((BitVec 5) × fregidx))
-  | FLI_D (_ : ((BitVec 5) × fregidx))
-  | FMINM_H (_ : (fregidx × fregidx × fregidx))
-  | FMAXM_H (_ : (fregidx × fregidx × fregidx))
-  | FMINM_S (_ : (fregidx × fregidx × fregidx))
-  | FMAXM_S (_ : (fregidx × fregidx × fregidx))
-  | FMINM_D (_ : (fregidx × fregidx × fregidx))
-  | FMAXM_D (_ : (fregidx × fregidx × fregidx))
-  | FROUND_H (_ : (fregidx × rounding_mode × fregidx))
-  | FROUNDNX_H (_ : (fregidx × rounding_mode × fregidx))
-  | FROUND_S (_ : (fregidx × rounding_mode × fregidx))
-  | FROUNDNX_S (_ : (fregidx × rounding_mode × fregidx))
-  | FROUND_D (_ : (fregidx × rounding_mode × fregidx))
-  | FROUNDNX_D (_ : (fregidx × rounding_mode × fregidx))
-  | FMVH_X_D (_ : (fregidx × regidx))
-  | FMVP_D_X (_ : (regidx × regidx × fregidx))
-  | FLEQ_H (_ : (fregidx × fregidx × regidx))
-  | FLTQ_H (_ : (fregidx × fregidx × regidx))
-  | FLEQ_S (_ : (fregidx × fregidx × regidx))
-  | FLTQ_S (_ : (fregidx × fregidx × regidx))
-  | FLEQ_D (_ : (fregidx × fregidx × regidx))
-  | FLTQ_D (_ : (fregidx × fregidx × regidx))
-  | FCVTMOD_W_D (_ : (fregidx × regidx))
   | CSRReg (_ : (csreg × regidx × regidx × csrop))
   | CSRImm (_ : (csreg × (BitVec 5) × regidx × csrop))
   | SINVAL_VMA (_ : (regidx × regidx))
@@ -669,6 +482,10 @@ inductive instruction where
 inductive Privilege where | User | VirtualUser | Supervisor | VirtualSupervisor | Machine
   deriving BEq, Inhabited, Repr
   open Privilege
+
+inductive extension where | Ext_M | Ext_A | Ext_F | Ext_D | Ext_B | Ext_V | Ext_S | Ext_U | Ext_H | Ext_Sha | Ext_Shcounterenw | Ext_Shgatpa | Ext_Shtvala | Ext_Shvsatpa | Ext_Shvstvala | Ext_Shvstvecd | Ext_Zibi | Ext_Zic64b | Ext_Zicbom | Ext_Zicbop | Ext_Zicboz | Ext_Zicfilp | Ext_Zicfiss | Ext_Zicntr | Ext_Zicond | Ext_Zicsr | Ext_Zifencei | Ext_Zihintntl | Ext_Zihintpause | Ext_Zihpm | Ext_Zilx | Ext_Zimop | Ext_Zmmul | Ext_Zaamo | Ext_Zabha | Ext_Zacas | Ext_Zalrsc | Ext_Zama16b | Ext_Zawrs | Ext_Za64rs | Ext_Za128rs | Ext_Zfa | Ext_Zfbfmin | Ext_Zfh | Ext_Zfhmin | Ext_Zfinx | Ext_Zdinx | Ext_Zca | Ext_Zcb | Ext_Zcd | Ext_Zcf | Ext_Zcmop | Ext_C | Ext_Zba | Ext_Zbb | Ext_Zbc | Ext_Zbkb | Ext_Zbkc | Ext_Zbkx | Ext_Zbs | Ext_Ziccamoa | Ext_Ziccamoc | Ext_Ziccif | Ext_Zicclsm | Ext_Ziccrse | Ext_Zknd | Ext_Zkne | Ext_Zknh | Ext_Zkr | Ext_Zksed | Ext_Zksh | Ext_Zkt | Ext_Zhinx | Ext_Zhinxmin | Ext_Zvl32b | Ext_Zvl64b | Ext_Zvl128b | Ext_Zvl256b | Ext_Zvl512b | Ext_Zvl1024b | Ext_Zve32f | Ext_Zve32x | Ext_Zve64d | Ext_Zve64f | Ext_Zve64x | Ext_Zvabd | Ext_Zvfbfmin | Ext_Zvfbfwma | Ext_Zvfh | Ext_Zvfhmin | Ext_Zvbb | Ext_Zvbc | Ext_Zvkb | Ext_Zvkg | Ext_Zvkned | Ext_Zvknha | Ext_Zvknhb | Ext_Zvksed | Ext_Zvksh | Ext_Zvkt | Ext_Zvkn | Ext_Zvknc | Ext_Zvkng | Ext_Zvks | Ext_Zvksc | Ext_Zvksg | Ext_Ssccptr | Ext_Sscofpmf | Ext_Sscounterenw | Ext_Ssdbltrp | Ext_Ssnpm | Ext_Ssstateen | Ext_Ssstrict | Ext_Sdtrig | Ext_Sstc | Ext_Sstvala | Ext_Sstvecd | Ext_Ssu64xl | Ext_Svbare | Ext_Sv32 | Ext_Sv39 | Ext_Sv48 | Ext_Sv57 | Ext_Svade | Ext_Svadu | Ext_Svinval | Ext_Svnapot | Ext_Svpbmt | Ext_Svrsw60t59b | Ext_Svukte | Ext_Svvptc | Ext_Smcntrpmf | Ext_Smdbltrp | Ext_Smmpm | Ext_Smnpm | Ext_Smstateen | Ext_Ssqosid | Ext_Sspm | Ext_Supm
+  deriving BEq, Inhabited, Repr
+  open extension
 
 inductive XenvcfgCbieReservedBehavior where | Xenvcfg_Fatal | Xenvcfg_ClearPermissions | Xenvcfg_Ignore
   deriving BEq, Inhabited, Repr
@@ -725,8 +542,6 @@ inductive stateen_bit where | STATEEN_FCSR | STATEEN_SRMCFG | STATEEN_P1P13 | ST
 inductive AmocasOddRegisterReservedBehavior where | AMOCAS_Fatal | AMOCAS_Illegal
   deriving BEq, Inhabited, Repr
   open AmocasOddRegisterReservedBehavior
-
-abbrev Hstatus := (BitVec 64)
 
 inductive InterruptType where | I_Reserved_0 | I_S_Software | I_VS_Software | I_M_Software | I_Reserved_4 | I_S_Timer | I_VS_Timer | I_M_Timer | I_Reserved_8 | I_S_External | I_VS_External | I_M_External | I_SG_External | I_COF | I_Reserved_14 | I_Reserved_15
   deriving BEq, Inhabited, Repr
@@ -988,6 +803,8 @@ inductive barrier_kind where | Barrier_RISCV_rw_rw | Barrier_RISCV_r_rw | Barrie
 
 abbrev regtype := xlenbits
 
+abbrev Hstatus := (BitVec 64)
+
 abbrev Mtvec := (BitVec 64)
 
 abbrev Mcause := (BitVec 64)
@@ -1086,10 +903,132 @@ inductive brop_zbkb where | PACK | PACKH
 
 abbrev fregtype := flenbits
 
+inductive f_madd_op_H where | FMADD_H | FMSUB_H | FNMSUB_H | FNMADD_H
+  deriving BEq, Inhabited, Repr
+  open f_madd_op_H
+
+inductive f_bin_rm_op_H where | FADD_H | FSUB_H | FMUL_H | FDIV_H
+  deriving BEq, Inhabited, Repr
+  open f_bin_rm_op_H
+
+inductive f_un_rm_ff_op_H where | FSQRT_H | FCVT_H_S | FCVT_H_D | FCVT_S_H | FCVT_D_H
+  deriving BEq, Inhabited, Repr
+  open f_un_rm_ff_op_H
+
+inductive f_un_rm_fx_op_H where | FCVT_W_H | FCVT_WU_H | FCVT_L_H | FCVT_LU_H
+  deriving BEq, Inhabited, Repr
+  open f_un_rm_fx_op_H
+
+inductive f_un_rm_xf_op_H where | FCVT_H_W | FCVT_H_WU | FCVT_H_L | FCVT_H_LU
+  deriving BEq, Inhabited, Repr
+  open f_un_rm_xf_op_H
+
+inductive f_un_x_op_H where | FCLASS_H | FMV_X_H
+  deriving BEq, Inhabited, Repr
+  open f_un_x_op_H
+
+inductive f_un_f_op_H where | FMV_H_X
+  deriving BEq, Inhabited, Repr
+  open f_un_f_op_H
+
+inductive f_bin_f_op_H where | FSGNJ_H | FSGNJN_H | FSGNJX_H | FMIN_H | FMAX_H
+  deriving BEq, Inhabited, Repr
+  open f_bin_f_op_H
+
+inductive f_bin_x_op_H where | FEQ_H | FLT_H | FLE_H
+  deriving BEq, Inhabited, Repr
+  open f_bin_x_op_H
+
+inductive rounding_mode where | RM_RNE | RM_RTZ | RM_RDN | RM_RUP | RM_RMM | RM_DYN
+  deriving BEq, Inhabited, Repr
+  open rounding_mode
+
+inductive f_madd_op_S where | FMADD_S | FMSUB_S | FNMSUB_S | FNMADD_S
+  deriving BEq, Inhabited, Repr
+  open f_madd_op_S
+
+inductive f_bin_rm_op_S where | FADD_S | FSUB_S | FMUL_S | FDIV_S
+  deriving BEq, Inhabited, Repr
+  open f_bin_rm_op_S
+
+inductive f_un_rm_ff_op_S where | FSQRT_S
+  deriving BEq, Inhabited, Repr
+  open f_un_rm_ff_op_S
+
+inductive f_un_rm_fx_op_S where | FCVT_W_S | FCVT_WU_S | FCVT_L_S | FCVT_LU_S
+  deriving BEq, Inhabited, Repr
+  open f_un_rm_fx_op_S
+
+inductive f_un_rm_xf_op_S where | FCVT_S_W | FCVT_S_WU | FCVT_S_L | FCVT_S_LU
+  deriving BEq, Inhabited, Repr
+  open f_un_rm_xf_op_S
+
+inductive f_un_op_f_S where | FMV_W_X
+  deriving BEq, Inhabited, Repr
+  open f_un_op_f_S
+
+inductive f_un_op_x_S where | FCLASS_S | FMV_X_W
+  deriving BEq, Inhabited, Repr
+  open f_un_op_x_S
+
+inductive f_bin_op_f_S where | FSGNJ_S | FSGNJN_S | FSGNJX_S | FMIN_S | FMAX_S
+  deriving BEq, Inhabited, Repr
+  open f_bin_op_f_S
+
+inductive f_bin_op_x_S where | FEQ_S | FLT_S | FLE_S
+  deriving BEq, Inhabited, Repr
+  open f_bin_op_x_S
+
+inductive f_madd_op_D where | FMADD_D | FMSUB_D | FNMSUB_D | FNMADD_D
+  deriving BEq, Inhabited, Repr
+  open f_madd_op_D
+
+inductive f_bin_rm_op_D where | FADD_D | FSUB_D | FMUL_D | FDIV_D
+  deriving BEq, Inhabited, Repr
+  open f_bin_rm_op_D
+
+inductive f_un_rm_ff_op_D where | FSQRT_D | FCVT_S_D | FCVT_D_S
+  deriving BEq, Inhabited, Repr
+  open f_un_rm_ff_op_D
+
+inductive f_un_rm_fx_op_D where | FCVT_W_D | FCVT_WU_D | FCVT_L_D | FCVT_LU_D
+  deriving BEq, Inhabited, Repr
+  open f_un_rm_fx_op_D
+
+inductive f_un_rm_xf_op_D where | FCVT_D_W | FCVT_D_WU | FCVT_D_L | FCVT_D_LU
+  deriving BEq, Inhabited, Repr
+  open f_un_rm_xf_op_D
+
+inductive f_bin_f_op_D where | FSGNJ_D | FSGNJN_D | FSGNJX_D | FMIN_D | FMAX_D
+  deriving BEq, Inhabited, Repr
+  open f_bin_f_op_D
+
+inductive f_bin_x_op_D where | FEQ_D | FLT_D | FLE_D
+  deriving BEq, Inhabited, Repr
+  open f_bin_x_op_D
+
+inductive f_un_x_op_D where | FCLASS_D | FMV_X_D
+  deriving BEq, Inhabited, Repr
+  open f_un_x_op_D
+
+inductive f_un_f_op_D where | FMV_D_X
+  deriving BEq, Inhabited, Repr
+  open f_un_f_op_D
+
+inductive fregidx where
+  | Fregidx (_ : (BitVec 5))
+  deriving Inhabited, BEq, Repr
+  open fregidx
+
 inductive fregno where
   | Fregno (_ : Nat)
   deriving Inhabited, BEq, Repr
   open fregno
+
+inductive cfregidx where
+  | Cfregidx (_ : (BitVec 3))
+  deriving Inhabited, BEq, Repr
+  open cfregidx
 
 abbrev Fcsr := (BitVec 32)
 
@@ -1857,6 +1796,7 @@ inductive Register : Type where
   | mepc
   | mcause
   | mtvec
+  | hstatus
   | cur_inst
   | x31
   | x30
@@ -1891,7 +1831,6 @@ inductive Register : Type where
   | x1
   | nextPC
   | PC
-  | hstatus
   | henvcfg
   | menvcfg
   | mseccfg
@@ -2074,6 +2013,7 @@ abbrev RegisterType : Register → Type
   | .mepc => (BitVec 64)
   | .mcause => (BitVec 64)
   | .mtvec => (BitVec 64)
+  | .hstatus => (BitVec 64)
   | .cur_inst => (BitVec 64)
   | .x31 => (BitVec 64)
   | .x30 => (BitVec 64)
@@ -2108,7 +2048,6 @@ abbrev RegisterType : Register → Type
   | .x1 => (BitVec 64)
   | .nextPC => (BitVec 64)
   | .PC => (BitVec 64)
-  | .hstatus => (BitVec 64)
   | .henvcfg => (BitVec 64)
   | .menvcfg => (BitVec 64)
   | .mseccfg => (BitVec 64)

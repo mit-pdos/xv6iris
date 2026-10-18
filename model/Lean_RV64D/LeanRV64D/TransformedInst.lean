@@ -243,10 +243,6 @@ def transformed_instruction (insn : instruction) : SailM (Option (BitVec 32)) :=
     (pure (some (← (encdec_forwards (LOAD ((zeros (n := 12)), zreg, rd, is_unsigned, width))))))
   | .STORE (_, rs2, _, width) =>
     (pure (some (← (encdec_forwards (STORE ((zeros (n := 12)), rs2, zreg, width))))))
-  | .LOAD_FP (_, _, rd, width) =>
-    (pure (some (← (encdec_forwards (LOAD_FP ((zeros (n := 12)), zreg, rd, width))))))
-  | .STORE_FP (_, rs2, _, width) =>
-    (pure (some (← (encdec_forwards (STORE_FP ((zeros (n := 12)), rs2, zreg, width))))))
   | .LOADRES (aq, rl, _, width, rd) =>
     (pure (some (← (encdec_forwards (LOADRES (aq, rl, zreg, width, rd))))))
   | .STORECON (aq, rl, rs2, _, width, rd) =>

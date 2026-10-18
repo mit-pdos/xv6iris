@@ -55,6 +55,36 @@ DMA reads see the top of the store order and its DMA writes append there as
 the disk agent (`MState.storeDma`), blocked while a hart reserves a byte of
 the footprint; the PLIC drives the harts' external-interrupt pins
 (`sig_seip`/`sig_meip`) through the wire primitive.
+
+The sail-riscv 0.16 bump (October 2026: concurrency interface v2, lean-sail
+v7).  The model's monad is lean-sail's free monad
+`FreeM ((Except (Sail.Error ue) InstructionEffect) ⊕ FinChoice)`, where it
+was the vendored V1 `Outcome` monad.  This semantics changed only where the
+interface forced it (`notes/design-rulings.md`, "The sail-riscv 0.16 bump"):
+
+1. Events are lean-sail's `InstructionEffect`s.  Register events carry a
+   system-register id the model never sets (`none`); it is ignored.
+2. A memory read answers its bits with an empty tag vector; a write carries
+   its bits in the event and answers `.ok ()`: the memory cannot report a
+   failed conditional write (MachCSL never did).
+3. Every store and AMO first announces its footprint (`memWriteAnnounce`):
+   a silent event.
+4. A nondeterministic choice is its own node, `.inr n`, answered by any
+   `Fin n`; V1's `choose` event was answered by any value of a Sail type.
+   Fewer behaviours only at the model's `undefined_int`/`undefined_nat`/
+   `undefined_string` sites, none on a kernel path.
+5. The other silent events are renamed (`tlbOp`, `archException`,
+   `returnException`, `clockCycle`, `printMessage`); `getCycleCount` still
+   answers 0.
+6. Access kinds carry the access type (`Load`, `Store`, `LoadReserved`,
+   `Atomic`, `InstructionFetch`, ...).  Exclusivity is still keyed on the
+   reserved and conditional kinds, so the blocking semantics is unchanged
+   (`MachCSL.TsoMem`).
+
+Model-side changes this semantics merely runs: WFI retires on a pending
+enabled platform interrupt; `STIP`/`MTIP` are recomputed from the timer at
+each cycle start; the fork keeps the atomic PTE A/D update and, as before the
+bump, leaves the F/D instructions out of the generated model.
 -/
 import MachCSL.Platform
 import MachCSL.BootImage

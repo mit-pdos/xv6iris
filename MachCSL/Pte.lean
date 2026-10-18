@@ -219,8 +219,7 @@ theorem update_PTE_Bits_pteSetAD (p : BitVec 64) (a d : BitVec 1)
   | CacheAccess c =>
     cases c <;>
       simp_all [update_PTE_Bits, Mk_PTE_Flags, A_of_pteSetAD, D_of_pteSetAD,
-        updateSubrange_pteSetAD, accWrites, is_prefetch_access, LeanRV64D.not,
-        sys_implicit_vs_pte_access_sets_gstage_d] <;>
+        updateSubrange_pteSetAD, accWrites, is_prefetch_access, LeanRV64D.not] <;>
       (repeat' split) <;> simp_all <;> rfl
   | _ =>
     simp_all [update_PTE_Bits, Mk_PTE_Flags, A_of_pteSetAD, D_of_pteSetAD,

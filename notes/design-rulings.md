@@ -72,6 +72,36 @@ where noted.
 - **Trusted base.** The ordinal order instance (`Iris.instSIdxSI`) depends on `Classical.choice`,
   which therefore enters `xv6FsAdequacy_closed`'s statement (the other roots already reached it).
 
+## The sail-riscv 0.16 bump (Oct 2026)
+
+The machine model was regenerated from sail-riscv 0.16 (e5acebb0) with lean-sail v7 and the Sail
+compiler's master, before the liveness work.  The owner's rulings of 2026-10-18 (D1–D11 of the
+bump's plan, kept outside the repository):
+
+- **Sources.** The model fork is `dongjaelee1/sail-riscv` branch `xv6`: upstream 0.16 plus the
+  atomic PTE A/D update and only the fixes the Lean backend or this verification needs.  The Sail
+  compiler is `dongjaelee1/sail` branch `xv6` (master plus the fixes).  lean-sail v7 is pinned by
+  git.  `tools/regen_sail_model.sh` pins all three.
+- **The interface is used natively.** MachCSL is re-expressed over lean-sail's
+  `InstructionEffect` free monad; no compatibility layer imitates the V1 `Outcome` monad.
+  `MachCSL/Lang.lean`'s header lists the semantic deltas.  In short: register events ignore their
+  system-register id; memory answers carry no tags; the memory never fails a conditional write; the
+  store announcement (`memWriteAnnounce`) is silent; choices are finite (`Fin n`).
+- **Configuration.** H is kept and Sdtrig compiled in, both disabled by the configuration.  The
+  external-interrupt pin registers are read unconditionally, which the fork's hook does without
+  the SIG.  Further deviations from the 0.16 default configuration are forced by disabled
+  extensions: `medeleg`'s delegatable set keeps the previous value, and `mstateen0.CONTEXT` is
+  read-only zero.  `model/sail-config-rv64d.json` and its generator list them.
+- **No float instructions.** Upstream's `postlude` requires `FD_instructions` (for the H
+  extension's transformed FP loads and stores), which compiled every F/D instruction and the
+  softfloat externs into `execute`.  The fork drops that dependency and the two FP arms.  The
+  generated model has no F/D instructions, as before the bump, and the softfloat axioms stay
+  outside every audited cone (`notes/adequacy_axioms_baseline.md`).
+- **Answer types.** lean-sail's `InstructionEffect.ret` is a plain `def`, and an imported
+  definition's reducibility cannot be changed without a check-disabling option.  So the WP's
+  event rules come with `_at` variants that take the program and an equation to its event node.
+  The register rules spell out their continuations' binder types.
+
 ## From `notes/briefs/crash_layer.md`
 
 **USER RULINGS (2026-09-25):** D35 = fully Rocq-literal. D37 = generic application slot, as Rocq. D36, D38–D45 = approved as recommended.
