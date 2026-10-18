@@ -1679,13 +1679,63 @@ theorem memModel_authored (σ : MState) (t : Nat) (h : Agent) :
 
 theorem memModel_resv (σ : MState) (cpu : CPU) (r : Option Resv) (b : Bool) :
     memModelAt E σ ∗ resvFragAt E cpu r b ⊢@{IProp GF} ⌜σ.resv cpu = r ∧ (σ.hr cpu).acq = b⌝ := by
-  unfold memModelAt resvFragAt
+  unfold memModelAt resvFragAt resvFragXAt
+  iintro ⟨⟨_, _, _, Hr, _⟩, %x, H⟩
+  ihave %Hl := ghost_map_lookup $$ Hr H
+  ipureintro
+  rw [resvMap_get?] at Hl
+  have := Option.some.inj Hl
+  exact ⟨congrArg Prod.fst this, congrArg (fun p => p.2.1) this⟩
+
+/-- The exact fragment names the hart's pending stale read too. -/
+theorem memModel_resvX (σ : MState) (cpu : CPU) (r : Option Resv) (b : Bool) (x : Option Resv) :
+    memModelAt E σ ∗ resvFragXAt E cpu r b x ⊢@{IProp GF}
+      ⌜σ.resv cpu = r ∧ (σ.hr cpu).acq = b ∧ σ.xstale cpu = x⌝ := by
+  unfold memModelAt resvFragXAt
   iintro ⟨⟨_, _, _, Hr, _⟩, H⟩
   ihave %Hl := ghost_map_lookup $$ Hr H
   ipureintro
   rw [resvMap_get?] at Hl
   have := Option.some.inj Hl
-  exact ⟨congrArg Prod.fst this, congrArg Prod.snd this⟩
+  exact ⟨congrArg Prod.fst this, congrArg (fun p => p.2.1) this, congrArg (fun p => p.2.2) this⟩
+
+/-- A fragment names the pending stale read it holds. -/
+theorem resvFragAt_cases (cpu : CPU) (r : Option Resv) (b : Bool) :
+    resvFragAt E cpu r b ⊢@{IProp GF} ∃ x : Option Resv, resvFragXAt E cpu r b x := by
+  unfold resvFragAt
+  iintro H; iexact H
+
+theorem resvFragAt_of_X (cpu : CPU) (r : Option Resv) (b : Bool) (x : Option Resv) :
+    resvFragXAt E cpu r b x ⊢@{IProp GF} resvFragAt E cpu r b := by
+  unfold resvFragAt
+  iintro H; iexists x; iexact H
+
+/-- **The reservation map's update** at one hart (any fragment): the entry
+becomes `(r', b', x' x)` where `x` is the hart's pending stale read before
+(`x' := id` for a step that keeps it, `fun _ => none` for one that clears it). -/
+theorem resvAuth_upd (σ : MState) (cpu : CPU) (r : Option Resv) (b : Bool) (r' : Option Resv) (b' : Bool)
+    (x' : Option Resv → Option Resv) :
+    (E.resvName ↪●MAP resvMap σ) ∗ resvFragAt E cpu r b ⊢@{IProp GF} |==>
+      ((E.resvName ↪●MAP Iris.Std.PartialMap.insert (resvMap σ) cpu.val (r', b', x' (σ.xstale cpu))) ∗
+      resvFragXAt E cpu r' b' (x' (σ.xstale cpu))) := by
+  unfold resvFragAt resvFragXAt
+  iintro ⟨Hresv, %x, Hfrag⟩
+  ihave %Hl := ghost_map_lookup $$ Hresv Hfrag
+  have hx : σ.xstale cpu = x := by
+    rw [resvMap_get?] at Hl
+    exact congrArg (fun p => p.2.2) (Option.some.inj Hl)
+  rw [hx]
+  iapply ghost_map_update ((r', b', x' x) : ResvVal) $$ Hresv Hfrag
+
+/-- The same from an exact fragment, to any entry. -/
+theorem resvAuth_updX (σ : MState) (cpu : CPU) (r : Option Resv) (b : Bool) (x : Option Resv)
+    (v : ResvVal) :
+    (E.resvName ↪●MAP resvMap σ) ∗ resvFragXAt E cpu r b x ⊢@{IProp GF} |==>
+      ((E.resvName ↪●MAP Iris.Std.PartialMap.insert (resvMap σ) cpu.val v) ∗
+      resvFragXAt E cpu v.1 v.2.1 v.2.2) := by
+  unfold resvFragXAt
+  iintro ⟨Hresv, Hfrag⟩
+  iapply ghost_map_update v $$ Hresv Hfrag
 
 /-- A dropped reservation (a blocked exclusive read, or -- W-RSV -- the
 instruction boundary): the hart's reservation, whatever it was, is dropped. -/
@@ -1704,11 +1754,11 @@ theorem memModel_dropResv (σ : MState) (cpu : CPU) (r : Option Resv) (b : Bool)
   unfold memModelAt
   rw [rsvModelAt_congr E (σ := σ) (σ' := σ.dropResv cpu) rfl rfl (fun _ _ => rfl)]
   icases Hmm with ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
-  unfold resvFragAt
-  imod ghost_map_update ((none, b) : ResvVal) $$ Hresv Hfrag with ⟨Hresv, Hfrag⟩
+  imod resvAuth_upd E σ cpu r b none b (fun _ => none) $$ [$Hresv $Hfrag] with ⟨Hresv, Hfrag⟩
+  ihave Hfrag := resvFragAt_of_X E cpu none b none $$ Hfrag
   imodintro
-  have hresv : resvMap (σ.dropResv cpu) = Iris.Std.PartialMap.insert (resvMap σ) cpu.val (none, b) :=
-    resvMap_upd σ _ cpu _ _ (by simp [updCpu, hres.2]) (fun c hc => by simp [updCpu, hc])
+  have hresv : resvMap (σ.dropResv cpu) = Iris.Std.PartialMap.insert (resvMap σ) cpu.val (none, b, none) :=
+    resvMap_upd σ _ cpu _ _ (by simp [updCpu, hres.2]) (fun c hc => by simp [updCpu, hc]) none
   rw [hresv]
   iframe Hfrag Htop Hauth Hresv Hrsv
   isplitl [Hviews]
@@ -1858,11 +1908,11 @@ theorem memModel_store_plainQ (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (
     (by simp only [MaxNat.le_toNat]; omega) $$ Htop with ⟨Htop, #Htoplb⟩
   imod ghost_map_insert_persist (σ.top + 1) (hartAgent cpu)
     (by rw [authMap_get?, if_neg (by simp only [MState.top]; omega)]) $$ Hauth with ⟨Hauth, #Hau⟩
-  unfold resvFragAt
-  imod ghost_map_update ((none, false) : ResvVal) $$ Hresv Hfrag with ⟨Hresv, Hfrag⟩
+  imod resvAuth_upd E σ cpu r b none false id $$ [$Hresv $Hfrag] with ⟨Hresv, Hfrag⟩
+  ihave Hfrag := resvFragAt_of_X E cpu none false _ $$ Hfrag
   imodintro
   have hresv : resvMap (σ.store cpu pa n w false) =
-      Iris.Std.PartialMap.insert (resvMap σ) cpu.val (none, false) :=
+      Iris.Std.PartialMap.insert (resvMap σ) cpu.val (none, false, id (σ.xstale cpu)) :=
     resvMap_upd σ _ cpu _ _ (by simp [updCpu, HRead.clearAcq, HRead.resetCoh])
       (fun c hc => by simp [updCpu, hc])
   rw [hresv]

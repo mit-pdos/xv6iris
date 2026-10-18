@@ -374,7 +374,7 @@ structure SimRel (c : Wpcfg Pexv6 Efab)
 `bootFacts`'), the boot image, an empty log, zero views, the reset devices. -/
 def bootG1 (σ0 : WGState) (ds : DevStates) : GState :=
   { m := ⟨σ0.wgregs, imgFlat bootImage, [], fun _ => 0, fun _ => 0, fun _ => HRead.zero,
-          fun _ => none, ds.reset, fun _ => DevRt.init, fun _ => -1, fun _ => none⟩,
+          fun _ => none, ds.reset, fun _ => DevRt.init, fun _ => -1, fun _ => none, fun _ => 0⟩,
     gen := 0, pow := true }
 
 theorem bootShapeG1 (g0 : GState) (σ0 : WGState) (ds : DevStates) (hb : wbootFacts σ0)

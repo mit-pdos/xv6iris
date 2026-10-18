@@ -121,6 +121,14 @@ structure MState where
   Set by `MState.afterExclStale`; cleared by `afterExcl`, `dropResv` (the
   instruction boundary) and `storeSilent`; `none` at power-on. -/
   xstale : CPU → Option Resv := fun _ => none
+  /-- THE WRITE-ORDER VIEW (W11-F [OWN.105], narrow δ1; ghost): the position
+  every later WRITE of the hart must pass by RVWMO ppo rule 4 -- a fence with a
+  write successor raises it past the hart's earlier reads (`hr.rv`, if the
+  fence's predecessor set has R) and its own last store (`ownPub`, if it has
+  W): the pf `fencePost`'s `wVwNew`.  Every write but a SILENT one lands at the
+  top anyway; only the stale exclusive read (whose silent write sits at its
+  past view) is bounded by it.  `0` at power-on. -/
+  wv : CPU → Nat := fun _ => 0
 
 /-- The top of the store order: the timestamp of the latest store. -/
 abbrev MState.top (σ : MState) : Nat := σ.log.length
@@ -202,15 +210,28 @@ abbrev MState.store (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec
            hr := updCpu σ.hr cpu ((σ.hr cpu).clearAcq.resetCoh pa n),
            resv := updCpu σ.resv cpu none }
 
+/-- The write-order view after a fence `b` (narrow δ1 [OWN.105]): a fence
+whose successor set has W raises it past its predecessors -- the earlier reads
+(`rv`) if the predecessor set has R, the hart's own last store (`pub`) if it
+has W (`fence.tso` orders R→RW and W→W, so both); every other fence keeps it. -/
+def fenceWv (b : barrier_kind) (wv rv pub : Nat) : Nat :=
+  match b with
+  | .Barrier_RISCV_rw_rw | .Barrier_RISCV_rw_w | .Barrier_RISCV_tso => max wv (max rv pub)
+  | .Barrier_RISCV_r_rw | .Barrier_RISCV_r_w => max wv rv
+  | .Barrier_RISCV_w_w | .Barrier_RISCV_w_rw => max wv pub
+  | _ => wv
+
 /-- After a fence: the floor per `fencePost`; `fence.i` raises the
-instruction view past the floor and the hart's own last store. -/
+instruction view past the floor and the hart's own last store; the
+write-order view per `fenceWv`. -/
 abbrev MState.fence (σ : MState) (cpu : CPU) (b : barrier_kind) : MState :=
   let pub := ownPub (hartAgent cpu) σ.log
   let tv' := fencePost (fenceDrains b) (fenceAcq b) (σ.tv cpu) (σ.hr cpu).rv pub
   { σ with tv := updCpu σ.tv cpu tv',
            itv := updCpu σ.itv cpu
              (if fenceIfetch b then max (σ.itv cpu) (fencePost true false (σ.tv cpu) (σ.hr cpu).rv pub)
-              else σ.itv cpu) }
+              else σ.itv cpu),
+           wv := updCpu σ.wv cpu (fenceWv b (σ.wv cpu) (σ.hr cpu).rv pub) }
 
 /-- After a DMA write of `w` at `pa` by the disk: the bytes' histories grow,
 the author log grows; no hart's views move (the device is pinned to the top
@@ -393,7 +414,7 @@ current file, reload the image, reset the devices. -/
 def bootWitness (g : GState) : GState :=
   { m := ⟨fun cpu => bootLand cpu (g.m.regs cpu), imgFlat bootImage, [], fun _ => 0, fun _ => 0,
           fun _ => HRead.zero, fun _ => none, g.m.devs.reset, fun _ => DevRt.init, fun _ => -1,
-          fun _ => none⟩,
+          fun _ => none, fun _ => 0⟩,
     gen := g.gen, pow := true }
 
 /-- All harts. -/

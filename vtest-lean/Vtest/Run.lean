@@ -287,7 +287,8 @@ def initX (t : Test) : Option XState :=
         rtP := DevRt.init
         rtV := DevRt.init
         pcAt := fun _ => -1
-        xstale := fun _ => none }
+        xstale := fun _ => none
+        wv := fun _ => 0 }
   else none
 
 theorem initX_abs (t : Test) (x : XState) (h : initX t = some x) : x.abs = testMState t := by
@@ -319,6 +320,7 @@ theorem initX_abs (t : Test) (x : XState) (h : initX t = some x) : x.abs = testM
       rcases d with (_ | _) | _ | _ <;> rfl
     · funext d
       rcases d with (_ | _) | _ | _ <;> rfl
+    · rfl
     · rfl
     · rfl
   · exact absurd h (by simp)

@@ -113,6 +113,8 @@ structure XState where
   pcAt : Nat → Int
   /-- the pending stale exclusive read's snapshot (`MState.xstale`) -/
   xstale : CPU → Option Resv
+  /-- the write-order view (`MState.wv`) -/
+  wv : CPU → Nat
 
 namespace XState
 
@@ -172,6 +174,7 @@ def abs (x : XState) : MState where
   devrt := x.rt
   pcAt := x.pcAt
   xstale := x.xstale
+  wv := x.wv
 
 end XState
 
@@ -179,7 +182,7 @@ end XState
 theorem MState.ext' {a b : MState} (h1 : a.regs = b.regs) (h2 : a.mem = b.mem) (h3 : a.log = b.log)
     (h4 : a.tv = b.tv) (h5 : a.itv = b.itv) (h6 : a.hr = b.hr) (h7 : a.resv = b.resv)
     (h8 : a.devs = b.devs) (h9 : a.devrt = b.devrt) (h10 : a.pcAt = b.pcAt)
-    (h11 : a.xstale = b.xstale) : a = b := by
+    (h11 : a.xstale = b.xstale) (h12 : a.wv = b.wv) : a = b := by
   cases a; cases b; simp_all
 
 theorem updCpu_self {α : Type} (f : CPU → α) (c : CPU) : updCpu f c (f c) = f := by
@@ -313,18 +316,24 @@ theorem abs_store (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8
   · rfl
   · rfl
   · rfl
+  · rfl
 
 def fence (x : XState) (cpu : CPU) (b : barrier_kind) : XState :=
   let h := x.hart cpu
   let pub := ownPub (hartAgent cpu) x.log
   let tv' := fencePost (fenceDrains b) (fenceAcq b) h.tv h.hr.rv pub
-  x.setHart cpu { h with
-    tv := tv',
-    itv := if fenceIfetch b then max h.itv (fencePost true false h.tv h.hr.rv pub) else h.itv }
+  { x.setHart cpu { h with
+      tv := tv',
+      itv := if fenceIfetch b then max h.itv (fencePost true false h.tv h.hr.rv pub) else h.itv } with
+    wv := updCpu x.wv cpu (fenceWv b (x.wv cpu) h.hr.rv pub) }
+
+/-- Replacing the write-order views denotes the same replacement. -/
+theorem abs_withWv (x : XState) (f : CPU → Nat) :
+    ({ x with wv := f } : XState).abs = { x.abs with wv := f } := rfl
 
 theorem abs_fence (x : XState) (cpu : CPU) (b : barrier_kind) :
     (x.fence cpu b).abs = x.abs.fence cpu b := by
-  rw [fence, abs_setHart]
+  rw [fence, abs_withWv, abs_setHart]
   apply MState.ext' <;> first | rfl | exact updCpu_self _ _
 
 /-- A DMA write by the disk (a zero-byte one is a no-op, as `MState.storeDma`). -/

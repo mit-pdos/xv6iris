@@ -550,7 +550,7 @@ theorem wp_power [KernelMap] [KernelRsv]
     imod Hclose
     -- the new era's ghosts
     have hbf' := hbf
-    obtain ⟨hmem0, hlog0, hhart0, _⟩ := hbf'
+    obtain ⟨hmem0, hlog0, hhart0, _, _, hxs0⟩ := hbf'
     imod (regs_alloc g₂.m.regs) with ⟨%names, Hri, Hrc⟩
     imod (genHeap_init_names (L := PAddr) (V := Hist) (H := MemF) g₂.m.mem) with ⟨%γh, %γm, Hheap, Hpts, _⟩
     imod (names_alloc (fun γ _ => iprop(MonoNat.auth_own γ (DFrac.own 1) (.ofNat 0) ∗
@@ -619,15 +619,16 @@ theorem wp_power [KernelMap] [KernelRsv]
     imod Hoclose2 $$ HP2
     -- the reservation fragments, one per hart
     ihave Hfrags' := bigSepM_cpus (fun k v => γresv ↪◯MAP[k] v)
-      (fun c => (g₂.m.resv c, (g₂.m.hr c).acq)) cpus (resvMap g₂.m) (List.nodup_finRange NCPU)
+      (fun c => (g₂.m.resv c, (g₂.m.hr c).acq, g₂.m.xstale c)) cpus (resvMap g₂.m) (List.nodup_finRange NCPU)
       (fun c _ => resvMap_get? g₂.m c) $$ Hfrags
-    have hfrag : ∀ c : CPU, (γresv ↪◯MAP[c.val] ((g₂.m.resv c, (g₂.m.hr c).acq) : ResvVal)) ⊢@{IProp GF}
+    have hfrag : ∀ c : CPU, (γresv ↪◯MAP[c.val] ((g₂.m.resv c, (g₂.m.hr c).acq, g₂.m.xstale c) : ResvVal)) ⊢@{IProp GF}
         resvFragAt ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir, γrsv, γch⟩ c none false := by
       intro c
-      unfold resvFragAt
-      rw [(hhart0 c).2.2.2, (hhart0 c).2.2.1]
-      show (γresv ↪◯MAP[c.val] ((none, false) : ResvVal)) ⊢ γresv ↪◯MAP[c.val] ((none, false) : ResvVal)
+      unfold resvFragAt resvFragXAt
+      rw [(hhart0 c).2.2.2, (hhart0 c).2.2.1, hxs0 c]
+      show (γresv ↪◯MAP[c.val] ((none, false, none) : ResvVal)) ⊢ ∃ x : Option Resv, γresv ↪◯MAP[c.val] ((none, false, x) : ResvVal)
       iintro H
+      iexists none
       iexact H
     -- the boot client
     ihave Hdf := (show ([∗list] d ∈ DevId.all, devFragN (GF := GF) dn d (g₂.m.devs.st d)) ⊢

@@ -52,8 +52,9 @@ theorem memModel_read_excl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w :
     · rename_i hj; subst hj; rfl
     · rfl)]
   icases Hmm with ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
-  unfold resvFragAt
-  imod ghost_map_update ((some (snapOf pa n w), acq) : ResvVal) $$ Hresv Hfrag with ⟨Hresv, Hfrag⟩
+  imod resvAuth_upd E σ cpu r b (some (snapOf pa n w)) acq (fun _ => none) $$ [$Hresv $Hfrag]
+    with ⟨Hresv, Hfrag⟩
+  ihave Hfrag := resvFragAt_of_X E cpu _ _ _ $$ Hfrag
   icases hartViews_acc E σ cpu $$ Hviews with ⟨Hc, Hclose⟩
   icases hartViewsAt_cases E σ cpu $$ Hc with ⟨Hv, Hi, Hr⟩
   have htv : σ.tv cpu ≤ σ.top := (hmm.2.1 cpu).1
@@ -65,9 +66,9 @@ theorem memModel_read_excl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w :
   imodintro
   iframe Hfrag Htop Hauth Hrsv
   have hresv : resvMap (σ.afterExcl cpu pa n w acq) =
-      Iris.Std.PartialMap.insert (resvMap σ) cpu.val (some (snapOf pa n w), acq) :=
+      Iris.Std.PartialMap.insert (resvMap σ) cpu.val (some (snapOf pa n w), acq, none) :=
     resvMap_upd σ _ cpu _ _ (by simp [updCpu, HRead.afterExcl])
-      (fun c hc => by simp [updCpu, hc])
+      (fun c hc => by simp [updCpu, hc]) none
   rw [hresv]
   iframe Hresv
   isplitl [Hv Hi Hr Hclose]
@@ -158,8 +159,8 @@ theorem memModel_store_excl_any (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
     (by simp only [MaxNat.le_toNat]; omega) $$ Htop with ⟨Htop, #Htoplb⟩
   imod ghost_map_insert_persist (σ.top + 1) (hartAgent cpu)
     (by rw [authMap_get?, if_neg (by simp only [MState.top]; omega)]) $$ Hauth with ⟨Hauth, #Hau⟩
-  unfold resvFragAt
-  imod ghost_map_update ((none, false) : ResvVal) $$ Hresv Hfrag with ⟨Hresv, Hfrag⟩
+  imod resvAuth_upd E σ cpu r acq none false id $$ [$Hresv $Hfrag] with ⟨Hresv, Hfrag⟩
+  ihave Hfrag := resvFragAt_of_X E cpu _ _ _ $$ Hfrag
   icases hartViews_acc E σ cpu $$ Hviews with ⟨Hc, Hclose⟩
   icases hartViewsAt_cases E σ cpu $$ Hc with ⟨Hv, Hi, Hr⟩
   have htv : σ.tv cpu ≤ σ.top := (hmm.2.1 cpu).1
@@ -167,7 +168,7 @@ theorem memModel_store_excl_any (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
     (by simp only [MaxNat.le_toNat]; split <;> omega) $$ Hv with ⟨Hv, #Hvlb⟩
   imodintro
   have hresv : resvMap (σ.store cpu pa n w true) =
-      Iris.Std.PartialMap.insert (resvMap σ) cpu.val (none, false) :=
+      Iris.Std.PartialMap.insert (resvMap σ) cpu.val (none, false, id (σ.xstale cpu)) :=
     resvMap_upd σ _ cpu _ _ (by simp [updCpu, HRead.clearAcq, HRead.resetCoh])
       (fun c hc => by simp [updCpu, hc])
   rw [hresv]

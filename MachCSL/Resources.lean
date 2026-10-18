@@ -81,9 +81,10 @@ theorem regIdx_injective : Function.Injective regIdx := by
   have := congrArg Register.ofNat h
   simpa [regIdx, Register.ofNat_ctorIdx] using this
 
-/-- The reservation map's values: a hart's reservation and its pending
-acquire bit. -/
-abbrev ResvVal := Option Resv × Bool
+/-- The reservation map's values: a hart's reservation, its pending
+acquire bit, and its pending STALE exclusive read (`MState.xstale`, narrow
+δ1 [OWN.105]). -/
+abbrev ResvVal := Option Resv × Bool × Option Resv
 
 /-- A device's state, tagged with the device (the value of the per-device
 ghost variables: one `GhostVarG` covers every device). -/
@@ -637,15 +638,16 @@ theorem authMap_nil : authMap [] = (∅ : RegMapF Agent) := rfl
 def resvMapAux (σ : MState) : Nat → RegMapF ResvVal
   | 0 => ∅
   | k + 1 =>
-    if h : k < NCPU then insert (resvMapAux σ k) k (σ.resv ⟨k, h⟩, (σ.hr ⟨k, h⟩).acq)
+    if h : k < NCPU then insert (resvMapAux σ k) k (σ.resv ⟨k, h⟩, (σ.hr ⟨k, h⟩).acq, σ.xstale ⟨k, h⟩)
     else resvMapAux σ k
 
-/-- The reservation map: hart ↦ (its reservation, its pending acquire bit). -/
+/-- The reservation map: hart ↦ (its reservation, its pending acquire bit,
+its pending stale read). -/
 def resvMap (σ : MState) : RegMapF ResvVal := resvMapAux σ NCPU
 
 theorem resvMapAux_get? (σ : MState) : ∀ (k j : Nat),
     get? (resvMapAux σ k) j =
-      if h : j < k ∧ j < NCPU then some (σ.resv ⟨j, h.2⟩, (σ.hr ⟨j, h.2⟩).acq) else none
+      if h : j < k ∧ j < NCPU then some (σ.resv ⟨j, h.2⟩, (σ.hr ⟨j, h.2⟩).acq, σ.xstale ⟨j, h.2⟩) else none
   | 0, j => by
     simp only [resvMapAux]
     rw [dif_neg (by omega)]
@@ -666,7 +668,7 @@ theorem resvMapAux_get? (σ : MState) : ∀ (k j : Nat),
       · rw [dif_neg h1, dif_neg (by omega)]
 
 theorem resvMap_get? (σ : MState) (c : CPU) :
-    get? (resvMap σ) c.val = some (σ.resv c, (σ.hr c).acq) := by
+    get? (resvMap σ) c.val = some (σ.resv c, (σ.hr c).acq, σ.xstale c) := by
   unfold resvMap
   rw [resvMapAux_get?, dif_pos ⟨c.isLt, c.isLt⟩]
 
@@ -674,8 +676,11 @@ theorem resvMap_get?_ge (σ : MState) (j : Nat) (h : NCPU ≤ j) : get? (resvMap
   unfold resvMap
   rw [resvMapAux_get?, dif_neg (by omega)]
 
-/-- Two states with the same reservations and acquire bits have the same map. -/
-theorem resvMap_congr (σ σ' : MState) (h : ∀ c, σ'.resv c = σ.resv c ∧ (σ'.hr c).acq = (σ.hr c).acq) :
+/-- Two states with the same reservations, acquire bits and stale reads have
+the same map (the stale-read clause is `rfl` for every step but the
+exclusive ones). -/
+theorem resvMap_congr (σ σ' : MState) (h : ∀ c, σ'.resv c = σ.resv c ∧ (σ'.hr c).acq = (σ.hr c).acq)
+    (hx : ∀ c, σ'.xstale c = σ.xstale c := by intro _; rfl) :
     resvMap σ' = resvMap σ := by
   apply LawfulPartialMap.equiv_iff_eq.mp
   intro j
@@ -688,17 +693,19 @@ theorem resvMap_congr (σ σ' : MState) (h : ∀ c, σ'.resv c = σ.resv c ∧ (
 /-- Updating one hart's entry. -/
 theorem resvMap_upd (σ σ' : MState) (cpu : CPU) (r : Option Resv) (b : Bool)
     (hc : σ'.resv cpu = r ∧ (σ'.hr cpu).acq = b)
-    (h : ∀ c, c ≠ cpu → σ'.resv c = σ.resv c ∧ (σ'.hr c).acq = (σ.hr c).acq) :
-    resvMap σ' = insert (resvMap σ) cpu.val (r, b) := by
+    (h : ∀ c, c ≠ cpu → σ'.resv c = σ.resv c ∧ (σ'.hr c).acq = (σ.hr c).acq)
+    (x : Option Resv := σ.xstale cpu) (hxc : σ'.xstale cpu = x := by first | rfl | simp [updCpu])
+    (hx : ∀ c, c ≠ cpu → σ'.xstale c = σ.xstale c := by intro _ _; first | rfl | simp_all [updCpu]) :
+    resvMap σ' = insert (resvMap σ) cpu.val (r, b, x) := by
   apply LawfulPartialMap.equiv_iff_eq.mp
   intro j
   by_cases hj : j = cpu.val
   · subst hj
-    rw [LawfulPartialMap.get?_insert_eq rfl, resvMap_get?, hc.1, hc.2]
+    rw [LawfulPartialMap.get?_insert_eq rfl, resvMap_get?, hc.1, hc.2, hxc]
   · rw [LawfulPartialMap.get?_insert_ne (Ne.symm hj)]
     by_cases hlt : j < NCPU
     · have hne : (⟨j, hlt⟩ : CPU) ≠ cpu := fun heq => hj (congrArg Fin.val heq)
-      rw [resvMap_get? σ ⟨j, hlt⟩, resvMap_get? σ' ⟨j, hlt⟩, (h _ hne).1, (h _ hne).2]
+      rw [resvMap_get? σ ⟨j, hlt⟩, resvMap_get? σ' ⟨j, hlt⟩, (h _ hne).1, (h _ hne).2, hx _ hne]
     · rw [resvMap_get?_ge σ j (by omega), resvMap_get?_ge σ' j (by omega)]
 
 /-! ### The DRAM bank in the memory model
