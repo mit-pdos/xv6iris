@@ -74,7 +74,8 @@ namespace Xv6.CI.Tcb
 
 /-- The project proper: what the main table lists. -/
 def projectRoots : List Name := [`MachCSL, `Xv6]
-/-- This tree's other modules: the generated Sail model and the Sail library. -/
+/-- This tree's other modules: the generated Sail model and the Sail library (lean-sail, a git
+dependency that lake fetches under `.lake/packages/Sail`). -/
 def modelRoots : List Name := [`LeanRV64D, `Sail]
 
 def isLocalRoot (r : Name) : Bool := projectRoots.contains r || modelRoots.contains r
@@ -84,7 +85,7 @@ def srcPath? (m : Name) : Option String :=
   let base : Option String := match m.getRoot with
     | `MachCSL | `Xv6 => some ""
     | `LeanRV64D => some "model/Lean_RV64D/"
-    | `Sail => some "vendor/lean-sail/"
+    | `Sail => some ".lake/packages/Sail/"
     | _ => none
   base.map fun b => b ++ "/".intercalate (m.components.map toString) ++ ".lean"
 

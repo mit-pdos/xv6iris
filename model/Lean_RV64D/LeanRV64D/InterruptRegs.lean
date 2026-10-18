@@ -1,5 +1,12 @@
+import LeanRV64D.Flow
+import LeanRV64D.Arith
 import LeanRV64D.Prelude
+import LeanRV64D.IsaVersion
+import LeanRV64D.Xlen
 import LeanRV64D.PlatformConfig
+import LeanRV64D.Callbacks
+import LeanRV64D.SysRegs
+import LeanRV64D.InterruptInterface
 
 set_option maxHeartbeats 1_000_000_000
 set_option maxRecDepth 1_000_000
@@ -7,12 +14,12 @@ set_option linter.unusedVariables false
 set_option match.ignoreUnusedAlts true
 
 open Sail
-open Sail.ConcurrencyInterfaceV1
+open Sail.ArchSem
 
 noncomputable section
 namespace LeanRV64D
 
-open ConcurrencyInterfaceV1
+open ArchSem
 
 namespace Functions
 
@@ -56,6 +63,8 @@ open vfnunary0
 open vextfunct6
 open vector_support
 open uop
+open trigger_addr_type
+open tdata
 open stateen_bit
 open sopw
 open sop
@@ -89,10 +98,13 @@ open mmfunct6
 open misaligned_exception
 open mem_payload
 open maskfunct3
+open mask_type
+open loop_chain_state
 open landing_pad_expectation
 open iop
 open instruction
 open indexed_mop
+open hlvop
 open fwvvmafunct6
 open fwvvfunct6
 open fwvfunct6
@@ -138,6 +150,7 @@ open f_bin_f_op_D
 open extop_zbb
 open extension
 open exception
+open event_csr
 open csrop
 open cregidx
 open checked_cbop
@@ -156,17 +169,24 @@ open biop_zbs
 open barrier_kind
 open amoop
 open agtype
+open access_kind
 open XtvecModeReservedBehavior
 open XipReadType
 open XenvcfgCbieReservedBehavior
 open WaitReason
 open VectorHalf
+open Trigger
+open Trig_Type
+open Trig_Match
+open Trig_Action
 open TrapVectorMode
 open TrapCause
+open TranslationStage
 open Step
 open Splittability
 open Software_Check_Code
 open Signedness
+open Sdtrig_breakpoint_reentrancy
 open SWCheckCodes
 open SATPMode
 open Reservability
@@ -181,12 +201,15 @@ open PTW_Error
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
+open MemoryTriggerPayload
 open MemoryRegionType
 open MemoryAccessType
 open InterruptType
 open IllegalVtypeReservedBehavior
 open ISA_Format
+open Hit
 open HartState
+open HGATPMode
 open FflagsDirtyPolicy
 open FetchResult
 open FetchBytes_Result
@@ -197,276 +220,196 @@ open ExtStatus
 open ExtContextPolicy
 open ExecutionResult
 open ExceptionType
+open Event
+open Compare_Selection
 open CSRCheckResult
+open CSRBitConfig
 open CSRAccessType
 open AtomicSupport
 open Architecture
 open AmocasOddRegisterReservedBehavior
 
-def undefined_Minterrupts (_ : Unit) : SailM (BitVec 64) := do
-  (undefined_bitvector 64)
+def hgei_mask : xlenbits := (zero_extend (m := 64) ((ones (n := geilen)) +++ 0#1))
 
-def Mk_Minterrupts (v : (BitVec 64)) : (BitVec 64) :=
-  v
+def legalize_hgeie (v : (BitVec 64)) : (BitVec 64) :=
+  (v &&& hgei_mask)
 
-def _get_Minterrupts_LCOFI (v : (BitVec 64)) : (BitVec 1) :=
-  (Sail.BitVec.extractLsb v 13 13)
+def guest_external_interrupts_pending (_ : Unit) : SailM (BitVec 64) := do
+  readReg sig_hgeip
 
-def _update_Minterrupts_LCOFI (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
-  (Sail.BitVec.updateSubrange v 13 13 x)
+def read_hgeip (_ : Unit) : SailM (BitVec 64) := do
+  (pure ((← (guest_external_interrupts_pending ())) &&& hgei_mask))
 
-def _update_Sinterrupts_LCOFI (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
-  (Sail.BitVec.updateSubrange v 13 13 x)
+def selected_vgein_in_hgeip (_ : Unit) : SailM (BitVec 1) := do
+  let vgein ← do (pure (BitVec.toNatInt (_get_Hstatus_VGEIN (← readReg hstatus))))
+  if (((vgein >b 0) && (vgein ≤b geilen)) : Bool)
+  then
+    (do
+      let hgeip ← do (read_hgeip ())
+      (pure (BitVec.join1 [(BitVec.access hgeip vgein)])))
+  else (pure 0#1)
 
-def _set_Minterrupts_LCOFI (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : SailM Unit := do
-  let r ← do (reg_deref r_ref)
-  writeRegRef r_ref (_update_Minterrupts_LCOFI r v)
-
-def _get_Sinterrupts_LCOFI (v : (BitVec 64)) : (BitVec 1) :=
-  (Sail.BitVec.extractLsb v 13 13)
-
-def _set_Sinterrupts_LCOFI (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : SailM Unit := do
-  let r ← do (reg_deref r_ref)
-  writeRegRef r_ref (_update_Sinterrupts_LCOFI r v)
-
-def _get_Minterrupts_MEI (v : (BitVec 64)) : (BitVec 1) :=
-  (Sail.BitVec.extractLsb v 11 11)
-
-def _update_Minterrupts_MEI (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
-  (Sail.BitVec.updateSubrange v 11 11 x)
-
-def _update_Sinterrupts_MEI (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
-  (Sail.BitVec.updateSubrange v 11 11 x)
-
-def _set_Minterrupts_MEI (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : SailM Unit := do
-  let r ← do (reg_deref r_ref)
-  writeRegRef r_ref (_update_Minterrupts_MEI r v)
-
-def _get_Sinterrupts_MEI (v : (BitVec 64)) : (BitVec 1) :=
-  (Sail.BitVec.extractLsb v 11 11)
-
-def _set_Sinterrupts_MEI (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : SailM Unit := do
-  let r ← do (reg_deref r_ref)
-  writeRegRef r_ref (_update_Sinterrupts_MEI r v)
-
-def _get_Minterrupts_MSI (v : (BitVec 64)) : (BitVec 1) :=
-  (Sail.BitVec.extractLsb v 3 3)
-
-def _update_Minterrupts_MSI (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
-  (Sail.BitVec.updateSubrange v 3 3 x)
-
-def _update_Sinterrupts_MSI (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
-  (Sail.BitVec.updateSubrange v 3 3 x)
-
-def _set_Minterrupts_MSI (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : SailM Unit := do
-  let r ← do (reg_deref r_ref)
-  writeRegRef r_ref (_update_Minterrupts_MSI r v)
-
-def _get_Sinterrupts_MSI (v : (BitVec 64)) : (BitVec 1) :=
-  (Sail.BitVec.extractLsb v 3 3)
-
-def _set_Sinterrupts_MSI (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : SailM Unit := do
-  let r ← do (reg_deref r_ref)
-  writeRegRef r_ref (_update_Sinterrupts_MSI r v)
-
-def _get_Minterrupts_MTI (v : (BitVec 64)) : (BitVec 1) :=
-  (Sail.BitVec.extractLsb v 7 7)
-
-def _update_Minterrupts_MTI (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
-  (Sail.BitVec.updateSubrange v 7 7 x)
-
-def _update_Sinterrupts_MTI (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
-  (Sail.BitVec.updateSubrange v 7 7 x)
-
-def _set_Minterrupts_MTI (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : SailM Unit := do
-  let r ← do (reg_deref r_ref)
-  writeRegRef r_ref (_update_Minterrupts_MTI r v)
-
-def _get_Sinterrupts_MTI (v : (BitVec 64)) : (BitVec 1) :=
-  (Sail.BitVec.extractLsb v 7 7)
-
-def _set_Sinterrupts_MTI (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : SailM Unit := do
-  let r ← do (reg_deref r_ref)
-  writeRegRef r_ref (_update_Sinterrupts_MTI r v)
-
-def _get_Minterrupts_SEI (v : (BitVec 64)) : (BitVec 1) :=
-  (Sail.BitVec.extractLsb v 9 9)
-
-def _update_Minterrupts_SEI (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
-  (Sail.BitVec.updateSubrange v 9 9 x)
-
-def _update_Sinterrupts_SEI (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
-  (Sail.BitVec.updateSubrange v 9 9 x)
-
-def _set_Minterrupts_SEI (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : SailM Unit := do
-  let r ← do (reg_deref r_ref)
-  writeRegRef r_ref (_update_Minterrupts_SEI r v)
-
-def _get_Sinterrupts_SEI (v : (BitVec 64)) : (BitVec 1) :=
-  (Sail.BitVec.extractLsb v 9 9)
-
-def _set_Sinterrupts_SEI (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : SailM Unit := do
-  let r ← do (reg_deref r_ref)
-  writeRegRef r_ref (_update_Sinterrupts_SEI r v)
-
-def _get_Minterrupts_SGEI (v : (BitVec 64)) : (BitVec 1) :=
-  (Sail.BitVec.extractLsb v 12 12)
-
-def _update_Minterrupts_SGEI (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
-  (Sail.BitVec.updateSubrange v 12 12 x)
-
-def _set_Minterrupts_SGEI (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : SailM Unit := do
-  let r ← do (reg_deref r_ref)
-  writeRegRef r_ref (_update_Minterrupts_SGEI r v)
-
-def _get_Minterrupts_SSI (v : (BitVec 64)) : (BitVec 1) :=
-  (Sail.BitVec.extractLsb v 1 1)
-
-def _update_Minterrupts_SSI (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
-  (Sail.BitVec.updateSubrange v 1 1 x)
-
-def _update_Sinterrupts_SSI (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
-  (Sail.BitVec.updateSubrange v 1 1 x)
-
-def _set_Minterrupts_SSI (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : SailM Unit := do
-  let r ← do (reg_deref r_ref)
-  writeRegRef r_ref (_update_Minterrupts_SSI r v)
-
-def _get_Sinterrupts_SSI (v : (BitVec 64)) : (BitVec 1) :=
-  (Sail.BitVec.extractLsb v 1 1)
-
-def _set_Sinterrupts_SSI (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : SailM Unit := do
-  let r ← do (reg_deref r_ref)
-  writeRegRef r_ref (_update_Sinterrupts_SSI r v)
-
-def _get_Minterrupts_STI (v : (BitVec 64)) : (BitVec 1) :=
-  (Sail.BitVec.extractLsb v 5 5)
-
-def _update_Minterrupts_STI (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
-  (Sail.BitVec.updateSubrange v 5 5 x)
-
-def _update_Sinterrupts_STI (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
-  (Sail.BitVec.updateSubrange v 5 5 x)
-
-def _set_Minterrupts_STI (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : SailM Unit := do
-  let r ← do (reg_deref r_ref)
-  writeRegRef r_ref (_update_Minterrupts_STI r v)
-
-def _get_Sinterrupts_STI (v : (BitVec 64)) : (BitVec 1) :=
-  (Sail.BitVec.extractLsb v 5 5)
-
-def _set_Sinterrupts_STI (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : SailM Unit := do
-  let r ← do (reg_deref r_ref)
-  writeRegRef r_ref (_update_Sinterrupts_STI r v)
-
-def _get_Minterrupts_VSEI (v : (BitVec 64)) : (BitVec 1) :=
-  (Sail.BitVec.extractLsb v 10 10)
-
-def _update_Minterrupts_VSEI (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
-  (Sail.BitVec.updateSubrange v 10 10 x)
-
-def _set_Minterrupts_VSEI (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : SailM Unit := do
-  let r ← do (reg_deref r_ref)
-  writeRegRef r_ref (_update_Minterrupts_VSEI r v)
-
-def _get_Minterrupts_VSSI (v : (BitVec 64)) : (BitVec 1) :=
-  (Sail.BitVec.extractLsb v 2 2)
-
-def _update_Minterrupts_VSSI (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
-  (Sail.BitVec.updateSubrange v 2 2 x)
-
-def _set_Minterrupts_VSSI (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : SailM Unit := do
-  let r ← do (reg_deref r_ref)
-  writeRegRef r_ref (_update_Minterrupts_VSSI r v)
-
-def _get_Minterrupts_VSTI (v : (BitVec 64)) : (BitVec 1) :=
-  (Sail.BitVec.extractLsb v 6 6)
-
-def _update_Minterrupts_VSTI (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
-  (Sail.BitVec.updateSubrange v 6 6 x)
-
-def _set_Minterrupts_VSTI (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : SailM Unit := do
-  let r ← do (reg_deref r_ref)
-  writeRegRef r_ref (_update_Minterrupts_VSTI r v)
+def supported_interrupts_mask (i : (BitVec 64)) : SailM (BitVec 64) := do
+  (pure (Mk_Minterrupts
+      ((_update_Minterrupts_LCOFI
+          (_update_Minterrupts_SGEI
+            (_update_Minterrupts_STI
+              (_update_Minterrupts_SSI
+                (_update_Minterrupts_SEI
+                  (_update_Minterrupts_MTI
+                    (_update_Minterrupts_MSI
+                      (_update_Minterrupts_MEI (Mk_Minterrupts (ones (n := 64)))
+                        (bool_to_bit plat_has_mei)) (bool_to_bit plat_has_msi))
+                    (bool_to_bit plat_has_mti)) (bool_to_bit plat_has_sei))
+                (bool_to_bit plat_has_ssi)) (bool_to_bit plat_has_sti)) (bool_to_bit (geilen >b 0)))
+          (← do
+            if ((← (currentlyEnabled Ext_Sscofpmf)) : Bool)
+            then (pure 1#1)
+            else (pure 0#1))) &&& i)))
 
 def legalize_mip (o : (BitVec 64)) (v : (BitVec 64)) : SailM (BitVec 64) := do
   let v := (Mk_Minterrupts v)
-  (pure (_update_Minterrupts_STI
-      (_update_Minterrupts_SSI
-        (_update_Minterrupts_SEI
-          (_update_Minterrupts_LCOFI o
-            (← do
-              if ((← (currentlyEnabled Ext_Sscofpmf)) : Bool)
-              then (pure (_get_Minterrupts_LCOFI v))
-              else (pure 0#1)))
+  (supported_interrupts_mask
+    (_update_Minterrupts_VSSI
+      (_update_Minterrupts_VSTI
+        (_update_Minterrupts_VSEI
+          (_update_Minterrupts_SGEI
+            (_update_Minterrupts_STI
+              (_update_Minterrupts_SSI
+                (_update_Minterrupts_SEI
+                  (_update_Minterrupts_LCOFI o
+                    (← do
+                      if ((← (currentlyEnabled Ext_Sscofpmf)) : Bool)
+                      then (pure (_get_Minterrupts_LCOFI v))
+                      else (pure 0#1)))
+                  (← do
+                    if ((← (currentlyEnabled Ext_S)) : Bool)
+                    then (pure (_get_Minterrupts_SEI v))
+                    else (pure 0#1)))
+                (← do
+                  if ((← (currentlyEnabled Ext_S)) : Bool)
+                  then (pure (_get_Minterrupts_SSI v))
+                  else (pure 0#1)))
+              (← do
+                if ((← (currentlyEnabled Ext_S)) : Bool)
+                then
+                  (do
+                    if ((← do
+                         if ((← (currentlyEnabled Ext_Sstc)) : Bool)
+                         then (pure ((_get_MEnvcfg_STCE (← readReg menvcfg)) == 1#1))
+                         else (pure false)) : Bool)
+                    then (pure (_get_Minterrupts_STI o))
+                    else (pure (_get_Minterrupts_STI v)))
+                else (pure 0#1))) 0#1)
           (← do
-            if ((← (currentlyEnabled Ext_S)) : Bool)
-            then (pure (_get_Minterrupts_SEI v))
+            if ((← (currentlyEnabled Ext_H)) : Bool)
+            then (pure (_get_Minterrupts_VSEI (← readReg hvip)))
             else (pure 0#1)))
         (← do
-          if ((← (currentlyEnabled Ext_S)) : Bool)
-          then (pure (_get_Minterrupts_SSI v))
+          if ((← (currentlyEnabled Ext_H)) : Bool)
+          then
+            (do
+              if ((← do
+                   if ((← (currentlyEnabled Ext_Sstc)) : Bool)
+                   then (pure ((_get_HEnvcfg_STCE (← (read_henvcfg ()))) == 1#1))
+                   else (pure false)) : Bool)
+              then (pure (_get_Minterrupts_VSTI o))
+              else (pure (_get_Minterrupts_VSTI (← readReg hvip))))
           else (pure 0#1)))
       (← do
-        if ((← (currentlyEnabled Ext_S)) : Bool)
-        then
-          (do
-            if ((← do
-                 if ((← (currentlyEnabled Ext_Sstc)) : Bool)
-                 then (pure ((_get_MEnvcfg_STCE (← readReg menvcfg)) == 1#1))
-                 else (pure false)) : Bool)
-            then (pure (_get_Minterrupts_STI o))
-            else (pure (_get_Minterrupts_STI v)))
+        if ((← (currentlyEnabled Ext_H)) : Bool)
+        then (pure (_get_Minterrupts_VSSI v))
         else (pure 0#1))))
 
 def legalize_mie (o : (BitVec 64)) (v : (BitVec 64)) : SailM (BitVec 64) := do
   let v := (Mk_Minterrupts v)
-  (pure (_update_Minterrupts_SSI
-      (_update_Minterrupts_STI
-        (_update_Minterrupts_SEI
-          (_update_Minterrupts_MSI
-            (_update_Minterrupts_MTI
-              (_update_Minterrupts_MEI
-                (_update_Minterrupts_LCOFI o
+  (supported_interrupts_mask
+    (_update_Minterrupts_VSSI
+      (_update_Minterrupts_VSTI
+        (_update_Minterrupts_VSEI
+          (_update_Minterrupts_SGEI
+            (_update_Minterrupts_SSI
+              (_update_Minterrupts_STI
+                (_update_Minterrupts_SEI
+                  (_update_Minterrupts_MSI
+                    (_update_Minterrupts_MTI
+                      (_update_Minterrupts_MEI
+                        (_update_Minterrupts_LCOFI o
+                          (← do
+                            if ((← (currentlyEnabled Ext_Sscofpmf)) : Bool)
+                            then (pure (_get_Minterrupts_LCOFI v))
+                            else (pure 0#1))) (_get_Minterrupts_MEI v)) (_get_Minterrupts_MTI v))
+                    (_get_Minterrupts_MSI v))
                   (← do
-                    if ((← (currentlyEnabled Ext_Sscofpmf)) : Bool)
-                    then (pure (_get_Minterrupts_LCOFI v))
-                    else (pure 0#1))) (_get_Minterrupts_MEI v)) (_get_Minterrupts_MTI v))
-            (_get_Minterrupts_MSI v))
+                    if ((← (currentlyEnabled Ext_S)) : Bool)
+                    then (pure (_get_Minterrupts_SEI v))
+                    else (pure 0#1)))
+                (← do
+                  if ((← (currentlyEnabled Ext_S)) : Bool)
+                  then (pure (_get_Minterrupts_STI v))
+                  else (pure 0#1)))
+              (← do
+                if ((← (currentlyEnabled Ext_S)) : Bool)
+                then (pure (_get_Minterrupts_SSI v))
+                else (pure 0#1)))
+            (← do
+              if ((← (currentlyEnabled Ext_H)) : Bool)
+              then (pure (_get_Minterrupts_SGEI v))
+              else (pure 0#1)))
           (← do
-            if ((← (currentlyEnabled Ext_S)) : Bool)
-            then (pure (_get_Minterrupts_SEI v))
+            if ((← (currentlyEnabled Ext_H)) : Bool)
+            then (pure (_get_Minterrupts_VSEI v))
             else (pure 0#1)))
         (← do
-          if ((← (currentlyEnabled Ext_S)) : Bool)
-          then (pure (_get_Minterrupts_STI v))
+          if ((← (currentlyEnabled Ext_H)) : Bool)
+          then (pure (_get_Minterrupts_VSTI v))
           else (pure 0#1)))
       (← do
-        if ((← (currentlyEnabled Ext_S)) : Bool)
-        then (pure (_get_Minterrupts_SSI v))
+        if ((← (currentlyEnabled Ext_H)) : Bool)
+        then (pure (_get_Minterrupts_VSSI v))
         else (pure 0#1))))
 
 def legalize_mideleg (_o : (BitVec 64)) (v : (BitVec 64)) : SailM (BitVec 64) := do
   let v := (Mk_Minterrupts (v &&& plat_mideleg_delegatable_bits))
-  (pure (_update_Minterrupts_SSI
-      (_update_Minterrupts_STI
-        (_update_Minterrupts_SEI
-          (_update_Minterrupts_LCOFI v
+  (pure (_update_Minterrupts_SGEI
+      (_update_Minterrupts_VSSI
+        (_update_Minterrupts_VSTI
+          (_update_Minterrupts_VSEI
+            (_update_Minterrupts_SSI
+              (_update_Minterrupts_STI
+                (_update_Minterrupts_SEI
+                  (_update_Minterrupts_LCOFI v
+                    (← do
+                      if ((← (currentlyEnabled Ext_Sscofpmf)) : Bool)
+                      then (pure (_get_Minterrupts_LCOFI v))
+                      else (pure 0#1)))
+                  (← do
+                    if ((← (currentlyEnabled Ext_S)) : Bool)
+                    then (pure (_get_Minterrupts_SEI v))
+                    else (pure 0#1)))
+                (← do
+                  if ((← (currentlyEnabled Ext_S)) : Bool)
+                  then (pure (_get_Minterrupts_STI v))
+                  else (pure 0#1)))
+              (← do
+                if ((← (currentlyEnabled Ext_S)) : Bool)
+                then (pure (_get_Minterrupts_SSI v))
+                else (pure 0#1)))
             (← do
-              if ((← (currentlyEnabled Ext_Sscofpmf)) : Bool)
-              then (pure (_get_Minterrupts_LCOFI v))
+              if ((← (currentlyEnabled Ext_H)) : Bool)
+              then (pure 1#1)
               else (pure 0#1)))
           (← do
-            if ((← (currentlyEnabled Ext_S)) : Bool)
-            then (pure (_get_Minterrupts_SEI v))
+            if ((← (currentlyEnabled Ext_H)) : Bool)
+            then (pure 1#1)
             else (pure 0#1)))
         (← do
-          if ((← (currentlyEnabled Ext_S)) : Bool)
-          then (pure (_get_Minterrupts_STI v))
+          if ((← (currentlyEnabled Ext_H)) : Bool)
+          then (pure 1#1)
           else (pure 0#1)))
       (← do
-        if ((← (currentlyEnabled Ext_S)) : Bool)
-        then (pure (_get_Minterrupts_SSI v))
+        if (((← (currentlyEnabled Ext_H)) && (geilen >b 0)) : Bool)
+        then (pure 1#1)
         else (pure 0#1))))
 
 def undefined_Medeleg (_ : Unit) : SailM (BitVec 64) := do
@@ -514,6 +457,16 @@ def _update_Medeleg_Fetch_Addr_Align (v : (BitVec 64)) (x : (BitVec 1)) : (BitVe
 def _set_Medeleg_Fetch_Addr_Align (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : SailM Unit := do
   let r ← do (reg_deref r_ref)
   writeRegRef r_ref (_update_Medeleg_Fetch_Addr_Align r v)
+
+def _get_Medeleg_Fetch_GPage_Fault (v : (BitVec 64)) : (BitVec 1) :=
+  (Sail.BitVec.extractLsb v 20 20)
+
+def _update_Medeleg_Fetch_GPage_Fault (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
+  (Sail.BitVec.updateSubrange v 20 20 x)
+
+def _set_Medeleg_Fetch_GPage_Fault (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : SailM Unit := do
+  let r ← do (reg_deref r_ref)
+  writeRegRef r_ref (_update_Medeleg_Fetch_GPage_Fault r v)
 
 def _get_Medeleg_Fetch_Page_Fault (v : (BitVec 64)) : (BitVec 1) :=
   (Sail.BitVec.extractLsb v 12 12)
@@ -565,6 +518,16 @@ def _set_Medeleg_Load_Addr_Align (r_ref : (RegisterRef (BitVec 64))) (v : (BitVe
   let r ← do (reg_deref r_ref)
   writeRegRef r_ref (_update_Medeleg_Load_Addr_Align r v)
 
+def _get_Medeleg_Load_GPage_Fault (v : (BitVec 64)) : (BitVec 1) :=
+  (Sail.BitVec.extractLsb v 21 21)
+
+def _update_Medeleg_Load_GPage_Fault (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
+  (Sail.BitVec.updateSubrange v 21 21 x)
+
+def _set_Medeleg_Load_GPage_Fault (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : SailM Unit := do
+  let r ← do (reg_deref r_ref)
+  writeRegRef r_ref (_update_Medeleg_Load_GPage_Fault r v)
+
 def _get_Medeleg_Load_Page_Fault (v : (BitVec 64)) : (BitVec 1) :=
   (Sail.BitVec.extractLsb v 13 13)
 
@@ -604,6 +567,16 @@ def _update_Medeleg_SAMO_Addr_Align (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec
 def _set_Medeleg_SAMO_Addr_Align (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : SailM Unit := do
   let r ← do (reg_deref r_ref)
   writeRegRef r_ref (_update_Medeleg_SAMO_Addr_Align r v)
+
+def _get_Medeleg_SAMO_GPage_Fault (v : (BitVec 64)) : (BitVec 1) :=
+  (Sail.BitVec.extractLsb v 23 23)
+
+def _update_Medeleg_SAMO_GPage_Fault (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
+  (Sail.BitVec.updateSubrange v 23 23 x)
+
+def _set_Medeleg_SAMO_GPage_Fault (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : SailM Unit := do
+  let r ← do (reg_deref r_ref)
+  writeRegRef r_ref (_update_Medeleg_SAMO_GPage_Fault r v)
 
 def _get_Medeleg_SAMO_Page_Fault (v : (BitVec 64)) : (BitVec 1) :=
   (Sail.BitVec.extractLsb v 15 15)
@@ -645,9 +618,60 @@ def _set_Medeleg_UEnvCall (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) :
   let r ← do (reg_deref r_ref)
   writeRegRef r_ref (_update_Medeleg_UEnvCall r v)
 
-def legalize_medeleg (_o : (BitVec 64)) (v : (BitVec 64)) : (BitVec 64) :=
-  (_update_Medeleg_MEnvCall
-    (_update_Medeleg_Double_Trap (Mk_Medeleg (v &&& plat_medeleg_delegatable_bits)) 0#1) 0#1)
+def _get_Medeleg_VSEnvCall (v : (BitVec 64)) : (BitVec 1) :=
+  (Sail.BitVec.extractLsb v 10 10)
+
+def _update_Medeleg_VSEnvCall (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
+  (Sail.BitVec.updateSubrange v 10 10 x)
+
+def _set_Medeleg_VSEnvCall (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : SailM Unit := do
+  let r ← do (reg_deref r_ref)
+  writeRegRef r_ref (_update_Medeleg_VSEnvCall r v)
+
+def _get_Medeleg_Virtual_Instr (v : (BitVec 64)) : (BitVec 1) :=
+  (Sail.BitVec.extractLsb v 22 22)
+
+def _update_Medeleg_Virtual_Instr (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
+  (Sail.BitVec.updateSubrange v 22 22 x)
+
+def _set_Medeleg_Virtual_Instr (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : SailM Unit := do
+  let r ← do (reg_deref r_ref)
+  writeRegRef r_ref (_update_Medeleg_Virtual_Instr r v)
+
+def legalize_medeleg (_o : (BitVec 64)) (v : (BitVec 64)) : SailM (BitVec 64) := do
+  let v := (Mk_Medeleg (v &&& plat_medeleg_delegatable_bits))
+  (pure (_update_Medeleg_Breakpoint
+      (_update_Medeleg_MEnvCall
+        (_update_Medeleg_Double_Trap
+          (_update_Medeleg_VSEnvCall
+            (_update_Medeleg_Fetch_GPage_Fault
+              (_update_Medeleg_Load_GPage_Fault
+                (_update_Medeleg_Virtual_Instr
+                  (_update_Medeleg_SAMO_GPage_Fault v
+                    (← do
+                      if ((← (currentlyEnabled Ext_H)) : Bool)
+                      then (pure (_get_Medeleg_SAMO_GPage_Fault v))
+                      else (pure 0#1)))
+                  (← do
+                    if ((← (currentlyEnabled Ext_H)) : Bool)
+                    then (pure (_get_Medeleg_Virtual_Instr v))
+                    else (pure 0#1)))
+                (← do
+                  if ((← (currentlyEnabled Ext_H)) : Bool)
+                  then (pure (_get_Medeleg_Load_GPage_Fault v))
+                  else (pure 0#1)))
+              (← do
+                if ((← (currentlyEnabled Ext_H)) : Bool)
+                then (pure (_get_Medeleg_Fetch_GPage_Fault v))
+                else (pure 0#1)))
+            (← do
+              if ((← (currentlyEnabled Ext_H)) : Bool)
+              then (pure (_get_Medeleg_VSEnvCall v))
+              else (pure 0#1))) 0#1) 0#1)
+      (← do
+        if (((← (currentlyEnabled Ext_Sdtrig)) && (sdtrig_breakpoint_reentrancy == Use_tcontrol)) : Bool)
+        then (pure 0#1)
+        else (pure (_get_Medeleg_Breakpoint v)))))
 
 def undefined_XipReadType (_ : Unit) : SailM XipReadType := do
   (internal_pick [IncludePlatformInterrupts, ExcludePlatformInterrupts])
@@ -663,22 +687,185 @@ def num_of_XipReadType (arg_ : XipReadType) : Int :=
   | .IncludePlatformInterrupts => 0
   | .ExcludePlatformInterrupts => 1
 
-def external_interrupts_pending (_ : Unit) : SailM (BitVec 64) := do
-  (pure (_update_Minterrupts_SEI
-      (_update_Minterrupts_MEI (Mk_Minterrupts (zeros (n := 64))) (← readReg sig_meip))
+def sig_external_interrupts_pending (hgeie_val : (BitVec 64)) : SailM (BitVec 64) := do
+  (pure (_update_Minterrupts_VSEI
+      (_update_Minterrupts_SGEI
+        (_update_Minterrupts_SEI
+          (_update_Minterrupts_MEI (Mk_Minterrupts (zeros (n := 64))) (← readReg sig_meip))
+          (← do
+            if ((← (currentlyEnabled Ext_S)) : Bool)
+            then readReg sig_seip
+            else (pure 0#1)))
+        (← do
+          if ((← (currentlyEnabled Ext_H)) : Bool)
+          then (pure (bool_to_bit (((← readReg sig_hgeip) &&& hgeie_val) != (zeros (n := 64)))))
+          else (pure 0#1)))
       (← do
-        if ((← (currentlyEnabled Ext_S)) : Bool)
-        then readReg sig_seip
+        if ((← (currentlyEnabled Ext_H)) : Bool)
+        then (selected_vgein_in_hgeip ())
         else (pure 0#1))))
+
+def external_interrupts_pending (hgeie_val : (BitVec 64)) : SailM (BitVec 64) := do
+  (sig_external_interrupts_pending hgeie_val)
+
+def sig_supervisor_software_interrupt_pending (_ : Unit) : SailM (BitVec 1) := do
+  readReg sig_ssip
+
+def supervisor_software_interrupt_pending (_ : Unit) : SailM (BitVec 1) := do
+  if (plat_have_sig : Bool)
+  then (sig_supervisor_software_interrupt_pending ())
+  else (pure 0#1)
 
 def read_mip (read_type : XipReadType) : SailM (BitVec 64) := do
   match read_type with
   | .IncludePlatformInterrupts =>
-    (pure (Mk_Minterrupts ((← readReg mip) ||| (← (external_interrupts_pending ())))))
+    (do
+      let platform_interrupts ← do
+        (supported_interrupts_mask
+          (_update_Minterrupts_SSI (← (external_interrupts_pending (← readReg hgeie)))
+            (← do
+              if ((← (currentlyEnabled Ext_S)) : Bool)
+              then (supervisor_software_interrupt_pending ())
+              else (pure 0#1))))
+      (pure (Mk_Minterrupts ((← readReg mip) ||| platform_interrupts))))
   | .ExcludePlatformInterrupts => readReg mip
+
+def clint_get_hart_mtimecmp (_ : Unit) : SailM (BitVec 64) := do
+  readReg mtimecmp
+
+def get_hart_mtimecmp (_ : Unit) : SailM (BitVec 64) := do
+  if (plat_have_clint : Bool)
+  then (clint_get_hart_mtimecmp ())
+  else (pure (zeros (n := 64)))
+
+def clint_get_mtime (_ : Unit) : SailM (BitVec 64) := do
+  readReg mtime
+
+def get_mtime (_ : Unit) : SailM (BitVec 64) := do
+  if (plat_have_clint : Bool)
+  then (clint_get_mtime ())
+  else (pure (zeros (n := 64)))
+
+def clint_machine_software_interrupt_pending (_ : Unit) : SailM (BitVec 1) := do
+  (pure (BitVec.access (← readReg msip) 0))
+
+def sig_machine_software_interrupt_pending (_ : Unit) : SailM (BitVec 1) := do
+  readReg sig_msip
+
+def machine_software_interrupt_pending (_ : Unit) : SailM (BitVec 1) := do
+  (pure ((← do
+        if (plat_have_clint : Bool)
+        then (clint_machine_software_interrupt_pending ())
+        else (pure 0#1)) ||| (← do
+        if (plat_have_sig : Bool)
+        then (sig_machine_software_interrupt_pending ())
+        else (pure 0#1))))
+
+def update_mip (_ : Unit) : SailM Unit := do
+  let old_mip ← do readReg mip
+  let platform_has_timer := plat_have_clint
+  let cur_mtime ← do (get_mtime ())
+  let hart_mtimecmp ← do (get_hart_mtimecmp ())
+  let new_mip ← do readReg mip
+  let new_mip ←
+    (pure (Sail.BitVec.updateSubrange new_mip 3 3 (← (machine_software_interrupt_pending ()))))
+  let new_mip ← (( do
+    if (platform_has_timer : Bool)
+    then
+      (do
+        let new_mip : (BitVec 64) :=
+          (Sail.BitVec.updateSubrange new_mip 7 7
+            (bool_to_bit (zopz0zIzJ_u hart_mtimecmp cur_mtime)))
+        if ((← do
+             if ((← (currentlyEnabled Ext_Sstc)) : Bool)
+             then (pure ((_get_MEnvcfg_STCE (← readReg menvcfg)) == 1#1))
+             else (pure false)) : Bool)
+        then
+          (do
+            (pure (Sail.BitVec.updateSubrange new_mip 5 5
+                (bool_to_bit (zopz0zIzJ_u (← readReg stimecmp) cur_mtime)))))
+        else (pure new_mip))
+    else (pure new_mip) ) : SailM (BitVec 64) )
+  let new_mip ← (( do
+    if ((← (currentlyEnabled Ext_H)) : Bool)
+    then
+      (do
+        let new_mip ←
+          (pure (Sail.BitVec.updateSubrange new_mip 10 10 (_get_Minterrupts_VSEI (← readReg hvip))))
+        (pure (Sail.BitVec.updateSubrange new_mip 6 6
+            ((_get_Minterrupts_VSTI (← readReg hvip)) ||| (← do
+                if ((← do
+                     if ((← (currentlyEnabled Ext_Sstc)) : Bool)
+                     then
+                       (pure (((_get_HEnvcfg_STCE (← (read_henvcfg ()))) == 1#1) && platform_has_timer))
+                     else (pure false)) : Bool)
+                then
+                  (pure (bool_to_bit
+                      (zopz0zIzJ_u (← readReg vstimecmp) (cur_mtime + (← readReg htimedelta)))))
+                else (pure 0#1))))))
+    else (pure new_mip) ) : SailM (BitVec 64) )
+  writeReg mip (← (supported_interrupts_mask new_mip))
+  if ((old_mip != (← readReg mip)) : Bool)
+  then (csr_name_write_callback "mip" (← (read_mip IncludePlatformInterrupts)))
+  else (pure ())
 
 def write_mip (value : (BitVec 64)) : SailM Unit := do
   writeReg mip (← (legalize_mip (← readReg mip) value))
+
+def legalize_hvip (h : (BitVec 64)) (v : (BitVec 64)) : (BitVec 64) :=
+  let v := (Mk_Minterrupts v)
+  (_update_Minterrupts_VSSI
+    (_update_Minterrupts_VSTI (_update_Minterrupts_VSEI h (_get_Minterrupts_VSEI v))
+      (_get_Minterrupts_VSTI v)) (_get_Minterrupts_VSSI v))
+
+def legalize_hie (m : (BitVec 64)) (v : (BitVec 64)) : SailM (BitVec 64) := do
+  let v := (Mk_Minterrupts v)
+  (supported_interrupts_mask
+    (_update_Minterrupts_VSSI
+      (_update_Minterrupts_VSTI
+        (_update_Minterrupts_VSEI (_update_Minterrupts_SGEI m (_get_Minterrupts_SGEI v))
+          (_get_Minterrupts_VSEI v)) (_get_Minterrupts_VSTI v)) (_get_Minterrupts_VSSI v)))
+
+def legalize_hip (m : (BitVec 64)) (v : (BitVec 64)) : SailM (BitVec 64) := do
+  let v := (Mk_Minterrupts v)
+  (supported_interrupts_mask (_update_Minterrupts_VSSI m (_get_Minterrupts_VSSI v)))
+
+def lower_mip_to_hvip (m : (BitVec 64)) (h : (BitVec 64)) : (BitVec 64) :=
+  (_update_Minterrupts_VSSI h (_get_Minterrupts_VSSI m))
+
+def lower_mie_to_hie (m : (BitVec 64)) : (BitVec 64) :=
+  (_update_Minterrupts_VSSI
+    (_update_Minterrupts_VSTI
+      (_update_Minterrupts_VSEI
+        (_update_Minterrupts_SGEI (Mk_Minterrupts (zeros (n := 64))) (_get_Minterrupts_SGEI m))
+        (_get_Minterrupts_VSEI m)) (_get_Minterrupts_VSTI m)) (_get_Minterrupts_VSSI m))
+
+def lower_mip_to_hip (m : (BitVec 64)) : (BitVec 64) :=
+  (_update_Minterrupts_VSSI
+    (_update_Minterrupts_VSTI
+      (_update_Minterrupts_VSEI
+        (_update_Minterrupts_SGEI (Mk_Minterrupts (zeros (n := 64))) (_get_Minterrupts_SGEI m))
+        (_get_Minterrupts_VSEI m)) (_get_Minterrupts_VSTI m)) (_get_Minterrupts_VSSI m))
+
+def hedeleg_writable_mask (_ : Unit) : (BitVec 64) :=
+  (_update_Medeleg_Hardware_Error
+    (_update_Medeleg_Software_Check (Mk_Medeleg 0x00000000000CB1FF#64)
+      (if (((privileged_isa_version_ge priv_isa_version Privileged_ISA_1_13) || ((hartSupports
+               Ext_Zicfiss) || (hartSupports Ext_Zicfilp))) : Bool)
+      then 1#1
+      else 0#1))
+    (if ((privileged_isa_version_ge priv_isa_version Privileged_ISA_1_13) : Bool)
+    then 1#1
+    else 0#1))
+
+def legalize_hedeleg (_m : (BitVec 64)) (v : (BitVec 64)) : (BitVec 64) :=
+  (Mk_Medeleg (v &&& (hedeleg_writable_mask ())))
+
+def legalize_hideleg (m : (BitVec 64)) (v : (BitVec 64)) : (BitVec 64) :=
+  let v := (Mk_Minterrupts v)
+  (_update_Minterrupts_VSSI
+    (_update_Minterrupts_VSTI (_update_Minterrupts_VSEI m (_get_Minterrupts_VSEI v))
+      (_get_Minterrupts_VSTI v)) (_get_Minterrupts_VSSI v))
 
 def undefined_Sinterrupts (_ : Unit) : SailM (BitVec 64) := do
   (undefined_bitvector 64)
@@ -720,6 +907,22 @@ def lower_mie (m : (BitVec 64)) (d : (BitVec 64)) : (BitVec 64) :=
       ((_get_Minterrupts_MSI m) &&& (_get_Minterrupts_MSI d)))
     ((_get_Minterrupts_SSI m) &&& (_get_Minterrupts_SSI d)))
 
+def lower_mip_to_vsip (m : (BitVec 64)) (d : (BitVec 64)) : (BitVec 64) :=
+  (_update_Sinterrupts_SSI
+    (_update_Sinterrupts_STI
+      (_update_Sinterrupts_SEI (Mk_Sinterrupts (zeros (n := 64)))
+        ((_get_Minterrupts_VSEI m) &&& (_get_Minterrupts_VSEI d)))
+      ((_get_Minterrupts_VSTI m) &&& (_get_Minterrupts_VSTI d)))
+    ((_get_Minterrupts_VSSI m) &&& (_get_Minterrupts_VSSI d)))
+
+def lower_mie_to_vsie (m : (BitVec 64)) (d : (BitVec 64)) : (BitVec 64) :=
+  let vs := (Mk_Minterrupts (zeros (n := 64)))
+  (_update_Minterrupts_SSI
+    (_update_Minterrupts_STI
+      (_update_Minterrupts_SEI vs ((_get_Minterrupts_VSEI m) &&& (_get_Minterrupts_VSEI d)))
+      ((_get_Minterrupts_VSTI m) &&& (_get_Minterrupts_VSTI d)))
+    ((_get_Minterrupts_VSSI m) &&& (_get_Minterrupts_VSSI d)))
+
 def lift_sip (o : (BitVec 64)) (d : (BitVec 64)) (s : (BitVec 64)) : (BitVec 64) :=
   (_update_Minterrupts_LCOFI
     (_update_Minterrupts_SSI o
@@ -730,14 +933,24 @@ def lift_sip (o : (BitVec 64)) (d : (BitVec 64)) (s : (BitVec 64)) : (BitVec 64)
     then (_get_Sinterrupts_LCOFI s)
     else (_get_Minterrupts_LCOFI o)))
 
-def legalize_sip (m : (BitVec 64)) (d : (BitVec 64)) (v : (BitVec 64)) : (BitVec 64) :=
-  (lift_sip m d (Mk_Sinterrupts v))
+def legalize_sip (m : (BitVec 64)) (d : (BitVec 64)) (v : (BitVec 64)) : SailM (BitVec 64) := do
+  (supported_interrupts_mask (lift_sip m d (Mk_Sinterrupts v)))
+
+def legalize_vsip (m : (BitVec 64)) (d : (BitVec 64)) (v : (BitVec 64)) : SailM (BitVec 64) := do
+  let v := (Mk_Minterrupts v)
+  (supported_interrupts_mask
+    (_update_Minterrupts_VSSI m ((_get_Minterrupts_SSI v) &&& (_get_Minterrupts_VSSI d))))
 
 def read_sip (read_type : XipReadType) : SailM (BitVec 64) := do
-  (pure (lower_mip (← (read_mip read_type)) (← readReg mideleg)))
+  if ((← (inVirtualPrivilege ())) : Bool)
+  then (pure (lower_mip_to_vsip (← (read_mip read_type)) (← readReg hideleg)))
+  else (pure (lower_mip (← (read_mip read_type)) (← readReg mideleg)))
 
 def write_sip (value : (BitVec 64)) : SailM Unit := do
-  writeReg mip (legalize_sip (← readReg mip) (← readReg mideleg) value)
+  writeReg mip (← do
+    if ((← (inVirtualPrivilege ())) : Bool)
+    then (legalize_vsip (← readReg mip) (← readReg hideleg) value)
+    else (legalize_sip (← readReg mip) (← readReg mideleg) value))
 
 def lift_sie (o : (BitVec 64)) (d : (BitVec 64)) (s : (BitVec 64)) : (BitVec 64) :=
   (_update_Minterrupts_LCOFI
@@ -769,6 +982,15 @@ def lift_sie (o : (BitVec 64)) (d : (BitVec 64)) (s : (BitVec 64)) : (BitVec 64)
     then (_get_Sinterrupts_LCOFI s)
     else (_get_Minterrupts_LCOFI o)))
 
-def legalize_sie (m : (BitVec 64)) (d : (BitVec 64)) (v : (BitVec 64)) : (BitVec 64) :=
-  (lift_sie m d (Mk_Sinterrupts v))
+def legalize_sie (m : (BitVec 64)) (d : (BitVec 64)) (v : (BitVec 64)) : SailM (BitVec 64) := do
+  (supported_interrupts_mask (lift_sie m d (Mk_Sinterrupts v)))
+
+def legalize_vsie (m : (BitVec 64)) (d : (BitVec 64)) (v : (BitVec 64)) : SailM (BitVec 64) := do
+  let v := (Mk_Minterrupts v)
+  (supported_interrupts_mask
+    (_update_Minterrupts_VSSI
+      (_update_Minterrupts_VSTI
+        (_update_Minterrupts_VSEI m ((_get_Minterrupts_SEI v) &&& (_get_Minterrupts_VSEI d)))
+        ((_get_Minterrupts_STI v) &&& (_get_Minterrupts_VSTI d)))
+      ((_get_Minterrupts_SSI v) &&& (_get_Minterrupts_VSSI d))))
 

@@ -6,12 +6,12 @@ set_option linter.unusedVariables false
 set_option match.ignoreUnusedAlts true
 
 open Sail
-open Sail.ConcurrencyInterfaceV1
+open Sail.ArchSem
 
 noncomputable section
 namespace LeanRV64D
 
-open ConcurrencyInterfaceV1
+open ArchSem
 
 namespace Functions
 
@@ -55,6 +55,8 @@ open vfnunary0
 open vextfunct6
 open vector_support
 open uop
+open trigger_addr_type
+open tdata
 open stateen_bit
 open sopw
 open sop
@@ -88,10 +90,13 @@ open mmfunct6
 open misaligned_exception
 open mem_payload
 open maskfunct3
+open mask_type
+open loop_chain_state
 open landing_pad_expectation
 open iop
 open instruction
 open indexed_mop
+open hlvop
 open fwvvmafunct6
 open fwvvfunct6
 open fwvfunct6
@@ -137,6 +142,7 @@ open f_bin_f_op_D
 open extop_zbb
 open extension
 open exception
+open event_csr
 open csrop
 open cregidx
 open checked_cbop
@@ -155,17 +161,24 @@ open biop_zbs
 open barrier_kind
 open amoop
 open agtype
+open access_kind
 open XtvecModeReservedBehavior
 open XipReadType
 open XenvcfgCbieReservedBehavior
 open WaitReason
 open VectorHalf
+open Trigger
+open Trig_Type
+open Trig_Match
+open Trig_Action
 open TrapVectorMode
 open TrapCause
+open TranslationStage
 open Step
 open Splittability
 open Software_Check_Code
 open Signedness
+open Sdtrig_breakpoint_reentrancy
 open SWCheckCodes
 open SATPMode
 open Reservability
@@ -180,12 +193,15 @@ open PTW_Error
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
+open MemoryTriggerPayload
 open MemoryRegionType
 open MemoryAccessType
 open InterruptType
 open IllegalVtypeReservedBehavior
 open ISA_Format
+open Hit
 open HartState
+open HGATPMode
 open FflagsDirtyPolicy
 open FetchResult
 open FetchBytes_Result
@@ -196,7 +212,10 @@ open ExtStatus
 open ExtContextPolicy
 open ExecutionResult
 open ExceptionType
+open Event
+open Compare_Selection
 open CSRCheckResult
+open CSRBitConfig
 open CSRAccessType
 open AtomicSupport
 open Architecture
@@ -207,15 +226,19 @@ def csr_name_map_forwards_matches (arg_ : (BitVec 12)) : Bool :=
   | 0x301 => true
   | 0x300 => true
   | 0x310 => true
+  | 0x600 => true
   | 0x747 => true
   | 0x757 => true
   | 0x30A => true
   | 0x31A => true
   | 0x10A => true
+  | 0x60A => true
+  | 0x61A => true
   | 0x342 => true
   | 0x343 => true
   | 0x340 => true
   | 0x106 => true
+  | 0x606 => true
   | 0x306 => true
   | 0x320 => true
   | 0xF11 => true
@@ -223,21 +246,130 @@ def csr_name_map_forwards_matches (arg_ : (BitVec 12)) : Bool :=
   | 0xF13 => true
   | 0xF14 => true
   | 0xF15 => true
+  | 0x34A => true
+  | 0x34B => true
+  | 0x605 => true
+  | 0x615 => true
+  | 0x643 => true
+  | 0x64A => true
+  | 0x200 => true
   | 0x100 => true
+  | 0x240 => true
+  | 0x242 => true
+  | 0x243 => true
   | 0x140 => true
   | 0x142 => true
   | 0x143 => true
-  | 0x7A0 => true
-  | 0x7A1 => true
-  | 0x7A2 => true
-  | 0x7A3 => true
+  | 0x607 => true
+  | 0xE12 => true
   | 0x304 => true
   | 0x344 => true
   | 0x302 => true
   | 0x312 => true
   | 0x303 => true
+  | 0x645 => true
+  | 0x604 => true
+  | 0x644 => true
+  | 0x602 => true
+  | 0x603 => true
+  | 0x612 => true
   | 0x144 => true
   | 0x104 => true
+  | 0x204 => true
+  | 0x244 => true
+  | 0xB00 => true
+  | 0xB02 => true
+  | 0xB80 => true
+  | 0xB82 => true
+  | 0x323 => true
+  | 0x324 => true
+  | 0x325 => true
+  | 0x326 => true
+  | 0x327 => true
+  | 0x328 => true
+  | 0x329 => true
+  | 0x32A => true
+  | 0x32B => true
+  | 0x32C => true
+  | 0x32D => true
+  | 0x32E => true
+  | 0x32F => true
+  | 0x330 => true
+  | 0x331 => true
+  | 0x332 => true
+  | 0x333 => true
+  | 0x334 => true
+  | 0x335 => true
+  | 0x336 => true
+  | 0x337 => true
+  | 0x338 => true
+  | 0x339 => true
+  | 0x33A => true
+  | 0x33B => true
+  | 0x33C => true
+  | 0x33D => true
+  | 0x33E => true
+  | 0x33F => true
+  | 0xB03 => true
+  | 0xB04 => true
+  | 0xB05 => true
+  | 0xB06 => true
+  | 0xB07 => true
+  | 0xB08 => true
+  | 0xB09 => true
+  | 0xB0A => true
+  | 0xB0B => true
+  | 0xB0C => true
+  | 0xB0D => true
+  | 0xB0E => true
+  | 0xB0F => true
+  | 0xB10 => true
+  | 0xB11 => true
+  | 0xB12 => true
+  | 0xB13 => true
+  | 0xB14 => true
+  | 0xB15 => true
+  | 0xB16 => true
+  | 0xB17 => true
+  | 0xB18 => true
+  | 0xB19 => true
+  | 0xB1A => true
+  | 0xB1B => true
+  | 0xB1C => true
+  | 0xB1D => true
+  | 0xB1E => true
+  | 0xB1F => true
+  | 0xB83 => true
+  | 0xB84 => true
+  | 0xB85 => true
+  | 0xB86 => true
+  | 0xB87 => true
+  | 0xB88 => true
+  | 0xB89 => true
+  | 0xB8A => true
+  | 0xB8B => true
+  | 0xB8C => true
+  | 0xB8D => true
+  | 0xB8E => true
+  | 0xB8F => true
+  | 0xB90 => true
+  | 0xB91 => true
+  | 0xB92 => true
+  | 0xB93 => true
+  | 0xB94 => true
+  | 0xB95 => true
+  | 0xB96 => true
+  | 0xB97 => true
+  | 0xB98 => true
+  | 0xB99 => true
+  | 0xB9A => true
+  | 0xB9B => true
+  | 0xB9C => true
+  | 0xB9D => true
+  | 0xB9E => true
+  | 0xB9F => true
+  | 0x205 => true
+  | 0x241 => true
   | 0x105 => true
   | 0x141 => true
   | 0x305 => true
@@ -336,6 +468,15 @@ def csr_name_map_forwards_matches (arg_ : (BitVec 12)) : Bool :=
   | 0x721 => true
   | 0x322 => true
   | 0x722 => true
+  | 0x7A0 => true
+  | 0x7A1 => true
+  | 0x7A2 => true
+  | 0x7A3 => true
+  | 0x7A4 => true
+  | 0x7A5 => true
+  | 0x5A8 => true
+  | 0x7A8 => true
+  | 0x6A8 => true
   | 0x30C => true
   | 0x30D => true
   | 0x30E => true
@@ -356,6 +497,8 @@ def csr_name_map_forwards_matches (arg_ : (BitVec 12)) : Bool :=
   | 0x10D => true
   | 0x10E => true
   | 0x10F => true
+  | 0x680 => true
+  | 0x280 => true
   | 0x180 => true
   | 0xC03 => true
   | 0xC04 => true
@@ -415,93 +558,6 @@ def csr_name_map_forwards_matches (arg_ : (BitVec 12)) : Bool :=
   | 0xC9D => true
   | 0xC9E => true
   | 0xC9F => true
-  | 0x323 => true
-  | 0x324 => true
-  | 0x325 => true
-  | 0x326 => true
-  | 0x327 => true
-  | 0x328 => true
-  | 0x329 => true
-  | 0x32A => true
-  | 0x32B => true
-  | 0x32C => true
-  | 0x32D => true
-  | 0x32E => true
-  | 0x32F => true
-  | 0x330 => true
-  | 0x331 => true
-  | 0x332 => true
-  | 0x333 => true
-  | 0x334 => true
-  | 0x335 => true
-  | 0x336 => true
-  | 0x337 => true
-  | 0x338 => true
-  | 0x339 => true
-  | 0x33A => true
-  | 0x33B => true
-  | 0x33C => true
-  | 0x33D => true
-  | 0x33E => true
-  | 0x33F => true
-  | 0xB03 => true
-  | 0xB04 => true
-  | 0xB05 => true
-  | 0xB06 => true
-  | 0xB07 => true
-  | 0xB08 => true
-  | 0xB09 => true
-  | 0xB0A => true
-  | 0xB0B => true
-  | 0xB0C => true
-  | 0xB0D => true
-  | 0xB0E => true
-  | 0xB0F => true
-  | 0xB10 => true
-  | 0xB11 => true
-  | 0xB12 => true
-  | 0xB13 => true
-  | 0xB14 => true
-  | 0xB15 => true
-  | 0xB16 => true
-  | 0xB17 => true
-  | 0xB18 => true
-  | 0xB19 => true
-  | 0xB1A => true
-  | 0xB1B => true
-  | 0xB1C => true
-  | 0xB1D => true
-  | 0xB1E => true
-  | 0xB1F => true
-  | 0xB83 => true
-  | 0xB84 => true
-  | 0xB85 => true
-  | 0xB86 => true
-  | 0xB87 => true
-  | 0xB88 => true
-  | 0xB89 => true
-  | 0xB8A => true
-  | 0xB8B => true
-  | 0xB8C => true
-  | 0xB8D => true
-  | 0xB8E => true
-  | 0xB8F => true
-  | 0xB90 => true
-  | 0xB91 => true
-  | 0xB92 => true
-  | 0xB93 => true
-  | 0xB94 => true
-  | 0xB95 => true
-  | 0xB96 => true
-  | 0xB97 => true
-  | 0xB98 => true
-  | 0xB99 => true
-  | 0xB9A => true
-  | 0xB9B => true
-  | 0xB9C => true
-  | 0xB9D => true
-  | 0xB9E => true
-  | 0xB9F => true
   | 0x723 => true
   | 0x724 => true
   | 0x725 => true
@@ -534,6 +590,8 @@ def csr_name_map_forwards_matches (arg_ : (BitVec 12)) : Bool :=
   | 0xDA0 => true
   | 0x14D => true
   | 0x15D => true
+  | 0x24D => true
+  | 0x25D => true
   | 0x011 => true
   | 0xC00 => true
   | 0xC01 => true
@@ -541,10 +599,6 @@ def csr_name_map_forwards_matches (arg_ : (BitVec 12)) : Bool :=
   | 0xC80 => true
   | 0xC81 => true
   | 0xC82 => true
-  | 0xB00 => true
-  | 0xB02 => true
-  | 0xB80 => true
-  | 0xB82 => true
   | 0x181 => true
   | reg => true
 
@@ -555,15 +609,19 @@ def csr_name_map_backwards_matches (arg_ : String) : SailM Bool := do
     | "misa" => (pure (some true))
     | "mstatus" => (pure (some true))
     | "mstatush" => (pure (some true))
+    | "hstatus" => (pure (some true))
     | "mseccfg" => (pure (some true))
     | "mseccfgh" => (pure (some true))
     | "menvcfg" => (pure (some true))
     | "menvcfgh" => (pure (some true))
     | "senvcfg" => (pure (some true))
+    | "henvcfg" => (pure (some true))
+    | "henvcfgh" => (pure (some true))
     | "mcause" => (pure (some true))
     | "mtval" => (pure (some true))
     | "mscratch" => (pure (some true))
     | "scounteren" => (pure (some true))
+    | "hcounteren" => (pure (some true))
     | "mcounteren" => (pure (some true))
     | "mcountinhibit" => (pure (some true))
     | "mvendorid" => (pure (some true))
@@ -571,21 +629,130 @@ def csr_name_map_backwards_matches (arg_ : String) : SailM Bool := do
     | "mimpid" => (pure (some true))
     | "mhartid" => (pure (some true))
     | "mconfigptr" => (pure (some true))
+    | "mtinst" => (pure (some true))
+    | "mtval2" => (pure (some true))
+    | "htimedelta" => (pure (some true))
+    | "htimedeltah" => (pure (some true))
+    | "htval" => (pure (some true))
+    | "htinst" => (pure (some true))
+    | "vsstatus" => (pure (some true))
     | "sstatus" => (pure (some true))
+    | "vsscratch" => (pure (some true))
+    | "vscause" => (pure (some true))
+    | "vstval" => (pure (some true))
     | "sscratch" => (pure (some true))
     | "scause" => (pure (some true))
     | "stval" => (pure (some true))
-    | "tselect" => (pure (some true))
-    | "tdata1" => (pure (some true))
-    | "tdata2" => (pure (some true))
-    | "tdata3" => (pure (some true))
+    | "hgeie" => (pure (some true))
+    | "hgeip" => (pure (some true))
     | "mie" => (pure (some true))
     | "mip" => (pure (some true))
     | "medeleg" => (pure (some true))
     | "medelegh" => (pure (some true))
     | "mideleg" => (pure (some true))
+    | "hvip" => (pure (some true))
+    | "hie" => (pure (some true))
+    | "hip" => (pure (some true))
+    | "hedeleg" => (pure (some true))
+    | "hideleg" => (pure (some true))
+    | "hedelegh" => (pure (some true))
     | "sip" => (pure (some true))
     | "sie" => (pure (some true))
+    | "vsie" => (pure (some true))
+    | "vsip" => (pure (some true))
+    | "mcycle" => (pure (some true))
+    | "minstret" => (pure (some true))
+    | "mcycleh" => (pure (some true))
+    | "minstreth" => (pure (some true))
+    | "mhpmevent3" => (pure (some true))
+    | "mhpmevent4" => (pure (some true))
+    | "mhpmevent5" => (pure (some true))
+    | "mhpmevent6" => (pure (some true))
+    | "mhpmevent7" => (pure (some true))
+    | "mhpmevent8" => (pure (some true))
+    | "mhpmevent9" => (pure (some true))
+    | "mhpmevent10" => (pure (some true))
+    | "mhpmevent11" => (pure (some true))
+    | "mhpmevent12" => (pure (some true))
+    | "mhpmevent13" => (pure (some true))
+    | "mhpmevent14" => (pure (some true))
+    | "mhpmevent15" => (pure (some true))
+    | "mhpmevent16" => (pure (some true))
+    | "mhpmevent17" => (pure (some true))
+    | "mhpmevent18" => (pure (some true))
+    | "mhpmevent19" => (pure (some true))
+    | "mhpmevent20" => (pure (some true))
+    | "mhpmevent21" => (pure (some true))
+    | "mhpmevent22" => (pure (some true))
+    | "mhpmevent23" => (pure (some true))
+    | "mhpmevent24" => (pure (some true))
+    | "mhpmevent25" => (pure (some true))
+    | "mhpmevent26" => (pure (some true))
+    | "mhpmevent27" => (pure (some true))
+    | "mhpmevent28" => (pure (some true))
+    | "mhpmevent29" => (pure (some true))
+    | "mhpmevent30" => (pure (some true))
+    | "mhpmevent31" => (pure (some true))
+    | "mhpmcounter3" => (pure (some true))
+    | "mhpmcounter4" => (pure (some true))
+    | "mhpmcounter5" => (pure (some true))
+    | "mhpmcounter6" => (pure (some true))
+    | "mhpmcounter7" => (pure (some true))
+    | "mhpmcounter8" => (pure (some true))
+    | "mhpmcounter9" => (pure (some true))
+    | "mhpmcounter10" => (pure (some true))
+    | "mhpmcounter11" => (pure (some true))
+    | "mhpmcounter12" => (pure (some true))
+    | "mhpmcounter13" => (pure (some true))
+    | "mhpmcounter14" => (pure (some true))
+    | "mhpmcounter15" => (pure (some true))
+    | "mhpmcounter16" => (pure (some true))
+    | "mhpmcounter17" => (pure (some true))
+    | "mhpmcounter18" => (pure (some true))
+    | "mhpmcounter19" => (pure (some true))
+    | "mhpmcounter20" => (pure (some true))
+    | "mhpmcounter21" => (pure (some true))
+    | "mhpmcounter22" => (pure (some true))
+    | "mhpmcounter23" => (pure (some true))
+    | "mhpmcounter24" => (pure (some true))
+    | "mhpmcounter25" => (pure (some true))
+    | "mhpmcounter26" => (pure (some true))
+    | "mhpmcounter27" => (pure (some true))
+    | "mhpmcounter28" => (pure (some true))
+    | "mhpmcounter29" => (pure (some true))
+    | "mhpmcounter30" => (pure (some true))
+    | "mhpmcounter31" => (pure (some true))
+    | "mhpmcounter3h" => (pure (some true))
+    | "mhpmcounter4h" => (pure (some true))
+    | "mhpmcounter5h" => (pure (some true))
+    | "mhpmcounter6h" => (pure (some true))
+    | "mhpmcounter7h" => (pure (some true))
+    | "mhpmcounter8h" => (pure (some true))
+    | "mhpmcounter9h" => (pure (some true))
+    | "mhpmcounter10h" => (pure (some true))
+    | "mhpmcounter11h" => (pure (some true))
+    | "mhpmcounter12h" => (pure (some true))
+    | "mhpmcounter13h" => (pure (some true))
+    | "mhpmcounter14h" => (pure (some true))
+    | "mhpmcounter15h" => (pure (some true))
+    | "mhpmcounter16h" => (pure (some true))
+    | "mhpmcounter17h" => (pure (some true))
+    | "mhpmcounter18h" => (pure (some true))
+    | "mhpmcounter19h" => (pure (some true))
+    | "mhpmcounter20h" => (pure (some true))
+    | "mhpmcounter21h" => (pure (some true))
+    | "mhpmcounter22h" => (pure (some true))
+    | "mhpmcounter23h" => (pure (some true))
+    | "mhpmcounter24h" => (pure (some true))
+    | "mhpmcounter25h" => (pure (some true))
+    | "mhpmcounter26h" => (pure (some true))
+    | "mhpmcounter27h" => (pure (some true))
+    | "mhpmcounter28h" => (pure (some true))
+    | "mhpmcounter29h" => (pure (some true))
+    | "mhpmcounter30h" => (pure (some true))
+    | "mhpmcounter31h" => (pure (some true))
+    | "vstvec" => (pure (some true))
+    | "vsepc" => (pure (some true))
     | "stvec" => (pure (some true))
     | "sepc" => (pure (some true))
     | "mtvec" => (pure (some true))
@@ -684,6 +851,15 @@ def csr_name_map_backwards_matches (arg_ : String) : SailM Bool := do
     | "mcyclecfgh" => (pure (some true))
     | "minstretcfg" => (pure (some true))
     | "minstretcfgh" => (pure (some true))
+    | "tselect" => (pure (some true))
+    | "tdata1" => (pure (some true))
+    | "tdata2" => (pure (some true))
+    | "tdata3" => (pure (some true))
+    | "tinfo" => (pure (some true))
+    | "tcontrol" => (pure (some true))
+    | "scontext" => (pure (some true))
+    | "mcontext" => (pure (some true))
+    | "hcontext" => (pure (some true))
     | "mstateen0" => (pure (some true))
     | "mstateen1" => (pure (some true))
     | "mstateen2" => (pure (some true))
@@ -704,6 +880,8 @@ def csr_name_map_backwards_matches (arg_ : String) : SailM Bool := do
     | "sstateen1" => (pure (some true))
     | "sstateen2" => (pure (some true))
     | "sstateen3" => (pure (some true))
+    | "hgatp" => (pure (some true))
+    | "vsatp" => (pure (some true))
     | "satp" => (pure (some true))
     | "hpmcounter3" => (pure (some true))
     | "hpmcounter4" => (pure (some true))
@@ -763,93 +941,6 @@ def csr_name_map_backwards_matches (arg_ : String) : SailM Bool := do
     | "hpmcounter29h" => (pure (some true))
     | "hpmcounter30h" => (pure (some true))
     | "hpmcounter31h" => (pure (some true))
-    | "mhpmevent3" => (pure (some true))
-    | "mhpmevent4" => (pure (some true))
-    | "mhpmevent5" => (pure (some true))
-    | "mhpmevent6" => (pure (some true))
-    | "mhpmevent7" => (pure (some true))
-    | "mhpmevent8" => (pure (some true))
-    | "mhpmevent9" => (pure (some true))
-    | "mhpmevent10" => (pure (some true))
-    | "mhpmevent11" => (pure (some true))
-    | "mhpmevent12" => (pure (some true))
-    | "mhpmevent13" => (pure (some true))
-    | "mhpmevent14" => (pure (some true))
-    | "mhpmevent15" => (pure (some true))
-    | "mhpmevent16" => (pure (some true))
-    | "mhpmevent17" => (pure (some true))
-    | "mhpmevent18" => (pure (some true))
-    | "mhpmevent19" => (pure (some true))
-    | "mhpmevent20" => (pure (some true))
-    | "mhpmevent21" => (pure (some true))
-    | "mhpmevent22" => (pure (some true))
-    | "mhpmevent23" => (pure (some true))
-    | "mhpmevent24" => (pure (some true))
-    | "mhpmevent25" => (pure (some true))
-    | "mhpmevent26" => (pure (some true))
-    | "mhpmevent27" => (pure (some true))
-    | "mhpmevent28" => (pure (some true))
-    | "mhpmevent29" => (pure (some true))
-    | "mhpmevent30" => (pure (some true))
-    | "mhpmevent31" => (pure (some true))
-    | "mhpmcounter3" => (pure (some true))
-    | "mhpmcounter4" => (pure (some true))
-    | "mhpmcounter5" => (pure (some true))
-    | "mhpmcounter6" => (pure (some true))
-    | "mhpmcounter7" => (pure (some true))
-    | "mhpmcounter8" => (pure (some true))
-    | "mhpmcounter9" => (pure (some true))
-    | "mhpmcounter10" => (pure (some true))
-    | "mhpmcounter11" => (pure (some true))
-    | "mhpmcounter12" => (pure (some true))
-    | "mhpmcounter13" => (pure (some true))
-    | "mhpmcounter14" => (pure (some true))
-    | "mhpmcounter15" => (pure (some true))
-    | "mhpmcounter16" => (pure (some true))
-    | "mhpmcounter17" => (pure (some true))
-    | "mhpmcounter18" => (pure (some true))
-    | "mhpmcounter19" => (pure (some true))
-    | "mhpmcounter20" => (pure (some true))
-    | "mhpmcounter21" => (pure (some true))
-    | "mhpmcounter22" => (pure (some true))
-    | "mhpmcounter23" => (pure (some true))
-    | "mhpmcounter24" => (pure (some true))
-    | "mhpmcounter25" => (pure (some true))
-    | "mhpmcounter26" => (pure (some true))
-    | "mhpmcounter27" => (pure (some true))
-    | "mhpmcounter28" => (pure (some true))
-    | "mhpmcounter29" => (pure (some true))
-    | "mhpmcounter30" => (pure (some true))
-    | "mhpmcounter31" => (pure (some true))
-    | "mhpmcounter3h" => (pure (some true))
-    | "mhpmcounter4h" => (pure (some true))
-    | "mhpmcounter5h" => (pure (some true))
-    | "mhpmcounter6h" => (pure (some true))
-    | "mhpmcounter7h" => (pure (some true))
-    | "mhpmcounter8h" => (pure (some true))
-    | "mhpmcounter9h" => (pure (some true))
-    | "mhpmcounter10h" => (pure (some true))
-    | "mhpmcounter11h" => (pure (some true))
-    | "mhpmcounter12h" => (pure (some true))
-    | "mhpmcounter13h" => (pure (some true))
-    | "mhpmcounter14h" => (pure (some true))
-    | "mhpmcounter15h" => (pure (some true))
-    | "mhpmcounter16h" => (pure (some true))
-    | "mhpmcounter17h" => (pure (some true))
-    | "mhpmcounter18h" => (pure (some true))
-    | "mhpmcounter19h" => (pure (some true))
-    | "mhpmcounter20h" => (pure (some true))
-    | "mhpmcounter21h" => (pure (some true))
-    | "mhpmcounter22h" => (pure (some true))
-    | "mhpmcounter23h" => (pure (some true))
-    | "mhpmcounter24h" => (pure (some true))
-    | "mhpmcounter25h" => (pure (some true))
-    | "mhpmcounter26h" => (pure (some true))
-    | "mhpmcounter27h" => (pure (some true))
-    | "mhpmcounter28h" => (pure (some true))
-    | "mhpmcounter29h" => (pure (some true))
-    | "mhpmcounter30h" => (pure (some true))
-    | "mhpmcounter31h" => (pure (some true))
     | "mhpmevent3h" => (pure (some true))
     | "mhpmevent4h" => (pure (some true))
     | "mhpmevent5h" => (pure (some true))
@@ -882,6 +973,8 @@ def csr_name_map_backwards_matches (arg_ : String) : SailM Bool := do
     | "scountovf" => (pure (some true))
     | "stimecmp" => (pure (some true))
     | "stimecmph" => (pure (some true))
+    | "vstimecmp" => (pure (some true))
+    | "vstimecmph" => (pure (some true))
     | "ssp" => (pure (some true))
     | "cycle" => (pure (some true))
     | "time" => (pure (some true))
@@ -889,10 +982,6 @@ def csr_name_map_backwards_matches (arg_ : String) : SailM Bool := do
     | "cycleh" => (pure (some true))
     | "timeh" => (pure (some true))
     | "instreth" => (pure (some true))
-    | "mcycle" => (pure (some true))
-    | "minstret" => (pure (some true))
-    | "mcycleh" => (pure (some true))
-    | "minstreth" => (pure (some true))
     | "srmcfg" => (pure (some true))
     | mapping0_ =>
       (do

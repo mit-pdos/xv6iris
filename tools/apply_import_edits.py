@@ -15,7 +15,7 @@ def path_of(root, m):
     if r == "LeanRV64D":
         return os.path.join(root, "model/Lean_RV64D", rel)
     if r == "Sail":
-        return os.path.join(root, "vendor/lean-sail", rel)
+        return os.path.join(root, ".lake/packages/Sail", rel)
     return os.path.join(root, rel)
 
 

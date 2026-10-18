@@ -8,12 +8,12 @@ set_option linter.unusedVariables false
 set_option match.ignoreUnusedAlts true
 
 open Sail
-open Sail.ConcurrencyInterfaceV1
+open Sail.ArchSem
 
 noncomputable section
 namespace LeanRV64D
 
-open ConcurrencyInterfaceV1
+open ArchSem
 
 namespace Functions
 
@@ -57,6 +57,8 @@ open vfnunary0
 open vextfunct6
 open vector_support
 open uop
+open trigger_addr_type
+open tdata
 open stateen_bit
 open sopw
 open sop
@@ -90,10 +92,13 @@ open mmfunct6
 open misaligned_exception
 open mem_payload
 open maskfunct3
+open mask_type
+open loop_chain_state
 open landing_pad_expectation
 open iop
 open instruction
 open indexed_mop
+open hlvop
 open fwvvmafunct6
 open fwvvfunct6
 open fwvfunct6
@@ -139,6 +144,7 @@ open f_bin_f_op_D
 open extop_zbb
 open extension
 open exception
+open event_csr
 open csrop
 open cregidx
 open checked_cbop
@@ -157,17 +163,24 @@ open biop_zbs
 open barrier_kind
 open amoop
 open agtype
+open access_kind
 open XtvecModeReservedBehavior
 open XipReadType
 open XenvcfgCbieReservedBehavior
 open WaitReason
 open VectorHalf
+open Trigger
+open Trig_Type
+open Trig_Match
+open Trig_Action
 open TrapVectorMode
 open TrapCause
+open TranslationStage
 open Step
 open Splittability
 open Software_Check_Code
 open Signedness
+open Sdtrig_breakpoint_reentrancy
 open SWCheckCodes
 open SATPMode
 open Reservability
@@ -182,12 +195,15 @@ open PTW_Error
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
+open MemoryTriggerPayload
 open MemoryRegionType
 open MemoryAccessType
 open InterruptType
 open IllegalVtypeReservedBehavior
 open ISA_Format
+open Hit
 open HartState
+open HGATPMode
 open FflagsDirtyPolicy
 open FetchResult
 open FetchBytes_Result
@@ -198,46 +214,58 @@ open ExtStatus
 open ExtContextPolicy
 open ExecutionResult
 open ExceptionType
+open Event
+open Compare_Selection
 open CSRCheckResult
+open CSRBitConfig
 open CSRAccessType
 open AtomicSupport
 open Architecture
 open AmocasOddRegisterReservedBehavior
 
 def undefined_stateen_bit (_ : Unit) : SailM stateen_bit := do
-  (internal_pick [STATEEN_FCSR, STATEEN_SRMCFG, STATEEN_ENVCFG, STATEEN_SE])
+  (internal_pick
+    [STATEEN_FCSR, STATEEN_SRMCFG, STATEEN_P1P13, STATEEN_CONTEXT, STATEEN_ENVCFG, STATEEN_SE])
 
-/-- Type quantifiers: arg_ : Nat, 0 ≤ arg_ ∧ arg_ ≤ 3 -/
+/-- Type quantifiers: arg_ : Nat, 0 ≤ arg_ ∧ arg_ ≤ 5 -/
 def stateen_bit_of_num (arg_ : Nat) : stateen_bit :=
   match arg_ with
   | 0 => STATEEN_FCSR
   | 1 => STATEEN_SRMCFG
-  | 2 => STATEEN_ENVCFG
+  | 2 => STATEEN_P1P13
+  | 3 => STATEEN_CONTEXT
+  | 4 => STATEEN_ENVCFG
   | _ => STATEEN_SE
 
 def num_of_stateen_bit (arg_ : stateen_bit) : Int :=
   match arg_ with
   | .STATEEN_FCSR => 0
   | .STATEEN_SRMCFG => 1
-  | .STATEEN_ENVCFG => 2
-  | .STATEEN_SE => 3
+  | .STATEEN_P1P13 => 2
+  | .STATEEN_CONTEXT => 3
+  | .STATEEN_ENVCFG => 4
+  | .STATEEN_SE => 5
 
 /-- Type quantifiers: arg_ : Nat, 0 ≤ arg_ ∧ arg_ ≤ 63 -/
 def stateen_bit_index_backwards (arg_ : Nat) : SailM stateen_bit := do
   match arg_ with
   | 63 => (pure STATEEN_SE)
   | 62 => (pure STATEEN_ENVCFG)
+  | 57 => (pure STATEEN_CONTEXT)
+  | 56 => (pure STATEEN_P1P13)
   | 55 => (pure STATEEN_SRMCFG)
   | 1 => (pure STATEEN_FCSR)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
 def stateen_bit_index_forwards_matches (arg_ : stateen_bit) : Bool :=
   match arg_ with
   | .STATEEN_SE => true
   | .STATEEN_ENVCFG => true
+  | .STATEEN_CONTEXT => true
+  | .STATEEN_P1P13 => true
   | .STATEEN_SRMCFG => true
   | .STATEEN_FCSR => true
 
@@ -246,6 +274,8 @@ def stateen_bit_index_backwards_matches (arg_ : Nat) : Bool :=
   match arg_ with
   | 63 => true
   | 62 => true
+  | 57 => true
+  | 56 => true
   | 55 => true
   | 1 => true
   | _ => false
@@ -272,12 +302,6 @@ def _get_Hstateen0_AIA (v : (BitVec 64)) : (BitVec 1) :=
 def _set_Hstateen0_AIA (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : SailM Unit := do
   let r ← do (reg_deref r_ref)
   writeRegRef r_ref (_update_Hstateen0_AIA r v)
-
-def _get_Mstateen0_CONTEXT (v : (BitVec 64)) : (BitVec 1) :=
-  (Sail.BitVec.extractLsb v 57 57)
-
-def _update_Mstateen0_CONTEXT (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
-  (Sail.BitVec.updateSubrange v 57 57 x)
 
 def _update_Hstateen0_CONTEXT (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
   (Sail.BitVec.updateSubrange v 57 57 x)
@@ -333,12 +357,6 @@ def _set_Hstateen0_CTR (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : Sa
   let r ← do (reg_deref r_ref)
   writeRegRef r_ref (_update_Hstateen0_CTR r v)
 
-def _get_Mstateen0_ENVCFG (v : (BitVec 64)) : (BitVec 1) :=
-  (Sail.BitVec.extractLsb v 62 62)
-
-def _update_Mstateen0_ENVCFG (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
-  (Sail.BitVec.updateSubrange v 62 62 x)
-
 def _update_Hstateen0_ENVCFG (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
   (Sail.BitVec.updateSubrange v 62 62 x)
 
@@ -352,12 +370,6 @@ def _get_Hstateen0_ENVCFG (v : (BitVec 64)) : (BitVec 1) :=
 def _set_Hstateen0_ENVCFG (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : SailM Unit := do
   let r ← do (reg_deref r_ref)
   writeRegRef r_ref (_update_Hstateen0_ENVCFG r v)
-
-def _get_Mstateen0_FCSR (v : (BitVec 64)) : (BitVec 1) :=
-  (Sail.BitVec.extractLsb v 1 1)
-
-def _update_Mstateen0_FCSR (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
-  (Sail.BitVec.updateSubrange v 1 1 x)
 
 def _update_Hstateen0_FCSR (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
   (Sail.BitVec.updateSubrange v 1 1 x)
@@ -433,21 +445,9 @@ def _set_Sstateen0_JVT (r_ref : (RegisterRef (BitVec 32))) (v : (BitVec 1)) : Sa
   let r ← do (reg_deref r_ref)
   writeRegRef r_ref (_update_Sstateen0_JVT r v)
 
-def _get_Mstateen0_P1P13 (v : (BitVec 64)) : (BitVec 1) :=
-  (Sail.BitVec.extractLsb v 56 56)
-
-def _update_Mstateen0_P1P13 (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
-  (Sail.BitVec.updateSubrange v 56 56 x)
-
 def _set_Mstateen0_P1P13 (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : SailM Unit := do
   let r ← do (reg_deref r_ref)
   writeRegRef r_ref (_update_Mstateen0_P1P13 r v)
-
-def _get_Mstateen0_SE0 (v : (BitVec 64)) : (BitVec 1) :=
-  (Sail.BitVec.extractLsb v 63 63)
-
-def _update_Mstateen0_SE0 (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
-  (Sail.BitVec.updateSubrange v 63 63 x)
 
 def _update_Hstateen0_SE0 (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
   (Sail.BitVec.updateSubrange v 63 63 x)
@@ -462,12 +462,6 @@ def _get_Hstateen0_SE0 (v : (BitVec 64)) : (BitVec 1) :=
 def _set_Hstateen0_SE0 (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : SailM Unit := do
   let r ← do (reg_deref r_ref)
   writeRegRef r_ref (_update_Hstateen0_SE0 r v)
-
-def _get_Mstateen0_SRMCFG (v : (BitVec 64)) : (BitVec 1) :=
-  (Sail.BitVec.extractLsb v 55 55)
-
-def _update_Mstateen0_SRMCFG (v : (BitVec 64)) (x : (BitVec 1)) : (BitVec 64) :=
-  (Sail.BitVec.updateSubrange v 55 55 x)
 
 def _set_Mstateen0_SRMCFG (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : SailM Unit := do
   let r ← do (reg_deref r_ref)
@@ -542,36 +536,17 @@ def _set_Hstateen3_SE3 (r_ref : (RegisterRef (BitVec 64))) (v : (BitVec 1)) : Sa
   let r ← do (reg_deref r_ref)
   writeRegRef r_ref (_update_Hstateen3_SE3 r v)
 
-def legalize_mstateen0 (m : (BitVec 64)) (v : (BitVec 64)) : SailM (BitVec 64) := do
-  let v := (Mk_Mstateen0 v)
-  (pure (_update_Mstateen0_C
-      (_update_Mstateen0_FCSR
-        (_update_Mstateen0_SRMCFG
-          (_update_Mstateen0_ENVCFG (_update_Mstateen0_SE0 m (_get_Mstateen0_SE0 v))
-            (← do
-              if ((← (currentlyEnabled Ext_S)) : Bool)
-              then (pure (_get_Mstateen0_ENVCFG v))
-              else (pure 0#1)))
-          (← do
-            if ((← (currentlyEnabled Ext_Ssqosid)) : Bool)
-            then (pure (_get_Mstateen0_SRMCFG v))
-            else (pure 0#1)))
-        (← do
-          if ((← do
-               if ((hartSupports Ext_Zfinx) : Bool)
-               then (pure ((_get_Misa_F (← readReg misa)) == 0#1))
-               else (pure false)) : Bool)
-          then (pure (_get_Mstateen0_FCSR v))
-          else (pure 0#1))) 0#1))
+def legalize_mstateen1 (m : (BitVec 64)) (v : (BitVec 64)) : (BitVec 64) :=
+  (_update_Mstateen1_SE1 m
+    (legalize_csr_bit mstateen1_se1 true (_get_Mstateen1_SE1 (Mk_Mstateen1 v))))
 
-def legalize_mstateen1 (m : (BitVec 64)) (_v : (BitVec 64)) : (BitVec 64) :=
-  m
+def legalize_mstateen2 (m : (BitVec 64)) (v : (BitVec 64)) : (BitVec 64) :=
+  (_update_Mstateen2_SE2 m
+    (legalize_csr_bit mstateen2_se2 true (_get_Mstateen2_SE2 (Mk_Mstateen2 v))))
 
-def legalize_mstateen2 (m : (BitVec 64)) (_v : (BitVec 64)) : (BitVec 64) :=
-  m
-
-def legalize_mstateen3 (m : (BitVec 64)) (_v : (BitVec 64)) : (BitVec 64) :=
-  m
+def legalize_mstateen3 (m : (BitVec 64)) (v : (BitVec 64)) : (BitVec 64) :=
+  (_update_Mstateen3_SE3 m
+    (legalize_csr_bit mstateen3_se3 true (_get_Mstateen3_SE3 (Mk_Mstateen3 v))))
 
 def undefined_Hstateen0 (_ : Unit) : SailM (BitVec 64) := do
   (undefined_bitvector 64)
@@ -593,27 +568,29 @@ def legalize_hstateen0 (h : (BitVec 64)) (v : (BitVec 64)) : SailM (BitVec 64) :
   let v ← do (pure (Mk_Hstateen0 (v &&& (← (get_hstateen_mask 0)))))
   (pure (_update_Hstateen0_C
       (_update_Hstateen0_FCSR
-        (_update_Hstateen0_ENVCFG (_update_Hstateen0_SE0 h (_get_Hstateen0_SE0 v))
+        (_update_Hstateen0_CONTEXT
+          (_update_Hstateen0_ENVCFG (_update_Hstateen0_SE0 h (_get_Hstateen0_SE0 v))
+            (legalize_csr_bit hstateen0_envcfg true (_get_Hstateen0_ENVCFG v)))
+          (legalize_csr_bit hstateen0_context
+            ((← (currentlyEnabled Ext_Sdtrig)) && sdtrig_has_scontext) (_get_Hstateen0_CONTEXT v)))
+        (legalize_csr_bit hstateen0_fcsr
           (← do
-            if ((← (currentlyEnabled Ext_S)) : Bool)
-            then (pure (_get_Hstateen0_ENVCFG v))
-            else (pure 0#1)))
-        (← do
-          if ((← do
-               if ((hartSupports Ext_Zfinx) : Bool)
-               then (pure ((_get_Misa_F (← readReg misa)) == 0#1))
-               else (pure false)) : Bool)
-          then (pure (_get_Hstateen0_FCSR v))
-          else (pure 0#1))) 0#1))
+            if ((hartSupports Ext_Zfinx) : Bool)
+            then (pure ((_get_Misa_F (← readReg misa)) == 0#1))
+            else (pure false)) (_get_Hstateen0_FCSR v)))
+      (legalize_csr_bit hstateen0_c true (_get_Hstateen0_C v))))
 
 def legalize_hstateen1 (_h : (BitVec 64)) (v : (BitVec 64)) : SailM (BitVec 64) := do
-  (pure (Mk_Hstateen1 (v &&& (← (get_hstateen_mask 1)))))
+  (pure (_update_Hstateen1_SE1 (Mk_Hstateen1 (zeros (n := 64)))
+      (_get_Hstateen1_SE1 (Mk_Hstateen1 (v &&& (← (get_hstateen_mask 1)))))))
 
 def legalize_hstateen2 (_h : (BitVec 64)) (v : (BitVec 64)) : SailM (BitVec 64) := do
-  (pure (Mk_Hstateen2 (v &&& (← (get_hstateen_mask 2)))))
+  (pure (_update_Hstateen2_SE2 (Mk_Hstateen2 (zeros (n := 64)))
+      (_get_Hstateen2_SE2 (Mk_Hstateen2 (v &&& (← (get_hstateen_mask 2)))))))
 
 def legalize_hstateen3 (_h : (BitVec 64)) (v : (BitVec 64)) : SailM (BitVec 64) := do
-  (pure (Mk_Hstateen3 (v &&& (← (get_hstateen_mask 3)))))
+  (pure (_update_Hstateen3_SE3 (Mk_Hstateen3 (zeros (n := 64)))
+      (_get_Hstateen3_SE3 (Mk_Hstateen3 (v &&& (← (get_hstateen_mask 3)))))))
 
 def undefined_Sstateen0 (_ : Unit) : SailM (BitVec 32) := do
   (undefined_bitvector 32)
@@ -637,13 +614,12 @@ def legalize_sstateen0 (s : (BitVec 32)) (v : (BitVec 32)) : SailM (BitVec 32) :
   let legalized ← do
     (pure (_update_Sstateen0_C
         (_update_Sstateen0_FCSR s
-          (← do
-            if ((← do
-                 if ((hartSupports Ext_Zfinx) : Bool)
-                 then (pure ((_get_Misa_F (← readReg misa)) == 0#1))
-                 else (pure false)) : Bool)
-            then (pure (_get_Sstateen0_FCSR v))
-            else (pure 0#1))) 0#1))
+          (legalize_csr_bit sstateen0_fcsr
+            (← do
+              if ((hartSupports Ext_Zfinx) : Bool)
+              then (pure ((_get_Misa_F (← readReg misa)) == 0#1))
+              else (pure false)) (_get_Sstateen0_FCSR v)))
+        (legalize_csr_bit sstateen0_c true (_get_Sstateen0_C v))))
   (pure (Mk_Sstateen0 (legalized &&& (Sail.BitVec.extractLsb mask 31 0))))
 
 def legalize_sstateen1 (s : (BitVec 32)) (_v : (BitVec 32)) : (BitVec 32) :=
@@ -656,8 +632,10 @@ def legalize_sstateen3 (s : (BitVec 32)) (_v : (BitVec 32)) : (BitVec 32) :=
   s
 
 def reset_stateen (_ : Unit) : SailM Unit := do
-  writeReg mstateen0 (zeros (n := 64))
-  writeReg mstateen1 (zeros (n := 64))
-  writeReg mstateen2 (zeros (n := 64))
-  writeReg mstateen3 (zeros (n := 64))
+  writeReg mstateen0 (← (legalize_mstateen0 (Mk_Mstateen0 (zeros (n := 64))) (zeros (n := 64))))
+  writeReg hstateen0 (← (legalize_hstateen0 (← readReg hstateen0) (← readReg hstateen0)))
+  writeReg sstateen0 (← (legalize_sstateen0 (← readReg sstateen0) (← readReg sstateen0)))
+  writeReg mstateen1 (legalize_mstateen1 (Mk_Mstateen1 (zeros (n := 64))) (zeros (n := 64)))
+  writeReg mstateen2 (legalize_mstateen2 (Mk_Mstateen2 (zeros (n := 64))) (zeros (n := 64)))
+  writeReg mstateen3 (legalize_mstateen3 (Mk_Mstateen3 (zeros (n := 64))) (zeros (n := 64)))
 

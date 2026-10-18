@@ -1,6 +1,6 @@
 import Sail
 import LeanRV64D.Defs
-import LeanRV64D.SpecializationV1
+import LeanRV64D.SpecializationArchSem
 import LeanRV64D.FakeReal
 import LeanRV64D.Xv6Extras
 import LeanRV64D.RiscvExtras
@@ -11,12 +11,12 @@ set_option linter.unusedVariables false
 set_option match.ignoreUnusedAlts true
 
 open Sail
-open Sail.ConcurrencyInterfaceV1
+open Sail.ArchSem
 
 noncomputable section
 namespace LeanRV64D
 
-open ConcurrencyInterfaceV1
+open ArchSem
 
 namespace Functions
 
@@ -60,6 +60,8 @@ open vfnunary0
 open vextfunct6
 open vector_support
 open uop
+open trigger_addr_type
+open tdata
 open stateen_bit
 open sopw
 open sop
@@ -93,10 +95,13 @@ open mmfunct6
 open misaligned_exception
 open mem_payload
 open maskfunct3
+open mask_type
+open loop_chain_state
 open landing_pad_expectation
 open iop
 open instruction
 open indexed_mop
+open hlvop
 open fwvvmafunct6
 open fwvvfunct6
 open fwvfunct6
@@ -142,6 +147,7 @@ open f_bin_f_op_D
 open extop_zbb
 open extension
 open exception
+open event_csr
 open csrop
 open cregidx
 open checked_cbop
@@ -160,17 +166,24 @@ open biop_zbs
 open barrier_kind
 open amoop
 open agtype
+open access_kind
 open XtvecModeReservedBehavior
 open XipReadType
 open XenvcfgCbieReservedBehavior
 open WaitReason
 open VectorHalf
+open Trigger
+open Trig_Type
+open Trig_Match
+open Trig_Action
 open TrapVectorMode
 open TrapCause
+open TranslationStage
 open Step
 open Splittability
 open Software_Check_Code
 open Signedness
+open Sdtrig_breakpoint_reentrancy
 open SWCheckCodes
 open SATPMode
 open Reservability
@@ -185,12 +198,15 @@ open PTW_Error
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
+open MemoryTriggerPayload
 open MemoryRegionType
 open MemoryAccessType
 open InterruptType
 open IllegalVtypeReservedBehavior
 open ISA_Format
+open Hit
 open HartState
+open HGATPMode
 open FflagsDirtyPolicy
 open FetchResult
 open FetchBytes_Result
@@ -201,7 +217,10 @@ open ExtStatus
 open ExtContextPolicy
 open ExecutionResult
 open ExceptionType
+open Event
+open Compare_Selection
 open CSRCheckResult
+open CSRBitConfig
 open CSRAccessType
 open AtomicSupport
 open Architecture
@@ -238,7 +257,7 @@ def dec_bits_1_forwards (arg_ : (BitVec 1)) : SailM String := do
   | .some result => (pure result)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
 def dec_bits_1_backwards (arg_ : String) : (BitVec 1) :=
@@ -277,7 +296,7 @@ def dec_bits_2_forwards (arg_ : (BitVec 2)) : SailM String := do
   | .some result => (pure result)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
 def dec_bits_2_backwards (arg_ : String) : (BitVec 2) :=
@@ -316,7 +335,7 @@ def dec_bits_3_forwards (arg_ : (BitVec 3)) : SailM String := do
   | .some result => (pure result)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
 def dec_bits_3_backwards (arg_ : String) : (BitVec 3) :=
@@ -355,7 +374,7 @@ def dec_bits_4_forwards (arg_ : (BitVec 4)) : SailM String := do
   | .some result => (pure result)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
 def dec_bits_4_backwards (arg_ : String) : (BitVec 4) :=
@@ -394,7 +413,7 @@ def dec_bits_5_forwards (arg_ : (BitVec 5)) : SailM String := do
   | .some result => (pure result)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
 def dec_bits_5_backwards (arg_ : String) : (BitVec 5) :=
@@ -433,7 +452,7 @@ def dec_bits_6_forwards (arg_ : (BitVec 6)) : SailM String := do
   | .some result => (pure result)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
 def dec_bits_6_backwards (arg_ : String) : (BitVec 6) :=
@@ -472,7 +491,7 @@ def dec_bits_7_forwards (arg_ : (BitVec 7)) : SailM String := do
   | .some result => (pure result)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
 def dec_bits_7_backwards (arg_ : String) : (BitVec 7) :=
@@ -511,7 +530,7 @@ def dec_bits_8_forwards (arg_ : (BitVec 8)) : SailM String := do
   | .some result => (pure result)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
 def dec_bits_8_backwards (arg_ : String) : (BitVec 8) :=
@@ -550,7 +569,7 @@ def dec_bits_9_forwards (arg_ : (BitVec 9)) : SailM String := do
   | .some result => (pure result)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
 def dec_bits_9_backwards (arg_ : String) : (BitVec 9) :=
@@ -589,7 +608,7 @@ def dec_bits_10_forwards (arg_ : (BitVec 10)) : SailM String := do
   | .some result => (pure result)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
 def dec_bits_10_backwards (arg_ : String) : (BitVec 10) :=
@@ -628,7 +647,7 @@ def dec_bits_32_forwards (arg_ : (BitVec 32)) : SailM String := do
   | .some result => (pure result)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
 def dec_bits_32_backwards (arg_ : String) : (BitVec 32) :=

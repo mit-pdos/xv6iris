@@ -1,4 +1,5 @@
 import LeanRV64D.Flow
+import LeanRV64D.Arith
 import LeanRV64D.Prelude
 import LeanRV64D.Errors
 import LeanRV64D.PmTypes
@@ -12,12 +13,12 @@ set_option linter.unusedVariables false
 set_option match.ignoreUnusedAlts true
 
 open Sail
-open Sail.ConcurrencyInterfaceV1
+open Sail.ArchSem
 
 noncomputable section
 namespace LeanRV64D
 
-open ConcurrencyInterfaceV1
+open ArchSem
 
 namespace Functions
 
@@ -61,6 +62,8 @@ open vfnunary0
 open vextfunct6
 open vector_support
 open uop
+open trigger_addr_type
+open tdata
 open stateen_bit
 open sopw
 open sop
@@ -94,10 +97,13 @@ open mmfunct6
 open misaligned_exception
 open mem_payload
 open maskfunct3
+open mask_type
+open loop_chain_state
 open landing_pad_expectation
 open iop
 open instruction
 open indexed_mop
+open hlvop
 open fwvvmafunct6
 open fwvvfunct6
 open fwvfunct6
@@ -143,6 +149,7 @@ open f_bin_f_op_D
 open extop_zbb
 open extension
 open exception
+open event_csr
 open csrop
 open cregidx
 open checked_cbop
@@ -161,17 +168,24 @@ open biop_zbs
 open barrier_kind
 open amoop
 open agtype
+open access_kind
 open XtvecModeReservedBehavior
 open XipReadType
 open XenvcfgCbieReservedBehavior
 open WaitReason
 open VectorHalf
+open Trigger
+open Trig_Type
+open Trig_Match
+open Trig_Action
 open TrapVectorMode
 open TrapCause
+open TranslationStage
 open Step
 open Splittability
 open Software_Check_Code
 open Signedness
+open Sdtrig_breakpoint_reentrancy
 open SWCheckCodes
 open SATPMode
 open Reservability
@@ -186,12 +200,15 @@ open PTW_Error
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
+open MemoryTriggerPayload
 open MemoryRegionType
 open MemoryAccessType
 open InterruptType
 open IllegalVtypeReservedBehavior
 open ISA_Format
+open Hit
 open HartState
+open HGATPMode
 open FflagsDirtyPolicy
 open FetchResult
 open FetchBytes_Result
@@ -202,7 +219,10 @@ open ExtStatus
 open ExtContextPolicy
 open ExecutionResult
 open ExceptionType
+open Event
+open Compare_Selection
 open CSRCheckResult
+open CSRBitConfig
 open CSRAccessType
 open AtomicSupport
 open Architecture
@@ -217,52 +237,62 @@ def get_pmm (eff_privilege : Privilege) : SailM PointerMaskingMode := do
       if ((← (currentlyEnabled Ext_S)) : Bool)
       then (pure (pmm_mode_backwards (_get_SEnvcfg_PMM (← (read_senvcfg ())))))
       else (pure (pmm_mode_backwards (_get_MEnvcfg_PMM (← readReg menvcfg)))))
-  | .VirtualUser =>
-    (internal_error "extensions/pointer_masking/pm_utils.sail" 15
-      "Hypervisor extension not supported")
-  | .VirtualSupervisor =>
-    (internal_error "extensions/pointer_masking/pm_utils.sail" 16
-      "Hypervisor extension not supported")
+  | .VirtualSupervisor => (pure (pmm_mode_backwards (_get_HEnvcfg_PMM (← (read_henvcfg ())))))
+  | .VirtualUser => (pure (pmm_mode_backwards (_get_SEnvcfg_PMM (← (read_senvcfg ())))))
 
 def is_pmm_applicable (access : (MemoryAccessType mem_payload)) (eff_privilege : Privilege) : SailM Bool := do
-  if ((bne access (InstructionFetch ())) : Bool)
-  then
+  let mxr_in_effect ← (( do
+    match eff_privilege with
+    | .Machine => (pure false)
+    | .VirtualSupervisor =>
+      (do
+        if (((_get_Mstatus_MXR (← readReg mstatus)) == 1#1) : Bool)
+        then (pure true)
+        else (pure ((_get_Mstatus_MXR (← readReg vsstatus)) == 1#1)))
+    | .VirtualUser =>
+      (do
+        if (((_get_Mstatus_MXR (← readReg mstatus)) == 1#1) : Bool)
+        then (pure true)
+        else (pure ((_get_Mstatus_MXR (← readReg vsstatus)) == 1#1)))
+    | _ => (pure ((_get_Mstatus_MXR (← readReg mstatus)) == 1#1)) ) : SailM Bool )
+  (pure ((bne access (InstructionFetch ())) && ((bne access (LoadExecute Data)) && ((bne access
+            (Load PageTableEntry)) && ((bne access (Store PageTableEntry)) && ((not mxr_in_effect) && (xlen == 64)))))))
+
+def pmlen_of_mode (pmm : PointerMaskingMode) : SailM Int := do
+  match pmm with
+  | .PMM_Disabled => (pure 0)
+  | .PMM_PMLEN_7 => (pure 7)
+  | .PMM_PMLEN_16 => (pure 16)
+  | .PMM_Reserved =>
     (do
-      if ((bne access (Load PageTableEntry)) : Bool)
-      then
-        (do
-          if ((bne access (Store PageTableEntry)) : Bool)
-          then
-            (pure ((← do
-                  if ((eff_privilege == Machine) : Bool)
-                  then (pure true)
-                  else (pure ((_get_Mstatus_MXR (← readReg mstatus)) == 0#1))) && (xlen == 64)))
-          else (pure false))
-      else (pure false))
-  else (pure false)
+      (internal_error "extensions/pointer_masking/pm_utils.sail" 52
+        "Invalid (reserved) pointer masking mode.")
+      (pure 0))
 
 def get_pmlen (access : (MemoryAccessType mem_payload)) (eff_privilege : Privilege) : SailM Int := do
   if ((← (is_pmm_applicable access eff_privilege)) : Bool)
-  then
-    (do
-      match (← (get_pmm eff_privilege)) with
-      | .PMM_Disabled => (pure 0)
-      | .PMM_PMLEN_7 => (pure 7)
-      | .PMM_PMLEN_16 => (pure 16)
-      | .PMM_Reserved =>
-        (do
-          (internal_error "extensions/pointer_masking/pm_utils.sail" 32
-            "Invalid pointer masking mode")
-          (pure 0)))
+  then (pmlen_of_mode (← (get_pmm eff_privilege)))
   else (pure 0)
 
-/-- Type quantifiers: pmlen : Nat, pmlen ∈ {0, 7, 16} -/
+def get_hlsv_pmlen (access : (MemoryAccessType mem_payload)) (eff_privilege : Privilege) : SailM Int := do
+  let pmm ← do
+    if ((← do
+         if ((eff_privilege == VirtualUser) : Bool)
+         then (pure ((← readReg cur_privilege) == User))
+         else (pure false)) : Bool)
+    then (pure (pmm_mode_backwards (_get_Hstatus_HUPMM (← readReg hstatus))))
+    else (get_pmm eff_privilege)
+  if ((← (is_pmm_applicable access eff_privilege)) : Bool)
+  then (pmlen_of_mode pmm)
+  else (pure 0)
+
+/-- Type quantifiers: pmlen : Nat, List.elem pmlen [0, 7, 16] -/
 def pm_transform_VA (typ_0 : virtaddr) (pmlen : Nat) : virtaddr :=
   let .Virtaddr effective_address : virtaddr := typ_0
   (Virtaddr
     (sign_extend (m := 64) (Sail.BitVec.extractLsb effective_address ((xlen -i pmlen) -i 1) 0)))
 
-/-- Type quantifiers: pmlen : Nat, pmlen ∈ {0, 7, 16} -/
+/-- Type quantifiers: pmlen : Nat, List.elem pmlen [0, 7, 16] -/
 def pm_transform_PA (typ_0 : virtaddr) (pmlen : Nat) : virtaddr :=
   let .Virtaddr effective_address : virtaddr := typ_0
   (Virtaddr

@@ -6,12 +6,12 @@ set_option linter.unusedVariables false
 set_option match.ignoreUnusedAlts true
 
 open Sail
-open Sail.ConcurrencyInterfaceV1
+open Sail.ArchSem
 
 noncomputable section
 namespace LeanRV64D
 
-open ConcurrencyInterfaceV1
+open ArchSem
 
 namespace Functions
 
@@ -55,6 +55,8 @@ open vfnunary0
 open vextfunct6
 open vector_support
 open uop
+open trigger_addr_type
+open tdata
 open stateen_bit
 open sopw
 open sop
@@ -88,10 +90,13 @@ open mmfunct6
 open misaligned_exception
 open mem_payload
 open maskfunct3
+open mask_type
+open loop_chain_state
 open landing_pad_expectation
 open iop
 open instruction
 open indexed_mop
+open hlvop
 open fwvvmafunct6
 open fwvvfunct6
 open fwvfunct6
@@ -137,6 +142,7 @@ open f_bin_f_op_D
 open extop_zbb
 open extension
 open exception
+open event_csr
 open csrop
 open cregidx
 open checked_cbop
@@ -155,17 +161,24 @@ open biop_zbs
 open barrier_kind
 open amoop
 open agtype
+open access_kind
 open XtvecModeReservedBehavior
 open XipReadType
 open XenvcfgCbieReservedBehavior
 open WaitReason
 open VectorHalf
+open Trigger
+open Trig_Type
+open Trig_Match
+open Trig_Action
 open TrapVectorMode
 open TrapCause
+open TranslationStage
 open Step
 open Splittability
 open Software_Check_Code
 open Signedness
+open Sdtrig_breakpoint_reentrancy
 open SWCheckCodes
 open SATPMode
 open Reservability
@@ -180,12 +193,15 @@ open PTW_Error
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
+open MemoryTriggerPayload
 open MemoryRegionType
 open MemoryAccessType
 open InterruptType
 open IllegalVtypeReservedBehavior
 open ISA_Format
+open Hit
 open HartState
+open HGATPMode
 open FflagsDirtyPolicy
 open FetchResult
 open FetchBytes_Result
@@ -196,7 +212,10 @@ open ExtStatus
 open ExtContextPolicy
 open ExecutionResult
 open ExceptionType
+open Event
+open Compare_Selection
 open CSRCheckResult
+open CSRBitConfig
 open CSRAccessType
 open AtomicSupport
 open Architecture
@@ -210,15 +229,15 @@ def range_subset (a_begin : (BitVec k_n)) (a_size : (BitVec k_n)) (b_begin : (Bi
   ((zopz0zIzJ_u a_begin b_end) && ((zopz0zIzJ_u a_end b_end) && (zopz0zIzJ_u a_begin a_end)))
 
 def test_range_subset (_ : Unit) : SailM Unit := do
-  (assert (range_subset 0x0#4 0x0#4 0x0#4 0x0#4) "core/range_util.sail:27.41-27.42")
-  (assert (range_subset 0x1#4 0x0#4 0x1#4 0x0#4) "core/range_util.sail:28.41-28.42")
-  (assert (range_subset 0x0#4 0x0#4 0x0#4 0x1#4) "core/range_util.sail:29.41-29.42")
-  (assert (range_subset 0x1#4 0x0#4 0x0#4 0x1#4) "core/range_util.sail:30.41-30.42")
-  (assert (range_subset 0x8#4 0xC#4 0x8#4 0xC#4) "core/range_util.sail:31.41-31.42")
-  (assert (not (range_subset 0x8#4 0xC#4 0x9#4 0xC#4)) "core/range_util.sail:32.46-32.47")
-  (assert (not (range_subset 0x8#4 0xC#4 0x8#4 0xB#4)) "core/range_util.sail:33.46-33.47")
-  (assert (not (range_subset 0x3E#8 0xE0#8 0xC1#8 0x9F#8)) "core/range_util.sail:34.50-34.51")
-  (assert (not (range_subset 0xC1#8 0x9F#8 0x3E#8 0xE0#8)) "core/range_util.sail:35.50-35.51")
+  sail_assert (range_subset 0x0#4 0x0#4 0x0#4 0x0#4) "core/range_util.sail:27.41-27.42"
+  sail_assert (range_subset 0x1#4 0x0#4 0x1#4 0x0#4) "core/range_util.sail:28.41-28.42"
+  sail_assert (range_subset 0x0#4 0x0#4 0x0#4 0x1#4) "core/range_util.sail:29.41-29.42"
+  sail_assert (range_subset 0x1#4 0x0#4 0x0#4 0x1#4) "core/range_util.sail:30.41-30.42"
+  sail_assert (range_subset 0x8#4 0xC#4 0x8#4 0xC#4) "core/range_util.sail:31.41-31.42"
+  sail_assert (not (range_subset 0x8#4 0xC#4 0x9#4 0xC#4)) "core/range_util.sail:32.46-32.47"
+  sail_assert (not (range_subset 0x8#4 0xC#4 0x8#4 0xB#4)) "core/range_util.sail:33.46-33.47"
+  sail_assert (not (range_subset 0x3E#8 0xE0#8 0xC1#8 0x9F#8)) "core/range_util.sail:34.50-34.51"
+  sail_assert (not (range_subset 0xC1#8 0x9F#8 0x3E#8 0xE0#8)) "core/range_util.sail:35.50-35.51"
 
 def range_subset_equals (a_begin : (BitVec 8)) (a_size : (BitVec 8)) (b_begin : (BitVec 8)) (b_size : (BitVec 8)) : Bool :=
   (zopz0zJzJzK

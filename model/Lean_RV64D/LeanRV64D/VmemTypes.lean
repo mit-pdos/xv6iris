@@ -1,3 +1,4 @@
+import LeanRV64D.LeanRV64D
 import LeanRV64D.Errors
 
 set_option maxHeartbeats 1_000_000_000
@@ -6,12 +7,12 @@ set_option linter.unusedVariables false
 set_option match.ignoreUnusedAlts true
 
 open Sail
-open Sail.ConcurrencyInterfaceV1
+open Sail.ArchSem
 
 noncomputable section
 namespace LeanRV64D
 
-open ConcurrencyInterfaceV1
+open ArchSem
 
 namespace Functions
 
@@ -55,6 +56,8 @@ open vfnunary0
 open vextfunct6
 open vector_support
 open uop
+open trigger_addr_type
+open tdata
 open stateen_bit
 open sopw
 open sop
@@ -88,10 +91,13 @@ open mmfunct6
 open misaligned_exception
 open mem_payload
 open maskfunct3
+open mask_type
+open loop_chain_state
 open landing_pad_expectation
 open iop
 open instruction
 open indexed_mop
+open hlvop
 open fwvvmafunct6
 open fwvvfunct6
 open fwvfunct6
@@ -137,6 +143,7 @@ open f_bin_f_op_D
 open extop_zbb
 open extension
 open exception
+open event_csr
 open csrop
 open cregidx
 open checked_cbop
@@ -155,17 +162,24 @@ open biop_zbs
 open barrier_kind
 open amoop
 open agtype
+open access_kind
 open XtvecModeReservedBehavior
 open XipReadType
 open XenvcfgCbieReservedBehavior
 open WaitReason
 open VectorHalf
+open Trigger
+open Trig_Type
+open Trig_Match
+open Trig_Action
 open TrapVectorMode
 open TrapCause
+open TranslationStage
 open Step
 open Splittability
 open Software_Check_Code
 open Signedness
+open Sdtrig_breakpoint_reentrancy
 open SWCheckCodes
 open SATPMode
 open Reservability
@@ -180,12 +194,15 @@ open PTW_Error
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
+open MemoryTriggerPayload
 open MemoryRegionType
 open MemoryAccessType
 open InterruptType
 open IllegalVtypeReservedBehavior
 open ISA_Format
+open Hit
 open HartState
+open HGATPMode
 open FflagsDirtyPolicy
 open FetchResult
 open FetchBytes_Result
@@ -196,11 +213,32 @@ open ExtStatus
 open ExtContextPolicy
 open ExecutionResult
 open ExceptionType
+open Event
+open Compare_Selection
 open CSRCheckResult
+open CSRBitConfig
 open CSRAccessType
 open AtomicSupport
 open Architecture
 open AmocasOddRegisterReservedBehavior
+
+/-- Type quantifiers: sv_width : Nat, (is_sv_or_svx4_mode sv_width) -/
+def get_root_level (sv_width : Nat) : Nat :=
+  if (((sv_width == 32) || (sv_width == 34)) : Bool)
+  then 1
+  else
+    (if (((sv_width == 39) || (sv_width == 41)) : Bool)
+    then 2
+    else
+      (if (((sv_width == 48) || (sv_width == 50)) : Bool)
+      then 3
+      else 4))
+
+/-- Type quantifiers: sv_width : Nat, (is_sv_or_svx4_mode sv_width) -/
+def get_vpn_level_size (sv_width : Nat) : Nat :=
+  (12 -i (if (((sv_width == 32) || (sv_width == 34)) : Bool)
+    then 2
+    else 3))
 
 def undefined_mem_payload (_ : Unit) : SailM mem_payload := do
   (internal_pick [Data, Vector, PageTableEntry, ShadowStack])
@@ -235,7 +273,7 @@ def mem_payload_name_backwards (arg_ : String) : SailM mem_payload := do
   | "ShadowStack" => (pure ShadowStack)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
 def mem_payload_name_forwards_matches (arg_ : mem_payload) : Bool :=
@@ -259,7 +297,7 @@ def mem_payload_str_backwards (arg_ : String) : SailM mem_payload := do
   | ".ss" => (pure ShadowStack)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
 def mem_payload_str_forwards_matches (arg_ : mem_payload) : Bool :=
@@ -284,6 +322,7 @@ def is_shadow_stack_access (access : (MemoryAccessType mem_payload)) : SailM Boo
   | .Load .Data => (pure false)
   | .Load .Vector => (pure false)
   | .Load .PageTableEntry => (pure false)
+  | .LoadExecute .Data => (pure false)
   | .LoadReserved (_, _, .Data) => (pure false)
   | .Store .Data => (pure false)
   | .Store .Vector => (pure false)
@@ -291,16 +330,20 @@ def is_shadow_stack_access (access : (MemoryAccessType mem_payload)) : SailM Boo
   | .StoreConditional (_, _, .Data) => (pure false)
   | .Atomic (_, _, _, .Data, .Data) => (pure false)
   | .CacheAccess _ => (pure false)
+  | .LoadExecute p =>
+    (internal_error "core/vmem_types.sail" 111
+      (HAppend.hAppend "Invalid payload ("
+        (HAppend.hAppend (mem_payload_name_forwards p) ") for LoadExecute.")))
   | .LoadReserved (_, _, p) =>
-    (internal_error "core/vmem_types.sail" 87
+    (internal_error "core/vmem_types.sail" 112
       (HAppend.hAppend "Invalid payload ("
         (HAppend.hAppend (mem_payload_name_forwards p) ") for LoadReserved.")))
   | .StoreConditional (_, _, p) =>
-    (internal_error "core/vmem_types.sail" 88
+    (internal_error "core/vmem_types.sail" 113
       (HAppend.hAppend "Invalid payload ("
         (HAppend.hAppend (mem_payload_name_forwards p) ") for StoreConditional.")))
   | .Atomic (_, _, _, rp, wp) =>
-    (internal_error "core/vmem_types.sail" 89
+    (internal_error "core/vmem_types.sail" 114
       (HAppend.hAppend "Invalid payloads ("
         (HAppend.hAppend (mem_payload_name_forwards rp)
           (HAppend.hAppend ", " (HAppend.hAppend (mem_payload_name_forwards wp) ") for Atomic.")))))
@@ -344,7 +387,7 @@ def page_based_mem_type_forwards (arg_ : (BitVec 2)) : SailM page_based_mem_type
   | 0b10 => (pure PBMT_IO)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
 def page_based_mem_type_backwards (arg_ : page_based_mem_type) : (BitVec 2) :=
@@ -365,4 +408,20 @@ def page_based_mem_type_backwards_matches (arg_ : page_based_mem_type) : Bool :=
   | .PBMT_PMA => true
   | .PBMT_NC => true
   | .PBMT_IO => true
+
+def undefined_TranslationStage (_ : Unit) : SailM TranslationStage := do
+  (internal_pick [S_Stage, VS_Stage, G_Stage])
+
+/-- Type quantifiers: arg_ : Nat, 0 ≤ arg_ ∧ arg_ ≤ 2 -/
+def TranslationStage_of_num (arg_ : Nat) : TranslationStage :=
+  match arg_ with
+  | 0 => S_Stage
+  | 1 => VS_Stage
+  | _ => G_Stage
+
+def num_of_TranslationStage (arg_ : TranslationStage) : Int :=
+  match arg_ with
+  | .S_Stage => 0
+  | .VS_Stage => 1
+  | .G_Stage => 2
 

@@ -1,6 +1,10 @@
+import LeanRV64D.Prelude
 import LeanRV64D.Errors
+import LeanRV64D.Xlen
 import LeanRV64D.TypesExt
+import LeanRV64D.Types
 import LeanRV64D.VmemTypes
+import LeanRV64D.SysRegs
 
 set_option maxHeartbeats 1_000_000_000
 set_option maxRecDepth 1_000_000
@@ -8,12 +12,12 @@ set_option linter.unusedVariables false
 set_option match.ignoreUnusedAlts true
 
 open Sail
-open Sail.ConcurrencyInterfaceV1
+open Sail.ArchSem
 
 noncomputable section
 namespace LeanRV64D
 
-open ConcurrencyInterfaceV1
+open ArchSem
 
 namespace Functions
 
@@ -57,6 +61,8 @@ open vfnunary0
 open vextfunct6
 open vector_support
 open uop
+open trigger_addr_type
+open tdata
 open stateen_bit
 open sopw
 open sop
@@ -90,10 +96,13 @@ open mmfunct6
 open misaligned_exception
 open mem_payload
 open maskfunct3
+open mask_type
+open loop_chain_state
 open landing_pad_expectation
 open iop
 open instruction
 open indexed_mop
+open hlvop
 open fwvvmafunct6
 open fwvvfunct6
 open fwvfunct6
@@ -139,6 +148,7 @@ open f_bin_f_op_D
 open extop_zbb
 open extension
 open exception
+open event_csr
 open csrop
 open cregidx
 open checked_cbop
@@ -157,17 +167,24 @@ open biop_zbs
 open barrier_kind
 open amoop
 open agtype
+open access_kind
 open XtvecModeReservedBehavior
 open XipReadType
 open XenvcfgCbieReservedBehavior
 open WaitReason
 open VectorHalf
+open Trigger
+open Trig_Type
+open Trig_Match
+open Trig_Action
 open TrapVectorMode
 open TrapCause
+open TranslationStage
 open Step
 open Splittability
 open Software_Check_Code
 open Signedness
+open Sdtrig_breakpoint_reentrancy
 open SWCheckCodes
 open SATPMode
 open Reservability
@@ -182,12 +199,15 @@ open PTW_Error
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
+open MemoryTriggerPayload
 open MemoryRegionType
 open MemoryAccessType
 open InterruptType
 open IllegalVtypeReservedBehavior
 open ISA_Format
+open Hit
 open HartState
+open HGATPMode
 open FflagsDirtyPolicy
 open FetchResult
 open FetchBytes_Result
@@ -198,7 +218,10 @@ open ExtStatus
 open ExtContextPolicy
 open ExecutionResult
 open ExceptionType
+open Event
+open Compare_Selection
 open CSRCheckResult
+open CSRBitConfig
 open CSRAccessType
 open AtomicSupport
 open Architecture
@@ -209,6 +232,18 @@ def ext_get_ptw_error (failure : pte_check_failure) : PTW_Error :=
   | .PTE_No_Permission () => (PTW_No_Permission ())
   | .PTE_No_Access () => (PTW_No_Access ())
   | .PTE_Ext_Failure _ => (PTW_No_Permission ())
+
+def convertToGuestException (e : ExceptionType) : ExceptionType :=
+  match e with
+  | .E_Fetch_Page_Fault () => (E_Fetch_GPage_Fault ())
+  | .E_Load_Page_Fault () => (E_Load_GPage_Fault ())
+  | .E_SAMO_Page_Fault () => (E_SAMO_GPage_Fault ())
+  | _ => e
+
+def g_stage_tval2_exception_value (trap : ExceptionType) (gpa : (BitVec 64)) : (BitVec 64) :=
+  if (((is_guest_page_fault trap) && sys_guest_page_fault_writes_htval) : Bool)
+  then (Sail.BitVec.truncate (gpa >>> 2) xlen)
+  else (zeros (n := 64))
 
 def translationException (access : (MemoryAccessType mem_payload)) (err : PTW_Error) : SailM ExceptionType := do
   match (access, err) with
@@ -221,6 +256,8 @@ def translationException (access : (MemoryAccessType mem_payload)) (err : PTW_Er
   | (.Load .Vector, _) => (pure (E_Load_Page_Fault ()))
   | (.Load .PageTableEntry, .PTW_No_Access ()) => (pure (E_Load_Access_Fault ()))
   | (.Load .PageTableEntry, _) => (pure (E_Load_Page_Fault ()))
+  | (.LoadExecute .Data, .PTW_No_Access ()) => (pure (E_Load_Access_Fault ()))
+  | (.LoadExecute .Data, _) => (pure (E_Load_Page_Fault ()))
   | (.LoadReserved (_, _, .Data), .PTW_No_Access ()) => (pure (E_Load_Access_Fault ()))
   | (.LoadReserved (_, _, .Data), _) => (pure (E_Load_Page_Fault ()))
   | (.Store .Data, .PTW_No_Access ()) => (pure (E_SAMO_Access_Fault ()))
@@ -254,16 +291,20 @@ def translationException (access : (MemoryAccessType mem_payload)) (err : PTW_Er
     | .PREFETCH_R => (pure (E_Load_Page_Fault ()))
     | .PREFETCH_W => (pure (E_SAMO_Page_Fault ()))
     | .PREFETCH_I => (pure (E_Fetch_Page_Fault ())))
+  | (.LoadExecute p, _) =>
+    (internal_error "sys/vmem_ptw.sail" 137
+      (HAppend.hAppend "Invalid payload ("
+        (HAppend.hAppend (mem_payload_name_forwards p) ") for LoadExecute.")))
   | (.LoadReserved (_, _, p), _) =>
-    (internal_error "sys/vmem_ptw.sail" 114
+    (internal_error "sys/vmem_ptw.sail" 138
       (HAppend.hAppend "Invalid payload ("
         (HAppend.hAppend (mem_payload_name_forwards p) ") for LoadReserved.")))
   | (.StoreConditional (_, _, p), _) =>
-    (internal_error "sys/vmem_ptw.sail" 115
+    (internal_error "sys/vmem_ptw.sail" 139
       (HAppend.hAppend "Invalid payload ("
         (HAppend.hAppend (mem_payload_name_forwards p) ") for StoreConditional.")))
   | (.Atomic (_, _, _, rp, wp), _) =>
-    (internal_error "sys/vmem_ptw.sail" 116
+    (internal_error "sys/vmem_ptw.sail" 140
       (HAppend.hAppend "Invalid payloads ("
         (HAppend.hAppend (mem_payload_name_forwards rp)
           (HAppend.hAppend ", " (HAppend.hAppend (mem_payload_name_forwards wp) ") for Atomic.")))))

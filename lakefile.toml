@@ -9,10 +9,14 @@ git = "https://github.com/dongjaelee1/iris-lean"
 rev = "439abbbb32bd4986c5b47174c9ce51adb1f6f01f"
 subDir = "Iris"
 
-# lean-sail with the free-monad concurrency interface (see vendor/lean-sail/README.md).
+# lean-sail (the Sail Lean runtime): upstream, by git, at tag v7 -- its `Sail.ArchSem.PreSailM` is
+# the free monad over `InstructionEffect` that MachCSL steps.  The generated model's own
+# lakefile.toml requires the SAME revision (tools/regen_sail_model.sh writes it;
+# tools/ci/toolchain_check.sh checks that the two agree).
 [[require]]
 name = "Sail"
-path = "vendor/lean-sail"
+git = "https://github.com/rems-project/lean-sail"
+rev = "01bb54c7c8a69e52ba11863c67e7c403a6cd198a"
 
 # The Sail RISC-V model compiled to Lean (generated; see tools/regen_sail_model.sh).
 [[require]]

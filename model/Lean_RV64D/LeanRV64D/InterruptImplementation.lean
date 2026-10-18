@@ -1,9 +1,4 @@
-import Sail
-import LeanRV64D.Defs
-import LeanRV64D.SpecializationV1
-import LeanRV64D.FakeReal
-import LeanRV64D.Xv6Extras
-import LeanRV64D.RiscvExtras
+import LeanRV64D.Platform
 
 set_option maxHeartbeats 1_000_000_000
 set_option maxRecDepth 1_000_000
@@ -11,12 +6,12 @@ set_option linter.unusedVariables false
 set_option match.ignoreUnusedAlts true
 
 open Sail
-open Sail.ConcurrencyInterfaceV1
+open Sail.ArchSem
 
 noncomputable section
 namespace LeanRV64D
 
-open ConcurrencyInterfaceV1
+open ArchSem
 
 namespace Functions
 
@@ -60,6 +55,8 @@ open vfnunary0
 open vextfunct6
 open vector_support
 open uop
+open trigger_addr_type
+open tdata
 open stateen_bit
 open sopw
 open sop
@@ -93,10 +90,13 @@ open mmfunct6
 open misaligned_exception
 open mem_payload
 open maskfunct3
+open mask_type
+open loop_chain_state
 open landing_pad_expectation
 open iop
 open instruction
 open indexed_mop
+open hlvop
 open fwvvmafunct6
 open fwvvfunct6
 open fwvfunct6
@@ -142,6 +142,7 @@ open f_bin_f_op_D
 open extop_zbb
 open extension
 open exception
+open event_csr
 open csrop
 open cregidx
 open checked_cbop
@@ -160,17 +161,24 @@ open biop_zbs
 open barrier_kind
 open amoop
 open agtype
+open access_kind
 open XtvecModeReservedBehavior
 open XipReadType
 open XenvcfgCbieReservedBehavior
 open WaitReason
 open VectorHalf
+open Trigger
+open Trig_Type
+open Trig_Match
+open Trig_Action
 open TrapVectorMode
 open TrapCause
+open TranslationStage
 open Step
 open Splittability
 open Software_Check_Code
 open Signedness
+open Sdtrig_breakpoint_reentrancy
 open SWCheckCodes
 open SATPMode
 open Reservability
@@ -185,12 +193,15 @@ open PTW_Error
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
+open MemoryTriggerPayload
 open MemoryRegionType
 open MemoryAccessType
 open InterruptType
 open IllegalVtypeReservedBehavior
 open ISA_Format
+open Hit
 open HartState
+open HGATPMode
 open FflagsDirtyPolicy
 open FetchResult
 open FetchBytes_Result
@@ -201,80 +212,15 @@ open ExtStatus
 open ExtContextPolicy
 open ExecutionResult
 open ExceptionType
+open Event
+open Compare_Selection
 open CSRCheckResult
+open CSRBitConfig
 open CSRAccessType
 open AtomicSupport
 open Architecture
 open AmocasOddRegisterReservedBehavior
 
-def undefined_Access_variety (_ : Unit) : SailM Access_variety := do
-  (internal_pick [AV_plain, AV_exclusive, AV_atomic_rmw])
-
-/-- Type quantifiers: arg_ : Nat, 0 ≤ arg_ ∧ arg_ ≤ 2 -/
-def Access_variety_of_num (arg_ : Nat) : Access_variety :=
-  match arg_ with
-  | 0 => AV_plain
-  | 1 => AV_exclusive
-  | _ => AV_atomic_rmw
-
-def num_of_Access_variety (arg_ : Access_variety) : Int :=
-  match arg_ with
-  | .AV_plain => 0
-  | .AV_exclusive => 1
-  | .AV_atomic_rmw => 2
-
-def undefined_Access_strength (_ : Unit) : SailM Access_strength := do
-  (internal_pick [AS_normal, AS_rel_or_acq, AS_acq_rcpc])
-
-/-- Type quantifiers: arg_ : Nat, 0 ≤ arg_ ∧ arg_ ≤ 2 -/
-def Access_strength_of_num (arg_ : Nat) : Access_strength :=
-  match arg_ with
-  | 0 => AS_normal
-  | 1 => AS_rel_or_acq
-  | _ => AS_acq_rcpc
-
-def num_of_Access_strength (arg_ : Access_strength) : Int :=
-  match arg_ with
-  | .AS_normal => 0
-  | .AS_rel_or_acq => 1
-  | .AS_acq_rcpc => 2
-
-def undefined_Explicit_access_kind (_ : Unit) : SailM Explicit_access_kind := do
-  (pure { variety := ← (undefined_Access_variety ())
-          strength := ← (undefined_Access_strength ()) })
-
-/-- Type quantifiers: k_n : Nat, k_vasize : Nat, k_pa : Type, k_translation_summary : Type, k_arch_ak
-  : Type, k_n > 0 ∧ k_vasize > 0 -/
-def mem_read_request_is_exclusive (request : (Mem_read_request k_n k_vasize k_pa k_translation_summary k_arch_ak)) : Bool :=
-  match request.access_kind with
-  | .AK_explicit eak =>
-    (match eak.variety with
-    | .AV_exclusive => true
-    | _ => false)
-  | _ => false
-
-/-- Type quantifiers: k_n : Nat, k_vasize : Nat, k_pa : Type, k_translation_summary : Type, k_arch_ak
-  : Type, k_n > 0 ∧ k_vasize > 0 -/
-def mem_read_request_is_ifetch (request : (Mem_read_request k_n k_vasize k_pa k_translation_summary k_arch_ak)) : Bool :=
-  match request.access_kind with
-  | .AK_ifetch () => true
-  | _ => false
-
-def __monomorphize_reads : Bool := false
-
-def __monomorphize_writes : Bool := false
-
-/-- Type quantifiers: k_n : Nat, k_vasize : Nat, k_pa : Type, k_translation_summary : Type, k_arch_ak
-  : Type, k_n > 0 ∧ k_vasize > 0 -/
-def mem_write_request_is_exclusive (request : (Mem_write_request k_n k_vasize k_pa k_translation_summary k_arch_ak)) : Bool :=
-  match request.access_kind with
-  | .AK_explicit eak =>
-    (match eak.variety with
-    | .AV_exclusive => true
-    | _ => false)
-  | _ => false
-
-/-- Type quantifiers: x_0 : Nat, x_0 ≥ 0, x_0 ∈ {32, 64} -/
-def sail_address_announce (x_0 : Nat) (x_1 : (BitVec x_0)) : Unit :=
-  ()
+def tick_clock (_ : Unit) : SailM Unit := do
+  (clint_tick_clock ())
 

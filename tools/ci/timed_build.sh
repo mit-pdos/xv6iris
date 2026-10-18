@@ -30,7 +30,7 @@ command -v lake >/dev/null 2>&1 || export PATH="$HOME/.elan/bin:$PATH"
 LOG=$1; shift
 if [ "${1:-}" = "--clean" ]; then
   shift
-  rm -rf .lake/build model/Lean_RV64D/.lake/build vendor/lean-sail/.lake/build
+  rm -rf .lake/build model/Lean_RV64D/.lake/build .lake/packages/Sail/.lake/build
 fi
 [ $# -gt 0 ] || set -- Xv6 MachCSL
 echo "@start $EPOCHREALTIME nproc=$(nproc)" > "$LOG"

@@ -1,6 +1,6 @@
 import Sail
 import LeanRV64D.Defs
-import LeanRV64D.SpecializationV1
+import LeanRV64D.SpecializationArchSem
 import LeanRV64D.FakeReal
 import LeanRV64D.Xv6Extras
 import LeanRV64D.RiscvExtras
@@ -11,12 +11,12 @@ set_option linter.unusedVariables false
 set_option match.ignoreUnusedAlts true
 
 open Sail
-open Sail.ConcurrencyInterfaceV1
+open Sail.ArchSem
 
 noncomputable section
 namespace LeanRV64D
 
-open ConcurrencyInterfaceV1
+open ArchSem
 
 namespace Functions
 
@@ -60,6 +60,8 @@ open vfnunary0
 open vextfunct6
 open vector_support
 open uop
+open trigger_addr_type
+open tdata
 open stateen_bit
 open sopw
 open sop
@@ -93,10 +95,13 @@ open mmfunct6
 open misaligned_exception
 open mem_payload
 open maskfunct3
+open mask_type
+open loop_chain_state
 open landing_pad_expectation
 open iop
 open instruction
 open indexed_mop
+open hlvop
 open fwvvmafunct6
 open fwvvfunct6
 open fwvfunct6
@@ -142,6 +147,7 @@ open f_bin_f_op_D
 open extop_zbb
 open extension
 open exception
+open event_csr
 open csrop
 open cregidx
 open checked_cbop
@@ -160,17 +166,24 @@ open biop_zbs
 open barrier_kind
 open amoop
 open agtype
+open access_kind
 open XtvecModeReservedBehavior
 open XipReadType
 open XenvcfgCbieReservedBehavior
 open WaitReason
 open VectorHalf
+open Trigger
+open Trig_Type
+open Trig_Match
+open Trig_Action
 open TrapVectorMode
 open TrapCause
+open TranslationStage
 open Step
 open Splittability
 open Software_Check_Code
 open Signedness
+open Sdtrig_breakpoint_reentrancy
 open SWCheckCodes
 open SATPMode
 open Reservability
@@ -185,12 +198,15 @@ open PTW_Error
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
+open MemoryTriggerPayload
 open MemoryRegionType
 open MemoryAccessType
 open InterruptType
 open IllegalVtypeReservedBehavior
 open ISA_Format
+open Hit
 open HartState
+open HGATPMode
 open FflagsDirtyPolicy
 open FetchResult
 open FetchBytes_Result
@@ -201,7 +217,10 @@ open ExtStatus
 open ExtContextPolicy
 open ExecutionResult
 open ExceptionType
+open Event
+open Compare_Selection
 open CSRCheckResult
+open CSRBitConfig
 open CSRAccessType
 open AtomicSupport
 open Architecture
@@ -279,7 +298,7 @@ def nfields_string_backwards (arg_ : String) : SailM Int := do
   | "seg8" => (pure 8)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
 /-- Type quantifiers: arg_ : Nat, arg_ > 0 ∧ arg_ ≤ 8 -/
@@ -315,10 +334,10 @@ def encdec_nfields_pow2_forwards (arg_ : (BitVec 3)) : SailM Int := do
   | 0b111 => (pure 8)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
-/-- Type quantifiers: arg_ : Nat, arg_ ∈ {1, 2, 4, 8} -/
+/-- Type quantifiers: arg_ : Nat, List.elem arg_ [1, 2, 4, 8] -/
 def encdec_nfields_pow2_backwards (arg_ : Nat) : (BitVec 3) :=
   match arg_ with
   | 1 => 0b000#3
@@ -334,7 +353,7 @@ def encdec_nfields_pow2_forwards_matches (arg_ : (BitVec 3)) : Bool :=
   | 0b111 => true
   | _ => false
 
-/-- Type quantifiers: arg_ : Nat, arg_ ∈ {1, 2, 4, 8} -/
+/-- Type quantifiers: arg_ : Nat, List.elem arg_ [1, 2, 4, 8] -/
 def encdec_nfields_pow2_backwards_matches (arg_ : Nat) : Bool :=
   match arg_ with
   | 1 => true
@@ -343,7 +362,7 @@ def encdec_nfields_pow2_backwards_matches (arg_ : Nat) : Bool :=
   | 8 => true
   | _ => false
 
-/-- Type quantifiers: arg_ : Nat, arg_ ∈ {1, 2, 4, 8} -/
+/-- Type quantifiers: arg_ : Nat, List.elem arg_ [1, 2, 4, 8] -/
 def nfields_pow2_string_forwards (arg_ : Nat) : String :=
   match arg_ with
   | 1 => "1"
@@ -359,10 +378,10 @@ def nfields_pow2_string_backwards (arg_ : String) : SailM Int := do
   | "8" => (pure 8)
   | _ =>
     (do
-      (assert false "Pattern match failure at unknown location")
+      sail_assert false "Pattern match failure at unknown location"
       throw Error.Exit)
 
-/-- Type quantifiers: arg_ : Nat, arg_ ∈ {1, 2, 4, 8} -/
+/-- Type quantifiers: arg_ : Nat, List.elem arg_ [1, 2, 4, 8] -/
 def nfields_pow2_string_forwards_matches (arg_ : Nat) : Bool :=
   match arg_ with
   | 1 => true

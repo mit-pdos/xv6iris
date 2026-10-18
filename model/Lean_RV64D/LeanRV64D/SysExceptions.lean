@@ -9,12 +9,12 @@ set_option linter.unusedVariables false
 set_option match.ignoreUnusedAlts true
 
 open Sail
-open Sail.ConcurrencyInterfaceV1
+open Sail.ArchSem
 
 noncomputable section
 namespace LeanRV64D
 
-open ConcurrencyInterfaceV1
+open ArchSem
 
 namespace Functions
 
@@ -58,6 +58,8 @@ open vfnunary0
 open vextfunct6
 open vector_support
 open uop
+open trigger_addr_type
+open tdata
 open stateen_bit
 open sopw
 open sop
@@ -91,10 +93,13 @@ open mmfunct6
 open misaligned_exception
 open mem_payload
 open maskfunct3
+open mask_type
+open loop_chain_state
 open landing_pad_expectation
 open iop
 open instruction
 open indexed_mop
+open hlvop
 open fwvvmafunct6
 open fwvvfunct6
 open fwvfunct6
@@ -140,6 +145,7 @@ open f_bin_f_op_D
 open extop_zbb
 open extension
 open exception
+open event_csr
 open csrop
 open cregidx
 open checked_cbop
@@ -158,17 +164,24 @@ open biop_zbs
 open barrier_kind
 open amoop
 open agtype
+open access_kind
 open XtvecModeReservedBehavior
 open XipReadType
 open XenvcfgCbieReservedBehavior
 open WaitReason
 open VectorHalf
+open Trigger
+open Trig_Type
+open Trig_Match
+open Trig_Action
 open TrapVectorMode
 open TrapCause
+open TranslationStage
 open Step
 open Splittability
 open Software_Check_Code
 open Signedness
+open Sdtrig_breakpoint_reentrancy
 open SWCheckCodes
 open SATPMode
 open Reservability
@@ -183,12 +196,15 @@ open PTW_Error
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
+open MemoryTriggerPayload
 open MemoryRegionType
 open MemoryAccessType
 open InterruptType
 open IllegalVtypeReservedBehavior
 open ISA_Format
+open Hit
 open HartState
+open HGATPMode
 open FflagsDirtyPolicy
 open FetchResult
 open FetchBytes_Result
@@ -199,7 +215,10 @@ open ExtStatus
 open ExtContextPolicy
 open ExecutionResult
 open ExceptionType
+open Event
+open Compare_Selection
 open CSRCheckResult
+open CSRBitConfig
 open CSRAccessType
 open AtomicSupport
 open Architecture
@@ -219,36 +238,29 @@ def prepare_trap_vector (p : Privilege) (cause : (BitVec 64)) : SailM (BitVec 64
     match p with
     | .Machine => readReg mtvec
     | .Supervisor => readReg stvec
-    | .User => (internal_error "exceptions/sys_exceptions.sail" 25 "Invalid privilege level")
-    | .VirtualUser =>
-      (internal_error "exceptions/sys_exceptions.sail" 26 "Hypervisor extension not supported")
-    | .VirtualSupervisor =>
-      (internal_error "exceptions/sys_exceptions.sail" 27 "Hypervisor extension not supported") ) :
-    SailM Mtvec )
+    | .User => (internal_error "exceptions/sys_exceptions.sail" 21 "Invalid privilege level")
+    | .VirtualUser => (internal_error "exceptions/sys_exceptions.sail" 22 "Invalid privilege level")
+    | .VirtualSupervisor => readReg vstvec ) : SailM Mtvec )
   match (tvec_addr tvec cause) with
   | .some epc => (pure epc)
-  | none => (internal_error "exceptions/sys_exceptions.sail" 31 "Invalid tvec mode")
+  | none => (internal_error "exceptions/sys_exceptions.sail" 27 "Invalid tvec mode")
 
 def get_xepc (p : Privilege) : SailM (BitVec 64) := do
   match p with
   | .Machine => (align_pc (← readReg mepc))
   | .Supervisor => (align_pc (← readReg sepc))
-  | .User => (internal_error "exceptions/sys_exceptions.sail" 45 "Invalid privilege level")
-  | .VirtualUser =>
-    (internal_error "exceptions/sys_exceptions.sail" 46 "Hypervisor extension not supported")
-  | .VirtualSupervisor =>
-    (internal_error "exceptions/sys_exceptions.sail" 47 "Hypervisor extension not supported")
+  | .User => (internal_error "exceptions/sys_exceptions.sail" 41 "Invalid privilege level")
+  | .VirtualUser => (internal_error "exceptions/sys_exceptions.sail" 42 "Invalid privilege level")
+  | .VirtualSupervisor => (align_pc (← readReg vsepc))
 
 def set_xepc (p : Privilege) (value : (BitVec 64)) : SailM (BitVec 64) := do
   let target := (legalize_xepc value)
   match p with
   | .Machine => writeReg mepc target
   | .Supervisor => writeReg sepc target
-  | .User => (internal_error "exceptions/sys_exceptions.sail" 55 "Invalid privilege level")
-  | .VirtualUser =>
-    (internal_error "exceptions/sys_exceptions.sail" 56 "Hypervisor extension not supported")
-  | .VirtualSupervisor =>
-    (internal_error "exceptions/sys_exceptions.sail" 57 "Hypervisor extension not supported")
+  | .User => (internal_error "exceptions/sys_exceptions.sail" 51 "Invalid privilege level")
+  | .VirtualUser => (internal_error "exceptions/sys_exceptions.sail" 52 "Invalid privilege level")
+  | .VirtualSupervisor => writeReg vsepc target
   (pure target)
 
 def prepare_xret_target (p : Privilege) : SailM (BitVec 64) := do
@@ -260,6 +272,9 @@ def get_mtvec (_ : Unit) : SailM (BitVec 64) := do
 def get_stvec (_ : Unit) : SailM (BitVec 64) := do
   readReg stvec
 
+def get_vstvec (_ : Unit) : SailM (BitVec 64) := do
+  readReg vstvec
+
 def set_mtvec (value : (BitVec 64)) : SailM (BitVec 64) := do
   writeReg mtvec (← (legalize_tvec (← readReg mtvec) value plat_mtvec_direct_mode_supported
       plat_mtvec_direct_base_alignment_exp plat_mtvec_vectored_mode_supported
@@ -270,6 +285,11 @@ def set_stvec (value : (BitVec 64)) : SailM (BitVec 64) := do
   writeReg stvec (← (legalize_tvec (← readReg stvec) value plat_stvec_direct_mode_supported 2
       plat_stvec_vectored_mode_supported plat_stvec_vectored_base_alignment_exp))
   readReg stvec
+
+def set_vstvec (value : (BitVec 64)) : SailM (BitVec 64) := do
+  writeReg vstvec (← (legalize_tvec (← readReg vstvec) value plat_vstvec_direct_mode_supported 2
+      plat_vstvec_vectored_mode_supported plat_vstvec_vectored_base_alignment_exp))
+  readReg vstvec
 
 def reset_tvecs (_ : Unit) : SailM Unit := do
   if (plat_mtvec_direct_mode_supported : Bool)
@@ -292,6 +312,17 @@ def reset_tvecs (_ : Unit) : SailM Unit := do
       if (plat_stvec_vectored_mode_supported : Bool)
       then
         writeReg stvec (Sail.BitVec.updateSubrange (← readReg stvec) 1 0
+          (trapVectorMode_backwards TV_Vector))
+      else (pure ()))
+  if (plat_vstvec_direct_mode_supported : Bool)
+  then
+    writeReg vstvec (Sail.BitVec.updateSubrange (← readReg vstvec) 1 0
+      (trapVectorMode_backwards TV_Direct))
+  else
+    (do
+      if (plat_vstvec_vectored_mode_supported : Bool)
+      then
+        writeReg vstvec (Sail.BitVec.updateSubrange (← readReg vstvec) 1 0
           (trapVectorMode_backwards TV_Vector))
       else (pure ()))
 

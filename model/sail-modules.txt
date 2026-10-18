@@ -1,4 +1,4 @@
-# The Sail modules model-xv6iris/{rv64d.v,rv64d_types.v} are generated from.
+# The Sail modules model/Lean_RV64D is generated from (sail-riscv 0.16 + the xv6 fork commits).
 #
 # This is sail-riscv's own SAIL_MODULES list for the rv64d build -- a curated
 # subset of riscv.sail_project's modules, NOT `--all-modules`.  It is recorded
@@ -14,6 +14,7 @@
 # and whether `hartSupports` answers true for it are independent axes.
 
 prelude core exceptions pmp sys postlude
+Sdtrig   # required by `sys` since 0.15; compiled in, disabled by the config (hartSupports Ext_Sdtrig = false)
 
 I_insts I_types
 M_insts M_types

@@ -4,13 +4,7 @@ import LeanRV64D.Prelude
 import LeanRV64D.Xlen
 import LeanRV64D.PlatformConfig
 import LeanRV64D.SysRegs
-import LeanRV64D.InterruptRegs
-import LeanRV64D.SysControl
-import LeanRV64D.Platform
-import LeanRV64D.Pma
-import LeanRV64D.VmemTlb
-import LeanRV64D.ZicsrInsts
-import LeanRV64D.Step
+import LeanRV64D.SdtrigTypes
 import LeanRV64D.Model
 
 set_option maxHeartbeats 1_000_000_000
@@ -19,12 +13,12 @@ set_option linter.unusedVariables false
 set_option match.ignoreUnusedAlts true
 
 open Sail
-open Sail.ConcurrencyInterfaceV1
+open Sail.ArchSem
 
 noncomputable section
 namespace LeanRV64D
 
-open ConcurrencyInterfaceV1
+open ArchSem
 
 namespace Functions
 
@@ -68,6 +62,8 @@ open vfnunary0
 open vextfunct6
 open vector_support
 open uop
+open trigger_addr_type
+open tdata
 open stateen_bit
 open sopw
 open sop
@@ -101,10 +97,13 @@ open mmfunct6
 open misaligned_exception
 open mem_payload
 open maskfunct3
+open mask_type
+open loop_chain_state
 open landing_pad_expectation
 open iop
 open instruction
 open indexed_mop
+open hlvop
 open fwvvmafunct6
 open fwvvfunct6
 open fwvfunct6
@@ -150,6 +149,7 @@ open f_bin_f_op_D
 open extop_zbb
 open extension
 open exception
+open event_csr
 open csrop
 open cregidx
 open checked_cbop
@@ -168,17 +168,24 @@ open biop_zbs
 open barrier_kind
 open amoop
 open agtype
+open access_kind
 open XtvecModeReservedBehavior
 open XipReadType
 open XenvcfgCbieReservedBehavior
 open WaitReason
 open VectorHalf
+open Trigger
+open Trig_Type
+open Trig_Match
+open Trig_Action
 open TrapVectorMode
 open TrapCause
+open TranslationStage
 open Step
 open Splittability
 open Software_Check_Code
 open Signedness
+open Sdtrig_breakpoint_reentrancy
 open SWCheckCodes
 open SATPMode
 open Reservability
@@ -193,12 +200,15 @@ open PTW_Error
 open PTE_Check
 open PM_Ext
 open OOBVstartReservedBehavior
+open MemoryTriggerPayload
 open MemoryRegionType
 open MemoryAccessType
 open InterruptType
 open IllegalVtypeReservedBehavior
 open ISA_Format
+open Hit
 open HartState
+open HGATPMode
 open FflagsDirtyPolicy
 open FetchResult
 open FetchBytes_Result
@@ -209,7 +219,10 @@ open ExtStatus
 open ExtContextPolicy
 open ExecutionResult
 open ExceptionType
+open Event
+open Compare_Selection
 open CSRCheckResult
+open CSRBitConfig
 open CSRAccessType
 open AtomicSupport
 open Architecture
@@ -230,14 +243,16 @@ def sail_model_init (x_0 : Unit) : SailM Unit := do
     (if (((xlen != 32) && (hartSupports Ext_U)) : Bool)
     then mxl
     else (zeros (n := 2)))))
+  writeReg vsstatus (_update_Mstatus_UXL (Mk_Mstatus (zeros (n := 64)))
+    (architecture_bits_forwards RV64))
   writeReg hstateen0 (Mk_Hstateen0 (zeros (n := 64)))
   writeReg hstateen1 (Mk_Hstateen1 (zeros (n := 64)))
   writeReg hstateen2 (Mk_Hstateen2 (zeros (n := 64)))
   writeReg hstateen3 (Mk_Hstateen3 (zeros (n := 64)))
-  writeReg mstateen0 (Mk_Mstateen0 (zeros (n := 64)))
   writeReg mstateen1 (Mk_Mstateen1 (zeros (n := 64)))
   writeReg mstateen2 (Mk_Mstateen2 (zeros (n := 64)))
   writeReg mstateen3 (Mk_Mstateen3 (zeros (n := 64)))
+  writeReg mstateen0 (Mk_Mstateen0 (zeros (n := 64)))
   writeReg sstateen0 (Mk_Sstateen0 (zeros (n := 32)))
   writeReg sstateen1 (Mk_Sstateen1 (zeros (n := 32)))
   writeReg sstateen2 (Mk_Sstateen2 (zeros (n := 32)))
@@ -245,13 +260,29 @@ def sail_model_init (x_0 : Unit) : SailM Unit := do
   writeReg senvcfg (← (legalize_senvcfg (Mk_SEnvcfg (zeros (n := 64))) (zeros (n := 64))))
   writeReg mseccfg (← (legalize_mseccfg (Mk_Seccfg (zeros (n := 64))) (zeros (n := 64))))
   writeReg menvcfg (← (legalize_menvcfg (Mk_MEnvcfg (zeros (n := 64))) (zeros (n := 64))))
+  writeReg henvcfg (← (legalize_henvcfg (Mk_HEnvcfg (zeros (n := 64))) (zeros (n := 64))))
+  writeReg hstatus (_update_Hstatus_VSXL (Mk_Hstatus (zeros (n := 64)))
+    (architecture_bits_forwards RV64))
+  writeReg mcountinhibit (Mk_Counterin (zeros (n := 32)))
   writeReg mvendorid (← (to_bits_checked (l := 32) (0 : Int)))
   writeReg mimpid (← (to_bits_checked (l := 64) (0 : Int)))
   writeReg marchid (← (to_bits_checked (l := 64) (0 : Int)))
   writeReg mhartid (← (to_bits_checked (l := 64) (0 : Int)))
   writeReg mconfigptr (zeros (n := 64))
+  writeReg hgeie (zeros (n := 64))
+  writeReg sig_hgeip (zeros (n := 64))
   writeReg sig_meip 0#1
   writeReg sig_seip 0#1
+  writeReg sig_ssip 0#1
+  writeReg msip (zeros (n := 32))
+  writeReg sig_msip 0#1
+  writeReg written_event_index none
+  writeReg triggers (vectorInit trig_reset_val)
+  writeReg tselect (zeros (n := 64))
+  writeReg written_trigger_index none
+  writeReg tcontrol (Mk_TControl (zeros (n := 64)))
+  writeReg scontext (Mk_SContext (zeros (n := 64)))
+  writeReg mcontext (Mk_MContext (zeros (n := 64)))
   writeReg pc_reset_address (zeros (n := 64))
   writeReg htif_tohost_base none
   writeReg htif_tohost (zeros (n := 64))
@@ -271,7 +302,8 @@ def sail_model_init (x_0 : Unit) : SailM Unit := do
                                           write_idempotent := true
                                           misaligned_exceptions := { load_store := none
                                                                      vector := none
-                                                                     amo := AccessFault }
+                                                                     amo := AccessFault
+                                                                     lrsc := AccessFault }
                                           atomic_support := AMONone
                                           reservability := RsrvNone
                                           supports_cbo_zero := false
@@ -291,7 +323,8 @@ def sail_model_init (x_0 : Unit) : SailM Unit := do
                                                                                write_idempotent := false
                                                                                misaligned_exceptions := { load_store := none
                                                                                                           vector := none
-                                                                                                          amo := AccessFault }
+                                                                                                          amo := AccessFault
+                                                                                                          lrsc := AccessFault }
                                                                                atomic_support := AMONone
                                                                                reservability := RsrvNone
                                                                                supports_cbo_zero := false
@@ -311,7 +344,8 @@ def sail_model_init (x_0 : Unit) : SailM Unit := do
                                                                                                                     write_idempotent := true
                                                                                                                     misaligned_exceptions := { load_store := none
                                                                                                                                                vector := none
-                                                                                                                                               amo := AccessFault }
+                                                                                                                                               amo := AccessFault
+                                                                                                                                               lrsc := AccessFault }
                                                                                                                     atomic_support := AMOCASQ
                                                                                                                     reservability := RsrvEventual
                                                                                                                     supports_cbo_zero := true

@@ -216,7 +216,7 @@ def main():
         if r == "LeanRV64D":
             return os.path.join(a.src, "model/Lean_RV64D", rel)
         if r == "Sail":
-            return os.path.join(a.src, "vendor/lean-sail", rel)
+            return os.path.join(a.src, ".lake/packages/Sail", rel)
         return os.path.join(a.src, rel)
 
     # namespaces opened by a bare `namespace N ... end N` (no public constants) are invisible
