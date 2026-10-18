@@ -797,6 +797,8 @@ import Weak.SilKillT
 import Weak.SilSiteTab
 import Weak.SilSiteTaint
 import Weak.SilSite
+import Weak.SilOrd2
+import Weak.SilSiteStep
 import Weak.SilWalk2
 import Weak.SilWalk
 import Weak.SilKill
