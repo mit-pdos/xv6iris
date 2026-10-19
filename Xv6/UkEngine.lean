@@ -73,7 +73,23 @@ def ukRt (ret : Bool) (C : UCfg) (P : UPtd) (T : BMap) (sz : Nat) (m' : RegMap) 
   ret = true ∧ ∃ V' : Nat → List (BitVec 8), UkPost C P T m' pc' V' s ∧ umemLazy P sz V' = M'
 
 /-- The trap predicate of a leaf: only a trapping leaf traps, at cause `e`. -/
-def ukEx (ret : Bool) (e : ExceptionType) (exc : sync_exception) : Prop := ret = false ∧ exc.trap = e
+def ukEx (ret : Bool) (e : ExceptionType) (exc : ExceptionContext) : Prop := ret = false ∧ exc.trap = e
+
+/-- The scause an exception delivers reads only its cause (`trap`). -/
+theorem uk_utrapScause_trap (c c' : ExceptionContext) (h : c.trap = c'.trap) (sc : BitVec 64) :
+    utrapScause (.Exception c) sc = utrapScause (.Exception c') sc := by
+  rw [← utrapScause_exception c sc, ← utrapScause_exception c' sc, h]
+
+/-- **The scause of an execute trap at cause `e`** (sail-riscv 0.16: a trap
+cause carries an `ExceptionContext`, and its scause reads only the `trap`
+field, so any context at `e` gives this one; as `Ustep.ustoreFaultScause`). -/
+abbrev ukExcScause (e : ExceptionType) : BitVec 64 :=
+  utrapScause (.Exception (make_exception_context e 0#64 false none)) 0#64
+
+theorem ukExcScause_of (exc : ExceptionContext) (e : ExceptionType) (h : exc.trap = e) :
+    utrapScause (.Exception exc) 0#64 = ukExcScause e := by
+  subst h
+  exact uk_utrapScause_trap exc _ rfl 0#64
 
 section engine
 variable {GF : BundledGFunctors.{0}} [MachGS GF] [CtokG GF] [UexecSG GF]
@@ -147,11 +163,11 @@ theorem uk_engine (π : Nat → Option UPerm) (sz : Nat) (Qp : Int → IProp GF)
     (hKc : ret = true → Kc = ukc π M' sz K.fdv K.cw K.gn K.cs K.pid false seccAll m' pc')
     (hTrap : ret = false → myPay K.gn Qp ∗
       (Kc ∧ uslot (uvisOfRun m pc M π sz K.fdv K.cw K.gn K.cs K.pid false seccAll)) ⊢
-        |==> uexecRetF uslot (utrapScause (.Exception e) 0#64)
+        |==> uexecRetF uslot (ukExcScause e)
           (uvisOfRun m pc M π sz K.fdv K.cw K.gn K.cs K.pid false seccAll))
     (hU : Ustep.ustep (uvisOfRun m pc M π sz K.fdv K.cw K.gn K.cs K.pid false seccAll) =
       if ret then .run (uvisOfRun m' pc' M' π sz K.fdv K.cw K.gn K.cs K.pid false seccAll)
-      else .trap (utrapScause (.Exception e) 0#64)) :
+      else .trap (ukExcScause e)) :
     ⊢ ukLeafGoal (GF := GF) π sz Qp K M m pc Kc := by
   unfold ukLeafGoal
   iloeb as IH
@@ -176,16 +192,21 @@ theorem uk_engine (π : Nat → Option UPerm) (sz : Nat) (Qp : Int → IProp GF)
     fun s' h' => h'.2.choose_spec.1.1.act
   have hRtU : ∀ s', ukRt ret C pt T sz m' pc' M' s' → s'.file .cur_privilege = Privilege.User :=
     fun s' h' => h'.2.choose_spec.1.1.priv
+  have hRtW : ∀ s', ukRt ret C pt T sz m' pc' M' s' → s'.file .written_trigger_index = none :=
+    fun s' h' => h'.2.choose_spec.1.1.cfg.wti
   unfold ukontF
+  -- H's trap CSRs ride the cycle (a trapping arm writes them), `mepc` stays aside
+  unfold ufAside
+  icases Ha with ⟨Hmepc, Hht⟩
   iapply wpLoop_ucStep
-  iintro %tick
+  iintro %tick %ew
   inext
   icases HKc with ⟨#Hmy, HKc⟩
   iapply swp_mono
-  isplitr [Hfr HX]
+  isplitr [Hfr HX Hht]
   rotate_left
   · -- THE CYCLE
-    iapply swp_ucTryStep_U (ufRegF h C) (ubFrame curCtx D) ufFoot_uc ufFoot_ucDisp s0 hm0 hl0.act hl0.priv hmm
+    iapply swp_ucTryStep_U (ufRegF h C) (ubFrame curCtx D) ufFoot_uc ufFoot_ucDisp s0 hm0 hl0.act hl0.priv hmm ew
       (ukQ C pt T m pc V (ukRt ret C pt T sz m' pc' M') (ukEx ret e))
       (ukRider h (uxTextOwn curCtx Kt (ukTextAddrs pt.um) T))
     iframe Hfr
@@ -193,7 +214,8 @@ theorem uk_engine (π : Nat → Option UPerm) (sz : Nat) (Qp : Int → IProp GF)
     · iintro %meip %seip %i0 %p %hd Hfr
       obtain ⟨rfl, hi⟩ := dispatchU_cases _ _ _ hmie i0 p hd
       have hl1 := ukLand_preS hl0
-      have hpc1 : (ucPreS s0).file .PC = pc := by rw [ucPreS_file_other _ _ (by decide)]; exact hop.hpc
+      have hpc1 : (ucPreS s0).file .PC = pc := by
+        rw [ucPreS_file_other _ _ (by decide) (by decide)]; exact hop.hpc
       have hq0 := ukTrapLand_trapS hl1 (ukRegs_preS hop.regs) hop.view (sCause i0) 0#64 ((ucPreS s0).file .PC)
       have hq : ukQ C pt T m pc V (ukRt ret C pt T sz m' pc' M') (ukEx ret e)
           (Step.Step_Pending_Interrupt (i0, Privilege.Supervisor))
@@ -205,15 +227,17 @@ theorem uk_engine (π : Nat → Option UPerm) (sz : Nat) (Qp : Int → IProp GF)
         exact e1
       iapply uk_armOb_interrupt h C pt D (uxTextOwn curCtx Kt (ukTextAddrs pt.um) T) _ (ucPreS s0) hl1.cfg
         hl1.priv hl1.act i0 hq
-      iframe Hhw Hwi Hfr HX
+      iframe Hhw Hwi Hfr Hht HX
     · iintro Hfr
       iapply uk_fetchArm h C pt D T Kt m pc V (ucPreS s0) (ukOpened_preS hop) fr len i hF hdec
-        (ukRt ret C pt T sz m' pc' M') hRtAct hRtU (ukEx ret e) hX
-      iframe Hhw Hwi HK Hfr HX
+        (ukRt ret C pt T sz m' pc' M') hRtAct hRtW hRtU (ukEx ret e) hX
+      iframe Hhw Hwi HK Hfr Hht HX
   -- AFTER THE CYCLE AND THE TICK
   iintro %b Hpost
   unfold ucCyclePost ukRider
-  icases Hpost with ⟨%st, %s2, %⟨hq, -⟩, Hfr, HX, Hrc⟩
+  icases Hpost with ⟨%st, %s2, %⟨hq, -⟩, Hfr, HX, Hht, Hrc⟩
+  ihave Ha : ufAside (GF := GF) h $$ [Hmepc Hht]
+  · unfold ufAside; iframe
   obtain ⟨-, hcase⟩ := uk_land_of_q st s2 hq
   have hcfgL : UfCfg C pt (ucLand st s2).2.file := by
     rcases hcase with ⟨⟨-, V', hpost, -⟩, hL⟩ | ⟨sc, stv, htl, -, -⟩
@@ -282,7 +306,7 @@ theorem uk_engine (π : Nat → Option UPerm) (sz : Nat) (Qp : Int → IProp GF)
       · exact absurd (hsc'.symm.trans hsc) (uk_sCause_ne i0 hi).1
       · rw [hU, hr]
         simp only [Bool.false_eq_true, ↓reduceIte]
-        rw [← hex, ← hsc', hsc]
+        rw [← ukExcScause_of exc e hex, ← hsc', hsc]
     unfold ukbF
     rcases hwhy with ⟨i0, hi, rfl, rfl⟩ | ⟨exc, ⟨hr, hex⟩, rfl, rfl⟩
     · -- THE INTERRUPT: the transparent arm, the pay fact and the slot
@@ -309,8 +333,8 @@ theorem uk_engine (π : Nat → Option UPerm) (sz : Nat) (Qp : Int → IProp GF)
       · unfold ukLeafGoal; iexact IH
       iframe Hmy HKc
     · -- THE EXECUTE TRAP: the caller's return, out of the pay fact and the pair
-      rw [hex]
-      ihave Hret : iprop(|==> uexecRetF uslot (utrapScause (.Exception e) 0#64)
+      rw [ukExcScause_of exc e hex]
+      ihave Hret : iprop(|==> uexecRetF uslot (ukExcScause e)
           (uvisOfRun m pc M π sz K.fdv K.cw K.gn K.cs K.pid false seccAll)) $$ [HKc]
       · iapply hTrap hr
         iframe Hmy
@@ -324,9 +348,9 @@ theorem uk_engine (π : Nat → Option UPerm) (sz : Nat) (Qp : Int → IProp GF)
       imod Hret
       imodintro
       iapply Hk $$ %(uvisOfRun m pc M π sz K.fdv K.cw K.gn K.cs K.pid false seccAll)
-        %(utrapScause (.Exception e) 0#64) %(tval exc.excinfo)
+        %(ukExcScause e) %(tval (xtval_exception_value exc.trap exc.excinfo))
         %hpe.symm %hszr.symm %hfdr.symm %hcwr.symm %hgnr.symm %hchr.symm %hpidr.symm %hlzr.symm %hscr.symm
-        %(by rw [← hex]; exact hland)
+        %(by rw [← ukExcScause_of exc e hex]; exact hland)
       isplitl [Htm]
       · rw [hszR]; iexact Htm
       isplitl [Hrfd]
