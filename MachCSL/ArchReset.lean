@@ -106,6 +106,11 @@ register, and each line is an obligation on the board:
    the board.
  - sstateen0 = 0: `reset_stateen` zeroes mstateen0..3 and STOPS, so the
    S-mode word is a board obligation (its M-mode sibling is NOT here).
+ - written_trigger_index = none (sail-riscv 0.16): NOT an architectural
+   register but the model's own Sdtrig bookkeeping (no hardware counterpart;
+   Sail declares it `= None()`).  With Sdtrig disabled nothing writes it, and
+   the end of EVERY cycle asserts it is none (`update_triggers`), so over
+   garbage the first cycle could fail its assertion.  `reset` never touches it.
 
 NOT HERE, on purpose -- every one of these is DERIVED by `init_model` over
 arbitrary garbage (`MachCSL.bootProg_run`): PC, nextPC, cur_privilege,
@@ -120,9 +125,10 @@ def boardWired (hid : BitVec 64) : SailM Unit := do
   set_pc_reset_address resetVector
   writeReg mhartid hid
 
-/-- THE BOARD'S POWER-ON REGISTER VALUES (Rocq `board_regs`): the ten the
-privileged spec's `reset` does not establish over garbage.  `pma` is a
-parameter (the table, `MachCSL.bootPMA`, is supplied by the caller). -/
+/-- THE BOARD'S POWER-ON REGISTER VALUES (Rocq `board_regs`, plus the 0.16
+model's `written_trigger_index`): the eleven the privileged spec's `reset` does
+not establish over garbage.  `pma` is a parameter (the table,
+`MachCSL.bootPMA`, is supplied by the caller). -/
 def boardRegs (pma : List PMA_Region) : SailM Unit := do
   writeReg pma_regions pma
   writeReg mstatus 0xA00000000#64
@@ -137,6 +143,8 @@ def boardRegs (pma : List PMA_Region) : SailM Unit := do
   writeReg senvcfg 0#64
   -- sstateen0: `reset_stateen` zeroes the M-mode four and stops
   writeReg sstateen0 0#32
+  -- the model's Sdtrig bookkeeping, asserted none at every cycle end (see above)
+  writeReg written_trigger_index none
 
 /-- The board's writes (Rocq `board_init`). -/
 def boardInit (hid : BitVec 64) (pma : List PMA_Region) : SailM Unit := do

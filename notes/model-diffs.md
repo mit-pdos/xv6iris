@@ -30,7 +30,7 @@ Pinned by `SAIL_RISCV_REV` in `tools/regen_sail_model.sh`.
 | 2 | `3fdb4bca` | `external_interrupts_pending` reads the pin registers `sig_meip`/`sig_seip` whether or not the Simple Interrupt Generator is configured. | Platform integration | Since upstream #1899 the pins are ignored without the SIG, and the SIG's MMIO window collides with xv6's PLIC base, so it is off (configuration deviation 1).  Restores the pre-#1899 behaviour for a platform that drives the pins itself (decision D6). |
 | 3 | `69ed097e` | `MemoryTriggerPayload` carries its value zero-extended to 16 bytes plus its width, instead of an existentially width-indexed vector. | Representation | The Lean backend cannot represent an existentially typed union constructor (the generated model did not elaborate).  `compare_value` computes what it computed before; trigger matching is unchanged.  Sdtrig is disabled in this configuration anyway. |
 | 4 | `9da94b63` | The Zaamo after-trigger tests the result with a pattern (`Retire_Success()`) instead of `==`. | Representation | `ExecutionResult` has no equality in the theorem-prover backends.  Identical behaviour. |
-| 5 | `d2cb43fc` | `postlude` no longer requires `FD_instructions`; `transformed_instruction` drops its `LOAD_FP`/`STORE_FP` arms. | Module selection | 0.16's postlude requires the F/D instructions (for the H extension's transformed FP loads/stores in mtinst/htinst), which compiles the whole F/D family, and with it the softfloat externs, into the model whatever `model/sail-modules.txt` selects.  Before the bump the F/D instructions were not in the model.  With H disabled the dropped arms are unreachable.  **Under review (owner decision 4).** |
+| 5 | `d2cb43fc` | `postlude` no longer requires `FD_instructions`; `transformed_instruction` drops its `LOAD_FP`/`STORE_FP` arms. | Module selection | 0.16's postlude requires the F/D instructions (for the H extension's transformed FP loads/stores in mtinst/htinst), which compiles the whole F/D family, and with it the softfloat externs, into the model whatever `model/sail-modules.txt` selects.  Before the bump the F/D instructions were not in the model; the module subset (section 4), the hook policy (section 5: the softfloat externs stay unrealised) and the audit (no audited theorem may reach them) all assume so.  With H disabled the dropped arms are unreachable.  Accepted 2026-10-19. |
 | 6 | `f0ef9813` | `getPendingSet` ignores `hideleg` when H is not enabled, as it already ignores `mideleg` when S is not. | Bug fix | Without H no write reaches `hideleg` (its legaliser lets only the VS bits be set) and nothing resets it, so only an unspecified power-on value can set its S bits, which would route a delegated supervisor interrupt to VS, where a hart without H never takes it.  Approved 2026-10-19. |
 
 Commits 1-5 are pushed; 6 is pending (`local-plan/model-bump/HOST.md`).  The patch files are also
@@ -73,7 +73,11 @@ Each is conditional and reports itself in the regeneration log.
   the board's short list of obligations, then the model's own `init_model` (configuration assert
   and `reset`), then the firmware step.  The model's own register initialisers (`sail_model_init`)
   are deliberately NOT run; that file's header gives the reason (they would pin ISA-unspecified
-  registers to simulator values).
+  registers to simulator values).  A register joins the board list only if some consumed fact does
+  not follow from `init_model` over an arbitrary file.  The 0.16 bump added one:
+  `written_trigger_index = none` (the model's own Sdtrig bookkeeping, no hardware counterpart, Sail
+  initial value `None()`; with Sdtrig disabled nothing writes it, and every cycle's end asserts
+  it is none; decided 2026-10-19).
 - **Platform hooks** (`model/Lean_RV64D/LeanRV64D/Xv6Extras.lean`): realised exactly where the
   hook has no effect on modelled state; the reservation predicates are opaque parameters; the
   hooks whose results are consumed (`plat_term_read`, `get_16_random_bits`, the softfloat family)
@@ -83,9 +87,4 @@ Each is conditional and reports itself in the regeneration log.
 
 ## 6. Open decisions
 
-- **F/D instructions** (fork commit 5): keep the module-selection patch, or follow upstream's
-  module set.
-- **`written_trigger_index`**: 0.16 asserts it is `none` at the end of every cycle; Sail declares
-  it `= None()`, but MachCSL's power-on does not run Sail's initialisers (section 5), so the first
-  cycle's assertion can fail.  Either a board obligation (the power-on policy's own mechanism) or
-  running the initialiser.
+None (2026-10-19).
