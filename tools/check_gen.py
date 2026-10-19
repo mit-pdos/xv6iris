@@ -16,6 +16,8 @@ WHAT IS CHECKED (always; pure Python, no toolchain):
 
   model-facts    MachCSL/ModelFacts.lean      = tools/gen_model_facts.py (model/…/PlatformConfig.lean)
   platform       MachCSL/Platform.lean        = tools/gen_platform.py (model/…/LeanRV64D.lean)
+  uxr-csr-lits   MachCSL/UExecCsrDflt.lean's marked block (`uxrLits`, `uxrLitMask`)
+                                              = tools/gen_uxr_csr_lits.py (model/…/SysControl.lean)
   kernel-tree    Xv6/KernelTree.lean          = tools/gen_text_tree.py (Xv6/KernelImage.lean)
   user-text:<P>  Xv6/User/<P>{Tree,Text}.lean = tools/gen_user_text.py (Xv6/User/<P>Image.lean)
   fs-img         Xv6/FsImgRaw.lean            = tools/dump_fs_image.py (the image the file itself spells,
@@ -213,6 +215,14 @@ def check_platform(c):
     c.regen("platform", ["MachCSL/Platform.lean"])
 
 
+def check_uxr_csr_lits(c):
+    # gen_uxr_csr_lits.py rewrites the marked block of an existing file in place
+    c.copy_in("model/Lean_RV64D/LeanRV64D/SysControl.lean")
+    c.copy_in("MachCSL/UExecCsrDflt.lean")
+    c.run([c.tool("gen_uxr_csr_lits.py"), "--root", ".", "--write"])
+    c.regen("uxr-csr-lits", ["MachCSL/UExecCsrDflt.lean"])
+
+
 def check_kernel_tree(c):
     # gen_text_tree.py names the image in the header by the path it is given
     c.copy_in("Xv6/KernelImage.lean")
@@ -335,7 +345,7 @@ def check_kernel(c, explicit):
 
 def all_checks(explicit_kernel):
     checks = [("pins", check_pins), ("model-facts", check_model_facts), ("platform", check_platform),
-              ("kernel-tree", check_kernel_tree)]
+              ("uxr-csr-lits", check_uxr_csr_lits), ("kernel-tree", check_kernel_tree)]
     checks += [(f"user-text:{P}", lambda c, P=P: check_user_text(c, P)) for P in USER_PROGS]
     checks += [("fs-img", check_fs_img)]
     checks += [(f"user-elf:{P}", lambda c, P=P: check_user_elf(c, P)) for P in USER_PROGS]
