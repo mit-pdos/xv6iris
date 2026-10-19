@@ -15,6 +15,9 @@
 # V_core/V_types ARE compiled into the model, and are then disabled by
 # `sail-config-rv64d.json` (see its header).  Whether an extension is compiled
 # and whether `hartSupports` answers true for it are independent axes.
+# Conversely, F and D (and, per the configuration, Zfh and scalar crypto) are
+# advertised but NOT compiled: `misa`/`hartSupports` report them, yet their
+# opcodes decode as illegal (notes/model-diffs.md section 4).
 
 prelude core exceptions pmp sys postlude
 Sdtrig   # required by `sys` since 0.15; compiled in, disabled by the config (hartSupports Ext_Sdtrig = false)

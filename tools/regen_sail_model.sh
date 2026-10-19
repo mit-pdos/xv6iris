@@ -228,7 +228,8 @@ else echo "patch C: not needed (sail_assert)"; fi
 # (sail only substitutes THE_MODULE_NAME, which the master does not use).
 cmp -s "$XV6_EXTRAS" "$OUT_DIR/Lean_RV64D/LeanRV64D/Xv6Extras.lean" || {
   echo "error: installed Xv6Extras.lean differs from $XV6_EXTRAS" >&2; exit 1; }
-echo "Done.  Review 'git diff --stat model/', then: lake update Sail Lean_RV64D (once, after a pin change)"
+echo "Done.  Review 'git diff --stat model/', then: lake update Sail Lean_RV64D (once, after a pin change;"
+echo "a pin change is a dependency bump, which needs the owner's approval)"
 echo "and build EVERY generated module -- \`lake build LeanRV64D\` covers only the root's import closure,"
 echo "which omits Step, InstsEnd, DecodeExt, DeviceTree, ...:"
 echo "  lake build \$(cd model/Lean_RV64D && ls LeanRV64D/*.lean | sed -e 's/\\.lean\$//' -e 's|/|.|g')"

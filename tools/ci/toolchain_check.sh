@@ -10,8 +10,9 @@
 # Always (text only, runs anywhere):
 #   * lean-toolchain and model/Lean_RV64D/lean-toolchain name the same Lean
 #     (two lake packages compiled into one build: a mismatch makes .olean
-#     files incompatible; lean-sail is a git dependency built by lake with
-#     the root toolchain, so it has no pin of its own here);
+#     files incompatible; lean-sail is a git dependency whose own
+#     lean-toolchain lake ignores: it is compiled with the root toolchain on
+#     purpose, and an incompatibility fails the build);
 #   * model/Lean_RV64D/lakefile.toml requires lean-sail (`Sail`) by git at the
 #     SAME revision as lakefile.toml (tools/regen_sail_model.sh writes the
 #     former; two revisions would mean two incompatible `Sail` packages);

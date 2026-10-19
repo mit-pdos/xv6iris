@@ -27,7 +27,8 @@
 -- the root (and at `open`s).  So the definitions below, in
 -- `LeanRV64D.Functions`, are what the generated model calls; the fork's
 -- root-level axioms stay declared but unused, and drop out of every
--- `#print axioms`.  Nothing generated and nothing from the fork is patched.
+-- `#print axioms`.  The override needs no patch of the generated files or of
+-- the fork's `RiscvExtras.lean`.
 --
 -- WHAT IS DEFINED OUTRIGHT (as in Rocq).  The three `SailM`-valued hooks
 -- have NO observable effect on the state this model carries: the LR/SC
