@@ -816,6 +816,8 @@ import Weak.SbHeadHop
 import Weak.SbHeadHop2
 import Weak.SbHoldX
 import Weak.SbHoldZero
+import Weak.SbBlocked
+import Weak.SbLbFree
 import Weak.CapRetag
 import Weak.CapSync
 import Weak.SilWalk2
