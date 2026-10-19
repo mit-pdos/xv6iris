@@ -21,7 +21,7 @@ it once per hart.
   the hart's running token, at the ambient context `X` (Bare), run the boot
   path and bridge its post-state; the continuation receives exactly the
   per-hart half of either `main` arm's precondition: `kctx cpu (bootKCtx R
-  bootStackSlots)`, `cpuCtxFree cpu`, `mainHartRaw cpu (f .tlb)` and `pcIs
+  bootStackSlots)`, `cpuCtxFree cpu`, `mainHartRaw cpu (vectorInit none)` and `pcIs
   cpu mainAddr`.
 * §2 `bootHartSecondary` (Rocq `boot_hart_secondary`, `cpu ≠ 0`): §1 then
   `MainSecondary.wp_main_secondary` at the concrete deposit
@@ -71,6 +71,13 @@ namespace Xv6
 
 open Iris Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 open LeanRV64D
+
+/-- The reset TLB (`MachCSL.resetValRun`: the boot run's `reset_vmem` empties it) holds no
+entry, so none of another stage: what MAIN / MAIN_SECONDARY's `kvminithart` needs
+(sail-riscv 0.16's `sfence.vma` flushes the supervisor stage only). -/
+theorem tlbStageS_reset : tlbStageS (Sail.vectorInit none : Tlb) := by
+  intro j hj ent h
+  simp [Sail.vectorInit] at h
 
 /-! ## Stack budgets -/
 
@@ -123,7 +130,7 @@ cells at the reset `tlb`, and `pcIs cpu mainAddr`. -/
 theorem bootEntryBridge [X : CurCtx] (hX : X.curTier = KTier.bare) (f : RegFile) (cpu : CPU) :
     kernelText (GF := GF) ⊢ kernelData -∗ bootHartRes f cpu -∗ ctxTok cpu curCtx -∗
       (∀ R : RegMap, kctx cpu (bootKCtx R bootStackSlots) -∗ cpuCtxFree cpu -∗
-        mainHartRaw cpu (f .tlb) -∗ pcIs cpu mainAddr -∗ wpLoop cpu) -∗
+        mainHartRaw cpu (Sail.vectorInit none) -∗ pcIs cpu mainAddr -∗ wpLoop cpu) -∗
       wpLoop cpu := by
   have hsp : bootSp KA.«stack0» (hartId cpu) = spOf cpu := rfl
   have hb := Boot.wp_boot (GF := GF) cpu DFrac.discard (hartId cpu) KA.«stack0» (f .x1) (f .x2)
@@ -191,8 +198,8 @@ theorem bootHartSecondaryAt [X : CurCtx] (hX : X.curTier = KTier.bare)
   iapply bootEntryBridge hX f cpu $$ Ht Hd Hres Htok
   iintro %R Hk Hf Hraw Hpc
   have hm := MainSecondary.wp_main_secondary (GF := GF) X Γ γ0 γ1 γc γl0 γl1 γd γdl γt
-    cpu (bootKCtx R bootStackSlots) γi ξd (f .tlb) hX hcpu bootChain_mainSecondarySlots_le
-    rfl rfl rfl rfl
+    cpu (bootKCtx R bootStackSlots) γi ξd (Sail.vectorInit none) hX hcpu bootChain_mainSecondarySlots_le
+    rfl rfl rfl rfl tlbStageS_reset
   unfold wp_main_secondary_body at hm
   iapply hm
   iframe Hk Hpc Hf Hs Hraw
@@ -265,9 +272,9 @@ theorem bootHartPrimary [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG
   iintro #Ht #Hd Hres Htok #Hs Hprim Hsup
   iapply bootEntryBridge hX f cpu $$ Ht Hd Hres Htok
   iintro %R Hk Hf Hraw Hpc
-  have hm' := hm cpu (bootKCtx R bootStackSlots) cn l0 l1 c0 dk sb nib cov ndisk S Pb Rspent (f .tlb)
-    γi ξd (mainDeposit Γ γ0 γ1 γc γl0 γl1 γd γdl γt) hcpu hX bootChain_mainSlots_le rfl rfl rfl rfl
-    hl0 hl1 hdead hcn hcne hdl hsnap
+  have hm' := hm cpu (bootKCtx R bootStackSlots) cn l0 l1 c0 dk sb nib cov ndisk S Pb Rspent
+    (Sail.vectorInit none) γi ξd (mainDeposit Γ γ0 γ1 γc γl0 γl1 γd γdl γt) hcpu hX bootChain_mainSlots_le
+    rfl rfl rfl rfl hl0 hl1 hdead hcn hcne hdl hsnap tlbStageS_reset
   unfold wp_main_boot_body at hm'
   iapply hm'
   isplitl [Hk]
