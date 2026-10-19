@@ -47,7 +47,7 @@ theorem swp_checked_mem_write_store1_S_au (cpu : CPU) (dq : DFrac) (c : MConf) (
   unfold checked_mem_write
   checked_mem_S_au_prefix pa 1 hram hal
   iapply swp_bind
-  iapply (swp_sail_mem_write_plain_au cpu _ data rfl rfl r)
+  mem_iapply (swp_sail_mem_write_plain_au cpu) data (vecbytes_to_bitvec_to_bytes_le_1 _) rfl r
   iframe Hfrag
   iapply writeAU_wand cpu pa 1 data Ψ $$ HAU
   inext
