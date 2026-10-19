@@ -808,6 +808,7 @@ import Weak.SbAgree
 import Weak.SbReplay
 import Weak.LitmusSbStuck
 import Weak.SbOrd
+import Weak.SbOrdWalk
 import Weak.SilWalk2
 import Weak.SilWalk
 import Weak.SilKill
