@@ -17,10 +17,10 @@ clock tick; `notes/model-policy.md` section 5), after the 0.16 prologue
 * `mip &&& mie = 0`, `ew = true` (the forced exit, upstream's time limit on a
   wait): `HART_ACTIVE`, then in M-mode the instruction retires, and in S-mode
   it retires iff `mstatus.TW = 0` -- with `TW = 1` it raises an
-  illegal-instruction exception instead.  The S-mode rules therefore take
-  `TW = 0` as a hypothesis: nothing in the kernel's configuration pins it yet
-  (`smFacts` does not mention bit 21; the board's power-on `mstatus` has it
-  clear and neither `reset` nor xv6 writes it).
+  illegal-instruction exception instead.  The kernel's configuration pins
+  `TW = 0` (the last conjunct of `smFacts`: the board's power-on `mstatus` has
+  it clear, `reset_sys` leaves it, S-mode cannot write it); the general
+  parked-hart rule `wpLoop_wait_wfi` takes it as a hypothesis.
 
 So under `TW = 0` the forced exit retires exactly like the wake arm.  The rule
 is proved by Löb induction over the parked state (`wpLoop_wait_wfi`): the
@@ -199,8 +199,8 @@ theorem wpLoop_wait_wfi (cpu : CPU) (p : Privilege)
 /-! ## The `wfi` cycle -/
 
 set_option maxHeartbeats 4000000 in
-/-- One supervisor-mode cycle executing `wfi` at `SIE = 0` and `TW = 0`, and
-the parked steps that follow it: the hart parks in
+/-- One supervisor-mode cycle executing `wfi` at `SIE = 0` (and `TW = 0`, from
+`SConfAt`'s `smFacts`), and the parked steps that follow it: the hart parks in
 `HART_WAITING (WAIT_WFI, ii)` with the pc unmoved, stays parked while
 `mip &&& mie = 0` and the driver does not force the exit, and retires at
 `pc + 4` when a pending interrupt shows up or the exit is forced (with
@@ -209,7 +209,6 @@ the parked steps that follow it: the hart parks in
 trap).  `R` is the text resource. -/
 theorem wpLoop_s_wfi_cycle [CurCtx] (cpu : CPU) (c : MConf) (tier : KTier) (root : BitVec 44)
     (hok : SConfAt (GF := GF) tier c root false) (hmie : c.mie &&& ~~~c.mideleg = 0#64)
-    (htw : BitVec.extractLsb' 21 1 c.mstatus = 0#1)
     (pc : BitVec 64) (w : BitVec 32) (R : IProp GF)
     (hfetch : fetchSpecS cpu (DFrac.own 1) c pc (transTok cpu tier root) R (FetchResult.F_Base w))
     (hdec : decodes32P (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c w (instruction.WFI ())) :
@@ -220,6 +219,8 @@ theorem wpLoop_s_wfi_cycle [CurCtx] (cpu : CPU) (c : MConf) (tier : KTier) (root
     ⊢ wpLoop cpu := by
   have hp' : Privilege.Supervisor = Privilege.Machine ∨ Privilege.Supervisor = Privilege.Supervisor := Or.inr rfl
   have hsie : BitVec.extractLsb' 1 1 c.mstatus = 0#1 := hok.phys.2.1.1
+  -- `TW = 0`: the last conjunct of `smFacts`
+  have htw : BitVec.extractLsb' 21 1 c.mstatus = 0#1 := hok.phys.2.1.2.2.2.2.2.2.2.2.2.2.2.2.2.2.2
   iintro ⟨HmConf, Hclock, Hpc, HT, HR, HΦ⟩
   ihave ⟨%mi, %minstret, %mcycle, %mtime, %mip, Hminstret_increment, Hminstret, Hmcycle, Hmtime, Hmip, Haux⟩ :=
     clockCells_cases _ $$ Hclock
@@ -304,17 +305,10 @@ idle loop): the hart parks until an interrupt is pending or the driver forces
 the exit -- with `SIE = 0` no interrupt is ever taken, and with `TW = 0` the
 forced exit retires, so the only exit is the instruction retiring at
 `pc + 4`, with the context unchanged.  Safety only: nothing says the hart
-ever leaves the wait state.
-
-`htw` (since the nondeterministic `exit_wait`): the kernel configuration's
-`mstatus.TW` is clear.  `kctx` does not record this yet -- `smFacts` pins
-TSR, TVM, MPRV, ... but not TW (bit 21) -- so the hypothesis is stated over
-every `mstatus` the context admits, and is dischargeable once `smFacts` (or
-`kConf`) pins `TW = 0`, which holds of the real machine: the board's power-on
-`mstatus` has it clear, `reset` and xv6 never write it. -/
+ever leaves the wait state.  (`TW = 0`, which the forced exit needs since the
+nondeterministic `exit_wait`, comes from the context's `smFacts`.) -/
 theorem wp_s_wfi [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
-    (hsie : k.sie = false)
-    (htw : ∀ ms : BitVec 64, smFacts ms k.sie → BitVec.extractLsb' 21 1 ms = 0#1) (pc : BitVec 64) :
+    (hsie : k.sie = false) (pc : BitVec 64) :
     instr (GF := GF) pc false (instruction.WFI ()) ∗ kctx cpu k ∗ pcIs cpu pc ∗
     ▷ (kctx cpu k -∗ pcIs cpu (pc + 4#64) -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
@@ -331,8 +325,7 @@ theorem wp_s_wfi [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
   icases HI with ⟨%r, %hr, %hwf', #HB, %hdec⟩
   cases r with
   | F_Base w =>
-    iapply (wpLoop_s_wfi_cycle cpu (sConfOf k.tier k.root ms mdl mepc stc lf) k.tier k.root hok hmdl
-      (htw ms hsm) pc w
+    iapply (wpLoop_s_wfi_cycle cpu (sConfOf k.tier k.root ms mdl mepc stc lf) k.tier k.root hok hmdl pc w
       (instrBytes pc (FetchResult.F_Base w))
       (fetchSpecS_instrBytes_base cpu (DFrac.own 1) _ false k.tier k.root hok pc w)
       (hdec.2 cpu (DFrac.own 1) _ rfl))
