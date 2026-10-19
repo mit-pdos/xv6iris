@@ -13,7 +13,8 @@ give from lane U1-P1's TLB/walk facts -- such that
 * the landing keeps `I` and the PC, and `I` gives the fetch's pins;
 * a success is a `PBMT_PMA` page whose 2- and 4-byte windows at the
   fetch's alignment are owned RAM at the landing;
-* a fault is a fetch fault (`uftExc`).
+* a fault is a fetch fault (`uftExc` of the context's trap; sail-riscv 0.16 reports an
+  `ExceptionContext`).
 
 `uft_fetch_total`: every oracle's fetch-walk lands in `uftOut I s`: `I`
 kept, the PC kept, a fetched instruction with a 2-ALIGNED PC (what the exec
@@ -33,22 +34,22 @@ open LeanRV64D LeanRV64D.Functions
 
 /-- **The translation hypothesis of the fetch** (see the header). -/
 structure UftTr (D : UFoot) (I : UWSt → Prop) where
-  res : UWSt → BitVec 64 → Result (physaddr × page_based_mem_type × Unit) (ExceptionType × Unit)
+  res : UWSt → BitVec 64 → Result (physaddr × page_based_mem_type × Unit) (ExceptionContext × Unit)
   land : UWSt → BitVec 64 → UWSt
   walk : ∀ s va orc, I s →
-    runRW D orc s (translateAddr (.Virtaddr va) (.InstructionFetch ())) = some (res s va, land s va, orc)
+    runRW D orc s (translateAddr (.Virtaddr va) (.InstructionFetch ()) .User) = some (res s va, land s va, orc)
   inv : ∀ s va, I s → I (land s va)
   pc : ∀ s va, I s → (land s va).file .PC = s.file .PC
   pins : ∀ s, I s → UftPins D s
   page : ∀ s va pa pbmt n, I s → res s va = .Ok (.Physaddr pa, pbmt, ()) → (n = 2 ∨ n = 4) → va.toNat % n = 0 →
     pbmt = .PBMT_PMA ∧ inRam pa n ∧ pa.toNat % n = 0 ∧ bmOwned (land s va).mm pa n = true
-  exc : ∀ s va e, I s → res s va = .Err (e, ()) → uftExc e
+  exc : ∀ s va e, I s → res s va = .Err (e, ()) → uftExc e.trap
 
 /-- What the fetch says of its result, at a PC. -/
 def uftShape (pc : BitVec 64) : FetchResult → Prop
   | .F_Base _ => pc.getLsbD 0 = false
   | .F_RVC _ => pc.getLsbD 0 = false
-  | .F_Error (e, _) => uftExc e
+  | .F_Error e => uftExc e.trap
   | .F_Ext_Error _ => False
 
 /-- **Where a fetch lands**: `I` kept, the PC kept, the result's shape. -/
@@ -80,7 +81,7 @@ theorem uft_chunk (s : UWSt) (hI : I s) (fs gs : BitVec 64) (n : Nat) (hn : n = 
     cases u
     refine Or.inl ⟨e, rfl, uftRun_of_runRW D _ orc s _ ?_⟩
     rw [hr] at hw
-    exact uft_fetchBytes_err D orc s _ fs gs n e hw
+    exact uft_fetchBytes_err D orc s _ (T.pins s hI) fs gs n e hw
   | Ok p =>
     obtain ⟨pa', pbmt, u⟩ := p
     cases u
@@ -92,12 +93,12 @@ theorem uft_chunk (s : UWSt) (hI : I s) (fs gs : BitVec 64) (n : Nat) (hn : n = 
       rw [hr] at hw
       have hP1 := T.pins _ (T.inv s gs hI)
       have hmr : uftRun D orc (T.land s gs)
-          (mem_read (.InstructionFetch ()) .PBMT_PMA (.Physaddr pa) n false false false) =
+          (mem_read (.InstructionFetch ()) .PBMT_PMA .User (.Physaddr pa) n false false false) =
           some (.Ok ((orc 0).ch (.bitvector (8 * n))), T.land s gs, orc.tail) := by
         rcases hn with rfl | rfl
         · exact uft_memRead2 D orc _ hP1 pa hram hpal hown
         · exact uft_memRead4 D orc _ hP1 pa hram hpal hown
-      exact uft_fetchBytes_ok D orc orc.tail s _ fs gs pa n _ (uftRun_of_runRW D _ orc s _ hw) hmr
+      exact uft_fetchBytes_ok D orc orc.tail s _ (T.pins s hI) fs gs pa n _ (uftRun_of_runRW D _ orc s _ hw) hmr
 
 /-- **The whole fetch** (Rocq `UserActiveClass`'s case tree): every
 oracle's fetch-walk lands in `uftOut`. -/
