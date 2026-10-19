@@ -810,6 +810,7 @@ import Weak.LitmusSbStuck
 import Weak.SbOrd
 import Weak.SbOrdWalk
 import Weak.LitmusSbStuck2
+import Weak.SbKill
 import Weak.CapRetag
 import Weak.SilWalk2
 import Weak.SilWalk
