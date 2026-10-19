@@ -11,7 +11,7 @@ originals are in git history: `git show 5c27ea7e4:notes/briefs/<file>` / `git sh
 
 - **Zkr / eager `&&`**: regenerate the Sail model with the short-circuit-patched Lean backend
   (https://github.com/zeldovich/sail/tree/lean-short-circuit, cherry-picked onto sail 5745ea9e;
-  since the 0.16 bump onto master `e4982101` in `dongjaelee1/sail`, `notes/model-diffs.md` §2)
+  since the 0.16 bump onto `sail2` `e4982101` in `dongjaelee1/sail`, `notes/model-diffs.md` §2)
   rather than adding a Zkr clause; `hZkr` is gone.  The patch is proposed upstream; once a Sail release
   contains it, regenerate with that release and drop the cherry-pick.
 - **Rocq drift** (Sept 29): the Lean proofs were brought in step with Rocq's latest proofs (drift waves
@@ -76,12 +76,13 @@ where noted.
 ## The sail-riscv 0.16 bump (Oct 2026)
 
 The machine model was regenerated from sail-riscv 0.16 (e5acebb0) with lean-sail v7 and the Sail
-compiler's master, before the liveness work.  The owner's rulings of 2026-10-18 and 2026-10-19
+compiler's `sail2` branch, before the liveness work.  The standard every deviation is judged by is
+`notes/model-policy.md` (2026-10-19); the rulings below are instances of it.  The owner's rulings of 2026-10-18 and 2026-10-19
 (the bump plan's decisions "bump D1"-"bump D11", not this file's D1-D54):
 
 - **Sources.** The model fork is `dongjaelee1/sail-riscv` branch `xv6`: upstream 0.16 plus the
   atomic PTE A/D update and only the fixes the Lean backend or this verification needs.  The Sail
-  compiler is `dongjaelee1/sail` branch `xv6` (master plus the fixes).  lean-sail v7 is pinned by
+  compiler is `dongjaelee1/sail` branch `xv6` (`sail2` `e4982101` plus the fixes).  lean-sail v7 is pinned by
   git.  `tools/regen_sail_model.sh` pins all three.
 - **The interface is used natively.** MachCSL is re-expressed over lean-sail's
   `InstructionEffect` free monad; no compatibility layer imitates the V1 `Outcome` monad.
@@ -89,8 +90,9 @@ compiler's master, before the liveness work.  The owner's rulings of 2026-10-18 
   system-register id; memory answers carry no tags; the memory never fails a conditional write; the
   store announcement (`memWriteAnnounce`) is silent; choices are finite (`Fin n`).
 - **Configuration.** H is kept and Sdtrig compiled in, both disabled by the configuration.  The
-  external-interrupt pin registers are read unconditionally, which the fork's hook does without
-  the SIG.  The deviations from the 0.16 default configuration are the seven items of
+  external-interrupt pin registers are read unconditionally: not a configuration value but fork
+  commit 2, a platform-integration patch that restores the reading upstream's #1899 made
+  conditional on its Simple Interrupt Generator (MachCSL's PLIC drives the pins).  The deviations from the 0.16 default configuration are the seven items of
   `model/sail-config-rv64d.json`'s header, each marked "xv6iris" inline: the SIG, B/V and the V
   family, H and its family and Sdtrig, the 128 MiB RAM, and three forced or kept ones -- `medeleg`'s
   delegatable set keeps the previous value, `mstateen0.CONTEXT` is read-only zero, and a misaligned

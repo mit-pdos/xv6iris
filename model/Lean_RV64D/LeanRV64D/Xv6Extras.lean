@@ -11,8 +11,9 @@
 -- regen script checks the two are identical.
 --
 -- WHAT IT IS FOR.  The platform hooks below are Sail `val`s with no Sail
--- body.  Their `lean`-backend spelling is their Sail name (the fork gives
--- them no `lean:` extern binding), and the fork's `RiscvExtras.lean`
+-- body.  Their `lean`-backend spelling is their Sail name (upstream gives
+-- them no `lean:` extern binding), and upstream's
+-- `handwritten_support/RiscvExtras.lean` (which the fork leaves untouched)
 -- declares each one as a bare root-level `axiom` so the model compiles for
 -- a consumer that supplies nothing else.  An opaque `SailM` term cannot be
 -- stepped by the free-monad language, so under those axioms an `lr`/`sc`

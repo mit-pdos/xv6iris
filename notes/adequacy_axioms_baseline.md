@@ -181,7 +181,7 @@ theorems unchanged in kind (propext, Classical.choice, Quot.sound + bv_decide ce
 
 The model is regenerated with the short-circuit Sail Lean backend (sail 5745ea9e + the
 `lean-short-circuit` fix from github.com/zeldovich/sail, commit d0ef9371 = 3c03fced; see
-tools/regen_sail_model.sh). The
+tools/regen_sail_model.sh; that compiler is superseded by the 0.16 bump's, `notes/model-diffs.md` §2). The
 hypothesis is discharged, not assumed: the CSR rows for every csr number (0x747/0x757 included) are plain
 walks of the model's `check_CSR_result`.
 

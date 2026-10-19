@@ -4,10 +4,11 @@ This project proves, in [Lean 4](https://lean-lang.org/) with the separation log
 [Transfinite Iris-Lean](https://github.com/dongjaelee1/iris-lean/tree/transfinite) (a fork of
 [iris-lean](https://github.com/leanprover-community/iris-lean) step-indexed by ordinals), that the
 [xv6-riscv](https://github.com/mit-pdos/xv6-riscv) kernel and its user programs are correct —
-reasoning about the *actual binaries*, instruction by instruction, against the official
-[Sail RISC-V](https://github.com/riscv/sail-riscv) ISA semantics compiled to Lean by Sail's own Lean
-backend (from the [dongjaelee1/sail-riscv](https://github.com/dongjaelee1/sail-riscv) fork of
-upstream 0.16; see "Regenerating the Sail model").  The kernel and user ELFs are dumped into Lean data, an Iris language
+reasoning about the *actual binaries*, instruction by instruction, against the
+[Sail RISC-V](https://github.com/riscv/sail-riscv) ISA semantics -- RISC-V International's formal
+model, release 0.16, with the deviations recorded in [`notes/model-diffs.md`](notes/model-diffs.md)
+(what may deviate, and how, is [`notes/model-policy.md`](notes/model-policy.md)) -- compiled to Lean
+by Sail's own Lean backend (see "Regenerating the Sail model").  The kernel and user ELFs are dumped into Lean data, an Iris language
 is built over the Sail model's event monad (together with device models for the UARTs, the PLIC and the
 virtio disk, and a power thread that cuts power and reboots), and machine code is specified with
 separation-logic points-to assertions for registers, memory and devices.
@@ -118,8 +119,8 @@ tools/regen_sail_model.sh [SAIL_RISCV_DIR]    # then: git diff --exit-code model
 ```
 
 It needs a `sail` with the Lean backend built from the fork
-[`dongjaelee1/sail`](https://github.com/dongjaelee1/sail), branch `xv6`: rems-project/sail `master`
-(`e4982101`) **plus four Lean-backend fixes** (`notes/model-diffs.md` §2) — two still-unmerged ones
+[`dongjaelee1/sail`](https://github.com/dongjaelee1/sail), branch `xv6`: rems-project/sail `sail2`
+(its development branch, `e4982101`) **plus four Lean-backend fixes** (`notes/model-diffs.md` §2) — two still-unmerged ones
 from [`zeldovich/sail`](https://github.com/zeldovich/sail), `lean-short-circuit` (`&&`/`||` must
 short-circuit when an operand has effects; the unpatched backend always evaluates both operands,
 which changes the model's semantics — upstream PR #1750) and `lean-backend-nexp-parens` (type-level

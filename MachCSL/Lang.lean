@@ -89,8 +89,9 @@ sail-riscv 0.16 bump"):
 
 The driver (`riscvStep`) is unchanged: `try_step 0 false` plus a
 nondeterministic tick.  With `exit_wait = false` a hart in WFI waits for an
-interrupt and never takes the model's forced WFI exit (upstream's own loop
-passes `true`); `notes/model-diffs.md` §5 records this.
+interrupt and never takes the model's forced WFI exit (upstream's own drivers
+run two schedules: the Sail `loop` passes `true` at every step, the C++ harness
+a bounded wait and then `true`); `notes/model-diffs.md` §5 records this.
 
 Model-side changes this semantics merely runs (a selection; the per-cycle hooks
 are in `MachCSL.WpStepHooks`): WFI retires on a pending enabled platform

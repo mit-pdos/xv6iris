@@ -40,8 +40,8 @@
 # ignored when H is not enabled, as `mideleg` is without S (a bug fix).
 #
 # Requires on PATH: `sail` with `sail_lean_backend` built from the fork
-# dongjaelee1/sail, branch `xv6` (merge b49c997e), = rems-project/sail master
-# $SAIL_REV with four Lean-backend fixes on top: the escaping of the Lean
+# dongjaelee1/sail, branch `xv6` (merge b49c997e), = rems-project/sail `sail2`
+# (its development branch) $SAIL_REV with four Lean-backend fixes on top: the escaping of the Lean
 # command keywords `prefix`, `infix`, `notation`, ... in identifiers (ours;
 # sail-riscv's DeviceTree has a parameter named `prefix`), `termination_by`
 # only on a definition that calls itself (ours; Lean warns about the measure
@@ -74,10 +74,11 @@ SAIL_RISCV_URL="${SAIL_RISCV_URL:-https://github.com/dongjaelee1/sail-riscv}"
 SAIL_RISCV_REV="${SAIL_RISCV_REV:-f0ef9813bf93f91907a08c0f475fd2434cb42dcb}"
 SAIL_RISCV_DIR="${1:-${SAIL_RISCV_DIR:-$REPO_ROOT/sail-riscv}}"
 case "$SAIL_RISCV_DIR" in /*) ;; *) SAIL_RISCV_DIR="$PWD/$SAIL_RISCV_DIR" ;; esac
-# the Sail compiler this model was generated with (informational; checked by name only):
-# upstream master $SAIL_REV; the built branch is dongjaelee1/sail `xv6` = that + the four fixes
-# (merge b49c997e91215c561f928d01f5bdadc0b8f406af)
+# the Sail compiler this model was generated with: upstream `sail2` $SAIL_REV; the built branch is
+# dongjaelee1/sail `xv6` = that + the four fixes, merge $SAIL_XV6_REV, which `sail --version` names
+# ("Sail 0.20.3 (xv6 @ <merge>)") and this script requires (notes/model-policy.md, section 6)
 SAIL_REV="e49821011450d2c26dad90e8806fc82d9698b627"
+SAIL_XV6_REV="b49c997e91215c561f928d01f5bdadc0b8f406af"
 # lean-sail: the revision the generated lakefile requires (= the root lakefile.toml's)
 LEAN_SAIL_GIT="https://github.com/rems-project/lean-sail"
 LEAN_SAIL_REV="${LEAN_SAIL_REV:-01bb54c7c8a69e52ba11863c67e7c403a6cd198a}"   # tag v7
@@ -110,7 +111,9 @@ fi
 
 have="$(git -C "$SAIL_RISCV_DIR" rev-parse HEAD 2>/dev/null || true)"
 if [ "$have" != "$SAIL_RISCV_REV" ]; then
-  echo "WARNING: $SAIL_RISCV_DIR is at $have, not the pinned $SAIL_RISCV_REV" >&2
+  echo "error: $SAIL_RISCV_DIR is at $have, not the pinned $SAIL_RISCV_REV" >&2
+  echo "       (REGEN_ALLOW_UNPINNED=1 makes this a warning, for an experiment whose output is never committed)" >&2
+  [ "${REGEN_ALLOW_UNPINNED:-}" = 1 ] || exit 1
 fi
 if ! grep -q '^\$define CONCURRENCY_INTERFACE_V2' "$SAIL_RISCV_DIR/model/core/phys_mem_interface.sail"; then
   echo "error: $SAIL_RISCV_DIR does not use concurrency interface v2; this script is for sail-riscv >= 0.15" >&2
@@ -124,9 +127,10 @@ else
   SAIL_REQUIRED_VER="0.20.3"
 fi
 SAIL_HAVE_VER="$(sail --version | sed -E 's/^Sail ([0-9.]+).*/\1/')"
-if ! sail --version | grep -q '(xv6 @\|lean-xv6-v2'; then
-  echo "WARNING: '$(sail --version)' does not look like the patched sail (short-circuit + type-level parens);" >&2
-  echo "         see this script's header." >&2
+if ! sail --version | grep -q "(xv6 @ $SAIL_XV6_REV)"; then
+  echo "error: '$(sail --version)' is not the pinned compiler (xv6 @ $SAIL_XV6_REV); see this script's header" >&2
+  echo "       (REGEN_ALLOW_UNPINNED=1 makes this a warning, for an experiment whose output is never committed)" >&2
+  [ "${REGEN_ALLOW_UNPINNED:-}" = 1 ] || exit 1
 fi
 if [ "$SAIL_REQUIRED_VER" != "$SAIL_HAVE_VER" ]; then
   echo "note: model asks for sail $SAIL_REQUIRED_VER, this is sail $SAIL_HAVE_VER;"
@@ -218,7 +222,7 @@ if [ "$n" -gt 0 ]; then
   echo "patch B: xlen ites folded in $n file(s); $left other xlen ite(s) left (add their shapes here if a proof trips on one)"
 else echo "patch B: not needed"; fi
 #  C. Lean 4.34 made `assert` a do-element of the intrinsic-verification
-#     syntax; Sail master emits `sail_assert`, so nothing should match.
+#     syntax; Sail `sail2` emits `sail_assert`, so nothing should match.
 n=$( (grep -lE '^\s*assert |(then|else|=>) assert ' "$OUT_DIR"/Lean_RV64D/LeanRV64D/*.lean 2>/dev/null || true) | wc -l)
 if [ "$n" -gt 0 ]; then
   echo "WARNING: $n generated file(s) still use bare 'assert' (expected 'sail_assert' from Sail >= 7e0e53d1); re-add the parenthesising patch" >&2

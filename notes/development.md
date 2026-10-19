@@ -51,5 +51,5 @@ Hard-won rules for working on this tree.  Design notes are in `notes/design/` an
   `.claude/coord/land.sh` (outside the repo).  `/shared/xv6iris-lean` is a stale wrong-design attempt:
   ignore it.
 - Sail with the Lean backend: opam switch `lean-xv6`; the model needs the Sail fork
-  `dongjaelee1/sail` `xv6` (master + four Lean-backend fixes) and `z3` (README, "Regenerating the
+  `dongjaelee1/sail` `xv6` (`sail2` + four Lean-backend fixes) and `z3` (README, "Regenerating the
   Sail model"; `notes/model-diffs.md` §2).
