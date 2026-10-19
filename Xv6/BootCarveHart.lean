@@ -463,9 +463,10 @@ theorem bootHartBss_open [CurCtx] (c : CPU) :
 
 /-- The CSRs the bundle takes out of the reset file's remainder beyond
 `bootEntryPre` and the 23 GPRs: the Bare slot, `hartCsrs`, and
-`mainHartRaw`'s rows. -/
+`mainHartRaw`'s rows (since sail-riscv 0.16 the trap CSRs include H's
+`hstatus`/`htval`/`htinst`, `MachCSL.hTrapCsrs`, which every trap writes). -/
 def bootHartCsrRegs : List Register :=
-  [.stvec, .sscratch, .tlb, .sepc, .scause, .stval]
+  [.stvec, .sscratch, .tlb, .sepc, .scause, .stval, .hstatus, .htval, .htinst]
 
 /-- **WHAT ONE HART'S BOOT CHAIN RUNS ON** (Rocq `boot_hart_res`), beside its
 running token: `bootEntryPre`'s output (without the wire pins), the other
@@ -475,7 +476,7 @@ running token: `bootEntryPre`'s output (without the wire pins), the other
 row and the hart's `.bss` share.  Context-free (deviations 1 and 5). -/
 def bootHartRes (f : RegFile) (c : CPU) : IProp GF := iprop%
   mBoot c (DFrac.own 1) ∗
-  Register.mhartid ↦ᵣ[c] hartId c ∗ clockCells c ∗ pcIs c KA.«_entry» ∗
+  Register.mhartid ↦ᵣ[c]□ hartId c ∗ clockCells c ∗ pcIs c KA.«_entry» ∗
   Register.x1 ↦ᵣ[c] f .x1 ∗ Register.x2 ↦ᵣ[c] f .x2 ∗ Register.x4 ↦ᵣ[c] f .x4 ∗
   Register.x8 ↦ᵣ[c] f .x8 ∗ Register.x10 ↦ᵣ[c] f .x10 ∗ Register.x11 ↦ᵣ[c] f .x11 ∗
   Register.x14 ↦ᵣ[c] f .x14 ∗ Register.x15 ↦ᵣ[c] f .x15 ∗
@@ -504,9 +505,11 @@ theorem bootHartRes_intro (f : RegFile) (c : CPU) (hres : resetRegsRun c f) :
     (by decide) (by decide) $$ H with ⟨Hc, -⟩
   unfold bootHartCsrRegs
   simp only [Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil]
-  icases Hc with ⟨Hstv, Hss, Htlb, Hep, Hca, Htv, -⟩
+  icases Hc with ⟨Hstv, Hss, Htlb, Hep, Hca, Htv, Hhs, Hhv, Hhi, -⟩
+  ihave Hh3 := hTrapCsrs_intro c (f .hstatus) (f .htval) (f .htinst) $$ [Hhs Hhv Hhi]
+  · iframe Hhs Hhv Hhi
   unfold bootHartRes hartCsrs mainHartRaw trapCsrs
-  iframe Hm Hh Hck Hpc H1 H2 H4 H8 H10 H11 H14 H15 Hgpr Hl Hg Hb Htlb
+  iframe Hm Hh Hck Hpc H1 H2 H4 H8 H10 H11 H14 H15 Hgpr Hl Hg Hb Htlb Hh3
   isplitl [Hstv]
   · iexists f .stvec; iexact Hstv
   isplitl [Hss]
