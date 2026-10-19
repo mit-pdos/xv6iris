@@ -32,5 +32,15 @@ theorem bvEnum_atomicSupport (a b : LeanRV64D.AtomicSupport) (h : a = b) : b = a
 theorem bvEnum_register (a b : LeanRV64D.Register) (h : a = b) : b = a := by bv_decide
 -- since 0.16 the TLB carries the translation stage (WpStepHooks, UTranslate bit-blast over it)
 theorem bvEnum_translationStage (a b : LeanRV64D.TranslationStage) (h : a = b) : b = a := by bv_decide
+-- the enums inside register types (`written_event_index : Option (Nat × event_csr)`, the
+-- Sdtrig `tdata` selectors), met whenever a goal's context holds a register value
+theorem bvEnum_eventCsr (a b : LeanRV64D.event_csr) (h : a = b) : b = a := by bv_decide
+theorem bvEnum_tdata (a b : LeanRV64D.tdata) (h : a = b) : b = a := by bv_decide
+-- a register value in the context (`RegisterType r`, e.g. the cell equations of
+-- `regPointsTo_of_eq`) also makes `bv_decide` mint the matcher lemma of `Register`'s
+-- `Hashable` instance (`instHashableRegister.hash.match_1.eq_cond_enumToBitVec`, first met in
+-- `MachCSL.WpStepHooks`)
+theorem bvEnum_registerType (_x : LeanRV64D.RegisterType LeanRV64D.Register.mip) (a b : BitVec 1)
+    (h : a = b) : b = a := by bv_decide
 
 end MachCSL
