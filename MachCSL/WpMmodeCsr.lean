@@ -8,6 +8,16 @@ the `swp_write_CSR_*` stage lemma of `MachCSL/WpCsr.lean` (keeping
 `write_CSR` opaque meanwhile, so the legaliser is not re-executed), and
 returns the configuration with the one field updated; reads run through
 directly.  `wp_m_csrw_*` / `wp_m_csrr_*` are the `wpLoop` rules over `instr`.
+
+sail-riscv 0.16: the `satp`, `sie` and `stimecmp` writes ask `cur_privilege`
+whether the hart is virtualised (`inVirtualPrivilege`; in machine mode it is
+not, `privLevel_is_virtual Machine = false`); `medeleg` and `sie` are legalised
+monadically (`medelegWrite`, `sieWrite` of `MachCSL.WpCsr` are the values);
+`read_mstatus` clears `SDT` (`Ssdbltrp` absent), so `csrr rd, mstatus` reads
+`_update_Mstatus_SDT c.mstatus 0#1`; and the counter check of `rdtime`
+(`counter_enabled`) also reads H's `hcounteren`, which the configuration
+bundles do not hold, so `rdtime`'s rules take a persistent `hcounteren` cell
+at some value.  No F-related CSR (`fflags`/`frm`/`fcsr`) is touched here.
 -/
 import MachCSL.WpCsr
 import MachCSL.AluFacts
@@ -122,10 +132,10 @@ theorem execSpec_csrw_satp0 (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (rs1
   swp_run 300
   subst hW
   iapply swp_bind
-  iapply swp_write_CSR_satp0 (hSXL := hSXL)
+  iapply swp_write_CSR_satp0 (p := Privilege.Machine) (hp := rfl) (hSXL := hSXL)
   iframe; iframe Hhw
   inext
-  iintro %x Hmstatus Hsatp %hx
+  iintro %x Hcur_privilege Hmstatus Hsatp %hx
   subst hx
   swp_run 60
   try (unfold wX_bits wX; swp_run 40)
@@ -138,10 +148,10 @@ theorem execSpec_csrw_satp0 (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (rs1
   iapply HΦ $$ HmConf HPC HnextPC Hrs1
 
 set_option maxHeartbeats 4000000 in
-/-- `csrw medeleg, rs1`. -/
+/-- `csrw medeleg, rs1` (`medelegWrite v`: 0.16's `legalize_medeleg`, monadic). -/
 theorem execSpec_csrw_medeleg (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (rs1 : BitVec 5)
     (hrs1 : rs1 ≠ 0#5) (v : BitVec 64) :
-    execSpec (GF := GF) cpu (DFrac.own 1) c { c with medeleg := legalize_medeleg c.medeleg v }
+    execSpec (GF := GF) cpu (DFrac.own 1) c { c with medeleg := medelegWrite v }
       (instruction.CSRReg (0x302#12, regidx.Regidx rs1, regidx.Regidx 0#5, csrop.CSRRW)) pc npc₀ npc₀
       (gpr cpu rs1 (DFrac.own 1) v)
       (gpr cpu rs1 (DFrac.own 1) v) := by
@@ -166,7 +176,7 @@ theorem execSpec_csrw_medeleg (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (r
   iintro Hmedeleg
   swp_run 60
   try (unfold wX_bits wX; swp_run 40)
-  ihave HmConf := confCells_intro cpu (DFrac.own 1) Privilege.Machine { c with medeleg := legalize_medeleg c.medeleg v }
+  ihave HmConf := confCells_intro cpu (DFrac.own 1) Privilege.Machine { c with medeleg := medelegWrite v }
     $$ [Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n]
   case' _ =>
     simp only []
@@ -212,10 +222,11 @@ theorem execSpec_csrw_mideleg (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (r
   iapply HΦ $$ HmConf HPC HnextPC Hrs1
 
 set_option maxHeartbeats 4000000 in
-/-- `csrw sie, rs1`: writes `mie` through the delegation mask. -/
+/-- `csrw sie, rs1`: writes `mie` through the delegation mask (`sieWrite`: 0.16's
+`legalize_sie`, monadic). -/
 theorem execSpec_csrw_sie (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (rs1 : BitVec 5)
     (hrs1 : rs1 ≠ 0#5) (v : BitVec 64) :
-    execSpec (GF := GF) cpu (DFrac.own 1) c { c with mie := legalize_sie c.mie c.mideleg v }
+    execSpec (GF := GF) cpu (DFrac.own 1) c { c with mie := sieWrite c.mie c.mideleg v }
       (instruction.CSRReg (0x104#12, regidx.Regidx rs1, regidx.Regidx 0#5, csrop.CSRRW)) pc npc₀ npc₀
       (gpr cpu rs1 (DFrac.own 1) v)
       (gpr cpu rs1 (DFrac.own 1) v) := by
@@ -234,13 +245,13 @@ theorem execSpec_csrw_sie (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (rs1 :
   swp_run 300
   subst hW
   iapply swp_bind
-  iapply swp_write_CSR_sie
+  iapply swp_write_CSR_sie (p := Privilege.Machine) (hp := rfl)
   iframe; iframe Hhw
   inext
-  iintro Hmie Hmideleg
+  iintro Hcur_privilege Hmie Hmideleg
   swp_run 60
   try (unfold wX_bits wX; swp_run 40)
-  ihave HmConf := confCells_intro cpu (DFrac.own 1) Privilege.Machine { c with mie := legalize_sie c.mie c.mideleg v }
+  ihave HmConf := confCells_intro cpu (DFrac.own 1) Privilege.Machine { c with mie := sieWrite c.mie c.mideleg v }
     $$ [Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n]
   case' _ =>
     simp only []
@@ -348,10 +359,10 @@ theorem execSpec_csrw_stimecmp (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (
   swp_run 300
   subst hW
   iapply swp_bind
-  iapply swp_write_CSR_stimecmp (hstce := hstce)
+  iapply swp_write_CSR_stimecmp (p := Privilege.Machine) (hp := rfl) (hstce := hstce)
   iframe; iframe Hhw
   inext
-  iintro %mip' Hstimecmp Hmtime Hmtimecmp Hmip Hmenvcfg
+  iintro %mip' Hcur_privilege Hstimecmp Hmtime Hmtimecmp Hmip Hmenvcfg
   swp_run 60
   try (unfold wX_bits wX; swp_run 40)
   ihave HmConf := confCells_intro cpu (DFrac.own 1) Privilege.Machine { c with stimecmp := v }
@@ -451,6 +462,27 @@ theorem execSpec_csrw_pmpcfg0 (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (r
 
 /-! ### `csrr`: execute stages -/
 
+/-- What `csrr rd, mstatus` reads when `mstatus.SDT` (bit 24) is clear already: the
+register itself (sail-riscv 0.16's `read_mstatus` clears `SDT`, `Ssdbltrp` being absent). -/
+theorem update_Mstatus_SDT_of_clear {m : BitVec 64} (h : BitVec.extractLsb' 24 1 m = 0#1) :
+    _update_Mstatus_SDT m 0#1 = m := by
+  have h24 : m[24] = false := by
+    have := congrArg (fun x : BitVec 1 => x[0]) h
+    simpa using this
+  simp only [_update_Mstatus_SDT, Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange']
+  dsimp only [Int.reduceSub, Int.reduceAdd, Int.reduceNeg, Int.reduceToNat, Nat.reduceSub, Nat.reduceAdd]
+  ext i hi
+  by_cases hi24 : i = 24
+  · subst hi24
+    simp [h24]
+  · simp only [BitVec.getElem_or, BitVec.getElem_and, BitVec.getElem_not, BitVec.getElem_shiftLeft]
+    simp
+    intro _
+    omega
+
+/-- The `mstatus` value `start` reads (the boot configuration's, `SDT` clear). -/
+theorem update_Mstatus_SDT_xv6 : _update_Mstatus_SDT 0xA00000000#64 0#1 = 0xA00000000#64 := by decide
+
 set_option hygiene false in
 /-- The read path: the access checks, the read, the `rd` write. -/
 macro "csrr_exec" hrd:term : tactic =>
@@ -464,12 +496,13 @@ macro "csrr_exec" hrd:term : tactic =>
              swp_run 10))
 
 set_option maxHeartbeats 4000000 in
-/-- `csrr rd, mstatus`. -/
+/-- `csrr rd, mstatus`: the register with `SDT` cleared (0.16's `read_mstatus`;
+`update_Mstatus_SDT_of_clear` when it is clear already). -/
 theorem execSpec_csrr_mstatus (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64) (rd : BitVec 5)
     (hrd : rd ≠ 0#5) (v : BitVec 64) :
     execSpec (GF := GF) cpu dq c c
       (instruction.CSRReg (0x300#12, regidx.Regidx 0#5, regidx.Regidx rd, csrop.CSRRS)) pc npc₀ npc₀
-      (gpr cpu rd (DFrac.own 1) v) (gpr cpu rd (DFrac.own 1) c.mstatus) := by
+      (gpr cpu rd (DFrac.own 1) v) (gpr cpu rd (DFrac.own 1) (_update_Mstatus_SDT c.mstatus 0#1)) := by
   intro Φ
   iintro ⟨HmConf, HPC, HnextPC, Hrd, HΦ⟩
   mconf_cases HmConf
@@ -520,15 +553,17 @@ theorem execSpec_csrr_mcounteren (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀
   iapply HΦ $$ HmConf HPC HnextPC Hrd
 
 set_option maxHeartbeats 4000000 in
-/-- `rdtime rd` (`csrr rd, time`): reads `mtime`. -/
+/-- `rdtime rd` (`csrr rd, time`): reads `mtime`.  The counter check reads H's
+`hcounteren` (0.16's `counter_enabled`; the value matters only at a virtual
+privilege), held persistently at an arbitrary value. -/
 theorem execSpec_csrr_time (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64) (rd : BitVec 5)
-    (hrd : rd ≠ 0#5) (v t : BitVec 64) :
+    (hrd : rd ≠ 0#5) (v t : BitVec 64) (hc : BitVec 32) :
     execSpec (GF := GF) cpu dq c c
       (instruction.CSRReg (0xC01#12, regidx.Regidx 0#5, regidx.Regidx rd, csrop.CSRRS)) pc npc₀ npc₀
-      iprop(gpr cpu rd (DFrac.own 1) v ∗ Register.mtime ↦ᵣ[cpu] t)
+      iprop(gpr cpu rd (DFrac.own 1) v ∗ Register.mtime ↦ᵣ[cpu] t ∗ Register.hcounteren ↦ᵣ[cpu]□ hc)
       iprop(gpr cpu rd (DFrac.own 1) t ∗ Register.mtime ↦ᵣ[cpu] t) := by
   intro Φ
-  iintro ⟨HmConf, HPC, HnextPC, ⟨Hrd, Hmtime⟩, HΦ⟩
+  iintro ⟨HmConf, HPC, HnextPC, ⟨Hrd, Hmtime, #Hhcounteren⟩, HΦ⟩
   mconf_cases HmConf
   csrr_exec hrd
   mconf_intro HmConf
@@ -574,7 +609,7 @@ theorem wp_m_csrw_medeleg (cpu : CPU) (c : MConf) (hok : MConf.ok (GF := GF) c) 
     (is_rvc : Bool) (rs1 : BitVec 5) (hrs1 : rs1 ≠ 0#5) (v : BitVec 64) :
     instr (GF := GF) pc is_rvc (instruction.CSRReg (0x302#12, regidx.Regidx rs1, regidx.Regidx 0#5, csrop.CSRRW)) ∗
     mConf cpu (DFrac.own 1) c ∗ clockCells cpu ∗ pcIs cpu pc ∗ gpr cpu rs1 (DFrac.own 1) v ∗
-    ▷ (mConf cpu (DFrac.own 1) { c with medeleg := legalize_medeleg c.medeleg v } -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗
+    ▷ (mConf cpu (DFrac.own 1) { c with medeleg := medelegWrite v } -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗
         gpr cpu rs1 (DFrac.own 1) v -∗ wpLoop cpu)
     ⊢ wpLoop cpu :=
   wpLoop_m_instr cpu (DFrac.own 1) c _ hok pc _ is_rvc _ _ _ (execSpec_csrw_medeleg cpu c pc _ rs1 hrs1 v)
@@ -594,7 +629,7 @@ theorem wp_m_csrw_sie (cpu : CPU) (c : MConf) (hok : MConf.ok (GF := GF) c) (pc 
     (is_rvc : Bool) (rs1 : BitVec 5) (hrs1 : rs1 ≠ 0#5) (v : BitVec 64) :
     instr (GF := GF) pc is_rvc (instruction.CSRReg (0x104#12, regidx.Regidx rs1, regidx.Regidx 0#5, csrop.CSRRW)) ∗
     mConf cpu (DFrac.own 1) c ∗ clockCells cpu ∗ pcIs cpu pc ∗ gpr cpu rs1 (DFrac.own 1) v ∗
-    ▷ (mConf cpu (DFrac.own 1) { c with mie := legalize_sie c.mie c.mideleg v } -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗
+    ▷ (mConf cpu (DFrac.own 1) { c with mie := sieWrite c.mie c.mideleg v } -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗
         gpr cpu rs1 (DFrac.own 1) v -∗ wpLoop cpu)
     ⊢ wpLoop cpu :=
   wpLoop_m_instr cpu (DFrac.own 1) c _ hok pc _ is_rvc _ _ _ (execSpec_csrw_sie cpu c pc _ rs1 hrs1 v)
@@ -670,13 +705,13 @@ theorem wp_m_csrw_pmpcfg0 (cpu : CPU) (c : MConf) (hok : MConf.ok (GF := GF) c) 
     ⊢ wpLoop cpu :=
   wpLoop_m_instr cpu (DFrac.own 1) c _ hok pc _ is_rvc _ _ _ (execSpec_csrw_pmpcfg0 cpu c pc _ rs1 hrs1 hcfg)
 
-/-- `csrr rd, mstatus`. -/
+/-- `csrr rd, mstatus`: the register with `SDT` cleared. -/
 theorem wp_m_csrr_mstatus (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c) (pc : BitVec 64)
     (is_rvc : Bool) (rd : BitVec 5) (hrd : rd ≠ 0#5) (v : BitVec 64) :
     instr (GF := GF) pc is_rvc (instruction.CSRReg (0x300#12, regidx.Regidx 0#5, regidx.Regidx rd, csrop.CSRRS)) ∗
     mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ gpr cpu rd (DFrac.own 1) v ∗
     ▷ (mConf cpu dq c -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗
-        gpr cpu rd (DFrac.own 1) (c.mstatus) -∗ wpLoop cpu)
+        gpr cpu rd (DFrac.own 1) (_update_Mstatus_SDT c.mstatus 0#1) -∗ wpLoop cpu)
     ⊢ wpLoop cpu :=
   wpLoop_m_instr cpu dq c c hok pc _ is_rvc _ _ _ (execSpec_csrr_mstatus cpu dq c pc _ rd hrd v)
 
@@ -711,32 +746,36 @@ theorem wp_m_csrr_mcounteren (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.o
   wpLoop_m_instr cpu dq c c hok pc _ is_rvc _ _ _ (execSpec_csrr_mcounteren cpu dq c pc _ rd hrd v)
 
 /-- `rdtime rd` (`csrr rd, time`): `rd` receives the current `mtime`, whatever
-it is. -/
+it is.  Since sail-riscv 0.16 the counter check (`counter_enabled`) also reads H's
+`hcounteren` (used only at a virtual privilege, so at any value): a persistent cell
+at some value is a premise. -/
 theorem wp_m_csrr_time (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c) (pc : BitVec 64)
     (is_rvc : Bool) (rd : BitVec 5) (hrd : rd ≠ 0#5) (v : BitVec 64) :
     instr (GF := GF) pc is_rvc (instruction.CSRReg (0xC01#12, regidx.Regidx 0#5, regidx.Regidx rd, csrop.CSRRS)) ∗
     mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ gpr cpu rd (DFrac.own 1) v ∗
+    (∃ hc : BitVec 32, Register.hcounteren ↦ᵣ[cpu]□ hc) ∗
     ▷ (∀ t : BitVec 64, mConf cpu dq c -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗
         gpr cpu rd (DFrac.own 1) t -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
+  iintro ⟨HI, HmConf, Hclock, Hpc, Hrd, ⟨%hc, #Hhc⟩, HΦ⟩
   have hexec : execSpecClk (GF := GF) cpu dq c Privilege.Machine c
       (instruction.CSRReg (0xC01#12, regidx.Regidx 0#5, regidx.Regidx rd, csrop.CSRRS))
       pc (pc + instrLen is_rvc) (pc + instrLen is_rvc)
-      (gpr cpu rd (DFrac.own 1) v) iprop(∃ t : BitVec 64, gpr cpu rd (DFrac.own 1) t) := by
+      iprop(gpr cpu rd (DFrac.own 1) v ∗ Register.hcounteren ↦ᵣ[cpu]□ hc)
+      iprop(∃ t : BitVec 64, gpr cpu rd (DFrac.own 1) t) := by
     intro ip mt Φ
-    have h := execSpec_csrr_time cpu dq c pc (pc + instrLen is_rvc) rd hrd v mt Φ
-    iintro ⟨HmConf, HPC, HnextPC, ⟨Hrd, Hmip, Hmtime⟩, HΦ⟩
+    have h := execSpec_csrr_time cpu dq c pc (pc + instrLen is_rvc) rd hrd v mt hc Φ
+    iintro ⟨HmConf, HPC, HnextPC, ⟨⟨Hrd, #Hhc⟩, Hmip, Hmtime⟩, HΦ⟩
     iapply h
-    iframe
+    iframe; iframe Hhc
     inext
     iintro HmConf HPC HnextPC ⟨Hrd, Hmtime⟩
     iapply HΦ $$ HmConf HPC HnextPC [Hrd Hmip Hmtime]
     isplitl [Hrd]
     · iexists mt; iframe
     · iexists ip, mt; iframe
-  iintro ⟨HI, HmConf, Hclock, Hpc, Hrd, HΦ⟩
   iapply wpLoop_m_instrClk cpu dq c Privilege.Machine (Or.inl rfl) c hok pc _ is_rvc _ _ _ hexec
-  iframe
+  iframe; iframe Hhc
   try (inext; iintro HmConf Hclock Hpc ⟨%t, Hrd⟩; iapply HΦ $$ %_ HmConf Hclock Hpc Hrd)
 
 end MachCSL
