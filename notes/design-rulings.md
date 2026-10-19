@@ -118,8 +118,10 @@ compiler's `sail2` branch, before the liveness work.  The standard every deviati
   to VS and never be taken.  A bug: the model fork guards the read exactly as the model already
   guards `mideleg` without S.
 - **The frozen bundle grows.** `hwConfig cpu` also holds `mhartid ↦□ bootHid cpu` (every physical
-  access reads it in `within_clint` since 0.16) and `hgeie` at an arbitrary value (read by
-  `read_mip`, used only when H is enabled, written by nothing here).
+  access reads it in `within_clint` since 0.16), `hgeie` at an arbitrary value (read by
+  `read_mip`, used only when H is enabled, written by nothing here) and, likewise, `hcounteren`
+  (read by every counter-CSR access check since 0.16, used only at a virtual privilege; policy
+  section 5: held, not reset, not a board line).
 - **Answer types.** lean-sail's `InstructionEffect.ret` is a plain `def`, and an imported
   definition's reducibility cannot be changed without a check-disabling option.  So the WP's
   event rules come with `_at` variants that take the program and an equation to its event node.
