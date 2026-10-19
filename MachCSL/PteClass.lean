@@ -24,12 +24,13 @@ def ptePpn (w : BitVec 64) : BitVec 44 := BitVec.extractLsb' 10 44 w
 
 /-- **Rocq `pte_invalid`/`pte_valid`**: the verdict of `pte_is_invalid` at
 xv6's configuration (`menvcfg.SSE = 0`, `PBMTE = 0`; Svnapot, Svpbmt and
-Svrsw60t59b enabled). -/
+Svrsw60t59b enabled).  sail-riscv 0.16: a non-leaf's extension bits are
+checked with the `RSW_60t59b` field masked out (software may use it). -/
 def uwkInv (w : BitVec 64) : Bool :=
   _get_PTE_Flags_V (uwkFl w) == 0#1 ||
   (_get_PTE_Flags_R (uwkFl w) == 0#1 && _get_PTE_Flags_W (uwkFl w) == 1#1) ||
   (pte_is_non_leaf (uwkFl w) && (_get_PTE_Flags_A (uwkFl w) == 1#1 || _get_PTE_Flags_D (uwkFl w) == 1#1 ||
-    _get_PTE_Flags_U (uwkFl w) == 1#1 || uwkExt w != 0#10)) ||
+    _get_PTE_Flags_U (uwkFl w) == 1#1 || _update_PTE_Ext_RSW_60t59b (uwkExt w) 0#2 != 0#10)) ||
   _get_PTE_Ext_PBMT (uwkExt w) != 0#2 || _get_PTE_Ext_reserved (uwkExt w) != 0#5
 
 /-- `v` is `c` up to the `A`/`D` bits (the hardware sets them; Rocq's

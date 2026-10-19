@@ -227,6 +227,9 @@ structure Cfg where
   condition) and, when they end in the same state and oracle, return the `if`
   of the two results -/
   merge : Bool := false
+  /-- the early-return normaliser (concurrency interface v2: `SailME.run` through its lifted
+  actions, `MachCSL.run_lift_bind` & co.) -/
+  runCtx : Option (Simp.Context × Simp.SimprocsArray) := none
 
 def whnfI (e : Lean.Expr) : MetaM Lean.Expr := withTransparency .instances <| whnf e
 
@@ -606,6 +609,11 @@ partial def walk (cx : Cfg) (X orc s m : Lean.Expr) : TacticM (Lean.Expr × Lean
       throwError "uwk_run: sub-walk result not in normal form{indentExpr r1}"
   if fn.isConstOf ``FreeM.impure then
     return ← walkEvent cx X orc s m
+  if fn.isConstOf ``LeanRV64D.SailME.run then
+    return ← walkRun cx X orc s m
+  if fn.isConstOf ``Sail.ArchSem.PreSail.PreSailME.run then
+    -- an unfolded block (the model's `SailME.run` is this, definitionally): fold it back
+    return ← walkRun cx X orc s (← mkAppM ``LeanRV64D.SailME.run #[m.appArg!])
   if fn.isConstOf ``ite then
     let a := m.getAppArgs
     let c := a[1]!; let inst := a[2]!; let tb := a[3]!; let eb := a[4]!
@@ -674,6 +682,96 @@ partial def walk (cx : Cfg) (X orc s m : Lean.Expr) : TacticM (Lean.Expr × Lean
       return ← walk cx X orc s m'
   throwError "uwk_run: stuck at{indentExpr m}"
 
+/-- The first computation of a block: the head of its leading binds. -/
+partial def firstComp (e : Lean.Expr) : MetaM Lean.Expr := do
+  let e ← whnfI e
+  if e.getAppFn.isConstOf ``FreeM.bind then
+    let a := e.getAppArgs
+    return ← firstComp a[a.size - 2]!
+  return e
+
+/-- An early-return block `SailME.run b` (concurrency interface v2: lean-sail v7's `PreSailME`,
+whose `Except.error` node is the early return).  In order: the run lemmas push `SailME.run`
+through the block's lifted actions, passing sub-computations to the walk as they are (so their
+sub-walk facts apply), and stop it at an early return (`MachCSL.run_lift_bind` & co.); an `if` or
+a `match` at the head of the block is decided (its condition, or its discriminant evaluated) and
+rewritten in place; as a last resort, a definitional step to the block's head event. -/
+partial def walkRun (cx : Cfg) (X orc s m : Lean.Expr) : TacticM (Lean.Expr × Lean.Expr) := do
+  trace m!"uwk run-block"
+  -- the run lemmas
+  if let some (ctx, sp) := cx.runCtx then
+    let ctx ← ctx.setLctxInitIndices
+    let (r, _) ← Lean.Meta.simp m ctx sp
+    if r.expr != m then
+      let hm ← match r.proof? with | some pf => pure pf | none => mkEqRefl m
+      let (res, p) ← walk cx X orc s r.expr
+      return (res, mkAppN (mkConst ``uwk_congr) #[X, cx.D, orc, s, m, r.expr, res, hm, p])
+  -- a decision at the head of the block
+  let core ← firstComp m.appArg!
+  let rewriteAt (t t' eq : Lean.Expr) : TacticM (Lean.Expr × Lean.Expr) := do
+    let mAbs ← kabstract m t
+    unless mAbs.hasLooseBVars do throwError "uwk_run: cannot rewrite in the block{indentExpr t}"
+    let motive := Lean.mkLambda `z .default (← inferType t) mAbs
+    let hm ← mkCongrArg motive eq
+    let m' := mAbs.instantiate1 t'
+    let (res, p) ← walk cx X orc s m'
+    return (res, mkAppN (mkConst ``uwk_congr) #[X, cx.D, orc, s, m, m', res, hm, p])
+  -- (the decision proofs are up to closed evaluation, so the lemma instances are built
+  -- unchecked; the kernel sees the definitional step)
+  if core.isAppOfArity ``ite 5 then
+    let a := core.getAppArgs
+    let α := a[0]!; let c := a[1]!; let inst := a[2]!; let tb := a[3]!; let eb := a[4]!
+    match ← decideProp cx c with
+    | some (hc, true) =>
+      return ← rewriteAt core tb (mkAppN (mkConst ``ite_eq_left [← getLevel α]) #[c, inst, hc, α, tb, eb])
+    | some (hc, false) =>
+      return ← rewriteAt core eb (mkAppN (mkConst ``ite_eq_right [← getLevel α]) #[c, inst, hc, α, tb, eb])
+    | none => throwError "uwk_run: cannot decide{indentExpr c}"
+  if core.isAppOfArity ``dite 5 then
+    let a := core.getAppArgs
+    let α := a[0]!; let c := a[1]!; let inst := a[2]!; let tb := a[3]!; let eb := a[4]!
+    match ← decideProp cx c with
+    | some (hc, true) =>
+      return ← rewriteAt core (tb.beta #[hc]) (mkAppN (mkConst ``dite_eq_left [← getLevel α]) #[c, inst, hc, α, tb, eb])
+    | some (hc, false) =>
+      return ← rewriteAt core (eb.beta #[hc]) (mkAppN (mkConst ``dite_eq_right [← getLevel α]) #[c, inst, hc, α, tb, eb])
+    | none => throwError "uwk_run: cannot decide{indentExpr c}"
+  if let some mi ← matchMatcherApp? core then
+    for i in [0:mi.discrs.size] do
+      let d := mi.discrs[i]!
+      if ← isValue d then continue
+      match ← evalTo cx d with
+      | some (v, pd) => return ← rewriteAt d v pd
+      | none => throwError "uwk_run: cannot evaluate the discriminant{indentExpr d}"
+    -- every discriminant a value: the match reduces (a definitional step)
+    let core' ← withTransparency .default <| whnf core
+    if core' != core then
+      return ← rewriteAt core core' (← mkExpectedTypeHint (← mkEqRefl core) (← mkEq core core'))
+  -- a combinator of the block (a loop, a helper returning early): one unfolding, in place, so that
+  -- the calls it makes stay calls (their sub-walk facts apply)
+  if let .const n _ := core.getAppFn then
+    unless n == ``FreeM.bind || n == ``FreeM.pure || n == ``FreeM.impure do
+      if ← isIrreducible n then
+        if let some eqn ← getUnfoldEqnFor? n (nonRec := true) then
+          let c ← mkConstWithFreshMVarLevels eqn
+          let (args, _, ty) ← forallMetaTelescopeReducing (← inferType c)
+          if let some (_, lhs, rhs) := ty.eq? then
+            if ← isDefEq lhs core then
+              let core' ← instantiateMVars rhs
+              return ← rewriteAt core core' (← instantiateMVars (mkAppN c args))
+      match ← withTransparency .all <| unfoldDefinition? core with
+      | some core' =>
+        let core' := core'.headBeta
+        return ← rewriteAt core core' (← mkExpectedTypeHint (← mkEqRefl core) (← mkEq core core'))
+      | none => pure ()
+  -- a definitional step to the head event
+  trace m!"uwk run-block: definitional step at{indentExpr core}"
+  let m' ← withTransparency .all <| whnf m
+  let hd := m'.getAppFn
+  if hd.isConstOf ``FreeM.pure || hd.isConstOf ``FreeM.impure then
+    return ← walk cx X orc s m'
+  throwError "uwk_run: stuck early-return block at{indentExpr core}"
+
 /-- `+merge` at an undecided `if c then a else b`: walk `a` under `c` and `b`
 under `¬ c`; if both end in the same state and oracle (and their results do
 not mention the branch hypothesis), the `if` of the results. -/
@@ -737,6 +835,7 @@ partial def bySubFact (cx : Cfg) (X orc s m : Lean.Expr) (retry : Bool := true) 
         let (r, _) ← Lean.Meta.simp m1 ctx sp
         pure r
       | none => simpProp cx m
+    trace m!"uwk bySubFact retry at{indentExpr r.expr}"
     if r.expr != m && r.expr.getAppFn == mfn then
       if let some (res, p) ← bySubFact cx X orc s r.expr false then
         let hm ← match r.proof? with | some pf => pure pf | none => mkEqRefl m
@@ -797,12 +896,23 @@ partial def walkEvent (cx : Cfg) (X orc s m : Lean.Expr) : TacticM (Lean.Expr ×
       else if ofn.isConstOf ``InstructionEffect.memRead then [``uwk_mrd, ``uwk_mrdx, ``uwk_mrdxA]
       else if ofn.isConstOf ``InstructionEffect.memWrite then [``uwk_mwr, ``uwk_mwrx, ``uwk_mwrA]
       else []
+  trace m!"uwk step lemmas: {lems}"
   for lem in lems do
     let saved ← saveState
     let (args, _, concl) ← forallMetaTelescopeReducing (← inferType (mkConst lem))
     let some (_, lhs, rhs) := concl.eq? | restoreState saved; continue
-    unless ← isDefEq lhs target do restoreState saved; continue
-    unless ← dischargeArgs cx args true do restoreState saved; continue
+    unless ← isDefEq lhs target do
+      restoreState saved
+      trace m!"uwk step {lem}: no match{indentExpr target}"
+      continue
+    unless ← dischargeArgs cx args true do
+      let a ← args.filterMapM fun a => do
+        if ← a.mvarId!.isAssigned then return none
+        let t ← instantiateMVars (← inferType a)
+        if ← isProp t then return some t else return none
+      restoreState saved
+      trace m!"uwk step {lem}: side condition failed among{indentD (MessageData.joinSep (a.toList.map MessageData.ofExpr) Format.line)}"
+      continue
     let hlast := args[args.size - 1]!
     let hty ← instantiateMVars (← inferType hlast)
     let some (_, l2, _) := hty.eq? | restoreState saved; continue
@@ -854,7 +964,7 @@ def mkCtx (lemmas : Array Syntax.Term) : TacticM (Simp.Context × Simp.SimprocsA
       Nat.reduceDiv, Nat.reduceMod, Nat.reducePow, Nat.reduceLeDiff, Nat.reduceEqDiff,
       Int.reduceToNat, Int.reduceMul, Int.reduceAdd, Int.reduceSub, Int.reduceNeg,
       Sail.BitVec.toNatInt, Int.toNat_natCast, uwk_toNat_ofNat, BitVec.add_zero, BitVec.reduceOfInt,
-      Int.cast_ofNat_Int, Int.natCast_mul, BitVec.setWidth_eq, *])
+      Int.cast_ofNat_Int, Int.natCast_mul, BitVec.setWidth_eq, Sail.ArchSem.Mem_request.toArchSem, *])
   let stx ← if lemmas.isEmpty then pure stx else
     match stx with
     | `(tactic| simp only [$ls,*]) =>
@@ -884,8 +994,15 @@ def run (lemmas : Array Syntax.Term) (lhs : Lean.Expr) (bv : Bool) (merge : Bool
     Term.synthesizeSyntheticMVarsNoPostponing
     instantiateMVars e
   let steps ← IO.mkRef 0
+  let runCtx ← do
+    let stx ← `(tactic| simp only [MachCSL.run_lift_bind, MachCSL.run_lift, MachCSL.run_pure,
+      MachCSL.run_throw, MachCSL.run_throw_bind, bind_assoc, pure_bind, MachCSL.FreeMLemmas.freeM_pure_bind,
+      ite_true, ite_false, dite_true, dite_false, ↓reduceIte, ↓reduceDIte])
+    let { ctx, simprocs, .. } ← Lean.Elab.Tactic.mkSimpContext stx (eraseLocal := false)
+    pure (some (ctx, simprocs))
   let cx : Cfg :=
-    { D := D, lemmas := ls, simpCtx := ctx, simprocs := simprocs, argCtx := argCtx, steps := steps, bv := bv, merge := merge }
+    { D := D, lemmas := ls, simpCtx := ctx, simprocs := simprocs, argCtx := argCtx, steps := steps, bv := bv,
+      merge := merge, runCtx := runCtx }
   let (r, p) ← walk cx X orc s m
   trace m!"uwk_run: {← steps.get} steps"
   -- the result's closed data evaluated (a definitional step)

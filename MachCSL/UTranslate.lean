@@ -56,6 +56,7 @@ pinned in `UtrPins`; the walk is the S stage's `translate` (VMID `0`), and a
 fault is reported as an `ExceptionContext` (`utrCtx`).
 -/
 import MachCSL.URunRW
+import MachCSL.BvEnums -- `bv_decide`'s enum encodings, declared once
 
 noncomputable section
 
@@ -273,6 +274,11 @@ theorem utr_validate (va : BitVec 64) (hc : BitVec.signExtend 64 (BitVec.extract
     exact (canon_truncate va hc).symm
   simp only [h1, Bool.false_eq_true, ite_false, h2, ite_true]
 
+/-- (Kept out of the proof below: its `bv_decide` would meet the `TranslationStage` hypothesis
+and add an enum encoding that clashes with `WpStepHooks`'s.) -/
+theorem utr_truncate39 (va : BitVec 64) : BitVec.truncate 39 va = BitVec.extractLsb' 0 39 va := by
+  bv_decide
+
 /-- A non-canonical Sv39 address is refused (`PTW_Invalid_Addr`). -/
 theorem utr_validate_noncanon (va : BitVec 64) (hc : ¬ BitVec.signExtend 64 (BitVec.extractLsb' 0 39 va) = va) :
     translate_validate_address va 39 .S_Stage = .Err (.PTW_Invalid_Addr ()) := by
@@ -282,8 +288,7 @@ theorem utr_validate_noncanon (va : BitVec 64) (hc : ¬ BitVec.signExtend 64 (Bi
     simp only [sign_extend, Sail.BitVec.signExtend, Sail.BitVec.truncate, beq_eq_false_iff_ne, ne_eq]
     intro h
     apply hc
-    have : BitVec.truncate 39 va = BitVec.extractLsb' 0 39 va := by bv_decide
-    rw [← this]
+    rw [← utr_truncate39]
     exact h.symm
   simp only [h1, Bool.false_eq_true, ite_false, h2]
 
