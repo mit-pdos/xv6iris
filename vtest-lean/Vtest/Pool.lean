@@ -109,7 +109,7 @@ def threadNoStep (g : GState) (e : Expr) : Prop :=
 /-- A live hart at an `error` node of the model -- a failed assertion, an
 unimplemented platform hook -- has no transition. -/
 def errorNode : Expr → Bool
-  | .hart 0 _ (.impure (.error _) _) => true
+  | .hart 0 _ (.impure (.inl (.error _)) _) => true
   | _ => false
 
 theorem errorNode_noStep (x : XState) (e : Expr) (h : errorNode e = true) :

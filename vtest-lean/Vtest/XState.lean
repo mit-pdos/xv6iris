@@ -35,7 +35,7 @@ def zeroRegs : RegFile := fun r => by
   cases r <;> exact default
 
 /-- How many registers the model has: `Register.ctorIdx` is below it. -/
-def nRegs : Nat := 180
+def nRegs : Nat := 213
 
 theorem ctorIdx_lt (r : Register) : r.ctorIdx < nRegs := by
   cases r <;> decide
