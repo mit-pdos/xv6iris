@@ -186,8 +186,9 @@ def urwDemoTlb : Tlb :=
   (Vector.replicate 64 none).set 1 (some (tlbEntryOf 0#16 1#27 urwDemoPpn (mkPte urwDemoPpn 0xd7#8) 0x80200008#64))
 
 /-- The configuration the load branches on (User mode, Sv39 with the entry
-resident, xv6's PMP and the platform PMAs), and the base register `x10`
-(the address is pinned: translation branches on it). -/
+resident, xv6's PMP and the platform PMAs; since sail-riscv 0.16 also the hart
+id, which every physical access reads for the CLINT check), and the base
+register `x10` (the address is pinned: translation branches on it). -/
 def urwDemoPinL : RegPin
   | .cur_privilege => some Privilege.User
   | .misa => some 0x8000000000141105#64
@@ -203,6 +204,7 @@ def urwDemoPinL : RegPin
   | .pmpaddr_n => some xv6Pmpaddr
   | .pma_regions => some bootPMA
   | .htif_tohost_base => some none
+  | .mhartid => some 0#64
   | .x10 => some 0x1008#64
   | _ => none
 
@@ -236,7 +238,8 @@ theorem urwDemo_ld (orc : UOrc) (rs : RegFile) (pg : BitVec 12 → BitVec 8) (rv
   simp only [Option.some.injEq, Prod.mk.injEq, UWSt.mk.injEq, and_true]
   refine ⟨rfl, congrArg _ ?_⟩
   simp only [regval_into_reg, extend_value, Bool.false_eq_true, ↓reduceIte, sign_extend,
-    Sail.BitVec.signExtend, Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', urwDemoDword]
+    Sail.BitVec.signExtend, Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', urwDemoDword,
+    MachCSL.from_bytes_le_vecbytes_8]
   bv_decide
 
 /-! ## The Iris side: one `swp_runRW` per fact -/
