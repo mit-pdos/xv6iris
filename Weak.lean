@@ -811,6 +811,8 @@ import Weak.SbOrd
 import Weak.SbOrdWalk
 import Weak.LitmusSbStuck2
 import Weak.SbKill
+import Weak.SbDevSt
+import Weak.SbHeadHop
 import Weak.CapRetag
 import Weak.CapSync
 import Weak.SilWalk2
