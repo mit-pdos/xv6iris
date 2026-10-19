@@ -121,7 +121,8 @@ compiler's `sail2` branch, before the liveness work.  The standard every deviati
   access reads it in `within_clint` since 0.16), `hgeie` at an arbitrary value (read by
   `read_mip`, used only when H is enabled, written by nothing here) and, likewise, `hcounteren`
   (read by every counter-CSR access check since 0.16, used only at a virtual privilege; policy
-  section 5: held, not reset, not a board line).
+  section 5: held, not reset, not a board line) and `henvcfg` (read by 0.16's CBO enable checks,
+  likewise).  The U-mode reference walks answer these reads the same way.
 - **`TW = 0` in the kernel's `mstatus` invariant** (2026-10-19). With `exit_wait` chosen by the
   driver, a parked S-mode WFI may be forced out, which 0.16 retires only under `mstatus.TW = 0`
   (otherwise an illegal-instruction trap).  TW is 0 on every reachable state (the board line,
