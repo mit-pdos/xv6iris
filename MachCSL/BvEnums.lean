@@ -30,5 +30,7 @@ theorem bvEnum_pageBasedMemType (a b : LeanRV64D.page_based_mem_type) (h : a = b
 theorem bvEnum_misalignedException (a b : LeanRV64D.misaligned_exception) (h : a = b) : b = a := by bv_decide
 theorem bvEnum_atomicSupport (a b : LeanRV64D.AtomicSupport) (h : a = b) : b = a := by bv_decide
 theorem bvEnum_register (a b : LeanRV64D.Register) (h : a = b) : b = a := by bv_decide
+-- since 0.16 the TLB carries the translation stage (WpStepHooks, UTranslate bit-blast over it)
+theorem bvEnum_translationStage (a b : LeanRV64D.TranslationStage) (h : a = b) : b = a := by bv_decide
 
 end MachCSL
