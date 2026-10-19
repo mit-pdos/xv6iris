@@ -1,7 +1,17 @@
 # Route P design — an RVWMO-faithful per-hart STORE BUFFER in MachCSL with a lockstep replay
 
-Design advisor (one-off, advisory: no proofs, no builds, no git/jj), 2026-10-19.  **Revised 2026-10-19 (rev 55 of the
-plan) by the reviser applying review R45 (`notes/weak-allocproc-plan-review-R45.md`; required changes [R45.1]–[R45.8],
+Design advisor (one-off, advisory: no proofs, no builds, no git/jj), 2026-10-19.  **Revised again 2026-10-19 (rev 56 of
+the plan) by the reviser applying review R46 (`notes/weak-allocproc-plan-review-R46.md`, "the LOAD side of route P";
+required changes [R46.1]–[R46.6], suggestions [R46.s1]–[R46.s4], 0 alt — every claim re-verified at the tip, `file:line`
+below; one precision: the registered plain-read arm reads `tvn ≤ σ.top` at the tip (`MachCSL/Lang.lean:1708-1709`, the
+eager/dual staging) and becomes `ltop` with the [OWN.122] switch) and the owner rulings [OWN.115]–[OWN.124]: **[OWN.123]
+Q-R46-LOADSIDE = (P) — NO load buffer, in `SbCand` or in MachCSL; the replay's late landing replaces it**; **[OWN.124]
+Q-R46-HH2 = (a) — `holding+0x12` exempt like `ip->ref`, carrying a `REVISIT [OWN.124]` flag** (§3.2, §3.4; alternative (b)
+on file); [OWN.122] the MachCSL switch on a RED branch until P-M8 (§5).  Landed since rev 55 (all merged, strict
+acceptance PASS): P-M1 `lrqroyvv`, P-M2 `uusvmmrl`, P-M3a+b `ouznrlqo`, P-M4a/b/c `uutlwtuz`; P-W2 (`Weak/SbWalk`/`SbAgree`/
+`SbReplay`, 2,763 l.), P-W3 (`LitmusSbStuck`, `SbOrd` 1,269, `SbOrdWalk` 757, `LitmusSbStuck2`), P-W4 (`SbKill` 564),
+`SbDevSt` 587, `SbHeadHop` 306, `SbHeadHop2` 551, 6b′ `CapRetag` 791, 6a `CapSync` 538 (`Weak.lean:804-818`).**  **Revised
+2026-10-19 (rev 55 of the plan) by the reviser applying review R45 (`notes/weak-allocproc-plan-review-R45.md`; required changes [R45.1]–[R45.8],
 suggestions [R45.s1]–[R45.s4]) and the owner rulings [OWN.111] (P re-confirmed after F-P1), [OWN.112] (Q-P-WFENCE-REF
 = (a)), [OWN.113] (Q-P-FIFO = (b): per-address + fence-epoch buffer), [OWN.114] (Q-P-δ1 = (c): retire narrow δ1
 inside P-M1); every R45 claim re-verified against the tip, `file:line` below; one alternative [R45.7-alt] (U2's
@@ -22,7 +32,40 @@ at `+0x10`; `iunlock+0x1c` = `0x8000341c` `lw a5,8(s1)` → `blez` at `+0x1e`), 
 PROGRESS-P.md` + the merged `Weak/SbCand.lean`/`SbCandLit.lean` (P-W1, DONE).  Every size is an unverified estimate (ranges); every spec mark is w.r.t. riscv.cat /
 RVWMO / Sail / Zifencei / PMAs.
 
-## 0. Summary, and the two findings the owner has seen (F-P1 → [OWN.111]; F-R45-1 → [OWN.112])
+## 0. Summary, and the three findings the owner has seen (F-P1 → [OWN.111]; F-R45-1 → [OWN.112]; F-HH2-1 → [OWN.124])
+
+**[rev 56] The load side, settled ([OWN.121] → R46 → [OWN.123]).**  The owner asked whether route P also needs a logical
+LOAD buffer ("it seems hard to build RVWMO without both the logical load buffer and store forwarding").  R46's answer,
+ruled (P): a GENERAL operational RVWMO machine needs (i) a store side, (ii) a load side for R→R reordering — early
+satisfaction or, equivalently, loads at STALE per-location views — and (iii) promises for R→W (load buffering, LB).
+MachCSL has had (ii) in the view form since TSO and keeps it under P (a plain load reads at any view `tvn ∈ [tv, top]`
+and raises only `rv` and the foreign-sourced `coh` floors, never `tv`: `MachCSL/Lang.lean:1708-1711`, `TsoMem.lean:356-358`;
+`fence r,*` raises the floor to `rv`, `fencePost :491`); P adds (i); MachCSL-P lacks only (iii), and no RVWMO-consistent
+GF of THIS binary has an LB shape (§1 row L6, §3.4 census).  **THIS proof needs no load buffer in the machine or in the
+twin**: the replay walks each row in program order and reads the member's TOP; a load GF satisfied early is reproduced
+by holding the competing store's LANDING back until the later-in-po read is realized (`land`'s `readersRealized`) —
+same rf, same co, a different gmo witness, FAITHFUL for the quantifier.  Late landing can fail only when the EARLIER read
+of the pair is itself a blocked head, i.e. a racy read whose GF source is a pending or unissued foreign store — a census
+site (18 kernel pcs `SilSiteTab.kSites :71-96` + 8 device reads); that finite table (`SbOrd.HeadOrdRd :251`, §3.4) IS the
+load-side analysis and had exactly ONE open row, **F-HH2-1 (`holding+0x12`) → [OWN.124] (a) with a REVISIT flag**.
+MachCSL's stale views stay (they serve the Xv6 proofs) but the replay never uses them (member loads at `tvn = ltop`).
+
+**FINDING F-HH2-1 (SbHeadHop2, w3 2026-10-19 16:27; → Q-R46-HH2, RULED [OWN.124] (a) + REVISIT).**  At a reachable walk
+state hart z won the swap on `L` and its `sd a0,16(s1)` (`acquire+0x28`, `lk->cpu = mycpu()`) is pending; hart x in
+`acquire(L)` → `holding` has realized `holding+0x0` (top 1 = GF 1) and its head `holding+0x12` (`0x80000c04`, `ld a5,16(a0)`)
+reads GF's source = z's pending store ⇒ blocked.  x's next instructions `mv s1,a5; jal mycpu` → `mycpu`'s `sd ra,8(sp)`/`sd
+s0,0(sp)` (`0x8000195e/60`) are WRITES, hence counted by the measure's `waitedOn` (`SbOrd.lean:171` `gisW`), and RVWMO
+orders a `ld` before an unrelated `sd` by nothing (`PResidue` in the census), so `mu (.hd x)` may sit gmo-before z's store
+and the (E5) edge does not descend.  Nothing is stuck (z's entry is landable); the MEASURE is too coarse — a load-side
+proof artifact, the dual of the LB row.  Options: **(a) exempt `holding+0x12` like `ip->ref`** (a third `rdX` pc; both
+values `≠ cpuAddr x`, so `holding` returns 0 on both sides; taint from `holding+0x12` across `jal mycpu` to the `seqz` at
+`holding+0x1e`; 0.6–1.2k Weak, no new MachCSL record — the member-side value fact is already the export twin
+`lkCpuReadAtP` `Xv6/AccessDiscipline.lean:1467`); (b) a custody-aware `waitedOn` (a write counts only if some other row
+can wait on it) — structurally nicer but needs a NEW per-load MachCSL footprint record on the serial lane, 1.1–2.2k; (c)
+name `noStuckP` — WEAKER.  **Ruling (a), "but this should be somehow flagged as something to look at again" ⇒ the
+exemption carries `REVISIT [OWN.124]` in its Lean docstring, a row in the plan's REVISIT list (§D), the final theorem's
+documentation (`LinkDiscAdequacy`/`RvwmoXv6Adequacy` header) names it, every status lists it; (b) stays on file.**  Both
+(a) and (b) need the GF-side fact `HoldZero` (`SbHeadHop2.lean:479`), now a sized row ([R46.3], §3.4).
 
 **The design in one paragraph.**  MachCSL keeps its timestamped byte histories, views and reservations; a plain
 RAM store no longer appends at its instruction.  It is ISSUED into the hart's buffer (`MState.sb cpu`) and LANDS at
@@ -38,10 +81,12 @@ by ISSUE stamps — so the store WP rules keep today's shape — and landing is 
 monotone side map `lp : stamp → Option Nat` (landing position), which views compare against.  On the Weak side the
 twin candidate `SbCand` gets the same buffer; the walk is [OWN.106]'s step-by-step order with ONE uniform gate — *no
 write may become the member-latest at a byte while a GF reader of its co-predecessor is unrealized, and no read is
-replayed before its GF source is landed* — **with ONE exception ([OWN.112] (a), F-R45-1 §3.4): the two unlocked
-`ip->ref` reads (`ilock+0xe`, `iunlock+0x1c`) are not gated; they read the landed top, provably ≥ 1 on both sides, and
-run tainted until their `blez`** — which makes every other member read return GF's value by construction.  Lockstep
-holds with no skips, no silent arm, no stale replay and no per-site value datum beyond those two pcs; the silent-AMO
+replayed before its GF source is landed* — **with THREE exempt pcs ([OWN.112] (a), F-R45-1 §3.4; [OWN.124] (a), F-HH2-1
+§0/§3.4, REVISIT-flagged): the two unlocked `ip->ref` reads (`ilock+0xe`, `iunlock+0x1c`) and `holding`'s `lk->cpu` read
+(`holding+0x12`) are not gated; they read the landed top — provably ≥ 1 on both sides for `ip->ref`, provably `≠ cpuAddr x`
+on both sides for `lk->cpu` — and run tainted until their compare (`blez` / `seqz`)** — which makes every other member read
+return GF's value by construction.  Lockstep holds with no skips, no silent arm, no stale replay, NO load buffer
+([OWN.123]) and no per-site value datum beyond those three pcs; the silent-AMO
 twin, CertZ24–34, `SilSite*` premises and narrow δ1 are retired (δ1 DELETED inside P-M1, [OWN.114] (c)).  Progress
 (`noStuckP`, §3.4 restated per [R45.2]) is now understood (confidence M, was M−); the merged-history ghost
 (`interp_land`) was the riskiest MachCSL piece — **P0(c) PASSED (w1 scratch, `../xv6iris-weak-w1/MachCSL/SpikeP.lean`
@@ -55,7 +100,7 @@ census: 27 MachCSL files, ≈ 411 errors (≈ 250 mechanical; the epoch adds 0) 
 **P-W1 MERGED at the tip (`zsqxzoqp`: `Weak/SbCand.lean` 751 l., `SbCandLit.lean` 136, `LitmusSBAcqP` §5; `Weak.lean:804-805`)
 with finding F-P-W1-1 (§1 row 5: an `.aq` AMO may overtake only pending entries of the CURRENT fence epoch that do not
 touch its bytes — rule 4; adopted for P-M1's AMO rule).**  Size ≈ **13.3–24.0k (MachCSL 7.8–14.1k serial, Weak 5.5–9.9k),
-98–222 h**, confidence M on the machine (P0(c) passed) and M on progress; **P-M1 is launchable now.**
+98–222 h**, confidence M on the machine (P0(c) passed) and M on progress; **P-M1 is launchable now.**  **[rev 56]: P-M1..P-M4 and P-W2..P-W4 LANDED; Σ P remaining 13.5–26.8k (the switch branch 5.3–9.8k + the queue 2.7–6.3k + P-W5/P-W6 2.4–4.3k + the load-side residue P-W3r 3.1–6.4k), ≈ 100–245 h; the branch is RUNNING (§5, §7).**
 
 **FINDING F-P1 (→ Q-P-R1, RULED [OWN.111]: P re-confirmed).**  The UART 3-hart chain that the K spike (§3, §6) and the
 K0 census (§3) present as the xv6-reachable instance of Litmus 2 is **excluded by the header's own trusted I/O item**:
@@ -113,9 +158,39 @@ entries overlapping an address) is empty.  *Forward*: an own load returns the ha
 | power loss | — | pending stores are lost (single era [R2.2]; the disk's durable image holds only DMA'd data) | FAITHFUL |
 | narrow δ1 (stale silent AMO, `MState.silentOk` `Lang.lean:446`) | — | **RETIRED inside P-M1 ([OWN.114] (c), [R45.5])**: under P a failed acquire reads the LANDED top (the release has not landed ⇒ 1), so the stale arm is never used by the replay; the δ1 pieces are DELETED in the same edit and strict audit as the buffer (`xstale :123`, `afterExclStale :173`, `storeSilent :187`, `fenceWv :217`, `MState.fence`'s `wv` line `:236`, `staleFree :439`, `silentOk :446`, `staleBlocked :454`, the `not_silentOk_*`/`staleFree_*` lemmas `:458-480`, `blockedStep`'s stale arm, `WpLock`'s stale acquire outcome, `MachOfPf`'s and Vtest's stale cases; `MState.wv` goes with them).  Keeping it dead with `σ.sb cpu = []` would cost +0.3–0.8k of extra cases in every stale lemma P-M1..M8 re-proves (R45 A10), not 0.1k | FAITHFUL ((a)/(b) would keep one extra harmless behaviour) |
 
+**The LOAD side ([R46.1]; [OWN.121] → [OWN.123]).**  Terms.  *gmo*: riscv.cat's global memory order.  *Stale view*: a load
+returning a write older than the latest landed one at its byte, allowed when no co-later write is visible at the hart's
+view.  *Logical load buffer*: an operational device letting a later-in-po load be satisfied before an earlier one.  *LB
+(load buffering)*: a later-in-po STORE becoming visible before an earlier load is satisfied (needs promises).  *Head*: a
+row's next GF event in the walk; *blocked head*: one the value gate rejects (`SbOrd.srcGate :75`/`valGate :81`: the
+member's top ≠ GF's value); *late landing*: the walk's `land` gate (`landG :105`) holding a store back while a GF reader
+of the byte's member-latest write is unrealized.
+
+| # | riscv.cat / RVWMO rule on loads | MachCSL-P as a MACHINE (`Lang.lean:1708-1711`, `TsoMem.lean:356-358`, `:491`) | the replay (member `SbCand`, gate `SbOrd.enbL :88`) | mark |
+|---|---|---|---|---|
+| L1 | load value axiom: a read returns a write gmo-before or po-before it, not overwritten before it in gmo (per byte) | `readFwd`: own pending byte, else the history at a view `tvn ∈ [tv, top]` (`ltop` after the switch) | reads the member's TOP (forwarded or latest landed); the GF source is the top by the gate | FAITHFUL (quantifier); the member's gmo differs from GF's where GF had the read earlier |
+| L2 | rules 2–3 (`[R];po-loc-no-w;[R]`, rsw/fri): two same-byte reads return co-nondecreasing writes unless an own write intervenes | per-byte `coh` floors raised by FOREIGN sources only, reset at own stores (`afterLoad`/`resetCoh`) | reads in po at the top: automatic | FAITHFUL |
+| L3 | rule 4 with `pr` (`fence r,r`/`r,rw`/`rw,*`): earlier loads before later accesses | floor := `rv` (the read watermark, `fencePost :491`) | po-respecting: automatic | FAITHFUL |
+| L4 | rule 5: `.aq` read before everything po-later | the exclusive read sets `rv`/floor := top; xv6's only `.aq` is `acquire+0x1c`'s AMO read half | AMO reads `rmwLatest` (landed top, atomicity); H1 `aqOrd` | FAITHFUL (machine STRONGER only at the exclusive read's same-address drain, row 1 above) |
+| L5 | R→R to DIFFERENT bytes, no fence/dep: UNORDERED (no rule) | stale views (`tv` is NOT raised by a load) | **late landing**: the overwriting landing waits for the earlier-in-po reader; the replay never uses stale views (member loads at `tvn = ltop`) | FAITHFUL; stuck only if the earlier read is a blocked head — the per-site table (§3.4) |
+| L6 | R→W to different bytes, no dep/fence: UNORDERED (LB allowed) | NOT modelled (loads execute in program order, no promises) | the store is issued after the read is realized; harmless unless the store is WAITED ON while the read is blocked (F-HH2-1) | machine STRONGER; FAITHFUL for the quantifier: no reachable LB shape of this binary (census leaf [R46.s1]: every census read → branch/fence before any foreign-readable store; only own-frame stores at `holding+0x12`/`mycpu` and `ismapped+0x10`'s return path precede the branch) |
+| L7 | rules 9–13 (addr/data/ctrl deps, `[M];addr;[M];po;[W]`) | none tracked (more permissive) | the member respects po, hence every dep; the emission's `dsCtl`/`dsLd` edges are used only in the progress hops (`wrHopOfCtl`, `diskWrHop`) | unchanged (theorem unaffected) |
+| L8 | mixed size / misalignment: per byte | per byte (`readFwd`, `textAt4S`) | per byte | FAITHFUL (N10 caveat unchanged) |
+| L9 | LR/SC reads | LR = exclusive read, drains overlapping own entries | no LR/SC in the image (`LockFacts.amoCensus`) | n/a (machine STRONGER, harmless) |
+| L10 | loads vs I/O: ordered only by fence i/o bits (Sail drops them, D48), deps, rule 5, PMAs | MMIO loads at the event | fabric order (R3); **(R2″) [OWN.116]** I/O → later RAM READ (`GraphFabResidue.ioResidue :123-138`) | STRONGER (trusted platform text, removable with (R1): A4; REVISIT list item 2) |
+| L11 | loads of DMA-written RAM: silent in RVWMO | device writes land at once | never pending; an unissued device write ⇒ device-row progress (`diskWrHop`, (R2′), `diskFabPo`) | device-model text (named `diskFabPo`), FAITHFUL to the model |
+| L12 | a read whose GF source is a store its hart has NOT YET REACHED (cross-hart R→W freedom) | n/a | `blkLoad :942`'s unissued-source edge → the source row's head, through `waitedOn :170` (the source is a write) | FAITHFUL; the dual of F-HH2-1 (§3.4) |
+
+**[R46.s2]** `HRead`'s stale-view freedom — a plain load raises `rv` and the foreign-sourced `coh` floors, never the hart
+view `tv` (`HRead.afterLoad` `TsoMem.lean:356-358`) — IS RVWMO's rules 2–3 in view form; it stays in the machine for the Xv6
+proofs and is left UNUSED by the replay (member loads at the landed top).  Nothing here changes what riscv.cat/RVWMO/Sail
+say.
+
 The buffer changes NOTHING about what RVWMO/riscv.cat/Sail say; with [OWN.113] the machine's store side IS RVWMO's.
-The machine stays STRONGER than RVWMO only where it was already (the exclusive read's drain, row 1; no dependency
-tracking is the opposite direction).
+The machine stays STRONGER than RVWMO only where it already was (the exclusive read's drain, row 1) **and on the load side
+by forbidding load→store (LB) reordering — harmless for the quantifier: no RVWMO-consistent GF of this binary has an LB
+shape (census leaf [R46.s1], row L6)**; no dependency tracking is the opposite direction.  No load buffer, in the twin or
+in MachCSL ([OWN.123]).
 
 ## 2. The MachCSL change (serial lane; the registered machine edited, statements unchanged, strict audits — the
 [OWN.105] precedent)
@@ -365,15 +440,25 @@ State: `SbWalk.St` = `SilWalk.St` (`Weak/SilWalk.lean:27-36`) with `c : SbCand.C
 `dv`; the dependency shadow `sh` (`SilDep`, needed only to bound the silent write) is DROPPED.  Enabledness of row
 `x` at its next GF event `e`, and of a landing, at walk state `S` (member-latest `latestW S b`, realized set):
 ```lean
-/-- the two value-insensitive racy reads (`fs.c:300,325` `ip->ref < 1`; census 6m §3.3; P0(a) §5) -/
-def ipRefPc (pc : Int) : Bool := pc = sym KernelSyms.«ilock» 0xe || pc = sym KernelSyms.«iunlock» 0x1c
-def ipRefRd (GF : Gfexec) (e : Geid) : Prop := gisR e ∧ ipRefPc (pcOf GF e)      -- pc from the emission state
+/-- the two value-insensitive racy reads (`fs.c:300,325` `ip->ref < 1`; census 6m §3.3; P0(a) §5) — LANDED
+    `Weak/SbReplay.lean:66` (as a `Prop`) -/
+def ipRefPc (pc : Int) : Prop := pc = sym KernelSyms.«ilock» 0xe ∨ pc = sym KernelSyms.«iunlock» 0x1c
+/-- **REVISIT [OWN.124]** — the THIRD exempt pc ([rev 56], F-HH2-1 (a), [R46.2]): `holding+0x12` = `0x80000c04`
+    `ld a5,16(a0)` (`lk->cpu`, read UNLOCKED inside `acquire`'s `holding(lk)`; `SilSiteTab.kSites` row 2, `.PResidue`).
+    Exempt like `ip->ref`: the member reads the top of `[L+16, L+24)` (own forwarded `sd zero` or the latest landed
+    value), GF reads its source; both are `≠ cpuAddr x` for a non-holder `x`, so `holding` returns 0 on both sides.
+    The owner flagged this exemption to be looked at again; alternative (b) — a custody-aware `waitedOn` + `FrameQuiet`'s
+    third clause + a NEW per-load MachCSL footprint record + P-W6 lookahead glue, 1.1–2.2k — is on file (§3.4). -/
+def holdCpuPc (pc : Int) : Prop := pc = sym KernelSyms.«holding» 0x12
+def exemptPc (pc : Int) : Prop := ipRefPc pc ∨ holdCpuPc pc
+def exemptRd (GF : Gfexec) (e : Geid) : Prop := gisR e ∧ exemptPc (pcOf GF e)      -- pc from the emission state (T)
 
 inductive SbOrd.enb (GF D fab) (S) (cnt) : Item → Prop
   | fab   : nextIsFabric GF S cnt x → enb (.ev x)                              -- fabric members in fabric order (R43)
-  | rd    : gisR e → ¬ ipRefRd GF e → (∀ b, srcOf GF e b = some w → landedOrOwn S x w b) → enb (.ev x)
+  | rd    : gisR e → ¬ exemptRd GF e → (∀ b, srcOf GF e b = some w → landedOrOwn S x w b) → enb (.ev x)
             -- every GF source LANDED in the member (or the row's own pending store: forwarding)
-  | rdX   : ipRefRd GF e → enb (.ev x)      -- [OWN.112] no source gate; the member reads the landed top / own pending
+  | rdX   : exemptRd GF e → enb (.ev x)     -- [OWN.112]/[OWN.124] no source gate; the member reads the landed top / own pending
+            -- (LANDED for the two `ip->ref` pcs as `SbReplay.rdXArm :705`; the third pc is row P-W3r-a, w3)
   | wr    : gisW e → (∀ b, coPred GF e b = some w0 → latestW S b = some w0 ∧ readersRealized GF S w0 b) → enb (.ev x)
             -- an AMO / exclusive write: its GF co-predecessor is member-latest and all its GF readers are realized
             -- (for an AMO this includes the rf gate: the source IS the co-predecessor; `srcLatest` of R44 §2 + the
@@ -382,22 +467,46 @@ inductive SbOrd.enb (GF D fab) (S) (cnt) : Item → Prop
   | land  : landablePol pol (σ.sb x) w → (∀ b, coPred GF w b = some w0 → latestW S b = some w0 ∧ readersRealized GF S w0 b) →
             noResv … → enb (.land x w)
 
-/-- value agreement: exact everywhere except at the two pcs, where both words are in [1, 2^31) -/
+/-- value agreement: exact everywhere except at the three exempt pcs — at the two `ip->ref` pcs both words are in
+    [1, 2^31) (LANDED `SbReplay.valEqX :744`, `irefOkL :740`); at `holding+0x12` NEITHER word is the reading hart's own
+    `cpuAddr` ([R46.2]; `x` = the row's hart) -/
 def SbAgree.valEqX (GF) (S) : Prop :=
-  ∀ r ∈ realized S, (¬ ipRefRd GF r → memberBytes S r = gfBytes GF r) ∧
-                     (ipRefRd GF r → irefOk (memberWord S r) ∧ irefOk (gfWord GF r))
-/-- the one value lemma, used on BOTH sides (GF co and the member's co-PREFIX of it): every write to `ip->ref`
-    co-between the reader's own last `ref++` and any write the reader can see is an `itable.lock`-protected
-    ±1 of a count that includes the reader's reference, hence ≥ 1 -/
-theorem irefGe1 (GF) (B : row) (x : write of ref) : ownInc GF B ≤co x → x ≤co srcOf GF e_B → irefOk (val x)
+  ∀ r ∈ realized S, (¬ exemptRd GF r → memberBytes S r = gfBytes GF r) ∧
+                     (ipRefRd GF r → irefOk (memberWord S r) ∧ irefOk (gfWord GF r)) ∧
+                     (holdCpuRd GF r → memberWord S r ≠ cpuAddr (row r) ∧ gfWord GF r ≠ cpuAddr (row r))
+/-- the `ip->ref` value facts.  [rev 56] F-P-W2-1: `irefGe1` is NOT GF-provable (process migration moves the reader's
+    own `ref++` to another hart) → [OWN.117] M12-a/M12-b: the GF side `IrefGF` (`SbReplay.lean:750`) from a MachCSL record
+    on `iput`'s closing 0-store, the member side `IrefTop` from a racy-load ghost record "`ip->ref` seen ≥ 1" — both via
+    P-W6; NAMED until the MCSL queue items Q5/Q6 land -/
+theorem irefGe1 (GF) (B : row) (x : write of ref) : ownInc GF B ≤co x → x ≤co srcOf GF e_B → irefOk (val x)  -- SUPERSEDED by IrefGF/IrefTop
+/-- the `lk->cpu` value facts ([R46.2]/[R46.3]).  GF side: `SbHeadHop2.HoldZero :479` — every `holding+0x12` read inside
+    `acquire(L)` by row `x` has GF value `≠ cpuAddr x` (x's po-last own write to `[L+16)` is its last release's `sd zero`
+    — no recursive acquire, the MachCSL proof's precondition —, every co-later write is another hart u's `sd a0,16(s1)`
+    with `a0 = mycpu() = cpuAddr u`, `u ≠ x`, or a 0; CoWR puts GF's source co-at-or-after x's own write).  Member side:
+    the export twin `lkCpuReadAtP` (`Xv6/AccessDiscipline.lean:1467`: a non-holder reading `lk->cpu` at ANY view from an
+    initial `v0 ≠ cpuAddr c` never obtains `cpuAddr c`) applied at `tvn = top` via P-W6's state map, "x is not the
+    holder" read off x's own realized lock-word history.  No new MachCSL record. -/
+theorem holdNotMine (GF) (S) (r : holdCpuRd) : memberWord S r ≠ cpuAddr (row r) ∧ gfWord GF r ≠ cpuAddr (row r)
 /-- datum: the registered lockstep datum with TAINT at the two sites — LANDED as static rules already:
     `SilSiteTaint.ruIlock`/`ruIunlock :647-650` (the loaded `a5` feeds only the `blez` at `ilock+0x10` / `iunlock+0x1e`)
     and the value rule `SilSite.ruleOfIrefPos :207` (both values ≥ 1 ⇒ same arm); P-W2 re-hosts them on `SbCand` -/
-theorem ipRefTailDies : ∀ pc, ipRefPc pc → loadTailDies pc {a5}
+theorem ipRefTailDies : ∀ pc, ipRefPc pc → loadTailDies pc {a5}          -- LANDED `SbReplay.ipRefTaint :75` / `ipRefRule :90`
+/-- [rev 56] the third taint arm ([R46.2]): from `holding+0x12` (`a5` tainted) through `mv s1,a5` (`0x80000c06`: `s1`
+    tainted too) and `jal mycpu` (`0x80000c08`) — `mycpu` `0x8000195c`–`0x8000197a` writes `sp`/`ra`/`s0`/`a5`/`a0` only, never
+    a callee-saved register other than its own saved/restored `s0`, and its frame stores `sd ra,8(sp)`/`sd s0,0(sp)` carry
+    UNTAINTED registers (`decide +kernel`) — to `sub a0,s1,a0` (`holding+0x1a`) and `seqz a0,a0` (`holding+0x1e`), where
+    BOTH sides give `a0 = 0` by `holdNotMine`: the taint dies by the value lemma, as `ilock`'s dies at `blez`; `s1` is
+    then reloaded from the frame (`ld s1`) in `holding`'s epilogue.  Needs the taint walker to cross ONE call (if the
+    landed walker stops at `jal`, +0.1–0.3k) and the Sail meaning of the 14-instruction path (O-P-W2-a's open item,
+    larger here) — inside row P-W3r-a. -/
+theorem holdCpuTailDies : loadTailDies (sym KernelSyms.«holding» 0x12) {a5, s1}
 ```
-**Value agreement by construction (`SbAgree.valEqX`).**  Invariant: at every walk state, for every byte, the member's
-landed co order is a prefix of GF's co at that byte, and every realized read other than the two pcs returned its GF
-source's bytes.  Proof per arm: `rd` — the source is member-latest (landed by the gate and nothing co-later has
+**Value agreement by construction (`SbAgree.valEqX`; LANDED P-W2 `Weak/SbReplay.lean:744` for the two `ip->ref` pcs,
+`agreeX`/`agreeW3OfX`/`agreeW4OfX` in `SbAgree.lean`; the third pc is row P-W3r-a).**  Invariant: at every walk state, for
+every byte, the member's landed co order is a prefix of GF's co at that byte (`PInv.pfx`, PROVED P-W2/P-W3), and every
+realized read other than the three exempt pcs returned its GF source's bytes.  At `holding+0x12` the member's word is
+the top of `[L+16, L+24)` (0 after a release/`initlock`, or another hart's landed `cpuAddr u`), GF's is its source
+(possibly a pending `cpuAddr z`); `holdNotMine` gives both `≠ cpuAddr x` ([R46.2]).  Proof per arm: `rd` — the source is member-latest (landed by the gate and nothing co-later has
 landed: a co-later write's landing/AMO waits for this reader by `wr`/`land`); own pending source — forwarding returns
 it (GF's load value says the read returns the own po-earlier store or a co-later write; a co-later write cannot have
 landed before an own pending store, so it is the own store); `wr`/`land` — the co prefix extends by GF's next write;
@@ -405,19 +514,38 @@ landed before an own pending store, so it is the own store); `wr`/`land` — the
 program-before `e`) is landed or forwarded, and every landed write co-after it is in `irefGe1`'s interval, so the top
 the member reads is ≥ 1 (`racyValOk :314` of the export says the same at the realized MachCSL state for an unchained
 foreign entry; the GF lemma serves both sides).  Hence the member's labels are GF's up to re-indexing (`lblReidxW`
-with EQUAL values except at the two pcs), the datum is the registered lockstep datum (`CertZ9.lockstepStep` /
-`CertZ13.hartStepOfSite` with `csync`) with TAINT at the two pcs (`CertZ13.relT`, `CertZ11.loadTail`), `relT`
-lockstep everywhere, and `agreeW4`'s four clauses (`CertZ24.lean:72-87`) hold with `nf = True` except at the two pcs —
+with EQUAL values except at the three exempt pcs), the datum is the registered lockstep datum (`CertZ9.lockstepStep` /
+`CertZ13.hartStepOfSite` with `csync`) with TAINT at the three pcs (`CertZ13.relT`, `CertZ11.loadTail`), `relT`
+lockstep everywhere, and `agreeW4`'s four clauses (`CertZ24.lean:72-87`) hold with `nf = True` except at the three pcs —
 including FULL lock co (`lockCoSP` for free: member co = GF co per byte; `SilOrd2`'s windowed reconstruction §1–2
-becomes unnecessary).  [OWN.108] is SUPERSEDED ([R45.8]): a pinned load is gated on "source landed" and replayed at
+becomes unnecessary).  **[rev 56] P-W2 findings:** F-P-W2-3 — `agreeW4` at the REAL `L` is false, consumers use
+`agreeW3OfX`/`agreeX`; F-P-W2-2 — the member is not `gwrowGmo`, so P-W4's kill glue goes through RVWMO ppo (`SbKill`,
+LANDED).  [OWN.108] is SUPERSEDED ([R45.8]): a pinned load is gated on "source landed" and replayed at
 the member's TOP, which equals the GF value because the overwriting landing is held back; no stale replay, and the
-per-site view/value datum of row 6m is vacuous except for the two `ip->ref` pcs.
+per-site view/value datum of row 6m is vacuous except for the three exempt pcs.
 **Spec marks of the exception.**  (a) FAITHFUL (the GF is admitted; only the member's value at a value-insensitive
 read differs, and the published statement speaks of GF's values through the kill, not the member's) — RULED
 [OWN.112]; (b) a NAMED premise excluding these GFs would be WEAKER and false-ish (they are reachable xv6 behaviours);
 (c) a kernel change (`ref` read under `itable.lock`) is out of scope [OWN.4].  Cost: `rdX` + `valEqX` + `irefGe1` +
 re-hosting the two-site taint ≈ +0.4–0.8k on P-W2/P-W3 over the first design (of which `irefGe1` 0.2–0.4k was already
-in row 6m's budget; the taint rules exist).
+in row 6m's budget; the taint rules exist) — LANDED in P-W2 (2,763 l. incl. the walk/agreement layer).
+**Spec marks of the THIRD exemption (`holding+0x12`, F-HH2-1; RULED [OWN.124] (a) + REVISIT).**  (a) exempt the read:
+FAITHFUL (the GF is admitted; the member may read 0 or another hart's pointer where GF read z's pending pointer; both
+`≠ cpuAddr x`, so `holding` returns 0 on both sides and the published statement speaks of GF's values) — an xv6 expert
+reads "at three unlocked sanity reads (`ip->ref` ×2, `holding`'s `lk->cpu` compare) the replay may see a different value
+than the graph did; both values give the same branch"; cost 0.6–1.2k Weak / 5–10 h (`rdX`/`valEqX` glue 0.2–0.4k, the
+call-crossing taint arm + its Sail meaning 0.3–0.6k, the member-side fact from `lkCpuReadAtP` 0.1–0.2k), NO new MachCSL
+record; risk M (the pattern exists, the call-crossing taint is new).  (b) a custody-aware measure: replace `waitedOn`'s
+write arm `gisW G m` (`SbOrd.lean:171`) by "a write to a BUSY byte" (`busy w a := (∃ pending entry writing a) ∨ (∃ AMO head
+writing a) ∨ (∃ load head whose GF source byte is a)`; `tgtW :446` gains the busy hypothesis at both call sites
+`blkLand`/`blkAmo`; `tgtEv`/`HeadOrdRd`/`descent` unchanged); then `mycpu`'s frame stores are waited on only if some OTHER
+row's head load reads x's live frame, and `FrameQuiet` (`SbHeadHop2.lean:492`) must gain exactly that clause — about
+another hart's UNREALIZED next load's footprint, which no current export gives (`ksFrameAtP :1539` constrains landed
+ENTRIES; `chainOkAtP` constrains observed entries AFTER the load) → a NEW per-load MachCSL footprint record ("a load's
+footprint avoids other harts' live frames", from the static regions + X1's page-provenance record) + a one-step-lookahead
+glue in P-W6; FAITHFUL and general; 0.3–0.7k Weak + 0.5–1.0k MachCSL (serial lane) + 0.3–0.5k glue = 1.1–2.2k / 9–21 h —
+**KEPT ON FILE as the owner-flagged alternative**.  (c) name `noStuckP`: WEAKER, rejected by the [OWN.100] standard.
+Shared by (a) and (b): `HoldZero` (§3.4, row P-W3r-b).
 
 ### 3.3 Why the two shapes are lockstep (walk-throughs; §4 has the full tables)
 
@@ -461,14 +589,80 @@ the HEAD `e_y ≤po r` needs **`gmo(e_y) ≤ gmo(r)`** — the per-head table:
 |---|---|---|
 | H1 `.aq` AMO (every kernel AMO: `acquire+0x1c`, G1 `kernelAmoAq`) | rule 5 | static, planned (6l G1, now inside P-W3) |
 | H2 draining fence | rule 4 (`pw ∧ sr`) | by definition of µ |
-| H3 gated plain read with a pending foreign source = a RACY site (census 6m: `holding+0x0` (acquire path, pending release), `holding+0x12` (pending `lk->cpu`), `main+0x16` (`started`), `ip->ref` ×2, PTE ×9, `virtio_disk_intr` ×4, device `DRead` ×8) | `holding+0x0/+0x12`: `→ctrl amoswap.aq` (rule 11, the AMO is a write) `→(rule 5)` every later read — no read between (`li a0,0; ret; bnez; amoswap`); `started`: `fence r,rw` (rule 4); **`ip->ref`: FAILS (F-R45-1, below) → never a head by `rdX` [OWN.112]**; PTE: custody ⇒ source landed ⇒ never blocked (**Q-6M-PTE (a), NOT moot — [R45.3]**, 0.3–0.6k inside P-W3); `virtio_disk_intr`: sources are device stores (land at once) ⇒ never blocked; device `DRead`: fabric member (Efab) | static per site; one exception |
-| H4 fabric member | (R3) | trusted arm |
-| H5 drain-blocked exclusive read (walker A/D pair on an own pending PTE) | rule 1 to the pair's write; readers of the PTE's co-pred are custody-chained | custody (Q-6M-PTE (a)) |
+| H3 gated plain read with a pending or unissued foreign source = a BLOCKED HEAD, which is a RACY census site (`SilSiteTab.kSites :71-96`: 18 kernel pcs; + 8 device `DRead` nodes) | **[rev 56] replaced by the PER-SITE TABLE below ([R46.6]; `SbHeadHop`/`SbHeadHop2` §HEADHOP2)** — the rev-55 cell is the record: it said "`holding+0x0/+0x12` → no read between" (FALSE on `holding+0x0`'s nonzero arm and at `holding+0x12`: F-P-W3-1, F-HH2-1) and "`virtio_disk_intr`: never blocked" (FALSE on vdi+0x36's fall-through and vdi+0x82's back edge, which legitimately WAIT for the device row's idx write — covered by `fenceNextHop`) | `HeadOrdRd :251` NAMED as the interface; (a1) static hops + (A2) windows PROVED; per-site inputs = rows P-W3r-* |
+| H4 fabric member | (R3) + **(R2″)** ([OWN.116]: an I/O access po-before a later RAM read is gmo-before it — F-P-W3-2 found (R3) alone never orders I/O before a later RAM read) | trusted arms (REVISIT list item 2: removed with (R1) in A4) |
+| H5 drain-blocked exclusive read (walker A/D pair on an own pending PTE) | rule 1 to the pair's write; readers of the PTE's co-pred are custody-chained | PROVED (every AMO `.aq`: a drain-blocked exclusive read is H1) |
 
-Inputs of `noStuckP`: `rvwmoCatConsistentT`, `ioResidueGmo` ((R3) only), the image (H1/H3 `decide +kernel`),
-`kernelAmoAq`, PTE custody at the realized prefix (6m F4 (a)); under the FIFO fallback additionally the WCrel census +
-`lk->cpu` reader lemma.  NO named premise (fallback: NAMED, WEAKER, 0).  Confidence M (was M−): the obstruction is
-understood and the table is finite.
+**The per-site table ([R46.6] = §HEADHOP2 re-derived by R46 §3; the complete LOAD-SIDE obligation of route P).**  Method:
+a head is blocked iff the member's top ≠ GF's value at some byte (`valGate`), i.e. GF's source is a pending or unissued
+FOREIGN store (own stores forward; landed sources make the top GF's value because the co-successor's landing waits).  A
+chained read's source is landed when the read becomes the head (the hop AMO is realized only when its source, the
+release, is member-latest = landed; the release's `fence rw,w` puts every earlier store of the releaser in an earlier
+epoch — `landOk`'s oldest-epoch clause — so they landed first; `started` likewise through `main+0xac`; device writes land
+at once).  For each blocked site the walk needs (A1) every later WAITED-ON write gmo-after the head and (A2) every later
+waited-on pure read past an ordering point (`headOrdRdOf`), or "never blocked", or an exemption.  **(T)** = the
+realization's label↔pc transport (P-W6), listed ONCE here and named nowhere else.
+
+| site (image pc) | blocked possible? | load→store before the branch? | (A1) | (A2) | named input / verdict |
+|---|---|---|---|---|---|
+| `holding+0x0` from `acquire+0x12` (`0x80000bf2` `lw a5,0(a0)`) | yes: zero arm (GF 0 = a pending release, top 1), nonzero arm (GF 1 = an unissued swap, top 0) | no: `bnez` next (`0x80000bf4`) | rule 11 via `dsCtl` (`wrHopOfCtl` + `ctlOfPsites`) | zero arm: next event is the `.aq` AMO (`aqNextA2`); nonzero arm: the window to the AMO holds `holding+0x12` (quiet by **`LkCpuQuiet`**: no pending `lk->cpu` store while the landed byte is 0) and own-frame reloads (quiet by **`FrameQuiet`**), then `bnez a0` → AMO or panic (excluded by **`HoldZero`**) | PROVED mod (T), `LkCpuQuiet`, `FrameQuiet`, `HoldZero` — no escape |
+| `holding+0x0` from `release+0xc`/`sched+0x14` (caller holds) | no: top = 1 = GF (the holder's AMO landed, spinners write 1, nobody writes 0) | — | — | — | **`HeldPin`** (realized-prefix lock fact) — no escape |
+| **`holding+0x12`** (`0x80000c04` `ld a5,16(a0)`) from `acquire` | **yes**: the holder z's `sd a0,16(s1)` (`acquire+0x28`) pending, GF reads it, top is 0 or an older pointer | **YES**: `mv s1,a5; jal mycpu` → `mycpu+0x2/+0x4` `sd ra`/`sd s0` before `seqz`/`bnez` | **FALSE** for the frame stores (no dep, no fence; pin `PResidue`) | window = `mycpu`'s and `holding`'s frame reloads (quiet) → `bnez a0` → AMO | **F-HH2-1 → EXEMPT [OWN.124] (a), REVISIT**; needs `HoldZero` (GF side) + `lkCpuReadAtP` (member side) |
+| `holding+0x12` from `release`/`sched` | no: the holder's own `sd a0,16` forwards or is landed (own source) | — | — | — | no escape |
+| `main+0x16` (`started`) | yes (GF 1, hart 0's `main+0xb0` pending) | no: `fence r,rw` next | rule 4 (`main16FenceNext`) | rule 4 | PROVED mod (T) |
+| `ilock+0xe`, `iunlock+0x1c` (`ip->ref`) | exempt (`rdX`, [OWN.112]) | no: `blez` next | — | — | exempt; value by `IrefTop`/`IrefGF` ([OWN.117] M12-a/b, Q5/Q6) |
+| PTE ×9 (`walk+0x32` … `uvmclear+0x10`) | no: custody — the table's writers are the owning process's hart (or the walker on it); hand-offs through `p->lock`; the reaper reads a ZOMBIE's table after `wait`'s acquire | 7 × ALU only to the branch (`ptePctrlAlu`); `ismapped+0x10` returns the value (its caller branches after `ld ra`/`ld s0` reloads — loads, no stores); `uvmclear+0x10` data-dep into its `sd` (rule 10) | ctrl / data | NOT static — must be never blocked | **PTE custody** (Q-6M-PTE (a)) ⇒ `SrcLanded` ⇒ passes the gate — no escape |
+| `virtio_disk_intr+0x36`/`+0x82` (`used->idx`) GF ≠ `used_idx` | yes (waits for the device row's idx write) | no: `beq`/`bne` next | `fenceNextHop` (vdi+0x3e `fence iorw,iorw`) | same | PROVED mod (T) |
+| vdi+0x36 taken / vdi+0x82 fall-through (GF = `used_idx`) | no (device idx writes consecutive, `0 ≤ idx − used_idx ≤ NUM`, realized idx reads monotone ⇒ top = GF) | — | — | NOT static | **`VirtioIdx`** — no escape once discharged |
+| vdi+0x4e (`ring[i].id`), vdi+0x5a (`info[id].status`) | no (the source is the device's completion write, `devStOrd`-before the idx the hart already read; landed) | no (`wrHopOfCtlR` through the `lbu`) | ctrl | NOT static | **`VirtioDesc`** — no escape |
+| the 8 device `DRead` nodes | blocked while the driver's descriptor/avail stores are pending | n/a (device program) | `diskWrHop` PROVED (rule 13 `dsLd`) | NOT static (disk loads carry no deps) | **`DiskDesc`**: the source is a driver store po-before its REALIZED `fence iorw,iorw` ⇒ landed (**`drainLanded`**, a new `PInv` clause, 0.1–0.3k) — no escape |
+| `forkret+0x18` (`lw first`, `0x800019c6`) | no: the writer (the first process, `0x800019d6`) is po-before its `fork`'s `release(&np->lock)`; the reader is resumed by a scheduler acquire of that lock | `beqz` next | — | — | chained (not a census site); `SpecForkret.lean:33` decides the branch by a token — consistent ([R46.s3]) |
+| `procdump+0x70` (`lw p->state` unlocked, `0x80002482`) | would be (a foreign `p->state` store under `p->lock` pending) | `beqz` next; then `printk`'s `acquire(&pr.lock)` → `holding+0x0` on `pr.lock` before any ordering point — (A2) would FAIL | — | — | **DEAD TEXT**: no `jal <procdump>` in `Xv6/KernelImage.lean` (verified: the only references to `0x80002412` are its own entry and `KernelSyms.procdump`); its contract is stated unsatisfiable (`SpecProcdump.lean:40-45`); unreachable — no escape ([R46.s3]) |
+| `panicked` / `pr.locking` readers | — | — | — | — | absent from this image (panic → `unreachable`); no escape ([R46.s3]) |
+| user rows; `uservec`/`userret`/`swtch`; `kfree`'s fill; `log`/`bio`/`pipe*`; `wakeup`/`sleep`; `either_copyout` | no (chained: sources are own writes, the kernel's writes on the process's behalf, `fork`/`exec` by the parent → chained through `np->lock`, `kfree`'s fill through `kmem.lock`; trap/switch data written po-before the previous hart's `release(&p->lock)`) | — | — | — | no escape; rests on **`blockedIsCensus`** ([R46.4]) |
+
+**Where the hunt's completeness rests** (all FAITHFUL program-layer facts, WEAKER only while named; the plan's
+NAMED-INPUTS table [R46.s4] tracks them): (i) **`blockedIsCensus`** ([R46.4]; row P-W3r-c, 0.5–1.0k Weak, 4–8 h) — "a
+plain-load head that is not a census site passes the value gate": own source ⇒ forwarded; chained source ⇒ the hop AMO
+realized ⇒ release landed ⇒ epoch ⇒ landed (`srcGateOfLanded`/`valGateOfLanded`); device source ⇒ landed at issue; an
+unissued foreign source is excluded by rules 4–5 against the row's realized acquire + the lock discipline of the GF rows
+(`SbKill.l2ClaimP :507`, row 6n) — today hidden inside (T), now its own item; (ii) the per-site named inputs `HoldZero`,
+`FrameQuiet`, `LkCpuQuiet`, `HeldPin`, `VirtioIdx`, `VirtioDesc`, `DiskDesc`, PTE custody, (T); (iii) the device model
+(`diskFabPo`, `usedElemGateOk`).  None is a load-buffer question.
+
+**`HoldZero` ([R46.3]; `SbHeadHop2.lean:479`; row P-W3r-b, 0.6–1.2k Weak, 4–10 h, NO MachCSL record).**  Statement: every
+`holding+0x12` read inside `acquire(L)` by row x has GF value `≠ cpuAddr x`.  Why true: x's po-last own write to `[L+16)`
+is its last release's `sd zero` (no recursive acquire — the MachCSL proof's precondition), every co-later write is another
+hart u's `sd a0,16(s1)` with `a0 = mycpu() = cpuAddr u` (u ≠ x) or a 0, and the `cpus` pointers are distinct; CoWR puts
+GF's source co-at-or-after x's own write.  Discharge path: REALIZED writes via `lockWordDiscAtP`/`lkCpuReadAtP` (P-W6);
+PENDING or UNISSUED writer rows carry a GF label whose relation to `cpuAddr u` comes from the emission's register state
+(`a0 = &cpus[tp]` at `acquire+0x28`, `mycpu+0x8` `mv a5,tp`) and the invariant `tp = row` at kernel pcs (boot `start`; after
+user mode `uservec`'s reload of `kernel_hartid`, written by the same hart in `prepare_return` — the [OWN.77]/[OWN.87]
+trapframe custody; `AxSpinT2a.mycpuRetHart :617` already gives `mycpu`'s value at `tp = hartId c`); `kfree`'s 1-fill and
+recycled pages are excluded by restricting to LIVE published locks (`Lk`).  It also unblocks `holding+0x0`'s nonzero arm
+(the panic exit).
+
+**F-HH2-1, re-derived (R46 §3; the ONLY escape).**  At a reachable walk state: z won the swap on `L` (landed at issue),
+z's `sd a0,16(s1)` is pending (no fence until z's release), x's `holding+0x0` realized (top 1 = GF 1), x's head `r12 =
+holding+0x12` has GF source = z's pending store ⇒ top ≠ GF ⇒ blocked.  `mu (.hd x)` is the least gmo position of x's
+unrealized waited-on events; `mycpu`'s `sd ra` is a write, hence waited on (`SbOrd.lean:171` `gisW`), and RVWMO lets it sit
+gmo-before z's store (no rule orders `ld` → unrelated `sd`), so `mu (.hd x) ≤ gpos (sd ra) < gpos (z's store) = mu (.ld z _)`
+and the (E5) edge does not descend.  Nothing is stuck (z's entry is landable: its co-predecessor's readers are
+`holding+0x12` reads, all realized or not waited on); the MEASURE is too coarse.  **Are there more of its kind?**  A blocked
+racy read followed by a store before the branch on its value: among the 18 only `holding+0x12` (frames) and
+`ismapped+0x10` (never blocked; its path to the caller's branch has loads only); among the device reads none (device
+programs store only after the fabric point).  The (A2) kind (a blocked racy read followed by a WAITED-ON read before an
+ordering point): `holding+0x0`'s nonzero arm (quiet window — handled) and `procdump+0x70` (dead text).  **No new escape.**
+The LB-freedom census leaf ([R46.s1], row P-W3r-d, 0.05–0.15k): for each of the 18 census pcs the instruction path to its
+certified branch contains no store, except `holding+0x12` (own frames) and `ismapped+0x10` (return path) —
+`holding0CtrlNext`, `main16FenceNext`, `vdiShape`, `ptePctrlAlu` exist; add `ilock+0xe`/`iunlock+0x1c` (`blez` next) and the
+two exceptions as explicit statements.
+
+Inputs of `noStuckP` ([rev 56]): `rvwmoCatConsistentT`, `ioResidueGmo` ((R3) and (R2″) only — (R1) unused), the image
+(H1/H2 and the static hops by `decide +kernel`), `kernelAmoAq`, and the NAMED per-site inputs above (rows P-W3r-*; the
+two buffer-state records `FrameQuiet`/`LkCpuQuiet` come from MachCSL Q7 after P-M8 via P-W6).  NO named premise in the
+published statement once P-W3r lands (fallback: NAMED, WEAKER, 0).  Confidence M: the table is finite and mostly proved
+mod (T).
 
 **F-R45-1, the execution (R45 §2.1; MECHANIZED in P-W1: `LitmusSBAcqP` §5 `l4Cat`/`l4NoMemberP`/`l4MemberX`, three
 rows, [R45.s2]).**  Byte `ref` =
@@ -508,7 +702,7 @@ the (E1) census does not settle progress at all (F-R45-1).  Nothing of that text
 | `SilCand`/`SilCandLit`/`SilMember`/`SilDep`/`SilReplay`'s silent arm, `SilWalk2`, `SilRegZero`'s twin ghost, `SilClose` untrimmed kills, `SilOrd2`'s silent/pin arms | RETIRED as consumers (dead, keep green, headers "superseded by P"); `SbCand` is a new leaf beside them |
 | `SilWalk` (state/snoc/okSnoc), `SilReplay.progOk` (program states), `SilAgree` (member/agreement shape), `SilPf*`/`SilEpf` (pf bridge) | REUSED, re-parametrized on `SbCand` (no `sil` column, no dep shadow, + pending lists) |
 | `SilOrd2` §5–6 (the step-by-step gate `enb :743`, `prefW`/`prefG`, `walkPolG`, `recLogOfTr`, `cycleKillGZ`, `noStuckG :775`) | REUSED as the pattern; the gate's arms replaced by §3.2's (`silent`/`pin` arms gone, `rdX`/`land` arms added); §1–2 (windowed co reconstruction) UNNECESSARY (co agreement is total) — keep for the record |
-| `SilSite` premises (`ordQ`/`silentQ`/`rmwQ`/`valQ`/`noPanicQ`/`custQ`/`drfQ`), `SilSiteStep`, the dynamic use of `SilSiteTaint` | RETIRED (values agree by construction, except the two pcs); `SilSiteTab`/`SilSiteTaint` kept as the static census record AND re-hosted for the two-site taint (`ruIlock`/`ruIunlock`), `SilSite.ruleOfIrefPos` likewise; Q-6M-GFVAL, Q-6M-HOLD, Q-6M-ORDER moot; **Q-6M-PTE (a) NOT moot ([R45.3]): PTE custody at the realized prefix is a P-W3 input (H3/H5)** |
+| `SilSite` premises (`ordQ`/`silentQ`/`rmwQ`/`valQ`/`noPanicQ`/`custQ`/`drfQ`), `SilSiteStep`, the dynamic use of `SilSiteTaint` | RETIRED (values agree by construction, except the three exempt pcs — `ip->ref` ×2 [OWN.112], `holding+0x12` [OWN.124]); `SilSiteTab`/`SilSiteTaint` kept as the static census record AND re-hosted for the two-site taint (`ruIlock`/`ruIunlock`), `SilSite.ruleOfIrefPos` likewise; Q-6M-GFVAL, Q-6M-HOLD, Q-6M-ORDER moot; **Q-6M-PTE (a) NOT moot ([R45.3]): PTE custody at the realized prefix is a P-W3 input (H3/H5)** |
 | `SilKillT.cycleKillCore :98` (twin-typed) → `cycleKillCZT` | REWRITTEN once for `SbCand` (`cycleKillCoreP`), same consumers (`CapFetchProv.t2linSupplyCZTtagged`) |
 | `CapFetchProv`, `CapPcLog`, CertZ2–23 lockstep/transport, `CertZ9/13` datum, `LockFacts*`, `GraphFetchN2.csChainedT` | REUSED unchanged |
 | CertZ24–34 (padded/skip/lag), the K-only rows 1′/6o/6p of R44; CertZ17's NF3/NF4 anchors (via `lockDiscCZ3`) | NOT needed (dead, green) |
@@ -582,7 +776,7 @@ The MMIO store overtaking a buffered RAM store is the one freedom P has that the
 needed a skip for.  **P needs neither (R1) nor (R2) for this; it needs (R3) (fabric ⊆ gmo) for H4.**  [OWN.111]'s
 premise is confirmed.
 
-## 5. Increment plan (rev 55: R45 §5 with the three rulings applied)
+## 5. Increment plan (rev 56: R45 §5 with [OWN.112]–[OWN.114] applied, then R46 [R46.2]–[R46.6] + [OWN.122]–[OWN.124]; DONE rows kept for the record)
 
 Lanes: **MCSL** = the serial MachCSL lane (one editor; δ1 is closed at inc 16b, X1 and E4 merged, P0(c) done on a
 scratch branch, so the lane is FREE for P-M1); **Weak** = parallel Weak-only slots.  Worker-hours at the observed rates
@@ -595,29 +789,40 @@ moves at most once), statements of every registered root textually unchanged (di
 | P0(a) | ~~P-WFENCE census~~ **DONE** (`notes/W10-P0a-wfence.md`, `ymqrrsuq`): P-WFENCE FALSE (`ip->ref` ×4 foreign-readable non-WCrel; 5 strict WCrel sites; `lk->cpu` acyclic reader-side; `initlock` unpublished; PTE stores chained given custody) → F-R45-1 → [OWN.112] | spike | 0 (note) | — | — | ✓ | the WCrel leaf is needed only under the FIFO fallback |
 | P0(b) | ~~Lean checks~~ **DONE** (`Weak/LitmusSBAcqP.lean` 752 l., `twqyqmnx`): F-P1 CONFIRMED (`uCat`/`uIoNo`/`uNoR1Ok`), `l1MemberP` (Litmus 1 has a P member), δ1′ sufficiency 26/26 census sites (`l3Cat`/`l3NoMember`/`l3MemberT`: the racy `ip->ref` chain needs 6m's route-T datum under δ1′) → [OWN.111] | spike | 0 (752 l. landed) | — | — | ✓ | |
 | P0(c) | ~~MachCSL churn spike~~ **DONE — PASSED** (w1 scratch, never merged: `vumrwzmr` core, `tvzktvuv`/`kynvprpl` `MachCSL/SpikeP.lean` 831 l. sorry-free; `PROGRESS-W11F.md` §6).  (1) `interp_land :537` PROVED over the minimal interpretation (merged-history heap + `lp` map with persistent `landedAt` certs + pure `mmOkP`), no client resource consumed, `readBytes_land :448`; (2) churn census A′: 27 MachCSL files, ≈ 411 errors (Wp 79, WpAtomic 77, WordHist 52, Resources 31, Lock 27, UIcache 25, WpStoreOrd 19, WpPtWalkOwn 17, KptInv 11, WpLock 10; ≈ 250 mechanical) + 319 position comparisons / 16 MachCSL files and 87 lines / 16 Xv6 files whose MEANING shifts (statements still type-check) — **go/no-go: GO** (statement churn in `ChainDefs`+`KptInv`+`Lock` well under the ≈ 120 threshold; `interp_land` client-invisible); (3) `memModel_issue :645` keeps the pushed postcondition, `wp_s_sw_core :718` (`wp_s_sw`'s statement does NOT break); (4) `read_casesP :784`/`read_cases_floorP :820`; (5) **`interp_landE :556` — the per-address + epoch buffer goes through, `landOk_landOkE :418` (FIFO is a special case); the epoch adds 0 errors → [OWN.113] CONFIRMED**; (6) `simStep` is `m ≤ 1` (§3.6); (7) the land arm is SILENT and absorbed once in `wpHart_lift_obsP` (§2.2).  **Measured MachCSL churn 6–10k** (+ the epoch token 0.3–0.7k, the merged-head `curWordAt` restatement, the `insLanded` AMO postconditions) | spike | 0 (831 l. scratch) | — | — | ✓ | the MCSL lane may commit |
-| P-M1 | `TsoMem`/`Lang` state + arms (§2.1–2.2: `lp`, `ltop`, `llog`, `sb` with epochs, `sbEp`, `landOk` = oldest epoch + footprint + no reservation, `issue`/`land`/`readFwd`/`sbOverlaps`, `insLanded` for exclusive/DMA writes, the AMO epoch guard (F-P-W1-1), `akRel`, drain/epoch fences, the silent land arm in `primStep`, `bootFacts`) **+ δ1 RETIREMENT ([OWN.114] (c): the deletions of §1's last row, same edit and audit)**; Vtest `XState` — **launchable NOW (P0(c) PASS, rulings in)** | MCSL | 0.6–1.1k | 5–11 | — | M+ | builds; `MState.store` kept for exclusive writes |
-| P-M2 | interpretation: `lpAuth`/`landedAt`, `sbAuth`, `epochAt` + `landedBeforeOfEpoch`, `pendOne`, `ctxLanded`, `histOkP`; **the FULL `interp_land` EARLY, as the acceptance gate** (the landing-sensitive conjuncts: `mmOk`'s reservation clause, `curWordAt`/`uSlotNow` over the merged head, `dmaView`); `mmOk`/`rsvOk`; `Adequacy` | MCSL | 1.1–2.0k | 9–20 | P-M1 | M | `riscvPowerAdequacy` green |
-| P-M3 | lifting + base memModel lemmas (`wpHart_lift_obsP` as spiked — per-event rules unchanged; `memModel_issue/read/excl/fence`; `WordHist` read lemmas with `visibleAt`; `memModel_store_plain*` callers → `memModel_issue`) | MCSL | 0.8–1.4k | 6–14 | P-M2 | M+ | `Wp`, `WpAtomic` green |
-| P-M4 | history layer + export sub-definitions over `lp` (§2.5, incl. `dynLockWinZAt`'s window, `ksFrameAt`; the 319 position comparisons, ≈ 250 mechanical) | MCSL | 1.5–2.8k | 12–28 | P-M3 | M | `AccessDiscipline` + `LinkDiscAdequacy` green; conjunct list unchanged |
-| P-M5 | contexts/hops (`Ctx`/`KCtx`/`CtxBox`/`CtxX`: `memModel_chainHop` with `ctxLanded`) **+ `pendOneOfCtx`** ([R45.4]) | MCSL | 0.9–1.6k | 7–16 | P-M4 | M | `CtxBox` green |
-| P-M6 | locks: release rule STATES "my stores issued before the release fence land first" (from the `epochAt` token `wp_s_fence_rw_w` mints, consumed with "no own store since the fence", `relAdj`; FIFO fallback: from `sbAuth`), discharged at `release+0x16`/`main+0xac` ([R45.4]; +0.3–0.7k measured); acquire reads the landed top (+ the new failed-spin case; δ1 outcome deleted); the `insLanded` AMO postcondition on a word with a pending release; the AMO epoch guard discharged from `landedBeforeOfEpoch`; `lockWinAt`/`lkFold` readings | MCSL | 1.5–2.6k | 10–26 | P-M5 | M− | `WpLock`, `Xv6/Spin*`, `Sleeplock` green |
-| P-M7 | store/fence/device rules (`WpSmodeRules`, `WpStoreOrd`, `WpStoreFree*`, `WpSmodeMint`, `WpSmodeAuRules`, `WpSmodeProc`, `WpSmodeFrame12b`, `WpSmodeFence*`, `WpSmodeDev*`, `WpDevDma` lease premise, `UMemAmo*`/`UkfWalk` drain arms) | MCSL | 0.8–1.4k | 6–14 | P-M6 | M | 219 call-site files rebuild with ≤ mechanical edits |
-| P-M8 | Xv6 fallout (the 87 meaning-shifted lines in 16 files + the `WordHist`-using files), `Boot`, Vtest `HartExec` policy, docs, full acceptance | MCSL | 0.6–1.2k | 5–12 | P-M7 | M | all roots re-proved; `tcb.sh` |
+| P-M1 | ~~`TsoMem`/`Lang` state + arms + δ1 RETIREMENT~~ **DONE — MERGED [rev 56]** (`lrqroyvv`, +1.04k/−1.64k; strict acceptance PASS 4,066 jobs): the route-P state and arms landed with an EAGER-landing staging (`landedEager`), δ1 deleted ([OWN.114]) | MCSL | 0 (was 0.6–1.1k) | — | — | ✓ | |
+| P-M2 | ~~interpretation~~ **DONE — MERGED [rev 56]** (`uusvmmrl`, +1.6k/−0.2k): the `okP` invariant, **`interp_land` PROVED without staging** (the gate), lifting re-proved; `sbNil` staging kept | MCSL | 0 (was 1.1–2.0k) | — | — | ✓ | |
+| P-M3 | ~~lifting + base memModel lemmas~~ **DONE as P-M3a+b — MERGED [rev 56]** (`ouznrlqo`, +1.1k): dual ops, Löb arms, `sbNil` kept; **F-P-M3-1: the flip is inseparable from the readers** → [OWN.122] | MCSL | 0 (was 0.8–1.4k) | — | — | ✓ | |
+| P-M4 | ~~history layer + export sub-definitions over `lp`~~ **DONE as P-M4a/b/c — MERGED [rev 56]** (`uutlwtuz`, +1.54k): `FlatMem.lview`, `stepGrowP`, the export TWINS `xv6AccessDiscP :1547` (`lkCpuReadAtP :1467`, `ksFrameAtP :1539`) + the eager bridge | MCSL | 0 (was 1.5–2.8k) | — | — | ✓ | |
+| **P-M5–8** | **THE SWITCH BRANCH ([OWN.122] (b); RUNNING w1, released by [OWN.123]/[R46.5])**: the switch (plain store = issue; `sbNil`/`landedEager` + issue-stamp conjuncts deleted; the registered read arm `tvn ≤ ltop`; the twins become THE definitions — the flip 1.5–3k), then P-M5 contexts/hops (`memModel_chainHop` with `ctxLanded`, `pendOneOfCtx`), P-M6 locks (release rule from the `epochAt` token, `relAdj`; acquire at the landed top + failed-spin case; `insLanded` AMO postcondition; AMO epoch guard; `lockWinAt`/`lkFold`), P-M7 store/fence/device rules, P-M8 Xv6 fallout + Vtest + docs (`LinkDiscAdequacy`/`RvwmoXv6Adequacy` headers NAME the `holding+0x12` REVISIT [OWN.124]); intermediate states may be RED; strict acceptance ONLY at the end.  NO load-side item enters the branch | MCSL | **5.3–9.8k** | 40–98 | P-M4 ✓ | M− | all registered roots re-proved, statements unchanged, `tcb.sh`, `audit.sh` baseline/opaques unchanged |
+| **Q1–Q8** | **the serial MCSL QUEUE after the branch** (plan REMAINING WORK rows Q1–Q8): Q1 [OWN.115] stuck-on-kernel-fault (+ `spinFenceNext` fold-in) 0.5–1.5k; Q2 M13 `acqExclOk` + clause 13 `lockNzExclAt` [OWN.118] 0.4–0.9k; Q3 walker A/D + DMA `pcAt` −2 stamp 0.1–0.2k; Q4 [OWN.119] load-pc ghost + export 0.3–0.7k; Q5 M12-a 0.3–0.7k; Q6 M12-b 0.4–0.8k [OWN.117]; **Q7 (r1) frame-quiet `∀ j a, ksLiveFrameAtP σ j a → ∀ i ≠ j, ∀ e ∈ σ.sb i, ¬ e.hits a` + (r2) `LkCpuQuiet` (PROGRESS §HEADHOP (a2-lkcpu)) — additive interpretation records on the route-P state [R46.5], 0.5–1.1k**; Q8 `csIssue` export (F-P-W4-1) 0.2–0.4k | MCSL | **2.7–6.3k** (estimates except Q1/Q7) | 21–62 | P-M8 | M | each an append-only export / additive record; `tcb/expected.json` unchanged |
 | **P-W1** | ~~`SbCand` …~~ **DONE — MERGED** (`zsqxzoqp`: `Weak/SbCand.lean` 751 l. — `SbEnt`, `SbPol` four laws, `SbPol.epoch` primary / `SbPol.fifo` fallback / `SbPol.leEpoch`, `execWfP`, `execWfOfOld`; `Weak/SbCandLit.lean` 136 l. — `l1MemberSb` under every lawful policy; `LitmusSBAcqP` §5 (+134 l.) — `l4Cat`/`l4NoMemberP` (policy-independent)/`l4MemberX`; `Weak.lean:804-805`).  Findings: **F-P-W1-1** (the AMO's epoch guard, adopted), **O-P-W1-a** (`LFence false×4` = `fence.i` AND the `sfence.vma` marker → P-W6 fetch marker); forwarded-byte label timestamps → P-W2 | Weak | 0 (1,021 l. landed) | — | — | ✓ | |
-| P-W2 | `SbWalk`/`SbReplay`/`SbAgree`: `valEqX`, the `rdX` arm, `irefGe1`, the two-site taint re-hosted (`ruIlock`/`ruIunlock`, `ruleOfIrefPos`), the forwarded-byte label timestamps, lockstep datum at `relT` (`CertZ9/13`) — **launchable now (w3)** | Weak | 1.0–1.8k | 6–14 | — | M | `agreeW4` with `nf = True` except the two pcs (tainted-lockstep) |
-| P-W3 | THE GATE + **`noStuckP` per §3.4** (items/edges/µ, head table H1–H5, `kernelAmoAq`, PTE custody from 6m F4 (a) 0.3–0.6k); `walkPolP`, `walkRunP` — under (β) NO (E1) census case (FIFO fallback would add the WCrel leaf 0.1–0.3k + `lk->cpu` reader lemma 0.2–0.4k) | Weak | 1.3–2.4k | 10–22 | P-W2 | **M** | `noStuckP` with NO named premise (fallback: NAMED, WEAKER, 0) |
-| P-W4 | kill glue: `cycleKillCoreP` → `CatLin.cycleKillCZT`, `certSupplyP`, `acqAqP`/`relCoversP` at the member (`LockFacts2/3` reuse — absorbs row 6f), `l2ClaimP` with `provAll` | Weak | 0.8–1.4k | 5–11 | P-W3 | M | `t2linSupplyCZTtagged` consumes it |
+| P-W2 | ~~`SbWalk`/`SbReplay`/`SbAgree`~~ **DONE — MERGED [rev 56]** (`xvqkutzu`/`kqnxzksy`/`otywpvqr`; 2,763 l.): `agreeX`/`agreeW3OfX`/`agreeW4OfX`, `memberGwf`, the read arms (`loadArm`, `rdXArm :705`), `valEqX :744`, `ipRefTaint :75`/`ipRefRule :90`, `memberFwdSrc`, `lockBlk`; findings F-P-W2-1 (`irefGe1` not GF-provable → `IrefGF`/`IrefTop` NAMED → M12-a/b), F-P-W2-2, F-P-W2-3, O-P-W2-a | Weak | 0 (was 1.0–1.8k) | — | — | ✓ | |
+| P-W3 | ~~THE GATE + `noStuckP`~~ **DONE modulo its NAMED INPUTS — MERGED [rev 56]** (`LitmusSbStuck` 361, `SbOrd` 1,269, `SbOrdWalk` 757, `LitmusSbStuck2` 239; heads `qxwpnplt`): `noStuckP :1202` modulo `HeadOrd`; H1/H2/H4/H5 PROVED (H4 by (R2″) [OWN.116]); H3 = `HeadOrdRd :251` with (a1) static hops (`SbHeadHop` 306) and (A2) windows (`SbHeadHop2` 551) PROVED; `DevStOrd` DERIVED (`SbDevSt` 587); residue = the per-site named inputs (rows P-W3r below) | Weak | 0 (was 1.3–2.4k) | — | — | ✓ | |
+| P-W4 | ~~kill glue~~ **DONE — MERGED [rev 56]** (`wknttmlq`, `SbKill` 564): class-blind transport (F-6b′-1 (A)), `acqAq`/`relCovers` at the member (6f absorbed), `certSupplyP :461`, `l2ClaimP :507`, `cycleKillAllP`; F-P-W4-1 `csIssue` NAMED → Q8 | Weak | 0 (was 0.8–1.4k) | — | — | ✓ | |
+| **P-W3r-a** | **the `holding+0x12` exemption — F-HH2-1 (a) [OWN.124], REVISIT (owner-flagged)** ([R46.2]; §3.2 `holdCpuPc`/`exemptPc`, `valEqX`'s third clause, `holdCpuTailDies` across `jal mycpu`, the member side from `lkCpuReadAtP :1467` via P-W6) — **RUNNING w3** | Weak | 0.6–1.2k | 5–10 | P-W3 ✓ (member side P-W6) | M | docstring `REVISIT [OWN.124]`; (b) on file |
+| **P-W3r-b** | **`HoldZero`** ([R46.3]; §3.4; `SbHeadHop2.lean:479`) — **RUNNING w3** | Weak | 0.6–1.2k | 4–10 | P-W3 ✓ | M | no MachCSL record |
+| **P-W3r-c** | **`blockedIsCensus`** ([R46.4]; §3.4 (i)) — **RUNNING w2** | Weak | 0.5–1.0k | 4–8 | P-W3 ✓ | M | the boundary of the per-site table, no longer inside (T) |
+| **P-W3r-d** | **the LB-freedom census leaf** ([R46.s1]) — **RUNNING w2** | Weak | 0.05–0.15k | 0.5–1 | — | H | `decide +kernel` |
+| **P-W3r-e** | **`drainLanded` (`PInv` clause) + `DiskDesc` + `VirtioIdx` + `VirtioDesc`** ([R46.6]) | Weak | 0.7–1.5k | 5–12 | P-W3 ✓ | M | |
+| **P-W3r-f** | **`HeldPin`** | Weak | 0.1–0.3k | 1–2 | P-W3 ✓ | M+ | |
+| **P-W3r-g** | **PTE custody at the realized prefix** (Q-6M-PTE (a), [R45.3]) | Weak | 0.3–0.6k | 2–5 | P-W6 | M | |
+| **P-W3r-h** | **`FrameQuiet` + `LkCpuQuiet` Weak glue** from Q7's records through P-W6 | Weak | 0.2–0.4k | 1–3 | Q7, P-W6 | M | |
 | P-W5 | registered W4 re-proof (buffer-empty invariant; stutter/fused arm per P0(c) (6)), M1/M2 re-registration | Weak (after P-M8) | 0.8–1.5k | 6–12 | P-M8 | M+ | `audit --weak --build` 13 roots green |
-| P-W6 | buffered twin W4-P (`rmemP`: `R-sb` (+epochs), `R-lp`), `recRealizedP`; CapF6–10's `readAt` at the member (feeds 6b, 6j E1); **+ a distinct fetch marker for `fence.i` vs the `sfence.vma` marker (O-P-W1-a; `SbCand` does not drain on `LFence false×4`, MachCSL drains at `fence.i`, xv6's `userret` executes one)** | Weak | 1.6–2.8k | 11–22 | P-W5, P-W2 | M− | `segRealized`/`readAt` at `SbCand` members |
-| **Σ P** | | | **13.3–24.0k** (MCSL 7.8–14.1k serial — P0(c)'s measure 6–10k for the churn proper + the epoch token, the merged-head restatement, Vtest and docs —, Weak 5.5–9.9k) | **98–222** | | **M** (machine M after P0(c); progress M) | |
+| P-W6 | buffered twin W4-P (`rmemP`: `R-sb` (+epochs), `R-lp`), `recRealizedP`; CapF6–10's `readAt` at the member (feeds 6b, 6j E1); **+ a distinct fetch marker for `fence.i` vs the `sfence.vma` marker (O-P-W1-a)**; **+ (T) the label↔pc transport and the state map the per-site inputs read through (`lkCpuReadAtP`/`lockWordDiscAtP` at the top; issue stamps vs `gwix` landing positions — 6a's note)** | Weak | 1.6–2.8k | 11–22 | P-W5, P-W2 | M− | `segRealized`/`readAt` at `SbCand` members |
+| **Σ P** (rev 56) | | | **13.5–26.8k** (MCSL 8.0–16.1k serial = the branch 5.3–9.8k + the queue 2.7–6.3k; Weak 5.5–10.7k = P-W5/P-W6 2.4–4.3k + P-W3r 3.1–6.4k); of rev 55's 13.3–24.0k, 8.5–15.8k LANDED | **≈ 100–245** | | **M** (the branch M−; progress M) | |
 
-Order: **P-M1 now** (the MCSL lane is free; P0(c) PASS, [OWN.112]–[OWN.114] RULED, [OWN.113] CONFIRMED) → P-M2 (the
-full `interp_land` early = the gate) → … → P-M8 serial (≈ 3–6 calendar weeks of one slot) ∥ **P-W2 now** (w3) → P-W3
-→ P-W4 ∥ the unaffected rows 6a/6c/6d/6e/6g/6h/6b′ (plan REMAINING WORK); P-W5/P-W6 after P-M8.  Row 6m under P =
-`irefGe1` + the two-site taint (inside P-W2) + PTE custody (inside P-W3) + the lockstep-datum glue 0.3–0.8k; the
-chain-based race-free-read theorem (6m F6) is retired (`valEqX` is it).  Riskiest steps now: **P-M2's full
-`interp_land`** (the landing-sensitive conjuncts `curWordAt`/`uSlotNow`, `mmOk`'s reservation clause) and **P-M6**
-(the release/`started` rules consuming the epoch token; the `insLanded` AMO postconditions) — both M−; `noStuckP` is M.
+Order ([rev 56]): **the switch branch now** (w1; [OWN.122]; released by [OWN.123]/[R46.5]) → P-M5 → P-M6 → P-M7 → P-M8
+(ONE strict acceptance; ≈ 3–6 calendar weeks of one slot) → the queue Q1 → … → Q8 ∥ **P-W3r-a + P-W3r-b (w3) and
+P-W3r-c + P-W3r-d (w2) now** → P-W3r-e/f ∥ the unaffected rows 6e/6g/6h/6m (plan REMAINING WORK); 6c/6d after Q1;
+P-W5/P-W6 after P-M8, then P-W3r-g/h, 6j, 6n, 7, 8.  Row 6m under P = the three-pc taint's Sail meaning (O-P-W2-a,
+inside P-W3r-a) + the lockstep-datum glue 0.3–0.8k; the chain-based race-free-read theorem (6m F6) is retired (`valEqX`
+is it).  Riskiest steps now: **the branch's flip + P-M6** (the release/`started` rules consuming the epoch token; the
+`insLanded` AMO postconditions; one long red stretch) — M−; `noStuckP`'s residue is M (finite table, mostly proved mod
+(T)).  **Rejected by R46 ([OWN.123])**: (P+L) a load side in the twin only (a blocked head realized EARLY with GF's value —
+W4-P must then REORDER, the (R) rescheduling the owner rejected for δ1 [OWN.103]; +3–6k Weak / 25–50 h, M−/L; the value
+interfaces are NOT saved); (M+L) a load side in MachCSL (loads from unlanded foreign stores / promises; +10–25k / 80–200 h
+inside the red branch, L — the WP load rules would return values no history holds, breaking the merged-history ghost
+§2.6; theorem UNCHANGED in meaning since LB is unreachable for this binary).
 
 ## 6. Published statement, trusted base, registered roots
 
@@ -626,7 +831,11 @@ chain-based race-free-read theorem (6m F6) is retired (`valEqX` is it).  Riskies
   realizes is proof content.  **Trusted base: UNCHANGED** — MachCSL is a proof device for T-alloc-RVWMO (confirmed:
   `MachCSL.*` appears nowhere in the published premises; it enters only through the registered MachCSL-tier roots
   the conclusion cites).  No new named premise; `noStuck` NAMED only as the fallback of P-W3 (WEAKER, [R44.7]).
-  **[R45.7] Of `ioResidueGmo`'s arms the replay uses (R3) only (H4/Efab); (R1) is NOT used by P.**
+  **[R45.7] Of `ioResidueGmo`'s arms the replay uses (R3) and — since P-W3 (F-P-W3-2, [OWN.116]) — the NEW (R2″) (H4/Efab:
+  an I/O access po-before a later RAM read is gmo-before it, `GraphFabResidue.ioResidue :123-138`); (R1) is NOT used by
+  P.  [rev 56] (R2″) is trusted platform text STRONGER than RVWMO + PMAs, owner-ruled to be removed with (R1) in A4
+  (REVISIT list item 2); the published statement's header is otherwise unchanged, and the `holding+0x12` exemption
+  [OWN.124] is named in `LinkDiscAdequacy`/`RvwmoXv6Adequacy`'s documentation as REVISIT (row P-M8 / row 8).**
 * **The registered MachCSL-tier roots** (`tools/ci/roots.txt`: `MachCSL.riscvPowerAdequacy`,
   `Xv6.xv6FsAdequacy_closed`/`_xv6GF`, `userProof`, `unionAdequacyClosed`, `unionSyncCutNeg`, `unionResults`,
   `xv6NiAdequacy`/`TwoRun`/`TwoRunObs`/`StrongInstance`/`Out`/`Prefix`/`Det`, `xv6TextAdequacy_closed`,
@@ -655,9 +864,27 @@ chain-based race-free-read theorem (6m F6) is retired (`valEqX` is it).  Riskies
   (R2) and (R2′) stay (also stronger than the ISA; not P's business).  **[R45.s3]** With D48 (i/o fence bits dropped)
   NO in-tree site is ISA-given — all of (R1) is platform text today; the plan's §B(11b) sentence is corrected.
 
-## 7. Σ remaining and % done (rev 55; see the plan's REMAINING WORK for the live table)
+## 7. Σ remaining and % done (rev 56; see the plan's REMAINING WORK for the live table)
 
-Since rev 54: rows 1 (narrow δ1, closed at inc 16b; inc 19 superseded by P), 5 (X1), 5′ (E4) MERGED; 6l's
+**[rev 56]**  Since rev 55: P-M1..P-M4 (MachCSL +5.3k/−1.9k incl. δ1's deletions), P-W2/P-W3/P-W4, `SbDevSt`/`SbHeadHop`/
+`SbHeadHop2`, 6a (glue), 6b′ LANDED — ≈ +14.0k gross — while three things became VISIBLE: the [OWN.122] flip (+1.5–3k,
+inside the P-M5–8 branch), the load-side residue of P-W3 (rows P-W3r-a..h, 3.1–6.4k; R46 §5: ≈ +1.5–3.3k net new over
+what rows P-W3/P-W6/6m already carried) and the serial MCSL queue Q1–Q8 (2.7–6.3k; the records that retire the named
+interim premises of 6a/6d/6j/P-W2/P-W4), and row 6d shrank under [OWN.115] (1.5–3k → 0.4–0.8k).  Under P now: P-M5–8
+branch 5.3–9.8k + Q 2.7–6.3k (MCSL) + P-W5/P-W6 2.4–4.3k + P-W3r 3.1–6.4k (Weak) = **13.5–26.8k**; the rest 6c 0.8–1.5,
+6d 0.4–0.8, 6e 0.8–1.5, 6g 0.3–0.8, 6h 0.5–1.2, 6j 0.8–1.6, 6m 0.3–0.8, 6n 1–2.5, 7 0.4–0.8, 8 0.1–0.2 = 5.4–11.7k.
+**Σ remaining ≈ 18.9–38.5k (mid ≈ 29k; rev 55: 21.2–40.8k / 31k); ≈ 135–340 h (mid ≈ 235 h; the MCSL lane ≈ 3–6 calendar
+weeks for the branch + 2–4 for the queue, Weak in parallel).**  DONE recounted at the tip by the rev-53 diff method (plain
+`diff -ruN` against `~/dev/xv6iris` @ `802a9ab13`; NO git/jj) with EVERY `Weak/Ax*.lean` excluded — the baseline holds 367
+and the weak tree 413 `Ax*` files (46 new + 126 modified) and they belong to the parallel AxSpin effort; rev 55 kept seven
+of them (≈ 14k), so its +128.1k is NOT on this basis: **+128.2k gross / −8.5k removed / +119.6k net** (MachCSL +25.3k,
+Xv6 +11.4k, Vtest +0.1k, Weak non-`Ax` +91.4k; 276 new non-`Ax` files 110.4k).  **% done by lines ≈ 128.2 ÷ (128.2 + 29)
+≈ 82 % (range 77 % at 38.5k remaining … 87 % at 18.9k); net 119.6 ÷ (119.6 + 29) ≈ 81 %**; counting the after-capstone
+A1/A2/A4 (mid 11.5k) ≈ 76 %.  Read with care: the remaining ≈ 18 % is ONE serial MachCSL lane (the red branch, then eight
+queue items) plus Weak work that cannot finish before it (P-W5/P-W6, P-W3r-g/h, 6j, 6n, 7); ≈ 2.7k (CertZ24–34) + ≈ 4–6k of
+`Sil*` consumers are counted as done but superseded-but-green.
+
+*Rev 55's text (the record).*  Since rev 54: rows 1 (narrow δ1, closed at inc 16b; inc 19 superseded by P), 5 (X1), 5′ (E4) MERGED; 6l's
 option-independent core (`SilOrd2`) and 6m's static half (`SilSiteTab`/`SilSiteTaint`/`SilSite`/`SilSiteStep`) landed
 and are now mostly superseded by P (the pattern and the two-site rules are reused).  Under P: rows 6l, 6m's order half,
 6b's twin half, 6f, 6j's E1 are ABSORBED by P-W3/P-W2/P-W6/P-W4; 6m shrinks to the lockstep-datum glue 0.3–0.8k; 6j =
@@ -674,6 +901,67 @@ leaves.  Read with care: the remaining ≈ 20 % is dominated by ONE serial lane 
 superseded-but-green.
 
 ## 8. Owner questions — ALL RULED (owner format kept as the record; [R45.8] informational items at the end)
+
+### Q-R46-LOADSIDE — RULED [OWN.123] (2026-10-19 ~16:xx): (P) — NO load buffer, in the twin or in MachCSL
+
+*Plain-language issue.*  RVWMO lets hardware reorder a hart's loads: a later load may be satisfied before an earlier one
+(different addresses, nothing fencing them), and a later store may even become visible before an earlier load is
+satisfied.  Any GENERAL machine model of RVWMO therefore needs a load-side mechanism besides the store buffer — the
+owner's intuition ([OWN.120]/[OWN.121]).  Our proof does not run a general machine: it replays one known execution graph
+of this kernel at a time on the buffered proof machine, step by step, and handles the reordered-load case by DELAYING
+the competing store instead of reordering the load — the two loads run in program order and the "early" load still
+sees the old value because the overwriting store has not been let through yet; same reads-from and coherence, only the
+bookkeeping order differs, which the theorem does not speak of.  The trick fails only when the earlier load is itself
+waiting for a store that has not arrived — an unlocked read — and xv6 has 18 such read instructions (+ 8 device reads),
+each handled by a static argument (branch or fence next), by "never waiting", or by an exemption.  *Tiny example.*  Hart
+z takes `L` (`amoswap.aq`) and writes its cpu pointer into `L->cpu`; the write sits in z's buffer.  Hart y, trying to take
+`L`, runs `holding`: reads `L->locked` = 1 (z's swap), then `L->cpu` = the OLD value 0 — on hardware because the second
+load was satisfied before z's write arrived; in the replay because z's write has not landed yet.  Same values, same
+reads-from, loads in program order.  *Terms.*  *Load buffer*: a modelling device letting a later load be satisfied
+before an earlier one.  *Store buffer / landing*: a store waits privately in its hart and LANDS later.  *Replay*: the
+proof's step-by-step construction of a run of the proof machine from a graph.  *Blocked read*: one the replay cannot
+take yet because the store it must return has not landed.  *Exempt read*: one the replay takes with a different value,
+allowed when both values give the same branch.  *Options.*  **(P) no load buffer; the per-site fixes** — reads: "the
+proof machine buffers stores exactly as RVWMO allows; loads run in order and read the latest value; every RVWMO
+execution of this kernel is still covered because the proof delays the competing store instead of reordering the load,
+and at three unlocked sanity reads it shows the value does not matter"; FAITHFUL (machine STRONGER only by forbidding a
+reordering xv6 never exhibits); cost = the load-side residue ≈ 3.0–6.3k / 22–50 h in total, ≈ +1.5–3.3k / +10–25 h new.
+**(P+L)** a load side in the twin only (early take, then re-sequence): FAITHFUL but the re-sequencing is the (R)
+rescheduling rejected for δ1 [OWN.103]; +3–6k / 25–50 h, M−/L.  **(M+L)** out-of-order or promised loads in MachCSL:
+machine closer to RVWMO, theorem unchanged in meaning; +10–25k / 80–200 h inside the red branch, L.  **Ruling: (P).**
+
+### Q-R46-HH2 — RULED [OWN.124] (2026-10-19 ~16:xx): (a) exempt `holding+0x12` like `ip->ref` — WITH A REVISIT FLAG
+
+*Plain-language issue.*  In `acquire`, xv6 first calls `holding(lk)` to detect a double acquire: it reads `lk->locked`
+and, if 1, reads `lk->cpu` and compares it with `mycpu()`.  That second read is unlocked and may need a value another
+hart has written but not yet landed; the replay then waits.  Nothing prevents the landing, but the progress
+bookkeeping — a count that must strictly decrease at every wait — treats every upcoming store of the waiting hart as
+something others might wait for, and RVWMO lets the hart's next stores (two pushes onto its own stack inside `mycpu`)
+sit before the blocked read in the global order, so the count cannot be shown to decrease.  A proof artifact, not a
+real stall.  *Tiny example.*  Hart z holds `L`, its `L->cpu = &cpus[z]` still buffered.  Hart x enters `acquire(L)`:
+`holding` reads `L->locked` = 1, then must read `L->cpu`; the graph says it returns z's buffered pointer, so the replay
+waits for z's write to land; meanwhile x's next instructions are `mycpu`'s `sd ra,8(sp)`, `sd s0,0(sp)` — private pushes
+nobody else reads — and the global order may place them before x's blocked read.  *Terms.*  *Measure*: the decreasing
+count.  *Waited-on event*: one the measure counts because some other wait could pass through it.  *Taint*: running the
+hart with a register that differs between the two runs until the difference is dead (here at the `seqz` that makes the
+compare 0 on both sides).  *Stack custody*: no hart touches another hart's live stack frame.  *Options.*  **(a) exempt
+the read** as the two `ip->ref` reads are: the replay reads whatever is there (0 or another hart's pointer), the graph
+reads z's pointer; both differ from x's own pointer, so `holding` returns 0 in both runs — "at three unlocked sanity
+reads the replay may see a different value than the graph; the outcome of the check is the same"; FAITHFUL; 0.6–1.2k
+Weak / 5–10 h; no new MachCSL record (the "a non-holder never reads its own pointer" fact is the export twin
+`lkCpuReadAtP`); plus the shared `HoldZero` ([R46.3]).  **(b) refine the bookkeeping** so a store counts as waited-on
+only when some hart could actually wait on it: "the progress argument knows private stack stores are nobody's
+business"; FAITHFUL and general, but the clause about other harts' NEXT loads needs a new per-load MachCSL record on
+the serial lane; 1.1–2.2k / 9–21 h.  **(c) assume progress** (name `noStuckP`): WEAKER; 0.  **Ruling: (a), "but this
+should be somehow flagged as something to look at again" ⇒ REVISIT [OWN.124] in the Lean docstring, the plan's §D
+REVISIT list (first item), the final theorem's documentation (`LinkDiscAdequacy`/`RvwmoXv6Adequacy` header) and every
+status; (b) kept on file for a second site of this kind (none found).**
+
+*Informational ([rev 56]; no menu).*  (v) **[OWN.122]** Q-P-M3-ORDER = (b): the MachCSL lane switches the machine on a
+RED branch until P-M8 (the coordinator's provisional dual-then-flip (a) is overridden; F-P-M3-1 found the flip
+inseparable from the readers).  (vi) **[OWN.116]** (R2″) — "an I/O access po-before a later RAM read is gmo-before it" —
+is trusted platform text (STRONGER than RVWMO + PMAs, true of QEMU-TCG) used by H4; owner-ruled to be REMOVED with (R1)
+in A4 (REVISIT list item 2).  (vii) **[OWN.117]–[OWN.120]** are MachCSL-lane / export decisions recorded in the plan (§D).
 
 ### Q-P-R1 — RULED [OWN.111] (2026-10-19 ~01:4x): route P RE-CONFIRMED over δ1′ after F-P1
 
@@ -757,7 +1045,24 @@ blocker — (R2)/(R2′) remain trusted platform text.  (iii) Q-6M-PTE (a) stays
 inside P-W3); Q-6M-ORDER / Q-6M-HOLD / Q-6M-GFVAL / Q-6L-PIN are moot under P.  (iv) [OWN.106]'s principle (step by
 step, no order premise) is kept by P; [OWN.107] (B) is unaffected (6j's E2–E4 remain; E1 moves to P-W6).
 
-## 9. Suggestions adopted ([R45.s1]–[R45.s4])
+## 9. Suggestions adopted ([R45.s1]–[R45.s4]; [rev 56] [R46.s1]–[R46.s4])
+
+* **[R46.s1]** a `decide +kernel` leaf "LB-freedom unused" (row P-W3r-d, 0.05–0.15k, w2): for each of the 18 census pcs
+  the instruction path to its certified branch contains no store, except `holding+0x12` (own frames: `mv s1,a5; jal mycpu`
+  → `sd ra`/`sd s0`) and `ismapped+0x10` (return path) — `holding0CtrlNext`, `main16FenceNext`, `vdiShape`, `ptePctrlAlu`
+  exist; `ilock+0xe`/`iunlock+0x1c` (`blez` next) and the two exceptions added as explicit statements.  It documents §1
+  row L6: MachCSL-P's only load-side strengthening (no LB) is never exercised by a GF of this binary.
+* **[R46.s2]** §1: `HRead`'s stale-view freedom (`tv` never raised by a plain load) is RVWMO's rules 2–3 in view form, left
+  unused by the replay (member loads at the landed top); it stays for the Xv6 proofs.
+* **[R46.s3]** census notes (§3.4 table; plan row 8's docs): `procdump` has no call site in the image (DEAD TEXT; the only
+  references to `0x80002412` in `Xv6/KernelImage.lean` are its own entry and `KernelSyms.procdump`; its contract is stated
+  unsatisfiable, `SpecProcdump.lean:40-45`), so its unlocked `p->state` reads are unreachable; `forkret+0x18`'s `first`
+  read (`0x800019c6`) is chained through fork's `release(&np->lock)` (the writer `0x800019d6` is po-before it); this image
+  has no `panicked`/`pr.locking` (panic paths end in `unreachable`).  Note: `~/dev/xv6-riscv/kernel/kernel.asm` is a
+  DIFFERENT build (`holding` at `0x80000b82`, a `panicking` global) — every instruction fact here is from
+  `Xv6/KernelImage.lean`.
+* **[R46.s4]** the 12 named inputs of §3.4 get ONE table in the plan (after REMAINING WORK: owner, size, status), so the
+  status reports can tick them.
 
 * **[R45.s1]** `Weak/LitmusSBAcq.lean:4` "A LEAF: nothing imports this file" is STALE — `Weak/LitmusSBAcqP.lean:64`
   imports it and `Weak.lean:802-803` imports both; `LitmusSBAcqP.lean:3` says the same of itself.  Docstring fix →
