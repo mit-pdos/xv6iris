@@ -16,6 +16,11 @@ privilege (`sret`, `WpSmodeSretU`).
 
 Interrupts are off at every trampoline instruction (`SConfPhys c false`):
 the dispatch finds nothing, so there is no trap branch.
+
+Since sail-riscv 0.16 the cycle has the shape `MachCSL.WpSmodeCycleBase`
+describes: the `update_mip` prologue (`cycle_prologue`), the Sdtrig
+breakpoint-reentrancy check before the fetch (`cycle_prefetch_s`), and the
+per-cycle `cycleAux` cells at the retire (`cycle_retire_su`).
 -/
 import MachCSL.WpSmodeCycle
 
@@ -40,27 +45,34 @@ theorem swp_tick_clock_cells_SU (cpu : CPU) (dq : DFrac) (p : Privilege)
   swp_tick_clock_hs cpu dq p c (HartState.HART_ACTIVE ()) mcycle mtime mip Φ
 
 set_option hygiene false in
-/-- The retire stage of a cycle landing in privilege `p'` (`hp'`). -/
+/-- The retire stage of a cycle landing in privilege `p'` (`hp'`).  Since 0.16
+the retire also runs the (disabled) Sdtrig icount check, clears
+`written_event_index` and checks `written_trigger_index = none`: the
+`cycleAux` cells (as `cycle_retire_t`, with the tick at `p'`). -/
 macro "cycle_retire_su" : tactic =>
   `(tactic| (cases tick
-             · swp_run 40
+             · swp_run 60
                (try split)
                all_goals
-                 swp_run 10
+                 swp_run 40
                  conf_intro HmConf
+                 ihave Haux := cycleAux_introW _ _ _ $$ Hmsip Hwritten_event_index Hwritten_trigger_index
                  ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip
+                   Haux
                  ihave Hpc := pcIs_introW _ _ $$ HPC HnextPC
                  iapply HΦ $$ HmConf Hclock Hpc HR HQ
-             · swp_run 40
+             · swp_run 60
                (try split)
                all_goals
-                 swp_run 5
+                 swp_run 40
                  conf_intro HmConf
                  iapply swp_tick_clock_cells_SU (hp := hp')
                  iframe
                  inext
                  iintro %mcycle' %mtime' %mip' HmConf Hmcycle Hmtime Hmip
+                 ihave Haux := cycleAux_introW _ _ _ $$ Hmsip Hwritten_event_index Hwritten_trigger_index
                  ihave Hclock := clockCells_introW _ _ _ _ _ _ $$ Hminstret_increment Hminstret Hmcycle Hmtime Hmip
+                   Haux
                  ihave Hpc := pcIs_introW _ _ $$ HPC HnextPC
                  iapply HΦ $$ HmConf Hclock Hpc HR HQ))
 
@@ -81,8 +93,9 @@ theorem wpLoop_sT_base (cpu : CPU) (c c' : MConf) (hok : SConfPhys (GF := GF) c 
     ▷ (confCells cpu (DFrac.own 1) p' c' -∗ clockCells cpu -∗ pcIs cpu npc -∗ R -∗ Q -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
   iintro ⟨HmConf, Hclock, Hpc, HT, HR, HP, HΦ⟩
-  ihave ⟨%mi, %minstret, %mcycle, %mtime, %mip, Hminstret_increment, Hminstret, Hmcycle, Hmtime, Hmip⟩ :=
+  ihave ⟨%mi, %minstret, %mcycle, %mtime, %mip, Hminstret_increment, Hminstret, Hmcycle, Hmtime, Hmip, Haux⟩ :=
     clockCells_cases _ $$ Hclock
+  ihave ⟨%msip, %wei, Hmsip, Hwritten_event_index, Hwritten_trigger_index⟩ := cycleAux_cases _ $$ Haux
   ihave ⟨HPC, HnextPC⟩ := pcIs_cases _ _ $$ Hpc
   iapply wpLoop_restart
   iintro %tick %ew
@@ -91,6 +104,7 @@ theorem wpLoop_sT_base (cpu : CPU) (c c' : MConf) (hok : SConfPhys (GF := GF) c 
   iapply swp_wpHart
   conf_cases HmConf
   unfold try_step
+  cycle_prologue
   swp_run 40
   -- `should_inc_minstret`: `minstretcfg` is read only under `mcountinhibit.IR = 0`
   iapply swp_bind
@@ -99,8 +113,6 @@ theorem wpLoop_sT_base (cpu : CPU) (c c' : MConf) (hok : SConfPhys (GF := GF) c 
   iframe Hhw
   iintro %mig
   swp_run 40
-  try (ihave Hmie := (show (Register.mie ↦ᵣ[cpu] (0x220#64) : IProp GF) ⊢ Register.mie ↦ᵣ[cpu] c.mie
-    by rw [hmie']; try exact .rfl) $$ Hmie)
   conf_intro HmConf
   iapply swp_bind
   iapply swp_dispatchInterrupt_S (hmie := hmie)
@@ -109,13 +121,16 @@ theorem wpLoop_sT_base (cpu : CPU) (c c' : MConf) (hok : SConfPhys (GF := GF) c 
   iintro %ipw HmConf Hmip
   have hd := dispatchS_off c ipw (by simpa using hok.2.1.1)
   try simp only [hd]
-  swp_run 40
+  cycle_prefetch_s
   iapply swp_bind
   iapply (hfetch _)
   iframe
   inext
   iintro HmConf HPC HT HR
+  -- 0.16: the fetched-instruction trigger check reads the privilege and `PC`
+  conf_cases HmConf
   swp_run 40
+  conf_intro HmConf
   iapply swp_bind
   iapply (hdec _)
   iframe
@@ -148,8 +163,9 @@ theorem wpLoop_sT_rvc (cpu : CPU) (c c' : MConf) (hok : SConfPhys (GF := GF) c f
     ▷ (confCells cpu (DFrac.own 1) p' c' -∗ clockCells cpu -∗ pcIs cpu npc -∗ R -∗ Q -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
   iintro ⟨HmConf, Hclock, Hpc, HT, HR, HP, HΦ⟩
-  ihave ⟨%mi, %minstret, %mcycle, %mtime, %mip, Hminstret_increment, Hminstret, Hmcycle, Hmtime, Hmip⟩ :=
+  ihave ⟨%mi, %minstret, %mcycle, %mtime, %mip, Hminstret_increment, Hminstret, Hmcycle, Hmtime, Hmip, Haux⟩ :=
     clockCells_cases _ $$ Hclock
+  ihave ⟨%msip, %wei, Hmsip, Hwritten_event_index, Hwritten_trigger_index⟩ := cycleAux_cases _ $$ Haux
   ihave ⟨HPC, HnextPC⟩ := pcIs_cases _ _ $$ Hpc
   iapply wpLoop_restart
   iintro %tick %ew
@@ -158,6 +174,7 @@ theorem wpLoop_sT_rvc (cpu : CPU) (c c' : MConf) (hok : SConfPhys (GF := GF) c f
   iapply swp_wpHart
   conf_cases HmConf
   unfold try_step
+  cycle_prologue
   swp_run 40
   -- `should_inc_minstret`: `minstretcfg` is read only under `mcountinhibit.IR = 0`
   iapply swp_bind
@@ -166,8 +183,6 @@ theorem wpLoop_sT_rvc (cpu : CPU) (c c' : MConf) (hok : SConfPhys (GF := GF) c f
   iframe Hhw
   iintro %mig
   swp_run 40
-  try (ihave Hmie := (show (Register.mie ↦ᵣ[cpu] (0x220#64) : IProp GF) ⊢ Register.mie ↦ᵣ[cpu] c.mie
-    by rw [hmie']; try exact .rfl) $$ Hmie)
   conf_intro HmConf
   iapply swp_bind
   iapply swp_dispatchInterrupt_S (hmie := hmie)
@@ -176,13 +191,16 @@ theorem wpLoop_sT_rvc (cpu : CPU) (c c' : MConf) (hok : SConfPhys (GF := GF) c f
   iintro %ipw HmConf Hmip
   have hd := dispatchS_off c ipw (by simpa using hok.2.1.1)
   try simp only [hd]
-  swp_run 40
+  cycle_prefetch_s
   iapply swp_bind
   iapply (hfetch _)
   iframe
   inext
   iintro HmConf HPC HT HR
+  -- 0.16: the fetched-instruction trigger check reads the privilege and `PC`
+  conf_cases HmConf
   swp_run 40
+  conf_intro HmConf
   iapply swp_bind
   iapply (hdec _)
   iframe
