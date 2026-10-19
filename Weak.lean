@@ -803,6 +803,8 @@ import Weak.LitmusSBAcq
 import Weak.LitmusSBAcqP
 import Weak.SbCand
 import Weak.SbCandLit
+import Weak.SbWalk
+import Weak.SbAgree
 import Weak.SilWalk2
 import Weak.SilWalk
 import Weak.SilKill
