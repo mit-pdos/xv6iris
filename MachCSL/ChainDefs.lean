@@ -1426,8 +1426,8 @@ device-ring arm: the used ring's hart-authored entries -- hart 0's boot
 zeroes -- are now CERTIFIED, `Xv6.DiskAcc.usedIdx_certs`.) -/
 def chainExAt (rs : List RsvRegion) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop) (m : FlatMem)
     (top : Nat) (a : PAddr) (t : Nat) : Prop :=
-  lockPubByteIn rs a ∨ (∃ b, dynLkDiscAt rs wit m top b t ∧ lockWordsByte b a) ∨ ptByteExAt rs m t a ∨
-    racyValAt rs m t a
+  lockPubByteIn rs a ∨ (∃ b, dynLkDiscAt rs wit m top b t ∧ lockWordsByte b a ∧ ¬ ksByteAt rs m t a) ∨
+    ptByteExAt rs m t a ∨ racyValAt rs m t a
 
 /-- Reading AS OF a position at or below the top is unchanged by a step that
 adds entries above the top only. -/
@@ -1559,9 +1559,9 @@ only (at the positions at or below the old top). -/
 theorem chainExAt_grow {rs : List RsvRegion} {wit : List (PAddr × HEnt) → PAddr → Nat → Prop}
     {m m' : FlatMem} {top top' : Nat} (hg : memGrow m top m') (hm : memAbove m top m') (htop : top ≤ top')
     (a : PAddr) (t : Nat) (ht : t ≤ top) (h : chainExAt rs wit m top a t) : chainExAt rs wit m' top' a t := by
-  rcases h with h | ⟨b, hb, hw⟩ | h | h
+  rcases h with h | ⟨b, hb, hw, hk⟩ | h | h
   · exact .inl h
-  · exact .inr (.inl ⟨b, dynLkDiscAt_mono hg htop hb, hw⟩)
+  · exact .inr (.inl ⟨b, dynLkDiscAt_mono hg htop hb, hw, fun h' => hk ((ksByteAt_grow hg hm ht a).1 h')⟩)
   · exact .inr (.inr (.inl ((ptByteExAt_grow hg hm ht a).2 h)))
   · exact .inr (.inr (.inr ((racyValAt_grow hg hm ht a).2 h)))
 
@@ -1569,9 +1569,9 @@ theorem chainExAt_grow {rs : List RsvRegion} {wit : List (PAddr × HEnt) → PAd
 theorem chainExAt_top {rs : List RsvRegion} {wit : List (PAddr × HEnt) → PAddr → Nat → Prop}
     {m : FlatMem} {top top' : Nat} (htop : top ≤ top') (a : PAddr) (t : Nat)
     (h : chainExAt rs wit m top a t) : chainExAt rs wit m top' a t := by
-  rcases h with h | ⟨b, hb, hw⟩ | h | h
+  rcases h with h | ⟨b, hb, hw, hk⟩ | h | h
   · exact .inl h
-  · exact .inr (.inl ⟨b, dynLkDiscAt_mono (memGrow_refl m top) htop hb, hw⟩)
+  · exact .inr (.inl ⟨b, dynLkDiscAt_mono (memGrow_refl m top) htop hb, hw, hk⟩)
   · exact .inr (.inr (.inl h))
   · exact .inr (.inr (.inr h))
 

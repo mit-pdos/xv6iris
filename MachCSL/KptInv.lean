@@ -581,11 +581,13 @@ theorem kpt_readAU [CurCtx] (cpu : CPU) (t : PTree) (M : RegMapF (BitVec 64)) (a
           iapply Hkc $$ %j %(addr + BitVec.ofNat 64 j) %e %⟨hj, het⟩
         · iright
           unfold exCertAt
-          iexists []
+          iexists [], []
+          isplitl []
+          · exact BigSepL.bigSepL_nil_intro
           isplitl []
           · exact BigSepL.bigSepL_nil_intro
           ipureintro
-          intro σ _ _ hcs _
+          intro σ _ _ hcs _ _
           have hr := hcs _ List.mem_cons_self
           have h1 := hcs _ (List.mem_cons_of_mem _ List.mem_cons_self)
           have h0 := hcs _ (List.mem_cons_of_mem _ (List.mem_cons_of_mem _ List.mem_cons_self))
@@ -691,11 +693,13 @@ theorem kpt_exclReadAUS [CurCtx] (cpu : CPU) (t : PTree) (M : RegMapF (BitVec 64
         iapply Hkc $$ %j %(addr + BitVec.ofNat 64 j) %e %⟨hj, het⟩
       · iright
         unfold exCertAt
-        iexists []
+        iexists [], []
+        isplitl []
+        · exact BigSepL.bigSepL_nil_intro
         isplitl []
         · exact BigSepL.bigSepL_nil_intro
         ipureintro
-        intro σ _ _ hcs _
+        intro σ _ _ hcs _ _
         have hr := hcs _ List.mem_cons_self
         have h1 := hcs _ (List.mem_cons_of_mem _ List.mem_cons_self)
         have h0 := hcs _ (List.mem_cons_of_mem _ (List.mem_cons_of_mem _ List.mem_cons_self))
@@ -1590,337 +1594,15 @@ def transSlotAt [CurCtx] (cpu : CPU) : KTier → BitVec 44 → IProp GF
   | .kpt, root => kptSlot cpu root
 
 
-/-! ## The sealed table AFTER the seal (mcslrec (3) X1-b, [OWN.90] [OWN.104] (b))
-
-The record (`kptSealOk`, `kptHistsAt`) pins every sealed slot's value AS OF the seal; every
-entry after it is a whole-doubleword store of an A/D variant of the slot's canonical value.  So
-as of every position `t ≥ S` a frozen slot still holds its canonical value and a leaf a variant
-of it (`KptInv.slot_asOfGe`), every sealed slot holds SOME value (`KptInv.slot_existsGe`), and a
-walk from the permanent root visits only sealed pages (`KptInv.root_inGe`, `KptInv.page_inGe`).
-Pure facts of the memory. -/
-
-/-- A kernel leaf's bytes `1 .. 7` do not depend on its `A`/`D` bits. -/
-theorem KptInv.kLeaf_byte_hi (ppn : BitVec 44) (perm : KPerm) (a d a' d' : BitVec 1) (j : Nat) (hj0 : 0 < j)
-    (hj : j < 8) : nthByte (n := 8) (kLeaf ppn perm a d) j = nthByte (n := 8) (kLeaf ppn perm a' d') j := by
-  have : j = 1 ∨ j = 2 ∨ j = 3 ∨ j = 4 ∨ j = 5 ∨ j = 6 ∨ j = 7 := by omega
-  rcases this with rfl | rfl | rfl | rfl | rfl | rfl | rfl <;> cases perm <;>
-    simp only [nthByte, kLeaf, pteSetAD, mkPte, KPerm.flags, Sail.BitVec.extractLsb,
-      Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', BitVec.extractLsb,
-      _update_PTE_Flags_A, _update_PTE_Flags_D] <;> bv_decide
-
-/-- A doubleword each byte of which is that byte of SOME `A`/`D` variant of a kernel leaf is a
-variant of it. -/
-theorem KptInv.pteVariant_of_bytes {ppn : BitVec 44} {perm : KPerm} {a d : BitVec 1} {v : BitVec 64}
-    (h : ∀ j, j < 8 → ∃ w, pteVariant (kLeaf ppn perm a d) w ∧ nthByte (n := 8) v j = nthByte (n := 8) w j) :
-    pteVariant (kLeaf ppn perm a d) v := by
-  obtain ⟨w0, hw0, h0⟩ := h 0 (by omega)
-  obtain ⟨a0, d0, rfl⟩ := pteVariant_of_kLeaf ppn perm a d hw0
-  have hv : v = kLeaf ppn perm a0 d0 := by
-    apply bv_eq_of_bytes (n := 8)
-    intro j hj
-    by_cases hj0 : j = 0
-    · subst hj0; exact h0
-    · obtain ⟨w, hw, hj'⟩ := h j hj
-      obtain ⟨a', d', rfl⟩ := pteVariant_of_kLeaf ppn perm a d hw
-      rw [hj']
-      exact KptInv.kLeaf_byte_hi ppn perm a' d' a0 d0 j (by omega) hj
-  rw [hv]
-  exact pteVariant_kLeaf ppn perm a d a0 d0
-
-/-- The first entry at or below `t ≥ S`, when it is at or below `S`, is the first at or below `S`. -/
-theorem KptInv.find_ge {S t : Nat} (hSt : S ≤ t) : ∀ {H : Hist} {e : HEnt},
-    H.find? (fun e => decide (e.t ≤ t)) = some e → e.t ≤ S → H.find? (fun e => decide (e.t ≤ S)) = some e
-  | [], _, h, _ => by simp at h
-  | x :: H, e, h, he => by
-    by_cases hx : x.t ≤ t
-    · rw [List.find?_cons_of_pos (by simpa using hx)] at h
-      obtain rfl := Option.some.inj h
-      exact List.find?_cons_of_pos (by simpa using he)
-    · rw [List.find?_cons_of_neg (by simpa using hx)] at h
-      rw [List.find?_cons_of_neg (by simp only [decide_eq_true_eq]; omega)]
-      exact KptInv.find_ge hSt h he
-
-/-- An entry at or below `S` is found at or below every `t ≥ S`. -/
-theorem KptInv.find_some_ge {S t : Nat} (hSt : S ≤ t) {H : Hist} {e : HEnt}
-    (h : H.find? (fun e => decide (e.t ≤ S)) = some e) : ∃ e', H.find? (fun e => decide (e.t ≤ t)) = some e' := by
-  have he := List.mem_of_find?_eq_some h
-  have hS := List.find?_some h
-  simp only [decide_eq_true_eq] at hS
-  cases hf : H.find? (fun e => decide (e.t ≤ t)) with
-  | some e' => exact ⟨e', rfl⟩
-  | none =>
-    rw [List.find?_eq_none] at hf
-    have := hf e he
-    simp only [decide_eq_true_eq] at this
-    omega
-
-/-- Eight bytes are the bytes of a doubleword. -/
-theorem KptInv.word_of_bytes (b : Nat → BitVec 8) : ∃ v : BitVec 64, ∀ j, j < 8 → nthByte (n := 8) v j = b j := by
-  refine ⟨b 7 ++ b 6 ++ b 5 ++ b 4 ++ b 3 ++ b 2 ++ b 1 ++ b 0, fun j hj => ?_⟩
-  have : j = 0 ∨ j = 1 ∨ j = 2 ∨ j = 3 ∨ j = 4 ∨ j = 5 ∨ j = 6 ∨ j = 7 := by omega
-  rcases this with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
-  · generalize b 0 = b0, b 1 = b1, b 2 = b2, b 3 = b3, b 4 = b4, b 5 = b5, b 6 = b6, b 7 = b7
-    simp only [nthByte]
-    bv_decide
-
-/-- **A sealed slot's value as of any position past the seal**: its canonical value (frozen) or
-an `A`/`D` variant of it (a leaf). -/
-theorem KptInv.slot_asOfGe {rs : List RsvRegion} {m : FlatMem} {top S : Nat} {dyn : List KSlot}
-    (hok : kptSealOk rs m top S dyn) (hh : kptHistsAt m S dyn) {d : KSlot} (hd : d ∈ dyn) {t : Nat}
-    (hSt : S ≤ t) {v : BitVec 64} (hv : wordAsOf m d.addr t v) :
-    if d.frozen then v = d.c else pteVariant d.c v := by
-  obtain ⟨Hs, hm, ⟨v0, hv0, hc0⟩, hent⟩ := hh d hd
-  have hb : ∀ j, j < 8 → ∃ w, (if d.frozen then w = d.c else pteVariant d.c w) ∧
-      nthByte (n := 8) v j = nthByte (n := 8) w j := by
-    intro j hj
-    have h1 := hv j hj
-    unfold FlatMem.entAsOf at h1
-    rw [hm j hj, Option.bind_some] at h1
-    cases hf : (Hs j).find? (fun e => decide (e.t ≤ t)) with
-    | none => rw [hf] at h1; cases h1
-    | some e =>
-      rw [hf, Option.map_some, Option.some.injEq] at h1
-      by_cases hle : e.t ≤ S
-      · have h2 := hv0 j hj
-        rw [KptInv.find_ge hSt hf hle, Option.map_some, Option.some.injEq] at h2
-        exact ⟨v0, hc0, by rw [← h1, h2]⟩
-      · obtain ⟨hfz, _, w, hw, hwv, _⟩ := hent j hj e (List.mem_of_find?_eq_some hf) (by omega)
-        refine ⟨w, ?_, by rw [← h1, hwv]⟩
-        rw [hfz]
-        simp only [Bool.false_eq_true, ↓reduceIte]
-        exact hw
-  cases hfz : d.frozen
-  · simp only [Bool.false_eq_true, ↓reduceIte]
-    obtain ⟨ppn, perm, a, dd, hcd⟩ := (hok.2.2.1 d hd).1 hfz
-    rw [hcd]
-    refine KptInv.pteVariant_of_bytes (fun j hj => ?_)
-    obtain ⟨w, hw, hj'⟩ := hb j hj
-    rw [hfz] at hw
-    simp only [Bool.false_eq_true, ↓reduceIte] at hw
-    exact ⟨w, by rw [← hcd]; exact hw, hj'⟩
-  · simp only [↓reduceIte]
-    apply bv_eq_of_bytes (n := 8)
-    intro j hj
-    obtain ⟨w, hw, hj'⟩ := hb j hj
-    rw [hfz] at hw
-    simp only [↓reduceIte] at hw
-    rw [hj', hw]
-
-/-- **Every sealed slot holds some value as of every position past the seal.** -/
-theorem KptInv.slot_existsGe {m : FlatMem} {S : Nat} {dyn : List KSlot} (hh : kptHistsAt m S dyn) {d : KSlot}
-    (hd : d ∈ dyn) {t : Nat} (hSt : S ≤ t) : ∃ v, wordAsOf m d.addr t v := by
-  obtain ⟨Hs, hm, ⟨v0, hv0, _⟩, _⟩ := hh d hd
-  have hb : ∀ j, j < 8 → ∃ x : BitVec 8, (m.entAsOf (d.addr + BitVec.ofNat 64 j) t).map HEnt.v = some x := by
-    intro j hj
-    have h2 := hv0 j hj
-    cases hf : (Hs j).find? (fun e => decide (e.t ≤ S)) with
-    | none => rw [hf] at h2; cases h2
-    | some e =>
-      obtain ⟨e', he'⟩ := KptInv.find_some_ge hSt hf
-      refine ⟨e'.v, ?_⟩
-      unfold FlatMem.entAsOf
-      rw [hm j hj, Option.bind_some, he', Option.map_some]
-  obtain ⟨v, hv⟩ := KptInv.word_of_bytes (fun j => if h : j < 8 then Classical.choose (hb j h) else 0#8)
-  refine ⟨v, fun j hj => ?_⟩
-  rw [hv j hj, dif_pos hj]
-  exact Classical.choose_spec (hb j hj)
-
-/-- A child, as of a position past the seal, of a sealed page is a sealed, page-aligned page. -/
-theorem KptInv.child_inGe {rs : List RsvRegion} {m : FlatMem} {top S : Nat} {dyn : List KSlot}
-    (hok : kptSealOk rs m top S dyn) (hh : kptHistsAt m S dyn) {t : Nat} (hSt : S ≤ t) {q p : PAddr}
-    (hq : pageIn dyn q) (hc : ptChildAt m t q p) : pageIn dyn p := by
-  obtain ⟨i, v, hi, hv, hp⟩ := hc
-  obtain ⟨d, hd, haddr⟩ := hq i hi
-  have hs := KptInv.slot_asOfGe hok hh hd hSt (v := v) (by rw [haddr]; exact hv)
-  cases hfz : d.frozen
-  · simp only [hfz, Bool.false_eq_true, ↓reduceIte] at hs
-    obtain ⟨ppn, perm, a, dd, hcd⟩ := (hok.2.2.1 d hd).1 hfz
-    rw [hcd] at hs
-    obtain ⟨a', d', rfl⟩ := pteVariant_of_kLeaf ppn perm a dd hs
-    exact absurd hp (KptInv.not_ptPtrTo_kLeaf ppn perm a' d' p)
-  · simp only [hfz, ↓reduceIte] at hs
-    subst hs
-    exact hok.2.2.2.2 d hd hfz p hp
-
-/-- A root page, as of a position past the seal, of a permanent root word is a sealed page. -/
-theorem KptInv.root_inGe {rs : List RsvRegion} {m : FlatMem} {top S : Nat} {dyn : List KSlot}
-    (hok : kptSealOk rs m top S dyn) (hh : kptHistsAt m S dyn) {t : Nat} (hSt : S ≤ t) {r : PAddr}
-    (hr : ptRootAt rs m t r) : pageIn dyn r := by
-  obtain ⟨hr0, base, cnt, stride, k, hR, hk, hw⟩ := hr
-  obtain ⟨d, hd, haddr, hfz, _, hpage⟩ := hok.2.2.2.1 base cnt stride k hR hk
-  have hs := KptInv.slot_asOfGe hok hh hd hSt (v := r) (by rw [haddr]; exact hw)
-  simp only [hfz, ↓reduceIte] at hs
-  subst hs
-  exact hpage hr0
-
-/-- Every page a walk from a sealed page visits as of a position past the seal is sealed. -/
-theorem KptInv.page_inGe {rs : List RsvRegion} {m : FlatMem} {top S : Nat} {dyn : List KSlot}
-    (hok : kptSealOk rs m top S dyn) (hh : kptHistsAt m S dyn) {t : Nat} (hSt : S ≤ t) {r p : PAddr}
-    (hr : pageIn dyn r) (hp : ptPageAt m t r p) : pageIn dyn p := by
-  rcases hp with rfl | hc | ⟨q, h1, h2⟩
-  · exact hr
-  · exact KptInv.child_inGe hok hh hSt hr hc
-  · exact KptInv.child_inGe hok hh hSt (KptInv.child_inGe hok hh hSt hr h1) h2
-
-/-- A publication word written as of `t` is written after the seal: `S < t`. -/
-theorem KptInv.pubWritten_gt {rs : List RsvRegion} {m : FlatMem} {top S : Nat} {dyn : List KSlot}
-    (hok : kptSealOk rs m top S dyn) {t : Nat} (hp : pubWrittenAt rs m t) : S < t := by
-  obtain ⟨f, w, e, hR, he, he0⟩ := hp
-  unfold FlatMem.entAsOf at he
-  cases hH : m[f]? with
-  | none => rw [hH] at he; cases he
-  | some H =>
-    rw [hH, Option.bind_some] at he
-    have hmem := List.mem_of_find?_eq_some he
-    have hle := List.find?_some he
-    simp only [decide_eq_true_eq] at hle
-    have := hok.2.1 f w hR f (RsvRegion.base_mem _ rfl) H hH e hmem he0
-    omega
-
-/-- A publication word written as of `s` is written as of every `t ≥ s`. -/
-theorem KptInv.pubWritten_mono {rs : List RsvRegion} {m : FlatMem} {s t : Nat} (hst : s ≤ t)
-    (hp : pubWrittenAt rs m s) : pubWrittenAt rs m t := by
-  obtain ⟨f, w, e, hR, he, he0⟩ := hp
-  unfold FlatMem.entAsOf at he
-  cases hH : m[f]? with
-  | none => rw [hH] at he; cases he
-  | some H =>
-    rw [hH, Option.bind_some] at he
-    have hle := List.find?_some he
-    simp only [decide_eq_true_eq] at hle
-    obtain ⟨e', he'⟩ := KptInv.find_some_ge hst he
-    refine ⟨f, w, e', hR, by unfold FlatMem.entAsOf; rw [hH, Option.bind_some, he'], fun h0 => ?_⟩
-    -- the entry found at `t` is `e` or one before it, past `s`
-    have key : ∀ (L : List HEnt), L.find? (fun e => decide (e.t ≤ s)) = some e →
-        L.find? (fun e => decide (e.t ≤ t)) = some e' → e'.t ≠ 0 := by
-      intro L
-      induction L with
-      | nil => intro h; simp at h
-      | cons x L ih =>
-        intro h1 h2
-        by_cases hx : x.t ≤ s
-        · rw [List.find?_cons_of_pos (by simpa using hx)] at h1
-          rw [List.find?_cons_of_pos (by simp only [decide_eq_true_eq]; omega)] at h2
-          obtain rfl := Option.some.inj h1
-          obtain rfl := Option.some.inj h2
-          exact he0
-        · rw [List.find?_cons_of_neg (by simpa using hx)] at h1
-          by_cases hxt : x.t ≤ t
-          · rw [List.find?_cons_of_pos (by simpa using hxt)] at h2
-            obtain rfl := Option.some.inj h2
-            omega
-          · rw [List.find?_cons_of_neg (by simpa using hxt)] at h2
-            exact ih h1 h2
-    exact key H he he' h0
-
-
-/-! ## The kernel-stack pages as of the seal, and the stack-free receipts (mcslrec (3) X1-c) -/
-
-/-- A leaf names a page-aligned page. -/
-theorem KptInv.leafTo_aligned {v : BitVec 64} {p : PAddr} (h : ptLeafTo v p) : p.toNat % 4096 = 0 := by
-  obtain ⟨_, _, rfl⟩ := h
-  rw [BitVec.toNat_and, show (4096 : Nat) = 2 ^ 12 from rfl, Nat.and_mod_two_pow]
-  have hm : (0x00FFFFFFFFFFF000#64).toNat % 2 ^ 12 = 0 := by decide
-  rw [hm, Nat.and_zero]
-
-/-- A kernel leaf's page does not depend on its `A`/`D` bits. -/
-theorem KptInv.ptLeafTo_ad (ppn : BitVec 44) (perm : KPerm) (a d a' d' : BitVec 1) (p : PAddr)
-    (h : ptLeafTo (kLeaf ppn perm a d) p) : ptLeafTo (kLeaf ppn perm a' d') p := by
-  obtain ⟨_, _, hp⟩ := h
-  refine ⟨(kLeaf_valid ppn perm a' d').1, (kLeaf_valid ppn perm a' d').2, ?_⟩
-  rw [hp]
-  cases perm <;>
-    simp only [kLeaf, pteSetAD, mkPte, KPerm.flags, Sail.BitVec.extractLsb, Sail.BitVec.updateSubrange,
-      Sail.BitVec.updateSubrange', BitVec.extractLsb, _update_PTE_Flags_A, _update_PTE_Flags_D] <;>
-    bv_decide
-
-/-- **A kernel-stack page past the seal is one as of the seal** (the walk reads the same frozen
-pointers and a variant of the same leaf). -/
-theorem KptInv.kstk_toS {rs : List RsvRegion} {m : FlatMem} {top S : Nat} {dyn : List KSlot}
-    (hok : kptSealOk rs m top S dyn) (hh : kptHistsAt m S dyn) {t : Nat} (hSt : S ≤ t) {p : PAddr}
-    (hp : kstkPageAt rs m t p) : kstkPageAt rs m S p := by
-  obtain ⟨base, cnt, vhi, i, r, hR, hi, ⟨hr0, base', cnt', stride, k, hR', hk, hw⟩, v2, v1, v0, p1, p0, w2, pp2,
-    w1, pp1, w0, pl⟩ := hp
-  obtain ⟨d, hd, haddr, hfz, _, hpage⟩ := hok.2.2.2.1 base' cnt' stride k hR' hk
-  have hs := KptInv.slot_asOfGe hok hh hd hSt (v := r) (by rw [haddr]; exact hw)
-  simp only [hfz, ↓reduceIte] at hs
-  have hrS : wordAsOf m (base' + BitVec.ofNat 64 (stride * k)) S r := by
-    obtain ⟨v, hv⟩ := KptInv.slot_existsGe hh hd (Nat.le_refl S)
-    have e := KptInv.slot_asOfGe hok hh hd (Nat.le_refl S) hv
-    simp only [hfz, ↓reduceIte] at e
-    rw [← haddr, hs, ← e]
-    exact hv
-  have hpr : pageIn dyn r := by rw [hs]; exact hpage (by rw [← hs]; exact hr0)
-  have ptr : ∀ (q c : PAddr) (v : BitVec 64), pageIn dyn q → ∀ idx, idx < 512 →
-      wordAsOf m (q + BitVec.ofNat 64 (8 * idx)) t v → ptPtrTo v c →
-      wordAsOf m (q + BitVec.ofNat 64 (8 * idx)) S v ∧ pageIn dyn c := by
-    intro q c v hq idx hidx hv hpv
-    obtain ⟨d', hd', ha'⟩ := hq idx hidx
-    have e := KptInv.slot_asOfGe hok hh hd' hSt (v := v) (by rw [ha']; exact hv)
-    cases hf : d'.frozen
-    · simp only [hf, Bool.false_eq_true, ↓reduceIte] at e
-      obtain ⟨ppn, perm, a, dd, hcd⟩ := (hok.2.2.1 d' hd').1 hf
-      rw [hcd] at e
-      obtain ⟨a', d'', rfl⟩ := pteVariant_of_kLeaf ppn perm a dd e
-      exact absurd hpv (KptInv.not_ptPtrTo_kLeaf ppn perm a' d'' c)
-    · simp only [hf, ↓reduceIte] at e
-      obtain ⟨vS, hvS⟩ := KptInv.slot_existsGe hh hd' (Nat.le_refl S)
-      have eS := KptInv.slot_asOfGe hok hh hd' (Nat.le_refl S) hvS
-      simp only [hf, ↓reduceIte] at eS
-      refine ⟨?_, hok.2.2.2.2 d' hd' hf c (by rw [← e]; exact hpv)⟩
-      rw [← ha', e, ← eS]
-      exact hvS
-  obtain ⟨w2S, hp1⟩ := ptr r p1 v2 hpr _ (Nat.mod_lt _ (by decide)) w2 pp2
-  obtain ⟨w1S, hp0⟩ := ptr p1 p0 v1 hp1 _ (Nat.mod_lt _ (by decide)) w1 pp1
-  obtain ⟨d0, hd0, ha0⟩ := hp0 (kvpnIdx (vhi - 2 * (i + 1)) 0) (Nat.mod_lt _ (by decide))
-  have e0 := KptInv.slot_asOfGe hok hh hd0 hSt (v := v0) (by rw [ha0]; exact w0)
-  obtain ⟨v0S, hv0S⟩ := KptInv.slot_existsGe hh hd0 (Nat.le_refl S)
-  have e0S := KptInv.slot_asOfGe hok hh hd0 (Nat.le_refl S) hv0S
-  refine ⟨base, cnt, vhi, i, r, hR, hi, ⟨hr0, base', cnt', stride, k, hR', hk, hrS⟩, v2, v1, v0S, p1, p0, w2S, pp2,
-    w1S, pp1, by rw [← ha0]; exact hv0S, ?_⟩
-  cases hf : d0.frozen
-  · simp only [hf, Bool.false_eq_true, ↓reduceIte] at e0 e0S
-    obtain ⟨ppn, perm, a, dd, hcd⟩ := (hok.2.2.1 d0 hd0).1 hf
-    rw [hcd] at e0 e0S
-    obtain ⟨a1, d1, rfl⟩ := pteVariant_of_kLeaf ppn perm a dd e0
-    obtain ⟨a2, d2, rfl⟩ := pteVariant_of_kLeaf ppn perm a dd e0S
-    exact KptInv.ptLeafTo_ad ppn perm a1 d1 a2 d2 p pl
-  · simp only [hf, ↓reduceIte] at e0 e0S
-    rw [e0S, ← e0]
-    exact pl
-
-theorem KptInv.ksKey_inj {q q' : PAddr} (h : ksKey q = ksKey q') : q = q' :=
-  BitVec.eq_of_toNat_eq (Nat.add_left_cancel (by unfold ksKey at h; exact h))
-
-/-- **A valid receipt's page holds no kernel-stack byte** (as of any position). -/
-theorem KptInv.ksFreePg_of {rs : List RsvRegion} {m : FlatMem} {top S : Nat} {dyn : List KSlot}
-    {stk : List PAddr} (hok : kptSealOk rs m top S dyn) (hh : kptHistsAt m S dyn)
-    (hin : ∀ p, kstkPageAt rs m S p → p ∈ stk) {q : PAddr} (hal : q.toNat % 4096 = 0) (hq : q ∉ stk)
-    (hst : ∀ j, j < 4096 → ¬ stackByteIn rs (q + BitVec.ofNat 64 j)) : ksFreePg rs m q := by
-  intro t j hj hks
-  rcases hks with hs | ⟨hpw, p, hp, hlo, hhi⟩
-  · exact hst j hj hs
-  have hS := KptInv.pubWritten_gt hok hpw
-  have hpS := KptInv.kstk_toS hok hh (Nat.le_of_lt hS) hp
-  have hpin := hin p hpS
-  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, pl⟩ := hp
-  have hpa := KptInv.leafTo_aligned pl
-  have hqlt := q.isLt
-  have hqj : (q + BitVec.ofNat 64 j).toNat = q.toNat + j := by
-    rw [BitVec.toNat_add, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (a := j) (by omega)]
-    exact Nat.mod_eq_of_lt (by omega)
-  rw [hqj] at hlo hhi
-  have hpq : p = q := BitVec.eq_of_toNat_eq (by omega)
-  exact hq (hpq ▸ hpin)
-
 /-- **A stack-free receipt, minted** (mcslrec (3) X1-c): a hart owning byte 0 of the page `q`
 OUTRIGHT, once the kernel table is sealed, learns that `q` is no carved (kernel-stack) page -- the
 interpretation holds half of each carved page's byte 0 -- and registers a persistent receipt
 (re-issued if one exists).  `q` page-aligned and off the static stacks (the client's facts). -/
-theorem memModel_ksMint (σ : MState) (ξ : CtxId) (q : PAddr) (v : BitVec 8) (hal : q.toNat % 4096 = 0)
+theorem memModel_ksMint (σ : MState) (q q' : PAddr) (hq : q' = q) (H : Hist) (hal : q.toNat % 4096 = 0)
     (hst : ∀ j, j < 4096 → ¬ stackByteIn (rsvList (hlc := hlc) (GF := GF)) (q + BitVec.ofNat 64 j)) :
-    memModel σ ∗ ctxByte ξ q (DFrac.own 1) v ∗ kptSealed ⊢@{IProp GF}
-      |==> (memModel σ ∗ ctxByte ξ q (DFrac.own 1) v ∗ ksRcptAt (MachGS.era (hlc := hlc) (GF := GF)) q) := by
+    memModel σ ∗ q' ↦ₕ{DFrac.own 1} H ∗ kptSealed ⊢@{IProp GF}
+      |==> (memModel σ ∗ q' ↦ₕ{DFrac.own 1} H ∗ ksRcptAt (MachGS.era (hlc := hlc) (GF := GF)) q) := by
+  subst q'
   unfold memModel memModelAt rsvModelAt kptModelAt kptSealed kptSealedAt ksRcptsAll
   iintro ⟨⟨Htop, Hauth, Hviews, Hresv, %hmm, ⟨%reg, Hreg, %⟨hin, hex, hrok, hrp⟩, %S, %dyn, %stk,
     %⟨hlk, hseal⟩, Hcells, Hcarve, #Hrc⟩, Hh, Hch⟩, Hb, #Hsl⟩
@@ -1933,10 +1615,9 @@ theorem memModel_ksMint (σ : MState) (ξ : CtxId) (q : PAddr) (v : BitVec 8) (h
   · obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 hmem
     icases (BigSepL.bigSepL_lookup_acc (Φ := fun _ q' => ksCarveAt (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) q')
       hi).1 $$ Hcarve with ⟨Hcv, _⟩
-    unfold ksCarveAt ctxByte
-    icases Hcv with ⟨%H, Hpt⟩
-    icases Hb with ⟨%e, %He, Hp, _⟩
-    icases pointsTo_ne $$ Hp Hpt with %hne'
+    unfold ksCarveAt
+    icases Hcv with ⟨%H', Hpt⟩
+    icases pointsTo_ne $$ Hb Hpt with %hne'
     exact (hne' rfl).elim
   cases hk : get? reg (ksKey q) with
   | some v0 =>
@@ -1990,13 +1671,36 @@ theorem memModel_ksMint (σ : MState) (ξ : CtxId) (q : PAddr) (v : BitVec 8) (h
       · imodintro
         iintro %q' %hq'
         by_cases hqq : ksKey q = ksKey q'
-        · rw [← KptInv.ksKey_inj hqq]
+        · rw [← KptSeal.ksKey_inj hqq]
           unfold ksRcptAt
           iexact Hnew
         · rw [Iris.Std.LawfulPartialMap.get?_insert_ne hqq] at hq'
           iapply Hrc $$ %q' %hq'
     · unfold ksRcptAt
       iexact Hnew
+
+/-- **A receipt minted from an owned word cell** (its byte 0). -/
+theorem wordCell_ksMint (σ : MState) (q : PAddr) (n lo : Nat) (hn : 0 < n) (v0 : BitVec (8 * n)) (W : WordHist n)
+    (hal : q.toNat % 4096 = 0)
+    (hst : ∀ j, j < 4096 → ¬ stackByteIn (rsvList (hlc := hlc) (GF := GF)) (q + BitVec.ofNat 64 j)) :
+    memModel σ ∗ wordCell q n lo v0 W ∗ kptSealed ⊢@{IProp GF}
+      |==> (memModel σ ∗ wordCell q n lo v0 W ∗ ksRcptAt (MachGS.era (hlc := hlc) (GF := GF)) q) := by
+  unfold wordCell histBytes
+  iintro ⟨Hmm, ⟨%Hold, Hb, %ht⟩, #Hsl⟩
+  have h0 : (List.range n)[0]? = some 0 := by simp [hn]
+  icases (BigSepL.bigSepL_lookup_acc (Φ := fun _ (j : Nat) =>
+    iprop((q + BitVec.ofNat 64 j) ↦ₕ{(fun _ => DFrac.own 1) j} (W.hist Hold j))) h0).1 $$ Hb with ⟨H0, Hcl⟩
+  imod memModel_ksMint σ q (q + BitVec.ofNat 64 0) (by simp) (W.hist Hold 0) hal hst $$ [Hmm H0 Hsl]
+    with ⟨Hmm, H0, #Hr⟩
+  · iframe Hmm H0 Hsl
+  imodintro
+  iframe Hmm Hr
+  iexists Hold
+  isplitl [H0 Hcl]
+  · ihave Hb := Hcl $$ H0
+    rw [rsvSetSelf h0]
+    iexact Hb
+  · ipureintro; exact ht
 
 /-- **The carve from an owned byte** (mcslrec (3) X1-c): half of it goes to the interpretation's
 carve (the other half and the byte's key are dropped). -/
@@ -2021,25 +1725,5 @@ theorem ksCarve_of_bytes (ξ : CtxId) (q q' : PAddr) (hq : q' = q) (w : BitVec (
   have e : q' + BitVec.ofNat 64 0 = q' := by simp
   rw [e]
   iapply ksCarve_of_ctxByte $$ H
-
-/-- **A receipt is valid of the machine** (mcslrec (3) X1-c): no byte of its page is a
-kernel-stack byte, as of any position. -/
-theorem memModel_ksValid (σ : MState) (q : PAddr) :
-    genHeapInterp σ.mem ∗ memModel σ ∗ ksRcptAt (MachGS.era (hlc := hlc) (GF := GF)) q ⊢@{IProp GF}
-      ⌜ksFreePg (rsvList (hlc := hlc) (GF := GF)) σ.mem q⌝ := by
-  unfold memModel memModelAt rsvModelAt kptModelAt ksRcptAt
-  iintro ⟨Hm, ⟨_, _, _, _, _, ⟨%reg, Hreg, _, %S, %dyn, %stk, %⟨_, hseal⟩, Hcells, _, _⟩, _, _⟩, #Hr⟩
-  ihave %hget := ghost_map_lookup $$ Hreg Hr
-  rcases hseal with h0 | hok
-  · have := h0.2.2.2 _ _ hget
-    unfold ksKey at this
-    omega
-  ihave %hh : ⌜kptHistsAt σ.mem S dyn⌝ $$ [Hm Hcells]
-  · iapply kptCells_hists _ σ.mem S dyn $$ [Hm Hcells]
-    iframe
-  ipureintro
-  obtain ⟨_, q', hk, hal, hq, hst⟩ := hok.2.2.2 _ _ hget (Nat.le_add_right _ _)
-  obtain rfl := KptInv.ksKey_inj hk
-  exact KptInv.ksFreePg_of hok.1 hh hok.2.2.1 hal hq hst
 
 end MachCSL

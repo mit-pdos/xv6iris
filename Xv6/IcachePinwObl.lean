@@ -214,11 +214,13 @@ theorem iref_certs (cpu : CPU) (k : Nat) (hk : k < NINODE)
   iintro %j %e %⟨hj, hpos⟩
   iright
   unfold exCertAt
-  iexists []
+  iexists [], []
+  isplitl []
+  · exact BigSepL.bigSepL_nil_intro
   isplitl []
   · exact BigSepL.bigSepL_nil_intro
   ipureintro
-  intro σ _ hget _ _
+  intro σ _ hget _ _ _
   have hT : (∃ x ∈ W, x.t ≤ e.t) ∨ lo ≤ e.t := by
     rcases hpos with ⟨x, hx, hxt⟩ | hl
     · exact Or.inl ⟨x, hx, Nat.le_of_eq hxt⟩

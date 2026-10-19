@@ -525,10 +525,32 @@ theorem pa_slotWit (k : Nat) (hk : k < NFILE) (te : Nat) (g : Agent) (b : BitVec
   unfold entsList
   rw [aFpipe_eq', aFpipe_slot k]
 
+/-- A page `kalloc` hands out is page-aligned (mcslrec (3) X1-c). -/
+theorem pa_page_aligned (p : BitVec 64) (hv : pageValid p) : p.toNat % 4096 = 0 := by
+  obtain ⟨hal, -, -⟩ := hv
+  have h12 : BitVec.extractLsb' 0 12 p = 0#12 := by revert hal; intro hal; bv_decide
+  have h := congrArg BitVec.toNat h12
+  simpa [BitVec.extractLsb'_toNat] using h
+
+/-- A page `kalloc` hands out holds no `stack0` byte (it lies above `end`). -/
+theorem pa_page_noStack (p : BitVec 64) (hv : pageValid p) (j : Nat) (hj : j < 4096) :
+    ¬ stackByteIn xv6RsvStatic (p + BitVec.ofNat 64 j) := by
+  rintro ⟨base, size, hR, h1, h2⟩
+  obtain ⟨rfl, rfl⟩ := xv6Stack_only base size hR
+  obtain ⟨-, h2', h3'⟩ := hv
+  simp only [BitVec.ult, decide_eq_true_eq, Nat.not_lt, kernelEndAddr, physTop, BitVec.toNat_ofNat,
+    Nat.reducePow, Nat.reduceMod] at h2' h3'
+  have hend : KA.«end».toNat = KernelSyms.«end» := rfl
+  have hs : KA.«stack0».toNat = KernelSyms.«stack0» := rfl
+  have hle : KernelSyms.«stack0» + 0x8000 ≤ KernelSyms.«end» := by decide
+  rw [BitVec.toNat_add, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (a := j) (by omega),
+    Nat.mod_eq_of_lt (by omega)] at h1 h2
+  omega
+
 theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γk : KmemNames) (on : Option Nat)
     (pidv : BitVec 32) (dqp : DFrac) (ke : Nat)
     (k0 k1 : Nat) (hk0 : k0 < NFILE) (hk1 : k1 < NFILE) (pi : BitVec 64) (hpv : pageValid pi)
-    (hwf : k.wf) (hK : pipeallocSlots ≤ k.avail)
+    (hwf : k.wf) (htier : k.tier = KTier.kpt) (hK : pipeallocSlots ≤ k.avail)
     (spie spp : Bool) (hsp : k.sie = false → spie = k.spie ∧ spp = k.spp)
     (hpin : k.sie = false ∨ k.proc = 0#64 → c = cpu)
     (R : RegMap) (h9 : R 9#5 = k.regs 10#5) (h20 : R 20#5 = k.regs 11#5) (h10 : R 10#5 = pi)
@@ -550,6 +572,8 @@ theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γ
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, Hav, Hpage, Hc0, Hc1, Href0, Href1, Hra, Hs0, Hs1, Hs4, Hsp1, Hsp2, Hte, Hce,
     Hpid, Hir, Hlend, #Hg, Hnext⟩
+  icases kctx_kptOn c _ (by simp [htier]) $$ Hk with ⟨⟨%tk, %Mk, _, #Hkon⟩, Hk⟩
+  ihave #Hsealed := kptOn_sealed tk Mk $$ Hkon
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
   have hK6 : 6 ≤ k.avail := by unfold pipeallocSlots at hK; have := filecloseSlots_callees.2.2.2; omega
@@ -703,6 +727,19 @@ theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γ
   iintro Hk Hpc ⟨Hpp0, %te, %hlote, #Htop, #Hent⟩
   -- the pipe is born, registered by the receipts of `f0->pipe = pi`
   icases kctx_rsvEq cI _ $$ Hk with ⟨%heqR, Hk⟩
+  -- the pipe page's stack-free receipt (mcslrec (3) X1-c): its lock word's byte 0 is owned outright
+  have hal : pi.toNat % 4096 = 0 := pa_page_aligned pi hpv
+  have hst : ∀ j, j < 4096 → ¬ stackByteIn (rsvList (hlc := hlc) (GF := GF)) (pi + BitVec.ofNat 64 j) := by
+    intro j hj; simp only [rsvList]; rw [heqR]; exact pa_page_noStack pi hpv j hj
+  iapply wpLoop_interpUpd cI iprop(wordCell (GF := GF) pi 4 lo 0 [] ∗
+    ksRcptAt (MachGS.era (hlc := hlc) (GF := GF)) pi)
+  isplitl [Hlw]
+  · iintro %σ ⟨Hmem, Hmm⟩
+    imod wordCell_ksMint σ pi 4 lo (by decide) 0 [] hal hst $$ [Hmm Hlw] with ⟨Hmm, Hlw, #Hr⟩
+    · iframe Hmm Hlw Hsealed
+    imodintro
+    iframe Hmem Hmm Hlw Hr
+  iintro ⟨Hlw, #Hrcpt⟩
   ihave #Hreg : lkDynReg (GF := GF) pi (max lo lc) $$ []
   · unfold lkDynReg
     iexists entsList (fnode k0 + 16#64) 8 te (hartAgent cI) pi, te
@@ -713,9 +750,12 @@ theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γ
     · iexact Htop
     isplit
     · iapply entsAt_list $$ Hent
+    isplit
     · ipureintro
+      refine ⟨?_, hal⟩
       rw [heqR]
       exact pa_slotWit k0 hk0 te (hartAgent cI) pi
+    · iexact Hrcpt
   iapply wpLoop_fupd
   imod (kctx_newPipe cI _ pi hpv hokL lo lc _ bs hbs) $$ [Hk Hid0 Hid16 Hlw Hlc Hnm Hnr Hnw Hro Hwo Hdat Hslack]
     with ⟨Hk, %γlp, %γp, #Hpipe, Hr0, Hr1, Hqf⟩
@@ -1150,7 +1190,7 @@ theorem pipealloc_proof (FA : FILEALLOC) (KAL : KALLOC) (IL : INITLOCK) (FC : FI
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [MachCSL.beq_ne _ (Xv6.PtRun.pageValid_ne_zero _ hpv)] next c18 hp18
         iintro Hk Hpc
         have hpin18 : k.sie = false ∨ k.proc = 0#64 → c18 = cpu := fun h => (hp18 h).trans (hpin17 h)
-        iapply (pa_success IL cpu c18 k γ γk on pidv dqp ke k0 k1 hk0 hk1 (R3 10#5) hpv hwf hK spie3 spp3 hsp3' hpin18 _
+        iapply (pa_success IL cpu c18 k γ γk on pidv dqp ke k0 k1 hk0 hk1 (R3 10#5) hpv hwf htier hK spie3 spp3 hsp3' hpin18 _
             (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact g9')
             (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact g20')
             (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false])

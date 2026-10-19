@@ -240,8 +240,8 @@ theorem swp_sail_mem_read_plain_aur (cpu : CPU) {n vasize : Nat}
     intro p hp j hj e he het
     exact histOk_author_eq σ.log (Hs j) (hmm.1 _ _ (hget j hj)) e he p.1 p.2
       (hau p hp).1 (hau p hp).2 het
-  ihave %hsrc := memModel_readCerts σ cpu req.pa n K ts Hs cs hget hcs hauthors $$ [Hmm Hcert]
-  · iframe Hmm
+  ihave %hsrc := memModel_readCerts σ cpu req.pa n K ts Hs cs hget hcs hauthors $$ [Hmem Hmm Hcert]
+  · iframe Hmem Hmm
     iexact Hcert
   have hram : ramBytes req.pa n := ramBytes_of_cells hmm.2.2.2.1 (fun j hj => ⟨Hs j, hget j hj⟩)
   imodintro

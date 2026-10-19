@@ -258,9 +258,12 @@ is a lock history from free, the owner-word pointers those of the registry's
 def xv6DynLock (σ : MState) (b : PAddr) (t : Nat) : Prop :=
   dynLkDiscAt xv6Rsv (slotWit xv6Rsv) σ.mem σ.top b t
 
-/-- `a` is a byte of the two words of a live dynamic lock at `b` as of `t`. -/
+/-- `a` is a byte of the two words of a live dynamic lock at `b` as of `t`, and (mcslrec (3) X1-c
+[OWN.90] [OWN.104] (b)) no kernel-stack byte as of `t` (`MachCSL.ksByteAt`: `stack0`, or -- the
+boot gate open -- a page the kernel table maps at a `KSTACK(i)`): a pipe lock never lives on a
+kernel stack, so its exemption never reaches a stack frame. -/
 def dynLockByteAt (σ : MState) (b a : PAddr) (t : Nat) : Prop :=
-  xv6DynLock σ b t ∧ lockWordsByte b a
+  xv6DynLock σ b t ∧ lockWordsByte b a ∧ ¬ ksByteAt xv6Rsv σ.mem t a
 
 open Classical in
 /-- **The custody map** (σ-readable): the exempt classes first, in the order
@@ -677,7 +680,7 @@ theorem kptMapsExp_of (σ : MState) (hk : kptStateOkK xv6Rsv xv6KptOk σ) : kptM
 /-! ### The kernel-stack pages past the seal (mcslrec (3) X1-b, [OWN.90] [OWN.104] (b))
 
 As of every position past the seal, the permanent root's walk at a `KSTACK(i)` page reads the
-same frozen pointers and an `A`/`D` variant of the same leaf (`MachCSL.KptInv.slot_asOfGe`), so
+same frozen pointers and an `A`/`D` variant of the same leaf (`MachCSL.KptSeal.slot_asOfGe`), so
 the kernel-stack pages (`MachCSL.kstkPageAt`) are exactly xv6's 64 `pas i` (`kstkPage_walk`,
 `kstkPage_build`), and a kernel-stack byte stays one (`ksByteAt_mono`). -/
 
@@ -720,7 +723,7 @@ theorem kstk_root {m : FlatMem} {top S : Nat} {dyn : List KSlot} (hok : kptSealO
   obtain ⟨rfl, rfl⟩ := xv6Roots_only base cnt stride hR
   have hk0 : k = 0 := by omega
   subst hk0
-  have hs := KptInv.slot_asOfGe hok hh hroot hSt (v := r) (by simpa using hw)
+  have hs := KptSeal.slot_asOfGe hok hh hroot hSt (v := r) (by simpa using hw)
   simpa using hs
 
 /-- **A kernel-stack page past the seal is one of the 64 `pas i`.** -/
@@ -741,19 +744,19 @@ theorem kstkPage_walk {m : FlatMem} {top S : Nat} {dyn : List KSlot} (hok : kptS
   subst hrb
   obtain ⟨b1, b0, a, d, h2, h1, h0⟩ := hmaps _ (pas i) .rw (Or.inr (Or.inr ⟨i, hi, rfl, rfl, rfl⟩))
   rw [kSlotP_add, ← kstk_idx i 2 hi] at w2
-  have e2 := KptInv.slot_asOfGe hok hh h2 hSt w2
+  have e2 := KptSeal.slot_asOfGe hok hh h2 hSt w2
   simp only [↓reduceIte] at e2
   subst e2
   have hp1 : p1 = kSlotP b1 0 := by rw [pp2.2.2, kPtr_target]
   subst hp1
   rw [kSlotP_add, ← kstk_idx i 1 hi] at w1
-  have e1 := KptInv.slot_asOfGe hok hh h1 hSt w1
+  have e1 := KptSeal.slot_asOfGe hok hh h1 hSt w1
   simp only [↓reduceIte] at e1
   subst e1
   have hp0 : p0 = kSlotP b0 0 := by rw [pp1.2.2, kPtr_target]
   subst hp0
   rw [kSlotP_add, ← kstk_idx i 0 hi] at w0
-  have e0 := KptInv.slot_asOfGe hok hh h0 hSt w0
+  have e0 := KptSeal.slot_asOfGe hok hh h0 hSt w0
   simp only [Bool.false_eq_true, ↓reduceIte] at e0
   obtain ⟨a', d', rfl⟩ := pteVariant_of_kLeaf _ _ _ _ e0
   exact ⟨i, hi, by rw [pl.2.2, kLeaf_target], hr0⟩
@@ -770,20 +773,20 @@ theorem kstkPage_build {m : FlatMem} {top S : Nat} {dyn : List KSlot} (hok : kpt
     (hb0 : kSlotP b 0 ≠ 0) {t : Nat} (hSt : S ≤ t) {i : Nat} (hi : i < 64) :
     kstkPageAt xv6Rsv m t (kSlotP (pas i) 0) := by
   obtain ⟨b1, b0, a, d, h2, h1, h0⟩ := hmaps _ (pas i) .rw (Or.inr (Or.inr ⟨i, hi, rfl, rfl, rfl⟩))
-  obtain ⟨vr, wr⟩ := KptInv.slot_existsGe hh hroot hSt
-  have er := KptInv.slot_asOfGe hok hh hroot hSt wr
+  obtain ⟨vr, wr⟩ := KptSeal.slot_existsGe hh hroot hSt
+  have er := KptSeal.slot_asOfGe hok hh hroot hSt wr
   simp only [↓reduceIte] at er
   subst er
-  obtain ⟨v2, w2⟩ := KptInv.slot_existsGe hh h2 hSt
-  have e2 := KptInv.slot_asOfGe hok hh h2 hSt w2
+  obtain ⟨v2, w2⟩ := KptSeal.slot_existsGe hh h2 hSt
+  have e2 := KptSeal.slot_asOfGe hok hh h2 hSt w2
   simp only [↓reduceIte] at e2
   subst e2
-  obtain ⟨v1, w1⟩ := KptInv.slot_existsGe hh h1 hSt
-  have e1 := KptInv.slot_asOfGe hok hh h1 hSt w1
+  obtain ⟨v1, w1⟩ := KptSeal.slot_existsGe hh h1 hSt
+  have e1 := KptSeal.slot_asOfGe hok hh h1 hSt w1
   simp only [↓reduceIte] at e1
   subst e1
-  obtain ⟨v0, w0⟩ := KptInv.slot_existsGe hh h0 hSt
-  have e0 := KptInv.slot_asOfGe hok hh h0 hSt w0
+  obtain ⟨v0, w0⟩ := KptSeal.slot_existsGe hh h0 hSt
+  have e0 := KptSeal.slot_asOfGe hok hh h0 hSt w0
   simp only [Bool.false_eq_true, ↓reduceIte] at e0
   obtain ⟨a', d', rfl⟩ := pteVariant_of_kLeaf _ _ _ _ e0
   refine ⟨0#64, 64, 0x3FFFFFF, i, kSlotP b 0, xv6RsvStatic_kstacks, hi,
@@ -808,9 +811,9 @@ theorem ksByteAt_mono {σ : MState} (hk : kptStateOkK xv6Rsv xv6KptOk σ) {s t :
     | some H =>
       rw [hH, Option.bind_some] at he
       exact he0 (hclean f w hR f (RsvRegion.base_mem _ rfl) H hH e (List.mem_of_find?_eq_some he))
-  have hSs := KptInv.pubWritten_gt hok hpw
+  have hSs := KptSeal.pubWritten_gt hok hpw
   obtain ⟨i, hi, rfl, hb0⟩ := kstkPage_walk hok hh hroot hmaps (by omega) hp
-  exact .inr ⟨KptInv.pubWritten_mono hst hpw, _, kstkPage_build hok hh hroot hmaps hb0 (by omega) hi, hlo, hhi⟩
+  exact .inr ⟨KptSeal.pubWritten_mono hst hpw, _, kstkPage_build hok hh hroot hmaps hb0 (by omega) hi, hlo, hhi⟩
 
 /-- **`utextDiscAt`, the user code** (W8 (f3-utext) [OWN.89] (W-R), [R34.1],
 O1; `MachCSL.uTextDiscAt`): while hart `h` is in user mode, every history
@@ -1037,7 +1040,7 @@ theorem custAt_notEx {σ : MState} {a : PAddr} {t : Nat} (h1 : ∀ b, custAt σ 
   by_cases c5 : racyByteIn xv6Rsv a
   · rw [if_pos c5] at h4
     intro hx
-    rcases hx with (⟨⟨base, kind⟩, hR, hk, ha⟩ | ⟨b, hd, hw⟩ | hp | hr)
+    rcases hx with (⟨⟨base, kind⟩, hR, hk, ha⟩ | ⟨b, hd, hw, hks⟩ | hp | hr)
     · rcases hk with ⟨cb, hcb⟩ | ⟨w, hw⟩
       · simp only at hcb
         subst hcb
@@ -1045,10 +1048,10 @@ theorem custAt_notEx {σ : MState} {a : PAddr} {t : Nat} (h1 : ∀ b, custAt σ 
       · simp only at hw
         subst hw
         exact c2 ⟨w, base, hR, ha⟩
-    · exact c3 ⟨b, hd, hw⟩
+    · exact c3 ⟨b, hd, hw, hks⟩
     · exact c4 hp
     · exact h4 ⟨rfl, hr⟩
-  rintro (⟨⟨base, kind⟩, hR, hk, ha⟩ | ⟨b, hd, hw⟩ | hp | hr)
+  rintro (⟨⟨base, kind⟩, hR, hk, ha⟩ | ⟨b, hd, hw, hks⟩ | hp | hr)
   · rcases hk with ⟨cb, hcb⟩ | ⟨w, hw⟩
     · simp only at hcb
       subst hcb
@@ -1056,7 +1059,7 @@ theorem custAt_notEx {σ : MState} {a : PAddr} {t : Nat} (h1 : ∀ b, custAt σ 
     · simp only at hw
       subst hw
       exact c2 ⟨w, base, hR, ha⟩
-  · exact c3 ⟨b, hd, hw⟩
+  · exact c3 ⟨b, hd, hw, hks⟩
   · exact c4 hp
   · exact c5 (racyByteIn_of_racyValAt hr)
 

@@ -1422,7 +1422,7 @@ theorem Lock.dyn_certs4 (cpu : CPU) (lk : BitVec 64) (K : Nat) (ts : List (Nat �
     (□ ∀ (a : PAddr) (e : HEnt), ⌜e.t = lo⌝ -∗ srcCertAt cpu a e) ∗ lkDynRegW lk lo lc st W W' ⊢@{IProp GF}
       readCertsAt cpu lk 4 K ts (W.hist Hold) [(lk + 16#64, 8, dq, W'.hist Hold')] := by
   unfold lkDynRegW hopRegAt
-  iintro ⟨#Hkc, ⟨%L, %te, %M, %⟨hf, _⟩, ⟨#Hte, #HL, %hwit⟩, #HM⟩⟩
+  iintro ⟨#Hkc, ⟨%L, %te, %M, %⟨hf, _⟩, ⟨#Hte, #HL, %⟨hwit, hal⟩, #Hrc⟩, #HM⟩⟩
   iapply readCertsAt_of cpu lk 4 K ts (W.hist Hold) _ (fun j e => e.t = lo ∨ ∃ x ∈ W, e = WEnt.proj j x)
   · intro j e tvn hj hKt hau hr
     obtain ⟨e0, H0, hH, _, he0⟩ := htail j hj
@@ -1437,11 +1437,14 @@ theorem Lock.dyn_certs4 (cpu : CPU) (lk : BitVec 64) (K : Nat) (ts : List (Nat �
       iapply Hkc $$ %_ %_ %het
     · iright
       unfold exCertAt
-      iexists L
+      iexists L, [lk]
+      isplitl []
+      · iapply BigSepL.bigSepL_singleton.2
+        iexact Hrc
       iframe HL
       ipureintro
-      intro σ hmm hget hcs hLm
-      refine Or.inr (Or.inl ⟨lk, ?_, Or.inl ⟨j, hj, rfl⟩⟩)
+      intro σ hmm hget hcs hLm hQ
+      refine Or.inr (Or.inl ⟨lk, ?_, Or.inl ⟨j, hj, rfl⟩, hQ lk (List.mem_singleton.2 rfl) _ j (by omega)⟩)
       have hxt : x.t ≤ σ.top := by
         have hok := hmm.1 _ _ (hget j hj)
         exact (hok.2 _ (by unfold WordHist.hist; exact List.mem_append_left _ (List.mem_map_of_mem hx))).1
@@ -1460,7 +1463,7 @@ theorem Lock.dyn_certs8 (cpu : CPU) (lk : BitVec 64) (K : Nat) (ts : List (Nat �
     (□ ∀ (a : PAddr) (e : HEnt), ⌜e.t = lc⌝ -∗ srcCertAt cpu a e) ∗ lkDynRegW lk lo lc st W W' ⊢@{IProp GF}
       readCertsAt cpu (lk + 16#64) 8 K ts (W'.hist Hold') [(lk, 4, dq, W.hist Hold)] := by
   unfold lkDynRegW hopRegAt
-  iintro ⟨#Hkc, ⟨%L, %te, %M, %⟨hf, _⟩, ⟨#Hte, #HL, %hwit⟩, #HM⟩⟩
+  iintro ⟨#Hkc, ⟨%L, %te, %M, %⟨hf, _⟩, ⟨#Hte, #HL, %⟨hwit, hal⟩, #Hrc⟩, #HM⟩⟩
   iapply readCertsAt_of cpu (lk + 16#64) 8 K ts (W'.hist Hold') _
     (fun j e => e.t = lc ∨ ∃ x ∈ W', e = WEnt.proj j x)
   · intro j e tvn hj hKt hau hr
@@ -1476,11 +1479,17 @@ theorem Lock.dyn_certs8 (cpu : CPU) (lk : BitVec 64) (K : Nat) (ts : List (Nat �
       iapply Hkc $$ %_ %_ %het
     · iright
       unfold exCertAt
-      iexists L
+      iexists L, [lk]
+      isplitl []
+      · iapply BigSepL.bigSepL_singleton.2
+        iexact Hrc
       iframe HL
       ipureintro
-      intro σ hmm hget hcs hLm
-      refine Or.inr (Or.inl ⟨lk, ?_, Or.inr ⟨j, hj, rfl⟩⟩)
+      intro σ hmm hget hcs hLm hQ
+      have e16 : lk + 16#64 + BitVec.ofNat 64 j = lk + BitVec.ofNat 64 (16 + j) := by
+        rw [BitVec.add_assoc, BitVec.ofNat_add]
+      refine Or.inr (Or.inl ⟨lk, ?_, Or.inr ⟨j, hj, rfl⟩, by
+        rw [e16]; exact hQ lk (List.mem_singleton.2 rfl) _ (16 + j) (by omega)⟩)
       have hxt : x.t ≤ σ.top := by
         have hok := hmm.1 _ _ (hget j hj)
         exact (hok.2 _ (by unfold WordHist.hist; exact List.mem_append_left _ (List.mem_map_of_mem hx))).1

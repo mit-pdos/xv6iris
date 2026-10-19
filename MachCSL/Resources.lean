@@ -1591,6 +1591,9 @@ def ksRcptAt [MachFixedGS hlc GF] (E : EraGS) (q : PAddr) : IProp GF := E.rsvNam
 instance [MachFixedGS hlc GF] (E : EraGS) (q : PAddr) : Persistent (PROP := IProp GF) (ksRcptAt E q) := by
   unfold ksRcptAt; infer_instance
 
+instance [MachFixedGS hlc GF] (E : EraGS) (q : PAddr) : Timeless (PROP := IProp GF) (ksRcptAt E q) := by
+  unfold ksRcptAt; infer_instance
+
 /-- Every registered receipt is re-issuable (the interpretation keeps them). -/
 def ksRcptsAll [MachFixedGS hlc GF] (E : EraGS) (reg : RegMapF Agent) : IProp GF := iprop%
   □ ∀ q : PAddr, ⌜get? reg (ksKey q) = some 0⌝ -∗ ksRcptAt E q
