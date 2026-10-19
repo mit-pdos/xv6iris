@@ -122,6 +122,12 @@ compiler's `sail2` branch, before the liveness work.  The standard every deviati
   `read_mip`, used only when H is enabled, written by nothing here) and, likewise, `hcounteren`
   (read by every counter-CSR access check since 0.16, used only at a virtual privilege; policy
   section 5: held, not reset, not a board line).
+- **`TW = 0` in the kernel's `mstatus` invariant** (2026-10-19). With `exit_wait` chosen by the
+  driver, a parked S-mode WFI may be forced out, which 0.16 retires only under `mstatus.TW = 0`
+  (otherwise an illegal-instruction trap).  TW is 0 on every reachable state (the board line,
+  `reset_sys`, S-mode cannot write it), so it is the last conjunct of `smFacts`; the WFI rules keep
+  their statements.  The USER-side twins (`userMstatusOk`, `trapMstatusOk`) grow the same bit with
+  the other 0.16 `mstatus` bits in P4 (the contract change the policy review flagged).
 - **Answer types.** lean-sail's `InstructionEffect.ret` is a plain `def`, and an imported
   definition's reducibility cannot be changed without a check-disabling option.  So the WP's
   event rules come with `_at` variants that take the program and an equation to its event node.
