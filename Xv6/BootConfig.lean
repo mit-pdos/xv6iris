@@ -200,10 +200,10 @@ theorem mBoot_of_cells (cpu : CPU) (f : RegFile) (hres : resetRegsRun cpu f) :
     Iris.Algebra.BigOpL.bigOpL_nil, e1, e2, e3, e4, e5, e9,
     h1, h2, h3, h4, h5, h6, h11, h12, h15]
   iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, H12, H13, H14,
-    M1, M2, M3, M4, M5, M6, M7, M8, M9, M10, M11, M12, M13, M14, M15, M16, -⟩
+    M1, M2, M3, M4, M5, M6, M7, M8, M9, M10, M11, M12, M13, M14, M15, M16, M17, -⟩
   imod hwConfig_intro cpu ⟨f .mcountinhibit, f .minstretcfg, f .mcyclecfg, f .mhpmcounter, f .scounteren⟩
-    (f .hgeie) (f .hcounteren)
-    $$ [M1 M2 M3 M4 M5 M6 M7 M8 M9 M10 M11 M12 M13 M14 M15 M16] with #Hhw
+    (f .hgeie) (f .hcounteren) (f .henvcfg)
+    $$ [M1 M2 M3 M4 M5 M6 M7 M8 M9 M10 M11 M12 M13 M14 M15 M16 M17] with #Hhw
   · iframe
   imodintro
   iexists ⟨f .medeleg, f .mepc, f .satp, f .stimecmp, f .mcounteren, f .mtimecmp, f .pmpcfg_n, f .pmpaddr_n, e13⟩
