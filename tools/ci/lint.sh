@@ -11,9 +11,10 @@
 #   options    no file turning `autoImplicit` back on
 #   drift      every .lean under Xv6/ and MachCSL/ is imported from the
 #              roots lake builds (a file that is not is checked by nobody)
-#   toolchain  the pins agree: lean-toolchain of the package, of the model
-#              and of lean-sail; lakefile.toml's iris revision and
-#              lake-manifest.json's (tools/ci/toolchain_check.sh)
+#   toolchain  the pins agree: lean-toolchain of the package and of the
+#              model; the two lean-sail pins (lakefile.toml and the model's);
+#              every git dependency against lake-manifest.json
+#              (tools/ci/toolchain_check.sh)
 #   roots      tools/ci/roots.txt (the cone the coverage and dead-code
 #              reports are about) and tools/audit/baseline.json (the theorems
 #              whose axioms are audited) name the same top theorems

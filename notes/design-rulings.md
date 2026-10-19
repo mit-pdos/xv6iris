@@ -10,7 +10,8 @@ originals are in git history: `git show 5c27ea7e4:notes/briefs/<file>` / `git sh
 ## Later rulings (Sept 26–30 2026)
 
 - **Zkr / eager `&&`**: regenerate the Sail model with the short-circuit-patched Lean backend
-  (https://github.com/zeldovich/sail/tree/lean-short-circuit, cherry-picked onto sail 5745ea9e)
+  (https://github.com/zeldovich/sail/tree/lean-short-circuit, cherry-picked onto sail 5745ea9e;
+  since the 0.16 bump onto master `e4982101` in `dongjaelee1/sail`, `notes/model-diffs.md` §2)
   rather than adding a Zkr clause; `hZkr` is gone.  The patch is proposed upstream; once a Sail release
   contains it, regenerate with that release and drop the cherry-pick.
 - **Rocq drift** (Sept 29): the Lean proofs were brought in step with Rocq's latest proofs (drift waves
@@ -75,8 +76,8 @@ where noted.
 ## The sail-riscv 0.16 bump (Oct 2026)
 
 The machine model was regenerated from sail-riscv 0.16 (e5acebb0) with lean-sail v7 and the Sail
-compiler's master, before the liveness work.  The owner's rulings of 2026-10-18 (D1–D11 of the
-bump's plan, kept outside the repository):
+compiler's master, before the liveness work.  The owner's rulings of 2026-10-18 and 2026-10-19
+(the bump plan's decisions "bump D1"-"bump D11", not this file's D1-D54):
 
 - **Sources.** The model fork is `dongjaelee1/sail-riscv` branch `xv6`: upstream 0.16 plus the
   atomic PTE A/D update and only the fixes the Lean backend or this verification needs.  The Sail
@@ -89,9 +90,18 @@ bump's plan, kept outside the repository):
   store announcement (`memWriteAnnounce`) is silent; choices are finite (`Fin n`).
 - **Configuration.** H is kept and Sdtrig compiled in, both disabled by the configuration.  The
   external-interrupt pin registers are read unconditionally, which the fork's hook does without
-  the SIG.  Further deviations from the 0.16 default configuration are forced by disabled
-  extensions: `medeleg`'s delegatable set keeps the previous value, and `mstateen0.CONTEXT` is
-  read-only zero.  `model/sail-config-rv64d.json` and its generator list them.
+  the SIG.  The deviations from the 0.16 default configuration are the seven items of
+  `model/sail-config-rv64d.json`'s header, each marked "xv6iris" inline: the SIG, B/V and the V
+  family, H and its family and Sdtrig, the 128 MiB RAM, and three forced or kept ones -- `medeleg`'s
+  delegatable set keeps the previous value, `mstateen0.CONTEXT` is read-only zero, and a misaligned
+  AMO faults, as before the bump (the first 0.16 refresh had dropped that one silently; restored on
+  review, 2026-10-19).
+- **Board obligations for model bookkeeping.** `written_trigger_index := none` is a board line
+  (owner, 2026-10-19), justified by the power-on policy's minimality rule (0.16 asserts it at every
+  cycle's end; `init_model` does not establish it).  Unlike the other board lines it is not a claim
+  a reader can check against hardware: it is the model's own Sdtrig bookkeeping, whose Sail initial
+  value is `None()`.  Running the model's initialisers instead would pin ISA-unspecified registers to
+  simulator values (`MachCSL/ArchReset.lean`).
 - **No float instructions.** Upstream's `postlude` requires `FD_instructions` (for the H
   extension's transformed FP loads and stores), which compiled every F/D instruction and the
   softfloat externs into `execute`.  The fork drops that dependency and the two FP arms.  The

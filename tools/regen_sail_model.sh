@@ -23,7 +23,8 @@
 # SAIL_RISCV_DIR defaults to $SAIL_RISCV_DIR in the environment, else
 # ./sail-riscv (gitignored; cloned here on demand).  The model is taken from
 # the fork dongjaelee1/sail-riscv (branch `xv6`) pinned at $SAIL_RISCV_REV:
-# upstream riscv/sail-riscv release 0.16 (e5acebb0) plus four commits --
+# upstream riscv/sail-riscv release 0.16 (e5acebb0) plus six commits (each
+# with its kind and reason in notes/model-diffs.md section 1) --
 # the atomic PTE A/D-bit update (upstream PR #1860); the external-interrupt
 # pin registers consulted without the Simple Interrupt Generator (so
 # MachCSL's PLIC device can drive sig_meip/sig_seip with the SIG's MMIO
@@ -32,7 +33,11 @@
 # `MemoryTriggerPayload` (its existential union does not elaborate in Lean;
 # Sdtrig is disabled by our config, and trigger matching is unchanged) and
 # the AMO's result tested by pattern instead of `==` on `ExecutionResult`
-# (which the backend gives no equality).
+# (which the backend gives no equality); the F/D instructions kept out of
+# `postlude`'s dependencies (0.16 pulls them in for H's transformed FP
+# loads/stores; they were not in the model before the bump, and their
+# softfloat externs must stay outside every audited cone); and `hideleg`
+# ignored when H is not enabled, as `mideleg` is without S (a bug fix).
 #
 # Requires on PATH: `sail` with `sail_lean_backend` built from the fork
 # dongjaelee1/sail, branch `xv6` (merge b49c997e), = rems-project/sail master
@@ -51,9 +56,10 @@
 #   4b46310d  "Lean: parenthesise non-atomic operands in type-level
 #             arithmetic" (upstream PR #1774; without it `flen` prints as
 #             `if true then 8 else 4 * 8`, i.e. 8)
-# and `z3` (the Sail type checker calls it).  In the agent container both
-# live under /work/toolchain (built by the recipe in
-# local-plan/model-bump/HOST.md, user space, no root):
+# and `z3` (the Sail type checker calls it).  Build sail from a clone of that
+# branch with opam and dune (`opam install --deps-only .`, `dune build
+# --release`, `dune install --release --prefix <dir>`).  In the agent
+# container both live under /work/toolchain (user space, no root):
 #   export PATH=/work/toolchain/sail-v2/bin:/work/toolchain/bin:$PATH
 # `sail --version` then prints "Sail 0.20.3 (xv6 @ …)".  Once an upstream Sail
 # release contains the fixes, build that release instead and drop this

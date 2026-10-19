@@ -26,19 +26,20 @@ Pinned by `SAIL_RISCV_REV` in `tools/regen_sail_model.sh`.
 
 | # | Commit | Change | Kind | Why |
 |---|---|---|---|---|
-| 1 | `2dfb4844` | The PTE A/D-bit update is an atomic read-check-write (exclusive re-read, re-check, conditional write). | Spec conformance | The privileged spec requires the A/D update to be atomic; upstream writes back the walk's copy with a plain write, which can resurrect a PTE another hart changed.  Sequential execution is unchanged except on the TLB-hit path when the PTE changed without an SFENCE.VMA.  Kept from before the bump (decision D3). |
-| 2 | `3fdb4bca` | `external_interrupts_pending` reads the pin registers `sig_meip`/`sig_seip` whether or not the Simple Interrupt Generator is configured. | Platform integration | Since upstream #1899 the pins are ignored without the SIG, and the SIG's MMIO window collides with xv6's PLIC base, so it is off (configuration deviation 1).  Restores the pre-#1899 behaviour for a platform that drives the pins itself (decision D6). |
+| 1 | `2dfb4844` | The PTE A/D-bit update is an atomic read-check-write (exclusive re-read, re-check, conditional write). | Spec conformance | The privileged spec requires the A/D update to be atomic; upstream writes back the walk's copy with a plain write, which can resurrect a PTE another hart changed.  Sequential execution is unchanged except on the TLB-hit path when the PTE changed without an SFENCE.VMA.  Kept from before the bump (bump decision D3).  Known gap: the fresh PTE is re-checked but not compared with the value the walk used (the spec's step 7 compares and, on a mismatch, walks again), so if another hart installs a different valid leaf the access uses the walked translation while A/D are set on the new PTE; open question for the owner. |
+| 2 | `3fdb4bca` | `external_interrupts_pending` reads the pin registers `sig_meip`/`sig_seip` whether or not the Simple Interrupt Generator is configured. | Platform integration | Since upstream #1899 the pins are ignored without the SIG, and the SIG's MMIO window collides with xv6's PLIC base, so it is off (configuration deviation 1).  Restores the pre-#1899 behaviour for a platform that drives the pins itself (bump decision D6). |
 | 3 | `69ed097e` | `MemoryTriggerPayload` carries its value zero-extended to 16 bytes plus its width, instead of an existentially width-indexed vector. | Representation | The Lean backend cannot represent an existentially typed union constructor (the generated model did not elaborate).  `compare_value` computes what it computed before; trigger matching is unchanged.  Sdtrig is disabled in this configuration anyway. |
 | 4 | `9da94b63` | The Zaamo after-trigger tests the result with a pattern (`Retire_Success()`) instead of `==`. | Representation | `ExecutionResult` has no equality in the theorem-prover backends.  Identical behaviour. |
 | 5 | `d2cb43fc` | `postlude` no longer requires `FD_instructions`; `transformed_instruction` drops its `LOAD_FP`/`STORE_FP` arms. | Module selection | 0.16's postlude requires the F/D instructions (for the H extension's transformed FP loads/stores in mtinst/htinst), which compiles the whole F/D family, and with it the softfloat externs, into the model whatever `model/sail-modules.txt` selects.  Before the bump the F/D instructions were not in the model; the module subset (section 4), the hook policy (section 5: the softfloat externs stay unrealised) and the audit (no audited theorem may reach them) all assume so.  With H disabled the dropped arms are unreachable.  Accepted 2026-10-19. |
 | 6 | `f0ef9813` | `getPendingSet` ignores `hideleg` when H is not enabled, as it already ignores `mideleg` when S is not. | Bug fix | Without H no write reaches `hideleg` (its legaliser lets only the VS bits be set) and nothing resets it, so only an unspecified power-on value can set its S bits, which would route a delegated supervisor interrupt to VS, where a hart without H never takes it.  Approved 2026-10-19. |
 
-Commits 1-5 are pushed; 6 is pending (`local-plan/model-bump/HOST.md`).  The patch files are also
-kept in `local-plan/model-bump/patches/`.
+Commits 1-5 are pushed; commit 6 awaits the owner's push (a fresh clone cannot check it out until
+then).
 
 ## 2. The compiler fork: `dongjaelee1/sail`, branch `xv6`
 
-Named in `tools/regen_sail_model.sh`'s header (merge `b49c997e`).
+Named in `tools/regen_sail_model.sh`'s header (merge `b49c997e`; the merge with commit `b72d7e842`
+awaits the owner's push).
 
 | Commit | Change | Kind |
 |---|---|---|
@@ -63,9 +64,12 @@ Each is conditional and reports itself in the regeneration log.
   instructions (`V_instructions`, the `Zv*` extensions), scalar crypto (`Zbkb`, `Zbkx`, `Zkn`,
   `Zkr`, `Zks`), `bfloat16_core`/`Zfbfmin`, `Zibi`, `Zilx`, and the non-model modules (`main`,
   `rmem`, `unit_tests`).  Some unselected leaves arrive anyway through `requires` (e.g. H's
-  instructions with the selected `H` group).
+  instructions with the selected `H` group).  Pre-existing and worth knowing: `misa` advertises F
+  and D (and the configuration Zfh and scalar crypto) whose instructions are not compiled, so they
+  decode as illegal; the kernel uses none of them (it never enables FS).
 - **The configuration**, `model/sail-config-rv64d.json`: upstream's `config.json.in` resolved for
-  rv64d, with the deviations listed in its header (items 1-6) and marked "xv6iris" inline.
+  rv64d, with the deviations listed in its header (items 1-7) and marked "xv6iris" inline
+  (restored on review: item 7, the misaligned-AMO fault, had been dropped by the first refresh).
 
 ## 5. Where MachCSL's semantics meets the model
 
@@ -78,7 +82,11 @@ Each is conditional and reports itself in the regeneration log.
   `written_trigger_index = none` (the model's own Sdtrig bookkeeping, no hardware counterpart, Sail
   initial value `None()`; with Sdtrig disabled nothing writes it, and every cycle's end asserts
   it is none; decided 2026-10-19).
-- **Platform hooks** (`model/Lean_RV64D/LeanRV64D/Xv6Extras.lean`): realised exactly where the
+- **The driver** (`MachCSL.riscvStep`, unchanged by the bump): `try_step 0 false` plus a
+  nondeterministic tick, in place of upstream's own loop (`try_step step_no true`, a tick every
+  `plat_insns_per_tick`).  `exit_wait = false` means a hart in WFI waits for an interrupt and never
+  takes the model's forced WFI exit, which the spec and upstream allow (fewer behaviours).
+- **Platform hooks** (`model/Xv6Extras.lean`, installed as `model/Lean_RV64D/LeanRV64D/Xv6Extras.lean`): realised exactly where the
   hook has no effect on modelled state; the reservation predicates are opaque parameters; the
   hooks whose results are consumed (`plat_term_read`, `get_16_random_bits`, the softfloat family)
   are deliberately left unrealised, and the audit (`tools/audit`) fails if an audited theorem
