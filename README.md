@@ -73,7 +73,7 @@ The proofs are a [lake](https://github.com/leanprover/lean4/tree/master/src/lake
 installs the Lean of `lean-toolchain`.
 
 ```sh
-lake build Xv6 MachCSL     # the whole development (~2,300 modules)
+lake build Xv6 MachCSL     # the whole development (~2,400 modules)
 lake build Vtest           # the device-conformance suite (not a default target)
 make help                  # the check/report entry points (lint, check-gen, test-tools, ci, ...)
 tools/ci/run_all.sh        # everything CI does, in order (= make ci)
