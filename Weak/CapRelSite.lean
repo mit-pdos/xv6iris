@@ -3,7 +3,7 @@ Weak: **`relSiteWCrel` at the end of a W4 run record, from the machine's pc reco
 [OWN.82]; mcslrec (2)).  Lean-only, no Rocq twin.
 
 The release-site fact `relSiteWCrel σ log` (`Weak/RvwmoXv6Adequacy.lean`) is composed from
-* (a1) the MachCSL export `relProvAt` (`Xv6.AccessDiscipline.xv6AccessDisc`'s last conjunct), read
+* (a1) the MachCSL export `relProvAt` (`Xv6.AccessDiscipline.xv6AccessDisc`'s ninth conjunct), read
   as `RelSiteProv.relProvExport σ (RelSiteProvExp.pcLogOf σ)` (`RelSiteProvExp.relProvExportOf`);
 * (a3) the arming fact `WbPrimed.relArmed r` on W4's record (`relArmedOf`, `Weak/PinRelArmAsm.lean`);
 * the composition `WbPrimed.relSiteWCrelArmed` (the primed twin of the record);

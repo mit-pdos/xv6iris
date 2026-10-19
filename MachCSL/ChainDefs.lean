@@ -756,7 +756,9 @@ def dynLkDiscAt (rs : List RsvRegion) (wit : List (PAddr × HEnt) → PAddr → 
     (∀ q ∈ L, ∃ H, m[q.1]? = some H ∧ q.2 ∈ H) ∧ te ≤ a ∧
     (∀ i, i < 4 → ∃ H, m[b + BitVec.ofNat 64 i]? = some H ∧ ∀ e ∈ H, te < e.t → e.t ≤ a →
       wordEntAt m b e.t e.tid) ∧
-    p ≤ te ∧ (⟨cpuPtrAt cb c, .cpu c⟩ : RsvRegion) ∈ rs ∧ lockWinAt (cpuPtrAt cb) m b p a
+    p ≤ te ∧ (⟨cpuPtrAt cb c, .cpu c⟩ : RsvRegion) ∈ rs ∧ lockWinAt (cpuPtrAt cb) m b p a ∧
+    ∀ i, i < 4 → ∃ H, m[b + BitVec.ofNat 64 i]? = some H ∧
+      (H.find? (fun e => decide (e.t ≤ p))).map HEnt.v = some 0
 
 /-- A disciplined dynamic lock is live. -/
 theorem dynLkAt_of_disc {rs : List RsvRegion} {wit : List (PAddr × HEnt) → PAddr → Nat → Prop} {m : FlatMem}
@@ -767,12 +769,12 @@ theorem dynLkAt_of_disc {rs : List RsvRegion} {wit : List (PAddr × HEnt) → PA
 theorem dynLkDiscAt_mono {rs : List RsvRegion} {wit : List (PAddr × HEnt) → PAddr → Nat → Prop}
     {m m' : FlatMem} {t t' : Nat} {b : PAddr} {a : Nat} (hg : memGrow m t m') (ht : t ≤ t')
     (h : dynLkDiscAt rs wit m t b a) : dynLkDiscAt rs wit m' t' b a := by
-  obtain ⟨hat, L, te, p, cb, c, hw, hL, hte, hwd, hp, hR, hwin⟩ := h
+  obtain ⟨hat, L, te, p, cb, c, hw, hL, hte, hwd, hp, hR, hwin, hz⟩ := h
   have hx : memExt m m' := fun a H hH => by
     obtain ⟨N, hN, _⟩ := hg a H hH
     exact ⟨N, hN⟩
   refine ⟨Nat.le_trans hat ht, L, te, p, cb, c, hw, fun q hq => ?_, hte, fun i hi => ?_, hp, hR,
-    lockWinAt_grow hg hat hwin⟩
+    lockWinAt_grow hg hat hwin, fun i hi => ?_⟩
   · obtain ⟨H, hH, hpe⟩ := hL q hq
     obtain ⟨N, hN, _⟩ := hg _ H hH
     exact ⟨N ++ H, hN, List.mem_append_right _ hpe⟩
@@ -782,6 +784,18 @@ theorem dynLkDiscAt_mono {rs : List RsvRegion} {wit : List (PAddr × HEnt) → P
     rcases List.mem_append.1 he with he | he
     · have := hNt e he; omega
     · exact wordEntAt_mono hx (hw0 e he hte' hea)
+  · obtain ⟨H, hH, hf⟩ := hz i hi
+    obtain ⟨N, hN, hNt⟩ := hg _ H hH
+    refine ⟨N ++ H, hN, ?_⟩
+    rw [List.find?_append]
+    have : N.find? (fun e => decide (e.t ≤ p)) = none := by
+      rw [List.find?_eq_none]
+      intro e he
+      have := hNt e he
+      simp only [decide_eq_true_eq]
+      omega
+    rw [this, Option.none_or]
+    exact hf
 
 /-- **A release → acquire hop** at the lock byte `b`: the acquire entry
 `⟨a, B, va⟩` (nonzero) immediately above the release entry `⟨r, A, 0⟩`,

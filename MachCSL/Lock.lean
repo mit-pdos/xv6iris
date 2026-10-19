@@ -1397,8 +1397,9 @@ theorem Lock.dynLkDiscAt_of (σ : MState) (hmm : mmOk σ) (lk : PAddr) (L : List
   have hR : (⟨cpuPtrAt KernelGeom.cpusBase c, .cpu c⟩ : RsvRegion) ∈ MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) :=
     List.mem_of_getElem? hci
   refine ⟨hat, L, te, te, KernelGeom.cpusBase, c, hwit, hL, hta, fun i hi => ⟨_, hget i hi, ?_⟩, Nat.le_refl _,
-    hR, W.filter (fun e => decide (e.t ≤ a)), W'.filter (fun e => decide (e.t ≤ a)), st, B,
-    fun j hj => ⟨_, hget j hj, ?_⟩, fun j hj => ⟨_, hget' j hj, ?_⟩, hd⟩
+    hR, ⟨W.filter (fun e => decide (e.t ≤ a)), W'.filter (fun e => decide (e.t ≤ a)), st, B,
+    fun j hj => ⟨_, hget j hj, ?_⟩, fun j hj => ⟨_, hget' j hj, ?_⟩, hd⟩,
+    fun i hi => ⟨_, hget i hi, ?_⟩⟩
   · intro e he hte _
     unfold WordHist.hist at he
     rcases List.mem_append.1 he with he | he
@@ -1409,6 +1410,22 @@ theorem Lock.dynLkDiscAt_of (σ : MState) (hmm : mmOk σ) (lk : PAddr) (L : List
       omega
   · exact Lock.win_filter W Hold j (fun x hx => (hW x hx).1) (fun e he => Nat.le_trans (hT j hj e he) hlo)
   · exact Lock.win_filter W' Hold' j (fun x hx => (hW' x hx).1) (fun e he => Nat.le_trans (hT' j hj e he) hlcte)
+  · -- the lock word is 0 as of the registration (row 5′ E4 [OWN.107] (c)): every post-birth entry
+    -- is past `te`, the tail's head is `initlock`'s zero at `lo ≤ te`
+    obtain ⟨e0, H0, hH0, hv0, ht0⟩ := htail i hi
+    unfold WordHist.hist
+    rw [List.find?_append]
+    have : (W.map (WEnt.proj i)).find? (fun e => decide (e.t ≤ te)) = none := by
+      rw [List.find?_eq_none]
+      intro e he
+      obtain ⟨x, hx, rfl⟩ := List.mem_map.1 he
+      have := (hW x hx).1
+      simp only [WEnt.proj, decide_eq_true_eq]
+      omega
+    rw [this, Option.none_or, hH0, List.find?_cons_of_pos (by simp only [decide_eq_true_eq]; omega)]
+    simp only [Option.map_some, hv0]
+    unfold nthByte
+    simp
 
 /-- **The certificates of a racy read of a dynamic lock's LOCK word**: its
 tail head (the creator's store) is keyed; every post-birth entry is past the

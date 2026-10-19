@@ -1,7 +1,7 @@
 /-
 Weak: **(a1) of `RelSiteProv`, discharged** (mcslrec (2) [OWN.82] (a1); Q-MCSL2-DYN ruled (i)):
 the MachCSL provenance export `RelSiteProv.relProvExport σ pl` from W8's access-discipline export
-`Xv6.AccessDiscipline.xv6AccessDisc` (its last conjunct, `relProvAt`), at the machine's own
+`Xv6.AccessDiscipline.xv6AccessDisc` (its ninth conjunct, `relProvAt`), at the machine's own
 per-store pc record (`MState.pcAt`).
 
 * `RelSiteProvExp.pcLogOf σ` — the issuing-pc log of `σ`: one entry per store position `q + 1`
@@ -40,7 +40,7 @@ theorem RelSiteProvExp.relEntAtEq (σ : MState) (r : Nat) :
 theorem RelSiteProvExp.relProvExportOf (σ : MState) (h : Xv6.AccessDiscipline.xv6AccessDisc σ) :
     RelSiteProv.relProvExport σ (RelSiteProvExp.pcLogOf σ) := by
   refine ⟨by simp [RelSiteProvExp.pcLogOf], fun q hq => ?_⟩
-  obtain ⟨hle, hpc⟩ := h.2.2.2.2.2.2.2.2 (q + 1) (by omega) ((RelSiteProvExp.relEntAtEq σ (q + 1)).1 hq)
+  obtain ⟨hle, hpc⟩ := h.2.2.2.2.2.2.2.2.1 (q + 1) (by omega) ((RelSiteProvExp.relEntAtEq σ (q + 1)).1 hq)
   have hq' : q < σ.log.length := by simp only [MState.top] at hle; omega
   refine ⟨σ.pcAt (q + 1), ?_, by rw [RelSiteProvExp.releasePcsEq]; exact hpc⟩
   simp [RelSiteProvExp.pcLogOf, List.getElem?_range hq']
