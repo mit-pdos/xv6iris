@@ -468,7 +468,7 @@ theorem main_proof (CI : CPUID) (CN : CONSOLEINIT) (PI : PRINTKINIT) (PK : PRINT
     (VD : VIRTIO_DISK_INIT) (UI : USERINIT) (SCH : SCHEDULER) (KVE : KERNELVEC) : MAIN :=
   ⟨fun {GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ _ γ0 γ1 γc γl0 γl1 γd γdl γt cpu k cn
       l0 l1 c0 dk sb nib cov ndisk S Pb Rspent tlb0 γi ξd P _ _ hcpu hX hK hsie hnoff hlocks hproc hl0 hl1
-      hdead hcn hcne hdl hsnap => by
+      hdead hcn hcne hdl hsnap htlb => by
   obtain ⟨ξ, τ⟩ := X
   obtain rfl : τ = KTier.bare := hX
   letI : CurCtx := ⟨ξ, KTier.bare⟩
@@ -563,7 +563,7 @@ theorem main_proof (CI : CPUID) (CN : CONSOLEINIT) (PI : PRINTKINIT) (PK : PRINT
     with ⟨Hk, #Hkpt, #Hsmap, #Htr, #Hrp⟩
   imodintro
   -- +0x76  kvminithart: the switch
-  iapply (mn_kvminithart KVH rfl startedPrimary (k.pushed 2) R8 hs2 (by simp; omega) tlb0 t (kvmMapT pas))
+  iapply (mn_kvminithart KVH rfl startedPrimary (k.pushed 2) R8 hs2 (by simp; omega) tlb0 t (kvmMapT pas) htlb)
   iframe Hk Hpc Htlb Hkpt Hrp
   iintro %R9 Hk Hpc Hstv
   -- the Bare credentials at the kernel tier
