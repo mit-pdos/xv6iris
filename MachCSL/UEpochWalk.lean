@@ -45,12 +45,12 @@ set_option swp_run.memStop true in
 after the exclusive read. -/
 theorem swp_checked_mem_write_pte8_cond_S_upt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
     (hok : SConfPhys (GF := GF) c sie)
-    (pa : BitVec 64) (r : Option Resv) (w data : BitVec 64) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0)
+    (pa : BitVec 64) (w0 w data : BitVec 64) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0)
     (hleaf : uepLeafB w = true) (had : uepAD w data)
     (root : BitVec 44) (hs : satpTable c.satp = some root) (a2 a1 : PAddr) (v2 v1 : BitVec 64) (dq2 dq1 : DFrac)
     (hpath : uptPathOk root a2 v2 a1 v1 pa)
     (Φ : Result Bool (physaddr × ExceptionType) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ ownCtx cpu curCtx ∗ resvFragAny cpu r ∗
+    confCells cpu dq Privilege.Supervisor c ∗ ownCtx cpu curCtx ∗ resvFrag cpu (some (snapOf pa 8 w0)) false ∗
     bytesPointsTo pa 8 dqUpt w ∗ bytesPointsTo a2 8 dq2 v2 ∗ bytesPointsTo a1 8 dq1 v1 ∗
     uptOpenWit root Privilege.Supervisor ∗
     ▷ (confCells cpu dq Privilege.Supervisor c -∗ ownCtx cpu curCtx -∗ resvFrag cpu none false -∗
@@ -61,8 +61,9 @@ theorem swp_checked_mem_write_pte8_cond_S_upt [CurCtx] (cpu : CPU) (dq : DFrac) 
   unfold checked_mem_write
   checked_mem_S_au_prefix pa 8 hram hal
   iapply swp_bind
-  iapply (swp_sail_mem_write_excl_upt cpu _ curCtx r w data rfl rfl hleaf had root c.satp hs
+  iapply (swp_sail_mem_write_excl_upt cpu _ curCtx (some (snapOf pa 8 w0)) w data rfl rfl hleaf had root c.satp hs
     Privilege.Supervisor dq dq dq2 dq1 a2 a1 v2 v1 hpath)
+  ihave Hfrag := resvFragAny_of cpu (some (snapOf pa 8 w0)) false $$ Hfrag
   iframe Hctx Hfrag Hb H2 H1 Hsatp Hcur_privilege Hw
   inext
   iintro Hctx Hfrag Hb H2 H1 Hsatp Hcur_privilege
@@ -76,12 +77,12 @@ set_option swp_run.memStop true in
 /-- `write_pte_conditional` on a leaf of the open epoch's table. -/
 theorem swp_write_pte_conditional_upt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
     (hok : SConfPhys (GF := GF) c sie)
-    (pa : BitVec 64) (r : Option Resv) (w data : BitVec 64) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0)
+    (pa : BitVec 64) (w0 w data : BitVec 64) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0)
     (hleaf : uepLeafB w = true) (had : uepAD w data)
     (root : BitVec 44) (hs : satpTable c.satp = some root) (a2 a1 : PAddr) (v2 v1 : BitVec 64) (dq2 dq1 : DFrac)
     (hpath : uptPathOk root a2 v2 a1 v1 pa)
     (Φ : Result Bool (physaddr × ExceptionType) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ ownCtx cpu curCtx ∗ resvFragAny cpu r ∗
+    confCells cpu dq Privilege.Supervisor c ∗ ownCtx cpu curCtx ∗ resvFrag cpu (some (snapOf pa 8 w0)) false ∗
     bytesPointsTo pa 8 dqUpt w ∗ bytesPointsTo a2 8 dq2 v2 ∗ bytesPointsTo a1 8 dq1 v1 ∗
     uptOpenWit root Privilege.Supervisor ∗
     ▷ (confCells cpu dq Privilege.Supervisor c -∗ ownCtx cpu curCtx -∗ resvFrag cpu none false -∗
@@ -91,7 +92,7 @@ theorem swp_write_pte_conditional_upt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MCo
   unfold write_pte_conditional mem_write_value_priv mem_write_value_priv_meta
   swp_run 20
   iapply swp_bind
-  iapply (swp_checked_mem_write_pte8_cond_S_upt cpu dq c sie hok pa r w data hram hal hleaf had root hs a2 a1 v2 v1
+  iapply (swp_checked_mem_write_pte8_cond_S_upt cpu dq c sie hok pa w0 w data hram hal hleaf had root hs a2 a1 v2 v1
     dq2 dq1 hpath)
   iframe HmConf Hctx Hfrag Hb H2 H1 Hw
   inext
@@ -137,17 +138,9 @@ theorem swp_update_and_write_pte_upt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MCon
     conf_intro HmConf
     iapply swp_bind
     iapply (swp_read_pte_exclusive_ctx cpu dq c sie hok addr haddr.1 haddr.2 r0 dqUpt (kLeaf ppn perm a d))
-    iframe HmConf Hctx Hfrag Hb
+    iframe HmConf Hfrag Hb
     inext
-    iintro HmConf Hctx HD Hb
-    ihave Hfr : iprop(∃ r1 : Option Resv, resvFragAny cpu r1) $$ [HD]
-    · icases HD with (Hfrag | Hfrag)
-      · iexists _
-        iapply resvFragAny_of cpu _ false $$ Hfrag
-      · iexists none
-        iapply resvFragAny_of cpu none false
-        iapply resvFrag_of_X cpu none false _ $$ Hfrag
-    icases Hfr with ⟨%r1, Hfrag⟩
+    iintro HmConf Hfrag Hb
     swp_run 40
     rw [check_leaf_pte39_eq]
     iapply swp_bind
@@ -159,7 +152,7 @@ theorem swp_update_and_write_pte_upt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MCon
     | none =>
       swp_run 40
       iapply HΦ $$ HmConf [Hctx Hfrag] H2 H1 %(some (kLeaf ppn perm a d)) %a %d [] Hb
-      · iapply ctxTok_intro cpu curCtx r1; iframe Hctx Hfrag
+      · iapply ctxTok_introB cpu curCtx _ false; iframe Hctx Hfrag
       · ipureintro; exact Or.inr rfl
     | some p2 =>
       have hp2 : ∃ a2 d2, p2 = kLeaf ppn perm a2 d2 := by
@@ -170,7 +163,7 @@ theorem swp_update_and_write_pte_upt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MCon
       obtain ⟨a2', d2', rfl⟩ := hp2
       swp_run 40
       iapply swp_bind
-      iapply (swp_write_pte_conditional_upt cpu dq c sie hok addr r1 (kLeaf ppn perm a d)
+      iapply (swp_write_pte_conditional_upt cpu dq c sie hok addr (kLeaf ppn perm a d) (kLeaf ppn perm a d)
         (kLeaf ppn perm a2' d2') haddr.1 haddr.2 (uepLeafB_kLeaf ppn perm a d) (uepAD_kLeaf ppn perm a d a2' d2')
         root hs a2 a1 v2 v1 dq2 dq1 hpath)
       iframe HmConf Hctx Hfrag Hb H2 H1 Hw

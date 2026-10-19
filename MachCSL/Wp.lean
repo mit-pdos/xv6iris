@@ -98,7 +98,9 @@ theorem wp_dead (gen : Nat) (cpu : CPU) (m : SailM Unit) :
   inext
   iintro %e₂ %g₂ %eₜ %Hstep _
   obtain ⟨rfl, h⟩ := primStep_hart_inv Hstep
-  rcases h with ⟨hl, _⟩ | ⟨_, rfl, rfl, rfl⟩
+  rcases h with ⟨hl, _⟩ | ⟨_, rfl, rfl, rfl⟩ | ⟨hl, _⟩
+  · exact absurd hl hnl
+  rotate_left
   · exact absurd hl hnl
   imod Hclose
   imodintro
@@ -176,6 +178,20 @@ theorem wpLoop_fupd (cpu : CPU) : (|={⊤}=> wpLoop (GF := GF) cpu) ⊢ wpLoop c
   imodintro
   iapply H $$ Hcert
 
+/-- Under the P-M1 machine every store buffer is empty (`mmOk`'s staging
+conjunct `MState.landedEager`): so the land arm of `primStep` never fires. -/
+theorem machInterp_mmOk (σ : MState) : machInterp (GF := GF) σ ⊢ ⌜mmOk σ⌝ := by
+  unfold machInterp memModel memModelAt
+  iintro ⟨_, _, ⟨_, _, _, _, %h, _⟩, _, _⟩
+  ipureintro
+  exact h
+
+theorem machInterp_sbNil (σ : MState) : machInterp (GF := GF) σ ⊢ ⌜∀ c, σ.sb c = []⌝ := by
+  iintro H
+  ihave %h := machInterp_mmOk σ $$ H
+  ipureintro
+  exact mmOk_sbNil h
+
 /-- **The generic lifting lemma for one hart event, OBSERVED** (NI M2-W1),
 and the single per-hart framing point.  The caller is handed the ambient
 era's interpretation at the machine `g.m` AND the machine's half of the
@@ -226,6 +242,8 @@ theorem wpHart_lift_obs (cpu : CPU) (m : SailM Unit) :
     -- the history so far, lent to the callback
     unfold obsInterp
     icases Hobs with ⟨%h, %htot, %hwf, Ha⟩
+    ihave %hsb : ⌜∀ c, g.m.sb c = []⌝ $$ [Hera]
+    · iapply machInterp_sbNil $$ Hera
     imod H $$ %g %h %⟨hwf, hl⟩ [Hera Ha] with ⟨%Hred, H⟩
     · iframe Hera Ha
     imodintro
@@ -236,7 +254,10 @@ theorem wpHart_lift_obs (cpu : CPU) (m : SailM Unit) :
     inext
     iintro %e₂ %g₂ %eₜ %Hstep Hcred
     obtain ⟨rfl, h⟩ := primStep_hart_inv Hstep
-    rcases h with ⟨_, hobs, m', σ', rfl, hs, rfl⟩ | ⟨hnl, _, _⟩
+    rcases h with ⟨_, hobs, m', σ', rfl, hs, rfl⟩ | ⟨hnl, _, _⟩ | ⟨_, _, _, t, hland, _⟩
+    rotate_right
+    · -- the land arm (route P): no store is ever buffered under the P-M1 machine
+      exact absurd hland (MState.not_landOk_of_nil _ cpu t (hsb cpu))
     · imod H $$ %m' %σ' %hs Hcred with ⟨Hσ', Ha, Hwp⟩
       imodintro
       -- the trace conjunct, re-packed at the extended history
@@ -282,7 +303,9 @@ theorem wpHart_lift_obs (cpu : CPU) (m : SailM Unit) :
     inext
     iintro %e₂ %g₂ %eₜ %Hstep _
     obtain ⟨rfl, h⟩ := primStep_hart_inv Hstep
-    rcases h with ⟨hl, _⟩ | ⟨_, rfl, rfl, rfl⟩
+    rcases h with ⟨hl, _⟩ | ⟨_, rfl, rfl, rfl⟩ | ⟨hl, _⟩
+    · exact absurd hl hnl
+    rotate_left
     · exact absurd hl hnl
     imod Hclose
     imodintro
@@ -690,6 +713,39 @@ theorem swp_event (cpu : CPU) {X : Type} (o : Outcome Register RegisterType)
     iapply H $$ %v %σ' %hs
   · iintro %hb
     exact absurd hb (hnb σ σ')
+
+/-- The per-event rule for an event that is never blocked at a machine the
+interpretation describes (route P, increment P-M1: a fence's drain-blocked
+arm needs a non-empty store buffer, and `mmOk` says every buffer is empty). -/
+theorem swp_event_mm (cpu : CPU) {X : Type} (o : Outcome Register RegisterType)
+    (k : o.ret → SailM X) (Φ : X → IProp GF) (hnb : ∀ σ σ', mmOk σ → ¬ blockedStep cpu o σ σ')
+    (hsil : ∀ σ, hartObs cpu o σ = [] := by intro; rfl) :
+    (∀ σ, machInterp σ ={⊤,∅}=∗
+      ⌜∃ v σ', evStep cpu o σ v σ'⌝ ∗
+      ▷ ∀ (v : o.ret) σ', ⌜evStep cpu o σ v σ'⌝ -∗ |={∅,⊤}=> machInterp σ' ∗ swp cpu (k v) Φ)
+    ⊢ swp cpu (.impure (.ok o) k) Φ := by
+  iintro H
+  iapply swp_event_step cpu o k Φ hsil
+  iintro %σ Hσ
+  ihave %hmm : ⌜mmOk σ⌝ $$ [Hσ]
+  · iapply machInterp_mmOk $$ Hσ
+  imod H $$ %σ Hσ with ⟨%Hred, H⟩
+  imodintro
+  isplit
+  · ipureintro
+    exact Or.inl Hred
+  inext
+  iintro %σ'
+  isplit
+  · iintro %v %hs
+    iapply H $$ %v %σ' %hs
+  · iintro %hb
+    exact absurd hb (hnb σ σ' hmm)
+
+/-- A fence's drain-blocked arm never fires under the P-M1 machine. -/
+theorem barrier_not_blocked (cpu : CPU) (b : barrier_kind) (σ σ' : MState) (hmm : mmOk σ) :
+    ¬ blockedStep cpu (.barrier b) σ σ' :=
+  fun hb => hb.2.1 (mmOk_sbNil hmm cpu)
 
 /-! ## Derived rules for each primitive
 
@@ -1722,63 +1778,13 @@ theorem memModel_authored (σ : MState) (t : Nat) (h : Agent) :
 
 theorem memModel_resv (σ : MState) (cpu : CPU) (r : Option Resv) (b : Bool) :
     memModelAt E σ ∗ resvFragAt E cpu r b ⊢@{IProp GF} ⌜σ.resv cpu = r ∧ (σ.hr cpu).acq = b⌝ := by
-  unfold memModelAt resvFragAt resvFragXAt
-  iintro ⟨⟨_, _, _, Hr, _⟩, %x, H⟩
-  ihave %Hl := ghost_map_lookup $$ Hr H
-  ipureintro
-  rw [resvMap_get?] at Hl
-  have := Option.some.inj Hl
-  exact ⟨congrArg Prod.fst this, congrArg (fun p => p.2.1) this⟩
-
-/-- The exact fragment names the hart's pending stale read too. -/
-theorem memModel_resvX (σ : MState) (cpu : CPU) (r : Option Resv) (b : Bool) (x : Option Resv) :
-    memModelAt E σ ∗ resvFragXAt E cpu r b x ⊢@{IProp GF}
-      ⌜σ.resv cpu = r ∧ (σ.hr cpu).acq = b ∧ σ.xstale cpu = x⌝ := by
-  unfold memModelAt resvFragXAt
+  unfold memModelAt resvFragAt
   iintro ⟨⟨_, _, _, Hr, _⟩, H⟩
   ihave %Hl := ghost_map_lookup $$ Hr H
   ipureintro
   rw [resvMap_get?] at Hl
   have := Option.some.inj Hl
-  exact ⟨congrArg Prod.fst this, congrArg (fun p => p.2.1) this, congrArg (fun p => p.2.2) this⟩
-
-/-- A fragment names the pending stale read it holds. -/
-theorem resvFragAt_cases (cpu : CPU) (r : Option Resv) (b : Bool) :
-    resvFragAt E cpu r b ⊢@{IProp GF} ∃ x : Option Resv, resvFragXAt E cpu r b x := by
-  unfold resvFragAt
-  iintro H; iexact H
-
-theorem resvFragAt_of_X (cpu : CPU) (r : Option Resv) (b : Bool) (x : Option Resv) :
-    resvFragXAt E cpu r b x ⊢@{IProp GF} resvFragAt E cpu r b := by
-  unfold resvFragAt
-  iintro H; iexists x; iexact H
-
-/-- **The reservation map's update** at one hart (any fragment): the entry
-becomes `(r', b', x' x)` where `x` is the hart's pending stale read before
-(`x' := id` for a step that keeps it, `fun _ => none` for one that clears it). -/
-theorem resvAuth_upd (σ : MState) (cpu : CPU) (r : Option Resv) (b : Bool) (r' : Option Resv) (b' : Bool)
-    (x' : Option Resv → Option Resv) :
-    (E.resvName ↪●MAP resvMap σ) ∗ resvFragAt E cpu r b ⊢@{IProp GF} |==>
-      ((E.resvName ↪●MAP Iris.Std.PartialMap.insert (resvMap σ) cpu.val (r', b', x' (σ.xstale cpu))) ∗
-      resvFragXAt E cpu r' b' (x' (σ.xstale cpu))) := by
-  unfold resvFragAt resvFragXAt
-  iintro ⟨Hresv, %x, Hfrag⟩
-  ihave %Hl := ghost_map_lookup $$ Hresv Hfrag
-  have hx : σ.xstale cpu = x := by
-    rw [resvMap_get?] at Hl
-    exact congrArg (fun p => p.2.2) (Option.some.inj Hl)
-  rw [hx]
-  iapply ghost_map_update ((r', b', x' x) : ResvVal) $$ Hresv Hfrag
-
-/-- The same from an exact fragment, to any entry. -/
-theorem resvAuth_updX (σ : MState) (cpu : CPU) (r : Option Resv) (b : Bool) (x : Option Resv)
-    (v : ResvVal) :
-    (E.resvName ↪●MAP resvMap σ) ∗ resvFragXAt E cpu r b x ⊢@{IProp GF} |==>
-      ((E.resvName ↪●MAP Iris.Std.PartialMap.insert (resvMap σ) cpu.val v) ∗
-      resvFragXAt E cpu v.1 v.2.1 v.2.2) := by
-  unfold resvFragXAt
-  iintro ⟨Hresv, Hfrag⟩
-  iapply ghost_map_update v $$ Hresv Hfrag
+  exact ⟨congrArg Prod.fst this, congrArg Prod.snd this⟩
 
 /-- A dropped reservation (a blocked exclusive read, or -- W-RSV -- the
 instruction boundary): the hart's reservation, whatever it was, is dropped. -/
@@ -1797,11 +1803,11 @@ theorem memModel_dropResv (σ : MState) (cpu : CPU) (r : Option Resv) (b : Bool)
   unfold memModelAt
   rw [rsvModelAt_congr E (σ := σ) (σ' := σ.dropResv cpu) rfl rfl (fun _ _ => rfl)]
   icases Hmm with ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
-  imod resvAuth_upd E σ cpu r b none b (fun _ => none) $$ [$Hresv $Hfrag] with ⟨Hresv, Hfrag⟩
-  ihave Hfrag := resvFragAt_of_X E cpu none b none $$ Hfrag
+  unfold resvFragAt
+  imod ghost_map_update ((none, b) : ResvVal) $$ Hresv Hfrag with ⟨Hresv, Hfrag⟩
   imodintro
-  have hresv : resvMap (σ.dropResv cpu) = Iris.Std.PartialMap.insert (resvMap σ) cpu.val (none, b, none) :=
-    resvMap_upd σ _ cpu _ _ (by simp [updCpu, hres.2]) (fun c hc => by simp [updCpu, hc]) none
+  have hresv : resvMap (σ.dropResv cpu) = Iris.Std.PartialMap.insert (resvMap σ) cpu.val (none, b) :=
+    resvMap_upd σ _ cpu _ _ (by simp [updCpu, hres.2]) (fun c hc => by simp [updCpu, hc])
   rw [hresv]
   iframe Hfrag Htop Hauth Hresv Hrsv
   isplitl [Hviews]
@@ -1951,11 +1957,11 @@ theorem memModel_store_plainQ (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (
     (by simp only [MaxNat.le_toNat]; omega) $$ Htop with ⟨Htop, #Htoplb⟩
   imod ghost_map_insert_persist (σ.top + 1) (hartAgent cpu)
     (by rw [authMap_get?, if_neg (by simp only [MState.top]; omega)]) $$ Hauth with ⟨Hauth, #Hau⟩
-  imod resvAuth_upd E σ cpu r b none false id $$ [$Hresv $Hfrag] with ⟨Hresv, Hfrag⟩
-  ihave Hfrag := resvFragAt_of_X E cpu none false _ $$ Hfrag
+  unfold resvFragAt
+  imod ghost_map_update ((none, false) : ResvVal) $$ Hresv Hfrag with ⟨Hresv, Hfrag⟩
   imodintro
   have hresv : resvMap (σ.store cpu pa n w false) =
-      Iris.Std.PartialMap.insert (resvMap σ) cpu.val (none, false, id (σ.xstale cpu)) :=
+      Iris.Std.PartialMap.insert (resvMap σ) cpu.val (none, false) :=
     resvMap_upd σ _ cpu _ _ (by simp [updCpu, HRead.clearAcq, HRead.resetCoh])
       (fun c hc => by simp [updCpu, hc])
   rw [hresv]
@@ -2690,20 +2696,21 @@ theorem swp_sail_mem_write_plain (cpu : CPU) {n vasize : Nat}
     · iapply memModel_mmOk $$ Hmm
     ipureintro
     exact ramBytes_of_readBytes hmm.2.2.2.1 (hrd _ (Nat.le_refl _))
+  ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
+  · iapply memModel_mmOk $$ Hmm
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
   isplit
   · ipureintro
     by_cases hno : othersReserve σ.resv cpu req.pa n
     · exact Or.inr ⟨σ, Or.inl hno, rfl⟩
-    · exact Or.inl ⟨.Ok (some true), _, Or.inr (Or.inl ⟨hram, w', hv, hno, MState.staleFree_of_plain _ _ _ hk, rfl, rfl⟩)⟩
+    · exact Or.inl ⟨.Ok (some true), _, Or.inr ⟨hram, w', hv, hno,
+        MState.landNowOk_of_nil _ _ _ _ _ (mmOk_sbNil hmm cpu), rfl, rfl⟩⟩
   inext
   iintro %σ'
   isplit
   · iintro %v %Hev
-    rcases Hev with ⟨hdev, w₀, ds₀, _, hdw, _, _⟩ | ⟨_, w'', hv', hno, _, rfl, rfl⟩ | ⟨hsil, _, _⟩
-    rotate_right
-    · exact absurd hsil (MState.not_silentOk_of_plain _ _ _ _ _ _ hk)
+    rcases Hev with ⟨hdev, w₀, ds₀, _, hdw, _, _⟩ | ⟨_, w'', hv', hno, _, rfl, rfl⟩
     · exact absurd hdev (not_devBytes_of_ramBytes hram (devWrite_pos hdw))
     rw [hv] at hv'
     obtain rfl := Option.some.inj hv'
@@ -2738,17 +2745,19 @@ theorem swp_sail_barrier (cpu : CPU) (b : barrier_kind) (Φ : Unit → IProp GF)
     ▷ Φ () ⊢ swp cpu (ConcurrencyInterfaceV1.sail_barrier b) Φ := by
   unfold ConcurrencyInterfaceV1.sail_barrier PreSail.sail_barrier PreSail.emit
   iintro HΦ
-  iapply swp_event cpu (.barrier b) (fun v => FreeM.pure v) Φ (fun _ _ h => h)
+  iapply swp_event_mm cpu (.barrier b) (fun v => FreeM.pure v) Φ (barrier_not_blocked cpu b)
   iintro %σ Hσ
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
+  ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
+  · iapply memModel_mmOk $$ Hmm
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
   isplit
   · ipureintro
-    exact ⟨(), σ.fence cpu b, rfl⟩
+    exact ⟨(), σ.fence cpu b, fun _ => mmOk_sbNil hmm cpu, rfl⟩
   inext
   iintro %v' %σ' %Hev
-  obtain rfl := Hev
+  obtain ⟨_, rfl⟩ := Hev
   imod memModel_fence _ σ cpu b $$ Hmm with ⟨Hmm, _⟩
   imod Hmask
   imodintro

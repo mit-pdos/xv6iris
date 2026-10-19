@@ -487,18 +487,18 @@ theorem evStep_wire (cpu : CPU) (o : Sail.ConcurrencyInterfaceV1.Outcome LeanRV6
   cases o
   case memRead n _ req =>
     rcases h with ⟨_, w, ds', hr, _, rfl⟩ | ⟨_, _, _, _, _, _, _, _, rfl⟩ |
-      ⟨_, _, _, _, _, _, _, _, _, rfl⟩ |
-      ⟨_, _, _, ⟨_, _, _, rfl⟩ | ⟨_, _, _, _, _, _, _, _, _, rfl⟩⟩
+      ⟨_, _, _, _, _, _, _, _, _, rfl⟩ | ⟨_, _, _, _, _, _, _, rfl⟩
     · exact devRead_wire _ _ _ _ _ hr j
     all_goals rfl
   case memWrite n _ req =>
-    rcases h with ⟨_, w, ds', _, hw, _, rfl⟩ | ⟨_, _, _, _, _, _, rfl⟩ | ⟨_, _, rfl⟩
+    rcases h with ⟨_, w, ds', _, hw, _, rfl⟩ | ⟨_, _, _, _, _, _, rfl⟩
     · exact devWrite_wire _ _ _ _ _ hw j
-    all_goals rfl
+    · rfl
   case readRam => exact h.elim
   case writeRam => exact h.elim
   case regRead => obtain ⟨_, rfl⟩ := h; rfl
   case getCycleCount => obtain ⟨_, rfl⟩ := h; rfl
+  case barrier => obtain ⟨_, rfl⟩ := h; rfl
   all_goals (have h' := h; simp only [evStep] at h'; subst h'; rfl)
 
 theorem hartStep_wire (cpu : CPU) (m m' : SailM Unit) (σ σ' : MState) (h : hartStep cpu m σ m' σ')
@@ -514,6 +514,7 @@ theorem hartStep_wire (cpu : CPU) (m m' : SailM Unit) (σ σ' : MState) (h : har
       split at hb
       · obtain ⟨_, _, rfl⟩ := hb; rfl
       · obtain ⟨_, rfl⟩ := hb; rfl
+      · obtain ⟨_, _, rfl⟩ := hb; rfl
       · exact hb.elim
 
 /-- ...and never makes a byte arrive (Rocq `mnode_step_u_recv`). -/
@@ -523,18 +524,18 @@ theorem evStep_recvd (cpu : CPU) (o : Sail.ConcurrencyInterfaceV1.Outcome LeanRV
   cases o
   case memRead n _ req =>
     rcases h with ⟨_, w, ds', hr, _, rfl⟩ | ⟨_, _, _, _, _, _, _, _, rfl⟩ |
-      ⟨_, _, _, _, _, _, _, _, _, rfl⟩ |
-      ⟨_, _, _, ⟨_, _, _, rfl⟩ | ⟨_, _, _, _, _, _, _, _, _, rfl⟩⟩
+      ⟨_, _, _, _, _, _, _, _, _, rfl⟩ | ⟨_, _, _, _, _, _, _, rfl⟩
     · exact devRead_recvd _ _ _ _ _ hr j
     all_goals rfl
   case memWrite n _ req =>
-    rcases h with ⟨_, w, ds', _, hw, _, rfl⟩ | ⟨_, _, _, _, _, _, rfl⟩ | ⟨_, _, rfl⟩
+    rcases h with ⟨_, w, ds', _, hw, _, rfl⟩ | ⟨_, _, _, _, _, _, rfl⟩
     · exact devWrite_recvd _ _ _ _ _ hw j
-    all_goals rfl
+    · rfl
   case readRam => exact h.elim
   case writeRam => exact h.elim
   case regRead => obtain ⟨_, rfl⟩ := h; rfl
   case getCycleCount => obtain ⟨_, rfl⟩ := h; rfl
+  case barrier => obtain ⟨_, rfl⟩ := h; rfl
   all_goals (have h' := h; simp only [evStep] at h'; subst h'; rfl)
 
 theorem hartStep_recvd (cpu : CPU) (m m' : SailM Unit) (σ σ' : MState) (h : hartStep cpu m σ m' σ')
@@ -550,6 +551,7 @@ theorem hartStep_recvd (cpu : CPU) (m m' : SailM Unit) (σ σ' : MState) (h : ha
       split at hb
       · obtain ⟨_, _, rfl⟩ := hb; rfl
       · obtain ⟨_, rfl⟩ := hb; rfl
+      · obtain ⟨_, _, rfl⟩ := hb; rfl
       · exact hb.elim
 
 /-- THE OBSERVATIONS ARE FAITHFUL: a device step's events are device events,
@@ -972,7 +974,7 @@ theorem primStep_obsWf (e : Expr) (g : GState) (κ : List Obs) (e' : Expr) (g' :
   cases e with
   | hart gen cpu m =>
     obtain ⟨rfl, hc⟩ := primStep_hart_inv hstep
-    rcases hc with ⟨⟨hpw, _⟩, rfl, m', σ', rfl, hs, rfl⟩ | ⟨_, rfl, rfl, rfl⟩
+    rcases hc with ⟨⟨hpw, _⟩, rfl, m', σ', rfl, hs, rfl⟩ | ⟨_, rfl, rfl, rfl⟩ | ⟨_, rfl, rfl, t, _, rfl⟩
     · -- a hart node: its events (only ever a user-boundary event) keep the
       -- power on and the boot count, skip the console segment, and it never
       -- moves a wire or a receiver
@@ -991,6 +993,8 @@ theorem primStep_obsWf (e : Expr) (g : GState) (κ : List Obs) (e' : Expr) (g' :
         rw [openSeg_user h _ hu, hrecv hpw i]
         exact (hartStep_recvd cpu m m' g.m σ' hs i).symm
     · rw [List.append_nil]; exact ⟨hsh, hbt, hwire, hrecv⟩
+    · -- the land arm (route P): silent, and it moves no device
+      rw [List.append_nil]; exact (show obsWf h g from ⟨hsh, hbt, hwire, hrecv⟩)
   | dev gen d tid m =>
     rcases primStep_dev_inv hstep with ⟨⟨hpw, _⟩, m', σ', rfl, hs, rfl⟩ | ⟨_, rfl, rfl, rfl, rfl⟩
     · -- a device: its events extend the open cycle, and by exactly what

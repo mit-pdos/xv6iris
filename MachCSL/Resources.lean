@@ -81,10 +81,9 @@ theorem regIdx_injective : Function.Injective regIdx := by
   have := congrArg Register.ofNat h
   simpa [regIdx, Register.ofNat_ctorIdx] using this
 
-/-- The reservation map's values: a hart's reservation, its pending
-acquire bit, and its pending STALE exclusive read (`MState.xstale`, narrow
-δ1 [OWN.105]). -/
-abbrev ResvVal := Option Resv × Bool × Option Resv
+/-- The reservation map's values: a hart's reservation and its pending
+acquire bit. -/
+abbrev ResvVal := Option Resv × Bool
 
 /-- A device's state, tagged with the device (the value of the per-device
 ghost variables: one `GhostVarG` covers every device). -/
@@ -638,16 +637,15 @@ theorem authMap_nil : authMap [] = (∅ : RegMapF Agent) := rfl
 def resvMapAux (σ : MState) : Nat → RegMapF ResvVal
   | 0 => ∅
   | k + 1 =>
-    if h : k < NCPU then insert (resvMapAux σ k) k (σ.resv ⟨k, h⟩, (σ.hr ⟨k, h⟩).acq, σ.xstale ⟨k, h⟩)
+    if h : k < NCPU then insert (resvMapAux σ k) k (σ.resv ⟨k, h⟩, (σ.hr ⟨k, h⟩).acq)
     else resvMapAux σ k
 
-/-- The reservation map: hart ↦ (its reservation, its pending acquire bit,
-its pending stale read). -/
+/-- The reservation map: hart ↦ (its reservation, its pending acquire bit). -/
 def resvMap (σ : MState) : RegMapF ResvVal := resvMapAux σ NCPU
 
 theorem resvMapAux_get? (σ : MState) : ∀ (k j : Nat),
     get? (resvMapAux σ k) j =
-      if h : j < k ∧ j < NCPU then some (σ.resv ⟨j, h.2⟩, (σ.hr ⟨j, h.2⟩).acq, σ.xstale ⟨j, h.2⟩) else none
+      if h : j < k ∧ j < NCPU then some (σ.resv ⟨j, h.2⟩, (σ.hr ⟨j, h.2⟩).acq) else none
   | 0, j => by
     simp only [resvMapAux]
     rw [dif_neg (by omega)]
@@ -668,7 +666,7 @@ theorem resvMapAux_get? (σ : MState) : ∀ (k j : Nat),
       · rw [dif_neg h1, dif_neg (by omega)]
 
 theorem resvMap_get? (σ : MState) (c : CPU) :
-    get? (resvMap σ) c.val = some (σ.resv c, (σ.hr c).acq, σ.xstale c) := by
+    get? (resvMap σ) c.val = some (σ.resv c, (σ.hr c).acq) := by
   unfold resvMap
   rw [resvMapAux_get?, dif_pos ⟨c.isLt, c.isLt⟩]
 
@@ -676,11 +674,8 @@ theorem resvMap_get?_ge (σ : MState) (j : Nat) (h : NCPU ≤ j) : get? (resvMap
   unfold resvMap
   rw [resvMapAux_get?, dif_neg (by omega)]
 
-/-- Two states with the same reservations, acquire bits and stale reads have
-the same map (the stale-read clause is `rfl` for every step but the
-exclusive ones). -/
-theorem resvMap_congr (σ σ' : MState) (h : ∀ c, σ'.resv c = σ.resv c ∧ (σ'.hr c).acq = (σ.hr c).acq)
-    (hx : ∀ c, σ'.xstale c = σ.xstale c := by intro _; rfl) :
+/-- Two states with the same reservations and acquire bits have the same map. -/
+theorem resvMap_congr (σ σ' : MState) (h : ∀ c, σ'.resv c = σ.resv c ∧ (σ'.hr c).acq = (σ.hr c).acq) :
     resvMap σ' = resvMap σ := by
   apply LawfulPartialMap.equiv_iff_eq.mp
   intro j
@@ -693,19 +688,17 @@ theorem resvMap_congr (σ σ' : MState) (h : ∀ c, σ'.resv c = σ.resv c ∧ (
 /-- Updating one hart's entry. -/
 theorem resvMap_upd (σ σ' : MState) (cpu : CPU) (r : Option Resv) (b : Bool)
     (hc : σ'.resv cpu = r ∧ (σ'.hr cpu).acq = b)
-    (h : ∀ c, c ≠ cpu → σ'.resv c = σ.resv c ∧ (σ'.hr c).acq = (σ.hr c).acq)
-    (x : Option Resv := σ.xstale cpu) (hxc : σ'.xstale cpu = x := by first | rfl | simp [updCpu])
-    (hx : ∀ c, c ≠ cpu → σ'.xstale c = σ.xstale c := by intro _ _; first | rfl | simp_all [updCpu]) :
-    resvMap σ' = insert (resvMap σ) cpu.val (r, b, x) := by
+    (h : ∀ c, c ≠ cpu → σ'.resv c = σ.resv c ∧ (σ'.hr c).acq = (σ.hr c).acq) :
+    resvMap σ' = insert (resvMap σ) cpu.val (r, b) := by
   apply LawfulPartialMap.equiv_iff_eq.mp
   intro j
   by_cases hj : j = cpu.val
   · subst hj
-    rw [LawfulPartialMap.get?_insert_eq rfl, resvMap_get?, hc.1, hc.2, hxc]
+    rw [LawfulPartialMap.get?_insert_eq rfl, resvMap_get?, hc.1, hc.2]
   · rw [LawfulPartialMap.get?_insert_ne (Ne.symm hj)]
     by_cases hlt : j < NCPU
     · have hne : (⟨j, hlt⟩ : CPU) ≠ cpu := fun heq => hj (congrArg Fin.val heq)
-      rw [resvMap_get? σ ⟨j, hlt⟩, resvMap_get? σ' ⟨j, hlt⟩, (h _ hne).1, (h _ hne).2, hx _ hne]
+      rw [resvMap_get? σ ⟨j, hlt⟩, resvMap_get? σ' ⟨j, hlt⟩, (h _ hne).1, (h _ hne).2]
     · rw [resvMap_get?_ge σ j (by omega), resvMap_get?_ge σ' j (by omega)]
 
 /-! ### The DRAM bank in the memory model
@@ -839,14 +832,20 @@ def devRtOk (σ : MState) : Prop := ∀ d : DevId, 0 < (σ.devrt d).next
 `hr_ok` and `resv_ok`): every history is well formed against the author log,
 every view and read-side position is at or below the top, every outstanding
 reservation still agrees with the top of memory, and every history sits at a
-DRAM address. -/
+DRAM address.  Route P, increment P-M1: the staging invariant
+`MState.landedEager` (every store buffer empty, every store landed at its own
+stamp) -- replaced by the buffer's interpretation in increment P-M2. -/
 def mmOk (σ : MState) : Prop :=
   (∀ (a : PAddr) (H : Hist), σ.mem[a]? = some H → histOk σ.log H) ∧
   (∀ c, σ.tv c ≤ σ.top ∧ σ.itv c ≤ σ.top ∧ (σ.hr c).bound σ.top) ∧
   (∀ c r, σ.resv c = some r → ∀ (a : PAddr) (v : BitVec 8), r[a]? = some v →
     (σ.mem[a]?).bind Hist.top = some v) ∧
   memRam σ.mem ∧
-  devRtOk σ
+  devRtOk σ ∧
+  σ.landedEager
+
+/-- Under the P-M1 machine every store buffer is empty. -/
+theorem mmOk_sbNil {σ : MState} (h : mmOk σ) (c : CPU) : σ.sb c = [] := h.2.2.2.2.2.1 c
 
 
 theorem mmOk_afterLoad (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv : tvn ≤ σ.top)
@@ -889,8 +888,8 @@ theorem mmOk_fence (σ : MState) (cpu : CPU) (b : barrier_kind) (h : mmOk σ) : 
 theorem mmOk_store (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (excl : Bool)
     (hram : ramBytes pa n) (hno : ¬ othersReserve σ.resv cpu pa n) (h : mmOk σ) :
     mmOk (σ.store cpu pa n w excl) := by
-  obtain ⟨h1, h2, h3, h4, h5⟩ := h
-  refine ⟨?_, ?_, ?_, memRam_writeBytes hram h4, h5⟩
+  obtain ⟨h1, h2, h3, h4, h5, h6⟩ := h
+  refine ⟨?_, ?_, ?_, memRam_writeBytes hram h4, h5, MState.landedEager_store σ cpu pa n w excl h6⟩
   · intro a H hget
     exact FlatMem.writeBytes_histOk σ.mem σ.log pa w (hartAgent cpu) h1 a H hget
   · intro c
@@ -929,9 +928,10 @@ theorem mmOk_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     mmOk (σ.storeDma pa n w) := by
   by_cases hn : n = 0
   · rw [MState.storeDma_zero σ pa n w hn]; exact h
-  rw [MState.storeDma_of_ne σ pa n w hn]
-  obtain ⟨h1, h2, h3, h4, h5⟩ := h
-  refine ⟨?_, ?_, ?_, memRam_writeBytes hram h4, h5⟩
+  have h6' := MState.landedEager_storeDma σ pa n w h.2.2.2.2.2
+  rw [MState.storeDma_of_ne σ pa n w hn] at h6' ⊢
+  obtain ⟨h1, h2, h3, h4, h5, -⟩ := h
+  refine ⟨?_, ?_, ?_, memRam_writeBytes hram h4, h5, h6'⟩
   · intro a H hget
     exact FlatMem.writeBytes_histOk σ.mem σ.log pa w diskAgent h1 a H hget
   · intro c
@@ -952,8 +952,8 @@ language makes -- recording a finished task and handing out the next id --
 both satisfy that). -/
 theorem mmOk_setRt (σ : MState) (d : DevId) (rt : DevRt)
     (hnext : 0 < (σ.devrt d).next → 0 < rt.next) (h : mmOk σ) : mmOk (σ.setRt d rt) := by
-  obtain ⟨h1, h2, h3, h4, h5⟩ := h
-  refine ⟨h1, h2, h3, h4, fun d' => ?_⟩
+  obtain ⟨h1, h2, h3, h4, h5, h6⟩ := h
+  refine ⟨h1, h2, h3, h4, fun d' => ?_, h6⟩
   simp only [updCpu']
   by_cases hd : d' = d
   · subst hd; simp only [if_true]; exact hnext (h5 d')
@@ -961,8 +961,9 @@ theorem mmOk_setRt (σ : MState) (d : DevId) (rt : DevRt)
 
 /-- A booted machine satisfies the step invariant. -/
 theorem mmOk_boot (σ : MState) (h : bootFacts σ) : mmOk σ := by
-  obtain ⟨hmem, hlog, hhart, _, hrt, _⟩ := h
-  refine ⟨?_, ?_, ?_, ?_, fun d => by rw [hrt d]; exact Nat.zero_lt_one⟩
+  obtain ⟨hmem, hlog, hhart, _, hrt, hll, hsb⟩ := h
+  refine ⟨?_, ?_, ?_, ?_, fun d => by rw [hrt d]; exact Nat.zero_lt_one,
+    fun c => (hsb c).1, by rw [hll, MState.top, hlog]; rfl⟩
   · intro a H hget
     rw [hmem, imgFlat_get?] at hget
     split at hget

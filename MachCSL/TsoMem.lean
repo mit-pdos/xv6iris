@@ -661,4 +661,221 @@ theorem FlatMem.writeBytes_histOk {n : Nat} (m : FlatMem) (log : List Agent) (pa
         exact hm a H hget
   exact key _ m (fun a H hg => histOk_append log [h] H (hm a H hg))
 
+/-! ## Route P: landing positions and the co-ordered readings (P-M1)
+
+Route P ([OWN.110] [OWN.111], `notes/weak-allocproc-routeP-design.md` §2.1): a plain store is
+ISSUED (its history entry, keyed by its ISSUE stamp, sits on top of its footprint's histories)
+and LANDS later (it enters the global order at the then-top LANDING position).  `LandPos` maps
+an issue stamp to its landing position (`none`: still pending); the boot image (stamp 0) is
+landed at 0.  Histories are kept in CO order: a hart's PENDING entries on top (issue order),
+the LANDED ones below them (landing order, latest first).
+
+P-M1 STAGING: the machine (`MachCSL.Lang`) still lands every store in the step that issues it
+(`MState.store` = `land ∘ issue`), so every issued stamp is landed AT ITS OWN STAMP
+(`lpOf_range'_one`) and the readings below agree with `HEnt.visible` / `Hist.read` /
+`Hist.top` (`HEnt.visibleP_eager`, `Hist.readP_eager`, `Hist.topL_eager`).  Increment P-M2
+switches the machine's reads to them. -/
+
+/-- Landing positions of issue stamps (`none`: pending). -/
+abbrev LandPos := Nat → Option Nat
+
+/-- The position (counted from `b + 1`) of the first occurrence of `t` in `l`. -/
+def posIn (t : Nat) : List Nat → Nat → Option Nat
+  | [], _ => none
+  | x :: l, b => if x = t then some (b + 1) else posIn t l (b + 1)
+
+/-- The landing positions of a landing log (issue stamps in landing order): stamp 0 (the
+boot image) at 0, a logged stamp at its index + 1. -/
+def lpOf (llog : List Nat) : LandPos := fun t => if t = 0 then some 0 else posIn t llog 0
+
+theorem posIn_snoc (t x : Nat) : ∀ (l : List Nat) (b : Nat),
+    posIn t (l ++ [x]) b = (posIn t l b).or (if x = t then some (b + l.length + 1) else none)
+  | [], b => by simp [posIn]
+  | y :: l, b => by
+    simp only [List.cons_append, posIn, List.length_cons]
+    split
+    · simp
+    · rw [posIn_snoc t x l (b + 1)]
+      have e : b + 1 + l.length + 1 = b + (l.length + 1) + 1 := by omega
+      rw [e]
+
+theorem posIn_none_of_not_mem (t : Nat) : ∀ (l : List Nat) (b : Nat), t ∉ l → posIn t l b = none
+  | [], _, _ => rfl
+  | y :: l, b, h => by
+    simp only [List.mem_cons, not_or] at h
+    simp only [posIn, if_neg (Ne.symm h.1)]
+    exact posIn_none_of_not_mem t l (b + 1) h.2
+
+theorem posIn_le (t : Nat) : ∀ (l : List Nat) (b p : Nat), posIn t l b = some p → b < p ∧ p ≤ b + l.length
+  | [], _, _, h => by simp [posIn] at h
+  | y :: l, b, p, h => by
+    simp only [posIn] at h
+    split at h
+    · cases h; simp
+    · have := posIn_le t l (b + 1) p h
+      simp only [List.length_cons]; omega
+
+/-- The positions in a run of consecutive stamps. -/
+theorem posIn_range' (t : Nat) : ∀ (k s b : Nat),
+    posIn t (List.range' s k) b = if s ≤ t ∧ t < s + k then some (b + (t - s) + 1) else none
+  | 0, s, b => by
+    rw [if_neg (by omega)]; rfl
+  | k + 1, s, b => by
+    rw [List.range'_succ]
+    simp only [posIn]
+    rw [posIn_range' t k (s + 1) (b + 1)]
+    by_cases h : s = t
+    · subst h
+      rw [if_pos rfl, if_pos (by omega)]
+      congr 1; omega
+    · rw [if_neg h]
+      split <;> split <;> first | rfl | omega | (congr 1; omega)
+
+/-- **Eager landing** (the P-M1 machine): when the landing log is `1, 2, …, k` -- every store
+landed in the step that issued it -- every issued stamp is landed at its own stamp. -/
+theorem lpOf_range'_one (k t : Nat) :
+    lpOf (List.range' 1 k) t = if t ≤ k then some t else none := by
+  unfold lpOf
+  by_cases h0 : t = 0
+  · subst h0; simp
+  · rw [if_neg h0, posIn_range' t k 1 0]
+    by_cases hk : t ≤ k
+    · rw [if_pos ⟨by omega, by omega⟩, if_pos hk]; congr 1; omega
+    · rw [if_neg (by omega), if_neg hk]
+
+/-- Appending to the landing log keeps every landed position. -/
+theorem lpOf_snoc_of_some (llog : List Nat) (x t p : Nat) (h : lpOf llog t = some p) :
+    lpOf (llog ++ [x]) t = some p := by
+  unfold lpOf at *
+  split at h
+  · rw [if_pos (by assumption)]; exact h
+  · rw [if_neg (by assumption), posIn_snoc, h]; rfl
+
+/-- A fresh nonzero stamp lands at the new landing top. -/
+theorem lpOf_snoc_self (llog : List Nat) (x : Nat) (hx : x ≠ 0) (hf : x ∉ llog) :
+    lpOf (llog ++ [x]) x = some (llog.length + 1) := by
+  unfold lpOf
+  rw [if_neg hx, posIn_snoc, posIn_none_of_not_mem x llog 0 hf]
+  simp
+
+/-- Every other stamp keeps its landing position. -/
+theorem lpOf_snoc_ne (llog : List Nat) (x t : Nat) (h : t ≠ x) :
+    lpOf (llog ++ [x]) t = lpOf llog t := by
+  unfold lpOf
+  split
+  · rfl
+  · rw [posIn_snoc, if_neg (Ne.symm h)]
+    cases posIn t llog 0 <;> rfl
+
+/-- Every landed position is at most the landing top. -/
+theorem lpOf_le (llog : List Nat) (t p : Nat) (h : lpOf llog t = some p) : p ≤ llog.length := by
+  unfold lpOf at h
+  split at h
+  · cases h; exact Nat.zero_le _
+  · have := posIn_le t llog 0 p h; omega
+
+/-- An entry is visible to agent `h` at (landing) view `tv` (route P): LANDED at or below the
+view, or the agent's own (forwarding: an own pending store is po-before the read). -/
+def HEnt.visibleP (lp : LandPos) (h : Agent) (tv : Nat) (e : HEnt) : Bool :=
+  (lp e.t).any (· ≤ tv) || decide (e.tid = h)
+
+/-- The byte agent `h` reads at (landing) view `tv` (route P): the CO-latest visible entry --
+co order is the list order. -/
+def Hist.readP (lp : LandPos) (h : Agent) (tv : Nat) (H : Hist) : Option (BitVec 8) :=
+  (H.find? (HEnt.visibleP lp h tv)).map HEnt.v
+
+/-- The byte at the top of the LANDED order (route P: what an exclusive read and the DMA
+engine see): the first landed entry. -/
+def Hist.topL (lp : LandPos) (H : Hist) : Option (BitVec 8) :=
+  (H.find? (fun e => (lp e.t).isSome)).map HEnt.v
+
+/-- Under eager landing an entry landed at its own stamp is visible exactly when it is today. -/
+theorem HEnt.visibleP_eager (lp : LandPos) (h : Agent) (tv : Nat) (e : HEnt)
+    (he : lp e.t = some e.t) : e.visibleP lp h tv = e.visible h tv := by
+  simp [HEnt.visibleP, HEnt.visible, he]
+
+theorem Hist.readP_eager (lp : LandPos) (h : Agent) (tv : Nat) (H : Hist)
+    (hH : ∀ e ∈ H, lp e.t = some e.t) : Hist.readP lp h tv H = Hist.read h tv H := by
+  induction H with
+  | nil => rfl
+  | cons e H ih =>
+    have ih' := ih (fun x hx => hH x (List.mem_cons_of_mem _ hx))
+    unfold Hist.readP Hist.read at ih' ⊢
+    rw [List.find?_cons, List.find?_cons, HEnt.visibleP_eager lp h tv e (hH e List.mem_cons_self)]
+    cases e.visible h tv
+    · exact ih'
+    · rfl
+
+theorem Hist.topL_eager (lp : LandPos) (H : Hist) (hH : ∀ e ∈ H, lp e.t = some e.t) :
+    Hist.topL lp H = Hist.top H := by
+  cases H with
+  | nil => rfl
+  | cons e H => simp [Hist.topL, Hist.top, hH e List.mem_cons_self]
+
+/-- Insert an entry right BELOW a history's pending prefix (route P): a write that lands AT
+ONCE (an exclusive write, a DMA write) is co-after every landed entry and co-before every
+pending one. -/
+def Hist.insLanded (lp : LandPos) (e : HEnt) (H : Hist) : Hist :=
+  H.takeWhile (fun x => (lp x.t).isNone) ++ e :: H.dropWhile (fun x => (lp x.t).isNone)
+
+/-- With no pending entry on top, a landed insert is a push. -/
+theorem Hist.insLanded_of_head (lp : LandPos) (e : HEnt) (H : Hist)
+    (h : ∀ x, H.head? = some x → (lp x.t).isSome) : Hist.insLanded lp e H = e :: H := by
+  cases H with
+  | nil => rfl
+  | cons x H =>
+    have hx := h x rfl
+    have hn : (lp x.t).isNone = false := by
+      cases hl : lp x.t with
+      | none => rw [hl] at hx; cases hx
+      | some _ => rfl
+    simp [Hist.insLanded, hn]
+
+/-- A landed insert at one byte. -/
+def FlatMem.pushLanded (m : FlatMem) (lp : LandPos) (a : PAddr) (e : HEnt) : FlatMem :=
+  m.insert a (Hist.insLanded lp e (m.getD a []))
+
+/-- The write of `w` at `pa` by `h` at stamp `t` that LANDS AT ONCE (route P). -/
+def FlatMem.landBytes (m : FlatMem) (lp : LandPos) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (t : Nat) (h : Agent) : FlatMem :=
+  (List.range n).foldl (fun m j => m.pushLanded lp (pa + BitVec.ofNat 64 j) ⟨t, h, nthByte w j⟩) m
+
+/-- The store with issue stamp `t` touches a byte of the footprint `pa .. pa+n-1`: some
+footprint byte's history holds an entry at `t` (route P: a buffered store's footprint). -/
+def FlatMem.stampIn (m : FlatMem) (t : Nat) (pa : PAddr) (n : Nat) : Prop :=
+  ∃ j, j < n ∧ ∃ H, m[pa + BitVec.ofNat 64 j]? = some H ∧ ∃ e ∈ H, e.t = t
+
+/-- The authors of the landed stores, in landing order (route P). -/
+def landAuthors (log : List Agent) (llog : List Nat) : List Agent :=
+  llog.map (fun t => log.getD (t - 1) diskAgent)
+
+/-- The LANDING position of agent `h`'s latest LANDED store (0 if none): what a draining
+fence passes once the hart's buffer is empty (route P). -/
+def ownPubL (h : Agent) (log : List Agent) (llog : List Nat) : Nat := ownPub h (landAuthors log llog)
+
+theorem ownPubL_le (h : Agent) (log : List Agent) (llog : List Nat) :
+    ownPubL h log llog ≤ llog.length := by
+  have := ownPub_le h (landAuthors log llog)
+  simpa [ownPubL, landAuthors] using this
+
+/-- A fence that must find the hart's store buffer EMPTY (route P, design §1 rule 4 and
+Zifencei): a W→R edge (`fenceDrains`) or `fence.i` (the instruction fetcher never forwards). -/
+def fenceDrainsSb (b : barrier_kind) : Bool := fenceDrains b || fenceIfetch b
+
+/-- A fence with a W predecessor AND a W successor (`rw,rw`, `rw,w`, `w,rw`, `w,w`, `tso`):
+it opens a new STORE EPOCH of the hart ([OWN.113], RVWMO ppo rule 4 for W→W): every store
+issued before it lands before every store issued after it. -/
+def fenceEpoch : barrier_kind → Bool
+  | .Barrier_RISCV_rw_rw | .Barrier_RISCV_rw_w | .Barrier_RISCV_w_rw | .Barrier_RISCV_w_w
+  | .Barrier_RISCV_tso => true
+  | _ => false
+
+/-- A RELEASE write (`.rl`, `.aqrl`: Sail's `Write_RISCV_conditional_release` /
+`_strong_release`, the strength bit of a write's access kind): RVWMO ppo rule 6 orders every
+earlier access of the hart before it (route P: it finds the hart's buffer empty). -/
+def akRel : AK → Bool
+  | .AK_explicit e => match e.strength with | .AS_normal => false | _ => true
+  | .AK_arch _ => true
+  | _ => false
+
 end MachCSL

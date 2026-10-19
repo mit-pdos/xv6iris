@@ -65,15 +65,9 @@ def rviewLbAt (cpu : CPU) (K : Nat) : IProp GF := iprop%
 /-- The store at timestamp `t` is agent `h`'s (persistent). -/
 def authoredByAt (t : Nat) (h : Agent) : IProp GF := E.authName ↪◯MAP[t]{.discard} h
 
-/-- Hart `cpu`'s EXACT reservation fragment: its reservation, pending acquire
-bit and pending stale exclusive read (`MState.xstale`, narrow δ1 [OWN.105]). -/
-def resvFragXAt (cpu : CPU) (r : Option Resv) (b : Bool) (x : Option Resv) : IProp GF :=
-  E.resvName ↪◯MAP[cpu.val] ((r, b, x) : ResvVal)
-
-/-- Hart `cpu`'s reservation fragment: its reservation and pending acquire bit
-(whatever its pending stale read). -/
+/-- Hart `cpu`'s reservation fragment: its reservation and pending acquire bit. -/
 def resvFragAt (cpu : CPU) (r : Option Resv) (b : Bool) : IProp GF :=
-  iprop(∃ x : Option Resv, resvFragXAt E cpu r b x)
+  E.resvName ↪◯MAP[cpu.val] ((r, b) : ResvVal)
 
 /-- Hart `cpu`'s reservation fragment at reservation `r`, whatever the pending
 acquire bit (Rocq `resv_frag`, over `resv_fragb` = `resvFragAt`). -/
@@ -151,9 +145,6 @@ instance (t : Nat) (h : Agent) : Persistent (PROP := IProp GF) (authoredByAt E t
   unfold authoredByAt; infer_instance
 instance (t : Nat) (h : Agent) : Timeless (PROP := IProp GF) (authoredByAt E t h) := by
   unfold authoredByAt; infer_instance
-instance (cpu : CPU) (r : Option Resv) (b : Bool) (x : Option Resv) :
-    Timeless (PROP := IProp GF) (resvFragXAt E cpu r b x) := by
-  unfold resvFragXAt; infer_instance
 instance (cpu : CPU) (r : Option Resv) (b : Bool) : Timeless (PROP := IProp GF) (resvFragAt E cpu r b) := by
   unfold resvFragAt; infer_instance
 instance (cpu : CPU) (r : Option Resv) : Timeless (PROP := IProp GF) (resvFragAnyAt E cpu r) := by
@@ -772,8 +763,6 @@ abbrev rviewLb (cpu : CPU) (K : Nat) : IProp GF := rviewLbAt (MachGS.era (hlc :=
 abbrev authoredBy (t : Nat) (h : Agent) : IProp GF := authoredByAt (MachGS.era (hlc := hlc) (GF := GF)) t h
 abbrev resvFrag (cpu : CPU) (r : Option Resv) (b : Bool) : IProp GF :=
   resvFragAt (MachGS.era (hlc := hlc) (GF := GF)) cpu r b
-abbrev resvFragX (cpu : CPU) (r : Option Resv) (b : Bool) (x : Option Resv) : IProp GF :=
-  resvFragXAt (MachGS.era (hlc := hlc) (GF := GF)) cpu r b x
 abbrev resvFragAny (cpu : CPU) (r : Option Resv) : IProp GF :=
   resvFragAnyAt (MachGS.era (hlc := hlc) (GF := GF)) cpu r
 abbrev ownCtx (cpu : CPU) (ξ : CtxId) : IProp GF := ownCtxAt (MachGS.era (hlc := hlc) (GF := GF)) cpu ξ
@@ -974,14 +963,6 @@ theorem resvFragAny_of (cpu : CPU) (r : Option Resv) (b : Bool) :
   unfold resvFragAny resvFragAnyAt resvFrag
   iintro H
   iexists b
-  iexact H
-
-/-- An exact fragment is a fragment. -/
-theorem resvFrag_of_X (cpu : CPU) (r : Option Resv) (b : Bool) (x : Option Resv) :
-    resvFragX cpu r b x ⊢@{IProp GF} resvFrag cpu r b := by
-  unfold resvFragX resvFrag resvFragAt
-  iintro H
-  iexists x
   iexact H
 
 /-- The fragment's acquire bit, named. -/

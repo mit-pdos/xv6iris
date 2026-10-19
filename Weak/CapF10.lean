@@ -105,7 +105,7 @@ theorem CapF10.agentFoot (hH : HypsC fok fcutT g0 c0) {c : Wpcfg Pexv6 Efab}
       (List.mem_of_getElem? (by rw [ht]; exact poolHart H c.pcDev vs cpu))
     rw [hm] at hred
     have hadj' : pairAdjacent (st ++ (hartAgent cpu, l) :: rest) := hadj
-    obtain ⟨-, hrbW⟩ := ramOfSafe hred ⟨hR.pow, hR.gen⟩ (notOthers hR.mem hadj')
+    obtain ⟨-, hrbW⟩ := ramOfSafe hred ⟨hR.pow, hR.gen⟩ (notOthers hR.mem hadj') (hR.mem.2.2.2.2 _)
     exact ⟨req.pa, hb, by rw [hd]; exact hrbW n0 va req rfl hdev⟩
   · have hiN : i = NCPU := by
       have := lookup_lt_Some hlk

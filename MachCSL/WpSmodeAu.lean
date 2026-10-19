@@ -129,41 +129,30 @@ abbrev amoswapAq : MemoryAccessType mem_payload :=
 
 set_option maxHeartbeats 4000000 in
 set_option swp_run.memStop true in
-/-- The read half of `amoswap.w.aq` from RAM: an exclusive read, FRESH (at
-the top: the reservation is taken) or STALE (narrow δ1 [OWN.105]: a racy
-read at a view `≥ K`, leaving the stale snapshot); one continuation. -/
+/-- The read half of `amoswap.w.aq` from RAM: an exclusive read at the top
+of the store order; the reservation is taken. -/
 theorem swp_checked_mem_read_amo4_S (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
     (hok : SConfPhys (GF := GF) c sie)
-    (pa : BitVec 64) (hram : inRam pa 4) (hal : pa.toNat % 4 = 0) (r : Option Resv) (K : Nat)
-    (ts : List (Nat × Agent)) (Ψ : BitVec (8 * 4) → IProp GF)
+    (pa : BitVec 64) (hram : inRam pa 4) (hal : pa.toNat % 4 = 0) (r : Option Resv) (Ψ : BitVec (8 * 4) → IProp GF)
     (Φ : Result ((BitVec (8 * 4)) × Unit) (physaddr × ExceptionType) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ resvFragAny cpu r ∗ viewLb cpu K ∗
-    exclReadAUS cpu pa 4 K ts (fun w => iprop(resvFrag cpu (some (snapOf pa 4 w)) true -∗ Ψ w))
-      (fun w => iprop(resvFragX cpu none true (some (snapOf pa 4 w)) -∗ Ψ w)) ∗
+    confCells cpu dq Privilege.Supervisor c ∗ resvFragAny cpu r ∗
+    exclReadAU pa 4 (fun w => iprop(resvFrag cpu (some (snapOf pa 4 w)) true -∗ Ψ w)) ∗
     ▷ (confCells cpu dq Privilege.Supervisor c -∗ ∀ w, Ψ w -∗ Φ (.Ok (w, ())))
     ⊢ swp cpu (checked_mem_read amoswapAq page_based_mem_type.PBMT_PMA
         Privilege.Supervisor (physaddr.Physaddr pa) 4 true false true false) Φ := by
-  iintro ⟨HmConf, Hfrag, #HK, HAU, HΦ⟩
+  iintro ⟨HmConf, Hfrag, HAU, HΦ⟩
   unfold checked_mem_read
   checked_mem_S_au_prefix pa 4 hram hal
   iapply swp_bind
-  iapply (swp_sail_mem_read_excl_au cpu _ true rfl rfl (by decide) K ts r)
+  iapply (swp_sail_mem_read_excl_au cpu _ true rfl rfl (by decide) r)
   iframe Hfrag
-  isplit
-  · iexact HK
-  iapply exclReadAUS_wand cpu pa 4 K ts _ _ _ _ $$ HAU
+  iapply exclReadAU_wand pa 4 _ _ $$ HAU
   inext
-  isplit
-  · iintro %w HΨ Hfrag
-    swp_run 60
-    conf_intro HmConf
-    iapply HΦ $$ HmConf %w
-    iapply HΨ $$ Hfrag
-  · iintro %w HΨ Hfrag
-    swp_run 60
-    conf_intro HmConf
-    iapply HΦ $$ HmConf %w
-    iapply HΨ $$ Hfrag
+  iintro %w HΨ Hfrag
+  swp_run 60
+  conf_intro HmConf
+  iapply HΦ $$ HmConf %w
+  iapply HΨ $$ Hfrag
 
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
@@ -192,33 +181,5 @@ theorem swp_checked_mem_write_amo4_S (cpu : CPU) (dq : DFrac) (c : MConf) (sie :
   iapply HΦ $$ HmConf Hfrag HΨ
 
 
-
-set_option maxHeartbeats 4000000 in
-set_option maxRecDepth 100000 in
-set_option swp_run.memStop true in
-/-- The write half of `amoswap.w.aq` to RAM after a STALE read half (narrow
-δ1 [OWN.105]): silent iff it stores the stale snapshot's bytes, else the
-hart hangs. -/
-theorem swp_checked_mem_write_amo4_stale_S (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
-    (hok : SConfPhys (GF := GF) c sie)
-    (pa : BitVec 64) (s0 : Resv) (data : BitVec (8 * 4)) (hram : inRam pa 4) (hal : pa.toNat % 4 = 0) (Ψ : IProp GF)
-    (Φ : Result Bool (physaddr × ExceptionType) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ resvFragX cpu none true (some s0) ∗
-    ▷ (⌜s0 = snapOf pa 4 data⌝ -∗ Ψ) ∗
-    ▷ (confCells cpu dq Privilege.Supervisor c -∗ resvFrag cpu none false -∗ Ψ -∗ Φ (.Ok true))
-    ⊢ swp cpu (checked_mem_write (physaddr.Physaddr pa) 4 data amoswapAq page_based_mem_type.PBMT_PMA
-        Privilege.Supervisor () false false true) Φ := by
-  iintro ⟨HmConf, Hfrag, HAU, HΦ⟩
-  unfold checked_mem_write
-  checked_mem_S_au_prefix pa 4 hram hal
-  iapply swp_bind
-  iapply (swp_sail_mem_write_stale cpu _ data true s0 rfl rfl (ramBytes_of_inRam hram) (by decide))
-  iframe Hfrag
-  inext
-  iintro %hs Hfrag
-  ihave HΨ := HAU $$ %hs
-  swp_run 60
-  conf_intro HmConf
-  iapply HΦ $$ HmConf Hfrag HΨ
 
 end MachCSL

@@ -286,9 +286,7 @@ def initX (t : Test) : Option XState :=
         rtU1 := DevRt.init
         rtP := DevRt.init
         rtV := DevRt.init
-        pcAt := fun _ => -1
-        xstale := fun _ => none
-        wv := fun _ => 0 }
+        pcAt := fun _ => -1 }
   else none
 
 theorem initX_abs (t : Test) (x : XState) (h : initX t = some x) : x.abs = testMState t := by
@@ -323,6 +321,7 @@ theorem initX_abs (t : Test) (x : XState) (h : initX t = some x) : x.abs = testM
     · rfl
     · rfl
     · rfl
+    · rfl
   · exact absurd h (by simp)
 
 /-- A run of test `t`: an execution of the language from the test's own
@@ -348,11 +347,14 @@ theorem TRun.exhibits {t : Test} (r : TRun t) (o : Observation)
   ⟨r.n, r.obs, r.pool, gOf r.x, r.ok, hin, hobs⟩
 
 /-- A run that typed the test's input and ends with a thread at an error
-node is STUCK. -/
+node, with no store buffered, is STUCK. -/
 theorem TRun.noStep {t : Test} (r : TRun t) (hin : obsIn r.obs = t.uartInput)
-    (hst : r.pool.any errorNode = true) : RunNoStepAt t := by
+    (hst : r.pool.any errorNode = true) (hsb : allCpus.all (fun c => (r.x.sb c).isEmpty) = true) :
+    RunNoStepAt t := by
   rw [List.any_eq_true] at hst
   obtain ⟨e, he, hn⟩ := hst
-  exact ⟨r.n, r.obs, r.pool, gOf r.x, e, r.ok, hin, he, errorNode_noStep r.x e hn⟩
+  rw [List.all_eq_true] at hsb
+  exact ⟨r.n, r.obs, r.pool, gOf r.x, e, r.ok, hin, he,
+    errorNode_noStep r.x e (fun c => List.isEmpty_iff.1 (hsb c (mem_allCpus c))) hn⟩
 
 end Vtest

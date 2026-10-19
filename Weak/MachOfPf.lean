@@ -374,13 +374,14 @@ structure SimRel (c : Wpcfg Pexv6 Efab)
 `bootFacts`'), the boot image, an empty log, zero views, the reset devices. -/
 def bootG1 (σ0 : WGState) (ds : DevStates) : GState :=
   { m := ⟨σ0.wgregs, imgFlat bootImage, [], fun _ => 0, fun _ => 0, fun _ => HRead.zero,
-          fun _ => none, ds.reset, fun _ => DevRt.init, fun _ => -1, fun _ => none, fun _ => 0⟩,
+          fun _ => none, ds.reset, fun _ => DevRt.init, fun _ => -1, [], fun _ => [], fun _ => 0⟩,
     gen := 0, pow := true }
 
 theorem bootShapeG1 (g0 : GState) (σ0 : WGState) (ds : DevStates) (hb : wbootFacts σ0)
     (hg : g0.gen = 0) (hd : g0.m.devs = ds) : bootShape g0 (bootG1 σ0 ds) := by
   obtain ⟨-, -, -, -, -, hregs, -, -⟩ := hb
-  refine ⟨hg.symm, rfl, ⟨rfl, rfl, fun _ => ⟨rfl, rfl, rfl, rfl⟩, hregs, fun _ => rfl, fun _ => rfl⟩, ?_⟩
+  refine ⟨hg.symm, rfl, ⟨rfl, rfl, fun _ => ⟨rfl, rfl, rfl, rfl⟩, hregs, fun _ => rfl, rfl,
+    fun _ => ⟨rfl, rfl⟩⟩, ?_⟩
   show ds.reset = g0.m.devs.reset
   rw [hd]
 
@@ -430,7 +431,8 @@ theorem simRelBoot (σ0 : WGState) (ds : DevStates) (hb : wbootFacts σ0) (hds :
       fun _ h => by cases h⟩, hdisk, hDS⟩, ?_, ?_, by simp [wpInit, stAuthors],
     ownCohInit _ _ _⟩
   · rw [himg]
-    exact rmemBoot _ _ _ ⟨rfl, rfl, fun _ => ⟨rfl, rfl, rfl, rfl⟩, hb.2.2.2.2.2.1, fun _ => rfl, fun _ => rfl⟩
+    exact rmemBoot _ _ _ ⟨rfl, rfl, fun _ => ⟨rfl, rfl, rfl, rfl⟩, hb.2.2.2.2.2.1, fun _ => rfl, rfl,
+      fun _ => ⟨rfl, rfl⟩⟩
   · exact viewRelNil _ _ (fun _ => rfl) (fun _ => rfl) (fun _ => rfl)
 
 /-! ## (F1, cont.) Step kinds, inversion, the run record -/
@@ -661,7 +663,7 @@ theorem memFrame {c c' : Wpcfg Pexv6 Efab} {st rest : List (Nat × Wlabel)} {i :
     (hadj : pairAdjacent (st ++ (i, l) :: rest)) (hR : rmem c st σ)
     (hV : viewRel TsoShadow.cohSrc σ st) (hA : c.pcLog.map Wmsg.wmTid = (stAuthors st).map some)
     (hC : ownCoh c) (hmem : σ'.mem = σ.mem) (hlog : σ'.log = σ.log) (hres : σ'.resv = σ.resv)
-    (hsr : sameRead σ σ') (hxs : σ'.xstale = σ.xstale := by rfl) :
+    (hsr : sameRead σ σ') (hxs : σ'.sb = σ.sb := by rfl) :
     rmem c' (st ++ [(i, l)]) σ' ∧ viewRel TsoShadow.cohSrc σ' (st ++ [(i, l)]) ∧
       c'.pcLog.map Wmsg.wmTid = (stAuthors (st ++ [(i, l)])).map some ∧ ownCoh c' := by
   refine ⟨(pfFrameRowMem pstepEv pclsEv c c' st rest σ i l hR hs hl hadj).2.2 σ' hmem hlog hres hxs,
@@ -682,10 +684,7 @@ theorem rmemDropResv {P D : Type} {c : Wpcfg P D} {st : List (Nat × Wlabel)} {�
       simp [updCpu]
     · have := hr c'
       simpa [updCpu, hc] using this
-  · by_cases hc : c' = cpu
-    · subst hc
-      simp [updCpu]
-    · simpa [updCpu, hc] using hx c'
+  · exact hx c'
 
 /-! ## The hypotheses W4 is parametric in -/
 
@@ -814,13 +813,12 @@ theorem evStepShape (cpu : CPU) (o : Outcome Register RegisterType) (σ σ' : MS
   | memRead n va req =>
     have hda := hR n va req rfl
     rcases h with ⟨-, w, ds', hdr, -, -⟩ | ⟨-, -, -, -, -, -, -, -, rfl⟩ |
-        ⟨-, -, -, -, -, -, -, -, -, rfl⟩ |
-        ⟨-, -, -, ⟨-, -, -, rfl⟩ | ⟨-, -, -, -, -, -, -, -, -, rfl⟩⟩
+        ⟨-, -, -, -, -, -, -, -, -, rfl⟩ | ⟨-, -, -, -, -, -, -, rfl⟩
     · rw [devReadNone _ _ _ hda] at hdr; cases hdr
     all_goals exact ⟨rfl, rfl, rfl⟩
   | memWrite n va req =>
     have hda := hW n va req rfl
-    rcases h with ⟨-, w, ds', -, hdw, -, -⟩ | ⟨-, w, -, -, -, -, rfl⟩ | ⟨-, -, rfl⟩
+    rcases h with ⟨-, w, ds', -, hdw, -, -⟩ | ⟨-, w, -, -, -, -, rfl⟩
     · rw [devWriteNone _ _ _ _ hda] at hdw; cases hdw
     all_goals exact ⟨rfl, rfl, rfl⟩
   | regRead r => obtain ⟨-, rfl⟩ := h; exact ⟨rfl, rfl, rfl⟩
@@ -828,6 +826,7 @@ theorem evStepShape (cpu : CPU) (o : Outcome Register RegisterType) (σ σ' : MS
   | readRam => exact h.elim
   | writeRam => exact h.elim
   | getCycleCount => obtain ⟨-, rfl⟩ := h; exact ⟨rfl, rfl, rfl⟩
+  | barrier b => obtain ⟨-, rfl⟩ := h; exact ⟨rfl, rfl, rfl⟩
   | _ => subst h; exact ⟨rfl, rfl, rfl⟩
 
 /-- Under `rmem` and the adjacency of the step being taken, no other hart reserves anything. -/
@@ -844,26 +843,30 @@ theorem notOthers {c : Wpcfg Pexv6 Efab} {st rest : List (Nat × Wlabel)} {σ : 
 device windows, with no foreign reservation, has a DRAM footprint. -/
 theorem ramOfSafe {g : GState} {cpu : CPU} {o : Outcome Register RegisterType}
     {k : o.ret → SailM Unit} (hred : PrimStep.Reducible (Expr.hart 0 cpu (.impure (.ok o) k), g))
-    (hlive : threadLive g 0) (hno : ∀ pa n, ¬ othersReserve g.m.resv cpu pa n) :
+    (hlive : threadLive g 0) (hno : ∀ pa n, ¬ othersReserve g.m.resv cpu pa n)
+    (hsb : g.m.sb cpu = []) :
     (∀ n va req, o = .memRead n va req → devAddr req.pa = false → ramBytes req.pa n) ∧
     (∀ n va req, o = .memWrite n va req → devAddr req.pa = false → ramBytes req.pa n) := by
   obtain ⟨obs, e', g', efs, hs⟩ := hred
-  rcases (primStep_hart_inv hs).2 with ⟨-, -, m', σ', -, hh, -⟩ | ⟨hd, -⟩
+  rcases (primStep_hart_inv hs).2 with ⟨-, -, m', σ', -, hh, -⟩ | ⟨hd, -⟩ | ⟨-, -, -, t, hland, -⟩
   · refine ⟨fun n va req ho hda => ?_, fun n va req ho hda => ?_⟩
     · subst ho
-      rcases hh with ⟨v, -, hev⟩ | ⟨⟨-, hor, -⟩, -⟩
+      rcases hh with ⟨v, -, hev⟩ | ⟨⟨-, hor | hsb', -⟩, -⟩
       · rcases hev with ⟨-, w, ds', hdr, -, -⟩ | ⟨hb, -⟩ | ⟨hb, -⟩ | ⟨hb, -⟩
         · rw [devReadNone _ _ _ hda] at hdr; cases hdr
         all_goals exact hb
       · exact absurd hor (hno _ _)
+      · exact absurd hsb' (MState.not_sbOverlaps_of_nil _ _ _ _ hsb)
     · subst ho
       rcases hh with ⟨v, -, hev⟩ | ⟨⟨hor | hsb, -⟩, -⟩
-      · rcases hev with ⟨-, w, ds', -, hdw, -, -⟩ | ⟨hb, -⟩ | ⟨⟨hb, -⟩, -⟩
+      · rcases hev with ⟨-, w, ds', -, hdw, -, -⟩ | ⟨hb, -⟩
         · rw [devWriteNone _ _ _ _ hda] at hdw; cases hdw
         all_goals exact hb
       · exact absurd hor (hno _ _)
       · exact hsb.1
   · exact absurd hlive hd
+  · -- the land arm (route P): no store is buffered (`rmem`)
+    exact absurd hland (MState.not_landOk_of_nil _ _ _ hsb)
 
 /-- A DRAM byte is no device address. -/
 theorem ramNotDev {pa : PAddr} {n : Nat} (h : ramBytes pa n) (hda : devAddr pa = true) :
@@ -878,26 +881,30 @@ theorem ramNotDev {pa : PAddr} {n : Nat} (h : ramBytes pa n) (hda : devAddr pa =
 is a device address, with no foreign reservation, has a device footprint. -/
 theorem devOfSafe {g : GState} {cpu : CPU} {o : Outcome Register RegisterType}
     {k : o.ret → SailM Unit} (hred : PrimStep.Reducible (Expr.hart 0 cpu (.impure (.ok o) k), g))
-    (hlive : threadLive g 0) (hno : ∀ pa n, ¬ othersReserve g.m.resv cpu pa n) :
+    (hlive : threadLive g 0) (hno : ∀ pa n, ¬ othersReserve g.m.resv cpu pa n)
+    (hsb : g.m.sb cpu = []) :
     (∀ n va req, o = .memRead n va req → devAddr req.pa = true → devBytes req.pa n) ∧
     (∀ n va req, o = .memWrite n va req → devAddr req.pa = true → devBytes req.pa n) := by
   obtain ⟨obs, e', g', efs, hs⟩ := hred
-  rcases (primStep_hart_inv hs).2 with ⟨-, -, m', σ', -, hh, -⟩ | ⟨hd, -⟩
+  rcases (primStep_hart_inv hs).2 with ⟨-, -, m', σ', -, hh, -⟩ | ⟨hd, -⟩ | ⟨-, -, -, t, hland, -⟩
   · refine ⟨fun n va req ho hda => ?_, fun n va req ho hda => ?_⟩
     · subst ho
-      rcases hh with ⟨v, -, hev⟩ | ⟨⟨-, hor, -⟩, -⟩
+      rcases hh with ⟨v, -, hev⟩ | ⟨⟨-, hor | hsb', -⟩, -⟩
       · rcases hev with ⟨hb, -⟩ | ⟨hb, -⟩ | ⟨hb, -⟩ | ⟨hb, -⟩
         · exact hb
         all_goals exact ramNotDev hb hda
       · exact absurd hor (hno _ _)
+      · exact absurd hsb' (MState.not_sbOverlaps_of_nil _ _ _ _ hsb)
     · subst ho
       rcases hh with ⟨v, -, hev⟩ | ⟨⟨hor | hsb, -⟩, -⟩
-      · rcases hev with ⟨hb, -⟩ | ⟨hb, -⟩ | ⟨⟨hb, -⟩, -⟩
+      · rcases hev with ⟨hb, -⟩ | ⟨hb, -⟩
         · exact hb
         all_goals exact ramNotDev hb hda
       · exact absurd hor (hno _ _)
       · exact ramNotDev hsb.1 hda
   · exact absurd hlive hd
+  · -- the land arm (route P): no store is buffered (`rmem`)
+    exact absurd hland (MState.not_landOk_of_nil _ _ _ hsb)
 
 /-! ## `R-dev` through the hart MMIO transactions and the UART / PLIC programs (F9) -/
 
@@ -1106,7 +1113,7 @@ theorem simNode {fok : Image → List Wmsg → Nat → Int → List (Nat × BitV
     have hred := hH.safe n κ t g hreach _
       (List.mem_of_getElem? (by rw [ht]; exact poolHart H c.pcDev vs cpu))
     rw [hm] at hred
-    obtain ⟨hdbR, hdbW⟩ := devOfSafe hred hlive (notOthers hmem hadj)
+    obtain ⟨hdbR, hdbW⟩ := devOfSafe hred hlive (notOthers hmem hadj) (hmem.2.2.2.2 cpu)
     have hev' := hev (fun n va req ho => hdbR n va req ho (hdaR n va req ho))
       (fun n va req ho => hdbW n va req ho (hdaW n va req ho))
     obtain ⟨hm1, hv1, -, -⟩ := memFrame (σ' := { g.m with devs := dsM' }) hs hfr
@@ -1127,7 +1134,7 @@ theorem simNode {fok : Image → List Wmsg → Nat → Int → List (Nat × BitV
     have hred := hH.safe n κ t g hreach _
       (List.mem_of_getElem? (by rw [ht]; exact poolHart H c.pcDev vs cpu))
     rw [hm] at hred
-    obtain ⟨hrbR, hrbW⟩ := ramOfSafe hred hlive (notOthers hmem hadj)
+    obtain ⟨hrbR, hrbW⟩ := ramOfSafe hred hlive (notOthers hmem hadj) (hmem.2.2.2.2 cpu)
     obtain ⟨hfi1, hfi2⟩ := hH.fi st c t g n κ hrun hreach hR0 cpu o k (g.m.regs cpu) ib ws pr hlkc
     have hps : pstepEv (.PHart cpu (.impure (.ok o) k) (g.m.regs cpu) none ib) c.pcDev l
         (.PHart cpu m' (ors.getD (g.m.regs cpu)) fn' (oib.getD ib)) c'.pcDev :=
@@ -1644,7 +1651,7 @@ structure DevOnly (σ σ' : MState) : Prop where
   log : σ'.log = σ.log
   resv : σ'.resv = σ.resv
   read : sameRead σ σ'
-  xs : σ'.xstale = σ.xstale
+  xs : σ'.sb = σ.sb
 
 theorem devOnlyRefl (σ : MState) : DevOnly σ σ := ⟨rfl, rfl, rfl, rfl, sameReadRefl σ, rfl⟩
 

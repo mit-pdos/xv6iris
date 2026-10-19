@@ -247,7 +247,8 @@ def memReadExec (pol : HPol) (cpu : CPU) (x : XState) (n vs : Nat) (req : ReadRe
   else none
 
 theorem memReadExec_sound (pol : HPol) (cpu : CPU) (x : XState) (n vs : Nat) (req : ReadReq n vs)
-    (v : ReadAns n) (x' : XState) (h : memReadExec pol cpu x n vs req = some (v, x')) :
+    (v : ReadAns n) (x' : XState) (hsb : x.sb cpu = [])
+    (h : memReadExec pol cpu x n vs req = some (v, x')) :
     evStep cpu (.memRead n vs req) x.abs v x'.abs := by
   unfold memReadExec at h
   simp only at h
@@ -292,7 +293,8 @@ theorem memReadExec_sound (pol : HPol) (cpu : CPU) (x : XState) (n vs : Nat) (re
             · rename_i hc
               simp only [Option.some.injEq, Prod.mk.injEq] at h
               obtain ⟨rfl, rfl⟩ := h
-              refine ⟨hram', hex, ?_, Or.inl ⟨_, (topBytesB_iff _ _ _ _).1 hc, rfl, ?_⟩⟩
+              refine ⟨hram', hex, ?_, MState.not_sbOverlaps_of_nil _ _ _ _ hsb, _,
+                (topBytesB_iff _ _ _ _).1 hc, rfl, ?_⟩
               · intro ho
                 exact hoth ((othersReserveB_iff _ _ _ _).2 ho)
               · exact XState.abs_afterExcl ..
@@ -326,17 +328,15 @@ def memWriteExec (cpu : CPU) (x : XState) (n vs : Nat) (req : WriteReq n vs) :
       | none => none
     else if ramBytesB pa n then
       if othersReserveB x cpu pa n then none
-      else if !(akExcl req.access_kind) || ((x.hart cpu).resv).isSome || (x.xstale cpu).isNone then
-        some (.Ok (some true), x.store cpu pa n w (akExcl req.access_kind))
-      else none
+      else some (.Ok (some true), x.store cpu pa n w (akExcl req.access_kind))
     else none
 
 theorem memWriteExec_sound (cpu : CPU) (x : XState) (n vs : Nat) (req : WriteReq n vs)
-    (v : WriteAns) (x' : XState) (h : memWriteExec cpu x n vs req = some (v, x')) :
+    (v : WriteAns) (x' : XState) (hsb : x.sb cpu = []) (h : memWriteExec cpu x n vs req = some (v, x')) :
     evStep cpu (.memWrite n vs req) x.abs v x'.abs := by
   unfold memWriteExec at h
   simp only at h
-  show (devBytes req.pa n ∧ _) ∨ (ramBytes req.pa n ∧ _) ∨ _
+  show (devBytes req.pa n ∧ _) ∨ (ramBytes req.pa n ∧ _)
   split at h
   · exact absurd h (by simp)
   · rename_i w hval
@@ -353,25 +353,16 @@ theorem memWriteExec_sound (cpu : CPU) (x : XState) (n vs : Nat) (req : WriteReq
       · exact absurd h (by simp)
     · split at h
       · rename_i hram
-        right; left
+        right
         split at h
         · exact absurd h (by simp)
         · rename_i hoth
-          split at h
-          · rename_i hsf
-            simp only [Option.some.injEq, Prod.mk.injEq] at h
-            obtain ⟨rfl, rfl⟩ := h
-            refine ⟨(ramBytesB_iff _ _).1 hram, w, hval, ?_, ?_, rfl, XState.abs_store ..⟩
-            · intro ho
-              exact hoth ((othersReserveB_iff _ _ _ _).2 ho)
-            · intro hex
-              simp only [Bool.or_eq_true, Bool.not_eq_true', Option.isSome_iff_ne_none,
-                Option.isNone_iff_eq_none] at hsf
-              rcases hsf with (h1 | h1) | h1
-              · rw [hex] at h1; exact absurd h1 (by decide)
-              · exact Or.inl h1
-              · exact Or.inr h1
-          · exact absurd h (by simp)
+          simp only [Option.some.injEq, Prod.mk.injEq] at h
+          obtain ⟨rfl, rfl⟩ := h
+          refine ⟨(ramBytesB_iff _ _).1 hram, w, hval, ?_, MState.landNowOk_of_nil _ _ _ _ _ hsb, rfl,
+            XState.abs_store ..⟩
+          intro ho
+          exact hoth ((othersReserveB_iff _ _ _ _).2 ho)
       · exact absurd h (by simp)
 
 /-! ## One event -/
@@ -381,11 +372,11 @@ def evExec (pol : HPol) (cpu : CPU) (x : XState) :
     (o : Outcome Register RegisterType) → Option (o.ret × XState)
   | .regRead r => some ((x.hart cpu).regs.get r, x)
   | .regWrite r v => some (PUnit.unit, x.setReg cpu r v)
-  | .memRead n vs req => memReadExec pol cpu x n vs req
-  | .memWrite n vs req => memWriteExec cpu x n vs req
+  | .memRead n vs req => if (x.sb cpu).isEmpty then memReadExec pol cpu x n vs req else none
+  | .memWrite n vs req => if (x.sb cpu).isEmpty then memWriteExec cpu x n vs req else none
   | .readRam .. => none
   | .writeRam .. => none
-  | .barrier b => some ((), x.fence cpu b)
+  | .barrier b => if (x.sb cpu).isEmpty then some ((), x.fence cpu b) else none
   | .cacheOp _ => some ((), x)
   | .tlbi _ => some ((), x)
   | .translationStart _ => some ((), x)
@@ -411,14 +402,28 @@ theorem evExec_sound (pol : HPol) (cpu : CPU) (x : XState) (o : Outcome Register
     simp only [evExec, Option.some.injEq, Prod.mk.injEq] at h
     obtain ⟨-, rfl⟩ := h
     exact XState.abs_setReg ..
-  | memRead n vs req => exact memReadExec_sound pol cpu x n vs req v x' h
-  | memWrite n vs req => exact memWriteExec_sound cpu x n vs req v x' h
+  | memRead n vs req =>
+    simp only [evExec] at h
+    split at h
+    · rename_i hsb
+      exact memReadExec_sound pol cpu x n vs req v x' (List.isEmpty_iff.1 hsb) h
+    · exact absurd h (by simp)
+  | memWrite n vs req =>
+    simp only [evExec] at h
+    split at h
+    · rename_i hsb
+      exact memWriteExec_sound cpu x n vs req v x' (List.isEmpty_iff.1 hsb) h
+    · exact absurd h (by simp)
   | readRam a b c => simp [evExec] at h
   | writeRam a b c d => simp [evExec] at h
   | barrier b =>
-    simp only [evExec, Option.some.injEq, Prod.mk.injEq] at h
-    obtain ⟨-, rfl⟩ := h
-    exact XState.abs_fence ..
+    simp only [evExec] at h
+    split at h
+    · rename_i hsb
+      simp only [Option.some.injEq, Prod.mk.injEq] at h
+      obtain ⟨-, rfl⟩ := h
+      exact ⟨fun _ => List.isEmpty_iff.1 hsb, XState.abs_fence ..⟩
+    · exact absurd h (by simp)
   | getCycleCount =>
     simp only [evExec, Option.some.injEq, Prod.mk.injEq] at h
     obtain ⟨rfl, rfl⟩ := h
@@ -446,7 +451,7 @@ theorem blockedExec_sound (cpu : CPU) (x : XState) (o : Outcome Register Registe
       simp only [Bool.and_eq_true] at hc
       simp only [Option.some.injEq] at h
       subst h
-      exact ⟨hc.1, (othersReserveB_iff _ _ _ _).1 hc.2, XState.abs_dropResv ..⟩
+      exact ⟨hc.1, Or.inl ((othersReserveB_iff _ _ _ _).1 hc.2), XState.abs_dropResv ..⟩
     · exact absurd h (by simp)
   | memWrite n vs req =>
     simp only [blockedExec] at h

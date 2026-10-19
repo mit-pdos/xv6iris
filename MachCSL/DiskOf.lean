@@ -147,14 +147,13 @@ theorem hartStep_diskOf {cpu : CPU} {m : SailM Unit} {σ : MState} {m' : SailM U
         | skip
       · -- a load: MMIO or DRAM
         rcases hev with ⟨_, w, ds', hr, _, rfl⟩ | ⟨_, _, _, _, _, _, _, _, rfl⟩ |
-          ⟨_, _, _, _, _, _, _, _, _, _, rfl⟩ |
-          ⟨_, _, _, ⟨_, _, _, rfl⟩ | ⟨_, _, _, _, _, _, _, _, _, rfl⟩⟩
+          ⟨_, _, _, _, _, _, _, _, _, _, rfl⟩ | ⟨_, _, _, _, _, _, _, rfl⟩
         · exact devRead_diskOf _ _ _ _ _ hr
         all_goals rfl
       · -- a store: MMIO or DRAM
-        rcases hev with ⟨_, w, ds', _, hw, _, rfl⟩ | ⟨_, _, _, _, _, _, rfl⟩ | ⟨_, _, rfl⟩
+        rcases hev with ⟨_, w, ds', _, hw, _, rfl⟩ | ⟨_, _, _, _, _, _, rfl⟩
         · exact devWrite_diskOf _ _ _ _ _ hw
-        all_goals rfl
+        · rfl
     · cases o <;> simp only [blockedStep] at hb
       all_goals first
         | exact hb.elim

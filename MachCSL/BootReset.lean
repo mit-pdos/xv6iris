@@ -125,7 +125,7 @@ theorem bootRun_bootLand (cpu : CPU) (f₀ : RegFile) :
 /-- A booted state exists: the power-on arm is always enabled. -/
 theorem bootShape_bootWitness (g : GState) : bootShape g (bootWitness g) :=
   ⟨rfl, rfl, ⟨rfl, rfl, fun _ => ⟨rfl, rfl, rfl, rfl⟩, fun cpu => ⟨g.m.regs cpu, bootRun_bootLand cpu _⟩,
-    fun _ => rfl, fun _ => rfl⟩, rfl⟩
+    ⟨fun _ => rfl, rfl, fun _ => ⟨rfl, rfl⟩⟩⟩, rfl⟩
 
 /-- **Every hart of a booted machine satisfies Rocq's `reset_regs`**, derived
 from `bootFacts`' run clause (Rocq `BootShared`'s use of

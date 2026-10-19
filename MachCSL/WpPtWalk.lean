@@ -78,36 +78,26 @@ set_option swp_run.memStop true in
 /-- The exclusive physical read of an entry (the write-back's read half). -/
 theorem swp_checked_mem_read_pte8_excl_S (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
     (hok : SConfPhys (GF := GF) c sie)
-    (pa : BitVec 64) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0) (r : Option Resv) (K : Nat)
-    (ts : List (Nat × Agent)) (Ψ : BitVec (8 * 8) → IProp GF)
+    (pa : BitVec 64) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0) (r : Option Resv) (Ψ : BitVec (8 * 8) → IProp GF)
     (Φ : Result ((BitVec (8 * 8)) × Unit) (physaddr × ExceptionType) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ resvFragAny cpu r ∗ viewLb cpu K ∗
-    exclReadAUS cpu pa 8 K ts (fun w => iprop(resvFrag cpu (some (snapOf pa 8 w)) false -∗ Ψ w))
-      (fun w => iprop(resvFragX cpu none false (some (snapOf pa 8 w)) -∗ Ψ w)) ∗
+    confCells cpu dq Privilege.Supervisor c ∗ resvFragAny cpu r ∗
+    exclReadAU pa 8 (fun w => iprop(resvFrag cpu (some (snapOf pa 8 w)) false -∗ Ψ w)) ∗
     ▷ (confCells cpu dq Privilege.Supervisor c -∗ ∀ w, Ψ w -∗ Φ (.Ok (w, ())))
     ⊢ swp cpu (checked_mem_read (MemoryAccessType.Load mem_payload.PageTableEntry) page_based_mem_type.PBMT_PMA
         Privilege.Supervisor (physaddr.Physaddr pa) 8 false false true false) Φ := by
-  iintro ⟨HmConf, Hfrag, #HK, HAU, HΦ⟩
+  iintro ⟨HmConf, Hfrag, HAU, HΦ⟩
   unfold checked_mem_read
   checked_mem_S_au_prefix pa 8 hram hal
   iapply swp_bind
-  iapply (swp_sail_mem_read_excl_au cpu _ false rfl rfl (by decide) K ts r)
+  iapply (swp_sail_mem_read_excl_au cpu _ false rfl rfl (by decide) r)
   iframe Hfrag
-  isplit
-  · iexact HK
-  iapply exclReadAUS_wand cpu pa 8 K ts _ _ _ _ $$ HAU
+  iapply exclReadAU_wand pa 8 _ _ $$ HAU
   inext
-  isplit
-  · iintro %w HΨ Hfrag
-    swp_run 60
-    conf_intro HmConf
-    iapply HΦ $$ HmConf %w
-    iapply HΨ $$ Hfrag
-  · iintro %w HΨ Hfrag
-    swp_run 60
-    conf_intro HmConf
-    iapply HΦ $$ HmConf %w
-    iapply HΨ $$ Hfrag
+  iintro %w HΨ Hfrag
+  swp_run 60
+  conf_intro HmConf
+  iapply HΦ $$ HmConf %w
+  iapply HΨ $$ Hfrag
 
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
@@ -115,22 +105,18 @@ set_option swp_run.memStop true in
 /-- `read_pte_exclusive`: the entry at `pa`, taking the reservation. -/
 theorem swp_read_pte_exclusive (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
     (hok : SConfPhys (GF := GF) c sie)
-    (pa : BitVec 64) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0) (r : Option Resv) (K : Nat)
-    (ts : List (Nat × Agent)) (Ψ : BitVec (8 * 8) → IProp GF)
+    (pa : BitVec 64) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0) (r : Option Resv) (Ψ : BitVec (8 * 8) → IProp GF)
     (Φ : Result (BitVec (8 * 8)) (physaddr × ExceptionType) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ resvFragAny cpu r ∗ viewLb cpu K ∗
-    exclReadAUS cpu pa 8 K ts (fun w => iprop(resvFrag cpu (some (snapOf pa 8 w)) false -∗ Ψ w))
-      (fun w => iprop(resvFragX cpu none false (some (snapOf pa 8 w)) -∗ Ψ w)) ∗
+    confCells cpu dq Privilege.Supervisor c ∗ resvFragAny cpu r ∗
+    exclReadAU pa 8 (fun w => iprop(resvFrag cpu (some (snapOf pa 8 w)) false -∗ Ψ w)) ∗
     ▷ (confCells cpu dq Privilege.Supervisor c -∗ ∀ w, Ψ w -∗ Φ (.Ok w))
     ⊢ swp cpu (read_pte_exclusive (physaddr.Physaddr pa) 8) Φ := by
-  iintro ⟨HmConf, Hfrag, #HK, HAU, HΦ⟩
+  iintro ⟨HmConf, Hfrag, HAU, HΦ⟩
   unfold read_pte_exclusive mem_read_priv mem_read_priv_meta
   swp_run 20
   iapply swp_bind
-  iapply (swp_checked_mem_read_pte8_excl_S cpu dq c sie hok pa hram hal r K ts Ψ)
+  iapply (swp_checked_mem_read_pte8_excl_S cpu dq c sie hok pa hram hal r Ψ)
   iframe HmConf Hfrag HAU
-  isplit
-  · iexact HK
   inext
   iintro HmConf %w HΨ
   swp_run 20
@@ -186,56 +172,6 @@ theorem swp_write_pte_conditional (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bo
   iintro HmConf Hfrag HΨ
   swp_run 20
   iapply HΦ $$ HmConf Hfrag HΨ
-
-set_option maxHeartbeats 4000000 in
-set_option maxRecDepth 100000 in
-set_option swp_run.memStop true in
-/-- The conditional physical write of an entry after a STALE exclusive re-read
-(narrow δ1 [OWN.105]): silent iff it stores the stale snapshot's bytes, else
-the hart hangs. -/
-theorem swp_checked_mem_write_pte8_cond_stale_S (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
-    (hok : SConfPhys (GF := GF) c sie)
-    (pa : BitVec 64) (s0 : Resv) (data : BitVec (8 * 8)) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0)
-    (Φ : Result Bool (physaddr × ExceptionType) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ resvFragX cpu none false (some s0) ∗
-    ▷ (confCells cpu dq Privilege.Supervisor c -∗ resvFrag cpu none false -∗ ⌜s0 = snapOf pa 8 data⌝ -∗
-      Φ (.Ok true))
-    ⊢ swp cpu (checked_mem_write (physaddr.Physaddr pa) 8 data (MemoryAccessType.Store mem_payload.PageTableEntry)
-        page_based_mem_type.PBMT_PMA Privilege.Supervisor () false false true) Φ := by
-  iintro ⟨HmConf, Hfrag, HΦ⟩
-  unfold checked_mem_write
-  checked_mem_S_au_prefix pa 8 hram hal
-  iapply swp_bind
-  iapply (swp_sail_mem_write_stale cpu _ data false s0 rfl rfl (ramBytes_of_inRam hram) (by decide))
-  iframe Hfrag
-  inext
-  iintro %hs Hfrag
-  swp_run 60
-  conf_intro HmConf
-  iapply HΦ $$ HmConf Hfrag %hs
-
-set_option maxHeartbeats 4000000 in
-set_option maxRecDepth 100000 in
-set_option swp_run.memStop true in
-/-- `write_pte_conditional` after a STALE exclusive re-read. -/
-theorem swp_write_pte_conditional_stale (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
-    (hok : SConfPhys (GF := GF) c sie)
-    (pa : BitVec 64) (s0 : Resv) (data : BitVec (8 * 8)) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0)
-    (Φ : Result Bool (physaddr × ExceptionType) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ resvFragX cpu none false (some s0) ∗
-    ▷ (confCells cpu dq Privilege.Supervisor c -∗ resvFrag cpu none false -∗ ⌜s0 = snapOf pa 8 data⌝ -∗
-      Φ (.Ok true))
-    ⊢ swp cpu (write_pte_conditional (physaddr.Physaddr pa) 8 data) Φ := by
-  iintro ⟨HmConf, Hfrag, HΦ⟩
-  unfold write_pte_conditional mem_write_value_priv mem_write_value_priv_meta
-  swp_run 20
-  iapply swp_bind
-  iapply (swp_checked_mem_write_pte8_cond_stale_S cpu dq c sie hok pa s0 data hram hal)
-  iframe HmConf Hfrag
-  inext
-  iintro HmConf Hfrag %hs
-  swp_run 20
-  iapply HΦ $$ HmConf Hfrag %hs
 
 /-! ## The walk's checks on the kernel's entries -/
 
@@ -553,30 +489,19 @@ theorem swp_update_and_write_pte_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MCon
     conf_cases HmConf
     swp_run 60
     conf_intro HmConf
-    icases kpt_exclReadAUS cpu t M addr _ hmem (pteLeafB_kLeaf _ _ _ _) $$ [Hkpt Hctx]
-      with ⟨Hctx, %K, %tsl, #HK, HAU⟩
-    · iframe Hctx; iexact Hkpt
+    ihave HAU := kpt_exclReadAU t M addr _ hmem (pteLeafB_kLeaf _ _ _ _) $$ Hkpt
     iapply swp_bind
-    iapply (swp_read_pte_exclusive cpu dq c sie hok addr (hents _ hmem).1 (hents _ hmem).2 r0 K tsl
-      (fun w => iprop(⌜pteVariant (kLeaf ppn perm a0 d0) w⌝ ∗ (resvFrag cpu (some (snapOf addr 8 w)) false ∨
-        resvFragX cpu none false (some (snapOf addr 8 w))))))
+    iapply (swp_read_pte_exclusive cpu dq c sie hok addr (hents _ hmem).1 (hents _ hmem).2 r0
+      (fun w => iprop(⌜pteVariant (kLeaf ppn perm a0 d0) w⌝ ∗ resvFrag cpu (some (snapOf addr 8 w)) false)))
     iframe HmConf Hfrag
-    isplit
-    · iexact HK
     isplitl [HAU]
-    · iapply exclReadAUS_wand cpu addr 8 K tsl _ _ _ _ $$ HAU
+    · iapply exclReadAU_wand addr 8 _ _ $$ HAU
       inext
-      isplit
-      · iintro %w %hw Hfrag
-        isplitr
-        · ipureintro; exact hw
-        ileft; iexact Hfrag
-      · iintro %w %hw Hfrag
-        isplitr
-        · ipureintro; exact hw
-        iright; iexact Hfrag
+      iintro %w %hw Hfrag
+      iframe Hfrag
+      ipureintro; exact hw
     inext
-    iintro HmConf %w ⟨%hw, HD⟩
+    iintro HmConf %w ⟨%hw, Hfrag⟩
     obtain ⟨a1, d1, rfl⟩ := pteVariant_of_kLeaf ppn perm a0 d0 hw
     swp_run 40
     rw [check_leaf_pte39_eq]
@@ -588,15 +513,9 @@ theorem swp_update_and_write_pte_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MCon
     cases hupd2 : update_PTE_Bits (kLeaf ppn perm a1 d1) acc with
     | none =>
       swp_run 40
-      icases HD with (Hfrag | Hfrag)
-      · ihave Hfrag := resvFragAny_of cpu (some (snapOf addr 8 (kLeaf ppn perm a1 d1))) false $$ Hfrag
-        iapply HΦ $$ HmConf Hctx %(some (snapOf addr 8 (kLeaf ppn perm a1 d1))) Hfrag %(some (kLeaf ppn perm a1 d1))
-        ipureintro; exact ⟨a1, d1, rfl⟩
-      · -- a STALE re-read that found the bits set (narrow δ1): the walk goes on with it
-        ihave Hfrag := resvFrag_of_X cpu none false _ $$ Hfrag
-        ihave Hfrag := resvFragAny_of cpu none false $$ Hfrag
-        iapply HΦ $$ HmConf Hctx %none Hfrag %(some (kLeaf ppn perm a1 d1))
-        ipureintro; exact ⟨a1, d1, rfl⟩
+      ihave Hfrag := resvFragAny_of cpu (some (snapOf addr 8 (kLeaf ppn perm a1 d1))) false $$ Hfrag
+      iapply HΦ $$ HmConf Hctx %(some (snapOf addr 8 (kLeaf ppn perm a1 d1))) Hfrag %(some (kLeaf ppn perm a1 d1))
+      ipureintro; exact ⟨a1, d1, rfl⟩
     | some p2 =>
       have hp2 : ∃ a2 d2, p2 = kLeaf ppn perm a2 d2 := by
         rw [kLeaf, update_PTE_Bits_pteSetAD _ _ _ _ hpl] at hupd2
@@ -605,30 +524,18 @@ theorem swp_update_and_write_pte_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MCon
         · exact absurd hupd2 (by simp)
       obtain ⟨a2, d2, rfl⟩ := hp2
       swp_run 40
-      icases HD with (Hfrag | Hfrag)
-      · ihave HW := kpt_exclWriteAU cpu t M addr _ hmem (pteLeafB_kLeaf _ _ _ _) (kLeaf ppn perm a1 d1)
-          (kLeaf ppn perm a2 d2) (pteVariant_kLeaf ppn perm a0 d0 a2 d2) $$ Hkpt
-        iapply swp_bind
-        iapply (swp_write_pte_conditional cpu dq c sie hok addr (kLeaf ppn perm a1 d1) (kLeaf ppn perm a2 d2)
-          (hents _ hmem).1 (hents _ hmem).2 emp)
-        iframe HmConf Hfrag HW
-        inext
-        iintro HmConf Hfrag _
-        swp_run 40
-        ihave Hfrag := resvFragAny_of cpu none false $$ Hfrag
-        iapply HΦ $$ HmConf Hctx %none Hfrag %(some (kLeaf ppn perm a2 d2))
-        ipureintro; exact ⟨a2, d2, rfl⟩
-      · -- after a STALE re-read (narrow δ1): silent (no memory change) or the hart hangs
-        iapply swp_bind
-        iapply (swp_write_pte_conditional_stale cpu dq c sie hok addr _ (kLeaf ppn perm a2 d2)
-          (hents _ hmem).1 (hents _ hmem).2)
-        iframe HmConf Hfrag
-        inext
-        iintro HmConf Hfrag %_
-        swp_run 40
-        ihave Hfrag := resvFragAny_of cpu none false $$ Hfrag
-        iapply HΦ $$ HmConf Hctx %none Hfrag %(some (kLeaf ppn perm a2 d2))
-        ipureintro; exact ⟨a2, d2, rfl⟩
+      ihave HW := kpt_exclWriteAU cpu t M addr _ hmem (pteLeafB_kLeaf _ _ _ _) (kLeaf ppn perm a1 d1) (kLeaf ppn perm a2 d2)
+        (pteVariant_kLeaf ppn perm a0 d0 a2 d2) $$ Hkpt
+      iapply swp_bind
+      iapply (swp_write_pte_conditional cpu dq c sie hok addr (kLeaf ppn perm a1 d1) (kLeaf ppn perm a2 d2)
+        (hents _ hmem).1 (hents _ hmem).2 emp)
+      iframe HmConf Hfrag HW
+      inext
+      iintro HmConf Hfrag _
+      swp_run 40
+      ihave Hfrag := resvFragAny_of cpu none false $$ Hfrag
+      iapply HΦ $$ HmConf Hctx %none Hfrag %(some (kLeaf ppn perm a2 d2))
+      ipureintro; exact ⟨a2, d2, rfl⟩
 
 /-! ## The TLB -/
 

@@ -111,10 +111,12 @@ structure XState where
   rtV : DevRt
   /-- the issuing pc of each store (`MState.pcAt`) -/
   pcAt : Nat → Int
-  /-- the pending stale exclusive read's snapshot (`MState.xstale`) -/
-  xstale : CPU → Option Resv
-  /-- the write-order view (`MState.wv`) -/
-  wv : CPU → Nat
+  /-- the landing log (`MState.llog`, route P) -/
+  llog : List Nat := []
+  /-- the store buffers (`MState.sb`, route P) -/
+  sb : CPU → List (Nat × Nat) := fun _ => []
+  /-- the store epochs (`MState.sbEp`, route P) -/
+  sbEp : CPU → Nat := fun _ => 0
 
 namespace XState
 
@@ -173,16 +175,17 @@ def abs (x : XState) : MState where
   devs := x.devs
   devrt := x.rt
   pcAt := x.pcAt
-  xstale := x.xstale
-  wv := x.wv
+  llog := x.llog
+  sb := x.sb
+  sbEp := x.sbEp
 
 end XState
 
 /-- Two language states with the same fields are the same state. -/
 theorem MState.ext' {a b : MState} (h1 : a.regs = b.regs) (h2 : a.mem = b.mem) (h3 : a.log = b.log)
     (h4 : a.tv = b.tv) (h5 : a.itv = b.itv) (h6 : a.hr = b.hr) (h7 : a.resv = b.resv)
-    (h8 : a.devs = b.devs) (h9 : a.devrt = b.devrt) (h10 : a.pcAt = b.pcAt)
-    (h11 : a.xstale = b.xstale) (h12 : a.wv = b.wv) : a = b := by
+    (h8 : a.devs = b.devs) (h9 : a.devrt = b.devrt) (h10 : a.pcAt = b.pcAt) (h11 : a.llog = b.llog)
+    (h12 : a.sb = b.sb) (h13 : a.sbEp = b.sbEp) : a = b := by
   cases a; cases b; simp_all
 
 theorem updCpu_self {α : Type} (f : CPU → α) (c : CPU) : updCpu f c (f c) = f := by
@@ -257,28 +260,23 @@ theorem abs_afterLoad (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (tvn : Nat
   rw [afterLoad, abs_setHart, afterLoadHR_eq]
   apply MState.ext' <;> first | rfl | exact updCpu_self _ _
 
-/-- Replacing the pending stale reads denotes the same replacement. -/
-theorem abs_withXstale (x : XState) (f : CPU → Option Resv) :
-    ({ x with xstale := f } : XState).abs = { x.abs with xstale := f } := rfl
-
 def afterExcl (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (acq : Bool) :
     XState :=
-  { x.setHart cpu { x.hart cpu with
-      tv := if acq then x.log.length else (x.hart cpu).tv,
-      hr := (x.hart cpu).hr.afterExcl x.log.length acq,
-      resv := some (snapOf pa n w) } with
-    xstale := updCpu x.xstale cpu none }
+  x.setHart cpu { x.hart cpu with
+    tv := if acq then x.log.length else (x.hart cpu).tv,
+    hr := (x.hart cpu).hr.afterExcl x.log.length acq,
+    resv := some (snapOf pa n w) }
 
 theorem abs_afterExcl (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (acq : Bool) : (x.afterExcl cpu pa n w acq).abs = x.abs.afterExcl cpu pa n w acq := by
-  rw [afterExcl, abs_withXstale, abs_setHart]
+  rw [afterExcl, abs_setHart]
   apply MState.ext' <;> first | rfl | exact updCpu_self _ _
 
 def dropResv (x : XState) (cpu : CPU) : XState :=
-  { x.setHart cpu { x.hart cpu with resv := none } with xstale := updCpu x.xstale cpu none }
+  x.setHart cpu { x.hart cpu with resv := none }
 
 theorem abs_dropResv (x : XState) (cpu : CPU) : (x.dropResv cpu).abs = x.abs.dropResv cpu := by
-  rw [dropResv, abs_withXstale, abs_setHart]
+  rw [dropResv, abs_setHart]
   apply MState.ext' <;> first | rfl | exact updCpu_self _ _
 
 def store (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (excl : Bool) :
@@ -290,6 +288,7 @@ def store (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (
       resv := none } with
     mem := x.mem.writeBytes pa n w (x.log.length + 1) (hartAgent cpu),
     log := x.log ++ [hartAgent cpu],
+    llog := x.llog ++ [x.log.length + 1],
     pcAt := fun t => if t = x.log.length + 1 then
       (if excl then -1 else ((((x.hart cpu).regs.file) Register.PC).toNat : Int)) else x.pcAt t }
 
@@ -317,6 +316,7 @@ theorem abs_store (x : XState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8
   · rfl
   · rfl
   · rfl
+  · rfl
 
 def fence (x : XState) (cpu : CPU) (b : barrier_kind) : XState :=
   let h := x.hart cpu
@@ -325,21 +325,22 @@ def fence (x : XState) (cpu : CPU) (b : barrier_kind) : XState :=
   { x.setHart cpu { h with
       tv := tv',
       itv := if fenceIfetch b then max h.itv (fencePost true false h.tv h.hr.rv pub) else h.itv } with
-    wv := updCpu x.wv cpu (fenceWv b (x.wv cpu) h.hr.rv pub) }
+    sbEp := updCpu x.sbEp cpu (if fenceEpoch b then x.sbEp cpu + 1 else x.sbEp cpu) }
 
-/-- Replacing the write-order views denotes the same replacement. -/
-theorem abs_withWv (x : XState) (f : CPU → Nat) :
-    ({ x with wv := f } : XState).abs = { x.abs with wv := f } := rfl
+/-- Replacing the store epochs denotes the same replacement. -/
+theorem abs_withSbEp (x : XState) (f : CPU → Nat) :
+    ({ x with sbEp := f } : XState).abs = { x.abs with sbEp := f } := rfl
 
 theorem abs_fence (x : XState) (cpu : CPU) (b : barrier_kind) :
     (x.fence cpu b).abs = x.abs.fence cpu b := by
-  rw [fence, abs_withWv, abs_setHart]
+  rw [fence, abs_withSbEp, abs_setHart]
   apply MState.ext' <;> first | rfl | exact updCpu_self _ _
 
 /-- A DMA write by the disk (a zero-byte one is a no-op, as `MState.storeDma`). -/
 def storeDma (x : XState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : XState :=
   { x with mem := if n = 0 then x.mem else x.mem.writeBytes pa n w (x.log.length + 1) diskAgent,
            log := if n = 0 then x.log else x.log ++ [diskAgent],
+           llog := if n = 0 then x.llog else x.llog ++ [x.log.length + 1],
            pcAt := if n = 0 then x.pcAt else fun t => if t = x.log.length + 1 then -1 else x.pcAt t }
 
 theorem abs_storeDma (x : XState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :

@@ -12,7 +12,7 @@ around, stated over the accessors of `MachCSL.WpAtomic`:
   bytes;
 * `execSpecF_amoswap_w_aq`: `amoswap.w.aq`, an exclusive read at the top of
   the store order followed by an exclusive write, the two halves of one
-  `amoAUS` (fresh or STALE read half, narrow δ1 [OWN.105]);
+  `amoAU`;
 * `execSpecF_fence`: a fence (no resources: the memory model's fence is a
   view change the receipts already account for);
 * `execSpecF_sltiu`.
@@ -369,8 +369,7 @@ theorem execSpecF_amoswap_w_aq [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (si
       (instruction.AMO (amoop.AMOSWAP, true, false, regidx.Regidx rs2, regidx.Regidx rs1, 4, regidx.Regidx rd))
       pc npc₀ npc₀
       iprop(transTok cpu curTier root ∗ kmapId (RegMap.get R rs1) ∗ gprFile cpu R ∗
-        (ownCtx cpu curCtx -∗ ∃ (K : Nat) (ts : List (Nat × Agent)), viewLb cpu K ∗
-          amoAUS cpu (RegMap.get R rs1) 4 K ts true (BitVec.setWidth 32 (RegMap.get R rs2)) Ψ))
+        (ownCtx cpu curCtx -∗ amoAU cpu (RegMap.get R rs1) 4 true (BitVec.setWidth 32 (RegMap.get R rs2)) Ψ))
       iprop(transSlotAt cpu curTier root ∗ resvFrag cpu none false ∗
         ∃ old : BitVec (8 * 4), gprFile cpu (RegMap.set R rd (BitVec.signExtend 64 old)) ∗ Ψ old) := by
   have hva := is_aligned_vaddr_of (RegMap.get R rs1) 4 hal
@@ -423,28 +422,18 @@ theorem execSpecF_amoswap_w_aq [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (si
   conf_intro HmConf
   icases ctxTok_cases cpu curCtx $$ Htok with ⟨Hctx, %r, Hfrag⟩
   ispecialize HAUw $$ Hctx
-  icases HAUw with ⟨%K, %ts, #HK, HAUw⟩
-  iapply (swp_checked_mem_read_amo4_S (hok := hok') (hram := hram) (hal := hal) (r := r) (K := K) (ts := ts)
-    (Ψ := fun w0 => iprop((resvFrag cpu (some (snapOf (RegMap.get R rs1) 4 w0)) true ∗
-      exclWriteAU cpu (RegMap.get R rs1) 4 true w0 (BitVec.setWidth 32 (RegMap.get R rs2)) (Ψ w0)) ∨
-      (resvFragX cpu none true (some (snapOf (RegMap.get R rs1) 4 w0)) ∗
-        (⌜w0 = BitVec.setWidth 32 (RegMap.get R rs2)⌝ -∗ Ψ w0)))))
+  iapply (swp_checked_mem_read_amo4_S (hok := hok') (hram := hram) (hal := hal) (r := r)
+    (Ψ := fun w0 => iprop(resvFrag cpu (some (snapOf (RegMap.get R rs1) 4 w0)) true ∗
+      exclWriteAU cpu (RegMap.get R rs1) 4 true w0 (BitVec.setWidth 32 (RegMap.get R rs2)) (Ψ w0))))
   iframe HmConf Hfrag
-  isplit
-  · iexact HK
   isplitl [HAUw]
-  · unfold amoAUS
-    iapply exclReadAUS_wand _ _ 4 K ts _ _ _ _ $$ HAUw
+  · unfold amoAU
+    iapply exclReadAU_wand _ 4 _ _ $$ HAUw
     inext
-    isplit
-    · iintro %w HW Hf
-      ileft
-      iframe
-    · iintro %w HW Hf
-      iright
-      iframe
+    iintro %w HW Hf
+    iframe
   inext
-  iintro HmConf %w0 HD
+  iintro HmConf %w0 ⟨Hfrag, HW⟩
   conf_cases HmConf
   swp_run 60
   iapply swp_bind
@@ -455,49 +444,23 @@ theorem execSpecF_amoswap_w_aq [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (si
   swp_run 100
   iapply swp_bind
   conf_intro HmConf
-  icases HD with (⟨Hfrag, HW⟩ | ⟨Hfrag, HS⟩)
-  · iapply (swp_checked_mem_write_amo4_S (hok := hok') (hram := hram) (hal := hal) (w0 := w0) (Ψ := Ψ w0))
-    iframe HmConf Hfrag HW
-    inext
-    iintro HmConf Hfrag HΨ
-    conf_cases HmConf
-    swp_run 60
-    iapply swp_bind
-    iapply swp_wX_file (hrd := hrd)
-    iframe
-    inext
-    iintro HF
-    swp_run 10
-    conf_intro HmConf
-    iapply HΦ $$ HmConf HPC HnextPC [Htrans Hfrag HF HΨ]
-    iframe Htrans Hfrag
-    iexists w0
-    iframe
-  · -- a STALE read half (narrow δ1 [OWN.105]): silent or hang
-    iapply (swp_checked_mem_write_amo4_stale_S (hok := hok') (hram := hram) (hal := hal)
-      (s0 := snapOf (RegMap.get R rs1) 4 w0) (Ψ := Ψ w0))
-    iframe HmConf Hfrag
-    isplitl [HS]
-    · inext
-      iintro %hs
-      iapply HS
-      ipureintro
-      exact snapOf_inj _ 4 _ _ (by decide) hs
-    inext
-    iintro HmConf Hfrag HΨ
-    conf_cases HmConf
-    swp_run 60
-    iapply swp_bind
-    iapply swp_wX_file (hrd := hrd)
-    iframe
-    inext
-    iintro HF
-    swp_run 10
-    conf_intro HmConf
-    iapply HΦ $$ HmConf HPC HnextPC [Htrans Hfrag HF HΨ]
-    iframe Htrans Hfrag
-    iexists w0
-    iframe
+  iapply (swp_checked_mem_write_amo4_S (hok := hok') (hram := hram) (hal := hal) (w0 := w0) (Ψ := Ψ w0))
+  iframe HmConf Hfrag HW
+  inext
+  iintro HmConf Hfrag HΨ
+  conf_cases HmConf
+  swp_run 60
+  iapply swp_bind
+  iapply swp_wX_file (hrd := hrd)
+  iframe
+  inext
+  iintro HF
+  swp_run 10
+  conf_intro HmConf
+  iapply HΦ $$ HmConf HPC HnextPC [Htrans Hfrag HF HΨ]
+  iframe Htrans Hfrag
+  iexists w0
+  iframe
 
 
 set_option maxHeartbeats 4000000 in

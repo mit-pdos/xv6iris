@@ -122,10 +122,9 @@ theorem swp_sail_mem_write_plain_auT (cpu : CPU) {n vasize : Nat}
     iintro %σ'
     isplit
     · iintro %v %Hev
-      rcases Hev with ⟨hdev, _⟩ | ⟨_, _, _, hno', _, _⟩ | ⟨hsil, _⟩
+      rcases Hev with ⟨hdev, _⟩ | ⟨_, _, _, hno', _, _⟩
       · exact absurd hdev (not_devBytes_of_othersReserve hmm.2.2.1 hmm.2.2.2.1 hno)
       · exact absurd hno hno'
-      · exact absurd hsil (MState.not_silentOk_of_plain _ _ _ _ _ _ hk)
     · iintro %Hbk
       obtain ⟨_, hσ⟩ := Hbk
       subst σ'
@@ -155,14 +154,12 @@ theorem swp_sail_mem_write_plain_auT (cpu : CPU) {n vasize : Nat}
       imodintro
       isplit
       · ipureintro
-        exact Or.inl ⟨.Ok (some true), _, Or.inr (Or.inl ⟨hram, w', hv, hno, MState.staleFree_of_plain _ _ _ hk, rfl, rfl⟩)⟩
+        exact Or.inl ⟨.Ok (some true), _, Or.inr ⟨hram, w', hv, hno, MState.landNowOk_of_nil _ _ _ _ _ (mmOk_sbNil hmm cpu), rfl, rfl⟩⟩
       inext
       iintro %σ'
       isplit
       · iintro %v %Hev
-        rcases Hev with ⟨hdev, w₀, ds₀, _, hdw, _, _⟩ | ⟨_, w'', hv', _, _, rfl, rfl⟩ | ⟨hsil, _, _⟩
-        rotate_right
-        · exact absurd hsil (MState.not_silentOk_of_plain _ _ _ _ _ _ hk)
+        rcases Hev with ⟨hdev, w₀, ds₀, _, hdw, _, _⟩ | ⟨_, w'', hv', _, _, rfl, rfl⟩
         · exact absurd hdev (not_devBytes_of_ramBytes hram (devWrite_pos hdw))
         rw [hv] at hv'
         obtain rfl := Option.some.inj hv'
@@ -189,9 +186,9 @@ theorem swp_sail_mem_write_plain_auT (cpu : CPU) {n vasize : Nat}
         · iapply swp_ret
           iapply HΦ $$ Hfrag
       · iintro %Hbk
-        obtain ⟨hno' | hsb, _⟩ := Hbk
+        obtain ⟨hno' | ⟨_, hln⟩, _⟩ := Hbk
         · exact absurd hno' hno
-        · exact absurd hsb (MState.not_staleBlocked_of_free _ _ _ _ _ _ (MState.staleFree_of_plain _ _ _ hk))
+        · exact absurd (MState.landNowOk_of_nil _ _ _ _ _ (mmOk_sbNil hmm cpu)) hln
     ihave %hnr := memModel_notRsv_hist σ req.pa Hs n $$ [Hmm Hb]
     · iframe
     ihave %hget : ⌜histsAt σ.mem req.pa n Hs⌝ $$ [Hmem Hb]
@@ -214,14 +211,12 @@ theorem swp_sail_mem_write_plain_auT (cpu : CPU) {n vasize : Nat}
     imodintro
     isplit
     · ipureintro
-      exact Or.inl ⟨.Ok (some true), _, Or.inr (Or.inl ⟨hram, w', hv, hno, MState.staleFree_of_plain _ _ _ hk, rfl, rfl⟩)⟩
+      exact Or.inl ⟨.Ok (some true), _, Or.inr ⟨hram, w', hv, hno, MState.landNowOk_of_nil _ _ _ _ _ (mmOk_sbNil hmm cpu), rfl, rfl⟩⟩
     inext
     iintro %σ'
     isplit
     · iintro %v %Hev
-      rcases Hev with ⟨hdev, w₀, ds₀, _, hdw, _, _⟩ | ⟨_, w'', hv', _, _, rfl, rfl⟩ | ⟨hsil, _, _⟩
-      rotate_right
-      · exact absurd hsil (MState.not_silentOk_of_plain _ _ _ _ _ _ hk)
+      rcases Hev with ⟨hdev, w₀, ds₀, _, hdw, _, _⟩ | ⟨_, w'', hv', _, _, rfl, rfl⟩
       · exact absurd hdev (not_devBytes_of_ramBytes hram (devWrite_pos hdw))
       rw [hv] at hv'
       obtain rfl := Option.some.inj hv'
@@ -243,9 +238,9 @@ theorem swp_sail_mem_write_plain_auT (cpu : CPU) {n vasize : Nat}
       · iapply swp_ret
         iapply HΦ $$ Hfrag
     · iintro %Hbk
-      obtain ⟨hno' | hsb, _⟩ := Hbk
+      obtain ⟨hno' | ⟨_, hln⟩, _⟩ := Hbk
       · exact absurd hno' hno
-      · exact absurd hsb (MState.not_staleBlocked_of_free _ _ _ _ _ _ (MState.staleFree_of_plain _ _ _ hk))
+      · exact absurd (MState.landNowOk_of_nil _ _ _ _ _ (mmOk_sbNil hmm cpu)) hln
 
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in

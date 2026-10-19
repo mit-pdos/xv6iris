@@ -432,7 +432,7 @@ theorem machInterp_devRtOk (σ : MState) : machInterp (GF := GF) σ ⊢ ⌜devRt
   iintro ⟨_, _, Hmm, _, _⟩
   ihave %h := memModel_mmOk _ σ $$ Hmm
   ipureintro
-  exact h.2.2.2.2
+  exact h.2.2.2.2.1
 
 /-- Recording a finished task does not move `next`. -/
 theorem machInterp_setRt_done (σ : MState) (d : DevId) (tid : TaskId) :

@@ -63,15 +63,15 @@ def rhist (m : FlatMem) (img : Image) (log : List Wmsg) : Prop :=
   (∀ pa, inRam pa 1 → m[pa]? = some (TsoOfPf.histOf img log (paZ pa))) ∧
   (∀ pa, ¬ inRam pa 1 → m[pa]? = none)
 
-/-- **The memory half of W2's `R`**: `R-log`, `R-img`, `R-hist`, `R-resv`, and -- narrow δ1
-[OWN.105] -- no pending STALE exclusive read (`MState.xstale`): the registered pf runs this
-relation simulates take only fresh exclusive reads. -/
+/-- **The memory half of W2's `R`**: `R-log`, `R-img`, `R-hist`, `R-resv`, and -- route P,
+increment P-M1 -- every MachCSL store buffer empty (`MState.sb`): the P-M1 machine lands every
+store in the step that issues it, so the TSO pf runs this relation simulates never buffer. -/
 def rmem {P D : Type} (c : Wpcfg P D) (st : List (Nat × Wlabel)) (σ : MState) : Prop :=
   (c.pcLog.map Wmsg.wmTid = σ.log.map some ∧ ∀ a ∈ σ.log, a ≤ NCPU) ∧
   c.pcImg = imgZ bootImage ∧
   rhist σ.mem c.pcImg c.pcLog ∧
   (∀ cpu, σ.resv cpu = none ∨ midPair st (hartAgent cpu)) ∧
-  (∀ cpu, σ.xstale cpu = none)
+  (∀ cpu, σ.sb cpu = [])
 
 /-- A store label, the exclusivity a parameter (`true`: `LExStore`, `false`: `LStore`). -/
 def stLbl (excl rl : Bool) (base : Int) (data : List (BitVec 8)) (asrc vsrc : List Dsrc) :
@@ -431,9 +431,9 @@ theorem histOfWriteBytes (σ : MState) (img : Image) (log : List Wmsg) (pa : PAd
 /-- **(6)** The booted machine is related to the initial configuration. -/
 theorem rmemBoot {P D : Type} (d0 : D) (ps : List P) (σ : MState) (h : bootFacts σ) :
     rmem (wpInit (imgZ bootImage) d0 ps) [] σ := by
-  obtain ⟨hmem, hlog, hcpu, -, -, hxs⟩ := h
+  obtain ⟨hmem, hlog, hcpu, -, -, -, hsb⟩ := h
   refine ⟨⟨by simp [wpInit, hlog], by simp [hlog]⟩, rfl, ⟨fun pa hpa => ?_, fun pa hpa => ?_⟩,
-    fun cpu => Or.inl (hcpu cpu).2.2.2, hxs⟩
+    fun cpu => Or.inl (hcpu cpu).2.2.2, fun cpu => (hsb cpu).1⟩
   · rw [hmem, imgFlat_get?, if_pos hpa]
     simp only [wpInit]
     rw [histOfNil, imgZLookup, bootImage_get?, if_pos hpa]
@@ -501,7 +501,7 @@ theorem rmemAppend {P D : Type} (c c' : Wpcfg P D) (st st' : List (Nat × Wlabel
     (hram : ramBytes pa n) (hd : data.length = n) (hb : ∀ j, j < n → data[j]? = some (nthByte w j))
     (hmem : σ'.mem = σ.mem.writeBytes pa n w (σ.top + 1) h) (hlg : σ'.log = σ.log ++ [h])
     (hres : ∀ cpu, σ'.resv cpu = none)
-    (hxs : ∀ cpu, σ'.xstale cpu = σ.xstale cpu := by intro; rfl) : rmem c' st' σ' := by
+    (hxs : ∀ cpu, σ'.sb cpu = σ.sb cpu := by intro; rfl) : rmem c' st' σ' := by
   obtain ⟨⟨hl1, hl2⟩, hi, hH, -, hx⟩ := hR
   have hlen : σ.log.length = c.pcLog.length := by
     have := congrArg List.length hl1; simpa using this.symm
@@ -589,7 +589,7 @@ theorem pfStoreRowMem {P D : Type} (pstep : P → D → Wlabel → P → D → P
     ¬ othersReserve σ.resv cpu pa n ∧
       ∀ σ' : MState, σ'.mem = σ.mem.writeBytes pa n w (σ.top + 1) (hartAgent cpu) →
         σ'.log = σ.log ++ [hartAgent cpu] → σ'.resv = updCpu σ.resv cpu none →
-        σ'.xstale = σ.xstale →
+        σ'.sb = σ.sb →
         rmem c' (st ++ [(i, stLbl excl rl base data asrc vsrc)]) σ' := by
   have hoth : ∀ c0, c0 ≠ cpu → σ.resv c0 = none := fun c0 hne =>
     resvOthersNone c st rest σ i _ hR hadj c0 (by rw [hi]; exact hartAgentNe _ _ hne)
@@ -619,7 +619,7 @@ theorem pfExLoadRowMem {P D : Type} (pstep : P → D → Wlabel → P → D → 
     σ.mem.topBytes pa n w ∧ ¬ othersReserve σ.resv cpu pa n ∧
       ∀ σ' : MState, σ'.mem = σ.mem → σ'.log = σ.log →
         σ'.resv = updCpu σ.resv cpu (some (snapOf pa n w)) →
-        σ'.xstale = updCpu σ.xstale cpu none →
+        σ'.sb = σ.sb →
         rmem c' (st ++ [(i, .LExLoad aq base tvs asrc)]) σ' := by
   have hoth : ∀ c0, c0 ≠ cpu → σ.resv c0 = none := fun c0 hne =>
     resvOthersNone c st rest σ i _ hR hadj c0 (by rw [hi]; exact hartAgentNe _ _ hne)
@@ -645,7 +645,7 @@ theorem pfExLoadRowMem {P D : Type} (pstep : P → D → Wlabel → P → D → 
     rw [hoth c0 hne] at hr0; cases hr0
   · obtain ⟨⟨hl1, hl2⟩, himg, hH, -, hx⟩ := hR
     refine ⟨⟨by rw [hlg]; exact hl1, by rw [hlg]; exact hl2⟩, himg, by rw [hmem]; exact hH,
-      fun c0 => ?_, fun c0 => by rw [hxs]; simp only [updCpu]; split <;> simp [hx]⟩
+      fun c0 => ?_, fun c0 => by rw [hxs]; exact hx c0⟩
     rw [hres]
     by_cases h : c0 = cpu
     · subst h hi
@@ -688,7 +688,7 @@ theorem pfDWriteRowMem {P D : Type} (pstep : P → D → Wlabel → P → D → 
     (hbytes : ∀ j, j < n → data[j]? = some (nthByte w j)) :
     ¬ anyReserve σ.resv pa n ∧
       ∀ σ' : MState, σ'.mem = σ.mem.writeBytes pa n w (σ.top + 1) diskAgent →
-        σ'.log = σ.log ++ [diskAgent] → σ'.resv = σ.resv → σ'.xstale = σ.xstale →
+        σ'.log = σ.log ++ [diskAgent] → σ'.resv = σ.resv → σ'.sb = σ.sb →
         rmem c' (st ++ [(NCPU, .LStore rl base data asrc vsrc)]) σ' := by
   have hnone : ∀ c0, σ.resv c0 = none := fun c0 =>
     resvOthersNone c st rest σ NCPU _ hR hadj c0 (Nat.ne_of_lt (hartAgent_lt c0))
@@ -794,7 +794,7 @@ theorem pfFrameRowMem {P D : Type} (pstep : P → D → Wlabel → P → D → P
     (σ : MState) (i : Nat) (l : Wlabel) (hR : rmem c st σ) (hstep : wpPfStep pstep pcls i l c c')
     (hl : frameLbl l) (hadj : pairAdjacent (st ++ (i, l) :: rest)) :
     c'.pcLog = c.pcLog ∧ c'.pcImg = c.pcImg ∧
-      ∀ σ' : MState, σ'.mem = σ.mem → σ'.log = σ.log → σ'.resv = σ.resv → σ'.xstale = σ.xstale →
+      ∀ σ' : MState, σ'.mem = σ.mem → σ'.log = σ.log → σ'.resv = σ.resv → σ'.sb = σ.sb →
         rmem c' (st ++ [(i, l)]) σ' := by
   obtain ⟨hlog, himg⟩ := frameStep pstep pcls i l c c' hstep hl
   refine ⟨hlog, himg, fun σ' hmem hlg hres hxs => ?_⟩

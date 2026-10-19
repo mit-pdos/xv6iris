@@ -107,21 +107,25 @@ def threadNoStep (g : GState) (e : Expr) : Prop :=
     ¬ PrimStep.primStep (e, g) obs (e', g', efs)
 
 /-- A live hart at an `error` node of the model -- a failed assertion, an
-unimplemented platform hook -- has no transition. -/
+unimplemented platform hook -- has no transition, when no store is buffered
+(route P: else the land arm can still step it). -/
 def errorNode : Expr → Bool
   | .hart 0 _ (.impure (.error _) _) => true
   | _ => false
 
-theorem errorNode_noStep (x : XState) (e : Expr) (h : errorNode e = true) :
+theorem errorNode_noStep (x : XState) (e : Expr) (hsb : ∀ c, x.sb c = []) (h : errorNode e = true) :
     threadNoStep (gOf x) e := by
   intro obs e' g' efs hp
   unfold errorNode at h
   split at h
   · rename_i cpu err k
-    obtain ⟨-, hl | hd⟩ := primStep_hart_inv hp
+    obtain ⟨-, hl | hd | hland⟩ := primStep_hart_inv hp
     · obtain ⟨-, -, m', σ', -, hs, -⟩ := hl
       exact hs
     · exact hd.1 (live0 x)
+    · -- the land arm (route P): an executable state never buffers a store
+      obtain ⟨-, -, -, t, hok, -⟩ := hland
+      exact MState.not_landOk_of_nil _ cpu t (hsb cpu) hok
   · exact absurd h (by simp)
 
 end Vtest

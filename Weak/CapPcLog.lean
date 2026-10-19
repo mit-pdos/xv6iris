@@ -76,19 +76,18 @@ theorem CapPcLog.evStepPc (cpu : CPU) (o : Outcome Register RegisterType) (σ : 
       (w : BitVec (8 * n)), o = .memWrite n va req ∧ σ' = σ.store cpu req.pa n w (akExcl req.access_kind) := by
   cases o with
   | memWrite n va req =>
-    rcases h with ⟨-, w, ds', -, -, -, rfl⟩ | ⟨-, w, -, -, -, -, rfl⟩ | ⟨-, -, rfl⟩
+    rcases h with ⟨-, w, ds', -, -, -, rfl⟩ | ⟨-, w, -, -, -, -, rfl⟩
     · exact Or.inl ⟨rfl, rfl⟩
     · exact Or.inr ⟨n, va, req, w, rfl, rfl⟩
-    · exact Or.inl ⟨rfl, rfl⟩
   | memRead n va req =>
     left
     rcases h with ⟨-, w, ds', -, -, rfl⟩ | ⟨-, -, tvn, w, -, -, -, -, rfl⟩ |
-      ⟨-, -, tvn, w, -, -, -, -, -, rfl⟩ |
-      ⟨-, -, -, ⟨w, -, -, rfl⟩ | ⟨tvn, w, -, -, -, -, -, -, -, rfl⟩⟩ <;> exact ⟨rfl, rfl⟩
+      ⟨-, -, tvn, w, -, -, -, -, -, rfl⟩ | ⟨-, -, -, -, w, -, -, rfl⟩ <;> exact ⟨rfl, rfl⟩
   | readRam => exact absurd h id
   | writeRam => exact absurd h id
   | regRead r => obtain ⟨-, rfl⟩ := h; exact Or.inl ⟨rfl, rfl⟩
   | getCycleCount => obtain ⟨-, rfl⟩ := h; exact Or.inl ⟨rfl, rfl⟩
+  | barrier b => obtain ⟨-, rfl⟩ := h; exact Or.inl ⟨rfl, rfl⟩
   | _ => subst h; exact Or.inl ⟨rfl, rfl⟩
 
 /-- A blocked hart event keeps the pc log. -/
@@ -97,6 +96,7 @@ theorem CapPcLog.blockedPc (cpu : CPU) (o : Outcome Register RegisterType) (σ �
   cases o with
   | memRead n va req => obtain ⟨-, -, rfl⟩ := h; exact ⟨rfl, rfl⟩
   | memWrite n va req => obtain ⟨-, rfl⟩ := h; exact ⟨rfl, rfl⟩
+  | barrier b => obtain ⟨-, -, rfl⟩ := h; exact ⟨rfl, rfl⟩
   | _ => exact absurd h id
 
 /-- **A hart step keeps the pc log, or is one of its events' stores** (`MachCSL.hartStep`). -/
@@ -169,11 +169,13 @@ theorem CapPcLog.primStepPc {e : Expr} {g : GState} {obs : List Obs} {e' : Expr}
     {efs : List Expr} (h : primStep (e, g) obs (e', g', efs)) (hp : g.pow = true) : CapPcLog.stepPc g.m g'.m := by
   cases e with
   | hart gen cpu m =>
-    obtain ⟨-, ⟨-, -, m', σ', -, hs, rfl⟩ | ⟨-, -, -, rfl⟩⟩ := h
+    obtain ⟨-, ⟨-, -, m', σ', -, hs, rfl⟩ | ⟨-, -, -, rfl⟩ | ⟨-, -, -, t, -, rfl⟩⟩ := h
     · rcases CapPcLog.hartStepPc cpu m g.m m' σ' hs with hk | ⟨n, va, req, w, he⟩
       · exact Or.inl hk
       · exact Or.inr (Or.inl ⟨cpu, n, va, req, w, he⟩)
     · exact Or.inl ⟨rfl, rfl⟩
+    · -- the land arm (route P): no log entry, no pc moves
+      exact Or.inl ⟨rfl, rfl⟩
   | dev gen d tid m =>
     rcases h with ⟨-, m', σ', -, hs, rfl⟩ | ⟨-, -, -, -, rfl⟩
     · rcases CapPcLog.devStepPc gen d tid m g.m obs m' σ' efs hs with hk | ⟨pa, n, w, s', he⟩
@@ -264,10 +266,11 @@ theorem CapPcLog.stepStoreOf {t t' : List Expr} {g g' : GState} {obs : List Obs}
   | @atomic e σ₀ obs₀ e' σ₁ eₜ H t₁ t₂ =>
     cases e with
     | hart gen cpu m =>
-      obtain ⟨-, ⟨-, -, m', σ', -, hs, rfl⟩ | ⟨-, -, -, rfl⟩⟩ := H
+      obtain ⟨-, ⟨-, -, m', σ', -, hs, rfl⟩ | ⟨-, -, -, rfl⟩ | ⟨-, -, -, t, -, rfl⟩⟩ := H
       · rcases CapPcLog.hartStepStore cpu m g.m m' σ' hs with hk | ⟨n, va, req, k, w, rfl, he⟩
         · exact Or.inl hk
         · exact Or.inr (Or.inl ⟨t₁, t₂, gen, cpu, n, va, req, k, w, rfl, he⟩)
+      · exact Or.inl ⟨rfl, rfl⟩
       · exact Or.inl ⟨rfl, rfl⟩
     | dev gen d tid m =>
       rcases H with ⟨-, m', σ', -, hs, rfl⟩ | ⟨-, -, -, -, rfl⟩
@@ -307,7 +310,7 @@ theorem CapPcLog.stepHartN {t t' : List Expr} {g g' : GState} {obs : List Obs}
     have hsame : CapPcLog.isHartOf cpu e' = CapPcLog.isHartOf cpu e ∧ CapPcLog.hartN cpu eₜ = 0 := by
       cases e with
       | hart gen c m =>
-        obtain ⟨rfl, ⟨-, -, m', σ', rfl, -, -⟩ | ⟨-, -, rfl, -⟩⟩ := H <;> exact ⟨rfl, rfl⟩
+        obtain ⟨rfl, ⟨-, -, m', σ', rfl, -, -⟩ | ⟨-, -, rfl, -⟩ | ⟨-, -, rfl, -⟩⟩ := H <;> exact ⟨rfl, rfl⟩
       | dev gen d tid m =>
         rcases H with ⟨-, m', σ', rfl, hs, -⟩ | ⟨-, -, rfl, rfl, -⟩
         · refine ⟨rfl, ?_⟩
@@ -344,7 +347,7 @@ theorem CapPcLog.stepGen {t t' : List Expr} {g g' : GState} {obs : List Obs}
   | @atomic e σ₀ obs₀ e' σ₁ eₜ H t₁ t₂ =>
     cases e with
     | hart gen c m =>
-      obtain ⟨-, ⟨-, -, m', σ', -, -, rfl⟩ | ⟨-, -, -, rfl⟩⟩ := H <;>
+      obtain ⟨-, ⟨-, -, m', σ', -, -, rfl⟩ | ⟨-, -, -, rfl⟩ | ⟨-, -, -, t, -, rfl⟩⟩ := H <;>
         exact ⟨Nat.le_refl _, fun hp => Or.inl ⟨rfl, hp⟩⟩
     | dev gen d tid m =>
       rcases H with ⟨-, m', σ', -, -, rfl⟩ | ⟨-, -, -, -, rfl⟩ <;>

@@ -37,9 +37,8 @@ byte it can reach (an owned byte map).  `runRW` walks a computation over
 `swp_runRW` is proved ONCE, by induction on the computation, from the
 per-event leaves (`swp_readReg`, `swp_writeReg`, `swp_readReg_any`,
 `swp_choose`, `swp_sail_mem_read_plain_ctx`, `swp_sail_mem_write_plain`,
-`swp_sail_mem_read_excl_ctx` (fresh or -- narrow δ1 [OWN.105] -- STALE: the owned value
-either way), `swp_sail_mem_write_excl_ctx` from any reservation state (a stale pair's
-write completes silently at the owned value, or the hart hangs), the silent rules).  It is stated over any
+`swp_sail_mem_read_excl_au` over `ctxBytes_exclReadAU`,
+`swp_sail_mem_write_excl_ctx` from any reservation state, the silent rules).  It is stated over any
 register frame and byte frame that hand out the cells they own
 (`URegFrame` / `UByteFrame`, the analogue of `runRead`'s `hacc`; a register
 is handed out at its own fraction).  The concrete instances here are
@@ -828,17 +827,13 @@ theorem urw_memRead {X : Type} (n vasize : Nat)
     obtain rfl := Option.some.inj hw0
     rw [e]
     iapply swp_bind
-    iapply swp_sail_mem_read_excl_ctx cpu req (akAcq req.access_kind) hex rfl hn ξ dq w r (fun v => swp cpu (k v) Φ)
-    iframe Hc Hfrag Hb
+    iapply swp_sail_mem_read_excl_au cpu req (akAcq req.access_kind) hex rfl hn r (fun v => swp cpu (k v) Φ)
+    iframe Hfrag
+    ihave Hau := ctxBytes_exclReadAU ξ req.pa n dq w $$ Hb
+    iapply exclReadAU_wand req.pa n _ _ $$ Hau
     inext
-    iintro Hc Hb HD
-    ihave Hfrag : iprop(∃ (r1 : Option Resv) (b1 : Bool), resvFrag cpu r1 b1) $$ [HD]
-    · icases HD with (Hfrag | Hfrag)
-      · iexists _, _
-        iexact Hfrag
-      · iexists none, _
-        iapply resvFrag_of_X cpu none _ _ $$ Hfrag
-    icases Hfrag with ⟨%r1, %b1, Hfrag⟩
+    iintro %w1 ⟨%hw1, Hb⟩ Hfrag
+    subst hw1
     ihave HB := HBc $$ Hb
     rw [← e]
     iapply urw_cont RF BF _ _ (ih _) s _ hro hpt hsat hok hstep Φ
@@ -848,7 +843,7 @@ theorem urw_memRead {X : Type} (n vasize : Nat)
     · ipureintro; exact ⟨hro, hpt, hsat⟩
     rw [show ({ s with rv := true } : UWSt).file = s.file from rfl]
     iframe HF HB Hc
-    iapply uResvTok_of cpu true r1 b1 $$ Hfrag
+    iapply uResvTok_of cpu true _ _ $$ Hfrag
 
 theorem urw_memWrite {X : Type} (n vasize : Nat)
     (req : Mem_write_request n vasize Arch.pa Arch.translation Arch.arch_ak)
