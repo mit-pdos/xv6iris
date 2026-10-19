@@ -616,6 +616,331 @@ theorem agreeW4OfX (G GR : Gexec) (X : Geid → Prop) :
   · rw [hl', Option.some.injEq] at h3; subst h3
     exact h2 e a t v ⟨l, h0, by rw [← relXIsW _ _ _ hrel]; exact hW'⟩ hr
 
+/-! # 4. The walk-level prefix invariant -/
+
+/-- Label `l` writes byte `b`. -/
+def wrsB (l : Lbl) (b : Int) : Bool :=
+  match lbWr l with
+  | some (base, vs) => (List.range vs.length).any (fun j => decide (accAddr base j = b))
+  | none => false
+
+theorem wrsBIff (l : Lbl) (b : Int) : wrsB l b = true ↔ ∃ base vs j v, lbWr l = some (base, vs) ∧
+    vs[j]? = some v ∧ accAddr base j = b := by
+  unfold wrsB
+  cases h : lbWr l with
+  | none => simp
+  | some q =>
+    obtain ⟨base, vs⟩ := q
+    simp only [List.any_eq_true, List.mem_range, decide_eq_true_eq]
+    constructor
+    · rintro ⟨j, hj, ha⟩
+      exact ⟨base, vs, j, vs[j], rfl, List.getElem?_eq_getElem hj, ha⟩
+    · rintro ⟨base', vs', j, v, he, hv, ha⟩
+      cases he
+      exact ⟨j, lookup_lt_Some hv, ha⟩
+
+/-- A graph event writes byte `b`. -/
+def gwrB (G : Gexec) (b : Int) (e : Geid) : Bool :=
+  match gxLbl G e with
+  | some l => wrsB l b
+  | none => false
+
+/-- A walk event writes byte `b` (off the rows). -/
+def rwrB (rows : Nat → List Lbl) (b : Int) (e : Geid) : Bool :=
+  match (rows e.1)[e.2]? with
+  | some l => wrsB l b
+  | none => false
+
+/-- GF's writes to `b` in gmo (= co) order. -/
+def wrAtG (G : Gexec) (b : Int) : List Geid := G.gxGmo.filter (gwrB G b)
+
+/-- The member's LANDED writes to `b`, in landing order. -/
+def wrAtW (w : WS) (b : Int) : List Geid := w.gmo.filter (rwrB w.rows b)
+
+/-- **THE PREFIX INVARIANT**: every member row label is related to GF's at the same event; at every
+byte the landed write list is a PREFIX of GF's. -/
+def pfx (G : Gexec) (X : Geid → Prop) (w : WS) : Prop :=
+  (∀ (x n : Nat) (l' : Lbl), (w.rows x)[n]? = some l' →
+    ∃ l, gxLbl G (x, n) = some l ∧ lblRelX (X (x, n)) l l') ∧
+  (∀ b, wrAtW w b <+: wrAtG G b)
+
+theorem pfxInit (G : Gexec) (X : Geid → Prop) (img : Image) : pfx G X (init img) :=
+  ⟨fun _ _ _ h => by simp [init] at h, fun _ => List.nil_prefix⟩
+
+/-- An event keeps the landed write list of every byte unless it is an AMO writing it. -/
+theorem wrAtEv (img : Image) (w : WS) (s : Estep) (b : Int) :
+    Inv img w →
+    wrAtW (nextI w (.ev s)) b =
+      if gmoEv s.esLb && wrsB s.esLb b then wrAtW w b ++ [(s.esAg, (w.rows s.esAg).length)]
+      else wrAtW w b := by
+  intro hI
+  have hcong : ∀ e, e ∈ w.gmo → rwrB (nextI w (.ev s)).rows b e = rwrB w.rows b e := by
+    intro e he
+    obtain ⟨l, hl, -⟩ := hI.gmoMem e he
+    unfold rwrB
+    rw [hl, rowsEvOld w s e.1 e.2 l hl]
+  have hnew : rwrB (nextI w (.ev s)).rows b (s.esAg, (w.rows s.esAg).length) = wrsB s.esLb b := by
+    unfold rwrB
+    show (match (upd w.rows s.esAg (w.rows s.esAg ++ [s.esLb]) s.esAg)[(w.rows s.esAg).length]? with
+      | some l => wrsB l b
+      | none => false) = _
+    rw [updEq]; simp
+  have hold : w.gmo.filter (rwrB (nextI w (.ev s)).rows b) = wrAtW w b := by
+    unfold wrAtW
+    exact List.filter_congr (fun e he => hcong e he)
+  unfold wrAtW
+  change (if gmoEv s.esLb then w.gmo ++ [(s.esAg, (w.rows s.esAg).length)] else w.gmo).filter _ = _
+  by_cases hg : gmoEv s.esLb = true
+  · rw [if_pos hg, List.filter_append, hold]
+    by_cases hw : wrsB s.esLb b = true
+    · rw [if_pos (by simp [hg, hw]), List.filter_cons, hnew, if_pos hw]; rfl
+    · rw [if_neg (by simp [hg, hw]), List.filter_cons, hnew, if_neg hw]; simp; rfl
+  · rw [if_neg hg, hold, if_neg (by simp [hg])]; rfl
+
+/-- **THE PREFIX INVARIANT ALONG AN EVENT**: the event's label is related to GF's next one of its row,
+and (an AMO) at every byte it writes, the landed list extended by it is still a GF prefix — the
+gate's `wr` arm (its co-predecessor is the member-latest). -/
+theorem pfxEv (img : Image) (G : Gexec) (X : Geid → Prop) (w : WS) (s : Estep) (l : Lbl) :
+    Inv img w → pfx G X w →
+    gxLbl G (s.esAg, (w.rows s.esAg).length) = some l →
+    lblRelX (X (s.esAg, (w.rows s.esAg).length)) l s.esLb →
+    (gmoEv s.esLb = true → ∀ b, wrsB s.esLb b = true →
+      wrAtW w b ++ [(s.esAg, (w.rows s.esAg).length)] <+: wrAtG G b) →
+    pfx G X (nextI w (.ev s)) := by
+  intro hI ⟨hR, hC⟩ hl hrel hco
+  refine ⟨fun x n l' hl' => ?_, fun b => ?_⟩
+  · rcases rowsEvInv w s x n l' hl' with h | ⟨rfl, rfl, rfl⟩
+    · exact hR x n l' h
+    · exact ⟨l, hl, hrel⟩
+  · rw [wrAtEv img w s b hI]
+    split
+    · rename_i h
+      simp only [Bool.and_eq_true] at h
+      exact hco h.1 b h.2
+    · exact hC b
+
+/-- **THE PREFIX INVARIANT ALONG A LANDING**: at every byte the landed store writes, the landed list
+extended by it is still a GF prefix — the gate's `land` arm. -/
+theorem pfxLand (img : Image) (pol : SbPol) (G : Gexec) (X : Geid → Prop) (w : WS) (i k : Nat) :
+    Inv img w → pfx G X w → pol.landOk (w.σ.sb i) k →
+    (∀ p, (w.pend i)[k]? = some p → ∀ b, rwrB w.rows b (i, p.1) = true →
+      wrAtW w b ++ [(i, p.1)] <+: wrAtG G b) →
+    pfx G X (nextI w (.land i k)) := by
+  intro hI ⟨hR, hC⟩ _ hco
+  cases hp : (w.pend i)[k]? with
+  | none => simp only [nextI, hp]; exact ⟨hR, hC⟩
+  | some p =>
+    simp only [nextI, hp]
+    refine ⟨hR, fun b => ?_⟩
+    show (w.gmo ++ [(i, p.1)]).filter (rwrB w.rows b) <+: _
+    rw [List.filter_append, List.filter_cons]
+    split
+    · rename_i h; exact hco p hp b h
+    · simp only [List.filter_nil, List.append_nil]; exact hC b
+
+/-- A prefix extended by the next element of the longer list. -/
+theorem prefixSnoc {α : Type} (l1 l2 t : List α) (e : α) : l2 = l1 ++ e :: t → l1 ++ [e] <+: l2 := by
+  intro h; rw [h]; exact ⟨t, by simp⟩
+
+/-! ## 4.1 Completion: the prefix invariant is the agreement -/
+
+/-- The position of `x` in `l` (`l.length` if absent). -/
+def posOf : List Geid → Geid → Nat
+  | [], _ => 0
+  | y :: l, x => if y = x then 0 else posOf l x + 1
+
+theorem posOfLookup : ∀ (l : List Geid) (i : Nat) (x : Geid), l.Nodup → l[i]? = some x → posOf l x = i
+  | [], _, _, _, h => by simp at h
+  | y :: l, 0, x, _, h => by
+    simp only [List.getElem?_cons_zero, Option.some.injEq] at h
+    simp [posOf, h]
+  | y :: l, i + 1, x, hnd, h => by
+    simp only [List.getElem?_cons_succ] at h
+    have hy : y ≠ x := by
+      intro hyx; subst hyx
+      exact (List.nodup_cons.1 hnd).1 (List.mem_of_getElem? h)
+    simp only [posOf, hy, if_false]
+    rw [posOfLookup l i x (List.nodup_cons.1 hnd).2 h]
+
+theorem gwixPosOf (G : Gexec) (x : Geid) :
+    G.gxGmo.Nodup → x ∈ gwrites G → gwix G x = posOf (gwrites G) x + 1 := by
+  intro hnd hx
+  obtain ⟨i, hi, h⟩ := gwixLookup G x hx
+  rw [h, posOfLookup _ i x (gwritesNodup G hnd) hi]
+
+/-- Filtering keeps the relative order. -/
+theorem posFilter (p : Geid → Bool) : ∀ (l : List Geid) (x y : Geid), l.Nodup → x ∈ l → y ∈ l →
+    p x = true → p y = true →
+    (posOf (l.filter p) x < posOf (l.filter p) y ↔ posOf l x < posOf l y)
+  | [], _, _, _, hx, _, _, _ => by simp at hx
+  | z :: l, x, y, hnd, hx, hy, hpx, hpy => by
+    have hnd' := (List.nodup_cons.1 hnd).2
+    by_cases hzx : z = x
+    · subst hzx
+      by_cases hzy : z = y
+      · subst hzy; simp
+      · have hy' : y ∈ l := by
+          rcases List.mem_cons.1 hy with h | h
+          · exact absurd h.symm hzy
+          · exact h
+        simp [posOf, hpx, hzy]
+    · have hx' : x ∈ l := by
+        rcases List.mem_cons.1 hx with h | h
+        · exact absurd h.symm hzx
+        · exact h
+      by_cases hzy : z = y
+      · subst hzy
+        simp [posOf, hpy, hzx]
+      · have hy' : y ∈ l := by
+          rcases List.mem_cons.1 hy with h | h
+          · exact absurd h.symm hzy
+          · exact h
+        have ih := posFilter p l x y hnd' hx' hy' hpx hpy
+        by_cases hpz : p z = true
+        · simp only [List.filter_cons, hpz, if_true, posOf, hzx, hzy, if_false]
+          omega
+        · simp only [List.filter_cons, hpz, Bool.false_eq_true, if_false, posOf, hzx, hzy]
+          omega
+
+/-- A prefix that contains every element of a duplicate-free longer list is the list. -/
+theorem prefixFull {α : Type} (l1 l2 : List α) : l1 <+: l2 → l2.Nodup → (∀ a, a ∈ l2 → a ∈ l1) →
+    l1 = l2 := by
+  rintro ⟨t, rfl⟩ hnd hsub
+  cases t with
+  | nil => simp
+  | cons a t =>
+    exfalso
+    have ha := hsub a (by simp)
+    exact (List.nodup_append.1 hnd).2.2 a ha a (by simp) rfl
+
+theorem gwritesMem (G : Gexec) (x : Geid) (b : Int) (v : BitVec 8) :
+    gwf G → gwritesByte G x b v → x ∈ G.gxGmo ∧ gisW G x = true ∧ gwrB G b x = true := by
+  rintro hwf ⟨l, base, vs, j, hl, hwr, hv, ha⟩
+  have hW : lbIsW l = true := by cases l <;> simp_all [lbWr, lbIsW]
+  refine ⟨(hwf.2.1 x).2 ⟨l, hl, by simp [lbIsMem, hW]⟩, by simp [gisW, hl, hW], ?_⟩
+  simp only [gwrB, hl]
+  exact (wrsBIff l b).2 ⟨base, vs, j, v, hwr, hv, ha⟩
+
+/-- **AT A COMPLETED, DRAINED WALK THE PREFIX INVARIANT IS THE AGREEMENT.** -/
+theorem agreeXOfPfx (N : Nat) (img : Image) (G : Gexec) (X : Geid → Prop) (w : WS) :
+    Inv img w → agOk N w → drained w → gwf G → G.gxImg = img → G.gxProg.length = N →
+    (∀ x, x < N → (w.rows x).length = (G.gxProg.getD x []).length) →
+    pfx G X w → agreeX G (memberW N img w) X := by
+  intro hI hag hdr hwf himg hN hlen ⟨hR, hC⟩
+  have hGlbl : ∀ e l, gxLbl G e = some l → e.1 < N ∧ e.2 < (w.rows e.1).length := by
+    intro e l hl
+    unfold gxLbl at hl
+    cases hr : G.gxProg[e.1]? with
+    | none => rw [hr] at hl; cases hl
+    | some row =>
+      rw [hr] at hl
+      have h1 : e.1 < N := by rw [← hN]; exact lookup_lt_Some hr
+      refine ⟨h1, ?_⟩
+      rw [hlen e.1 h1, List.getD_eq_getElem?_getD, hr]
+      exact lookup_lt_Some hl
+  -- the rows are related, event by event, to the member's
+  have hev : ∀ e l, gxLbl G e = some l → ∃ l'', (w.rows e.1)[e.2]? = some l'' ∧
+      gxLbl (memberW N img w) e = some (fixLbl (rawG N img w) e.1 l'' ((w.fw e.1).getD e.2 [])) ∧
+      lblRelX (X e) l l'' := by
+    intro e l hl
+    obtain ⟨h1, h2⟩ := hGlbl e l hl
+    obtain ⟨l'', hl''⟩ : ∃ l'', (w.rows e.1)[e.2]? = some l'' := ⟨_, List.getElem?_eq_getElem h2⟩
+    obtain ⟨l0, hl0, hrel⟩ := hR e.1 e.2 l'' hl''
+    rw [show ((e.1, e.2) : Geid) = e from rfl, hl, Option.some.injEq] at hl0
+    subst hl0
+    exact ⟨l'', hl'', memLblSome N img w e l'' h1 hl'', hrel⟩
+  have hfixRel : ∀ (x : Prop) l l'' i f, lblRelX x l l'' → lblRelX x l (fixLbl (rawG N img w) i l'' f) := by
+    intro x l l'' i f h
+    rcases fixLblCases (rawG N img w) i l'' f with he | ⟨aq, base, ts, vs, rfl, he⟩
+    · rw [he]; exact h
+    · rw [he]
+      rcases h with ⟨hx, h⟩ | ⟨hx, h⟩
+      · left; refine ⟨hx, ?_⟩
+        cases l with
+        | LLoad aq0 base0 ts0 vs0 =>
+          obtain ⟨h1, h2, h3, h4⟩ := h
+          exact ⟨h1, h2, h3, by rw [fixTsLen]; exact h4⟩
+        | _ => cases h
+      · right; refine ⟨hx, ?_⟩
+        cases l with
+        | LLoad aq0 base0 ts0 vs0 =>
+          obtain ⟨h1, h2, h3, h4, h5⟩ := h
+          exact ⟨h1, h2, h3, by rw [fixTsLen]; exact h4, by rw [fixTsLen]; exact h5⟩
+        | _ => cases h
+  refine ⟨himg.symm, fun e => ?_, fun b x y vx vy hx hy => ?_⟩
+  · cases hl : gxLbl G e with
+    | some l =>
+      obtain ⟨l'', -, hm, hrel⟩ := hev e l hl
+      exact .inr ⟨l, _, rfl, hm, hfixRel _ l l'' _ _ hrel⟩
+    | none =>
+      refine .inl ⟨rfl, ?_⟩
+      rw [memLbl]
+      split
+      · rename_i h1
+        have hnone : (w.rows e.1)[e.2]? = none := by
+          rw [List.getElem?_eq_none_iff, hlen e.1 h1]
+          unfold gxLbl at hl
+          cases hr : G.gxProg[e.1]? with
+          | none =>
+            exfalso
+            have : e.1 < G.gxProg.length := by rw [hN]; exact h1
+            rw [List.getElem?_eq_getElem this] at hr; cases hr
+          | some row =>
+            rw [hr] at hl
+            simp only [Option.bind_some] at hl
+            rw [List.getD_eq_getElem?_getD, hr]
+            simpa using hl
+        rw [hnone]; rfl
+      · rfl
+  · -- the landed write list of `b` IS GF's
+    have hfull : wrAtW w b = wrAtG G b := by
+      refine prefixFull _ _ (hC b) (hwf.1.filter _) (fun e he => ?_)
+      obtain ⟨heG, hwG⟩ := List.mem_filter.1 he
+      obtain ⟨l, hl, hm⟩ := (hwf.2.1 e).1 heG
+      obtain ⟨l'', hl'', -, hrel⟩ := hev e l hl
+      have hwl : wrsB l'' b = true := by
+        simp only [gwrB, hl] at hwG
+        unfold wrsB; rw [relXWr _ _ _ hrel]; exact hwG
+      have hmem : lbIsMem l'' = true := by
+        have := relXIsW _ _ _ hrel
+        rcases hrel with ⟨-, h⟩ | ⟨-, h⟩
+        · cases l <;> cases l'' <;> simp_all [lblReidx, lbIsMem, lbIsR, lbIsW, lbIsIo]
+        · cases l <;> cases l'' <;> simp_all [lblReidxSub, lbIsMem, lbIsR, lbIsW, lbIsIo]
+      have hin : e ∈ w.gmo := by
+        rcases hI.memIn e.1 e.2 l'' hl'' hmem with h | h
+        · exact h
+        · rw [hdr e.1] at h; simp at h
+      exact List.mem_filter.2 ⟨hin, by simp only [rwrB, hl'']; exact hwl⟩
+    obtain ⟨hxG, hxW, hxb⟩ := gwritesMem G x b vx hwf hx
+    obtain ⟨hyG, hyW, hyb⟩ := gwritesMem G y b vy hwf hy
+    have hxin : x ∈ wrAtG G b := List.mem_filter.2 ⟨hxG, hxb⟩
+    have hyin : y ∈ wrAtG G b := List.mem_filter.2 ⟨hyG, hyb⟩
+    rw [← hfull] at hxin hyin
+    obtain ⟨hxM, hxr⟩ := List.mem_filter.1 hxin
+    obtain ⟨hyM, hyr⟩ := List.mem_filter.1 hyin
+    have hWm : ∀ e, e ∈ w.gmo → rwrB w.rows b e = true → gisW (memberW N img w) e = true := by
+      intro e he hr
+      obtain ⟨l, hl, -⟩ := hI.gmoMem e he
+      simp only [rwrB, hl] at hr
+      have hWl : lbIsW l = true := by
+        unfold wrsB at hr; cases l <;> simp_all [lbWr, lbIsW]
+      simp only [gisW, memLblSome N img w e l (agOfRow N w e l hag hl) hl, fixW, hWl]
+    have hxw : x ∈ gwrites (memberW N img w) := List.mem_filter.2 ⟨hxM, hWm x hxM hxr⟩
+    have hyw : y ∈ gwrites (memberW N img w) := List.mem_filter.2 ⟨hyM, hWm y hyM hyr⟩
+    have hxg : x ∈ gwrites G := List.mem_filter.2 ⟨hxG, hxW⟩
+    have hyg : y ∈ gwrites G := List.mem_filter.2 ⟨hyG, hyW⟩
+    rw [gwixPosOf G x hwf.1 hxg, gwixPosOf G y hwf.1 hyg,
+      gwixPosOf (memberW N img w) x hI.gmoNd hxw, gwixPosOf (memberW N img w) y hI.gmoNd hyw,
+      Nat.add_lt_add_iff_right, Nat.add_lt_add_iff_right]
+    show posOf (G.gxGmo.filter (gisW G)) x < posOf (G.gxGmo.filter (gisW G)) y ↔
+      posOf (w.gmo.filter (gisW (memberW N img w))) x < posOf (w.gmo.filter (gisW (memberW N img w))) y
+    rw [posFilter _ _ x y hwf.1 hxG hyG hxW hyW,
+      posFilter _ _ x y hI.gmoNd hxM hyM (hWm x hxM hxr) (hWm y hyM hyr),
+      ← posFilter (gwrB G b) _ x y hwf.1 hxG hyG hxb hyb,
+      ← posFilter (rwrB w.rows b) _ x y hI.gmoNd hxM hyM hxr hyr]
+    show posOf (wrAtG G b) x < posOf (wrAtG G b) y ↔ posOf (wrAtW w b) x < posOf (wrAtW w b) y
+    rw [hfull]
+
 end SbAgree
 
 end Weak
