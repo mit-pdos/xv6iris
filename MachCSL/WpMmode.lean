@@ -165,16 +165,26 @@ theorem execSpec_mul_same (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitV
   iapply HΦ $$ HmConf HPC HnextPC [Hrd Hrs2]
   iframe
 
+/-- Two cells of the same register agree on its value. -/
+theorem regPointsTo_agree (cpu : CPU) (r : Register) (dq1 dq2 : DFrac) (v1 v2 : RegisterType r) :
+    r ↦ᵣ[cpu]{dq1} v1 ∗ r ↦ᵣ[cpu]{dq2} v2 ⊢@{IProp GF} ⌜v1 = v2⌝ := by
+  unfold regPointsTo regPointsToAt
+  iintro H
+  icases ghost_map_elem_agree _ _ _ _ _ _ $$ H with %h
+  ipureintro
+  exact eq_of_heq (Sigma.mk.inj h).2
+
 set_option maxHeartbeats 4000000 in
-/-- `csrr rd, mhartid` (`rd ≠ 0`). -/
-theorem execSpec_csrr_mhartid (cpu : CPU) (dq dq' : DFrac) (c : MConf) (pc npc₀ : BitVec 64) (rd : BitVec 5)
-    (hrd : rd ≠ 0#5) (v hartid : BitVec 64) :
+/-- `csrr rd, mhartid` (`rd ≠ 0`), the id read off the hardware configuration
+(`hwConfig`, which `mConf` carries): since sail-riscv 0.16 `mhartid` is a frozen
+cell of the bundle, at `bootHid cpu`. -/
+theorem execSpec_csrr_mhartid_hw (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64)
+    (rd : BitVec 5) (hrd : rd ≠ 0#5) (v : BitVec 64) :
     execSpec (GF := GF) cpu dq c c
       (instruction.CSRReg (0xF14#12, regidx.Regidx 0#5, regidx.Regidx rd, csrop.CSRRS))
-      pc npc₀ npc₀ iprop(gpr cpu rd (DFrac.own 1) v ∗ Register.mhartid ↦ᵣ[cpu]{dq'} hartid)
-      iprop(gpr cpu rd (DFrac.own 1) hartid ∗ Register.mhartid ↦ᵣ[cpu]{dq'} hartid) := by
+      pc npc₀ npc₀ (gpr cpu rd (DFrac.own 1) v) (gpr cpu rd (DFrac.own 1) (bootHid cpu)) := by
   intro Φ
-  iintro ⟨HmConf, HPC, HnextPC, ⟨Hrd, Hmhartid⟩, HΦ⟩
+  iintro ⟨HmConf, HPC, HnextPC, Hrd, HΦ⟩
   mconf_cases HmConf
   unfold execute
   swp_run 60
@@ -187,6 +197,29 @@ theorem execSpec_csrr_mhartid (cpu : CPU) (dq dq' : DFrac) (c : MConf) (pc npc�
   iintro Hrd
   swp_run 10
   mconf_intro HmConf
+  iapply HΦ $$ HmConf HPC HnextPC Hrd
+
+/-- `csrr rd, mhartid` (`rd ≠ 0`), stated over a cell of `mhartid`: the cell
+agrees with the bundle's (`hwConfig_mhartid`), so `hartid = bootHid cpu`. -/
+theorem execSpec_csrr_mhartid (cpu : CPU) (dq dq' : DFrac) (c : MConf) (pc npc₀ : BitVec 64) (rd : BitVec 5)
+    (hrd : rd ≠ 0#5) (v hartid : BitVec 64) :
+    execSpec (GF := GF) cpu dq c c
+      (instruction.CSRReg (0xF14#12, regidx.Regidx 0#5, regidx.Regidx rd, csrop.CSRRS))
+      pc npc₀ npc₀ iprop(gpr cpu rd (DFrac.own 1) v ∗ Register.mhartid ↦ᵣ[cpu]{dq'} hartid)
+      iprop(gpr cpu rd (DFrac.own 1) hartid ∗ Register.mhartid ↦ᵣ[cpu]{dq'} hartid) := by
+  intro Φ
+  iintro ⟨HmConf, HPC, HnextPC, ⟨Hrd, Hmhartid⟩, HΦ⟩
+  icases confCells_hw cpu dq _ c $$ HmConf with ⟨HmConf, #Hhw⟩
+  ihave #Hid := hwConfig_mhartid cpu $$ Hhw
+  ihave %heq := regPointsTo_agree cpu _ _ _ _ _ $$ [Hid Hmhartid]
+  · isplitl []
+    · iexact Hid
+    · iexact Hmhartid
+  subst heq
+  iapply (execSpec_csrr_mhartid_hw cpu dq c pc npc₀ rd hrd v Φ)
+  iframe
+  inext
+  iintro HmConf HPC HnextPC Hrd
   iapply HΦ $$ HmConf HPC HnextPC [Hrd Hmhartid]
   iframe
 
@@ -218,6 +251,7 @@ theorem execSpec_jal (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64
     iapply HΦ $$ HmConf HPC HnextPC Hrd
 
 set_option maxHeartbeats 4000000 in
+set_option maxRecDepth 100000 in
 /-- `ld rd, imm(rd)` (`rd ≠ 0`) from an 8-aligned RAM address. -/
 theorem execSpec_ld_same [CurCtx] (cpu : CPU) (dq dq' : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
     (pc npc₀ : BitVec 64) (imm : BitVec 12)
@@ -244,9 +278,9 @@ theorem execSpec_ld_same [CurCtx] (cpu : CPU) (dq dq' : DFrac) (c : MConf) (hok 
   inext
   iintro Hrd
   swp_run 150
-  mconf_intro HmConf
   iapply swp_bind
-  iapply (swp_transform_effective_address_M cpu dq c hok _ _ (Or.inr (Or.inl rfl)))
+  mconf_intro HmConf
+  iapply (swp_transform_effective_address_M cpu dq c hok _)
   iframe HmConf
   iintro HmConf
   mconf_cases HmConf
@@ -254,8 +288,8 @@ theorem execSpec_ld_same [CurCtx] (cpu : CPU) (dq dq' : DFrac) (c : MConf) (hok 
   iapply swp_bind
   iapply swp_translationMode_M
   swp_run 60
-  mconf_intro HmConf
   iapply swp_bind
+  mconf_intro HmConf
   iapply (swp_translateAddr_M cpu dq c hok _ _ (Or.inr (Or.inl rfl)))
   iframe HmConf
   iintro HmConf
@@ -350,7 +384,19 @@ theorem wp_m_mul_same (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF :
   iintro HmConf Hclock Hpc ⟨Hrd, Hrs2⟩
   iapply HΦ $$ HmConf Hclock Hpc Hrd Hrs2
 
-/-- `csrr rd, mhartid`. -/
+/-- `csrr rd, mhartid`: the hart's id, off the hardware configuration. -/
+theorem wp_m_csrr_mhartid_hw (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
+    (pc : BitVec 64) (is_rvc : Bool)
+    (rd : BitVec 5) (hrd : rd ≠ 0#5) (v : BitVec 64) :
+    instr (GF := GF) pc is_rvc (instruction.CSRReg (0xF14#12, regidx.Regidx 0#5, regidx.Regidx rd, csrop.CSRRS)) ∗
+    mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ gpr cpu rd (DFrac.own 1) v ∗
+    ▷ (mConf cpu dq c -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗
+        gpr cpu rd (DFrac.own 1) (bootHid cpu) -∗ wpLoop cpu)
+    ⊢ wpLoop cpu :=
+  wpLoop_m_instr cpu dq c c hok pc _ is_rvc _ _ _ (execSpec_csrr_mhartid_hw cpu dq c pc _ rd hrd v)
+
+/-- `csrr rd, mhartid`, over a cell of `mhartid` (which agrees with the bundle's,
+so `hartid = bootHid cpu`). -/
 theorem wp_m_csrr_mhartid (cpu : CPU) (dq dq' : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c)
     (pc : BitVec 64) (is_rvc : Bool)
     (rd : BitVec 5) (hrd : rd ≠ 0#5) (v hartid : BitVec 64) :
