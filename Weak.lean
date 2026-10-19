@@ -821,6 +821,7 @@ import Weak.SbLbFree
 import Weak.SbVirtio
 import Weak.SbHeldPin
 import Weak.SbPteCust
+import Weak.CapFrame
 import Weak.CapRetag
 import Weak.CapSync
 import Weak.SilWalk2

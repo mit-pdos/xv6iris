@@ -12,8 +12,8 @@ Weak: **allocproc route P, increment P-W3 (2/2) — `SbOrdWalk`, THE GATED WALK 
       half F-P-W2-1 and its `lk->cpu` half [OWN.124], kept NAMED);
   §3  **`walkStepP`**: every enabled genuine item extends the walk candidate (`SbWalk.validW` under the
       epoch buffer) keeping `PInv` and strictly decreasing the work measure `work`;
-  §4  **`walkRunP`**: from the empty walk, given `noStuckP`'s interfaces at every reachable state, a
-      FINISHED walk (every row complete, every buffer drained) — and **`memberOfRun`**: its member is a
+  §4  **`walkRunP`**: from the empty walk, given `noStuckP`'s interfaces at every reachable GATED state
+      (`gatedW`: every item enabled at its state — F-W2-V-1 (a), `PROGRESS-P-W3r-e.md`), a FINISHED gated walk (every row complete, every buffer drained) — and **`memberOfRun`**: its member is a
       well-formed graph whose writes are the landed log, whose AMOs read the latest bytes, which AGREES
       with GF (`SbAgree.agreeX`, P-W2's `agreeXOfPfx`), with `agreeW4` (`nf = True`), `agreeW3` at every
       lock set, and value agreement `valEqX` given `ExValGF`.
@@ -586,6 +586,40 @@ theorem curSnoc (c : CandW) (it : Item) : cur (snocC c it) = nextI (cur c) it :=
   rw [List.length_append, List.length_singleton]
   exact stAtSnocEnd c it
 
+/-- The walk target an item realizes (an event of row `s.esAg`'s head, or the landing of `i`'s `k`-th
+entry). -/
+def itemTgt : Item → Tgt
+  | .ev s => .hd s.esAg
+  | .land i k => .ld i k
+
+/-- **A GATED CANDIDATE** (F-W2-V-1 (a), PROGRESS-P-W3r-e): every item was ENABLED (`enb` under the epoch
+buffer, with the read gate `rdG`) at the walk state before it — the candidates `walkRunP` builds. -/
+def gatedW (G : Gexec) (X : Geid → Prop) (rdG : RdG) (dev : List Geid) (c : CandW) : Prop :=
+  ∀ (k : Nat) (it : Item), c.its[k]? = some it → enb SbPol.epoch G X rdG dev (stAt c k) (itemTgt it)
+
+theorem gatedNil (G : Gexec) (X : Geid → Prop) (rdG : RdG) (dev : List Geid) (img : Image) :
+    gatedW G X rdG dev ⟨img, []⟩ := fun _ _ h => by simp at h
+
+theorem gatedSnoc (G : Gexec) (X : Geid → Prop) (rdG : RdG) (dev : List Geid) (c : CandW) (it : Item)
+    (hg : gatedW G X rdG dev c) (he : enb SbPol.epoch G X rdG dev (cur c) (itemTgt it)) :
+    gatedW G X rdG dev (snocC c it) := by
+  intro k it' hk
+  change (c.its ++ [it])[k]? = some it' at hk
+  by_cases hlt : k < c.its.length
+  · rw [List.getElem?_append_left hlt] at hk
+    rw [stAtSnoc c it k (Nat.le_of_lt hlt)]
+    exact hg k it' hk
+  · have hk' : k = c.its.length := by
+      have := (List.getElem?_eq_some_iff.1 hk).1
+      simp only [List.length_append, List.length_singleton] at this
+      omega
+    subst hk'
+    rw [List.getElem?_append_right (Nat.le_refl _), Nat.sub_self] at hk
+    simp only [List.getElem?_cons_zero, Option.some.injEq] at hk
+    subst hk
+    rw [stAtSnoc c it _ (Nat.le_refl _)]
+    exact he
+
 /-- **`walkStepP` — ONE GATED WALK STEP**: an enabled genuine item extends the walk (valid under the
 epoch buffer), keeps the walk invariant and strictly decreases the work. -/
 theorem walkStepP (GF : Gfexec) (N : Nat) (X : Geid → Prop) (rdG : RdG) (c : CandW)
@@ -594,12 +628,12 @@ theorem walkStepP (GF : Gfexec) (N : Nat) (X : Geid → Prop) (rdG : RdG) (c : C
     (T : Tgt) (hT : validT N GF.gfGd.gdG (cur c) T)
     (he : enb SbPol.epoch GF.gfGd.gdG X rdG GF.gfDev (cur c) T) :
     ∃ it, validW SbPol.epoch (snocC c it) ∧ PInv N c.img GF.gfGd.gdG X GF.gfDev (cur (snocC c it)) ∧
-      work N GF.gfGd.gdG (cur (snocC c it)) < work N GF.gfGd.gdG (cur c) := by
+      work N GF.gfGd.gdG (cur (snocC c it)) < work N GF.gfGd.gdG (cur c) ∧ itemTgt it = T := by
   cases T with
   | ld i k =>
     obtain ⟨hi, -⟩ := hT
     obtain ⟨p, hp, hok, -⟩ := id he
-    refine ⟨.land i k, validSnoc _ c _ hv hok, by rw [curSnoc]; exact pinvLand _ hP i k he, ?_⟩
+    refine ⟨.land i k, validSnoc _ c _ hv hok, by rw [curSnoc]; exact pinvLand _ hP i k he, ?_, rfl⟩
     rw [curSnoc]
     refine sumToLt _ _ i N hi ?_ (fun y hy => ?_)
     · rw [landEq i k p hp]
@@ -616,7 +650,7 @@ theorem walkStepP (GF : Gfexec) (N : Nat) (X : Geid → Prop) (rdG : RdG) (c : C
     obtain ⟨lb', hrel, hst, hco, hdone, hex⟩ := armHd hv hP hW.cat hW.imgEq hS.sound hW.ex hW.def'
       hS.iref x l hl hen
     refine ⟨.ev ⟨x, lb'⟩, validSnoc _ c _ hv hst, by
-      rw [curSnoc]; exact pinvEv hP hW.imgF x hx hcnt l lb' hl hrel hst hfab hco hdone hex, ?_⟩
+      rw [curSnoc]; exact pinvEv hP hW.imgF x hx hcnt l lb' hl hrel hst hfab hco hdone hex, ?_, rfl⟩
     rw [curSnoc]
     refine sumToLt _ _ x N hx ?_ (fun y hy => ?_)
     · rw [rowsEvEq, if_pos rfl, pendEvEq, if_pos rfl, List.length_append, List.length_singleton]
@@ -646,44 +680,47 @@ theorem pinvInit (N : Nat) (img : Image) (G : Gexec) (X : Geid → Prop) (dev : 
   nrl _ _ h := by simp [init] at h
 
 /-- **`walkRunP` — THE GATED WALK RUNS TO COMPLETION**: given the global hypotheses and, at every reachable
-candidate, `noStuckP`'s per-state interfaces, a FINISHED valid walk exists (every row complete, every
-buffer drained) with the walk invariant. -/
+GATED candidate (F-W2-V-1 (a): every item enabled at its state, `gatedW`), `noStuckP`'s per-state
+interfaces, a FINISHED valid gated walk exists (every row complete, every buffer drained) with the walk
+invariant. -/
 theorem walkRunP (GF : Gfexec) (N : Nat) (img : Image) (X : Geid → Prop) (rdG : RdG)
     (hW : WalkHyp GF N img X)
-    (hS : ∀ c, validW SbPol.epoch c → c.img = img → PInv N img GF.gfGd.gdG X GF.gfDev (cur c) →
-      StateIfc GF.gfGd.gdG X rdG GF.gfDev c) :
+    (hS : ∀ c, validW SbPol.epoch c → gatedW GF.gfGd.gdG X rdG GF.gfDev c → c.img = img →
+      PInv N img GF.gfGd.gdG X GF.gfDev (cur c) → StateIfc GF.gfGd.gdG X rdG GF.gfDev c) :
     ∃ c, c.img = img ∧ validW SbPol.epoch c ∧ PInv N img GF.gfGd.gdG X GF.gfDev (cur c) ∧
       (∀ x, x < N → ((cur c).rows x).length = (GF.gfGd.gdG.gxProg.getD x []).length) ∧
-      drained (cur c) := by
-  suffices H : ∀ n c, validW SbPol.epoch c → c.img = img →
+      drained (cur c) ∧ gatedW GF.gfGd.gdG X rdG GF.gfDev c := by
+  suffices H : ∀ n c, validW SbPol.epoch c → gatedW GF.gfGd.gdG X rdG GF.gfDev c → c.img = img →
       PInv N img GF.gfGd.gdG X GF.gfDev (cur c) → work N GF.gfGd.gdG (cur c) ≤ n →
       ∃ c', c'.img = img ∧ validW SbPol.epoch c' ∧ PInv N img GF.gfGd.gdG X GF.gfDev (cur c') ∧
         (∀ x, x < N → ((cur c').rows x).length = (GF.gfGd.gdG.gxProg.getD x []).length) ∧
-        drained (cur c') by
-    exact H _ ⟨img, []⟩ (fun k it h => by simp at h) rfl (pinvInit N img _ X _) (Nat.le_refl _)
+        drained (cur c') ∧ gatedW GF.gfGd.gdG X rdG GF.gfDev c' by
+    exact H _ ⟨img, []⟩ (fun k it h => by simp at h) (gatedNil _ X rdG _ img) rfl (pinvInit N img _ X _)
+      (Nat.le_refl _)
   intro n
   induction n with
   | zero =>
-    intro c hv hc hP hw
+    intro c hv hg hc hP hw
     by_cases hfin : (∀ x, x < N → ((cur c).rows x).length = (GF.gfGd.gdG.gxProg.getD x []).length) ∧
         drained (cur c)
-    · exact ⟨c, hc, hv, hP, hfin⟩
+    · exact ⟨c, hc, hv, hP, hfin.1, hfin.2, hg⟩
     · exfalso
       obtain ⟨T, hT, he⟩ := noStuckP GF N img X rdG (cur c) hW.cat hW.io hW.wio hW.imgF hW.len hP
-        (hS c hv hc hP).mono hW.devSt hW.hart (hS c hv hc hP).head (nonFinal hP hfin)
+        (hS c hv hg hc hP).mono hW.devSt hW.hart (hS c hv hg hc hP).head (nonFinal hP hfin)
       subst hc
-      obtain ⟨it, -, -, hlt⟩ := walkStepP GF N X rdG c hW hv hP (hS c hv rfl hP) T hT he
+      obtain ⟨it, -, -, hlt, -⟩ := walkStepP GF N X rdG c hW hv hP (hS c hv hg rfl hP) T hT he
       omega
   | succ n ih =>
-    intro c hv hc hP hw
+    intro c hv hg hc hP hw
     by_cases hfin : (∀ x, x < N → ((cur c).rows x).length = (GF.gfGd.gdG.gxProg.getD x []).length) ∧
         drained (cur c)
-    · exact ⟨c, hc, hv, hP, hfin⟩
+    · exact ⟨c, hc, hv, hP, hfin.1, hfin.2, hg⟩
     · obtain ⟨T, hT, he⟩ := noStuckP GF N img X rdG (cur c) hW.cat hW.io hW.wio hW.imgF hW.len hP
-        (hS c hv hc hP).mono hW.devSt hW.hart (hS c hv hc hP).head (nonFinal hP hfin)
+        (hS c hv hg hc hP).mono hW.devSt hW.hart (hS c hv hg hc hP).head (nonFinal hP hfin)
       subst hc
-      obtain ⟨it, hv', hP', hlt⟩ := walkStepP GF N X rdG c hW hv hP (hS c hv rfl hP) T hT he
-      exact ih (snocC c it) hv' rfl hP' (by omega)
+      obtain ⟨it, hv', hP', hlt, hit⟩ := walkStepP GF N X rdG c hW hv hP (hS c hv hg rfl hP) T hT he
+      exact ih (snocC c it) hv' (gatedSnoc _ X rdG _ c it hg (by rw [hit]; exact he)) rfl hP'
+        (by omega)
 where
   nonFinal {G : Gexec} {dev : List Geid} {w : WS} (hP : PInv N img G X dev w)
       (hfin : ¬ ((∀ x, x < N → (w.rows x).length = (G.gxProg.getD x []).length) ∧ drained w)) :
@@ -715,21 +752,22 @@ theorem memberOfRun (pol : SbPol) (N : Nat) (G : Gexec) (X : Geid → Prop) (dev
     memberRmwLatest N _ _ hP.inv hR hP.ag hdr, hagr, agreeW4OfX _ _ X hagr,
     fun L => agreeW3OfX _ _ X L hagr, fun hG => valEqXOfAgree _ _ X hagr hG (memberExOk N _ X _ hP.ex)⟩
 
-/-- **A COMPLETED MEMBER FOR EVERY CAT-CONSISTENT GF** (modulo `noStuckP`'s named per-state interfaces):
+/-- **A COMPLETED MEMBER FOR EVERY CAT-CONSISTENT GF** (modulo `noStuckP`'s named per-state interfaces, asked
+only at GATED candidates, F-W2-V-1 (a)):
 the gated walk under the per-address + fence-epoch buffer runs to completion, and its member agrees with
 GF (labels up to read re-timing, exempt reads up to their word; FULL co), with value agreement given the
 exempt-value interface `ExValGF`. -/
 theorem memberOfCat (GF : Gfexec) (N : Nat) (img : Image) (X : Geid → Prop) (rdG : RdG)
     (hW : WalkHyp GF N img X)
-    (hS : ∀ c, validW SbPol.epoch c → c.img = img → PInv N img GF.gfGd.gdG X GF.gfDev (cur c) →
-      StateIfc GF.gfGd.gdG X rdG GF.gfDev c) :
+    (hS : ∀ c, validW SbPol.epoch c → gatedW GF.gfGd.gdG X rdG GF.gfDev c → c.img = img →
+      PInv N img GF.gfGd.gdG X GF.gfDev (cur c) → StateIfc GF.gfGd.gdG X rdG GF.gfDev c) :
     ∃ c, c.img = img ∧ validW SbPol.epoch c ∧ drained (cur c) ∧
       gwf (memberP N c) ∧ logOf (memberP N c) (logP c) ∧
       CertZ18.rmwLatest (memberP N c) (logP c) ∧ agreeX GF.gfGd.gdG (memberP N c) X ∧
       CertZ24.agreeW4 GF.gfGd.gdG (memberP N c) (fun _ => False) ∧
       (∀ L, CertZ18.agreeW3 GF.gfGd.gdG (memberP N c) L) ∧
       (ExValGF GF.gfGd.gdG X → valEqX GF.gfGd.gdG (memberP N c) X) := by
-  obtain ⟨c, hc, hv, hP, hfin, hdr⟩ := walkRunP GF N img X rdG hW hS
+  obtain ⟨c, hc, hv, hP, hfin, hdr, -⟩ := walkRunP GF N img X rdG hW hS
   subst hc
   exact ⟨c, rfl, hv, hdr, memberOfRun SbPol.epoch N _ X _ c hv hW.cat.wf hW.imgEq hW.len hP hfin hdr⟩
 

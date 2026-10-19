@@ -439,13 +439,13 @@ def SbKill.walkHypCZ (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (im
 
 /-- **THE PER-STATE INTERFACES (NAMED)**: row H3 (`HeadOrdRd`, F-P-W3-3) and the exempt-value fact
 (`ExValTop`: its `ip->ref` half F-P-W2-1, its `lk->cpu` half [OWN.124]) at every reachable walk state,
-under the value gate. -/
+under the value gate — asked only at GATED candidates (`SbOrd.gatedW`, F-W2-V-1 (a)). -/
 def SbKill.stateIfcCZ (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (im : Image)
     (Xof : Gfexec → Geid → Prop) : Prop :=
   ∀ (GF : Gfexec) (ad : List (Geid × Geid)),
     GF.gfGd.gdG.gxImg = im → CatLin.rvwmoCatAD GF.gfGd ad → GraphFabConf.gfexecConfZF boot d0 fab GF →
     ioResidueGmo GF →
-    ∀ c, validW SbPol.epoch c → c.img = im →
+    ∀ c, validW SbPol.epoch c → gatedW GF.gfGd.gdG (Xof GF) valGate GF.gfDev c → c.img = im →
       PInv GF.gfGd.gdG.gxProg.length im GF.gfGd.gdG (Xof GF) GF.gfDev (cur c) →
       HeadOrdRd GF.gfGd.gdG (Xof GF) valGate GF.gfDev (cur c) ∧ ExValTop GF.gfGd.gdG (Xof GF) (cur c)
 
@@ -486,8 +486,8 @@ theorem SbKill.certSupplyOfWalkP (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat �
       ex := hex
       def' := hdef }
   obtain ⟨c, hcimg, hv, hdr, hgwf, hlog, hlat, hagX, -⟩ :=
-    memberOfCat GF _ im (Xof GF) valGate hWH (fun c hv hci hP =>
-      let h := hS GF ad him hc hconf hres c hv hci hP
+    memberOfCat GF _ im (Xof GF) valGate hWH (fun c hv hg hci hP =>
+      let h := hS GF ad him hc hconf hres c hv hg hci hP
       let h' := valIfc GF _ im (Xof GF) hWH c hv hP
       ⟨h.1, h.2, h'.1, h'.2⟩)
   exact ⟨c, hcimg.trans him.symm, hv, hdr, hgwf, hlog, hlat, hagX⟩

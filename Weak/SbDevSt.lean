@@ -551,8 +551,8 @@ theorem SbDevSt.certSupplyOfWalkPD (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat
       ex := hex
       def' := hdef }
   obtain ⟨c, hcimg, hv, hdr, hgwf, hlog, hlat, hagX, -⟩ :=
-    memberOfCat GF _ im (Xof GF) valGate hWH (fun c hv hci hP =>
-      let h := hS GF ad him hc hconf hres c hv hci hP
+    memberOfCat GF _ im (Xof GF) valGate hWH (fun c hv hg hci hP =>
+      let h := hS GF ad him hc hconf hres c hv hg hci hP
       let h' := valIfc GF _ im (Xof GF) hWH c hv hP
       ⟨h.1, h.2, h'.1, h'.2⟩)
   exact ⟨c, hcimg.trans him.symm, hv, hdr, hgwf, hlog, hlat, hagX⟩
