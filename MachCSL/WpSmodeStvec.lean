@@ -9,6 +9,7 @@ it rides client-side.  So the rule takes and returns the cell explicitly.
 With a direct-mode value the model's legalization is the identity.
 -/
 import MachCSL.WpSmodeRules
+import MachCSL.WpCsr
 
 namespace MachCSL
 
@@ -24,8 +25,11 @@ variable {lent : Bool}
 -- the `write_CSR` arm, so the leaf never unfolds the model's whole match
 -- (the unfolded body costs the kernel ~10 s).  Not a `sail_facts`: callers
 -- stop in front of `write_CSR 0x105` and apply `swp_write_CSR_stvec`.
+-- sail-riscv 0.16: the arm first asks `inVirtualPrivilege` (the H
+-- extension's `vstvec` redirect; never taken outside a virtual privilege).
 theorem write_CSR_stvec (v : BitVec 64) : write_CSR 0x105#12 v =
-    (do let r ← set_stvec v; pure (.Ok r)) := rfl
+    (do if (← inVirtualPrivilege ()) then (do let r ← set_vstvec v; pure (.Ok r))
+        else (do let r ← set_stvec v; pure (.Ok r))) := rfl
 
 /-- A direct-mode vector's mode field. -/
 theorem tvec_mode_direct (v : BitVec 64) (hd : stvecDirect v) :
@@ -52,21 +56,28 @@ theorem swp_legalize_tvec_direct (cpu : CPU) (o v : BitVec 64) (hd : stvecDirect
   iexact H
 
 set_option maxHeartbeats 4000000 in
-/-- `write_CSR stvec v` with `v` a direct-mode vector: legalization keeps
-`v`. -/
-theorem swp_write_CSR_stvec (cpu : CPU) (o v : BitVec 64) (hd : stvecDirect v)
+/-- `write_CSR stvec v` with `v` a direct-mode vector, outside a virtual
+privilege (since sail-riscv 0.16 the write asks `cur_privilege`):
+legalization keeps `v`. -/
+theorem swp_write_CSR_stvec (cpu : CPU) (dp : DFrac) (p : Privilege) (hp : privLevel_is_virtual p = false)
+    (o v : BitVec 64) (hd : stvecDirect v)
     (Φ : Result (BitVec 64) Unit → IProp GF) :
-    hwConfig cpu ∗ Register.stvec ↦ᵣ[cpu] o ∗
-    ▷ (Register.stvec ↦ᵣ[cpu] v -∗ Φ (.Ok v))
+    hwConfig cpu ∗ Register.cur_privilege ↦ᵣ[cpu]{dp} p ∗ Register.stvec ↦ᵣ[cpu] o ∗
+    ▷ (Register.cur_privilege ↦ᵣ[cpu]{dp} p -∗ Register.stvec ↦ᵣ[cpu] v -∗ Φ (.Ok v))
     ⊢ swp cpu (write_CSR 0x105#12 v) Φ := by
-  iintro ⟨#Hhw, Hstvec, HΦ⟩
+  iintro ⟨#Hhw, Hcur_privilege, Hstvec, HΦ⟩
   rw [write_CSR_stvec]
+  iapply (swp_inVirtualPrivilege_bind cpu dp p hp)
+  iframe Hcur_privilege
+  inext
+  iintro Hcur_privilege
+  simp only [Bool.false_eq_true, ite_false]
   swp_run 2
   iapply swp_bind
   iapply swp_bind
   iapply (swp_legalize_tvec_direct cpu o v hd)
   swp_run 40
-  iapply HΦ $$ Hstvec
+  iapply HΦ $$ Hcur_privilege Hstvec
 
 set_option maxHeartbeats 4000000 in
 /-- The execute stage of `csrw stvec, rs1` (its value a
@@ -94,10 +105,10 @@ theorem execSpecF_csrw_stvec (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPh
   swp_run 300
   subst hW
   iapply swp_bind
-  iapply swp_write_CSR_stvec (hd := hd)
+  iapply (swp_write_CSR_stvec (p := Privilege.Supervisor) (hp := rfl) (hd := hd))
   iframe; iframe Hhw
   inext
-  iintro Hstvec
+  iintro Hcur_privilege Hstvec
   swp_run 30
   unfold wX_bits wX
   simp only [Sail.BitVec.toNatInt, Int.ofNat_eq_natCast, Int.toNat_natCast]

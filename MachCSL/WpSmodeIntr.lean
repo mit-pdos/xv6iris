@@ -260,13 +260,13 @@ theorem wp_s_csrrci_sstatus_flip [CurCtx] [KernelGeom] [KernelImage GF] (cpu : C
     simp only [sConfOf_setMs, sConfOf_mstatus]
     ihave HConf := kConf_intro cpu' curTier k.root false (spieOf ms) (sppOf ms) (ms &&& 0xFFFFFFFFFFFFFFFD#64)
       mdl mepc stc lf ⟨smFacts_clear ms k.sie hsm, sretFacts_clear ms, hmdl, hlf⟩ $$ HmConf
-    have hpure : (k.sie = false → spieOf ms = k.spie ∧ sppOf ms = k.spp) ∧ sstatusAt k.sie (lower_mstatus ms) :=
+    have hpure : (k.sie = false → spieOf ms = k.spie ∧ sppOf ms = k.spp) ∧ sstatusAt k.sie (mstatusLower ms) :=
       ⟨fun hs => by rw [hs] at hsr; exact sretFacts_pinned ms k.spie k.spp hsr,
        by unfold sstatusAt; rw [lower_mstatus_sie]; exact hsm.1⟩
-    have htp := tpPin_set cpu' k.regs rd (lower_mstatus ms) hrdtp
-    have hsp := KCtx.setReg_sp (k.intrOff (spieOf ms) (sppOf ms)) rd (lower_mstatus ms) hrdsp
-    iapply HΦ' $$ %(spieOf ms) %(sppOf ms) %(lower_mstatus ms) %hpure [HConf HF Hstack Htrans Hcpu Htok Hclock] Hpc Harm
-    iapply (kctx_intro' cpu' ((k.intrOff (spieOf ms) (sppOf ms)).setReg rd (lower_mstatus ms))
+    have htp := tpPin_set cpu' k.regs rd (mstatusLower ms) hrdtp
+    have hsp := KCtx.setReg_sp (k.intrOff (spieOf ms) (sppOf ms)) rd (mstatusLower ms) hrdsp
+    iapply HΦ' $$ %(spieOf ms) %(sppOf ms) %(mstatusLower ms) %hpure [HConf HF Hstack Htrans Hcpu Htok Hclock] Hpc Harm
+    iapply (kctx_intro' cpu' ((k.intrOff (spieOf ms) (sppOf ms)).setReg rd (mstatusLower ms))
       ((KCtx.wf_setReg _ rd _).mpr (KCtx.wf_intrOff k _ _ hwf)))
     simp only [KCtx.setReg_regs, KCtx.setReg_sie, KCtx.setReg_spie, KCtx.setReg_spp, KCtx.setReg_avail,
       KCtx.setReg_noff, KCtx.setReg_intena, KCtx.setReg_locks, KCtx.setReg_tier, KCtx.setReg_root,
