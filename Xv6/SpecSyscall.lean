@@ -99,7 +99,7 @@ fallback (+0x40..+0x56) and the shared epilogue (+0x58..+0x62).
    on kfork's -1 arm (`uforkAns`'s left disjunct) and drops the slot wand
    until kfork's re-spec consumes it.
 8. The exit arm's closer is `stackOwn k.sp (trapRes k.sie + k.avail) -∗
-   stackOwn (V.kstack + 4096#64) 512` (SpecSysExit's form of Rocq's
+   stackOwn (V.kstack + 4096#64) 511` (SpecSysExit's form of Rocq's
    `kstack_closer pj sp (trap_res b + av)`).
 9. `syscallSlots = 4 + sysExecSlots` (Rocq `K_syscall = 4 + K_sys_exec`):
    exec IS the deepest entry (248 of the 22 Specs' constants; the printk
@@ -541,7 +541,7 @@ def syscallPost (PT : SchedNames → IProp GF) (Γ : SchedNames) (k : KCtx) (γ 
 /-- **The divergent conjunct** (deviation 8): an entry that declines to
 return (sys_exit) reclaims the kernel stack from syscall's own entry `sp`. -/
 def syscallCloser (k : KCtx) (V : ProcPriv) : IProp GF :=
-  iprop(stackOwn k.sp (trapRes k.sie + k.avail) -∗ stackOwn (V.kstack + 4096#64) 512)
+  iprop(stackOwn k.sp (trapRes k.sie + k.avail) -∗ stackOwn (V.kstack + 4096#64) 511)
 
 /-- **WP of `syscall()`** (Rocq `wp_syscall_sconf_body`), at either entry
 `SIE` (D32).  The exit slot is `wpNext true … (syscallPost …) ∧

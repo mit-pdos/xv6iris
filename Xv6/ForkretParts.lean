@@ -63,7 +63,7 @@ structure FkrAfter (kr : KCtx) (eb : Bool) (root : BitVec 44) (pa ksp : BitVec 6
   sp : kr.regs 2#5 = ksp + 0xFFFFFFFFFFFFFFD0#64
   s0 : kr.regs 8#5 = ksp
   s1 : kr.regs 9#5 = pa
-  avail : kr.avail + trapRes eb = 506
+  avail : kr.avail + trapRes eb = 505
 
 section Head
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]

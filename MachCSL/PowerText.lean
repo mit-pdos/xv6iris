@@ -490,11 +490,20 @@ theorem wp_powerT [KernelMap] [KernelRsv] (lo hi : Nat)
               rw [hmem0]
               exact rsvAllOk_boot hrwf
             · unfold kptModelAt
-              iexists 0, []
+              iexists 0, [], []
               isplit
               · ipureintro
-                exact ⟨rsvRegMap_kptLinked _, Or.inl ⟨rfl, by rw [hmem0]; exact pubClean_boot hrwf⟩⟩
-              · exact BigSepL.bigSepL_nil_intro
+                exact ⟨rsvRegMap_kptLinked _, Or.inl ⟨rfl, by rw [hmem0]; exact pubClean_boot hrwf, rfl,
+                  rsvRegMap_ksPre _⟩⟩
+              · isplit
+                · exact BigSepL.bigSepL_nil_intro
+                isplit
+                · exact BigSepL.bigSepL_nil_intro
+                · iapply ksRcptsAll_none
+                  intro q hq
+                  have := rsvRegMap_ksPre _ _ _ hq
+                  unfold ksKey at this
+                  omega
           · isplit
             · ipureintro
               exact loadsChained_zero _ _ (fun j a => by

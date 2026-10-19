@@ -44,7 +44,7 @@ THE PLAN (reverse-engineered; see the report accompanying this file):
       return `-1` (left disjunct, kforkAns `-1`, block unchanged).
     - `r = procAddr i`: `procHeld USED`, `hartAtAny`, child
       `procPriv (procAddr i) pid_c V_c M_c` (allocprocPriv, context
-      `[forkret, kstack+PGSIZE, 0x12]`), `stackOwn (kstack+PGSIZE) 512`,
+      `[forkret, kstack+PGSIZE, 0x12]`), `stackOwn (kstack+PGSIZE) 511`,
       `kallocAvail (availSub none g) = none`.  Save `s4 = np` (store
       `s4@16`).
 * `uvmcopy` (`SpecUvmcopy`) over Pold (peeled from the parent) and Pnew
@@ -1915,7 +1915,7 @@ def kfOfileΨ [CurCtx] (cpu : CPU) (k : KCtx) (Γ : SchedNames) [ClaimIs (hlc :=
   wordPointsTo (pSecc (procAddr i)) 8 (DFrac.own 1) V_c.pvSecc ∗
   wordPointsTo (pRoot (procAddr i)) 8 (DFrac.own 1) V_c.root ∗
   procPtAt Pnew' Mnew' ∗ tfPageAt V_c.upt.tfp (V.tf.set 14 0#64) ∗ actCnt (procAddr i) V_c.ev ∗
-  stackOwn (V_c.kstack + 4096#64) 512 ∗
+  stackOwn (V_c.kstack + 4096#64) 511 ∗
   procHeld Γ cpu i USED ch ∗ hartAtAny Γ (procAddr i) ∗ zsElem (procAddr i) none ∗ slotUsed Γ (procAddr i) ∗
   cwdRefAt V.cwd V.cwi ∗ rootRefAt V.root V.rti ∗ fdSlots FDSPARE ∗ irefSlots (IREFHOME + IREFSPARE) ∗
   bslots 3 ∗ chFrag V_c.chg (procAddr i) ∅ ∗
@@ -2201,7 +2201,7 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
       wordPointsTo (pSecc (procAddr i)) 8 (DFrac.own 1) V_c.pvSecc ∗
       wordPointsTo (pRoot (procAddr i)) 8 (DFrac.own 1) V_c.root ∗
       procPtAt Pnew' Mnew' ∗ tfPageAt V_c.upt.tfp (V.tf.set 14 0#64) ∗ actCnt (procAddr i) V_c.ev ∗
-      stackOwn (V_c.kstack + 4096#64) 512 ∗
+      stackOwn (V_c.kstack + 4096#64) 511 ∗
       procHeld Γ cpu i USED ch ∗ hartAtAny Γ (procAddr i) ∗ zsElem (procAddr i) none ∗ slotUsed Γ (procAddr i) ∗
       cwdRefAt V.cwd V.cwi ∗ rootRefAt V.root V.rti ∗ fdSlots FDSPARE ∗
       irefSlots (IREFHOME + IREFSPARE) ∗ bslots 3 ∗ chFrag V_c.chg (procAddr i) ∅ ∗
@@ -3246,7 +3246,7 @@ theorem kfork_led_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCP
             genNew V_c.gen (procAddr i) pid_c Q ∗ slotGen (procAddr i) (.own 1) V_c.gen ∗
             pidRegRest pid_c V_c.gen ∗
             (∃ xsv : BitVec 32, wordPointsTo (pXstate (procAddr i)) 4 xsHalf xsv) ∗
-            stackOwn (V_c.kstack + 4096#64) 512 ∗ kallocAvail γk (availSub none gc))
+            stackOwn (V_c.kstack + 4096#64) 511 ∗ kallocAvail γk (availSub none gc))
           from by unfold allocprocPostLed; iintro H; iexact H) $$ Hpost
         with (⟨%hbad, _, _⟩ |
           ⟨%i, %ch, %pid_c, %V_c, %M_c, %gc, #Hrcpt, #Hka, %hpure, Hheld, Hhart, #Hused, _,

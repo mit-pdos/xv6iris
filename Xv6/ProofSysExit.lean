@@ -90,7 +90,7 @@ theorem sysx_kexit (KX : KEXIT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     procPrivUnmarked γ (procAddr j) pid V M ∗ fdFrags V.fdg sts ∗ filecloseCpays (hlc := hlc) sts ∗
     chFrag V.chg (procAddr j) cs ∗
     myPay V.gen Q ∗ (Q st ∨ (⌜st = -1⌝ ∗ killShot V.gen ∗ takenAt V.gen)) ∗
-    (stackOwn sp n -∗ stackOwn (V.kstack + 4096#64) 512)
+    (stackOwn sp n -∗ stackOwn (V.kstack + 4096#64) 511)
     ⊢ wpLoop (GF := GF) c := by
   subst hs
   subst hst
@@ -262,7 +262,7 @@ theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
     -- the dead frame joins the closer, re-anchored at kexit's entry sp
     ihave Hcloser := sysx_closer (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) w2 lo _ (trapRes k.sie + k.avail)
       (by omega) hal
-      (stackOwn (V.kstack + 4096#64) 512) $$ [F0 F1 Flo Fnn F3 Hcloser]
+      (stackOwn (V.kstack + 4096#64) 511) $$ [F0 F1 Flo Fnn F3 Hcloser]
     case' _ => iframe
     iapply (sysx_kexit KX Γ cpu _ γw γl γ γkl γk on j pid V M ip cs sts Q (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)
         (trapRes k.sie + k.avail - 4) k.sie (xstateOf v)

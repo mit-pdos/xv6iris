@@ -22,6 +22,7 @@ import Xv6.SyscallEnv
 import Xv6.LogBoot
 import Xv6.SpecKvminithart
 import Xv6.KptPlain
+import Xv6.SpecProcMapstacks
 
 namespace Xv6
 
@@ -128,6 +129,37 @@ theorem kmap_insert_boot [CurCtx] (pas : Nat → BitVec 44) :
   unfold kmapAt
   iexact Ht
 
+/-- **The kernel stacks, carved** (mcslrec (3) X1-c [OWN.90] [OWN.104] (b)): each kalloc'd stack
+page without its bottom doubleword -- the interpretation keeps half of byte 0 (`MachCSL.ksCarveAt`),
+bytes 1 .. 7 are dropped -- i.e. the 511 stack slots above it. -/
+def kstackPagesC [CurCtx] (pas : Nat → BitVec 44) : IProp GF := iprop%
+  [∗list] i ∈ List.range 64, byteBuf (pageAddr (pas i) + BitVec.ofNat 64 8) (DFrac.own 1) (List.replicate 4088 5#8)
+
+/-- The carve's list: the 64 kernel-stack pages. -/
+def kstackCarve (pas : Nat → BitVec 44) : List PAddr := (List.range 64).map (fun i => pageAddr (pas i))
+
+/-- **The carve**, at the Bare tier: byte 0 of each stack page, halved, to the interpretation. -/
+theorem kstackPages_carve [CurCtx] (hct : curTier = KTier.bare) (pas : Nat → BitVec 44) :
+    kstackPages (GF := GF) pas ⊢
+      ([∗list] q ∈ kstackCarve pas, ksCarveAt (MachGS.era (hlc := hlc) (GF := GF)) q) ∗ kstackPagesC pas := by
+  unfold kstackPages kstackPagesC kstackCarve
+  rw [BigSepL.bigSepL_map]
+  refine (BigSepL.bigSepL_mono_of_forall ?_).trans BigSepL.bigSepL_sep_eqv.1
+  intro _ i
+  iintro H
+  ihave H := (byteBuf_replicate_split (pageAddr (pas i)) (DFrac.own 1) 5#8 8 4088).1 $$ H
+  icases H with ⟨H0, Hrest⟩
+  isplitl [H0]
+  · ihave H0 := (byteBuf_replicate_split (pageAddr (pas i)) (DFrac.own 1) 5#8 1 7).1 $$ H0
+    icases H0 with ⟨H0, _⟩
+    unfold byteBuf
+    simp only [List.replicate_one]
+    icases BigSepL.bigSepL_singleton.1 $$ H0 with H0
+    icases wordPointsTo_bare_phys _ 1 (DFrac.own 1) 5#8 hct $$ H0 with ⟨_, Hp⟩
+    icases pwordPointsTo_cases _ 1 (DFrac.own 1) 5#8 $$ Hp with ⟨_, Hb⟩
+    iapply ksCarve_of_bytes _ (pageAddr (pas i)) _ (by simp) $$ Hb
+  · iexact Hrest
+
 /-- **THE PUBLICATION** (Rocq's `kvm_M_mint` + `kpt_inv_alloc`): `kvmmake`'s
 output becomes `kptOn` for the published map, and the 65 non-identity
 claims -- the 64 stacks and the trampoline -- are handed back.  W8 (f3-ptek)
@@ -140,13 +172,14 @@ theorem kctx_kptOn_publish [CurCtx] [Xv6G GF] [FdslotG GF] [BioslotG GF] [Irefsl
     kctxL (GF := GF) lent cpu k ∗ ptreeOwn 2 (DFrac.own 1) t ∗
       (MachGS.kmapName (hlc := hlc) (GF := GF) ↪●MAP KernelMap.static) ∗
       (MachGS.kptRootName (hlc := hlc) (GF := GF) ↪VAR r0) ∗
-      wordPointsTo kernelPagetableAddr 8 (DFrac.own 1) (pageAddr t.base) ∗
+      wordPointsTo kernelPagetableAddr 8 (DFrac.own 1) (pageAddr t.base) ∗ kstackPages pas ∗
       (∀ m : FlatMem, genHeapInterp m ={⊤}=∗ genHeapInterp m ∗
         ⌜pubClean (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) m⌝ ∗ R)
     ⊢ ∀ σ : MState, genHeapInterp σ.mem ∗ memModel σ ={⊤}=∗ genHeapInterp σ.mem ∗ memModel σ ∗
       (kctxL lent cpu k ∗ kptOn t (kvmMapT pas) ∗ kstackMapAt pas ∗ syscTrampCl ∗
-        pwordPointsTo kernelPagetableAddr 8 DFrac.discard (pageAddr t.base) ∗ R) := by
-  iintro ⟨Hk, Ht, Hauth, Hroot, Hrw, Hpub⟩ %σ ⟨Hmem, Hmm⟩
+        pwordPointsTo kernelPagetableAddr 8 DFrac.discard (pageAddr t.base) ∗ kstackPagesC pas ∗ R) := by
+  iintro ⟨Hk, Ht, Hauth, Hroot, Hrw, Hstk, Hpub⟩ %σ ⟨Hmem, Hmm⟩
+  icases kstackPages_carve hct pas $$ Hstk with ⟨Hcarve, HstkC⟩
   icases kctx_rsvEq cpu k $$ Hk with ⟨%heqR, Hk⟩
   icases kctx_kptOkEq cpu k $$ Hk with ⟨%heqK, Hk⟩
   have hkok : MachFixedGS.kptOk (hlc := hlc) (GF := GF) (kptSlots kernelPagetableAddr t) := by
@@ -166,13 +199,25 @@ theorem kctx_kptOn_publish [CurCtx] [Xv6G GF] [FdslotG GF] [BioslotG GF] [Irefsl
       wordPointsTo kernelPagetableAddr 8 (DFrac.own 1) (pteAddr t.base 0#9) from .rfl) $$ Hrw
   have hso : kptStackOff (hlc := hlc) (GF := GF) t := by
     intro e he j hj; rw [heqR]; exact kvmTableOk_stackOff t pas hok e he j hj
+  have hstk : ∀ (m : FlatMem) (top : Nat),
+      kptSealOk (rsvList (hlc := hlc) (GF := GF)) m top top (kptSlots kernelPagetableAddr t) →
+      kptHistsAt m top (kptSlots kernelPagetableAddr t) →
+      ∀ p, kstkPageAt (rsvList (hlc := hlc) (GF := GF)) m top p → p ∈ kstackCarve pas := by
+    intro m top hs hh p hp
+    have hs' : kptSealOk AccessDiscipline.xv6Rsv m top top (kptSlots KA.«kernel_pagetable» t) := by
+      have h' := hs; simp only [rsvList] at h'; rw [heqR] at h'; exact h'
+    have hp' : kstkPageAt AccessDiscipline.xv6Rsv m top p := by
+      have h' := hp; simp only [rsvList] at h'; rw [heqR] at h'; exact h'
+    obtain ⟨hr, hmaps, -⟩ := xv6KptOk_parts hok
+    obtain ⟨i, hi, rfl, -⟩ := AccessDiscipline.kstkPage_walk hs' hh hr hmaps (Nat.le_refl _) hp'
+    exact List.mem_map.2 ⟨i, List.mem_range.2 hi, (kSlotP_pteAddr (pas i) 0#9).symm⟩
   ihave Hseal := kptOn_seal cpu t (kvmMapT pas) r0 hct (kvmTableOk_kptFacts_tramp t pas hok) hso kernelPagetableAddr hra
-    hroots hkok R $$ [Hctx Hents Hrw Hauth Hroot Hpub]
-  · iframe Hctx Hents Hrw Hauth Hroot Hpub
+    hroots hkok (kstackCarve pas) hstk R $$ [Hctx Hcarve Hents Hrw Hauth Hroot Hpub]
+  · iframe Hctx Hcarve Hents Hrw Hauth Hroot Hpub
   imod Hseal $$ %σ [Hmem Hmm] with ⟨Hmem, Hmm, Hctx, #Hkpt, Hrp, HR⟩
   · iframe Hmem Hmm
   imodintro
-  iframe Hmem Hmm HR
+  iframe Hmem Hmm HR HstkC
   isplitl [HConf HF Hstack Htrans Harm Hcpu Hctx Hfrag Hclock]
   · iapply kctx_intro' cpu k hwf
     iframe HConf HF Hstack Htrans Harm Hcpu Hclock

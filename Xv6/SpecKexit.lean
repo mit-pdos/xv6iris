@@ -29,7 +29,7 @@ the save area -- which is why the ofile loop and `p->cwd = 0` are not
 bookkeeping but the payment (`procDormant` demands `ofile = 0 x 16` and
 `cwd = 0`) -- TOGETHER WITH THE WHOLE KERNEL STACK.
 
-Hence the STACK CLOSER premise.  A dormant slot owns all 512 slots below
+Hence the STACK CLOSER premise.  A dormant slot owns all 511 slots below
 `p->kstack + PGSIZE` (nobody runs on them any more), but the exiting
 thread is standing on them: it owns only the region below its own `sp`.
 The frames above `sp` belong to its callers, so the closer is what the
@@ -162,7 +162,7 @@ def wp_kexit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
   chFrag V.chg (procAddr j) cs ∗
   myPay V.gen Q ∗
   (Q (xstateOf (k.regs 10#5)) ∨ (⌜xstateOf (k.regs 10#5) = -1⌝ ∗ killShot V.gen ∗ takenAt V.gen)) ∗
-  (stackOwn k.sp k.avail -∗ stackOwn (V.kstack + 4096#64) 512)
+  (stackOwn k.sp k.avail -∗ stackOwn (V.kstack + 4096#64) 511)
   ⊢ wpLoop (GF := GF) cpu
 
 /-- **WP of `kexit`, at either entry `SIE`** (Rocq `wp_kexit_sconf_body`):
@@ -189,7 +189,7 @@ def wp_kexit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   chFrag V.chg (procAddr j) cs ∗
   myPay V.gen Q ∗
   (Q (xstateOf (k.regs 10#5)) ∨ (⌜xstateOf (k.regs 10#5) = -1⌝ ∗ killShot V.gen ∗ takenAt V.gen)) ∗
-  (stackOwn k.sp (trapRes k.sie + k.avail) -∗ stackOwn (V.kstack + 4096#64) 512)
+  (stackOwn k.sp (trapRes k.sie + k.avail) -∗ stackOwn (V.kstack + 4096#64) 511)
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `kexit`. -/

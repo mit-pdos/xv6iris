@@ -58,9 +58,16 @@ theorem KptPlain.mem_kptSlots {ra : PAddr} {t : PTree} {e : BitVec 64 × BitVec 
 
 /-- **The registered shape** (`KernelRsv.kptOk` at xv6's instance) of the table `kvmmake`
 returns, sealed with its root word at `kernel_pagetable`. -/
-theorem xv6KptOk_of {t : PTree} {pas : Nat → BitVec 44} (h : kvmTableOk t pas) :
-    xv6KptOk (kptSlots KA.«kernel_pagetable» t) := by
-  refine ⟨pas, t.base, ?_, fun vpn ppn perm hk => ?_, fun i hi => ?_⟩
+theorem xv6KptOk_parts {t : PTree} {pas : Nat → BitVec 44} (h : kvmTableOk t pas) :
+    (⟨KA.«kernel_pagetable», kSlotP t.base 0, true⟩ : KSlot) ∈ kptSlots KA.«kernel_pagetable» t ∧
+    (∀ (vpn : BitVec 27) (ppn : BitVec 44) (perm : KPerm), kMapP pas vpn ppn perm →
+      ∃ (b1 b0 : BitVec 44) (a d : BitVec 1),
+        (⟨kSlotP t.base (kIdxP vpn 2), kPtr b1, true⟩ : KSlot) ∈ kptSlots KA.«kernel_pagetable» t ∧
+        (⟨kSlotP b1 (kIdxP vpn 1), kPtr b0, true⟩ : KSlot) ∈ kptSlots KA.«kernel_pagetable» t ∧
+        (⟨kSlotP b0 (kIdxP vpn 0), kLeaf ppn perm a d, false⟩ : KSlot) ∈ kptSlots KA.«kernel_pagetable» t) ∧
+    ∀ i, i < 64 → KA.«end».toNat ≤ (kSlotP (pas i) 0).toNat ∧
+      ∀ d ∈ kptSlots KA.«kernel_pagetable» t, d.addr ≠ kSlotP (pas i) 0 := by
+  refine ⟨?_, fun vpn ppn perm hk => ?_, fun i hi => ?_⟩
   · have e : kSlotP t.base 0 = pteAddr t.base 0#9 := kSlotP_pteAddr t.base 0#9
     rw [e]
     exact List.mem_cons_self
@@ -100,6 +107,10 @@ theorem xv6KptOk_of {t : PTree} {pas : Nat → BitVec 44} (h : kvmTableOk t pas)
       rw [kSlotP_idx]; simpa [pteLeafB_kPtr] using this
     · have := KptPlain.mem_kptSlots (ra := KA.«kernel_pagetable») h0
       rw [kSlotP_idx]; simpa [pteLeafB_kLeaf] using this
+
+theorem xv6KptOk_of {t : PTree} {pas : Nat → BitVec 44} (h : kvmTableOk t pas) :
+    xv6KptOk (kptSlots KA.«kernel_pagetable» t) :=
+  ⟨pas, t.base, xv6KptOk_parts h⟩
 
 /-! ## 3. The consumers' facts, from the export -/
 

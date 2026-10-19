@@ -1498,6 +1498,12 @@ theorem ptByteLiveAt_grow {rs : List RsvRegion} {m m' : FlatMem} {top t : Nat} (
   simp only [ptByteLiveAt, ptByteAt_grow hg hm ht, ptURootAt, ptLivePageAt, ptLiveChildAt,
     wordAsOf_grow hg hm ht, wordPosAsOf_grow hg hm ht, ptFreedSince_grow hg hm ht]
 
+/-- **A kernel-stack page stays one** (and a non-one stays non-one): as of a position at or below
+the top, under a step that adds entries above the top only. -/
+theorem kstkPageAt_grow {rs : List RsvRegion} {m m' : FlatMem} {top t : Nat} (hg : memGrow m top m')
+    (hm : memAbove m top m') (ht : t ≤ top) (p : PAddr) : kstkPageAt rs m' t p ↔ kstkPageAt rs m t p := by
+  simp only [kstkPageAt, ptRootAt, ptLeafAt, wordAsOf_grow hg hm ht]
+
 theorem ksByteAt_grow {rs : List RsvRegion} {m m' : FlatMem} {top t : Nat} (hg : memGrow m top m')
     (hm : memAbove m top m') (ht : t ≤ top) (a : PAddr) : ksByteAt rs m' t a ↔ ksByteAt rs m t a := by
   simp only [ksByteAt, pubWrittenAt, kstkPageAt, ptRootAt, ptLeafAt, wordAsOf_grow hg hm ht,

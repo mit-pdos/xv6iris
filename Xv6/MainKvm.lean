@@ -156,20 +156,20 @@ theorem mn_publish [CurCtx] (hct : curTier = KTier.bare) (cpu : CPU) (k : KCtx) 
     kctx cpu k ∗ ptreeOwn 2 (DFrac.own 1) t ∗
     (MachGS.kmapName (hlc := hlc) (GF := GF) ↪●MAP KernelMap.static) ∗
     (∃ r : BitVec 44, MachGS.kptRootName (hlc := hlc) (GF := GF) ↪VAR r) ∗
-    wordPointsTo kernelPagetableAddr 8 (DFrac.own 1) (pageAddr t.base) ∗
+    wordPointsTo kernelPagetableAddr 8 (DFrac.own 1) (pageAddr t.base) ∗ kstackPages pas ∗
     (∀ m : FlatMem, genHeapInterp m ={⊤}=∗ genHeapInterp m ∗
       ⌜pubClean (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) m⌝ ∗ R) ∗
     (kctx (GF := GF) cpu k -∗ kptOn t (kvmMapT pas) -∗ kstackMapAt pas -∗ syscTrampCl -∗
-      pwordPointsTo kernelPagetableAddr 8 DFrac.discard (pageAddr t.base) -∗ R -∗ wpLoop cpu)
+      pwordPointsTo kernelPagetableAddr 8 DFrac.discard (pageAddr t.base) -∗ kstackPagesC pas -∗ R -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hk, Ht, Hauth, ⟨%r0, Hroot⟩, Hw, Hpub, HΦ⟩
+  iintro ⟨Hk, Ht, Hauth, ⟨%r0, Hroot⟩, Hw, Hstk, Hpub, HΦ⟩
   iapply wpLoop_interpUpd cpu iprop(kctx (GF := GF) cpu k ∗ kptOn t (kvmMapT pas) ∗ kstackMapAt pas ∗ syscTrampCl ∗
-      pwordPointsTo kernelPagetableAddr 8 DFrac.discard (pageAddr t.base) ∗ R)
-  isplitl [Hk Ht Hauth Hroot Hw Hpub]
-  · iapply kctx_kptOn_publish cpu k t pas r0 hct hok R $$ [Hk Ht Hauth Hroot Hw Hpub]
-    iframe Hk Ht Hauth Hroot Hw Hpub
-  · iintro ⟨Hk, Hkpt, Hs, Htr, Hrp, HR⟩
-    iapply HΦ $$ Hk Hkpt Hs Htr Hrp HR
+      pwordPointsTo kernelPagetableAddr 8 DFrac.discard (pageAddr t.base) ∗ kstackPagesC pas ∗ R)
+  isplitl [Hk Ht Hauth Hroot Hw Hstk Hpub]
+  · iapply kctx_kptOn_publish cpu k t pas r0 hct hok R $$ [Hk Ht Hauth Hroot Hw Hstk Hpub]
+    iframe Hk Ht Hauth Hroot Hw Hstk Hpub
+  · iintro ⟨Hk, Hkpt, Hs, Htr, Hrp, HstkC, HR⟩
+    iapply HΦ $$ Hk Hkpt Hs Htr Hrp HstkC HR
 
 set_option maxHeartbeats 4000000 in
 /-- **+0x76 → +0x7a**: `kvminithart()` switches the hart to the published
@@ -246,10 +246,10 @@ theorem mn_byteBuf_toKpt (X : CurCtx) (a : BitVec 64) (dq : DFrac) (bs : List (B
   unfold byteBuf
   exact BigSepL.bigSepL_mono_of_forall (fun {_ _} => wordPointsTo_toKpt X _ 1 dq _)
 
-/-- `kvminit`'s stack pages travel to the kernel table. -/
+/-- `kvminit`'s stack pages (carved) travel to the kernel table. -/
 theorem mn_kstackPages_toKpt (X : CurCtx) (pas : Nat → BitVec 44) :
-    @kstackPages hlc GF _ X pas ⊢ @kstackPages hlc GF _ X.toKpt pas := by
-  unfold kstackPages
+    @kstackPagesC hlc GF _ X pas ⊢ @kstackPagesC hlc GF _ X.toKpt pas := by
+  unfold kstackPagesC
   exact BigSepL.bigSepL_mono_of_forall (fun {_ _} => mn_byteBuf_toKpt X _ _ _)
 
 /-- **One slot's inputs to `procsInv_alloc`**, as main holds them: procinit's
@@ -260,14 +260,14 @@ def mnSlotIn [CurCtx] (Γ : SchedNames) (pas : Nat → BitVec 44) (i : Nat) : IP
   ((∃ ch : BitVec 64, wordPointsTo (pChan (procAddr i)) 8 (DFrac.own 1) ch) ∗
     (∃ kl xs pid : BitVec 32, procPubRest (procAddr i) kl xs pid)) ∗
   hartFull Γ i startedPrimary ∗ pstateFull Γ i UNUSED ∗ slotFree Γ (procAddr i) ∗
-  lockFreeTok (Γ.lock i) ∗ byteBuf (pageAddr (pas i)) (DFrac.own 1) (List.replicate 4096 5#8) ∗
+  lockFreeTok (Γ.lock i) ∗ byteBuf (pageAddr (pas i) + BitVec.ofNat 64 8) (DFrac.own 1) (List.replicate 4088 5#8) ∗
   (∃ γ0 g : GName, chFrag γ0 (procAddr i) ∅ ∗ slotGen (procAddr i) (DFrac.own 1) g ∗
     actCnt (procAddr i) 0 ∗ zsElem (procAddr i) none) ∗
   soElem (hlc := hlc) (procAddr i) false
 
 theorem mn_unused_isUnused : isUnused UNUSED := by decide
 
-theorem mn_replicate_len : (List.replicate 4096 (5#8 : BitVec 8)).length = 4096 := List.length_replicate
+theorem mn_replicate_len : (List.replicate 4088 (5#8 : BitVec 8)).length = 4088 := List.length_replicate
 
 set_option maxRecDepth 100000 in
 /-- One slot's inputs become `procsInvSlot` (the stack re-homed at
@@ -284,7 +284,7 @@ theorem mn_slotIn [CurCtx] (hct : curTier = KTier.kpt) (Γ : SchedNames) (pas : 
   · unfold pavSlot
     rw [if_pos mn_unused_isUnused]
     ileft; iexact Hsf
-  iapply kstackOwn_of_page pas i hi (List.replicate 4096 5#8) mn_replicate_len hct hpv $$ HS Hst Hbuf
+  iapply kstackOwn_of_page pas i hi (List.replicate 4088 5#8) mn_replicate_len hct hpv $$ HS Hst Hbuf
 
 set_option maxHeartbeats 4000000 in
 /-- The per-slot inputs, zipped out of main's seven NPROC-wide rows. -/
@@ -297,13 +297,13 @@ theorem mn_slots_zip [CurCtx] (Γ : SchedNames) (pas : Nat → BitVec 44) :
     ([∗list] i ∈ List.range NPROC, pstateFull Γ i UNUSED) ∗
     ([∗list] i ∈ List.range NPROC, slotFree Γ (procAddr i)) ∗
     ([∗list] i ∈ List.range NPROC, lockFreeTok (Γ.lock i)) ∗
-    kstackPages pas ∗
+    kstackPagesC pas ∗
     ([∗list] i ∈ List.range NPROC, ∃ γ0 g : GName,
       chFrag γ0 (procAddr i) ∅ ∗ slotGen (procAddr i) (DFrac.own 1) g ∗ actCnt (procAddr i) 0 ∗
         zsElem (procAddr i) none) ∗
     ([∗list] i ∈ List.range NPROC, soElem (hlc := hlc) (procAddr i) false)
     ⊢ [∗list] i ∈ List.range NPROC, mnSlotIn (GF := GF) Γ pas i := by
-  unfold kstackPages mnSlotIn
+  unfold kstackPagesC mnSlotIn
   rw [show List.range 64 = List.range NPROC from rfl]
   iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9⟩
   ihave H8 := (BigSepL.bigSepL_sep_eqv (l := List.range NPROC)
@@ -311,7 +311,8 @@ theorem mn_slots_zip [CurCtx] (Γ : SchedNames) (pas : Nat → BitVec 44) :
       slotGen (procAddr i) (DFrac.own 1) g ∗ actCnt (procAddr i) 0 ∗ zsElem (procAddr i) none))
     (Ψ := fun _ i => iprop(soElem (hlc := hlc) (GF := GF) (procAddr i) false))).2 $$ [$H8 $H9]
   ihave H := (BigSepL.bigSepL_sep_eqv (l := List.range NPROC)
-    (Φ := fun _ i => iprop(byteBuf (GF := GF) (pageAddr (pas i)) (DFrac.own 1) (List.replicate 4096 5#8)))
+    (Φ := fun _ i => iprop(byteBuf (GF := GF) (pageAddr (pas i) + BitVec.ofNat 64 8) (DFrac.own 1)
+      (List.replicate 4088 5#8)))
     (Ψ := fun _ i => iprop((∃ γ0 g : GName, chFrag (GF := GF) γ0 (procAddr i) ∅ ∗
       slotGen (procAddr i) (DFrac.own 1) g ∗ actCnt (procAddr i) 0 ∗ zsElem (procAddr i) none) ∗
       soElem (hlc := hlc) (GF := GF) (procAddr i) false))).2 $$ [$H7 $H8]

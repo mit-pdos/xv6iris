@@ -83,7 +83,7 @@ theorem urc_resume (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames →
     (k : KCtx) (m : Nat) (P : UPtd) (ksp : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (sts : List FdState) (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32)
     (sep sc tv : BitVec 64) (hproc : k.proc = procAddr j) (hctx : utCtxOk k) (htier : k.tier = KTier.kpt)
-    (hnoff : k.noff = 0) (hsp : k.sp + 8#64 * BitVec.ofNat 64 m = ksp) (hav : k.avail + m = 512)
+    (hnoff : k.noff = 0) (hsp : k.sp + 8#64 * BitVec.ofNat 64 m = ksp) (hav : k.avail + m = 511)
     (ha0 : k.regs 10#5 = satpOf KTier.kpt P.root) (hsep : retPc sep = tfResumePc V.tf)
     (hgn : gn = V.gen) (ox : Option (Nat × Obs))
     (hfit : niFit ox (.uEnter cpu (satpOf KTier.kpt P.root) sep (tfGprs V.tf))) :

@@ -43,7 +43,7 @@ the CLOSED trap loop.
   PROVES the run key it is asked for; at `false` forkret walks the boot arm.
 * **THE ENTRY IS THE SCHEDULER'S HAND-OFF**: swtch lands here with `p->lock`
   STILL HELD from scheduler() -- a resumed kernel context
-  (`resumedK R spie spp 512 eb root pa`: interrupts off, depth 1, `["proc"]`
+  (`resumedK R spie spp 511 eb root pa`: interrupts off, depth 1, `["proc"]`
   held, the whole kernel stack), the trap CSRs and handler, the claim, the
   held lock and its resource (`procLockPay Γ j`, rebuilt by the park).
   `release` is forkret's first act and the whole of the index bookkeeping:
@@ -69,7 +69,7 @@ the CLOSED trap loop.
    `cpu_own 1 eb p false {["proc"]}`), the calling convention `R sp =
    V.kstack + PGSIZE` (Rocq `is_kstack` + the `sp` register fact).  Rocq's
    `trap_res eb + av2 = av - 6`, `K_kexec ≤ av2`, `K_usertrap ≤ av` budget
-   premises are the whole page (`forkretStack = 512`).
+   premises are the whole page (`forkretStack = 511`).
 2. **The globals are Lean's park rows** (ParkCap deviation 2):
    `parkGlobals` (which carries `procsInv Γ`) and `utSysParkRows`;
    `kernel_text` is `kctx`'s, `wire_inv` / the trampoline claim ride

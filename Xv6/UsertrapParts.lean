@@ -125,7 +125,7 @@ structure UtOk (Γ : SchedNames) (A : UtArgs GF) : Prop where
   htier : A.k.tier = KTier.kpt
   hnoff : A.k.noff = 0
   hsp : A.k.regs 2#5 = A.ksp
-  havail : A.k.avail = 512
+  havail : A.k.avail = 511
   hgn : A.gn = A.V.gen
   hΓ : A.N.Γ = Γ
   hNj : A.N.j = A.j

@@ -62,9 +62,9 @@ theorem FkrAfter.callee {k : KCtx} {eb : Bool} {root : BitVec 44} {pa ksp : BitV
   obtain ⟨h2, h8, h9, -⟩ := hcs
   exact ⟨a, b, c, d, e, f, h2.trans g, h8.trans i, h9.trans l, m⟩
 
-/-- The frame's budget after the release: at least 416 units. -/
+/-- The frame's budget after the release: at least 415 units. -/
 theorem FkrAfter.avail_ge {k : KCtx} {eb : Bool} {root : BitVec 44} {pa ksp : BitVec 64}
-    (h : FkrAfter k eb root pa ksp) (n : Nat) (hn : n ≤ 416) : n ≤ k.avail := by
+    (h : FkrAfter k eb root pa ksp) (n : Nat) (hn : n ≤ 415) : n ≤ k.avail := by
   have := h.avail
   cases eb <;> simp only [trapRes, kvFrameSlots, Bool.false_eq_true, if_false, if_true] at this <;> omega
 
@@ -147,7 +147,7 @@ theorem fkr_fsinit_call [CurCtx] (FS : FSINIT) (Γ : SchedNames) [ClaimIs (hlc :
   · iframe Hir1 Hir2
   iapply Hcont $$ %c' %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hfsr Henv Hbs3 Hirs
 
-theorem fkr_fsinit_slots : fsinitSlots ≤ 416 := by decide
+theorem fkr_fsinit_slots : fsinitSlots ≤ 415 := by decide
 
 theorem fkr_first_addr2 : KA.«forkret» + 36900#64 + 18446744073709549998#64 = firstAddr := by decide
 theorem fkr_first_addr2' : KA.«forkret» + 35282#64 = firstAddr := by decide

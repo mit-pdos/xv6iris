@@ -405,7 +405,7 @@ def fpKeep [CurCtx] (pa : BitVec 64) (V : ProcPriv) (nm : List (BitVec 8)) : IPr
   wordPointsTo (pSecc pa) 8 (DFrac.own 1) V.pvSecc ∗
   wordPointsTo (pRoot pa) 8 (DFrac.own 1) V.root ∗
   dormantAllow ∗ chFrag V.chg pa ∅ ∗ actCnt pa V.ev ∗
-  stackOwn (V.kstack + 4096#64) 512
+  stackOwn (V.kstack + 4096#64) 511
 
 /-- The lock-protected cells other than `pid` (`procPub` minus its pid
 quarter). -/

@@ -1501,26 +1501,35 @@ theorem memModel_chainLb (σ : MState) (h : CPU) (t : Nat) (j : CPU) (τ : Nat) 
 
 /-- A load adds no entry. -/
 theorem kptGrow_load (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) :
-    memGrowR σ.mem σ.top (σ.afterLoad cpu pa n tvn).mem ∧ σ.top ≤ (σ.afterLoad cpu pa n tvn).top :=
-  ⟨memGrowR_refl _ _, Nat.le_refl _⟩
+    memGrowR σ.mem σ.top (σ.afterLoad cpu pa n tvn).mem ∧ σ.top ≤ (σ.afterLoad cpu pa n tvn).top ∧
+      memGrow σ.mem σ.top (σ.afterLoad cpu pa n tvn).mem ∧ memAbove σ.mem σ.top (σ.afterLoad cpu pa n tvn).mem :=
+  ⟨memGrowR_refl _ _, Nat.le_refl _, memGrow_refl _ _, memAbove_refl _ _⟩
 
 /-- A hart's store adds only its own entries, at the next position. -/
 theorem kptGrow_store (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (excl : Bool) :
-    memGrowR σ.mem σ.top (σ.store cpu pa n w excl).mem ∧ σ.top ≤ (σ.store cpu pa n w excl).top :=
+    memGrowR σ.mem σ.top (σ.store cpu pa n w excl).mem ∧ σ.top ≤ (σ.store cpu pa n w excl).top ∧
+      memGrow σ.mem σ.top (σ.store cpu pa n w excl).mem ∧ memAbove σ.mem σ.top (σ.store cpu pa n w excl).mem :=
   ⟨memGrowR_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _),
-    by simp only [MState.top, List.length_append, List.length_singleton]; omega⟩
+    by simp only [MState.top, List.length_append, List.length_singleton]; omega,
+    memGrow_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _), memAbove_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _)⟩
 
 /-- A DMA write adds only the disk's entries, at the next position. -/
 theorem kptGrow_dma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
-    memGrowR σ.mem σ.top (σ.storeDma pa n w).mem ∧ σ.top ≤ (σ.storeDma pa n w).top := by
+    memGrowR σ.mem σ.top (σ.storeDma pa n w).mem ∧ σ.top ≤ (σ.storeDma pa n w).top ∧
+      memGrow σ.mem σ.top (σ.storeDma pa n w).mem ∧ memAbove σ.mem σ.top (σ.storeDma pa n w).mem := by
   by_cases hn : n = 0
-  · rw [MState.storeDma_zero σ pa n w hn]; exact ⟨memGrowR_refl _ _, Nat.le_refl _⟩
-  · refine ⟨?_, ?_⟩
+  · rw [MState.storeDma_zero σ pa n w hn]
+    exact ⟨memGrowR_refl _ _, Nat.le_refl _, memGrow_refl _ _, memAbove_refl _ _⟩
+  · refine ⟨?_, ?_, ?_, ?_⟩
     · rw [MState.storeDma_mem_of_ne σ pa n w hn]
       exact memGrowR_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _)
     · show σ.log.length ≤ (σ.storeDma pa n w).log.length
       rw [MState.storeDma_log_of_ne σ pa n w hn, List.length_append]
       exact Nat.le_add_right _ _
+    · rw [MState.storeDma_mem_of_ne σ pa n w hn]
+      exact memGrow_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _)
+    · rw [MState.storeDma_mem_of_ne σ pa n w hn]
+      exact memAbove_writeBytes _ _ _ _ _ _ (Nat.lt_succ_self _)
 
 /-- The sealed table's facts move with a step at the top: the seal stays at
 or below the top, and every new entry is past it (W8 (f3-ptek)). -/
@@ -1533,11 +1542,18 @@ theorem kptSealOk_grow {rs : List RsvRegion} {σ σ' : MState} {S : Nat} {dyn : 
   · omega
   · exact hpub f w hf a ha H hH e he' h0
 
+/-- The carve's list and the receipts move with a step at the top (the kernel-stack pages as of
+the seal are read at or below the top). -/
+theorem ksPost_grow {rs : List RsvRegion} {m m' : FlatMem} {top S : Nat} {stk : List PAddr} {reg : RegMapF Agent}
+    (hg : memGrow m top m') (hm : memAbove m top m') (hS : S ≤ top) (h : ksPost rs m S stk reg) :
+    ksPost rs m' S stk reg :=
+  ⟨fun p hp => h.1 p ((kstkPageAt_grow hg hm hS p).1 hp), h.2⟩
+
 /-- The reserved conjunct moves with the memory, given the regions'
 discipline does (and -- W8 (f3-ptek) -- the step adds only entries above the
 top). -/
 theorem rsvModel_mono (σ σ' : MState)
-    (hg : memGrowR σ.mem σ.top σ'.mem ∧ σ.top ≤ σ'.top)
+    (hg : memGrowR σ.mem σ.top σ'.mem ∧ σ.top ≤ σ'.top ∧ memGrow σ.mem σ.top σ'.mem ∧ memAbove σ.mem σ.top σ'.mem)
     (hpub : pubClean (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem →
       pubClean (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ'.mem)
     (h : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem →
@@ -1552,32 +1568,34 @@ theorem rsvModel_mono (σ σ' : MState)
       loadsChained (chainEnv (hlc := hlc) (GF := GF) σ') (chainEx (hlc := hlc) (GF := GF) σ')) :
     rsvModelAt E σ ⊢@{IProp GF} rsvModelAt E σ' := by
   unfold rsvModelAt chainModelAt kptModelAt
-  iintro ⟨⟨%reg, Hreg, %⟨hin, hex, hok, hrp⟩, ⟨%S, %dyn, %⟨hlk, hseal⟩, Hcells⟩⟩, Hh, %hlc0, ⟨%Z, HZ, %hZ, #Hels⟩⟩
+  iintro ⟨⟨%reg, Hreg, %⟨hin, hex, hok, hrp⟩, ⟨%S, %dyn, %stk, %⟨hlk, hseal⟩, Hcells, Hcarve, #Hrc⟩⟩, Hh, %hlc0, ⟨%Z, HZ, %hZ, #Hels⟩⟩
   have hnew := h (all_of_reservedOk hin hok)
   iframe Hh
-  isplitl [Hreg Hcells]
+  isplitl [Hreg Hcells Hcarve]
   · iexists reg
     iframe Hreg
     isplit
     · ipureintro
       exact ⟨hin, hex, reservedOk_of_all hex hnew, hpc hrp⟩
-    iexists S, dyn
-    iframe Hcells
+    iexists S, dyn, stk
+    iframe Hcells Hcarve Hrc
     ipureintro
-    exact ⟨hlk, hseal.imp (fun h0 => ⟨h0.1, hpub h0.2⟩) (fun h0 => ⟨kptSealOk_grow hg h0.1, h0.2⟩)⟩
+    exact ⟨hlk, hseal.imp (fun h0 => ⟨h0.1, hpub h0.2.1, h0.2.2⟩)
+      (fun h0 => ⟨kptSealOk_grow ⟨hg.1, hg.2.1⟩ h0.1, h0.2.1,
+        ksPost_grow hg.2.2.1 hg.2.2.2 h0.1.1 h0.2.2⟩)⟩
   · isplit
     · ipureintro
       exact hch hnew hlc0
     iexists Z
     iframe HZ Hels
     ipureintro
-    exact ⟨certsOk_mono (hext hnew) hZ.1, pcKeysOk_mono hg.2 hpcs hZ.2⟩
+    exact ⟨certsOk_mono (hext hnew) hZ.1, pcKeysOk_mono hg.2.1 hpcs hZ.2⟩
 
 /-- `rsvModel_mono` for a step that may write a publication word, given the
 seal's certificate (W8 (f3-ptek): the boot gate opens only after the kernel
 table's seal). -/
 theorem rsvModel_mono_sealed (σ σ' : MState)
-    (hg : memGrowR σ.mem σ.top σ'.mem ∧ σ.top ≤ σ'.top)
+    (hg : memGrowR σ.mem σ.top σ'.mem ∧ σ.top ≤ σ'.top ∧ memGrow σ.mem σ.top σ'.mem ∧ memAbove σ.mem σ.top σ'.mem)
     (h : rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem →
       rsvAllOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ'.mem)
     (hpc : relPcOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.relPcs (hlc := hlc) (GF := GF)) σ →
@@ -1590,32 +1608,32 @@ theorem rsvModel_mono_sealed (σ σ' : MState)
       loadsChained (chainEnv (hlc := hlc) (GF := GF) σ') (chainEx (hlc := hlc) (GF := GF) σ')) :
     rsvModelAt E σ ∗ kptSealedAt E ⊢@{IProp GF} rsvModelAt E σ' := by
   unfold rsvModelAt chainModelAt kptModelAt kptSealedAt
-  iintro ⟨⟨⟨%reg, Hreg, %⟨hin, hex, hok, hrp⟩, ⟨%S, %dyn, %⟨hlk, hseal⟩, Hcells⟩⟩, Hh, %hlc0, ⟨%Z, HZ, %hZ, #Hels⟩⟩,
+  iintro ⟨⟨⟨%reg, Hreg, %⟨hin, hex, hok, hrp⟩, ⟨%S, %dyn, %stk, %⟨hlk, hseal⟩, Hcells, Hcarve, #Hrc⟩⟩, Hh, %hlc0, ⟨%Z, HZ, %hZ, #Hels⟩⟩,
     #Hsl⟩
   ihave %hget := ghost_map_lookup $$ Hreg Hsl
   have hne := hlk.2 _ hget
   have hnew := h (all_of_reservedOk hin hok)
   iframe Hh
-  isplitl [Hreg Hcells]
+  isplitl [Hreg Hcells Hcarve]
   · iexists reg
     iframe Hreg
     isplit
     · ipureintro
       exact ⟨hin, hex, reservedOk_of_all hex hnew, hpc hrp⟩
-    iexists S, dyn
-    iframe Hcells
+    iexists S, dyn, stk
+    iframe Hcells Hcarve Hrc
     ipureintro
     refine ⟨hlk, ?_⟩
     rcases hseal with h0 | h0
     · exact absurd h0.1 hne
-    · exact Or.inr ⟨kptSealOk_grow hg h0.1, h0.2⟩
+    · exact Or.inr ⟨kptSealOk_grow ⟨hg.1, hg.2.1⟩ h0.1, h0.2.1, ksPost_grow hg.2.2.1 hg.2.2.2 h0.1.1 h0.2.2⟩
   · isplit
     · ipureintro
       exact hch hnew hlc0
     iexists Z
     iframe HZ Hels
     ipureintro
-    exact ⟨certsOk_mono (hext hnew) hZ.1, pcKeysOk_mono hg.2 hpcs hZ.2⟩
+    exact ⟨certsOk_mono (hext hnew) hZ.1, pcKeysOk_mono hg.2.1 hpcs hZ.2⟩
 
 /-- The mirrors move with the task bookkeeping (only the pure conjunct
 `devRtOk` of `mmOk` sees `devrt` at all). -/

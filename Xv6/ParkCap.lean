@@ -62,7 +62,7 @@ Both occurrences of the token inside its own definition are under `▷`
 2. **The package's rows are Lean's park rows** (UsertrapRes deviation 8):
    `parkGlobals` and the syscall side's `utSysParkRows` (Rocq's
    `park_globals`), the slot marker `slotUsed` (Rocq `pslot_used_at`), the
-   child's kernel stack (the whole page, Lean's `forkretStack = 512`; Rocq's
+   child's kernel stack (the whole page, Lean's `forkretStack = 511`; Rocq's
    `av` budget is Lean's `KCtx.avail`), the mode row and the closer.
    `kernel_text` rides `kctx`; `wire_inv` and the trampoline claim ride
    `utSysParkRows`' `parkWorld` (SyscallEnv deviation 5), so they are not
@@ -108,8 +108,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 abbrev parkForkretPc : BitVec 64 := forkretAddr
 
 /-- The kernel stack a born process resumes on: the whole `KSTACK` page,
-512 slots below `p->kstack + PGSIZE` (the park's `av`, deviation 2). -/
-def forkretStack : Nat := 512
+511 slots below `p->kstack + PGSIZE` (the park's `av`, deviation 2). -/
+def forkretStack : Nat := 511
 
 /-- The syscall side's park rows are persistent (UtResFits'
 `utSysParkRows`). -/

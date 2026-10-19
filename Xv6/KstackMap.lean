@@ -14,9 +14,9 @@ the `kpt` tier needs the map to say so: `kmapAt (kstackVpn i) (kLeaf (pas i)
 * `kvmTableOk_kptFacts_stacks`: `kvmmake`'s table satisfies `kptFacts`
   for that map (the stack leaves are mapped by `kvmTableOk`);
 * `kstackOwn_of_page`: at the `kpt` tier a stack claim plus the kalloc'd
-  page (owned at its physical address, any 4096 bytes) is `stackOwn
-  (kstackVa i + 4096) 512`: the whole kernel stack of process `i`, as the scheduler and
-  `forkret` need it.
+  page without its bottom doubleword (owned at its physical address, any 4088 bytes; the
+  carve, mcslrec (3) X1-c) is `stackOwn (kstackVa i + 4096) 511`: the whole kernel stack of
+  process `i`, as the scheduler and `forkret` need it.
 
 Imports only definitional/lemma files.
 -/
@@ -330,21 +330,28 @@ theorem pageValid_kmapClass (b : BitVec 44) (hb : pageValid (pageAddr b)) (off :
     · omega
 
 /-- **The kernel stack of process `i`**, at the `kpt` tier: its claim and
-its kalloc'd page give the 512 slots below `KSTACK(i) + PGSIZE`. -/
+its kalloc'd page without the bottom doubleword (mcslrec (3) X1-c: the carve,
+`Xv6.kstackPagesC`) give the 511 slots below `KSTACK(i) + PGSIZE`. -/
 theorem kstackOwn_of_page [CurCtx] (pas : Nat → BitVec 44) (i : Nat) (hi : i < 64) (bs : List (BitVec 8))
-    (hbs : bs.length = 4096) (hct : curTier = KTier.kpt) (hpv : pageValid (pageAddr (pas i))) :
+    (hbs : bs.length = 4088) (hct : curTier = KTier.kpt) (hpv : pageValid (pageAddr (pas i))) :
     kmapStatic (GF := GF) ⊢ kstackMapAt pas -∗
-      byteBuf (pageAddr (pas i)) (DFrac.own 1) bs -∗
-      stackOwn (kstackVa i + 4096#64) 512 := by
+      byteBuf (pageAddr (pas i) + BitVec.ofNat 64 8) (DFrac.own 1) bs -∗
+      stackOwn (kstackVa i + 4096#64) 511 := by
   iintro #HS #Hst H
   ihave #Hcl := kstackMapAt_at pas i hi $$ Hst
-  ihave H := byteBuf_rehome (pageAddr (pas i)) (kstackVa i) (kstackVpn i) (pas i) bs hct
-    (fun j hj => paOf_kstackVa (pas i) i hi j (by omega))
-    (fun j hj => kstackVa_lt i hi j (by omega))
-    (fun j hj => pageValid_kmapClass (pas i) hpv j (by omega))
-    (fun j hj => vpnOf_kstackVa i hi j (by omega)) $$ HS Hcl H
-  rw [show (4096#64 : BitVec 64) = BitVec.ofNat 64 (8 * 512) from rfl]
-  ihave H := byteBuf_stackOwn (kstackVa i) (kstackVa_align i hi) 512 bs (by omega) $$ H
-  iexact H
+  have e : ∀ (a : BitVec 64) (j : Nat), a + BitVec.ofNat 64 8 + BitVec.ofNat 64 j = a + BitVec.ofNat 64 (8 + j) :=
+    fun a j => by rw [BitVec.add_assoc, BitVec.ofNat_add]
+  ihave H := byteBuf_rehome (pageAddr (pas i) + BitVec.ofNat 64 8) (kstackVa i + BitVec.ofNat 64 8) (kstackVpn i)
+    (pas i) bs hct
+    (fun j hj => by rw [e, e]; exact paOf_kstackVa (pas i) i hi (8 + j) (by omega))
+    (fun j hj => by rw [e]; exact kstackVa_lt i hi (8 + j) (by omega))
+    (fun j hj => by rw [e]; exact pageValid_kmapClass (pas i) hpv (8 + j) (by omega))
+    (fun j hj => by rw [e]; exact vpnOf_kstackVa i hi (8 + j) (by omega)) $$ HS Hcl H
+  have hal : (kstackVa i + BitVec.ofNat 64 8).toNat % 8 = 0 := by
+    rw [kstackVa_add_toNat i hi 8 (by omega)]; omega
+  have e2 : kstackVa i + BitVec.ofNat 64 8 + BitVec.ofNat 64 (8 * 511) = kstackVa i + 4096#64 := by
+    simp only [Nat.reduceMul]; bv_omega
+  rw [← e2]
+  iapply byteBuf_stackOwn (kstackVa i + BitVec.ofNat 64 8) hal 511 bs (by omega) $$ H
 
 end Xv6

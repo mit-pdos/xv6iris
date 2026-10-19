@@ -133,7 +133,7 @@ def allocprocPost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
     fdSlots FDSPARE ∗ irefSlots (IREFHOME + IREFSPARE) ∗ bslots 3 ∗ chFrag V.chg (procAddr j) ∅ ∗
     genNew V.gen (procAddr j) pid Q ∗ slotGen (procAddr j) (.own 1) V.gen ∗ pidRegRest pid V.gen ∗
     (∃ xsv : BitVec 32, wordPointsTo (pXstate (procAddr j)) 4 xsHalf xsv) ∗
-    stackOwn (V.kstack + 4096#64) 512 ∗
+    stackOwn (V.kstack + 4096#64) 511 ∗
     kallocAvail γk (availSub on g))
 
 /-- THE LED TWIN OF `allocprocPost` (Rocq `allocproc_post_led`, design
@@ -178,7 +178,7 @@ def allocprocPostLed {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     fdSlots FDSPARE ∗ irefSlots (IREFHOME + IREFSPARE) ∗ bslots 3 ∗ chFrag V.chg (procAddr j) ∅ ∗
     genNew V.gen (procAddr j) pid Q ∗ slotGen (procAddr j) (.own 1) V.gen ∗ pidRegRest pid V.gen ∗
     (∃ xsv : BitVec 32, wordPointsTo (pXstate (procAddr j)) 4 xsHalf xsv) ∗
-    stackOwn (V.kstack + 4096#64) 512 ∗
+    stackOwn (V.kstack + 4096#64) 511 ∗
     kallocAvail γk (availSub on g))
 
 /-- The landed post is the led one with the receipt dropped (Rocq

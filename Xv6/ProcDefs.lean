@@ -250,19 +250,19 @@ def procPriv [WchG GF] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Na
 /-! ## Dormant slots (Rocq `proc_dormant`, `proc_slots`) -/
 
 /-- The memory a dormant slot still owns (the tail of Rocq
-`proc_dormant`): its whole kernel stack (the 512 slots below `kstack +
+`proc_dormant`): its whole kernel stack (the 511 slots below `kstack +
 PGSIZE`: nobody runs on it), and at ZOMBIE the address space and the
 trapframe page, which `wait` reaps; at UNUSED `pagetable`, `trapframe`,
 `sz` and `pid` are zero. -/
 def dormantSpace (st : BitVec 32) (V : ProcPriv) (pid : BitVec 32) : IProp GF :=
   if st = UNUSED then
     iprop(⌜V.pagetable = 0#64 ∧ V.trapframe = 0#64 ∧ V.sz = 0#64 ∧ pid = 0#32⌝ ∗
-      stackOwn (V.kstack + 4096#64) 512)
+      stackOwn (V.kstack + 4096#64) 511)
   else
     iprop(∃ M : Nat → List (BitVec 8),
       ⌜V.pagetable = pageAddr V.upt.root ∧ V.trapframe = pageAddr V.upt.tfp ∧
         umBelow V.sz V.upt⌝ ∗
-      procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗ stackOwn (V.kstack + 4096#64) 512)
+      procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗ stackOwn (V.kstack + 4096#64) 511)
 
 section Dormant
 variable [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
@@ -422,7 +422,7 @@ row's and the generation's names and at `ev := 0` (Rocq G: the seal takes
 the `.bss` carve left is junk until then). -/
 theorem procDormantPrestk_seal (pa : BitVec 64) (ks : BitVec 64) (γ0 g : GName) :
     procDormantPrestk (GF := GF) pa ∗ wordPointsTo (pKstack pa) 8 (DFrac.own 1) ks ∗
-      stackOwn (ks + 4096#64) 512 ∗ chFrag γ0 pa ∅ ∗ slotGen pa (DFrac.own 1) g ∗ actCnt pa 0 ⊢
+      stackOwn (ks + 4096#64) 511 ∗ chFrag γ0 pa ∅ ∗ slotGen pa (DFrac.own 1) g ∗ actCnt pa 0 ⊢
       procDormant pa UNUSED := by
   unfold procDormantPrestk procDormantNofd procDormant
   iintro ⟨⟨⟨%V, %pid, %hV, Hpid, Hf, ⟨%xsv, Hxs⟩⟩, Hfd, Hir, Hbs⟩, Hks, Hstk, Hch, Hsg, Hev⟩

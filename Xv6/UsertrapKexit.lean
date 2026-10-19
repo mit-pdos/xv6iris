@@ -11,7 +11,7 @@ exclusive rows out of `utOwn` (the syscall environment `Rsys` is dropped:
 the syscalls' footprint belongs to a process that will run one), the
 payment is kexit's RIGHT disjunct (status `-1`, the incarnation's kill shot),
 and the stack closer is usertrap's own frame over the stack below it
-(`ut_frame_closer`: 4 + 508 = 512 slots at `ksp = V2.kstack + 4096`).
+(`ut_frame_closer`: 4 + 507 = 511 slots at `ksp = V2.kstack + 4096`).
 
 THE TEAR-DOWN'S PRICE (`utTear`, Rocq lane PQ-C): a third party's kill
 pays every close out of the killer's credential (`filecloseCpays_taint`) and
@@ -57,7 +57,7 @@ theorem usertrap_kexit_proof [ClaimIs (hlc := hlc) GF Γ] (KE : KEXIT) : UT_KEXI
   have hcl : ∀ n, stackOwn (GF := GF) kx.sp n = stackOwn (A.ksp + 0xFFFFFFFFFFFFFFE0#64) n := by
     intro n; rw [KCtx.sp_eq, hsp]
   have hks' : V2.kstack + 4096#64 = A.ksp := by rw [hks]; exact hok.hks
-  have hn : 4 + (trapRes kx.sie + kx.avail) = 512 := by omega
+  have hn : 4 + (trapRes kx.sie + kx.avail) = 511 := by omega
   iintro ⟨Hk, Hpc, Hfr, Hte, Hce, #Hcaps, Hown, #Hmy, Htear⟩
   ihave #Hin := utCaps_initIdent A.N $$ Hcaps
   icases utCaps_kalloc A.N $$ Hcaps with ⟨#Hkl, #Hka⟩

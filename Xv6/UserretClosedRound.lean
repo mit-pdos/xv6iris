@@ -119,7 +119,7 @@ theorem urc_exit (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames → I
     (hsz : W.sz = V.sz.toNat) (hcw : W.cwd = V.cwi) (hgn : W.gen = gn) (hch : W.ch = cs)
     (hpid : W.pid = pid) (hlz : W.lazy = V.pvLazy) (hsc : W.secc = V.pvSecc) (hVgn : V.gen = gn)
     (hproc : k.proc = procAddr j) (hsie : k.sie = false) (htier : k.tier = KTier.kpt) (hnoff : k.noff = 0)
-    (hsp : (uservecCtx k (tfResumeGpr0 W.tf) V.tf).sp = ksp) (hav : k.avail = 512)
+    (hsp : (uservecCtx k (tfResumeGpr0 W.tf) V.tf).sp = ksp) (hav : k.avail = 511)
     (i : Nat) (x : Obs) (hx : exitFits x sc W) (Wr : Uvis) (hland : Ustep.ulands Wr sc W) :
     wireInv ∗ uRcpt (i, x) ∗ MachFixedGS.uClaimR (hlc := hlc) (GF := GF) i ∗
       kmapAt trampVpn (kLeaf trampPpn .rx 0#1 0#1) ∗ ▷ urcLoop (hlc := hlc) PT Γ j ∗
@@ -164,9 +164,9 @@ theorem urc_exit (UR : USERRET) [NiFitIs (hlc := hlc) GF] (PT : SchedNames → I
     have h2 : R' 2#5 = ksp := hcs.1.trans hsp
     show R' 2#5 + 8#64 * BitVec.ofNat 64 0 = ksp
     rw [h2]; bv_omega
-  have hav' : (((uservecCtx k (tfResumeGpr0 W.tf) V.tf).intrOff true false).withRegs R').avail + 0 = 512 := by
+  have hav' : (((uservecCtx k (tfResumeGpr0 W.tf) V.tf).intrOff true false).withRegs R').avail + 0 = 511 := by
     simp only [KCtx.withRegs_avail, KCtx.intrOff_avail]
-    show trapRes k.sie + k.avail + 0 = 512
+    show trapRes k.sie + k.avail + 0 = 511
     rw [hsie, hav]; rfl
   ihave Hgap := urc_stackOwn_zero (GF := GF) ksp
   have hctx' : utCtxOk (((uservecCtx k (tfResumeGpr0 W.tf) V.tf).intrOff true false).withRegs R') :=

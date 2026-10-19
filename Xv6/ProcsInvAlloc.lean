@@ -24,9 +24,9 @@ DEVIATIONS from Rocq (Lean's name discipline, not process layer):
    each slot brings its lock's free token `lockFreeTok (Γ.lock i)` (minted by
    boot with `lockGhostAlloc`, as SpecMain's header says) and the conclusion
    is `procsInv Γ`.
-2. **The kernel stacks come per slot** (`stackOwn (kstackVa i + 4096) 512`,
+2. **The kernel stacks come per slot** (`stackOwn (kstackVa i + 4096) 511`,
    `KstackMap.kstackOwn_of_page`'s output) rather than as Rocq's one
-   `kstack_bank`, and at the whole page (Lean's `dormantSpace` owns 512
+   `kstack_bank`, and at the whole page (Lean's `dormantSpace` owns 511
    slots; Rocq carves `KSTACK_AV`).
 3. **The marker arm** is the slot's `pavSlot Γ pa UNUSED` (Lean's
    `ProcAvail` keeps it in `procSlotsAt`), brought by the caller.
@@ -68,7 +68,7 @@ def procsInvSlot [CurCtx] (Γ : SchedNames) (i : Nat) : IProp GF := iprop%
   procReady i ∗ (∃ ch : BitVec 64, wordPointsTo (pChan (procAddr i)) 8 (DFrac.own 1) ch) ∗
   (∃ kl xs pid : BitVec 32, procPubRest (procAddr i) kl xs pid) ∗
   (∃ h : CPU, hartFull Γ i h) ∗ pstateFull Γ i UNUSED ∗ pavSlot Γ (procAddr i) UNUSED ∗
-  lockFreeTok (Γ.lock i) ∗ stackOwn (kstackVa i + 4096#64) 512 ∗
+  lockFreeTok (Γ.lock i) ∗ stackOwn (kstackVa i + 4096#64) 511 ∗
   (∃ γ0 g : GName, chFrag γ0 (procAddr i) ∅ ∗ slotGen (procAddr i) (DFrac.own 1) g ∗
     actCnt (procAddr i) 0 ∗ zsElem (procAddr i) none) ∗
   soElem (hlc := hlc) (procAddr i) false

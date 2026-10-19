@@ -355,7 +355,7 @@ def UT_KEXIT [ClaimIs (hlc := hlc) GF Γ] : Prop :=
   ∀ (A : UtArgs GF) (cpu : CPU) (kx : KCtx) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8))
     (sts2 : List FdState) (cs2 : ExtTreeSet GName compare) (a b c d : BitVec 64),
     UtOk Γ A → kx.regs 10#5 = -1#64 → kx.regs 2#5 = A.ksp + 0xFFFFFFFFFFFFFFE0#64 →
-    kx.proc = A.k.proc → kx.noff = 0 → kx.tier = KTier.kpt → trapRes kx.sie + kx.avail = 508 →
+    kx.proc = A.k.proc → kx.noff = 0 → kx.tier = KTier.kpt → trapRes kx.sie + kx.avail = 507 →
     V2.kstack = A.V.kstack → V2.gen = A.V.gen →
     (kctx cpu kx ∗ pcIs cpu kexitAddr ∗ frame4s2 A.ksp a b c d ∗
       trapCsrsExt cpu kx.sie ∗ cpuClaimExt cpu kx.sie A.k.proc ∗ utCaps A.N ∗

@@ -1354,16 +1354,19 @@ theorem memModel_kptRegister [CurCtx] (σ : MState) (hmm : mmOk σ) (t : PTree) 
     (hra : (⟨ra, .roots 1 8⟩ : RsvRegion) ∈ rsvList (hlc := hlc) (GF := GF))
     (hnd : ((t.entries 2).map Prod.fst).Nodup)
     (hseal : kptSealOk (rsvList (hlc := hlc) (GF := GF)) σ.mem σ.top σ.top (kptSlots ra t))
-    (hkok : MachFixedGS.kptOk (hlc := hlc) (GF := GF) (kptSlots ra t)) :
+    (hkok : MachFixedGS.kptOk (hlc := hlc) (GF := GF) (kptSlots ra t)) (stk : List PAddr)
+    (hstk : ∀ (m : FlatMem) (top : Nat), kptSealOk (rsvList (hlc := hlc) (GF := GF)) m top top (kptSlots ra t) →
+      kptHistsAt m top (kptSlots ra t) → ∀ p, kstkPageAt (rsvList (hlc := hlc) (GF := GF)) m top p → p ∈ stk) :
     genHeapInterp σ.mem ∗ memModel σ ∗ ctxBytes curCtx ra 8 (DFrac.own 1) (pteAddr t.base 0#9) ∗
-      ([∗list] e ∈ t.entries 2, kslotCellAt (MachGS.era (hlc := hlc) (GF := GF)) σ.top ⟨e.1, e.2, !pteLeafB e.2⟩)
+      ([∗list] e ∈ t.entries 2, kslotCellAt (MachGS.era (hlc := hlc) (GF := GF)) σ.top ⟨e.1, e.2, !pteLeafB e.2⟩) ∗
+      ([∗list] q ∈ stk, ksCarveAt (MachGS.era (hlc := hlc) (GF := GF)) q)
       ⊢@{IProp GF} |==> (genHeapInterp σ.mem ∗ memModel σ ∗
         ctxBytes curCtx ra 8 DFrac.discard (pteAddr t.base 0#9) ∗ kptRegs (GF := GF) t ∗ kptSealed) := by
   unfold memModel memModelAt rsvModelAt kptModelAt
-  iintro ⟨Hmem, ⟨Htop, Hauth, Hviews, Hresv, %hmm', ⟨%reg, Hreg, %⟨hin, hex, hok⟩, %S0, %dyn0, %⟨hlk, hseal0⟩,
-    Hcells0⟩, Hh, Hch⟩, Hrw, Hnew⟩
+  iintro ⟨Hmem, ⟨Htop, Hauth, Hviews, Hresv, %hmm', ⟨%reg, Hreg, %⟨hin, hex, hok⟩, %S0, %dyn0, %stk0,
+    %⟨hlk, hseal0⟩, Hcells0, Hcarve0, _⟩, Hh, Hch⟩, Hrw, Hnew, Hcarve⟩
   -- the record is empty: an earlier seal would hold the root word's discarded byte
-  rcases hseal0 with ⟨rfl, _⟩ | hs0
+  rcases hseal0 with ⟨rfl, _, rfl, hpre⟩ | hs0
   rotate_left
   · obtain ⟨d, hd, hda, _, _, _⟩ := hs0.1.2.2.2.1 ra 1 8 0 hra (by decide)
     obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 hd
@@ -1414,6 +1417,14 @@ theorem memModel_kptRegister [CurCtx] (σ : MState) (hmm : mmOk σ) (t : PTree) 
         unfold kslotKey kptSealKey at hk
         have := e.1.isLt
         omega
+  ihave Hall : [∗list] d ∈ kptSlots ra t, kslotCellAt (MachGS.era (hlc := hlc) (GF := GF)) σ.top d $$ [Hrk Hnew]
+  · unfold kptSlots
+    iapply BigSepL.bigSepL_cons.2
+    iframe Hrk
+    rw [BigSepL.bigSepL_map]
+    iexact Hnew
+  ihave %hh := kptCells_hists (MachGS.era (hlc := hlc) (GF := GF)) σ.mem σ.top (kptSlots ra t) $$ [Hmem Hall]
+  · iframe Hmem Hall
   imod ghost_map_insert_persist kptSealKey 0 hsk $$ Hreg with ⟨Hreg, #Hsl⟩
   imodintro
   iframe Hmem Htop Hauth Hviews Hresv Hh Hch Hbd
@@ -1432,20 +1443,28 @@ theorem memModel_kptRegister [CurCtx] (σ : MState) (hmm : mmOk σ) (t : PTree) 
     isplit
     · ipureintro
       exact ⟨hin', hex', reservedOk_of_all hex' (all_of_reservedOk hin hok.1), hok.2⟩
-    iexists σ.top, (kptSlots ra t)
-    isplit
+    iexists σ.top, (kptSlots ra t), stk
+    isplitl []
     · ipureintro
-      refine ⟨⟨fun k v hv hk hk2 => ?_, fun v _ => List.cons_ne_nil _ _⟩, Or.inr ⟨hseal, hkok⟩⟩
-      rw [Iris.Std.LawfulPartialMap.get?_insert_ne (by omega)] at hv
-      rcases h2 k v hv with h | ⟨e, he, hl, rfl, rfl⟩
-      · obtain ⟨d, hd, _⟩ := hlk.1 _ _ h hk hk2; cases hd
-      · refine ⟨⟨e.1, e.2, !pteLeafB e.2⟩, List.mem_cons_of_mem _ (List.mem_map.2 ⟨e, he, rfl⟩), ?_, rfl, rfl⟩
-        simp [hl]
-    · unfold kptSlots
-      iapply BigSepL.bigSepL_cons.2
-      iframe Hrk
-      rw [BigSepL.bigSepL_map]
-      iexact Hnew
+      refine ⟨⟨fun k v hv hk hk2 => ?_, fun v _ => List.cons_ne_nil _ _⟩,
+        Or.inr ⟨hseal, hkok, hstk σ.mem σ.top hseal hh, fun k v hv hk => ?_⟩⟩
+      · rw [Iris.Std.LawfulPartialMap.get?_insert_ne (by omega)] at hv
+        rcases h2 k v hv with h | ⟨e, he, hl, rfl, rfl⟩
+        · obtain ⟨d, hd, _⟩ := hlk.1 _ _ h hk hk2; cases hd
+        · refine ⟨⟨e.1, e.2, !pteLeafB e.2⟩, List.mem_cons_of_mem _ (List.mem_map.2 ⟨e, he, rfl⟩), ?_, rfl, rfl⟩
+          simp [hl]
+      · exfalso
+        rw [Iris.Std.LawfulPartialMap.get?_insert_ne (by unfold kptSealKey; omega)] at hv
+        rcases h2 k v hv with h | ⟨e, _, _, rfl, _⟩
+        · have := hpre k v h; omega
+        · unfold kslotKey at hk; have := e.1.isLt; omega
+    iframe Hall Hcarve
+    iapply ksRcptsAll_none
+    intro q hq
+    rw [Iris.Std.LawfulPartialMap.get?_insert_ne (by unfold kptSealKey ksKey; omega)] at hq
+    rcases h2 _ _ hq with h | ⟨e, _, _, hk, _⟩
+    · have := hpre _ _ h; unfold ksKey at this; omega
+    · unfold kslotKey ksKey at hk; have := e.1.isLt; omega
   · isplitl []
     · unfold kptRegs
       iexact Hregs
@@ -1471,8 +1490,12 @@ theorem kptOn_seal [CurCtx] (cpu : CPU) (t : PTree) (M : RegMapF (BitVec 64)) (r
     (hroots : ∀ (base : PAddr) (cnt stride : Nat),
       (⟨base, .roots cnt stride⟩ : RsvRegion) ∈ MachFixedGS.rsvStatic (hlc := hlc) (GF := GF) → base = ra ∧ cnt = 1)
     (hkok : MachFixedGS.kptOk (hlc := hlc) (GF := GF) (kptSlots ra t))
+    (stk : List PAddr)
+    (hstk : ∀ (m : FlatMem) (top : Nat), kptSealOk (rsvList (hlc := hlc) (GF := GF)) m top top (kptSlots ra t) →
+      kptHistsAt m top (kptSlots ra t) → ∀ p, kstkPageAt (rsvList (hlc := hlc) (GF := GF)) m top p → p ∈ stk)
     (R : IProp GF) :
     ownCtx (GF := GF) cpu curCtx ∗
+      ([∗list] q ∈ stk, ksCarveAt (MachGS.era (hlc := hlc) (GF := GF)) q) ∗
       ([∗list] e ∈ t.entries 2, wordPointsTo e.1 8 (DFrac.own 1) e.2) ∗
       wordPointsTo ra 8 (DFrac.own 1) (pteAddr t.base 0#9) ∗
       (MachGS.kmapName (hlc := hlc) (GF := GF) ↪●MAP M) ∗
@@ -1481,7 +1504,7 @@ theorem kptOn_seal [CurCtx] (cpu : CPU) (t : PTree) (M : RegMapF (BitVec 64)) (r
         ⌜pubClean (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) m⌝ ∗ R)
     ⊢ ∀ σ : MState, genHeapInterp σ.mem ∗ memModel σ ={⊤}=∗ genHeapInterp σ.mem ∗ memModel σ ∗
         (ownCtx cpu curCtx ∗ kptOn t M ∗ pwordPointsTo ra 8 DFrac.discard (pteAddr t.base 0#9) ∗ R) := by
-  iintro ⟨Hctx, Hents, Hrw, Hauth, Hroot, Hpub⟩ %σ ⟨Hmem, Hmm⟩
+  iintro ⟨Hctx, Hcarve, Hents, Hrw, Hauth, Hroot, Hpub⟩ %σ ⟨Hmem, Hmm⟩
   ihave %hmm := memModel_mmOk _ σ $$ Hmm
   imod Hpub $$ %σ.mem Hmem with ⟨Hmem, %hpub, HR⟩
   ihave Hents := BigSepL.bigSepL_mono_of_forall
@@ -1505,8 +1528,8 @@ theorem kptOn_seal [CurCtx] (cpu : CPU) (t : PTree) (M : RegMapF (BitVec 64)) (r
     with ⟨Hmem, Hmm, %⟨hnrE, hfl⟩, Hbody, #Hptrs, Hks⟩
   have hseal := KptInv.kptSealOk_of (rsvList (hlc := hlc) (GF := GF)) σ.mem σ.top t hf.1 ra hroots hpub hnrR hnrE
   -- the registration: the root word frozen, every slot shared, the leaves registered
-  imod memModel_kptRegister σ hmm t ra hra (PTree.entries_addr_nodup 2 t hf.2.1) hseal hkok
-    $$ [$Hmem $Hmm $Hb $Hks] with ⟨Hmem, Hmm, #Hbd, #Hregs, #Hsl⟩
+  imod memModel_kptRegister σ hmm t ra hra (PTree.entries_addr_nodup 2 t hf.2.1) hseal hkok stk hstk
+    $$ [$Hmem $Hmm $Hb $Hks $Hcarve] with ⟨Hmem, Hmm, #Hbd, #Hregs, #Hsl⟩
   icases histBytes_keys_of_wordBytes ra 8 DFrac.discard (pteAddr t.base 0#9) $$ Hbd
     with ⟨%Hr, %fr, #Hrh, %hrt, _⟩
   ihave %hget := histBytes_valid σ.mem ra 8 _ Hr $$ [Hmem Hrh]
@@ -1789,5 +1812,234 @@ theorem KptInv.pubWritten_mono {rs : List RsvRegion} {m : FlatMem} {s t : Nat} (
           · rw [List.find?_cons_of_neg (by simpa using hxt)] at h2
             exact ih h1 h2
     exact key H he he' h0
+
+
+/-! ## The kernel-stack pages as of the seal, and the stack-free receipts (mcslrec (3) X1-c) -/
+
+/-- A leaf names a page-aligned page. -/
+theorem KptInv.leafTo_aligned {v : BitVec 64} {p : PAddr} (h : ptLeafTo v p) : p.toNat % 4096 = 0 := by
+  obtain ⟨_, _, rfl⟩ := h
+  rw [BitVec.toNat_and, show (4096 : Nat) = 2 ^ 12 from rfl, Nat.and_mod_two_pow]
+  have hm : (0x00FFFFFFFFFFF000#64).toNat % 2 ^ 12 = 0 := by decide
+  rw [hm, Nat.and_zero]
+
+/-- A kernel leaf's page does not depend on its `A`/`D` bits. -/
+theorem KptInv.ptLeafTo_ad (ppn : BitVec 44) (perm : KPerm) (a d a' d' : BitVec 1) (p : PAddr)
+    (h : ptLeafTo (kLeaf ppn perm a d) p) : ptLeafTo (kLeaf ppn perm a' d') p := by
+  obtain ⟨_, _, hp⟩ := h
+  refine ⟨(kLeaf_valid ppn perm a' d').1, (kLeaf_valid ppn perm a' d').2, ?_⟩
+  rw [hp]
+  cases perm <;>
+    simp only [kLeaf, pteSetAD, mkPte, KPerm.flags, Sail.BitVec.extractLsb, Sail.BitVec.updateSubrange,
+      Sail.BitVec.updateSubrange', BitVec.extractLsb, _update_PTE_Flags_A, _update_PTE_Flags_D] <;>
+    bv_decide
+
+/-- **A kernel-stack page past the seal is one as of the seal** (the walk reads the same frozen
+pointers and a variant of the same leaf). -/
+theorem KptInv.kstk_toS {rs : List RsvRegion} {m : FlatMem} {top S : Nat} {dyn : List KSlot}
+    (hok : kptSealOk rs m top S dyn) (hh : kptHistsAt m S dyn) {t : Nat} (hSt : S ≤ t) {p : PAddr}
+    (hp : kstkPageAt rs m t p) : kstkPageAt rs m S p := by
+  obtain ⟨base, cnt, vhi, i, r, hR, hi, ⟨hr0, base', cnt', stride, k, hR', hk, hw⟩, v2, v1, v0, p1, p0, w2, pp2,
+    w1, pp1, w0, pl⟩ := hp
+  obtain ⟨d, hd, haddr, hfz, _, hpage⟩ := hok.2.2.2.1 base' cnt' stride k hR' hk
+  have hs := KptInv.slot_asOfGe hok hh hd hSt (v := r) (by rw [haddr]; exact hw)
+  simp only [hfz, ↓reduceIte] at hs
+  have hrS : wordAsOf m (base' + BitVec.ofNat 64 (stride * k)) S r := by
+    obtain ⟨v, hv⟩ := KptInv.slot_existsGe hh hd (Nat.le_refl S)
+    have e := KptInv.slot_asOfGe hok hh hd (Nat.le_refl S) hv
+    simp only [hfz, ↓reduceIte] at e
+    rw [← haddr, hs, ← e]
+    exact hv
+  have hpr : pageIn dyn r := by rw [hs]; exact hpage (by rw [← hs]; exact hr0)
+  have ptr : ∀ (q c : PAddr) (v : BitVec 64), pageIn dyn q → ∀ idx, idx < 512 →
+      wordAsOf m (q + BitVec.ofNat 64 (8 * idx)) t v → ptPtrTo v c →
+      wordAsOf m (q + BitVec.ofNat 64 (8 * idx)) S v ∧ pageIn dyn c := by
+    intro q c v hq idx hidx hv hpv
+    obtain ⟨d', hd', ha'⟩ := hq idx hidx
+    have e := KptInv.slot_asOfGe hok hh hd' hSt (v := v) (by rw [ha']; exact hv)
+    cases hf : d'.frozen
+    · simp only [hf, Bool.false_eq_true, ↓reduceIte] at e
+      obtain ⟨ppn, perm, a, dd, hcd⟩ := (hok.2.2.1 d' hd').1 hf
+      rw [hcd] at e
+      obtain ⟨a', d'', rfl⟩ := pteVariant_of_kLeaf ppn perm a dd e
+      exact absurd hpv (KptInv.not_ptPtrTo_kLeaf ppn perm a' d'' c)
+    · simp only [hf, ↓reduceIte] at e
+      obtain ⟨vS, hvS⟩ := KptInv.slot_existsGe hh hd' (Nat.le_refl S)
+      have eS := KptInv.slot_asOfGe hok hh hd' (Nat.le_refl S) hvS
+      simp only [hf, ↓reduceIte] at eS
+      refine ⟨?_, hok.2.2.2.2 d' hd' hf c (by rw [← e]; exact hpv)⟩
+      rw [← ha', e, ← eS]
+      exact hvS
+  obtain ⟨w2S, hp1⟩ := ptr r p1 v2 hpr _ (Nat.mod_lt _ (by decide)) w2 pp2
+  obtain ⟨w1S, hp0⟩ := ptr p1 p0 v1 hp1 _ (Nat.mod_lt _ (by decide)) w1 pp1
+  obtain ⟨d0, hd0, ha0⟩ := hp0 (kvpnIdx (vhi - 2 * (i + 1)) 0) (Nat.mod_lt _ (by decide))
+  have e0 := KptInv.slot_asOfGe hok hh hd0 hSt (v := v0) (by rw [ha0]; exact w0)
+  obtain ⟨v0S, hv0S⟩ := KptInv.slot_existsGe hh hd0 (Nat.le_refl S)
+  have e0S := KptInv.slot_asOfGe hok hh hd0 (Nat.le_refl S) hv0S
+  refine ⟨base, cnt, vhi, i, r, hR, hi, ⟨hr0, base', cnt', stride, k, hR', hk, hrS⟩, v2, v1, v0S, p1, p0, w2S, pp2,
+    w1S, pp1, by rw [← ha0]; exact hv0S, ?_⟩
+  cases hf : d0.frozen
+  · simp only [hf, Bool.false_eq_true, ↓reduceIte] at e0 e0S
+    obtain ⟨ppn, perm, a, dd, hcd⟩ := (hok.2.2.1 d0 hd0).1 hf
+    rw [hcd] at e0 e0S
+    obtain ⟨a1, d1, rfl⟩ := pteVariant_of_kLeaf ppn perm a dd e0
+    obtain ⟨a2, d2, rfl⟩ := pteVariant_of_kLeaf ppn perm a dd e0S
+    exact KptInv.ptLeafTo_ad ppn perm a1 d1 a2 d2 p pl
+  · simp only [hf, ↓reduceIte] at e0 e0S
+    rw [e0S, ← e0]
+    exact pl
+
+theorem KptInv.ksKey_inj {q q' : PAddr} (h : ksKey q = ksKey q') : q = q' :=
+  BitVec.eq_of_toNat_eq (Nat.add_left_cancel (by unfold ksKey at h; exact h))
+
+/-- **A valid receipt's page holds no kernel-stack byte** (as of any position). -/
+theorem KptInv.ksFreePg_of {rs : List RsvRegion} {m : FlatMem} {top S : Nat} {dyn : List KSlot}
+    {stk : List PAddr} (hok : kptSealOk rs m top S dyn) (hh : kptHistsAt m S dyn)
+    (hin : ∀ p, kstkPageAt rs m S p → p ∈ stk) {q : PAddr} (hal : q.toNat % 4096 = 0) (hq : q ∉ stk)
+    (hst : ∀ j, j < 4096 → ¬ stackByteIn rs (q + BitVec.ofNat 64 j)) : ksFreePg rs m q := by
+  intro t j hj hks
+  rcases hks with hs | ⟨hpw, p, hp, hlo, hhi⟩
+  · exact hst j hj hs
+  have hS := KptInv.pubWritten_gt hok hpw
+  have hpS := KptInv.kstk_toS hok hh (Nat.le_of_lt hS) hp
+  have hpin := hin p hpS
+  obtain ⟨_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, pl⟩ := hp
+  have hpa := KptInv.leafTo_aligned pl
+  have hqlt := q.isLt
+  have hqj : (q + BitVec.ofNat 64 j).toNat = q.toNat + j := by
+    rw [BitVec.toNat_add, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (a := j) (by omega)]
+    exact Nat.mod_eq_of_lt (by omega)
+  rw [hqj] at hlo hhi
+  have hpq : p = q := BitVec.eq_of_toNat_eq (by omega)
+  exact hq (hpq ▸ hpin)
+
+/-- **A stack-free receipt, minted** (mcslrec (3) X1-c): a hart owning byte 0 of the page `q`
+OUTRIGHT, once the kernel table is sealed, learns that `q` is no carved (kernel-stack) page -- the
+interpretation holds half of each carved page's byte 0 -- and registers a persistent receipt
+(re-issued if one exists).  `q` page-aligned and off the static stacks (the client's facts). -/
+theorem memModel_ksMint (σ : MState) (ξ : CtxId) (q : PAddr) (v : BitVec 8) (hal : q.toNat % 4096 = 0)
+    (hst : ∀ j, j < 4096 → ¬ stackByteIn (rsvList (hlc := hlc) (GF := GF)) (q + BitVec.ofNat 64 j)) :
+    memModel σ ∗ ctxByte ξ q (DFrac.own 1) v ∗ kptSealed ⊢@{IProp GF}
+      |==> (memModel σ ∗ ctxByte ξ q (DFrac.own 1) v ∗ ksRcptAt (MachGS.era (hlc := hlc) (GF := GF)) q) := by
+  unfold memModel memModelAt rsvModelAt kptModelAt kptSealed kptSealedAt ksRcptsAll
+  iintro ⟨⟨Htop, Hauth, Hviews, Hresv, %hmm, ⟨%reg, Hreg, %⟨hin, hex, hrok, hrp⟩, %S, %dyn, %stk,
+    %⟨hlk, hseal⟩, Hcells, Hcarve, #Hrc⟩, Hh, Hch⟩, Hb, #Hsl⟩
+  ihave %hget := ghost_map_lookup $$ Hreg Hsl
+  have hne := hlk.2 _ hget
+  rcases hseal with h0 | hok
+  · exact absurd h0.1 hne
+  -- `q` is not carved: the interpretation would hold half of its byte 0
+  by_cases hmem : q ∈ stk
+  · obtain ⟨i, hi⟩ := List.mem_iff_getElem?.1 hmem
+    icases (BigSepL.bigSepL_lookup_acc (Φ := fun _ q' => ksCarveAt (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) q')
+      hi).1 $$ Hcarve with ⟨Hcv, _⟩
+    unfold ksCarveAt ctxByte
+    icases Hcv with ⟨%H, Hpt⟩
+    icases Hb with ⟨%e, %He, Hp, _⟩
+    icases pointsTo_ne $$ Hp Hpt with %hne'
+    exact (hne' rfl).elim
+  cases hk : get? reg (ksKey q) with
+  | some v0 =>
+    have hv0 := (hok.2.2.2 _ _ hk (Nat.le_add_right _ _)).1
+    subst hv0
+    ihave #Hr := Hrc $$ %q %hk
+    imodintro
+    iframe Hb Hr Htop Hauth Hviews Hresv Hh Hch
+    isplit
+    · ipureintro; exact hmm
+    iexists reg
+    iframe Hreg
+    isplit
+    · ipureintro; exact ⟨hin, hex, hrok, hrp⟩
+    iexists S, dyn, stk
+    iframe Hcells Hcarve Hrc
+    ipureintro
+    exact ⟨hlk, Or.inr hok⟩
+  | none =>
+    imod ghost_map_insert_persist (ksKey q) 0 hk $$ Hreg with ⟨Hreg, #Hnew⟩
+    imodintro
+    iframe Hb Htop Hauth Hviews Hresv Hh Hch
+    have hlt : ∀ k, k < 2 ^ 64 → get? (Iris.Std.PartialMap.insert reg (ksKey q) (0 : Agent)) k = get? reg k :=
+      fun k hk' => by rw [Iris.Std.LawfulPartialMap.get?_insert_ne (by unfold ksKey; omega)]
+    have hin' : staticIn (rsvList (hlc := hlc) (GF := GF)) (Iris.Std.PartialMap.insert reg (ksKey q) 0) :=
+      fun i R hi => by rw [hlt _ R.base.isLt]; exact hin i R hi
+    have hex' : rsvExact (rsvList (hlc := hlc) (GF := GF)) (Iris.Std.PartialMap.insert reg (ksKey q) 0) :=
+      fun k i hk' hg => by rw [hlt k hk'] at hg; exact hex k i hk' hg
+    isplitr [Hnew]
+    · isplit
+      · ipureintro; exact hmm
+      iexists (Iris.Std.PartialMap.insert reg (ksKey q) 0)
+      iframe Hreg
+      isplit
+      · ipureintro
+        exact ⟨hin', hex', reservedOk_of_all hex' (all_of_reservedOk hin hrok), hrp⟩
+      iexists S, dyn, stk
+      iframe Hcells Hcarve
+      isplitl []
+      · ipureintro
+        refine ⟨⟨fun k v' hv hk1 hk2 => ?_, fun v' hv => ?_⟩, Or.inr ⟨hok.1, hok.2.1, hok.2.2.1, fun k v' hv hk1 => ?_⟩⟩
+        · rw [Iris.Std.LawfulPartialMap.get?_insert_ne (by unfold ksKey kptSealKey at *; omega)] at hv
+          exact hlk.1 k v' hv hk1 hk2
+        · rw [Iris.Std.LawfulPartialMap.get?_insert_ne (by unfold ksKey kptSealKey; omega)] at hv
+          exact hlk.2 v' hv
+        · by_cases hkq : ksKey q = k
+          · rw [Iris.Std.LawfulPartialMap.get?_insert_eq hkq] at hv
+            exact ⟨(Option.some.inj hv).symm, q, hkq.symm, hal, hmem, hst⟩
+          · rw [Iris.Std.LawfulPartialMap.get?_insert_ne hkq] at hv
+            exact hok.2.2.2 k v' hv hk1
+      · imodintro
+        iintro %q' %hq'
+        by_cases hqq : ksKey q = ksKey q'
+        · rw [← KptInv.ksKey_inj hqq]
+          unfold ksRcptAt
+          iexact Hnew
+        · rw [Iris.Std.LawfulPartialMap.get?_insert_ne hqq] at hq'
+          iapply Hrc $$ %q' %hq'
+    · unfold ksRcptAt
+      iexact Hnew
+
+/-- **The carve from an owned byte** (mcslrec (3) X1-c): half of it goes to the interpretation's
+carve (the other half and the byte's key are dropped). -/
+theorem ksCarve_of_ctxByte (ξ : CtxId) (q : PAddr) (v : BitVec 8) :
+    ctxByte ξ q (DFrac.own 1) v ⊢@{IProp GF} ksCarveAt (MachGS.era (hlc := hlc) (GF := GF)) q := by
+  unfold ctxByte ksCarveAt
+  iintro ⟨%e, %H, Hp, _⟩
+  have h := (Fractional.fractional (Φ := fun r => iprop(q ↦ₕ{DFrac.own r} (e :: H))) (1 : Qp).half (1 : Qp).half)
+  rw [Qp.half_add_half] at h
+  icases h.1 $$ Hp with ⟨H1, _⟩
+  iexists (e :: H)
+  iexact H1
+
+/-- The carve from an owned one-byte cell. -/
+theorem ksCarve_of_bytes (ξ : CtxId) (q q' : PAddr) (hq : q' = q) (w : BitVec (8 * 1)) :
+    ctxBytes ξ q' 1 (DFrac.own 1) w ⊢@{IProp GF} ksCarveAt (MachGS.era (hlc := hlc) (GF := GF)) q := by
+  subst hq
+  unfold ctxBytes
+  simp only [List.range_one]
+  iintro H
+  icases BigSepL.bigSepL_singleton.1 $$ H with H
+  have e : q' + BitVec.ofNat 64 0 = q' := by simp
+  rw [e]
+  iapply ksCarve_of_ctxByte $$ H
+
+/-- **A receipt is valid of the machine** (mcslrec (3) X1-c): no byte of its page is a
+kernel-stack byte, as of any position. -/
+theorem memModel_ksValid (σ : MState) (q : PAddr) :
+    genHeapInterp σ.mem ∗ memModel σ ∗ ksRcptAt (MachGS.era (hlc := hlc) (GF := GF)) q ⊢@{IProp GF}
+      ⌜ksFreePg (rsvList (hlc := hlc) (GF := GF)) σ.mem q⌝ := by
+  unfold memModel memModelAt rsvModelAt kptModelAt ksRcptAt
+  iintro ⟨Hm, ⟨_, _, _, _, _, ⟨%reg, Hreg, _, %S, %dyn, %stk, %⟨_, hseal⟩, Hcells, _, _⟩, _, _⟩, #Hr⟩
+  ihave %hget := ghost_map_lookup $$ Hreg Hr
+  rcases hseal with h0 | hok
+  · have := h0.2.2.2 _ _ hget
+    unfold ksKey at this
+    omega
+  ihave %hh : ⌜kptHistsAt σ.mem S dyn⌝ $$ [Hm Hcells]
+  · iapply kptCells_hists _ σ.mem S dyn $$ [Hm Hcells]
+    iframe
+  ipureintro
+  obtain ⟨_, q', hk, hal, hq, hst⟩ := hok.2.2.2 _ _ hget (Nat.le_add_right _ _)
+  obtain rfl := KptInv.ksKey_inj hk
+  exact KptInv.ksFreePg_of hok.1 hh hok.2.2.1 hal hq hst
 
 end MachCSL

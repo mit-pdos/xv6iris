@@ -1606,7 +1606,8 @@ theorem memModel_kslot_acc (σ : MState) (pa : PAddr) (c : BitVec 64) :
       (∀ Hs' : Nat → Hist, ⌜kslotHistOk S ⟨pa, c, false⟩ Hs'⌝ -∗
         histBytes pa 8 (fun _ => DFrac.own (1 : Qp).half) Hs' -∗ memModel σ) := by
   unfold memModel memModelAt rsvModelAt kptModelAt kslotReg
-  iintro ⟨⟨Htop, Hauth, Hviews, Hresv, %hmm, ⟨%reg, Hreg, %hrs, %S, %dyn, %⟨hlk, hseal⟩, Hcells⟩, Hh, Hch⟩, #Hfrag⟩
+  iintro ⟨⟨Htop, Hauth, Hviews, Hresv, %hmm, ⟨%reg, Hreg, %hrs, %S, %dyn, %stk, %⟨hlk, hseal⟩, Hcells, Hcarve, #Hrc⟩, Hh,
+    Hch⟩, #Hfrag⟩
   ihave %hget := ghost_map_lookup $$ Hreg Hfrag
   obtain ⟨⟨daddr, dc, dfz⟩, hd, hfz, hkey, hval⟩ := hlk.1 _ _ hget (Nat.le_add_right _ _)
     (by unfold kslotKey kptSealKey; have := pa.isLt; omega)
@@ -1646,8 +1647,8 @@ theorem memModel_kslot_acc (σ : MState) (pa : PAddr) (c : BitVec 64) :
   iframe Hreg
   isplit
   · ipureintro; exact hrs
-  iexists S, dyn
-  iframe Hc
+  iexists S, dyn, stk
+  iframe Hc Hcarve Hrc
   ipureintro
   exact ⟨hlk, Or.inr hok⟩
 

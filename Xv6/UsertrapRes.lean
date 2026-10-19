@@ -56,7 +56,7 @@ THE WHOLE-PAGE STACK (the uservec obligation, notes/design-rulings.md):
 uservec is entered at a context `k` whose `sp` is the trapframe's
 `kernel_sp` (`uservecKWords`: `tfW ws 1 = k.sp`), and usertrap's kexit arm
 hands the WHOLE page back (`SpecKexit`'s stack closer), so the loop runs
-uservec at `k.sp = V.kstack + 4096`, `k.avail = 512` (`utStackTop`).  What
+uservec at `k.sp = V.kstack + 4096`, `k.avail = 511` (`utStackTop`).  What
 userret leaves is deeper when the thread came through forkret (whose frame
 is never popped: Rocq SpecForkret "the frame merged back in"); the frame's
 cells are the caller's, and `userretLeft_pop` / `userretLeft_top` merge them
@@ -169,8 +169,8 @@ theorem uservecCtx_ok (k : KCtx) (g : RegMap) (ws : List (BitVec 64)) (h : k.sie
     utCtxOk (uservecCtx k g ws) := ⟨h, rfl, rfl⟩
 
 /-- **The whole-page stack** uservec is entered at: `sp` at the page top
-`ksp`, all 512 slots free (the trap reserve is empty at `sie = false`). -/
-def utStackTop (k : KCtx) (ksp : BitVec 64) : Prop := k.sp = ksp ∧ k.avail = 512
+`ksp`, all 511 slots free (the trap reserve is empty at `sie = false`). -/
+def utStackTop (k : KCtx) (ksp : BitVec 64) : Prop := k.sp = ksp ∧ k.avail = 511
 
 section Trap
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
@@ -203,7 +203,7 @@ theorem userretLeft_pop (cpu : CPU) (k : KCtx) (m : Nat) :
 /-- ...and at the page top: the frame is exactly the gap between the
 context's `sp` and `ksp`, and the merged context is `utStackTop`. -/
 theorem userretLeft_top (cpu : CPU) (k : KCtx) (ksp : BitVec 64) (m : Nat)
-    (hsp : k.sp + 8#64 * BitVec.ofNat 64 m = ksp) (hav : k.avail + m = 512) :
+    (hsp : k.sp + 8#64 * BitVec.ofNat 64 m = ksp) (hav : k.avail + m = 511) :
     userretLeft (GF := GF) cpu k ∗ stackOwn ksp m ⊢
       userretLeft cpu (k.pop m) ∗ ⌜utStackTop (k.pop m) ksp⌝ := by
   iintro ⟨Hl, Hm⟩

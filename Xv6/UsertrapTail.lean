@@ -177,7 +177,7 @@ set_option maxHeartbeats 4000000 in
 /-- **Rocq `ut_ret`** (+0xae). -/
 theorem usertrap_ret_proof (PR : PREPARE_RETURN) : UT_RET (hlc := hlc) (GF := GF) PT Γ := by
   intro A cpu kb R V2 M2 sts2 cs2 hok hb hpins hrows hlive
-  have hkb : 422 ≤ kb.avail := by
+  have hkb : 421 ≤ kb.avail := by
     have h := utBase_avail hb
     rw [hok.hctx.1, hok.havail] at h
     unfold trapRes kvFrameSlots at h

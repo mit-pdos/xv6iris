@@ -147,7 +147,7 @@ theorem ut90_call [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hlc) GF Γ
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, #Hcaps, #Hpay, Hkont, Hbs, Hfd, Hir, Henv, Hpriv, Hfrag, Hch, Hsi, Hfi, Hpi⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  have hav : A.k.avail = 512 := hok.havail
+  have hav : A.k.avail = 511 := hok.havail
   -- +0xa2  jal syscall
   k_step_e (wp_s_jal cpu _ (KA.«usertrap» + 0xa2#64) false 580#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ut90_sys_tgt]
@@ -187,7 +187,7 @@ theorem ut90_call [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hlc) GF Γ
           A.ksp + 0xFFFFFFFFFFFFFFE0#64 := by
         rw [KCtx.sp_withRegs]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hsp
       have hn : 4 + (trapRes ((A.k.intrOn.pushed 4).withRegs (R.set 1#5 (KA.«usertrap» + 0xa6#64))).sie +
-          ((A.k.intrOn.pushed 4).withRegs (R.set 1#5 (KA.«usertrap» + 0xa6#64))).avail) = 512 := by
+          ((A.k.intrOn.pushed 4).withRegs (R.set 1#5 (KA.«usertrap» + 0xa6#64))).avail) = 511 := by
         simp only [KCtx.withRegs_sie, KCtx.pushed_sie, KCtx.intrOn_sie, KCtx.withRegs_avail,
           KCtx.pushed_avail, KCtx.intrOn_avail, hav]; decide
       have e3 : (utSysRec A.sep A.V).kstack + 4096#64 = A.ksp := hok.hks
@@ -221,7 +221,7 @@ theorem ut90_bump [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hlc) GF Γ
       utKont PT Γ A
     ⊢ wpLoop (GF := GF) cpu := by
   have hsie : A.k.sie = false := hok.hctx.1
-  have hav : A.k.avail = 512 := hok.havail
+  have hav : A.k.avail = 511 := hok.havail
   have h9 : R 9#5 = procAddr A.j := hpins.2.1
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Hcaps, Hown, Hsi, Hfi, Hpi, Hkont⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -335,7 +335,7 @@ theorem ut90_after [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hlc) GF �
       utKont PT Γ A ∗ utKillRead (hlc := hlc) A.gn iprop(emp) kl
     ⊢ wpLoop (GF := GF) cpu := by
   have hsie : A.k.sie = false := hok.hctx.1
-  have hav : A.k.avail = 512 := hok.havail
+  have hav : A.k.avail = 511 := hok.havail
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Hcaps, Hown, Hsi, Hfi, Hpi, Hkont, Hrd⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   by_cases hk0 : kl = 0#32
@@ -372,7 +372,7 @@ theorem ut90_after [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hlc) GF �
       simp [RegMap.set_apply]
     have e2 : (((R.set 10#5 0xFFFFFFFFFFFFFFFF#64).set 1#5 (KA.«usertrap» + 0xce#64)) 2#5)
         = A.ksp + 0xFFFFFFFFFFFFFFE0#64 := by simp [RegMap.set_apply]; exact hsp
-    have e3 : trapRes A.k.sie + (A.k.avail - 4) = 508 := by rw [hsie, hav]; decide
+    have e3 : trapRes A.k.sie + (A.k.avail - 4) = 507 := by rw [hsie, hav]; decide
     iapply (HK A cpu ((A.k.pushed 4).withRegs
         ((R.set 10#5 0xFFFFFFFFFFFFFFFF#64).set 1#5 (KA.«usertrap» + 0xce#64)))
       (utV1 A) A.M A.sts A.cs (A.k.regs 1#5) (A.k.regs 8#5) (A.k.regs 9#5) (A.k.regs 18#5) hok
@@ -391,7 +391,7 @@ theorem usertrap_90_proof [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hl
     (HK : UT_KEXIT (hlc := hlc) PT Γ) : UT_90A (hlc := hlc) PT Γ := by
   intro A cpu R hok hpins h10 hsc
   have hsie : A.k.sie = false := hok.hctx.1
-  have hav : A.k.avail = 512 := hok.havail
+  have hav : A.k.avail = 511 := hok.havail
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Hcaps, Hown, Hsi, Hfi, Hpi, Hkont⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_tier _ _ $$ Hk with ⟨%hti, Hk⟩

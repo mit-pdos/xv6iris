@@ -420,7 +420,7 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (FP : FORKRET_PARK_PAID)
     (hlocks : kf.locks = ["proc"]) (htier : kf.tier = KTier.kpt) (hK : 10 ≤ kf.avail) :
     kctx cpu kf ∗ pcIs cpu (KA.«userinit» + 0x24#64) ∗ procsInv Γ ∗
     procHeld Γ cpu j USED ch ∗ hartAtAny Γ (procAddr j) ∗ zsElem (procAddr j) none ∗ slotUsed Γ (procAddr j) ∗
-    procPriv (procAddr j) pid V M ∗ stackOwn (V.kstack + 4096#64) 512 ∗ liveAllow ∗
+    procPriv (procAddr j) pid V M ∗ stackOwn (V.kstack + 4096#64) 511 ∗ liveAllow ∗
     chFrag V.chg (procAddr j) ∅ ∗
     inodeHeldAt (kf.regs 10#5) ROOTINO ∗ inodeHeldAt V.root ROOTINO ∗ uiBootRows (procAddr j) pid V.gen ∗
     ([∗list] _f ∈ List.replicate NOFILE (0#64 : BitVec 64), fdSlot) ∗
@@ -636,7 +636,7 @@ theorem ui_publish [X : CurCtx] (RE : RELEASE) (IR : IGETROOT) (ID : IDUP) (FP :
     itableInv (hlc := hlc) ∗ iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ panicEnv ∗
     irefSlot ∗ irefSlot ∗ liveAllow ∗ chFrag V.chg (procAddr j) ∅ ∗
     procHeld Γ cpu j USED ch ∗ hartAtAny Γ (procAddr j) ∗ zsElem (procAddr j) none ∗ slotUsed Γ (procAddr j) ∗
-    procPriv (procAddr j) pid V M ∗ stackOwn (V.kstack + 4096#64) 512 ∗
+    procPriv (procAddr j) pid V M ∗ stackOwn (V.kstack + 4096#64) 511 ∗
     uiBootRows (procAddr j) pid V.gen ∗
     ([∗list] _f ∈ List.replicate NOFILE (0#64 : BitVec 64), fdSlot) ∗
     ([∗list] i ∈ List.range NOFILE, fdStAt V.fdg i (.own 1) .closed) ∗

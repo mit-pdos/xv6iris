@@ -1559,6 +1559,57 @@ def kptLinked (dyn : List KSlot) (reg : RegMapF Agent) : Prop :=
     ∃ d ∈ dyn, d.frozen = false ∧ k = kslotKey d.addr ∧ v = d.c.toNat) ∧
   ∀ v, get? reg kptSealKey = some v → dyn ≠ []
 
+/-! ### The kernel-stack carve and the stack-free receipts (mcslrec (3) X1-c, [OWN.90] [OWN.104] (b))
+
+At the seal the client hands the interpretation HALF of byte 0 of every kernel-stack page
+(`stk`: every page `MachCSL.kstkPageAt` names as of the seal is listed), so a page the client
+later owns OUTRIGHT is no kernel-stack page: its owner mints a persistent RECEIPT (a registry
+element at `ksKey q`), valid of the machine (`ksPost`): `q` page-aligned, off the carve and off the
+static stacks.  Before the seal there is no carve and no receipt (`ksPre`). -/
+
+/-- The registry key of the stack-free receipt for the page at `q`: past the seal key. -/
+def ksKey (q : PAddr) : Nat := 2 ^ 66 + q.toNat
+
+/-- Before the seal: no receipt. -/
+def ksPre (reg : RegMapF Agent) : Prop := ∀ k v, get? reg k = some v → k < 2 ^ 66
+
+/-- **The carve's list and the receipts after the seal `S`**: every kernel-stack page as of the
+seal is carved; every receipt names a page-aligned page off the carve and off the static stacks. -/
+def ksPost (rs : List RsvRegion) (m : FlatMem) (S : Nat) (stk : List PAddr) (reg : RegMapF Agent) : Prop :=
+  (∀ p, kstkPageAt rs m S p → p ∈ stk) ∧
+  ∀ k v, get? reg k = some v → 2 ^ 66 ≤ k → v = 0 ∧ ∃ q : PAddr, k = ksKey q ∧ q.toNat % 4096 = 0 ∧ q ∉ stk ∧
+    ∀ j, j < 4096 → ¬ stackByteIn rs (q + BitVec.ofNat 64 j)
+
+/-- **No byte of the page at `q` is a kernel-stack byte**, as of any position: what a valid
+receipt gives. -/
+def ksFreePg (rs : List RsvRegion) (m : FlatMem) (q : PAddr) : Prop :=
+  ∀ t j, j < 4096 → ¬ ksByteAt rs m t (q + BitVec.ofNat 64 j)
+
+/-- **A stack-free receipt** for the page at `q` (persistent): its registry element. -/
+def ksRcptAt [MachFixedGS hlc GF] (E : EraGS) (q : PAddr) : IProp GF := E.rsvName ↪◯MAP[ksKey q]{.discard} 0
+
+instance [MachFixedGS hlc GF] (E : EraGS) (q : PAddr) : Persistent (PROP := IProp GF) (ksRcptAt E q) := by
+  unfold ksRcptAt; infer_instance
+
+/-- Every registered receipt is re-issuable (the interpretation keeps them). -/
+def ksRcptsAll [MachFixedGS hlc GF] (E : EraGS) (reg : RegMapF Agent) : IProp GF := iprop%
+  □ ∀ q : PAddr, ⌜get? reg (ksKey q) = some 0⌝ -∗ ksRcptAt E q
+
+instance [MachFixedGS hlc GF] (E : EraGS) (reg : RegMapF Agent) : Persistent (PROP := IProp GF) (ksRcptsAll E reg) := by
+  unfold ksRcptsAll; infer_instance
+
+/-- With no receipt key registered, every receipt is re-issuable (vacuously). -/
+theorem ksRcptsAll_none [MachFixedGS hlc GF] (E : EraGS) (reg : RegMapF Agent)
+    (h : ∀ q : PAddr, get? reg (ksKey q) ≠ some 0) : ⊢@{IProp GF} ksRcptsAll E reg := by
+  unfold ksRcptsAll
+  imodintro
+  iintro %q %hq
+  exact absurd hq (h q)
+
+/-- The interpretation's half of a carved page's byte 0. -/
+def ksCarveAt [MachFixedGS hlc GF] (E : EraGS) (q : PAddr) : IProp GF := iprop%
+  ∃ H : Hist, pointsTo (G := E.mem) q (DFrac.own (1 : Qp).half) H
+
 /-- The interpretation's share of a sealed slot, sealed at `S`. -/
 def kslotCellAt [MachFixedGS hlc GF] (E : EraGS) (S : Nat) (d : KSlot) : IProp GF := iprop%
   ∃ Hs : Nat → Hist, ([∗list] j ∈ List.range 8, pointsTo (G := E.mem) (d.addr + BitVec.ofNat 64 j) (kslotFrac d) (Hs j)) ∗
@@ -1567,11 +1618,13 @@ def kslotCellAt [MachFixedGS hlc GF] (E : EraGS) (S : Nat) (d : KSlot) : IProp G
 /-- **The sealed kernel table's conjunct** of era `E`'s interpretation, at
 the registry `reg`. -/
 def kptModelAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (reg : RegMapF Agent) : IProp GF := iprop%
-  ∃ (S : Nat) (dyn : List KSlot),
-    ⌜kptLinked dyn reg ∧ ((dyn = [] ∧ pubClean (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem) ∨
+  ∃ (S : Nat) (dyn : List KSlot) (stk : List PAddr),
+    ⌜kptLinked dyn reg ∧ ((dyn = [] ∧ pubClean (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem ∧
+        stk = [] ∧ ksPre reg) ∨
       (kptSealOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem σ.top S dyn ∧
-        MachFixedGS.kptOk (hlc := hlc) (GF := GF) dyn))⌝ ∗
-    [∗list] d ∈ dyn, kslotCellAt E S d
+        MachFixedGS.kptOk (hlc := hlc) (GF := GF) dyn ∧
+        ksPost (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ.mem S stk reg))⌝ ∗
+    ([∗list] d ∈ dyn, kslotCellAt E S d) ∗ ([∗list] q ∈ stk, ksCarveAt E q) ∗ ksRcptsAll E reg
 
 /-- **The seal's certificate** (persistent): the era's record is sealed. -/
 def kptSealedAt [MachFixedGS hlc GF] (E : EraGS) : IProp GF := E.rsvName ↪◯MAP[kptSealKey]{.discard} 0
@@ -1656,10 +1709,10 @@ theorem kptModel_stateOk [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (reg : R
     genHeapInterp (G := E.mem) σ.mem ∗ kptModelAt E σ reg ⊢@{IProp GF}
       ⌜kptStateOk (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) σ⌝ := by
   unfold kptModelAt
-  iintro ⟨Hm, %S, %dyn, %⟨_, hseal⟩, Hc⟩
+  iintro ⟨Hm, %S, %dyn, %stk, %⟨_, hseal⟩, Hc, _, _⟩
   rcases hseal with hnil | hok
   · ipureintro
-    exact ⟨S, dyn, .inl hnil⟩
+    exact ⟨S, dyn, .inl ⟨hnil.1, hnil.2.1⟩⟩
   · ihave %hh : ⌜kptHistsAt σ.mem S dyn⌝ $$ [Hm Hc]
     · iapply kptCells_hists E σ.mem S dyn $$ [Hm Hc]
       iframe
@@ -1671,15 +1724,15 @@ theorem kptModel_stateOkK [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (reg : 
     genHeapInterp (G := E.mem) σ.mem ∗ kptModelAt E σ reg ⊢@{IProp GF}
       ⌜kptStateOkK (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) (MachFixedGS.kptOk (hlc := hlc) (GF := GF)) σ⌝ := by
   unfold kptModelAt
-  iintro ⟨Hm, %S, %dyn, %⟨_, hseal⟩, Hc⟩
+  iintro ⟨Hm, %S, %dyn, %stk, %⟨_, hseal⟩, Hc, _, _⟩
   rcases hseal with hnil | hok
   · ipureintro
-    exact ⟨S, dyn, .inl hnil⟩
+    exact ⟨S, dyn, .inl ⟨hnil.1, hnil.2.1⟩⟩
   · ihave %hh : ⌜kptHistsAt σ.mem S dyn⌝ $$ [Hm Hc]
     · iapply kptCells_hists E σ.mem S dyn $$ [Hm Hc]
       iframe
     ipureintro
-    exact ⟨S, dyn, .inr ⟨hok.1, hh, hok.2⟩⟩
+    exact ⟨S, dyn, .inr ⟨hok.1, hh, hok.2.1⟩⟩
 
 /-- **The reserved-region conjunct** of era `E`'s interpretation (plan [R25.2]
 deliverable (i): `⌜staticIn reg ∧ reservedOk σ reg⌝` beside `⌜mmOk σ⌝`), with

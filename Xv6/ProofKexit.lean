@@ -192,7 +192,7 @@ theorem kx_dormant_build (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : Pr
     (M : Nat → List (BitVec 8)) (hof : V.ofile = List.replicate NOFILE 0#64) (hcwd : V.cwd = 0#64)
     (hroot : V.root = 0#64) :
     procPrivNoctxAt (GF := GF) ξ pa pid V M ∗ dormantAllow ∗ chFrag V.chg pa ∅ ∗
-      @stackOwn hlc GF _ ⟨ξ, KTier.kpt⟩ (V.kstack + 4096#64) 512 ∗
+      @stackOwn hlc GF _ ⟨ξ, KTier.kpt⟩ (V.kstack + 4096#64) 511 ∗
       genHalvesAt pa pid V.gen ∗
       (∃ xsv : BitVec 32, @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pXstate pa) 4 xsHalf xsv ∗
         exitTok V.gen pid (xstateVal xsv) ∗ zsElem pa (some (pid, xstateVal xsv))) ⊢
@@ -847,7 +847,7 @@ theorem kx_rest_root (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP)
     wordPointsTo (pSecc (procAddr j)) 8 (DFrac.own 1) V.pvSecc ∗
     procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗ actCnt (procAddr j) V.ev ∗
     stackOwn (spval + 48#64) 6 ∗
-    (stackOwn (spval + 48#64) ((trapRes eb + availval) + 6) -∗ stackOwn (V.kstack + 4096#64) 512) ∗
+    (stackOwn (spval + 48#64) ((trapRes eb + availval) + 6) -∗ stackOwn (V.kstack + 4096#64) 511) ∗
     isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initIdentAt curCtx ip ∗
     chFrag V.chg (procAddr j) cs ∗
     myPay V.gen Q ∗ (Q (xstateOf status) ∨ (⌜xstateOf status = -1⌝ ∗ killShot V.gen ∗ takenAt V.gen))
@@ -1406,7 +1406,7 @@ theorem kx_rest (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC 
     wordPointsTo (pSecc (procAddr j)) 8 (DFrac.own 1) V.pvSecc ∗
     procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗ actCnt (procAddr j) V.ev ∗
     stackOwn (spval + 48#64) 6 ∗
-    (stackOwn (spval + 48#64) ((trapRes eb + availval) + 6) -∗ stackOwn (V.kstack + 4096#64) 512) ∗
+    (stackOwn (spval + 48#64) ((trapRes eb + availval) + 6) -∗ stackOwn (V.kstack + 4096#64) 511) ∗
     isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initIdentAt curCtx ip ∗
     chFrag V.chg (procAddr j) cs ∗
     myPay V.gen Q ∗ (Q (xstateOf status) ∨ (⌜xstateOf status = -1⌝ ∗ killShot V.gen ∗ takenAt V.gen))
@@ -1560,7 +1560,7 @@ theorem kx_after_loop (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP
     (hX : curTier = KTier.kpt) :
     kxLoopExit (hlc := hlc) (GF := GF) Γ γ γkl γk j pid V M eb status spval availval
       iprop(fdSlots FDSPARE ∗ irefSlots 3 ∗ panicEnv ∗ stackOwn (spval + 48#64) 6 ∗
-        (stackOwn (spval + 48#64) ((trapRes eb + availval) + 6) -∗ stackOwn (V.kstack + 4096#64) 512) ∗
+        (stackOwn (spval + 48#64) ((trapRes eb + availval) + 6) -∗ stackOwn (V.kstack + 4096#64) 511) ∗
         isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initIdentAt curCtx ip ∗
         chFrag V.chg (procAddr j) cs ∗
         myPay V.gen Q ∗ (Q (xstateOf status) ∨ (⌜xstateOf status = -1⌝ ∗ killShot V.gen ∗ takenAt V.gen))) := by
@@ -1847,9 +1847,9 @@ theorem kexit_proof (MP : MYPROC) (FC : FILECLOSE) (BO : BEGIN_OP) (IP : IPUT) (
   have hav6 : (trapRes k.sie + (k.avail - 6)) + 6 = trapRes k.sie + k.avail := by
     rw [kexitSlots_eq] at hK; omega
   ihave Hcloser := (show iprop(stackOwn (GF := GF) (k.regs 2#5) (trapRes k.sie + k.avail) -∗
-        stackOwn (V.kstack + 4096#64) 512) ⊢
+        stackOwn (V.kstack + 4096#64) 511) ⊢
       iprop(stackOwn (k.regs 2#5 - 8#64 * BitVec.ofNat 64 6 + 48#64) ((trapRes k.sie + (k.avail - 6)) + 6) -∗
-        stackOwn (V.kstack + 4096#64) 512) from by
+        stackOwn (V.kstack + 4096#64) 511) from by
     rw [kx_sp48, hav6]) $$ Hcloser
   -- wire the fd loop, whose continuation is the tail (`kx_after_loop` → `kx_rest`)
   iapply (kx_loop FC Γ γl γ γkl γk j hj pid V M k.sie (k.regs 10#5)
@@ -1857,7 +1857,7 @@ theorem kexit_proof (MP : MYPROC) (FC : FILECLOSE) (BO : BEGIN_OP) (IP : IPUT) (
       iprop(fdSlots FDSPARE ∗ irefSlots 3 ∗ panicEnv ∗
         stackOwn (k.regs 2#5 - 8#64 * BitVec.ofNat 64 6 + 48#64) 6 ∗
         (stackOwn (k.regs 2#5 - 8#64 * BitVec.ofNat 64 6 + 48#64) ((trapRes k.sie + (k.avail - 6)) + 6) -∗
-          stackOwn (V.kstack + 4096#64) 512) ∗
+          stackOwn (V.kstack + 4096#64) 511) ∗
         isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initIdentAt curCtx ip ∗
         chFrag V.chg (procAddr j) cs ∗
         myPay V.gen Q ∗ (Q (xstateOf (k.regs 10#5)) ∨ (⌜xstateOf (k.regs 10#5) = -1⌝ ∗ killShot V.gen ∗ takenAt V.gen))) rfl

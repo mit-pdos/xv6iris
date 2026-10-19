@@ -77,7 +77,7 @@ slot's event counter at the block's `ev` (`actCnt pa V.ev`, Rocq G's
 def freeprocIn (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) : IProp GF := iprop%
   ⌜V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64 ∧ V.root = 0#64⌝ ∗
   wordPointsTo (pPid pa) 4 pidPriv pid ∗ procFields pa (DFrac.own 1) V ∗
-  dormantAllow ∗ chFrag V.chg pa ∅ ∗ actCnt pa V.ev ∗ stackOwn (V.kstack + 4096#64) 512 ∗
+  dormantAllow ∗ chFrag V.chg pa ∅ ∗ actCnt pa V.ev ∗ stackOwn (V.kstack + 4096#64) 511 ∗
   (if V.trapframe = 0#64 then emp else
     ⌜V.trapframe = pageAddr V.upt.tfp ∧ pageValid V.trapframe⌝ ∗ tfPageAt V.upt.tfp V.tf) ∗
   (if V.pagetable = 0#64 then emp else

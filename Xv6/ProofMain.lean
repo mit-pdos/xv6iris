@@ -360,7 +360,7 @@ theorem mn_phaseB (PR : PROCINIT) (TI : TRAPINIT) (TIH : TRAPINITHART) (PLI : PL
     (pas : Nat → BitVec 44) (hok : kvmTableOk t pas) :
     kctx startedPrimary (k.withRegs R0) ∗ pcIs startedPrimary (KA.«main» + 122#64) ∗
     mnKptB cn ∗ mnProcBoot Γ ∗ lockFreeTok γt ∗ lockFreeTok γc ∗ lkFresh consAddr ∗
-    kstackPages pas ∗ kstackMapAt pas ∗ mnWorldB γ0 γ1 γl0 γl1 ∗
+    kstackPagesC pas ∗ kstackMapAt pas ∗ mnWorldB γ0 γ1 γl0 γl1 ∗
     (∃ v : BitVec 64, Register.stvec ↦ᵣ[startedPrimary] v) ∗
     mnKptFs ∗ mnFsBoot (hlc := hlc) dk Rspent Pb ∗
     kallocAvail fsReadyKmem (some (kinitPages - kvmmakeCount)) ∗
@@ -564,8 +564,8 @@ theorem main_proof (CI : CPUID) (CN : CONSOLEINIT) (PI : PRINTKINIT) (PK : PRINT
   icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
   ihave Hpub := started_pubClean _ _ _ $$ Hinv Hprim
   iapply (mn_publish rfl startedPrimary _ t pas hok (startedPrim γi))
-  iframe Hk Htree Hauth Hroot Hrootw Hpub
-  iintro Hk #Hkpt #Hsmap #Htr #Hrp Hprim
+  iframe Hk Htree Hauth Hroot Hrootw Hstk Hpub
+  iintro Hk #Hkpt #Hsmap #Htr #Hrp Hstk Hprim
   -- +0x76  kvminithart: the switch
   iapply (mn_kvminithart KVH rfl startedPrimary (k.pushed 2) R8 hs2 (by simp; omega) tlb0 t (kvmMapT pas))
   iframe Hk Hpc Htlb Hkpt Hrp

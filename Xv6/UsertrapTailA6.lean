@@ -68,12 +68,12 @@ theorem ut_yield [ClaimIs (hlc := hlc) GF Γ] (YI : YIELD) (c : CPU) (k' : KCtx)
 
 /-- The base's slot budget: 512 with the trap reserve. -/
 theorem ut_base_avail {Γ : SchedNames} {A : UtArgs GF} {kb : KCtx} (hok : UtOk Γ A) (hb : utBase A.k kb) :
-    trapRes kb.sie + kb.avail = 512 := by
+    trapRes kb.sie + kb.avail = 511 := by
   have := utBase_avail hb
   rw [this, hok.hctx.1, hok.havail]; rfl
 
 theorem ut_base_avail_ge {Γ : SchedNames} {A : UtArgs GF} {kb : KCtx} (hok : UtOk Γ A) (hb : utBase A.k kb) :
-    422 ≤ kb.avail := by
+    421 ≤ kb.avail := by
   have h := ut_base_avail hok hb
   unfold trapRes kvFrameSlots at h; split at h <;> omega
 
@@ -134,7 +134,7 @@ theorem usertrap_a6_after [ClaimIs (hlc := hlc) GF Γ] (HR : UT_RET PT Γ) (HK :
         = -1#64 := by simp [RegMap.set_apply]
     have e2 : ((((R.set 18#5 0#64).set 10#5 0xFFFFFFFFFFFFFFFF#64).set 1#5 (KA.«usertrap» + 0xfc#64)) 2#5)
         = A.ksp + 0xFFFFFFFFFFFFFFE0#64 := by simp [RegMap.set_apply]; exact hsp
-    have e3 : trapRes kb.sie + (kb.avail - 4) = 508 := by omega
+    have e3 : trapRes kb.sie + (kb.avail - 4) = 507 := by omega
     iapply (HK A cpu ((kb.pushed 4).withRegs
         (((R.set 18#5 0#64).set 10#5 0xFFFFFFFFFFFFFFFF#64).set 1#5 (KA.«usertrap» + 0xfc#64)))
       V2 M2 sts2 cs2 (A.k.regs 1#5) (A.k.regs 8#5) (A.k.regs 9#5) (A.k.regs 18#5) hok
@@ -226,7 +226,7 @@ theorem usertrap_a6_self [ClaimIs (hlc := hlc) GF Γ] (KI : KILLED) (HK : UT_KEX
     have hb' := utBase_withSpie _ _ spie spp hb
     have hbav' := ut_base_avail hok hb'
     have hav' := ut_base_avail_ge hok hb'
-    have e3 : trapRes (kb.withSpie spie spp).sie + ((kb.withSpie spie spp).avail - 4) = 508 := by omega
+    have e3 : trapRes (kb.withSpie spie spp).sie + ((kb.withSpie spie spp).avail - 4) = 507 := by omega
     ihave Htear : utTear (hlc := hlc) (GF := GF) A.gn sts2 $$ [Hcp Hq]
     · unfold utTear; iright; iframe Hcp Hq
     iapply (HK A cpu (((kb.withSpie spie spp).pushed 4).withRegs
@@ -329,7 +329,7 @@ theorem usertrap_fa_proof [ClaimIs (hlc := hlc) GF Γ] (YI : YIELD) (HR : UT_RET
   have hsie : A.k.sie = false := hok.hctx.1
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Hcaps, Hown, Houts, Hko, Hkont⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  have hav : A.k.avail = 512 := hok.havail
+  have hav : A.k.avail = 511 := hok.havail
   -- +0xfc  c.li a5,2
   k_step (wp_s_addi cpu _ (KA.«usertrap» + 0xfc#64) true 2#12 15#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]

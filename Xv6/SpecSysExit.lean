@@ -92,7 +92,7 @@ def wp_sys_exit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   procPrivFd γ (procAddr j) pid V M ∗ fdFrags V.fdg sts ∗ filecloseCpays (hlc := hlc) sts ∗
   chFrag V.chg (procAddr j) cs ∗
   myPay V.gen Q ∗ Q (exitXs V.tf) ∗
-  (stackOwn k.sp k.avail -∗ stackOwn (V.kstack + 4096#64) 512)
+  (stackOwn k.sp k.avail -∗ stackOwn (V.kstack + 4096#64) 511)
   ⊢ wpLoop (GF := GF) cpu
 
 /-- **WP of `sys_exit()`, at either entry `SIE`**: the complement in,
@@ -118,7 +118,7 @@ def wp_sys_exit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
   procPrivFd γ (procAddr j) pid V M ∗ fdFrags V.fdg sts ∗ filecloseCpays (hlc := hlc) sts ∗
   chFrag V.chg (procAddr j) cs ∗
   myPay V.gen Q ∗ Q (exitXs V.tf) ∗
-  (stackOwn k.sp (trapRes k.sie + k.avail) -∗ stackOwn (V.kstack + 4096#64) 512)
+  (stackOwn k.sp (trapRes k.sie + k.avail) -∗ stackOwn (V.kstack + 4096#64) 511)
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `sys_exit`. -/

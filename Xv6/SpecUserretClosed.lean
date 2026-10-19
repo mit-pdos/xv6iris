@@ -107,7 +107,7 @@ def wp_userret_closed_body (PT : SchedNames → IProp GF) (Γ : SchedNames) (j :
     (m : Nat) (P : UPtd) (ksp : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
     (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32) (sep sc tv : BitVec 64)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hctx : utCtxOk k) (htier : k.tier = KTier.kpt)
-    (hnoff : k.noff = 0) (hsp : k.sp + 8#64 * BitVec.ofNat 64 m = ksp) (hav : k.avail + m = 512)
+    (hnoff : k.noff = 0) (hsp : k.sp + 8#64 * BitVec.ofNat 64 m = ksp) (hav : k.avail + m = 511)
     (ha0 : k.regs 10#5 = satpOf KTier.kpt P.root) (hsep : retPc sep = tfResumePc V.tf)
     (hgn : gn = V.gen) : Prop :=
   wireInv ∗ kmapAt trampVpn (kLeaf trampPpn .rx 0#1 0#1) ∗

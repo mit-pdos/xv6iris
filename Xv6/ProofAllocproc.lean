@@ -667,7 +667,7 @@ def apPostCells [CurCtx] (Γ : SchedNames) (cpu : CPU) (γk : KmemNames) (on : O
     procPriv (procAddr j) pid V M ∗ dormantAllow ∗ zsElem (procAddr j) none ∗ chFrag V.chg (procAddr j) ∅ ∗
     genNew V.gen (procAddr j) pid Q ∗ slotGen (procAddr j) (.own 1) V.gen ∗ pidRegRest pid V.gen ∗
     (∃ xsv : BitVec 32, wordPointsTo (pXstate (procAddr j)) 4 xsHalf xsv) ∗
-    stackOwn (V.kstack + 4096#64) 512 ∗
+    stackOwn (V.kstack + 4096#64) 511 ∗
     kallocAvail γk (availSub on g))
 
 /-- `allocproc`'s continuation, at the cells-level post. -/
@@ -1282,7 +1282,7 @@ theorem ap_dormant_unused_elim [CurCtx] (pa : BitVec 64) :
       wordPointsTo (pPid pa) 4 pidPriv 0#32 ∗ procFields pa (DFrac.own 1) V ∗
       dormantAllow ∗ chFrag V.chg pa ∅ ∗ actCnt pa V.ev ∗ slotGen pa (.own 1) V.gen ∗
       (∃ xsv : BitVec 32, wordPointsTo (pXstate pa) 4 xsHalf xsv) ∗
-      stackOwn (V.kstack + 4096#64) 512 := by
+      stackOwn (V.kstack + 4096#64) 511 := by
   have hz : ¬ ((UNUSED : BitVec 32) = ZOMBIE) := by decide
   unfold procDormant dormantSpace genHalvesDorm
   simp only [if_neg hz, if_pos (rfl : (UNUSED : BitVec 32) = UNUSED), ite_true]

@@ -90,6 +90,12 @@ theorem rsvRegMap_kptLinked (rs : List RsvRegion) : kptLinked [] (rsvRegMap rs) 
   refine ⟨fun k i h hk _ => absurd (hbig k i h) (by omega), fun v h => absurd (hbig _ v h) ?_⟩
   unfold kptSealKey; omega
 
+/-- The boot registry holds no stack-free receipt (mcslrec (3) X1-c). -/
+theorem rsvRegMap_ksPre (rs : List RsvRegion) : ksPre (rsvRegMap rs) := fun k i h => by
+  obtain ⟨_, R, _, hb⟩ := rsvRegMapAux_exact rs 0 k i h
+  have := R.base.isLt
+  omega
+
 /-! ## The heap's cells, reserved bytes split out -/
 
 /-- The heap map without the reserved bytes. -/

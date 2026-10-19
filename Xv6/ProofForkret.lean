@@ -40,7 +40,7 @@ open LeanRV64D
 
 set_option linter.unusedSimpArgs false
 
-theorem fkr_prep_slots : prepareReturnSlots ≤ 416 := by decide
+theorem fkr_prep_slots : prepareReturnSlots ≤ 415 := by decide
 
 section Arms
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
