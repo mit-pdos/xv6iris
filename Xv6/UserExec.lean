@@ -134,7 +134,11 @@ def userHartOk : HartState → Prop
 
 /-- **Rocq `user_mstatus_ok`** (bit positions as MachCSL `smFacts`): SXL = 2,
 MPRV = 0, MXR = 0, FS = VS = Off, TVM = TSR = 0, and the four kernel-tier
-pins `sret` left (XS = Off, SD = 0, MPP ≠ 2, SIE = 1). -/
+pins `sret` left (XS = Off, SD = 0, MPP ≠ 2, SIE = 1); and, since sail-riscv
+0.16 (as `smFacts`, last): SDT = 0 (bit 24), GVA = 0 (bit 38), MPV = 0
+(bit 39), MDT = 0 (bit 42) -- every `mstatus` write clears them, `Ssdbltrp`,
+`H` and `Smdbltrp` being absent -- and TW = 0 (bit 21: the board's value, which
+S-mode cannot write), so the trapped `mstatus` meets `smFacts` again. -/
 def userMstatusOk (ms : BitVec 64) : Prop :=
   BitVec.extractLsb' 34 2 ms = 2#2 ∧
   BitVec.extractLsb' 17 1 ms = 0#1 ∧
@@ -146,10 +150,17 @@ def userMstatusOk (ms : BitVec 64) : Prop :=
   BitVec.extractLsb' 15 2 ms = 0#2 ∧
   BitVec.extractLsb' 63 1 ms = 0#1 ∧
   BitVec.extractLsb' 11 2 ms ≠ 2#2 ∧
-  BitVec.extractLsb' 1 1 ms = 1#1
+  BitVec.extractLsb' 1 1 ms = 1#1 ∧
+  BitVec.extractLsb' 24 1 ms = 0#1 ∧
+  BitVec.extractLsb' 38 1 ms = 0#1 ∧
+  BitVec.extractLsb' 39 1 ms = 0#1 ∧
+  BitVec.extractLsb' 42 1 ms = 0#1 ∧
+  BitVec.extractLsb' 21 1 ms = 0#1
 
 /-- **Rocq `trap_mstatus_ok`**: after the trap -- the same pins, SPP = U,
-SIE = 0, and SPIE = 1 (the trap copied SIE = 1 into it). -/
+SIE = 0, and SPIE = 1 (the trap copied SIE = 1 into it); and the 0.16 pins
+SDT = GVA = MPV = MDT = TW = 0 (as `userMstatusOk`; the trap does not touch
+them). -/
 def trapMstatusOk (ms : BitVec 64) : Prop :=
   BitVec.extractLsb' 34 2 ms = 2#2 ∧
   BitVec.extractLsb' 17 1 ms = 0#1 ∧
@@ -163,7 +174,12 @@ def trapMstatusOk (ms : BitVec 64) : Prop :=
   BitVec.extractLsb' 15 2 ms = 0#2 ∧
   BitVec.extractLsb' 63 1 ms = 0#1 ∧
   BitVec.extractLsb' 11 2 ms ≠ 2#2 ∧
-  BitVec.extractLsb' 5 1 ms = 1#1
+  BitVec.extractLsb' 5 1 ms = 1#1 ∧
+  BitVec.extractLsb' 24 1 ms = 0#1 ∧
+  BitVec.extractLsb' 38 1 ms = 0#1 ∧
+  BitVec.extractLsb' 39 1 ms = 0#1 ∧
+  BitVec.extractLsb' 42 1 ms = 0#1 ∧
+  BitVec.extractLsb' 21 1 ms = 0#1
 
 /-- **Rocq `WpIntrCore.stvec_base`**: the direct-mode trap target. -/
 def stvecBase (v : BitVec 64) : BitVec 64 := v &&& ~~~3#64

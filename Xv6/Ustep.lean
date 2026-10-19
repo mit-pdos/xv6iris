@@ -180,8 +180,11 @@ def ustoreDeniedPerm (π : Nat → Option UPerm) (va : BitVec 64) : Bool :=
 def uaccessOk (M : ElfMem) (va : BitVec 64) (k : Nat) : Bool :=
   decide (va.toNat % k = 0) && ubytesOk M va.toNat k
 
-/-- The scause of `wp_uk_store_denied`'s trap (`UkLeafWrap`: `E_SAMO_Page_Fault`). -/
-def ustoreFaultScause : BitVec 64 := utrapScause (.Exception (.E_SAMO_Page_Fault ())) 0#64
+/-- The scause of `wp_uk_store_denied`'s trap (`UkLeafWrap`: `E_SAMO_Page_Fault`).  Since
+sail-riscv 0.16 a trap cause carries an `ExceptionContext`; the scause reads only its `trap`
+field (`trapCause_bits`), so the context's other fields are immaterial here. -/
+def ustoreFaultScause : BitVec 64 :=
+  utrapScause (.Exception (make_exception_context (.E_SAMO_Page_Fault ()) 0#64 false none)) 0#64
 
 /-! ### The `Bool` tests are the leaves' premises (what U-2a reads them as) -/
 

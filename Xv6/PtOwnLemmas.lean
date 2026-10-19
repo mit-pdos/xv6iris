@@ -610,7 +610,7 @@ theorem ptreeOwn_read_acc [CurCtx] (lvl : Nat) (dq : DFrac) (t : PTree) (i : Bit
 
 theorem pageAddr_align (b : BitVec 44) : (Xv6.pageAddr b).toNat % 8 = 0 := by
   have h8 : BitVec.extractLsb' 0 3 (Xv6.pageAddr b) = 0#3 := by
-    simp only [Xv6.pageAddr, pteAddr, LeanRV64D.zero_extend, Sail.BitVec.zeroExtend]
+    simp only [Xv6.pageAddr, pteAddr, LeanRV64D.Functions.zero_extend, Sail.BitVec.zeroExtend]
     bv_decide
   have h8' := congrArg BitVec.toNat h8
   simp only [BitVec.extractLsb'_toNat, Nat.shiftRight_zero, BitVec.toNat_ofNat,

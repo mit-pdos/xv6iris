@@ -358,10 +358,10 @@ theorem pteAddr_ne_zero (b : BitVec 44) (i : BitVec 9) (h : pageAddr b ≠ 0#64)
   intro hc
   refine h ?_
   have hb : b = 0#44 := by
-    unfold pteAddr LeanRV64D.zero_extend Sail.BitVec.zeroExtend at hc
+    unfold pteAddr LeanRV64D.Functions.zero_extend Sail.BitVec.zeroExtend at hc
     revert hc; bv_decide
   rw [hb]
-  unfold pageAddr pteAddr LeanRV64D.zero_extend Sail.BitVec.zeroExtend
+  unfold pageAddr pteAddr LeanRV64D.Functions.zero_extend Sail.BitVec.zeroExtend
   bv_decide
 
 /-- The address a completed walk returns is never `0`, since every node page

@@ -15,7 +15,6 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
-  LeanRV64D.Functions.virtual_memory_supported
 
 /-- `auipc a5,0x9 ; ld a5,904(a5)` at `0x80000f8e` reads `kernel_pagetable`. -/
 theorem kpt_addr : KA.«kvminithart» + 0x9486#64 = KA.«kernel_pagetable» := by decide
@@ -29,7 +28,7 @@ theorem satp_word (rootAddr : BitVec 64) (hhi : BitVec.extractLsb' 56 8 rootAddr
 theorem kvminithart_br_9486 : KA.«kvminithart» + 0x9486#64 = KA.«kernel_pagetable» := by decide
 
 set_option maxHeartbeats 4000000 in
-theorem kvminithart_proof : KVMINITHART := ⟨fun {GF} _ X cpu k tlb0 rootAddr dqr t M hX hsie hK hhi hroot => by
+theorem kvminithart_proof : KVMINITHART := ⟨fun {GF} _ X cpu k tlb0 rootAddr dqr t M hX hsie hK hhi hroot hstage => by
   unfold wp_kvminithart_body
   iintro ⟨Hk, Hpc, Htlb, Hroot, #Hkpt, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -48,6 +47,8 @@ theorem kvminithart_proof : KVMINITHART := ⟨fun {GF} _ X cpu k tlb0 rootAddr d
   -- sfence.vma
   k_step (wp_s_sfence_vma_cell cpu _ ?hs (KA.«kvminithart» + 0x8#64) false tlb0) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc Htlb
+  -- the entry TLB holds supervisor-stage entries only: the fence leaves it empty
+  rw [tlbFlushS_of_stageS tlb0 hstage]
   -- auipc a5,0x9 ; ld a5,904(a5) : the root's address
   k_step (wp_s_auipc cpu _ (KA.«kvminithart» + 0xc#64) false 9#20 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc

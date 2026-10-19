@@ -96,20 +96,20 @@ theorem w_idx2 (va : BitVec 64) (b : BitVec 44) :
     ((va >>> (Sail.BitVec.extractLsb (BitVec.ofNat 64 30) 5 0) &&& 511#64) <<< 3) + pageAddr b
       = pteAddr b (vpnIdx (vpnOf va) 2) := by
   simp only [pageAddr, pteAddr, vpnIdx, vpnOf, Sail.BitVec.extractLsb, BitVec.extractLsb,
-    LeanRV64D.zero_extend, Sail.BitVec.zeroExtend]
+    LeanRV64D.Functions.zero_extend, Sail.BitVec.zeroExtend]
   bv_decide
 
 theorem w_idx1 (va : BitVec 64) (b : BitVec 44) :
     ((va >>> (Sail.BitVec.extractLsb (BitVec.ofNat 64 21) 5 0) &&& 511#64) <<< 3) + pageAddr b
       = pteAddr b (vpnIdx (vpnOf va) 1) := by
   simp only [pageAddr, pteAddr, vpnIdx, vpnOf, Sail.BitVec.extractLsb, BitVec.extractLsb,
-    LeanRV64D.zero_extend, Sail.BitVec.zeroExtend]
+    LeanRV64D.Functions.zero_extend, Sail.BitVec.zeroExtend]
   bv_decide
 
 theorem w_idx0 (va : BitVec 64) (b : BitVec 44) :
     ((va >>> 12 &&& 511#64) <<< 3) + pageAddr b = pteAddr b (vpnIdx (vpnOf va) 0) := by
   simp only [pageAddr, pteAddr, vpnIdx, vpnOf,
-    LeanRV64D.zero_extend, Sail.BitVec.zeroExtend]
+    LeanRV64D.Functions.zero_extend, Sail.BitVec.zeroExtend]
   bv_decide
 
 /-- The pushed context with its pinned bits, in the callee's spelling. -/

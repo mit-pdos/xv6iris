@@ -130,12 +130,12 @@ theorem kxc_elf_align (sp0 : BitVec 64) (h : (kxcElfBuf sp0).toNat % 8 = 0) :
 /-- Rocq `kxc_page_base_inj`, at proc_pagetable's Lean post: the trapframe
 page the new table maps IS the block's own `tfp` (deviation 6). -/
 theorem kxc_tfp_extract (t : BitVec 44) : BitVec.extractLsb' 12 44 (pageAddr t) = t := by
-  simp only [pageAddr, pteAddr, LeanRV64D.zero_extend, Sail.BitVec.zeroExtend]
+  simp only [pageAddr, pteAddr, LeanRV64D.Functions.zero_extend, Sail.BitVec.zeroExtend]
   bv_decide
 
 /-- Rocq `kxc_tf_align`: proc_pagetable's `htf` premise. -/
 theorem kxc_tf_align (t : BitVec 44) : pageAddr t &&& 0xfff#64 = 0#64 := by
-  simp only [pageAddr, pteAddr, LeanRV64D.zero_extend, Sail.BitVec.zeroExtend]
+  simp only [pageAddr, pteAddr, LeanRV64D.Functions.zero_extend, Sail.BitVec.zeroExtend]
   bv_decide
 
 /-! ## THE COVERAGE HALF OF THE PHDR LOOP INVARIANT, ACROSS uvmalloc -/

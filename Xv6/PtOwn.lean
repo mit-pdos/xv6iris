@@ -161,7 +161,7 @@ def _root_.MachCSL.PTree.missingRun : PTree → BitVec 27 → Nat → Nat
 
 /-- `PTE2PA` of a pointer entry. -/
 theorem ptr_page (b : BitVec 44) : ((kPtr b >>> 10) <<< 12) = pageAddr b := by
-  simp only [kPtr, mkPte, ptrFlags, pageAddr, pteAddr, LeanRV64D.zero_extend,
+  simp only [kPtr, mkPte, ptrFlags, pageAddr, pteAddr, LeanRV64D.Functions.zero_extend,
     Sail.BitVec.zeroExtend]
   bv_decide
 

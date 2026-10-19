@@ -199,7 +199,7 @@ theorem paOf_kstackVa (ppn : BitVec 44) (i : Nat) (hi : i < 64) (off : Nat) (hof
   unfold paOf
   rw [hlow]
   unfold pageAddr pteAddr
-  simp only [LeanRV64D.zero_extend, Sail.BitVec.zeroExtend]
+  simp only [LeanRV64D.Functions.zero_extend, Sail.BitVec.zeroExtend]
   have hoff' : BitVec.ofNat 64 off < 4096#64 := by
     rw [BitVec.lt_def]; simp only [BitVec.toNat_ofNat, Nat.reducePow]; omega
   have h12 : (BitVec.ofNat 12 off : BitVec 12) = BitVec.setWidth 12 (BitVec.ofNat 64 off) := by
