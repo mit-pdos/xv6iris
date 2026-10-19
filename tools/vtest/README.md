@@ -125,11 +125,15 @@ imported by `Vtest.lean`, so CI stays green while its row says `no proof`.
 What fails CI is an imported module that stopped compiling -- a proof that
 used to hold, or the harness.
 
-Current state (after the narrow-virtio fix below): QEMU 69 pass (68 agree, 1
-stuck), JH7110 23, CVA6 19 (18 agree, 1 stuck).  Rocq's green set is QEMU 64,
-JH7110 23, CVA6 19: the same runs, plus the five hart-1 variants
+Current state (the sail-riscv 0.16 model, since 2026-10-19): QEMU 66 pass (65
+agree, 1 stuck), JH7110 23, CVA6 18 (17 agree, 1 stuck).  Rocq's green set is
+QEMU 64, JH7110 23, CVA6 19.  Ours is Rocq's plus the five hart-1 variants
 (`core_smoke`, `core_regs_{fcsr,hpm,pmp,scsr}` on hart 1), for which the Rocq
-tool does not generate a proof.  Every run that is red here is red in Rocq.
+tool does not generate a proof, minus the four runs the 0.16 configuration
+turned red (`notes/device-conformance.md`, "The 0.16 bump": QEMU/CoreRegsFcsr
+on both harts, CVA6/CoreRegsFcsr, QEMU/CoreCsrprobe).  Apart from those four,
+every run that is red here is red in Rocq.  (Before the bump: QEMU 69, JH7110
+23, CVA6 19.)
 
 ## Layout
 
