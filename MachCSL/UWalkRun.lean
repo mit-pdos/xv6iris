@@ -715,17 +715,21 @@ partial def walkRun (cx : Cfg) (X orc s m : Lean.Expr) : TacticM (Lean.Expr × L
     return (res, mkAppN (mkConst ``uwk_congr) #[X, cx.D, orc, s, m, m', res, hm, p])
   if core.isAppOfArity ``ite 5 then
     let a := core.getAppArgs
-    let c := a[1]!; let tb := a[3]!; let eb := a[4]!
+    let α := a[0]!; let c := a[1]!; let inst := a[2]!; let tb := a[3]!; let eb := a[4]!
     match ← decideProp cx c with
-    | some (hc, true) => return ← rewriteAt core tb (← mkAppM ``ite_eq_left #[hc])
-    | some (hc, false) => return ← rewriteAt core eb (← mkAppM ``ite_eq_right #[hc])
+    | some (hc, true) =>
+      return ← rewriteAt core tb (← mkAppOptM ``ite_eq_left #[some c, some inst, some hc, some α, some tb, some eb])
+    | some (hc, false) =>
+      return ← rewriteAt core eb (← mkAppOptM ``ite_eq_right #[some c, some inst, some hc, some α, some tb, some eb])
     | none => throwError "uwk_run: cannot decide{indentExpr c}"
   if core.isAppOfArity ``dite 5 then
     let a := core.getAppArgs
-    let c := a[1]!; let tb := a[3]!; let eb := a[4]!
+    let α := a[0]!; let c := a[1]!; let inst := a[2]!; let tb := a[3]!; let eb := a[4]!
     match ← decideProp cx c with
-    | some (hc, true) => return ← rewriteAt core (tb.beta #[hc]) (← mkAppM ``dite_eq_left #[hc])
-    | some (hc, false) => return ← rewriteAt core (eb.beta #[hc]) (← mkAppM ``dite_eq_right #[hc])
+    | some (hc, true) =>
+      return ← rewriteAt core (tb.beta #[hc]) (← mkAppOptM ``dite_eq_left #[some c, some inst, some hc, some α, some tb, some eb])
+    | some (hc, false) =>
+      return ← rewriteAt core (eb.beta #[hc]) (← mkAppOptM ``dite_eq_right #[some c, some inst, some hc, some α, some tb, some eb])
     | none => throwError "uwk_run: cannot decide{indentExpr c}"
   if let some mi ← matchMatcherApp? core then
     for i in [0:mi.discrs.size] do
