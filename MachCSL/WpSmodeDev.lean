@@ -307,7 +307,7 @@ theorem execSpecF_lbu_dev [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : B
   swp_run 150
   iapply swp_bind
   conf_intro HmConf
-  iapply (swp_transform_effective_address_S cpu dq c sie curTier root hok _ _ (Or.inr (Or.inl rfl)))
+  iapply (swp_transform_effective_address_S cpu dq c sie curTier root hok _)
   iframe HmConf
   inext
   iintro HmConf
@@ -396,7 +396,7 @@ theorem execSpecF_sb_dev [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bo
   swp_run 150
   iapply swp_bind
   conf_intro HmConf
-  iapply (swp_transform_effective_address_S cpu dq c sie curTier root hok _ _ (Or.inr (Or.inr (Or.inl rfl))))
+  iapply (swp_transform_effective_address_S cpu dq c sie curTier root hok _)
   iframe HmConf
   inext
   iintro HmConf
