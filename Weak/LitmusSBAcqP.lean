@@ -1,7 +1,7 @@
 /-
 Weak: **allocproc route P, spike P0(b)** (`notes/weak-allocproc-routeP-design.md` §0 FINDING F-P1, §5
-row P0 (b), §8 Q-P-R1).  Lean-only, no Rocq twin.  A LEAF: nothing imports this file (it imports
-`Weak.LitmusSBAcq`, whose `SBAcq.*` kit and Litmus 1 it reuses).
+row P0 (b), §8 Q-P-R1).  Lean-only, no Rocq twin.  A leaf of the route-P record: only `Weak/SbCandLit.lean` imports it
+(it imports `Weak.LitmusSBAcq`, whose `SBAcq.*` kit and Litmus 1 it reuses).
 
 ## Spec first (RVWMO / riscv.cat / Sail / Zifencei / PMAs)
 
@@ -57,6 +57,12 @@ a RAM access po-before an I/O event is gmo-before it; [OWN.12] D32 (a′), [OWN.
   `SBAcqP.l3MemberT`: a δ1′ member EXISTS once the racy read is re-sourced to an older `≥ 1` value (the
   route-T taint discharge: the value feeds only `blez → unreachable`).  So δ1′'s sufficiency on this
   site rests on the 6m T-datum, not on the order.
+* §5 **F-R45-1** (R45 §2.1, [R45.s2], P-W1; [OWN.112]): the 3-hart `ip->ref` execution
+  (`iunlockput`/`iput` on A, `ilock`'s racy count read then `holding` on B, `acquire`/`iunlock` on
+  C).  `SBAcqP.l4Cat`/`SBAcqP.l4CatT`: RVWMO-CONSISTENT.  `SBAcqP.l4NoMemberP`: NO route-P member
+  without the reader exception, from program order + `ReadsGF` + `GateWr` alone (no FIFO, drain or
+  co hypothesis: the deadlock is buffer-shape independent).  `SBAcqP.l4MemberX`: a member EXISTS once
+  `e_B` (`ilock+0xe`) is exempt and reads the landed top (`SBAcqP.l4x`, `SBAcqP.l4xOnlyEB`).
 
 Spec: theorems about the existing model and the trusted item's TEXT; nothing assumed.  Lean-only
 helpers `SBAcqP.*`.
@@ -748,5 +754,133 @@ theorem SBAcqP.l3MemberT :
     SBAcq.floorSrc SBAcqP.l3t.gdG (SBAcq.posIn SBAcqP.ord3) SBAcqP.fl3 ∧
     SBAcq.srcLe SBAcqP.l3t.gdG (SBAcq.posIn SBAcqP.ord3) SBAcqP.fl3 :=
   SBAcq.memberBSound _ _ _ (by decide +kernel)
+
+/-! # 5. F-R45-1 — the `ip->ref` landing deadlock needs NO FIFO edge (R45 §2.1, [R45.s2]; [OWN.112])
+
+Bytes: `lk` = 0 (`dp->lock.lk`, the sleeplock's inner spinlock), `itable.lock` = 3, `ref` = 4
+(`dp->ref`; image value 2 = `w₀`, the count before A's decrement — an earlier landed `ref++`).
+Row 0 (hart A, `iunlockput(dp)`): `releasesleep`'s `acquire(&lk)` `A_lk` (0,0); `release(&lk)`:
+`fence rw,w` (0,1), `Y` = `sw zero lk` (0,2); `iput(dp)`: `acquire(&itable.lock)` (0,3), `lw ref`
+(0,4) reads `w₀`, `w` = `ref--` (0,5) writes 1 (`iput+0x22`).
+Row 1 (hart B, `ilock(dp)`): `e_B` = `ilock+0xe` (1,0) reads `ref = w`; `r_B` = `holding+0x0` (1,1)
+reads `lk = 1` = `A_lk` (stale: `Y` is co-after).
+Row 2 (hart C, `ilock` … `iunlock`): `e_C` = `holding+0x0` (2,0) reads `lk = 0` = `Y`; the
+`amoswap.w.aq` takes `lk` (2,1); `r_C` = `iunlock+0x1c` (2,2) reads `ref = w₀` (stale: `w` is co-after).
+The witness gmo is R45's `r_B < Y < e_C < r_C < w < e_B` (with `A_lk` first).  Deviation from R45's
+sketch: `w₀` is the image (R45 leaves its writer open; "FOUR-row" would add a row for an earlier
+`ref++`), which changes nothing — `ReadsGF`'s image clause gates an image reader exactly as `GateWr`
+gates a reader of a co-predecessor. -/
+
+def SBAcqP.img4 : Image := fun a => if a = 4 then some SBAcqP.b2 else some b0
+
+/-- `tB`/`vB`: what `e_B` reads (GF: write #5 = `w`, value 1). -/
+def SBAcqP.l4Prog (tB : Nat) (vB : BitVec 8) : List (List Lbl) :=
+  [[LRmw true false 0 [0] [b0] [b1] .WCexcl,
+    LFence true true false true,
+    LStore false 0 [b0] .WCplain,
+    LRmw true false 3 [0] [b0] [b1] .WCexcl,
+    LLoad false 4 [0] [SBAcqP.b2],
+    LStore false 4 [b1] .WCplain],
+   [LLoad false 4 [tB] [vB],
+    LLoad false 0 [1] [b1]],
+   [LLoad false 0 [2] [b0],
+    LRmw true false 0 [2] [b0] [b1] .WCexcl,
+    LLoad false 4 [0] [SBAcqP.b2]]]
+
+def SBAcqP.l4Gmo : List Geid :=
+  [(0, 0), (1, 1), (0, 2), (2, 0), (2, 1), (2, 2), (0, 3), (0, 4), (0, 5), (1, 0)]
+
+def SBAcqP.l4 : Gdexec := ⟨⟨SBAcqP.img4, SBAcqP.l4Prog 5 b1, SBAcqP.l4Gmo⟩, [], []⟩
+
+/-- **THE F-R45-1 EXECUTION IS RVWMO-CONSISTENT** (the faithful cat model). -/
+theorem SBAcqP.l4Cat : rvwmoCatConsistent SBAcqP.l4 := catConsistentBSound _ (by decide +kernel)
+
+/-- The tagged model, with the dependencies of the text: `acquire`'s spin branch into the release
+store, `iput`'s spin branch and data dependency into `ref--`, `holding`'s result into C's `amoswap`. -/
+def SBAcqP.l4Deps : List Tdep :=
+  [(((0, 0), (0, 2)), Dtag.DTctrl), (((0, 3), (0, 5)), Dtag.DTctrl), (((0, 4), (0, 5)), Dtag.DTdata),
+   (((2, 0), (2, 1)), Dtag.DTctrl)]
+
+theorem SBAcqP.l4CatT :
+    rvwmoCatConsistentT ⟨⟨SBAcqP.img4, SBAcqP.l4Prog 5 b1, SBAcqP.l4Gmo⟩, SBAcqP.l4Deps, []⟩ :=
+  catTConsistentBSound _ (by decide +kernel)
+
+/-- The outcome's rf: `e_B` ← `w` (#5), `r_B` ← `A_lk` (#1), `e_C` ← `Y` (#2). -/
+theorem SBAcqP.l4Rf :
+    gwriteAt SBAcqP.l4.gdG 5 = some (0, 5) ∧ gwriteAt SBAcqP.l4.gdG 1 = some (0, 0) ∧
+    gwriteAt SBAcqP.l4.gdG 2 = some (0, 2) := by
+  decide +kernel
+
+theorem SBAcqP.l4NoRl : (SBAcqP.l4Prog 5 b1).flatten.all (fun l => !lbRl l) = true := by decide +kernel
+
+/-- **F-R45-1: NO ROUTE-P MEMBER WITHOUT THE READER EXCEPTION** — for ANY issue/landing positions
+in which each hart's events keep program order, every read returns GF's source at the landed top
+(`ReadsGF`, i.e. the read gate applies to the two `ip->ref` reads too) and the write gate holds
+(`GateWr`): `q w < p e_B < p r_B < q Y < p e_C < p r_C < q w`.  NO FIFO, drain or co hypothesis is
+used, so the deadlock is the same under the FIFO and the per-address + epoch buffer. -/
+theorem SBAcqP.l4NoMemberP (p q : Geid → Nat)
+    (hpo : ∀ e1 e2, WeakRvwmoGraph.gpo SBAcqP.l4.gdG e1 e2 → p e1 < p e2)
+    (hr : SBAcqP.ReadsGF SBAcqP.l4.gdG p q) (hg : SBAcqP.GateWr SBAcqP.l4.gdG p q) : False := by
+  have hlw : SBAcqP.lpos SBAcqP.l4.gdG p q (0, 5) = q (0, 5) := by
+    unfold SBAcqP.lpos; exact if_pos (by decide +kernel)
+  have hlY : SBAcqP.lpos SBAcqP.l4.gdG p q (0, 2) = q (0, 2) := by
+    unfold SBAcqP.lpos; exact if_pos (by decide +kernel)
+  have a1 : q (0, 5) < p (1, 0) := by
+    rcases hr.1 (1, 0) 4 5 b1 (0, 5) ((grbBSpec _ _ _ _ _).1 (by decide +kernel)) SBAcqP.l4Rf.1 with
+      ⟨hgp, -⟩ | ⟨hl, -⟩
+    · exact absurd hgp.1 (by decide)
+    · rw [hlw] at hl; exact hl
+  have a2 := hpo (1, 0) (1, 1) ((gpoBSpec _ _ _).1 (by decide +kernel))
+  have a3 : p (1, 1) < q (0, 2) := by
+    have := hg (0, 2) 0 b0 (1, 1) 1 b1 (0, 0) ((gwbBSpec _ _ _ _).1 (by decide +kernel))
+      ((grbBSpec _ _ _ _ _).1 (by decide +kernel)) SBAcqP.l4Rf.2.1
+      ((gmoLtBSpec _ _ _).1 (by decide +kernel)) (by decide)
+    rw [hlY] at this; exact this
+  have a4 : q (0, 2) < p (2, 0) := by
+    rcases hr.1 (2, 0) 0 2 b0 (0, 2) ((grbBSpec _ _ _ _ _).1 (by decide +kernel)) SBAcqP.l4Rf.2.2 with
+      ⟨hgp, -⟩ | ⟨hl, -⟩
+    · exact absurd hgp.1 (by decide)
+    · rw [hlY] at hl; exact hl
+  have a5 := hpo (2, 0) (2, 2) ((gpoBSpec _ _ _).1 (by decide +kernel))
+  have a6 : p (2, 2) < q (0, 5) := by
+    have := (hr.2 (2, 2) 4 SBAcqP.b2 ((grbBSpec _ _ _ _ _).1 (by decide +kernel))).1 (0, 5) b1
+      ((gwbBSpec _ _ _ _).1 (by decide +kernel)) (by decide)
+    rw [hlw] at this; exact this
+  omega
+
+/-- …in particular no FIFO member (the §3 notion). -/
+theorem SBAcqP.l4NoMemberFifo (p q : Geid → Nat) :
+    ¬ (SBAcqP.FifoCore SBAcqP.l4.gdG p q ∧ SBAcqP.ReadsGF SBAcqP.l4.gdG p q ∧
+      SBAcqP.CoGF SBAcqP.l4.gdG p q ∧ SBAcqP.GateWr SBAcqP.l4.gdG p q) :=
+  fun ⟨hc, hr, _, hg⟩ => SBAcqP.l4NoMemberP p q hc.po hr hg
+
+/-- **THE COMPANION: A MEMBER WITH THE EXEMPTION** ([OWN.112], R45 §2.2 `rdX`): exempt `e_B` from the
+read gate — it reads the LANDED top, the image's `ref = 2` (`w` is still pending), where GF's value
+is 1; both `≥ 1`, so `ilock`'s `blez` takes the same arm.  `SBAcqP.l4x` is the graph with `e_B`
+re-sourced so; the walk: A runs to `Y`'s issue, `e_B` (top), `r_B` (stale `A_lk`, `Y` pending),
+`L(Y)`, C's `e_C`/`amoswap`/`r_C` (`w` not yet issued), A's `iput`, `L(w)`.  (`r_C` reads GF's value;
+the exemption of `iunlock+0x1c` is not needed on this witness.) -/
+def SBAcqP.l4x : Gdexec := ⟨⟨SBAcqP.img4, SBAcqP.l4Prog 0 SBAcqP.b2, SBAcqP.l4Gmo⟩, [], []⟩
+
+def SBAcqP.ord4X : List SBAcqP.Item :=
+  [(false, (0, 0)), (false, (0, 1)), (false, (0, 2)), (false, (1, 0)), (false, (1, 1)), (true, (0, 2)),
+   (false, (2, 0)), (false, (2, 1)), (false, (2, 2)), (false, (0, 3)), (false, (0, 4)), (false, (0, 5)),
+   (true, (0, 5))]
+
+theorem SBAcqP.l4MemberX :
+    SBAcqP.OrdOk SBAcqP.l4x.gdG SBAcqP.ord4X ∧
+    SBAcqP.FifoCore SBAcqP.l4x.gdG (SBAcqP.pOf SBAcqP.ord4X) (SBAcqP.qOf SBAcqP.ord4X) ∧
+    SBAcqP.ReadsGF SBAcqP.l4x.gdG (SBAcqP.pOf SBAcqP.ord4X) (SBAcqP.qOf SBAcqP.ord4X) ∧
+    SBAcqP.CoGF SBAcqP.l4x.gdG (SBAcqP.pOf SBAcqP.ord4X) (SBAcqP.qOf SBAcqP.ord4X) ∧
+    SBAcqP.GateWr SBAcqP.l4x.gdG (SBAcqP.pOf SBAcqP.ord4X) (SBAcqP.qOf SBAcqP.ord4X) :=
+  ⟨by unfold SBAcqP.OrdOk; decide +kernel, SBAcqP.memberPBSound _ _ _ (by decide +kernel)⟩
+
+/-- The re-sourcing touches ONLY `e_B`: the two graphs agree on every other label and on gmo. -/
+theorem SBAcqP.l4xOnlyEB :
+    (SBAcqP.l4x.gdG.gxProg.zip SBAcqP.l4.gdG.gxProg).map (fun p => (p.1.zip p.2).filter
+      (fun q => q.1 ≠ q.2)) =
+      [[], [(LLoad false 4 [0] [SBAcqP.b2], LLoad false 4 [5] [b1])], []] ∧
+    SBAcqP.l4x.gdG.gxGmo = SBAcqP.l4.gdG.gxGmo := by
+  decide +kernel
 
 end Weak
