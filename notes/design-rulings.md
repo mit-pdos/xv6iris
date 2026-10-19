@@ -127,8 +127,18 @@ compiler's `sail2` branch, before the liveness work.  The standard every deviati
   driver, a parked S-mode WFI may be forced out, which 0.16 retires only under `mstatus.TW = 0`
   (otherwise an illegal-instruction trap).  TW is 0 on every reachable state (the board line,
   `reset_sys`, S-mode cannot write it), so it is the last conjunct of `smFacts`; the WFI rules keep
-  their statements.  The USER-side twins (`userMstatusOk`, `trapMstatusOk`) grow the same bit with
-  the other 0.16 `mstatus` bits in P4 (the contract change the policy review flagged).
+  their statements.  The USER-side twins (`userMstatusOk`, `trapMstatusOk`) grew the same bit with
+  the other 0.16 `mstatus` bits (SDT, GVA, MPV, MDT) on 2026-10-19 (the contract change the policy
+  review flagged; `Xv6/UserExec.lean`).
+- **The user frames carry H's trap CSRs** (2026-10-19). 0.16 writes `hstatus`/`htval`/`htinst` on
+  every trap and `sret` writes `hstatus`, H enabled or not, so `uRegs`/`uvRegs`/`userTrapFrame`
+  hold `hTrapCsrs` (at some value) beside sepc/scause/stval through USERRET, USERTRAP and
+  PREPARE_RETURN (deviation 10 of `Xv6/UserExec.lean`'s header): resources the model forces, not a
+  weakening; invisible without H.
+- **The TLB after `sfence.vma`** (2026-10-19). 0.16's `flush_TLB` is stage-aware, so the cell-form
+  rules return `tlbFlushS tlb0`; `KVMINITHART` takes `tlbStageS tlb0`, which the boot chain
+  discharges from the empty TLB `init_model` derives (`reset_vmem` -> `reset_TLB`; a `bootPost`
+  fact, never a board line), and the page-table slots hand `tlbStageS` out with their TLB.
 - **Answer types.** lean-sail's `InstructionEffect.ret` is a plain `def`, and an imported
   definition's reducibility cannot be changed without a check-disabling option.  So the WP's
   event rules come with `_at` variants that take the program and an equation to its event node.
