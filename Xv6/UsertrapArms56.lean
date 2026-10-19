@@ -87,7 +87,7 @@ theorem usertrap_56_proof (PK : PRINTK) (SK : SETKILLED) (hEX : UtExitElim (GF :
   icases Hte with ⟨Hcsrs, Hir⟩
   icases trapCsrs_cases cpu $$ Hcsrs with ⟨%e, %s, %t, Hcsrs⟩
   unfold trapCsrsAt
-  icases Hcsrs with ⟨Hsepc, Hscause, Hstval⟩
+  icases Hcsrs with ⟨Hsepc, Hscause, Hstval, Hhcsrs⟩
   ihave Hqp := (show wordPointsTo (GF := GF) (pPid (procAddr A.j)) 4 pidPriv A.pid ⊢
     wordPointsTo (procAddr A.j + 48#64) 4 pidPriv A.pid from .rfl) $$ Hqp
   -- +0x56  csrr a1,scause
@@ -234,8 +234,8 @@ theorem usertrap_56_proof (PK : PRINTK) (SK : SETKILLED) (hEX : UtExitElim (GF :
       iapply (show takenAt (GF := GF) A.gn ⊢ takenAt ((utV1 A).updEv kv).gen from by rw [hok.hgn]) $$ Ht
     · iright
       iframe Hown Hshot Hcp Hq
-  ihave Hcsrs := trapCsrs_intro cpu _ _ _ $$ [Hsepc Hscause Hstval]
-  · unfold trapCsrsAt; iframe Hsepc Hscause Hstval
+  ihave Hcsrs := trapCsrs_intro cpu _ _ _ $$ [Hsepc Hscause Hstval Hhcsrs]
+  · unfold trapCsrsAt; iframe Hsepc Hscause Hstval Hhcsrs
   ihave Hte : trapCsrsExt (GF := GF) cpu A.k.sie $$ [Hcsrs Hir]
   · rw [hsie, trapCsrsExt_false]; iframe Hcsrs Hir
   ihave Hce := (show cpuClaimExt (GF := GF) cpu false A.k.proc ⊢ cpuClaimExt cpu A.k.sie A.k.proc from by

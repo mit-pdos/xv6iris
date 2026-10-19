@@ -46,6 +46,7 @@ theorem ut_close (A : UtArgs GF) (c : CPU) (R' : RegMap) (V2 : ProcPriv) (M2 : N
     kctx c ((A.k.intrOff true false).withRegs R') ∗ pcIs c (jumpPc (A.k.regs 1#5)) ∗
     Register.sepc ↦ᵣ[c] (tfW V2.tf 3 &&& 0xFFFFFFFFFFFFFFFE#64) ∗
     (∃ v : BitVec 64, Register.scause ↦ᵣ[c] v) ∗ (∃ v : BitVec 64, Register.stval ↦ᵣ[c] v) ∗
+    hTrapCsrs c ∗
     Register.stvec ↦ᵣ[c] uservecTvec ∗ cpuClaim c (procAddr A.j) ∗ utCaps A.N ∗
     utOwn (utRsys PT Γ A) A.N (utPrep V2 rt c) M2 sts2 cs2 A.pid ∗
     utOuts A V2 M2 sts2 cs2 ∗ utKillOut A.sc A.Wk ∗ utKont PT Γ A ∗ £ 1
@@ -61,7 +62,7 @@ theorem ut_close (A : UtArgs GF) (c : CPU) (R' : RegMap) (V2 : ProcPriv) (M2 : N
   have hepc : retPc (tfW V2.tf 3 &&& 0xFFFFFFFFFFFFFFFE#64) = tfResumePc (utPrep V2 A.k.root c).tf := by
     rw [ut_retPc_mask]; unfold tfResumePc; rw [← tfUeq_epc hu]; rfl
   have hpj : A.N.pj = procAddr A.j := hok.pj
-  iintro ⟨Hk, Hpc, Hsepc, Hsc, Htv, Hstv, Hcl, #Hcaps, Hown, Hout, Hko, Hkont, Hlc⟩
+  iintro ⟨Hk, Hpc, Hsepc, Hsc, Htv, Hh, Hstv, Hcl, #Hcaps, Hown, Hout, Hko, Hkont, Hlc⟩
   icases ut_kctx_kptOnAt c _ (by simp only [KCtx.withRegs_tier, KCtx.intrOff_tier]; exact hok.htier)
     $$ Hk with ⟨#Hkp, Hk⟩
   ihave #Hkp' := (show kptOnAt (GF := GF) ((A.k.intrOff true false).withRegs R').root ⊢
@@ -86,7 +87,7 @@ theorem ut_close (A : UtArgs GF) (c : CPU) (R' : RegMap) (V2 : ProcPriv) (M2 : N
   unfold usertrapPost
   iapply HK $$ %R' %V2.upt %(utPrep V2 A.k.root c) %M2 %sts2 %cs2 %(tfW V2.tf 3 &&& 0xFFFFFFFFFFFFFFFE#64)
     %⟨hcs, ha0⟩ %⟨rfl, hrows.tfp⟩ %hrows'.round %hrows'.fdk %hrows'.chk %hrows'.gen %hrows'.evq %hrows'.fde
-    %hrows'.pipe %hrows'.rpid %hepc %hlive' Hk Hpc Hsepc Hsc Htv Hstv Hpt Htf Hres Hxo Hfo Hwo Hko Hso Heo
+    %hrows'.pipe %hrows'.rpid %hepc %hlive' Hk Hpc Hsepc Hsc Htv Hh Hstv Hpt Htf Hres Hxo Hfo Hwo Hko Hso Heo
 
 end Close
 

@@ -390,6 +390,7 @@ def usertrapPost (R : CPU → UPtd → BitVec 64 → ProcPriv → List FdState �
     kctx cpu' ((k.intrOff true false).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     Register.sepc ↦ᵣ[cpu'] uepc -∗
     (∃ v : BitVec 64, Register.scause ↦ᵣ[cpu'] v) -∗ (∃ v : BitVec 64, Register.stval ↦ᵣ[cpu'] v) -∗
+    hTrapCsrs cpu' -∗
     Register.stvec ↦ᵣ[cpu'] uservecTvec -∗
     procPtAt P' M' -∗ tfPageAt P'.tfp V'.tf -∗ R cpu' P' ksp V' sts' cs' pid -∗
     utExecOut sc sep V M V' M' sts sts' gn cs pid -∗
@@ -414,6 +415,7 @@ def wp_usertrap_body (R : CPU → UPtd → BitVec 64 → ProcPriv → List FdSta
     (hnoff : k.noff = 0) (hstk : utStackTop k ksp) (hgn : gn = V.gen) : Prop :=
   kctx cpu k ∗ pcIs cpu usertrapPc ∗
   Register.sepc ↦ᵣ[cpu] sep ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] tv ∗
+  hTrapCsrs cpu ∗
   Register.stvec ↦ᵣ[cpu] uservecTvec ∗
   procPtAt P M ∗ tfPageAt P.tfp V.tf ∗ R cpu P ksp V sts cs pid ∗
   -- the deposits (Rocq `ut_sys_in`, `ut_fork_in`, `ut_pay_in`, `ut_kill_in`)

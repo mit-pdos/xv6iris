@@ -157,14 +157,15 @@ section
 variable {GF : BundledGFunctors.{0}} [MachGS GF]
 
 /-- **What uservec hands usertrap** (the continuation, at usertrap's
-entry): the kernel context, the pc, the raw trap cells, `stvec` at
-uservec, the address space parked (at a page view `Mp` whose lazy view is
+entry): the kernel context, the pc, the raw trap cells (with, since
+sail-riscv 0.16, H's trap CSRs `hTrapCsrs`), `stvec` at uservec, the address space parked (at a page view `Mp` whose lazy view is
 the entry image `M`), the trapframe with the registers saved, the residue. -/
 def uservecPost [CurCtx] (cpu : CPU) (k : KCtx) (P : UPtd) (Rut : UPtd → IProp GF) (sz : Nat) (M : ElfMem)
     (ws : List (BitVec 64)) (g : RegMap) (sep sc tv : BitVec 64) : IProp GF := iprop%
   ∀ Mp : Nat → List (BitVec 8), ⌜umemLazy P sz Mp = M⌝ -∗
     kctx cpu (uservecCtx k g ws) -∗ pcIs cpu usertrapPc -∗
     Register.sepc ↦ᵣ[cpu] sep -∗ Register.scause ↦ᵣ[cpu] sc -∗ Register.stval ↦ᵣ[cpu] tv -∗
+    hTrapCsrs cpu -∗
     Register.stvec ↦ᵣ[cpu] uservecTvec -∗
     procPtAt P Mp -∗ tfPageAt P.tfp (uservecTf ws g) -∗ Rut P -∗
     -- THE EXIT'S TOKEN, handed back (NI M2-W2d): the frame's receipt and the

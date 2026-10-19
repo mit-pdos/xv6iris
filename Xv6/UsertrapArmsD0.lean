@@ -173,7 +173,7 @@ theorem usertrap_d0_proof (VM : VMFAULT) (HA : UT_A6 PT Γ) (H56 : UT_56 PT Γ) 
   icases Hte with ⟨Hcsrs, Hir⟩
   icases trapCsrs_cases cpu $$ Hcsrs with ⟨%e, %s, %t, Hcsrs⟩
   unfold trapCsrsAt
-  icases Hcsrs with ⟨Hsepc, Hscause, Hstval⟩
+  icases Hcsrs with ⟨Hsepc, Hscause, Hstval, Hhcsrs⟩
   -- +0xd0  csrr a2,stval ; +0xd4  csrr a3,scause
   k_step (wp_s_csrr_stval cpu _ ?hs (KA.«usertrap» + 0xd0#64) false 12#5 (by decide) t)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc $Hstval]
@@ -235,8 +235,8 @@ theorem usertrap_d0_proof (VM : VMFAULT) (HA : UT_A6 PT Γ) (H56 : UT_56 PT Γ) 
   ihave Hpg := (show wordPointsTo (GF := GF) (procAddr A.j + 80#64) 8 (DFrac.own 1)
       (pageAddr (utV1 A).upt.root) ⊢
     wordPointsTo (pPagetable (procAddr A.j)) 8 (DFrac.own 1) (pageAddr (utV1 A).upt.root) from .rfl) $$ Hpg
-  ihave Hcsrs := trapCsrs_intro cpu _ _ _ $$ [Hsepc Hscause Hstval]
-  · unfold trapCsrsAt; iframe Hsepc Hscause Hstval
+  ihave Hcsrs := trapCsrs_intro cpu _ _ _ $$ [Hsepc Hscause Hstval Hhcsrs]
+  · unfold trapCsrsAt; iframe Hsepc Hscause Hstval Hhcsrs
   ihave Hte : trapCsrsExt (GF := GF) cpu false $$ [Hcsrs Hir]
   · rw [trapCsrsExt_false]; iframe Hcsrs Hir
   icases Hres with (⟨%h0, Hpt⟩ | ⟨%r, %⟨hr, hval, hlt, hnone⟩, Hpt⟩)

@@ -148,6 +148,7 @@ def wp_userret_body {GF : BundledGFunctors.{0}} [MachGS GF] [CurCtx]
   ⌜MachFixedGS.uFit (GF := GF) ox (.uEnter cpu (satpOf .kpt P.root) sep (tfGprs ws))⌝ ∗
   pcIs cpu userretVa ∗ kmapAt trampVpn (kLeaf trampPpn .rx 0#1 0#1) ∗
   Register.sepc ↦ᵣ[cpu] sep ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] tv ∗
+  hTrapCsrs cpu ∗
   Register.stvec ↦ᵣ[cpu] uservecTvec ∗
   procPtAt P M ∗ tfPageAt P.tfp ws ∗
   ▷ userretPost cpu k P M ws sep sc tv

@@ -91,14 +91,14 @@ theorem urc_resume (UR : USERRET) [NiFitIs GF] (PT : SchedNames → IProp GF) (�
     MachFixedGS.uEvid (GF := GF) ox (.uEnter cpu (satpOf KTier.kpt P.root) sep (tfGprs V.tf)) ∗
     kmapAt trampVpn (kLeaf trampPpn .rx 0#1 0#1) ∗
     kctx cpu k ∗ stackOwn ksp m ∗ pcIs cpu userretVa ∗
-    Register.sepc ↦ᵣ[cpu] sep ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] tv ∗
+    Register.sepc ↦ᵣ[cpu] sep ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] tv ∗ hTrapCsrs cpu ∗
     Register.stvec ↦ᵣ[cpu] uservecTvec ∗
     procPtAt P M ∗ tfPageAt P.tfp V.tf ∗ usertrapResAt PT Γ j cpu P ksp V sts cs pid ∗
     uhistAt (uvisOf V M sts gn cs pid) ∗
     uslot (uvisOf V M sts gn cs pid) ∗ ▷ urcLoop PT Γ j
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨hsie, hspie, hspp⟩ := hctx
-  iintro ⟨#Hwire, #Hrc, Hclm, #Hev, #Hcl, Hk, Hgap, Hpc, Hsep, Hsc, Hstv, Hstvec, Hppt, Htf, Hres, Huh, Hslot,
+  iintro ⟨#Hwire, #Hrc, Hclm, #Hev, #Hcl, Hk, Hgap, Hpc, Hsep, Hsc, Hstv, Hh, Hstvec, Hppt, Htf, Hres, Huh, Hslot,
     #Hloop⟩
   icases kctx_kmapStatic cpu k $$ Hk with ⟨#Hks, Hk⟩
   icases kctx_hw cpu k $$ Hk with ⟨Hk, #Hhw⟩
@@ -109,7 +109,7 @@ theorem urc_resume (UR : USERRET) [NiFitIs GF] (PT : SchedNames → IProp GF) (�
   have HUR := UR.wp_userret (GF := GF) cpu k P M V.tf sep sc tv ox hsie hspie hspp htier ha0
   unfold wp_userret_body at HUR
   iapply HUR
-  iframe Hk Hwire Hrc Hclm Hev Hpc Hcl Hsep Hsc Hstv Hstvec Hppt Htf
+  iframe Hk Hwire Hrc Hclm Hev Hpc Hcl Hsep Hsc Hstv Hh Hstvec Hppt Htf
   isplitr
   · ipureintro; exact uFit_of_niFit ox _ hfit
   inext

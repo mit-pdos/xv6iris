@@ -111,6 +111,7 @@ theorem fkr_prep_call [CurCtx] (PR : PREPARE_RETURN) (c : CPU) (k' : KCtx) (γ :
       Register.sepc ↦ᵣ[cpu'] (epc &&& 0xFFFFFFFFFFFFFFFE#64) -∗
       (∃ v : BitVec 64, Register.scause ↦ᵣ[cpu'] v) -∗
       (∃ v : BitVec 64, Register.stval ↦ᵣ[cpu'] v) -∗
+      hTrapCsrs cpu' -∗
       Register.stvec ↦ᵣ[cpu'] uservecTvec -∗
       procPrivFd γ pa pid
         { V with tf := prepareReturnTf V.tf (satpOf KTier.kpt k'.root) (V.kstack + 4096#64) (hartId cpu') } M -∗
@@ -157,6 +158,7 @@ theorem fkr_tail [X : CurCtx] (PR : PREPARE_RETURN) (c : CPU) (k : KCtx) (γ : F
       kctx c' ((k.intrOff true false).withRegs R') -∗ pcIs c' userretVa -∗
       Register.sepc ↦ᵣ[c'] tfResumePc V.tf -∗
       (∃ v : BitVec 64, Register.scause ↦ᵣ[c'] v) -∗ (∃ v : BitVec 64, Register.stval ↦ᵣ[c'] v) -∗
+      hTrapCsrs c' -∗
       Register.stvec ↦ᵣ[c'] uservecTvec -∗ cpuClaim c' pa -∗
       procPrivFd γ pa pid (fkrPrep V k.root c') M -∗ wpLoop c'))
     ⊢ wpLoop (GF := GF) c := by
@@ -183,7 +185,7 @@ theorem fkr_tail [X : CurCtx] (PR : PREPARE_RETURN) (c : CPU) (k : KCtx) (γ : F
   iintro %c2 %hpin
   have hpin' : k.sie = false → c2 = c1 := fun h => hpin (Or.inl h)
   ihave Hce := cpuClaimExt_move c1 c2 _ _ hpin' $$ Hce
-  iintro %R1 Hk Hpc %hcs Hpay Hsepc Hsc Htv Hstv Hpv
+  iintro %R1 Hk Hpc %hcs Hpay Hsepc Hsc Htv Hh Hstv Hpv
   ihave Hcl := fkr_claim c2 k.sie pa $$ [Hce Hpay]
   · iframe
   have hsie : ((k.intrOff true false).withRegs R1).sie = false := rfl
@@ -255,7 +257,7 @@ theorem fkr_tail [X : CurCtx] (PR : PREPARE_RETURN) (c : CPU) (k : KCtx) (γ : F
   ihave Hsepc := (show Register.sepc ↦ᵣ[c2] (tfW V.tf 3 &&& 0xFFFFFFFFFFFFFFFE#64) ⊢
       Register.sepc ↦ᵣ[c2] tfResumePc V.tf from by rw [fkr_sepc]) $$ Hsepc
   ihave Hk := kctx_eq_mono c2 _ _ (fkr_ctx_setReg k 1#5 (KA.«forkret» + 88#64) true false _) $$ Hk
-  iapply Hn $$ %_ %⟨?_, ?_⟩ Hk Hpc Hsepc Hsc Htv Hstv Hcl Hpv
+  iapply Hn $$ %_ %⟨?_, ?_⟩ Hk Hpc Hsepc Hsc Htv Hh Hstv Hcl Hpv
   · simp only [RegMap.set_apply]
     k_norm_g
     exact fkr_make_satp _

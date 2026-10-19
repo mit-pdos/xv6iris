@@ -79,7 +79,7 @@ theorem userretClosed_proof (UT : USERTRAP) (UV : USERVEC) (UR : USERRET) : USER
       j cpu k m P ksp V M sts gn cs pid sep sc tv hj hproc hctx htier hnoff hsp hav ha0 hsep hgn => by
     let PT := parkToken (GF := GF) (SG := uexecSGXv6)
     unfold wp_userret_closed_body
-    iintro ⟨#Hw, #Hc, Hk, Hgap, Hpc, Hsep, Hsc, Hstv, Hstvec, Hppt, Htf, Hres, Hslot, Hclm⟩
+    iintro ⟨#Hw, #Hc, Hk, Hgap, Hpc, Hsep, Hsc, Hstv, Hh, Hstvec, Hppt, Htf, Hres, Hslot, Hclm⟩
     ihave #HL := urc_loop UT UV UR PT Γ rfl j hj $$ Hw Hc
     -- THE FILING (NI M2-W2c): userret_closed's entry is an incarnation's
     -- first resume (forkret), filed as an origin at its own key
@@ -105,7 +105,7 @@ theorem userretClosed_proof (UT : USERTRAP) (UV : USERVEC) (UR : USERRET) : USER
     imodintro
     iapply HRS
     unfold uRcptOpt uClaimFor uClaimForRaw
-    iframe Hw Hc Hclm Hev Hk Hgap Hpc Hsep Hsc Hstv Hstvec Hppt Htf Hres Huh Hslot
+    iframe Hw Hc Hclm Hev Hk Hgap Hpc Hsep Hsc Hstv Hh Hstvec Hppt Htf Hres Huh Hslot
     inext
     iexact HL⟩
 

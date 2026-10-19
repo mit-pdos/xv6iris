@@ -77,6 +77,11 @@ userret).
    (the verified engine, `UK_LEAVES`).
 8. The user tier's `CurCtx` is the ambient class instance (`[CurCtx]`,
    Rocq's `XI`), its hart the explicit `cpu : CPU` (Rocq's `CID`).
+10. **H's trap CSRs ride with the user tier** (sail-riscv 0.16; not in Rocq):
+   every trap writes `hstatus`/`htval`/`htinst`, H enabled or not, so
+   `uRegs`/`uvRegs`/`userTrapFrame`/`userTrapFrameAtm` hold `MachCSL.hTrapCsrs`
+   beside `clockCells` (at some value), and `userMstatusOk`/`trapMstatusOk`
+   pin 0.16's SDT/GVA/MPV/MDT/TW = 0 (as `smFacts`).
 -/
 import Xv6.UPtDefs
 import Xv6.ElfFile
@@ -192,13 +197,16 @@ variable {GF : BundledGFunctors.{0}} [MachGS GF]
 /-- **Rocq `UserFrame.u_regs`**: the per-step mutable cells, as ONE bundle --
 hart state, privilege User, mstatus, the three trap CSRs, PC and nextPC
 (decoupled: a WAITING hart skipped the tick), the clock riders
-(`clockCells`, deviation 2) and the register file. -/
+(`clockCells`, deviation 2), H's trap CSRs `hstatus`/`htval`/`htinst`
+(`hTrapCsrs`: since sail-riscv 0.16 every trap writes them, H enabled or not,
+so the user tier, whose traps they are, owns them at some value) and the
+register file. -/
 def uRegs (cpu : CPU) (hs : HartState) (ms sc stv sep va va' : BitVec 64) (g : RegMap) :
     IProp GF := iprop%
   Register.hart_state ↦ᵣ[cpu] hs ∗ Register.cur_privilege ↦ᵣ[cpu] Privilege.User ∗
   Register.mstatus ↦ᵣ[cpu] ms ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] stv ∗
   Register.sepc ↦ᵣ[cpu] sep ∗ Register.PC ↦ᵣ[cpu] va ∗ Register.nextPC ↦ᵣ[cpu] va' ∗
-  clockCells cpu ∗ gprFile cpu g
+  clockCells cpu ∗ hTrapCsrs cpu ∗ gprFile cpu g
 
 /-- **The configuration cells the user tier reads but never writes, held
 exclusively** (deviation 1; the frozen ones are `hwConfig`): the cells the
@@ -325,8 +333,8 @@ def userTrapFrame [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IP
     Register.hart_state ↦ᵣ[cpu] HartState.HART_ACTIVE () ∗
     Register.cur_privilege ↦ᵣ[cpu] Privilege.Supervisor ∗
     Register.mstatus ↦ᵣ[cpu] ms ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] stv ∗
-    Register.sepc ↦ᵣ[cpu] sep ∗ pcIs cpu (stvecBase C.stvec) ∗ clockCells cpu ∗ gprFile cpu g ∗
-    userPtAny cpu pt ∗ userCfg cpu C ∗ Rut pt ∗
+    Register.sepc ↦ᵣ[cpu] sep ∗ pcIs cpu (stvecBase C.stvec) ∗ clockCells cpu ∗ hTrapCsrs cpu ∗
+    gprFile cpu g ∗ userPtAny cpu pt ∗ userCfg cpu C ∗ Rut pt ∗
     uExitTok (.uExit cpu (satpOf .kpt pt.root) sc sep (gprList g))
 
 /-- **Rocq `stvec_handler_wp`**: the kernel re-entry contract -- the handler
@@ -384,8 +392,8 @@ def userTrapFrameAtm [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd →
   Register.hart_state ↦ᵣ[cpu] HartState.HART_ACTIVE () ∗
   Register.cur_privilege ↦ᵣ[cpu] Privilege.Supervisor ∗
   Register.mstatus ↦ᵣ[cpu] ms ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] stv ∗
-  Register.sepc ↦ᵣ[cpu] sep ∗ pcIs cpu (stvecBase C.stvec) ∗ clockCells cpu ∗ gprFile cpu g ∗
-  userPtmInv cpu pt sz M ∗ userCfg cpu C ∗ Rut pt ∗
+  Register.sepc ↦ᵣ[cpu] sep ∗ pcIs cpu (stvecBase C.stvec) ∗ clockCells cpu ∗ hTrapCsrs cpu ∗
+  gprFile cpu g ∗ userPtmInv cpu pt sz M ∗ userCfg cpu C ∗ Rut pt ∗
   uExitTok (.uExit cpu (satpOf .kpt pt.root) sc sep (gprList g))
 
 /-- The GPR list does not read the map's slot `0` (NI M2-W2b). -/
@@ -407,12 +415,13 @@ theorem uRcpt_gprList_ext {GF : BundledGFunctors.{0}} [MachGS GF] (cpu : CPU)
   rw [gprList_ext m m' h]
 
 /-- **Rocq `UmodeRegs.uv_regs`**: the per-step CSR cells with their values
-swallowed, plus the clock riders (UserExec deviation 2). -/
+swallowed, plus the clock riders (UserExec deviation 2) and H's trap CSRs
+(`hTrapCsrs`, as `uRegs`). -/
 def uvRegs (cpu : CPU) : IProp GF := iprop%
   ∃ ms sc stv sep : BitVec 64, ⌜userMstatusOk ms⌝ ∗
     Register.hart_state ↦ᵣ[cpu] HartState.HART_ACTIVE () ∗ Register.cur_privilege ↦ᵣ[cpu] Privilege.User ∗
     Register.mstatus ↦ᵣ[cpu] ms ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] stv ∗
-    Register.sepc ↦ᵣ[cpu] sep ∗ clockCells cpu
+    Register.sepc ↦ᵣ[cpu] sep ∗ clockCells cpu ∗ hTrapCsrs cpu
 
 /-- **Rocq `UmodeRegs.uv_amb`**: the hart's `hw_config`, the kernel's static
 map (deviation 9, not in Rocq) and the wire invariant (`minstret_inv` is
@@ -427,8 +436,8 @@ theorem uRegs_uvRegs (cpu : CPU) (ms sc stv sep va : BitVec 64) (g : RegMap) (hm
     uRegs (GF := GF) cpu (HartState.HART_ACTIVE ()) ms sc stv sep va va g ⊢
       uvRegs cpu ∗ gprFile cpu g ∗ pcIs cpu va := by
   unfold uRegs uvRegs pcIs
-  iintro ⟨Hhs, Hpr, Hms, Hsc, Hstv, Hsep, Hpc, Hnpc, Hck, Hg⟩
-  isplitl [Hhs Hpr Hms Hsc Hstv Hsep Hck]
+  iintro ⟨Hhs, Hpr, Hms, Hsc, Hstv, Hsep, Hpc, Hnpc, Hck, Hh, Hg⟩
+  isplitl [Hhs Hpr Hms Hsc Hstv Hsep Hck Hh]
   · iexists ms, sc, stv, sep
     iframe
     ipureintro; exact hms
@@ -440,7 +449,7 @@ theorem uvRegs_uRegs (cpu : CPU) (va : BitVec 64) (g : RegMap) :
       ∃ ms sc stv sep : BitVec 64, ⌜userMstatusOk ms⌝ ∗
         uRegs cpu (HartState.HART_ACTIVE ()) ms sc stv sep va va g := by
   unfold uRegs uvRegs pcIs
-  iintro ⟨⟨%ms, %sc, %stv, %sep, %hms, Hhs, Hpr, Hms, Hsc, Hstv, Hsep, Hck⟩, Hg, Hpc, Hnpc⟩
+  iintro ⟨⟨%ms, %sc, %stv, %sep, %hms, Hhs, Hpr, Hms, Hsc, Hstv, Hsep, Hck, Hh⟩, Hg, Hpc, Hnpc⟩
   iexists ms, sc, stv, sep
   isplitr
   · ipureintro; exact hms

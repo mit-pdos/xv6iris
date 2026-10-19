@@ -101,14 +101,14 @@ the dispatch at +0x30. -/
 theorem usertrap_entry (MP : MYPROC) (HD : UT_DISPATCH PT Γ)
     (A : UtArgs GF) (cpu : CPU) (tv : BitVec 64) (hok : UtOk Γ A) :
     kctx cpu A.k ∗ pcIs cpu usertrapPc ∗ Register.sepc ↦ᵣ[cpu] A.sep ∗ Register.scause ↦ᵣ[cpu] A.sc ∗
-      Register.stval ↦ᵣ[cpu] tv ∗ Register.stvec ↦ᵣ[cpu] uservecTvec ∗ cpuClaim cpu A.k.proc ∗
+      Register.stval ↦ᵣ[cpu] tv ∗ hTrapCsrs cpu ∗ Register.stvec ↦ᵣ[cpu] uservecTvec ∗ cpuClaim cpu A.k.proc ∗
       utCaps A.N ∗ utOwn (utRsys PT Γ A) A.N A.V A.M A.sts A.cs A.pid ∗
       utSysIn A.f A.sc A.sep A.V A.M A.sts A.gn A.cs A.pid ∗
       utForkIn A.f A.sc A.sep A.V A.M A.sts ∗ utPayIn A.f A.sc A.sep A.V ∗
       utKillIn A.f A.sc A.Wk A.gn A.sts ∗ utKont PT Γ A
     ⊢ wpLoop (GF := GF) cpu := by
   have hsie : A.k.sie = false := hok.hctx.1
-  iintro ⟨Hk, Hpc, Hsepc, Hsc, Htv, Hstv, Hcl, #Hcaps, Hown, Hsi, Hfi, Hpi, Hki, Hkont⟩
+  iintro ⟨Hk, Hpc, Hsepc, Hsc, Htv, Hh, Hstv, Hcl, #Hcaps, Hown, Hsi, Hfi, Hpi, Hki, Hkont⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_tier _ _ $$ Hk with ⟨%hti, Hk⟩
   have hct : curTier = KTier.kpt := by rw [← hti]; exact hok.htier
@@ -208,7 +208,7 @@ theorem usertrap_entry (MP : MYPROC) (HD : UT_DISPATCH PT Γ)
   iapply (HD A cpu _ tv hok ?hp3 ?h10')
   rotate_left 2
   unfold utDispRes
-  iframe Hk Hpc Hsc Hframe Hsepc Htv Hstv Hcl Hcaps Hown Hsi Hfi Hpi Hki Hkont
+  iframe Hk Hpc Hsc Hframe Hsepc Htv Hh Hstv Hcl Hcaps Hown Hsi Hfi Hpi Hki Hkont
   case hp3 => ut_pins
   case h10' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; rw [h10, hok.hproc]
 

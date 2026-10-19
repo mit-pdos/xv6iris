@@ -303,7 +303,7 @@ theorem userTrapFrame_trapped [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut :
         ⌜W.perm = π ∧ W.sz = sz ∧ W.fd = fdv ∧ W.cwd = cw ∧ W.gen = gn ∧ W.ch = cs ∧ W.pid = pidv ∧
           W.lazy = lz ∧ W.secc = secc⌝ ∗ trappedMachine cpu C pt Rut sz sc stv W := by
   unfold userTrapFrame
-  iintro ⟨%ms, %sc, %stv, %sep, %g, %hto, Hhs, Hpr, Hms, Hsc, Hstv, Hsep, Hpc, Hck, Hg, Hany, Hcfg, Hrut, Hrc⟩
+  iintro ⟨%ms, %sc, %stv, %sep, %g, %hto, Hhs, Hpr, Hms, Hsc, Hstv, Hsep, Hpc, Hck, Hh, Hg, Hany, Hcfg, Hrut, Hrc⟩
   ihave ⟨%M, Hpt⟩ := userPtmInv_intro cpu pt sz $$ Hany
   let g0 : RegMap := g.set 0#5 0#64
   have hg0 : g0 0#5 = 0#64 := by simp [g0]
