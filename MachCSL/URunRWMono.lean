@@ -33,33 +33,38 @@ theorem runRW_preserves (D : UFoot) (R : UWSt → UWSt → Prop) (hrefl : ∀ s,
   | impure call k ih =>
     intro orc s x s' orc' h
     cases call with
+    | inr n =>
+      simp only [runRW] at h
+      split at h
+      · exact ih _ _ _ _ _ _ h
+      · simp at h
+    | inl c =>
+    cases c with
     | error e => simp [runRW] at h
     | ok o =>
       cases o with
-      | regWrite r v =>
+      | regWrite r a v =>
         simp only [runRW] at h
         split at h
         · rename_i hd
           exact htrans _ _ _ (hw s r v hd) (ih _ _ _ _ _ _ h)
         · simp at h
-      | memRead n vs req =>
+      | memRead R =>
         simp only [runRW] at h
         (repeat' split at h) <;> first
           | (simp at h; done)
           | exact htrans _ _ _ (hrv s) (ih _ _ _ _ _ _ h)
           | exact ih _ _ _ _ _ _ h
-      | memWrite n vs req =>
+      | memWrite R w' tags =>
         simp only [runRW] at h
         (repeat' split at h) <;> first
           | (simp at h; done)
-          | exact htrans _ _ _ (hm s _ n _ (by assumption) (by assumption)) (ih _ _ _ _ _ _ h)
-      | regRead r =>
+          | exact htrans _ _ _ (hm s _ R.size _ (by assumption) (by assumption)) (ih _ _ _ _ _ _ h)
+      | regRead r a =>
         simp only [runRW] at h
         (repeat' split at h) <;> first
           | (simp at h; done)
           | exact ih _ _ _ _ _ _ h
-      | readRam => simp [runRW] at h
-      | writeRam => simp [runRW] at h
       | _ => simp only [runRW] at h; exact ih _ _ _ _ _ _ h
 
 /-- **A walk keeps the owned map's domain.** -/
