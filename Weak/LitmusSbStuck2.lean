@@ -215,4 +215,25 @@ theorem SbOrd.imgFenceSw :
       (fun p => !(wFencePw (kw p) && wFenceSr (kw p)) || wFenceSw (kw p)) = true := by
   decide +kernel
 
+/-! # 4. F-P-W4-1 — RVWMO lets a store land after its hart's later `.aq` AMO
+
+The P member's log is LANDING order; route T read program order off it (`gwrowGmo`,
+`CertZ24.poOfRowR4`).  Spec first: RVWMO orders a plain store before a po-later `.aq` AMO of ANOTHER
+byte by no rule (rule 1 needs the same byte, rule 4 a fence, rule 5 orders only what FOLLOWS the
+`.aq`, rule 6/7 need `.rl`).  Row 0: `x` = `sw` to byte 1 (0,0); `A` = `amoswap.w.aq` on byte 0
+(0,1).  gmo `A < x`: RVWMO-consistent, so the member may land `x` after `A` although `x <po A` — the
+two program-order facts of `csChainedT4` are issue-order facts (`SbKill.csIssue`), not ppo. -/
+
+def SbStuck.l9Prog : List (List Lbl) :=
+  [[LStore false 1 [b1] .WCplain, LRmw true false 0 [0] [b0] [b1] .WCexcl]]
+
+def SbStuck.l9 : Gdexec := AxLitmus.mkgd SbStuck.l9Prog [(0, 1), (0, 0)] []
+
+theorem SbStuck.l9Cat : rvwmoCatConsistent SbStuck.l9 := catConsistentBSound _ (by decide +kernel)
+
+/-- The store is po-BEFORE the `.aq` AMO and gmo-AFTER it. -/
+theorem SbStuck.l9StoreAfterAmo :
+    WeakRvwmoGraph.gpo SbStuck.l9.gdG (0, 0) (0, 1) ∧ gmoLt SbStuck.l9.gdG (0, 1) (0, 0) :=
+  ⟨(gpoBSpec _ _ _).1 (by decide +kernel), (gmoLtBSpec _ _ _).1 (by decide +kernel)⟩
+
 end Weak
