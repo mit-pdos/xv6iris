@@ -91,7 +91,7 @@ theorem swp_checked_mem_read_dev4_S (cpu : CPU) (dq : DFrac) (c : MConf) (sie : 
   iintro Hpmpcfg_n Hpmpaddr_n
   swp_run 80
   iapply swp_bind
-  iapply (swp_sail_mem_read_dev cpu _ pa rfl d off hdec (devWordOk_devBytes hio) (by decide) rfl Ψ)
+  mem_iapply (swp_sail_mem_read_dev cpu) pa rfl d off hdec (devWordOk_devBytes hio) (by decide) rfl Ψ
   iframe HAU
   inext
   iintro %w HΨ
@@ -128,7 +128,8 @@ theorem swp_checked_mem_write_dev4_S (cpu : CPU) (dq : DFrac) (c : MConf) (sie :
   iintro Hpmpcfg_n Hpmpaddr_n
   swp_run 80
   iapply swp_bind
-  iapply (swp_sail_mem_write_dev cpu _ pa rfl d off hdec (devWordOk_devBytes hio) (by decide) data rfl Ψ)
+  mem_iapply (swp_sail_mem_write_dev cpu) pa rfl d off hdec (devWordOk_devBytes hio) (by decide) data
+    (vecbytes_to_bitvec_to_bytes_le_4 _) Ψ
   iframe HAU
   inext
   iintro HΨ
