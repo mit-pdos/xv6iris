@@ -15,9 +15,8 @@ not, `privLevel_is_virtual Machine = false`); `medeleg` and `sie` are legalised
 monadically (`medelegWrite`, `sieWrite` of `MachCSL.WpCsr` are the values);
 `read_mstatus` clears `SDT` (`Ssdbltrp` absent), so `csrr rd, mstatus` reads
 `_update_Mstatus_SDT c.mstatus 0#1`; and the counter check of `rdtime`
-(`counter_enabled`) also reads H's `hcounteren`, which the configuration
-bundles do not hold, so `rdtime`'s rules take a persistent `hcounteren` cell
-at some value.  No F-related CSR (`fflags`/`frm`/`fcsr`) is touched here.
+(`counter_enabled`) also reads H's `hcounteren`, answered off `hwConfig` at an
+arbitrary value.  No F-related CSR (`fflags`/`frm`/`fcsr`) is touched here.
 -/
 import MachCSL.WpCsr
 import MachCSL.AluFacts
@@ -553,17 +552,16 @@ theorem execSpec_csrr_mcounteren (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀
   iapply HΦ $$ HmConf HPC HnextPC Hrd
 
 set_option maxHeartbeats 4000000 in
-/-- `rdtime rd` (`csrr rd, time`): reads `mtime`.  The counter check reads H's
-`hcounteren` (0.16's `counter_enabled`; the value matters only at a virtual
-privilege), held persistently at an arbitrary value. -/
+/-- `rdtime rd` (`csrr rd, time`): reads `mtime`.  (Since sail-riscv 0.16 the
+counter check also reads H's `hcounteren`, off `hwConfig`.) -/
 theorem execSpec_csrr_time (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : BitVec 64) (rd : BitVec 5)
-    (hrd : rd ≠ 0#5) (v t : BitVec 64) (hc : BitVec 32) :
+    (hrd : rd ≠ 0#5) (v t : BitVec 64) :
     execSpec (GF := GF) cpu dq c c
       (instruction.CSRReg (0xC01#12, regidx.Regidx 0#5, regidx.Regidx rd, csrop.CSRRS)) pc npc₀ npc₀
-      iprop(gpr cpu rd (DFrac.own 1) v ∗ Register.mtime ↦ᵣ[cpu] t ∗ Register.hcounteren ↦ᵣ[cpu]□ hc)
+      iprop(gpr cpu rd (DFrac.own 1) v ∗ Register.mtime ↦ᵣ[cpu] t)
       iprop(gpr cpu rd (DFrac.own 1) t ∗ Register.mtime ↦ᵣ[cpu] t) := by
   intro Φ
-  iintro ⟨HmConf, HPC, HnextPC, ⟨Hrd, Hmtime, #Hhcounteren⟩, HΦ⟩
+  iintro ⟨HmConf, HPC, HnextPC, ⟨Hrd, Hmtime⟩, HΦ⟩
   mconf_cases HmConf
   csrr_exec hrd
   mconf_intro HmConf
@@ -746,36 +744,32 @@ theorem wp_m_csrr_mcounteren (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.o
   wpLoop_m_instr cpu dq c c hok pc _ is_rvc _ _ _ (execSpec_csrr_mcounteren cpu dq c pc _ rd hrd v)
 
 /-- `rdtime rd` (`csrr rd, time`): `rd` receives the current `mtime`, whatever
-it is.  Since sail-riscv 0.16 the counter check (`counter_enabled`) also reads H's
-`hcounteren` (used only at a virtual privilege, so at any value): a persistent cell
-at some value is a premise. -/
+it is. -/
 theorem wp_m_csrr_time (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF := GF) c) (pc : BitVec 64)
     (is_rvc : Bool) (rd : BitVec 5) (hrd : rd ≠ 0#5) (v : BitVec 64) :
     instr (GF := GF) pc is_rvc (instruction.CSRReg (0xC01#12, regidx.Regidx 0#5, regidx.Regidx rd, csrop.CSRRS)) ∗
     mConf cpu dq c ∗ clockCells cpu ∗ pcIs cpu pc ∗ gpr cpu rd (DFrac.own 1) v ∗
-    (∃ hc : BitVec 32, Register.hcounteren ↦ᵣ[cpu]□ hc) ∗
     ▷ (∀ t : BitVec 64, mConf cpu dq c -∗ clockCells cpu -∗ pcIs cpu (pc + instrLen is_rvc) -∗
         gpr cpu rd (DFrac.own 1) t -∗ wpLoop cpu)
     ⊢ wpLoop cpu := by
-  iintro ⟨HI, HmConf, Hclock, Hpc, Hrd, ⟨%hc, #Hhc⟩, HΦ⟩
   have hexec : execSpecClk (GF := GF) cpu dq c Privilege.Machine c
       (instruction.CSRReg (0xC01#12, regidx.Regidx 0#5, regidx.Regidx rd, csrop.CSRRS))
       pc (pc + instrLen is_rvc) (pc + instrLen is_rvc)
-      iprop(gpr cpu rd (DFrac.own 1) v ∗ Register.hcounteren ↦ᵣ[cpu]□ hc)
-      iprop(∃ t : BitVec 64, gpr cpu rd (DFrac.own 1) t) := by
+      (gpr cpu rd (DFrac.own 1) v) iprop(∃ t : BitVec 64, gpr cpu rd (DFrac.own 1) t) := by
     intro ip mt Φ
-    have h := execSpec_csrr_time cpu dq c pc (pc + instrLen is_rvc) rd hrd v mt hc Φ
-    iintro ⟨HmConf, HPC, HnextPC, ⟨⟨Hrd, #Hhc⟩, Hmip, Hmtime⟩, HΦ⟩
+    have h := execSpec_csrr_time cpu dq c pc (pc + instrLen is_rvc) rd hrd v mt Φ
+    iintro ⟨HmConf, HPC, HnextPC, ⟨Hrd, Hmip, Hmtime⟩, HΦ⟩
     iapply h
-    iframe; iframe Hhc
+    iframe
     inext
     iintro HmConf HPC HnextPC ⟨Hrd, Hmtime⟩
     iapply HΦ $$ HmConf HPC HnextPC [Hrd Hmip Hmtime]
     isplitl [Hrd]
     · iexists mt; iframe
     · iexists ip, mt; iframe
+  iintro ⟨HI, HmConf, Hclock, Hpc, Hrd, HΦ⟩
   iapply wpLoop_m_instrClk cpu dq c Privilege.Machine (Or.inl rfl) c hok pc _ is_rvc _ _ _ hexec
-  iframe; iframe Hhc
+  iframe
   try (inext; iintro HmConf Hclock Hpc ⟨%t, Hrd⟩; iapply HΦ $$ %_ HmConf Hclock Hpc Hrd)
 
 end MachCSL

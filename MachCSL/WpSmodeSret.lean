@@ -36,21 +36,36 @@ def sretMs (ms : BitVec 64) : BitVec 64 :=
       17 17 0#1)
     23 23 0#1
 
+/-- `hstatus` after a non-virtual `sret` (sail-riscv 0.16 writes it, H
+enabled or not): `SPV := 0` (bit 7). -/
+def hstatusSret (hs : BitVec 64) : BitVec 64 := BitVec.updateSubrange hs 7 7 0#1
+
 set_option maxHeartbeats 4000000 in
 /-- The execute stage of `sret` (`SPP = S`, `TSR = 0`, `menvcfg.LPE = 0`):
-the hart stays in supervisor mode, at `sepc` with bit 0 cleared. -/
+the hart stays in supervisor mode, at `sepc` with bit 0 cleared.  (Since
+sail-riscv 0.16 the return privilege is `(SPP, hstatus.SPV & H)`, so `sret`
+reads `hstatus` and clears its `SPV`, H enabled or not; with H off the
+return privilege is `Supervisor` whatever `SPV` holds.) -/
 theorem execSpecF_sret (cpu : CPU) (c : MConf) (hok : SConfPhys (GF := GF) c false)
     (hspie : BitVec.extractLsb' 5 1 c.mstatus = 1#1) (hspp : BitVec.extractLsb' 8 1 c.mstatus = 1#1)
-    (pc npc₀ epc : BitVec 64) (R : RegMap) :
+    (pc npc₀ epc hs : BitVec 64) (R : RegMap) :
     execSpecPP (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c Privilege.Supervisor
       { c with mstatus := sretMs c.mstatus } (instruction.SRET ()) pc npc₀ (epc &&& 0xFFFFFFFFFFFFFFFE#64)
-      iprop(gprFile cpu R ∗ Register.sepc ↦ᵣ[cpu] epc) iprop(gprFile cpu R ∗ Register.sepc ↦ᵣ[cpu] epc) := by
+      iprop(gprFile cpu R ∗ Register.sepc ↦ᵣ[cpu] epc ∗ Register.hstatus ↦ᵣ[cpu] hs)
+      iprop(gprFile cpu R ∗ Register.sepc ↦ᵣ[cpu] epc ∗ Register.hstatus ↦ᵣ[cpu] hstatusSret hs) := by
   intro Φ
-  iintro ⟨HmConf, HPC, HnextPC, ⟨HF, Hsepc⟩, HΦ⟩
+  iintro ⟨HmConf, HPC, HnextPC, ⟨HF, Hsepc, Hhstatus⟩, HΦ⟩
   conf_cases HmConf
   obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok
   obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
-  have hspp' : BitVec.extractLsb' 8 1 (~~~(1#64 <<< 5) &&& (~~~(1#64 <<< 1) &&& c.mstatus ||| 1#64 <<< 1) ||| 1#64 <<< 5) = 1#1 := by
+  -- 0.16 clears `SPP` first, then copies `SPIE` into `SIE`: the same value
+  have hms : BitVec.updateSubrange (BitVec.updateSubrange (BitVec.updateSubrange
+      (BitVec.updateSubrange (BitVec.updateSubrange c.mstatus 8 8 0#1) 1 1
+        (_get_Mstatus_SPIE (BitVec.updateSubrange c.mstatus 8 8 0#1))) 5 5 1#1) 17 17 0#1) 23 23 0#1 =
+      sretMs c.mstatus := by
+    unfold sretMs _get_Mstatus_SPIE
+    simp only [Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', Sail.BitVec.extractLsb,
+      BitVec.extractLsb]
     bv_decide
   unfold execute
   swp_run 300
@@ -59,11 +74,12 @@ theorem execSpecF_sret (cpu : CPU) (c : MConf) (hok : SConfPhys (GF := GF) c fal
     $$ [Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren
         Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n]
   case' _ =>
-    simp only [sretMs, hspie, BitVec.reduceZeroExtend]
     iframe
     iexact Hhw
-  iapply HΦ $$ HmConf HPC HnextPC [HF Hsepc]
+  iapply HΦ $$ HmConf HPC HnextPC [HF Hsepc Hhstatus]
   iframe HF Hsepc
+  unfold hstatusSret
+  iexact Hhstatus
 
 /-- `smFacts` across `sret`: with `SPIE = 1`, interrupts come on. -/
 theorem smFacts_sret (ms : BitVec 64) (h : smFacts ms false) (hspie : BitVec.extractLsb' 5 1 ms = 1#1) :
@@ -139,11 +155,12 @@ theorem wp_s_sret [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) 
   simp only [ite_true] at hspie' hspp'
   have hok := SConfAt_sConfOf (GF := GF) curTier k.root ms mdl mepc stc lf false hsm hlf
   unfold trapCsrsAt
-  icases Hcsrs with ⟨Hsepc, Hscause, Hstval⟩
+  icases Hcsrs with ⟨Hsepc, Hscause, Hstval, Hh⟩
+  icases hTrapCsrs_cases cpu $$ Hh with ⟨%hs, %v4, %v5, Hhstatus, Hhtval, Hhtinst⟩
   have hexec := (execSpecF_sret (GF := GF) cpu (sConfOf curTier k.root ms mdl mepc stc lf) hok.phys hspie' hspp'
-    pc (pc + instrLen is_rvc) epc (tpPin cpu k.regs)).frameL (transTok cpu curTier k.root)
+    pc (pc + instrLen is_rvc) epc hs (tpPin cpu k.regs)).frameL (transTok cpu curTier k.root)
   iapply (wpLoop_s_instr cpu _ _ curTier k.root false hok hmdl rfl rfl pc _ is_rvc _ _ _ hexec)
-  iframe HI HmConf Hclock Hpc HF Hsepc
+  iframe HI HmConf Hclock Hpc HF Hsepc Hhstatus
   isplitl [Htrans Htok]
   · unfold transTok; iframe Htrans Htok
   isplit
@@ -155,7 +172,7 @@ theorem wp_s_sret [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) 
   iintro HmConf Hclock Hpc HT HQ _
   unfold transTok
   icases HT with ⟨Htrans, Htok⟩
-  icases HQ with ⟨HF, Hsepc⟩
+  icases HQ with ⟨HF, Hsepc, Hhstatus⟩
   simp only [sConfOf_setMs, sConfOf_mstatus]
   ihave HConf := kConf_intro cpu curTier k.root true spie spp (sretMs ms) mdl mepc stc lf
     ⟨smFacts_sret ms hsm hspie', sretFacts_on _ _ _, hmdl, hlf⟩ $$ HmConf
@@ -164,8 +181,10 @@ theorem wp_s_sret [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) 
   -- the arm, from the trap CSRs, the claim and the handler
   unfold intrRes intrResP
   icases Hres with ⟨%E, %h, %hd, Hstv, #HS, #Henv⟩
-  ihave Hcsrs := trapCsrs_intro cpu epc sc tv $$ [Hsepc Hscause Hstval]
-  case' _ => unfold trapCsrsAt; iframe Hsepc Hscause Hstval
+  ihave Hh := hTrapCsrs_intro cpu (hstatusSret hs) v4 v5 $$ [Hhstatus Hhtval Hhtinst]
+  case' _ => iframe Hhstatus Hhtval Hhtinst
+  ihave Hcsrs := trapCsrs_intro cpu epc sc tv $$ [Hsepc Hscause Hstval Hh]
+  case' _ => unfold trapCsrsAt; iframe Hsepc Hscause Hstval Hh
   ihave HarmOn := sieArm_on_intro cpu E k.proc h hd $$ [Hcsrs Hclaim Hstv HS Henv]
   case' _ => iframe Hcsrs Hclaim Hstv HS Henv
   iapply HΦ $$ [HConf HF Hstack Htrans HarmOn Hcpu Htok Hclock] Hpc

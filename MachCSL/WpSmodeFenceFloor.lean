@@ -168,10 +168,10 @@ read watermark has reached. -/
 theorem swp_sail_barrier_view (cpu : CPU) (b : barrier_kind) (hacq : fenceAcq b = true)
     (T : Nat) (Φ : Unit → IProp GF) :
     rviewLb cpu T ∗ ▷ (viewLb cpu T -∗ Φ ())
-    ⊢ swp cpu (ArchSem.sail_barrier b) Φ := by
-  unfold ArchSem.sail_barrier PreSail.sail_barrier PreSail.emit
+    ⊢ swp cpu (LeanRV64D.ArchSem.sail_barrier b) Φ := by
   iintro ⟨#Hrv, HΦ⟩
-  iapply swp_event cpu (.barrier b) (fun v => FreeM.pure v) Φ (fun _ _ h => h)
+  iapply swp_event_at cpu (LeanRV64D.ArchSem.sail_barrier b) (.barrier b) (fun (v : Unit) => FreeM.pure v)
+    (sail_barrier_def b) Φ (fun _ _ h => h)
   iintro %σ Hσ
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
   iapply fupd_mask_intro LawfulSet.empty_subset
@@ -182,6 +182,7 @@ theorem swp_sail_barrier_view (cpu : CPU) (b : barrier_kind) (hacq : fenceAcq b 
   inext
   iintro %v' %σ' %Hev
   obtain rfl := Hev
+  cases v'
   imod memModel_fence_acq (MachGS.era (GF := GF)) σ cpu b hacq T $$ Hrv Hmm with ⟨Hmm, #Hv⟩
   imod Hmask
   imodintro
@@ -196,19 +197,21 @@ theorem swp_sail_barrier_view (cpu : CPU) (b : barrier_kind) (hacq : fenceAcq b 
 /-- A plain load of bytes inside a `readAUr`: the twin of
 `MachCSL.swp_sail_mem_read_plain_au`, which mints the same watermark
 update and drops the receipt. -/
-theorem swp_sail_mem_read_plain_aur (cpu : CPU) {n vasize : Nat}
-    (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
+theorem swp_sail_mem_read_plain_aur (cpu : CPU) {n nt : Nat}
+    (req : Mem_request n nt Arch.addr_size Arch.addr_space Arch.mem_acc)
     (hk : akPlain req.access_kind = true) (K : Nat) (ts : List (Nat × Agent))
-    (Φ : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → IProp GF) :
-    viewLb cpu K ∗ readAUr cpu req.pa n K ts (fun w => Φ (.Ok (w, none)))
-    ⊢ swp cpu (ArchSem.sail_mem_read req) Φ := by
-  unfold ArchSem.sail_mem_read PreSail.sail_mem_read PreSail.emit readAUr
+    (Φ : Result ((Vector (BitVec 8) n) × (Vector Bool nt)) Unit → IProp GF) :
+    viewLb cpu K ∗
+    readAUr cpu req.address n K ts (fun w => Φ (.Ok (bitvec_to_vecbytes w, bitvec_to_vecbool 0#nt)))
+    ⊢ swp cpu (LeanRV64D.ArchSem.sail_mem_read req) Φ := by
+  unfold readAUr
   iintro ⟨#HK, #Hts, H⟩
   have hk' : akIfetch req.access_kind = false ∧ akExcl req.access_kind = false := by
     unfold akPlain at hk
     simp only [Bool.and_eq_true, Bool.not_eq_eq_eq_not, Bool.not_true] at hk
     exact hk
-  iapply swp_event cpu (.memRead n vasize req) (fun v => FreeM.pure v) Φ
+  iapply swp_event_at cpu (LeanRV64D.ArchSem.sail_mem_read req) (.memRead (memReq req))
+    (fun v => FreeM.pure (memReadAns v)) (sail_mem_read_def req) Φ
     (fun _ _ hb => by
       have h1 : akExcl req.access_kind = true := hb.1
       rw [hk'.2] at h1
@@ -216,8 +219,8 @@ theorem swp_sail_mem_read_plain_aur (cpu : CPU) {n vasize : Nat}
   iintro %σ Hσ
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
   imod H with ⟨%dqs, %Hs, Hb, %hne, Hcont⟩
-  ihave %hget : ⌜histsAt σ.mem req.pa n Hs⌝ $$ [Hmem Hb]
-  · iapply histBytes_valid σ.mem req.pa n dqs Hs $$ [Hmem Hb]
+  ihave %hget : ⌜histsAt σ.mem req.address n Hs⌝ $$ [Hmem Hb]
+  · iapply histBytes_valid σ.mem req.address n dqs Hs $$ [Hmem Hb]
     iframe
   ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
   · iapply memModel_mmOk $$ Hmm
@@ -233,12 +236,12 @@ theorem swp_sail_mem_read_plain_aur (cpu : CPU) {n vasize : Nat}
     intro p hp j hj e he het
     exact histOk_author_eq σ.log (Hs j) (hmm.1 _ _ (hget j hj)) e he p.1 p.2
       (hau p hp).1 (hau p hp).2 het
-  have hram : ramBytes req.pa n := ramBytes_of_cells hmm.2.2.2.1 (fun j hj => ⟨Hs j, hget j hj⟩)
+  have hram : ramBytes req.address n := ramBytes_of_cells hmm.2.2.2.1 (fun j hj => ⟨Hs j, hget j hj⟩)
   imodintro
   isplit
   · ipureintro
-    obtain ⟨w, hw⟩ := exists_read_top σ (hartAgent cpu) req.pa n Hs hmm hget hne
-    refine ⟨.Ok (w, none), σ.afterLoad cpu req.pa n σ.top, Or.inr (Or.inr (Or.inl
+    obtain ⟨w, hw⟩ := exists_read_top σ (hartAgent cpu) req.address n Hs hmm hget hne
+    refine ⟨.ok (w, 0#nt), σ.afterLoad cpu req.address n σ.top, Or.inr (Or.inr (Or.inl
       ⟨hram, hk, σ.top, w, (hmm.2.1 cpu).1, le_refl _, ?_, hw, rfl, rfl⟩))⟩
     intro j _
     exact (hmm.2.1 cpu).2.2.2 _
@@ -249,7 +252,7 @@ theorem swp_sail_mem_read_plain_aur (cpu : CPU) {n vasize : Nat}
   · exact absurd hdev (not_devBytes_of_ramBytes hram (devRead_pos hdr))
   · rw [hk'.1] at hif
     exact absurd hif (by decide)
-  · imod memModel_load_rv _ σ cpu req.pa n tvn htop $$ Hmm with ⟨Hmm, #Hrv⟩
+  · imod memModel_load_rv _ σ cpu req.address n tvn htop $$ Hmm with ⟨Hmm, #Hrv⟩
     have hreads : readsAre (hartAgent cpu) tvn Hs n w' := by
       intro j hj
       have := hrd' j hj
@@ -259,7 +262,7 @@ theorem swp_sail_mem_read_plain_aur (cpu : CPU) {n vasize : Nat}
     imod Hcont $$ %w' %tvn %(by omega) %hreads %hauthors Hrv Hb with HΦ
     imodintro
     isplitl [Hregs Hmem Hmm Hclose]
-    · iapply Hclose $$ %(σ.afterLoad cpu req.pa n tvn) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
+    · iapply Hclose $$ %(σ.afterLoad cpu req.address n tvn) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
     · iapply swp_ret
       iexact HΦ
   · rw [hk'.2] at hex'
@@ -283,7 +286,7 @@ theorem swp_checked_mem_read_load2_S_aur (cpu : CPU) (dq : DFrac) (c : MConf) (s
   unfold checked_mem_read
   checked_mem_S_au_prefix pa 2 hram hal
   iapply swp_bind
-  iapply (swp_sail_mem_read_plain_aur cpu _ rfl K ts)
+  mem_iapply (swp_sail_mem_read_plain_aur cpu) rfl K ts
   isplit
   · iexact HK
   iapply readAUr_wand cpu pa 2 K ts Ψ $$ HAU
@@ -463,7 +466,7 @@ theorem swp_checked_mem_read_load4_S_aur (cpu : CPU) (dq : DFrac) (c : MConf) (s
   unfold checked_mem_read
   checked_mem_S_au_prefix pa 4 hram hal
   iapply swp_bind
-  iapply (swp_sail_mem_read_plain_aur cpu _ rfl K ts)
+  mem_iapply (swp_sail_mem_read_plain_aur cpu) rfl K ts
   isplit
   · iexact HK
   iapply readAUr_wand cpu pa 4 K ts Ψ $$ HAU
@@ -588,7 +591,6 @@ theorem execSpecF_fence_r_rw_floor (cpu : CPU) (dq : DFrac) (c : MConf) (sie : B
   · iexact Hrv
   inext
   iintro #Hv
-  iapply swp_ret
   swp_run 80
   conf_intro HmConf
   iapply HΦ $$ HmConf HPC HnextPC [HF Hv]

@@ -92,7 +92,6 @@ theorem execSpecF_fence_iorw_iorw_floor (cpu : CPU) (dq : DFrac) (c : MConf) (si
   · iexact Hrv
   inext
   iintro #Hv
-  iapply swp_ret
   swp_run 80
   conf_intro HmConf
   iapply HΦ $$ HmConf HPC HnextPC [HF Hv]

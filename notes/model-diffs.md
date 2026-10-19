@@ -84,7 +84,10 @@ Each is conditional and reports itself in the regeneration log.
   support from F's -- and the F-dependent Zfa, Zfbfmin, Zfh, Zfhmin, Zcd off: the kernel never
   enables `mstatus.FS` and the module subset compiles none of their instructions, so `misa` now
   advertises what is compiled (the derived `misa` value changed accordingly; `mstatus.FS` is
-  read-only zero; the floating-point CSRs are illegal).
+  read-only zero; the floating-point CSRs are illegal).  Device conformance: items 8 and 3 turn
+  four vtest runs red (the three `core_regs_fcsr` runs; QEMU `core_csrprobe`'s `tselect`), recorded
+  as findings in `notes/device-conformance.md` ("The 0.16 bump"); under upstream's defaults they
+  would agree.
 
 ## 5. Where MachCSL's semantics meets the model
 
