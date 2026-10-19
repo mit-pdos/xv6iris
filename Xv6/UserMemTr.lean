@@ -251,7 +251,7 @@ def UmeXOut (C : UCfg) (P : UPtd) (t0 : PTree) (mm0 : BMap) (s : UWSt) (va : Bit
   UstLand C P t0 mm0 s' ∧ (∀ x, x ≠ .tlb → s'.file x = s.file x) ∧
   (∀ pa pbmt, r = .Ok (.Physaddr pa, pbmt, ()) → pbmt = .PBMT_PMA ∧ ∃ ppn, UftPageOf P ppn ∧ pa = paOf ppn va ∧
     utrCanon va ∧ ∀ orc, runRW ufFoot orc s (utrTranslate s va acc) = some (.Ok (ppn, .PBMT_PMA, ()), s', orc)) ∧
-  (∀ e, r = .Err (e, ()) → userExc e.trap = true)
+  (∀ e, r = .Err (e, ()) → e.ext = none ∧ userExc e.trap = true)
 
 /-- **The translation of a user data access at a user machine**
 (`translateAddr`, U1-P2's front over `ume_translate`). -/
@@ -288,12 +288,12 @@ theorem ume_xlate (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 s)
       · intro pa pbmt h; cases h
       · intro e' h
         cases h
-        exact ume_userExc_texc acc f (herr f rfl)
+        exact ⟨rfl, ume_userExc_texc acc f (herr f rfl)⟩
   · refine ⟨_, s, fun orc => utr_translateAddr_noncanon ufFoot orc s hp va _ hacc hc, hl, fun _ _ => rfl, ?_, ?_⟩
     · intro pa pbmt h; cases h
     · intro e' h
       cases h
-      exact ume_userExc_texc acc (.PTW_Invalid_Addr ()) (fun x h => by cases h)
+      exact ⟨rfl, ume_userExc_texc acc (.PTW_Invalid_Addr ()) (fun x h => by cases h)⟩
 
 end tr
 

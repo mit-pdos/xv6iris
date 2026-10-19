@@ -27,7 +27,7 @@ theorem ume_pf_miss (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 
     (hstep : UbMemStep P t0 t mm0 s.mm) (htlb : utlbOk t (s.file .tlb)) (vpn : BitVec 27) (c : cbop_zicbop)
     (sum : Bool) :
     ∃ r s', (∀ orc, runRW ufFoot orc s
-        (translate_TLB_miss 39 0#16 P.root vpn (umoPf c) .User false sum ()) = some (r, s', orc)) ∧
+        (translate_TLB_miss 39 0#16 0#14 P.root vpn (umoPf c) .User false sum .S_Stage ()) = some (r, s', orc)) ∧
       UftTrOut C P t0 mm0 s r s' := by
   have hwf : UbMemWf P t s.mm := ubMemStep_wf P t0 t mm0 s.mm hl.wf hstep
   have hwk : UwkPins ufFoot s.file := (uft_pins_land hl).wk
@@ -44,7 +44,7 @@ theorem ume_pf_miss (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 
   have herr : ∀ e, (∀ x, e ≠ PTW_Error.PTW_Ext_Error x) →
       uwkWalkRes (umePfAcc c) false (t.walk 2 vpn) = .Err (e, ()) →
       ∃ r s', (∀ orc, runRW ufFoot orc s
-        (translate_TLB_miss 39 0#16 t.base vpn (umoPf c) .User false sum ()) = some (r, s', orc)) ∧
+        (translate_TLB_miss 39 0#16 0#14 t.base vpn (umoPf c) .User false sum .S_Stage ()) = some (r, s', orc)) ∧
       UftTrOut C P t0 mm0 s r s' := by
     intro e he hres
     have hout : UftTrOut C P t0 mm0 s (.Err (e, ())) s := by
@@ -67,7 +67,7 @@ theorem ume_pf_miss (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 
       exact herr (.PTW_No_Permission ()) (fun x h => by cases h)
         (by rw [hw]; simp only [uwkWalkRes, hok.inv, hperm, Bool.false_eq_true, ite_false])
     | true =>
-      have hwalk' : ∀ orc, runRW ufFoot orc s (pt_walk 39 vpn (umoPf c) .User false sum t.base 2 false ()) =
+      have hwalk' : ∀ orc, runRW ufFoot orc s (pt_walk 39 vpn (umoPf c) .User false sum t.base 2 false .S_Stage ()) =
           some (.Ok (uwkOut w addr false, ()), s, orc) := fun orc => by
         rw [hwalk orc, hw]
         simp only [uwkWalkRes, hok.inv, hperm, hok.g0]
@@ -79,7 +79,7 @@ theorem ume_pf_miss (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 
         exact hperm.1
       have hpage : UftPageOf P (ptePpn w) := ⟨_, lw, w, hlok.2 hU, had, rfl⟩
       refine ⟨.Ok (ptePpn w, .PBMT_PMA, ()), _, fun orc => utlb_miss_ok ufFoot orc orc s s hdr hdw _ rfl vpn t.base
-        _ false sum w addr none (hwalk' orc) (uwk_upd_none ufFoot orc s vpn addr w _ false sum (ume_upd_pf w c)), ?_⟩
+        _ false sum w addr none (hwalk' orc) (ume_upd_none_pf ufFoot orc s vpn addr w c false sum), ?_⟩
       refine ⟨uft_land hl (fun r hr => uft_file_tlb _ _ _ _ _ r hr) t hstep ?_, fun x hx => uft_file_tlb _ _ _ _ _ x hx,
         fun ppn pbmt h => ?_, fun f h => by cases h⟩
       · rw [uft_file_tlb_same]
@@ -90,9 +90,9 @@ set_option maxHeartbeats 1000000 in
 theorem ume_pf_hit (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 s) (t : PTree)
     (hstep : UbMemStep P t0 t mm0 s.mm) (htlb : utlbOk t (s.file .tlb)) (vpn : BitVec 27) (c : cbop_zicbop)
     (sum : Bool) (ent : TLB_Entry) (hslot : (s.file .tlb)[tlbHash vpn]'(tlbHash_lt vpn) = some ent)
-    (hm : match_TLB_Entry ent 0#16 (BitVec.signExtend 45 vpn) = true) :
+    (hm : match_TLB_Entry ent 0#16 0#14 (sign_extend (m := 47) vpn) .S_Stage = true) :
     ∃ r s', (∀ orc, runRW ufFoot orc s
-        (translate_TLB_hit 39 0#16 vpn (umoPf c) .User false sum () (tlbHash vpn) ent) = some (r, s', orc)) ∧
+        (translate_TLB_hit 39 0#16 0#14 vpn (umoPf c) .User false sum (tlbHash vpn) ent .S_Stage ()) = some (r, s', orc)) ∧
       UftTrOut C P t0 mm0 s r s' := by
   have hwf : UbMemWf P t s.mm := ubMemStep_wf P t0 t mm0 s.mm hl.wf hstep
   have hwk : UwkPins ufFoot s.file := (uft_pins_land hl).wk
@@ -131,20 +131,20 @@ theorem ume_pf_hit (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 s
 /-- **`translate` of a prefetch at a user machine.** -/
 theorem ume_pf_translate (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 s) (vpn : BitVec 27)
     (c : cbop_zicbop) (sum : Bool) :
-    ∃ r s', (∀ orc, runRW ufFoot orc s (translate 39 0#16 P.root vpn (umoPf c) .User false sum ()) =
+    ∃ r s', (∀ orc, runRW ufFoot orc s (translate 39 0#16 0#14 P.root vpn (umoPf c) .User false sum .S_Stage ()) =
         some (r, s', orc)) ∧ UftTrOut C P t0 mm0 s r s' := by
   obtain ⟨t, hstep, htlb⟩ := hl.mem
   have hdr : ufFoot.Dr .tlb = true := ufFoot_rd _ (by decide)
-  have hmiss : (∀ orc, runRW ufFoot orc s (lookup_TLB 39 0#16 vpn) = some (none, s, orc)) →
-      ∃ r s', (∀ orc, runRW ufFoot orc s (translate 39 0#16 P.root vpn (umoPf c) .User false sum ()) =
+  have hmiss : (∀ orc, runRW ufFoot orc s (lookup_TLB 39 0#16 0#14 vpn .S_Stage) = some (none, s, orc)) →
+      ∃ r s', (∀ orc, runRW ufFoot orc s (translate 39 0#16 0#14 P.root vpn (umoPf c) .User false sum .S_Stage ()) =
         some (r, s', orc)) ∧ UftTrOut C P t0 mm0 s r s' := by
     intro hl0
     obtain ⟨r, s', hw, hout⟩ := ume_pf_miss hv s hl t hstep htlb vpn c sum
-    exact ⟨r, s', fun orc => utlb_translate_of_miss ufFoot orc s _ vpn _ _ false sum _ (hl0 orc) (hw orc), hout⟩
+    exact ⟨r, s', fun orc => utlb_translate_of_miss ufFoot orc s _ vpn _ _ false sum (ufFoot_rd _ (by decide)) _ (hl0 orc) (hw orc), hout⟩
   cases hslot : (s.file .tlb)[tlbHash vpn]! with
   | none => exact hmiss (fun orc => utlb_lookup_empty ufFoot orc s hdr _ rfl vpn hslot)
   | some ent =>
-    cases hm : match_TLB_Entry ent 0#16 (BitVec.signExtend 45 vpn) with
+    cases hm : match_TLB_Entry ent 0#16 0#14 (sign_extend (m := 47) vpn) .S_Stage with
     | false => exact hmiss (fun orc => utlb_lookup_other ufFoot orc s hdr _ rfl vpn ent hslot hm)
     | true =>
       have hslot' : (s.file .tlb)[tlbHash vpn]'(tlbHash_lt vpn) = some ent := by
@@ -179,15 +179,15 @@ theorem ume_pa_al64 {t : PTree} {mm : BMap} (hwf : UbMemWf P t mm) {ppn : BitVec
 aligned. -/
 theorem ume_pf_xlate (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 s) (va : BitVec 64)
     (hva : va.toNat % 64 = 0) (c : cbop_zicbop) :
-    ∃ (r : Result (physaddr × page_based_mem_type × Unit) (ExceptionType × Unit)) (s' : UWSt),
-      (∀ orc, runRW ufFoot orc s (translateAddr (.Virtaddr va) (umoPf c)) = some (r, s', orc)) ∧
+    ∃ (r : Result (physaddr × page_based_mem_type × Unit) (ExceptionContext × Unit)) (s' : UWSt),
+      (∀ orc, runRW ufFoot orc s (translateAddr (.Virtaddr va) (umoPf c) .User) = some (r, s', orc)) ∧
       UstLand C P t0 mm0 s' ∧
       ∀ pa pbmt, r = .Ok (.Physaddr pa, pbmt, ()) → pbmt = .PBMT_PMA ∧ inRam pa 64 ∧ pa.toNat % 64 = 0 := by
   have hp : UtrPins ufFoot s := uf_utrPins C P s hl.cfg hl.priv hl.ms
   by_cases hc : utrCanon va
   · obtain ⟨r0, s', hw, hout⟩ := ume_pf_translate hv s hl (vpnOf va) c (utrSum (s.file .mstatus))
     have e : utrTranslate s va (umoPf c) =
-        translate 39 0#16 P.root (vpnOf va) (umoPf c) .User false (utrSum (s.file .mstatus)) () := by
+        translate 39 0#16 0#14 P.root (vpnOf va) (umoPf c) .User false (utrSum (s.file .mstatus)) .S_Stage () := by
       unfold utrTranslate
       rw [hl.cfg.satp, utrRoot_satpOf, utrMxr_false _ hl.ms.2.2.1]
     have hw' : ∀ orc, runRW ufFoot orc s (utrTranslate s va (umoPf c)) = some (r0, s', orc) := by
