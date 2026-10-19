@@ -31,6 +31,7 @@ set_option hygiene false in
 macro "ukf_phys" hP:term:max hd:term:max n:num hram:term:max hal:term:max : tactic => `(tactic| (
   have hdms := ($hP).dms; have hdcp := ($hP).dcp; have hcp := ($hP).cp
   uwk_pins ($hP).wk
+  have hrange := uwk_pmpRange _ $n (pmpOk_of_inRam $hram)
   have hpok := pmpOk_of_inRam $hram
   have hpchk : ∀ (a : BitVec 64) (w : Nat) (p : Privilege), pmpOk a w →
       uxRun _ _ orc s (pmpCheck (.Physaddr a) w (.InstructionFetch ()) p) = some (none, s, orc) :=
@@ -40,19 +41,16 @@ macro "ukf_phys" hP:term:max hd:term:max n:num hram:term:max hal:term:max : tact
   have hclint := within_clint_ram _ $n $hram
   have halign := is_aligned_paddr_of _ $n (by decide) $hal
   ukf_run -bv
-  simp only [bits_of_physaddr, addInt_eq, Int.cast_ofNat_Int, Int.zero_mul, uwk_add_ofInt0,
-    MemoryOpResult_drop_meta, BitVec.setWidth_eq, hT]
-  apply congrArg some
-  apply congrArg (fun x => (x, s, orc))
-  apply congrArg Result.Ok
-  simp [Option.getD, Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange']))
+  simp only [MemoryOpResult_drop_meta, BitVec.setWidth_eq, MachCSL.updateSubrange_full16,
+    MachCSL.updateSubrange_full32, MachCSL.from_bytes_le_vecbytes_2, MachCSL.from_bytes_le_vecbytes_4,
+    uma_chunk0_addr'', hT, Option.getD_some]))
 
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 /-- **A 2-byte instruction read of text bytes.** -/
 theorem ukf_memRead2 (D : UFoot) (T : BMap) (orc : UOrc) (s : UWSt) (hd : UxwDisj T s) (hP : UftPins D s)
     (pa : BitVec 64) (hram : inRam pa 2) (hal : pa.toNat % 2 = 0) (v : BitVec 16) (hT : bmRead T pa 2 = some v) :
-    uxRun D T orc s (mem_read (.InstructionFetch ()) .PBMT_PMA (.Physaddr pa) 2 false false false) =
+    uxRun D T orc s (mem_read (.InstructionFetch ()) .PBMT_PMA .User (.Physaddr pa) 2 false false false) =
       some (.Ok v, s, orc) := by
   have hown : bmOwned T pa 2 = true := bmOwned_of_read T pa 2 v hT
   ukf_phys hP hd 2 hram hal
@@ -62,7 +60,7 @@ set_option maxRecDepth 100000 in
 /-- **A 4-byte instruction read of text bytes.** -/
 theorem ukf_memRead4 (D : UFoot) (T : BMap) (orc : UOrc) (s : UWSt) (hd : UxwDisj T s) (hP : UftPins D s)
     (pa : BitVec 64) (hram : inRam pa 4) (hal : pa.toNat % 4 = 0) (v : BitVec 32) (hT : bmRead T pa 4 = some v) :
-    uxRun D T orc s (mem_read (.InstructionFetch ()) .PBMT_PMA (.Physaddr pa) 4 false false false) =
+    uxRun D T orc s (mem_read (.InstructionFetch ()) .PBMT_PMA .User (.Physaddr pa) 4 false false false) =
       some (.Ok v, s, orc) := by
   have hown : bmOwned T pa 4 = true := bmOwned_of_read T pa 4 v hT
   ukf_phys hP hd 4 hram hal
@@ -71,13 +69,14 @@ set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 /-- A chunk whose translation succeeds: the text read at the page (the
 twin of `uft_fetchBytes_ok`). -/
-theorem ukf_fetchBytes_ok (D : UFoot) (T : BMap) (orc orc' : UOrc) (s s1 : UWSt) (fs gs pa : BitVec 64) (n : Nat)
-    (w : BitVec (8 * n))
-    (htr : uxRun D T orc s (translateAddr (.Virtaddr gs) (.InstructionFetch ())) =
+theorem ukf_fetchBytes_ok (D : UFoot) (T : BMap) (orc orc' : UOrc) (s s1 : UWSt) (hP : UftPins D s)
+    (fs gs pa : BitVec 64) (n : Nat) (w : BitVec (8 * n))
+    (htr : uxRun D T orc s (translateAddr (.Virtaddr gs) (.InstructionFetch ()) .User) =
       some (.Ok (.Physaddr pa, .PBMT_PMA, ()), s1, orc))
-    (hmr : uxRun D T orc s1 (mem_read (.InstructionFetch ()) .PBMT_PMA (.Physaddr pa) n false false false) =
+    (hmr : uxRun D T orc s1 (mem_read (.InstructionFetch ()) .PBMT_PMA .User (.Physaddr pa) n false false false) =
       some (.Ok w, s1, orc')) :
     uxRun D T orc s (fetch_bytes fs gs n) = some (.FetchBytes_Success w, s1, orc') := by
+  have hdms := hP.dms; have hdcp := hP.dcp; have hcp := hP.cp
   ukf_run -bv
 
 set_option hygiene false in

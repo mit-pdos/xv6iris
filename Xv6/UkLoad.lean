@@ -29,12 +29,13 @@ theorem ukm_exec_load {D : UFoot} (hD : UmoFoot D) (orc : UOrc) (s : UWSt) (hU :
     (imm : BitVec 12) (i1 rd : BitVec 5) (uns : Bool) (w : Nat) (hw : umaW w) (v : BitVec (8 * w)) (s1 : UWSt)
     (orc1 : UOrc)
     (hvr : runRW D orc s (vmem_read_addr (.Virtaddr (uxaXget s.file i1 + sign_extend (m := 64) imm)) w (.Load .Data)
-      false false false) = some (.Ok v, s1, orc1)) :
+      umoAI false false false) = some (.Ok v, s1, orc1)) :
     runRW D orc s (execute (.LOAD (imm, .Regidx i1, .Regidx rd, uns, (w : Int)))) =
       some (RETIRE_SUCCESS, uxaWr s1 rd (extend_value uns v), orc1) := by
-  have hga := umo_gtda hD orc s hU hp i1
+  have hga := umo_gtda hD orc s hp i1
+  have hdai := umo_default_access_info hD orc s hU hp
   have hwx := uxa_wX hD.ctl.alu
-  rcases hw with rfl | rfl | rfl | rfl <;> uwk_run [hga, hvr, hwx]
+  rcases hw with rfl | rfl | rfl | rfl <;> uwk_run [hga, hdai, hvr, hwx]
 
 /-- The pins of the physical side at an engine machine. -/
 theorem ukm_umaPhys {C : UCfg} {P : UPtd} {T : BMap} {s : UWSt} (hl : UkLand C P T s) : UmaPhys ufFoot s :=
@@ -70,9 +71,10 @@ theorem ukRetire_load (C : UCfg) (P : UPtd) (T : BMap) (imm : BitVec 12) (rs1 rd
   have hva : uxaXget (ucNpcS s len).file rs1 + sign_extend (m := 64) imm = m.get rs1 + BitVec.signExtend 64 imm := by
     rw [hr0 rs1]; rfl
   have hrd : runRW ufFoot orc (ucNpcS s len) (vmem_read_addr (.Virtaddr (uxaXget (ucNpcS s len).file rs1 +
-      sign_extend (m := 64) imm)) k (.Load .Data) false false false) = some (.Ok w, s1, orc) := by
+      sign_extend (m := 64) imm)) k (.Load .Data) umoAI false false false) = some (.Ok w, s1, orc) := by
     rw [hva]
-    exact uma_vmem_read_addr_al ufFoot orc orc _ s1 s1 hp0 _ k hW hal (.Load .Data) false false false _ w (htr orc)
+    exact uma_vmem_read_addr_al ufFoot orc orc _ s1 s1 hp0 _ k hW hal (.Load .Data) umoAI rfl false false false rfl
+      _ w (htr orc)
       (uma_mem_read_load ufFoot orc s1 (ukm_umaPhys hl1) _ k hW hram w hbytes)
   have hex := ukm_exec_load ume_umoFoot orc (ucNpcS s len) (uf_drefU C P _ hl0.cfg hl0.priv) hp0 imm rs1 rd u k hW
     w s1 orc hrd

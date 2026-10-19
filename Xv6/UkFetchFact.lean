@@ -89,7 +89,8 @@ theorem ukFetch_base (C : UCfg) (P : UPtd) (T : BMap) (pc : BitVec 64) (V : Nat 
     have hram := ukm_umaRam P hwf _ lw hk (pc.toNat % 4096) 4 (Or.inr (Or.inr (Or.inl rfl))) (by omega)
       (by omega)
     have hmr := ukf_memRead4 ufFoot T orc s1 hd1 (ukm_pins hl1) _ hram.ram hram.al w hT4
-    have hfb := ukf_fetchBytes_ok ufFoot T orc orc s s1 pc pc (pte2pa lw + BitVec.ofNat 64 (pc.toNat % 4096)) 4 w (uke_uxRun_of_runRW hl _ orc _ (htr1 orc)) hmr
+    have hfb := ukf_fetchBytes_ok ufFoot T orc orc s s1 (ukm_pins hl) pc pc
+      (pte2pa lw + BitVec.ofNat 64 (pc.toNat % 4096)) 4 w (uke_uxRun_of_runRW hl _ orc _ (htr1 orc)) hmr
     exact ⟨s1, orc, ukf_fetch4_base ufFoot T orc orc s s1 hd (ukm_pins hl) pc hpc hal w hfb hrvc, hl1, hf1, hV1⟩
   · -- the low half: a 2-byte read on the pc's page
     have hT2 := ukm_view_bytesT hm1 _ lw hk ht (pc.toNat % 4096) 2 (by omega) (BitVec.extractLsb' 0 16 w)
@@ -98,7 +99,8 @@ theorem ukFetch_base (C : UCfg) (P : UPtd) (T : BMap) (pc : BitVec 64) (V : Nat 
           show pc.toNat % 4096 + j = (pc.toNat + j) % 4096 by omega, hw j (by omega), ukf_lo_byte w j hj])
     have hram := ukm_umaRam P hwf _ lw hk (pc.toNat % 4096) 2 (Or.inr (Or.inl rfl)) (by omega) (by omega)
     have hmr := ukf_memRead2 ufFoot T orc s1 hd1 (ukm_pins hl1) _ hram.ram hram.al _ hT2
-    have hfb := ukf_fetchBytes_ok ufFoot T orc orc s s1 pc pc (pte2pa lw + BitVec.ofNat 64 (pc.toNat % 4096)) 2 _ (uke_uxRun_of_runRW hl _ orc _ (htr1 orc)) hmr
+    have hfb := ukf_fetchBytes_ok ufFoot T orc orc s s1 (ukm_pins hl) pc pc
+      (pte2pa lw + BitVec.ofNat 64 (pc.toNat % 4096)) 2 _ (uke_uxRun_of_runRW hl _ orc _ (htr1 orc)) hmr
     -- the high half: a 2-byte read at `pc + 2`, through ITS page's leaf
     obtain ⟨lw2, hk2', hU2, hX2, ht2⟩ := hhi hmid
     have hlt := ukf_pc_lt P hwf pc lw hk
@@ -116,7 +118,7 @@ theorem ukFetch_base (C : UCfg) (P : UPtd) (T : BMap) (pc : BitVec 64) (V : Nat 
     have hram2 := ukm_umaRam P hwf _ lw2 hk2 ((BitVec.addInt pc 2).toNat % 4096) 2 (Or.inr (Or.inl rfl))
       (by rw [e2]; omega) (by rw [e2]; omega)
     have hmr2 := ukf_memRead2 ufFoot T orc s2 (uke_disj hl2) (ukm_pins hl2) _ hram2.ram hram2.al _ hT2'
-    have hfb2 := ukf_fetchBytes_ok ufFoot T orc orc s1 s2 pc (BitVec.addInt pc 2)
+    have hfb2 := ukf_fetchBytes_ok ufFoot T orc orc s1 s2 (ukm_pins hl1) pc (BitVec.addInt pc 2)
       (pte2pa lw2 + BitVec.ofNat 64 ((BitVec.addInt pc 2).toNat % 4096)) 2 _
       (uke_uxRun_of_runRW hl1 _ orc _ (htr2 orc)) hmr2
     have hpc1 : s1.file .PC = pc := (hf1 .PC (by decide)).trans hpc
@@ -162,13 +164,15 @@ theorem ukFetch_rvc (C : UCfg) (P : UPtd) (T : BMap) (pc : BitVec 64) (V : Nat �
     have hram := ukm_umaRam P hwf _ lw hk (pc.toNat % 4096) 4 (Or.inr (Or.inr (Or.inl rfl))) (by omega)
       (by omega)
     have hmr := ukf_memRead4 ufFoot T orc s1 hd1 (ukm_pins hl1) _ hram.ram hram.al w hT4
-    have hfb := ukf_fetchBytes_ok ufFoot T orc orc s s1 pc pc (pte2pa lw + BitVec.ofNat 64 (pc.toNat % 4096)) 4 w (uke_uxRun_of_runRW hl _ orc _ (htr1 orc)) hmr
+    have hfb := ukf_fetchBytes_ok ufFoot T orc orc s s1 (ukm_pins hl) pc pc
+      (pte2pa lw + BitVec.ofNat 64 (pc.toNat % 4096)) 4 w (uke_uxRun_of_runRW hl _ orc _ (htr1 orc)) hmr
     have hres := ukf_fetch4_rvc ufFoot T orc orc s s1 hd (ukm_pins hl) pc hpc hal w hfb (by rw [hlo]; exact hrvc)
     rw [hlo] at hres
     exact ⟨s1, orc, hres, hl1, hf1, hV1⟩
   · have hram := ukm_umaRam P hwf _ lw hk (pc.toNat % 4096) 2 (Or.inr (Or.inl rfl)) (by omega) (by omega)
     have hmr := ukf_memRead2 ufFoot T orc s1 hd1 (ukm_pins hl1) _ hram.ram hram.al _ hT2
-    have hfb := ukf_fetchBytes_ok ufFoot T orc orc s s1 pc pc (pte2pa lw + BitVec.ofNat 64 (pc.toNat % 4096)) 2 _ (uke_uxRun_of_runRW hl _ orc _ (htr1 orc)) hmr
+    have hfb := ukf_fetchBytes_ok ufFoot T orc orc s s1 (ukm_pins hl) pc pc
+      (pte2pa lw + BitVec.ofNat 64 (pc.toNat % 4096)) 2 _ (uke_uxRun_of_runRW hl _ orc _ (htr1 orc)) hmr
     exact ⟨s1, orc, ukf_fetch2_rvc ufFoot T orc orc s s1 hd (ukm_pins hl) pc hpc hmid h hfb hrvc, hl1, hf1, hV1⟩
 
 end Xv6
