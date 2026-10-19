@@ -87,14 +87,17 @@ virtual page number (conformance finding 26). -/
 theorem model_tlb_is_64_way_direct_mapped : Functions.num_tlb_entries_exp = 6 := rfl
 
 /-- ...so these Sv39 pages collide in it (the captures `pt_tlb` and
-`pt_tlb_set0` are built on the collision). -/
+`pt_tlb_set0` are built on the collision).  (Since sail-riscv 0.16 the hash
+also mixes in the translation stage; the captures translate at the
+supervisor stage, whose stage bits are 0.) -/
 theorem model_tlb_sets_collide :
-    tlb_hash 39 (0x40000#27) = tlb_hash 39 (0x80000#27) ∧
-      tlb_hash 39 (0x40000#27) = tlb_hash 39 (0x80100#27) := by
+    tlb_hash 39 (0x40000#27) .S_Stage = tlb_hash 39 (0x80000#27) .S_Stage ∧
+      tlb_hash 39 (0x40000#27) .S_Stage = tlb_hash 39 (0x80100#27) .S_Stage := by
   decide
 
 /-- ...and these do not. -/
-theorem model_tlb_set7_does_not : tlb_hash 39 (0x40007#27) ≠ tlb_hash 39 (0x80000#27) := by
+theorem model_tlb_set7_does_not :
+    tlb_hash 39 (0x40007#27) .S_Stage ≠ tlb_hash 39 (0x80000#27) .S_Stage := by
   decide
 
 end Vtest

@@ -29,16 +29,16 @@ def hex (n : Nat) : String := "0x" ++ String.ofList (Nat.toDigits 16 n)
 def headOf (pool : List Expr) (i : Nat) : String :=
   match pool[i]? with
   | some (.hart _ _ (.pure _)) => "at the cycle boundary"
-  | some (.hart _ _ (.impure (.error e) _)) =>
+  | some (.hart _ _ (.impure (.inl (.error e)) _)) =>
     "an ERROR node of the model (no transition): " ++ e.print
-  | some (.hart _ _ (.impure (.ok o) _)) =>
+  | some (.hart _ _ (.impure (.inr n) _)) =>
+    s!"a finite choice among {(show Nat from n)} alternatives"
+  | some (.hart _ _ (.impure (.inl (.ok o)) _)) =>
     match o with
-    | .memRead n _ req =>
-      s!"a {n}-byte READ at pa {hex (req.pa : BitVec 64).toNat} the interpreter could not answer"
-    | .memWrite n _ req =>
-      s!"a {n}-byte WRITE at pa {hex (req.pa : BitVec 64).toNat} the interpreter could not answer"
-    | .readRam .. => "a legacy readRam event"
-    | .writeRam .. => "a legacy writeRam event"
+    | .memRead req =>
+      s!"a {req.size}-byte READ at pa {hex (req.pa : BitVec 64).toNat} the interpreter could not answer"
+    | .memWrite req _ _ =>
+      s!"a {req.size}-byte WRITE at pa {hex (req.pa : BitVec 64).toNat} the interpreter could not answer"
     | _ => "an event the interpreter could not answer"
   | _ => "not a hart"
 
