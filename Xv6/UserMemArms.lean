@@ -39,7 +39,7 @@ theorem ume_zicbop (t0 : PTree) (mm0 : BMap) (s : UWSt) (c : cbop_zicbop) (rs1 :
   · obtain ⟨rfl, hram, hal⟩ := hok pa pbmt rfl
     obtain ⟨r', hpc⟩ := ume_pf_phys_check ufFoot orc s1 (ume_umaPhys hl1) pa hram hal c
     exact ⟨_, _, _, umo_zicbop_ok ume_umoFoot orc s (ucl_uxcCfg hl) (ume_utrPins hl) c i off pa .PBMT_PMA s1 orc
-      (htr orc) hl1.priv hl1.ms.2.1 r' s1 orc hpc, ucl_resOk_retire hl1⟩
+      (htr orc) r' s1 orc hpc, ucl_resOk_retire hl1⟩
   · exact ⟨_, _, _, umo_zicbop_tfault ume_umoFoot orc s (ucl_uxcCfg hl) (ume_utrPins hl) c i off e s1 orc (htr orc),
       ucl_resOk_retire hl1⟩
 

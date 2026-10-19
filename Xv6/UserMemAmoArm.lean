@@ -86,8 +86,8 @@ theorem ume_amo (t0 : PTree) (mm0 : BMap) (s : UWSt) (op : amoop) (aq rl : Bool)
       have hea := ume_mem_write_ea_amo ufFoot orc s1 hq _ w hwA hr op aq rl
       have hrd := ume_mem_read_amo ufFoot orc s1 hq _ w hwA hr op aq rl v hvr
       have hwr : ∀ x : BitVec (8 * w), runRW ufFoot orc (umoRv s1)
-          (mem_write_value (.Physaddr (paOf ppn (uxaXget s.file i1))) w x (umoAcc op aq rl) .PBMT_PMA (aq && rl) rl
-            true) = some (.Ok true, umoSt s1 (paOf ppn (uxaXget s.file i1)) w x, orc) :=
+          (mem_write_value (.Physaddr (paOf ppn (uxaXget s.file i1))) w x .User (umoAcc op aq rl) .PBMT_PMA (aq && rl)
+            rl true) = some (.Ok true, umoSt s1 (paOf ppn (uxaXget s.file i1)) w x, orc) :=
         fun x => ume_mem_write_value_amo ufFoot orc (umoRv s1) (hq.mm_rv s1.mm true) _ w hwA hr op aq rl x ho
       have hst : ∀ x, UstLand C P t0 mm0 (umoSt s1 (paOf ppn (uxaXget s.file i1)) w x) := fun x =>
         ume_land_fr hl1 hk ((uxaXget s.file i1).toNat % 4096) w hin _ rfl
@@ -115,7 +115,7 @@ theorem ume_amo (t0 : PTree) (mm0 : BMap) (s : UWSt) (op : amoop) (aq rl : Bool)
           · exact ⟨_, _, _, umo_amocas16_fail hD orc s hU hp aq rl i2 i1 ird hal' _ _ s1 orc htr hea v hrd hc,
               ucl_resOk_retire (ume_land_pair hrv ird _)⟩
     · exact ⟨_, _, _, umo_amo_tfault hD orc s hU hp op aq rl i2 i1 ird w hw' hal' e s1 orc (htr1 orc),
-        ume_resOk_trap hl1 e (herr1 e rfl) _⟩
+        ume_resOk_fault hl1 ⟨e, rfl, herr1 e rfl⟩⟩
   · have hal' := not_is_aligned_vaddr_of _ w (umeAW_pos hwA) hal
     exact ⟨_, _, _, umo_amo_misaligned hD orc s hU hp op aq rl i2 i1 ird w hw' hal', ⟨hl, rfl, rfl, rfl⟩⟩
 
