@@ -55,31 +55,6 @@ macro "uma_pures" : tactic => `(tactic|
 
 /-! ## §1 Reads -/
 
-set_option hygiene false in
-/-- The shared script of the `checked_mem_read` composites: the PMA check,
-the one-chunk plan, the read kind, one loop iteration (PMP, MMIO window, the
-RAM read), the result. -/
-macro "uma_cmr_proof" hrk:term:max hpma:term:max hpmp:term:max hmmio:term:max hrd:term:max : tactic => `(tactic| (
-  unfold checked_mem_read
-  sail_norm
-  simp only [runRW_bind]
-  rw [$hpma:term]
-  simp only [Option.bind_some]
-  erw [runRW_pure]
-  simp only [Option.bind_some]
-  simp only [uma_split_misaligned_one, $hrk:term]
-  try sail_norm
-  simp only [untilFuelM, untilFuelM.go]
-  try sail_norm
-  simp only [utr_assert_true, runRW_bind]
-  erw [runRW_pure]
-  simp only [Option.bind_some]
-  uma_seq $hpmp
-  uma_seq $hmmio
-  uma_seq $hrd
-  uma_pures
-  try rfl))
-
 theorem uma_rk_load : read_kind_of_flags false false false = pure .Read_plain := rfl
 
 /-- The address of the one chunk of an unsplit access (the loop's first offset is 0). -/

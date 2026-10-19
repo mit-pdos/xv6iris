@@ -47,7 +47,7 @@ physical access; the shapes are its RAM leaves', `uma_mem_write_ea` /
 and so is the translation (lanes U1-P1/U1-P2: `utr_translateAddr_ok/_err`
 over the `UTlb`/`UWalk` facts):
 
-* `htr : runRW D orc s (translateAddr (.Virtaddr x[rs1]) (umoAcc op aq rl))
+* `htr : runRW D orc s (translateAddr (.Virtaddr x[rs1]) (umoAcc op aq rl) .User)
     = some (.Ok (.Physaddr pa, pbmt, ()), s1, orc1)` (or `.Err (e, ())`).
 
 **Model notes** (reported to the coordinator):
