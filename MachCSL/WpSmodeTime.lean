@@ -173,10 +173,12 @@ theorem execSpecF_csrw_stimecmp (cpu : CPU) (c : MConf) (sie : Bool) (hok : SCon
   swp_run 300
   subst hW
   iapply swp_bind
-  iapply (swp_write_CSR_stimecmp cpu (DFrac.own 1) _ _ mt _ ip menvcfgS (by decide))
+  -- 0.16: the write lemma also takes the privilege cell (not virtual)
+  iapply swp_write_CSR_stimecmp (p := Privilege.Supervisor) (hp := rfl) (me := menvcfgS)
+    (hstce := by decide)
   iframe; iframe Hhw
   inext
-  iintro %ip' Hstimecmp Hmtime Hmtimecmp Hmip Hmenvcfg
+  iintro %ip' Hcur_privilege Hstimecmp Hmtime Hmtimecmp Hmip Hmenvcfg
   swp_run 60
   try (unfold wX_bits wX; swp_run 40)
   ihave HmConf := confCells_intro _ _ _
