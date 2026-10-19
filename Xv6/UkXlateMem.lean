@@ -151,7 +151,7 @@ theorem ukm_pins {C : UCfg} {P : UPtd} {T : BMap} {s : UWSt} (h : UkLand C P T s
   ⟨ufFoot_rd _ (by decide), ufFoot_rd _ (by decide), ufFoot_rd _ (by decide), h.priv,
    ⟨ufFoot_rd _ (by decide), ufFoot_rd _ (by decide), ufFoot_rd _ (by decide), ufFoot_rd _ (by decide),
     ufFoot_rd _ (by decide), ufFoot_rd _ (by decide), h.cfg.hw _ _ rfl, h.cfg.menvcfg,
-    h.cfg.lok.2, h.cfg.hw _ _ rfl, h.cfg.hw _ _ rfl⟩⟩
+    h.cfg.lok.2, h.cfg.hw _ _ rfl, h.cfg.hw _ _ rfl, ufFoot_rd _ (by decide)⟩⟩
 
 /-- **The outcome of a translation stretch at an engine machine**: an
 engine machine, the file moved only at `tlb`, the page view unchanged. -/
