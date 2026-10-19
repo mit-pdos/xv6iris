@@ -25,8 +25,8 @@ open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
 /-- Is the call a read the text map answers? -/
-def uxwIsText (T : BMap) : Eff RegisterType exception → Bool
-  | .ok (.memRead _ _ req) => uxTextRead T req
+def uxwIsText (T : BMap) : SailEff → Bool
+  | .inl (.ok (.memRead req)) => uxTextRead T req
   | _ => false
 
 /-- The walker's map misses the text map. -/
@@ -37,51 +37,49 @@ variable (D : UFoot) (T : BMap)
 
 /-- A node the text map does not answer: a one-node `runRW` walk, then the
 continuation. -/
-theorem uxw_node {X : Type} (orc : UOrc) (s : UWSt) (c : Eff RegisterType exception)
+theorem uxw_node {X : Type} (orc : UOrc) (s : UWSt) (c : SailEff)
     (k : ArchSem.Effect.ret c → SailM X) (hc : uxwIsText T c = false) :
     uxRun D T orc s (FreeM.impure c k) =
       (runRW D orc s (FreeM.impure c FreeM.pure)).bind fun r => uxRun D T r.2.2 r.2.1 (k r.1) := by
-  rcases c with e | op
+  rcases c with (e | op) | n
   · simp only [uxRun]
   · cases op with
-    | memRead n vasize req =>
+    | memRead R =>
       simp only [uxwIsText] at hc
       simp only [uxRun, hc, Bool.false_eq_true, ite_false]
     | _ => simp only [uxRun]
+  · simp only [uxRun]
 
 /-- A text read: the text map's bytes. -/
-theorem uxw_text {X : Type} (orc : UOrc) (s : UWSt) {n vasize : Nat}
-    (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
-    (k : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → SailM X)
-    (hk : uxTextRead T req = true) :
-    uxRun D T orc s (FreeM.impure (.ok (.memRead n vasize req)) k) =
-      match bmRead T req.pa n with
-      | some w => uxRun D T orc s (k (.Ok (w, none)))
+theorem uxw_text {X : Type} (orc : UOrc) (s : UWSt) (R : MemRequest)
+    (k : ERet (.memRead R) → SailM X) (hk : uxTextRead T R = true) :
+    uxRun D T orc s (FreeM.impure (.inl (.ok (.memRead R))) k) =
+      match bmRead T R.pa R.size with
+      | some w => uxRun D T orc s (k (Except.ok (w, 0#R.numTag)))
       | none => none := by
   simp only [uxRun, hk, ite_true]
-  cases bmRead T req.pa n <;> rfl
+  cases bmRead T R.pa R.size <;> rfl
 
 /-- **The T-read node**: a text read of bytes `w` of the text map. -/
-theorem uxw_text_some {X : Type} (orc : UOrc) (s : UWSt) {n vasize : Nat}
-    (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
-    (k : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → SailM X)
-    (hk : uxTextRead T req = true) (w : BitVec (8 * n)) (hw : bmRead T req.pa n = some w) :
-    uxRun D T orc s (FreeM.impure (.ok (.memRead n vasize req)) k) = uxRun D T orc s (k (.Ok (w, none))) := by
-  rw [uxw_text D T orc s req k hk, hw]
+theorem uxw_text_some {X : Type} (orc : UOrc) (s : UWSt) (R : MemRequest)
+    (k : ERet (.memRead R) → SailM X)
+    (hk : uxTextRead T R = true) (w : BitVec (8 * R.size)) (hw : bmRead T R.pa R.size = some w) :
+    uxRun D T orc s (FreeM.impure (.inl (.ok (.memRead R))) k) =
+      uxRun D T orc s (k (Except.ok (w, 0#R.numTag))) := by
+  rw [uxw_text D T orc s R k hk, hw]
 
-/-- The leaf: a text read of `w`. -/
-theorem uxw_sail_mem_read_text (orc : UOrc) (s : UWSt) {n vasize : Nat}
-    (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
-    (hk : uxTextRead T req = true) (w : BitVec (8 * n)) (hw : bmRead T req.pa n = some w) :
-    uxRun D T orc s (ArchSem.sail_mem_read req) = some (.Ok (w, none), s, orc) := by
-  show uxRun D T orc s (FreeM.impure (.ok (.memRead n vasize req)) FreeM.pure) = _
-  rw [uxw_text_some D T orc s req _ hk w hw]
+/-- The leaf: a text read of `w` (as the model's byte vectors). -/
+theorem uxw_sail_mem_read_text (orc : UOrc) (s : UWSt) {n nt : Nat}
+    (req : Mem_request n nt Arch.addr_size Arch.addr_space Arch.mem_acc)
+    (hk : uxTextRead T (memReq req) = true) (w : BitVec (8 * n)) (hw : bmRead T req.address n = some w) :
+    uxRun D T orc s (LeanRV64D.ArchSem.sail_mem_read req) =
+      some (.Ok (bitvec_to_vecbytes w, bitvec_to_vecbool 0#nt), s, orc) := by
+  rw [sail_mem_read_def req, uxw_text_some D T orc s (memReq req) _ hk w hw]
   rfl
 
 /-- A read the text map answers, windowed: non-empty, in `T` at its base. -/
-theorem uxTextRead_base {n vasize : Nat}
-    (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
-    (hk : uxTextRead T req = true) : 0 < n ∧ (T req.pa).isSome = true := by
+theorem uxTextRead_base (R : MemRequest)
+    (hk : uxTextRead T R = true) : 0 < R.size ∧ (T R.pa).isSome = true := by
   simp only [uxTextRead, Bool.and_eq_true, decide_eq_true_eq] at hk
   obtain ⟨⟨⟨hn, -⟩, -⟩, ho⟩ := hk
   refine ⟨hn, ?_⟩
@@ -90,29 +88,27 @@ theorem uxTextRead_base {n vasize : Nat}
   have := ho 0 (List.mem_range.2 hn)
   simpa using this
 
-theorem uxwIsText_true {c : Eff RegisterType exception} (h : uxwIsText T c = true) :
-    ∃ (n vasize : Nat) (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak),
-      c = .ok (.memRead n vasize req) ∧ uxTextRead T req = true := by
-  rcases c with e | op
+theorem uxwIsText_true {c : SailEff} (h : uxwIsText T c = true) :
+    ∃ R : MemRequest, c = .inl (.ok (.memRead R)) ∧ uxTextRead T R = true := by
+  rcases c with (e | op) | n
   · simp [uxwIsText] at h
   · cases op with
-    | memRead n vasize req => exact ⟨n, vasize, req, rfl, h⟩
+    | memRead R => exact ⟨R, rfl, h⟩
     | _ => simp [uxwIsText] at h
+  · simp [uxwIsText] at h
 
 /-- `runRW` refuses a text read when its map misses the text map. -/
-theorem uxw_runRW_text_none {X : Type} (orc : UOrc) (s : UWSt) (hd : UxwDisj T s) {n vasize : Nat}
-    (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
-    (k : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → SailM X)
-    (hk : uxTextRead T req = true) :
-    runRW D orc s (FreeM.impure (.ok (.memRead n vasize req)) k) = none := by
-  obtain ⟨hn, hT⟩ := uxTextRead_base T req hk
-  have hb : bmRead s.mm req.pa n = none := by
-    cases hb : bmRead s.mm req.pa n with
+theorem uxw_runRW_text_none {X : Type} (orc : UOrc) (s : UWSt) (hd : UxwDisj T s) (R : MemRequest)
+    (k : ERet (.memRead R) → SailM X) (hk : uxTextRead T R = true) :
+    runRW D orc s (FreeM.impure (.inl (.ok (.memRead R))) k) = none := by
+  obtain ⟨hn, hT⟩ := uxTextRead_base T R hk
+  have hb : bmRead s.mm R.pa R.size = none := by
+    cases hb : bmRead s.mm R.pa R.size with
     | none => rfl
     | some w =>
       exfalso
-      have h0 := bmRead_spec s.mm req.pa n w hb 0 hn
-      have h1 := hd req.pa hT
+      have h0 := bmRead_spec s.mm R.pa R.size w hb 0 hn
+      have h1 := hd R.pa hT
       simp only [BitVec.add_zero] at h0
       rw [h0] at h1
       cases h1
@@ -137,8 +133,8 @@ theorem uxw_of_runRW' {X : Type} (m : SailM X) :
     intro orc s r hd h
     cases hc : uxwIsText T c with
     | true =>
-      obtain ⟨n, vasize, req, rfl, hk⟩ := uxwIsText_true T hc
-      rw [uxw_runRW_text_none D T orc s hd req k hk] at h
+      obtain ⟨R, rfl, hk⟩ := uxwIsText_true T hc
+      rw [uxw_runRW_text_none D T orc s hd R k hk] at h
       cases h
     | false =>
       rw [uxw_node D T orc s c k hc]
@@ -168,9 +164,9 @@ theorem uxw_bind {X Y : Type} (m : SailM X) (f : X → SailM Y) :
     rw [e]
     cases hc : uxwIsText T c with
     | true =>
-      obtain ⟨n, vasize, req, rfl, hk⟩ := uxwIsText_true T hc
-      rw [uxw_text D T orc s req _ hk, uxw_text D T orc s req _ hk]
-      cases bmRead T req.pa n with
+      obtain ⟨R, rfl, hk⟩ := uxwIsText_true T hc
+      rw [uxw_text D T orc s R _ hk, uxw_text D T orc s R _ hk]
+      cases bmRead T R.pa R.size with
       | some w => exact ih _ _ _
       | none => rfl
     | false =>
