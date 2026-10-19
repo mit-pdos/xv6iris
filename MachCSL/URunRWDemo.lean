@@ -240,6 +240,9 @@ theorem urwDemo_ld (orc : UOrc) (rs : RegFile) (pg : BitVec 12 → BitVec 8) (rv
   simp only [regval_into_reg, extend_value, Bool.false_eq_true, ↓reduceIte, sign_extend,
     Sail.BitVec.signExtend, Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', urwDemoDword,
     MachCSL.from_bytes_le_vecbytes_8]
+  -- (only the bytes stay in `bv_decide`'s view: the walk equation and the state's other parts
+  -- would make it encode enums -- `TranslationStage` -- that clash with `WpStepHooks`'s)
+  clear h orc rs rv
   bv_decide
 
 /-! ## The Iris side: one `swp_runRW` per fact -/
