@@ -37,10 +37,20 @@ def umePfAcc : cbop_zicbop → MemoryAccessType mem_payload
   | .PREFETCH_W => .Store .Data
   | .PREFETCH_I => .InstructionFetch ()
 
-/-- **A prefetch sets no `A`/`D` bit.** -/
-theorem ume_upd_pf (w : BitVec 64) (c : cbop_zicbop) : update_PTE_Bits w (umoPf c) = none := by
+/-- **A prefetch sets no `A`/`D` bit** (at the supervisor stage, sail-riscv 0.16). -/
+theorem ume_upd_pf (w : BitVec 64) (c : cbop_zicbop) : update_PTE_Bits w (umoPf c) .S_Stage = pure none := by
   unfold update_PTE_Bits
   simp [is_prefetch_access]
+
+set_option maxHeartbeats 4000000 in
+set_option maxRecDepth 100000 in
+/-- **No write-back for a prefetch** (U1-P1's `uwk_upd_none` at the prefetch's kind):
+nothing is read or written. -/
+theorem ume_upd_none_pf (D : UFoot) (orc : UOrc) (s : UWSt) (vpn : BitVec 27) (addr : BitVec 64)
+    (w : BitVec 64) (c : cbop_zicbop) (mxr sum : Bool) :
+    runRW D orc s (update_and_write_pte 39 vpn (.Physaddr addr) w 0 (umoPf c) .User mxr sum .S_Stage ()) =
+      some (.Ok (none, ()), s, orc) := by
+  uwk_run -bv [ume_upd_pf]
 
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
@@ -48,7 +58,7 @@ set_option maxRecDepth 100000 in
 on a leaf that is not `W` without `R`. -/
 theorem ume_check_perm_pf (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file) (w : BitVec 64)
     (c : cbop_zicbop) (mxr sum : Bool) (hrw : (uwkR w || !uwkW w) = true) :
-    runRW D orc s (check_PTE_permission (umoPf c) .User mxr sum (uwkFl w) (uwkExt w) ()) =
+    runRW D orc s (check_PTE_permission (umoPf c) .User .S_Stage mxr sum (uwkFl w) (uwkExt w) ()) =
       some (uwkPerm (umePfAcc c) mxr w, s, orc) := by
   unfold uwkPerm uwkPermOk uwkAccOk
   cases c <;> simp only [umePfAcc]
@@ -76,21 +86,24 @@ theorem ume_walk_leaf0_pf (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.
     (c : cbop_zicbop) (mxr sum : Bool) (base : BitVec 44) (g : Bool) (w : BitVec 64)
     (hok : pteAddrOk (pteAddr base (vpnIdx vpn 0))) (hr : bmRead s.mm (pteAddr base (vpnIdx vpn 0)) 8 = some w)
     (hinv : uwkInv w = false) (hnl : pte_is_non_leaf (uwkFl w) = false) (hN : _get_PTE_Ext_N (uwkExt w) = 0#1) :
-    runRW D orc s (pt_walk 39 vpn (umoPf c) .User mxr sum base 0 g ()) =
+    runRW D orc s (pt_walk 39 vpn (umoPf c) .User mxr sum base 0 g .S_Stage ()) =
       some (if uwkPermOk (umePfAcc c) mxr w then
           .Ok (uwkOut w (pteAddr base (vpnIdx vpn 0)) (g || uwkG w), ())
         else .Err (.PTW_No_Permission (), ()), s, orc) := by
   have hrw := uwk_rw_of_valid w hinv
   uwk_pins hp
   cases hperm : uwkPermOk (umePfAcc c) mxr w <;>
-    uwk_run -bv [uwk_read_pte, uwk_pte_is_invalid, ume_check_perm_pf, uwkPerm]
+    uwk_run -bv [uwk_read_pte_add, uwk_pte_is_invalid, ume_check_perm_pf, uwkPerm]
+  -- the reported entry address: the walk's sum form is `pteAddr` (as `uwk_walk_leaf0`)
+  all_goals (simp only [ite_true, uwkOut, uwkG, uwkFl, BitVec.setWidth_eq, Bool.true_and]
+             rw [← uwk_pteAddr_add]; rfl)
 
 /-- **The walk of an owned user-shaped table, for a prefetch** (U1-P1's
 `uwk_pt_walk` at the prefetch's check). -/
 theorem ume_pt_walk_pf (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file) (t : PTree) (hwf : t.wfU 2)
     (hm : uwkTreeMem s.mm t) (vpn : BitVec 27) (c : cbop_zicbop) (mxr sum : Bool)
     (hN : ∀ addr w, t.walk 2 vpn = some (addr, w) → _get_PTE_Ext_N (uwkExt w) = 0#1) :
-    runRW D orc s (pt_walk 39 vpn (umoPf c) .User mxr sum t.base 2 false ()) =
+    runRW D orc s (pt_walk 39 vpn (umoPf c) .User mxr sum t.base 2 false .S_Stage ()) =
       some (uwkWalkRes (umePfAcc c) mxr (t.walk 2 vpn), s, orc) := by
   have h2 := hwf (vpnIdx vpn 2)
   obtain ⟨ok2, rd2⟩ := uwk_mem_self hm (vpnIdx vpn 2)
@@ -149,8 +162,8 @@ moves. -/
 theorem ume_hit_denied_pf (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file) (vpn : BitVec 27)
     (c : cbop_zicbop) (mxr sum : Bool) (ppn : BitVec 44) (w addr : BitVec 64) (hinv : uwkInv w = false)
     (hperm : uwkPermOk (umePfAcc c) mxr w = false) :
-    runRW D orc s (translate_TLB_hit 39 0#16 vpn (umoPf c) .User mxr sum () (tlbHash vpn)
-      (tlbEntryOf 0#16 vpn ppn w addr)) = some (.Err (.PTW_No_Permission (), ()), s, orc) := by
+    runRW D orc s (translate_TLB_hit 39 0#16 0#14 vpn (umoPf c) .User mxr sum (tlbHash vpn)
+      (tlbEntryOf 0#16 vpn ppn w addr) .S_Stage ()) = some (.Err (.PTW_No_Permission (), ()), s, orc) := by
   have hrw := uwk_rw_of_valid w hinv
   uwk_run -bv [ume_check_perm_pf, uwkPerm, tlb_get_pte_tlbEntryOf]
 
@@ -161,11 +174,11 @@ set_option maxRecDepth 100000 in
 theorem ume_hit_keep_pf (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file) (vpn : BitVec 27)
     (c : cbop_zicbop) (mxr sum : Bool) (ppn : BitVec 44) (w addr : BitVec 64) (hinv : uwkInv w = false)
     (hperm : uwkPermOk (umePfAcc c) mxr w = true) :
-    runRW D orc s (translate_TLB_hit 39 0#16 vpn (umoPf c) .User mxr sum () (tlbHash vpn)
-      (tlbEntryOf 0#16 vpn ppn w addr)) = some (.Ok (ppn, .PBMT_PMA, ()), s, orc) := by
+    runRW D orc s (translate_TLB_hit 39 0#16 0#14 vpn (umoPf c) .User mxr sum (tlbHash vpn)
+      (tlbEntryOf 0#16 vpn ppn w addr) .S_Stage ()) = some (.Ok (ppn, .PBMT_PMA, ()), s, orc) := by
   have hrw := uwk_rw_of_valid w hinv
   have hpb := utlb_pbmt_of_valid w hinv
-  have hupd := uwk_upd_none D orc s vpn addr w (umoPf c) mxr sum (ume_upd_pf w c)
+  have hupd := ume_upd_none_pf D orc s vpn addr w c mxr sum
   uwk_run -bv [ume_check_perm_pf, uwkPerm, tlb_get_pte_tlbEntryOf, tlb_get_level_tlbEntryOf,
     pteAddr_tlbEntryOf, tlb_get_ppn_tlbEntryOf, utlb_pte_tlbEntryOf, hupd]
   all_goals try simp only [tlb_get_ppn_tlbEntryOf]
