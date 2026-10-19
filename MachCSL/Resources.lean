@@ -159,6 +159,15 @@ structure EraGS where
   (`MachCSL.ChainCert.key`; persistent elements), every one valid of the
   memory (`MachCSL.certsOk`).  The camera is the author log's. -/
   chainName : GName
+  /-- THE LANDING LOG (route P, increment P-M2, design §2.3 `lpAuth`): the era's
+  ghost map landing position ↦ issue stamp, persistent elements (`landedAtE`:
+  the store with that stamp landed there).  The camera is the author log's. -/
+  lpName : GName
+  /-- THE STORE-EPOCH RECORDS (route P, [OWN.113], increment P-M2): the era's
+  ghost map `epKey c k` ↦ the issue top at hart `c`'s `k`-th epoch-opening
+  fence, persistent elements (`epochAtE`: every own store issued up to it
+  lands before every own store issued after it).  The author log's camera. -/
+  epName : GName
 
 /-- The functors the machine needs (for adequacy: what a `BundledGFunctors`
 must contain). -/
@@ -496,6 +505,10 @@ class MachGS (hlc : outParam HasLC) (GF : BundledGFunctors) where
   rsvName : GName
   /-- the era's chain certificates (see `EraGS.chainName`) -/
   chainName : GName
+  /-- the era's landing log (see `EraGS.lpName`) -/
+  lpName : GName
+  /-- the era's store-epoch records (see `EraGS.epName`) -/
+  epName : GName
   gen : Nat
   /-- the running-proc claim of a hart (`MachCSL.KCtx.cpuClaim`): the client
   chooses it when it instantiates the machine (the xv6 client: the claimed
@@ -532,7 +545,8 @@ field projection.) -/
    MachGS.lockSetName (hlc := hlc) (GF := GF), MachGS.kmapName (hlc := hlc) (GF := GF),
    MachGS.kptRootName (hlc := hlc) (GF := GF),
    MachGS.devName (hlc := hlc) (GF := GF), MachGS.mirrorName (hlc := hlc) (GF := GF),
-   MachGS.rsvName (hlc := hlc) (GF := GF), MachGS.chainName (hlc := hlc) (GF := GF)⟩
+   MachGS.rsvName (hlc := hlc) (GF := GF), MachGS.chainName (hlc := hlc) (GF := GF),
+   MachGS.lpName (hlc := hlc) (GF := GF), MachGS.epName (hlc := hlc) (GF := GF)⟩
 
 /-- The register-map ghost name of hart `cpu` in the ambient era. -/
 def regName [MachGS hlc GF] (cpu : CPU) : GName := MachGS.regName (hlc := hlc) (GF := GF) cpu
@@ -832,9 +846,13 @@ def devRtOk (σ : MState) : Prop := ∀ d : DevId, 0 < (σ.devrt d).next
 `hr_ok` and `resv_ok`): every history is well formed against the author log,
 every view and read-side position is at or below the top, every outstanding
 reservation still agrees with the top of memory, and every history sits at a
-DRAM address.  Route P, increment P-M1: the staging invariant
-`MState.landedEager` (every store buffer empty, every store landed at its own
-stamp) -- replaced by the buffer's interpretation in increment P-M2. -/
+DRAM address.  Route P (increment P-M2, design §2.3): the ROUTE-P INVARIANT
+`MState.okP` (co-ordered histories over the landing positions, reservations at
+the LANDED top, views at landing positions, the landing log, the store buffers
+with their epochs), beside the staging conjunct `MState.sbNil` (every store
+buffer empty) that increment P-M3 deletes with the switch of plain stores to
+`issue`.  The first three conjuncts are today's readings over issue stamps;
+under `sbNil` they agree with `okP`'s (`MState.okP_ltop`, `MState.okP_topL`). -/
 def mmOk (σ : MState) : Prop :=
   (∀ (a : PAddr) (H : Hist), σ.mem[a]? = some H → histOk σ.log H) ∧
   (∀ c, σ.tv c ≤ σ.top ∧ σ.itv c ≤ σ.top ∧ (σ.hr c).bound σ.top) ∧
@@ -842,16 +860,29 @@ def mmOk (σ : MState) : Prop :=
     (σ.mem[a]?).bind Hist.top = some v) ∧
   memRam σ.mem ∧
   devRtOk σ ∧
-  σ.landedEager
+  (σ.sbNil ∧ σ.okP)
 
-/-- Under the P-M1 machine every store buffer is empty. -/
+/-- Under the P-M2 machine every store buffer is empty (the staging conjunct). -/
 theorem mmOk_sbNil {σ : MState} (h : mmOk σ) (c : CPU) : σ.sb c = [] := h.2.2.2.2.2.1 c
+
+/-- The route-P invariant. -/
+theorem mmOk_okP {σ : MState} (h : mmOk σ) : σ.okP := h.2.2.2.2.2.2
+
+/-- **A LANDING KEEPS THE STEP INVARIANT** (route P, the pure half of
+`interp_land`): the route-P invariant by `MState.okP_land` (no staging premise),
+the staging conjunct on its own (`MState.sbNil_land`), and the rest because a
+landing moves no history, log, view, reservation or device. -/
+theorem mmOk_land (σ : MState) (cpu : CPU) (t : Nat) (hok : σ.landOk cpu t) (h : mmOk σ) :
+    mmOk (σ.land cpu t) := by
+  obtain ⟨h1, h2, h3, h4, h5, h6, h7⟩ := h
+  exact ⟨h1, h2, h3, h4, h5, σ.sbNil_land cpu t h6, σ.okP_land cpu t hok h7⟩
 
 
 theorem mmOk_afterLoad (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv : tvn ≤ σ.top)
     (h : mmOk σ) : mmOk (σ.afterLoad cpu pa n tvn) := by
-  obtain ⟨h1, h2, h3, h4, h5⟩ := h
-  refine ⟨h1, fun c => ?_, h3, h4, h5⟩
+  obtain ⟨h1, h2, h3, h4, h5, h6, h7⟩ := h
+  refine ⟨h1, fun c => ?_, h3, h4, h5, h6,
+    σ.okP_afterLoad cpu pa n tvn (by rw [σ.okP_ltop h7 h6]; exact htv) h7⟩
   obtain ⟨a1, a2, a3, a4⟩ := h2 c
   simp only [MState.top] at *
   by_cases hc : c = cpu
@@ -869,8 +900,8 @@ theorem mmOk_afterLoad (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv
     exact ⟨a1, a2, a3, a4⟩
 
 theorem mmOk_fence (σ : MState) (cpu : CPU) (b : barrier_kind) (h : mmOk σ) : mmOk (σ.fence cpu b) := by
-  obtain ⟨h1, h2, h3, h4, h5⟩ := h
-  refine ⟨h1, fun c => ?_, h3, h4, h5⟩
+  obtain ⟨h1, h2, h3, h4, h5, h6, h7⟩ := h
+  refine ⟨h1, fun c => ?_, h3, h4, h5, h6, σ.okP_fence cpu b h7 h6⟩
   obtain ⟨a1, a2, a3, a4⟩ := h2 c
   obtain ⟨b1, b2, b3, b4⟩ := h2 cpu
   have hpub := ownPub_le (hartAgent cpu) σ.log
@@ -889,7 +920,7 @@ theorem mmOk_store (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec 
     (hram : ramBytes pa n) (hno : ¬ othersReserve σ.resv cpu pa n) (h : mmOk σ) :
     mmOk (σ.store cpu pa n w excl) := by
   obtain ⟨h1, h2, h3, h4, h5, h6⟩ := h
-  refine ⟨?_, ?_, ?_, memRam_writeBytes hram h4, h5, MState.landedEager_store σ cpu pa n w excl h6⟩
+  refine ⟨?_, ?_, ?_, memRam_writeBytes hram h4, h5, h6.1, σ.okP_store cpu pa n w excl hno h6.2 h6.1⟩
   · intro a H hget
     exact FlatMem.writeBytes_histOk σ.mem σ.log pa w (hartAgent cpu) h1 a H hget
   · intro c
@@ -928,10 +959,10 @@ theorem mmOk_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     mmOk (σ.storeDma pa n w) := by
   by_cases hn : n = 0
   · rw [MState.storeDma_zero σ pa n w hn]; exact h
-  have h6' := MState.landedEager_storeDma σ pa n w h.2.2.2.2.2
+  have h6' := σ.okP_storeDma pa n w hno h.2.2.2.2.2.2 h.2.2.2.2.2.1
   rw [MState.storeDma_of_ne σ pa n w hn] at h6' ⊢
-  obtain ⟨h1, h2, h3, h4, h5, -⟩ := h
-  refine ⟨?_, ?_, ?_, memRam_writeBytes hram h4, h5, h6'⟩
+  obtain ⟨h1, h2, h3, h4, h5, h6, -⟩ := h
+  refine ⟨?_, ?_, ?_, memRam_writeBytes hram h4, h5, h6, h6'⟩
   · intro a H hget
     exact FlatMem.writeBytes_histOk σ.mem σ.log pa w diskAgent h1 a H hget
   · intro c
@@ -961,9 +992,10 @@ theorem mmOk_setRt (σ : MState) (d : DevId) (rt : DevRt)
 
 /-- A booted machine satisfies the step invariant. -/
 theorem mmOk_boot (σ : MState) (h : bootFacts σ) : mmOk σ := by
-  obtain ⟨hmem, hlog, hhart, _, hrt, hll, hsb⟩ := h
+  have hP := σ.okP_boot h
+  obtain ⟨hmem, hlog, hhart, _, hrt, _, hsb⟩ := h
   refine ⟨?_, ?_, ?_, ?_, fun d => by rw [hrt d]; exact Nat.zero_lt_one,
-    fun c => (hsb c).1, by rw [hll, MState.top, hlog]; rfl⟩
+    fun c => (hsb c).1, hP⟩
   · intro a H hget
     rw [hmem, imgFlat_get?] at hget
     split at hget
@@ -1845,10 +1877,307 @@ def rsvModelAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) : IProp GF := ipro
   rsvHalvesAt E (MachFixedGS.rsvStatic (hlc := hlc) (GF := GF)) ∗
   chainModelAt E σ
 
+/-! ## The landing log and the store-epoch records (route P, increment P-M2)
+
+Design §2.3: a landing changes no resource a client can hold; what it changes
+(`llog`, `sb`) lives in the interpretation only -- the pure route-P invariant
+`MState.okP` (inside `mmOk`) and the two ghost maps here: the LANDING LOG
+`lpAuth` (position ↦ stamp, every element persistent and kept by the
+interpretation, so the landing certificate `landedAtE` of any landed store can
+be handed out) and the STORE-EPOCH RECORDS ([OWN.113]: the token `epochAtE c s`
+"hart `c`'s stores issued up to `s` land before its stores issued after `s`",
+minted at an epoch-opening fence, `memModel_fenceE`; consumed by
+`landedBeforeOfEpoch`).  Both maps use the author log's camera. -/
+
+/-- The landing log as a map: landing position ↦ issue stamp (the author log's
+map shape: `authMap`). -/
+abbrev landMap (llog : List Nat) : RegMapF Agent := authMap llog
+
+/-- The key of hart `c`'s `k`-th store epoch. -/
+def epKey (c : CPU) (k : Nat) : Nat := k * NCPU + c.val
+
+theorem epKey_inj {c c' : CPU} {k k' : Nat} (h : epKey c k = epKey c' k') : c = c' ∧ k = k' := by
+  unfold epKey at h
+  have hc := c.isLt
+  have hc' := c'.isLt
+  have hk : k = k' := by
+    have e1 : (k * NCPU + c.val) / NCPU = k := by
+      rw [Nat.add_comm, Nat.add_mul_div_right _ _ (by decide : 0 < NCPU), Nat.div_eq_of_lt hc, Nat.zero_add]
+    have e2 : (k' * NCPU + c'.val) / NCPU = k' := by
+      rw [Nat.add_comm, Nat.add_mul_div_right _ _ (by decide : 0 < NCPU), Nat.div_eq_of_lt hc', Nat.zero_add]
+    rw [← e1, ← e2, h]
+  subst hk
+  exact ⟨Fin.ext (by omega), rfl⟩
+
+/-- **The store-epoch records' invariant** ([OWN.113], stated over the state's
+fields): a record `(c, k) ↦ s` names an epoch `k` the hart has opened, at an
+issue top `s` reached; the hart's pending stores issued up to `s` are of an
+epoch before `k`, those issued after `s` of `k` or later; and of two own stores
+across `s`, the later never lands before the earlier (`landedBeforeOfEpoch`). -/
+def epochRecOk (log : List Agent) (llog : List Nat) (sb : CPU → List (Nat × Nat)) (sbEp : CPU → Nat)
+    (M : RegMapF Agent) : Prop :=
+  ∀ (c : CPU) (k s : Nat), get? M (epKey c k) = some s →
+    k ≤ sbEp c ∧ s ≤ log.length ∧
+    (∀ p ∈ sb c, (p.1 ≤ s → p.2 < k) ∧ (s < p.1 → k ≤ p.2)) ∧
+    ∀ t t' p', 1 ≤ t → t ≤ s → s < t' → log[t - 1]? = some (hartAgent c) →
+      log[t' - 1]? = some (hartAgent c) → lpOf llog t' = some p' →
+      ∃ p, p < p' ∧ lpOf llog t = some p
+
+/-- THE LANDING CERTIFICATE (design §2.3 `landedAt`, persistent): the store with
+issue stamp `t` landed at position `p`. -/
+def landedAtE [MachFixedGS hlc GF] (E : EraGS) (t p : Nat) : IProp GF := E.lpName ↪◯MAP[p]{.discard} t
+
+/-- THE FENCE-EPOCH TOKEN (design §2.3 `epochAt`, [OWN.113], persistent): hart
+`c`'s `k`-th epoch-opening fence happened at issue top `s`. -/
+def epochAtE [MachFixedGS hlc GF] (E : EraGS) (c : CPU) (k s : Nat) : IProp GF :=
+  E.epName ↪◯MAP[epKey c k]{.discard} s
+
+instance [MachFixedGS hlc GF] (E : EraGS) (t p : Nat) : Persistent (PROP := IProp GF) (landedAtE E t p) := by
+  unfold landedAtE; infer_instance
+instance [MachFixedGS hlc GF] (E : EraGS) (c : CPU) (k s : Nat) :
+    Persistent (PROP := IProp GF) (epochAtE E c k s) := by
+  unfold epochAtE; infer_instance
+
+/-- **The landing authority** (`lpAuth`, design §2.3), over the state's fields:
+the landing log's map with every certificate kept, and the store-epoch records. -/
+def lpAuthAt [MachFixedGS hlc GF] (E : EraGS) (log : List Agent) (llog : List Nat)
+    (sb : CPU → List (Nat × Nat)) (sbEp : CPU → Nat) : IProp GF := iprop%
+  (E.lpName ↪●MAP landMap llog) ∗ ([∗list] i ↦ t ∈ llog, landedAtE E t (i + 1)) ∗
+  ∃ M : RegMapF Agent, (E.epName ↪●MAP M) ∗ ⌜epochRecOk log llog sb sbEp M⌝
+
+/-! ### The records' invariant under every step -/
+
+/-- **A landing keeps the records' invariant** (the epoch half of `interp_land`; no staging
+premise): the landing store is of the hart's OLDEST pending epoch (`landOk`), so every own store
+issued up to a record's top -- of an earlier epoch -- has landed already. -/
+theorem epochRecOk_land (σ : MState) (cpu : CPU) (t : Nat) (hok : σ.landOk cpu t) (hP : σ.okP)
+    (M : RegMapF Agent) (h : epochRecOk σ.log σ.llog σ.sb σ.sbEp M) :
+    epochRecOk σ.log (σ.llog ++ [t]) (σ.land cpu t).sb σ.sbEp M := by
+  obtain ⟨-, -, -, -, -, -, hsb, -, -⟩ := hP
+  obtain ⟨e, hte, hmin, -⟩ := hok
+  obtain ⟨ht1, -, ht3, ht4⟩ := (hsb cpu t).1 ⟨e, hte⟩
+  intro c k s hM
+  obtain ⟨hk, hs, hsbr, hlb⟩ := h c k s hM
+  refine ⟨hk, hs, fun p hp => ?_, ?_⟩
+  · apply hsbr p
+    have : p ∈ (if c = cpu then (σ.sb cpu).filter (fun p => p.1 != t) else σ.sb c) := hp
+    by_cases hc : c = cpu
+    · subst hc; rw [if_pos rfl] at this; exact (List.mem_filter.1 this).1
+    · rw [if_neg hc] at this; exact this
+  · intro u t' p' hu1 hus hst' hu hct' hlp'
+    by_cases htt : t' = t
+    · rw [htt] at hst' hct' hlp'
+      rw [ht3] at hct'
+      have hc : c = cpu := Fin.ext (Option.some.inj hct').symm
+      subst hc
+      have hu_le : u ≤ σ.top := Nat.le_trans hus hs
+      by_cases hul : u ∈ σ.llog
+      · have hu0 : u ≠ 0 := by omega
+        obtain ⟨q, hq⟩ := Option.isSome_iff_exists.1 ((lpOf_isSome_iff σ.llog u hu0).2 hul)
+        have hq' := lpOf_le σ.llog u q hq
+        rw [lpOf_snoc_self σ.llog t (by omega) ht4] at hlp'
+        obtain rfl := Option.some.inj hlp'
+        exact ⟨q, by omega, lpOf_snoc_of_some σ.llog t u q hq⟩
+      · exfalso
+        obtain ⟨eu, heu⟩ := (hsb c u).2 ⟨hu1, hu_le, hu, hul⟩
+        have h1 := (hsbr (u, eu) heu).1 hus
+        have h2 := (hsbr (t, e) hte).2 hst'
+        have h3 := hmin (u, eu) heu
+        simp only at h1 h2 h3
+        omega
+    · have hlp'' : lpOf σ.llog t' = some p' := by rwa [lpOf_snoc_ne σ.llog t t' htt] at hlp'
+      obtain ⟨p, hp, hlpu⟩ := hlb u t' p' hu1 hus hst' hu hct' hlp''
+      exact ⟨p, hp, lpOf_snoc_of_some σ.llog t u p hlpu⟩
+
+/-- A store that lands at once (any author `g`; the P-M2 machine's every RAM write) keeps the
+records' invariant, every earlier store being landed (the staging conjunct). -/
+theorem epochRecOk_storeG (σ : MState) (g : Agent) (hP : σ.okP) (hs0 : σ.sbNil) (M : RegMapF Agent)
+    (h : epochRecOk σ.log σ.llog σ.sb σ.sbEp M) :
+    epochRecOk (σ.log ++ [g]) (σ.llog ++ [σ.top + 1]) σ.sb σ.sbEp M := by
+  have hll := hP.2.2.2.2.1
+  have hfresh : σ.top + 1 ∉ σ.llog := fun hm => by have := (hll _ hm).2; omega
+  intro c k s hM
+  obtain ⟨hk, hs, hsbr, hlb⟩ := h c k s hM
+  refine ⟨hk, by simp only [List.length_append, List.length_singleton]; omega, hsbr, ?_⟩
+  intro u t' p' hu1 hus hst' hu hct' hlp'
+  have hu_le : u ≤ σ.top := Nat.le_trans hus hs
+  have hu' : σ.log[u - 1]? = some (hartAgent c) := by
+    rw [List.getElem?_append_left (by simp only [MState.top] at hu_le; omega)] at hu; exact hu
+  by_cases htt : t' = σ.top + 1
+  · have hul := σ.okP_landed hP hs0 u hu1 hu_le
+    have hu0 : u ≠ 0 := by omega
+    obtain ⟨q, hq⟩ := Option.isSome_iff_exists.1 ((lpOf_isSome_iff σ.llog u hu0).2 hul)
+    have hq' := lpOf_le σ.llog u q hq
+    rw [htt, lpOf_snoc_self σ.llog _ (by omega) hfresh] at hlp'
+    obtain rfl := Option.some.inj hlp'
+    exact ⟨q, by omega, lpOf_snoc_of_some σ.llog _ u q hq⟩
+  · have hlp'' : lpOf σ.llog t' = some p' := by rwa [lpOf_snoc_ne σ.llog _ t' htt] at hlp'
+    have ht'0 : t' ≠ 0 := by omega
+    have ht'm : t' ∈ σ.llog := (lpOf_isSome_iff σ.llog t' ht'0).1 (by rw [hlp'']; rfl)
+    have ht'le := (hll t' ht'm).2
+    have hct'' : σ.log[t' - 1]? = some (hartAgent c) := by
+      rw [List.getElem?_append_left (by simp only [MState.top] at ht'le; omega)] at hct'; exact hct'
+    obtain ⟨p, hp, hlpu⟩ := hlb u t' p' hu1 hus hst' hu' hct'' hlp''
+    exact ⟨p, hp, lpOf_snoc_of_some σ.llog _ u p hlpu⟩
+
+/-- A step that raises store epochs only keeps the records' invariant. -/
+theorem epochRecOk_epUp (log : List Agent) (llog : List Nat) (sb : CPU → List (Nat × Nat))
+    (sbEp sbEp' : CPU → Nat) (hge : ∀ c, sbEp c ≤ sbEp' c) (M : RegMapF Agent)
+    (h : epochRecOk log llog sb sbEp M) : epochRecOk log llog sb sbEp' M := by
+  intro c k s hM
+  obtain ⟨hk, hs, hsbr, hlb⟩ := h c k s hM
+  exact ⟨Nat.le_trans hk (hge c), hs, hsbr, hlb⟩
+
+/-- **THE EPOCH TOKEN'S MINT** ([OWN.113]): at an epoch-opening fence of hart `cpu` (its epoch
+goes to `sbEp cpu + 1`), the record `(cpu, sbEp cpu + 1) ↦ top` joins the map: every pending
+own store is of an earlier epoch and issued at or below the top, and no store issued after the
+top has landed. -/
+theorem epochRecOk_mint (σ : MState) (cpu : CPU) (hP : σ.okP) (sbEp' : CPU → Nat)
+    (hcpu : sbEp' cpu = σ.sbEp cpu + 1) (hge : ∀ c, σ.sbEp c ≤ sbEp' c) (M : RegMapF Agent)
+    (h : epochRecOk σ.log σ.llog σ.sb σ.sbEp M) :
+    get? M (epKey cpu (σ.sbEp cpu + 1)) = none ∧
+    epochRecOk σ.log σ.llog σ.sb sbEp' (insert M (epKey cpu (σ.sbEp cpu + 1)) σ.top) := by
+  obtain ⟨-, -, -, -, hll, -, hsb, -, hep⟩ := hP
+  refine ⟨?_, fun c k s hM => ?_⟩
+  · cases hg : get? M (epKey cpu (σ.sbEp cpu + 1)) with
+    | none => rfl
+    | some s => have := (h cpu _ s hg).1; omega
+  · by_cases hkey : epKey cpu (σ.sbEp cpu + 1) = epKey c k
+    · obtain ⟨rfl, rfl⟩ := epKey_inj hkey
+      rw [LawfulPartialMap.get?_insert_eq hkey] at hM
+      obtain rfl := Option.some.inj hM
+      refine ⟨by omega, Nat.le_refl _, fun p hp => ⟨fun _ => ?_, fun hlt => ?_⟩, ?_⟩
+      · have := hep cpu p hp; omega
+      · have := ((hsb cpu p.1).1 ⟨p.2, hp⟩).2.1; omega
+      · intro u t' p' _ _ hst' _ _ hlp'
+        exfalso
+        have ht'0 : t' ≠ 0 := by omega
+        have := (hll t' ((lpOf_isSome_iff σ.llog t' ht'0).1 (by rw [hlp']; rfl))).2
+        omega
+    · rw [LawfulPartialMap.get?_insert_ne hkey] at hM
+      exact epochRecOk_epUp _ _ _ _ _ hge M h c k s hM
+
+section lpauth
+variable [MachFixedGS hlc GF] (E : EraGS)
+
+/-- **A landing in the landing authority**: the store `t` lands at the next position, its
+certificate is minted (and kept), the records follow (`hrec`). -/
+theorem lpAuthAt_snoc (log log' : List Agent) (llog : List Nat) (t : Nat)
+    (sb sb' : CPU → List (Nat × Nat)) (sbEp : CPU → Nat)
+    (hrec : ∀ M, epochRecOk log llog sb sbEp M → epochRecOk log' (llog ++ [t]) sb' sbEp M) :
+    lpAuthAt E log llog sb sbEp ⊢@{IProp GF}
+      |==> (lpAuthAt E log' (llog ++ [t]) sb' sbEp ∗ landedAtE E t (llog.length + 1)) := by
+  unfold lpAuthAt
+  iintro ⟨Hlp, Hfr, %M, Hep, %hM⟩
+  imod ghost_map_insert_persist (llog.length + 1) t
+    (by rw [authMap_get?, if_neg (by omega)]) $$ Hlp with ⟨Hlp, #Hl⟩
+  imodintro
+  rw [show landMap (llog ++ [t]) = insert (landMap llog) (llog.length + 1) t from authMap_snoc llog t]
+  isplitl [Hlp Hfr Hep]
+  · iframe Hlp
+    isplitl [Hfr]
+    · iapply BigSepL.bigSepL_snoc.2
+      iframe Hfr
+      unfold landedAtE
+      iexact Hl
+    · iexists M
+      iframe Hep
+      ipureintro
+      exact hrec M hM
+  · unfold landedAtE
+    iexact Hl
+
+/-- A step that raises store epochs only. -/
+theorem lpAuthAt_epUp (log : List Agent) (llog : List Nat) (sb : CPU → List (Nat × Nat))
+    (sbEp sbEp' : CPU → Nat) (hge : ∀ c, sbEp c ≤ sbEp' c) :
+    lpAuthAt E log llog sb sbEp ⊢@{IProp GF} lpAuthAt E log llog sb sbEp' := by
+  unfold lpAuthAt
+  iintro ⟨Hlp, Hfr, %M, Hep, %hM⟩
+  iframe Hlp Hfr
+  iexists M
+  iframe Hep
+  ipureintro
+  exact epochRecOk_epUp _ _ _ _ _ hge M hM
+
+/-- The epoch token's mint (see `epochRecOk_mint`). -/
+theorem lpAuthAt_mint (σ : MState) (cpu : CPU) (hP : σ.okP) (sbEp' : CPU → Nat)
+    (hcpu : sbEp' cpu = σ.sbEp cpu + 1) (hge : ∀ c, σ.sbEp c ≤ sbEp' c) :
+    lpAuthAt E σ.log σ.llog σ.sb σ.sbEp ⊢@{IProp GF}
+      |==> (lpAuthAt E σ.log σ.llog σ.sb sbEp' ∗ epochAtE E cpu (σ.sbEp cpu + 1) σ.top) := by
+  unfold lpAuthAt
+  iintro ⟨Hlp, Hfr, %M, Hep, %hM⟩
+  obtain ⟨hfresh, hM'⟩ := epochRecOk_mint σ cpu hP sbEp' hcpu hge M hM
+  imod ghost_map_insert_persist (epKey cpu (σ.sbEp cpu + 1)) σ.top hfresh $$ Hep with ⟨Hep, #Hk⟩
+  imodintro
+  isplitl [Hlp Hfr Hep]
+  · iframe Hlp Hfr
+    iexists _
+    iframe Hep
+    ipureintro
+    exact hM'
+  · unfold epochAtE
+    iexact Hk
+
+/-- The boot: nothing landed, no record. -/
+theorem lpAuthAt_boot (log : List Agent) (sb : CPU → List (Nat × Nat)) (sbEp : CPU → Nat) :
+    (E.lpName ↪●MAP (∅ : RegMapF Agent)) ∗ (E.epName ↪●MAP (∅ : RegMapF Agent)) ⊢@{IProp GF}
+      lpAuthAt E log [] sb sbEp := by
+  unfold lpAuthAt
+  iintro ⟨Hlp, Hep⟩
+  rw [show landMap [] = (∅ : RegMapF Agent) from authMap_nil]
+  iframe Hlp
+  isplitr [Hep]
+  · exact BigSepL.bigSepL_nil_intro
+  · iexists ∅
+    iframe Hep
+    ipureintro
+    intro c k s hM
+    simp [LawfulPartialMap.get?_empty] at hM
+
+/-- **The landing certificate agrees with the landing log.** -/
+theorem lpAuthAt_landed (log : List Agent) (llog : List Nat) (sb : CPU → List (Nat × Nat))
+    (sbEp : CPU → Nat) (t p : Nat) :
+    lpAuthAt E log llog sb sbEp ∗ landedAtE E t p ⊢@{IProp GF} ⌜1 ≤ p ∧ llog[p - 1]? = some t⌝ := by
+  unfold lpAuthAt landedAtE
+  iintro ⟨⟨Hlp, _⟩, H⟩
+  ihave %Hl := ghost_map_lookup $$ Hlp H
+  ipureintro
+  rw [authMap_get?] at Hl
+  split at Hl
+  · exact ⟨by omega, Hl⟩
+  · exact absurd Hl (by simp)
+
+/-- **The certificate of any landed store**, out of the authority (which keeps them all). -/
+theorem lpAuthAt_get (log : List Agent) (llog : List Nat) (sb : CPU → List (Nat × Nat))
+    (sbEp : CPU → Nat) (t p : Nat) (hp : 1 ≤ p) (h : llog[p - 1]? = some t) :
+    lpAuthAt E log llog sb sbEp ⊢@{IProp GF} landedAtE E t p := by
+  unfold lpAuthAt
+  iintro ⟨_, Hfr, _⟩
+  have e : p = (p - 1) + 1 := by omega
+  rw [e]
+  iapply (BigSepL.bigSepL_lookup (Φ := fun i t => landedAtE (GF := GF) E t (i + 1)) h) $$ Hfr
+
+/-- **`landedBeforeOfEpoch`** ([OWN.113], design §2.4): given the token of hart `c`'s
+epoch-opening fence at top `s`, an own store issued after `s` that has landed at `p'` was
+preceded in the landing order by every own store issued up to `s`. -/
+theorem lpAuthAt_landedBefore (log : List Agent) (llog : List Nat) (sb : CPU → List (Nat × Nat))
+    (sbEp : CPU → Nat) (c : CPU) (k s : Nat) :
+    lpAuthAt E log llog sb sbEp ∗ epochAtE E c k s ⊢@{IProp GF}
+      ⌜∀ t t' p', 1 ≤ t → t ≤ s → s < t' → log[t - 1]? = some (hartAgent c) →
+        log[t' - 1]? = some (hartAgent c) → lpOf llog t' = some p' →
+        ∃ p, p < p' ∧ lpOf llog t = some p⌝ := by
+  unfold lpAuthAt epochAtE
+  iintro ⟨⟨_, _, %M, Hep, %hM⟩, H⟩
+  ihave %Hl := ghost_map_lookup $$ Hep H
+  ipureintro
+  exact (hM c k s Hl).2.2.2
+
+end lpauth
+
 /-- Era `E`'s memory-model mirrors at the machine `σ`. -/
 def memModelAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) : IProp GF := iprop%
   MonoNat.auth_own E.topName (DFrac.own 1) (.ofNat σ.top) ∗
-  (E.authName ↪●MAP authMap σ.log) ∗
+  ((E.authName ↪●MAP authMap σ.log) ∗ lpAuthAt E σ.log σ.llog σ.sb σ.sbEp) ∗
   ([∗list] cpu ∈ cpus, hartViewsAt E σ cpu) ∗
   (E.resvName ↪●MAP resvMap σ) ∗
   ⌜mmOk σ⌝ ∗ rsvModelAt E σ
@@ -1863,6 +2192,59 @@ theorem rsvModelAt_congr [MachFixedGS hlc GF] (E : EraGS) {σ σ' : MState} (h :
   unfold rsvModelAt reservedOk kptModelAt chainModelAt chainEnv chainEx relPcOk
   have hpk : pcKeysOk σ' = pcKeysOk σ := by funext Z; unfold pcKeysOk; rw [ht, hp]
   rw [chainEnvAt_congr _ _ _ h hl hc hp, h, ht, hp, hpk]
+
+/-- **THE LANDING, IN THE MEMORY-MODEL MIRRORS** (route P, design §2.3, the heart of
+`interp_land`): a landing consumes and produces no client resource -- the top, the author log,
+the views, the reservations and the reserved conjunct are untouched (a landing moves none of
+what they read) -- the landing authority mints the store's certificate and the records follow
+(`epochRecOk_land`), and the step invariant holds after it (`mmOk_land`; its route-P half with no
+help from the staging conjunct). -/
+theorem memModel_land [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (cpu : CPU) (t : Nat)
+    (hok : σ.landOk cpu t) :
+    memModelAt E σ ⊢@{IProp GF} |==> (memModelAt E (σ.land cpu t) ∗ landedAtE E t (σ.ltop + 1)) := by
+  unfold memModelAt
+  rw [rsvModelAt_congr E (σ := σ) (σ' := σ.land cpu t) rfl rfl (fun _ _ => rfl)]
+  iintro ⟨Htop, ⟨Hauth, Hlp⟩, Hviews, Hresv, %hmm, Hrsv⟩
+  imod lpAuthAt_snoc E σ.log σ.log σ.llog t σ.sb (σ.land cpu t).sb σ.sbEp
+    (fun M hM => epochRecOk_land σ cpu t hok (mmOk_okP hmm) M hM) $$ Hlp with ⟨Hlp, #Hl⟩
+  imodintro
+  have hresv : resvMap (σ.land cpu t) = resvMap σ := resvMap_congr _ _ (fun _ => ⟨rfl, rfl⟩)
+  have hv : ∀ c, hartViewsAt (GF := GF) E (σ.land cpu t) c = hartViewsAt E σ c := fun _ => rfl
+  rw [hresv, BigSepL.bigSepL_eq (fun {_ c} _ => hv c)]
+  iframe Hl
+  iframe Htop Hauth Hlp Hviews Hresv Hrsv
+  ipureintro
+  exact mmOk_land σ cpu t hok hmm
+
+/-- **The landing certificate agrees with the machine.** -/
+theorem memModel_landedAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (t p : Nat) (ht : t ≠ 0) :
+    memModelAt E σ ∗ landedAtE E t p ⊢@{IProp GF} ⌜σ.lp t = some p⌝ := by
+  unfold memModelAt
+  iintro ⟨⟨_, ⟨_, Hlp⟩, _, _, %hmm, _⟩, H⟩
+  ihave %h := lpAuthAt_landed E _ _ _ _ t p $$ [Hlp H]
+  · iframe Hlp H
+  ipureintro
+  exact lpOf_of_get σ.llog t p (mmOk_okP hmm).2.2.2.1 h.1 h.2 ht
+
+/-- **The certificate of any landed store**, from the interpretation. -/
+theorem memModel_landedGet [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (t p : Nat)
+    (h : σ.lp t = some p) (ht : t ≠ 0) : memModelAt E σ ⊢@{IProp GF} landedAtE E t p := by
+  unfold memModelAt
+  iintro ⟨_, ⟨_, Hlp⟩, _⟩
+  have hg := lpOf_get σ.llog t p h ht
+  iapply lpAuthAt_get E _ _ _ _ t p hg.1 hg.2 $$ Hlp
+
+/-- **`landedBeforeOfEpoch`** at the machine ([OWN.113], design §2.4): with hart `c`'s token of
+its epoch-opening fence at top `s`, an own store issued after `s` that has landed at `p'` was
+preceded in the landing order by every own store issued up to `s`. -/
+theorem memModel_landedBefore [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (c : CPU) (k s : Nat) :
+    memModelAt E σ ∗ epochAtE E c k s ⊢@{IProp GF}
+      ⌜∀ t t' p', 1 ≤ t → t ≤ s → s < t' → σ.log[t - 1]? = some (hartAgent c) →
+        σ.log[t' - 1]? = some (hartAgent c) → σ.lp t' = some p' → ∃ p, p < p' ∧ σ.lp t = some p⌝ := by
+  unfold memModelAt
+  iintro ⟨⟨_, ⟨_, Hlp⟩, _⟩, H⟩
+  iapply lpAuthAt_landedBefore E _ _ _ _ c k s $$ [Hlp H]
+  iframe Hlp H
 
 /-- `cpus` lists every hart at its own index. -/
 theorem cpus_get? (cpu : CPU) : cpus[cpu.val]? = some cpu := by
@@ -2093,6 +2475,14 @@ def uPtDiscAt (rs : List RsvRegion) (σ : MState) : Prop :=
     (∀ ra : PAddr, (⟨ra, .roots 1 8⟩ : RsvRegion) ∈ rs → ¬ curWordAt σ.mem ra (uepRootPA r)) →
     ∀ (a : PAddr) (v c : BitVec 64), uSlotNow σ.mem r a v → wordAsOf σ.mem a (σ.itv h) c →
       uSlotDiscAfter σ.mem (σ.itv h) a c
+
+/-- The export's user-table readings are over the MERGED head (`Hist.top`, `curWordAt`,
+`uSlotNow`) and the instruction views: no landing moves them (route P, P-M2). -/
+theorem uTextDiscAt_land (σ : MState) (c : CPU) (t : Nat) : uTextDiscAt (σ.land c t) ↔ uTextDiscAt σ :=
+  Iff.rfl
+
+theorem uPtDiscAt_land (rs : List RsvRegion) (σ : MState) (c : CPU) (t : Nat) :
+    uPtDiscAt rs (σ.land c t) ↔ uPtDiscAt rs σ := Iff.rfl
 
 /-- **The user-epoch conjunct** of era `E`'s interpretation. -/
 def uepModelAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) : IProp GF := iprop%

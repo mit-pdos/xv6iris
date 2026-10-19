@@ -88,6 +88,6 @@ fixed-layer-only law (`al_merge`) reads a `[MachGS]`-section lemma at. -/
   { fixed := F, regName := fun _ => 0, heapName := 0, metaName := 0, viewName := fun _ => 0,
     iviewName := fun _ => 0, rviewName := fun _ => 0, topName := 0, authName := 0, resvName := 0,
     lockSetName := fun _ => 0, kmapName := 0, kptRootName := 0, devName := fun _ => 0,
-    mirrorName := 0, rsvName := 0, chainName := 0, gen := 0, claimP := fun _ _ => iprop(True), claim_idle := fun _ => BI.true_intro }
+    mirrorName := 0, rsvName := 0, chainName := 0, lpName := 0, epName := 0, gen := 0, claimP := fun _ _ => iprop(True), claim_idle := fun _ => BI.true_intro }
 
 end Xv6

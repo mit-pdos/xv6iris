@@ -114,12 +114,12 @@ structure MState where
   /-- THE LANDING LOG (route P [OWN.110] [OWN.111], increment P-M1): the issue stamps of the
   stores that have LANDED (entered the global order), in landing order; a stamp's landing
   position is its index + 1 (`MState.lp`), the landing top is the log's length
-  (`MState.ltop`).  The P-M1 machine lands every store in the step that issues it, so the
-  landing log is `1, 2, …, top` (`MState.landedEager`). -/
+  (`MState.ltop`).  Until increment P-M3 the machine lands every store in the step that issues
+  it, so every issued stamp is in the landing log (`MState.sbNil`, `MState.okP`). -/
   llog : List Nat := []
   /-- THE STORE BUFFERS (route P, [OWN.113] per-address + fence-epoch): each hart's PENDING
   (issued, not yet landed) plain stores, as (issue stamp, store epoch), oldest first.  Empty
-  at power-on; the P-M1 machine never leaves a store in it (`MState.landedEager`). -/
+  at power-on; until increment P-M3 the machine never leaves a store in it (`MState.sbNil`). -/
   sb : CPU → List (Nat × Nat) := fun _ => []
   /-- Each hart's current STORE EPOCH ([OWN.113]): bumped by every fence with a W predecessor
   and a W successor (`fenceEpoch`); a buffered store records the epoch it was issued in. -/
@@ -241,6 +241,10 @@ theorem MState.storeDma_mem_of_ne (σ : MState) (pa : PAddr) (n : Nat) (w : BitV
 
 theorem MState.storeDma_log_of_ne (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (hn : n ≠ 0) : (σ.storeDma pa n w).log = σ.log ++ [diskAgent] := by
+  simp only [if_neg hn]
+
+theorem MState.storeDma_llog_of_ne (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (hn : n ≠ 0) : (σ.storeDma pa n w).llog = σ.llog ++ [σ.top + 1] := by
   simp only [if_neg hn]
 
 /-- Every byte of the `n`-byte footprint at `pa` is a device address: the
@@ -420,9 +424,11 @@ hart touches its footprint (`MState.sbOverlaps`, rule 1); a W→R fence and
 INCREMENT P-M1 (the staging, `PROGRESS-W11F.md` §7): every arm and guard is in
 the step relation, but a RAM store still issues-and-lands in one step
 (`MState.store` = `land ∘ issue`, `MState.store_eq_land_issue`), so every
-buffer stays empty and every stamp lands at itself (`MState.landedEager`, the
-staging invariant the interpretation carries until P-M2 makes plain stores
-`issue` only and moves the reads to landing positions). -/
+buffer stays empty (`MState.sbNil`, the staging conjunct the interpretation
+carries until P-M3 makes plain stores `issue` only and moves the reads to
+landing positions).  INCREMENT P-M2: the interpretation's route-P invariant
+`MState.okP` and its preservation by every step -- by a LANDING without the
+staging conjunct (`MState.okP_land`). -/
 
 /-- **THE ISSUE of a plain store** (route P): the store's entry, keyed by its
 ISSUE stamp `top + 1`, is pushed on top of the footprint's histories, the
@@ -504,18 +510,36 @@ def MState.readFwd (σ : MState) (cpu : CPU) (tvn : Nat) (pa : PAddr) (n : Nat)
     (w : BitVec (8 * n)) : Prop :=
   ∀ j, j < n → σ.byteFwd cpu tvn (pa + BitVec.ofNat 64 j) = some (nthByte w j)
 
-/-- **THE P-M1 STAGING INVARIANT**: every store buffer is empty and every
-issued store landed in the step that issued it, at its own stamp
-(`MState.landedEager_lp`).  It holds of every state the P-M1 machine reaches
-(`mmOk`'s sixth conjunct); increment P-M2 replaces it by the buffer's
-interpretation. -/
-def MState.landedEager (σ : MState) : Prop :=
-  (∀ c, σ.sb c = []) ∧ σ.llog = List.range' 1 σ.top
+/-- **THE STAGING CONJUNCT** (route P, increments P-M1/P-M2): every store
+buffer is empty.  It holds of every state the machine reaches while a RAM store
+still issues and lands in one step (`MState.store`); increment P-M3 makes a
+plain store `issue` only and deletes it.  It is closed under a landing on its
+own (`MState.sbNil_land`), so `interp_land` does not rest on it. -/
+def MState.sbNil (σ : MState) : Prop := ∀ c, σ.sb c = []
 
-theorem MState.landedEager_lp (σ : MState) (h : σ.landedEager) (t : Nat) :
-    σ.lp t = if t ≤ σ.top then some t else none := by
-  show lpOf σ.llog t = _
-  rw [h.2]; exact lpOf_range'_one _ t
+/-- **THE ROUTE-P MEMORY INVARIANT** (increment P-M2, design §2.1/§2.3; the pure
+part of the interpretation's route-P conjunct): every history is in CO order
+over the landing positions (`histOkP`); every reservation agrees with the
+LANDED top (what an exclusive read reads, and what a landing may not move:
+`landFootOk`'s no-reservation clause); every view is at or below the landing
+top; the landing log is a list of distinct issued stamps, every pending stamp a
+hart's; and THE BUFFERS (`sbAuth`, design §2.3: the interpretation's alone, so a
+pure clause) hold exactly each hart's issued, unlanded stamps, in issue order,
+with ascending store epochs at most the hart's current one ([OWN.113]).
+Stated over the state's FIELDS (a `def`, so a step that moves none of them
+keeps it by definitional unfolding). -/
+def MState.okP (σ : MState) : Prop :=
+  (∀ (a : PAddr) (H : Hist), σ.mem[a]? = some H → histOkP σ.lp σ.log H) ∧
+  (∀ c r, σ.resv c = some r → ∀ (a : PAddr) (v : BitVec 8), r[a]? = some v →
+    (σ.mem[a]?).bind (Hist.topL σ.lp) = some v) ∧
+  (∀ c, σ.tv c ≤ σ.ltop ∧ σ.itv c ≤ σ.ltop ∧ (σ.hr c).bound σ.ltop) ∧
+  σ.llog.Nodup ∧
+  (∀ t ∈ σ.llog, 1 ≤ t ∧ t ≤ σ.top) ∧
+  (∀ t, 1 ≤ t → t ≤ σ.top → t ∉ σ.llog → ∃ c, σ.log[t - 1]? = some (hartAgent c)) ∧
+  (∀ c t, (∃ e, (t, e) ∈ σ.sb c) ↔
+    (1 ≤ t ∧ t ≤ σ.top ∧ σ.log[t - 1]? = some (hartAgent c) ∧ t ∉ σ.llog)) ∧
+  (∀ c, (σ.sb c).Pairwise (fun p q => p.1 < q.1 ∧ p.2 ≤ q.2)) ∧
+  (∀ c, ∀ p ∈ σ.sb c, p.2 ≤ σ.sbEp c)
 
 theorem MState.not_landOk_of_nil (σ : MState) (cpu : CPU) (t : Nat) (h : σ.sb cpu = []) :
     ¬ σ.landOk cpu t := fun ⟨_, hm, _⟩ => by rw [h] at hm; cases hm
@@ -550,24 +574,6 @@ theorem MState.range'_one_succ (L : Nat) : List.range' 1 (L + 1) = List.range' 1
   have : 1 + 1 * L = L + 1 := by omega
   rw [this]
 
-/-- A store of the P-M1 machine keeps the staging invariant: it lands at its
-own stamp, and no buffer moves. -/
-theorem MState.landedEager_store (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (excl : Bool) (h : σ.landedEager) : (σ.store cpu pa n w excl).landedEager := by
-  refine ⟨h.1, ?_⟩
-  show σ.llog ++ [σ.log.length + 1] = List.range' 1 (σ.log ++ [hartAgent cpu]).length
-  rw [h.2, List.length_append, List.length_singleton, MState.range'_one_succ]
-
-/-- So does a DMA write. -/
-theorem MState.landedEager_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (h : σ.landedEager) : (σ.storeDma pa n w).landedEager := by
-  by_cases hn : n = 0
-  · rw [MState.storeDma_zero σ pa n w hn]; exact h
-  · refine ⟨h.1, ?_⟩
-    show (if n = 0 then σ.llog else σ.llog ++ [σ.log.length + 1]) =
-      List.range' 1 (if n = 0 then σ.log else σ.log ++ [diskAgent]).length
-    rw [if_neg hn, if_neg hn, h.2, List.length_append, List.length_singleton, MState.range'_one_succ]
-
 /-- **THE P-M1 PLAIN STORE IS ISSUE THEN LAND** (the staging is route P with
 eager landing): with no pending entry already at the fresh stamp, a plain
 `MState.store` is the issue of the store followed at once by its landing. -/
@@ -584,6 +590,553 @@ theorem MState.store_eq_land_issue (σ : MState) (cpu : CPU) (pa : PAddr) (n : N
   all_goals first
     | (by_cases hx : x = cpu <;> simp [updCpu, hx, hsb])
     | (by_cases hx : x = σ.top + 1 <;> simp [hx])
+
+/-! ### The route-P invariant under every step (increment P-M2)
+
+`MState.okP_land` is THE GATE (design §2.3, plan rev 55 P-M2): a landing keeps the route-P
+invariant with no help from the staging conjunct `MState.sbNil` -- the landing-sensitive
+reservation clause by `landFootOk`'s no-reservation guard, the co order by its lowest-pending
+guard, the buffers by the oldest-epoch guard's membership.  The other steps of the P-M2
+machine keep it given `sbNil` (they still land every store at once). -/
+
+/-- The staging conjunct is closed under a landing on its own. -/
+theorem MState.sbNil_land (σ : MState) (cpu : CPU) (t : Nat) (h : σ.sbNil) : (σ.land cpu t).sbNil := by
+  intro c
+  show (if c = cpu then (σ.sb cpu).filter (fun p => p.1 != t) else σ.sb c) = []
+  split
+  · rw [h cpu]; rfl
+  · exact h c
+
+/-- **A LANDING KEEPS THE ROUTE-P INVARIANT** (no staging premise). -/
+theorem MState.okP_land (σ : MState) (cpu : CPU) (t : Nat) (hok : σ.landOk cpu t) (h : σ.okP) :
+    (σ.land cpu t).okP := by
+  obtain ⟨h1, h2, h3, hnd, hll, hph, hsb, hord, hep⟩ := h
+  obtain ⟨e, hte, _, hfoot⟩ := hok
+  obtain ⟨ht1, ht2, ht3, ht4⟩ := (hsb cpu t).1 ⟨e, hte⟩
+  have ht0 : t ≠ 0 := by omega
+  have hlp : lpOf σ.llog t = none := lpOf_none_of_not_mem σ.llog t ht4 ht0
+  have hlp' : lpOf (σ.llog ++ [t]) t = some (σ.llog.length + 1) := lpOf_snoc_self σ.llog t ht0 ht4
+  have hsbE : ∀ c, (σ.land cpu t).sb c =
+      (if c = cpu then (σ.sb cpu).filter (fun p => p.1 != t) else σ.sb c) := fun _ => rfl
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · -- co-ordered histories: the landing store is the lowest pending entry of its bytes
+    intro a H hget
+    refine histOkP_land (lpOf σ.llog) (lpOf (σ.llog ++ [t])) σ.log t (σ.llog.length + 1) hlp hlp'
+      (fun s hs => lpOf_snoc_ne σ.llog t s hs)
+      (fun s p hs => Nat.le_succ_of_le (lpOf_le σ.llog s p hs)) H (h1 a H hget) ?_
+    intro H1 x H2 hH hx
+    exact (hfoot a H hget ⟨x, by rw [hH]; simp, hx⟩).2 H1 x H2 hH hx
+  · -- the landed top of a reserved byte: no entry of the landing store is on it
+    intro c r hr a v hav
+    have hold := h2 c r hr a v hav
+    show (σ.mem[a]?).bind (Hist.topL (lpOf (σ.llog ++ [t]))) = some v
+    cases hget : σ.mem[a]? with
+    | none => rw [hget] at hold; cases hold
+    | some H =>
+      rw [hget] at hold
+      have hnot : ∀ x ∈ H, x.t ≠ t := by
+        intro x hx hxt
+        have := (hfoot a H hget ⟨x, hx, hxt⟩).1 c r hr
+        rw [hav] at this; cases this
+      simp only [Option.bind_some] at hold ⊢
+      rw [Hist.topL_snoc_ne σ.llog t H hnot]
+      exact hold
+  · intro c
+    obtain ⟨a1, a2, a3, a4⟩ := h3 c
+    show σ.tv c ≤ (σ.llog ++ [t]).length ∧ σ.itv c ≤ (σ.llog ++ [t]).length ∧
+      (σ.hr c).bound (σ.llog ++ [t]).length
+    simp only [MState.ltop, List.length_append, List.length_singleton] at a1 a2 a3 a4 ⊢
+    exact ⟨by omega, by omega, by omega, fun a => by have := a4 a; omega⟩
+  · show (σ.llog ++ [t]).Nodup
+    exact List.nodup_append.2 ⟨hnd, List.nodup_cons.2 ⟨List.not_mem_nil, List.nodup_nil⟩, fun x hx y hy => by
+      simp only [List.mem_singleton] at hy; subst hy; intro hxy; subst hxy; exact ht4 hx⟩
+  · intro s hs
+    rcases List.mem_append.1 hs with hs | hs
+    · exact hll s hs
+    · simp only [List.mem_singleton] at hs; subst hs; exact ⟨ht1, ht2⟩
+  · intro s hs1 hs2 hs3
+    exact hph s hs1 hs2 (fun hm => hs3 (List.mem_append_left _ hm))
+  · intro c s
+    rw [hsbE c]
+    show _ ↔ (1 ≤ s ∧ s ≤ σ.top ∧ σ.log[s - 1]? = some (hartAgent c) ∧ s ∉ σ.llog ++ [t])
+    by_cases hc : c = cpu
+    · subst hc
+      rw [if_pos rfl]
+      constructor
+      · rintro ⟨e', he'⟩
+        rw [List.mem_filter] at he'
+        obtain ⟨hm, hne⟩ := he'
+        have hst : s ≠ t := by simpa using hne
+        obtain ⟨a1, a2, a3, a4⟩ := (hsb c s).1 ⟨e', hm⟩
+        refine ⟨a1, a2, a3, fun hm' => ?_⟩
+        rcases List.mem_append.1 hm' with hm' | hm'
+        · exact a4 hm'
+        · exact hst (List.mem_singleton.1 hm')
+      · rintro ⟨a1, a2, a3, a4⟩
+        obtain ⟨e', he'⟩ := (hsb c s).2 ⟨a1, a2, a3, fun hm => a4 (List.mem_append_left _ hm)⟩
+        have hst : s ≠ t := fun hst => a4 (List.mem_append_right _ (List.mem_singleton.2 hst))
+        exact ⟨e', List.mem_filter.2 ⟨he', by simpa using hst⟩⟩
+    · rw [if_neg hc]
+      constructor
+      · rintro ⟨e', he'⟩
+        obtain ⟨a1, a2, a3, a4⟩ := (hsb c s).1 ⟨e', he'⟩
+        refine ⟨a1, a2, a3, fun hm' => ?_⟩
+        rcases List.mem_append.1 hm' with hm' | hm'
+        · exact a4 hm'
+        · rw [List.mem_singleton] at hm'
+          subst hm'
+          rw [ht3] at a3
+          exact hc (Fin.ext (Option.some.inj a3).symm)
+      · rintro ⟨a1, a2, a3, a4⟩
+        exact (hsb c s).2 ⟨a1, a2, a3, fun hm => a4 (List.mem_append_left _ hm)⟩
+  · intro c
+    rw [hsbE c]
+    split
+    · exact (hord cpu).filter _
+    · exact hord c
+  · intro c p hp
+    rw [hsbE c] at hp
+    show p.2 ≤ σ.sbEp c
+    by_cases hc : c = cpu
+    · subst hc; rw [if_pos rfl] at hp; exact hep c p (List.mem_filter.1 hp).1
+    · rw [if_neg hc] at hp; exact hep c p hp
+
+/-- Under the staging conjunct every issued stamp has landed. -/
+theorem MState.okP_landed (σ : MState) (h : σ.okP) (hs : σ.sbNil) (t : Nat) (h1 : 1 ≤ t)
+    (h2 : t ≤ σ.top) : t ∈ σ.llog := by
+  obtain ⟨-, -, -, -, -, hph, hsb, -, -⟩ := h
+  by_cases hn : t ∈ σ.llog
+  · exact hn
+  · exfalso
+    obtain ⟨c, hc⟩ := hph t h1 h2 hn
+    obtain ⟨e, he⟩ := (hsb c t).2 ⟨h1, h2, hc, hn⟩
+    rw [hs c] at he; cases he
+
+/-- Under the staging conjunct the landing top is the issue top. -/
+theorem MState.okP_ltop (σ : MState) (h : σ.okP) (hs : σ.sbNil) : σ.ltop = σ.top := by
+  have hnd := h.2.2.2.1
+  have hll := h.2.2.2.2.1
+  apply Nat.le_antisymm
+  · have := nodup_length_le σ.llog (List.range' 1 σ.top) hnd (fun x hx => by
+      have := hll x hx; rw [List.mem_range'_1]; omega)
+    simpa using this
+  · have := nodup_length_le (List.range' 1 σ.top) σ.llog List.nodup_range' (fun x hx => by
+      rw [List.mem_range'_1] at hx; exact σ.okP_landed h hs x hx.1 (by omega))
+    simpa using this
+
+/-- Under the staging conjunct every history entry has landed. -/
+theorem MState.okP_entLanded (σ : MState) (h : σ.okP) (hs : σ.sbNil) (a : PAddr) (H : Hist)
+    (hget : σ.mem[a]? = some H) (e : HEnt) (he : e ∈ H) : (σ.lp e.t).isSome := by
+  have hb := ((h.1 a H hget).2 e he).1
+  by_cases h0 : e.t = 0
+  · rw [h0]; simp [lpOf]
+  · exact (lpOf_isSome_iff σ.llog e.t h0).2 (σ.okP_landed h hs e.t (by omega) hb)
+
+/-- Under the staging conjunct the landed top is the merged head. -/
+theorem MState.okP_topL (σ : MState) (h : σ.okP) (hs : σ.sbNil) (a : PAddr) :
+    (σ.mem[a]?).bind (Hist.topL σ.lp) = (σ.mem[a]?).bind Hist.top := by
+  cases hget : σ.mem[a]? with
+  | none => rfl
+  | some H => exact Hist.topL_eq_top σ.lp H (fun e he => σ.okP_entLanded h hs a H hget e he)
+
+/-- The landed-top reservation clause, from the merged-head one, under the staging conjunct. -/
+theorem MState.okP_resvL_of_top (σ : MState) (h : σ.okP) (hs : σ.sbNil) (resv : CPU → Option Resv)
+    (hr : ∀ c r, resv c = some r → ∀ (a : PAddr) (v : BitVec 8), r[a]? = some v →
+      (σ.mem[a]?).bind Hist.top = some v) :
+    ∀ c r, resv c = some r → ∀ (a : PAddr) (v : BitVec 8), r[a]? = some v →
+      (σ.mem[a]?).bind (Hist.topL σ.lp) = some v := by
+  intro c r hc a v hav
+  rw [σ.okP_topL h hs a]
+  exact hr c r hc a v hav
+
+/-- A store (issued and landed at once, P-M1/P-M2) keeps the invariant. -/
+theorem MState.okP_store (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (excl : Bool) (hno : ¬ othersReserve σ.resv cpu pa n) (h : σ.okP) (hs : σ.sbNil) :
+    (σ.store cpu pa n w excl).okP := by
+  have hlt := σ.okP_ltop h hs
+  have hent := σ.okP_entLanded h hs
+  obtain ⟨h1, h2, h3, hnd, hll, hph, hsb, hord, hep⟩ := h
+  have hfresh : σ.top + 1 ∉ σ.llog := fun hm => by have := (hll _ hm).2; omega
+  have hlp' : lpOf (σ.llog ++ [σ.top + 1]) (σ.log.length + 1) = some (σ.llog.length + 1) :=
+    lpOf_snoc_self σ.llog _ (by omega) hfresh
+  have hlogE : ∀ s, 1 ≤ s → s ≤ σ.top → (σ.log ++ [hartAgent cpu])[s - 1]? = σ.log[s - 1]? := by
+    intro s h1 h2
+    rw [List.getElem?_append_left (by simp only [MState.top] at h2; omega)]
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · intro a H hget
+    refine (FlatMem.writeBytes_histOkP_landed σ.mem (lpOf (σ.llog ++ [σ.top + 1])) σ.log pa w
+      (hartAgent cpu) (σ.llog.length + 1) hlp' ?_ a H hget).1
+    intro a' H' hget'
+    have hold := h1 a' H' hget'
+    have hne : ∀ e ∈ H', lpOf (σ.llog ++ [σ.top + 1]) e.t = lpOf σ.llog e.t := fun e he =>
+      lpOf_snoc_ne σ.llog _ e.t (by have := (hold.2 e he).1; simp only [MState.top]; omega)
+    refine ⟨histOkP_append _ _ _ _ (histOkP_congr _ _ _ _ hne hold), fun e he => ?_⟩
+    obtain ⟨p, hp⟩ := Option.isSome_iff_exists.1 (hent a' H' hget' e he)
+    exact ⟨p, by rw [hne e he]; exact hp, Nat.le_succ_of_le (lpOf_le σ.llog e.t p hp)⟩
+  · intro c r hr a v hav
+    simp only [updCpu] at hr
+    by_cases hc : c = cpu
+    · subst hc; simp at hr
+    · rw [if_neg hc] at hr
+      have hno' : ∀ j, j < n → a ≠ pa + BitVec.ofNat 64 j := by
+        intro j hj heq
+        apply hno
+        refine ⟨c, hc, r, hr, j, hj, ?_⟩
+        rw [← heq, hav]; rfl
+      show ((σ.mem.writeBytes pa n w (σ.top + 1) (hartAgent cpu))[a]?).bind
+        (Hist.topL (lpOf (σ.llog ++ [σ.top + 1]))) = some v
+      rw [FlatMem.writeBytes_get?_notin _ _ _ _ _ _ hno']
+      have hold := h2 c r hr a v hav
+      cases hget : σ.mem[a]? with
+      | none => rw [hget] at hold; cases hold
+      | some H =>
+        rw [hget] at hold
+        simp only [Option.bind_some] at hold ⊢
+        rw [Hist.topL_snoc_ne σ.llog _ H (fun e he heq => by
+          have := ((h1 a H hget).2 e he).1; simp only [MState.top] at heq; omega)]
+        exact hold
+  · intro c
+    obtain ⟨a1, a2, a3, a4⟩ := h3 c
+    show (σ.store cpu pa n w excl).tv c ≤ (σ.llog ++ [σ.top + 1]).length ∧
+      (σ.store cpu pa n w excl).itv c ≤ (σ.llog ++ [σ.top + 1]).length ∧
+      ((σ.store cpu pa n w excl).hr c).bound (σ.llog ++ [σ.top + 1]).length
+    simp only [MState.ltop, MState.top, List.length_append, List.length_singleton] at a1 a2 a3 a4 hlt ⊢
+    by_cases hc : c = cpu
+    · subst hc
+      simp only [updCpu, if_true]
+      refine ⟨?_, by omega, ?_, ?_⟩
+      · split <;> omega
+      · simp only [HRead.resetCoh, HRead.clearAcq]; omega
+      · intro a; simp only [HRead.resetCoh, HRead.clearAcq]; have := a4 a; split <;> omega
+    · simp only [updCpu, hc, if_false]
+      exact ⟨by omega, by omega, by omega, fun a => by have := a4 a; omega⟩
+  · show (σ.llog ++ [σ.top + 1]).Nodup
+    exact List.nodup_append.2 ⟨hnd, List.nodup_cons.2 ⟨List.not_mem_nil, List.nodup_nil⟩, fun x hx y hy => by
+      simp only [List.mem_singleton] at hy; subst hy; intro hxy; subst hxy; exact hfresh hx⟩
+  · intro s hs'
+    show 1 ≤ s ∧ s ≤ (σ.log ++ [hartAgent cpu]).length
+    simp only [List.length_append, List.length_singleton]
+    rcases List.mem_append.1 hs' with hs' | hs'
+    · have := hll s hs'; simp only [MState.top] at this; omega
+    · simp only [List.mem_singleton] at hs'; subst hs'; simp only [MState.top]; omega
+  · intro s hs1 hs2 hs3
+    have hs3' : s ∉ σ.llog := fun hm => hs3 (List.mem_append_left _ hm)
+    have hne : s ≠ σ.top + 1 := fun he => hs3 (List.mem_append_right _ (List.mem_singleton.2 he))
+    have hs2' : s ≤ σ.top := by
+      simp only [MState.top, List.length_append, List.length_singleton] at hs2 hne ⊢; omega
+    obtain ⟨c, hc⟩ := hph s hs1 hs2' hs3'
+    exact ⟨c, by show (σ.log ++ [hartAgent cpu])[s - 1]? = _; rw [hlogE s hs1 hs2']; exact hc⟩
+  · intro c s
+    show (∃ e, (s, e) ∈ σ.sb c) ↔ (1 ≤ s ∧ s ≤ (σ.log ++ [hartAgent cpu]).length ∧
+      (σ.log ++ [hartAgent cpu])[s - 1]? = some (hartAgent c) ∧ s ∉ σ.llog ++ [σ.top + 1])
+    constructor
+    · intro hm
+      obtain ⟨a1, a2, a3, a4⟩ := (hsb c s).1 hm
+      refine ⟨a1, by simp only [List.length_append, List.length_singleton]; simp only [MState.top] at a2; omega,
+        by rw [hlogE s a1 a2]; exact a3, fun hm' => ?_⟩
+      rcases List.mem_append.1 hm' with hm' | hm'
+      · exact a4 hm'
+      · rw [List.mem_singleton] at hm'; omega
+    · rintro ⟨a1, a2, a3, a4⟩
+      have hne : s ≠ σ.top + 1 := fun he => a4 (List.mem_append_right _ (List.mem_singleton.2 he))
+      have a2' : s ≤ σ.top := by
+        simp only [MState.top, List.length_append, List.length_singleton] at a2 hne ⊢; omega
+      exact (hsb c s).2 ⟨a1, a2', by rw [← hlogE s a1 a2']; exact a3,
+        fun hm => a4 (List.mem_append_left _ hm)⟩
+  · exact hord
+  · exact hep
+
+/-- A DMA write (lands at once) keeps the invariant. -/
+theorem MState.okP_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (hno : ¬ anyReserve σ.resv pa n) (h : σ.okP) (hs : σ.sbNil) :
+    (σ.storeDma pa n w).okP := by
+  by_cases hn : n = 0
+  · rw [MState.storeDma_zero σ pa n w hn]; exact h
+  rw [MState.storeDma_of_ne σ pa n w hn]
+  have hent := σ.okP_entLanded h hs
+  obtain ⟨h1, h2, h3, hnd, hll, hph, hsb, hord, hep⟩ := h
+  have hfresh : σ.top + 1 ∉ σ.llog := fun hm => by have := (hll _ hm).2; omega
+  have hlp' : lpOf (σ.llog ++ [σ.top + 1]) (σ.log.length + 1) = some (σ.llog.length + 1) :=
+    lpOf_snoc_self σ.llog _ (by omega) hfresh
+  have hlogE : ∀ s, 1 ≤ s → s ≤ σ.top → (σ.log ++ [diskAgent])[s - 1]? = σ.log[s - 1]? := by
+    intro s h1 h2
+    rw [List.getElem?_append_left (by simp only [MState.top] at h2; omega)]
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · intro a H hget
+    refine (FlatMem.writeBytes_histOkP_landed σ.mem (lpOf (σ.llog ++ [σ.top + 1])) σ.log pa w
+      diskAgent (σ.llog.length + 1) hlp' ?_ a H hget).1
+    intro a' H' hget'
+    have hold := h1 a' H' hget'
+    have hne : ∀ e ∈ H', lpOf (σ.llog ++ [σ.top + 1]) e.t = lpOf σ.llog e.t := fun e he =>
+      lpOf_snoc_ne σ.llog _ e.t (by have := (hold.2 e he).1; simp only [MState.top]; omega)
+    refine ⟨histOkP_append _ _ _ _ (histOkP_congr _ _ _ _ hne hold), fun e he => ?_⟩
+    obtain ⟨p, hp⟩ := Option.isSome_iff_exists.1 (hent a' H' hget' e he)
+    exact ⟨p, by rw [hne e he]; exact hp, Nat.le_succ_of_le (lpOf_le σ.llog e.t p hp)⟩
+  · intro c r hr a v hav
+    have hno' : ∀ j, j < n → a ≠ pa + BitVec.ofNat 64 j := by
+      intro j hj heq
+      exact hno ⟨c, r, hr, j, hj, by rw [← heq, hav]; rfl⟩
+    show ((σ.mem.writeBytes pa n w (σ.top + 1) diskAgent)[a]?).bind
+      (Hist.topL (lpOf (σ.llog ++ [σ.top + 1]))) = some v
+    rw [FlatMem.writeBytes_get?_notin _ _ _ _ _ _ hno']
+    have hold := h2 c r hr a v hav
+    cases hget : σ.mem[a]? with
+    | none => rw [hget] at hold; cases hold
+    | some H =>
+      rw [hget] at hold
+      simp only [Option.bind_some] at hold ⊢
+      rw [Hist.topL_snoc_ne σ.llog _ H (fun e he heq => by
+        have := ((h1 a H hget).2 e he).1; simp only [MState.top] at heq; omega)]
+      exact hold
+  · intro c
+    obtain ⟨a1, a2, a3, a4⟩ := h3 c
+    show σ.tv c ≤ (σ.llog ++ [σ.top + 1]).length ∧ σ.itv c ≤ (σ.llog ++ [σ.top + 1]).length ∧
+      (σ.hr c).bound (σ.llog ++ [σ.top + 1]).length
+    simp only [MState.ltop, List.length_append, List.length_singleton] at a1 a2 a3 a4 ⊢
+    exact ⟨by omega, by omega, by omega, fun a => by have := a4 a; omega⟩
+  · show (σ.llog ++ [σ.top + 1]).Nodup
+    exact List.nodup_append.2 ⟨hnd, List.nodup_cons.2 ⟨List.not_mem_nil, List.nodup_nil⟩, fun x hx y hy => by
+      simp only [List.mem_singleton] at hy; subst hy; intro hxy; subst hxy; exact hfresh hx⟩
+  · intro s hs'
+    show 1 ≤ s ∧ s ≤ (σ.log ++ [diskAgent]).length
+    simp only [List.length_append, List.length_singleton]
+    rcases List.mem_append.1 hs' with hs' | hs'
+    · have := hll s hs'; simp only [MState.top] at this; omega
+    · simp only [List.mem_singleton] at hs'; subst hs'; simp only [MState.top]; omega
+  · intro s hs1 hs2 hs3
+    have hs3' : s ∉ σ.llog := fun hm => hs3 (List.mem_append_left _ hm)
+    have hne : s ≠ σ.top + 1 := fun he => hs3 (List.mem_append_right _ (List.mem_singleton.2 he))
+    have hs2' : s ≤ σ.top := by
+      simp only [MState.top, List.length_append, List.length_singleton] at hs2 hne ⊢; omega
+    obtain ⟨c, hc⟩ := hph s hs1 hs2' hs3'
+    exact ⟨c, by show (σ.log ++ [diskAgent])[s - 1]? = _; rw [hlogE s hs1 hs2']; exact hc⟩
+  · intro c s
+    show (∃ e, (s, e) ∈ σ.sb c) ↔ (1 ≤ s ∧ s ≤ (σ.log ++ [diskAgent]).length ∧
+      (σ.log ++ [diskAgent])[s - 1]? = some (hartAgent c) ∧ s ∉ σ.llog ++ [σ.top + 1])
+    constructor
+    · intro hm
+      obtain ⟨a1, a2, a3, a4⟩ := (hsb c s).1 hm
+      refine ⟨a1, by simp only [List.length_append, List.length_singleton]; simp only [MState.top] at a2; omega,
+        by rw [hlogE s a1 a2]; exact a3, fun hm' => ?_⟩
+      rcases List.mem_append.1 hm' with hm' | hm'
+      · exact a4 hm'
+      · rw [List.mem_singleton] at hm'; omega
+    · rintro ⟨a1, a2, a3, a4⟩
+      have hne : s ≠ σ.top + 1 := fun he => a4 (List.mem_append_right _ (List.mem_singleton.2 he))
+      have a2' : s ≤ σ.top := by
+        simp only [MState.top, List.length_append, List.length_singleton] at a2 hne ⊢; omega
+      exact (hsb c s).2 ⟨a1, a2', by rw [← hlogE s a1 a2']; exact a3,
+        fun hm => a4 (List.mem_append_left _ hm)⟩
+  · exact hord
+  · exact hep
+
+/-- A plain load moves only its hart's read side, to a landing view. -/
+theorem MState.okP_afterLoad (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv : tvn ≤ σ.ltop)
+    (h : σ.okP) : (σ.afterLoad cpu pa n tvn).okP := by
+  obtain ⟨h1, h2, h3, h4⟩ := h
+  refine ⟨h1, h2, fun c => ?_, h4⟩
+  obtain ⟨a1, a2, a3, a4⟩ := h3 c
+  simp only [MState.ltop] at *
+  by_cases hc : c = cpu
+  · subst hc
+    simp only [updCpu, if_true]
+    refine ⟨a1, a2, ?_, ?_⟩
+    · simp only [HRead.afterLoad]; omega
+    · intro a
+      simp only [HRead.afterLoad]
+      have hs := LoadSrcs.stamp_le _ (hartAgent c) pa n a tvn
+        (fun j _ => FlatMem.loadSrcs_stampAt_le σ.mem (hartAgent c) tvn pa n j)
+      have := a4 a
+      omega
+  · simp only [updCpu, hc, if_false]
+    exact ⟨a1, a2, a3, a4⟩
+
+/-- An exclusive read: its snapshot is the merged head, which is the landed top under the staging
+conjunct; its views go to the issue top, which is the landing top. -/
+theorem MState.okP_afterExcl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (acq : Bool) (h : σ.okP) (hs : σ.sbNil)
+    (hres : ∀ c r, (σ.afterExcl cpu pa n w acq).resv c = some r → ∀ (a : PAddr) (v : BitVec 8),
+      r[a]? = some v → (σ.mem[a]?).bind Hist.top = some v) :
+    (σ.afterExcl cpu pa n w acq).okP := by
+  have hlt := σ.okP_ltop h hs
+  have hresL := σ.okP_resvL_of_top h hs _ hres
+  obtain ⟨h1, _, h3, h4⟩ := h
+  refine ⟨h1, hresL, fun c => ?_, h4⟩
+  obtain ⟨a1, a2, a3, a4⟩ := h3 c
+  simp only [MState.ltop, MState.top] at *
+  by_cases hc : c = cpu
+  · subst hc
+    simp only [updCpu, if_true, HRead.afterExcl]
+    exact ⟨by split <;> omega, a2, by dsimp only; omega, a4⟩
+  · simp only [updCpu, hc, if_false]
+    exact ⟨a1, a2, a3, a4⟩
+
+/-- Dropping a reservation. -/
+theorem MState.okP_dropResv (σ : MState) (cpu : CPU) (h : σ.okP) : (σ.dropResv cpu).okP := by
+  obtain ⟨h1, h2, h3⟩ := h
+  refine ⟨h1, fun c r hr => ?_, h3⟩
+  simp only [updCpu] at hr
+  split at hr
+  · cases hr
+  · exact h2 c r hr
+
+/-- A fence: views to at most the landing top (the hart's last store is landed under the
+staging conjunct), the store epoch up. -/
+theorem MState.okP_fence (σ : MState) (cpu : CPU) (b : barrier_kind) (h : σ.okP) (hs : σ.sbNil) :
+    (σ.fence cpu b).okP := by
+  have hlt := σ.okP_ltop h hs
+  obtain ⟨h1, h2, h3, h4, h5, h6, h7, h8, h9⟩ := h
+  have hpub := ownPub_le (hartAgent cpu) σ.log
+  refine ⟨h1, h2, fun c => ?_, h4, h5, h6, h7, h8, fun c p hp => ?_⟩
+  · obtain ⟨a1, a2, a3, a4⟩ := h3 c
+    obtain ⟨b1, b2, b3, b4⟩ := h3 cpu
+    simp only [MState.ltop, MState.top] at *
+    by_cases hc : c = cpu
+    · subst hc
+      simp only [updCpu, if_true]
+      refine ⟨fencePost_le _ _ _ _ _ _ b1 b3 (by omega), ?_, a3, a4⟩
+      split
+      · exact Nat.max_le.2 ⟨b2, fencePost_le _ _ _ _ _ _ b1 b3 (by omega)⟩
+      · exact b2
+    · simp only [updCpu, hc, if_false]
+      exact ⟨a1, a2, a3, a4⟩
+  · have := h9 c p hp
+    show p.2 ≤ (if c = cpu then (if fenceEpoch b then σ.sbEp cpu + 1 else σ.sbEp cpu) else σ.sbEp c)
+    by_cases hc : c = cpu
+    · subst hc; rw [if_pos rfl]; split <;> omega
+    · rw [if_neg hc]; exact this
+
+/-- A fence moves store epochs up only. -/
+theorem MState.fence_sbEp_ge (σ : MState) (cpu : CPU) (b : barrier_kind) (c : CPU) :
+    σ.sbEp c ≤ (σ.fence cpu b).sbEp c := by
+  show σ.sbEp c ≤ (if c = cpu then (if fenceEpoch b then σ.sbEp cpu + 1 else σ.sbEp cpu) else σ.sbEp c)
+  by_cases hc : c = cpu
+  · subst hc; rw [if_pos rfl]; split <;> omega
+  · rw [if_neg hc]; exact Nat.le_refl _
+
+/-- An epoch-opening fence opens the next epoch. -/
+theorem MState.fence_sbEp_self (σ : MState) (cpu : CPU) (b : barrier_kind) (hb : fenceEpoch b = true) :
+    (σ.fence cpu b).sbEp cpu = σ.sbEp cpu + 1 := by
+  show (if cpu = cpu then (if fenceEpoch b then σ.sbEp cpu + 1 else σ.sbEp cpu) else σ.sbEp cpu) = _
+  rw [if_pos rfl, if_pos hb]
+
+/-- A booted machine: nothing issued, nothing landed, every buffer empty. -/
+theorem MState.okP_boot (σ : MState) (h : bootFacts σ) : σ.okP := by
+  obtain ⟨hmem, hlog, hhart, _, _, hll, hsb⟩ := h
+  have htop : σ.top = 0 := by simp [MState.top, hlog]
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  · intro a H hget
+    rw [hmem, imgFlat_get?] at hget
+    split at hget
+    case isFalse => simp at hget
+    cases hi : bootImage[a]? with
+    | none => rw [hi] at hget; simp at hget
+    | some v =>
+      rw [hi] at hget
+      simp only [Option.map_some, Option.some.injEq] at hget
+      subst hget
+      refine ⟨List.pairwise_singleton _ _, fun e he => ?_⟩
+      simp only [List.mem_singleton] at he
+      subst he
+      exact ⟨Nat.zero_le _, Or.inl rfl⟩
+  · intro c r hr
+    rw [(hhart c).2.2.2] at hr
+    cases hr
+  · intro c
+    obtain ⟨h1, h2, h3, _⟩ := hhart c
+    rw [h1, h2, h3]
+    exact ⟨Nat.zero_le _, Nat.zero_le _, Nat.zero_le _, fun _ => Nat.zero_le _⟩
+  · rw [hll]; exact List.nodup_nil
+  · intro t ht; rw [hll] at ht; cases ht
+  · intro t h1 h2; rw [htop] at h2; omega
+  · intro c t
+    rw [(hsb c).1, htop]
+    constructor
+    · rintro ⟨_, he⟩; cases he
+    · rintro ⟨h1, h2, _⟩; omega
+  · intro c; rw [(hsb c).1]; exact List.Pairwise.nil
+  · intro c p hp; rw [(hsb c).1] at hp; cases hp
+
+/-! ### `pendOne`, `ctxLanded`, and the step-time readings under a landing (P-M2 vocabulary)
+
+The two invariant notions the store rules (P-M3/P-M7) and the context hop (P-M5/P-M6) will carry
+(design §2.3/§2.4), with the landing-stability facts `interp_land`'s clients need. -/
+
+/-- **`pendOne`** (design §2.4): the footprint `pa .. pa+n-1` holds no PENDING entry of an agent
+other than hart `cpu` -- the side condition of a plain store's issue under route P. -/
+def MState.pendOneAt (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) : Prop :=
+  ∀ j, j < n → ∀ H, σ.mem[pa + BitVec.ofNat 64 j]? = some H → ∀ e ∈ H, e.tid ≠ hartAgent cpu →
+    (σ.lp e.t).isSome
+
+/-- A landing keeps `pendOne` (landing positions only grow). -/
+theorem MState.pendOneAt_land (σ : MState) (c cpu : CPU) (t : Nat) (pa : PAddr) (n : Nat)
+    (h : σ.pendOneAt cpu pa n) : (σ.land c t).pendOneAt cpu pa n := by
+  intro j hj H hH e he hne
+  obtain ⟨p, hp⟩ := Option.isSome_iff_exists.1 (h j hj H hH e he hne)
+  show (lpOf (σ.llog ++ [t]) e.t).isSome
+  rw [lpOf_snoc_of_some σ.llog t e.t p hp]; rfl
+
+/-- Under the staging conjunct every footprint satisfies `pendOne`. -/
+theorem MState.pendOneAt_of_sbNil (σ : MState) (h : σ.okP) (hs : σ.sbNil) (cpu : CPU) (pa : PAddr)
+    (n : Nat) : σ.pendOneAt cpu pa n :=
+  fun _ _ H hH e he _ => σ.okP_entLanded h hs _ H hH e he
+
+/-- **`ctxLanded`** (design §2.3) of a context certificate with per-author vector bound `Vb`
+(issue stamps) and release stamp `r`: once `r` has landed at `p`, every store of every author `X`
+issued at or below `Vb X` has landed before `p`. -/
+def MState.ctxLandedAt (σ : MState) (Vb : CPU → Nat) (r : Nat) : Prop :=
+  ∀ p, σ.lp r = some p → ∀ (X : CPU) (t : Nat), 1 ≤ t → t ≤ Vb X →
+    σ.log[t - 1]? = some (hartAgent X) → ∃ q, q < p ∧ σ.lp t = some q
+
+/-- A landing of another store keeps `ctxLanded`. -/
+theorem MState.ctxLandedAt_land_ne (σ : MState) (c : CPU) (t : Nat) (Vb : CPU → Nat) (r : Nat)
+    (hne : r ≠ t) (h : σ.ctxLandedAt Vb r) : (σ.land c t).ctxLandedAt Vb r := by
+  intro p hp X u hu1 huV hu
+  have hp' : σ.lp r = some p := by
+    show lpOf σ.llog r = some p
+    rw [← lpOf_snoc_ne σ.llog t r hne]; exact hp
+  obtain ⟨q, hq, hlq⟩ := h p hp' X u hu1 huV hu
+  exact ⟨q, hq, lpOf_snoc_of_some σ.llog t u q hlq⟩
+
+/-- The landing of the release itself, when every store under the bound has landed already
+(what the release rule must STATE, P-M6 [R45.4]: its own stores through the release fence's
+epoch token, `landedBeforeOfEpoch`; a foreign author's through the acquire's floor). -/
+theorem MState.ctxLandedAt_land_self (σ : MState) (c : CPU) (r : Nat) (Vb : CPU → Nat) (hr0 : r ≠ 0)
+    (hr : r ∉ σ.llog)
+    (hall : ∀ (X : CPU) (t : Nat), 1 ≤ t → t ≤ Vb X → σ.log[t - 1]? = some (hartAgent X) →
+      (σ.lp t).isSome) :
+    (σ.land c r).ctxLandedAt Vb r := by
+  intro p hp X u hu1 huV hu
+  have hpr : lpOf (σ.llog ++ [r]) r = some (σ.llog.length + 1) := lpOf_snoc_self σ.llog r hr0 hr
+  have hpe : p = σ.llog.length + 1 := by
+    have : lpOf (σ.llog ++ [r]) r = some p := hp
+    rw [hpr] at this; exact (Option.some.inj this).symm
+  obtain ⟨q, hq⟩ := Option.isSome_iff_exists.1 (hall X u hu1 huV hu)
+  exact ⟨q, by have := lpOf_le σ.llog u q hq; omega, lpOf_snoc_of_some σ.llog r u q hq⟩
+
+/-- The OWN half of `ctxLanded` from a fence-epoch token's content (`landedBeforeOfEpoch`): the
+releaser `A`'s stores up to the fence top `s` precede its release `r`, issued after `s`. -/
+theorem MState.ctxLandedAt_own (σ : MState) (A : CPU) (s r : Nat)
+    (hlb : ∀ t t' p', 1 ≤ t → t ≤ s → s < t' → σ.log[t - 1]? = some (hartAgent A) →
+      σ.log[t' - 1]? = some (hartAgent A) → σ.lp t' = some p' → ∃ p, p < p' ∧ σ.lp t = some p)
+    (hsr : s < r) (hrA : σ.log[r - 1]? = some (hartAgent A)) :
+    ∀ p, σ.lp r = some p → ∀ t, 1 ≤ t → t ≤ s → σ.log[t - 1]? = some (hartAgent A) →
+      ∃ q, q < p ∧ σ.lp t = some q :=
+  fun p hp t h1 h2 ht => hlb t r p h1 h2 hsr ht hrA hp
+
+/-- What a DMA read sees, over the LANDED top (route P; P-M3's reading of `dmaRead`). -/
+def dmaViewL (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) : Prop :=
+  ∀ j, j < n → ∀ b, (σ.mem[pa + BitVec.ofNat 64 j]?).bind (Hist.topL σ.lp) = some b → nthByte w j = b
+
+/-- A DMA read's view is step-time: no landing moves it. -/
+theorem dmaView_land (σ : MState) (c : CPU) (t : Nat) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) :
+    dmaView (σ.land c t) pa n w ↔ dmaView σ pa n w := Iff.rfl
+
+/-- Under the staging conjunct the merged-head and landed-top DMA views agree. -/
+theorem dmaView_iff_L (σ : MState) (h : σ.okP) (hs : σ.sbNil) (pa : PAddr) (n : Nat)
+    (w : BitVec (8 * n)) : dmaView σ pa n w ↔ dmaViewL σ pa n w := by
+  unfold dmaView dmaViewL
+  simp only [σ.okP_topL h hs]
 
 /-! ## The per-event step relation -/
 

@@ -164,7 +164,9 @@ theorem memModel_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * 
       (genHeapInterp (G := E.mem) σ.mem ∗ memModelAt E (σ.storeDma pa n w) ∗
        authoredByAt E (σ.top + 1) diskAgent ∗ topLbAt E (σ.top + 1)) := by
   unfold memModelAt
-  iintro ⟨Hm, ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩, #Hc⟩
+  iintro ⟨Hm, ⟨Htop, ⟨Hauth, Hlp⟩, Hviews, Hresv, %hmm, Hrsv⟩, #Hc⟩
+  imod lpAuthAt_snoc E σ.log (σ.log ++ [diskAgent]) σ.llog (σ.top + 1) σ.sb σ.sb σ.sbEp
+    (fun M hM => epochRecOk_storeG σ diskAgent (mmOk_okP hmm) hmm.2.2.2.2.2.1 M hM) $$ Hlp with ⟨Hlp, _⟩
   ihave Hx := rsvModel_dma E σ pa n w hn hpub hrsv
     (relPcOk_storeDma σ pa n w (ramBytes_le hram) (relPc_le_top hmm.1) hnr) (relPc_dmaOld σ pa n w)
     (fun _ => chainEnvAt_ext_dma _ _ _ σ pa n w (relPc_le_top hmm.1)) (fun _ h => chainLoads_dma σ pa n w hmm h)
@@ -180,12 +182,12 @@ theorem memModel_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * 
   have hresv : resvMap (σ.storeDma pa n w) = resvMap σ := resvMap_congr _ _ (fun c => ⟨rfl, rfl⟩)
   rw [hresv]
   iframe Hresv
-  isplitl [Htop Hauth Hviews Hrsv]
+  isplitl [Htop Hauth Hlp Hviews Hrsv]
   · iframe Hrsv
     rw [show (σ.storeDma pa n w).top = σ.top + 1 by
           simp [MState.top, hn],
-        MState.storeDma_log_of_ne σ pa n w hn, authMap_snoc]
-    iframe Htop Hauth
+        MState.storeDma_log_of_ne σ pa n w hn, MState.storeDma_llog_of_ne σ pa n w hn, authMap_snoc]
+    iframe Htop Hauth Hlp
     isplitl [Hviews]
     · rw [BigSepL.bigSepL_eq (fun {_ c} _ => hartViews_storeDma E σ pa n w c)]
       iexact Hviews

@@ -79,17 +79,11 @@ theorem memModel_read_excl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w :
       simp only [updCpu, if_true, HRead.afterExcl]
       iframe Hv Hi Hr
   · ipureintro
-    obtain ⟨h1, h2, h3, h4⟩ := hmm
-    refine ⟨h1, fun c => ?_, fun c r hr => ?_, h4⟩
-    · obtain ⟨a1, a2, a3, a4⟩ := h2 c
-      simp only [MState.top] at *
-      by_cases hc : c = cpu
-      · subst hc
-        simp only [updCpu, if_true, HRead.afterExcl]
-        refine ⟨by split <;> omega, a2, Nat.le_refl _, a4⟩
-      · simp only [updCpu, hc, if_false]
-        exact ⟨a1, a2, a3, a4⟩
-    · simp only [updCpu] at hr ⊢
+    obtain ⟨h1, h2, h3, h4, h5, h6, h7⟩ := hmm
+    have h3' : ∀ c r, (σ.afterExcl cpu pa n w acq).resv c = some r → ∀ (a : PAddr) (v : BitVec 8),
+        r[a]? = some v → (σ.mem[a]?).bind Hist.top = some v := by
+      intro c r hr
+      simp only [updCpu] at hr ⊢
       by_cases hc : c = cpu
       · subst hc
         simp only [if_true, Option.some.injEq] at hr
@@ -125,6 +119,15 @@ theorem memModel_read_excl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w :
           cases hav
       · simp only [hc, if_false] at hr
         exact h3 c r hr
+    refine ⟨h1, fun c => ?_, h3', h4, h5, h6, σ.okP_afterExcl cpu pa n w acq h7 h6 h3'⟩
+    obtain ⟨a1, a2, a3, a4⟩ := h2 c
+    simp only [MState.top] at *
+    by_cases hc : c = cpu
+    · subst hc
+      simp only [updCpu, if_true, HRead.afterExcl]
+      refine ⟨by split <;> omega, a2, Nat.le_refl _, a4⟩
+    · simp only [updCpu, hc, if_false]
+      exact ⟨a1, a2, a3, a4⟩
 
 /-- The write half of an exclusive pair (the store consumes the
 reservation and the acquire bit; an acquire pair's floor passes its own
@@ -148,7 +151,9 @@ theorem memModel_store_excl_any (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
   · iapply memModel_resv E σ cpu r acq $$ [Hmm Hfrag]
     iframe
   unfold memModelAt
-  icases Hmm with ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
+  icases Hmm with ⟨Htop, ⟨Hauth, Hlp⟩, Hviews, Hresv, %hmm, Hrsv⟩
+  imod lpAuthAt_snoc E σ.log (σ.log ++ [hartAgent cpu]) σ.llog (σ.top + 1) σ.sb σ.sb σ.sbEp
+    (fun M hM => epochRecOk_storeG σ (hartAgent cpu) (mmOk_okP hmm) hmm.2.2.2.2.2.1 M hM) $$ Hlp with ⟨Hlp, _⟩
   ihave Hrsv := rsvModel_mono E σ (σ.store cpu pa n w true) (kptGrow_store σ cpu pa n w true) hpub hrsv
     (relPcOk_store σ cpu pa n w true (ramBytes_le hram) (relPc_le_top hmm.1) hst)
     (relPc_storeOld σ cpu pa n w true)
@@ -172,11 +177,11 @@ theorem memModel_store_excl_any (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat)
       (fun c hc => by simp [updCpu, hc])
   rw [hresv]
   iframe Hfrag Hresv
-  isplitl [Htop Hauth Hv Hi Hr Hclose Hrsv]
+  isplitl [Htop Hauth Hlp Hv Hi Hr Hclose Hrsv]
   · iframe Hrsv
     rw [show (σ.store cpu pa n w true).top = σ.top + 1 by simp [MState.top],
         show (σ.store cpu pa n w true).log = σ.log ++ [hartAgent cpu] from rfl, authMap_snoc]
-    iframe Htop Hauth
+    iframe Htop Hauth Hlp
     isplitl [Hv Hi Hr Hclose]
     · iapply Hclose $$ %(σ.store cpu pa n w true)
       · ipureintro

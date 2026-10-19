@@ -131,6 +131,8 @@ other name a placeholder. -/
   mirrorName := 0
   rsvName := 0
   chainName := 0
+  lpName := 0
+  epName := 0
   gen := gen
   claimP := fun _ _ => iprop(True)
   claim_idle := fun _ => true_intro

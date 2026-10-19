@@ -878,4 +878,308 @@ def akRel : AK → Bool
   | .AK_arch _ => true
   | _ => false
 
+/-! ### Route P, increment P-M2: co-ordered histories and the landing log's facts
+
+The interpretation's pure route-P invariant (`MachCSL.MState.okP`) reads the histories in CO
+order over the landing positions (`histOkP`, design §2.1: a PENDING prefix in issue order over a
+LANDED suffix in landing order) and the landing log as a set of distinct issued stamps.  These
+are the lemmas `interp_land` and the P-M1 steps need. -/
+
+/-- `e` is CO-above `e'` (`e` precedes `e'` in a history): two pending entries in issue order,
+a pending entry above every landed one, two landed entries in landing order. -/
+def coAbove (lp : LandPos) (e e' : HEnt) : Prop :=
+  match lp e.t, lp e'.t with
+  | none, none => e'.t ≤ e.t
+  | none, some _ => True
+  | some _, none => False
+  | some p, some p' => p' ≤ p
+
+/-- A history is well formed (route P): it is in CO order -- a PENDING prefix (issue stamps
+descending) over a LANDED suffix (landing positions descending) -- every entry is at or below
+the issue top, and every non-image entry's author is the log's. -/
+def histOkP (lp : LandPos) (log : List Agent) (H : Hist) : Prop :=
+  H.Pairwise (coAbove lp) ∧
+  ∀ e ∈ H, e.t ≤ log.length ∧ (e.t = 0 ∨ log[e.t - 1]? = some e.tid)
+
+theorem histOkP_append (lp : LandPos) (log : List Agent) (l : List Agent) (H : Hist) (h : histOkP lp log H) :
+    histOkP lp (log ++ l) H := by
+  obtain ⟨hs, hb⟩ := h
+  refine ⟨hs, fun e he => ?_⟩
+  obtain ⟨h1, h2⟩ := hb e he
+  refine ⟨by simp; omega, ?_⟩
+  rcases h2 with h2 | h2
+  · exact Or.inl h2
+  · right
+    obtain ⟨hlt, -⟩ := List.getElem?_eq_some_iff.1 h2
+    rw [List.getElem?_append_left hlt]
+    exact h2
+
+/-- **A LANDING keeps every history well formed** (the pure core of `interp_land`): stamp `t`,
+pending before, lands at `q`, above every landed position; every other stamp keeps its landing
+position; and wherever `t` has an entry, nothing PENDING lies below it (the land arm's guard
+`MState.landFootOk`: the store is the lowest pending entry of each footprint byte). -/
+theorem histOkP_land (lp lp' : LandPos) (log : List Agent) (t q : Nat)
+    (ht : lp t = none) (ht' : lp' t = some q) (hother : ∀ s, s ≠ t → lp' s = lp s)
+    (hq : ∀ s p, lp s = some p → p ≤ q) :
+    ∀ H : Hist, histOkP lp log H →
+      (∀ H1 e H2, H = H1 ++ e :: H2 → e.t = t → ∀ e' ∈ H2, (lp e'.t).isSome) →
+      histOkP lp' log H := by
+  intro H hH hlow
+  refine ⟨?_, hH.2⟩
+  have hpw := hH.1
+  clear hH
+  induction H with
+  | nil => exact List.Pairwise.nil
+  | cons x H ih =>
+    rw [List.pairwise_cons] at hpw ⊢
+    refine ⟨fun y hy => ?_, ih (fun H1 e H2 hH he e' he' => hlow (x :: H1) e H2 (by rw [hH]; rfl) he e' he') hpw.2⟩
+    have hxy := hpw.1 y hy
+    unfold coAbove at hxy ⊢
+    by_cases hx : x.t = t
+    · have hyl := hlow [] x H rfl hx y hy
+      have hyt : y.t ≠ t := by
+        intro h; rw [h, ht] at hyl; cases hyl
+      rw [hx, ht', hother y.t hyt]
+      cases hy' : lp y.t with
+      | none => rw [hy'] at hyl; cases hyl
+      | some p' => exact hq _ _ hy'
+    · rw [hother x.t hx]
+      by_cases hy' : y.t = t
+      · rw [hy', ht']
+        rw [hy', ht] at hxy
+        cases hxl : lp x.t with
+        | none => trivial
+        | some _ => rw [hxl] at hxy; exact (hxy : False).elim
+      · rw [hother y.t hy']
+        exact hxy
+
+/-- **An ISSUE keeps every history well formed** (route P): the new entries carry the fresh
+stamp `log.length + 1` (pending) and sit on top of the footprint's histories -- co-above every
+pending entry (a smaller stamp) and every landed one. -/
+theorem FlatMem.writeBytes_histOkP {n : Nat} (m : FlatMem) (lp : LandPos) (log : List Agent) (pa : PAddr)
+    (w : BitVec (8 * n)) (h : Agent) (hfresh : lp (log.length + 1) = none)
+    (hm : ∀ (a : PAddr) (H : Hist), m[a]? = some H → histOkP lp log H) :
+    ∀ (a : PAddr) (H : Hist), (m.writeBytes pa n w (log.length + 1) h)[a]? = some H →
+      histOkP lp (log ++ [h]) H := by
+  unfold FlatMem.writeBytes
+  have key : ∀ (l : List Nat) (m : FlatMem),
+      (∀ (a : PAddr) (H : Hist), m[a]? = some H → histOkP lp (log ++ [h]) H) →
+      ∀ (a : PAddr) (H : Hist), (l.foldl (fun (m : FlatMem) j => m.push (pa + BitVec.ofNat 64 j) ⟨log.length + 1, h, nthByte w j⟩) m : FlatMem)[a]? = some H →
+        histOkP lp (log ++ [h]) H := by
+    intro l
+    induction l with
+    | nil => intro m hm; exact hm
+    | cons j l ih =>
+      intro m hm
+      simp only [List.foldl_cons]
+      apply ih
+      intro a H hget
+      by_cases hja : a = pa + BitVec.ofNat 64 j
+      · subst hja
+        rw [FlatMem.push_get?_eq] at hget
+        obtain rfl := Option.some.inj hget
+        have hold : histOkP lp (log ++ [h]) (m.getD (pa + BitVec.ofNat 64 j) []) := by
+          rw [Std.ExtTreeMap.getD_eq_getD_getElem?]
+          cases hg : m[pa + BitVec.ofNat 64 j]? with
+          | none => exact ⟨List.Pairwise.nil, fun e he => by simp at he⟩
+          | some H₀ => exact hm _ _ hg
+        obtain ⟨hs, hb⟩ := hold
+        refine ⟨?_, ?_⟩
+        · rw [List.pairwise_cons]
+          refine ⟨fun e he => ?_, hs⟩
+          have := (hb e he).1
+          simp only [List.length_append, List.length_singleton] at this
+          unfold coAbove
+          simp only [hfresh]
+          cases lp e.t with
+          | none => simp only; omega
+          | some _ => trivial
+        · intro e he
+          simp only [List.mem_cons] at he
+          rcases he with rfl | he
+          · exact ⟨by simp, Or.inr (by simp)⟩
+          · exact hb e he
+      · rw [FlatMem.push_get?_ne _ _ _ _ hja] at hget
+        exact hm a H hget
+  exact key _ m (fun a H hg => histOkP_append lp log [h] H (hm a H hg))
+
+/-- `find?` only sees the predicate on the list's own elements. -/
+theorem List.find?_congrP {α : Type} {p q : α → Bool} : ∀ (l : List α), (∀ x ∈ l, p x = q x) →
+    l.find? p = l.find? q
+  | [], _ => rfl
+  | x :: l, h => by
+    simp only [List.find?_cons, h x List.mem_cons_self,
+      List.find?_congrP l (fun y hy => h y (List.mem_cons_of_mem _ hy))]
+
+/-- A history holding no entry at stamp `x` keeps its landed top when `x` lands. -/
+theorem Hist.topL_snoc_ne (llog : List Nat) (x : Nat) (H : Hist) (hH : ∀ e ∈ H, e.t ≠ x) :
+    Hist.topL (lpOf (llog ++ [x])) H = Hist.topL (lpOf llog) H := by
+  unfold Hist.topL
+  rw [List.find?_congrP H (fun e he => by rw [lpOf_snoc_ne llog x e.t (hH e he)])]
+
+/-- A history whose every entry is landed has its landed top at its head. -/
+theorem Hist.topL_eq_top (lp : LandPos) (H : Hist) (h : ∀ e ∈ H, (lp e.t).isSome) :
+    Hist.topL lp H = Hist.top H := by
+  cases H with
+  | nil => rfl
+  | cons e H => simp [Hist.topL, Hist.top, h e List.mem_cons_self]
+
+/-- A distinct list included in another is no longer. -/
+theorem nodup_length_le : ∀ (l₁ l₂ : List Nat), l₁.Nodup → (∀ x ∈ l₁, x ∈ l₂) →
+    l₁.length ≤ l₂.length
+  | [], _, _, _ => Nat.zero_le _
+  | a :: l, l₂, hnd, hsub => by
+    rw [List.nodup_cons] at hnd
+    have ha : a ∈ l₂ := hsub a List.mem_cons_self
+    have hsub' : ∀ x ∈ l, x ∈ l₂.erase a := fun x hx =>
+      (List.mem_erase_of_ne (fun he => hnd.1 (by rw [← he]; exact hx))).2 (hsub x (List.mem_cons_of_mem _ hx))
+    have := nodup_length_le l (l₂.erase a) hnd.2 hsub'
+    rw [List.length_erase_of_mem ha] at this
+    have hpos : 0 < l₂.length := List.length_pos_of_mem ha
+    simp only [List.length_cons]
+    omega
+
+theorem posIn_some_of_mem (t : Nat) : ∀ (l : List Nat) (b : Nat), t ∈ l → (posIn t l b).isSome
+  | [], _, h => by cases h
+  | y :: l, b, h => by
+    simp only [posIn]
+    split
+    · rfl
+    · rename_i hy
+      exact posIn_some_of_mem t l (b + 1) ((List.mem_cons.1 h).resolve_left (Ne.symm hy))
+
+theorem mem_of_posIn (t : Nat) : ∀ (l : List Nat) (b p : Nat), posIn t l b = some p → t ∈ l
+  | [], _, _, h => by simp [posIn] at h
+  | y :: l, b, p, h => by
+    simp only [posIn] at h
+    split at h
+    · rename_i hy; subst hy; exact List.mem_cons_self
+    · exact List.mem_cons_of_mem _ (mem_of_posIn t l (b + 1) p h)
+
+/-- A logged stamp's landing position names it in the log. -/
+theorem posIn_get (t : Nat) : ∀ (l : List Nat) (b p : Nat), posIn t l b = some p → l[p - b - 1]? = some t
+  | [], _, _, h => by simp [posIn] at h
+  | y :: l, b, p, h => by
+    simp only [posIn] at h
+    split at h
+    · rename_i hy; cases h; subst hy; simp
+    · have h' := posIn_get t l (b + 1) p h
+      have hle := (posIn_le t l (b + 1) p h).1
+      have e : p - b - 1 = (p - (b + 1) - 1) + 1 := by omega
+      rw [e, List.getElem?_cons_succ]
+      exact h'
+
+/-- In a distinct log, the stamp at an index lands at that index + 1. -/
+theorem posIn_of_get (t : Nat) : ∀ (l : List Nat) (b i : Nat), l.Nodup → l[i]? = some t →
+    posIn t l b = some (b + i + 1)
+  | [], _, _, _, h => by simp at h
+  | y :: l, b, i, hnd, h => by
+    rw [List.nodup_cons] at hnd
+    simp only [posIn]
+    cases i with
+    | zero =>
+      simp only [List.getElem?_cons_zero, Option.some.injEq] at h
+      subst h; simp
+    | succ i =>
+      rw [List.getElem?_cons_succ] at h
+      have hne : y ≠ t := fun he => hnd.1 (he ▸ List.mem_of_getElem? h)
+      rw [if_neg hne, posIn_of_get t l (b + 1) i hnd.2 h]
+      congr 1; omega
+
+/-- A nonzero stamp is landed iff it is in the landing log. -/
+theorem lpOf_isSome_iff (llog : List Nat) (t : Nat) (ht : t ≠ 0) :
+    (lpOf llog t).isSome ↔ t ∈ llog := by
+  unfold lpOf
+  rw [if_neg ht]
+  constructor
+  · intro h
+    obtain ⟨p, hp⟩ := Option.isSome_iff_exists.1 h
+    exact mem_of_posIn t llog 0 p hp
+  · exact posIn_some_of_mem t llog 0
+
+/-- A nonzero stamp not in the landing log is pending. -/
+theorem lpOf_none_of_not_mem (llog : List Nat) (t : Nat) (h : t ∉ llog) : t ≠ 0 →
+    lpOf llog t = none := by
+  intro ht
+  unfold lpOf
+  rw [if_neg ht]
+  exact posIn_none_of_not_mem t llog 0 h
+
+/-- A stamp landed at a positive position is the log's entry there. -/
+theorem lpOf_get (llog : List Nat) (t p : Nat) (h : lpOf llog t = some p) (ht : t ≠ 0) :
+    1 ≤ p ∧ llog[p - 1]? = some t := by
+  unfold lpOf at h
+  rw [if_neg ht] at h
+  have := posIn_le t llog 0 p h
+  refine ⟨by omega, ?_⟩
+  have h' := posIn_get t llog 0 p h
+  simpa using h'
+
+/-- In a distinct log, the entry at a position lands there. -/
+theorem lpOf_of_get (llog : List Nat) (t p : Nat) (hnd : llog.Nodup) (hp : 1 ≤ p)
+    (h : llog[p - 1]? = some t) (ht : t ≠ 0) : lpOf llog t = some p := by
+  unfold lpOf
+  rw [if_neg ht, posIn_of_get t llog 0 (p - 1) hnd h]
+  congr 1; omega
+
+/-- The co order only sees the landing positions of the history's own stamps. -/
+theorem histOkP_congr (lp lp' : LandPos) (log : List Agent) (H : Hist) (h : ∀ e ∈ H, lp' e.t = lp e.t)
+    (hH : histOkP lp log H) : histOkP lp' log H :=
+  ⟨hH.1.imp_of_mem (fun {a b} ha hb hab => by unfold coAbove at hab ⊢; rw [h a ha, h b hb]; exact hab), hH.2⟩
+
+/-- **A store that LANDS AT ONCE** above every landed position keeps a fully landed memory's
+histories well formed (route P, the eager store of increments P-M1/P-M2 and the DMA write): its
+entries, at the fresh stamp, land at `q`, and every old entry is landed at most at `q`. -/
+theorem FlatMem.writeBytes_histOkP_landed {n : Nat} (m : FlatMem) (lp : LandPos) (log : List Agent)
+    (pa : PAddr) (w : BitVec (8 * n)) (h : Agent) (q : Nat) (hq : lp (log.length + 1) = some q)
+    (hm : ∀ (a : PAddr) (H : Hist), m[a]? = some H → histOkP lp (log ++ [h]) H ∧
+      ∀ e ∈ H, ∃ p, lp e.t = some p ∧ p ≤ q) :
+    ∀ (a : PAddr) (H : Hist), (m.writeBytes pa n w (log.length + 1) h)[a]? = some H →
+      histOkP lp (log ++ [h]) H ∧ ∀ e ∈ H, ∃ p, lp e.t = some p ∧ p ≤ q := by
+  unfold FlatMem.writeBytes
+  have key : ∀ (l : List Nat) (m : FlatMem),
+      (∀ (a : PAddr) (H : Hist), m[a]? = some H → histOkP lp (log ++ [h]) H ∧
+        ∀ e ∈ H, ∃ p, lp e.t = some p ∧ p ≤ q) →
+      ∀ (a : PAddr) (H : Hist), (l.foldl (fun (m : FlatMem) j => m.push (pa + BitVec.ofNat 64 j) ⟨log.length + 1, h, nthByte w j⟩) m : FlatMem)[a]? = some H →
+        histOkP lp (log ++ [h]) H ∧ ∀ e ∈ H, ∃ p, lp e.t = some p ∧ p ≤ q := by
+    intro l
+    induction l with
+    | nil => intro m hm; exact hm
+    | cons j l ih =>
+      intro m hm
+      simp only [List.foldl_cons]
+      apply ih
+      intro a H hget
+      by_cases hja : a = pa + BitVec.ofNat 64 j
+      · subst hja
+        rw [FlatMem.push_get?_eq] at hget
+        obtain rfl := Option.some.inj hget
+        have hold : histOkP lp (log ++ [h]) (m.getD (pa + BitVec.ofNat 64 j) []) ∧
+            ∀ e ∈ m.getD (pa + BitVec.ofNat 64 j) [], ∃ p, lp e.t = some p ∧ p ≤ q := by
+          rw [Std.ExtTreeMap.getD_eq_getD_getElem?]
+          cases hg : m[pa + BitVec.ofNat 64 j]? with
+          | none => exact ⟨⟨List.Pairwise.nil, fun e he => by simp at he⟩, fun e he => by simp at he⟩
+          | some H₀ => exact hm _ _ hg
+        obtain ⟨⟨hs, hb⟩, hl⟩ := hold
+        refine ⟨⟨?_, ?_⟩, ?_⟩
+        · rw [List.pairwise_cons]
+          refine ⟨fun e he => ?_, hs⟩
+          obtain ⟨p, hp, hpq⟩ := hl e he
+          unfold coAbove
+          simp only [hq, hp]
+          exact hpq
+        · intro e he
+          simp only [List.mem_cons] at he
+          rcases he with rfl | he
+          · exact ⟨by simp, Or.inr (by simp)⟩
+          · exact hb e he
+        · intro e he
+          simp only [List.mem_cons] at he
+          rcases he with rfl | he
+          · exact ⟨q, hq, Nat.le_refl _⟩
+          · exact hl e he
+      · rw [FlatMem.push_get?_ne _ _ _ _ hja] at hget
+        exact hm a H hget
+  exact key _ m hm
+
 end MachCSL

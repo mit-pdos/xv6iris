@@ -178,8 +178,10 @@ theorem wpLoop_fupd (cpu : CPU) : (|={⊤}=> wpLoop (GF := GF) cpu) ⊢ wpLoop c
   imodintro
   iapply H $$ Hcert
 
-/-- Under the P-M1 machine every store buffer is empty (`mmOk`'s staging
-conjunct `MState.landedEager`): so the land arm of `primStep` never fires. -/
+/-- The step invariant of the interpretation.  (Route P, increment P-M2: it
+carries the staging conjunct `MState.sbNil`, every store buffer empty, which
+the drain/overtake guards of the event rules still read; the LAND ARM does
+not rest on it -- `machInterp_land`.) -/
 theorem machInterp_mmOk (σ : MState) : machInterp (GF := GF) σ ⊢ ⌜mmOk σ⌝ := by
   unfold machInterp memModel memModelAt
   iintro ⟨_, _, ⟨_, _, _, _, %h, _⟩, _, _⟩
@@ -192,6 +194,20 @@ theorem machInterp_sbNil (σ : MState) : machInterp (GF := GF) σ ⊢ ⌜∀ c, 
   ipureintro
   exact mmOk_sbNil h
 
+/-- **`interp_land`** (route P, design §2.3, the plan's P-M2 acceptance gate): a
+landing is a ghost update of the interpretation ALONE.  The registers, the heap
+of merged histories, the devices and the user-epoch record are untouched (a
+landing moves no history: `MState.land_mem`); the memory-model mirrors by
+`memModel_land` (the landing certificate is minted and kept). -/
+theorem machInterp_land (σ : MState) (cpu : CPU) (t : Nat) (hok : σ.landOk cpu t) :
+    machInterp (GF := GF) σ ⊢ |==> machInterp (σ.land cpu t) := by
+  unfold machInterp
+  iintro ⟨Hregs, Hheap, Hmm, Hdev, Huep⟩
+  imod memModel_land _ σ cpu t hok $$ Hmm with ⟨Hmm, _⟩
+  imodintro
+  iframe Hregs Hheap Hmm Hdev
+  iapply uepModelAt_stable _ (σ := σ) (σ' := σ.land cpu t) (uepStable_of_eq rfl rfl) $$ Huep
+
 /-- **The generic lifting lemma for one hart event, OBSERVED** (NI M2-W1),
 and the single per-hart framing point.  The caller is handed the ambient
 era's interpretation at the machine `g.m` AND the machine's half of the
@@ -202,7 +218,17 @@ handing the history back extended by the step's own observations
 (`hartObsM`; only a crossing write of `cur_privilege` has any).  The other
 half of the history lives in the client's trace predicate, so a caller
 extending it is a caller with the client's consent (`swp_writeReg_uexit`/`_uenter`).
-The era bookkeeping is dispatched here. -/
+The era bookkeeping is dispatched here.
+
+ROUTE P (increment P-M2; the spike's `wpHart_lift_obsP`, design §2.2): the
+SILENT LAND ARM of `primStep` is absorbed HERE, once, so the callback still sees
+`hartStep` (event steps) only and every per-event rule keeps its text and proof.
+When no landing is enabled the callback runs first, as before.  When one is,
+the hart is reducible by it and the callback is POSTPONED into the step's
+`£ 1 ={∅}=∗ ▷` window: an event step runs it then (its `▷` merged with the
+step's; no later credit is spent, MachCSL being generic in `hlc`); a landing
+re-establishes the interpretation by `machInterp_land` and the SAME `wpHart`
+follows by Löb from the unused callback. -/
 theorem wpHart_lift_obs (cpu : CPU) (m : SailM Unit) :
     (∀ (g : GState) (h : List Obs), ⌜obsWf h g ∧ threadLive g (genId (hlc := hlc) (GF := GF))⌝ -∗
       machInterp g.m ∗ obsAuth h ={⊤,∅}=∗
@@ -210,11 +236,13 @@ theorem wpHart_lift_obs (cpu : CPU) (m : SailM Unit) :
       ▷ ∀ m' σ', ⌜hartStep cpu m g.m m' σ'⌝ -∗ £ 1 ={∅,⊤}=∗
         machInterp σ' ∗ obsAuth (h ++ hartObsM cpu m g.m) ∗ wpHart cpu m')
     ⊢@{IProp GF} wpHart cpu m := by
+  iintro H
+  iloeb as IH
   unfold wpHart hartWP
-  iintro H #Hcert
+  iintro #Hcert
   ihave #Hparts := genCert_parts $$ Hcert
   icases Hparts with ⟨Hborn, Hstarted, Hreg⟩
-  iapply wp_lift_step rfl
+  iapply wp_lift_step_fupd rfl
   iintro %g %ns %obs %obs' %nt Hσ
   rw [stateInterp_eq]
   icases Hσ with ⟨Hσ, Hobs⟩
@@ -242,55 +270,136 @@ theorem wpHart_lift_obs (cpu : CPU) (m : SailM Unit) :
     -- the history so far, lent to the callback
     unfold obsInterp
     icases Hobs with ⟨%h, %htot, %hwf, Ha⟩
-    ihave %hsb : ⌜∀ c, g.m.sb c = []⌝ $$ [Hera]
-    · iapply machInterp_sbNil $$ Hera
-    imod H $$ %g %h %⟨hwf, hl⟩ [Hera Ha] with ⟨%Hred, H⟩
-    · iframe Hera Ha
-    imodintro
-    isplit
-    · ipureintro
-      obtain ⟨m', σ', hs⟩ := Hred
-      exact ⟨_, .hart _ cpu m', { g with m := σ' }, [], primStep_hart_live hl hs⟩
-    inext
-    iintro %e₂ %g₂ %eₜ %Hstep Hcred
-    obtain ⟨rfl, h⟩ := primStep_hart_inv Hstep
-    rcases h with ⟨_, hobs, m', σ', rfl, hs, rfl⟩ | ⟨hnl, _, _⟩ | ⟨_, _, _, t, hland, _⟩
-    rotate_right
-    · -- the land arm (route P): no store is ever buffered under the P-M1 machine
-      exact absurd hland (MState.not_landOk_of_nil _ cpu t (hsb cpu))
-    · imod H $$ %m' %σ' %hs Hcred with ⟨Hσ', Ha, Hwp⟩
-      imodintro
-      -- the trace conjunct, re-packed at the extended history
-      subst hobs
-      ihave Hobs := obsInterp_close _ _ _ _ _ _ h obs' Hstep hwf htot $$ Ha
-      rw [stateInterp_eq]
-      unfold powerInterp
-      iframe Hobs
-      rw [show startCount { g with m := σ' } = startCount g from rfl]
-      iframe Hgen Hstart
-      -- the durable disk: a hart step never moves it
-      have hdk : diskFixedInterp (hlc := hlc) (GF := GF) { g with m := σ' } = diskFixedInterp g := by
-        unfold diskFixedInterp; rw [show diskOf σ'.devs = diskOf g.m.devs from hartStep_diskOf hs]
-      rw [hdk]
-      iframe Hdisk
-      isplitl [HR Hσ']
-      · iexists R
-        iframe HR
-        isplit
-        · ipureintro
-          exact Hok
-        rw [eraCur_true (g := { g with m := σ' }) hpow]
-        iexists (MachGS.era (hlc := hlc) (GF := GF))
-        isplit
-        · ipureintro
-          exact HRg'
-        rw [eraInterp_ambient]
-        iexact Hσ'
+    by_cases hlo : ∃ t, g.m.landOk cpu t
+    · ---- THE LAND ARM IS ENABLED: the hart is reducible by it, the callback is POSTPONED
+      obtain ⟨t0, ht0⟩ := hlo
+      iapply fupd_mask_intro LawfulSet.empty_subset
+      iintro Hclose
       isplit
-      · iapply Hwp
-        iexact Hcert
-      · exact BigSepL.bigSepL_nil_intro
-    · exact absurd hl hnl
+      · ipureintro
+        exact ⟨[], .hart _ cpu m, { g with m := g.m.land cpu t0 }, [], primStep_hart_land hl ht0⟩
+      iintro %e₂ %g₂ %eₜ %Hstep Hcred
+      obtain ⟨rfl, hc⟩ := primStep_hart_inv Hstep
+      rcases hc with ⟨_, hobs, m', σ', rfl, hs, rfl⟩ | ⟨hnl, _, _⟩ | ⟨_, hobs, rfl, t, hlt, rfl⟩
+      · -- an EVENT step: the callback runs now (mask re-opened), its `▷` merged with the step's
+        imod Hclose
+        imod H $$ %g %h %⟨hwf, hl⟩ [Hera Ha] with ⟨_, H⟩
+        · iframe Hera Ha
+        imodintro
+        inext
+        imod H $$ %m' %σ' %hs Hcred with ⟨Hσ', Ha, Hwp⟩
+        imodintro
+        subst hobs
+        ihave Hobs := obsInterp_close _ _ _ _ _ _ h obs' Hstep hwf htot $$ Ha
+        rw [stateInterp_eq]
+        unfold powerInterp
+        iframe Hobs
+        rw [show startCount { g with m := σ' } = startCount g from rfl]
+        iframe Hgen Hstart
+        have hdk : diskFixedInterp (hlc := hlc) (GF := GF) { g with m := σ' } = diskFixedInterp g := by
+          unfold diskFixedInterp; rw [show diskOf σ'.devs = diskOf g.m.devs from hartStep_diskOf hs]
+        rw [hdk]
+        iframe Hdisk
+        isplitl [HR Hσ']
+        · iexists R
+          iframe HR
+          isplit
+          · ipureintro
+            exact Hok
+          rw [eraCur_true (g := { g with m := σ' }) hpow]
+          iexists (MachGS.era (hlc := hlc) (GF := GF))
+          isplit
+          · ipureintro
+            exact HRg'
+          rw [eraInterp_ambient]
+          iexact Hσ'
+        isplit
+        · iapply Hwp
+          iexact Hcert
+        · exact BigSepL.bigSepL_nil_intro
+      · exact absurd hl hnl
+      · -- THE LAND ARM: `interp_land`; silent; the SAME wp by Löb, the callback unused
+        imodintro
+        inext
+        imod Hclose
+        imod machInterp_land g.m cpu t hlt $$ Hera with Hera
+        imodintro
+        subst hobs
+        have hcl := obsInterp_close (hlc := hlc) (GF := GF) _ _ _ _ _ _ h obs' Hstep hwf htot
+        rw [List.append_nil] at hcl
+        ihave Hobs := hcl $$ Ha
+        rw [stateInterp_eq]
+        unfold powerInterp
+        iframe Hobs
+        rw [show startCount { g with m := g.m.land cpu t } = startCount g from rfl]
+        iframe Hgen Hstart
+        have hdk : diskFixedInterp (hlc := hlc) (GF := GF) { g with m := g.m.land cpu t } = diskFixedInterp g := by
+          unfold diskFixedInterp; rw [show diskOf (g.m.land cpu t).devs = diskOf g.m.devs by rw [MState.land_devs]]
+        rw [hdk]
+        iframe Hdisk
+        isplitl [HR Hera]
+        · iexists R
+          iframe HR
+          isplit
+          · ipureintro
+            exact Hok
+          rw [eraCur_true (g := { g with m := g.m.land cpu t }) hpow]
+          iexists (MachGS.era (hlc := hlc) (GF := GF))
+          isplit
+          · ipureintro
+            exact HRg'
+          rw [eraInterp_ambient]
+          iexact Hera
+        isplit
+        · iapply IH $$ H
+          iexact Hcert
+        · exact BigSepL.bigSepL_nil_intro
+    · ---- THE LAND ARM IS DISABLED: the callback runs first, as before route P
+      imod H $$ %g %h %⟨hwf, hl⟩ [Hera Ha] with ⟨%Hred, H⟩
+      · iframe Hera Ha
+      imodintro
+      isplit
+      · ipureintro
+        obtain ⟨m', σ', hs⟩ := Hred
+        exact ⟨_, .hart _ cpu m', { g with m := σ' }, [], primStep_hart_live hl hs⟩
+      iintro %e₂ %g₂ %eₜ %Hstep Hcred
+      obtain ⟨rfl, hc⟩ := primStep_hart_inv Hstep
+      rcases hc with ⟨_, hobs, m', σ', rfl, hs, rfl⟩ | ⟨hnl, _, _⟩ | ⟨_, _, _, t, hlo', _⟩
+      · imodintro
+        inext
+        imod H $$ %m' %σ' %hs Hcred with ⟨Hσ', Ha, Hwp⟩
+        imodintro
+        subst hobs
+        ihave Hobs := obsInterp_close _ _ _ _ _ _ h obs' Hstep hwf htot $$ Ha
+        rw [stateInterp_eq]
+        unfold powerInterp
+        iframe Hobs
+        rw [show startCount { g with m := σ' } = startCount g from rfl]
+        iframe Hgen Hstart
+        -- the durable disk: a hart step never moves it
+        have hdk : diskFixedInterp (hlc := hlc) (GF := GF) { g with m := σ' } = diskFixedInterp g := by
+          unfold diskFixedInterp; rw [show diskOf σ'.devs = diskOf g.m.devs from hartStep_diskOf hs]
+        rw [hdk]
+        iframe Hdisk
+        isplitl [HR Hσ']
+        · iexists R
+          iframe HR
+          isplit
+          · ipureintro
+            exact Hok
+          rw [eraCur_true (g := { g with m := σ' }) hpow]
+          iexists (MachGS.era (hlc := hlc) (GF := GF))
+          isplit
+          · ipureintro
+            exact HRg'
+          rw [eraInterp_ambient]
+          iexact Hσ'
+        isplit
+        · iapply Hwp
+          iexact Hcert
+        · exact BigSepL.bigSepL_nil_intro
+      · exact absurd hl hnl
+      · exact absurd ⟨t, hlo'⟩ hlo
   · -- a passed generation: derive the death certificate and self-loop
     have hlt : genId (hlc := hlc) (GF := GF) < g.gen := by omega
     ihave #Hdead := genAuth_get_dead _ _ hlt $$ Hgen
@@ -300,13 +409,14 @@ theorem wpHart_lift_obs (cpu : CPU) (m : SailM Unit) :
     isplit
     · ipureintro
       exact ⟨[], .hart _ cpu m, g, [], primStep_hart_dead hnl⟩
-    inext
     iintro %e₂ %g₂ %eₜ %Hstep _
     obtain ⟨rfl, h⟩ := primStep_hart_inv Hstep
     rcases h with ⟨hl, _⟩ | ⟨_, rfl, rfl, rfl⟩ | ⟨hl, _⟩
     · exact absurd hl hnl
     rotate_left
     · exact absurd hl hnl
+    imodintro
+    inext
     imod Hclose
     imodintro
     ihave Hobs := obsInterp_silent_nil _ _ _ _ _ obs' Hstep $$ Hobs
@@ -1723,7 +1833,7 @@ theorem memModel_setRt (σ : MState) (d : DevId) (rt : DevRt)
     memModelAt E σ ⊢@{IProp GF} memModelAt E (σ.setRt d rt) := by
   have e : memModelAt E (σ.setRt d rt) = iprop(
       MonoNat.auth_own E.topName (DFrac.own 1) (.ofNat σ.top) ∗
-      (E.authName ↪●MAP authMap σ.log) ∗
+      ((E.authName ↪●MAP authMap σ.log) ∗ lpAuthAt E σ.log σ.llog σ.sb σ.sbEp) ∗
       ([∗list] cpu ∈ cpus, hartViewsAt (GF := GF) E σ cpu) ∗
       (E.resvName ↪●MAP resvMap σ) ∗
       ⌜mmOk (σ.setRt d rt)⌝ ∗ rsvModelAt E σ) := rfl
@@ -1768,7 +1878,7 @@ theorem memModel_viewLb (σ : MState) (cpu : CPU) (K : Nat) :
 theorem memModel_authored (σ : MState) (t : Nat) (h : Agent) :
     memModelAt E σ ∗ authoredByAt E t h ⊢@{IProp GF} ⌜1 ≤ t ∧ σ.log[t - 1]? = some h⌝ := by
   unfold memModelAt authoredByAt
-  iintro ⟨⟨_, Hauth, _⟩, H⟩
+  iintro ⟨⟨_, ⟨Hauth, _⟩, _⟩, H⟩
   ihave %Hl := ghost_map_lookup $$ Hauth H
   ipureintro
   rw [authMap_get?] at Hl
@@ -1814,8 +1924,8 @@ theorem memModel_dropResv (σ : MState) (cpu : CPU) (r : Option Resv) (b : Bool)
   · rw [BigSepL.bigSepL_eq (fun {_ c} _ => hartViews_dropResv E σ cpu c)]
     iexact Hviews
   · ipureintro
-    obtain ⟨h1, h2, h3, h4⟩ := hmm
-    refine ⟨h1, h2, fun c r hr => ?_, h4⟩
+    obtain ⟨h1, h2, h3, h4, h5, h6, h7⟩ := hmm
+    refine ⟨h1, h2, fun c r hr => ?_, h4, h5, h6, σ.okP_dropResv cpu h7⟩
     simp only [updCpu] at hr
     split at hr
     · cases hr
@@ -1881,12 +1991,18 @@ theorem memModel_load (σ : MState) (cpu : CPU) (pa : PAddr) (n tvn : Nat) (htv 
 
 /-- A fence moves its hart's data and instruction views (never down), and
 mints the view receipt at the new floor. -/
-theorem memModel_fence (σ : MState) (cpu : CPU) (b : barrier_kind) :
+theorem memModel_fence_acc (σ : MState) (cpu : CPU) (b : barrier_kind) :
     memModelAt E σ ⊢@{IProp GF}
-      |==> (memModelAt E (σ.fence cpu b) ∗ viewLbAt E cpu ((σ.fence cpu b).tv cpu)) := by
+      lpAuthAt E σ.log σ.llog σ.sb σ.sbEp ∗ ⌜mmOk σ⌝ ∗
+      (lpAuthAt E σ.log σ.llog σ.sb (σ.fence cpu b).sbEp -∗
+        |==> (memModelAt E (σ.fence cpu b) ∗ viewLbAt E cpu ((σ.fence cpu b).tv cpu))) := by
   unfold memModelAt
   rw [rsvModelAt_congr E (σ := σ) (σ' := σ.fence cpu b) rfl rfl (fun _ _ => rfl)]
-  iintro ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
+  iintro ⟨Htop, ⟨Hauth, Hlp⟩, Hviews, Hresv, %hmm, Hrsv⟩
+  iframe Hlp
+  isplitr
+  · ipureintro; exact hmm
+  iintro Hlp
   icases hartViews_acc E σ cpu $$ Hviews with ⟨Hc, Hclose⟩
   icases hartViewsAt_cases E σ cpu $$ Hc with ⟨Hv, Hi, Hr⟩
   have hmm' := mmOk_fence σ cpu b hmm
@@ -1907,8 +2023,8 @@ theorem memModel_fence (σ : MState) (cpu : CPU) (b : barrier_kind) :
   imodintro
   have hresv : resvMap (σ.fence cpu b) = resvMap σ := resvMap_congr _ _ (fun c => ⟨rfl, rfl⟩)
   rw [hresv]
-  isplitl [Htop Hauth Hresv Hv Hi Hr Hclose Hrsv]
-  · iframe Htop Hauth Hresv Hrsv
+  isplitl [Htop Hauth Hlp Hresv Hv Hi Hr Hclose Hrsv]
+  · iframe Htop Hauth Hlp Hresv Hrsv
     isplitl [Hv Hi Hr Hclose]
     · iapply Hclose $$ %(σ.fence cpu b)
       · ipureintro
@@ -1925,6 +2041,29 @@ theorem memModel_fence (σ : MState) (cpu : CPU) (b : barrier_kind) :
     unfold topLbAt
     iright
     iexact Htoplb
+
+theorem memModel_fence (σ : MState) (cpu : CPU) (b : barrier_kind) :
+    memModelAt E σ ⊢@{IProp GF}
+      |==> (memModelAt E (σ.fence cpu b) ∗ viewLbAt E cpu ((σ.fence cpu b).tv cpu)) := by
+  iintro Hmm
+  icases memModel_fence_acc E σ cpu b $$ Hmm with ⟨Hlp, _, Hk⟩
+  iapply Hk
+  iapply lpAuthAt_epUp E _ _ _ _ _ (MState.fence_sbEp_ge σ cpu b) $$ Hlp
+
+/-- **An epoch-opening fence MINTS the epoch token** ([OWN.113], design §2.3/§2.4: what
+`wp_s_fence_rw_w` will hand the release rule, P-M6): hart `cpu`'s stores issued up to the
+current top land before its stores issued after it. -/
+theorem memModel_fenceE (σ : MState) (cpu : CPU) (b : barrier_kind) (hb : fenceEpoch b = true) :
+    memModelAt E σ ⊢@{IProp GF}
+      |==> (memModelAt E (σ.fence cpu b) ∗ viewLbAt E cpu ((σ.fence cpu b).tv cpu) ∗
+        epochAtE E cpu (σ.sbEp cpu + 1) σ.top) := by
+  iintro Hmm
+  icases memModel_fence_acc E σ cpu b $$ Hmm with ⟨Hlp, %hmm, Hk⟩
+  imod lpAuthAt_mint E σ cpu (mmOk_okP hmm) (σ.fence cpu b).sbEp (MState.fence_sbEp_self σ cpu b hb)
+    (MState.fence_sbEp_ge σ cpu b) $$ Hlp with ⟨Hlp, #Htok⟩
+  imod Hk $$ Hlp with ⟨Hmm, Hlb⟩
+  imodintro
+  iframe Hmm Hlb Htok
 
 theorem hartViews_store_plain (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (c : CPU) : hartViewsAt (GF := GF) E (σ.store cpu pa n w false) c = hartViewsAt E σ c := by
@@ -1950,7 +2089,9 @@ theorem memModel_store_plainQ (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (
   · iapply memModel_resv E σ cpu r b $$ [Hmm Hfrag]
     iframe
   unfold memModelAt
-  icases Hmm with ⟨Htop, Hauth, Hviews, Hresv, %hmm, Hrsv⟩
+  icases Hmm with ⟨Htop, ⟨Hauth, Hlp⟩, Hviews, Hresv, %hmm, Hrsv⟩
+  imod lpAuthAt_snoc E σ.log (σ.log ++ [hartAgent cpu]) σ.llog (σ.top + 1) σ.sb σ.sb σ.sbEp
+    (fun M hM => epochRecOk_storeG σ (hartAgent cpu) (mmOk_okP hmm) hmm.2.2.2.2.2.1 M hM) $$ Hlp with ⟨Hlp, _⟩
   ihave Hrsv := hmono $$ [Hrsv HQ]
   · iframe Hrsv HQ
   imod MonoNat.own_update _ (.ofNat σ.top) (.ofNat (σ.top + 1))
@@ -1966,12 +2107,12 @@ theorem memModel_store_plainQ (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (
       (fun c hc => by simp [updCpu, hc])
   rw [hresv]
   iframe Hfrag Hresv
-  isplitl [Htop Hauth Hviews Hrsv]
+  isplitl [Htop Hauth Hlp Hviews Hrsv]
   · iframe Hrsv
     rw [show (σ.store cpu pa n w false).top = σ.top + 1 by
           simp [MState.top],
         show (σ.store cpu pa n w false).log = σ.log ++ [hartAgent cpu] from rfl, authMap_snoc]
-    iframe Htop Hauth
+    iframe Htop Hauth Hlp
     isplitl [Hviews]
     · rw [BigSepL.bigSepL_eq (fun {_ c} _ => hartViews_store_plain E σ cpu pa n w c)]
       iexact Hviews
