@@ -100,7 +100,7 @@ def UstResOk (C : UCfg) (P : UPtd) (t0 : PTree) (mm0 : BMap) : ExecutionResult �
 def UstFetchOut (C : UCfg) (P : UPtd) (t0 : PTree) (mm0 : BMap) : FetchResult → UWSt → Prop
   | .F_Base _, s => UstLand C P t0 mm0 s ∧ (s.file .PC).getLsbD 0 = false
   | .F_RVC _, s => UstLand C P t0 mm0 s ∧ (s.file .PC).getLsbD 0 = false
-  | .F_Error (e, _), s => UstLand C P t0 mm0 s ∧ userExc e = true
+  | .F_Error c, s => UstLand C P t0 mm0 s ∧ userExc c.trap = true
   | .F_Ext_Error _, _ => False
 
 /-- **One instruction's execute fact** (U3-A): from the `nextPC := PC + len`
@@ -164,16 +164,18 @@ theorem ustTrapS_rv (s : UWSt) (ms sc stv sep npc : BitVec 64) : (ustTrapS s ms 
 
 /-- The read-only cells are none of the cells the cycle's glue writes. -/
 theorem ust_ro_ne : ∀ r ∈ ufRoList, r ≠ .PC ∧ r ≠ .nextPC ∧ r ≠ .minstret ∧ r ≠ .minstret_increment ∧
-    r ≠ .hart_state ∧ r ≠ .mcycle ∧ r ≠ .mtime ∧ r ≠ .mip ∧ r ∉ ufTrapRw := by decide
+    r ≠ .hart_state ∧ r ≠ .mcycle ∧ r ≠ .mtime ∧ r ≠ .mip ∧ r ∉ ufTrapRw ∧ r ≠ .written_event_index := by
+  decide
 
 /-- The pins survive any write off the read-only list. -/
 theorem ust_cfg_of (C : UCfg) (P : UPtd) (s s' : UWSt) (hc : UfCfg C P s.file)
     (h : ∀ r, r ≠ .PC → r ≠ .nextPC → r ≠ .minstret → r ≠ .minstret_increment → r ≠ .hart_state →
-      r ≠ .mcycle → r ≠ .mtime → r ≠ .mip → r ∉ ufTrapRw → s'.file r = s.file r) :
+      r ≠ .mcycle → r ≠ .mtime → r ≠ .mip → r ∉ ufTrapRw → r ≠ .written_event_index →
+      s'.file r = s.file r) :
     UfCfg C P s'.file :=
   ufCfg_of_ro C P s.file s'.file hc fun r hr => by
-    obtain ⟨h1, h2, h3, h4, h5, h6, h7, h8, h9⟩ := ust_ro_ne r hr
-    exact h r h1 h2 h3 h4 h5 h6 h7 h8 h9
+    obtain ⟨h1, h2, h3, h4, h5, h6, h7, h8, h9, h10⟩ := ust_ro_ne r hr
+    exact h r h1 h2 h3 h4 h5 h6 h7 h8 h9 h10
 
 theorem ust_stvecBase (v : BitVec 64) (h : stvecDirect v) : stvecBase v = v := by
   unfold stvecBase; unfold stvecDirect at h; bv_decide
@@ -182,28 +184,28 @@ variable {C : UCfg} {P : UPtd} {t0 : PTree} {mm0 : BMap}
 
 /-- The prelude (`minstret_increment` only) keeps a user machine. -/
 theorem ustLand_preS {s : UWSt} (h : UstLand C P t0 mm0 s) : UstLand C P t0 mm0 (ucPreS s) := by
-  refine ⟨h.wf, ust_cfg_of C P s _ h.cfg fun r _ _ _ h4 _ _ _ _ _ => ucPreS_file_other s r h4, ?_, ?_, ?_, ?_⟩
-  · rw [ucPreS_file_other _ _ (by decide)]; exact h.priv
-  · rw [ucPreS_file_other _ _ (by decide)]; exact h.ms
-  · rw [ucPreS_file_other _ _ (by decide)]; exact h.act
-  · rw [ucPreS_file_other _ _ (by decide)]; exact h.mem
+  refine ⟨h.wf, ust_cfg_of C P s _ h.cfg fun r _ _ _ h4 _ _ _ h8 _ _ => ucPreS_file_other s r h4 h8, ?_, ?_, ?_, ?_⟩
+  · rw [ucPreS_file_other _ _ (by decide) (by decide)]; exact h.priv
+  · rw [ucPreS_file_other _ _ (by decide) (by decide)]; exact h.ms
+  · rw [ucPreS_file_other _ _ (by decide) (by decide)]; exact h.act
+  · rw [ucPreS_file_other _ _ (by decide) (by decide)]; exact h.mem
 
 /-- **The retire landing** (the epilogue's tick and bump). -/
 theorem ustUserAt_epi (r : Bool) {s : UWSt} (h : UstLand C P t0 mm0 s) : UstUserAt C P t0 mm0 (ucEpi r s) := by
-  refine ⟨h.wf, ust_cfg_of C P s _ h.cfg fun x h1 _ h3 _ _ _ _ _ _ => ucEpi_file_other r s x h1 h3,
+  refine ⟨h.wf, ust_cfg_of C P s _ h.cfg fun x h1 _ h3 _ _ _ _ _ _ hw => ucEpi_file_other r s x h1 h3 hw,
     ?_, ?_, ?_, ?_, ?_⟩
-  · rw [ucEpi_file_other _ _ _ (by decide) (by decide)]; exact h.priv
-  · rw [ucEpi_file_other _ _ _ (by decide) (by decide), h.act]; trivial
-  · rw [ucEpi_file_other _ _ _ (by decide) (by decide)]; exact h.ms
+  · rw [ucEpi_file_other _ _ _ (by decide) (by decide) (by decide)]; exact h.priv
+  · rw [ucEpi_file_other _ _ _ (by decide) (by decide) (by decide), h.act]; trivial
+  · rw [ucEpi_file_other _ _ _ (by decide) (by decide) (by decide)]; exact h.ms
   · intro _ _
-    rw [ucEpi_file_pc, ucEpi_file_other _ _ _ (by decide) (by decide)]
-  · rw [ucEpi_mm, ucEpi_file_other _ _ _ (by decide) (by decide)]; exact h.mem
+    rw [ucEpi_file_pc, ucEpi_file_other _ _ _ (by decide) (by decide) (by decide)]
+  · rw [ucEpi_mm, ucEpi_file_other _ _ _ (by decide) (by decide) (by decide)]; exact h.mem
 
 /-- **The wait-entry landing** (`hart_state := HART_WAITING`, no tick). -/
-theorem ustUserAt_wait {s : UWSt} (h : UstLand C P t0 mm0 s) (wr : WaitReason) (ib : BitVec 32)
+theorem ustUserAt_wait {s : UWSt} (h : UstLand C P t0 mm0 s) (wr : WaitReason) (ib : instr_info)
     (hw : uwIsWrs wr = true) : UstUserAt C P t0 mm0 (ucWaitS s wr ib) := by
   unfold ucWaitS
-  refine ⟨h.wf, ust_cfg_of C P s _ h.cfg fun x _ _ _ _ h5 _ _ _ _ => UWSt.setR_file_other s _ x _ h5,
+  refine ⟨h.wf, ust_cfg_of C P s _ h.cfg fun x _ _ _ _ h5 _ _ _ _ _ => UWSt.setR_file_other s _ x _ h5,
     ?_, ?_, ?_, ?_, ?_⟩
   · rw [UWSt.setR_file_other _ _ _ _ (by decide)]; exact h.priv
   · rw [UWSt.setR_file_same]
@@ -219,14 +221,14 @@ theorem ustUserAt_wait {s : UWSt} (h : UstLand C P t0 mm0 s) (wr : WaitReason) (
 
 /-- **The trap landing** (the epilogue's tick moves `PC` to the handler). -/
 theorem ustTrapAt_epi {s : UWSt} (h : UstTrapped C P t0 mm0 s) : UstTrapAt C P t0 mm0 (ucEpi false s) := by
-  refine ⟨h.wf, ust_cfg_of C P s _ h.cfg fun x h1 _ h3 _ _ _ _ _ _ => ucEpi_file_other false s x h1 h3,
+  refine ⟨h.wf, ust_cfg_of C P s _ h.cfg fun x h1 _ h3 _ _ _ _ _ _ hw => ucEpi_file_other false s x h1 h3 hw,
     ?_, ?_, ?_, ?_, ?_, ?_⟩
-  · rw [ucEpi_file_other _ _ _ (by decide) (by decide)]; exact h.priv
-  · rw [ucEpi_file_other _ _ _ (by decide) (by decide)]; exact h.act
-  · rw [ucEpi_file_other _ _ _ (by decide) (by decide)]; exact h.ms
+  · rw [ucEpi_file_other _ _ _ (by decide) (by decide) (by decide)]; exact h.priv
+  · rw [ucEpi_file_other _ _ _ (by decide) (by decide) (by decide)]; exact h.act
+  · rw [ucEpi_file_other _ _ _ (by decide) (by decide) (by decide)]; exact h.ms
   · rw [ucEpi_file_pc]; exact h.npc
-  · rw [ucEpi_file_other _ _ _ (by decide) (by decide)]; exact h.npc
-  · rw [ucEpi_mm, ucEpi_file_other _ _ _ (by decide) (by decide)]; exact h.mem
+  · rw [ucEpi_file_other _ _ _ (by decide) (by decide) (by decide)]; exact h.npc
+  · rw [ucEpi_mm, ucEpi_file_other _ _ _ (by decide) (by decide) (by decide)]; exact h.mem
 
 /-- **Every arm's landing** (Rocq: the closer `u_step_psi` picks its closer
 by the arm): a retire or wait lands at User, every other arm trapped. -/
@@ -245,7 +247,7 @@ theorem ust_land_of_q (st : Step) (s2 : UWSt) (hq : ustQ C P t0 mm0 st s2) :
 theorem ustUserAt_clock {s s' : UWSt} (h : UstUserAt C P t0 mm0 s) (hag : ucClockAgree s s') :
     UstUserAt C P t0 mm0 s' := by
   obtain ⟨hmm, -, hf⟩ := hag
-  refine ⟨h.wf, ust_cfg_of C P s s' h.cfg fun r _ _ _ _ _ h6 h7 h8 _ => hf r h6 h7 h8, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨h.wf, ust_cfg_of C P s s' h.cfg fun r _ _ _ _ _ h6 h7 h8 _ _ => hf r h6 h7 h8, ?_, ?_, ?_, ?_, ?_⟩
   · rw [hf _ (by decide) (by decide) (by decide)]; exact h.priv
   · rw [hf _ (by decide) (by decide) (by decide)]; exact h.hok
   · rw [hf _ (by decide) (by decide) (by decide)]; exact h.ms
@@ -259,7 +261,7 @@ theorem ustUserAt_clock {s s' : UWSt} (h : UstUserAt C P t0 mm0 s) (hag : ucCloc
 theorem ustTrapAt_clock {s s' : UWSt} (h : UstTrapAt C P t0 mm0 s) (hag : ucClockAgree s s') :
     UstTrapAt C P t0 mm0 s' := by
   obtain ⟨hmm, -, hf⟩ := hag
-  refine ⟨h.wf, ust_cfg_of C P s s' h.cfg fun r _ _ _ _ _ h6 h7 h8 _ => hf r h6 h7 h8, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨h.wf, ust_cfg_of C P s s' h.cfg fun r _ _ _ _ _ h6 h7 h8 _ _ => hf r h6 h7 h8, ?_, ?_, ?_, ?_, ?_, ?_⟩
   · rw [hf _ (by decide) (by decide) (by decide)]; exact h.priv
   · rw [hf _ (by decide) (by decide) (by decide)]; exact h.hs
   · rw [hf _ (by decide) (by decide) (by decide)]; exact h.ms
@@ -277,32 +279,36 @@ theorem ust_at_cfg {s : UWSt} (h : UstUserAt C P t0 mm0 s ∨ UstTrapAt C P t0 m
 /-- **The parked hart's landing** (Rocq `wpin_stay` / `wpin_wake*`): it stays
 parked, or wakes ACTIVE with `PC := nextPC`; nothing else the closer reads
 moves. -/
-theorem ustUserAt_uwLand {s : UWSt} (h : UstUserAt C P t0 mm0 s) (wr : WaitReason) (ib : BitVec 32)
-    (hw : s.file .hart_state = .HART_WAITING (wr, ib)) : UstUserAt C P t0 mm0 (uwLand wr s).2 := by
+theorem ustUserAt_uwLand {s : UWSt} (h : UstUserAt C P t0 mm0 s) (ew : Bool) (wr : WaitReason)
+    (ib : instr_info) (meip seip : BitVec 1)
+    (hw : s.file .hart_state = .HART_WAITING (wr, ib)) :
+    UstUserAt C P t0 mm0 (uwLand ew wr s meip seip).2 := by
   unfold uwLand
   split
   · -- WAKE: `ucEpi true ((ucPreS s).setR hart_state ACTIVE)`
-    have e : ∀ x, x ≠ .PC → x ≠ .minstret → x ≠ .hart_state → x ≠ .minstret_increment →
+    have e : ∀ x, x ≠ .PC → x ≠ .minstret → x ≠ .hart_state → x ≠ .minstret_increment → x ≠ .mip →
+        x ≠ .written_event_index →
         (ucEpi true ((ucPreS s).setR .hart_state (.HART_ACTIVE ()))).file x = s.file x :=
-      fun x h1 h2 h3 h4 => by
-        rw [ucEpi_file_other _ _ _ h1 h2, UWSt.setR_file_other _ _ _ _ h3, ucPreS_file_other _ _ h4]
-    refine ⟨h.wf, ust_cfg_of C P s _ h.cfg fun x h1 _ h3 h4 h5 _ _ _ _ => e x h1 h3 h5 h4, ?_, ?_, ?_, ?_, ?_⟩
-    · rw [e _ (by decide) (by decide) (by decide) (by decide)]; exact h.priv
-    · rw [ucEpi_file_other _ _ _ (by decide) (by decide), UWSt.setR_file_same]; trivial
-    · rw [e _ (by decide) (by decide) (by decide) (by decide)]; exact h.ms
-    · intro _ _
-      rw [ucEpi_file_pc, ucEpi_file_other _ _ _ (by decide) (by decide)]
-    · rw [ucEpi_mm, e _ (by decide) (by decide) (by decide) (by decide)]; exact h.mem
-  · -- STAY: the prelude's state
-    refine ⟨h.wf, ust_cfg_of C P s _ h.cfg fun r _ _ _ h4 _ _ _ _ _ => ucPreS_file_other s r h4,
+      fun x h1 h2 h3 h4 h5 h6 => by
+        rw [ucEpi_file_other _ _ _ h1 h2 h6, UWSt.setR_file_other _ _ _ _ h3, ucPreS_file_other _ _ h4 h5]
+    refine ⟨h.wf, ust_cfg_of C P s _ h.cfg fun x h1 _ h3 h4 h5 _ _ h8 _ hw => e x h1 h3 h5 h4 h8 hw,
       ?_, ?_, ?_, ?_, ?_⟩
-    · rw [ucPreS_file_other _ _ (by decide)]; exact h.priv
-    · rw [ucPreS_file_other _ _ (by decide)]; exact h.hok
-    · rw [ucPreS_file_other _ _ (by decide)]; exact h.ms
+    · rw [e _ (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)]; exact h.priv
+    · rw [ucEpi_file_other _ _ _ (by decide) (by decide) (by decide), UWSt.setR_file_same]; trivial
+    · rw [e _ (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)]; exact h.ms
+    · intro _ _
+      rw [ucEpi_file_pc, ucEpi_file_other _ _ _ (by decide) (by decide) (by decide)]
+    · rw [ucEpi_mm, e _ (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)]; exact h.mem
+  · -- STAY: the prelude's state
+    refine ⟨h.wf, ust_cfg_of C P s _ h.cfg fun r _ _ _ h4 _ _ _ h8 _ _ => ucPreS_file_other s r h4 h8,
+      ?_, ?_, ?_, ?_, ?_⟩
+    · rw [ucPreS_file_other _ _ (by decide) (by decide)]; exact h.priv
+    · rw [ucPreS_file_other _ _ (by decide) (by decide)]; exact h.hok
+    · rw [ucPreS_file_other _ _ (by decide) (by decide)]; exact h.ms
     · intro u hu
-      rw [ucPreS_file_other _ _ (by decide), hw] at hu
+      rw [ucPreS_file_other _ _ (by decide) (by decide), hw] at hu
       cases hu
-    · rw [ucPreS_file_other _ _ (by decide)]; exact h.mem
+    · rw [ucPreS_file_other _ _ (by decide) (by decide)]; exact h.mem
 
 /-- **The trap tower's landing** is a trapped machine. -/
 theorem ustTrapped_trapS {s : UWSt} (h : UstLand C P t0 mm0 s) (sc stv sep : BitVec 64) :
@@ -310,7 +316,7 @@ theorem ustTrapped_trapS {s : UWSt} (h : UstLand C P t0 mm0 s) (sc stv sep : Bit
   have e : ∀ x, x ∉ ufTrapRw →
       (ustTrapS s (utrapMs 0#1 (s.file .mstatus)) sc stv sep C.stvec).file x = s.file x :=
     fun x hx => ufTrapSet_other _ _ _ _ _ _ _ x hx
-  refine ⟨h.wf, ust_cfg_of C P s _ h.cfg fun x _ _ _ _ _ _ _ _ h9 => e x h9,
+  refine ⟨h.wf, ust_cfg_of C P s _ h.cfg fun x _ _ _ _ _ _ _ _ h9 _ => e x h9,
     ufTrapSet_cp s.file Privilege.Supervisor (utrapMs 0#1 (s.file .mstatus)) sc stv sep C.stvec, ?_,
     ?_, ?_, ?_⟩
   · rw [ustTrapS_file, ufTrapSet_ms]

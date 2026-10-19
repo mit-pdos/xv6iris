@@ -116,7 +116,7 @@ pages are unchanged. -/
 def UkExecTrap (C : UCfg) (P : UPtd) (T : BMap) (i : instruction) (len : Int) (m : RegMap)
     (pc : BitVec 64) (V : Nat → List (BitVec 8)) (e : ExceptionType) : Prop :=
   ∀ s : UWSt, UkLand C P T s → ukRegs s.file m → s.file .PC = pc → ukView P.um s.mm T = V →
-    ∀ orc : UOrc, ∃ (exc : sync_exception) (s' : UWSt) (orc' : UOrc),
+    ∀ orc : UOrc, ∃ (exc : ExceptionContext) (s' : UWSt) (orc' : UOrc),
       uxRun ufFoot T orc (ucNpcS s len) (execute i) = some (.Trap (Privilege.User, exc, pc), s', orc') ∧
       exc.trap = e ∧ exc.ext = none ∧
       UkLand C P T s' ∧ ukRegs s'.file m ∧ s'.file .PC = pc ∧ ukView P.um s'.mm T = V

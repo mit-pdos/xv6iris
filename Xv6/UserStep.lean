@@ -130,10 +130,15 @@ theorem ust_obligationActive_holds (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPt
   imodintro
   iintro %v %t %mm %hu %ha %hwf %htlb HF HB Ha Hrut Hk
   icases ust_frames cpu C pt Rut hacc v t mm $$ [$HF $HB $Hrut] with ⟨Hfr, Hres⟩
+  -- H's trap CSRs ride the cycle (a trapping arm writes them), `mepc` stays aside
+  unfold ufAside
+  icases Ha with ⟨Hmepc, Hht⟩
   iapply ust_step_active cpu C pt t hF hX v mm hu ha hwf htlb
-  iframe Hhw Hwi Hfr
+  iframe Hhw Hwi Hfr Hht
   inext
-  iintro %s3 %h3 Hfr Hrc
+  iintro %s3 %h3 Hfr Hrc Hht
+  ihave Ha : ufAside (GF := GF) cpu $$ [Hmepc Hht]
+  · unfold ufAside; iframe
   iapply ust_close cpu C pt Rut t mm s3 h3 $$ HS Hfr Ha Hres Hrc Hk
 
 /-- **The body of `USER`** (Rocq `wp_user_exec_full`): SpecUser's

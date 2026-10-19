@@ -95,8 +95,8 @@ theorem ucl_row_cfgRefused {s : UWSt} (hL : UstLand C P t0 mm0 s) (len : Int) (i
   cases i <;> first | exact absurd h Bool.false_ne_true | skip
   case ZICBOM p =>
     obtain ⟨op, rs1⟩ := p
-    exact ucl_row_illegal hL len _ fun orc => ucl_zicbom ufFoot_uxc orc _ hU op rs1
-  case ZICBOZ p => exact ucl_row_illegal hL len _ fun orc => ucl_zicboz ufFoot_uxc orc _ hU p
+    exact ucl_row_illegal hL len _ fun orc => ucl_zicbom ufFoot_uxc (by decide) orc _ hU op rs1
+  case ZICBOZ p => exact ucl_row_illegal hL len _ fun orc => ucl_zicboz ufFoot_uxc (by decide) orc _ hU p
   case SSAMOSWAP p =>
     obtain ⟨aq, rl, rs2, rs1, width, rd⟩ := p
     exact ucl_row_illegal hL len _ fun orc => ucl_ssamoswap ufFoot_uxc orc _ hU aq rl rs2 rs1 width rd
