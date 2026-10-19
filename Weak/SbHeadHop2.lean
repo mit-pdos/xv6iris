@@ -475,7 +475,9 @@ value other than its hart's own `&cpus[r.1]` (`cpuB r.1`, its 8 little-endian by
 xv6 (CoWR): the hart's po-latest own store to `L + 16` before `r` is its last `release(L)`'s
 `sd zero,16(s1)` (no recursive `acquire`), so `r`'s source is that store or co-later; every co-later
 store is another hart's `acquire` (`sd mycpu`, its own pointer) or `release`/`initlock` (0), and the
-`cpus` pointers are distinct. -/
+`cpus` pointers are distinct.  PROVED at `cpuB` from its floor decomposition — `SbHoldZero.holdZeroOf`
+(residuals `CpuWordWin` / `CpuFloor` / `NotHolder`, `Weak/SbHoldZero.lean`); the `lk->cpu` half of the
+[OWN.124] exemption's GF side (`SbHoldX.cpuGFOfHoldZero`). -/
 def SbHeadHop2.HoldZero (G : Gexec) (cpuB : Nat → List (BitVec 8)) (AcqCpuRd : Geid → Int → Prop) :
     Prop :=
   ∀ r L base ts vs, AcqCpuRd r L → gxLbl G r = some (LLoad false base ts vs) → base = L + 16 →

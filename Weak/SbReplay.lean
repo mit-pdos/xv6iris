@@ -27,10 +27,13 @@ plan rev 55 row P-W2; rulings [OWN.112] (the two-site exemption) [OWN.113]).  Le
       GF's values (re-timed); `rmwArm` — an AMO whose sources are member-latest reads GF's bytes at the
       landed log, with `rmwLatest` (the AMO's side conditions — `amoOk`, `.rl`, `.aq` — are the gate's);
       `rdXArm` — an exempt read ALWAYS has an `SbCand` step reading the top (`topVals`), a plain load of
-      GF's footprint (`lblReidxSub`); **`valEqX`** (values exact off the two pcs, both words in
-      `[1, 2^31)` at them) and `valEqXOfAgree` (from `SbAgree.agreeX` and the exempt-value facts);
-      the exempt-value facts are the INTERFACE **`IrefGF`** / **`IrefTop`** (finding F-P-W2-1: they
-      are reference counting over the whole kernel heap — NOT a GF-level fact; see PROGRESS);
+      GF's footprint (`lblReidxSub`); **`valEqX`** (values exact off the exempt reads; at them both words
+      satisfy the exempt-value fact `exValV` — told apart by WIDTH: `ip->ref`'s `lw` both in `[1, 2^31)`,
+      `holding+0x12`'s `ld` ([OWN.124], the THIRD exempt pc, `Weak/SbHoldX.lean`) neither the row's own
+      `&cpus[x]` (`cpuB`)) and `valEqXOfAgree` (from `SbAgree.agreeX` and the exempt-value facts);
+      the exempt-value facts are the INTERFACE **`ExValGF`** / **`ExValTop`**; their `ip->ref` halves
+      `IrefGF` / `IrefTop` (finding F-P-W2-1: reference counting over the whole kernel heap — NOT a
+      GF-level fact; see PROGRESS), their `lk->cpu` halves in `Weak/SbHoldX.lean` / `SbHoldZero.lean`;
   §5  **THE LOCKSTEP DATUM** at `CertZ13.relT`'s lockstep arm: `lockBlk` — in lockstep (the member's
       program state IS the emission's), the emission's block with its read RE-TIMED to the member's
       timestamps is the member's program step (`SbWalk.evData`), given text custody of the star's
@@ -41,7 +44,7 @@ plan rev 55 row P-W2; rulings [OWN.112] (the two-site exemption) [OWN.113]).  Le
   §6  **`memberOfWalk`** — the FINISHED walk (complete rows, drained buffers, `pfx`, `exOk`): the
       member is well-formed, its writes are the landed log, its AMOs read the latest bytes, it agrees
       with GF (`agreeX`), hence `agreeW4` with `nf = True` and `agreeW3` at every lock set, and
-      `valEqX` given `IrefGF` (the agent bound from the program data, `agOkWalk`).
+      `valEqX` given `ExValGF` (the agent bound from the program data, `agOkWalk`).
 
 Spec: FAITHFUL (proof organisation; the exemption is [OWN.112] (a), FAITHFUL; the exempt-value
 interface is NOT a memory-model statement — RVWMO/riscv.cat say nothing about values — it is the
@@ -739,41 +742,67 @@ theorem rdXArm (pol : SbPol) (c : CandW) (G : Gexec) (x n : Nat) (base : Int) (t
 /-- An exempt read's word is in `[1, 2^31)` (`ip->ref ≥ 1`). -/
 def irefOkL (l : Lbl) : Prop := ∃ base ts vs, l = LLoad false base ts vs ∧ SilSite.pos32 vs
 
+/-- `&cpus[x]`'s eight little-endian bytes (`cpus + 128·x`; `sizeof (struct cpu)` = 128). -/
+def cpuB (x : Nat) : List (BitVec 8) :=
+  (List.range 8).map (fun j => BitVec.ofNat 8 ((KernelSyms.«cpus» + 128 * x) / 256 ^ j))
+
+/-- **THE EXEMPT-VALUE FACT of a read word of row `x`** ([OWN.112], [OWN.124]): the exempt classes are
+told apart by WIDTH — the two `ip->ref` reads are `lw` (4 bytes: the word is in `[1, 2^31)`, `pos32`), the
+`holding+0x12` read is `ld` (8 bytes: the word is NOT the row's own `&cpus[x]`). -/
+def exValV (x : Nat) (vs : List (BitVec 8)) : Prop :=
+  (vs.length = 4 → SilSite.pos32 vs) ∧ (vs.length = 8 → vs ≠ cpuB x)
+
+/-- An exempt read label of row `x`: a plain load whose word satisfies `exValV x`. -/
+def exValL (x : Nat) (l : Lbl) : Prop := ∃ base ts vs, l = LLoad false base ts vs ∧ exValV x vs
+
 /-- **VALUE AGREEMENT** (design §3.2 `SbAgree.valEqX`): every read of `G` other than the exempt ones
-returns, in `GR`, exactly `G`'s bytes; at the exempt ones both words are in `[1, 2^31)`. -/
+returns, in `GR`, exactly `G`'s bytes; at the exempt ones both words satisfy the exempt-value fact
+(`ip->ref`: both in `[1, 2^31)`; `holding+0x12` from `acquire`: neither is the row's `&cpus[x]`). -/
 def valEqX (G GR : Gexec) (X : Geid → Prop) : Prop :=
   ∀ e l l', gxLbl G e = some l → gxLbl GR e = some l' → lbIsR l = true →
     (¬ X e → (lbRd l').map (fun r => r.2.2) = (lbRd l).map (fun r => r.2.2)) ∧
-    (X e → irefOkL l ∧ irefOkL l')
+    (X e → exValL e.1 l ∧ exValL e.1 l')
 
-/-- **THE EXEMPT-VALUE INTERFACE, GF SIDE** (F-P-W2-1): GF's exempt reads see `ip->ref ≥ 1`. -/
-def IrefGF (G : Gexec) (X : Geid → Prop) : Prop := ∀ e l, X e → gxLbl G e = some l → irefOkL l
+/-- **THE EXEMPT-VALUE INTERFACE, GF SIDE** (both exempt classes): GF's exempt reads satisfy `exValV`. -/
+def ExValGF (G : Gexec) (X : Geid → Prop) : Prop := ∀ e l, X e → gxLbl G e = some l → exValL e.1 l
 
-/-- **THE EXEMPT-VALUE INTERFACE, MEMBER SIDE** (F-P-W2-1): at a walk state, the top word an exempt
-read of a row's next GF event would read is in `[1, 2^31)`.
+/-- **THE `ip->ref` HALF, GF SIDE** (F-P-W2-1): GF's 4-byte exempt reads see `ip->ref ≥ 1`. -/
+def IrefGF (G : Gexec) (X : Geid → Prop) : Prop :=
+  ∀ e base ts vs, X e → gxLbl G e = some (LLoad false base ts vs) → vs.length = 4 → SilSite.pos32 vs
 
-Both halves are the REFERENCE-COUNTING fact of the design's `irefGe1` ("every write of `ip->ref`
-co-between the reader's own last `ref++` and its next own `ref--` is ≥ 1"): GF's source lies in that
-interval (CoWR from the own increment, CoRW to the own decrement), and so does the member's top (the
-own increment is landed or forwarded; the own decrement is not yet issued, hence every landed write is
-co-before it by the co-prefix invariant `pfx`).  That fact is a property of the WHOLE kernel's
-reference discipline, not of the graph: it is NOT derivable from GF (see PROGRESS F-P-W2-1). -/
+/-- **THE EXEMPT-VALUE INTERFACE, MEMBER SIDE** (both exempt classes): at a walk state, the top word an
+exempt read of a row's next GF event would read satisfies `exValV`. -/
+def ExValTop (G : Gexec) (X : Geid → Prop) (w : WS) : Prop :=
+  ∀ (x : Nat) (base : Int) (ts : List Nat) (vs vs' : List (BitVec 8)), X (x, (w.rows x).length) →
+    gxLbl G (x, (w.rows x).length) = some (LLoad false base ts vs) → vs'.length = ts.length →
+    topVals w x base vs' → exValV x vs'
+
+/-- **THE `ip->ref` HALF, MEMBER SIDE** (F-P-W2-1): at a walk state, the top word a 4-byte exempt read of
+a row's next GF event would read is in `[1, 2^31)`.
+
+Both `ip->ref` halves are the REFERENCE-COUNTING fact of the design's `irefGe1` ("every write of
+`ip->ref` co-between the reader's own last `ref++` and its next own `ref--` is ≥ 1" — per HOLDER, not per
+hart: PROGRESS F-12-1): GF's source lies in that interval (CoWR from the opening increment, CoRW to the
+closing decrement), and so does the member's top (the opening increment is landed or forwarded; the
+closing decrement is not yet issued, hence every landed write is co-before it by the co-prefix invariant
+`pfx`).  That fact is a property of the WHOLE kernel's reference discipline, not of the graph: it is NOT
+derivable from GF (see PROGRESS F-P-W2-1). -/
 def IrefTop (G : Gexec) (X : Geid → Prop) (w : WS) : Prop :=
   ∀ (x : Nat) (base : Int) (ts : List Nat) (vs vs' : List (BitVec 8)), X (x, (w.rows x).length) →
     gxLbl G (x, (w.rows x).length) = some (LLoad false base ts vs) → vs'.length = ts.length →
-    topVals w x base vs' → SilSite.pos32 vs'
+    ts.length = 4 → topVals w x base vs' → SilSite.pos32 vs'
 
-/-- The member rows' exempt reads carry words in `[1, 2^31)`. -/
+/-- The member rows' exempt reads carry the exempt-value fact of their row. -/
 def exOk (X : Geid → Prop) (w : WS) : Prop :=
-  ∀ (x n : Nat) (l' : Lbl), (w.rows x)[n]? = some l' → X (x, n) → irefOkL l'
+  ∀ (x n : Nat) (l' : Lbl), (w.rows x)[n]? = some l' → X (x, n) → exValL x l'
 
 theorem exOkInit (X : Geid → Prop) (img : Image) : exOk X (init img) :=
   fun _ _ _ h => by simp [init] at h
 
-/-- `exOk` along an event: the appended label, if exempt, is an `irefOkL` load (the `rdX` arm with
-`IrefTop`). -/
+/-- `exOk` along an event: the appended label, if exempt, is an `exValL` load (the `rdX` arm with
+`ExValTop`). -/
 theorem exOkEv (X : Geid → Prop) (w : WS) (s : Estep) :
-    exOk X w → (X (s.esAg, (w.rows s.esAg).length) → irefOkL s.esLb) → exOk X (nextI w (.ev s)) := by
+    exOk X w → (X (s.esAg, (w.rows s.esAg).length) → exValL s.esAg s.esLb) → exOk X (nextI w (.ev s)) := by
   intro h hnew x n l' hl' hx
   rcases rowsEvInv w s x n l' hl' with h' | ⟨rfl, rfl, rfl⟩
   · exact h x n l' h' hx
@@ -785,18 +814,18 @@ theorem exOkLand (X : Geid → Prop) (w : WS) (i k : Nat) : exOk X w → exOk X 
   | none => simp only [nextI, hp]; exact h
   | some p => simp only [nextI, hp]; exact h
 
-/-- **THE `rdX` STEP KEEPS `exOk`**: the arm's top word is in range by `IrefTop`. -/
+/-- **THE `rdX` STEP KEEPS `exOk`**: the arm's top word has the exempt-value fact by `ExValTop`. -/
 theorem rdXIref (G : Gexec) (X : Geid → Prop) (w : WS) (x : Nat) (base : Int) (ts ts' : List Nat)
     (vs vs' : List (BitVec 8)) :
-    IrefTop G X w → X (x, (w.rows x).length) →
+    ExValTop G X w → X (x, (w.rows x).length) →
     gxLbl G (x, (w.rows x).length) = some (LLoad false base ts vs) → vs'.length = ts.length →
-    topVals w x base vs' → irefOkL (LLoad false base ts' vs') :=
+    topVals w x base vs' → exValL x (LLoad false base ts' vs') :=
   fun h hx hl hlen htop => ⟨base, ts', vs', rfl, h x base ts vs vs' hx hl hlen htop⟩
 
 /-- **VALUE AGREEMENT FROM THE AGREEMENT**: exact values off the exempt reads (`lblReidx`), and the
 exempt-value facts at them. -/
 theorem valEqXOfAgree (G GR : Gexec) (X : Geid → Prop) :
-    agreeX G GR X → IrefGF G X → (∀ e l', X e → gxLbl GR e = some l' → irefOkL l') →
+    agreeX G GR X → ExValGF G X → (∀ e l', X e → gxLbl GR e = some l' → exValL e.1 l') →
     valEqX G GR X := by
   rintro ⟨-, hl, -⟩ hG hR e l l' h1 h2 hRd
   refine ⟨fun hx => ?_, fun hx => ⟨hG e l hx h1, hR e l' hx h2⟩⟩
@@ -819,7 +848,7 @@ theorem valEqXOfAgree (G GR : Gexec) (X : Geid → Prop) :
 
 /-- The member's exempt labels carry `exOk`'s words (the fix-up keeps load values). -/
 theorem memberExOk (N : Nat) (img : Image) (X : Geid → Prop) (w : WS) :
-    exOk X w → ∀ e l', X e → gxLbl (memberW N img w) e = some l' → irefOkL l' := by
+    exOk X w → ∀ e l', X e → gxLbl (memberW N img w) e = some l' → exValL e.1 l' := by
   intro h e l' hx hl'
   obtain ⟨-, l, hl, rfl⟩ := memLblInv N img w e l' hl'
   obtain ⟨base, ts, vs, rfl, hp⟩ := h e.1 e.2 l hl hx
@@ -937,7 +966,7 @@ theorem memberOfWalk (pol : SbPol) (d0 : Efab) (S : St) (N : Nat) (G : Gexec) (X
     CertZ18.rmwLatest (memberP N S.c) (logP S.c) ∧ agreeX G (memberP N S.c) X ∧
     CertZ24.agreeW4 G (memberP N S.c) (fun _ => False) ∧
     (∀ L, CertZ18.agreeW3 G (memberP N S.c) L) ∧
-    (IrefGF G X → valEqX G (memberP N S.c) X) := by
+    (ExValGF G X → valEqX G (memberP N S.c) X) := by
   intro hok h0 hpf hex hdr hwf himg hN hlen
   have hv := hok.1
   have hI : Inv S.c.img (cur S.c) := invStAt pol S.c hv _

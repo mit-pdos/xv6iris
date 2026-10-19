@@ -8,14 +8,15 @@ Weak: **allocproc route P, increment P-W3 (2/2) — `SbOrdWalk`, THE GATED WALK 
       enabled head event, with the member label its arm gives, keeps it (`pinvEv`) — the read arm `rdG`
       is a PARAMETER with its soundness `RdSound` (proved for the design's source gate from P-W2's
       `loadArm`, `srcSound`, and for the value gate from `topTs`, `valSound`); the exempt arm is P-W2's
-      `rdXArm` with the exempt-value interface `SbReplay.IrefTop` (F-P-W2-1, kept NAMED);
+      `rdXArm` with the exempt-value interface `SbReplay.ExValTop` (both exempt classes: its `ip->ref`
+      half F-P-W2-1 and its `lk->cpu` half [OWN.124], kept NAMED);
   §3  **`walkStepP`**: every enabled genuine item extends the walk candidate (`SbWalk.validW` under the
       epoch buffer) keeping `PInv` and strictly decreasing the work measure `work`;
   §4  **`walkRunP`**: from the empty walk, given `noStuckP`'s interfaces at every reachable state, a
       FINISHED walk (every row complete, every buffer drained) — and **`memberOfRun`**: its member is a
       well-formed graph whose writes are the landed log, whose AMOs read the latest bytes, which AGREES
       with GF (`SbAgree.agreeX`, P-W2's `agreeXOfPfx`), with `agreeW4` (`nf = True`), `agreeW3` at every
-      lock set, and value agreement `valEqX` given `IrefGF`.
+      lock set, and value agreement `valEqX` given `ExValGF`.
 
 The program layer (`SbWalk.ok`'s `progOk`: each event item realized by the emission's block, P-W2's
 `lockBlk`) is NOT built here: the walk is the machine walk, the datum is P-W4/P-W6's (the gate never reads
@@ -231,7 +232,7 @@ theorem pinvEv (hP : PInv N img G X dev w) (hI : ImgFacts G) (x : Nat) (hx : x <
     (hfab : fabOk dev w (hd w x))
     (hco : gmoEv lb' = true → ∀ b, wrsB lb' b = true → wrAtW w b ++ [hd w x] <+: wrAtG G b)
     (hdone : gmoEv lb' = true → ∀ b, wrsB lb' b = true → readersDone G w b (hd w x))
-    (hex : X (hd w x) → irefOkL lb') :
+    (hex : X (hd w x) → exValL x lb') :
     PInv N img G X dev (nextI w (.ev ⟨x, lb'⟩)) := by
   have htag : ∀ q, q ∈ w.pend x → q.1 < (w.rows x).length := fun q hq => pendRealized hP x q hq
   refine ⟨invEv img w ⟨x, lb'⟩ hP.inv hst, pfxEv img G X w ⟨x, lb'⟩ l hP.inv hP.pf hl hrel hco,
@@ -446,7 +447,7 @@ theorem armHd {N : Nat} {G : Gexec} {X : Geid → Prop} {dev : List Geid} {rdG :
     (hv : validW SbPol.epoch c) (hP : PInv N c.img G X dev (cur c)) (hc : CatH G)
     (himg : G.gxImg = c.img) (hrs : RdSound G rdG c)
     (hX : ∀ e l, X e → gxLbl G e = some l → ∃ base ts vs, l = LLoad false base ts vs)
-    (hdef : ∀ e a t v, greadsByte G e a t v → (c.img a).isSome) (hIref : IrefTop G X (cur c))
+    (hdef : ∀ e a t v, greadsByte G e a t v → (c.img a).isSome) (hIref : ExValTop G X (cur c))
     (x : Nat) (l : Lbl) (hl : gxLbl G (hd (cur c) x) = some l)
     (he : enbL G X rdG (cur c) (hd (cur c) x) l) :
     ∃ lb', lblRelX (X (hd (cur c) x)) l lb' ∧
@@ -454,7 +455,7 @@ theorem armHd {N : Nat} {G : Gexec} {X : Geid → Prop} {dev : List Geid} {rdG :
       (gmoEv lb' = true → ∀ b, wrsB lb' b = true →
         wrAtW (cur c) b ++ [hd (cur c) x] <+: wrAtG G b) ∧
       (gmoEv lb' = true → ∀ b, wrsB lb' b = true → readersDone G (cur c) b (hd (cur c) x)) ∧
-      (X (hd (cur c) x) → irefOkL lb') := by
+      (X (hd (cur c) x) → exValL x lb') := by
   have hnX : ∀ l0, gxLbl G (hd (cur c) x) = some l0 → (∀ base ts vs, l0 ≠ LLoad false base ts vs) →
       ¬ X (hd (cur c) x) := by
     intro l0 hl0 hn hx
@@ -560,7 +561,7 @@ H4, H5 are PROVED, `SbOrd.blkHead`; F-P-W3-3), the exempt-value interface (NAMED
 gate weaker than the source gate (PROVED for `srcGate` and `valGate`: `srcIfc`, `valIfc`). -/
 structure StateIfc (G : Gexec) (X : Geid → Prop) (rdG : RdG) (dev : List Geid) (c : CandW) : Prop where
   head : HeadOrdRd G X rdG dev (cur c)
-  iref : IrefTop G X (cur c)
+  iref : ExValTop G X (cur c)
   sound : RdSound G rdG c
   mono : ∀ x aq base ts vs, gxLbl G (hd (cur c) x) = some (LLoad aq base ts vs) →
     srcGate G (cur c) x base ts vs → rdG (cur c) x base ts vs
@@ -707,7 +708,7 @@ theorem memberOfRun (pol : SbPol) (N : Nat) (G : Gexec) (X : Geid → Prop) (dev
     CertZ18.rmwLatest (memberP N c) (logP c) ∧ agreeX G (memberP N c) X ∧
     CertZ24.agreeW4 G (memberP N c) (fun _ => False) ∧
     (∀ L, CertZ18.agreeW3 G (memberP N c) L) ∧
-    (IrefGF G X → valEqX G (memberP N c) X) := by
+    (ExValGF G X → valEqX G (memberP N c) X) := by
   have hR : RmwInv c.img (cur c) := rmwInvStAt pol c hv _
   have hagr := agreeXOfPfx N c.img G X (cur c) hP.inv hP.ag hdr hwf himg hN hfin hP.pf
   exact ⟨memberGwf N _ _ hP.inv hP.ag hdr, memberLogOf N _ _ hP.inv hP.ag,
@@ -717,7 +718,7 @@ theorem memberOfRun (pol : SbPol) (N : Nat) (G : Gexec) (X : Geid → Prop) (dev
 /-- **A COMPLETED MEMBER FOR EVERY CAT-CONSISTENT GF** (modulo `noStuckP`'s named per-state interfaces):
 the gated walk under the per-address + fence-epoch buffer runs to completion, and its member agrees with
 GF (labels up to read re-timing, exempt reads up to their word; FULL co), with value agreement given the
-exempt-value interface `IrefGF`. -/
+exempt-value interface `ExValGF`. -/
 theorem memberOfCat (GF : Gfexec) (N : Nat) (img : Image) (X : Geid → Prop) (rdG : RdG)
     (hW : WalkHyp GF N img X)
     (hS : ∀ c, validW SbPol.epoch c → c.img = img → PInv N img GF.gfGd.gdG X GF.gfDev (cur c) →
@@ -727,7 +728,7 @@ theorem memberOfCat (GF : Gfexec) (N : Nat) (img : Image) (X : Geid → Prop) (r
       CertZ18.rmwLatest (memberP N c) (logP c) ∧ agreeX GF.gfGd.gdG (memberP N c) X ∧
       CertZ24.agreeW4 GF.gfGd.gdG (memberP N c) (fun _ => False) ∧
       (∀ L, CertZ18.agreeW3 GF.gfGd.gdG (memberP N c) L) ∧
-      (IrefGF GF.gfGd.gdG X → valEqX GF.gfGd.gdG (memberP N c) X) := by
+      (ExValGF GF.gfGd.gdG X → valEqX GF.gfGd.gdG (memberP N c) X) := by
   obtain ⟨c, hc, hv, hP, hfin, hdr⟩ := walkRunP GF N img X rdG hW hS
   subst hc
   exact ⟨c, rfl, hv, hdr, memberOfRun SbPol.epoch N _ X _ c hv hW.cat.wf hW.imgEq hW.len hP hfin hdr⟩

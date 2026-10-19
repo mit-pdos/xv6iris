@@ -21,7 +21,7 @@ Lean-only, no Rocq twin.
   §4  **THE KILL CORE `SbKill.cycleKillCoreP` → `CatLin.cycleKillCZT`**: the cycle's segments, the
       gated walk's member (`SbOrd.memberOfCat` under the value gate), the chain, `cycleKillIOC`.  Its
       named inputs: `SbKill.walkHypCZ` (image facts, device-row store order, the exempt reads),
-      `SbKill.stateIfcCZ` (`HeadOrdRd`, `IrefTop` at every reachable state), `SbKill.memberRunCZ`
+      `SbKill.stateIfcCZ` (`HeadOrdRd`, `ExValTop` at every reachable state), `SbKill.memberRunCZ`
       (`protRegZB`, `lockRealB`, `csIssue` at every finished member — the export / realization,
       P-W5/P-W6/6j), `SbKill.l2ClaimP` (the L2′ classification at every finished member, with
       `provAll`, row 6n) and `¬ Bad`; plus `CatLin.gfDevWIoCZ` and the boot's hart rows.
@@ -438,7 +438,8 @@ def SbKill.walkHypCZ (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (im
     (∀ e a t v, greadsByte GF.gfGd.gdG e a t v → (im a).isSome)
 
 /-- **THE PER-STATE INTERFACES (NAMED)**: row H3 (`HeadOrdRd`, F-P-W3-3) and the exempt-value fact
-(`IrefTop`, F-P-W2-1) at every reachable walk state, under the value gate. -/
+(`ExValTop`: its `ip->ref` half F-P-W2-1, its `lk->cpu` half [OWN.124]) at every reachable walk state,
+under the value gate. -/
 def SbKill.stateIfcCZ (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (im : Image)
     (Xof : Gfexec → Geid → Prop) : Prop :=
   ∀ (GF : Gfexec) (ad : List (Geid × Geid)),
@@ -446,7 +447,7 @@ def SbKill.stateIfcCZ (boot : Nat → Pexv6) (d0 : Efab) (fab : Nat → Efab) (i
     ioResidueGmo GF →
     ∀ c, validW SbPol.epoch c → c.img = im →
       PInv GF.gfGd.gdG.gxProg.length im GF.gfGd.gdG (Xof GF) GF.gfDev (cur c) →
-      HeadOrdRd GF.gfGd.gdG (Xof GF) valGate GF.gfDev (cur c) ∧ IrefTop GF.gfGd.gdG (Xof GF) (cur c)
+      HeadOrdRd GF.gfGd.gdG (Xof GF) valGate GF.gfDev (cur c) ∧ ExValTop GF.gfGd.gdG (Xof GF) (cur c)
 
 /-- A FINISHED P MEMBER of `GF`: a drained valid walk at GF's image whose member is well formed,
 logs its log, has RMW atomicity and agrees with GF up to the exempt reads. -/
