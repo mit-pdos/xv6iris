@@ -150,7 +150,7 @@ theorem uwkInv_uLeaf (ppn : BitVec 44) (perm : BitVec 64) (hm : perm &&& ~~~0x3F
   revert hm hrwx hrw
   simp only [uwkInv, leafOf, pte_is_non_leaf, _get_PTE_Flags_V, _get_PTE_Flags_R, _get_PTE_Flags_W,
     _get_PTE_Flags_X, _get_PTE_Flags_A, _get_PTE_Flags_D, _get_PTE_Flags_U, _get_PTE_Ext_PBMT,
-    _get_PTE_Ext_reserved, ext_bits_of_PTE, Mk_PTE_Ext, Sail.BitVec.length, _update_PTE_Ext_RSW_60t59b, Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', Mk_PTE_Flags,
+    _get_PTE_Ext_reserved, ext_bits_of_PTE, Mk_PTE_Ext, Sail.BitVec.length, Mk_PTE_Flags,
     Sail.BitVec.extractLsb, BitVec.extractLsb]
   bv_decide
 
@@ -159,7 +159,7 @@ theorem uwkInv_andNotU (w : BitVec 64) (h : uwkInv w = false) : uwkInv (w &&& ~~
   revert h
   simp only [uwkInv, PTE_U, pte_is_non_leaf, _get_PTE_Flags_V, _get_PTE_Flags_R, _get_PTE_Flags_W,
     _get_PTE_Flags_X, _get_PTE_Flags_A, _get_PTE_Flags_D, _get_PTE_Flags_U, _get_PTE_Ext_PBMT,
-    _get_PTE_Ext_reserved, ext_bits_of_PTE, Mk_PTE_Ext, Sail.BitVec.length, _update_PTE_Ext_RSW_60t59b, Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', Mk_PTE_Flags,
+    _get_PTE_Ext_reserved, ext_bits_of_PTE, Mk_PTE_Ext, Sail.BitVec.length, Mk_PTE_Flags,
     Sail.BitVec.extractLsb, BitVec.extractLsb]
   bv_decide
 
@@ -169,8 +169,9 @@ theorem uwkInv_uLeaf_pteFlags (ppn : BitVec 44) (w : BitVec 64) (h : uwkInv w = 
   revert h
   simp only [uwkInv, leafOf, pteFlags, pte_is_non_leaf, _get_PTE_Flags_V, _get_PTE_Flags_R,
     _get_PTE_Flags_W, _get_PTE_Flags_X, _get_PTE_Flags_A, _get_PTE_Flags_D, _get_PTE_Flags_U,
-    _get_PTE_Ext_PBMT, _get_PTE_Ext_reserved, ext_bits_of_PTE, Mk_PTE_Ext, Sail.BitVec.length, _update_PTE_Ext_RSW_60t59b, Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange',
-    Mk_PTE_Flags, Sail.BitVec.extractLsb, BitVec.extractLsb]
+    _get_PTE_Ext_PBMT, _get_PTE_Ext_reserved, ext_bits_of_PTE, Mk_PTE_Ext, Sail.BitVec.length,
+    Mk_PTE_Flags, Sail.BitVec.extractLsb, BitVec.extractLsb, _update_PTE_Ext_RSW_60t59b,
+    Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange']
   bv_decide
 
 end
