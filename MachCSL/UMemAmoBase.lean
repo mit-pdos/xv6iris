@@ -20,7 +20,9 @@ readable) and the configuration premises `UxcCfg s` (the file agrees with
 the pointer-masking length is 0 (`umo_get_pmlen`; `is_pmm_applicable` reads
 `mstatus.MXR`, a symbolic bit, so its two outcomes are split and both give
 0), and under Sv39 `pm_transform_VA _ 0` is the identity, so the effective
-address is `x[rs1] + offset`, state untouched.
+address is `x[rs1] + offset`, state untouched.  Since sail-riscv 0.16 the effective privilege
+and the masking length travel in the access information (`default_access_info`,
+`umo_default_access_info`), which `get_transformed_data_addr` takes.
 
 **The pair leaves** (`umo_rX_pair`, `umo_wX_pair`): the register INDEX is
 split as `x0` / not `x0` (the model branches on `rs ≠ zreg`); inside, the
@@ -111,20 +113,33 @@ theorem umo_pm_transform_VA0 (v : BitVec 64) : pm_transform_VA (.Virtaddr v) 0 =
 
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
-/-- **The data-address front at User** (Rocq's `Heff`/`Hpml`/`Htm` premises,
-discharged): the effective address is `x[rs1] + offset`; the state does not
-move. -/
-theorem umo_gtda {D : UFoot} (hD : UmoFoot D) (orc : UOrc) (s : UWSt) (hU : UxcCfg s) (hp : UtrPins D s)
-    (i : BitVec 5) (off : BitVec 64) (acc : MemoryAccessType mem_payload) (w : Nat) :
-    runRW D orc s (get_transformed_data_addr (.Regidx i) off acc w) =
-      some (.Ext_DataAddr_OK (.Virtaddr (uxaXget s.file i + off)), s, orc) := by
+/-- **The access information at User** (sail-riscv 0.16's `default_access_info`): the effective
+privilege User (`MPRV = 0`), pointer masking off, not a guest access. -/
+theorem umo_default_access_info {D : UFoot} (hD : UmoFoot D) (orc : UOrc) (s : UWSt) (hU : UxcCfg s)
+    (hp : UtrPins D s) (acc : MemoryAccessType mem_payload) :
+    runRW D orc s (default_access_info acc) =
+      some ({ eff_privilege := .User, pmlen := 0, as_guest := false }, s, orc) := by
   have hpl := umo_get_pmlen hD orc s hU acc
-  have hx := uxa_rX hD.ctl.alu orc s i
-  have htm := utr_translationMode_U D orc s hp.dms hp.dsatp hp.ms.1 hp.satp.1
   have hcp := hp.cp
   have hmprv := hp.ms.2
-  uwk_run [hpl, hx, htm, utr_effPriv]
-  rw [umo_pm_transform_VA0]
+  have hms := hD.ms
+  have hdcp := hp.dcp
+  uwk_run [hpl, utr_effPriv]
+
+set_option maxHeartbeats 4000000 in
+set_option maxRecDepth 100000 in
+/-- **The data-address front at User** (Rocq's `Heff`/`Hpml`/`Htm` premises,
+discharged; sail-riscv 0.16 takes the access information `ai`, here User with pointer masking
+off): the effective address is `x[rs1] + offset`; the state does not move. -/
+theorem umo_gtda {D : UFoot} (hD : UmoFoot D) (orc : UOrc) (s : UWSt) (hp : UtrPins D s)
+    (i : BitVec 5) (off : BitVec 64) (acc : MemoryAccessType mem_payload) (ai : AccessInfo)
+    (hai : ai.eff_privilege = .User) (hpl : ai.pmlen = 0) (w : Nat) :
+    runRW D orc s (get_transformed_data_addr (.Regidx i) off acc ai w) =
+      some (.Ext_DataAddr_OK (.Virtaddr (uxaXget s.file i + off)), s, orc) := by
+  have hx := uxa_rX hD.ctl.alu orc s i
+  have htm := utr_translationMode_U D orc s hp.dms hp.dsatp hp.dmisa hp.misaS hp.ms.1 hp.satp.1
+  uwk_run [hx, htm, hai, hpl]
+  rw [hpl, show Int.toNat 0 = 0 from rfl, umo_pm_transform_VA0]
 
 /-! ## §2 The GPR pair (`AMOCAS.Q`) -/
 
