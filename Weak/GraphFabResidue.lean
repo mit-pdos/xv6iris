@@ -17,13 +17,18 @@ order: gmo is already total over the memory events, and `ioResidueGmo GF` says t
   and the single order, and (R1)'s disk use shrinks to the START event, the ring POP event (the
   avail-index / ring reads po-before it) and the UART/PLIC moves.  The text of (R1) is unchanged.
 * **(R2)** `gpo x y ∧ gisIo x ∧ gisW y` — an I/O event po-before a RAM WRITE (`grule14`'s shape).
-  RAM READS po-after an I/O event stay UNORDERED on hart rows (the (a′) point [R7.1]).
+  RAM READS po-after an I/O event stay UNORDERED on hart rows by the ISA (the (a′) point [R7.1]);
+  the residue orders them since (R2″) [OWN.116].
 * **(R2′)** `gpo x y ∧ gisIo x ∧ gisR y ∧ y.1 = NCPU` — an I/O event po-before a DISK-ROW RAM read
   (G3-Q RULED (a″) [OWN.17]: the device model's "reads after the MMIO see everything before it").
 * **(R3)** `(gisIo x ∧ gisIo y ∧ gpo x y) ∨ (gmem x ∧ gmem y ∧ gfBefore GF x y)` — same-row issue
   order among I/O events, and FABRIC order among the fabric members that HAVE a memory-order
   position (`gmem`), stated on the ORDER `gfBefore` (not on `gdevAdj`, so hulls that cut members out
   keep it).
+* **(R2″)** `gpo x y ∧ gisIo x ∧ gisR y` — an I/O event po-before a RAM READ, ANY row ([OWN.116],
+  2026-10-19, route P F-P-W3-2: the read-side twin of (R1)).  **STRONGER than RVWMO+PMAs, removable
+  with (R1) (A4).**  Appended as the LAST disjunct (the earlier arms keep their positions); it
+  subsumes (R2′), which is kept verbatim.
 
 **W13 (R3′) — a TRUSTED-SURFACE TEXT CHANGE ([OWN.53] Q-L-R3 (a), [R39.3], [R40.1] (α); plan §A(6),
 §C top "W13 (R3′)").**  Until W13 (R3′) the fabric arm read `gisIo x ∧ gisIo y ∧ gfBefore GF x y`
@@ -108,7 +113,13 @@ def gfBefore (GF : Gfexec) (x y : Geid) : Prop := before GF.gfDev x y
 
 /-! ## 2. The residue and THE TRUSTED-BASE ITEM -/
 
-/-- The I/O-ordering residue: (R1) ∨ (R2) ∨ (R2′) ∨ (R3), see the header. -/
+/-- The I/O-ordering residue: (R1) ∨ (R2) ∨ (R2′) ∨ (R3) ∨ (R2″), see the header.  **(R2″)** [OWN.116]
+(2026-10-19, appended LAST so the earlier arms keep their positions): an I/O event po-before a RAM READ
+of its row is gmo-before it — the read-side twin of (R1); STRONGER than RVWMO+PMAs (RAM reads po-after
+an I/O event are unordered on hart rows by the ISA, the (a′) point [R7.1]; Sail drops the fence i/o
+bits, D48), true of QEMU-TCG (MMIO is a synchronous helper call; a TSO host does not reorder loads
+with earlier loads); removable with (R1) (A4).  It subsumes (R2′) (kept, so its users are untouched).
+Route P's progress uses it at fabric heads (`SbOrd`, F-P-W3-2: `SbStuck.l6NoMember`/`l6IoRdNo`). -/
 def ioResidue (GF : Gfexec) (x y : Geid) : Prop :=
   -- (R1) RAM access po-before an I/O event
   (WeakRvwmoGraph.gpo GF.gfGd.gdG x y ∧ gmem GF.gfGd.gdG x ∧
@@ -121,7 +132,10 @@ def ioResidue (GF : Gfexec) (x y : Geid) : Prop :=
     gisR GF.gfGd.gdG y = true ∧ y.1 = NCPU) ∨
   -- (R3) I/O events in same-row issue order, or `gmem` fabric members in fabric order (W13 (R3′))
   (gisIo GF.gfGd.gdG x = true ∧ gisIo GF.gfGd.gdG y = true ∧ WeakRvwmoGraph.gpo GF.gfGd.gdG x y) ∨
-  (gmem GF.gfGd.gdG x ∧ gmem GF.gfGd.gdG y ∧ gfBefore GF x y)
+  (gmem GF.gfGd.gdG x ∧ gmem GF.gfGd.gdG y ∧ gfBefore GF x y) ∨
+  -- (R2″) I/O event po-before a RAM READ, any row ([OWN.116]; STRONGER than RVWMO+PMAs, removable
+  -- with (R1) (A4))
+  (WeakRvwmoGraph.gpo GF.gfGd.gdG x y ∧ gisIo GF.gfGd.gdG x = true ∧ gisR GF.gfGd.gdG y = true)
 
 /-- **THE TRUSTED-BASE ITEM**: the residue is gmo-forward. -/
 def ioResidueGmo (GF : Gfexec) : Prop :=
@@ -149,12 +163,13 @@ fabric order (the (R3′) fabric arm). -/
 theorem GraphFabResidue.ioResidueIo (GF : Gfexec) (x y : Geid) :
     ioResidue GF x y → gisIo GF.gfGd.gdG x = true ∨ gisIo GF.gfGd.gdG y = true ∨
       (gmem GF.gfGd.gdG x ∧ gmem GF.gfGd.gdG y ∧ gfBefore GF x y) := by
-  rintro (⟨-, -, -, h⟩ | ⟨-, h, -⟩ | ⟨-, h, -⟩ | ⟨h, -⟩ | h)
+  rintro (⟨-, -, -, h⟩ | ⟨-, h, -⟩ | ⟨-, h, -⟩ | ⟨h, -⟩ | h | ⟨-, h, -⟩)
   · exact Or.inr (Or.inl h)
   · exact Or.inl h
   · exact Or.inl h
   · exact Or.inl h
   · exact Or.inr (Or.inr h)
+  · exact Or.inl h
 
 /-- **Free when no row has an I/O event and the fabric is empty**: LB and W→W reordering stay in
 the quantifier. -/
@@ -186,8 +201,8 @@ I/O events; since (R3′) on every `gmem` member, `GraphFabResidue.gdevAdjGmoMem
 theorem GraphFabResidue.gdevAdjGmoMem (GF : Gfexec) (a b : Geid) :
     ioResidueGmo GF → gmem GF.gfGd.gdG a → gmem GF.gfGd.gdG b →
     gdevAdj GF a b → gmoLt GF.gfGd.gdG a b :=
-  fun h ha hb hd => h a b (Or.inr (Or.inr (Or.inr (Or.inr ⟨ha, hb,
-    GraphFabResidue.gdevAdjGfBefore GF a b hd⟩))))
+  fun h ha hb hd => h a b (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl ⟨ha, hb,
+    GraphFabResidue.gdevAdjGfBefore GF a b hd⟩)))))
 
 theorem GraphFabResidue.gdevAdjGmo (GF : Gfexec) (a b : Geid) :
     ioResidueGmo GF → gisIo GF.gfGd.gdG a = true → gisIo GF.gfGd.gdG b = true →
@@ -287,19 +302,20 @@ theorem w13fIoResidueOk : ioResidueGmo w13fIo := by
   intro x y hr
   -- both endpoints are events of the graph
   have hxy : (gxLbl w13fIoG x).isSome = true ∧ (gxLbl w13fIoG y).isSome = true := by
-    rcases hr with ⟨hp, -⟩ | ⟨hp, -⟩ | ⟨hp, -⟩ | ⟨hx, hy, -⟩ | ⟨hx, hy, -⟩
+    rcases hr with ⟨hp, -⟩ | ⟨hp, -⟩ | ⟨hp, -⟩ | ⟨hx, hy, -⟩ | ⟨hx, hy, -⟩ | ⟨hp, -⟩
     · exact ⟨hp.2.2.1, hp.2.2.2⟩
     · exact ⟨hp.2.2.1, hp.2.2.2⟩
     · exact ⟨hp.2.2.1, hp.2.2.2⟩
     · exact ⟨GraphFabResidue.gisIoSome _ _ hx, GraphFabResidue.gisIoSome _ _ hy⟩
     · exact ⟨GraphFabResidue.gmemSome _ _ hx, GraphFabResidue.gmemSome _ _ hy⟩
+    · exact ⟨hp.2.2.1, hp.2.2.2⟩
   rcases GraphFabResidue.w13fIoLbl x hxy.1 with rfl | rfl | rfl | rfl <;>
   rcases GraphFabResidue.w13fIoLbl y hxy.2 with rfl | rfl | rfl | rfl <;>
   first
   | (show gmoLt w13fIoG _ _; unfold gmoLt; decide +kernel)
   | (exfalso
      rcases hr with ⟨hp, hm, hx, hy⟩ | ⟨hp, hx, hy⟩ | ⟨hp, hx, hy, hn⟩ | ⟨hx, hy, hp⟩ |
-       ⟨hx, hy, hb⟩
+       ⟨hx, hy, hb⟩ | ⟨hp, hx, hy⟩
      all_goals first
        | exact absurd hp.2.1 (by decide)
        | exact absurd hp.1 (by decide)
@@ -312,9 +328,9 @@ theorem w13fIoResidueOk : ioResidueGmo w13fIo := by
 excluded, since gmo puts MMIO₀ first. -/
 theorem w13fIoRevExcluded : ¬ ioResidueGmo ⟨⟨w13fIoG, [], []⟩, [(1, 0), (0, 0)]⟩ := by
   intro h
-  have := h (1, 0) (0, 0) (Or.inr (Or.inr (Or.inr (Or.inr
+  have := h (1, 0) (0, 0) (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl
     ⟨GraphFabResidue.gisIoGmem _ _ rfl, GraphFabResidue.gisIoGmem _ _ rfl,
-      ⟨0, 1, rfl, rfl, by omega⟩⟩))))
+      ⟨0, 1, rfl, rfl, by omega⟩⟩)))))
   revert this
   unfold gmoLt
   decide +kernel
@@ -363,19 +379,20 @@ theorem GraphFabResidue.diskFabResidueOk : ioResidueGmo GraphFabResidue.diskFab 
   intro x y hr
   have hxy : (gxLbl GraphFabResidue.diskFabG x).isSome = true ∧
       (gxLbl GraphFabResidue.diskFabG y).isSome = true := by
-    rcases hr with ⟨hp, -⟩ | ⟨hp, -⟩ | ⟨hp, -⟩ | ⟨hx, hy, -⟩ | ⟨hx, hy, -⟩
+    rcases hr with ⟨hp, -⟩ | ⟨hp, -⟩ | ⟨hp, -⟩ | ⟨hx, hy, -⟩ | ⟨hx, hy, -⟩ | ⟨hp, -⟩
     · exact ⟨hp.2.2.1, hp.2.2.2⟩
     · exact ⟨hp.2.2.1, hp.2.2.2⟩
     · exact ⟨hp.2.2.1, hp.2.2.2⟩
     · exact ⟨GraphFabResidue.gisIoSome _ _ hx, GraphFabResidue.gisIoSome _ _ hy⟩
     · exact ⟨GraphFabResidue.gmemSome _ _ hx, GraphFabResidue.gmemSome _ _ hy⟩
+    · exact ⟨hp.2.2.1, hp.2.2.2⟩
   rcases GraphFabResidue.diskFabLbl x hxy.1 with rfl | rfl <;>
   rcases GraphFabResidue.diskFabLbl y hxy.2 with rfl | rfl <;>
   first
   | (show gmoLt GraphFabResidue.diskFabG _ _; unfold gmoLt; decide +kernel)
   | (exfalso
      rcases hr with ⟨hp, hm, hx, hy⟩ | ⟨hp, hx, hy⟩ | ⟨hp, hx, hy, hn⟩ | ⟨hx, hy, hp⟩ |
-       ⟨hx, hy, hb⟩
+       ⟨hx, hy, hb⟩ | ⟨hp, hx, hy⟩
      all_goals first
        | exact absurd hp.2.1 (by decide)
        | exact absurd hp.1 (by decide)
@@ -388,9 +405,9 @@ theorem GraphFabResidue.diskFabResidueOk : ioResidueGmo GraphFabResidue.diskFab 
 theorem GraphFabResidue.diskFabRevExcluded :
     ¬ ioResidueGmo ⟨⟨GraphFabResidue.diskFabG, [], []⟩, [(NCPU, 0), (0, 0)]⟩ := by
   intro h
-  have := h (NCPU, 0) (0, 0) (Or.inr (Or.inr (Or.inr (Or.inr
+  have := h (NCPU, 0) (0, 0) (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl
     ⟨⟨GraphFabResidue.usedIdxSt, rfl, rfl⟩, GraphFabResidue.gisIoGmem _ _ rfl,
-      ⟨0, 1, rfl, rfl, by omega⟩⟩))))
+      ⟨0, 1, rfl, rfl, by omega⟩⟩)))))
   revert this
   unfold gmoLt
   decide +kernel

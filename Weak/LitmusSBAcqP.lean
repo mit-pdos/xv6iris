@@ -98,7 +98,7 @@ theorem SBAcqP.fabLt (GF : Gfexec) (x y : Geid) (lx ly : Lbl) (hio : ioResidueGm
     (hx : gxLbl GF.gfGd.gdG x = some lx) (hy : gxLbl GF.gfGd.gdG y = some ly)
     (hmx : lbIsMem lx = true) (hmy : lbIsMem ly = true) (hb : gfBefore GF x y) :
     gmoLt GF.gfGd.gdG x y :=
-  hio x y (Or.inr (Or.inr (Or.inr (Or.inr ⟨⟨lx, hx, hmx⟩, ⟨ly, hy, hmy⟩, hb⟩))))
+  hio x y (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl ⟨⟨lx, hx, hmx⟩, ⟨ly, hy, hmy⟩, hb⟩)))))
 
 /-- **THE I/O HOP**: a RAM access `w` po-before an I/O event `X` of its hart, `X` before `L` in fabric
 order, `L` an I/O event po-before a RAM WRITE `R` of another (or the same) hart: `w <gmo R`.  Every
@@ -217,7 +217,7 @@ theorem SBAcqP.uNotIo : ¬ ioResidueGmo SBAcqP.uF := fun h =>
 
 /-! ## 2.1 (R1) is the arm that excludes it: the witness satisfies every other arm -/
 
-/-- The residue minus (R1): (R2) ∨ (R2′) ∨ (R3) — `ioResidue GF x y ↔ (R1) ∨ ioResidueNoR1 GF x y`
+/-- The residue minus (R1): (R2) ∨ (R2′) ∨ (R3) ∨ (R2″) [OWN.116] — `ioResidue GF x y ↔ (R1) ∨ ioResidueNoR1 GF x y`
 holds by `Iff.rfl`. -/
 def SBAcqP.ioResidueNoR1 (GF : Gfexec) (x y : Geid) : Prop :=
   (WeakRvwmoGraph.gpo GF.gfGd.gdG x y ∧ gisIo GF.gfGd.gdG x = true ∧
@@ -225,7 +225,8 @@ def SBAcqP.ioResidueNoR1 (GF : Gfexec) (x y : Geid) : Prop :=
   (WeakRvwmoGraph.gpo GF.gfGd.gdG x y ∧ gisIo GF.gfGd.gdG x = true ∧
     gisR GF.gfGd.gdG y = true ∧ y.1 = NCPU) ∨
   (gisIo GF.gfGd.gdG x = true ∧ gisIo GF.gfGd.gdG y = true ∧ WeakRvwmoGraph.gpo GF.gfGd.gdG x y) ∨
-  (gmem GF.gfGd.gdG x ∧ gmem GF.gfGd.gdG y ∧ gfBefore GF x y)
+  (gmem GF.gfGd.gdG x ∧ gmem GF.gfGd.gdG y ∧ gfBefore GF x y) ∨
+  (WeakRvwmoGraph.gpo GF.gfGd.gdG x y ∧ gisIo GF.gfGd.gdG x = true ∧ gisR GF.gfGd.gdG y = true)
 
 theorem SBAcqP.ioResidueSplit (GF : Gfexec) (x y : Geid) :
     ioResidue GF x y ↔
@@ -253,7 +254,8 @@ def SBAcqP.armsNoR1B (GF : Gfexec) (x y : Geid) : Bool :=
   (gpoB GF.gfGd.gdG x y && gisIo GF.gfGd.gdG x && gisW GF.gfGd.gdG y) ||
   (gpoB GF.gfGd.gdG x y && gisIo GF.gfGd.gdG x && gisR GF.gfGd.gdG y && decide (y.1 = NCPU)) ||
   (gisIo GF.gfGd.gdG x && gisIo GF.gfGd.gdG y && gpoB GF.gfGd.gdG x y) ||
-  (glblB GF.gfGd.gdG x lbIsMem && glblB GF.gfGd.gdG y lbIsMem && SBAcqP.beforeB GF.gfDev x y)
+  (glblB GF.gfGd.gdG x lbIsMem && glblB GF.gfGd.gdG y lbIsMem && SBAcqP.beforeB GF.gfDev x y) ||
+  (gpoB GF.gfGd.gdG x y && gisIo GF.gfGd.gdG x && gisR GF.gfGd.gdG y)
 
 def SBAcqP.resNoR1B (GF : Gfexec) : Bool :=
   (gevents GF.gfGd.gdG).all (fun x => (gevents GF.gfGd.gdG).all (fun y =>
@@ -264,19 +266,21 @@ theorem SBAcqP.resNoR1BSound (GF : Gfexec) :
   intro hb x y hr
   unfold SBAcqP.ioResidueNoR1 at hr
   have hxy : x ∈ gevents GF.gfGd.gdG ∧ y ∈ gevents GF.gfGd.gdG := by
-    rcases hr with ⟨hp, -⟩ | ⟨hp, -⟩ | ⟨-, -, hp⟩ | ⟨⟨lx, hx, -⟩, ⟨ly, hy, -⟩, -⟩
+    rcases hr with ⟨hp, -⟩ | ⟨hp, -⟩ | ⟨-, -, hp⟩ | ⟨⟨lx, hx, -⟩, ⟨ly, hy, -⟩, -⟩ | ⟨hp, -⟩
     · exact gpoGevents _ _ _ hp
     · exact gpoGevents _ _ _ hp
     · exact gpoGevents _ _ _ hp
     · exact ⟨geventsOfLbl _ _ _ hx, geventsOfLbl _ _ _ hy⟩
+    · exact gpoGevents _ _ _ hp
   have h := (forallbForallTrue _ _).1 ((forallbForallTrue _ _).1 hb x hxy.1) y hxy.2
   have harm : SBAcqP.armsNoR1B GF x y = true := by
     unfold SBAcqP.armsNoR1B
-    rcases hr with ⟨hp, h1, h2⟩ | ⟨hp, h1, h2, h3⟩ | ⟨h1, h2, hp⟩ | ⟨hx, hy, hb'⟩
+    rcases hr with ⟨hp, h1, h2⟩ | ⟨hp, h1, h2, h3⟩ | ⟨h1, h2, hp⟩ | ⟨hx, hy, hb'⟩ | ⟨hp, h1, h2⟩
     · simp [(gpoBSpec _ _ _).2 hp, h1, h2]
     · simp [(gpoBSpec _ _ _).2 hp, h1, h2, h3]
     · simp [(gpoBSpec _ _ _).2 hp, h1, h2]
     · simp [(glblBSpec _ _ lbIsMem).2 hx, (glblBSpec _ _ lbIsMem).2 hy, SBAcqP.beforeBOf _ _ _ hb']
+    · simp [(gpoBSpec _ _ _).2 hp, h1, h2]
   simp only [harm, Bool.not_true, Bool.false_or] at h
   exact (gmoLtBSpec _ _ _).1 h
 

@@ -22,16 +22,21 @@ buffer: `SbPol.epoch`)).  Lean-only, no Rocq twin.  A PRIMED TWIN: nothing regis
       of `dev`), `ord` (pending tags in issue order), `fs0`/`fs2` (an entry's fence counter is nonzero
       / two entries' counters differ only across a `pw ∧ sw` fence of the row).
   §3  the measure `SbOrd.mu` (a landing: its store's gmo position; a head: the LEAST gmo position of
-      an unrealized memory event of the row — so an edge INTO a head is free and the per-head table
-      speaks only of edges OUT of blocked heads) and the abstract **`SbOrd.descent`**.
-  §4  the per-head table as interfaces: **`SbOrd.HeadOrd`** — a BLOCKED memory head that is not an
-      `.aq` read is gmo-before every later memory event of its row (rows H3 / H4 / H5 of R45's table;
-      findings F-P-W3-1 / F-P-W3-2, `Weak/LitmusSbStuck.lean`: FALSE on xv6 shapes under the design's
-      gate, so it stays NAMED); the image facts `SbOrd.ImgFacts` (G1 every AMO `.aq`, no `.rl`, every
-      draining fence `sw`) — H1 (rule 5) and H2 (rule 4 + (R1)) are PROVED from them.
+      an unrealized WAITED-ON event of the row (`waitedOn`: a fabric member, a write, or a reader of a
+      byte's member-latest that a pending entry or an AMO head writes) — so an edge INTO a head is
+      free and the per-head table speaks only of edges OUT of blocked heads) and **`SbOrd.descent`**.
+  §4  the per-head table: rows H1 (`aqOrd`, rule 5 + `ImgFacts.amoAq`), H2 (`blkFence`, rule 4 + (R1) +
+      `ImgFacts.fenceSw`), H4 (`ioOrd`: (R2), (R2″) [OWN.116], (R3); `stOrd`: the hart-row fabric fact
+      + the device-row store order `DevStOrd`, NAMED device model) and H5 (a drain-blocked exclusive
+      read is an `.aq` AMO: H1) PROVED; row H3 the NAMED **`SbOrd.HeadOrdRd`** (a read-gate-blocked
+      plain load is gmo-before every later WAITED-ON event of its row — finding F-P-W3-3,
+      `Weak/LitmusSbStuck2.lean`: the unrestricted form is FALSE at reachable states, the restricted
+      form needs the lock protocol at the realized prefix); the image facts `SbOrd.ImgFacts` (G1 every
+      AMO `.aq`, no `.rl`, every draining fence `sw`; image halves `SbOrd.imgAmoAq`/`imgFenceSw`).
 
 Spec: FAITHFUL (proof organisation over riscv.cat's rules 1, 4, 5, load value, atomicity, co ⊆ gmo, and
-the trusted residue's (R1)/(R3)); the named items are listed in §4 with their marks.  Lean-only helpers
+the trusted residue's (R1)/(R2)/(R3) and (R2″) [OWN.116] — STRONGER than RVWMO+PMAs, removable with
+(R1) (A4)); the named items are listed in §4 with their marks.  Lean-only helpers
 `SbOrd.*`.
 -/
 import Weak.SbReplay
@@ -157,28 +162,43 @@ theorem minPosGt (G : Gexec) (d n : Nat) : ∀ (l : List Geid), n < d → (∀ e
   | [], hd, _ => hd
   | f :: l, hd, h => Nat.lt_min.2 ⟨h f (by simp), minPosGt G d n l hd (fun e he => h e (by simp [he]))⟩
 
+/-- **AN EVENT SOME ITEM CAN WAIT ON** (finding F-P-W3-3): a fabric member (Efab), a write (an unissued
+source, (E2)/(E2w)), or a GF reader of a byte's member-latest write where a PENDING entry or an AMO HEAD
+writes that byte ((E3)/(E3w)).  These are exactly the events the edges INTO a head pass through; an
+unrealized read nothing can wait on is left out of its head's measure (it may be gmo-before a blocked
+head — load–load reordering, `SbStuck.l7` — without closing any cycle). -/
+def waitedOn (G : Gexec) (dev : List Geid) (w : WS) (m : Geid) : Prop :=
+  m ∈ dev ∨ gisW G m = true ∨
+  ∃ a t v, greadsByte G m a t v ∧ srcLatest G w a t ∧
+    ((∃ i p, p ∈ w.pend i ∧ gwrB G a (i, p.1) = true) ∨
+     (∃ x aq rl base ts rvs wvs kc, gxLbl G (hd w x) = some (LRmw aq rl base ts rvs wvs kc) ∧
+       gwrB G a (hd w x) = true))
+
+open Classical in
 /-- **THE MEASURE**: a landing — its store's gmo position; a head — the least gmo position of an
-unrealized memory event of its row (`|gmo|` if none). -/
-def mu (G : Gexec) (w : WS) : Tgt → Nat
-  | .hd x => minPos G G.gxGmo.length (G.gxGmo.filter (fun e => decide (e.1 = x ∧ ¬ realized w e)))
+unrealized WAITED-ON memory event of its row (`|gmo|` if none). -/
+noncomputable def mu (G : Gexec) (dev : List Geid) (w : WS) : Tgt → Nat
+  | .hd x => minPos G G.gxGmo.length
+      (G.gxGmo.filter (fun e => decide (e.1 = x ∧ ¬ realized w e ∧ waitedOn G dev w e)))
   | .ld i k =>
     match (w.pend i)[k]? with
     | some p => gpos G (i, p.1)
     | none => G.gxGmo.length
 
-theorem muHdLe (G : Gexec) (w : WS) (e : Geid) :
-    e ∈ G.gxGmo → ¬ realized w e → mu G w (.hd e.1) ≤ gpos G e :=
-  fun hm hr => minPosLe G _ _ e (List.mem_filter.2 ⟨hm, by simp [hr]⟩)
+theorem muHdLe (G : Gexec) (dev : List Geid) (w : WS) (e : Geid) :
+    e ∈ G.gxGmo → ¬ realized w e → waitedOn G dev w e → mu G dev w (.hd e.1) ≤ gpos G e :=
+  fun hm hr hw => minPosLe G _ _ e (List.mem_filter.2 ⟨hm, by simp [hr, hw]⟩)
 
-theorem muHdGt (G : Gexec) (w : WS) (x n : Nat) : n < G.gxGmo.length →
-    (∀ e, e ∈ G.gxGmo → e.1 = x → ¬ realized w e → n < gpos G e) → n < mu G w (.hd x) :=
+theorem muHdGt (G : Gexec) (dev : List Geid) (w : WS) (x n : Nat) : n < G.gxGmo.length →
+    (∀ e, e ∈ G.gxGmo → e.1 = x → ¬ realized w e → waitedOn G dev w e → n < gpos G e) →
+    n < mu G dev w (.hd x) :=
   fun hd h => minPosGt G _ n _ hd (fun e he => by
     obtain ⟨h1, h2⟩ := List.mem_filter.1 he
     simp only [decide_eq_true_eq] at h2
-    exact h e h1 h2.1 h2.2)
+    exact h e h1 h2.1 h2.2.1 h2.2.2)
 
-theorem muLd (G : Gexec) (w : WS) (i k : Nat) (p : Nat × SbEnt) :
-    (w.pend i)[k]? = some p → mu G w (.ld i k) = gpos G (i, p.1) := by
+theorem muLd (G : Gexec) (dev : List Geid) (w : WS) (i k : Nat) (p : Nat × SbEnt) :
+    (w.pend i)[k]? = some p → mu G dev w (.ld i k) = gpos G (i, p.1) := by
   intro h; simp [mu, h]
 
 /-- **THE DESCENT**: if every blocked genuine item waits for a genuine item that is enabled or has a
@@ -218,15 +238,29 @@ structure ImgFacts (G : Gexec) : Prop where
   noRl : ∀ e l, gxLbl G e = some l → lbRl l = false
   fenceSw : ∀ e pr pw sr sw, gxLbl G e = some (LFence pr pw sr sw) → (pw && sr) = true → sw = true
 
-/-- **THE PER-HEAD ORDER** (R45 table rows H3 / H4 / H5, NAMED): at walk state `w`, a BLOCKED memory head
-that is not an `.aq` read is gmo-before every later memory event of its row.  FALSE on xv6 shapes under
-the design's gate (`SbStuck.l5NoMemberP`: `holding+0x0` reading nonzero; `SbStuck.l6NoMember`: an I/O
-head before a RAM read) — the lines are STOPPED (PROGRESS F-P-W3-1/2); it is the exact residue of
-`noStuckP` once rows H1/H2, every landing edge and every edge into a head are proved. -/
-def HeadOrd (pol : SbPol) (G : Gexec) (X : Geid → Prop) (rdG : RdG) (dev : List Geid) (w : WS) : Prop :=
-  ∀ x l, gxLbl G (hd w x) = some l → lbIsMem l = true → ¬ enb pol G X rdG dev w (.hd x) →
-    (lbIsR l && lbAq l) = false →
-    ∀ m, m ∈ G.gxGmo → m.1 = x → (hd w x).2 < m.2 → gmoLt G (hd w x) m
+/-- **ROW H3 — THE GATED PLAIN READ (NAMED, the only per-state residue of `noStuckP`)**: at walk state
+`w`, a non-exempt plain-load head BLOCKED by the read gate is gmo-before every later WAITED-ON event of
+its row (`waitedOn`).  Restricted to waited-on events (finding F-P-W3-3): the unrestricted form ("every
+later memory event", the former `HeadOrd`) is FALSE at the INITIAL state of an xv6-shaped graph under
+either gate (`SbStuck.l7HeadOrdFalse`: `holding+0x0` waiting for a not-yet-issued `amoswap`, its
+`holding+0x12` gmo-before it).  This form is believed TRUE of xv6 but NOT from RVWMO + the text alone:
+`SbStuck.l8NoMember` (a non-xv6 text: a pending store, a draining fence, the AMO the racy read reads)
+has no member under the value gate — its xv6 discharge needs the lock protocol at the realized prefix
+("no pending `lk->cpu` store while the lock's landed byte is free"), plus the emission's static hops
+(rule 11 `ctrl;[W]` into `amoswap.aq`; `fence r,rw` after `started`) — PROGRESS F-P-W3-3. -/
+def HeadOrdRd (G : Gexec) (X : Geid → Prop) (rdG : RdG) (dev : List Geid) (w : WS) : Prop :=
+  ∀ x base ts vs, gxLbl G (hd w x) = some (LLoad false base ts vs) → ¬ X (hd w x) →
+    ¬ rdG w x base ts vs →
+    ∀ m, m ∈ G.gxGmo → m.1 = x → (hd w x).2 < m.2 → waitedOn G dev w m → gmoLt G (hd w x) m
+
+/-- **THE DEVICE-ROW STORE ORDER (NAMED, device model; row H4 for non-I/O fabric members)**: a non-I/O
+fabric member of a device row (`NCPU ≤ f.1`: the virtio disk's fabric-moving `DWriteDev` RAM stores) is
+gmo-before every po-later memory event of its row.  Device-model text: `VirtioProg`'s rows put no
+`DRead` between a `DWriteDev` and the next START (`LDev`, an I/O event: (R1) then (R2′)), every disk RAM
+write is a fabric-moving `DWriteDev` (`LockFacts3.diskFabPo`), the `DFence` sits before the used index;
+NAMED here like `diskFabPo` (FAITHFUL to the device model, open: a pass over `pdiskProg`'s emission). -/
+def DevStOrd (G : Gexec) (dev : List Geid) : Prop :=
+  ∀ f m, f ∈ dev → gisIo G f = false → NCPU ≤ f.1 → WeakRvwmoGraph.gpo G f m → gmem G m → gmoLt G f m
 
 /-! # 5. Basic facts -/
 
@@ -385,9 +419,10 @@ theorem unlanded (hP : PInv N img G X dev w) (a : Int) (s : Geid) :
 
 /-- **AN UNREALIZED EVENT IS A TARGET**: its row's head is genuine and measures at most its position. -/
 theorem tgtEv (hwf : gwf G) (hN : G.gxProg.length = N) (m : Geid) :
-    m ∈ G.gxGmo → ¬ realized w m → validT N G w (.hd m.1) ∧ mu G w (.hd m.1) ≤ gpos G m := by
-  intro hm hr
-  refine ⟨?_, muHdLe G w m hm hr⟩
+    m ∈ G.gxGmo → ¬ realized w m → waitedOn G dev w m →
+    validT N G w (.hd m.1) ∧ mu G dev w (.hd m.1) ≤ gpos G m := by
+  intro hm hr hwo
+  refine ⟨?_, muHdLe G dev w m hm hr hwo⟩
   obtain ⟨l, hl, -⟩ := (hwf.2.1 m).1 hm
   unfold gxLbl at hl
   cases hrow : G.gxProg[m.1]? with
@@ -404,16 +439,22 @@ theorem tgtEv (hwf : gwf G) (hN : G.gxProg.length = N) (m : Geid) :
 
 /-- **A PENDING STORE IS A TARGET**: its landing is genuine and measures its position. -/
 theorem tgtPend (hP : PInv N img G X dev w) (i k : Nat) (p : Nat × SbEnt) :
-    (w.pend i)[k]? = some p → validT N G w (.ld i k) ∧ mu G w (.ld i k) = gpos G (i, p.1) :=
-  fun h => ⟨⟨pendAg hP i p (List.mem_of_getElem? h), p, h⟩, muLd G w i k p h⟩
+    (w.pend i)[k]? = some p → validT N G w (.ld i k) ∧ mu G dev w (.ld i k) = gpos G (i, p.1) :=
+  fun h => ⟨⟨pendAg hP i p (List.mem_of_getElem? h), p, h⟩, muLd G dev w i k p h⟩
 
 /-- **AN UNLANDED GF WRITE BELOW A BOUND YIELDS A GENUINE ITEM BELOW IT.** -/
 theorem tgtW (hP : PInv N img G X dev w) (hwf : gwf G) (hN : G.gxProg.length = N) (a : Int)
     (s : Geid) (n : Nat) : gwrB G a s = true → s ∈ G.gxGmo → s ∉ wrAtW w a → gpos G s < n →
-    ∃ B, validT N G w B ∧ mu G w B < n := by
+    ∃ B, validT N G w B ∧ mu G dev w B < n := by
   intro hw hm hn hlt
   rcases unlanded hP a s hw hn with hr | ⟨k, p, hk, hp1⟩
-  · obtain ⟨hv, hle⟩ := tgtEv hwf hN s hm hr
+  · have hwo : waitedOn G dev w s := by
+      refine .inr (.inl ?_)
+      unfold gwrB at hw; unfold gisW
+      cases hl : gxLbl G s with
+      | none => rw [hl] at hw; cases hw
+      | some l => rw [hl] at hw; exact wrsBOfWr l a hw
+    obtain ⟨hv, hle⟩ := tgtEv hwf hN s hm hr hwo
     exact ⟨_, hv, by omega⟩
   · obtain ⟨hv, heq⟩ := tgtPend hP s.1 k p hk
     refine ⟨_, hv, ?_⟩
@@ -421,9 +462,10 @@ theorem tgtW (hP : PInv N img G X dev w) (hwf : gwf G) (hN : G.gxProg.length = N
 
 /-- An unrealized event at a gmo position below the bound. -/
 theorem tgtE (hwf : gwf G) (hN : G.gxProg.length = N) (m : Geid) (n : Nat) :
-    m ∈ G.gxGmo → ¬ realized w m → gpos G m < n → ∃ B, validT N G w B ∧ mu G w B < n := by
-  intro hm hr hlt
-  obtain ⟨hv, hle⟩ := tgtEv hwf hN m hm hr
+    m ∈ G.gxGmo → ¬ realized w m → waitedOn G dev w m → gpos G m < n →
+    ∃ B, validT N G w B ∧ mu G dev w B < n := by
+  intro hm hr hwo hlt
+  obtain ⟨hv, hle⟩ := tgtEv hwf hN m hm hr hwo
   exact ⟨_, hv, by omega⟩
 
 end Inv
@@ -543,7 +585,7 @@ theorem pendWrites (hP : PInv N img G X dev w) (i : Nat) (p : Nat × SbEnt) (a :
 it waits for a genuine item of strictly smaller measure — no census, no interface. -/
 theorem blkLand (hP : PInv N img G X dev w) (hc : CatH G) (hN : G.gxProg.length = N) (i k : Nat)
     (p : Nat × SbEnt) (hp : (w.pend i)[k]? = some p) (hb : ¬ landG SbPol.epoch G w i k) :
-    ∃ B, validT N G w B ∧ mu G w B < gpos G (i, p.1) := by
+    ∃ B, validT N G w B ∧ mu G dev w B < gpos G (i, p.1) := by
   have hpm : p ∈ w.pend i := List.mem_of_getElem? hp
   obtain ⟨rl, base, vs, kc, hl, hrow, hmsg⟩ := pendLbl hP i p hpm
   have hsm : (i, p.1) ∈ G.gxGmo := lblGmo G _ _ hc.wf hl rfl
@@ -582,7 +624,8 @@ theorem blkLand (hP : PInv N img G X dev w) (hc : CatH G) (hN : G.gxProg.length 
           rw [← hsrcIx]
           exact (gwixGposLt G src _ hc.wf.1 hsrcGW (gwritesOf G _ a u hc.wf hwu)).2 hg
       have hrs := frLtW hc r (i, p.1) a t v u hr hwu hlt hne
-      exact tgtE hc.wf hN r _ hrs.1 hnr hrs.2.2
+      exact tgtE hc.wf hN r _ hrs.1 hnr (.inr (.inr ⟨a, t, v, hr, hsl, .inl ⟨i, p, hpm, hgw⟩⟩))
+        hrs.2.2
     · -- (E2): the next unlanded GF write of the byte
       obtain ⟨n, hnG, hnW, hlt⟩ := nextUnlanded G w a _ (hP.pf.2 a) hc.wf.1 hsG hsW hpre
       obtain ⟨hnm, hnb⟩ := List.mem_filter.1 hnG
@@ -730,17 +773,17 @@ theorem lblOfValid (x : Nat) : (w.rows x).length < (G.gxProg.getD x []).length �
 measure. -/
 theorem headBound (hwf : gwf G) (x : Nat) (l : Lbl) (n : Nat) :
     gxLbl G (hd w x) = some l → lbIsMem l = true →
-    (∀ m, m ∈ G.gxGmo → m.1 = x → (hd w x).2 < m.2 → gmoLt G (hd w x) m) →
-    n < gpos G (hd w x) → n < mu G w (.hd x) := by
+    (∀ m, m ∈ G.gxGmo → m.1 = x → (hd w x).2 < m.2 → waitedOn G dev w m → gmoLt G (hd w x) m) →
+    n < gpos G (hd w x) → n < mu G dev w (.hd x) := by
   intro hl hm hord hn
   have he := lblGmo G _ l hwf hl hm
-  refine muHdGt G w x n (Nat.lt_trans hn (gposLtLen G _ he)) (fun m hmG hmx hmr => ?_)
+  refine muHdGt G dev w x n (Nat.lt_trans hn (gposLtLen G _ he)) (fun m hmG hmx hmr hwo => ?_)
   unfold realized at hmr
   by_cases heq : m.2 = (hd w x).2
   · have : m = hd w x := Prod.ext hmx heq
     subst this; exact hn
   · have hlt : (hd w x).2 < m.2 := by unfold hd at heq ⊢; rw [hmx] at hmr; omega
-    exact Nat.lt_trans hn (hord m hmG hmx hlt).2.2
+    exact Nat.lt_trans hn (hord m hmG hmx hlt hwo).2.2
 
 /-- **ROW H1 (rule 5)**: an `.aq` read head is gmo-before every later memory event of its row. -/
 theorem aqOrd (hc : CatH G) (x : Nat) (l : Lbl) : gxLbl G (hd w x) = some l → (lbIsR l && lbAq l) = true →
@@ -758,7 +801,7 @@ theorem blkFence (hP : PInv N img G X dev w) (hc : CatH G) (hI : ImgFacts G)
       gmoLt G s m)
     (hN : G.gxProg.length = N) (x : Nat) (pr pw sr sw : Bool)
     (hl : gxLbl G (hd w x) = some (LFence pr pw sr sw)) (hdr : SbCand.drains pw sr = true)
-    (hne : w.σ.sb x ≠ []) : ∃ B, validT N G w B ∧ mu G w B < mu G w (.hd x) := by
+    (hne : w.σ.sb x ≠ []) : ∃ B, validT N G w B ∧ mu G dev w B < mu G dev w (.hd x) := by
   have hpw : pw = true := by simp [SbCand.drains] at hdr; exact hdr.1
   have hsr : sr = true := by simp [SbCand.drains] at hdr; exact hdr.2
   have hsw : sw = true := hI.fenceSw _ pr pw sr sw hl (by simp [hpw, hsr])
@@ -775,7 +818,7 @@ theorem blkFence (hP : PInv N img G X dev w) (hc : CatH G) (hI : ImgFacts G)
   obtain ⟨hv, heq⟩ := tgtPend hP x 0 p0 hp0
   refine ⟨_, hv, ?_⟩
   rw [heq]
-  refine muHdGt G w x _ (gposLtLen G _ hs0m) (fun m hm hmx hmr => ?_)
+  refine muHdGt G dev w x _ (gposLtLen G _ hs0m) (fun m hm hmx hmr _ => ?_)
   obtain ⟨lm, hlm, hmm⟩ := gwfGmoMem G m hc.wf hm
   unfold realized at hmr hs0r
   have hgt : (w.rows x).length < m.2 := by
@@ -817,7 +860,7 @@ theorem blkAmo (hP : PInv N img G X dev w) (hc : CatH G) (hI : ImgFacts G) (hN :
     (rdG : RdG) (x : Nat) (aq rl : Bool) (base : Int) (ts : List Nat) (rvs wvs : List (BitVec 8))
     (kc : WmClass) (hl : gxLbl G (hd w x) = some (LRmw aq rl base ts rvs wvs kc))
     (hb : ¬ enbL G X rdG w (hd w x) (LRmw aq rl base ts rvs wvs kc)) :
-    ∃ B, validT N G w B ∧ mu G w B < gpos G (hd w x) := by
+    ∃ B, validT N G w B ∧ mu G dev w B < gpos G (hd w x) := by
   obtain ⟨-, hwl, hrl⟩ := rmwShape hc.wf _ aq rl base ts rvs wvs kc hl
   have hrl0 : rl = false := hI.noRl _ _ hl
   have hnr : SbCand.noRl (w.σ.sb x) := by
@@ -874,7 +917,10 @@ theorem blkAmo (hP : PInv N img G X dev w) (hc : CatH G) (hI : ImgFacts G) (hN :
       have := srcLatestUniq G w _ t' t hc.wf.1 hsl' hsl
       subst this
       have hrs := frLtW hc r (hd w x) _ t' v' _ hr (hwr j hjl) hlt hne
-      exact tgtE hc.wf hN r _ hrs.1 hnrr hrs.2.2
+      have hwo : waitedOn G dev w r :=
+        .inr (.inr ⟨_, t', v', hr, hsl', .inr ⟨x, aq, rl, base, ts, rvs, wvs, kc, hl,
+          (gwrBOf G _ _ _ hc.wf (hwr j hjl)).1⟩⟩)
+      exact tgtE hc.wf hN r _ hrs.1 hnrr hwo hrs.2.2
     · -- (E2w) / the source not yet issued: an unlanded source, gmo-before the AMO
       have hnl : ¬ landedSrc G w (accAddr base j) t :=
         fun h => hsl (hP.rd _ _ t _ hrd he h)
@@ -896,7 +942,7 @@ case): if the design's source gate fails, a target strictly gmo-before the load.
 theorem blkLoad (hP : PInv N img G X dev w) (hc : CatH G) (hN : G.gxProg.length = N) (x : Nat)
     (aq : Bool) (base : Int) (ts : List Nat) (vs : List (BitVec 8))
     (hl : gxLbl G (hd w x) = some (LLoad aq base ts vs)) (hns : ¬ srcGate G w x base ts vs) :
-    ∃ B, validT N G w B ∧ mu G w B < gpos G (hd w x) := by
+    ∃ B, validT N G w B ∧ mu G dev w B < gpos G (hd w x) := by
   obtain ⟨j, t, v, htj, hvj, hbad⟩ : ∃ j t v, ts[j]? = some t ∧ vs[j]? = some v ∧
       ¬ (SbCand.fwdByte (w.σ.sb x) (accAddr base j) = some v ∨
         (SbCand.fwdByte (w.σ.sb x) (accAddr base j) = none ∧ srcLatest G w (accAddr base j) t)) := by
@@ -1000,7 +1046,7 @@ theorem blkLoad (hP : PInv N img G X dev w) (hc : CatH G) (hN : G.gxProg.length 
 gmo-before it. -/
 theorem blkFab (hc : CatH G) (hN : G.gxProg.length = N) (hwio : ∀ d, d ∈ dev → gmem G d)
     (hr3 : ∀ d e, gmem G d → gmem G e → before dev d e → gmoLt G d e) (x : Nat)
-    (hb : ¬ fabOk dev w (hd w x)) : ∃ B, validT N G w B ∧ mu G w B < gpos G (hd w x) := by
+    (hb : ¬ fabOk dev w (hd w x)) : ∃ B, validT N G w B ∧ mu G dev w B < gpos G (hd w x) := by
   unfold fabOk at hb
   have hin : hd w x ∈ dev := Classical.byContradiction (fun h => hb (fun h' => absurd h' h))
   obtain ⟨d, hbd, hnr⟩ : ∃ d, before dev d (hd w x) ∧ ¬ realized w d := by
@@ -1008,29 +1054,73 @@ theorem blkFab (hc : CatH G) (hN : G.gxProg.length = N) (hwio : ∀ d, d ∈ dev
     exact Classical.byContradiction (fun h => hn ⟨d, hd', h⟩)
   have hdm : d ∈ dev := by obtain ⟨i, -, hi, -, -⟩ := hbd; exact List.mem_of_getElem? hi
   have hlt := hr3 d _ (hwio d hdm) (hwio _ hin) hbd
-  exact tgtE hc.wf hN d _ hlt.1 hnr hlt.2.2
+  exact tgtE hc.wf hN d _ hlt.1 hnr (.inl hdm) hlt.2.2
 
-/-- **EVERY BLOCKED HEAD WAITS FOR A GENUINE ITEM OF STRICTLY SMALLER MEASURE** — rows H1 (`aqOrd`) and
-H2 (`blkFence`) proved, rows H3/H4/H5 the interface `HeadOrd`. -/
+/-- **ROW H4 (I/O head; (R2), (R2″) [OWN.116], (R3))**: an I/O head is gmo-before every later memory event
+of its row — RAM writes by (R2), RAM READS by (R2″) (F-P-W3-2), I/O events by (R3)'s same-row arm. -/
+theorem ioOrd (hc : CatH G)
+    (hr2 : ∀ s m, WeakRvwmoGraph.gpo G s m → gisIo G s = true → gisW G m = true → gmoLt G s m)
+    (hr2'' : ∀ s m, WeakRvwmoGraph.gpo G s m → gisIo G s = true → gisR G m = true → gmoLt G s m)
+    (hr3a : ∀ s m, gisIo G s = true → gisIo G m = true → WeakRvwmoGraph.gpo G s m → gmoLt G s m)
+    (x : Nat) (kd : IoKind) (base : Int) (vs : List (BitVec 8))
+    (hl : gxLbl G (hd w x) = some (LIo kd base vs)) :
+    ∀ m, m ∈ G.gxGmo → m.1 = x → (hd w x).2 < m.2 → gmoLt G (hd w x) m := by
+  intro m hm hmx hlt
+  obtain ⟨lm, hlm, hmm⟩ := gwfGmoMem G m hc.wf hm
+  have hpo : WeakRvwmoGraph.gpo G (hd w x) m :=
+    SBAcq.gpoOf G _ m _ lm hl hlm (by unfold hd; exact hmx.symm) hlt
+  have hio : gisIo G (hd w x) = true := by unfold gisIo; rw [hl]; rfl
+  by_cases h1 : lbIsIo lm = true
+  · exact hr3a _ m hio (by unfold gisIo; rw [hlm]; exact h1) hpo
+  · by_cases h2 : lbIsW lm = true
+    · exact hr2 _ m hpo hio (by unfold gisW; rw [hlm]; exact h2)
+    · have h3 : lbIsR lm = true := by
+        unfold lbIsMem at hmm; simp_all
+      exact hr2'' _ m hpo hio (by unfold gisR; rw [hlm]; exact h3)
+
+/-- **ROW H4 (non-I/O fabric member)**: a fabric-member store head lies on a device row (hart-row members
+are I/O, `LockFacts3.hartDevIo`) and is ordered by the device fact `DevStOrd`. -/
+theorem stOrd (hc : CatH G) (hDS : DevStOrd G dev)
+    (hHart : ∀ e, e ∈ dev → e.1 < NCPU → gisIo G e = true) (x : Nat) (rl : Bool) (base : Int)
+    (vs : List (BitVec 8)) (kc : WmClass) (hl : gxLbl G (hd w x) = some (LStore rl base vs kc))
+    (hin : hd w x ∈ dev) :
+    ∀ m, m ∈ G.gxGmo → m.1 = x → (hd w x).2 < m.2 → gmoLt G (hd w x) m := by
+  intro m hm hmx hlt
+  obtain ⟨lm, hlm, hmm⟩ := gwfGmoMem G m hc.wf hm
+  have hpo : WeakRvwmoGraph.gpo G (hd w x) m :=
+    SBAcq.gpoOf G _ m _ lm hl hlm (by unfold hd; exact hmx.symm) hlt
+  have hio : gisIo G (hd w x) = false := by unfold gisIo; rw [hl]; rfl
+  have hx : NCPU ≤ (hd w x).1 := by
+    refine Nat.le_of_not_lt (fun h => ?_)
+    rw [hHart _ hin h] at hio; cases hio
+  exact hDS _ m hin hio hx hpo ⟨lm, hlm, hmm⟩
+
+/-- **EVERY BLOCKED HEAD WAITS FOR A GENUINE ITEM OF STRICTLY SMALLER MEASURE** — rows H1 (`aqOrd`; H5,
+the drain-blocked exclusive read, is an `.aq` AMO by `ImgFacts.amoAq`), H2 (`blkFence`) and H4 (`ioOrd`,
+`stOrd`) PROVED, row H3 the named `HeadOrdRd`. -/
 theorem blkHead (pol : SbPol) (hP : PInv N img G X dev w) (hc : CatH G) (hI : ImgFacts G)
     (hN : G.gxProg.length = N) (rdG : RdG) (hwio : ∀ d, d ∈ dev → gmem G d)
+    (hwio2 : ∀ d, d ∈ dev → gisWIo G d = true)
     (hr1 : ∀ s m, WeakRvwmoGraph.gpo G s m → gmem G s → gisIo G s = false → gisIo G m = true →
       gmoLt G s m)
+    (hr2 : ∀ s m, WeakRvwmoGraph.gpo G s m → gisIo G s = true → gisW G m = true → gmoLt G s m)
+    (hr2'' : ∀ s m, WeakRvwmoGraph.gpo G s m → gisIo G s = true → gisR G m = true → gmoLt G s m)
+    (hr3a : ∀ s m, gisIo G s = true → gisIo G m = true → WeakRvwmoGraph.gpo G s m → gmoLt G s m)
     (hr3 : ∀ d e, gmem G d → gmem G e → before dev d e → gmoLt G d e)
-    (hH : HeadOrd pol G X rdG dev w) (x : Nat)
+    (hR : HeadOrdRd G X rdG dev w) (hDS : DevStOrd G dev)
+    (hHart : ∀ e, e ∈ dev → e.1 < NCPU → gisIo G e = true) (x : Nat)
     (hmono : ∀ aq base ts vs, gxLbl G (hd w x) = some (LLoad aq base ts vs) →
       srcGate G w x base ts vs → rdG w x base ts vs)
     (hv : validT N G w (.hd x)) (hb : ¬ enb pol G X rdG dev w (.hd x)) :
-    ∃ B, validT N G w B ∧ mu G w B < mu G w (.hd x) := by
+    ∃ B, validT N G w B ∧ mu G dev w B < mu G dev w (.hd x) := by
   obtain ⟨l, hl⟩ := lblOfValid x hv.2
-  have hord : lbIsMem l = true → ∀ m, m ∈ G.gxGmo → m.1 = x → (hd w x).2 < m.2 →
-      gmoLt G (hd w x) m := by
-    intro hm
-    by_cases hra : (lbIsR l && lbAq l) = true
-    · exact aqOrd hc x l hl hra
-    · exact hH x l hl hm hb (by simpa using hra)
-  have hbound : ∀ n, lbIsMem l = true → n < gpos G (hd w x) → n < mu G w (.hd x) :=
-    fun n hm hn => headBound hc.wf x l n hl hm (hord hm) hn
+  have hbound : ∀ n, lbIsMem l = true →
+      (∀ m, m ∈ G.gxGmo → m.1 = x → (hd w x).2 < m.2 → waitedOn G dev w m → gmoLt G (hd w x) m) →
+      n < gpos G (hd w x) → n < mu G dev w (.hd x) :=
+    fun n hm hord hn => headBound hc.wf x l n hl hm hord hn
+  have hall : (∀ m, m ∈ G.gxGmo → m.1 = x → (hd w x).2 < m.2 → gmoLt G (hd w x) m) →
+      ∀ m, m ∈ G.gxGmo → m.1 = x → (hd w x).2 < m.2 → waitedOn G dev w m → gmoLt G (hd w x) m :=
+    fun H m h1 h2 h3 _ => H m h1 h2 h3
   by_cases hf : fabOk dev w (hd w x)
   · have hnl : ¬ enbL G X rdG w (hd w x) l := fun h => hb ⟨l, hl, hf, h⟩
     cases l with
@@ -1042,7 +1132,13 @@ theorem blkHead (pol : SbPol) (hP : PInv N img G X dev w) (hc : CatH G) (hI : Im
         obtain ⟨p, hp, rfl⟩ := List.mem_map.1 he
         exact hP.nrl _ p hp
       obtain ⟨B, hB, hlt⟩ := blkLoad hP hc hN x aq base ts vs hl hns
-      exact ⟨B, hB, hbound _ rfl hlt⟩
+      refine ⟨B, hB, hbound _ rfl ?_ hlt⟩
+      cases aq with
+      | true => exact hall (aqOrd hc x _ hl rfl)
+      | false =>
+        have hX : ¬ X (hd w x) := fun hX => hnl (.inl hX)
+        have hrd : ¬ rdG w x base ts vs := fun h => hnl (.inr ⟨hX, fun h' => absurd h' (by decide), h⟩)
+        exact hR x base ts vs hl hX hrd
     | LStore rl base vs kc =>
       exfalso
       have := hI.noRl _ _ hl
@@ -1054,7 +1150,9 @@ theorem blkHead (pol : SbPol) (hP : PInv N img G X dev w) (hc : CatH G) (hI : Im
       exact blkFence hP hc hI hr1 hN x pr pw sr sw hl hdr hne
     | LRmw aq rl base ts rvs wvs kc =>
       obtain ⟨B, hB, hlt⟩ := blkAmo hP hc hI hN rdG x aq rl base ts rvs wvs kc hl hnl
-      exact ⟨B, hB, hbound _ rfl hlt⟩
+      have haq := hI.amoAq _ aq rl base ts rvs wvs kc hl
+      subst haq
+      exact ⟨B, hB, hbound _ rfl (hall (aqOrd hc x _ hl rfl)) hlt⟩
     | LIo kd base vs => exact absurd trivial hnl
   · obtain ⟨B, hB, hlt⟩ := blkFab hc hN hwio hr3 x hf
     have hin : hd w x ∈ dev := by
@@ -1063,7 +1161,19 @@ theorem blkHead (pol : SbPol) (hP : PInv N img G X dev w) (hc : CatH G) (hI : Im
     obtain ⟨l', hl', hm'⟩ := hwio _ hin
     rw [hl, Option.some.injEq] at hl'
     subst hl'
-    exact ⟨B, hB, hbound _ hm' hlt⟩
+    refine ⟨B, hB, hbound _ hm' ?_ hlt⟩
+    have hwi := hwio2 _ hin
+    unfold gisWIo gisW gisIo at hwi
+    rw [hl] at hwi
+    cases l with
+    | LIo kd base vs => exact hall (ioOrd hc hr2 hr2'' hr3a x kd base vs hl)
+    | LStore rl base vs kc => exact hall (stOrd hc hDS hHart x rl base vs kc hl hin)
+    | LRmw aq rl base ts rvs wvs kc =>
+      have haq := hI.amoAq _ aq rl base ts rvs wvs kc hl
+      subst haq
+      exact hall (aqOrd hc x _ hl rfl)
+    | LLoad _ _ _ _ => simp [lbIsW, lbIsIo] at hwi
+    | LFence _ _ _ _ => simp [lbIsW, lbIsIo] at hwi
 
 end Blk
 
@@ -1085,14 +1195,18 @@ theorem validOfNonFinal {N : Nat} {img : Image} {G : Gexec} {X : Geid → Prop} 
 /-- **`noStuckP` — PROGRESS** (design §3.4 restated per R45 §2.4, [OWN.106]): at every walk state of a
 cat-consistent `GF` satisfying the walk invariant, if any work is left, SOME GENUINE ITEM IS ENABLED —
 under the per-address + fence-epoch buffer [OWN.113], any read gate weaker than the design's source
-gate, the trusted residue's (R1)/(R3), `gfDevWIo`, the image facts (rows H1/H2) and the per-head order
-interface `HeadOrd` (rows H3/H4/H5 — FALSE in general under the design's gate, F-P-W3-1/2). -/
+gate, the trusted residue ((R1), (R2), (R2″) [OWN.116], (R3)), `gfDevWIo`, the hart-row fabric fact
+(`LockFacts3.hartDevIo`'s conclusion), the image facts (rows H1/H2/H5), the device-row store order
+`DevStOrd` (row H4, NAMED device model) and the gated-read interface `HeadOrdRd` (row H3, NAMED,
+F-P-W3-3). -/
 theorem noStuckP (GF : Gfexec) (N : Nat) (img : Image) (X : Geid → Prop) (rdG : RdG) (w : WS)
     (hc : CatH GF.gfGd.gdG) (hio : ioResidueGmo GF) (hwio : gfDevWIo GF) (hI : ImgFacts GF.gfGd.gdG)
     (hN : GF.gfGd.gdG.gxProg.length = N) (hP : PInv N img GF.gfGd.gdG X GF.gfDev w)
     (hmono : ∀ x aq base ts vs, gxLbl GF.gfGd.gdG (hd w x) = some (LLoad aq base ts vs) →
       srcGate GF.gfGd.gdG w x base ts vs → rdG w x base ts vs)
-    (hH : HeadOrd SbPol.epoch GF.gfGd.gdG X rdG GF.gfDev w) :
+    (hDS : DevStOrd GF.gfGd.gdG GF.gfDev)
+    (hHart : ∀ e, e ∈ GF.gfDev → e.1 < NCPU → gisIo GF.gfGd.gdG e = true)
+    (hR : HeadOrdRd GF.gfGd.gdG X rdG GF.gfDev w) :
     ((∃ x, x < N ∧ (w.rows x).length < (GF.gfGd.gdG.gxProg.getD x []).length) ∨ (∃ i, w.pend i ≠ [])) →
     ∃ T, validT N GF.gfGd.gdG w T ∧ enb SbPol.epoch GF.gfGd.gdG X rdG GF.gfDev w T := by
   intro hne
@@ -1102,20 +1216,29 @@ theorem noStuckP (GF : Gfexec) (N : Nat) (img : Image) (X : Geid → Prop) (rdG 
   have hr1 : ∀ s m, WeakRvwmoGraph.gpo GF.gfGd.gdG s m → gmem GF.gfGd.gdG s →
       gisIo GF.gfGd.gdG s = false → gisIo GF.gfGd.gdG m = true → gmoLt GF.gfGd.gdG s m :=
     fun s m hpo hgm hn hi => hio s m (.inl ⟨hpo, hgm, hn, hi⟩)
+  have hr2 : ∀ s m, WeakRvwmoGraph.gpo GF.gfGd.gdG s m → gisIo GF.gfGd.gdG s = true →
+      gisW GF.gfGd.gdG m = true → gmoLt GF.gfGd.gdG s m :=
+    fun s m hpo hi hw => hio s m (.inr (.inl ⟨hpo, hi, hw⟩))
+  have hr2'' : ∀ s m, WeakRvwmoGraph.gpo GF.gfGd.gdG s m → gisIo GF.gfGd.gdG s = true →
+      gisR GF.gfGd.gdG m = true → gmoLt GF.gfGd.gdG s m :=
+    fun s m hpo hi hr => hio s m (.inr (.inr (.inr (.inr (.inr ⟨hpo, hi, hr⟩)))))
+  have hr3a : ∀ s m, gisIo GF.gfGd.gdG s = true → gisIo GF.gfGd.gdG m = true →
+      WeakRvwmoGraph.gpo GF.gfGd.gdG s m → gmoLt GF.gfGd.gdG s m :=
+    fun s m hi hj hpo => hio s m (.inr (.inr (.inr (.inl ⟨hi, hj, hpo⟩))))
   have hr3 : ∀ d e, gmem GF.gfGd.gdG d → gmem GF.gfGd.gdG e → before GF.gfDev d e →
       gmoLt GF.gfGd.gdG d e :=
-    fun d e hd he hb => hio d e (.inr (.inr (.inr (.inr ⟨hd, he, hb⟩))))
+    fun d e hd he hb => hio d e (.inr (.inr (.inr (.inr (.inl ⟨hd, he, hb⟩)))))
   refine descent (validT N GF.gfGd.gdG w) (enb SbPol.epoch GF.gfGd.gdG X rdG GF.gfDev w)
-    (mu GF.gfGd.gdG w) (fun A hv hb => ?_) A0 hA0
+    (mu GF.gfGd.gdG GF.gfDev w) (fun A hv hb => ?_) A0 hA0
   cases A with
   | hd x =>
-    obtain ⟨B, hB, hlt⟩ := blkHead SbPol.epoch hP hc hI hN rdG hwio' hr1 hr3 hH x
-      (hmono x) hv hb
+    obtain ⟨B, hB, hlt⟩ := blkHead SbPol.epoch hP hc hI hN rdG hwio' hwio hr1 hr2 hr2'' hr3a hr3 hR
+      hDS hHart x (hmono x) hv hb
     exact ⟨B, hB, .inr hlt⟩
   | ld i k =>
     obtain ⟨-, p, hp⟩ := hv
     obtain ⟨B, hB, hlt⟩ := blkLand hP hc hN i k p hp hb
-    exact ⟨B, hB, .inr (by rw [muLd _ w i k p hp]; exact hlt)⟩
+    exact ⟨B, hB, .inr (by rw [muLd _ _ w i k p hp]; exact hlt)⟩
 
 /-- The VALUE gate is admissible (weaker than the source gate at every invariant state). -/
 theorem valGateMono {N : Nat} {img : Image} {G : Gexec} {X : Geid → Prop} {dev : List Geid} {w : WS}

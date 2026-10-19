@@ -135,13 +135,15 @@ theorem WeakRvwmoKillIO.gisRGmem (G : Gexec) (e : Geid) : gisR G e = true → gm
 
 theorem ioExtraGmem (GF : Gfexec) (x y : Geid) :
     ioExtra GF x y → gmem GF.gfGd.gdG x ∧ gmem GF.gfGd.gdG y := by
-  rintro ((⟨-, hm, -, hy⟩ | ⟨-, hx, hy⟩ | ⟨-, hx, hy, -⟩ | ⟨hx, hy, -⟩ | ⟨hx, hy, -⟩) |
+  rintro ((⟨-, hm, -, hy⟩ | ⟨-, hx, hy⟩ | ⟨-, hx, hy, -⟩ | ⟨hx, hy, -⟩ | ⟨hx, hy, -⟩ |
+      ⟨-, hx, hy⟩) |
     ⟨hx, hy, -⟩ | ⟨-, hm, -, hr, -⟩ | ⟨-, hfx, hfy, -⟩)
   · exact ⟨hm, GraphFabResidue.gisIoGmem _ _ hy⟩
   · exact ⟨GraphFabResidue.gisIoGmem _ _ hx, WeakRvwmoAcyc.gisWGmem _ _ hy⟩
   · exact ⟨GraphFabResidue.gisIoGmem _ _ hx, WeakRvwmoKillIO.gisRGmem _ _ hy⟩
   · exact ⟨GraphFabResidue.gisIoGmem _ _ hx, GraphFabResidue.gisIoGmem _ _ hy⟩
   · exact ⟨hx, hy⟩
+  · exact ⟨GraphFabResidue.gisIoGmem _ _ hx, WeakRvwmoKillIO.gisRGmem _ _ hy⟩
   · exact ⟨GraphFabResidue.gisIoGmem _ _ hx, GraphFabResidue.gisIoGmem _ _ hy⟩
   · exact ⟨hm, WeakRvwmoKillIO.gisRGmem _ _ hr⟩
   · exact ⟨hfx, hfy⟩
@@ -260,7 +262,8 @@ theorem ioResidueHull (GF : Gfexec) (cs : List Nat) (x y : Geid) :
     show gisW (gxHull GF.gfGd.gdG cs) e = _
     rw [gxhGisW]
     cases gcut cs e <;> rfl
-  rcases hr with ⟨hp, hm, hx, hy⟩ | ⟨hp, hx, hy⟩ | ⟨hp, hx, hy, hn⟩ | ⟨hx, hy, hp⟩ | ⟨hx, hy, hb⟩
+  rcases hr with ⟨hp, hm, hx, hy⟩ | ⟨hp, hx, hy⟩ | ⟨hp, hx, hy, hn⟩ | ⟨hx, hy, hp⟩ | ⟨hx, hy, hb⟩ |
+    ⟨hp, hx, hy⟩
   · obtain ⟨hp, hcx, hcy⟩ := WeakRvwmoKillIO.gxhGpoCut _ cs x y hp
     obtain ⟨-, hm⟩ := (gxhGmem _ cs x).1 hm
     rw [hio, hcx, Bool.true_and] at hx
@@ -281,7 +284,11 @@ theorem ioResidueHull (GF : Gfexec) (cs : List Nat) (x y : Geid) :
   · obtain ⟨hb, hcx, hcy⟩ := WeakRvwmoKillIO.gfHullBefore GF cs x y hdc hb
     obtain ⟨-, hx⟩ := (gxhGmem _ cs x).1 hx
     obtain ⟨-, hy⟩ := (gxhGmem _ cs y).1 hy
-    exact ⟨Or.inr (Or.inr (Or.inr (Or.inr ⟨hx, hy, hb⟩))), hcx, hcy⟩
+    exact ⟨Or.inr (Or.inr (Or.inr (Or.inr (Or.inl ⟨hx, hy, hb⟩)))), hcx, hcy⟩
+  · obtain ⟨hp, hcx, hcy⟩ := WeakRvwmoKillIO.gxhGpoCut _ cs x y hp
+    rw [hio, hcx, Bool.true_and] at hx
+    rw [hR, hcy, Bool.true_and] at hy
+    exact ⟨Or.inr (Or.inr (Or.inr (Or.inr (Or.inr ⟨hp, hx, hy⟩)))), hcx, hcy⟩
 
 /-- THE TRUSTED ITEM RESTRICTS TO A `dclosed` HULL. -/
 theorem ioResidueGmoHull (GF : Gfexec) (cs : List Nat) :
@@ -718,8 +725,8 @@ memory order of the I/O events). -/
 theorem w13fIoRevRacyDIOCycle : tc (racyDIO ⟨⟨w13fIoG, [], []⟩, [(1, 0), (0, 0)]⟩) (0, 0) (0, 0) := by
   have hmo : gmoLt w13fIoG (0, 0) (1, 0) := by unfold gmoLt; decide +kernel
   refine tc_l (Or.inr (Or.inr (Or.inl ⟨rfl, rfl, hmo⟩))) (tc_once ?_)
-  exact Or.inr (Or.inl (Or.inr (Or.inr (Or.inr (Or.inr
+  exact Or.inr (Or.inl (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl
     ⟨GraphFabResidue.gisIoGmem _ _ rfl, GraphFabResidue.gisIoGmem _ _ rfl,
-      ⟨0, 1, rfl, rfl, by omega⟩⟩)))))
+      ⟨0, 1, rfl, rfl, by omega⟩⟩))))))
 
 end Weak

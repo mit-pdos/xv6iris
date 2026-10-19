@@ -615,12 +615,13 @@ theorem GraphFetchWalkZ.ioCrossLbl (GF : Gfexec) (x y : Geid) :
     rcases h with hX | hX
     · exact hgmo (CatLin.gcrossEGmo _ x y hwf hlv hX).2.1
     · rcases hX with hX | hX | hX | hX
-      · rcases hX with ⟨hp, _⟩ | ⟨hp, _⟩ | ⟨hp, _⟩ | ⟨_, _, hp⟩ | ⟨_, hm, _⟩
+      · rcases hX with ⟨hp, _⟩ | ⟨hp, _⟩ | ⟨hp, _⟩ | ⟨_, _, hp⟩ | ⟨_, hm, _⟩ | ⟨hp, _⟩
         · exact hpo x hp
         · exact hpo x hp
         · exact hpo x hp
         · exact hpo x hp
         · exact hmem hm
+        · exact hpo x hp
       · have h1 := hX.2.1
         rw [hio] at h1
         cases h1

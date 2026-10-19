@@ -1236,9 +1236,9 @@ theorem WeakRvwmoLin2.wioGmem (G : Gexec) (e : Geid) : gisWIo G e = true → gme
 endpoints are `gmem`, so the arm fires on every `gfBefore` pair (replaces `gfDevGmoOfIo`). -/
 theorem gfDevGmoOfRes (GF : Gfexec) : ioResidueGmo GF → gfDevWIo GF → gfDevGmo GF := by
   rintro hres hwio x y ⟨i, j, hi, hj, hij⟩
-  exact hres x y (Or.inr (Or.inr (Or.inr (Or.inr
+  exact hres x y (Or.inr (Or.inr (Or.inr (Or.inr (Or.inl
     ⟨WeakRvwmoLin2.wioGmem _ x (hwio x (elem_of_list_lookup_2 hi)),
-      WeakRvwmoLin2.wioGmem _ y (hwio y (elem_of_list_lookup_2 hj)), ⟨i, j, hi, hj, hij⟩⟩))))
+      WeakRvwmoLin2.wioGmem _ y (hwio y (elem_of_list_lookup_2 hj)), ⟨i, j, hi, hj, hij⟩⟩)))))
 
 /-- THE DISCHARGE of `fconfSupply'`'s former premise: an I/O-aware trace visits the fabric
 members in fabric order. -/

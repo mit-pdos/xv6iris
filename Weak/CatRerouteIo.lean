@@ -143,7 +143,7 @@ theorem ioSegRerouteKill (GF : Gfexec) (ad : List (Geid × Geid)) (X : Geid → 
 /-- **The window `(x, v)` of `rrIo` — its step `u → v` OUTSIDE `ioStepCloses`
 (`rrIoNotCloses`), NO `CertC` at `ioCross` (`rrIoNoCert`) — is certified re-routed to the
 release `(0,5)`**, by `ioSegCertRrC` (no step condition). -/
-theorem rrIoWinCert :
+theorem rrIoWinCert (rrIoResidue : ioResidueGmo rrIo) :
     CertC rrIo.gfGd.gdG (ioCross rrIo) (2, 0) ⟨0, (0, 0), (0, 5)⟩ := by
   obtain ⟨hx0, hr0, -⟩ := rrIoRaw
   exact ioSegCertRrC rrIo _ (ioCross rrIo) (2, 0) (0, 0) (0, 5) ⟨0, (0, 0), (0, 3)⟩ rrIoCatAD
@@ -152,7 +152,7 @@ theorem rrIoWinCert :
 
 /-- **…and the whole re-routed chain** `[(x, REL); (ACQ, w2)]` at `ioCross`, by `ioSegRerouteC`
 (the hop `REL →rfe ACQ`). -/
-theorem rrIoWinChain :
+theorem rrIoWinChain (rrIoResidue : ioResidueGmo rrIo) :
     chainC rrIo.gfGd.gdG (ioCross rrIo) (2, 0) (1, 1)
       ([] ++ ⟨0, (0, 0), (0, 5)⟩ :: ⟨1, (1, 0), (1, 1)⟩ :: []) := by
   obtain ⟨hx0, hr0, -⟩ := rrIoRaw

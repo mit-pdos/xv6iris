@@ -71,7 +71,8 @@ does NOT order (ppo rule 2 is `([R];po-loc-no-w;[R]) \ rsw` — same-source read
 
   * `kcatCexCatT`: the TAGGED model `rvwmoCatConsistentT` holds (computed) — so
     `kcatCexCatAD`: the cat chain's hypothesis `CatLin.rvwmoCatAD`; `kcatCexResidue`: the
-    trusted residue `ioResidueGmo` holds ((R1) `w2 <gmo y`, (R2) `x <gmo w`, nothing else).
+    trusted residue's pre-[OWN.116] arms hold ((R1) `w2 <gmo y`, (R2) `x <gmo w`, nothing else);
+    since [OWN.116] its (R2″) arm EXCLUDES the graph (`kcatCexExcluded`: `x` before the read `u`).
   * `kcatCexAfterIoU`: `u` satisfies the invariant (forwarded from `w`, po- and gmo-after `x`);
     `kcatCexStep`: `u → v` is an `rsameC` step (`gpoloc` on byte 0);
     `kcatCexNoFence`: the side condition holds (the row has no fence);
@@ -151,31 +152,44 @@ theorem WeakRvwmoKillIOC.kcatCexLbl (e : Geid) :
   rcases i with _ | _ | i <;> rcases k with _ | _ | _ | _ | k <;>
     simp [gxLbl, kcatCex, kcatCexT, mkgt, forget, kcatCexProg] at h ⊢
 
-/-- The trusted residue holds. -/
-theorem kcatCexResidue : ioResidueGmo kcatCex := by
-  intro x y hr
+/-- The trusted residue's pre-[OWN.116] arms hold ((R1), (R2), (R2′), (R3)); since [OWN.116] the
+residue also carries (R2″) and EXCLUDES this graph (`kcatCexExcluded`). -/
+theorem kcatCexResidue : ∀ x y, ioResidue kcatCex x y →
+    ¬ (WeakRvwmoGraph.gpo kcatCex.gfGd.gdG x y ∧ gisIo kcatCex.gfGd.gdG x = true ∧
+      gisR kcatCex.gfGd.gdG y = true) → gmoLt kcatCex.gfGd.gdG x y := by
+  intro x y hr hn6
   have hxy : (gxLbl kcatCex.gfGd.gdG x).isSome = true ∧
       (gxLbl kcatCex.gfGd.gdG y).isSome = true := by
-    rcases hr with ⟨hp, -⟩ | ⟨hp, -⟩ | ⟨hp, -⟩ | ⟨hx, hy, -⟩ | ⟨hx, hy, -⟩
+    rcases hr with ⟨hp, -⟩ | ⟨hp, -⟩ | ⟨hp, -⟩ | ⟨hx, hy, -⟩ | ⟨hx, hy, -⟩ | ⟨hp, -⟩
     · exact ⟨hp.2.2.1, hp.2.2.2⟩
     · exact ⟨hp.2.2.1, hp.2.2.2⟩
     · exact ⟨hp.2.2.1, hp.2.2.2⟩
     · exact ⟨GraphFabResidue.gisIoSome _ _ hx, GraphFabResidue.gisIoSome _ _ hy⟩
     · exact ⟨GraphFabResidue.gmemSome _ _ hx, GraphFabResidue.gmemSome _ _ hy⟩
+    · exact ⟨hp.2.2.1, hp.2.2.2⟩
   rcases WeakRvwmoKillIOC.kcatCexLbl x hxy.1 with rfl | rfl | rfl | rfl | rfl | rfl <;>
   rcases WeakRvwmoKillIOC.kcatCexLbl y hxy.2 with rfl | rfl | rfl | rfl | rfl | rfl <;>
   first
   | (show gmoLt kcatCex.gfGd.gdG _ _; exact (gmoLtBSpec _ _ _).1 (by decide +kernel))
   | (exfalso
      rcases hr with ⟨hp, hm, hx, hy⟩ | ⟨hp, hx, hy⟩ | ⟨hp, hx, hy, hn⟩ | ⟨hx, hy, hp⟩ |
-       ⟨hx, hy, hb⟩
+       ⟨hx, hy, hb⟩ | ⟨hp, hx, hy⟩
      all_goals first
+       | exact hn6 ⟨hp, hx, hy⟩
        | exact absurd hp.2.1 (by decide)
        | exact absurd hp.1 (by decide)
        | exact absurd hx (by decide +kernel)
        | exact absurd hy (by decide +kernel)
        | exact absurd hn (by decide)
        | (obtain ⟨i, j, hi, -⟩ := hb; simp [kcatCex] at hi))
+
+/-- **SINCE [OWN.116] THE TRUSTED RESIDUE EXCLUDES THE COUNTER-MODEL**: (R2″) orders the UART store
+`x = (0,0)` before the po-later read `u = (0,2)`, which this gmo puts first. -/
+theorem kcatCexExcluded : ¬ ioResidueGmo kcatCex := by
+  intro h
+  have := h (0, 0) (0, 2) (.inr (.inr (.inr (.inr (.inr ⟨(gpoBSpec _ _ _).1 (by decide +kernel),
+    by decide +kernel, by decide +kernel⟩)))))
+  exact absurd ((gmoLtBSpec _ _ _).2 this) (by decide +kernel)
 
 /-- `u = (0,2)` satisfies the invariant: its byte 1 is forwarded from `w = (0,1)`, po- and
 gmo-after `x = (0,0)`. -/
@@ -610,25 +624,30 @@ theorem WeakRvwmoKillIOC.kcatOkLbl (e : Geid) :
   rcases i with _ | i <;> rcases k with _ | _ | _ | _ | _ | _ | k <;>
     simp [gxLbl, kcatOk, kcatOkT, mkgt, forget, kcatOkProg] at h ⊢
 
-/-- The trusted residue holds. -/
-theorem kcatOkResidue : ioResidueGmo kcatOk := by
-  intro x y hr
+/-- The trusted residue's pre-[OWN.116] arms hold ((R1), (R2), (R2′), (R3)); since [OWN.116] the
+residue also carries (R2″) and EXCLUDES this graph (`kcatOkExcluded`). -/
+theorem kcatOkResidue : ∀ x y, ioResidue kcatOk x y →
+    ¬ (WeakRvwmoGraph.gpo kcatOk.gfGd.gdG x y ∧ gisIo kcatOk.gfGd.gdG x = true ∧
+      gisR kcatOk.gfGd.gdG y = true) → gmoLt kcatOk.gfGd.gdG x y := by
+  intro x y hr hn6
   have hxy : (gxLbl kcatOk.gfGd.gdG x).isSome = true ∧
       (gxLbl kcatOk.gfGd.gdG y).isSome = true := by
-    rcases hr with ⟨hp, -⟩ | ⟨hp, -⟩ | ⟨hp, -⟩ | ⟨hx, hy, -⟩ | ⟨hx, hy, -⟩
+    rcases hr with ⟨hp, -⟩ | ⟨hp, -⟩ | ⟨hp, -⟩ | ⟨hx, hy, -⟩ | ⟨hx, hy, -⟩ | ⟨hp, -⟩
     · exact ⟨hp.2.2.1, hp.2.2.2⟩
     · exact ⟨hp.2.2.1, hp.2.2.2⟩
     · exact ⟨hp.2.2.1, hp.2.2.2⟩
     · exact ⟨GraphFabResidue.gisIoSome _ _ hx, GraphFabResidue.gisIoSome _ _ hy⟩
     · exact ⟨GraphFabResidue.gmemSome _ _ hx, GraphFabResidue.gmemSome _ _ hy⟩
+    · exact ⟨hp.2.2.1, hp.2.2.2⟩
   rcases WeakRvwmoKillIOC.kcatOkLbl x hxy.1 with rfl | rfl | rfl | rfl | rfl | rfl <;>
   rcases WeakRvwmoKillIOC.kcatOkLbl y hxy.2 with rfl | rfl | rfl | rfl | rfl | rfl <;>
   first
   | (show gmoLt kcatOk.gfGd.gdG _ _; exact (gmoLtBSpec _ _ _).1 (by decide +kernel))
   | (exfalso
      rcases hr with ⟨hp, hm, hx, hy⟩ | ⟨hp, hx, hy⟩ | ⟨hp, hx, hy, hn⟩ | ⟨hx, hy, hp⟩ |
-       ⟨hx, hy, hb⟩
+       ⟨hx, hy, hb⟩ | ⟨hp, hx, hy⟩
      all_goals first
+       | exact hn6 ⟨hp, hx, hy⟩
        | exact absurd hp.2.1 (by decide)
        | exact absurd hp.1 (by decide)
        | exact absurd hx (by decide +kernel)
@@ -636,13 +655,23 @@ theorem kcatOkResidue : ioResidueGmo kcatOk := by
        | exact absurd hn (by decide)
        | (obtain ⟨i, j, hi, -⟩ := hb; simp [kcatOk] at hi))
 
+/-- **SINCE [OWN.116] THE TRUSTED RESIDUE EXCLUDES `kcatOk`**: (R2″) orders the UART store `(0,1)`
+before the po-later read `(0,3)`, which this gmo puts first. -/
+theorem kcatOkExcluded : ¬ ioResidueGmo kcatOk := by
+  intro h
+  have := h (0, 1) (0, 3) (.inr (.inr (.inr (.inr (.inr ⟨(gpoBSpec _ _ _).1 (by decide +kernel),
+    by decide +kernel, by decide +kernel⟩)))))
+  exact absurd ((gmoLtBSpec _ _ _).2 this) (by decide +kernel)
+
 theorem WeakRvwmoKillIOC.kcatOkGpow (u v : Geid) :
     gpoB kcatOk.gfGd.gdG u v = true → gmem kcatOk.gfGd.gdG u →
     gisW kcatOk.gfGd.gdG v = true → ioStepC kcatOk (gtAd kcatOkT.gtG kcatOkT.gtDeps) (0, 1) u v :=
   fun hpo hm hw => ⟨Or.inl ⟨(gpoBSpec _ _ _).1 hpo, hm, hw⟩, Or.inl (Or.inl hw)⟩
 
-/-- **`ioSegPinnedC` applies**: every hypothesis is met, the conclusion is `e <gmo z`. -/
-theorem kcatOkSegPinned : gmoLt kcatOk.gfGd.gdG (0, 0) (0, 5) := by
+/-- **`ioSegPinnedC` applies**: every OTHER hypothesis is met, the conclusion is `e <gmo z`.  Since
+[OWN.116] the residue hypothesis is the theorem's own (the graph violates (R2″), `kcatOkExcluded`), so
+this instance is conditional — a record of the arms (1), (5), (6), (1). -/
+theorem kcatOkSegPinned (hres : ioResidueGmo kcatOk) : gmoLt kcatOk.gfGd.gdG (0, 0) (0, 5) := by
   have hrfi : CatLin.grfi kcatOk.gfGd.gdG (0, 2) (0, 3) :=
     ⟨(grfBSpec _ _ _).1 (by decide +kernel), rfl⟩
   have s1 := WeakRvwmoKillIOC.kcatOkGpow (0, 1) (0, 2) (by decide +kernel)
@@ -658,7 +687,7 @@ theorem kcatOkSegPinned : gmoLt kcatOk.gfGd.gdG (0, 0) (0, 5) := by
     ⟨LLoad false 1 [1] [b1], by decide +kernel, rfl⟩ (by decide +kernel)
   have hent : CatLin.rsameC kcatOk.gfGd (0, 0) (0, 1) :=
     Or.inr (Or.inl (Or.inr (Or.inr (Or.inl ((gacqBSpec _ _ _).1 (by decide +kernel))))))
-  refine ioSegPinnedC kcatOk _ (0, 1) (0, 0) (0, 5) kcatOkCatAD kcatOkResidue
+  refine ioSegPinnedC kcatOk _ (0, 1) (0, 0) (0, 5) kcatOkCatAD hres
     (by decide +kernel) ⟨LLoad true 0 [0] [b0], by decide +kernel, rfl⟩ (tc_once hent)
     (rtc_l s1 (rtc_l s2 (rtc_l s3 (rtc_once s4)))) (Or.inl ?_)
   rintro ⟨w, ⟨a, t, vv, ⟨l, base, ts, vs, j, hl, hrd, -⟩, -⟩, -⟩

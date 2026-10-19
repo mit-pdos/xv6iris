@@ -555,23 +555,26 @@ theorem sumToZero (f : Nat → Nat) : ∀ n, sumTo f n = 0 → ∀ y, y < n → 
 def work (N : Nat) (G : Gexec) (w : WS) : Nat :=
   sumTo (fun x => 2 * ((G.gxProg.getD x []).length - (w.rows x).length) + (w.pend x).length) N
 
-/-- What the walk needs at every reachable candidate: the per-head order (NAMED, rows H3/H4/H5), the
-exempt-value interface (NAMED, F-P-W2-1), a sound read gate weaker than the source gate (PROVED for
-`srcGate` and `valGate`: `srcIfc`, `valIfc`). -/
+/-- What the walk needs at every reachable candidate: the gated-read order (NAMED, row H3 — rows H1, H2,
+H4, H5 are PROVED, `SbOrd.blkHead`; F-P-W3-3), the exempt-value interface (NAMED, F-P-W2-1), a sound read
+gate weaker than the source gate (PROVED for `srcGate` and `valGate`: `srcIfc`, `valIfc`). -/
 structure StateIfc (G : Gexec) (X : Geid → Prop) (rdG : RdG) (dev : List Geid) (c : CandW) : Prop where
-  head : HeadOrd SbPol.epoch G X rdG dev (cur c)
+  head : HeadOrdRd G X rdG dev (cur c)
   iref : IrefTop G X (cur c)
   sound : RdSound G rdG c
   mono : ∀ x aq base ts vs, gxLbl G (hd (cur c) x) = some (LLoad aq base ts vs) →
     srcGate G (cur c) x base ts vs → rdG (cur c) x base ts vs
 
 /-- The global hypotheses of the walk (cat, the trusted residue, `gfDevWIo`, the image facts, the
-exempt reads are plain loads of image bytes). -/
+device-row store order (NAMED device model, row H4), the hart-row fabric fact (`LockFacts3.hartDevIo`
+on an xv6 bundle), the exempt reads are plain loads of image bytes). -/
 structure WalkHyp (GF : Gfexec) (N : Nat) (img : Image) (X : Geid → Prop) : Prop where
   cat : CatH GF.gfGd.gdG
   io : ioResidueGmo GF
   wio : gfDevWIo GF
   imgF : ImgFacts GF.gfGd.gdG
+  devSt : DevStOrd GF.gfGd.gdG GF.gfDev
+  hart : ∀ e, e ∈ GF.gfDev → e.1 < NCPU → gisIo GF.gfGd.gdG e = true
   len : GF.gfGd.gdG.gxProg.length = N
   imgEq : GF.gfGd.gdG.gxImg = img
   ex : ∀ e l, X e → gxLbl GF.gfGd.gdG e = some l → ∃ base ts vs, l = LLoad false base ts vs
@@ -666,7 +669,7 @@ theorem walkRunP (GF : Gfexec) (N : Nat) (img : Image) (X : Geid → Prop) (rdG 
     · exact ⟨c, hc, hv, hP, hfin⟩
     · exfalso
       obtain ⟨T, hT, he⟩ := noStuckP GF N img X rdG (cur c) hW.cat hW.io hW.wio hW.imgF hW.len hP
-        (hS c hv hc hP).mono (hS c hv hc hP).head (nonFinal hP hfin)
+        (hS c hv hc hP).mono hW.devSt hW.hart (hS c hv hc hP).head (nonFinal hP hfin)
       subst hc
       obtain ⟨it, -, -, hlt⟩ := walkStepP GF N X rdG c hW hv hP (hS c hv rfl hP) T hT he
       omega
@@ -676,7 +679,7 @@ theorem walkRunP (GF : Gfexec) (N : Nat) (img : Image) (X : Geid → Prop) (rdG 
         drained (cur c)
     · exact ⟨c, hc, hv, hP, hfin⟩
     · obtain ⟨T, hT, he⟩ := noStuckP GF N img X rdG (cur c) hW.cat hW.io hW.wio hW.imgF hW.len hP
-        (hS c hv hc hP).mono (hS c hv hc hP).head (nonFinal hP hfin)
+        (hS c hv hc hP).mono hW.devSt hW.hart (hS c hv hc hP).head (nonFinal hP hfin)
       subst hc
       obtain ⟨it, hv', hP', hlt⟩ := walkStepP GF N X rdG c hW hv hP (hS c hv rfl hP) T hT he
       exact ih (snocC c it) hv' rfl hP' (by omega)

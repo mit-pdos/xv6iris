@@ -222,8 +222,8 @@ theorem CertZ23.keyLt (GF : Gfexec) (ad : List (Geid × Geid)) (Lb : Int → Pro
   · have hxd : x ∈ GF.gfDev := List.mem_of_getElem? hm
     have hyd : y ∈ GF.gfDev := List.mem_of_getElem? hn
     have hxy : gmoLt GF.gfGd.gdG x y :=
-      hres x y (.inr (.inr (.inr (.inr ⟨WeakRvwmoLin2.wioGmem _ x (hwio x hxd),
-        WeakRvwmoLin2.wioGmem _ y (hwio y hyd), m, n, hm, hn, hmn⟩))))
+      hres x y (.inr (.inr (.inr (.inr (.inl ⟨WeakRvwmoLin2.wioGmem _ x (hwio x hxd),
+        WeakRvwmoLin2.wioGmem _ y (hwio y hyd), m, n, hm, hn, hmn⟩)))))
     have hkx := CertZ23.kapLe GF ad Lb hc hres hwio hld hdevL x (.inr hxd)
     have hny : CertZ17.anc GF.gfGd.gdG Lb y = none := by
       cases ha : CertZ17.anc GF.gfGd.gdG Lb y with

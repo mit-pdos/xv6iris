@@ -524,25 +524,31 @@ theorem CatReroute.rrIoLbl (e : Geid) :
   rcases i with _ | _ | _ | i <;> rcases k with _ | _ | _ | _ | _ | _ | k <;>
     simp [gxLbl, rrIo, rrIoT, mkgt, forget, rrIoProg] at h ⊢
 
-/-- The trusted residue holds. -/
-theorem rrIoResidue : ioResidueGmo rrIo := by
-  intro x y hr
+/-- The trusted residue's pre-[OWN.116] arms hold; since [OWN.116] its (R2″) arm EXCLUDES the graph
+(`rrIoExcluded`: the UART store `x` before the read `u`), so the examples below that use the residue
+take it as a hypothesis (a record of the `kcatCex` shape, which (R2″) now rules out). -/
+theorem rrIoResidue : ∀ x y, ioResidue rrIo x y →
+    ¬ (WeakRvwmoGraph.gpo rrIo.gfGd.gdG x y ∧ gisIo rrIo.gfGd.gdG x = true ∧
+      gisR rrIo.gfGd.gdG y = true) → gmoLt rrIo.gfGd.gdG x y := by
+  intro x y hr hn6
   have hxy : (gxLbl rrIo.gfGd.gdG x).isSome = true ∧
       (gxLbl rrIo.gfGd.gdG y).isSome = true := by
-    rcases hr with ⟨hp, -⟩ | ⟨hp, -⟩ | ⟨hp, -⟩ | ⟨hx, hy, -⟩ | ⟨hx, hy, -⟩
+    rcases hr with ⟨hp, -⟩ | ⟨hp, -⟩ | ⟨hp, -⟩ | ⟨hx, hy, -⟩ | ⟨hx, hy, -⟩ | ⟨hp, -⟩
     · exact ⟨hp.2.2.1, hp.2.2.2⟩
     · exact ⟨hp.2.2.1, hp.2.2.2⟩
     · exact ⟨hp.2.2.1, hp.2.2.2⟩
     · exact ⟨GraphFabResidue.gisIoSome _ _ hx, GraphFabResidue.gisIoSome _ _ hy⟩
     · exact ⟨GraphFabResidue.gmemSome _ _ hx, GraphFabResidue.gmemSome _ _ hy⟩
+    · exact ⟨hp.2.2.1, hp.2.2.2⟩
   rcases CatReroute.rrIoLbl x hxy.1 with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
   rcases CatReroute.rrIoLbl y hxy.2 with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl <;>
   first
   | (show gmoLt rrIo.gfGd.gdG _ _; exact (gmoLtBSpec _ _ _).1 (by decide +kernel))
   | (exfalso
      rcases hr with ⟨hp, hm, hx, hy⟩ | ⟨hp, hx, hy⟩ | ⟨hp, hx, hy, hn⟩ | ⟨hx, hy, hp⟩ |
-       ⟨hx, hy, hb⟩
+       ⟨hx, hy, hb⟩ | ⟨hp, hx, hy⟩
      all_goals first
+       | exact hn6 ⟨hp, hx, hy⟩
        | exact absurd hp.2.1 (by decide)
        | exact absurd hp.1 (by decide)
        | exact absurd hx (by decide +kernel)
@@ -631,9 +637,16 @@ theorem rrIoNoCert : ¬ CertC rrIo.gfGd.gdG (ioCross rrIo) (2, 0) ⟨0, (0, 0), 
   · exact absurd ((gmoLtBSpec _ _ _).2 h) (by decide +kernel)
   · exact h
 
+/-- **SINCE [OWN.116] THE TRUSTED RESIDUE EXCLUDES `rrIo`.** -/
+theorem rrIoExcluded : ¬ ioResidueGmo rrIo := by
+  intro h
+  have := h (0, 0) (0, 2) (.inr (.inr (.inr (.inr (.inr ⟨(gpoBSpec _ _ _).1 (by decide +kernel),
+    by decide +kernel, by decide +kernel⟩)))))
+  exact absurd ((gmoLtBSpec _ _ _).2 this) (by decide +kernel)
+
 /-- The annotation: `(x, v)` re-routed to `REL = (0,5)` ((R2)), the next entry to
 `ACQ = (1,0)`. -/
-theorem rrIoAnn :
+theorem rrIoAnn (rrIoResidue : ioResidueGmo rrIo) :
     rrRawChain rrIo.gfGd (ioCross rrIo) (2, 0) none (1, 1) none
       [(⟨0, (0, 0), (0, 3)⟩, some ⟨(0, 5), (1, 0)⟩), (⟨1, (1, 1), (1, 1)⟩, none)] := by
   obtain ⟨hx0, hr0, hx1, hr1, -⟩ := rrIoRaw
@@ -647,14 +660,15 @@ theorem rrIoAnn :
     (fun _ => ⟨LStore false 0 [b1] .WCplain, by decide +kernel, rfl⟩)
 
 /-- **…and the re-routed chain certifies** at `ioCross`: `[(x, REL); (ACQ, w2)]`. -/
-theorem rrIoChain :
+theorem rrIoChain (rrIoResidue : ioResidueGmo rrIo) :
     chainC rrIo.gfGd.gdG (ioCross rrIo) (2, 0) (1, 1)
       [⟨0, (0, 0), (0, 5)⟩, ⟨1, (1, 0), (1, 1)⟩] :=
   chainCOfRrRaw rrIo.gfGd _ (ioCross rrIo) rrIoCatAD (ioCrossGmo rrIo rrIoCatAD.1 rrIoCatAD.2.2.1 rrIoResidue rrIoDiskRead14) _
-    (2, 0) none (1, 1) none trivial rrIoAnn
+    (2, 0) none (1, 1) none trivial (rrIoAnn rrIoResidue)
 
-theorem rrIoGmoLt : gmoLt rrIo.gfGd.gdG (2, 0) (1, 1) :=
-  chainCGmo _ _ _ _ _ (ioCrossGmo rrIo rrIoCatAD.1 rrIoCatAD.2.2.1 rrIoResidue rrIoDiskRead14) (by simp) rrIoChain
+theorem rrIoGmoLt (rrIoResidue : ioResidueGmo rrIo) : gmoLt rrIo.gfGd.gdG (2, 0) (1, 1) :=
+  chainCGmo _ _ _ _ _ (ioCrossGmo rrIo rrIoCatAD.1 rrIoCatAD.2.2.1 rrIoResidue rrIoDiskRead14) (by simp)
+    (rrIoChain rrIoResidue)
 
 end CatLin
 

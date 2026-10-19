@@ -33,7 +33,8 @@ NO gate-respecting member:
   read).  `uartintr` → `uartgetc`'s LSR read, then `consoleintr` → `acquire(&cons.lock)` →
   `holding+0x0`; hart y holds `cons.lock` after u's release and writes THR (`consputc` →
   `uartputc_sync`) before x's LSR read in fabric order; x's `holding+0x0` reads the stale 1 of u's swap.
-  `SbStuck.l6Cat`: RVWMO-consistent; `SbStuck.l6Res`: the trusted residue `ioResidueGmo` HOLDS;
+  `SbStuck.l6Cat`: RVWMO-consistent; `SbStuck.l6Res`: the trusted residue's pre-[OWN.116] arms HOLD
+  (since [OWN.116] the residue carries (R2″) and EXCLUDES the witness, `SbStuck.l6Excluded`);
   `SbStuck.l6WIo`: `gfDevWIo`.  **`SbStuck.l6NoMember`**: no member with program order, fabric order,
   `GateWr` and `CoGF` — `ReadsGF` is NOT used, so a value gate does not help: the cycle `a_y <po f <fab
   e_x <po m <gate W <co a_y`.  **`SbStuck.l6IoRdNo`**: the execution is excluded by the CANDIDATE trusted
@@ -224,33 +225,53 @@ theorem SbStuck.l6NoRl : SbStuck.l6Prog.flatten.all (fun l => !lbRl l) = true :=
 def SbStuck.r1B (GF : Gfexec) (x y : Geid) : Bool :=
   gpoB GF.gfGd.gdG x y && glblB GF.gfGd.gdG x lbIsMem && !gisIo GF.gfGd.gdG x && gisIo GF.gfGd.gdG y
 
-def SbStuck.resB (GF : Gfexec) : Bool :=
+/-- The pre-[OWN.116] residue text (R1) ∨ (R2) ∨ (R2′) ∨ (R3), as a boolean on a pair (= `r1B ∨
+armsNoR1B` without its (R2″) disjunct). -/
+def SbStuck.armsPreB (GF : Gfexec) (x y : Geid) : Bool :=
+  SbStuck.r1B GF x y ||
+  (gpoB GF.gfGd.gdG x y && gisIo GF.gfGd.gdG x && gisW GF.gfGd.gdG y) ||
+  (gpoB GF.gfGd.gdG x y && gisIo GF.gfGd.gdG x && gisR GF.gfGd.gdG y && decide (y.1 = NCPU)) ||
+  (gisIo GF.gfGd.gdG x && gisIo GF.gfGd.gdG y && gpoB GF.gfGd.gdG x y) ||
+  (glblB GF.gfGd.gdG x lbIsMem && glblB GF.gfGd.gdG y lbIsMem && SBAcqP.beforeB GF.gfDev x y)
+
+def SbStuck.resPreB (GF : Gfexec) : Bool :=
   (gevents GF.gfGd.gdG).all (fun x => (gevents GF.gfGd.gdG).all (fun y =>
-    !(SbStuck.r1B GF x y || SBAcqP.armsNoR1B GF x y) || gmoLtB GF.gfGd.gdG x y))
+    !SbStuck.armsPreB GF x y || gmoLtB GF.gfGd.gdG x y))
 
-theorem SbStuck.resBSound (GF : Gfexec) : SbStuck.resB GF = true → ioResidueGmo GF := by
-  intro hb x y hr
-  rcases (SBAcqP.ioResidueSplit GF x y).1 hr with ⟨hp, hm, hn, hi⟩ | hr'
-  · have hxy := gpoGevents _ _ _ hp
-    have h := (forallbForallTrue _ _).1 ((forallbForallTrue _ _).1 hb x hxy.1) y hxy.2
-    have harm : SbStuck.r1B GF x y = true := by
-      unfold SbStuck.r1B
-      simp [(gpoBSpec _ _ _).2 hp, (glblBSpec _ _ lbIsMem).2 hm, hn, hi]
-    simp only [harm, Bool.true_or, Bool.not_true, Bool.false_or] at h
-    exact (gmoLtBSpec _ _ _).1 h
-  · have hb' : SBAcqP.resNoR1B GF = true := by
-      unfold SBAcqP.resNoR1B
-      rw [forallbForallTrue]
-      intro x' hx'
-      rw [forallbForallTrue]
-      intro y' hy'
-      have h := (forallbForallTrue _ _).1 ((forallbForallTrue _ _).1 hb x' hx') y' hy'
-      cases h1 : SBAcqP.armsNoR1B GF x' y' <;> simp_all
-    exact SBAcqP.resNoR1BSound GF hb' x y hr'
+/-- Soundness: every pair in the pre-[OWN.116] arms is gmo-ordered. -/
+theorem SbStuck.resPreBSound (GF : Gfexec) : SbStuck.resPreB GF = true →
+    ∀ x y, ioResidue GF x y →
+      ¬ (WeakRvwmoGraph.gpo GF.gfGd.gdG x y ∧ gisIo GF.gfGd.gdG x = true ∧ gisR GF.gfGd.gdG y = true) →
+      gmoLt GF.gfGd.gdG x y := by
+  intro hb x y hr hn
+  have hxy : x ∈ gevents GF.gfGd.gdG ∧ y ∈ gevents GF.gfGd.gdG := by
+    rcases hr with ⟨hp, -⟩ | ⟨hp, -⟩ | ⟨hp, -⟩ | ⟨-, -, hp⟩ | ⟨⟨lx, hx, -⟩, ⟨ly, hy, -⟩, -⟩ | ⟨hp, -⟩
+    · exact gpoGevents _ _ _ hp
+    · exact gpoGevents _ _ _ hp
+    · exact gpoGevents _ _ _ hp
+    · exact gpoGevents _ _ _ hp
+    · exact ⟨geventsOfLbl _ _ _ hx, geventsOfLbl _ _ _ hy⟩
+    · exact gpoGevents _ _ _ hp
+  have h := (forallbForallTrue _ _).1 ((forallbForallTrue _ _).1 hb x hxy.1) y hxy.2
+  have harm : SbStuck.armsPreB GF x y = true := by
+    unfold SbStuck.armsPreB SbStuck.r1B
+    rcases hr with ⟨hp, hm, h1, h2⟩ | ⟨hp, h1, h2⟩ | ⟨hp, h1, h2, h3⟩ | ⟨h1, h2, hp⟩ | ⟨hx, hy, hb'⟩ |
+      h6
+    · simp [(gpoBSpec _ _ _).2 hp, (glblBSpec _ _ lbIsMem).2 hm, h1, h2]
+    · simp [(gpoBSpec _ _ _).2 hp, h1, h2]
+    · simp [(gpoBSpec _ _ _).2 hp, h1, h2, h3]
+    · simp [(gpoBSpec _ _ _).2 hp, h1, h2]
+    · simp [(glblBSpec _ _ lbIsMem).2 hx, (glblBSpec _ _ lbIsMem).2 hy, SBAcqP.beforeBOf _ _ _ hb']
+    · exact absurd h6 hn
+  simp only [harm, Bool.not_true, Bool.false_or] at h
+  exact (gmoLtBSpec _ _ _).1 h
 
-/-- **THE TRUSTED I/O ITEM HOLDS ON THE WITNESS** — (R1) (`e_y`, `a_y` before `f`), (R3) (`f` before
-`e_x`); (R2)/(R2′) are vacuous. -/
-theorem SbStuck.l6Res : ioResidueGmo SbStuck.l6F := SbStuck.resBSound _ (by decide +kernel)
+/-- **THE PRE-[OWN.116] TRUSTED I/O ITEM HELD ON THE WITNESS** (the record of F-P-W3-2) — (R1) (`e_y`,
+`a_y` before `f`), (R3) (`f` before `e_x`); (R2)/(R2′) vacuous.  Only (R2″) (`e_x` before `m`) fails. -/
+theorem SbStuck.l6Res : ∀ x y, ioResidue SbStuck.l6F x y →
+    ¬ (WeakRvwmoGraph.gpo SbStuck.l6F.gfGd.gdG x y ∧ gisIo SbStuck.l6F.gfGd.gdG x = true ∧
+      gisR SbStuck.l6F.gfGd.gdG y = true) → gmoLt SbStuck.l6F.gfGd.gdG x y :=
+  SbStuck.resPreBSound _ (by decide +kernel)
 
 /-- The fabric members are writes or I/O (`gfDevWIo`, the published bundle's named premise). -/
 theorem SbStuck.l6WIo : gfDevWIo SbStuck.l6F := by
@@ -286,8 +307,9 @@ theorem SbStuck.l6NoMember (p q : Geid → Nat)
 
 /-! ## 2.3 The read-side twin of (R1) excludes it -/
 
-/-- **CANDIDATE TRUSTED ARM (R2″)** (NOT a premise anywhere; for the owner question): an I/O event
-po-before a RAM READ of its row is gmo-before it.  STRONGER than RVWMO + PMAs. -/
+/-- **(R2″)** as a stand-alone predicate (the candidate of F-P-W3-2; since [OWN.116] it is the last arm
+of `ioResidue`, `SbStuck.ioRdOfRes`): an I/O event po-before a RAM READ of its row is gmo-before it.
+STRONGER than RVWMO + PMAs. -/
 def SbStuck.ioRdGmo (GF : Gfexec) : Prop :=
   ∀ x y, WeakRvwmoGraph.gpo GF.gfGd.gdG x y → gisIo GF.gfGd.gdG x = true → gisR GF.gfGd.gdG y = true →
     gmoLt GF.gfGd.gdG x y
@@ -326,5 +348,14 @@ theorem SbStuck.l6IoRdNo (GF : Gfexec) (hP : GF.gfGd.gdG.gxProg = SbStuck.l6Prog
   have k5 := SBAcqP.fabLt GF (1, 2) (2, 0) _ _ hio L12 L20 rfl rfl hfab
   exact gmoLtIrrefl _ _ (gmoLtTrans _ _ _ _ k1 (gmoLtTrans _ _ _ _ k2 (gmoLtTrans _ _ _ _ k3
     (gmoLtTrans _ _ _ _ k4 k5))))
+
+/-- The trusted residue (since [OWN.116]) gives (R2″). -/
+theorem SbStuck.ioRdOfRes (GF : Gfexec) : ioResidueGmo GF → SbStuck.ioRdGmo GF :=
+  fun h x y hpo hio hr => h x y (.inr (.inr (.inr (.inr (.inr ⟨hpo, hio, hr⟩)))))
+
+/-- **SINCE [OWN.116] THE RESIDUE EXCLUDES F-P-W3-2's EXECUTION.** -/
+theorem SbStuck.l6Excluded : ¬ ioResidueGmo SbStuck.l6F := fun h =>
+  SbStuck.l6IoRdNo SbStuck.l6F rfl (SBAcq.ok6OfCat _ SbStuck.l6Cat) h (SbStuck.ioRdOfRes _ h)
+    ⟨0, 1, rfl, rfl, by omega⟩ SbStuck.l6Rf.1 SbStuck.l6Rf.2
 
 end Weak
