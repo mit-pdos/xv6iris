@@ -124,6 +124,9 @@ compiler's `sail2` branch, before the liveness work.  The standard every deviati
   definition's reducibility cannot be changed without a check-disabling option.  So the WP's
   event rules come with `_at` variants that take the program and an equation to its event node.
   The register rules spell out their continuations' binder types.
+- **The policy** (owner, 2026-10-19): `notes/model-policy.md` is approved, and the decisions it had
+  left open are taken there (section 8): the A/D update's step-7 compare in a later lane, a
+  nondeterministic `exit_wait`, nothing filed upstream, F and D off in the configuration.
 
 ## From `notes/briefs/crash_layer.md`
 

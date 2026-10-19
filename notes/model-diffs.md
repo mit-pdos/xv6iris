@@ -9,7 +9,8 @@ MachCSL runs the model goes here in the same commit.
 record the fix here.  The tiers a deviation may fall in, and what each requires, are in
 `notes/model-policy.md` (section 4).  Upstream status: the A/D update is upstream PR #1860 (open,
 deferred by the maintainers) and the two cherry-picked compiler fixes are PRs #1750 and #1774
-(open); nothing else has been offered upstream (owner, 2026-10-19: not for now).
+(open, by their original authors); this project files nothing (owner, 2026-10-19: it keeps its own
+fork; the upstream status of every row is "owner decided not to file").
 
 "Upstream" is:
 - the model: [riscv/sail-riscv](https://github.com/riscv/sail-riscv) 0.16, `e5acebb0`;
@@ -114,15 +115,14 @@ Each is conditional and reports itself in the regeneration log.
 
 ## 6. Open decisions
 
-As the policy leaves them (`notes/model-policy.md`, section 8), 2026-10-19:
+Decided by the owner 2026-10-19 (`notes/model-policy.md`, section 8); each item is planned work,
+not an open question:
 
-- Fork commit 1 does not compare the fresh PTE with the walked one (section 1, row 1): keep the
-  recorded gap, complete the update with the spec's step-7 comparison in a later lane
-  (recommended), or drop the commit.
-- The driver's `exit_wait = false` (section 5): the policy prefers a nondeterministic `exit_wait`,
-  so that the theorems cover both of upstream's schedules (recommended, with the WFI leaves).
-- Which upstream candidates to file, and when: fork commits 3, 4 and 6; the two compiler fixes of
-  ours.  (Owner, 2026-10-19: not for now.)
-- Whether `misa` should advertise F and D, whose instructions are not compiled (inherited from the
-  Rocq era's device-conformance findings; a T0 change with proof-side consequences for the
-  derived `misa` value).
+- Fork commit 1 does not compare the fresh PTE with the walked one (section 1, row 1): the
+  recorded gap stays for now; a lane after the bump's leaves completes the update with the spec's
+  step-7 comparison (a fork commit under T5).
+- The driver's `exit_wait = false` (section 5) becomes nondeterministic with the WFI leaves, so
+  that the theorems cover both of upstream's schedules.
+- Nothing is filed upstream; the project keeps its own fork.
+- F and D go off in the configuration (T0(a)), so that `misa` advertises what is compiled: a
+  configuration lane with its own regeneration (the derived `misa` value changes).

@@ -1,6 +1,7 @@
 # The machine model: what it is, what may change in it, and how
 
-**Status:** proposed 2026-10-19, during the sail-riscv 0.16 bump, for the owner's approval.  It
+**Status:** approved by the owner 2026-10-19 (proposed the same day, during the sail-riscv 0.16
+bump).  It
 consolidates the owner's rulings on the bump (`notes/design-rulings.md`, "The sail-riscv 0.16
 bump"), the rules the Rocq-era project laid down, and the policies of the projects this tree
 depends on (section 7, with an assessment of each).  It is the standard every change to the model
@@ -169,9 +170,10 @@ through T0(b).
 - **The register** (`notes/model-diffs.md`): one row per deviation with the fields of section 4,
   updated in the same commit; "upstream status" is one of *PR #n open / merged in release X /
   candidate, not filed / owner decided not to file*.
-- **Upstreaming.** The owner decides when anything is offered upstream.  Until then every fork
-  commit is kept in upstreamable form: one topic, a spec quotation where the tier asks for one,
-  upstream's style, and the disclosure upstream requires for AI-assisted work.
+- **Upstreaming.** Nothing is filed upstream (owner, 2026-10-19): the project keeps its own fork,
+  and filing is low priority.  Every fork commit still keeps the shape that would allow it -- one
+  topic, a spec quotation where the tier asks for one, upstream's style -- as hygiene, and the
+  register's "upstream status" records *owner decided not to file*.
 - **Public claims and notes.** README and every note describe the model as section 1's claim.
   Deviation headers ("Deviations from Rocq", "Deviations from upstream") and the rule that a
   tracked file points at nothing outside the repository are this tree's conventions, not
@@ -211,7 +213,7 @@ docs and ChangeLog; the Sail manual and the Lean backend's sources; lean-sail v7
 
 | Deviation | Tier | Verdict |
 |---|---|---|
-| fork 1 `2dfb4844`, atomic PTE A/D update (carried since the Rocq era's fork) | **T5** (owner exception, bump decision D3) | keep: `MachCSL.TsoMem`'s exclusive PTE kinds (`akPteRe`) and `WpPtWalk`/`WpPtWalkOwn` depend on it; the step-7 value compare the spec asks for (and upstream's reviewers asked for on PR #1860) is the recorded residual gap -- owner decision below |
+| fork 1 `2dfb4844`, atomic PTE A/D update (carried since the Rocq era's fork) | **T5** (owner exception, bump decision D3) | keep: `MachCSL.TsoMem`'s exclusive PTE kinds (`akPteRe`) and `WpPtWalk`/`WpPtWalkOwn` depend on it; the step-7 value compare the spec asks for (and upstream's reviewers asked for on PR #1860) is the recorded residual gap, to be completed in a later lane (decision (2) below) |
 | fork 2 `3fdb4bca`, pins read without the SIG | **T2** | keep: upstream has no knob (the SIG is its only external-interrupt source and the pin registers are private); framed for upstream's external-controller direction |
 | fork 3 `69ed097e`, fork 4 `9da94b63` | **T3** | keep; upstream candidates |
 | fork 5 `d2cb43fc`, F/D out of `postlude` | **T1** (by a `requires` edit; the dropped arms unreachable with H off) | keep; local (upstream would not take a footprint change) |
@@ -219,16 +221,18 @@ docs and ChangeLog; the Sail manual and the Lean backend's sources; lean-sail v7
 | compiler: short-circuit, type-level parens (PRs #1750, #1774 open); keyword escape, `termination_by` (ours) | I5 rule | keep until a release contains them; the two of ours are candidates |
 | patches A, B | I7 rule | keep; both meaning-preserving; retire when the backend allows |
 | config items 1-7 | **T0**: 1, 2, 4 (a); 3, 5, 6 forced by `config_is_valid` with H/Sdtrig off, (a); 7 (b): the user tier's misaligned-AMO arms depend on the pre-0.13 behaviour, which the spec permits | keep |
-| module subset + Sdtrig; `misa` advertises F/D it does not compile | **T1** | keep, documented; the inherited "which machine" question (whether `misa` should advertise F and D at all) stays open for the owner |
+| module subset + Sdtrig; `misa` advertises F/D it does not compile | **T1** | keep; `misa`'s F and D bits go with the configuration lane of decision (5) below |
 | board line `written_trigger_index := none` | §5 (model bookkeeping, flagged; upstream relies on the declared `None()`) | keep |
 | `hgeie` existential, `mhartid` pinned in `hwConfig` | §5 | keep |
-| the driver's `exit_wait = false` | §5: a recorded restriction (upstream runs two schedules; the spec allows WFI to wait or to retire) | the policy prefers a nondeterministic `exit_wait`; owner decision below |
+| the driver's `exit_wait = false` | §5: a recorded restriction (upstream runs two schedules; the spec allows WFI to wait or to retire) | becomes nondeterministic (decision (3) below) |
 | lean-sail's rendering of `undefined_*`, `exit`/`assert`, printing, uninitialised registers | interface facts, recorded in `notes/model-diffs.md` §5 | none on a kernel path |
 | the dropped fork reset `a5460414` (`hideleg`/`hgeie`) | would have been a reset in the fork for M1's sake | dropped, correctly |
 | README's "official semantics", "unmodified"; `master` for `sail2`; "nothing reported upstream" | §1, §6 | corrected 2026-10-19 |
 
-**Open for the owner (2026-10-19):** (1) approve or amend this policy; (2) the T5 exception's
-gap: keep the A/D update as it is (recorded gap), complete it with the spec's step-7 compare in a
-later lane (recommended), or drop it; (3) make `exit_wait` nondeterministic (recommended, with the
-WFI leaves of P3); (4) which of the upstream candidates (forks 3, 4, 6; the two compiler fixes) to
-file, and when; (5) the inherited "which machine" question for `misa`'s F and D bits.
+**Decided by the owner (2026-10-19):** (1) this policy is approved; (2) the T5 exception stays
+with its recorded gap for now and is completed with the spec's step-7 compare in a lane of its own
+after the bump's leaves (a fork commit under T5, re-ruled then); (3) `exit_wait` becomes
+nondeterministic, with the WFI leaves of P3; (4) nothing is filed upstream (section 6); (5) F and D
+are turned off in the configuration (T0(a): the kernel never enables FS, and the module subset
+compiles neither), so that `misa` advertises what is compiled -- a configuration lane with its own
+regeneration, before the remaining leaves.
