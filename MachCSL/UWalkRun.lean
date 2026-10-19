@@ -841,7 +841,7 @@ def mkCtx (lemmas : Array Syntax.Term) : TacticM (Simp.Context × Simp.SimprocsA
       reduceClosedOr, reduceClosedDecide, reduceClosedIte, reduceClosedDIte, reduceClosedEq, reduceClosedNe,
       reduceClosedLe, reduceClosedLt, reduceClosedMem, sail_facts,
       Bool.true_and, Bool.and_true, Bool.false_and, Bool.and_false, Bool.true_or, Bool.or_true,
-      Bool.false_or, Bool.or_false, Bool.not_true, Bool.not_false, Bool.not_not, LeanRV64D.Functions.not,
+      Bool.false_or, Bool.or_false, Bool.not_true, Bool.not_false, Bool.not_not, LeanRV64D.not,
       bne_self_eq_false, beq_self_eq_true, Bool.false_eq_true, true_iff, false_iff, not_true_eq_false,
       not_false_eq_true, Bool.not_eq_true, Bool.not_eq_false, beq_iff_eq, bne_iff_ne, ne_eq,
       decide_eq_true_eq, decide_eq_false_iff_not, Option.some.injEq, reduceCtorEq,

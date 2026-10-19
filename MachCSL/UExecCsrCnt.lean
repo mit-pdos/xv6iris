@@ -171,9 +171,10 @@ theorem uxr_cE_cnt (hD : UxrFoot D) (hc : UxrCfg s) (orc : UOrc) (i : BitVec 5) 
 walk): the two enable bits, as data. -/
 theorem uxr_counter_enabled (hD : UxrFoot D) (hc : UxrCfg s) (orc : UOrc) (k : Nat) :
     runRW D orc s (counter_enabled k .User) = some (uxrCen s.file k, s, orc) := by
-  unfold counter_enabled feature_enabled_for_priv_bool feature_enabled_for_priv
+  unfold counter_enabled feature_enabled_for_priv
   rw [runRW_bind_some D _ _ orc orc s s _ (uxr_readReg orc .mcounteren (hD _ (by decide)))]
   rw [runRW_bind_some D _ _ orc orc s s _ (uxr_readReg orc .scounteren (hD _ (by decide)))]
+  rw [runRW_bind_some D _ _ orc orc s s _ (uxr_readReg orc .hcounteren (hD _ (by decide)))]
   simp only [uxrCen]
   generalize (BitVec.access (s.file .mcounteren) k == 1#1) = a
   generalize (BitVec.access (s.file .scounteren) k == 1#1) = b
@@ -237,6 +238,7 @@ theorem uxr_result_hi (hD : UxrFoot D) (hc : UxrCfg s) (orc : UOrc) (i : BitVec 
 
 /-- The counters a read returns, off the file (as data). -/
 def uxrCntPin (f : RegFile) : (r : Register) → Option (RegisterType r)
+  | .cur_privilege => some Privilege.User
   | .mcycle => some (f .mcycle)
   | .mtime => some (f .mtime)
   | .minstret => some (f .minstret)
@@ -255,8 +257,10 @@ theorem uxr_readCSR_run (f : RegFile) (i : BitVec 5) :
     (runRead (uxrCntPin f) (read_CSR (uxrCntLo i))).isSome = true := by
   uxr_cnt_cases i <;> kernel_rfl
 
-/-- **`read_CSR` of a low counter** reads the counter, nothing else. -/
-theorem uxr_readCSR_cnt (hD : UxrFoot D) (orc : UOrc) (i : BitVec 5) :
+/-- **`read_CSR` of a low counter** reads the counter (and, for `time`, since
+sail-riscv 0.16, `cur_privilege`: `htimedelta` is added in a virtual privilege), nothing
+else. -/
+theorem uxr_readCSR_cnt (hD : UxrFoot D) (hc : UxrCfg s) (orc : UOrc) (i : BitVec 5) :
     runRW D orc s (read_CSR (uxrCntLo i)) = some (uxrCntVal s.file i, s, orc) := by
   have h := uxr_readCSR_run s.file i
   unfold uxrCntVal
@@ -269,7 +273,7 @@ theorem uxr_readCSR_cnt (hD : UxrFoot D) (orc : UOrc) (i : BitVec 5) :
     refine runRW_of_runRead D (uxrCntPin s.file) orc s (fun r v hv => ?_) _ w b hr
     unfold uxrCntPin at hv
     split at hv <;> simp only [reduceCtorEq, Option.some.injEq] at hv <;> subst hv <;>
-      exact ⟨hD _ (by decide), rfl⟩
+      first | exact ⟨hD _ (by decide), rfl⟩ | exact ⟨hD _ (by decide), hc.priv⟩
 
 /-- **`doCSR`'s `CSR_Check_OK` continuation at a low counter, for a read**
 (Rocq `exec_doCSR_U`'s retiring branch): the counter into `rd`. -/
@@ -279,7 +283,7 @@ theorem uxr_doCSR_ok (hD : UxrFoot D) (hA : UxaFoot D) (hc : UxrCfg s) (i j : Bi
       some (CSRCheckResult.CSR_Check_OK (), s, orc)) (orc : UOrc) :
     runRW D orc s (doCSR (uxrCntLo i) v (regidx.Regidx j) op .CSRRead) =
       some (RETIRE_SUCCESS, uxaWr s j (uxrCntVal s.file i), orc) := by
-  have hread := fun orc => uxr_readCSR_cnt (s := s) hD orc i
+  have hread := fun orc => uxr_readCSR_cnt (s := s) hD hc orc i
   unfold doCSR
   rw [runRW_bind_some D _ _ orc orc s s Privilege.User
       (by rw [uxr_readReg orc .cur_privilege (hD _ (by decide)), hc.priv]),
