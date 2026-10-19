@@ -80,105 +80,118 @@ theorem uft_dite_neg (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (c : Prop) (
 
 theorem uft_error (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (e : Sail.Error exception)
     (k : Empty → SailM X) :
-    uftRun D orc s (FreeM.impure (Except.error e) k : SailM X) = none := rfl
+    uftRun D orc s (FreeM.impure (.inl (Except.error e)) k : SailM X) = none := rfl
 
 /-- A non-fetch node whose one-node walk is known. -/
-theorem uft_node_of {X : Type} (D : UFoot) (orc : UOrc) (s : UWSt) (c : Eff RegisterType exception)
+theorem uft_node_of {X : Type} (D : UFoot) (orc : UOrc) (s : UWSt) (c : SailEff)
     (k : ArchSem.Effect.ret c → SailM X) (hc : uftIsFetch c = false) (v : ArchSem.Effect.ret c) (s' : UWSt)
     (o' : UOrc) (h1 : runRW D orc s (FreeM.impure c FreeM.pure) = some (v, s', o')) :
     uftRun D orc s (FreeM.impure c k) = uftRun D o' s' (k v) := by
   rw [uftRun_node D orc s c k hc, h1]; rfl
 
-theorem uft_rr (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (r : Register) (v : RegisterType r)
-    (k : RegisterType r → SailM X) (res : Option (X × UWSt × UOrc))
+theorem uft_rr (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (r : Register) (a : Option Arch.sys_reg_id)
+    (v : RegisterType r) (k : RegisterType r → SailM X) (res : Option (X × UWSt × UOrc))
     (hd : D.Dr r = true) (hv : s.file r = v) (h : uftRun D orc s (k v) = res) :
-    uftRun D orc s (FreeM.impure (.ok (.regRead r)) k) = res := by
+    uftRun D orc s (FreeM.impure (.inl (.ok (.regRead r a))) k) = res := by
   rw [← h]
-  exact uft_node_of D orc s (.ok (.regRead r)) k rfl v s orc (by rw [runRW_regRead_dr D orc s r _ hd, hv]; rfl)
+  exact uft_node_of D orc s (.inl (.ok (.regRead r a))) k rfl v s orc
+    ((runRW_regRead_dr D orc s r (a := a) (FreeM.pure : RegisterType r → SailM (RegisterType r)) hd).trans
+      (by rw [hv]; rfl))
 
-theorem uft_rr_any (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (r : Register)
+theorem uft_rr_any (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (r : Register) (a : Option Arch.sys_reg_id)
     (k : RegisterType r → SailM X) (res : Option (X × UWSt × UOrc))
     (hd : D.Dr r = false) (ha : D.Dany r = true) (h : uftRun D orc.tail s (k ((orc 0).reg r)) = res) :
-    uftRun D orc s (FreeM.impure (.ok (.regRead r)) k) = res := by
+    uftRun D orc s (FreeM.impure (.inl (.ok (.regRead r a))) k) = res := by
   rw [← h]
-  exact uft_node_of D orc s (.ok (.regRead r)) k rfl ((orc 0).reg r) s orc.tail
-    (by rw [runRW_regRead_any D orc s r _ hd ha]; rfl)
+  exact uft_node_of D orc s (.inl (.ok (.regRead r a))) k rfl ((orc 0).reg r) s orc.tail
+    ((runRW_regRead_any D orc s r (a := a) (FreeM.pure : RegisterType r → SailM (RegisterType r)) hd ha).trans
+      rfl)
 
-theorem uft_rw (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (r : Register) (v : RegisterType r)
-    (k : PUnit → SailM X) (res : Option (X × UWSt × UOrc))
+theorem uft_rw (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (r : Register) (a : Option Arch.sys_reg_id)
+    (v : RegisterType r) (k : PUnit → SailM X) (res : Option (X × UWSt × UOrc))
     (hd : D.Dw r = true) (h : uftRun D orc (UWSt.mk (s.pin.set r v) s.rs s.mm s.rv) (k ()) = res) :
-    uftRun D orc s (FreeM.impure (.ok (.regWrite r v)) k) = res := by
+    uftRun D orc s (FreeM.impure (.inl (.ok (.regWrite r a v))) k) = res := by
   rw [← h]
-  exact uft_node_of D orc s (.ok (.regWrite r v)) k rfl PUnit.unit _ orc (by simp only [runRW, hd, ite_true])
+  exact uft_node_of D orc s (.inl (.ok (.regWrite r a v))) k rfl PUnit.unit _ orc
+    ((runRW_regWrite_dw D orc s r (a := a) v (FreeM.pure : PUnit → SailM PUnit) hd).trans rfl)
 
-theorem uft_mrd (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat)
-    (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
-    (k : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → SailM X)
-    (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * n))
-    (hif : akIfetch req.access_kind = false) (hn : n < 2 ^ 64) (hex : akExcl req.access_kind = false)
-    (hr : bmRead s.mm req.pa n = some w) (h : uftRun D orc s (k (.Ok (w, none))) = res) :
-    uftRun D orc s (FreeM.impure (.ok (.memRead n vasize req)) k) = res := by
+theorem uft_mrd (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (R : MemRequest)
+    (k : ERet (.memRead R) → SailM X)
+    (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * R.size))
+    (hif : akIfetch R.accessKind = false) (hn : R.size < 2 ^ 64) (hex : akExcl R.accessKind = false)
+    (hr : bmRead s.mm R.pa R.size = some w) (h : uftRun D orc s (k (Except.ok (w, 0#R.numTag))) = res) :
+    uftRun D orc s (FreeM.impure (.inl (.ok (.memRead R))) k) = res := by
   rw [← h]
-  exact uft_node_of D orc s (.ok (.memRead n vasize req)) k hif
-    (Result.Ok (w, none) : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort) s orc
+  exact uft_node_of D orc s (.inl (.ok (.memRead R))) k hif (Except.ok (w, 0#R.numTag)) s orc
     (by simp only [runRW, hif, hn, hex, hr, Bool.false_eq_true, ↓reduceIte])
 
-theorem uft_mrdx (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat)
-    (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
-    (k : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → SailM X)
-    (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * n))
-    (hif : akIfetch req.access_kind = false) (hn : n < 2 ^ 64) (hex : akExcl req.access_kind = true)
-    (hacq : akAcq req.access_kind = false) (hr : bmRead s.mm req.pa n = some w)
-    (h : uftRun D orc (UWSt.mk s.pin s.rs s.mm true) (k (.Ok (w, none))) = res) :
-    uftRun D orc s (FreeM.impure (.ok (.memRead n vasize req)) k) = res := by
+theorem uft_mrdxA (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (R : MemRequest)
+    (k : ERet (.memRead R) → SailM X)
+    (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * R.size))
+    (hif : akIfetch R.accessKind = false) (hn : R.size < 2 ^ 64) (hex : akExcl R.accessKind = true)
+    (hr : bmRead s.mm R.pa R.size = some w)
+    (h : uftRun D orc (UWSt.mk s.pin s.rs s.mm true) (k (Except.ok (w, 0#R.numTag))) = res) :
+    uftRun D orc s (FreeM.impure (.inl (.ok (.memRead R))) k) = res := by
   rw [← h]
-  exact uft_node_of D orc s (.ok (.memRead n vasize req)) k hif
-    (Result.Ok (w, none) : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort) _ orc
+  exact uft_node_of D orc s (.inl (.ok (.memRead R))) k hif (Except.ok (w, 0#R.numTag)) _ orc
     (by simp only [runRW, hif, hn, hex, hr, Bool.false_eq_true, ↓reduceIte])
 
-theorem uft_mwr (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat)
-    (req : Mem_write_request n vasize Arch.pa Arch.translation Arch.arch_ak)
-    (k : Result (Option Bool) Arch.abort → SailM X)
-    (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * n))
-    (hn : n < 2 ^ 64) (hv : req.value = some w) (ho : bmOwned s.mm req.pa n = true)
-    (hex : akExcl req.access_kind = false)
-    (h : uftRun D orc (UWSt.mk s.pin s.rs (bmWrite s.mm req.pa n w) false) (k (.Ok (some true))) = res) :
-    uftRun D orc s (FreeM.impure (.ok (.memWrite n vasize req)) k) = res := by
-  rw [← h]
-  exact uft_node_of D orc s (.ok (.memWrite n vasize req)) k rfl
-    (Result.Ok (some true) : Result (Option Bool) Arch.abort) _ orc
-    (by simp only [runRW, hn, hv, ho, ↓reduceIte])
+theorem uft_mrdx (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (R : MemRequest)
+    (k : ERet (.memRead R) → SailM X)
+    (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * R.size))
+    (hif : akIfetch R.accessKind = false) (hn : R.size < 2 ^ 64) (hex : akExcl R.accessKind = true)
+    (_hacq : akAcq R.accessKind = false) (hr : bmRead s.mm R.pa R.size = some w)
+    (h : uftRun D orc (UWSt.mk s.pin s.rs s.mm true) (k (Except.ok (w, 0#R.numTag))) = res) :
+    uftRun D orc s (FreeM.impure (.inl (.ok (.memRead R))) k) = res :=
+  uft_mrdxA X D orc s R k res w hif hn hex hr h
 
-theorem uft_mwrx (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat)
-    (req : Mem_write_request n vasize Arch.pa Arch.translation Arch.arch_ak)
-    (k : Result (Option Bool) Arch.abort → SailM X)
-    (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * n))
-    (hn : n < 2 ^ 64) (hv : req.value = some w) (ho : bmOwned s.mm req.pa n = true)
-    (hex : akExcl req.access_kind = true) (hrv : s.rv = true)
-    (h : uftRun D orc (UWSt.mk s.pin s.rs (bmWrite s.mm req.pa n w) false) (k (.Ok (some true))) = res) :
-    uftRun D orc s (FreeM.impure (.ok (.memWrite n vasize req)) k) = res := by
+theorem uft_mwrA (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (R : MemRequest)
+    (w : BitVec (8 * R.size)) (tags : BitVec R.numTag) (k : ERet (.memWrite R w tags) → SailM X)
+    (res : Option (X × UWSt × UOrc))
+    (hn : R.size < 2 ^ 64) (ho : bmOwned s.mm R.pa R.size = true)
+    (h : uftRun D orc (UWSt.mk s.pin s.rs (bmWrite s.mm R.pa R.size w) false) (k (Except.ok ())) = res) :
+    uftRun D orc s (FreeM.impure (.inl (.ok (.memWrite R w tags))) k) = res := by
   rw [← h]
-  exact uft_node_of D orc s (.ok (.memWrite n vasize req)) k rfl
-    (Result.Ok (some true) : Result (Option Bool) Arch.abort) _ orc
-    (by simp only [runRW, hn, hv, ho, ↓reduceIte])
+  exact uft_node_of D orc s (.inl (.ok (.memWrite R w tags))) k rfl (Except.ok ()) _ orc
+    (by simp only [runRW, hn, ho, ↓reduceIte])
 
-theorem uft_choose (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (p : Sail.Primitive)
-    (k : p.reflect → SailM X) (res : Option (X × UWSt × UOrc))
-    (h : uftRun D orc.tail s (k ((orc 0).ch p)) = res) :
-    uftRun D orc s (FreeM.impure (.ok (.choose p)) k) = res := by
+theorem uft_mwr (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (R : MemRequest)
+    (w : BitVec (8 * R.size)) (tags : BitVec R.numTag) (k : ERet (.memWrite R w tags) → SailM X)
+    (res : Option (X × UWSt × UOrc))
+    (hn : R.size < 2 ^ 64) (ho : bmOwned s.mm R.pa R.size = true)
+    (_hex : akExcl R.accessKind = false)
+    (h : uftRun D orc (UWSt.mk s.pin s.rs (bmWrite s.mm R.pa R.size w) false) (k (Except.ok ())) = res) :
+    uftRun D orc s (FreeM.impure (.inl (.ok (.memWrite R w tags))) k) = res :=
+  uft_mwrA X D orc s R w tags k res hn ho h
+
+theorem uft_mwrx (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (R : MemRequest)
+    (w : BitVec (8 * R.size)) (tags : BitVec R.numTag) (k : ERet (.memWrite R w tags) → SailM X)
+    (res : Option (X × UWSt × UOrc))
+    (hn : R.size < 2 ^ 64) (ho : bmOwned s.mm R.pa R.size = true)
+    (_hex : akExcl R.accessKind = true) (_hrv : s.rv = true)
+    (h : uftRun D orc (UWSt.mk s.pin s.rs (bmWrite s.mm R.pa R.size w) false) (k (Except.ok ())) = res) :
+    uftRun D orc s (FreeM.impure (.inl (.ok (.memWrite R w tags))) k) = res :=
+  uft_mwrA X D orc s R w tags k res hn ho h
+
+theorem uft_choose (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n : FinChoice)
+    (k : Fin (fcN n) → SailM X) (res : Option (X × UWSt × UOrc)) (hn : 0 < fcN n)
+    (h : uftRun D orc.tail s (k (Fin.mk ((orc 0).ch .nat % fcN n) (Nat.mod_lt _ hn))) = res) :
+    uftRun D orc s (FreeM.impure (.inr n) k : SailM X) = res := by
   rw [← h]
-  exact uft_node_of D orc s (.ok (.choose p)) k rfl ((orc 0).ch p) s orc.tail rfl
+  exact uft_node_of D orc s (.inr n) k rfl (Fin.mk ((orc 0).ch .nat % fcN n) (Nat.mod_lt _ hn)) s orc.tail
+    (by simp only [runRW, hn, dite_true])
 
 theorem uft_silent (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (m m' : SailM X)
     (res : Option (X × UWSt × UOrc)) (hdef : uftRun D orc s m = uftRun D orc s m')
     (h : uftRun D orc s m' = res) : uftRun D orc s m = res := hdef.trans h
 
-/-- **The fetch leaf**, in the stepper's sub-fact shape. -/
-theorem uft_leaf (D : UFoot) (o : UOrc) (s : UWSt) (n vasize : Nat)
-    (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
-    (hk : akIfetch req.access_kind = true) (hn : n < 2 ^ 64) (ho : bmOwned s.mm req.pa n = true) :
-    uftRun D o s (ArchSem.sail_mem_read req) =
-      some (.Ok ((o 0).ch (.bitvector (8 * n)), none), s, o.tail) :=
+/-- **The fetch leaf**, in the stepper's sub-fact shape (at the model's `sail_mem_read`; the
+answer as the model's byte vectors). -/
+theorem uft_leaf (D : UFoot) (o : UOrc) (s : UWSt) (n nt : Nat)
+    (req : Mem_request n nt Arch.addr_size Arch.addr_space Arch.mem_acc)
+    (hk : akIfetch req.access_kind = true) (hn : n < 2 ^ 64) (ho : bmOwned s.mm req.address n = true) :
+    uftRun D o s (LeanRV64D.ArchSem.sail_mem_read req) =
+      some (.Ok (bitvec_to_vecbytes ((o 0).ch (.bitvector (8 * n))), bitvec_to_vecbool 0#nt), s, o.tail) :=
   uftRun_sail_mem_read_ifetch D o s req hk hn ho
 
 /-! ## The tactic -/
@@ -192,7 +205,8 @@ def twins : List (Name × Name) :=
    (``uwk_bind_none, ``uft_bind_none), (``uwk_congr, ``uft_congr), (``uwk_ite_pos, ``uft_ite_pos),
    (``uwk_ite_neg, ``uft_ite_neg), (``uwk_dite_pos, ``uft_dite_pos), (``uwk_dite_neg, ``uft_dite_neg),
    (``uwk_error, ``uft_error), (``uwk_rr, ``uft_rr), (``uwk_rr_any, ``uft_rr_any), (``uwk_rw, ``uft_rw),
-   (``uwk_mrd, ``uft_mrd), (``uwk_mrdx, ``uft_mrdx), (``uwk_mwr, ``uft_mwr), (``uwk_mwrx, ``uft_mwrx),
+   (``uwk_mrd, ``uft_mrd), (``uwk_mrdx, ``uft_mrdx), (``uwk_mrdxA, ``uft_mrdxA), (``uwk_mwr, ``uft_mwr),
+   (``uwk_mwrx, ``uft_mwrx), (``uwk_mwrA, ``uft_mwrA),
    (``uwk_choose, ``uft_choose), (``uwk_silent, ``uft_silent)]
 
 /-- `runRW` ↦ `uftRun` and every step lemma ↦ its twin. -/

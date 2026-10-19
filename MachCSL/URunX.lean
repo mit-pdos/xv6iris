@@ -34,20 +34,19 @@ open LeanRV64D LeanRV64D.Functions
 
 /-- A read the text map answers: non-empty, below `2^64` bytes, not
 exclusive (an instruction fetch or a plain load), its window owned by `T`. -/
-def uxTextRead (T : BMap) {n vasize : Nat}
-    (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak) : Bool :=
-  decide (0 < n) && decide (n < 2 ^ 64) && !akExcl req.access_kind && bmOwned T req.pa n
+def uxTextRead (T : BMap) (req : MemRequest) : Bool :=
+  decide (0 < req.size) && decide (req.size < 2 ^ 64) && !akExcl req.accessKind && bmOwned T req.pa req.size
 
 /-- **The walker with a stamped text map.** -/
 def uxRun {X : Type} (D : UFoot) (T : BMap) : UOrc → UWSt → SailM X → Option (X × UWSt × UOrc)
   | orc, s, .pure x => some (x, s, orc)
-  | orc, s, .impure (.ok (.memRead n vasize req)) k =>
+  | orc, s, .impure (.inl (.ok (.memRead req))) k =>
     if uxTextRead T req then
-      match bmRead T req.pa n with
-      | some w => uxRun D T orc s (k (.Ok (w, none)))
+      match bmRead T req.pa req.size with
+      | some w => uxRun D T orc s (k (Except.ok (w, 0#req.numTag)))
       | none => none
     else
-      (runRW D orc s (FreeM.impure (.ok (.memRead n vasize req)) FreeM.pure)).bind
+      (runRW D orc s (FreeM.impure (.inl (.ok (.memRead req))) FreeM.pure)).bind
         fun r => uxRun D T r.2.2 r.2.1 (k r.1)
   | orc, s, .impure c k =>
     (runRW D orc s (FreeM.impure c FreeM.pure)).bind fun r => uxRun D T r.2.2 r.2.1 (k r.1)

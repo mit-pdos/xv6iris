@@ -144,27 +144,27 @@ theorem uic_ctxBytesX_read (m : FlatMem) (ξ : CtxId) (K : Nat) (pa : PAddr) (n 
       ⌜∀ (ag : Agent) (tvn : Nat), K ≤ tvn → m.readBytes ag tvn pa n w⌝ :=
   uic_ctxBytesX_read' m ξ K pa dq (nthByte w) n
 
-/-- **A5, THE FETCH GATE** (Rocq `ctx_phys_xfetch_ok`): an instruction fetch
-of stamped bytes, once the hart's instruction view has passed the stamp,
-returns exactly them. -/
-theorem swp_sail_mem_read_ifetch_x (cpu : CPU) {n vasize : Nat}
-    (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
-    (ξ : CtxId) (K : Nat) (dq : DFrac) (w : BitVec (8 * n)) (hk : akIfetch req.access_kind = true)
-    (Φ : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → IProp GF) :
-    ctxBytesX ξ K req.pa n dq w ∗ iviewLb cpu K ∗ ▷ (ctxBytesX ξ K req.pa n dq w -∗ Φ (.Ok (w, none)))
-    ⊢ swp cpu (ArchSem.sail_mem_read req) Φ := by
-  unfold ArchSem.sail_mem_read PreSail.sail_mem_read PreSail.emit
+/-- **A5, THE FETCH GATE** (Rocq `ctx_phys_xfetch_ok`), at a raw node (concurrency interface v2:
+the walkers see `.impure (.inl (.ok (.memRead R))) k`): an instruction fetch of stamped bytes,
+once the hart's instruction view has passed the stamp, returns exactly them (with an empty tag
+vector). -/
+theorem swp_memRead_ifetch_x_k (cpu : CPU) (R : MemRequest) (ξ : CtxId) (K : Nat) (dq : DFrac)
+    (w : BitVec (8 * R.size)) (hk : akIfetch R.accessKind = true) {X : Type}
+    (k : ERet (.memRead R) → SailM X) (Φ : X → IProp GF) :
+    ctxBytesX ξ K R.pa R.size dq w ∗ iviewLb cpu K ∗
+    ▷ (ctxBytesX ξ K R.pa R.size dq w -∗ swp cpu (k (Except.ok (w, 0#R.numTag))) Φ)
+    ⊢ swp cpu (FreeM.impure (.inl (.ok (.memRead R))) k) Φ := by
   iintro ⟨Hb, #Hiv, HΦ⟩
   have hex := akExcl_of_ifetch _ hk
-  iapply swp_event cpu (.memRead n vasize req) (fun v => FreeM.pure v) Φ
+  iapply swp_event_at cpu (FreeM.impure (.inl (.ok (.memRead R))) k) (.memRead R) (fun v => k v) rfl Φ
     (fun _ _ hb => by
-      have h1 : akExcl req.access_kind = true := hb.1
+      have h1 : akExcl R.accessKind = true := hb.1
       rw [hex] at h1
       exact absurd h1 (by decide))
   iintro %σ Hσ
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
-  ihave %hrd : ⌜∀ (ag : Agent) (tvn : Nat), K ≤ tvn → σ.mem.readBytes ag tvn req.pa n w⌝ $$ [Hmem Hb]
-  · iapply uic_ctxBytesX_read σ.mem ξ K req.pa n dq w $$ [Hmem Hb]
+  ihave %hrd : ⌜∀ (ag : Agent) (tvn : Nat), K ≤ tvn → σ.mem.readBytes ag tvn R.pa R.size w⌝ $$ [Hmem Hb]
+  · iapply uic_ctxBytesX_read σ.mem ξ K R.pa R.size dq w $$ [Hmem Hb]
     iframe
   ihave %hK : ⌜K ≤ σ.itv cpu⌝ $$ [Hmm Hiv]
   · iapply uic_memModel_iviewLb _ σ cpu K $$ [Hmm Hiv]
@@ -172,12 +172,12 @@ theorem swp_sail_mem_read_ifetch_x (cpu : CPU) {n vasize : Nat}
     iexact Hiv
   ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
   · iapply memModel_mmOk $$ Hmm
-  have hram : ramBytes req.pa n := ramBytes_of_readBytes hmm.2.2.2.1 (hrd (ifetchAgent cpu) _ hK)
+  have hram : ramBytes R.pa R.size := ramBytes_of_readBytes hmm.2.2.2.1 (hrd (ifetchAgent cpu) _ hK)
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
   isplit
   · ipureintro
-    exact ⟨.Ok (w, none), σ, Or.inr (Or.inl
+    exact ⟨.ok (w, 0#R.numTag), σ, Or.inr (Or.inl
       ⟨hram, hk, σ.itv cpu, w, le_refl _, (hmm.2.1 cpu).2.1, hrd _ _ hK, rfl, rfl⟩)⟩
   inext
   iintro %v' %σ' %Hev
@@ -190,49 +190,64 @@ theorem swp_sail_mem_read_ifetch_x (cpu : CPU) {n vasize : Nat}
     imodintro
     isplitl [Hregs Hmem Hmm Hclose]
     · iapply Hclose $$ %σ %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
-    · iapply swp_ret
-      iapply HΦ $$ Hb
+    · iapply HΦ $$ Hb
   · simp [akPlain, hk] at hpl
   · rw [hex] at hex'
     exact absurd hex' (by decide)
 
+/-- **A5** at the model's primitive (`sail_mem_read req`, a fetch): the stamped word, as the
+model's byte vectors. -/
+theorem swp_sail_mem_read_ifetch_x (cpu : CPU) {n nt : Nat}
+    (req : Mem_request n nt Arch.addr_size Arch.addr_space Arch.mem_acc)
+    (ξ : CtxId) (K : Nat) (dq : DFrac) (w : BitVec (8 * n)) (hk : akIfetch req.access_kind = true)
+    (Φ : Result ((Vector (BitVec 8) n) × (Vector Bool nt)) Unit → IProp GF) :
+    ctxBytesX ξ K req.address n dq w ∗ iviewLb cpu K ∗
+    ▷ (ctxBytesX ξ K req.address n dq w -∗ Φ (.Ok (bitvec_to_vecbytes w, bitvec_to_vecbool 0#nt)))
+    ⊢ swp cpu (LeanRV64D.ArchSem.sail_mem_read req) Φ := by
+  rw [sail_mem_read_def req]
+  iintro ⟨Hb, #Hiv, HΦ⟩
+  iapply swp_memRead_ifetch_x_k cpu (memReq req) ξ K dq w hk (fun v => FreeM.pure (memReadAns v)) Φ
+  iframe Hb Hiv
+  inext
+  iintro Hb
+  iapply swp_ret
+  iapply HΦ $$ Hb
+
 /-! ## A6: the data gate -/
 
-/-- **A6, THE DATA GATE** (Rocq `ctx_phys_xload_ok`): a plain load of stamped
+/-- **A6, THE DATA GATE** (Rocq `ctx_phys_xload_ok`), at a raw node: a plain load of stamped
 bytes of the running context returns them, the stamp kept. -/
-theorem swp_sail_mem_read_plain_x (cpu : CPU) {n vasize : Nat}
-    (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
-    (ξ : CtxId) (K : Nat) (dq : DFrac) (w : BitVec (8 * n)) (hk : akPlain req.access_kind = true)
-    (Φ : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → IProp GF) :
-    ownCtx cpu ξ ∗ ctxBytesX ξ K req.pa n dq w ∗
-    ▷ (ownCtx cpu ξ -∗ ctxBytesX ξ K req.pa n dq w -∗ Φ (.Ok (w, none)))
-    ⊢ swp cpu (ArchSem.sail_mem_read req) Φ := by
-  unfold ArchSem.sail_mem_read PreSail.sail_mem_read PreSail.emit
+theorem swp_memRead_plain_x_k (cpu : CPU) (R : MemRequest) (ξ : CtxId) (K : Nat) (dq : DFrac)
+    (w : BitVec (8 * R.size)) (hk : akPlain R.accessKind = true) {X : Type}
+    (k : ERet (.memRead R) → SailM X) (Φ : X → IProp GF) :
+    ownCtx cpu ξ ∗ ctxBytesX ξ K R.pa R.size dq w ∗
+    ▷ (ownCtx cpu ξ -∗ ctxBytesX ξ K R.pa R.size dq w -∗ swp cpu (k (Except.ok (w, 0#R.numTag))) Φ)
+    ⊢ swp cpu (FreeM.impure (.inl (.ok (.memRead R))) k) Φ := by
   iintro ⟨Hctx, Hb, HΦ⟩
-  have hk' : akIfetch req.access_kind = false ∧ akExcl req.access_kind = false := by
+  have hk' : akIfetch R.accessKind = false ∧ akExcl R.accessKind = false := by
     unfold akPlain at hk
     simp only [Bool.and_eq_true, Bool.not_eq_eq_eq_not, Bool.not_true] at hk
     exact hk
-  iapply swp_event cpu (.memRead n vasize req) (fun v => FreeM.pure v) Φ
+  iapply swp_event_at cpu (FreeM.impure (.inl (.ok (.memRead R))) k) (.memRead R) (fun v => k v) rfl Φ
     (fun _ _ hb => by
-      have h1 : akExcl req.access_kind = true := hb.1
+      have h1 : akExcl R.accessKind = true := hb.1
       rw [hk'.2] at h1
       exact absurd h1 (by decide))
   iintro %σ Hσ
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
-  ihave %hrd : ⌜∀ tvn, σ.tv cpu ≤ tvn → σ.mem.readBytes (hartAgent cpu) tvn req.pa n w⌝
+  ihave %hrd : ⌜∀ tvn, σ.tv cpu ≤ tvn → σ.mem.readBytes (hartAgent cpu) tvn R.pa R.size w⌝
       $$ [Hmm Hctx Hmem Hb]
-  · iapply ctxBytes_readable σ cpu ξ req.pa n dq w $$ [Hmm Hctx Hmem Hb]
+  · iapply ctxBytes_readable σ cpu ξ R.pa R.size dq w $$ [Hmm Hctx Hmem Hb]
     iframe Hmm Hctx Hmem
     iapply ctxBytesX_forget $$ Hb
   ihave %hmm : ⌜mmOk σ⌝ $$ [Hmm]
   · iapply memModel_mmOk $$ Hmm
-  have hram : ramBytes req.pa n := ramBytes_of_readBytes hmm.2.2.2.1 (hrd _ (Nat.le_refl _))
+  have hram : ramBytes R.pa R.size := ramBytes_of_readBytes hmm.2.2.2.1 (hrd _ (Nat.le_refl _))
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hmask
   isplit
   · ipureintro
-    refine ⟨.Ok (w, none), σ.afterLoad cpu req.pa n σ.top, Or.inr (Or.inr (Or.inl
+    refine ⟨.ok (w, 0#R.numTag), σ.afterLoad cpu R.pa R.size σ.top, Or.inr (Or.inr (Or.inl
       ⟨hram, hk, σ.top, w, (hmm.2.1 cpu).1, le_refl _, ?_, hrd _ (hmm.2.1 cpu).1, rfl, rfl⟩))⟩
     intro j _
     exact (hmm.2.1 cpu).2.2.2 _
@@ -244,15 +259,32 @@ theorem swp_sail_mem_read_plain_x (cpu : CPU) {n vasize : Nat}
   · rw [hk'.1] at hif
     exact absurd hif (by decide)
   · obtain rfl := readBytes_unique _ _ _ _ _ _ _ (hrd tvn htv) hrd'
-    imod memModel_load _ σ cpu req.pa n tvn htop $$ Hmm with Hmm
+    imod memModel_load _ σ cpu R.pa R.size tvn htop $$ Hmm with Hmm
     imod Hmask
     imodintro
     isplitl [Hregs Hmem Hmm Hclose]
-    · iapply Hclose $$ %(σ.afterLoad cpu req.pa n tvn) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
-    · iapply swp_ret
-      iapply HΦ $$ Hctx Hb
+    · iapply Hclose $$ %(σ.afterLoad cpu R.pa R.size tvn) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
+    · iapply HΦ $$ Hctx Hb
   · rw [hk'.2] at hex'
     exact absurd hex' (by decide)
+
+/-- **A6** at the model's primitive (`sail_mem_read req`, a plain load). -/
+theorem swp_sail_mem_read_plain_x (cpu : CPU) {n nt : Nat}
+    (req : Mem_request n nt Arch.addr_size Arch.addr_space Arch.mem_acc)
+    (ξ : CtxId) (K : Nat) (dq : DFrac) (w : BitVec (8 * n)) (hk : akPlain req.access_kind = true)
+    (Φ : Result ((Vector (BitVec 8) n) × (Vector Bool nt)) Unit → IProp GF) :
+    ownCtx cpu ξ ∗ ctxBytesX ξ K req.address n dq w ∗
+    ▷ (ownCtx cpu ξ -∗ ctxBytesX ξ K req.address n dq w -∗
+        Φ (.Ok (bitvec_to_vecbytes w, bitvec_to_vecbool 0#nt)))
+    ⊢ swp cpu (LeanRV64D.ArchSem.sail_mem_read req) Φ := by
+  rw [sail_mem_read_def req]
+  iintro ⟨Hctx, Hb, HΦ⟩
+  iapply swp_memRead_plain_x_k cpu (memReq req) ξ K dq w hk (fun v => FreeM.pure (memReadAns v)) Φ
+  iframe Hctx Hb
+  inext
+  iintro Hctx Hb
+  iapply swp_ret
+  iapply HΦ $$ Hctx Hb
 
 /-! ## A7: the text map's accessor -/
 

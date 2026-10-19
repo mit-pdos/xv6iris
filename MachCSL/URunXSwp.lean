@@ -30,40 +30,40 @@ open LeanRV64D LeanRV64D.Functions
 /-! ## The walker's node equations -/
 
 /-- Is the call a read the text map answers? -/
-def uxrIsText (T : BMap) : Eff RegisterType exception → Bool
-  | .ok (.memRead _ _ req) => uxTextRead T req
+def uxrIsText (T : BMap) : SailEff → Bool
+  | .inl (.ok (.memRead req)) => uxTextRead T req
   | _ => false
 
-theorem uxr_isText_true {T : BMap} {c : Eff RegisterType exception} (h : uxrIsText T c = true) :
-    ∃ (n vasize : Nat) (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak),
-      c = .ok (.memRead n vasize req) ∧ uxTextRead T req = true := by
-  rcases c with e | op
+theorem uxr_isText_true {T : BMap} {c : SailEff} (h : uxrIsText T c = true) :
+    ∃ R : MemRequest, c = .inl (.ok (.memRead R)) ∧ uxTextRead T R = true := by
+  rcases c with (e | op) | n
   · simp [uxrIsText] at h
   · cases op with
-    | memRead n vasize req => exact ⟨n, vasize, req, rfl, h⟩
+    | memRead R => exact ⟨R, rfl, h⟩
     | _ => simp [uxrIsText] at h
+  · simp [uxrIsText] at h
 
 section walker
 variable (D : UFoot) (T : BMap)
 
 /-- A node the text map does not answer: a one-node `runRW` walk. -/
-theorem uxr_run_node {X : Type} (orc : UOrc) (s : UWSt) (c : Eff RegisterType exception)
+theorem uxr_run_node {X : Type} (orc : UOrc) (s : UWSt) (c : SailEff)
     (k : ArchSem.Effect.ret c → SailM X) (hc : uxrIsText T c = false) :
     uxRun D T orc s (FreeM.impure c k) =
       (runRW D orc s (FreeM.impure c FreeM.pure)).bind fun r => uxRun D T r.2.2 r.2.1 (k r.1) := by
-  rcases c with e | op
+  rcases c with (e | op) | n
   · simp only [uxRun]
   · cases op with
-    | memRead n vasize req =>
+    | memRead R =>
       simp only [uxrIsText] at hc
       simp only [uxRun, hc, Bool.false_eq_true, ite_false]
     | _ => simp only [uxRun]
+  · simp only [uxRun]
 
-theorem uxr_run_text_none {X : Type} (orc : UOrc) (s : UWSt) {n vasize : Nat}
-    (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
-    (k : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → SailM X)
-    (hc : uxTextRead T req = true) (hw : bmRead T req.pa n = none) :
-    uxRun D T orc s (FreeM.impure (.ok (.memRead n vasize req)) k) = none := by
+theorem uxr_run_text_none {X : Type} (orc : UOrc) (s : UWSt) (R : MemRequest)
+    (k : ERet (.memRead R) → SailM X)
+    (hc : uxTextRead T R = true) (hw : bmRead T R.pa R.size = none) :
+    uxRun D T orc s (FreeM.impure (.inl (.ok (.memRead R))) k) = none := by
   simp only [uxRun, hc, ite_true, hw]
 
 end walker
@@ -105,48 +105,43 @@ theorem swp_uxRun {X : Type} (K : Nat) (DT : List PAddr) (T : BMap) (m : SailM X
     intro s hok Φ
     cases hc : uxrIsText T c with
     | true =>
-      obtain ⟨n, vasize, req, rfl, htx⟩ := uxr_isText_true hc
+      obtain ⟨R, rfl, htx⟩ := uxr_isText_true hc
       have htx' := htx
       simp only [uxTextRead, Bool.and_eq_true, decide_eq_true_eq, Bool.not_eq_true'] at htx'
       obtain ⟨⟨⟨_, hn⟩, hex⟩, _⟩ := htx'
-      obtain ⟨w, hw⟩ : ∃ w, bmRead T req.pa n = some w := by
-        cases hr : bmRead T req.pa n with
+      obtain ⟨w, hw⟩ : ∃ w, bmRead T R.pa R.size = some w := by
+        cases hr : bmRead T R.pa R.size with
         | some w => exact ⟨w, rfl⟩
         | none =>
           have h := hok (UOrc.dflt s.rs)
-          rw [uxr_run_text_none D T _ s req k htx hr] at h
+          rw [uxr_run_text_none D T _ s R k htx hr] at h
           cases h
-      have hstep : ∀ o : UOrc, uxRun D T o s (FreeM.impure (.ok (.memRead n vasize req)) k) =
-          uxRun D T o s (k (.Ok (w, none))) := fun o => MachCSL.uxw_text_some D T o s req k htx w hw
-      have hok' : ∀ o, (uxRun D T o s (k (.Ok (w, none)))).isSome = true := fun o => by
+      have hstep : ∀ o : UOrc, uxRun D T o s (FreeM.impure (.inl (.ok (.memRead R))) k) =
+          uxRun D T o s (k (Except.ok (w, 0#R.numTag))) := fun o => MachCSL.uxw_text_some D T o s R k htx w hw
+      have hok' : ∀ o, (uxRun D T o s (k (Except.ok (w, 0#R.numTag)))).isSome = true := fun o => by
         rw [← hstep o]; exact hok o
-      show uFr RF BF s ∗ uxTextOwn ξ K DT T ∗ iviewLb cpu K ∗
-          uxPost RF BF T s (FreeM.impure (.ok (.memRead n vasize req)) k)
-            (fun x => iprop(uxTextOwn ξ K DT T -∗ Φ x)) ⊢
-        swp cpu (ArchSem.sail_mem_read req >>= k) Φ
       iintro ⟨Hfr, Htx, #Hiv, HP⟩
       ihave HP := uxPost_step RF BF T s s _ _ _ (fun o => ⟨o, hstep o⟩) $$ HP
-      icases uxTextOwn_acc ξ K DT T req.pa n w hn hw $$ Htx with ⟨Hb, Hcl⟩
-      iapply swp_bind
-      cases hif : akIfetch req.access_kind with
+      icases uxTextOwn_acc ξ K DT T R.pa R.size w hn hw $$ Htx with ⟨Hb, Hcl⟩
+      cases hif : akIfetch R.accessKind with
       | true =>
-        iapply swp_sail_mem_read_ifetch_x cpu req ξ K (DFrac.own 1) w hif (fun v => swp cpu (k v) Φ)
+        iapply swp_memRead_ifetch_x_k cpu R ξ K (DFrac.own 1) w hif k Φ
         iframe Hb Hiv
         inext
         iintro Hb
         ihave Htx := Hcl $$ Hb
-        iapply ih (.Ok (w, none)) s hok' Φ
+        iapply ih (Except.ok (w, 0#R.numTag)) s hok' Φ
         iframe Hfr Htx Hiv HP
       | false =>
-        have hpl : akPlain req.access_kind = true := by simp [akPlain, hif, hex]
+        have hpl : akPlain R.accessKind = true := by simp [akPlain, hif, hex]
         unfold uFr
         icases Hfr with ⟨HF, HB, Hc, Hr⟩
-        iapply swp_sail_mem_read_plain_x cpu req ξ K (DFrac.own 1) w hpl (fun v => swp cpu (k v) Φ)
+        iapply swp_memRead_plain_x_k cpu R ξ K (DFrac.own 1) w hpl k Φ
         iframe Hc Hb
         inext
         iintro Hc Hb
         ihave Htx := Hcl $$ Hb
-        iapply ih (.Ok (w, none)) s hok' Φ
+        iapply ih (Except.ok (w, 0#R.numTag)) s hok' Φ
         iframe Htx Hiv HP
         unfold uFr
         iframe
