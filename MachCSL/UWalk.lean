@@ -51,12 +51,14 @@ structure UwkPins (D : UFoot) (f : RegFile) : Prop where
   pmp0 : pmpEnt0Ok (f .pmpcfg_n) (f .pmpaddr_n)
   pma : f .pma_regions = bootPMA
   htif : f .htif_tohost_base = none
+  /-- sail-riscv 0.16: `within_clint` reads `mhartid` -/
+  dmhart : D.Dr .mhartid = true
 
 set_option hygiene false in
 /-- Put the pins in the context (the stepper reads them from there). -/
 macro "uwk_pins" hp:term:max : tactic => `(tactic| (
   have hpc := $hp
-  obtain ⟨hDmisa, hDmenv, hDpmpc, hDpmpa, hDpma, hDhtif, hmisa, hmenv, hpmp0, hpma, hhtif⟩ := hpc))
+  obtain ⟨hDmisa, hDmenv, hDpmpc, hDpmpa, hDpma, hDhtif, hmisa, hmenv, hpmp0, hpma, hhtif, hDmhart⟩ := hpc))
 
 /-! ## §1 The entry word's class -/
 
@@ -82,6 +84,7 @@ def uwkAccOk (acc : MemoryAccessType mem_payload) (mxr : Bool) (w : BitVec 64) :
   | .StoreConditional _ => uwkW w
   | .Atomic _ => uwkW w && (uwkR w || (uwkX w && mxr))
   | .InstructionFetch _ => uwkX w
+  | .LoadExecute _ => uwkX w
   | .CacheAccess _ => false
 
 /-- Whether a leaf grants the access at User. -/
@@ -101,7 +104,7 @@ set_option maxRecDepth 100000 in
 /-- **Rocq `pte_valid`/`pte_invalid` as one equation**: `pte_is_invalid`
 answers `uwkInv`. -/
 theorem uwk_pte_is_invalid (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file) (w : BitVec 64) :
-    runRW D orc s (pte_is_invalid (uwkFl w) (uwkExt w)) = some (uwkInv w, s, orc) := by
+    runRW D orc s (pte_is_invalid (uwkFl w) (uwkExt w) .S_Stage) = some (uwkInv w, s, orc) := by
   uwk_pins hp
   have hres : pte_reserved_bits_must_be_zero = true := by decide
   unfold pte_is_invalid
@@ -114,9 +117,9 @@ theorem uwk_pte_is_invalid (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s
   all_goals
     -- the leaf is a pure bit fact: drop the pins first, or the leaf's
     -- `simp … at *` and `bv_decide` carry them
-    clear hDmisa hDmenv hDpmpc hDpmpa hDpma hDhtif hmisa hmenv hpmp0 hpma hhtif hres hp
+    clear hDmisa hDmenv hDpmpc hDpmpa hDpma hDhtif hmisa hmenv hpmp0 hpma hhtif hDmhart hres hp
     simp only [Option.some.injEq, Prod.mk.injEq, and_true, uwkInv, uwk_pbmt_matches, pte_is_non_leaf,
-      Functions.not, Bool.and_true, Bool.false_or, Bool.and_false, Bool.true_and] at *
+      LeanRV64D.not, Bool.and_true, Bool.false_or, Bool.and_false, Bool.true_and] at *
     simp only [_get_PTE_Flags_V, _get_PTE_Flags_R, _get_PTE_Flags_W, _get_PTE_Flags_X, _get_PTE_Flags_A,
       _get_PTE_Flags_D, _get_PTE_Flags_U, _get_PTE_Ext_PBMT, _get_PTE_Ext_reserved,
       _get_PTE_Ext_N, _get_PTE_Ext_RSW_60t59b, _get_MEnvcfg_SSE, _get_MEnvcfg_PBMTE, menvcfgS, zeros, BitVec.zero,
@@ -125,12 +128,12 @@ theorem uwk_pte_is_invalid (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s
 
 /-- The permission check's assertion holds on a word that is not `W` without `R`. -/
 theorem uwk_perm_assert (R W X : Bool) (h : (R || !W) = true) :
-    zopz0zJzJzK W (R || Functions.not X) = true := by
+    zopz0zJzJzK W (R || LeanRV64D.not X) = true := by
   revert h; cases R <;> cases W <;> cases X <;> decide
 
 /-- ... and the shadow-stack arm (`!R && W && !X`) is not taken. -/
 theorem uwk_perm_noss (R W X : Bool) (h : (R || !W) = true) :
-    (Functions.not R && (W && Functions.not X)) = false := by
+    (LeanRV64D.not R && (W && LeanRV64D.not X)) = false := by
   revert h; cases R <;> cases W <;> cases X <;> decide
 
 set_option maxHeartbeats 4000000 in
@@ -141,11 +144,11 @@ never reaches the check). -/
 theorem uwk_check_perm (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file) (w : BitVec 64)
     (acc : MemoryAccessType mem_payload) (hacc : utrAcc acc = true) (mxr sum : Bool)
     (hrw : (uwkR w || !uwkW w) = true) :
-    runRW D orc s (check_PTE_permission acc .User mxr sum (uwkFl w) (uwkExt w) ()) =
+    runRW D orc s (check_PTE_permission acc .User .S_Stage mxr sum (uwkFl w) (uwkExt w) ()) =
       some (uwkPerm acc mxr w, s, orc) := by
   uwk_pins hp
   unfold uwkPerm uwkPermOk uwkAccOk
-  rcases acc with p | p | ⟨_, _, p⟩ | ⟨_, _, p⟩ | ⟨_, _, _, p, q⟩ | _ | c <;>
+  rcases acc with p | p | ⟨_, _, p⟩ | p | ⟨_, _, p⟩ | ⟨_, _, _, p, q⟩ | _ | c <;>
     (try cases p) <;> (try cases q) <;> simp [utrAcc] at hacc
   -- the check is a function of the four flag bits and `mxr`: decide the
   -- assertion and the shadow-stack arm once from `hrw`, name the bits, and
@@ -202,7 +205,23 @@ theorem uwk_read_pte (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file)
   uwk_pins hp
   uwk_addr pa hok
   uwk_run -bv [utr_pmpCheck_ent0, utr_pmpCheckRWX_pteLoad, utr_pmpCheckRWX_pteStore]
-  simp only [MemoryOpResult_drop_meta, BitVec.setWidth_eq, MachCSL.updateSubrange_full64]
+  simp only [MemoryOpResult_drop_meta, BitVec.setWidth_eq, MachCSL.updateSubrange_full64,
+    MachCSL.from_bytes_le_vecbytes_8]
+
+/-- The entry address as sail-riscv 0.16's walk computes it (the index added to the page
+base, `pt_base +++ zeros + zero_extend (vpn_i +++ zeros)`, where it used to concatenate). -/
+theorem uwk_pteAddr_add (b : BitVec 44) (i : BitVec 9) :
+    BitVec.setWidth 64 (b +++ 0#12 + BitVec.setWidth 56 (i +++ 0#3)) = pteAddr b i := by
+  unfold pteAddr zero_extend Sail.BitVec.zeroExtend
+  bv_decide
+
+/-- `uwk_read_pte` at the walk's own address form (the stepper unifies the call with this
+up to unfolding, so the entry's base and index come out of the address). -/
+theorem uwk_read_pte_add (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file) (b : BitVec 44)
+    (i : BitVec 9) (hok : pteAddrOk (pteAddr b i)) (w : BitVec 64) (hr : bmRead s.mm (pteAddr b i) 8 = some w) :
+    runRW D orc s (read_pte (.Physaddr (BitVec.setWidth 64 (b +++ 0#12 + BitVec.setWidth 56 (i +++ 0#3)))) 8) =
+      some (.Ok w, s, orc) := by
+  rw [uwk_pteAddr_add]; exact uwk_read_pte D orc s hp _ hok w hr
 
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
@@ -214,7 +233,8 @@ theorem uwk_read_pte_excl (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.
   uwk_pins hp
   uwk_addr pa hok
   uwk_run -bv [utr_pmpCheck_ent0, utr_pmpCheckRWX_pteLoad, utr_pmpCheckRWX_pteStore]
-  simp only [MemoryOpResult_drop_meta, BitVec.setWidth_eq, MachCSL.updateSubrange_full64]
+  simp only [MemoryOpResult_drop_meta, BitVec.setWidth_eq, MachCSL.updateSubrange_full64,
+    MachCSL.from_bytes_le_vecbytes_8]
 
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
@@ -229,7 +249,8 @@ theorem uwk_write_pte_cond (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s
   uwk_addr pa hok
   uwk_run -bv [utr_pmpCheck_ent0, utr_pmpCheckRWX_pteLoad, utr_pmpCheckRWX_pteStore]
   simp only [bits_of_physaddr, addInt_eq, Int.cast_ofNat_Int, Int.zero_mul, uwk_add_ofInt0,
-    Sail.BitVec.extractLsb, BitVec.setWidth_eq, uwk_extract_full]
+    Sail.BitVec.extractLsb, BitVec.setWidth_eq, uwk_extract_full, Sail.ArchSem.Mem_request.toArchSem,
+    MemRequest.pa, MachCSL.vecbytes_to_bitvec_to_bytes_le_8]
 
 /-! ## §3 The walk, level by level (Rocq `CommonWalk` §UserWalk/§UserWalkFault) -/
 
@@ -256,7 +277,8 @@ theorem uwk_inv_zero : uwkInv 0#64 = true := by decide
 theorem uwk_inv_kPtr (b : BitVec 44) : uwkInv (kPtr b) = false := by
   simp only [uwkInv, kPtr, mkPte, ptrFlags, pte_is_non_leaf, _get_PTE_Flags_V, _get_PTE_Flags_R,
     _get_PTE_Flags_W, _get_PTE_Flags_X, _get_PTE_Flags_A, _get_PTE_Flags_D, _get_PTE_Flags_U,
-    _get_PTE_Ext_PBMT, _get_PTE_Ext_reserved, Mk_PTE_Flags, Sail.BitVec.extractLsb, ext_bits_of_PTE,
+    _get_PTE_Ext_PBMT, _get_PTE_Ext_reserved, _update_PTE_Ext_RSW_60t59b, Sail.BitVec.updateSubrange,
+    Sail.BitVec.updateSubrange', Mk_PTE_Flags, Sail.BitVec.extractLsb, ext_bits_of_PTE,
     Mk_PTE_Ext, Sail.BitVec.length]
   bv_decide
 
@@ -289,10 +311,10 @@ theorem uwk_walk_inv (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file)
     (g : Bool) (w : BitVec 64)
     (hok : pteAddrOk (pteAddr base (vpnIdx vpn lvl))) (hr : bmRead s.mm (pteAddr base (vpnIdx vpn lvl)) 8 = some w)
     (hinv : uwkInv w = true) :
-    runRW D orc s (pt_walk 39 vpn acc .User mxr sum base lvl g ()) = some (.Err (.PTW_Invalid_PTE (), ()), s, orc) := by
+    runRW D orc s (pt_walk 39 vpn acc .User mxr sum base lvl g .S_Stage ()) = some (.Err (.PTW_Invalid_PTE (), ()), s, orc) := by
   uwk_pins hp
   obtain rfl | rfl | rfl : lvl = 0 ∨ lvl = 1 ∨ lvl = 2 := by omega
-  all_goals uwk_run -bv [uwk_read_pte, uwk_pte_is_invalid]
+  all_goals uwk_run -bv [uwk_read_pte_add, uwk_pte_is_invalid]
 
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
@@ -305,11 +327,11 @@ theorem uwk_walk_ptr (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file)
     (hok : pteAddrOk (pteAddr base (vpnIdx vpn lvl))) (hr : bmRead s.mm (pteAddr base (vpnIdx vpn lvl)) 8 = some w)
     (hinv : uwkInv w = false) (hnl : pte_is_non_leaf (uwkFl w) = true)
     (r : Option (Result (PTW_Output 39 × Unit) (PTW_Error × Unit) × UWSt × UOrc))
-    (hsub : runRW D orc s (pt_walk 39 vpn acc .User mxr sum (ptePpn w) (lvl - 1) (g || uwkG w) ()) = r) :
-    runRW D orc s (pt_walk 39 vpn acc .User mxr sum base lvl g ()) = r := by
+    (hsub : runRW D orc s (pt_walk 39 vpn acc .User mxr sum (ptePpn w) (lvl - 1) (g || uwkG w) .S_Stage ()) = r) :
+    runRW D orc s (pt_walk 39 vpn acc .User mxr sum base lvl g .S_Stage ()) = r := by
   uwk_pins hp
   obtain rfl | rfl : lvl = 1 ∨ lvl = 2 := by omega
-  all_goals uwk_run -bv [uwk_read_pte, uwk_pte_is_invalid]
+  all_goals uwk_run -bv [uwk_read_pte_add, uwk_pte_is_invalid]
 
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
@@ -322,14 +344,17 @@ theorem uwk_walk_leaf0 (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.fil
     (g : Bool) (w : BitVec 64)
     (hok : pteAddrOk (pteAddr base (vpnIdx vpn 0))) (hr : bmRead s.mm (pteAddr base (vpnIdx vpn 0)) 8 = some w)
     (hinv : uwkInv w = false) (hnl : pte_is_non_leaf (uwkFl w) = false) (hN : _get_PTE_Ext_N (uwkExt w) = 0#1) :
-    runRW D orc s (pt_walk 39 vpn acc .User mxr sum base 0 g ()) =
+    runRW D orc s (pt_walk 39 vpn acc .User mxr sum base 0 g .S_Stage ()) =
       some (if uwkPermOk acc mxr w then
           .Ok (uwkOut w (pteAddr base (vpnIdx vpn 0)) (g || uwkG w), ())
         else .Err (.PTW_No_Permission (), ()), s, orc) := by
   have hrw := uwk_rw_of_valid w hinv
   uwk_pins hp
   cases hperm : uwkPermOk acc mxr w <;>
-    uwk_run -bv [uwk_read_pte, uwk_pte_is_invalid, uwk_check_perm, uwkPerm]
+    uwk_run -bv [uwk_read_pte_add, uwk_pte_is_invalid, uwk_check_perm, uwkPerm]
+  -- the reported entry address: the walk's sum form is `pteAddr`
+  all_goals (simp only [ite_true, uwkOut, uwkG, uwkFl, BitVec.setWidth_eq, Bool.true_and]
+             rw [← uwk_pteAddr_add]; rfl)
 
 /-! ## §4 The walk of an owned table (Rocq `exec_pt_walk_user` and the
 fault walks, composed over the tree) -/
@@ -372,7 +397,7 @@ node writes: the A/D write-back is `translate_TLB_miss`'s). -/
 theorem uwk_pt_walk (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file) (t : PTree) (hwf : t.wfU 2)
     (hm : uwkTreeMem s.mm t) (vpn : BitVec 27) (acc : MemoryAccessType mem_payload) (hacc : utrAcc acc = true)
     (mxr sum : Bool) (hN : ∀ addr w, t.walk 2 vpn = some (addr, w) → _get_PTE_Ext_N (uwkExt w) = 0#1) :
-    runRW D orc s (pt_walk 39 vpn acc .User mxr sum t.base 2 false ()) =
+    runRW D orc s (pt_walk 39 vpn acc .User mxr sum t.base 2 false .S_Stage ()) =
       some (uwkWalkRes acc mxr (t.walk 2 vpn), s, orc) := by
   have h2 := hwf (vpnIdx vpn 2)
   obtain ⟨ok2, rd2⟩ := uwk_mem_self hm (vpnIdx vpn 2)
@@ -427,16 +452,45 @@ theorem uwk_pt_walk (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file) 
 
 /-! ## §5 The Svadu `A`/`D` write-back (Rocq `PtTreeAdue`) -/
 
+/-- `update_PTE_Bits` at the S stage (sail-riscv 0.16 made it monadic, for the G stage's rule
+on implicit accesses; at the S stage it is the old pure function): the `A` bit on every
+non-prefetch access, the `D` bit on a store-like one. -/
+def uwkUpd (w : BitVec 64) (acc : MemoryAccessType mem_payload) : Option (BitVec 64) :=
+  let pte_flags := Mk_PTE_Flags (Sail.BitVec.extractLsb w 7 0)
+  let update_d : Bool := (_get_PTE_Flags_D pte_flags == 0#1) && (match acc with
+    | .Store _ => true
+    | .StoreConditional _ => true
+    | .Atomic _ => true
+    | .CacheAccess (.CB_zero ()) => true
+    | _ => false)
+  let update_a := (_get_PTE_Flags_A pte_flags == 0#1) && !(is_prefetch_access acc)
+  if update_d || update_a then
+    some (Sail.BitVec.updateSubrange w 7 0
+      (_update_PTE_Flags_D (_update_PTE_Flags_A pte_flags 1#1) (if update_d then 1#1 else _get_PTE_Flags_D pte_flags)))
+  else none
+
+/-- On the user access kinds, `update_PTE_Bits` at the S stage is `uwkUpd`. -/
+theorem uwk_update_PTE_Bits (w : BitVec 64) (acc : MemoryAccessType mem_payload) (hacc : utrAcc acc = true) :
+    update_PTE_Bits w acc .S_Stage = pure (uwkUpd w acc) := by
+  rcases acc with p | p | ⟨_, _, p⟩ | p | ⟨_, _, p⟩ | ⟨_, _, _, p, q⟩ | _ | c <;>
+    (try cases p) <;> (try cases q) <;> simp [utrAcc] at hacc
+  all_goals
+    unfold update_PTE_Bits uwkUpd
+    cases hD : (_get_PTE_Flags_D (Mk_PTE_Flags (Sail.BitVec.extractLsb w 7 0)) == 0#1) <;>
+      simp only [hD, sys_implicit_vs_pte_access_sets_gstage_d, LeanRV64D.not, ite_true, ite_false,
+        Bool.false_eq_true, pure_bind, Bool.true_and, Bool.false_and, Bool.false_or, Bool.true_or,
+        apply_ite (f := (pure : Option (BitVec 64) → SailM (Option (BitVec 64))))]
+
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 /-- **No update needed** (the cached or walked word already has the bits the
 access sets): nothing is read or written. -/
 theorem uwk_upd_none (D : UFoot) (orc : UOrc) (s : UWSt) (vpn : BitVec 27) (addr : BitVec 64)
-    (w : BitVec 64) (acc : MemoryAccessType mem_payload) (mxr sum : Bool)
-    (hu : update_PTE_Bits w acc = none) :
-    runRW D orc s (update_and_write_pte 39 vpn (.Physaddr addr) w 0 acc .User mxr sum ()) =
+    (w : BitVec 64) (acc : MemoryAccessType mem_payload) (hacc : utrAcc acc = true) (mxr sum : Bool)
+    (hu : uwkUpd w acc = none) :
+    runRW D orc s (update_and_write_pte 39 vpn (.Physaddr addr) w 0 acc .User mxr sum .S_Stage ()) =
       some (.Ok (none, ()), s, orc) := by
-  uwk_run -bv
+  uwk_run -bv [uwk_update_PTE_Bits]
 
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
@@ -448,15 +502,16 @@ caller holds (the walk's, or the TLB's cached copy). -/
 theorem uwk_upd_write (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file) (vpn : BitVec 27)
     (addr : BitVec 64) (hok : pteAddrOk addr) (w m m' x : BitVec 64) (hr : bmRead s.mm addr 8 = some m)
     (acc : MemoryAccessType mem_payload) (hacc : utrAcc acc = true) (mxr sum : Bool)
-    (hu : update_PTE_Bits w acc = some x) (hinv : uwkInv m = false) (hnl : pte_is_non_leaf (uwkFl m) = false)
+    (hu : uwkUpd w acc = some x) (hinv : uwkInv m = false) (hnl : pte_is_non_leaf (uwkFl m) = false)
     (hN : _get_PTE_Ext_N (uwkExt m) = 0#1) (hperm : uwkPermOk acc mxr m = true)
-    (hum : update_PTE_Bits m acc = some m') :
-    runRW D orc s (update_and_write_pte 39 vpn (.Physaddr addr) w 0 acc .User mxr sum ()) =
+    (hum : uwkUpd m acc = some m') :
+    runRW D orc s (update_and_write_pte 39 vpn (.Physaddr addr) w 0 acc .User mxr sum .S_Stage ()) =
       some (.Ok (some m', ()), { s with mm := bmWrite s.mm addr 8 m', rv := false }, orc) := by
   have hrw := uwk_rw_of_valid m hinv
   have hown := bmOwned_of_read _ _ _ _ hr
   uwk_pins hp
-  uwk_run -bv [uwk_read_pte_excl, uwk_pte_is_invalid, uwk_check_perm, uwk_write_pte_cond, uwkPerm]
+  uwk_run -bv [uwk_read_pte_excl, uwk_pte_is_invalid, uwk_check_perm, uwk_write_pte_cond, uwkPerm,
+    uwk_update_PTE_Bits]
 
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
@@ -466,13 +521,13 @@ the reservation stays held. -/
 theorem uwk_upd_keep (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UwkPins D s.file) (vpn : BitVec 27)
     (addr : BitVec 64) (hok : pteAddrOk addr) (w m x : BitVec 64) (hr : bmRead s.mm addr 8 = some m)
     (acc : MemoryAccessType mem_payload) (hacc : utrAcc acc = true) (mxr sum : Bool)
-    (hu : update_PTE_Bits w acc = some x) (hinv : uwkInv m = false) (hnl : pte_is_non_leaf (uwkFl m) = false)
+    (hu : uwkUpd w acc = some x) (hinv : uwkInv m = false) (hnl : pte_is_non_leaf (uwkFl m) = false)
     (hN : _get_PTE_Ext_N (uwkExt m) = 0#1) (hperm : uwkPermOk acc mxr m = true)
-    (hum : update_PTE_Bits m acc = none) :
-    runRW D orc s (update_and_write_pte 39 vpn (.Physaddr addr) w 0 acc .User mxr sum ()) =
+    (hum : uwkUpd m acc = none) :
+    runRW D orc s (update_and_write_pte 39 vpn (.Physaddr addr) w 0 acc .User mxr sum .S_Stage ()) =
       some (.Ok (some m, ()), { s with rv := true }, orc) := by
   have hrw := uwk_rw_of_valid m hinv
   uwk_pins hp
-  uwk_run -bv [uwk_read_pte_excl, uwk_pte_is_invalid, uwk_check_perm, uwkPerm]
+  uwk_run -bv [uwk_read_pte_excl, uwk_pte_is_invalid, uwk_check_perm, uwkPerm, uwk_update_PTE_Bits]
 
 end MachCSL
