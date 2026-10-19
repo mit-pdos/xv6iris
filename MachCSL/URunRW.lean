@@ -450,7 +450,7 @@ def UAns.dflt (f : RegFile) : UAns where
 /-- A default oracle. -/
 def UOrc.dflt (f : RegFile) : UOrc := fun _ => UAns.dflt f
 
-theorem runRW_regRead_dr {X : Type} (orc : UOrc) (s : UWSt) (r : Register) (a : Option Arch.sys_reg_id)
+theorem runRW_regRead_dr {X : Type} (orc : UOrc) (s : UWSt) (r : Register) {a : Option Arch.sys_reg_id}
     (k : RegisterType r → SailM X) (h : D.Dr r = true) :
     runRW D orc s (FreeM.impure (.inl (.ok (.regRead r a))) k) = runRW D orc s (k (s.file r)) := by
   conv => lhs; unfold runRW
@@ -459,12 +459,21 @@ theorem runRW_regRead_dr {X : Type} (orc : UOrc) (s : UWSt) (r : Register) (a : 
   unfold UWSt.file
   cases s.pin r <;> rfl
 
-theorem runRW_regRead_any {X : Type} (orc : UOrc) (s : UWSt) (r : Register) (a : Option Arch.sys_reg_id)
+theorem runRW_regRead_any {X : Type} (orc : UOrc) (s : UWSt) (r : Register) {a : Option Arch.sys_reg_id}
     (k : RegisterType r → SailM X) (h : D.Dr r = false) (h' : D.Dany r = true) :
     runRW D orc s (FreeM.impure (.inl (.ok (.regRead r a))) k) = runRW D orc.tail s (k ((orc 0).reg r)) := by
   conv => lhs; unfold runRW
   show (if D.Dr r = true then _ else if D.Dany r = true then _ else _) = _
   rw [ite_eq_right (by simp [h]), ite_eq_left h']
+
+/-- A register write the footprint allows pins the written value (any access type). -/
+theorem runRW_regWrite_dw {X : Type} (orc : UOrc) (s : UWSt) (r : Register) {a : Option Arch.sys_reg_id}
+    (v : RegisterType r) (k : PUnit → SailM X) (h : D.Dw r = true) :
+    runRW D orc s (FreeM.impure (.inl (.ok (.regWrite r a v))) k) =
+      runRW D orc { s with pin := s.pin.set r v } (k ()) := by
+  conv => lhs; unfold runRW
+  show (if D.Dw r = true then _ else _) = _
+  rw [ite_eq_left h]
 
 end steps
 
@@ -984,7 +993,7 @@ theorem urw_regRead {X : Type} (r : Register) (a : Option Arch.sys_reg_id) (k : 
   cases hdr : D.Dr r with
   | true =>
     have hstep : ∀ orc', ∃ orc, runRW D orc s (FreeM.impure (.inl (.ok (.regRead r a))) k) =
-        runRW D orc' s (k (s.file r)) := fun o => ⟨o, runRW_regRead_dr D o s r a k hdr⟩
+        runRW D orc' s (k (s.file r)) := fun o => ⟨o, runRW_regRead_dr D o s r (a := a) k hdr⟩
     unfold uFr
     iintro ⟨⟨HF, HB, Hc, Hr⟩, HP⟩
     icases RF.rd s.file r hdr $$ HF with ⟨%dq, Hreg, HFc⟩
@@ -1009,7 +1018,7 @@ theorem urw_regRead {X : Type} (r : Register) (a : Option Arch.sys_reg_id) (k : 
       have hstep : ∀ orc', ∃ orc, runRW D orc s (FreeM.impure (.inl (.ok (.regRead r a))) k) =
           runRW D orc' s (k v) := fun o => by
         refine ⟨UOrc.cons ⟨(o 0).reg.set r v, (o 0).ch⟩ o, ?_⟩
-        rw [runRW_regRead_any D _ s r a k hdr hda]
+        rw [runRW_regRead_any D _ s r (a := a) k hdr hda]
         simp only [UOrc.tail_cons, UOrc.cons_zero, RegFile.set_same]
       iapply urw_cont RF BF _ _ (ih v) s s hok hstep Φ
       iframe
@@ -1430,7 +1439,7 @@ theorem runRW_of_runRead (D : UFoot) (dref : (r : Register) → Option (Register
             rw [hr] at h
             dsimp only at h
             obtain ⟨hdr, hf⟩ := hd r v hr
-            rw [runRW_regRead_dr D orc s r a k hdr, hf]
+            rw [runRW_regRead_dr D orc s r (a := a) k hdr, hf]
             cases hk : runRead dref (k v) with
             | none => rw [hk] at h; cases h
             | some p =>
@@ -1505,8 +1514,8 @@ theorem runRW_ro {X : Type} (Lr : List Register) (D : UFoot) (hD : ∀ r ∈ Lr,
         · have hrL : r ∈ Lr := List.contains_iff_mem.1 hc
           have h0 : (uFootL [] Lr []).Dr r = true := by
             simp only [uFootL, List.contains_nil, Bool.false_or, hc]
-          rw [runRW_regRead_dr _ orc s₀ r a k h0] at h
-          have e := runRW_regRead_dr D orc s r a k (hD r hrL)
+          rw [runRW_regRead_dr _ orc s₀ r (a := a) k h0] at h
+          have e := runRW_regRead_dr D orc s r (a := a) k (hD r hrL)
           rw [e, ← hf r hrL]
           exact ih _ _ _ _ _ _ _ hf hm hr h
         · simp only [runRW, uFootL, List.contains_nil, Bool.false_or, hc, Bool.false_eq_true,
