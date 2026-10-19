@@ -17,6 +17,11 @@ plan rev 55 row P-W2; rulings [OWN.112] (the two-site exemption) [OWN.113]).  Le
       message there, with that write's byte) and `latestOfNil` (no landed write: the image), and
       **`srcVal`** — a GF read whose GF source is the member-latest (or, with nothing landed, the image)
       sees GF's value in the member's log (from `pfx`: the member's write labels ARE GF's);
+      §3.1 forwarding: `fwdRel` (the forwarded byte and the forwarding TAG come from the same,
+      youngest, entry), **`fwdArm`** (GF's source is the agent's own youngest pending store covering
+      the byte ⇒ the member forwards GF's value), and **`memberFwdSrc`** — THE FORWARDED-BYTE
+      TIMESTAMP settled: the member label names the forwarding store's member write index, whose
+      write IS that store (the member's rf at a forwarded byte is the own store);
   §4  **THE READ ARMS** (the gate's `rd` / `wr` / `rdX`, design §3.2): `loadArm` — a load all of whose
       bytes are forwarded with GF's values or have a member-latest GF source IS an `SbCand` step with
       GF's values (re-timed); `rmwArm` — an AMO whose sources are member-latest reads GF's bytes at the
@@ -385,6 +390,179 @@ theorem srcVal (img : Image) (G : Gexec) (X : Geid → Prop) (w : WS) (e : Geid)
       simp only [Option.some.injEq] at hm
       subst hm
       rw [← ha, msgByteVal]; exact hv
+
+
+/-! ## 3.1 Forwarding: the youngest tagged entry -/
+
+/-- The forwarded byte and the forwarding tag come from the SAME (youngest) entry. -/
+theorem fwdRelGen (a : Int) (L : List (Nat × SbEnt)) : ∀ (ps : List (Nat × SbEnt)) (o1 : Option Nat)
+    (o2 : Option (BitVec 8)), (∀ p, p ∈ ps → p ∈ L) →
+    ((o1 = none ∧ o2 = none) ∨
+      ∃ p, p ∈ L ∧ o1 = some p.1 ∧ o2 = msgByte p.2.msg a ∧ (msgByte p.2.msg a).isSome) →
+    let r1 := ps.foldl (fun o p => if (msgByte p.2.msg a).isSome then some p.1 else o) o1
+    let r2 := (ps.map Prod.snd).foldl (fun o e => (msgByte e.msg a).or o) o2
+    (r1 = none ∧ r2 = none) ∨
+      ∃ p, p ∈ L ∧ r1 = some p.1 ∧ r2 = msgByte p.2.msg a ∧ (msgByte p.2.msg a).isSome
+  | [], _, _, _, h => h
+  | q :: ps, o1, o2, hsub, h => by
+    simp only [List.foldl_cons, List.map_cons]
+    apply fwdRelGen a L ps _ _ (fun p hp => hsub p (List.mem_cons_of_mem _ hp))
+    by_cases hq : (msgByte q.2.msg a).isSome
+    · right
+      refine ⟨q, hsub q List.mem_cons_self, by rw [if_pos hq], ?_, hq⟩
+      obtain ⟨v, hv⟩ := Option.isSome_iff_exists.1 hq
+      rw [hv]; rfl
+    · have hn : msgByte q.2.msg a = none := by simpa using hq
+      rw [if_neg hq, hn, Option.none_or]
+      exact h
+
+theorem fwdRel (ps : List (Nat × SbEnt)) (a : Int) :
+    (fwdId ps a = none ∧ SbCand.fwdByte (ps.map Prod.snd) a = none) ∨
+      ∃ p, p ∈ ps ∧ fwdId ps a = some p.1 ∧ SbCand.fwdByte (ps.map Prod.snd) a = msgByte p.2.msg a ∧
+        (msgByte p.2.msg a).isSome :=
+  fwdRelGen a ps ps none none (fun _ h => h) (.inl ⟨rfl, rfl⟩)
+
+/-- No forwarding tag: no forwarded byte. -/
+theorem fwdNone (img : Image) (w : WS) (x : Nat) (a : Int) :
+    Inv img w → fwdId (w.pend x) a = none → SbCand.fwdByte (w.σ.sb x) a = none := by
+  intro hI h
+  rw [hI.sb x]
+  rcases fwdRel (w.pend x) a with ⟨-, h2⟩ | ⟨p, -, h1, -, -⟩
+  · exact h2
+  · rw [h] at h1; cases h1
+
+/-- **THE OWN-PENDING SOURCE** (the gate's forwarding alternative): if GF's source of a byte is the
+agent's own store whose tag is the youngest pending one covering the byte, the member FORWARDS GF's
+value there. -/
+theorem fwdArm (img : Image) (G : Gexec) (X : Geid → Prop) (w : WS) (e : Geid) (x r : Nat) (a : Int)
+    (t : Nat) (v : BitVec 8) :
+    Inv img w → pfx G X w → gloadValue G → greadsByte G e a t v → gwriteAt G t = some (x, r) →
+    fwdId (w.pend x) a = some r → SbCand.fwdByte (w.σ.sb x) a = some v := by
+  intro hI hpf hlv hrd hsrc hid
+  rw [hI.sb x]
+  rcases fwdRel (w.pend x) a with ⟨h1, -⟩ | ⟨p, hp, h1, h2, h3⟩
+  · rw [hid] at h1; cases h1
+  · rw [hid, Option.some.injEq] at h1
+    subst h1
+    rw [h2]
+    obtain ⟨rl, base, vs, kc, hrow, hmsg⟩ := hI.pendSt x p hp
+    -- GF's source writes `v` at `a`, and its label is the member's store (verbatim)
+    have hlv' := (hlv e a t v hrd).1
+    obtain ⟨t0, rfl⟩ : ∃ t0, t = t0 + 1 := by
+      cases t with
+      | zero => simp [gwriteAt] at hsrc
+      | succ t0 => exact ⟨t0, rfl⟩
+    obtain ⟨src, hs, hwr, -⟩ := hlv'
+    rw [hsrc, Option.some.injEq] at hs
+    subst hs
+    obtain ⟨l, base', vs', j, hl, hwrl, hv, ha⟩ := hwr
+    obtain ⟨l0, hl0, hrel⟩ := hpf.1 x p.1 _ hrow
+    rw [hl, Option.some.injEq] at hl0
+    subst hl0
+    rw [← relXWr _ _ _ hrel] at hwrl
+    simp only [lbWr, Option.some.injEq, Prod.mk.injEq] at hwrl
+    obtain ⟨rfl, rfl⟩ := hwrl
+    rw [hmsg, ← ha, msgByteVal]
+    exact hv
+
+/-- Every forwarding record names a STORE of the same agent. -/
+def fwSt (w : WS) : Prop :=
+  ∀ (x n : Nat) (f : List (Option Nat)) (j r : Nat), (w.fw x)[n]? = some f → f[j]? = some (some r) →
+    ∃ rl base vs kc, (w.rows x)[r]? = some (LStore rl base vs kc)
+
+theorem fwStInit (img : Image) : fwSt (init img) := fun _ _ _ _ _ h => by simp [init] at h
+
+theorem fwStEv (img : Image) (w : WS) (s : Estep) : Inv img w → fwSt w → fwSt (nextI w (.ev s)) := by
+  intro hI h x n f j r hf hr
+  change (upd w.fw s.esAg (w.fw s.esAg ++ [fwOf (w.pend s.esAg) s.esLb]) x)[n]? = some f at hf
+  have hold : ∀ rl base vs kc, (w.rows x)[r]? = some (LStore rl base vs kc) →
+      ∃ rl base vs kc, ((nextI w (.ev s)).rows x)[r]? = some (LStore rl base vs kc) :=
+    fun rl base vs kc h' => ⟨rl, base, vs, kc, rowsEvOld w s x r _ h'⟩
+  by_cases hx : x = s.esAg
+  · subst hx
+    rw [updEq] at hf
+    rcases getAppInv _ _ _ _ hf with hf | ⟨-, rfl⟩
+    · obtain ⟨rl, base, vs, kc, h'⟩ := h _ n f j r hf hr
+      exact hold rl base vs kc h'
+    · cases hlb : s.esLb with
+      | LLoad aq base ts vs =>
+        rw [hlb] at hr
+        simp only [fwOf, List.getElem?_map] at hr
+        cases hj : (List.range ts.length)[j]? with
+        | none => rw [hj] at hr; cases hr
+        | some j' =>
+          rw [hj] at hr
+          simp only [Option.map_some, Option.some.injEq] at hr
+          rcases fwdRel (w.pend s.esAg) (accAddr base j') with ⟨h1, -⟩ | ⟨p, hp, h1, -, -⟩
+          · rw [h1] at hr; cases hr
+          · rw [h1, Option.some.injEq] at hr
+            subst hr
+            obtain ⟨rl, base', vs', kc, hrow, -⟩ := hI.pendSt _ p hp
+            exact hold rl base' vs' kc hrow
+      | _ => rw [hlb] at hr; simp [fwOf] at hr
+  · rw [updNe _ _ _ _ hx] at hf
+    obtain ⟨rl, base, vs, kc, h'⟩ := h x n f j r hf hr
+    exact hold rl base vs kc h'
+
+theorem fwStLand (w : WS) (i k : Nat) : fwSt w → fwSt (nextI w (.land i k)) := by
+  intro h
+  cases hp : (w.pend i)[k]? with
+  | none => simp only [nextI, hp]; exact h
+  | some p => simp only [nextI, hp]; exact h
+
+theorem fwStAt (pol : SbPol) (c : CandW) : validW pol c → ∀ k, fwSt (stAt c k) := by
+  intro hv k
+  induction k with
+  | zero => exact fwStInit c.img
+  | succ k ih =>
+    cases hk : c.its[k]? with
+    | none =>
+      have e : stAt c (k + 1) = stAt c k := by
+        show (match c.its[k]? with
+          | some it => nextI (stAt c k) it
+          | none => stAt c k) = _
+        rw [hk]
+      rw [e]; exact ih
+    | some it =>
+      rw [stAtSucc c k it hk]
+      cases it with
+      | ev s => exact fwStEv c.img _ s (invStAt pol c hv k) ih
+      | land i j => exact fwStLand _ i j ih
+
+/-- **THE FORWARDED-BYTE TIMESTAMP** (the P-W1 open item, settled): at a drained state, a member load's
+forwarded byte names its forwarding store's member write index — the member's rf at that byte is the
+own store. -/
+theorem memberFwdSrc (N : Nat) (img : Image) (w : WS) (x n : Nat) (l : Lbl) (j r : Nat) :
+    Inv img w → fwSt w → agOk N w → drained w → (w.rows x)[n]? = some l →
+    ((w.fw x).getD n [])[j]? = some (some r) →
+    ∀ aq base ts vs, l = LLoad aq base ts vs → j < ts.length →
+    ∃ ts', gxLbl (memberW N img w) (x, n) = some (LLoad aq base ts' vs) ∧
+      ts'[j]? = some (gwix (memberW N img w) (x, r)) ∧
+      gwriteAt (memberW N img w) (gwix (memberW N img w) (x, r)) = some (x, r) := by
+  intro hI hfw hag hdr hl hf aq base ts vs hle hj
+  subst hle
+  have hx : x < N := agOfRow N w (x, n) _ hag hl
+  have hf' : ∃ f, (w.fw x)[n]? = some f ∧ f[j]? = some (some r) := by
+    have hnl : n < (w.fw x).length := by rw [hI.fwLen x]; exact lookup_lt_Some hl
+    refine ⟨(w.fw x)[n], List.getElem?_eq_getElem hnl, ?_⟩
+    rw [List.getD_eq_getElem?_getD, List.getElem?_eq_getElem hnl] at hf
+    exact hf
+  obtain ⟨f, hfn, hfj⟩ := hf'
+  obtain ⟨rl, base', vs', kc, hst⟩ := hfw x n f j r hfn hfj
+  -- the store has landed: it is in gmo, a member write
+  have hin : (x, r) ∈ w.gmo := by
+    rcases hI.memIn x r _ hst (by rfl) with h | h
+    · exact h
+    · rw [hdr x] at h; simp at h
+  have hW : (x, r) ∈ gwrites (memberW N img w) := by
+    refine List.mem_filter.2 ⟨hin, ?_⟩
+    simp only [gisW, memLblSome N img w (x, r) _ hx hst, fixLbl, lbIsW]
+  refine ⟨fixTs (rawG N img w) x ts ((w.fw x).getD n []), memLblSome N img w (x, n) _ hx hl, ?_,
+    gwriteAtGwix _ _ hW⟩
+  rw [gwixEq]
+  simp only [fixTs, List.getElem?_mapIdx, List.getElem?_eq_getElem hj, Option.map_some]
+  rw [List.getD_eq_getElem?_getD, hf]
+  rfl
 
 /-! # 4. The read arms -/
 

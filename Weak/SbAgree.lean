@@ -10,7 +10,7 @@ plan rev 55 row P-W2; [OWN.112] [OWN.113]).  Lean-only, no Rocq twin.
       label's timestamp at a forwarded byte (`SbCand.fwdMask`), so the walk TRACE may carry anything
       there (the pf label P-W6 relates it to chooses); the MEMBER label carries the forwarding store's
       member WRITE INDEX (`fixTs`: its landing position) — the member's rf at that byte is the own
-      store, which is GF's source under the aligned event identities.  The fix-up touches only load
+      store, which is GF's source under the aligned event identities (`SbReplay.memberFwdSrc`).  The fix-up touches only load
       timestamps, so every write / class / gmo fact of the member is the raw rows' (`fix*`).
   §2  the member's facts at a drained state (no pending store): **`memberGwf`**, **`memberLogOf`**
       (the landed log is the message list of the member's writes), **`memberRmwLatest`** (every AMO read
