@@ -64,7 +64,11 @@ set_option maxRecDepth 100000 in
 `ppn` by the kernel map (a claim) with a permission allowing the access,
 and the tier pins the mapping; the physical address is `paOf ppn va`.  The
 slot and the token come back (the TLB possibly refilled, a reservation
-possibly left standing). -/
+possibly left standing).  Since sail-riscv 0.16 the effective privilege is
+an argument of `translateAddr` (the caller takes it from
+`default_access_info`); here it is `Supervisor`, a failure would report an
+`ExceptionContext`, and the Svukte check that runs first reads
+`senvcfg`/`menvcfg` from the configuration cells. -/
 theorem swp_translateAddr_tier [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
     (tier : KTier) (root : BitVec 44) (hok : SConfAt (GF := GF) tier c root sie)
     (va : BitVec 64) (hlt : va.toNat < 2 ^ 38) (acc : MemoryAccessType mem_payload) (hacc : kernelAccess acc)
