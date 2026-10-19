@@ -98,10 +98,19 @@ theorem ume_runRW_union (D : UFoot) (m2 : BMap) {X : Type} (m : SailM X) :
   | impure call k ih =>
     intro orc p rs mm v x p' rs' mm' v' orc' h
     cases call with
+    | inr n =>
+      simp only [runRW] at h ⊢
+      split at h
+      · rename_i hn
+        simp only [hn, dite_true]
+        exact ih _ _ _ _ _ _ _ _ _ _ _ _ h
+      · simp at h
+    | inl c =>
+    cases c with
     | error e => simp [runRW] at h
     | ok o =>
       cases o
-      case regRead r =>
+      case regRead r a =>
         simp only [runRW] at h ⊢
         cases hd : D.Dr r
         · simp only [hd, Bool.false_eq_true, ↓reduceIte] at h ⊢
@@ -115,42 +124,38 @@ theorem ume_runRW_union (D : UFoot) (m2 : BMap) {X : Type} (m : SailM X) :
             exact ih _ _ _ _ _ _ _ _ _ _ _ _ h
           · simp only [hp] at h ⊢
             exact ih _ _ _ _ _ _ _ _ _ _ _ _ h
-      case regWrite r val =>
+      case regWrite r a val =>
         simp only [runRW] at h ⊢
         cases hd : D.Dw r
         · simp [hd] at h
         · simp only [hd, ↓reduceIte] at h ⊢
           exact ih _ _ _ _ _ _ _ _ _ _ _ _ h
-      case memRead n vs req =>
+      case memRead R =>
         simp only [runRW] at h ⊢
-        cases hi : akIfetch req.access_kind
+        cases hi : akIfetch R.accessKind
         · simp only [hi, Bool.false_eq_true, ↓reduceIte] at h ⊢
-          by_cases hn : n < 2 ^ 64
+          by_cases hn : R.size < 2 ^ 64
           · simp only [hn, ↓reduceIte] at h ⊢
-            cases hr : bmRead mm req.pa n with
+            cases hr : bmRead mm R.pa R.size with
             | none => simp [hr] at h
             | some w =>
-              rw [ume_bmRead_union mm m2 req.pa n w hr]
-              cases he : akExcl req.access_kind
+              rw [ume_bmRead_union mm m2 R.pa R.size w hr]
+              cases he : akExcl R.accessKind
               · simp only [he, hr, Bool.false_eq_true, ↓reduceIte] at h ⊢
                 exact ih _ _ _ _ _ _ _ _ _ _ _ _ h
               · simp only [he, hr, ↓reduceIte] at h ⊢
                 exact ih _ _ _ _ _ _ _ _ _ _ _ _ h
           · simp [hn] at h
         · simp [hi] at h
-      case memWrite n vs req =>
+      case memWrite R w tags =>
         simp only [runRW] at h ⊢
-        by_cases hn : n < 2 ^ 64
+        by_cases hn : R.size < 2 ^ 64
         · simp only [hn, ↓reduceIte] at h ⊢
-          cases hv : req.value with
-          | none => simp [hv] at h
-          | some w =>
-            simp only [hv] at h ⊢
-            cases ho : bmOwned mm req.pa n
-            · simp [ho] at h
-            · simp only [ho, ume_bmOwned_union mm m2 req.pa n ho, ↓reduceIte] at h ⊢
-              rw [ume_bmWrite_union mm m2 req.pa n w hn]
-              exact ih _ _ _ _ _ _ _ _ _ _ _ _ h
+          cases ho : bmOwned mm R.pa R.size
+          · simp [ho] at h
+          · simp only [ho, ume_bmOwned_union mm m2 R.pa R.size ho, ↓reduceIte] at h ⊢
+            rw [ume_bmWrite_union mm m2 R.pa R.size w hn]
+            exact ih _ _ _ _ _ _ _ _ _ _ _ _ h
         · simp [hn] at h
       all_goals
         simp only [runRW] at h ⊢
