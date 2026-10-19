@@ -481,6 +481,19 @@ theorem uwk_update_PTE_Bits (w : BitVec 64) (acc : MemoryAccessType mem_payload)
         Bool.false_eq_true, pure_bind, Bool.true_and, Bool.false_and, Bool.false_or, Bool.true_or,
         apply_ite (f := (pure : Option (BitVec 64) → SailM (Option (BitVec 64))))]
 
+/-- `uwkUpd` of an entry whose `A`/`D` bits are `a`/`d` (`Pte.update_PTE_Bits_pteSetAD`, through
+`uwk_update_PTE_Bits`): it sets `A`, and `D` on a write, `none` when there is nothing to do. -/
+theorem uwkUpd_pteSetAD (p : BitVec 64) (a d : BitVec 1) (acc : MemoryAccessType mem_payload)
+    (hpl : accPlain acc) (hacc : utrAcc acc = true) :
+    uwkUpd (pteSetAD p a d) acc =
+      (if ((d == 0#1) && accWrites acc) || (a == 0#1) then
+        some (pteSetAD p 1#1 (if (d == 0#1) && accWrites acc then 1#1 else d))
+      else none) := by
+  have h := uwk_update_PTE_Bits (pteSetAD p a d) acc hacc
+  rw [update_PTE_Bits_pteSetAD p a d acc hpl] at h
+  injection h with h
+  exact h.symm
+
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
 /-- **No update needed** (the cached or walked word already has the bits the
