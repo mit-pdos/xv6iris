@@ -23,8 +23,11 @@ RTL: 30) either
 - no proof, which is a FINDING (the row says `no proof`).
 
 It is a regression test: the executions already recorded from real machines
-are still executions the model ADMITS.  Green set: QEMU 69 (68 agree, 1
-stuck), JH7110 23, CVA6 19 -- Rocq's green set plus five hart-1 variants.
+are still executions the model ADMITS.  Green set on the sail-riscv 0.16 model
+(since 2026-10-19): QEMU 66 (65 agree, 1 stuck), JH7110 23, CVA6 18 --
+Rocq's green set plus five hart-1 variants, minus the four runs the 0.16
+configuration turned red (below, "The 0.16 bump").  Before the bump: QEMU 69
+(68 agree, 1 stuck), JH7110 23, CVA6 19.
 
 ## How it is checked
 
@@ -37,6 +40,18 @@ the noncomputable part of the Sail model comes from compiled copies tied to
 the originals by `rfl`-proved `csimp` rules (`Vtest/Compile.lean`).  Trusted
 beyond the kernel: the Lean compiler/interpreter (one `native_decide` axiom
 per capture).
+
+The harness speaks lean-sail's concurrency interface v2 (sail-riscv 0.16):
+a hart's events are `Sail.ArchSem.InstructionEffect`s over a `MemRequest`
+(a read answers its bits and an empty tag vector, a write carries its bits
+and answers `.ok ()`, a store's footprint is announced first, silently), and
+the model's failures and finite choices are separate nodes of its monad
+(`.inl (.error _)`, `.inr n`).  Two things the relation leaves open are
+fixed by the interpreter's policy (`HPol`), which can make a run miss a
+capture but never take a step the model does not have: the `exit_wait`
+input of `try_step` at each cycle boundary (`HPol.ew`, default `false`, the
+schedule the pre-0.16 harness ran) and a finite choice (its first
+alternative).  `XState` keeps one slot per model register (213 in 0.16).
 
 ## Commands (on a build machine or in CI)
 
@@ -61,6 +76,26 @@ Rocq README's open model-vs-hardware findings (misa.H / mideleg, the DTB
 pointer, raw counters, virtio feature words and `seg_max`, the
 four-descriptor chain, no F/D instructions, the direct-mapped TLB, power-on
 ADUE, board and RTL CSR differences); `explain --all` prints each.
+
+### The 0.16 bump (2026-10-19): four runs red, by this tree's configuration
+
+Re-running every checked-in capture on the sail-riscv 0.16 model (no
+capture regenerated, no proof changed) turned four green runs red and no red
+run green.  All four are FINDINGS about this tree's CONFIGURATION, both T0
+choices under `notes/model-policy.md` (section 4) recorded in
+`notes/model-diffs.md` section 4; under upstream's defaults the runs would
+agree.  0.16's device behaviour (UARTs, PLIC, CLINT, virtio) is not
+involved: every device run that was green is still green.
+
+| Run | Claim | Verdict (`explain`) and first failing obligation | Cause |
+|---|---|---|---|
+| QEMU/CoreRegsFcsr | agrees | BUDGET at pc 0, mcause 1: the run never reaches DONE, so `allShow (runTest test ...) observed` is false | configuration item 8, F and D off: `mstatus.FS` is read-only zero and the floating-point CSRs are illegal, so the test's `csrr fcsr` traps to the mtvec it never installed (0) and the fetch at 0 faults forever; the platforms read `fcsr = 0` with `FS = Initial` |
+| QEMU/CoreRegsFcsr (hart 1) | agrees | the same | the same |
+| CVA6/CoreRegsFcsr | agrees | the same | the same |
+| QEMU/CoreCsrprobe | agrees | DONE, result differs at slot 35 (`tselect`: model 1 = trapped, QEMU 0), at the trap count (2 vs 1) and in the trap records (an extra mcause 2 at mepc 0x800003c0, mtval 0x7a0023f3 = `csrr t2, tselect`) | configuration item 3, Sdtrig off (upstream default on): reading `tselect` is an illegal instruction; the pre-bump model had a `tselect` stub that always answered |
+
+(JH7110/CoreRegsFcsr and the CVA6 and JH7110 CoreCsrprobe runs were red
+before the bump and stay red.)
 
 Noted, not a difference: `Virtio.capacity0` is 2000 sectors (xv6's FSSIZE)
 where Rocq's `virtio_capacity0` is 128; a test starts its disk at 128
