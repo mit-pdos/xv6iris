@@ -23,9 +23,9 @@ set_option maxHeartbeats 1000000 in
 theorem uft_hit (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 s) (t : PTree)
     (hstep : UbMemStep P t0 t mm0 s.mm) (htlb : utlbOk t (s.file .tlb)) (vpn : BitVec 27) (sum : Bool)
     (ent : TLB_Entry) (hslot : (s.file .tlb)[tlbHash vpn]'(tlbHash_lt vpn) = some ent)
-    (hm : match_TLB_Entry ent 0#16 (BitVec.signExtend 45 vpn) = true) :
+    (hm : match_TLB_Entry ent 0#16 0#14 (sign_extend (m := 47) vpn) .S_Stage = true) :
     ∃ r s', (∀ orc, runRW ufFoot orc s
-        (translate_TLB_hit 39 0#16 vpn (.InstructionFetch ()) .User false sum () (tlbHash vpn) ent) =
+        (translate_TLB_hit 39 0#16 0#14 vpn (.InstructionFetch ()) .User false sum (tlbHash vpn) ent .S_Stage ()) =
           some (r, s', orc)) ∧
       UftTrOut C P t0 mm0 s r s' := by
   have hwf : UbMemWf P t s.mm := ubMemStep_wf P t0 t mm0 s.mm hl.wf hstep
@@ -58,16 +58,16 @@ theorem uft_hit (hv : UftLeavesValid P) (s : UWSt) (hl : UstLand C P t0 mm0 s) (
       simp only [Bool.and_eq_true] at hperm
       exact hperm.1
     have hpage : UftPageOf P (ptePpn w) := ⟨_, lw, w, hlok.2 hU, had, rfl⟩
-    cases hu : update_PTE_Bits w' (.InstructionFetch ()) with
+    cases hu : uwkUpd w' (.InstructionFetch ()) with
     | none =>
       have hout : UftTrOut C P t0 mm0 s (.Ok (ptePpn w, .PBMT_PMA, ())) s := by
         refine ⟨hl, fun _ _ => rfl, ?_, ?_⟩
         · intro ppn pbmt h; cases h; exact ⟨rfl, hpage⟩
         · intro f hf; cases hf
       exact ⟨_, _, fun orc => utlb_hit_keep ufFoot orc orc s s hwk vpn _ rfl false sum (ptePpn w) w' addr hok'.inv
-        hperm' (uwk_upd_none ufFoot orc s vpn addr w' _ false sum hu), hout⟩
+        hperm' (uwk_upd_none ufFoot orc s vpn addr w' _ rfl false sum hu), hout⟩
     | some x =>
-      cases hum : update_PTE_Bits w (.InstructionFetch ()) with
+      cases hum : uwkUpd w (.InstructionFetch ()) with
       | some m' =>
         have hadm : pteAD w m' := pteAD_trans (pteAD_symm had) (uft_update_AD had hum)
         have hokm := uftLeafOk_AD hok hadm
