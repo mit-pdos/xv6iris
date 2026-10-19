@@ -179,6 +179,18 @@ theorem utrapMs_SD (e : BitVec 1) (ms : BitVec 64) :
     BitVec.extractLsb' 63 1 (utrapMs e ms) = BitVec.extractLsb' 63 1 ms := by utrap_bits
 theorem utrapMs_MPP (e : BitVec 1) (ms : BitVec 64) :
     BitVec.extractLsb' 11 2 (utrapMs e ms) = BitVec.extractLsb' 11 2 ms := by utrap_bits
+/-- The 0.16 `mstatus` pins (SDT 24, GVA 38, MPV 39, MDT 42, TW 21): `utrapMs`
+does not touch them. -/
+theorem utrapMs_SDT (e : BitVec 1) (ms : BitVec 64) :
+    BitVec.extractLsb' 24 1 (utrapMs e ms) = BitVec.extractLsb' 24 1 ms := by utrap_bits
+theorem utrapMs_GVA (e : BitVec 1) (ms : BitVec 64) :
+    BitVec.extractLsb' 38 1 (utrapMs e ms) = BitVec.extractLsb' 38 1 ms := by utrap_bits
+theorem utrapMs_MPV (e : BitVec 1) (ms : BitVec 64) :
+    BitVec.extractLsb' 39 1 (utrapMs e ms) = BitVec.extractLsb' 39 1 ms := by utrap_bits
+theorem utrapMs_MDT (e : BitVec 1) (ms : BitVec 64) :
+    BitVec.extractLsb' 42 1 (utrapMs e ms) = BitVec.extractLsb' 42 1 ms := by utrap_bits
+theorem utrapMs_TW (e : BitVec 1) (ms : BitVec 64) :
+    BitVec.extractLsb' 21 1 (utrapMs e ms) = BitVec.extractLsb' 21 1 ms := by utrap_bits
 end bits
 
 /-- **Rocq `utrap_ms_ok`**: the frame's `mstatus` pins hold at the delivered
@@ -198,7 +210,12 @@ theorem trapMstatusOk_utrapMs (e : BitVec 1) (ms : BitVec 64)
       BitVec.extractLsb' 15 2 ms = 0#2 ∧
       BitVec.extractLsb' 63 1 ms = 0#1 ∧
       BitVec.extractLsb' 11 2 ms ≠ 2#2 ∧
-      BitVec.extractLsb' 1 1 ms = 1#1) :
+      BitVec.extractLsb' 1 1 ms = 1#1 ∧
+      BitVec.extractLsb' 24 1 ms = 0#1 ∧
+      BitVec.extractLsb' 38 1 ms = 0#1 ∧
+      BitVec.extractLsb' 39 1 ms = 0#1 ∧
+      BitVec.extractLsb' 42 1 ms = 0#1 ∧
+      BitVec.extractLsb' 21 1 ms = 0#1) :
     let ms' := utrapMs e ms
     BitVec.extractLsb' 34 2 ms' = 2#2 ∧
     BitVec.extractLsb' 17 1 ms' = 0#1 ∧
@@ -212,10 +229,17 @@ theorem trapMstatusOk_utrapMs (e : BitVec 1) (ms : BitVec 64)
     BitVec.extractLsb' 15 2 ms' = 0#2 ∧
     BitVec.extractLsb' 63 1 ms' = 0#1 ∧
     BitVec.extractLsb' 11 2 ms' ≠ 2#2 ∧
-    BitVec.extractLsb' 5 1 ms' = 1#1 := by
-  obtain ⟨hSXL, hMPRV, hMXR, hFS, hVS, hTVM, hTSR, hXS, hSD, hMPP, hSIE⟩ := h
+    BitVec.extractLsb' 5 1 ms' = 1#1 ∧
+    BitVec.extractLsb' 24 1 ms' = 0#1 ∧
+    BitVec.extractLsb' 38 1 ms' = 0#1 ∧
+    BitVec.extractLsb' 39 1 ms' = 0#1 ∧
+    BitVec.extractLsb' 42 1 ms' = 0#1 ∧
+    BitVec.extractLsb' 21 1 ms' = 0#1 := by
+  obtain ⟨hSXL, hMPRV, hMXR, hFS, hVS, hTVM, hTSR, hXS, hSD, hMPP, hSIE,
+    hSDT, hGVA, hMPV, hMDT, hTW⟩ := h
   intro ms'
-  refine ⟨?_, ?_, ?_, utrapMs_SPP e ms, utrapMs_SIE e ms, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
+  refine ⟨?_, ?_, ?_, utrapMs_SPP e ms, utrapMs_SIE e ms, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_,
+    ?_, ?_, ?_, ?_, ?_⟩
   · rw [utrapMs_SXL]; exact hSXL
   · rw [utrapMs_MPRV]; exact hMPRV
   · rw [utrapMs_MXR]; exact hMXR
@@ -227,6 +251,11 @@ theorem trapMstatusOk_utrapMs (e : BitVec 1) (ms : BitVec 64)
   · rw [utrapMs_SD]; exact hSD
   · rw [utrapMs_MPP]; exact hMPP
   · rw [utrapMs_SPIE]; exact hSIE
+  · rw [utrapMs_SDT]; exact hSDT
+  · rw [utrapMs_GVA]; exact hGVA
+  · rw [utrapMs_MPV]; exact hMPV
+  · rw [utrapMs_MDT]; exact hMDT
+  · rw [utrapMs_TW]; exact hTW
 
 section swp
 variable {GF : BundledGFunctors.{0}} [MachGS GF]
