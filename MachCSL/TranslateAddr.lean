@@ -69,12 +69,12 @@ theorem swp_translateAddr_tier [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (si
     (tier : KTier) (root : BitVec 44) (hok : SConfAt (GF := GF) tier c root sie)
     (va : BitVec 64) (hlt : va.toNat < 2 ^ 38) (acc : MemoryAccessType mem_payload) (hacc : kernelAccess acc)
     (ppn : BitVec 44) (perm : KPerm) (hperm : perm.allows acc = true) (hpin : tierPin tier ppn va)
-    (Φ : Result (physaddr × page_based_mem_type × Unit) (ExceptionType × Unit) → IProp GF) :
+    (Φ : Result (physaddr × page_based_mem_type × Unit) (ExceptionContext × Unit) → IProp GF) :
     confCells cpu dq Privilege.Supervisor c ∗ kmapAt (vpnOf va) (kLeaf ppn perm 0#1 0#1) ∗
     transSlotAt cpu tier root ∗ ctxTok cpu curCtx ∗
     (confCells cpu dq Privilege.Supervisor c -∗ transSlotAt cpu tier root -∗ ctxTok cpu curCtx -∗
       Φ (.Ok (physaddr.Physaddr (paOf ppn va), page_based_mem_type.PBMT_PMA, ())))
-    ⊢ swp cpu (translateAddr (virtaddr.Virtaddr va) acc) Φ := by
+    ⊢ swp cpu (translateAddr (virtaddr.Virtaddr va) acc Privilege.Supervisor) Φ := by
   iintro ⟨HmConf, #Hcl, Htrans, Htok, HΦ⟩
   cases tier with
   | bare =>
@@ -87,6 +87,15 @@ theorem swp_translateAddr_tier [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (si
     unfold translateAddr
     rw [is_shadow_stack_access_kernel acc hacc]
     swp_run 40
+    conf_intro HmConf
+    iapply swp_bind
+    iapply (swp_translationMode_bare cpu dq c sie hok0)
+    iframe HmConf
+    inext
+    iintro HmConf
+    conf_cases HmConf
+    -- the Svukte check, then `translate_vs_stage` reads the mode again
+    swp_run 120
     conf_intro HmConf
     iapply swp_bind
     iapply (swp_translationMode_bare cpu dq c sie hok0)
