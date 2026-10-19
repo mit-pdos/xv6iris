@@ -1404,6 +1404,303 @@ theorem powerInterp_accessDisc (heq : MachFixedGS.rsvStatic (hlc := hlc) (GF := 
     rw [heq, heqP] at hrp
     exact accessDisc_of g.m hmm (heq ▸ all_of_reservedOk hin hok.1) hch' hk hu hpt hkk hrp hkd
 
+/-! ## Route P, increment P-M4c: the export's sub-definitions over landing positions (DUAL)
+
+(`PROGRESS-W11F.md` §10.)  The export `xv6AccessDisc` and its eleven conjuncts are UNCHANGED.
+Beside them, their route-P twins: readings AS OF a position over the LANDED VIEW
+(`MachCSL.FlatMem.lview`: the co-latest store landed at or before the position -- riscv.cat's
+global memory order), entry-wise "after `S`" as "not landed at or before `S`" (pending or landed
+later, `MachCSL.HEnt.landedLe`), reads over `WEnt.visibleP` (landed at or below the view, or
+own), the load floor `coh` as the read entry's LANDING position.  Verbatim (identity, keyed by
+ISSUE stamp): the sync paths (`syncPath`, `relProvAt`: P-M5's hops), the pc record, the power-on
+clauses (`e.t ≠ 0`), the static locks' list shape (`lockRegionOk`), `cpuStaticAt`.  Under eager
+landing each twin IS today's (`xv6AccessDiscP_eager`); the flip after P-M7 swaps them.
+Spec: RVWMO/riscv.cat (a store is in the global memory order from its landing); FAITHFUL. -/
+
+/-- A live dynamic (pipe) lock at `b` as of LANDING position `t` (route P). -/
+def xv6DynLockP (σ : MState) (b : PAddr) (t : Nat) : Prop :=
+  dynLkDiscAtP xv6Rsv (slotWit xv6Rsv) σ.mem σ.lp σ.ltop b t
+
+/-- A byte of a live dynamic lock's words as of `t`, off every kernel-stack byte (route P). -/
+def dynLockByteAtP (σ : MState) (b a : PAddr) (t : Nat) : Prop :=
+  xv6DynLockP σ b t ∧ lockWordsByte b a ∧ ¬ ksByteAtP xv6Rsv σ.mem σ.lp t a
+
+open Classical in
+/-- **The custody map as of landing position `t`** (route P; `custAt`'s twin). -/
+noncomputable def custAtP (σ : MState) (a : PAddr) (t : Nat) : Cust :=
+  if h1 : ∃ b, staticLockByteOf b a then .lockw (Classical.choose h1) else
+  if h2 : ∃ w, pubByteOf w a then .pub (Classical.choose h2) else
+  if h3 : ∃ b, dynLockByteAtP σ b a t then .lockw (Classical.choose h3) else
+  if ptByteExAtP xv6Rsv σ.mem σ.lp t a then .pte else
+  if racyByteIn xv6Rsv a then .racy else
+  if h7 : ∃ c, a ∈ cpuCellBytes c then .hart (Classical.choose h7) else .free
+
+/-- The racy word's value clause as of landing position `t` (route P). -/
+def racyValOkP (σ : MState) (a : PAddr) (t : Nat) : Prop := racyValAtP xv6Rsv σ.mem σ.lp t a
+
+/-- **(iii+), route P**: hart `j`'s coherence floor at `a` is the LANDING position of a
+post-power-on foreign hart entry; custody and the racy value are read as of that position. -/
+def chainOkAtP (σ : MState) : Prop :=
+  ∀ (j : CPU) (a : PAddr) (H : Hist) (e : HEnt), σ.mem[a]? = some H → e ∈ H → e.t ≠ 0 →
+    σ.lp e.t = some ((σ.hr j).coh a) → ∀ hA : e.tid < NCPU, e.tid ≠ hartAgent j →
+    (∀ b, custAtP σ a ((σ.hr j).coh a) ≠ .lockw b) → (∀ w, custAtP σ a ((σ.hr j).coh a) ≠ .pub w) →
+    custAtP σ a ((σ.hr j).coh a) ≠ .pte →
+    syncPath σ ⟨e.tid, hA⟩ e.t j (σ.top + 1) ∨
+      (custAtP σ a ((σ.hr j).coh a) = .racy ∧ racyValOkP σ a ((σ.hr j).coh a))
+
+/-- The lock words as of landing position `t` (route P). -/
+def xv6LockWordP (σ : MState) (b : PAddr) (t : Nat) : Prop := b ∈ xv6StaticLocks ∨ xv6DynLockP σ b t
+
+/-- A dynamic lock's windowed discipline, the window `(p, t]` of LANDING positions (route P). -/
+def dynLockWinAtP (σ : MState) (b : PAddr) (t : Nat) : Prop :=
+  ∃ (L : List (PAddr × HEnt)) (te p : Nat), slotWit xv6Rsv L b te ∧ p ≤ te ∧ te ≤ t ∧
+    lockWinAtP (cpuPtrAt KernelGeom.cpusBase) σ.mem σ.lp b p t
+
+/-- **The lock layer's discipline, route P.** -/
+def lockWordDiscAtP (σ : MState) : Prop :=
+  ∀ (b : PAddr) (t : Nat), xv6LockWordP σ b t →
+    (b ∈ xv6StaticLocks → lockRegionOk (cpuPtrAt KernelGeom.cpusBase) σ.mem b) ∧
+    (xv6DynLockP σ b t → dynLockWinAtP σ b t)
+
+/-- **`holding()`'s harmlessness, route P**: a static lock's merged word histories read over
+`WEnt.visibleP` (any landing view); a dynamic lock's window over the landed view. -/
+def lkCpuReadAtP (σ : MState) : Prop :=
+  ∀ (b : PAddr) (t : Nat), xv6LockWordP σ b t →
+    (b ∈ xv6StaticLocks →
+      ∃ (W : WordHist 4) (W' : WordHist 8) (Hold Hold' : Nat → Hist) (st : Option (CPU × Bool)) (B : Nat),
+        wordHistAt σ.mem b 4 W Hold ∧ wordHistAt σ.mem (b + 16#64) 8 W' Hold' ∧
+        lockDiscW (cpuPtrAt KernelGeom.cpusBase) st B W W' ∧
+        ∀ (c : CPU), (∀ k, st ≠ some (c, k)) → ∀ (tvn : Nat) (v0 w : BitVec 64), v0 ≠ cpuAddr c →
+          ReadCasesP σ.lp W' (hartAgent c) tvn v0 w → w ≠ cpuAddr c) ∧
+    (xv6DynLockP σ b t →
+      ∃ (L : List (PAddr × HEnt)) (te p : Nat) (W : WordHist 4) (W' : WordHist 8) (st : Option (CPU × Bool))
+        (B : Nat), slotWit xv6Rsv L b te ∧ p ≤ te ∧ te ≤ t ∧
+        (∀ j, j < 4 → ∃ H, (σ.mem.lview σ.lp)[b + BitVec.ofNat 64 j]? = some H ∧
+          H.filter (lkWinIn p t) = W.map (WEnt.proj j)) ∧
+        (∀ j, j < 8 → ∃ H, (σ.mem.lview σ.lp)[b + 16#64 + BitVec.ofNat 64 j]? = some H ∧
+          H.filter (lkWinIn p t) = W'.map (WEnt.proj j)) ∧
+        lockDiscWin (cpuPtrAt KernelGeom.cpusBase) st B W W' ∧
+        ∀ (c : CPU), (∀ k, st ≠ some (c, k)) → ∀ (tvn : Nat) (v0 w : BitVec 64), v0 ≠ cpuAddr c →
+          ReadCases W' (hartAgent c) tvn v0 w → w ≠ cpuAddr c)
+
+/-- **A seal position, route P**: at or below the LANDING top; every post-power-on entry of the
+root word landed at or before it; no post-power-on entry of `started` landed at or before it. -/
+def kptSealAtP (σ : MState) (S : Nat) : Prop :=
+  S ≤ σ.ltop ∧
+  (∀ a ∈ kptRootBytes, ∀ H, σ.mem[a]? = some H → ∀ e ∈ H, e.t ≠ 0 → e.landedLe σ.lp S = true) ∧
+  (∀ a ∈ xv6StartedR.bytes, ∀ H, σ.mem[a]? = some H → ∀ e ∈ H, e.t ≠ 0 → e.landedLe σ.lp S = false)
+
+/-- **One slot's discipline after `S`, route P**: every entry not landed at or before `S`. -/
+def kptSlotDiscP (σ : MState) (S : Nat) (addr : PAddr) (c : BitVec 64) : Prop :=
+  ∀ (j : Nat) (H : Hist) (e : HEnt), j < 8 → σ.mem[addr + BitVec.ofNat 64 j]? = some H → e ∈ H →
+    e.landedLe σ.lp S = false →
+    e.tid < NCPU ∧ ∃ v : BitVec 64, pteVariant c v ∧ e.v = nthByte (n := 8) v j ∧
+      ∀ j', j' < 8 → ∃ H', σ.mem[addr + BitVec.ofNat 64 j']? = some H' ∧
+        (⟨e.t, e.tid, nthByte (n := 8) v j'⟩ : HEnt) ∈ H'
+
+/-- **`pteDiscAt`, route P.** -/
+def pteDiscAtP (σ : MState) : Prop :=
+  ∃ S : Nat, kptSealAtP σ S ∧ ∀ (addr : PAddr) (c : BitVec 64), addr.toNat % 8 = 0 →
+    ptByteAtP xv6Rsv σ.mem σ.lp S addr → wordAsOfP σ.mem σ.lp addr S c → kptSlotDiscP σ S addr c
+
+/-- One kernel mapping's walk at the seal, route P (`kptWalkP`'s twin: as of `S` over the landed
+view, each slot disciplined after `S` over landing positions). -/
+def kptWalkPL (σ : MState) (S : Nat) (b : BitVec 44) (vpn : BitVec 27) (ppn : BitVec 44) (perm : KPerm) :
+    Prop :=
+  ∃ (b1 b0 : BitVec 44) (a d : BitVec 1),
+    wordAsOfP σ.mem σ.lp (kSlotP b (kIdxP vpn 2)) S (kPtr b1) ∧ kptSlotDiscP σ S (kSlotP b (kIdxP vpn 2)) (kPtr b1) ∧
+    wordAsOfP σ.mem σ.lp (kSlotP b1 (kIdxP vpn 1)) S (kPtr b0) ∧ kptSlotDiscP σ S (kSlotP b1 (kIdxP vpn 1)) (kPtr b0) ∧
+    (∃ v, wordAsOfP σ.mem σ.lp (kSlotP b0 (kIdxP vpn 0)) S v ∧ pteVariant (kLeaf ppn perm a d) v) ∧
+    kptSlotDiscP σ S (kSlotP b0 (kIdxP vpn 0)) (kLeaf ppn perm a d)
+
+/-- **`kptMapsExp`, route P** (the seal position and the as-of-`S` readings over landing positions;
+`kptMapsExp` reads positions too -- design §2.5 lists it as untouched, it is not). -/
+def kptMapsExpP (σ : MState) : Prop :=
+  (∀ a ∈ xv6StartedR.bytes, ∀ H : Hist, σ.mem[a]? = some H → ∀ e ∈ H, e.t = 0) ∨
+  ∃ (pas : Nat → BitVec 44) (S : Nat) (b : BitVec 44), kptSealAtP σ S ∧
+    wordAsOfP σ.mem σ.lp KA.«kernel_pagetable» S (kSlotP b 0) ∧
+    ∀ (vpn : BitVec 27) (ppn : BitVec 44) (perm : KPerm), kMapP pas vpn ppn perm → kptWalkPL σ S b vpn ppn perm
+
+/-- **O1, route P.** -/
+def utextDiscAtP (σ : MState) : Prop := uTextDiscAtP σ
+
+/-- **T4, route P.** -/
+def uptDiscAtP (σ : MState) : Prop := uPtDiscAtP xv6Rsv σ
+
+/-- **A pipe lock's word is 0 at its window's opening, route P** (positions = landing positions). -/
+def dynLockWinZAtP (σ : MState) : Prop :=
+  ∀ (b : PAddr) (t : Nat), xv6DynLockP σ b t →
+    ∃ (L : List (PAddr × HEnt)) (te p : Nat), slotWit xv6Rsv L b te ∧ p ≤ te ∧ te ≤ t ∧
+      lockWinAtP (cpuPtrAt KernelGeom.cpusBase) σ.mem σ.lp b p t ∧
+      ∀ j, j < 4 → (σ.mem.entAsOfP σ.lp (b + BitVec.ofNat 64 j) p).map HEnt.v = some 0
+
+/-- **The kernel stacks' frames, route P**: a kernel-stack byte as of `s` is unexempt as of every
+later position, and every entry on it not landed at or before `s` is a hart's. -/
+def ksFrameAtP (σ : MState) : Prop :=
+  ∀ (a : PAddr) (s : Nat), ksByteAtP xv6Rsv σ.mem σ.lp s a →
+    (∀ t, s < t → (∀ b, custAtP σ a t ≠ .lockw b) ∧ (∀ w, custAtP σ a t ≠ .pub w) ∧ custAtP σ a t ≠ .pte ∧
+      custAtP σ a t ≠ .racy) ∧
+    (∀ (H : Hist) (e : HEnt), σ.mem[a]? = some H → e ∈ H → e.landedLe σ.lp s = false → e.tid < NCPU)
+
+/-- **THE EXPORT, route P** (DUAL; the SAME eleven conjuncts in the same order, each its twin;
+`cpuStaticAt` and `relProvAt` verbatim). -/
+def xv6AccessDiscP (σ : MState) : Prop :=
+  chainOkAtP σ ∧ lockWordDiscAtP σ ∧ cpuStaticAt σ ∧ lkCpuReadAtP σ ∧ pteDiscAtP σ ∧ utextDiscAtP σ ∧
+    uptDiscAtP σ ∧ kptMapsExpP σ ∧ relProvAt σ ∧ dynLockWinZAtP σ ∧ ksFrameAtP σ
+
+/-! ### Agreement under eager landing (the bridges) -/
+
+/-- The read cases over `visibleP` are today's on a word history landed at its own stamps. -/
+theorem ReadCasesP_eager {n : Nat} {lp : LandPos} {W : WordHist n} (hW : ∀ e ∈ W, lp e.t = some e.t)
+    (h : Agent) (tvn : Nat) (v0 w : BitVec (8 * n)) : ReadCasesP lp W h tvn v0 w ↔ ReadCases W h tvn v0 w := by
+  have hv : ∀ x ∈ W, x.visibleP lp h tvn = x.visible h tvn := fun x hx => WEnt.visibleP_eager lp h tvn x (hW x hx)
+  unfold ReadCasesP ReadCases
+  constructor
+  · rintro (⟨W1, e, W2, hW', h1, h2, h3⟩ | ⟨h1, h2⟩)
+    · refine .inl ⟨W1, e, W2, hW', ?_, fun x hx => ?_, h3⟩
+      · rw [← hv e (by rw [hW']; simp)]; exact h1
+      · rw [← hv x (by rw [hW']; simp [hx])]; exact h2 x hx
+    · exact .inr ⟨fun x hx => by rw [← hv x hx]; exact h1 x hx, h2⟩
+  · rintro (⟨W1, e, W2, hW', h1, h2, h3⟩ | ⟨h1, h2⟩)
+    · refine .inl ⟨W1, e, W2, hW', ?_, fun x hx => ?_, h3⟩
+      · rw [hv e (by rw [hW']; simp)]; exact h1
+      · rw [hv x (by rw [hW']; simp [hx])]; exact h2 x hx
+    · exact .inr ⟨fun x hx => by rw [hv x hx]; exact h1 x hx, h2⟩
+
+section eagerX
+variable (σ : MState) (h : σ.okP) (he : σ.llog = List.range' 1 σ.top)
+include h he
+
+theorem xv6DynLockP_eager : xv6DynLockP σ = xv6DynLock σ := by
+  funext b t
+  show dynLkDiscAt xv6Rsv (slotWit xv6Rsv) (σ.mem.lview σ.lp) σ.ltop b t =
+    dynLkDiscAt xv6Rsv (slotWit xv6Rsv) σ.mem σ.top b t
+  rw [FlatMem.lview_eagerOn σ.mem σ.lp (σ.okP_eagerOn h he), σ.ltop_eager he]
+
+theorem dynLockByteAtP_eager : dynLockByteAtP σ = dynLockByteAt σ := by
+  funext b a t
+  show (xv6DynLockP σ b t ∧ lockWordsByte b a ∧ ¬ ksByteAt xv6Rsv (σ.mem.lview σ.lp) t a) =
+    (xv6DynLock σ b t ∧ lockWordsByte b a ∧ ¬ ksByteAt xv6Rsv σ.mem t a)
+  rw [xv6DynLockP_eager σ h he, FlatMem.lview_eagerOn σ.mem σ.lp (σ.okP_eagerOn h he)]
+
+theorem custAtP_eager : custAtP σ = custAt σ := by
+  have hpe : ptByteExAtP xv6Rsv σ.mem σ.lp = ptByteExAt xv6Rsv σ.mem := by
+    show ptByteExAt xv6Rsv (σ.mem.lview σ.lp) = _
+    rw [FlatMem.lview_eagerOn σ.mem σ.lp (σ.okP_eagerOn h he)]
+  funext a t
+  unfold custAtP custAt
+  rw [dynLockByteAtP_eager σ h he, hpe]
+
+theorem racyValOkP_eager : racyValOkP σ = racyValOk σ := by
+  funext a t
+  show racyValAt xv6Rsv (σ.mem.lview σ.lp) t a = racyValAt xv6Rsv σ.mem t a
+  rw [FlatMem.lview_eagerOn σ.mem σ.lp (σ.okP_eagerOn h he)]
+
+theorem chainOkAtP_eager : chainOkAtP σ ↔ chainOkAt σ := by
+  have hm := σ.okP_eagerOn h he
+  unfold chainOkAtP chainOkAt
+  rw [custAtP_eager σ h he, racyValOkP_eager σ h he]
+  constructor
+  · intro hc j a H e hH hme h0 hcoh hA hne h1 h2 h3
+    have hlp := hm a H hH e hme
+    rcases hc j a H e hH hme h0 (by rw [hlp, hcoh]) hA hne (by rw [← hcoh]; exact h1) (by rw [← hcoh]; exact h2)
+      (by rw [← hcoh]; exact h3) with hs | hr
+    · exact .inl hs
+    · right; rw [hcoh]; exact hr
+  · intro hc j a H e hH hme h0 hcoh hA hne h1 h2 h3
+    have hlp := hm a H hH e hme
+    have hc' : e.t = (σ.hr j).coh a := Option.some.inj (hlp.symm.trans hcoh)
+    rcases hc j a H e hH hme h0 hc' hA hne (by rw [hc']; exact h1) (by rw [hc']; exact h2)
+      (by rw [hc']; exact h3) with hs | hr
+    · exact .inl hs
+    · right; rw [← hc']; exact hr
+
+theorem xv6LockWordP_eager : xv6LockWordP σ = xv6LockWord σ := by
+  funext b t
+  unfold xv6LockWordP xv6LockWord
+  rw [xv6DynLockP_eager σ h he]
+
+theorem dynLockWinAtP_eager : dynLockWinAtP σ = dynLockWinAt σ := by
+  funext b t
+  unfold dynLockWinAtP dynLockWinAt lockWinAtP
+  rw [FlatMem.lview_eagerOn σ.mem σ.lp (σ.okP_eagerOn h he)]
+
+theorem lockWordDiscAtP_eager : lockWordDiscAtP σ ↔ lockWordDiscAt σ := by
+  unfold lockWordDiscAtP lockWordDiscAt
+  rw [xv6LockWordP_eager σ h he, xv6DynLockP_eager σ h he, dynLockWinAtP_eager σ h he]
+
+/-- A word history the memory holds over tails is landed at its own stamps. -/
+theorem wordHistAt_eager {pa : PAddr} {n : Nat} (hn : 0 < n) {W : WordHist n} {Hold : Nat → Hist}
+    (hw : wordHistAt σ.mem pa n W Hold) : ∀ e ∈ W, σ.lp e.t = some e.t := by
+  intro e hm
+  have h0 := hw.1 0 hn
+  have hin : e.proj 0 ∈ W.hist Hold 0 := List.mem_append_left _ (List.mem_map_of_mem hm)
+  exact σ.okP_eagerOn h he _ _ h0 _ hin
+
+theorem lkCpuReadAtP_eager : lkCpuReadAtP σ ↔ lkCpuReadAt σ := by
+  unfold lkCpuReadAtP lkCpuReadAt
+  rw [xv6LockWordP_eager σ h he, xv6DynLockP_eager σ h he, FlatMem.lview_eagerOn σ.mem σ.lp (σ.okP_eagerOn h he)]
+  refine forall_congr' fun b => forall_congr' fun t => imp_congr_right fun _ => and_congr ?_ Iff.rfl
+  refine imp_congr_right fun _ => ?_
+  constructor
+  · rintro ⟨W, W', Hold, Hold', st, B, h1, h2, h3, h4⟩
+    refine ⟨W, W', Hold, Hold', st, B, h1, h2, h3, fun c hc tvn v0 w hv0 hr => h4 c hc tvn v0 w hv0 ?_⟩
+    exact (ReadCasesP_eager (wordHistAt_eager σ h he (by decide) h2) _ _ _ _).2 hr
+  · rintro ⟨W, W', Hold, Hold', st, B, h1, h2, h3, h4⟩
+    refine ⟨W, W', Hold, Hold', st, B, h1, h2, h3, fun c hc tvn v0 w hv0 hr => h4 c hc tvn v0 w hv0 ?_⟩
+    exact (ReadCasesP_eager (wordHistAt_eager σ h he (by decide) h2) _ _ _ _).1 hr
+
+theorem kptSealAtP_eager (S : Nat) : kptSealAtP σ S ↔ kptSealAt σ S := by
+  have hm := σ.okP_eagerOn h he
+  unfold kptSealAtP kptSealAt
+  rw [σ.ltop_eager he]
+  refine and_congr Iff.rfl (and_congr ?_ ?_) <;>
+  refine forall_congr' fun a => imp_congr_right fun _ => forall_congr' fun H => forall_congr' fun hH =>
+    forall_congr' fun e => forall_congr' fun hme => imp_congr_right fun _ => ?_ <;>
+  rw [HEnt.landedLe_eager σ.lp S e (hm a H hH e hme)] <;> simp
+
+theorem kptSlotDiscP_eager (S : Nat) (addr : PAddr) (c : BitVec 64) :
+    kptSlotDiscP σ S addr c ↔ kptSlotDisc σ S addr c := by
+  have hm := σ.okP_eagerOn h he
+  unfold kptSlotDiscP kptSlotDisc
+  refine forall_congr' fun j => forall_congr' fun H => forall_congr' fun e => imp_congr_right fun _ =>
+    forall_congr' fun hH => forall_congr' fun hme => imp_congr_left ?_
+  rw [HEnt.landedLe_eager σ.lp S e (hm _ H hH e hme)]
+  simp
+
+theorem pteDiscAtP_eager : pteDiscAtP σ ↔ pteDiscAt σ := by
+  unfold pteDiscAtP pteDiscAt ptByteAtP wordAsOfP
+  rw [FlatMem.lview_eagerOn σ.mem σ.lp (σ.okP_eagerOn h he)]
+  simp only [kptSealAtP_eager σ h he, kptSlotDiscP_eager σ h he]
+
+theorem kptMapsExpP_eager : kptMapsExpP σ ↔ kptMapsExp σ := by
+  unfold kptMapsExpP kptMapsExp kptWalkPL kptWalkP wordAsOfP
+  rw [FlatMem.lview_eagerOn σ.mem σ.lp (σ.okP_eagerOn h he)]
+  simp only [kptSealAtP_eager σ h he, kptSlotDiscP_eager σ h he]
+
+theorem dynLockWinZAtP_eager : dynLockWinZAtP σ ↔ dynLockWinZAt σ := by
+  unfold dynLockWinZAtP dynLockWinZAt lockWinAtP FlatMem.entAsOfP
+  rw [xv6DynLockP_eager σ h he, FlatMem.lview_eagerOn σ.mem σ.lp (σ.okP_eagerOn h he)]
+
+theorem ksFrameAtP_eager : ksFrameAtP σ ↔ ksFrameAt σ := by
+  have hm := σ.okP_eagerOn h he
+  unfold ksFrameAtP ksFrameAt ksByteAtP
+  rw [custAtP_eager σ h he, FlatMem.lview_eagerOn σ.mem σ.lp hm]
+  refine forall_congr' fun a => forall_congr' fun s => imp_congr_right fun _ => and_congr Iff.rfl ?_
+  refine forall_congr' fun H => forall_congr' fun e => forall_congr' fun hH => forall_congr' fun hme =>
+    imp_congr_left ?_
+  rw [HEnt.landedLe_eager σ.lp s e (hm a H hH e hme)]
+  simp
+
+/-- **The route-P export IS today's under eager landing** (the DUAL form's bridge). -/
+theorem xv6AccessDiscP_eager : xv6AccessDiscP σ ↔ xv6AccessDisc σ := by
+  unfold xv6AccessDiscP xv6AccessDisc utextDiscAtP uptDiscAtP utextDiscAt uptDiscAt
+  rw [chainOkAtP_eager σ h he, lockWordDiscAtP_eager σ h he, lkCpuReadAtP_eager σ h he, pteDiscAtP_eager σ h he,
+    σ.uTextDiscAtP_eager h he, σ.uPtDiscAtP_eager h he xv6Rsv, kptMapsExpP_eager σ h he,
+    dynLockWinZAtP_eager σ h he, ksFrameAtP_eager σ h he]
+
+end eagerX
+
 end AccessDiscipline
 
 end Xv6

@@ -759,4 +759,106 @@ theorem pubClean_boot {rs : List RsvRegion} (hwf : rsvWf rs) : pubClean rs (imgF
       rfl
   · simp at hs
 
+
+/-! ## Route P, increment P-M4b: the sealed slot's discipline over landing positions
+
+Twins of `histWordAsOf`/`kslotHistOk` (design §2.5, `PROGRESS-W11F.md` §10): the as-of-`S`
+reading over the landed views (`Hist.lview`), "after `S`" over the MERGED histories as "not
+landed at or before `S`" (landed later or pending: `HEnt.landedLe`).  The identity clause (the
+same issue stamp at every byte of the doubleword) is unchanged. -/
+
+/-- The eight histories hold `v` as of (landing) position `t` (route P). -/
+def histWordAsOfP (lp : LandPos) (Hs : Nat → Hist) (t : Nat) (v : BitVec 64) : Prop :=
+  histWordAsOf (fun j => Hist.lview lp (Hs j)) t v
+
+/-- **A sealed slot's discipline, route P**: as of landing position `S` the slot holds its
+canonical value (a frozen slot) or a variant of it (a leaf); every entry NOT landed at or before
+`S` is a leaf's, by a hart, one byte of a whole-doubleword store of a variant. -/
+def kslotHistOkP (lp : LandPos) (S : Nat) (d : KSlot) (Hs : Nat → Hist) : Prop :=
+  (∃ v : BitVec 64, histWordAsOfP lp Hs S v ∧ (if d.frozen then v = d.c else pteVariant d.c v)) ∧
+  ∀ j, j < 8 → ∀ e ∈ Hs j, e.landedLe lp S = false → d.frozen = false ∧ e.tid < NCPU ∧
+    ∃ v : BitVec 64, pteVariant d.c v ∧ e.v = nthByte (n := 8) v j ∧
+      ∀ j', j' < 8 → (⟨e.t, e.tid, nthByte (n := 8) v j'⟩ : HEnt) ∈ Hs j'
+
+theorem kslotHistOkP_congr {lp : LandPos} {S : Nat} {d : KSlot} {Hs Hs' : Nat → Hist}
+    (h : ∀ j, j < 8 → Hs j = Hs' j) (hk : kslotHistOkP lp S d Hs) : kslotHistOkP lp S d Hs' := by
+  obtain ⟨⟨v0, hv0, hc0⟩, hent⟩ := hk
+  refine ⟨⟨v0, fun j hj => by
+    show ((Hist.lview lp (Hs' j)).find? _).map HEnt.v = _
+    rw [← h j hj]; exact hv0 j hj, hc0⟩, fun j hj e he het => ?_⟩
+  rw [← h j hj] at he
+  obtain ⟨h1, h2, w, hw, hwv, hall⟩ := hent j hj e he het
+  exact ⟨h1, h2, w, hw, hwv, fun j' hj' => by rw [← h j' hj']; exact hall j' hj'⟩
+
+/-- **The discipline is stable under a landing** (or any growth of the landing positions above
+`p ≥ S`): the as-of-`S` value and "landed at or before `S`" do not move. -/
+theorem kslotHistOkP_grow {lp lp' : LandPos} {p S : Nat} (hg : LandPos.grow lp p lp') (hS : S ≤ p)
+    {d : KSlot} {Hs : Nat → Hist} (h : kslotHistOkP lp S d Hs) : kslotHistOkP lp' S d Hs := by
+  obtain ⟨⟨v0, hv0, hc0⟩, hent⟩ := h
+  refine ⟨⟨v0, fun j hj => ?_, hc0⟩, fun j hj e he het => ?_⟩
+  · show ((Hist.lview lp' (Hs j)).find? _).map HEnt.v = _
+    rw [Hist.lview_find?_grow hg hS]
+    exact hv0 j hj
+  · rw [HEnt.landedLe_grow hg hS] at het
+    exact hent j hj e he het
+
+/-- Under eager landing the route-P discipline is today's. -/
+theorem kslotHistOkP_eager {lp : LandPos} {S : Nat} {d : KSlot} {Hs : Nat → Hist}
+    (he : ∀ j, j < 8 → ∀ e ∈ Hs j, lp e.t = some e.t) : kslotHistOkP lp S d Hs ↔ kslotHistOk S d Hs := by
+  have hv : ∀ v, histWordAsOfP lp Hs S v ↔ histWordAsOf Hs S v := fun v => by
+    unfold histWordAsOfP histWordAsOf
+    exact forall_congr' fun j => imp_congr_right fun hj => by
+      dsimp only
+      rw [Hist.lview_eager lp (Hs j) (he j hj)]
+  have hl : ∀ j, j < 8 → ∀ e ∈ Hs j, (e.landedLe lp S = false ↔ S < e.t) := fun j hj e hm => by
+    rw [HEnt.landedLe_eager lp S e (he j hj e hm)]
+    simp
+  unfold kslotHistOkP kslotHistOk
+  constructor
+  · rintro ⟨⟨v, h1, h2⟩, h3⟩
+    exact ⟨⟨v, (hv v).1 h1, h2⟩, fun j hj e hm hS => h3 j hj e hm ((hl j hj e hm).2 hS)⟩
+  · rintro ⟨⟨v, h1, h2⟩, h3⟩
+    exact ⟨⟨v, (hv v).2 h1, h2⟩, fun j hj e hm hS => h3 j hj e hm ((hl j hj e hm).1 hS)⟩
+
+/-- A whole-doubleword hart store of a variant, not landed at or before the seal (pending, or
+landed later), keeps a LEAF's discipline (route P's twin of `kslotHistOk_push`). -/
+theorem kslotHistOkP_push {lp : LandPos} {S : Nat} {d : KSlot} {Hs : Nat → Hist}
+    (h : kslotHistOkP lp S d Hs) (hleaf : d.frozen = false) (t : Nat)
+    (hSt : ∀ q, lp t = some q → S < q) (g : Agent) (hg : g < NCPU) (v : BitVec 64)
+    (hv : pteVariant d.c v) :
+    kslotHistOkP lp S d (fun j => (⟨t, g, nthByte (n := 8) v j⟩ : HEnt) :: Hs j) := by
+  obtain ⟨⟨v0, hv0, hc0⟩, hent⟩ := h
+  refine ⟨⟨v0, fun j hj => ?_, hc0⟩, fun j hj e he het => ?_⟩
+  · show ((Hist.lview lp ((⟨t, g, nthByte (n := 8) v j⟩ : HEnt) :: Hs j)).find? _).map HEnt.v = _
+    rw [Hist.lview_find?_le, List.find?_cons]
+    rw [HEnt.landedLe_false_of lp S ⟨t, g, nthByte (n := 8) v j⟩ hSt, ← Hist.lview_find?_le]
+    exact hv0 j hj
+  · rcases List.mem_cons.1 he with rfl | he
+    · exact ⟨hleaf, hg, v, hv, rfl, fun j' _ => List.mem_cons_self⟩
+    · obtain ⟨h1, h2, w, hw, hwv, hall⟩ := hent j hj e he het
+      exact ⟨h1, h2, w, hw, hwv, fun j' hj' => List.mem_cons_of_mem _ (hall j' hj')⟩
+
+/-- A whole-doubleword hart store of a variant that LANDS AT ONCE above the seal (the walker's
+A/D write-back, route P: inserted below the pending prefix) keeps a LEAF's discipline. -/
+theorem kslotHistOkP_insLanded {lp : LandPos} {S : Nat} {d : KSlot} {Hs : Nat → Hist}
+    (h : kslotHistOkP lp S d Hs) (hleaf : d.frozen = false) (t q : Nat) (hq : lp t = some q) (hSq : S < q)
+    (g : Agent) (hg : g < NCPU) (v : BitVec 64) (hv : pteVariant d.c v) :
+    kslotHistOkP lp S d (fun j => Hist.insLanded lp (⟨t, g, nthByte (n := 8) v j⟩ : HEnt) (Hs j)) := by
+  obtain ⟨⟨v0, hv0, hc0⟩, hent⟩ := h
+  refine ⟨⟨v0, fun j hj => ?_, hc0⟩, fun j hj e he het => ?_⟩
+  · show ((Hist.lview lp (Hist.insLanded lp (⟨t, g, nthByte (n := 8) v j⟩ : HEnt) (Hs j))).find? _).map HEnt.v = _
+    rw [Hist.lview_insLanded lp _ hq, List.find?_cons]
+    have : decide (q ≤ S) = false := decide_eq_false (by omega)
+    rw [this]
+    exact hv0 j hj
+  · rcases (Hist.mem_insLanded lp _ _ e).1 he with rfl | he
+    · exact ⟨hleaf, hg, v, hv, rfl, fun j' _ => (Hist.mem_insLanded lp _ _ _).2 (.inl rfl)⟩
+    · obtain ⟨h1, h2, w, hw, hwv, hall⟩ := hent j hj e he het
+      exact ⟨h1, h2, w, hw, hwv, fun j' hj' => (Hist.mem_insLanded lp _ _ _).2 (.inr (hall j' hj'))⟩
+
+/-- **A spinlock's discipline over the window `(p, a]` of LANDING positions** (route P): today's
+`lockWinAt` of the landed view. -/
+abbrev lockWinAtP (ptr : CPU → BitVec 64) (m : FlatMem) (lp : LandPos) (lk : PAddr) (p a : Nat) : Prop :=
+  lockWinAt ptr (m.lview lp) lk p a
+
 end MachCSL

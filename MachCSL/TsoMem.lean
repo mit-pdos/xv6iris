@@ -1435,4 +1435,344 @@ theorem snapOf_get?_notin (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (a : PAddr
   rw [key _ (fun j hj heq => hin ⟨j, List.mem_range.1 hj, heq⟩) ∅]
   simp
 
+
+/-! ### Route P, increment P-M4a: the LANDED VIEW -- the memory as of landing positions
+
+RVWMO/riscv.cat: a reading "as of position `p`" of the global memory order is the co-latest
+store that has ENTERED the order (landed) at or before `p`; a pending store is not in it yet.
+The route-P memory as of positions is therefore the RELABELED memory `FlatMem.lview m lp`:
+each history's LANDED entries, relabeled to their landing positions, in the same (co) order,
+pending entries dropped.  It is a `FlatMem` of today's shape over positions, so today's as-of
+predicates applied to it are their route-P twins, and today's growth lemmas apply verbatim to
+it (`MachCSL.lviewGrows`, `MachCSL.ChainDefs`).  Entry-wise comparisons over the MERGED
+history ("landed at or before `p`") read `HEnt.landedLe`, stable under every step that lands
+only above `p` (`LandPos.grow`). -/
+
+/-- Entry `e` has LANDED at or before position `p` (route P: it is in the global memory order at
+or before `p`); a pending entry has not. -/
+def HEnt.landedLe (lp : LandPos) (p : Nat) (e : HEnt) : Bool := (lp e.t).any (· ≤ p)
+
+theorem HEnt.visibleP_eq_landedLe (lp : LandPos) (h : Agent) (tv : Nat) (e : HEnt) :
+    e.visibleP lp h tv = (e.landedLe lp tv || decide (e.tid = h)) := rfl
+
+/-- Under eager landing (`lp e.t = some e.t`) "landed at or before `p`" is today's `e.t ≤ p`. -/
+theorem HEnt.landedLe_eager (lp : LandPos) (p : Nat) (e : HEnt) (he : lp e.t = some e.t) :
+    e.landedLe lp p = decide (e.t ≤ p) := by
+  simp [HEnt.landedLe, he]
+
+/-- `lp'` GROWS `lp` above `p`: every landed stamp keeps its position, and every stamp that lands
+in `lp'` only lands above `p` (what a route-P step at landing top `p` does). -/
+def LandPos.grow (lp : LandPos) (p : Nat) (lp' : LandPos) : Prop :=
+  (∀ t q, lp t = some q → lp' t = some q) ∧ (∀ t q, lp' t = some q → lp t = none → p < q)
+
+theorem LandPos.grow_refl (lp : LandPos) (p : Nat) : LandPos.grow lp p lp :=
+  ⟨fun _ _ h => h, fun _ _ h h' => by rw [h'] at h; cases h⟩
+
+theorem LandPos.grow_trans {lp lp' lp'' : LandPos} {p : Nat} (h1 : LandPos.grow lp p lp')
+    (h2 : LandPos.grow lp' p lp'') : LandPos.grow lp p lp'' := by
+  refine ⟨fun t q h => h2.1 t q (h1.1 t q h), fun t q h hn => ?_⟩
+  cases h' : lp' t with
+  | none => exact h2.2 t q h h'
+  | some q' =>
+    have hq' := h1.2 t q' h' hn
+    have hq : q' = q := Option.some.inj ((h2.1 t q' h').symm.trans h)
+    omega
+
+theorem LandPos.grow_mono {lp lp' : LandPos} {p p' : Nat} (h : LandPos.grow lp p lp') (hp : p' ≤ p) :
+    LandPos.grow lp p' lp' :=
+  ⟨h.1, fun t q h1 h2 => Nat.lt_of_le_of_lt hp (h.2 t q h1 h2)⟩
+
+/-- **Appending to the landing log grows the landing positions above the old landing top**
+(unconditionally: a stamp already logged keeps its position, a new one lands at the new top). -/
+theorem lpOf_snoc_grow (llog : List Nat) (x : Nat) :
+    LandPos.grow (lpOf llog) llog.length (lpOf (llog ++ [x])) := by
+  refine ⟨fun t q h => lpOf_snoc_of_some llog x t q h, fun t q h hn => ?_⟩
+  by_cases htx : t = x
+  · subst htx
+    unfold lpOf at h hn
+    by_cases h0 : t = 0
+    · rw [if_pos h0] at hn; cases hn
+    · rw [if_neg h0] at hn h
+      rw [posIn_snoc, hn, Option.none_or, if_pos rfl] at h
+      have := Option.some.inj h
+      omega
+  · rw [lpOf_snoc_ne llog x t htx, hn] at h; cases h
+
+/-- **"Landed at or before `q`" is stable** under growth above `p ≥ q`. -/
+theorem HEnt.landedLe_grow {lp lp' : LandPos} {p q : Nat} (h : LandPos.grow lp p lp') (hq : q ≤ p)
+    (e : HEnt) : e.landedLe lp' q = e.landedLe lp q := by
+  unfold HEnt.landedLe
+  cases h1 : lp e.t with
+  | some r => rw [h.1 _ _ h1]
+  | none =>
+    cases h2 : lp' e.t with
+    | none => rfl
+    | some r =>
+      have := h.2 _ _ h2 h1
+      simp only [Option.any_some, Option.any_none]
+      exact decide_eq_false (by omega)
+
+/-- Visibility at a view at or below `p` is stable under growth above `p`. -/
+theorem HEnt.visibleP_grow {lp lp' : LandPos} {p q : Nat} (h : LandPos.grow lp p lp') (hq : q ≤ p)
+    (g : Agent) (e : HEnt) : e.visibleP lp' g q = e.visibleP lp g q := by
+  rw [HEnt.visibleP_eq_landedLe, HEnt.visibleP_eq_landedLe, HEnt.landedLe_grow h hq]
+
+/-- An entry relabeled to its LANDING position (`none` while it is pending). -/
+def HEnt.atLanding (lp : LandPos) (e : HEnt) : Option HEnt := (lp e.t).map (fun q => ⟨q, e.tid, e.v⟩)
+
+/-- **A history's landed view**: its landed entries at their landing positions, in co order. -/
+def Hist.lview (lp : LandPos) (H : Hist) : Hist := H.filterMap (HEnt.atLanding lp)
+
+/-- **THE LANDED VIEW of the memory** (route P): every history's landed view. -/
+def FlatMem.lview (m : FlatMem) (lp : LandPos) : FlatMem := m.map (fun _ H => Hist.lview lp H)
+
+theorem FlatMem.lview_get? (m : FlatMem) (lp : LandPos) (a : PAddr) :
+    (m.lview lp)[a]? = m[a]?.map (Hist.lview lp) := by
+  unfold FlatMem.lview
+  exact Std.ExtTreeMap.getElem?_map
+
+theorem FlatMem.lview_get?_some {m : FlatMem} {lp : LandPos} {a : PAddr} {H : Hist}
+    (h : m[a]? = some H) : (m.lview lp)[a]? = some (H.lview lp) := by
+  rw [FlatMem.lview_get?, h]; rfl
+
+theorem FlatMem.lview_get?_eq_some {m : FlatMem} {lp : LandPos} {a : PAddr} {L : Hist}
+    (h : (m.lview lp)[a]? = some L) : ∃ H, m[a]? = some H ∧ L = H.lview lp := by
+  rw [FlatMem.lview_get?] at h
+  cases hm : m[a]? with
+  | none => rw [hm] at h; cases h
+  | some H => rw [hm] at h; exact ⟨H, rfl, (Option.some.inj h).symm⟩
+
+theorem Hist.lview_nil (lp : LandPos) : Hist.lview lp [] = [] := rfl
+
+theorem Hist.lview_cons_landed (lp : LandPos) (e : HEnt) (H : Hist) {q : Nat} (he : lp e.t = some q) :
+    Hist.lview lp (e :: H) = ⟨q, e.tid, e.v⟩ :: Hist.lview lp H := by
+  simp [Hist.lview, HEnt.atLanding, he]
+
+theorem Hist.lview_cons_pending (lp : LandPos) (e : HEnt) (H : Hist) (he : lp e.t = none) :
+    Hist.lview lp (e :: H) = Hist.lview lp H := by
+  simp [Hist.lview, HEnt.atLanding, he]
+
+theorem Hist.lview_append (lp : LandPos) (H H' : Hist) :
+    Hist.lview lp (H ++ H') = Hist.lview lp H ++ Hist.lview lp H' := by
+  simp [Hist.lview, List.filterMap_append]
+
+/-- The landed view's entries: relabelings of the history's landed entries. -/
+theorem Hist.mem_lview (lp : LandPos) (H : Hist) (x : HEnt) :
+    x ∈ Hist.lview lp H ↔ ∃ e ∈ H, lp e.t = some x.t ∧ x.tid = e.tid ∧ x.v = e.v := by
+  unfold Hist.lview HEnt.atLanding
+  rw [List.mem_filterMap]
+  constructor
+  · rintro ⟨e, he, hx⟩
+    cases hq : lp e.t with
+    | none => rw [hq] at hx; cases hx
+    | some q =>
+      rw [hq] at hx
+      obtain rfl := Option.some.inj hx
+      exact ⟨e, he, hq, rfl, rfl⟩
+  · rintro ⟨e, he, hq, ht, hv⟩
+    refine ⟨e, he, ?_⟩
+    rw [hq]
+    cases x
+    simp only [Option.map_some, Option.some.injEq, HEnt.mk.injEq]
+    exact ⟨trivial, ht.symm, hv.symm⟩
+
+/-- Two landing maps that agree on a history's stamps give it the same landed view. -/
+theorem Hist.lview_congr (lp lp' : LandPos) : ∀ (H : Hist), (∀ e ∈ H, lp' e.t = lp e.t) →
+    Hist.lview lp' H = Hist.lview lp H
+  | [], _ => rfl
+  | e :: H, h => by
+    have ih := Hist.lview_congr lp lp' H (fun e' he' => h e' (List.mem_cons_of_mem _ he'))
+    have he := h e List.mem_cons_self
+    simp only [Hist.lview, List.filterMap_cons, HEnt.atLanding, he] at ih ⊢
+    rw [ih]
+
+/-- Under eager landing a history is its own landed view. -/
+theorem Hist.lview_eager (lp : LandPos) : ∀ (H : Hist), (∀ e ∈ H, lp e.t = some e.t) → Hist.lview lp H = H
+  | [], _ => rfl
+  | e :: H, h => by
+    rw [Hist.lview_cons_landed lp e H (h e List.mem_cons_self),
+      Hist.lview_eager lp H (fun e' he' => h e' (List.mem_cons_of_mem _ he'))]
+
+/-- **A landed insert below the pending prefix** shows in the landed view ON TOP (route P: an
+exclusive or DMA write, which lands at once). -/
+theorem Hist.lview_insLanded (lp : LandPos) (e : HEnt) {q : Nat} (he : lp e.t = some q) :
+    ∀ H : Hist, Hist.lview lp (Hist.insLanded lp e H) = ⟨q, e.tid, e.v⟩ :: Hist.lview lp H
+  | [] => by
+    simp only [Hist.insLanded, List.takeWhile_nil, List.dropWhile_nil, List.nil_append]
+    exact Hist.lview_cons_landed lp e [] he
+  | x :: H => by
+    have ih := Hist.lview_insLanded lp e he H
+    cases hx : lp x.t with
+    | none =>
+      have hins : Hist.insLanded lp e (x :: H) = x :: Hist.insLanded lp e H := by
+        simp [Hist.insLanded, hx]
+      rw [hins, Hist.lview_cons_pending lp x _ hx, ih, Hist.lview_cons_pending lp x H hx]
+    | some r =>
+      have hins : Hist.insLanded lp e (x :: H) = e :: x :: H := by
+        simp [Hist.insLanded, hx]
+      rw [hins, Hist.lview_cons_landed lp e _ he]
+
+/-- In CO order (`histOkP`) the landed view descends in position. -/
+theorem Hist.lview_sorted (lp : LandPos) (log : List Agent) (H : Hist) (h : histOkP lp log H) :
+    (Hist.lview lp H).Pairwise (fun e e' => e'.t ≤ e.t) := by
+  unfold Hist.lview
+  rw [List.pairwise_filterMap]
+  refine h.1.imp ?_
+  intro e e' hco b hb b' hb'
+  unfold HEnt.atLanding at hb hb'
+  unfold coAbove at hco
+  cases hq : lp e.t with
+  | none => rw [hq] at hb; cases hb
+  | some q =>
+    cases hq' : lp e'.t with
+    | none => rw [hq'] at hb'; cases hb'
+    | some q' =>
+      rw [hq] at hb; rw [hq'] at hb'
+      obtain rfl := Option.some.inj hb
+      obtain rfl := Option.some.inj hb'
+      rw [hq, hq'] at hco
+      exact hco
+
+
+theorem Hist.lview_cons (lp : LandPos) (e : HEnt) (H : Hist) :
+    Hist.lview lp (e :: H) = (e.atLanding lp).toList ++ Hist.lview lp H := by
+  cases h : e.atLanding lp <;> simp [Hist.lview, h]
+
+/-- **A LANDING grows a history's landed view by the landed entry, on top** (the pure core of
+the land step's as-of stability): stamp `t`, pending before, lands at `q`; every other stamp
+keeps its landing position; nothing pending lies below `t`'s entry (`MState.landFootOk`). -/
+theorem Hist.lview_land (lp lp' : LandPos) (t q : Nat) (ht : lp t = none) (ht' : lp' t = some q)
+    (hother : ∀ s, s ≠ t → lp' s = lp s) : ∀ (H : Hist), H.Pairwise (coAbove lp) →
+      (∀ H1 e H2, H = H1 ++ e :: H2 → e.t = t → ∀ e' ∈ H2, (lp e'.t).isSome) →
+      ∃ N : Hist, Hist.lview lp' H = N ++ Hist.lview lp H ∧ ∀ x ∈ N, x.t = q
+  | [], _, _ => ⟨[], rfl, fun _ hx => by cases hx⟩
+  | x :: H, hco, hlow => by
+    rw [List.pairwise_cons] at hco
+    have hcong : (∀ y ∈ H, (lp y.t).isSome) → Hist.lview lp' H = Hist.lview lp H := fun hall =>
+      Hist.lview_congr lp lp' H (fun y hy => hother y.t (fun hyt => by
+        have := hall y hy; rw [hyt, ht] at this; cases this))
+    cases hx : lp x.t with
+    | some r =>
+      have hall : ∀ y ∈ H, (lp y.t).isSome := fun y hy => by
+        have hxy := hco.1 y hy
+        unfold coAbove at hxy
+        rw [hx] at hxy
+        cases hy' : lp y.t with
+        | none => rw [hy'] at hxy; exact (hxy : False).elim
+        | some _ => rfl
+      have hxt : x.t ≠ t := fun h => by rw [h, ht] at hx; cases hx
+      refine ⟨[], ?_, fun _ hx => by cases hx⟩
+      rw [List.nil_append, Hist.lview_cons_landed lp x H hx,
+        Hist.lview_cons_landed lp' x H (by rw [hother x.t hxt, hx]), hcong hall]
+    | none =>
+      by_cases hxt : x.t = t
+      · have hall := hlow [] x H rfl hxt
+        refine ⟨[⟨q, x.tid, x.v⟩], ?_, fun y hy => by simp at hy; rw [hy]⟩
+        rw [Hist.lview_cons_landed lp' x H (by rw [hxt]; exact ht'), Hist.lview_cons_pending lp x H hx,
+          hcong hall]
+        rfl
+      · obtain ⟨N, hN, hNq⟩ := Hist.lview_land lp lp' t q ht ht' hother H hco.2
+          (fun H1 e H2 hH he => hlow (x :: H1) e H2 (by rw [hH]; rfl) he)
+        refine ⟨N, ?_, hNq⟩
+        rw [Hist.lview_cons_pending lp' x H (by rw [hother x.t hxt, hx]), Hist.lview_cons_pending lp x H hx, hN]
+
+
+/-! ### Route P, increment P-M4b: the landed view's readings and eager agreement -/
+
+/-- Every entry of the memory landed at its own stamp (EAGER landing, the P-M1/P-M2 machine). -/
+def FlatMem.eagerOn (m : FlatMem) (lp : LandPos) : Prop :=
+  ∀ (a : PAddr) (H : Hist), m[a]? = some H → ∀ e ∈ H, lp e.t = some e.t
+
+/-- **Under eager landing the landed view is the memory.** -/
+theorem FlatMem.lview_eagerOn (m : FlatMem) (lp : LandPos) (h : m.eagerOn lp) : m.lview lp = m := by
+  apply Std.ExtTreeMap.ext_getElem?
+  intro a
+  rw [FlatMem.lview_get?]
+  cases hget : m[a]? with
+  | none => rfl
+  | some H => rw [Option.map_some, Hist.lview_eager lp H (h a H hget)]
+
+/-- Landed at or before a smaller position: only if at or before the larger. -/
+theorem HEnt.landedLe_mono (lp : LandPos) {p q : Nat} (hq : q ≤ p) (e : HEnt)
+    (h : e.landedLe lp p = false) : e.landedLe lp q = false := by
+  unfold HEnt.landedLe at h ⊢
+  cases hl : lp e.t with
+  | none => rfl
+  | some r =>
+    rw [hl] at h
+    simp only [Option.any_some, decide_eq_false_iff_not] at h ⊢
+    omega
+
+/-- Not landed at or before `p`: pending, or landed above `p`. -/
+theorem HEnt.landedLe_false_of (lp : LandPos) (p : Nat) (e : HEnt) (h : ∀ q, lp e.t = some q → p < q) :
+    e.landedLe lp p = false := by
+  unfold HEnt.landedLe
+  cases hl : lp e.t with
+  | none => rfl
+  | some q =>
+    simp only [Option.any_some]
+    exact decide_eq_false (by have := h q hl; omega)
+
+/-- The landed view's reading as of `p` is the merged history's co-latest entry landed at or
+before `p`, relabeled. -/
+theorem Hist.lview_find?_le (lp : LandPos) (p : Nat) : ∀ H : Hist,
+    (Hist.lview lp H).find? (fun e => decide (e.t ≤ p)) = (H.find? (HEnt.landedLe lp p)).bind (HEnt.atLanding lp)
+  | [] => rfl
+  | e :: H => by
+    have ih := Hist.lview_find?_le lp p H
+    cases hl : lp e.t with
+    | none =>
+      rw [Hist.lview_cons_pending lp e H hl, ih, List.find?_cons]
+      have : e.landedLe lp p = false := by simp [HEnt.landedLe, hl]
+      rw [this]
+    | some q =>
+      rw [Hist.lview_cons_landed lp e H hl, List.find?_cons, List.find?_cons]
+      by_cases hqp : q ≤ p
+      · have : e.landedLe lp p = true := by simp [HEnt.landedLe, hl, hqp]
+        rw [this]
+        simp [hqp, HEnt.atLanding, hl]
+      · have : e.landedLe lp p = false := by simp [HEnt.landedLe, hl, hqp]
+        rw [this]
+        simp [hqp, ih]
+
+/-- **A landed view's reading as of a position at or below `p` is stable** under growth above `p`
+(the landing positions only). -/
+theorem Hist.lview_find?_grow {lp lp' : LandPos} {p q : Nat} (hg : LandPos.grow lp p lp') (hq : q ≤ p)
+    (H : Hist) : (Hist.lview lp' H).find? (fun e => decide (e.t ≤ q)) =
+      (Hist.lview lp H).find? (fun e => decide (e.t ≤ q)) := by
+  rw [Hist.lview_find?_le, Hist.lview_find?_le]
+  have hf : H.find? (HEnt.landedLe lp' q) = H.find? (HEnt.landedLe lp q) := by
+    congr 1
+    funext e
+    exact HEnt.landedLe_grow hg hq e
+  rw [hf]
+  cases hfe : H.find? (HEnt.landedLe lp q) with
+  | none => rfl
+  | some e =>
+    have he := List.find?_some hfe
+    unfold HEnt.landedLe at he
+    cases hl : lp e.t with
+    | none => rw [hl] at he; cases he
+    | some r =>
+      simp only [Option.bind_some, HEnt.atLanding, hl, hg.1 _ _ hl]
+
+/-- The entries of a landed insert: the inserted one and the old ones. -/
+theorem Hist.mem_insLanded (lp : LandPos) (e : HEnt) (H : Hist) (x : HEnt) :
+    x ∈ Hist.insLanded lp e H ↔ x = e ∨ x ∈ H := by
+  unfold Hist.insLanded
+  constructor
+  · intro hx
+    rcases List.mem_append.1 hx with hx | hx
+    · exact .inr (List.takeWhile_subset _ hx)
+    · rcases List.mem_cons.1 hx with rfl | hx
+      · exact .inl rfl
+      · exact .inr (List.dropWhile_subset _ hx)
+  · rintro (rfl | hx)
+    · exact List.mem_append_right _ List.mem_cons_self
+    · have : x ∈ H.takeWhile (fun x => (lp x.t).isNone) ++ H.dropWhile (fun x => (lp x.t).isNone) := by
+        rw [List.takeWhile_append_dropWhile]; exact hx
+      rcases List.mem_append.1 this with h1 | h1
+      · exact List.mem_append_left _ h1
+      · exact List.mem_append_right _ (List.mem_cons_of_mem _ h1)
+
 end MachCSL

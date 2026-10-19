@@ -2667,6 +2667,260 @@ theorem uTextDiscAt_land (σ : MState) (c : CPU) (t : Nat) : uTextDiscAt (σ.lan
 theorem uPtDiscAt_land (rs : List RsvRegion) (σ : MState) (c : CPU) (t : Nat) :
     uPtDiscAt rs (σ.land c t) ↔ uPtDiscAt rs σ := Iff.rfl
 
+/-! ### Route P, increment P-M4b: the kernel table's and the user tables' pure facts over
+landing positions (`PROGRESS-W11F.md` §10)
+
+Twins of `pubAfter`/`kptSealOk`/`kptHistsAt`/`dmaOkAt`/`kptStateOk*`, `uslotHistOk`,
+`uTextDiscAt`, `uSlotDiscAfter`, `uPtDiscAt`: readings AS OF a position over the landed view;
+"after `S`" over the merged histories as "not landed at or before `S`" (`HEnt.landedLe`);
+"at or below the instruction view" as "landed at or before it" (a pending store is not in the
+order the fetcher reads, Zifencei: `fence.i` drains).  Each with its agreement under eager
+landing and its stability under a landing. -/
+
+/-- Every post-power-on entry of every publication word is NOT landed at or before `S`. -/
+def pubAfterP (rs : List RsvRegion) (m : FlatMem) (lp : LandPos) (S : Nat) : Prop :=
+  ∀ (f : PAddr) (w : CPU), (⟨f, .pub w⟩ : RsvRegion) ∈ rs → ∀ a ∈ (⟨f, .pub w⟩ : RsvRegion).bytes,
+    ∀ H, m[a]? = some H → ∀ e ∈ H, e.t ≠ 0 → e.landedLe lp S = false
+
+/-- **The seal's facts, route P** (landing top `ltop`, seal position `S`). -/
+def kptSealOkP (rs : List RsvRegion) (m : FlatMem) (lp : LandPos) (ltop S : Nat) (dyn : List KSlot) : Prop :=
+  S ≤ ltop ∧ pubAfterP rs m lp S ∧
+  (∀ d ∈ dyn, (d.frozen = false → ∃ (ppn : BitVec 44) (perm : KPerm) (a dd : BitVec 1), d.c = kLeaf ppn perm a dd) ∧
+    ∀ j, j < 8 → d.addr + BitVec.ofNat 64 j ∉ rsvBytes rs) ∧
+  (∀ (base : PAddr) (cnt stride k : Nat), (⟨base, .roots cnt stride⟩ : RsvRegion) ∈ rs → k < cnt →
+    ∃ d ∈ dyn, d.addr = base + BitVec.ofNat 64 (stride * k) ∧ d.frozen = true ∧ d.c.toNat % 4096 = 0 ∧
+      (d.c ≠ 0 → pageIn dyn d.c)) ∧
+  (∀ d ∈ dyn, d.frozen = true → ∀ p, ptPtrTo d.c p → pageIn dyn p)
+
+/-- The sealed slots' histories, each disciplined over landing positions. -/
+def kptHistsAtP (m : FlatMem) (lp : LandPos) (S : Nat) (dyn : List KSlot) : Prop :=
+  ∀ d ∈ dyn, ∃ Hs : Nat → Hist, (∀ j, j < 8 → m[d.addr + BitVec.ofNat 64 j]? = some (Hs j)) ∧
+    kslotHistOkP lp S d Hs
+
+/-- The DMA facts, route P: once sealed, every disk entry not landed at or before the seal is off
+every carved page. -/
+def dmaOkAtP (rs : List RsvRegion) (m : FlatMem) (lp : LandPos) (S : Nat) (stk : List PAddr)
+    (dyn : List KSlot) : Prop :=
+  (∀ (a : PAddr) (H : Hist) (e : HEnt), m[a]? = some H → e ∈ H → NCPU ≤ e.tid → ¬ stackByteIn rs a) ∧
+  (dyn ≠ [] → ∀ (a : PAddr) (H : Hist) (e : HEnt), m[a]? = some H → e ∈ H → NCPU ≤ e.tid →
+    e.landedLe lp S = false → ∀ p ∈ stk, ¬ inPage p a)
+
+/-- **`kptStateOk`, route P.** -/
+def kptStateOkP (rs : List RsvRegion) (σ : MState) : Prop :=
+  ∃ (S : Nat) (dyn : List KSlot), (dyn = [] ∧ pubClean rs σ.mem) ∨
+    (kptSealOkP rs σ.mem σ.lp σ.ltop S dyn ∧ kptHistsAtP σ.mem σ.lp S dyn)
+
+/-- **`kptStateOkK`, route P.** -/
+def kptStateOkKP (rs : List RsvRegion) (ok : List KSlot → Prop) (σ : MState) : Prop :=
+  ∃ (S : Nat) (dyn : List KSlot), (dyn = [] ∧ pubClean rs σ.mem) ∨
+    (kptSealOkP rs σ.mem σ.lp σ.ltop S dyn ∧ kptHistsAtP σ.mem σ.lp S dyn ∧ ok dyn)
+
+/-- **`kptStateOkD`, route P**: the carve is the kernel-stack pages as of the seal, over the
+landed view. -/
+def kptStateOkDP (rs : List RsvRegion) (ok : List KSlot → Prop) (σ : MState) : Prop :=
+  ∃ (S : Nat) (dyn : List KSlot) (stk : List PAddr), dmaOkAtP rs σ.mem σ.lp S stk dyn ∧
+    ((dyn = [] ∧ pubClean rs σ.mem) ∨
+      (kptSealOkP rs σ.mem σ.lp σ.ltop S dyn ∧ kptHistsAtP σ.mem σ.lp S dyn ∧ ok dyn ∧
+        ∀ p, p ∈ stk ↔ kstkPageAtP rs σ.mem σ.lp S p))
+
+/-- **A user-table slot's discipline, route P**: as of landing position `K` it holds `d.c`; the
+current word (the merged heads) is `d.c` or a variant; every entry not landed at or before `K` is
+a leaf's, by a hart, one byte of a whole-doubleword store of an `A`/`D` variant. -/
+def uslotHistOkP (lp : LandPos) (K : Nat) (d : KSlot) (Hs : Nat → Hist) : Prop :=
+  histWordAsOfP lp Hs K d.c ∧
+  (∃ w : BitVec 64, (∀ j, j < 8 → (Hs j).head?.map HEnt.v = some (nthByte (n := 8) w j)) ∧
+    (if d.frozen then w = d.c else uepAD d.c w)) ∧
+  ∀ j, j < 8 → ∀ e ∈ Hs j, e.landedLe lp K = false → d.frozen = false ∧ e.tid < NCPU ∧
+    ∃ v : BitVec 64, uepAD d.c v ∧ e.v = nthByte (n := 8) v j ∧
+      ∀ j', j' < 8 → (⟨e.t, e.tid, nthByte (n := 8) v j'⟩ : HEnt) ∈ Hs j'
+
+/-- **O1, route P**: every entry on a user text byte has LANDED at or before the hart's
+instruction view. -/
+def uTextDiscAtP (σ : MState) : Prop :=
+  ∀ (h : CPU) (r : BitVec 44), σ.regs h Register.cur_privilege = Privilege.User →
+    satpTable (σ.regs h Register.satp) = some r →
+    ∀ (a : PAddr) (v : BitVec 64), uSlotNow σ.mem r a v → uepTextB v = true →
+      ∀ j, j < 4096 → ∀ H : Hist, σ.mem[uepLeafPA v + BitVec.ofNat 64 j]? = some H → ∀ e ∈ H,
+        e.landedLe σ.lp (σ.itv h) = true
+
+/-- **One user-table slot's discipline after `T`, route P**: every entry not landed at or before
+`T` on the slot is a hart's, one byte of a whole-doubleword store of an `A`/`D` variant of `c`. -/
+def uSlotDiscAfterP (m : FlatMem) (lp : LandPos) (T : Nat) (a : PAddr) (c : BitVec 64) : Prop :=
+  ∀ (j : Nat) (H : Hist) (e : HEnt), j < 8 → m[a + BitVec.ofNat 64 j]? = some H → e ∈ H →
+    e.landedLe lp T = false →
+    e.tid < NCPU ∧ ∃ v : BitVec 64, uepAD c v ∧ e.v = nthByte (n := 8) v j ∧
+      ∀ j', j' < 8 → ∃ H', m[a + BitVec.ofNat 64 j']? = some H' ∧
+        (⟨e.t, e.tid, nthByte (n := 8) v j'⟩ : HEnt) ∈ H'
+
+/-- **T4, route P**: the slot's value as of the instruction view over the landed view; the
+discipline after it over landing positions. -/
+def uPtDiscAtP (rs : List RsvRegion) (σ : MState) : Prop :=
+  ∀ (h : CPU) (r : BitVec 44), σ.regs h Register.cur_privilege ≠ Privilege.Machine →
+    satpTable (σ.regs h Register.satp) = some r →
+    (∀ ra : PAddr, (⟨ra, .roots 1 8⟩ : RsvRegion) ∈ rs → ¬ curWordAt σ.mem ra (uepRootPA r)) →
+    ∀ (a : PAddr) (v c : BitVec 64), uSlotNow σ.mem r a v → wordAsOfP σ.mem σ.lp a (σ.itv h) c →
+      uSlotDiscAfterP σ.mem σ.lp (σ.itv h) a c
+
+/-! #### Agreement under eager landing -/
+
+section eagerP
+variable {m : FlatMem} {lp : LandPos} (he : m.eagerOn lp)
+include he
+
+theorem pubAfterP_eager (rs : List RsvRegion) (S : Nat) : pubAfterP rs m lp S ↔ pubAfter rs m S := by
+  unfold pubAfterP pubAfter
+  refine forall_congr' fun f => forall_congr' fun w => imp_congr_right fun _ => forall_congr' fun a =>
+    imp_congr_right fun _ => forall_congr' fun H => forall_congr' fun hH => forall_congr' fun e =>
+      forall_congr' fun hm => imp_congr_right fun _ => ?_
+  rw [HEnt.landedLe_eager lp S e (he a H hH e hm)]
+  simp
+
+theorem kptSealOkP_eager (rs : List RsvRegion) (top S : Nat) (dyn : List KSlot) :
+    kptSealOkP rs m lp top S dyn ↔ kptSealOk rs m top S dyn := by
+  unfold kptSealOkP kptSealOk
+  rw [pubAfterP_eager he]
+
+theorem kptHistsAtP_eager (S : Nat) (dyn : List KSlot) : kptHistsAtP m lp S dyn ↔ kptHistsAt m S dyn := by
+  unfold kptHistsAtP kptHistsAt
+  refine forall_congr' fun d => imp_congr_right fun _ => ⟨fun ⟨Hs, h1, h2⟩ => ⟨Hs, h1, ?_⟩,
+    fun ⟨Hs, h1, h2⟩ => ⟨Hs, h1, ?_⟩⟩
+  · exact (kslotHistOkP_eager (fun j hj e hm => he _ _ (h1 j hj) e hm)).1 h2
+  · exact (kslotHistOkP_eager (fun j hj e hm => he _ _ (h1 j hj) e hm)).2 h2
+
+theorem dmaOkAtP_eager (rs : List RsvRegion) (S : Nat) (stk : List PAddr) (dyn : List KSlot) :
+    dmaOkAtP rs m lp S stk dyn ↔ dmaOkAt rs m S stk dyn := by
+  unfold dmaOkAtP dmaOkAt
+  refine and_congr Iff.rfl (imp_congr_right fun _ => forall_congr' fun a => forall_congr' fun H =>
+    forall_congr' fun e => forall_congr' fun hH => forall_congr' fun hm => imp_congr_right fun _ => ?_)
+  rw [HEnt.landedLe_eager lp S e (he a H hH e hm)]
+  simp
+
+theorem uSlotDiscAfterP_eager (T : Nat) (a : PAddr) (c : BitVec 64) :
+    uSlotDiscAfterP m lp T a c ↔ uSlotDiscAfter m T a c := by
+  unfold uSlotDiscAfterP uSlotDiscAfter
+  refine forall_congr' fun j => forall_congr' fun H => forall_congr' fun e => imp_congr_right fun _ =>
+    forall_congr' fun hH => forall_congr' fun hm => ?_
+  rw [HEnt.landedLe_eager lp T e (he _ H hH e hm)]
+  simp
+
+end eagerP
+
+theorem uslotHistOkP_eager {lp : LandPos} {K : Nat} {d : KSlot} {Hs : Nat → Hist}
+    (he : ∀ j, j < 8 → ∀ e ∈ Hs j, lp e.t = some e.t) : uslotHistOkP lp K d Hs ↔ uslotHistOk K d Hs := by
+  have hv : histWordAsOfP lp Hs K d.c ↔ histWordAsOf Hs K d.c := by
+    unfold histWordAsOfP histWordAsOf
+    exact forall_congr' fun j => imp_congr_right fun hj => by
+      dsimp only
+      rw [Hist.lview_eager lp (Hs j) (he j hj)]
+  unfold uslotHistOkP uslotHistOk
+  rw [hv]
+  refine and_congr Iff.rfl (and_congr Iff.rfl (forall_congr' fun j => forall_congr' fun hj =>
+    forall_congr' fun e => forall_congr' fun hm => imp_congr_left ?_))
+  rw [HEnt.landedLe_eager lp K e (he j hj e hm)]
+  simp
+
+theorem MState.kptStateOkDP_eager (σ : MState) (h : σ.okP) (he : σ.llog = List.range' 1 σ.top)
+    (rs : List RsvRegion) (ok : List KSlot → Prop) : kptStateOkDP rs ok σ ↔ kptStateOkD rs ok σ := by
+  have hm := σ.okP_eagerOn h he
+  unfold kptStateOkDP kptStateOkD
+  simp only [dmaOkAtP_eager hm, kptSealOkP_eager hm, kptHistsAtP_eager hm, kstkPageAtP,
+    FlatMem.lview_eagerOn σ.mem σ.lp hm, MState.ltop_eager σ he]
+
+theorem MState.uTextDiscAtP_eager (σ : MState) (h : σ.okP) (he : σ.llog = List.range' 1 σ.top) :
+    uTextDiscAtP σ ↔ uTextDiscAt σ := by
+  have hm := σ.okP_eagerOn h he
+  unfold uTextDiscAtP uTextDiscAt
+  refine forall_congr' fun c => forall_congr' fun r => imp_congr_right fun _ => imp_congr_right fun _ =>
+    forall_congr' fun a => forall_congr' fun v => imp_congr_right fun _ => imp_congr_right fun _ =>
+      forall_congr' fun j => imp_congr_right fun _ => forall_congr' fun H => forall_congr' fun hH =>
+        forall_congr' fun e => forall_congr' fun hme => ?_
+  rw [HEnt.landedLe_eager σ.lp _ e (hm _ H hH e hme)]
+  simp
+
+theorem MState.uPtDiscAtP_eager (σ : MState) (h : σ.okP) (he : σ.llog = List.range' 1 σ.top)
+    (rs : List RsvRegion) : uPtDiscAtP rs σ ↔ uPtDiscAt rs σ := by
+  have hm := σ.okP_eagerOn h he
+  unfold uPtDiscAtP uPtDiscAt
+  simp only [wordAsOfP, FlatMem.lview_eagerOn σ.mem σ.lp hm, uSlotDiscAfterP_eager hm]
+
+/-! #### Stability under a step / a landing -/
+
+/-- The seal's facts move with a route-P step (the seal stays at or below the landing top; every
+entry the step adds is not landed at or before it). -/
+theorem MState.stepGrowP_kptSealOkP {σ σ' : MState} (hs : σ.stepGrowP σ') {rs : List RsvRegion} {S : Nat}
+    {dyn : List KSlot} (h : kptSealOkP rs σ.mem σ.lp σ.ltop S dyn) : kptSealOkP rs σ'.mem σ'.lp σ'.ltop S dyn := by
+  obtain ⟨hS, hpub, hrest⟩ := h
+  refine ⟨Nat.le_trans hS hs.2.2.1, fun f w hf a ha H' hH' e he h0 => ?_, hrest⟩
+  rcases hs.2.2.2 a H' hH' e he with ⟨H, hH, he'⟩ | hnew
+  · rw [HEnt.landedLe_grow hs.2.1 hS]
+    exact hpub f w hf a ha H hH e he' h0
+  · exact HEnt.landedLe_mono σ'.lp hS e hnew
+
+/-- The sealed slots' disciplines move with a growth of the landing positions on the same memory
+(a landing). -/
+theorem kptHistsAtP_grow {m : FlatMem} {lp lp' : LandPos} {p S : Nat} (hg : LandPos.grow lp p lp') (hS : S ≤ p)
+    {dyn : List KSlot} (h : kptHistsAtP m lp S dyn) : kptHistsAtP m lp' S dyn :=
+  fun d hd => let ⟨Hs, h1, h2⟩ := h d hd; ⟨Hs, h1, kslotHistOkP_grow hg hS h2⟩
+
+/-- The DMA facts move with a route-P step that adds no disk entry. -/
+theorem MState.stepGrowP_dmaOkAtP {σ σ' : MState} (hs : σ.stepGrowP σ') {rs : List RsvRegion} {S : Nat}
+    (hS : S ≤ σ.ltop) {stk : List PAddr} {dyn : List KSlot}
+    (hnd : ∀ (a : PAddr) (H' : Hist) (e : HEnt), σ'.mem[a]? = some H' → e ∈ H' → NCPU ≤ e.tid →
+      ∃ H, σ.mem[a]? = some H ∧ e ∈ H)
+    (h : dmaOkAtP rs σ.mem σ.lp S stk dyn) : dmaOkAtP rs σ'.mem σ'.lp S stk dyn := by
+  refine ⟨fun a H' e hH' he hd => ?_, fun hne a H' e hH' he hd hl => ?_⟩
+  · obtain ⟨H, hH, he'⟩ := hnd a H' e hH' he hd
+    exact h.1 a H e hH he' hd
+  · obtain ⟨H, hH, he'⟩ := hnd a H' e hH' he hd
+    rw [HEnt.landedLe_grow hs.2.1 hS] at hl
+    exact h.2 hne a H e hH he' hd hl
+
+/-- **The route-P sealed-table fact is invariant under a LANDING** (the pure core of
+`interp_land` for the kpt conjunct's twin). -/
+theorem MState.kptStateOkDP_land (σ : MState) (cpu : CPU) (t : Nat) (h : σ.okP) (hok : σ.landOk cpu t)
+    {rs : List RsvRegion} {ok : List KSlot → Prop} (hk : kptStateOkDP rs ok σ) : kptStateOkDP rs ok (σ.land cpu t) := by
+  have hs := σ.stepGrowP_land cpu t h hok
+  obtain ⟨S, dyn, stk, hdma, hrest⟩ := hk
+  have hnd : ∀ (a : PAddr) (H' : Hist) (e : HEnt), (σ.land cpu t).mem[a]? = some H' → e ∈ H' → NCPU ≤ e.tid →
+      ∃ H, σ.mem[a]? = some H ∧ e ∈ H := fun a H' e hH' he _ => ⟨H', hH', he⟩
+  rcases hrest with ⟨h0, hc⟩ | ⟨hseal, hh, hokd, hstk⟩
+  · -- before the seal: `S` is free; pick it at the landing top
+    refine ⟨S, dyn, stk, ⟨hdma.1, fun hne => absurd h0 hne⟩, .inl ⟨h0, hc⟩⟩
+  · refine ⟨S, dyn, stk, MState.stepGrowP_dmaOkAtP hs hseal.1 hnd hdma, .inr ⟨MState.stepGrowP_kptSealOkP hs hseal,
+      kptHistsAtP_grow hs.2.1 hseal.1 hh, hokd, fun p => (hstk p).trans ?_⟩⟩
+    exact (MState.stepGrowP_kstkPageAtP hs hseal.1 p).symm
+
+theorem uslotHistOkP_grow {lp lp' : LandPos} {p K : Nat} (hg : LandPos.grow lp p lp') (hK : K ≤ p)
+    {d : KSlot} {Hs : Nat → Hist} (h : uslotHistOkP lp K d Hs) : uslotHistOkP lp' K d Hs := by
+  obtain ⟨hv, hw, hent⟩ := h
+  refine ⟨fun j hj => ?_, hw, fun j hj e he het => ?_⟩
+  · show ((Hist.lview lp' (Hs j)).find? _).map HEnt.v = _
+    rw [Hist.lview_find?_grow hg hK]
+    exact hv j hj
+  · rw [HEnt.landedLe_grow hg hK] at het
+    exact hent j hj e he het
+
+/-- **O1 (route P) is invariant under a landing**: every instruction view is at or below the
+landing top, so "landed at or before it" does not move. -/
+theorem MState.uTextDiscAtP_land (σ : MState) (cpu : CPU) (t : Nat) (h : σ.okP) (hu : uTextDiscAtP σ) :
+    uTextDiscAtP (σ.land cpu t) := by
+  intro c r hp hsat a v hsl htx j hj H hH e he
+  have hle : σ.itv c ≤ σ.ltop := (h.2.2.1 c).2.1
+  show e.landedLe (lpOf (σ.llog ++ [t])) (σ.itv c) = true
+  rw [HEnt.landedLe_grow (lpOf_snoc_grow σ.llog t) hle]
+  exact hu c r hp hsat a v hsl htx j hj H hH e he
+
+/-- **T4 (route P) is invariant under a landing.** -/
+theorem MState.uPtDiscAtP_land (σ : MState) (cpu : CPU) (t : Nat) (h : σ.okP) (hok : σ.landOk cpu t)
+    {rs : List RsvRegion} (hu : uPtDiscAtP rs σ) : uPtDiscAtP rs (σ.land cpu t) := by
+  have hs := σ.stepGrowP_land cpu t h hok
+  intro c r hp hsat hroot a v w hsl hw j H e hj hH he hl
+  have hle : σ.itv c ≤ σ.ltop := (h.2.2.1 c).2.1
+  have hw' : wordAsOfP σ.mem σ.lp a (σ.itv c) w := (MState.stepGrowP_wordAsOfP hs hle a w).1 hw
+  have hl' : e.landedLe σ.lp (σ.itv c) = false := by
+    rw [← HEnt.landedLe_grow hs.2.1 hle]; exact hl
+  exact hu c r hp hsat hroot a v w hsl hw' j H e hj hH he hl'
+
 /-- **The user-epoch conjunct** of era `E`'s interpretation. -/
 def uepModelAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) : IProp GF := iprop%
   ∃ ksat : Option (BitVec 44), uepKsatAt E ksat ∗ [∗list] h ∈ cpus, uepHartAt E σ ksat h

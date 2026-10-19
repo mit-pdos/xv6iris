@@ -42,6 +42,19 @@ def WEnt.visibleP (lp : LandPos) (h : Agent) (tv : Nat) (e : WEnt n) : Bool :=
 theorem WEnt.proj_visibleP (j : Nat) (lp : LandPos) (h : Agent) (tv : Nat) (e : WEnt n) :
     (e.proj j).visibleP lp h tv = e.visibleP lp h tv := rfl
 
+/-- Under eager landing a word entry landed at its own stamp is visible exactly when it is today. -/
+theorem WEnt.visibleP_eager (lp : LandPos) (h : Agent) (tv : Nat) (e : WEnt n) (he : lp e.t = some e.t) :
+    e.visibleP lp h tv = e.visible h tv := by
+  simp [WEnt.visibleP, WEnt.visible, he]
+
+/-- The read cases of a word history for a reader `h` at (landing) view `tvn` (route P, increment
+P-M4c; `MachCSL.ReadCases`'s twin over `WEnt.visibleP`): the first visible entry's value, or the
+initial value when none is visible. -/
+abbrev ReadCasesP (lp : LandPos) (W : WordHist n) (h : Agent) (tvn : Nat) (v0 w : BitVec (8 * n)) : Prop :=
+  (∃ W1 e W2, W = W1 ++ e :: W2 ∧ e.visibleP lp h tvn = true ∧ (∀ x ∈ W1, x.visibleP lp h tvn = false) ∧
+    w = e.v) ∨
+  ((∀ x ∈ W, x.visibleP lp h tvn = false) ∧ w = v0)
+
 /-- The byte histories of the word: `W`'s projections over the tails. -/
 def WordHist.hist (W : WordHist n) (Hold : Nat → Hist) (j : Nat) : Hist :=
   W.map (WEnt.proj j) ++ Hold j

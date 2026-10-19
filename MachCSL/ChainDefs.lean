@@ -1627,4 +1627,535 @@ theorem chainExAt_top {rs : List RsvRegion} {wit : List (PAddr × HEnt) → PAdd
   · exact .inr (.inr (.inl h))
   · exact .inr (.inr (.inr h))
 
+
+/-! ## Route P, increment P-M4a: the landed view's growth under every route-P step
+
+Today's as-of predicates and their `_grow` lemmas (`memGrow`/`memAbove`/`memGrowR` at the top)
+apply verbatim to the LANDED VIEW (`FlatMem.lview`, `MachCSL.TsoMem`) once a step is shown to
+grow the landed views above the landing top: `lviewGrows`, and per step `MState.stepGrowP`
+(the landed views and the landing positions grow above `σ.ltop`, the merged histories gain only
+entries not landed at or before it). -/
+
+/-- **The landed views grow above `p`** (route P): every history's landed view gains entries
+above `p` only, on top; a byte without a history before holds only entries above `p` in its
+landed view. -/
+def lviewGrows (lp : LandPos) (p : Nat) (m : FlatMem) (lp' : LandPos) (m' : FlatMem) : Prop :=
+  (∀ (a : PAddr) (H : Hist), m[a]? = some H → ∃ (H' N : Hist), m'[a]? = some H' ∧
+      Hist.lview lp' H' = N ++ Hist.lview lp H ∧ ∀ e ∈ N, p < e.t) ∧
+  (∀ (a : PAddr) (H' : Hist), m'[a]? = some H' → m[a]? = none → ∀ e ∈ Hist.lview lp' H', p < e.t)
+
+theorem lviewGrows_refl (lp : LandPos) (p : Nat) (m : FlatMem) : lviewGrows lp p m lp m :=
+  ⟨fun _ H h => ⟨H, [], h, rfl, fun _ he => by cases he⟩, fun _ _ h hn => by rw [hn] at h; cases h⟩
+
+theorem lviewGrows_trans {lp lp' lp'' : LandPos} {p : Nat} {m m' m'' : FlatMem}
+    (h1 : lviewGrows lp p m lp' m') (h2 : lviewGrows lp' p m' lp'' m'') : lviewGrows lp p m lp'' m'' := by
+  refine ⟨fun a H hH => ?_, fun a H'' hH'' hn => ?_⟩
+  · obtain ⟨H', N, hH', hv, hN⟩ := h1.1 a H hH
+    obtain ⟨H'', N', hH'', hv', hN'⟩ := h2.1 a H' hH'
+    refine ⟨H'', N' ++ N, hH'', by rw [hv', hv, List.append_assoc], fun e he => ?_⟩
+    rcases List.mem_append.1 he with he | he
+    · exact hN' e he
+    · exact hN e he
+  · cases hm' : m'[a]? with
+    | none => exact h2.2 a H'' hH'' hm'
+    | some H' =>
+      intro e he
+      obtain ⟨H3, N', hH3, hv', hN'⟩ := h2.1 a H' hm'
+      rw [hH''] at hH3
+      obtain rfl := Option.some.inj hH3
+      rw [hv'] at he
+      rcases List.mem_append.1 he with he | he
+      · exact hN' e he
+      · exact h1.2 a H' hm' hn e he
+
+/-- The landed views GROW above `p` (today's `memGrow`, of the views). -/
+theorem lviewGrows.grow {lp lp' : LandPos} {p : Nat} {m m' : FlatMem} (h : lviewGrows lp p m lp' m') :
+    memGrow (m.lview lp) p (m'.lview lp') := by
+  intro a L hL
+  obtain ⟨H, hH, rfl⟩ := FlatMem.lview_get?_eq_some hL
+  obtain ⟨H', N, hH', hv, hN⟩ := h.1 a H hH
+  exact ⟨N, by rw [FlatMem.lview_get?_some hH', hv], hN⟩
+
+/-- The landed views gain entries only above `p` (today's `memAbove`, of the views). -/
+theorem lviewGrows.above {lp lp' : LandPos} {p : Nat} {m m' : FlatMem} (h : lviewGrows lp p m lp' m') :
+    memAbove (m.lview lp) p (m'.lview lp') := by
+  intro a L' hL' e he hep
+  obtain ⟨H', hH', rfl⟩ := FlatMem.lview_get?_eq_some hL'
+  cases hm : m[a]? with
+  | none => exact absurd (h.2 a H' hH' hm e he) (by omega)
+  | some H =>
+    obtain ⟨H'', N, hH'', hv, hN⟩ := h.1 a H hm
+    rw [hH'] at hH''
+    obtain rfl := Option.some.inj hH''
+    rw [hv] at he
+    rcases List.mem_append.1 he with he | he
+    · exact absurd (hN e he) (by omega)
+    · exact ⟨Hist.lview lp H, FlatMem.lview_get?_some hm, he⟩
+
+/-- Every entry of the new landed views is old or above `p` (today's `memGrowR`, of the views). -/
+theorem lviewGrows.growR {lp lp' : LandPos} {p : Nat} {m m' : FlatMem} (h : lviewGrows lp p m lp' m') :
+    memGrowR (m.lview lp) p (m'.lview lp') := by
+  intro a L' hL' e he
+  obtain ⟨H', hH', rfl⟩ := FlatMem.lview_get?_eq_some hL'
+  cases hm : m[a]? with
+  | none => exact .inl (h.2 a H' hH' hm e he)
+  | some H =>
+    obtain ⟨H'', N, hH'', hv, hN⟩ := h.1 a H hm
+    rw [hH'] at hH''
+    obtain rfl := Option.some.inj hH''
+    rw [hv] at he
+    rcases List.mem_append.1 he with he | he
+    · exact .inl (hN e he)
+    · exact .inr ⟨Hist.lview lp H, FlatMem.lview_get?_some hm, he⟩
+
+/-- A change of the landing positions that moves no stamp of the memory moves no landed view. -/
+theorem lviewGrows_relabel (lp lp' : LandPos) (p : Nat) (m : FlatMem)
+    (h : ∀ (a : PAddr) (H : Hist), m[a]? = some H → ∀ e ∈ H, lp' e.t = lp e.t) : lviewGrows lp p m lp' m :=
+  ⟨fun a H hH => ⟨H, [], hH, Hist.lview_congr lp lp' H (h a H hH), fun _ he => by cases he⟩,
+    fun _ _ hH' hn => by rw [hn] at hH'; cases hH'⟩
+
+/-- A push of an entry pending or landed above `p` grows the landed views above `p`. -/
+theorem lviewGrows_push (lp : LandPos) (p : Nat) (m : FlatMem) (a : PAddr) (e : HEnt)
+    (he : ∀ x, e.atLanding lp = some x → p < x.t) : lviewGrows lp p m lp (m.push a e) := by
+  refine ⟨fun a' H hH => ?_, fun a' H' hH' hn => ?_⟩
+  · by_cases ha : a' = a
+    · subst ha
+      refine ⟨e :: H, (e.atLanding lp).toList, ?_, Hist.lview_cons lp e H, fun x hx => he x (by simpa using hx)⟩
+      rw [FlatMem.push_get?_eq, Std.ExtTreeMap.getD_eq_getD_getElem?, hH]
+      rfl
+    · exact ⟨H, [], by rw [FlatMem.push_get?_ne _ _ _ _ ha, hH], rfl, fun _ hx => by cases hx⟩
+  · by_cases ha : a' = a
+    · subst ha
+      rw [FlatMem.push_get?_eq, Std.ExtTreeMap.getD_eq_getD_getElem?, hn] at hH'
+      obtain rfl := Option.some.inj hH'
+      intro x hx
+      rw [Hist.lview_cons] at hx
+      simp only [Option.getD_none, Hist.lview_nil, List.append_nil] at hx
+      exact he x (by simpa using hx)
+    · rw [FlatMem.push_get?_ne _ _ _ _ ha, hn] at hH'; cases hH'
+
+/-- A landed insert of an entry landed above `p` grows the landed views above `p`. -/
+theorem lviewGrows_pushLanded (lp : LandPos) (p : Nat) (m : FlatMem) (a : PAddr) (e : HEnt) {q : Nat}
+    (he : lp e.t = some q) (hq : p < q) : lviewGrows lp p m lp (m.pushLanded lp a e) := by
+  refine ⟨fun a' H hH => ?_, fun a' H' hH' hn => ?_⟩
+  · by_cases ha : a' = a
+    · subst ha
+      refine ⟨Hist.insLanded lp e H, [⟨q, e.tid, e.v⟩], ?_, Hist.lview_insLanded lp e he H,
+        fun x hx => by simp at hx; rw [hx]; exact hq⟩
+      rw [FlatMem.pushLanded_get?_eq, Std.ExtTreeMap.getD_eq_getD_getElem?, hH]
+      rfl
+    · exact ⟨H, [], by rw [FlatMem.pushLanded_get?_ne _ _ _ _ _ ha, hH], rfl, fun _ hx => by cases hx⟩
+  · by_cases ha : a' = a
+    · subst ha
+      rw [FlatMem.pushLanded_get?_eq, Std.ExtTreeMap.getD_eq_getD_getElem?, hn] at hH'
+      obtain rfl := Option.some.inj hH'
+      intro x hx
+      rw [Option.getD_none, Hist.lview_insLanded lp e he [], Hist.lview_nil] at hx
+      simp at hx; rw [hx]; exact hq
+    · rw [FlatMem.pushLanded_get?_ne _ _ _ _ _ ha, hn] at hH'; cases hH'
+
+/-- A store whose stamp is pending, or landed above `p`, grows the landed views above `p`. -/
+theorem lviewGrows_writeBytes {n : Nat} (lp : LandPos) (p : Nat) (m : FlatMem) (pa : PAddr)
+    (w : BitVec (8 * n)) (t : Nat) (h : Agent) (ht : ∀ q, lp t = some q → p < q) :
+    lviewGrows lp p m lp (m.writeBytes pa n w t h) := by
+  unfold FlatMem.writeBytes
+  have key : ∀ (l : List Nat) (m : FlatMem), lviewGrows lp p m lp
+      (l.foldl (fun (m : FlatMem) j => m.push (pa + BitVec.ofNat 64 j) ⟨t, h, nthByte w j⟩) m) := by
+    intro l
+    induction l with
+    | nil => intro m; exact lviewGrows_refl lp p m
+    | cons j l ih =>
+      intro m
+      simp only [List.foldl_cons]
+      refine lviewGrows_trans (lviewGrows_push lp p m _ _ (fun x hx => ?_)) (ih _)
+      unfold HEnt.atLanding at hx
+      cases hq : lp t with
+      | none => simp only [hq, Option.map_none] at hx; cases hx
+      | some q =>
+        simp only [hq, Option.map_some, Option.some.injEq] at hx
+        rw [← hx]; exact ht q hq
+  exact key _ m
+
+/-- A write that lands at once, at `q > p`, grows the landed views above `p`. -/
+theorem lviewGrows_landBytes {n : Nat} (lp : LandPos) (p : Nat) (m : FlatMem) (pa : PAddr)
+    (w : BitVec (8 * n)) (t : Nat) (h : Agent) {q : Nat} (ht : lp t = some q) (hq : p < q) :
+    lviewGrows lp p m lp (m.landBytes lp pa n w t h) := by
+  unfold FlatMem.landBytes
+  have key : ∀ (l : List Nat) (m : FlatMem), lviewGrows lp p m lp
+      (l.foldl (fun (m : FlatMem) j => m.pushLanded lp (pa + BitVec.ofNat 64 j) ⟨t, h, nthByte w j⟩) m) := by
+    intro l
+    induction l with
+    | nil => intro m; exact lviewGrows_refl lp p m
+    | cons j l ih =>
+      intro m
+      simp only [List.foldl_cons]
+      exact lviewGrows_trans (lviewGrows_pushLanded lp p m _ _ ht hq) (ih _)
+  exact key _ m
+
+/-- A LANDING grows the landed views by the landed store's entries, at its new position. -/
+theorem lviewGrows_land (lp lp' : LandPos) (p : Nat) (m : FlatMem) (t q : Nat) (ht : lp t = none)
+    (ht' : lp' t = some q) (hother : ∀ s, s ≠ t → lp' s = lp s) (hq : p < q)
+    (hco : ∀ (a : PAddr) (H : Hist), m[a]? = some H → H.Pairwise (coAbove lp))
+    (hlow : ∀ (a : PAddr) (H : Hist), m[a]? = some H →
+      ∀ H1 e H2, H = H1 ++ e :: H2 → e.t = t → ∀ e' ∈ H2, (lp e'.t).isSome) :
+    lviewGrows lp p m lp' m := by
+  refine ⟨fun a H hH => ?_, fun _ _ hH' hn => by rw [hn] at hH'; cases hH'⟩
+  obtain ⟨N, hN, hNq⟩ := Hist.lview_land lp lp' t q ht ht' hother H (hco a H hH) (hlow a H hH)
+  exact ⟨H, N, hH, hN, fun x hx => by rw [hNq x hx]; exact hq⟩
+
+/-- `memNew` is transitive. -/
+theorem memNew_trans {m m' m'' : FlatMem} {P : PAddr → HEnt → Prop} (h1 : memNew m P m')
+    (h2 : memNew m' P m'') : memNew m P m'' := by
+  intro a H'' hH e he
+  rcases h2 a H'' hH e he with ⟨H', hH', he'⟩ | hp
+  · exact h1 a H' hH' e he'
+  · exact .inr hp
+
+theorem memNew_mono {m m' : FlatMem} {P Q : PAddr → HEnt → Prop} (h : memNew m P m')
+    (hPQ : ∀ a e, P a e → Q a e) : memNew m Q m' := by
+  intro a H' hH e he
+  rcases h a H' hH e he with h1 | h1
+  · exact .inl h1
+  · exact .inr (hPQ a e h1)
+
+/-- A write that lands at once adds only entries at its stamp. -/
+theorem memNew_landBytes {n : Nat} (m : FlatMem) (lp : LandPos) (pa : PAddr) (w : BitVec (8 * n))
+    (t : Nat) (h : Agent) : memNew m (fun _ e => e.t = t) (m.landBytes lp pa n w t h) := by
+  unfold FlatMem.landBytes
+  have key : ∀ (l : List Nat) (m : FlatMem), memNew m (fun _ e => e.t = t)
+      (l.foldl (fun (m : FlatMem) j => m.pushLanded lp (pa + BitVec.ofNat 64 j) ⟨t, h, nthByte w j⟩) m) := by
+    intro l
+    induction l with
+    | nil => intro m; exact memNew_refl m _
+    | cons j l ih =>
+      intro m
+      simp only [List.foldl_cons]
+      refine memNew_trans (fun a H' hH' x hx => ?_) (ih _)
+      by_cases ha : a = pa + BitVec.ofNat 64 j
+      · subst ha
+        rw [FlatMem.pushLanded_get?_eq] at hH'
+        obtain rfl := Option.some.inj hH'
+        unfold Hist.insLanded at hx
+        rw [Std.ExtTreeMap.getD_eq_getD_getElem?] at hx
+        rcases List.mem_append.1 hx with hx | hx
+        · cases hm : m[pa + BitVec.ofNat 64 j]? with
+          | none => rw [hm] at hx; simp at hx
+          | some H => rw [hm] at hx; exact .inl ⟨H, rfl, List.takeWhile_subset _ hx⟩
+        · rcases List.mem_cons.1 hx with rfl | hx
+          · exact .inr rfl
+          · cases hm : m[pa + BitVec.ofNat 64 j]? with
+            | none => rw [hm] at hx; simp at hx
+            | some H => rw [hm] at hx; exact .inl ⟨H, rfl, List.dropWhile_subset _ hx⟩
+      · rw [FlatMem.pushLanded_get?_ne _ _ _ _ _ ha] at hH'
+        exact .inl ⟨H', hH', hx⟩
+  exact key _ m
+
+/-! ### Per step -/
+
+/-- **A route-P step's effect on the readings by position**: the landed views and the landing
+positions grow above the landing top (which does not drop), and the merged histories gain only
+entries not landed at or before it. -/
+def MState.stepGrowP (σ σ' : MState) : Prop :=
+  lviewGrows σ.lp σ.ltop σ.mem σ'.lp σ'.mem ∧ LandPos.grow σ.lp σ.ltop σ'.lp ∧ σ.ltop ≤ σ'.ltop ∧
+    memNew σ.mem (fun _ e => e.landedLe σ'.lp σ.ltop = false) σ'.mem
+
+/-- `stepGrowP` over the fields it reads. -/
+theorem MState.stepGrowP_iff_fields (σ σ' : MState) : σ.stepGrowP σ' ↔
+    (lviewGrows (lpOf σ.llog) σ.llog.length σ.mem (lpOf σ'.llog) σ'.mem ∧
+      LandPos.grow (lpOf σ.llog) σ.llog.length (lpOf σ'.llog) ∧ σ.llog.length ≤ σ'.llog.length ∧
+      memNew σ.mem (fun _ e => e.landedLe (lpOf σ'.llog) σ.llog.length = false) σ'.mem) := Iff.rfl
+
+/-- A step that moves neither the memory nor the landing log. -/
+theorem MState.stepGrowP_of_eq (σ σ' : MState) (hm : σ'.mem = σ.mem) (hl : σ'.llog = σ.llog) :
+    σ.stepGrowP σ' := by
+  unfold MState.stepGrowP MState.lp MState.ltop
+  rw [hm, hl]
+  exact ⟨lviewGrows_refl _ _ _, LandPos.grow_refl _ _, Nat.le_refl _, memNew_refl _ _⟩
+
+theorem MState.stepGrowP_refl (σ : MState) : σ.stepGrowP σ := σ.stepGrowP_of_eq σ rfl rfl
+
+/-- Under the invariant the fresh stamp has not landed. -/
+theorem MState.okP_fresh (σ : MState) (h : σ.okP) : σ.lp (σ.top + 1) = none := by
+  have hll := h.2.2.2.2.1
+  show (if σ.top + 1 = 0 then some 0 else posIn (σ.top + 1) σ.llog 0) = none
+  rw [if_neg (by omega)]
+  exact posIn_none_of_not_mem _ _ 0 (fun hm => by have := hll _ hm; omega)
+
+/-- Under the invariant every history entry is at or below the issue top. -/
+theorem MState.okP_le_top (σ : MState) (h : σ.okP) (a : PAddr) (H : Hist) (hget : σ.mem[a]? = some H)
+    (e : HEnt) (he : e ∈ H) : e.t ≤ σ.top :=
+  ((h.1 a H hget).2 e he).1
+
+/-- Logging the fresh stamp moves no stamp of the memory. -/
+theorem MState.okP_lp_snoc (σ : MState) (h : σ.okP) (a : PAddr) (H : Hist) (hget : σ.mem[a]? = some H)
+    (e : HEnt) (he : e ∈ H) : lpOf (σ.llog ++ [σ.top + 1]) e.t = σ.lp e.t :=
+  lpOf_snoc_ne σ.llog (σ.top + 1) e.t (by have := σ.okP_le_top h a H hget e he; omega)
+
+/-- **An ISSUE** (route P): its entries are pending; no landed view and no landing position moves. -/
+theorem MState.stepGrowP_issue (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (h : σ.okP) : σ.stepGrowP (σ.issue cpu pa n w) := by
+  have hf := σ.okP_fresh h
+  refine ⟨lviewGrows_writeBytes σ.lp σ.ltop σ.mem pa w (σ.top + 1) (hartAgent cpu)
+      (fun q hq => by rw [hf] at hq; cases hq), LandPos.grow_refl _ _, Nat.le_refl _, ?_⟩
+  refine memNew_mono (memNew_writeBytes σ.mem pa w (σ.top + 1) (hartAgent cpu)) (fun a e he => ?_)
+  show e.landedLe σ.lp σ.ltop = false
+  rw [HEnt.landedLe, he.2.1, hf]
+  rfl
+
+/-- **A LANDING** (route P): the landed store enters the landed views on top, at the new landing
+top; nothing else moves. -/
+theorem MState.stepGrowP_land (σ : MState) (cpu : CPU) (t : Nat) (h : σ.okP) (hok : σ.landOk cpu t) :
+    σ.stepGrowP (σ.land cpu t) := by
+  obtain ⟨ep, hmem, -, hfoot⟩ := hok
+  obtain ⟨ht1, -, -, htl⟩ := (h.2.2.2.2.2.2.1 cpu t).1 ⟨ep, hmem⟩
+  have ht : σ.lp t = none := by
+    show (if t = 0 then some 0 else posIn t σ.llog 0) = none
+    rw [if_neg (by omega)]
+    exact posIn_none_of_not_mem _ _ 0 htl
+  refine ⟨?_, lpOf_snoc_grow σ.llog t, by simp [MState.ltop], memNew_refl _ _⟩
+  exact lviewGrows_land σ.lp (lpOf (σ.llog ++ [t])) σ.ltop σ.mem t (σ.llog.length + 1) ht
+    (lpOf_snoc_self σ.llog t (by omega) htl) (fun s hs => lpOf_snoc_ne σ.llog t s hs) (Nat.lt_succ_self _)
+    (fun a H hH => (h.1 a H hH).1)
+    (fun a H hH H1 e H2 hHe het => (hfoot a H hH ⟨e, by rw [hHe]; simp, het⟩).2 H1 e H2 hHe het)
+
+/-- The stamp a write that lands at once logs lands at the new landing top. -/
+theorem MState.okP_snoc_self (σ : MState) (h : σ.okP) :
+    lpOf (σ.llog ++ [σ.top + 1]) (σ.top + 1) = some (σ.ltop + 1) := by
+  have hll := h.2.2.2.2.1
+  exact lpOf_snoc_self σ.llog (σ.top + 1) (by omega) (fun hm => by have := hll _ hm; omega)
+
+/-- The common core of the writes that land at once: relabel to the new landing positions, then
+the landed insert. -/
+theorem MState.lviewGrows_landNow (σ : MState) (h : σ.okP) (m' : FlatMem)
+    (hm' : lviewGrows (lpOf (σ.llog ++ [σ.top + 1])) σ.ltop σ.mem (lpOf (σ.llog ++ [σ.top + 1])) m') :
+    lviewGrows σ.lp σ.ltop σ.mem (lpOf (σ.llog ++ [σ.top + 1])) m' :=
+  lviewGrows_trans (lviewGrows_relabel σ.lp _ σ.ltop σ.mem (fun a H hH e he => σ.okP_lp_snoc h a H hH e he)) hm'
+
+/-- **An EXCLUSIVE write** (route P): it lands at once, at the new landing top. -/
+theorem MState.stepGrowP_storeL (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (h : σ.okP) : σ.stepGrowP (σ.storeL cpu pa n w) := by
+  have hs := σ.okP_snoc_self h
+  refine ⟨σ.lviewGrows_landNow h _ (lviewGrows_landBytes _ σ.ltop σ.mem pa w (σ.top + 1) (hartAgent cpu) hs
+      (Nat.lt_succ_self _)), lpOf_snoc_grow σ.llog (σ.top + 1), by simp [MState.ltop], ?_⟩
+  refine memNew_mono (memNew_landBytes σ.mem _ pa w (σ.top + 1) (hartAgent cpu)) (fun a e he => ?_)
+  show e.landedLe (lpOf (σ.llog ++ [σ.top + 1])) σ.ltop = false
+  rw [HEnt.landedLe, he, hs]
+  simp
+
+/-- **A DMA write** (route P): it lands at once (a zero-byte one is the identity). -/
+theorem MState.stepGrowP_storeDmaL (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (h : σ.okP) : σ.stepGrowP (σ.storeDmaL pa n w) := by
+  by_cases hn : n = 0
+  · exact σ.stepGrowP_of_eq _ (by simp [hn]) (by simp [hn])
+  have hs := σ.okP_snoc_self h
+  have hm : (σ.storeDmaL pa n w).mem = σ.mem.landBytes (lpOf (σ.llog ++ [σ.top + 1])) pa n w (σ.top + 1)
+      diskAgent := by simp [hn]
+  have hl : (σ.storeDmaL pa n w).llog = σ.llog ++ [σ.top + 1] := by simp [hn]
+  rw [MState.stepGrowP_iff_fields, hm, hl]
+  refine ⟨σ.lviewGrows_landNow h _ (lviewGrows_landBytes _ σ.ltop σ.mem pa w (σ.top + 1) diskAgent hs
+      (Nat.lt_succ_self _)), lpOf_snoc_grow σ.llog (σ.top + 1), by simp, ?_⟩
+  refine memNew_mono (memNew_landBytes σ.mem _ pa w (σ.top + 1) diskAgent) (fun a e he => ?_)
+  show e.landedLe (lpOf (σ.llog ++ [σ.top + 1])) σ.llog.length = false
+  rw [HEnt.landedLe, he, hs]
+  simp
+
+/-- **The P-M2 machine's EAGER store** (issued and landed in one step): it lands at the new
+landing top, on top of the history. -/
+theorem MState.stepGrowP_store (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (excl : Bool) (h : σ.okP) : σ.stepGrowP (σ.store cpu pa n w excl) := by
+  have hs := σ.okP_snoc_self h
+  refine ⟨σ.lviewGrows_landNow h _ (lviewGrows_writeBytes _ σ.ltop σ.mem pa w (σ.top + 1) (hartAgent cpu)
+      (fun q hq => by rw [hs] at hq; obtain rfl := Option.some.inj hq; exact Nat.lt_succ_self _)),
+    lpOf_snoc_grow σ.llog (σ.top + 1), by simp [MState.ltop], ?_⟩
+  refine memNew_mono (memNew_writeBytes σ.mem pa w (σ.top + 1) (hartAgent cpu)) (fun a e he => ?_)
+  show e.landedLe (lpOf (σ.llog ++ [σ.top + 1])) σ.ltop = false
+  rw [HEnt.landedLe, he.2.1, hs]
+  simp
+
+/-- The P-M2 machine's eager DMA write. -/
+theorem MState.stepGrowP_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
+    (h : σ.okP) : σ.stepGrowP (σ.storeDma pa n w) := by
+  by_cases hn : n = 0
+  · exact σ.stepGrowP_of_eq _ (by simp [hn]) (by simp [hn])
+  have hs := σ.okP_snoc_self h
+  have hm : (σ.storeDma pa n w).mem = σ.mem.writeBytes pa n w (σ.top + 1) diskAgent := by simp [hn]
+  have hl : (σ.storeDma pa n w).llog = σ.llog ++ [σ.top + 1] := by simp [hn]
+  rw [MState.stepGrowP_iff_fields, hm, hl]
+  refine ⟨σ.lviewGrows_landNow h _ (lviewGrows_writeBytes _ σ.ltop σ.mem pa w (σ.top + 1) diskAgent
+      (fun q hq => by rw [hs] at hq; obtain rfl := Option.some.inj hq; exact Nat.lt_succ_self _)),
+    lpOf_snoc_grow σ.llog (σ.top + 1), by simp, ?_⟩
+  refine memNew_mono (memNew_writeBytes σ.mem pa w (σ.top + 1) diskAgent) (fun a e he => ?_)
+  show e.landedLe (lpOf (σ.llog ++ [σ.top + 1])) σ.llog.length = false
+  rw [HEnt.landedLe, he.2.1, hs]
+  simp
+
+/-- Steps compose (at a landing top that does not drop). -/
+theorem MState.stepGrowP_trans {σ σ' σ'' : MState} (h1 : σ.stepGrowP σ') (h2 : σ'.stepGrowP σ'') :
+    σ.stepGrowP σ'' := by
+  obtain ⟨g1, l1, t1, n1⟩ := h1
+  obtain ⟨g2, l2, t2, n2⟩ := h2
+  have l2' := LandPos.grow_mono l2 t1
+  refine ⟨lviewGrows_trans g1 ?_, LandPos.grow_trans l1 l2', Nat.le_trans t1 t2, ?_⟩
+  · -- the second step grows above `σ'.ltop ≥ σ.ltop`
+    refine ⟨fun a H hH => ?_, fun a H' hH' hn e he => ?_⟩
+    · obtain ⟨H', N, hH', hv, hN⟩ := g2.1 a H hH
+      exact ⟨H', N, hH', hv, fun e he => Nat.lt_of_le_of_lt t1 (hN e he)⟩
+    · exact Nat.lt_of_le_of_lt t1 (g2.2 a H' hH' hn e he)
+  · intro a H'' hH e he
+    rcases n2 a H'' hH e he with ⟨H', hH', he'⟩ | hp
+    · rcases n1 a H' hH' e he' with h0 | hp
+      · exact .inl h0
+      · right
+        show e.landedLe σ''.lp σ.ltop = false
+        rw [HEnt.landedLe_grow l2' (Nat.le_refl _)]
+        exact hp
+    · right
+      show e.landedLe σ''.lp σ.ltop = false
+      unfold HEnt.landedLe at hp ⊢
+      cases hq : σ''.lp e.t with
+      | none => rfl
+      | some r =>
+        rw [hq] at hp
+        simp only [Option.any_some, decide_eq_false_iff_not] at hp ⊢
+        omega
+
+/-! ### Agreement under EAGER landing (the bridges)
+
+Under eager landing (`σ.llog = List.range' 1 σ.top`: every issued stamp landed at itself --
+P-M1's `landedEager`, deleted from the invariant in P-M2, true of every state the P-M2 machine
+reaches) the landed view IS the memory and "landed at or before `p`" IS `e.t ≤ p`, so every
+route-P twin is today's reading. -/
+
+/-- Under the invariant and eager landing every entry landed at its own stamp. -/
+theorem MState.okP_eager_lp (σ : MState) (h : σ.okP) (he : σ.llog = List.range' 1 σ.top) (a : PAddr)
+    (H : Hist) (hget : σ.mem[a]? = some H) (e : HEnt) (hm : e ∈ H) : σ.lp e.t = some e.t := by
+  show lpOf σ.llog e.t = some e.t
+  rw [he, lpOf_range'_one, if_pos (σ.okP_le_top h a H hget e hm)]
+
+/-- **Under eager landing the landed view is the memory.** -/
+theorem MState.lview_eager (σ : MState) (h : σ.okP) (he : σ.llog = List.range' 1 σ.top) :
+    σ.mem.lview σ.lp = σ.mem := by
+  apply Std.ExtTreeMap.ext_getElem?
+  intro a
+  rw [FlatMem.lview_get?]
+  cases hget : σ.mem[a]? with
+  | none => rfl
+  | some H =>
+    rw [Option.map_some, Hist.lview_eager σ.lp H (fun e hm => σ.okP_eager_lp h he a H hget e hm)]
+
+/-- Under eager landing "landed at or before `p`" is `e.t ≤ p` for every history entry. -/
+theorem MState.landedLe_eager (σ : MState) (h : σ.okP) (he : σ.llog = List.range' 1 σ.top) (a : PAddr)
+    (H : Hist) (hget : σ.mem[a]? = some H) (e : HEnt) (hm : e ∈ H) (p : Nat) :
+    e.landedLe σ.lp p = decide (e.t ≤ p) :=
+  HEnt.landedLe_eager σ.lp p e (σ.okP_eager_lp h he a H hget e hm)
+
+/-- Under eager landing the landing top is the issue top. -/
+theorem MState.ltop_eager (σ : MState) (he : σ.llog = List.range' 1 σ.top) : σ.ltop = σ.top := by
+  show σ.llog.length = σ.top
+  rw [he, List.length_range']
+
+
+/-! ## Route P, increment P-M4b: the as-of family over the landed view
+
+Each twin is today's predicate of the LANDED VIEW (positions = landing positions); its stability
+under a route-P step is today's `_grow` lemma at the landed views (`MState.stepGrowP`). -/
+
+/-- Byte `a`'s entry as of landing position `p` (route P), relabeled to its landing position. -/
+abbrev FlatMem.entAsOfP (m : FlatMem) (lp : LandPos) (a : PAddr) (p : Nat) : Option HEnt :=
+  (m.lview lp).entAsOf a p
+
+/-- The reading as of `p` is the MERGED history's co-latest entry landed at or before `p`. -/
+theorem FlatMem.entAsOfP_eq (m : FlatMem) (lp : LandPos) (a : PAddr) (p : Nat) :
+    m.entAsOfP lp a p = (m[a]?).bind (fun H => (H.find? (HEnt.landedLe lp p)).bind (HEnt.atLanding lp)) := by
+  unfold FlatMem.entAsOfP FlatMem.entAsOf
+  rw [FlatMem.lview_get?]
+  cases m[a]? with
+  | none => rfl
+  | some H => exact Hist.lview_find?_le lp p H
+
+abbrev wordAsOfP (m : FlatMem) (lp : LandPos) (a : PAddr) (p : Nat) (v : BitVec 64) : Prop :=
+  wordAsOf (m.lview lp) a p v
+abbrev ptByteAtP (rs : List RsvRegion) (m : FlatMem) (lp : LandPos) (p : Nat) (a : PAddr) : Prop :=
+  ptByteAt rs (m.lview lp) p a
+abbrev ptByteLiveAtP (rs : List RsvRegion) (m : FlatMem) (lp : LandPos) (p : Nat) (a : PAddr) : Prop :=
+  ptByteLiveAt rs (m.lview lp) p a
+abbrev ptByteExAtP (rs : List RsvRegion) (m : FlatMem) (lp : LandPos) (p : Nat) (a : PAddr) : Prop :=
+  ptByteExAt rs (m.lview lp) p a
+abbrev kstkPageAtP (rs : List RsvRegion) (m : FlatMem) (lp : LandPos) (p : Nat) (q : PAddr) : Prop :=
+  kstkPageAt rs (m.lview lp) p q
+abbrev ksByteAtP (rs : List RsvRegion) (m : FlatMem) (lp : LandPos) (p : Nat) (a : PAddr) : Prop :=
+  ksByteAt rs (m.lview lp) p a
+abbrev racyValAtP (rs : List RsvRegion) (m : FlatMem) (lp : LandPos) (p : Nat) (a : PAddr) : Prop :=
+  racyValAt rs (m.lview lp) p a
+abbrev dynLkAtP (wit : List (PAddr × HEnt) → PAddr → Nat → Prop) (m : FlatMem) (lp : LandPos) (ltop : Nat)
+    (b : PAddr) (a : Nat) : Prop :=
+  dynLkAt wit (m.lview lp) ltop b a
+abbrev dynLkDiscAtP (rs : List RsvRegion) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop) (m : FlatMem)
+    (lp : LandPos) (ltop : Nat) (b : PAddr) (a : Nat) : Prop :=
+  dynLkDiscAt rs wit (m.lview lp) ltop b a
+abbrev chainExAtP (rs : List RsvRegion) (wit : List (PAddr × HEnt) → PAddr → Nat → Prop) (m : FlatMem)
+    (lp : LandPos) (ltop : Nat) (a : PAddr) (p : Nat) : Prop :=
+  chainExAt rs wit (m.lview lp) ltop a p
+
+section stepP
+variable {σ σ' : MState} (hs : σ.stepGrowP σ')
+include hs
+
+theorem MState.stepGrowP_entAsOfP {p : Nat} (hp : p ≤ σ.ltop) (a : PAddr) :
+    σ'.mem.entAsOfP σ'.lp a p = σ.mem.entAsOfP σ.lp a p :=
+  FlatMem.entAsOf_grow hs.1.grow hs.1.above hp a
+
+theorem MState.stepGrowP_wordAsOfP {p : Nat} (hp : p ≤ σ.ltop) (a : PAddr) (v : BitVec 64) :
+    wordAsOfP σ'.mem σ'.lp a p v ↔ wordAsOfP σ.mem σ.lp a p v :=
+  wordAsOf_grow hs.1.grow hs.1.above hp a v
+
+theorem MState.stepGrowP_ptByteAtP {rs : List RsvRegion} {p : Nat} (hp : p ≤ σ.ltop) (a : PAddr) :
+    ptByteAtP rs σ'.mem σ'.lp p a ↔ ptByteAtP rs σ.mem σ.lp p a :=
+  ptByteAt_grow hs.1.grow hs.1.above hp a
+
+theorem MState.stepGrowP_ptByteLiveAtP {rs : List RsvRegion} {p : Nat} (hp : p ≤ σ.ltop) (a : PAddr) :
+    ptByteLiveAtP rs σ'.mem σ'.lp p a ↔ ptByteLiveAtP rs σ.mem σ.lp p a :=
+  ptByteLiveAt_grow hs.1.grow hs.1.above hp a
+
+theorem MState.stepGrowP_ptByteExAtP {rs : List RsvRegion} {p : Nat} (hp : p ≤ σ.ltop) (a : PAddr) :
+    ptByteExAtP rs σ'.mem σ'.lp p a ↔ ptByteExAtP rs σ.mem σ.lp p a :=
+  ptByteExAt_grow hs.1.grow hs.1.above hp a
+
+theorem MState.stepGrowP_kstkPageAtP {rs : List RsvRegion} {p : Nat} (hp : p ≤ σ.ltop) (q : PAddr) :
+    kstkPageAtP rs σ'.mem σ'.lp p q ↔ kstkPageAtP rs σ.mem σ.lp p q :=
+  kstkPageAt_grow hs.1.grow hs.1.above hp q
+
+theorem MState.stepGrowP_ksByteAtP {rs : List RsvRegion} {p : Nat} (hp : p ≤ σ.ltop) (a : PAddr) :
+    ksByteAtP rs σ'.mem σ'.lp p a ↔ ksByteAtP rs σ.mem σ.lp p a :=
+  ksByteAt_grow hs.1.grow hs.1.above hp a
+
+theorem MState.stepGrowP_racyValAtP {rs : List RsvRegion} {p : Nat} (hp : p ≤ σ.ltop) (a : PAddr) :
+    racyValAtP rs σ'.mem σ'.lp p a ↔ racyValAtP rs σ.mem σ.lp p a :=
+  racyValAt_grow hs.1.grow hs.1.above hp a
+
+theorem MState.stepGrowP_dynLkAtP {wit : List (PAddr × HEnt) → PAddr → Nat → Prop} {b : PAddr} {a : Nat}
+    (h : dynLkAtP wit σ.mem σ.lp σ.ltop b a) : dynLkAtP wit σ'.mem σ'.lp σ'.ltop b a :=
+  dynLkAt_mono hs.1.grow hs.2.2.1 h
+
+theorem MState.stepGrowP_dynLkDiscAtP {rs : List RsvRegion} {wit : List (PAddr × HEnt) → PAddr → Nat → Prop}
+    {b : PAddr} {a : Nat} (h : dynLkDiscAtP rs wit σ.mem σ.lp σ.ltop b a) :
+    dynLkDiscAtP rs wit σ'.mem σ'.lp σ'.ltop b a :=
+  dynLkDiscAt_mono hs.1.grow hs.2.2.1 h
+
+theorem MState.stepGrowP_chainExAtP {rs : List RsvRegion} {wit : List (PAddr × HEnt) → PAddr → Nat → Prop}
+    (a : PAddr) {p : Nat} (hp : p ≤ σ.ltop) (h : chainExAtP rs wit σ.mem σ.lp σ.ltop a p) :
+    chainExAtP rs wit σ'.mem σ'.lp σ'.ltop a p :=
+  chainExAt_grow hs.1.grow hs.1.above hs.2.2.1 a p hp h
+
+theorem MState.stepGrowP_lockWinAtP {ptr : CPU → BitVec 64} {lk : PAddr} {p a : Nat} (ha : a ≤ σ.ltop)
+    (h : lockWinAtP ptr σ.mem σ.lp lk p a) : lockWinAtP ptr σ'.mem σ'.lp lk p a :=
+  lockWinAt_grow hs.1.grow ha h
+
+end stepP
+
+/-- Under the invariant and eager landing the memory is eager. -/
+theorem MState.okP_eagerOn (σ : MState) (h : σ.okP) (he : σ.llog = List.range' 1 σ.top) :
+    σ.mem.eagerOn σ.lp :=
+  fun a H hget e hm => σ.okP_eager_lp h he a H hget e hm
+
 end MachCSL
