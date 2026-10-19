@@ -46,9 +46,10 @@ at the raised instruction view `K`, whose receipt is handed out. -/
 theorem swp_sail_barrier_fencei (cpu : CPU) (P : IProp GF) (Q : Nat → IProp GF) (Φ : Unit → IProp GF) :
     ifenceStep cpu P Q ∗ P ∗ ▷ (∀ K, iviewLb cpu K -∗ Q K -∗ Φ ()) ⊢
       swp cpu (ArchSem.sail_barrier .Barrier_RISCV_i) Φ := by
-  unfold ArchSem.sail_barrier PreSail.sail_barrier PreSail.emit ifenceStep
+  unfold ifenceStep
   iintro ⟨Hs, HP, HΦ⟩
-  iapply swp_event cpu (.barrier .Barrier_RISCV_i) (fun v => FreeM.pure v) Φ (fun _ _ h => h)
+  iapply swp_event_at cpu (LeanRV64D.ArchSem.sail_barrier .Barrier_RISCV_i) (.barrier .Barrier_RISCV_i)
+    (fun (v : Unit) => FreeM.pure v) (sail_barrier_def _) Φ (fun _ _ h => h)
   iintro %σ Hσ
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
   iapply fupd_mask_intro LawfulSet.empty_subset
@@ -59,6 +60,7 @@ theorem swp_sail_barrier_fencei (cpu : CPU) (P : IProp GF) (Q : Nat → IProp GF
   inext
   iintro %v' %σ' %Hev
   obtain rfl := Hev
+  cases v'
   imod memModel_fence _ σ cpu .Barrier_RISCV_i $$ Hmm with ⟨Hmm, _⟩
   icases uic_memModel_iviewLb_get _ (σ.fence cpu .Barrier_RISCV_i) cpu $$ Hmm with ⟨Hmm, #Hiv⟩
   have h1 : (σ.fence cpu .Barrier_RISCV_i).tv cpu ≤ (σ.fence cpu .Barrier_RISCV_i).itv cpu := by
