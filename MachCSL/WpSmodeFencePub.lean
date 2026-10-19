@@ -99,10 +99,10 @@ itself written. -/
 theorem swp_sail_barrier_pub (cpu : CPU) (b : barrier_kind) (hdrain : fenceDrains b = true)
     (T : Nat) (Φ : Unit → IProp GF) :
     authoredBy T (hartAgent cpu) ∗ ▷ (viewLb cpu T -∗ Φ ())
-    ⊢ swp cpu (ArchSem.sail_barrier b) Φ := by
-  unfold ArchSem.sail_barrier PreSail.sail_barrier PreSail.emit
+    ⊢ swp cpu (LeanRV64D.ArchSem.sail_barrier b) Φ := by
   iintro ⟨#Hau, HΦ⟩
-  iapply swp_event cpu (.barrier b) (fun v => FreeM.pure v) Φ (fun _ _ h => h)
+  iapply swp_event_at cpu (LeanRV64D.ArchSem.sail_barrier b) (.barrier b) (fun (v : Unit) => FreeM.pure v)
+    (sail_barrier_def b) Φ (fun _ _ h => h)
   iintro %σ Hσ
   icases machInterp_acc_mem σ cpu $$ Hσ with ⟨Hregs, Hmem, Hmm, Hclose⟩
   iapply fupd_mask_intro LawfulSet.empty_subset
@@ -113,6 +113,7 @@ theorem swp_sail_barrier_pub (cpu : CPU) (b : barrier_kind) (hdrain : fenceDrain
   inext
   iintro %v' %σ' %Hev
   obtain rfl := Hev
+  cases v'
   imod memModel_fence_pub (MachGS.era (GF := GF)) σ cpu b hdrain T $$ Hau Hmm
     with ⟨Hmm, #Hv⟩
   imod Hmask
@@ -148,7 +149,6 @@ theorem execSpecF_fence_iorw_iorw_pub (cpu : CPU) (dq : DFrac) (c : MConf) (sie 
   · iexact Hau
   inext
   iintro #Hv
-  iapply swp_ret
   swp_run 80
   conf_intro HmConf
   iapply HΦ $$ HmConf HPC HnextPC [HF Hv]
