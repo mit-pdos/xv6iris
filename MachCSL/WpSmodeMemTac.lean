@@ -39,10 +39,12 @@ macro "load_file_S_proof" lem:ident hrd:term:max va:term:max n:num spl:term:max 
     iapply swp_rX_file
     iframe
     iintro HF
+    -- sail-riscv 0.16: `default_access_info` (effective privilege `Supervisor`,
+    -- no pointer masking: `swp_default_access_info_S`) runs inline here
     swp_run 150
     iapply swp_bind
     conf_intro HmConf
-    iapply (swp_transform_effective_address_S cpu dq c sie curTier root hok _ _ (Or.inr (Or.inl rfl)))
+    iapply (swp_transform_effective_address_S cpu dq c sie curTier root hok _)
     iframe HmConf
     inext
     iintro HmConf
@@ -114,10 +116,12 @@ macro "store_file_S_proof" lem:ident va:term:max n:num spl:term:max : tactic =>
     iapply swp_rX_file
     iframe
     iintro HF
+    -- sail-riscv 0.16: `default_access_info` (effective privilege `Supervisor`,
+    -- no pointer masking: `swp_default_access_info_S`) runs inline here
     swp_run 150
     iapply swp_bind
     conf_intro HmConf
-    iapply (swp_transform_effective_address_S cpu dq c sie curTier root hok _ _ (Or.inr (Or.inr (Or.inl rfl))))
+    iapply (swp_transform_effective_address_S cpu dq c sie curTier root hok _)
     iframe HmConf
     inext
     iintro HmConf
