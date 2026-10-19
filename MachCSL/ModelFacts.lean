@@ -306,7 +306,7 @@ open AmocasOddRegisterReservedBehavior
 @[sail_facts] theorem hartSupports_Ext_Zihpm : hartSupports extension.Ext_Zihpm = (true) := by
   rw [hartSupports.eq_def] <;> rfl
 
-@[sail_facts] theorem hartSupports_Ext_Zilx : hartSupports extension.Ext_Zilx = (((sys_enable_experimental_extensions ()) && (false : Bool))) := by
+@[sail_facts] theorem hartSupports_Ext_Zilx : hartSupports extension.Ext_Zilx = (((sys_enable_experimental_extensions ()) && (true : Bool))) := by
   rw [hartSupports.eq_def] <;> rfl
 
 @[sail_facts] theorem hartSupports_Ext_Zimop : hartSupports extension.Ext_Zimop = (true) := by
@@ -603,7 +603,7 @@ open AmocasOddRegisterReservedBehavior
 @[sail_facts] theorem hartSupports_Ext_Svrsw60t59b : hartSupports extension.Ext_Svrsw60t59b = (true) := by
   rw [hartSupports.eq_def] <;> rfl
 
-@[sail_facts] theorem hartSupports_Ext_Svukte : hartSupports extension.Ext_Svukte = (((sys_enable_experimental_extensions ()) && ((false : Bool) && (xlen == 64)))) := by
+@[sail_facts] theorem hartSupports_Ext_Svukte : hartSupports extension.Ext_Svukte = (((sys_enable_experimental_extensions ()) && ((true : Bool) && (xlen == 64)))) := by
   rw [hartSupports.eq_def] <;> rfl
 
 @[sail_facts] theorem hartSupports_Ext_Svvptc : hartSupports extension.Ext_Svvptc = (true) := by

@@ -2293,7 +2293,7 @@ def hartSupports (merge_var : extension) : Bool :=
   | .Ext_Zihintntl => true
   | .Ext_Zihintpause => true
   | .Ext_Zihpm => true
-  | .Ext_Zilx => ((sys_enable_experimental_extensions ()) && (false : Bool))
+  | .Ext_Zilx => ((sys_enable_experimental_extensions ()) && (true : Bool))
   | .Ext_Zimop => true
   | .Ext_Zmmul => false
   | .Ext_Zaamo => false
@@ -2398,7 +2398,7 @@ def hartSupports (merge_var : extension) : Bool :=
   | .Ext_Svnapot => ((true : Bool) && (xlen == 64))
   | .Ext_Svpbmt => ((true : Bool) && (xlen == 64))
   | .Ext_Svrsw60t59b => true
-  | .Ext_Svukte => ((sys_enable_experimental_extensions ()) && ((false : Bool) && (xlen == 64)))
+  | .Ext_Svukte => ((sys_enable_experimental_extensions ()) && ((true : Bool) && (xlen == 64)))
   | .Ext_Svvptc => true
   | .Ext_Smcntrpmf => true
   | .Ext_Smdbltrp => false
@@ -5084,7 +5084,7 @@ def misaligned_exception_is_access_fault (e : (Option misaligned_exception)) : B
 def plat_misaligned_access : GlobalMisalignedExceptions :=
   { load_store := none
     vector := none
-    amo := none
+    amo := (some AccessFault)
     lrsc := (some AccessFault) }
 
 def undefined_CSRBitConfig (_ : Unit) : SailM CSRBitConfig := do

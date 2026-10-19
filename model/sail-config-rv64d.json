@@ -19,7 +19,9 @@
 //   3. The extensions upstream added after the previous pin, off because they are not part of the
 //      machine the proofs are about and would widen the decoder's U-mode image for nothing:
 //      H (and the H-dependent Sha, Shcounterenw, Shgatpa, Shtvala, Shvsatpa, Shvstvala, Shvstvecd),
-//      Sdtrig (its code is compiled in: `sys` requires the module), Zilx, Svukte.
+//      Sdtrig (its code is compiled in: `sys` requires the module).  (Zilx and Svukte, also new,
+//      stay at upstream's default: they are experimental, and `Xv6Extras`'s
+//      `sys_enable_experimental_extensions = false` already disables them.)
 //   4. the RAM region's `size` := 0x8000000 (128 MiB), matching xv6's PHYSTOP.
 //   5. `base.medeleg.delegatable_bits` := 0x…000c_b3FF (the previous pin's value): 0.16's default
 //      0x…00fc_b7FF adds the hypervisor exceptions 10 and 20-23, which the model's own
@@ -27,13 +29,17 @@
 //   6. `extensions.Stateen.mstateen0.CONTEXT` := "CSRBit_ReadOnlyZero": the bit's feature (Sdtrig's
 //      scontext/hcontext) is unsupported with Sdtrig off, and `config_is_valid` requires the bits
 //      of unsupported features to be read-only zero (`check_stateen_config`).
+//   7. `memory.misaligned.exceptions.amo` := {"Some": "AccessFault"} (upstream default
+//      {"None": null}), kept from before the bump: a misaligned AMO always faults on the modelled
+//      platform (see the comment at the field).
 // Everything else is unmodified sail-riscv 0.16 default config -- INCLUDING one default that
 // changed since the previous pin and is accepted: `platform.clint.size` 0xC000 (was 0xC0000).
 //
 // To refresh after a sail-riscv bump: resolve the new config/config.json.in with the cmake values
-// above, re-apply the four edits (tools/../local-plan/model-bump/patches has the script that did
-// it for 0.16), diff against the previous file, and re-check the two load-bearing fields
-// `memory.physaddr_bits` (56) and `memory.misaligned.exceptions`.  After ANY extension flip,
+// above, re-apply the deviations listed above (each marked "xv6iris" inline), and diff against
+// the previous file field by field -- a deviation is easily lost silently (the first 0.16 refresh
+// dropped item 7) -- re-checking the two load-bearing fields `memory.physaddr_bits` (56) and
+// `memory.misaligned.exceptions`.  notes/model-diffs.md lists every deviation from upstream.  After ANY extension flip,
 // re-check validity: `sail_riscv_sim --config <file> --validate-config`, and in the tree the
 // cold-boot proof evaluates `init_model`'s `config_is_valid` assert (MachCSL/BootInitModel.lean).
 //
@@ -189,6 +195,7 @@
       // not exist.
       "delegatable_bits": {
         "len": 64,
+        // xv6iris: the pre-0.16 value (upstream default: 0x...00fc_b7FF adds H's exceptions) -- deviation 5
         "value": "0x0000_0000_000c_b3FF"
       }
     },
@@ -367,8 +374,16 @@
         },
         // Similarly, a misaligned AMO and LR/SC can be configured with the same
         // option values.
+        //
+        // xv6iris: DEVIATION from the upstream template, which defaults this to
+        // {"None": null} (deviation 7 in the header, kept from before the 0.16
+        // bump).  The template this project was originally generated from offered
+        // no such option -- a misaligned AMO always faulted -- so that is the
+        // platform this development models, and the proofs (the user tier's
+        // misaligned-AMO arms) are about it.  Taking upstream's default would
+        // change the modelled hardware, not just the model.
         "amo": {
-          "None": null
+          "Some": "AccessFault"
         },
         "lrsc": {
           "Some": "AccessFault"
@@ -501,6 +516,7 @@
         },
         "size": {
           "len": 64,
+          // xv6iris: 128 MiB (upstream default: 0x80000000 = 2 GiB), matching xv6's PHYSTOP -- deviation 4
           "value": "0x8000000"
         },
         "attributes": {
@@ -582,6 +598,7 @@
     // purposes. See docs/SimpleInterruptGenerator.md for details.
     "simple_interrupt_generator": {
       // Whether the platform contains this device.
+      // xv6iris: false (upstream default: true) -- deviation 1 (its MMIO window collides with the PLIC), see the header
       "supported": false,
       // If supported, this must be in a suitable IO memory region (see `memory.regions`)
       // and 4-byte aligned. The size is always 0x20.  If not supported, this can be left
@@ -699,6 +716,7 @@
       // For e.g. Zve32x and Zve32f require `elen_exp` >= 5,
       // Zve64x, Zve64f, and Zve64d require `elen_exp` >= 6,
       // and V requires `elen_exp` >= 6 and `vlen_exp` >= 7.
+      // xv6iris: "Disabled" (upstream default: "Full") -- deviation 2, see the header
       "support_level": "Disabled",
       // mutable_misa only applies if support_level is set to Full
       "mutable_misa": true,
@@ -743,6 +761,7 @@
       }
     },
     "B": {
+      // xv6iris: false (upstream default: true) -- deviation 2, see the header
       "supported": false,
       "mutable_misa": true
     },
@@ -767,6 +786,7 @@
       "mutable_misa": true
     },
     "H": {
+      // xv6iris: false (upstream default: true) -- deviation 3, see the header
       "supported": false,
       "mutable_misa": true,
       // GEILEN, the number of guest external interrupts. The maximum is XLEN-1.
@@ -870,7 +890,7 @@
       "supported": true
     },
     "Zilx": {
-      "supported": false
+      "supported": true
     },
     "Zimop": {
       "supported": true
@@ -999,54 +1019,69 @@
       "supported": false
     },
     "Zvabd": {
+      // xv6iris: false (upstream default: true) -- depends on V, deviation 2
       "supported": false
     },
     "Zvfbfmin": {
+      // xv6iris: false (upstream default: true) -- depends on V, deviation 2
       "supported": false
     },
     "Zvfbfwma": {
+      // xv6iris: false (upstream default: true) -- depends on V, deviation 2
       "supported": false
     },
     "Zvfh": {
+      // xv6iris: false (upstream default: true) -- depends on V, deviation 2
       "supported": false
     },
     "Zvfhmin": {
+      // xv6iris: false (upstream default: true) -- depends on V, deviation 2
       "supported": false
     },
     "Zvbb": {
+      // xv6iris: false (upstream default: true) -- depends on V, deviation 2
       "supported": false
     },
     "Zvbc": {
+      // xv6iris: false (upstream default: true) -- depends on V, deviation 2
       "supported": false
     },
     "Zvkb": {
       "supported": false
     },
     "Zvkg": {
+      // xv6iris: false (upstream default: true) -- depends on V, deviation 2
       "supported": false
     },
     "Zvkned": {
+      // xv6iris: false (upstream default: true) -- depends on V, deviation 2
       "supported": false
     },
     "Zvknha": {
+      // xv6iris: false (upstream default: true) -- depends on V, deviation 2
       "supported": false
     },
     "Zvknhb": {
+      // xv6iris: false (upstream default: true) -- depends on V, deviation 2
       "supported": false
     },
     "Zvksed": {
+      // xv6iris: false (upstream default: true) -- depends on V, deviation 2
       "supported": false
     },
     "Zvksh": {
+      // xv6iris: false (upstream default: true) -- depends on V, deviation 2
       "supported": false
     },
     "Zvkt": {
+      // xv6iris: false (upstream default: true) -- depends on V, deviation 2
       "supported": false
     },
     "Ssccptr": {
       "supported": true
     },
     "Sdtrig": {
+      // xv6iris: false (upstream default: true; compiled in, `sys` requires it) -- deviation 3, see the header
       "supported": false,
       // The number of supported triggers.  This has to be
       // non-negative, and greater than 0 if Sdtrig is supported.  The
@@ -1139,9 +1174,11 @@
     // Enabling Sha requires H, Ssstateen, Shcounterenw, Shgatpa, Shtvala,
     // Shvsatpa, Shvstvala and Shvstvecd.
     "Sha": {
+      // xv6iris: false (upstream default: true) -- depends on H, deviation 3
       "supported": false
     },
     "Shcounterenw": {
+      // xv6iris: false (upstream default: true) -- depends on H, deviation 3
       "supported": false
     },
     "Sscounterenw": {
@@ -1150,14 +1187,17 @@
     // Enabling Shvsatpa requires that every mode supported in `satp` is also
     // supported in `vsatp` (under `extensions.H.vsatp_modes`).
     "Shvsatpa": {
+      // xv6iris: false (upstream default: true) -- depends on H, deviation 3
       "supported": false
     },
     // Enabling Shvstvala requires that the exceptions specified in the
     // extension have their appropriate settings under `base.xtval_nonzero`.
     "Shvstvala": {
+      // xv6iris: false (upstream default: true) -- depends on H, deviation 3
       "supported": false
     },
     "Shvstvecd": {
+      // xv6iris: false (upstream default: true) -- depends on H, deviation 3
       "supported": false
     },
     "Ssstrict": {
@@ -1169,9 +1209,11 @@
     // Enabling Shgatpa requires an `hgatp` SvNNx4 mode (under
     // `extensions.H.hgatp_modes`) for every SvNN mode supported in `satp`.
     "Shgatpa": {
+      // xv6iris: false (upstream default: true) -- depends on H, deviation 3
       "supported": false
     },
     "Shtvala": {
+      // xv6iris: false (upstream default: true) -- depends on H, deviation 3
       "supported": false
     },
     // Enabling Sstvala requires that the exceptions specified in the extension
@@ -1200,7 +1242,7 @@
       "supported": true
     },
     "Svukte": {
-      "supported": false
+      "supported": true
     },
     "Ssnpm": {
       "supported": true,
@@ -1261,6 +1303,7 @@
       "mstateen0": {
         "SE0": "CSRBit_Writable",
         "ENVCFG": "CSRBit_Writable",
+        // xv6iris: read-only zero (upstream default: writable; Sdtrig's context is unsupported) -- deviation 6
         "CONTEXT": "CSRBit_ReadOnlyZero",
         "P1P13": "CSRBit_ReadOnlyZero",
         "SRMCFG": "CSRBit_Writable",

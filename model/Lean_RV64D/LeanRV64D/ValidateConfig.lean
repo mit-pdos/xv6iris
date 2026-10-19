@@ -477,7 +477,7 @@ def check_mmu_config (_ : Unit) : SailM Bool := do
     then (valid && (require_Sv39 "Svnapot"))
     else valid
   let valid : Bool :=
-    if ((false : Bool) : Bool)
+    if ((true : Bool) : Bool)
     then (valid && (require_Sv39 "Svukte"))
     else valid
   let valid ← (( do
@@ -1828,7 +1828,7 @@ def check_extension_param_constraints (_ : Unit) : Bool :=
         if ((misaligned_exception_is_access_fault
              ({ load_store := none
                 vector := none
-                amo := none
+                amo := (some AccessFault)
                 lrsc := (some AccessFault) } : GlobalMisalignedExceptions).load_store) : Bool)
         then
           (let valid : Bool := false
@@ -1840,7 +1840,7 @@ def check_extension_param_constraints (_ : Unit) : Bool :=
       if ((misaligned_exception_is_access_fault
            ({ load_store := none
               vector := none
-              amo := none
+              amo := (some AccessFault)
               lrsc := (some AccessFault) } : GlobalMisalignedExceptions).vector) : Bool)
       then
         (let valid : Bool := false
