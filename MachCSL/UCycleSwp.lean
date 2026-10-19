@@ -367,7 +367,7 @@ theorem wpLoop_ucStep :
     ⊢ wpLoop (GF := GF) cpu := by
   iintro H
   iapply wpLoop_restart
-  iintro %tick
+  iintro %tick %ew
   ispecialize H $$ %tick
   inext
   iapply swp_wpHart

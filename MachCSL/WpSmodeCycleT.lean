@@ -85,7 +85,7 @@ theorem wpLoop_sT_base (cpu : CPU) (c c' : MConf) (hok : SConfPhys (GF := GF) c 
     clockCells_cases _ $$ Hclock
   ihave ⟨HPC, HnextPC⟩ := pcIs_cases _ _ $$ Hpc
   iapply wpLoop_restart
-  iintro %tick
+  iintro %tick %ew
   inext
   unfold riscvStep
   iapply swp_wpHart
@@ -152,7 +152,7 @@ theorem wpLoop_sT_rvc (cpu : CPU) (c c' : MConf) (hok : SConfPhys (GF := GF) c f
     clockCells_cases _ $$ Hclock
   ihave ⟨HPC, HnextPC⟩ := pcIs_cases _ _ $$ Hpc
   iapply wpLoop_restart
-  iintro %tick
+  iintro %tick %ew
   inext
   unfold riscvStep
   iapply swp_wpHart

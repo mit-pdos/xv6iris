@@ -96,7 +96,7 @@ theorem wpLoop_wait_wfi (cpu : CPU) (p : Privilege)
   ihave ⟨%mi, %minstret, %mcycle, %mtime, %mip, Hminstret_increment, Hminstret, Hmcycle, Hmtime, Hmip⟩ :=
     clockCells_cases _ $$ Hclock
   iapply wpLoop_restart
-  iintro %tick
+  iintro %tick %ew
   inext
   unfold riscvStep
   iapply swp_wpHart
@@ -174,7 +174,7 @@ theorem wpLoop_s_wfi_cycle [CurCtx] (cpu : CPU) (c : MConf) (tier : KTier) (root
     clockCells_cases _ $$ Hclock
   ihave ⟨HPC, HnextPC⟩ := pcIs_cases _ _ $$ Hpc
   iapply wpLoop_restart
-  iintro %tick
+  iintro %tick %ew
   inext
   unfold riscvStep
   iapply swp_wpHart
