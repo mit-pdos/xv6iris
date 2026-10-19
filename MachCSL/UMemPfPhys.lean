@@ -6,7 +6,8 @@ MachCSL: **a prefetch's `translateAddr` front and physical check at User**
 * the front (`ume_pf_translateAddr_ok/_err/_noncanon`): UTranslate's
   composition at the prefetch kind -- a prefetch is no shadow-stack access,
   and its translation faults are the model's table (`umePfTexc`, the load /
-  store / fetch fault of the prefetch's kind);
+  store / fetch fault of the prefetch's kind), reported since sail-riscv 0.16 as
+  an exception context (`umePfCtx`) by `translateAddr` at the access's privilege (User);
 * the check (`ume_pf_phys_check`): at a 64-byte-aligned RAM block, xv6's
   PMP entry 0 grants the prefetch (`R`/`W`/`X` all set) and the RAM PMA
   region answers (the prefetch writes nothing; any answer does).
@@ -44,56 +45,64 @@ theorem ume_texc_pf (c : cbop_zicbop) (f : PTW_Error) :
     translationException (umoPf c) f = (pure (umePfTexc c f) : SailM ExceptionType) := by
   cases c <;> cases f <;> rfl
 
-set_option hygiene false in
-/-- The front of `translateAddr` at User for a prefetch, up to the canonical
-check (UTranslate's `utr_front` at the prefetch kind). -/
-macro "ume_pf_front" hp:term:max c:term:max : tactic => `(tactic| (
-  obtain ⟨hms, hcpD, hsatp, hcp, ⟨hsxl, hmprv⟩, ⟨hmode, hasid⟩⟩ := $hp
-  unfold translateAddr
-  rw [ume_ssa_pf $c]
-  sail_norm
-  simp only [runRW_bind, utr_readReg _ _ _ _ hms, utr_readReg _ _ _ _ hcpD, Option.bind_some, hcp,
-    utr_effPriv _ _ _ hmprv, runRW_pure, utr_translationMode_U _ _ _ hms hsatp hsxl hmode]
-  sail_norm
-  simp only [utr_width39]
-  sail_norm
-  simp only [runRW_bind, utr_readReg _ _ _ _ hsatp, Option.bind_some, runRW_pure, utr_assert_true,
-    utr_get_satp39]))
+/-- The prefetch's translation fault as the exception context sail-riscv 0.16's
+`translateAddr` reports (`build_exception_context` at a non-virtual access: the fault, the
+address, nothing else; `UTranslate.utrCtx` at the prefetch kind). -/
+def umePfCtx (c : cbop_zicbop) (va : BitVec 64) (f : PTW_Error) : ExceptionContext :=
+  { trap := umePfTexc c f, excinfo_is_gva := false, excinfo := va, excinfo2 := none, excinst := none,
+    excinst_offset := 0#5, ext := none }
 
-/-- **A prefetch's `translateAddr`, canonical `va`**: `translate`'s walk,
-mapped (a page at `va`'s offset, or the prefetch's fault). -/
+/-- The back of the front for a prefetch (`UTranslate.utrBack` at the prefetch kind). -/
+def umePfBack (c : cbop_zicbop) (va : BitVec 64) :
+    Result (BitVec 44 × page_based_mem_type × Unit) (PTW_Error × Unit) →
+      Result (physaddr × page_based_mem_type × Unit) (ExceptionContext × Unit)
+  | .Ok (ppn, pbmt, e) => .Ok (.Physaddr (paOf ppn va), pbmt, e)
+  | .Err (f, e) => .Err (umePfCtx c va f, e)
+
+/-- **A prefetch's `translateAddr` at User, canonical `va`**: `translate`'s walk,
+mapped (a page at `va`'s offset, or the prefetch's fault) -- UTranslate's
+`utr_translateAddr_canon` at the prefetch kind (no shadow-stack access; its own fault table). -/
 theorem ume_pf_translateAddr_canon (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UtrPins D s) (va : BitVec 64)
     (c : cbop_zicbop) (hc : utrCanon va) :
-    runRW D orc s (translateAddr (.Virtaddr va) (umoPf c)) =
-      (runRW D orc s (utrTranslate s va (umoPf c))).map (fun r =>
-        ((match r.1 with
-          | .Ok (ppn, pbmt, e) => .Ok (.Physaddr (paOf ppn va), pbmt, e)
-          | .Err (f, e) => .Err (umePfTexc c f, e) :
-            Result (physaddr × page_based_mem_type × Unit) (ExceptionType × Unit)), r.2.1, r.2.2)) := by
+    runRW D orc s (translateAddr (.Virtaddr va) (umoPf c) .User) =
+      (runRW D orc s (utrTranslate s va (umoPf c))).map (fun r => (umePfBack c va r.1, r.2.1, r.2.2)) := by
+  obtain ⟨hms, hcpD, hsatp, hcp, ⟨hsxl, hmprv⟩, ⟨hmode, hasid⟩, hmisa, hsenv, hmenv, hS, hukte⟩ := hp
   unfold utrCanon at hc
-  ume_pf_front hp c
-  simp only [hc, bne_self_eq_false, Bool.false_eq_true, ite_false]
+  unfold translateAddr
+  rw [ume_ssa_pf c]
   sail_norm
-  simp only [runRW_bind, utr_readReg D _ _ _ hms, Option.bind_some,
-    satp_to_asid_of _ hasid, satp_to_ppn_of _ _ rfl, utr_vpn]
-  simp only [utrTranslate, utrRoot, utrMxr, utrSum]
+  simp only [runRW_bind, utr_translationMode_U D _ _ hms hsatp hmisa hS hsxl hmode, Option.bind_some,
+    utr_svukte D _ _ (umoPf c) hcpD hcp hsenv hmenv hukte, Bool.false_and, Bool.false_eq_true, ite_false]
+  sail_norm
+  unfold translate_vs_stage translate_stage
+  sail_norm
+  simp only [runRW_bind, utr_translationMode_U D _ _ hms hsatp hmisa hS hsxl hmode, Option.bind_some,
+    utr_width39]
+  sail_norm
+  simp only [utr_validate va hc, utr_get_asid_S, utr_get_vmid_S, utr_get_mxr_S, utr_get_sum_S,
+    utr_xatp_to_ppn_S]
+  sail_norm
+  simp only [runRW_bind, Option.bind_some, utr_readReg D _ _ _ hsatp, utr_readReg D _ _ _ hms,
+    satp_to_asid_of _ hasid, satp_to_ppn_of _ _ rfl, utr_vpn39]
+  simp only [utrTranslate, utrRoot, utrMxr, utrSum, init_ext_ptw]
   generalize runRW D orc s _ = R
   rcases R with _ | ⟨⟨⟨ppn, pbmt, e⟩ | ⟨f, e⟩, s', o'⟩⟩
   · rfl
-  · simp only [Option.bind_some, Option.map_some]
+  · simp only [Option.bind_some, Option.map_some, runRW_pure]
     sail_norm
-    simp only [runRW_pure, Option.bind_some, paOf]
+    simp only [runRW_pure, umePfBack, paOf, utr_off12]
     rfl
-  · simp only [Option.bind_some, Option.map_some]
+  · simp only [Option.bind_some, Option.map_some, runRW_pure]
     sail_norm
+    unfold build_exception_context
     simp only [ume_texc_pf c]
     sail_norm
-    simp only [runRW_pure, Option.bind_some]
+    simp only [runRW_pure, umePfBack, umePfCtx]
 
 theorem ume_pf_translateAddr_ok (D : UFoot) (orc orc' : UOrc) (s s' : UWSt) (hp : UtrPins D s) (va : BitVec 64)
     (c : cbop_zicbop) (hc : utrCanon va) (ppn : BitVec 44) (pbmt : page_based_mem_type)
     (htr : runRW D orc s (utrTranslate s va (umoPf c)) = some (.Ok (ppn, pbmt, ()), s', orc')) :
-    runRW D orc s (translateAddr (.Virtaddr va) (umoPf c)) =
+    runRW D orc s (translateAddr (.Virtaddr va) (umoPf c) .User) =
       some (.Ok (.Physaddr (paOf ppn va), pbmt, ()), s', orc') := by
   rw [ume_pf_translateAddr_canon D orc s hp va c hc, htr]
   rfl
@@ -101,7 +110,7 @@ theorem ume_pf_translateAddr_ok (D : UFoot) (orc orc' : UOrc) (s s' : UWSt) (hp 
 theorem ume_pf_translateAddr_err (D : UFoot) (orc orc' : UOrc) (s s' : UWSt) (hp : UtrPins D s) (va : BitVec 64)
     (c : cbop_zicbop) (hc : utrCanon va) (f : PTW_Error)
     (htr : runRW D orc s (utrTranslate s va (umoPf c)) = some (.Err (f, ()), s', orc')) :
-    runRW D orc s (translateAddr (.Virtaddr va) (umoPf c)) = some (.Err (umePfTexc c f, ()), s', orc') := by
+    runRW D orc s (translateAddr (.Virtaddr va) (umoPf c) .User) = some (.Err (umePfCtx c va f, ()), s', orc') := by
   rw [ume_pf_translateAddr_canon D orc s hp va c hc, htr]
   rfl
 
@@ -109,18 +118,28 @@ theorem ume_pf_translateAddr_err (D : UFoot) (orc orc' : UOrc) (s s' : UWSt) (hp
 nothing moves. -/
 theorem ume_pf_translateAddr_noncanon (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UtrPins D s) (va : BitVec 64)
     (c : cbop_zicbop) (hc : ¬ utrCanon va) :
-    runRW D orc s (translateAddr (.Virtaddr va) (umoPf c)) =
-      some (.Err (umePfTexc c (.PTW_Invalid_Addr ()), ()), s, orc) := by
+    runRW D orc s (translateAddr (.Virtaddr va) (umoPf c) .User) =
+      some (.Err (umePfCtx c va (.PTW_Invalid_Addr ()), ()), s, orc) := by
+  obtain ⟨hms, hcpD, hsatp, hcp, ⟨hsxl, hmprv⟩, ⟨hmode, hasid⟩, hmisa, hsenv, hmenv, hS, hukte⟩ := hp
   unfold utrCanon at hc
-  ume_pf_front hp c
-  have hb : (va != BitVec.signExtend 64 (BitVec.extractLsb' 0 39 va)) = true := by
-    simp only [bne_iff_ne, ne_eq]
-    exact fun h => hc h.symm
-  simp only [hb, ite_true]
+  unfold translateAddr
+  rw [ume_ssa_pf c]
   sail_norm
+  simp only [runRW_bind, utr_translationMode_U D _ _ hms hsatp hmisa hS hsxl hmode, Option.bind_some,
+    utr_svukte D _ _ (umoPf c) hcpD hcp hsenv hmenv hukte, Bool.false_and, Bool.false_eq_true, ite_false]
+  sail_norm
+  unfold translate_vs_stage translate_stage
+  sail_norm
+  simp only [runRW_bind, utr_translationMode_U D _ _ hms hsatp hmisa hS hsxl hmode, Option.bind_some,
+    utr_width39]
+  sail_norm
+  simp only [utr_validate_noncanon va hc]
+  simp only [runRW_pure, Option.bind_some]
+  sail_norm
+  unfold build_exception_context
   simp only [ume_texc_pf c]
   sail_norm
-  rfl
+  simp only [runRW_pure, umePfCtx]
 
 /-! ## §2 The physical check -/
 
@@ -164,7 +183,7 @@ theorem ume_pmpCheck_pf (D : UFoot) (orc : UOrc) (s : UWSt) (addr : BitVec 64) (
   sail_norm
   simp only [ume_pmpCheckRWX_pf c]
   sail_norm
-  simp only [runRW_pure, Option.bind_some]
+  simp only [runRW_pure]
 
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
